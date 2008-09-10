@@ -39,6 +39,7 @@
 #include <sys/uuid.h>
 #include <limits.h>
 #include <pthread.h>
+#include <libintl.h>
 #include <mms_list.h>
 #include <mms_parser.h>
 #include <mms_cores.h>
@@ -47,7 +48,8 @@
 #include <mms_trace.h>
 #include <mms_strapp.h>
 #include <mms_cfg.h>
-#include <lm_msg_cat.h>
+#include <mms_cat.h>
+#include <mms_lm_msg.h>
 #include <lm_cmd_fmt.h>
 
 #ifdef	__cplusplus

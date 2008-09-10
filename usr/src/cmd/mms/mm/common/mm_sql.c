@@ -1512,8 +1512,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	return;
 
 }
@@ -2959,8 +2959,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	return (1);
 
 }
@@ -3885,8 +3885,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	return;
 
 }

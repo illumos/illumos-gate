@@ -744,9 +744,8 @@ lm_handle_parser_error(mms_par_node_t *cmd, mms_list_t *err_list)
 	lm_serr(MMS_CRIT, "lm_handle_parser_error: Parser syntax error "
 	    "on LMPM %s command from MM", mms_pn_token(root));
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7005_MSG, mms_pn_token(root),
-	    mms_pn_token(root));
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7005_MSG, "cmd", mms_pn_token(root), NULL);
 	(void) snprintf(rsp_str, sizeof (rsp_str),
 	    LM_UNACC_RESP, msg_str);
 	if (lm_write_msg(rsp_str, &lm.lm_mms_conn, lm_write_mutex)) {

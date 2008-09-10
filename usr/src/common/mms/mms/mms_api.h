@@ -213,7 +213,7 @@ int mms_agoodbye(void *, int);
 void *mms_api_reader(void *);
 void *mms_api_writer(void *);
 
-void mms_send_errmsg(mms_session_t *sp, const char *, int, ...);
+void mms_send_errmsg(mms_session_t *sp, int msgid, ...);
 int mms_handle_err_rsp(void *, int *, int *, char **);
 
 int mms_send_cmd(void *, char *, void **);

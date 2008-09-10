@@ -147,10 +147,8 @@ lm_queue_clean()
 		}
 		mms_trace(MMS_DEBUG, "lm_queue_clean: Aborting %s command",
 		    lm_cmdData[ce->lmqe_cindex].cmd);
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7027_MSG,
-		    lm_cmdData[ce->lmqe_cindex].cmd,
-		    lm_cmdData[ce->lmqe_cindex].cmd);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7027_MSG, "cmd", lm_cmdData[ce->lmqe_cindex].cmd, NULL);
 		(void) snprintf(rsp_str, sizeof (rsp_str),
 		    LM_ERR_FINAL, ce->lmqe_tid,
 		    mms_sym_code_to_str(MMS_INTERNAL),

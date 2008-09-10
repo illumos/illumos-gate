@@ -104,26 +104,25 @@ lm_handle_acs_cmd_error(STATUS status, char *cmd, char *tid, char *msg)
 			    "command to MM.");
 		lm_state = LM_DISCONNECTED;
 			/* Send message to operator indicating issue */
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7203_MSG, acs_status(status),
-		    acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7203_MSG, "status", acs_status(status), NULL);
 				/* No need to check return status */
 		lm_message("operator", "alert", msg_str);
 			/* Create error message for LMPM command */
 		code = MMS_LM_E_DEVCOMMERR;
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7225_MSG, cmd, acs_status(status),
-		    cmd, acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7225_MSG, "cmd", cmd, "status", acs_status(status),
+		    NULL);
 	} else if (status == STATUS_PROCESS_FAILURE) {
 		code = MMS_LM_E_DEVCMD;
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7227_MSG, cmd, acs_status(status),
-		    cmd, acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7227_MSG, "cmd", cmd, "status", acs_status(status),
+		    NULL);
 	} else {
 		code = MMS_LM_E_INTERNAL;
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7229_MSG, cmd, acs_status(status),
-		    cmd, acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7229_MSG, "cmd", cmd, "status", acs_status(status),
+		    NULL);
 	}
 
 	(void) snprintf(msg, RMBUFSIZE,
@@ -186,26 +185,25 @@ char *msg)
 			    "command to MM.");
 		lm_state = LM_DISCONNECTED;
 			/* Send message to operator indicating issue */
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7203_MSG, acs_status(status),
-		    acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7203_MSG, "status", acs_status(status), NULL);
 				/* No need to check return status */
 		lm_message("operator", "alert", msg_str);
 			/* Create error message for LMPM command */
 		code = MMS_LM_E_DEVCOMMERR;
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7226_MSG, cmd, acsls, acs_status(status),
-		    cmd, acsls, acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7226_MSG, "cmd", cmd, "acsls", acsls,
+		    "status", acs_status(status), NULL);
 	} else if (status == STATUS_PROCESS_FAILURE) {
 		code = MMS_LM_E_DEVCMD;
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7228_MSG, cmd, acsls, acs_status(status),
-		    cmd, acsls, acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7228_MSG, "cmd", cmd, "acsls", acsls,
+		    "status", acs_status(status), NULL);
 	} else {
 		code = MMS_LM_E_INTERNAL;
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7230_MSG, cmd, acsls, acs_status(status),
-		    cmd, acsls, acs_status(status));
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7230_MSG, "cmd", cmd, "acsls", acsls,
+		    "status", acs_status(status), NULL);
 	}
 
 	(void) snprintf(msg, RMBUFSIZE,
@@ -244,9 +242,9 @@ char *cmd, char *tid, char *msg)
 
 	char msg_str[1024];
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7208_MSG, cmd, acsls, acs_status(status), cmd,
-	    acsls, acs_status(status));
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7208_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", acs_status(status), NULL);
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(class),
 	    mms_sym_code_to_str(code), msg_str);
@@ -291,8 +289,8 @@ char *cart, int panel, char *acsls, char *cmd, char *tid, char *msg)
 			/* Send alert message to operator indicating */
 			/* that a drive was found to be offline in */
 			/* ACSLS library */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7210_MSG, drive, serialnum, drive, serialnum);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7210_MSG, "drive", drive, "geom", serialnum, NULL);
 	lm_message("operator", "alert", msg_str);
 
 			/* Generate LMPL config drive command to update */
@@ -334,9 +332,9 @@ char *cart, int panel, char *acsls, char *cmd, char *tid, char *msg)
 	}
 
 			/* Generate error response for LMPM command */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7208_MSG, cmd, acsls, "STATUS_DRIVE_OFFLINE", cmd,
-	    acsls, "STATUS_DRIVE_OFFLINE");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7208_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", "STATUS_DRIVE_OFFLINE", NULL);
 
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_STATE),
@@ -380,8 +378,8 @@ char *cart, int panel, char *acsls, char *cmd, char *tid, char *msg)
 
 			/* Send alert message to operator indicating */
 			/* that a drive was not found in ACSLS library */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7219_MSG, drive, serialnum, drive, serialnum);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7219_MSG, "drive", drive, "geom", serialnum, NULL);
 	lm_message("operator", "alert", msg_str);
 
 			/* Generate LMPL config drive command to update */
@@ -425,9 +423,9 @@ char *cart, int panel, char *acsls, char *cmd, char *tid, char *msg)
 	}
 
 			/* Generate error response for LMPM command */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7208_MSG, cmd, acsls, "STATUS_DRIVE_NOT_IN_LIBRARY",
-	    cmd, acsls, "STATUS_DRIVE_NOT_IN_LIBRARY");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7208_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", "STATUS_DRIVE_NOT_IN_LIBRARY", NULL);
 
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_STATE),
@@ -471,9 +469,8 @@ char *cart, int panel, char *acsls, char *cmd, char *tid, char *msg)
 			/* Send alert message to operator indicating */
 			/* that a drive was found to be empty in the */
 			/* ACSLS library */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7220_MSG, cart, drive, serialnum,
-	    cart, drive, serialnum);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7220_MSG, "cart", cart, "drive", drive, "geom", serialnum, NULL);
 	lm_message("operator", "alert", msg_str);
 
 			/* Generate LMPL config drive command to update */
@@ -512,8 +509,8 @@ char *cart, int panel, char *acsls, char *cmd, char *tid, char *msg)
 		lm_remove_lmpl_cmd(lmpl_tid, ele);
 	}
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7215_MSG, cmd, drive, cart, cmd, drive, cart);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7215_MSG, "cmd", cmd, "drive", drive, "cart", cart, NULL);
 
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_STATE),
@@ -541,6 +538,7 @@ static void
 lm_handle_lsm_offline(int lsm, char *acsls, char *cmd, char *tid, char *msg)
 {
 	char	msg_str[1024];
+	char	buf[30];
 
 			/* If only one lsm in library set state of */
 			/* library to broken */
@@ -557,13 +555,14 @@ lm_handle_lsm_offline(int lsm, char *acsls, char *cmd, char *tid, char *msg)
 			/* Send alert message to operator indicating */
 			/* that the lsm is set to offline on the */
 			/* ACSLS server */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7211_MSG, lm.lm_acs, lsm, lm.lm_acs, lsm);
+	(void) snprintf(buf, sizeof (buf), "%d,%d", lm.lm_acs, lsm);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7211_MSG, "lsm", buf, NULL);
 	lm_message("operator", "alert", msg_str);
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7208_MSG, cmd, acsls, "STATUS_LSM_OFFLINE",
-	    cmd, acsls, "STATUS_LSM_OFFLINE");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7208_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", "STATUS_LSM_OFFLINE", NULL);
 
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_STATE),
@@ -602,15 +601,14 @@ lm_handle_database_error(char *acsls, char *cmd, char *tid, char *msg)
 
 			/* Send alert message to operator indicating */
 			/* that the ACSLS database is generating an error */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7207_MSG, "STATUS_DATABASE_ERROR", acsls,
-	    "STATUS_DATABASE_ERROR", acsls);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7207_MSG,
+	    "status", "STATUS_DATABASE_ERROR", "acsls", acsls, NULL);
 	lm_message("operator", "alert", msg_str);
 
 			/* Create error response for LMPM command */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7208_MSG, cmd, acsls, "STATUS_DATABASE_ERROR",
-	    cmd, acsls, "STATUS_DATABASE_ERROR");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7208_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", "STATUS_DATABASE_ERROR", NULL);
 
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_INTERNAL),
@@ -651,15 +649,14 @@ lm_handle_configuration_error(char *acsls, char *cmd, char *tid, char *msg)
 			/* Send alert message to operator indicating */
 			/* that the ACSLS server has a configuration */
 			/* issue */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7207_MSG, "STATUS_CONFIGURATION_ERROR", acsls,
-	    "STATUS_CONFIGURATION_ERROR", acsls);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7207_MSG,
+	    "status", "STATUS_CONFIGURATION_ERROR", "acsls", acsls, NULL);
 	lm_message("operator", "alert", msg_str);
 
 			/* Create error response for LMPM command */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7208_MSG, cmd, acsls, "STATUS_CONFIGURATION_ERROR",
-	    cmd, acsls, "STATUS_CONFIGURATION_ERROR");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7208_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", "STATUS_CONFIGURATION_ERROR", NULL);
 
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_INTERNAL),
@@ -706,30 +703,30 @@ lm_handle_library_not_available(char *acsls, char *cmd, char *tid, char *msg)
 			srv_sp = &srv_qp->srv_status[0];
 				/* Send alert message to operator with */
 				/* state of server */
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7202_MSG, acs_state(srv_sp->state),
-			    acs_state(srv_sp->state));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7202_MSG, "state", acs_state(srv_sp->state),
+			    NULL);
 			lm_message("operator", "alert", msg_str);
 
 				/* Create error response with state of server */
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7200_MSG, cmd, acsls,
-			    acs_state(srv_sp->state), cmd,
-			    acsls, acs_state(srv_sp->state));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7200_MSG, "cmd", cmd, "acsls", acsls,
+			    "state", acs_state(srv_sp->state), NULL);
 		} else {
 				/* Send alert message to operator without */
 				/* state of server */
-			(void) snprintf(msg_str, sizeof (msg_str), LM_7206_MSG);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7206_MSG, NULL);
 			lm_message("operator", "alert", msg_str);
 
 				/* Create error response without the state */
 				/* of the server */
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7201_MSG, cmd, acsls, cmd, acsls);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7201_MSG, "cmd", cmd, "acsls", acsls, NULL);
 		}
 	} else {
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7201_MSG, cmd, acsls, cmd, acsls);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7201_MSG, "cmd", cmd, "acsls", acsls, NULL);
 	}
 
 	(void) snprintf(msg, RMBUFSIZE,
@@ -744,9 +741,9 @@ char *msg)
 
 	char msg_str[1024];
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7232_MSG, cmd, acsls, acs_status(status), cmd,
-	    acsls, acs_status(status));
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7232_MSG, "cmd", cmd, "acsls", acsls,
+	    "status", acs_status(status), NULL);
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(MMS_INTERNAL),
 	    mms_sym_code_to_str(MMS_LM_E_INTERNAL), msg_str);
@@ -763,8 +760,8 @@ lm_handle_query_vol_error(STATUS status, char *cmd, char *tid, char *msg)
 
 	switch (status) {
 		case STATUS_AUDIT_IN_PROGRESS:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7204_MSG, cmd, cmd);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7204_MSG, "cmd", cmd, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_RETRY),
@@ -772,13 +769,13 @@ lm_handle_query_vol_error(STATUS status, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_COMMAND_ACCESS_DENIED:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7222_MSG, "acs_query_volume",
-			    "acs_query_volume");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7222_MSG, "acsls", "acs_query_volume", NULL);
 			lm_message("operator", "alert", msg_str);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7205_MSG, cmd, "acs_query_volume",
-			    cmd, "acs_query_volume");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7205_MSG, "cmd", cmd,
+			    "acsls", "acs_query_volume",
+			    NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_STATE),
@@ -796,10 +793,9 @@ lm_handle_query_vol_error(STATUS status, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_PROCESS_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7221_MSG, "acs_query_volume",
-			    acs_status(status), "acs_query_volume",
-			    acs_status(status));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7221_MSG, "acsls", "acs_query_volume",
+			    "status", acs_status(status), NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_DEVCOMMERR;
@@ -839,8 +835,8 @@ lm_handle_query_mount_error(STATUS status, char *cmd, char *tid, char *msg)
 
 	switch (status) {
 		case STATUS_AUDIT_IN_PROGRESS:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7204_MSG, cmd, cmd);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7204_MSG, "cmd", cmd, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_RETRY),
@@ -848,13 +844,13 @@ lm_handle_query_mount_error(STATUS status, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_COMMAND_ACCESS_DENIED:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7222_MSG, "acs_query_mount",
-			    "acs_query_mount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7222_MSG, "acsls", "acs_query_mount", NULL);
 			lm_message("operator", "alert", msg_str);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7205_MSG, cmd, "acs_query_mount",
-			    cmd, "acs_query_mount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7205_MSG, "cmd", cmd,
+			    "acsls", "acs_query_mount",
+			    NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_STATE),
@@ -872,10 +868,9 @@ lm_handle_query_mount_error(STATUS status, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_PROCESS_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7221_MSG, "acs_query_mount",
-			    acs_status(status), "acs_query_mount",
-			    acs_status(status));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7221_MSG, "acsls", "acs_query_mount",
+			    "status", acs_status(status), NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_DEVCOMMERR;
@@ -913,11 +908,12 @@ char *geometry, int lsm, int panel, char *cmd, char *tid, char *msg)
 	int	code;
 
 	char	msg_str[512];
+	char	nbuf[20];
 
 	switch (status) {
 		case STATUS_AUDIT_IN_PROGRESS:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7204_MSG, cmd, cmd);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7204_MSG, "cmd", cmd, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_RETRY),
@@ -925,12 +921,12 @@ char *geometry, int lsm, int panel, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_COMMAND_ACCESS_DENIED:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7222_MSG, "acs_mount", "acs_mount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7222_MSG, "acsls", "acs_mount", NULL);
 			lm_message("operator", "alert", msg_str);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7205_MSG, cmd, "acs_mount",
-			    cmd, "acs_mount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7205_MSG, "cmd", cmd,
+			    "acsls", "acs_mount", NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_STATE),
@@ -949,18 +945,18 @@ char *geometry, int lsm, int panel, char *cmd, char *tid, char *msg)
 
 		case STATUS_LIBRARY_BUSY:
 		case STATUS_PROCESS_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7221_MSG, "acs_mount",
-			    acs_status(status), "acs_mount",
-			    acs_status(status));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7221_MSG, "acsls", "acs_mount",
+			    "status", acs_status(status), NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_DEVCOMMERR;
 			break;
 
 		case STATUS_ACS_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7217_MSG, lm.lm_acs, lm.lm_acs);
+			(void) snprintf(nbuf, sizeof (nbuf), "%d", lm.lm_acs);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7217_MSG, "acs", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -968,9 +964,10 @@ char *geometry, int lsm, int panel, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_LSM_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7218_MSG, lm.lm_acs, 0,
-			    lm.lm_acs, 0);
+			(void) snprintf(nbuf, sizeof (nbuf),
+			    "%d,%d", lm.lm_acs, 0);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7218_MSG, "lsm", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1002,8 +999,8 @@ char *geometry, int lsm, int panel, char *cmd, char *tid, char *msg)
 			break;
 
 		case STATUS_LIBRARY_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7209_MSG, "acs_mount", "acs_mount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7209_MSG, "acsls", "acs_mount", NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_LIBRARY;
@@ -1060,11 +1057,12 @@ char *geometry, char *cart, int lsm, int panel, char *cmd, char *tid, char *msg)
 	int	code;
 
 	char	msg_str[512];
+	char	nbuf[20];
 
 	switch (status) {
 		case STATUS_AUDIT_IN_PROGRESS:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7204_MSG, cmd, cmd);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7204_MSG, "cmd", cmd, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_RETRY),
@@ -1072,12 +1070,13 @@ char *geometry, char *cart, int lsm, int panel, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_COMMAND_ACCESS_DENIED:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7222_MSG, "acs_dismount", "acs_dismount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7222_MSG, "acsls", "acs_dismount", NULL);
 			lm_message("operator", "alert", msg_str);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7205_MSG, cmd, "acs_dismount",
-			    cmd, "acs_dismount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7205_MSG, "cmd", cmd,
+			    "acsls", "acs_dismount",
+			    NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_STATE),
@@ -1085,8 +1084,9 @@ char *geometry, char *cart, int lsm, int panel, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_ACS_FULL:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7216_MSG, cmd, lm.lm_acs, cmd, lm.lm_acs);
+			(void) snprintf(nbuf, sizeof (nbuf), "%d", lm.lm_acs);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7216_MSG, "cmd", cmd, "acs", nbuf, NULL);
 			lm_message("operator", "alert", msg_str);
 
 			class = MMS_STATE;
@@ -1115,18 +1115,18 @@ char *geometry, char *cart, int lsm, int panel, char *cmd, char *tid, char *msg)
 
 		case STATUS_LIBRARY_BUSY:
 		case STATUS_PROCESS_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7221_MSG, "acs_dismount",
-			    acs_status(status), "acs_dismount",
-			    acs_status(status));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7221_MSG, "acsls", "acs_dismount",
+			    "status", acs_status(status), NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_DEVCOMMERR;
 			break;
 
 		case STATUS_ACS_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7217_MSG, lm.lm_acs, lm.lm_acs);
+			(void) snprintf(nbuf, sizeof (nbuf), "%d",  lm.lm_acs);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7217_MSG, "acs", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1134,8 +1134,10 @@ char *geometry, char *cart, int lsm, int panel, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_LSM_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7218_MSG, lm.lm_acs, 0, lm.lm_acs, 0);
+			(void) snprintf(nbuf, sizeof (nbuf),
+			    "%d,%d", lm.lm_acs, 0);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7218_MSG, "lsm", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1165,8 +1167,8 @@ char *geometry, char *cart, int lsm, int panel, char *cmd, char *tid, char *msg)
 			return;
 
 		case STATUS_LIBRARY_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7209_MSG, "acs_dismount", "acs_dismount");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7209_MSG, "acsls", "acs_dismount", NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_LIBRARY;
@@ -1226,12 +1228,13 @@ char *msg)
 	int	code;
 
 	char	msg_str[512];
+	char	nbuf[20];
 
 	switch (status) {
 
 		case STATUS_CAP_IN_USE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7212_MSG, cap, cap);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7212_MSG, "cap", cap, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_RETRY),
@@ -1239,8 +1242,8 @@ char *msg)
 			return;
 
 		case STATUS_CAP_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7117_MSG, cap, cap);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7117_MSG, "port", cap, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INVALID),
@@ -1248,8 +1251,8 @@ char *msg)
 			return;
 
 		case STATUS_CAP_OFFLINE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7214_MSG, cap, "enter", cap, "enter");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7214_MSG, "cap", cap, "acsls", "enter", NULL);
 			lm_message("operator", "alert", msg_str);
 
 			class = MMS_STATE;
@@ -1261,8 +1264,8 @@ char *msg)
 			return;
 
 		case STATUS_INCORRECT_CAP_MODE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7213_MSG, cap, cap);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7213_MSG, "cap", cap, NULL);
 			lm_message("operator", "alert", msg_str);
 
 			(void) snprintf(msg, RMBUFSIZE,
@@ -1272,12 +1275,12 @@ char *msg)
 			return;
 
 		case STATUS_COMMAND_ACCESS_DENIED:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7222_MSG, "acs_enter", "acs_enter");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7222_MSG, "acsls", "acs_enter", NULL);
 			lm_message("operator", "alert", msg_str);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7205_MSG, cmd, "acs_enter",
-			    cmd, "acs_enter");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7205_MSG, "cmd", cmd, "acsls", "acs_enter",
+			    NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_STATE),
@@ -1301,18 +1304,18 @@ char *msg)
 
 		case STATUS_LIBRARY_BUSY:
 		case STATUS_PROCESS_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7221_MSG, "acs_enter",
-			    acs_status(status), "acs_enter",
-			    acs_status(status));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7221_MSG, "acsls", "acs_enter",
+			    "status", acs_status(status), NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_DEVCOMMERR;
 			break;
 
 		case STATUS_ACS_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7217_MSG, lm.lm_acs, lm.lm_acs);
+			(void) snprintf(nbuf, sizeof (nbuf), "%d", lm.lm_acs);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7217_MSG, "acs", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1320,8 +1323,10 @@ char *msg)
 			return;
 
 		case STATUS_LSM_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7218_MSG, lm.lm_acs, 0, lm.lm_acs, 0);
+			(void) snprintf(nbuf, sizeof (nbuf),
+			    "%d,%d", lm.lm_acs, 0);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7218_MSG, "lsm", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1329,8 +1334,8 @@ char *msg)
 			return;
 
 		case STATUS_LIBRARY_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7209_MSG, "acs_enter", "acs_enter");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7209_MSG, "acsls", "acs_enter", NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_LIBRARY;
@@ -1373,12 +1378,13 @@ char *msg)
 	int	code;
 
 	char	msg_str[512];
+	char	nbuf[20];
 
 	switch (status) {
 
 		case STATUS_CAP_IN_USE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7212_MSG, cap, cap);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7212_MSG, "cap", cap, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_RETRY),
@@ -1386,8 +1392,8 @@ char *msg)
 			return;
 
 		case STATUS_CAP_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7117_MSG, cap, cap);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7117_MSG, "port", cap, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INVALID),
@@ -1395,8 +1401,8 @@ char *msg)
 			return;
 
 		case STATUS_CAP_OFFLINE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7214_MSG, cap, "eject", cap, "eject");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7214_MSG, "cap", cap, "acsls", "eject", NULL);
 			lm_message("operator", "alert", msg_str);
 
 			(void) snprintf(msg, RMBUFSIZE,
@@ -1406,11 +1412,12 @@ char *msg)
 			return;
 
 		case STATUS_COMMAND_ACCESS_DENIED:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7222_MSG, "acs_eject", "acs_eject");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7222_MSG, "acsls", "acs_eject", NULL);
 			lm_message("operator", "alert", msg_str);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7205_MSG, cmd, "acs_eject", cmd, "acs_eject");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7205_MSG, "cmd", cmd, "acsls", "acs_eject",
+			    NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_STATE),
@@ -1434,17 +1441,18 @@ char *msg)
 
 		case STATUS_LIBRARY_BUSY:
 		case STATUS_PROCESS_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7221_MSG, "acs_eject", acs_status(status),
-			    "acs_eject", acs_status(status));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7221_MSG, "acsls", "acs_eject",
+			    "status", acs_status(status), NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_DEVCOMMERR;
 			break;
 
 		case STATUS_ACS_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7217_MSG, lm.lm_acs, lm.lm_acs);
+			(void) snprintf(nbuf, sizeof (nbuf), "%d", lm.lm_acs);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7217_MSG, "acs", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1452,9 +1460,10 @@ char *msg)
 			return;
 
 		case STATUS_LSM_NOT_IN_LIBRARY:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7218_MSG, lm.lm_acs, 0,
-			    lm.lm_acs, 0);
+			(void) snprintf(nbuf, sizeof (nbuf),
+			    "%d,%d", lm.lm_acs, 0);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7218_MSG, "lsm", nbuf, NULL);
 			(void) snprintf(msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1462,8 +1471,8 @@ char *msg)
 			return;
 
 		case STATUS_LIBRARY_FAILURE:
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7209_MSG, "acs_eject", "acs_eject");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7209_MSG, "acsls", "acs_eject", NULL);
 			lm_message("operator", "alert", msg_str);
 			class = MMS_INTERNAL;
 			code = MMS_LM_E_LIBRARY;
@@ -1510,9 +1519,8 @@ lm_handle_acsls_state(STATE state, char *acsls, char *cmd, char *tid, char *msg)
 	class = MMS_INTERNAL;
 	code = MMS_LM_E_DEVCMD;
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7234_MSG, cmd, acsls, acs_state(state),
-	    cmd, acsls, acs_state(state));
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7234_MSG,
+	    "cmd", cmd, "acsls", acsls, "status", acs_state(state), NULL);
 	(void) snprintf(msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid, mms_sym_code_to_str(class),
 	    mms_sym_code_to_str(code), msg_str);
@@ -1678,23 +1686,22 @@ lm_obtain_acs_response(SEQ_NO seq, char *cmd, char *tid, char *msg)
 					lm_state = LM_DISCONNECTED;
 						/* Send message to operator */
 						/* indicating issue */
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str),
-					    LM_7203_MSG,
+					    LM_7203_MSG, "status",
 					    acs_status(new_rsp->acs_status),
-					    acs_status(new_rsp->acs_status));
+					    NULL);
 						/* No need to check return */
 						/* status */
 					lm_message("operator", "alert",
 					    msg_str);
 						/* Create error message for */
 						/* LMPM command */
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str),
-					    LM_7225_MSG, cmd,
+					    LM_7225_MSG, "cmd", cmd, "status",
 					    acs_status(new_rsp->acs_status),
-					    cmd,
-					    acs_status(new_rsp->acs_status));
+					    NULL);
 					(void) snprintf(msg, RMBUFSIZE,
 					    LM_ERR_FINAL, tid,
 					    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1830,10 +1837,10 @@ lm_acs_enter(acs_rsp_ele_t **ret_rsp, CAPID cap_id, char *cmd, char *tid,
 			    "for acs_enter() while processing %s cmd, "
 			    "type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "enter",
-			    acs_type_response(acs_rsp->acs_type), cmd, "enter",
-			    acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "enter",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1893,10 +1900,10 @@ lm_acs_eject(acs_rsp_ele_t **ret_rsp, CAPID cap_id, VOLID vols[MAX_ID],
 			    "for acs_eject() while processing %s cmd, "
 			    "type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "eject",
-			    acs_type_response(acs_rsp->acs_type), cmd, "eject",
-			    acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "eject",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1957,10 +1964,10 @@ lm_acs_mount(acs_rsp_ele_t **ret_rsp, VOLID vol_id, DRIVEID drive_id,
 			mms_trace(MMS_ERR, "Received unexpected response type "
 			    "for acs_mount() while processing %s cmd, type "
 			    "- %s", cmd, acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "mount",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "mount", acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "mount",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -2021,10 +2028,10 @@ lm_acs_dismount(acs_rsp_ele_t **ret_rsp, VOLID vol_id, DRIVEID drive_id,
 			mms_trace(MMS_ERR, "Received unexpected response type "
 			    "for acs_dismount() while processing %s cmd, type "
 			    "- %s", cmd, acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "unmount",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "unmount", acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "unmount",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -2087,11 +2094,10 @@ lm_acs_query_drive(acs_rsp_ele_t **ret_rsp, DRIVEID drive_id[MAX_ID],
 			    "for acs_query_drive() while processing %s "
 			    "command, type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "query_drive",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "query_drive",
-			    acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "query_drive",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -2161,11 +2167,10 @@ lm_acs_query_mount(acs_rsp_ele_t **ret_rsp, VOLID vol_id_list[MAX_ID],
 			    "for acs_query_mount() while processing %s "
 			    "command, type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "query_volume",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "query_mount",
-			    acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "query_volume",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -2231,11 +2236,10 @@ lm_acs_query_volume(acs_rsp_ele_t **ret_rsp, VOLID vol_id_list[MAX_ID],
 			    "for acs_query_volume() while processing %s "
 			    "command, type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "query_volume",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "query_volume",
-			    acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "query_volume",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -2300,10 +2304,10 @@ lm_acs_query_cap(acs_rsp_ele_t **ret_rsp, CAPID capid[MAX_ID], char *cmd,
 			    "for acs_query_cap() while processing %s "
 			    "command, type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "query_cap",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "query_cap", acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "query_cap",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -2425,10 +2429,10 @@ lm_acs_display(acs_rsp_ele_t **ret_rsp, DISPLAY_XML_DATA display_xml_data,
 			    "for acs_display() while processing %s "
 			    "command, type - %s", cmd,
 			    acs_type_response(acs_rsp->acs_type));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7233_MSG, cmd, "display",
-			    acs_type_response(acs_rsp->acs_type), cmd,
-			    "display", acs_type_response(acs_rsp->acs_type));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7233_MSG, "cmd", cmd, "acsls", "display",
+			    "type", acs_type_response(acs_rsp->acs_type),
+			    NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),

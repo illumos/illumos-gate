@@ -94,10 +94,10 @@ mm_system_error(mm_command_t *cmd, char *fmt, ...) {
 
 	mm_response_error(cmd,
 	    ECLASS_INTERNAL, "ESYSTEM",
-	    5021,
+	    MM_5021_MSG,
 	    "text",
 	    text,
-	    MESS_END);
+	    NULL);
 
 	free(text);
 }
@@ -278,8 +278,8 @@ mm_set_cmd_err_buf(mm_command_t *cmd, char *class, char *token) {
 	    token, strlen(token));
 
 	mm_response_error(cmd,
-	    class, token, 5019,
-	    MESS_END);
+	    class, token, MM_5019_MSG,
+	    NULL);
 	return;
 
 

@@ -39,42 +39,6 @@
 
 static	char *_SrcFile = __FILE__;
 
-static	mms_sym_t	_dm_msg_cat[] = {
-	"$dm$: syntax error: $error$", 6500,
-	"$dm$: activate $type$ failed: $error$", 6501,
-	"$dm$: reserved. Preempt reservation? reply yes/no/retry.", 6502,
-	"$dm$: volume has no label. Enter volume id (VSN) or abort", 6503,
-	"$dm$: USCSICMD error: $error$", 6504,
-	"$dm$: no matching command: $error$", 6505,
-	"$dm$: internal error: $error$", 6506,
-	"$dm$: unknown capability: $error$", 6507,
-	"$dm$: attach error: $error$", 6508,
-	"$dm$: I/O error: $error$", 6509,
-	"$dm$: identify error: $error$", 6510,
-	"$dm$: detach error: $error$", 6511,
-	"$dm$: get request: $error$", 6512,
-	"$dm$: set blocksize error: $error$", 6513,
-	"$dm$: get blocksize error: $error$", 6514,
-	"$dm$: unsupported MTIOCTOP function: $error$", 6515,
-	"$dm$: open error: $error$", 6516,
-	"$dm$: load command error: $error$", 6517,
-	"$dm$: overwrite data on $pcl$? reply yes/no.", 6518,
-	"$dm$: switch label from $from$ to $to$ on $pcl$? reply yes/no.", 6519,
-	"$dm$: switch label from $from$ to $to$ and writeover data on $pcl$? "
-	"reply yes/no.", 6520,
-	"$dm$: $drive$ is still opened by pid $pid$", 6521,
-	"$dm$: MTSEEK error: $error$", 6522,
-	"$dm$: MTTELL error: $error$", 6523,
-	"$dm$: DM restarting because of attach error: $error$", 6524,
-	"$dm$: DM initialization error: $error$", 6525,
-	"$dm$: DM restarting: $error$", 6526,
-	"$dm$: mount command error: $error$", 6527,
-	"$dm$: DM exiting: $error$", 6528
-};
-
-mms_sym_t	*dm_msg_cat = _dm_msg_cat;
-int	dm_msg_cat_num = sizeof (_dm_msg_cat) / sizeof (mms_sym_t);
-
 void
 dm_msg_create_hdr(void)
 {

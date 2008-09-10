@@ -52,6 +52,7 @@
 #include <dm_msg.h>
 #include <dm_proto.h>
 #include <mms_strapp.h>
+#include <mms_cat.h>
 
 static	char *_SrcFile = __FILE__;
 
@@ -452,7 +453,7 @@ dm_read_input(void)
 			}
 			mms_trace_flush();
 			if (cmd == NULL) {
-				DM_MSG_SEND((DM_ADM_ERR, 6505, NULL));
+				DM_MSG_SEND((DM_ADM_ERR, DM_6505_MSG, NULL));
 				mms_pn_destroy(root);
 				free(buf);
 				return;
@@ -527,7 +528,7 @@ dm_read_input(void)
 		TRACE((MMS_OPER, "Exiting DM"));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "Lost connection to MM"));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	} else {
 		/*
@@ -537,7 +538,7 @@ dm_read_input(void)
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_reader error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	}
 	free(buf);
@@ -703,7 +704,7 @@ dm_resp_unacceptable(int msgid, ...)
 	 * Build a message clause
 	 */
 	va_start(args, msgid);
-	msgcl = dm_bld_msgcl(msgid, args);
+	msgcl = mms_bld_msgcl(msgid, args);
 	va_end(args);
 
 	unacc = mms_strnew("response unacceptable %s ;", msgcl);
@@ -751,7 +752,7 @@ dm_resp_error(char *task, int msgid, ...)
 	 * Build a message clause
 	 */
 	va_start(args, msgid);
-	msgcl = dm_bld_msgcl(msgid, args);
+	msgcl = mms_bld_msgcl(msgid, args);
 	va_end(args);
 
 	rep = mms_strnew("response task [ '%s' ] "
@@ -768,14 +769,14 @@ dm_resp_error(char *task, int msgid, ...)
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	} else if (rc == DM_PARTIAL_WRITE) {
 		TRACE((MMS_ERR, "dm_resp_error: mms_writer error: %s",
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	}
 }
@@ -820,177 +821,16 @@ dm_resp_success(char *task, char *text)
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	} else if (rc == DM_PARTIAL_WRITE) {
 		TRACE((MMS_DEBUG, "dm_resp_success: mms_writer error: %s",
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	}
-}
-
-/*
- * Function name
- *	dm_bld_msgcl(int msgid, va_list args)
- *
- * Parameters:
- *	msgid	message id
- *	args	variable list of arguments, terminated by NULL
- *
- * Description:
- *	constrict a message clause using the message with msgid and
- *	a loctext clause with the message
- *
- * Return code:
- *	the message clause
- *
- * Note:
- *
- *
- */
-
-char *
-dm_bld_msgcl(int msgid, va_list args)
-{
-	char		*msgcl;
-	char		*msgfmt;
-	char		*loctext = NULL;
-	char		*argcl = NULL;
-	char		*arglist = NULL;
-	int		nargs = 0;
-	va_list		ap;
-	char		*argp;
-	char		*valp;
-	int		i;
-	int		alen;
-	mms_sym_t	*mms_sym;
-	int		addarg;
-	int		cpstart;
-
-	msgcl = NULL;
-	if (msgid == 0) {		/* No message */
-		return (msgcl);
-	}
-
-	/*
-	 * Get message from msg catalog
-	 */
-	mms_sym = mms_lookup_sym_code(msgid, dm_msg_cat, dm_msg_cat_num);
-	if (mms_sym != NULL) {
-		msgfmt = mms_sym->sym_token;
-	} else {
-		/* Undefined message */
-		TRACE((MMS_ERR, "Undefined message id '%d'", msgid));
-		return (msgcl);
-	}
-
-	/*
-	 * Create arguement list
-	 */
-	ap = args;
-	for (argp = va_arg(ap, char *);
-	    argp != NULL; argp = va_arg(ap, char *)) {
-		/* Add to arguments list */
-		arglist = mms_strapp(arglist, "'%s' '%s' ",
-		    argp, va_arg(ap, char *));
-	}
-
-	/*
-	 * Substitue arg values into variables in msg to create loctext
-	 */
-	for (i = 0, cpstart = 0; msgfmt[i] != '\0'; ) {
-		valp = NULL;
-		if (msgfmt[i] == '$') {
-			ap = args;
-			for (argp = va_arg(ap, char *);
-			    argp != NULL; argp = va_arg(ap, char *)) {
-				alen = strlen(argp);
-				if (strncmp(msgfmt + i + 1, argp,
-				    alen) == 0 &&
-				    msgfmt[i + 1 + alen] == '$') {
-					valp = va_arg(ap, char *);
-					/* don't add this to arg list */
-					addarg = 0;
-					break;
-				} else {
-					/* Not matched, skip value */
-					(void) va_arg(ap, char *);
-				}
-			}
-			if (valp == NULL) {	/* no matching arg */
-				/* See if dmname or error */
-				argp = DM_MSG_DM;
-				alen = strlen(argp);
-				if (strncmp(msgfmt + i + 1, argp,
-				    alen) == 0 &&
-				    msgfmt[i + 1 + alen] == '$') {
-					valp = drv->drv_dmname;
-					/* Add to arg list */
-					addarg = 1;
-				}
-			}
-			if (valp == NULL) {
-				argp = DM_MSG_ERROR;
-				alen = strlen(argp);
-				if (strncmp(msgfmt + i + 1, argp,
-				    alen) == 0 &&
-				    msgfmt[i + 1 + alen] == '$') {
-					valp = dm_msg_text();
-					if (valp != NULL) {
-						addarg = 1;
-					} else {
-						addarg = 0;
-					}
-				}
-			}
-
-			if (valp != NULL) {
-				/* Substitute variable with value */
-				if (addarg) {
-					/* Add to arguments list */
-					arglist = mms_strapp(arglist,
-					    "'%s' '%s' ",
-					    argp, valp);
-					nargs += 2;
-				}
-				/* Copy the uncopied portion of msgfmt */
-				/* to loctext */
-				loctext = mms_strnapp(loctext, i - cpstart,
-				    msgfmt + cpstart);
-				loctext = mms_strapp(loctext, "%s", valp);
-				i += (alen + 2);	/* skip over arg */
-				cpstart = i;
-			} else {
-				i++;
-			}
-		} else {
-			i++;
-		}
-	}
-
-	/* if not at end of msgfmt, copy the last portion of text to loctext */
-	if (cpstart != i) {
-		loctext = mms_strapp(loctext, "%s", msgfmt + cpstart);
-	}
-
-	/*
-	 * Terminate argument clause
-	 */
-	if (nargs == 0) {		/* no arguments */
-		argcl = "";
-	} else {
-		argcl = mms_strnew("arguments [ %s ] ", arglist);
-		free(arglist);
-	}
-
-	msgcl = mms_strapp(msgcl, "message [ id [ 'SUNW' 'MMS' '%d' ] %s "
-	    "loctext [ 'EN' '%s' ]] ", msgid, argcl, loctext);
-	free(argcl);
-	free(loctext);
-	return (msgcl);
 }
 
 /*
@@ -1025,7 +865,7 @@ dm_send_message(char *who, char *severity, int msgid, ...)
 
 	task = dm_bld_task("message");
 	va_start(ap, msgid);
-	msgcl = dm_bld_msgcl(msgid, ap);
+	msgcl = mms_bld_msgcl(msgid, ap);
 	va_end(ap);
 	msg_cmd = mms_strnew("message task [ '%s' ] who [ %s ] "
 	    "severity [ %s ] %s ;", task, who, severity, msgcl);
@@ -1203,7 +1043,7 @@ dm_send_ready_aux(char *spec, int msgid, va_list args)
 	/*
 	 * Build a message clause
 	 */
-	msgcl = dm_bld_msgcl(msgid, args);
+	msgcl = mms_bld_msgcl(msgid, args);
 
 	task = dm_bld_task("ready");
 	if (spec == NULL) {
@@ -2356,7 +2196,7 @@ dm_cmd_response(dm_command_t *cmd)
 			TRACE((MMS_CRIT, "Unexpected response from MM"));
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "Unexpected response from MM"));
-			DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+			DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 			DM_EXIT(DM_NO_RESTART);
 		}
 default:
@@ -2366,7 +2206,7 @@ default:
 		TRACE((MMS_CRIT, "Unexpected cmd state: %d", cmd->cmd_state));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "Unexpected cmd state: %d", cmd->cmd_state));
-		DM_MSG_SEND((DM_ADM_ERR, 6526, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	}
 
@@ -2699,9 +2539,9 @@ dm_activate_enable(dm_command_t *cmd)
 	return (DM_COMPLETE);
 
 error1:
-	(void) dm_send_ready_disconnected(6501, "type", "enable", NULL);
+	(void) dm_send_ready_disconnected(DM_6501_MSG, "type", "enable", NULL);
 error:
-	dm_resp_error(cmd->cmd_task, 6501, "type", "enable", NULL);
+	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "enable", NULL);
 	return (DM_COMPLETE);
 }
 
@@ -2743,7 +2583,7 @@ success:
 	return (DM_COMPLETE);
 
 error:
-	dm_resp_error(cmd->cmd_task, 6501, "type", "reserve", NULL);
+	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "reserve", NULL);
 	return (DM_COMPLETE);
 }
 
@@ -2777,7 +2617,7 @@ dm_activate_release(dm_command_t *cmd)
 	return (DM_COMPLETE);
 
 error:
-	dm_resp_error(cmd->cmd_task, 6501, "type", "release", NULL);
+	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "release", NULL);
 	return (DM_COMPLETE);
 }
 
@@ -2801,7 +2641,7 @@ dm_dmpm_private_cmd(dm_command_t *cmd)
 	mnt->mnt_fseq = -1;		/* fseq not specified */
 	if (dm_get_mount_options(cmd) != 0) {
 		/* had error */
-		dm_resp_error(cmd->cmd_task, 6507, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6507_MSG, NULL);
 		return (DM_COMPLETE);
 	}
 	/*
@@ -2813,7 +2653,7 @@ dm_dmpm_private_cmd(dm_command_t *cmd)
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "User %s is not authorized to use MMS",
 			    mnt->mnt_user));
-			dm_resp_error(cmd->cmd_task, 6527, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6527_MSG, NULL);
 			return (DM_COMPLETE);
 		}
 	}
@@ -2833,7 +2673,7 @@ dm_dmpm_private_cmd(dm_command_t *cmd)
 		if (mnt->mnt_fname == NULL) {
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "out of memory"));
-			dm_resp_error(cmd->cmd_task, 6506, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6506_MSG, NULL);
 			return (DM_COMPLETE);
 		}
 		memset(mnt->mnt_fname, ' ', 17);
@@ -2986,12 +2826,12 @@ dm_attach_cmd(dm_command_t *cmd)
 		/* Drive already attached */
 		DM_MSG_ADD((MMS_STATE, MMS_DM_E_INTERNAL,
 		    "already attached"));
-		dm_resp_error(cmd->cmd_task, 6508, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
 		/*
 		 * Something is very wrong here because MM has not done
 		 * a detach. Restart and cleanup.
 		 */
-		DM_MSG_SEND((DM_ADM_ERR, 6524, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6524_MSG, NULL));
 		DM_EXIT(DM_RESTART);
 	}
 
@@ -3024,7 +2864,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_MAKEHANDLE,
 		    "make handle error: %s: %s",
 		    wka->dm_targ_hdl, strerror(err)));
-		dm_resp_error(cmd->cmd_task, 6508, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
 		free(wka->dm_targ_hdl);
 		return (DM_COMPLETE);
 	}
@@ -3047,7 +2887,7 @@ dm_attach_cmd(dm_command_t *cmd)
 			 */
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_USER,
 			    "no user"));
-			dm_resp_error(cmd->cmd_task, 6508, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
 			free(wka->dm_targ_hdl);
 			return (DM_COMPLETE);
 		}
@@ -3057,7 +2897,7 @@ dm_attach_cmd(dm_command_t *cmd)
 			TRACE((MMS_ERR, "Can't chown to user"));
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_USER,
 			    "cannot chown handle to user"));
-			dm_resp_error(cmd->cmd_task, 6508, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
 			free(wka->dm_targ_hdl);
 			return (DM_COMPLETE);
 		}
@@ -3073,7 +2913,7 @@ dm_attach_cmd(dm_command_t *cmd)
 	if (dm_show_application(&approot) != 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get APPLICATION"));
-		dm_resp_error(cmd->cmd_task, 6508,
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
 		    NULL);
 		return (DM_COMPLETE);
 	}
@@ -3093,7 +2933,7 @@ dm_attach_cmd(dm_command_t *cmd)
 	if (val == NULL) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get application name"));
-		dm_resp_error(cmd->cmd_task, 6508,
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
 		    NULL);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
@@ -3104,7 +2944,7 @@ dm_attach_cmd(dm_command_t *cmd)
 	if ((dca->dca_flags & DRV_DCA_VALID) == 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get info for DRIVECARTRIDGEACCESS"));
-		dm_resp_error(cmd->cmd_task, 6508,
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
 		    NULL);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
@@ -3118,7 +2958,7 @@ dm_attach_cmd(dm_command_t *cmd)
 	    dm_get_part_rwmode(root) != 0 || dm_update_write_protect() != 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get info for application/partition"));
-		dm_resp_error(cmd->cmd_task, 6508,
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
 		    NULL);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
@@ -3191,7 +3031,7 @@ dm_attach_cmd(dm_command_t *cmd)
 	if (dm_get_capacity(root) != 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get info for application/partition"));
-		dm_resp_error(cmd->cmd_task, 6508,
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
 		    NULL);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
@@ -3210,7 +3050,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		if (dm_update_capacity() != 0) {
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "unable to update capacity"));
-			dm_resp_error(cmd->cmd_task, 6508,
+			dm_resp_error(cmd->cmd_task, DM_6508_MSG,
 			    NULL);
 			mms_pn_destroy(root);
 			mms_pn_destroy(approot);
@@ -3405,7 +3245,7 @@ dm_load_cmd(dm_command_t *cmd)
 	if (DRV_CALL(drv_load, ()) != 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_DRIVE,
 		    "load failed, drive not ready"));
-		dm_resp_error(cmd->cmd_task, 6517, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6517_MSG, NULL);
 		return (DM_COMPLETE);
 	}
 
@@ -3432,7 +3272,7 @@ dm_identify_cmd(dm_command_t *cmd)
 
 	if ((drv->drv_flags & DRV_LOADED) == 0) {
 		DM_MSG_ADD((MMS_STATE, MMS_DM_E_LOAD, "drive not loaded"));
-		dm_resp_error(cmd->cmd_task, 6510, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
 		return (DM_COMPLETE);
 	}
 
@@ -3457,14 +3297,14 @@ dm_identify_cmd(dm_command_t *cmd)
 		/* I/O error */
 		drv->drv_flags |= DRV_LOST_POS;
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_IO, "rewind error"));
-		dm_resp_error(cmd->cmd_task, 6510, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
 		return (DM_COMPLETE);
 	}
 
 	if (dm_set_label_blksize() != 0) {
 		/* I/O error */
 		TRACE((MMS_DEBUG, "Can't set label blksize"));
-		dm_resp_error(cmd->cmd_task, 6510, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
 		return (DM_COMPLETE);
 	}
 
@@ -3496,7 +3336,7 @@ dm_identify_cmd(dm_command_t *cmd)
 			/* I/O error */
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_IO,
 			    "rewind error"));
-			dm_resp_error(cmd->cmd_task, 6510, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
 			return (DM_COMPLETE);
 		}
 		drv->drv_fseq = 1;	/* at file seq 1 */
@@ -3504,7 +3344,7 @@ dm_identify_cmd(dm_command_t *cmd)
 		if (dm_get_bof_pos() != 0) {
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "unable to get BOF position"));
-			dm_resp_error(cmd->cmd_task, 6510, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
 			return (DM_COMPLETE);
 		}
 		resp = "No Signature";
@@ -3534,8 +3374,8 @@ dm_identify_cmd(dm_command_t *cmd)
 					    "incorrect volume id: "
 					    "requested %s, mounted %s",
 					    mnt->mnt_vid, drv->drv_vid));
-					dm_resp_error(cmd->cmd_task, 6510,
-					    NULL);
+					dm_resp_error(cmd->cmd_task,
+					    DM_6510_MSG, NULL);
 					return (DM_COMPLETE);
 				}
 			}
@@ -3584,22 +3424,22 @@ dm_detach_cmd(dm_command_t *cmd)
 	if (wka->dm_targ_hdl == NULL) {
 		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_NOEXISTHANDLE,
 		    "no handle"));
-		dm_resp_error(cmd->cmd_task, 6511, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
 		return (DM_COMPLETE);
 	} else if (strcmp(mms_pn_token(handle), wka->dm_targ_hdl) != 0) {
 		/* unknown handle name */
 		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_BADHANDLE,
 		    "unknown handle"));
-		dm_resp_error(cmd->cmd_task, 6511, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
 		return (DM_COMPLETE);
 	} else if (wka->dm_app_pid != 0) {
 		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_HANDLEINUSE,
 		    "handle in use by pid %d", (int)wka->dm_app_pid));
-		dm_resp_error(cmd->cmd_task, 6511, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
 		return (DM_COMPLETE);
 	} else if ((drv->drv_flags & DRV_ATTACHED) == 0) {
 		DM_MSG_ADD((MMS_STATE, MMS_DM_E_DEVDET, "not attached"));
-		dm_resp_error(cmd->cmd_task, 6511, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
 		return (DM_COMPLETE);
 	}
 
@@ -3633,7 +3473,7 @@ dm_detach_cmd(dm_command_t *cmd)
 		 */
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "stale handle"));
-		dm_resp_error(cmd->cmd_task, 6511, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
 	}
 
 	return (DM_COMPLETE);
@@ -4436,7 +4276,7 @@ dm_send_request(char **reply, int msgid, ...)
 	*reply = NULL;
 	task = dm_bld_task("request");
 	va_start(args, msgid);
-	msgcl = dm_bld_msgcl(msgid, args);
+	msgcl = mms_bld_msgcl(msgid, args);
 	va_end(args);
 	req_cmd = mms_strnew("request task ['%s'] type[DM] "
 	    "priority ['1000'] %s ;", task, msgcl);

@@ -35,6 +35,9 @@ SUNW_1.1 {
 		mms_api_reader;
 		mms_be_wait;
 		mms_be_wakeup;
+		mms_bld_msgcl;
+		mms_buf_msgcl;
+		mms_cat_open;
 		mms_cfg__flex_debug;
 		mms_cfg_alloc_getvar;
 		mms_cfg_getvar;
@@ -52,7 +55,11 @@ SUNW_1.1 {
 		mms_format_sense;
 		mms_free_rsp;
 		mms_get_attribute;
+		mms_get_cat_msg;
 		mms_get_error_string;
+		mms_get_locstr;
+		mms_get_msg;
+		mms_get_msgcl;
 		mms_goodbye;
 		mms_handle_err_rsp;
 		mms_hello;

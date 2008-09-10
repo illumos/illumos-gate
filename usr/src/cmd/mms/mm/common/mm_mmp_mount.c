@@ -250,12 +250,12 @@ mm_check_drive(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "EDRVNODMCONFIGURED",
-		    5035,
+		    MM_5035_MSG,
 		    "dm",
 		    dm_name,
 		    "drive",
 		    drive,
-		    MESS_END);
+		    NULL);
 		mm_clear_db(&db->mm_db_results);
 		return (0);
 	}
@@ -276,12 +276,12 @@ mm_check_drive(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_COMPAT,
 		    "ECARTDRVNOTCOMPATIBLE",
-		    5096,
+		    MM_5096_MSG,
 		    "drive",
 		    drive,
 		    "cart",
 		    cart_id,
-		    MESS_END);
+		    NULL);
 		mm_clear_db(&db->mm_db_results);
 		return (0);
 	}
@@ -313,12 +313,12 @@ mm_check_drive(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_COMPAT,
 		    "ECARTDRVNOTCOMPATIBLE",
-		    5036,
+		    MM_5036_MSG,
 		    "dm",
 		    dm_name,
 		    "drive",
 		    drive,
-		    MESS_END);
+		    NULL);
 		return (0);
 	}
 	/* No modes exist, access is default */
@@ -435,10 +435,10 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT,
 			    "EAPPDRVNOACC",
-			    5027,
+			    MM_5027_MSG,
 			    "app", conn->cci_client,
 			    "drive", candidate_drive,
-			    MESS_END);
+			    NULL);
 			rc = 0; goto end;
 		}
 	}
@@ -472,10 +472,10 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT,
 			    "EAPPDRVNOACC",
-			    5030,
+			    MM_5030_MSG,
 			    "app", conn->cci_client,
 			    "drive", candidate_drive,
-			    MESS_END);
+			    NULL);
 			mm_clear_db(&db->mm_db_results);
 			rc = 0; goto end;
 		}
@@ -496,9 +496,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 		mm_response_error(cmd,
 		    ECLASS_PERMPRIV,
 		    "EDRIVEOFFLINE",
-		    5029,
+		    MM_5029_MSG,
 		    "drive", candidate_drive,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 
@@ -514,9 +514,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "EDRVINUSE",
-			    5025,
+			    MM_5025_MSG,
 			    "drive", candidate_drive,
-			    MESS_END);
+			    NULL);
 			rc = 0; goto end;
 		} else {
 			mms_trace(MMS_DEVP,
@@ -548,9 +548,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 				mm_response_error(cmd,
 				    ECLASS_RETRY,
 				    "EDRVUNLOADING",
-				    5102,
+				    MM_5102_MSG,
 				    "drive", candidate_drive,
-				    MESS_END);
+				    NULL);
 				rc = 0; goto end;
 			}
 		} else {
@@ -568,9 +568,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 					mm_response_error(cmd,
 					    ECLASS_RETRY,
 					    "EDRVINUSE",
-					    5028,
+					    MM_5028_MSG,
 					    "drive", candidate_drive,
-					    MESS_END);
+					    NULL);
 					rc = 0; goto end;
 				}
 			}
@@ -603,17 +603,17 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_PERMPRIV,
 			    "EDRVDISABLEDTEMP",
-			    5022,
+			    MM_5022_MSG,
 			    "drive", candidate_drive,
-			    MESS_END);
+			    NULL);
 
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_PERMPRIV,
 			    "EDRVDISABLEDPERM",
-			    5023,
+			    MM_5023_MSG,
 			    "drive", candidate_drive,
-			    MESS_END);
+			    NULL);
 		}
 		rc = 0; goto end;
 	}
@@ -626,9 +626,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "EDRVBROKEN",
-		    5024,
+		    MM_5024_MSG,
 		    "drive", candidate_drive,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 
@@ -641,9 +641,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 		mm_response_error(cmd,
 		    ECLASS_INTERNAL,
 		    "ELMDRVNOTACCESS",
-		    5026,
+		    MM_5026_MSG,
 		    "drive", candidate_drive,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 
@@ -659,24 +659,24 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "EDMNOTCONNECTED",
-			    5032,
+			    MM_5032_MSG,
 			    "dm",
 			    dm_stat->dm_stat_name,
 			    "drive",
 			    candidate_drive,
-			    MESS_END);
+			    NULL);
 			rc = 0; goto end;
 		} else if (strcmp(dm_stat->dm_stat_soft,
 		    "disconnected") == 0) {
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    "EDRVBROKEN",
-			    5033,
+			    MM_5033_MSG,
 			    "dm",
 			    dm_stat->dm_stat_name,
 			    "drive",
 			    candidate_drive,
-			    MESS_END);
+			    NULL);
 			rc = 0; goto end;
 		} else if (strcmp(dm_stat->dm_stat_soft,
 		    "not ready") == 0) {
@@ -686,12 +686,12 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 				mm_response_error(cmd,
 				    ECLASS_RETRY,
 				    "EDMSTILLBOOTING",
-				    5034,
+				    MM_5034_MSG,
 				    "dm",
 				    dm_stat->dm_stat_name,
 				    "drive",
 				    candidate_drive,
-				    MESS_END);
+				    NULL);
 				rc = 0; goto end;
 			}
 		} else if (strcmp(dm_stat->dm_stat_soft,
@@ -702,12 +702,12 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 				mm_response_error(cmd,
 				    ECLASS_CONFIG,
 				    "EDRVNODMCONFIGURED",
-				    5034,
+				    MM_5034_MSG,
 				    "dm",
 				    dm_stat->dm_stat_name,
 				    "drive",
 				    candidate_drive,
-				    MESS_END);
+				    NULL);
 				rc = 0; goto end;
 			}
 		} else if ((mount_info->cmi_operation == MM_MOUNT) &&
@@ -719,10 +719,10 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 				mm_response_error(cmd,
 				    ECLASS_RETRY,
 				    "EDRVINUSE",
-				    5098,
+				    MM_5098_MSG,
 				    "dm",
 				    dm_stat->dm_stat_name,
-				    MESS_END);
+				    NULL);
 				rc = 0; goto end;
 			}
 		}
@@ -744,12 +744,12 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "EDRVBROKEN",
-		    5031,
+		    MM_5031_MSG,
 		    "drive",
 		    candidate_drive,
 		    "dm",
 		    dm_stat->dm_stat_name,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 	if (mount_info->cmi_operation == MM_UNMOUNT) {
@@ -864,10 +864,10 @@ mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    "ECARTNOTLOCATED",
-			    5037,
+			    MM_5037_MSG,
 			    "cart",
 			    candidate_cartid,
-			    MESS_END);
+			    NULL);
 			rc = 0; goto end;
 		}
 		/* mark this cartridge not ready */
@@ -879,10 +879,10 @@ mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "ECARTINUSE",
-			    5038,
+			    MM_5038_MSG,
 			    "cart",
 			    candidate_cartid,
-			    MESS_END);
+			    NULL);
 			rc = 0; goto end;
 		}
 	}
@@ -918,10 +918,10 @@ mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "ENOSLOT",
-		    5095,
+		    MM_5095_MSG,
 		    "cart",
 		    candidate_cartid,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 
@@ -962,12 +962,12 @@ mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "EAPPHASNOVOLS",
-		    5040,
+		    MM_5040_MSG,
 		    "app",
 		    conn->cci_client,
 		    "cart",
 		    candidate_cartid,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 
@@ -1022,10 +1022,10 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(cmd,
 		    ECLASS_PERMPRIV,
 		    "ELIBRARYOFFLINE",
-		    5041,
+		    MM_5041_MSG,
 		    "lib",
 		    candidate_library,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 	if ((strcmp(lib_stat->lib_stat_disabled, "true") == 0) ||
@@ -1038,18 +1038,18 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 			mm_response_error(cmd,
 			    ECLASS_PERMPRIV,
 			    "ELIBDISABLEDTEMP",
-			    5042,
+			    MM_5042_MSG,
 			    "lib",
 			    candidate_library,
-			    MESS_END);
+			    NULL);
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_PERMPRIV,
 			    "ELIBDISABLEDPERM",
-			    5043,
+			    MM_5043_MSG,
 			    "lib",
 			    candidate_library,
-			    MESS_END);
+			    NULL);
 		}
 		rc = 0; goto end;
 	}
@@ -1061,10 +1061,10 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "ELIBBROKEN",
-		    5044,
+		    MM_5044_MSG,
 		    "lib",
 		    candidate_library,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 	mms_trace(MMS_DEVP,
@@ -1093,10 +1093,10 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    "ELIBBROKEN",
-		    5045,
+		    MM_5045_MSG,
 		    "lm",
 		    lib_stat->lib_stat_lm,
-		    MESS_END);
+		    NULL);
 		rc = 0; goto end;
 	}
 	if (strcmp(lm_stat->lm_stat_soft, "ready") != 0) {
@@ -1109,36 +1109,36 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "ELMNOTCONNECTED",
-			    5046,
+			    MM_5046_MSG,
 			    "lm",
 			    lib_stat->lib_stat_lm,
 			    "lib",
 			    lib_stat->lib_stat_name,
-			    MESS_END);
+			    NULL);
 		}
 		if (strcmp(lm_stat->lm_stat_soft,
 		    "present") == 0) {
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "ELMNOTREADY",
-			    5047,
+			    MM_5047_MSG,
 			    "lm",
 			    lib_stat->lib_stat_lm,
 			    "lib",
 			    lib_stat->lib_stat_name,
-			    MESS_END);
+			    NULL);
 		}
 		if (strcmp(lm_stat->lm_stat_soft,
 		    "disconnected") == 0) {
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    "ELIBBROKEN",
-			    5048,
+			    MM_5048_MSG,
 			    "lm",
 			    lib_stat->lib_stat_lm,
 			    "lib",
 			    lib_stat->lib_stat_name,
-			    MESS_END);
+			    NULL);
 
 		}
 		if (strcmp(lm_stat->lm_stat_soft,
@@ -1146,12 +1146,12 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "ELMSTILLBOOTING",
-			    5049,
+			    MM_5049_MSG,
 			    "lm",
 			    lib_stat->lib_stat_lm,
 			    "lib",
 			    lib_stat->lib_stat_name,
-			    MESS_END);
+			    NULL);
 		}
 		rc = 0; goto end;
 	}
@@ -1369,10 +1369,10 @@ mm_setup_drive(mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_COMPAT,
 		    "EAPPDMDIFFHOSTS",
-		    5050,
+		    MM_5050_MSG,
 		    "host",
 		    mount_info->cmi_where,
-		    MESS_END);
+		    NULL);
 		mm_clear_db(&db->mm_db_results);
 		return (NULL);
 	}
@@ -1432,8 +1432,8 @@ mm_setup_drive(mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_COMPAT,
 		    "ECARTDRVSLOTMISMATCH",
-		    5097,
-		    MESS_END);
+		    MM_5097_MSG,
+		    NULL);
 		mm_clear_db(&dm);
 		mm_clear_db(&dm_shape);
 		return (NULL);
@@ -1469,10 +1469,10 @@ mm_setup_drive(mm_command_t *cmd,
 			mm_response_error(cmd,
 			    ECLASS_COMPAT,
 			    "EDMNOMOUNTPOINT",
-			    5103,
+			    MM_5103_MSG,
 			    "dm",
 			    dm_name,
-			    MESS_END);
+			    NULL);
 			mm_clear_db(&dm);
 			mm_clear_db(&db->mm_db_results);
 			return (NULL);
@@ -2633,8 +2633,8 @@ mm_parse_mount_cmd(mm_wka_t *mm_wka, mm_command_t *cmd) {
 		mm_response_error(cmd,
 		    EINVALIDTYPE,
 		    ESYNTAX,
-		    5051,
-		    MESS_END);
+		    MM_5051_MSG,
+		    NULL);
 		return (MM_CMD_ERROR);
 	}
 
@@ -2863,8 +2863,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -3140,10 +3140,10 @@ mm_mount_init_candidates(mm_command_t *cmd,
 			    candidate_library);
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT, ENOMATCH,
-			    5094,
+			    MM_5094_MSG,
 			    "lib",
 			    candidate_library,
-			    MESS_END);
+			    NULL);
 			mm_clear_db(&drive_results);
 			return (1);
 		}
@@ -3322,8 +3322,8 @@ PGresult* mm_mount_cart_results(mm_wka_t *mm_wka,
 		    "didn't match any cartridge/volumes");
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT, ENOMATCH,
-		    5052,
-		    MESS_END);
+		    MM_5052_MSG,
+		    NULL);
 		mm_clear_db(&db->mm_db_results);
 		return (NULL);
 	}
@@ -3416,8 +3416,8 @@ mm_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db, int is_retry) {
 		    "didn't match any cartridge/volumes");
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT, ENOMATCH,
-		    5052,
-		    MESS_END);
+		    MM_5052_MSG,
+		    NULL);
 		mm_clear_db(&cart_results);
 		return (MM_MOUNT_ERROR);
 	}
@@ -3778,11 +3778,11 @@ start:
 			response_message =
 			    mm_ret_response_msg(cmd);
 			mm_response_error(cmd,
-			    "subop", "ELMPMOUNT", 5018,
+			    "subop", "ELMPMOUNT", MM_5018_MSG,
 			    "cartridge", mount_info->cmi_cartridge,
 			    "drive", mount_info->cmi_drive,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			/* Set cmd for remove, send message to client */
 			cmd->cmd_remove = 1;
@@ -3855,14 +3855,14 @@ start:
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    "EDMPLOAD",
-			    5053,
+			    MM_5053_MSG,
 			    "cartridge",
 			    mount_info->cmi_cartridge,
 			    "drive",
 			    mount_info->cmi_drive,
 			    "msg_rsp",
 			    response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn,
@@ -3912,14 +3912,14 @@ start:
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    "EDMPATTACH",
-			    5054,
+			    MM_5054_MSG,
 			    "cartridge",
 			    mount_info->cmi_cartridge,
 			    "drive",
 			    mount_info->cmi_drive,
 			    "msg_rsp",
 			    response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn,
@@ -4213,8 +4213,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	rc = MM_CMD_ERROR;
@@ -4225,9 +4225,9 @@ lm_dm_error:
 	mm_response_error(cmd,
 	    ECLASS_SUBOP,
 	    ELMDMCOMMUNICATION,
-	    5055,
+	    MM_5055_MSG,
 	    "msg_rsp", response_message,
-	    MESS_END);
+	    NULL);
 	free(response_message);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -4315,9 +4315,9 @@ mm_delay_unmount_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			response_message = NULL;
 
@@ -4682,8 +4682,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -4826,8 +4826,8 @@ mm_unmount_cart_results(mm_wka_t *mm_wka,
 		    "didn't match any cartridge/volumes");
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT, ENOMATCH,
-		    5052,
-		    MESS_END);
+		    MM_5052_MSG,
+		    NULL);
 		return (NULL);
 	}
 	tmp_buf = mms_strapp(tmp_buf,
@@ -4907,8 +4907,8 @@ mm_unmount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db) {
 		    "didn't match any cartridge/volumes");
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT, ENOMATCH,
-		    5052,
-		    MESS_END);
+		    MM_5052_MSG,
+		    NULL);
 		mm_clear_db(&cart_results);
 		return (MM_UNMOUNT_ERROR);
 	}
@@ -5085,9 +5085,9 @@ mm_unmount_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_SUBOP,
 				    ELMDMCOMMUNICATION,
-				    5055,
+				    MM_5055_MSG,
 				    "msg_rsp", response_message,
-				    MESS_END);
+				    NULL);
 				free(response_message);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -5138,9 +5138,9 @@ mm_unmount_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", mm_ret_response_msg(cmd),
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			rc = MM_CMD_ERROR;
@@ -5263,9 +5263,9 @@ mm_unmount_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 
@@ -5342,9 +5342,9 @@ mm_unmount_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -5466,8 +5466,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	rc = MM_CMD_ERROR;
@@ -5544,8 +5544,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);

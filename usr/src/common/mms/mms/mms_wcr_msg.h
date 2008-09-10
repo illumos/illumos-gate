@@ -22,47 +22,27 @@
  * Use is subject to license terms.
  */
 
-#ifndef	__DM_MSG_H
-#define	__DM_MSG_H
+#ifndef	__MMS_WCR_MSG_H
+#define	__MMS_WCR_MSG_H
 
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#include <mms_sym.h>
-#include <mms_list.h>
-#include <mms_dm_msg.h>
+#ifndef	WCR_MSG
+#define	WCR_MSG(n, s)
+#endif
 
-extern	mms_list_t	dm_msg_hdr_list;
+/* Watcher Messages 8000-8999 */
 
-#define	DM_MSG_DM	"dm"
-#define	DM_MSG_ERROR	"error"
-
-/*
- * There is a dm_msghdr_t for every pthread.
- */
-typedef	struct	dm_msg_hdr {
-	mms_list_node_t	msg_next;
-	mms_list_t	msg_msglist;
-	pthread_t	msg_tid;		/* pthread id */
-}	dm_msg_hdr_t;
-
-typedef	struct	dm_msg {
-	mms_list_node_t	msg_next;
-	char		*msg_text;		/* could be NULL */
-	int		msg_class;		/* error class */
-	int		msg_code;		/* error code */
-}	dm_msg_t;
-
-#define	DM_MSG_ADD(x)		TRACE((MMS_ERR, dm_msg_add x))
-#define	DM_MSG_ADD_HEAD(x)	TRACE((MMS_ERR, dm_msg_add_head x))
-#define	DM_MSG_PREPEND(x)	TRACE((MMS_ERR, dm_msg_prepend x))
-#define	DM_ADM_ERR		"administrator", "error"
-#define	DM_MSG_SEND(x)		dm_send_message x
+#define	WCR_8000_MSG 8000
+WCR_MSG(WCR_8000_MSG, gettext("Conflicting ssi configuration on $wcr_host$, " \
+	"Same SSI port configured for different ACSLS libraries: $lmname1$ " \
+	"$ssiport1$ $ssihost1$, $lmname2$ $ssiport2$ $ssihost2$"))
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* __DM_MSG_H */
+#endif	/* __MMS_WCR_MSG_H */

@@ -28,6 +28,7 @@
 
 #include <limits.h>
 #include <mms_network.h>
+#include <mms_mm_msg.h>
 #include <host_ident.h>
 
 #ifdef	__cplusplus
@@ -395,7 +396,6 @@ enum mm_msg_who {
 	MESS_ADMIN
 };
 
-#define	MESS_END		NULL
 #define	MESS_MANUFACTURER	"SUNW"
 #define	MESS_MODEL		"MMS"
 #define	MESS_LANG		"EN"
@@ -981,7 +981,6 @@ extern int mm_msg_set_limit(mm_db_t *db);
 extern void mm_response_error(mm_command_t *cmd, char *eclass, char *ecode,
 					int messageid, ...);
 extern int mm_msg_send_tracing(mm_wka_t *mm_wka);
-extern char *mm_get_vlocalized_string(int messageid, va_list args);
 extern char *mm_msg_lang2component(mm_lang_t lang);
 
 /* System log file */

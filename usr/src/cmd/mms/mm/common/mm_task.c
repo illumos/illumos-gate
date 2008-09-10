@@ -302,8 +302,8 @@ tm_be_unmount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		    "didn't match any cartridge/volumes");
 		mm_response_error(end_cmd,
 				ECLASS_EXPLICIT, ENOMATCH,
-				5052,
-				MESS_END);
+				MM_5052_MSG,
+				NULL);
 		mm_clear_db(&cart_results);
 		return (MM_UNMOUNT_ERROR);
 	}
@@ -359,8 +359,8 @@ tm_be_unmount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(end_cmd,
 		    ECLASS_EXPLICIT,
 		    "ENOSOLUTIONS",
-		    5105,
-		    MESS_END);
+		    MM_5105_MSG,
+		    NULL);
 		return (MM_UNMOUNT_ERROR);
 	}
 	if (found_ready_cart_drive == 0) {
@@ -371,8 +371,8 @@ tm_be_unmount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 		return (MM_UNMOUNT_NOT_READY);
 	}
 
@@ -419,8 +419,8 @@ tm_be_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		    "didn't match any cartridge/volumes");
 		mm_response_error(end_cmd,
 				ECLASS_EXPLICIT, ENOMATCH,
-				5052,
-				MESS_END);
+				MM_5052_MSG,
+				NULL);
 		mm_clear_db(&cart_results);
 		return (MM_MOUNT_ERROR);
 	}
@@ -495,16 +495,16 @@ tm_be_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 			mm_response_error(end_cmd,
 			    ECLASS_RETRY,
 			    "ETMPUNAVAIL",
-			    5104,
-			    MESS_END);
+			    MM_5104_MSG,
+			    NULL);
 			return (MM_MOUNT_ERROR);
 		}
 
 		mm_response_error(end_cmd,
 		    ECLASS_EXPLICIT,
 		    "ENOSOLUTIONS",
-		    5105,
-		    MESS_END);
+		    MM_5105_MSG,
+		    NULL);
 
 		return (MM_MOUNT_ERROR);
 	}
@@ -517,8 +517,8 @@ tm_be_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 
 		return (MM_MOUNT_NOT_READY);
 	}
@@ -641,8 +641,8 @@ tm_be_set_mount(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 
 		return (MM_BE_ERROR);
 
@@ -684,8 +684,8 @@ tm_be_set_unmount(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 		if (mm_wka->wka_begin_end.be_mode ==
 		    ACCESS_MODE_BLOCKING) {
 			return (MM_BE_BLOCKING);
@@ -703,8 +703,8 @@ tm_be_set_unmount(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 		if (mm_wka->wka_begin_end.be_mode ==
 		    ACCESS_MODE_BLOCKING) {
 			return (MM_BE_BLOCKING);
@@ -896,8 +896,8 @@ tm_be_init_mount(mm_command_t *end_cmd, mm_db_t *db) {
 			    "didn't match any cartridge/volumes");
 			mm_response_error(end_cmd,
 				ECLASS_EXPLICIT, ENOMATCH,
-				5052,
-				MESS_END);
+				MM_5052_MSG,
+				NULL);
 			mm_clear_db(&cart_results);
 			return (MM_BE_ERROR);
 		}
@@ -982,8 +982,8 @@ tm_be_match_mount(mm_command_t *mnt_cmd, mm_command_t *end_cmd, mm_db_t *db) {
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 		if (mm_wka->wka_begin_end.be_mode ==
 		    ACCESS_MODE_BLOCKING) {
 			return (MM_BE_BLOCKING);
@@ -1000,8 +1000,8 @@ tm_be_match_mount(mm_command_t *mnt_cmd, mm_command_t *end_cmd, mm_db_t *db) {
 		mm_response_error(end_cmd,
 		    ECLASS_RETRY,
 		    "ETMPUNAVAIL",
-		    5104,
-		    MESS_END);
+		    MM_5104_MSG,
+		    NULL);
 		if (mm_wka->wka_begin_end.be_mode ==
 		    ACCESS_MODE_BLOCKING) {
 			return (MM_BE_BLOCKING);
@@ -1400,16 +1400,16 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 				mm_response_error(cmd,
 				    ECLASS_RETRY,
 				    "ETMPINUSE",
-				    5104,
-				    MESS_END);
+				    MM_5104_MSG,
+				    NULL);
 
 			} else {
 				/* Set error for retry */
 				mm_response_error(cmd,
 				    ECLASS_RETRY,
 				    "ETMPUNAVAIL",
-				    5104,
-				    MESS_END);
+				    MM_5104_MSG,
+				    NULL);
 			}
 		} else {
 			mms_trace(MMS_ERR,
@@ -1420,8 +1420,8 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT,
 			    "ENOSOLUTIONS",
-			    5105,
-			    MESS_END);
+			    MM_5105_MSG,
+			    NULL);
 		}
 		return (MM_BE_ERROR);
 	}

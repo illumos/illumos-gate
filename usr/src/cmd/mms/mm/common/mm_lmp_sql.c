@@ -2029,8 +2029,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -2813,8 +2813,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);

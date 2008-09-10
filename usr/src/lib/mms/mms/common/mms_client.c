@@ -234,8 +234,8 @@ mms_hello_net(void *session, mms_network_cfg_t *net, char *tag, void *ssl_data)
 	if (mms_mmconnect(net, ssl_data, &sp->mms_conn, &err, tag) != 0) {
 		mms_trace(MMS_ERR, "mms_hello: Error returned from "
 		    "mms_mmconnect() - %d, %s", err, mms_sym_code_to_str(err));
-		mms_send_errmsg(sp, MMS_API_3051_MSG, 2,
-		    mms_sym_code_to_str(err), mms_sym_code_to_str(err));
+		mms_send_errmsg(sp, MMS_API_3051_MSG, "error",
+		    mms_sym_code_to_str(err), NULL);
 		return (err);
 	}
 
@@ -529,7 +529,7 @@ mms_mm_shutdown(mms_session_t *sp, int force)
 	if ((rc = mms_send_cmd(sp, cmd_str, &rsp)) != MMS_API_OK) {
 		mms_trace(MMS_ERR, "mms_mm_shutdown: Sending goodbye to MM "
 		    "failed with a %s error", mms_sym_code_to_str(rc));
-		mms_send_errmsg(sp, MMS_API_3052_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3052_MSG, NULL);
 		return;
 	}
 
@@ -896,14 +896,14 @@ mms_goodbye(void *session, int force)
 	if (sp == NULL) {
 		mms_trace(MMS_ERR, "mms_goodbye: Client session pointer is "
 		    "NULL, unable to close session");
-		mms_send_errmsg(sp, MMS_API_3000_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3000_MSG, NULL);
 		return (MMS_INVALID_REQ);
 	}
 
 	if (sp->mms_api_mode != MMS_API_SYNC) {
 		mms_trace(MMS_ERR, "mms_goodbye: Trying to use sync close "
 		    "on a session which is not an sync session");
-		mms_send_errmsg(sp, MMS_API_3019_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3019_MSG, NULL);
 		return (MMS_WRONG_API_MODE);
 	}
 
@@ -945,14 +945,14 @@ mms_agoodbye(void *session, int force)
 	if (sp == NULL) {
 		mms_trace(MMS_ERR, "mms_agoodbye: Client session pointer is "
 		    "NULL, unable to close session");
-		mms_send_errmsg(sp, MMS_API_3000_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3000_MSG, NULL);
 		return (MMS_INVALID_REQ);
 	}
 
 	if (sp->mms_api_mode != MMS_API_ASYNC) {
 		mms_trace(MMS_ERR, "mms_agoodbye: Trying to use async close "
 		    "on a session which is not an async session");
-		mms_send_errmsg(sp, MMS_API_3019_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3019_MSG, NULL);
 		return (MMS_WRONG_API_MODE);
 	}
 
@@ -1032,7 +1032,7 @@ mms_send_cmd(void *session, char *cmd, void **rsp)
 	if (sp->mms_api_state == MMS_API_FAILURE) {
 		mms_trace(MMS_ERR, "mms_send_cmd: MMS API is in a state of "
 		    "error, unable to send new command:\n%s", cmd);
-		mms_send_errmsg(sp, MMS_API_3001_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3001_MSG, NULL);
 		return (sp->mms_api_errcode);
 	}
 
@@ -1149,14 +1149,14 @@ mms_read_response(void *session, char *tid, void **rsp)
 		mms_trace(MMS_ERR, "mms_read_response: Session pointer is "
 		    "set to NULL, unable to obtain a response for command "
 		    "with taskid %s", tid);
-		mms_send_errmsg(sp, MMS_API_3000_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3000_MSG, NULL);
 		return (MMS_INVALID_REQ);
 	}
 	if (sp->mms_api_state == MMS_API_FAILURE) {
 		mms_trace(MMS_ERR, "mms_read_response: MMS API is in a "
 		    "state of error, unable to obtain a response for command "
 		    "with taskid %s", tid);
-		mms_send_errmsg(sp, MMS_API_3001_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3001_MSG, NULL);
 		return (sp->mms_api_errcode);
 	}
 
@@ -1238,7 +1238,7 @@ mms_send_acmd(void *session, char *cmd, void (*callbk)(void *arg, void *arg1),
 	if (sp->mms_api_state == MMS_API_FAILURE) {
 		mms_trace(MMS_ERR, "mms_send_acmd: MMS API is in a state "
 		    "of error, unable to send new command:\n%s", cmd);
-		mms_send_errmsg(sp, MMS_API_3001_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3001_MSG, NULL);
 		return (sp->mms_api_errcode);
 	}
 
@@ -1249,7 +1249,7 @@ mms_send_acmd(void *session, char *cmd, void (*callbk)(void *arg, void *arg1),
 		mms_trace(MMS_ERR, "mms_send_acmd: Trying to use the MMS "
 		    "API connection in ASYNC mode, though it is configured for "
 		    "%s mode", mms_api[sp->mms_api_mode]);
-		mms_send_errmsg(sp, MMS_API_3019_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3019_MSG, NULL);
 		return (MMS_WRONG_API_MODE);
 	}
 

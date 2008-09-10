@@ -311,21 +311,21 @@ handle_lmpl_cmd_error(int rc, char *cmd, char *lmpl, char *tid, char *msg)
 	char msg_str[1024];
 
 	if (rc == LMPL_UNACCEPTABLE)
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7030_MSG, cmd, lmpl, "unacceptable",
-		    cmd, lmpl, "unacceptable");
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7030_MSG, "cmd", cmd, "lmpl", lmpl,
+		    "rsp", "unacceptable", NULL);
 	else if (rc == LMPL_FINAL_ERROR)
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7030_MSG, cmd, lmpl, "final error",
-		    cmd, lmpl, "final error");
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7030_MSG, "cmd", cmd, "lmpl", lmpl,
+		    "rsp", "final error", NULL);
 	else if (rc == LMPL_FINAL_CANCEL)
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7030_MSG, cmd, lmpl, "final cancel",
-		    cmd, lmpl, "final cancel");
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7030_MSG, "cmd", cmd, "lmpl", lmpl,
+		    "rsp", "final cancel", NULL);
 	else
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7030_MSG, cmd, lmpl, "invalid final",
-		    cmd, lmpl, "invalid final");
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7030_MSG, "cmd", cmd, "lmpl", lmpl,
+		    "rsp", "invalid final", NULL);
 
 	mms_trace(MMS_ERR, "handle_lmpl_cmd_error: %s", msg_str);
 

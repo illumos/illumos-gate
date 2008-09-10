@@ -30,8 +30,13 @@
 extern "C" {
 #endif
 
-char *mms_get_cat_msg(int);
-char *mms_get_msg(mms_par_node_t *);
+void mms_cat_open(void);
+char *mms_get_cat_msg(int msgid);
+char *mms_get_msg(mms_par_node_t *root);
+char *mms_get_msgcl(int msgid, ...);
+char *mms_buf_msgcl(char *buf, int len, int msgid, ...);
+char *mms_bld_msgcl(int msgid, va_list args);
+char *mms_get_locstr(int msgid, va_list args);
 
 #ifdef	__cplusplus
 }

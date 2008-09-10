@@ -116,8 +116,8 @@ lm_mount(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_mount");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7004_MSG, "mount",
-	    "mount");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "mount", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INTERNAL),
 	    mms_sym_code_to_str(MMS_LM_E_INTERNAL), msg_str);
@@ -165,9 +165,9 @@ lm_mount(mms_par_node_t *cmd, char *tid, char *ret_msg)
 	mms_trace(MMS_DEBUG, "lm_mount: Got successful response for mount "
 	    "config command");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7102_MSG,
-	    mms_pn_token(cartridge), mms_pn_token(value),
-	    mms_pn_token(cartridge), mms_pn_token(value));
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7102_MSG,
+	    "cart", mms_pn_token(cartridge), "drive", mms_pn_token(value),
+	    NULL);
 	(void) snprintf(text_str, sizeof (text_str), LM_TEXT_MNT,
 	    mms_pn_token(value), mms_pn_token(slot_name),
 	    mms_pn_token(cartridge), mms_pn_token(side));
@@ -182,8 +182,8 @@ lm_mount(mms_par_node_t *cmd, char *tid, char *ret_msg)
 not_found:
 	mms_trace(MMS_ERR, "LMPM command %s encounterd an invalid or missing "
 	    "%s clause:\n%s", "mount", kw, mms_pn_build_cmd_text(cmd));
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7009_MSG, "mount", kw,
-	    "mount", kw);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7009_MSG, "cmd", "mount", "part", kw, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INVALID),
 	    mms_sym_code_to_str(MMS_LM_E_CMDARGS), msg_str);
@@ -238,8 +238,8 @@ lm_unmount(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_unmount");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7004_MSG, "unmount",
-	    "unmount");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "unmount", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INTERNAL),
 	    mms_sym_code_to_str(MMS_LM_E_INTERNAL), msg_str);
@@ -298,9 +298,9 @@ lm_unmount(mms_par_node_t *cmd, char *tid, char *ret_msg)
 	mms_trace(MMS_DEBUG, "lm_unmount: Got successful response for unmount "
 	    "config command");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7103_MSG,
-	    mms_pn_token(cartridge), mms_pn_token(value),
-	    mms_pn_token(cartridge), mms_pn_token(value));
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7103_MSG,
+	    "cart", mms_pn_token(cartridge), "drive", mms_pn_token(value),
+	    NULL);
 	(void) snprintf(text_str, sizeof (text_str), LM_TEXT_MNT,
 	    mms_pn_token(value), mms_pn_token(slot_name),
 	    mms_pn_token(cartridge), mms_pn_token(side));
@@ -315,8 +315,8 @@ lm_unmount(mms_par_node_t *cmd, char *tid, char *ret_msg)
 not_found:
 	mms_trace(MMS_ERR, "LMPM command %s encounterd an invalid or missing "
 	    "%s clause:\n%s", "unmount", kw, mms_pn_build_cmd_text(cmd));
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7009_MSG, "unmount", kw,
-	    "unmount", kw);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7009_MSG, "cmd", "unmount", "part", kw, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INVALID),
 	    mms_sym_code_to_str(MMS_LM_E_CMDARGS), msg_str);
@@ -356,8 +356,8 @@ lm_move(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_move");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7105_MSG, "move",
-	    lm.lm_type, "move", lm.lm_type);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7105_MSG, "cmd", "move", "type", lm.lm_type, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
 
 	mms_trace(MMS_DEVP, "Exiting lm_move");
@@ -395,8 +395,8 @@ lm_inject(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_inject");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7105_MSG, "inject",
-	    lm.lm_type, "inject", lm.lm_type);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7105_MSG, "cmd", "inject", "type", lm.lm_type, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
 
 	mms_trace(MMS_DEVP, "Exiting lm_inject");
@@ -460,7 +460,8 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_scan");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7004_MSG, "scan", "scan");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "scan", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INTERNAL),
 	    mms_sym_code_to_str(MMS_LM_E_INTERNAL), msg_str);
@@ -639,8 +640,8 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 		lm_remove_lmpl_cmd(lmpl_tid, config_ele);
 		free(spec_str);
 		free(config_buf);
-		(void) snprintf(msg_str, sizeof (msg_str), LM_7118_MSG,
-		    dev_list, dev_list);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7118_MSG,
+		    "carts", dev_list, NULL);
 		free(dev_list);
 	} else if ((clause = mms_pn_lookup(cmd, kw = "fromslot",
 	    MMS_PN_CLAUSE, NULL)) != NULL) {
@@ -658,8 +659,8 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 		    "supported on a DiskArchiving library, sending error "
 		    "response for scan command");
 
-		(void) snprintf(msg_str, sizeof (msg_str), LM_7116_MSG,
-		    lm.lm_type, lm.lm_type);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7116_MSG,
+		    "type", lm.lm_type, NULL);
 		(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 		    mms_sym_code_to_str(MMS_INTERNAL),
 		    mms_sym_code_to_str(MMS_LM_E_INTERNAL), msg_str);
@@ -835,8 +836,8 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 		free(config_buf);
 
 		lm_remove_lmpl_cmd(lmpl_tid, config_ele);
-		(void) snprintf(msg_str, sizeof (msg_str), LM_7125_MSG,
-		    dev_list, dev_list);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7125_MSG,
+		    "list", dev_list, NULL);
 		free(dev_list);
 
 	} else {
@@ -866,7 +867,8 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 		lm_state = LM_ACTIVE;
 
 		mms_trace(MMS_OPER, "lm_scan: library sate set to READY");
-		(void) snprintf(msg_str, sizeof (msg_str), LM_7124_MSG);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7124_MSG,
+		    NULL);
 	}
 
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
@@ -877,8 +879,8 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 not_found:
 	mms_trace(MMS_ERR, "lm_scan: Encountered an invalid or missing "
 	    "%s clause:\n%s", kw, mms_pn_build_cmd_text(cmd));
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7009_MSG, "scan", kw,
-	    "scan", kw);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7009_MSG, "cmd", "scan", "part", kw, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INVALID),
 	    mms_sym_code_to_str(MMS_LM_E_CMDARGS), msg_str);
@@ -956,8 +958,8 @@ lm_eject(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_eject");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7105_MSG, "eject",
-	    lm.lm_type, "eject", lm.lm_type);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7105_MSG, "cmd", "eject", "type", lm.lm_type, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
 
 	mms_trace(MMS_DEVP, "Exiting lm_eject");
@@ -996,8 +998,8 @@ lm_barrier(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_barrier");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7105_MSG, "barrier",
-	    lm.lm_type, "barrier", lm.lm_type);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7105_MSG, "cmd", "barrier", "type", lm.lm_type, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
 
 	mms_trace(MMS_DEVP, "Exiting lm_barrier");
@@ -1037,8 +1039,8 @@ lm_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_private");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7015_MSG, "private",
-	    lm.lm_type, "private", lm.lm_type);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7105_MSG, "cmd", "private", "type", lm.lm_type, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
 
 	mms_trace(MMS_DEVP, "Exiting lm_private");
@@ -1072,8 +1074,8 @@ lm_cancel(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering DISK lm_cancel");
 
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7105_MSG, "barrier",
-	    lm.lm_type, "barrier", lm.lm_type);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7105_MSG, "cmd", "barrier", "type", lm.lm_type, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_SUC_FINAL, tid, msg_str, "");
 
 	mms_trace(MMS_DEVP, "Exiting DISK lm_cancel");

@@ -322,6 +322,7 @@ MSGSUBDIRS=		\
 	libzonecfg	\
 	lvm		\
 	madv		\
+	mms		\
 	mpss		\
 	pam_modules	\
 	rpcsec_gss

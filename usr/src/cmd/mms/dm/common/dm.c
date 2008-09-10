@@ -66,6 +66,7 @@
 #include <host_ident.h>
 #include <mms_strapp.h>
 #include <mms_cores.h>
+#include <mms_cat.h>
 
 static char	*_SrcFile = __FILE__;
 
@@ -691,7 +692,7 @@ dm_rem_old_handle(void)
 				DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 				    "Unable to create handle directory %s: %s",
 				    MMS_HDL_DIR, strerror(err)));
-				DM_MSG_SEND((DM_ADM_ERR, 6529, NULL));
+				DM_MSG_SEND((DM_ADM_ERR, DM_6529_MSG, NULL));
 				DM_EXIT(DM_NO_RESTART);
 			}
 			/*
@@ -703,7 +704,7 @@ dm_rem_old_handle(void)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "Unable to open handle directory %s: %s",
 		    MMS_HDL_DIR, strerror(err)));
-		DM_MSG_SEND((DM_ADM_ERR, 6525, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6525_MSG, NULL));
 		DM_EXIT(DM_NO_RESTART);
 	}
 
@@ -772,8 +773,14 @@ dm_init(int argc, char **argv)
 	setsid();			/* become session leader */
 	umask(0);			/* clear file mode create mask */
 
-	mms_sort_sym_code(dm_msg_cat, dm_msg_cat_num);	/* sort msg catalog */
+	/*
+	 * Init message catalog
+	 */
+	mms_cat_open();
 
+	/*
+	 * Initialize work area
+	 */
 	dm_init_wka();
 
 	/*
@@ -797,7 +804,6 @@ dm_init(int argc, char **argv)
 		    strerror(errno)));
 	}
 	free(corename);
-
 
 	/*
 	 * Init message logging
@@ -1184,7 +1190,7 @@ dm_signal(int sig, void (*handler) ())
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "Unable to set signal handler for "
 		    "signal %d: %s", sig, strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, 6525, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6525_MSG, NULL));
 		DM_EXIT(DM_NO_RESTART);
 	}
 }

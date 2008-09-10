@@ -68,8 +68,6 @@ f none usr/lib/mms/libmmsadm.so.1 0755 root other
 s none usr/lib/mms/libmmsadm.so=libmmsadm.so.1
 f none usr/lib/mms/llib-lmmsadm.ln 0644 root other
 
-f none usr/lib/mms/mm.cat 0555 root other
-
 d none usr/lib/mms/dm 0755 root bin
 f none usr/lib/mms/dm/libdm_default.so.1 0755 root bin
 s none usr/lib/mms/dm/libdm_default.so=libdm_default.so.1

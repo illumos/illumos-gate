@@ -37,11 +37,13 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <nl_types.h>
+#include <libintl.h>
+#include <locale.h>
 #include <ctype.h>
 #include <mms_trace.h>
 #include <mms_strapp.h>
 #include <msg_sub.h>
+#include <mms_cat.h>
 #include "mm_db.h"
 #include "mm.h"
 #include "mm_util.h"
@@ -92,13 +94,7 @@ static void mm_slog_close(void);
 static void mm_slog_flush(void);
 static int mm_slog(mm_msg_t *mess);
 
-/* internationalized message catalog */
-static int mm_msg_cat_open(void);
-static char *mm_msg_cat(int messageid);
-static void mm_msg_cat_close(void);
-
 /* utility */
-static char *mm_get_vmessage_clause(int messageid, va_list args);
 static char *mm_msg_sev2str(mm_msg_sev_t severity);
 static mm_msg_sev_t mm_msg_str2sev(char *serverity);
 static char *mm_msg_who2str(mm_msg_who_t who);
@@ -110,6 +106,9 @@ static mm_msg_data_t mm_msg_data;
 int
 mm_message_init(mm_db_t *db, mm_data_t *data)
 {
+	mms_cat_open();
+	(void) setlocale(LC_MESSAGES, "");
+
 	memset(&mm_msg_data, 0, sizeof (mm_msg_data_t));
 	mm_msg_data.msg_client = data->mm_cfg.mm_network_cfg.cli_name;
 	mm_msg_data.msg_instance = data->mm_cfg.mm_network_cfg.cli_inst;
@@ -119,17 +118,12 @@ mm_message_init(mm_db_t *db, mm_data_t *data)
 		mms_trace(MMS_ERR, "unable to open system log file");
 		return (1);
 	}
-	if (mm_msg_cat_open()) {
-		mms_trace(MMS_ERR, "unable to open message catalog");
-		return (1);
-	}
 	return (0);
 }
 
 void
 mm_message_close(void)
 {
-	mm_msg_cat_close();
 	mm_slog_close();
 	pthread_mutex_destroy(&mm_msg_data.slog_mutex);
 	memset(&mm_msg_data, 0, sizeof (mm_msg_data_t));
@@ -729,7 +723,7 @@ mm_message(mm_db_t *db, mm_msg_who_t who, mm_msg_sev_t severity,
 	mess.msg_messageid = messageid;
 	mess.msg_lang = MESS_LANG;
 	va_start(args, messageid);
-	mess.msg_localized = mm_get_vlocalized_string(messageid, args);
+	mess.msg_localized = mms_get_locstr(messageid, args);
 	va_end(args);
 
 	if ((rc = mm_slog(&mess)) == 0) {
@@ -742,17 +736,16 @@ mm_message(mm_db_t *db, mm_msg_who_t who, mm_msg_sev_t severity,
 }
 
 int
-mm_msg_exists(int message_id) {
-	/* Tells caller if message_id is in */
-	/* the message catalog */
-	char		*fmt;
-	fmt = mm_msg_cat(message_id);
+mm_msg_exists(int message_id)
+{
+	char	*fmt;
+
+	fmt = mms_get_cat_msg(message_id);
 	if (fmt == NULL || fmt[0] == '\0') {
 		return (0);
 	}
 	return (1);
 }
-
 
 int
 mm_msg_parse(mm_command_t *cmd, mms_par_node_t *root)
@@ -803,7 +796,7 @@ mm_msg_parse(mm_command_t *cmd, mms_par_node_t *root)
 	}
 
 	/* lookup localized message */
-	fmt = mm_msg_cat(cmd->cmd_msg.msg_messageid);
+	fmt = mms_get_cat_msg(cmd->cmd_msg.msg_messageid);
 	if (fmt == NULL || fmt[0] == '\0') {
 		/* no catalog message found so use default if it exists */
 		mms_trace(MMS_DEVP, "catalog messageid %d not found",
@@ -1289,57 +1282,6 @@ mm_slog_set_size(mm_db_t *db)
 }
 
 /*
- * Message Catalog Functions
- */
-
-#define	MMS_MSG_CAT_FILE "mm.cat"
-#define	MMS_MSG_CAT_PATH "/usr/lib/mms/"
-
-static nl_catd mms_mm_msg_catd = (nl_catd)-1;
-
-static int
-mm_msg_cat_open(void)
-{
-	/* open message catalog */
-	mms_mm_msg_catd = catopen(MMS_MSG_CAT_FILE, NL_CAT_LOCALE);
-	if (mms_mm_msg_catd == (nl_catd)-1 ||
-	    mms_mm_msg_catd->__content == NULL) {
-		if (mms_mm_msg_catd != (nl_catd)-1) {
-			catclose(mms_mm_msg_catd);
-		}
-		mms_mm_msg_catd = catopen(MMS_MSG_CAT_PATH MMS_MSG_CAT_FILE,
-		    NL_CAT_LOCALE);
-		if (mms_mm_msg_catd == (nl_catd)-1 ||
-		    mms_mm_msg_catd->__content == NULL) {
-			if (mms_mm_msg_catd != (nl_catd)-1) {
-				catclose(mms_mm_msg_catd);
-			}
-			return (1);
-		}
-	}
-	return (0);
-}
-
-/* Read mms message-clause localized message catalog */
-char *
-mm_msg_cat(int messageid)
-{
-	char *fmt;
-	fmt = catgets(mms_mm_msg_catd, 1, messageid, "\0");
-	return (fmt);
-}
-
-/* Close mms message-clause local-text-clause catalog. */
-static void
-mm_msg_cat_close(void)
-{
-	if (mms_mm_msg_catd != (nl_catd)-1) {
-		catclose(mms_mm_msg_catd);
-		mms_mm_msg_catd = (nl_catd)-1;
-	}
-}
-
-/*
  * Get message-clause strings
  */
 
@@ -1376,7 +1318,7 @@ mm_response_error(mm_command_t *cmd, char *eclass, char *ecode,
 	cmd->cmd_ecode = strdup(ecode);
 
 	va_start(args, messageid);
-	text = mm_get_vmessage_clause(messageid, args);
+	text = mms_bld_msgcl(messageid, args);
 	va_end(args);
 
 	buf = mms_strnew("response task[\"%s\"] error[%s %s] %s;",
@@ -1390,74 +1332,6 @@ mm_response_error(mm_command_t *cmd, char *eclass, char *ecode,
 
 no_mem:
 	MM_ABORT_NO_MEM();
-}
-
-static char *
-mm_get_vmessage_clause(int messageid, va_list args)
-{
-	char *buf;
-	char *s1;
-	char *s2;
-	char *arg_key;
-	char *arg_text;
-
-	/*
-	 * Get message-clause
-	 */
-
-	buf = mms_strnew("message[ id[\"%s\" \"%s\" \"%d\"] ",
-	    MESS_MANUFACTURER, MESS_MODEL, messageid);
-
-	s1 = strdup(mm_msg_cat(messageid));
-
-	if ((arg_key = va_arg(args, char *)) != NULL) {
-		buf = mms_strapp(buf, "arguments[");
-		do {
-			if ((arg_text = va_arg(args, char *)) == NULL) {
-				break;
-			}
-			if ((buf = mms_strapp(buf, "\"%s\" \"%s\" ",
-			    arg_key, arg_text)) == NULL) {
-				MM_ABORT_NO_MEM();
-				return (NULL);
-			}
-			s2 = mms_msg_sub(s1, arg_key, arg_text);
-			free(s1);
-			s1 = s2;
-		} while ((arg_key = va_arg(args, char *)) != NULL);
-		buf = mms_strapp(buf, "] ");
-	}
-
-	buf = mms_strapp(buf, "loctext[\"%s\" \"%s\"] ]", MESS_LANG, s1);
-	free(s1);
-
-	return (buf);
-}
-
-char *
-mm_get_vlocalized_string(int messageid, va_list args)
-{
-	char *s1;
-	char *s2;
-	char *arg_key;
-	char *arg_text;
-
-	/*
-	 * Get locale-text-clause localized-string
-	 */
-
-	s1 = strdup(mm_msg_cat(messageid));
-
-	while ((arg_key = va_arg(args, char *)) != NULL) {
-		if ((arg_text = va_arg(args, char *)) == NULL) {
-			break;
-		}
-		s2 = mms_msg_sub(s1, arg_key, arg_text);
-		free(s1);
-		s1 = s2;
-	}
-
-	return (s1);
 }
 
 static mm_msg_sev_t

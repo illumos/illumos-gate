@@ -32,6 +32,15 @@ HDRDIR =	common
 SUBDIRS	=	$(MACH)
 #$(BUILD64)SUBDIRS += $(MACH64)
 
+POFILE = mms.po
+MSGFILES = common/mms_cat.i
+CLEANFILES += $(MSGFILES)
+
+# C preprocessor flags used to build message catalog:
+#	- Include message header file directories.
+#	- Don't redefine gettext for message catalog generation.
+CPPFLAGS +=     -I$(SRCDIR) -I$(SRC)/common/mms/mms -DMMS_CAT
+
 all := 		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
@@ -46,9 +55,15 @@ install_h:
 
 check:
 
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
+
+_msg: $(MSGDOMAINPOFILE)
+
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
+include $(SRC)/Makefile.msg.targ
 include ../../Makefile.targ

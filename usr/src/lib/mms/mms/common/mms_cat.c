@@ -22,66 +22,104 @@
  * Use is subject to license terms.
  */
 
-
-#include <nl_types.h>
-#include <mms.h>
+#include <libintl.h>
+#include <locale.h>
+#include <sys/varargs.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include "mms_parser.h"
+#include "mms_strapp.h"
+#include "mms_trace.h"
+#include "mms_sym.h"
 #include "msg_sub.h"
+#include "mms_cat.h"
 
 static char	*_SrcFile = __FILE__;
 
 /*
- * Message Catalog Functions
+ * Message Catalog
  */
 
-#define	MMS_MSG_CAT_FILE "mm.cat"
-#define	MMS_MSG_CAT_PATH "/usr/lib/mms/"
 
-static nl_catd mms_mm_msg_catd = (nl_catd)-1;
+/*
+ * Gettext is not redefined here so the C preprocessor output from
+ * this file can be used for mms message catalog generation. The
+ * MMS_CAT define is a C preprocessor flag.
+ */
+#ifndef MMS_CAT
+#define	gettext(s) s
+#endif
 
-int
-mms_msg_cat_open(void)
-{
-	/* open message catalog */
-	mms_mm_msg_catd = catopen(MMS_MSG_CAT_FILE, NL_CAT_LOCALE);
-	if (mms_mm_msg_catd == (nl_catd)-1 ||
-	    mms_mm_msg_catd->__content == NULL) {
-		if (mms_mm_msg_catd != (nl_catd)-1) {
-			(void) catclose(mms_mm_msg_catd);
-		}
-		mms_mm_msg_catd = catopen(MMS_MSG_CAT_PATH MMS_MSG_CAT_FILE,
-		    NL_CAT_LOCALE);
-		if (mms_mm_msg_catd == (nl_catd)-1 ||
-		    mms_mm_msg_catd->__content == NULL) {
-			if (mms_mm_msg_catd != (nl_catd)-1) {
-				(void) catclose(mms_mm_msg_catd);
-			}
-			return (1);
-		}
-	}
-	return (0);
-}
+/*
+ * Get the messsageids and message format strings when the message
+ * header files are included below.
+ */
+#define	MM_MSG(n, s)		s, n,
+#define	MMS_API_MSG(n, s)	s, n,
+#define	WCR_MSG(n, s)		s, n,
+#define	DM_MSG(n, s)		s, n,
+#define	LM_MSG(n, s)		s, n,
+
+/*
+ * Message array used to lookup a message format string by messageid.
+ */
+static mms_sym_t	_mms_msg_cat[] = {
+/*
+ * Message header files
+ */
+#include <mms_mm_msg.h>
+#include <mms_api_msg.h>
+#include <mms_wcr_msg.h>
+#include <mms_dm_msg.h>
+#include <mms_lm_msg.h>
+	NULL, 0
+};
+
+/*
+ * Gettext is once again used to localize the message format string.
+ */
+#ifndef MMS_CAT
+#undef gettext
+#endif
+
+static mms_sym_t	*mms_msg_cat = _mms_msg_cat;
+static int	mms_msg_cat_num = sizeof (_mms_msg_cat) / sizeof (mms_sym_t);
 
 void
-mms_msg_cat_close(void)
+mms_cat_open(void)
 {
-	if (mms_mm_msg_catd != (nl_catd)-1) {
-		(void) catclose(mms_mm_msg_catd);
-		mms_mm_msg_catd = (nl_catd)-1;
-	}
+	/*
+	 * Locale is "C" so the API, WCR, DM and LM use the
+	 * English (EN) language. MM will reset locale based
+	 * on client application preference.
+	 */
+	(void) setlocale(LC_MESSAGES, "C");
+
+	/*
+	 * Set the message catalog file name.
+	 */
+	(void) textdomain(TEXT_DOMAIN);
+
+	/*
+	 * Sort the message format strings.
+	 */
+	mms_sort_sym_code(mms_msg_cat, mms_msg_cat_num);
 }
 
 char *
 mms_get_cat_msg(int msgid)
 {
-	char	*fmt;
+	mms_sym_t	*mms_sym;
+	char		*fmt;
 
-	if (mms_msg_cat_open()) {
-		mms_trace(MMS_ERR, "mms_get_cat_msg: Unable to open mms "
-		    "message catalog");
-		return (NULL);
+	mms_sym = mms_lookup_sym_code(msgid, mms_msg_cat, mms_msg_cat_num);
+	if (mms_sym != NULL && mms_sym->sym_token != NULL) {
+		fmt = gettext(mms_sym->sym_token);
+	} else {
+		fmt = NULL;
 	}
-
-	fmt = catgets(mms_mm_msg_catd, 1, msgid, "\0");
 
 	return (fmt);
 }
@@ -131,12 +169,10 @@ mms_get_msg(mms_par_node_t *message)
 		/* Make copy so args can be substituted */
 	text = strdup(fmt);
 
-	mms_msg_cat_close();
-
 		/* Get any arguments for message */
 	if (arg = mms_pn_lookup(message, "arguments", MMS_PN_CLAUSE,
 	    NULL)) {
-			/* Substitue each argument with value in message */
+			/* Substitute each argument with value in message */
 		mms_list_pair_foreach(&arg->pn_arglist, name, value) {
 
 			if (name == NULL || value == NULL)
@@ -183,4 +219,202 @@ get_loctext:
 	    "Messageid: %d", man, model, msgid);
 	text = strdup(err_msg);
 	return (text);
+}
+
+static char *
+mms_get_locale(char *locale, int len)
+{
+	char	*lang;
+	char	buf[3];
+
+	if ((lang = setlocale(LC_MESSAGES, NULL)) == NULL) {
+		(void) snprintf(locale, len, "EN");
+	} else {
+		buf[0] = (char)toupper(lang[0]);
+		buf[1] = (char)toupper(lang[1]);
+		buf[2] = '\0';
+		(void) snprintf(locale, len, "%s", buf);
+	}
+	return (locale);
+}
+
+char *
+mms_get_msgcl(int msgid, ...)
+{
+	char	*msg;
+	va_list	args;
+
+	va_start(args, msgid);
+	msg = mms_bld_msgcl(msgid, args);
+	va_end(args);
+
+	return (msg);
+}
+
+char *
+mms_buf_msgcl(char *buf, int len, int msgid, ...)
+{
+	char	*msg;
+	va_list	args;
+
+	if (buf != NULL && len > 0) {
+		va_start(args, msgid);
+		msg = mms_bld_msgcl(msgid, args);
+		va_end(args);
+
+		buf[0] = '\0';
+		if (msg != NULL) {
+			(void) snprintf(buf, len, "%s", msg);
+			free(msg);
+		}
+	}
+	return (buf);
+}
+
+char *
+mms_bld_msgcl(int msgid, va_list args)
+{
+	char		*msgcl = NULL;
+	char		*msgfmt;
+	char		*loctext = NULL;
+	char		*argcl = NULL;
+	char		*arglist = NULL;
+	int		nargs = 0;
+	va_list		ap;
+	char		*argp;
+	char		*valp;
+	int		i;
+	int		alen;
+	int		addarg;
+	int		cpstart;
+	char		lang[20];
+
+	/*
+	 * Get language
+	 */
+	(void) mms_get_locale(lang, sizeof (lang));
+
+	/*
+	 * Get localized message format string from msg catalog
+	 */
+	msgfmt = mms_get_cat_msg(msgid);
+	if (msgfmt == NULL || msgfmt[0] == '\0') {
+		/* Undefined message */
+		mms_trace(MMS_ERR, "Undefined message id '%d'", msgid);
+		return (msgcl);
+	}
+
+	/*
+	 * Create argument list
+	 */
+	ap = args;
+	for (argp = va_arg(ap, char *);
+	    argp != NULL; argp = va_arg(ap, char *)) {
+		/* Add to arguments list */
+		arglist = mms_strapp(arglist, "'%s' '%s' ",
+		    argp, va_arg(ap, char *));
+	}
+
+	/*
+	 * Substitute arg values into variables in msg to create loctext
+	 */
+	for (i = 0, cpstart = 0; msgfmt[i] != '\0'; ) {
+		valp = NULL;
+		if (msgfmt[i] == '$') {
+			ap = args;
+			for (argp = va_arg(ap, char *);
+			    argp != NULL; argp = va_arg(ap, char *)) {
+				alen = strlen(argp);
+				if (strncmp(msgfmt + i + 1, argp,
+				    alen) == 0 &&
+				    msgfmt[i + 1 + alen] == '$') {
+					valp = va_arg(ap, char *);
+					/* don't add this to arg list */
+					addarg = 0;
+					break;
+				} else {
+					/* Not matched, skip value */
+					(void) va_arg(ap, char *);
+				}
+			}
+			if (valp != NULL) {
+				/* Substitute variable with value */
+				if (addarg) {
+					/* Add to arguments list */
+					arglist = mms_strapp(arglist,
+					    "'%s' '%s' ",
+					    argp, valp);
+					nargs += 2;
+				}
+				/* Copy the uncopied portion of msgfmt */
+				/* to loctext */
+				loctext = mms_strnapp(loctext, i - cpstart,
+				    msgfmt + cpstart);
+				loctext = mms_strapp(loctext, "%s", valp);
+				i += (alen + 2);	/* skip over arg */
+				cpstart = i;
+			} else {
+				i++;
+			}
+		} else {
+			i++;
+		}
+	}
+
+	/* if not at end of msgfmt, copy the last portion of text to loctext */
+	if (cpstart != i) {
+		loctext = mms_strapp(loctext, "%s", msgfmt + cpstart);
+	}
+
+	/*
+	 * Terminate argument clause
+	 */
+	if (nargs == 0) {		/* no arguments */
+		argcl = "";
+	} else {
+		argcl = mms_strnew("arguments [ %s ] ", arglist);
+		free(arglist);
+	}
+
+	msgcl = mms_strapp(msgcl, "message [ id [ 'SUNW' 'MMS' '%d' ] %s "
+	    "loctext [ '%s' '%s' ]] ", msgid, argcl, lang, loctext);
+	free(argcl);
+	free(loctext);
+	return (msgcl);
+}
+
+char *
+mms_get_locstr(int msgid, va_list args)
+{
+	char	*s1;
+	char	*s2;
+	char	*arg_key;
+	char	*arg_text;
+	char	*msgfmt;
+
+	/*
+	 * Get localized message format string.
+	 */
+	msgfmt = mms_get_cat_msg(msgid);
+	if (msgfmt == NULL || msgfmt[0] == '\0') {
+		/* Undefined message */
+		mms_trace(MMS_ERR, "Undefined message id '%d'", msgid);
+		return (NULL);
+	}
+
+	/*
+	 * Substitute message arguments into message format string
+	 * to create a localized message string.
+	 */
+	s1 = strdup(msgfmt);
+	while ((arg_key = va_arg(args, char *)) != NULL) {
+		if ((arg_text = va_arg(args, char *)) == NULL) {
+			break;
+		}
+		s2 = mms_msg_sub(s1, arg_key, arg_text);
+		free(s1);
+		s1 = s2;
+	}
+
+	return (s1);
 }

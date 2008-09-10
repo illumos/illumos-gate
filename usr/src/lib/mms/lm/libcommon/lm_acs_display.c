@@ -511,8 +511,8 @@ lm_get_type_info(ACS_DISPLAY_RESPONSE *from_server, char *tid, char *ret_msg)
 		mms_trace(MMS_ERR, "Library %s is suppose to be of type %s, "
 		    "but ACSLS says library with ACSLS cordinates of %d,%d "
 		    "is of type %s", lm.lm_name, lm.lm_type, lm.lm_acs, 0, p);
-		(void) snprintf(msg_str, sizeof (msg_str), LM_7033_MSG,
-		    lm.lm_type, p, lm.lm_type, p);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str), LM_7033_MSG,
+		    "type", lm.lm_type, "a_type", p, NULL);
 		(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 		    mms_sym_code_to_str(MMS_INVALID),
 		    mms_sym_code_to_str(MMS_LM_E_UNKNOWN), msg_str);

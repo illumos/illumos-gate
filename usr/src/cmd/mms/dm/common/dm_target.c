@@ -968,7 +968,7 @@ dm_bind_target_base(void)
 			    pid));
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "waiting for close"));
-			DM_MSG_SEND((DM_ADM_ERR, 6521,
+			DM_MSG_SEND((DM_ADM_ERR, DM_6521_MSG,
 			    "drive", drv->drv_drvname, "pid", pid, NULL));
 			pthread_cond_wait(&wka->dm_tdv_close_cv,
 			    &wka->dm_tdv_close_mutex);

@@ -323,7 +323,7 @@ dm_ioctl_mtiocltop(drm_request_t *req, drm_reply_t *rep)
 		rc = DRV_CALL(drv_tell,
 		    ((uint64_t *)&rep->drm_mtop_rep.drm_count));
 		if (rc) {
-			DM_MSG_SEND((DM_ADM_ERR, 6523, NULL));
+			DM_MSG_SEND((DM_ADM_ERR, DM_6523_MSG, NULL));
 		}
 		break;
 	case MTFSF:
@@ -366,7 +366,7 @@ dm_ioctl_mtiocltop(drm_request_t *req, drm_reply_t *rep)
 		rc = DRV_CALL(drv_get_blksize,
 		    ((uint64_t *)&rep->drm_mtop_rep.drm_count));
 		if (rc) {
-			DM_MSG_SEND((DM_ADM_ERR, 6514, NULL));
+			DM_MSG_SEND((DM_ADM_ERR, DM_6514_MSG, NULL));
 		}
 		rep->drm_mtop_rep.drm_op = MTGRSZ;
 		break;
@@ -374,7 +374,7 @@ dm_ioctl_mtiocltop(drm_request_t *req, drm_reply_t *rep)
 	default:
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "0x%x", (int)op->drm_op));
-		DM_MSG_SEND((DM_ADM_ERR, 6515, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6515_MSG, NULL));
 		rc = EINVAL;
 		break;
 	}
@@ -798,7 +798,7 @@ fatal:
 	free(user);
 	wka->dm_app_pid = 0;
 	DRV_CALL(drv_locate, (&pos));
-	DM_MSG_SEND((DM_ADM_ERR, 6516, NULL));
+	DM_MSG_SEND((DM_ADM_ERR, DM_6516_MSG, NULL));
 	(void) dm_set_label_blksize();
 	return (rc);
 
@@ -2568,7 +2568,7 @@ dm_ioctl_seek(int count)
 
 	rc = DRV_CALL(drv_seek, ((uint64_t)count));
 	if (rc) {
-		DM_MSG_SEND((DM_ADM_ERR, 6522, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6522_MSG, NULL));
 		rc = EIO;
 	}
 
@@ -2629,7 +2629,7 @@ dm_ioctl_set_blksize(uint64_t blksize)
 	rc = DRV_CALL(drv_set_blksize, (blksize));
 
 	if (rc) {
-		DM_MSG_SEND((DM_ADM_ERR, 6513, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6513_MSG, NULL));
 		return (rc);
 	}
 	if ((drv->drv_cur_blksize = blksize) == 0) {

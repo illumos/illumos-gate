@@ -95,19 +95,18 @@ lm_common_ready(int level, char *tid, char *ret_msg)
 			break;
 		case LM_NOT:
 			cfg_str = LM_READY_N;
-			(void) snprintf(msg_str, sizeof (msg_str), LM_7013_MSG,
-			    "Not Ready", "Not Ready");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7013_MSG, "state", "Not Ready", NULL);
 			break;
 		case LM_DISCONN:
 			cfg_str = LM_READY_D;
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7013_MSG, "Disconnected",
-			    "Disconnected");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7013_MSG, "state", "Disconnected", NULL);
 			break;
 		case LM_BROKE:
 			cfg_str = LM_READY_B;
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7013_MSG, "Broke", "Broke");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7013_MSG, "state", "Broke", NULL);
 			break;
 		case LM_PRESENT:
 			cfg_str = LM_READY_P;
@@ -202,8 +201,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 	mms_trace(MMS_DEVP, "Entering lm_common_activate()");
 
 		/* Create default final error response for MM */
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7004_MSG, "activate", "activate");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "activate", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INTERNAL),
 	    mms_sym_code_to_str(MMS_LM_E_INTERNAL), msg_str);
@@ -268,9 +267,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "attribute found in final success response of "
 			    "private command to obtain library name, "
 			    "response:\n%s", mms_pn_build_cmd_text(cmd_spec));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7018_MSG, "LibraryName",
-			    "LibraryName");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7018_MSG, "object", "LibraryName", NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -286,9 +284,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "response of private command to obtain library "
 			    "name, response:\n%s",
 			    mms_pn_build_cmd_text(cmd_spec));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7018_MSG, "LibraryName",
-			    "LibraryName");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7018_MSG, "object", "LibraryName", NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -310,9 +307,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "attribute found in final success response of "
 			    "private command to obtain library type, "
 			    "response:\n%s", mms_pn_build_cmd_text(cmd_spec));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7018_MSG, "LibraryType",
-			    "LibraryType");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7018_MSG, "object", "LibraryType", NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -328,9 +324,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "response of private command to obtain library "
 			    "type, response:\n%s",
 			    mms_pn_build_cmd_text(cmd_spec));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7018_MSG, "LibraryType",
-			    "LibraryType");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7018_MSG, "object", "LibraryType", NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -354,9 +349,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "private command to obtain library connection "
 			    "type, response:\n%s",
 			    mms_pn_build_cmd_text(cmd_spec));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7018_MSG,
-			    "LibraryConnection", "LibraryConnection");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7018_MSG, "object", "LibraryConnection", NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -373,9 +367,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "success response of private command to obtain "
 			    "library connection type, response:\n%s",
 			    mms_pn_build_cmd_text(cmd_spec));
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7018_MSG,
-			    "LibraryConnection", "LibraryConnection");
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7018_MSG, "object", "LibraryConnection", NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
 			    mms_sym_code_to_str(MMS_INTERNAL),
@@ -409,10 +402,9 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			mms_trace(MMS_ERR, "lm_c_activate: unable to load "
 			    "command handling routines for library type - "
 			    "%s, %s", lm.lm_type, lm.lm_conn);
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7020_MSG,
-			    lm.lm_type, lm.lm_conn,
-			    lm.lm_type, lm.lm_conn);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7020_MSG, "type", lm.lm_type,
+			    "conn", lm.lm_conn, NULL);
 			lm_message("operator", "alert", msg_str);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_ERR_FINAL, tid,
@@ -457,8 +449,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 		mms_trace(MMS_DEBUG, "lm_c_activate: LM is active");
 
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    "%s", LM_7014_MSG);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7014_MSG, NULL);
 		(void) snprintf(ret_msg, RMBUFSIZE,
 		    LM_SUC_FINAL, tid, msg_str, "");
 
@@ -499,7 +491,8 @@ lm_common_activate(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 		mms_trace(MMS_DEBUG, "lm_c_activate: LM is inactive");
 
-		(void) snprintf(msg_str, sizeof (msg_str), "%s", LM_7015_MSG);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7015_MSG, NULL);
 		(void) snprintf(ret_msg, RMBUFSIZE,
 		    LM_SUC_FINAL, tid, msg_str, "");
 
@@ -581,10 +574,9 @@ lm_c_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				mms_trace(MMS_ERR, "lm_c_v_private: private "
 				    "command contains a unsupport get-name - "
 				    "%s", mms_pn_token(name));
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7010_MSG, "get",
-				    mms_pn_token(name), "get",
-				    mms_pn_token(name));
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7010_MSG, "type", "get",
+				    "name", mms_pn_token(name), NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_ERR_FINAL, tid,
 				    mms_sym_code_to_str(MMS_EXIST),
@@ -623,10 +615,9 @@ lm_c_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				mms_trace(MMS_ERR, "lm_c_v_private: private "
 				    "command contains a unsupport set-name - "
 				    "%s", mms_pn_token(name));
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7010_MSG, "set",
-				    mms_pn_token(name), "set",
-				    mms_pn_token(name));
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7010_MSG, "type", "set",
+				    "name", mms_pn_token(name), NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_ERR_FINAL, tid,
 				    mms_sym_code_to_str(MMS_EXIST),
@@ -671,10 +662,9 @@ lm_c_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				mms_trace(MMS_ERR, "lm_c_v_private: private "
 				    "command contains a unsupport unset-name - "
 				    "%s", mms_pn_token(name));
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7010_MSG, "unset",
-				    mms_pn_token(name), "unset",
-				    mms_pn_token(name));
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7010_MSG, "type", "unset",
+				    "name", mms_pn_token(name), NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_ERR_FINAL, tid,
 				    mms_sym_code_to_str(MMS_EXIST),
@@ -691,8 +681,8 @@ lm_c_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 not_found:
 	mms_trace(MMS_ERR, "lm_c_v_private: LMPM private command has a "
 	    "missing value for a %s set-name", mms_pn_token(name));
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7009_MSG, "private", kw, "private", kw);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7009_MSG, "cmd", "private", "part", kw, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INVALID),
@@ -748,8 +738,8 @@ lm_common_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering lm_common_private");
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7004_MSG, "private", "private");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "private", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INTERNAL),
@@ -812,13 +802,12 @@ lm_common_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				if (mms_trace_str_filter(mms_pn_token(value))) {
 					mms_trace(MMS_DEBUG, "lm_c_private: "
 					    "mms_trace_str_filter failed");
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str),
 					    LM_7011_MSG,
-					    mms_pn_token(name),
-					    mms_pn_token(value),
-					    mms_pn_token(name),
-					    mms_pn_token(value));
+					    "name", mms_pn_token(name),
+					    "value", mms_pn_token(value),
+					    NULL);
 					(void) snprintf(ret_msg, RMBUFSIZE,
 					    LM_ERR_FINAL,
 					    tid,
@@ -838,13 +827,12 @@ lm_common_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				if (mms_trace_set_fsize(mms_pn_token(value))) {
 					mms_trace(MMS_DEBUG, "lm_c_private: "
 					    "mms_trace_set_fsize failed");
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str),
 					    LM_7011_MSG,
-					    mms_pn_token(name),
-					    mms_pn_token(value),
-					    mms_pn_token(name),
-					    mms_pn_token(value));
+					    "name", mms_pn_token(name),
+					    "value", mms_pn_token(value),
+					    NULL);
 					(void) snprintf(ret_msg, RMBUFSIZE,
 					    LM_ERR_FINAL,
 					    tid,
@@ -869,13 +857,12 @@ lm_common_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 					mms_trace(MMS_ERR, "lm_c_private "
 					    "invalid message level - %s",
 					    mms_pn_token(value));
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str),
 					    LM_7011_MSG,
-					    mms_pn_token(name),
-					    mms_pn_token(value),
-					    mms_pn_token(name),
-					    mms_pn_token(value));
+					    "name", mms_pn_token(name),
+					    "value", mms_pn_token(value),
+					    NULL);
 					(void) snprintf(ret_msg, RMBUFSIZE,
 					    LM_ERR_FINAL,
 					    tid,
@@ -947,8 +934,8 @@ lm_common_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 	mms_trace(MMS_DEBUG,
 	    "lm_c_private: completed private command successfully");
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7101_MSG, "private", "private");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7101_MSG, "cmd", "private", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE,
 	    LM_SUC_FINAL, tid, get_str, msg_str);
 	mms_trace(MMS_DEVP, "Exiting lm_common_private");
@@ -957,8 +944,8 @@ lm_common_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 not_found:
 	mms_trace(MMS_ERR, "lm_c_private: LMPM private command has a "
 	    "missing value for a %s set-name", mms_pn_token(name));
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7009_MSG, "private", kw, "private", kw);
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7009_MSG, "cmd", "private", "part", kw, NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INVALID),
@@ -1232,8 +1219,8 @@ lm_common_exit(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	mms_trace(MMS_DEVP, "Entering CommonExit");
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7004_MSG, "exit", "exit");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "exit", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE,
 	    LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INTERNAL),
@@ -1265,15 +1252,15 @@ lm_common_exit(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			mms_trace(MMS_ERR, "lm_c_exit: library specific "
 			    "exit command failed to do pre exit cleanly");
 		} else {
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7016_MSG);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7016_MSG, NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_SUC_FINAL, tid, msg_str, "");
 		}
 	} else {
 		if (rc == LM_OK) {
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7016_MSG);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7016_MSG, NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_SUC_FINAL, tid, msg_str, "");
 		}
@@ -1326,8 +1313,8 @@ lm_common_reset(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 	lret_msg[0] = '\0';
 
-	(void) snprintf(msg_str, sizeof (msg_str),
-	    LM_7004_MSG, "reset", "reset");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7004_MSG, "cmd", "reset", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE,
 	    LM_ERR_FINAL,
 	    tid,
@@ -1393,14 +1380,14 @@ lm_common_reset(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			}
 		} else {
 			if (partial) {
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7022_MSG);
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7022_MSG, NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_SUC_FINAL,
 				    tid, msg_str, "");
 			} else {
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7017_MSG);
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7017_MSG, NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_SUC_FINAL,
 				    tid, msg_str, "");
@@ -1417,15 +1404,15 @@ lm_common_reset(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    "LM's state back to ready");
 				return (LM_ERROR);
 			}
-			(void) snprintf(msg_str, sizeof (msg_str),
-			    LM_7022_MSG);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7022_MSG, NULL);
 			(void) snprintf(ret_msg, RMBUFSIZE,
 			    LM_SUC_FINAL, tid, msg_str, "");
 			return (LM_OK);
 		} else {
 			if (rc == LM_OK) {
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7017_MSG);
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7017_MSG, NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_SUC_FINAL,
 				    tid, msg_str, "");

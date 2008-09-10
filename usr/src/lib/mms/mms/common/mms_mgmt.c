@@ -419,8 +419,8 @@ mms_ev_insert(mms_session_t *sp, mms_rsp_ele_t *rsp)
 	int	rc;
 
 	if ((rc = pthread_mutex_lock(&sp->mms_ev_mutex)) != 0) {
-		mms_send_errmsg(sp, MMS_API_3002_MSG, 4, "mms_ev_mutex",
-		    strerror(rc), "mms_ev_mutex", strerror(rc));
+		mms_send_errmsg(sp, MMS_API_3002_MSG, "name", "mms_ev_mutex",
+		    "errno", strerror(rc), NULL);
 		mms_serr(MMS_CRIT, "mms_ev_insert: Lock of MMS event"
 		    "mutex failed with errno - %s\n", strerror(rc));
 	}
@@ -428,16 +428,16 @@ mms_ev_insert(mms_session_t *sp, mms_rsp_ele_t *rsp)
 	mms_list_insert_tail(&sp->mms_ev_list, rsp);
 
 	if ((rc = pthread_cond_broadcast(&sp->mms_ev_cv)) != 0) {
-		mms_send_errmsg(sp, MMS_API_3003_MSG, 4, "mms_ev_cv",
-		    strerror(rc), "mms_ev_cv", strerror(rc));
+		mms_send_errmsg(sp, MMS_API_3003_MSG, "name", "mms_ev_cv",
+		    "errno", strerror(rc), NULL);
 		mms_serr(MMS_CRIT, "mms_ev_insert: Broadcast on "
 		    "event list condition variable failed with errno -"
 		    " %s", strerror(rc));
 	}
 
 	if ((rc = pthread_mutex_unlock(&sp->mms_ev_mutex)) != 0) {
-		mms_send_errmsg(sp, MMS_API_3003_MSG, 4, "mms_ev_mutex",
-		    strerror(rc), "mms_ev_mutex", strerror(rc));
+		mms_send_errmsg(sp, MMS_API_3003_MSG, "name", "mms_ev_mutex",
+		    "errno", strerror(rc), NULL);
 		mms_serr(MMS_CRIT, "mms_ev_insert: Unlock of MMS event "
 		    "list mutex failed with errno - %s", strerror(rc));
 	}

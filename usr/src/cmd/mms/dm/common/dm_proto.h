@@ -33,7 +33,6 @@ extern "C" {
 char **dm_bld_dir_tab(void);
 char **drv_get_mounted(void);
 char *dm_bld_config_cmd(char *task);
-char *dm_bld_msgcl(int msgid, va_list args);
 char *dm_bld_task(char *cmd);
 char *dm_char_to_hex(uchar_t *ibuf, int ilen, char *obuf, int olen);
 char *dm_get_attr_value(mms_par_node_t *root, char *obj, char *attr);

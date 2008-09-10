@@ -81,9 +81,9 @@ mm_cpexit_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -170,8 +170,8 @@ mm_cpexit_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ENOMATCH,
-		    5079,
-		    MESS_END);
+		    MM_5079_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -181,8 +181,8 @@ mm_cpexit_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ETOOMANY,
-		    5076,
-		    MESS_END);
+		    MM_5076_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -312,8 +312,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -419,8 +419,8 @@ mm_cpstart_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ENOMATCH,
-		    5079,
-		    MESS_END);
+		    MM_5079_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -430,8 +430,8 @@ mm_cpstart_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ETOOMANY,
-		    5076,
-		    MESS_END);
+		    MM_5076_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -599,8 +599,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -720,8 +720,8 @@ mm_cpscan_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    ELIBNOLMCONFIGURED,
-			    5080,
-			    MESS_END);
+			    MM_5080_MSG,
+			    NULL);
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			cmd->cmd_remove = 1;
 			return (MM_CMD_ERROR);
@@ -730,8 +730,8 @@ mm_cpscan_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT,
 			    ETOOMANY,
-			    5076,
-			    MESS_END);
+			    MM_5076_MSG,
+			    NULL);
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			cmd->cmd_remove = 1;
 			return (MM_CMD_ERROR);
@@ -762,10 +762,10 @@ mm_cpscan_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    ELIBNOLMCONFIGURED,
-			    5021,
+			    MM_5021_MSG,
 			    "lm",
 			    lm_name,
-			    MESS_END);
+			    NULL);
 			mm_clear_db(&db->mm_db_results);
 			mm_clear_db(&lm_results);
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -786,10 +786,10 @@ mm_cpscan_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    ELMNOTREADY,
-			    5021,
+			    MM_5021_MSG,
 			    "lm",
 			    lm_name,
-			    MESS_END);
+			    NULL);
 			mm_clear_db(&db->mm_db_results);
 			mm_clear_db(&lm_results);
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -885,9 +885,9 @@ mm_cpscan_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			rc = MM_CMD_ERROR;
 		} else {
@@ -909,8 +909,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -947,9 +947,9 @@ mm_cpreset_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -1044,14 +1044,14 @@ mm_cpreset_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    EDRVNODMCONFIGURED,
-			    5074,
-			    MESS_END);
+			    MM_5074_MSG,
+			    NULL);
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    ELIBNOLMCONFIGURED,
-			    5075,
-			    MESS_END);
+			    MM_5075_MSG,
+			    NULL);
 		}
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -1062,8 +1062,8 @@ mm_cpreset_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ETOOMANY,
-		    5076,
-		    MESS_END);
+		    MM_5076_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -1118,18 +1118,18 @@ mm_cpreset_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    EDMNOTCONNECTED,
-			    5077,
+			    MM_5077_MSG,
 			    "dm",
 			    mgr_name,
-			    MESS_END);
+			    NULL);
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    ELMNOTCONNECTED,
-			    5078,
+			    MM_5078_MSG,
 			    "lm",
 			    mgr_name,
-			    MESS_END);
+			    NULL);
 		}
 		mm_clear_db(&db->mm_db_results);
 		mm_clear_db(&dev_results);
@@ -1154,18 +1154,18 @@ mm_cpreset_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    EDMNOTCONNECTED,
-			    5077,
+			    MM_5077_MSG,
 			    "dm",
 			    mgr_name,
-			    MESS_END);
+			    NULL);
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    ELMNOTCONNECTED,
-			    5078,
+			    MM_5078_MSG,
 			    "lm",
 			    mgr_name,
-			    MESS_END);
+			    NULL);
 		}
 		mm_clear_db(&dev_results);
 		cmd->cmd_remove = 1;
@@ -1235,8 +1235,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);

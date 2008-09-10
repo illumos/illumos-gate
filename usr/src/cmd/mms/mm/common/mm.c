@@ -4894,7 +4894,7 @@ main(int argc, char **argv)
 	mm_signal(SIGPIPE, mm_signal_handler);
 
 	(void) mm_message(&mm_data.mm_db_main,
-	    MESS_LOG, MESS_INFO, 5013, MESS_END);
+	    MESS_LOG, MESS_INFO, MM_5013_MSG, NULL);
 
 	/*
 	 * Accept new clients, read client input

@@ -26,7 +26,7 @@
 #include <mms.h>
 #include <mgmt_mms.h>
 
-#define	MMS_API_MSG "message task [\"3999\"] who [operator] \
+#define	MMS_API_MSG_CMD "message task [\"3999\"] who [operator] \
 severity [error] %s; "
 
 #if mms_lint
@@ -155,77 +155,6 @@ mms_gen_err_rsp(char *tid, int code, char *err_msg)
 }
 
 /*
- * mms_msglen
- *
- * Calculate the message length.
- */
-static int
-mms_msglen(const char *fmt, int nargs, va_list args)
-{
-	char	*ap;
-	int	len = MMS_API_MSG_PAD;
-	int	i;
-
-	len += strlen(fmt);
-	for (i = 0; i < nargs; i++) {
-		ap = va_arg(args, char *);
-		len += strlen(ap);
-	}
-
-	return (len);
-}
-
-/*
- * mms_crtmsg
- *
- * Create an error response message.
- */
-static char *
-mms_crtmsg(const char *fmt, int len, va_list args)
-{
-	char	*msg;
-
-	msg = malloc(len);
-	if (msg == NULL)
-		return (NULL);
-
-	if (vsnprintf(msg, len, fmt, args) == -1) {
-		free(msg);
-		return (NULL);
-	}
-
-	return (msg);
-}
-
-/*
- * mms_errmsg
- *
- * Allocate the memory for and then create and return an
- * error message.
- */
-static char *
-mms_errmsg(const char *fmt, int nargs, ...)
-{
-	va_list	arglist;
-	char	*message;
-	int	len;
-
-	va_start(arglist, nargs);
-	len = mms_msglen(fmt, nargs, arglist);
-	va_end(arglist);
-
-	/*
-	 *   Create the error message.
-	 */
-	va_start(arglist, nargs);
-	message = mms_crtmsg(fmt, len, arglist);
-	va_end(arglist);
-
-	return (message);
-}
-
-
-/*
  *   mms_log_error
  *
  *   Output an error message to a log file.
@@ -246,14 +175,14 @@ mms_log_error(mms_session_t *sp, char *message)
 	if (message == NULL)
 		return;
 
-	len += strlen(MMS_API_MSG) + strlen(message);
+	len += strlen(MMS_API_MSG_CMD) + strlen(message);
 	err_msg = malloc(len);
 	if (!err_msg) {
 		free(message);
 		return;
 	}
 
-	if (snprintf(err_msg, len, MMS_API_MSG, message) == -1) {
+	if (snprintf(err_msg, len, MMS_API_MSG_CMD, message) == -1) {
 		mms_trace(MMS_ERR, "mms_log_error: Unable to create API error "
 		    "message:\n%s", message);
 		free(err_msg);
@@ -315,11 +244,10 @@ mms_log_error(mms_session_t *sp, char *message)
  *
  */
 void
-mms_send_errmsg(mms_session_t *sp, const char *fmt, int nargs, ...)
+mms_send_errmsg(mms_session_t *sp, int msgid, ...)
 {
-	va_list		arglist;
+	va_list		args;
 	char		*message;
-	int		len;
 
 	if (sp->clog == NULL)
 		return;
@@ -327,13 +255,10 @@ mms_send_errmsg(mms_session_t *sp, const char *fmt, int nargs, ...)
 	/*
 	 *   Calculate the message length.
 	 */
-	va_start(arglist, nargs);
-	len = mms_msglen(fmt, nargs, arglist);
-	va_end(arglist);
+	va_start(args, msgid);
+	message = mms_get_msgcl(msgid, args);
+	va_end(args);
 
-	va_start(arglist, nargs);
-	message = mms_crtmsg(fmt, len, arglist);
-	va_end(arglist);
 	if (!message)
 		return;
 
@@ -379,9 +304,8 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 			    err->pe_token, err->pe_code,
 			    err->pe_msg);
 		}
-/* XXX SEE IF LM PARSE MMS_ERROR CODE CAN BE ADAPTED TO WORK HERE AS WELL */
-		*msg = mms_errmsg(MMS_API_3017_MSG, 1, (err == NULL) ?
-		    "parse error" : err->pe_msg);
+		*msg = mms_get_msgcl(MMS_API_3017_MSG, "errmsg",
+		    (err == NULL) ? "parse error" : err->pe_msg);
 		mms_pe_destroy(&err_list);
 		return (MMS_E_INVALID_RESPONSE);
 	}
@@ -395,8 +319,8 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 		    "node found in what should be a valid "
 		    "response or event from MMS:\n%s", input);
 		mms_pn_destroy(cmd);
-		*msg = mms_errmsg(MMS_API_3014_MSG, 2, "command node",
-		    "command node");
+		*msg = mms_get_msgcl(MMS_API_3014_MSG, "part", "command node",
+		    NULL);
 		return (MMS_E_INVALID_RESPONSE);
 	}
 
@@ -423,7 +347,7 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 		if (clause == NULL) {
 			mms_trace(MMS_ERR, "mms_rsp_extract: No tag "
 			    "clause found in event:\n%s", input);
-			*msg = mms_errmsg(MMS_API_3013_MSG, 0);
+			*msg = mms_get_msgcl(MMS_API_3013_MSG, NULL);
 			mms_pn_destroy(cmd);
 			return (-1);
 		}
@@ -432,7 +356,7 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 		if (value == NULL) {
 			mms_trace(MMS_ERR, "mms_rsp_extract: No tag "
 			    "string found in event:\n%s", input);
-			*msg = mms_errmsg(MMS_API_3013_MSG, 0);
+			*msg = mms_get_msgcl(MMS_API_3013_MSG, NULL);
 			mms_pn_destroy(cmd);
 			return (-1);
 		}
@@ -464,8 +388,8 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 			mms_trace(MMS_ERR, "mms_rsp_extract: No task "
 			    "clause found in response:\n%s", input);
 			mms_pn_destroy(cmd);
-			*msg = mms_errmsg(MMS_API_3014_MSG, 2,
-			    "task id clause", "task id clause");
+			*msg = mms_get_msgcl(MMS_API_3014_MSG, "part",
+			    "task id clause", NULL);
 			return (MMS_MISSING_TASKID);
 		}
 		value = mms_pn_lookup(clause, NULL, MMS_PN_STRING, NULL);
@@ -473,8 +397,8 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 			mms_trace(MMS_ERR, "mms_rsp_extract: No task"
 			    "string found in response:\n%s", input);
 			mms_pn_destroy(cmd);
-			*msg = mms_errmsg(MMS_API_3014_MSG, 2,
-			    "task id string", "task id string");
+			*msg = mms_get_msgcl(MMS_API_3014_MSG, "part",
+			    "task id string", NULL);
 			return (MMS_MISSING_TASKID);
 		}
 
@@ -516,7 +440,8 @@ mms_rsp_extract(mms_session_t *sp, char *input, mms_par_node_t **cmdp,
 		} else {
 			mms_trace(MMS_CRIT, "mms_rsp_extract: Recevied an "
 			    "unknown type of response:\n%s", input);
-			*msg = mms_errmsg(MMS_API_3006_MSG, 2, *tid, *tid);
+			*msg = mms_get_msgcl(MMS_API_3006_MSG, "taskid", *tid,
+			    NULL);
 			mms_pn_destroy(cmd);
 			return (MMS_INVALID_RSP);
 		}
@@ -556,14 +481,14 @@ mms_rsp_read(mms_session_t *sp, mms_rsp_ele_t **rsp, char **msg)
 		if (sp->mms_api_state == MMS_API_SHUTDOWN) {
 			mms_trace(MMS_OPER, "mms_rsp_read: MMS "
 			    "API session is being terminated");
-			*msg = mms_errmsg(MMS_API_3018_MSG, 0);
+			*msg = mms_get_msgcl(MMS_API_3018_MSG, NULL);
 			return (MMS_API_SHUTDOWN);
 		}
 
 		if (sp->mms_api_state == MMS_API_FAILURE) {
 			mms_trace(MMS_ERR, "mms_rsp_read: MMS API is in a state"
 			    " of error, returning error response for command");
-			*msg = mms_errmsg(MMS_API_3001_MSG, 0);
+			*msg = mms_get_msgcl(MMS_API_3001_MSG, NULL);
 			return (sp->mms_api_errcode);
 		}
 
@@ -583,13 +508,13 @@ mms_rsp_read(mms_session_t *sp, mms_rsp_ele_t **rsp, char **msg)
 					continue;
 				mms_trace(MMS_ERR, "mms_rsp_read: "
 				    "Socket to MMS is not open");
-				*msg = mms_errmsg(MMS_API_3010_MSG, 0);
+				*msg = mms_get_msgcl(MMS_API_3010_MSG, NULL);
 				return (MMS_E_NET_IO_ERR);
 			} else {
 				mms_trace(MMS_ERR, "mms_rsp_read: select "
 				    "failed with errno - %s", strerror(errno));
-				*msg = mms_errmsg(MMS_API_3011_MSG, 2,
-				    strerror(errno), strerror(errno));
+				*msg = mms_get_msgcl(MMS_API_3011_MSG, "errno",
+				    strerror(errno), NULL);
 				return (MMS_SELECT_ERROR);
 			}
 		} else if (rc == 0) {	/* select timeout hit */
@@ -610,8 +535,8 @@ mms_rsp_read(mms_session_t *sp, mms_rsp_ele_t **rsp, char **msg)
 			mms_trace(MMS_ERR, "mms_rsp_read: Failed "
 			    "to read new response, rc - %d", rc);
 		}
-		*msg = mms_errmsg((rc == 0) ? MMS_API_3012_MSG :
-		    MMS_API_3013_MSG, 0);
+		*msg = mms_get_msgcl((rc == 0) ? MMS_API_3012_MSG :
+		    MMS_API_3013_MSG, NULL);
 		return (MMS_E_NET_IO_ERR);
 	}
 
@@ -661,7 +586,7 @@ mms_obtain_accept(mms_session_t *sp, char *tid, mms_rsp_ele_t **ret_rsp)
 		if (sp->mms_api_state == MMS_API_SHUTDOWN) {
 			mms_trace(MMS_OPER, "mms_obtain_accept: MMS API "
 			    "session is being terminated");
-			mms_send_errmsg(sp, MMS_API_3018_MSG, 0);
+			mms_send_errmsg(sp, MMS_API_3018_MSG, NULL);
 			rc = MMS_API_SHUTDOWN;
 			break;
 		}
@@ -674,7 +599,7 @@ mms_obtain_accept(mms_session_t *sp, char *tid, mms_rsp_ele_t **ret_rsp)
 			mms_trace(MMS_ERR, "mms_obtain_accept: MMS API is in "
 			    "a state of error, returning an error response "
 			    "for command with task id %s", tid);
-			mms_send_errmsg(sp, MMS_API_3001_MSG, 0);
+			mms_send_errmsg(sp, MMS_API_3001_MSG, NULL);
 			rc = sp->mms_api_errcode;
 			break;
 		}
@@ -697,8 +622,9 @@ mms_obtain_accept(mms_session_t *sp, char *tid, mms_rsp_ele_t **ret_rsp)
 
 				sp->mms_api_errcode = MMS_WRONG_TASKID;
 				sp->mms_api_state = MMS_API_FAILURE;
-				mms_send_errmsg(sp, MMS_API_3008_MSG, 4, tid,
-				    rsp->mms_rsp_tid, tid, rsp->mms_rsp_tid);
+				mms_send_errmsg(sp, MMS_API_3008_MSG,
+				    "expected", tid,
+				    "received", rsp->mms_rsp_tid, NULL);
 				mms_free_rsp(rsp);
 				rc = MMS_WRONG_TASKID;
 			}
@@ -779,7 +705,7 @@ mms_obtain_event(mms_session_t *sp, mms_rsp_ele_t **event)
 		mms_trace(MMS_ERR,
 		    "mms_obtain_event: Session pointer is set to "
 		    "NULL, unable to obtain any events at this time");
-		mms_send_errmsg(sp, MMS_API_3000_MSG, 0);
+		mms_send_errmsg(sp, MMS_API_3000_MSG, NULL);
 		return (MMS_WRONG_API_MODE);
 	}
 
@@ -896,7 +822,7 @@ mms_obtain_final(mms_session_t *sp, char *tid, mms_rsp_ele_t **final_rsp)
 		if (sp->mms_api_state == MMS_API_SHUTDOWN) {
 			mms_trace(MMS_OPER, "mms_obtain_final: MMS API "
 			    "session is being terminated");
-			mms_send_errmsg(sp, MMS_API_3018_MSG, 0);
+			mms_send_errmsg(sp, MMS_API_3018_MSG, NULL);
 			rc = MMS_API_SHUTDOWN;
 			break;
 		}
@@ -909,7 +835,7 @@ mms_obtain_final(mms_session_t *sp, char *tid, mms_rsp_ele_t **final_rsp)
 			mms_trace(MMS_ERR, "mms_obtain_final: MMS API is in "
 			    "a state of error, returning an error response "
 			    "for command with task id %s", tid);
-			mms_send_errmsg(sp, MMS_API_3001_MSG, 0);
+			mms_send_errmsg(sp, MMS_API_3001_MSG, NULL);
 			rc = sp->mms_api_errcode;
 			break;
 		}
@@ -1039,7 +965,7 @@ mms_send(mms_session_t *sp, char *tid, mms_cmd_name_t cmdtype, char *cmd,
 		}
 		if (cmdtype == MMS_CMD_END || cmdtype == MMS_CMD_BEGIN)
 			mms_be_wakeup(sp);
-		mms_send_errmsg(sp, MMS_API_3005_MSG, 2, tid, tid);
+		mms_send_errmsg(sp, MMS_API_3005_MSG, "taskid", tid, NULL);
 		sp->mms_api_errcode = MMS_E_NET_IO_ERR;
 		sp->mms_api_state = MMS_API_FAILURE;
 		return (MMS_E_NET_IO_ERR);
@@ -1322,9 +1248,9 @@ mms_api_reader(void *arg)
 
 			cmd = mms_cmd_remove(sp, new_rsp->mms_rsp_tid);
 			if (cmd == NULL) {
-				msg = mms_errmsg(MMS_API_3015_MSG, 4,
-				    "command list", new_rsp->mms_rsp_tid,
-				    "command list", new_rsp->mms_rsp_tid);
+				msg = mms_get_msgcl(MMS_API_3015_MSG,
+				    "list", "command list",
+				    "taskid", new_rsp->mms_rsp_tid, NULL);
 				rc = MMS_API_ERR;
 				break;
 			}
@@ -1352,9 +1278,9 @@ mms_api_reader(void *arg)
 			 */
 			cmd = mms_cmd_remove(sp, new_rsp->mms_rsp_tid);
 			if (cmd == NULL) {
-				msg = mms_errmsg(MMS_API_3015_MSG, 4,
-				    "command list", new_rsp->mms_rsp_tid,
-				    "command list", new_rsp->mms_rsp_tid);
+				msg = mms_get_msgcl(MMS_API_3015_MSG,
+				    "list", "command list",
+				    "taskid", new_rsp->mms_rsp_tid, NULL);
 				mms_free_rsp(new_rsp);
 				break;
 			}
@@ -1378,8 +1304,8 @@ mms_api_reader(void *arg)
 		 *   An invalid response was received.
 		 */
 		} else {
-			msg = mms_errmsg(MMS_API_3006_MSG, 2,
-			    new_rsp->mms_rsp_tid, new_rsp->mms_rsp_tid);
+			msg = mms_get_msgcl(MMS_API_3006_MSG, "taskid",
+			    new_rsp->mms_rsp_tid, NULL);
 			mms_free_rsp(new_rsp);
 			break;
 		}

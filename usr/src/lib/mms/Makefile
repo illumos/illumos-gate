@@ -25,7 +25,7 @@
 #
 #
 
-include ../Makefile.lib
+include $(SRC)/lib/Makefile.lib
 
 SUBDIRS = \
 	mms .WAIT \
@@ -49,9 +49,9 @@ _msg := TARGET += _msg
 
 all check clean clobber install install_h lint: $(SUBDIRS)
 
+_msg: mms
+
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-include $(SRC)/lib/Makefile.targ

@@ -103,10 +103,7 @@ DBVER_CHK = nawk '{ \
 		exit 1 \
 	}}'
 
-CATMSGS = ../common/mm.msg
-CATALOG = ../common/mm.cat
-
-all: $(DBVER) .WAIT db_version_check .WAIT $(CATALOG) $(PROG) MKDIRS
+all: $(DBVER) .WAIT db_version_check .WAIT $(PROG) MKDIRS
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -133,7 +130,6 @@ install_h:
 MMPATHS  = $(ROOT)/etc/mms/config
 MMTYPES = $(ROOT)/etc/mms/types
 SSLCONF = $(ROOT)/var/mms/ssl/ca
-MMCAT = $(ROOT)/usr/lib/mms
 MMDB = $(ROOT)/etc/mms/db
 SCBIN = $(ROOT)/usr/bin
 LIBSVC = $(ROOT)/lib/svc/method
@@ -151,7 +147,6 @@ VARCORES = $(ROOT)/var/mms/cores
 FILES += $(MMPATHS)/mm_paths.xml
 FILES += $(MMTYPES)/mm_types.xml
 FILES += $(SCBIN)/mmsssl.sh
-FILES += $(MMCAT)/mm.cat
 FILES += $(MMDB)/mms_db
 FILES += $(SSLCONF)/mms_openssl.cnf
 
@@ -177,17 +172,10 @@ $(DBVER): $(DBMODS)
 db_version_check:
 	$(DBVER_CHK) < $(DBVER)
 
-$(CATALOG): $(CATMSGS)
-	/bin/rm -f $(CATALOG)
-	/usr/bin/gencat $(CATALOG) $(CATMSGS)
-
 $(MMPATHS):
 	$(INS.dir)
 
 $(MMTYPES):
-	$(INS.dir)
-
-$(MMCAT):
 	$(INS.dir)
 
 $(MMDB):
@@ -212,10 +200,7 @@ $(SCBIN)/%:	../common/%
 $(SSLCONF)/% := FILEMODE = 0644
 
 $(SSLCONF)/%:	$(SSLCONF) ../common/%
-	$(INS.file)
-
-$(MMCAT)/%:	$(MMCAT) ../common/%
-	$(INS.file)
+	$(INS.file)	
 
 $(MMDB)/% := FILEMODE = 0644
 

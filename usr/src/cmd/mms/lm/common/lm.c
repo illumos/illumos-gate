@@ -242,6 +242,9 @@ lm_initialize(char *cfg_name, int lm_daemon_mode)
 			/* Set up signal handling */
 	set_signal_handling();
 
+			/* Open message catalog */
+	mms_cat_open();
+
 			/* Obtain information from config file in order */
 			/* be able to connect to MM */
 	if (rc = mms_net_cfg_read(&lm.lm_net_cfg, cfg_name)) {
@@ -710,22 +713,25 @@ lm_input_handler()
 
 			switch (rc) {
 				case LM_NOMEM:
-					(void) snprintf(msg_str,
-					    sizeof (msg_str), LM_7025_MSG);
+					(void) mms_buf_msgcl(msg_str,
+					    sizeof (msg_str), LM_7025_MSG,
+					    NULL);
 					(void) snprintf(rsp_str,
 					    sizeof (rsp_str), LM_MSG_PARSE,
 					    msg_str);
 					break;
 				case LM_SYNTAX_ERR:
-					(void) snprintf(msg_str,
-					    sizeof (msg_str), LM_7024_MSG);
+					(void) mms_buf_msgcl(msg_str,
+					    sizeof (msg_str), LM_7024_MSG,
+					    NULL);
 					(void) snprintf(rsp_str,
 					    sizeof (rsp_str), LM_MSG_PARSE,
 					    msg_str);
 					break;
 				case LM_SYNTAX_RSP:
-					(void) snprintf(msg_str,
-					    sizeof (msg_str), LM_7023_MSG);
+					(void) mms_buf_msgcl(msg_str,
+					    sizeof (msg_str),
+					    LM_7023_MSG, NULL);
 					(void) snprintf(rsp_str,
 					    sizeof (rsp_str), LM_MSG_PARSE,
 					    msg_str);
@@ -733,17 +739,17 @@ lm_input_handler()
 				case LM_SYNTAX_CMD:
 					node = mms_pn_lookup(cmd, NULL,
 					    MMS_PN_CMD, NULL);
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str), LM_7005_MSG,
-					    mms_pn_token(node),
-					    mms_pn_token(node));
+					    "cmd", mms_pn_token(node), NULL);
 					(void) snprintf(rsp_str,
 					    sizeof (rsp_str), LM_MSG_PARSE,
 					    msg_str);
 					break;
 				default:
-					(void) snprintf(msg_str,
-					    sizeof (msg_str), LM_7026_MSG);
+					(void) mms_buf_msgcl(msg_str,
+					    sizeof (msg_str), LM_7026_MSG,
+					    NULL);
 					(void) snprintf(rsp_str,
 					    sizeof (rsp_str), LM_MSG_PARSE,
 					    msg_str);
@@ -827,9 +833,8 @@ parse_ok:
 			/* issue an error for the command and yet we could */
 			/* not find the task id for the command */
 		if (tid == NULL || *tid == '\0') {
-			(void) snprintf(msg_str,
-			    sizeof (msg_str), LM_7000_MSG, mms_pn_token(cmd),
-			    mms_pn_token(cmd));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7000_MSG, "cmd", mms_pn_token(cmd), NULL);
 			(void) snprintf(rsp_str, sizeof (rsp_str),
 			    LM_UNACC_RESP, msg_str);
 			mms_trace(MMS_OPER,
@@ -867,9 +872,8 @@ parse_ok:
 			/* after one of the above, will be aborted with an */
 			/* error response */
 		if (lm_state == LM_STOP) {
-			(void) snprintf(msg_str,
-			    sizeof (msg_str), LM_7003_MSG, mms_pn_token(cmd),
-			    mms_pn_token(cmd));
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7003_MSG, "cmd", mms_pn_token(cmd), NULL);
 			mms_pn_destroy(cmd);
 			(void) snprintf(rsp_str,
 			    sizeof (rsp_str), LM_ERR_FINAL, tid,
@@ -914,10 +918,9 @@ parse_ok:
 					    lm_cmdData[rc].cmd, lm_state);
 					code = MMS_LM_E_READY;
 					class = MMS_STATE;
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str), LM_7001_MSG,
-					    lm_cmdData[rc].cmd,
-					    lm_cmdData[rc].cmd);
+					    "cmd", lm_cmdData[rc].cmd, NULL);
 				}
 				break;
 
@@ -934,10 +937,9 @@ parse_ok:
 					    lm_cmdData[rc].cmd, lm_state);
 					code = MMS_LM_E_READY;
 					class = MMS_STATE;
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str), LM_7001_MSG,
-					    lm_cmdData[rc].cmd,
-					    lm_cmdData[rc].cmd);
+					    "cmd", lm_cmdData[rc].cmd, NULL);
 				}
 				break;
 				/* Commands that can only be executed with */
@@ -958,10 +960,9 @@ parse_ok:
 					    lm_cmdData[rc].cmd, lm_state);
 					code = MMS_LM_E_READY;
 					class = MMS_STATE;
-					(void) snprintf(msg_str,
+					(void) mms_buf_msgcl(msg_str,
 					    sizeof (msg_str), LM_7001_MSG,
-					    lm_cmdData[rc].cmd,
-					    lm_cmdData[rc].cmd);
+					    "cmd", lm_cmdData[rc].cmd, NULL);
 				}
 				break;
 			case MMS_LM_E_DEVCMDILLEGAL:
@@ -969,9 +970,9 @@ parse_ok:
 				    "lm_input_handler: cmd_intrp "
 				    "returned invalid command found, send "
 				    "error final response");
-				(void) snprintf(msg_str, sizeof (msg_str),
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
 				    LM_7002_MSG,
-				    mms_pn_token(cmd), mms_pn_token(cmd));
+				    "cmd", mms_pn_token(cmd), NULL);
 				code = rc;
 				class = MMS_INTERNAL;
 				break;
@@ -1109,6 +1110,7 @@ main(int argc, char **argv)
 {
 	char	msg_str[256];
 	char	msg_cmd[512];
+	char	nbuf[20];
 
 			/* If a second parameter is passed then this */
 			/* indicates that LM is being run in standalone mode */
@@ -1141,16 +1143,19 @@ main(int argc, char **argv)
 		/* send a message to MM indicating LM is shutting down */
 	if (lm_internal_error) {
 		if (lm_internal_error == LM_NO_WCR)
-			(void) sprintf(msg_str, LM_7021_MSG);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7021_MSG, NULL);
 		else
-			(void) sprintf(msg_str, LM_7007_MSG);
+			(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+			    LM_7007_MSG, NULL);
 		(void) snprintf(msg_cmd, sizeof (msg_cmd),
 		    LM_MSG_EXIT, msg_str);
 		(void) mms_writer(&lm.lm_mms_conn, msg_cmd);
 	} else if (exit_code == LM_SIG_NRESTART || exit_code ==
 	    LM_SIG_RESTART) {
-		(void) snprintf(msg_str, sizeof (msg_str),
-		    LM_7006_MSG, exit_code, exit_code);
+		(void) snprintf(nbuf, sizeof (nbuf), "%d", exit_code);
+		(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+		    LM_7006_MSG, "ecode", nbuf, NULL);
 		(void) snprintf(msg_cmd, sizeof (msg_cmd),
 		    LM_MSG_EXIT, msg_str);
 		if (lm_write_msg(msg_cmd, &lm.lm_mms_conn, lm_write_mutex))

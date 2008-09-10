@@ -48,6 +48,7 @@
 #include "mms_sock.h"
 #include "net_cfg_service.h"
 #include "mms_cfg.h"
+#include "mms_cat.h"
 
 static char *_SrcFile = __FILE__;
 
@@ -230,9 +231,9 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -346,8 +347,8 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_LANGUAGE,
 		    ETOOMANYCLAUSES,
-		    5057,
-		    MESS_END);
+		    MM_5057_MSG,
+		    NULL);
 		/* Create new error codes */
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -373,8 +374,8 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_EXIST,
 			    ELIBRARYNOEXIST,
-			    5058,
-			    MESS_END);
+			    MM_5058_MSG,
+			    NULL);
 			/* Create new error codes */
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -401,8 +402,8 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    "ELIBBROKEN",
-			    5044,
-			    MESS_END);
+			    MM_5044_MSG,
+			    NULL);
 			/* Create new error codes */
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -426,10 +427,10 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    "ELIBALREADYONLINE",
-				    5059,
+				    MM_5059_MSG,
 				    "lib",
 				    lib_name,
-				    MESS_END);
+				    NULL);
 				/* Create new error codes */
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -454,8 +455,8 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXIST,
 				    ELMNOEXIST,
-				    5060,
-				    MESS_END);
+				    MM_5060_MSG,
+				    NULL);
 				/* Create new error codes */
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -497,10 +498,10 @@ mm_libonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    "ELIBALREADYOFFLINE",
-				    5061,
+				    MM_5061_MSG,
 				    "lib",
 				    lib_name,
-				    MESS_END);
+				    NULL);
 				/* Create new error codes */
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -656,8 +657,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	rc = MM_CMD_ERROR;
@@ -790,8 +791,8 @@ mm_drvonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_EXIST,
 			    EDRIVENOEXIST,
-			    5063,
-			    MESS_END);
+			    MM_5063_MSG,
+			    NULL);
 			/* Create new error codes */
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -824,10 +825,10 @@ mm_drvonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    "EDRIVEALREADYONLINE",
-				    5064,
+				    MM_5064_MSG,
 				    "drive",
 				    drive_name,
-				    MESS_END);
+				    NULL);
 				/* Create new error codes */
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -867,10 +868,10 @@ mm_drvonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_INTERNAL,
 				    "EMNTCARTPRES",
-				    5065,
+				    MM_5065_MSG,
 				    "drive",
 				    drive_name,
-				    MESS_END);
+				    NULL);
 				/* Create new error codes */
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -895,10 +896,10 @@ mm_drvonline_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    "EDRIVEALREADYOFFLINE",
-				    5066,
+				    MM_5066_MSG,
 				    "drive",
 				    drive_name,
-				    MESS_END);
+				    NULL);
 				/* Create new error codes */
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -1005,8 +1006,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	rc = MM_CMD_ERROR;
@@ -1442,11 +1443,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing"
 			    " object clause",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -1459,11 +1460,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing"
 			    " object string",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -1561,11 +1562,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing"
 			    " tag clause",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -1578,11 +1579,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing"
 			    " tag string",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -1628,11 +1629,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing"
 			    " action clause",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -1645,11 +1646,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing"
 			    " action string",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -1867,11 +1868,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_LANGUAGE,
 				    "ECLAUSENEEDSARG",
-				    5067,
+				    MM_5067_MSG,
 				    "text",
 				    "reveive clause missing"
 				    " object string",
-				    MESS_END);
+				    NULL);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 				return (MM_CMD_ERROR);
@@ -1939,11 +1940,11 @@ mm_notify_chg_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_LANGUAGE,
 				    "ECLAUSENEEDSARG",
-				    5067,
+				    MM_5067_MSG,
 				    "text",
 				    "reveive clause missing"
 				    " tag string",
-				    MESS_END);
+				    NULL);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 				return (MM_CMD_ERROR);
@@ -2064,10 +2065,10 @@ mm_notify_chg_cmd_func_old(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing event arg",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -2078,10 +2079,10 @@ mm_notify_chg_cmd_func_old(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_LANGUAGE,
 			    "ECLAUSENEEDSARG",
-			    5067,
+			    MM_5067_MSG,
 			    "text",
 			    "reveive clause missing scope arg",
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -2185,8 +2186,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -2401,9 +2402,9 @@ mm_inject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -2427,8 +2428,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -2509,8 +2510,8 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    ENOSUCHCART,
-				    5004, "cartid", cartid,
-				    MESS_END);
+				    MM_5004_MSG, "cartid", cartid,
+				    NULL);
 				mm_clear_db(&db->mm_db_results);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn,
@@ -2579,8 +2580,8 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    ENOSUCHPCL,
-				    5005, "cartpcl", cartpcl,
-				    MESS_END);
+				    MM_5005_MSG, "cartpcl", cartpcl,
+				    NULL);
 				mm_clear_db(&db->mm_db_results);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn,
@@ -2668,8 +2669,8 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    ENOMATCH,
-				    5068,
-				    MESS_END);
+				    MM_5068_MSG,
+				    NULL);
 				mm_clear_db(&db->mm_db_results);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn,
@@ -2714,8 +2715,8 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT,
 			    ENOMATCH,
-			    5068,
-			    MESS_END);
+			    MM_5068_MSG,
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -2765,9 +2766,9 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 						mm_response_error(cmd,
 						    ECLASS_RETRY,
 						    ECARTINUSE,
-						    5006, "cartid",
+						    MM_5006_MSG, "cartid",
 						    eject_cart->cart_cartid,
-						    MESS_END);
+						    NULL);
 						cmd->cmd_remove = 1;
 						mm_send_text(mm_wka->
 						    mm_wka_conn,
@@ -2793,9 +2794,9 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    ENOSLOT,
-				    5010, "cartid",
+				    MM_5010_MSG, "cartid",
 				    eject_cart->cart_cartid,
-				    MESS_END);
+				    NULL);
 				mm_clear_db(&db->mm_db_results);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn,
@@ -2809,9 +2810,9 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    ESLOTNOTOCCUPIED,
-				    5011, "cartid",
+				    MM_5011_MSG, "cartid",
 				    eject_cart->cart_cartid,
-				    MESS_END);
+				    NULL);
 				mm_clear_db(&db->mm_db_results);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn,
@@ -2830,11 +2831,11 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    ETOOMANY,
-				    5007,
+				    MM_5007_MSG,
 				    "cartid1", eject_cart->cart_cartid,
 				    "lib1", eject_cart->cart_library,
 				    "lib2", cmd->cmd_eject->eject_library,
-				    MESS_END);
+				    NULL);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn,
 				    cmd->cmd_buf);
@@ -2855,8 +2856,8 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_CONFIG,
 			    ELIBNOLMCONFIGURED,
-			    5008, "lib", cmd->cmd_eject->eject_library,
-			    MESS_END);
+			    MM_5008_MSG, "lib", cmd->cmd_eject->eject_library,
+			    NULL);
 			mm_clear_db(&db->mm_db_results);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn,
@@ -2867,8 +2868,8 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_EXPLICIT,
 			    ETOOMANY,
-			    5009, "lib", cmd->cmd_eject->eject_library,
-			    MESS_END);
+			    MM_5009_MSG, "lib", cmd->cmd_eject->eject_library,
+			    NULL);
 			mm_clear_db(&db->mm_db_results);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -2999,9 +3000,9 @@ mm_eject_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_SUBOP,
 			    ELMDMCOMMUNICATION,
-			    5055,
+			    MM_5055_MSG,
 			    "msg_rsp", response_message,
-			    MESS_END);
+			    NULL);
 			free(response_message);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -3025,8 +3026,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -3527,8 +3528,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -4636,15 +4637,15 @@ mm_move_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_EXIST,
 			    ENOSUCHCART,
-			    5069,
-			    MESS_END);
+			    MM_5069_MSG,
+			    NULL);
 
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_EXIST,
 			    ENOMATCH,
-			    5069,
-			    MESS_END);
+			    MM_5069_MSG,
+			    NULL);
 		}
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -4655,8 +4656,8 @@ mm_move_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ETOOMANY,
-		    5070,
-		    MESS_END);
+		    MM_5070_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		rc = MM_CMD_ERROR;
@@ -4675,10 +4676,10 @@ mm_move_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    ECARTNOTLOCATED,
-		    5071,
+		    MM_5071_MSG,
 		    "pcl",
 		    cartpcl,
-		    MESS_END);
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		rc = MM_CMD_ERROR;
@@ -4696,10 +4697,10 @@ mm_move_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_CONFIG,
 		    ELIBNOLMCONFIGURED,
-		    5072,
+		    MM_5072_MSG,
 		    "lib",
 		    libname,
-		    MESS_END);
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		rc = MM_CMD_ERROR;
@@ -4739,10 +4740,10 @@ mm_move_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_RETRY,
 		    ELMNOTREADY,
-		    5073,
+		    MM_5073_MSG,
 		    "lm",
 		    lmname,
-		    MESS_END);
+		    NULL);
 		mm_clear_db(&db->mm_db_results);
 		mm_clear_db(&lm_results);
 		mm_clear_db(&cart_results);
@@ -4793,8 +4794,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 
@@ -4880,8 +4881,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -5166,8 +5167,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	free(volname);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -5367,8 +5368,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	free(volname);
 	free(report_buf);
 	cmd->cmd_remove = 1;
@@ -5432,8 +5433,8 @@ mm_allocate_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 					mm_response_error(cmd,
 					    ECLASS_LANGUAGE,
 					    "ECLAUSENOPRIVILEGE",
-					    5082,
-					    MESS_END);
+					    MM_5082_MSG,
+					    NULL);
 					cmd->cmd_remove = 1;
 					mm_send_text(mm_wka->mm_wka_conn,
 					    cmd->cmd_buf);
@@ -5458,8 +5459,8 @@ mm_allocate_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 					mm_response_error(cmd,
 					    ECLASS_LANGUAGE,
 					    "ECLAUSENOPRIVILEGE",
-					    5082,
-					    MESS_END);
+					    MM_5082_MSG,
+					    NULL);
 					cmd->cmd_remove = 1;
 					mm_send_text(mm_wka->mm_wka_conn,
 					    cmd->cmd_buf);
@@ -5534,8 +5535,8 @@ mm_allocate_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_LANGUAGE,
 		    ESYNTAX,
-		    5083,
-		    MESS_END);
+		    MM_5083_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -5553,8 +5554,8 @@ mm_allocate_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_INVALID,
 		    ENEWVOLNAMECOUNT,
-		    5084,
-		    MESS_END);
+		    MM_5084_MSG,
+		    NULL);
 		cmd->cmd_remove = 1;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		return (MM_CMD_ERROR);
@@ -5683,8 +5684,8 @@ mm_allocate_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXPLICIT,
 		    ENOTENOUGHPARTITIONS,
-		    5085,
-		    MESS_END);
+		    MM_5085_MSG,
+		    NULL);
 		mm_clear_db(&results);
 		free(volname);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -5880,8 +5881,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	free(volname);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -5979,8 +5980,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -6064,8 +6065,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -6115,10 +6116,10 @@ mm_attribute_check_helper(mm_command_t *cmd, char *object, char *attribute) {
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    EOBJSYSATTRMODNOPRIV,
-				    5109,
+				    MM_5109_MSG,
 				    "object", object,
 				    "attribute", attribute,
-				    MESS_END);
+				    NULL);
 				goto return_error;
 			}
 		}
@@ -6131,10 +6132,10 @@ mm_attribute_check_helper(mm_command_t *cmd, char *object, char *attribute) {
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    EOBJSYSATTRMODNOPRIV,
-				    5109,
+				    MM_5109_MSG,
 				    "object", object,
 				    "attribute", attribute,
-				    MESS_END);
+				    NULL);
 				goto return_error;
 			}
 		}
@@ -6148,10 +6149,10 @@ mm_attribute_check_helper(mm_command_t *cmd, char *object, char *attribute) {
 			mm_response_error(cmd,
 			    ECLASS_PERMPRIV,
 			    EOBJSYSATTRMODNOPRIV,
-			    5108,
+			    MM_5108_MSG,
 			    "object", object,
 			    "attribute", attribute,
-			    MESS_END);
+			    NULL);
 			goto return_error;
 		}
 
@@ -6162,10 +6163,10 @@ mm_attribute_check_helper(mm_command_t *cmd, char *object, char *attribute) {
 				mm_response_error(cmd,
 				    ECLASS_PERMPRIV,
 				    EOBJSYSATTRMODNOPRIV,
-				    5108,
+				    MM_5108_MSG,
 				    "object", object,
 				    "attribute", attribute,
-				    MESS_END);
+				    NULL);
 				goto return_error;
 			}
 		}
@@ -6592,9 +6593,9 @@ mm_attribute_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    ESYSTEMCONFIGCHANGE,
-		    5099,
+		    MM_5099_MSG,
 		    "info", info,
-		    MESS_END);
+		    NULL);
 		free(info);
 		info = NULL;
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
@@ -7066,8 +7067,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	return (MM_CMD_ERROR);
@@ -7841,8 +7842,8 @@ mm_create_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    "invalid",
 			    "EOBJCREATESYSATTRREQUIRED",
-			    5086,
-			    MESS_END);
+			    MM_5086_MSG,
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			rc = MM_CMD_ERROR;
@@ -7856,8 +7857,8 @@ mm_create_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    "invalid",
 			    "EOBJCREATESYSATTRREQUIRED",
-			    5087,
-			    MESS_END);
+			    MM_5087_MSG,
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			rc = MM_CMD_ERROR;
@@ -7900,12 +7901,12 @@ mm_create_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 				mm_response_error(cmd,
 				    "explicit",
 				    "EAPPCARTNOACC",
-				    5088,
+				    MM_5088_MSG,
 				    "client",
 				    mm_wka->wka_conn.cci_client,
 				    "pcl",
 				    CartridgePCL,
-				    MESS_END);
+				    NULL);
 				cmd->cmd_remove = 1;
 				mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 				rc = MM_CMD_ERROR;
@@ -8254,8 +8255,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	cmd->cmd_remove = 1;
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	rc = MM_CMD_ERROR;
@@ -8495,10 +8496,10 @@ mm_attendance_mode_internal(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_INTERNAL,
 		    MM_E_INTERNAL,
-		    5021,
+		    MM_5021_MSG,
 		    "text",
 		    "no results in attendance mode query",
-		    MESS_END);
+		    NULL);
 		cmd->cmd_response = mm_text_to_par_node(req_cmd->cmd_buf,
 		    mms_mmp_parse);
 		return (-1);
@@ -8542,10 +8543,10 @@ mm_attendance_mode_internal(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_INTERNAL,
 		    MM_E_INTERNAL,
-		    5021,
+		    MM_5021_MSG,
 		    "text",
 		    "set request unattended count not 1",
-		    MESS_END);
+		    NULL);
 		cmd->cmd_response = mm_text_to_par_node(req_cmd->cmd_buf,
 		    mms_mmp_parse);
 		return (-1);
@@ -8556,8 +8557,8 @@ mm_attendance_mode_internal(mm_wka_t *mm_wka, mm_command_t *cmd,
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    EREQSTATECHANGEFAILED,
-		    5089,
-		    MESS_END);
+		    MM_5089_MSG,
+		    NULL);
 		cmd->cmd_response = mm_text_to_par_node(req_cmd->cmd_buf,
 		    mms_mmp_parse);
 		return (-1);
@@ -8608,7 +8609,7 @@ mm_make_request(mm_wka_t *mm_wka, mm_command_t *cmd, char *task, int priority,
 	req_cmd->cmd_mm_data = mm_wka->mm_data;
 	mm_get_uuid(new_task);
 	va_start(args, messageid);
-	text = mm_get_vlocalized_string(messageid, args);
+	text = mms_get_locstr(messageid, args);
 	va_end(args);
 	req_cmd->cmd_name = strdup("mm request");
 	req_cmd->cmd_textcmd = mms_strnew("internal \"%s\" "
@@ -8663,14 +8664,14 @@ mm_make_request(mm_wka_t *mm_wka, mm_command_t *cmd, char *task, int priority,
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    MM_E_NOTASK,
-				    5090,
-				    MESS_END);
+				    MM_5090_MSG,
+				    NULL);
 			} else {
 				mm_response_error(cmd,
 				    ECLASS_EXPLICIT,
 				    MM_E_TOOMANYTASKS,
-				    5091,
-				    MESS_END);
+				    MM_5091_MSG,
+				    NULL);
 			}
 			cmd->cmd_response =
 			    mm_text_to_par_node(req_cmd->cmd_buf,
@@ -8835,8 +8836,8 @@ mm_attendance_mode(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    EREQSTATECHANGEFAILED,
-		    5089,
-		    MESS_END);
+		    MM_5089_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -8957,10 +8958,10 @@ mm_request_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		free(taskid);
 		mm_response_error(cmd,
 		    ECLASS_INTERNAL, MM_E_CMDARGS,
-		    5067,
+		    MM_5067_MSG,
 		    "text",
 		    "mission task.taskid for device manager",
-		    MESS_END);
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9086,8 +9087,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -9212,8 +9213,8 @@ mm_get_requests(mm_wka_t *mm_wka, mm_command_t *cmd)
 	} else {
 		mm_response_error(cmd,
 		    ECLASS_EXIST, ENOMATCH,
-		    5092,
-		    MESS_END);
+		    MM_5092_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9235,13 +9236,13 @@ mm_get_requests(mm_wka_t *mm_wka, mm_command_t *cmd)
 		    MMS_PN_CLAUSE, NULL)) {
 			mm_response_error(cmd,
 			    ECLASS_EXIST, ENOMATCH,
-			    5092,
-			    MESS_END);
+			    MM_5092_MSG,
+			    NULL);
 		} else {
 			mm_response_error(cmd,
 			    ECLASS_EXIST, ENOSUCHREQ,
-			    5093,
-			    MESS_END);
+			    MM_5093_MSG,
+			    NULL);
 		}
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
@@ -9255,8 +9256,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -9341,8 +9342,8 @@ mm_accept_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    EREQSTATECHANGEFAILED,
-		    5089,
-		    MESS_END);
+		    MM_5089_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9358,8 +9359,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -9422,8 +9423,8 @@ mm_respond_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_clear_db(&db->mm_db_results);
 		mm_response_error(cmd,
 		    ECLASS_EXIST, ENOSUCHREQ,
-		    5093,
-		    MESS_END);
+		    MM_5093_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9473,8 +9474,8 @@ mm_respond_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    EREQSTATECHANGEFAILED,
-		    5089,
-		    MESS_END);
+		    MM_5089_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9485,8 +9486,8 @@ mm_respond_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    EREQSTATECHANGEFAILED,
-		    5089,
-		    MESS_END);
+		    MM_5089_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9531,8 +9532,8 @@ mm_respond_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 	if (cmd_p == NULL) {
 		mm_response_error(cmd,
 		    ECLASS_EXIST, ENOSUCHREQ,
-		    5093,
-		    MESS_END);
+		    MM_5093_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9551,8 +9552,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -9709,8 +9710,8 @@ mm_release_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_SUBOP,
 		    EREQSTATECHANGEFAILED,
-		    5089,
-		    MESS_END);
+		    MM_5089_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -9726,8 +9727,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -9906,8 +9907,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -9981,8 +9982,8 @@ mm_direct_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_response_error(cmd,
 		    ECLASS_EXIST,
 		    ENOTCONNECTED,
-		    5100,
-		    MESS_END);
+		    MM_5100_MSG,
+		    NULL);
 		mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 		cmd->cmd_remove = 1;
 		return (MM_CMD_ERROR);
@@ -10014,8 +10015,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
@@ -10111,8 +10112,8 @@ mm_setpassword_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_INVALID,
 			    ENOMATCH,
-			    5106,
-			    MESS_END);
+			    MM_5106_MSG,
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -10186,9 +10187,9 @@ mm_setpassword_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			mm_response_error(cmd,
 			    ECLASS_INTERNAL,
 			    MM_E_INTERNAL,
-			    5107,
+			    MM_5107_MSG,
 			    "file", MMS_NET_CFG_HELLO_FILE,
-			    MESS_END);
+			    NULL);
 			cmd->cmd_remove = 1;
 			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 			return (MM_CMD_ERROR);
@@ -10209,8 +10210,8 @@ not_found:
 	mm_response_error(cmd,
 	    ECLASS_LANGUAGE,
 	    ENOTFOUND,
-	    5062,
-	    MESS_END);
+	    MM_5062_MSG,
+	    NULL);
 	mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);

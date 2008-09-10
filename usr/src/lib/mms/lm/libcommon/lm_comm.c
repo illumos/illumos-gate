@@ -111,10 +111,9 @@ lm_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    "lm_v_private: private command "
 				    "contains a unsupport get-name - %s",
 				    mms_pn_token(name));
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7010_MSG, "get",
-				    mms_pn_token(name), "get",
-				    mms_pn_token(name));
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7010_MSG, "type", "get",
+				    "name", mms_pn_token(name), NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_ERR_FINAL, tid,
 				    mms_sym_code_to_str(MMS_EXIST),
@@ -154,10 +153,9 @@ lm_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    "lm_v_private: private command "
 				    "contains a unsupport set-name - %s",
 				    mms_pn_token(name));
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7010_MSG, "set",
-				    mms_pn_token(name), "set",
-				    mms_pn_token(name));
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7010_MSG, "type", "set",
+				    "name", mms_pn_token(name), NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_ERR_FINAL, tid,
 				    mms_sym_code_to_str(MMS_EXIST),
@@ -204,10 +202,9 @@ lm_validate_private(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    "lm_v_private: private command "
 				    "contains a unsupport unset-name - %s",
 				    mms_pn_token(name));
-				(void) snprintf(msg_str, sizeof (msg_str),
-				    LM_7010_MSG, "unset",
-				    mms_pn_token(name), "unset",
-				    mms_pn_token(name));
+				(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+				    LM_7010_MSG, "type", "unset",
+				    "name", mms_pn_token(name), NULL);
 				(void) snprintf(ret_msg, RMBUFSIZE,
 				    LM_ERR_FINAL, tid,
 				    mms_sym_code_to_str(MMS_EXIST),
@@ -225,8 +222,8 @@ not_found:
 	mms_trace(MMS_ERR, "lm_v_private: LMPM private command has a "
 	    "missing value for a set-name:\n%s",
 	    mms_pn_build_cmd_text(cmd));
-	(void) snprintf(msg_str, sizeof (msg_str), LM_7009_MSG,
-	    "private", "set", "private", "set");
+	(void) mms_buf_msgcl(msg_str, sizeof (msg_str),
+	    LM_7009_MSG, "cmd", "private", "part", "set", NULL);
 	(void) snprintf(ret_msg, RMBUFSIZE, LM_ERR_FINAL, tid,
 	    mms_sym_code_to_str(MMS_INVALID),
 	    mms_sym_code_to_str(MMS_LM_E_CMDARGS), msg_str);
