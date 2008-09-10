@@ -2,7 +2,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* crypto/engine/hw_pk11_err.c */
 /* This product includes software developed by the OpenSSL Project for 
@@ -234,14 +233,14 @@ static void ERR_unload_pk11_strings(void)
     }
 }
 
-static void ERR_pk11_error(int function, int reason, char *file, int line)
+void ERR_pk11_error(int function, int reason, char *file, int line)
 {
     if (pk11_lib_error_code == 0)
 	pk11_lib_error_code=ERR_get_next_error_library();
     ERR_PUT_error(pk11_lib_error_code,function,reason,file,line);
 }
 
-static void PK11err_add_data(int function, int reason, CK_RV rv)
+void PK11err_add_data(int function, int reason, CK_RV rv)
 {
 	char tmp_buf[20];
 

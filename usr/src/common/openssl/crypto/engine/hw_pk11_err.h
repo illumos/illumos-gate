@@ -67,9 +67,8 @@
 #ifndef HW_PK11_ERR_H
 #define HW_PK11_ERR_H
 
-static void ERR_load_pk11_strings(void);
-static void ERR_pk11_error(int function, int reason, char *file, int line);
-static void PK11err_add_data(int function, int reason, CK_RV rv);
+void ERR_pk11_error(int function, int reason, char *file, int line);
+void PK11err_add_data(int function, int reason, CK_RV rv);
 #define	PK11err(f, r)	ERR_pk11_error((f), (r), __FILE__, __LINE__)
 
 /* Error codes for the PK11 functions. */

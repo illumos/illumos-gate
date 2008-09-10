@@ -1107,6 +1107,7 @@ static int pk11_init(ENGINE *e)
  * digest information is needed when setting default engine, this function
  * needs to be called before calling ENGINE_set_default.
  */
+/* ARGSUSED */
 static int pk11_library_init(ENGINE *e)
 	{
 	CK_C_GetFunctionList p;
@@ -1271,6 +1272,7 @@ err:
 
 /* Destructor (complements the "ENGINE_pk11()" constructor)
  */
+/* ARGSUSED */
 static int pk11_destroy(ENGINE *e)
 	{
 	free_PK11_LIBNAME();
@@ -1281,6 +1283,7 @@ static int pk11_destroy(ENGINE *e)
 /* Termination function to clean up the session, the token, and 
  * the pk11 library.
  */
+/* ARGSUSED */
 static int pk11_finish(ENGINE *e)
 	{
 	int i;
@@ -1329,6 +1332,7 @@ err:
 	}
 
 /* Standard engine interface function to set the dynamic library path */
+/* ARGSUSED */
 static int pk11_ctrl(ENGINE *e, int cmd, long i, void *p, void (*f)())
 	{
 	int initialized = ((pk11_dso == NULL) ? 0 : 1);
@@ -1366,6 +1370,7 @@ static void pk11_rand_cleanup(void)
 	return;
 	}
 
+/* ARGSUSED */
 static void pk11_rand_add(const void *buf, int num, double add)
 	{
 	PK11_SESSION *sp;
@@ -1512,7 +1517,7 @@ PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 				PK11_R_MALLOC_FAILURE);
 			goto err;
 			}
-		memset(sp, 0, sizeof(PK11_SESSION));
+		(void) memset(sp, 0, sizeof(PK11_SESSION));
 		}
 	else
 		{
@@ -2157,7 +2162,7 @@ static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_CIPHER *pcipher,
 		 */
 		ctr_params.ulCounterBits = AES_BLOCK_SIZE * 8;
 		OPENSSL_assert(pcipher->iv_len == AES_BLOCK_SIZE);
-		memcpy(ctr_params.cb, ctx->iv, AES_BLOCK_SIZE);
+		(void) memcpy(ctr_params.cb, ctx->iv, AES_BLOCK_SIZE);
 		}
 	else
 #endif	/* SOLARIS_AES_CTR */
@@ -2188,6 +2193,7 @@ static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_CIPHER *pcipher,
 	return (1);
 	}
 
+/* ARGSUSED */
 static int
 pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     const unsigned char *iv, int enc)
@@ -2431,6 +2437,7 @@ pk11_cipher_cleanup(EVP_CIPHER_CTX *ctx)
  * a particular NID in the ENGINE. This says what we'll do at the
  * top level - note, that list is restricted by what we answer with
  */
+/* ARGSUSED */
 static int
 pk11_engine_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 	const int **nids, int nid)
@@ -2496,6 +2503,7 @@ pk11_engine_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 	return (*cipher != NULL);
 	}
 
+/* ARGSUSED */
 static int
 pk11_engine_digests(ENGINE *e, const EVP_MD **digest,
 	const int **nids, int nid)
@@ -2583,7 +2591,7 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	 */
 	sp->opdata_key_len = ctx->key_len > PK11_KEY_LEN_MAX ?
 		PK11_KEY_LEN_MAX : ctx->key_len;
-	memcpy(sp->opdata_key, key, sp->opdata_key_len);
+	(void) memcpy(sp->opdata_key, key, sp->opdata_key_len);
 err:
 
 	return h_key;
@@ -3115,8 +3123,8 @@ pk11_choose_slots(int *any_slot_found)
 		current_slot = pSlotList[i];
 		current_slot_n_cipher = 0;
 		current_slot_n_digest = 0;
-		memset(local_cipher_nids, 0, sizeof(local_cipher_nids));
-		memset(local_digest_nids, 0, sizeof(local_digest_nids));
+		(void) memset(local_cipher_nids, 0, sizeof(local_cipher_nids));
+		(void) memset(local_digest_nids, 0, sizeof(local_digest_nids));
 
 		pk11_find_symmetric_ciphers(pFuncList, current_slot,
 		    &current_slot_n_cipher, local_cipher_nids);
@@ -3149,9 +3157,9 @@ pk11_choose_slots(int *any_slot_found)
 			best_slot_sofar = SLOTID = current_slot;
 			cipher_count = slot_n_cipher = current_slot_n_cipher;
 			digest_count = slot_n_digest = current_slot_n_digest;
-			memcpy(cipher_nids, local_cipher_nids,
+			(void) memcpy(cipher_nids, local_cipher_nids,
 			    sizeof (local_cipher_nids));
-			memcpy(digest_nids, local_digest_nids,
+			(void) memcpy(digest_nids, local_digest_nids,
 			    sizeof (local_digest_nids));
 			}
 		}
@@ -3577,7 +3585,7 @@ static int check_hw_mechanisms(void)
 	pflist->C_Finalize(NULL);
 #endif
 	OPENSSL_free(pSlotList);
-	dlclose(handle);
+	(void) dlclose(handle);
 	hw_cnids = tmp_hw_cnids;
 	hw_dnids = tmp_hw_dnids;
 

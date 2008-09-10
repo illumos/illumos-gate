@@ -97,7 +97,7 @@
 
 #include "security/cryptoki.h"
 #include "security/pkcs11.h"
-#include "hw_pk11_err.c"
+#include "hw_pk11_err.h"
 
 #ifndef OPENSSL_NO_RSA
 /* RSA stuff */
@@ -1058,7 +1058,7 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 err:
 	if (type != NID_md5_sha1)
 		{
-		memset(s,0,(unsigned int)j+1);
+		(void) memset(s,0,(unsigned int)j+1);
 		OPENSSL_free(s);
 		}
 	
@@ -1177,7 +1177,7 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 err:
 	if (type != NID_md5_sha1)
 		{
-		memset(s,0,(unsigned int)siglen);
+		(void) memset(s,0,(unsigned int)siglen);
 		OPENSSL_free(s);
 		}
 
@@ -1186,6 +1186,7 @@ err:
 	}
 
 /* load RSA private key from a file */
+/* ARGSUSED */
 EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	UI_METHOD *ui_method, void *callback_data)
 	{
@@ -1201,7 +1202,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	if ((pubkey=fopen(privkey_file,"r")) != NULL)
 		{
 		pkey = PEM_read_PrivateKey(pubkey, NULL, NULL, NULL);
-		fclose(pubkey);
+		(void) fclose(pubkey);
 		if (pkey != NULL)
 			{
 			rsa = EVP_PKEY_get1_RSA(pkey);
@@ -1232,6 +1233,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	}
 
 /* load RSA public key from a file */
+/* ARGSUSED */
 EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 	UI_METHOD *ui_method, void *callback_data)
 	{
@@ -1247,7 +1249,7 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 	if ((pubkey=fopen(pubkey_file,"r")) != NULL)
 		{
 		pkey = PEM_read_PUBKEY(pubkey, NULL, NULL, NULL);
-		fclose(pubkey);
+		(void) fclose(pubkey);
 		if (pkey != NULL)
 			{
 			rsa = EVP_PKEY_get1_RSA(pkey);
@@ -1389,6 +1391,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 			goto err;
 			}
 
+	/* LINTED: E_CONSTANT_CONDITION */
 	KEY_HANDLE_REFHOLD(h_key, OP_RSA, FALSE, rollback, err);
 	if (key_ptr != NULL)
 		*key_ptr = rsa;
@@ -1526,6 +1529,7 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 			goto err;
 			}
 
+	/* LINTED: E_CONSTANT_CONDITION */
 	KEY_HANDLE_REFHOLD(h_key, OP_RSA, FALSE, rollback, err);
 	if (key_ptr != NULL)
 		*key_ptr = rsa;
@@ -1548,7 +1552,7 @@ malloc_err:
 		{
 		if (a_key_template[i].pValue != NULL)
 			{
-			memset(a_key_template[i].pValue, 0, 
+			(void) memset(a_key_template[i].pValue, 0, 
 				a_key_template[i].ulValueLen);
 			OPENSSL_free(a_key_template[i].pValue);
 			a_key_template[i].pValue = NULL;
@@ -1617,12 +1621,13 @@ static int check_new_rsa_key_priv(PK11_SESSION *sp, const RSA *rsa)
 #ifndef OPENSSL_NO_DSA
 /* The DSA function implementation
  */
+/* ARGSUSED */
 static int pk11_DSA_init(DSA *dsa)
 	{
 	return 1;
 	}
 
-
+/* ARGSUSED */
 static int pk11_DSA_finish(DSA *dsa)
 	{
 	return (1);
@@ -1685,7 +1690,7 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 			goto ret;
 			}
 
-		memset(sigret, 0, siglen);
+		(void) memset(sigret, 0, siglen);
 		rv = pFuncList->C_Sign(sp->session, 
 			(unsigned char*) dgst, dlen, sigret, 
 			(CK_ULONG_PTR) &siglen);
@@ -1807,7 +1812,7 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 		 * be shorter than DSA_SIGNATURE_LEN/2 bytes so we need
 		 * to act accordingly and shift if necessary.
 		 */
-		memset(sigbuf, 0, siglen);
+		(void) memset(sigbuf, 0, siglen);
 		BN_bn2bin(sig->r, sigbuf + siglen2 - BN_num_bytes(sig->r));
 		BN_bn2bin(sig->s, &sigbuf[siglen2] + siglen2 -
 		    BN_num_bytes(sig->s));
@@ -1923,6 +1928,7 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 			goto err;
 			}
 
+	/* LINTED: E_CONSTANT_CONDITION */
 	KEY_HANDLE_REFHOLD(h_key, OP_DSA, FALSE, rollback, err);
 	if (key_ptr != NULL)
 		*key_ptr = dsa;
@@ -2048,6 +2054,7 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 			goto err;
 			}
 
+	/* LINTED: E_CONSTANT_CONDITION */
 	KEY_HANDLE_REFHOLD(h_key, OP_DSA, FALSE, rollback, err);
 	if (key_ptr != NULL)
 		*key_ptr = dsa;
@@ -2070,7 +2077,7 @@ malloc_err:
 		{
 		if (a_key_template[i].pValue != NULL)
 			{
-			memset(a_key_template[i].pValue, 0,
+			(void) memset(a_key_template[i].pValue, 0,
 				a_key_template[i].ulValueLen);
 			OPENSSL_free(a_key_template[i].pValue);
 			a_key_template[i].pValue = NULL;
@@ -2139,11 +2146,13 @@ static int check_new_dsa_key_priv(PK11_SESSION *sp, DSA *dsa)
 #ifndef OPENSSL_NO_DH
 /* The DH function implementation
  */
+/* ARGSUSED */
 static int pk11_DH_init(DH *dh)
 	{
 	return 1;
 	}
 
+/* ARGSUSED */
 static int pk11_DH_finish(DH *dh)
 	{
 	return (1);
@@ -2511,7 +2520,7 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 				break;
 			}
 
-		memcpy(key, ((char *) priv_key_result[0].pValue) + i, 
+		(void) memcpy(key, ((char *) priv_key_result[0].pValue) + i, 
 			priv_key_result[0].ulValueLen - i);
 		ret = priv_key_result[0].ulValueLen - i;
 		}
@@ -2651,6 +2660,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 			goto err;
 			}
 
+	/* LINTED: E_CONSTANT_CONDITION */
 	KEY_HANDLE_REFHOLD(h_key, OP_DH, FALSE, rollback, err);
 	if (key_ptr != NULL)
 		*key_ptr = dh;

@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libcrypto.a
 
@@ -251,6 +249,8 @@ lint :=			CPPFLAGS += -DNO_WINDOWS_BRAINDEATH
 all:		subdirs $(LIBS)
 
 lint:		lintcheck
+
+lintcheck := SRCS = $(SRCDIR)/engine/hw_pk11.c $(SRCDIR)/engine/hw_pk11_pub.c
 
 subdirs:	FRC
 	@mkdir -p \

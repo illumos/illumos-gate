@@ -403,6 +403,7 @@ COMMON_SUBDIRS = \
 	lib/nametoaddr \
 	lib/ncad_addr \
 	lib/nsswitch \
+	lib/openssl/libcrypto \
 	lib/pam_modules \
 	lib/passwdutil \
 	lib/pkcs11 \

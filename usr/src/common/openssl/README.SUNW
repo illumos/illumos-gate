@@ -2,7 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 The version of OpenSSL found in this directory was created by taking the
 stock version of OpenSSL 0.9.8a from www.openssl.org and modifying some of
@@ -120,8 +119,9 @@ The following files are different from the OpenSSL 0.9.8a release.
 	(Note: apps/openssl.cnf is unused.)
 
 
-6. Two files were added for a clean ON build even though the OpenSSL
-   code itself is not subject to lint checks.
+6. Two files were added for a clean ON build even though the majority
+   if OpenSSL code itself is not subject to lint checks (with the exception
+   of crypto/engine/hw_pk11*.[ch] files).
 
 	crypto/llib-lcrypto
 	ssl/llib-lssl
