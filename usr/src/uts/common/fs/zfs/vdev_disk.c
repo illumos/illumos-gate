@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/refcount.h>
@@ -602,16 +600,15 @@ vdev_ops_t vdev_disk_ops = {
  * Given the root disk device devid or pathname, read the label from
  * the device, and construct a configuration nvlist.
  */
-nvlist_t *
-vdev_disk_read_rootlabel(char *devpath, char *devid)
+int
+vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 {
-	nvlist_t *config = NULL;
 	ldi_handle_t vd_lh;
 	vdev_label_t *label;
 	uint64_t s, size;
 	int l;
 	ddi_devid_t tmpdevid;
-	int error = -1;
+	int error = 0;
 	char *minor_name;
 
 	/*
@@ -625,13 +622,13 @@ vdev_disk_read_rootlabel(char *devpath, char *devid)
 		ddi_devid_str_free(minor_name);
 	}
 
-	if (error && ldi_open_by_name(devpath, FREAD, kcred, &vd_lh,
-	    zfs_li))
-		return (NULL);
+	if (error && (error = ldi_open_by_name(devpath, FREAD, kcred,
+	    &vd_lh, zfs_li)) != 0)
+		return (error);
 
 	if (ldi_get_size(vd_lh, &s)) {
 		(void) ldi_close(vd_lh, FREAD, kcred);
-		return (NULL);
+		return (EIO);
 	}
 
 	size = P2ALIGN_TYPED(s, sizeof (vdev_label_t), uint64_t);
@@ -648,22 +645,22 @@ vdev_disk_read_rootlabel(char *devpath, char *devid)
 			continue;
 
 		if (nvlist_unpack(label->vl_vdev_phys.vp_nvlist,
-		    sizeof (label->vl_vdev_phys.vp_nvlist), &config, 0) != 0) {
-			config = NULL;
+		    sizeof (label->vl_vdev_phys.vp_nvlist), config, 0) != 0) {
+			*config = NULL;
 			continue;
 		}
 
-		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
+		if (nvlist_lookup_uint64(*config, ZPOOL_CONFIG_POOL_STATE,
 		    &state) != 0 || state >= POOL_STATE_DESTROYED) {
-			nvlist_free(config);
-			config = NULL;
+			nvlist_free(*config);
+			*config = NULL;
 			continue;
 		}
 
-		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
+		if (nvlist_lookup_uint64(*config, ZPOOL_CONFIG_POOL_TXG,
 		    &txg) != 0 || txg == 0) {
-			nvlist_free(config);
-			config = NULL;
+			nvlist_free(*config);
+			*config = NULL;
 			continue;
 		}
 
@@ -673,5 +670,5 @@ vdev_disk_read_rootlabel(char *devpath, char *devid)
 	kmem_free(label, sizeof (vdev_label_t));
 	(void) ldi_close(vd_lh, FREAD, kcred);
 
-	return (config);
+	return (error);
 }

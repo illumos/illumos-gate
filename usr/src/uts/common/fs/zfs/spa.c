@@ -2245,7 +2245,7 @@ spa_build_rootpool_config(nvlist_t *config)
  * Get the root pool information from the root disk, then import the root pool
  * during the system boot up time.
  */
-extern nvlist_t *vdev_disk_read_rootlabel(char *, char *);
+extern int vdev_disk_read_rootlabel(char *, char *, nvlist_t **);
 
 int
 spa_check_rootconf(char *devpath, char *devid, nvlist_t **bestconf,
@@ -2253,14 +2253,17 @@ spa_check_rootconf(char *devpath, char *devid, nvlist_t **bestconf,
 {
 	nvlist_t *config;
 	uint64_t txg;
+	int error;
 
-	if ((config = vdev_disk_read_rootlabel(devpath, devid)) == NULL)
-		return (-1);
+	if (error = vdev_disk_read_rootlabel(devpath, devid, &config))
+		return (error);
 
 	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG, &txg) == 0);
 
 	if (bestconf != NULL)
 		*bestconf = config;
+	else
+		nvlist_free(config);
 	*besttxg = txg;
 	return (0);
 }
@@ -2294,13 +2297,13 @@ spa_get_rootconf(char *devpath, char *devid, nvlist_t **bestconf)
 	char *bootpath = NULL;
 	uint_t children, c;
 	char *tmp;
+	int error;
 
 	if (devpath && ((tmp = strchr(devpath, ' ')) != NULL))
 		*tmp = '\0';
-	if (spa_check_rootconf(devpath, devid, &conf, &txg) < 0) {
+	if (error = spa_check_rootconf(devpath, devid, &conf, &txg)) {
 		cmn_err(CE_NOTE, "error reading device label");
-		nvlist_free(conf);
-		return (EINVAL);
+		return (error);
 	}
 	if (txg == 0) {
 		cmn_err(CE_NOTE, "this device is detached");
@@ -2341,8 +2344,9 @@ spa_get_rootconf(char *devpath, char *devid, nvlist_t **bestconf)
 		if (nvlist_lookup_string(child[c], ZPOOL_CONFIG_DEVID,
 		    &cdevid) != 0)
 			return (EINVAL);
-		if ((spa_check_rootconf(cpath, cdevid, NULL,
-		    &tmptxg) == 0) && (tmptxg > txg)) {
+		if (error = spa_check_rootconf(cpath, cdevid, NULL, &tmptxg))
+			return (error);
+		if (tmptxg > txg) {
 			txg = tmptxg;
 			VERIFY(nvlist_lookup_string(child[c],
 			    ZPOOL_CONFIG_PATH, &bootpath) == 0);
