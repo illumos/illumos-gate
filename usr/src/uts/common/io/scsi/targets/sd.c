@@ -15380,14 +15380,14 @@ not_successful:
 		case STATUS_SCSI2:
 		case STATUS_INTERMEDIATE_MET:
 		case STATUS_ACA_ACTIVE:
-			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
+			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "Unexpected SCSI status received: 0x%x\n",
 			    SD_GET_PKT_STATUS(pktp));
 			sd_return_failed_command(un, bp, EIO);
 			break;
 
 		default:
-			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
+			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "Invalid SCSI status received: 0x%x\n",
 			    SD_GET_PKT_STATUS(pktp));
 			sd_return_failed_command(un, bp, EIO);
