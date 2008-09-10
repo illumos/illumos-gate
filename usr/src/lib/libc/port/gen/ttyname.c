@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ttyname(f): return "/dev/X" (where X is a relative pathname
  * under /dev/), which is the name of the tty character special
@@ -143,7 +141,8 @@ static spcl_t special_case[] = {
 	"/dev/console", 0, 0, 0,
 	"/dev/conslog", 0, 0, 0,
 	"/dev/systty", 0, 0, 0,
-	"/dev/wscons", 0, 0, 0
+	"/dev/wscons", 0, 0, 0,
+	"/dev/msglog", 0, 0, 0,
 };
 #define	NUMSPECIAL	(sizeof (special_case) / sizeof (spcl_t))
 static spcl_t ptmspecial = {
