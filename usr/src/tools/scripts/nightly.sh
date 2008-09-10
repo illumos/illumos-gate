@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
 # Changes also by kjc, dmk.
@@ -62,6 +60,7 @@ unset CDPATH
 # Get the absolute path of the nightly script that the user invoked.  This
 # may be a relative path, and we need to do this before changing directory.
 nightly_path=`whence $0`
+nightly_ls="`ls -l $nightly_path`"
 
 #
 # Keep track of where we found nightly so we can invoke the matching
@@ -2058,6 +2057,58 @@ if [ "$w_FLAG" = "y" -a "$MULTI_PROTO" = yes -a -d "$ROOT-nd" ]; then
 	mv $ROOT-nd $ROOT-nd.prev
 fi
 
+# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
+function wstypes {
+	typeset parent_type child_type junk
+
+	CODEMGR_WS="$BRINGOVER_WS" "$WHICH_SCM" 2>/dev/null \
+	    | read parent_type junk
+	if [[ -z "$parent_type" || "$parent_type" == unknown ]]; then
+		# Probe BRINGOVER_WS to determine its type
+		if [[ $BRINGOVER_WS == svn*://* ]]; then
+			parent_type="subversion"
+		elif [[ $BRINGOVER_WS == file://* ]] &&
+		    egrep -s "This is a Subversion repository" \
+		    ${BRINGOVER_WS#file://}/README.txt 2> /dev/null; then
+			parent_type="subversion"
+		elif [[ $BRINGOVER_WS == ssh://* ]]; then
+			parent_type="mercurial"
+		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
+			parent_type="subversion"
+		elif [[ $BRINGOVER_WS == http://* ]] && \
+		    http_get "$BRINGOVER_WS/?cmd=heads" | \
+		    egrep -s "application/mercurial" 2> /dev/null; then
+			parent_type="mercurial"
+		else
+			parent_type="none"
+		fi
+	fi
+
+	# Probe CODEMGR_WS to determine its type
+	if [[ -d $CODEMGR_WS ]]; then
+		$WHICH_SCM | read child_type junk || exit 1
+	fi
+
+	# fold both unsupported and unrecognized results into "none"
+	case "$parent_type" in
+	none|subversion|teamware|mercurial)
+		;;
+	*)	parent_type=none
+		;;
+	esac
+	case "$child_type" in
+	none|subversion|teamware|mercurial)
+		;;
+	*)	child_type=none
+		;;
+	esac
+
+	echo $child_type $parent_type
+}
+
+wstypes | read SCM_TYPE PARENT_SCM_TYPE
+export SCM_TYPE PARENT_SCM_TYPE
+
 #
 #	Decide whether to clobber
 #
@@ -2359,57 +2410,6 @@ http_get() {
 	fi
 }
 
-# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
-function wstypes {
-	typeset parent_type child_type
-
-	env CODEMGR_WS=$BRINGOVER_WS $WHICH_SCM 2>/dev/null | read parent_type junk
-	if [[ -z "$parent_type" || "$parent_type" == unknown ]]; then
-		# Probe BRINGOVER_WS to determine its type
-		if [[ $BRINGOVER_WS == svn*://* ]]; then
-			parent_type="subversion"
-		elif [[ $BRINGOVER_WS == file://* ]] &&
-		    egrep -s "This is a Subversion repository" \
-		    ${BRINGOVER_WS#file://}/README.txt 2> /dev/null; then
-			parent_type="subversion"
-		elif [[ $BRINGOVER_WS == ssh://* ]]; then
-			parent_type="mercurial"
-		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
-			parent_type="subversion"
-		elif [[ $BRINGOVER_WS == http://* ]] && \
-		    http_get "$BRINGOVER_WS/?cmd=heads" | \
-		    egrep -s "application/mercurial" 2> /dev/null; then
-			parent_type="mercurial"
-		else
-			parent_type="none"
-		fi
-	fi
-
-	# Probe CODEMGR_WS to determine its type
-	if [[ -d $CODEMGR_WS ]]; then
-		$WHICH_SCM | read child_type junk || exit 1
-	fi
-
-	# fold both unsupported and unrecognized results into "none"
-	case "$parent_type" in
-	none|subversion|teamware|mercurial)
-		;;
-	*)	parent_type=none
-		;;
-	esac
-	case "$child_type" in
-	none|subversion|teamware|mercurial)
-		;;
-	*)	child_type=none
-		;;
-	esac
-
-	echo $child_type $parent_type
-}
-
-wstypes | read SCM_TYPE PARENT_SCM_TYPE
-export SCM_TYPE PARENT_SCM_TYPE
-
 #
 #	Decide whether to bringover to the codemgr workspace
 #
@@ -2469,7 +2469,7 @@ if [[ $nightly_path = "/opt/onbld/bin/nightly" ]] &&
     pkginfo SUNWonbld > /dev/null 2>&1 ; then
 	pkginfo -l SUNWonbld | egrep "PKGINST:|VERSION:|PSTAMP:"
 else
-	ls -l "$nightly_path"
+	echo "$nightly_ls"
 fi | tee -a $build_environ_file >> $LOGFILE
 echo | tee -a $build_environ_file >> $LOGFILE
 
