@@ -41,7 +41,6 @@
 #ifndef	_MEGARAID_SAS_H_
 #define	_MEGARAID_SAS_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1185,6 +1184,8 @@ struct megasas_instance {
 	int		baseaddress;
 	char		iocnode[16];
 
+	int		fm_capabilities;
+
 	struct megasas_func_ptr	*func_ptr;
 };
 
@@ -1595,7 +1596,7 @@ static uint_t	megasas_isr(caddr_t);
 static uint_t	megasas_softintr(caddr_t);
 
 static int	init_mfi(struct megasas_instance *);
-static void	mega_free_dma_obj(dma_obj_t);
+static int	mega_free_dma_obj(struct megasas_instance *, dma_obj_t);
 static int	mega_alloc_dma_obj(struct megasas_instance *, dma_obj_t *);
 static struct megasas_cmd *get_mfi_pkt(struct megasas_instance *);
 static void	return_mfi_pkt(struct megasas_instance *,
@@ -1666,6 +1667,18 @@ static int	abort_aen_cmd(struct megasas_instance *instance,
 #if defined(NOT_YET) && !defined(lint)
 static void 	io_timeout_checker(void *instance);
 #endif
+
+static int	megasas_common_check(struct megasas_instance *instance,
+		    struct  megasas_cmd *cmd);
+
+static void	megasas_fm_init(struct megasas_instance *instance);
+static void	megasas_fm_fini(struct megasas_instance *instance);
+static int	megasas_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
+		    const void *);
+static void	megasas_fm_ereport(struct megasas_instance *instance,
+		    char *detail);
+static int	megasas_check_dma_handle(ddi_dma_handle_t handle);
+static int	megasas_check_acc_handle(ddi_acc_handle_t handle);
 
 #ifdef	__cplusplus
 }

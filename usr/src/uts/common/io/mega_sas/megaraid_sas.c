@@ -43,8 +43,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/file.h>
@@ -66,6 +64,14 @@
 #include <sys/signal.h>
 
 #include "megaraid_sas.h"
+
+/*
+ * FMA header files
+ */
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
 
 /*
  * Local static data
@@ -306,7 +312,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uint16_t	command;
 
 	scsi_hba_tran_t		*tran;
-	ddi_dma_attr_t 		tran_dma_attr = megasas_generic_dma_attr;
+	ddi_dma_attr_t  tran_dma_attr;
 	struct megasas_instance	*instance;
 
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
@@ -470,6 +476,15 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			instance->subsysvid	= subsysvid;
 			instance->subsysid	= subsysid;
 
+			/* Initialize FMA */
+			instance->fm_capabilities = ddi_prop_get_int(
+			    DDI_DEV_T_ANY, instance->dip, DDI_PROP_CANSLEEP
+			    | DDI_PROP_DONTPASS, "fm-capable",
+			    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE
+			    | DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+
+			megasas_fm_init(instance);
+
 			/* setup the mfi based low level driver */
 			if (init_mfi(instance) != DDI_SUCCESS) {
 				con_log(CL_ANN, (CE_WARN, "megaraid: "
@@ -598,6 +613,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			tran->tran_quiesce	= megasas_tran_quiesce;
 			tran->tran_unquiesce	= megasas_tran_unquiesce;
 
+			tran_dma_attr = megasas_generic_dma_attr;
 			tran_dma_attr.dma_attr_sgllen = instance->max_num_sge;
 
 			/* Attach this instance of the hba */
@@ -667,6 +683,15 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			/* Finally! We are on the air.  */
 			ddi_report_dev(dip);
+
+			if (megasas_check_acc_handle(instance->regmap_handle) !=
+			    DDI_SUCCESS) {
+				goto fail_attach;
+			}
+			if (megasas_check_acc_handle(instance->pci_handle) !=
+			    DDI_SUCCESS) {
+				goto fail_attach;
+			}
 			break;
 		case DDI_PM_RESUME:
 			con_log(CL_ANN, (CE_NOTE,
@@ -710,6 +735,11 @@ fail_attach:
 	if (added_isr_f) {
 		ddi_remove_intr(dip, 0, instance->iblock_cookie);
 	}
+
+	megasas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
+	ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+
+	megasas_fm_fini(instance);
 
 	pci_config_teardown(&instance->pci_handle);
 
@@ -843,6 +873,8 @@ megasas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			ddi_remove_intr(dip, 0, instance->iblock_cookie);
 
 			free_space_for_mfi(instance);
+
+			megasas_fm_fini(instance);
 
 			pci_config_teardown(&instance->pci_handle);
 
@@ -1376,6 +1408,7 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		}
 
 		return_mfi_pkt(instance, cmd);
+		(void) megasas_common_check(instance, cmd);
 
 		if (pkt->pkt_comp) {
 			(*pkt->pkt_comp)(pkt);
@@ -1798,6 +1831,13 @@ megasas_isr(caddr_t arg)
 	(void) ddi_dma_sync(instance->mfi_internal_dma_obj.dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORCPU);
 
+	if (megasas_check_dma_handle(instance->mfi_internal_dma_obj.dma_handle)
+	    != DDI_SUCCESS) {
+		megasas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	producer = *instance->producer;
 	consumer = *instance->consumer;
 
@@ -1873,7 +1913,8 @@ get_mfi_pkt(struct megasas_instance *instance)
 		cmd = mlist_entry(head->next, struct megasas_cmd, list);
 		mlist_del_init(head->next);
 	}
-
+	if (cmd != NULL)
+		cmd->pkt = NULL;
 	mutex_exit(&instance->cmd_pool_mtx);
 
 	return (cmd);
@@ -1948,7 +1989,7 @@ destroy_mfi_frame_pool(struct megasas_instance *instance)
 		cmd = instance->cmd_list[i];
 
 		if (cmd->frame_dma_obj_status == DMA_OBJ_ALLOCATED)
-			mega_free_dma_obj(cmd->frame_dma_obj);
+			(void) mega_free_dma_obj(instance, cmd->frame_dma_obj);
 
 		cmd->frame_dma_obj_status  = DMA_OBJ_FREED;
 	}
@@ -2038,12 +2079,14 @@ static void
 free_additional_dma_buffer(struct megasas_instance *instance)
 {
 	if (instance->mfi_internal_dma_obj.status == DMA_OBJ_ALLOCATED) {
-		mega_free_dma_obj(instance->mfi_internal_dma_obj);
+		(void) mega_free_dma_obj(instance,
+		    instance->mfi_internal_dma_obj);
 		instance->mfi_internal_dma_obj.status = DMA_OBJ_FREED;
 	}
 
 	if (instance->mfi_evt_detail_obj.status == DMA_OBJ_ALLOCATED) {
-		mega_free_dma_obj(instance->mfi_evt_detail_obj);
+		(void) mega_free_dma_obj(instance,
+		    instance->mfi_evt_detail_obj);
 		instance->mfi_evt_detail_obj.status = DMA_OBJ_FREED;
 	}
 }
@@ -2260,6 +2303,9 @@ get_ctrl_info(struct megasas_instance *instance,
 	}
 
 	return_mfi_pkt(instance, cmd);
+	if (megasas_common_check(instance, cmd) != DDI_SUCCESS) {
+		ret = -1;
+	}
 
 	return (ret);
 }
@@ -2311,6 +2357,7 @@ abort_aen_cmd(struct megasas_instance *instance,
 	instance->aen_cmd = 0;
 
 	return_mfi_pkt(instance, cmd);
+	(void) megasas_common_check(instance, cmd);
 
 	return (ret);
 }
@@ -2432,6 +2479,9 @@ init_mfi(struct megasas_instance *instance)
 	}
 
 	return_mfi_pkt(instance, cmd);
+	if (megasas_common_check(instance, cmd) != DDI_SUCCESS) {
+		goto fail_fw_init;
+	}
 
 	/* gather misc FW related information */
 	if (!get_ctrl_info(instance, &ctrl_info)) {
@@ -2441,6 +2491,10 @@ init_mfi(struct megasas_instance *instance)
 	} else {
 		instance->max_sectors_per_req = instance->max_num_sge *
 		    PAGESIZE / 512;
+	}
+
+	if (megasas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
+		goto fail_fw_init;
 	}
 
 	return (0);
@@ -2601,6 +2655,9 @@ mfi_state_transition_to_ready(struct megasas_instance *instance)
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	WR_IB_DOORBELL(0xF, instance);
 
+	if (megasas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
+		return (-ENODEV);
+	}
 	return (0);
 }
 
@@ -2669,10 +2726,13 @@ get_seq_num(struct megasas_instance *instance,
 		ret = 0;
 	}
 
-	mega_free_dma_obj(dcmd_dma_obj);
+	if (mega_free_dma_obj(instance, dcmd_dma_obj) != DDI_SUCCESS)
+		ret = -1;
 
 	return_mfi_pkt(instance, cmd);
-
+	if (megasas_common_check(instance, cmd) != DDI_SUCCESS) {
+		ret = -1;
+	}
 	return (ret);
 }
 
@@ -2740,9 +2800,13 @@ get_seq_num_in_poll(struct megasas_instance *instance,
 		ret = 0;
 	}
 
-	mega_free_dma_obj(dcmd_dma_obj);
+	if (mega_free_dma_obj(instance, dcmd_dma_obj) != DDI_SUCCESS)
+		ret = -1;
 
 	return_mfi_pkt(instance, cmd);
+	if (megasas_common_check(instance, cmd) != DDI_SUCCESS) {
+		ret = -1;
+	}
 
 	return (ret);
 }
@@ -2816,6 +2880,7 @@ flush_cache(struct megasas_instance *instance)
 	}
 	con_log(CL_DLEVEL1, (CE_NOTE, "done"));
 	return_mfi_pkt(instance, cmd);
+	(void) megasas_common_check(instance, cmd);
 }
 
 /*
@@ -2860,7 +2925,7 @@ service_mfi_aen(struct megasas_instance *instance, struct megasas_cmd *cmd)
 	instance->aen_cmd = 0;
 
 	return_mfi_pkt(instance, cmd);
-
+	megasas_common_check(instance, cmd);
 	ret = register_mfi_aen(instance, seq_num, class_locale.word);
 
 	if (ret) {
@@ -2951,6 +3016,14 @@ megasas_softintr(caddr_t arg)
 		/* syncronize the Cmd frame for the controller */
 		(void) ddi_dma_sync(cmd->frame_dma_obj.dma_handle,
 		    0, 0, DDI_DMA_SYNC_FORCPU);
+
+		if (megasas_check_dma_handle(cmd->frame_dma_obj.dma_handle) !=
+		    DDI_SUCCESS) {
+			megasas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
+			ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+			return (DDI_INTR_UNCLAIMED);
+		}
+
 		hdr = &cmd->frame->hdr;
 
 		/* remove the internal command from the process list */
@@ -3118,6 +3191,18 @@ megasas_softintr(caddr_t arg)
 			/* pull_pend_queue(instance); */
 
 			return_mfi_pkt(instance, cmd);
+
+			(void) megasas_common_check(instance, cmd);
+
+			if (acmd->cmd_dmahandle) {
+				if (megasas_check_dma_handle(
+				    acmd->cmd_dmahandle) != DDI_SUCCESS) {
+					ddi_fm_service_impact(instance->dip,
+					    DDI_SERVICE_UNAFFECTED);
+					pkt->pkt_reason = CMD_TRAN_ERR;
+					pkt->pkt_statistics = 0;
+				}
+			}
 			/*
 			 * con_log(CL_ANN,
 			 *   (CE_CONT,"call add %lx",pkt->pkt_comp));
@@ -3161,7 +3246,17 @@ megasas_softintr(caddr_t arg)
 			complete_cmd_in_sync_mode(instance, cmd);
 			break;
 		default:
-			con_log(CL_ANN, (CE_PANIC, "Cmd type unknown !!"));
+			megasas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
+			ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+
+			if (cmd->pkt != NULL) {
+				pkt = cmd->pkt;
+				if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
+				    pkt->pkt_comp) {
+					(*pkt->pkt_comp)(pkt);
+				}
+			}
+			con_log(CL_ANN, (CE_WARN, "Cmd type unknown !!"));
 			break;
 		}
 	}
@@ -3229,21 +3324,44 @@ mega_alloc_dma_obj(struct megasas_instance *instance, dma_obj_t *obj)
 		return (-1);
 	}
 
+	if (megasas_check_dma_handle(obj->dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+		return (-1);
+	}
+
+	if (megasas_check_acc_handle(obj->acc_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+		return (-1);
+	}
+
 	return (cookie_cnt);
 }
 
 /*
- * mega_free_dma_obj(dma_obj_t)
+ * mega_free_dma_obj(struct megasas_instance *, dma_obj_t)
  *
  * De-allocate the memory and other resources for an dma object, which must
  * have been alloated by a previous call to mega_alloc_dma_obj()
  */
-static void
-mega_free_dma_obj(dma_obj_t obj)
+static int
+mega_free_dma_obj(struct megasas_instance *instance, dma_obj_t obj)
 {
+
+	if (megasas_check_dma_handle(obj.dma_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		return (DDI_FAILURE);
+	}
+
+	if (megasas_check_acc_handle(obj.acc_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		return (DDI_FAILURE);
+	}
+
 	(void) ddi_dma_unbind_handle(obj.dma_handle);
 	ddi_dma_mem_free(&obj.acc_handle);
 	ddi_dma_free_handle(&obj.dma_handle);
+
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -3691,6 +3809,8 @@ wait_for_outstanding(struct megasas_instance *instance)
 		return (1);
 	}
 
+	ddi_fm_acc_err_clear(instance->regmap_handle, DDI_FME_VERSION);
+
 	return (0);
 }
 
@@ -3816,7 +3936,8 @@ issue_mfi_pthru(struct megasas_instance *instance, struct megasas_ioctl *ioctl,
 
 	if (xferlen) {
 		/* free kernel buffer */
-		mega_free_dma_obj(pthru_dma_obj);
+		if (mega_free_dma_obj(instance, pthru_dma_obj) != DDI_SUCCESS)
+			return (1);
 	}
 
 	return (0);
@@ -3931,7 +4052,8 @@ issue_mfi_dcmd(struct megasas_instance *instance, struct megasas_ioctl *ioctl,
 
 	if (xferlen) {
 		/* free kernel buffer */
-		mega_free_dma_obj(dcmd_dma_obj);
+		if (mega_free_dma_obj(instance, dcmd_dma_obj) != DDI_SUCCESS)
+			return (1);
 	}
 
 	return (0);
@@ -4150,12 +4272,15 @@ issue_mfi_smp(struct megasas_instance *instance, struct megasas_ioctl *ioctl,
 
 	if (request_xferlen) {
 		/* free kernel buffer */
-		mega_free_dma_obj(request_dma_obj);
+		if (mega_free_dma_obj(instance, request_dma_obj) != DDI_SUCCESS)
+			return (1);
 	}
 
 	if (response_xferlen) {
 		/* free kernel buffer */
-		mega_free_dma_obj(response_dma_obj);
+		if (mega_free_dma_obj(instance, response_dma_obj) !=
+		    DDI_SUCCESS)
+			return (1);
 	}
 
 	return (0);
@@ -4327,12 +4452,14 @@ issue_mfi_stp(struct megasas_instance *instance, struct megasas_ioctl *ioctl,
 
 	if (fis_xferlen) {
 		/* free kernel buffer */
-		mega_free_dma_obj(fis_dma_obj);
+		if (mega_free_dma_obj(instance, fis_dma_obj) != DDI_SUCCESS)
+			return (1);
 	}
 
 	if (data_xferlen) {
 		/* free kernel buffer */
-		mega_free_dma_obj(data_dma_obj);
+		if (mega_free_dma_obj(instance, data_dma_obj) != DDI_SUCCESS)
+			return (1);
 	}
 
 	return (0);
@@ -4515,7 +4642,8 @@ handle_mfi_ioctl(struct megasas_instance *instance, struct megasas_ioctl *ioctl,
 
 
 	return_mfi_pkt(instance, cmd);
-
+	if (megasas_common_check(instance, cmd) != DDI_SUCCESS)
+		rval = 1;
 	return (rval);
 }
 
@@ -5047,4 +5175,176 @@ intr_ack_ppc(struct megasas_instance *instance)
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: interrupt cleared\n"));
 
 	return (DDI_INTR_CLAIMED);
+}
+
+static int
+megasas_common_check(struct megasas_instance *instance,
+    struct  megasas_cmd *cmd)
+{
+	int ret = DDI_SUCCESS;
+
+	if (megasas_check_dma_handle(cmd->frame_dma_obj.dma_handle) !=
+	    DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		if (cmd->pkt != NULL) {
+			cmd->pkt->pkt_reason = CMD_TRAN_ERR;
+			cmd->pkt->pkt_statistics = 0;
+		}
+		ret = DDI_FAILURE;
+	}
+	if (megasas_check_dma_handle(instance->mfi_internal_dma_obj.dma_handle)
+	    != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		if (cmd->pkt != NULL) {
+			cmd->pkt->pkt_reason = CMD_TRAN_ERR;
+			cmd->pkt->pkt_statistics = 0;
+		}
+		ret = DDI_FAILURE;
+	}
+	if (megasas_check_dma_handle(instance->mfi_evt_detail_obj.dma_handle) !=
+	    DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		if (cmd->pkt != NULL) {
+			cmd->pkt->pkt_reason = CMD_TRAN_ERR;
+			cmd->pkt->pkt_statistics = 0;
+		}
+		ret = DDI_FAILURE;
+	}
+	if (megasas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		ddi_fm_acc_err_clear(instance->regmap_handle, DDI_FME_VER0);
+		if (cmd->pkt != NULL) {
+			cmd->pkt->pkt_reason = CMD_TRAN_ERR;
+			cmd->pkt->pkt_statistics = 0;
+		}
+		ret = DDI_FAILURE;
+	}
+
+	return (ret);
+}
+
+/*ARGSUSED*/
+static int
+megasas_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+static void
+megasas_fm_init(struct megasas_instance *instance)
+{
+	/* Need to change iblock to priority for new MSI intr */
+	ddi_iblock_cookie_t fm_ibc;
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (instance->fm_capabilities) {
+		/* Adjust access and dma attributes for FMA */
+		endian_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+		megasas_generic_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+
+		/*
+		 * Register capabilities with IO Fault Services.
+		 * fm_capabilities will be updated to indicate
+		 * capabilities actually supported (not requested.)
+		 */
+
+		ddi_fm_init(instance->dip, &instance->fm_capabilities, &fm_ibc);
+
+		/*
+		 * Initialize pci ereport capabilities if ereport
+		 * capable (should always be.)
+		 */
+
+		if (DDI_FM_EREPORT_CAP(instance->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(instance->fm_capabilities)) {
+			pci_ereport_setup(instance->dip);
+		}
+
+		/*
+		 * Register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(instance->fm_capabilities)) {
+			ddi_fm_handler_register(instance->dip,
+			    megasas_fm_error_cb, (void*) instance);
+		}
+	} else {
+		endian_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		megasas_generic_dma_attr.dma_attr_flags = 0;
+	}
+}
+
+static void
+megasas_fm_fini(struct megasas_instance *instance)
+{
+	/* Only unregister FMA capabilities if registered */
+	if (instance->fm_capabilities) {
+		/*
+		 * Un-register error callback if error callback capable.
+		 */
+		if (DDI_FM_ERRCB_CAP(instance->fm_capabilities)) {
+			ddi_fm_handler_unregister(instance->dip);
+		}
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(instance->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(instance->fm_capabilities)) {
+			pci_ereport_teardown(instance->dip);
+		}
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(instance->dip);
+
+		/* Adjust access and dma attributes for FMA */
+		endian_attr.devacc_attr_access = DDI_DEFAULT_ACC;
+		megasas_generic_dma_attr.dma_attr_flags = 0;
+	}
+}
+
+int
+megasas_check_acc_handle(ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	if (handle == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+
+	return (de.fme_status);
+}
+
+int
+megasas_check_dma_handle(ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	if (handle == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+
+	return (de.fme_status);
+}
+
+void
+megasas_fm_ereport(struct megasas_instance *instance, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(instance->fm_capabilities)) {
+		ddi_fm_ereport_post(instance->dip, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERSION, NULL);
+	}
 }
