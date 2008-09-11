@@ -791,7 +791,6 @@ audiohd_resume(audiohd_state_t *statep)
 	mutex_enter(&statep->hda_mutex);
 	statep->suspended = B_FALSE;
 	/* Restore the hda state */
-	audiohd_change_widget_power_state(statep, AUDIOHD_PW_ON);
 	if (audiohd_reinit_hda(statep) == AUDIO_FAILURE) {
 		audio_sup_log(statep->hda_ahandle, CE_WARN,
 		    "!audiohd_resume() hda reinit failed");
@@ -832,7 +831,8 @@ audiohd_resume(audiohd_state_t *statep)
 		AUDIOHD_REG_SET8(regbase + AUDIOHD_SDREG_OFFSET_CTL,
 		    AUDIOHDR_SD_CTL_INTS | AUDIOHDR_SD_CTL_SRUN);
 	}
-
+	/* set widget power to D0 */
+	audiohd_change_widget_power_state(statep, AUDIOHD_PW_ON);
 	mutex_enter(&statep->hda_mutex);
 	cv_broadcast(&statep->hda_cv); /* wake up entry points */
 	mutex_exit(&statep->hda_mutex);
@@ -862,10 +862,11 @@ audiohd_suspend(audiohd_state_t *statep)
 		return (DDI_FAILURE);
 	}
 
+	/* set widget power to D2 */
+	audiohd_change_widget_power_state(statep, AUDIOHD_PW_OFF);
 	/* Disable h/w */
 	audiohd_disable_intr(statep);
 	audiohd_stop_dma(statep);
-	audiohd_change_widget_power_state(statep, AUDIOHD_PW_OFF);
 	mutex_exit(&statep->hda_mutex);
 
 	return (DDI_SUCCESS);
