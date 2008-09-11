@@ -248,6 +248,7 @@ DRV_KMODS	+= ippctl
 DRV_KMODS	+= ipsecah
 DRV_KMODS	+= ipsecesp
 DRV_KMODS	+= ipw
+DRV_KMODS	+= iwh
 DRV_KMODS	+= iwi
 DRV_KMODS	+= iwk
 DRV_KMODS	+= iwscn

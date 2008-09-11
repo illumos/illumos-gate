@@ -1503,6 +1503,8 @@ IPW_OBJS += ipw2100_hw.o ipw2100.o
 
 IWI_OBJS += ipw2200_hw.o ipw2200.o
 
+IWH_OBJS += iwh.o
+
 IWK_OBJS += iwk2.o
 
 WPI_OBJS += wpi.o
