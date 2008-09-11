@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of all implementation architecture
 #	dependent modules for the sun4v architecture.
 #
@@ -38,7 +36,6 @@ include Makefile.thunder
 include Makefile.turgo
 include Makefile.congo
 include Makefile.monza
-include Makefile.lightning
 
 USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
 USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
@@ -210,9 +207,7 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_CONGO_DIR) $(USR_CONGO_SBIN_DIR) \
 			$(USR_CONGO_LIB_DIR) \
 			$(USR_MONZA_DIR) \
-			$(USR_MONZA_SBIN_DIR) $(USR_MONZA_SBIN_LINKS) \
-			$(USR_LIGHTNING_DIR) $(USR_LIGHTNING_SBIN_DIR) \
-			$(USR_LIGHTNING_LIB_DIR)
+			$(USR_MONZA_SBIN_DIR) $(USR_MONZA_SBIN_LINKS)
 
 
 #
@@ -299,15 +294,6 @@ $(USR_MONZA_SBIN_DIR):		$(USR_MONZA_DIR)
 
 $(USR_MONZA_SBIN_LINKS):	$(USR_MONZA_SBIN_DIR)
 	$(INS.slink7)
-
-$(USR_LIGHTNING_DIR):		$(USR_SUN4V_PLAT_DIR)
-	-$(INS.dir.root.sys)
-
-$(USR_LIGHTNING_SBIN_DIR):	$(USR_LIGHTNING_DIR)
-	$(INS.slink5)
-
-$(USR_LIGHTNING_LIB_DIR):	$(USR_LIGHTNING_DIR)
-	-$(INS.dir.root.bin)
 
 #
 #	Full kernel lint target.

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 
 #include "hb_rcid.h"
@@ -44,14 +42,6 @@ prc_t t5140_prcs[] = {
 	{ 1, 0x500 }
 };
 
-/* A list of physical root complexes of the SUNW,USBRDT-5440 platform */
-prc_t usbrdt_5440_prcs[] = {
-	/* physical id, bus address */
-	{ 0, 0x400 },
-	{ 1, 0x500 },
-	{ 2, 0x600 },
-	{ 3, 0x700 }
-};
 
 pprc_t plat_prcids[] = {
 	/*
@@ -96,10 +86,7 @@ pprc_t plat_prcids[] = {
 	    t5140_prcs },
 	{ "SUNW,USBRDT-5240",
 	    sizeof (t5140_prcs) / sizeof (prc_t),
-	    t5140_prcs },
-	{ "SUNW,USBRDT-5440",
-	    sizeof (usbrdt_5440_prcs) / sizeof (prc_t),
-	    usbrdt_5440_prcs }
+	    t5140_prcs }
 };
 
 pprcs_t prcids = {

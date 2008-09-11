@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 sparc_SUBDIRS	= sun4u \
 		  sun4v \
@@ -36,8 +35,7 @@ sparc_SUBDIRS	= sun4u \
 		  SUNW,Netra-T5440 \
 		  SUNW,T5140 \
 		  SUNW,USBRDT-5240 \
-		  SUNW,SPARC-Enterprise-T5120  \
-		  SUNW,USBRDT-5440
+		  SUNW,SPARC-Enterprise-T5120
 
 i386_SUBDIRS	=
 
