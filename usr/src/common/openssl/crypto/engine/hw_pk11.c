@@ -1055,6 +1055,9 @@ static void pk11_fork_prepare(void)
 	{
 	int i;
 
+	if (!pk11_library_initialized)
+		return;
+
 	LOCK_OBJSTORE(OP_RSA);
 	LOCK_OBJSTORE(OP_DSA);
 	LOCK_OBJSTORE(OP_DH);
@@ -1068,6 +1071,9 @@ static void pk11_fork_prepare(void)
 static void pk11_fork_parent(void)
 	{
 	int i;
+
+	if (!pk11_library_initialized)
+		return;
 
 	for (i = OP_MAX - 1; i >= 0; i--)
 		{
@@ -1085,6 +1091,9 @@ static void pk11_fork_parent(void)
 static void pk11_fork_child(void)
 	{
 	int i;
+
+	if (!pk11_library_initialized)
+		return;
 
 	for (i = OP_MAX - 1; i >= 0; i--)
 		{
@@ -1323,6 +1332,13 @@ static int pk11_finish(ENGINE *e)
 	pFuncList = NULL;
 	pk11_library_initialized = FALSE;
 	pk11_pid = 0;
+	/*
+	 * There is no way how to unregister atfork handlers (other than
+	 * unloading the library) so we just free the locks. For this reason
+	 * the atfork handlers check if the engine is initialized and bail out
+	 * immediately if not. This is necessary in case a process finishes
+	 * the engine before calling fork().
+	 */
 	pk11_free_all_locks();
 
 	return 1;
