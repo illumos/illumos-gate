@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -188,6 +187,7 @@ atapi_init_drive(
 	ADBG_TRACE(("atapi_init_drive entered\n"));
 
 	/* Determine ATAPI CDB size */
+	(void) atapi_id_update(ata_ctlp, ata_drvp, NULL);
 
 	switch (ata_drvp->ad_id.ai_config & ATAPI_ID_CFG_PKT_SZ) {
 
@@ -1158,6 +1158,14 @@ atapi_id_update(
 
 	rc = atapi_id(ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
 	    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2, aidp);
+	if (rc) {
+		swab(aidp->ai_drvser, aidp->ai_drvser,
+		    sizeof (aidp->ai_drvser));
+		swab(aidp->ai_fw, aidp->ai_fw,
+		    sizeof (aidp->ai_fw));
+		swab(aidp->ai_model, aidp->ai_model,
+		    sizeof (aidp->ai_model));
+	}
 
 	if (ata_pktp == NULL)
 		return (ATA_FSM_RC_FINI);

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/modctl.h>
 #include <sys/debug.h>
@@ -3493,7 +3491,6 @@ ata_resume_drive(ata_drv_t *ata_drvp)
 	ata_ctl_t *ata_ctlp = ata_drvp->ad_ctlp;
 	int drive_type;
 	struct ata_id id;
-	uint8_t udma;
 
 	ADBG_TRACE(("ata_resume_drive entered\n"));
 
@@ -3504,26 +3501,16 @@ ata_resume_drive(ata_drv_t *ata_drvp)
 	if (drive_type == ATA_DEV_NONE)
 		return;
 
-	/* Reset Ultra DMA mode */
-	udma = ATACM_UDMA_SEL(&ata_drvp->ad_id);
-	if (udma != 0) {
-		uint8_t mode;
-		for (mode = 0; mode < 8; mode++)
-			if (((1 << mode) & udma) != 0)
-				break;
-		ASSERT(mode != 8);
-
-		mode |= ATF_XFRMOD_UDMA;
-
-		if (!ata_set_feature(ata_ctlp, ata_drvp, ATSF_SET_XFRMOD, mode))
-			return;
-	}
-
 	if (!ATAPIDRV(ata_drvp)) {
+		/* Reset Ultra DMA mode */
+		(void) ata_set_dma_mode(ata_ctlp, ata_drvp);
 		if (!ata_disk_setup_parms(ata_ctlp, ata_drvp))
 			return;
-		(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
+	} else {
+		atapi_init_drive(ata_drvp);
 	}
+	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
+
 }
 
 /*
@@ -3652,31 +3639,33 @@ ata_change_power(dev_info_t *dip, uint8_t cmd)
 	/*
 	 * Issue command on each disk device on the bus.
 	 */
+	if (cmd == ATC_SLEEP) {
+		for (targ = 0; targ < ATA_MAXTARG; targ++) {
+			ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
+			if (ata_drvp == NULL)
+				continue;
+			if (ata_drive_type(ata_drvp->ad_drive_bits,
+			    ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
+			    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
+			    &id) != ATA_DEV_DISK)
+				continue;
+			(void) ata_flush_cache(ata_ctlp, ata_drvp);
+			if (!ata_command(ata_ctlp, ata_drvp, TRUE, TRUE,
+			    5 * 1000000, cmd, 0, 0, 0, 0, 0, 0)) {
+				cmn_err(CE_WARN, "!ata_controller - Can not "
+				    "put drive %d in to power mode %u",
+				    targ, cmd);
+				(void) ata_devo_reset(dip, DDI_RESET_FORCE);
+				return (DDI_FAILURE);
+			}
+		}
+		return (DDI_SUCCESS);
+	}
+
+	(void) ata_software_reset(ata_ctlp);
 	for (targ = 0; targ < ATA_MAXTARG; targ++) {
 		ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
 		if (ata_drvp == NULL)
-			continue;
-		if (ata_drive_type(ata_drvp->ad_drive_bits,
-		    ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
-		    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
-		    &id) != ATA_DEV_DISK)
-			continue;
-		(void) ata_flush_cache(ata_ctlp, ata_drvp);
-		if (!ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
-		    cmd, 0, 0, 0, 0, 0, 0)) {
-			cmn_err(CE_WARN, "!ata_controller - Can not put "
-			    "drive %d in to power mode %u", targ, cmd);
-			(void) ata_devo_reset(dip, DDI_RESET_FORCE);
-			return (DDI_FAILURE);
-		}
-	}
-
-	if (cmd == ATC_SLEEP)
-		return (DDI_SUCCESS);
-
-	for (targ = 0; targ < ATA_MAXTARG; targ++) {
-		ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
-		if ((ata_drvp == NULL) || !(ata_drvp->ad_flags & AD_DISK))
 			continue;
 		ata_resume_drive(ata_drvp);
 
@@ -3691,7 +3680,6 @@ ata_change_power(dev_info_t *dip, uint8_t cmd)
 			if (ata_drvp != NULL)
 				ata_resume_drive(ata_drvp);
 		}
-		(void) ata_software_reset(ata_ctlp);
 	}
 
 	return (DDI_SUCCESS);
@@ -3773,12 +3761,6 @@ ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 
 	/* Return directly if DMA is not supported */
 	if (!(aidp->ai_cap & ATAC_DMA_SUPPORT))
-		return (rval);
-
-	/* Return if DMA mode is already selected */
-	if (((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
-	    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK)) ||
-	    (aidp->ai_dworddma & ATAC_MDMA_SEL_MASK))
 		return (rval);
 
 	/* First check Ultra DMA mode if no DMA is selected */
