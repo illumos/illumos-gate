@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This Makefile is used exclusively by `xref' to generate and maintain
 # cross-reference databases (right now: cscope, ctags, and etags).
@@ -73,12 +71,14 @@ XRINCS	= $(XRINCDIRS:%=-I%) $(HDRDIR:%=-I%) $(CPPFLAGS)
 
 include $(XRMAKEFILE)
 
-XRADDDEF	= *.[Ccdshlxy] Makefile* *.il* *.cc llib-* *.xml *.dtd.* *.ndl
-XRDELDEF	= *.ln
-XRFINDADD	= $(XRADDDEF:%=-o -name '%') $(XRADD:%=-o -name '%')
-XRFINDDEL	= $(XRDELDEF:%=-a ! -name '%') $(XRDEL:%=-a ! -name '%')
-XRFINDPRUNE	= $(XRPRUNE:%=-o -name '%')
-XRSEDPRUNE	= $(XRPRUNE:%=/\/%\//d; /^%\//d;)
+XRADDLIST	= $(XRADD) *.[Ccdshlxy] Makefile* *.il* *.cc llib-* *.xml \
+		  *.dtd.* *.ndl
+XRDELLIST	= $(XRDEL) *.ln
+XRPRUNELIST	= $(XRPRUNE) .hg
+XRFINDADD	= $(XRADDLIST:%=-o -name '%')
+XRFINDDEL	= $(XRDELLIST:%=-a ! -name '%')
+XRFINDPRUNE	= $(XRPRUNELIST:%=-o -name '%')
+XRSEDPRUNE	= $(XRPRUNELIST:%=/\/%\//d; /^%\//d;)
 
 .KEEP_STATE:
 .PRECIOUS: cscope.out cscope.in.out cscope.po.out tags TAGS
@@ -108,9 +108,9 @@ XRSEDPRUNE	= $(XRPRUNE:%=/\/%\//d; /^%\//d;)
 #
 xref.files:
 	$(TOUCH) xref.flg
-	$(FIND) $(XRDIRS) `$(CAT) xref.flg` -name SCCS -prune		\
-	    -o -type d \( -name '.del-*' $(XRFINDPRUNE) \) -prune	\
-	    -o -type f \( \( -name '' $(XRFINDADD) \) $(XRFINDDEL) \) -print |\
+	$(FIND) $(XRDIRS) `$(CAT) xref.flg` 			\
+	    -type d \( -name SCCS $(XRFINDPRUNE) \) -prune -o	\
+	    -type f \( \( -name '' $(XRFINDADD) \) $(XRFINDDEL) \) -print |\
 	    $(PERL) -ne 's:^\./::; next if ($$seen{$$_}++); print' > xref.tmp
 	> xref.files
 	-$(GREP) -v Makefile xref.tmp >> xref.files
