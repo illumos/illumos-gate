@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "bge_impl.h"
 
 
@@ -98,8 +96,8 @@ bge_nd_param_init(bge_t *bgep)
 	BGE_INIT_PROP("adv_autoneg_cap", param_adv_autoneg, 1);
 	BGE_INIT_PROP("adv_1000fdx_cap", param_adv_1000fdx, 1);
 	BGE_INIT_PROP("adv_1000hdx_cap", param_adv_1000hdx, 1);
-	BGE_INIT_PROP("adv_pause_cap", param_adv_pause, 0);
-	BGE_INIT_PROP("adv_asym_pause_cap", param_adv_asym_pause, 0);
+	BGE_INIT_PROP("adv_pause_cap", param_adv_pause, 1);
+	BGE_INIT_PROP("adv_asym_pause_cap", param_adv_asym_pause, 1);
 
 	if (flags & CHIP_FLAG_SERDES) {
 		bgep->param_adv_100fdx = 0;
