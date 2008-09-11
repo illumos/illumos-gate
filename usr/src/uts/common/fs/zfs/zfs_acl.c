@@ -56,6 +56,7 @@
 #define	ALLOW	ACE_ACCESS_ALLOWED_ACE_TYPE
 #define	DENY	ACE_ACCESS_DENIED_ACE_TYPE
 #define	MAX_ACE_TYPE	ACE_SYSTEM_ALARM_CALLBACK_OBJECT_ACE_TYPE
+#define	MIN_ACE_TYPE	ALLOW
 
 #define	OWNING_GROUP		(ACE_GROUP|ACE_IDENTIFIER_GROUP)
 #define	EVERYONE_ALLOW_MASK (ACE_READ_ACL|ACE_READ_ATTRIBUTES | \
@@ -394,31 +395,36 @@ zfs_acl_free(zfs_acl_t *aclp)
 }
 
 static boolean_t
+zfs_acl_valid_ace_type(uint_t type, uint_t flags)
+{
+	uint16_t entry_type;
+
+	switch (type) {
+	case ALLOW:
+	case DENY:
+	case ACE_SYSTEM_AUDIT_ACE_TYPE:
+	case ACE_SYSTEM_ALARM_ACE_TYPE:
+		entry_type = flags & ACE_TYPE_FLAGS;
+		return (entry_type == ACE_OWNER ||
+		    entry_type == OWNING_GROUP ||
+		    entry_type == ACE_EVERYONE || entry_type == 0 ||
+		    entry_type == ACE_IDENTIFIER_GROUP);
+	default:
+		if (type >= MIN_ACE_TYPE && type <= MAX_ACE_TYPE)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+static boolean_t
 zfs_ace_valid(vtype_t obj_type, zfs_acl_t *aclp, uint16_t type, uint16_t iflags)
 {
 	/*
 	 * first check type of entry
 	 */
 
-	switch (iflags & ACE_TYPE_FLAGS) {
-	case ACE_OWNER:
-	case OWNING_GROUP:
-	case ACE_IDENTIFIER_GROUP:
-	case ACE_EVERYONE:
-	case 0:	/* User entry */
-		break;
-	default:
+	if (!zfs_acl_valid_ace_type(type, iflags))
 		return (B_FALSE);
-
-	}
-
-	/*
-	 * next check inheritance level flags
-	 */
-
-	if (type != ALLOW && type > MAX_ACE_TYPE) {
-		return (B_FALSE);
-	}
 
 	switch (type) {
 	case ACE_ACCESS_ALLOWED_OBJECT_ACE_TYPE:
@@ -429,6 +435,10 @@ zfs_ace_valid(vtype_t obj_type, zfs_acl_t *aclp, uint16_t type, uint16_t iflags)
 			return (B_FALSE);
 		aclp->z_hints |= ZFS_ACL_OBJ_ACE;
 	}
+
+	/*
+	 * next check inheritance level flags
+	 */
 
 	if (obj_type == VDIR &&
 	    (iflags & (ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE)))
@@ -478,12 +488,23 @@ zfs_acl_next_ace(zfs_acl_t *aclp, void *start, uint64_t *who,
 
 	if (aclnode->z_ace_idx < aclnode->z_ace_count) {
 		void *acep = aclp->z_next_ace;
+		size_t ace_size;
+
+		/*
+		 * Make sure we don't overstep our bounds
+		 */
+		ace_size = aclp->z_ops.ace_size(acep);
+
+		if (((caddr_t)acep + ace_size) >
+		    ((caddr_t)aclnode->z_acldata + aclnode->z_size)) {
+			return (NULL);
+		}
+
 		*iflags = aclp->z_ops.ace_flags_get(acep);
 		*type = aclp->z_ops.ace_type_get(acep);
 		*access_mask = aclp->z_ops.ace_mask_get(acep);
 		*who = aclp->z_ops.ace_who_get(acep);
-		aclp->z_next_ace = (caddr_t)aclp->z_next_ace +
-		    aclp->z_ops.ace_size(acep);
+		aclp->z_next_ace = (caddr_t)aclp->z_next_ace + ace_size;
 		aclnode->z_ace_idx++;
 		return ((void *)acep);
 	}
@@ -764,6 +785,9 @@ zfs_mode_fuid_compute(znode_t *zp, zfs_acl_t *aclp, cred_t *cr,
 
 	while (acep = zfs_acl_next_ace(aclp, acep, &who,
 	    &access_mask, &iflags, &type)) {
+
+		if (!zfs_acl_valid_ace_type(type, iflags))
+			continue;
 
 		entry_type = (iflags & ACE_TYPE_FLAGS);
 
@@ -1659,10 +1683,16 @@ zfs_acl_inherit(znode_t *zp, zfs_acl_t *paclp, boolean_t *need_chmod)
 
 	*need_chmod = B_TRUE;
 	pacep = NULL;
-	aclp = zfs_acl_alloc(zfs_acl_version_zp(zp));
+	aclp = zfs_acl_alloc(paclp->z_version);
 	if (zfsvfs->z_acl_inherit != ZFS_ACL_DISCARD) {
 		while (pacep = zfs_acl_next_ace(paclp, pacep, &who,
 		    &access_mask, &iflags, &type)) {
+
+			/*
+			 * don't inherit bogus ACEs
+			 */
+			if (!zfs_acl_valid_ace_type(type, iflags))
+				continue;
 
 			if (zfsvfs->z_acl_inherit == ZFS_ACL_NOALLOW &&
 			    type == ALLOW)
@@ -2226,6 +2256,9 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 
 	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
 	    &iflags, &type)) {
+
+		if (!zfs_acl_valid_ace_type(type, iflags))
+			continue;
 
 		if (ZTOV(zp)->v_type == VDIR && (iflags & ACE_INHERIT_ONLY_ACE))
 			continue;

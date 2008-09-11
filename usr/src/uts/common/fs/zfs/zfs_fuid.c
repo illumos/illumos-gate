@@ -63,6 +63,8 @@ typedef struct fuid_domain {
 	uint64_t	f_idx;
 } fuid_domain_t;
 
+static char *nulldomain = "";
+
 /*
  * Compare two indexes.
  */
@@ -179,7 +181,7 @@ zfs_fuid_idx_domain(avl_tree_t *idx_tree, uint32_t idx)
 
 	findnode = avl_find(idx_tree, &searchnode, &loc);
 
-	return (findnode->f_ksid->kd_name);
+	return (findnode ? findnode->f_ksid->kd_name : nulldomain);
 }
 
 #ifdef _KERNEL
@@ -214,10 +216,13 @@ zfs_fuid_init(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 		}
 	}
 
-	zfsvfs->z_fuid_size = zfs_fuid_table_load(zfsvfs->z_os,
-	    zfsvfs->z_fuid_obj, &zfsvfs->z_fuid_idx, &zfsvfs->z_fuid_domain);
+	if (zfsvfs->z_fuid_obj != 0) {
+		zfsvfs->z_fuid_size = zfs_fuid_table_load(zfsvfs->z_os,
+		    zfsvfs->z_fuid_obj, &zfsvfs->z_fuid_idx,
+		    &zfsvfs->z_fuid_domain);
+		zfsvfs->z_fuid_loaded = B_TRUE;
+	}
 
-	zfsvfs->z_fuid_loaded = B_TRUE;
 	rw_exit(&zfsvfs->z_fuid_lock);
 }
 
@@ -241,7 +246,7 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 	 * for the user nobody.
 	 */
 	if (domain[0] == '\0') {
-		*retdomain = "";
+		*retdomain = nulldomain;
 		return (0);
 	}
 
@@ -344,7 +349,11 @@ zfs_fuid_find_by_idx(zfsvfs_t *zfsvfs, uint32_t idx)
 		zfs_fuid_init(zfsvfs, NULL);
 
 	rw_enter(&zfsvfs->z_fuid_lock, RW_READER);
-	domain = zfs_fuid_idx_domain(&zfsvfs->z_fuid_idx, idx);
+
+	if (zfsvfs->z_fuid_obj)
+		domain = zfs_fuid_idx_domain(&zfsvfs->z_fuid_idx, idx);
+	else
+		domain = nulldomain;
 	rw_exit(&zfsvfs->z_fuid_lock);
 
 	ASSERT(domain);
@@ -567,7 +576,7 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr,
 			 * purposes.
 			 */
 			rid = UID_NOBODY;
-			domain = "";
+			domain = nulldomain;
 		}
 	}
 
