@@ -2827,6 +2827,7 @@ ar_query_delete(ace_t *ace, void *arg)
 	arp_stack_t *as = ar->ar_as;
 	ip_stack_t *ipst = as->as_netstack->netstack_ip;
 
+	mi_timer(ace->ace_arl->arl_wq, ace->ace_mp, -1L);
 	while ((mp = *mpp) != NULL) {
 		/* The response queue was stored in the query b_prev. */
 		if ((queue_t *)mp->b_prev == ar->ar_wq ||

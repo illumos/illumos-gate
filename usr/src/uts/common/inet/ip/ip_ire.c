@@ -1495,12 +1495,15 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 	if (ret_ire == NULL) {
 		/* ire_freemblk needs these set */
 		ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
+		ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
 		ire->ire_ipst = ipst;
 		freeb(ire->ire_mp);
 		return (NULL);
 	}
 	ret_ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
+	ret_ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
 	ASSERT(ret_ire == ire);
+	ASSERT(ret_ire->ire_ipst == ipst);
 	/*
 	 * ire_max_frag is normally zero here and is atomically set
 	 * under the irebucket lock in ire_add_v[46] except for the
@@ -5450,6 +5453,7 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	ill = ire_to_ill(ire);
 	ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
 	ire->ire_zoneid = in_ire->ire_zoneid;
+	ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
 	ire->ire_ipst = ipst;
 
 	/*
@@ -5500,12 +5504,14 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
  * Note that the ARP/IP merge should replace the functioanlity by providing
  * direct function calls to clean up unresolved entries in ire/nce lists.
  */
+
 void
 ire_freemblk(ire_t *ire_mp)
 {
 	nce_t		*nce = NULL;
 	ill_t		*ill;
 	ip_stack_t	*ipst;
+	netstack_t	*ns = NULL;
 
 	ASSERT(ire_mp != NULL);
 
@@ -5520,14 +5526,17 @@ ire_freemblk(ire_t *ire_mp)
 
 	/*
 	 * the arp information corresponding to this ire_mp was not
-	 * transferred to  a ire_cache entry. Need
+	 * transferred to an ire_cache entry. Need
 	 * to clean up incomplete ire's and nce, if necessary.
 	 */
 	ASSERT(ire_mp->ire_stq != NULL);
 	ASSERT(ire_mp->ire_stq_ifindex != 0);
 	ASSERT(ire_mp->ire_ipst != NULL);
 
-	ipst = ire_mp->ire_ipst;
+	ns = netstack_find_by_stackid(ire_mp->ire_stackid);
+	ipst = (ns ? ns->netstack_ip : NULL);
+	if (ipst == NULL || ipst != ire_mp->ire_ipst) /* Disapeared on us */
+		goto  cleanup;
 
 	/*
 	 * Get any nce's corresponding to this ire_mp. We first have to
@@ -5575,6 +5584,8 @@ ire_freemblk(ire_t *ire_mp)
 		NCE_REFRELE(nce); /* release the ref taken by ndp_lookup_v4 */
 
 cleanup:
+	if (ns != NULL)
+		netstack_rele(ns);
 	/*
 	 * Get rid of the ire buffer
 	 * We call kmem_free here(instead of ire_delete()), since

@@ -2532,9 +2532,11 @@ typedef struct ire_s {
 	 * ire's that are embedded inside mblk_t and sent to the external
 	 * resolver use the ire_stq_ifindex to track the ifindex of the
 	 * ire_stq, so that the ill (if it exists) can be correctly recovered
-	 * for cleanup in the esbfree routine when arp failure occurs
+	 * for cleanup in the esbfree routine when arp failure occurs.
+	 * Similarly, the ire_stackid is used to recover the ip_stack_t.
 	 */
-	uint_t	ire_stq_ifindex;
+	uint_t		ire_stq_ifindex;
+	netstackid_t	ire_stackid;
 	uint_t		ire_defense_count;	/* number of ARP conflicts */
 	uint_t		ire_defense_time;	/* last time defended (secs) */
 	boolean_t	ire_trace_disable;	/* True when alloc fails */
