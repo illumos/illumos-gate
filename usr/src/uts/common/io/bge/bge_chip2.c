@@ -2629,14 +2629,21 @@ bge_sync_mac_modes(bge_t *bgep)
 	macmode = regval = bge_reg_get32(bgep, ETHERNET_MAC_MODE_REG);
 	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
 	    (bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
-		macmode &= ~ETHERNET_MODE_LINK_POLARITY;
+		if (DEVICE_5714_SERIES_CHIPSETS(bgep))
+			macmode |= ETHERNET_MODE_LINK_POLARITY;
+		else
+			macmode &= ~ETHERNET_MODE_LINK_POLARITY;
 	else
 		macmode |= ETHERNET_MODE_LINK_POLARITY;
 	macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
 	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
-	    (bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
-		macmode |= ETHERNET_MODE_PORTMODE_TBI;
-	else if (bgep->param_link_speed == 10 || bgep->param_link_speed == 100)
+	    (bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC)) {
+		if (DEVICE_5714_SERIES_CHIPSETS(bgep))
+			macmode |= ETHERNET_MODE_PORTMODE_GMII;
+		else
+			macmode |= ETHERNET_MODE_PORTMODE_TBI;
+	} else if (bgep->param_link_speed == 10 ||
+	    bgep->param_link_speed == 100)
 		macmode |= ETHERNET_MODE_PORTMODE_MII;
 	else
 		macmode |= ETHERNET_MODE_PORTMODE_GMII;

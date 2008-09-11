@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "bge_impl.h"
 
 /*
@@ -978,9 +976,15 @@ bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
 	 * appropriately for the SerDes interface ...
 	 */
 	macmode = bge_reg_get32(bgep, ETHERNET_MAC_MODE_REG);
-	macmode &= ~ETHERNET_MODE_LINK_POLARITY;
-	macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
-	macmode |= ETHERNET_MODE_PORTMODE_TBI;
+	if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+		macmode |= ETHERNET_MODE_LINK_POLARITY;
+		macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
+		macmode |= ETHERNET_MODE_PORTMODE_GMII;
+	} else {
+		macmode &= ~ETHERNET_MODE_LINK_POLARITY;
+		macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
+		macmode |= ETHERNET_MODE_PORTMODE_TBI;
+	}
 	bge_reg_put32(bgep, ETHERNET_MAC_MODE_REG, macmode);
 
 	/*
@@ -1195,62 +1199,97 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 	uint32_t emac_status;
 	uint32_t lpadv;
 	boolean_t linkup;
+	boolean_t linkup_old = bgep->param_link_up;
 
 	for (;;) {
 		/*
-		 * Step 10: read & clear the main (Ethernet) MAC status
-		 * (the relevant bits of this are write-one-to-clear).
+		 * Step 10: BCM5714S, BCM5715S only
+		 * Don't call function bge_autoneg_serdes() as
+		 * RX_1000BASEX_AUTONEG_REG (0x0448) is not applicable
+		 * to BCM5705, BCM5788, BCM5721, BCM5751, BCM5752,
+		 * BCM5714, and BCM5715 devices.
 		 */
-		emac_status = bge_reg_get32(bgep, ETHERNET_MAC_STATUS_REG);
-		bge_reg_put32(bgep, ETHERNET_MAC_STATUS_REG, emac_status);
-
-		BGE_DEBUG(("bge_check_serdes: link %d/%s, "
-		    "MAC status 0x%x (was 0x%x)",
-		    bgep->link_state, UPORDOWN(bgep->param_link_up),
-		    emac_status, bgep->serdes_status));
-
-		/*
-		 * We will only consider the link UP if all the readings
-		 * are consistent and give meaningful results ...
-		 */
-		bgep->serdes_status = emac_status;
-		linkup = BIS(emac_status, ETHERNET_STATUS_SIGNAL_DETECT);
-		linkup &= BIS(emac_status, ETHERNET_STATUS_PCS_SYNCHED);
-
-		/*
-		 * Now some fiddling with the interpretation:
-		 *	if there's been an error at the PCS level, treat
-		 *	it as a link change (the h/w doesn't do this)
-		 *
-		 *	if there's been a change, but it's only a PCS sync
-		 *	change (not a config change), AND the link already
-		 *	was & is still UP, then ignore the change
-		 */
-		if (BIS(emac_status, ETHERNET_STATUS_PCS_ERROR))
-			emac_status |= ETHERNET_STATUS_LINK_CHANGED;
-		else if (BIC(emac_status, ETHERNET_STATUS_CFG_CHANGED))
-			if (bgep->param_link_up && linkup)
+		if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+			emac_status =  bge_reg_get32(bgep, MI_STATUS_REG);
+			linkup = BIS(emac_status, MI_STATUS_LINK);
+			bgep->serdes_status = emac_status;
+			if ((linkup && linkup_old) ||
+			    (!linkup && !linkup_old)) {
 				emac_status &= ~ETHERNET_STATUS_LINK_CHANGED;
+				emac_status &= ~ETHERNET_STATUS_RECEIVING_CFG;
+				break;
+			}
+			emac_status |= ETHERNET_STATUS_LINK_CHANGED;
+			emac_status |= ETHERNET_STATUS_RECEIVING_CFG;
+			if (linkup)
+				linkup_old = B_TRUE;
+			else
+				linkup_old = B_FALSE;
+			recheck = B_TRUE;
+		} else {
+			/*
+			 * Step 10: others
+			 * read & clear the main (Ethernet) MAC status
+			 * (the relevant bits of this are write-one-to-clear).
+			 */
+			emac_status = bge_reg_get32(bgep,
+			    ETHERNET_MAC_STATUS_REG);
+			bge_reg_put32(bgep,
+			    ETHERNET_MAC_STATUS_REG, emac_status);
 
-		BGE_DEBUG(("bge_check_serdes: status 0x%x => 0x%x %s",
-		    bgep->serdes_status, emac_status, UPORDOWN(linkup)));
+			BGE_DEBUG(("bge_check_serdes: link %d/%s, "
+			    "MAC status 0x%x (was 0x%x)",
+			    bgep->link_state, UPORDOWN(bgep->param_link_up),
+			    emac_status, bgep->serdes_status));
 
-		/*
-		 * If we're receiving configs, run the autoneg protocol
-		 */
-		if (linkup && BIS(emac_status, ETHERNET_STATUS_RECEIVING_CFG))
-			bge_autoneg_serdes(bgep);
+			/*
+			 * We will only consider the link UP if all the readings
+			 * are consistent and give meaningful results ...
+			 */
+			bgep->serdes_status = emac_status;
+			linkup = BIS(emac_status,
+			    ETHERNET_STATUS_SIGNAL_DETECT);
+			linkup &= BIS(emac_status, ETHERNET_STATUS_PCS_SYNCHED);
 
-		/*
-		 * If the SerDes status hasn't changed, we're done ...
-		 */
-		if (BIC(emac_status, ETHERNET_STATUS_LINK_CHANGED))
-			break;
+			/*
+			 * Now some fiddling with the interpretation:
+			 *	if there's been an error at the PCS level, treat
+			 *	it as a link change (the h/w doesn't do this)
+			 *
+			 *	if there's been a change, but it's only a PCS
+			 *	sync change (not a config change), AND the link
+			 *	already was & is still UP, then ignore the
+			 *	change
+			 */
+			if (BIS(emac_status, ETHERNET_STATUS_PCS_ERROR))
+				emac_status |= ETHERNET_STATUS_LINK_CHANGED;
+			else if (BIC(emac_status, ETHERNET_STATUS_CFG_CHANGED))
+				if (bgep->param_link_up && linkup)
+					emac_status &=
+					    ~ETHERNET_STATUS_LINK_CHANGED;
 
-		/*
-		 * Go round again until we no longer see a change ...
-		 */
-		recheck = B_TRUE;
+			BGE_DEBUG(("bge_check_serdes: status 0x%x => 0x%x %s",
+			    bgep->serdes_status, emac_status,
+			    UPORDOWN(linkup)));
+
+			/*
+			 * If we're receiving configs, run the autoneg protocol
+			 */
+			if (linkup && BIS(emac_status,
+			    ETHERNET_STATUS_RECEIVING_CFG))
+				bge_autoneg_serdes(bgep);
+
+			/*
+			 * If the SerDes status hasn't changed, we're done ...
+			 */
+			if (BIC(emac_status, ETHERNET_STATUS_LINK_CHANGED))
+				break;
+
+			/*
+			 * Go round again until we no longer see a change ...
+			 */
+			recheck = B_TRUE;
+		}
 	}
 
 	/*
