@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # packaging files
 i copyright
@@ -69,6 +67,7 @@ f none usr/benchmarks/filebench/workloads/filemicro_seqwrite.f 444 root bin
 f none usr/benchmarks/filebench/workloads/filemicro_seqwriterand.f 444 root bin
 f none usr/benchmarks/filebench/workloads/filemicro_seqwriterandvargam.f 444 root bin
 f none usr/benchmarks/filebench/workloads/filemicro_seqwriterandvartab.f 444 root bin
+f none usr/benchmarks/filebench/workloads/filemicro_statfile.f 444 root bin
 f none usr/benchmarks/filebench/workloads/filemicro_writefsync.f 444 root bin
 f none usr/benchmarks/filebench/workloads/fileserver.f 444 root bin
 f none usr/benchmarks/filebench/workloads/mongo.f 444 root bin

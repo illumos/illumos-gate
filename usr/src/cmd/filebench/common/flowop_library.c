@@ -25,8 +25,6 @@
  * Portions Copyright 2008 Denis Cheng
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #include <sys/types.h>
@@ -105,6 +103,7 @@ static int flowoplib_init_generic(flowop_t *flowop);
 static void flowoplib_destruct_generic(flowop_t *flowop);
 static void flowoplib_destruct_noop(flowop_t *flowop);
 static int flowoplib_fdnum(threadflow_t *threadflow, flowop_t *flowop);
+static int flowoplib_print(threadflow_t *threadflow, flowop_t *flowop);
 static int flowoplib_write(threadflow_t *threadflow, flowop_t *flowop);
 #ifdef HAVE_AIO
 static int flowoplib_aiowrite(threadflow_t *threadflow, flowop_t *flowop);
@@ -209,6 +208,8 @@ static flowoplib_t flowoplib_funcs[] = {
 	flowoplib_deletefile, flowoplib_destruct_generic,
 	FLOW_TYPE_IO, FLOW_ATTR_WRITE, "writewholefile", flowoplib_init_generic,
 	flowoplib_writewholefile, flowoplib_destruct_generic,
+	FLOW_TYPE_OTHER, 0, "print", flowoplib_init_generic,
+	flowoplib_print, flowoplib_destruct_generic,
 	/* routine to calculate mean and stddev for output from a randvar */
 	FLOW_TYPE_OTHER, 0, "testrandvar", flowoplib_testrandvar_init,
 	flowoplib_testrandvar, flowoplib_testrandvar_destruct
@@ -1964,6 +1965,7 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 #endif /* HAVE_RAW_SUPPORT */
 
 	if (file == NULL) {
+		/* pick arbitrary, existing (allocated) file */
 		if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0))
 		    == NULL) {
 			filebench_log(LOG_DEBUG_SCRIPT,
@@ -1971,7 +1973,18 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 			return (FILEBENCH_NORSC);
 		}
 	} else {
-		(void) ipc_mutex_lock(&file->fse_lock);
+		/* delete specific file. wait for it to be non-busy */
+		(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+		while (file->fse_flags & FSE_BUSY) {
+			file->fse_flags |= FSE_THRD_WAITNG;
+			(void) pthread_cond_wait(&fileset->fs_thrd_wait_cv,
+			    &fileset->fs_pick_lock);
+		}
+
+		/* File now available, grab it for deletion */
+		file->fse_flags |= FSE_BUSY;
+		fileset->fs_idle_files--;
+		(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 	}
 
 	*path = 0;
@@ -1982,14 +1995,13 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	(void) strcat(path, pathtmp);
 	free(pathtmp);
 
+	/* delete the selected file */
 	flowop_beginop(threadflow, flowop);
 	(void) unlink(path);
 	flowop_endop(threadflow, flowop, 0);
-	file->fse_flags &= ~FSE_EXISTS;
-	(void) ipc_mutex_lock(&fileset->fs_num_files_lock);
-	fileset->fs_num_act_files--;
-	(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
-	(void) ipc_mutex_unlock(&file->fse_lock);
+
+	/* indicate that it is no longer busy and no longer exists */
+	fileset_unbusy(file, TRUE, FALSE);
 
 	filebench_log(LOG_DEBUG_SCRIPT, "deleted file %s", file->fse_path);
 
@@ -2117,33 +2129,84 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 {
 	filesetentry_t *file;
 	fileset_t *fileset;
-	char path[MAXPATHLEN];
-	char *pathtmp;
+	struct stat statbuf;
+	int fd = flowop->fo_fdnumber;
 
-	if ((fileset = flowop->fo_fileset) == NULL) {
-		filebench_log(LOG_ERROR, "flowop NULL file");
+	/* if fd specified and the file is open, use it to access file */
+	if ((fd > 0) && ((threadflow->tf_fd[fd]) > 0)) {
+
+		/* check whether file handle still valid */
+		if ((file = threadflow->tf_fse[fd]) == NULL) {
+			filebench_log(LOG_DEBUG_SCRIPT,
+			    "flowop %s trying to stat NULL file at fd = %d",
+			    flowop->fo_name, fd);
+			return (FILEBENCH_ERROR);
+		}
+
+		/* if here, we still have a valid file pointer */
+		fileset = file->fse_fileset;
+	} else {
+		/* Otherwise, pick arbitrary file */
+		file = NULL;
+		fileset = flowop->fo_fileset;
+	}
+
+
+	if (fileset == NULL) {
+		filebench_log(LOG_ERROR,
+		    "statfile with no fileset specified");
 		return (FILEBENCH_ERROR);
 	}
 
-	if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0)) == NULL) {
-		filebench_log(LOG_DEBUG_SCRIPT,
-		    "flowop %s failed to pick file",
+#ifdef HAVE_RAW_SUPPORT
+	/* can't be used with raw devices */
+	if (fileset->fs_attrs & FILESET_IS_RAW_DEV) {
+		filebench_log(LOG_ERROR,
+		    "flowop %s attempted do a statfile on a RAW device",
 		    flowop->fo_name);
-		return (FILEBENCH_NORSC);
+		return (FILEBENCH_ERROR);
 	}
+#endif /* HAVE_RAW_SUPPORT */
 
-	*path = 0;
-	(void) strcpy(path, avd_get_str(fileset->fs_path));
-	(void) strcat(path, "/");
-	(void) strcat(path, avd_get_str(fileset->fs_name));
-	pathtmp = fileset_resolvepath(file);
-	(void) strcat(path, pathtmp);
-	free(pathtmp);
+	if (file == NULL) {
+		char path[MAXPATHLEN];
+		char *pathtmp;
 
-	flowop_beginop(threadflow, flowop);
-	flowop_endop(threadflow, flowop, 0);
+		/* pick arbitrary, existing (allocated) file */
+		if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0))
+		    == NULL) {
+			filebench_log(LOG_DEBUG_SCRIPT,
+			    "Statfile flowop %s failed to pick file",
+			    flowop->fo_name);
+			return (FILEBENCH_NORSC);
+		}
 
-	(void) ipc_mutex_unlock(&file->fse_lock);
+		/* resolve path and do a stat on file */
+		*path = 0;
+		(void) strcpy(path, avd_get_str(fileset->fs_path));
+		(void) strcat(path, "/");
+		(void) strcat(path, avd_get_str(fileset->fs_name));
+		pathtmp = fileset_resolvepath(file);
+		(void) strcat(path, pathtmp);
+		free(pathtmp);
+
+		/* stat the file */
+		flowop_beginop(threadflow, flowop);
+		if (stat(path, &statbuf) == -1)
+			filebench_log(LOG_ERROR,
+			    "statfile flowop %s failed", flowop->fo_name);
+		flowop_endop(threadflow, flowop, 0);
+
+		fileset_unbusy(file, FALSE, FALSE);
+	} else {
+		/* stat specific file */
+		flowop_beginop(threadflow, flowop);
+		if (fstat(threadflow->tf_fd[fd], &statbuf) == -1)
+			filebench_log(LOG_ERROR,
+			    "statfile flowop %s failed", flowop->fo_name);
+		flowop_endop(threadflow, flowop, 0);
+
+	}
 
 	return (FILEBENCH_OK);
 }
@@ -2562,6 +2625,24 @@ flowoplib_testrandvar_destruct(flowop_t *flowop)
 	    "testrandvar: ops = %llu, mean = %8.2lf, stddev = %8.2lf",
 	    (u_longlong_t)mystats->sample_count, mean, std_dev);
 	free(mystats);
+}
+
+/*
+ * prints message to the console from within a thread
+ */
+static int
+flowoplib_print(threadflow_t *threadflow, flowop_t *flowop)
+{
+	procflow_t *procflow;
+
+	procflow = threadflow->tf_process;
+	filebench_log(LOG_INFO,
+	    "Message from process (%s,%d), thread (%s,%d): %s",
+	    procflow->pf_name, procflow->pf_instance,
+	    threadflow->tf_name, threadflow->tf_instance,
+	    avd_get_str(flowop->fo_value));
+
+	return (FILEBENCH_OK);
 }
 
 /*

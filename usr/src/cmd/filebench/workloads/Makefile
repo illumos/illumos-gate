@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 
@@ -47,6 +46,7 @@ WORKLOADS = \
 	filemicro_seqread.f \
 	filemicro_seqwrite.f \
 	filemicro_seqwriterand.f \
+	filemicro_statfile.f \
 	filemicro_writefsync.f \
 	fileserver.f \
 	mongo.f \

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #ifdef HAVE_LWPS
@@ -253,7 +251,9 @@ flowop_initflow(flowop_t *flowop)
 	 * save static copies of two items, in case they are supplied
 	 * from random variables
 	 */
-	flowop->fo_constvalue = avd_get_int(flowop->fo_value);
+	if (!AVD_IS_STRING(flowop->fo_value))
+		flowop->fo_constvalue = avd_get_int(flowop->fo_value);
+
 	flowop->fo_constwss = avd_get_int(flowop->fo_wss);
 
 	if ((*flowop->fo_init)(flowop) < 0) {
@@ -587,7 +587,8 @@ flowop_start(threadflow_t *threadflow)
 void
 flowop_init(void)
 {
-	(void) pthread_mutex_init(&controlstats_lock, ipc_mutexattr());
+	(void) pthread_mutex_init(&controlstats_lock,
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	flowoplib_init();
 }
 
@@ -744,7 +745,8 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 
 	if (inherit) {
 		(void) memcpy(flowop, inherit, sizeof (flowop_t));
-		(void) pthread_mutex_init(&flowop->fo_lock, ipc_mutexattr());
+		(void) pthread_mutex_init(&flowop->fo_lock,
+		    ipc_mutexattr(IPC_MUTEX_PRI_ROB));
 		(void) ipc_mutex_lock(&flowop->fo_lock);
 		flowop->fo_next = NULL;
 		flowop->fo_exec_next = NULL;
@@ -754,7 +756,8 @@ flowop_define_common(threadflow_t *threadflow, char *name, flowop_t *inherit,
 		(void) memset(flowop, 0, sizeof (flowop_t));
 		flowop->fo_iters = avd_int_alloc(1);
 		flowop->fo_type = type;
-		(void) pthread_mutex_init(&flowop->fo_lock, ipc_mutexattr());
+		(void) pthread_mutex_init(&flowop->fo_lock,
+		    ipc_mutexattr(IPC_MUTEX_PRI_ROB));
 		(void) ipc_mutex_lock(&flowop->fo_lock);
 	}
 
@@ -814,6 +817,7 @@ flowop_define(threadflow_t *threadflow, char *name, flowop_t *inherit,
 		return (NULL);
 
 	(void) ipc_mutex_unlock(&flowop->fo_lock);
+
 	return (flowop);
 }
 

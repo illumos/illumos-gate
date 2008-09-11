@@ -25,8 +25,6 @@
  * Portions Copyright 2008 Denis Cheng
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -50,8 +48,6 @@ static enum create_n_wait {
 	CNW_DONE,
 	CNW_ERROR
 } cnw_wait;
-
-static pthread_cond_t procflow_procs_created;
 
 #endif	/* USE_PROCESS_MODEL */
 
@@ -358,7 +354,7 @@ procflow_createnwait(void *nothing)
 	else
 		cnw_wait = CNW_ERROR;
 
-	if (pthread_cond_signal(&procflow_procs_created) != 0)
+	if (pthread_cond_signal(&filebench_shm->shm_procflow_procs_cv) != 0)
 		exit(1);
 
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
@@ -429,15 +425,13 @@ procflow_init(void)
 	    (u_longlong_t)avd_get_int(procflow->pf_instances));
 
 #ifdef USE_PROCESS_MODEL
-	if ((ret = pthread_cond_init(&procflow_procs_created, NULL)) != 0)
-		return (ret);
 
 	if ((pthread_create(&tid, NULL, procflow_createnwait, NULL)) != 0)
 		return (ret);
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 
-	if ((ret = pthread_cond_wait(&procflow_procs_created,
+	if ((ret = pthread_cond_wait(&filebench_shm->shm_procflow_procs_cv,
 	    &filebench_shm->shm_procflow_lock)) != 0)
 		return (ret);
 
@@ -638,12 +632,11 @@ procflow_shutdown(void)
 	int wait_cnt;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
-	if (filebench_shm->shm_procs_running == 0) {
+	if (filebench_shm->shm_procs_running <= 0) {
 		/* No processes running, so no need to do anything */
 		(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 		return;
 	}
-	filebench_shm->shm_procs_running = 0;
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
@@ -670,6 +663,11 @@ procflow_shutdown(void)
 	filebench_shm->shm_f_abort = 0;
 
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procflow_lock);
+
+	/* indicate all processes are stopped, even if some are "stuck" */
+	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
+	filebench_shm->shm_procs_running = 0;
+	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 }
 
 

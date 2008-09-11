@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #include <stdio.h>
@@ -42,7 +40,6 @@
 
 static int shmfd;
 filebench_shm_t *filebench_shm = NULL;
-static pthread_mutexattr_t *mutexattr = NULL;
 
 /*
  * Interprocess Communication mechanisms. If multiple processes
@@ -114,55 +111,76 @@ ipc_mutex_unlock(pthread_mutex_t *mutex)
 }
 
 /*
+ * Initialize mutex attributes for the various flavors of mutexes
+ */
+static void
+ipc_mutexattr_init(int mtx_type)
+{
+	pthread_mutexattr_t *mtx_attrp;
+
+	mtx_attrp = &(filebench_shm->shm_mutexattr[mtx_type]);
+
+	(void) pthread_mutexattr_init(mtx_attrp);
+
+#ifdef USE_PROCESS_MODEL
+#ifdef HAVE_PROCSCOPE_PTHREADS
+	if (pthread_mutexattr_setpshared(mtx_attrp,
+	    PTHREAD_PROCESS_SHARED) != 0) {
+		filebench_log(LOG_ERROR, "cannot set mutex attr "
+		    "PROCESS_SHARED on this platform");
+		filebench_shutdown(1);
+	}
+#ifdef HAVE_PTHREAD_MUTEXATTR_SETPROTOCOL
+	if (mtx_type & IPC_MUTEX_PRIORITY) {
+		if (pthread_mutexattr_setprotocol(mtx_attrp,
+		    PTHREAD_PRIO_INHERIT) != 0) {
+			filebench_log(LOG_ERROR,
+			    "cannot set mutex attr "
+			    "PTHREAD_PRIO_INHERIT on this platform");
+			filebench_shutdown(1);
+		}
+	}
+#endif /* HAVE_PTHREAD_MUTEXATTR_SETPROTOCOL */
+#endif /* HAVE_PROCSCOPE_PTHREADS */
+#ifdef HAVE_ROBUST_MUTEX
+	if (mtx_type & IPC_MUTEX_ROBUST) {
+		if (pthread_mutexattr_setrobust_np(mtx_attrp,
+		    PTHREAD_MUTEX_ROBUST_NP) != 0) {
+			filebench_log(LOG_ERROR,
+			    "cannot set mutex attr "
+			    "PTHREAD_MUTEX_ROBUST_NP on this platform");
+			filebench_shutdown(1);
+		}
+		if (pthread_mutexattr_settype(mtx_attrp,
+		    PTHREAD_MUTEX_ERRORCHECK) != 0) {
+			filebench_log(LOG_ERROR,
+			    "cannot set mutex attr "
+			    "PTHREAD_MUTEX_ERRORCHECK "
+			    "on this platform");
+			filebench_shutdown(1);
+		}
+	}
+#endif /* HAVE_ROBUST_MUTEX */
+#endif /* USE_PROCESS_MODEL */
+}
+
+/*
  * On first invocation, allocates a mutex attributes structure
  * and initializes it with appropriate attributes. In all cases,
  * returns a pointer to the structure.
  */
 pthread_mutexattr_t *
-ipc_mutexattr(void)
+ipc_mutexattr(int mtx_type)
 {
-#ifdef USE_PROCESS_MODEL
-	if (mutexattr == NULL) {
-		if ((mutexattr =
-		    malloc(sizeof (pthread_mutexattr_t))) == NULL) {
-			filebench_log(LOG_ERROR, "cannot alloc mutex attr");
-			filebench_shutdown(1);
-		}
-#ifdef HAVE_PROCSCOPE_PTHREADS
-		(void) pthread_mutexattr_init(mutexattr);
-		if (pthread_mutexattr_setpshared(mutexattr,
-		    PTHREAD_PROCESS_SHARED) != 0) {
-			filebench_log(LOG_ERROR, "cannot set mutex attr "
-			    "PROCESS_SHARED on this platform");
-			filebench_shutdown(1);
-		}
-#ifdef HAVE_PTHREAD_MUTEXATTR_SETPROTOCOL
-		if (pthread_mutexattr_setprotocol(mutexattr,
-		    PTHREAD_PRIO_INHERIT) != 0) {
-			filebench_log(LOG_ERROR, "cannot set mutex attr "
-			    "PTHREAD_PRIO_INHERIT on this platform");
-			filebench_shutdown(1);
-		}
-#endif /* HAVE_PTHREAD_MUTEXATTR_SETPROTOCOL */
-#endif /* HAVE_PROCSCOPE_PTHREADS */
-#ifdef HAVE_ROBUST_MUTEX
-		if (pthread_mutexattr_setrobust_np(mutexattr,
-		    PTHREAD_MUTEX_ROBUST_NP) != 0) {
-			filebench_log(LOG_ERROR, "cannot set mutex attr "
-			    "PTHREAD_MUTEX_ROBUST_NP on this platform");
-			filebench_shutdown(1);
-		}
-		if (pthread_mutexattr_settype(mutexattr,
-		    PTHREAD_MUTEX_ERRORCHECK) != 0) {
-			filebench_log(LOG_ERROR, "cannot set mutex attr "
-			    "PTHREAD_MUTEX_ERRORCHECK on this platform");
-			filebench_shutdown(1);
-		}
-#endif /* HAVE_ROBUST_MUTEX */
-
+	if ((mtx_type >= IPC_NUM_MUTEX_ATTRS) ||
+	    (mtx_type < IPC_MUTEX_NORMAL)) {
+		filebench_log(LOG_ERROR,
+		    "ipc_mutexattr called with undefined attr selector %d",
+		    mtx_type);
+		return (&(filebench_shm->shm_mutexattr[IPC_MUTEX_NORMAL]));
 	}
-#endif /* USE_PROCESS_MODEL */
-	return (mutexattr);
+
+	return (&(filebench_shm->shm_mutexattr[mtx_type]));
 }
 
 static pthread_condattr_t *condattr = NULL;
@@ -332,28 +350,36 @@ ipc_init(void)
 	filebench_shm->shm_path_ptr = &filebench_shm->shm_filesetpaths[0];
 
 	/* Setup mutexes for object lists */
+	ipc_mutexattr_init(IPC_MUTEX_NORMAL);
+	ipc_mutexattr_init(IPC_MUTEX_PRIORITY);
+	ipc_mutexattr_init(IPC_MUTEX_ROBUST);
+	ipc_mutexattr_init(IPC_MUTEX_PRI_ROB);
 	(void) pthread_mutex_init(&filebench_shm->shm_fileset_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_procflow_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_procs_running_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_threadflow_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_flowop_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_msg_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_eventgen_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_PRI_ROB));
 	(void) pthread_mutex_init(&filebench_shm->shm_malloc_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_mutex_init(&filebench_shm->shm_ism_lock,
-	    ipc_mutexattr());
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 	(void) pthread_cond_init(&filebench_shm->shm_eventgen_cv,
 	    ipc_condattr());
 	(void) pthread_rwlock_init(&filebench_shm->shm_flowop_find_lock,
 	    ipc_rwlockattr());
+#ifdef USE_PROCESS_MODEL
+	(void) pthread_cond_init(&filebench_shm->shm_procflow_procs_cv,
+	    ipc_condattr());
+#endif
 	(void) pthread_rwlock_init(&filebench_shm->shm_run_lock,
 	    ipc_rwlockattr());
 	(void) pthread_rwlock_rdlock(&filebench_shm->shm_run_lock);

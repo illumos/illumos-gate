@@ -26,8 +26,6 @@
 #ifndef _FB_IPC_H
 #define	_FB_IPC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 #include <pthread.h>
 
@@ -47,6 +45,13 @@ extern "C" {
 #else
 #define	FILEBENCH_MEMSIZE 2048
 #endif /* USE_PROCESS_MODEL */
+
+/* Mutex Priority Inheritance and Robustness flags */
+#define	IPC_MUTEX_NORMAL	0x0
+#define	IPC_MUTEX_PRIORITY	0x1
+#define	IPC_MUTEX_ROBUST	0x2
+#define	IPC_MUTEX_PRI_ROB	0x3
+#define	IPC_NUM_MUTEX_ATTRS	4
 
 #define	FILEBENCH_NFILESETS FILEBENCH_MEMSIZE
 #define	FILEBENCH_NFILESETENTRIES (1024 * 1024)
@@ -80,56 +85,113 @@ extern "C" {
 #define	FILEBENCH_MODE_QALLDONE	0x2
 
 typedef struct filebench_shm {
-	pthread_mutex_t shm_fileset_lock;
-	pthread_mutex_t shm_procflow_lock;
-	pthread_mutex_t shm_threadflow_lock;
-	pthread_mutex_t shm_flowop_lock;
-	pthread_mutex_t shm_msg_lock;
-	pthread_mutex_t shm_malloc_lock;
-	pthread_mutex_t shm_ism_lock;
-	pthread_mutex_t shm_procs_running_lock;	/* protects shm_procs_running */
-	pthread_rwlock_t shm_run_lock;
-	pthread_rwlock_t shm_flowop_find_lock;
+	/*
+	 * All state down to shm_marker are set to zero during filebench
+	 * initialization
+	 */
 
-	char		*shm_string_ptr;
-	char		*shm_path_ptr;
-	fileset_t	*shm_filesetlist;
-	flowop_t	*shm_flowoplist;
-	procflow_t	*shm_proclist;
-	var_t		*shm_var_list;
-	var_t		*shm_var_dyn_list;
-	randdist_t	*shm_rand_list;
-	var_t		*shm_var_loc_list;
+	/*
+	 * list of defined filesets and related locks.
+	 */
+	fileset_t	*shm_filesetlist; /* list of defined filesets */
+	pthread_mutex_t shm_fileset_lock; /* protects access to list */
+
+	/*
+	 * parallel file allocation  control. Restricts number of spawned
+	 * allocation threads and allows waiting for allocation to finish.
+	 */
+	pthread_cond_t	shm_fsparalloc_cv;    /* cv to wait for alloc threads */
+	int		shm_fsparalloc_count; /* active alloc thread count */
+	pthread_mutex_t	shm_fsparalloc_lock;  /* lock to protect count */
+
+	/*
+	 * Procflow and process state
+	 */
+	procflow_t	*shm_proclist;	   /* list of defined procflows */
+	pthread_mutex_t shm_procflow_lock; /* protects shm_proclist */
+	int		shm_procs_running; /* count of running processes */
+	pthread_mutex_t shm_procs_running_lock;	/* protects shm_procs_running */
+	int		shm_f_abort;	/* stop the run NOW! */
+	pthread_rwlock_t shm_run_lock;	/* used as barrier to sync run */
+#ifdef USE_PROCESS_MODEL
+	pthread_cond_t  shm_procflow_procs_cv;	/* pauses procflow_init till */
+#endif						/* all procflows are created */
+
+	/*
+	 * flowop state
+	 */
+	flowop_t	*shm_flowoplist;	/* list of defined flowops */
+	pthread_mutex_t shm_flowop_lock;	/* protects flowoplist */
+	pthread_rwlock_t shm_flowop_find_lock;	/* prevents flowop_find() */
+					    /* during initial flowop creation */
+
+	/*
+	 * lists related to variables
+	 */
+
+	var_t		*shm_var_list;	   /* normal variables */
+	var_t		*shm_var_dyn_list; /* special system variables */
+	var_t		*shm_var_loc_list; /* variables local to comp flowops */
+	randdist_t	*shm_rand_list;	   /* random variables */
+
+	/*
+	 * log and statistics dumping controls and state
+	 */
 	int		shm_debug_level;
-	hrtime_t	shm_epoch;
-	hrtime_t	shm_starttime;
-	int		shm_bequiet;
+	int		shm_bequiet;	/* pause run while collecting stats */
+	int		shm_log_fd;	/* log file descriptor */
+	int		shm_dump_fd;	/* dump file descriptor */
+	char		shm_dump_filename[MAXPATHLEN];
+
+	/*
+	 * Event generator state
+	 */
+	int		shm_eventgen_hz;   /* number of events per sec. */
+	uint64_t	shm_eventgen_q;    /* count of unclaimed events */
+	pthread_mutex_t	shm_eventgen_lock; /* lock protecting count */
+	pthread_cond_t	shm_eventgen_cv;   /* cv to wait on for more events */
+
+	/*
+	 * System 5 semaphore state
+	 */
 	key_t		shm_semkey;
 	int		shm_sys_semid;
-	int		shm_utid;
-	int		shm_log_fd;
-	int		shm_dump_fd;
-	char		shm_dump_filename[MAXPATHLEN];
-	pthread_mutex_t	shm_eventgen_lock;
-	pthread_cond_t	shm_eventgen_cv;
-	int		shm_eventgen_hz;
-	uint64_t	shm_eventgen_q;
+	char		shm_semids[FILEBENCH_NSEMS];
+
+	/*
+	 * Misc. pointers and state
+	 */
 	char		shm_fscriptname[1024];
 	int		shm_id;
+	int		shm_rmode;
+	int		shm_1st_err;
+	pthread_mutex_t shm_threadflow_lock;
+	pthread_mutex_t shm_msg_lock;
+	pthread_mutexattr_t shm_mutexattr[IPC_NUM_MUTEX_ATTRS];
+	char		*shm_string_ptr;
+	char		*shm_path_ptr;
+	hrtime_t	shm_epoch;
+	hrtime_t	shm_starttime;
+	int		shm_utid;
+
+	/*
+	 * Shared memory allocation control
+	 */
+	pthread_mutex_t shm_malloc_lock;
+	pthread_mutex_t shm_ism_lock;
+	int		shm_bitmap[FILEBENCH_TYPES][FILEBENCH_MAXBITMAP];
+	int		shm_lastbitmapindex[FILEBENCH_TYPES];
 	size_t		shm_required;
 	size_t		shm_allocated;
 	caddr_t		shm_addr;
 	char		*shm_ptr;
-	int		shm_procs_running;
-	int		shm_f_abort;
-	int		shm_rmode;
-	int		shm_1st_err;
-	int		shm_bitmap[FILEBENCH_TYPES][FILEBENCH_MAXBITMAP];
-	int		shm_lastbitmapindex[FILEBENCH_TYPES];
-	char		shm_semids[FILEBENCH_NSEMS];
 
-	int		shm_marker;
+	int		shm_marker;	/* end of pre-zeroed data */
 
+	/*
+	 * actual storage for shared entities.
+	 * These are not zeroed during initialization
+	 */
 	fileset_t	shm_fileset[FILEBENCH_NFILESETS];
 	filesetentry_t	shm_filesetentry[FILEBENCH_NFILESETENTRIES];
 	char		shm_filesetpaths[FILEBENCH_FILESETPATHMEMORY];
@@ -148,7 +210,7 @@ void ipc_init(void);
 void *ipc_malloc(int type);
 void ipc_free(int type, char *addr);
 int ipc_attach(caddr_t shmaddr);
-pthread_mutexattr_t *ipc_mutexattr(void);
+pthread_mutexattr_t *ipc_mutexattr(int);
 pthread_condattr_t *ipc_condattr(void);
 int ipc_semidalloc(void);
 void ipc_semidfree(int semid);

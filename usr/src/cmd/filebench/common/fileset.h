@@ -26,8 +26,7 @@
 #ifndef _FB_FILESET_H
 #define	_FB_FILESET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include "filebench.h"
 #include "config.h"
 
 #ifndef HAVE_OFF64_T
@@ -64,7 +63,8 @@ extern "C" {
 #define	FSE_FREE	0x02
 #define	FSE_EXISTS	0x04
 #define	FSE_BUSY	0x08
-#define	FSE_REUSING	0x10
+#define	FSE_THRD_WAITNG	0x10
+#define	FSE_REUSING	0x20
 
 typedef struct filesetentry {
 	struct filesetentry	*fse_next;
@@ -72,11 +72,10 @@ typedef struct filesetentry {
 	struct filesetentry	*fse_filenext;	/* List of files */
 	struct filesetentry	*fse_dirnext;	/* List of directories */
 	struct fileset		*fse_fileset;	/* Parent fileset */
-	pthread_mutex_t		fse_lock;
 	char			*fse_path;
 	int			fse_depth;
 	off64_t			fse_size;
-	int			fse_flags;
+	int			fse_flags;	/* protected by fs_pick_lock */
 } filesetentry_t;
 
 #define	FILESET_PICKANY	    0x1 /* Pick any file from the set */
@@ -121,13 +120,23 @@ typedef struct fileset {
 	fbint_t		fs_num_act_files;   /* total number of files */
 					    /* actually existing in the */
 					    /* host or server's file system */
-	pthread_mutex_t	fs_num_files_lock; /* lock for fs_num_act_files */
+	fbint_t		fs_num_act_dirs;   /* total number of directories */
+					    /* actually existing in the */
+					    /* host or server's file system */
+	int64_t		fs_idle_files;	/* number of files NOT busy */
+	pthread_cond_t	fs_idle_files_cv; /* idle files condition variable */
+	int64_t		fs_idle_dirs;	/* number of dirs NOT busy */
+	pthread_cond_t	fs_idle_dirs_cv; /* idle dirs condition variable */
+	pthread_mutex_t	fs_pick_lock;	/* per fileset "pick" function lock */
+	pthread_cond_t	fs_thrd_wait_cv; /* per fileset file busy wait cv */
 	filesetentry_t	*fs_filelist;	/* List of files */
 	filesetentry_t	*fs_dirlist;	/* List of directories */
 	filesetentry_t	*fs_filefree;	/* Ptr to next free file */
 	filesetentry_t	*fs_dirfree;	/* Ptr to next free directory */
 	filesetentry_t	*fs_filerotor[FSE_MAXTID];	/* next file to */
 							/* select */
+	filesetentry_t	*fs_file_ne_rotor;	/* next non existent file */
+						/* to select for createfile */
 	filesetentry_t	*fs_dirrotor;	/* Ptr to next directory to select */
 } fileset_t;
 
@@ -141,6 +150,8 @@ char *fileset_resolvepath(filesetentry_t *entry);
 void fileset_usage(void);
 void fileset_iter(int (*cmd)(fileset_t *fileset, int first));
 int fileset_print(fileset_t *fileset, int first);
+void fileset_unbusy(filesetentry_t *entry, int update_exist,
+    int new_exist_val);
 
 #ifdef	__cplusplus
 }

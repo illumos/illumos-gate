@@ -26,8 +26,6 @@
 #ifndef _FB_VARS_H
 #define	_FB_VARS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #include <stdio.h>
@@ -75,7 +73,9 @@ typedef struct avd {
 	} avd_val;
 } *avd_t;
 
-#define	AVD_IS_RANDOM(vp)	((vp)->avd_type == AVD_IND_RANDVAR)
+#define	AVD_IS_RANDOM(vp)	((vp) && ((vp)->avd_type == AVD_IND_RANDVAR))
+#define	AVD_IS_STRING(vp)	((vp) && (((vp)->avd_type == AVD_VAL_STR) || \
+				((vp)->avd_type == AVD_VARVAL_STR)))
 
 typedef struct var {
 	char		*var_name;

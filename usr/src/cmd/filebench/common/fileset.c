@@ -25,9 +25,6 @@
  * Portions Copyright 2008 Denis Cheng
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
@@ -48,21 +45,24 @@
  * fileset has been created, has a tree of directories and files
  * corresponding to the fileset's filesetentry tree.
  *
- * This routine is called from fileset_createset(), which is in turn
- * called from parser_gram.y: parser_create_fileset() when a
- * "create fileset" or "run" command is encountered.
- * When the "create fileset" command is used, it is generally paired with
+ * Fileset entities are allocated by fileset_define() which is called from
+ * parser_gram.y: parser_fileset_define(). The filesetentry tree corrseponding
+ * to the eventual directory and file tree to be instantiated on the storage
+ * medium is built by fileset_populate(), which is called from
+ * fileset_createset(). After calling fileset_populate(), fileset_createset()
+ * will call fileset_create() to pre-allocate designated files and directories.
+ *
+ * Fileset_createset() is called from parser_gram.y: parser_create_fileset()
+ * when a "create fileset" or "run" command is encountered. When the
+ * "create fileset" command is used, it is generally paired with
  * a "create processes" command, and must appear first, in order to
  * instantiate all the files in the fileset before trying to use them.
  */
 
 static int fileset_checkraw(fileset_t *fileset);
 
-/* parallel allocation control */
+/* maximum parallel allocation control */
 #define	MAX_PARALLOC_THREADS 32
-static pthread_mutex_t	paralloc_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t	paralloc_cv = PTHREAD_COND_INITIALIZER;
-static int		paralloc_count;
 
 /*
  * returns pointer to file or fileset
@@ -129,8 +129,8 @@ fileset_usage(void)
 /*
  * Frees up memory mapped file region of supplied size. The
  * file descriptor "fd" indicates which memory mapped file.
- * If successful, returns 0. Otherwise returns -1 if "size"
- * is zero, or -1 times the number of times msync() failed.
+ * If successful, returns 0. Otherwise returns -1 times the number of
+ * times msync() failed.
  */
 static int
 fileset_freemem(int fd, off64_t size)
@@ -224,7 +224,7 @@ fileset_mkdir(char *path, int mode)
 	}
 
 	free(p);
-	return (0);
+	return (FILEBENCH_OK);
 
 null_str:
 	/* clean up */
@@ -234,7 +234,7 @@ null_str:
 	filebench_log(LOG_ERROR,
 	    "Failed to create directory path %s: Out of memory", path);
 
-	return (-1);
+	return (FILEBENCH_ERROR);
 }
 
 /*
@@ -256,12 +256,12 @@ fileset_create_subdirs(fileset_t *fileset, char *filesetpath)
 		free(part_path);
 
 		/* now create this portion of the subdirectory tree */
-		if (fileset_mkdir(full_path, 0755) == -1)
-			return (-1);
+		if (fileset_mkdir(full_path, 0755) == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
 
 		direntry = direntry->fse_dirnext;
 	}
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -293,26 +293,26 @@ fileset_alloc_file(filesetentry_t *entry)
 			filebench_log(LOG_INFO,
 			    "Attempted but failed to Re-use file %s",
 			    path);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 
 		if (sb.st_size == (off64_t)entry->fse_size) {
-			filebench_log(LOG_INFO,
+			filebench_log(LOG_DEBUG_IMPL,
 			    "Re-using file %s", path);
 
 			if (!avd_get_bool(entry->fse_fileset->fs_cached))
 				(void) fileset_freemem(fd,
 				    entry->fse_size);
 
-			entry->fse_flags |= FSE_EXISTS;
 			(void) ipc_mutex_lock(
-			    &entry->fse_fileset->fs_num_files_lock);
+			    &entry->fse_fileset->fs_pick_lock);
+			entry->fse_flags |= FSE_EXISTS;
 			entry->fse_fileset->fs_num_act_files++;
 			(void) ipc_mutex_unlock(
-			    &entry->fse_fileset->fs_num_files_lock);
+			    &entry->fse_fileset->fs_pick_lock);
 
 			(void) close(fd);
-			return (0);
+			return (FILEBENCH_OK);
 
 		} else if (sb.st_size > (off64_t)entry->fse_size) {
 			/* reuse, but too large */
@@ -329,16 +329,15 @@ fileset_alloc_file(filesetentry_t *entry)
 				(void) fileset_freemem(fd,
 				    entry->fse_size);
 
-			entry->fse_flags |= FSE_EXISTS;
-
 			(void) ipc_mutex_lock(
-			    &entry->fse_fileset->fs_num_files_lock);
+			    &entry->fse_fileset->fs_pick_lock);
+			entry->fse_flags |= FSE_EXISTS;
 			entry->fse_fileset->fs_num_act_files++;
 			(void) ipc_mutex_unlock(
-			    &entry->fse_fileset->fs_num_files_lock);
+			    &entry->fse_fileset->fs_pick_lock);
 
 			(void) close(fd);
-			return (0);
+			return (FILEBENCH_OK);
 		}
 	} else {
 
@@ -348,18 +347,17 @@ fileset_alloc_file(filesetentry_t *entry)
 			    "Failed to pre-allocate file %s: %s",
 			    path, strerror(errno));
 
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 	}
 
 	if ((buf = (char *)malloc(FILE_ALLOC_BLOCK)) == NULL)
-		return (-1);
+		return (FILEBENCH_ERROR);
 
+	(void) ipc_mutex_lock(&entry->fse_fileset->fs_pick_lock);
 	entry->fse_flags |= FSE_EXISTS;
-
-	(void) ipc_mutex_lock(&entry->fse_fileset->fs_num_files_lock);
 	entry->fse_fileset->fs_num_act_files++;
-	(void) ipc_mutex_unlock(&entry->fse_fileset->fs_num_files_lock);
+	(void) ipc_mutex_unlock(&entry->fse_fileset->fs_pick_lock);
 
 	for (seek = 0; seek < entry->fse_size; ) {
 		off64_t wsize;
@@ -378,7 +376,7 @@ fileset_alloc_file(filesetentry_t *entry)
 			    path, strerror(errno));
 			(void) close(fd);
 			free(buf);
-			return (-1);
+			return (FILEBENCH_ERROR);
 		}
 		seek += wsize;
 	}
@@ -394,26 +392,27 @@ fileset_alloc_file(filesetentry_t *entry)
 	    "Pre-allocated file %s size %llu",
 	    path, (u_longlong_t)entry->fse_size);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
  * given a fileset entry, determines if the associated file
  * needs to be allocated or not, and if so does the allocation.
+ * Sets shm_fsparalloc_count to -1 on error.
  */
 static void *
 fileset_alloc_thread(filesetentry_t *entry)
 {
-	if (fileset_alloc_file(entry) == -1) {
-		(void) pthread_mutex_lock(&paralloc_lock);
-		paralloc_count = -1;
+	if (fileset_alloc_file(entry) == FILEBENCH_ERROR) {
+		(void) pthread_mutex_lock(&filebench_shm->shm_fsparalloc_lock);
+		filebench_shm->shm_fsparalloc_count = -1;
 	} else {
-		(void) pthread_mutex_lock(&paralloc_lock);
-		paralloc_count--;
+		(void) pthread_mutex_lock(&filebench_shm->shm_fsparalloc_lock);
+		filebench_shm->shm_fsparalloc_count--;
 	}
 
-	(void) pthread_cond_signal(&paralloc_cv);
-	(void) pthread_mutex_unlock(&paralloc_lock);
+	(void) pthread_cond_signal(&filebench_shm->shm_fsparalloc_cv);
+	(void) pthread_mutex_unlock(&filebench_shm->shm_fsparalloc_lock);
 
 	pthread_exit(NULL);
 	return (NULL);
@@ -451,16 +450,8 @@ fileset_openfile(fileset_t *fileset,
 
 	/* If we are going to create a file, create the parent dirs */
 	if ((flag & O_CREAT) && (stat64(dir, &sb) != 0)) {
-		if (fileset_mkdir(dir, 0755) == -1)
-			return (-1);
-	}
-
-	if (flag & O_CREAT) {
-		entry->fse_flags |= FSE_EXISTS;
-
-		(void) ipc_mutex_lock(&fileset->fs_num_files_lock);
-		fileset->fs_num_act_files++;
-		(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
+		if (fileset_mkdir(dir, 0755) == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
 	}
 
 	if (attrs & FLOW_ATTR_DSYNC) {
@@ -475,10 +466,15 @@ fileset_openfile(fileset_t *fileset,
 		filebench_log(LOG_ERROR,
 		    "Failed to open file %s: %s",
 		    path, strerror(errno));
-		(void) ipc_mutex_unlock(&entry->fse_lock);
-		return (-1);
+
+		fileset_unbusy(entry, FALSE, FALSE);
+		return (FILEBENCH_ERROR);
 	}
-	(void) ipc_mutex_unlock(&entry->fse_lock);
+
+	if (flag & O_CREAT)
+		fileset_unbusy(entry, TRUE, TRUE);
+	else
+		fileset_unbusy(entry, FALSE, FALSE);
 
 #ifdef sun
 	if (attrs & FLOW_ATTR_DIRECTIO)
@@ -505,7 +501,7 @@ fileset_openfile(fileset_t *fileset,
  * FILESET_PICKNOEXIST insures that only non extant
  * (not FSE_EXISTS) state files are selected.
  * Note that the selected fileset entry (file) is returned
- * with its fse_lock field locked.
+ * with its FSE_BUSY flag (in fse_flags) set.
  */
 filesetentry_t *
 fileset_pick(fileset_t *fileset, int flags, int tid)
@@ -513,26 +509,33 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 	filesetentry_t *entry = NULL;
 	filesetentry_t *first = NULL;
 
-	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+
+	/* see if we have to wait for available files or directories */
+	if (flags & FILESET_PICKDIR) {
+		while (fileset->fs_idle_dirs == 0) {
+			(void) pthread_cond_wait(&fileset->fs_idle_dirs_cv,
+			    &fileset->fs_pick_lock);
+		}
+	} else {
+		while (fileset->fs_idle_files == 0) {
+			(void) pthread_cond_wait(&fileset->fs_idle_files_cv,
+			    &fileset->fs_pick_lock);
+		}
+	}
 
 	/* see if asking for impossible */
-	(void) ipc_mutex_lock(&fileset->fs_num_files_lock);
 	if (flags & FILESET_PICKEXISTS) {
 		if (fileset->fs_num_act_files == 0) {
-			(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
-			(void) ipc_mutex_unlock(
-			    &filebench_shm->shm_fileset_lock);
+			(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 			return (NULL);
 		}
 	} else if (flags & FILESET_PICKNOEXIST) {
 		if (fileset->fs_num_act_files == fileset->fs_realfiles) {
-			(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
-			(void) ipc_mutex_unlock(
-			    &filebench_shm->shm_fileset_lock);
+			(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 			return (NULL);
 		}
 	}
-	(void) ipc_mutex_unlock(&fileset->fs_num_files_lock);
 
 	while (entry == NULL) {
 
@@ -575,12 +578,23 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 				    entry = fileset->fs_dirlist;
 				fileset->fs_dirrotor = entry->fse_dirnext;
 			} else {
-				entry = fileset->fs_filerotor[tid];
-				if (entry == NULL)
+				if (flags & FILESET_PICKNOEXIST) {
+					entry = fileset->fs_file_ne_rotor;
+					if (entry == NULL)
+						fileset->fs_file_ne_rotor =
+						    entry =
+						    fileset->fs_filelist;
+					fileset->fs_file_ne_rotor =
+					    entry->fse_filenext;
+				} else {
+					entry = fileset->fs_filerotor[tid];
+					if (entry == NULL)
+						fileset->fs_filerotor[tid] =
+						    entry =
+						    fileset->fs_filelist;
 					fileset->fs_filerotor[tid] =
-					    entry = fileset->fs_filelist;
-				fileset->fs_filerotor[tid] =
-				    entry->fse_filenext;
+					    entry->fse_filenext;
+				}
 			}
 		}
 
@@ -590,31 +604,120 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 		if (first == NULL)
 			first = entry;
 
-		/* Return locked entry */
-		(void) ipc_mutex_lock(&entry->fse_lock);
+		/* see if entry in use */
+		if (entry->fse_flags & FSE_BUSY) {
+
+			/* it is, so try next */
+			entry = NULL;
+			continue;
+		}
 
 		/* If we ask for an existing file, go round again */
 		if ((flags & FILESET_PICKEXISTS) &&
-		    !(entry->fse_flags & FSE_EXISTS)) {
-			(void) ipc_mutex_unlock(&entry->fse_lock);
+		    !(entry->fse_flags & FSE_EXISTS))
 			entry = NULL;
-		}
 
 		/* If we ask for not an existing file, go round again */
 		if ((flags & FILESET_PICKNOEXIST) &&
-		    (entry->fse_flags & FSE_EXISTS)) {
-			(void) ipc_mutex_unlock(&entry->fse_lock);
+		    (entry->fse_flags & FSE_EXISTS))
 			entry = NULL;
-		}
 	}
 
-	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
+	/* update file or directory idle counts */
+	if (flags & FILESET_PICKDIR)
+		fileset->fs_idle_dirs--;
+	else
+		fileset->fs_idle_files--;
+
+	/* Indicate that file or directory is now busy */
+	entry->fse_flags |= FSE_BUSY;
+
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 	filebench_log(LOG_DEBUG_SCRIPT, "Picked file %s", entry->fse_path);
 	return (entry);
 
 empty:
-	(void) ipc_mutex_unlock(&filebench_shm->shm_fileset_lock);
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 	return (NULL);
+}
+
+/*
+ * Removes a filesetentry from the "FSE_BUSY" state, signaling any threads
+ * that are waiting for a NOT BUSY filesetentry. Also sets whether it is
+ * existant or not, or leaves that designation alone.
+ */
+void
+fileset_unbusy(filesetentry_t *entry, int update_exist, int new_exist_val)
+{
+	fileset_t *fileset = NULL;
+	int fse_is_dir;
+
+	if (entry)
+		fileset = entry->fse_fileset;
+
+	if (fileset == NULL) {
+		filebench_log(LOG_ERROR, "fileset_unbusy: NO FILESET!");
+		return;
+	}
+
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+	fse_is_dir = entry->fse_flags & FSE_DIR;
+
+	/* increment idle count, clear FSE_BUSY and signal IF it was busy */
+	if (entry->fse_flags & FSE_BUSY) {
+
+		/* unbusy it */
+		entry->fse_flags &= (~FSE_BUSY);
+
+		/* release any threads waiting for unbusy */
+		if (entry->fse_flags & FSE_THRD_WAITNG) {
+			entry->fse_flags &= (~FSE_THRD_WAITNG);
+			(void) pthread_cond_broadcast(
+			    &fileset->fs_thrd_wait_cv);
+		}
+
+		/* increment idle count and signal waiting threads */
+		if (fse_is_dir) {
+			fileset->fs_idle_dirs++;
+			if (fileset->fs_idle_dirs == 1) {
+				(void) pthread_cond_signal(
+				    &fileset->fs_idle_dirs_cv);
+			}
+		} else {
+			fileset->fs_idle_files++;
+			if (fileset->fs_idle_files == 1) {
+				(void) pthread_cond_signal(
+				    &fileset->fs_idle_files_cv);
+			}
+		}
+	}
+
+	/* modify FSE_EXIST flag and actual dirs/files count, if requested */
+	if (update_exist) {
+		if (new_exist_val == TRUE) {
+			if (!(entry->fse_flags & FSE_EXISTS)) {
+
+				/* asked to set, and it was clear */
+				entry->fse_flags |= FSE_EXISTS;
+				if (fse_is_dir)
+					fileset->fs_num_act_dirs++;
+				else
+					fileset->fs_num_act_files++;
+			}
+		} else {
+			if (entry->fse_flags & FSE_EXISTS) {
+
+				/* asked to clear, and it was set */
+				entry->fse_flags &= (~FSE_EXISTS);
+				if (fse_is_dir)
+					fileset->fs_num_act_dirs--;
+				else
+					fileset->fs_num_act_files--;
+			}
+		}
+	}
+
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 }
 
 /*
@@ -629,7 +732,8 @@ empty:
  * their containing subdirectory trees in the filesystem and
  * creating actual files for fileset_preallocpercent of them. The
  * created files are filled with fse_size bytes of unitialized
- * data. The routine returns -1 on errors, 0 on success.
+ * data. The routine returns FILEBENCH_ERROR on errors,
+ * FILEBENCH_OK on success.
  */
 static int
 fileset_create(fileset_t *fileset)
@@ -648,22 +752,19 @@ fileset_create(fileset_t *fileset)
 	if ((fileset_path = avd_get_str(fileset->fs_path)) == NULL) {
 		filebench_log(LOG_ERROR, "%s path not set",
 		    fileset_entity_name(fileset));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if ((fileset_name = avd_get_str(fileset->fs_name)) == NULL) {
 		filebench_log(LOG_ERROR, "%s name not set",
 		    fileset_entity_name(fileset));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
-
-	/* declare all files currently non existant (single threaded code) */
-	fileset->fs_num_act_files = 0;
 
 #ifdef HAVE_RAW_SUPPORT
 	/* treat raw device as special case */
 	if (fileset->fs_attrs & FILESET_IS_RAW_DEV)
-		return (0);
+		return (FILEBENCH_OK);
 #endif /* HAVE_RAW_SUPPORT */
 
 	/* XXX Add check to see if there is enough space */
@@ -694,8 +795,8 @@ fileset_create(fileset_t *fileset)
 	(void) mkdir(path, 0755);
 
 	/* make the filesets directory tree */
-	if (fileset_create_subdirs(fileset, path) == -1)
-		return (-1);
+	if (fileset_create_subdirs(fileset, path) == FILEBENCH_ERROR)
+		return (FILEBENCH_ERROR);
 
 	start = gethrtime();
 
@@ -713,10 +814,8 @@ fileset_create(fileset_t *fileset)
 
 		pickflags = FILESET_PICKUNIQUE;
 
-		entry->fse_flags &= ~FSE_EXISTS;
-
 		/* entry doesn't need to be locked during initialization */
-		(void) ipc_mutex_unlock(&entry->fse_lock);
+		fileset_unbusy(entry, FALSE, FALSE);
 
 		if (rand() < randno)
 			continue;
@@ -728,34 +827,52 @@ fileset_create(fileset_t *fileset)
 		else
 			entry->fse_flags &= (~FSE_REUSING);
 
+		/* fire off allocation threads for each file if paralloc set */
 		if (avd_get_bool(fileset->fs_paralloc)) {
 
-			/* fire off a separate allocation thread */
-			(void) pthread_mutex_lock(&paralloc_lock);
-			while (paralloc_count >= MAX_PARALLOC_THREADS) {
+			/* limit total number of simultaneous allocations */
+			(void) pthread_mutex_lock(
+			    &filebench_shm->shm_fsparalloc_lock);
+			while (filebench_shm->shm_fsparalloc_count
+			    >= MAX_PARALLOC_THREADS) {
 				(void) pthread_cond_wait(
-				    &paralloc_cv, &paralloc_lock);
+				    &filebench_shm->shm_fsparalloc_cv,
+				    &filebench_shm->shm_fsparalloc_lock);
 			}
 
-			if (paralloc_count < 0) {
-				(void) pthread_mutex_unlock(&paralloc_lock);
-				return (-1);
+			/* quit if any allocation thread reports and error */
+			if (filebench_shm->shm_fsparalloc_count < 0) {
+				(void) pthread_mutex_unlock(
+				    &filebench_shm->shm_fsparalloc_lock);
+				return (FILEBENCH_ERROR);
 			}
 
-			paralloc_count++;
-			(void) pthread_mutex_unlock(&paralloc_lock);
+			filebench_shm->shm_fsparalloc_count++;
+			(void) pthread_mutex_unlock(
+			    &filebench_shm->shm_fsparalloc_lock);
 
+			/*
+			 * Fire off a detached allocation thread per file.
+			 * The thread will self destruct when it finishes
+			 * writing pre-allocation data to the file.
+			 */
 			if (pthread_create(&tid, NULL,
 			    (void *(*)(void*))fileset_alloc_thread,
-			    entry) != 0) {
+			    entry) == 0) {
+				/*
+				 * A thread was created; detach it so it can
+				 * fully quit when finished.
+				 */
+				(void) pthread_detach(tid);
+			} else {
 				filebench_log(LOG_ERROR,
 				    "File prealloc thread create failed");
 				filebench_shutdown(1);
 			}
 
 		} else {
-			if (fileset_alloc_file(entry) == -1)
-				return (-1);
+			if (fileset_alloc_file(entry) == FILEBENCH_ERROR)
+				return (FILEBENCH_ERROR);
 		}
 	}
 
@@ -767,7 +884,7 @@ exit:
 	    fileset_entity_name(fileset), fileset_name,
 	    (u_longlong_t)(((gethrtime() - start) / 1000000000) + 1));
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -811,8 +928,8 @@ fileset_insdirlist(fileset_t *fileset, filesetentry_t *entry)
  * list in the specified parent filesetentry entity, which may
  * be a directory filesetentry, or the root filesetentry in the
  * fileset. It is also placed on the fileset's list of all
- * contained files. Returns 0 if successful or -1 if ipc memory
- * for the path string cannot be allocated.
+ * contained files. Returns FILEBENCH_OK if successful or FILEBENCH_ERROR
+ * if ipc memory for the path string cannot be allocated.
  */
 static int
 fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
@@ -825,20 +942,24 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
 	    == NULL) {
 		filebench_log(LOG_ERROR,
 		    "fileset_populate_file: Can't malloc filesetentry");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
-	(void) pthread_mutex_init(&entry->fse_lock, ipc_mutexattr());
+	/* Another currently idle file */
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+	fileset->fs_idle_files++;
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
+
 	entry->fse_parent = parent;
 	entry->fse_fileset = fileset;
-	entry->fse_flags |= FSE_FREE;
+	entry->fse_flags = FSE_FREE;
 	fileset_insfilelist(fileset, entry);
 
 	(void) snprintf(tmpname, sizeof (tmpname), "%08d", serial);
 	if ((entry->fse_path = (char *)ipc_pathalloc(tmpname)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "fileset_populate_file: Can't alloc path string");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	/* see if random variable was supplied for file size */
@@ -860,7 +981,7 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
 	fileset->fs_bytes += entry->fse_size;
 
 	fileset->fs_realfiles++;
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -877,9 +998,9 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
  * initial call to this routine is a tree of directories of
  * random width and varying depth with sufficient leaf
  * directories to contain all required files.
- * Returns 0 on success. Returns -1 if ipc path string memory
- * cannot be allocated and returns an error code (currently
- * also -1) from calls to fileset_populate_file or recursive
+ * Returns FILEBENCH_OK on success. Returns FILEBENCH_ERROR if ipc path
+ * string memory cannot be allocated and returns the error code (currently
+ * also FILEBENCH_ERROR) from calls to fileset_populate_file or recursive
  * calls to fileset_populate_subdir.
  */
 static int
@@ -899,20 +1020,23 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 	    == NULL) {
 		filebench_log(LOG_ERROR,
 		    "fileset_populate_subdir: Can't malloc filesetentry");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
-	(void) pthread_mutex_init(&entry->fse_lock, ipc_mutexattr());
+	/* another idle directory */
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+	fileset->fs_idle_dirs++;
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 
 	(void) snprintf(tmpname, sizeof (tmpname), "%08d", serial);
 	if ((entry->fse_path = (char *)ipc_pathalloc(tmpname)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "fileset_populate_subdir: Can't alloc path string");
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	entry->fse_parent = parent;
-	entry->fse_flags |= FSE_DIR | FSE_FREE;
+	entry->fse_flags = FSE_DIR | FSE_FREE;
 	fileset_insdirlist(fileset, entry);
 
 	if (fileset->fs_dirdepthrv) {
@@ -969,7 +1093,7 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 		if (ret != 0)
 			return (ret);
 	}
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -997,11 +1121,27 @@ fileset_populate(fileset_t *fileset)
 #ifdef HAVE_RAW_SUPPORT
 	/* check for raw device */
 	if (fileset->fs_attrs & FILESET_IS_RAW_DEV)
-		return (0);
+		return (FILEBENCH_OK);
 #endif /* HAVE_RAW_SUPPORT */
 
 	/* save value of entries obtained for later, in case it was random */
 	fileset->fs_constentries = entries;
+
+	/* declare all files currently non existant */
+	fileset->fs_num_act_files = 0;
+
+	/* initialize idle files and directories condition variables */
+	(void) pthread_cond_init(&fileset->fs_idle_dirs_cv, ipc_condattr());
+	(void) pthread_cond_init(&fileset->fs_idle_files_cv, ipc_condattr());
+
+	/* no files or dirs idle (or busy) yet */
+	fileset->fs_idle_files = 0;
+	fileset->fs_idle_dirs = 0;
+
+	/* initialize locks and other condition variables */
+	(void) pthread_mutex_init(&fileset->fs_pick_lock,
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
+	(void) pthread_cond_init(&fileset->fs_thrd_wait_cv, ipc_condattr());
 
 	/* is dirwidth a random variable? */
 	if (AVD_IS_RANDOM(fileset->fs_dirwidth)) {
@@ -1054,7 +1194,7 @@ exists:
 		    (u_longlong_t)(fileset->fs_bytes / 1024UL / 1024UL));
 	}
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1083,10 +1223,6 @@ fileset_define(avd_t name)
 
 	filebench_log(LOG_DEBUG_IMPL,
 	    "Defining file %s", avd_get_str(name));
-
-	/* initialize fs_num_act_files lock */
-	(void) pthread_mutex_init(&fileset->fs_num_files_lock,
-	    ipc_mutexattr());
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_fileset_lock);
 
@@ -1129,7 +1265,10 @@ fileset_createset(fileset_t *fileset)
 	int ret = 0;
 
 	/* set up for possible parallel allocate */
-	paralloc_count = 0;
+	filebench_shm->shm_fsparalloc_count = 0;
+	(void) pthread_cond_init(
+	    &filebench_shm->shm_fsparalloc_cv,
+	    ipc_condattr());
 
 	if (fileset && avd_get_bool(fileset->fs_prealloc)) {
 
@@ -1139,7 +1278,7 @@ fileset_createset(fileset_t *fileset)
 			    "file %s/%s is a RAW device",
 			    avd_get_str(fileset->fs_path),
 			    avd_get_str(fileset->fs_name));
-			return (0);
+			return (FILEBENCH_OK);
 		}
 
 		filebench_log(LOG_INFO,
@@ -1147,10 +1286,10 @@ fileset_createset(fileset_t *fileset)
 		    fileset_entity_name(fileset),
 		    avd_get_str(fileset->fs_name));
 
-		if ((ret = fileset_populate(fileset)) != 0)
+		if ((ret = fileset_populate(fileset)) != FILEBENCH_OK)
 			return (ret);
 
-		if ((ret = fileset_create(fileset)) != 0)
+		if ((ret = fileset_create(fileset)) != FILEBENCH_OK)
 			return (ret);
 	} else {
 
@@ -1169,10 +1308,12 @@ fileset_createset(fileset_t *fileset)
 				continue;
 			}
 
-			if ((ret = fileset_populate(list)) != 0)
+			if ((ret = fileset_populate(list)) != FILEBENCH_OK)
 				return (ret);
-			if ((ret = fileset_create(list)) != 0)
+
+			if ((ret = fileset_create(list)) != FILEBENCH_OK)
 				return (ret);
+
 			list = list->fs_next;
 		}
 	}
@@ -1181,15 +1322,17 @@ fileset_createset(fileset_t *fileset)
 	filebench_log(LOG_INFO,
 	    "waiting for fileset pre-allocation to finish");
 
-	(void) pthread_mutex_lock(&paralloc_lock);
-	while (paralloc_count > 0)
-		(void) pthread_cond_wait(&paralloc_cv, &paralloc_lock);
-	(void) pthread_mutex_unlock(&paralloc_lock);
+	(void) pthread_mutex_lock(&filebench_shm->shm_fsparalloc_lock);
+	while (filebench_shm->shm_fsparalloc_count > 0)
+		(void) pthread_cond_wait(
+		    &filebench_shm->shm_fsparalloc_cv,
+		    &filebench_shm->shm_fsparalloc_lock);
+	(void) pthread_mutex_unlock(&filebench_shm->shm_fsparalloc_lock);
 
-	if (paralloc_count < 0)
-		return (-1);
+	if (filebench_shm->shm_fsparalloc_count < 0)
+		return (FILEBENCH_ERROR);
 
-	return (0);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1255,13 +1398,13 @@ fileset_print(fileset_t *fileset, int first)
 	if ((fileset_path = avd_get_str(fileset->fs_path)) == NULL) {
 		filebench_log(LOG_ERROR, "%s path not set",
 		    fileset_entity_name(fileset));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	if ((fileset_name = avd_get_str(fileset->fs_name)) == NULL) {
 		filebench_log(LOG_ERROR, "%s name not set",
 		    fileset_entity_name(fileset));
-		return (-1);
+		return (FILEBENCH_ERROR);
 	}
 
 	pathlength = strlen(fileset_path) + strlen(fileset_name);
@@ -1295,7 +1438,7 @@ fileset_print(fileset_t *fileset, int first)
 		    (u_longlong_t)avd_get_int(fileset->fs_dirwidth),
 		    (u_longlong_t)fileset->fs_constentries);
 	}
-	return (0);
+	return (FILEBENCH_OK);
 }
 /*
  * checks to see if the path/name pair points to a raw device. If
@@ -1316,10 +1459,10 @@ fileset_checkraw(fileset_t *fileset)
 #ifdef HAVE_RAW_SUPPORT
 	/* check for raw device */
 	if ((pathname = avd_get_str(fileset->fs_path)) == NULL)
-		return (0);
+		return (FILEBENCH_OK);
 
 	if ((setname = avd_get_str(fileset->fs_name)) == NULL)
-		return (0);
+		return (FILEBENCH_OK);
 
 	(void) strcpy(path, pathname);
 	(void) strcat(path, "/");
@@ -1339,5 +1482,5 @@ fileset_checkraw(fileset_t *fileset)
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
-	return (0);
+	return (FILEBENCH_OK);
 }

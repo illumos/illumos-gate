@@ -25,8 +25,6 @@
  * Portions Copyright 2008 Denis Cheng
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 #include <pthread.h>
 #ifdef HAVE_LWPS
@@ -426,7 +424,8 @@ threadflow_define_common(procflow_t *procflow, char *name,
 	threadflow->tf_instance = instance;
 	(void) strcpy(threadflow->tf_name, name);
 	threadflow->tf_process = procflow;
-	(void) pthread_mutex_init(&threadflow->tf_lock, ipc_mutexattr());
+	(void) pthread_mutex_init(&threadflow->tf_lock,
+	    ipc_mutexattr(IPC_MUTEX_NORMAL));
 
 	filebench_log(LOG_DEBUG_IMPL, "Defining thread %s-%d",
 	    name, instance);

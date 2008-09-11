@@ -28,8 +28,6 @@
 #ifndef _FB_FILEBENCH_H
 #define	_FB_FILEBENCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #include <stdio.h>
@@ -42,6 +40,14 @@ typedef enum { B_FALSE, B_TRUE } boolean_t;
 
 #ifndef HAVE_U_LONGLONG_T
 typedef unsigned long long u_longlong_t;
+#endif
+
+#ifndef TRUE
+#define	TRUE 1
+#endif
+
+#ifndef FALSE
+#define	FALSE 0
 #endif
 
 #include "procflow.h"
@@ -74,14 +80,6 @@ typedef unsigned long long u_longlong_t;
 
 #ifdef	__cplusplus
 extern "C" {
-#endif
-
-#ifndef TRUE
-#define	TRUE 1
-#endif
-
-#ifndef FALSE
-#define	FALSE 0
 #endif
 
 extern pid_t my_pid;		/* this process' process id */
@@ -119,7 +117,7 @@ void filebench_shutdown(int error);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.3.3"
+#define	FILEBENCH_VERSION	"1.3.4"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024
