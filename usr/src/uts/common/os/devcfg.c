@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 #include <sys/t_lock.h>
 #include <sys/cmn_err.h>
@@ -129,6 +127,7 @@ static hrtime_t volatile devinfo_freeze = 0;
 /* number of dev_info attaches/detaches currently in progress */
 static ulong_t devinfo_attach_detach = 0;
 
+extern int	sys_shutdown;
 extern kmutex_t global_vhci_lock;
 
 /* bitset of DS_SYSAVAIL & DS_RECONFIG - no races, no lock */
@@ -7306,7 +7305,8 @@ i_ddi_di_cache_free(struct di_cache *cache)
 			cmn_err(CE_NOTE, "i_ddi_di_cache_free: NULL cache");
 	}
 
-	if (!modrootloaded || rootvp == NULL || vn_is_readonly(rootvp)) {
+	if (!modrootloaded || rootvp == NULL ||
+	    vn_is_readonly(rootvp) || sys_shutdown) {
 		if (di_cache_debug) {
 			cmn_err(CE_WARN, "/ not mounted/RDONLY. Skip unlink");
 		}

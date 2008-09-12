@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/t_lock.h>
@@ -212,6 +210,7 @@ int kfio_debug = 0;
 extern int modrootloaded;
 extern void mdi_read_devices_files(void);
 extern void mdi_clean_vhcache(void);
+extern int sys_shutdown;
 
 /*
  * Initialize the overall cache file management
@@ -409,9 +408,9 @@ fread_nvlist(char *filename, nvlist_t **ret_nvlist)
 	KFDEBUG2((CE_CONT, "nvpf_magic: 0x%x\n", hdr.nvpf_magic));
 	KFDEBUG2((CE_CONT, "nvpf_version: %d\n", hdr.nvpf_version));
 	KFDEBUG2((CE_CONT, "nvpf_size: %lld\n",
-		(longlong_t)hdr.nvpf_size));
+	    (longlong_t)hdr.nvpf_size));
 	KFDEBUG2((CE_CONT, "nvpf_hdr_chksum: 0x%x\n",
-		hdr.nvpf_hdr_chksum));
+	    hdr.nvpf_hdr_chksum));
 	KFDEBUG2((CE_CONT, "nvpf_chksum: 0x%x\n", hdr.nvpf_chksum));
 
 	cksum = hdr.nvpf_hdr_chksum;
@@ -441,7 +440,7 @@ fread_nvlist(char *filename, nvlist_t **ret_nvlist)
 			nvf_error("%s: read error %d", filename, n);
 		} else {
 			nvf_error("%s: incomplete read %d/%lld",
-				filename, n, (longlong_t)hdr.nvpf_size);
+			    filename, n, (longlong_t)hdr.nvpf_size);
 		}
 		return (EINVAL);
 	}
@@ -451,7 +450,7 @@ fread_nvlist(char *filename, nvlist_t **ret_nvlist)
 	kobj_close_file(file);
 	if (rval > 0) {
 		nvf_error("%s is larger than %lld\n",
-			filename, (longlong_t)hdr.nvpf_size);
+		    filename, (longlong_t)hdr.nvpf_size);
 		kmem_free(buf, hdr.nvpf_size);
 		return (EINVAL);
 	}
@@ -468,7 +467,7 @@ fread_nvlist(char *filename, nvlist_t **ret_nvlist)
 	rval = nvlist_unpack(buf, hdr.nvpf_size, &nvl, 0);
 	if (rval != 0) {
 		nvf_error("%s: error %d unpacking nvlist\n",
-			filename, rval);
+		    filename, rval);
 		kmem_free(buf, hdr.nvpf_size);
 		return (EINVAL);
 	}
@@ -494,13 +493,13 @@ kfcreate(char *filename, kfile_t **kfilep)
 	fp->kf_state = 0;
 
 	KFDEBUG((CE_CONT, "create: %s flags 0x%x\n",
-		filename, fp->kf_vnflags));
+	    filename, fp->kf_vnflags));
 	rval = vn_open(filename, UIO_SYSSPACE, fp->kf_vnflags,
 	    0444, &fp->kf_vp, CRCREAT, 0);
 	if (rval != 0) {
 		kmem_free(fp, sizeof (kfile_t));
 		KFDEBUG((CE_CONT, "%s: create error %d\n",
-			filename, rval));
+		    filename, rval));
 		return (rval);
 	}
 
@@ -517,7 +516,7 @@ kfremove(char *filename)
 	rval = vn_remove(filename, UIO_SYSSPACE, RMFILE);
 	if (rval != 0) {
 		KFDEBUG((CE_CONT, "%s: remove error %d\n",
-			filename, rval));
+		    filename, rval));
 	}
 	return (rval);
 }
@@ -535,10 +534,10 @@ kfread(kfile_t *fp, char *buf, ssize_t bufsiz, ssize_t *ret_n)
 		return (fp->kf_state);
 
 	err = vn_rdwr(UIO_READ, fp->kf_vp, buf, bufsiz, fp->kf_fpos,
-		UIO_SYSSPACE, 0, (rlim64_t)0, kcred, &resid);
+	    UIO_SYSSPACE, 0, (rlim64_t)0, kcred, &resid);
 	if (err != 0) {
 		KFDEBUG((CE_CONT, "%s: read error %d\n",
-			fp->kf_fname, err));
+		    fp->kf_fname, err));
 		fp->kf_state = err;
 		return (err);
 	}
@@ -547,7 +546,7 @@ kfread(kfile_t *fp, char *buf, ssize_t bufsiz, ssize_t *ret_n)
 	n = bufsiz - resid;
 
 	KFDEBUG1((CE_CONT, "%s: read %ld bytes ok %ld bufsiz, %ld resid\n",
-		fp->kf_fname, n, bufsiz, resid));
+	    fp->kf_fname, n, bufsiz, resid));
 
 	fp->kf_fpos += n;
 	*ret_n = n;
@@ -572,16 +571,16 @@ kfwrite(kfile_t *fp, char *buf, ssize_t bufsiz, ssize_t *ret_n)
 	rlimit = bufsiz + 1;
 	for (;;) {
 		err = vn_rdwr(UIO_WRITE, fp->kf_vp, buf, len, fp->kf_fpos,
-			UIO_SYSSPACE, FSYNC, rlimit, kcred, &resid);
+		    UIO_SYSSPACE, FSYNC, rlimit, kcred, &resid);
 		if (err) {
 			KFDEBUG((CE_CONT, "%s: write error %d\n",
-				fp->kf_fname, err));
+			    fp->kf_fname, err));
 			fp->kf_state = err;
 			return (err);
 		}
 
 		KFDEBUG1((CE_CONT, "%s: write %ld bytes ok %ld resid\n",
-			fp->kf_fname, len-resid, resid));
+		    fp->kf_fname, len-resid, resid));
 
 		ASSERT(resid >= 0 && resid <= len);
 
@@ -591,7 +590,7 @@ kfwrite(kfile_t *fp, char *buf, ssize_t bufsiz, ssize_t *ret_n)
 
 		if (resid == len) {
 			KFDEBUG((CE_CONT, "%s: filesystem full?\n",
-				fp->kf_fname));
+			    fp->kf_fname));
 			fp->kf_state = ENOSPC;
 			return (ENOSPC);
 		}
@@ -621,17 +620,17 @@ kfclose(kfile_t *fp)
 		rval = VOP_FSYNC(fp->kf_vp, FSYNC, kcred, NULL);
 		if (rval != 0) {
 			nvf_error("%s: sync error %d\n",
-				fp->kf_fname, rval);
+			    fp->kf_fname, rval);
 		}
 		KFDEBUG((CE_CONT, "%s: sync ok\n", fp->kf_fname));
 	}
 
-	rval = VOP_CLOSE(fp->kf_vp, fp->kf_vnflags, 1, (offset_t)0, kcred,
-		NULL);
+	rval = VOP_CLOSE(fp->kf_vp, fp->kf_vnflags, 1,
+	    (offset_t)0, kcred, NULL);
 	if (rval != 0) {
 		if (fp->kf_state == 0) {
 			nvf_error("%s: close error %d\n",
-				fp->kf_fname, rval);
+			    fp->kf_fname, rval);
 		}
 	} else {
 		if (fp->kf_state == 0)
@@ -654,7 +653,7 @@ kfrename(char *oldname, char *newname)
 
 	if ((rval = vn_rename(oldname, newname, UIO_SYSSPACE)) != 0) {
 		KFDEBUG((CE_CONT, "rename %s to %s: %d\n",
-			oldname, newname, rval));
+		    oldname, newname, rval));
 	}
 
 	return (rval);
@@ -677,7 +676,7 @@ fwrite_nvlist(char *filename, nvlist_t *nvl)
 	err = nvlist_pack(nvl, &nvbuf, &buflen, NV_ENCODE_NATIVE, 0);
 	if (err != 0) {
 		nvf_error("%s: error %d packing nvlist\n",
-			filename, err);
+		    filename, err);
 		return (err);
 	}
 
@@ -689,7 +688,7 @@ fwrite_nvlist(char *filename, nvlist_t *nvl)
 	((nvpf_hdr_t *)buf)->nvpf_size = buflen;
 	((nvpf_hdr_t *)buf)->nvpf_chksum = nvp_cksum((uchar_t *)nvbuf, buflen);
 	((nvpf_hdr_t *)buf)->nvpf_hdr_chksum =
-		nvp_cksum((uchar_t *)buf, sizeof (nvpf_hdr_t));
+	    nvp_cksum((uchar_t *)buf, sizeof (nvpf_hdr_t));
 
 	bcopy(nvbuf, buf + sizeof (nvpf_hdr_t), buflen);
 	kmem_free(nvbuf, buflen);
@@ -699,8 +698,7 @@ fwrite_nvlist(char *filename, nvlist_t *nvl)
 	newname = kmem_alloc(len, KM_SLEEP);
 
 
-	(void) sprintf(newname, "%s.%s",
-		filename, NEW_FILENAME_SUFFIX);
+	(void) sprintf(newname, "%s.%s", filename, NEW_FILENAME_SUFFIX);
 
 	/*
 	 * To make it unlikely we suffer data loss, write
@@ -713,7 +711,7 @@ fwrite_nvlist(char *filename, nvlist_t *nvl)
 		err = kfwrite(fp, buf, buflen, &n);
 		if (err) {
 			nvf_error("%s: write error - %d\n",
-				newname, err);
+			    newname, err);
 		} else {
 			if (n != buflen) {
 				nvf_error(
@@ -742,7 +740,7 @@ fwrite_nvlist(char *filename, nvlist_t *nvl)
 	if (err == 0) {
 		if ((err = kfrename(newname, filename)) != 0) {
 			nvf_error("%s: rename from %s failed\n",
-				newname, filename);
+			    newname, filename);
 		}
 	}
 
@@ -831,7 +829,7 @@ fread_nvp_list(nvfd_t *nvfd)
 
 		default:
 			nvf_error("%s: %s unsupported data type %d\n",
-				nvfd->nvf_cache_path, name, nvpair_type(nvp));
+			    nvfd->nvf_cache_path, name, nvpair_type(nvp));
 			rval = EINVAL;
 			goto error;
 		}
@@ -867,18 +865,18 @@ nvf_read_file(nvf_handle_t nvf_handle)
 		case EIO:
 			nvfd->nvf_flags |= NVF_F_REBUILD_MSG;
 			cmn_err(CE_WARN, "%s: I/O error",
-				nvfd->nvf_cache_path);
+			    nvfd->nvf_cache_path);
 			break;
 		case ENOENT:
 			nvfd->nvf_flags |= NVF_F_CREATE_MSG;
 			nvf_error("%s: not found\n",
-				nvfd->nvf_cache_path);
+			    nvfd->nvf_cache_path);
 			break;
 		case EINVAL:
 		default:
 			nvfd->nvf_flags |= NVF_F_REBUILD_MSG;
 			cmn_err(CE_WARN, "%s: data file corrupted",
-				nvfd->nvf_cache_path);
+			    nvfd->nvf_cache_path);
 			break;
 		}
 	}
@@ -925,10 +923,10 @@ nvf_wake_daemon(void)
 	clock_t nticks;
 
 	/*
-	 * If the system isn't up yet
+	 * If the system isn't up yet or is shutting down,
 	 * don't even think about starting a flush.
 	 */
-	if (!i_ddi_io_initialized())
+	if (!i_ddi_io_initialized() || sys_shutdown)
 		return;
 
 	mutex_enter(&nvpflush_lock);
@@ -964,7 +962,7 @@ nvpflush_one(nvfd_t *nvfd)
 	ASSERT((nvfd->nvf_flags & NVF_F_FLUSHING) == 0);
 
 	if (!NVF_IS_DIRTY(nvfd) ||
-	    NVF_IS_READONLY(nvfd) || kfio_disable_write) {
+	    NVF_IS_READONLY(nvfd) || kfio_disable_write || sys_shutdown) {
 		NVF_CLEAR_DIRTY(nvfd);
 		rw_exit(&nvfd->nvf_lock);
 		return (DDI_SUCCESS);
@@ -1001,7 +999,7 @@ nvpflush_one(nvfd_t *nvfd)
 			nvfd->nvf_flags &= ~(NVF_F_ERROR | NVF_F_DIRTY);
 		} else if ((nvfd->nvf_flags & NVF_F_ERROR) == 0) {
 			cmn_err(CE_CONT,
-			    "%s: updated failed\n", nvfd->nvf_cache_path);
+			    "%s: update failed\n", nvfd->nvf_cache_path);
 			nvfd->nvf_flags |= NVF_F_ERROR | NVF_F_DIRTY;
 		}
 	} else {
@@ -1051,14 +1049,13 @@ nvpflush_daemon(void)
 	CALLB_CPR_INIT(&cprinfo, &nvpflush_lock, callb_generic_cpr, "nvp");
 	mutex_enter(&nvpflush_lock);
 	for (;;) {
-
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
 		while (do_nvpflush == 0) {
 			clk = cv_timedwait(&nvpflush_cv, &nvpflush_lock,
 			    ddi_get_lbolt() +
-				(nvpdaemon_idle_time * TICKS_PER_SECOND));
-			if (clk == -1 &&
-			    do_nvpflush == 0 && nvpflush_timer_busy == 0) {
+			    (nvpdaemon_idle_time * TICKS_PER_SECOND));
+			if ((clk == -1 && do_nvpflush == 0 &&
+			    nvpflush_timer_busy == 0) || sys_shutdown) {
 				/*
 				 * Note that CALLB_CPR_EXIT calls mutex_exit()
 				 * on the lock passed in to CALLB_CPR_INIT,
