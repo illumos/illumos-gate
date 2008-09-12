@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -262,8 +260,7 @@ _init(void)
 
 	/* Initialize soft state pointer. */
 	if ((error = ddi_soft_state_init(&ssm_softstates,
-		sizeof (struct ssm_soft_state),
-		SSM_MAX_INSTANCES)) != 0)
+	    sizeof (struct ssm_soft_state), SSM_MAX_INSTANCES)) != 0)
 		return (error);
 
 	/* Install the module. */
@@ -387,9 +384,8 @@ ssm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 #endif
 
 	if (ssm_make_nodes(devi, instance, softsp->ssm_nodeid)) {
-		cmn_err(CE_WARN,
-			"ssm:%s:%d: failed to make nodes",
-			ddi_driver_name(devi), instance);
+		cmn_err(CE_WARN, "ssm:%s:%d: failed to make nodes",
+		    ddi_driver_name(devi), instance);
 		ddi_remove_minor_node(devi, NULL);
 		ddi_soft_state_free(ssm_softstates, instance);
 		return (DDI_FAILURE);
@@ -466,7 +462,7 @@ ssm_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	if (softsp == NULL) {
 		cmn_err(CE_WARN,
-			"ssm_open bad instance number %d", instance);
+		    "ssm_open bad instance number %d", instance);
 		return (ENXIO);
 	}
 
@@ -477,7 +473,7 @@ ssm_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		ddi_remove_minor_node(devi, NULL);
 
 		sbd_teardown_instance = (int (*) (int, caddr_t))
-			modgetsymvalue("sbd_teardown_instance", 0);
+		    modlookup("misc/sbd", "sbd_teardown_instance");
 
 		if (!sbd_teardown_instance) {
 			cmn_err(CE_WARN, "cannot find sbd_teardown_instance");
@@ -688,13 +684,12 @@ ssm_make_nodes(dev_info_t *dip, int instance, int ssm_nodeid)
 		minor_num = (instance << SSM_INSTANCE_SHIFT) | bd;
 
 		rv = ddi_create_minor_node(dip, filename, S_IFCHR,
-			minor_num, DDI_NT_SBD_ATTACHMENT_POINT,
-			NULL);
+		    minor_num, DDI_NT_SBD_ATTACHMENT_POINT, NULL);
 		if (rv == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-				"ssm_make_nodes:%d: failed to create "
-				"minor node (%s, 0x%x)",
-					instance, filename, minor_num);
+			    "ssm_make_nodes:%d: failed to create "
+			    "minor node (%s, 0x%x)",
+			    instance, filename, minor_num);
 			return (-1);
 		}
 	}
@@ -749,7 +744,7 @@ ssm_open(dev_t *devi, int flags, int otyp, cred_t *credp)
 		}
 
 		sbd_setup_instance = (int (*)(int, dev_info_t *, int, int,
-		    caddr_t))modgetsymvalue("sbd_setup_instance", 0);
+		    caddr_t))modlookup("misc/sbd", "sbd_setup_instance");
 
 		if (!sbd_setup_instance) {
 			cmn_err(CE_WARN, "cannot find sbd_setup_instance");
@@ -761,8 +756,8 @@ ssm_open(dev_t *devi, int flags, int otyp, cred_t *credp)
 		sbdp_info.wnode = softsp->ssm_nodeid;
 
 		rv = (*sbd_setup_instance)(instance, softsp->top_node,
-			plat_max_boards(), softsp->ssm_nodeid,
-			(caddr_t)&sbdp_info);
+		    plat_max_boards(), softsp->ssm_nodeid,
+		    (caddr_t)&sbdp_info);
 		if (rv != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "cannot run sbd_setup_instance");
 			mutex_exit(&softsp->ssm_sft_lock);
@@ -843,7 +838,7 @@ ssm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		ssm_sbdp_info_t	sbdp_info;
 		int (*sbd_teardown_instance) (int, caddr_t);
 		sbd_teardown_instance = (int (*) (int, caddr_t))
-			modgetsymvalue("sbd_teardown_instance", 0);
+		    modlookup("misc/sbd", "sbd_teardown_instance");
 
 		if (!sbd_teardown_instance) {
 			cmn_err(CE_WARN, "cannot find sbd_teardown_instance");
@@ -867,9 +862,8 @@ ssm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	default: {
 		char	event = 0;
 
-		sbd_ioctl = (int (*)
-			(dev_t, int, intptr_t, int, char *))
-			modgetsymvalue("sbd_ioctl", 0);
+		sbd_ioctl = (int (*) (dev_t, int, intptr_t, int, char *))
+		    modlookup("misc/sbd", "sbd_ioctl");
 
 		if (sbd_ioctl)
 			rv = (*sbd_ioctl) (dev, cmd, arg, mode, &event);
@@ -1097,7 +1091,7 @@ ssm_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 		ddi_iblock_cookie_t *ibc)
 {
 	struct ssm_soft_state *softsp = ddi_get_soft_state(ssm_softstates,
-			ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	*ibc = softsp->ssm_fm_ibc;
 	return (softsp->ssm_fm_cap);
