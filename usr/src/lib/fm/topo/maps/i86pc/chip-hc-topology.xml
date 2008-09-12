@@ -46,6 +46,22 @@
             </propgroup>
 
         </set> 
+        <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250'>
+	    
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+
+                <propmethod name='simple_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+
+        </set> 
         <set type='product'
 	    setlist='Sun-Fire-V20z|Sun-Fire-V40z'>
 	    
