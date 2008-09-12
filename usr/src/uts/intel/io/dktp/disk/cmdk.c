@@ -1708,7 +1708,7 @@ cmdk_devid_read(struct cmdk *dkp)
 	uint_t		*ip;
 	int		chksum;
 	int		i, sz;
-	tgdk_iob_handle	handle;
+	tgdk_iob_handle	handle = NULL;
 	int		rc = DDI_FAILURE;
 
 	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk, 0))
