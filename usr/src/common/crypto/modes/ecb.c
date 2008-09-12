@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 #include <strings.h>
 #include <limits.h>
@@ -56,50 +54,50 @@ ecb_cipher_contiguous_blocks(ecb_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
 
-	if (length + ctx->cc_remainder_len < block_size) {
+	if (length + ctx->ecb_remainder_len < block_size) {
 		/* accumulate bytes here and return */
 		bcopy(datap,
-		    (uint8_t *)ctx->cc_remainder + ctx->cc_remainder_len,
+		    (uint8_t *)ctx->ecb_remainder + ctx->ecb_remainder_len,
 		    length);
-		ctx->cc_remainder_len += length;
-		ctx->cc_copy_to = datap;
+		ctx->ecb_remainder_len += length;
+		ctx->ecb_copy_to = datap;
 		return (CRYPTO_SUCCESS);
 	}
 
-	lastp = (uint8_t *)ctx->cc_iv;
+	lastp = (uint8_t *)ctx->ecb_iv;
 	if (out != NULL)
 		crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	do {
 		/* Unprocessed data from last call. */
-		if (ctx->cc_remainder_len > 0) {
-			need = block_size - ctx->cc_remainder_len;
+		if (ctx->ecb_remainder_len > 0) {
+			need = block_size - ctx->ecb_remainder_len;
 
 			if (need > remainder)
 				return (CRYPTO_DATA_LEN_RANGE);
 
-			bcopy(datap, &((uint8_t *)ctx->cc_remainder)
-			    [ctx->cc_remainder_len], need);
+			bcopy(datap, &((uint8_t *)ctx->ecb_remainder)
+			    [ctx->ecb_remainder_len], need);
 
-			blockp = (uint8_t *)ctx->cc_remainder;
+			blockp = (uint8_t *)ctx->ecb_remainder;
 		} else {
 			blockp = datap;
 		}
 
 		if (out == NULL) {
-			cipher(ctx->cc_keysched, blockp, blockp);
+			cipher(ctx->ecb_keysched, blockp, blockp);
 
-			ctx->cc_lastp = blockp;
+			ctx->ecb_lastp = blockp;
 			lastp = blockp;
 
-			if (ctx->cc_remainder_len > 0) {
-				bcopy(blockp, ctx->cc_copy_to,
-				    ctx->cc_remainder_len);
-				bcopy(blockp + ctx->cc_remainder_len, datap,
+			if (ctx->ecb_remainder_len > 0) {
+				bcopy(blockp, ctx->ecb_copy_to,
+				    ctx->ecb_remainder_len);
+				bcopy(blockp + ctx->ecb_remainder_len, datap,
 				    need);
 			}
 		} else {
-			cipher(ctx->cc_keysched, blockp, lastp);
+			cipher(ctx->ecb_keysched, blockp, lastp);
 			crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
 			    &out_data_1_len, &out_data_2, block_size);
 
@@ -114,9 +112,9 @@ ecb_cipher_contiguous_blocks(ecb_ctx_t *ctx, char *data, size_t length,
 		}
 
 		/* Update pointer to next block of data to be processed. */
-		if (ctx->cc_remainder_len != 0) {
+		if (ctx->ecb_remainder_len != 0) {
 			datap += need;
-			ctx->cc_remainder_len = 0;
+			ctx->ecb_remainder_len = 0;
 		} else {
 			datap += block_size;
 		}
@@ -125,12 +123,12 @@ ecb_cipher_contiguous_blocks(ecb_ctx_t *ctx, char *data, size_t length,
 
 		/* Incomplete last block. */
 		if (remainder > 0 && remainder < block_size) {
-			bcopy(datap, ctx->cc_remainder, remainder);
-			ctx->cc_remainder_len = remainder;
-			ctx->cc_copy_to = datap;
+			bcopy(datap, ctx->ecb_remainder, remainder);
+			ctx->ecb_remainder_len = remainder;
+			ctx->ecb_copy_to = datap;
 			goto out;
 		}
-		ctx->cc_copy_to = NULL;
+		ctx->ecb_copy_to = NULL;
 
 	} while (remainder > 0);
 
@@ -151,6 +149,6 @@ ecb_alloc_ctx(int kmflag)
 #endif
 		return (NULL);
 
-	ecb_ctx->cc_flags = ECB_MODE;
+	ecb_ctx->ecb_flags = ECB_MODE;
 	return (ecb_ctx);
 }

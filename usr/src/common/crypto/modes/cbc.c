@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 #include <strings.h>
 #include <limits.h>
@@ -58,32 +56,32 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
 
-	if (length + ctx->cc_remainder_len < block_size) {
+	if (length + ctx->cbc_remainder_len < block_size) {
 		/* accumulate bytes here and return */
 		bcopy(datap,
-		    (uint8_t *)ctx->cc_remainder + ctx->cc_remainder_len,
+		    (uint8_t *)ctx->cbc_remainder + ctx->cbc_remainder_len,
 		    length);
-		ctx->cc_remainder_len += length;
-		ctx->cc_copy_to = datap;
+		ctx->cbc_remainder_len += length;
+		ctx->cbc_copy_to = datap;
 		return (CRYPTO_SUCCESS);
 	}
 
-	lastp = (uint8_t *)ctx->cc_iv;
+	lastp = (uint8_t *)ctx->cbc_iv;
 	if (out != NULL)
 		crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	do {
 		/* Unprocessed data from last call. */
-		if (ctx->cc_remainder_len > 0) {
-			need = block_size - ctx->cc_remainder_len;
+		if (ctx->cbc_remainder_len > 0) {
+			need = block_size - ctx->cbc_remainder_len;
 
 			if (need > remainder)
 				return (CRYPTO_DATA_LEN_RANGE);
 
-			bcopy(datap, &((uint8_t *)ctx->cc_remainder)
-			    [ctx->cc_remainder_len], need);
+			bcopy(datap, &((uint8_t *)ctx->cbc_remainder)
+			    [ctx->cbc_remainder_len], need);
 
-			blockp = (uint8_t *)ctx->cc_remainder;
+			blockp = (uint8_t *)ctx->cbc_remainder;
 		} else {
 			blockp = datap;
 		}
@@ -94,15 +92,15 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 			 * current clear block.
 			 */
 			xor_block(lastp, blockp);
-			encrypt(ctx->cc_keysched, blockp, blockp);
+			encrypt(ctx->cbc_keysched, blockp, blockp);
 
-			ctx->cc_lastp = blockp;
+			ctx->cbc_lastp = blockp;
 			lastp = blockp;
 
-			if (ctx->cc_remainder_len > 0) {
-				bcopy(blockp, ctx->cc_copy_to,
-				    ctx->cc_remainder_len);
-				bcopy(blockp + ctx->cc_remainder_len, datap,
+			if (ctx->cbc_remainder_len > 0) {
+				bcopy(blockp, ctx->cbc_copy_to,
+				    ctx->cbc_remainder_len);
+				bcopy(blockp + ctx->cbc_remainder_len, datap,
 				    need);
 			}
 		} else {
@@ -111,7 +109,7 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 			 * current clear block.
 			 */
 			xor_block(blockp, lastp);
-			encrypt(ctx->cc_keysched, lastp, lastp);
+			encrypt(ctx->cbc_keysched, lastp, lastp);
 			crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
 			    &out_data_1_len, &out_data_2, block_size);
 
@@ -131,9 +129,9 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 		}
 
 		/* Update pointer to next block of data to be processed. */
-		if (ctx->cc_remainder_len != 0) {
+		if (ctx->cbc_remainder_len != 0) {
 			datap += need;
-			ctx->cc_remainder_len = 0;
+			ctx->cbc_remainder_len = 0;
 		} else {
 			datap += block_size;
 		}
@@ -142,12 +140,12 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 
 		/* Incomplete last block. */
 		if (remainder > 0 && remainder < block_size) {
-			bcopy(datap, ctx->cc_remainder, remainder);
-			ctx->cc_remainder_len = remainder;
-			ctx->cc_copy_to = datap;
+			bcopy(datap, ctx->cbc_remainder, remainder);
+			ctx->cbc_remainder_len = remainder;
+			ctx->cbc_copy_to = datap;
 			goto out;
 		}
-		ctx->cc_copy_to = NULL;
+		ctx->cbc_copy_to = NULL;
 
 	} while (remainder > 0);
 
@@ -155,16 +153,16 @@ out:
 	/*
 	 * Save the last encrypted block in the context.
 	 */
-	if (ctx->cc_lastp != NULL) {
-		copy_block((uint8_t *)ctx->cc_lastp, (uint8_t *)ctx->cc_iv);
-		ctx->cc_lastp = (uint8_t *)ctx->cc_iv;
+	if (ctx->cbc_lastp != NULL) {
+		copy_block((uint8_t *)ctx->cbc_lastp, (uint8_t *)ctx->cbc_iv);
+		ctx->cbc_lastp = (uint8_t *)ctx->cbc_iv;
 	}
 
 	return (CRYPTO_SUCCESS);
 }
 
 #define	OTHER(a, ctx) \
-	(((a) == (ctx)->cc_lastblock) ? (ctx)->cc_iv : (ctx)->cc_lastblock)
+	(((a) == (ctx)->cbc_lastblock) ? (ctx)->cbc_iv : (ctx)->cbc_lastblock)
 
 /* ARGSUSED */
 int
@@ -185,32 +183,32 @@ cbc_decrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
 
-	if (length + ctx->cc_remainder_len < block_size) {
+	if (length + ctx->cbc_remainder_len < block_size) {
 		/* accumulate bytes here and return */
 		bcopy(datap,
-		    (uint8_t *)ctx->cc_remainder + ctx->cc_remainder_len,
+		    (uint8_t *)ctx->cbc_remainder + ctx->cbc_remainder_len,
 		    length);
-		ctx->cc_remainder_len += length;
-		ctx->cc_copy_to = datap;
+		ctx->cbc_remainder_len += length;
+		ctx->cbc_copy_to = datap;
 		return (CRYPTO_SUCCESS);
 	}
 
-	lastp = ctx->cc_lastp;
+	lastp = ctx->cbc_lastp;
 	if (out != NULL)
 		crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	do {
 		/* Unprocessed data from last call. */
-		if (ctx->cc_remainder_len > 0) {
-			need = block_size - ctx->cc_remainder_len;
+		if (ctx->cbc_remainder_len > 0) {
+			need = block_size - ctx->cbc_remainder_len;
 
 			if (need > remainder)
 				return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
 
-			bcopy(datap, &((uint8_t *)ctx->cc_remainder)
-			    [ctx->cc_remainder_len], need);
+			bcopy(datap, &((uint8_t *)ctx->cbc_remainder)
+			    [ctx->cbc_remainder_len], need);
 
-			blockp = (uint8_t *)ctx->cc_remainder;
+			blockp = (uint8_t *)ctx->cbc_remainder;
 		} else {
 			blockp = datap;
 		}
@@ -219,11 +217,11 @@ cbc_decrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 		copy_block(blockp, (uint8_t *)OTHER((uint64_t *)lastp, ctx));
 
 		if (out != NULL) {
-			decrypt(ctx->cc_keysched, blockp,
-			    (uint8_t *)ctx->cc_remainder);
-			blockp = (uint8_t *)ctx->cc_remainder;
+			decrypt(ctx->cbc_keysched, blockp,
+			    (uint8_t *)ctx->cbc_remainder);
+			blockp = (uint8_t *)ctx->cbc_remainder;
 		} else {
-			decrypt(ctx->cc_keysched, blockp, blockp);
+			decrypt(ctx->cbc_keysched, blockp, blockp);
 		}
 
 		/*
@@ -248,16 +246,16 @@ cbc_decrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 			/* update offset */
 			out->cd_offset += block_size;
 
-		} else if (ctx->cc_remainder_len > 0) {
+		} else if (ctx->cbc_remainder_len > 0) {
 			/* copy temporary block to where it belongs */
-			bcopy(blockp, ctx->cc_copy_to, ctx->cc_remainder_len);
-			bcopy(blockp + ctx->cc_remainder_len, datap, need);
+			bcopy(blockp, ctx->cbc_copy_to, ctx->cbc_remainder_len);
+			bcopy(blockp + ctx->cbc_remainder_len, datap, need);
 		}
 
 		/* Update pointer to next block of data to be processed. */
-		if (ctx->cc_remainder_len != 0) {
+		if (ctx->cbc_remainder_len != 0) {
 			datap += need;
-			ctx->cc_remainder_len = 0;
+			ctx->cbc_remainder_len = 0;
 		} else {
 			datap += block_size;
 		}
@@ -266,17 +264,17 @@ cbc_decrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 
 		/* Incomplete last block. */
 		if (remainder > 0 && remainder < block_size) {
-			bcopy(datap, ctx->cc_remainder, remainder);
-			ctx->cc_remainder_len = remainder;
-			ctx->cc_lastp = lastp;
-			ctx->cc_copy_to = datap;
+			bcopy(datap, ctx->cbc_remainder, remainder);
+			ctx->cbc_remainder_len = remainder;
+			ctx->cbc_lastp = lastp;
+			ctx->cbc_copy_to = datap;
 			return (CRYPTO_SUCCESS);
 		}
-		ctx->cc_copy_to = NULL;
+		ctx->cbc_copy_to = NULL;
 
 	} while (remainder > 0);
 
-	ctx->cc_lastp = lastp;
+	ctx->cbc_lastp = lastp;
 	return (CRYPTO_SUCCESS);
 }
 
@@ -296,11 +294,11 @@ cbc_init_ctx(cbc_ctx_t *cbc_ctx, char *param, size_t param_len,
 #else
 		assert(param_len == block_size);
 #endif
-		copy_block((uchar_t *)param, cbc_ctx->cc_iv);
+		copy_block((uchar_t *)param, cbc_ctx->cbc_iv);
 	}
 
-	cbc_ctx->cc_lastp = (uint8_t *)&cbc_ctx->cc_iv[0];
-	cbc_ctx->cc_flags |= CBC_MODE;
+	cbc_ctx->cbc_lastp = (uint8_t *)&cbc_ctx->cbc_iv[0];
+	cbc_ctx->cbc_flags |= CBC_MODE;
 	return (CRYPTO_SUCCESS);
 }
 
@@ -317,6 +315,6 @@ cbc_alloc_ctx(int kmflag)
 #endif
 		return (NULL);
 
-	cbc_ctx->cc_flags = CBC_MODE;
+	cbc_ctx->cbc_flags = CBC_MODE;
 	return (cbc_ctx);
 }

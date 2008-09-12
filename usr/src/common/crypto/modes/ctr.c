@@ -34,10 +34,7 @@
 #include <modes/modes.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
-
-#ifdef _LITTLE_ENDIAN
 #include <sys/byteorder.h>
-#endif
 
 /*
  * Encrypt and decrypt multiple blocks of data in counter mode.
@@ -58,7 +55,7 @@ ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_1;
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
-	uint64_t counter;
+	uint64_t lower_counter, upper_counter;
 
 	if (length + ctx->ctr_remainder_len < block_size) {
 		/* accumulate bytes here and return */
@@ -97,23 +94,27 @@ ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *data, size_t length,
 		lastp = (uint8_t *)ctx->ctr_tmp;
 
 		/*
-		 * Increment counter. Counter bits are confined
-		 * to the bottom 64 bits of the counter block.
+		 * Increment Counter.
 		 */
-#ifdef _LITTLE_ENDIAN
-		counter = ntohll(ctx->ctr_cb[1] & ctx->ctr_counter_mask);
-		counter = htonll(counter + 1);
-#else
-		counter = ctx->ctr_cb[1] & ctx->ctr_counter_mask;
-		counter++;
-#endif	/* _LITTLE_ENDIAN */
-		counter &= ctx->ctr_counter_mask;
-		ctx->ctr_cb[1] =
-		    (ctx->ctr_cb[1] & ~(ctx->ctr_counter_mask)) | counter;
+		lower_counter = ntohll(ctx->ctr_cb[1] & ctx->ctr_lower_mask);
+		lower_counter = htonll(lower_counter + 1);
+		lower_counter &= ctx->ctr_lower_mask;
+		ctx->ctr_cb[1] = (ctx->ctr_cb[1] & ~(ctx->ctr_lower_mask)) |
+		    lower_counter;
+
+		/* wrap around */
+		if (lower_counter == 0) {
+			upper_counter =
+			    ntohll(ctx->ctr_cb[0] & ctx->ctr_upper_mask);
+			upper_counter = htonll(upper_counter + 1);
+			upper_counter &= ctx->ctr_upper_mask;
+			ctx->ctr_cb[0] =
+			    (ctx->ctr_cb[0] & ~(ctx->ctr_upper_mask)) |
+			    upper_counter;
+		}
 
 		/*
-		 * XOR the previous cipher block or IV with the
-		 * current clear block.
+		 * XOR encrypted counter block with the current clear block.
 		 */
 		xor_block(blockp, lastp);
 
@@ -206,18 +207,24 @@ int
 ctr_init_ctx(ctr_ctx_t *ctr_ctx, ulong_t count, uint8_t *cb,
 void (*copy_block)(uint8_t *, uint8_t *))
 {
-	uint64_t mask = 0;
+	uint64_t upper_mask = 0;
+	uint64_t lower_mask = 0;
 
-	if (count == 0 || count > 64) {
+	if (count == 0 || count > 128) {
 		return (CRYPTO_MECHANISM_PARAM_INVALID);
 	}
-	while (count-- > 0)
-		mask |= (1ULL << count);
+	/* upper 64 bits of the mask */
+	if (count >= 64) {
+		count -= 64;
+		upper_mask = (count == 64) ? UINT64_MAX : (1ULL << count) - 1;
+		lower_mask = UINT64_MAX;
+	} else {
+		/* now the lower 63 bits */
+		lower_mask = (1ULL << count) - 1;
+	}
+	ctr_ctx->ctr_lower_mask = htonll(lower_mask);
+	ctr_ctx->ctr_upper_mask = htonll(upper_mask);
 
-#ifdef _LITTLE_ENDIAN
-	mask = htonll(mask);
-#endif
-	ctr_ctx->ctr_counter_mask = mask;
 	copy_block(cb, (uchar_t *)ctr_ctx->ctr_cb);
 	ctr_ctx->ctr_lastp = (uint8_t *)&ctr_ctx->ctr_cb[0];
 	ctr_ctx->ctr_flags |= CTR_MODE;

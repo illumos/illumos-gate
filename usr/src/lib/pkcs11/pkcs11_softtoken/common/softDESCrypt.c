@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -806,16 +804,16 @@ des_cbc_ctx_init(void *key_sched, size_t size, uint8_t *ivec, CK_KEY_TYPE type)
 	if ((cbc_ctx = calloc(1, sizeof (cbc_ctx_t))) == NULL)
 		return (NULL);
 
-	cbc_ctx->cc_keysched = key_sched;
+	cbc_ctx->cbc_keysched = key_sched;
 
-	(void) memcpy(&cbc_ctx->cc_iv[0], ivec, DES_BLOCK_LEN);
+	(void) memcpy(&cbc_ctx->cbc_iv[0], ivec, DES_BLOCK_LEN);
 
-	cbc_ctx->cc_lastp = (uint8_t *)&cbc_ctx->cc_iv[0];
-	cbc_ctx->cc_keysched_len = size;
+	cbc_ctx->cbc_lastp = (uint8_t *)&cbc_ctx->cbc_iv[0];
+	cbc_ctx->cbc_keysched_len = size;
 	if (type == CKK_DES)
-		cbc_ctx->cc_flags |= CBC_MODE;
+		cbc_ctx->cbc_flags |= CBC_MODE;
 	else
-		cbc_ctx->cc_flags |= CBC_MODE | DES3_STRENGTH;
+		cbc_ctx->cbc_flags |= CBC_MODE | DES3_STRENGTH;
 
 	return (cbc_ctx);
 
