@@ -26,10 +26,6 @@
 
 include ../Makefile.com
 
-DATAFILES +=
-LICENSEFILES += $(OSBL)
-CDDL=
-
 MMSHDR = $(ROOT)/usr/include/mms
 
 FILES += $(MMSHDR)/mms.h

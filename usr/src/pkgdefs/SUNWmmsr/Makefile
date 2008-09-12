@@ -26,11 +26,7 @@
 
 include ../Makefile.com
 
-DATAFILES += i.rbac r.rbac i.initd i.manifest r.manifest i.logadmconf
-LICENSEFILES += $(OSBL)
-CDDL=
-
-CHKINSTALLSRC=checkinstall.initd
+DATAFILES += i.rbac r.rbac i.manifest r.manifest i.logadmconf
 
 ETCSEC = $(ROOT)/etc/security
 
