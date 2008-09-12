@@ -40,12 +40,9 @@ i pkginfo
 i depend
 i postinstall
 i preremove
-i i.rbac
-i r.rbac
 i i.manifest
 i r.manifest
 i i.logadmconf
-i space
 
 d none etc 0755 root sys
 d none etc/mms 0755 root sys
@@ -58,9 +55,6 @@ f none etc/mms/types/mm_types.xml 0644 root sys
 d none etc/mms/passwd 0755 root sys
 f none etc/mms/release-note 0644 root sys
 d none etc/security 0755 root sys
-e rbac etc/security/mms_auth_attr 644 root sys
-e rbac etc/security/mms_prof_attr 644 root sys
-e rbac etc/security/mms_exec_attr 644 root sys
 
 f none kernel/drv/dmd.conf 0644 root sys
 f none kernel/drv/dda.conf 0644 root sys

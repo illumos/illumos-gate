@@ -74,6 +74,13 @@ solaris.login.remote:::Remote Login::help=LoginRemote.html
 solaris.mail.:::Mail::help=MailHeader.html
 solaris.mail.mailq:::Mail Queue::help=MailQueue.html
 #
+solaris.mms.media:::MMS Media Import, Export, Label and Move::help=AuthMMSMedia.html
+solaris.mms.request:::Handle MMS Device Manager Requests::help=AuthMMSRequest.html
+solaris.mms.device.state:::Start and Stop MMS Device Managers::help=AuthMMSDeviceState.html
+solaris.mms.device.log:::Change MMS Trace and Message Levels::help=AuthMMSDeviceLog.html
+solaris.mms.io.read:::Read Permission for MMS Volumes::help=AuthMMSIORead.html
+solaris.mms.io.write:::Read and Write Permission for MMS Volumes::help=AuthMMSIOWrite.html
+#
 solaris.network.:::Network::help=NetworkHeader.html
 solaris.network.link.security:::Link Security::help=LinkSecurity.html
 solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
@@ -168,3 +175,8 @@ solaris.smf.manage.iscsitgt:::Manage ISCSI Target Service States::help=SmfValueI
 solaris.smf.read.iscsitgt:::Read ISCSI Target secrets::help=SmfValueIscsitgt.html
 solaris.smf.modify.iscsitgt:::Add/Remove Values of ISCSI Target Service Properties::help=SmfValueIscsitgt.html
 solaris.smf.value.iscsitgt:::Change Values of ISCSI Target Service Properties::help=SmfValueIscsitgt.html
+#
+solaris.smf.manage.mms:::Manage MMS Service States::help=SmfManageMMS.html
+solaris.smf.modify.mms:::Add/Remove Values of MMS Service Properties::help=SmfModifyMMS.html
+solaris.smf.value.mms:::Change Values of MMS Service Properties::help=SmfValueMMS.html
+solaris.smf.read.mms:::Read Permission for Protected MMS Service Properties::help=SmfReadMMS.html

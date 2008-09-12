@@ -151,6 +151,10 @@ Media Restore:suser:cmd:::/usr/bin/cpio:euid=0
 Media Restore:suser:cmd:::/usr/bin/mt:euid=0
 Media Restore:suser:cmd:::/usr/lib/fs/ufs/ufsrestore:euid=0
 Media Restore:suser:cmd:::/usr/sbin/tar:euid=0
+MMS Administrator:solaris:cmd:::/usr/bin/mmsinit:uid=0
+MMS Administrator:solaris:cmd:::/usr/bin/mmsadm:uid=0
+MMS Operator:solaris:cmd:::/usr/bin/mmsadm:uid=0;privs=file_dac_read
+MMS User:solaris:cmd:::/usr/bin/mmsmnt:uid=0;privs=file_dac_read
 Name Service Management:suser:cmd:::/usr/bin/nischttl:euid=0
 Name Service Management:suser:cmd:::/usr/bin/nisln:euid=0
 Name Service Management:suser:cmd:::/usr/lib/nis/nisctl:euid=0

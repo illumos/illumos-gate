@@ -74,9 +74,4 @@ if [ "$dda_rule" = "" ]; then
 		>> ${PKG_INSTALL_ROOT}/etc/devlink.tab
 fi
 
-/usr/sbin/installf -c rbac SUNWmmsr ${BASEDIR}/etc/security/auth_attr
-/usr/sbin/installf -c rbac SUNWmmsr ${BASEDIR}/etc/security/exec_attr
-/usr/sbin/installf -c rbac SUNWmmsr ${BASEDIR}/etc/security/prof_attr
-/usr/sbin/installf -f SUNWmmsr
-
 exit 0
