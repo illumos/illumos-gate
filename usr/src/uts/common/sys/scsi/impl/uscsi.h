@@ -30,7 +30,6 @@
 #ifndef _SYS_SCSI_IMPL_USCSI_H
 #define	_SYS_SCSI_IMPL_USCSI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -190,13 +189,20 @@ struct uscsi_rqs32	{
 
 #include <sys/scsi/scsi_types.h>
 
+struct uscsi_cmd *scsi_uscsi_alloc();
+int	scsi_uscsi_copyin(intptr_t, int,
+	    struct scsi_address *, struct uscsi_cmd **);
 int	scsi_uscsi_alloc_and_copyin(intptr_t, int,
 	    struct scsi_address *, struct uscsi_cmd **);
+
 int	scsi_uscsi_pktinit(struct uscsi_cmd *, struct scsi_pkt *);
 int	scsi_uscsi_handle_cmd(dev_t, enum uio_seg,
 	    struct uscsi_cmd *, int (*)(struct buf *),
 	    struct buf *, void *);
 int	scsi_uscsi_pktfini(struct scsi_pkt *, struct uscsi_cmd *);
+
+int	scsi_uscsi_copyout(intptr_t, struct uscsi_cmd *);
+void	scsi_uscsi_free(struct uscsi_cmd *);
 int	scsi_uscsi_copyout_and_free(intptr_t, struct uscsi_cmd *);
 
 #endif	/* _KERNEL */

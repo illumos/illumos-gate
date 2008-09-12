@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_IMPL_SERVICES_H
 #define	_SYS_SCSI_IMPL_SERVICES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,6 +63,13 @@ char	*scsi_cmd_name(uchar_t cmd, struct scsi_key_strings *cmdlist,
 char	*scsi_sname(uchar_t sense_key);
 char	*scsi_esname(uint_t sense_key, char *tmpstr);
 char	*scsi_asc_name(uint_t asc, uint_t ascq, char *tmpstr);
+
+void	scsi_generic_errmsg(struct scsi_device *devp, char *label,
+	    int severity, daddr_t blkno, daddr_t err_blkno,
+	    uchar_t cmd_name, struct scsi_key_strings *cmdlist,
+	    uint8_t *sensep, struct scsi_asq_key_strings *asc_list,
+	    char *(*decode_fru)(struct scsi_device *, char *, int, uchar_t));
+
 void	scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pktp,
 	    char *drv_name, int severity, daddr_t blkno, daddr_t err_blkno,
 	    struct scsi_key_strings *cmdlist,
@@ -74,6 +80,10 @@ void	scsi_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt,
 	    char *label, int severity, daddr_t blkno, daddr_t err_blkno,
 	    struct scsi_key_strings *cmdlist,
 	    struct scsi_extended_sense *sensep);
+
+
+
+
 /*PRINTFLIKE4*/
 void	scsi_log(dev_info_t *dev, char *label,
 	    uint_t level, const char *fmt, ...) __KPRINTFLIKE(4);

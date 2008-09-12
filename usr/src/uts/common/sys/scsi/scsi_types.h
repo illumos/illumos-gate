@@ -26,7 +26,6 @@
 #ifndef	_SYS_SCSI_SCSI_TYPES_H
 #define	_SYS_SCSI_SCSI_TYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Types for SCSI subsystems.
@@ -80,6 +79,7 @@ typedef	void *opaque_t;
 #ifdef	_KERNEL
 #include <sys/scsi/conf/autoconf.h>
 #include <sys/scsi/scsi_watch.h>
+#include <sys/scsi/scsi_fm.h>
 #endif	/* _KERNEL */
 
 #include <sys/scsi/generic/commands.h>

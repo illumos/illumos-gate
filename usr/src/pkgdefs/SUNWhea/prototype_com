@@ -1182,11 +1182,12 @@ f none usr/include/sys/scsi/impl/usmp.h 644 root bin
 f none usr/include/sys/scsi/scsi.h 644 root bin
 f none usr/include/sys/scsi/scsi_address.h 644 root bin
 f none usr/include/sys/scsi/scsi_ctl.h 644 root bin
-f none usr/include/sys/scsi/scsi_watch.h 644 root bin
+f none usr/include/sys/scsi/scsi_fm.h 644 root bin
 f none usr/include/sys/scsi/scsi_params.h 644 root bin
 f none usr/include/sys/scsi/scsi_pkt.h 644 root bin
 f none usr/include/sys/scsi/scsi_resource.h 644 root bin
 f none usr/include/sys/scsi/scsi_types.h 644 root bin
+f none usr/include/sys/scsi/scsi_watch.h 644 root bin
 d none usr/include/sys/scsi/targets 755 root bin
 f none usr/include/sys/scsi/targets/ses.h 644 root bin
 f none usr/include/sys/scsi/targets/sesio.h 644 root bin

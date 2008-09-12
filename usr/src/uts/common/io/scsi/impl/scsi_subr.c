@@ -1040,7 +1040,6 @@ scsi_sname(uchar_t sense_key)
 /*
  * Print a piece of inquiry data- cleaned up for non-printable characters.
  */
-
 static void
 inq_fill(char *p, int l, char *s)
 {
@@ -1103,10 +1102,10 @@ scsi_asc_ascq_name(uint_t asc, uint_t ascq, char *tmpstr,
 #define	SCSI_ERRMSG_BUF_LEN	256
 
 void
-scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
-    int severity, daddr_t blkno, daddr_t err_blkno,
-    struct scsi_key_strings *cmdlist, struct scsi_extended_sense *sensep,
-    struct scsi_asq_key_strings *asc_list,
+scsi_generic_errmsg(struct scsi_device *devp, char *label, int severity,
+    daddr_t blkno, daddr_t err_blkno,
+    uchar_t cmd_name, struct scsi_key_strings *cmdlist,
+    uint8_t *sensep, struct scsi_asq_key_strings *asc_list,
     char *(*decode_fru)(struct scsi_device *, char *, int, uchar_t))
 {
 	uchar_t com;
@@ -1134,7 +1133,7 @@ scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
 	}
 
 	bzero(buf, 256);
-	com = ((union scsi_cdb *)pkt->pkt_cdbp)->scc_cmd;
+	com = cmd_name;
 	(void) sprintf(buf, "Error for Command: %s",
 	    scsi_cmd_name(com, cmdlist, tmpbuf));
 	buflen = strlen(buf);
@@ -1181,10 +1180,10 @@ scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
 	impl_scsi_log(dev, label, CE_CONT, "%s\n", buf);
 
 	if (sensep) {
-		sense_key = scsi_sense_key((uint8_t *)sensep);
-		asc = scsi_sense_asc((uint8_t *)sensep);
-		ascq = scsi_sense_ascq((uint8_t *)sensep);
-		scsi_ext_sense_fields((uint8_t *)sensep, SENSE_LENGTH,
+		sense_key = scsi_sense_key(sensep);
+		asc = scsi_sense_asc(sensep);
+		ascq = scsi_sense_ascq(sensep);
+		scsi_ext_sense_fields(sensep, SENSE_LENGTH,
 		    NULL, NULL, &fru_code_ptr, NULL, NULL);
 		fru_code = (fru_code_ptr ? *fru_code_ptr : 0);
 
@@ -1230,6 +1229,23 @@ scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
 		impl_scsi_log(dev, label, CE_CONT, "%s\n", buf);
 	}
 	mutex_exit(&scsi_log_mutex);
+}
+
+void
+scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
+    int severity, daddr_t blkno, daddr_t err_blkno,
+    struct scsi_key_strings *cmdlist, struct scsi_extended_sense *sensep,
+    struct scsi_asq_key_strings *asc_list,
+    char *(*decode_fru)(struct scsi_device *, char *, int, uchar_t))
+{
+	uchar_t com;
+
+	com = ((union scsi_cdb *)pkt->pkt_cdbp)->scc_cmd;
+
+	scsi_generic_errmsg(devp, label, severity, blkno, err_blkno,
+	    com, cmdlist, (uint8_t *)sensep, asc_list, decode_fru);
+
+
 }
 
 void
@@ -1991,19 +2007,8 @@ int
 scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
     struct uscsi_cmd **uscmdp)
 {
-#ifdef _MULTI_DATAMODEL
-	/*
-	 * For use when a 32 bit app makes a call into a
-	 * 64 bit ioctl
-	 */
-	struct uscsi_cmd32	uscsi_cmd_32_for_64;
-	struct uscsi_cmd32	*ucmd32 = &uscsi_cmd_32_for_64;
-#endif /* _MULTI_DATAMODEL */
-	struct uscsi_i_cmd	*uicmd;
-	struct uscsi_cmd	*uscmd;
-	int			max_hba_cdb;
-	int			rval;
-	extern dev_info_t	*scsi_vhci_dip;
+	int	rval = 0;
+	struct uscsi_cmd *uscmd;
 
 	/*
 	 * In order to not worry about where the uscsi structure came
@@ -2016,17 +2021,75 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	 * into it. We also save infos of the uscsi command by using
 	 * uicmd to supply referrence for the copyout operation.
 	 */
+	uscmd = scsi_uscsi_alloc();
+
+	if ((rval = scsi_uscsi_copyin(arg, flag, ap, &uscmd)) != 0) {
+		scsi_uscsi_free(uscmd);
+		*uscmdp = NULL;
+		rval = EFAULT;
+	} else {
+		*uscmdp = uscmd;
+	}
+
+	return (rval);
+}
+
+struct uscsi_cmd *
+scsi_uscsi_alloc()
+{
+	struct uscsi_i_cmd	*uicmd;
+
 	uicmd = (struct uscsi_i_cmd *)
 	    kmem_zalloc(sizeof (struct uscsi_i_cmd), KM_SLEEP);
-	*uscmdp = &(uicmd->uic_cmd);
-	uscmd = *uscmdp;
+
+	/*
+	 * It is supposed that the uscsi_cmd has been alloced correctly,
+	 * we need to check is it NULL or mis-created.
+	 */
+	ASSERT(uicmd && (offsetof(struct uscsi_i_cmd, uic_cmd) == 0));
+
+	return (&uicmd->uic_cmd);
+}
+
+int
+scsi_uscsi_copyin(intptr_t arg, int flag, struct scsi_address *ap,
+    struct uscsi_cmd **uscmdp)
+{
+#ifdef _MULTI_DATAMODEL
+	/*
+	 * For use when a 32 bit app makes a call into a
+	 * 64 bit ioctl
+	 */
+	struct uscsi_cmd32	uscsi_cmd_32_for_64;
+	struct uscsi_cmd32	*ucmd32 = &uscsi_cmd_32_for_64;
+#endif /* _MULTI_DATAMODEL */
+	struct uscsi_cmd	*uscmd = *uscmdp;
+	struct uscsi_i_cmd	*uicmd = (struct uscsi_i_cmd *)(uscmd);
+	int			max_hba_cdb;
+	int			rval;
+	extern dev_info_t	*scsi_vhci_dip;
+
+	ASSERT(uscmd != NULL);
+	ASSERT(uicmd != NULL);
+
+	/*
+	 * To be able to issue multiple commands off a single uscmdp
+	 * We need to free the original cdb, rqbuf and bzero the uscmdp
+	 * if the cdb, rqbuf and uscmdp is not NULL
+	 */
+	if (uscmd->uscsi_rqbuf != NULL)
+		kmem_free(uscmd->uscsi_rqbuf, uscmd->uscsi_rqlen);
+	if (uscmd->uscsi_cdb != NULL)
+		kmem_free(uscmd->uscsi_cdb, uscmd->uscsi_cdblen);
+	bzero(uscmd, sizeof (struct uscsi_cmd));
+
 
 #ifdef _MULTI_DATAMODEL
 	switch (ddi_model_convert_from(flag & FMODELS)) {
 	case DDI_MODEL_ILP32:
 		if (ddi_copyin((void *)arg, ucmd32, sizeof (*ucmd32), flag)) {
 			rval = EFAULT;
-			goto done;
+			goto scsi_uscsi_copyin_failed;
 		}
 		/*
 		 * Convert the ILP32 uscsi data from the
@@ -2037,17 +2100,26 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	case DDI_MODEL_NONE:
 		if (ddi_copyin((void *)arg, uscmd, sizeof (*uscmd), flag)) {
 			rval = EFAULT;
-			goto done;
+			goto scsi_uscsi_copyin_failed;
 		}
 		break;
+	default:
+		rval = EFAULT;
+		goto scsi_uscsi_copyin_failed;
 	}
 #else /* ! _MULTI_DATAMODEL */
 	if (ddi_copyin((void *)arg, uscmd, sizeof (*uscmd), flag)) {
 		rval = EFAULT;
-		goto done;
+		goto scsi_uscsi_copyin_failed;
 	}
 #endif /* _MULTI_DATAMODEL */
 
+	/*
+	 * We are going to allocate kernel virtual addresses for
+	 * uscsi_rqbuf and uscsi_cdb pointers, so save off the
+	 * original, possibly user virtual, uscsi_addresses
+	 * in uic_fields
+	 */
 	uicmd->uic_rqbuf = uscmd->uscsi_rqbuf;
 	uicmd->uic_rqlen = uscmd->uscsi_rqlen;
 	uicmd->uic_cdb   = uscmd->uscsi_cdb;
@@ -2071,7 +2143,7 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	if ((uscmd->uscsi_flags & USCSI_PATH_INSTANCE) &&
 	    (A_TO_TRAN(ap)->tran_hba_dip != scsi_vhci_dip)) {
 		rval = EFAULT;
-		goto done;
+		goto scsi_uscsi_copyin_failed;
 	}
 
 	/*
@@ -2085,12 +2157,12 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	if (uscmd->uscsi_cdblen < CDB_GROUP0 ||
 	    uscmd->uscsi_cdblen > max_hba_cdb) {
 		rval = EINVAL;
-		goto done;
+		goto scsi_uscsi_copyin_failed;
 	}
 	if ((uscmd->uscsi_flags & USCSI_RQENABLE) &&
 	    (uscmd->uscsi_rqlen == 0 || uscmd->uscsi_rqbuf == NULL)) {
 		rval = EINVAL;
-		goto done;
+		goto scsi_uscsi_copyin_failed;
 	}
 
 	/*
@@ -2099,7 +2171,7 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	 */
 	if (uscmd->uscsi_flags & USCSI_RESERVED) {
 		rval = EINVAL;
-		goto done;
+		goto scsi_uscsi_copyin_failed;
 	}
 
 	/*
@@ -2111,7 +2183,7 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	    (uint_t)uscmd->uscsi_cdblen, flag) != 0) {
 		kmem_free(uscmd->uscsi_cdb, (size_t)uscmd->uscsi_cdblen);
 		rval = EFAULT;
-		goto done;
+		goto scsi_uscsi_copyin_failed;
 	}
 
 	if (uscmd->uscsi_cdb[0] != SCMD_VAR_LEN) {
@@ -2121,14 +2193,14 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 			kmem_free(uscmd->uscsi_cdb,
 			    (size_t)uscmd->uscsi_cdblen);
 			rval = EINVAL;
-			goto done;
+			goto scsi_uscsi_copyin_failed;
 		}
 	} else {
 		if ((uscmd->uscsi_cdblen % 4) != 0) {
 			kmem_free(uscmd->uscsi_cdb,
 			    (size_t)uscmd->uscsi_cdblen);
 			rval = EINVAL;
-			goto done;
+			goto scsi_uscsi_copyin_failed;
 		}
 	}
 
@@ -2163,8 +2235,14 @@ scsi_uscsi_alloc_and_copyin(intptr_t arg, int flag, struct scsi_address *ap,
 	}
 	return (0);
 
-done:
-	kmem_free(uicmd, sizeof (struct uscsi_i_cmd));
+scsi_uscsi_copyin_failed:
+	/*
+	 * The uscsi_rqbuf and uscsi_cdb is refering to user-land
+	 * address now, no need to free them.
+	 */
+	uscmd->uscsi_rqbuf = NULL;
+	uscmd->uscsi_cdb = NULL;
+
 	return (rval);
 }
 
@@ -2404,6 +2482,18 @@ scsi_uscsi_pktfini(struct scsi_pkt *pkt, struct uscsi_cmd *uscmd)
 int
 scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 {
+	int	rval = 0;
+
+	rval = scsi_uscsi_copyout(arg, uscmd);
+
+	scsi_uscsi_free(uscmd);
+
+	return (rval);
+}
+
+int
+scsi_uscsi_copyout(intptr_t arg, struct uscsi_cmd *uscmd)
+{
 #ifdef _MULTI_DATAMODEL
 	/*
 	 * For use when a 32 bit app makes a call into a
@@ -2439,8 +2529,9 @@ scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 	}
 
 	/*
-	 * Free allocated resources and return, mapout the buf in case it was
-	 * mapped in by a lower layer.
+	 * Restore original uscsi_values, saved in uic_fields for
+	 * copyout (so caller does not experience a change in these
+	 * fields)
 	 */
 	k_rqbuf = uscmd->uscsi_rqbuf;
 	k_rqlen = uscmd->uscsi_rqlen;
@@ -2468,6 +2559,8 @@ scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 			rval = EFAULT;
 		}
 		break;
+	default:
+		rval = EFAULT;
 	}
 #else /* _MULTI_DATAMODE */
 	if (ddi_copyout(uscmd, (void *)arg, sizeof (*uscmd), uicmd->uic_flag)) {
@@ -2475,13 +2568,33 @@ scsi_uscsi_copyout_and_free(intptr_t arg, struct uscsi_cmd *uscmd)
 	}
 #endif /* _MULTI_DATAMODE */
 
-	if (k_rqbuf != NULL) {
-		kmem_free(k_rqbuf, k_rqlen);
-	}
-	if (k_cdb != NULL) {
-		kmem_free(k_cdb, (size_t)uscmd->uscsi_cdblen);
-	}
-	kmem_free(uicmd, sizeof (struct uscsi_i_cmd));
+	/*
+	 * Copyout done, restore kernel virtual addresses for further
+	 * scsi_uscsi_free().
+	 */
+	uscmd->uscsi_rqbuf = k_rqbuf;
+	uscmd->uscsi_rqlen = k_rqlen;
+	uscmd->uscsi_cdb = k_cdb;
 
 	return (rval);
+}
+
+void
+scsi_uscsi_free(struct uscsi_cmd *uscmd)
+{
+	struct uscsi_i_cmd	*uicmd = (struct uscsi_i_cmd *)uscmd;
+
+	ASSERT(uicmd != NULL);
+
+	if ((uscmd->uscsi_rqbuf != NULL) && (uscmd->uscsi_rqlen != 0)) {
+		kmem_free(uscmd->uscsi_rqbuf, (size_t)uscmd->uscsi_rqlen);
+		uscmd->uscsi_rqbuf = NULL;
+	}
+
+	if ((uscmd->uscsi_cdb != NULL) && (uscmd->uscsi_cdblen != 0)) {
+		kmem_free(uscmd->uscsi_cdb, (size_t)uscmd->uscsi_cdblen);
+		uscmd->uscsi_cdb = NULL;
+	}
+
+	kmem_free(uicmd, sizeof (struct uscsi_i_cmd));
 }

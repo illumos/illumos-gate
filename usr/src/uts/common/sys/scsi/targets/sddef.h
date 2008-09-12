@@ -71,6 +71,9 @@ extern "C" {
  * #endif
  */
 
+#if DEBUG || lint
+#define	SD_FAULT_INJECTION
+#endif
 #define	VERBOSE			1
 #define	SILENT			0
 
@@ -525,6 +528,12 @@ struct sd_lun {
 #endif
 
 	cmlb_handle_t	un_cmlbhandle;
+
+	/*
+	 * Pointer to internal struct sd_fm_internal in which
+	 * will pass necessary information for FMA ereport posting.
+	 */
+	void		*un_fm_private;
 };
 
 #define	SD_IS_VALID_LABEL(un)  (cmlb_is_valid(un->un_cmlbhandle))
@@ -612,7 +621,8 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
 	sd_lun::un_dcvb_timeid
 	sd_lun::un_f_allow_bus_device_reset
 	sd_lun::un_sys_blocksize
-	sd_lun::un_tgt_blocksize))
+	sd_lun::un_tgt_blocksize
+	sd_lun::un_additional_codes))
 
 _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	sd_lun::un_reserve_release_time
@@ -1030,16 +1040,17 @@ struct sd_fi_arq {
 	struct scsi_extended_sense	sts_sensedata;
 };
 
-/* Conditional set def */
-#define	SD_CONDSET(a, b, c, d) 					\
-	if ((((fi_ ## b)->c) != 0xFF) && 			\
-		(((fi_ ## b)->c) != 0xFFFF) &&		\
-		(((fi_ ## b)->c) != 0xFFFFFFFF)) {	\
-			a->c = ((fi_ ## b)->c); 		\
-			SD_INFO(SD_LOG_IOERR, un,			\
-					"sd_fault_injection:"		\
-					"setting %s to %d\n", 		\
-					d, ((fi_ ## b)->c)); }
+/*
+ * Conditional set def
+ */
+#define	SD_CONDSET(a, b, c, d)			\
+	{ \
+	a->c = ((fi_ ## b)->c);			\
+	SD_INFO(SD_LOG_IOERR, un,		\
+			"sd_fault_injection:"	\
+			"setting %s to %d\n", 	\
+			d, ((fi_ ## b)->c)); 	\
+	}
 
 /* SD FaultInjection ioctls */
 #define	SDIOC			('T'<<8)
@@ -1257,16 +1268,16 @@ if (((pktp)->pkt_reason == CMD_RESET) ||				\
 
 /*
  * xb_pkt_flags defines
- * SD_XB_USCSICMD indicates the scsi request is a uscsi request
  * SD_XB_DMA_FREED indicates the scsi_pkt has had its DMA resources freed
  * by a call to scsi_dmafree(9F). The resources must be reallocated before
  *   before a call to scsi_transport can be made again.
+ * SD_XB_USCSICMD indicates the scsi request is a uscsi request
  * SD_XB_INITPKT_MASK: since this field is also used to store flags for
  *   a scsi_init_pkt(9F) call, we need a mask to make sure that we don't
  *   pass any unintended bits to scsi_init_pkt(9F) (ugly hack).
  */
-#define	SD_XB_USCSICMD		0x40000000
 #define	SD_XB_DMA_FREED		0x20000000
+#define	SD_XB_USCSICMD		0x40000000
 #define	SD_XB_INITPKT_MASK	(PKT_CONSISTENT | PKT_DMA_PARTIAL)
 
 /*
@@ -1323,6 +1334,7 @@ struct sd_xbuf {
 	 * the driver owns or is free to modify.
 	 */
 	daddr_t	xb_blkno;		/* Absolute block # on target */
+	uint64_t xb_ena;		/* ena for a specific SCSI command */
 
 	int	xb_chain_iostart;	/* iostart side index */
 	int	xb_chain_iodone;	/* iodone side index */
@@ -1362,7 +1374,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per pkt", sd_xbuf))
 #define	SD_GET_PKTP(bp)		((SD_GET_XBUF(bp))->xb_pktp)
 #define	SD_GET_BLKNO(bp)	((SD_GET_XBUF(bp))->xb_blkno)
 
-
 /*
  * Special-purpose struct for sd_send_scsi_cmd() to pass command-specific
  * data through the layering chains to sd_initpkt_for_uscsi().
@@ -1375,10 +1386,162 @@ struct sd_uscsi_info {
 	 * for async completion notification.
 	 */
 	struct dk_callback	ui_dkc;
+	/*
+	 * The following fields are to be used for FMA ereport generation.
+	 */
+	uchar_t			ui_pkt_reason;
+	uint32_t		ui_pkt_state;
+	uint32_t		ui_pkt_statistics;
+	uint64_t		ui_lba;
+	uint64_t		ui_ena;
 };
 
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_uscsi_info))
 
+/*
+ * This structure is used to issue 'internal' command sequences from the
+ * driver's attach(9E)/open(9E)/etc entry points. It provides a common context
+ * for issuing command sequences, with the ability to issue a command
+ * and provide expected/unexpected assessment of results at any code
+ * level within the sd_ssc_t scope and preserve the information needed
+ * produce telemetry for the problem, when needed, from a single
+ * outer-most-scope point.
+ *
+ * The sd_ssc_t abstraction should result in well-structured code where
+ * the basic code structure is not jeprodized by future localized improvement.
+ *
+ *   o  Scope for a sequence of commands.
+ *   o  Within a scoped sequence of commands, provides a single top-level
+ *      location for initiating telementry generation from captured data.
+ *   o  Provide a common place to capture command execution data and driver
+ *      assessment information for delivery to telemetry generation point.
+ *   o  Mechanism to get device-as-detector (dad) and transport telemetry
+ *      information from interrupt context (sdintr) back to the internal
+ *      command 'driver-assessment' code.
+ *   o  Ability to record assessment, and return information back to
+ *      top-level telemetry generation code when an unexpected condition
+ *      occurs.
+ *   o  For code paths were an command itself was successful but
+ *      the data returned looks suspect, the ability to record
+ *      'unexpected data' conditions.
+ *   o  Record assessment of issuing the command and interpreting
+ *      the returned data for consumption by top-level ereport telemetry
+ *      generation code.
+ *   o  All data required to produce telemetry available off single data
+ *      structure.
+ */
+typedef struct {
+	struct sd_lun		*ssc_un;
+	struct uscsi_cmd	*ssc_uscsi_cmd;
+	struct sd_uscsi_info	*ssc_uscsi_info;
+	int			ssc_flags; /* Bits for flags */
+	char			ssc_info[64]; /* Buffer holding for info */
+} sd_ssc_t;
+
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_ssc_t))
+
+/*
+ * This struct switch different 'type-of-assessment'
+ * as an input argument for sd_ssc_assessment
+ *
+ *
+ * in sd_send_scsi_XXX or upper-level
+ *
+ * - SD_FMT_IGNORE
+ *   when send uscsi command failed, and
+ *   the following code check sense data properly.
+ *   we use 'ignore' to let sd_ssc_assessment
+ *   trust current and do not do additional
+ *   checking for the uscsi command.
+ *
+ * - SD_FMT_IGNORE_COMPROMISE
+ *   when send uscsi command failed, and
+ *   the code does not check sense data or we don't
+ *   think the checking is 100% coverage. We mark it
+ *   as 'compromise' to indicate that we need to
+ *   enhance current code in the future.
+ *
+ * - SD_FMT_STATUS_CHECK
+ *   when send uscsi command failed and cause sd entries
+ *   failed finally, we need to send out real reason against
+ *   status of uscsi command no matter if there is sense back
+ *   or not.
+ *
+ * - SD_FMT_STANDARD
+ *   when send uscsi command succeeded, and
+ *   the code does not check sense data, we need to check
+ *   it to make sure there is no 'fault'.
+ */
+enum sd_type_assessment {
+	SD_FMT_IGNORE = 0,
+	SD_FMT_IGNORE_COMPROMISE,
+	SD_FMT_STATUS_CHECK,
+	SD_FMT_STANDARD
+};
+
+/*
+ * The following declaration are used as hints of severities when posting
+ * SCSI FMA ereport.
+ * - SD_FM_DRV_FATAL
+ *   When posting ereport with SD_FM_DRV_FATAL, the payload
+ *   "driver-assessment" will be "fail" or "fatal" depending on the
+ *   sense-key value. If driver-assessment is "fail", it will be
+ *   propagated to an upset, otherwise, a fault will be propagated.
+ * - SD_FM_DRV_RETRY
+ *   When posting ereport with SD_FM_DRV_RETRY, the payload
+ *   "driver-assessment" will be "retry", and it will be propagated to an
+ *   upset.
+ * - SD_FM_DRV_RECOVERY
+ *   When posting ereport with SD_FM_DRV_RECOVERY, the payload
+ *   "driver-assessment" will be "recovered", and it will be propagated to
+ *   an upset.
+ * - SD_FM_DRV_NOTICE
+ *   When posting ereport with SD_FM_DRV_NOTICE, the payload
+ *   "driver-assessment" will be "info", and it will be propagated to an
+ *   upset.
+ */
+enum sd_driver_assessment {
+	SD_FM_DRV_FATAL = 0,
+	SD_FM_DRV_RETRY,
+	SD_FM_DRV_RECOVERY,
+	SD_FM_DRV_NOTICE
+};
+
+/*
+ * The following structure is used as a buffer when posting SCSI FMA
+ * ereport for raw i/o. It will be allocated per sd_lun when entering
+ * sd_unit_attach and will be deallocated when entering sd_unit_detach.
+ */
+struct sd_fm_internal {
+	sd_ssc_t fm_ssc;
+	struct uscsi_cmd fm_ucmd;
+	struct sd_uscsi_info fm_uinfo;
+};
+
+/*
+ * Bits in ssc_flags
+ * sd_ssc_init will mark ssc_flags = SSC_FLAGS_UNKNOWN
+ * sd_ssc_send will mark ssc_flags = SSC_FLAGS_CMD_ISSUED &
+ *                                   SSC_FLAGS_NEED_ASSESSMENT
+ * sd_ssc_assessment will clear SSC_FLAGS_CMD_ISSUED and
+ * SSC_FLAGS_NEED_ASSESSMENT bits of ssc_flags.
+ * SSC_FLAGS_CMD_ISSUED is to indicate whether the SCSI command has been
+ * sent out.
+ * SSC_FLAGS_NEED_ASSESSMENT is to guarantee we will not miss any
+ * assessment point.
+ */
+#define		SSC_FLAGS_UNKNOWN		0x00000000
+#define		SSC_FLAGS_CMD_ISSUED		0x00000001
+#define		SSC_FLAGS_NEED_ASSESSMENT	0x00000002
+#define		SSC_FLAGS_TRAN_ABORT		0x00000004
+
+/*
+ * The following bits in ssc_flags are for detecting unexpected data.
+ */
+#define		SSC_FLAGS_INVALID_PKT_REASON	0x00000010
+#define		SSC_FLAGS_INVALID_STATUS	0x00000020
+#define		SSC_FLAGS_INVALID_SENSE		0x00000040
+#define		SSC_FLAGS_INVALID_DATA		0x00000080
 
 /*
  * Macros and definitions for driver kstats and errstats
