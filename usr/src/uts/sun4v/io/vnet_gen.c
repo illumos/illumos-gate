@@ -576,9 +576,8 @@ vgen_uninit(void *arg)
 	rw_destroy(&vgenp->vgenports.rwlock);
 	mutex_destroy(&vgenp->lock);
 
-	KMEM_FREE(vgenp);
-
 	DBG1(vgenp, NULL, "exit\n");
+	KMEM_FREE(vgenp);
 
 	return (DDI_SUCCESS);
 }
@@ -2094,7 +2093,7 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	vgenp = (vgen_t *)cb_argp;
 	vnetp = vgenp->vnetp;
 
-	DBG1(vgenp, NULL, "%s: added %d : removed %d : curr matched %d"
+	DBG1(vgenp, NULL, "added %d : removed %d : curr matched %d"
 	    " : prev matched %d", resp->added.nelem, resp->removed.nelem,
 	    resp->match_curr.nelem, resp->match_prev.nelem);
 
@@ -3214,6 +3213,11 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 		ldcp->htid = 0;
 	}
 
+	if (ldcp->cancel_htid) {
+		(void) untimeout(ldcp->cancel_htid);
+		ldcp->cancel_htid = 0;
+	}
+
 	/* cancel transmit watchdog timeout */
 	if (ldcp->wd_tid) {
 		(void) untimeout(ldcp->wd_tid);
@@ -3710,6 +3714,8 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 	vgen_t		*vgenp;
 	ldc_status_t 	istatus;
 	vgen_stats_t	*statsp;
+	timeout_id_t	cancel_htid = 0;
+	uint_t		ret = LDC_SUCCESS;
 
 	ldcp = (vgen_ldc_t *)arg;
 	vgenp = LDC_TO_VGEN(ldcp);
@@ -3727,6 +3733,13 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 	}
 
 	/*
+	 * cache cancel_htid before the events specific
+	 * code may overwrite it. Do not clear ldcp->cancel_htid
+	 * as it is also used to indicate the timer to quit immediately.
+	 */
+	cancel_htid = ldcp->cancel_htid;
+
+	/*
 	 * NOTE: not using switch() as event could be triggered by
 	 * a state change and a read request. Also the ordering	of the
 	 * check for the event types is deliberate.
@@ -3735,8 +3748,8 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 			DWARN(vgenp, ldcp, "ldc_status err\n");
 			/* status couldn't be determined */
-			mutex_exit(&ldcp->cblock);
-			return (LDC_FAILURE);
+			ret = LDC_FAILURE;
+			goto ldc_cb_ret;
 		}
 		ldcp->ldc_status = istatus;
 		if (ldcp->ldc_status != LDC_UP) {
@@ -3744,8 +3757,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 			    " but ldc status is not UP(0x%x)\n",
 			    ldcp->ldc_status);
 			/* spurious interrupt, return success */
-			mutex_exit(&ldcp->cblock);
-			return (LDC_SUCCESS);
+			goto ldc_cb_ret;
 		}
 		DWARN(vgenp, ldcp, "event(%lx) UP, status(%d)\n",
 		    event, ldcp->ldc_status);
@@ -3760,8 +3772,8 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 			DWARN(vgenp, ldcp, "ldc_status error\n");
 			/* status couldn't be determined */
-			mutex_exit(&ldcp->cblock);
-			return (LDC_FAILURE);
+			ret = LDC_FAILURE;
+			goto ldc_cb_ret;
 		}
 		ldcp->ldc_status = istatus;
 		DWARN(vgenp, ldcp, "event(%lx) RESET/DOWN, status(%d)\n",
@@ -3804,9 +3816,19 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 			vgen_handle_evt_read(ldcp);
 		}
 	}
+
+ldc_cb_ret:
+	/*
+	 * Check to see if the status of cancel_htid has
+	 * changed. If another timer needs to be cancelled,
+	 * then let the next callback to clear it.
+	 */
+	if (cancel_htid == 0) {
+		cancel_htid = ldcp->cancel_htid;
+	}
 	mutex_exit(&ldcp->cblock);
 
-	if (ldcp->cancel_htid) {
+	if (cancel_htid) {
 		/*
 		 * Cancel handshake timer.
 		 * untimeout(9F) will not return until the pending callback is
@@ -3815,12 +3837,17 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		 * If the timeout handler did run, then it would just
 		 * return as cancel_htid is set.
 		 */
-		(void) untimeout(ldcp->cancel_htid);
-		ldcp->cancel_htid = 0;
+		DBG2(vgenp, ldcp, "calling cance_htid =0x%X \n", cancel_htid);
+		(void) untimeout(cancel_htid);
+		mutex_enter(&ldcp->cblock);
+		/* clear it only if its the same as the one we cancelled */
+		if (ldcp->cancel_htid == cancel_htid) {
+			ldcp->cancel_htid = 0;
+		}
+		mutex_exit(&ldcp->cblock);
 	}
 	DBG1(vgenp, ldcp, "exit\n");
-
-	return (LDC_SUCCESS);
+	return (ret);
 }
 
 static void
@@ -3940,12 +3967,14 @@ vgen_evtread_error:
 	}
 
 	/*
-	 * If the receive thread is not enabled, then cancel the
+	 * If the receive thread is enabled, then cancel the
 	 * handshake timeout here.
 	 */
 	if (ldcp->rcv_thread != NULL) {
+		timeout_id_t cancel_htid = ldcp->cancel_htid;
+
 		mutex_exit(&ldcp->cblock);
-		if (ldcp->cancel_htid) {
+		if (cancel_htid) {
 			/*
 			 * Cancel handshake timer. untimeout(9F) will
 			 * not return until the pending callback is cancelled
@@ -3954,8 +3983,19 @@ vgen_evtread_error:
 			 * If the timeout handler did run, then it would just
 			 * return as cancel_htid is set.
 			 */
-			(void) untimeout(ldcp->cancel_htid);
-			ldcp->cancel_htid = 0;
+			DBG2(vgenp, ldcp, "calling cance_htid =0x%X \n",
+			    cancel_htid);
+			(void) untimeout(cancel_htid);
+
+			/*
+			 * clear it only if its the same as the one we
+			 * cancelled
+			 */
+			mutex_enter(&ldcp->cblock);
+			if (ldcp->cancel_htid == cancel_htid) {
+				ldcp->cancel_htid = 0;
+			}
+			mutex_exit(&ldcp->cblock);
 		}
 	}
 
@@ -4614,6 +4654,7 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		 * channel is reset due to errors or
 		 * vgen_ldc_uninit() is invoked(vgen_stop).
 		 */
+		ASSERT(ldcp->htid == 0);
 		ldcp->htid = timeout(vgen_hwatchdog, (caddr_t)ldcp,
 		    drv_usectohz(vgen_hwd_interval * MICROSEC));
 
