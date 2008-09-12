@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -173,7 +172,7 @@ trans_test_trygetblk(void *d, int mode, IOLOCK *lock)
 	migp->size = 0;
 
 	un = trans_getun(migp->id, &migp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL)
 		return (EINVAL);
 
@@ -284,7 +283,7 @@ trans_test_trypage(void *d, int mode, IOLOCK *lock)
 	migp->size = 0;
 
 	un = trans_getun(migp->id, &migp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL)
 		return (EINVAL);
 
@@ -731,7 +730,7 @@ trans_test_tsd(void *d, int mode)
 	for (i = 0; i < NKEYS; ++i) {
 		allocatorvalue = i;
 		if (*(int *)tsd_getcreate(&keys[i], trans_test_destructor_alloc,
-			trans_test_allocator) != allocatorvalue) {
+		    trans_test_allocator) != allocatorvalue) {
 			error = 600;
 			goto errout;
 		}
@@ -844,7 +843,7 @@ find_by_dev(md_dev64_t dev)
 	ASSERT(mutex_owned(&error_mutex) != 0);
 	while ((errp = errp->er_next) != (mt_error_t *)NULL) {
 		if ((errp->er_unitp->un_m_dev == dev) ||
-			(errp->er_unitp->un_l_dev == dev))
+		    (errp->er_unitp->un_l_dev == dev))
 			break;
 	}
 	return (errp);
@@ -871,10 +870,9 @@ trans_check_error(buf_t *bp, mt_error_t *errp)
 			 * can try again later.
 			 */
 			if ((((errp->er_total_errors % 2) == 0) &&
-			(errp->er_unitp->un_l_dev == target)) ||
-				(((errp->er_total_errors % 2) != 0) &&
-				(errp->er_unitp->un_m_dev ==
-					target))) {
+			    (errp->er_unitp->un_l_dev == target)) ||
+			    (((errp->er_total_errors % 2) != 0) &&
+			    (errp->er_unitp->un_m_dev == target))) {
 				/* simulate an error */
 				bp->b_flags |= B_ERROR;
 				bp->b_error = EIO;
@@ -899,7 +897,7 @@ trans_check_error(buf_t *bp, mt_error_t *errp)
 
 	case mte_watch_block:
 		if ((bp->b_edev == errp->er_bad_unit) &&
-			(bp->b_blkno == errp->er_bad_block)) {
+		    (bp->b_blkno == errp->er_bad_block)) {
 			bp->b_flags |= B_ERROR;
 			bp->b_error = EIO;
 			rv = 1;
@@ -935,8 +933,8 @@ trans_error_injector(buf_t *bp, int flag, void* private)
 			 * the range of blocks designated as our log.
 			 */
 			if ((bp->b_blkno >= un->un_l_pwsblk) &&
-				((bp->b_blkno + btodb(bp->b_bcount)) <=
-				(un->un_l_sblk + un->un_l_tblks))) {
+			    ((bp->b_blkno + btodb(bp->b_bcount)) <=
+			    (un->un_l_sblk + un->un_l_tblks))) {
 				rv = trans_check_error(bp, errp);
 			}
 		}
@@ -986,7 +984,7 @@ trans_inject_errors(void *d, int mode, IOLOCK *lock)
 	mdclrerror(&migp->mde);
 
 	un = trans_getun(migp->id, &migp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL)
 		return (EINVAL);
 
@@ -1047,7 +1045,7 @@ trans_stop_errors(void *d, int mode, IOLOCK *lock)
 	mdclrerror(&migp->mde);
 
 	un = trans_getun(migp->id, &migp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL)
 		return (EINVAL);
 
@@ -1057,7 +1055,7 @@ trans_stop_errors(void *d, int mode, IOLOCK *lock)
 		/* Remove from list. */
 		pred_errp->er_next = errp->er_next;
 		if ((error_list_head.er_next == (mt_error_t *)NULL) &&
-			(mdv_strategy_tstpnt == trans_error_injector)) {
+		    (mdv_strategy_tstpnt == trans_error_injector)) {
 			mdv_strategy_tstpnt = tstpnt_save;
 		}
 	} else {
@@ -1111,7 +1109,7 @@ trans_ufserror(void *d, int mode, IOLOCK *lock)
 	mdclrerror(&migp->mde);
 
 	un = trans_getun(migp->id, &migp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL || un->un_ut == NULL)
 		return (EINVAL);
 
@@ -1131,7 +1129,7 @@ trans_set_shadow(void *d, int mode, IOLOCK *lock)
 	mdclrerror(&migp->mde);
 
 	un = trans_getun(migp->id, &migp->mde,
-		WR_LOCK, lock);
+	    WR_LOCK, lock);
 	if (un == NULL)
 		return (EINVAL);
 
@@ -1165,7 +1163,7 @@ trans_get(void *d, int mode, IOLOCK *lock)
 	mdclrerror(&migp->mde);
 
 	un = trans_getun(migp->id, &migp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL)
 		return (0);
 
@@ -1211,7 +1209,7 @@ log:
 				if (un->un_l_nblks > btodb(LDL_MAXLOGSIZE))
 					un->un_l_nblks = btodb(LDL_MAXLOGSIZE);
 				un->un_l_maxresv = (uint_t)(un->un_l_nblks *
-					LDL_USABLE_BSIZE);
+				    LDL_USABLE_BSIZE);
 			}
 	}
 
@@ -1228,9 +1226,9 @@ trans_replace(replace_params_t *params)
 	minor_t		mnum = params->mnum;
 	mt_unit_t	*un;
 	mdi_unit_t	*ui;
-	md_dev64_t	cmp_dev,
-			ldev,
-			mdev;
+	md_dev64_t	cmp_dev;
+	md_dev64_t	ldev;
+	md_dev64_t	mdev;
 
 	mdclrerror(&params->mde);
 
@@ -1268,7 +1266,7 @@ trans_grow(void *d, int mode, IOLOCK  *lock)
 	mdclrerror(&mgp->mde);
 
 	un = trans_getun(mgp->mnum, &mgp->mde,
-		RD_LOCK, lock);
+	    RD_LOCK, lock);
 	if (un == NULL)
 		return (0);
 
@@ -1302,7 +1300,7 @@ trans_detach_ioctl(void *d, int mode, IOLOCK *lock)
 
 	/* acquire both md_unit_array_rw, and unit_reader lock */
 	un = trans_getun(migp->id, &migp->mde,
-		READERS, lock);
+	    READERS, lock);
 	if (un == NULL)
 		return (0);
 
@@ -1462,6 +1460,14 @@ trans_get_vtoc(mt_unit_t *un, struct vtoc *vtocp)
 }
 
 static int
+trans_get_extvtoc(mt_unit_t *un, struct extvtoc *vtocp)
+{
+	md_get_extvtoc((md_unit_t *)un, vtocp);
+
+	return (0);
+}
+
+static int
 trans_islog(mt_unit_t *un)
 {
 	if (un->un_l_unit == NULL)
@@ -1476,6 +1482,12 @@ trans_set_vtoc(
 )
 {
 	return (md_set_vtoc((md_unit_t *)un, vtocp));
+}
+
+static int
+trans_set_extvtoc(mt_unit_t *un, struct extvtoc *vtocp)
+{
+	return (md_set_extvtoc((md_unit_t *)un, vtocp));
 }
 
 static int
@@ -2043,6 +2055,41 @@ md_trans_ioctl(
 		return (err);
 	}
 
+
+	case DKIOCGEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FREAD))
+			return (EACCES);
+
+		if ((err = trans_get_extvtoc(un, &extvtoc)) != 0) {
+			return (err);
+		}
+
+		if (ddi_copyout(&extvtoc, data, sizeof (extvtoc), mode))
+			err = EFAULT;
+
+		return (err);
+	}
+
+	case DKIOCSEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FWRITE))
+			return (EACCES);
+
+		if (ddi_copyin(data, &extvtoc, sizeof (extvtoc), mode)) {
+			err = EFAULT;
+		}
+
+		if (err == 0)
+			err = trans_set_extvtoc(un, &extvtoc);
+
+		return (err);
+	}
+
 	case DKIOCGAPART:
 	{
 		struct dk_map	dmp;
@@ -2053,7 +2100,7 @@ md_trans_ioctl(
 
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 			if (ddi_copyout((caddr_t)&dmp, data, sizeof (dmp),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #ifdef _SYSCALL32
@@ -2064,7 +2111,7 @@ md_trans_ioctl(
 			dmp32.dkl_nblk = dmp.dkl_nblk;
 
 			if (ddi_copyout((caddr_t)&dmp32, data, sizeof (dmp32),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #endif /* _SYSCALL32 */
@@ -2213,7 +2260,7 @@ trans_renexch_update_kids(
 	ASSERT(!(un->un_l_unit && (md_getmajor(un->un_l_dev) != md_major)));
 
 	if ((md_getmajor(un->un_m_dev) == md_major) &&
-		(master_min == from_min)) {
+	    (master_min == from_min)) {
 
 		ASSERT(!(un->un_l_unit && (log_min == from_min)));
 
@@ -2221,7 +2268,7 @@ trans_renexch_update_kids(
 		un->un_m_key = rtxnp->to.key;
 
 	} else if ((md_getmajor(un->un_m_dev) == md_major) &&
-		    un->un_l_unit && (log_min == from_min)) {
+	    un->un_l_unit && (log_min == from_min)) {
 
 		ASSERT(master_min != from_min);
 
@@ -2315,8 +2362,7 @@ trans_exchange_self_update_from_down(
 
 	/* both devices must be metadevices in order to be updated */
 	ASSERT(md_getmajor(un->un_m_dev) == md_major);
-	ASSERT(!(un->un_l_unit &&
-		(md_getmajor(un->un_l_dev) != md_major)));
+	ASSERT(!(un->un_l_unit && (md_getmajor(un->un_l_dev) != md_major)));
 
 	if ((md_getmajor(un->un_m_dev) == md_major) &&
 	    (master_min == to_min)) {
@@ -2329,7 +2375,7 @@ trans_exchange_self_update_from_down(
 		un->un_m_key = rtxnp->from.key;
 
 	} else if ((md_getmajor(un->un_m_dev) == md_major) &&
-		    un->un_l_unit && (log_min == to_min)) {
+	    un->un_l_unit && (log_min == to_min)) {
 
 		/* master and log can't both be changed */
 		ASSERT(!(master_min == to_min));
@@ -2435,11 +2481,10 @@ trans_exchange_parent_update_to(
 
 	/* both devices must be metadevices in order to be updated */
 	ASSERT(md_getmajor(un->un_m_dev) == md_major);
-	ASSERT(!(un->un_l_unit &&
-		(md_getmajor(un->un_l_dev) != md_major)));
+	ASSERT(!(un->un_l_unit && (md_getmajor(un->un_l_dev) != md_major)));
 
 	if ((md_getmajor(un->un_m_dev) == md_major) &&
-		(master_min == from_min)) {
+	    (master_min == from_min)) {
 
 		/* can't be changing log and master */
 		ASSERT(!(un->un_l_unit && (log_min == to_min)));
@@ -2449,8 +2494,7 @@ trans_exchange_parent_update_to(
 		un->un_m_key = rtxnp->to.key;
 
 	} else if (un->un_l_unit &&
-		    ((md_getmajor(un->un_l_dev) == md_major) &&
-		    log_min == to_min)) {
+	    ((md_getmajor(un->un_l_dev) == md_major) && log_min == to_min)) {
 
 		/* can't be changing log and master */
 		ASSERT(master_min != from_min);
@@ -2516,10 +2560,9 @@ trans_rename_listkids(
 		master_min = md_getminor(from_un->un_m_dev);
 
 		p = new = md_build_rendelta(MDRR_CHILD,
-				to_min == master_min? MDRR_SELF: MDRR_CHILD,
-				from_un->un_m_dev, p,
-				MD_UNIT(master_min), MDI_UNIT(master_min),
-				&rtxnp->mde);
+		    to_min == master_min? MDRR_SELF: MDRR_CHILD,
+		    from_un->un_m_dev, p, MD_UNIT(master_min),
+		    MDI_UNIT(master_min), &rtxnp->mde);
 
 		if (!new) {
 			if (mdisok(&rtxnp->mde)) {
@@ -2536,10 +2579,9 @@ trans_rename_listkids(
 		log_min = md_getminor(from_un->un_l_dev);
 
 		new = md_build_rendelta(MDRR_CHILD,
-				to_min == log_min? MDRR_SELF: MDRR_CHILD,
-				from_un->un_l_dev, p,
-				MD_UNIT(log_min), MDI_UNIT(log_min),
-				&rtxnp->mde);
+		    to_min == log_min? MDRR_SELF: MDRR_CHILD,
+		    from_un->un_l_dev, p, MD_UNIT(log_min),
+		    MDI_UNIT(log_min), &rtxnp->mde);
 		if (!new) {
 			if (mdisok(&rtxnp->mde)) {
 				(void) mdsyserror(&rtxnp->mde, ENOMEM);
@@ -2572,7 +2614,7 @@ trans_may_renexch_self(
 
 	if (!un || !ui) {
 		(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-								from_min);
+		    from_min);
 		return (EINVAL);
 	}
 
@@ -2595,21 +2637,21 @@ trans_may_renexch_self(
 		 */
 		if (md_getmajor(un->un_m_dev) != md_major) {
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_TARGET_BAD,
-									to_min);
+			    to_min);
 			return (EINVAL);
 		}
 
 		if (un->un_l_unit &&
-			(md_getmajor(un->un_l_dev) != md_major)) {
+		    (md_getmajor(un->un_l_dev) != md_major)) {
 
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_TARGET_BAD,
-									to_min);
+			    to_min);
 			return (EINVAL);
 		}
 
 		if (md_getminor(un->un_m_dev) != to_min) {
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_TARGET_BAD,
-									to_min);
+			    to_min);
 			return (EINVAL);
 		}
 
@@ -2620,7 +2662,7 @@ trans_may_renexch_self(
 
 	default:
 		(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-								from_min);
+		    from_min);
 		return (EINVAL);
 	}
 
@@ -2661,7 +2703,7 @@ trans_rename_check(
 		    ((md_getminor(delta->dev) == rtxnp->from.mnum) ||
 		    (md_getminor(delta->dev) == rtxnp->to.mnum))) {
 			(void) mdmderror(&rtxnp->mde,
-					MDE_RENAME_BUSY, rtxnp->from.mnum);
+			    MDE_RENAME_BUSY, rtxnp->from.mnum);
 			return (EBUSY);
 		}
 	}
@@ -2672,7 +2714,7 @@ trans_rename_check(
 
 	if (un->un_l_unit) {
 		(void) mdmderror(&rtxnp->mde,
-					MDE_RENAME_BUSY, rtxnp->from.mnum);
+		    MDE_RENAME_BUSY, rtxnp->from.mnum);
 		return (EBUSY);
 	}
 
@@ -2682,7 +2724,7 @@ trans_rename_check(
 		 * self does additional checks
 		 */
 		err = trans_may_renexch_self((mt_unit_t *)delta->unp,
-						delta->uip, rtxnp);
+		    delta->uip, rtxnp);
 		if (err != 0) {
 			goto out;
 		}

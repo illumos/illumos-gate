@@ -20,12 +20,10 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sun4v/vdc/Makefile
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the vdc driver module.
 #
@@ -64,11 +62,8 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
 CFLAGS	+= $(CCVERBOSE)
-CFLAGS	+= -errwarn=%all
+CFLAGS += -D_EXTVTOC
 
 LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc -Nmisc/scsi
 

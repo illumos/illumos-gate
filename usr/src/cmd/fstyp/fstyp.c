@@ -440,8 +440,8 @@ struct part_find_s {
 	int	count;
 	int	systid;
 	int	r_systid;
-	int	r_relsect;
-	int	r_numsect;
+	uint32_t	r_relsect;
+	uint32_t	r_numsect;
 };
 
 enum { WALK_CONTINUE, WALK_TERMINATE };
@@ -450,16 +450,16 @@ enum { WALK_CONTINUE, WALK_TERMINATE };
  * Walk partition tables and invoke a callback for each.
  */
 static void
-walk_partitions(int fd, int startsec, off_t secsz,
-    int (*f)(void *, int, int, int), void *arg)
+walk_partitions(int fd, uint32_t startsec, off_t secsz,
+    int (*f)(void *, int, uint32_t, uint32_t), void *arg)
 {
 	uint32_t buf[1024/4];
 	int bufsize = 1024;
 	struct mboot *mboot = (struct mboot *)&buf[0];
 	struct ipart ipart[FD_NUMPART];
-	int sec = startsec;
-	int lastsec = sec + 1;
-	int relsect;
+	uint32_t sec = startsec;
+	uint32_t lastsec = sec + 1;
+	uint32_t relsect;
 	int ext = 0;
 	int systid;
 	boolean_t valid;
@@ -499,7 +499,7 @@ walk_partitions(int fd, int startsec, off_t secsz,
 }
 
 static int
-find_dos_drive_cb(void *arg, int systid, int relsect, int numsect)
+find_dos_drive_cb(void *arg, int systid, uint32_t relsect, uint32_t numsect)
 {
 	struct part_find_s *p = arg;
 

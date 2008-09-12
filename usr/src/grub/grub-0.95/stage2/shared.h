@@ -652,8 +652,8 @@ extern int compressed_file;
 #endif
 
 /* instrumentation variables */
-extern void (*disk_read_hook) (int, int, int);
-extern void (*disk_read_func) (int, int, int);
+extern void (*disk_read_hook) (unsigned int, int, int);
+extern void (*disk_read_func) (unsigned int, int, int);
 
 #ifndef STAGE1_5
 /* The flag for debug mode.  */
@@ -699,7 +699,8 @@ extern unsigned long part_length;
 extern int current_slice;
 
 extern int buf_drive;
-extern int buf_track;
+#define BUF_CACHE_INVALID 0xffffffff
+extern unsigned int buf_track;
 extern struct geometry buf_geom;
 
 /* these are the current file position and maximum file position */
@@ -873,7 +874,7 @@ int checkkey (void);
 /* Low-level disk I/O */
 int get_diskinfo (int drive, struct geometry *geometry);
 int biosdisk (int subfunc, int drive, struct geometry *geometry,
-	      int sector, int nsec, int segment);
+    unsigned int sector, int nsec, int segment);
 void stop_floppy (void);
 
 /* Command-line interface functions. */
@@ -990,10 +991,11 @@ int gunzip_test_header (void);
 int gunzip_read (char *buf, int len);
 #endif /* NO_DECOMPRESSION */
 
-int rawread (int drive, int sector, int byte_offset, int byte_len, char *buf);
-int devread (int sector, int byte_offset, int byte_len, char *buf);
-int rawwrite (int drive, int sector, char *buf);
-int devwrite (int sector, int sector_len, char *buf);
+int rawread (int drive, unsigned int sector, int byte_offset, int byte_len,
+	char *buf);
+int devread (unsigned int sector, int byte_offset, int byte_len, char *buf);
+int rawwrite (int drive, unsigned int sector, char *buf);
+int devwrite (unsigned int sector, int sector_len, char *buf);
 
 /* Parse a device string and initialize the global parameters. */
 char *set_device (char *device);

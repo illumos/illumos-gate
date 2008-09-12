@@ -1,4 +1,4 @@
-/***************************************************************************
+/*
  *
  * fsutils.c : filesystem utilities
  *
@@ -7,12 +7,10 @@
  *
  * Licensed under the Academic Free License version 2.1
  *
- **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+ */
 
 #ifdef HAVE_CONFIG_H
-#  include <config.h>
+#include <config.h>
 #endif
 
 #include <stdio.h>
@@ -54,7 +52,7 @@ dos_to_dev(char *path, char **devpath, int *num)
 }
 
 char *
-get_slice_name (char *devlink)
+get_slice_name(char *devlink)
 {
 	char	*part, *slice, *disk;
 	char	*s = NULL;
@@ -102,8 +100,8 @@ struct part_find_s {
 	int	count;
 	int	systid;
 	int	r_systid;
-	int	r_relsect;
-	int	r_numsect;
+	uint_t	r_relsect;
+	uint_t	r_numsect;
 };
 
 enum { WALK_CONTINUE, WALK_TERMINATE };
@@ -113,15 +111,15 @@ enum { WALK_CONTINUE, WALK_TERMINATE };
  */
 static void
 walk_partitions(int fd, int startsec, uint_t secsz,
-    int (*f)(void *, int, int, int), void *arg)
+    int (*f)(void *, int, uint_t, uint_t), void *arg)
 {
 	uint32_t buf[1024/4];
 	int bufsize = 1024;
 	struct mboot *mboot = (struct mboot *)&buf[0];
 	struct ipart ipart[FD_NUMPART];
-	int sec = startsec;
-	int lastsec = sec + 1;
-	int relsect;
+	uint_t sec = startsec;
+	uint_t lastsec = sec + 1;
+	uint_t relsect;
 	int ext = 0;
 	int systid;
 	boolean_t valid;
@@ -161,7 +159,7 @@ walk_partitions(int fd, int startsec, uint_t secsz,
 }
 
 static int
-find_dos_drive_cb(void *arg, int systid, int relsect, int numsect)
+find_dos_drive_cb(void *arg, int systid, uint_t relsect, uint_t numsect)
 {
 	struct part_find_s *p = arg;
 
@@ -200,7 +198,7 @@ find_dos_drive(int fd, int num, uint_t secsz, off_t *offset)
 }
 
 static int
-get_num_dos_drives_cb(void *arg, int systid, int relsect, int numsect)
+get_num_dos_drives_cb(void *arg, int systid, uint_t relsect, uint_t numsect)
 {
 	if (is_dos_drive(systid)) {
 		(*(int *)arg)++;
@@ -223,12 +221,12 @@ get_num_dos_drives(int fd, uint_t secsz)
  * are tagged backup/entire disk.
  */
 boolean_t
-vtoc_one_slice_entire_disk(struct vtoc *vtoc)
+vtoc_one_slice_entire_disk(struct extvtoc *vtoc)
 {
 	int		i;
-	struct partition *p;
-	daddr_t		prev_start;
-	long		prev_size;
+	struct extpartition *p;
+	diskaddr_t	prev_start;
+	diskaddr_t	prev_size;
 
 	for (i = 0; i < vtoc->v_nparts; i++) {
 		p = &vtoc->v_part[i];

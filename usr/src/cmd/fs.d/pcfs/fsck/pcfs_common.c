@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fsck_pcfs -- common.c
@@ -377,7 +374,7 @@ void
 bad_arg(char *option)
 {
 	(void) fprintf(stderr,
-		gettext("Unrecognized option -o %s.\n"), option);
+	    gettext("Unrecognized option -o %s.\n"), option);
 	usage();
 	exit(2);
 }
@@ -386,7 +383,7 @@ void
 missing_arg(char *option)
 {
 	(void) fprintf(stderr,
-		gettext("Option %s requires a value.\n"), option);
+	    gettext("Option %s requires a value.\n"), option);
 	usage();
 	exit(3);
 }
@@ -474,7 +471,7 @@ findPartitionOffset(int fd, char *ldrive)
 	struct ipart part[FD_NUMPART];
 	struct mboot extmboot;
 	struct mboot mb;
-	daddr_t xstartsect;
+	diskaddr_t xstartsect;
 	off64_t nextseek = 0;
 	off64_t lastseek = 0;
 	off64_t found = 0;
@@ -483,7 +480,7 @@ findPartitionOffset(int fd, char *ldrive)
 	int extendedPart = -1;
 	int primaryPart = -1;
 	int bootPart = -1;
-	int xnumsect = -1;
+	uint32_t xnumsect = 0;
 	int drvnum;
 	int driveIndex;
 	int i;
@@ -606,9 +603,9 @@ findPartitionOffset(int fd, char *ldrive)
 			 */
 			if (lseek64(fd, nextseek * BPSEC, SEEK_SET) < 0 ||
 			    read(fd, &extmboot, sizeof (extmboot)) !=
-				sizeof (extmboot)) {
+			    sizeof (extmboot)) {
 				perror(gettext("Unable to read extended "
-					"partition record"));
+				    "partition record"));
 				return (error);
 			}
 			(void) memcpy(part, extmboot.parts, sizeof (part));

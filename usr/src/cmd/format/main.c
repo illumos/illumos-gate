@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * This file contains the main entry point of the program and other
  * routines relating to the general flow.
@@ -542,7 +541,7 @@ Continue"))
 	 * Check to see if there are any mounted file systems on the
 	 * disk.  If there are, print a warning.
 	 */
-	if ((found_mount = checkmount((daddr_t)-1, (daddr_t)-1)) != 0)
+	if ((found_mount = checkmount((diskaddr_t)-1, (diskaddr_t)-1)) != 0)
 		err_print("Warning: Current Disk has mounted partitions.\n");
 
 	/*

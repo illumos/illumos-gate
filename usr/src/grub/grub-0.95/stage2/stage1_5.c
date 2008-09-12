@@ -19,10 +19,10 @@
 
 #include "shared.h"
 
-static int saved_sector = -1;
+static unsigned int saved_sector = (unsigned int)-1;
 
 static void
-disk_read_savesect_func (int sector, int offset, int length)
+disk_read_savesect_func (unsigned int sector, int offset, int length)
 {
   saved_sector = sector;
 }
@@ -45,7 +45,7 @@ cmain (void)
       disk_read_hook = NULL;
 
       /* Sanity check: catch an internal error.  */
-      if (saved_sector == -1)
+      if (saved_sector == (unsigned int)-1)
 	{
 	  grub_printf ("internal error: the second sector of Stage 2 is unknown.");
 	  stop ();

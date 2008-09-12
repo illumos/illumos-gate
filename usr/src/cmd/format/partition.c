@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions that operate on partition tables.
@@ -117,16 +114,16 @@ maxofN(struct dk_gpt *map)
 void
 change_partition(int num)
 {
-	int		i;
+	uint_t		i;
 	uint64_t	i64, j64;
-	int		j;
+	uint_t		j;
 	int		deflt;
 	part_deflt_t	p_deflt;
 	u_ioparam_t	ioparam;
 	int		tag;
 	int		flag;
 	char		msg[256];
-	long		cyl_offset = 0;
+	blkaddr32_t	cyl_offset = 0;
 	efi_deflt_t	efi_deflt;
 
 	/*
@@ -251,7 +248,7 @@ change_partition(int num)
 	ioparam.io_bounds.upper = ncyl - 1;
 	deflt = max(cur_parts->pinfo_map[num].dkl_cylno,
 		cyl_offset);
-	i = input(FIO_INT, "Enter new starting cyl", ':', &ioparam,
+	i = (uint_t)input(FIO_INT, "Enter new starting cyl", ':', &ioparam,
 	    &deflt, DATA_INPUT);
 
 	ioparam.io_bounds.lower = 0;
@@ -264,7 +261,7 @@ change_partition(int num)
 		    ioparam.io_bounds.upper);
 
 	/* call input, passing p_deflt's address, typecast to (int *) */
-	j = input(FIO_ECYL, "Enter partition size", ':', &ioparam,
+	j = (uint_t)input(FIO_ECYL, "Enter partition size", ':', &ioparam,
 	    (int *)&p_deflt, DATA_INPUT);
 
 	/*
@@ -310,7 +307,7 @@ change_partition(int num)
 	 * return an Error.
 	 */
 	if (tag == V_BACKUP) {
-		int fullsz;
+		uint_t fullsz;
 
 		fullsz = ncyl * nhead * nsect;
 		if (fullsz != j) {

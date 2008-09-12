@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_GLOBAL_H
 #define	_GLOBAL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,7 +42,11 @@ extern "C" {
 #endif
 
 #ifndef UINT_MAX32
-#define	UINT_MAX32	0xffffffff
+#define	UINT_MAX32	0xffffffffU
+#endif
+
+#if !defined(_EXTVTOC)
+#define	_EXTVTOC	/* extented vtoc (struct extvtoc) format is used */
 #endif
 
 /*
@@ -114,22 +116,22 @@ struct	partition_info *cur_parts;	/* current disk's partitioning */
 struct	defect_list cur_list;		/* current disk's defect list */
 void	*cur_buf;			/* current disk's I/O buffer */
 void	*pattern_buf;			/* current disk's pattern buffer */
-int	pcyl;				/* # physical cyls */
-int	ncyl;				/* # data cyls */
-int	acyl;				/* # alt cyls */
-int	nhead;				/* # heads */
-int	phead;				/* # physical heads */
-int	nsect;				/* # data sects/track */
-int	psect;				/* # physical sects/track */
-int	apc;				/* # alternates/cyl */
-int	solaris_offset;			/* Solaris offset, this value is zero */
+uint_t	pcyl;				/* # physical cyls */
+uint_t	ncyl;				/* # data cyls */
+uint_t	acyl;				/* # alt cyls */
+uint_t	nhead;				/* # heads */
+uint_t	phead;				/* # physical heads */
+uint_t	nsect;				/* # data sects/track */
+uint_t	psect;				/* # physical sects/track */
+uint_t	apc;				/* # alternates/cyl */
+uint_t	solaris_offset;			/* Solaris offset, this value is zero */
 					/* for non-fdisk machines. */
 #if defined(_SUNOS_VTOC_16)
-int	bcyl;				/* # other cyls */
+uint_t	bcyl;				/* # other cyls */
 #endif		/* defined(_SUNOS_VTOC_16) */
 
 struct	mboot boot_sec;			/* fdisk partition info */
-int	xstart;				/* solaris partition start */
+uint_t	xstart;				/* solaris partition start */
 char	x86_devname[MAXNAMELEN];	/* saved device name for fdisk */
 					/* information accesses */
 struct	mctlr_list	*controlp;	/* master controller list ptr */
@@ -140,11 +142,11 @@ struct	mctlr_list	*controlp;	/* master controller list ptr */
  * the current disk.
  */
 #define	sectors(h)	((h) == nhead - 1 ? nsect - apc : nsect)
-#define	spc()		((int)(nhead * nsect - apc))
-#define	chs2bn(c, h, s)	((daddr_t)((c) * spc() + (h) * nsect + (s)))
-#define	bn2c(bn)	((bn) / (int)spc())
-#define	bn2h(bn)	(((bn) % (int)spc()) / (int)nsect)
-#define	bn2s(bn)	(((bn) % (int)spc()) % (int)nsect)
+#define	spc()		(nhead * nsect - apc)
+#define	chs2bn(c, h, s)	(((diskaddr_t)(c) * spc() + (h) * nsect + (s)))
+#define	bn2c(bn)	(uint_t)((diskaddr_t)(bn) / spc())
+#define	bn2h(bn)	(uint_t)(((diskaddr_t)(bn) % spc()) / nsect)
+#define	bn2s(bn)	(uint_t)(((diskaddr_t)(bn) % spc()) % nsect)
 #define	datasects()	(ncyl * spc())
 #define	totalsects()	((ncyl + acyl) * spc())
 #define	physsects()	(pcyl * spc())

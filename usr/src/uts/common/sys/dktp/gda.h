@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DKTP_GDA_H
 #define	_SYS_DKTP_GDA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,7 +42,7 @@ extern void 	gda_inqfill(char *p, int l, char *s);
 extern void	gda_log(dev_info_t *, char *, uint_t, const char *, ...)
 	__KPRINTFLIKE(4);
 extern void	gda_errmsg(struct scsi_device *, struct cmpkt *, char *,
-			int, int, int, char **, char **);
+			int, daddr_t, daddr_t, char **, char **);
 extern struct 	cmpkt *gda_pktprep(opaque_t objp, struct cmpkt *in_pktp,
 			opaque_t dmatoken, int (*func)(caddr_t), caddr_t arg);
 extern void	gda_free(opaque_t objp, struct cmpkt *pktp, struct buf *bp);

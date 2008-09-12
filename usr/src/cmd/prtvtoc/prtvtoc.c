@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -28,11 +27,9 @@
 
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Print a disk partition map (volume table of contents, or VTOC).
@@ -75,18 +72,18 @@ typedef struct {
 	u_longlong_t	fr_size;	/* Length of free space */
 } freemap_t;
 
-static	freemap_t	*findfree(struct dk_geom *, struct vtoc *);
+static	freemap_t	*findfree(struct dk_geom *, struct extvtoc *);
 static	int	partcmp(const void *, const void *);
 static	int	partcmp64(const void *, const void *);
 static	int	prtvtoc(char *);
-static	void	putfree(struct vtoc *, freemap_t *);
+static	void	putfree(struct extvtoc *, freemap_t *);
 static	void	putfree64(struct dk_gpt *, freemap_t *);
-static	void	puttable(struct dk_geom *, struct vtoc *, freemap_t *,
+static	void	puttable(struct dk_geom *, struct extvtoc *, freemap_t *,
 			char *, char **);
 static	void	puttable64(struct dk_gpt *, freemap_t *,
 			char *, char **);
 static	int	readgeom(int, char *, struct dk_geom *);
-static	int	readvtoc(int, char *, struct vtoc *);
+static	int	readvtoc(int, char *, struct extvtoc *);
 static	int	readefi(int, char *, struct dk_gpt **);
 static	void	usage(void);
 static	int	warn(char *, char *);
@@ -148,18 +145,18 @@ static freemap_t	*freemap;
  * findfree(): Find free space on a disk.
  */
 static freemap_t *
-findfree(struct dk_geom *geom, struct vtoc *vtoc)
+findfree(struct dk_geom *geom, struct extvtoc *vtoc)
 {
-	struct partition	*part;
-	struct partition	**list;
+	struct extpartition	*part;
+	struct extpartition	**list;
 	freemap_t		*freeidx;
-	ulong_t			fullsize;
+	diskaddr_t		fullsize;
 	ulong_t			cylsize;
-	struct partition	*sorted[V_NUMPAR + 1];
+	struct extpartition	*sorted[V_NUMPAR + 1];
 
 	freemap = calloc(sizeof (freemap_t), V_NUMPAR + 1);
 	cylsize  = (geom->dkg_nsect) * (geom->dkg_nhead);
-	fullsize = (geom->dkg_ncyl) * cylsize;
+	fullsize = (diskaddr_t)(geom->dkg_ncyl) * cylsize;
 	if (vtoc->v_nparts > V_NUMPAR) {
 		(void) warn("putfree()", "Too many partitions on disk!");
 		exit(1);
@@ -369,7 +366,7 @@ prtvtoc(char *devname)
 	int		idx;
 	freemap_t	*freemap;
 	struct stat	sb;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	int		geo;
 	struct dk_geom	geom;
 	char		*name;
@@ -432,7 +429,7 @@ prtvtoc(char *devname)
  * of free space. FREE_PART lists the unassigned partitions.
  */
 static void
-putfree(struct vtoc *vtoc, freemap_t *freemap)
+putfree(struct extvtoc *vtoc, freemap_t *freemap)
 {
 	freemap_t *freeidx;
 	ushort_t idx;
@@ -475,7 +472,7 @@ putfree64(struct dk_gpt *efi, freemap_t *freemap)
  * puttable(): Print a human-readable VTOC.
  */
 static void
-puttable(struct dk_geom *geom, struct vtoc *vtoc, freemap_t *freemap,
+puttable(struct dk_geom *geom, struct extvtoc *vtoc, freemap_t *freemap,
     char *name, char **mtab)
 {
 	ushort_t	idx;
@@ -519,7 +516,7 @@ puttable(struct dk_geom *geom, struct vtoc *vtoc, freemap_t *freemap,
 	for (idx = 0; idx < vtoc->v_nparts; ++idx) {
 		if (vtoc->v_part[idx].p_size == 0)
 			continue;
-		(void) printf("      %2u  %5u    %02x  %9lu %9lu %9lu",
+		(void) printf("      %2u  %5u    %02x  %9llu %9llu %9llu",
 		    idx, vtoc->v_part[idx].p_tag, vtoc->v_part[idx].p_flag,
 		    vtoc->v_part[idx].p_start, vtoc->v_part[idx].p_size,
 		    vtoc->v_part[idx].p_start + vtoc->v_part[idx].p_size - 1);
@@ -608,11 +605,11 @@ readgeom(int fd, char *name, struct dk_geom *geom)
  * readvtoc(): Read a partition map.
  */
 static int
-readvtoc(int fd, char *name, struct vtoc *vtoc)
+readvtoc(int fd, char *name, struct extvtoc *vtoc)
 {
 	int	retval;
 
-	if ((retval = read_vtoc(fd, vtoc)) >= 0)
+	if ((retval = read_extvtoc(fd, vtoc)) >= 0)
 		return (0);
 
 	switch (retval) {

@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MDVAR_H
 #define	_SYS_MDVAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -741,7 +740,7 @@ extern proc_t	*md_getproc(void);
 extern int	md_checkpid(pid_t pid, proc_t *proc);
 extern char	*md_strdup(char *cp);
 extern void	freestr(char *cp);
-extern int	md_check_ioctl_against_efi(int, ushort_t);
+extern int	md_check_ioctl_against_unit(int, mdc_unit_t);
 extern mddb_recid_t md_vtoc_to_efi_record(mddb_recid_t, set_t);
 
 extern int	mdmn_ksend_message(set_t, md_mn_msgtype_t, uint_t, char *, int,
@@ -761,8 +760,10 @@ extern int	md_mn_is_commd_present(void);
 extern void	md_mn_clear_commd_present(void);
 extern int	md_admin_ioctl(md_dev64_t, int, caddr_t, int, IOLOCK *lockp);
 extern void	md_get_geom(md_unit_t *, struct dk_geom *);
-extern void	md_get_vtoc(md_unit_t *, struct vtoc *);
 extern int	md_set_vtoc(md_unit_t *, struct vtoc *);
+extern void	md_get_vtoc(md_unit_t *, struct vtoc *);
+extern int	md_set_extvtoc(md_unit_t *, struct extvtoc *);
+extern void	md_get_extvtoc(md_unit_t *, struct extvtoc *);
 extern void	md_get_cgapart(md_unit_t *, struct dk_map *);
 extern void	md_get_efi(md_unit_t *, char *);
 extern int	md_set_efi(md_unit_t *, char *);

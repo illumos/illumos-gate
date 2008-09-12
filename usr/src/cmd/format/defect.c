@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains routines that manipulate the defect list.
@@ -214,7 +212,7 @@ checkdefsum(struct defect_list *list, int mode)
 	 */
 	lp = (int *)list->list;
 	for (i = 0; i < (list->header.count *
-			sizeof (struct defect_entry) / sizeof (int)); i++)
+	    sizeof (struct defect_entry) / sizeof (int)); i++)
 		sum ^= *(lp + i);
 	/*
 	 * If in check mode, return whether header checksum was correct.
@@ -257,7 +255,7 @@ pr_defect(struct defect_entry *def, int num)
 	} else {
 		fmt_print("                ");
 		fmt_print("%8d", def->sect);
-		fmt_print("%8lu", chs2bn(def->cyl, def->head, def->sect));
+		fmt_print("%8llu", chs2bn(def->cyl, def->head, def->sect));
 	}
 	fmt_print("\n");
 }

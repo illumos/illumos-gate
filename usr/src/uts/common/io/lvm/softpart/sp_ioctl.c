@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Soft partitioning metadevice driver (md_sp), administrative routines.
@@ -486,11 +485,11 @@ sp_set(void *d, int mode)
 		return (mdmderror(mdep, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		recids[0] = mddb_createrec((size_t)msp->size, rec_type, 0,
-			MD_CRO_64BIT | MD_CRO_SOFTPART | MD_CRO_FN, setno);
+		    MD_CRO_64BIT | MD_CRO_SOFTPART | MD_CRO_FN, setno);
 #endif
 	} else {
 		recids[0] = mddb_createrec((size_t)msp->size, rec_type, 0,
-			MD_CRO_32BIT | MD_CRO_SOFTPART | MD_CRO_FN, setno);
+		    MD_CRO_32BIT | MD_CRO_SOFTPART | MD_CRO_FN, setno);
 	}
 	/* set initial value for possible child record */
 	recids[1] = 0;
@@ -814,11 +813,11 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 		goto out;
 #else
 		recid = mddb_createrec((size_t)mgp->size, rec_type, 0,
-				MD_CRO_64BIT | options, setno);
+		    MD_CRO_64BIT | options, setno);
 #endif
 	} else {
 		recid = mddb_createrec((size_t)mgp->size, rec_type, 0,
-				MD_CRO_32BIT | options, setno);
+		    MD_CRO_32BIT | options, setno);
 	}
 	if (recid < 0) {
 		rval = mddbstatus2error(mdep, (int)recid, mnum, setno);
@@ -851,7 +850,7 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 		    (un->c.un_vtoc_id != 0)) {
 			old_vtoc = un->c.un_vtoc_id;
 			new_un->c.un_vtoc_id =
-				md_vtoc_to_efi_record(old_vtoc, setno);
+			    md_vtoc_to_efi_record(old_vtoc, setno);
 		}
 	}
 
@@ -1248,7 +1247,7 @@ md_sp_ioctl(dev_t dev, int cmd, void *data, int mode, IOLOCK *lockp)
 		return (ENXIO);
 
 	/* is this a supported ioctl? */
-	err = md_check_ioctl_against_efi(cmd, un->c.un_flag);
+	err = md_check_ioctl_against_unit(cmd, un->c);
 	if (err != 0) {
 		return (err);
 	}
@@ -1316,7 +1315,7 @@ md_sp_ioctl(dev_t dev, int cmd, void *data, int mode, IOLOCK *lockp)
 
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 			if (ddi_copyout((caddr_t)&dmp, data, sizeof (dmp),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #ifdef _SYSCALL32
@@ -1327,7 +1326,7 @@ md_sp_ioctl(dev_t dev, int cmd, void *data, int mode, IOLOCK *lockp)
 			dmp32.dkl_nblk = dmp.dkl_nblk;
 
 			if (ddi_copyout((caddr_t)&dmp32, data, sizeof (dmp32),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #endif /* _SYSCALL32 */
@@ -1385,6 +1384,39 @@ md_sp_ioctl(dev_t dev, int cmd, void *data, int mode, IOLOCK *lockp)
 
 		if (err == 0)
 			err = md_set_vtoc((md_unit_t *)un, &vtoc);
+
+		return (err);
+	}
+
+	case DKIOCGEXTVTOC:
+	{
+		/* extended vtoc information */
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FREAD))
+			return (EACCES);
+
+		md_get_extvtoc((md_unit_t *)un, &extvtoc);
+
+		if (ddi_copyout(&extvtoc, data, sizeof (extvtoc), mode))
+			err = EFAULT;
+
+		return (err);
+	}
+
+	case DKIOCSEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FWRITE))
+			return (EACCES);
+
+		if (ddi_copyin(data, &extvtoc, sizeof (extvtoc), mode)) {
+			err = EFAULT;
+		}
+
+		if (err == 0)
+			err = md_set_extvtoc((md_unit_t *)un, &extvtoc);
 
 		return (err);
 	}

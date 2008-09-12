@@ -27,8 +27,6 @@
 #ifndef	_VDC_H
 #define	_VDC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Virtual disk client implementation definitions
  */
@@ -272,7 +270,7 @@ typedef struct vdc {
 	int		dkio_flush_pending; /* # outstanding DKIO flushes */
 	int		validate_pending; /* # outstanding validate request */
 	vd_disk_label_t vdisk_label; 	/* label type of device/disk imported */
-	struct vtoc	*vtoc;		/* structure to store VTOC data */
+	struct extvtoc	*vtoc;		/* structure to store VTOC data */
 	struct dk_geom	*geom;		/* structure to store geometry data */
 	vd_slice_t	slice[V_NUMPAR]; /* logical partitions */
 

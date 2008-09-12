@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -31,6 +29,7 @@ include $(SRC)/cmd/Makefile.cmd
 
 COMMON_SUBDIRS=		\
 	filelist	\
+	fiocompress	\
 	scripts		\
 	bootadm
 
@@ -39,27 +38,20 @@ i386_SUBDIRS=		\
 	mbr		\
 	symdef
 
-sparc_SUBDIRS=		\
-	fiocompress
-
 COMMON_LINTSUBDIRS=	\
 	bootadm	
 
 i386_LINTSUBDIRS=	\
+	fiocompress	\
 	installgrub	\
 	symdef
 
-sparc_LINTSUBDIRS=	\
-	fiocompress
-
 COMMON_MSGSUBDIRS=	\
-	bootadm
+	bootadm		\
+	fiocompress
 
 i386_MSGSUBDIRS=	\
 	installgrub
-
-sparc_MSGSUBDIRS=	\
-	fiocompress
 
 
 all:=		TARGET= all

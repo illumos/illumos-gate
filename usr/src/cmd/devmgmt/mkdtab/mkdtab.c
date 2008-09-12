@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -59,10 +56,10 @@
 #define	ORIGLEN	1024
 
 struct dpart {
-	char	alias[20];
-	char	*cdevice;
-	char	*bdevice;
-	long	capacity;
+	char		alias[20];
+	char		*cdevice;
+	char		*bdevice;
+	diskaddr_t	capacity;
 };
 
 static int		vfsnum;
@@ -97,15 +94,16 @@ memstr(const char *str)
 static void
 fdisk(const int diskno, const char *disknm)
 {
-	if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev -a diskette%d \
-cdevice=/dev/r%s bdevice=/dev/%s desc=\"Floppy Drive\" \
-mountpt=/mnt volume=diskette \
-type=diskette removable=true capacity=2880 \
-fmtcmd=\"/usr/bin/fdformat -f -v /dev/r%s\" \
-erasecmd=\"/usr/sbin/fdformat -f -v /dev/r%s\" \
-removecmd=\"/usr/bin/eject\" copy=true \
-mkfscmd=\"/usr/sbin/mkfs -F ufs /dev/r%s 2880 18 2 4096 512 80 2 5 3072 t\"",
-diskno, disknm, disknm, disknm, disknm, disknm) >= lastlen) {
+	if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev -a diskette%d "
+	    "cdevice=/dev/r%s bdevice=/dev/%s desc=\"Floppy Drive\" "
+	    "mountpt=/mnt volume=diskette "
+	    "type=diskette removable=true capacity=2880 "
+	    "fmtcmd=\"/usr/bin/fdformat -f -v /dev/r%s\" "
+	    "erasecmd=\"/usr/sbin/fdformat -f -v /dev/r%s\" "
+	    "removecmd=\"/usr/bin/eject\" copy=true "
+	    "mkfscmd=\"/usr/sbin/mkfs -F ufs /dev/r%s 2880 18 "
+	    "2 4096 512 80 2 5 3072 t\"",
+	    diskno, disknm, disknm, disknm, disknm, disknm) >= lastlen) {
 		(void) fprintf(stderr,
 		    "%s: Command too long: %s\n", cmd, putdevcmd);
 		exit(1);
@@ -147,7 +145,7 @@ hdisk(const int drive, const char *drivepfx)
 	char		*bdskpath;
 	char		*mountpoint;
 	int		i, j, dpartcnt, fd;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	static struct dpart    *dparttab;
 
 	if ((cdskpath = (char *)malloc(strlen(drivepfx) + 13)) == NULL) {
@@ -166,7 +164,7 @@ hdisk(const int drive, const char *drivepfx)
 	/*
 	 * Read volume table of contents.
 	 */
-	if (read_vtoc(fd, &vtoc) < 0) {
+	if (read_extvtoc(fd, &vtoc) < 0) {
 		(void) close(fd);
 		free(cdskpath);
 		return;
@@ -186,11 +184,11 @@ hdisk(const int drive, const char *drivepfx)
 
 	(void) snprintf(bdskpath, strlen(drivepfx) + 13, "/dev/dsk/%ss2",
 	    drivepfx);
-	if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev -a disk%d \
-cdevice=%s bdevice=%s \
-desc=\"Disk Drive\" type=disk \
-part=true removable=false capacity=%ld dpartlist=",
-	    drive, cdskpath, bdskpath, vtoc.v_part[6].p_size) >= lastlen) {
+	if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev -a disk%d "
+	    "cdevice=%s bdevice=%s "
+	    "desc=\"Disk Drive\" type=disk "
+	    "part=true removable=false capacity=%llu dpartlist=",
+	    drive, cdskpath, bdskpath, vtoc.v_part[2].p_size) >= lastlen) {
 		(void) fprintf(stderr,
 		    "%s: Command too long: %s\n", cmd, putdevcmd);
 		exit(1);
@@ -205,11 +203,10 @@ part=true removable=false capacity=%ld dpartlist=",
 	 */
 
 	if ((dparttab =
-		(struct dpart *)malloc((int)vtoc.v_nparts *
-				sizeof (struct dpart))) == NULL) {
+	    (struct dpart *)malloc((int)vtoc.v_nparts *
+	    sizeof (struct dpart))) == NULL) {
 		(void) fprintf(stderr,
-			"%s: can't disk partitions table: Out of memory\n",
-			cmd);
+		    "%s: can't disk partitions table: Out of memory\n", cmd);
 		exit(1);
 	}
 
@@ -221,7 +218,7 @@ part=true removable=false capacity=%ld dpartlist=",
 		    i);
 
 		if ((dparttab[dpartcnt].cdevice =
-			(char *)malloc(strlen(drivepfx) + 14)) == NULL) {
+		    (char *)malloc(strlen(drivepfx) + 14)) == NULL) {
 			(void) fprintf(stderr, "%s: Out of memory\n", cmd);
 			exit(1);
 		}
@@ -229,7 +226,7 @@ part=true removable=false capacity=%ld dpartlist=",
 		(void) snprintf(dparttab[dpartcnt].cdevice,
 		    strlen(drivepfx) + 14, "/dev/rdsk/%ss%x", drivepfx, i);
 		if ((dparttab[dpartcnt].bdevice =
-			(char *)malloc(strlen(drivepfx) + 14)) == NULL) {
+		    (char *)malloc(strlen(drivepfx) + 14)) == NULL) {
 			(void) fprintf(stderr, "%s: Out of memory\n", cmd);
 			exit(1);
 		}
@@ -253,7 +250,7 @@ part=true removable=false capacity=%ld dpartlist=",
 		for (j = 0; j < vfsnum; j++) {
 			if (vfstab[j].vfs_special != NULL &&
 			    strcmp(dparttab[i].bdevice,
-				vfstab[j].vfs_special) == 0)
+			    vfstab[j].vfs_special) == 0)
 				break;
 		}
 		if (j < vfsnum) {
@@ -262,14 +259,17 @@ part=true removable=false capacity=%ld dpartlist=",
 			 */
 			if (vfstab[j].vfs_mountp == NULL ||
 			    strcmp(vfstab[j].vfs_mountp, "-") == 0)
-				mountpoint="/mnt";
+				mountpoint = "/mnt";
 			else
-				mountpoint=vfstab[j].vfs_mountp;
-			if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev \
--a %s cdevice=%s bdevice=%s desc=\"Disk Partition\" type=dpart removable=false \
-capacity=%ld dparttype=fs fstype=%s mountpt=%s", dparttab[i].alias,
-dparttab[i].cdevice, dparttab[i].bdevice, dparttab[i].capacity,
-vfstab[j].vfs_fstype, mountpoint) >= lastlen) {
+				mountpoint = vfstab[j].vfs_mountp;
+			if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev "
+			    "-a %s cdevice=%s bdevice=%s "
+			    "desc=\"Disk Partition\" type=dpart "
+			    "removable=false capacity=%llu dparttype=fs "
+			    "fstype=%s mountpt=%s", dparttab[i].alias,
+			    dparttab[i].cdevice, dparttab[i].bdevice,
+			    dparttab[i].capacity, vfstab[j].vfs_fstype,
+			    mountpoint) >= lastlen) {
 					(void) fprintf(stderr,
 					    "%s: Command too long: %s\n",
 					    cmd, putdevcmd);
@@ -319,12 +319,12 @@ do_hdisks(void)
 static void
 tape(const int driveno, const char *drivenm)
 {
-	if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev -a ctape%d \
-cdevice=/dev/rmt/%s \
-desc=\"Tape Drive\" volume=\"tape\" \
-type=ctape removable=true capacity=45539 bufsize=15872 \
-erasecmd=\"/usr/bin/mt -f /dev/rmt/%s erase\" \
-removecmd=\"/usr/bin/mt -f /dev/rmt/%s offline\"",
+	if (snprintf(putdevcmd, lastlen, "/usr/bin/putdev -a ctape%d "
+	    "cdevice=/dev/rmt/%s "
+	    "desc=\"Tape Drive\" volume=\"tape\" "
+	    "type=ctape removable=true capacity=45539 bufsize=15872 "
+	    "erasecmd=\"/usr/bin/mt -f /dev/rmt/%s erase\" "
+	    "removecmd=\"/usr/bin/mt -f /dev/rmt/%s offline\"",
 	    driveno, drivenm, drivenm, drivenm) >= lastlen) {
 		(void) fprintf(stderr,
 		    "%s: Command too long: %s\n", cmd, putdevcmd);
@@ -369,7 +369,7 @@ initialize(void)
 	if ((fp = fopen("/etc/vfstab", "r")) == NULL) {
 		(void) fprintf(stderr,
 		    "%s: can't update device tables:Can't open /etc/vfstab\n",
-			cmd);
+		    cmd);
 		exit(1);
 	}
 
@@ -385,8 +385,7 @@ initialize(void)
 	if ((vfstab = (struct vfstab *)malloc(vfsnum * sizeof (struct vfstab)))
 	    == NULL) {
 		(void) fprintf(stderr,
-			"%s: can't update device tables:Out of memory\n",
-		    cmd);
+		    "%s: can't update device tables:Out of memory\n", cmd);
 		exit(1);
 	}
 
@@ -432,7 +431,7 @@ initialize(void)
 
 	if (putdevcmd == NULL) {
 		perror("malloc");
-		exit (-1);
+		exit(-1);
 	}
 
 	(void) memset(putdevcmd, 0, ORIGLEN);

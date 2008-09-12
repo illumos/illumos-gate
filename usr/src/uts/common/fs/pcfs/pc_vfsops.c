@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1525,7 +1524,7 @@ findTheDrive(struct pcfs *fsp, buf_t **bp)
 	int extendedPart = -1;		/* index of extended dos partition */
 	int primaryPart = -1;		/* index of primary dos partition */
 	int bootPart = -1;		/* index of a Solaris boot partition */
-	int xnumsect = -1;		/* length of extended DOS partition */
+	uint32_t xnumsect = 0;		/* length of extended DOS partition */
 	int driveIndex;			/* computed FDISK table index */
 	daddr_t startsec;
 	len_t mediasize;

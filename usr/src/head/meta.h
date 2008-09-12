@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -779,10 +780,10 @@ extern	int		meta_getdevs(mdsetname_t *sp, mdname_t *namep,
 extern	int		meta_getalldevs(mdsetname_t *sp, mdnamelist_t **nlpp,
 			    int check_db, md_error_t *ep);
 extern	int		meta_getvtoc(int fd, char *devname,
-			    struct vtoc *vtocbufp, int *partno,
+			    struct extvtoc *vtocbufp, int *partno,
 			    md_error_t *ep);
 extern	int		meta_setvtoc(int fd, char *devname,
-			    struct vtoc *vtocbufp, md_error_t *ep);
+			    struct extvtoc *vtocbufp, md_error_t *ep);
 extern	int		meta_setmdvtoc(int fd, char *devname,
 			    mdvtoc_t *mdvtocbufp, md_error_t *ep);
 extern	int		meta_get_names(char *drivername, mdsetname_t *sp,

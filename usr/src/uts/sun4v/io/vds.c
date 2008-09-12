@@ -56,6 +56,8 @@
 #include <sys/ontrap.h>
 #include <vm/seg_map.h>
 
+#define	ONE_MEGABYTE	(1ULL << 20)
+#define	ONE_GIGABYTE	(1ULL << 30)
 #define	ONE_TERABYTE	(1ULL << 40)
 
 /* Virtual disk server initialization flags */
@@ -428,7 +430,7 @@ typedef struct vd {
 	uint_t			flabel_size;	/* fake label size */
 	uint_t			flabel_limit;	/* limit of the fake label */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
-	struct vtoc		vtoc;		/* synthetic for slice type */
+	struct extvtoc		vtoc;		/* synthetic for slice type */
 	vd_slice_t		slices[VD_MAXPART]; /* logical partitions */
 	boolean_t		ownership;	/* disk ownership status */
 	ldc_status_t		ldc_state;	/* LDC connection state */
@@ -472,12 +474,13 @@ typedef struct vd {
 	    sizeof (efi_gpe_t) * VD_MAXPART, DEV_BSIZE)
 
 #define	VD_LABEL_VTOC(vd)	\
-		((struct dk_label *)((vd)->flabel))
+		((struct dk_label *)(void *)((vd)->flabel))
 
 #define	VD_LABEL_EFI_GPT(vd)	\
-		((efi_gpt_t *)((vd)->flabel + DEV_BSIZE))
+		((efi_gpt_t *)(void *)((vd)->flabel + DEV_BSIZE))
 #define	VD_LABEL_EFI_GPE(vd)	\
-		((efi_gpe_t *)((vd)->flabel + DEV_BSIZE + sizeof (efi_gpt_t)))
+		((efi_gpe_t *)(void *)((vd)->flabel + DEV_BSIZE + \
+		sizeof (efi_gpt_t)))
 
 
 typedef struct vds_operation {
@@ -613,12 +616,12 @@ static int vd_backend_ioctl(vd_t *vd, int cmd, caddr_t arg);
 static int vds_efi_alloc_and_read(vd_t *, efi_gpt_t **, efi_gpe_t **);
 static void vds_efi_free(vd_t *, efi_gpt_t *, efi_gpe_t *);
 static void vds_driver_types_free(vds_t *vds);
-static void vd_vtocgeom_to_label(struct vtoc *vtoc, struct dk_geom *geom,
+static void vd_vtocgeom_to_label(struct extvtoc *vtoc, struct dk_geom *geom,
     struct dk_label *label);
-static void vd_label_to_vtocgeom(struct dk_label *label, struct vtoc *vtoc,
+static void vd_label_to_vtocgeom(struct dk_label *label, struct extvtoc *vtoc,
     struct dk_geom *geom);
 static boolean_t vd_slice_geom_isvalid(vd_t *vd, struct dk_geom *geom);
-static boolean_t vd_slice_vtoc_isvalid(vd_t *vd, struct vtoc *vtoc);
+static boolean_t vd_slice_vtoc_isvalid(vd_t *vd, struct extvtoc *vtoc);
 
 extern int is_pseudo_device(dev_info_t *);
 
@@ -839,32 +842,57 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	bzero(label, sizeof (struct dk_label));
 
 	/*
-	 * We must have a resonable number of cylinders and sectors so
-	 * that newfs can run using default values.
+	 * Ideally we would like the cylinder size (nsect * nhead) to be the
+	 * same whatever the disk size is. That way the VTOC label could be
+	 * easily updated in case the disk size is increased (keeping the
+	 * same cylinder size allows to preserve the existing partitioning
+	 * when updating the VTOC label). But it is not possible to have
+	 * a fixed cylinder size and to cover all disk size.
 	 *
-	 * if (disk_size < 2MB)
-	 * 	phys_cylinders = disk_size / 100K
-	 * else if (disk_size >= 18.75GB)
-	 *	phys_cylinders = 65535 (maximum number of cylinders)
-	 * else
-	 * 	phys_cylinders = disk_size / 300K
-	 *
-	 * phys_cylinders = (phys_cylinders == 0) ? 1 : phys_cylinders
-	 * alt_cylinders = (phys_cylinders > 2) ? 2 : 0;
-	 * data_cylinders = phys_cylinders - alt_cylinders
-	 *
-	 * sectors = disk_size / (phys_cylinders * blk_size)
-	 *
-	 * The disk size test is an attempt to not have too few cylinders
+	 * So we define different cylinder sizes depending on the disk size.
+	 * The cylinder size is chosen so that we don't have too few cylinders
 	 * for a small disk image, or so many on a big disk image that you
 	 * waste space for backup superblocks or cylinder group structures.
+	 * Also we must have a resonable number of cylinders and sectors so
+	 * that newfs can run using default values.
+	 *
+	 *	+-----------+--------+---------+--------+
+	 *	| disk_size |  < 2MB | 2MB-4GB | >= 8GB |
+	 *	+-----------+--------+---------+--------+
+	 *	| nhead	    |	 1   |	   1   |    96  |
+	 *	| nsect	    |  200   |   600   |   768  |
+	 *	+-----------+--------+---------+--------+
+	 *
+	 * Other parameters are computed from these values:
+	 *
+	 * 	pcyl = disk_size / (nhead * nsect * 512)
+	 * 	acyl = (pcyl > 2)? 2 : 0
+	 * 	ncyl = pcyl - acyl
+	 *
+	 * The maximum number of cylinder is 65535 so this allows to define a
+	 * geometry for a disk size up to 65535 * 96 * 768 * 512 = 2.24 TB
+	 * which is more than enough to cover the maximum size allowed by the
+	 * extended VTOC format (2TB).
 	 */
-	if (disk_size < (2 * 1024 * 1024))
-		label->dkl_pcyl = disk_size / (100 * 1024);
-	else if (disk_size >= (UINT16_MAX * 300 * 1024ULL))
-		label->dkl_pcyl = UINT16_MAX;
-	else
-		label->dkl_pcyl = disk_size / (300 * 1024);
+
+	if (disk_size >= 8 * ONE_GIGABYTE) {
+
+		label->dkl_nhead = 96;
+		label->dkl_nsect = 768;
+
+	} else if (disk_size >= 2 * ONE_MEGABYTE) {
+
+		label->dkl_nhead = 1;
+		label->dkl_nsect = 600;
+
+	} else {
+
+		label->dkl_nhead = 1;
+		label->dkl_nsect = 200;
+	}
+
+	label->dkl_pcyl = disk_size /
+	    (label->dkl_nsect * label->dkl_nhead * DEV_BSIZE);
 
 	if (label->dkl_pcyl == 0)
 		label->dkl_pcyl = 1;
@@ -874,9 +902,7 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	if (label->dkl_pcyl > 2)
 		label->dkl_acyl = 2;
 
-	label->dkl_nsect = disk_size / (DEV_BSIZE * label->dkl_pcyl);
 	label->dkl_ncyl = label->dkl_pcyl - label->dkl_acyl;
-	label->dkl_nhead = 1;
 	label->dkl_write_reinstruct = 0;
 	label->dkl_read_reinstruct = 0;
 	label->dkl_rpm = 7200;
@@ -903,7 +929,7 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	    label->dkl_nsect);
 
 	/* default VTOC */
-	label->dkl_vtoc.v_version = V_VERSION;
+	label->dkl_vtoc.v_version = V_EXTVERSION;
 	label->dkl_vtoc.v_nparts = V_NUMPAR;
 	label->dkl_vtoc.v_sanity = VTOC_SANE;
 	label->dkl_vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_tag = V_BACKUP;
@@ -933,7 +959,7 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 static int
 vd_file_set_vtoc(vd_t *vd, struct dk_label *label)
 {
-	int blk, sec, cyl, head, cnt;
+	size_t blk, sec, cyl, head, cnt;
 
 	ASSERT(vd->file);
 
@@ -972,12 +998,12 @@ vd_file_set_vtoc(vd_t *vd, struct dk_label *label)
 
 		if (vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BWRITE, (caddr_t)label,
 		    blk + sec, sizeof (struct dk_label)) < 0) {
-			PR0("error writing backup label at block %d\n",
+			PR0("error writing backup label at block %lu\n",
 			    blk + sec);
 			return (EIO);
 		}
 
-		PR1("wrote backup label at block %d\n", blk + sec);
+		PR1("wrote backup label at block %lu\n", blk + sec);
 
 		sec += 2;
 	}
@@ -1059,7 +1085,7 @@ vd_dkdevid2cksum(struct dk_devid *dkdevid)
 	int i;
 
 	chksum = 0;
-	ip = (uint_t *)dkdevid;
+	ip = (void *)dkdevid;
 	for (i = 0; i < ((DEV_BSIZE - sizeof (int)) / sizeof (int)); i++)
 		chksum ^= ip[i];
 
@@ -1259,7 +1285,7 @@ vd_do_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 		 */
 		if (blk < (2 << 20) && nsectors <= 0xff && !vd->is_atapi_dev) {
 			FORMG0ADDR(&cdb, blk);
-			FORMG0COUNT(&cdb, nsectors);
+			FORMG0COUNT(&cdb, (uchar_t)nsectors);
 			ucmd.uscsi_cdblen = CDB_GROUP0;
 		} else if (blk > 0xffffffff) {
 			FORMG4LONGADDR(&cdb, blk);
@@ -1509,7 +1535,7 @@ vd_slice_flabel_write(vd_t *vd, caddr_t data, size_t offset, size_t length)
 	uint_t limit = vd->flabel_limit * DEV_BSIZE;
 	struct dk_label *label;
 	struct dk_geom geom;
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
 	ASSERT(vd->flabel != NULL);
@@ -1524,7 +1550,7 @@ vd_slice_flabel_write(vd_t *vd, caddr_t data, size_t offset, size_t length)
 	 */
 	if (vd->vdisk_label == VD_DISK_LABEL_VTOC &&
 	    offset == 0 && length == DEV_BSIZE) {
-		label = (struct dk_label *)data;
+		label = (void *)data;
 
 		/* check that this is a valid label */
 		if (label->dkl_magic != DKL_MAGIC ||
@@ -2313,7 +2339,7 @@ vd_geom2dk_geom(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
 static int
 vd_vtoc2vtoc(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
 {
-	VD_VTOC2VTOC((vd_vtoc_t *)vd_buf, (struct vtoc *)ioctl_arg);
+	VD_VTOC2VTOC((vd_vtoc_t *)vd_buf, (struct extvtoc *)ioctl_arg);
 	return (0);
 }
 
@@ -2326,7 +2352,7 @@ dk_geom2vd_geom(void *ioctl_arg, void *vd_buf)
 static void
 vtoc2vd_vtoc(void *ioctl_arg, void *vd_buf)
 {
-	VTOC2VD_VTOC((struct vtoc *)ioctl_arg, (vd_vtoc_t *)vd_buf);
+	VTOC2VD_VTOC((struct extvtoc *)ioctl_arg, (vd_vtoc_t *)vd_buf);
 }
 
 static int
@@ -2520,7 +2546,7 @@ vd_lbl2cksum(struct dk_label *label)
  * Copy information from a vtoc and dk_geom structures to a dk_label structure.
  */
 static void
-vd_vtocgeom_to_label(struct vtoc *vtoc, struct dk_geom *geom,
+vd_vtocgeom_to_label(struct extvtoc *vtoc, struct dk_geom *geom,
     struct dk_label *label)
 {
 	int i;
@@ -2573,7 +2599,7 @@ vd_vtocgeom_to_label(struct vtoc *vtoc, struct dk_geom *geom,
  * Copy information from a dk_label structure to a vtoc and dk_geom structures.
  */
 static void
-vd_label_to_vtocgeom(struct dk_label *label, struct vtoc *vtoc,
+vd_label_to_vtocgeom(struct dk_label *label, struct extvtoc *vtoc,
     struct dk_geom *geom)
 {
 	int i;
@@ -2644,7 +2670,7 @@ vd_slice_geom_isvalid(vd_t *vd, struct dk_geom *geom)
  * fake vtoc we have created.
  */
 static boolean_t
-vd_slice_vtoc_isvalid(vd_t *vd, struct vtoc *vtoc)
+vd_slice_vtoc_isvalid(vd_t *vd, struct extvtoc *vtoc)
 {
 	size_t csize;
 	int i;
@@ -2708,7 +2734,7 @@ static int
 vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
 	dk_efi_t *dk_ioc;
-	struct vtoc *vtoc;
+	struct extvtoc *vtoc;
 	struct dk_geom *geom;
 	size_t len, lba;
 	int rval;
@@ -2737,7 +2763,7 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 			bcopy(&vd->dk_geom, ioctl_arg, sizeof (vd->dk_geom));
 			return (0);
 
-		case DKIOCGVTOC:
+		case DKIOCGEXTVTOC:
 			ASSERT(ioctl_arg != NULL);
 			bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
 			return (0);
@@ -2754,13 +2780,13 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 
 			return (0);
 
-		case DKIOCSVTOC:
+		case DKIOCSEXTVTOC:
 			ASSERT(ioctl_arg != NULL);
 			if (vd_slice_single_slice)
 				return (ENOTSUP);
 
 			/* fake sucess only if the new vtoc is valid */
-			vtoc = (struct vtoc *)ioctl_arg;
+			vtoc = (struct extvtoc *)ioctl_arg;
 			if (!vd_slice_vtoc_isvalid(vd, vtoc))
 				return (EINVAL);
 
@@ -2844,7 +2870,7 @@ vd_file_validate_efi(vd_t *vd)
 	if ((status = vds_efi_alloc_and_read(vd, &gpt, &gpe)) != 0)
 		return (status);
 
-	bzero(&vd->vtoc, sizeof (struct vtoc));
+	bzero(&vd->vtoc, sizeof (struct extvtoc));
 	bzero(&vd->dk_geom, sizeof (struct dk_geom));
 	bzero(vd->slices, sizeof (vd_slice_t) * VD_MAXPART);
 
@@ -2905,7 +2931,7 @@ vd_file_validate_geometry(vd_t *vd)
 {
 	struct dk_label label;
 	struct dk_geom *geom = &vd->dk_geom;
-	struct vtoc *vtoc = &vd->vtoc;
+	struct extvtoc *vtoc = &vd->vtoc;
 	int i;
 	int status = 0;
 
@@ -2959,7 +2985,7 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
 	struct dk_label label;
 	struct dk_geom *geom;
-	struct vtoc *vtoc;
+	struct extvtoc *vtoc;
 	dk_efi_t *efi;
 	int rc;
 
@@ -2978,14 +3004,14 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		bcopy(&vd->dk_geom, geom, sizeof (struct dk_geom));
 		return (0);
 
-	case DKIOCGVTOC:
+	case DKIOCGEXTVTOC:
 		ASSERT(ioctl_arg != NULL);
-		vtoc = (struct vtoc *)ioctl_arg;
+		vtoc = (struct extvtoc *)ioctl_arg;
 
 		rc = vd_file_validate_geometry(vd);
 		if (rc != 0 && rc != EINVAL)
 			return (rc);
-		bcopy(&vd->vtoc, vtoc, sizeof (struct vtoc));
+		bcopy(&vd->vtoc, vtoc, sizeof (struct extvtoc));
 		return (0);
 
 	case DKIOCSGEOM:
@@ -2999,16 +3025,16 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		 * The current device geometry is not updated, just the driver
 		 * "notion" of it. The device geometry will be effectively
 		 * updated when a label is written to the device during a next
-		 * DKIOCSVTOC.
+		 * DKIOCSEXTVTOC.
 		 */
 		bcopy(ioctl_arg, &vd->dk_geom, sizeof (vd->dk_geom));
 		return (0);
 
-	case DKIOCSVTOC:
+	case DKIOCSEXTVTOC:
 		ASSERT(ioctl_arg != NULL);
 		ASSERT(vd->dk_geom.dkg_nhead != 0 &&
 		    vd->dk_geom.dkg_nsect != 0);
-		vtoc = (struct vtoc *)ioctl_arg;
+		vtoc = (struct extvtoc *)ioctl_arg;
 
 		if (vtoc->v_sanity != VTOC_SANE ||
 		    vtoc->v_sectorsz != DEV_BSIZE ||
@@ -3051,7 +3077,7 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		return (ENOTSUP);
 	}
 
-	ASSERT(cmd == DKIOCSVTOC || cmd == DKIOCSETEFI);
+	ASSERT(cmd == DKIOCSEXTVTOC || cmd == DKIOCSETEFI);
 
 	/* label has changed, revalidate the geometry */
 	(void) vd_file_validate_geometry(vd);
@@ -3072,6 +3098,7 @@ static int
 vd_backend_ioctl(vd_t *vd, int cmd, caddr_t arg)
 {
 	int rval = 0, status;
+	struct vtoc vtoc;
 
 	/*
 	 * Call the appropriate function to execute the ioctl depending
@@ -3092,6 +3119,35 @@ vd_backend_ioctl(vd_t *vd, int cmd, caddr_t arg)
 		/* disk device exported as a full disk */
 		status = ldi_ioctl(vd->ldi_handle[0], cmd, (intptr_t)arg,
 		    vd->open_flags | FKIOCTL, kcred, &rval);
+
+		/*
+		 * By default VTOC ioctls are done using ioctls for the
+		 * extended VTOC. Some drivers (in particular non-Sun drivers)
+		 * may not support these ioctls. In that case, we fallback to
+		 * the regular VTOC ioctls.
+		 */
+		if (status == ENOTTY) {
+			switch (cmd) {
+
+			case DKIOCGEXTVTOC:
+				cmd = DKIOCGVTOC;
+				status = ldi_ioctl(vd->ldi_handle[0], cmd,
+				    (intptr_t)&vtoc, vd->open_flags | FKIOCTL,
+				    kcred, &rval);
+				vtoctoextvtoc(vtoc,
+				    (*(struct extvtoc *)(void *)arg));
+				break;
+
+			case DKIOCSEXTVTOC:
+				cmd = DKIOCSVTOC;
+				extvtoctovtoc((*(struct extvtoc *)(void *)arg),
+				    vtoc);
+				status = ldi_ioctl(vd->ldi_handle[0], cmd,
+				    (intptr_t)&vtoc, vd->open_flags | FKIOCTL,
+				    kcred, &rval);
+				break;
+			}
+		}
 	}
 
 #ifdef DEBUG
@@ -3246,7 +3302,7 @@ vd_ioctl(vd_task_t *task)
 	int			i, status;
 	void			*buf = NULL;
 	struct dk_geom		dk_geom = {0};
-	struct vtoc		vtoc = {0};
+	struct extvtoc		vtoc = {0};
 	struct dk_efi		dk_efi = {0};
 	struct uscsi_cmd	uscsi = {0};
 	vd_t			*vd		= task->vd;
@@ -3266,7 +3322,7 @@ vd_ioctl(vd_task_t *task)
 		    DKIOCGGEOM, STRINGIZE(DKIOCGGEOM),
 		    &dk_geom, NULL, dk_geom2vd_geom, B_FALSE},
 		{VD_OP_GET_VTOC, STRINGIZE(VD_OP_GET_VTOC), RNDSIZE(vd_vtoc_t),
-		    DKIOCGVTOC, STRINGIZE(DKIOCGVTOC),
+		    DKIOCGEXTVTOC, STRINGIZE(DKIOCGEXTVTOC),
 		    &vtoc, NULL, vtoc2vd_vtoc, B_FALSE},
 		{VD_OP_GET_EFI, STRINGIZE(VD_OP_GET_EFI), RNDSIZE(vd_efi_t),
 		    DKIOCGETEFI, STRINGIZE(DKIOCGETEFI),
@@ -3281,7 +3337,7 @@ vd_ioctl(vd_task_t *task)
 		    DKIOCSGEOM, STRINGIZE(DKIOCSGEOM),
 		    &dk_geom, vd_geom2dk_geom, NULL, B_TRUE},
 		{VD_OP_SET_VTOC, STRINGIZE(VD_OP_SET_VTOC), RNDSIZE(vd_vtoc_t),
-		    DKIOCSVTOC, STRINGIZE(DKIOCSVTOC),
+		    DKIOCSEXTVTOC, STRINGIZE(DKIOCSEXTVTOC),
 		    &vtoc, vd_vtoc2vtoc, NULL, B_TRUE},
 		{VD_OP_SET_EFI, STRINGIZE(VD_OP_SET_EFI), RNDSIZE(vd_efi_t),
 		    DKIOCSETEFI, STRINGIZE(DKIOCSETEFI),
@@ -4887,8 +4943,7 @@ vd_recv_msg(void *arg)
 		status = recv_msg(vd->ldc_handle, vd->vio_msgp, &msglen);
 		switch (status) {
 		case 0:
-			rv = vd_process_msg(vd, (vio_msg_t *)vd->vio_msgp,
-			    msglen);
+			rv = vd_process_msg(vd, (void *)vd->vio_msgp, msglen);
 			/* check if max_msglen changed */
 			if (msgsize != vd->max_msglen) {
 				PR0("max_msglen changed 0x%lx to 0x%lx bytes\n",
@@ -5373,7 +5428,7 @@ vd_setup_partition_vtoc(vd_t *vd)
 		bzero(vd->vtoc.v_volume, sizeof (vd->vtoc.v_volume));
 
 		/* create a fake label from the vtoc and geometry */
-		vd->flabel_limit = csize;
+		vd->flabel_limit = (uint_t)csize;
 		vd->flabel_size = VD_LABEL_VTOC_SIZE;
 		vd->flabel = kmem_zalloc(vd->flabel_size, KM_SLEEP);
 		vd_vtocgeom_to_label(&vd->vtoc, &vd->dk_geom,
@@ -5602,7 +5657,7 @@ vd_setup_backend_vnode(vd_t *vd)
 		vd->vdisk_label = (vd_slice_label == VD_DISK_LABEL_UNK)?
 		    vd_file_slice_label : vd_slice_label;
 		if (vd->vdisk_label == VD_DISK_LABEL_EFI ||
-		    vd->file_size >= ONE_TERABYTE) {
+		    vd->file_size >= 2 * ONE_TERABYTE) {
 			status = vd_setup_partition_efi(vd);
 		} else {
 			/*
@@ -5633,8 +5688,7 @@ vd_setup_backend_vnode(vd_t *vd)
 		 * of the ISO image (images for both drive types are stored
 		 * in the ISO-9600 format). CDs can store up to just under 1Gb
 		 */
-		if ((vd->vdisk_size * vd->vdisk_block_size) >
-		    (1024 * 1024 * 1024))
+		if ((vd->vdisk_size * vd->vdisk_block_size) > ONE_GIGABYTE)
 			vd->vdisk_media = VD_MEDIA_DVD;
 		else
 			vd->vdisk_media = VD_MEDIA_CD;
@@ -5843,6 +5897,7 @@ vd_setup_single_slice_disk(vd_t *vd)
 	int status, rval;
 	struct dk_label label;
 	char *device_path = vd->device_path;
+	struct vtoc vtoc;
 
 	/* Get size of backing device */
 	if (ldi_get_size(vd->ldi_handle[0], &vd->vdisk_size) != DDI_SUCCESS) {
@@ -5878,9 +5933,17 @@ vd_setup_single_slice_disk(vd_t *vd)
 	    vd->vdisk_size >= ONE_TERABYTE / DEV_BSIZE) {
 		vd->vdisk_label = VD_DISK_LABEL_EFI;
 	} else {
-		status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
+		status = ldi_ioctl(vd->ldi_handle[0], DKIOCGEXTVTOC,
 		    (intptr_t)&vd->vtoc, (vd->open_flags | FKIOCTL),
 		    kcred, &rval);
+
+		if (status == ENOTTY) {
+			/* try with the non-extended vtoc ioctl */
+			status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
+			    (intptr_t)&vtoc, (vd->open_flags | FKIOCTL),
+			    kcred, &rval);
+			vtoctoextvtoc(vtoc, vd->vtoc);
+		}
 
 		if (status == 0) {
 			status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -246,9 +247,9 @@ metaflushctlrcache(void)
 char *
 getdrvnode(mdname_t *np, md_error_t *ep)
 {
-	char	*devicespath,
-	    *drvnode,
-	    *cp;
+	char	*devicespath;
+	char	*drvnode;
+	char	*cp;
 
 	if ((devicespath = metagetdevicesname(np, ep)) == NULL)
 		return (NULL);
@@ -288,9 +289,9 @@ getdrvnode(mdname_t *np, md_error_t *ep)
 static void *
 meta_load_dl(mdname_t *np, md_error_t *ep)
 {
-	char	*drvnode,
-	    newpath[MAXPATHLEN],
-	    *p;
+	char	*drvnode;
+	char	newpath[MAXPATHLEN];
+	char	*p;
 	void	*cookie;
 
 	if ((drvnode = getdrvnode(np, ep)) != NULL) {
@@ -355,8 +356,8 @@ meta_match_names(mdname_t *np, struct dk_cinfo *cp, mdcinfo_t *mdcp,
 int
 meta_match_enclosure(mdname_t *np, mdcinfo_t *mdcp, md_error_t *ep)
 {
-	meta_enclosure_e	e,
-	    ((*fptr)(mdname_t *, mdcinfo_t *,
+	meta_enclosure_e	e;
+	meta_enclosure_e	((*fptr)(mdname_t *, mdcinfo_t *,
 	    md_error_t *));
 	void			*cookie;
 
@@ -424,7 +425,7 @@ meta_cinfo_to_md(mdname_t *np, struct dk_cinfo *cp, mdcinfo_t *mdcp,
 
 static void
 meta_vtoc_to_md(
-	struct vtoc	*vp,
+	struct extvtoc	*vp,
 	mdvtoc_t	*mdvp
 )
 {
@@ -627,7 +628,7 @@ metagetvtoc(
 		efi_free(gpt);
 	} else {
 		/* no error on DKIOCGGEOM, try meta_getvtoc */
-		struct vtoc	vtoc;
+		struct extvtoc	vtoc;
 
 		if (meta_getvtoc(fd, np->cname, &vtoc, &partno, ep) < 0) {
 			(void) close(fd);
@@ -660,7 +661,7 @@ metagetvtoc(
 static void
 meta_mdvtoc_to_vtoc(
 	mdvtoc_t	*mdvp,
-	struct vtoc	*vp
+	struct extvtoc	*vp
 )
 {
 	uint_t		i;
@@ -668,8 +669,8 @@ meta_mdvtoc_to_vtoc(
 	(void) memset(&vp->v_part, '\0', sizeof (vp->v_part));
 	vp->v_nparts = (ushort_t)mdvp->nparts;
 	for (i = 0; (i < mdvp->nparts); ++i) {
-		vp->v_part[i].p_start = (daddr32_t)mdvp->parts[i].start;
-		vp->v_part[i].p_size  = (daddr32_t)mdvp->parts[i].size;
+		vp->v_part[i].p_start = mdvp->parts[i].start;
+		vp->v_part[i].p_size  = mdvp->parts[i].size;
 		vp->v_part[i].p_tag   = mdvp->parts[i].tag;
 		vp->v_part[i].p_flag  = mdvp->parts[i].flag;
 	}
@@ -704,7 +705,7 @@ metasetvtoc(
 	err = ioctl(fd, DKIOCGGEOM, &geom);
 	save_errno = errno;
 	if (err == 0) {
-		struct vtoc	vtoc;
+		struct extvtoc	vtoc;
 
 		if (meta_getvtoc(fd, np->cname, &vtoc, NULL, ep) < 0) {
 			(void) close(fd);
@@ -1244,12 +1245,10 @@ meta_isopen(
 			 * Hence NO_LOG and NO_MCT
 			 */
 			err = mdmn_send_message(
-			    sp->setno,
-			    MD_MN_MSG_CLU_CHECK,
+			    sp->setno, MD_MN_MSG_CLU_CHECK,
 			    MD_MSGF_NO_MCT | MD_MSGF_STOP_ON_ERROR |
 			    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
-			    (char *)&d, sizeof (md_isopen_t),
-			    &resp, ep);
+			    (char *)&d, sizeof (md_isopen_t), &resp, ep);
 			if (err == 0) {
 				d.isopen = resp->mmr_exitval;
 			} else {

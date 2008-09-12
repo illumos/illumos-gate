@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
@@ -74,14 +72,14 @@ static int is_floppy = 0;
 static int is_bootpar = 0;
 static int stage2_fd;
 static int partition, slice = 0xff;
-static int stage2_first_sector, stage2_second_sector;
+static unsigned int stage2_first_sector, stage2_second_sector;
 
 
 static char bpb_sect[SECTOR_SIZE];
 static char boot_sect[SECTOR_SIZE];
 static char stage1_buffer[SECTOR_SIZE];
 static char stage2_buffer[2 * SECTOR_SIZE];
-static int blocklist[SECTOR_SIZE / sizeof (int)];
+static unsigned int blocklist[SECTOR_SIZE / sizeof (unsigned int)];
 
 static int open_device(char *);
 static void read_bpb_sect(int);
@@ -90,12 +88,12 @@ static void write_boot_sect(char *);
 static void read_stage1_stage2(char *, char *);
 static void modify_and_write_stage1(int);
 static void modify_and_write_stage2(int);
-static int get_start_sector(int);
+static unsigned int get_start_sector(int);
 static void copy_stage2(int, char *);
 static char *get_raw_partition(char *);
 static void usage(char *);
 
-extern int read_stage2_blocklist(int, int *);
+extern int read_stage2_blocklist(int, unsigned int *);
 
 int
 main(int argc, char *argv[])
@@ -169,10 +167,10 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-static int
+static unsigned int
 get_start_sector(int fd)
 {
-	static int start_sect = 0;
+	static unsigned int start_sect = 0;
 
 	int i;
 	struct mboot *mboot;
@@ -196,15 +194,20 @@ get_start_sector(int fd)
 
 	if (i == FD_NUMPART) {
 		struct part_info dkpi;
+		struct extpart_info edkpi;
 
 		/*
 		 * Get the solaris partition information from the device
 		 * and compare the offset of S2 with offset of solaris partition
 		 * from fdisk partition table.
 		 */
-		if (ioctl(fd, DKIOCPARTINFO, &dkpi) < 0) {
-			(void) fprintf(stderr, PART_FAIL);
-			exit(-1);
+		if (ioctl(fd, DKIOCEXTPARTINFO, &edkpi) < 0) {
+			if (ioctl(fd, DKIOCPARTINFO, &dkpi) < 0) {
+				(void) fprintf(stderr, PART_FAIL);
+				exit(-1);
+			} else {
+				edkpi.p_start = dkpi.p_start;
+			}
 		}
 
 		for (i = 0; i < FD_NUMPART; i++) {
@@ -214,8 +217,8 @@ get_start_sector(int fd)
 				(void) fprintf(stderr, BAD_PART, i);
 				exit(-1);
 			}
-			if (dkpi.p_start >= part->relsect &&
-			    dkpi.p_start < (part->relsect + part->numsect)) {
+			if (edkpi.p_start >= part->relsect &&
+			    edkpi.p_start < (part->relsect + part->numsect)) {
 				/* Found the partition */
 				break;
 			}

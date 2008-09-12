@@ -24,8 +24,6 @@
 % * Use is subject to license terms.
 % */
 %
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%
 
 %/* get timeval32 definition */
 %#include <sys/types32.h>
@@ -239,6 +237,7 @@ const	MDDB_MINOR_NAME_MAX = 32;
 const	MD_MAXDRVNM = 16;
 
 const	MD_MAX_BLKS_FOR_SMALL_DEVS = 2147483647;
+%#define	MD_MAX_BLKS_FOR_EXTVTOC	4294967295ULL
 %
 %/* Minimum number of metadevice database replicas needed */
 const	MD_MINREPLICAS = 1;

@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NAME:	raid_ioctl.c
@@ -48,6 +47,8 @@
  *	raid_get_geom() - used to get the geometry of a RAID metadevice
  *	raid_get_vtoc() - used to get the VTOC on a RAID metadevice
  *	raid_set_vtoc() - used to set the VTOC on a RAID metadevice
+ *	raid_get_extvtoc() - used to get the extended VTOC on a RAID metadevice
+ *	raid_set_extvtoc() - used to set the extended VTOC on a RAID metadevice
  *	 raid_getdevs() - return all devices within a RAID metadevice
  *   raid_admin_ioctl() - IOCTL operations unique to metadevices and RAID
  */
@@ -269,7 +270,7 @@ raid_check_pw(mr_unit_t *un)
 		 * use the hotspare key
 		 */
 		tmpdev = md_resolve_bydevid(mnum, tmpdev, HOTSPARED(un, i) ?
-			colptr->un_hs_key : colptr->un_orig_key);
+		    colptr->un_hs_key : colptr->un_orig_key);
 		if (md_layered_open(mnum, &tmpdev, MD_OFLG_NULL)) {
 			colptr->un_dev = tmpdev;
 			return (1);
@@ -371,7 +372,7 @@ init_col_nextio(raid_ci_t *cur)
 		/* truncate last chunk to end_addr if needed */
 		if (cur->ci_blkno + cur->ci_zerosize > cur->ci_lastblk) {
 			cur->ci_zerosize = (size_t)
-				(cur->ci_lastblk - cur->ci_blkno);
+			    (cur->ci_lastblk - cur->ci_blkno);
 		}
 
 		/* set address and length for I/O bufs */
@@ -412,7 +413,7 @@ init_col_int(buf_t *cb)
 		return (1);
 	}
 	daemon_request(&md_done_daemon, init_col_nextio,
-			(daemon_queue_t *)cur, REQ_OLD);
+	    (daemon_queue_t *)cur, REQ_OLD);
 	return (1);
 }
 
@@ -516,10 +517,8 @@ raid_init_columns(minor_t mnum)
 		cur->ci_buf.b_iodone = init_col_int;
 		cur->ci_buf.b_flags = B_BUSY | B_WRITE;
 		cur->ci_buf.b_edev = md_dev64_to_dev(un->un_column[ix].un_dev);
-		sema_init(&cur->ci_buf.b_io, 0, NULL,
-			SEMA_DEFAULT, NULL);
-		sema_init(&cur->ci_buf.b_sem, 0, NULL,
-			SEMA_DEFAULT, NULL);
+		sema_init(&cur->ci_buf.b_io, 0, NULL, SEMA_DEFAULT, NULL);
+		sema_init(&cur->ci_buf.b_sem, 0, NULL, SEMA_DEFAULT, NULL);
 		/* set address and length for I/O bufs */
 		cur->ci_buf.b_bufsize = dbtob(zerosize);
 		cur->ci_buf.b_bcount = dbtob(zerosize);
@@ -534,9 +533,9 @@ raid_init_columns(minor_t mnum)
 			 * use the hotspare key
 			 */
 			tmpdev = md_resolve_bydevid(mnum, tmpdev,
-				HOTSPARED(un, ix) ?
-				un->un_column[ix].un_hs_key :
-				un->un_column[ix].un_orig_key);
+			    HOTSPARED(un, ix) ?
+			    un->un_column[ix].un_hs_key :
+			    un->un_column[ix].un_orig_key);
 			if ((cur->ci_err = md_layered_open(mnum, &tmpdev,
 			    MD_OFLG_NULL)) == 0)
 				un->un_column[ix].un_devflags |=
@@ -562,9 +561,9 @@ raid_init_columns(minor_t mnum)
 					err = cur->ci_err;
 				else if (cur->ci_flag == COL_INIT_DONE) {
 					(void) init_pw_area(un,
-						un->un_column[col].un_dev,
-						un->un_column[col].un_pwstart,
-						col);
+					    un->un_column[col].un_dev,
+					    un->un_column[col].un_pwstart,
+					    col);
 					cur->ci_flag = COL_READY;
 				}
 			} else {
@@ -662,7 +661,7 @@ raid_init_unit(minor_t mnum, md_error_t *ep)
 	}
 
 	if (raid_internal_open(mnum, (FREAD | FWRITE),
-			OTYP_LYR, MD_OFLG_ISINIT)) {
+	    OTYP_LYR, MD_OFLG_ISINIT)) {
 		rval = mdmderror(ep, MDE_RAID_OPEN_FAILURE, mnum);
 		goto out;
 	}
@@ -737,7 +736,7 @@ regen_unit(minor_t mnum)
 
 	for (line = 0; line < total_segments; line++) {
 		bp->b_lblkno = line *
-				((un->un_origcolumncnt - 1) * un->un_segsize);
+		    ((un->un_origcolumncnt - 1) * un->un_segsize);
 		bp->b_un.b_addr = buffer;
 		bp->b_bcount = iosize;
 		bp->b_iodone = NULL;
@@ -753,7 +752,7 @@ regen_unit(minor_t mnum)
 			break;
 		}
 		un->un_percent_done = (uint_t)((line * 1000) /
-						un->un_segsincolumn);
+		    un->un_segsincolumn);
 		/* just to avoid rounding errors */
 		if (un->un_percent_done > 1000)
 			un->un_percent_done = 1000;
@@ -767,12 +766,12 @@ regen_unit(minor_t mnum)
 	(void) md_io_writerexit(ui);
 	un = md_unit_writerlock(ui);
 	if (!err &&
-		(raid_state_cnt(un, RCS_OKAY) == un->un_totalcolumncnt))
+	    (raid_state_cnt(un, RCS_OKAY) == un->un_totalcolumncnt))
 			un->un_state = RUS_OKAY;
 	raid_commit(un, NULL);
 	md_unit_writerexit(ui);
 	if (err ||
-		raid_state_cnt(un, RCS_OKAY) != un->un_totalcolumncnt) {
+	    raid_state_cnt(un, RCS_OKAY) != un->un_totalcolumncnt) {
 		SE_NOTIFY(EC_SVM_STATE, ESC_SVM_REGEN_FAILED,
 		    SVM_TAG_METADEVICE, MD_UN2SET(un), MD_SID(un));
 	} else {
@@ -915,16 +914,16 @@ raid_set(void	*d, int mode)
 		return (mdmderror(&msp->mde, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		mr_recid = mddb_createrec(msp->size, typ1, 0,
-			MD_CRO_64BIT | MD_CRO_RAID | MD_CRO_FN, setno);
+		    MD_CRO_64BIT | MD_CRO_RAID | MD_CRO_FN, setno);
 #endif
 	} else {
 		mr_recid = mddb_createrec(msp->size, typ1, 0,
-			MD_CRO_32BIT | MD_CRO_RAID | MD_CRO_FN, setno);
+		    MD_CRO_32BIT | MD_CRO_RAID | MD_CRO_FN, setno);
 	}
 
 	if (mr_recid < 0)
 		return (mddbstatus2error(&msp->mde,
-				(int)mr_recid, mnum, setno));
+		    (int)mr_recid, mnum, setno));
 
 	/* get the address of the mdstruct */
 	un = (mr_unit_t *)mddb_getrecaddr(mr_recid);
@@ -977,7 +976,7 @@ raid_set(void	*d, int mode)
 	if (err = raid_build_incore(un, 0)) {
 		if (un->mr_ic) {
 			kmem_free(un->un_column_ic, sizeof (mr_column_ic_t) *
-				un->un_totalcolumncnt);
+			    un->un_totalcolumncnt);
 			kmem_free(un->mr_ic, sizeof (*un->mr_ic));
 		}
 		MD_UNIT(mnum) = NULL;
@@ -1067,7 +1066,7 @@ raid_get(
 	mdclrerror(&migph->mde);
 
 	if ((un = raid_getun(mnum, &migph->mde,
-		RD_LOCK, lock)) == NULL)
+	    RD_LOCK, lock)) == NULL)
 		return (0);
 
 	if (migph->size == 0) {
@@ -1160,7 +1159,7 @@ raid_replace(
 		 */
 		if (tmpdevt == NODEV64) {
 			tmpdevt = md_resolve_bydevid(mnum, tmpdevt,
-				un->un_column[ix].un_orig_key);
+			    un->un_column[ix].un_orig_key);
 			un->un_column[ix].un_orig_dev = tmpdevt;
 		}
 
@@ -1197,7 +1196,7 @@ raid_replace(
 
 	if (un->un_state & RUS_DOI)
 		return (mdcomperror(ep, MDE_REPL_INVAL_STATE, mnum,
-			un->un_column[col].un_dev));
+		    un->un_column[col].un_dev));
 
 	if ((raid_state_cnt(un, RCS_INIT) != 0) || (un->un_state & RUS_INIT) ||
 	    (MD_STATUS(un) & MD_UN_GROW_PENDING))
@@ -1213,16 +1212,15 @@ raid_replace(
 	if (un->un_state == RUS_LAST_ERRED) {
 		/* Must use -f force flag for unit in LAST_ERRED state */
 		if (!force)
-			return (mdmderror(ep,
-				MDE_RAID_NEED_FORCE, mnum));
+			return (mdmderror(ep, MDE_RAID_NEED_FORCE, mnum));
 
 		/* Must use -f force flag on ERRED column first */
 		if (un->un_column[col].un_devstate != RCS_ERRED) {
 			for (ix = 0; ix < un->un_totalcolumncnt; ix++) {
 				if (un->un_column[ix].un_devstate & RCS_ERRED)
 					return (mdcomperror(ep,
-						MDE_RAID_COMP_ERRED, mnum,
-						un->un_column[ix].un_dev));
+					    MDE_RAID_COMP_ERRED, mnum,
+					    un->un_column[ix].un_dev));
 			}
 		}
 
@@ -1230,7 +1228,7 @@ raid_replace(
 		if ((un->un_column[col].un_devstate != RCS_LAST_ERRED) &&
 		    (un->un_column[col].un_devstate != RCS_ERRED))
 			return (mdcomperror(ep, MDE_RAID_COMP_ERRED,
-				mnum, un->un_column[col].un_dev));
+			    mnum, un->un_column[col].un_dev));
 	}
 
 	if (un->un_state == RUS_ERRED) {
@@ -1390,7 +1388,7 @@ raid_replace(
 			un->un_column[col].un_devflags |= MD_RAID_COPY_RESYNC;
 		} else {
 			if (!(un->un_column[col].un_devflags &
-				MD_RAID_DEV_ISOPEN)) {
+			    MD_RAID_DEV_ISOPEN)) {
 				if (md_layered_open(mnum, &tmpdev,
 				    MD_OFLG_NULL)) {
 					un->un_column[col].un_dev = tmpdev;
@@ -1401,17 +1399,17 @@ raid_replace(
 				    tmpdev != 0);
 
 				if ((md_getmajor(tmpdev) != md_major) &&
-					(md_devid_found(setno, side, raidkey)
-						== 1)) {
+				    (md_devid_found(setno, side, raidkey)
+				    == 1)) {
 					if (md_update_namespace_did(setno, side,
 					    raidkey, &mde) != 0) {
 						cmn_err(CE_WARN,
 						    "md: could not"
-							" update namespace\n");
+						    " update namespace\n");
 					}
 				}
 				un->un_column[col].un_dev =
-					un->un_column[col].un_orig_dev;
+				    un->un_column[col].un_orig_dev;
 			}
 			un->un_column[col].un_devflags |= MD_RAID_DEV_ISOPEN;
 			un->un_column[col].un_devflags |= MD_RAID_REGEN_RESYNC;
@@ -1574,7 +1572,7 @@ raid_set_sync(
 	/* The unit requires not work so just force replay of the device */
 	if (raid_internal_open(mnum, (FREAD | FWRITE), OTYP_LYR, 0))
 		return (mdmderror(&rip->mde,
-			MDE_RAID_OPEN_FAILURE, mnum));
+		    MDE_RAID_OPEN_FAILURE, mnum));
 	(void) raid_internal_close(mnum, OTYP_LYR, 0, 0);
 
 	return (0);
@@ -1706,14 +1704,12 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 
 	if (MD_STATUS(un) & MD_UN_RESYNC_ACTIVE) {
 		md_unit_readerexit(ui);
-		return (mdmderror(&mgph->mde, MDE_RESYNC_ACTIVE,
-			mnum));
+		return (mdmderror(&mgph->mde, MDE_RESYNC_ACTIVE, mnum));
 	}
 
 	if (UNIT_STATE(un) & RUS_LAST_ERRED) {
 		md_unit_readerexit(ui);
-		return (mdmderror(&mgph->mde, MDE_RAID_LAST_ERRED,
-			mnum));
+		return (mdmderror(&mgph->mde, MDE_RAID_LAST_ERRED, mnum));
 	}
 
 	if (UNIT_STATE(un) & RUS_DOI) {
@@ -1729,22 +1725,20 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 	md_unit_readerexit(ui);
 
 	if ((un = raid_getun(mnum, &mgph->mde, WRITERS, lock)) ==
-		NULL)
+	    NULL)
 		return (0);
 
 	if (MD_STATUS(un) & MD_UN_GROW_PENDING)
 		return (mdmderror(&mgph->mde, MDE_IN_USE, mnum));
 
 	if (MD_STATUS(un) & MD_UN_RESYNC_ACTIVE)
-		return (mdmderror(&mgph->mde, MDE_RESYNC_ACTIVE,
-			mnum));
+		return (mdmderror(&mgph->mde, MDE_RESYNC_ACTIVE, mnum));
 
 	if (un->c.un_size >= mgph->size)
 		return (EINVAL);
 
 	if (UNIT_STATE(un) & RUS_LAST_ERRED)
-		return (mdmderror(&mgph->mde, MDE_RAID_LAST_ERRED,
-			mnum));
+		return (mdmderror(&mgph->mde, MDE_RAID_LAST_ERRED, mnum));
 
 	if (UNIT_STATE(un) & RUS_DOI)
 		return (mdmderror(&mgph->mde, MDE_RAID_DOI, mnum));
@@ -1769,15 +1763,15 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 		return (mdmderror(&mgph->mde, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		mr_recid = mddb_createrec(mgph->size, typ1, 0,
-				MD_CRO_64BIT | options, setno);
+		    MD_CRO_64BIT | options, setno);
 #endif
 	} else {
 		mr_recid = mddb_createrec(mgph->size, typ1, 0,
-				MD_CRO_32BIT | options, setno);
+		    MD_CRO_32BIT | options, setno);
 	}
 	if (mr_recid < 0) {
 		rval = mddbstatus2error(&mgph->mde, (int)mr_recid,
-			mnum, setno);
+		    mnum, setno);
 		return (rval);
 	}
 
@@ -1843,14 +1837,14 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 	 */
 	new_un->un_column_ic = (mr_column_ic_t *)
 	    kmem_zalloc(sizeof (mr_column_ic_t) * new_un->un_totalcolumncnt,
-		KM_SLEEP);
+	    KM_SLEEP);
 
 	/*
 	 * Restore old column slots
 	 * Free the old column slots
 	 */
 	bcopy(mrc, new_un->un_column_ic,
-		sizeof (mr_column_ic_t) * un->un_totalcolumncnt);
+	    sizeof (mr_column_ic_t) * un->un_totalcolumncnt);
 	kmem_free(mrc, sizeof (mr_column_ic_t) * un->un_totalcolumncnt);
 
 	/* All 64 bit metadevices only support EFI labels. */
@@ -1865,7 +1859,7 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 		    (un->c.un_vtoc_id != 0)) {
 			old_vtoc = un->c.un_vtoc_id;
 			new_un->c.un_vtoc_id =
-				md_vtoc_to_efi_record(old_vtoc, setno);
+			    md_vtoc_to_efi_record(old_vtoc, setno);
 		}
 	}
 
@@ -1949,8 +1943,7 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 	md_unit_writerexit(ui);
 
 	if (raid_internal_open(mnum, (FREAD | FWRITE), OTYP_LYR, 0)) {
-		rval = mdmderror(&mgph->mde, MDE_RAID_OPEN_FAILURE,
-			mnum);
+		rval = mdmderror(&mgph->mde, MDE_RAID_OPEN_FAILURE, mnum);
 		SE_NOTIFY(EC_SVM_STATE, ESC_SVM_OPEN_FAIL, SVM_TAG_METADEVICE,
 		    MD_UN2SET(new_un), MD_SID(new_un));
 		return (rval);
@@ -1959,7 +1952,7 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 	for (i = 0; i < new_un->un_totalcolumncnt; i++) {
 		if (new_un->un_column[i].un_devstate & RCS_OKAY)
 			(void) init_pw_area(new_un, new_un->un_column[i].un_dev,
-				new_un->un_column[i].un_pwstart, i);
+			    new_un->un_column[i].un_pwstart, i);
 	}
 	md_unit_writerexit(ui);
 	(void) raid_internal_close(mnum, OTYP_LYR, 0, 0);
@@ -2097,6 +2090,45 @@ raid_set_vtoc(
 }
 
 
+/*
+ * NAME:	raid_get_extvtoc
+ * DESCRIPTION: used to get the extended VTOC on a RAID metadevice
+ * PARAMETERS:	mr_unit_t    *un - RAID unit to get the VTOC from
+ *		struct extvtoc *vtocp - pointer to extended VTOC data structure
+ *
+ * LOCKS:	none
+ *
+ */
+static int
+raid_get_extvtoc(
+	mr_unit_t	*un,
+	struct extvtoc	*vtocp
+)
+{
+	md_get_extvtoc((md_unit_t *)un, vtocp);
+
+	return (0);
+}
+
+/*
+ * NAME:	raid_set_extvtoc
+ * DESCRIPTION: used to set the extended VTOC on a RAID metadevice
+ * PARAMETERS:	mr_unit_t    *un - RAID unit to set the VTOC on
+ *		struct extvtoc *vtocp - pointer to extended VTOC data structure
+ *
+ * LOCKS:	none
+ *
+ */
+static int
+raid_set_extvtoc(
+	mr_unit_t	*un,
+	struct extvtoc	*vtocp
+)
+{
+	return (md_set_extvtoc((md_unit_t *)un, vtocp));
+}
+
+
 
 /*
  * NAME:	raid_get_cgapart
@@ -2149,8 +2181,7 @@ raid_getdevs(
 	/* check out unit */
 	mdclrerror(&mgdph->mde);
 
-	if ((un = raid_getun(mnum, &mgdph->mde, RD_LOCK,
-		lock)) == NULL)
+	if ((un = raid_getun(mnum, &mgdph->mde, RD_LOCK, lock)) == NULL)
 		return (0);
 
 	udevs = (md_dev64_t *)(uintptr_t)mgdph->devs;
@@ -2165,8 +2196,7 @@ raid_getdevs(
 			}
 
 			if (ddi_copyout((caddr_t)&unit_dev,
-					(caddr_t)&udevs[cnt], sizeof (*udevs),
-					mode) != 0)
+			    (caddr_t)&udevs[cnt], sizeof (*udevs), mode) != 0)
 				return (EFAULT);
 		}
 		if (HOTSPARED(un, i)) {
@@ -2182,8 +2212,7 @@ raid_getdevs(
 			}
 
 			if (ddi_copyout((caddr_t)&unit_dev,
-					(caddr_t)&udevs[cnt], sizeof (*udevs),
-					mode) != 0)
+			    (caddr_t)&udevs[cnt], sizeof (*udevs), mode) != 0)
 				return (EFAULT);
 		}
 	}
@@ -2516,10 +2545,10 @@ raid_admin_ioctl(
 		p->probe.nmdevs = ph->nmdevs;
 		(void) strcpy(p->probe.test_name, ph->test_name);
 		bcopy(&ph->md_driver, &(p->probe.md_driver),
-				sizeof (md_driver_t));
+		    sizeof (md_driver_t));
 
 		if ((p->probe.nmdevs < 1) ||
-			(strstr(p->probe.test_name, "probe") == NULL)) {
+		    (strstr(p->probe.test_name, "probe") == NULL)) {
 			err = EINVAL;
 			goto free_mem;
 		}
@@ -2549,7 +2578,8 @@ raid_admin_ioctl(
 		for (i = 0; i < p->probe.nmdevs; i++) {
 			sema_p(PROBE_SEMA(p));
 		}
-		while (md_ioctl_lock_enter() == EINTR);
+		while (md_ioctl_lock_enter() == EINTR)
+			;
 
 		/*
 		 * clean up. The hdr list is freed in the probe routines
@@ -2628,7 +2658,7 @@ md_raid_ioctl(
 		return (ENXIO);
 
 	/* is this a supported ioctl? */
-	err = md_check_ioctl_against_efi(cmd, un->c.un_flag);
+	err = md_check_ioctl_against_unit(cmd, un->c);
 	if (err != 0) {
 		return (err);
 	}
@@ -2742,6 +2772,40 @@ md_raid_ioctl(
 		return (err);
 	}
 
+	case DKIOCGEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FREAD))
+			return (EACCES);
+
+		if ((err = raid_get_extvtoc(un, &extvtoc)) != 0) {
+			return (err);
+		}
+
+		if (ddi_copyout(&extvtoc, data, sizeof (extvtoc), mode))
+			err = EFAULT;
+
+		return (err);
+	}
+
+	case DKIOCSEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FWRITE))
+			return (EACCES);
+
+		if (ddi_copyin(data, &extvtoc, sizeof (extvtoc), mode)) {
+			err = EFAULT;
+		}
+
+		if (err == 0)
+			err = raid_set_extvtoc(un, &extvtoc);
+
+		return (err);
+	}
+
 	case DKIOCGAPART:
 	{
 		struct dk_map	dmp;
@@ -2752,7 +2816,7 @@ md_raid_ioctl(
 
 		if ((mode & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 			if (ddi_copyout((caddr_t)&dmp, data, sizeof (dmp),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #ifdef _SYSCALL32
@@ -2763,7 +2827,7 @@ md_raid_ioctl(
 			dmp32.dkl_nblk = dmp.dkl_nblk;
 
 			if (ddi_copyout((caddr_t)&dmp32, data, sizeof (dmp32),
-				mode) != 0)
+			    mode) != 0)
 				err = EFAULT;
 		}
 #endif /* _SYSCALL32 */
@@ -2830,7 +2894,7 @@ raid_may_renexch_self(
 
 	if (!un || !ui) {
 		(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-								from_min);
+		    from_min);
 		return (EINVAL);
 	}
 
@@ -2855,7 +2919,7 @@ raid_may_renexch_self(
 
 		if (!related) {
 			(void) mdmderror(&rtxnp->mde,
-					MDE_RENAME_TARGET_UNRELATED, to_min);
+			    MDE_RENAME_TARGET_UNRELATED, to_min);
 			return (EINVAL);
 		}
 
@@ -2869,14 +2933,14 @@ raid_may_renexch_self(
 
 		if (toplevel && md_unit_isopen(ui)) {
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_BUSY,
-								from_min);
+			    from_min);
 			return (EBUSY);
 		}
 		break;
 
 	default:
 		(void) mdmderror(&rtxnp->mde, MDE_RENAME_CONFIG_ERROR,
-								from_min);
+		    from_min);
 		return (EINVAL);
 	}
 
@@ -2921,38 +2985,38 @@ raid_rename_check(
 
 		if (colstate & RCS_LAST_ERRED) {
 			(void) mdmderror(&rtxnp->mde, MDE_RAID_LAST_ERRED,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (EINVAL);
 		}
 
 		if (colstate & RCS_INIT_ERRED) {
 			(void) mdmderror(&rtxnp->mde, MDE_RAID_DOI,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (EINVAL);
 		}
 
 		/* How did we get this far before detecting this? */
 		if (colstate & RCS_RESYNC) {
 			(void) mdmderror(&rtxnp->mde, MDE_RENAME_BUSY,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (EBUSY);
 		}
 
 		if (colstate & RCS_ERRED) {
 			(void) mdmderror(&rtxnp->mde, MDE_RAID_NOT_OKAY,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (EINVAL);
 		}
 
 		if (!(colstate & RCS_OKAY)) {
 			(void) mdmderror(&rtxnp->mde, MDE_RAID_NOT_OKAY,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (EINVAL);
 		}
 
 		if (HOTSPARED(un, column)) {
 			(void) mdmderror(&rtxnp->mde, MDE_RAID_NOT_OKAY,
-						md_getminor(delta->dev));
+			    md_getminor(delta->dev));
 			return (EINVAL);
 		}
 	}
@@ -2960,7 +3024,7 @@ raid_rename_check(
 	/* self does additional checks */
 	if (delta->old_role == MDRR_SELF) {
 		err = raid_may_renexch_self((mr_unit_t *)delta->unp,
-							delta->uip, rtxnp);
+		    delta->uip, rtxnp);
 	}
 	return (err);
 }
@@ -3046,13 +3110,12 @@ raid_rename_unlock(
 		goto out;
 	}
 	if (raid_internal_open(mnum, (FREAD | FWRITE),
-			OTYP_LYR, MD_OFLG_ISINIT) == 0) {
+	    OTYP_LYR, MD_OFLG_ISINIT) == 0) {
 		for (col = 0; col < un->un_totalcolumncnt; col++) {
 			if (un->un_column[col].un_devstate & RCS_OKAY)
 				(void) init_pw_area(un,
-						un->un_column[col].un_dev,
-						un->un_column[col].un_pwstart,
-						col);
+				    un->un_column[col].un_dev,
+				    un->un_column[col].un_pwstart, col);
 		}
 		(void) raid_internal_close(mnum, OTYP_LYR, 0, 0);
 	}

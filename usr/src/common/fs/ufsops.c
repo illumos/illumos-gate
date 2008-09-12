@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -106,7 +105,7 @@ openi(fileid_t *filep, ino_t inode)
 
 	filep->fi_offset = 0;
 	filep->fi_blocknum = fsbtodb(&devp->un_fs.di_fs,
-				itod(&devp->un_fs.di_fs, inode));
+	    itod(&devp->un_fs.di_fs, inode));
 
 	/* never more than 1 disk block */
 	filep->fi_count = devp->un_fs.di_fs.fs_bsize;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rmf_menu.c :
@@ -51,7 +49,7 @@ extern int32_t l_flag;
 
 extern char *myname;
 extern char *slice_file;
-extern uint32_t repair_blk_no;
+extern diskaddr_t repair_blk_no;
 extern int32_t quick_format;
 extern int32_t long_format;
 extern int32_t force_format;
@@ -75,12 +73,12 @@ extern void check_invalid_combinations_again(int32_t);
 extern void process_options();
 extern void get_passwd(struct smwp_state *wp, int32_t confirm);
 extern int32_t valid_slice_file(smedia_handle_t, int32_t, char *,
-	struct vtoc *);
+	struct extvtoc *);
 extern void trap_SIGINT();
 extern void release_SIGINT();
 extern int32_t verify(smedia_handle_t handle, int32_t fd,
-		uint32_t start_sector, uint32_t nblocks,
-		char *buf, int32_t flag, int32_t blocksize, int32_t no_raw_rw);
+	diskaddr_t start_sector, uint32_t nblocks,
+	char *buf, int32_t flag, int32_t blocksize, int32_t no_raw_rw);
 extern void my_perror(char *err_string);
 extern void write_default_label(smedia_handle_t, int32_t fd);
 extern int find_device(int defer, char *tmpstr);
@@ -223,7 +221,7 @@ performed on a mounted device.\n"));
 
 	DPRINTF1("media type %x\n", med_info.sm_media_type);
 	DPRINTF1("media block size %x\n", med_info.sm_blocksize);
-	DPRINTF1("media capacity %x\n", med_info.sm_capacity);
+	DPRINTF1("media capacity %u\n", (uint32_t)med_info.sm_capacity);
 	DPRINTF3("media cyl %d head %d sect %d\n",
 		med_info.sm_pcyl, med_info.sm_nhead, med_info.sm_nsect);
 	check_invalid_combinations_again(med_info.sm_media_type);
@@ -818,7 +816,7 @@ process_c_flag(smedia_handle_t handle)
 
 	if (smedia_reassign_block(handle, repair_blk_no) != 0) {
 		(void) snprintf(error_string, 255,
-		    gettext("Could not repair block no %d"), repair_blk_no);
+		    gettext("Could not repair block no %llu"), repair_blk_no);
 		PERROR(error_string);
 		return;
 	}
@@ -836,13 +834,14 @@ static void
 process_V_flag(smedia_handle_t handle, int32_t fd)
 {
 	int32_t ret;
-	uint32_t i, j;
+	uint32_t j;
+	diskaddr_t bn;
 	char *read_buf, *write_buf;
 	int32_t old_per = 0;
 	int32_t new_per;
 	int32_t no_raw_rw = 0;
 	int32_t verify_size;
-	uint32_t capacity;
+	diskaddr_t capacity;
 	int32_t blocksize;
 
 	DPRINTF("ANALYSE MEDIA \n");
@@ -855,12 +854,12 @@ process_V_flag(smedia_handle_t handle, int32_t fd)
 
 	DPRINTF1("media_type %d\n", med_info.sm_media_type);
 	DPRINTF1("sector_size %d\n", med_info.sm_blocksize);
-	DPRINTF1("num_sectors %d\n", med_info.sm_capacity);
+	DPRINTF1("num_sectors %u\n", (uint32_t)med_info.sm_capacity);
 	DPRINTF1("nsect	 %d\n", med_info.sm_nsect);
 
 	blocksize = med_info.sm_blocksize;
 
-	capacity = med_info.sm_capacity;
+	capacity = (uint32_t)med_info.sm_capacity;
 	verify_size = (med_info.sm_nsect > 64) ? 64 : med_info.sm_nsect;
 	read_buf = (char *)malloc(blocksize * verify_size);
 	if (read_buf == NULL) {
@@ -876,40 +875,42 @@ process_V_flag(smedia_handle_t handle, int32_t fd)
 
 	if (!verify_write) {
 		DPRINTF("Non-destructive verify \n");
-		for (i = 0; i < med_info.sm_capacity; i += verify_size) {
-			new_per = (i * 80)/med_info.sm_capacity;
+		for (bn = 0; bn < (uint32_t)med_info.sm_capacity;
+		    bn += verify_size) {
+			new_per = (bn * 80)/(uint32_t)med_info.sm_capacity;
 			if (new_per >= old_per) {
 				(void) printf(".");
 				(void) fflush(stdout);
 				old_per++;
 			}
-			DPRINTF2("Reading %d blks starting at %d\n",
-				verify_size, i);
-			ret = verify(handle, fd, i, verify_size, read_buf,
-				VERIFY_READ, blocksize, no_raw_rw);
+			DPRINTF2("Reading %d blks starting at %llu\n",
+			    verify_size, bn);
+			ret = verify(handle, fd, bn, verify_size, read_buf,
+			    VERIFY_READ, blocksize, no_raw_rw);
 			if ((ret == -1) && (errno == ENOTSUP)) {
 				no_raw_rw = 1;
-				ret = verify(handle, fd, i, verify_size,
-					read_buf,
-					VERIFY_READ, blocksize, no_raw_rw);
-				capacity = med_info.sm_pcyl * med_info.sm_nhead
-					* med_info.sm_nsect;
+				ret = verify(handle, fd, bn, verify_size,
+				    read_buf,
+				    VERIFY_READ, blocksize, no_raw_rw);
+				capacity = (diskaddr_t)med_info.sm_pcyl *
+				    med_info.sm_nhead * med_info.sm_nsect;
 			}
 
 			if (ret != 0) {
 				for (j = 0; j < verify_size; j++) {
-					if ((i + j) >= capacity)
+					if ((bn + j) >= capacity)
 							return;
-					    DPRINTF2(
-					"Reading %d blks starting at %d\n",
-						1, i+j);
-					ret = verify(handle, fd, i + j, 1,
-						read_buf,
-						VERIFY_READ, blocksize,
-						no_raw_rw);
+					DPRINTF2(
+					    "Reading %d blks starting "
+					    "at %llu\n", 1, bn + j);
+					ret = verify(handle, fd, bn + j, 1,
+					    read_buf,
+					    VERIFY_READ, blocksize,
+					    no_raw_rw);
 					if (ret == -1) {
-						(void) printf("Bad block %d\n",
-							i+j);
+						(void) printf(
+						    "Bad block %llu\n",
+						    bn + j);
 					}
 				}
 			}
@@ -917,8 +918,9 @@ process_V_flag(smedia_handle_t handle, int32_t fd)
 	} else {
 
 		DPRINTF("Destrutive verify \n");
-		for (i = 0; i < med_info.sm_capacity; i += verify_size) {
-			new_per = (i * 80)/med_info.sm_capacity;
+		for (bn = 0; bn < (uint32_t)med_info.sm_capacity;
+		    bn += verify_size) {
+			new_per = (bn * 80)/(uint32_t)med_info.sm_capacity;
 			if (new_per >= old_per) {
 				(void) printf(".");
 
@@ -927,48 +929,48 @@ process_V_flag(smedia_handle_t handle, int32_t fd)
 			}
 
 			for (j = 0; j < blocksize * verify_size; j++) {
-				write_buf[j] = (i|j) & 0xFF;
+				write_buf[j] = (bn | j) & 0xFF;
 			}
-			DPRINTF2("Writing %d blks starting at %d\n",
-				verify_size, i);
-			ret = verify(handle, fd, i, verify_size, write_buf,
-				VERIFY_WRITE, blocksize, no_raw_rw);
+			DPRINTF2("Writing %d blks starting at %llu\n",
+			    verify_size, bn);
+			ret = verify(handle, fd, bn, verify_size, write_buf,
+			    VERIFY_WRITE, blocksize, no_raw_rw);
 
 			if (ret != 0) {
 				for (j = 0; j < verify_size; j++) {
-					if ((i + j) >= capacity)
+					if ((bn + j) >= capacity)
 							break;
 					DPRINTF2(
-				"Writing %d blks starting at %d\n",
-					1, i+j);
-					ret = verify(handle, fd, i + j, 1,
-						write_buf,
-						VERIFY_WRITE, blocksize,
-						no_raw_rw);
+					    "Writing %d blks starting "
+					    "at %llu\n", 1, bn + j);
+					ret = verify(handle, fd, bn + j, 1,
+					    write_buf,
+					    VERIFY_WRITE, blocksize,
+					    no_raw_rw);
 					if (ret == -1) {
-						(void) printf("Bad block %d\n",
-							i+j);
+						(void) printf(
+						    "Bad block %llu\n", bn + j);
 					}
 				}
 			}
-			DPRINTF2("Read after write  %d blks starting at %d\n",
-				verify_size, i);
-			ret = verify(handle, fd, i, verify_size,
-				read_buf, VERIFY_READ, blocksize, no_raw_rw);
+			DPRINTF2("Read after write  %d blks starting at %llu\n",
+			    verify_size, bn);
+			ret = verify(handle, fd, bn, verify_size,
+			    read_buf, VERIFY_READ, blocksize, no_raw_rw);
 
 			if (ret != 0) {
 				for (j = 0; j < verify_size; j++) {
-					if ((i + j) >= capacity)
+					if ((bn + j) >= capacity)
 							return;
 					DPRINTF2(
-				"Read after write  %d blks starting at %d\n",
-					1, i+j);
-					ret = verify(handle, fd, i + j, 1,
-						read_buf, VERIFY_READ,
-						blocksize, no_raw_rw);
+					    "Read after write  %d blks "
+					    "starting at %llu\n", 1, bn + j);
+					ret = verify(handle, fd, bn + j, 1,
+					    read_buf, VERIFY_READ,
+					    blocksize, no_raw_rw);
 					if (ret == -1) {
-						(void) printf("Bad block %d\n",
-							i+j);
+						(void) printf(
+						    "Bad block %llu\n", bn + j);
 					}
 				}
 			}
@@ -982,7 +984,7 @@ static void
 process_s_flag(smedia_handle_t handle, int32_t fd)
 {
 	int32_t i, ret;
-	struct vtoc v_toc, t_vtoc;
+	struct extvtoc v_toc, t_vtoc;
 	if (valid_slice_file(handle, fd, slice_file, &v_toc)) {
 			(void) smedia_release_handle(handle);
 			(void) close(fd);
@@ -1002,7 +1004,7 @@ process_s_flag(smedia_handle_t handle, int32_t fd)
 	/* Turn on privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	(void) read_vtoc(fd, &t_vtoc);
+	(void) read_extvtoc(fd, &t_vtoc);
 
 	/* Turn off privileges. */
 	(void) __priv_bracket(PRIV_OFF);
@@ -1020,7 +1022,7 @@ process_s_flag(smedia_handle_t handle, int32_t fd)
 	/* Turn on privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	ret = write_vtoc(fd, &t_vtoc);
+	ret = write_extvtoc(fd, &t_vtoc);
 
 	/* Turn off privileges. */
 	(void) __priv_bracket(PRIV_OFF);
@@ -1117,7 +1119,7 @@ static void
 process_b_flag(int32_t fd)
 {
 	int32_t ret, nparts;
-	struct vtoc v_toc;
+	struct extvtoc v_toc;
 	struct dk_gpt *vtoc64;
 
 	/* For EFI disks. */
@@ -1158,7 +1160,7 @@ process_b_flag(int32_t fd)
 	/* Turn on privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	ret = read_vtoc(fd, &v_toc);
+	ret = read_extvtoc(fd, &v_toc);
 
 	/* Turn off privileges */
 	(void) __priv_bracket(PRIV_OFF);
@@ -1185,7 +1187,7 @@ process_b_flag(int32_t fd)
 	/* Turn on the privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	ret = write_vtoc(fd, &v_toc);
+	ret = write_extvtoc(fd, &v_toc);
 
 	/* Turn off the privileges. */
 	(void) __priv_bracket(PRIV_OFF);

@@ -155,6 +155,7 @@ f none kernel/exec/intpexec 755 root sys
 f none kernel/fs/autofs 755 root sys
 f none kernel/fs/cachefs 755 root sys
 f none kernel/fs/ctfs 755 root sys
+f none kernel/fs/dcfs 755 root sys
 f none kernel/fs/devfs 755 root sys
 f none kernel/fs/dev 755 root sys
 f none kernel/fs/fifofs 755 root sys
@@ -364,6 +365,7 @@ d none kernel/fs/amd64 755 root sys
 f none kernel/fs/amd64/autofs 755 root sys
 f none kernel/fs/amd64/cachefs 755 root sys
 f none kernel/fs/amd64/ctfs 755 root sys
+f none kernel/fs/amd64/dcfs 755 root sys
 f none kernel/fs/amd64/dev 755 root sys
 f none kernel/fs/amd64/devfs 755 root sys
 f none kernel/fs/amd64/fifofs 755 root sys

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rmf_main.c :
@@ -53,7 +51,7 @@ int32_t w_flag = 0;
 static char *myname;
 char *slice_file = NULL;
 char *label;
-uint32_t repair_blk_no;
+diskaddr_t repair_blk_no;
 int32_t quick_format = 0;
 int32_t long_format = 0;
 int32_t force_format = 0;
@@ -69,7 +67,7 @@ char *dev_name = NULL;
 static void usage(char *);
 void check_invalid_combinations();
 void check_invalid_combinations_again(int32_t);
-extern int64_t my_atoll(char *ptr);
+extern uint64_t my_atoll(char *ptr);
 extern void my_perror(char *err_string);
 void process_options();
 
@@ -100,8 +98,7 @@ main(int32_t argc, char **argv)
 	myname = argv[0];
 	DPRINTF1("myname %s\n", myname);
 
-	while ((i = getopt(argc, argv, "b:c:DeF:HlpR:s:tUV:W:w:"))
-							!= -1) {
+	while ((i = getopt(argc, argv, "b:c:DeF:HlpR:s:tUV:W:w:")) != -1) {
 		DPRINTF1("arg %c\n", i);
 		switch (i) {
 		case 'b' :
@@ -120,13 +117,13 @@ restricted to 8 characters.\n"));
 			c_flag++;
 			tmp_ptr = strdup(optarg);
 			errno = 0;
-			repair_blk_no = (uint32_t)my_atoll(tmp_ptr);
-			if (repair_blk_no == (uint32_t)(-1)) {
+			repair_blk_no = my_atoll(tmp_ptr);
+			if (repair_blk_no == (diskaddr_t)(-1)) {
 				free(tmp_ptr);
 				usage("invalid block number");
 			}
 
-			DPRINTF1(" block no. %x\n", repair_blk_no);
+			DPRINTF1(" block no. %llu\n", repair_blk_no);
 			free(tmp_ptr);
 			break;
 
@@ -326,7 +323,7 @@ void
 check_invalid_combinations_again(int32_t medium_type)
 {
 	if ((medium_type != SM_FLOPPY) &&
-			(medium_type != SM_PCMCIA_MEM)) {
+	    (medium_type != SM_PCMCIA_MEM)) {
 		if (D_flag || H_flag) {
 			usage("-D, -H  options are compatible with floppy and \
 PCMCIA memory cards only.");

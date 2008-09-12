@@ -18,13 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * rmf_misc.c :
@@ -713,12 +711,12 @@ is not a raw device.\n"));
 	return (fd);
 }
 
-int64_t
+uint64_t
 my_atoll(char *ptr)
 {
 	char *tmp_ptr = ptr;
 	int32_t base = 10;
-	int64_t ret_val;
+	uint64_t ret_val;
 
 	while (*tmp_ptr) {
 		if (isdigit(*tmp_ptr))
@@ -745,7 +743,7 @@ my_atoll(char *ptr)
 			}
 		}
 	}
-	ret_val = strtoll(ptr, (char **)NULL, 0);
+	ret_val = (uint64_t)strtoull(ptr, (char **)NULL, 0);
 	return (ret_val);
 }
 
@@ -753,10 +751,10 @@ int32_t
 write_sunos_label(int32_t fd, int32_t media_type)
 {
 
-	struct vtoc v_toc;
+	struct extvtoc v_toc;
 	int32_t ret;
 
-	(void) memset(&v_toc, 0, sizeof (struct vtoc));
+	(void) memset(&v_toc, 0, sizeof (struct extvtoc));
 
 	/* Initialize the vtoc information */
 
@@ -874,15 +872,15 @@ write_sunos_label(int32_t fd, int32_t media_type)
 		/* we want the same partitioning as used for normal floppies */
 
 		v_toc.v_part[0].p_start = 0;
-		v_toc.v_part[0].p_size =  (dkgeom.dkg_ncyl - 1) *
+		v_toc.v_part[0].p_size =  (diskaddr_t)(dkgeom.dkg_ncyl - 1) *
 		    dkgeom.dkg_nhead * dkgeom.dkg_nsect;
 
-		v_toc.v_part[1].p_start = (dkgeom.dkg_ncyl - 1) *
+		v_toc.v_part[1].p_start = (diskaddr_t)(dkgeom.dkg_ncyl - 1) *
 		    dkgeom.dkg_nhead * dkgeom.dkg_nsect;
 		v_toc.v_part[1].p_size =  dkgeom.dkg_nhead * dkgeom.dkg_nsect;
 
 		v_toc.v_part[2].p_start = 0;
-		v_toc.v_part[2].p_size = dkgeom.dkg_ncyl *
+		v_toc.v_part[2].p_size = (diskaddr_t)dkgeom.dkg_ncyl *
 		    dkgeom.dkg_nhead * dkgeom.dkg_nsect;
 
 		/* both write_vtoc and DKIOCSVTOC require V_NUMPAR partitions */
@@ -909,7 +907,7 @@ write_sunos_label(int32_t fd, int32_t media_type)
 	/* Turn on the privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	ret = write_vtoc(fd, &v_toc);
+	ret = write_extvtoc(fd, &v_toc);
 
 	/* Turn off the privileges. */
 	(void) __priv_bracket(PRIV_OFF);
@@ -969,11 +967,11 @@ release_SIGINT()
 }
 
 int32_t
-verify(smedia_handle_t handle, int32_t fd, uint32_t start_sector,
+verify(smedia_handle_t handle, int32_t fd, diskaddr_t start_sector,
 	uint32_t nblocks, char *buf,
-			int32_t flag, int32_t blocksize, int32_t no_raw_rw)
+	int32_t flag, int32_t blocksize, int32_t no_raw_rw)
 {
-	int32_t ret;
+	uint64_t ret;
 
 	DPRINTF("ANALYSE MEDIA \n");
 
@@ -989,11 +987,11 @@ verify(smedia_handle_t handle, int32_t fd, uint32_t start_sector,
 		/* Turn off the privileges. */
 		(void) __priv_bracket(PRIV_OFF);
 
-		if ((ret < 0) || (ret != (nblocks * blocksize)))
-				return (-1);
+		if (ret != (nblocks * blocksize))
+			return (-1);
 		return (0);
 
-		} else if ((flag == VERIFY_WRITE) && (!no_raw_rw)) {
+	} else if ((flag == VERIFY_WRITE) && (!no_raw_rw)) {
 
 		/* Turn on privileges. */
 		(void) __priv_bracket(PRIV_ON);
@@ -1004,7 +1002,7 @@ verify(smedia_handle_t handle, int32_t fd, uint32_t start_sector,
 		/* Turn off the privileges. */
 		(void) __priv_bracket(PRIV_OFF);
 
-		if ((ret < 0) || (ret != (blocksize * nblocks)))
+		if (ret != (blocksize * nblocks))
 			return (-1);
 		return (0);
 
@@ -2028,7 +2026,7 @@ static void
 get_media_info(device_t *t_dev, char *sdev, char *pname, char *sn)
 {
 	struct dk_cinfo cinfo;
-	struct vtoc vtocinfo;
+	struct extvtoc vtocinfo;
 	float size;
 	int32_t fd;
 	smedia_handle_t handle;
@@ -2079,7 +2077,7 @@ get_media_info(device_t *t_dev, char *sdev, char *pname, char *sn)
 	/*
 	 * Print label.
 	 */
-	if (!device_type && (!ioctl(t_dev->d_fd, DKIOCGVTOC, &vtocinfo))) {
+	if (!device_type && (read_extvtoc(t_dev->d_fd,  &vtocinfo) >= 0)) {
 		if (*vtocinfo.v_volume) {
 			(void) printf("\tLabel: %s\n", vtocinfo.v_volume);
 		} else {

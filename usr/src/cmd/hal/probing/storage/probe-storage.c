@@ -2,14 +2,12 @@
  *
  * probe-storage.c : Probe for storage devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
@@ -349,7 +347,7 @@ main (int argc, char *argv[])
 	dbus_bool_t vtoc_slices = FALSE;
 	int dos_cnt = 0;
 	const char *scheme = "";
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 	dk_gpt_t *gpt;
 	LibHalChangeSet *cs = NULL;
 
@@ -436,7 +434,7 @@ main (int argc, char *argv[])
 	if (is_mbr) {
 		scheme = "mbr";
 	}
-	if (read_vtoc(rfd, &vtoc) >= 0) {
+	if (read_extvtoc(rfd, &vtoc) >= 0) {
 		if (!vtoc_one_slice_entire_disk(&vtoc)) {
 			is_smi = TRUE;
 			if (!is_mbr) {

@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver for Virtual Disk.
@@ -3587,10 +3586,10 @@ md_get_vtoc(md_unit_t *un, struct vtoc *vtoc)
 				vtoc32tovtoc((*vt32), (*vtoc));
 			}
 			if (un->c.un_flag & MD_LABELED)
-				vtoc->v_part[0].p_start = 0;
+				vtoc->v_part[0].p_start = 0ULL;
 			else
-				vtoc->v_part[0].p_start =
-				    un->c.un_nhead * un->c.un_nsect;
+				vtoc->v_part[0].p_start = (diskaddr_t)
+				    (un->c.un_nhead * un->c.un_nsect);
 			vtoc->v_part[0].p_size = un->c.un_total_blocks;
 			vtoc->v_version = V_VERSION;
 			vtoc->v_sectorsz = DEV_BSIZE;
@@ -3607,9 +3606,10 @@ md_get_vtoc(md_unit_t *un, struct vtoc *vtoc)
 	vtoc->v_version = V_VERSION;
 	vtoc->v_sectorsz = DEV_BSIZE;
 	if (un->c.un_flag & MD_LABELED)
-		vtoc->v_part[0].p_start = 0;
+		vtoc->v_part[0].p_start = 0ULL;
 	else
-		vtoc->v_part[0].p_start = un->c.un_nhead * un->c.un_nsect;
+		vtoc->v_part[0].p_start = (diskaddr_t)(un->c.un_nhead *
+		    un->c.un_nsect);
 	vtoc->v_part[0].p_size = un->c.un_total_blocks;
 }
 
@@ -3623,7 +3623,7 @@ md_set_vtoc(md_unit_t *un, struct vtoc *vtoc)
 	mddb_recid_t		recids[3];
 	mddb_recstatus_t	status;
 	caddr_t			v;
-	daddr_t			sb;
+	diskaddr_t		sb;
 
 	/*
 	 * Sanity-check the vtoc
@@ -3641,19 +3641,20 @@ md_set_vtoc(md_unit_t *un, struct vtoc *vtoc)
 	for (i = 0; i < V_NUMPAR; i++, vpart++) {
 		if (i == 0) {
 			if (un->c.un_flag & MD_LABELED)
-				sb = 0;
+				sb = 0ULL;
 			else
-				sb = un->c.un_nhead * un->c.un_nsect;
+				sb = (diskaddr_t)(un->c.un_nhead *
+				    un->c.un_nsect);
 			if (vpart->p_start != sb)
 				return (EINVAL);
-			if (vpart->p_size != (long)un->c.un_total_blocks)
+			if (vpart->p_size != un->c.un_total_blocks)
 				return (EINVAL);
 			continue;
 		}
 		/* all other partitions must be zero */
-		if (vpart->p_start != 0)
+		if (vpart->p_start != 0ULL)
 			return (EINVAL);
-		if (vpart->p_size != 0)
+		if (vpart->p_size != 0ULL)
 			return (EINVAL);
 	}
 
@@ -3702,6 +3703,161 @@ md_set_vtoc(md_unit_t *un, struct vtoc *vtoc)
 
 	un->c.un_vtoc_id = recid;
 	un->c.un_flag &= ~MD_EFILABEL;
+	mddb_commitrecs_wrapper(recids);
+	return (0);
+}
+
+void
+md_get_extvtoc(md_unit_t *un, struct extvtoc *extvtoc)
+{
+	caddr_t			v;
+	mddb_recstatus_t	status;
+	struct vtoc32		*vt32;
+	struct vtoc		*vtoc;
+
+	/*
+	 * Return extvtoc structure fields in the provided VTOC area, addressed
+	 * by *extvtoc.
+	 *
+	 */
+
+	bzero((caddr_t)extvtoc, sizeof (struct extvtoc));
+	if (un->c.un_vtoc_id) {
+		status = mddb_getrecstatus(un->c.un_vtoc_id);
+		if (status == MDDB_OK) {
+			v = mddb_getrecaddr(un->c.un_vtoc_id);
+			if (un->c.un_flag & MD_EFILABEL) {
+				bcopy(v, (caddr_t)&(extvtoc->v_volume),
+				    LEN_DKL_VVOL);
+			} else {
+				/*
+				 * if this seems to be a sane vtoc,
+				 * just copy it ...
+				 */
+				if (((struct vtoc *)v)->v_sanity == VTOC_SANE) {
+					vtoc = (struct vtoc *)v;
+					vtoctoextvtoc((*vtoc), (*extvtoc));
+				} else {
+					/* assume a vtoc32 was stored here */
+					vt32 = (struct vtoc32 *)v;
+					vtoc32toextvtoc((*vt32), (*extvtoc));
+				}
+			}
+		} else {
+			un->c.un_vtoc_id = 0;
+			mddb_commitrec_wrapper(un->c.un_record_id);
+		}
+	}
+
+	extvtoc->v_sanity = VTOC_SANE;
+	extvtoc->v_nparts = 1;
+	extvtoc->v_version = V_VERSION;
+	extvtoc->v_sectorsz = DEV_BSIZE;
+	if (un->c.un_flag & MD_LABELED)
+		extvtoc->v_part[0].p_start = 0ULL;
+	else
+		extvtoc->v_part[0].p_start = (diskaddr_t)(un->c.un_nhead *
+		    un->c.un_nsect);
+	extvtoc->v_part[0].p_size = un->c.un_total_blocks;
+}
+
+int
+md_set_extvtoc(md_unit_t *un, struct extvtoc *extvtoc)
+{
+
+	struct extpartition	*vpart;
+	int			i;
+	mddb_recid_t		recid;
+	mddb_recid_t		recids[3];
+	mddb_recstatus_t	status;
+	caddr_t			v;
+	diskaddr_t		sb;
+	struct vtoc		vtoc;
+
+	/*
+	 * Sanity-check the vtoc
+	 */
+	if (extvtoc->v_sanity != VTOC_SANE || extvtoc->v_nparts != 1)
+		return (EINVAL);
+
+	/*
+	 * Validate the partition table
+	 */
+	vpart = extvtoc->v_part;
+	for (i = 0; i < V_NUMPAR; i++, vpart++) {
+		if (i == 0) {
+			if (un->c.un_flag & MD_LABELED)
+				sb = 0ULL;
+			else
+				sb = (diskaddr_t)(un->c.un_nhead *
+				    un->c.un_nsect);
+			if (vpart->p_start != sb)
+				return (EINVAL);
+			if (vpart->p_size != un->c.un_total_blocks)
+				return (EINVAL);
+			continue;
+		}
+		/* all other partitions must be zero */
+		if (vpart->p_start != 0ULL)
+			return (EINVAL);
+		if (vpart->p_size != 0)
+			return (EINVAL);
+	}
+
+	if (!(un->c.un_revision & MD_64BIT_META_DEV)) {
+		extvtoctovtoc((*extvtoc), (vtoc));
+		return (md_set_vtoc(un, &vtoc));
+	}
+
+	/*
+	 * Since the size is greater than 1 TB the information can either
+	 * be stored as a VTOC or EFI.  Since EFI uses less space just use
+	 * it.  md_get_extvtoc can reconstruct the label information from
+	 * either format.
+	 */
+	if (un->c.un_vtoc_id) {
+		recid = un->c.un_vtoc_id;
+		status = mddb_getrecstatus(recid);
+		if (status == MDDB_OK) {
+			/*
+			 * If there's enough space in the record, and the
+			 * existing record is an EFI record (not vtoc),
+			 * we just can use the existing space.
+			 * Otherwise, we create a new MDDB_EFILABEL record for
+			 * this unit.
+			 */
+			if ((mddb_getrecsize(recid) >= MD_EFI_PARTNAME_BYTES) &&
+			    (un->c.un_flag & MD_EFILABEL))  {
+				v = mddb_getrecaddr(recid);
+				bzero((caddr_t)v, MD_EFI_PARTNAME_BYTES);
+				bcopy((caddr_t)&(extvtoc->v_volume),
+				    v, LEN_DKL_VVOL);
+				mddb_commitrec_wrapper(recid);
+				return (0);
+			}
+
+			un->c.un_vtoc_id = 0;
+			mddb_commitrec_wrapper(un->c.un_record_id);
+			mddb_deleterec_wrapper(recid);
+		}
+	}
+
+	recid = mddb_createrec(MD_EFI_PARTNAME_BYTES, MDDB_EFILABEL, 0,
+	    MD_CRO_32BIT, MD_UN2SET(un));
+
+	if (recid < 0) {
+		return (ENOSPC);
+	}
+
+	recids[0] = recid;
+	recids[1] = un->c.un_record_id;
+	recids[2] = 0;
+	v = mddb_getrecaddr(recid);
+	bzero((caddr_t)v, MD_EFI_PARTNAME_BYTES);
+	bcopy((caddr_t)&(extvtoc->v_volume), v, LEN_DKL_VVOL);
+
+	un->c.un_vtoc_id = recid;
+	un->c.un_flag |= MD_EFILABEL;
 	mddb_commitrecs_wrapper(recids);
 	return (0);
 }

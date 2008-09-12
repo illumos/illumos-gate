@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains I/O related functions.
@@ -71,7 +69,7 @@ static void	pushchar(int c);
 static int	checkeof(void);
 static void	flushline(void);
 static int	strcnt(char *s1, char *s2);
-static int	getbn(char *str, daddr_t *iptr);
+static int	getbn(char *str, diskaddr_t *iptr);
 static void	print_input_choices(int type, u_ioparam_t *param);
 static int	slist_widest_str(slist_t *slist);
 static void	ljust_print(char *str, int width);
@@ -89,7 +87,7 @@ static void	pushchar(int c);
 static int	checkeof(void);
 static void	flushline(void);
 static int	strcnt(char *s1, char *s2);
-static int	getbn(char *str, daddr_t *iptr);
+static int	getbn(char *str, diskaddr_t *iptr);
 static void	print_input_choices(int type, u_ioparam_t *param);
 static int	slist_widest_str(slist_t *slist);
 static void	ljust_print(char *str, int width);
@@ -347,10 +345,12 @@ geti64(str, iptr, wild)
 static int
 getbn(str, iptr)
 	char	*str;
-	daddr_t	*iptr;
+	diskaddr_t	*iptr;
 {
 	char	*cptr, *hptr, *sptr;
-	int	cyl, head, sect, wild;
+	int	cyl, head, sect;
+	int	wild;
+	diskaddr_t	wild64;
 	TOKEN	buf;
 
 	/*
@@ -366,8 +366,8 @@ getbn(str, iptr)
 	 * If there wasn't one, convert string to an integer and return it.
 	 */
 	if (*str == '\0') {
-		wild = physsects() - 1;
-		if (geti(cptr, (int *)iptr, &wild))
+		wild64 = physsects() - 1;
+		if (geti64(cptr, iptr, &wild64))
 			return (-1);
 		return (0);
 	}
@@ -449,7 +449,7 @@ input(type, promptstr, delim, param, deflt, cmdflag)
 	int		cmdflag;
 {
 	int		interactive, help, i, length, index, tied;
-	daddr_t		bn;
+	blkaddr_t	bn;
 	diskaddr_t	bn64;
 	char		**str, **strings;
 	TOKEN		token, cleantoken;
@@ -499,9 +499,11 @@ reprompt:
 	if (deflt != NULL) {
 		switch (type) {
 		case FIO_BN:
-			fmt_print("[%d, ", *deflt);
-			pr_dblock(fmt_print, (daddr_t)*deflt);
+#if !defined(lint)	/* caller has aligned the pointer specifying FIO_BN */
+			fmt_print("[%llu, ", *(diskaddr_t *)deflt);
+			pr_dblock(fmt_print, *(diskaddr_t *)deflt);
 			fmt_print("]");
+#endif
 			break;
 		case FIO_INT:
 			fmt_print("[%d]", *deflt);
@@ -544,8 +546,9 @@ reprompt:
 			 * Old-style partition size input, used to
 			 * modify complete partition tables
 			 */
-			fmt_print("[%db, %dc, %1.2fmb, %1.2fgb]", *deflt,
-			    bn2c(*deflt), bn2mb(*deflt), bn2gb(*deflt));
+			blokno = *(blkaddr32_t *)deflt;
+			fmt_print("[%llub, %uc, %1.2fmb, %1.2fgb]", blokno,
+			    bn2c(blokno), bn2mb(blokno), bn2gb(blokno));
 			break;
 		case FIO_ECYL:
 			/*
@@ -578,14 +581,13 @@ reprompt:
 			if (part_deflt->deflt_size == 0) {
 				cylno = part_deflt->start_cyl;
 			} else if (part_deflt->start_cyl == 0) {
-				cylno = bn2c(part_deflt->deflt_size)
-				    - 1;
+				cylno = bn2c(part_deflt->deflt_size) - 1;
 			} else {
 				cylno = (bn2c(part_deflt->deflt_size) +
 					    part_deflt->start_cyl) - 1;
 			}
 
-			fmt_print("[%db, %dc, %de, %1.2fmb, %1.2fgb]",
+			fmt_print("[%ub, %uc, %de, %1.2fmb, %1.2fgb]",
 			    part_deflt->deflt_size,
 			    bn2c(part_deflt->deflt_size),
 			    cylno,
@@ -813,31 +815,22 @@ reprompt:
 			(uint64_t *)NULL))
 			    break;
 		} else {
-		    if (getbn(cleantoken, &bn))
+		    if (getbn(cleantoken, &bn64))
 			break;
-		}
-		if (cur_label == L_TYPE_EFI) {
-		    if ((bn64 < bounds->lower) || (bn64 > bounds->upper)) {
-			err_print("`");
-			pr_dblock(err_print, bn64);
-			err_print("' is out of range.\n");
-			break;
-		    }
-		    return (bn64);
 		}
 		/*
 		 * Check to be sure it is within the legal bounds.
 		 */
-		if ((bn < bounds->lower) || (bn > bounds->upper)) {
+		if ((bn64 < bounds->lower) || (bn64 > bounds->upper)) {
 			err_print("`");
-			pr_dblock(err_print, bn);
+			pr_dblock(err_print, bn64);
 			err_print("' is out of range.\n");
 			break;
 		}
 		/*
-		 * If it's ok, return it.
+		 * It's ok, return it.
 		 */
-		return (bn);
+		return (bn64);
 	/*
 	 * Expecting an integer.
 	 */
@@ -864,7 +857,7 @@ reprompt:
 		 * Check to be sure it is within the legal bounds.
 		 */
 		if ((bn < bounds->lower) || (bn > bounds->upper)) {
-			err_print("`%ld' is out of range.\n", bn);
+			err_print("`%lu' is out of range.\n", bn);
 			break;
 		}
 		/*
@@ -928,14 +921,15 @@ reprompt:
 		 * Check to be sure it is within the legal bounds.
 		 */
 		if ((bn < bounds->lower) || (bn > bounds->upper)) {
-			err_print("`%ld' is out of range.\n", bn);
+			err_print("`%lu' is out of range.\n", bn);
 			break;
 		}
 		/*
 		 * For optional case, return 1 indicating that
 		 * the user actually did enter something.
 		 */
-		*deflt = bn;
+		if (!deflt)
+			*deflt = bn;
 		return (1);
 	/*
 	 * Expecting a closed string.  This means that the input
@@ -1107,7 +1101,7 @@ reprompt:
 		if (help) {
 			fmt_print("Expecting up to %llu blocks,",
 			    bounds->upper);
-			fmt_print(" %llu cylinders, ", bn2c(bounds->upper));
+			fmt_print(" %u cylinders, ", bn2c(bounds->upper));
 			fmt_print(" %1.2f megabytes, ", bn2mb(bounds->upper));
 			fmt_print("or %1.2f gigabytes\n", bn2gb(bounds->upper));
 			break;
@@ -1159,34 +1153,33 @@ reprompt:
 			/*
 			 * Convert token to a disk block number.
 			 */
-			i = bounds->upper;
-			if (geti(cleantoken, &value, &i))
+			if (geti64(cleantoken, &bn64, &bounds->upper))
 				break;
-			bn = value;
 			/*
 			 * Check to be sure it is within the legal bounds.
 			 */
-			if ((bn < bounds->lower) || (bn > bounds->upper)) {
+			if ((bn64 < bounds->lower) || (bn64 > bounds->upper)) {
 				err_print(
-"`%ldb' is out of the range %llu to %llu\n",
-				    bn, bounds->lower, bounds->upper);
+				    "`%llub' is out of the range %llu "
+				    "to %llu\n",
+				    bn64, bounds->lower, bounds->upper);
 				break;
 			}
 			/*
 			 * Verify the block lies on a cylinder boundary
 			 */
-			if ((bn % spc()) != 0) {
+			if ((bn64 % spc()) != 0) {
 				err_print(
-"partition size must be a multiple of %d blocks to lie on a cylinder \
-boundary\n",
+				    "partition size must be a multiple of "
+				    "%u blocks to lie on a cylinder boundary\n",
 				    spc());
 				err_print(
-"%ld blocks is approximately %ld cylinders, %1.2f megabytes or %1.2f\
-gigabytes\n",
-				    bn, bn2c(bn), bn2mb(bn), bn2gb(bn));
+				    "%llu blocks is approximately %u cylinders,"
+				    " %1.2f megabytes or %1.2f gigabytes\n",
+				    bn64, bn2c(bn64), bn2mb(bn64), bn2gb(bn64));
 				break;
 			}
-			return (bn);
+			return (bn64);
 		case 'c':
 			/*
 			 * Convert token from a number of cylinders to
@@ -1225,13 +1218,13 @@ gigabytes\n",
 			/*
 			 * Convert to blocks
 			 */
-			bn = mb2bn(nmegs);
+			bn64 = mb2bn(nmegs);
 			/*
 			 * Round value up to nearest cylinder
 			 */
 			i = spc();
-			bn = ((bn + (i-1)) / i) * i;
-			return (bn);
+			bn64 = ((bn64 + (i-1)) / i) * i;
+			return (bn64);
 		case 'g':
 			/*
 			 * Convert token from gigabytes to a block number.
@@ -1251,13 +1244,13 @@ gigabytes\n",
 			/*
 			 * Convert to blocks
 			 */
-			bn = gb2bn(ngigs);
+			bn64 = gb2bn(ngigs);
 			/*
 			 * Round value up to nearest cylinder
 			 */
 			i = spc();
-			bn = ((bn + (i-1)) / i) * i;
-			return (bn);
+			bn64 = ((bn64 + (i-1)) / i) * i;
+			return (bn64);
 		default:
 			err_print(
 "Please specify units in either b(blocks), c(cylinders), m(megabytes) \
@@ -1279,10 +1272,10 @@ or g(gigabytes)\n");
 		if (help) {
 			fmt_print("Expecting up to %llu blocks,",
 			    bounds->upper);
-			fmt_print(" %llu cylinders, ",
+			fmt_print(" %u cylinders, ",
 			    bn2c(bounds->upper));
-			fmt_print(" %llu end cylinder, ",
-			    (bounds->upper / spc()));
+			fmt_print(" %u end cylinder, ",
+			    (uint_t)(bounds->upper / spc()));
 			fmt_print(" %1.2f megabytes, ",
 			    bn2mb(bounds->upper));
 			fmt_print("or %1.2f gigabytes\n",
@@ -1345,18 +1338,16 @@ or g(gigabytes)\n");
 			/*
 			 * Convert token to a disk block number.
 			 */
-			i = bounds->upper;
-			if (geti(cleantoken, &value, &i))
+			if (geti64(cleantoken, &bn64, &bounds->upper))
 				break;
-			bn = value;
 			/*
 			 * Check to be sure it is within the
 			 * legal bounds.
 			 */
-			if ((bn < bounds->lower) || (bn > bounds->upper)) {
+			if ((bn64 < bounds->lower) || (bn64 > bounds->upper)) {
 				err_print(
-"`%ldb' is out of the range %llu to %llu\n",
-				    bn, bounds->lower, bounds->upper);
+"`%llub' is out of the range %llu to %llu\n",
+				    bn64, bounds->lower, bounds->upper);
 				break;
 			}
 
@@ -1364,19 +1355,19 @@ or g(gigabytes)\n");
 			 * Verify the block lies on a cylinder
 			 * boundary
 			 */
-			if ((bn % spc()) != 0) {
+			if ((bn64 % spc()) != 0) {
 				err_print(
-"partition size must be a multiple of %d blocks to lie on a cylinder \
-boundary\n",
+				    "partition size must be a multiple of %u "
+				    "blocks to lie on a cylinder boundary\n",
 				    spc());
 				err_print(
-"%ld blocks is approximately %ld cylinders, %1.2f \
-megabytes or %1.2f gigabytes\n",
-				    bn, bn2c(bn), bn2mb(bn), bn2gb(bn));
+				    "%llu blocks is approximately %u cylinders,"
+				    " %1.2f megabytes or %1.2f gigabytes\n",
+				    bn64, bn2c(bn64), bn2mb(bn64), bn2gb(bn64));
 				break;
 			}
 
-			return (bn);
+			return (bn64);
 
 		case 'e':
 			/*
@@ -1396,7 +1387,7 @@ megabytes or %1.2f gigabytes\n",
 			 */
 			if (cylno < part_deflt->start_cyl) {
 				err_print(
-"End cylinder must fall on or after start cylinder %d\n",
+"End cylinder must fall on or after start cylinder %u\n",
 				    part_deflt->start_cyl);
 				break;
 			}
@@ -1467,14 +1458,14 @@ megabytes or %1.2f gigabytes\n",
 			/*
 			 * Convert to blocks
 			 */
-			bn = mb2bn(nmegs);
+			bn64 = mb2bn(nmegs);
 
 			/*
 			 * Round value up to nearest cylinder
 			 */
 			i = spc();
-			bn = ((bn + (i-1)) / i) * i;
-			return (bn);
+			bn64 = ((bn64 + (i-1)) / i) * i;
+			return (bn64);
 
 		case 'g':
 			/*
@@ -1498,14 +1489,14 @@ megabytes or %1.2f gigabytes\n",
 			/*
 			 * Convert to blocks
 			 */
-			bn = gb2bn(ngigs);
+			bn64 = gb2bn(ngigs);
 
 			/*
 			 * Round value up to nearest cylinder
 			 */
 			i = spc();
-			bn = ((bn + (i-1)) / i) * i;
-			return (bn);
+			bn64 = ((bn64 + (i-1)) / i) * i;
+			return (bn64);
 
 		default:
 			err_print(
@@ -2106,7 +2097,7 @@ pr_diskline(disk, num)
 
 	fmt_print("    %4d. %s ", num, disk->disk_name);
 	if ((type != NULL) && (disk->label_type == L_TYPE_SOLARIS)) {
-		fmt_print("<%s cyl %d alt %d hd %d sec %d>",
+		fmt_print("<%s cyl %u alt %u hd %u sec %u>",
 			type->dtype_asciilabel, type->dtype_ncyl,
 			type->dtype_acyl, type->dtype_nhead,
 			type->dtype_nsect);
@@ -2145,7 +2136,7 @@ pr_diskline(disk, num)
 	fmt_print("\n");
 	if (type != NULL) {
 		fmt_print(
-"           %s%d: <%s cyl %d alt %d hd %d sec %d>\n",
+"           %s%d: <%s cyl %u alt %u hd %u sec %u>\n",
 		    ctlr->ctlr_dname, disk->disk_dkinfo.dki_unit,
 		    type->dtype_asciilabel, type->dtype_ncyl,
 		    type->dtype_acyl, type->dtype_nhead,
@@ -2160,15 +2151,13 @@ pr_diskline(disk, num)
 /*
  * This routine prints out a given disk block number in cylinder/head/sector
  * format.  It uses the printing routine passed in to do the actual output.
- * Downcasting bn is okay for L_TYPE_SOLARIS because the number of blocks
- * on a Solaris (VTOC) label will never exceed 4 bytes (daddr_t).
  */
 void
 pr_dblock(void (*func)(char *, ...), diskaddr_t bn)
 {
 	if (cur_label == L_TYPE_SOLARIS) {
-		(*func)("%d/%d/%d", bn2c((daddr_t)bn),
-		    bn2h((daddr_t)bn), bn2s((daddr_t)bn));
+		(*func)("%u/%u/%u", bn2c(bn),
+		    bn2h(bn), bn2s(bn));
 	} else {
 		(*func)("%llu", bn);
 	}

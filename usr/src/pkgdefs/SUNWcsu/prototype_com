@@ -803,6 +803,7 @@ s none usr/sbin/edquota=../lib/fs/ufs/edquota
 f none usr/sbin/eeprom 2555 root sys
 s none usr/sbin/fdisk=../../sbin/fdisk
 f none usr/sbin/ff 555 root bin
+s none usr/sbin/fiocompress=../../sbin/fiocompress
 f none usr/sbin/fmthard 555 root sys
 f none usr/sbin/format 555 root bin
 f none usr/sbin/fsck 555 root bin

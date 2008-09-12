@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *   diskscan:
@@ -49,7 +46,7 @@
 static void verexit();	/* signal handler and exit routine	*/
 static void report();	   /* tell user how we're getting on */
 static void scandisk(char *device, int devfd, int writeflag);
-static void report(char *what, int sector);
+static void report(char *what, diskaddr_t sector);
 static void verexit(int code);
 
 #define	TRUE		1
@@ -60,8 +57,8 @@ static void verexit(int code);
 static char	*progname;
 static struct  dk_geom	dkg;	  /* physical device boot info */
 static char	replybuf[64];	  /* used for user replies to questions */
-static daddr_t unix_base;	  /* first sector of UNIX System partition */
-static daddr_t unix_size;	  /* # sectors in UNIX System partition */
+static diskaddr_t unix_base;	  /* first sector of UNIX System partition */
+static diskaddr_t unix_size;	  /* # sectors in UNIX System partition */
 static long	numbadrd = 0;	  /* number of bad sectors on read */
 static long	numbadwr = 0;	  /* number of bad sectors on write */
 static char	eol = '\n';	  /* end-of-line char (if -n, we set to '\n') */
@@ -74,6 +71,7 @@ main(int argc, char *argv[]) {
 	int		devfd;	/* device file descriptor */
 	struct stat 	statbuf;
 	struct part_info	part_info;
+	struct extpart_info	extpartinfo;
 	int		c;
 	int		errflag = 0;
 	char		*device;
@@ -141,15 +139,22 @@ main(int argc, char *argv[]) {
 		perror("");
 		exit(9);
 	}
-	if ((ioctl(devfd, DKIOCPARTINFO, &part_info)) == -1) {
-		(void) fprintf(stderr, "%s: unable to get partition info.\n",
-				progname);
-		perror("");
-		exit(9);
+
+	if ((ioctl(devfd, DKIOCEXTPARTINFO, &extpartinfo)) == 0) {
+		unix_base = extpartinfo.p_start;
+		unix_size = extpartinfo.p_length;
+	} else {
+		if ((ioctl(devfd, DKIOCPARTINFO, &part_info)) == 0) {
+			unix_base = (ulong_t)part_info.p_start;
+			unix_size = (uint_t)part_info.p_length;
+		} else {
+			(void) fprintf(stderr, "%s: unable to get partition "
+			    "info.\n", progname);
+			perror("");
+			exit(9);
+		}
 	}
 
-	unix_base = part_info.p_start;
-	unix_size = part_info.p_length;
 	scandisk(device, devfd, do_scan);
 	return (0);
 }
@@ -165,12 +170,12 @@ scandisk(char *device, int devfd, int writeflag)
 {
 	int	 trksiz = NBPSCTR * dkg.dkg_nsect;
 	char	*verbuf;
-	daddr_t cursec;
+	diskaddr_t cursec;
 	int	 cylsiz =  dkg.dkg_nsect * dkg.dkg_nhead;
 	int	 i;
 	char	*rptr;
-	long	tmpend = 0;
-	long	tmpsec = 0;
+	diskaddr_t tmpend = 0;
+	diskaddr_t tmpsec = 0;
 
 /* #define LIBMALLOC */
 
@@ -233,10 +238,10 @@ scandisk(char *device, int devfd, int writeflag)
 	}
 
 	for (cursec = 0; cursec < unix_size; cursec +=  dkg.dkg_nsect) {
-		if (lseek(devfd, (long)cursec * NBPSCTR, 0) == -1) {
+		if (llseek(devfd, cursec * NBPSCTR, 0) == -1) {
 			(void) fprintf(stderr,
-			    "Error seeking sector %ld Cylinder %ld\n",
-				    cursec, cursec / cylsiz);
+			    "Error seeking sector %llu Cylinder %llu\n",
+			    cursec, cursec / cylsiz);
 			verexit(1);
 		}
 
@@ -256,10 +261,9 @@ scandisk(char *device, int devfd, int writeflag)
 				 *  then announce the sector bad on stderr
 				 */
 
-				if (lseek
-				    (devfd, (long)tmpsec * NBPSCTR, 0) == -1) {
+				if (llseek(devfd, tmpsec * NBPSCTR, 0) == -1) {
 					(void) fprintf(stderr, "Error seeking "
-					    "sector %ld Cylinder %ld\n",
+					    "sector %llu Cylinder %llu\n",
 					    tmpsec, cursec / cylsiz);
 					verexit(1);
 				}
@@ -268,7 +272,7 @@ scandisk(char *device, int devfd, int writeflag)
 
 				if (write(devfd, verbuf, NBPSCTR) != NBPSCTR) {
 					(void) fprintf(stderr,
-					    "%ld\n", tmpsec + unix_base);
+					    "%llu\n", tmpsec + unix_base);
 					numbadwr++;
 				}
 			}
@@ -279,10 +283,10 @@ scandisk(char *device, int devfd, int writeflag)
 	do_readonly:
 
 	for (cursec = 0; cursec < unix_size; cursec +=  dkg.dkg_nsect) {
-		if (lseek(devfd, (long)cursec * NBPSCTR, 0) == -1) {
+		if (llseek(devfd, cursec * NBPSCTR, 0) == -1) {
 			(void) fprintf(stderr,
-			    "Error seeking sector %ld Cylinder %ld\n",
-				    cursec, cursec / cylsiz);
+			    "Error seeking sector %llu Cylinder %llu\n",
+			    cursec, cursec / cylsiz);
 			verexit(1);
 		}
 
@@ -296,16 +300,15 @@ scandisk(char *device, int devfd, int writeflag)
 		if (read(devfd, verbuf, trksiz) != trksiz) {
 			tmpend = cursec +  dkg.dkg_nsect;
 			for (tmpsec = cursec; tmpsec < tmpend; tmpsec++) {
-				if (lseek(devfd, (long)tmpsec * NBPSCTR, 0)
-				    == -1) {
+				if (llseek(devfd, tmpsec * NBPSCTR, 0) == -1) {
 					(void) fprintf(stderr, "Error seeking"
-					    " sector %ld Cylinder %ld\n",
+					    " sector %llu Cylinder %llu\n",
 					    tmpsec, cursec / cylsiz);
 					verexit(1);
 				}
 				report("Reading", tmpsec);
 				if (read(devfd, verbuf, NBPSCTR) != NBPSCTR) {
-					(void) fprintf(stderr, "%ld\n",
+					(void) fprintf(stderr, "%llu\n",
 					    tmpsec + unix_base);
 					numbadrd++;
 				}
@@ -335,8 +338,8 @@ verexit(int code)
  */
 
 static void
-report(char *what, int sector)
+report(char *what, diskaddr_t sector)
 {
-	(void) printf("%s sector %-7d of %-7ld%c", what, sector,
+	(void) printf("%s sector %-19llu of %-19llu%c", what, sector,
 	    unix_size, eol);
 }

@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -993,16 +992,22 @@ efi_free(struct dk_gpt *ptr)
 
 /*
  * Input: File descriptor
- * Output: 1 if disk is >1TB OR has an EFI label, 0 otherwise.
+ * Output: 1 if disk has an EFI label, or > 2TB with no VTOC or legacy MBR.
+ * Otherwise 0.
  */
 int
 efi_type(int fd)
 {
 	struct vtoc vtoc;
+	struct extvtoc extvtoc;
 
-	if (ioctl(fd, DKIOCGVTOC, &vtoc) == -1) {
-		if (errno == ENOTSUP) {
+	if (ioctl(fd, DKIOCGEXTVTOC, &extvtoc) == -1) {
+		if (errno == ENOTSUP)
 			return (1);
+		else if (errno == ENOTTY) {
+			if (ioctl(fd, DKIOCGVTOC, &vtoc) == -1)
+				if (errno == ENOTSUP)
+					return (1);
 		}
 	}
 	return (0);

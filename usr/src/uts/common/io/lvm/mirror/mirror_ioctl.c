@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -446,6 +447,26 @@ mirror_set_vtoc(
 )
 {
 	return (md_set_vtoc((md_unit_t *)un, vtocp));
+}
+
+static int
+mirror_get_extvtoc(
+	mm_unit_t	*un,
+	struct extvtoc	*vtocp
+)
+{
+	md_get_extvtoc((md_unit_t *)un, vtocp);
+
+	return (0);
+}
+
+static int
+mirror_set_extvtoc(
+	mm_unit_t	*un,
+	struct extvtoc	*vtocp
+)
+{
+	return (md_set_extvtoc((md_unit_t *)un, vtocp));
 }
 
 static int
@@ -2964,7 +2985,7 @@ md_mirror_ioctl(
 	    ((un = MD_UNIT(mnum)) == NULL))
 		return (ENXIO);
 	/* is this a supported ioctl? */
-	err = md_check_ioctl_against_efi(cmd, un->c.un_flag);
+	err = md_check_ioctl_against_unit(cmd, un->c);
 	if (err != 0) {
 		return (err);
 	}
@@ -3074,6 +3095,40 @@ md_mirror_ioctl(
 
 		if (err == 0)
 			err = mirror_set_vtoc(un, &vtoc);
+
+		return (err);
+	}
+
+	case DKIOCGEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FREAD))
+			return (EACCES);
+
+		if ((err = mirror_get_extvtoc(un, &extvtoc)) != 0) {
+			return (err);
+		}
+
+		if (ddi_copyout(&extvtoc, data, sizeof (extvtoc), mode))
+			err = EFAULT;
+
+		return (err);
+	}
+
+	case DKIOCSEXTVTOC:
+	{
+		struct extvtoc	extvtoc;
+
+		if (! (mode & FWRITE))
+			return (EACCES);
+
+		if (ddi_copyin(data, &extvtoc, sizeof (extvtoc), mode)) {
+			err = EFAULT;
+		}
+
+		if (err == 0)
+			err = mirror_set_extvtoc(un, &extvtoc);
 
 		return (err);
 	}

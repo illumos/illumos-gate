@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Decompression module for stand alone file systems.
@@ -48,10 +47,12 @@
 #define	GZIP_CM_DEFLATE		0x08
 #define	SEEKBUFSIZE		8192
 
+extern void prom_printf(const char *fmt, ...);
+
 #ifdef	_BOOT
-#define	dprintf	if (cf_debug) printf
+#define	dprintf	if (cf_debug) prom_printf
 #else
-#define	dprintf	if (cf_debug) printf
+#define	dprintf	if (cf_debug) prom_printf
 
 #endif
 
@@ -63,7 +64,7 @@ caddr_t scratch_bufs[MAX_DECOMP_BUFS];	/* array of free scratch mem bufs */
 int decomp_bufcnt;			/* total no, of allocated decomp bufs */
 int free_dcomp_bufs;			/* no. of free decomp bufs */
 char seek_scrbuf[SEEKBUFSIZE];		/* buffer for seeking */
-int cf_debug;				/* non-zero enables debug prints */
+int cf_debug = 0;			/* non-zero enables debug prints */
 
 void *
 cf_alloc(void *opaque, unsigned int items, unsigned int size)
@@ -107,8 +108,15 @@ cf_check_compressed(fileid_t *filep)
 	z_stream *zsp;
 
 	/*
-	 * If the file is not long enough to check for a decompression header
-	 * then return not compressed.
+	 * checking for a dcfs compressed file first would involve:
+	 *
+	 *	if (filep->fi_inode->i_cflags & ICOMPRESS)
+	 * 		filep->fi_flags |= FI_COMPRESSED;
+	 */
+
+	/*
+	 * If the file is not long enough to check for a
+	 * decompression header then return not compressed.
 	 */
 	if (filep->fi_inode->i_size < 3)
 		return (0);
@@ -119,7 +127,8 @@ cf_check_compressed(fileid_t *filep)
 	filep->fi_count = 0;
 	filep->fi_cfoff = 0;
 	filebytes = (unsigned char *)filep->fi_memp;
-	if (filebytes[0] != GZIP_ID_BYTE_1 || filebytes[1] != GZIP_ID_BYTE_2 ||
+	if (filebytes[0] != GZIP_ID_BYTE_1 ||
+	    filebytes[1] != GZIP_ID_BYTE_2 ||
 	    filebytes[2] != GZIP_CM_DEFLATE)
 		return (0); /* not compressed */
 	filep->fi_flags |= FI_COMPRESSED;
@@ -150,7 +159,7 @@ cf_check_compressed(fileid_t *filep)
 	zsp->next_in = NULL;
 	zsp->avail_out = 0;
 	zsp->next_out = NULL;
-	if (inflateInit2(zsp, MAX_WBITS + 16) != Z_OK) {
+	if (inflateInit2(zsp, MAX_WBITS | 0x20) != Z_OK) {
 		dprintf("inflateInit2() failed\n");
 		return (-1);
 	}

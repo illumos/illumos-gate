@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains functions to implement the partition menu commands.
  */
@@ -201,9 +199,9 @@ p_select()
 	struct partition_info	*pptr, *parts;
 	u_ioparam_t		ioparam;
 	int			i, index, deflt, *defltptr = NULL;
-	long			b_cylno;
+	blkaddr_t		b_cylno;
 #if defined(i386)
-	long			cyl_offset;
+	blkaddr_t		cyl_offset;
 #endif
 
 	parts = cur_dtype->dtype_plist;
@@ -291,13 +289,14 @@ p_select()
 				pptr->pinfo_map[i].dkl_cylno);
 			return (0);
 		}
-		if (pptr->pinfo_map[i].dkl_nblk < 0 ||
+		if (pptr->pinfo_map[i].dkl_nblk == 0 ||
 			(int)pptr->pinfo_map[i].dkl_nblk > ((ncyl -
 				pptr->pinfo_map[i].dkl_cylno) * spc())) {
 			err_print(
-"partition %c: specified # of blocks, %d, is out of range\n",
-				(PARTITION_BASE+i),
-				pptr->pinfo_map[i].dkl_nblk);
+			    "partition %c: specified # of blocks, %u, "
+			    "is out of range\n",
+			    (PARTITION_BASE+i),
+			    pptr->pinfo_map[i].dkl_nblk);
 			return (0);
 		}
 	}
@@ -319,10 +318,10 @@ p_select()
 #if defined(_SUNOS_VTOC_16)
 	for (i = 0; i < NDKMAP; i++)  {
 		cur_parts->vtoc.v_part[i].p_start =
-		    (daddr_t)(cur_parts->pinfo_map[i].dkl_cylno *
+		    (blkaddr_t)(cur_parts->pinfo_map[i].dkl_cylno *
 		    (nhead * nsect));
 		cur_parts->vtoc.v_part[i].p_size =
-		    (long)cur_parts->pinfo_map[i].dkl_nblk;
+		    (blkaddr_t)cur_parts->pinfo_map[i].dkl_nblk;
 	}
 #endif	/* defined(_SUNOS_VTOC_16) */
 
@@ -561,15 +560,15 @@ void
 print_partition(struct partition_info *pinfo, int partnum, int want_header)
 {
 	int		i;
-	uint_t		nblks;
+	blkaddr_t	nblks;
 	int		cyl1;
 	int		cyl2;
 	float		scaled;
 	int		maxcyl2;
 	int		ncyl2_digits;
 	char		*s;
-	daddr_t		maxnblks = 0;
-	size_t		len;
+	blkaddr_t	maxnblks = 0;
+	blkaddr_t	len;
 
 	/*
 	 * To align things nicely, we need to know the maximum
@@ -662,7 +661,7 @@ print_partition(struct partition_info *pinfo, int partnum, int want_header)
 	 */
 	len = strlen(" %") + ndigits(ndigits(maxnblks)) + strlen("d\n") + 1;
 	s = zalloc(len);
-	(void) snprintf(s, len, "%s%d%s", " %", ndigits(maxnblks), "u\n");
+	(void) snprintf(s, len, "%s%u%s", " %", ndigits(maxnblks), "u\n");
 	fmt_print(s, nblks);
 	(void) free(s);
 }

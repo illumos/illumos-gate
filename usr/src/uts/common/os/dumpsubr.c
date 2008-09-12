@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -256,9 +255,9 @@ dumpinit(vnode_t *vp, char *name, int justchecking)
 		if (VOP_OPEN(&cdev_vp, FREAD | FWRITE, kcred, NULL) == 0) {
 			size_t blk_size;
 			struct dk_cinfo dki;
-			struct vtoc vtoc;
+			struct extvtoc vtoc;
 
-			if (VOP_IOCTL(cdev_vp, DKIOCGVTOC, (intptr_t)&vtoc,
+			if (VOP_IOCTL(cdev_vp, DKIOCGEXTVTOC, (intptr_t)&vtoc,
 			    FKIOCTL, kcred, NULL, NULL) == 0 &&
 			    vtoc.v_sectorsz != 0)
 				blk_size = vtoc.v_sectorsz;

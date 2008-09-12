@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
 #ifndef _SYS_DKTP_ALTSCTR_H
 #define	_SYS_DKTP_ALTSCTR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -46,20 +44,20 @@ extern "C" {
 struct	alts_parttbl {
 	uint32_t	alts_sanity;	/* to validate correctness	*/
 	uint32_t  	alts_version;	/* version number		*/
-	daddr32_t	alts_map_base;	/* disk offset of alts_partmap	*/
+	uint32_t	alts_map_base;	/* disk offset of alts_partmap	*/
 	uint32_t	alts_map_len;	/* byte length of alts_partmap	*/
-	daddr32_t	alts_ent_base;	/* disk offset of alts_entry	*/
+	uint32_t	alts_ent_base;	/* disk offset of alts_entry	*/
 	uint32_t	alts_ent_used;	/* number of alternate entries used */
-	daddr32_t	alts_ent_end;	/* disk offset of top of alts_entry */
-	daddr32_t	alts_resv_base;	/* disk offset of alts_reserved	*/
+	uint32_t	alts_ent_end;	/* disk offset of top of alts_entry */
+	uint32_t	alts_resv_base;	/* disk offset of alts_reserved	*/
 	uint32_t 	alts_pad[5];	/* reserved fields		*/
 };
 
 /*	alternate sector remap entry table				*/
 struct	alts_ent {
-	daddr32_t	bad_start;	/* starting bad sector number	*/
-	daddr32_t	bad_end;	/* ending bad sector number	*/
-	daddr32_t	good_start;	/* starting alternate sector to use */
+	uint32_t	bad_start;	/* starting bad sector number	*/
+	uint32_t	bad_end;	/* ending bad sector number	*/
+	uint32_t	good_start;	/* starting alternate sector to use */
 };
 
 /*	size of alternate partition table structure			*/

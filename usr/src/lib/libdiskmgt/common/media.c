@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <libdevinfo.h>
@@ -421,7 +420,7 @@ get_attrs(disk_t *dp, int fd, nvlist_t *attrs)
 	/* sparc call */
 	if (ioctl(fd, DKIOCGGEOM, &geometry) >= 0) {
 #endif
-		struct vtoc	vtoc;
+		struct extvtoc	vtoc;
 
 		if (nvlist_add_uint64(attrs, DM_START, 0) != 0) {
 			return (ENOMEM);
@@ -456,7 +455,7 @@ get_attrs(disk_t *dp, int fd, nvlist_t *attrs)
 			return (ENOMEM);
 		}
 
-		if (read_vtoc(fd, &vtoc) >= 0 && vtoc.v_volume[0] != 0) {
+		if (read_extvtoc(fd, &vtoc) >= 0 && vtoc.v_volume[0] != 0) {
 			char	label[LEN_DKL_VVOL + 1];
 
 			(void) snprintf(label, sizeof (label), "%.*s",
@@ -548,9 +547,9 @@ get_rmm_name(disk_t *dp, char *mname, int size)
 		struct dk_minfo minfo;
 
 		if ((loaded = media_read_info(fd, &minfo))) {
-			struct vtoc vtoc;
+			struct extvtoc vtoc;
 
-			if (read_vtoc(fd, &vtoc) >= 0) {
+			if (read_extvtoc(fd, &vtoc) >= 0) {
 				if (vtoc.v_volume[0] != NULL) {
 					if (LEN_DKL_VVOL < size) {
 						(void) strlcpy(mname,

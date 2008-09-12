@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -436,7 +434,7 @@ main (int argc, char *argv[])
 	char *partition_scheme = NULL;
 	dbus_uint64_t partition_start = 0;
 	int partition_number = 0;
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 	dk_gpt_t *gpt;
 	struct dk_minfo mi;
 	int i, dos_cnt;
@@ -557,7 +555,7 @@ main (int argc, char *argv[])
 		partition_start = (dbus_uint64_t)probe_offset;
 		partition_number = dos_num;
 	} else {
-		if ((partition_number = read_vtoc(rfd, &vtoc)) >= 0) {
+		if ((partition_number = read_extvtoc(rfd, &vtoc)) >= 0) {
 			if (!vtoc_one_slice_entire_disk(&vtoc)) {
 				partition_scheme = "smi";
 				if (partition_number < vtoc.v_nparts) {

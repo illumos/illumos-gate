@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides support for labeling operations for target
  * drivers.
@@ -175,7 +173,7 @@ int cmlb_rot_delay = 4;	/* default rotational delay */
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,   /* Type of module */
-	"Common Labeling module %I%"
+	"Common Labeling module"
 };
 
 static struct modlinkage modlinkage = {
@@ -209,7 +207,7 @@ static void cmlb_clear_vtoc(struct cmlb_lun *cl, void *tg_cookie);
 static void cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie);
 static int cmlb_create_minor_nodes(struct cmlb_lun *cl);
 static int cmlb_check_update_blockcount(struct cmlb_lun *cl, void *tg_cookie);
-static int cmlb_check_efi_mbr(uchar_t *buf);
+static int cmlb_check_efi_mbr(uchar_t *buf, int *is_mbr);
 
 #if defined(__i386) || defined(__amd64)
 static int cmlb_update_fdisk_and_vtoc(struct cmlb_lun *cl, void *tg_cookie);
@@ -235,7 +233,11 @@ static int cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
     int flag, void *tg_cookie);
 static int cmlb_dkio_get_vtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
     void *tg_cookie);
+static int cmlb_dkio_get_extvtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
+    void *tg_cookie);
 static int cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
+    int flag, void *tg_cookie);
+static int cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
     int flag, void *tg_cookie);
 static int cmlb_dkio_get_mboot(struct cmlb_lun *cl, caddr_t arg, int flag,
     void *tg_cookie);
@@ -248,6 +250,8 @@ static int cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 static int cmlb_dkio_get_virtgeom(struct cmlb_lun *cl, caddr_t arg, int flag);
 static int cmlb_dkio_get_phygeom(struct cmlb_lun *cl, caddr_t  arg, int flag);
 static int cmlb_dkio_partinfo(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
+    int flag);
+static int cmlb_dkio_extpartinfo(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
     int flag);
 #endif
 
@@ -507,7 +511,7 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  *
  *			3) Calculate geometry:refer to cmlb_convert_geometry()
  *			   If capacity increasing by 1 causes disks' capacity
- *			   to cross over the limits in table CHS_values,
+ *			   to cross over the limits in geometry calculation,
  *			   geometry info will change. This will raise an issue:
  *			   In case that primary VTOC label is destroyed, format
  *			   commandline can restore it via backup VTOC labels.
@@ -588,13 +592,14 @@ cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
 	cl->cl_def_labeltype = CMLB_LABEL_VTOC;
 	cl->cl_alter_behavior = alter_behavior;
 	cl->cl_reserved = -1;
+	cl->cl_msglog_flag |= CMLB_ALLOW_2TB_WARN;
 
-	if (is_removable != 0) {
+	if (is_removable == 0) {
 		mutex_exit(CMLB_MUTEX(cl));
 		status = DK_TG_GETCAP(cl, &cap, tg_cookie);
 		mutex_enter(CMLB_MUTEX(cl));
-		if (status == 0 && cap > DK_MAX_BLOCKS) {
-			/* set default EFI if > 1TB */
+		if (status == 0 && cap > CMLB_EXTVTOC_LIMIT) {
+			/* set default EFI if > 2TB */
 			cl->cl_def_labeltype = CMLB_LABEL_EFI;
 		}
 	}
@@ -851,7 +856,7 @@ cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp,
 		}
 	} else {
 		/* if the disk is unlabeled, don't write a devid to it */
-		if (!cl->cl_vtoc_label_is_from_media) {
+		if (cl->cl_label_from_media != CMLB_LABEL_VTOC) {
 			mutex_exit(CMLB_MUTEX(cl));
 			return (EINVAL);
 		}
@@ -934,8 +939,14 @@ cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
 			(void) cmlb_validate_geometry((struct cmlb_lun *)cl, 0,
 			    0, tg_cookie);
 
+#if defined(_SUNOS_VTOC_16)
+		if (((cl->cl_f_geometry_is_valid == FALSE) ||
+		    (part < NDKMAP && cl->cl_solaris_size == 0)) &&
+		    (part != P0_RAW_DISK)) {
+#else
 		if ((cl->cl_f_geometry_is_valid == FALSE) ||
 		    (part < NDKMAP && cl->cl_solaris_size == 0)) {
+#endif
 			rval = EINVAL;
 		} else {
 			if (startblockp != NULL)
@@ -1024,7 +1035,6 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 
 	int err;
 	struct cmlb_lun *cl;
-	int status;
 
 	cl = (struct cmlb_lun *)cmlbhandle;
 
@@ -1037,58 +1047,50 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 	}
 
 	switch (cmd) {
-		case DKIOCSVTOC:
+		case DKIOCSEXTVTOC:
 		case DKIOCSGEOM:
 		case DKIOCSETEFI:
 		case DKIOCSMBOOT:
 			break;
+		case DKIOCSVTOC:
+#if defined(__i386) || defined(__amd64)
+		case DKIOCPARTINFO:
+#endif
+			if (cl->cl_blockcount > CMLB_OLDVTOC_LIMIT) {
+				mutex_exit(CMLB_MUTEX(cl));
+				return (EOVERFLOW);
+			}
+			break;
 		default:
-			status = cmlb_validate_geometry(cl, 1, CMLB_SILENT,
+			(void) cmlb_validate_geometry(cl, 1, CMLB_SILENT,
 			    tg_cookie);
 
-			/*
-			 * VTOC related ioctls except SVTOC/SGEOM should
-			 * fail if > 1TB disk and there is not already a VTOC
-			 * on the disk.i.e either EFI or blank
-			 *
-			 * PHYGEOM AND VIRTGEOM succeeds when disk is
-			 * EFI labeled but <1TB
-			 */
+			switch (cmd) {
+			case DKIOCGVTOC:
+			case DKIOCGAPART:
+			case DKIOCSAPART:
 
-			if (status == ENOTSUP &&
-			    cl->cl_f_geometry_is_valid == FALSE) {
-				switch (cmd) {
-				case DKIOCGAPART:
-				case DKIOCGGEOM:
-				case DKIOCGVTOC:
-				case DKIOCSAPART:
-				case DKIOCG_PHYGEOM:
-				case DKIOCG_VIRTGEOM:
+				if (cl->cl_label_from_media == CMLB_LABEL_EFI) {
+					/* GPT label on disk */
+					mutex_exit(CMLB_MUTEX(cl));
+					return (ENOTSUP);
+				} else if
+				    (cl->cl_blockcount > CMLB_OLDVTOC_LIMIT) {
+					mutex_exit(CMLB_MUTEX(cl));
+					return (EOVERFLOW);
+				}
+				break;
 
+			case DKIOCGGEOM:
+				if (cl->cl_label_from_media == CMLB_LABEL_EFI) {
+					/* GPT label on disk */
 					mutex_exit(CMLB_MUTEX(cl));
 					return (ENOTSUP);
 				}
-			} else {
-				if ((cl->cl_f_geometry_is_valid == TRUE) &&
-				    (cl->cl_solaris_size > 0)) {
-					if (cl->cl_vtoc.v_sanity != VTOC_SANE) {
-					/*
-					 * it is EFI, so return ENOTSUP for
-					 * these
-					 */
-					switch (cmd) {
-					case DKIOCGAPART:
-					case DKIOCGGEOM:
-					case DKIOCGVTOC:
-					case DKIOCSVTOC:
-					case DKIOCSAPART:
-
-						mutex_exit(CMLB_MUTEX(cl));
-						return (ENOTSUP);
-					}
-				}
+				break;
+			default:
+				break;
 			}
-		}
 	}
 
 	mutex_exit(CMLB_MUTEX(cl));
@@ -1120,6 +1122,11 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 		err = cmlb_dkio_get_vtoc(cl, (caddr_t)arg, flag, tg_cookie);
 		break;
 
+	case DKIOCGEXTVTOC:
+		cmlb_dbg(CMLB_TRACE, cl, "DKIOCGVTOC\n");
+		err = cmlb_dkio_get_extvtoc(cl, (caddr_t)arg, flag, tg_cookie);
+		break;
+
 	case DKIOCGETEFI:
 		cmlb_dbg(CMLB_TRACE, cl, "DKIOCGETEFI\n");
 		err = cmlb_dkio_get_efi(cl, (caddr_t)arg, flag, tg_cookie);
@@ -1133,6 +1140,12 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 	case DKIOCSVTOC:
 		cmlb_dbg(CMLB_TRACE, cl, "DKIOCSVTOC\n");
 		err = cmlb_dkio_set_vtoc(cl, dev, (caddr_t)arg, flag,
+		    tg_cookie);
+		break;
+
+	case DKIOCSEXTVTOC:
+		cmlb_dbg(CMLB_TRACE, cl, "DKIOCSVTOC\n");
+		err = cmlb_dkio_set_extvtoc(cl, dev, (caddr_t)arg, flag,
 		    tg_cookie);
 		break;
 
@@ -1174,6 +1187,14 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 		err = ENOTTY;
 #endif
 		break;
+	case DKIOCEXTPARTINFO:
+		cmlb_dbg(CMLB_TRACE, cl, "DKIOCPARTINFO");
+#if defined(__i386) || defined(__amd64)
+		err = cmlb_dkio_extpartinfo(cl, dev, (caddr_t)arg, flag);
+#else
+		err = ENOTTY;
+#endif
+		break;
 
 	default:
 		err = ENOTTY;
@@ -1193,6 +1214,7 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 		case DKIOCSGEOM:
 		case DKIOCSAPART:
 		case DKIOCSVTOC:
+		case DKIOCSEXTVTOC:
 		case DKIOCSETEFI:
 			i_ddi_prop_dyn_cache_invalidate(CMLB_DEVINFO(cl),
 			    i_ddi_prop_dyn_driver_get(CMLB_DEVINFO(cl)));
@@ -1426,9 +1448,6 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 	int		label_error = 0;
 	diskaddr_t	capacity;
 	int		count;
-#if defined(__i386) || defined(__amd64)
-	int forced_under_1t = 0;
-#endif
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 
@@ -1450,9 +1469,10 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 	 * or vtoc.
 	 */
 	cl->cl_map[P0_RAW_DISK].dkl_cylno = 0;
+	cl->cl_offset[P0_RAW_DISK] = 0;
 	/*
-	 * note if capacity > uint32_max we should be using efi,
-	 * and not use p0, so the truncation does not matter.
+	 * note if capacity > int32_max(1TB) we are in 64bit environment
+	 * so no truncation happens
 	 */
 	cl->cl_map[P0_RAW_DISK].dkl_nblk  = capacity;
 #endif
@@ -1463,6 +1483,7 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 	 */
 	cmlb_resync_geom_caches(cl, capacity, tg_cookie);
 
+	cl->cl_label_from_media = CMLB_LABEL_UNDEF;
 	label_error = cmlb_use_efi(cl, capacity, flags, tg_cookie);
 	if (label_error == 0) {
 
@@ -1478,41 +1499,29 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 
 	/* NO EFI label found */
 
-	if (capacity > DK_MAX_BLOCKS) {
+	if (capacity > CMLB_EXTVTOC_LIMIT) {
 		if (label_error == ESRCH) {
 			/*
-			 * they've configured a LUN over 1TB, but used
+			 * they've configured a LUN over 2TB, but used
 			 * format.dat to restrict format's view of the
-			 * capacity to be under 1TB
+			 * capacity to be under 2TB in some earlier Solaris
+			 * release.
 			 */
-			/* i.e > 1Tb with a VTOC < 1TB */
-			if (!(flags & CMLB_SILENT)) {
-				cmlb_log(CMLB_DEVINFO(cl), CMLB_LABEL(cl),
-				    CE_WARN, "is >1TB and has a VTOC label: "
-				    "use format(1M) to either decrease the");
+			/* i.e > 2TB with a VTOC < 2TB */
+			if (!(flags & CMLB_SILENT) &&
+			    (cl->cl_msglog_flag & CMLB_ALLOW_2TB_WARN)) {
 
 				cmlb_log(CMLB_DEVINFO(cl), CMLB_LABEL(cl),
-				    CE_NOTE, "size to be < 1TB or relabel the "
-				    "disk with an EFI label");
-#if defined(__i386) || defined(__amd64)
-				forced_under_1t = 1;
-#endif
+				    CE_NOTE, "!Disk (%s%d) is limited to 2 TB "
+				    "due to VTOC label. To use the full "
+				    "capacity of the disk, use format(1M) to "
+				    "relabel the disk with EFI/GPT label.\n",
+				    CMLB_LABEL(cl),
+				    ddi_get_instance(CMLB_DEVINFO(cl)));
+
+				cl->cl_msglog_flag &= ~CMLB_ALLOW_2TB_WARN;
 			}
 		} else {
-			/* unlabeled disk over 1TB */
-#if defined(__i386) || defined(__amd64)
-
-			/*
-			 * Refer to comments on off-by-1 at the head of the file
-			 * A 1TB disk was treated as (1T - 512)B in the past,
-			 * thus, it might have valid solaris partition. We
-			 * will return ENOTSUP later only if this disk has no
-			 * valid solaris partition.
-			 */
-			if (!(cl->cl_alter_behavior & CMLB_OFF_BY_ONE) ||
-			    (cl->cl_sys_blocksize != cl->cl_tgt_blocksize) ||
-			    (capacity - 1 > DK_MAX_BLOCKS))
-#endif
 				return (ENOTSUP);
 		}
 	}
@@ -1545,17 +1554,6 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 		}
 
 		if (cl->cl_solaris_size <= DK_LABEL_LOC) {
-
-#if defined(__i386) || defined(__amd64)
-			/*
-			 * Refer to comments on off-by-1 at the head of the file
-			 * This is for 1TB disk only. Since that there is no
-			 * solaris partitions, return ENOTSUP as we do for
-			 * >1TB disk.
-			 */
-			if (cl->cl_blockcount > DK_MAX_BLOCKS)
-				return (ENOTSUP);
-#endif
 			/*
 			 * Found fdisk table but no Solaris partition entry,
 			 * so don't call cmlb_uselabel() and don't create
@@ -1567,27 +1565,6 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 		}
 
 		label_addr = (daddr_t)(cl->cl_solaris_offset + DK_LABEL_LOC);
-
-#if defined(__i386) || defined(__amd64)
-		/*
-		 * Refer to comments on off-by-1 at the head of the file
-		 * Now, this 1TB disk has valid solaris partition. It
-		 * must be created by previous sd driver, we have to
-		 * treat it as (1T-512)B.
-		 */
-		if ((cl->cl_blockcount > DK_MAX_BLOCKS) &&
-		    (forced_under_1t != 1)) {
-			/*
-			 * Refer to cmlb_read_fdisk, when there is no
-			 * fdisk partition table, cl_solaris_size is
-			 * set to disk's capacity. In this case, we
-			 * need to adjust it
-			 */
-			if (cl->cl_solaris_size > DK_MAX_BLOCKS)
-				cl->cl_solaris_size = DK_MAX_BLOCKS;
-			cmlb_resync_geom_caches(cl, DK_MAX_BLOCKS, tg_cookie);
-		}
-#endif
 
 		buffer_size = sizeof (struct dk_label);
 
@@ -1613,7 +1590,7 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 			    CMLB_LABEL_IS_VALID) {
 				label_error = EINVAL;
 			} else
-				cl->cl_vtoc_label_is_from_media = 1;
+				cl->cl_label_from_media = CMLB_LABEL_VTOC;
 			break;
 		case EACCES:
 			label_error = EACCES;
@@ -1656,7 +1633,7 @@ no_solaris_partition:
 	 * we set it to an entirely bogus value.
 	 */
 	for (count = 0; count < FD_NUMPART; count++) {
-		cl->cl_map[FDISK_P1 + count].dkl_cylno = -1;
+		cl->cl_map[FDISK_P1 + count].dkl_cylno = UINT16_MAX;
 		cl->cl_map[FDISK_P1 + count].dkl_nblk =
 		    cl->cl_fmap[count].fmap_nblk;
 
@@ -1684,16 +1661,6 @@ no_solaris_partition:
 
 #if defined(_SUNOS_VTOC_16)
 /*
- * Macro: MAX_BLKS
- *
- *	This macro is used for table entries where we need to have the largest
- *	possible sector value for that head & SPT (sectors per track)
- *	combination.  Other entries for some smaller disk sizes are set by
- *	convention to match those used by X86 BIOS usage.
- */
-#define	MAX_BLKS(heads, spt)	UINT16_MAX * heads * spt, heads, spt
-
-/*
  *    Function: cmlb_convert_geometry
  *
  * Description: Convert physical geometry into a dk_geom structure. In
@@ -1705,18 +1672,6 @@ no_solaris_partition:
 static void
 cmlb_convert_geometry(diskaddr_t capacity, struct dk_geom *cl_g)
 {
-	int i;
-	static const struct chs_values {
-		uint_t max_cap;		/* Max Capacity for this HS. */
-		uint_t nhead;		/* Heads to use. */
-		uint_t nsect;		/* SPT to use. */
-	} CHS_values[] = {
-		{0x00200000,  64, 32},		/* 1GB or smaller disk. */
-		{0x01000000, 128, 32},		/* 8GB or smaller disk. */
-		{MAX_BLKS(255,  63)},		/* 502.02GB or smaller disk. */
-		{MAX_BLKS(255, 126)},		/* .98TB or smaller disk. */
-		{DK_MAX_BLOCKS, 255, 189}	/* Max size is just under 1TB */
-	};
 
 	/* Unlabeled SCSI floppy device */
 	if (capacity <= 0x1000) {
@@ -1727,26 +1682,50 @@ cmlb_convert_geometry(diskaddr_t capacity, struct dk_geom *cl_g)
 	}
 
 	/*
-	 * For all devices we calculate cylinders using the
-	 * heads and sectors we assign based on capacity of the
-	 * device.  The table is designed to be compatible with the
-	 * way other operating systems lay out fdisk tables for X86
-	 * and to insure that the cylinders never exceed 65535 to
-	 * prevent problems with X86 ioctls that report geometry.
-	 * We use SPT that are multiples of 63, since other OSes that
-	 * are not limited to 16-bits for cylinders stop at 63 SPT
-	 * we make do by using multiples of 63 SPT.
+	 * For all devices we calculate cylinders using the heads and sectors
+	 * we assign based on capacity of the device.  The algorithm is
+	 * designed to be compatible with the way other operating systems
+	 * lay out fdisk tables for X86 and to insure that the cylinders never
+	 * exceed 65535 to prevent problems with X86 ioctls that report
+	 * geometry.
+	 * For some smaller disk sizes we report geometry that matches those
+	 * used by X86 BIOS usage. For larger disks, we use SPT that are
+	 * multiples of 63, since other OSes that are not limited to 16-bits
+	 * for cylinders stop at 63 SPT we make do by using multiples of 63 SPT.
 	 *
-	 * Note than capacities greater than or equal to 1TB will simply
-	 * get the largest geometry from the table. This should be okay
-	 * since disks this large shouldn't be using CHS values anyway.
+	 * The following table (in order) illustrates some end result
+	 * calculations:
+	 *
+	 * Maximum number of blocks 		nhead	nsect
+	 *
+	 * 2097152 (1GB)			64	32
+	 * 16777216 (8GB)			128	32
+	 * 1052819775 (502.02GB)		255  	63
+	 * 2105639550 (0.98TB)			255	126
+	 * 3158459325 (1.47TB)			255  	189
+	 * 4211279100 (1.96TB)			255  	252
+	 * 5264098875 (2.45TB)			255  	315
+	 * ...
 	 */
-	for (i = 0; CHS_values[i].max_cap < capacity &&
-	    CHS_values[i].max_cap != DK_MAX_BLOCKS; i++)
-		;
 
-	cl_g->dkg_nhead = CHS_values[i].nhead;
-	cl_g->dkg_nsect = CHS_values[i].nsect;
+	if (capacity <= 0x200000) {
+		cl_g->dkg_nhead = 64;
+		cl_g->dkg_nsect = 32;
+	} else if (capacity <= 0x01000000) {
+		cl_g->dkg_nhead = 128;
+		cl_g->dkg_nsect = 32;
+	} else {
+		cl_g->dkg_nhead = 255;
+
+		/* make nsect be smallest multiple of 63 */
+		cl_g->dkg_nsect = ((capacity +
+		    (UINT16_MAX * 255 * 63) - 1) /
+		    (UINT16_MAX * 255 * 63)) * 63;
+
+		if (cl_g->dkg_nsect == 0)
+			cl_g->dkg_nsect = (UINT16_MAX / 63) * 63;
+	}
+
 }
 #endif
 
@@ -2011,8 +1990,8 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	solaris_size   = 0;
 
 	for (fdp = fdisk, i = 0; i < FD_NUMPART; i++, fdp++) {
-		int	relsect;
-		int	numsect;
+		uint32_t relsect;
+		uint32_t numsect;
 
 		if (fdp->numsect == 0) {
 			cl->cl_fmap[i].fmap_start = 0;
@@ -2144,15 +2123,21 @@ cmlb_validate_efi(efi_gpt_t *labp)
  */
 
 static int
-cmlb_check_efi_mbr(uchar_t *buf)
+cmlb_check_efi_mbr(uchar_t *buf, int *is_mbr)
 {
 	struct ipart	*fdp;
 	struct mboot	*mbp = (struct mboot *)buf;
 	struct ipart	fdisk[FD_NUMPART];
 	int		i;
 
-	if (LE_16(mbp->signature) != MBB_MAGIC)
+	if (is_mbr != NULL)
+		*is_mbr = TRUE;
+
+	if (LE_16(mbp->signature) != MBB_MAGIC) {
+		if (is_mbr != NULL)
+			is_mbr = FALSE;
 		return (TRUE);
+	}
 
 	bcopy(&mbp->parts[0], fdisk, sizeof (fdisk));
 
@@ -2179,6 +2164,9 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	diskaddr_t	alternate_lba;
 	int		iofailed = 0;
 	struct uuid	uuid_type_reserved = EFI_RESERVED;
+#if defined(_FIRMWARE_NEEDS_FDISK)
+		int 		is_mbr;
+#endif
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 
@@ -2195,7 +2183,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 
 	buf = kmem_zalloc(EFI_MIN_ARRAY_SIZE, KM_SLEEP);
 
-	rval = DK_TG_READ(cl, buf, 0, lbasize, tg_cookie);
+	rval = DK_TG_READ(cl, buf,  0, lbasize, tg_cookie);
 	if (rval) {
 		iofailed = 1;
 		goto done_err;
@@ -2206,10 +2194,21 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 		goto done_err;
 	}
 
-	if (cmlb_check_efi_mbr(buf) == FALSE) {
+#if defined(_FIRMWARE_NEEDS_FDISK)
+	if (cmlb_check_efi_mbr(buf, &is_mbr) == FALSE) {
+		if (is_mbr == TRUE)
+			rval = ESRCH;
+		else
+			rval = EINVAL;
+		goto done_err;
+	}
+#else
+	if (cmlb_check_efi_mbr(buf, NULL) == FALSE) {
 		rval = EINVAL;
 		goto done_err;
 	}
+
+#endif
 
 	rval = DK_TG_READ(cl, buf, 1, lbasize, tg_cookie);
 	if (rval) {
@@ -2321,6 +2320,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	}
 	cl->cl_solaris_offset = 0;
 	cl->cl_solaris_size = capacity;
+	cl->cl_label_from_media = CMLB_LABEL_EFI;
 	cl->cl_f_geometry_is_valid = TRUE;
 
 	/* clear the vtoc label */
@@ -2341,7 +2341,7 @@ done_err1:
 	 * valid because cmlb_prop_op will now fail, which in turn
 	 * causes things like opens and stats on the partition to fail.
 	 */
-	if ((capacity > DK_MAX_BLOCKS) && (rval != ESRCH) && !iofailed) {
+	if ((capacity > CMLB_EXTVTOC_LIMIT) && (rval != ESRCH) && !iofailed) {
 		cl->cl_f_geometry_is_valid = FALSE;
 	}
 	return (rval);
@@ -2376,7 +2376,7 @@ cmlb_uselabel(struct cmlb_lun *cl, struct dk_label *labp, int flags)
 	int		label_error = CMLB_LABEL_IS_VALID;
 	int		i;
 	diskaddr_t	label_capacity;
-	int		part_end;
+	uint32_t	part_end;
 	diskaddr_t	track_capacity;
 #if defined(_SUNOS_VTOC_16)
 	struct	dkl_partition	*vpartp;
@@ -2699,7 +2699,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 			cl->cl_g.dkg_nhead = 64;
 			cl->cl_g.dkg_nsect = 32;
 			cl->cl_g.dkg_ncyl = cl->cl_blockcount / (64 * 32);
-			cl->cl_solaris_size = cl->cl_g.dkg_ncyl *
+			cl->cl_solaris_size = (diskaddr_t)cl->cl_g.dkg_ncyl *
 			    cl->cl_g.dkg_nhead * cl->cl_g.dkg_nsect;
 		} else {
 			cl->cl_g.dkg_ncyl  = 1;
@@ -2731,7 +2731,8 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 		}
 
 		cl->cl_solaris_size =
-		    cl->cl_g.dkg_ncyl * cl->cl_g.dkg_nhead * cl->cl_g.dkg_nsect;
+		    (diskaddr_t)cl->cl_g.dkg_ncyl * cl->cl_g.dkg_nhead *
+		    cl->cl_g.dkg_nsect;
 
 	}
 
@@ -2895,7 +2896,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 	cl->cl_vtoc.v_sanity  = VTOC_SANE;
 
 	cl->cl_f_geometry_is_valid = TRUE;
-	cl->cl_vtoc_label_is_from_media = 0;
+	cl->cl_label_from_media = CMLB_LABEL_UNDEF;
 
 	cmlb_dbg(CMLB_INFO,  cl,
 	    "cmlb_build_default_label: Default label created: "
@@ -2980,7 +2981,7 @@ cmlb_dkio_get_geometry(struct cmlb_lun *cl, caddr_t arg, int flag,
 		 * do not really assume a default label for the device.
 		 * dad driver utilizes this.
 		 */
-		if (cl->cl_blockcount <= DK_MAX_BLOCKS) {
+		if (cl->cl_blockcount <= CMLB_OLDVTOC_LIMIT) {
 			cmlb_setup_default_geometry(cl, tg_cookie);
 			rval = 0;
 		}
@@ -3210,7 +3211,7 @@ cmlb_dkio_set_partition(struct cmlb_lun *cl, caddr_t arg, int flag)
 	_NOTE(DATA_READABLE_WITHOUT_LOCK(cmlb_lun::cl_solaris_size))
 	mutex_enter(CMLB_MUTEX(cl));
 
-	if (cl->cl_blockcount > DK_MAX_BLOCKS) {
+	if (cl->cl_blockcount > CMLB_OLDVTOC_LIMIT) {
 		mutex_exit(CMLB_MUTEX(cl));
 		return (ENOTSUP);
 	}
@@ -3306,6 +3307,11 @@ cmlb_dkio_get_vtoc(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 	int		rval = 0;
 
 	mutex_enter(CMLB_MUTEX(cl));
+	if (cl->cl_blockcount > CMLB_OLDVTOC_LIMIT) {
+		mutex_exit(CMLB_MUTEX(cl));
+		return (EOVERFLOW);
+	}
+
 	rval = cmlb_validate_geometry(cl, 1, 0, tg_cookie);
 
 #if defined(_SUNOS_VTOC_8)
@@ -3316,7 +3322,7 @@ cmlb_dkio_get_vtoc(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 		 * really assume a default label for the device.
 		 * dad driver utilizes this.
 		 */
-		if (cl->cl_blockcount <= DK_MAX_BLOCKS) {
+		if (cl->cl_blockcount <= CMLB_OLDVTOC_LIMIT) {
 			cmlb_setup_default_geometry(cl, tg_cookie);
 			rval = 0;
 		}
@@ -3403,6 +3409,85 @@ cmlb_dkio_get_vtoc(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 	return (rval);
 }
 
+
+/*
+ *    Function: cmlb_dkio_get_extvtoc
+ */
+static int
+cmlb_dkio_get_extvtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
+    void *tg_cookie)
+{
+	struct extvtoc	ext_vtoc;
+#if defined(_SUNOS_VTOC_8)
+	struct vtoc	user_vtoc;
+#endif	/* defined(_SUNOS_VTOC_8) */
+	int		rval = 0;
+
+	bzero(&ext_vtoc, sizeof (struct extvtoc));
+	mutex_enter(CMLB_MUTEX(cl));
+	rval = cmlb_validate_geometry(cl, 1, 0, tg_cookie);
+
+#if defined(_SUNOS_VTOC_8)
+	if (rval == EINVAL &&
+	    (cl->cl_alter_behavior & CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8)) {
+		/*
+		 * This is to return a default label even when we do not
+		 * really assume a default label for the device.
+		 * dad driver utilizes this.
+		 */
+		if (cl->cl_blockcount <= CMLB_OLDVTOC_LIMIT) {
+			cmlb_setup_default_geometry(cl, tg_cookie);
+			rval = 0;
+		}
+	}
+#endif
+	if (rval) {
+		mutex_exit(CMLB_MUTEX(cl));
+		return (rval);
+	}
+
+#if defined(_SUNOS_VTOC_8)
+	cmlb_build_user_vtoc(cl, &user_vtoc);
+	mutex_exit(CMLB_MUTEX(cl));
+
+	/*
+	 * Checking callers data model does not make much sense here
+	 * since extvtoc will always be equivalent to 64bit vtoc.
+	 * What is important is whether the kernel is in 32 or 64 bit
+	 */
+
+#ifdef _LP64
+		if (ddi_copyout(&user_vtoc, (void *)arg,
+		    sizeof (struct extvtoc), flag)) {
+			return (EFAULT);
+		}
+#else
+		vtoc32tovtoc(user_vtoc, ext_vtoc);
+		if (ddi_copyout(&ext_vtoc, (void *)arg,
+		    sizeof (struct extvtoc), flag)) {
+			return (EFAULT);
+		}
+#endif
+
+#elif defined(_SUNOS_VTOC_16)
+	mutex_exit(CMLB_MUTEX(cl));
+
+	/*
+	 * The cl_vtoc structure is a "struct dk_vtoc"  which is always
+	 * 32-bit to maintain compatibility with existing on-disk
+	 * structures.  Thus, we need to convert the structure when copying
+	 * it out to extvtoc
+	 */
+	vtoc32tovtoc(cl->cl_vtoc, ext_vtoc);
+
+	if (ddi_copyout(&ext_vtoc, (void *)arg, sizeof (struct extvtoc), flag))
+		return (EFAULT);
+#else
+#error "No VTOC format defined."
+#endif
+
+	return (rval);
+}
 static int
 cmlb_dkio_get_efi(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 {
@@ -3455,7 +3540,7 @@ cmlb_build_user_vtoc(struct cmlb_lun *cl, struct vtoc *user_vtoc)
 	struct dk_map2		*lpart;
 	struct dk_map		*lmap;
 	struct partition	*vpart;
-	int			nblks;
+	uint32_t		nblks;
 	int			i;
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
@@ -3631,9 +3716,10 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 #endif /* _MULTI_DATAMODEL */
 
 	mutex_enter(CMLB_MUTEX(cl));
-	if (cl->cl_blockcount > DK_MAX_BLOCKS) {
+
+	if (cl->cl_blockcount > CMLB_OLDVTOC_LIMIT) {
 		mutex_exit(CMLB_MUTEX(cl));
-		return (ENOTSUP);
+		return (EOVERFLOW);
 	}
 
 #if defined(__i386) || defined(__amd64)
@@ -3667,12 +3753,81 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 				    "cmlb_dkio_set_vtoc: "
 				    "Failed validate geometry\n");
 			}
+			cl->cl_msglog_flag |= CMLB_ALLOW_2TB_WARN;
 		}
 	}
 	mutex_exit(CMLB_MUTEX(cl));
 	return (rval);
 }
 
+/*
+ *    Function: cmlb_dkio_set_extvtoc
+ */
+static int
+cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
+    void *tg_cookie)
+{
+	int		rval = 0;
+	struct vtoc	user_vtoc;
+
+	/*
+	 * Checking callers data model does not make much sense here
+	 * since extvtoc will always be equivalent to 64bit vtoc.
+	 * What is important is whether the kernel is in 32 or 64 bit
+	 */
+
+#ifdef _LP64
+	if (ddi_copyin((const void *)arg, &user_vtoc,
+		    sizeof (struct extvtoc), flag)) {
+			return (EFAULT);
+	}
+#else
+	struct	extvtoc	user_extvtoc;
+	if (ddi_copyin((const void *)arg, &user_extvtoc,
+		    sizeof (struct extvtoc), flag)) {
+			return (EFAULT);
+	}
+
+	vtoctovtoc32(user_extvtoc, user_vtoc);
+#endif
+
+	mutex_enter(CMLB_MUTEX(cl));
+#if defined(__i386) || defined(__amd64)
+	if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize) {
+		mutex_exit(CMLB_MUTEX(cl));
+		return (EINVAL);
+	}
+#endif
+
+	if (cl->cl_g.dkg_ncyl == 0) {
+		mutex_exit(CMLB_MUTEX(cl));
+		return (EINVAL);
+	}
+
+	mutex_exit(CMLB_MUTEX(cl));
+	cmlb_clear_efi(cl, tg_cookie);
+	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd");
+	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd,raw");
+	(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h",
+	    S_IFBLK, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
+	    cl->cl_node_type, NULL);
+	(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h,raw",
+	    S_IFCHR, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
+	    cl->cl_node_type, NULL);
+	mutex_enter(CMLB_MUTEX(cl));
+
+	if ((rval = cmlb_build_label_vtoc(cl, &user_vtoc)) == 0) {
+		if ((rval = cmlb_write_label(cl, tg_cookie)) == 0) {
+			if (cmlb_validate_geometry(cl, 1, 0, tg_cookie) != 0) {
+				cmlb_dbg(CMLB_ERROR, cl,
+				    "cmlb_dkio_set_vtoc: "
+				    "Failed validate geometry\n");
+			}
+		}
+	}
+	mutex_exit(CMLB_MUTEX(cl));
+	return (rval);
+}
 
 /*
  *    Function: cmlb_build_label_vtoc
@@ -3692,7 +3847,7 @@ cmlb_build_label_vtoc(struct cmlb_lun *cl, struct vtoc *user_vtoc)
 {
 	struct dk_map		*lmap;
 	struct partition	*vpart;
-	int			nblks;
+	uint_t			nblks;
 #if defined(_SUNOS_VTOC_8)
 	int			ncyl;
 	struct dk_map2		*lpart;
@@ -3720,16 +3875,16 @@ cmlb_build_label_vtoc(struct cmlb_lun *cl, struct vtoc *user_vtoc)
 #if defined(_SUNOS_VTOC_8)
 	vpart = user_vtoc->v_part;
 	for (i = 0; i < V_NUMPAR; i++) {
-		if ((vpart->p_start % nblks) != 0) {
+		if (((unsigned)vpart->p_start % nblks) != 0) {
 			cmlb_dbg(CMLB_INFO,  cl,
 			    "cmlb_build_label_vtoc: p_start not multiply of"
 			    "nblks part %d p_start %d nblks %d\n", i,
 			    vpart->p_start, nblks);
 			return (EINVAL);
 		}
-		ncyl = vpart->p_start / nblks;
-		ncyl += vpart->p_size / nblks;
-		if ((vpart->p_size % nblks) != 0) {
+		ncyl = (unsigned)vpart->p_start / nblks;
+		ncyl += (unsigned)vpart->p_size / nblks;
+		if (((unsigned)vpart->p_size % nblks) != 0) {
 			ncyl++;
 		}
 		if (ncyl > (int)cl->cl_g.dkg_ncyl) {
@@ -3763,8 +3918,8 @@ cmlb_build_label_vtoc(struct cmlb_lun *cl, struct vtoc *user_vtoc)
 	vpart = user_vtoc->v_part;
 
 	for (i = 0; i < (int)user_vtoc->v_nparts; i++, lmap++, vpart++) {
-		lmap->dkl_cylno = vpart->p_start / nblks;
-		lmap->dkl_nblk = vpart->p_size;
+		lmap->dkl_cylno = (unsigned)vpart->p_start / nblks;
+		lmap->dkl_nblk = (unsigned)vpart->p_size;
 	}
 
 #elif defined(_SUNOS_VTOC_8)
@@ -3795,8 +3950,8 @@ cmlb_build_label_vtoc(struct cmlb_lun *cl, struct vtoc *user_vtoc)
 	for (i = 0; i < (int)user_vtoc->v_nparts; i++) {
 		lpart->p_tag  = vpart->p_tag;
 		lpart->p_flag = vpart->p_flag;
-		lmap->dkl_cylno = vpart->p_start / nblks;
-		lmap->dkl_nblk = vpart->p_size;
+		lmap->dkl_cylno = (unsigned)vpart->p_start / nblks;
+		lmap->dkl_nblk = (unsigned)vpart->p_size;
 
 		lmap++;
 		lpart++;
@@ -3934,7 +4089,7 @@ cmlb_set_vtoc(struct cmlb_lun *cl, struct dk_label *dkl, void *tg_cookie)
 {
 	uint_t	label_addr;
 	int	sec;
-	int	blk;
+	diskaddr_t	blk;
 	int	head;
 	int	cyl;
 	int	rval;
@@ -3971,7 +4126,7 @@ cmlb_set_vtoc(struct cmlb_lun *cl, struct dk_label *dkl, void *tg_cookie)
 	 * write past the last cylinder.
 	 */
 	for (sec = 1; ((sec < 5 * 2 + 1) && (sec < dkl->dkl_nsect)); sec += 2) {
-		blk = (daddr_t)(
+		blk = (diskaddr_t)(
 		    (cyl * ((dkl->dkl_nhead * dkl->dkl_nsect) - dkl->dkl_apc)) +
 		    (head * dkl->dkl_nsect) + sec);
 #if defined(__i386) || defined(__amd64)
@@ -3980,7 +4135,7 @@ cmlb_set_vtoc(struct cmlb_lun *cl, struct dk_label *dkl, void *tg_cookie)
 		rval = DK_TG_WRITE(cl, dkl, blk, cl->cl_sys_blocksize,
 		    tg_cookie);
 		cmlb_dbg(CMLB_INFO,  cl,
-		"cmlb_set_vtoc: wrote backup label %d\n", blk);
+		"cmlb_set_vtoc: wrote backup label %llx\n", blk);
 		if (rval != 0) {
 			goto exit;
 		}
@@ -4135,7 +4290,7 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 		if (cl->cl_vtoc.v_sanity == VTOC_SANE) {
 			cmlb_dbg(CMLB_TRACE,  cl,
 			    "cmlb_dkio_set_efi: CLEAR VTOC\n");
-			if (cl->cl_vtoc_label_is_from_media)
+			if (cl->cl_label_from_media == CMLB_LABEL_VTOC)
 				cmlb_clear_vtoc(cl, tg_cookie);
 			bzero(&cl->cl_vtoc, sizeof (struct dk_vtoc));
 			mutex_exit(CMLB_MUTEX(cl));
@@ -4320,10 +4475,11 @@ cmlb_dkio_set_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 		 * mboot has been written successfully.
 		 * set up the default geometry and VTOC
 		 */
-		if (cl->cl_blockcount <= DK_MAX_BLOCKS)
+		if (cl->cl_blockcount <= CMLB_EXTVTOC_LIMIT)
 			cmlb_setup_default_geometry(cl, tg_cookie);
 	}
 #endif
+	cl->cl_msglog_flag |= CMLB_ALLOW_2TB_WARN;
 	mutex_exit(CMLB_MUTEX(cl));
 	kmem_free(mboot, (size_t)(sizeof (struct mboot)));
 	return (rval);
@@ -4569,7 +4725,7 @@ no_solaris_partition:
 	 * we set it to an entirely bogus value.
 	 */
 	for (count = 0; count < FD_NUMPART; count++) {
-		cl->cl_map[FDISK_P1 + count].dkl_cylno = -1;
+		cl->cl_map[FDISK_P1 + count].dkl_cylno = UINT32_MAX;
 		cl->cl_map[FDISK_P1 + count].dkl_nblk =
 		    cl->cl_fmap[count].fmap_nblk;
 		cl->cl_offset[FDISK_P1 + count] =
@@ -4767,6 +4923,35 @@ cmlb_dkio_partinfo(struct cmlb_lun *cl, dev_t dev, caddr_t  arg, int flag)
 		if (ddi_copyout(&p, (void *)arg, sizeof (p), flag))
 			err = EFAULT;
 #endif /* _MULTI_DATAMODEL */
+	}
+	return (err);
+}
+static int
+cmlb_dkio_extpartinfo(struct cmlb_lun *cl, dev_t dev, caddr_t  arg, int flag)
+{
+	int err = 0;
+
+	/*
+	 * Return parameters describing the selected disk slice.
+	 * Note: this ioctl is for the intel platform only
+	 */
+	int part;
+
+	part = CMLBPART(dev);
+
+	mutex_enter(CMLB_MUTEX(cl));
+	/* don't check cl_solaris_size for pN */
+	if (part < P0_RAW_DISK && cl->cl_solaris_size == 0) {
+		err = EIO;
+		mutex_exit(CMLB_MUTEX(cl));
+	} else {
+		struct extpart_info p;
+
+		p.p_start = (diskaddr_t)cl->cl_offset[part];
+		p.p_length = (diskaddr_t)cl->cl_map[part].dkl_nblk;
+		mutex_exit(CMLB_MUTEX(cl));
+		if (ddi_copyout(&p, (void *)arg, sizeof (p), flag))
+			err = EFAULT;
 	}
 	return (err);
 }

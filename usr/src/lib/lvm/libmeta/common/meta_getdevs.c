@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * get dev_t list
@@ -370,7 +369,7 @@ int
 meta_getvtoc(
 	int		fd,		/* fd for named device */
 	char		*devname,	/* name of device */
-	struct vtoc	*vtocbufp,	/* vtoc buffer to fill */
+	struct extvtoc	*vtocbufp,	/* vtoc buffer to fill */
 	int		*partno,	/* return partno here */
 	md_error_t	*ep
 )
@@ -378,7 +377,7 @@ meta_getvtoc(
 	int		part;
 
 	(void) memset(vtocbufp, 0, sizeof (*vtocbufp));
-	if ((part = read_vtoc(fd, vtocbufp)) < 0) {
+	if ((part = read_extvtoc(fd, vtocbufp)) < 0) {
 		int	err = errno;
 
 		if (ioctl(fd, MHIOCSTATUS, NULL) == 1)
@@ -395,6 +394,10 @@ meta_getvtoc(
 		}
 		return (mdsyserror(ep, err, devname));
 	}
+
+	/* Slice number for *p0 partition (whole disk on x86) is 16 */
+	if (part >= V_NUMPAR)
+		return (mdsyserror(ep, EINVAL, devname));
 
 	/* Slice number for *p0 partition (whole disk on x86) is 16 */
 	if (part >= V_NUMPAR)
@@ -454,14 +457,14 @@ int
 meta_setvtoc(
 	int		fd,		/* fd for named device */
 	char		*devname,	/* name of device */
-	struct vtoc	*vtocbufp,	/* vtoc buffer to fill */
+	struct extvtoc	*vtocbufp,	/* vtoc buffer to fill */
 	md_error_t	*ep
 )
 {
 	int		part;
 	int		err;
 
-	if ((part = write_vtoc(fd, vtocbufp)) < 0) {
+	if ((part = write_extvtoc(fd, vtocbufp)) < 0) {
 		if (part == VT_EINVAL)
 			err = EINVAL;
 		else if (part == VT_EIO)

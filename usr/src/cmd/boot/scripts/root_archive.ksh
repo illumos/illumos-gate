@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # utility to pack and unpack a boot/root archive
 # both ufs and hsfs (iso9660) format archives are unpacked
@@ -40,11 +39,6 @@
 #   In the case of (un)packmedia, the image is packed or unpacked to/from
 #   Solaris media and all the things that don't go into the ramdisk image
 #   are (un)cpio'd as well
-#
-# This utility is also used to pack parts (in essence the window system,
-# usr/dt and usr/openwin) of the non ramdisk SPARC
-# miniroot. (un)packmedia will recognize that they are being run a SPARC
-# miniroot and do the appropriate work.
 #
 
 usage()
@@ -67,6 +61,7 @@ cleanup()
 		rm -f "$TMR"
 	fi
 	rm -f "$TMR.gz"
+	rm -f /tmp/flist$$
 }
 
 preload_Gnome()
@@ -409,10 +404,18 @@ archive_lu()
 
 	(
 		cd "$MINIROOT"
-		find usr/lib/install usr/snadm usr/sbin | \
-		    cpio -ocmPuB 2> /dev/null | bzip2 > "$CPIO_DIR"/lu.cpio.bz2
+		find usr/lib/install usr/snadm usr/sbin \
+		    boot/grub boot/solaris/bootenv.rc \
+		    tmp/root/boot/grub tmp/root/boot/solaris/bootenv.rc \
+		    2> /dev/null | cpio -ocmPuB 2> /dev/null | bzip2 \
+		    > "$CPIO_DIR"/lu.cpio.bz2
 		ls platform > "$CPIO_DIR/lu.platforms"
 	)
+}
+
+cleanout_pkgdata()
+{
+	rm -Rf tmp/root/var/sadm/install tmp/root/var/sadm/pkg
 }
 
 packmedia()
@@ -483,13 +486,11 @@ packmedia()
 		find tmp/root/var/sadm/install tmp/root/var/sadm/pkg -print | \
 		    cpio -ocmPuB 2> /dev/null | bzip2 > \
 		    "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2"
-	)
-	rm -rf "$MINIROOT/tmp/root/var/sadm/install"
-	rm -rf "$MINIROOT/tmp/root/var/sadm/pkg"
 
-	if [ -d "$MINIROOT/kernel/drv/sparcv9" ] ; then
-		archive_lu "$MEDIA" "$MINIROOT"
-	fi
+		cleanout_pkgdata
+	)
+
+	archive_lu "$MEDIA" "$MINIROOT"
 
 	archive_X "$MEDIA" "$MINIROOT"
 
@@ -512,6 +513,7 @@ packmedia()
 		# 32-bit archives and miniroot
 
 		unpackmedia "$MEDIA" "$MINIROOT"
+		cleanout_pkgdata
 		mkdir -p "$MEDIA/$RELEASE/Tools/Boot/amd64"
 		for i in $ARCHIVES; do
 			mv "$MEDIA/$RELEASE/Tools/Boot/${i}.cpio.bz2" \
@@ -630,7 +632,7 @@ unpack()
 		exit 1
 	fi
 
-	if [ `basename $MR` = x86.miniroot ] ; then
+	if [ `uname -i` = i86pc ] ; then
 		gzcat "$MR" > $TMR
 	else
 		REALTHING=true ; export REALTHING
@@ -688,21 +690,49 @@ compress()
 
 		done
 
-		# now re-copy a couple of uncompressed files
-		#
+		wait `pgrep fiocompress`
 
-		find kernel platform -name unix | cpio -pdum $DST 2> /dev/null
-		find kernel platform -name genunix | cpio -pdum $DST \
-		    2> /dev/null
-		find kernel platform -name platmod | cpio -pdum $DST \
-		    2> /dev/null
-		find `find kernel platform -name cpu` | cpio -pdum $DST \
-		    2> /dev/null
-		find `find kernel platform -name kmdb\*` | cpio -pdum $DST \
-		    2> /dev/null
-		find kernel/misc/sparcv9/ctf kernel/fs/sparcv9/dcfs \
-		    etc/system etc/name_to_major etc/path_to_inst \
-		    etc/name_to_sysnum | cpio -pdum $DST 2> /dev/null
+		# now re-copy a couple of uncompressed files
+
+		if [ -d "$SRC/platform/i86pc" ] ; then
+			find `cat boot/solaris/filelist.ramdisk` -type file \
+			    -print 2> /dev/null > /tmp/flist$$
+			find usr/kernel -type file -print 2> /dev/null \
+			    >> /tmp/flist$$
+			# some of the files are replaced with links into
+			# tmp/root on the miniroot, so find the backing files
+			# from there as well and add them to the list ti
+			# be copied uncompressed
+			(
+				cd $SRC/tmp/root
+				find `cat ../../boot/solaris/filelist.ramdisk` \
+				    -type file -print 2> /dev/null | \
+				    sed 's#^#tmp/root/#' >> /tmp/flist$$
+			)
+			flist=`cat /tmp/flist$$`
+			(
+				cd $DST
+				rm -f $flist
+			)
+			for file in $flist ; do
+				echo $file | cpio -pdum $DST 2> /dev/null
+			done
+		else
+			find kernel platform -name unix | \
+			    cpio -pdum $DST 2> /dev/null
+			find kernel platform -name genunix | cpio -pdum $DST \
+			    2> /dev/null
+			find kernel platform -name platmod | cpio -pdum $DST \
+			    2> /dev/null
+			find `find kernel platform -name cpu` | \
+			    cpio -pdum $DST 2> /dev/null
+			find `find kernel platform -name kmdb\*` | \
+				cpio -pdum $DST 2> /dev/null
+			find kernel/misc/sparcv9/ctf kernel/fs/sparcv9/dcfs \
+			    kernel/misc/ctf kernel/fs/dcfs \
+			    etc/system etc/name_to_major etc/path_to_inst \
+			    etc/name_to_sysnum | cpio -pdum $DST 2> /dev/null
+		fi
 	)
 }
 
@@ -724,10 +754,9 @@ pack()
 		exit 1
 	fi
 
-	# always compress on sparc if fiocompress exists
+	# always compress if fiocompress exists
 	#
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] && \
-	    [ -x /usr/sbin/fiocompress ] ; then
+	if [ -x /usr/sbin/fiocompress ] ; then
 		COMPRESS=true
 	fi
 
@@ -750,7 +779,7 @@ pack()
 	    {t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
 	    END {print int(t * 1.10 / 1024)}')
 	if [ "$COMPRESS" = true ] ; then
-		size=`echo $size | nawk '{s = $1} END {print int(s * .53)}'`
+		size=`echo $size | nawk '{s = $1} END {print int(s * 0.6)}'`
 	fi
 
 	/usr/sbin/mkfile ${size}k "$TMR"

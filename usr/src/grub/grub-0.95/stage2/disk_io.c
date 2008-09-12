@@ -31,8 +31,8 @@
 #endif
 
 /* instrumentation variables */
-void (*disk_read_hook) (int, int, int) = NULL;
-void (*disk_read_func) (int, int, int) = NULL;
+void (*disk_read_hook) (unsigned int, int, int) = NULL;
+void (*disk_read_func) (unsigned int, int, int) = NULL;
 
 #ifndef STAGE1_5
 int print_possibilities;
@@ -136,7 +136,7 @@ int find_best_root;
 
 /* disk buffer parameters */
 int buf_drive = -1;
-int buf_track;
+unsigned int buf_track;
 struct geometry buf_geom;
 
 /* filesystem common variables */
@@ -154,7 +154,8 @@ grub_log2 (unsigned long word)
 #define log2 grub_log2
 
 int
-rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
+rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
+	char *buf)
 {
   int slen, sectors_per_vtrack;
   int sector_size_bits = log2 (buf_geom.sector_size);
@@ -164,7 +165,8 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
 
   while (byte_len > 0 && !errnum)
     {
-      int soff, num_sect, track, size = byte_len;
+      int soff, num_sect, size = byte_len;
+      unsigned int track;  
       char *bufaddr;
 
       /*
@@ -179,12 +181,12 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
 	      return 0;
 	    }
 	  buf_drive = drive;
-	  buf_track = -1;
+	  buf_track = BUF_CACHE_INVALID;
 	  sector_size_bits = log2 (buf_geom.sector_size);
 	}
 
       /* Make sure that SECTOR is valid.  */
-      if (sector < 0 || sector >= buf_geom.total_sectors)
+      if (sector >= buf_geom.total_sectors)
 	{
 	  errnum = ERR_GEOM;
 	  return 0;
@@ -208,7 +210,8 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
 
       if (track != buf_track)
 	{
-	  int bios_err, read_start = track, read_len = sectors_per_vtrack;
+	  int bios_err, read_len = sectors_per_vtrack;
+	  unsigned int read_start = track;
 
 	  /*
 	   *  If there's more than one read in this entire loop, then
@@ -226,7 +229,7 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
 			       read_start, read_len, BUFFERSEG);
 	  if (bios_err)
 	    {
-	      buf_track = -1;
+	      buf_track = BUF_CACHE_INVALID;
 
 	      if (bios_err == BIOSDISK_ERROR_GEOMETRY)
 		errnum = ERR_GEOM;
@@ -278,7 +281,7 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
        */
       if (disk_read_func)
 	{
-	  int sector_num = sector;
+	  unsigned int sector_num = sector;
 	  int length = buf_geom.sector_size - byte_offset;
 	  if (length > size)
 	    length = size;
@@ -308,14 +311,13 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
 
 
 int
-devread (int sector, int byte_offset, int byte_len, char *buf)
+devread(unsigned int sector, int byte_offset, int byte_len, char *buf)
 {
   /*
    *  Check partition boundaries
    */
-  if (sector < 0
-      || ((sector + ((byte_offset + byte_len - 1) >> SECTOR_BITS))
-	  >= part_length))
+  if ((sector + ((byte_offset + byte_len - 1) >> SECTOR_BITS))
+	>= part_length)
     {
       errnum = ERR_OUTSIDE_PART;
       return 0;
@@ -329,7 +331,7 @@ devread (int sector, int byte_offset, int byte_len, char *buf)
 
 #if !defined(STAGE1_5)
   if (disk_read_hook && debug)
-    printf ("<%d, %d, %d>", sector, byte_offset, byte_len);
+    printf ("<%u, %d, %d>", sector, byte_offset, byte_len);
 #endif /* !STAGE1_5 */
 
   /*
@@ -347,7 +349,7 @@ devread (int sector, int byte_offset, int byte_len, char *buf)
 
 #ifndef STAGE1_5
 int
-rawwrite (int drive, int sector, char *buf)
+rawwrite(int drive, unsigned int sector, char *buf)
 {
   if (sector == 0)
     {
@@ -374,13 +376,13 @@ rawwrite (int drive, int sector, char *buf)
 
   if (sector - sector % buf_geom.sectors == buf_track)
     /* Clear the cache.  */
-    buf_track = -1;
+    buf_track = BUF_CACHE_INVALID;
 
   return 1;
 }
 
 int
-devwrite (int sector, int sector_count, char *buf)
+devwrite(unsigned int sector, int sector_count, char *buf)
 {
 #if defined(GRUB_UTIL) && defined(__linux__)
   if (current_partition != 0xFFFFFF
@@ -552,7 +554,7 @@ set_partition_hidden_flag (int hidden)
 	    PC_SLICE_TYPE (mbr, entry) &= ~PC_SLICE_TYPE_HIDDEN_FLAG;       
 	  
 	  /* Write back the MBR to the disk.  */
-	  buf_track = -1;
+	  buf_track = BUF_CACHE_INVALID;
 	  if (! rawwrite (current_drive, offset, mbr))
 	    return 1;
 	  
@@ -870,7 +872,7 @@ real_open_partition (int flags)
 	  return 0;
 	}
       buf_drive = current_drive;
-      buf_track = -1;
+      buf_track = BUF_CACHE_INVALID;
     }
   part_length = buf_geom.total_sectors;
 

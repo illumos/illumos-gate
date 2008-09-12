@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Two output fields under the -i option will always be
@@ -62,7 +61,7 @@
 
 static	void	partinfo(int fd, char *device);
 static	void	devinfo(struct dk_geom *geom, int fd, char *device);
-static	int	readvtoc(int fd, char *name, struct vtoc *vtoc);
+static	int	readvtoc(int fd, char *name, struct extvtoc *vtoc);
 static	int	warn(char *what, char *why);
 static	void	usage(void);
 
@@ -133,7 +132,7 @@ partinfo(int fd, char *device)
 	major_t maj;
 	minor_t min;
 	struct stat64 statbuf;
-	struct vtoc vtdata;
+	struct extvtoc vtdata;
 	struct dk_gpt *efi;
 
 	i = stat64(device, &statbuf);
@@ -144,7 +143,7 @@ partinfo(int fd, char *device)
 
 	if ((slice = readvtoc(fd, device, &vtdata)) >= 0) {
 
-		(void) printf("%s\t%0lx\t%0lx\t%ld\t%ld\t%x\t%x\n",
+		(void) printf("%s\t%0lx\t%0lx\t%llu\t%llu\t%x\t%x\n",
 			device, maj, min,
 			vtdata.v_part[slice].p_start,
 			vtdata.v_part[slice].p_size,
@@ -168,7 +167,7 @@ devinfo(struct dk_geom *geom, int fd, char *device)
 {
 	int i;
 	unsigned int nopartitions, sectorcyl, bytes;
-	struct vtoc vtdata;
+	struct extvtoc vtdata;
 /*
  *	unsigned int version = 0;
  *	unsigned int driveid = 0;
@@ -207,11 +206,11 @@ devinfo(struct dk_geom *geom, int fd, char *device)
  * Read a partition map.
  */
 static int
-readvtoc(int fd, char *name, struct vtoc *vtoc)
+readvtoc(int fd, char *name, struct extvtoc *vtoc)
 {
 	int	retval;
 
-	retval = read_vtoc(fd, vtoc);
+	retval = read_extvtoc(fd, vtoc);
 
 	switch (retval) {
 		case (VT_ERROR):

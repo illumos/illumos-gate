@@ -21,10 +21,8 @@
 #
 # uts/intel/dadk/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the dadk "misc"
 #	kernel module.
@@ -63,6 +61,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 LDFLAGS		+= -dy -Nmisc/gda
+
+# Larger than 1TB VTOC support
+
+CPPFLAGS	+= -D_EXTVTOC
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -19,9 +19,6 @@
  * CDDL HEADER END
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	/* from UCB 5.2 9/11/85 */
-
 /*
  * newfs: friendly front end to mkfs
  *
@@ -758,14 +755,14 @@ getdiskbydev(char *disk)
 		if (ioctl(fd, DKIOCGGEOM, &g))
 			fatal(gettext(
 			    "%s: Unable to read Disk geometry"), disk);
-		if (((g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect) > CHSLIMIT) &&
-		    !Tflag) {
+		if ((((diskaddr_t)g.dkg_ncyl * g.dkg_nhead *
+		    g.dkg_nsect) > CHSLIMIT) && !Tflag) {
 			use_efi_dflts = 1;
 		}
-		dprintf(("DeBuG newfs : geom=%ld, CHSLIMIT=%d "
+		dprintf(("DeBuG newfs : geom=%llu, CHSLIMIT=%d "
 		    "isremovable = %d ishotpluggable = %d use_efi_dflts = %d\n",
-		    g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT,
-		    isremovable, ishotpluggable, use_efi_dflts));
+		    (diskaddr_t)g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect,
+		    CHSLIMIT, isremovable, ishotpluggable, use_efi_dflts));
 		/*
 		 * The ntracks that is passed to mkfs is decided here based
 		 * on 'use_efi_dflts' and whether ntracks was specified as a
@@ -819,11 +816,11 @@ getdiskbydev(char *disk)
 static diskaddr_t
 get_device_size(int fd, char *name)
 {
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 	dk_gpt_t *efi_vtoc;
 	diskaddr_t	slicesize;
 
-	int index = read_vtoc(fd, &vtoc);
+	int index = read_extvtoc(fd, &vtoc);
 
 	if (index >= 0) {
 		label_type = LABEL_TYPE_VTOC;
@@ -875,16 +872,7 @@ get_device_size(int fd, char *name)
 		slicesize = efi_vtoc->efi_parts[index].p_size;
 		efi_free(efi_vtoc);
 	} else if (label_type == LABEL_TYPE_VTOC) {
-		/*
-		 * In the vtoc struct, p_size is a 32-bit signed quantity.
-		 * In the dk_gpt struct (efi's version of the vtoc), p_size
-		 * is an unsigned 64-bit quantity.  By casting the vtoc's
-		 * psize to an unsigned 32-bit quantity, it will be copied
-		 * to 'slicesize' (an unsigned 64-bit diskaddr_t) without
-		 * sign extension.
-		 */
-
-		slicesize = (uint32_t)vtoc.v_part[index].p_size;
+		slicesize = vtoc.v_part[index].p_size;
 	}
 
 	return (slicesize);

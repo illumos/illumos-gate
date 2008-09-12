@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,8 +26,6 @@
 
 #ifndef _SYS_DKIO_H
 #define	_SYS_DKIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS-4.0 5.19 */
 
 #include <sys/dklabel.h>	/* Needed for NDKMAP define */
 
@@ -166,6 +165,9 @@ struct dk_geom {
 #define	DKIOCGVTOC	(DKIOC|11)		/* Get VTOC */
 #define	DKIOCSVTOC	(DKIOC|12)		/* Set VTOC & Write to Disk */
 
+#define	DKIOCGEXTVTOC	(DKIOC|23)	/* Get extended VTOC */
+#define	DKIOCSEXTVTOC	(DKIOC|24)	/* Set extended VTOC, Write to Disk */
+
 /*
  * Disk Cache Controls.  These ioctls should be supported by
  * all disk drivers.
@@ -252,6 +254,9 @@ struct defect_header {
 };
 
 #define	DKIOCPARTINFO	(DKIOC|22)	/* Get partition or slice parameters */
+#define	DKIOCEXTPARTINFO (DKIOC|19)	/* Get extended partition or slice */
+					/* parameters */
+
 
 /*
  * Used by applications to get partition or slice information
@@ -266,6 +271,11 @@ struct part_info32 {
 struct part_info {
 	daddr_t		p_start;
 	int		p_length;
+};
+
+struct extpart_info {
+	diskaddr_t	p_start;
+	diskaddr_t	p_length;
 };
 
 /* The following ioctls are for Optical Memory Device */

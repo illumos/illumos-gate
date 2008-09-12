@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <sys/types.h>
 #include <time.h>
@@ -1006,9 +1004,9 @@ error:
 }
 
 static Boolean_t
-readvtoc(int fd, struct vtoc *v, int *slice)
+readvtoc(int fd, struct extvtoc *v, int *slice)
 {
-	if ((*slice = read_vtoc(fd, v)) >= 0)
+	if ((*slice = read_extvtoc(fd, v)) >= 0)
 		return (True);
 	else
 		return (False);
@@ -1040,7 +1038,7 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, tgt_node_t *n,
 {
 	struct stat	s;
 	char		*raw_name, buf[512];
-	struct vtoc	vtoc;
+	struct extvtoc	extvtoc;
 	struct dk_gpt	*efi;
 	int		slice, fd;
 	tgt_node_t	*pn;
@@ -1083,8 +1081,8 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, tgt_node_t *n,
 			(void) close(fd);
 			return (False);
 		}
-		if (readvtoc(fd, &vtoc, &slice) == True) {
-			*size = (long long)vtoc.v_part[slice].p_size * 512;
+		if (readvtoc(fd, &extvtoc, &slice) == True) {
+			*size = extvtoc.v_part[slice].p_size * 512;
 
 		} else if (readefi(fd, &efi, &slice) == True) {
 			*size = efi->efi_parts[slice].p_size * 512;

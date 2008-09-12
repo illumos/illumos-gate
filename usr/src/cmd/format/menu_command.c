@@ -147,7 +147,7 @@ c_disk()
 		/*
 		 * Convert the token into an integer.
 		 */
-		if (geti(cleantoken, (int *)&index, (int *)NULL))
+		if (geti(cleantoken, &index, (int *)NULL))
 			return (0);
 
 		/*
@@ -400,7 +400,7 @@ c_type()
 	 */
 	if (index == auto_conf_choice) {
 		float			scaled;
-		long			nblks;
+		diskaddr_t		nblks;
 		int			nparts;
 
 		/*
@@ -415,7 +415,7 @@ c_type()
 		}
 		fmt_print("%s: configured with capacity of ",
 			cur_disk->disk_name);
-		nblks = tptr->dtype_ncyl * tptr->dtype_nhead *
+		nblks = (diskaddr_t)tptr->dtype_ncyl * tptr->dtype_nhead *
 			tptr->dtype_nsect;
 		scaled = bn2mb(nblks);
 		if (scaled > 1024.0) {
@@ -593,7 +593,7 @@ c_type()
 	 * running from a file.
 	 */
 	if ((tptr != oldtype) &&
-			checkmount((daddr_t)-1, (daddr_t)-1)) {
+			checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print(
 		"Cannot set disk type while it has mounted partitions.\n\n");
 		return (-1);
@@ -602,7 +602,7 @@ c_type()
 	 * check for partitions being used for swapping in format zone
 	 */
 	if ((tptr != oldtype) &&
-			checkswap((daddr_t)-1, (daddr_t)-1)) {
+			checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print("Cannot set disk type while its partition are \
 currently being used for swapping.\n");
 		return (-1);
@@ -770,7 +770,8 @@ c_format()
 	time_t			clock;
 	int			format_time, format_tracks, format_cyls;
 	int			format_interval;
-	int			deflt, status;
+	diskaddr_t		deflt;
+	int			status;
 	u_ioparam_t		ioparam;
 
 	/*
@@ -827,12 +828,12 @@ c_format()
 		deflt = ioparam.io_bounds.lower;
 		start = input(FIO_BN,
 			"Enter starting block number", ':',
-			&ioparam, &deflt, DATA_INPUT);
+			&ioparam, (int *)&deflt, DATA_INPUT);
 		ioparam.io_bounds.lower = start;
 		deflt = ioparam.io_bounds.upper;
 		end = input(FIO_BN,
 			"Enter ending block number", ':',
-			&ioparam, &deflt, DATA_INPUT);
+			&ioparam, (int *)&deflt, DATA_INPUT);
 	}
 	/*
 	 * Some disks can format tracks.  Make sure the whole track is
@@ -1277,7 +1278,7 @@ int
 c_show()
 {
 	u_ioparam_t	ioparam;
-	daddr_t		bn;
+	diskaddr_t	bn;
 
 	/*
 	 * There must be a current disk type, so we will know the geometry.
@@ -1295,12 +1296,12 @@ c_show()
 	} else {
 	    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 	}
-	bn = (daddr_t)input(FIO_BN, "Enter a disk block", ':',
+	bn = input(FIO_BN, "Enter a disk block", ':',
 	    &ioparam, (int *)NULL, DATA_INPUT);
 	/*
 	 * Echo it back.
 	 */
-	fmt_print("Disk block = %ld = 0x%lx = (", bn, bn);
+	fmt_print("Disk block = %lld = 0x%llx = (", bn, bn);
 	pr_dblock(fmt_print, bn);
 	fmt_print(")\n\n");
 	return (0);
@@ -1342,7 +1343,7 @@ c_label()
 	 * only if the partitions would change for the mounted partitions.
 	 *
 	 */
-	if (checkmount((daddr_t)-1, (daddr_t)-1)) {
+	if (checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
 		/* Bleagh, too descriptive */
 		if (check_label_with_mount()) {
 			err_print("Cannot label disk while it has "
@@ -1356,7 +1357,7 @@ c_label()
 	 * on the current disk.  If so, refuse to label the disk, but
 	 * only if the partitions would change for the mounted partitions.
 	 */
-	if (checkswap((daddr_t)-1, (daddr_t)-1)) {
+	if (checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
 		if (check_label_with_swap()) {
 			err_print("Cannot label disk while its "
 			    "partitions are currently being used for "
@@ -1402,19 +1403,13 @@ c_label()
 #endif
 	    int 		choice;
 	    u_ioparam_t		ioparam;
-	    struct vtoc		vtoc;
+	    struct extvtoc	vtoc;
 	    struct dk_label	label;
 	    struct dk_gpt	*vtoc64;
 	    struct efi_info	efinfo;
 	    struct disk_type	*dptr;
 
-		/* If capacity > 1TB then offer no choice */
-	    if (cur_label == L_TYPE_EFI) {
-		if (cur_dtype->capacity > INFINITY) {
-		    goto expert_end;
-		}
-	    }
-		/* Ask user what label to use */
+	    /* Ask user what label to use */
 	    fmt_print("[0] SMI Label\n");
 	    fmt_print("[1] EFI Label\n");
 	    ioparam.io_bounds.lower = 0;
@@ -1437,29 +1432,34 @@ c_label()
 		 * EFI label to SMI label
 		 */
 		if (cur_dtype->capacity > INFINITY) {
-		    fmt_print("SMI Label not supported on this disk\n");
-		    return (-1);
+		    fmt_print("Warning: SMI labels only support up to 2 TB.\n");
 		}
 
-
-		fmt_print("Warning: This disk has an EFI label. Changing to "
-		    "SMI label will erase all\ncurrent partitions.\n");
-
-		if (check("Continue"))
+		if (cur_disk->fdisk_part.systid == EFI_PMBR) {
+		    fmt_print("Warning: This disk has an EFI label. Changing to"
+		    " SMI label will erase all\ncurrent partitions.\n");
+		    if (check("Continue"))
 			return (-1);
-
-		(void) memset((char *)&label, 0, sizeof (struct dk_label));
-
-		if ((cur_disk->fdisk_part.systid == EFI_PMBR) ||
-		    (((cur_disk->fdisk_part.systid == SUNIXOS) ||
-		    (cur_disk->fdisk_part.systid == SUNIXOS2)) &&
-		    (cur_disk->fdisk_part.numsect == 0))) {
-			fmt_print("You must use fdisk to delete the current "
+#if defined(_FIRMWARE_NEEDS_FDISK)
+		    fmt_print("You must use fdisk to delete the current "
 			    "EFI partition and create a new\n"
 			    "Solaris partition before you can convert the "
 			    "label.\n");
+		    return (-1);
+#endif
+		}
+
+#if defined(_FIRMWARE_NEEDS_FDISK)
+		if (!(((cur_disk->fdisk_part.systid != SUNIXOS) ||
+		    (cur_disk->fdisk_part.systid != SUNIXOS2)) &&
+		    (cur_disk->fdisk_part.numsect > 0))) {
+			fmt_print("You must use fdisk to create a Solaris "
+			    "partition before you can convert the label.\n");
 			return (-1);
 		}
+#endif
+
+		(void) memset((char *)&label, 0, sizeof (struct dk_label));
 
 		(void) strcpy(x86_devname, cur_disk->disk_name);
 		if (cur_ctype->ctype_ctype == DKC_DIRECT)
@@ -1696,7 +1696,7 @@ c_backup()
 	struct	dk_label label;
 	struct	disk_type *dtype;
 	struct	partition_info *parts, *plist;
-	daddr_t	bn;
+	diskaddr_t	bn;
 	int	sec, head, i;
 
 	/*
@@ -1757,7 +1757,7 @@ c_backup()
 		/*
 		 * Attempt to read it.
 		 */
-		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, (diskaddr_t)bn,
+		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, bn,
 				1, (char *)&label, F_NORMAL, NULL)) {
 			continue;
 		}
@@ -1922,7 +1922,7 @@ c_verify()
 {
 	struct	dk_label p_label, b_label, *label;
 	struct	partition_info tmp_pinfo;
-	daddr_t	bn;
+	diskaddr_t	bn;
 	int	sec, head, i, status;
 	int	p_label_bad = 0;
 	int	b_label_bad = 0;
@@ -2008,7 +2008,7 @@ Warning: Primary label on disk appears to be different from\ncurrent label.\n");
 		/*
 		 * Attempt to read it.
 		 */
-		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, (diskaddr_t)bn,
+		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, bn,
 				1, (char *)&b_label, F_NORMAL, NULL))
 			continue;
 		/*
@@ -2220,7 +2220,7 @@ c_volname()
 	 * only if the partitions would change for the mounted partitions.
 	 *
 	 */
-	if (checkmount((daddr_t)-1, (daddr_t)-1)) {
+	if (checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
 		/* Bleagh, too descriptive */
 		if (check_label_with_mount()) {
 			err_print(
@@ -2235,7 +2235,7 @@ c_volname()
 	 * only if the partitions would change for the swap partitions.
 	 *
 	 */
-	if (checkswap((daddr_t)-1, (daddr_t)-1)) {
+	if (checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
 		/* Bleagh, too descriptive */
 		if (check_label_with_swap()) {
 			err_print(

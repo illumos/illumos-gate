@@ -47,8 +47,9 @@ extern int get_diskinfo_floppy (int drive,
    return the error number. Otherwise, return 0.  */
 int
 biosdisk (int read, int drive, struct geometry *geometry,
-	  int sector, int nsec, int segment)
+	  unsigned int sector, int nsec, int segment)
 {
+
   int err;
   
   if (geometry->flags & BIOSDISK_FLAG_LBA_EXTENSION)
@@ -79,7 +80,6 @@ biosdisk (int read, int drive, struct geometry *geometry,
       /* This is undocumented part. The address is formated in
 	 SEGMENT:ADDRESS.  */
       dap.buffer = segment << 16;
-      
       err = biosdisk_int13_extensions ((read + 0x42) << 8, drive, &dap);
       /*
        * Try to report errors upwards when the bios has read only part of
@@ -108,7 +108,6 @@ biosdisk (int read, int drive, struct geometry *geometry,
     {
       int cylinder_offset, head_offset, sector_offset;
       int head;
-
       /* SECTOR_OFFSET is counted from one, while HEAD_OFFSET and
 	 CYLINDER_OFFSET are counted from zero.  */
       sector_offset = sector % geometry->sectors + 1;

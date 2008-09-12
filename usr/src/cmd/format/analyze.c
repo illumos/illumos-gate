@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains routines to analyze the surface of a disk.
  */
@@ -51,7 +49,7 @@ int	scan_stop = 0;			/* stop after error flag */
 int	scan_loop = 0;			/* loop forever flag */
 int	scan_passes = 2;		/* number of passes */
 int	scan_random = 0;		/* random patterns flag */
-int	scan_size = 0;			/* sectors/scan operation */
+uint_t	scan_size = 0;			/* sectors/scan operation */
 int	scan_auto = 1;			/* scan after format flag */
 int	scan_restore_defects = 1;	/* restore defect list after writing */
 int	scan_restore_label = 1;		/* restore label after writing */
@@ -100,10 +98,10 @@ static unsigned int alpha_pattern =  0x40404040;   /* 10000000...  == @@@@... */
 #ifdef	__STDC__
 
 static int	scan_repair(diskaddr_t bn, int mode);
-static int	analyze_blocks(int flags, diskaddr_t blkno, int blkcnt,
+static int	analyze_blocks(int flags, diskaddr_t blkno, uint_t blkcnt,
 		unsigned data, int init, int driver_flags, int *xfercntp);
 static int	handle_error_conditions(void);
-static int	verify_blocks(int flags, diskaddr_t blkno, int blkcnt,
+static int	verify_blocks(int flags, diskaddr_t blkno, uint_t blkcnt,
 		unsigned data, int driver_flags, int *xfercntp);
 #else	/* __STDC__ */
 
@@ -125,7 +123,8 @@ do_scan(flags, mode)
 	int	flags, mode;
 {
 	diskaddr_t	start, end, curnt;
-	int	pass, size, needinit, data;
+	int	pass, needinit, data;
+	uint_t	size;
 	int	status, founderr, i, j;
 	int	error = 0;
 	int	pattern = 0;
@@ -197,8 +196,8 @@ do_scan(flags, mode)
 	 */
 	if (flags & (SCAN_PATTERN | SCAN_WRITE)) {
 	    if (cur_label == L_TYPE_SOLARIS) {
-		if (start < (daddr_t)totalsects() &&
-				end >= (daddr_t)datasects()) {
+		if (start < (diskaddr_t)totalsects() &&
+				end >= (diskaddr_t)datasects()) {
 			if (!EMBEDDED_SCSI) {
 				cur_list.flags |= LIST_DIRTY;
 			}
@@ -577,13 +576,15 @@ scan_repair(bn, mode)
  */
 static int
 analyze_blocks(flags, blkno, blkcnt, data, init, driver_flags, xfercntp)
-	int	flags, driver_flags, blkcnt, init;
+	int	flags, driver_flags, init;
+	uint_t	blkcnt;
 	register unsigned data;
 	diskaddr_t	blkno;
 	int	*xfercntp;
 {
-	int	corrupt = 0;
-	register int	status, i, nints;
+	int		corrupt = 0;
+	int		status;
+	register diskaddr_t	i, nints;
 	register unsigned *ptr = (uint_t *)pattern_buf;
 
 	media_error = 0;
@@ -595,7 +596,7 @@ analyze_blocks(flags, blkno, blkcnt, data, init, driver_flags, xfercntp)
 	/*
 	 * Initialize the pattern buffer if necessary.
 	 */
-	nints = blkcnt * SECSIZE / sizeof (int);
+	nints = (diskaddr_t)blkcnt * SECSIZE / sizeof (int);
 	if ((flags & SCAN_PATTERN) && init) {
 		for (i = 0; i < nints; i++)
 			*((int *)((int *)pattern_buf + i)) = data;
@@ -663,7 +664,7 @@ analyze_blocks(flags, blkno, blkcnt, data, init, driver_flags, xfercntp)
 					*((int *)((int *)pattern_buf +
 					(nints - i))));
 				pr_dblock(err_print, blkno);
-				err_print(", offset = 0x%x.\n",
+				err_print(", offset = 0x%llx.\n",
 					(nints - i) * sizeof (int));
 				goto bad;
 			}
@@ -715,7 +716,7 @@ bad:
 static int
 verify_blocks(int flags,
 		diskaddr_t blkno,
-		int blkcnt,
+		uint_t blkcnt,
 		unsigned data,
 		int driver_flags,
 		int *xfercntp)
@@ -759,17 +760,19 @@ verify_blocks(int flags,
 		 * compare and make sure the pattern came back intact.
 		 */
 		for (data = blkno; data < blkno + blkcnt; data++) {
-		    for (i = 0; i < nints; i++) {
-			if (*ptr++ != data) {
-			    ptr--;
-			    err_print("Data miscompare error (expecting "
-				"0x%x, got 0x%x) at ", data, *ptr);
-			    pr_dblock(err_print, blkno);
-			    err_print(", offset = 0x%x.\n", (ptr -
-				(uint_t *)pattern_buf) * sizeof (int));
-			    goto bad;
+			for (i = 0; i < nints; i++) {
+				if (*ptr++ != data) {
+					ptr--;
+					err_print("Data miscompare error "
+					    "(expecting 0x%x, got 0x%x) at ",
+					    data, *ptr);
+					pr_dblock(err_print, blkno);
+					err_print(", offset = 0x%x.\n",
+					    (ptr - (uint_t *)pattern_buf) *
+					    sizeof (int));
+					goto bad;
+				}
 			}
-		    }
 		}
 	}
 	/*

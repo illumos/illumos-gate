@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -24,8 +24,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2422,11 +2420,11 @@ getdisksize(caddr_t disk, int fd)
 static diskaddr_t
 get_device_size(int fd, caddr_t name)
 {
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 	struct dk_gpt *efi_vtoc;
 	diskaddr_t slicesize = 0;
 
-	int index = read_vtoc(fd, &vtoc);
+	int index = read_extvtoc(fd, &vtoc);
 
 	if (index >= 0) {
 		label_type = LABEL_TYPE_VTOC;
@@ -2474,16 +2472,7 @@ get_device_size(int fd, caddr_t name)
 		slicesize = efi_vtoc->efi_parts[index].p_size;
 		efi_free(efi_vtoc);
 	} else if (label_type == LABEL_TYPE_VTOC) {
-		/*
-		 * In the vtoc struct, p_size is a 32-bit signed quantity.
-		 * In the dk_gpt struct (efi's version of the vtoc), p_size
-		 * is an unsigned 64-bit quantity.  By casting the vtoc's
-		 * psize to an unsigned 32-bit quantity, it will be copied
-		 * to 'slicesize' (an unsigned 64-bit diskaddr_t) without
-		 * sign extension.
-		 */
-
-		slicesize = (uint32_t)vtoc.v_part[index].p_size;
+		slicesize = vtoc.v_part[index].p_size;
 	}
 
 	return (slicesize);

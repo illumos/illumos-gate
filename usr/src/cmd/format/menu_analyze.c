@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions implementing the analyze menu commands.
@@ -193,7 +190,7 @@ a_print()
 		for (j = 0; j < 6; j++)
 			if (i + j < scan_size * SECSIZE / sizeof (int))
 				fmt_print("0x%08x  ",
-				*((int *)((int *)cur_buf + i + j)));
+				    *((int *)((int *)cur_buf + i + j)));
 		fmt_print("\n");
 		lines++;
 
@@ -274,11 +271,11 @@ a_setup()
 		ioparam.io_bounds.lower = 0;
 		if ((cur_ctype->ctype_flags & CF_SCSI) &&
 		    (cur_disk->label_type == L_TYPE_SOLARIS)) {
-		    ioparam.io_bounds.upper = datasects() - 1;
+			ioparam.io_bounds.upper = datasects() - 1;
 		} else if (cur_disk->label_type == L_TYPE_SOLARIS) {
-		    ioparam.io_bounds.upper = physsects() - 1;
+			ioparam.io_bounds.upper = physsects() - 1;
 		} else if (cur_disk->label_type == L_TYPE_EFI) {
-		    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
+			ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 		}
 
 		scan_lower = (diskaddr_t)input(FIO_BN,
@@ -331,8 +328,8 @@ a_setup()
 	ioparam.io_bounds.upper = min(size, BUF_SECTS);
 	if (scan_size > ioparam.io_bounds.upper)
 		scan_size = ioparam.io_bounds.upper;
-	scan_size = input(FIO_BN, "Enter number of blocks per transfer", ':',
-	    &ioparam, &scan_size, DATA_INPUT);
+	scan_size = input(FIO_INT, "Enter number of blocks per transfer", ':',
+	    &ioparam, (int *)&scan_size, DATA_INPUT);
 	deflt = !scan_auto;
 	ioparam.io_charlist = confirm_list;
 	scan_auto = !input(FIO_MSTR, "Verify media after formatting", '?',
@@ -391,7 +388,7 @@ a_config()
 	fmt_print(scan_random ? "yes\n" : "no\n");
 
 	fmt_print("        Number of blocks per transfer: %d (", scan_size);
-	pr_dblock(fmt_print, (daddr_t)scan_size);
+	pr_dblock(fmt_print, (diskaddr_t)scan_size);
 	fmt_print(")\n");
 
 	fmt_print("        Verify media after formatting? ");
@@ -436,9 +433,9 @@ a_purge()
 		if (scan_passes < NPPATTERNS) {
 			fmt_print("The purge command runs for a minimum of ");
 			fmt_print("%d passes plus a last pass if the\n",
-						NPPATTERNS);
+			    NPPATTERNS);
 			fmt_print("first %d passes were successful.\n",
-					NPPATTERNS);
+			    NPPATTERNS);
 		}
 		scan_passes = NPPATTERNS + 1;
 	}

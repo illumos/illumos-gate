@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -378,6 +379,18 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* open the target disk	 */
 	if (dadk_open(DKTP_DATA, 0) != DDI_SUCCESS)
 		goto fail2;
+
+#ifdef _ILP32
+	{
+		struct  tgdk_geom phyg;
+		(void) dadk_getphygeom(DKTP_DATA, &phyg);
+		if ((phyg.g_cap - 1) > DK_MAX_BLOCKS) {
+			(void) dadk_close(DKTP_DATA);
+			goto fail2;
+		}
+	}
+#endif
+
 
 	/* mark as having opened target */
 	dkp->dk_flag |= CMDK_TGDK_OPEN;
@@ -764,7 +777,7 @@ rwcmd_copyin(struct dadkio_rwcmd *rwcmdp, caddr_t inaddr, int flag)
 
 			rwcmdp->cmd = cmd32.cmd;
 			rwcmdp->flags = cmd32.flags;
-			rwcmdp->blkaddr = (daddr_t)cmd32.blkaddr;
+			rwcmdp->blkaddr = (blkaddr_t)cmd32.blkaddr;
 			rwcmdp->buflen = cmd32.buflen;
 			rwcmdp->bufaddr = (caddr_t)(intptr_t)cmd32.bufaddr;
 			/*
@@ -971,6 +984,9 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	case DKIOCGVTOC:
 	case DKIOCSVTOC:
 	case DKIOCPARTINFO:
+	case DKIOCGEXTVTOC:
+	case DKIOCSEXTVTOC:
+	case DKIOCEXTPARTINFO:
 	case DKIOCGMBOOT:
 	case DKIOCSMBOOT:
 	case DKIOCGETEFI:

@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * LDoms virtual disk client (vdc) device driver
  *
@@ -98,6 +97,8 @@
 #include <sys/vdsk_mailbox.h>
 #include <sys/vdc.h>
 
+#define	VD_OLDVTOC_LIMIT	0x7fffffff
+
 /*
  * function prototypes
  */
@@ -144,7 +145,8 @@ static int	vdc_init_descriptor_ring(vdc_t *vdc);
 static void	vdc_destroy_descriptor_ring(vdc_t *vdc);
 static int	vdc_setup_devid(vdc_t *vdc);
 static void	vdc_store_label_efi(vdc_t *, efi_gpt_t *, efi_gpe_t *);
-static void	vdc_store_label_vtoc(vdc_t *, struct dk_geom *, struct vtoc *);
+static void	vdc_store_label_vtoc(vdc_t *, struct dk_geom *,
+		    struct extvtoc *);
 static void	vdc_store_label_unk(vdc_t *vdc);
 static boolean_t vdc_is_opened(vdc_t *vdc);
 static void	vdc_update_size(vdc_t *vdc, size_t, size_t, size_t);
@@ -203,6 +205,10 @@ static int	vdc_set_wce_convert(vdc_t *vdc, void *from, void *to,
 static int	vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_get_extvtoc_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_set_extvtoc_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_get_geom_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
@@ -555,7 +561,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		kmem_free(vdc->cinfo, sizeof (struct dk_cinfo));
 
 	if (vdc->vtoc)
-		kmem_free(vdc->vtoc, sizeof (struct vtoc));
+		kmem_free(vdc->vtoc, sizeof (struct extvtoc));
 
 	if (vdc->geom)
 		kmem_free(vdc->geom, sizeof (struct dk_geom));
@@ -675,7 +681,7 @@ vdc_do_attach(dev_info_t *dip)
 
 	/* Initialize remaining structures before starting the msg thread */
 	vdc->vdisk_label = VD_DISK_LABEL_UNK;
-	vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
+	vdc->vtoc = kmem_zalloc(sizeof (struct extvtoc), KM_SLEEP);
 	vdc->geom = kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
 	vdc->minfo = kmem_zalloc(sizeof (struct dk_minfo), KM_SLEEP);
 
@@ -5148,7 +5154,7 @@ static int
 vdc_dkio_gapart(vdc_t *vdc, caddr_t arg, int flag)
 {
 	struct dk_geom *geom;
-	struct vtoc *vtoc;
+	struct extvtoc *vtoc;
 	union {
 		struct dk_map map[NDKMAP];
 		struct dk_map32 map32[NDKMAP];
@@ -5160,6 +5166,11 @@ vdc_dkio_gapart(vdc_t *vdc, caddr_t arg, int flag)
 	if ((rv = vdc_validate_geometry(vdc)) != 0) {
 		mutex_exit(&vdc->lock);
 		return (rv);
+	}
+
+	if (vdc->vdisk_size > VD_OLDVTOC_LIMIT) {
+		mutex_exit(&vdc->lock);
+		return (EOVERFLOW);
 	}
 
 	vtoc = vdc->vtoc;
@@ -6621,6 +6632,10 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 		vdc_get_vtoc_convert},
 	{VD_OP_SET_VTOC,	DKIOCSVTOC,		sizeof (vd_vtoc_t),
 		vdc_set_vtoc_convert},
+	{VD_OP_GET_VTOC,	DKIOCGEXTVTOC,		sizeof (vd_vtoc_t),
+		vdc_get_extvtoc_convert},
+	{VD_OP_SET_VTOC,	DKIOCSEXTVTOC,		sizeof (vd_vtoc_t),
+		vdc_set_extvtoc_convert},
 	{VD_OP_GET_DISKGEOM,	DKIOCGGEOM,		sizeof (vd_geom_t),
 		vdc_get_geom_convert},
 	{VD_OP_GET_DISKGEOM,	DKIOCG_PHYGEOM,		sizeof (vd_geom_t),
@@ -7162,12 +7177,10 @@ static int
 vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
 	int		i;
-	void		*tmp_mem = NULL;
-	void		*tmp_memp;
-	struct vtoc	vt;
-	struct vtoc32	vt32;
-	int		copy_len = 0;
-	int		rv = 0;
+	struct vtoc	vtoc;
+	struct vtoc32	vtoc32;
+	struct extvtoc	evtoc;
+	int		rv;
 
 	if (dir != VD_COPYOUT)
 		return (0);	/* nothing to do */
@@ -7175,32 +7188,29 @@ vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	if ((from == NULL) || (to == NULL))
 		return (ENXIO);
 
-	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32)
-		copy_len = sizeof (struct vtoc32);
-	else
-		copy_len = sizeof (struct vtoc);
+	if (vdc->vdisk_size > VD_OLDVTOC_LIMIT)
+		return (EOVERFLOW);
 
-	tmp_mem = kmem_alloc(copy_len, KM_SLEEP);
-
-	VD_VTOC2VTOC((vd_vtoc_t *)from, &vt);
+	VD_VTOC2VTOC((vd_vtoc_t *)from, &evtoc);
 
 	/* fake the VTOC timestamp field */
 	for (i = 0; i < V_NUMPAR; i++) {
-		vt.timestamp[i] = vdc->vtoc->timestamp[i];
+		evtoc.timestamp[i] = vdc->vtoc->timestamp[i];
 	}
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		/* LINTED E_ASSIGN_NARROW_CONV */
-		vtoctovtoc32(vt, vt32);
-		tmp_memp = &vt32;
+		extvtoctovtoc32(evtoc, vtoc32);
+		rv = ddi_copyout(&vtoc32, to, sizeof (vtoc32), mode);
+		if (rv != 0)
+			rv = EFAULT;
 	} else {
-		tmp_memp = &vt;
+		extvtoctovtoc(evtoc, vtoc);
+		rv = ddi_copyout(&vtoc, to, sizeof (vtoc), mode);
+		if (rv != 0)
+			rv = EFAULT;
 	}
-	rv = ddi_copyout(tmp_memp, to, copy_len, mode);
-	if (rv != 0)
-		rv = EFAULT;
 
-	kmem_free(tmp_mem, copy_len);
 	return (rv);
 }
 
@@ -7227,40 +7237,30 @@ vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 static int
 vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
-	_NOTE(ARGUNUSED(vdc))
-
-	void		*tmp_mem = NULL, *uvtoc;
-	struct vtoc	vt;
-	struct vtoc	*vtp = &vt;
-	vd_vtoc_t	vtvd;
-	int		copy_len = 0;
-	int		i, rv = 0;
+	void		*uvtoc;
+	struct vtoc	vtoc;
+	struct vtoc32	vtoc32;
+	struct extvtoc	evtoc;
+	int		i, rv;
 
 	if ((from == NULL) || (to == NULL))
 		return (ENXIO);
 
-	if (dir == VD_COPYIN)
-		uvtoc = from;
-	else
-		uvtoc = to;
+	if (vdc->vdisk_size > VD_OLDVTOC_LIMIT)
+		return (EOVERFLOW);
 
-	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32)
-		copy_len = sizeof (struct vtoc32);
-	else
-		copy_len = sizeof (struct vtoc);
-
-	tmp_mem = kmem_alloc(copy_len, KM_SLEEP);
-
-	rv = ddi_copyin(uvtoc, tmp_mem, copy_len, mode);
-	if (rv != 0) {
-		kmem_free(tmp_mem, copy_len);
-		return (EFAULT);
-	}
+	uvtoc = (dir == VD_COPYIN)? from : to;
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		vtoc32tovtoc((*(struct vtoc32 *)tmp_mem), vt);
+		rv = ddi_copyin(uvtoc, &vtoc32, sizeof (vtoc32), mode);
+		if (rv != 0)
+			return (EFAULT);
+		vtoc32toextvtoc(vtoc32, evtoc);
 	} else {
-		vtp = tmp_mem;
+		rv = ddi_copyin(uvtoc, &vtoc, sizeof (vtoc), mode);
+		if (rv != 0)
+			return (EFAULT);
+		vtoctoextvtoc(vtoc, evtoc);
 	}
 
 	if (dir == VD_COPYOUT) {
@@ -7274,15 +7274,75 @@ vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 		 * We also need to keep track of the timestamp fields.
 		 */
 		for (i = 0; i < V_NUMPAR; i++) {
-			vdc->vtoc->timestamp[i] = vtp->timestamp[i];
+			vdc->vtoc->timestamp[i] = evtoc.timestamp[i];
 		}
 
-		return (0);
+	} else {
+		VTOC2VD_VTOC(&evtoc, (vd_vtoc_t *)to);
 	}
 
-	VTOC2VD_VTOC(vtp, &vtvd);
-	bcopy(&vtvd, to, sizeof (vd_vtoc_t));
-	kmem_free(tmp_mem, copy_len);
+	return (0);
+}
+
+static int
+vdc_get_extvtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
+{
+	int		i, rv;
+	struct extvtoc	evtoc;
+
+	if (dir != VD_COPYOUT)
+		return (0);	/* nothing to do */
+
+	if ((from == NULL) || (to == NULL))
+		return (ENXIO);
+
+	VD_VTOC2VTOC((vd_vtoc_t *)from, &evtoc);
+
+	/* fake the VTOC timestamp field */
+	for (i = 0; i < V_NUMPAR; i++) {
+		evtoc.timestamp[i] = vdc->vtoc->timestamp[i];
+	}
+
+	rv = ddi_copyout(&evtoc, to, sizeof (struct extvtoc), mode);
+	if (rv != 0)
+		rv = EFAULT;
+
+	return (rv);
+}
+
+static int
+vdc_set_extvtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
+{
+	void		*uvtoc;
+	struct extvtoc	evtoc;
+	int		i, rv;
+
+	if ((from == NULL) || (to == NULL))
+		return (ENXIO);
+
+	uvtoc = (dir == VD_COPYIN)? from : to;
+
+	rv = ddi_copyin(uvtoc, &evtoc, sizeof (struct extvtoc), mode);
+	if (rv != 0)
+		return (EFAULT);
+
+	if (dir == VD_COPYOUT) {
+		/*
+		 * The disk label may have changed. Revalidate the disk
+		 * geometry. This will also update the device nodes.
+		 */
+		vdc_validate(vdc);
+
+		/*
+		 * We also need to keep track of the timestamp fields.
+		 */
+		for (i = 0; i < V_NUMPAR; i++) {
+			vdc->vtoc->timestamp[i] = evtoc.timestamp[i];
+		}
+
+	} else {
+		VTOC2VD_VTOC(&evtoc, (vd_vtoc_t *)to);
+	}
 
 	return (0);
 }
@@ -7645,7 +7705,7 @@ vdc_validate_geometry(vdc_t *vdc)
 	int	rv, rval;
 	struct dk_label label;
 	struct dk_geom geom;
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 	efi_gpt_t *gpt;
 	efi_gpe_t *gpe;
 	vd_efi_dev_t edev;
@@ -7665,7 +7725,7 @@ vdc_validate_geometry(vdc_t *vdc)
 
 	rv = vd_process_ioctl(dev, DKIOCGGEOM, (caddr_t)&geom, FKIOCTL, &rval);
 	if (rv == 0)
-		rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)&vtoc,
+		rv = vd_process_ioctl(dev, DKIOCGEXTVTOC, (caddr_t)&vtoc,
 		    FKIOCTL, &rval);
 
 	if (rv == ENOTSUP) {
@@ -7957,7 +8017,7 @@ vdc_store_label_efi(vdc_t *vdc, efi_gpt_t *gpt, efi_gpe_t *gpe)
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	vdc->vdisk_label = VD_DISK_LABEL_EFI;
-	bzero(vdc->vtoc, sizeof (struct vtoc));
+	bzero(vdc->vtoc, sizeof (struct extvtoc));
 	bzero(vdc->geom, sizeof (struct dk_geom));
 	bzero(vdc->slice, sizeof (vd_slice_t) * V_NUMPAR);
 
@@ -7982,7 +8042,7 @@ vdc_store_label_efi(vdc_t *vdc, efi_gpt_t *gpt, efi_gpe_t *gpe)
 }
 
 static void
-vdc_store_label_vtoc(vdc_t *vdc, struct dk_geom *geom, struct vtoc *vtoc)
+vdc_store_label_vtoc(vdc_t *vdc, struct dk_geom *geom, struct extvtoc *vtoc)
 {
 	int i;
 
@@ -7990,7 +8050,7 @@ vdc_store_label_vtoc(vdc_t *vdc, struct dk_geom *geom, struct vtoc *vtoc)
 	ASSERT(vdc->block_size == vtoc->v_sectorsz);
 
 	vdc->vdisk_label = VD_DISK_LABEL_VTOC;
-	bcopy(vtoc, vdc->vtoc, sizeof (struct vtoc));
+	bcopy(vtoc, vdc->vtoc, sizeof (struct extvtoc));
 	bcopy(geom, vdc->geom, sizeof (struct dk_geom));
 	bzero(vdc->slice, sizeof (vd_slice_t) * V_NUMPAR);
 
@@ -8006,7 +8066,7 @@ vdc_store_label_unk(vdc_t *vdc)
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	vdc->vdisk_label = VD_DISK_LABEL_UNK;
-	bzero(vdc->vtoc, sizeof (struct vtoc));
+	bzero(vdc->vtoc, sizeof (struct extvtoc));
 	bzero(vdc->geom, sizeof (struct dk_geom));
 	bzero(vdc->slice, sizeof (vd_slice_t) * V_NUMPAR);
 }

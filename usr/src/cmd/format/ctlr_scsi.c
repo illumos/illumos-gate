@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the routines for embedded scsi disks
  */
@@ -327,8 +325,8 @@ scsi_ck_format(void)
 	/*
 	 * Try to read the first four blocks.
 	 */
-	status = scsi_rdwr(DIR_READ, cur_file, 0, 4, (caddr_t)cur_buf,
-		F_SILENT, NULL);
+	status = scsi_rdwr(DIR_READ, cur_file, (diskaddr_t)0, 4,
+		(caddr_t)cur_buf, F_SILENT, NULL);
 	return (!status);
 }
 

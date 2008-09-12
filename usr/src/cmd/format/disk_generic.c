@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions that implement the fdisk menu commands.
@@ -67,9 +64,8 @@
  *	Local prototypes for ANSI C compilers
  */
 static int	generic_ck_format(void);
-static int	generic_rdwr(int dir, int fd, daddr_t blkno, int secnt,
+static int	generic_rdwr(int dir, int fd, diskaddr_t blkno, int secnt,
 			caddr_t bufaddr, int flags, int *xfercntp);
-
 #else	/* __STDC__ */
 
 static int	generic_ck_format();
@@ -102,7 +98,7 @@ generic_ck_format()
 	 * Try to read the first four blocks.
 	 */
 	status = generic_rdwr(DIR_READ, cur_file, 0, 4, (caddr_t)cur_buf,
-			F_SILENT, NULL);
+	    F_SILENT, NULL);
 	return (!status);
 }
 
@@ -115,37 +111,52 @@ static int
 generic_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
 	int	dir;
 	int	fd;
-	daddr_t	blkno;
+	diskaddr_t	blkno;
 	int	secnt;
 	caddr_t	bufaddr;
 	int	flags;
 	int	*xfercntp;
 {
 
-	int	tmpsec, status, tmpblk;
+	offset_t	tmpsec, status, tmpblk;
+	int		ret;
 
-	tmpsec = secnt * UBSIZE;
-	tmpblk = blkno * UBSIZE;
+	tmpsec = (offset_t)secnt * UBSIZE;
+	tmpblk = (offset_t)blkno * UBSIZE;
 
+#if defined(_FIRMWARE_NEEDS_FDISK)
+	/* Use "p0" file to seek/read the data  */
+	(void) open_cur_file(FD_USE_P0_PATH);
+#endif
 	if (dir == DIR_READ) {
-		status = lseek(fd, tmpblk, SEEK_SET);
-		if (status != tmpblk)
-			return (status);
+		status = llseek(fd, tmpblk, SEEK_SET);
+		if (status != tmpblk) {
+			ret = (int)status;
+			goto out;
+		}
 
-		status = read(fd, bufaddr, tmpsec);
+		status = read(fd, bufaddr, (size_t)tmpsec);
 		if (status != tmpsec)
-			return (tmpsec);
+			ret = (int)tmpsec;
 		else
-			return (0);
+			ret = 0;
 	} else {
-		status = lseek(fd, tmpblk, SEEK_SET);
-		if (status != tmpblk)
-			return (status);
+		status = llseek(fd, tmpblk, SEEK_SET);
+		if (status != tmpblk) {
+			ret = (int)status;
+			goto out;
+		}
 
-		status = write(fd, bufaddr, tmpsec);
+		status = write(fd, bufaddr, (size_t)tmpsec);
 		if (status != tmpsec)
-			return (tmpsec);
+			ret = (int)tmpsec;
 		else
-			return (0);
+			ret = 0;
 	}
+out:
+#if defined(_FIRMWARE_NEEDS_FDISK)
+	/* Restore cur_file with cur_disk->disk_path */
+	(void) open_cur_file(FD_USE_CUR_DISK_PATH);
+#endif
+	return (ret);
 }

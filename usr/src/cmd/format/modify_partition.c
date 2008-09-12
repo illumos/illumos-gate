@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions to implement the partition menu commands.
@@ -104,7 +102,7 @@ p_modify()
 	/*
 	 * If the disk has mounted partitions, cannot modify
 	 */
-	if (checkmount((daddr_t)-1, (daddr_t)-1)) {
+	if (checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print(
 "Cannot modify disk partitions while it has mounted partitions.\n\n");
 		return (-1);
@@ -114,7 +112,7 @@ p_modify()
 	 * If the disk has partitions currently being used for
 	 * swapping, cannot modify
 	 */
-	if (checkswap((daddr_t)-1, (daddr_t)-1)) {
+	if (checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print(
 "Cannot modify disk partitions while it is \
 currently being used for swapping.\n");
@@ -396,9 +394,9 @@ static int
 check_map(map)
 	struct	dk_map32 *map;
 {
-	int	i;
-	int	cyloffset = 0;
-	int	tot_blks = 0;
+	int		i;
+	int		cyloffset = 0;
+	blkaddr32_t	tot_blks = 0;
 
 #ifdef i386
 	/*
@@ -413,17 +411,16 @@ check_map(map)
 	 * not modify the table.
 	 */
 	for (i = 0; i < NDKMAP; i++) {
-		if (map[i].dkl_cylno < 0 ||
-				map[i].dkl_cylno > (daddr_t)ncyl-1) {
+		if (map[i].dkl_cylno > (blkaddr32_t)ncyl-1) {
 			err_print("\
 Warning: Partition %c starting cylinder %d is out of range.\n",
 				(PARTITION_BASE+i), map[i].dkl_cylno);
 			return (-1);
 		}
-		if (map[i].dkl_nblk < 0 || map[i].dkl_nblk > (daddr_t)(ncyl -
-			map[i].dkl_cylno) * spc()) {
+		if (map[i].dkl_nblk >
+			(blkaddr32_t)(ncyl - map[i].dkl_cylno) * spc()) {
 			err_print("\
-Warning: Partition %c, specified # of blocks, %d, is out of range.\n",
+Warning: Partition %c, specified # of blocks, %u, is out of range.\n",
 				(PARTITION_BASE+i), map[i].dkl_nblk);
 			return (-1);
 		}
@@ -464,8 +461,8 @@ get_user_map(map, float_part)
 	int	float_part;
 {
 	int		i;
-	int		newsize;
-	int		deflt;
+	blkaddr32_t	newsize;
+	blkaddr32_t	deflt;
 	char		tmpstr[80];
 	u_ioparam_t	ioparam;
 
@@ -491,8 +488,8 @@ Warning: no space available for '%s' from Free Hog partition\n",
 			(void) snprintf(tmpstr, sizeof (tmpstr),
 				"Enter size of partition '%s' ",
 				partn_list[i]);
-			newsize = input(FIO_CYL, tmpstr, ':',
-				&ioparam, &deflt, DATA_INPUT);
+			newsize = (blkaddr32_t)input(FIO_CYL, tmpstr, ':',
+				&ioparam, (int *)&deflt, DATA_INPUT);
 			map[float_part].dkl_nblk -= (newsize - map[i].dkl_nblk);
 			map[i].dkl_nblk = newsize;
 		}
@@ -539,8 +536,8 @@ struct disk_type *tptr;
 	    part->pinfo_map[i] = label->dkl_map[i];
 #else
 	    part->pinfo_map[i].dkl_cylno =
-	    label->dkl_vtoc.v_part[i].p_start /
-			((int)(tptr->dtype_nhead * tptr->dtype_nsect - apc));
+		label->dkl_vtoc.v_part[i].p_start /
+		(blkaddr32_t)(tptr->dtype_nhead * tptr->dtype_nsect - apc);
 	    part->pinfo_map[i].dkl_nblk =
 		label->dkl_vtoc.v_part[i].p_size;
 #endif /* ifdefined(_SUNOS_VTOC_8) */

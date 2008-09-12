@@ -28,10 +28,8 @@
  *	Computers Limited (ICL) under a development agreement with AT&T.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +65,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/int_limits.h>
 #include <sys/stat.h>
 #include <sys/uadmin.h>
 #include <sys/open.h>
@@ -85,29 +84,22 @@
 #define	SECSIZE			DEV_BSIZE
 #endif	/* SECSIZE */
 
-
-/*
- * External functions.
- */
-extern	int	read_vtoc(int, struct vtoc *);
-extern	int	write_vtoc(int, struct vtoc *);
-
 /*
  * Internal functions.
  */
 extern	int	main(int, char **);
-static	void	display(struct dk_geom *, struct vtoc *, char *);
+static	void	display(struct dk_geom *, struct extvtoc *, char *);
 static	void	display64(struct dk_gpt *,  char *);
-static	void	insert(char *, struct vtoc *);
+static	void	insert(char *, struct extvtoc *);
 static	void	insert64(char *, struct dk_gpt *);
-static	void	load(FILE *, struct dk_geom *, struct vtoc *);
+static	void	load(FILE *, struct dk_geom *, struct extvtoc *);
 static	void	load64(FILE *, int fd, struct dk_gpt **);
 static	void	usage(void);
-static	void	validate(struct dk_geom *, struct vtoc *);
+static	void	validate(struct dk_geom *, struct extvtoc *);
 static	void	validate64(struct dk_gpt *);
-static	int	vread(int, struct vtoc *, char *);
+static	int	vread(int, struct extvtoc *, char *);
 static	void	vread64(int, struct dk_gpt **, char *);
-static	void	vwrite(int, struct vtoc *, char *);
+static	void	vwrite(int, struct extvtoc *, char *);
 static	void	vwrite64(int, struct dk_gpt *, char *);
 
 /*
@@ -135,7 +127,7 @@ static char *uboot = "";
 static char	*ufirm = "firm";
 #if defined(_SUNOS_VTOC_16)
 static int		sectsiz;
-static struct vtoc	disk_vtoc;
+static struct extvtoc	disk_vtoc;
 #endif	/* defined(_SUNOS_VTOC_16) */
 
 int
@@ -147,7 +139,7 @@ main(int argc, char **argv)
 	char		*vname;
 	struct stat	statbuf;
 #if defined(_SUNOS_VTOC_8)
-	struct vtoc	disk_vtoc;
+	struct extvtoc	disk_vtoc;
 #endif	/* defined(_SUNOS_VTOC_8) */
 	struct dk_gpt	*disk_efi;
 	struct dk_geom	disk_geom;
@@ -376,7 +368,7 @@ main(int argc, char **argv)
  * display contents of VTOC without writing it to disk
  */
 static void
-display(struct dk_geom *geom, struct vtoc *vtoc, char *device)
+display(struct dk_geom *geom, struct extvtoc *vtoc, char *device)
 {
 	int	i;
 	int	c;
@@ -411,7 +403,7 @@ display(struct dk_geom *geom, struct vtoc *vtoc, char *device)
 	for (i = 0; i < V_NUMPAR; i++) {
 		if (vtoc->v_part[i].p_size > 0)
 			(void) printf(
-"    %d		%d	0%x		%ld		%ld\n",
+"    %d		%d	0%x		%llu		%llu\n",
 				i, vtoc->v_part[i].p_tag,
 				vtoc->v_part[i].p_flag,
 				vtoc->v_part[i].p_start,
@@ -467,15 +459,15 @@ display64(struct dk_gpt *efi, char *device)
  * Insert a change into the VTOC.
  */
 static void
-insert(char *data, struct vtoc *vtoc)
+insert(char *data, struct extvtoc *vtoc)
 {
-	int	part;
-	int	tag;
-	uint_t	flag;
-	daddr_t	start;
-	long	size;
+	int		part;
+	int		tag;
+	uint_t		flag;
+	diskaddr_t	start;
+	uint64_t	size;
 
-	if (sscanf(data, "%d:%d:%x:%ld:%ld",
+	if (sscanf(data, "%d:%d:%x:%llu:%llu",
 	    &part, &tag, &flag, &start, &size) != 5) {
 		(void) fprintf(stderr, "Delta syntax error on \"%s\"\n", data);
 		exit(1);
@@ -529,17 +521,17 @@ insert64(char *data, struct dk_gpt *efi)
  * Load VTOC information from a datafile.
  */
 static void
-load(FILE *fp, struct dk_geom *geom, struct vtoc *vtoc)
+load(FILE *fp, struct dk_geom *geom, struct extvtoc *vtoc)
 {
-	int	part;
-	int	tag;
-	uint_t	flag;
-	daddr_t	start;
-	long	size;
-	char	line[256];
-	int	i;
-	long	nblks;
-	long	fullsz;
+	int		part;
+	int		tag;
+	uint_t		flag;
+	diskaddr_t	start;
+	uint64_t	size;
+	char		line[256];
+	int		i;
+	uint64_t	nblks;
+	uint64_t	fullsz;
 
 	for (i = 0; i < V_NUMPAR; ++i) {
 		vtoc->v_part[i].p_tag = 0;
@@ -551,7 +543,7 @@ load(FILE *fp, struct dk_geom *geom, struct vtoc *vtoc)
 	 * initialize partition 2, by convention it corresponds to whole
 	 * disk. It will be overwritten, if specified in the input datafile
 	 */
-	fullsz = geom->dkg_ncyl * geom->dkg_nsect * geom->dkg_nhead;
+	fullsz = (uint64_t)geom->dkg_ncyl * geom->dkg_nsect * geom->dkg_nhead;
 	vtoc->v_part[2].p_tag = V_BACKUP;
 	vtoc->v_part[2].p_flag = V_UNMNT;
 	vtoc->v_part[2].p_start = 0;
@@ -563,7 +555,7 @@ load(FILE *fp, struct dk_geom *geom, struct vtoc *vtoc)
 		if (line[0] == '\0' || line[0] == '\n' || line[0] == '*')
 			continue;
 		line[strlen(line) - 1] = '\0';
-		if (sscanf(line, "%d %d %x %ld %ld",
+		if (sscanf(line, "%d %d %x %llu %llu",
 		    &part, &tag, &flag, &start, &size) != 5) {
 			(void) fprintf(stderr, "Syntax error: \"%s\"\n",
 				line);
@@ -697,21 +689,21 @@ raw-device\n");
  * Validate the new VTOC.
  */
 static void
-validate(struct dk_geom *geom, struct vtoc *vtoc)
+validate(struct dk_geom *geom, struct extvtoc *vtoc)
 {
-	int	i;
-	int	j;
-	long	fullsz;
-	long	endsect;
-	daddr_t	istart;
-	daddr_t	jstart;
-	long	isize;
-	long	jsize;
-	long	nblks;
+	int		i;
+	int		j;
+	uint64_t	fullsz;
+	diskaddr_t	endsect;
+	diskaddr_t	istart;
+	diskaddr_t	jstart;
+	uint64_t	isize;
+	uint64_t	jsize;
+	uint64_t	nblks;
 
 	nblks = geom->dkg_nsect * geom->dkg_nhead;
 
-	fullsz = geom->dkg_ncyl * geom->dkg_nsect * geom->dkg_nhead;
+	fullsz = (uint64_t)geom->dkg_ncyl * geom->dkg_nsect * geom->dkg_nhead;
 
 #if defined(_SUNOS_VTOC_16)
 	/* make the vtoc look sane - ha ha */
@@ -729,7 +721,7 @@ validate(struct dk_geom *geom, struct vtoc *vtoc)
 			if (vtoc->v_part[i].p_size != fullsz) {
 				(void) fprintf(stderr, "\
 fmthard: Partition %d specifies the full disk and is not equal\n\
-full size of disk.  The full disk capacity is %lu sectors.\n", i, fullsz);
+full size of disk.  The full disk capacity is %llu sectors.\n", i, fullsz);
 #if defined(sparc)
 			exit(1);
 #endif
@@ -747,8 +739,8 @@ fmthard: Partition %d not aligned on cylinder boundary \n", i);
 			vtoc->v_part[i].p_start +
 				vtoc->v_part[i].p_size > fullsz) {
 			(void) fprintf(stderr, "\
-fmthard: Partition %d specified as %lu sectors starting at %lu\n\
-\tdoes not fit. The full disk contains %lu sectors.\n",
+fmthard: Partition %d specified as %llu sectors starting at %llu\n\
+\tdoes not fit. The full disk contains %llu sectors.\n",
 				i, vtoc->v_part[i].p_size,
 				vtoc->v_part[i].p_start, fullsz);
 #if defined(sparc)
@@ -861,11 +853,11 @@ fmthard: Partition %d overlaps partition %d. Overlap is allowed\n\
  * Read the VTOC
  */
 int
-vread(int fd, struct vtoc *vtoc, char *devname)
+vread(int fd, struct extvtoc *vtoc, char *devname)
 {
 	int	i;
 
-	if ((i = read_vtoc(fd, vtoc)) < 0) {
+	if ((i = read_extvtoc(fd, vtoc)) < 0) {
 		if (i == VT_ENOTSUP) {
 			return (1);
 		}
@@ -904,11 +896,11 @@ vread64(int fd, struct dk_gpt **efi_hdr, char *devname)
  * Write the VTOC
  */
 void
-vwrite(int fd, struct vtoc *vtoc, char *devname)
+vwrite(int fd, struct extvtoc *vtoc, char *devname)
 {
 	int	i;
 
-	if ((i = write_vtoc(fd, vtoc)) != 0) {
+	if ((i = write_extvtoc(fd, vtoc)) != 0) {
 		if (i == VT_EINVAL) {
 			(void) fprintf(stderr,
 			"%s: invalid entry exists in vtoc\n",

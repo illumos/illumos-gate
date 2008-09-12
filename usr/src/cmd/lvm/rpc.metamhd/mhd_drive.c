@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mhd_local.h"
 
@@ -769,7 +766,7 @@ mhd_ident(
 	struct uscsi_cmd	ucmd;
 	union scsi_cdb		cdb;
 	struct scsi_inquiry	inq;
-	struct vtoc		vtoc_buf;
+	struct extvtoc		vtoc_buf;
 	char			path[MAXPATHLEN + 1];
 	int			len;
 	int			err;
@@ -841,15 +838,15 @@ mhd_ident(
 		if (! serial)
 			mhd_mx_unlock(&sp->sr_mx);
 		(void) memset(&vtoc_buf, 0, sizeof (vtoc_buf));
-		err = read_vtoc(dp->dr_fd, &vtoc_buf);
+		err = read_extvtoc(dp->dr_fd, &vtoc_buf);
 		if (! serial)
 			mhd_mx_lock(&sp->sr_mx);
 		if (err < 0) {
-			MHDPRINTF(("%s: read_vtoc: failed errno %d\n",
+			MHDPRINTF(("%s: read_extvtoc: failed errno %d\n",
 			    dp->dr_rname, errno));
 			dp->dr_drive_id.did_flags &= ~MHD_DID_TIME;
 		} else {
-			MHDPRINTF(("%s: read_vtoc: success\n",
+			MHDPRINTF(("%s: read_extvtoc: success\n",
 			    dp->dr_rname));
 			dp->dr_drive_id.did_flags |= MHD_DID_TIME;
 			dp->dr_drive_id.did_time = vtoc_buf.timestamp[0];

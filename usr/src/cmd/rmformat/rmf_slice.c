@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rmf_slice.c :
@@ -129,8 +127,8 @@ static slist_t pflag_choices[] = {
 /*
  *	Prototypes for ANSI C compilers
  */
-static int32_t	sup_prxfile(char *file_name, struct vtoc *vt);
-static int32_t	sup_setpart(struct vtoc *vt);
+static int32_t	sup_prxfile(char *file_name, struct extvtoc *vt);
+static int32_t	sup_setpart(struct extvtoc *vt);
 static void	sup_pushchar(int32_t c);
 static void	clean_token(char *cleantoken, char *token);
 static void clean_token(char *cleantoken, char *token);
@@ -138,21 +136,22 @@ static int32_t sup_inputchar();
 static int32_t sup_gettoken(char *buf);
 static int32_t sup_get_token(char *buf);
 static int32_t find_value(slist_t *slist, char *str, int32_t *value);
-static int32_t check_vtoc_sanity(smedia_handle_t, int32_t fd, struct vtoc *vt);
-static int32_t str2sector(char *str);
+static int32_t check_vtoc_sanity(smedia_handle_t, int32_t fd,
+		struct extvtoc *vt);
+static uint64_t str2sector(char *str);
 static int32_t strcnt(char *s1, char *s2);
 static int32_t get_fdisk(smedia_handle_t, int32_t fd, int32_t offset,
 		struct fdisk_info *fdisk);
-static void erase(smedia_handle_t handle, uint32_t offset, uint32_t size);
+static void erase(smedia_handle_t handle, diskaddr_t offset, diskaddr_t size);
 
 extern char *myname;
-extern int64_t my_atoll(char *ptr);
+extern uint64_t my_atoll(char *ptr);
 extern smmedium_prop_t med_info;
 
 static FILE *data_file;
 
 static int32_t
-sup_prxfile(char *file_name, struct vtoc *vt)
+sup_prxfile(char *file_name, struct extvtoc *vt)
 {
 	int32_t	status, ret_val;
 	TOKEN	token;
@@ -426,10 +425,11 @@ clean_token(char *cleantoken, char *token)
 }
 
 static int32_t
-sup_setpart(struct vtoc *vt)
+sup_setpart(struct extvtoc *vt)
 {
 	TOKEN	token, cleaned, ident;
-	int32_t	i, index, status, val1, val2;
+	int32_t	i, index, status;
+	uint64_t	val1, val2;
 	ushort_t	vtoc_tag = 0xFFFF;
 	ushort_t	vtoc_flag = 0xFFFF;
 
@@ -728,13 +728,13 @@ strcnt(char	*s1, char *s2)
 	return (i);
 }
 
-static int32_t
+static uint64_t
 str2sector(char *str)
 {
 	int32_t mul_factor = 1;
 	char *s1, *s2, *base;
-	int32_t num_sectors;
-	int64_t size;
+	uint64_t num_sectors;
+	uint64_t size;
 
 	base = s2 = (char *)malloc(strlen(str) + 1);
 	if (s2 == NULL) {
@@ -779,7 +779,7 @@ str2sector(char *str)
 		free(base);
 		return (-1);
 	}
-	num_sectors = (uint64_t)size * (uint64_t)mul_factor /512;
+	num_sectors = size * (uint64_t)mul_factor /512;
 
 	free(base);
 	return (num_sectors);
@@ -788,7 +788,7 @@ str2sector(char *str)
 
 int32_t
 valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
-	struct vtoc *vt)
+	struct extvtoc *vt)
 {
 	struct stat status;
 	int32_t ret_val;
@@ -817,8 +817,8 @@ valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
 	int32_t i;
 	for (i = 0; i < 8; i++) {
 		DPRINTF1("\npart %d\n", i);
-		DPRINTF1("\t start %d",  (int32_t)vt->v_part[i].p_start);
-		DPRINTF1("\t size %d ", (int32_t)vt->v_part[i].p_size);
+		DPRINTF1("\t start %llu",  vt->v_part[i].p_start);
+		DPRINTF1("\t size %llu ", vt->v_part[i].p_size);
 		DPRINTF1("\t tag %d", vt->v_part[i].p_tag);
 		DPRINTF1("\t flag %d", vt->v_part[i].p_flag);
 	}
@@ -832,8 +832,8 @@ valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
 	int32_t i;
 	for (i = 0; i < 8; i++) {
 		DPRINTF1("\npart %d\n", i);
-		DPRINTF1("\t start %d",  (int32_t)vt->v_part[i].p_start);
-		DPRINTF1("\t size %d ", (int32_t)vt->v_part[i].p_size);
+		DPRINTF1("\t start %llu",  vt->v_part[i].p_start);
+		DPRINTF1("\t size %llu ", vt->v_part[i].p_size);
 		DPRINTF1("\t tag %d", vt->v_part[i].p_tag);
 		DPRINTF1("\t flag %d", vt->v_part[i].p_flag);
 	}
@@ -842,7 +842,7 @@ valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
 	return (0);
 }
 
-#define	SWAP(a, b)	{int32_t tmp; tmp = (a); (a) = (b); (b) = tmp; }
+#define	SWAP(a, b)	{diskaddr_t tmp; tmp = (a); (a) = (b); (b) = tmp; }
 
 /*
  * On x86 Solaris, the partitioning is done in two levels, fdisk and Solaris
@@ -870,21 +870,22 @@ valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
  */
 
 static int32_t
-check_vtoc_sanity(smedia_handle_t handle, int32_t fd, struct vtoc *vt)
+check_vtoc_sanity(smedia_handle_t handle, int32_t fd, struct extvtoc *vt)
 {
 
 	int32_t i, j;
 	struct dk_geom dkg;
 	int32_t num_backup = 0;
-	long backup_size = 0;
+	diskaddr_t backup_size = 0;
 	struct part_struct {
-		long start;
-		long end;
+		diskaddr_t start;
+		diskaddr_t end;
 		int32_t num;
 	} part[NDKMAP];
-	long min_val, min_slice, num_slices;
-	long media_size;
-	int32_t cyl_size;
+	diskaddr_t min_val;
+	int32_t min_slice, num_slices;
+	diskaddr_t media_size;
+	uint32_t cyl_size;
 	int sparc_style = 0;	/* sparc_style handling ? */
 	struct fdisk_info fdisk;
 	int sol_part;
@@ -907,7 +908,8 @@ check_vtoc_sanity(smedia_handle_t handle, int32_t fd, struct vtoc *vt)
 			PERROR("DKIOCGGEOM Failed");
 			return (-1);
 		}
-		media_size = dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect;
+		media_size = (diskaddr_t)dkg.dkg_ncyl * dkg.dkg_nhead *
+		    dkg.dkg_nsect;
 		cyl_size = dkg.dkg_nhead * dkg.dkg_nsect;
 	}
 
@@ -938,10 +940,10 @@ Solaris partition found!\n"));
 			if (total_parts > 1)
 				(void) fprintf(stderr, gettext("Multiple FDISK \
 Solaris partitions found.\n"));
-			media_size = fdisk.part[sol_part].numsect;
+			media_size = (diskaddr_t)fdisk.part[sol_part].numsect;
 
 			DPRINTF1("sol_part %d\n", sol_part);
-			DPRINTF1("media_size %d\n", (int)media_size);
+			DPRINTF1("media_size %llu\n", media_size);
 		} else {
 			DPRINTF("Didn't get fdisk\n");
 			/*
@@ -956,7 +958,7 @@ Solaris partitions found.\n"));
 			}
 			/* On x86 platform 1 cylinder is used for fdisk table */
 			dkg.dkg_ncyl = dkg.dkg_ncyl - 1;
-			media_size = dkg.dkg_ncyl * dkg.dkg_nhead *
+			media_size = (diskaddr_t)dkg.dkg_ncyl * dkg.dkg_nhead *
 			    dkg.dkg_nsect;
 		}
 	}
@@ -968,7 +970,7 @@ Solaris partitions found.\n"));
 #endif /* DEBUG */
 
 	if (media_size == 0) {
-		media_size = med_info.sm_capacity;
+		media_size = (uint32_t)med_info.sm_capacity;
 	}
 
 	(void) memset(&part, 0, sizeof (part));
@@ -1031,8 +1033,8 @@ Solaris partitions found.\n"));
 
 #ifdef DEBUG
 	for (i = 0; i < num_slices; i++) {
-		DPRINTF4("\n %d (%d) : %d, %d", i, part[i].num,
-			part[i].start, part[i].end);
+		DPRINTF4("\n %d (%d) : %llu, %llu", i, part[i].num,
+		    part[i].start, part[i].end);
 	}
 #endif /* DEBUG */
 
@@ -1042,7 +1044,8 @@ Solaris partitions found.\n"));
 			    gettext(
 			"Backup slice extends beyond size of media\n"));
 			(void) fprintf(stderr,
-			    gettext("media size : %d sectors \n"), media_size);
+			    gettext("media size : %llu sectors \n"),
+				media_size);
 		} else {
 
 			(void) fprintf(stderr,
@@ -1050,7 +1053,7 @@ Solaris partitions found.\n"));
 Solaris partition\n"));
 			(void) fprintf(stderr,
 			    gettext(
-			"FDISK Solaris partition size : %d sectors \n"),
+			"FDISK Solaris partition size : %llu sectors \n"),
 			    media_size);
 		}
 		return (-1);
@@ -1077,16 +1080,16 @@ Solaris partition\n"));
 				"Slice %d extends beyond media size\n"),
 				    part[num_slices -1].num);
 				(void) fprintf(stderr,
-					gettext("media size : %d sectors \n"),
+				    gettext("media size : %llu sectors \n"),
 				    media_size);
 			} else {
 				(void) fprintf(stderr,
 				    gettext(
 		"Slice %d extends beyond FDISK Solaris partition size\n"),
 			part[num_slices -1].num);
-				(void) fprintf(stderr,
-				    gettext("FDISK Solaris partition size : %d \
-sectors \n"), media_size);
+				(void) fprintf(stderr, gettext(
+				    "FDISK Solaris partition size : %llu "
+				    "sectors \n"), media_size);
 			}
 			return (-1);
 		}
@@ -1139,8 +1142,9 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 		/* Turn on privileges. */
 		(void) __priv_bracket(PRIV_ON);
 
-		ret = smedia_raw_read(handle, offset/med_info.sm_blocksize,
-			buf, med_info.sm_blocksize);
+		ret = smedia_raw_read(handle,
+		    (diskaddr_t)offset/med_info.sm_blocksize,
+		    buf, med_info.sm_blocksize);
 
 		/* Turn off privileges. */
 		(void) __priv_bracket(PRIV_OFF);
@@ -1242,12 +1246,13 @@ void
 write_default_label(smedia_handle_t handle, int32_t fd)
 {
 
-	struct vtoc v_toc;
-	int32_t nhead, numcyl, nsect, capacity;
+	struct extvtoc v_toc;
+	uint32_t nhead, numcyl, nsect;
+	diskaddr_t capacity;
 	int32_t ret;
 	char asciilabel[LEN_DKL_ASCII];
 	char asciilabel2[LEN_DKL_ASCII] = "DEFAULT\0";
-	int32_t acyl = 2;
+	uint32_t acyl = 2;
 
 
 	DPRINTF("Writing default vtoc\n");
@@ -1267,7 +1272,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	 * This will cause some truncation of size due to
 	 * round off errors.
 	 */
-	if (med_info.sm_capacity <= 0x200000) {
+	if ((uint32_t)med_info.sm_capacity <= 0x200000) {
 		nhead = 64;
 		nsect = 32;
 	} else {
@@ -1275,8 +1280,8 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 		nsect = 63;
 	}
 
-	numcyl = med_info.sm_capacity / (nhead * nsect);
-	capacity = nhead * nsect * numcyl;
+	numcyl = (uint32_t)med_info.sm_capacity / (nhead * nsect);
+	capacity = (diskaddr_t)nhead * nsect * numcyl;
 
 	v_toc.v_part[0].p_start = 0;
 	v_toc.v_part[0].p_size = capacity;
@@ -1300,7 +1305,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	/* Turn on privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	ret = write_vtoc(fd, &v_toc);
+	ret = write_extvtoc(fd, &v_toc);
 
 	/* Turn off privileges. */
 	(void) __priv_bracket(PRIV_OFF);
@@ -1320,20 +1325,20 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 
 	int32_t i, ret;
 	struct dk_geom  dkg;
-	struct vtoc v_toc;
+	struct extvtoc v_toc;
 	int tmp_fd;
 	char *fdisk_buf;
 	struct mboot boot_code;		/* Buffer for master boot record */
 	struct ipart parts[FD_NUMPART];
-	int32_t numcyl, nhead, nsect;
-	int32_t unixend;
-	int32_t blocksize;
-	int32_t capacity;
+	uint32_t numcyl, nhead, nsect;
+	uint32_t unixend;
+	uint32_t blocksize;
+	diskaddr_t capacity;
 	int	save_errno;
 	size_t	bytes_written;
 	char asciilabel[LEN_DKL_ASCII];
 	char asciilabel2[LEN_DKL_ASCII] = "DEFAULT\0";
-	int32_t acyl = 2;
+	uint32_t acyl = 2;
 
 	DPRINTF("Writing default fdisk table and vtoc\n");
 	(void) memset(&v_toc, 0, sizeof (v_toc));
@@ -1384,7 +1389,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	unixend = numcyl;
 
 	parts[0].relsect = lel(nhead * nsect);
-	parts[0].numsect = lel((long)((numcyl) * nhead * nsect));
+	parts[0].numsect = lel(((diskaddr_t)numcyl * nhead * nsect));
 	parts[0].systid = SUNIXOS2;   /* Solaris */
 	parts[0].beghead = 0;
 	parts[0].begcyl = 1;
@@ -1413,8 +1418,8 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 		/* Turn on privileges. */
 		(void) __priv_bracket(PRIV_ON);
 
-		bytes_written = smedia_raw_write(handle, 0, fdisk_buf,
-			blocksize);
+		bytes_written = smedia_raw_write(handle, (diskaddr_t)0,
+		    fdisk_buf, blocksize);
 
 		/* Turn off privileges. */
 		(void) __priv_bracket(PRIV_OFF);
@@ -1440,7 +1445,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 			}
 		}
 	}
-	capacity = (numcyl - 1) * nhead * nsect;
+	capacity = (diskaddr_t)(numcyl - 1) * nhead * nsect;
 
 	v_toc.v_nparts = V_NUMPAR;
 	v_toc.v_sanity = VTOC_SANE;
@@ -1470,7 +1475,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	/* Turn on privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
-	ret = write_vtoc(fd, &v_toc);
+	ret = write_extvtoc(fd, &v_toc);
 
 	/* Turn off privileges. */
 	(void) __priv_bracket(PRIV_OFF);
@@ -1508,11 +1513,11 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 {
 
 	struct fdisk_info fdisk;
-	uint32_t sol_offset = 0;
+	diskaddr_t sol_offset = 0;
 	int i, ret;
-	struct vtoc t_vtoc;
+	struct extvtoc t_vtoc;
 #ifdef i386
-	uint32_t sol_size = 0;
+	diskaddr_t sol_size = 0;
 	int32_t active = 0;
 #endif /* i386 */
 
@@ -1545,8 +1550,8 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 				}
 			}
 #endif /* i386 */
-			erase(handle, fdisk.part[i].relsect,
-			    fdisk.part[i].numsect);
+			erase(handle, (diskaddr_t)fdisk.part[i].relsect,
+			    (diskaddr_t)fdisk.part[i].numsect);
 		}
 	}
 
@@ -1559,14 +1564,14 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 		/* Turn on privileges. */
 		(void) __priv_bracket(PRIV_ON);
 
-		ret = read_vtoc(fd, &t_vtoc);
+		ret = read_extvtoc(fd, &t_vtoc);
 
 		/* Turn off privileges. */
 		(void) __priv_bracket(PRIV_OFF);
 
 		if (ret < 0) {
 			/* No valid vtoc, erase fdisk table. */
-			erase(handle, 0, 1);
+			erase(handle, (diskaddr_t)0, (diskaddr_t)1);
 			return;
 		}
 	} else {
@@ -1575,14 +1580,15 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 		/* Turn on privileges */
 		(void) __priv_bracket(PRIV_ON);
 
-		ret = read_vtoc(fd, &t_vtoc);
+		ret = read_extvtoc(fd, &t_vtoc);
 
 		/* Turn off privileges. */
 		(void) __priv_bracket(PRIV_OFF);
 
 		if (ret < 0) {
 			/* No valid vtoc, erase from 0th sector */
-			erase(handle, 0, med_info.sm_capacity);
+			erase(handle, (diskaddr_t)0,
+			    (uint32_t)med_info.sm_capacity);
 			return;
 		}
 	}
@@ -1596,16 +1602,16 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 			 * erase sectors 256, (p_size-256) and psize.
 			 */
 			erase(handle,
-				sol_offset + t_vtoc.v_part[i].p_start + 256,
-				1);
+			    sol_offset + t_vtoc.v_part[i].p_start + 256,
+			    (diskaddr_t)1);
 			erase(handle,
-				(sol_offset + t_vtoc.v_part[i].p_start +
-				t_vtoc.v_part[i].p_size - 256),
-				1);
+			    (sol_offset + t_vtoc.v_part[i].p_start +
+			    t_vtoc.v_part[i].p_size - 256),
+			    (diskaddr_t)1);
 			erase(handle,
-				(sol_offset + t_vtoc.v_part[i].p_start +
-				t_vtoc.v_part[i].p_size - 1),
-				1);
+			    (sol_offset + t_vtoc.v_part[i].p_start +
+			    t_vtoc.v_part[i].p_size - 1),
+			    (diskaddr_t)1);
 		}
 	}
 
@@ -1614,7 +1620,7 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 	 * for sparc, the erasing 0the sector erases vtoc.
 	 */
 	if (sol_offset) {
-		erase(handle, sol_offset, DK_LABEL_LOC + 2);
+		erase(handle, sol_offset, (diskaddr_t)DK_LABEL_LOC + 2);
 	}
 
 	/*
@@ -1622,7 +1628,7 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 	 * erased in the above sequence.
 	 */
 
-	erase(handle, 0, 1);
+	erase(handle, (diskaddr_t)0, (diskaddr_t)1);
 }
 
 /*
@@ -1633,10 +1639,10 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
  */
 
 static void
-erase(smedia_handle_t handle, uint32_t offset, uint32_t size)
+erase(smedia_handle_t handle, diskaddr_t offset, diskaddr_t size)
 {
 	char *buf;
-	int32_t nblocks = size;
+	diskaddr_t nblocks = size;
 	int32_t ret;
 
 
@@ -1646,13 +1652,13 @@ erase(smedia_handle_t handle, uint32_t offset, uint32_t size)
 		PERROR("malloc failed");
 		return;
 	}
-	(void) memset(buf, 0, nblocks * med_info.sm_blocksize);
+	(void) memset(buf, 0, (size_t)nblocks * med_info.sm_blocksize);
 
 	/* Turn on privileges. */
 	(void) __priv_bracket(PRIV_ON);
 
 	ret = smedia_raw_write(handle, offset, buf,
-	    nblocks * med_info.sm_blocksize);
+	    (size_t)nblocks * med_info.sm_blocksize);
 
 	/* Turn off privileges. */
 	(void) __priv_bracket(PRIV_OFF);

@@ -17,6 +17,7 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -90,6 +91,8 @@ static int configfile_func (char *arg, int flags);
 static void solaris_config_file (void);
 #endif
 
+static unsigned int min_mem64 = 0;
+
 #if defined(__sun) && !defined(GRUB_UTIL)
 extern void __enable_execute_stack (void *);
 void
@@ -147,9 +150,9 @@ check_password (char *entered, char* expected, password_t type)
 
 /* Print which sector is read when loading a file.  */
 static void
-disk_read_print_func (int sector, int offset, int length)
+disk_read_print_func(unsigned int sector, int offset, int length)
 {
-  grub_printf ("[%d,%d,%d]", sector, offset, length);
+  grub_printf ("[%u,%d,%d]", sector, offset, length);
 }
 
 
@@ -165,7 +168,8 @@ blocklist_func (char *arg, int flags)
 
   /* Collect contiguous blocks into one entry as many as possible,
      and print the blocklist notation on the screen.  */
-  static void disk_read_blocklist_func (int sector, int offset, int length)
+  static void disk_read_blocklist_func(unsigned int sector, int offset,
+	int length)
     {
       if (num_sectors > 0)
 	{
@@ -1230,6 +1234,10 @@ displaymem_func (char *arg, int flags)
 	       "Upper memory (to first chipset hole): %uK\n",
 	       mbi.mem_lower, mbi.mem_upper);
 
+  if (min_mem64 != 0)
+  	grub_printf (" Memory limit for 64-bit ISADIR expansion: %uMB\n",
+	    min_mem64);
+
   if (mbi.flags & MB_INFO_MEM_MAP)
     {
       struct AddrRangeDesc *map = (struct AddrRangeDesc *) mbi.mmap_addr;
@@ -1246,12 +1254,12 @@ displaymem_func (char *arg, int flags)
 	  else
 	    str = "Reserved";
 	  grub_printf ("   %s:  Base Address:  0x%x X 4GB + 0x%x,\n"
-		       "      Length:   0x%x X 4GB + 0x%x bytes\n",
-		       str,
-		       (unsigned long) (map->BaseAddr >> 32),
-		       (unsigned long) (map->BaseAddr & 0xFFFFFFFF),
-		       (unsigned long) (map->Length >> 32),
-		       (unsigned long) (map->Length & 0xFFFFFFFF));
+		"      Length:   0x%x X 4GB + 0x%x bytes\n",
+		str,
+		(unsigned long) (map->BaseAddr >> 32),
+		(unsigned long) (map->BaseAddr & 0xFFFFFFFF),
+		(unsigned long) (map->Length >> 32),
+		(unsigned long) (map->Length & 0xFFFFFFFF));
 
 	  map = ((struct AddrRangeDesc *) (((int) map) + 4 + map->size));
 	}
@@ -1443,7 +1451,7 @@ embed_func (char *arg, int flags)
     }
 
   /* Clear the cache.  */
-  buf_track = -1;
+  buf_track = BUF_CACHE_INVALID;
 
   /* Now perform the embedding.  */
   if (! devwrite (sector - part_start, size, stage1_5_buffer))
@@ -1814,7 +1822,7 @@ geometry_func (char *arg, int flags)
 #endif
 
   grub_printf ("drive 0x%x: C/H/S = %d/%d/%d, "
-	       "The number of sectors = %d, %s\n",
+	       "The number of sectors = %u, %s\n",
 	       current_drive,
 	       geom.cylinders, geom.heads, geom.sectors,
 	       geom.total_sectors, msg);
@@ -2162,12 +2170,13 @@ install_func (char *arg, int flags)
   char *config_filename = stage2_second_buffer + SECTOR_SIZE;
   char *dummy = config_filename + SECTOR_SIZE;
   int new_drive = GRUB_INVALID_DRIVE;
-  int dest_drive, dest_partition, dest_sector;
+  int dest_drive, dest_partition;
+  unsigned int dest_sector;
   int src_drive, src_partition, src_part_start;
   int i;
   struct geometry dest_geom, src_geom;
-  int saved_sector;
-  int stage2_first_sector, stage2_second_sector;
+  unsigned int saved_sector;
+  unsigned int stage2_first_sector, stage2_second_sector;
   char *ptr;
   int installaddr, installlist;
   /* Point to the location of the name of a configuration file in Stage 2.  */
@@ -2188,10 +2197,11 @@ install_func (char *arg, int flags)
 #endif /* GRUB_UTIL */
   
   /* Save the first sector of Stage2 in STAGE2_SECT.  */
-  static void disk_read_savesect_func (int sector, int offset, int length)
+  static void disk_read_savesect_func(unsigned int sector, int offset,
+	int length)
     {
       if (debug)
-	printf ("[%d]", sector);
+	printf ("[%u]", sector);
 
       /* ReiserFS has files which sometimes contain data not aligned
          on sector boundaries.  Returning an error is better than
@@ -2204,10 +2214,11 @@ install_func (char *arg, int flags)
 
   /* Write SECTOR to INSTALLLIST, and update INSTALLADDR and
      INSTALLSECT.  */
-  static void disk_read_blocklist_func (int sector, int offset, int length)
+  static void disk_read_blocklist_func(unsigned int sector, int offset,
+	int length)
     {
       if (debug)
-	printf("[%d]", sector);
+	printf("[%u]", sector);
 
       if (offset != 0 || last_length != SECTOR_SIZE)
 	{
@@ -2548,7 +2559,7 @@ install_func (char *arg, int flags)
 	    }
 	  
 	  /* Write it to the disk.  */
-	  buf_track = -1;
+	  buf_track = BUF_CACHE_INVALID;
 
 #ifdef GRUB_UTIL
 	  /* In the grub shell, access the Stage 2 via the OS filesystem
@@ -2591,7 +2602,7 @@ install_func (char *arg, int flags)
     }
 
   /* Clear the cache.  */
-  buf_track = -1;
+  buf_track = BUF_CACHE_INVALID;
 
   /* Write the modified sectors of Stage2 to the disk.  */
 #ifdef GRUB_UTIL
@@ -2905,6 +2916,34 @@ static struct builtin builtin_kernel =
   " Linux's mem option automatically."
 };
 
+int
+min_mem64_func(char *arg, int flags)
+{
+	if (!safe_parse_maxint(&arg, &min_mem64))
+		return (1);
+}
+
+static struct builtin builtin_min_mem64 =
+{
+	"min_mem64",
+	min_mem64_func,
+	BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_SCRIPT | BUILTIN_HELP_LIST,
+	"min_mem64 <memory in MB>",
+	"Sets minimum memory (in MB) required for $ISADIR to expand to amd64, "
+	"even on 64-bit capable hardware."
+};
+
+int
+check_min_mem64()
+{
+	if (min_mem64 == 0)
+		return (1);
+
+	if ((mbi.mem_upper / 10240) * 11 >= min_mem64)
+		return (1);
+
+	return (0);
+}
 
 static int detect_target_operating_mode();
 
@@ -3144,7 +3183,7 @@ expand_arch (char *arg, char *newarg)
     strncat(newarg, arg, MAX_CMDLINE);
     index[0] = '$';
 
-    if (isamd64())
+    if (isamd64() && check_min_mem64())
       strncat(newarg, "amd64", MAX_CMDLINE);
 
     arg = index + 7;
@@ -3597,7 +3636,7 @@ partnew_func (char *arg, int flags)
   PC_MBR_SIG (mbr) = PC_MBR_SIGNATURE;
   
   /* Write back the MBR to the disk.  */
-  buf_track = -1;
+  buf_track = BUF_CACHE_INVALID;
   if (! rawwrite (current_drive, 0, mbr))
     return 1;
 
@@ -3669,7 +3708,7 @@ parttype_func (char *arg, int flags)
 	  PC_SLICE_TYPE (mbr, entry) = new_type;
 	  
 	  /* Write back the MBR to the disk.  */
-	  buf_track = -1;
+	  buf_track = BUF_CACHE_INVALID;
 	  if (! rawwrite (current_drive, offset, mbr))
 	    return 1;
 
@@ -4139,7 +4178,7 @@ savedefault_func (char *arg, int flags)
   char sect[SECTOR_SIZE];
   int entryno;
   int sector_count = 0;
-  int saved_sectors[2];
+  unsigned int saved_sectors[2];
   int saved_offsets[2];
   int saved_lengths[2];
 
@@ -4149,8 +4188,9 @@ savedefault_func (char *arg, int flags)
   }
 
   /* Save sector information about at most two sectors.  */
-  auto void disk_read_savesect_func (int sector, int offset, int length);
-  void disk_read_savesect_func (int sector, int offset, int length)
+  auto void disk_read_savesect_func(unsigned int sector, int offset,
+	int length);
+  void disk_read_savesect_func(unsigned int sector, int offset, int length)
     {
       if (sector_count < 2)
 	{
@@ -4265,7 +4305,7 @@ savedefault_func (char *arg, int flags)
 	}
 
       /* Clear the cache.  */
-      buf_track = -1;
+      buf_track = BUF_CACHE_INVALID;
     }
 
  fail:
@@ -5768,6 +5808,7 @@ struct builtin *builtin_table[] =
 #ifdef USE_MD5_PASSWORDS
   &builtin_md5crypt,
 #endif /* USE_MD5_PASSWORDS */
+  &builtin_min_mem64,
   &builtin_module,
   &builtin_module_dollar,
   &builtin_modulenounzip,

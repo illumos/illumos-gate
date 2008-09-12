@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <errno.h>
@@ -1978,6 +1976,7 @@ client_servproc(void *cookie, char *argp, size_t arg_size,
 	char			rq_data[RQ_LEN];
 	uint_t			nexpected_desc;
 	struct vtoc		vtoc;
+	struct extvtoc		extvtoc;
 
 	door_dp = (door_data_t *)cookie;
 	req = (smedia_services_t *)((void *)argp);
@@ -2224,7 +2223,10 @@ client_servproc(void *cookie, char *argp, size_t arg_size,
 		}
 
 		/* Check for EFI type because DKIOCGGEOM does not support EFI */
-		ret_val = ioctl(door_dp->dd_fd, DKIOCGVTOC, &vtoc);
+		ret_val = ioctl(door_dp->dd_fd, DKIOCGEXTVTOC, &extvtoc);
+		if (ret_val < 0 && errno == ENOTTY)
+			ret_val = ioctl(door_dp->dd_fd, DKIOCGVTOC, &vtoc);
+
 		if (!((ret_val < 0) && (errno == ENOTSUP))) {
 			ret_val = ioctl(door_dp->dd_fd, DKIOCGGEOM, &dkgeom);
 			if (ret_val < 0)  {

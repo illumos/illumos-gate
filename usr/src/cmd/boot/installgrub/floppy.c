@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +48,7 @@ int bootrd_debug = 0;
 #define	DEV_BSIZE	512
 #define	MAX_CHUNK	64
 
-static int *blocklist;
+static unsigned int *blocklist;
 
 /* diskread_callback is set in filesytem module (pcfs.c) */
 int (*diskread_callback)(int, int);
@@ -171,7 +168,7 @@ floppy_lseek(int fd, off_t addr, int whence)
  * Get the blocklist for stage2
  */
 int
-read_stage2_blocklist(int device_fd, int *blkbuf)
+read_stage2_blocklist(int device_fd, unsigned int *blkbuf)
 {
 	int i, fd, stage2_block;
 	char buf[DEV_BSIZE];

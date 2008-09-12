@@ -926,7 +926,7 @@ hex_dump (void *buf, size_t size)
 
 int
 biosdisk (int subfunc, int drive, struct geometry *geometry,
-	  int sector, int nsec, int segment)
+	  unsigned int sector, int nsec, int segment)
 {
   char *buf;
   int fd = geometry->flags;
@@ -984,7 +984,7 @@ biosdisk (int subfunc, int drive, struct geometry *geometry,
     case BIOSDISK_WRITE:
       if (verbose)
 	{
-	  grub_printf ("Write %d sectors starting from %d sector"
+	  grub_printf ("Write %d sectors starting from %u sector"
 		       " to drive 0x%x (%s)\n",
 		       nsec, sector, drive, device_map[drive]);
 	  hex_dump (buf, nsec * SECTOR_SIZE);

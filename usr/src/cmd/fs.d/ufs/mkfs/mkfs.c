@@ -36,9 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * The maximum supported file system size (in sectors) is the
  * number of frags that can be represented in an int32_t field
@@ -1155,15 +1152,16 @@ main(int argc, char *argv[])
 				    "system determined parameters.\n", fsys));
 				ishotpluggable = 0;
 			}
-			if (((dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect)
-			    > CHSLIMIT) || isremovable || ishotpluggable) {
+			if ((((diskaddr_t)dkg.dkg_ncyl * dkg.dkg_nhead *
+			    dkg.dkg_nsect) > CHSLIMIT) || isremovable ||
+			    ishotpluggable) {
 				use_efi_dflts = 1;
 				retry = 1;
 			}
 		}
 	}
-	dprintf(("DeBuG CHSLIMIT = %d geom = %ld\n", CHSLIMIT,
-	    dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
+	dprintf(("DeBuG CHSLIMIT = %d geom = %llu\n", CHSLIMIT,
+	    (diskaddr_t)dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
 	dprintf(("DeBuG label_type = %d isremovable = %d ishotpluggable = %d "
 	    "use_efi_dflts = %d\n", label_type, isremovable, ishotpluggable,
 	    use_efi_dflts));
@@ -2393,11 +2391,11 @@ grow50:
 static diskaddr_t
 get_max_size(int fd)
 {
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 	dk_gpt_t *efi_vtoc;
 	diskaddr_t	slicesize;
 
-	int index = read_vtoc(fd, &vtoc);
+	int index = read_extvtoc(fd, &vtoc);
 
 	if (index >= 0) {
 		label_type = LABEL_TYPE_VTOC;

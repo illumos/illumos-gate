@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CMLB_IMPL_H
 #define	_SYS_CMLB_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -104,12 +103,18 @@ extern "C" {
 #define	CMLB_LABEL_IS_VALID	0
 #define	CMLB_LABEL_IS_INVALID	1
 
+#define	CMLB_2TB_BLOCKS		0xffffffff
+#define	CMLB_1TB_BLOCKS		0x7fffffff
+
+#define	CMLB_EXTVTOC_LIMIT	CMLB_2TB_BLOCKS
+#define	CMLB_OLDVTOC_LIMIT	CMLB_1TB_BLOCKS
+
 /*
  * fdisk partition mapping structure
  */
 struct fmap {
-	daddr_t fmap_start;	/* starting block number */
-	daddr_t fmap_nblk;	/* number of blocks */
+	ulong_t fmap_start;	/* starting block number */
+	ulong_t fmap_nblk;	/* number of blocks */
 };
 
 /* for cm_state */
@@ -125,6 +130,8 @@ typedef enum
 	CMLB_LABEL_EFI
 } cmlb_label_t;
 
+#define	CMLB_ALLOW_2TB_WARN 0x1
+
 
 typedef struct cmlb_lun {
 	dev_info_t	*cl_devi;		/* pointer to devinfo */
@@ -138,6 +145,9 @@ typedef struct cmlb_lun {
 	uint_t		cl_solaris_offset;	/* offset to Solaris part. */
 
 	struct  dk_map  cl_map[MAXPART];	/* logical partitions */
+						/* cylno is overloaded. used */
+						/* for starting block for EFI */
+
 	diskaddr_t	cl_offset[MAXPART];	/* partition start blocks */
 
 	struct fmap	cl_fmap[FD_NUMPART];	/* fdisk partitions */
@@ -167,7 +177,7 @@ typedef struct cmlb_lun {
 	cmlb_label_t	cl_cur_labeltype;	/* current label type */
 
 	/* indicates whether vtoc label is read from media */
-	uchar_t		cl_vtoc_label_is_from_media;
+	cmlb_label_t		cl_label_from_media;
 
 	cmlb_state_t	cl_state;		/* state of handle */
 
@@ -184,10 +194,10 @@ typedef struct cmlb_lun {
 	int		cl_device_type;		/* DTYPE_DIRECT,.. */
 	int		cl_reserved;		/* reserved efi partition # */
 	cmlb_tg_ops_t 	*cmlb_tg_ops;
-
+	uint8_t		cl_msglog_flag;		/* used to enable/suppress */
+						/* certain log messages */
 } cmlb_lun_t;
 
-_NOTE(MUTEX_PROTECTS_DATA(cmlb_lun::cl_mutex, cmlb_lun))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cmlb_tg_ops))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_devi))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_is_removable))

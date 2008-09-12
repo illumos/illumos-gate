@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi.h>
 
@@ -204,8 +202,8 @@ gda_log(dev_info_t *dev, char *label, uint_t level, const char *fmt, ...)
 	if (dev) {
 		if (level == CE_PANIC || level == CE_WARN) {
 			(void) sprintf(name, "%s (%s%d):\n",
-				ddi_pathname(dev, buf), label,
-				ddi_get_instance(dev));
+			    ddi_pathname(dev, buf), label,
+			    ddi_get_instance(dev));
 		} else if (level == CE_NOTE ||
 		    level >= (uint_t)SCSI_DEBUG) {
 			(void) sprintf(name,
@@ -246,7 +244,7 @@ gda_log(dev_info_t *dev, char *label, uint_t level, const char *fmt, ...)
 
 void
 gda_errmsg(struct scsi_device *devp, struct cmpkt *pktp, char *label,
-    int severity, int blkno, int err_blkno,
+    int severity, daddr_t blkno, daddr_t err_blkno,
     char **cmdvec, char **senvec)
 {
 	auto char buf[256];
@@ -258,27 +256,27 @@ gda_errmsg(struct scsi_device *devp, struct cmpkt *pktp, char *label,
 
 	bzero((caddr_t)buf, 256);
 	(void) sprintf(buf, "Error for command '%s'\tError Level: %s",
-		gda_name(*(uchar_t *)pktp->cp_cdbp, cmdvec),
-		error_classes[severity]);
+	    gda_name(*(uchar_t *)pktp->cp_cdbp, cmdvec),
+	    error_classes[severity]);
 	gda_log(dev, label, CE_WARN, buf);
 
 	bzero((caddr_t)buf, 256);
 	if ((blkno != -1) && (err_blkno != -1)) {
-		(void) sprintf(buf, "Requested Block %d, Error Block: %d\n",
+		(void) sprintf(buf, "Requested Block %ld, Error Block: %ld\n",
 		    blkno, err_blkno);
 		gda_log(dev, label, CE_CONT, buf);
 	}
 
 	bzero((caddr_t)buf, 256);
 	(void) sprintf(buf, "Sense Key: %s\n",
-		gda_name(*(uchar_t *)pktp->cp_scbp, senvec));
+	    gda_name(*(uchar_t *)pktp->cp_scbp, senvec));
 
 	gda_log(dev, label, CE_CONT, buf);
 	bzero((caddr_t)buf, 256);
 	(void) strcpy(buf, "Vendor '");
 	gda_inqfill(devp->sd_inq->inq_vid, 8, &buf[strlen(buf)]);
 	(void) sprintf(&buf[strlen(buf)],
-		"' error code: 0x%x",
-		*(uchar_t *)pktp->cp_scbp);
+	    "' error code: 0x%x",
+	    *(uchar_t *)pktp->cp_scbp);
 	gda_log(dev, label, CE_CONT, "%s\n", buf);
 }

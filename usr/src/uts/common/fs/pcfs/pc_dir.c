@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -135,7 +134,7 @@ pc_direnter(
 	struct vnode *vp = PCTOV(dp);
 	struct pcfs *fsp = VFSTOPCFS(vp->v_vfsp);
 	offset_t offset;
-	int	blkno;
+	daddr_t	blkno;
 	int	boff;
 	struct buf *bp = NULL;
 	struct pcdir *ep;
@@ -676,7 +675,7 @@ top:
 
 	if ((error == 0) || (error == ENOENT)) {
 		offset_t lfn_offset = -1;
-		int	blkno;
+		daddr_t	blkno;
 		struct pcdir *direntries;
 		struct pcdir *ep;
 		int	ndirentries;

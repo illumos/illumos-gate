@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the code relating to label manipulation.
  */
@@ -60,10 +58,10 @@
  * Prototypes for ANSI C compilers
  */
 static int	do_geometry_sanity_check(void);
-static int	vtoc_to_label(struct dk_label *label, struct vtoc *vtoc,
+static int	vtoc_to_label(struct dk_label *label, struct extvtoc *vtoc,
 		struct dk_geom *geom, struct dk_cinfo *cinfo);
-extern int	read_vtoc(int, struct vtoc *);
-extern int	write_vtoc(int, struct vtoc *);
+extern int	read_extvtoc(int, struct extvtoc *);
+extern int	write_extvtoc(int, struct extvtoc *);
 static int	vtoc64_to_label(struct efi_info *, struct dk_gpt *);
 
 #else	/* __STDC__ */
@@ -73,11 +71,15 @@ static int	vtoc64_to_label(struct efi_info *, struct dk_gpt *);
  */
 static int	do_geometry_sanity_check();
 static int	vtoc_to_label();
-extern int	read_vtoc();
-extern int	write_vtoc();
+extern int	read_extvtoc();
+extern int	write_extvtoc();
 static int	vtoc64_to_label();
 
 #endif	/* __STDC__ */
+
+#ifdef	DEBUG
+static void dump_label(struct dk_label *label);
+#endif
 
 /*
  * This routine checks the given label to see if it is valid.
@@ -212,7 +214,7 @@ do_geometry_sanity_check()
 
 /*
  * create a clear EFI partition table when format is used
- * to convert a SMI label to an EFI lable
+ * to convert an SMI label to an EFI label
  */
 int
 SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
@@ -269,7 +271,7 @@ write_label()
 	int	error = 0, head, sec;
 	struct dk_label label;
 	struct dk_label new_label;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	struct dk_geom	geom;
 	struct dk_gpt	*vtoc64;
 	int		nbackups;
@@ -420,7 +422,7 @@ write_label()
 	 * always use an ioctl to read the vtoc from the
 	 * driver, so it can do as it likes.
 	 */
-	if (write_vtoc(cur_file, &vtoc) != 0) {
+	if (write_extvtoc(cur_file, &vtoc) != 0) {
 		err_print("Warning: error writing VTOC.\n");
 		error = -1;
 	}
@@ -470,17 +472,17 @@ write_label()
 
 /*
  * Read the label from the disk.
- * Do this via the read_vtoc() library routine, then convert it to a label.
+ * Do this via the read_extvtoc() library routine, then convert it to a label.
  * We also need a DKIOCGGEOM ioctl to get the disk's geometry.
  */
 int
 read_label(int fd, struct dk_label *label)
 {
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	struct dk_geom	geom;
 	struct dk_cinfo	dkinfo;
 
-	if (read_vtoc(fd, &vtoc) < 0		||
+	if (read_extvtoc(fd, &vtoc) < 0		||
 	    ioctl(fd, DKIOCGGEOM, &geom) == -1	||
 	    ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
 		return (-1);
@@ -667,8 +669,8 @@ vtoc64_to_label(struct efi_info *label, struct dk_gpt *vtoc)
  * Convert vtoc/geom to label.
  */
 static int
-vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
-    struct dk_cinfo *cinfo)
+vtoc_to_label(struct dk_label *label, struct extvtoc *vtoc,
+    struct dk_geom *geom, struct dk_cinfo *cinfo)
 {
 #if defined(_SUNOS_VTOC_8)
 	struct dk_map32		*lmap;
@@ -678,8 +680,8 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
 #error No VTOC format defined.
 #endif			/* defined(_SUNOS_VTOC_8) */
 
-	struct partition	*vpart;
-	long			nblks;
+	struct extpartition	*vpart;
+	ulong_t			nblks;
 	int			i;
 
 	(void) memset((char *)label, 0, sizeof (struct dk_label));
@@ -740,13 +742,15 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
 	for (i = 0; i < V_NUMPAR; i++) {
 		label->dkl_vtoc.v_part[i].p_tag = vtoc->v_part[i].p_tag;
 		label->dkl_vtoc.v_part[i].p_flag = vtoc->v_part[i].p_flag;
+		label->dkl_vtoc.v_timestamp[i] = vtoc->timestamp[i];
 	}
-	(void) memcpy((char *)label->dkl_vtoc.v_bootinfo,
-	    (char *)vtoc->v_bootinfo, sizeof (vtoc->v_bootinfo));
-	(void) memcpy((char *)label->dkl_vtoc.v_reserved,
-	    (char *)vtoc->v_reserved, sizeof (vtoc->v_reserved));
-	(void) memcpy((char *)label->dkl_vtoc.v_timestamp,
-	    (char *)vtoc->timestamp, sizeof (vtoc->timestamp));
+
+	for (i = 0; i < 10; i++)
+		label->dkl_vtoc.v_reserved[i] = vtoc->v_reserved[i];
+
+	label->dkl_vtoc.v_bootinfo[0] = vtoc->v_bootinfo[0];
+	label->dkl_vtoc.v_bootinfo[1] = vtoc->v_bootinfo[1];
+	label->dkl_vtoc.v_bootinfo[2] = vtoc->v_bootinfo[2];
 
 	(void) memcpy(label->dkl_asciilabel, vtoc->v_asciilabel,
 	    LEN_DKL_ASCII);
@@ -772,7 +776,7 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
 
 	vpart = vtoc->v_part;
 
-	nblks = (int)label->dkl_nsect * (int)label->dkl_nhead;
+	nblks = label->dkl_nsect * label->dkl_nhead;
 
 	for (i = 0; i < NDKMAP; i++, lmap++, vpart++) {
 		if (cinfo->dki_ctype != DKC_VBD) {
@@ -782,12 +786,12 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
 			}
 		}
 #if defined(_SUNOS_VTOC_8)
-		lmap->dkl_cylno = vpart->p_start / nblks;
-		lmap->dkl_nblk = vpart->p_size;
+		lmap->dkl_cylno = (blkaddr32_t)(vpart->p_start / nblks);
+		lmap->dkl_nblk = (blkaddr32_t)vpart->p_size;
 
 #elif defined(_SUNOS_VTOC_16)
-		lmap->p_start = vpart->p_start;
-		lmap->p_size = vpart->p_size;
+		lmap->p_start = (blkaddr32_t)vpart->p_start;
+		lmap->p_size = (blkaddr32_t)vpart->p_size;
 #else
 #error No VTOC format defined.
 #endif			/* defined(_SUNOS_VTOC_8) */
@@ -798,6 +802,10 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
 	 */
 	(void) checksum(label, CK_MAKESUM);
 
+#ifdef DEBUG
+	if (option_msg && diag_msg)
+		dump_label(label);
+#endif
 	return (0);
 }
 
@@ -807,12 +815,12 @@ vtoc_to_label(struct dk_label *label, struct vtoc *vtoc, struct dk_geom *geom,
  * Extract a vtoc structure out of a valid label
  */
 int
-label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
+label_to_vtoc(struct extvtoc *vtoc, struct dk_label *label)
 {
 #if defined(_SUNOS_VTOC_8)
 	struct dk_map2		*lpart;
 	struct dk_map32		*lmap;
-	long			nblks;
+	ulong_t			nblks;
 
 #elif defined(_SUNOS_VTOC_16)
 	struct dkl_partition	*lpart;
@@ -820,10 +828,10 @@ label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
 #error No VTOC format defined.
 #endif				/* defined(_SUNOS_VTOC_8) */
 
-	struct partition	*vpart;
+	struct extpartition	*vpart;
 	int			i;
 
-	(void) memset((char *)vtoc, 0, sizeof (struct vtoc));
+	(void) memset((char *)vtoc, 0, sizeof (struct extvtoc));
 
 	switch (label->dkl_vtoc.v_version) {
 	case 0:
@@ -846,21 +854,20 @@ label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
 			vpart->p_flag = lpart->p_flag;
 
 #if defined(_SUNOS_VTOC_16)
-			vpart->p_start = lpart->p_start;
-			vpart->p_size = lpart->p_size;
+			vpart->p_start = (diskaddr_t)lpart->p_start;
+			vpart->p_size = (diskaddr_t)lpart->p_size;
 #endif	/* defined(_SUNOS_VTOC_16) */
+			vtoc->timestamp[i] = label->dkl_vtoc.v_timestamp[i];
 		}
 		(void) memcpy(vtoc->v_volume, label->dkl_vtoc.v_volume,
 		    LEN_DKL_VVOL);
-		(void) memcpy((char *)vtoc->v_bootinfo,
-		    (char *)label->dkl_vtoc.v_bootinfo,
-		    sizeof (vtoc->v_bootinfo));
-		(void) memcpy((char *)vtoc->v_reserved,
-		    (char *)label->dkl_vtoc.v_reserved,
-		    sizeof (vtoc->v_reserved));
-		(void) memcpy((char *)vtoc->timestamp,
-		    (char *)label->dkl_vtoc.v_timestamp,
-		    sizeof (vtoc->timestamp));
+
+		for (i = 0; i < 10; i++)
+			vtoc->v_reserved[i] = label->dkl_vtoc.v_reserved[i];
+
+		vtoc->v_bootinfo[0] = label->dkl_vtoc.v_bootinfo[0];
+		vtoc->v_bootinfo[1] = label->dkl_vtoc.v_bootinfo[1];
+		vtoc->v_bootinfo[2] = label->dkl_vtoc.v_bootinfo[2];
 		break;
 
 	default:
@@ -890,8 +897,8 @@ label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
 	vpart = vtoc->v_part;
 	nblks = label->dkl_nsect * label->dkl_nhead;
 	for (i = 0; i < V_NUMPAR; i++, vpart++, lmap++) {
-		vpart->p_start = lmap->dkl_cylno * nblks;
-		vpart->p_size = lmap->dkl_nblk;
+		vpart->p_start = (diskaddr_t)(lmap->dkl_cylno * nblks);
+		vpart->p_size = (diskaddr_t)lmap->dkl_nblk;
 	}
 #endif			/* defined(_SUNOS_VTOC_8) */
 
@@ -900,18 +907,17 @@ label_to_vtoc(struct vtoc *vtoc, struct dk_label *label)
 
 /*
  * Input: File descriptor
- * Output: 1 if disk is >1TB OR has an EFI label, 0 otherwise.
+ * Output: 1 if disk has an EFI label, 0 otherwise.
  */
 
 int
 is_efi_type(int fd)
 {
-	struct vtoc vtoc;
+	struct extvtoc vtoc;
 
-	if (ioctl(fd, DKIOCGVTOC, &vtoc) == -1) {
-		if (errno == ENOTSUP) {
-			return (1);
-		}
+	if (read_extvtoc(fd, &vtoc) == VT_ENOTSUP) {
+		/* assume the disk has EFI label */
+		return (1);
 	}
 	return (0);
 }
@@ -1005,8 +1011,8 @@ err_check(struct dk_gpt *vtoc)
 	}
 }
 
-#ifdef	FOR_DEBUGGING_ONLY
-int
+#ifdef	DEBUG
+static void
 dump_label(label)
 	struct dk_label	*label;
 {
@@ -1064,7 +1070,7 @@ dump_label(label)
 			label->dkl_map[i].dkl_nblk);
 
 #elif defined(_SUNOS_VTOC_16)
-		fmt_print("%c:        start=%d, blocks=%d", i+'a',
+		fmt_print("%c:        start=%u, blocks=%u", i+'a',
 		    label->dkl_vtoc.v_part[i].p_start,
 		    label->dkl_vtoc.v_part[i].p_size);
 #else
@@ -1107,4 +1113,4 @@ dump_label(label)
 
 	fmt_print("\n\n");
 }
-#endif	/* FOR_DEBUGGING_ONLY */
+#endif	/* DEBUG */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions implementing the scsi menu commands.
@@ -282,7 +279,7 @@ c_scsi()
 				(void) do_mode_sense(pageno);
 			} else if (*p == 'b') {
 				if (parse_change_spec(s, p, pageno,
-						&change_item)) {
+				    &change_item)) {
 					(void) do_mode_select(&change_item);
 				}
 			}
@@ -293,9 +290,9 @@ Please display the page on which you'd like to do a mode select\n");
 					goto error;
 				}
 				chg_item = (struct chg_list *)
-					zalloc(sizeof (struct chg_list));
+				    zalloc(sizeof (struct chg_list));
 				if (parse_change_spec(s, s, current_page,
-						chg_item)) {
+				    chg_item)) {
 					add_new_change_list_item(chg_item);
 				} else {
 					destroy_data((char *)chg_item);
@@ -552,7 +549,7 @@ do_format()
 	/*
 	 * Are there mounted partitions?
 	 */
-	if (checkmount((daddr_t)-1, (daddr_t)-1)) {
+	if (checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print("Cannot format disk with mounted partitions\n\n");
 		return (-1);
 	}
@@ -560,7 +557,7 @@ do_format()
 	/*
 	 * Is any of the partitions being used for swapping.
 	 */
-	if (checkswap((daddr_t)-1, (daddr_t)-1)) {
+	if (checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print("Cannot format disk while its partitions are \
 currently being used for swapping.\n\n");
 		return (-1);
@@ -582,7 +579,7 @@ currently being used for swapping.\n\n");
 	deflt = 0;
 	ioparam.io_charlist = confirm_list;
 	grown_list = !input(FIO_MSTR, "Format with the Grown Defects list",
-		'?', &ioparam, &deflt, DATA_INPUT);
+	    '?', &ioparam, &deflt, DATA_INPUT);
 
 	/*
 	 * Construct the uscsi format ioctl.
@@ -766,7 +763,7 @@ do_display()
 				break;
 			case CHG_MODE_CLR:
 				fmt_print("&= ~0x%x\n",
-					(~(cp->value)) & 0xff);
+				    (~(cp->value)) & 0xff);
 				break;
 			default:
 				impossible("do_display");
@@ -968,8 +965,7 @@ default_all_pages()
 	ucmd.uscsi_cdblen = CDB_GROUP0;
 	ucmd.uscsi_bufaddr = msbuf;
 	ucmd.uscsi_buflen = nbytes;
-	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg) ? F_NORMAL : F_SILENT);
+	status = uscsi_cmd(cur_file, &ucmd, (option_msg) ? F_NORMAL : F_SILENT);
 	if (status) {
 		if (!option_msg) {
 			err_print("\nMode sense page 0x3f failed\n");
@@ -984,7 +980,7 @@ default_all_pages()
 	 */
 	mh = (struct mode_header *)msbuf;
 	nbytes = mh->length - sizeof (struct mode_header) -
-			mh->bdesc_length + 1;
+	    mh->bdesc_length + 1;
 	p = msbuf + sizeof (struct mode_header) + mh->bdesc_length;
 
 	while (nbytes > 0) {

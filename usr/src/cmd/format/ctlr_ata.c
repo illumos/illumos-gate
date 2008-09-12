@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the routines for the IDE drive interface
@@ -68,7 +65,7 @@ static int	ata_ck_format(void);
 #ifdef i386
 static int	ata_ex_cur(struct defect_list *);
 static int	ata_wr_cur(struct defect_list *);
-static int	ata_repair(int, int);
+static int	ata_repair(diskaddr_t, int);
 #endif /* i386 */
 #else /* __STDC__ */
 static int	ata_ck_format();
@@ -114,7 +111,7 @@ struct  ctlr_ops pcmcia_ataops = {
 
 
 #if defined(i386)
-static struct	partition	*dpart = NULL;
+static struct	dkl_partition	*dpart = NULL;
 #endif	/* defined(i386) */
 extern	struct	badsec_lst	*badsl_chain;
 extern	int	badsl_chain_cnt;
@@ -153,9 +150,9 @@ ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
 {
 	int	tmpsec;
 	struct dadkio_rwcmd	dadkio_rwcmd;
-	daddr_t	blkno;
+	blkaddr_t	blkno;
 
-	blkno = (daddr_t)blk64;
+	blkno = (blkaddr_t)blk64;
 	bzero((caddr_t)&dadkio_rwcmd, sizeof (struct dadkio_rwcmd));
 
 	tmpsec = secnt * 512;
@@ -219,7 +216,8 @@ ata_ck_format()
 	unsigned char bufaddr[2048];
 	int status;
 
-	status = ata_rdwr(DIR_READ, cur_file, 1, 4, (caddr_t)bufaddr, 0, NULL);
+	status = ata_rdwr(DIR_READ, cur_file, (diskaddr_t)1, 4,
+	    (caddr_t)bufaddr, 0, NULL);
 
 	return (!status);
 }
@@ -242,7 +240,7 @@ get_alts_slice()
 	for (i = 0; i < V_NUMPAR && alts_slice == -1; i++) {
 		if (cur_parts->vtoc.v_part[i].p_tag == V_ALTSCTR) {
 			alts_slice = i;
-			dpart = (struct partition *)&cur_parts->vtoc.v_part[i];
+			dpart = &cur_parts->vtoc.v_part[i];
 		}
 	}
 
@@ -301,14 +299,14 @@ ata_convert_list(struct defect_list *list, int list_format)
 			list->header.magicno = (uint_t)DEFECT_MAGIC;
 			list->list = new_defect;
 			for (i = 0; i < ap->ap_tblp->alts_ent_used;
-					    i++, new_defect++) {
+			    i++, new_defect++) {
 				new_defect->cyl =
-					    bn2c((ap->ap_entp)[i].bad_start);
+				    bn2c((ap->ap_entp)[i].bad_start);
 				new_defect->head =
-					    bn2h((ap->ap_entp)[i].bad_start);
+				    bn2h((ap->ap_entp)[i].bad_start);
 				new_defect->bfi = UNKNOWN;
 				new_defect->sect =
-					    bn2s((ap->ap_entp)[i].bad_start);
+				    bn2s((ap->ap_entp)[i].bad_start);
 				new_defect->nbits = UNKNOWN;
 			}
 
@@ -365,7 +363,7 @@ ata_ex_cur(struct defect_list *list)
 }
 
 int
-ata_repair(int bn, int flag)
+ata_repair(diskaddr_t bn, int flag)
 {
 
 	int	status;
@@ -398,7 +396,7 @@ ata_repair(int bn, int flag)
 		}
 		blc_p = blc_p->bl_nxt;
 	}
-	blc_p->bl_sec[blc_p->bl_cnt++] = bn;
+	blc_p->bl_sec[blc_p->bl_cnt++] = (uint_t)bn;
 	gbadsl_chain_cnt++;
 
 	(void) updatebadsec(dpart, 0);
@@ -460,7 +458,7 @@ ata_wr_cur(struct defect_list *list)
 		/* test for unsupported list format */
 		if ((dlist->bfi != UNKNOWN) || (dlist->nbits != UNKNOWN)) {
 			(void) fprintf(stderr,
-				"BFI unsuported format for bad sectors\n");
+			    "BFI unsuported format for bad sectors\n");
 			return (-1);
 		}
 
@@ -487,7 +485,7 @@ ata_wr_cur(struct defect_list *list)
 			blc_p = blc_p->bl_nxt;
 		}
 		blc_p->bl_sec[blc_p->bl_cnt++] =
-			    chs2bn(dlist->cyl, dlist->head, dlist->sect);
+		    (uint_t)chs2bn(dlist->cyl, dlist->head, dlist->sect);
 		gbadsl_chain_cnt++;
 		dlist++;
 	}

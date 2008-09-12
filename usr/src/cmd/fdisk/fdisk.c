@@ -31,8 +31,6 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PROGRAM: fdisk(1M)
  * This program reads the partition table on the specified device and
@@ -50,6 +48,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <limits.h>
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <sys/efi_partition.h>
@@ -86,6 +85,8 @@
 #define	MAX_SECT	(63)
 #define	MAX_CYL		(1022)
 #define	MAX_HEAD	(254)
+
+#define	DK_MAX_2TB	UINT32_MAX	/* Max # of sectors in 2TB */
 
 /* for clear_vtoc() */
 #define	OLD		0
@@ -272,7 +273,7 @@ static int	io_image = 0;		/* create image using geometry (-I) */
 static struct mboot *Bootblk;		/* pointer to cut/paste sector zero */
 static char	*Bootsect;		/* pointer to sector zero buffer */
 static char	*Nullsect;
-static struct vtoc	disk_vtoc;	/* verify VTOC table */
+static struct extvtoc	disk_vtoc;	/* verify VTOC table */
 static int	vt_inval = 0;
 static int	no_virtgeom_ioctl = 0;	/* ioctl for virtual geometry failed */
 static int	no_physgeom_ioctl = 0;	/* ioctl for physical geometry failed */
@@ -284,10 +285,14 @@ static struct ipart	Old_Table[FD_NUMPART];
 static struct dk_minfo	minfo;
 static struct dk_geom	disk_geom;
 
-static diskaddr_t	dev_capacity;	/* number of blocks on device */
-static diskaddr_t	chs_capacity;	/* Numcyl * heads * sectors */
-
 static int Dev;			/* fd for open device */
+
+static diskaddr_t	dev_capacity;	/* number of blocks on device */
+static diskaddr_t	chs_capacity;	/* Numcyl_usable * heads * sectors */
+
+static int		Numcyl_usable;	/* Number of usable cylinders */
+					/*  used to limit fdisk to 2TB */
+
 /* Physical geometry for the drive */
 static int	Numcyl;			/* number of cylinders */
 static int	heads;			/* number of heads */
@@ -323,14 +328,14 @@ static void Set_Table_CHS_Values(int ti);
 static int insert_tbl(int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
-    int rsect, int numsect);
+    uint32_t rsect, uint32_t numsect);
 static int verify_tbl(void);
 static int pars_fdisk(char *line,
     int *id, int *act,
     int *bhead, int *bsect, int *bcyl,
     int *ehead, int *esect, int *ecyl,
-    int *rsect, int *numsect);
-static int validate_part(int id, int rsect, int numsect);
+    uint32_t *rsect, uint32_t *numsect);
+static int validate_part(int id, uint32_t rsect, uint32_t numsect);
 static void stage0(void);
 static int pcreate(void);
 static int specify(uchar_t tsystid);
@@ -728,8 +733,16 @@ main(int argc, char *argv[])
 	 * some drivers may not support DKIOCGMEDIAINFO
 	 * in that case use CHS
 	 */
-	chs_capacity = Numcyl * heads * sectors;
+	chs_capacity = (diskaddr_t)Numcyl * heads * sectors;
 	dev_capacity = chs_capacity;
+	Numcyl_usable = Numcyl;
+
+	if (chs_capacity > DK_MAX_2TB) {
+		/* limit to 2TB */
+		Numcyl_usable = DK_MAX_2TB / (heads * sectors);
+		chs_capacity = (diskaddr_t)Numcyl_usable * heads * sectors;
+	}
+
 	if (minfo.dki_capacity > 0)
 		dev_capacity = minfo.dki_capacity;
 
@@ -805,6 +818,11 @@ main(int argc, char *argv[])
 				    "Type \"y\" to accept the default "
 				    "partition,  otherwise type \"n\" to "
 				    "edit the\n partition table.\n");
+
+				if (Numcyl > Numcyl_usable)
+					(void) printf("WARNING: Disk is larger"
+					    " than 2TB. Solaris partition will"
+					    " be limited to 2 TB.\n");
 			}
 
 			/* Edit the partition table as directed */
@@ -812,23 +830,25 @@ main(int argc, char *argv[])
 
 				/* Default scenario */
 				nulltbl();
-
 				/* now set up UNIX System partition */
 				Table[0].bootid = ACTIVE;
 				Table[0].relsect = lel(heads * sectors);
-				Table[0].numsect = lel((long)((Numcyl - 1) *
+
+				Table[0].numsect =
+				    lel((ulong_t)((Numcyl_usable - 1) *
 				    heads * sectors));
+
 				Table[0].systid = SUNIXOS2;   /* Solaris */
 
 				/* calculate CHS values for table entry 0 */
 				Set_Table_CHS_Values(0);
-
 				update_disk_and_exit(B_TRUE);
 			} else if (io_EFIdisk) {
 				/* create an EFI partition for the whole disk */
 				nulltbl();
 				i = insert_tbl(EFI_PMBR, 0, 0, 0, 0, 0, 0, 0, 1,
-				    dev_capacity - 1);
+				    (dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB :
+				    (dev_capacity - 1));
 				if (i != 0) {
 					(void) fprintf(stderr,
 					    "Error creating EFI partition\n");
@@ -1315,8 +1335,8 @@ load(int funct, char *file)
 	int	ehead;
 	int	esect;
 	int	ecyl;
-	int	rsect;
-	int	numsect;
+	uint32_t	rsect;
+	uint32_t	numsect;
 	char	line[256];
 	int	i = 0;
 	int	j;
@@ -1475,11 +1495,21 @@ load(int funct, char *file)
 				exit(1);
 			}
 
-			if (numsect != dev_capacity - 1) {
+
+			if (dev_capacity > DK_MAX_2TB) {
+				if (numsect != DK_MAX_2TB) {
+					(void) fprintf(stderr,
+					    "fdisk: EFI partitions must "
+					    "encompass the entire maximum 2 TB "
+					    "(input numsect: %u - max: %llu)\n",
+					    numsect, (diskaddr_t)DK_MAX_2TB);
+				exit(1);
+				}
+			} else if (numsect != dev_capacity - 1) {
 				(void) fprintf(stderr,
 				    "fdisk: EFI partitions must encompass the "
 				    "entire disk\n"
-				    "(input numsect: %d - avail: %llu)\n",
+				    "(input numsect: %u - avail: %llu)\n",
 				    numsect,
 				    dev_capacity - 1);
 				exit(1);
@@ -1570,16 +1600,17 @@ insert_tbl(
     int id, int act,
     int bhead, int bsect, int bcyl,
     int ehead, int esect, int ecyl,
-    int rsect, int numsect)
+    uint32_t rsect, uint32_t numsect)
 {
 	int	i;
 
 	/* validate partition size */
-	if (rsect + numsect > dev_capacity) {
+	if (((diskaddr_t)rsect + numsect) > dev_capacity) {
 		(void) fprintf(stderr,
 		    "fdisk: Partition table exceeds the size of the disk.\n");
 		return (-1);
 	}
+
 
 	/* find UNUSED partition table entry */
 	for (i = 0; i < FD_NUMPART; i++) {
@@ -1639,7 +1670,7 @@ insert_tbl(
 static int
 verify_tbl(void)
 {
-	int	i, j, rsect, numsect;
+	uint32_t	i, j, rsect, numsect;
 	int	noMoreParts = 0;
 	int	numParts = 0;
 
@@ -1693,14 +1724,18 @@ verify_tbl(void)
 			/* make sure the partition isn't larger than the disk */
 			rsect = lel(Table[i].relsect);
 			numsect = lel(Table[i].numsect);
-			if ((rsect + numsect) > dev_capacity) {
+
+			if ((((diskaddr_t)rsect + numsect) > dev_capacity) ||
+			    (((diskaddr_t)rsect + numsect) > DK_MAX_2TB)) {
 				return (-1);
 			}
 
 			for (j = i + 1; j < FD_NUMPART; j++) {
 				if (Table[j].systid != UNUSED) {
-					int t_relsect = lel(Table[j].relsect);
-					int t_numsect = lel(Table[j].numsect);
+					uint32_t t_relsect =
+					    lel(Table[j].relsect);
+					uint32_t t_numsect =
+					    lel(Table[j].numsect);
 
 					if (noMoreParts) {
 						(void) fprintf(stderr,
@@ -1742,7 +1777,6 @@ verify_tbl(void)
 
 						return (-1);
 					}
-
 					if ((rsect >=
 					    (t_relsect + t_numsect)) ||
 					    ((rsect + numsect) <= t_relsect)) {
@@ -1762,8 +1796,10 @@ verify_tbl(void)
 	}
 	if (Table[i].systid != UNUSED) {
 		if (noMoreParts ||
-		    ((lel(Table[i].relsect) + lel(Table[i].numsect)) >
-		    dev_capacity)) {
+		    (((diskaddr_t)lel(Table[i].relsect) +
+		    lel(Table[i].numsect)) > dev_capacity) ||
+		    (((diskaddr_t)lel(Table[i].relsect) +
+		    lel(Table[i].numsect)) > DK_MAX_2TB)) {
 			return (-1);
 		}
 	}
@@ -1782,7 +1818,7 @@ pars_fdisk(
     int *id, int *act,
     int *bhead, int *bsect, int *bcyl,
     int *ehead, int *esect, int *ecyl,
-    int *rsect, int *numsect)
+    uint32_t *rsect, uint32_t *numsect)
 {
 	int	i;
 	if (line[0] == '\0' || line[0] == '\n' || line[0] == '*')
@@ -1795,7 +1831,7 @@ pars_fdisk(
 			line[i] = ' ';
 		}
 	}
-	if (sscanf(line, "%d %d %d %d %d %d %d %d %d %d",
+	if (sscanf(line, "%d %d %d %d %d %d %d %d %u %u",
 	    id, act, bhead, bsect, bcyl, ehead, esect, ecyl,
 	    rsect, numsect) != 10) {
 		(void) fprintf(stderr, "Syntax error:\n	\"%s\".\n", line);
@@ -1810,7 +1846,7 @@ pars_fdisk(
  * partitions and previously existing partitions are allowed to start at 0.
  */
 static int
-validate_part(int id, int rsect, int numsect)
+validate_part(int id, uint32_t rsect, uint32_t numsect)
 {
 	int i;
 	if ((id != UNUSED) && (rsect == 0)) {
@@ -1912,7 +1948,7 @@ pcreate(void)
 {
 	uchar_t tsystid = 'z';
 	int i, j;
-	int rsect = 1;
+	uint32_t numsect;
 	int retCode = 0;
 
 	i = 0;
@@ -1931,12 +1967,12 @@ pcreate(void)
 		i++;
 	}
 
-	j = 0;
+	numsect = 0;
 	for (i = 0; i < FD_NUMPART; i++) {
 		if (Table[i].systid != UNUSED) {
-			j += lel(Table[i].numsect);
+			numsect += lel(Table[i].numsect);
 		}
-		if (j >= chs_capacity) {
+		if (numsect >= chs_capacity) {
 			(void) printf(E_LINE);
 			(void) printf("There is no more room on the disk for"
 			    " another partition.\n");
@@ -1947,6 +1983,15 @@ pcreate(void)
 		}
 	}
 	while (tsystid == 'z') {
+
+		/*
+		 * The question here is expanding to more than what is
+		 * allocated for question lines (Q_LINE) which garbles
+		 * at least warning line. Clearing warning line as workaround
+		 * for now.
+		 */
+
+		(void) printf(W_LINE);
 		(void) printf(Q_LINE);
 		(void) printf(
 		    "Select the partition type to create:\n"
@@ -2026,6 +2071,11 @@ pcreate(void)
 	(void) printf(E_LINE);
 
 	if (tsystid != EFI_PMBR) {
+		(void) printf(W_LINE);
+		if ((dev_capacity > DK_MAX_2TB))
+			(void) printf("WARNING: Disk is larger than 2 TB. "
+			    "Upper limit is 2 TB for non-EFI partition ID\n");
+
 		/* create the new partition */
 		i = specify(tsystid);
 
@@ -2093,8 +2143,9 @@ pcreate(void)
 		}
 
 		/* create the table entry - i should be 0 */
-		i = insert_tbl(tsystid, 0, 0, 0, 0, 0, 0, 0, rsect,
-		    dev_capacity - rsect);
+		i = insert_tbl(tsystid, 0, 0, 0, 0, 0, 0, 0, 1,
+		    (dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB:
+		    (dev_capacity - 1));
 
 		if (i != 0) {
 			(void) printf("Error creating EFI partition!!!\n");
@@ -2122,8 +2173,9 @@ static int
 specify(uchar_t tsystid)
 {
 	int	i, j, percent = -1;
-	int	cyl, cylen, first_free, size_free;
-	int	max_free;
+	int	cyl, cylen;
+	diskaddr_t first_free, size_free;
+	diskaddr_t max_free;
 	int	cyl_size;
 	struct ipart *partition[FD_NUMPART];
 
@@ -2150,6 +2202,7 @@ specify(uchar_t tsystid)
 			}
 		}
 	}
+
 
 	(void) printf(Q_LINE);
 	(void) printf(
@@ -2189,17 +2242,16 @@ specify(uchar_t tsystid)
 			return (-1);
 		}
 
-
 		if (percent == 100)
-			cylen = Numcyl - 1;
+			cylen = Numcyl_usable - 1;
 		else
-			cylen = (Numcyl * percent) / 100;
+			cylen = (Numcyl_usable * percent) / 100;
 
 		/* Verify DOS12 partition doesn't exceed max size of 32MB. */
 		if ((tsystid == DOSOS12) &&
 		    ((long)((long)cylen * cyl_size) > MAXDOS)) {
 			int n;
-			n = MAXDOS * 100 / (int)(cyl_size) / Numcyl;
+			n = MAXDOS * 100 / (int)(cyl_size) / Numcyl_usable;
 			(void) printf(E_LINE);
 			(void) printf("Maximum size for a DOS partition "
 			    "is %d%%; retry the operation.",
@@ -2244,7 +2296,7 @@ specify(uchar_t tsystid)
 			if (max_free < size_free)
 				max_free = size_free;
 
-			if ((cylen * cyl_size) <= size_free) {
+			if (((uint64_t)cylen * cyl_size) <= size_free) {
 				/* We found a place to use */
 				break;
 			}
@@ -2252,8 +2304,8 @@ specify(uchar_t tsystid)
 				(void) printf(E_LINE);
 				max_free /= (cyl_size);
 				(void) fprintf(stderr, "fdisk: "
-				    "Maximum percentage available is %d\n",
-				    100 * max_free / Numcyl);
+				    "Maximum percentage available is %lld\n",
+				    100 * max_free / Numcyl_usable);
 				return (-1);
 			}
 		}
@@ -2287,14 +2339,17 @@ specify(uchar_t tsystid)
 			    "New partition cannot start at cylinder 0.\n");
 			return (-1);
 		}
-		if (cyl >= (unsigned int)Numcyl) {
+
+
+		if (cyl >= Numcyl_usable) {
 			(void) printf(E_LINE);
 			(void) printf(
 			    "Cylinder %d is out of bounds, "
 			    "the maximum is %d.\n",
-			    cyl, Numcyl - 1);
+			    cyl, Numcyl_usable - 1);
 			return (-1);
 		}
+
 		(void) printf(Q_LINE);
 		(void) printf("Enter partition size in cylinders: ");
 		if ((cylen = getcyl()) == -1) {
@@ -2332,13 +2387,20 @@ specify(uchar_t tsystid)
 			}
 		}
 
-		/* Verify partition doesn't exceed disk size */
-		if (cyl + cylen > Numcyl) {
+		/* Verify partition doesn't exceed disk size or 2 TB */
+		if (cyl + cylen > Numcyl_usable) {
 			(void) printf(E_LINE);
-			(void) printf(
-			    "Maximum size for partition is %d cylinders;"
-			    "\nretry the operation.",
-			    Numcyl - cyl);
+			if (Numcyl > Numcyl_usable) {
+				(void) printf(
+				    "Maximum size for partition is %d "
+				    "cylinders; \nretry the operation.",
+				    Numcyl_usable - cyl);
+			} else {
+				(void) printf(
+				    "Maximum size for partition is %d "
+				    "cylinders; \nretry the operation.",
+				    Numcyl_usable - cyl);
+			}
 			return (-1);
 		}
 
@@ -2638,6 +2700,7 @@ disptbl(void)
 	int i;
 	unsigned int startcyl, endcyl, length, percent, remainder;
 	char *stat, *type;
+	int is_pmbr = 0;
 
 	if ((heads == 0) || (sectors == 0)) {
 		(void) printf("WARNING: critical disk geometry information"
@@ -2768,6 +2831,9 @@ disptbl(void)
 			break;
 		case EFI_PMBR:
 			type = EFIstr;
+			if (lel(Table[i].numsect) == DK_MAX_2TB)
+				is_pmbr = 1;
+
 			break;
 		default:
 			type = Ostr;
@@ -2775,14 +2841,22 @@ disptbl(void)
 		}
 		startcyl = lel(Table[i].relsect) /
 		    (unsigned long)(heads * sectors);
-		length = lel(Table[i].numsect) /
-		    (unsigned long)(heads * sectors);
-		if (lel(Table[i].numsect) % (unsigned long)(heads * sectors))
-			length++;
-		endcyl = startcyl + length - 1;
-		percent = length * 100 / Numcyl;
-		if ((remainder = (length * 100 % Numcyl)) != 0) {
-			if ((remainder * 100 / Numcyl) > 50) {
+
+		if (lel(Table[i].numsect) == DK_MAX_2TB) {
+			endcyl = Numcyl - 1;
+			length = endcyl - startcyl + 1;
+		} else {
+			length = lel(Table[i].numsect) /
+			    (unsigned long)(heads * sectors);
+			if (lel(Table[i].numsect) %
+			    (unsigned long)(heads * sectors))
+				length++;
+			endcyl = startcyl + length - 1;
+		}
+
+		percent = length * 100 / Numcyl_usable;
+		if ((remainder = (length * 100 % Numcyl_usable)) != 0) {
+			if ((remainder * 100 / Numcyl_usable) > 50) {
 				/* round up */
 				percent++;
 			}
@@ -2796,6 +2870,7 @@ disptbl(void)
 		    "    %3d",
 		    i + 1, stat, type, startcyl, endcyl, length, percent);
 	}
+
 	/* Print warning message if table is empty */
 	if (Table[0].systid == UNUSED) {
 		(void) printf(W_LINE);
@@ -2803,6 +2878,11 @@ disptbl(void)
 	} else {
 		/* Clear the warning line */
 		(void) printf(W_LINE);
+
+		/* Print warning if disk > 2TB and is not EFI PMBR */
+		if (!is_pmbr && (dev_capacity > DK_MAX_2TB))
+			(void) printf("WARNING: Disk is larger than 2 TB. "
+			    "Upper limit is 2 TB for non-EFI partition ID\n");
 	}
 }
 
@@ -2832,8 +2912,8 @@ print_Table(void)
 		(void) fprintf(stderr, "%-5d ", Table[i].endsect & 0x3f);
 		(void) fprintf(stderr, "%-8d ",
 		    (((uint_t)Table[i].endsect & 0xc0) << 2) + Table[i].endcyl);
-		(void) fprintf(stderr, "%-9d ", lel(Table[i].relsect));
-		(void) fprintf(stderr, "%-9d\n", lel(Table[i].numsect));
+		(void) fprintf(stderr, "%-10u ", lel(Table[i].relsect));
+		(void) fprintf(stderr, "%-10u\n", lel(Table[i].numsect));
 
 	}
 }
@@ -3103,12 +3183,13 @@ ffile_write(char *file)
 	(void) fprintf(fp, "*\n");
 	(void) fprintf(fp,
 	    "\n* Id    Act  Bhead  Bsect  Bcyl    Ehead  Esect  Ecyl"
-	    "    Rsect    Numsect\n");
+	    "    Rsect      Numsect\n");
+
 	for (i = 0; i < FD_NUMPART; i++) {
 		if (Table[i].systid != UNUSED)
 			(void) fprintf(fp,
-			    "  %-5d %-4d %-6d %-6d %-7d %-6d %-6d %-7d %-8d"
-			    " %-8d\n",
+			    "  %-5d %-4d %-6d %-6d %-7d %-6d %-6d %-7d %-10u"
+			    " %-10u\n",
 			    Table[i].systid,
 			    Table[i].bootid,
 			    Table[i].beghead,
@@ -3136,7 +3217,7 @@ static void
 fix_slice(void)
 {
 	int	i;
-	int	numsect;
+	uint32_t	numsect;
 
 	if (io_image) {
 		return;
@@ -3171,7 +3252,7 @@ fix_slice(void)
 		if (i == 2) {
 			if (disk_vtoc.v_part[i].p_start != 0) {
 				(void) fprintf(stderr,
-				    "slice %d starts at %ld, is not at"
+				    "slice %d starts at %llu, is not at"
 				    " start of partition",
 				    i, disk_vtoc.v_part[i].p_start);
 				if (!io_nifdisk) {
@@ -3186,7 +3267,7 @@ fix_slice(void)
 			}
 			if (disk_vtoc.v_part[i].p_size != numsect) {
 				(void) fprintf(stderr,
-				    "slice %d size %ld does not cover"
+				    "slice %d size %llu does not cover"
 				    " complete partition",
 				    i, disk_vtoc.v_part[i].p_size);
 				if (!io_nifdisk) {
@@ -3221,7 +3302,7 @@ fix_slice(void)
 			    disk_vtoc.v_part[i].p_start +
 			    disk_vtoc.v_part[i].p_size > numsect) {
 				(void) fprintf(stderr,
-				    "slice %d (start %ld, end %ld)"
+				    "slice %d (start %llu, end %llu)"
 				    " is larger than the partition",
 				    i, disk_vtoc.v_part[i].p_start,
 				    disk_vtoc.v_part[i].p_start +
@@ -3247,8 +3328,8 @@ fix_slice(void)
 		}
 		if (disk_vtoc.v_part[i].p_start > numsect) {
 			(void) fprintf(stderr,
-			    "slice %d (start %ld) is larger than the partition",
-			    i, disk_vtoc.v_part[i].p_start);
+			    "slice %d (start %llu) is larger than the "
+			    "partition", i, disk_vtoc.v_part[i].p_start);
 			if (!io_nifdisk) {
 				(void) printf(" remove ?:");
 				if (yesno()) {
@@ -3268,7 +3349,7 @@ fix_slice(void)
 		} else if (disk_vtoc.v_part[i].p_start
 		    + disk_vtoc.v_part[i].p_size > numsect) {
 			(void) fprintf(stderr,
-			    "slice %d (end %ld) is larger"
+			    "slice %d (end %llu) is larger"
 			    " than the partition",
 			    i,
 			    disk_vtoc.v_part[i].p_start +
@@ -3333,7 +3414,7 @@ readvtoc(void)
 	int	i;
 	int	retval = VTOC_OK;
 
-	if ((i = read_vtoc(Dev, &disk_vtoc)) < VTOC_OK) {
+	if ((i = read_extvtoc(Dev, &disk_vtoc)) < VTOC_OK) {
 		if (i == VT_EINVAL) {
 			(void) fprintf(stderr, "fdisk: Invalid VTOC.\n");
 			vt_inval++;
@@ -3360,7 +3441,7 @@ writevtoc(void)
 	int	i;
 	int	retval = 0;
 
-	if ((i = write_vtoc(Dev, &disk_vtoc)) != 0) {
+	if ((i = write_extvtoc(Dev, &disk_vtoc)) != 0) {
 		if (i == VT_EINVAL) {
 			(void) fprintf(stderr,
 			    "fdisk: Invalid entry exists in VTOC.\n");
@@ -3496,8 +3577,9 @@ clear_vtoc(int table, int part)
 {
 	struct ipart *clr_table;
 	struct dk_label disk_label;
-	int pcyl, ncyl, count, bytes;
-	uint_t backup_block, solaris_offset;
+	uint32_t pcyl, ncyl, count;
+	diskaddr_t backup_block, solaris_offset;
+	ssize_t bytes;
 	off_t seek_byte;
 
 #ifdef DEBUG
@@ -3532,8 +3614,8 @@ clear_vtoc(int table, int part)
 
 	if (bytes != sizeof (struct dk_label)) {
 		(void) fprintf(stderr,
-		    "\tWarning: only %d bytes written to clear primary VTOC!\n",
-		    bytes);
+		    "\tWarning: only %d bytes written to clear primary"
+		    " VTOC!\n", bytes);
 	}
 
 #ifdef DEBUG
@@ -3684,10 +3766,11 @@ lecture_and_query(char *warning, char *devname)
 static void
 sanity_check_provided_device(char *devname, int fd)
 {
-	struct vtoc v;
+	struct extvtoc v;
 	struct dk_geom d;
 	struct part_info pi;
-	long totsize;
+	struct extpart_info extpi;
+	diskaddr_t totsize;
 	int idx = -1;
 
 	/*
@@ -3695,7 +3778,15 @@ sanity_check_provided_device(char *devname, int fd)
 	 *  to tell if they've specified the full disk partition by checking
 	 *  to see if they've specified a partition that starts at sector 0.
 	 */
-	if (ioctl(fd, DKIOCPARTINFO, &pi) != -1) {
+	if (ioctl(fd, DKIOCEXTPARTINFO, &extpi) != -1) {
+		if (extpi.p_start != 0) {
+			if (!lecture_and_query(FDISK_LECTURE_NOT_SECTOR_ZERO,
+			    devname)) {
+				(void) close(fd);
+				exit(1);
+			}
+		}
+	} else if (ioctl(fd, DKIOCPARTINFO, &pi) != -1) {
 		if (pi.p_start != 0) {
 			if (!lecture_and_query(FDISK_LECTURE_NOT_SECTOR_ZERO,
 			    devname)) {
@@ -3704,7 +3795,7 @@ sanity_check_provided_device(char *devname, int fd)
 			}
 		}
 	} else {
-		if ((idx = read_vtoc(fd, &v)) < 0) {
+		if ((idx = read_extvtoc(fd, &v)) < 0) {
 			if (!lecture_and_query(FDISK_LECTURE_NO_VTOC,
 			    devname)) {
 				(void) close(fd);
@@ -3721,7 +3812,7 @@ sanity_check_provided_device(char *devname, int fd)
 			}
 			return;
 		}
-		totsize = d.dkg_ncyl * d.dkg_nhead * d.dkg_nsect;
+		totsize = (diskaddr_t)d.dkg_ncyl * d.dkg_nhead * d.dkg_nsect;
 		if (v.v_part[idx].p_size != totsize) {
 			if (!lecture_and_query(FDISK_LECTURE_NOT_FULL,
 			    devname)) {

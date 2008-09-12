@@ -1,4 +1,4 @@
-/***************************************************************************
+/*
  *
  * fsutils.h : definitions for filesystem utilities
  *
@@ -7,9 +7,7 @@
  *
  * Licensed under the Academic Free License version 2.1
  *
- **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+ */
 
 #ifndef FSUTILS_H
 #define	FSUTILS_H
@@ -23,6 +21,6 @@ boolean_t is_dos_drive(uchar_t id);
 boolean_t is_dos_extended(uchar_t id);
 boolean_t find_dos_drive(int fd, int num, uint_t secsz, off_t *offset);
 int get_num_dos_drives(int fd, uint_t);
-boolean_t vtoc_one_slice_entire_disk(struct vtoc *vtoc);
+boolean_t vtoc_one_slice_entire_disk(struct extvtoc *vtoc);
 
 #endif /* FSUTILS_H */

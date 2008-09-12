@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1200,7 +1201,7 @@ static void  sd_update_block_info(struct sd_lun *un, uint32_t lbasize,
  */
 static int  sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p);
 static int  sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p);
-static int  sd_ready_and_valid(struct sd_lun *un);
+static int  sd_ready_and_valid(struct sd_lun *un, int part);
 
 static void sdmin(struct buf *bp);
 static int sdread(dev_t dev, struct uio *uio, cred_t *cred_p);
@@ -9406,7 +9407,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	 */
 	if (!nodelay) {
 		mutex_exit(SD_MUTEX(un));
-		rval = sd_ready_and_valid(un);
+		rval = sd_ready_and_valid(un, part);
 		mutex_enter(SD_MUTEX(un));
 		/*
 		 * Fail if device is not ready or if the number of disk
@@ -9759,7 +9760,7 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
  */
 
 static int
-sd_ready_and_valid(struct sd_lun *un)
+sd_ready_and_valid(struct sd_lun *un, int part)
 {
 	struct sd_errstats	*stp;
 	uint64_t		capacity;
@@ -9885,8 +9886,9 @@ sd_ready_and_valid(struct sd_lun *un)
 
 	if (un->un_f_format_in_progress == FALSE) {
 		mutex_exit(SD_MUTEX(un));
-		if (cmlb_validate(un->un_cmlbhandle, 0,
-		    (void *)SD_PATH_DIRECT) != 0) {
+
+		if (cmlb_partinfo(un->un_cmlbhandle, part, NULL, NULL, NULL,
+		    NULL, (void *) SD_PATH_DIRECT) != 0) {
 			rval = SD_NOT_READY_VALID;
 			mutex_enter(SD_MUTEX(un));
 			goto done;
@@ -10015,7 +10017,7 @@ sdread(dev_t dev, struct uio *uio, cred_t *cred_p)
 		}
 		un->un_ncmds_in_driver++;
 		mutex_exit(SD_MUTEX(un));
-		if ((sd_ready_and_valid(un)) != SD_READY_VALID) {
+		if ((sd_ready_and_valid(un, SDPART(dev))) != SD_READY_VALID) {
 			mutex_enter(SD_MUTEX(un));
 			un->un_ncmds_in_driver--;
 			ASSERT(un->un_ncmds_in_driver >= 0);
@@ -10094,7 +10096,7 @@ sdwrite(dev_t dev, struct uio *uio, cred_t *cred_p)
 		}
 		un->un_ncmds_in_driver++;
 		mutex_exit(SD_MUTEX(un));
-		if ((sd_ready_and_valid(un)) != SD_READY_VALID) {
+		if ((sd_ready_and_valid(un, SDPART(dev))) != SD_READY_VALID) {
 			mutex_enter(SD_MUTEX(un));
 			un->un_ncmds_in_driver--;
 			ASSERT(un->un_ncmds_in_driver >= 0);
@@ -10173,7 +10175,7 @@ sdaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 		}
 		un->un_ncmds_in_driver++;
 		mutex_exit(SD_MUTEX(un));
-		if ((sd_ready_and_valid(un)) != SD_READY_VALID) {
+		if ((sd_ready_and_valid(un, SDPART(dev))) != SD_READY_VALID) {
 			mutex_enter(SD_MUTEX(un));
 			un->un_ncmds_in_driver--;
 			ASSERT(un->un_ncmds_in_driver >= 0);
@@ -10252,7 +10254,7 @@ sdawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 		}
 		un->un_ncmds_in_driver++;
 		mutex_exit(SD_MUTEX(un));
-		if ((sd_ready_and_valid(un)) != SD_READY_VALID) {
+		if ((sd_ready_and_valid(un, SDPART(dev))) != SD_READY_VALID) {
 			mutex_enter(SD_MUTEX(un));
 			un->un_ncmds_in_driver--;
 			ASSERT(un->un_ncmds_in_driver >= 0);
@@ -11066,8 +11068,10 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * removable-media devices, of if the device was opened in
 	 * NDELAY/NONBLOCK mode.
 	 */
+	partition = SDPART(bp->b_edev);
+
 	if (!SD_IS_VALID_LABEL(un) &&
-	    (sd_ready_and_valid(un) != SD_READY_VALID)) {
+	    (sd_ready_and_valid(un, partition) != SD_READY_VALID)) {
 		/*
 		 * For removable devices it is possible to start an I/O
 		 * without a media by opening the device in nodelay mode.
@@ -11086,7 +11090,6 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 		return;
 	}
 
-	partition = SDPART(bp->b_edev);
 
 	nblocks = 0;
 	(void) cmlb_partinfo(un->un_cmlbhandle, partition,
@@ -20106,13 +20109,16 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		switch (cmd) {
 		case DKIOCGGEOM:	/* SD_PATH_DIRECT */
 		case DKIOCGVTOC:
+		case DKIOCGEXTVTOC:
 		case DKIOCGAPART:
 		case DKIOCPARTINFO:
+		case DKIOCEXTPARTINFO:
 		case DKIOCSGEOM:
 		case DKIOCSAPART:
 		case DKIOCGETEFI:
 		case DKIOCPARTITION:
 		case DKIOCSVTOC:
+		case DKIOCSEXTVTOC:
 		case DKIOCSETEFI:
 		case DKIOCGMBOOT:
 		case DKIOCSMBOOT:
@@ -20192,7 +20198,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		}
 
 		mutex_exit(SD_MUTEX(un));
-		err = sd_ready_and_valid(un);
+		err = sd_ready_and_valid(un, SDPART(dev));
 		mutex_enter(SD_MUTEX(un));
 
 		if (err != SD_READY_VALID) {
@@ -20241,13 +20247,16 @@ skip_ready_valid:
 
 	case DKIOCGGEOM:
 	case DKIOCGVTOC:
+	case DKIOCGEXTVTOC:
 	case DKIOCGAPART:
 	case DKIOCPARTINFO:
+	case DKIOCEXTPARTINFO:
 	case DKIOCSGEOM:
 	case DKIOCSAPART:
 	case DKIOCGETEFI:
 	case DKIOCPARTITION:
 	case DKIOCSVTOC:
+	case DKIOCSEXTVTOC:
 	case DKIOCSETEFI:
 	case DKIOCGMBOOT:
 	case DKIOCSMBOOT:

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains functions to implement automatic configuration
  * of scsi disks.
@@ -116,8 +114,8 @@ static struct part_table part_table_infinity = {
 
 
 static struct default_partitions {
-	long			min_capacity;
-	long			max_capacity;
+	diskaddr_t		min_capacity;
+	diskaddr_t		max_capacity;
 	struct part_table	*part_table;
 } default_partitions[] = {
 	{ 0,	64,		&part_table_64mb },	/* 0 to 64 mb */
@@ -228,14 +226,17 @@ static char		*strcopy(
 				char	*dst,
 				char	*src,
 				int	n);
-static	int		adjust_disk_geometry(int capacity, int *cyl,
-						int *nsect, int *nhead);
+static	int		adjust_disk_geometry(diskaddr_t capacity, uint_t *cyl,
+				uint_t *nsect, uint_t *nhead);
+static void 		compute_chs_values(diskaddr_t total_capacity,
+				diskaddr_t usable_capacity, uint_t *pcylp,
+				uint_t *nheadp, uint_t *nsectp);
 #if defined(_SUNOS_VTOC_8)
-static int square_box(
-			int capacity,
-			int *dim1, int lim1,
-			int *dim2, int lim2,
-			int *dim3, int lim3);
+static diskaddr_t square_box(
+			diskaddr_t capacity,
+			uint_t *dim1, uint_t lim1,
+			uint_t *dim2, uint_t lim2,
+			uint_t *dim3, uint_t lim3);
 #endif	/* defined(_SUNOS_VTOC_8) */
 
 
@@ -566,7 +567,7 @@ auto_label_init(struct dk_label *label)
 	label->dkl_magic = DKL_MAGIC;
 
 	(void) snprintf(label->dkl_asciilabel, sizeof (label->dkl_asciilabel),
-	    "%s cyl %d alt %d hd %d sec %d",
+	    "%s cyl %u alt %u hd %u sec %u",
 	    "DEFAULT", ncyl, acyl, nhead, nsect);
 
 	rval = 0;
@@ -696,8 +697,8 @@ new_direct_disk_type(
 #elif defined(_SUNOS_VTOC_16)
 		part->pinfo_map[i].dkl_cylno =
 			label->dkl_vtoc.v_part[i].p_start /
-				((int)(disk->dtype_nhead *
-					disk->dtype_nsect - apc));
+			    ((blkaddr_t)(disk->dtype_nhead *
+			    disk->dtype_nsect - apc));
 		part->pinfo_map[i].dkl_nblk =
 			label->dkl_vtoc.v_part[i].p_size;
 #else
@@ -878,15 +879,15 @@ generic_disk_sense(
 	char			*disk_name)
 {
 	struct disk_type		*disk;
-	int				i;
 	int				setdefault = 0;
-	int				pcyl = 0;
-	int				ncyl = 0;
-	int				acyl = 0;
-	int				nhead = 0;
-	int				nsect = 0;
+	uint_t				pcyl = 0;
+	uint_t				ncyl = 0;
+	uint_t				acyl = 0;
+	uint_t				nhead = 0;
+	uint_t				nsect = 0;
 	int				rpm = 0;
-	long				nblocks = 0;
+	diskaddr_t			nblocks = 0;
+	diskaddr_t			tblocks = 0;
 	union {
 		struct mode_format	page3;
 		uchar_t			buf3[MAX_MODE_SENSE_SIZE];
@@ -899,19 +900,6 @@ generic_disk_sense(
 	struct mode_format		*page3 = &u_page3.page3;
 	struct mode_geometry		*page4 = &u_page4.page4;
 	struct scsi_ms_header		header;
-	/* refer cmlb_convert_geometry in cmlb.c */
-	static const struct chs_values {
-		uint_t max_cap;		/* Max Capacity for this HS. */
-		uint_t nhead;		/* Heads to use. */
-		uint_t nsect;		/* SPT to use. */
-	} CHS_values[] = {
-		{0x00200000,  64, 32},		/* 1GB or smaller disk. */
-		{0x01000000, 128, 32},		/* 8GB or smaller disk. */
-		{MAXBLKS(255,  63)},		/* 502.02GB or smaller disk. */
-		{MAXBLKS(255, 126)},		/* .98TB or smaller disk. */
-		{INFINITY, 255, 189}		/* Max size is just under 1TB */
-	};
-
 
 	/*
 	 * If the name of this disk appears to be "SUN", use it,
@@ -960,8 +948,13 @@ generic_disk_sense(
 	/*
 	 * Get the number of blocks from Read Capacity data. Note that
 	 * the logical block address range from 0 to capacity->sc_capacity.
+	 * Limit the size to 2 TB (UINT32_MAX) to use with SMI labels.
 	 */
-	nblocks = (long)(capacity->sc_capacity + 1);
+	tblocks = (capacity->sc_capacity + 1);
+	if (tblocks > UINT32_MAX)
+		nblocks = UINT32_MAX;
+	else
+		nblocks = tblocks;
 
 	/*
 	 * Get current Page 3 - Format Parameters page
@@ -1000,11 +993,21 @@ generic_disk_sense(
 		/*
 		 * Construct a new label out of the sense data,
 		 * Inquiry and Capacity.
+		 *
+		 * If the disk capacity is > 1TB then simply compute
+		 * the CHS values based on the total disk capacity and
+		 * not use the values from mode-sense data.
 		 */
-		pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) +
-		    page4->cyl_lb;
-		nhead = page4->heads;
-		nsect = page3->sect_track;
+		if (tblocks > INT32_MAX) {
+			compute_chs_values(tblocks, nblocks, &pcyl, &nhead,
+			    &nsect);
+		} else {
+			pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) +
+				page4->cyl_lb;
+			nhead = page4->heads;
+			nsect = page3->sect_track;
+		}
+
 		rpm = page4->rpm;
 
 		/*
@@ -1013,10 +1016,10 @@ generic_disk_sense(
 		 * we have atleast SUN_MIN_CYL cylinders.
 		 */
 		if (pcyl < SUN_MIN_CYL) {
-			if (nhead <= 0 || nsect <= 0) {
+			if (nhead == 0 || nsect == 0) {
 				setdefault = 1;
 			} else if (adjust_disk_geometry(
-			    (int)(capacity->sc_capacity + 1),
+			    (diskaddr_t)(capacity->sc_capacity + 1),
 			    &pcyl, &nhead, &nsect)) {
 				setdefault = 1;
 			}
@@ -1036,20 +1039,7 @@ generic_disk_sense(
 		    "capacity data.\n\n");
 
 		/* convert capacity to nsect * nhead * pcyl */
-		/* Unlabeled SCSI floppy device */
-		if (nblocks <= 0x1000) {
-			nhead = 2;
-			pcyl = 80;
-			nsect = nblocks / (nhead * pcyl);
-		} else {
-			for (i = 0; CHS_values[i].max_cap < nblocks &&
-			    CHS_values[i].max_cap != INFINITY; i++)
-				;
-
-			nhead = CHS_values[i].nhead;
-			nsect = CHS_values[i].nsect;
-			pcyl = nblocks / (nhead * nsect);
-		}
+		compute_chs_values(tblocks, nblocks, &pcyl, &nhead, &nsect);
 	}
 
 	/*
@@ -1061,17 +1051,18 @@ generic_disk_sense(
 
 	if (option_msg && diag_msg) {
 		err_print("Geometry:\n");
-		err_print("    pcyl:    %d\n", pcyl);
-		err_print("    ncyl:    %d\n", ncyl);
-		err_print("    heads:   %d\n", nhead);
-		err_print("    nsects:  %d\n", nsect);
-		err_print("    acyl:    %d\n", acyl);
+		err_print("    pcyl:    %u\n", pcyl);
+		err_print("    ncyl:    %u\n", ncyl);
+		err_print("    heads:   %u\n", nhead);
+		err_print("    nsects:  %u\n", nsect);
+		err_print("    acyl:    %u\n", acyl);
 
 #if defined(_SUNOS_VTOC_16)
-		err_print("    bcyl:    %d\n", bcyl);
+		err_print("    bcyl:    %u\n", bcyl);
 #endif			/* defined(_SUNOS_VTOC_16) */
 
 		err_print("    rpm:     %d\n", rpm);
+		err_print("    nblocks:     %llu\n", nblocks);
 	}
 
 	/*
@@ -1092,12 +1083,37 @@ generic_disk_sense(
 	 * chosen so that this change below does not generate a different
 	 * geometry for currently supported sun disks.
 	 */
-	if ((nsect <= 0) ||
-	    (pcyl * nhead * nsect) < (nblocks - nblocks/32) ||
-	    (pcyl * nhead * nsect) > (nblocks + nblocks/4)) {
-		err_print("Mode sense page(3) reports nsect value as %d, "
-		    "adjusting it to %ld\n", nsect, nblocks / (pcyl * nhead));
-		nsect = nblocks / (pcyl * nhead);
+	if ((nsect == 0) ||
+	    ((diskaddr_t)pcyl * nhead * nsect) < (nblocks - nblocks/32) ||
+	    ((diskaddr_t)pcyl * nhead * nsect) > (nblocks + nblocks/4)) {
+		if (nblocks > (pcyl * nhead)) {
+			err_print("Mode sense page(3) reports nsect value"
+			    " as %d, adjusting it to %llu\n",
+			    nsect, nblocks / (pcyl * nhead));
+			nsect = nblocks / (pcyl * nhead);
+		} else {
+			/* convert capacity to nsect * nhead * pcyl */
+			err_print("\nWARNING: Disk geometry is based on "
+			    "capacity data.\n\n");
+			compute_chs_values(tblocks, nblocks, &pcyl, &nhead,
+			    &nsect);
+			ncyl = pcyl - acyl;
+			if (option_msg && diag_msg) {
+				err_print("Geometry:(after adjustment)\n");
+				err_print("    pcyl:    %u\n", pcyl);
+				err_print("    ncyl:    %u\n", ncyl);
+				err_print("    heads:   %u\n", nhead);
+				err_print("    nsects:  %u\n", nsect);
+				err_print("    acyl:    %u\n", acyl);
+
+#if defined(_SUNOS_VTOC_16)
+				err_print("    bcyl:    %u\n", bcyl);
+#endif
+
+				err_print("    rpm:     %d\n", rpm);
+				err_print("    nblocks:     %llu\n", nblocks);
+			}
+		}
 	}
 
 	/*
@@ -1106,16 +1122,16 @@ generic_disk_sense(
 	 * geometry to allow for this, so we don't run off
 	 * the end of the disk.
 	 */
-	if ((pcyl * nhead * nsect) > nblocks) {
-		int	p = pcyl;
+	if (((diskaddr_t)pcyl * nhead * nsect) > nblocks) {
+		uint_t	p = pcyl;
 		if (option_msg && diag_msg) {
-			err_print("Computed capacity (%ld) exceeds actual "
-				"disk capacity (%ld)\n",
-				(long)(pcyl * nhead * nsect), nblocks);
+			err_print("Computed capacity (%llu) exceeds actual "
+			    "disk capacity (%llu)\n",
+			    (diskaddr_t)pcyl * nhead * nsect, nblocks);
 		}
 		do {
 			pcyl--;
-		} while ((pcyl * nhead * nsect) > nblocks);
+		} while (((diskaddr_t)pcyl * nhead * nsect) > nblocks);
 
 		if (can_prompt && expert_mode && !option_f) {
 			/*
@@ -1123,11 +1139,12 @@ generic_disk_sense(
 			 * can optimize. For compatability reasons do this
 			 * only in expert mode (refer to bug 1144812).
 			 */
-			int	n = nsect;
+			uint_t	n = nsect;
 			do {
 				n--;
-			} while ((p * nhead * n) > nblocks);
-			if ((p * nhead * n) > (pcyl * nhead * nsect)) {
+			} while (((diskaddr_t)p * nhead * n) > nblocks);
+			if (((diskaddr_t)p * nhead * n) >
+			    ((diskaddr_t)pcyl * nhead * nsect)) {
 				u_ioparam_t	ioparam;
 				int		deflt = 1;
 				/*
@@ -1135,14 +1152,14 @@ generic_disk_sense(
 				 */
 				ioparam.io_bounds.lower = 1;
 				ioparam.io_bounds.upper = 2;
-				err_print("1. Capacity = %d, with pcyl = %d "
-					"nhead = %d nsect = %d\n",
-					(pcyl * nhead * nsect),
-					pcyl, nhead, nsect);
-				err_print("2. Capacity = %d, with pcyl = %d "
-					"nhead = %d nsect = %d\n",
-					(p * nhead * n),
-					p, nhead, n);
+				err_print("1. Capacity = %llu, with pcyl = %u "
+				    "nhead = %u nsect = %u\n",
+				    ((diskaddr_t)pcyl * nhead * nsect),
+				    pcyl, nhead, nsect);
+				err_print("2. Capacity = %llu, with pcyl = %u "
+				    "nhead = %u nsect = %u\n",
+				    ((diskaddr_t)p * nhead * n),
+				    p, nhead, n);
 				if (input(FIO_INT, "Select one of the above "
 				    "choices ", ':', &ioparam,
 					&deflt, DATA_INPUT) == 2) {
@@ -1236,9 +1253,9 @@ generic_disk_sense(
 		if (option_msg && diag_msg &&
 		    (capacity->sc_capacity + 1 != nblocks)) {
 			err_print("After adjusting geometry you lost"
-				" %llu of %lld blocks.\n",
-				(capacity->sc_capacity + 1 - nblocks),
-				capacity->sc_capacity + 1);
+			    " %llu of %llu blocks.\n",
+			    (capacity->sc_capacity + 1 - nblocks),
+			    capacity->sc_capacity + 1);
 		}
 		while (can_prompt && expert_mode && !option_f) {
 			int				deflt = 1;
@@ -1247,11 +1264,11 @@ generic_disk_sense(
 			 * Allow user to modify this by hand if desired.
 			 */
 			(void) sprintf(msg,
-				"\nGeometry: %d heads, %d sectors %d "
-				" cylinders result in %d out of %lld blocks.\n"
-				"Do you want to modify the device geometry",
-				nhead, nsect, pcyl,
-				(int)nblocks, capacity->sc_capacity + 1);
+			    "\nGeometry: %u heads, %u sectors %u cylinders"
+			    " result in %llu out of %llu blocks.\n"
+			    "Do you want to modify the device geometry",
+			    nhead, nsect, pcyl,
+			    nblocks, capacity->sc_capacity + 1);
 
 			ioparam.io_charlist = confirm_list;
 			if (input(FIO_MSTR, msg, '?', &ioparam,
@@ -1261,22 +1278,22 @@ generic_disk_sense(
 			ioparam.io_bounds.lower = MINIMUM_NO_HEADS;
 			ioparam.io_bounds.upper = MAXIMUM_NO_HEADS;
 			nhead = input(FIO_INT, "Number of heads", ':',
-				&ioparam, &nhead, DATA_INPUT);
+			    &ioparam, (int *)&nhead, DATA_INPUT);
 			ioparam.io_bounds.lower = MINIMUM_NO_SECTORS;
 			ioparam.io_bounds.upper = MAXIMUM_NO_SECTORS;
 			nsect = input(FIO_INT,
-				"Number of sectors per track",
-				':', &ioparam, &nsect, DATA_INPUT);
+			    "Number of sectors per track",
+			    ':', &ioparam, (int *)&nsect, DATA_INPUT);
 			ioparam.io_bounds.lower = SUN_MIN_CYL;
 			ioparam.io_bounds.upper = MAXIMUM_NO_CYLINDERS;
 			pcyl = input(FIO_INT, "Number of cylinders",
-				':', &ioparam, &pcyl, DATA_INPUT);
-			nblocks = nhead * nsect * pcyl;
+			    ':', &ioparam, (int *)&pcyl, DATA_INPUT);
+			nblocks = (diskaddr_t)nhead * nsect * pcyl;
 			if (nblocks > capacity->sc_capacity + 1) {
-				err_print("Warning: %ld blocks exceeds "
-					"disk capacity of %lld blocks\n",
-					nblocks,
-					capacity->sc_capacity + 1);
+				err_print("Warning: %llu blocks exceeds "
+				    "disk capacity of %llu blocks\n",
+				    nblocks,
+				    capacity->sc_capacity + 1);
 			}
 		}
 	}
@@ -1286,11 +1303,11 @@ generic_disk_sense(
 
 	if (option_msg && diag_msg) {
 		err_print("\nGeometry after adjusting for capacity:\n");
-		err_print("    pcyl:    %d\n", pcyl);
-		err_print("    ncyl:    %d\n", ncyl);
-		err_print("    heads:   %d\n", nhead);
-		err_print("    nsects:  %d\n", nsect);
-		err_print("    acyl:    %d\n", acyl);
+		err_print("    pcyl:    %u\n", pcyl);
+		err_print("    ncyl:    %u\n", ncyl);
+		err_print("    heads:   %u\n", nhead);
+		err_print("    nsects:  %u\n", nsect);
+		err_print("    acyl:    %u\n", acyl);
 		err_print("    rpm:     %d\n", rpm);
 	}
 
@@ -1299,8 +1316,8 @@ generic_disk_sense(
 	label->dkl_magic = DKL_MAGIC;
 
 	(void) snprintf(label->dkl_asciilabel, sizeof (label->dkl_asciilabel),
-		"%s cyl %d alt %d hd %d sec %d",
-		disk_name, ncyl, acyl, nhead, nsect);
+	    "%s cyl %u alt %u hd %u sec %u",
+	    disk_name, ncyl, acyl, nhead, nsect);
 
 	label->dkl_pcyl = pcyl;
 	label->dkl_ncyl = ncyl;
@@ -1312,7 +1329,8 @@ generic_disk_sense(
 	label->dkl_rpm = rpm;
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
-	(void) auto_solaris_part(label);
+	if (auto_solaris_part(label) == -1)
+		goto err;
 	ncyl = label->dkl_ncyl;
 #endif		/* defined(_FIRMWARE_NEEDS_FDISK) */
 
@@ -1344,9 +1362,9 @@ generic_disk_sense(
 "Changing disk type name from '%s' to '%s'\n", old_name, disk_name);
 			}
 			(void) snprintf(label->dkl_asciilabel,
-				sizeof (label->dkl_asciilabel),
-				"%s cyl %d alt %d hd %d sec %d",
-				disk_name, ncyl, acyl, nhead, nsect);
+			    sizeof (label->dkl_asciilabel),
+			    "%s cyl %u alt %u hd %u sec %u",
+			    disk_name, ncyl, acyl, nhead, nsect);
 			(void) checksum(label, CK_MAKESUM);
 			disk = find_scsi_disk_type(disk_name, label);
 		}
@@ -1431,10 +1449,10 @@ use_existing_disk_type(
 
 	if (option_msg && diag_msg) {
 		err_print("Format.dat geometry:\n");
-		err_print("    pcyl:    %d\n", pcyl);
-		err_print("    heads:   %d\n", nhead);
-		err_print("    nsects:  %d\n", nsect);
-		err_print("    acyl:    %d\n", acyl);
+		err_print("    pcyl:    %u\n", pcyl);
+		err_print("    heads:   %u\n", nhead);
+		err_print("    nsects:  %u\n", nsect);
+		err_print("    acyl:    %u\n", acyl);
 		err_print("    rpm:     %d\n", rpm);
 	}
 
@@ -1443,9 +1461,9 @@ use_existing_disk_type(
 	label->dkl_magic = DKL_MAGIC;
 
 	(void) snprintf(label->dkl_asciilabel, sizeof (label->dkl_asciilabel),
-		"%s cyl %d alt %d hd %d sec %d",
-		disk_type->dtype_asciilabel,
-		ncyl, acyl, nhead, nsect);
+	    "%s cyl %u alt %u hd %u sec %u",
+	    disk_type->dtype_asciilabel,
+	    ncyl, acyl, nhead, nsect);
 
 	label->dkl_pcyl = pcyl;
 	label->dkl_ncyl = ncyl;
@@ -1478,12 +1496,12 @@ build_default_partition(
 {
 	int				i;
 	int				ncyls[NDKMAP];
-	int				nblks;
+	diskaddr_t			nblks;
 	int				cyl;
 	struct dk_vtoc			*vtoc;
 	struct part_table		*pt;
 	struct default_partitions	*dpt;
-	long				capacity;
+	diskaddr_t			capacity;
 	int				freecyls;
 	int				blks_per_cyl;
 	int				ncyl;
@@ -1509,8 +1527,8 @@ build_default_partition(
 	 * Find a partition that matches this disk.  Capacity
 	 * is in integral number of megabytes.
 	 */
-	capacity = (long)(label->dkl_ncyl * label->dkl_nhead *
-		label->dkl_nsect) / (long)((1024 * 1024) / DEV_BSIZE);
+	capacity = ((diskaddr_t)(label->dkl_ncyl) * label->dkl_nhead *
+	    label->dkl_nsect) / (1024 * 1024) / DEV_BSIZE;
 	dpt = default_partitions;
 	for (i = 0; i < DEFAULT_PARTITION_TABLE_SIZE; i++, dpt++) {
 		if (capacity >= dpt->min_capacity &&
@@ -1520,8 +1538,8 @@ build_default_partition(
 	}
 	if (i == DEFAULT_PARTITION_TABLE_SIZE) {
 		if (option_msg && diag_msg) {
-			err_print("No matching default partition (%ld)\n",
-				capacity);
+			err_print("No matching default partition (%llu)\n",
+			    capacity);
 		}
 		return (0);
 	}
@@ -1556,8 +1574,8 @@ build_default_partition(
 			for (i = 0; i < NDKMAP; i++) {
 				if (ncyls[i] == 0)
 					continue;
-				err_print("Partition %d: %d cyls\n",
-					i, ncyls[i]);
+				err_print("Partition %d: %u cyls\n",
+				    i, ncyls[i]);
 			}
 			err_print("Free cylinders exhausted (%d)\n",
 				freecyls);
@@ -1879,7 +1897,7 @@ new_scsi_disk_type(
 	 */
 	dp = ctlr->ctlr_ctype->ctype_dlist;
 	if (dp == NULL) {
-		ctlr->ctlr_ctype->ctype_dlist = dp;
+		ctlr->ctlr_ctype->ctype_dlist = disk;
 	} else {
 		while (dp->dtype_next != NULL) {
 			dp = dp->dtype_next;
@@ -1947,8 +1965,8 @@ new_scsi_disk_type(
 #elif defined(_SUNOS_VTOC_16)
 			part->pinfo_map[i].dkl_cylno =
 				label->dkl_vtoc.v_part[i].p_start /
-					((int)(disk->dtype_nhead *
-						disk->dtype_nsect - apc));
+				    ((blkaddr32_t)(disk->dtype_nhead *
+				    disk->dtype_nsect - apc));
 			part->pinfo_map[i].dkl_nblk =
 				label->dkl_vtoc.v_part[i].p_size;
 #else
@@ -2218,11 +2236,12 @@ strcopy(
  * cylinder )
  */
 int
-adjust_disk_geometry(int capacity, int *cyl, int *nhead, int *nsect)
+adjust_disk_geometry(diskaddr_t capacity, uint_t *cyl, uint_t *nhead,
+	uint_t *nsect)
 {
-	int	lcyl = *cyl;
-	int	lnhead = *nhead;
-	int	lnsect = *nsect;
+	uint_t	lcyl = *cyl;
+	uint_t	lnhead = *nhead;
+	uint_t	lnsect = *nsect;
 
 	assert(lcyl < SUN_MIN_CYL);
 
@@ -2272,14 +2291,14 @@ adjust_disk_geometry(int capacity, int *cyl, int *nhead, int *nsect)
  * values will be twiddled until they are all less than or
  * equal to their limit.  Returns the number in the new geometry.
  */
-static int
+static diskaddr_t
 square_box(
-		int capacity,
-		int *dim1, int lim1,
-		int *dim2, int lim2,
-		int *dim3, int lim3)
+		diskaddr_t capacity,
+		uint_t *dim1, uint_t lim1,
+		uint_t *dim2, uint_t lim2,
+		uint_t *dim3, uint_t lim3)
 {
-	int	i;
+	uint_t	i;
 
 	/*
 	 * Although the routine should work with any ordering of
@@ -2347,3 +2366,73 @@ square_box(
 	return (*dim1 * *dim2 * *dim3);
 }
 #endif /* defined(_SUNOS_VTOC_8) */
+
+/*
+ * Calculate CHS values based on the capacity data.
+ *
+ * NOTE: This function is same as cmlb_convert_geomerty() function in
+ * cmlb kernel module.
+ */
+static void
+compute_chs_values(diskaddr_t total_capacity, diskaddr_t usable_capacity,
+	uint_t *pcylp, uint_t *nheadp, uint_t *nsectp)
+{
+
+	/* Unlabeled SCSI floppy device */
+	if (total_capacity <= 0x1000) {
+		*nheadp = 2;
+		*pcylp = 80;
+		*nsectp = total_capacity / (80 * 2);
+		return;
+	}
+
+	/*
+	 * For all devices we calculate cylinders using the heads and sectors
+	 * we assign based on capacity of the device.  The algorithm is
+	 * designed to be compatible with the way other operating systems
+	 * lay out fdisk tables for X86 and to insure that the cylinders never
+	 * exceed 65535 to prevent problems with X86 ioctls that report
+	 * geometry.
+	 * For some smaller disk sizes we report geometry that matches those
+	 * used by X86 BIOS usage. For larger disks, we use SPT that are
+	 * multiples of 63, since other OSes that are not limited to 16-bits
+	 * for cylinders stop at 63 SPT we make do by using multiples of 63 SPT.
+	 *
+	 * The following table (in order) illustrates some end result
+	 * calculations:
+	 *
+	 * Maximum number of blocks 		nhead	nsect
+	 *
+	 * 2097152 (1GB)			64	32
+	 * 16777216 (8GB)			128	32
+	 * 1052819775 (502.02GB)		255  	63
+	 * 2105639550 (0.98TB)			255	126
+	 * 3158459325 (1.47TB)			255  	189
+	 * 4211279100 (1.96TB)			255  	252
+	 * 5264098875 (2.45TB)			255  	315
+	 * ...
+	 */
+
+	if (total_capacity <= 0x200000) {
+		*nheadp = 64;
+		*nsectp = 32;
+	} else if (total_capacity <= 0x01000000) {
+		*nheadp = 128;
+		*nsectp = 32;
+	} else {
+		*nheadp = 255;
+
+		/* make nsect be smallest multiple of 63 */
+		*nsectp = ((total_capacity +
+		    (UINT16_MAX * 255 * 63) - 1) /
+		    (UINT16_MAX * 255 * 63)) * 63;
+
+		if (*nsectp == 0)
+			*nsectp = (UINT16_MAX / 63) * 63;
+	}
+
+	if (usable_capacity < total_capacity)
+		*pcylp = usable_capacity / ((*nheadp) * (*nsectp));
+	else
+		*pcylp = total_capacity / ((*nheadp) * (*nsectp));
+}

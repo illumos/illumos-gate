@@ -21,10 +21,8 @@
 #
 # uts/intel/cmdk/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the cmdk driver
 #	kernel module.
@@ -64,6 +62,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/cmlb
+
+# Larger than 1TB VTOC support
+CPPFLAGS	+= -D_EXTVTOC
 
 #
 # For now, disable these lint checks; maintainers should endeavor

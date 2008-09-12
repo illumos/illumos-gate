@@ -27,14 +27,20 @@
 #ifndef	_PARAM_H
 #define	_PARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #ifndef UINT16_MAX
 #define	UINT16_MAX	0xffffU
+#endif
+
+#ifndef UINT32_MAX
+#define	UINT32_MAX	0xffffffffU
+#endif
+
+#ifndef INT32_MAX
+#define	INT32_MAX	0x7fffffff
 #endif
 
 /*
@@ -56,7 +62,7 @@ extern "C" {
 #define	AVG_BPS		600			/* default bytes/sector */
 #define	MAX_BPS		1000			/* max legal bytes/sector */
 
-#define	INFINITY	0x7fffffff		/* a big number */
+#define	INFINITY	0xffffffffU		/* a big number */
 
 #define	MAXBLKS(heads, spt)	UINT16_MAX * heads * spt, heads, spt
 #ifdef	__cplusplus

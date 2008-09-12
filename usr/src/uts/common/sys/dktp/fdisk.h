@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988 AT&T	*/
@@ -28,8 +29,6 @@
 
 #ifndef _SYS_DKTP_FDISK_H
 #define	_SYS_DKTP_FDISK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -70,8 +69,8 @@ struct ipart {
 	unsigned char endhead;	/* ending head, sector, cylinder */
 	unsigned char endsect;	/* endcyl is a 10-bit number.  High 2 bits */
 	unsigned char endcyl;	/*	are in endsect. */
-	int	relsect;	/* first sector relative to start of disk */
-	int	numsect;	/* number of sectors in partition */
+	uint32_t relsect;	/* first sector relative to start of disk */
+	uint32_t numsect;	/* number of sectors in partition */
 };
 /*
  * Values for bootid.

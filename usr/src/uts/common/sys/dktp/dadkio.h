@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DKTP_DADKIO_H
 #define	_SYS_DKTP_DADKIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -40,6 +38,18 @@ extern "C" {
 #define	DIOCTL_GETSERIAL	4	/* get serial number		*/
 #define	DIOCTL_RWCMD		5	/* read/write a disk		*/
 #define	DIOCTL_GETWCE		6	/* get write cache enabled state */
+
+#if !defined(BLKADDR_TYPE)
+#define	BLKADDR_TYPE
+#if defined(_EXTVTOC)
+typedef	unsigned long	blkaddr_t;
+typedef	unsigned int	blkaddr32_t;
+#else
+typedef	daddr_t		blkaddr_t;
+typedef	daddr32_t	blkaddr32_t;
+#endif
+#endif
+
 /*
  * arg structure for DIOCTL_GETMODEL and DIOCTL_GETSERIAL
  * On input to the ioctl, is_size contains the size of the buffer
@@ -158,7 +168,7 @@ struct dadkio_status {
 	int		status;
 	ulong_t		resid;
 	int		failed_blk_is_valid;
-	daddr_t		failed_blk;
+	blkaddr_t	failed_blk;
 	int		fru_code_is_valid;
 	int		fru_code;
 	char		add_error_info[DADKIO_ERROR_INFO_LEN];
@@ -169,7 +179,7 @@ struct dadkio_status32 {
 	int		status;
 	uint32_t	resid;
 	int		failed_blk_is_valid;
-	daddr32_t	failed_blk;
+	blkaddr32_t	failed_blk;
 	int		fru_code_is_valid;
 	int		fru_code;
 	char		add_error_info[DADKIO_ERROR_INFO_LEN];
@@ -182,7 +192,7 @@ struct dadkio_status32 {
 struct dadkio_rwcmd {
 	int			cmd;
 	int			flags;
-	daddr_t			blkaddr;
+	blkaddr_t		blkaddr;
 	uint_t			buflen;
 	caddr_t			bufaddr;
 	struct dadkio_status	status;
@@ -192,7 +202,7 @@ struct dadkio_rwcmd {
 struct dadkio_rwcmd32 {
 	int			cmd;
 	int			flags;
-	daddr32_t		blkaddr;
+	blkaddr32_t		blkaddr;
 	uint_t			buflen;
 	caddr32_t		bufaddr;
 	struct dadkio_status32	status;

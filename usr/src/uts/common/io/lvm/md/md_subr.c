@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver for Virtual Disk.
@@ -680,7 +679,7 @@ md_ioctl_lock_exit(int code, int flags, mdi_unit_t *ui, int ioctl_end)
 		 * replica.
 		 */
 		mddb_parse_msg = kmem_zalloc(sizeof (md_mn_msg_mddb_parse_t),
-			KM_SLEEP);
+		    KM_SLEEP);
 		while (((s->s_mn_parseflags_sending & MDDB_PARSE_MASK) == 0) &&
 		    (s->s_mn_parseflags & MDDB_PARSE_MASK) &&
 		    (!(status & MD_SET_MNPARSE_BLK))) {
@@ -700,14 +699,14 @@ md_ioctl_lock_exit(int code, int flags, mdi_unit_t *ui, int ioctl_end)
 			 * replica.
 			 */
 			mddb_parse_msg->msg_parse_flags =
-				s->s_mn_parseflags_sending;
+			    s->s_mn_parseflags_sending;
 
 			for (i = 0; i < MDDB_NLB; i++) {
 				mddb_parse_msg->msg_lb_flags[i] =
-					lbp->lb_locators[i].l_flags;
+				    lbp->lb_locators[i].l_flags;
 			}
 			kresult = kmem_zalloc(sizeof (md_mn_kresult_t),
-				KM_SLEEP);
+			    KM_SLEEP);
 			while (rval != 0) {
 				flag = 0;
 				if (status & MD_SET_STALE)
@@ -719,7 +718,7 @@ md_ioctl_lock_exit(int code, int flags, mdi_unit_t *ui, int ioctl_end)
 				/* if the node hasn't yet joined, it's Ok. */
 				if ((!MDMN_KSEND_MSG_OK(rval, kresult)) &&
 				    (kresult->kmmr_comm_state !=
-							MDMNE_NOT_JOINED)) {
+				    MDMNE_NOT_JOINED)) {
 					mdmn_ksend_show_error(rval, kresult,
 					    "MD_MN_MSG_MDDB_PARSE");
 					cmn_err(CE_WARN, "md_ioctl_lock_exit: "
@@ -847,7 +846,8 @@ md_ioctl_reacquirelocks(int flags, mdi_unit_t *ui)
 		md_mtioctl_cnt++;
 		mutex_exit(&md_mx);
 	} else {
-		while (md_ioctl_lock_enter() == EINTR);
+		while (md_ioctl_lock_enter() == EINTR)
+			;
 	}
 	if (flags & MD_ARRAY_WRITER) {
 		rw_enter(&md_unit_array_rw.lock, RW_WRITER);
@@ -1333,12 +1333,12 @@ callb_md_cpr(void *arg, int code)
 		 */
 		mutex_enter(&md_cpr_resync.md_resync_mutex);
 		if ((md_cpr_resync.md_mirror_resync > 0) ||
-				(md_cpr_resync.md_raid_resync > 0)) {
+		    (md_cpr_resync.md_raid_resync > 0)) {
 			mutex_exit(&md_cpr_resync.md_resync_mutex);
 			cmn_err(CE_WARN, "There are Solaris Volume Manager "
 			    "synchronization threads running.");
 			cmn_err(CE_WARN, "Please try system suspension at "
-							"a later time.");
+			    "a later time.");
 			ret = -1;
 			break;
 		}
@@ -1348,7 +1348,7 @@ callb_md_cpr(void *arg, int code)
 		while (!(cp->cc_events & CALLB_CPR_SAFE))
 			/* cv_timedwait() returns -1 if it times out. */
 			if ((ret = cv_timedwait(&cp->cc_callb_cv, cp->cc_lockp,
-				lbolt + CPR_KTHREAD_TIMEOUT_SEC * hz)) == -1)
+			    lbolt + CPR_KTHREAD_TIMEOUT_SEC * hz)) == -1)
 				break;
 			break;
 
@@ -1454,7 +1454,7 @@ daemon_request(mdq_anchor_t *anchor, void (*func)(),
 	anchor->dq.qlen += i;
 	anchor->dq.treqs += i;
 	anchor->dq.maxq_len = (anchor->dq.qlen > anchor->dq.maxq_len) ?
-					anchor->dq.qlen : anchor->dq.maxq_len;
+	    anchor->dq.qlen : anchor->dq.maxq_len;
 
 	/* now add the list to request queue */
 	request->dq_prev = anchor->dq.dq_prev;
@@ -1850,7 +1850,7 @@ md_halt(int global_locks_owned_mask)
 		}
 
 		/* uninitialize */
-		name = ops->md_driver.md_drivername,
+		name = ops->md_driver.md_drivername;
 		md_ops[i] = NULL;
 		md_mods[i] = NULL;
 		ops->md_selfindex = 0;
@@ -1874,7 +1874,7 @@ md_halt(int global_locks_owned_mask)
 		md_haltsnarf_exit(i);
 
 	return (md_global_lock_exit(global_locks_owned_mask, 0,
-		MD_ARRAY_WRITER, NULL));
+	    MD_ARRAY_WRITER, NULL));
 }
 
 /*
@@ -1913,7 +1913,7 @@ md_layered_open(
 		ui = MDI_UNIT(mnum);
 		if (md_ops[ui->ui_opsindex]->md_open != NULL) {
 			int ret = (*md_ops[ui->ui_opsindex]->md_open)(&ddi_dev,
-					flag, OTYP_LYR, cred_p, md_oflags);
+			    flag, OTYP_LYR, cred_p, md_oflags);
 			/*
 			 * As open() may change the device,
 			 * send this info back to the caller.
@@ -2033,7 +2033,7 @@ md_checkbuf(mdi_unit_t *ui, md_unit_t *un, buf_t *bp)
 
 	bp->b_resid = 0;
 	endblk = (diskaddr_t)(bp->b_lblkno +
-			howmany(bp->b_bcount, DEV_BSIZE) - 1);
+	    howmany(bp->b_bcount, DEV_BSIZE) - 1);
 
 	if (endblk > (un->c.un_total_blocks - 1)) {
 		bp->b_resid = dbtob(endblk - (un->c.un_total_blocks - 1));
@@ -2117,7 +2117,7 @@ md_start_daemons(int init_queue)
 	i = 0;
 	while (!NULL_REQUESTQ_ENTRY(rqp)) {
 		cnt = init_requestq(rqp, start_daemon,
-			(caddr_t)rqp->dispq_headp, minclsyspri, init_queue);
+		    (caddr_t)rqp->dispq_headp, minclsyspri, init_queue);
 
 		if (cnt && cnt != *rqp->num_threadsp) {
 			retval = 1;
@@ -2977,7 +2977,7 @@ md_shortname(
 		/* This is a traditional metadevice */
 		if (setno == MD_LOCAL_SET) {
 			(void) snprintf(buf, sizeof (buf), "d%u",
-				(unsigned)unit);
+			    (unsigned)unit);
 		} else {
 			(void) snprintf(buf, sizeof (buf), "%s/d%u",
 			    mddb_getsetname(setno), (unsigned)unit);
@@ -2991,7 +2991,7 @@ md_shortname(
 	side = mddb_getsidenum(setno);
 	devname = (char *)kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	if (md_getdevname(setno, side, MD_KEYWILD,
-		md_makedevice(md_major, mnum), devname, MAXPATHLEN) == 0) {
+	    md_makedevice(md_major, mnum), devname, MAXPATHLEN) == 0) {
 		/*
 		 * md_getdevname has given us either /dev/md/dsk/<metaname>
 		 * or /dev/md/<setname>/dsk/<metname> depending on whether
@@ -3009,7 +3009,7 @@ md_shortname(
 		} else {
 			/* Include setname */
 			(void) snprintf(buf, sizeof (buf), "%s/%s",
-				mddb_getsetname(setno), metaname);
+			    mddb_getsetname(setno), metaname);
 		}
 	} else {
 		/* We couldn't find the name. */
@@ -3040,7 +3040,7 @@ md_devname(
 	}
 
 	err = md_getdevname_common(setno, mddb_getsidenum(setno),
-		0, dev, buf, size, MD_NOWAIT_LOCK);
+	    0, dev, buf, size, MD_NOWAIT_LOCK);
 	if (err) {
 		if (err == ENOENT) {
 			(void) sprintf(buf, "(Unavailable)");
@@ -3343,7 +3343,7 @@ md_init_probereq(struct md_probedev_impl *p, daemon_queue_t **hdrpp)
 
 	modindx = md_getmodindex(&(p->probe.md_driver), 1, 1);
 	probe_test = md_get_named_service(NODEV64, modindx,
-		p->probe.test_name, 0);
+	    p->probe.test_name, 0);
 	if (probe_test == NULL) {
 		err = EINVAL;
 		goto err_out;
@@ -3380,7 +3380,8 @@ md_probe_one(probe_req_t *reqp)
 	 * on the metadevice because metaclear takes the readerlock (via
 	 * openclose lock).
 	 */
-	while (md_ioctl_lock_enter() == EINTR);
+	while (md_ioctl_lock_enter() == EINTR)
+		;
 	ui = MDI_UNIT(reqp->mnum);
 	if (ui != NULL) {
 		(void) md_unit_writerlock_common(ui, 0);
@@ -3396,7 +3397,7 @@ md_probe_one(probe_req_t *reqp)
 	mutex_enter(PROBE_MX(p));
 	if (err != 0) {
 		cmn_err(CE_NOTE, "md_probe_one: err %d mnum %d\n", err,
-			reqp->mnum);
+		    reqp->mnum);
 		(void) mdsyserror(&(p->probe.mde), err);
 	}
 
@@ -3748,7 +3749,7 @@ md_getminor(md_dev64_t dev)
 }
 
 int
-md_check_ioctl_against_efi(int cmd, ushort_t flags)
+md_check_ioctl_against_unit(int cmd, mdc_unit_t c)
 {
 	/*
 	 * If the metadevice is an old style device, it has a vtoc,
@@ -3758,15 +3759,32 @@ md_check_ioctl_against_efi(int cmd, ushort_t flags)
 	 */
 	switch (cmd) {
 		case DKIOCGGEOM:
-		case DKIOCGVTOC:
 		case DKIOCGAPART:
-			if ((flags & MD_EFILABEL) != 0) {
+			/* if > 2 TB then fail */
+			if (c.un_total_blocks > MD_MAX_BLKS_FOR_EXTVTOC) {
+				return (ENOTSUP);
+			}
+			break;
+		case DKIOCGVTOC:
+			/* if > 2 TB then fail */
+			if (c.un_total_blocks > MD_MAX_BLKS_FOR_EXTVTOC) {
+				return (ENOTSUP);
+			}
+
+			/* if > 1 TB but < 2TB return overflow */
+			if (c.un_revision & MD_64BIT_META_DEV) {
+				return (EOVERFLOW);
+			}
+			break;
+		case DKIOCGEXTVTOC:
+			/* if > 2 TB then fail */
+			if (c.un_total_blocks > MD_MAX_BLKS_FOR_EXTVTOC) {
 				return (ENOTSUP);
 			}
 			break;
 		case DKIOCGETEFI:
 		case DKIOCPARTITION:
-			if ((flags & MD_EFILABEL) == 0) {
+			if ((c.un_flag & MD_EFILABEL) == 0) {
 				return (ENOTSUP);
 			}
 			break;
@@ -3776,11 +3794,21 @@ md_check_ioctl_against_efi(int cmd, ushort_t flags)
 			return (0);
 
 		case DKIOCSVTOC:
-		/*
-		 * This one is ok for small devices, even if they have an EFI
-		 * label. The appropriate check is in md_set_vtoc
-		 */
-			return (0);
+			/* if > 2 TB then fail */
+			if (c.un_total_blocks > MD_MAX_BLKS_FOR_EXTVTOC) {
+				return (ENOTSUP);
+			}
+
+			/* if > 1 TB but < 2TB return overflow */
+			if (c.un_revision & MD_64BIT_META_DEV) {
+				return (EOVERFLOW);
+			}
+			break;
+		case DKIOCSEXTVTOC:
+			if (c.un_total_blocks > MD_MAX_BLKS_FOR_EXTVTOC) {
+				return (ENOTSUP);
+			}
+			break;
 	}
 	return (0);
 }
@@ -3818,7 +3846,7 @@ md_vtoc_to_efi_record(mddb_recid_t vtoc_recid, set_t setno)
 	}
 	vtoc = (struct vtoc *)mddb_getrecaddr(vtoc_recid);
 	efi_recid = mddb_createrec(MD_EFI_PARTNAME_BYTES, MDDB_EFILABEL, 0,
-					MD_CRO_32BIT, setno);
+	    MD_CRO_32BIT, setno);
 	if (efi_recid < 0) {
 		return (0);
 	}
@@ -3867,13 +3895,9 @@ mdmn_ksend_message(
 
 #ifdef DEBUG_COMM
 	printf("send msg: set=%d, flags=%d, type=%d, txid = 0x%llx,"
-		" size=%d, data=%d, data2=%d\n",
-			kmsg->kmsg_setno,
-			kmsg->kmsg_flags,
-			kmsg->kmsg_type,
-			kmsg->kmsg_size,
-			*(int *)data,
-			*(int *)(char *)(&kmsg->kmsg_data));
+	    " size=%d, data=%d, data2=%d\n",
+	    kmsg->kmsg_setno, kmsg->kmsg_flags, kmsg->kmsg_type,
+	    kmsg->kmsg_size, *(int *)data, *(int *)(char *)(&kmsg->kmsg_data));
 
 
 #endif /* DEBUG_COMM */
@@ -3907,7 +3931,7 @@ mdmn_ksend_message(
 			}
 		} else {
 			cmn_err(CE_WARN,
-				"md door call failed. Returned %d", rval);
+			    "md door call failed. Returned %d", rval);
 		}
 		delay(md_hz);
 	}
@@ -4097,7 +4121,7 @@ callb_md_mrs_cpr(void *arg, int code)
 		while (!(cp->cc_events & CALLB_CPR_SAFE))
 			/* cv_timedwait() returns -1 if it times out. */
 			if ((ret = cv_timedwait(&cp->cc_callb_cv, cp->cc_lockp,
-				lbolt + CPR_KTHREAD_TIMEOUT_SEC * hz)) == -1)
+			    lbolt + CPR_KTHREAD_TIMEOUT_SEC * hz)) == -1)
 				break;
 			break;
 
@@ -4149,7 +4173,7 @@ md_rem_selfname(minor_t selfid)
 	}
 
 	if ((n = (struct nm_name *)lookup_entry(nh, setno, MD_SIDEWILD,
-		MD_KEYWILD, dev, 0L)) == NULL) {
+	    MD_KEYWILD, dev, 0L)) == NULL) {
 		return (ENOENT);
 	}
 

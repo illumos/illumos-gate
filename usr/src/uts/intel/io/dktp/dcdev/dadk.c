@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Direct Attached Disk
  */
@@ -1388,7 +1386,7 @@ static struct dadkio_derr dadk_errtab[] = {
 static int
 dadk_chkerr(struct cmpkt *pktp)
 {
-	int err_blkno;
+	daddr_t err_blkno;
 	struct dadk *dadkp = PKT2DADK(pktp);
 	dadk_errstats_t *dep;
 	int scb = *(char *)pktp->cp_scbp;

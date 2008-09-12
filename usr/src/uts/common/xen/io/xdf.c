@@ -1137,6 +1137,9 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case DKIOCGVTOC:
 	case DKIOCSVTOC:
 	case DKIOCPARTINFO:
+	case DKIOCGEXTVTOC:
+	case DKIOCSEXTVTOC:
+	case DKIOCEXTPARTINFO:
 	case DKIOCGMBOOT:
 	case DKIOCSMBOOT:
 	case DKIOCGETEFI:
@@ -1881,6 +1884,18 @@ xdf_post_connect(xdf_t *vdp)
 		xvdi_fatal_error(devi, rv, "reading backend info");
 		return (DDI_FAILURE);
 	}
+
+#ifdef _ILP32
+	if (vdp->xdf_xdev_nblocks > DK_MAX_BLOCKS) {
+		cmn_err(CE_WARN, "xdf_post_connect: xdf@%s: "
+		    "backend disk device too large with %llu blocks for"
+		    " 32-bit kernel", ddi_get_name_addr(devi),
+		    vdp->xdf_xdev_nblocks);
+		xvdi_fatal_error(devi, rv, "reading backend info");
+		return (DDI_FAILURE);
+	}
+#endif
+
 
 	/*
 	 * Only update the physical geometry to reflect the new device

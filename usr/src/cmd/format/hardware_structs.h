@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_HARDWARE_STRUCTS_H
 #define	_HARDWARE_STRUCTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -81,19 +78,19 @@ struct disk_type {
 	ulong_t	dtype_options;			/* flags for options */
 	uint_t	dtype_fmt_time;			/* format time */
 	uint_t	dtype_bpt;			/* # bytes per track */
-	int	dtype_ncyl;			/* # of data cylinders */
-	int	dtype_acyl;			/* # of alternate cylinders */
-	int	dtype_pcyl;			/* # of physical cylinders */
-	int	dtype_nhead;			/* # of heads */
-	int	dtype_phead;			/* # of physical heads */
-	int	dtype_nsect;			/* # of data sectors/track */
-	int	dtype_psect;			/* # physical sectors/track */
-	int	dtype_rpm;			/* rotations per minute */
+	uint_t	dtype_ncyl;			/* # of data cylinders */
+	uint_t	dtype_acyl;			/* # of alternate cylinders */
+	uint_t	dtype_pcyl;			/* # of physical cylinders */
+	uint_t	dtype_nhead;			/* # of heads */
+	uint_t	dtype_phead;			/* # of physical heads */
+	uint_t	dtype_nsect;			/* # of data sectors/track */
+	uint_t	dtype_psect;			/* # physical sectors/track */
+	uint_t	dtype_rpm;			/* rotations per minute */
 	int	dtype_cyl_skew;			/* cylinder skew */
 	int	dtype_trk_skew;			/* track skew */
-	int	dtype_trks_zone;		/* # tracks per zone */
-	int	dtype_atrks;			/* # alt. tracks  */
-	int	dtype_asect;			/* # alt. sectors */
+	uint_t	dtype_trks_zone;		/* # tracks per zone */
+	uint_t	dtype_atrks;			/* # alt. tracks  */
+	uint_t	dtype_asect;			/* # alt. sectors */
 	int	dtype_cache;			/* cache control */
 	int	dtype_threshold;		/* cache prefetch threshold */
 	int	dtype_read_retries;		/* read retries */

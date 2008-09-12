@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions that implement the fdisk menu commands.
@@ -335,15 +333,6 @@ c_fdisk()
 	}
 
 	/*
-	 * If disk is larger than 1TB then an EFI label is required
-	 * and there is no point in running fdisk
-	 */
-	if (cur_dtype->capacity > INFINITY) {
-		err_print("This disk must use an EFI label.\n");
-		return (-1);
-	}
-
-	/*
 	 * Before running the fdisk command, get file status of
 	 *	/dev/rdsk/cn[tn]dnp0 path to see if this disk
 	 *	supports fixed disk partition table.
@@ -494,7 +483,7 @@ get_solaris_part(int fd, struct ipart *ipart)
 			}
 #endif /* DEBUG */
 
-			solaris_offset = lel(ip.relsect);
+			solaris_offset = (uint_t)lel(ip.relsect);
 			break;
 		}
 	}
@@ -515,13 +504,20 @@ get_solaris_part(int fd, struct ipart *ipart)
 
 	/* if the disk partitioning has changed - get the VTOC */
 	if (status) {
-		status = ioctl(fd, DKIOCGVTOC, &cur_parts->vtoc);
+		struct extvtoc exvtoc;
+		struct vtoc vtoc;
+
+		status = ioctl(fd, DKIOCGEXTVTOC, &exvtoc);
 		if (status == -1) {
 			i = errno;
-			err_print("Bad ioctl DKIOCGVTOC.\n");
-			err_print("errno=%d %s\n", i, strerror(i));
-			err_print("Cannot read vtoc information.\n");
-			return (-1);
+			/* Try the old ioctl DKIOCGVTOC */
+			status = ioctl(fd, DKIOCGVTOC, &vtoc);
+			if (status == -1) {
+				err_print("Bad ioctl DKIOCGEXTVTOC.\n");
+				err_print("errno=%d %s\n", i, strerror(i));
+				err_print("Cannot read vtoc information.\n");
+				return (-1);
+			}
 		}
 
 		status = read_label(fd, &update_label);
@@ -529,6 +525,9 @@ get_solaris_part(int fd, struct ipart *ipart)
 			err_print("Cannot read label information.\n");
 			return (-1);
 		}
+
+		/* copy vtoc information */
+		cur_parts->vtoc = update_label.dkl_vtoc;
 
 #if defined(_SUNOS_VTOC_16)
 		/*

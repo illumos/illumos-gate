@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the code to perform program startup.  This
@@ -80,7 +78,7 @@ static void	check_dtypes_for_inconsistency(struct disk_type *dp1,
 		struct disk_type *dp2);
 static void	check_pinfo_for_inconsistency(struct partition_info *pp1,
 		struct partition_info *pp2);
-static int	str2blks(char *str);
+static uint_t	str2blks(char *str);
 static int	str2cyls(char *str);
 static struct	chg_list *new_chg_list(struct disk_type *);
 static char	*get_physical_name(char *);
@@ -106,7 +104,7 @@ static void	search_duplicate_dtypes();
 static void	search_duplicate_pinfo();
 static void	check_dtypes_for_inconsistency();
 static void	check_pinfo_for_inconsistency();
-static int	str2blks();
+static uint_t	str2blks();
 static int	str2cyls();
 static struct	chg_list *new_chg_list();
 static char	*get_physical_name();
@@ -943,7 +941,8 @@ sup_setpart()
 	struct	ctlr_type *ctype = NULL;
 	struct	partition_info *pinfo, *parts;
 	char	*pinfo_name;
-	int	i, index, status, val1, val2, flags = 0;
+	int	i, index, status, flags = 0;
+	uint_t	val1, val2;
 	ushort_t	vtoc_tag;
 	ushort_t	vtoc_flag;
 	struct	mctlr_list	*mlp;
@@ -1207,7 +1206,7 @@ sup_setpart()
 		 * is the starting cylinder number of the partition.
 		 */
 		val1 = str2cyls(cleaned);
-		if (val1 == -1) {
+		if (val1 == (uint_t)(-1)) {
 			datafile_error("Expecting an integer, found '%s'",
 			    cleaned);
 			return;
@@ -1237,7 +1236,7 @@ sup_setpart()
 		 * they choose to be so specific.
 		 */
 		val2 = str2blks(cleaned);
-		if (val2 == -1) {
+		if (val2 == (uint_t)(-1)) {
 			datafile_error("Expecting an integer, found '%s'",
 			    cleaned);
 			return;
@@ -1454,7 +1453,7 @@ do_search(char *arglist[])
 	i = 0;
 	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
 		float			scaled;
-		long			nblks;
+		diskaddr_t		nblks;
 		struct disk_type	*type;
 		if (disk->disk_flags & DSK_AUTO_CONFIG) {
 			if (i++ == 0) {
@@ -1709,7 +1708,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	 * generic check for reserved disks here, including intel disks.
 	 */
 	if (dkinfo.dki_ctype == DKC_SCSI_CCS) {
-		i = scsi_rdwr(DIR_READ, search_file, (daddr_t)0,
+		i = scsi_rdwr(DIR_READ, search_file, (diskaddr_t)0,
 		    1, (char *)&search_label, F_SILENT, NULL);
 		switch (i) {
 		case DSK_RESERVED:
@@ -1860,7 +1859,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	/*
 	 * If reading the label failed, and this is a SCSI
 	 * disk, we can attempt to auto-sense the disk
-	 * configuration.
+	 * Configuration.
 	 */
 	ctlr = search_ctlr->ctlr_ctype;
 	if ((status == -1) && (ctlr->ctype_ctype == DKC_SCSI_CCS)) {
@@ -2087,7 +2086,7 @@ add_device_to_disklist(char *devname, char *devpath)
 #elif defined(_SUNOS_VTOC_16)
 			search_parts->pinfo_map[i].dkl_cylno =
 			    search_label.dkl_vtoc.v_part[i].p_start /
-			    ((int)(search_label.dkl_nhead *
+			    ((blkaddr32_t)(search_label.dkl_nhead *
 			    search_label.dkl_nsect));
 			search_parts->pinfo_map[i].dkl_nblk =
 			    search_label.dkl_vtoc.v_part[i].p_size;
@@ -2540,7 +2539,7 @@ check_pinfo_for_inconsistency(pp1, pp2)
  *
  * Returns -1 in the case of an error.
  */
-static int
+static uint_t
 str2blks(char *str)
 {
 	int	blks;
@@ -2591,7 +2590,7 @@ str2cyls(char *str)
 	 */
 	if (*p != 0) {
 		/*
-		 * Units specifier of 'c': convert cylinders to blocks
+		 * Units specifier of 'c': accept it.
 		 */
 		if (*p == 'c') {
 			p++;

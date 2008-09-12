@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <libdevinfo.h>
@@ -401,7 +400,7 @@ get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs)
 	int		data_format = FMT_UNKNOWN;
 	int		snum = -1;
 	int		error;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	struct dk_gpt	*efip;
 	struct dk_cinfo	dkinfo;
 	disk_t		*diskp;
@@ -419,7 +418,7 @@ get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs)
 	    return (ENODEV);
 	}
 
-	if ((status = read_vtoc(fd, &vtoc)) >= 0) {
+	if ((status = read_extvtoc(fd, &vtoc)) >= 0) {
 	    data_format = FMT_VTOC;
 	} else if (status == VT_ENOTSUP && efi_alloc_and_read(fd, &efip) >= 0) {
 	    data_format = FMT_EFI;
@@ -620,7 +619,7 @@ get_fixed_assocs(descriptor_t *desc, int *errp)
 	int		status;
 	int		data_format = FMT_UNKNOWN;
 	int		cnt;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	struct dk_gpt	*efip;
 	int		pos;
 	char		*media_name = NULL;
@@ -632,7 +631,7 @@ get_fixed_assocs(descriptor_t *desc, int *errp)
 	    return (NULL);
 	}
 
-	if ((status = read_vtoc(fd, &vtoc)) >= 0) {
+	if ((status = read_extvtoc(fd, &vtoc)) >= 0) {
 	    data_format = FMT_VTOC;
 	} else if (status == VT_ENOTSUP && efi_alloc_and_read(fd, &efip) >= 0) {
 	    data_format = FMT_EFI;
@@ -739,7 +738,7 @@ make_fixed_descriptors(disk_t *dp)
 	slice_t		*devp;
 	char		mname[MAXPATHLEN];
 	int		data_format = FMT_UNKNOWN;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	struct dk_gpt	*efip;
 
 	/* Just check the first drive name. */
@@ -765,7 +764,7 @@ make_fixed_descriptors(disk_t *dp)
 		int	status;
 
 		if ((fd = drive_open_disk(dp, NULL, 0)) >= 0) {
-		    if ((status = read_vtoc(fd, &vtoc)) >= 0) {
+		    if ((status = read_extvtoc(fd, &vtoc)) >= 0) {
 			data_format = FMT_VTOC;
 		    } else if (status == VT_ENOTSUP &&
 			efi_alloc_and_read(fd, &efip) >= 0) {
@@ -819,7 +818,7 @@ match_fixed_name(disk_t *diskp, char *name, int *errp)
 	int		fd;
 	int		status;
 	int		data_format = FMT_UNKNOWN;
-	struct vtoc	vtoc;
+	struct extvtoc	vtoc;
 	struct dk_gpt	*efip;
 
 	ap = diskp->aliases;
@@ -869,7 +868,7 @@ match_fixed_name(disk_t *diskp, char *name, int *errp)
 	    return (1);
 	}
 
-	if ((status = read_vtoc(fd, &vtoc)) >= 0) {
+	if ((status = read_extvtoc(fd, &vtoc)) >= 0) {
 	    data_format = FMT_VTOC;
 	} else if (status == VT_ENOTSUP && efi_alloc_and_read(fd, &efip) >= 0) {
 	    data_format = FMT_EFI;

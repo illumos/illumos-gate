@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <ctype.h>
@@ -643,14 +641,14 @@ seek_partn(int fd, char *pn, bpb_t *wbpb, off64_t *seekto)
 	struct ipart part[FD_NUMPART];
 	struct mboot extmboot;
 	struct mboot mb;
-	daddr_t xstartsect;
+	diskaddr_t xstartsect;
 	off64_t nextseek = 0;
 	off64_t lastseek = 0;
 	int logicalDriveCount = 0;
 	int extendedPart = -1;
 	int primaryPart = -1;
 	int bootPart = -1;
-	int xnumsect = -1;
+	uint32_t xnumsect = 0;
 	int drvnum;
 	int driveIndex;
 	int i;
