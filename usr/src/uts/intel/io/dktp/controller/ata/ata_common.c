@@ -3507,7 +3507,7 @@ ata_resume_drive(ata_drv_t *ata_drvp)
 		if (!ata_disk_setup_parms(ata_ctlp, ata_drvp))
 			return;
 	} else {
-		atapi_init_drive(ata_drvp);
+		(void) atapi_init_drive(ata_drvp);
 	}
 	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
 
