@@ -53,8 +53,13 @@ extern "C" {
 #define	SMF_FPS_PROP_GRP_NAME "config"
 #define	SMF_PROP_EXCLD_CPUS	"exclude_cpus"
 
-#define	FPS_LOWTST_SWAP  4   /* Low stress consumes 4 MB */
-#define	FPS_SWAP_RESERVE 25  /* Leave atleast 25 MB in the system */
+/*
+ * RSS of fptest is about 10M and size = 15M; Keeping 185M in reserve,
+ * which is chosen aribitrarily that didn't cause test fork failure,
+ * nor a memory crunch in the system. So total swap space needed = 200M.
+ */
+#define	FPS_LOWTST_SWAP  15   /* Low stress consumes 15 MB */
+#define	FPS_SWAP_RESERVE 185	/* Leave atleast 185 MB in the system */
 
 /* (in secs) Delay test on low config m/c for 5min during bootup */
 #define	FPS_BOOT_TST_DELAY (3*60)

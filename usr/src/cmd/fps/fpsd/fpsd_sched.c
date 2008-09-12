@@ -69,13 +69,6 @@ static int identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index);
 
 void  *test_fpu_thr(void *arg);
 
-#define	CPU_TST_FORK_FAIL	{\
-	error = errno;							\
-	fpsd_message(FPSD_NO_EXIT, FPS_WARNING, FORK_FAIL_MSG,	\
-		testpath, strerror(error)); \
-	return (-1);							\
-	}
-
 #define	CPU_TST_EXEC_FAIL	{		\
 	error = errno;							\
 	fpsd_message(FPSD_EXIT_ERROR,\
@@ -110,11 +103,13 @@ check_if_disabled(int fpu_index) {
 }
 
 /*
- * Forks and executes "fptest" and waits for an amount
- * of time equal to the time to schedule next "fptest".
- * Times out if the test does not complete and unbinds
- * and terminates the test.
- * Return : 0 = Nothing Invoked. 1 = invoked OK. -1 = Failure.
+ * Forks and executes "fptest" and waits for an amount of time equal to
+ * the time to schedule next "fptest". Times out if the test does not
+ * complete and unbinds and terminates the test.
+ * Return = 1 implies fptest could be invoked successfully but a non-zero
+ * status would be dealt with by setting the reprobe flag.
+ * Return = -1 implies fptest could not be successfully invoked or test
+ * exited with non-zero exit status that requires the scheduler to retry.
  */
 static int
 check_invoke_prog(int   devid,		/* cpu-id */
@@ -132,7 +127,7 @@ check_invoke_prog(int   devid,		/* cpu-id */
 	char cpuid_c[64];
 	char frequency_c[10];
 	char group_c[10];
-	int ret = 0;
+	int ret = -1;
 	int status = 0;
 	char *testpath;
 	char sig_str[32];
@@ -143,7 +138,7 @@ check_invoke_prog(int   devid,		/* cpu-id */
 
 	testpath = fpsd.d_conf->m_cpus[fpu_index].fptest_path;
 	if (check_if_disabled(fpu_index)) {
-		return (0);
+		return (ret);
 	}
 
 	/* Compare all in seconds.  */
@@ -154,7 +149,7 @@ check_invoke_prog(int   devid,		/* cpu-id */
 	(void) snprintf(frequency_c, sizeof (frequency_c), "%d", frequency);
 	(void) snprintf(group_c, sizeof (group_c), "%d", group_no);
 
-	/* Check if enough swap space is there; Return 0 if not. */
+	/* Check if enough swap space is there; Return -1 if not. */
 
 	if (get_free_swap() < (uint64_t)(tstswap+FPS_SWAP_RESERVE)) {
 		fpsd_message(FPSD_NO_EXIT, FPS_INFO, SWAP_WARN, testpath);
@@ -181,8 +176,17 @@ check_invoke_prog(int   devid,		/* cpu-id */
 		CPU_TST_EXEC_FAIL	/* Should never reach here */
 	}
 
-	if (pid == -1)
-		CPU_TST_FORK_FAIL
+	if (pid == (pid_t)-1) {
+		error = errno;
+		if ((error == EAGAIN) || (error == ENOMEM)) {
+			fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
+			    FORK_FAIL_MSG, testpath, strerror(error));
+		} else {
+			fpsd_message(FPSD_NO_EXIT, FPS_WARNING,
+			    FORK_FAIL_MSG, testpath, strerror(error));
+		}
+		return (-1);
+	}
 
 	/* Synchronously wait here till the child exits */
 
@@ -636,6 +640,7 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index)
 	/* Timestamp at which SIGHUP ts was checked last */
 	static hrtime_t	ts_hup_chkd = 0;
 	hrtime_t tmp_ts;
+	int iter = 0;
 
 	*iteration = *freq = 0;
 	while (fpuid == -1) {
@@ -658,7 +663,14 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index)
 		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, IDENTIFY_FPU_MSG,
 		    fpsd.d_fpuid_index, fpsd.d_iteration,
 		    fpsd.d_conf->total_iter, fpsd.d_conf->m_cpuids_size);
-		if (fpsd.d_iteration == fpsd.d_conf->total_iter) {
+		if (iter >=  fpsd.d_conf->m_cpuids_size) {
+			/* Possible infinite loop */
+			fpsd_message(FPSD_EXIT_ERROR, FPS_INFO,
+			    INFINITE_LOOP_MSG);
+		}
+		iter++;
+
+		if (fpsd.d_iteration >= fpsd.d_conf->total_iter) {
 			/* One pass completed */
 			fpsd.d_iteration = 0;
 

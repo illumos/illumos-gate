@@ -131,7 +131,7 @@ extern "C" {
 #define	TST_EXEC_FAIL	gettext("Could not execute CPU test program: %s"\
 	"\n      Reason: %s\n")
 
-#define	SWAP_WARN	gettext("Low swap space: Test: %s -n was not invoked.")
+#define	SWAP_WARN	gettext("Low swap space: Test: %s was not invoked.")
 
 #define	START_TEST_MSG	gettext("Start Test :%s -f %s -p %s -d %s\n")
 
@@ -313,6 +313,10 @@ extern "C" {
 
 #define	REPROBE_FAILURE	\
 	gettext("Reprobe failed. Exiting...\n")
+
+#define	INFINITE_LOOP_MSG	\
+	gettext("Assertion failed: No testable CPU could be identified "\
+		" after traversing the list of CPUs.\n")
 
 #ifdef __cplusplus
 }
