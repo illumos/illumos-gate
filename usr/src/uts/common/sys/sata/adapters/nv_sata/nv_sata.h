@@ -99,6 +99,7 @@ typedef struct nv_ctl {
 	uint8_t		nvc_revid;	/* PCI revid of device */
 
 #ifdef SGPIO_SUPPORT
+	int		nvc_mcp55_flag;	/* is the controller MCP55 or CK804 */
 	uint8_t		nvc_ctlr_num;	/* controller number within the part */
 	uint32_t	nvc_sgp_csr;	/* SGPIO CSR i/o address */
 	volatile nv_sgp_cb_t *nvc_sgp_cbp; /* SGPIO Command Block */

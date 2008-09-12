@@ -951,6 +951,10 @@ nv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (EBADF);
 	}
 
+	if ((nvc->nvc_sgp_cbp == NULL) || (nvc->nvc_sgp_cmn == NULL)) {
+		return (EBADF);
+	}
+
 	switch (cmd) {
 	case DEVCTL_SET_LED:
 		status = ddi_copyin((void *)arg, &led,
@@ -2323,7 +2327,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 {
 	struct sata_hba_tran stran;
 	nv_port_t *nvp;
-	int j, ck804 = B_TRUE;
+	int j, ck804;
 	uchar_t *cmd_addr, *ctl_addr, *bm_addr;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
 	uchar_t *bar5  = nvc->nvc_bar_addr[5];
@@ -2331,6 +2335,11 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	uint8_t reg8, reg8_save;
 
 	NVLOG((NVDBG_INIT, nvc, NULL, "nv_init_ctl entered"));
+
+	ck804 = B_TRUE;
+#ifdef SGPIO_SUPPORT
+	nvc->nvc_mcp55_flag = B_FALSE;
+#endif
 
 	/*
 	 * Need to set bit 2 to 1 at config offset 0x50
@@ -2360,6 +2369,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 		if (reg8 != j) {
 			ck804 = B_FALSE;
+			nvc->nvc_mcp55_flag = B_TRUE;
 			break;
 		}
 	}
@@ -5647,6 +5657,21 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	extern caddr_t psm_map_phys_new(paddr_t, size_t, int);
 
 	/*
+	 * Initialize with appropriately invalid values in case this function
+	 * exits without initializing SGPIO (for example, there is no SGPIO
+	 * support).
+	 */
+	nvc->nvc_sgp_csr = 0;
+	nvc->nvc_sgp_cbp = NULL;
+
+	/*
+	 * CK804 can pass the sgpio_detect test even though it does not support
+	 * SGPIO, so don't even look at a CK804.
+	 */
+	if (nvc->nvc_mcp55_flag != B_TRUE)
+		return;
+
+	/*
 	 * The NVIDIA SGPIO support can nominally handle 6 drives.
 	 * However, the current implementation only supports 4 drives.
 	 * With two drives per controller, that means only look at the
@@ -5902,6 +5927,9 @@ static int
 nv_sgp_check_set_cmn(nv_ctl_t *nvc)
 {
 	nv_sgp_cmn_t *cmn;
+
+	if (nvc->nvc_sgp_cbp == NULL)
+		return (NV_FAILURE);
 
 	/* check to see if Scratch Register is set */
 	if (nvc->nvc_sgp_cbp->sgpio_sr != 0) {
@@ -6269,6 +6297,14 @@ nv_sgp_cleanup(nv_ctl_t *nvc)
 	volatile nv_sgp_cb_t *cb = nvc->nvc_sgp_cbp;
 	nv_sgp_cmn_t *cmn = nvc->nvc_sgp_cmn;
 	extern void psm_unmap_phys(caddr_t, size_t);
+
+	/*
+	 * If the SGPIO command block isn't mapped or the shared data
+	 * structure isn't present in this instance, there isn't much that
+	 * can be cleaned up.
+	 */
+	if ((cb == NULL) || (cmn == NULL))
+		return;
 
 	/* turn off activity LEDs for this controller */
 	drv_leds = TR_ACTIVE_SET(TR_ACTIVE_DISABLE);
