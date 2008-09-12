@@ -1,10 +1,8 @@
 #!/sbin/sh
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"	
-
 # Function: check_add_drv()
 #
 # This function will check if the module has an entry in etc/name_to_major
@@ -109,5 +107,5 @@ check_add_drv()
 	#
 	# It is quite possible that other aliases ar
 	check_add_drv -b "${BASEDIR}" -i \
-		'"pci8086,1a48" "pci8086,1048" "pci8086,a11f"' \
+		'"pci8086,1a48" "pci8086,1048" "pci8086,a11f" "pci8086,109e"' \
 		-m '* 0666 root root' ixgb
