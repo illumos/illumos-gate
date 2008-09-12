@@ -41,7 +41,6 @@
 #ifndef	_MEGARAID_SAS_H_
 #define	_MEGARAID_SAS_H_
 
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -49,13 +48,11 @@ extern "C" {
 #include <sys/scsi/scsi.h>
 #include "list.h"
 
-#pragma pack(1)
-
 /*
  * MegaRAID SAS Driver meta data
  */
-#define	MEGASAS_VERSION				"LSIv1.26"
-#define	MEGASAS_RELDATE				"Mar 31, 2008"
+#define	MEGASAS_VERSION				"LSIv1.27"
+#define	MEGASAS_RELDATE				"Sept 4, 2008"
 
 #define	MEGASAS_TRUE				1
 #define	MEGASAS_FALSE				0
@@ -156,6 +153,7 @@ extern "C" {
  * Definition for cmd_status
  */
 #define	MFI_CMD_STATUS_POLL_MODE		0xFF
+#define	MFI_CMD_STATUS_SYNC_MODE		0xFF
 
 /*
  * MFI command opcodes
@@ -292,6 +290,8 @@ enum MR_EVT_ARGS {
 	MR_EVT_ARGS_TIME,
 	MR_EVT_ARGS_ECC
 };
+
+#pragma pack(1)
 
 /*
  * SAS controller properties
@@ -526,41 +526,53 @@ struct megasas_ctrl_info {
  */
 #define	IS_DMA64		(sizeof (dma_addr_t) == 8)
 
+#define	IB_MSG_0_OFF			0x10	/* XScale */
+#define	OB_MSG_0_OFF			0x18	/* XScale */
+#define	IB_DOORBELL_OFF			0x20	/* XScale & ROC */
+#define	OB_INTR_STATUS_OFF		0x30	/* XScale & ROC */
+#define	OB_INTR_MASK_OFF		0x34	/* XScale & ROC */
+#define	IB_QPORT_OFF			0x40	/* XScale & ROC */
+#define	OB_DOORBELL_CLEAR_OFF		0xA0	/* ROC */
+#define	OB_SCRATCH_PAD_0_OFF		0xB0	/* ROC */
+#define	OB_INTR_MASK			0xFFFFFFFF
+#define	OB_DOORBELL_CLEAR_MASK		0xFFFFFFFF
+
 /*
  * All MFI register set macros accept megasas_register_set*
  */
 #define	WR_IB_MSG_0(v, instance) 	ddi_put32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x10), (v))
+	(uint32_t *)((uintptr_t)(instance)->regmap + IB_MSG_0_OFF), (v))
 
 #define	RD_OB_MSG_0(instance) 		ddi_get32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x18))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_MSG_0_OFF))
 
 #define	WR_IB_DOORBELL(v, instance)	ddi_put32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x20), (v))
+	(uint32_t *)((uintptr_t)(instance)->regmap + IB_DOORBELL_OFF), (v))
 
 #define	RD_IB_DOORBELL(instance)	ddi_get32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x20))
+	(uint32_t *)((uintptr_t)(instance)->regmap + IB_DOORBELL_OFF))
 
 #define	WR_OB_INTR_STATUS(v, instance) 	ddi_put32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x30), (v))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_INTR_STATUS_OFF), (v))
 
 #define	RD_OB_INTR_STATUS(instance) 	ddi_get32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x30))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_INTR_STATUS_OFF))
 
 #define	WR_OB_INTR_MASK(v, instance) 	ddi_put32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x34), (v))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_INTR_MASK_OFF), (v))
 
 #define	RD_OB_INTR_MASK(instance) 	ddi_get32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x34))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_INTR_MASK_OFF))
 
 #define	WR_IB_QPORT(v, instance) 	ddi_put32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0x40), (v))
+	(uint32_t *)((uintptr_t)(instance)->regmap + IB_QPORT_OFF), (v))
 
 #define	WR_OB_DOORBELL_CLEAR(v, instance) ddi_put32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0xA0), (v))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_DOORBELL_CLEAR_OFF), \
+	(v))
 
 #define	RD_OB_SCRATCH_PAD_0(instance) 	ddi_get32((instance)->regmap_handle, \
-				(uint32_t *)((instance)->regmap + 0xB0))
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_SCRATCH_PAD_0_OFF))
 
 /*
  * When FW is in MFI_STATE_READY or MFI_STATE_OPERATIONAL, the state data
@@ -579,16 +591,23 @@ struct megasas_ctrl_info {
 #define	MFI_POLL_TIMEOUT_SECS		60
 
 #define	MFI_ENABLE_INTR(instance)  ddi_put32((instance)->regmap_handle, \
-			(uint32_t *)((instance)->regmap + 0x34), 1)
+		(uint32_t *)((uintptr_t)(instance)->regmap + 0x34), 1)
 #define	MFI_DISABLE_INTR(instance)					\
 {									\
 	uint32_t disable = 1;						\
 	uint32_t mask =  ddi_get32((instance)->regmap_handle, 		\
-			(uint32_t *)((instance)->regmap + 0x34));	\
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_INTR_MASK_OFF));\
 	mask &= ~disable;						\
-	ddi_put32((instance)->regmap_handle, 				\
-			(uint32_t *)((instance)->regmap + 0x34), mask);	\
+	ddi_put32((instance)->regmap_handle, (uint32_t *)		\
+	    (uintptr_t)((instance)->regmap + OB_INTR_MASK_OFF), mask);	\
 }
+
+/* By default, the firmware programs for 8 Kbytes of memory */
+#define	DEFAULT_MFI_MEM_SZ	8192
+#define	MINIMUM_MFI_MEM_SZ	4096
+
+/* DCMD Message Frame MAILBOX0-11 */
+#define	DCMD_MBOX_SZ		12
 
 
 struct megasas_register_set {
@@ -772,9 +791,9 @@ struct megasas_dcmd_frame {
 	uint32_t		data_xfer_len;		/* 14h */
 	uint32_t		opcode;			/* 18h */
 
-	/* uint8_t		mbox[12]; */		/* 1Ch */
+	/* uint8_t		mbox[DCMD_MBOX_SZ]; */	/* 1Ch */
 	union {						/* 1Ch */
-		uint8_t b[12];
+		uint8_t b[DCMD_MBOX_SZ];
 		uint16_t s[6];
 		uint32_t w[3];
 	} mbox;
@@ -1090,11 +1109,11 @@ typedef struct _MR_LD_LIST {
 } MR_LD_LIST;
 /* 4 + 4 + (MAX_LOGICAL_DRIVES * 16), for 40LD it is = 648 bytes */
 
+#pragma pack()
+
 #define	DMA_OBJ_ALLOCATED	1
 #define	DMA_OBJ_REALLOCATED	2
 #define	DMA_OBJ_FREED		3
-
-#pragma pack()
 
 /*
  * dma_obj_t	- Our DMA object
@@ -1215,7 +1234,7 @@ struct megasas_func_ptr {
  * the message.
  *
  *
- * consolge messages debug levels
+ * console messages debug levels
  */
 #define	CL_ANN		0	/* print unconditionally, announcements */
 #define	CL_ANN1		1	/* No o/p  */
@@ -1573,9 +1592,6 @@ static int	megasas_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 static int	megasas_tran_tgt_init(dev_info_t *, dev_info_t *,
 		    scsi_hba_tran_t *, struct scsi_device *);
-#if defined(USELESS) && !defined(lint)
-static int	megasas_tran_tgt_probe(struct scsi_device *, int);
-#endif
 static struct scsi_pkt *megasas_tran_init_pkt(struct scsi_address *, register
 		    struct scsi_pkt *, struct buf *, int, int, int, int,
 		    int (*)(), caddr_t);
@@ -1592,8 +1608,8 @@ static void	megasas_tran_dmafree(struct scsi_address *, struct scsi_pkt *);
 static void	megasas_tran_sync_pkt(struct scsi_address *, struct scsi_pkt *);
 static int	megasas_tran_quiesce(dev_info_t *dip);
 static int	megasas_tran_unquiesce(dev_info_t *dip);
-static uint_t	megasas_isr(caddr_t);
-static uint_t	megasas_softintr(caddr_t);
+static uint_t	megasas_isr();
+static uint_t	megasas_softintr();
 
 static int	init_mfi(struct megasas_instance *);
 static int	mega_free_dma_obj(struct megasas_instance *, dma_obj_t);
@@ -1601,11 +1617,7 @@ static int	mega_alloc_dma_obj(struct megasas_instance *, dma_obj_t *);
 static struct megasas_cmd *get_mfi_pkt(struct megasas_instance *);
 static void	return_mfi_pkt(struct megasas_instance *,
 		    struct megasas_cmd *);
-#ifndef lint
-static void	push_pend_queue(struct megasas_instance *instance,
-		    struct megasas_cmd *cmd);
-static struct megasas_cmd *pull_pend_queue(struct megasas_instance *instance);
-#endif
+
 static void	free_space_for_mfi(struct megasas_instance *);
 static void	free_additional_dma_buffer(struct megasas_instance *);
 static int	alloc_additional_dma_buffer(struct megasas_instance *);
@@ -1645,9 +1657,6 @@ static int	handle_mfi_ioctl(struct megasas_instance *instance,
 static int	handle_mfi_aen(struct megasas_instance *instance,
 		    struct megasas_aen *aen);
 static void	fill_up_drv_ver(struct megasas_drv_ver *dv);
-#ifndef lint
-static void	megasas_minphys(struct buf *bp);
-#endif
 static struct megasas_cmd *build_cmd(struct megasas_instance *instance,
 		    struct scsi_address *ap, struct scsi_pkt *pkt,
 		    uchar_t *cmd_done);
@@ -1664,13 +1673,9 @@ static int	issue_mfi_stp(struct megasas_instance *instance, struct
 		    megasas_ioctl *ioctl, struct megasas_cmd *cmd, int mode);
 static int	abort_aen_cmd(struct megasas_instance *instance,
 		    struct megasas_cmd *cmd_to_abort);
-#if defined(NOT_YET) && !defined(lint)
-static void 	io_timeout_checker(void *instance);
-#endif
 
 static int	megasas_common_check(struct megasas_instance *instance,
 		    struct  megasas_cmd *cmd);
-
 static void	megasas_fm_init(struct megasas_instance *instance);
 static void	megasas_fm_fini(struct megasas_instance *instance);
 static int	megasas_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
