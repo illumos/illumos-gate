@@ -29,8 +29,6 @@
 #ifndef _IWK_VAR_H
 #define	_IWK_VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -97,6 +95,8 @@ typedef struct iwk_softc {
 	dev_info_t		*sc_dip;
 	int			(*sc_newstate)(struct ieee80211com *,
 	    enum ieee80211_state, int);
+	void			(*sc_recv_mgmt)(ieee80211com_t *, mblk_t *,
+	    ieee80211_node_t *, int, int, uint32_t);
 	enum ieee80211_state	sc_ostate;
 	kmutex_t		sc_glock;
 	kmutex_t		sc_mt_lock;
@@ -141,7 +141,8 @@ typedef struct iwk_softc {
 	caddr_t			sc_cfg_base;
 	ddi_acc_handle_t	sc_handle;
 	caddr_t			sc_base;
-	ddi_iblock_cookie_t	sc_iblk;
+	ddi_intr_handle_t	*sc_intr_htable;
+	uint_t			sc_intr_pri;
 
 	iwk_rxon_cmd_t	sc_config;
 	struct iwk_eep		sc_eep_map; /* eeprom map */
@@ -150,10 +151,17 @@ typedef struct iwk_softc {
 	struct iwk_alive_resp	sc_card_alive_run;
 	struct iwk_init_alive_resp	sc_card_alive_init;
 
+	int32_t			sc_tempera;
+	int32_t			sc_last_tempera;
+	int32_t			sc_user_txpower;
+	struct iwk_notif_statistics	sc_statistics;
+	struct iwk_rx_gain_diff		sc_rxgain_diff;
+	struct iwk_rx_sensitivity	sc_rx_sens;
+
 	uint32_t		sc_tx_timer;
 	uint8_t			*sc_fw_bin;
 
-	ddi_softintr_t		sc_rx_softint_id;
+	ddi_softint_handle_t    sc_soft_hdl;
 	uint32_t		sc_rx_softint_pending;
 	uint32_t		sc_need_reschedule;
 
@@ -176,6 +184,8 @@ typedef struct iwk_softc {
 #define	IWK_F_SCANNING		(1 << 6)
 #define	IWK_F_SUSPEND		(1 << 7)
 #define	IWK_F_RADIO_OFF		(1 << 8)
+#define	IWK_F_STATISTICS	(1 << 9)
+#define	IWK_F_READY		(1 << 10)
 
 #define	IWK_SUCCESS		0
 #define	IWK_FAIL		EIO

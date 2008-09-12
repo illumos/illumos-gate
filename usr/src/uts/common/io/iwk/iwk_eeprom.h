@@ -76,8 +76,6 @@
 #ifndef _IWK_EEPROM_H_
 #define	_IWK_EEPROM_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines EEPROM related constants, enums, and inline functions.
  */
@@ -187,9 +185,9 @@ struct iwl_eeprom_temperature_corr {
 };
 
 #define	EEP_TX_POWER_TX_CHAINS		(2)
-#define	EEP_TX_POWER_BANDS			(8)
-#define	EEP_TX_POWER_MEASURE			(3)
-#define	EEP_TX_POWER_VERSION			(2)
+#define	EEP_TX_POWER_BANDS		(8)
+#define	EEP_TX_POWER_MEASUREMENTS	(3)
+#define	EEP_TX_POWER_VERSION		(2)
 #define	EEP_TX_POWER_VERSION_NEW	(5)
 
 struct iwk_eep_calib_measure {
@@ -202,7 +200,7 @@ struct iwk_eep_calib_measure {
 struct iwk_eep_calib_channel_info {
 	uint8_t ch_num;
 	struct iwk_eep_calib_measure
-	    measure[EEP_TX_POWER_TX_CHAINS][EEP_TX_POWER_MEASURE];
+	    measure[EEP_TX_POWER_TX_CHAINS][EEP_TX_POWER_MEASUREMENTS];
 };
 
 struct iwk_eep_calib_subband_info {

@@ -76,8 +76,6 @@
 #ifndef	_IWK_HW_H_
 #define	_IWK_HW_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -2642,6 +2640,7 @@ enum {
 
 	/* Multi-Station support */
 	REPLY_ADD_STA = 0x18,
+	REPLY_REMOVE_ALL_STA = 0x1a,
 
 	/* RX, TX */
 
@@ -2877,9 +2876,9 @@ typedef struct iwk_calibration_cmd {
 	uint8_t opCode;
 	uint8_t flags;
 	uint16_t reserved;
-	char *diff_gain_a;
-	char *diff_gain_b;
-	char *diff_gain_c;
+	char diff_gain_a;
+	char diff_gain_b;
+	char diff_gain_c;
 	uint8_t reserved1;
 } iwk_calibation_cmd_t;
 
@@ -3047,6 +3046,17 @@ typedef struct iwk_tx_cmd {
 	} timeout;
 	uint16_t driver_txop;
 } iwk_tx_cmd_t;
+
+/*
+ * structure for command "TX beacon"
+ */
+typedef struct iwk_tx_beacon_cmd {
+	iwk_tx_cmd_t	config;
+	uint16_t	tim_idx;
+	uint8_t		tim_size;
+	uint8_t		reserved;
+	uint8_t		bcon_frame[2342];
+} iwk_tx_beacon_cmd_t;
 
 /*
  * LEDs Command & Response

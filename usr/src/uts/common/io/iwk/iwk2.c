@@ -26,8 +26,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Driver for Intel PRO/Wireless 4965AGN(kedron) 802.11 network adapters.
  */
@@ -58,6 +56,7 @@
 #include <sys/policy.h>
 #include <sys/pci.h>
 
+#include "iwk_calibration.h"
 #include "iwk_hw.h"
 #include "iwk_eeprom.h"
 #include "iwk2_var.h"
@@ -79,6 +78,7 @@
 #define	IWK_DEBUG_RATECTL	(1 << 12)
 #define	IWK_DEBUG_RADIO		(1 << 13)
 #define	IWK_DEBUG_RESUME	(1 << 14)
+#define	IWK_DEBUG_CALIBRATION	(1 << 15)
 uint32_t iwk_dbg_flags = 0;
 #define	IWK_DBG(x) \
 	iwk_dbg x
@@ -261,12 +261,12 @@ static void	iwk_rx_intr(iwk_sc_t *, iwk_rx_desc_t *,
 static void	iwk_tx_intr(iwk_sc_t *, iwk_rx_desc_t *,
 		    iwk_rx_data_t *);
 static void	iwk_cmd_intr(iwk_sc_t *, iwk_rx_desc_t *);
-static uint_t	iwk_intr(caddr_t);
+static uint_t   iwk_intr(caddr_t, caddr_t);
 static int	iwk_eep_load(iwk_sc_t *sc);
 static void	iwk_get_mac_from_eep(iwk_sc_t *sc);
 static int	iwk_eep_sem_down(iwk_sc_t *sc);
 static void	iwk_eep_sem_up(iwk_sc_t *sc);
-static uint_t	iwk_rx_softintr(caddr_t);
+static uint_t   iwk_rx_softintr(caddr_t, caddr_t);
 static uint8_t	iwk_rate_to_plcp(int);
 static int	iwk_cmd(iwk_sc_t *, int, const void *, int, int);
 static void	iwk_set_led(iwk_sc_t *, uint8_t, uint8_t, uint8_t);
@@ -281,9 +281,39 @@ static void	iwk_stop(iwk_sc_t *);
 static void	iwk_amrr_init(iwk_amrr_t *);
 static void	iwk_amrr_timeout(iwk_sc_t *);
 static void	iwk_amrr_ratectl(void *, ieee80211_node_t *);
+static int32_t	iwk_curr_tempera(iwk_sc_t *sc);
+static int	iwk_tx_power_calibration(iwk_sc_t *sc);
+static inline int	iwk_is_24G_band(iwk_sc_t *sc);
+static inline int	iwk_is_fat_channel(iwk_sc_t *sc);
+static int	iwk_txpower_grp(uint16_t channel);
+static struct	iwk_eep_channel *iwk_get_eep_channel(iwk_sc_t *sc,
+    uint16_t channel,
+    int is_24G, int is_fat, int is_hi_chan);
+static int32_t	iwk_band_number(iwk_sc_t *sc, uint16_t channel);
+static int	iwk_division(int32_t num, int32_t denom, int32_t *res);
+static int32_t	iwk_interpolate_value(int32_t x, int32_t x1, int32_t y1,
+    int32_t x2, int32_t y2);
+static int	iwk_channel_interpolate(iwk_sc_t *sc, uint16_t channel,
+    struct iwk_eep_calib_channel_info *chan_info);
+static int32_t	iwk_voltage_compensation(int32_t eep_voltage,
+    int32_t curr_voltage);
+static int32_t	iwk_min_power_index(int32_t rate_pow_idx, int32_t is_24G);
+static int	iwk_txpower_table_cmd_init(iwk_sc_t *sc,
+    struct iwk_tx_power_db *tp_db);
+static void	iwk_statistics_notify(iwk_sc_t *sc, iwk_rx_desc_t *desc);
+static int	iwk_is_associated(iwk_sc_t *sc);
+static int	iwk_rxgain_diff_init(iwk_sc_t *sc);
+static int	iwk_rxgain_diff(iwk_sc_t *sc);
+static int	iwk_rx_sens_init(iwk_sc_t *sc);
+static int	iwk_rx_sens(iwk_sc_t *sc);
+static int	iwk_cck_sens(iwk_sc_t *sc, uint32_t actual_rx_time);
+static int	iwk_ofdm_sens(iwk_sc_t *sc, uint32_t actual_rx_time);
 
-static int iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
-static int iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static void	iwk_write_event_log(iwk_sc_t *);
+static void	iwk_write_error_log(iwk_sc_t *);
+
+static int	iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+static int	iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 /*
  * GLD specific operations
@@ -294,7 +324,7 @@ static void	iwk_m_stop(void *arg);
 static int	iwk_m_unicst(void *arg, const uint8_t *macaddr);
 static int	iwk_m_multicst(void *arg, boolean_t add, const uint8_t *m);
 static int	iwk_m_promisc(void *arg, boolean_t on);
-static mblk_t  *iwk_m_tx(void *arg, mblk_t *mp);
+static mblk_t 	*iwk_m_tx(void *arg, mblk_t *mp);
 static void	iwk_m_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 
 static void	iwk_destroy_locks(iwk_sc_t *sc);
@@ -419,6 +449,10 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	wifi_data_t		wd = { 0 };
 	mac_register_t		*macp;
 
+	int			intr_type;
+	int			intr_count;
+	int			intr_actual;
+
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
@@ -480,25 +514,50 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_fail2a;
 	}
 
-	/*
-	 * Initialize mutexs and condvars
-	 */
-	err = ddi_get_iblock_cookie(dip, 0, &sc->sc_iblk);
-	if (err != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "iwk_attach(): failed to do ddi_get_iblock_cookie()\n");
-		goto attach_fail2b;
+	err = ddi_intr_get_supported_types(dip, &intr_type);
+	if ((err != DDI_SUCCESS) || (!(intr_type & DDI_INTR_TYPE_FIXED))) {
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "Fixed type interrupt is not supported\n");
+		goto attach_fail_intr_a;
 	}
-	mutex_init(&sc->sc_glock, NULL, MUTEX_DRIVER, sc->sc_iblk);
-	mutex_init(&sc->sc_tx_lock, NULL, MUTEX_DRIVER, sc->sc_iblk);
+
+	err = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_FIXED, &intr_count);
+	if ((err != DDI_SUCCESS) || (intr_count != 1)) {
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "No fixed interrupts\n");
+		goto attach_fail_intr_a;
+	}
+
+	sc->sc_intr_htable = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);
+
+	err = ddi_intr_alloc(dip, sc->sc_intr_htable, DDI_INTR_TYPE_FIXED, 0,
+	    intr_count, &intr_actual, 0);
+	if ((err != DDI_SUCCESS) || (intr_actual != 1)) {
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "ddi_intr_alloc() failed 0x%x\n", err);
+		goto attach_fail_intr_b;
+	}
+
+	err = ddi_intr_get_pri(sc->sc_intr_htable[0], &sc->sc_intr_pri);
+	if (err != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "ddi_intr_get_pri() failed 0x%x\n", err);
+		goto attach_fail_intr_c;
+	}
+
+	mutex_init(&sc->sc_glock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_pri));
+	mutex_init(&sc->sc_tx_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_pri));
+	mutex_init(&sc->sc_mt_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_pri));
+
 	cv_init(&sc->sc_fw_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&sc->sc_cmd_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&sc->sc_tx_cv, "tx-ring", CV_DRIVER, NULL);
 	/*
 	 * initialize the mfthread
 	 */
-	mutex_init(&sc->sc_mt_lock, NULL, MUTEX_DRIVER,
-	    (void *) sc->sc_iblk);
 	cv_init(&sc->sc_mt_cv, NULL, CV_DRIVER, NULL);
 	sc->sc_mf_thread = NULL;
 	sc->sc_mf_thread_switch = 0;
@@ -508,7 +567,8 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	err = iwk_alloc_shared(sc);
 	if (err != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "failed to allocate shared page\n");
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "failed to allocate shared page\n");
 		goto attach_fail3;
 	}
 
@@ -517,7 +577,8 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	err = iwk_alloc_kw(sc);
 	if (err != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "failed to allocate keep warm page\n");
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "failed to allocate keep warm page\n");
 		goto attach_fail3a;
 	}
 
@@ -526,7 +587,8 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	err = iwk_preinit(sc);
 	if (err != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "failed to init hardware\n");
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "failed to init hardware\n");
 		goto attach_fail4;
 	}
 
@@ -579,6 +641,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Support WPA/WPA2
 	 */
 	ic->ic_caps |= IEEE80211_C_WPA;
+
 	/* set supported .11b and .11g rates */
 	ic->ic_sup_rates[IEEE80211_MODE_11B] = iwk_rateset_11b;
 	ic->ic_sup_rates[IEEE80211_MODE_11G] = iwk_rateset_11g;
@@ -591,7 +654,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM |
 		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ;
 	}
-	ic->ic_ibss_chan = &ic->ic_sup_channels[0];
+
 	ic->ic_xmit = iwk_send;
 	/*
 	 * init Wifi layer
@@ -610,6 +673,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = iwk_newstate;
+	sc->sc_recv_mgmt = ic->ic_recv_mgmt;
 	ic->ic_node_alloc = iwk_node_alloc;
 	ic->ic_node_free = iwk_node_free;
 	ic->ic_crypto.cs_key_set = iwk_key_set;
@@ -618,25 +682,30 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * initialize default tx key
 	 */
 	ic->ic_def_txkey = 0;
-
-	err = ddi_add_softintr(dip, DDI_SOFTINT_LOW,
-	    &sc->sc_rx_softint_id, &sc->sc_iblk, NULL, iwk_rx_softintr,
-	    (caddr_t)sc);
+	err = ddi_intr_add_softint(dip, &sc->sc_soft_hdl, DDI_INTR_SOFTPRI_MAX,
+	    iwk_rx_softintr, (caddr_t)sc);
 	if (err != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "iwk_attach(): failed to do ddi_add_softintr()\n");
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "add soft interrupt failed\n");
 		goto attach_fail7;
 	}
 
 	/*
 	 * Add the interrupt handler
 	 */
-	err = ddi_add_intr(dip, 0, &sc->sc_iblk, NULL,
-	    iwk_intr, (caddr_t)sc);
+	err = ddi_intr_add_handler(sc->sc_intr_htable[0], iwk_intr,
+	    (caddr_t)sc, NULL);
 	if (err != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "iwk_attach(): failed to do ddi_add_intr()\n");
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "ddi_intr_add_handle() failed\n");
 		goto attach_fail8;
+	}
+
+	err = ddi_intr_enable(sc->sc_intr_htable[0]);
+	if (err != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_attach(): "
+		    "ddi_intr_enable() failed\n");
+		goto attach_fail_intr_d;
 	}
 
 	/*
@@ -693,7 +762,6 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * create the mf thread to handle the link status,
 	 * recovery fatal error, etc.
 	 */
-
 	sc->sc_mf_thread_switch = 1;
 	if (sc->sc_mf_thread == NULL)
 		sc->sc_mf_thread = thread_create((caddr_t)NULL, 0,
@@ -703,10 +771,13 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 attach_fail9:
-	ddi_remove_intr(dip, 0, sc->sc_iblk);
+	(void) ddi_intr_disable(sc->sc_intr_htable[0]);
+attach_fail_intr_d:
+	(void) ddi_intr_remove_handler(sc->sc_intr_htable[0]);
+
 attach_fail8:
-	ddi_remove_softintr(sc->sc_rx_softint_id);
-	sc->sc_rx_softint_id = NULL;
+	(void) ddi_intr_remove_softint(sc->sc_soft_hdl);
+	sc->sc_soft_hdl = NULL;
 attach_fail7:
 	ieee80211_detach(ic);
 attach_fail6:
@@ -719,7 +790,11 @@ attach_fail3a:
 	iwk_free_shared(sc);
 attach_fail3:
 	iwk_destroy_locks(sc);
-attach_fail2b:
+attach_fail_intr_c:
+	(void) ddi_intr_free(sc->sc_intr_htable[0]);
+attach_fail_intr_b:
+	kmem_free(sc->sc_intr_htable, sizeof (ddi_intr_handle_t));
+attach_fail_intr_a:
 	ddi_regs_map_free(&sc->sc_handle);
 attach_fail2a:
 	ddi_regs_map_free(&sc->sc_cfg_handle);
@@ -757,6 +832,10 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (!(sc->sc_flags & IWK_F_ATTACHED))
 		return (DDI_FAILURE);
 
+	err = mac_disable(sc->sc_ic.ic_mach);
+	if (err != DDI_SUCCESS)
+		return (err);
+
 	/*
 	 * Destroy the mf_thread
 	 */
@@ -774,9 +853,7 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/*
 	 * Unregiste from the MAC layer subsystem
 	 */
-	err = mac_unregister(sc->sc_ic.ic_mach);
-	if (err != DDI_SUCCESS)
-		return (err);
+	(void) mac_unregister(sc->sc_ic.ic_mach);
 
 	mutex_enter(&sc->sc_glock);
 	iwk_free_fw_dma(sc);
@@ -785,9 +862,13 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	iwk_free_shared(sc);
 	mutex_exit(&sc->sc_glock);
 
-	ddi_remove_intr(dip, 0, sc->sc_iblk);
-	ddi_remove_softintr(sc->sc_rx_softint_id);
-	sc->sc_rx_softint_id = NULL;
+	(void) ddi_intr_disable(sc->sc_intr_htable[0]);
+	(void) ddi_intr_remove_handler(sc->sc_intr_htable[0]);
+	(void) ddi_intr_free(sc->sc_intr_htable[0]);
+	kmem_free(sc->sc_intr_htable, sizeof (ddi_intr_handle_t));
+
+	(void) ddi_intr_remove_softint(sc->sc_soft_hdl);
+	sc->sc_soft_hdl = NULL;
 
 	/*
 	 * detach ieee80211
@@ -1254,9 +1335,9 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 		data->paddr_desc = paddr_desc_h +
 		    _PTRDIFF(data->desc, desc_h);
 		data->cmd = cmd_h +  i; /* (i % slots); */
+		/* ((i % slots) * sizeof (iwk_cmd_t)); */
 		data->paddr_cmd = paddr_cmd_h +
 		    _PTRDIFF(data->cmd, cmd_h);
-		    /* ((i % slots) * sizeof (iwk_cmd_t)); */
 	}
 	dma_p = &ring->data[0].dma_data;
 	IWK_DBG((IWK_DEBUG_DMA, "tx buffer[0][ncookies:%d addr:%lx "
@@ -1397,13 +1478,13 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 {
 	iwk_sc_t *sc = (iwk_sc_t *)ic;
 	ieee80211_node_t *in = ic->ic_bss;
-	iwk_tx_power_table_cmd_t txpower;
 	enum ieee80211_state ostate = ic->ic_state;
 	int i, err = IWK_SUCCESS;
 
 	mutex_enter(&sc->sc_glock);
 	switch (nstate) {
 	case IEEE80211_S_SCAN:
+		ic->ic_state = nstate;
 		if (ostate == IEEE80211_S_INIT) {
 			ic->ic_flags |= IEEE80211_F_SCAN | IEEE80211_F_ASCAN;
 			/* let LED blink when scanning */
@@ -1414,11 +1495,11 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 				    "could not initiate scan\n"));
 				ic->ic_flags &= ~(IEEE80211_F_SCAN |
 				    IEEE80211_F_ASCAN);
+				ic->ic_state = ostate;
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
 		}
-		ic->ic_state = nstate;
 		sc->sc_clk = 0;
 		mutex_exit(&sc->sc_glock);
 		return (IWK_SUCCESS);
@@ -1447,70 +1528,60 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			iwk_set_led(sc, 2, 10, 10);
 			break;
 		}
-
-		if (ic->ic_opmode != IEEE80211_M_STA) {
-			(void) iwk_hw_set_before_auth(sc);
-			/* need setup beacon here */
-		}
 		IWK_DBG((IWK_DEBUG_80211, "iwk: associated."));
 
-		/* update adapter's configuration */
-		sc->sc_config.assoc_id = sc->sc_assoc_id & 0x3fff;
-		/* short preamble/slot time are negotiated when associating */
-		sc->sc_config.flags &= ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
-		    RXON_FLG_SHORT_SLOT_MSK);
+		/* none IBSS mode */
+		if (ic->ic_opmode != IEEE80211_M_IBSS) {
+			/* update adapter's configuration */
+			sc->sc_config.assoc_id = sc->sc_assoc_id & 0x3fff;
+			/*
+			 * short preamble/slot time are
+			 * negotiated when associating
+			 */
+			sc->sc_config.flags &=
+			    ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
+			    RXON_FLG_SHORT_SLOT_MSK);
 
-		if (ic->ic_flags & IEEE80211_F_SHSLOT)
-			sc->sc_config.flags |= LE_32(RXON_FLG_SHORT_SLOT_MSK);
+			if (ic->ic_flags & IEEE80211_F_SHSLOT)
+				sc->sc_config.flags |=
+				    LE_32(RXON_FLG_SHORT_SLOT_MSK);
 
-		if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
-			sc->sc_config.flags |=
-			    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
+			if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+				sc->sc_config.flags |=
+				    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
 
-		sc->sc_config.filter_flags |= LE_32(RXON_FILTER_ASSOC_MSK);
-
-		if (ic->ic_opmode != IEEE80211_M_STA)
 			sc->sc_config.filter_flags |=
-			    LE_32(RXON_FILTER_BCON_AWARE_MSK);
+			    LE_32(RXON_FILTER_ASSOC_MSK);
 
-		IWK_DBG((IWK_DEBUG_80211, "config chan %d flags %x"
-		    " filter_flags %x\n",
-		    sc->sc_config.chan, sc->sc_config.flags,
-		    sc->sc_config.filter_flags));
-		err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
-		    sizeof (iwk_rxon_cmd_t), 1);
-		if (err != IWK_SUCCESS) {
-			IWK_DBG((IWK_DEBUG_80211,
-			    "could not update configuration\n"));
-			mutex_exit(&sc->sc_glock);
-			return (err);
+			if (ic->ic_opmode != IEEE80211_M_STA)
+				sc->sc_config.filter_flags |=
+				    LE_32(RXON_FILTER_BCON_AWARE_MSK);
+
+			IWK_DBG((IWK_DEBUG_80211, "config chan %d flags %x"
+			    " filter_flags %x\n",
+			    sc->sc_config.chan, sc->sc_config.flags,
+			    sc->sc_config.filter_flags));
+			err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
+			    sizeof (iwk_rxon_cmd_t), 1);
+			if (err != IWK_SUCCESS) {
+				IWK_DBG((IWK_DEBUG_80211,
+				    "could not update configuration\n"));
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
 		}
+
+		/* obtain current temperature of chipset */
+		sc->sc_tempera = iwk_curr_tempera(sc);
 
 		/*
-		 * set Tx power for 2.4GHz channels
-		 * (need further investigation. fix tx power at present)
-		 * This cmd should be issued each time the reply_rxon cmd is
-		 * invoked.
+		 * make Tx power calibration to determine
+		 * the gains of DSP and radio
 		 */
-		(void) memset(&txpower, 0, sizeof (txpower));
-		txpower.band = 1; /* for 2.4G */
-		txpower.channel = sc->sc_config.chan;
-		txpower.channel_normal_width = 0;
-		for (i = 0; i < POWER_TABLE_NUM_HT_OFDM_ENTRIES; i++) {
-			txpower.tx_power.ht_ofdm_power[i].s.ramon_tx_gain =
-			    0x3f3f;
-			txpower.tx_power.ht_ofdm_power[i].s.dsp_predis_atten =
-			    110 | (110 << 8);
-		}
-		txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES]
-		    .s.ramon_tx_gain = 0x3f3f;
-		txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES]
-		    .s.dsp_predis_atten = 110 | (110 << 8);
-		err = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &txpower,
-		    sizeof (txpower), 1);
-		if (err != IWK_SUCCESS) {
-			cmn_err(CE_WARN, "iwk_newstate(): failed to "
-			    "set txpower\n");
+		err = iwk_tx_power_calibration(sc);
+		if (err) {
+			cmn_err(CE_WARN, "iwk_newstate(): "
+			    "failed to set tx power table\n");
 			return (err);
 		}
 
@@ -1541,7 +1612,37 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	}
 
 	mutex_exit(&sc->sc_glock);
-	return (sc->sc_newstate(ic, nstate, arg));
+
+	err = sc->sc_newstate(ic, nstate, arg);
+
+	if (nstate == IEEE80211_S_RUN) {
+
+		mutex_enter(&sc->sc_glock);
+
+		/*
+		 * make initialization for Receiver
+		 * sensitivity calibration
+		 */
+		err = iwk_rx_sens_init(sc);
+		if (err) {
+			cmn_err(CE_WARN, "iwk_newstate(): "
+			    "failed to init RX sensitivity\n");
+			return (err);
+		}
+
+		/* make initialization for Receiver gain balance */
+		err = iwk_rxgain_diff_init(sc);
+		if (err) {
+			cmn_err(CE_WARN, "iwk_newstate(): "
+			    "failed to init phy calibration\n");
+			return (err);
+		}
+
+		mutex_exit(&sc->sc_glock);
+
+	}
+
+	return (err);
 }
 
 /*ARGSUSED*/
@@ -1561,8 +1662,8 @@ static int iwk_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 	default:
 		return (0);
 	}
-	sc->sc_config.filter_flags &= ~(RXON_FILTER_DIS_DECRYPT_MSK
-	    | RXON_FILTER_DIS_GRP_DECRYPT_MSK);
+	sc->sc_config.filter_flags &= ~(RXON_FILTER_DIS_DECRYPT_MSK |
+	    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
 
 	mutex_enter(&sc->sc_glock);
 
@@ -1634,15 +1735,12 @@ iwk_mac_access_exit(iwk_sc_t *sc)
 	    tmp & ~CSR_GP_CNTRL_REG_FLAG_MAC_ACCESS_REQ);
 }
 
-/*
- * this function defined here for future use.
- * static uint32_t
- * iwk_mem_read(iwk_sc_t *sc, uint32_t addr)
- * {
- * 	IWK_WRITE(sc, HBUS_TARG_MEM_RADDR, addr);
- * 	return (IWK_READ(sc, HBUS_TARG_MEM_RDAT));
- * }
- */
+static uint32_t
+iwk_mem_read(iwk_sc_t *sc, uint32_t addr)
+{
+	IWK_WRITE(sc, HBUS_TARG_MEM_RADDR, addr);
+	return (IWK_READ(sc, HBUS_TARG_MEM_RDAT));
+}
 
 static void
 iwk_mem_write(iwk_sc_t *sc, uint32_t addr, uint32_t data)
@@ -1770,8 +1868,8 @@ iwk_rx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	phyinfo = (struct iwk_rx_non_cfg_phy *)stat->non_cfg_phy;
 	agc = (phyinfo->agc_info & IWK_AGC_DB_MASK) >> IWK_AGC_DB_POS;
 	mrssi = 0;
-	ants = (stat->phy_flags & RX_PHY_FLAGS_ANTENNAE_MASK)
-	    >> RX_PHY_FLAGS_ANTENNAE_OFFSET;
+	ants = (stat->phy_flags & RX_PHY_FLAGS_ANTENNAE_MASK) >>
+	    RX_PHY_FLAGS_ANTENNAE_OFFSET;
 	for (i = 0; i < 3; i++) {
 		if (ants & (1 << i))
 			mrssi = MAX(mrssi, phyinfo->rssi_info[i << 1]);
@@ -1780,8 +1878,8 @@ iwk_rx_intr(iwk_sc_t *sc, iwk_rx_desc_t *desc, iwk_rx_data_t *data)
 	/*
 	 * convert dBm to percentage ???
 	 */
-	rssi = (100 * 75 * 75 - (-20 - t) * (15 * 75 + 62 * (-20 - t)))
-	    / (75 * 75);
+	rssi = (100 * 75 * 75 - (-20 - t) * (15 * 75 + 62 * (-20 - t))) /
+	    (75 * 75);
 	if (rssi > 100)
 		rssi = 100;
 	if (rssi < 1)
@@ -1999,7 +2097,8 @@ iwk_ucode_alive(iwk_sc_t *sc, iwk_rx_desc_t *desc)
 }
 
 static uint_t
-iwk_rx_softintr(caddr_t arg)
+/* LINTED: argument unused in function: unused */
+iwk_rx_softintr(caddr_t arg, caddr_t unused)
 {
 	iwk_sc_t *sc = (iwk_sc_t *)arg;
 	ieee80211com_t *ic = &sc->sc_ic;
@@ -2034,7 +2133,10 @@ iwk_rx_softintr(caddr_t arg)
 		/* a command other than a tx need to be replied */
 		if (!(desc->hdr.qid & 0x80) &&
 		    (desc->hdr.type != REPLY_RX_PHY_CMD) &&
-		    (desc->hdr.type != REPLY_TX))
+		    (desc->hdr.type != REPLY_TX) &&
+		    (desc->hdr.type != REPLY_TX_PWR_TABLE_CMD) &&
+		    (desc->hdr.type != REPLY_PHY_CALIBRATION_CMD) &&
+		    (desc->hdr.type != SENSITIVITY_CMD))
 			iwk_cmd_intr(sc, desc);
 
 		switch (desc->hdr.type) {
@@ -2065,7 +2167,8 @@ iwk_rx_softintr(caddr_t arg)
 				 * button is pushed again(ON)
 				 */
 				cmn_err(CE_NOTE,
-				    "iwk: Radio transmitter is off\n");
+				    "iwk_rx_softintr(): "
+				    "Radio transmitter is off\n");
 				sc->sc_ostate = sc->sc_ic.ic_state;
 				ieee80211_new_state(&sc->sc_ic,
 				    IEEE80211_S_INIT, -1);
@@ -2088,8 +2191,16 @@ iwk_rx_softintr(caddr_t arg)
 		}
 		case SCAN_COMPLETE_NOTIFICATION:
 			IWK_DBG((IWK_DEBUG_SCAN, "scan finished\n"));
+			sc->sc_flags &= ~IWK_F_SCANNING;
 			ieee80211_end_scan(ic);
 			break;
+		case STATISTICS_NOTIFICATION:
+		{
+			/* handle statistics notification */
+			iwk_statistics_notify(sc, desc);
+			break;
+		}
+
 		}
 
 		sc->sc_rxq.cur = (sc->sc_rxq.cur + 1) % RX_QUEUE_SIZE;
@@ -2112,7 +2223,8 @@ iwk_rx_softintr(caddr_t arg)
 }
 
 static uint_t
-iwk_intr(caddr_t arg)
+/* LINTED: argument unused in function: unused */
+iwk_intr(caddr_t arg, caddr_t unused)
 {
 	iwk_sc_t *sc = (iwk_sc_t *)arg;
 	uint32_t r, rfh;
@@ -2140,14 +2252,18 @@ iwk_intr(caddr_t arg)
 	IWK_WRITE(sc, CSR_INT, r);
 	IWK_WRITE(sc, CSR_FH_INT_STATUS, rfh);
 
-	if (sc->sc_rx_softint_id == NULL) {
+	if (sc->sc_soft_hdl == NULL) {
 		mutex_exit(&sc->sc_glock);
 		return (DDI_INTR_CLAIMED);
 	}
-
 	if (r & (BIT_INT_SWERROR | BIT_INT_ERR)) {
 		IWK_DBG((IWK_DEBUG_FW, "fatal firmware error\n"));
 		mutex_exit(&sc->sc_glock);
+#ifdef DEBUG
+		/* dump event and error logs to dmesg */
+		iwk_write_error_log(sc);
+		iwk_write_event_log(sc);
+#endif /* DEBUG */
 		iwk_stop(sc);
 		sc->sc_ostate = sc->sc_ic.ic_state;
 		ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
@@ -2162,7 +2278,7 @@ iwk_intr(caddr_t arg)
 	if ((r & (BIT_INT_FH_RX | BIT_INT_SW_RX)) ||
 	    (rfh & FH_INT_RX_MASK)) {
 		sc->sc_rx_softint_pending = 1;
-		ddi_trigger_softintr(sc->sc_rx_softint_id);
+		(void) ddi_intr_trigger_softint(sc->sc_soft_hdl, NULL);
 	}
 
 	if (r & BIT_INT_ALIVE)	{
@@ -2415,7 +2531,8 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		tx->sta_id = IWK_BROADCAST_ID;
 	} else {
-		tx->sta_id = IWK_AP_ID;
+		if (ic->ic_opmode != IEEE80211_M_IBSS)
+			tx->sta_id = IWK_AP_ID;
 	}
 
 	if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
@@ -2484,8 +2601,8 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	mutex_exit(&sc->sc_tx_lock);
 
 	/* kick ring */
-	sc->sc_shared->queues_byte_cnt_tbls[ring->qid].tfd_offset[ring->cur].val
-	    = 8 + len;
+	sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
+	    tfd_offset[ring->cur].val = 8 + len;
 	if (ring->cur < IWK_MAX_WIN_SIZE) {
 		sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
 		    tfd_offset[IWK_QUEUE_SIZE + ring->cur].val = 8 + len;
@@ -2517,6 +2634,7 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 	int		err;
 
 	err = ieee80211_ioctl(ic, wq, mp);
+
 	if (err == ENETRESET) {
 		/*
 		 * This is special for the hidden AP connection.
@@ -2791,6 +2909,7 @@ iwk_cmd(iwk_sc_t *sc, int code, const void *buf, int size, int async)
 	iwk_tx_ring_t *ring = &sc->sc_txq[IWK_CMD_QUEUE_NUM];
 	iwk_tx_desc_t *desc;
 	iwk_cmd_t *cmd;
+	clock_t clk;
 
 	ASSERT(size <= sizeof (cmd->data));
 	ASSERT(mutex_owned(&sc->sc_glock));
@@ -2812,11 +2931,11 @@ iwk_cmd(iwk_sc_t *sc, int code, const void *buf, int size, int async)
 	desc->pa[0].val1 = ((4 + size) << 4) & 0xfff0;
 
 	/* kick cmd ring XXX */
-	sc->sc_shared->queues_byte_cnt_tbls[ring->qid]
-	    .tfd_offset[ring->cur].val = 8;
+	sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
+	    tfd_offset[ring->cur].val = 8;
 	if (ring->cur < IWK_MAX_WIN_SIZE) {
-		sc->sc_shared->queues_byte_cnt_tbls[ring->qid]
-		    .tfd_offset[IWK_QUEUE_SIZE + ring->cur].val = 8;
+		sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
+		    tfd_offset[IWK_QUEUE_SIZE + ring->cur].val = 8;
 	}
 	ring->cur = (ring->cur + 1) % ring->count;
 	IWK_WRITE(sc, HBUS_TARG_WRPTR, ring->qid << 8 | ring->cur);
@@ -2824,12 +2943,11 @@ iwk_cmd(iwk_sc_t *sc, int code, const void *buf, int size, int async)
 	if (async)
 		return (IWK_SUCCESS);
 	else {
-		clock_t clk;
 		sc->sc_flags &= ~IWK_F_CMD_DONE;
 		clk = ddi_get_lbolt() + drv_usectohz(2000000);
 		while (!(sc->sc_flags & IWK_F_CMD_DONE)) {
-			if (cv_timedwait(&sc->sc_cmd_cv, &sc->sc_glock, clk)
-			    < 0)
+			if (cv_timedwait(&sc->sc_cmd_cv, &sc->sc_glock, clk) <
+			    0)
 				break;
 		}
 		if (sc->sc_flags & IWK_F_CMD_DONE)
@@ -2857,7 +2975,6 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 {
 	ieee80211com_t *ic = &sc->sc_ic;
 	ieee80211_node_t *in = ic->ic_bss;
-	iwk_tx_power_table_cmd_t txpower;
 	iwk_add_sta_t node;
 	iwk_link_quality_cmd_t link_quality;
 	struct ieee80211_rateset rs;
@@ -2910,29 +3027,14 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 		return (err);
 	}
 
-	/*
-	 * set Tx power for 2.4GHz channels
-	 * (need further investigation. fix tx power at present)
-	 */
-	(void) memset(&txpower, 0, sizeof (txpower));
-	txpower.band = 1; /* for 2.4G */
-	txpower.channel = sc->sc_config.chan;
-	txpower.channel_normal_width = 0;
-	for (i = 0; i < POWER_TABLE_NUM_HT_OFDM_ENTRIES; i++) {
-		txpower.tx_power.ht_ofdm_power[i].s
-		    .ramon_tx_gain = 0x3f3f;
-		txpower.tx_power.ht_ofdm_power[i].s
-		    .dsp_predis_atten = 110 | (110 << 8);
-	}
-	txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES].
-	    s.ramon_tx_gain = 0x3f3f;
-	txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES].
-	    s.dsp_predis_atten = 110 | (110 << 8);
-	err = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &txpower,
-	    sizeof (txpower), 1);
-	if (err != IWK_SUCCESS) {
+	/* obtain current temperature of chipset */
+	sc->sc_tempera = iwk_curr_tempera(sc);
+
+	/* make Tx power calibration to determine the gains of DSP and radio */
+	err = iwk_tx_power_calibration(sc);
+	if (err) {
 		cmn_err(CE_WARN, "iwk_hw_set_before_auth():"
-		    " failed to set txpower\n");
+		    "failed to set tx power table\n");
 		return (err);
 	}
 
@@ -2942,8 +3044,8 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 	node.id = IWK_AP_ID;
 	err = iwk_cmd(sc, REPLY_ADD_STA, &node, sizeof (node), 1);
 	if (err != IWK_SUCCESS) {
-		cmn_err(CE_WARN, "iwk_hw_set_before_auth():"
-		    " failed to add BSS node\n");
+		cmn_err(CE_WARN, "iwk_hw_set_before_auth(): "
+		    "failed to add BSS node\n");
 		return (err);
 	}
 
@@ -2998,6 +3100,8 @@ iwk_scan(iwk_sc_t *sc)
 	enum ieee80211_phymode mode;
 	uint8_t *frm;
 	int i, pktlen, nrates;
+
+	sc->sc_flags |= IWK_F_SCANNING;
 
 	data = &ring->data[ring->cur];
 	desc = data->desc;
@@ -3117,11 +3221,11 @@ iwk_scan(iwk_sc_t *sc)
 	 * maybe for cmd, filling the byte cnt table is not necessary.
 	 * anyway, we fill it here.
 	 */
-	sc->sc_shared->queues_byte_cnt_tbls[ring->qid]
-	    .tfd_offset[ring->cur].val = 8;
+	sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
+	    tfd_offset[ring->cur].val = 8;
 	if (ring->cur < IWK_MAX_WIN_SIZE) {
-		sc->sc_shared->queues_byte_cnt_tbls[ring->qid]
-		    .tfd_offset[IWK_QUEUE_SIZE + ring->cur].val = 8;
+		sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
+		    tfd_offset[IWK_QUEUE_SIZE + ring->cur].val = 8;
 	}
 
 	/* kick cmd ring */
@@ -3135,7 +3239,6 @@ static int
 iwk_config(iwk_sc_t *sc)
 {
 	ieee80211com_t *ic = &sc->sc_ic;
-	iwk_tx_power_table_cmd_t txpower;
 	iwk_powertable_cmd_t powertable;
 	iwk_bt_cmd_t bt;
 	iwk_add_sta_t node;
@@ -3174,8 +3277,8 @@ iwk_config(iwk_sc_t *sc)
 	IEEE80211_ADDR_COPY(sc->sc_config.node_addr, ic->ic_macaddr);
 	IEEE80211_ADDR_COPY(sc->sc_config.wlap_bssid, ic->ic_macaddr);
 	sc->sc_config.chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
-	sc->sc_config.flags = (RXON_FLG_TSF2HOST_MSK | RXON_FLG_AUTO_DETECT_MSK
-	    | RXON_FLG_BAND_24G_MSK);
+	sc->sc_config.flags = (RXON_FLG_TSF2HOST_MSK |
+	    RXON_FLG_AUTO_DETECT_MSK | RXON_FLG_BAND_24G_MSK);
 	sc->sc_config.flags &= (~RXON_FLG_CCK_MSK);
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
@@ -3184,9 +3287,12 @@ iwk_config(iwk_sc_t *sc)
 		    RXON_FILTER_DIS_DECRYPT_MSK |
 		    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
 		break;
-	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
 		sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
+		sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+		sc->sc_config.filter_flags = LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
+		    RXON_FILTER_DIS_DECRYPT_MSK |
+		    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
 		break;
 	case IEEE80211_M_HOSTAP:
 		sc->sc_config.dev_type = RXON_DEV_TYPE_AP;
@@ -3217,29 +3323,14 @@ iwk_config(iwk_sc_t *sc)
 		    "failed to set configure command\n");
 		return (err);
 	}
+	/* obtain current temperature of chipset */
+	sc->sc_tempera = iwk_curr_tempera(sc);
 
-	/*
-	 * set Tx power for 2.4GHz channels
-	 * (need further investigation. fix tx power at present)
-	 */
-	(void) memset(&txpower, 0, sizeof (txpower));
-	txpower.band = 1; /* for 2.4G */
-	txpower.channel = sc->sc_config.chan;
-	txpower.channel_normal_width = 0;
-	for (i = 0; i < POWER_TABLE_NUM_HT_OFDM_ENTRIES; i++) {
-		txpower.tx_power.ht_ofdm_power[i]
-		    .s.ramon_tx_gain = 0x3f3f;
-		txpower.tx_power.ht_ofdm_power[i]
-		    .s.dsp_predis_atten = 110 | (110 << 8);
-	}
-	txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES]
-	    .s.ramon_tx_gain = 0x3f3f;
-	txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES]
-	    .s.dsp_predis_atten = 110 | (110 << 8);
-	err = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &txpower,
-	    sizeof (txpower), 0);
-	if (err != IWK_SUCCESS) {
-		cmn_err(CE_WARN, "iwk_config(): failed to set txpower\n");
+	/* make Tx power calibration to determine the gains of DSP and radio */
+	err = iwk_tx_power_calibration(sc);
+	if (err) {
+		cmn_err(CE_WARN, "iwk_config(): "
+		    "failed to set tx power table\n");
 		return (err);
 	}
 
@@ -3378,7 +3469,8 @@ iwk_preinit(iwk_sc_t *sc)
 
 	tmp = IWK_READ(sc, CSR_SW_VER);
 	tmp |= CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI |
-	    CSR_HW_IF_CONFIG_REG_BIT_MAC_SI | CSR_HW_IF_CONFIG_REG_BIT_KEDRON_R;
+	    CSR_HW_IF_CONFIG_REG_BIT_MAC_SI |
+	    CSR_HW_IF_CONFIG_REG_BIT_KEDRON_R;
 	IWK_WRITE(sc, CSR_SW_VER, tmp);
 
 	/* make sure power supply on each part of the hardware */
@@ -3587,7 +3679,7 @@ iwk_init(iwk_sc_t *sc)
 		break;
 	}
 	if (n == 2) {
-		cmn_err(CE_WARN, "iwk_init(): " "failed to load firmware\n");
+		cmn_err(CE_WARN, "iwk_init(): failed to load firmware\n");
 		goto fail1;
 	}
 	/* ..and wait at most one second for adapter to initialize */
@@ -3752,4 +3844,1611 @@ iwk_amrr_ratectl(void *arg, ieee80211_node_t *in)
 
 	if (is_enough(amrr) || need_change)
 		reset_cnt(amrr);
+}
+
+/*
+ * calculate 4965 chipset's kelvin temperature according to
+ * the data of init alive and satistics notification.
+ * The details is described in iwk_calibration.h file
+ */
+static int32_t iwk_curr_tempera(iwk_sc_t *sc)
+{
+	int32_t  tempera;
+	int32_t  r1, r2, r3;
+	uint32_t  r4_u;
+	int32_t   r4_s;
+
+	if (iwk_is_fat_channel(sc)) {
+		r1 = (int32_t)(sc->sc_card_alive_init.therm_r1[1]);
+		r2 = (int32_t)(sc->sc_card_alive_init.therm_r2[1]);
+		r3 = (int32_t)(sc->sc_card_alive_init.therm_r3[1]);
+		r4_u = sc->sc_card_alive_init.therm_r4[1];
+	} else {
+		r1 = (int32_t)(sc->sc_card_alive_init.therm_r1[0]);
+		r2 = (int32_t)(sc->sc_card_alive_init.therm_r2[0]);
+		r3 = (int32_t)(sc->sc_card_alive_init.therm_r3[0]);
+		r4_u = sc->sc_card_alive_init.therm_r4[0];
+	}
+
+	if (sc->sc_flags & IWK_F_STATISTICS) {
+		r4_s = (int32_t)(sc->sc_statistics.general.temperature <<
+		    (31-23)) >> (31-23);
+	} else {
+		r4_s = (int32_t)(r4_u << (31-23)) >> (31-23);
+	}
+
+	IWK_DBG((IWK_DEBUG_CALIBRATION, "temperature R[1-4]: %d %d %d %d\n",
+	    r1, r2, r3, r4_s));
+
+	if (r3 == r1) {
+		cmn_err(CE_WARN, "iwk_curr_tempera(): "
+		    "failed to calculate temperature"
+		    "because r3 = r1\n");
+		return (DDI_FAILURE);
+	}
+
+	tempera = TEMPERATURE_CALIB_A_VAL * (r4_s - r2);
+	tempera /= (r3 - r1);
+	tempera = (tempera*97) / 100 + TEMPERATURE_CALIB_KELVIN_OFFSET;
+
+	IWK_DBG((IWK_DEBUG_CALIBRATION, "calculated temperature: %dK, %dC\n",
+	    tempera, KELVIN_TO_CELSIUS(tempera)));
+
+	return (tempera);
+}
+
+/* Determine whether 4965 is using 2.4 GHz band */
+static inline int iwk_is_24G_band(iwk_sc_t *sc)
+{
+	return (sc->sc_config.flags & RXON_FLG_BAND_24G_MSK);
+}
+
+/* Determine whether 4965 is using fat channel */
+static inline int iwk_is_fat_channel(iwk_sc_t *sc)
+{
+	return ((sc->sc_config.flags & RXON_FLG_CHANNEL_MODE_PURE_40_MSK) ||
+	    (sc->sc_config.flags & RXON_FLG_CHANNEL_MODE_MIXED_MSK));
+}
+
+/*
+ * In MIMO mode, determine which group 4965's current channel belong to.
+ * For more infomation about "channel group",
+ * please refer to iwk_calibration.h file
+ */
+static int iwk_txpower_grp(uint16_t channel)
+{
+	if (channel >= CALIB_IWK_TX_ATTEN_GR5_FCH &&
+	    channel <= CALIB_IWK_TX_ATTEN_GR5_LCH) {
+		return (CALIB_CH_GROUP_5);
+	}
+
+	if (channel >= CALIB_IWK_TX_ATTEN_GR1_FCH &&
+	    channel <= CALIB_IWK_TX_ATTEN_GR1_LCH) {
+		return (CALIB_CH_GROUP_1);
+	}
+
+	if (channel >= CALIB_IWK_TX_ATTEN_GR2_FCH &&
+	    channel <= CALIB_IWK_TX_ATTEN_GR2_LCH) {
+		return (CALIB_CH_GROUP_2);
+	}
+
+	if (channel >= CALIB_IWK_TX_ATTEN_GR3_FCH &&
+	    channel <= CALIB_IWK_TX_ATTEN_GR3_LCH) {
+		return (CALIB_CH_GROUP_3);
+	}
+
+	if (channel >= CALIB_IWK_TX_ATTEN_GR4_FCH &&
+	    channel <= CALIB_IWK_TX_ATTEN_GR4_LCH) {
+		return (CALIB_CH_GROUP_4);
+	}
+
+	cmn_err(CE_WARN, "iwk_txpower_grp(): "
+	    "can't find txpower group for channel %d.\n", channel);
+
+	return (DDI_FAILURE);
+}
+
+/* 2.4 GHz */
+static uint16_t iwk_eep_band_1[14] = {
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+};
+
+/* 5.2 GHz bands */
+static uint16_t iwk_eep_band_2[13] = {
+	183, 184, 185, 187, 188, 189, 192, 196, 7, 8, 11, 12, 16
+};
+
+static uint16_t iwk_eep_band_3[12] = {
+	34, 36, 38, 40, 42, 44, 46, 48, 52, 56, 60, 64
+};
+
+static uint16_t iwk_eep_band_4[11] = {
+	100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140
+};
+
+static uint16_t iwk_eep_band_5[6] = {
+	145, 149, 153, 157, 161, 165
+};
+
+static uint16_t iwk_eep_band_6[7] = {
+	1, 2, 3, 4, 5, 6, 7
+};
+
+static uint16_t iwk_eep_band_7[11] = {
+	36, 44, 52, 60, 100, 108, 116, 124, 132, 149, 157
+};
+
+/* Get regulatory data from eeprom for a given channel */
+static struct iwk_eep_channel *iwk_get_eep_channel(iwk_sc_t *sc,
+    uint16_t channel,
+    int is_24G, int is_fat, int is_hi_chan)
+{
+	int32_t i;
+	uint16_t chan;
+
+	if (is_fat) {  /* 11n mode */
+
+		if (is_hi_chan) {
+			chan = channel - 4;
+		} else {
+			chan = channel;
+		}
+
+		for (i = 0; i < 7; i++) {
+			if (iwk_eep_band_6[i] == chan) {
+				return (&sc->sc_eep_map.band_24_channels[i]);
+			}
+		}
+		for (i = 0; i < 11; i++) {
+			if (iwk_eep_band_7[i] == chan) {
+				return (&sc->sc_eep_map.band_52_channels[i]);
+			}
+		}
+	} else if (is_24G) {  /* 2.4 GHz band */
+		for (i = 0; i < 14; i++) {
+			if (iwk_eep_band_1[i] == channel) {
+				return (&sc->sc_eep_map.band_1_channels[i]);
+			}
+		}
+	} else {  /* 5 GHz band */
+		for (i = 0; i < 13; i++) {
+			if (iwk_eep_band_2[i] == channel) {
+				return (&sc->sc_eep_map.band_2_channels[i]);
+			}
+		}
+		for (i = 0; i < 12; i++) {
+			if (iwk_eep_band_3[i] == channel) {
+				return (&sc->sc_eep_map.band_3_channels[i]);
+			}
+		}
+		for (i = 0; i < 11; i++) {
+			if (iwk_eep_band_4[i] == channel) {
+				return (&sc->sc_eep_map.band_4_channels[i]);
+			}
+		}
+		for (i = 0; i < 6; i++) {
+			if (iwk_eep_band_5[i] == channel) {
+				return (&sc->sc_eep_map.band_5_channels[i]);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
+/*
+ * Determine which subband a given channel belongs
+ * to in 2.4 GHz or 5 GHz band
+ */
+static int32_t iwk_band_number(iwk_sc_t *sc, uint16_t channel)
+{
+	int32_t b_n = -1;
+
+	for (b_n = 0; b_n < EEP_TX_POWER_BANDS; b_n++) {
+		if (0 == sc->sc_eep_map.calib_info.band_info_tbl[b_n].ch_from) {
+			continue;
+		}
+
+		if ((channel >=
+		    (uint16_t)sc->sc_eep_map.calib_info.
+		    band_info_tbl[b_n].ch_from) &&
+		    (channel <=
+		    (uint16_t)sc->sc_eep_map.calib_info.
+		    band_info_tbl[b_n].ch_to)) {
+			break;
+		}
+	}
+
+	return (b_n);
+}
+
+/* Make a special division for interpolation operation */
+static int iwk_division(int32_t num, int32_t denom, int32_t *res)
+{
+	int32_t sign = 1;
+
+	if (num < 0) {
+		sign = -sign;
+		num = -num;
+	}
+
+	if (denom < 0) {
+		sign = -sign;
+		denom = -denom;
+	}
+
+	*res = ((num*2 + denom) / (denom*2)) * sign;
+
+	return (IWK_SUCCESS);
+}
+
+/* Make interpolation operation */
+static int32_t iwk_interpolate_value(int32_t x, int32_t x1, int32_t y1,
+    int32_t x2, int32_t y2)
+{
+	int32_t val;
+
+	if (x2 == x1) {
+		return (y1);
+	} else {
+		(void) iwk_division((x2-x)*(y1-y2), (x2-x1), &val);
+		return (val + y2);
+	}
+}
+
+/* Get interpolation measurement data of a given channel for all chains. */
+static int iwk_channel_interpolate(iwk_sc_t *sc, uint16_t channel,
+    struct iwk_eep_calib_channel_info *chan_info)
+{
+	int32_t ban_n;
+	uint32_t ch1_n, ch2_n;
+	int32_t c, m;
+	struct iwk_eep_calib_measure *m1_p, *m2_p, *m_p;
+
+	/* determine subband number */
+	ban_n = iwk_band_number(sc, channel);
+	if (ban_n >= EEP_TX_POWER_BANDS) {
+		return (DDI_FAILURE);
+	}
+
+	ch1_n =
+	    (uint32_t)sc->sc_eep_map.calib_info.band_info_tbl[ban_n].ch1.ch_num;
+	ch2_n =
+	    (uint32_t)sc->sc_eep_map.calib_info.band_info_tbl[ban_n].ch2.ch_num;
+
+	chan_info->ch_num = (uint8_t)channel;  /* given channel number */
+
+	/*
+	 * go through all chains on chipset
+	 */
+	for (c = 0; c < EEP_TX_POWER_TX_CHAINS; c++) {
+		/*
+		 * go through all factory measurements
+		 */
+		for (m = 0; m < EEP_TX_POWER_MEASUREMENTS; m++) {
+			m1_p =
+			    &(sc->sc_eep_map.calib_info.
+			    band_info_tbl[ban_n].ch1.measure[c][m]);
+			m2_p =
+			    &(sc->sc_eep_map.calib_info.band_info_tbl[ban_n].
+			    ch2.measure[c][m]);
+			m_p = &(chan_info->measure[c][m]);
+
+			/*
+			 * make interpolation to get actual
+			 * Tx power for given channel
+			 */
+			m_p->actual_pow = iwk_interpolate_value(channel,
+			    ch1_n, m1_p->actual_pow,
+			    ch2_n, m2_p->actual_pow);
+
+			/* make interpolation to get index into gain table */
+			m_p->gain_idx = iwk_interpolate_value(channel,
+			    ch1_n, m1_p->gain_idx,
+			    ch2_n, m2_p->gain_idx);
+
+			/* make interpolation to get chipset temperature */
+			m_p->temperature = iwk_interpolate_value(channel,
+			    ch1_n, m1_p->temperature,
+			    ch2_n, m2_p->temperature);
+
+			/*
+			 * make interpolation to get power
+			 * amp detector level
+			 */
+			m_p->pa_det = iwk_interpolate_value(channel, ch1_n,
+			    m1_p->pa_det,
+			    ch2_n, m2_p->pa_det);
+		}
+	}
+
+	return (IWK_SUCCESS);
+}
+
+/*
+ * Calculate voltage compensation for Tx power. For more infomation,
+ * please refer to iwk_calibration.h file
+ */
+static int32_t iwk_voltage_compensation(int32_t eep_voltage,
+    int32_t curr_voltage)
+{
+	int32_t vol_comp = 0;
+
+	if ((TX_POWER_IWK_ILLEGAL_VOLTAGE == eep_voltage) ||
+	    (TX_POWER_IWK_ILLEGAL_VOLTAGE == curr_voltage)) {
+		return (vol_comp);
+	}
+
+	(void) iwk_division(curr_voltage-eep_voltage,
+	    TX_POWER_IWK_VOLTAGE_CODES_PER_03V, &vol_comp);
+
+	if (curr_voltage > eep_voltage) {
+		vol_comp *= 2;
+	}
+	if ((vol_comp < -2) || (vol_comp > 2)) {
+		vol_comp = 0;
+	}
+
+	return (vol_comp);
+}
+
+/*
+ * Thermal compensation values for txpower for various frequency ranges ...
+ * ratios from 3:1 to 4.5:1 of degrees (Celsius) per half-dB gain adjust
+ */
+static struct iwk_txpower_tempera_comp {
+	int32_t degrees_per_05db_a;
+	int32_t degrees_per_05db_a_denom;
+} txpower_tempera_comp_table[CALIB_CH_GROUP_MAX] = {
+	{9, 2},			/* group 0 5.2, ch  34-43 */
+	{4, 1},			/* group 1 5.2, ch  44-70 */
+	{4, 1},			/* group 2 5.2, ch  71-124 */
+	{4, 1},			/* group 3 5.2, ch 125-200 */
+	{3, 1}			/* group 4 2.4, ch   all */
+};
+
+/*
+ * bit-rate-dependent table to prevent Tx distortion, in half-dB units,
+ * for OFDM 6, 12, 18, 24, 36, 48, 54, 60 MBit, and CCK all rates.
+ */
+static int32_t back_off_table[] = {
+	10, 10, 10, 10, 10, 15, 17, 20, /* OFDM SISO 20 MHz */
+	10, 10, 10, 10, 10, 15, 17, 20, /* OFDM MIMO 20 MHz */
+	10, 10, 10, 10, 10, 15, 17, 20, /* OFDM SISO 40 MHz */
+	10, 10, 10, 10, 10, 15, 17, 20, /* OFDM MIMO 40 MHz */
+	10			/* CCK */
+};
+
+/* determine minimum Tx power index in gain table */
+static int32_t iwk_min_power_index(int32_t rate_pow_idx, int32_t is_24G)
+{
+	if ((!is_24G) && ((rate_pow_idx & 7) <= 4)) {
+		return (MIN_TX_GAIN_INDEX_52GHZ_EXT);
+	}
+
+	return (MIN_TX_GAIN_INDEX);
+}
+
+/*
+ * Determine DSP and radio gain according to temperature and other factors.
+ * This function is the majority of Tx power calibration
+ */
+static int iwk_txpower_table_cmd_init(iwk_sc_t *sc,
+    struct iwk_tx_power_db *tp_db)
+{
+	int is_24G, is_fat, is_high_chan, is_mimo;
+	int c, r;
+	int32_t target_power;
+	int32_t tx_grp = CALIB_CH_GROUP_MAX;
+	uint16_t channel;
+	uint8_t saturation_power;
+	int32_t regu_power;
+	int32_t curr_regu_power;
+	struct iwk_eep_channel *eep_chan_p;
+	struct iwk_eep_calib_channel_info eep_chan_calib;
+	int32_t eep_voltage, init_voltage;
+	int32_t voltage_compensation;
+	int32_t temperature;
+	int32_t degrees_per_05db_num;
+	int32_t degrees_per_05db_denom;
+	struct iwk_eep_calib_measure *measure_p;
+	int32_t interpo_temp;
+	int32_t power_limit;
+	int32_t atten_value;
+	int32_t tempera_comp[2];
+	int32_t interpo_gain_idx[2];
+	int32_t interpo_actual_pow[2];
+	union iwk_tx_power_dual_stream txpower_gains;
+	int32_t txpower_gains_idx;
+
+	channel = sc->sc_config.chan;
+
+	/* 2.4 GHz or 5 GHz band */
+	is_24G = iwk_is_24G_band(sc);
+
+	/* fat channel or not */
+	is_fat = iwk_is_fat_channel(sc);
+
+	/*
+	 * using low half channel number or high half channel number
+	 * identify fat channel
+	 */
+	if (is_fat && (sc->sc_config.flags &
+	    RXON_FLG_CONTROL_CHANNEL_LOC_HIGH_MSK)) {
+		is_high_chan = 1;
+	}
+
+	if ((channel > 0) && (channel < 200)) {
+		/* get regulatory channel data from eeprom */
+		eep_chan_p = iwk_get_eep_channel(sc, channel, is_24G,
+		    is_fat, is_high_chan);
+		if (NULL == eep_chan_p) {
+			cmn_err(CE_WARN,
+			    "iwk_txpower_table_cmd_init(): "
+			    "can't get channel infomation\n");
+			return (DDI_FAILURE);
+		}
+	} else {
+		cmn_err(CE_WARN, "iwk_txpower_table_cmd_init(): "
+		    "channel(%d) isn't in proper range\n",
+		    channel);
+		return (DDI_FAILURE);
+	}
+
+	/* initial value of Tx power */
+	sc->sc_user_txpower = (int32_t)eep_chan_p->max_power_avg;
+	if (sc->sc_user_txpower < IWK_TX_POWER_TARGET_POWER_MIN) {
+		cmn_err(CE_WARN, "iwk_txpower_table_cmd_init(): "
+		    "user TX power is too weak\n");
+		return (DDI_FAILURE);
+	} else if (sc->sc_user_txpower > IWK_TX_POWER_TARGET_POWER_MAX) {
+		cmn_err(CE_WARN, "iwk_txpower_table_cmd_init(): "
+		    "user TX power is too strong\n");
+		return (DDI_FAILURE);
+	}
+
+	target_power = 2 * sc->sc_user_txpower;
+
+	/* determine which group current channel belongs to */
+	tx_grp = iwk_txpower_grp(channel);
+	if (tx_grp < 0) {
+		return (tx_grp);
+	}
+
+
+	if (is_fat) {
+		if (is_high_chan) {
+			channel -= 2;
+		} else {
+			channel += 2;
+		}
+	}
+
+	/* determine saturation power */
+	if (is_24G) {
+		saturation_power =
+		    sc->sc_eep_map.calib_info.saturation_power24;
+	} else {
+		saturation_power =
+		    sc->sc_eep_map.calib_info.saturation_power52;
+	}
+
+	if (saturation_power < IWK_TX_POWER_SATURATION_MIN ||
+	    saturation_power > IWK_TX_POWER_SATURATION_MAX) {
+		if (is_24G) {
+			saturation_power = IWK_TX_POWER_DEFAULT_SATURATION_24;
+		} else {
+			saturation_power = IWK_TX_POWER_DEFAULT_SATURATION_52;
+		}
+	}
+
+	/* determine regulatory power */
+	regu_power = (int32_t)eep_chan_p->max_power_avg * 2;
+	if ((regu_power < IWK_TX_POWER_REGULATORY_MIN) ||
+	    (regu_power > IWK_TX_POWER_REGULATORY_MAX)) {
+		if (is_24G) {
+			regu_power = IWK_TX_POWER_DEFAULT_REGULATORY_24;
+		} else {
+			regu_power = IWK_TX_POWER_DEFAULT_REGULATORY_52;
+		}
+	}
+
+	/*
+	 * get measurement data for current channel
+	 * suach as temperature,index to gain table,actual Tx power
+	 */
+	(void) iwk_channel_interpolate(sc, channel, &eep_chan_calib);
+
+	eep_voltage = (int32_t)sc->sc_eep_map.calib_info.voltage;
+	init_voltage = (int32_t)sc->sc_card_alive_init.voltage;
+
+	/* calculate voltage compensation to Tx power */
+	voltage_compensation =
+	    iwk_voltage_compensation(eep_voltage, init_voltage);
+
+	if (sc->sc_tempera >= IWK_TX_POWER_TEMPERATURE_MIN) {
+		temperature = sc->sc_tempera;
+	} else {
+		temperature = IWK_TX_POWER_TEMPERATURE_MIN;
+	}
+	if (sc->sc_tempera <= IWK_TX_POWER_TEMPERATURE_MAX) {
+		temperature = sc->sc_tempera;
+	} else {
+		temperature = IWK_TX_POWER_TEMPERATURE_MAX;
+	}
+	temperature = KELVIN_TO_CELSIUS(temperature);
+
+	degrees_per_05db_num =
+	    txpower_tempera_comp_table[tx_grp].degrees_per_05db_a;
+	degrees_per_05db_denom =
+	    txpower_tempera_comp_table[tx_grp].degrees_per_05db_a_denom;
+
+	for (c = 0; c < 2; c++) {  /* go through all chains */
+		measure_p = &eep_chan_calib.measure[c][1];
+		interpo_temp = measure_p->temperature;
+
+		/* determine temperature compensation to Tx power */
+		(void) iwk_division(
+		    (temperature-interpo_temp)*degrees_per_05db_denom,
+		    degrees_per_05db_num, &tempera_comp[c]);
+
+		interpo_gain_idx[c] = measure_p->gain_idx;
+		interpo_actual_pow[c] = measure_p->actual_pow;
+	}
+
+	/*
+	 * go through all rate entries in Tx power table
+	 */
+	for (r = 0; r < POWER_TABLE_NUM_ENTRIES; r++) {
+		if (r & 0x8) {
+			/* need to lower regulatory power for MIMO mode */
+			curr_regu_power = regu_power -
+			    IWK_TX_POWER_MIMO_REGULATORY_COMPENSATION;
+			is_mimo = 1;
+		} else {
+			curr_regu_power = regu_power;
+			is_mimo = 0;
+		}
+
+		power_limit = saturation_power - back_off_table[r];
+		if (power_limit > curr_regu_power) {
+			/* final Tx power limit */
+			power_limit = curr_regu_power;
+		}
+
+		if (target_power > power_limit) {
+			target_power = power_limit; /* final target Tx power */
+		}
+
+		for (c = 0; c < 2; c++) {	  /* go through all Tx chains */
+			if (is_mimo) {
+				atten_value =
+				    sc->sc_card_alive_init.tx_atten[tx_grp][c];
+			} else {
+				atten_value = 0;
+			}
+
+			/*
+			 * calculate index in gain table
+			 * this step is very important
+			 */
+			txpower_gains_idx = interpo_gain_idx[c] -
+			    (target_power - interpo_actual_pow[c]) -
+			    tempera_comp[c] - voltage_compensation +
+			    atten_value;
+
+			if (txpower_gains_idx <
+			    iwk_min_power_index(r, is_24G)) {
+				txpower_gains_idx =
+				    iwk_min_power_index(r, is_24G);
+			}
+
+			if (!is_24G) {
+				/*
+				 * support negative index for 5 GHz
+				 * band
+				 */
+				txpower_gains_idx += 9;
+			}
+
+			if (POWER_TABLE_CCK_ENTRY == r) {
+				/* for CCK mode, make necessary attenuaton */
+				txpower_gains_idx +=
+				    IWK_TX_POWER_CCK_COMPENSATION_C_STEP;
+			}
+
+			if (txpower_gains_idx > 107) {
+				txpower_gains_idx = 107;
+			} else if (txpower_gains_idx < 0) {
+				txpower_gains_idx = 0;
+			}
+
+			/* search DSP and radio gains in gain table */
+			txpower_gains.s.radio_tx_gain[c] =
+			    gains_table[is_24G][txpower_gains_idx].radio;
+			txpower_gains.s.dsp_predis_atten[c] =
+			    gains_table[is_24G][txpower_gains_idx].dsp;
+
+			IWK_DBG((IWK_DEBUG_CALIBRATION,
+			    "rate_index: %d, "
+			    "gain_index %d, c: %d,is_mimo: %d\n",
+			    r, txpower_gains_idx, c, is_mimo));
+		}
+
+		/* initialize Tx power table */
+		if (r < POWER_TABLE_NUM_HT_OFDM_ENTRIES) {
+			tp_db->ht_ofdm_power[r].dw = txpower_gains.dw;
+		} else {
+			tp_db->legacy_cck_power.dw = txpower_gains.dw;
+		}
+	}
+
+	return (IWK_SUCCESS);
+}
+
+/*
+ * make Tx power calibration to adjust Tx power.
+ * This is completed by sending out Tx power table command.
+ */
+static int iwk_tx_power_calibration(iwk_sc_t *sc)
+{
+	iwk_tx_power_table_cmd_t cmd;
+	int rv;
+
+	if (sc->sc_flags & IWK_F_SCANNING) {
+		return (IWK_SUCCESS);
+	}
+
+	/* necessary initialization to Tx power table command */
+	cmd.band = (uint8_t)iwk_is_24G_band(sc);
+	cmd.channel = sc->sc_config.chan;
+	cmd.channel_normal_width = 0;
+
+	/* initialize Tx power table */
+	rv = iwk_txpower_table_cmd_init(sc, &cmd.tx_power);
+	if (rv) {
+		cmn_err(CE_NOTE, "rv= %d\n", rv);
+		return (rv);
+	}
+
+	/* send out Tx power table command */
+	rv = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &cmd, sizeof (cmd), 1);
+	if (rv) {
+		return (rv);
+	}
+
+	/* record current temperature */
+	sc->sc_last_tempera = sc->sc_tempera;
+
+	return (IWK_SUCCESS);
+}
+
+/* This function is the handler of statistics notification from uCode */
+static void iwk_statistics_notify(iwk_sc_t *sc, iwk_rx_desc_t *desc)
+{
+	int is_diff;
+	struct iwk_notif_statistics *statistics_p =
+	    (struct iwk_notif_statistics *)(desc + 1);
+
+	mutex_enter(&sc->sc_glock);
+
+	is_diff = (sc->sc_statistics.general.temperature !=
+	    statistics_p->general.temperature) ||
+	    ((sc->sc_statistics.flag & STATISTICS_REPLY_FLG_FAT_MODE_MSK) !=
+	    (statistics_p->flag & STATISTICS_REPLY_FLG_FAT_MODE_MSK));
+
+	/* update statistics data */
+	(void) memcpy(&sc->sc_statistics, statistics_p,
+	    sizeof (struct iwk_notif_statistics));
+
+	sc->sc_flags |= IWK_F_STATISTICS;
+
+	if (!(sc->sc_flags & IWK_F_SCANNING)) {
+		/* make Receiver gain balance calibration */
+		(void) iwk_rxgain_diff(sc);
+
+		/* make Receiver sensitivity calibration */
+		(void) iwk_rx_sens(sc);
+	}
+
+
+	if (!is_diff) {
+		mutex_exit(&sc->sc_glock);
+		return;
+	}
+
+	/* calibration current temperature of 4965 chipset */
+	sc->sc_tempera = iwk_curr_tempera(sc);
+
+	/* distinct temperature change will trigger Tx power calibration */
+	if (((sc->sc_tempera - sc->sc_last_tempera) >= 3) ||
+	    ((sc->sc_last_tempera - sc->sc_tempera) >= 3)) {
+		/* make Tx power calibration */
+		(void) iwk_tx_power_calibration(sc);
+	}
+
+	mutex_exit(&sc->sc_glock);
+}
+
+/* Determine this station is in associated state or not */
+static int iwk_is_associated(iwk_sc_t *sc)
+{
+	return (sc->sc_config.filter_flags & RXON_FILTER_ASSOC_MSK);
+}
+
+/* Make necessary preparation for Receiver gain balance calibration */
+static int iwk_rxgain_diff_init(iwk_sc_t *sc)
+{
+	int i, rv;
+	struct iwk_calibration_cmd cmd;
+	struct iwk_rx_gain_diff *gain_diff_p;
+
+	gain_diff_p = &sc->sc_rxgain_diff;
+
+	(void) memset(gain_diff_p, 0, sizeof (struct iwk_rx_gain_diff));
+	(void) memset(&cmd, 0, sizeof (struct iwk_calibration_cmd));
+
+	for (i = 0; i < RX_CHAINS_NUM; i++) {
+		gain_diff_p->gain_diff_chain[i] = CHAIN_GAIN_DIFF_INIT_VAL;
+	}
+
+	if (iwk_is_associated(sc)) {
+		cmd.opCode = PHY_CALIBRATE_DIFF_GAIN_CMD;
+		cmd.diff_gain_a = 0;
+		cmd.diff_gain_b = 0;
+		cmd.diff_gain_c = 0;
+
+		/* assume the gains of every Rx chains is balanceable */
+		rv = iwk_cmd(sc, REPLY_PHY_CALIBRATION_CMD, &cmd,
+		    sizeof (cmd), 1);
+		if (rv) {
+			return (rv);
+		}
+
+		gain_diff_p->state = IWK_GAIN_DIFF_ACCUMULATE;
+	}
+
+	return (IWK_SUCCESS);
+}
+
+/*
+ * make Receiver gain balance to balance Rx gain between Rx chains
+ * and determine which chain is disconnected
+ */
+static int iwk_rxgain_diff(iwk_sc_t *sc)
+{
+	int i, is_24G, rv;
+	int max_beacon_chain_n;
+	int min_noise_chain_n;
+	uint16_t channel_n;
+	int32_t beacon_diff;
+	int32_t noise_diff;
+	uint32_t noise_chain_a, noise_chain_b, noise_chain_c;
+	uint32_t beacon_chain_a, beacon_chain_b, beacon_chain_c;
+	struct iwk_calibration_cmd cmd;
+	uint32_t beacon_aver[RX_CHAINS_NUM] = {0xFFFFFFFF};
+	uint32_t noise_aver[RX_CHAINS_NUM] = {0xFFFFFFFF};
+	struct statistics_rx_non_phy *rx_general_p =
+	    &sc->sc_statistics.rx.general;
+	struct iwk_rx_gain_diff *gain_diff_p = &sc->sc_rxgain_diff;
+
+	if (INTERFERENCE_DATA_AVAILABLE !=
+	    rx_general_p->interference_data_flag) {
+		return (IWK_SUCCESS);
+	}
+
+	if (IWK_GAIN_DIFF_ACCUMULATE != gain_diff_p->state) {
+		return (IWK_SUCCESS);
+	}
+
+	is_24G = iwk_is_24G_band(sc);
+	channel_n = sc->sc_config.chan;	 /* channel number */
+
+	if ((channel_n != (sc->sc_statistics.flag >> 16)) ||
+	    ((STATISTICS_REPLY_FLG_BAND_24G_MSK ==
+	    (sc->sc_statistics.flag & STATISTICS_REPLY_FLG_BAND_24G_MSK)) &&
+	    !is_24G)) {
+		return (IWK_SUCCESS);
+	}
+
+	/* Rx chain's noise strength from statistics notification */
+	noise_chain_a = rx_general_p->beacon_silence_rssi_a & 0xFF;
+	noise_chain_b = rx_general_p->beacon_silence_rssi_b & 0xFF;
+	noise_chain_c = rx_general_p->beacon_silence_rssi_c & 0xFF;
+
+	/* Rx chain's beacon strength from statistics notification */
+	beacon_chain_a = rx_general_p->beacon_rssi_a & 0xFF;
+	beacon_chain_b = rx_general_p->beacon_rssi_b & 0xFF;
+	beacon_chain_c = rx_general_p->beacon_rssi_c & 0xFF;
+
+	gain_diff_p->beacon_count++;
+
+	/* accumulate chain's noise strength */
+	gain_diff_p->noise_stren_a += noise_chain_a;
+	gain_diff_p->noise_stren_b += noise_chain_b;
+	gain_diff_p->noise_stren_c += noise_chain_c;
+
+	/* accumulate chain's beacon strength */
+	gain_diff_p->beacon_stren_a += beacon_chain_a;
+	gain_diff_p->beacon_stren_b += beacon_chain_b;
+	gain_diff_p->beacon_stren_c += beacon_chain_c;
+
+	if (BEACON_NUM_20 == gain_diff_p->beacon_count) {
+		/* calculate average beacon strength */
+		beacon_aver[0] = (gain_diff_p->beacon_stren_a) / BEACON_NUM_20;
+		beacon_aver[1] = (gain_diff_p->beacon_stren_b) / BEACON_NUM_20;
+		beacon_aver[2] = (gain_diff_p->beacon_stren_c) / BEACON_NUM_20;
+
+		/* calculate average noise strength */
+		noise_aver[0] = (gain_diff_p->noise_stren_a) / BEACON_NUM_20;
+		noise_aver[1] = (gain_diff_p->noise_stren_b) / BEACON_NUM_20;
+		noise_aver[2] = (gain_diff_p->noise_stren_b) / BEACON_NUM_20;
+
+		/* determine maximum beacon strength among 3 chains */
+		if ((beacon_aver[0] >= beacon_aver[1]) &&
+		    (beacon_aver[0] >= beacon_aver[2])) {
+			max_beacon_chain_n = 0;
+			gain_diff_p->connected_chains = 1 << 0;
+		} else if (beacon_aver[1] >= beacon_aver[2]) {
+			max_beacon_chain_n = 1;
+			gain_diff_p->connected_chains = 1 << 1;
+		} else {
+			max_beacon_chain_n = 2;
+			gain_diff_p->connected_chains = 1 << 2;
+		}
+
+		/* determine which chain is disconnected */
+		for (i = 0; i < RX_CHAINS_NUM; i++) {
+			if (i != max_beacon_chain_n) {
+				beacon_diff = beacon_aver[max_beacon_chain_n] -
+				    beacon_aver[i];
+				if (beacon_diff > MAX_ALLOWED_DIFF) {
+					gain_diff_p->disconnect_chain[i] = 1;
+				} else {
+					gain_diff_p->connected_chains |=
+					    (1 << i);
+				}
+			}
+		}
+
+		/*
+		 * if chain A and B are both disconnected,
+		 * assume the stronger in beacon strength is connected
+		 */
+		if (gain_diff_p->disconnect_chain[0] &&
+		    gain_diff_p->disconnect_chain[1]) {
+			if (beacon_aver[0] >= beacon_aver[1]) {
+				gain_diff_p->disconnect_chain[0] = 0;
+				gain_diff_p->connected_chains |= (1 << 0);
+			} else {
+				gain_diff_p->disconnect_chain[1] = 0;
+				gain_diff_p->connected_chains |= (1 << 1);
+			}
+		}
+
+		/* determine minimum noise strength among 3 chains */
+		if (!gain_diff_p->disconnect_chain[0]) {
+			min_noise_chain_n = 0;
+
+			for (i = 0; i < RX_CHAINS_NUM; i++) {
+				if (!gain_diff_p->disconnect_chain[i] &&
+				    (noise_aver[i] <=
+				    noise_aver[min_noise_chain_n])) {
+					min_noise_chain_n = i;
+				}
+
+			}
+		} else {
+			min_noise_chain_n = 1;
+
+			for (i = 0; i < RX_CHAINS_NUM; i++) {
+				if (!gain_diff_p->disconnect_chain[i] &&
+				    (noise_aver[i] <=
+				    noise_aver[min_noise_chain_n])) {
+					min_noise_chain_n = i;
+				}
+			}
+		}
+
+		gain_diff_p->gain_diff_chain[min_noise_chain_n] = 0;
+
+		/* determine gain difference between chains */
+		for (i = 0; i < RX_CHAINS_NUM; i++) {
+			if (!gain_diff_p->disconnect_chain[i] &&
+			    (CHAIN_GAIN_DIFF_INIT_VAL ==
+			    gain_diff_p->gain_diff_chain[i])) {
+
+				noise_diff = noise_aver[i] -
+				    noise_aver[min_noise_chain_n];
+				gain_diff_p->gain_diff_chain[i] =
+				    (uint8_t)((noise_diff * 10) / 15);
+
+				if (gain_diff_p->gain_diff_chain[i] > 3) {
+					gain_diff_p->gain_diff_chain[i] = 3;
+				}
+
+				gain_diff_p->gain_diff_chain[i] |= (1 << 2);
+			} else {
+				gain_diff_p->gain_diff_chain[i] = 0;
+			}
+		}
+
+		if (!gain_diff_p->gain_diff_send) {
+			gain_diff_p->gain_diff_send = 1;
+
+			(void) memset(&cmd, 0, sizeof (cmd));
+
+			cmd.opCode = PHY_CALIBRATE_DIFF_GAIN_CMD;
+			cmd.diff_gain_a = gain_diff_p->gain_diff_chain[0];
+			cmd.diff_gain_b = gain_diff_p->gain_diff_chain[1];
+			cmd.diff_gain_c = gain_diff_p->gain_diff_chain[2];
+
+			/*
+			 * send out PHY calibration command to
+			 * adjust every chain's Rx gain
+			 */
+			rv = iwk_cmd(sc, REPLY_PHY_CALIBRATION_CMD,
+			    &cmd, sizeof (cmd), 1);
+			if (rv) {
+				return (rv);
+			}
+
+			gain_diff_p->state = IWK_GAIN_DIFF_CALIBRATED;
+		}
+
+		gain_diff_p->beacon_stren_a = 0;
+		gain_diff_p->beacon_stren_b = 0;
+		gain_diff_p->beacon_stren_c = 0;
+
+		gain_diff_p->noise_stren_a = 0;
+		gain_diff_p->noise_stren_b = 0;
+		gain_diff_p->noise_stren_c = 0;
+	}
+
+	return (IWK_SUCCESS);
+}
+
+/* Make necessary preparation for Receiver sensitivity calibration */
+static int iwk_rx_sens_init(iwk_sc_t *sc)
+{
+	int i, rv;
+	struct iwk_rx_sensitivity_cmd cmd;
+	struct iwk_rx_sensitivity *rx_sens_p = &sc->sc_rx_sens;
+
+	(void) memset(&cmd, 0, sizeof (struct iwk_rx_sensitivity_cmd));
+	(void) memset(rx_sens_p, 0, sizeof (struct iwk_rx_sensitivity));
+
+	rx_sens_p->auto_corr_ofdm_x4 = 90;
+	rx_sens_p->auto_corr_mrc_ofdm_x4 = 170;
+	rx_sens_p->auto_corr_ofdm_x1 = 105;
+	rx_sens_p->auto_corr_mrc_ofdm_x1 = 220;
+
+	rx_sens_p->auto_corr_cck_x4 = 125;
+	rx_sens_p->auto_corr_mrc_cck_x4 = 200;
+	rx_sens_p->min_energy_det_cck = 100;
+
+	rx_sens_p->flags &= (~IWK_SENSITIVITY_CALIB_ALLOW_MSK);
+	rx_sens_p->flags &= (~IWK_SENSITIVITY_OFDM_UPDATE_MSK);
+	rx_sens_p->flags &= (~IWK_SENSITIVITY_CCK_UPDATE_MSK);
+
+	rx_sens_p->last_bad_plcp_cnt_ofdm = 0;
+	rx_sens_p->last_false_alarm_cnt_ofdm = 0;
+	rx_sens_p->last_bad_plcp_cnt_cck = 0;
+	rx_sens_p->last_false_alarm_cnt_cck = 0;
+
+	rx_sens_p->cck_curr_state = IWK_TOO_MANY_FALSE_ALARM;
+	rx_sens_p->cck_prev_state = IWK_TOO_MANY_FALSE_ALARM;
+	rx_sens_p->cck_no_false_alarm_num = 0;
+	rx_sens_p->cck_beacon_idx = 0;
+
+	for (i = 0; i < 10; i++) {
+		rx_sens_p->cck_beacon_min[i] = 0;
+	}
+
+	rx_sens_p->cck_noise_idx = 0;
+	rx_sens_p->cck_noise_ref = 0;
+
+	for (i = 0; i < 20; i++) {
+		rx_sens_p->cck_noise_max[i] = 0;
+	}
+
+	rx_sens_p->cck_noise_diff = 0;
+	rx_sens_p->cck_no_false_alarm_num = 0;
+
+	cmd.control = IWK_SENSITIVITY_CONTROL_WORK_TABLE;
+
+	cmd.table[AUTO_CORR32_X4_TH_ADD_MIN_IDX] =
+	    rx_sens_p->auto_corr_ofdm_x4;
+	cmd.table[AUTO_CORR32_X4_TH_ADD_MIN_MRC_IDX] =
+	    rx_sens_p->auto_corr_mrc_ofdm_x4;
+	cmd.table[AUTO_CORR32_X1_TH_ADD_MIN_IDX] =
+	    rx_sens_p->auto_corr_ofdm_x1;
+	cmd.table[AUTO_CORR32_X1_TH_ADD_MIN_MRC_IDX] =
+	    rx_sens_p->auto_corr_mrc_ofdm_x1;
+
+	cmd.table[AUTO_CORR40_X4_TH_ADD_MIN_IDX] =
+	    rx_sens_p->auto_corr_cck_x4;
+	cmd.table[AUTO_CORR40_X4_TH_ADD_MIN_MRC_IDX] =
+	    rx_sens_p->auto_corr_mrc_cck_x4;
+	cmd.table[MIN_ENERGY_CCK_DET_IDX] = rx_sens_p->min_energy_det_cck;
+
+	cmd.table[MIN_ENERGY_OFDM_DET_IDX] = 100;
+	cmd.table[BARKER_CORR_TH_ADD_MIN_IDX] = 190;
+	cmd.table[BARKER_CORR_TH_ADD_MIN_MRC_IDX] = 390;
+	cmd.table[PTAM_ENERGY_TH_IDX] = 62;
+
+	/* at first, set up Rx to maximum sensitivity */
+	rv = iwk_cmd(sc, SENSITIVITY_CMD, &cmd, sizeof (cmd), 1);
+	if (rv) {
+		cmn_err(CE_WARN, "iwk_rx_sens_init(): "
+		    "in the process of initialization, "
+		    "failed to send rx sensitivity command\n");
+		return (rv);
+	}
+
+	rx_sens_p->flags |= IWK_SENSITIVITY_CALIB_ALLOW_MSK;
+
+	return (IWK_SUCCESS);
+}
+
+/*
+ * make Receiver sensitivity calibration to adjust every chain's Rx sensitivity.
+ * for more infomation, please refer to iwk_calibration.h file
+ */
+static int iwk_rx_sens(iwk_sc_t *sc)
+{
+	int rv;
+	uint32_t actual_rx_time;
+	struct statistics_rx_non_phy *rx_general_p =
+	    &sc->sc_statistics.rx.general;
+	struct iwk_rx_sensitivity *rx_sens_p = &sc->sc_rx_sens;
+	struct iwk_rx_sensitivity_cmd cmd;
+
+	if (!(rx_sens_p->flags & IWK_SENSITIVITY_CALIB_ALLOW_MSK)) {
+		cmn_err(CE_WARN, "iwk_rx_sens(): "
+		    "sensitivity initialization has not finished.\n");
+		return (DDI_FAILURE);
+	}
+
+	if (INTERFERENCE_DATA_AVAILABLE !=
+	    rx_general_p->interference_data_flag) {
+		cmn_err(CE_WARN, "iwk_rx_sens(): "
+		    "can't make rx sensitivity calibration,"
+		    "because of invalid statistics\n");
+		return (DDI_FAILURE);
+	}
+
+	actual_rx_time = rx_general_p->channel_load;
+	if (!actual_rx_time) {
+		cmn_err(CE_WARN, "iwk_rx_sens(): "
+		    "can't make rx sensitivity calibration,"
+		    "because has not enough rx time\n");
+		return (DDI_FAILURE);
+	}
+
+	/* make Rx sensitivity calibration for OFDM mode */
+	rv = iwk_ofdm_sens(sc, actual_rx_time);
+	if (rv) {
+		return (rv);
+	}
+
+	/* make Rx sensitivity calibration for CCK mode */
+	rv = iwk_cck_sens(sc, actual_rx_time);
+	if (rv) {
+		return (rv);
+	}
+
+	/*
+	 * if the sum of false alarm had not changed, nothing will be done
+	 */
+	if ((!(rx_sens_p->flags & IWK_SENSITIVITY_OFDM_UPDATE_MSK)) &&
+	    (!(rx_sens_p->flags & IWK_SENSITIVITY_CCK_UPDATE_MSK))) {
+		return (IWK_SUCCESS);
+	}
+
+	cmd.control = IWK_SENSITIVITY_CONTROL_WORK_TABLE;
+
+	cmd.table[AUTO_CORR32_X4_TH_ADD_MIN_IDX] =
+	    rx_sens_p->auto_corr_ofdm_x4;
+	cmd.table[AUTO_CORR32_X4_TH_ADD_MIN_MRC_IDX] =
+	    rx_sens_p->auto_corr_mrc_ofdm_x4;
+	cmd.table[AUTO_CORR32_X1_TH_ADD_MIN_IDX] =
+	    rx_sens_p->auto_corr_ofdm_x1;
+	cmd.table[AUTO_CORR32_X1_TH_ADD_MIN_MRC_IDX] =
+	    rx_sens_p->auto_corr_mrc_ofdm_x1;
+
+	cmd.table[AUTO_CORR40_X4_TH_ADD_MIN_IDX] =
+	    rx_sens_p->auto_corr_cck_x4;
+	cmd.table[AUTO_CORR40_X4_TH_ADD_MIN_MRC_IDX] =
+	    rx_sens_p->auto_corr_mrc_cck_x4;
+	cmd.table[MIN_ENERGY_CCK_DET_IDX] =
+	    rx_sens_p->min_energy_det_cck;
+
+	cmd.table[MIN_ENERGY_OFDM_DET_IDX] = 100;
+	cmd.table[BARKER_CORR_TH_ADD_MIN_IDX] = 190;
+	cmd.table[BARKER_CORR_TH_ADD_MIN_MRC_IDX] = 390;
+	cmd.table[PTAM_ENERGY_TH_IDX] = 62;
+
+	/*
+	 * send sensitivity command to complete actual sensitivity calibration
+	 */
+	rv = iwk_cmd(sc, SENSITIVITY_CMD, &cmd, sizeof (cmd), 1);
+	if (rv) {
+		cmn_err(CE_WARN, "iwk_rx_sens(): "
+		    "fail to send rx sensitivity command\n");
+		return (rv);
+	}
+
+	return (IWK_SUCCESS);
+
+}
+
+/*
+ * make Rx sensitivity calibration for CCK mode.
+ * This is preparing parameters for Sensitivity command
+ */
+static int iwk_cck_sens(iwk_sc_t *sc, uint32_t actual_rx_time)
+{
+	int i;
+	uint8_t noise_a, noise_b, noise_c;
+	uint8_t max_noise_abc, max_noise_20;
+	uint32_t beacon_a, beacon_b, beacon_c;
+	uint32_t min_beacon_abc, max_beacon_10;
+	uint32_t cck_fa, cck_bp;
+	uint32_t cck_sum_fa_bp;
+	uint32_t temp;
+	struct statistics_rx_non_phy *rx_general_p =
+	    &sc->sc_statistics.rx.general;
+	struct iwk_rx_sensitivity *rx_sens_p = &sc->sc_rx_sens;
+
+	cck_fa = sc->sc_statistics.rx.cck.false_alarm_cnt;
+	cck_bp = sc->sc_statistics.rx.cck.plcp_err;
+
+	/* accumulate false alarm */
+	if (rx_sens_p->last_false_alarm_cnt_cck > cck_fa) {
+		temp = rx_sens_p->last_false_alarm_cnt_cck;
+		rx_sens_p->last_false_alarm_cnt_cck = cck_fa;
+		cck_fa += (0xFFFFFFFF - temp);
+	} else {
+		cck_fa -= rx_sens_p->last_false_alarm_cnt_cck;
+		rx_sens_p->last_false_alarm_cnt_cck += cck_fa;
+	}
+
+	/* accumulate bad plcp */
+	if (rx_sens_p->last_bad_plcp_cnt_cck > cck_bp) {
+		temp = rx_sens_p->last_bad_plcp_cnt_cck;
+		rx_sens_p->last_bad_plcp_cnt_cck = cck_bp;
+		cck_bp += (0xFFFFFFFF - temp);
+	} else {
+		cck_bp -= rx_sens_p->last_bad_plcp_cnt_cck;
+		rx_sens_p->last_bad_plcp_cnt_cck += cck_bp;
+	}
+
+	/*
+	 * calculate relative value
+	 */
+	cck_sum_fa_bp = (cck_fa + cck_bp) * 200 * 1024;
+	rx_sens_p->cck_noise_diff = 0;
+
+	noise_a =
+	    (uint8_t)((rx_general_p->beacon_silence_rssi_a & 0xFF00) >> 8);
+	noise_b =
+	    (uint8_t)((rx_general_p->beacon_silence_rssi_b & 0xFF00) >> 8);
+	noise_c =
+	    (uint8_t)((rx_general_p->beacon_silence_rssi_c & 0xFF00) >> 8);
+
+	beacon_a = rx_general_p->beacon_energy_a;
+	beacon_b = rx_general_p->beacon_energy_b;
+	beacon_c = rx_general_p->beacon_energy_c;
+
+	/* determine maximum noise among 3 chains */
+	if ((noise_a >= noise_b) && (noise_a >= noise_c)) {
+		max_noise_abc = noise_a;
+	} else if (noise_b >= noise_c) {
+		max_noise_abc = noise_b;
+	} else {
+		max_noise_abc = noise_c;
+	}
+
+	/* record maximum noise among 3 chains */
+	rx_sens_p->cck_noise_max[rx_sens_p->cck_noise_idx] = max_noise_abc;
+	rx_sens_p->cck_noise_idx++;
+	if (rx_sens_p->cck_noise_idx >= 20) {
+		rx_sens_p->cck_noise_idx = 0;
+	}
+
+	/* determine maximum noise among 20 max noise */
+	max_noise_20 = rx_sens_p->cck_noise_max[0];
+	for (i = 0; i < 20; i++) {
+		if (rx_sens_p->cck_noise_max[i] >= max_noise_20) {
+			max_noise_20 = rx_sens_p->cck_noise_max[i];
+		}
+	}
+
+	/* determine minimum beacon among 3 chains */
+	if ((beacon_a <= beacon_b) && (beacon_a <= beacon_c)) {
+		min_beacon_abc = beacon_a;
+	} else if (beacon_b <= beacon_c) {
+		min_beacon_abc = beacon_b;
+	} else {
+		min_beacon_abc = beacon_c;
+	}
+
+	/* record miminum beacon among 3 chains */
+	rx_sens_p->cck_beacon_min[rx_sens_p->cck_beacon_idx] = min_beacon_abc;
+	rx_sens_p->cck_beacon_idx++;
+	if (rx_sens_p->cck_beacon_idx >= 10) {
+		rx_sens_p->cck_beacon_idx = 0;
+	}
+
+	/* determine maximum beacon among 10 miminum beacon among 3 chains */
+	max_beacon_10 = rx_sens_p->cck_beacon_min[0];
+	for (i = 0; i < 10; i++) {
+		if (rx_sens_p->cck_beacon_min[i] >= max_beacon_10) {
+			max_beacon_10 = rx_sens_p->cck_beacon_min[i];
+		}
+	}
+
+	/* add a little margin */
+	max_beacon_10 += 6;
+
+	/* record the count of having no false alarms */
+	if (cck_sum_fa_bp < (5 * actual_rx_time)) {
+		rx_sens_p->cck_no_false_alarm_num++;
+	} else {
+		rx_sens_p->cck_no_false_alarm_num = 0;
+	}
+
+	/*
+	 * adjust parameters in sensitivity command
+	 * according to different status.
+	 * for more infomation, please refer to iwk_calibration.h file
+	 */
+	if (cck_sum_fa_bp > (50 * actual_rx_time)) {
+		rx_sens_p->cck_curr_state = IWK_TOO_MANY_FALSE_ALARM;
+
+		if (rx_sens_p->auto_corr_cck_x4 > 160) {
+			rx_sens_p->cck_noise_ref = max_noise_20;
+
+			if (rx_sens_p->min_energy_det_cck > 2) {
+				rx_sens_p->min_energy_det_cck -= 2;
+			}
+		}
+
+		if (rx_sens_p->auto_corr_cck_x4 < 160) {
+			rx_sens_p->auto_corr_cck_x4 = 160 + 1;
+		} else {
+			if ((rx_sens_p->auto_corr_cck_x4 + 3) < 200) {
+				rx_sens_p->auto_corr_cck_x4 += 3;
+			} else {
+				rx_sens_p->auto_corr_cck_x4 = 200;
+			}
+		}
+
+		if ((rx_sens_p->auto_corr_mrc_cck_x4 + 3) < 400) {
+			rx_sens_p->auto_corr_mrc_cck_x4 += 3;
+		} else {
+			rx_sens_p->auto_corr_mrc_cck_x4 = 400;
+		}
+
+		rx_sens_p->flags |= IWK_SENSITIVITY_CCK_UPDATE_MSK;
+
+	} else if (cck_sum_fa_bp < (5 * actual_rx_time)) {
+		rx_sens_p->cck_curr_state = IWK_TOO_FEW_FALSE_ALARM;
+
+		rx_sens_p->cck_noise_diff = (int32_t)rx_sens_p->cck_noise_ref -
+		    (int32_t)max_noise_20;
+
+		if ((rx_sens_p->cck_prev_state != IWK_TOO_MANY_FALSE_ALARM) &&
+		    ((rx_sens_p->cck_noise_diff > 2) ||
+		    (rx_sens_p->cck_no_false_alarm_num > 100))) {
+			if ((rx_sens_p->min_energy_det_cck + 2) < 97) {
+				rx_sens_p->min_energy_det_cck += 2;
+			} else {
+				rx_sens_p->min_energy_det_cck = 97;
+			}
+
+			if ((rx_sens_p->auto_corr_cck_x4 - 3) > 125) {
+				rx_sens_p->auto_corr_cck_x4 -= 3;
+			} else {
+				rx_sens_p->auto_corr_cck_x4 = 125;
+			}
+
+			if ((rx_sens_p->auto_corr_mrc_cck_x4 -3) > 200) {
+				rx_sens_p->auto_corr_mrc_cck_x4 -= 3;
+			} else {
+				rx_sens_p->auto_corr_mrc_cck_x4 = 200;
+			}
+
+			rx_sens_p->flags |= IWK_SENSITIVITY_CCK_UPDATE_MSK;
+		} else {
+			rx_sens_p->flags &= (~IWK_SENSITIVITY_CCK_UPDATE_MSK);
+		}
+	} else {
+		rx_sens_p->cck_curr_state = IWK_GOOD_RANGE_FALSE_ALARM;
+
+		rx_sens_p->cck_noise_ref = max_noise_20;
+
+		if (IWK_TOO_MANY_FALSE_ALARM == rx_sens_p->cck_prev_state) {
+			rx_sens_p->min_energy_det_cck -= 8;
+		}
+
+		rx_sens_p->flags &= (~IWK_SENSITIVITY_CCK_UPDATE_MSK);
+	}
+
+	if (rx_sens_p->min_energy_det_cck < max_beacon_10) {
+		rx_sens_p->min_energy_det_cck = (uint16_t)max_beacon_10;
+	}
+
+	rx_sens_p->cck_prev_state = rx_sens_p->cck_curr_state;
+
+	return (IWK_SUCCESS);
+}
+
+/*
+ * make Rx sensitivity calibration for OFDM mode.
+ * This is preparing parameters for Sensitivity command
+ */
+static int iwk_ofdm_sens(iwk_sc_t *sc, uint32_t actual_rx_time)
+{
+	uint32_t temp;
+	uint16_t temp1;
+	uint32_t ofdm_fa, ofdm_bp;
+	uint32_t ofdm_sum_fa_bp;
+	struct iwk_rx_sensitivity *rx_sens_p = &sc->sc_rx_sens;
+
+	ofdm_fa = sc->sc_statistics.rx.ofdm.false_alarm_cnt;
+	ofdm_bp = sc->sc_statistics.rx.ofdm.plcp_err;
+
+	/* accumulate false alarm */
+	if (rx_sens_p->last_false_alarm_cnt_ofdm > ofdm_fa) {
+		temp = rx_sens_p->last_false_alarm_cnt_ofdm;
+		rx_sens_p->last_false_alarm_cnt_ofdm = ofdm_fa;
+		ofdm_fa += (0xFFFFFFFF - temp);
+	} else {
+		ofdm_fa -= rx_sens_p->last_false_alarm_cnt_ofdm;
+		rx_sens_p->last_false_alarm_cnt_ofdm += ofdm_fa;
+	}
+
+	/* accumulate bad plcp */
+	if (rx_sens_p->last_bad_plcp_cnt_ofdm > ofdm_bp) {
+		temp = rx_sens_p->last_bad_plcp_cnt_ofdm;
+		rx_sens_p->last_bad_plcp_cnt_ofdm = ofdm_bp;
+		ofdm_bp += (0xFFFFFFFF - temp);
+	} else {
+		ofdm_bp -= rx_sens_p->last_bad_plcp_cnt_ofdm;
+		rx_sens_p->last_bad_plcp_cnt_ofdm += ofdm_bp;
+	}
+
+	ofdm_sum_fa_bp = (ofdm_fa + ofdm_bp) * 200 * 1024; /* relative value */
+
+	/*
+	 * adjust parameter in sensitivity command according to different status
+	 */
+	if (ofdm_sum_fa_bp > (50 * actual_rx_time)) {
+		temp1 = rx_sens_p->auto_corr_ofdm_x4 + 1;
+		rx_sens_p->auto_corr_ofdm_x4 = (temp1 <= 120) ? temp1 : 120;
+
+		temp1 = rx_sens_p->auto_corr_mrc_ofdm_x4 + 1;
+		rx_sens_p->auto_corr_mrc_ofdm_x4 =
+		    (temp1 <= 210) ? temp1 : 210;
+
+		temp1 = rx_sens_p->auto_corr_ofdm_x1 + 1;
+		rx_sens_p->auto_corr_ofdm_x1 = (temp1 <= 140) ? temp1 : 140;
+
+		temp1 = rx_sens_p->auto_corr_mrc_ofdm_x1 + 1;
+		rx_sens_p->auto_corr_mrc_ofdm_x1 =
+		    (temp1 <= 270) ? temp1 : 270;
+
+		rx_sens_p->flags |= IWK_SENSITIVITY_OFDM_UPDATE_MSK;
+
+	} else if (ofdm_sum_fa_bp < (5 * actual_rx_time)) {
+		temp1 = rx_sens_p->auto_corr_ofdm_x4 - 1;
+		rx_sens_p->auto_corr_ofdm_x4 = (temp1 >= 85) ? temp1 : 85;
+
+		temp1 = rx_sens_p->auto_corr_mrc_ofdm_x4 - 1;
+		rx_sens_p->auto_corr_mrc_ofdm_x4 =
+		    (temp1 >= 170) ? temp1 : 170;
+
+		temp1 = rx_sens_p->auto_corr_ofdm_x1 - 1;
+		rx_sens_p->auto_corr_ofdm_x1 = (temp1 >= 105) ? temp1 : 105;
+
+		temp1 = rx_sens_p->auto_corr_mrc_ofdm_x1 - 1;
+		rx_sens_p->auto_corr_mrc_ofdm_x1 =
+		    (temp1 >= 220) ? temp1 : 220;
+
+		rx_sens_p->flags |= IWK_SENSITIVITY_OFDM_UPDATE_MSK;
+
+	} else {
+		rx_sens_p->flags &= (~IWK_SENSITIVITY_OFDM_UPDATE_MSK);
+	}
+
+	return (IWK_SUCCESS);
+}
+
+/*
+ * 1)  log_event_table_ptr indicates base of the event log.  This traces
+ *     a 256-entry history of uCode execution within a circular buffer.
+ *     Its header format is:
+ *
+ *	uint32_t log_size;	log capacity (in number of entries)
+ *	uint32_t type;	(1) timestamp with each entry, (0) no timestamp
+ *	uint32_t wraps;	# times uCode has wrapped to top of circular buffer
+ *      uint32_t write_index;	next circular buffer entry that uCode would fill
+ *
+ *     The header is followed by the circular buffer of log entries.  Entries
+ *     with timestamps have the following format:
+ *
+ *	uint32_t event_id;     range 0 - 1500
+ *	uint32_t timestamp;    low 32 bits of TSF (of network, if associated)
+ *	uint32_t data;         event_id-specific data value
+ *
+ *     Entries without timestamps contain only event_id and data.
+ */
+
+/*
+ * iwk_write_event_log - Write event log to dmesg
+ */
+static void iwk_write_event_log(iwk_sc_t *sc)
+{
+	uint32_t log_event_table_ptr;	/* Start address of event table */
+	uint32_t startptr;	/* Start address of log data */
+	uint32_t logptr;	/* address of log data entry */
+	uint32_t i, n, num_events;
+	uint32_t event_id, data1, data2; /* log data */
+
+	uint32_t log_size;   /* log capacity (in number of entries) */
+	uint32_t type;	/* (1)timestamp with each entry,(0) no timestamp */
+	uint32_t wraps;	/* # times uCode has wrapped to */
+			/* the top of circular buffer */
+	uint32_t idx; /* index of entry to be filled in next */
+
+	log_event_table_ptr = sc->sc_card_alive_run.log_event_table_ptr;
+	if (!(log_event_table_ptr)) {
+		IWK_DBG((IWK_DEBUG_EEPROM, "NULL event table pointer\n"));
+		return;
+	}
+
+	iwk_mac_access_enter(sc);
+
+	/* Read log header */
+	log_size = iwk_mem_read(sc, log_event_table_ptr);
+	log_event_table_ptr += sizeof (uint32_t); /* addr of "type" */
+	type = iwk_mem_read(sc, log_event_table_ptr);
+	log_event_table_ptr += sizeof (uint32_t); /* addr of "wraps" */
+	wraps = iwk_mem_read(sc, log_event_table_ptr);
+	log_event_table_ptr += sizeof (uint32_t); /* addr of "idx" */
+	idx = iwk_mem_read(sc, log_event_table_ptr);
+	startptr = log_event_table_ptr +
+	    sizeof (uint32_t); /* addr of start of log data */
+	if (!log_size & !wraps) {
+		IWK_DBG((IWK_DEBUG_EEPROM, "Empty log\n"));
+		iwk_mac_access_exit(sc);
+		return;
+	}
+
+	if (!wraps) {
+		num_events = idx;
+		logptr = startptr;
+	} else {
+		num_events = log_size - idx;
+		n = type ? 2 : 3;
+		logptr = startptr + (idx * n * sizeof (uint32_t));
+	}
+
+	for (i = 0; i < num_events; i++) {
+		event_id = iwk_mem_read(sc, logptr);
+		logptr += sizeof (uint32_t);
+		data1 = iwk_mem_read(sc, logptr);
+		logptr += sizeof (uint32_t);
+		if (type == 0) { /* no timestamp */
+			IWK_DBG((IWK_DEBUG_EEPROM, "Event ID=%d, Data=%x0x",
+			    event_id, data1));
+		} else { /* timestamp */
+			data2 = iwk_mem_read(sc, logptr);
+			printf("Time=%d, Event ID=%d, Data=0x%x\n",
+			    data1, event_id, data2);
+			IWK_DBG((IWK_DEBUG_EEPROM,
+			    "Time=%d, Event ID=%d, Data=0x%x\n",
+			    data1, event_id, data2));
+			logptr += sizeof (uint32_t);
+		}
+	}
+
+	/*
+	 * Print the wrapped around entries, if any
+	 */
+	if (wraps) {
+		logptr = startptr;
+		for (i = 0; i < idx; i++) {
+			event_id = iwk_mem_read(sc, logptr);
+			logptr += sizeof (uint32_t);
+			data1 = iwk_mem_read(sc, logptr);
+			logptr += sizeof (uint32_t);
+			if (type == 0) { /* no timestamp */
+				IWK_DBG((IWK_DEBUG_EEPROM,
+				    "Event ID=%d, Data=%x0x", event_id, data1));
+			} else { /* timestamp */
+				data2 = iwk_mem_read(sc, logptr);
+				IWK_DBG((IWK_DEBUG_EEPROM,
+				    "Time = %d, Event ID=%d, Data=0x%x\n",
+				    data1, event_id, data2));
+				logptr += sizeof (uint32_t);
+			}
+		}
+	}
+
+	iwk_mac_access_exit(sc);
+}
+
+/*
+ * error_event_table_ptr indicates base of the error log.  This contains
+ * information about any uCode error that occurs.  For 4965, the format is:
+ *
+ * uint32_t valid;        (nonzero) valid, (0) log is empty
+ * uint32_t error_id;     type of error
+ * uint32_t pc;           program counter
+ * uint32_t blink1;       branch link
+ * uint32_t blink2;       branch link
+ * uint32_t ilink1;       interrupt link
+ * uint32_t ilink2;       interrupt link
+ * uint32_t data1;        error-specific data
+ * uint32_t data2;        error-specific data
+ * uint32_t line;         source code line of error
+ * uint32_t bcon_time;    beacon timer
+ * uint32_t tsf_low;      network timestamp function timer
+ * uint32_t tsf_hi;       network timestamp function timer
+ */
+/*
+ * iwk_write_error_log - Write error log to dmesg
+ */
+static void iwk_write_error_log(iwk_sc_t *sc)
+{
+	uint32_t err_ptr;	/* Start address of error log */
+	uint32_t valid;		/* is error log valid */
+
+	err_ptr = sc->sc_card_alive_run.error_event_table_ptr;
+	if (!(err_ptr)) {
+		IWK_DBG((IWK_DEBUG_EEPROM, "NULL error table pointer\n"));
+		return;
+	}
+
+	iwk_mac_access_enter(sc);
+
+	valid = iwk_mem_read(sc, err_ptr);
+	if (!(valid)) {
+		IWK_DBG((IWK_DEBUG_EEPROM, "Error data not valid\n"));
+		iwk_mac_access_exit(sc);
+		return;
+	}
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "err=%d ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "pc=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM,
+	    "branch link1=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM,
+	    "branch link2=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM,
+	    "interrupt link1=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM,
+	    "interrupt link2=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "data1=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "data2=0x%X ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "line=%d ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "bcon_time=%d ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "tsf_low=%d ", iwk_mem_read(sc, err_ptr)));
+	err_ptr += sizeof (uint32_t);
+	IWK_DBG((IWK_DEBUG_EEPROM, "tsf_hi=%d\n", iwk_mem_read(sc, err_ptr)));
+
+	iwk_mac_access_exit(sc);
 }
