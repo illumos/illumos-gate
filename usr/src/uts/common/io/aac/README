@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 aac driver 2.0
 ================
 The Solaris aac driver enhancement updates the Solaris aac 1.6 driver
@@ -69,7 +67,7 @@ SPARC platform support is added in this release:
 	now uses DDI compliant functions to access the device's IO and memory
 	spaces for DMA transfers.
 
-aac driver 2.2.23
+aac driver 2.2.3
 ==================
 MSI interrupts supporting is added in this release:
 	Instead of supporting fixed interrupt only, the driver added the MSI
@@ -77,3 +75,17 @@ MSI interrupts supporting is added in this release:
 	driver has replaced all legacy interrupt ddi interfaces callings by 
 	the according ddi_intr_* ones.
 
+aac driver 2.2.5
+==================
+Two new features are included in this release:
+One is Non-DASD support:
+	The driver now supports non-DASD(Non Direct Access Storage Device).
+	This means you can use cdroms and other non-DASD devices with
+	your aac card. Before trying it, make sure your card's firmware support
+	non-DASD access. For some cards, you may need to explicitly enable it
+	through aac BIOS. Make sure nondasd-enable property in aac.conf is
+	switched on.
+The other is FIB dump:
+	The driver now supports FIB contents dumping for driver debugging. To
+	enable it, you need to set AAC_DEBUG and the appropriate flags in
+	aac_debug_fib_flags.

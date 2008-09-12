@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -44,8 +42,9 @@ i copyright
 i depend
 i postinstall
 i postremove
+i i.aacconf
 
 # Adaptec AdvanceRaid Controller Driver
 d none kernel 0755 root sys
 d none kernel/drv 0755 root sys
-f none kernel/drv/aac.conf 0644 root sys
+e aacconf kernel/drv/aac.conf 0644 root sys

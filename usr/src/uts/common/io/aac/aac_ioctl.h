@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,6 @@
 
 #ifndef	_AAC_IOCTL_H_
 #define	_AAC_IOCTL_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -137,7 +135,7 @@ struct aac_features {
  *
  * Normally the packed structures are defined in a way that if the initial
  * member is aligned, then the following members will also be aligned. So
- * we need only to make the packed structure, ie. the first member, is
+ * we need only to make sure the packed structure, ie. the first member, is
  * aligned to satisfy alignment requirement.
  */
 union aac_revision_align {

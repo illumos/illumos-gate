@@ -20,12 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 one aac_softstate
 
 add aac_softstate::aac_if.aif_get_fwstatus target \
@@ -48,7 +45,7 @@ add aac_softstate::aac_cmd_fib_scsi target \
 	aac_cmd_fib_scsi32 \
 	aac_cmd_fib_scsi64
 
-root aac_intr_old aac_intr_new aac_fm_error_cb
+root aac_intr_old aac_intr_new aac_fm_error_cb aac_handle_dr aac_name_node
 
 add scsi_pkt::pkt_comp target \
 	aac_tran_destroy_pkt \

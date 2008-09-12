@@ -213,6 +213,7 @@ global_zone_only_files="
 	etc/security/tsol/devalloc_defaults
 	etc/system
 	etc/zones/index
+	kernel/drv/aac.conf
 	kernel/drv/elxl.conf
 	kernel/drv/md.conf
 	kernel/drv/options.conf

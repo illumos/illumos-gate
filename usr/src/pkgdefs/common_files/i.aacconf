@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# Get parameter value from old aac.conf file.
+# Syntax: file parameter-name
+getval()
+{
+	# Strip all instances of ';' putval() will add exactly one.
+	sed -n "/^[ 	]*[^#]/s/.*$2[ 	]*=[ 	]*\([^ 	;]*\).*/\1/p" $1 \
+		| head -1
+}
+
+# Put old parameter value into new aac.conf file.
+# Syntax: file parameter-name value
+putval()
+{
+	# If new parameter-value pair, append it to the file.
+	grep "^[ 	]*$2" $1 >/dev/null
+	if [ $? -eq 0 ]; then
+		sed "/^[ 	]*[^#]/s/\($2[ 	]*=[ 	]*\)[^ 	]*/\1$3;/" \
+			$1 > /tmp/tmp.$$
+		mv /tmp/tmp.$$ $1
+	else
+		echo "$2=$3;" >>$1
+	fi
+}
+
+if read src dest; then
+	if [ ! -f $dest ]; then
+		# no existing version, just copy in new one
+		cp $src $dest
+	else
+		#
+		# upgrading solaris
+		# Save existing values of the following parameters.
+		# Copy new aac.conf over current configuration file.
+		# Restore saved parameters in the new aac.conf file.
+		#
+		legacy_name_enable=`getval $dest legacy-name-enable`
+		nondasd_enable=`getval $dest nondasd-enable`
+
+		cp $src $dest
+
+		if [ -z "$legacy_name_enable" ]; then
+			legacy_name_enable='"yes"'
+		fi
+		putval $dest legacy-name-enable $legacy_name_enable
+		if [ -z "$nondasd_enable" ]; then
+			nondasd_enable='"no"'
+		fi
+		putval $dest nondasd-enable $nondasd_enable
+	fi
+fi
+exit 0

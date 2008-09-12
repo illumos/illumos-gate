@@ -38,8 +38,6 @@
 #ifndef	_AAC_H_
 #define	_AAC_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -57,7 +55,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		4
+#define	AAC_DRIVER_BUGFIX_LEVEL		5
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -96,7 +94,7 @@ extern "C" {
 #define	AAC_IMMEDIATE_TIMEOUT		60	/* seconds */
 #endif
 #define	AAC_FWUP_TIMEOUT		180	/* wait up to 3 minutes */
-#define	AAC_IOCTL_TIMEOUT		180	/* wait up to 3 minutes */
+#define	AAC_IOCTL_TIMEOUT		900	/* wait up to 15 minutes */
 
 /* Adapter hardware interface types */
 #define	AAC_HWIF_UNKNOWN		0
@@ -151,17 +149,48 @@ struct aac_card_type {
 	char *desc;		/* ASCII data for INQUIRY command product id */
 };
 
+/* Device types */
+#define	AAC_DEV_LD		0	/* logical device */
+#define	AAC_DEV_PD		1	/* physical device */
+
+/* DR events */
+#define	AAC_EVT_NONE		0
+#define	AAC_EVT_ONLINE		1
+#define	AAC_EVT_OFFLINE		2
+
+/* Device flags */
+#define	AAC_DFLAG_VALID		(1 << 0)
+#define	AAC_DFLAG_CONFIGURING	(1 << 1)
+
+#define	AAC_DEV_IS_VALID(dvp)	((dvp)->flags & AAC_DFLAG_VALID)
+
+struct aac_device {
+	int flags;
+
+	uint8_t type;
+	dev_info_t *dip;
+	int ncmds[AAC_CMDQ_NUM];	/* outstanding cmds of the device */
+	int throttle[AAC_CMDQ_NUM];	/* hold IO cmds for the device */
+};
+
 /* Array description */
 struct aac_container {
-	uint8_t valid;
+	struct aac_device dev;
+
 	uint32_t cid;		/* container id */
 	uint32_t uid;		/* container uid */
 	uint64_t size;		/* in block */
 	uint8_t locked;
 	uint8_t deleted;
-	uint8_t reset;			/* container is being reseted */
-	int ncmds[AAC_CMDQ_NUM];	/* outstanding cmds of the device */
-	int throttle[AAC_CMDQ_NUM];	/* hold IO cmds for the device */
+	uint8_t reset;		/* container is being reseted */
+};
+
+/* Non-DASD phys. device descrption, eg. CDROM or tape */
+struct aac_nondasd {
+	struct aac_device dev;
+
+	uint32_t bus;
+	uint32_t tid;
 };
 
 /*
@@ -214,6 +243,7 @@ struct aac_slot {
 #define	AAC_FLAGS_LBA_64BIT	(1 << 7) /* 64-bit LBA supported */
 #define	AAC_FLAGS_17SG		(1 << 8) /* quirk: 17 scatter gather maximum */
 #define	AAC_FLAGS_34SG		(1 << 9) /* quirk: 34 scatter gather maximum */
+#define	AAC_FLAGS_NONDASD	(1 << 10) /* non-DASD device supported */
 
 struct aac_softstate;
 struct aac_interface {
@@ -252,13 +282,16 @@ struct aac_softstate {
 	int flags;		/* firmware features enabled */
 	int instance;
 	dev_info_t *devinfo_p;
+	scsi_hba_tran_t *hba_tran;
 	int slen;
+	int legacy;		/* legacy device naming */
 
 	/* DMA attributes */
 	ddi_dma_attr_t buf_dma_attr;
 	ddi_dma_attr_t addr_dma_attr;
 
 	/* PCI spaces */
+	ddi_device_acc_attr_t acc_attr;
 	ddi_acc_handle_t pci_mem_handle;
 	uint8_t *pci_mem_base_vaddr;
 	uint32_t pci_mem_base_paddr;
@@ -293,6 +326,9 @@ struct aac_softstate {
 
 	struct aac_container containers[AAC_MAX_LD];
 	int container_count;		/* max container id + 1 */
+	struct aac_nondasd *nondasds;
+	uint32_t bus_max;		/* max FW buses exposed */
+	uint32_t tgt_max;		/* max FW target per bus */
 
 	/*
 	 * Command queues
@@ -330,6 +366,7 @@ struct aac_softstate {
 	int devcfg_wait_on;		/* AIF event waited for rescan */
 
 	int fm_capabilities;
+	ddi_taskq_t *taskq;
 
 	/* MSI specific fields */
 	ddi_intr_handle_t *htable;	/* For array of interrupts */
@@ -341,6 +378,7 @@ struct aac_softstate {
 #ifdef DEBUG
 	/* UART trace printf variables */
 	uint32_t debug_flags;		/* debug print flags bitmap */
+	uint32_t debug_fib_flags;	/* debug FIB print flags bitmap */
 	uint32_t debug_fw_flags;	/* FW debug flags */
 	uint32_t debug_buf_offset;	/* offset from DPMEM start */
 	uint32_t debug_buf_size;	/* FW debug buffer size in bytes */
@@ -356,7 +394,7 @@ struct aac_softstate {
 _NOTE(SCHEME_PROTECTS_DATA("stable data", aac_softstate::{flags slen \
     buf_dma_attr pci_mem_handle pci_mem_base_vaddr \
     comm_space_acc_handle comm_space_dma_handle aac_max_fib_size \
-    aac_sg_tablesize aac_cmd_fib aac_cmd_fib_scsi debug_flags}))
+    aac_sg_tablesize aac_cmd_fib aac_cmd_fib_scsi debug_flags bus_max tgt_max}))
 
 /*
  * Scatter-gather list structure defined by HBA hardware
@@ -422,11 +460,15 @@ struct aac_cmd {
 	void (*ac_comp)(struct aac_softstate *, struct aac_cmd *);
 
 	struct aac_slot *slotp;	/* slot used by this command */
-	struct aac_container *dvp;	/* target device */
+	struct aac_device *dvp;	/* target device */
 
 	/* FIB for this IO command */
 	int fib_size; /* size of the FIB xferred to/from the card */
 	struct aac_fib *fibp;
+
+#ifdef DEBUG
+	uint32_t fib_flags;
+#endif
 };
 
 #ifdef DEBUG
@@ -444,10 +486,23 @@ struct aac_cmd {
 #define	AACDB_FLAGS_FIB			0x00000200
 #define	AACDB_FLAGS_IOCTL		0x00000400
 
+/*
+ * Flags for FIB print
+ */
+/* FIB sources */
+#define	AACDB_FLAGS_FIB_SCMD		0x00000001
+#define	AACDB_FLAGS_FIB_IOCTL		0x00000002
+#define	AACDB_FLAGS_FIB_SRB		0x00000004
+#define	AACDB_FLAGS_FIB_SYNC		0x00000008
+/* FIB components */
+#define	AACDB_FLAGS_FIB_HEADER		0x00000010
+/* FIB states */
+#define	AACDB_FLAGS_FIB_TIMEOUT		0x00000100
+
 extern uint32_t aac_debug_flags;
 extern int aac_dbflag_on(struct aac_softstate *, int);
 extern void aac_printf(struct aac_softstate *, uint_t, const char *, ...);
-extern void aac_print_fib(struct aac_softstate *, struct aac_fib *);
+extern void aac_print_fib(struct aac_softstate *, struct aac_slot *);
 
 #define	AACDB_PRINT(s, lev, ...) { \
 	if (aac_dbflag_on((s), AACDB_FLAGS_MISC)) \

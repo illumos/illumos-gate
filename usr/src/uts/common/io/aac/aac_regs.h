@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,6 @@
 
 #ifndef	__AAC_REGS_H__
 #define	__AAC_REGS_H__
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -103,6 +101,8 @@ extern "C" {
 #define	AAC_RESP_DATA_FORMAT	2
 
 #define	AAC_MAX_LD		64	/* max number of logical disks */
+#define	AAC_MAX_PD(s)		((s)->bus_max * (s)->tgt_max)
+#define	AAC_MAX_DEV(s)		(AAC_MAX_LD + AAC_MAX_PD((s)))
 #define	AAC_BLK_SIZE		AAC_SECTOR_SIZE
 #define	AAC_DMA_ALIGN		4
 #define	AAC_DMA_ALIGN_MASK	(AAC_DMA_ALIGN - 1)
@@ -376,6 +376,30 @@ struct aac_mntinforesp {
 	uint32_t		MntType;
 	uint32_t		MntRespCount;
 	struct aac_mntobj	MntObj;
+};
+
+/*
+ * Structures used to access physical drives
+ */
+struct aac_bus_info {
+	uint32_t	Command;	/* VM_Ioctl */
+	uint32_t	ObjType;	/* FT_DRIVE */
+	uint32_t	MethodId;	/* 1 = SCSI Layer */
+	uint32_t	ObjectId;	/* Handle */
+	uint32_t	CtlCmd;		/* GetBusInfo */
+};
+
+struct aac_bus_info_response {
+	uint32_t	Status;		/* ST_OK */
+	uint32_t	ObjType;
+	uint32_t	MethodId;	/* unused */
+	uint32_t	ObjectId;	/* unused */
+	uint32_t	CtlCmd;		/* unused */
+	uint32_t	ProbeComplete;
+	uint32_t	BusCount;
+	uint32_t	TargetsPerBus;
+	uint8_t		InitiatorBusId[10];
+	uint8_t		BusValid[10];
 };
 
 #define	CT_FIB_PARAMS			6
@@ -938,6 +962,21 @@ struct aac_close_command {
 	uint32_t		ContainerId;
 };
 
+/*
+ * Container Config Command
+ */
+struct aac_ctcfg {
+	uint32_t		Command;
+	uint32_t		cmd;
+	uint32_t		param;
+};
+
+struct aac_ctcfg_resp {
+	uint32_t		Status;
+	uint32_t		resp;
+	uint32_t		param;
+};
+
 /* Write 'stability' options */
 #define	CSTABLE			1
 #define	CUNSTABLE		2
@@ -1465,8 +1504,7 @@ struct aac_srb_reply
 	uint32_t scsi_status;
 	uint32_t data_xfer_length;
 	uint32_t sense_data_size;
-	uint8_t sense_data[AAC_SENSE_BUFFERSIZE];    /* Can this be */
-						    /* SCSI_SENSE_BUFFERSIZE */
+	uint8_t sense_data[AAC_SENSE_BUFFERSIZE];
 };
 
 /*

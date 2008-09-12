@@ -32,8 +32,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/modctl.h>
 #include <sys/conf.h>
 #include <sys/cmn_err.h>
@@ -261,10 +259,14 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	acp->fib_size = fib_size;
 	fibp->Header.Size = LE_16(fib_size);
 
-	AACDB_PRINT_FIB(softs, fibp);
-
 	/* Process FIB */
 	if (fib_command == TakeABreakPt) {
+#ifdef DEBUG
+		if (aac_dbflag_on(softs, AACDB_FLAGS_FIB) &&
+		    (softs->debug_fib_flags & AACDB_FLAGS_FIB_IOCTL))
+			aac_printf(softs, CE_NOTE, "FIB> TakeABreakPt, sz=%d",
+			    fib_size);
+#endif
 		(void) aac_sync_mbcommand(softs, AAC_BREAKPOINT_REQ,
 		    0, 0, 0, 0, NULL);
 		fibp->Header.XferState = LE_32(0);
@@ -275,6 +277,9 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 		acp->timeout = AAC_IOCTL_TIMEOUT;
 		acp->aac_cmd_fib = aac_cmd_fib_copy;
+#ifdef DEBUG
+		acp->fib_flags = AACDB_FLAGS_FIB_IOCTL;
+#endif
 		if ((rval = aac_send_fib(softs, acp)) != 0)
 			goto finish;
 	}
@@ -573,10 +578,10 @@ aac_send_raw_srb(struct aac_softstate *softs, dev_t dev, intptr_t arg, int mode)
 
 		bp = ddi_umem_iosetup(cookie, (uintptr_t)usge->addr - \
 		    (uintptr_t)addrlo, usge->bcount, direct, dev, 0, NULL,
-		    DDI_UMEM_SLEEP);
+		    DDI_UMEM_NOSLEEP);
 		if (bp == NULL) {
 			AACDB_PRINT(softs, CE_NOTE, "ddi_umem_iosetup failed");
-			rval = EFAULT;
+			rval = ENOMEM;
 			goto finish;
 		}
 		if (aac_cmd_dma_alloc(softs, &usge->acp, bp, 0, NULL_FUNC,
@@ -612,8 +617,10 @@ send_fib:
 	acp->timeout = srb->timeout;
 
 	/* Send FIB command */
-	AACDB_PRINT_FIB(softs, fibp);
 	acp->aac_cmd_fib = softs->aac_cmd_fib_scsi;
+#ifdef DEBUG
+	acp->fib_flags = AACDB_FLAGS_FIB_SRB;
+#endif
 	if ((rval = aac_send_fib(softs, acp)) != 0)
 		goto finish;
 
@@ -694,7 +701,7 @@ aac_query_disk(struct aac_softstate *softs, intptr_t arg, int mode)
 
 	mutex_enter(&softs->io_lock);
 	dvp = &softs->containers[qdisk->container_no];
-	qdisk->valid = dvp->valid;
+	qdisk->valid = AAC_DEV_IS_VALID(&dvp->dev);
 	qdisk->locked = dvp->locked;
 	qdisk->deleted = dvp->deleted;
 	mutex_exit(&softs->io_lock);
@@ -727,7 +734,7 @@ aac_delete_disk(struct aac_softstate *softs, intptr_t arg, int mode)
 	 * a container, rather we rely on an AIF coming from the
 	 * controller.
 	 */
-	if (dvp->valid) {
+	if (AAC_DEV_IS_VALID(&dvp->dev)) {
 		if (dvp->locked)
 			rval = EBUSY;
 	}
