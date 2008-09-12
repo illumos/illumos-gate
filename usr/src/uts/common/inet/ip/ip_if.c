@@ -14437,6 +14437,14 @@ ill_down_ipifs(ill_t *ill, mblk_t *mp, int index, boolean_t chk_nofailover)
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		if (chk_nofailover && (ipif->ipif_flags & IPIF_NOFAILOVER))
 			continue;
+		/*
+		 * Don't bring down the LINK LOCAL addresses as they are tied
+		 * to physical interface and they don't move. Treat them as
+		 * IPIF_NOFAILOVER.
+		 */
+		if (chk_nofailover && ill->ill_isv6 &&
+		    IN6_IS_ADDR_LINKLOCAL(&ipif->ipif_v6lcl_addr))
+			continue;
 		if (index == 0 || index == ipif->ipif_orig_ifindex) {
 			/*
 			 * We go through the ipif_down logic even if the ipif
