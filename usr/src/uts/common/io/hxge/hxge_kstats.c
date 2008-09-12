@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 #include <inet/mi.h>
 #include <sys/cmn_err.h>
@@ -78,9 +76,9 @@ typedef enum {
 hxge_kstat_index_t hxge_rdc_stats[] = {
 	{RDC_STAT_PACKETS, KSTAT_DATA_UINT64, "rdc_packets"},
 	{RDC_STAT_BYTES, KSTAT_DATA_UINT64, "rdc_bytes"},
+	{RDC_STAT_ERRORS, KSTAT_DATA_ULONG, "rdc_errors"},
 	{RDC_STAT_JUMBO_PKTS, KSTAT_DATA_ULONG, "rdc_jumbo_pkts"},
 	{RDC_STAT_RCR_UNKNOWN_ERR, KSTAT_DATA_ULONG, "rdc_rcr_unknown_err"},
-	{RDC_STAT_ERRORS, KSTAT_DATA_ULONG, "rdc_errors"},
 	{RDC_STAT_RCR_SHA_PAR_ERR, KSTAT_DATA_ULONG, "rdc_rcr_sha_par_err"},
 	{RDC_STAT_RBR_PRE_PAR_ERR, KSTAT_DATA_ULONG, "rdc_rbr_pre_par_err"},
 	{RDC_STAT_RBR_PRE_EMTY, KSTAT_DATA_ULONG, "rdc_rbr_pre_empty"},

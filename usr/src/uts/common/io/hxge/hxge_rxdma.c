@@ -41,7 +41,6 @@ extern uint32_t hxge_mblks_pending;
  * ISR doing Rx Processing.
  */
 extern uint32_t hxge_max_rx_pkts;
-boolean_t hxge_jumbo_enable;
 
 /*
  * Tunables to manage the receive buffer blocks.
@@ -1196,6 +1195,8 @@ hxge_intr_exit:
 	 */
 	cs.value &= RDC_STAT_WR1C;
 	cs.bits.mex = 1;
+	cs.bits.ptrread = 0;
+	cs.bits.pktread = 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	/*
@@ -1283,16 +1284,16 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	p_rcr_entry_t		rcr_desc_rd_head_pp;
 	p_mblk_t		nmp, mp_cont, head_mp, *tail_mp;
 	uint16_t		qlen, nrcr_read, npkt_read;
-	uint32_t		qlen_hw;
+	uint32_t		qlen_hw, qlen_sw;
 	uint32_t		invalid_rcr_entry;
 	boolean_t		multi;
 	rdc_rcr_cfg_b_t		rcr_cfg_b;
-#if defined(_BIG_ENDIAN)
-	hpi_status_t		rs = HPI_SUCCESS;
-#else
 	p_rx_mbox_t		rx_mboxp;
 	p_rxdma_mailbox_t	mboxp;
-#endif
+	uint64_t		rcr_head_index, rcr_tail_index;
+	uint64_t		rcr_tail;
+	uint64_t		value;
+	rdc_rcr_tail_t		rcr_tail_reg;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_pkts:vindex %d "
 	    "channel %d", vindex, ldvp->channel));
@@ -1318,16 +1319,12 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	    channel, rcr_p->rcr_desc_rd_head_p,
 	    rcr_p->rcr_desc_rd_head_pp, rcr_p->comp_rd_index));
 
-#if defined(_BIG_ENDIAN)
-	rs = hpi_rxdma_rdc_rcr_qlen_get(handle, channel, &qlen);
-	if (rs != HPI_SUCCESS) {
-		return (NULL);
-	}
-#else
 	rx_mboxp = hxgep->rx_mbox_areas_p->rxmbox_areas[channel];
 	mboxp = (p_rxdma_mailbox_t)rx_mboxp->rx_mbox.kaddrp;
-	qlen = mboxp->rcrstat_a.bits.qlen;
-#endif
+
+	(void) hpi_rxdma_rdc_rcr_qlen_get(handle, channel, &qlen);
+	RXDMA_REG_READ64(handle, RDC_RCR_TAIL, channel, &rcr_tail_reg.value);
+	rcr_tail = rcr_tail_reg.bits.tail;
 
 	if (!qlen) {
 		HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
@@ -1355,6 +1352,23 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	tail_mp = &head_mp;
 	nmp = mp_cont = NULL;
 	multi = B_FALSE;
+
+	rcr_head_index = rcr_p->rcr_desc_rd_head_p - rcr_p->rcr_desc_first_p;
+	rcr_tail_index = rcr_tail - rcr_p->rcr_tail_begin;
+
+	if (rcr_tail_index >= rcr_head_index) {
+		qlen_sw = rcr_tail_index - rcr_head_index;
+	} else {
+		/* rcr_tail has wrapped around */
+		qlen_sw = (rcr_p->comp_size - rcr_head_index) + rcr_tail_index;
+	}
+
+	if (qlen_hw > qlen_sw) {
+		HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
+		    "Channel %d, rcr_qlen from reg %d and from rcr_tail %d\n",
+		    channel, qlen_hw, qlen_sw));
+		qlen_hw = qlen_sw;
+	}
 
 	while (qlen_hw) {
 #ifdef HXGE_DEBUG
@@ -1435,10 +1449,8 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	rcr_p->comp_rd_index = comp_rd_index;
 	rcr_p->rcr_desc_rd_head_p = rcr_desc_rd_head_p;
 
-#if !defined(_BIG_ENDIAN)
 	/* Adjust the mailbox queue length for a hardware bug workaround */
 	mboxp->rcrstat_a.bits.qlen -= npkt_read;
-#endif
 
 	if ((hxgep->intr_timeout != rcr_p->intr_timeout) ||
 	    (hxgep->intr_threshold != rcr_p->intr_threshold)) {
@@ -1455,6 +1467,13 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 
 	cs.bits.pktread = npkt_read;
 	cs.bits.ptrread = nrcr_read;
+	value = cs.value;
+	cs.value &= 0xffffffffULL;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+
+	cs.value = value & ~0xffffffffULL;
+	cs.bits.pktread = 0;
+	cs.bits.ptrread = 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
@@ -1572,8 +1591,6 @@ hxge_receive_packet(p_hxge_t hxgep,
 
 	/* get the stats ptr */
 	rdc_stats = rcr_p->rdc_stats;
-	if (l2_len > (STD_FRAME_SIZE - ETHERFCSL))
-		rdc_stats->jumbo_pkts++;
 
 	if (!l2_len) {
 		HXGE_DEBUG_MSG((hxgep, RX_CTL,
@@ -1865,11 +1882,18 @@ hxge_receive_packet(p_hxge_t hxgep,
 	is_valid = (nmp != NULL);
 	if (first_entry) {
 		rdc_stats->ipackets++; /* count only 1st seg for jumbo */
+		if (l2_len > (STD_FRAME_SIZE - ETHERFCSL))
+			rdc_stats->jumbo_pkts++;
 		rdc_stats->ibytes += skip_len + l2_len < bsize ?
 		    l2_len : bsize;
 	} else {
-		rdc_stats->ibytes += l2_len - bytes_read < bsize ?
-		    l2_len - bytes_read : bsize;
+		/*
+		 * Add the current portion of the packet to the kstats.
+		 * The current portion of the packet is calculated by using
+		 * length of the packet and the previously received portion.
+		 */
+		rdc_stats->ibytes += l2_len - rcr_p->rcvd_pkt_bytes < bsize ?
+		    l2_len - rcr_p->rcvd_pkt_bytes : bsize;
 	}
 
 	rcr_p->rcvd_pkt_bytes = bytes_read;
@@ -1945,6 +1969,8 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 	channel = ldvp->channel;
 
 	/* Clear the interrupts */
+	cs.bits.pktread = 0;
+	cs.bits.ptrread = 0;
 	cs_val = cs.value & RDC_STAT_WR1C;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs_val);
 
@@ -2543,6 +2569,9 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
 	rcrp->rcr_desc_last_pp = rcrp->rcr_desc_rd_head_pp +
 	    (hxge_port_rcr_size - 1);
 
+	rcrp->rcr_tail_begin = DMA_COMMON_IOADDR(rcrp->rcr_desc);
+	rcrp->rcr_tail_begin = (rcrp->rcr_tail_begin & 0x7ffffULL) >> 3;
+
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 	    "==> hxge_map_rxdma_channel_cfg_ring: channel %d "
 	    "rbr_vaddrp $%p rcr_desc_rd_head_p $%p "
@@ -2713,7 +2742,7 @@ hxge_map_rxdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 
 	rbrp->block_size = hxgep->rx_default_block_size;
 
-	if (!hxge_jumbo_enable && !hxgep->param_arr[param_accept_jumbo].value) {
+	if (!hxgep->param_arr[param_accept_jumbo].value) {
 		rbrp->pkt_buf_size2 = RBR_BUFSZ2_2K;
 		rbrp->pkt_buf_size2_bytes = RBR_BUFSZ2_2K_BYTES;
 		rbrp->hpi_pkt_buf_size2 = SIZE_2KB;
@@ -3452,6 +3481,9 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 	    (hxge_port_rcr_size - 1);
 	rcrp->rcr_desc_last_pp = rcrp->rcr_desc_rd_head_pp +
 	    (hxge_port_rcr_size - 1);
+
+	rcrp->rcr_tail_begin = DMA_COMMON_IOADDR(rcrp->rcr_desc);
+	rcrp->rcr_tail_begin = (rcrp->rcr_tail_begin & 0x7ffffULL) >> 3;
 
 	dmap = (p_hxge_dma_common_t)&rcrp->rcr_desc;
 	bzero((caddr_t)dmap->kaddrp, dmap->alength);

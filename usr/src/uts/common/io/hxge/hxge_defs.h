@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_DEFS_H
 #define	_SYS_HXGE_HXGE_DEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -137,7 +135,15 @@ extern "C" {
 #define	LD_IM_MASK		0x00000003ULL
 #define	LDGTITMRES_RES_MASK	0x000FFFFFULL
 
-#define	STD_FRAME_SIZE		1522		/* 1518 + 4 = 5EE + 4 */
+#define	MIN_FRAME_SIZE		106	/* 68 byte min MTU + 38 byte header */
+#define	MAX_FRAME_SIZE		9216
+#define	STD_FRAME_SIZE		1522	/* 1518 + 4 = 5EE + 4 */
+#define	HXGE_DEFAULT_MTU	1500
+/*
+ * sizeof (struct ether_header) + ETHERFCSL + 4 + TX_PKT_HEADER_SIZE
+ * 12 + 6 + 4 + 16
+ */
+#define	MTU_TO_FRAME_SIZE	38
 
 #ifdef	__cplusplus
 }

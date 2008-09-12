@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 #include <hxge_vmac.h>
 
@@ -39,8 +37,6 @@ hxge_status_t hxge_tx_vmac_reset(p_hxge_t hxgep);
 hxge_status_t hxge_rx_vmac_reset(p_hxge_t hxgep);
 uint_t hxge_vmac_intr(caddr_t arg1, caddr_t arg2);
 hxge_status_t hxge_set_promisc(p_hxge_t hxgep, boolean_t on);
-
-extern boolean_t hxge_jumbo_enable;
 
 hxge_status_t
 hxge_link_init(p_hxge_t hxgep)
@@ -114,19 +110,6 @@ hxge_tx_vmac_init(p_hxge_t hxgep)
 {
 	uint64_t	config;
 	hpi_handle_t	handle = hxgep->hpi_handle;
-
-	/* Set Max and Min Frame Size */
-
-	hxgep->vmac.is_jumbo = B_FALSE;
-	if (hxge_jumbo_enable)
-		hxgep->vmac.is_jumbo = B_TRUE;
-
-	if (hxgep->param_arr[param_accept_jumbo].value ||
-	    hxgep->vmac.is_jumbo == B_TRUE)
-		hxgep->vmac.maxframesize = TX_JUMBO_MTU;
-	else
-		hxgep->vmac.maxframesize = STD_FRAME_SIZE + TX_PKT_HEADER_SIZE;
-	hxgep->vmac.minframesize = 64;
 
 	/* CFG_VMAC_TX_EN is done separately */
 	config = CFG_VMAC_TX_CRC_INSERT | CFG_VMAC_TX_PAD;
@@ -396,4 +379,28 @@ hxge_save_cntrs(p_hxge_t hxgep)
 
 hxge_save_cntrs_exit:
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_save_cntrs"));
+}
+
+int
+hxge_vmac_set_framesize(p_hxge_t hxgep)
+{
+	int	status = 0;
+
+	HXGE_DEBUG_MSG((hxgep, NDD_CTL, "==> hxge_vmac_set_framesize"));
+
+	RW_ENTER_WRITER(&hxgep->filter_lock);
+	(void) hxge_rx_vmac_disable(hxgep);
+	(void) hxge_tx_vmac_disable(hxgep);
+
+	/*
+	 * Apply the new jumbo parameter here which is contained in hxgep
+	 * data structure (hxgep->vmac.maxframesize);
+	 * The order of the following two calls is important.
+	 */
+	(void) hxge_tx_vmac_enable(hxgep);
+	(void) hxge_rx_vmac_enable(hxgep);
+	RW_EXIT(&hxgep->filter_lock);
+
+	HXGE_DEBUG_MSG((hxgep, NDD_CTL, "<== hxge_vmac_set_framesize"));
+	return (status);
 }

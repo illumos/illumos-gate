@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_FM_H
 #define	_SYS_HXGE_HXGE_FM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -66,7 +64,7 @@ typedef	struct _hxge_fm_ereport_attr {
 
 /* VMAC ereports */
 typedef	enum {
-	HXGE_FM_EREPORT_VMAC_LINK_DOWN = (FM_VMAC_ID << EREPORT_FM_ID_SHIFT),
+	HXGE_FM_EREPORT_VMAC_LINK_DOWN = (FM_VMAC_ID << EREPORT_FM_ID_SHIFT)
 } hxge_fm_ereport_vmac_t;
 
 /* PFC ereports */

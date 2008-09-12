@@ -26,8 +26,6 @@
 #ifndef _HPI_VIR_H
 #define	_HPI_VIR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -78,7 +76,7 @@ extern "C" {
 
 typedef enum {
 	VECTOR0,
-	VECTOR1,
+	VECTOR1
 } ldsv_type_t;
 
 /*

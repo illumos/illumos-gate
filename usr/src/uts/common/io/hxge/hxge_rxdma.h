@@ -328,6 +328,7 @@ typedef struct _rx_rcr_ring_t {
 
 	p_rcr_entry_t		rcr_desc_rd_head_p;	/* software next read */
 	p_rcr_entry_t		rcr_desc_rd_head_pp;
+	uint64_t		rcr_tail_begin;
 
 	struct _rx_rbr_ring_t	*rx_rbr_p;
 	uint32_t		intr_timeout;

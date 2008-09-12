@@ -50,8 +50,6 @@ extern uint_t hxge_vmac_intr();
 extern uint_t hxge_syserr_intr();
 extern uint_t hxge_pfc_intr();
 
-uint_t hxge_nmac_intr(caddr_t arg1, caddr_t arg2);
-
 /*
  * Entry point to populate configuration parameters into the master hxge
  * data structure and to update the NDD parameter list.
@@ -490,9 +488,6 @@ hxge_ldgv_init(p_hxge_t hxgep, int *navail_p, int *nrequired_p)
 	/* pfc */
 	nldvs++;
 
-	/* nmac for the link status register only */
-	nldvs++;
-
 	/* system error interrupts. */
 	nldvs++;
 
@@ -625,22 +620,6 @@ hxge_ldgv_init(p_hxge_t hxgep, int *navail_p, int *nrequired_p)
 	ldvp->ldv_intr_handler = hxge_pfc_intr;
 	ldvp->ldv_ldf_masks = 0;
 	ldv = HXGE_PFC_LD;
-	ldvp->ldv = ldv;
-	ldvp->use_timer = B_FALSE;
-	ldvp->hxgep = hxgep;
-	hxge_ldgv_setup(&ptr, &ldvp, ldv, endldg, nrequired_p);
-	nldvs++;
-
-	HXGE_DEBUG_MSG((hxgep, INT_CTL,
-	    "==> hxge_ldgv_init: nldvs %d navail %d nrequired %d",
-	    nldvs, *navail_p, *nrequired_p));
-
-	/*
-	 * NMAC
-	 */
-	ldvp->ldv_intr_handler = hxge_nmac_intr;
-	ldvp->ldv_ldf_masks = 0;
-	ldv = HXGE_NMAC_LD;
 	ldvp->ldv = ldv;
 	ldvp->use_timer = B_FALSE;
 	ldvp->hxgep = hxgep;
@@ -854,15 +833,6 @@ hxge_intr_mask_mgmt_set(p_hxge_t hxgep, boolean_t on)
 				    "==> hxge_intr_mask_mgmt_set:mask on"));
 			}
 
-			/*
-			 * Bringup - NMAC constantly interrupts since hydrad
-			 * is not available yet. When hydrad is available
-			 * and handles the interrupts, we will delete the
-			 * following two lines
-			 */
-			if (ldvp->ldv_intr_handler == hxge_nmac_intr)
-				ldvp->ldv_ldf_masks = (uint8_t)LD_IM_MASK;
-
 			rs = hpi_intr_mask_set(handle, ldvp->ldv,
 			    ldvp->ldv_ldf_masks);
 			if (rs != HPI_SUCCESS) {
@@ -1037,34 +1007,4 @@ hxge_mmac_init(p_hxge_t hxgep)
 	hxgep->statsp->mmac_stats.mmac_avail_cnt = mmac_info->naddrfree;
 
 	return (HXGE_OK);
-}
-
-/*ARGSUSED*/
-uint_t
-hxge_nmac_intr(caddr_t arg1, caddr_t arg2)
-{
-	p_hxge_t		hxgep = (p_hxge_t)arg2;
-	hpi_handle_t		handle;
-	p_hxge_stats_t		statsp;
-	cip_link_stat_t		link_stat;
-
-	HXGE_DEBUG_MSG((hxgep, MAC_INT_CTL, "==> hxge_nmac_intr"));
-
-	handle = HXGE_DEV_HPI_HANDLE(hxgep);
-	statsp = (p_hxge_stats_t)hxgep->statsp;
-
-	HXGE_REG_RD32(handle, CIP_LINK_STAT, &link_stat.value);
-	HXGE_DEBUG_MSG((hxgep, MAC_INT_CTL, "hxge_nmac_intr: status is 0x%x",
-	    link_stat.value));
-
-	if (link_stat.bits.xpcs0_link_up) {
-		mac_link_update(hxgep->mach, LINK_STATE_UP);
-		statsp->mac_stats.link_up = 1;
-	} else {
-		mac_link_update(hxgep->mach, LINK_STATE_DOWN);
-		statsp->mac_stats.link_up = 0;
-	}
-
-	HXGE_DEBUG_MSG((hxgep, MAC_INT_CTL, "<== hxge_nmac_intr"));
-	return (DDI_INTR_CLAIMED);
 }

@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_IMPL_H
 #define	_SYS_HXGE_HXGE_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -441,6 +439,12 @@ boolean_t hxge_nd_load(caddr_t *, char *, pfi_t, pfi_t, caddr_t);
 void hxge_nd_free(caddr_t *);
 int hxge_nd_getset(p_hxge_t, queue_t *, caddr_t, p_mblk_t);
 boolean_t hxge_set_lb(p_hxge_t, queue_t *wq, p_mblk_t mp);
+int hxge_param_rx_intr_pkts(p_hxge_t hxgep, queue_t *, mblk_t *, char *,
+    caddr_t);
+int hxge_param_rx_intr_time(p_hxge_t hxgep, queue_t *, mblk_t *, char *,
+    caddr_t);
+int hxge_param_set_ip_opt(p_hxge_t hxgep, queue_t *, mblk_t *, char *, caddr_t);
+int hxge_param_get_ip_opt(p_hxge_t hxgep, queue_t *, mblk_t *, caddr_t);
 
 /* hxge_virtual.c */
 hxge_status_t hxge_get_config_properties(p_hxge_t);
@@ -471,6 +475,7 @@ hxge_status_t hxge_del_mcast_addr(p_hxge_t, struct ether_addr *);
 hxge_status_t hxge_set_mac_addr(p_hxge_t hxgep, struct ether_addr *addr);
 hxge_status_t hxge_set_promisc(p_hxge_t hxgep, boolean_t on);
 void hxge_save_cntrs(p_hxge_t hxgep);
+int hxge_vmac_set_framesize(p_hxge_t hxgep);
 
 void hxge_debug_msg(p_hxge_t, uint64_t, char *, ...);
 

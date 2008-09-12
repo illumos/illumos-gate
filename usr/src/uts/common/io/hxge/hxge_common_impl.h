@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_COMMON_IMPL_H
 #define	_SYS_HXGE_HXGE_COMMON_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -70,6 +68,7 @@ extern "C" {
 #define		RX_INT_CTL	0x0000000080000000ULL
 #define		TX_ERR_CTL	0x0000000100000000ULL
 #define		DDI_INT_CTL	0x0000000200000000ULL
+#define		DLADM_CTL	0x0000000400000000ULL
 #define		DUMP_ALWAYS	0x2000000000000000ULL
 
 /* HPI Debug and Error defines */

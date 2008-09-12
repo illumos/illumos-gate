@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 
 lb_property_t lb_normal = {normal, "normal", hxge_lb_normal};
@@ -32,8 +30,7 @@ lb_property_t lb_mac10g = {internal, "mac10g", hxge_lb_mac10g};
 
 uint32_t hxge_lb_dbg = 1;
 
-extern uint32_t hxge_jumbo_mtu;
-extern boolean_t hxge_jumbo_enable;
+extern uint32_t hxge_jumbo_frame_size;
 
 static void hxge_rtrace_ioctl(p_hxge_t, queue_t *, mblk_t *, struct iocblk *);
 
@@ -61,15 +58,15 @@ hxge_hw_id_init(p_hxge_t hxgep)
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "==> hxge_hw_id_init"));
 
 	/*
-	 * Set up initial hardware parameters required such as mac mtu size.
+	 * Initialize the frame size to either standard "1500 + 38" or
+	 * jumbo. The user may tune the frame size through the "mtu" parameter
+	 * using "dladm set-linkprop"
 	 */
-	hxgep->vmac.is_jumbo = B_FALSE;
-	/* 1518 + 4 + 16 */
-	hxgep->vmac.maxframesize = STD_FRAME_SIZE + TX_PKT_HEADER_SIZE;
-	if (hxgep->param_arr[param_accept_jumbo].value || hxge_jumbo_enable) {
-		hxgep->vmac.maxframesize = (uint16_t)hxge_jumbo_mtu;
-		hxgep->vmac.is_jumbo = B_TRUE;
-	}
+	hxgep->vmac.minframesize = MIN_FRAME_SIZE;
+	hxgep->vmac.maxframesize = HXGE_DEFAULT_MTU + MTU_TO_FRAME_SIZE;
+	if (hxgep->param_arr[param_accept_jumbo].value)
+		hxgep->vmac.maxframesize = (uint16_t)hxge_jumbo_frame_size;
+
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "==> hxge_hw_id_init: maxframesize %d",
 	    hxgep->vmac.maxframesize));
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "<== hxge_hw_id_init"));
@@ -241,14 +238,14 @@ hxge_peu_handle_sys_errors(p_hxge_t hxgep)
 	handle = hxgep->hpi_handle;
 	statsp = (p_hxge_peu_sys_stats_t)&hxgep->statsp->peu_sys_stats;
 
-	HXGE_REG_RD64(handle, PEU_INTR_STAT, &stat.value);
+	HXGE_REG_RD32(handle, PEU_INTR_STAT, &stat.value);
 
 	/*
 	 * The PCIE errors are unrecoverrable and cannot be cleared.
 	 * The only thing we can do here is to mask them off to prevent
 	 * continued interrupts.
 	 */
-	HXGE_REG_WR64(handle, PEU_INTR_MASK, 0xffffffff);
+	HXGE_REG_WR32(handle, PEU_INTR_MASK, 0xffffffff);
 
 	if (stat.bits.spc_acc_err) {
 		statsp->spc_acc_err++;

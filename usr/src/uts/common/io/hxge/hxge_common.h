@@ -49,11 +49,11 @@ extern "C" {
 #define	HXGE_DMA_BLOCK		(64 * 64)
 #endif
 
-#define	HXGE_RBR_RBB_MIN	(128)
+#define	HXGE_RBR_RBB_MIN	128
 #define	HXGE_RBR_RBB_MAX	(64 * 128 -1)
-#define	HXGE_RBR_RBB_DEFAULT	(2048)		/* Number of RBR Blocks */
+#define	HXGE_RBR_RBB_DEFAULT	2048		/* Number of RBR Blocks */
 #define	HXGE_RCR_MIN		(HXGE_RBR_RBB_MIN * 2)
-#define	HXGE_RCR_MAX		(65504)			/* 2^16 - 32 */
+#define	HXGE_RCR_MAX		65504			/* 2^16 - 32 */
 
 #if defined(_BIG_ENDIAN)
 #define	HXGE_RCR_DEFAULT	(HXGE_RBR_RBB_DEFAULT * 8)
@@ -65,7 +65,7 @@ extern "C" {
 #endif
 #endif /* _BIG_ENDIAN */
 
-#define	HXGE_TX_RING_DEFAULT	(1024)
+#define	HXGE_TX_RING_DEFAULT	2048
 #define	HXGE_TX_RING_MAX	(64 * 128 - 1)
 
 #define	RBR_BKSIZE_4K			0
@@ -87,7 +87,7 @@ extern "C" {
 #define	RBR_BUFSZ0_1K			2
 #define	RBR_BUFSZ0_256_BYTES		256
 #define	RBR_BUFSZ0_512B_BYTES		512
-#define	RBR_BUFSZ0_1K_BYTES		(1024)
+#define	RBR_BUFSZ0_1K_BYTES		1024
 
 /*
  * VLAN table configuration
