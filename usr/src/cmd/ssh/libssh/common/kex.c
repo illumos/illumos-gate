@@ -21,14 +21,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: kex.c,v 1.51 2002/06/24 14:55:38 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 
@@ -266,6 +264,18 @@ kex_do_hook(Kex *kex)
 	kex_prop_free(prop);
 }
 
+/* Initiate the key exchange by sending the SSH2_MSG_KEXINIT message. */
+void
+kex_start(Kex *kex)
+{
+	kex_send_kexinit(kex);
+	kex_reset_dispatch();
+}
+
+/*
+ * Allocate a key exchange structure and populate it with a proposal we are
+ * going to use. This function does not start the actual key exchange.
+ */
 Kex *
 kex_setup(const char *host, char *proposal[PROPOSAL_MAX], Kex_hook_func hook)
 {
@@ -284,9 +294,6 @@ kex_setup(const char *host, char *proposal[PROPOSAL_MAX], Kex_hook_func hook)
 		kex->server = 1;
 
 	kex_prop2buf(&kex->my, proposal);
-
-	kex_send_kexinit(kex);
-	kex_reset_dispatch();
 
 	return kex;
 }
@@ -364,7 +371,8 @@ choose_kex(Kex *k, char *client, char *server)
 {
 	k->name = match_list(client, server, NULL);
 	if (k->name == NULL)
-		fatal("no kex alg");
+		fatal("no common kex alg: client '%s', server '%s'", client,
+		    server);
 	/* XXX Finish 3.6/7 merge of kex stuff -- choose_kex() done */
 	if (strcmp(k->name, KEX_DH1) == 0) {
 		k->kex_type = KEX_DH_GRP1_SHA1;

@@ -25,8 +25,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: dh.c,v 1.22 2002/06/27 08:49:44 markus Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "xmalloc.h"
 
 #include <openssl/bn.h>
@@ -212,7 +210,7 @@ dh_gen_key(DH *dh, int need)
 		if (!BN_rand(dh->priv_key, 2*need, 0, 0))
 			fatal("dh_gen_key: BN_rand failed");
 		if (DH_generate_key(dh) == 0)
-			fatal("DH_generate_key");
+			fatal("dh_gen_key: DH_generate_key() failed");
 		for (i = 0; i <= BN_num_bits(dh->priv_key); i++)
 			if (BN_is_bit_set(dh->priv_key, i))
 				bits_set++;

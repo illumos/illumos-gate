@@ -29,8 +29,6 @@
 
 #ifdef GSSAPI
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ssh.h"
 #include "ssh2.h"
 #include "xmalloc.h"
@@ -246,6 +244,7 @@ ssh_gssapi_encode_oid_for_kex(const gss_OID oid, char **enc_name)
 	buffer_put_char(&buf, '\0');
 
 	debug2("GSS-API Mechanism encoded as %s", encoded);
+	xfree(encoded);
 
 	*enc_name = xstrdup(buffer_ptr(&buf));
 	buffer_free(&buf);
@@ -271,6 +270,7 @@ ssh_gssapi_make_kexalgs_list(gss_OID_set mechs, const char *old_kexalgs)
 	len = strlen(old_kexalgs) + strlen(gss_kexalgs) + 2;
 	new_kexalgs = xmalloc(len);
 	(void) snprintf(new_kexalgs, len, "%s,%s", gss_kexalgs, old_kexalgs);
+	xfree(gss_kexalgs);
 
 	return (new_kexalgs);
 }
@@ -286,7 +286,7 @@ ssh_gssapi_modify_kex(Kex *kex, gss_OID_set mechs, char **proposal)
 	int i;
 
 	if (kex == NULL || proposal == NULL ||
-	    (orig_kexalgs = proposal[PROPOSAL_KEX_ALGS]) == NULL) {
+	    proposal[PROPOSAL_KEX_ALGS] == NULL) {
 		fatal("INTERNAL ERROR (%s)", __func__);
 	}
 
@@ -340,7 +340,7 @@ mod_offer:
 
 	(void) gss_release_oid_set(&min, &kex->mechs); /* ok if !kex->mechs */
 
-	/* Not offering GSS kexalgs now -> all done */
+	/* Not offering GSS kex algorithms now -> all done */
 	if (mechs == GSS_C_NULL_OID_SET)
 		return;
 
@@ -358,9 +358,10 @@ mod_offer:
 		}
 	}
 
-	/* Add mechs to kexalgs ... */
+	/* Add mechs to kex algorithms ... */
 	proposal[PROPOSAL_KEX_ALGS] = ssh_gssapi_make_kexalgs_list(mechs,
 	    kexalgs);
+	xfree(kexalgs);
 	kex->mechs = dup_mechs; /* remember what we offer now */
 
 	/*

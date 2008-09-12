@@ -9,14 +9,12 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: servconf.c,v 1.115 2002/09/04 18:52:42 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_DEFOPEN
 #include <deflt.h>
@@ -147,6 +145,7 @@ initialize_server_options(ServerOptions *options)
 	options->max_init_auth_tries_log = -1;
 
 	options->lookup_client_hostnames = -1;
+	options->use_openssl_engine = -1;
 }
 
 #ifdef HAVE_DEFOPEN
@@ -375,6 +374,8 @@ fill_default_server_options(ServerOptions *options)
 
 	if (options->lookup_client_hostnames == -1)
 		options->lookup_client_hostnames = 1;
+	if (options->use_openssl_engine == -1)
+		options->use_openssl_engine = 1;
 }
 
 /* Keyword tokens. */
@@ -412,7 +413,7 @@ typedef enum {
 	sHostbasedUsesNameFromPacketOnly, sClientAliveInterval,
 	sClientAliveCountMax, sAuthorizedKeysFile, sAuthorizedKeysFile2,
 	sMaxAuthTries, sMaxAuthTriesLog, sUsePrivilegeSeparation,
-	sLookupClientHostnames,
+	sLookupClientHostnames, sUseOpenSSLEngine,
 	sDeprecated
 } ServerOpCodes;
 
@@ -507,6 +508,7 @@ static struct {
 	{ "maxauthtrieslog", sMaxAuthTriesLog },
 	{ "useprivilegeseparation", sUsePrivilegeSeparation},
 	{ "lookupclienthostnames", sLookupClientHostnames},
+	{ "useopensslengine", sUseOpenSSLEngine},
 	{ NULL, sBadOption }
 };
 
@@ -1077,6 +1079,9 @@ parse_flag:
 
 	case sLookupClientHostnames:
 		intptr = &options->lookup_client_hostnames;
+		goto parse_flag;
+	case sUseOpenSSLEngine:
+		intptr = &options->use_openssl_engine;
 		goto parse_flag;
 
 	case sDeprecated:

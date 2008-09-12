@@ -14,32 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #include "includes.h"
 RCSID("$OpenBSD: cipher-ctr.c,v 1.4 2004/02/06 23:41:13 dtucker Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <openssl/evp.h>
 
 #include "log.h"
 #include "xmalloc.h"
-
-#if OPENSSL_VERSION_NUMBER < 0x00906000L
-#define SSH_OLD_EVP
-#endif
-
-#if (OPENSSL_VERSION_NUMBER < 0x00907000L)
-#include "rijndael.h"
-#define AES_KEY rijndael_ctx
-#define AES_BLOCK_SIZE 16
-#define AES_encrypt(a, b, c) rijndael_encrypt(c, a, b)
-#define AES_set_encrypt_key(a, b, c) rijndael_set_key(c, (u_char *)a, b, 1)
-#else
 #include <openssl/aes.h>
-#endif
 
 const EVP_CIPHER *evp_aes_128_ctr(void);
 void ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, u_int);
@@ -133,22 +119,54 @@ ssh_aes_ctr_iv(EVP_CIPHER_CTX *evp, int doset, u_char * iv, u_int len)
 		memcpy(iv, c->aes_counter, len);
 }
 
+/*
+ * Function fills an EVP_CIPHER structure for AES CTR functions based on the NID
+ * and the key length.
+ */
+static const EVP_CIPHER *
+evp_aes_ctr(const char *nid, int key_len, EVP_CIPHER *aes_ctr)
+{
+	memset(aes_ctr, 0, sizeof(EVP_CIPHER));
+	/*
+	 * If the PKCS#11 engine is used the AES CTR NIDs were dynamically
+	 * created during the engine initialization. If the engine is not used
+	 * we work with NID_undef's which is OK since in that case OpenSSL
+	 * doesn't use NIDs at all.
+	 */
+	if ((aes_ctr->nid = OBJ_ln2nid(nid)) != NID_undef)
+		debug3("%s NID found", nid);
+
+	aes_ctr->block_size = AES_BLOCK_SIZE;
+	aes_ctr->iv_len = AES_BLOCK_SIZE;
+	aes_ctr->key_len = key_len;
+	aes_ctr->init = ssh_aes_ctr_init;
+	aes_ctr->cleanup = ssh_aes_ctr_cleanup;
+	aes_ctr->do_cipher = ssh_aes_ctr;
+	aes_ctr->flags = EVP_CIPH_CBC_MODE | EVP_CIPH_VARIABLE_LENGTH |
+	    EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CUSTOM_IV;
+	return (aes_ctr);
+}
+
 const EVP_CIPHER *
 evp_aes_128_ctr(void)
 {
 	static EVP_CIPHER aes_ctr;
 
-	memset(&aes_ctr, 0, sizeof(EVP_CIPHER));
-	aes_ctr.nid = NID_undef;
-	aes_ctr.block_size = AES_BLOCK_SIZE;
-	aes_ctr.iv_len = AES_BLOCK_SIZE;
-	aes_ctr.key_len = 16;
-	aes_ctr.init = ssh_aes_ctr_init;
-	aes_ctr.cleanup = ssh_aes_ctr_cleanup;
-	aes_ctr.do_cipher = ssh_aes_ctr;
-#ifndef SSH_OLD_EVP
-	aes_ctr.flags = EVP_CIPH_CBC_MODE | EVP_CIPH_VARIABLE_LENGTH |
-	    EVP_CIPH_ALWAYS_CALL_INIT | EVP_CIPH_CUSTOM_IV;
-#endif
-	return (&aes_ctr);
+	return (evp_aes_ctr("aes-128-ctr", 16, &aes_ctr));
+}
+
+const EVP_CIPHER *
+evp_aes_192_ctr(void)
+{
+	static EVP_CIPHER aes_ctr;
+
+	return (evp_aes_ctr("aes-192-ctr", 24, &aes_ctr));
+}
+
+const EVP_CIPHER *
+evp_aes_256_ctr(void)
+{
+	static EVP_CIPHER aes_ctr;
+
+	return (evp_aes_ctr("aes-256-ctr", 32, &aes_ctr));
 }

@@ -42,8 +42,6 @@
 
 /* $OpenBSD: packet.c,v 1.148 2007/06/07 19:37:34 pvalchev Exp $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "includes.h"
 
 #include "sys-queue.h"
@@ -66,6 +64,10 @@
 #include "canohost.h"
 #include "misc.h"
 #include "ssh.h"
+#include "engine.h"
+
+/* PKCS#11 engine */
+ENGINE *e;
 
 #ifdef ALTPRIVSEP
 static int packet_server = 0;
@@ -77,6 +79,8 @@ static int packet_monitor = 0;
 #else
 #define DBG(x)
 #endif
+
+static void packet_send2(void);
 
 /*
  * This variable contains the file descriptors used for communicating with
@@ -148,6 +152,31 @@ struct packet {
 	Buffer payload;
 };
 TAILQ_HEAD(, packet) outgoing;
+
+/*
+ * Part of what -f option and ~& escape sequence do in the client is that they
+ * will force it to daemonize itself. Due to the fork safety rules inherent in
+ * any PKCS#11 environment, if the engine is used we must do a key re-exchange
+ * before forking a child to negotiate the new keys. Those keys will be used to
+ * inicialize the new crypto contexts. This involves finishing the engine in the
+ * parent and reinitializing it again in both processes after fork() returns.
+ * This approach also leaves protocol 1 out since it doesn't support rekeying.
+ */
+int will_daemonize;
+
+#ifdef	PACKET_DEBUG
+/* This function dumps data onto stderr. This is for debugging only. */
+void
+data_dump(void *data, u_int len)
+{
+	Buffer buf;
+
+	buffer_init(&buf);
+	buffer_append(&buf, data, len);
+	buffer_dump(&buf);
+	buffer_free(&buf);
+}
+#endif
 
 /*
  * Sets the descriptors used for communication.  Disables encryption until
@@ -520,7 +549,8 @@ packet_send1(void)
 	    buffer_len(&outgoing_packet));
 
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "encrypted: ");
+	debug("encrypted output queue now contains (%d bytes):\n",
+	    buffer_len(&output));
 	buffer_dump(&output);
 #endif
 
@@ -556,12 +586,15 @@ set_newkeys(int mode)
 		p_read.packets = p_read.blocks = 0;
 		max_blocks = &max_blocks_in;
 	}
+
+	debug("set_newkeys: setting new keys for '%s' mode",
+	    mode == MODE_IN ? "in" : "out");
+
 	if (newkeys[mode] != NULL) {
-		debug("set_newkeys: setting new keys for '%s' mode",
-		    mode == MODE_IN ? "in" : "out");
 		cipher_cleanup(cc);
 		free_keys(newkeys[mode]);
 	}
+
 	newkeys[mode] = kex_get_newkeys(mode);
 	if (newkeys[mode] == NULL)
 		fatal("newkeys: no keys for mode %d", mode);
@@ -570,7 +603,14 @@ set_newkeys(int mode)
 	comp = &newkeys[mode]->comp;
 	if (mac->md != NULL)
 		mac->enabled = 1;
-	DBG(debug("cipher_init_context: %d", mode));
+#ifdef	PACKET_DEBUG
+	debug("new encryption key:\n");
+	data_dump(enc->key, enc->key_len);
+	debug("new encryption IV:\n");
+	data_dump(enc->iv, enc->block_size);
+	debug("new MAC key:\n");
+	data_dump(mac->key, mac->key_len);
+#endif
 	cipher_init(cc, enc->cipher, enc->key, enc->key_len,
 	    enc->iv, enc->block_size, crypt_type);
 	/* Deleting the keys does not gain extra security */
@@ -642,6 +682,43 @@ free_keys(Newkeys *keys)
 }
 
 /*
+ * Process SSH2_MSG_NEWKEYS message. If we are using the engine we must have
+ * both SSH2_MSG_NEWKEYS processed before we can finish the engine, fork, and
+ * reinitialize the crypto contexts. We can't fork before processing the 2nd
+ * message otherwise we couldn't encrypt/decrypt that message at all - note that
+ * parent's PKCS#11 sessions are useless after the fork and we must process
+ * both SSH2_MSG_NEWKEYS messages using the old keys.
+ */
+void
+process_newkeys(int mode)
+{
+	if (packet_is_server() != 0)
+		return;
+
+	if (will_daemonize == FIRST_NEWKEYS_PROCESSED) {
+		debug3("both SSH2_MSG_NEWKEYS processed, will daemonize now");
+		cipher_cleanup(&send_context);
+		cipher_cleanup(&receive_context);
+		pkcs11_engine_finish(e);
+		if (daemon(1, 1) < 0) {
+			fatal("daemon() failed: %.200s",
+			    strerror(errno));
+		}
+		e = pkcs11_engine_load(e != NULL ? 1 : 0);
+
+		set_newkeys(MODE_OUT);
+		set_newkeys(MODE_IN);
+		will_daemonize = SECOND_NEWKEYS_PROCESSED;
+		packet_send2();
+	} else {
+		if (will_daemonize == DAEMONIZING_REQUESTED)
+			will_daemonize = FIRST_NEWKEYS_PROCESSED;
+		else
+			set_newkeys(mode);
+	}
+}
+
+/*
  * Finalize packet in SSH2 format (compress, mac, encrypt, enqueue)
  */
 static void
@@ -668,7 +745,8 @@ packet_send2_wrapped(void)
 	type = cp[5];
 
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "plain:     ");
+	debug("plain output packet to be processed (%d bytes):\n",
+	    buffer_len(&outgoing_packet));
 	buffer_dump(&outgoing_packet);
 #endif
 
@@ -723,7 +801,8 @@ packet_send2_wrapped(void)
 	cp = buffer_ptr(&outgoing_packet);
 	PUT_32BIT(cp, packet_length);
 	cp[4] = padlen;
-	DBG(debug("send: len %d (includes padlen %d)", packet_length+4, padlen));
+	DBG(debug("will send %d bytes (includes padlen %d)",
+	    packet_length + 4, padlen));
 
 	/* compute MAC over seqnr and packet(length fields, payload, padding) */
 	if (mac && mac->enabled) {
@@ -740,7 +819,8 @@ packet_send2_wrapped(void)
 	if (mac && mac->enabled)
 		buffer_append(&output, (char *)macbuf, mac->mac_len);
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "encrypted: ");
+	debug("encrypted output queue now contains (%d bytes):\n",
+	    buffer_len(&output));
 	buffer_dump(&output);
 #endif
 	/* increment sequence number for outgoing packets */
@@ -765,14 +845,29 @@ packet_send2_wrapped(void)
 	p_send.blocks += (packet_length + 4) / block_size;
 	buffer_clear(&outgoing_packet);
 
-	if (type == SSH2_MSG_NEWKEYS)
-#ifdef ALTPRIVSEP
-		/* set_newkeys(MODE_OUT) in client, server, but not monitor */
-		if (!packet_is_server() && !packet_is_monitor())
-#endif /* ALTPRIVSEP */
-		set_newkeys(MODE_OUT);
+	if (type == SSH2_MSG_NEWKEYS) {
+		/*
+		 * set_newkeys(MODE_OUT) in the client. Note that in the
+		 * unprivileged child, set_newkeys() for MODE_OUT are set after
+		 * SSH2_MSG_NEWKEYS is read from the monitor and forwarded to
+		 * the client side.
+		 */
+		process_newkeys(MODE_OUT);
+	}
 }
 
+/*
+ * Packets we deal with here are plain until we encrypt them in
+ * packet_send2_wrapped().
+ *
+ * As already mentioned in a comment at process_newkeys() function we must not
+ * fork() until both SSH2_MSG_NEWKEYS packets were processed. Until this is done
+ * we must queue all packets so that they can be encrypted with the new keys and
+ * then sent to the other side. However, what can happen here is that we get
+ * SSH2_MSG_NEWKEYS after we sent it. In that situation we must call
+ * packet_send2() anyway to empty the queue, and set the rekey flag to the
+ * finished state. If we didn't do that we would just hang and enqueue data.
+ */
 static void
 packet_send2(void)
 {
@@ -780,35 +875,41 @@ packet_send2(void)
 	struct packet *p;
 	u_char type, *cp;
 
-	cp = buffer_ptr(&outgoing_packet);
-	type = cp[5];
+	if (will_daemonize != SECOND_NEWKEYS_PROCESSED) {
+		cp = buffer_ptr(&outgoing_packet);
+		type = cp[5];
 
-	/* during rekeying we can only send key exchange messages */
-	if (rekeying) {
-		if (!((type >= SSH2_MSG_TRANSPORT_MIN) &&
-		    (type <= SSH2_MSG_TRANSPORT_MAX))) {
-			debug("enqueue packet: %u", type);
-			p = xmalloc(sizeof(*p));
-			p->type = type;
-			memcpy(&p->payload, &outgoing_packet, sizeof(Buffer));
-			buffer_init(&outgoing_packet);
-			TAILQ_INSERT_TAIL(&outgoing, p, next);
-			return;
+		/* during rekeying we can only send key exchange messages */
+		if (rekeying) {
+			if (!((type >= SSH2_MSG_TRANSPORT_MIN) &&
+			    (type <= SSH2_MSG_TRANSPORT_MAX))) {
+				debug("enqueue a plain packet because rekex in "
+				    "progress [type %u]", type);
+				p = xmalloc(sizeof(*p));
+				p->type = type;
+				memcpy(&p->payload, &outgoing_packet, sizeof(Buffer));
+				buffer_init(&outgoing_packet);
+				TAILQ_INSERT_TAIL(&outgoing, p, next);
+				return;
+			}
 		}
+
+		/* rekeying starts with sending KEXINIT */
+		if (type == SSH2_MSG_KEXINIT)
+			rekeying = 1;
+
+		packet_send2_wrapped();
 	}
 
-	/* rekeying starts with sending KEXINIT */
-	if (type == SSH2_MSG_KEXINIT)
-		rekeying = 1;
-
-	packet_send2_wrapped();
-
-	/* after a NEWKEYS message we can send the complete queue */
-	if (type == SSH2_MSG_NEWKEYS) {
+	/* after rekex is done we can process the queue of plain packets */
+	if (will_daemonize == SECOND_NEWKEYS_PROCESSED ||
+	    (will_daemonize == NOT_DAEMONIZING && type == SSH2_MSG_NEWKEYS)) {
 		rekeying = 0;
+		will_daemonize = NOT_DAEMONIZING;
 		while ((p = TAILQ_FIRST(&outgoing)) != NULL) {
 			type = p->type;
-			debug("dequeue packet: %u", type);
+			debug("dequeuing a plain packet since rekex is over "
+			    "[type %u]", type);
 			buffer_free(&outgoing_packet);
 			memcpy(&outgoing_packet, &p->payload, sizeof(Buffer));
 			TAILQ_REMOVE(&outgoing, p, next);
@@ -973,7 +1074,7 @@ packet_read_poll1(void)
 	buffer_consume(&input, padded_len);
 
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "read_poll plain: ");
+	debug("read_poll plain/full:\n");
 	buffer_dump(&incoming_packet);
 #endif
 
@@ -1032,6 +1133,11 @@ packet_read_poll2(u_int32_t *seqnr_p)
 		 */
 		if (buffer_len(&input) < block_size)
 			return SSH_MSG_NONE;
+#ifdef PACKET_DEBUG
+		debug("encrypted data we have in read queue (%d bytes):\n",
+		    buffer_len(&input));
+		buffer_dump(&input);
+#endif
 		buffer_clear(&incoming_packet);
 		cp = buffer_append_space(&incoming_packet, block_size);
 		cipher_crypt(&receive_context, cp, buffer_ptr(&input),
@@ -1039,15 +1145,23 @@ packet_read_poll2(u_int32_t *seqnr_p)
 		cp = buffer_ptr(&incoming_packet);
 		packet_length = GET_32BIT(cp);
 		if (packet_length < 1 + 4 || packet_length > 256 * 1024) {
+			error("bad packet length %d; i/o counters "
+			    "%llu/%llu", packet_length,
+			    p_read.blocks * block_size,
+			    p_send.blocks * block_size);
+			error("decrypted %d bytes follows:\n", block_size);
 			buffer_dump(&incoming_packet);
-			packet_disconnect("Bad packet length %d.", packet_length);
+			packet_disconnect("Bad packet length %d, i/o counters "
+			    "%llu/%llu.", packet_length,
+			    p_read.blocks * block_size,
+			    p_send.blocks * block_size);
 		}
 		DBG(debug("input: packet len %u", packet_length + 4));
 		buffer_consume(&input, block_size);
 	}
 	/* we have a partial packet of block_size bytes */
 	need = 4 + packet_length - block_size;
-	DBG(debug("partial packet %d, need %d, maclen %d", block_size,
+	DBG(debug("partial packet %d, still need %d, maclen %d", block_size,
 	    need, maclen));
 	if (need % block_size != 0)
 		fatal("padding error: need %d block %d mod %d",
@@ -1059,7 +1173,8 @@ packet_read_poll2(u_int32_t *seqnr_p)
 	if (buffer_len(&input) < need + maclen)
 		return SSH_MSG_NONE;
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "read_poll enc/full: ");
+	debug("in read_poll, the encrypted input queue now contains "
+	    "(%d bytes):\n", buffer_len(&input));
 	buffer_dump(&input);
 #endif
 	cp = buffer_append_space(&incoming_packet, need);
@@ -1115,17 +1230,20 @@ packet_read_poll2(u_int32_t *seqnr_p)
 	 * return length of payload (without type field)
 	 */
 	type = buffer_get_char(&incoming_packet);
-#ifdef ALTPRIVSEP
-	if (type == SSH2_MSG_NEWKEYS)
-		/* set_newkeys(MODE_OUT) in client, server, but not monitor */
-		if (!packet_is_server() && !packet_is_monitor())
-			set_newkeys(MODE_IN);
-#else /* ALTPRIVSEP */
-	if (type == SSH2_MSG_NEWKEYS)
-		set_newkeys(MODE_IN);
-#endif /* ALTPRIVSEP */
+	if (type == SSH2_MSG_NEWKEYS) {
+		/*
+		 * set_newkeys(MODE_IN) in the client because it doesn't have a
+		 * dispatch function for SSH2_MSG_NEWKEYS in contrast to the
+		 * server processes. Note that in the unprivileged child,
+		 * set_newkeys() for MODE_IN are set in dispatch function
+		 * altprivsep_rekey() after SSH2_MSG_NEWKEYS packet is received
+		 * from the client.
+		 */
+		process_newkeys(MODE_IN);
+	}
+
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "read/plain[%d]:\r\n", type);
+	debug("decrypted input packet [type %d]:\n", type);
 	buffer_dump(&incoming_packet);
 #endif
 	/* reset for next packet */
@@ -1133,6 +1251,10 @@ packet_read_poll2(u_int32_t *seqnr_p)
 	return type;
 }
 
+/*
+ * This tries to read a packet from the buffer of received data. Note that it
+ * doesn't read() anything from the network socket.
+ */
 int
 packet_read_poll_seqnr(u_int32_t *seqnr_p)
 {
@@ -1414,6 +1536,10 @@ packet_write_poll(void)
 			else
 				fatal("Write failed: %.100s", strerror(errno));
 		}
+#ifdef PACKET_DEBUG
+		debug("in packet_write_poll, %d bytes just sent to the "
+		    "remote side", len);
+#endif
 		buffer_consume(&output, len);
 	}
 }
@@ -1608,12 +1734,6 @@ packet_set_server(void)
 	packet_server = 1;
 }
 
-void
-packet_set_no_monitor(void)
-{
-	packet_server = 0;
-}
-
 int
 packet_is_server(void)
 {
@@ -1661,16 +1781,55 @@ packet_set_monitor(int pipe)
 
 	/*
 	 * make sure that the monitor's child's socket is not shutdown(3SOCKET)
-	 * when we packet_close()
+	 * when we packet_close(). Setting connection_out to -1 will take care
+	 * of that.
 	 */
 	if (packet_connection_is_on_socket())
 		connection_out = -1;
 
-	/* now cleanup state related to ssh socket */
+	/*
+	 * Now clean up the state related to the server socket. As a side
+	 * effect, we also clean up existing cipher contexts that were
+	 * initialized with 'none' cipher in packet_set_connection(). That
+	 * function was called in the child server process shortly after the
+	 * master SSH process forked. However, all of that is reinialized again
+	 * by another packet_set_connection() call right below.
+	 */
 	packet_close();
 
-	/* now make the monitor pipe look like the ssh connection */
+	/*
+	 * Now make the monitor pipe look like the ssh connection which means
+	 * that connection_in and connection_out will be set to the
+	 * communication pipe descriptors.
+	 */
 	packet_set_connection(pipe, dup_fd);
+}
+
+/*
+ * We temporarily need to set connection_in and connection_out descriptors so
+ * that we can make use of existing code that gets the IP address and hostname
+ * of the peer to write a login/logout record. It's not nice but we would have
+ * to change more code when implementing the PKCS#11 engine support.
+ */
+void
+packet_set_fds(int fd, int restore)
+{
+	static int stored_fd;
+
+	if (stored_fd == 0 && restore == 0) {
+		debug3("packet_set_fds: saving %d, installing %d",
+		    connection_in, fd);
+		stored_fd = connection_in;
+		/* we don't have a socket in inetd mode */
+		if (fd != -1)
+			connection_in = connection_out = fd;
+		return;
+	}
+
+	if (restore == 1) {
+		debug3("restoring %d to connection_in/out", stored_fd);
+		connection_in = connection_out = stored_fd;
+	}
 }
 
 int

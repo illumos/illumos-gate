@@ -1,20 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*	$OpenBSD: kex.h,v 1.32 2002/09/09 14:54:14 markus Exp $	*/
-
-#ifndef	_KEX_H
-#define	_KEX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-/*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +21,19 @@ extern "C" {
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	$OpenBSD: kex.h,v 1.32 2002/09/09 14:54:14 markus Exp $	*/
+
+#ifndef	_KEX_H
+#define	_KEX_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <openssl/evp.h>
 #include "buffer.h"
@@ -165,6 +162,7 @@ typedef void (*Kex_hook_func)(Kex *, char **); /* for GSS-API rekeying */
 Kex	 *kex_setup(const char *host,
 		    char *proposal[PROPOSAL_MAX],
 		    Kex_hook_func hook);
+void	  kex_start(Kex *);
 void	  kex_finish(Kex *);
 
 void	  kex_send_kexinit(Kex *);

@@ -39,16 +39,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: ssh.c,v 1.186 2002/09/19 01:58:18 djm Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <openssl/evp.h>
 #include <openssl/err.h>
 
 #include "ssh.h"
@@ -1169,11 +1166,10 @@ ssh_session2(void)
 
 	/* If requested, let ssh continue in the background. */
 	if (fork_after_authentication_flag)
-		if (daemon(1, 1) < 0)
-			fatal("daemon() failed: %.200s", strerror(errno));
+		client_daemonize();
 
-	return client_loop(tty_flag, tty_flag ?
-	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
+	return (client_loop(tty_flag, tty_flag ?
+	    options.escape_char : SSH_ESCAPECHAR_NONE, id));
 }
 
 static void

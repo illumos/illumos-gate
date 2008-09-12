@@ -1,7 +1,5 @@
-   Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+   Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
    Use is subject to license terms.
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 	Sun's Alternative "Privilege Separation" for OpenSSH
 
@@ -193,7 +191,7 @@ A.    References
     ease.
 
 
-4.    OpenSSH's Privilege Separation
+4.  OpenSSH's Privilege Separation
 
     The OpenSSH privilege separation model is quite complex.
 
@@ -279,6 +277,35 @@ A.    References
        other services on Solaris do the same and everything still works
        because of grantpt(3C).
 
+     - The sshd server process (the one that will become a monitor)
+       forks a child process before the key exchange starts. The reason
+       for it is that if we forked after that we would end up using
+       PKCS#11 sessions initialized in the monitor unless
+       UseOpenSSLEngine was explicitly set to 'no'. Using any existing
+       PKCS#11 sessions or object handles over fork is what the PKCS#11
+       standard explicitly prohibits. To solve that, we would have to
+       rekey before fork and then newly initialize the engine in the
+       child, together with the new crypto contexts initialized with the
+       keys produced by the key re-exchange. And, that wouldn't help in
+       situations where the client does not support rekeying which also
+       includes the whole protocol version 1. The pre-fork solution is
+       simpler and also much faster. So, the key exchange and
+       authentication is fully done in the child server process while
+       the monitor waits aside to read the authentication context that
+       is needed for further operation. The child drops privileges after
+       the authentication finishes.
+
+       With the ssh client, the situation is slightly more complicated.
+       Given the fact that the user can request to go to the background
+       during the connection using the ~& sequence we must be prepared
+       to rekey before forking, to reinitialize the engine in the child
+       after that, and then set the new crypto contexts with the new
+       keys. If the server we are communicating with does not support
+       rekeying we will not use the engine at all. We expect this
+       situation to be extremely rare and will not offer any workaround
+       for that. This also includes the protocol version 1. However,
+       this version is already considered obsolete and should not be used
+       if possible.
 
 6.  Comparison of the OpenSSH and SUNWssh PrivSep Models
 
@@ -344,7 +371,7 @@ A.    References
     The OpenSSH 3.5p1 monitor protocol, on Solaris, has approximately 20
     monitor request and corresponding response messages.
 
-    The SUNWssh monitor protocol has 3 monitor request and response
+    The SUNWssh monitor protocol has 5 monitor request and response
     messages; additionally, the monitor processes standard re-key
     messages (but note: the monitor and the session process IPC is
     completely unencrypted), which amounts to about 14 more messages

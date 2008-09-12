@@ -18,10 +18,10 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)Makefile.com	1.19	08/08/12 SMI"
 #
 
 LIBRARY =	libssh.a
@@ -43,6 +43,7 @@ OBJECTS =	\
 		deattack.o \
 		dh.o \
 		dispatch.o \
+		engine.o \
 		fatal.o \
 		g11n.o \
 		mac.o \

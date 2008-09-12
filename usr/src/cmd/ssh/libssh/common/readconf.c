@@ -11,14 +11,12 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: readconf.c,v 1.100 2002/06/19 00:27:55 deraadt Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ssh.h"
 #include "xmalloc.h"
@@ -129,7 +127,7 @@ typedef enum {
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
 	oFallBackToRsh, oUseRsh, oConnectTimeout, oHashKnownHosts,
 	oServerAliveInterval, oServerAliveCountMax, oDisableBanner,
-	oIgnoreIfUnknown, oRekeyLimit,
+	oIgnoreIfUnknown, oRekeyLimit, oUseOpenSSLEngine,
 	oDeprecated
 } OpCodes;
 
@@ -223,6 +221,7 @@ static struct {
 	{ "disablebanner", oDisableBanner },
 	{ "hashknownhosts", oHashKnownHosts },
 	{ "ignoreifunknown", oIgnoreIfUnknown },
+	{ "useopensslengine", oUseOpenSSLEngine },
 	{ NULL, oBadOption }
 };
 
@@ -850,6 +849,10 @@ parse_int:
 		charptr = &options->ignore_if_unknown;
 		goto parse_string;
 
+	case oUseOpenSSLEngine:
+		intptr = &options->use_openssl_engine;
+		goto parse_flag;
+
 	case oDeprecated:
 		debug("%s line %d: Deprecated option \"%s\"",
 		    filename, linenum, keyword);
@@ -989,6 +992,7 @@ initialize_options(Options * options)
 	options->ignore_if_unknown = NULL;
 	options->unknown_opts_num = 0;
 	options->disable_banner = -1;
+	options->use_openssl_engine = -1;
 }
 
 /*
@@ -1135,6 +1139,8 @@ fill_default_options(Options * options)
 		options->hash_known_hosts = 0;
 	if (options->disable_banner == -1)
 		options->disable_banner = 0;
+	if (options->use_openssl_engine == -1)
+		options->use_openssl_engine = 1;
 	/* options->proxy_command should not be set by default */
 	/* options->user will be set in the main program if appropriate */
 	/* options->hostname will be set in the main program if appropriate */

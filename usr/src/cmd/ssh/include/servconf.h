@@ -1,5 +1,3 @@
-/*	$OpenBSD: servconf.h,v 1.59 2002/07/30 17:03:55 markus Exp $	*/
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -13,14 +11,14 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	$OpenBSD: servconf.h,v 1.59 2002/07/30 17:03:55 markus Exp $	*/
+
 #ifndef	_SERVCONF_H
 #define	_SERVCONF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -158,6 +156,7 @@ typedef struct {
 	int	max_init_auth_tries_log;    /* SUNW: /etc/default/login */
 
 	int	lookup_client_hostnames;
+	int	use_openssl_engine;
 
 }       ServerOptions;
 

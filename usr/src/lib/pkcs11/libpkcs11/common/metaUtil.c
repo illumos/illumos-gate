@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <cryptoutil.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -33,6 +31,7 @@
 #include "metaGlobal.h"
 
 extern cipher_mechs_threshold_t	meta_mechs_threshold[];
+static boolean_t threshold_chk_enabled = B_FALSE;
 
 CK_RV
 meta_operation_init_defer(CK_FLAGS optype, meta_session_t *session,
@@ -537,7 +536,7 @@ meta_do_operation(CK_FLAGS optype, int mode,
 			    session->init.pMech->mechanism);
 		}
 
-		if ((inLen > threshold) || (threshold == 0)) {
+		if ((threshold_chk_enabled == B_FALSE) || (inLen > threshold)) {
 			if ((session->init.app) && (!session->init.done)) {
 				/*
 				 * Call real init operation only if the
@@ -1731,8 +1730,12 @@ finish:
  * ${METASLOT_OBJECTSTORE_TOKEN}
  * ${METASLOT_AUTO_KEY_MIGRATE}
  *
+ * ${_METASLOT_ENABLE_THRESHOLD} - private environmental variable to
+ * enable the treshold checking which is disabled by default.
+ *
  * values defined in these environment variables will be stored in the
- * global variable "metaslot_config"
+ * global variable "metaslot_config". Variable threshold_chk_disabled is an
+ * exception.
  */
 void
 get_user_metaslot_config()
@@ -1787,5 +1790,11 @@ get_user_metaslot_config()
 		metaslot_config.keystore_token_specified = B_TRUE;
 		(void) strlcpy((char *)metaslot_config.keystore_token, env_val,
 		    TOKEN_LABEL_SIZE);
+	}
+
+	/* _METASLOT_ENABLE_THRESHOLD */
+	env_val = getenv("_METASLOT_ENABLE_THRESHOLD");
+	if (env_val) {
+		threshold_chk_enabled = B_TRUE;
 	}
 }

@@ -12,14 +12,12 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: sshconnect.c,v 1.135 2002/09/19 01:58:18 djm Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <openssl/bn.h>
 
@@ -39,6 +37,7 @@ RCSID("$OpenBSD: sshconnect.c,v 1.135 2002/09/19 01:58:18 djm Exp $");
 #include "misc.h"
 #include "readpass.h"
 #include <langinfo.h>
+#include "engine.h"
 
 char *client_version_string = NULL;
 char *server_version_string = NULL;
@@ -49,6 +48,7 @@ extern char *__progname;
 extern uid_t original_real_uid;
 extern uid_t original_effective_uid;
 extern pid_t proxy_command_pid;
+extern ENGINE *e;
 
 #ifndef INET6_ADDRSTRLEN		/* for non IPv6 machines */
 #define INET6_ADDRSTRLEN 46
@@ -982,6 +982,13 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 
 	/* Exchange protocol version identification strings with the server. */
 	ssh_exchange_identification();
+
+	/*
+	 * See comment at definition of will_daemonize for information why we
+	 * don't support the PKCS#11 engine with protocol 1.
+	 */
+	if (compat20 == 1 && options.use_openssl_engine == 1)
+		e = pkcs11_engine_load(options.use_openssl_engine);
 
 	/* Put the connection into non-blocking mode. */
 	packet_set_nonblocking();

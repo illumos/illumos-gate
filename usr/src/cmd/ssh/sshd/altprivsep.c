@@ -22,7 +22,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+
+#include <pwd.h>
 
 #include "includes.h"
 #include "atomicio.h"
@@ -42,13 +48,23 @@
 #include "sshlogin.h"
 #include "xmalloc.h"
 #include "altprivsep.h"
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
+#include "canohost.h"
+#include "engine.h"
+#include "servconf.h"
+
+#ifdef HAVE_BSM
+#include "bsmaudit.h"
+adt_session_data_t *ah = NULL;
+#endif /* HAVE_BSM */
+
+#ifdef GSSAPI
+#include "ssh-gss.h"
+extern Gssctxt *xxx_gssctxt;
+#endif /* GSSAPI */
 
 extern Kex *xxx_kex;
+extern u_char *session_id2;
+extern int session_id2_len;
 
 static Buffer to_monitor;
 static Buffer from_monitor;
@@ -164,10 +180,23 @@ static Buffer input_pipe, output_pipe; /* for pipe I/O */
 static Authctxt *xxx_authctxt;
 
 /* Monitor functions */
-extern void aps_monitor_loop(Authctxt *authctxt, int pipe, pid_t child_pid);
+extern void aps_monitor_loop(Authctxt *authctxt, pid_t child_pid);
 static void aps_record_login(void);
 static void aps_record_logout(void);
 static void aps_start_rekex(void);
+Authctxt *aps_read_auth_context(void);
+
+/* main functions for handling the monitor */
+static pid_t	altprivsep_start_monitor(Authctxt **authctxt);
+static void	altprivsep_do_monitor(Authctxt *authctxt, pid_t child_pid);
+static int	altprivsep_started(void);
+static int	altprivsep_is_monitor(void);
+
+/* calls _to_ monitor from unprivileged process */
+static void	altprivsep_get_newkeys(enum kex_modes mode);
+
+/* monitor-side fatal_cleanup callbacks */
+static void	altprivsep_shutdown_sock(void *arg);
 
 /* Altprivsep packet utilities for communication with the monitor */
 static void	altprivsep_packet_start(u_char);
@@ -186,26 +215,25 @@ static u_int	 altprivsep_packet_get_char(void);
 static void	*altprivsep_packet_get_raw(u_int *length_ptr);
 static void	*altprivsep_packet_get_string(u_int *length_ptr);
 
+Kex		*prepare_for_ssh2_kex(void);
+
 /*
  * Start monitor from privileged sshd process.
  *
  * Return values are like fork(2); the parent is the monitor.  The caller should
  * fatal() on error.
  *
- * Privileges are dropped, on the unprivileged side, upon success.
+ * Note that the monitor waits until the still privileged child finishes the
+ * authentication. The child drops its privileges after the authentication.
  */
-pid_t
-altprivsep_start_monitor(Authctxt *authctxt)
+static pid_t
+altprivsep_start_monitor(Authctxt **authctxt)
 {
 	pid_t pid;
 	int junk;
 
-	if (aps_started || authctxt == NULL || authctxt->pw == NULL)
+	if (aps_started)
 		fatal("Monitor startup failed: missing state");
-
-	xxx_authctxt = authctxt;
-
-	packet_set_server();
 
 	buffer_init(&output_pipe);
 	buffer_init(&input_pipe);
@@ -222,6 +250,13 @@ altprivsep_start_monitor(Authctxt *authctxt)
 	monitor_pid = getpid();
 
 	if ((pid = fork()) > 0) {
+		/*
+		 * From now on, all debug messages from monitor will have prefix
+		 * "monitor "
+		 */
+		set_log_txt_prefix("monitor ");
+		(void) prepare_for_ssh2_kex();
+		packet_set_server();
 		/* parent */
 		child_pid = pid;
 
@@ -229,24 +264,25 @@ altprivsep_start_monitor(Authctxt *authctxt)
 			monitor_pid, child_pid);
 
 		(void) close(pipe_fds[1]);
-
 		pipe_fd = pipe_fds[0];
+
+		/*
+		 * Signal readiness of the monitor and then read the
+		 * authentication context from the child.
+		 */
+		(void) write(pipe_fd, &pid, sizeof (pid));
+		packet_set_monitor(pipe_fd);
+		xxx_authctxt = *authctxt = aps_read_auth_context();
 
 		if (fcntl(pipe_fd, F_SETFL, O_NONBLOCK) < 0)
 			error("fcntl O_NONBLOCK: %.100s", strerror(errno));
-
-		/* signal readiness of monitor */
-		(void) write(pipe_fd, &pid, sizeof (pid));
 
 		aps_started = 1;
 		is_monitor = 1;
 
 		debug2("Monitor started");
 
-		set_log_txt_prefix("monitor ");
-
 		return (pid);
-
 	}
 
 	if (pid < 0) {
@@ -255,10 +291,10 @@ altprivsep_start_monitor(Authctxt *authctxt)
 		return (pid);
 	}
 
-	/* caller should drop privs */
+	/* this is the child that will later drop privileges */
 
+	/* note that Solaris has bi-directional pipes so one pipe is enough */
 	(void) close(pipe_fds[0]);
-
 	pipe_fd = pipe_fds[1];
 
 	/* wait for monitor to be ready */
@@ -266,17 +302,8 @@ altprivsep_start_monitor(Authctxt *authctxt)
 	(void) read(pipe_fd, &junk, sizeof (junk));
 	debug2("Monitor signalled readiness");
 
-	if (fcntl(pipe_fd, F_SETFL, O_NONBLOCK) < 0)
-		error("fcntl O_NONBLOCK: %.100s", strerror(errno));
-
 	buffer_init(&to_monitor);
 	buffer_init(&from_monitor);
-
-	if (compat20) {
-		debug3("Setting handler to forward re-key packets to monitor");
-		dispatch_range(SSH2_MSG_KEXINIT, SSH2_MSG_TRANSPORT_MAX,
-			&altprivsep_rekey);
-	}
 
 	/* AltPrivSep interfaces are set up */
 	aps_started = 1;
@@ -289,6 +316,10 @@ altprivsep_get_pipe_fd(void)
 	return (pipe_fd);
 }
 
+/*
+ * This function is used in the unprivileged child for all packets in the range
+ * between SSH2_MSG_KEXINIT and SSH2_MSG_TRANSPORT_MAX.
+ */
 void
 altprivsep_rekey(int type, u_int32_t seq, void *ctxt)
 {
@@ -297,18 +328,19 @@ altprivsep_rekey(int type, u_int32_t seq, void *ctxt)
 	if (kex == NULL)
 		fatal("Missing key exchange context in unprivileged process");
 
-	debug2("Forwarding re-key packet (%d) to monitor", type);
-
-	if (type != SSH2_MSG_NEWKEYS)
+	if (type != SSH2_MSG_NEWKEYS) {
+		debug2("Forwarding re-key packet (%d) to monitor", type);
 		if (!altprivsep_fwd_packet(type))
 			fatal("Monitor not responding");
+	}
 
 	/* tell server_loop2() that we're re-keying */
 	kex->done = 0;
 
 	/* NEWKEYS is special: get the new keys for client->server direction */
 	if (type == SSH2_MSG_NEWKEYS) {
-		debug2("Getting new inbound keystate from monitor");
+		debug2("received SSH2_MSG_NEWKEYS packet - "
+		    "getting new inbound keys from the monitor");
 		altprivsep_get_newkeys(MODE_IN);
 		kex->done = 1;
 	}
@@ -321,14 +353,13 @@ altprivsep_process_input(fd_set *rset)
 	int	 type;
 	u_int	 dlen;
 
-	debug2("Reading from pipe to monitor (%d)", pipe_fd);
-
 	if (pipe_fd == -1)
 		return;
 
 	if (!FD_ISSET(pipe_fd, rset))
 		return;
 
+	debug2("reading from pipe to monitor (%d)", pipe_fd);
 	if ((type = altprivsep_packet_read()) == -1)
 		fatal("Monitor not responding");
 
@@ -348,9 +379,11 @@ altprivsep_process_input(fd_set *rset)
 
 	/* NEWKEYS is special: get the new keys for server->client direction */
 	if (type == SSH2_MSG_NEWKEYS) {
-		debug2("Getting new outbound keystate from monitor");
+		debug2("forwarding SSH2_MSG_NEWKEYS packet we got from monitor to "
+		    "the client");
 		packet_start(SSH2_MSG_NEWKEYS);
 		packet_send();
+		debug2("getting new outbound keys from the monitor");
 		altprivsep_get_newkeys(MODE_OUT);
 		return;
 	}
@@ -365,19 +398,19 @@ altprivsep_process_input(fd_set *rset)
 	packet_send();
 }
 
-void
+static void
 altprivsep_do_monitor(Authctxt *authctxt, pid_t child_pid)
 {
-	aps_monitor_loop(authctxt, pipe_fd, child_pid);
+	aps_monitor_loop(authctxt, child_pid);
 }
 
-int
+static int
 altprivsep_started(void)
 {
 	return (aps_started);
 }
 
-int
+static int
 altprivsep_is_monitor(void)
 {
 	return (is_monitor);
@@ -386,7 +419,7 @@ altprivsep_is_monitor(void)
 /*
  * A fatal cleanup function to forcibly shutdown the connection socket
  */
-void
+static void
 altprivsep_shutdown_sock(void *arg)
 {
 	int sock;
@@ -400,8 +433,7 @@ altprivsep_shutdown_sock(void *arg)
 }
 
 /* Calls _to_ monitor from unprivileged process */
-static
-int
+static int
 altprivsep_fwd_packet(u_char type)
 {
 	u_int len;
@@ -418,7 +450,7 @@ altprivsep_fwd_packet(u_char type)
 extern Newkeys *current_keys[MODE_MAX];
 
 /* To be called from packet.c:set_newkeys() before referencing current_keys */
-void
+static void
 altprivsep_get_newkeys(enum kex_modes mode)
 {
 	Newkeys	*newkeys;
@@ -527,6 +559,30 @@ altprivsep_start_rekex(void)
 {
 	altprivsep_packet_start(SSH2_PRIV_MSG_ALTPRIVSEP);
 	altprivsep_packet_put_char(APS_MSG_START_REKEX);
+	altprivsep_packet_send();
+	altprivsep_packet_read_expect(SSH2_PRIV_MSG_ALTPRIVSEP);
+}
+
+/*
+ * The monitor needs some information that its child learns during the
+ * authentication process. Since the child was forked before the key exchange
+ * and authentication started it must send some context to the monitor after the
+ * authentication is finished. Less obvious part - monitor needs the session ID
+ * since it is used in the key generation process after the key (re-)exchange is
+ * finished.
+ */
+void
+altprivsep_send_auth_context(Authctxt *authctxt)
+{
+	debug("sending auth context to the monitor");
+	altprivsep_packet_start(SSH2_PRIV_MSG_ALTPRIVSEP);
+	altprivsep_packet_put_char(APS_MSG_AUTH_CONTEXT);
+	altprivsep_packet_put_int(authctxt->pw->pw_uid);
+	altprivsep_packet_put_int(authctxt->pw->pw_gid);
+	altprivsep_packet_put_cstring(authctxt->pw->pw_name);
+	altprivsep_packet_put_raw(session_id2, session_id2_len);
+	debug("will send %d bytes of auth context to the monitor",
+	    buffer_len(&to_monitor));
 	altprivsep_packet_send();
 	altprivsep_packet_read_expect(SSH2_PRIV_MSG_ALTPRIVSEP);
 }
@@ -704,35 +760,84 @@ aps_start_rekex(void)
 		debug2("rekeying already in progress");
 }
 
+/*
+ * This is the monitor side of altprivsep_send_auth_context().
+ */
+Authctxt *
+aps_read_auth_context(void)
+{
+	unsigned char *tmp;
+	Authctxt *authctxt;
+	
+	/*
+	 * After the successful authentication we get the context. Getting
+	 * end-of-file means that authentication failed and we can exit as well.
+	 */
+	debug("reading the context from the child");
+	packet_read_expect(SSH2_PRIV_MSG_ALTPRIVSEP);
+	debug3("got SSH2_PRIV_MSG_ALTPRIVSEP");
+	if (packet_get_char() != APS_MSG_AUTH_CONTEXT) {
+		fatal("APS_MSG_AUTH_CONTEXT message subtype expected.");
+	}
+
+	authctxt = xcalloc(1, sizeof(Authctxt));
+	authctxt->pw = xcalloc(1, sizeof(struct passwd));
+
+	/* uid_t and gid_t are integers (UNIX spec) */
+	authctxt->pw->pw_uid = packet_get_int();
+	authctxt->pw->pw_gid = packet_get_int();
+	authctxt->pw->pw_name = packet_get_string(NULL);
+	authctxt->user = xstrdup(authctxt->pw->pw_name);
+	debug3("uid/gid/username %d/%d/%s", authctxt->pw->pw_uid,
+	    authctxt->pw->pw_gid, authctxt->user);
+	session_id2 = (unsigned char *)packet_get_raw((unsigned int*)&session_id2_len);
+
+	/* we don't have this for SSH1. In that case, session_id2_len is 0. */
+	if (session_id2_len > 0) {
+		tmp = (unsigned char *)xmalloc(session_id2_len);
+		memcpy(tmp, session_id2, session_id2_len);
+		session_id2 = tmp;
+		debug3("read session ID (%d B)", session_id2_len);
+		xxx_kex->session_id = tmp;
+		xxx_kex->session_id_len = session_id2_len;
+	}
+	debug("finished reading the context");
+
+	/* send confirmation */
+	packet_start(SSH2_PRIV_MSG_ALTPRIVSEP);
+	packet_send();
+
+	return (authctxt);
+}
+
 
 /* Utilities for communication with the monitor */
-static
-void
+static void
 altprivsep_packet_start(u_char type)
 {
 	buffer_clear(&to_monitor);
 	buffer_put_char(&to_monitor, type);
 }
-static
-void
+
+static void
 altprivsep_packet_put_char(int ch)
 {
 	buffer_put_char(&to_monitor, ch);
 }
-static
-void
+
+static void
 altprivsep_packet_put_int(u_int value)
 {
 	buffer_put_int(&to_monitor, value);
 }
-static
-void
+
+static void
 altprivsep_packet_put_cstring(const char *str)
 {
 	buffer_put_cstring(&to_monitor, str);
 }
-static
-void
+
+static void
 altprivsep_packet_put_raw(const void *buf, u_int len)
 {
 	buffer_append(&to_monitor, buf, len);
@@ -744,8 +849,7 @@ altprivsep_packet_put_raw(const void *buf, u_int len)
  * Returns -1 if the monitor pipe has been closed earlier, fatal()s if
  * there's any other problems.
  */
-static
-int
+static int
 altprivsep_packet_send(void)
 {
 	ssize_t len;
@@ -832,8 +936,7 @@ pipe_gone:
 /*
  * Read a monitor packet from the monitor.  This function is blocking.
  */
-static
-int
+static int
 altprivsep_packet_read(void)
 {
 	ssize_t len = -1;
@@ -903,8 +1006,7 @@ pipe_gone:
 	return (0);
 }
 
-static
-void
+static void
 altprivsep_packet_read_expect(int expected)
 {
 	int type;
@@ -919,8 +1021,7 @@ altprivsep_packet_read_expect(int expected)
 			"packet type %d, got %d", expected, type);
 }
 
-static
-u_int
+static u_int
 altprivsep_packet_get_char(void)
 {
 	return (buffer_get_char(&from_monitor));
@@ -937,4 +1038,137 @@ void
 *altprivsep_packet_get_string(u_int *length_ptr)
 {
 	return (buffer_get_string(&from_monitor, length_ptr));
+}
+
+void
+altprivsep_start_and_do_monitor(int use_engine, int inetd, int newsock,
+	int statup_pipe)
+{
+	pid_t aps_child;
+	Authctxt *authctxt;
+
+	/*
+	 * The monitor will packet_close() in packet_set_monitor() called from
+	 * altprivsep_start_monitor() below to clean up the socket stuff before
+	 * it switches to pipes for communication to the child. The socket fd is
+	 * closed there so we must dup it here - monitor needs that socket to
+	 * shutdown the connection in case of any problem; see comments below.
+	 * Note that current newsock was assigned to connection_(in|out) which
+	 * are the variables used in packet_close() to close the communication
+	 * socket.
+	 */
+	newsock = dup(newsock);
+
+	if ((aps_child = altprivsep_start_monitor(&authctxt)) == -1)
+		fatal("Monitor could not be started.");
+
+	if (aps_child > 0) {
+		/* ALTPRIVSEP Monitor */
+
+		/*
+		 * The ALTPRIVSEP monitor here does:
+		 *
+		 *  - record keeping and auditing
+		 *  - PAM cleanup
+		 */
+
+		/*
+		 * Alarm signal handler is for our child only since that's the
+		 * one that does the authentication.
+		 */
+		(void) alarm(0);
+		(void) signal(SIGALRM, SIG_DFL);
+		/* this is for MaxStartups and the child takes care of that */
+		(void) close(statup_pipe);
+		(void) pkcs11_engine_load(use_engine);
+
+		/*
+		 * If the monitor fatal()s it will audit/record a logout, so
+		 * we'd better do something to really mean it: shutdown the
+		 * socket but leave the child alone -- it's been disconnected
+		 * and we hope it exits, but killing any pid from a privileged
+		 * monitor could be dangerous.
+		 *
+		 * NOTE: Order matters -- these fatal cleanups must come before
+		 * the audit logout fatal cleanup as these functions are called
+		 * in LIFO.
+		 */
+		fatal_add_cleanup((void (*)(void *))altprivsep_shutdown_sock,
+			(void *)&newsock);
+
+		if (compat20) {
+			debug3("Recording SSHv2 session login in wtmpx");
+			/*
+			 * record_login() relies on connection_in to be the
+			 * socket to get the peer address. The problem is that
+			 * connection_in had to be set to the pipe descriptor in
+			 * altprivsep_start_monitor(). It's not nice but the
+			 * easiest way to get the peer's address is to
+			 * temporarily set connection_in to the socket's file
+			 * descriptor.
+			 */
+			packet_set_fds(inetd == 1 ? -1 : newsock, 0);
+			record_login(getpid(), NULL, "sshd", authctxt->user);
+			packet_set_fds(0, 1);
+		}
+
+#ifdef HAVE_BSM
+
+		/* Initialize the group list, audit sometimes needs it. */
+		if (initgroups(authctxt->pw->pw_name,
+		    authctxt->pw->pw_gid) < 0) {
+			perror("initgroups");
+			exit (1);
+		}
+
+		audit_sshd_login(&ah, authctxt->pw->pw_uid,
+			authctxt->pw->pw_gid);
+
+		fatal_add_cleanup((void (*)(void *))audit_sshd_logout,
+			(void *)&ah);
+#endif /* HAVE_BSM */
+
+#ifdef GSSAPI
+		fatal_add_cleanup((void (*)(void *))ssh_gssapi_cleanup_creds,
+			(void *)&xxx_gssctxt);
+#endif /* GSSAPI */
+
+		altprivsep_do_monitor(authctxt, aps_child);
+
+		/* If we got here the connection is dead. */
+		fatal_remove_cleanup((void (*)(void *))altprivsep_shutdown_sock,
+			(void *)&newsock);
+
+		if (compat20) {
+			debug3("Recording SSHv2 session logout in wtmpx");
+			record_logout(getpid(), NULL, "sshd", authctxt->user);
+		}
+
+		/*
+		 * Make sure the socket is closed. The monitor can't call
+		 * packet_close here as it's done a packet_set_connection()
+		 * with the pipe to the child instead of the socket.
+		 */
+		(void) shutdown(newsock, SHUT_RDWR);
+
+#ifdef GSSAPI
+		fatal_remove_cleanup((void (*)(void *))ssh_gssapi_cleanup_creds,
+			&xxx_gssctxt);
+		ssh_gssapi_cleanup_creds(xxx_gssctxt);
+		ssh_gssapi_server_mechs(NULL); /* release cached mechs list */
+#endif /* GSSAPI */
+
+#ifdef HAVE_BSM
+		fatal_remove_cleanup((void (*)(void *))audit_sshd_logout, (void *)&ah);
+		audit_sshd_logout(&ah);
+#endif /* HAVE_BSM */
+
+		exit(0);
+	} else {
+		/*
+		 * This is the child, close the dup()ed file descriptor for a
+		 * socket. It's not needed in the child.
+		 */
+		close(newsock);
+	}
 }

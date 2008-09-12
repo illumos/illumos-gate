@@ -32,14 +32,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: session.c,v 1.150 2002/09/16 19:55:33 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_DEFOPEN
 #include <deflt.h>
@@ -1972,8 +1970,7 @@ session_loc_env_check(char *var, char *val)
 	else if (strcmp(var, "LC_MESSAGES") == 0)
 		cat = LC_MESSAGES;
 
-	if ((current = setlocale(cat, NULL)) != NULL)
-		current = xstrdup(current);
+	current = setlocale(cat, NULL);
 
 	ret = (setlocale(cat, val) != NULL);
 	(void) setlocale(cat, current);

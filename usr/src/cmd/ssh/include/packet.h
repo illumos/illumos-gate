@@ -11,7 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -19,8 +19,6 @@
 #define	_PACKET_H
 
 /*	$OpenBSD: packet.h,v 1.35 2002/06/19 18:01:00 markus Exp $	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +36,7 @@ void	 packet_set_monitor(int pip_fd);
 int	 packet_is_server(void);
 int	 packet_is_monitor(void);
 void	 packet_set_packet(const void *buf, u_int len);
+void	 packet_set_fds(int fd, int restore);
 #endif /* ALTPRIVSEP */
 
 void     packet_set_connection(int, int);
@@ -123,6 +122,12 @@ do { \
 
 int	 packet_need_rekeying(void);
 void     packet_set_rekey_limit(u_int32_t);
+
+/* see a comment attached to will_daemonize in packet.c for more information */
+#define NOT_DAEMONIZING			0
+#define DAEMONIZING_REQUESTED		1
+#define FIRST_NEWKEYS_PROCESSED		2
+#define SECOND_NEWKEYS_PROCESSED	3
 
 #ifdef __cplusplus
 }

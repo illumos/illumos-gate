@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: sshconnect2.c,v 1.107 2002/07/01 19:48:46 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ssh.h"
 #include "ssh2.h"
@@ -163,6 +161,7 @@ ssh_kex2(char *host, struct sockaddr *hostaddr)
 
         /* start key exchange */
         kex = kex_setup(host, myproposal, kex_hook);
+	kex_start(kex);
         kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
         kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 #ifdef GSSAPI

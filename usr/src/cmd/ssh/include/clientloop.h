@@ -1,15 +1,3 @@
-/*	$OpenBSD: clientloop.h,v 1.7 2002/04/22 21:04:52 markus Exp $	*/
-
-#ifndef	_CLIENTLOOP_H
-#define	_CLIENTLOOP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -44,12 +32,26 @@ extern "C" {
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	_CLIENTLOOP_H
+#define	_CLIENTLOOP_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*	$OpenBSD: clientloop.h,v 1.7 2002/04/22 21:04:52 markus Exp $	*/
 
 /* Client side main loop for the interactive session. */
 int	 client_loop(int, int, int);
-void	 client_x11_get_proto(const char *, const char *, u_int,
-	     char **, char **);
+void	 client_x11_get_proto(const char *, const char *, uint_t,
+		char **, char **);
 void	 client_global_request_reply_fwd(int type, u_int32_t seq, void *ctxt);
+void	 client_daemonize(void);
 
 #ifdef __cplusplus
 }

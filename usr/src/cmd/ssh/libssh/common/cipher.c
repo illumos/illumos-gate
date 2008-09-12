@@ -42,8 +42,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: cipher.c,v 1.61 2002/07/12 15:50:17 markus Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "xmalloc.h"
 #include "log.h"
 #include "cipher.h"
@@ -55,7 +53,14 @@ RCSID("$OpenBSD: cipher.c,v 1.61 2002/07/12 15:50:17 markus Exp $");
 #define EVP_CIPHER_CTX_get_app_data(e)          ((e)->app_data)
 #endif
 
+/*
+ * Symmetric ciphers can be offloaded to any engine through the EVP API only.
+ * However, OpenSSL doesn't offer AES in counter mode through EVP. So, we must
+ * define our own EVP functions.
+ */
 extern const EVP_CIPHER *evp_aes_128_ctr(void);
+extern const EVP_CIPHER *evp_aes_192_ctr(void);
+extern const EVP_CIPHER *evp_aes_256_ctr(void);
 extern void ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, u_int);
 
 static const EVP_CIPHER *evp_ssh1_3des(void);
@@ -82,8 +87,8 @@ struct Cipher {
 	{ "aes192-cbc",		SSH_CIPHER_SSH2, 16, 24, EVP_aes_192_cbc },
 	{ "aes256-cbc",		SSH_CIPHER_SSH2, 16, 32, EVP_aes_256_cbc },
         { "aes128-ctr",         SSH_CIPHER_SSH2, 16, 16, evp_aes_128_ctr },
-        { "aes192-ctr",         SSH_CIPHER_SSH2, 16, 24, evp_aes_128_ctr },
-        { "aes256-ctr",         SSH_CIPHER_SSH2, 16, 32, evp_aes_128_ctr },
+        { "aes192-ctr",         SSH_CIPHER_SSH2, 16, 24, evp_aes_192_ctr },
+        { "aes256-ctr",         SSH_CIPHER_SSH2, 16, 32, evp_aes_256_ctr },
 	{ NULL,			SSH_CIPHER_ILLEGAL, 0, 0, NULL }
 };
 

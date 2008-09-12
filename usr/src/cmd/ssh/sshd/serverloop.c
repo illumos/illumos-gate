@@ -41,8 +41,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: serverloop.c,v 1.104 2002/09/19 16:03:15 stevesk Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "xmalloc.h"
 #include "packet.h"
 #include "buffer.h"
@@ -368,8 +366,12 @@ process_input(fd_set * readset)
 	if (FD_ISSET(connection_in, readset)) {
 		len = read(connection_in, buf, sizeof(buf));
 		if (len == 0) {
-			verbose("Connection closed by %.100s",
-			    get_remote_ipaddr());
+			if (packet_is_monitor()) {
+				debug("child closed the communication pipe");
+			} else {
+				verbose("Connection closed by %.100s",
+				    get_remote_ipaddr());
+			}
 			connection_closed = 1;
 			if (compat20)
 				return;
@@ -854,7 +856,7 @@ aps_monitor_sigchld_handler(int sig)
 }
 
 void
-aps_monitor_loop(Authctxt *authctxt, int pipe, pid_t child_pid)
+aps_monitor_loop(Authctxt *authctxt, pid_t child_pid)
 {
 	fd_set *readset = NULL, *writeset = NULL;
 	int max_fd, nalloc = 0;
@@ -876,8 +878,6 @@ aps_monitor_loop(Authctxt *authctxt, int pipe, pid_t child_pid)
 
 	child_terminated = 0;
 	mysignal(SIGCHLD, aps_monitor_sigchld_handler);
-
-	packet_set_monitor(pipe);
 
 	connection_in = packet_get_connection_in();
 	connection_out = packet_get_connection_out();
@@ -919,6 +919,10 @@ aps_monitor_loop(Authctxt *authctxt, int pipe, pid_t child_pid)
 }
 #endif /* ALTPRIVSEP */
 
+/*
+ * This server loop is for unprivileged child only. Our monitor runs its own
+ * aps_monitor_loop() funtion.
+ */
 void
 server_loop2(Authctxt *authctxt)
 {

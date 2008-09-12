@@ -17,48 +17,27 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_ALTPRIVSEP_H
-#define	_ALTPRIVSEP_H
+#ifndef _ENGINE_H
+#define	_ENGINE_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <sys/types.h>
-#include "auth.h"
-#include "kex.h"
+#include "includes.h"
+#include <openssl/engine.h>
 
-#define	APS_MSG_NEWKEYS_REQ	0
-#define	APS_MSG_NEWKEYS_REP	1
-#define	APS_MSG_RECORD_LOGIN	2
-#define	APS_MSG_RECORD_LOGOUT	3
-#define	APS_MSG_START_REKEX	4
-#define	APS_MSG_AUTH_CONTEXT	5
-
-void	altprivsep_start_and_do_monitor(int use_engine, int inetd, int newsock,
-		int statup_pipe);
-int	altprivsep_get_pipe_fd(void);
-
-/* child-side handler of re-key packets */
-void	altprivsep_rekey(int type, u_int32_t seq, void *ctxt);
-
-/* Calls _to_ monitor from unprivileged process */
-void	altprivsep_process_input(fd_set *rset);
-void	altprivsep_record_login(pid_t pid, const char *ttyname);
-void	altprivsep_record_logout(pid_t pid);
-void	altprivsep_start_rekex(void);
-void	altprivsep_send_auth_context(Authctxt *authctxt);
-
-/* Functions for use in the monitor */
-void	aps_input_altpriv_msg(int type, u_int32_t seq, void *ctxt);
+ENGINE *pkcs11_engine_load(int use_engine);
+void pkcs11_engine_finish(void *engine);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _ALTPRIVSEP_H */
+#endif /* _ENGINE_H */

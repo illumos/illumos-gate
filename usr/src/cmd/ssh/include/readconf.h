@@ -11,7 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -19,8 +19,6 @@
 #define	_READCONF_H
 
 /*	$OpenBSD: readconf.h,v 1.43 2002/06/08 05:17:01 markus Exp $	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -157,6 +155,7 @@ typedef struct {
 	int	server_alive_count_max;
 
 	int	hash_known_hosts;
+	int	use_openssl_engine;
 }       Options;
 
 

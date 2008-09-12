@@ -1,8 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
  * Modification and redistribution in source and binary forms is
@@ -10,10 +6,13 @@
  * OpenBSD project by leaving this copyright notice intact.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #include "includes.h"
 RCSID("$OpenBSD: ssh-keyscan.c,v 1.40 2002/07/06 17:47:58 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "sys-queue.h"
 
@@ -362,6 +361,7 @@ keygrab_ssh2(con *c)
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss": "ssh-rsa";
 	c->c_kex = kex_setup(c->c_name, myproposal, NULL);
+	kex_start(c->c_kex);
 	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	c->c_kex->verify_host_key = hostjump;

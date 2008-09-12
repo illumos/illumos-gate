@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)pkcs11General.c	1.10	08/08/12 SMI"
 
 #include <unistd.h>
 #include <string.h>
@@ -372,9 +372,6 @@ finalize_common(CK_VOID_PTR pReserved)
 	pkcs11_initialized = B_FALSE;
 	pkcs11_cant_create_threads = B_FALSE;
 	pkcs11_pid = 0;
-
-	if (metaslot_enabled)
-		rv = meta_Finalize(pReserved);
 
 	/* Check if C_WaitForSlotEvent() is currently active */
 	(void) pthread_mutex_lock(&slottable->st_mutex);

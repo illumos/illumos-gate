@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth2-pubkey.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ssh2.h"
 #include "xmalloc.h"
@@ -160,7 +158,7 @@ userauth_pubkey(Authctxt *authctxt)
 			authenticated = 1;
 		}
 		authctxt->method->postponed = 0;
-		buffer_clear(&b);
+		buffer_free(&b);
 		xfree(sig);
 	} else {
 		debug("test whether pkalg/pkblob are acceptable");

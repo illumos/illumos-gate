@@ -10,10 +10,12 @@
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /* $OpenBSD: buffer.c,v 1.31 2006/08/03 03:34:41 deraadt Exp $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "includes.h"
 
@@ -231,7 +233,6 @@ buffer_ptr(Buffer *buffer)
 }
 
 /* Dumps the contents of the buffer to stderr. */
-
 void
 buffer_dump(Buffer *buffer)
 {
@@ -241,9 +242,22 @@ buffer_dump(Buffer *buffer)
 	for (i = buffer->offset; i < buffer->end; i++) {
 		fprintf(stderr, "%02x", ucp[i]);
 		if ((i-buffer->offset)%16==15)
-			fprintf(stderr, "\r\n");
+			fprintf(stderr, "\n");
 		else if ((i-buffer->offset)%2==1)
 			fprintf(stderr, " ");
 	}
-	fprintf(stderr, "\r\n");
+
+	if (buffer->offset == buffer->end) {
+		/* explicitly state when the buffer is empty */
+		fprintf(stderr, "<EMPTY BUFFER>\n");
+	} else {
+		/* print the terminal '\n' if it wasn't already printed */
+		if ((i - buffer->offset) % 16 != 0)
+			fprintf(stderr, "\n");
+	}
+	/*
+	 * We want an extra empty line after the packet dump for better
+	 * readability.
+	 */
+	fprintf(stderr, "\n");
 }

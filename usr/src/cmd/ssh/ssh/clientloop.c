@@ -66,8 +66,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: clientloop.c,v 1.104 2002/08/22 19:38:42 stevesk Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ssh.h"
 #include "ssh1.h"
 #include "ssh2.h"
@@ -138,6 +136,8 @@ int	session_ident = -1;
 
 /*XXX*/
 extern Kex *xxx_kex;
+
+extern int will_daemonize;
 
 /* Restores stdin to blocking mode. */
 
@@ -723,12 +723,33 @@ out:
 		xfree(fwd.connect_host);
 }
 
+/*
+ * If we are using the engine we must not fork until we do key reexchange. See
+ * PKCS#11 spec for more information on fork safety and packet.c for information
+ * about forking with the engine.
+ */
+void
+client_daemonize(void)
+{
+	if (compat20 == 1 && options.use_openssl_engine == 1) {
+		will_daemonize = 1;
+		debug("must rekey before daemonizing");
+		kex_send_kexinit(xxx_kex);
+		need_rekeying = 0;
+	}
+	else {
+		if (daemon(1, 1) < 0) {
+			fatal("daemon() failed: %.200s",
+			    strerror(errno));
+		}
+	}
+}
+
 /* process the characters one by one */
 static int
 process_escapes(Buffer *bin, Buffer *bout, Buffer *berr, char *buf, int len)
 {
 	char string[1536];
-	pid_t pid;
 	int bytes = 0;
 	u_int i;
 	u_char ch;
@@ -806,16 +827,8 @@ process_escapes(Buffer *bin, Buffer *bout, Buffer *berr, char *buf, int len)
 					 escape_char);
 				buffer_append(berr, string, strlen(string));
 
-				/* Fork into background. */
-				pid = fork();
-				if (pid < 0) {
-					error("fork: %.100s", strerror(errno));
-					continue;
-				}
-				if (pid != 0) {	/* This is the parent. */
-					/* The parent just exits. */
-					exit(0);
-				}
+				client_daemonize();
+
 				/* The child continues serving connections. */
 				if (compat20) {
 					buffer_append(bin, "\004", 1);
@@ -1179,7 +1192,6 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 			channel_after_select(readset, writeset);
 			if (need_rekeying || packet_need_rekeying()) {
 				debug("rekey limit reached, need rekeying");
-				xxx_kex->done = 0;
 				kex_send_kexinit(xxx_kex);
 				need_rekeying = 0;
 			}
@@ -1471,6 +1483,7 @@ client_input_channel_open(int type, u_int32_t seq, void *ctxt)
 	}
 	xfree(ctype);
 }
+
 static void
 client_input_channel_req(int type, u_int32_t seq, void *ctxt)
 {
@@ -1507,6 +1520,7 @@ client_input_channel_req(int type, u_int32_t seq, void *ctxt)
 	}
 	xfree(rtype);
 }
+
 static void
 client_input_global_request(int type, u_int32_t seq, void *ctxt)
 {
@@ -1549,6 +1563,7 @@ client_init_dispatch_20(void)
 	dispatch_set(SSH2_MSG_REQUEST_FAILURE, &client_global_request_reply);
 	dispatch_set(SSH2_MSG_REQUEST_SUCCESS, &client_global_request_reply);
 }
+
 static void
 client_init_dispatch_13(void)
 {
@@ -1568,6 +1583,7 @@ client_init_dispatch_13(void)
 	dispatch_set(SSH_SMSG_X11_OPEN, options.forward_x11 ?
 	    &x11_input_open : &deny_input_open);
 }
+
 static void
 client_init_dispatch_15(void)
 {
@@ -1575,6 +1591,7 @@ client_init_dispatch_15(void)
 	dispatch_set(SSH_MSG_CHANNEL_CLOSE, &channel_input_ieof);
 	dispatch_set(SSH_MSG_CHANNEL_CLOSE_CONFIRMATION, & channel_input_oclose);
 }
+
 static void
 client_init_dispatch(void)
 {

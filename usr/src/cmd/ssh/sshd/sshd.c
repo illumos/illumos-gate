@@ -48,8 +48,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: sshd.c,v 1.260 2002/09/27 10:42:09 mickey Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <openssl/dh.h>
 #include <openssl/bn.h>
 #include <openssl/md5.h>
@@ -90,10 +88,10 @@ RCSID("$OpenBSD: sshd.c,v 1.260 2002/09/27 10:42:09 mickey Exp $");
 #include "g11n.h"
 #include "sshlogin.h"
 #include "xlist.h"
+#include "engine.h"
 
 #ifdef HAVE_BSM
 #include "bsmaudit.h"
-adt_session_data_t *ah = NULL;
 #endif /* HAVE_BSM */
 
 #ifdef ALTPRIVSEP
@@ -109,7 +107,6 @@ adt_session_data_t *ah = NULL;
 
 #ifdef GSSAPI
 #include "ssh-gss.h"
-extern Gssctxt *xxx_gssctxt;
 #endif /* GSSAPI */
 
 #ifdef LIBWRAP
@@ -825,7 +822,7 @@ main(int ac, char **av)
 {
 	extern char *optarg;
 	extern int optind;
-	int opt, sock_in = 0, sock_out = 0, newsock, j, i, fdsetsz, on = 1;
+	int opt, j, i, fdsetsz, sock_in = 0, sock_out = 0, newsock = -1, on = 1;
 	pid_t pid;
 	socklen_t fromlen;
 	fd_set *fdset;
@@ -838,15 +835,13 @@ main(int ac, char **av)
 	int listen_sock, maxfd;
 	int startup_p[2];
 	int startups = 0;
-	Authctxt *authctxt;
+	Authctxt *authctxt = NULL;
 	Key *key;
 	int ret, key_used = 0;
 #ifdef HAVE_BSM
 	au_id_t	    auid = AU_NOAUDITID;
 #endif /* HAVE_BSM */
-#ifdef ALTPRIVSEP
-	pid_t aps_child;
-#endif /* ALTPRIVSEP */
+	int mpipe;
 
 	__progname = get_progname(av[0]);
 
@@ -961,7 +956,12 @@ main(int ac, char **av)
 			break;
 		}
 	}
+
+	/*
+	 * There is no need to use the PKCS#11 engine in the master SSH process.
+	 */
 	SSLeay_add_all_algorithms();
+	seed_rng();
 	channel_set_af(IPv4or6);
 
 	/*
@@ -981,8 +981,6 @@ main(int ac, char **av)
 	 */
 	drop_cray_privs();
 #endif
-
-	seed_rng();
 
 	/* Read server configuration options from the configuration file. */
 	read_server_config(&options, config_file_name);
@@ -1148,6 +1146,7 @@ main(int ac, char **av)
 		sock_in = dup(0);
 		sock_out = dup(1);
 		startup_pipe = -1;
+		/* we need this later for setting audit context */
 		newsock = sock_in;
 		/*
 		 * We intentionally do not close the descriptors 0, 1, and 2
@@ -1421,7 +1420,10 @@ main(int ac, char **av)
 
 				arc4random_stir();
 
-				/* Close the new socket (the child is now taking care of it). */
+				/*
+				 * Close the accepted socket since the child
+				 * will now take care of the new connection.
+				 */
 				(void) close(newsock);
 			}
 			/* child process check (or debug mode) */
@@ -1430,7 +1432,10 @@ main(int ac, char **av)
 		}
 	}
 
-	/* This is the child processing a new connection. */
+	/*
+	 * This is the child processing a new connection, the SSH master process
+	 * stays in the ( ; ; ) loop above.
+	 */
 #ifdef HAVE_BSM
 	audit_sshd_settid(newsock);
 #endif
@@ -1537,6 +1542,21 @@ main(int ac, char **av)
 
 	packet_set_nonblocking();
 
+	/*
+	 * Start the monitor. That way both processes will have their own
+	 * PKCS#11 sessions. See the PKCS#11 standard for more information on
+	 * fork safety and packet.c for information about forking with the
+	 * engine.
+	 */
+	altprivsep_start_and_do_monitor(options.use_openssl_engine,
+	    inetd_flag, newsock, startup_pipe);
+
+	/*
+	 * The child is about to start the first key exchange while the monitor
+	 * stays in altprivsep_start_and_do_monitor() function.
+	 */
+	(void) pkcs11_engine_load(options.use_openssl_engine);
+
 	/* perform the key exchange */
 	/* authenticate user and start session */
 	if (compat20) {
@@ -1550,149 +1570,64 @@ main(int ac, char **av)
 authenticated:
 	/* Authentication complete */
 	(void) alarm(0);
+	/* we no longer need an alarm handler */
+	(void) signal(SIGALRM, SIG_DFL);
 
 	if (startup_pipe != -1) {
 		(void) close(startup_pipe);
 		startup_pipe = -1;
 	}
 
-#ifdef ALTPRIVSEP
-	if ((aps_child = altprivsep_start_monitor(authctxt)) == -1)
-		fatal("Monitor could not be started.");
+	/* ALTPRIVSEP Child */
 
-	if (aps_child > 0) {
+	/*
+	 * Drop privileges, access to privileged resources.
+	 *
+	 * Destroy private host keys, if any.
+	 *
+	 * No need to release any GSS credentials -- sshd only acquires
+	 * creds to determine what mechs it can negotiate then releases
+	 * them right away and uses GSS_C_NO_CREDENTIAL to accept
+	 * contexts.
+	 */
+	debug2("Unprivileged server process dropping privileges");
+	permanently_set_uid(authctxt->pw);
+	destroy_sensitive_data();
+	ssh_gssapi_server_mechs(NULL); /* release cached mechs list */
+	packet_set_server();
 
-		/* ALTPRIVSEP Monitor */
+	/* now send the authentication context to the monitor */
+	altprivsep_send_auth_context(authctxt);
 
-		/*
-		 * The ALTPRIVSEP monitor here does:
-		 *
-		 *  - record keeping and auditing
-		 *  - PAM cleanup
-		 */
-
-		/*
-		 * If the monitor fatal()s it will audit/record a logout, so
-		 * we'd better do something to really mean it: shutdown the
-		 * socket but leave the child alone -- it's been disconnected
-		 * and we hope it exits, but killing any pid from a privileged
-		 * monitor could be dangerous.
-		 *
-		 * NOTE: Order matters -- these fatal cleanups must come before
-		 * the audit logout fatal cleanup as these functions are called
-		 * in LIFO.
-		 *
-		 * NOTE: The monitor will packet_close(), which will close
-		 * "newsock," so we dup() it.
-		 */
-		newsock = dup(newsock);
-		fatal_add_cleanup((void (*)(void *))altprivsep_shutdown_sock,
-			(void *)&newsock);
-
-		if (compat20) {
-			debug3("Recording SSHv2 session login in wtmpx");
-			record_login(getpid(), NULL, "sshd", authctxt->user);
-		}
+	mpipe = altprivsep_get_pipe_fd();
+	if (fcntl(mpipe, F_SETFL, O_NONBLOCK) < 0)
+		error("fcntl O_NONBLOCK: %.100s", strerror(errno));
 
 #ifdef HAVE_BSM
-		fatal_remove_cleanup(
-			(void (*)(void *))audit_failed_login_cleanup,
-			(void *)authctxt);
-
-		/* Initialize the group list, audit sometimes needs it. */
-		if (initgroups(authctxt->pw->pw_name,
-		    authctxt->pw->pw_gid) < 0) {
-			perror("initgroups");
-			exit (1);
-		}
-		audit_sshd_login(&ah, authctxt->pw->pw_uid,
-			authctxt->pw->pw_gid);
-
-		fatal_add_cleanup((void (*)(void *))audit_sshd_logout,
-			(void *)&ah);
+	fatal_remove_cleanup(
+		(void (*)(void *))audit_failed_login_cleanup,
+		(void *)authctxt);
 #endif /* HAVE_BSM */
 
-#ifdef GSSAPI
-		fatal_add_cleanup((void (*)(void *))ssh_gssapi_cleanup_creds,
-			(void *)&xxx_gssctxt);
-#endif /* GSSAPI */
+	if (compat20) {
+		debug3("setting handler to forward re-key packets to the monitor");
+		dispatch_range(SSH2_MSG_KEXINIT, SSH2_MSG_TRANSPORT_MAX,
+			&altprivsep_rekey);
+	}
 
-		altprivsep_do_monitor(authctxt, aps_child);
+	/* Logged-in session. */
+	do_authenticated(authctxt);
 
-		/* If we got here the connection is dead. */
-		fatal_remove_cleanup((void (*)(void *))altprivsep_shutdown_sock,
-			(void *)&newsock);
+	/* The connection has been terminated. */
+	verbose("Closing connection to %.100s", remote_ip);
 
-		if (compat20) {
-			debug3("Recording SSHv2 session logout in wtmpx");
-			record_logout(getpid(), NULL, "sshd", authctxt->user);
-		}
-
-		/*
-		 * Make sure the socket is closed. The monitor can't call
-		 * packet_close here as it's done a packet_set_connection()
-		 * with the pipe to the child instead of the socket.
-		 */
-		(void) shutdown(newsock, SHUT_RDWR);
-
-#ifdef GSSAPI
-		fatal_remove_cleanup((void (*)(void *))ssh_gssapi_cleanup_creds,
-			&xxx_gssctxt);
-		ssh_gssapi_cleanup_creds(xxx_gssctxt);
-		ssh_gssapi_server_mechs(NULL); /* release cached mechs list */
-#endif /* GSSAPI */
-
-#ifdef HAVE_BSM
-		fatal_remove_cleanup((void (*)(void *))audit_sshd_logout, (void *)&ah);
-		audit_sshd_logout(&ah);
-#endif /* HAVE_BSM */
+	packet_close();
 
 #ifdef USE_PAM
-		finish_pam(authctxt);
+	finish_pam(authctxt);
 #endif /* USE_PAM */
 
-		return (ret);
-
-		/* NOTREACHED */
-
-	} else {
-
-		/* ALTPRIVSEP Child */
-
-		/*
-		 * Drop privileges, access to privileged resources.
-		 *
-		 * Destroy private host keys, if any.
-		 *
-		 * No need to release any GSS credentials -- sshd only acquires
-		 * creds to determine what mechs it can negotiate then releases
-		 * them right away and uses GSS_C_NO_CREDENTIAL to accept
-		 * contexts.
-		 */
-		debug2("Unprivileged server process dropping privileges");
-		permanently_set_uid(authctxt->pw);
-		destroy_sensitive_data();
-		ssh_gssapi_server_mechs(NULL); /* release cached mechs list */
-
-#ifdef HAVE_BSM
-		fatal_remove_cleanup(
-			(void (*)(void *))audit_failed_login_cleanup,
-			(void *)authctxt);
-#endif /* HAVE_BSM */
-
-		/* Logged-in session. */
-		do_authenticated(authctxt);
-
-		/* The connection has been terminated. */
-		verbose("Closing connection to %.100s", remote_ip);
-
-		packet_close();
-
-		return (0);
-
-		/* NOTREACHED */
-	}
-#endif /* ALTPRIVSEP */
+	return (0);
 }
 
 /*
@@ -1931,10 +1866,10 @@ do_ssh1_kex(void)
 }
 
 /*
- * SSH2 key exchange: diffie-hellman-group1-sha1
+ * Prepare for SSH2 key exchange.
  */
-static void
-do_ssh2_kex(void)
+Kex *
+prepare_for_ssh2_kex(void)
 {
 	Kex *kex;
 	Kex_hook_func kex_hook = NULL;
@@ -1994,7 +1929,6 @@ do_ssh2_kex(void)
 		kex_hook = ssh_gssapi_server_kex_hook;
 #endif /* GSSAPI */
 
-	/* start key exchange */
 	kex = kex_setup(NULL, myproposal, kex_hook);
 
 	if (myproposal[PROPOSAL_LANG_STOC] != NULL)
@@ -2008,12 +1942,25 @@ do_ssh2_kex(void)
 	kex->kex[KEX_GSS_GRP1_SHA1] = kexgss_server;
 #endif /* GSSAPI */
 	kex->server = 1;
-	kex->client_version_string=client_version_string;
-	kex->server_version_string=server_version_string;
-	kex->load_host_key=&get_hostkey_by_type;
-	kex->host_key_index=&get_hostkey_index;
+	kex->client_version_string = client_version_string;
+	kex->server_version_string = server_version_string;
+	kex->load_host_key = &get_hostkey_by_type;
+	kex->host_key_index = &get_hostkey_index;
 
 	xxx_kex = kex;
+	return (kex);
+}
+
+/*
+ * Do SSH2 key exchange.
+ */
+static void
+do_ssh2_kex(void)
+{
+	Kex *kex;
+
+	kex = prepare_for_ssh2_kex();
+	kex_start(kex);
 
 	dispatch_run(DISPATCH_BLOCK, &kex->done, kex);
 
