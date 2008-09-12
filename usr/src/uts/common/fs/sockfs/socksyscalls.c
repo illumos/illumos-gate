@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -2176,7 +2174,7 @@ typedef struct {
 void
 snf_smap_desbfree(snf_smap_desbinfo *snfi)
 {
-	if (!segmap_kpm) {
+	if (! IS_KPM_ADDR(snfi->snfi_base)) {
 		/*
 		 * We don't need to call segmap_fault(F_SOFTUNLOCK) for
 		 * segmap_kpm as long as the latter never falls back to
@@ -2196,9 +2194,8 @@ snf_smap_desbfree(snf_smap_desbinfo *snfi)
 }
 
 /*
- * Use segmap instead of bcopy to send down a chain of desballoca'ed, mblks.
- * Each mblk contains a segmap slot of no more than MAXBSIZE. The total
- * length of a chain is no more than sd_qn_maxpsz.
+ * Use segmap instead of bcopy to send down a desballoca'ed, mblk.  The mblk
+ * contains a segmap slot of no more than MAXBSIZE.
  *
  * At the end of the whole sendfile() operation, we wait till the data from
  * the last mblk is ack'ed by the transport before returning so that the
@@ -2206,13 +2203,13 @@ snf_smap_desbfree(snf_smap_desbinfo *snfi)
  */
 int
 snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
-    uint_t maxpsz, ssize_t *count, boolean_t nowait)
+    ssize_t *count, boolean_t nowait)
 {
 	caddr_t base;
 	int mapoff;
 	vnode_t *vp;
-	mblk_t *mp, *mp1;
-	int iosize, iosize1;
+	mblk_t *mp;
+	int iosize;
 	int error;
 	short fflag;
 	int ksize;
@@ -2228,80 +2225,69 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			error = EINTR;
 			break;
 		}
-		iosize = 0;
-		mp = NULL;
-		do {
-			mapoff = fileoff & MAXBOFFSET;
-			iosize1 = MAXBSIZE - mapoff;
-			if (iosize1 > size)
-				iosize1 = size;
-			/*
-			 * we don't forcefault because we'll call
-			 * segmap_fault(F_SOFTLOCK) next.
-			 *
-			 * S_READ will get the ref bit set (by either
-			 * segmap_getmapflt() or segmap_fault()) and page
-			 * shared locked.
-			 */
-			base = segmap_getmapflt(segkmap, fvp, fileoff, iosize1,
-			    segmap_kpm ? SM_FAULT : 0, S_READ);
 
-			snfi = kmem_alloc(sizeof (*snfi), KM_SLEEP);
-			snfi->snfi_len = (size_t)roundup(mapoff+iosize1,
-			    PAGESIZE)- (mapoff & PAGEMASK);
-			/*
-			 * We must call segmap_fault() even for segmap_kpm
-			 * because that's how error gets returned.
-			 * (segmap_getmapflt() never fails but segmap_fault()
-			 * does.)
-			 */
-			if (segmap_fault(kas.a_hat, segkmap,
-			    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff) &
-			    PAGEMASK), snfi->snfi_len, F_SOFTLOCK,
-			    S_READ) != 0) {
-				(void) segmap_release(segkmap, base, 0);
-				kmem_free(snfi, sizeof (*snfi));
-				freemsg(mp);
-				error = EIO;
-				goto out;
-			}
-			snfi->snfi_frtn.free_func = snf_smap_desbfree;
-			snfi->snfi_frtn.free_arg = (caddr_t)snfi;
-			snfi->snfi_base = base;
-			snfi->snfi_mapoff = mapoff;
-			mp1 = esballoca((uchar_t *)base + mapoff,
-			    iosize1, BPRI_HI, &snfi->snfi_frtn);
+		mapoff = fileoff & MAXBOFFSET;
+		iosize = MAXBSIZE - mapoff;
+		if (iosize > size)
+			iosize = size;
+		/*
+		 * we don't forcefault because we'll call
+		 * segmap_fault(F_SOFTLOCK) next.
+		 *
+		 * S_READ will get the ref bit set (by either
+		 * segmap_getmapflt() or segmap_fault()) and page
+		 * shared locked.
+		 */
+		base = segmap_getmapflt(segkmap, fvp, fileoff, iosize,
+		    segmap_kpm ? SM_FAULT : 0, S_READ);
 
-			if (mp1 == NULL) {
-				(void) segmap_fault(kas.a_hat, segkmap,
-				    (caddr_t)(uintptr_t)(((uintptr_t)base +
-				    mapoff) & PAGEMASK), snfi->snfi_len,
-				    F_SOFTUNLOCK, S_OTHER);
-				(void) segmap_release(segkmap, base, 0);
-				kmem_free(snfi, sizeof (*snfi));
-				freemsg(mp);
-				error = EAGAIN;
-				goto out;
-			}
-			VN_HOLD(fvp);
-			snfi->snfi_vp = fvp;
-			mp1->b_wptr += iosize1;
+		snfi = kmem_alloc(sizeof (*snfi), KM_SLEEP);
+		snfi->snfi_len = (size_t)roundup(mapoff+iosize,
+		    PAGESIZE)- (mapoff & PAGEMASK);
+		/*
+		 * We must call segmap_fault() even for segmap_kpm
+		 * because that's how error gets returned.
+		 * (segmap_getmapflt() never fails but segmap_fault()
+		 * does.)
+		 */
+		if (segmap_fault(kas.a_hat, segkmap,
+		    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff) & PAGEMASK),
+		    snfi->snfi_len, F_SOFTLOCK, S_READ) != 0) {
+			(void) segmap_release(segkmap, base, 0);
+			kmem_free(snfi, sizeof (*snfi));
+			error = EIO;
+			goto out;
+		}
+		snfi->snfi_frtn.free_func = snf_smap_desbfree;
+		snfi->snfi_frtn.free_arg = (caddr_t)snfi;
+		snfi->snfi_base = base;
+		snfi->snfi_mapoff = mapoff;
+		mp = esballoca((uchar_t *)base + mapoff, iosize, BPRI_HI,
+		    &snfi->snfi_frtn);
 
-			/* Mark this dblk with the zero-copy flag */
-			mp1->b_datap->db_struioflag |= STRUIO_ZC;
-			if (mp == NULL)
-				mp = mp1;
-			else
-				linkb(mp, mp1);
-			iosize += iosize1;
-			fileoff += iosize1;
-			size -= iosize1;
-		} while (iosize < maxpsz && size != 0);
+		if (mp == NULL) {
+			(void) segmap_fault(kas.a_hat, segkmap,
+			    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff)
+			    & PAGEMASK), snfi->snfi_len, F_SOFTUNLOCK, S_OTHER);
+			(void) segmap_release(segkmap, base, 0);
+			kmem_free(snfi, sizeof (*snfi));
+			freemsg(mp);
+			error = EAGAIN;
+			goto out;
+		}
+		VN_HOLD(fvp);
+		snfi->snfi_vp = fvp;
+		mp->b_wptr += iosize;
+
+		/* Mark this dblk with the zero-copy flag */
+		mp->b_datap->db_struioflag |= STRUIO_ZC;
+		fileoff += iosize;
+		size -= iosize;
 
 		if (size == 0 && !nowait) {
 			ASSERT(!dowait);
 			dowait = B_TRUE;
-			mp1->b_datap->db_struioflag |= STRUIO_ZCNOTIFY;
+			mp->b_datap->db_struioflag |= STRUIO_ZCNOTIFY;
 		}
 		VOP_RWUNLOCK(fvp, V_WRITELOCK_FALSE, NULL);
 		if ((error = kstrwritemp(vp, mp, fflag)) != 0) {
@@ -2511,10 +2497,6 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 
 	vp = fp->f_vnode;
 	stp = vp->v_stream;
-	if (stp->sd_qn_maxpsz == INFPSZ)
-		maxpsz = maxphys;
-	else
-		maxpsz = roundup(stp->sd_qn_maxpsz, MAXBSIZE);
 	/*
 	 * When the NOWAIT flag is not set, we enable zero-copy only if the
 	 * transfer size is large enough. This prevents performance loss
@@ -2536,8 +2518,12 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 	if (dozcopy) {
 		sf_stats.ss_file_segmap++;
 		error = snf_segmap(fp, fvp, sfv_off, (u_offset_t)sfv_len,
-		    maxpsz, &count, ((sfv->sfv_flag & SFV_NOWAIT) != 0));
+		    &count, ((sfv->sfv_flag & SFV_NOWAIT) != 0));
 	} else {
+		if (stp->sd_qn_maxpsz == INFPSZ)
+			maxpsz = maxphys;
+		else
+			maxpsz = roundup(stp->sd_qn_maxpsz, MAXBSIZE);
 		sf_stats.ss_file_cached++;
 		error = snf_cache(fp, fvp, sfv_off, (u_offset_t)sfv_len,
 		    maxpsz, &count);

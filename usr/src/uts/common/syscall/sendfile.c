@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -75,8 +73,8 @@ extern int sosendfile64(file_t *, file_t *, const struct ksendfilevec64 *,
 		ssize32_t *);
 extern int nl7c_sendfilev(struct sonode *, u_offset_t *, struct sendfilevec *,
 		int, ssize_t *);
-extern int snf_segmap(file_t *, vnode_t *, u_offset_t, u_offset_t, uint_t,
-		ssize_t *, boolean_t);
+extern int snf_segmap(file_t *, vnode_t *, u_offset_t, u_offset_t, ssize_t *,
+		boolean_t);
 
 #define	readflg	(V_WRITELOCK_FALSE)
 #define	rwflag	(V_WRITELOCK_TRUE)
@@ -975,16 +973,11 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 
 			if (segmapit) {
 				boolean_t nowait;
-				uint_t maxpsz;
 
 				nowait = (sfv->sfv_flag & SFV_NOWAIT) != 0;
-				maxpsz = stp->sd_qn_maxpsz;
-				if (maxpsz == INFPSZ)
-					maxpsz = maxphys;
-				maxpsz = roundup(maxpsz, MAXBSIZE);
 				error = snf_segmap(fp, readvp, sfv_off,
-				    (u_offset_t)sfv_len, maxpsz,
-				    (ssize_t *)&cnt, nowait);
+				    (u_offset_t)sfv_len, (ssize_t *)&cnt,
+				    nowait);
 				releasef(sfv->sfv_fd);
 				*count += cnt;
 				if (error)
@@ -1323,7 +1316,7 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 		 * i) latency is important for smaller files. So if the
 		 * data is smaller than 'tcp_slow_start_initial' times
 		 * maxblk, then use sendvec_small_chunk which creates
-		 * maxblk size mblks and chains then together and sends
+		 * maxblk size mblks and chains them together and sends
 		 * them to TCP in one shot. It also leaves 'wroff' size
 		 * space for the headers in each mblk.
 		 *
