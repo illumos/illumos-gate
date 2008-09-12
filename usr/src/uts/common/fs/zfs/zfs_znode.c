@@ -25,8 +25,6 @@
 
 /* Portions Copyright 2007 Jeremy Teo */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef _KERNEL
 #include <sys/types.h>
 #include <sys/param.h>
@@ -160,11 +158,9 @@ static struct {
 	uint64_t zms_zfsvfs_invalid;
 	uint64_t zms_zfsvfs_unmounted;
 	uint64_t zms_zfsvfs_recheck_invalid;
+	uint64_t zms_obj_held;
 	uint64_t zms_vnode_locked;
-	uint64_t zms_znode_in_use;
-	uint64_t zms_yes;
-	uint64_t zms_later;
-	uint64_t zms_dont_know;
+	uint64_t zms_not_only_dnlc;
 } znode_move_stats;
 #endif	/* ZNODE_STATS */
 
@@ -242,7 +238,6 @@ zfs_znode_move(void *buf, void *newbuf, size_t size, void *arg)
 	zfsvfs = ozp->z_zfsvfs;
 	if (!POINTER_IS_VALID(zfsvfs)) {
 		ZNODE_STAT_ADD(znode_move_stats.zms_zfsvfs_invalid);
-		ZNODE_STAT_ADD(znode_move_stats.zms_dont_know);
 		return (KMEM_CBRC_DONT_KNOW);
 	}
 
@@ -251,7 +246,6 @@ zfs_znode_move(void *buf, void *newbuf, size_t size, void *arg)
 	 */
 	if (zfs_enter(zfsvfs) != 0) {		/* ZFS_ENTER */
 		ZNODE_STAT_ADD(znode_move_stats.zms_zfsvfs_unmounted);
-		ZNODE_STAT_ADD(znode_move_stats.zms_dont_know);
 		return (KMEM_CBRC_DONT_KNOW);
 	}
 
@@ -264,30 +258,37 @@ zfs_znode_move(void *buf, void *newbuf, size_t size, void *arg)
 		mutex_exit(&zfsvfs->z_znodes_lock);
 		ZFS_EXIT(zfsvfs);
 		ZNODE_STAT_ADD(znode_move_stats.zms_zfsvfs_recheck_invalid);
-		ZNODE_STAT_ADD(znode_move_stats.zms_dont_know);
 		return (KMEM_CBRC_DONT_KNOW);
 	}
 
 	/*
 	 * At this point we know that as long as we hold z_znodes_lock, the
 	 * znode cannot be freed and fields within the znode can be safely
-	 * accessed.
+	 * accessed. Now, prevent a race with zfs_zget().
 	 */
+	if (ZFS_OBJ_HOLD_TRYENTER(zfsvfs, ozp->z_id) == 0) {
+		mutex_exit(&zfsvfs->z_znodes_lock);
+		ZFS_EXIT(zfsvfs);
+		ZNODE_STAT_ADD(znode_move_stats.zms_obj_held);
+		return (KMEM_CBRC_LATER);
+	}
+
 	vp = ZTOV(ozp);
 	if (mutex_tryenter(&vp->v_lock) == 0) {
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, ozp->z_id);
 		mutex_exit(&zfsvfs->z_znodes_lock);
 		ZFS_EXIT(zfsvfs);
 		ZNODE_STAT_ADD(znode_move_stats.zms_vnode_locked);
-		ZNODE_STAT_ADD(znode_move_stats.zms_later);
 		return (KMEM_CBRC_LATER);
 	}
+
 	/* Only move znodes that are referenced _only_ by the DNLC. */
 	if (vp->v_count != 1 || !vn_in_dnlc(vp)) {
 		mutex_exit(&vp->v_lock);
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, ozp->z_id);
 		mutex_exit(&zfsvfs->z_znodes_lock);
 		ZFS_EXIT(zfsvfs);
-		ZNODE_STAT_ADD(znode_move_stats.zms_znode_in_use);
-		ZNODE_STAT_ADD(znode_move_stats.zms_later);
+		ZNODE_STAT_ADD(znode_move_stats.zms_not_only_dnlc);
 		return (KMEM_CBRC_LATER);
 	}
 
@@ -297,12 +298,12 @@ zfs_znode_move(void *buf, void *newbuf, size_t size, void *arg)
 	 */
 	zfs_znode_move_impl(ozp, nzp);
 	mutex_exit(&vp->v_lock);
+	ZFS_OBJ_HOLD_EXIT(zfsvfs, ozp->z_id);
 
 	list_link_replace(&ozp->z_link_node, &nzp->z_link_node);
 	mutex_exit(&zfsvfs->z_znodes_lock);
 	ZFS_EXIT(zfsvfs);
 
-	ZNODE_STAT_ADD(znode_move_stats.zms_yes);
 	return (KMEM_CBRC_YES);
 }
 
