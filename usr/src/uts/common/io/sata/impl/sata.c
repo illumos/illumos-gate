@@ -127,7 +127,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, uint8_t, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.37"};
+static char sata_rev_tag[] = {"1.38"};
 
 /*
  * SATA cb_ops functions
@@ -3883,6 +3883,7 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 	scsipkt->pkt_reason = CMD_CMPLT;
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
+	nointr_flag = scsipkt->pkt_flags & FLAG_NOINTR;
 
 	/* Reject not supported request */
 	if (! (scsipkt->pkt_cdbp[1] & 0x10)) { /* No support for PF bit = 0 */
@@ -3937,7 +3938,6 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 		 * in SYNCH mode, regardless of scsi_pkt setting.
 		 * Save scsi_pkt setting and indicate SYNCH mode
 		 */
-		nointr_flag = scsipkt->pkt_flags & FLAG_NOINTR;
 		if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 		    scsipkt->pkt_comp != NULL) {
 			scsipkt->pkt_flags |= FLAG_NOINTR;
