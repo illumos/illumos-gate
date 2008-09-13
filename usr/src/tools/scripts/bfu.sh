@@ -732,6 +732,22 @@ upgrade_aggr_and_linkprop () {
 	fi
 }
 
+# Update aac.conf for set legacy-name-enable properly
+update_aac_conf()
+{
+	conffile=$rootprefix/kernel/drv/aac.conf
+	childconffile=$rootprefix/bfu.child/kernel/drv/aac.conf
+
+	# Already using autoenumeration mode, return
+	egrep -s "legacy-name-enable" $childconffile && \
+	    grep "legacy-name-enable" $childconffile | egrep -s "no" && return
+
+	# Else enable legacy mode
+	sed -e 's/legacy-name-enable="no"/legacy-name-enable="yes"/g' \
+	    < $conffile > /tmp/aac.conf.$$
+	mv -f /tmp/aac.conf.$$ $conffile
+}
+
 # update x86 version mpt.conf for property tape
 mpttapeprop='[ 	]*tape[ 	]*=[ 	]*"sctp"[ 	]*;'
 update_mptconf_i386()
@@ -8015,6 +8031,8 @@ mondo_loop() {
 	update_policy_conf
 
 	tx_check_bkbfu
+
+	update_aac_conf
 
 	if [ $target_isa = i386 ]; then
 	    update_mptconf_i386
