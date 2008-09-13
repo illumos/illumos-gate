@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <fm/libtopo.h>
@@ -50,12 +49,11 @@ static const char *g_fmri = NULL;
 
 static const char *opt_R = "/";
 static const char *opt_s = FM_FMRI_SCHEME_HC;
-static const char optstr[] = "bCdeEP:pR:s:StVx";
+static const char optstr[] = "bCdeP:pR:s:StVx";
 
 static int opt_b = 0;
 static int opt_d = 0;
 static int opt_e = 0;
-static int opt_E = 0;
 static int opt_p = 0;
 static int opt_S = 0;
 static int opt_t = 0;
@@ -77,7 +75,7 @@ static int
 usage(FILE *fp)
 {
 	(void) fprintf(fp,
-	    "Usage: %s [-bCeEdpSVx] [-P group.property[=type:value]] "
+	    "Usage: %s [-bCedpSVx] [-P group.property[=type:value]] "
 	    "[-R root] [-s scheme] [fmri]\n", g_pname);
 
 	(void) fprintf(fp,
@@ -85,7 +83,6 @@ usage(FILE *fp)
 	    "\t-C  dump core after completing execution\n"
 	    "\t-d  set debug mode for libtopo modules\n"
 	    "\t-e  display FMRIs as paths using esc/eft notation\n"
-	    "\t-E  enumerate sensor nodes\n"
 	    "\t-P  get/set specified properties\n"
 	    "\t-p  display of FMRI protocol properties\n"
 	    "\t-R  set root directory for libtopo plug-ins and other files\n"
@@ -799,7 +796,7 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	int err;
 	nvlist_t *nvl;
-	nvlist_t *rsrc, *out;
+	nvlist_t *rsrc;
 	char *s;
 
 	if (opt_e && strcmp(opt_s, FM_FMRI_SCHEME_HC) == 0) {
@@ -829,24 +826,6 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 	print_node(thp, node, rsrc, s);
 	topo_hdl_strfree(thp, s);
 	nvlist_free(rsrc);
-
-	/*
-	 * If the "-E" option was specified, we want to also enumerate any
-	 * available facility nodes.  To do that we check if the node supports
-	 * a facility enumerator method.  If it exists, then we invoke it to
-	 * enumerate the sensors for this node.
-	 */
-	if (opt_E) {
-		if (topo_method_supported(node, TOPO_METH_FAC_ENUM, 0))
-			if (topo_method_invoke(node, TOPO_METH_FAC_ENUM, 0,
-			    NULL, &out, &err) != 0) {
-				(void) fprintf(stderr,
-				    "topo_method_invoke failed (%s) on node "
-				    "%s=%d\n", topo_strerror(err),
-				    topo_node_name(node),
-				    topo_node_instance(node));
-			}
-	}
 
 	if (opt_V || opt_all) {
 		if ((nvl = topo_prop_getprops(node, &err)) == NULL) {
@@ -1195,9 +1174,6 @@ main(int argc, char *argv[])
 				break;
 			case 'e':
 				opt_e++;
-				break;
-			case 'E':
-				opt_E++;
 				break;
 			case 'P':
 				pcnt++;

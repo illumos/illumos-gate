@@ -419,9 +419,11 @@ topo_node_hash(topo_nodehash_t *nhp, topo_instance_t inst)
 }
 
 static tnode_t *
-node_bind_seterror(topo_mod_t *mod, tnode_t *pnode, tnode_t *node, int err)
+node_bind_seterror(topo_mod_t *mod, tnode_t *pnode, tnode_t *node,
+    boolean_t pnode_locked, int err)
 {
-	topo_node_unlock(pnode);
+	if (pnode_locked)
+		topo_node_unlock(pnode);
 
 	(void) topo_mod_seterrno(mod, err);
 
@@ -454,12 +456,12 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			if (inst > nhp->th_range.tr_max ||
 			    inst < nhp->th_range.tr_min)
 				return (node_bind_seterror(mod, pnode, NULL,
-				    EMOD_NODE_RANGE));
+				    B_TRUE, EMOD_NODE_RANGE));
 
 			h = topo_node_hash(nhp, inst);
 			if (nhp->th_nodearr[h] != NULL)
 				return (node_bind_seterror(mod, pnode, NULL,
-				    EMOD_NODE_BOUND));
+				    B_TRUE, EMOD_NODE_BOUND));
 			else
 				break;
 
@@ -467,10 +469,12 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	}
 
 	if (nhp == NULL)
-		return (node_bind_seterror(mod, pnode, NULL, EMOD_NODE_NOENT));
+		return (node_bind_seterror(mod, pnode, NULL, B_TRUE,
+		    EMOD_NODE_NOENT));
 
 	if ((node = topo_mod_zalloc(mod, sizeof (tnode_t))) == NULL)
-		return (node_bind_seterror(mod, pnode, NULL, EMOD_NOMEM));
+		return (node_bind_seterror(mod, pnode, NULL, B_TRUE,
+		    EMOD_NOMEM));
 
 	(void) pthread_mutex_init(&node->tn_lock, NULL);
 
@@ -486,14 +490,15 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	topo_mod_hold(mod);
 
 	if (fmri == NULL)
-		return (node_bind_seterror(mod, pnode, node, EMOD_NVL_INVAL));
+		return (node_bind_seterror(mod, pnode, node, B_TRUE,
+		    EMOD_NVL_INVAL));
 
 	if (topo_pgroup_create(node, &protocol_pgroup, &err) < 0)
-		return (node_bind_seterror(mod, pnode, node, err));
+		return (node_bind_seterror(mod, pnode, node, B_TRUE, err));
 
 	if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_RESOURCE,
 	    TOPO_PROP_IMMUTABLE, fmri, &err) < 0)
-		return (node_bind_seterror(mod, pnode, node, err));
+		return (node_bind_seterror(mod, pnode, node, B_TRUE, err));
 
 	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
 	    "node bound %s=%d/%s=%d\n", topo_node_name(pnode),
@@ -535,31 +540,40 @@ topo_node_facbind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	if (topo_node_range_create(mod, pnode, name, 0, 0) < 0)
 		return (NULL);  /* mod errno set */
 
+	topo_node_hold(pnode);
 	topo_node_lock(pnode);
 	for (nhp = topo_list_next(&pnode->tn_children); nhp != NULL;
 	    nhp = topo_list_next(nhp)) {
 		if (strcmp(nhp->th_name, name) == 0) {
 
 			if (inst > nhp->th_range.tr_max ||
-			    inst < nhp->th_range.tr_min)
+			    inst < nhp->th_range.tr_min) {
+				topo_node_rele(pnode);
 				return (node_bind_seterror(mod, pnode, NULL,
-				    EMOD_NVL_INVAL));
-
+				    B_TRUE, EMOD_NVL_INVAL));
+			}
 			h = topo_node_hash(nhp, inst);
-			if (nhp->th_nodearr[h] != NULL)
+			if (nhp->th_nodearr[h] != NULL) {
+				topo_node_rele(pnode);
 				return (node_bind_seterror(mod, pnode, NULL,
-				    EMOD_NODE_BOUND));
-			else
+				    B_TRUE, EMOD_NODE_BOUND));
+			} else
 				break;
 
 		}
 	}
+	topo_node_unlock(pnode);
 
-	if (nhp == NULL)
-		return (node_bind_seterror(mod, pnode, NULL, EMOD_NODE_NOENT));
-
-	if ((node = topo_mod_zalloc(mod, sizeof (tnode_t))) == NULL)
-		return (node_bind_seterror(mod, pnode, NULL, EMOD_NOMEM));
+	if (nhp == NULL) {
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, NULL, B_FALSE,
+		    EMOD_NODE_NOENT));
+	}
+	if ((node = topo_mod_zalloc(mod, sizeof (tnode_t))) == NULL) {
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, NULL, B_FALSE,
+		    EMOD_NOMEM));
+	}
 
 	(void) pthread_mutex_init(&node->tn_lock, NULL);
 
@@ -575,26 +589,35 @@ topo_node_facbind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	/* Ref count module that bound this node */
 	topo_mod_hold(mod);
 
-	if (topo_pgroup_create(node, &protocol_pgroup, &err) < 0)
-		return (node_bind_seterror(mod, pnode, node, err));
-
-	if (topo_mod_nvalloc(mod, &fnvl, NV_UNIQUE_NAME) < 0)
-		return (node_bind_seterror(mod, pnode, node, EMOD_NOMEM));
+	if (topo_pgroup_create(node, &protocol_pgroup, &err) < 0) {
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, node, B_FALSE, err));
+	}
+	if (topo_mod_nvalloc(mod, &fnvl, NV_UNIQUE_NAME) < 0) {
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, node, B_FALSE,
+		    EMOD_NOMEM));
+	}
 	if (nvlist_add_string(fnvl, FM_FMRI_FACILITY_NAME, name) != 0 ||
 	    nvlist_add_string(fnvl, FM_FMRI_FACILITY_TYPE, type) != 0) {
 		nvlist_free(fnvl);
-		return (node_bind_seterror(mod, pnode, node,  EMOD_FMRI_NVL));
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, node,  B_FALSE,
+		    EMOD_FMRI_NVL));
 	}
 
 	if (topo_node_resource(pnode, &pfmri, &err) < 0) {
 		nvlist_free(fnvl);
-		return (node_bind_seterror(mod, pnode, node, err));
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, node, B_FALSE, err));
 	}
 
 	if (nvlist_add_nvlist(pfmri, FM_FMRI_FACILITY, fnvl) != 0) {
 		nvlist_free(fnvl);
 		nvlist_free(pfmri);
-		return (node_bind_seterror(mod, pnode, node,  EMOD_FMRI_NVL));
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, node,  B_FALSE,
+		    EMOD_FMRI_NVL));
 	}
 
 	nvlist_free(fnvl);
@@ -602,7 +625,8 @@ topo_node_facbind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_RESOURCE,
 	    TOPO_PROP_IMMUTABLE, pfmri, &err) < 0) {
 		nvlist_free(pfmri);
-		return (node_bind_seterror(mod, pnode, node, err));
+		topo_node_rele(pnode);
+		return (node_bind_seterror(mod, pnode, node, B_FALSE, err));
 	}
 
 	nvlist_free(pfmri);
@@ -614,9 +638,11 @@ topo_node_facbind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 	topo_node_hold(node);
 	nhp->th_nodearr[h] = node;
-	++pnode->tn_refs;
 
+	topo_node_lock(pnode);
+	++pnode->tn_refs;
 	topo_node_unlock(pnode);
+	topo_node_rele(pnode);
 
 	if (topo_pgroup_create(node, &auth_pgroup, &err) == 0) {
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
@@ -635,38 +661,11 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
     uint32_t fac_subtype, topo_faclist_t *faclist, int *errp)
 {
 	tnode_t *tmp;
-	nvlist_t *rsrc, *fac, *out;
+	nvlist_t *rsrc, *fac;
 	char *tmp_factype;
 	uint32_t tmp_facsubtype;
 	boolean_t list_empty = 1;
 	topo_faclist_t *fac_ele;
-
-	/*
-	 * Some facility nodes will be statically enumerated in the xml maps.
-	 * Other may be enumerated on-demand.  We can check for/handle the
-	 * latter case by looking for a node method for doing facility
-	 * enumeration and invoking it, if found.
-	 *
-	 * If the TOPO_FACILITIES_BOUND flag is set on this node, then we've
-	 * already enumerated the facilties for this node (by a previous call
-	 * to topo_node_facility) so there's no need to invoke the enumeration
-	 * method.
-	 */
-	topo_node_lock(node);
-	if (!(node->tn_state & TOPO_FACILITIES_BOUND) &&
-	    topo_method_supported(node, TOPO_METH_FAC_ENUM, 0)) {
-
-		if (topo_method_invoke(node, TOPO_METH_FAC_ENUM, 0, NULL, &out,
-		    errp) != 0) {
-			topo_dprintf(thp, TOPO_DBG_ERR,
-			    "topo_method_invoke failed (%s) on node %s=%d\n",
-			    topo_strerror(*errp), topo_node_name(node),
-			    topo_node_instance(node));
-			topo_node_unlock(node);
-			return (-1);
-		} else
-			node->tn_state |= TOPO_FACILITIES_BOUND;
-	}
 
 	bzero(faclist, sizeof (topo_faclist_t));
 	for (tmp = topo_child_first(node); tmp != NULL;

@@ -80,6 +80,7 @@
 #include <uuid/uuid.h>
 
 #include <fm/libtopo.h>
+#include <sys/fm/protocol.h>
 
 #include <topo_alloc.h>
 #include <topo_builtin.h>
@@ -321,19 +322,63 @@ topo_snap_log_create(topo_hdl_t *thp, const char *uuid, int *errp)
 	return ((char *)uuid);
 }
 
+/*ARGSUSED*/
+static int
+fac_walker(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	nvlist_t *out;
+
+	if (topo_method_supported(node, TOPO_METH_FAC_ENUM, 0)) {
+		/*
+		 * If the facility enumeration method fails, note the failure,
+		 * but continue on with the walk.
+		 */
+		if (topo_method_invoke(node, TOPO_METH_FAC_ENUM, 0, NULL, &out,
+		    &err) != 0) {
+			topo_dprintf(thp, TOPO_DBG_ERR,
+			    "facility enumeration method failed on node %s=%d "
+			    "(%s)\n", topo_node_name(node),
+			    topo_node_instance(node), topo_strerror(err));
+		}
+	}
+	return (TOPO_WALK_NEXT);
+}
+
 /*
  * Return snapshot id
  */
 char *
 topo_snap_hold(topo_hdl_t *thp, const char *uuid, int *errp)
 {
+	topo_walk_t *twp;
+
 	if (thp == NULL)
 		return (NULL);
 
-	if (uuid == NULL)
-		return (topo_snap_create(thp, errp));
-	else
-		return (topo_snap_log_create(thp, uuid, errp));
+	if (uuid == NULL) {
+		char *ret;
+
+		ret = topo_snap_create(thp, errp);
+
+		/*
+		 * Now walk the tree and invoke any facility enumeration methods
+		 */
+		if (ret != NULL) {
+			if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
+			    fac_walker, (void *)0, errp)) == NULL) {
+				return (ret);
+			}
+			if (topo_walk_step(twp, TOPO_WALK_CHILD)
+			    != TOPO_WALK_ERR) {
+				topo_walk_fini(twp);
+				return (ret);
+			}
+			topo_walk_fini(twp);
+		}
+		return (ret);
+	}
+	return (topo_snap_log_create(thp, uuid, errp));
 }
 
 /*ARGSUSED*/

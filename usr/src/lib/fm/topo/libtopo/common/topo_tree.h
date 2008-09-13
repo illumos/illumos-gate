@@ -76,12 +76,6 @@ struct topo_node {
 #define	TOPO_NODE_ROOT		0x0002
 #define	TOPO_NODE_BOUND		0x0004
 #define	TOPO_NODE_LINKED	0x0008
-/*
- * Used by topo_node_facility() to determine whether or not this node's
- * facilities have been enumerated.  This is to avoid unecessarily re-running
- * the facility enumeration method on this node (which can be expensive)
- */
-#define	TOPO_FACILITIES_BOUND	0x0010
 
 typedef struct topo_tree {
 	topo_list_t tt_list;		/* next/prev pointers */
