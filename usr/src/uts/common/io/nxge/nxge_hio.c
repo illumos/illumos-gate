@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nxge_hio.c
  *
@@ -128,8 +126,7 @@ nxge_get_environs(
  *	Any domain
  */
 int
-nxge_hio_init(
-	nxge_t *nxge)
+nxge_hio_init(nxge_t *nxge)
 {
 	nxge_hio_data_t *nhd;
 
@@ -148,19 +145,17 @@ nxge_hio_init(
 #endif
 
 void
-nxge_hio_uninit(
-	nxge_t *nxge)
+nxge_hio_uninit(nxge_t *nxge)
 {
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 
-	ASSERT(nhd != NULL);
 	ASSERT(nxge->nxge_hw_p->ndevs == 0);
 
-	MUTEX_DESTROY(&nhd->lock);
-
-	KMEM_FREE(nhd, sizeof (*nhd));
-
-	nxge->nxge_hw_p->hio = 0;
+	if (nhd != NULL) {
+		MUTEX_DESTROY(&nhd->lock);
+		KMEM_FREE(nhd, sizeof (*nhd));
+		nxge->nxge_hw_p->hio = 0;
+	}
 }
 
 /*

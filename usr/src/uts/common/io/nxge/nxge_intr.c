@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nxge_intr.c
  *
@@ -727,6 +725,9 @@ nxge_hio_intr_uninit(
 
 	interrupts->intr_registered = B_FALSE;
 
+	if (nxge->ldgvp == NULL)
+		goto nxge_hio_intr_uninit_exit;
+
 	control = nxge->ldgvp;
 	if (control->ldgp) {
 		KMEM_FREE(control->ldgp,
@@ -740,6 +741,7 @@ nxge_hio_intr_uninit(
 		control->ldvp = 0;
 	}
 
+nxge_hio_intr_uninit_exit:
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_intr_uninit"));
 }
 

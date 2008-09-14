@@ -633,7 +633,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #if defined(sun4v)
 	/* This is required by nxge_hio_init(), which follows. */
 	if ((status = nxge_hsvc_register(nxgep)) != DDI_SUCCESS)
-		goto nxge_attach_fail;
+		goto nxge_attach_fail4;
 #endif
 
 	if ((status = nxge_hio_init(nxgep)) != NXGE_OK) {
@@ -1082,8 +1082,7 @@ nxge_unattach(p_nxge_t nxgep)
 
 #if defined(sun4v)
 int
-nxge_hsvc_register(
-	nxge_t *nxgep)
+nxge_hsvc_register(nxge_t *nxgep)
 {
 	nxge_status_t status;
 
@@ -6579,10 +6578,14 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 			 * assigned to this instance of nxge in
 			 * nxge_use_cfg_dma_config().
 			 */
-			p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
-			p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
-			(void) nxge_fzc_rdc_tbl_unbind(nxgep,
-			    p_cfgp->def_mac_rxdma_grpid);
+			if (!isLDOMguest(nxgep)) {
+				p_dma_cfgp =
+				    (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
+				p_cfgp =
+				    (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
+				(void) nxge_fzc_rdc_tbl_unbind(nxgep,
+				    p_cfgp->def_mac_rxdma_grpid);
+			}
 
 			if (hw_p->ndevs) {
 				hw_p->ndevs--;
