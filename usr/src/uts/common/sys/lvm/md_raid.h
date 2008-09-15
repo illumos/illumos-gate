@@ -26,8 +26,6 @@
 #ifndef _SYS_MD_RAID_H
 #define	_SYS_MD_RAID_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_rename.h>
 
@@ -61,7 +59,7 @@ extern "C" {
 	((un)->un_column[(column)].un_devstate == RCS_ERRED) || \
 	((un)->un_column[(column)].un_devstate == RCS_RESYNC) || \
 	((un)->un_column[(column)].un_devstate == RCS_LAST_ERRED) || \
-	((un)->un_column[(column)].un_devstate == RCS_REGEN)))
+	((un)->un_column[(column)].un_devstate == RCS_REGEN))
 
 #define	COLUMN_ISUP(un, column) (\
 	((un)->un_column[(column)].un_devstate == RCS_OKAY) || \
