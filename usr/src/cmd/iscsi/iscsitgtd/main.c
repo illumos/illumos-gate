@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	FD_SETSIZE	65536
 #include <sys/types.h>
@@ -228,10 +227,11 @@ process_config()
  * | "logout requested" the initiator is supposed to respond with
  * | a LogoutRequested PDU within a certain amount of time. If it
  * | fails to do so, it's the targets responsibility to clean up.
- * | After ASYNC_LOGOUT_TIMEOUT seconds (currently 10) we look to
- * | see if any connections are still in the S7_LOGOUT_REQUESTED
- * | state. If so, reissue the management request to logout which
- * | will cause the connections to close.
+ * | We will check logout status in a 1 second interval, if the
+ * | initiators responded to the logout request then logout is
+ * | conpleted, if ASYNC_LOGOUT_TIMEOUT seconds (currently 10)
+ * | is reached then we will reissue the management request to
+ * | to logout which will cause the connections to close.
  * []----
  */
 static void *
@@ -242,24 +242,51 @@ logout_cleanup(void *v)
 	mgmt_request_t	m;
 	iscsi_conn_t	*conn;
 	extern pthread_mutex_t port_mutex;
+	Boolean_t	logout = False;
 
 	bzero(&m, sizeof (m));
 	m.m_request	= mgmt_logout;
 	m.m_q		= queue_alloc();
 	msg_sent	= 0;
 
-	(void) sleep(ASYNC_LOGOUT_TIMEOUT);
-	(void) pthread_mutex_lock(&port_mutex);
-	for (conn = conn_head; conn; conn = conn->c_next) {
-		if ((conn->c_state == S7_LOGOUT_REQUESTED) &&
-		    (strcmp(conn->c_sess->s_t_name, targ) == 0)) {
-
-			queue_message_set(conn->c_dataq, 0,
-			    msg_mgmt_rqst, &m);
-			msg_sent++;
+	/*
+	 * The for loop is to manage the wait time for the
+	 * logout request to complete, if logout completed
+	 * before ASYNC_LOGOUT_TIMEOUT then done
+	 */
+	for (i = 0; i < ASYNC_LOGOUT_TIMEOUT; i++) {
+		logout = True;
+		(void) pthread_mutex_lock(&port_mutex);
+		for (conn = conn_head; conn; conn = conn->c_next) {
+			if ((conn->c_state == S7_LOGOUT_REQUESTED) &&
+			    (strcmp(conn->c_sess->s_t_name, targ) == 0)) {
+				logout = False;
+				break;
+			}
 		}
+		(void) pthread_mutex_unlock(&port_mutex);
+		if (logout)
+			break;
+		else
+			(void) sleep(1);
 	}
-	(void) pthread_mutex_unlock(&port_mutex);
+
+	/*
+	 * Logout did not complete, queue message to shutdown
+	 * connection.
+	 */
+	if (logout == False) {
+		(void) pthread_mutex_lock(&port_mutex);
+		for (conn = conn_head; conn; conn = conn->c_next) {
+			if ((conn->c_state == S7_LOGOUT_REQUESTED) &&
+			    (strcmp(conn->c_sess->s_t_name, targ) == 0)) {
+				queue_message_set(conn->c_dataq, 0,
+				    msg_mgmt_rqst, &m);
+				msg_sent++;
+			}
+		}
+		(void) pthread_mutex_unlock(&port_mutex);
+	}
 
 	/*
 	 * Wait to see if they received the message.
