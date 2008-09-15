@@ -2976,7 +2976,6 @@ matched:
 		fin->fin_nat = is->is_nat[fin->fin_rev];
 
 	fin->fin_state = is;
-	is->is_touched = ifs->ifs_fr_ticks;
 	MUTEX_ENTER(&is->is_lock);
 	is->is_ref++;
 	MUTEX_EXIT(&is->is_lock);

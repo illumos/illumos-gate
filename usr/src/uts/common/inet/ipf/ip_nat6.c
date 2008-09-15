@@ -2177,7 +2177,6 @@ maskloop:
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
 			MUTEX_EXIT(&nat->nat_lock);
-			nat->nat_touched = ifs->ifs_fr_ticks;
 			fin->fin_nat = nat;
 		}
 	} else
@@ -2465,7 +2464,6 @@ maskloop:
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
 			MUTEX_EXIT(&nat->nat_lock);
-			nat->nat_touched = ifs->ifs_fr_ticks;
 			fin->fin_nat = nat;
 			fin->fin_state = nat->nat_state;
 		}

@@ -5147,6 +5147,7 @@ ipf_stack_t *ifs;
 /* Parameters:  tq(I)   - pointer to timeout queue information              */
 /*              oifp(I) - old timeout queue entry was on                    */
 /*              nifp(I) - new timeout queue to put entry on                 */
+/*		ifs	- ipf stack instance				    */
 /*                                                                          */
 /* Move a queue entry from one timeout queue to another timeout queue.      */
 /* If it notices that the current entry is already last and does not need   */
@@ -5158,17 +5159,33 @@ ipftq_t *oifq, *nifq;
 ipf_stack_t *ifs;
 {
 	/*
-	 * Is the operation here going to be a no-op ?
+	 * If the queue isn't changing, and the clock hasn't ticked
+	 * since the last update, the operation will be a no-op.
 	 */
+	if (oifq == nifq && tqe->tqe_touched == ifs->ifs_fr_ticks)
+		return;
+
+	/*
+	 * Grab the lock and update the timers.
+	 */
+	MUTEX_ENTER(&oifq->ifq_lock);
+	tqe->tqe_touched = ifs->ifs_fr_ticks;
 	tqe->tqe_die = ifs->ifs_fr_ticks + nifq->ifq_ttl;
+
+	/*
+	 * The remainder of the operation can still be a no-op.
+	 *
+	 * If the queue isn't changing, check to see if
+	 * an update would be meaningless.
+	 */
 	if (oifq == nifq) {
-		if (tqe->tqe_next == NULL)
+		if ((tqe->tqe_next == NULL) ||
+		    (tqe->tqe_next->tqe_die == tqe->tqe_die)) {
+			MUTEX_EXIT(&oifq->ifq_lock);
 			return;
-		if (tqe->tqe_next->tqe_die == tqe->tqe_die)
-			return;
+		}
 	}
 
-	MUTEX_ENTER(&oifq->ifq_lock);
 	/*
 	 * Remove from the old queue
 	 */
