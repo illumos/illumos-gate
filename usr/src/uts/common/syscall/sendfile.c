@@ -370,6 +370,8 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 				aiov.iov_base = ptr;
 				aiov.iov_len = cnt;
 				auio.uio_loffset = *fileoff;
+				auio.uio_iov = &aiov;
+				auio.uio_iovcnt = 1;
 				auio.uio_resid = cnt;
 				auio.uio_segflg = UIO_SYSSPACE;
 				auio.uio_llimit = curproc->p_fsz_ctl;
@@ -1080,6 +1082,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					aiov.iov_len = cnt;
 					auio.uio_loffset = *fileoff;
 					auio.uio_resid = cnt;
+					auio.uio_iov = &aiov;
+					auio.uio_iovcnt = 1;
 					auio.uio_segflg = UIO_SYSSPACE;
 					auio.uio_llimit = curproc->p_fsz_ctl;
 					auio.uio_fmode = fflag;
