@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCI Express nexus driver interface
  */
@@ -60,6 +58,10 @@ static int px_cb_attach(px_t *);
 static void px_cb_detach(px_t *);
 static int px_pwr_setup(dev_info_t *dip);
 static void px_pwr_teardown(dev_info_t *dip);
+
+static void px_set_mps(px_t *px_p);
+
+extern int pcie_max_mps;
 
 extern errorq_t *pci_target_queue;
 
@@ -128,7 +130,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 		/* Type of module - driver */
-	"PCI Express nexus driver %I%",	/* Name of module. */
+	"PCI Express nexus driver",	/* Name of module. */
 	&px_ops,			/* driver ops */
 };
 
@@ -318,6 +320,8 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto err_bad_intr;
 
 		(void) px_init_hotplug(px_p);
+
+		(void) px_set_mps(px_p);
 
 		/*
 		 * Create the "devctl" node for hotplug and pcitool support.
@@ -1437,4 +1441,42 @@ px_uninit_hotplug(dev_info_t *dip)
 	px_lib_hotplug_uninit(dip);
 
 	return (DDI_SUCCESS);
+}
+
+static void
+px_set_mps(px_t *px_p)
+{
+	dev_info_t	*dip;
+	pcie_bus_t	*bus_p;
+	int		max_supported;
+
+	dip = px_p->px_dip;
+	bus_p = PCIE_DIP2BUS(dip);
+
+	bus_p->bus_mps = -1;
+
+	if (pcie_root_port(dip) == DDI_FAILURE) {
+		if (px_lib_get_root_complex_mps(px_p, dip,
+		    &max_supported) < 0) {
+
+			DBG(DBG_MPS, dip, "MPS:  Can not get RC MPS\n");
+			return;
+		}
+
+		DBG(DBG_MPS, dip, "MPS: Root Complex MPS Cap of = %x\n",
+		    max_supported);
+
+		if (pcie_max_mps < max_supported)
+			max_supported = pcie_max_mps;
+
+		(void) pcie_get_fabric_mps(dip, ddi_get_child(dip),
+		    &max_supported);
+
+		bus_p->bus_mps = max_supported;
+
+		(void) px_lib_set_root_complex_mps(px_p, dip, bus_p->bus_mps);
+
+		DBG(DBG_MPS, dip, "MPS: Root Complex MPS Set to = %x\n",
+		    bus_p->bus_mps);
+	}
 }

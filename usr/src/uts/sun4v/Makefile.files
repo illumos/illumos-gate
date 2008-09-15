@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This Makefile defines all file modules for the directory uts/sun4v
 #	and it's children. These are the source files which are sun4u
 #	"implementation architecture" dependent.
@@ -115,7 +113,7 @@ SPECIAL_OBJS += intrq.o
 #			driver modules
 #
 ROOTNEX_OBJS	+= mach_rootnex.o
-PX_OBJS		+= px_lib4v.o px_err.o px_tools_4v.o px_hcall.o
+PX_OBJS		+= px_lib4v.o px_err.o px_tools_4v.o px_hcall.o px_libhv.o 
 FPC_OBJS	+= fpc-impl-4v.o fpc-asm-4v.o
 N2PIUPC_OBJS	+= n2piupc.o n2piupc_tables.o n2piupc_kstats.o \
 			n2piupc_biterr.o n2piupc_asm.o

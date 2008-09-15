@@ -69,6 +69,31 @@ static boolean_t px_cpr_callb(void *arg, int code);
 static uint_t px_cb_intr(caddr_t arg);
 
 /*
+ * ACKNAK Latency Threshold Table.
+ * See Fire PRM 2.0 section 1.2.12.2, table 1-17.
+ */
+int px_acknak_timer_table[LINK_MAX_PKT_ARR_SIZE][LINK_WIDTH_ARR_SIZE] = {
+	{0xED,   0x49,  0x43,  0x30},
+	{0x1A0,  0x76,  0x6B,  0x48},
+	{0x22F,  0x9A,  0x56,  0x56},
+	{0x42F,  0x11A, 0x96,  0x96},
+	{0x82F,  0x21A, 0x116, 0x116},
+	{0x102F, 0x41A, 0x216, 0x216}
+};
+
+/*
+ * TxLink Replay Timer Latency Table
+ * See Fire PRM 2.0 sections 1.2.12.3, table 1-18.
+ */
+int px_replay_timer_table[LINK_MAX_PKT_ARR_SIZE][LINK_WIDTH_ARR_SIZE] = {
+	{0x379,  0x112, 0xFC,  0xB4},
+	{0x618,  0x1BA, 0x192, 0x10E},
+	{0x831,  0x242, 0x143, 0x143},
+	{0xFB1,  0x422, 0x233, 0x233},
+	{0x1EB0, 0x7E1, 0x412, 0x412},
+	{0x3CB0, 0xF61, 0x7D2, 0x7D2}
+};
+/*
  * px_lib_map_registers
  *
  * This function is called from the attach routine to map the registers
@@ -2604,4 +2629,81 @@ px_lib_get_bdf(px_t *px_p)
 	bdf = CSR_BR(csr_base, DMC_PCI_EXPRESS_CONFIGURATION, REQ_ID);
 
 	return (bdf);
+}
+
+/*ARGSUSED*/
+int
+px_lib_get_root_complex_mps(px_t *px_p, dev_info_t *dip, int *mps)
+{
+	pxu_t	*pxu_p;
+	caddr_t csr_base;
+
+	pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	if (pxu_p == NULL)
+		return (DDI_FAILURE);
+
+	csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+
+
+	*mps = CSR_XR(csr_base, TLU_DEVICE_CAPABILITIES) &
+	    TLU_DEVICE_CAPABILITIES_MPS_MASK;
+
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+int
+px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps)
+{
+	pxu_t	*pxu_p;
+	caddr_t csr_base;
+	uint64_t dev_ctrl;
+	int link_width, val;
+	px_chip_type_t chip_type = px_identity_init(px_p);
+
+	pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	if (pxu_p == NULL)
+		return (DDI_FAILURE);
+
+	csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+
+	dev_ctrl = CSR_XR(csr_base, TLU_DEVICE_CONTROL);
+	dev_ctrl |= (mps << TLU_DEVICE_CONTROL_MPS);
+
+	CSR_XS(csr_base, TLU_DEVICE_CONTROL, dev_ctrl);
+
+	link_width = CSR_FR(csr_base, TLU_LINK_STATUS, WIDTH);
+
+	/*
+	 * Convert link_width to match timer array configuration.
+	 */
+	switch (link_width) {
+	case 1:
+		link_width = 0;
+		break;
+	case 4:
+		link_width = 1;
+		break;
+	case 8:
+		link_width = 2;
+		break;
+	case 16:
+		link_width = 3;
+		break;
+	default:
+		link_width = 0;
+	}
+
+	val = px_replay_timer_table[mps][link_width];
+	CSR_XS(csr_base, LPU_TXLINK_REPLAY_TIMER_THRESHOLD, val);
+
+	if (chip_type == PX_CHIP_OBERON)
+		return (DDI_SUCCESS);
+
+	val = px_acknak_timer_table[mps][link_width];
+	CSR_XS(csr_base, LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD, val);
+
+	return (DDI_SUCCESS);
 }

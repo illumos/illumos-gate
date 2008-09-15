@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PX_LIB4V_H
 #define	_SYS_PX_LIB4V_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -183,6 +181,10 @@ extern uint64_t hvio_peek(devhandle_t dev_hdl, r_addr_t ra, size_t size,
     uint32_t *status, uint64_t *data_p);
 extern uint64_t hvio_poke(devhandle_t dev_hdl, r_addr_t ra, size_t size,
     uint64_t data, pci_device_t bdf, uint32_t *wrt_stat);
+extern uint64_t hvio_get_rp_mps_cap(devhandle_t dev_hdl, pci_device_t bdf,
+    int32_t *mps_cap);
+extern uint64_t hvio_set_rp_mps(devhandle_t dev_hdl, pci_device_t bdf,
+    int32_t mps);
 
 /*
  * Priviledged physical access:

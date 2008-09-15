@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -110,9 +108,7 @@ ushort_t pcie_base_err_default =
     PCIE_DEVCTL_UR_REPORTING_EN;
 
 /* PCI-Express Device Control Register */
-uint16_t pcie_devctl_default =
-    PCIE_DEVCTL_RO_EN |
-    PCIE_DEVCTL_MAX_PAYLOAD_128 |
+uint16_t pcie_devctl_default = PCIE_DEVCTL_RO_EN |
     PCIE_DEVCTL_MAX_READ_REQ_512;
 
 /* PCI-Express AER Root Control Register */
@@ -166,13 +162,22 @@ uint32_t pcie_aer_suce_severity = PCIE_AER_SUCE_SERR_ASSERT | \
     PCIE_AER_SUCE_UC_ADDR_ERR | PCIE_AER_SUCE_UC_ATTR_ERR | \
     PCIE_AER_SUCE_USC_MSG_DATA_ERR;
 
+int pcie_max_mps = PCIE_DEVCTL_MAX_PAYLOAD_4096 >> 5;
+
+static void pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip,
+	int *max_supported);
+static int pcie_get_max_supported(dev_info_t *dip, void *arg);
+static int pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
+    caddr_t *addrp, ddi_acc_handle_t *handlep);
+static void pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph);
+
 /*
  * modload support
  */
 extern struct mod_ops mod_miscops;
 struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
-	"PCIE: PCI Express Architecture %I%"
+	"PCIE: PCI framework"
 };
 
 struct modlinkage modlinkage = {
@@ -334,6 +339,9 @@ pcie_initchild(dev_info_t *cdip)
 		/* Enable PCIe errors */
 		pcie_enable_errors(cdip);
 	}
+
+	if (pcie_initchild_mps(cdip) == DDI_FAILURE)
+		return (DDI_FAILURE);
 
 	return (DDI_SUCCESS);
 }
@@ -668,6 +676,20 @@ pcie_init_bus(dev_info_t *cdip)
 
 	pcie_init_pfd(cdip);
 
+	/*
+	 * If it is a Root Port, perform a fabric scan to determine
+	 * the Max Payload Size for the fabric.
+	 */
+	if (PCIE_IS_RP(bus_p)) {
+		int max_supported = pcie_max_mps;
+
+		(void) pcie_get_fabric_mps(ddi_get_parent(cdip), cdip,
+		    &max_supported);
+
+		bus_p->bus_mps = max_supported;
+	} else
+		bus_p->bus_mps = -1;
+
 	PCIE_DBG("Add %s(dip 0x%p, bdf 0x%x, secbus 0x%x)\n",
 	    ddi_driver_name(cdip), (void *)cdip, bus_p->bus_bdf,
 	    bus_p->bus_bdg_secbus);
@@ -750,8 +772,12 @@ pcie_enable_errors(dev_info_t *dip)
 	 */
 	if ((reg16 = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL)) !=
 	    PCI_CAP_EINVAL16) {
-		tmp16 = pcie_devctl_default | (pcie_base_err_default &
-		    (~PCIE_DEVCTL_CE_REPORTING_EN));
+		tmp16 = (reg16 & (PCIE_DEVCTL_MAX_READ_REQ_MASK |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
+		    (pcie_devctl_default & ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) |
+		    (pcie_base_err_default & (~PCIE_DEVCTL_CE_REPORTING_EN));
+
 		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, tmp16);
 		PCIE_DBG_CAP(dip, bus_p, "DEVCTL", 16, PCIE_DEVCTL, reg16);
 	}
@@ -1107,6 +1133,318 @@ pcie_is_link_disabled(dev_info_t *dip)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
+}
+
+/*
+ * Initialize the Maximum Payload Size of a device.
+ *
+ * cdip - dip of device.
+ *
+ * returns - DDI_SUCCESS or DDI_FAILURE
+ */
+int
+pcie_initchild_mps(dev_info_t *cdip)
+{
+	int		max_payload_size;
+	pcie_bus_t	*bus_p;
+	dev_info_t	*pdip = ddi_get_parent(cdip);
+
+	bus_p = PCIE_DIP2BUS(cdip);
+	if (bus_p == NULL) {
+		PCIE_DBG("%s: BUS not found.\n",
+		    ddi_driver_name(cdip));
+		return (DDI_FAILURE);
+	}
+
+	if (PCIE_IS_RP(bus_p)) {
+		/*
+		 * If this device is a root port, then the mps scan
+		 * saved the mps in the root ports bus_p.
+		 */
+		max_payload_size = bus_p->bus_mps;
+	} else {
+		/*
+		 * If the device is not a root port, then the mps of
+		 * its parent should be used.
+		 */
+		pcie_bus_t *parent_bus_p = PCIE_DIP2BUS(pdip);
+		max_payload_size = parent_bus_p->bus_mps;
+	}
+
+	if (PCIE_IS_PCIE(bus_p) && (max_payload_size >= 0)) {
+		pcie_bus_t *rootp_bus_p = PCIE_DIP2BUS(bus_p->bus_rp_dip);
+		uint16_t mask, dev_ctrl = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL),
+		    mps = PCIE_CAP_GET(16, bus_p, PCIE_DEVCAP) &
+		    PCIE_DEVCAP_MAX_PAYLOAD_MASK;
+
+		mps = MIN(mps, (uint16_t)max_payload_size);
+
+		/*
+		 * If the MPS to be set is less than the root ports
+		 * MPS, then MRRS will have to be set the same as MPS.
+		 */
+		mask = ((mps < rootp_bus_p->bus_mps) ?
+		    PCIE_DEVCTL_MAX_READ_REQ_MASK : 0) |
+		    PCIE_DEVCTL_MAX_PAYLOAD_MASK;
+
+		dev_ctrl &= ~mask;
+		mask = ((mps < rootp_bus_p->bus_mps)
+		    ? mps << PCIE_DEVCTL_MAX_READ_REQ_SHIFT : 0)
+		    | (mps << PCIE_DEVCTL_MAX_PAYLOAD_SHIFT);
+
+		dev_ctrl |= mask;
+
+		PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL, dev_ctrl);
+
+		bus_p->bus_mps = mps;
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Scans a device tree/branch for a maximum payload size capabilities.
+ *
+ * rc_dip - dip of Root Complex.
+ * dip - dip of device where scan will begin.
+ * max_supported (IN) - maximum allowable MPS.
+ * max_supported (OUT) - maximum payload size capability of fabric.
+ */
+void
+pcie_get_fabric_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
+{
+	/*
+	 * Perform a fabric scan to obtain Maximum Payload Capabilities
+	 */
+	(void) pcie_scan_mps(rc_dip, dip, max_supported);
+
+	PCIE_DBG("MPS: Highest Common MPS= %x\n", max_supported);
+}
+
+/*
+ * Scans fabric and determines Maximum Payload Size based on
+ * highest common denominator alogorithm
+ */
+static void
+pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
+{
+	int circular_count;
+	pcie_max_supported_t max_pay_load_supported;
+
+	max_pay_load_supported.dip = rc_dip;
+	max_pay_load_supported.highest_common_mps = *max_supported;
+
+	ndi_devi_enter(rc_dip, &circular_count);
+	ddi_walk_devs(dip, pcie_get_max_supported,
+	    (void *)&max_pay_load_supported);
+	ndi_devi_exit(rc_dip, circular_count);
+
+	*max_supported = max_pay_load_supported.highest_common_mps;
+}
+
+/*
+ * Called as part of the Maximum Payload Size scan.
+ */
+static int
+pcie_get_max_supported(dev_info_t *dip, void *arg)
+{
+	uint32_t max_supported;
+	uint16_t cap_ptr;
+	pcie_max_supported_t *current = (pcie_max_supported_t *)arg;
+	pci_regspec_t *reg;
+	int rlen;
+	caddr_t virt;
+	ddi_acc_handle_t config_handle;
+
+	if (ddi_get_child(current->dip) == NULL) {
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if (pcie_dev(dip) == DDI_FAILURE) {
+		PCIE_DBG("MPS: pcie_get_max_supported: %s:  "
+		    "Not a PCIe dev\n", ddi_driver_name(dip));
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
+	    (caddr_t)&reg, &rlen) != DDI_PROP_SUCCESS) {
+		PCIE_DBG("MPS: pcie_get_max_supported: %s:  "
+		    "Can not read reg\n", ddi_driver_name(dip));
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if (pcie_map_phys(ddi_get_child(current->dip), reg, &virt,
+	    &config_handle) != DDI_SUCCESS) {
+		PCIE_DBG("MPS: pcie_get_max_supported: %s:  pcie_map_phys "
+		    "failed\n", ddi_driver_name(dip));
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr)) ==
+	    DDI_FAILURE) {
+		pcie_unmap_phys(&config_handle, reg);
+		return (DDI_WALK_CONTINUE);
+	}
+
+	max_supported = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+	    PCIE_DEVCAP) & PCIE_DEVCAP_MAX_PAYLOAD_MASK;
+
+	PCIE_DBG("PCIE MPS: %s: MPS Capabilities %x\n", ddi_driver_name(dip),
+	    max_supported);
+
+	if (max_supported < current->highest_common_mps)
+		current->highest_common_mps = max_supported;
+
+	pcie_unmap_phys(&config_handle, reg);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Determines if there are any root ports attached to a root complex.
+ *
+ * dip - dip of root complex
+ *
+ * Returns - DDI_SUCCESS if there is at least one root port otherwise
+ *           DDI_FAILURE.
+ */
+int
+pcie_root_port(dev_info_t *dip)
+{
+	int port_type;
+	uint16_t cap_ptr;
+	ddi_acc_handle_t config_handle;
+	dev_info_t *cdip = ddi_get_child(dip);
+
+	/*
+	 * Determine if any of the children of the passed in dip
+	 * are root ports.
+	 */
+	for (; cdip; cdip = ddi_get_next_sibling(cdip)) {
+
+		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS)
+			continue;
+
+		if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E,
+		    &cap_ptr)) == DDI_FAILURE) {
+			pci_config_teardown(&config_handle);
+			continue;
+		}
+
+		port_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+
+		pci_config_teardown(&config_handle);
+
+		if (port_type == PCIE_PCIECAP_DEV_TYPE_ROOT)
+			return (DDI_SUCCESS);
+	}
+
+	/* No root ports were found */
+
+	return (DDI_FAILURE);
+}
+
+/*
+ * Function that determines if a device a PCIe device.
+ *
+ * dip - dip of device.
+ *
+ * returns - DDI_SUCCESS if device is a PCIe device, otherwise DDI_FAILURE.
+ */
+int
+pcie_dev(dev_info_t *dip)
+{
+	/* get parent device's device_type property */
+	char *device_type;
+	int rc = DDI_FAILURE;
+	dev_info_t *pdip = ddi_get_parent(dip);
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+	    DDI_PROP_DONTPASS, "device_type", &device_type)
+	    != DDI_PROP_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	if (strcmp(device_type, "pciex") == 0)
+		rc = DDI_SUCCESS;
+	else
+		rc = DDI_FAILURE;
+
+	ddi_prop_free(device_type);
+	return (rc);
+}
+
+/*
+ * Function to map in a device's memory space.
+ */
+static int
+pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
+    caddr_t *addrp, ddi_acc_handle_t *handlep)
+{
+	ddi_map_req_t mr;
+	ddi_acc_hdl_t *hp;
+	int result;
+	ddi_device_acc_attr_t attr;
+
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	attr.devacc_attr_access = DDI_CAUTIOUS_ACC;
+
+	*handlep = impl_acc_hdl_alloc(KM_SLEEP, NULL);
+	hp = impl_acc_hdl_get(*handlep);
+	hp->ah_vers = VERS_ACCHDL;
+	hp->ah_dip = dip;
+	hp->ah_rnumber = 0;
+	hp->ah_offset = 0;
+	hp->ah_len = 0;
+	hp->ah_acc = attr;
+
+	mr.map_op = DDI_MO_MAP_LOCKED;
+	mr.map_type = DDI_MT_REGSPEC;
+	mr.map_obj.rp = (struct regspec *)phys_spec;
+	mr.map_prot = PROT_READ | PROT_WRITE;
+	mr.map_flags = DDI_MF_KERNEL_MAPPING;
+	mr.map_handlep = hp;
+	mr.map_vers = DDI_MAP_VERSION;
+
+	result = ddi_map(dip, &mr, 0, 0, addrp);
+
+	if (result != DDI_SUCCESS) {
+		impl_acc_hdl_free(*handlep);
+		*handlep = (ddi_acc_handle_t)NULL;
+	} else {
+		hp->ah_addr = *addrp;
+	}
+
+	return (result);
+}
+
+/*
+ * Map out memory that was mapped in with pcie_map_phys();
+ */
+static void
+pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph)
+{
+	ddi_map_req_t mr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(*handlep);
+	ASSERT(hp);
+
+	mr.map_op = DDI_MO_UNMAP;
+	mr.map_type = DDI_MT_REGSPEC;
+	mr.map_obj.rp = (struct regspec *)ph;
+	mr.map_prot = PROT_READ | PROT_WRITE;
+	mr.map_flags = DDI_MF_KERNEL_MAPPING;
+	mr.map_handlep = hp;
+	mr.map_vers = DDI_MAP_VERSION;
+
+	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
+	    hp->ah_len, &hp->ah_addr);
+
+	impl_acc_hdl_free(*handlep);
+	*handlep = (ddi_acc_handle_t)NULL;
 }
 
 #ifdef	DEBUG

@@ -1994,3 +1994,25 @@ px_lib_get_bdf(px_t *px_p)
 {
 	return (0x0000);
 }
+
+int
+px_lib_get_root_complex_mps(px_t *px_p, dev_info_t *dip, int *mps)
+{
+	pci_device_t	bdf = px_lib_get_bdf(px_p);
+
+	if (hvio_get_rp_mps_cap(DIP_TO_HANDLE(dip), bdf, mps) == H_EOK)
+		return (DDI_SUCCESS);
+	else
+		return (DDI_FAILURE);
+}
+
+int
+px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps)
+{
+	pci_device_t	bdf = px_lib_get_bdf(px_p);
+
+	if (hvio_set_rp_mps(DIP_TO_HANDLE(dip), bdf, mps) == H_EOK)
+		return (DDI_SUCCESS);
+	else
+		return (DDI_FAILURE);
+}

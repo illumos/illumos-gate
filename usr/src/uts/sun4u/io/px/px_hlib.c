@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/vmsystm.h>
@@ -174,6 +172,9 @@ static uint64_t msiq_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
 static void msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p);
 static void jbc_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
 static void ubc_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
+
+extern int px_acknak_timer_table[LINK_MAX_PKT_ARR_SIZE][LINK_WIDTH_ARR_SIZE];
+extern int px_replay_timer_table[LINK_MAX_PKT_ARR_SIZE][LINK_WIDTH_ARR_SIZE];
 
 /*
  * Initialize the bus, but do not enable interrupts.
@@ -734,32 +735,6 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	uint64_t val;
 
 	/*
-	 * ACKNAK Latency Threshold Table.
-	 * See Fire PRM 2.0 section 1.2.12.2, table 1-17.
-	 */
-	int acknak_timer_table[LINK_MAX_PKT_ARR_SIZE][LINK_WIDTH_ARR_SIZE] = {
-		{0xED,   0x49,  0x43,  0x30},
-		{0x1A0,  0x76,  0x6B,  0x48},
-		{0x22F,  0x9A,  0x56,  0x56},
-		{0x42F,  0x11A, 0x96,  0x96},
-		{0x82F,  0x21A, 0x116, 0x116},
-		{0x102F, 0x41A, 0x216, 0x216}
-	};
-
-	/*
-	 * TxLink Replay Timer Latency Table
-	 * See Fire PRM 2.0 sections 1.2.12.3, table 1-18.
-	 */
-	int replay_timer_table[LINK_MAX_PKT_ARR_SIZE][LINK_WIDTH_ARR_SIZE] = {
-		{0x379,  0x112, 0xFC,  0xB4},
-		{0x618,  0x1BA, 0x192, 0x10E},
-		{0x831,  0x242, 0x143, 0x143},
-		{0xFB1,  0x422, 0x233, 0x233},
-		{0x1EB0, 0x7E1, 0x412, 0x412},
-		{0x3CB0, 0xF61, 0x7D2, 0x7D2}
-	};
-
-	/*
 	 * Get the Link Width.  See table above LINK_WIDTH_ARR_SIZE #define
 	 * Only Link Widths of x1, x4, and x8 are supported.
 	 * If any width is reported other than x8, set default to x8.
@@ -1031,7 +1006,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	/*
 	 * CSR_V LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD
 	 */
-	val = acknak_timer_table[max_payload][link_width];
+	val = px_acknak_timer_table[max_payload][link_width];
 	CSR_XS(csr_base, LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD, val);
 
 	DBG(DBG_LPU, NULL, "lpu_init - "
@@ -1048,7 +1023,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	/*
 	 * CSR_V LPU_TXLINK_REPLAY_TIMER_THRESHOLD
 	 */
-	val = replay_timer_table[max_payload][link_width];
+	val = px_replay_timer_table[max_payload][link_width];
 	CSR_XS(csr_base, LPU_TXLINK_REPLAY_TIMER_THRESHOLD, val);
 
 	DBG(DBG_LPU, NULL,

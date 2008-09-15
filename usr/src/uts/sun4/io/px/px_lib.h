@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_LIB_H
 #define	_SYS_PX_LIB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -210,6 +208,9 @@ extern void px_hp_intr_redist(px_t *px_p);
 
 extern boolean_t px_lib_is_in_drain_state(px_t *px_p);
 extern pcie_req_id_t px_lib_get_bdf(px_t *px_p);
+
+extern int px_lib_get_root_complex_mps(px_t *px_p, dev_info_t *dip, int *mps);
+extern int px_lib_set_root_complex_mps(px_t *px_p,  dev_info_t *dip, int mps);
 
 #ifdef	__cplusplus
 }

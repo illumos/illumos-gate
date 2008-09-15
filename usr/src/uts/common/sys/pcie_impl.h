@@ -26,8 +26,6 @@
 #ifndef	_SYS_PCIE_IMPL_H
 #define	_SYS_PCIE_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -268,6 +266,8 @@ typedef struct pcie_bus {
 
 	/* Cache of last fault data */
 	pf_data_t	*bus_pfd;
+
+	int		bus_mps;		/* Maximum Payload Size */
 } pcie_bus_t;
 
 struct pf_data {
@@ -334,6 +334,11 @@ typedef struct pf_impl {
 
 #define	PCIE_PCIECAP_DEV_TYPE_RC_PSEUDO	0x100
 
+typedef struct {
+	dev_info_t	*dip;
+	int		highest_common_mps;
+} pcie_max_supported_t;
+
 /* PCIe Friendly Functions */
 extern int pcie_initchild(dev_info_t *dip);
 extern void pcie_uninitchild(dev_info_t *dip);
@@ -354,6 +359,11 @@ extern boolean_t pcie_is_child(dev_info_t *dip, dev_info_t *rdip);
 extern int pcie_get_bdf_from_dip(dev_info_t *dip, pcie_req_id_t *bdf);
 extern dev_info_t *pcie_get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
 extern uint32_t pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip);
+extern int pcie_dev(dev_info_t *dip);
+extern void pcie_get_fabric_mps(dev_info_t *rc_dip, dev_info_t *dip,
+	int *max_supported);
+extern int pcie_root_port(dev_info_t *dip);
+extern int pcie_initchild_mps(dev_info_t *dip);
 
 extern uint32_t pcie_get_aer_uce_mask();
 extern uint32_t pcie_get_aer_ce_mask();

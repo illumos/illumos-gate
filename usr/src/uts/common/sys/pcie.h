@@ -26,8 +26,6 @@
 #ifndef	_SYS_PCIE_H
 #define	_SYS_PCIE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -150,6 +148,7 @@ extern "C" {
 #define	PCIE_DEVCTL_MAX_PAYLOAD_2048	0x80
 #define	PCIE_DEVCTL_MAX_PAYLOAD_4096	0xA0
 #define	PCIE_DEVCTL_MAX_PAYLOAD_MASK	0xE0	/* Max_Payload_Size */
+#define	PCIE_DEVCTL_MAX_PAYLOAD_SHIFT	0x5
 
 #define	PCIE_DEVCTL_EXT_TAG_FIELD_EN	0x100	/* Extended Tag Field Enable */
 #define	PCIE_DEVCTL_PHTM_FUNC_EN	0x200	/* Phantom Functions Enable */
@@ -163,6 +162,7 @@ extern "C" {
 #define	PCIE_DEVCTL_MAX_READ_REQ_2048	0x4000
 #define	PCIE_DEVCTL_MAX_READ_REQ_4096	0x5000
 #define	PCIE_DEVCTL_MAX_READ_REQ_MASK	0x7000	/* Max_Read_Request_Size */
+#define	PCIE_DEVCTL_MAX_READ_REQ_SHIFT	0xC
 
 /*
  * Device Status Register (2 bytes)

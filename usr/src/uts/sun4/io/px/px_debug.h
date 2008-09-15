@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_DEBUG_H
 #define	_SYS_PX_DEBUG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -103,8 +101,9 @@ typedef enum {	/* same sequence as px_debug_sym[] */
 
 	/* 52 */ DBG_TOOLS,
 	/* 53 */ DBG_PHYS_ACC,
+	/* 54 */ DBG_HP,
+	/* 55 */ DBG_MPS
 
-	/* 54 */ DBG_HP
 } px_debug_bit_t;
 
 #define	DBG_BITS	6
