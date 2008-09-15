@@ -397,6 +397,7 @@ DRV_KMODS	+= emul64
 #
 DRV_KMODS	+= options
 DRV_KMODS	+= scsi_vhci
+DRV_KMODS	+= arcmsr
 
 #
 #	PCMCIA specific module(s)

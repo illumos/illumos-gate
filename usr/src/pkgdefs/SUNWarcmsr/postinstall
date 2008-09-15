@@ -1,0 +1,67 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+set -u
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+# 
+# Driver info 
+# 
+DRV=arcmsr
+ALIASES=" \"pci17d3,1110\" \"pci17d3,1120\" \"pci17d3,1130\" \"pci17d3,1160\" \"pci17d3,1170\" \"pci17d3,1201\" \"pci17d3,1210\" \"pci17d3,1220\" \"pci17d3,1230\" \"pci17d3,1260\" \"pci17d3,1270\" \"pci17d3,1280\" \"pci17d3,1380\" \"pci17d3,1381\" \"pci17d3,1680\" \"pci17d3,1681\""
+DRVPERM='* 0600 root sys'
+
+ADD_DRV=/usr/sbin/add_drv
+
+#
+# Select the correct add_drv options to execute.
+#
+if [ "$BASEDIR" = "" ]; then
+	BASEDIR="/"
+fi
+
+if [ "$BASEDIR" != "/" ]; then
+        ADD_DRV_ARGS="-b $BASEDIR"
+else
+	ADD_DRV_ARGS=
+fi
+
+#
+# Make sure add_drv has *not* been previously executed
+# before attempting to add the driver.
+#
+grep -w "$DRV" $BASEDIR/etc/name_to_major > /dev/null 2>&1
+if [ $? -eq 1 ]; then
+        $ADD_DRV $ADD_DRV_ARGS -m "$DRVPERM" -c scsi -i "$ALIASES" $DRV
+        if [ $? -ne 0 ]; then
+                echo "\nFailed to add arcmsr(7d) to system\n" >&2
+                exit 1
+        fi
+fi
+
+exit 0
