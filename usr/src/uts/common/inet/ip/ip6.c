@@ -26,8 +26,6 @@
  * Copyright (c) 1990 Mentat Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
@@ -5805,9 +5803,14 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			    NULL, zoneid, NULL, NULL, NULL, NULL, ipst);
 		}
 		if (src_ipif == NULL && ip6_asp_can_lookup(ipst)) {
+			uint_t restrict_ill = RESTRICT_TO_NONE;
+
+			if (ip6i_present && ((ip6i_t *)ip6h)->ip6i_flags
+			    & IP6I_ATTACH_IF)
+				restrict_ill = RESTRICT_TO_ILL;
 			ip6_asp_table_held = B_TRUE;
 			src_ipif = ipif_select_source_v6(dst_ill, v6dstp,
-			    RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT, zoneid);
+			    restrict_ill, IPV6_PREFER_SRC_DEFAULT, zoneid);
 		}
 
 		if (src_ipif == NULL) {
