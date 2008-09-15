@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.21 v2008-02-29
+ * IntelVersion: 1.23 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_ICH8LAN_H_
 #define	_E1000_ICH8LAN_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -111,6 +109,25 @@ extern "C" {
     E1000_IMS_DSW   | \
     E1000_IMS_PHYINT | \
     E1000_IMS_EPRST)
+
+/* Additional interrupt register bit definitions */
+#define	E1000_ICR_LSECPNC	0x00004000	/* PN threshold - client */
+#define	E1000_IMS_LSECPNC	E1000_ICR_LSECPNC /* PN threshold - client */
+#define	E1000_ICS_LSECPNC	E1000_ICR_LSECPNC /* PN threshold - client */
+
+/* Security Processing bit Indication */
+#define	E1000_RXDEXT_LINKSEC_STATUS_LSECH	0x01000000
+#define	E1000_RXDEXT_LINKSEC_ERROR_BIT_MASK	0x60000000
+#define	E1000_RXDEXT_LINKSEC_ERROR_NO_SA_MATCH	0x20000000
+#define	E1000_RXDEXT_LINKSEC_ERROR_REPLAY_ERROR	0x40000000
+#define	E1000_RXDEXT_LINKSEC_ERROR_BAD_SIG	0x60000000
+
+
+void e1000_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
+    bool state);
+void e1000_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw);
+void e1000_gig_downshift_workaround_ich8lan(struct e1000_hw *hw);
+void e1000_disable_gig_wol_ich8lan(struct e1000_hw *hw);
 
 #ifdef __cplusplus
 }

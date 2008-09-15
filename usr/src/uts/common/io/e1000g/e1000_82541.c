@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.55 v2008-02-29
+ * IntelVersion: 1.59 v2008-7-17_MountAngel2
  */
 
 /*
@@ -35,7 +35,6 @@
  */
 
 #include "e1000_api.h"
-#include "e1000_82541.h"
 
 static s32 e1000_init_phy_params_82541(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_82541(struct e1000_hw *hw);
@@ -75,17 +74,13 @@ static const u16 e1000_igp_cable_length_table[] =
 struct e1000_dev_spec_82541 {
 	e1000_dsp_config dsp_config;
 	e1000_ffe_config ffe_config;
-#ifndef FIFO_WORKAROUND
 	u32 tx_fifo_head;
 	u32 tx_fifo_start;
 	u32 tx_fifo_size;
 	u16 dsp_reset_counter;
-#endif
 	u16 spd_default;
 	bool phy_init_script;
-#ifndef FIFO_WORKAROUND
 	bool ttl_workaround;
-#endif
 };
 
 /*
@@ -253,7 +248,7 @@ e1000_init_mac_params_82541(struct e1000_hw *hw)
 	/* Set rar entry count */
 	mac->rar_entry_count = E1000_RAR_ENTRIES;
 	/* Set if part includes ASF firmware */
-	mac->asf_firmware_present = TRUE;
+	mac->asf_firmware_present = true;
 
 	/* Function Pointers */
 
@@ -326,9 +321,7 @@ e1000_init_function_pointers_82541(struct e1000_hw *hw)
 static s32
 e1000_reset_hw_82541(struct e1000_hw *hw)
 {
-#ifndef FIFO_WORKAROUND
 	struct e1000_dev_spec_82541 *dev_spec;
-#endif
 	u32 ledctl, ctrl, manc;
 
 	DEBUGFUNC("e1000_reset_hw_82541");
@@ -340,11 +333,9 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_TCTL, E1000_TCTL_PSP);
 	E1000_WRITE_FLUSH(hw);
 
-#ifndef FIFO_WORKAROUND
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 	dev_spec->tx_fifo_head = 0;
 
-#endif
 	/*
 	 * Delay to allow any outstanding PCI transactions to complete
 	 * before resetting the device.
@@ -414,10 +405,8 @@ static s32
 e1000_init_hw_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-#ifndef FIFO_WORKAROUND
 	struct e1000_dev_spec_82541 *dev_spec;
 	u32 pba;
-#endif
 	u32 i, txdctl;
 	s32 ret_val;
 
@@ -430,13 +419,11 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 		/* This is not fatal and we should not stop init due to this */
 	}
 
-#ifndef FIFO_WORKAROUND
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 	pba = E1000_READ_REG(hw, E1000_PBA);
 	dev_spec->tx_fifo_start = (pba & 0x0000FFFF) * E1000_FIFO_MULTIPLIER;
 	dev_spec->tx_fifo_size = (pba & 0xFFFF0000) >> 6;
 
-#endif
 	/* Disabling VLAN filtering */
 	DEBUGOUT("Initializing the IEEE VLAN\n");
 	mac->ops.clear_vfta(hw);
@@ -592,7 +579,7 @@ e1000_setup_copper_link_82541(struct e1000_hw *hw)
 	ctrl &= ~(E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 
-	hw->phy.reset_disable = FALSE;
+	hw->phy.reset_disable = false;
 
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 
@@ -663,11 +650,11 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 		goto out;
 
 	if (!link) {
-		ret_val = e1000_config_dsp_after_link_change_82541(hw, FALSE);
+		ret_val = e1000_config_dsp_after_link_change_82541(hw, false);
 		goto out;	/* No link detected */
 	}
 
-	mac->get_link_status = FALSE;
+	mac->get_link_status = false;
 
 	/*
 	 * Check if there was DownShift, must be checked
@@ -684,7 +671,7 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 		goto out;
 	}
 
-	ret_val = e1000_config_dsp_after_link_change_82541(hw, TRUE);
+	ret_val = e1000_config_dsp_after_link_change_82541(hw, true);
 
 	/*
 	 * Auto-Neg is enabled.  Auto Speed Detection takes care
@@ -1311,7 +1298,6 @@ e1000_init_script_state_82541(struct e1000_hw *hw, bool state)
 	dev_spec->phy_init_script = state;
 }
 
-#ifndef FIFO_WORKAROUND
 /*
  * e1000_fifo_workaround_82547 - Workaround for Tx fifo failure
  * @hw: pointer to the HW structure
@@ -1448,7 +1434,7 @@ bool
 e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
-	bool state = FALSE;
+	bool state = false;
 
 	DEBUGFUNC("e1000_ttl_workaround_enabled_82541");
 
@@ -1557,7 +1543,6 @@ out:
 	return (ret_val);
 }
 
-#endif
 /*
  * e1000_power_down_phy_copper_82541 - Remove link in case of PHY power down
  * @hw: pointer to the HW structure

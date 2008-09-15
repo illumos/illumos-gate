@@ -23,13 +23,10 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * IntelVersion: 1.39 v2008-02-29
+ * IntelVersion: 1.43 v2008-7-17_MountAngel2
  */
 #include "e1000_api.h"
-#include "e1000_nvm.h"
 
 /*
  * e1000_init_nvm_ops_generic - Initialize NVM function pointers
@@ -647,8 +644,6 @@ e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 	if (ret_val)
 		goto out;
 
-	msec_delay(10);
-
 	while (widx < words) {
 		u8 write_opcode = NVM_WRITE_OPCODE_SPI;
 
@@ -691,7 +686,7 @@ e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		}
 	}
 
-	msec_delay(10);
+	msec_delay(nvm->semaphore_delay);
 release:
 	nvm->ops.release(hw);
 

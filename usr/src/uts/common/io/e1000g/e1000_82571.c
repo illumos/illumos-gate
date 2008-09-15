@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.75 v2008-02-29
+ * IntelVersion: 1.83 v2008-7-17_MountAngel2
  */
 
 /*
@@ -35,7 +35,6 @@
  */
 
 #include "e1000_api.h"
-#include "e1000_82571.h"
 
 static s32 e1000_init_phy_params_82571(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_82571(struct e1000_hw *hw);
@@ -52,6 +51,8 @@ static s32 e1000_set_d0_lplu_state_82571(struct e1000_hw *hw,
 static s32 e1000_reset_hw_82571(struct e1000_hw *hw);
 static s32 e1000_init_hw_82571(struct e1000_hw *hw);
 static void e1000_clear_vfta_82571(struct e1000_hw *hw);
+static bool e1000_check_mng_mode_82574(struct e1000_hw *hw);
+static s32 e1000_led_on_82574(struct e1000_hw *hw);
 static void e1000_update_mc_addr_list_82571(struct e1000_hw *hw,
     u8 *mc_addr_list, u32 mc_addr_count,
     u32 rar_used_count, u32 rar_count);
@@ -147,6 +148,25 @@ e1000_init_phy_params_82571(struct e1000_hw *hw)
 			goto out;
 		}
 		break;
+	case e1000_82574:
+		phy->type = e1000_phy_bm;
+		phy->ops.get_cfg_done = e1000_get_cfg_done_generic;
+		phy->ops.get_info = e1000_get_phy_info_m88;
+		phy->ops.commit = e1000_phy_sw_reset_generic;
+		phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_m88;
+		phy->ops.get_cable_length = e1000_get_cable_length_m88;
+		phy->ops.read_reg = e1000_read_phy_reg_bm2;
+		phy->ops.write_reg = e1000_write_phy_reg_bm2;
+
+		/* This uses above function pointers */
+		ret_val = e1000_get_phy_id_82571(hw);
+		/* Verify PHY ID */
+		if (phy->id != BME1000_E_PHY_ID_R2) {
+			ret_val = -E1000_ERR_PHY;
+			DEBUGOUT1("PHY ID unknown: type = 0x%08x\n", phy->id);
+			goto out;
+		}
+		break;
 	default:
 		ret_val = -E1000_ERR_PHY;
 		goto out;
@@ -190,6 +210,7 @@ e1000_init_nvm_params_82571(struct e1000_hw *hw)
 
 	switch (hw->mac.type) {
 	case e1000_82573:
+	case e1000_82574:
 		if (((eecd >> 15) & 0x3) == 0x3) {
 			nvm->type = e1000_nvm_flash_hw;
 			nvm->word_size = 2048;
@@ -268,11 +289,11 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 	/* Set rar entry count */
 	mac->rar_entry_count = E1000_RAR_ENTRIES;
 	/* Set if part includes ASF firmware */
-	mac->asf_firmware_present = TRUE;
+	mac->asf_firmware_present = true;
 	/* Set if manageability features are enabled. */
 	mac->arc_subsystem_valid =
 	    (E1000_READ_REG(hw, E1000_FWSM) & E1000_FWSM_MODE_MASK)
-	    ? TRUE : FALSE;
+	    ? true : false;
 
 	/* Function pointers */
 
@@ -305,7 +326,14 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 		goto out;
 	}
 	/* check management mode */
-	mac->ops.check_mng_mode = e1000_check_mng_mode_generic;
+	switch (hw->mac.type) {
+	case e1000_82574:
+		mac->ops.check_mng_mode = e1000_check_mng_mode_82574;
+		break;
+	default:
+		mac->ops.check_mng_mode = e1000_check_mng_mode_generic;
+		break;
+	}
 	/* multicast address update */
 	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_82571;
 	/* writing VFTA */
@@ -323,7 +351,14 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 	/* cleanup LED */
 	mac->ops.cleanup_led = e1000_cleanup_led_generic;
 	/* turn on/off LED */
-	mac->ops.led_on = e1000_led_on_generic;
+	switch (hw->mac.type) {
+	case e1000_82574:
+		mac->ops.led_on = e1000_led_on_82574;
+		break;
+	default:
+		mac->ops.led_on = e1000_led_on_generic;
+		break;
+	}
 	mac->ops.led_off = e1000_led_off_generic;
 	/* remove device */
 	mac->ops.remove_device = e1000_remove_device_generic;
@@ -373,6 +408,7 @@ e1000_get_phy_id_82571(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
+	u16 phy_id = 0;
 
 	DEBUGFUNC("e1000_get_phy_id_82571");
 
@@ -389,11 +425,26 @@ e1000_get_phy_id_82571(struct e1000_hw *hw)
 	case e1000_82573:
 		ret_val = e1000_get_phy_id(hw);
 		break;
+	case e1000_82574:
+		ret_val = phy->ops.read_reg(hw, PHY_ID1, &phy_id);
+		if (ret_val)
+			goto out;
+
+		phy->id = (u32)(phy_id << 16);
+		usec_delay(20);
+		ret_val = phy->ops.read_reg(hw, PHY_ID2, &phy_id);
+		if (ret_val)
+			goto out;
+
+		phy->id |= (u32)(phy_id);
+		phy->revision = (u32)(phy_id & ~PHY_REVISION_MASK);
+		break;
 	default:
 		ret_val = -E1000_ERR_PHY;
 		break;
 	}
 
+out:
 	return (ret_val);
 }
 
@@ -477,7 +528,7 @@ e1000_acquire_nvm_82571(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	if (hw->mac.type != e1000_82573)
+	if (hw->mac.type != e1000_82573 && hw->mac.type != e1000_82574)
 		ret_val = e1000_acquire_nvm_generic(hw);
 
 	if (ret_val)
@@ -524,6 +575,7 @@ e1000_write_nvm_82571(struct e1000_hw *hw, u16 offset, u16 words,
 
 	switch (hw->mac.type) {
 	case e1000_82573:
+	case e1000_82574:
 		ret_val = e1000_write_nvm_eewr_82571(hw, offset, words, data);
 		break;
 	case e1000_82571:
@@ -714,7 +766,7 @@ out:
 /*
  * e1000_set_d0_lplu_state_82571 - Set Low Power Linkup D0 state
  * @hw: pointer to the HW structure
- * @active: TRUE to enable LPLU, FALSE to disable
+ * @active: true to enable LPLU, false to disable
  *
  * Sets the LPLU D0 state according to the active flag.  When activating LPLU
  * this function also disables smart speed and vice versa.  LPLU will not be
@@ -834,7 +886,7 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 	 * Must acquire the MDIO ownership before MAC reset. Ownership
 	 * defaults to firmware after a reset.
 	 */
-	if (hw->mac.type == e1000_82573) {
+	if (hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) {
 		extcnf_ctrl = E1000_READ_REG(hw, E1000_EXTCNF_CTRL);
 		extcnf_ctrl |= E1000_EXTCNF_CTRL_MDIO_SW_OWNERSHIP;
 
@@ -875,7 +927,7 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 	 * Need to wait for Phy configuration completion before accessing
 	 * NVM and Phy.
 	 */
-	if (hw->mac.type == e1000_82573)
+	if (hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574)
 		msec_delay(25);
 
 	/* Clear any pending interrupt events. */
@@ -883,7 +935,7 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 	(void) E1000_READ_REG(hw, E1000_ICR);
 
 	if (!(e1000_check_alt_mac_addr_generic(hw)))
-		e1000_set_laa_state_82571(hw, TRUE);
+		e1000_set_laa_state_82571(hw, true);
 
 out:
 	return (ret_val);
@@ -944,14 +996,14 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_TXDCTL(0), reg_data);
 
 	/* ...for both queues. */
-	if (mac->type != e1000_82573) {
+	if (mac->type != e1000_82573 && mac->type != e1000_82574) {
 		reg_data = E1000_READ_REG(hw, E1000_TXDCTL(1));
 		reg_data = (reg_data & ~E1000_TXDCTL_WTHRESH) |
 		    E1000_TXDCTL_FULL_TX_DESC_WB |
 		    E1000_TXDCTL_COUNT_DESC;
 		E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg_data);
 	} else {
-		(void) e1000_enable_tx_pkt_filtering(hw);
+		(void) e1000_enable_tx_pkt_filtering_generic(hw);
 		reg_data = E1000_READ_REG(hw, E1000_GCR);
 		reg_data |= E1000_GCR_L1_ACT_WITHOUT_L0S_RX;
 		E1000_WRITE_REG(hw, E1000_GCR, reg_data);
@@ -1025,18 +1077,25 @@ e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 	}
 
 	/* Device Control */
-	if (hw->mac.type == e1000_82573) {
+	if (hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) {
 		reg = E1000_READ_REG(hw, E1000_CTRL);
 		reg &= ~(1 << 29);
 		E1000_WRITE_REG(hw, E1000_CTRL, reg);
 	}
 
 	/* Extended Device Control */
-	if (hw->mac.type == e1000_82573) {
+	if (hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) {
 		reg = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		reg &= ~(1 << 23);
 		reg |= (1 << 22);
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT, reg);
+	}
+
+	/* PCI-Ex Control Register */
+	if (hw->mac.type == e1000_82574) {
+		reg = E1000_READ_REG(hw, E1000_GCR);
+		reg |= (1 << 22);
+		E1000_WRITE_REG(hw, E1000_GCR, reg);
 	}
 }
 
@@ -1057,7 +1116,7 @@ e1000_clear_vfta_82571(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_clear_vfta_82571");
 
-	if (hw->mac.type == e1000_82573) {
+	if (hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) {
 		if (hw->mng_cookie.vlan_id != 0) {
 			/*
 			 * The VFTA is a 4096b bit-field, each identifying a
@@ -1083,6 +1142,54 @@ e1000_clear_vfta_82571(struct e1000_hw *hw)
 		E1000_WRITE_REG_ARRAY(hw, E1000_VFTA, offset, vfta_value);
 		E1000_WRITE_FLUSH(hw);
 	}
+}
+
+/*
+ * e1000_check_mng_mode_82574 - Check manageability is enabled
+ * @hw: pointer to the HW structure
+ *
+ * Reads the NVM Initialization Control Word 2 and returns true
+ * (>0) if any manageability is enabled, else false (0).
+ */
+static bool
+e1000_check_mng_mode_82574(struct e1000_hw *hw)
+{
+	u16 data;
+
+	DEBUGFUNC("e1000_check_mng_mode_82574");
+
+	hw->nvm.ops.read(hw, NVM_INIT_CONTROL2_REG, 1, &data);
+	return ((data & E1000_NVM_INIT_CTRL2_MNGM) != 0);
+}
+
+/*
+ * e1000_led_on_82574 - Turn LED on
+ * @hw: pointer to the HW structure
+ *
+ * Turn LED on.
+ */
+static s32
+e1000_led_on_82574(struct e1000_hw *hw)
+{
+	u32 ctrl;
+	u32 i;
+
+	DEBUGFUNC("e1000_led_on_82574");
+
+	ctrl = hw->mac.ledctl_mode2;
+	if (!(E1000_STATUS_LU & E1000_READ_REG(hw, E1000_STATUS))) {
+		/*
+		 * If no link, then turn LED on by setting the invert bit
+		 * for each LED that's "on" (0x0E) in ledctl_mode2.
+		 */
+		for (i = 0; i < 4; i++)
+			if (((hw->mac.ledctl_mode2 >> (i * 8)) & 0xFF) ==
+			    E1000_LEDCTL_MODE_LED_ON)
+				ctrl |= (E1000_LEDCTL_LED0_IVRT << (i * 8));
+	}
+	E1000_WRITE_REG(hw, E1000_LEDCTL, ctrl);
+
+	return (E1000_SUCCESS);
 }
 
 /*
@@ -1131,7 +1238,8 @@ e1000_setup_link_82571(struct e1000_hw *hw)
 	 * 82573 does not have a word in the NVM to determine the default flow
 	 * control setting, so we explicitly set it to full.
 	 */
-	if (hw->mac.type == e1000_82573 && hw->fc.type == e1000_fc_default)
+	if ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) &&
+	    hw->fc.type == e1000_fc_default)
 		hw->fc.type = e1000_fc_full;
 
 	return (e1000_setup_link_generic(hw));
@@ -1238,11 +1346,10 @@ e1000_valid_led_default_82571(struct e1000_hw *hw, u16 * data)
 		goto out;
 	}
 
-	if (hw->mac.type == e1000_82573 &&
+	if ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) &&
 	    *data == ID_LED_RESERVED_F746)
 		*data = ID_LED_DEFAULT_82573;
-	else if (*data == ID_LED_RESERVED_0000 ||
-	    *data == ID_LED_RESERVED_FFFF)
+	else if (*data == ID_LED_RESERVED_0000 || *data == ID_LED_RESERVED_FFFF)
 		*data = ID_LED_DEFAULT;
 
 out:
@@ -1259,7 +1366,7 @@ bool
 e1000_get_laa_state_82571(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82571 *dev_spec;
-	bool state = FALSE;
+	bool state = false;
 
 	DEBUGFUNC("e1000_get_laa_state_82571");
 

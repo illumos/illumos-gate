@@ -48,11 +48,9 @@ extern "C" {
 #include <sys/note.h>
 #include "e1000g_debug.h"
 
-/*
- * === BEGIN CONTENT FORMERLY IN FXHW.H ===
- */
 #define	usec_delay(x)		drv_usecwait(x)
 #define	msec_delay(x)		drv_usecwait(x * 1000)
+#define	msec_delay_irq		msec_delay
 
 #ifdef E1000G_DEBUG
 #define	DEBUGOUT(S)		\
@@ -75,18 +73,17 @@ extern "C" {
 
 #define	OS_DEP(hw)		((struct e1000g_osdep *)((hw)->back))
 
-#define	FALSE		0
-#define	TRUE		1
+#define	false		0
+#define	true		1
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
+#define	ADAPTER_REG_SET		1 /* solaris mapping of adapter registers */
 #define	ICH_FLASH_REG_SET	2	/* solaris mapping of flash memory */
 
 #define	RECEIVE_BUFFER_ALIGN_SIZE	256
 #define	E1000_MDALIGN			4096
 #define	E1000_ERT_2048			0x100
-
-#define	E1000_DEV_ID_ICH10D_BM_LM	0x10DE
 
 /* PHY Extended Status Register */
 #define	IEEE_ESR_1000T_HD_CAPS	0x1000	/* 1000T HD capable */
@@ -167,12 +164,6 @@ extern "C" {
 	ddi_put16((OS_DEP(hw))->ich_flash_handle, \
 		(uint16_t *)((uintptr_t)(hw)->flash_address + (reg)), (value))
 
-/*
- * === END CONTENT FORMERLY IN FXHW.H ===
- */
-
-#define	msec_delay_irq	msec_delay
-
 #define	UNREFERENCED_1PARAMETER(_p)		_NOTE(ARGUNUSED(_p))
 #define	UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
 #define	UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
@@ -188,26 +179,7 @@ typedef	uint8_t		u8;
 typedef	uint16_t	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
-
-typedef uint8_t		UCHAR;	/* 8-bit unsigned */
-typedef UCHAR		UINT8;	/* 8-bit unsigned */
-typedef uint16_t	USHORT;	/* 16-bit unsigned */
-typedef uint16_t	UINT16;	/* 16-bit unsigned */
-typedef uint32_t	ULONG;	/* 32-bit unsigned */
-typedef uint32_t	UINT32;
-typedef uint32_t	UINT;	/* 32-bit unsigned */
-typedef UCHAR		BOOLEAN;
-typedef	BOOLEAN		bool;
-typedef UCHAR		*PUCHAR;
-typedef UINT		*PUINT;
-typedef ULONG		*PLONG;
-typedef ULONG		NDIS_STATUS;
-typedef USHORT		*PUSHORT;
-typedef PUSHORT		PUINT16; /* 16-bit unsigned pointer */
-typedef ULONG		E1000_32_BIT_PHYSICAL_ADDRESS,
-	*PFX_32_BIT_PHYSICAL_ADDRESS;
-typedef uint64_t	E1000_64_BIT_PHYSICAL_ADDRESS,
-	*PFX_64_BIT_PHYSICAL_ADDRESS;
+typedef boolean_t	bool;
 
 struct e1000g_osdep {
 	ddi_acc_handle_t reg_handle;

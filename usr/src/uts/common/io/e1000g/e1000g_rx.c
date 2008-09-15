@@ -212,6 +212,9 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	uint32_t buf_low;
 	uint32_t buf_high;
 	uint32_t reg_val;
+	uint32_t rctl;
+	uint32_t rxdctl;
+	uint32_t ert;
 	int i;
 	int size;
 	e1000g_rx_ring_t *rx_ring;
@@ -323,7 +326,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	 * minimum threshold size to 1/2, and the receive buffer size to
 	 * 2k.
 	 */
-	reg_val = E1000_RCTL_EN |	/* Enable Receive Unit */
+	rctl = E1000_RCTL_EN |		/* Enable Receive Unit */
 	    E1000_RCTL_BAM |		/* Accept Broadcast Packets */
 	    E1000_RCTL_LPE |		/* Large Packet Enable bit */
 	    (hw->mac.mc_filter_type << E1000_RCTL_MO_SHIFT) |
@@ -331,32 +334,47 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	    E1000_RCTL_LBM_NO;		/* Loopback Mode = none */
 
 	if (Adapter->strip_crc)
-		reg_val |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
+		rctl |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
 
 	if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_2K) &&
 	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_4K))
-		reg_val |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX;
+		rctl |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX;
 	else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_4K) &&
 	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_8K))
-		reg_val |= E1000_RCTL_SZ_8192 | E1000_RCTL_BSEX;
+		rctl |= E1000_RCTL_SZ_8192 | E1000_RCTL_BSEX;
 	else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_8K) &&
 	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_16K))
-		reg_val |= E1000_RCTL_SZ_16384 | E1000_RCTL_BSEX;
+		rctl |= E1000_RCTL_SZ_16384 | E1000_RCTL_BSEX;
 	else
-		reg_val |= E1000_RCTL_SZ_2048;
+		rctl |= E1000_RCTL_SZ_2048;
 
 	if (e1000_tbi_sbp_enabled_82543(hw))
-		reg_val |= E1000_RCTL_SBP;
+		rctl |= E1000_RCTL_SBP;
 
 	/*
 	 * Enable early receives on supported devices, only takes effect when
 	 * packet size is equal or larger than the specified value (in 8 byte
 	 * units), e.g. using jumbo frames when setting to E1000_ERT_2048
 	 */
-	if ((hw->mac.type == e1000_82573) || (hw->mac.type == e1000_ich9lan))
-		E1000_WRITE_REG(hw, E1000_ERT, E1000_ERT_2048);
+	if ((hw->mac.type == e1000_82573) ||
+	    (hw->mac.type == e1000_82574) ||
+	    (hw->mac.type == e1000_ich9lan) ||
+	    (hw->mac.type == e1000_ich10lan)) {
 
-	E1000_WRITE_REG(hw, E1000_RCTL, reg_val);
+		ert = E1000_ERT_2048;
+
+		/*
+		 * Special modification when ERT and
+		 * jumbo frames are enabled
+		 */
+		if (Adapter->default_mtu > ETHERMTU) {
+			rxdctl = E1000_READ_REG(hw, E1000_RXDCTL(0));
+			E1000_WRITE_REG(hw, E1000_RXDCTL(0), rxdctl | 0x3);
+			ert |= (1 << 13);
+		}
+
+		E1000_WRITE_REG(hw, E1000_ERT, ert);
+	}
 
 	reg_val =
 	    E1000_RXCSUM_TUOFL |	/* TCP/UDP checksum offload Enable */
@@ -374,6 +392,9 @@ e1000g_rx_setup(struct e1000g *Adapter)
 		    E1000_RFCTL_NEW_IPV6_EXT_DIS);
 		E1000_WRITE_REG(hw, E1000_RFCTL, reg_val);
 	}
+
+	/* Write to enable the receive unit */
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
 }
 
 /*
@@ -410,7 +431,7 @@ e1000g_receive(struct e1000g *Adapter)
 	struct e1000_rx_desc *last_desc;
 	p_rx_sw_packet_t packet;
 	p_rx_sw_packet_t newpkt;
-	USHORT length;
+	uint16_t length;
 	uint32_t pkt_count;
 	uint32_t desc_count;
 	boolean_t accept_frame;

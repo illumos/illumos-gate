@@ -604,3 +604,10 @@ Notes on packaging:
    6634746 e1000g is missing lint target in Makefile
    6705005 e1000g LINK/ACT LED behaviour is not consistent with the EEPROM default
    6738552 e1000g rx_lock is not initialized and destroyed in the code
+
+5.2.13
+======
+  This version has the following fix:
+   6666998 Add support for ICH10 in e1000g driver
+   6709230 Requesting driver support in e1000g for new Intel(R) single port MAC/PHY NIC
+

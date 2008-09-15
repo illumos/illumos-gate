@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.59 v2008-02-29
+ * IntelVersion: 1.63 v2008-7-17_MountAngel2
  */
 
 /*
@@ -33,7 +33,6 @@
  */
 
 #include "e1000_api.h"
-#include "e1000_82543.h"
 
 static s32 e1000_init_phy_params_82543(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_82543(struct e1000_hw *hw);
@@ -269,7 +268,7 @@ e1000_init_mac_params_82543(struct e1000_hw *hw)
 	/* Set tbi compatibility */
 	if ((hw->mac.type != e1000_82543) ||
 	    (hw->phy.media_type == e1000_media_type_fiber))
-		e1000_set_tbi_compatibility_82543(hw, FALSE);
+		e1000_set_tbi_compatibility_82543(hw, false);
 
 out:
 	return (ret_val);
@@ -303,7 +302,7 @@ static bool
 e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
-	bool state = FALSE;
+	bool state = false;
 
 	DEBUGFUNC("e1000_tbi_compatibility_enabled_82543");
 
@@ -320,7 +319,7 @@ e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw)
 	}
 
 	state = (dev_spec->tbi_compatibility & TBI_COMPAT_ENABLED)
-	    ? TRUE : FALSE;
+	    ? true : false;
 
 out:
 	return (state);
@@ -369,7 +368,7 @@ bool
 e1000_tbi_sbp_enabled_82543(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82543 *dev_spec;
-	bool state = FALSE;
+	bool state = false;
 
 	DEBUGFUNC("e1000_tbi_sbp_enabled_82543");
 
@@ -386,7 +385,7 @@ e1000_tbi_sbp_enabled_82543(struct e1000_hw *hw)
 	}
 
 	state = (dev_spec->tbi_compatibility & TBI_SBP_ENABLED)
-	    ? TRUE : FALSE;
+	    ? true : false;
 
 out:
 	return (state);
@@ -430,7 +429,7 @@ e1000_init_phy_disabled_82543(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_init_phy_disabled_82543");
 
 	if (hw->mac.type != e1000_82543) {
-		ret_val = FALSE;
+		ret_val = false;
 		goto out;
 	}
 
@@ -438,7 +437,7 @@ e1000_init_phy_disabled_82543(struct e1000_hw *hw)
 
 	if (!dev_spec) {
 		DEBUGOUT("dev_spec pointer is set to NULL.\n");
-		ret_val = FALSE;
+		ret_val = false;
 		goto out;
 	}
 
@@ -971,7 +970,7 @@ e1000_reset_hw_82543(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_TCTL, E1000_TCTL_PSP);
 	E1000_WRITE_FLUSH(hw);
 
-	e1000_set_tbi_sbp_82543(hw, FALSE);
+	e1000_set_tbi_sbp_82543(hw, false);
 
 	/*
 	 * Delay to allow any outstanding PCI transactions to complete before
@@ -1149,7 +1148,7 @@ e1000_setup_copper_link_82543(struct e1000_hw *hw)
 		ret_val = hw->phy.ops.reset(hw);
 		if (ret_val)
 			goto out;
-		hw->phy.reset_disable = FALSE;
+		hw->phy.reset_disable = false;
 	} else {
 		ctrl &= ~(E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
 		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
@@ -1293,7 +1292,7 @@ e1000_check_for_copper_link_82543(struct e1000_hw *hw)
 	if (!link)
 		goto out;	/* No link detected */
 
-	mac->get_link_status = FALSE;
+	mac->get_link_status = false;
 
 	(void) e1000_check_downshift_generic(hw);
 
@@ -1376,7 +1375,7 @@ e1000_check_for_copper_link_82543(struct e1000_hw *hw)
 				 * If we previously were in the mode,
 				 * turn it off.
 				 */
-				e1000_set_tbi_sbp_82543(hw, FALSE);
+				e1000_set_tbi_sbp_82543(hw, false);
 				rctl = E1000_READ_REG(hw, E1000_RCTL);
 				rctl &= ~E1000_RCTL_SBP;
 				E1000_WRITE_REG(hw, E1000_RCTL, rctl);
@@ -1390,7 +1389,7 @@ e1000_check_for_copper_link_82543(struct e1000_hw *hw)
 			 * will look like CRC errors to to the hardware.
 			 */
 			if (!e1000_tbi_sbp_enabled_82543(hw)) {
-				e1000_set_tbi_sbp_82543(hw, TRUE);
+				e1000_set_tbi_sbp_82543(hw, true);
 				rctl = E1000_READ_REG(hw, E1000_RCTL);
 				rctl |= E1000_RCTL_SBP;
 				E1000_WRITE_REG(hw, E1000_RCTL, rctl);
@@ -1465,7 +1464,7 @@ e1000_check_for_fiber_link_82543(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_TXCW, mac->txcw);
 		E1000_WRITE_REG(hw, E1000_CTRL, (ctrl & ~E1000_CTRL_SLU));
 
-		mac->serdes_has_link = TRUE;
+		mac->serdes_has_link = true;
 	}
 
 out:

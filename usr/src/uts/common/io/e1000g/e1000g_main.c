@@ -44,9 +44,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.12";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.13";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.12";
+static char e1000g_version[] = "Driver Ver. 5.2.13";
 
 /*
  * Proto types for DDI entry points
@@ -155,6 +155,8 @@ static void e1000g_fm_init(struct e1000g *Adapter);
 static void e1000g_fm_fini(struct e1000g *Adapter);
 static int e1000g_get_def_val(struct e1000g *, mac_prop_id_t, uint_t, void *);
 static void e1000g_param_sync(struct e1000g *);
+static void e1000g_get_driver_control(struct e1000_hw *);
+static void e1000g_release_driver_control(struct e1000_hw *);
 
 mac_priv_prop_t e1000g_priv_props[] = {
 	{"_tx_bcopy_threshold", MAC_PROP_PERM_RW},
@@ -643,19 +645,16 @@ e1000g_regs_map(struct e1000g *Adapter)
 	struct e1000g_osdep *osdep = &Adapter->osdep;
 	off_t mem_size;
 
-	/*
-	 * first get the size of device register to be mapped. The
-	 * second parameter is the register we are interested. I our
-	 * wiseman 0 is for config registers and 1 is for memory mapped
-	 * registers Mem size should have memory mapped region size
-	 */
-	if (ddi_dev_regsize(devinfo, 1, &mem_size) != DDI_SUCCESS) {
+	/* Get size of adapter register memory */
+	if (ddi_dev_regsize(devinfo, ADAPTER_REG_SET, &mem_size) !=
+	    DDI_SUCCESS) {
 		E1000G_DEBUGLOG_0(Adapter, CE_WARN,
 		    "ddi_dev_regsize for registers failed");
 		return (DDI_FAILURE);
 	}
 
-	if ((ddi_regs_map_setup(devinfo, 1, /* register of interest */
+	/* Map adapter register memory */
+	if ((ddi_regs_map_setup(devinfo, ADAPTER_REG_SET,
 	    (caddr_t *)&hw->hw_addr, 0, mem_size, &e1000g_regs_acc_attr,
 	    &osdep->reg_handle)) != DDI_SUCCESS) {
 		E1000G_DEBUGLOG_0(Adapter, CE_WARN,
@@ -664,7 +663,9 @@ e1000g_regs_map(struct e1000g *Adapter)
 	}
 
 	/* ICH needs to map flash memory */
-	if (hw->mac.type == e1000_ich8lan || hw->mac.type == e1000_ich9lan) {
+	if (hw->mac.type == e1000_ich8lan ||
+	    hw->mac.type == e1000_ich9lan ||
+	    hw->mac.type == e1000_ich10lan) {
 		/* get flash size */
 		if (ddi_dev_regsize(devinfo, ICH_FLASH_REG_SET,
 		    &mem_size) != DDI_SUCCESS) {
@@ -1204,7 +1205,7 @@ e1000g_init(struct e1000g *Adapter)
 	result = 0;
 #ifdef __sparc
 	/*
-	 * Firstly, we try to get the local ethernet address from OBP. If
+	 * First, we try to get the local ethernet address from OBP. If
 	 * failed, then we get it from the EEPROM of NIC card.
 	 */
 	result = e1000g_find_mac_address(Adapter);
@@ -1256,10 +1257,17 @@ e1000g_init(struct e1000g *Adapter)
 			pba = E1000_PBA_30K;	/* 30K for Rx, 18K for Tx */
 		else
 			pba = E1000_PBA_38K;	/* 38K for Rx, 10K for Tx */
+	} else if (hw->mac.type == e1000_82573) {
+		pba = E1000_PBA_20K;		/* 20K for Rx, 12K for Tx */
+	} else if (hw->mac.type == e1000_82574) {
+		/* Keep adapter default: 20K for Rx, 20K for Tx */
+		pba = E1000_READ_REG(hw, E1000_PBA);
 	} else if (hw->mac.type == e1000_ich8lan) {
 		pba = E1000_PBA_8K;		/* 8K for Rx, 12K for Tx */
 	} else if (hw->mac.type == e1000_ich9lan) {
-		pba = E1000_PBA_12K;
+		pba = E1000_PBA_10K;
+	} else if (hw->mac.type == e1000_ich10lan) {
+		pba = E1000_PBA_10K;
 	} else {
 		/*
 		 * Total FIFO is 40K
@@ -1286,7 +1294,8 @@ e1000g_init(struct e1000g *Adapter)
 	 * Rx FIFO size minus one full frame.
 	 */
 	high_water = min(((pba << 10) * 9 / 10),
-	    ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_ich9lan) ?
+	    ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_ich9lan ||
+	    hw->mac.type == e1000_ich10lan) ?
 	    ((pba << 10) - (E1000_ERT_2048 << 3)) :
 	    ((pba << 10) - Adapter->max_frame_size)));
 
@@ -1609,6 +1618,9 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 
 	/* Stop the chip and release pending resources */
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
+
+	/* Tell firmware driver is no longer in control */
+	e1000g_release_driver_control(&Adapter->shared);
 
 	e1000g_clear_all_interrupts(Adapter);
 
@@ -2742,7 +2754,7 @@ reset:
 				break;
 			}
 
-			/* ich8 doed not support jumbo frames */
+			/* ich8 does not support jumbo frames */
 			if ((mac->type == e1000_ich8lan) &&
 			    (tmp > DEFAULT_FRAME_SIZE)) {
 				err = EINVAL;
@@ -5574,7 +5586,7 @@ e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
  * See comments in <sys/dld.h> for details of the *_en_*
  * parameters. The usage of ndd for setting adv parameters will
  * synchronize all the en parameters with the e1000g parameters,
- * implicity disalbing any settings made via dladm.
+ * implicitly disabling any settings made via dladm.
  */
 static void
 e1000g_param_sync(struct e1000g *Adapter)
@@ -5585,4 +5597,70 @@ e1000g_param_sync(struct e1000g *Adapter)
 	Adapter->param_en_100hdx = Adapter->param_adv_100hdx;
 	Adapter->param_en_10fdx = Adapter->param_adv_10fdx;
 	Adapter->param_en_10hdx = Adapter->param_adv_10hdx;
+}
+
+/*
+ * e1000g_get_driver_control - tell manageability firmware that the driver
+ * has control.
+ */
+static void
+e1000g_get_driver_control(struct e1000_hw *hw)
+{
+	uint32_t ctrl_ext;
+	uint32_t swsm;
+
+	/* tell manageability firmware the driver has taken over */
+	switch (hw->mac.type) {
+	case e1000_82573:
+		swsm = E1000_READ_REG(hw, E1000_SWSM);
+		E1000_WRITE_REG(hw, E1000_SWSM, swsm | E1000_SWSM_DRV_LOAD);
+		break;
+	case e1000_82571:
+	case e1000_82572:
+	case e1000_82574:
+	case e1000_80003es2lan:
+	case e1000_ich8lan:
+	case e1000_ich9lan:
+	case e1000_ich10lan:
+		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
+		    ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
+		break;
+	default:
+		/* no manageability firmware: do nothing */
+		break;
+	}
+}
+
+/*
+ * e1000g_release_driver_control - tell manageability firmware that the driver
+ * has released control.
+ */
+static void
+e1000g_release_driver_control(struct e1000_hw *hw)
+{
+	uint32_t ctrl_ext;
+	uint32_t swsm;
+
+	/* tell manageability firmware the driver has released control */
+	switch (hw->mac.type) {
+	case e1000_82573:
+		swsm = E1000_READ_REG(hw, E1000_SWSM);
+		E1000_WRITE_REG(hw, E1000_SWSM, swsm & ~E1000_SWSM_DRV_LOAD);
+		break;
+	case e1000_82571:
+	case e1000_82572:
+	case e1000_82574:
+	case e1000_80003es2lan:
+	case e1000_ich8lan:
+	case e1000_ich9lan:
+	case e1000_ich10lan:
+		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
+		    ctrl_ext & ~E1000_CTRL_EXT_DRV_LOAD);
+		break;
+	default:
+		/* no manageability firmware: do nothing */
+		break;
+	}
 }

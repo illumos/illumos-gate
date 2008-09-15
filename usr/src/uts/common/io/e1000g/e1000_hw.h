@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.363 v2008-02-29
+ * IntelVersion: 1.372 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_HW_H_
 #define	_E1000_HW_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,6 +91,7 @@ struct e1000_hw;
 #define	E1000_DEV_ID_82573E			0x108B
 #define	E1000_DEV_ID_82573E_IAMT		0x108C
 #define	E1000_DEV_ID_82573L			0x109A
+#define	E1000_DEV_ID_82574L			0x10D3
 #define	E1000_DEV_ID_80003ES2LAN_COPPER_DPT	0x1096
 #define	E1000_DEV_ID_80003ES2LAN_SERDES_DPT	0x1098
 #define	E1000_DEV_ID_80003ES2LAN_COPPER_SPT	0x10BA
@@ -113,6 +112,11 @@ struct e1000_hw;
 #define	E1000_DEV_ID_ICH9_IFE			0x10C0
 #define	E1000_DEV_ID_ICH9_IFE_GT		0x10C3
 #define	E1000_DEV_ID_ICH9_IFE_G			0x10C2
+#define	E1000_DEV_ID_ICH10_R_BM_LM		0x10CC
+#define	E1000_DEV_ID_ICH10_R_BM_LF		0x10CD
+#define	E1000_DEV_ID_ICH10_R_BM_V		0x10CE
+#define	E1000_DEV_ID_ICH10_D_BM_LM		0x10DE
+#define	E1000_DEV_ID_ICH10_D_BM_LF		0x10DF
 
 #define	E1000_REVISION_0	0
 #define	E1000_REVISION_1	1
@@ -140,9 +144,11 @@ typedef enum {
 	e1000_82571,
 	e1000_82572,
 	e1000_82573,
+	e1000_82574,
 	e1000_80003es2lan,
 	e1000_ich8lan,
 	e1000_ich9lan,
+	e1000_ich10lan,
 	e1000_num_macs	/* List is 1-based, so subtract 1 for true count. */
 } e1000_mac_type;
 
@@ -180,7 +186,8 @@ typedef enum {
 	e1000_phy_gg82563,
 	e1000_phy_igp_3,
 	e1000_phy_ife,
-	e1000_phy_bm
+	e1000_phy_bm,
+	e1000_phy_vf
 } e1000_phy_type;
 
 typedef enum {
@@ -530,6 +537,7 @@ struct e1000_mac_operations {
 	void (*remove_device)(struct e1000_hw *);
 	s32 (*reset_hw)(struct e1000_hw *);
 	s32 (*init_hw)(struct e1000_hw *);
+	void (*shutdown_serdes)(struct e1000_hw *);
 	s32 (*setup_link)(struct e1000_hw *);
 	s32 (*setup_physical_interface)(struct e1000_hw *);
 	s32 (*setup_led)(struct e1000_hw *);
@@ -659,6 +667,7 @@ struct e1000_nvm_info {
 
 	u32 flash_bank_size;
 	u32 flash_base_addr;
+	u32 semaphore_delay;
 
 	u16 word_size;
 	u16 delay_usec;
@@ -712,6 +721,12 @@ struct e1000_hw {
 
 	u8 revision_id;
 };
+
+#include "e1000_82541.h"
+#include "e1000_82543.h"
+#include "e1000_82571.h"
+#include "e1000_80003es2lan.h"
+#include "e1000_ich8lan.h"
 
 /* These functions must be implemented by drivers */
 void e1000_pci_clear_mwi(struct e1000_hw *hw);

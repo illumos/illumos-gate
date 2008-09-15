@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.8 v2008-02-29
+ * IntelVersion: 1.9 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_80003ES2LAN_H_
 #define	_E1000_80003ES2LAN_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {

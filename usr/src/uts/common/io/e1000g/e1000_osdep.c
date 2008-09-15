@@ -149,34 +149,3 @@ e1000_enable_pciex_master(struct e1000_hw *hw)
 	ctrl &= ~E1000_CTRL_GIO_MASTER_DISABLE;
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 }
-
-/*
- * e1000g_get_driver_control - tell manageability firmware that the driver
- * has control.
- */
-void
-e1000g_get_driver_control(struct e1000_hw *hw)
-{
-	uint32_t ctrl_ext;
-	uint32_t swsm;
-
-	/* tell manageability firmware the driver has taken over */
-	switch (hw->mac.type) {
-	case e1000_82573:
-		swsm = E1000_READ_REG(hw, E1000_SWSM);
-		E1000_WRITE_REG(hw, E1000_SWSM, swsm | E1000_SWSM_DRV_LOAD);
-		break;
-	case e1000_82571:
-	case e1000_82572:
-	case e1000_80003es2lan:
-	case e1000_ich8lan:
-	case e1000_ich9lan:
-		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-		E1000_WRITE_REG(hw, E1000_CTRL_EXT,
-		    ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
-		break;
-	default:
-		/* no manageability firmware: do nothing */
-		break;
-	}
-}

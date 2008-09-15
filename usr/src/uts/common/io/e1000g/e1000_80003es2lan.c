@@ -24,14 +24,13 @@
  */
 
 /*
- * IntelVersion: 1.61 v2008-02-29
+ * IntelVersion: 1.65 v2008-7-17_MountAngel2
  */
 /*
  * e1000_80003es2lan
  */
 
 #include "e1000_api.h"
-#include "e1000_80003es2lan.h"
 
 static s32 e1000_init_phy_params_80003es2lan(struct e1000_hw *hw);
 static s32 e1000_init_nvm_params_80003es2lan(struct e1000_hw *hw);
@@ -218,11 +217,11 @@ e1000_init_mac_params_80003es2lan(struct e1000_hw *hw)
 	/* Set rar entry count */
 	mac->rar_entry_count = E1000_RAR_ENTRIES;
 	/* Set if part includes ASF firmware */
-	mac->asf_firmware_present = TRUE;
+	mac->asf_firmware_present = true;
 	/* Set if manageability features are enabled. */
 	mac->arc_subsystem_valid =
 	    (E1000_READ_REG(hw, E1000_FWSM) & E1000_FWSM_MODE_MASK)
-	    ? TRUE : FALSE;
+	    ? true : false;
 
 	/* Function pointers */
 
@@ -1097,21 +1096,21 @@ e1000_copper_link_setup_gg82563_80003es2lan(struct e1000_hw *hw)
 	}
 
 	/* Bypass Rx and Tx FIFO's */
-	ret_val = e1000_write_kmrn_reg(hw,
+	ret_val = e1000_write_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_FIFO_CTRL,
 	    E1000_KMRNCTRLSTA_FIFO_CTRL_RX_BYPASS |
 	    E1000_KMRNCTRLSTA_FIFO_CTRL_TX_BYPASS);
 	if (ret_val)
 		goto out;
 
-	ret_val = e1000_read_kmrn_reg(hw,
+	ret_val = e1000_read_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_MAC2PHY_OPMODE,
 	    &data);
 	if (ret_val)
 		goto out;
 
 	data |= E1000_KMRNCTRLSTA_OPMODE_E_IDLE;
-	ret_val = e1000_write_kmrn_reg(hw,
+	ret_val = e1000_write_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_MAC2PHY_OPMODE,
 	    data);
 	if (ret_val)
@@ -1215,23 +1214,26 @@ e1000_setup_copper_link_80003es2lan(struct e1000_hw *hw)
 	 * iteration and increase the max iterations when
 	 * polling the phy; this fixes erroneous timeouts at 10Mbps.
 	 */
-	ret_val = e1000_write_kmrn_reg(hw, GG82563_REG(0x34, 4), 0xFFFF);
+	ret_val = e1000_write_kmrn_reg_generic(hw, GG82563_REG(0x34, 4),
+	    0xFFFF);
 	if (ret_val)
 		goto out;
-	ret_val = e1000_read_kmrn_reg(hw, GG82563_REG(0x34, 9), &reg_data);
+	ret_val = e1000_read_kmrn_reg_generic(hw, GG82563_REG(0x34, 9),
+	    &reg_data);
 	if (ret_val)
 		goto out;
 	reg_data |= 0x3F;
-	ret_val = e1000_write_kmrn_reg(hw, GG82563_REG(0x34, 9), reg_data);
+	ret_val = e1000_write_kmrn_reg_generic(hw, GG82563_REG(0x34, 9),
+	    reg_data);
 	if (ret_val)
 		goto out;
-	ret_val = e1000_read_kmrn_reg(hw,
+	ret_val = e1000_read_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_INB_CTRL,
 	    &reg_data);
 	if (ret_val)
 		goto out;
 	reg_data |= E1000_KMRNCTRLSTA_INB_CTRL_DIS_PADDING;
-	ret_val = e1000_write_kmrn_reg(hw,
+	ret_val = e1000_write_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_INB_CTRL,
 	    reg_data);
 	if (ret_val)
@@ -1266,7 +1268,7 @@ e1000_cfg_kmrn_10_100_80003es2lan(struct e1000_hw *hw, u16 duplex)
 	DEBUGFUNC("e1000_configure_kmrn_for_10_100");
 
 	reg_data = E1000_KMRNCTRLSTA_HD_CTRL_10_100_DEFAULT;
-	ret_val = e1000_write_kmrn_reg(hw,
+	ret_val = e1000_write_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_HD_CTRL,
 	    reg_data);
 	if (ret_val)
@@ -1322,7 +1324,7 @@ e1000_cfg_kmrn_1000_80003es2lan(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_configure_kmrn_for_1000");
 
 	reg_data = E1000_KMRNCTRLSTA_HD_CTRL_1000_DEFAULT;
-	ret_val = e1000_write_kmrn_reg(hw,
+	ret_val = e1000_write_kmrn_reg_generic(hw,
 	    E1000_KMRNCTRLSTA_OFFSET_HD_CTRL,
 	    reg_data);
 	if (ret_val)

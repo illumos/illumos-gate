@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.6 v2008-02-29
+ * IntelVersion: 1.8 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_82541_H_
 #define	_E1000_82541_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,7 +85,6 @@ extern "C" {
 #define	IGP01E1000_MSE_CHANNEL_B		0x0F00
 #define	IGP01E1000_MSE_CHANNEL_A		0xF000
 
-#ifndef FIFO_WORKAROUND
 #define	E1000_FIFO_MULTIPLIER			0x80
 #define	E1000_FIFO_HDR_SIZE			0x10
 #define	E1000_FIFO_GRANULARITY			0x10
@@ -100,7 +97,12 @@ extern "C" {
 
 #define	E1000_ROUNDUP(size, unit)	(((size) + (unit) - 1) & ~((unit) - 1))
 
-#endif
+void e1000_init_script_state_82541(struct e1000_hw *hw, bool state);
+s32 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length);
+void e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length);
+void e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, bool state);
+bool e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw);
+s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
 
 #ifdef __cplusplus
 }

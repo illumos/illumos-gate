@@ -24,10 +24,9 @@
  */
 
 /*
- * IntelVersion: 1.69 v2008-02-29
+ * IntelVersion: 1.76 v2008-7-17_MountAngel2
  */
 #include "e1000_api.h"
-#include "e1000_mac.h"
 
 /*
  * e1000_init_mac_ops_generic - Initialize MAC function pointers
@@ -120,7 +119,7 @@ e1000_null_mng_mode(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_null_mng_mode");
 	UNREFERENCED_1PARAMETER(hw);
-	return (FALSE);
+	return (false);
 }
 
 /*
@@ -344,7 +343,7 @@ e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
 	/* Setup the receive address */
 	DEBUGOUT("Programming MAC Address into RAR[0]\n");
 
-	e1000_rar_set_generic(hw, hw->mac.addr, 0);
+	hw->mac.ops.rar_set(hw, hw->mac.addr, 0);
 
 	/* Zero out the other (rar_entry_count - 1) receive addresses */
 	DEBUGOUT1("Clearing RAR[1-%u]\n", rar_count - 1);
@@ -542,7 +541,7 @@ e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
 
 	/* Load any remaining multicast addresses into the hash table. */
 	for (; mc_addr_count > 0; mc_addr_count--) {
-		hash_value = e1000_hash_mc_addr(hw, mc_addr_list);
+		hash_value = e1000_hash_mc_addr_generic(hw, mc_addr_list);
 		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
 		hw->mac.ops.mta_set(hw, hash_value);
 		mc_addr_list += ETH_ADDR_LEN;
@@ -749,7 +748,7 @@ e1000_check_for_copper_link_generic(struct e1000_hw *hw)
 	if (!link)
 		goto out;	/* No link detected */
 
-	mac->get_link_status = FALSE;
+	mac->get_link_status = false;
 
 	/*
 	 * Check if there was DownShift, must be checked immediately after
@@ -851,7 +850,7 @@ e1000_check_for_fiber_link_generic(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_TXCW, mac->txcw);
 		E1000_WRITE_REG(hw, E1000_CTRL, (ctrl & ~E1000_CTRL_SLU));
 
-		mac->serdes_has_link = TRUE;
+		mac->serdes_has_link = true;
 	}
 
 out:
@@ -920,7 +919,7 @@ e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_TXCW, mac->txcw);
 		E1000_WRITE_REG(hw, E1000_CTRL, (ctrl & ~E1000_CTRL_SLU));
 
-		mac->serdes_has_link = TRUE;
+		mac->serdes_has_link = true;
 	} else if (!(E1000_TXCW_ANE & E1000_READ_REG(hw, E1000_TXCW))) {
 		/*
 		 * If we force link for non-auto-negotiation switch, check
@@ -931,11 +930,11 @@ e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 		usec_delay(10);
 		if (E1000_RXCW_SYNCH & E1000_READ_REG(hw, E1000_RXCW)) {
 			if (!(rxcw & E1000_RXCW_IV)) {
-				mac->serdes_has_link = TRUE;
+				mac->serdes_has_link = true;
 				DEBUGOUT("SERDES: Link is up.\n");
 			}
 		} else {
-			mac->serdes_has_link = FALSE;
+			mac->serdes_has_link = false;
 			DEBUGOUT("SERDES: Link is down.\n");
 		}
 	}
@@ -943,8 +942,8 @@ e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 	if (E1000_TXCW_ANE & E1000_READ_REG(hw, E1000_TXCW)) {
 		status = E1000_READ_REG(hw, E1000_STATUS);
 		mac->serdes_has_link = (status & E1000_STATUS_LU)
-		    ? TRUE
-		    : FALSE;
+		    ? true
+		    : false;
 	}
 
 out:
@@ -2096,7 +2095,7 @@ e1000_reset_adaptive_generic(struct e1000_hw *hw)
 		mac->ifs_ratio = IFS_RATIO;
 	}
 
-	mac->in_ifs_mode = FALSE;
+	mac->in_ifs_mode = false;
 	E1000_WRITE_REG(hw, E1000_AIT, 0);
 }
 
@@ -2121,7 +2120,7 @@ e1000_update_adaptive_generic(struct e1000_hw *hw)
 
 	if ((mac->collision_delta * mac->ifs_ratio) > mac->tx_packet_delta) {
 		if (mac->tx_packet_delta > MIN_NUM_XMITS) {
-			mac->in_ifs_mode = TRUE;
+			mac->in_ifs_mode = true;
 			if (mac->current_ifs_val < mac->ifs_max_val) {
 				if (!mac->current_ifs_val)
 					mac->current_ifs_val = mac->ifs_min_val;
@@ -2136,7 +2135,7 @@ e1000_update_adaptive_generic(struct e1000_hw *hw)
 		if (mac->in_ifs_mode &&
 		    (mac->tx_packet_delta <= MIN_NUM_XMITS)) {
 			mac->current_ifs_val = 0;
-			mac->in_ifs_mode = FALSE;
+			mac->in_ifs_mode = false;
 			E1000_WRITE_REG(hw, E1000_AIT, 0);
 		}
 	}

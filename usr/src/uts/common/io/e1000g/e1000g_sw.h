@@ -26,8 +26,6 @@
 #ifndef _E1000G_SW_H
 #define	_E1000G_SW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -86,15 +84,17 @@ extern "C" {
 #define	MAX_NUM_MULTICAST_ADDRESSES	256
 
 /*
- * MAX_TX_DESC_PER_PACKET = max_packet_size/page_size +
- * one for cross page split + one for the context descriptor +
- * two for the workaround of the 82546 chip
+ * MAX_COOKIES = max_packet_size/page_size + one for cross page split
+ * MAX_TX_DESC_PER_PACKET = MAX_COOKIES + one for the context descriptor +
+ *	two for the workaround of the 82546 chip
  */
-#define	MAX_TX_DESC_PER_PACKET		20
+#define	MAX_COOKIES			18
+#define	MAX_TX_DESC_PER_PACKET		21
 
 /*
  * constants used in setting flow control thresholds
  */
+#define	E1000_PBA_10K		0x000A
 #define	E1000_PBA_MASK		0xffff
 #define	E1000_PBA_SHIFT		10
 #define	E1000_FC_HIGH_DIFF	0x1638 /* High: 5688 bytes below Rx FIFO size */
@@ -995,15 +995,11 @@ void e1000g_clear_tx_interrupt(struct e1000g *Adapter);
 void e1000g_mask_tx_interrupt(struct e1000g *Adapter);
 void phy_spd_state(struct e1000_hw *hw, boolean_t enable);
 void e1000_enable_pciex_master(struct e1000_hw *hw);
-void e1000g_get_driver_control(struct e1000_hw *hw);
 int e1000g_check_acc_handle(ddi_acc_handle_t handle);
 int e1000g_check_dma_handle(ddi_dma_handle_t handle);
 void e1000g_fm_ereport(struct e1000g *Adapter, char *detail);
 void e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag);
-
 int e1000g_reset_link(struct e1000g *Adapter);
-
-#pragma inline(e1000_rar_set)
 
 /*
  * Global variables

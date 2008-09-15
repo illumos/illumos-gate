@@ -24,13 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.79 v2008-02-29
+ * IntelVersion: 1.91 v2008-7-17_MountAngel2
  */
 
 #include "e1000_api.h"
-#include "e1000_mac.h"
-#include "e1000_nvm.h"
-#include "e1000_phy.h"
 
 /*
  * e1000_init_mac_params - Initialize MAC function pointers
@@ -72,6 +69,7 @@ e1000_init_nvm_params(struct e1000_hw *hw)
 	s32 ret_val = E1000_SUCCESS;
 
 	if (hw->nvm.ops.init_params) {
+		hw->nvm.semaphore_delay = 10;
 		ret_val = hw->nvm.ops.init_params(hw);
 		if (ret_val) {
 			DEBUGOUT("NVM Initialization Error\n");
@@ -213,6 +211,9 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_82573L:
 		mac->type = e1000_82573;
 		break;
+	case E1000_DEV_ID_82574L:
+		mac->type = e1000_82574;
+		break;
 	case E1000_DEV_ID_80003ES2LAN_COPPER_DPT:
 	case E1000_DEV_ID_80003ES2LAN_SERDES_DPT:
 	case E1000_DEV_ID_80003ES2LAN_COPPER_SPT:
@@ -237,8 +238,14 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_ICH9_IGP_AMT:
 	case E1000_DEV_ID_ICH9_BM:
 	case E1000_DEV_ID_ICH9_IGP_C:
-	case E1000_DEV_ID_ICH10D_BM_LM:
+	case E1000_DEV_ID_ICH10_R_BM_LM:
+	case E1000_DEV_ID_ICH10_R_BM_LF:
+	case E1000_DEV_ID_ICH10_R_BM_V:
 		mac->type = e1000_ich9lan;
+		break;
+	case E1000_DEV_ID_ICH10_D_BM_LM:
+	case E1000_DEV_ID_ICH10_D_BM_LF:
+		mac->type = e1000_ich10lan;
 		break;
 	default:
 		/* Should never have loaded on this device */
@@ -252,10 +259,10 @@ e1000_set_mac_type(struct e1000_hw *hw)
 /*
  * e1000_setup_init_funcs - Initializes function pointers
  * @hw: pointer to the HW structure
- * @init_device: TRUE will initialize the rest of the function pointers
- *                getting the device ready for use.  FALSE will only set
+ * @init_device: true will initialize the rest of the function pointers
+ *                getting the device ready for use.  false will only set
  *                MAC type and the function pointers for the other init
- *                functions.  Passing FALSE will not generate any hardware
+ *                functions.  Passing false will not generate any hardware
  *                reads or writes.
  *
  * This function must be called by a driver in order to use the rest
@@ -315,6 +322,7 @@ e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 	case e1000_82571:
 	case e1000_82572:
 	case e1000_82573:
+	case e1000_82574:
 		e1000_init_function_pointers_82571(hw);
 		break;
 	case e1000_80003es2lan:
@@ -322,6 +330,7 @@ e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 		break;
 	case e1000_ich8lan:
 	case e1000_ich9lan:
+	case e1000_ich10lan:
 		e1000_init_function_pointers_ich8lan(hw);
 		break;
 	default:
@@ -485,7 +494,7 @@ e1000_check_mng_mode(struct e1000_hw *hw)
 	if (hw->mac.ops.check_mng_mode)
 		return (hw->mac.ops.check_mng_mode(hw));
 
-	return (FALSE);
+	return (false);
 }
 
 /*
@@ -1243,4 +1252,17 @@ e1000_power_down_phy(struct e1000_hw *hw)
 {
 	if (hw->phy.ops.power_down)
 		hw->phy.ops.power_down(hw);
+}
+
+/*
+ * e1000_shutdown_fiber_serdes_link - Remove link during power down
+ * @hw: pointer to the HW structure
+ *
+ * Shutdown the optics and PCS on driver unload.
+ */
+void
+e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw)
+{
+	if (hw->mac.ops.shutdown_serdes)
+		hw->mac.ops.shutdown_serdes(hw);
 }

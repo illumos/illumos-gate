@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.23 v2008-02-29
+ * IntelVersion: 1.26 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_MAC_H_
 #define	_E1000_MAC_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {

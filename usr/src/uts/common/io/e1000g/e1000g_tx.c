@@ -45,7 +45,7 @@ static int e1000g_tx_copy(e1000g_tx_ring_t *,
     p_tx_sw_packet_t, mblk_t *, boolean_t);
 static int e1000g_tx_bind(e1000g_tx_ring_t *,
     p_tx_sw_packet_t, mblk_t *);
-static boolean_t e1000g_retreive_context(mblk_t *, context_data_t *, size_t);
+static boolean_t e1000g_retrieve_context(mblk_t *, context_data_t *, size_t);
 static boolean_t e1000g_check_context(e1000g_tx_ring_t *, context_data_t *);
 static int e1000g_fill_tx_ring(e1000g_tx_ring_t *, LIST_DESCRIBER *,
     context_data_t *);
@@ -64,7 +64,7 @@ static void e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *);
 #ifndef E1000G_DEBUG
 #pragma inline(e1000g_tx_copy)
 #pragma inline(e1000g_tx_bind)
-#pragma inline(e1000g_retreive_context)
+#pragma inline(e1000g_retrieve_context)
 #pragma inline(e1000g_check_context)
 #pragma inline(e1000g_fill_tx_ring)
 #pragma inline(e1000g_fill_context_descriptor)
@@ -176,8 +176,8 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		msg_size += MBLKL(nmp);
 	}
 
-	/* retreive and compute information for context descriptor */
-	if (!e1000g_retreive_context(mp, &cur_context, msg_size)) {
+	/* retrieve and compute information for context descriptor */
+	if (!e1000g_retrieve_context(mp, &cur_context, msg_size)) {
 		freemsg(mp);
 		return (B_TRUE);
 	}
@@ -373,7 +373,7 @@ tx_no_resource:
 }
 
 static boolean_t
-e1000g_retreive_context(mblk_t *mp, context_data_t *cur_context,
+e1000g_retrieve_context(mblk_t *mp, context_data_t *cur_context,
     size_t msg_size)
 {
 	uintptr_t ip_start;
@@ -385,7 +385,7 @@ e1000g_retreive_context(mblk_t *mp, context_data_t *cur_context,
 	/* retrieve checksum info */
 	hcksum_retrieve(mp, NULL, NULL, &cur_context->cksum_start,
 	    &cur_context->cksum_stuff, NULL, NULL, &cur_context->cksum_flags);
-	/* retreive ethernet header size */
+	/* retrieve ethernet header size */
 	if (((struct ether_vlan_header *)(uintptr_t)mp->b_rptr)->ether_tpid ==
 	    htons(ETHERTYPE_VLAN))
 		cur_context->ether_header_size =
@@ -757,7 +757,7 @@ e1000g_tx_setup(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw;
 	p_tx_sw_packet_t packet;
-	UINT i;
+	uint32_t i;
 	uint32_t buf_high;
 	uint32_t buf_low;
 	uint32_t reg_tipg;

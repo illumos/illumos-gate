@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.40 v2008-02-29
+ * IntelVersion: 1.44.12.1 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_API_H_
 #define	_E1000_API_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -102,7 +100,6 @@ s32 e1000_wait_autoneg(struct e1000_hw *hw);
 s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active);
 s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, bool active);
 bool e1000_check_mng_mode(struct e1000_hw *hw);
-bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw);
 s32 e1000_mng_enable_host_if(struct e1000_hw *hw);
 s32 e1000_mng_host_if_write(struct e1000_hw *hw,
@@ -111,31 +108,7 @@ s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
     struct e1000_host_mng_command_header *hdr);
 s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw,
     u8 *buffer, u16 length);
-void e1000_tbi_adjust_stats_82543(struct e1000_hw *hw,
-    struct e1000_hw_stats *stats,
-    u32 frame_len, u8 *mac_addr,
-    u32 max_frame_size);
-void e1000_set_tbi_compatibility_82543(struct e1000_hw *hw,
-    bool state);
-bool e1000_tbi_sbp_enabled_82543(struct e1000_hw *hw);
 u32 e1000_translate_register_82542(u32 reg);
-void e1000_init_script_state_82541(struct e1000_hw *hw, bool state);
-bool e1000_get_laa_state_82571(struct e1000_hw *hw);
-void e1000_set_laa_state_82571(struct e1000_hw *hw, bool state);
-void e1000_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
-    bool state);
-void e1000_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw);
-void e1000_gig_downshift_workaround_ich8lan(struct e1000_hw *hw);
-void e1000_disable_gig_wol_ich8lan(struct e1000_hw *hw);
-#ifndef FIFO_WORKAROUND
-s32 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length);
-void e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length);
-void e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw,
-    bool state);
-bool e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw);
-s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
-#endif
-
 
 /*
  * TBI_ACCEPT macro definition:
@@ -156,11 +129,11 @@ s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
  * Typical use:
  *  ...
  *  if (TBI_ACCEPT) {
- *	accept_frame = TRUE;
+ *	accept_frame = true;
  *	e1000_tbi_adjust_stats(adapter, MacAddress);
  *	frame_length--;
  *  } else {
- *	accept_frame = FALSE;
+ *	accept_frame = false;
  *  }
  *  ...
  */

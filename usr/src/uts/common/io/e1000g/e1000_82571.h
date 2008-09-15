@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.12 v2008-02-29
+ * IntelVersion: 1.16 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_82571_H_
 #define	_E1000_82571_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +40,19 @@ extern "C" {
 				(ID_LED_DEF1_DEF2))
 
 #define	E1000_GCR_L1_ACT_WITHOUT_L0S_RX	0x08000000
+
+/* Intr Throttling - RW */
+#define	E1000_EITR_82574(_n)	(0x000E8 + (0x4 * (_n)))
+
+#define	E1000_EIAC_82574	0x000DC /* Ext. Interrupt Auto Clear - RW */
+#define	E1000_EIAC_MASK_82574	0x01F00000
+
+#define	E1000_NVM_INIT_CTRL2_MNGM 0x6000 /* Manageability Operation Mode mask */
+
+#define	E1000_RXCFGL	0x0B634 /* TimeSync Rx EtherType & Msg Type Reg - RW */
+
+bool e1000_get_laa_state_82571(struct e1000_hw *hw);
+void e1000_set_laa_state_82571(struct e1000_hw *hw, bool state);
 
 #ifdef __cplusplus
 }

@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.38 v2008-02-29
+ * IntelVersion: 1.42 v2008-7-17_MountAngel2
  */
 
 /*
@@ -42,6 +42,7 @@ static s32 e1000_init_hw_82542(struct e1000_hw *hw);
 static s32 e1000_setup_link_82542(struct e1000_hw *hw);
 static s32 e1000_led_on_82542(struct e1000_hw *hw);
 static s32 e1000_led_off_82542(struct e1000_hw *hw);
+static void e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index);
 static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw);
 
 struct e1000_dev_spec_82542 {
@@ -141,6 +142,8 @@ e1000_init_mac_params_82542(struct e1000_hw *hw)
 	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
 	mac->ops.mta_set = e1000_mta_set_generic;
+	/* set RAR */
+	mac->ops.rar_set = e1000_rar_set_82542;
 	/* turn on/off LED */
 	mac->ops.led_on = e1000_led_on_82542;
 	mac->ops.led_off = e1000_led_off_82542;
@@ -425,6 +428,42 @@ e1000_led_off_82542(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 
 	return (E1000_SUCCESS);
+}
+
+/*
+ * e1000_rar_set_82542 - Set receive address register
+ * @hw: pointer to the HW structure
+ * @addr: pointer to the receive address
+ * @index: receive address array register
+ *
+ * Sets the receive address array register at index to the address passed
+ * in by addr.
+ */
+static void
+e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index)
+{
+	u32 rar_low, rar_high;
+
+	DEBUGFUNC("e1000_rar_set_82542");
+
+	/*
+	 * HW expects these in little endian so we reverse the byte order
+	 * from network order (big endian) to little endian
+	 */
+	rar_low = ((u32) addr[0] |
+	    ((u32) addr[1] << 8) |
+	    ((u32) addr[2] << 16) | ((u32) addr[3] << 24));
+
+	rar_high = ((u32) addr[4] | ((u32) addr[5] << 8));
+
+	/* If MAC address zero, no need to set the AV bit */
+	if (rar_low || rar_high) {
+		if (!hw->mac.disable_av)
+			rar_high |= E1000_RAH_AV;
+	}
+
+	E1000_WRITE_REG_ARRAY(hw, E1000_RA, (index << 1), rar_low);
+	E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((index << 1) + 1), rar_high);
 }
 
 /*

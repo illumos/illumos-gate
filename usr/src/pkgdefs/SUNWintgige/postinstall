@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"	
 
 # Function: check_add_drv()
 #
@@ -199,10 +198,15 @@ check_add_drv()
 	"pci8086,10c4"
 	"pci8086,10c5"
 	"pci8086,10cb"
+	"pci8086,10cc"
+	"pci8086,10cd"
+	"pci8086,10ce"
+	"pci8086,10d3"
 	"pci8086,10d5"
 	"pci8086,10d9"
 	"pci8086,10da"
 	"pci8086,10de"
+	"pci8086,10df"
 	"pci8086,10e5"
 	"pci8086,10f5"
 	"pci8086,294c"
@@ -236,10 +240,15 @@ check_add_drv()
 	"pciex8086,10c4"
 	"pciex8086,10c5" 
 	"pciex8086,10cb"
+	"pciex8086,10cc"
+	"pciex8086,10cd"
+	"pciex8086,10ce"
+	"pciex8086,10d3"
 	"pciex8086,10d5"
 	"pciex8086,10d9"
 	"pciex8086,10da"
 	"pciex8086,10de"
+	"pciex8086,10df"
 	"pciex8086,10e5"
 	"pciex8086,10f5"
 	"pciex8086,294c"' \

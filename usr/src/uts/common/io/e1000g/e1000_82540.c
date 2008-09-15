@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.47 v2008-02-29
+ * IntelVersion: 1.51 v2008-7-17_MountAngel2
  */
 
 /*
@@ -623,7 +623,7 @@ e1000_set_phy_mode_82540(struct e1000_hw *hw)
 			goto out;
 		}
 
-		phy->reset_disable = FALSE;
+		phy->reset_disable = false;
 	}
 
 out:

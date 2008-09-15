@@ -24,10 +24,9 @@
  */
 
 /*
- * IntelVersion: 1.80 v2008-02-29
+ * IntelVersion: 1.88 v2008-7-17_MountAngel2
  */
 #include "e1000_api.h"
-#include "e1000_phy.h"
 
 static u32 e1000_get_phy_addr_for_bm_page(u32 page, u32 reg);
 
@@ -631,7 +630,8 @@ e1000_copper_link_setup_m88(struct e1000_hw *hw)
 		goto out;
 
 	if ((phy->type == e1000_phy_m88) &&
-	    (phy->revision < E1000_REVISION_4)) {
+	    (phy->revision < E1000_REVISION_4) &&
+	    (phy->id != BME1000_E_PHY_ID_R2)) {
 		/*
 		 * Force TX_CLK in the Extended PHY Specific Control Register
 		 * to 25MHz clock.
@@ -659,6 +659,18 @@ e1000_copper_link_setup_m88(struct e1000_hw *hw)
 		ret_val = phy->ops.write_reg(hw,
 		    M88E1000_EXT_PHY_SPEC_CTRL,
 		    phy_data);
+		if (ret_val)
+			goto out;
+	}
+
+	if ((phy->type == e1000_phy_bm) && (phy->id == BME1000_E_PHY_ID_R2)) {
+		/* Set PHY page 0, register 29 to 0x0003 */
+		ret_val = phy->ops.write_reg(hw, 29, 0x0003);
+		if (ret_val)
+			goto out;
+
+		/* Set PHY page 0, register 30 to 0x0000 */
+		ret_val = phy->ops.write_reg(hw, 30, 0x0000);
 		if (ret_val)
 			goto out;
 	}
@@ -695,7 +707,7 @@ e1000_copper_link_setup_igp(struct e1000_hw *hw)
 		goto out;
 	}
 
-	ret_val = e1000_phy_hw_reset(hw);
+	ret_val = hw->phy.ops.reset(hw);
 	if (ret_val) {
 		DEBUGOUT("Error resetting the PHY.\n");
 		goto out;
@@ -712,7 +724,7 @@ e1000_copper_link_setup_igp(struct e1000_hw *hw)
 	 */
 	if (phy->type == e1000_phy_igp) {
 		/* disable lplu d3 during driver init */
-		ret_val = e1000_set_d3_lplu_state(hw, FALSE);
+		ret_val = hw->phy.ops.set_d3_lplu_state(hw, false);
 		if (ret_val) {
 			DEBUGOUT("Error Disabling LPLU D3\n");
 			goto out;
@@ -720,10 +732,12 @@ e1000_copper_link_setup_igp(struct e1000_hw *hw)
 	}
 
 	/* disable lplu d0 during driver init */
-	ret_val = e1000_set_d0_lplu_state(hw, FALSE);
-	if (ret_val) {
-		DEBUGOUT("Error Disabling LPLU D0\n");
-		goto out;
+	if (hw->phy.ops.set_d0_lplu_state) {
+		ret_val = hw->phy.ops.set_d0_lplu_state(hw, false);
+		if (ret_val) {
+			DEBUGOUT("Error Disabling LPLU D0\n");
+			goto out;
+		}
 	}
 	/* Configure mdi-mdix settings */
 	ret_val = phy->ops.read_reg(hw, IGP01E1000_PHY_PORT_CTRL, &data);
@@ -871,7 +885,7 @@ e1000_copper_link_autoneg(struct e1000_hw *hw)
 	 * at a later time (for example, callback routine).
 	 */
 	if (phy->autoneg_wait_to_complete) {
-		ret_val = e1000_wait_autoneg(hw);
+		ret_val = hw->mac.ops.wait_autoneg(hw);
 		if (ret_val) {
 			DEBUGOUT("Error while waiting for "
 			    "autoneg to complete\n");
@@ -879,7 +893,7 @@ e1000_copper_link_autoneg(struct e1000_hw *hw)
 		}
 	}
 
-	hw->mac.get_link_status = TRUE;
+	hw->mac.get_link_status = true;
 
 out:
 	return (ret_val);
@@ -1493,7 +1507,7 @@ e1000_check_downshift_generic(struct e1000_hw *hw)
 		break;
 	default:
 		/* speed downshift not supported */
-		phy->speed_downgraded = FALSE;
+		phy->speed_downgraded = false;
 		ret_val = E1000_SUCCESS;
 		goto out;
 	}
@@ -1501,7 +1515,7 @@ e1000_check_downshift_generic(struct e1000_hw *hw)
 	ret_val = phy->ops.read_reg(hw, offset, &phy_data);
 
 	if (!ret_val)
-		phy->speed_downgraded = (phy_data & mask) ? TRUE : FALSE;
+		phy->speed_downgraded = (phy_data & mask) ? true : false;
 
 out:
 	return (ret_val);
@@ -1662,7 +1676,7 @@ e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
 			usec_delay(usec_interval);
 	}
 
-	*success = (i < iterations) ? TRUE : FALSE;
+	*success = (i < iterations) ? true : false;
 
 	return (ret_val);
 }
@@ -1822,8 +1836,8 @@ e1000_get_phy_info_m88(struct e1000_hw *hw)
 		goto out;
 
 	phy->polarity_correction = (phy_data & M88E1000_PSCR_POLARITY_REVERSAL)
-	    ? TRUE
-	    : FALSE;
+	    ? true
+	    : false;
 
 	ret_val = e1000_check_polarity_m88(hw);
 	if (ret_val)
@@ -1833,10 +1847,10 @@ e1000_get_phy_info_m88(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	phy->is_mdix = (phy_data & M88E1000_PSSR_MDIX) ? TRUE : FALSE;
+	phy->is_mdix = (phy_data & M88E1000_PSSR_MDIX) ? true : false;
 
 	if ((phy_data & M88E1000_PSSR_SPEED) == M88E1000_PSSR_1000MBS) {
-		ret_val = e1000_get_cable_length(hw);
+		ret_val = hw->phy.ops.get_cable_length(hw);
 		if (ret_val)
 			goto out;
 
@@ -1891,7 +1905,7 @@ e1000_get_phy_info_igp(struct e1000_hw *hw)
 		goto out;
 	}
 
-	phy->polarity_correction = TRUE;
+	phy->polarity_correction = true;
 
 	ret_val = e1000_check_polarity_igp(hw);
 	if (ret_val)
@@ -1901,11 +1915,11 @@ e1000_get_phy_info_igp(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	phy->is_mdix = (data & IGP01E1000_PSSR_MDIX) ? TRUE : FALSE;
+	phy->is_mdix = (data & IGP01E1000_PSSR_MDIX) ? true : false;
 
 	if ((data & IGP01E1000_PSSR_SPEED_MASK) ==
 	    IGP01E1000_PSSR_SPEED_1000MBPS) {
-		ret_val = e1000_get_cable_length(hw);
+		ret_val = hw->phy.ops.get_cable_length(hw);
 		if (ret_val)
 			goto out;
 
@@ -2237,7 +2251,7 @@ e1000_write_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 data)
 	/* Page 800 works differently than the rest so it has its own func */
 	if (page == BM_WUC_PAGE) {
 		ret_val = e1000_access_phy_wakeup_reg_bm(hw,
-		    offset, &data, FALSE);
+		    offset, &data, false);
 		goto out;
 	}
 	ret_val = hw->phy.ops.acquire(hw);
@@ -2302,7 +2316,7 @@ e1000_read_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data)
 	/* Page 800 works differently than the rest so it has its own func */
 	if (page == BM_WUC_PAGE) {
 		ret_val = e1000_access_phy_wakeup_reg_bm(hw,
-		    offset, data, TRUE);
+		    offset, data, true);
 		goto out;
 	}
 	ret_val = hw->phy.ops.acquire(hw);
@@ -2344,6 +2358,107 @@ out:
 }
 
 /*
+ * e1000_read_phy_reg_bm2 - Read BM PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ *
+ * Acquires semaphore, if necessary, then reads the PHY register at offset
+ * and storing the retrieved information in data.  Release any acquired
+ * semaphores before exiting.
+ */
+s32
+e1000_read_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 *data)
+{
+	s32 ret_val;
+	u16 page = (u16)(offset >> IGP_PAGE_SHIFT);
+
+	DEBUGFUNC("e1000_write_phy_reg_bm2");
+
+	/* Page 800 works differently than the rest so it has its own func */
+	if (page == BM_WUC_PAGE) {
+		ret_val = e1000_access_phy_wakeup_reg_bm(hw, offset, data,
+		    true);
+		goto out;
+	}
+
+	ret_val = hw->phy.ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
+	hw->phy.addr = 1;
+
+	if (offset > MAX_PHY_MULTI_PAGE_REG) {
+
+		/* Page is shifted left, PHY expects (page x 32) */
+		ret_val = e1000_write_phy_reg_mdic(hw, BM_PHY_PAGE_SELECT,
+		    page);
+
+		if (ret_val) {
+			hw->phy.ops.release(hw);
+			goto out;
+		}
+	}
+
+	ret_val = e1000_read_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & offset,
+	    data);
+	hw->phy.ops.release(hw);
+
+out:
+	return (ret_val);
+}
+
+/*
+ * e1000_write_phy_reg_bm2 - Write BM PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ *
+ * Acquires semaphore, if necessary, then writes the data to PHY register
+ * at the offset.  Release any acquired semaphores before exiting.
+ */
+s32
+e1000_write_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 data)
+{
+	s32 ret_val;
+	u16 page = (u16)(offset >> IGP_PAGE_SHIFT);
+
+	DEBUGFUNC("e1000_write_phy_reg_bm2");
+
+	/* Page 800 works differently than the rest so it has its own func */
+	if (page == BM_WUC_PAGE) {
+		ret_val = e1000_access_phy_wakeup_reg_bm(hw, offset, &data,
+		    false);
+		goto out;
+	}
+
+	ret_val = hw->phy.ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
+	hw->phy.addr = 1;
+
+	if (offset > MAX_PHY_MULTI_PAGE_REG) {
+		/* Page is shifted left, PHY expects (page x 32) */
+		ret_val = e1000_write_phy_reg_mdic(hw, BM_PHY_PAGE_SELECT,
+		    page);
+
+		if (ret_val) {
+			hw->phy.ops.release(hw);
+			goto out;
+		}
+	}
+
+	ret_val = e1000_write_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & offset,
+	    data);
+
+	hw->phy.ops.release(hw);
+
+out:
+	return (ret_val);
+}
+
+/*
  * e1000_access_phy_wakeup_reg_bm - Read BM PHY wakeup register
  * @hw: pointer to the HW structure
  * @offset: register offset to be read or written
@@ -2365,7 +2480,7 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
     u32 offset, u16 *data, bool read)
 {
 	s32 ret_val;
-	u16 reg = ((u16)offset) & PHY_REG_MASK;
+	u16 reg = ((u16)offset);
 	u16 phy_reg = 0;
 	u8 phy_acquired = 1;
 

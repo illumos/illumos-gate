@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.45 v2008-02-29
+ * IntelVersion: 1.47 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_PHY_H_
 #define	_E1000_PHY_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,6 +90,8 @@ s32 e1000_write_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_read_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data,
     bool read);
+s32 e1000_read_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 *data);
+s32 e1000_write_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 data);
 void e1000_power_up_phy_copper(struct e1000_hw *hw);
 void e1000_power_down_phy_copper(struct e1000_hw *hw);
 s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);

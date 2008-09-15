@@ -213,7 +213,8 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	e1000g_ksp->Fcruc.value.ul += E1000_READ_REG(hw, E1000_FCRUC);
 
 	if ((hw->mac.type != e1000_ich8lan) &&
-	    (hw->mac.type != e1000_ich9lan)) {
+	    (hw->mac.type != e1000_ich9lan) &&
+	    (hw->mac.type != e1000_ich10lan)) {
 		e1000g_ksp->Symerrs.value.ul +=
 		    E1000_READ_REG(hw, E1000_SYMERRS);
 #ifdef E1000G_DEBUG

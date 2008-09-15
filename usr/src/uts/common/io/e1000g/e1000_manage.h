@@ -24,12 +24,10 @@
  */
 
 /*
- * IntelVersion: 1.15 v2008-02-29
+ * IntelVersion: 1.17 v2008-7-17_MountAngel2
  */
 #ifndef _E1000_MANAGE_H_
 #define	_E1000_MANAGE_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +42,7 @@ s32 e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
     struct e1000_host_mng_command_header *hdr);
 s32 e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw,
     u8 *buffer, u16 length);
+bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 
 typedef enum {
 	e1000_mng_mode_none = 0,
