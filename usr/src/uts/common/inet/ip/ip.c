@@ -17286,6 +17286,15 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		if (CLASSD(ipha->ipha_dst) && !IS_LOOPBACK(recv_ill)) {
 			ASSERT(ire->ire_type == IRE_BROADCAST);
 			/*
+			 * Inactive/Failed interfaces are not supposed to
+			 * respond to the multicast packets.
+			 */
+			if (ill_is_probeonly(ill)) {
+				freemsg(first_mp);
+				return;
+			}
+
+			/*
 			 * In the multicast case, applications may have joined
 			 * the group from different zones, so we need to deliver
 			 * the packet to each of them. Loop through the
