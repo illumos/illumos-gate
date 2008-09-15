@@ -26,8 +26,6 @@
 #ifndef	_SYS_CONTROLREGS_H
 #define	_SYS_CONTROLREGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _ASM
 #include <sys/types.h>
 #endif
@@ -224,8 +222,9 @@ extern "C" {
  */
 #define	AMD_GH_NB_CFG_EN_ECS		(UINT64_C(1) << 46)
 
-/* AMD */
+/* AMD microcode patch loader */
 #define	MSR_AMD_PATCHLEVEL	0x8b
+#define	MSR_AMD_PATCHLOADER	0xc0010020
 
 #ifdef __cplusplus
 }

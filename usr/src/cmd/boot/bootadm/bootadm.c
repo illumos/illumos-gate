@@ -7859,8 +7859,9 @@ ucode_install(char *root)
 		struct stat fstatus, tstatus;
 		struct utimbuf u_times;
 
-		(void) snprintf(file, PATH_MAX, "%s/%s/%s-ucode.txt",
-		    bam_root, UCODE_INSTALL_PATH, ucode_vendors[i].filestr);
+		(void) snprintf(file, PATH_MAX, "%s/%s/%s-ucode.%s",
+		    bam_root, UCODE_INSTALL_PATH, ucode_vendors[i].filestr,
+		    ucode_vendors[i].extstr);
 
 		if (stat(file, &fstatus) != 0 || !(S_ISREG(fstatus.st_mode)))
 			continue;

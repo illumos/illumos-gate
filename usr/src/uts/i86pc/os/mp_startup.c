@@ -1396,7 +1396,7 @@ start_other_cpus(int cprboot)
 	}
 
 	/* Free the space allocated to hold the microcode file */
-	ucode_free();
+	ucode_cleanup();
 
 	affinity_clear();
 

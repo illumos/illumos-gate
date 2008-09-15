@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/processor.h>
@@ -60,6 +58,19 @@ static char	ucode_install_path[] = UCODE_INSTALL_PATH;
 
 static int	ucode_debug = 0;
 
+static int ucode_convert_amd(const char *, uint8_t *, size_t);
+static int ucode_convert_intel(const char *, uint8_t *, size_t);
+
+static ucode_errno_t ucode_gen_files_amd(uint8_t *, int, char *);
+static ucode_errno_t ucode_gen_files_intel(uint8_t *, int, char *);
+
+static const struct ucode_ops ucode_ops[] = {
+	{ ucode_convert_intel, ucode_gen_files_intel, ucode_validate_intel },
+	{ ucode_convert_amd, ucode_gen_files_amd, ucode_validate_amd },
+};
+
+const struct ucode_ops *ucode;
+
 static void
 dprintf(const char *format, ...)
 {
@@ -81,20 +92,19 @@ usage(int verbose)
 		    gettext("\t\t Shows running microcode version.\n\n"));
 	}
 
-	(void) fprintf(stderr, "\t%s -u microcode-text-file\n", cmdname);
+	(void) fprintf(stderr, "\t%s -u microcode-file\n", cmdname);
 	if (verbose) {
 		(void) fprintf(stderr, gettext("\t\t Updates microcode to the "
 		    "latest matching version found in\n"
-		    "\t\t microcode-text-file.\n\n"));
+		    "\t\t microcode-file.\n\n"));
 	}
 
-	(void) fprintf(stderr, "\t%s -i [-R path] microcode-text-file\n",
-	    cmdname);
+	(void) fprintf(stderr, "\t%s -i [-R path] microcode-file\n", cmdname);
 	if (verbose) {
 		(void) fprintf(stderr, gettext("\t\t Installs microcode to be "
-		    "used for subsequent boots. Microcode\n"
-		    "\t\t text file name must start with vendor name, "
-		    "such as \"intel\".\n\n"));
+		    "used for subsequent boots.\n\n"));
+		(void) fprintf(stderr, gettext("Microcode file name must start "
+		    "with vendor name, such as \"intel\" or \"amd\".\n\n"));
 	}
 }
 
@@ -113,7 +123,25 @@ ucode_perror(const char *str, ucode_errno_t rc)
  * Return the number of characters read.
  */
 static int
-ucode_convert(const char *infile, uint8_t *buf, size_t size)
+ucode_convert_amd(const char *infile, uint8_t *buf, size_t size)
+{
+	int fd;
+
+	if (infile == NULL || buf == NULL || size == 0)
+		return (0);
+
+	if ((fd = open(infile, O_RDONLY)) < 0)
+		return (0);
+
+	size = read(fd, buf, size);
+
+	(void) close(fd);
+
+	return (size);
+}
+
+static int
+ucode_convert_intel(const char *infile, uint8_t *buf, size_t size)
 {
 	char	linebuf[LINESIZE];
 	FILE	*infd = NULL;
@@ -173,11 +201,11 @@ ucode_convert(const char *infile, uint8_t *buf, size_t size)
  * Returns 0 if no need to update the link; -1 otherwise
  */
 static int
-ucode_should_update(char *filename, uint32_t new_rev)
+ucode_should_update_intel(char *filename, uint32_t new_rev)
 {
 	int		fd;
 	struct stat	statbuf;
-	ucode_header_t	header;
+	ucode_header_intel_t header;
 
 	/*
 	 * If the file or link already exists, check to see if
@@ -205,7 +233,64 @@ ucode_should_update(char *filename, uint32_t new_rev)
  * Generate microcode binary files.  Must be called after ucode_validate().
  */
 static ucode_errno_t
-ucode_gen_files(uint8_t *buf, int size, char *path)
+ucode_gen_files_amd(uint8_t *buf, int size, char *path)
+{
+	/* LINTED: pointer alignment */
+	uint32_t *ptr = (uint32_t *)buf;
+	int plen = strlen(path);
+	int fd, count, counter;
+	ucode_header_amd_t *uh;
+	int last_cpu_rev = 0;
+
+	/* skip over magic number & equivalence table header */
+	ptr += 2; size -= 8;
+
+	count = *ptr++; size -= 4;
+
+	/* equivalence table uses special name */
+	(void) strlcat(path, "/equivalence-table", PATH_MAX);
+
+	for (;;) {
+		dprintf("path = %s\n", path);
+		fd = open(path, O_WRONLY | O_CREAT | O_TRUNC,
+		    S_IRUSR | S_IRGRP | S_IROTH);
+
+		if (fd == -1) {
+			ucode_perror(path, EM_SYS);
+			return (EM_SYS);
+		}
+
+		if (write(fd, ptr, count) != count) {
+			(void) close(fd);
+			ucode_perror(path, EM_SYS);
+			return (EM_SYS);
+		}
+
+		(void) close(fd);
+		ptr += count >> 2; size -= count;
+
+		if (!size)
+			return (EM_OK);
+
+		ptr++; size -= 4;
+		count = *ptr++; size -= 4;
+
+		/* construct name from header information */
+		uh = (ucode_header_amd_t *)ptr;
+
+		if (uh->uh_cpu_rev != last_cpu_rev) {
+			last_cpu_rev = uh->uh_cpu_rev;
+			counter = 0;
+		}
+
+		path[plen] = '\0';
+		(void) snprintf(path + plen, PATH_MAX - plen, "/%04X-%02X",
+		    uh->uh_cpu_rev, counter++);
+	}
+}
+
+static ucode_errno_t
+ucode_gen_files_intel(uint8_t *buf, int size, char *path)
 {
 	int	remaining;
 	char	common_path[PATH_MAX];
@@ -226,11 +311,13 @@ ucode_gen_files(uint8_t *buf, int size, char *path)
 		char		name[PATH_MAX];
 		int		i;
 		uint8_t		*curbuf = &buf[size - remaining];
-		ucode_header_t	*uhp = (ucode_header_t *)(intptr_t)curbuf;
-		ucode_ext_table_t *extp;
+		ucode_header_intel_t	*uhp;
+		ucode_ext_table_intel_t *extp;
 
-		total_size = UCODE_TOTAL_SIZE(uhp->uh_total_size);
-		body_size = UCODE_BODY_SIZE(uhp->uh_body_size);
+		uhp = (ucode_header_intel_t *)(intptr_t)curbuf;
+
+		total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
+		body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
 
 		remaining -= total_size;
 
@@ -238,7 +325,7 @@ ucode_gen_files(uint8_t *buf, int size, char *path)
 		    common_path, uhp->uh_signature, uhp->uh_proc_flags);
 		dprintf("firstname = %s\n", firstname);
 
-		if (ucode_should_update(firstname, uhp->uh_rev) != 0) {
+		if (ucode_should_update_intel(firstname, uhp->uh_rev) != 0) {
 			int fd;
 
 			/* Remove the existing one first */
@@ -275,7 +362,7 @@ ucode_gen_files(uint8_t *buf, int size, char *path)
 			dprintf("proc_flags = %x, platid = %x, name = %s\n",
 			    uhp->uh_proc_flags, platid, name);
 
-			if (ucode_should_update(name, uhp->uh_rev) != 0) {
+			if (ucode_should_update_intel(name, uhp->uh_rev) != 0) {
 
 				/* Remove the existing one first */
 				(void) unlink(name);
@@ -290,17 +377,17 @@ ucode_gen_files(uint8_t *buf, int size, char *path)
 				break;
 		}
 
-		offset = UCODE_HEADER_SIZE + body_size;
+		offset = UCODE_HEADER_SIZE_INTEL + body_size;
 
 		/* Check to see if there is extended signature table */
 		if (total_size == offset)
 			continue;
 
 		/* There is extended signature table.  More processing. */
-		extp = (ucode_ext_table_t *)(uintptr_t)&curbuf[offset];
+		extp = (ucode_ext_table_intel_t *)(uintptr_t)&curbuf[offset];
 
 		for (i = 0; i < extp->uet_count; i++) {
-			ucode_ext_sig_t *uesp = &extp->uet_ext_sig[i];
+			ucode_ext_sig_intel_t *uesp = &extp->uet_ext_sig[i];
 			int j;
 
 			for (j = 0; j < 8; j++) {
@@ -313,8 +400,8 @@ ucode_gen_files(uint8_t *buf, int size, char *path)
 				    "%s/%08X-%02X", path, extp->uet_ext_sig[i],
 				    id);
 
-				if (ucode_should_update(name, uhp->uh_rev) !=
-				    0) {
+				if (ucode_should_update_intel(name, uhp->uh_rev)
+				    != 0) {
 
 					/* Remove the existing one first */
 					(void) unlink(name);
@@ -460,6 +547,29 @@ main(int argc, char *argv[])
 	 * Convert from text format to binary format
 	 */
 	if ((action & UCODE_OPT_INSTALL) || (action & UCODE_OPT_UPDATE)) {
+		int i;
+		UCODE_VENDORS;
+
+		for (i = 0; ucode_vendors[i].filestr != NULL; i++) {
+			dprintf("i = %d, filestr = %s, filename = %s\n",
+			    i, ucode_vendors[i].filestr, filename);
+			if (strncasecmp(ucode_vendors[i].filestr,
+			    basename(filename),
+			    strlen(ucode_vendors[i].filestr)) == 0) {
+				ucode = &ucode_ops[i];
+				(void) strncpy(ucode_vendor_str,
+				    ucode_vendors[i].vendorstr,
+				    sizeof (ucode_vendor_str));
+				break;
+			}
+		}
+
+		if (ucode_vendors[i].filestr == NULL) {
+			rc = EM_NOVENDOR;
+			ucode_perror(basename(filename), rc);
+			goto err_out;
+		}
+
 		if ((stat(filename, &filestat)) < 0) {
 			rc = EM_SYS;
 			ucode_perror(filename, rc);
@@ -479,7 +589,7 @@ main(int argc, char *argv[])
 			goto err_out;
 		}
 
-		ucode_size = ucode_convert(filename, buf, filestat.st_size);
+		ucode_size = ucode->convert(filename, buf, filestat.st_size);
 
 		dprintf("ucode_size = %d\n", ucode_size);
 
@@ -489,7 +599,7 @@ main(int argc, char *argv[])
 			goto err_out;
 		}
 
-		if ((rc = ucode_validate(buf, ucode_size)) != EM_OK) {
+		if ((rc = ucode->validate(buf, ucode_size)) != EM_OK) {
 			ucode_perror(filename, rc);
 			goto err_out;
 		}
@@ -500,29 +610,6 @@ main(int argc, char *argv[])
 	 * "intel" for Intel microcode, and "amd" for AMD microcode.
 	 */
 	if (action & UCODE_OPT_INSTALL) {
-		int i;
-		UCODE_VENDORS;
-
-		for (i = 0; ucode_vendors[i].filestr != NULL; i++) {
-			dprintf("i = %d, filestr = %s, filename = %s\n",
-			    i, ucode_vendors[i].filestr, filename);
-			if (strncasecmp(ucode_vendors[i].filestr,
-			    basename(filename),
-			    strlen(ucode_vendors[i].filestr)) == 0) {
-
-				(void) strncpy(ucode_vendor_str,
-				    ucode_vendors[i].vendorstr,
-				    sizeof (ucode_vendor_str));
-				break;
-			}
-		}
-
-		if (ucode_vendors[i].filestr == NULL) {
-			rc = EM_NOVENDOR;
-			ucode_perror(basename(filename), rc);
-			goto err_out;
-		}
-
 		/*
 		 * If no path is provided by the -R option, put the files in
 		 * /ucode_install_path/ucode_vendor_str/.
@@ -544,7 +631,7 @@ main(int argc, char *argv[])
 			goto err_out;
 		}
 
-		rc = ucode_gen_files(buf, ucode_size, path);
+		rc = ucode->gen_files(buf, ucode_size, path);
 
 		goto err_out;
 	}

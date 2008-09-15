@@ -19,15 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_UCODE_H
 #define	_SYS_UCODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#ifdef _KERNEL
+#include <sys/cpuvar.h>
+#endif
 #include <sys/types.h>
 #include <sys/priv.h>
 #include <sys/processor.h>
@@ -92,9 +93,41 @@ struct ucode_write_struct32 {
 #endif	/* _SYSCALL32_IMPL */
 
 /*
- * Microcode file information
+ * AMD Microcode file information
  */
-typedef struct ucode_header {
+typedef struct ucode_header_amd {
+	uint32_t uh_date;
+	uint32_t uh_patch_id;
+	uint32_t uh_internal; /* patch data id & length, init flag */
+	uint32_t uh_cksum;
+	uint32_t uh_nb_id;
+	uint32_t uh_sb_id;
+	uint16_t uh_cpu_rev;
+	uint8_t  uh_nb_rev;
+	uint8_t  uh_sb_rev;
+	uint32_t uh_bios_rev;
+	uint32_t uh_match[8];
+} ucode_header_amd_t;
+
+typedef struct ucode_file_amd {
+	ucode_header_amd_t uf_header;
+	uint8_t uf_data[896];
+	uint8_t uf_resv[896];
+	uint8_t uf_code_present;
+	uint8_t uf_code[191];
+} ucode_file_amd_t;
+
+typedef struct ucode_eqtbl_amd {
+	uint32_t ue_inst_cpu;
+	uint32_t ue_fixed_mask;
+	uint32_t ue_fixed_comp;
+	uint32_t ue_equiv_cpu;
+} ucode_eqtbl_amd_t;
+
+/*
+ * Intel Microcode file information
+ */
+typedef struct ucode_header_intel {
 	uint32_t	uh_header_ver;
 	uint32_t	uh_rev;
 	uint32_t	uh_date;
@@ -105,25 +138,33 @@ typedef struct ucode_header {
 	uint32_t	uh_body_size;
 	uint32_t	uh_total_size;
 	uint32_t	uh_reserved[3];
-} ucode_header_t;
+} ucode_header_intel_t;
 
-typedef struct ucode_ext_sig {
+typedef struct ucode_ext_sig_intel {
 	uint32_t	ues_signature;
 	uint32_t	ues_proc_flags;
 	uint32_t	ues_checksum;
-} ucode_ext_sig_t;
+} ucode_ext_sig_intel_t;
 
-typedef struct ucode_ext_table {
+typedef struct ucode_ext_table_intel {
 	uint32_t	uet_count;
 	uint32_t	uet_checksum;
 	uint32_t	uet_reserved[3];
-	ucode_ext_sig_t uet_ext_sig[1];
-} ucode_ext_table_t;
+	ucode_ext_sig_intel_t uet_ext_sig[1];
+} ucode_ext_table_intel_t;
 
-typedef struct ucode_file {
-	ucode_header_t		uf_header;
+typedef struct ucode_file_intel {
+	ucode_header_intel_t	*uf_header;
 	uint8_t			*uf_body;
-	ucode_ext_table_t	*uf_ext_table;
+	ucode_ext_table_intel_t	*uf_ext_table;
+} ucode_file_intel_t;
+
+/*
+ * common container
+ */
+typedef union ucode_file {
+	ucode_file_amd_t *amd;
+	ucode_file_intel_t intel;
 } ucode_file_t;
 
 
@@ -139,14 +180,14 @@ typedef struct ucode_file {
 #define	UCODE_MAX_PATH_LEN	(PATH_MAX - UCODE_COMMON_NAME_LEN)
 
 
-#define	UCODE_HEADER_SIZE	(sizeof (struct ucode_header))
-#define	UCODE_EXT_TABLE_SIZE	(20)	/* 20-bytes */
-#define	UCODE_EXT_SIG_SIZE	(sizeof (struct ucode_ext_sig))
+#define	UCODE_HEADER_SIZE_INTEL		(sizeof (struct ucode_header_intel))
+#define	UCODE_EXT_TABLE_SIZE_INTEL	(20)	/* 20-bytes */
+#define	UCODE_EXT_SIG_SIZE_INTEL	(sizeof (struct ucode_ext_sig_intel))
 
 #define	UCODE_KB(a)	((a) << 10)	/* KB */
 #define	UCODE_MB(a)	((a) << 20)	/* MB */
 #define	UCODE_DEFAULT_TOTAL_SIZE	UCODE_KB(2)
-#define	UCODE_DEFAULT_BODY_SIZE		(UCODE_KB(2) - UCODE_HEADER_SIZE)
+#define	UCODE_DEFAULT_BODY_SIZE		(UCODE_KB(2) - UCODE_HEADER_SIZE_INTEL)
 
 /*
  * For a single microcode file, the minimum size is 1K, maximum size is 16K.
@@ -164,34 +205,86 @@ typedef struct ucode_file {
 #define	UCODE_SIZE_CONVERT(size, default_size) \
 	((size) == 0 ? (default_size) : (size))
 
-#define	UCODE_BODY_SIZE(size) \
+#define	UCODE_BODY_SIZE_INTEL(size) \
 	UCODE_SIZE_CONVERT((size), UCODE_DEFAULT_BODY_SIZE)
 
-#define	UCODE_TOTAL_SIZE(size) \
+#define	UCODE_TOTAL_SIZE_INTEL(size)			\
 	UCODE_SIZE_CONVERT((size), UCODE_DEFAULT_TOTAL_SIZE)
 
-#define	UCODE_MATCH(sig1, sig2, pf1, pf2) \
+#define	UCODE_MATCH_INTEL(sig1, sig2, pf1, pf2) \
 	(((sig1) == (sig2)) && \
 	(((pf1) & (pf2)) || (((pf1) == 0) && ((pf2) == 0))))
 
-extern ucode_errno_t ucode_header_validate(ucode_header_t *);
-extern uint32_t ucode_checksum(uint32_t, uint32_t, uint8_t *);
-extern ucode_errno_t ucode_validate(uint8_t *, int);
+extern ucode_errno_t ucode_header_validate_intel(ucode_header_intel_t *);
+extern uint32_t ucode_checksum_intel(uint32_t, uint32_t, uint8_t *);
+
+extern ucode_errno_t ucode_validate_amd(uint8_t *, int);
+extern ucode_errno_t ucode_validate_intel(uint8_t *, int);
+
+#ifdef _KERNEL
 extern ucode_errno_t ucode_get_rev(uint32_t *);
 extern ucode_errno_t ucode_update(uint8_t *, int);
+
+/*
+ * Microcode specific information per core
+ */
+typedef struct cpu_ucode_info {
+	uint32_t	cui_platid;	/* platform id */
+	uint32_t	cui_rev;	/* microcode revision */
+} cpu_ucode_info_t;
+
+/*
+ * Data structure used for xcall
+ */
+typedef struct ucode_update {
+	uint32_t		sig;	/* signature */
+	cpu_ucode_info_t	info;	/* ucode info */
+	uint32_t		expected_rev;
+	uint32_t		new_rev;
+	uint8_t			*ucodep; /* pointer to ucode */
+	uint32_t		usize;
+} ucode_update_t;
+
+/*
+ * Microcode kernel operations
+ */
+struct ucode_ops {
+	uint32_t	write_msr;
+	int		(*capable)(cpu_t *);
+	void		(*file_reset)(ucode_file_t *, processorid_t);
+	void		(*read_rev)(cpu_ucode_info_t *);
+	uint32_t	(*load)(ucode_file_t *, cpu_ucode_info_t *, cpu_t *);
+	ucode_errno_t	(*validate)(uint8_t *, int);
+	ucode_errno_t	(*extract)(ucode_update_t *, uint8_t *, int);
+	ucode_errno_t	(*locate)(cpu_t *, cpu_ucode_info_t *, ucode_file_t *);
+};
+#else
 
 #define	UCODE_MAX_VENDORS_NAME_LEN		20
 
 #define	UCODE_VENDORS				\
 static struct {					\
 	char *filestr;				\
+	char *extstr;				\
 	char *vendorstr;			\
 	int  supported;				\
 } ucode_vendors[] = {				\
-	{ "intel", "GenuineIntel", 1 },		\
-	{ "amd", "AuthenticAMD", 0 },		\
-	{ NULL, NULL, 0 }				\
+	{ "intel", "txt", "GenuineIntel", 1 },	\
+	{ "amd", "bin", "AuthenticAMD", 1 },	\
+	{ NULL, NULL, NULL, 0 }			\
 }
+
+/*
+ * Microcode user operations
+ */
+struct ucode_ops {
+	int		(*convert)(const char *, uint8_t *, size_t);
+	ucode_errno_t	(*gen_files)(uint8_t *, int, char *);
+	ucode_errno_t	(*validate)(uint8_t *, int);
+};
+#endif
+
+extern const struct ucode_ops *ucode;
 
 #ifdef __cplusplus
 }

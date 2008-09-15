@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ucode.h>
@@ -46,7 +44,7 @@
  * Returns EM_OK on success, EM_HEADER on failure.
  */
 ucode_errno_t
-ucode_header_validate(ucode_header_t *uhp)
+ucode_header_validate_intel(ucode_header_intel_t *uhp)
 {
 	uint32_t header_size, body_size, total_size;
 
@@ -59,9 +57,9 @@ ucode_header_validate(ucode_header_t *uhp)
 	if (uhp->uh_header_ver != 0x1)
 		return (EM_HEADER);
 
-	header_size = UCODE_HEADER_SIZE;
-	total_size = UCODE_TOTAL_SIZE(uhp->uh_total_size);
-	body_size = UCODE_BODY_SIZE(uhp->uh_body_size);
+	header_size = UCODE_HEADER_SIZE_INTEL;
+	total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
+	body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
 
 	/*
 	 * The body size field of the microcode code header specifies the size
@@ -91,7 +89,7 @@ ucode_header_validate(ucode_header_t *uhp)
 	 */
 	if (total_size > (header_size + body_size)) {
 		if ((total_size - body_size - header_size -
-		    UCODE_EXT_TABLE_SIZE) % UCODE_EXT_SIG_SIZE) {
+		    UCODE_EXT_TABLE_SIZE_INTEL) % UCODE_EXT_SIG_SIZE_INTEL) {
 
 			return (EM_HEADER);
 		}
@@ -104,7 +102,7 @@ ucode_header_validate(ucode_header_t *uhp)
  * Returns checksum.
  */
 uint32_t
-ucode_checksum(uint32_t sum, uint32_t size, uint8_t *code)
+ucode_checksum_intel(uint32_t sum, uint32_t size, uint8_t *code)
 {
 	int i;
 	uint32_t *lcode = (uint32_t *)(intptr_t)code;
@@ -117,9 +115,65 @@ ucode_checksum(uint32_t sum, uint32_t size, uint8_t *code)
 }
 
 ucode_errno_t
-ucode_validate(uint8_t *ucodep, int size)
+ucode_validate_amd(uint8_t *ucodep, int size)
 {
-	uint32_t header_size = UCODE_HEADER_SIZE;
+	/* LINTED: pointer alignment */
+	uint32_t *ptr = (uint32_t *)ucodep;
+	uint32_t count;
+
+	if (ucodep == NULL || size <= 0)
+		return (EM_INVALIDARG);
+
+	/* Magic Number: "AMD\0" */
+	size -= 4;
+	if (*ptr++ != 0x00414d44)
+		return (EM_FILEFORMAT);
+
+	/* equivalence table */
+	size -= 4;
+	if (*ptr++)
+		return (EM_FILEFORMAT);
+
+	size -= 4;
+	if (((count = *ptr++) > size) || (count % 16))
+		return (EM_FILEFORMAT);
+
+	/* LINTED: pointer alignment */
+	ptr = (uint32_t *)(((uint8_t *)ptr) + count);
+	size -= count;
+
+	/*
+	 * minimum valid size:
+	 * - type and size fields (8 bytes)
+	 * - patch header (64 bytes)
+	 * - one patch triad (28 bytes)
+	 */
+	while (size >= 100) {
+		/* microcode patch */
+		size -= 4;
+		if (*ptr++ != 1)
+			return (EM_FILEFORMAT);
+
+		size -= 4;
+		if (((count = *ptr++) > size) ||
+		    ((count - sizeof (ucode_header_amd_t)) % 28))
+			return (EM_FILEFORMAT);
+
+		/* LINTED: pointer alignment */
+		ptr = (uint32_t *)(((uint8_t *)ptr) + count);
+		size -= count;
+	}
+
+	if (size)
+		return (EM_FILEFORMAT);
+
+	return (EM_OK);
+}
+
+ucode_errno_t
+ucode_validate_intel(uint8_t *ucodep, int size)
+{
+	uint32_t header_size = UCODE_HEADER_SIZE_INTEL;
 	int remaining;
 
 	if (ucodep == NULL || size <= 0)
@@ -127,36 +181,38 @@ ucode_validate(uint8_t *ucodep, int size)
 
 	for (remaining = size; remaining > 0; ) {
 		uint32_t total_size, body_size, ext_size;
-		ucode_header_t *uhp;
+		ucode_header_intel_t *uhp;
 		uint8_t *curbuf = &ucodep[size - remaining];
 		ucode_errno_t rc;
 
-		uhp = (ucode_header_t *)(intptr_t)curbuf;
+		uhp = (ucode_header_intel_t *)(intptr_t)curbuf;
 
-		if ((rc = ucode_header_validate(uhp)) != EM_OK)
+		if ((rc = ucode_header_validate_intel(uhp)) != EM_OK)
 			return (rc);
 
-		total_size = UCODE_TOTAL_SIZE(uhp->uh_total_size);
+		total_size = UCODE_TOTAL_SIZE_INTEL(uhp->uh_total_size);
 
-		if (ucode_checksum(0, total_size, curbuf))
+		if (ucode_checksum_intel(0, total_size, curbuf))
 			return (EM_CHECKSUM);
 
-		body_size = UCODE_BODY_SIZE(uhp->uh_body_size);
+		body_size = UCODE_BODY_SIZE_INTEL(uhp->uh_body_size);
 		ext_size = total_size - (header_size + body_size);
 
 		if (ext_size > 0) {
 			uint32_t i;
 
-			if (ucode_checksum(0, ext_size,
+			if (ucode_checksum_intel(0, ext_size,
 			    &curbuf[header_size + body_size])) {
 				return (EM_CHECKSUM);
 			}
 
-			ext_size -= UCODE_EXT_TABLE_SIZE;
-			for (i = 0; i < ext_size / UCODE_EXT_SIG_SIZE; i++) {
-				if (ucode_checksum(0, UCODE_EXT_SIG_SIZE,
+			ext_size -= UCODE_EXT_TABLE_SIZE_INTEL;
+			for (i = 0; i < ext_size / UCODE_EXT_SIG_SIZE_INTEL;
+			    i++) {
+				if (ucode_checksum_intel(0,
+				    UCODE_EXT_SIG_SIZE_INTEL,
 				    &curbuf[total_size - ext_size +
-				    i * UCODE_EXT_SIG_SIZE])) {
+				    i * UCODE_EXT_SIG_SIZE_INTEL])) {
 
 					return (EM_CHECKSUM);
 				}

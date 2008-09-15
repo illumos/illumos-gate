@@ -138,6 +138,12 @@ ucode_open(dev_t *dev, int flag, int otyp, cred_t *cr)
 static int
 ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 {
+	/*
+	 * Make sure that the ucode ops pointer has been set up.
+	 */
+	if (!ucode)
+		return (EIO);
+
 	switch (cmd) {
 	case UCODE_GET_VERSION: {
 		int size;
@@ -218,7 +224,7 @@ ucode_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 			return (EFAULT);
 		}
 
-		if ((rc = ucode_validate(ucodep, size)) != EM_OK) {
+		if ((rc = ucode->validate(ucodep, size)) != EM_OK) {
 			kmem_free(ucodep, size);
 			STRUCT_FSET(h, uw_errno, rc);
 			if (ddi_copyout(STRUCT_BUF(h), (void *)arg,
