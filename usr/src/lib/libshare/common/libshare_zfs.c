@@ -1278,6 +1278,17 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 		}
 
 		/*
+		 * Make sure only one leading '/' This condition came
+		 * about when using HAStoragePlus which insisted on
+		 * putting an extra leading '/' in the ZFS path
+		 * name. The problem is fixed in other areas, but this
+		 * will catch any other ways that a double slash might
+		 * get introduced.
+		 */
+		while (*pathp == '/' && *(pathp + 1) == '/')
+			pathp++;
+
+		/*
 		 * chop off part of path, but if we are at root then
 		 * make sure path is a /
 		 */
