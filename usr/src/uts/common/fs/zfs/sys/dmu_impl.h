@@ -49,7 +49,7 @@ extern "C" {
  * XXX try to improve evicting path?
  *
  * dp_config_rwlock > os_obj_lock > dn_struct_rwlock >
- * 	dn_dbufs_mtx > hash_mutexes > db_mtx > leafs
+ * 	dn_dbufs_mtx > hash_mutexes > db_mtx > dd_lock > leafs
  *
  * dp_config_rwlock
  *    must be held before: everything
@@ -176,6 +176,9 @@ extern "C" {
  *   	dmu_tx_unassign: none
  *
  * dd_lock
+ *    must be held before:
+ *      ds_lock
+ *      ancestors' dd_lock
  *    protects:
  *    	dd_prop_cbs
  *    	dd_sync_*

@@ -929,13 +929,15 @@ dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
     int64_t used, int64_t compressed, int64_t uncompressed, dmu_tx_t *tx)
 {
 	int64_t accounted_delta;
+	boolean_t needlock = !MUTEX_HELD(&dd->dd_lock);
 
 	ASSERT(dmu_tx_is_syncing(tx));
 	ASSERT(type < DD_USED_NUM);
 
 	dsl_dir_dirty(dd, tx);
 
-	mutex_enter(&dd->dd_lock);
+	if (needlock)
+		mutex_enter(&dd->dd_lock);
 	accounted_delta = parent_delta(dd, dd->dd_phys->dd_used_bytes, used);
 	ASSERT(used >= 0 || dd->dd_phys->dd_used_bytes >= -used);
 	ASSERT(compressed >= 0 ||
@@ -958,7 +960,8 @@ dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
 		ASSERT3U(u, ==, dd->dd_phys->dd_used_bytes);
 #endif
 	}
-	mutex_exit(&dd->dd_lock);
+	if (needlock)
+		mutex_exit(&dd->dd_lock);
 
 	if (dd->dd_parent != NULL) {
 		dsl_dir_diduse_space(dd->dd_parent, DD_USED_CHILD,
@@ -973,6 +976,8 @@ void
 dsl_dir_transfer_space(dsl_dir_t *dd, int64_t delta,
     dd_used_t oldtype, dd_used_t newtype, dmu_tx_t *tx)
 {
+	boolean_t needlock = !MUTEX_HELD(&dd->dd_lock);
+
 	ASSERT(dmu_tx_is_syncing(tx));
 	ASSERT(oldtype < DD_USED_NUM);
 	ASSERT(newtype < DD_USED_NUM);
@@ -981,16 +986,17 @@ dsl_dir_transfer_space(dsl_dir_t *dd, int64_t delta,
 		return;
 
 	dsl_dir_dirty(dd, tx);
-	mutex_enter(&dd->dd_lock);
+	if (needlock)
+		mutex_enter(&dd->dd_lock);
 	ASSERT(delta > 0 ?
 	    dd->dd_phys->dd_used_breakdown[oldtype] >= delta :
 	    dd->dd_phys->dd_used_breakdown[newtype] >= -delta);
 	ASSERT(dd->dd_phys->dd_used_bytes >= ABS(delta));
 	dd->dd_phys->dd_used_breakdown[oldtype] -= delta;
 	dd->dd_phys->dd_used_breakdown[newtype] += delta;
-	mutex_exit(&dd->dd_lock);
+	if (needlock)
+		mutex_exit(&dd->dd_lock);
 }
-
 
 static int
 dsl_dir_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
@@ -1121,13 +1127,13 @@ dsl_dir_set_reservation_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	delta = MAX(used, new_reservation) -
 	    MAX(used, dd->dd_phys->dd_reserved);
 	dd->dd_phys->dd_reserved = new_reservation;
-	mutex_exit(&dd->dd_lock);
 
 	if (dd->dd_parent != NULL) {
 		/* Roll up this additional usage into our ancestors */
 		dsl_dir_diduse_space(dd->dd_parent, DD_USED_CHILD_RSRV,
 		    delta, 0, 0, tx);
 	}
+	mutex_exit(&dd->dd_lock);
 
 	spa_history_internal_log(LOG_DS_RESERVATION, dd->dd_pool->dp_spa,
 	    tx, cr, "%lld dataset = %llu",
@@ -1322,22 +1328,4 @@ dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space)
 		return (ENOSPC);
 
 	return (0);
-}
-
-void
-dsl_dir_new_refreservation(dsl_dir_t *dd, dsl_dataset_t *ds,
-    uint64_t new_reservation, cred_t *cr, dmu_tx_t *tx)
-{
-	int64_t delta;
-
-	mutex_enter(&dd->dd_lock);
-	delta = dsl_dataset_new_refreservation(ds, new_reservation, tx);
-	mutex_exit(&dd->dd_lock);
-
-	dsl_dir_diduse_space(dd, DD_USED_REFRSRV, delta, 0, 0, tx);
-	dsl_prop_set_uint64_sync(dd, "refreservation", new_reservation, cr, tx);
-
-	spa_history_internal_log(LOG_DS_REFRESERV,
-	    dd->dd_pool->dp_spa, tx, cr, "%lld dataset = %llu",
-	    (longlong_t)new_reservation, ds->ds_object);
 }
