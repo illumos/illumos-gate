@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_server.c	1.10	08/08/07 SMI"
-
 /*
  * General Structures Layout
  * -------------------------
@@ -378,6 +376,7 @@ smb_server_create(void)
 
 	sv->sv_pid = curproc->p_pid;
 
+	smb_kdoor_clnt_init();
 	smb_opipe_door_init();
 	(void) smb_server_kstat_init(sv);
 
@@ -458,6 +457,7 @@ smb_server_delete(void)
 	smb_server_stop(sv);
 	rw_destroy(&sv->sv_cfg_lock);
 	smb_opipe_door_fini();
+	smb_kdoor_clnt_fini();
 	smb_server_kstat_fini(sv);
 	smb_llist_destructor(&sv->sv_vfs_list);
 	kmem_cache_destroy(sv->si_cache_vfs);
@@ -469,7 +469,6 @@ smb_server_delete(void)
 	kmem_cache_destroy(sv->si_cache_odir);
 	kmem_cache_destroy(sv->si_cache_node);
 
-	taskq_destroy(sv->sv_thread_pool);
 	smb_thread_destroy(&sv->si_thread_timers);
 	mutex_destroy(&sv->sv_mutex);
 	cv_destroy(&sv->sv_cv);
@@ -544,7 +543,8 @@ smb_server_start(struct smb_io_start *io_start)
 		    TASKQ_DYNAMIC|TASKQ_PREPOPULATE);
 
 		sv->sv_session = smb_session_create(NULL, 0, sv);
-		if (sv->sv_session == NULL) {
+
+		if (sv->sv_thread_pool == NULL || sv->sv_session == NULL) {
 			rc = ENOMEM;
 			break;
 		}
@@ -555,10 +555,12 @@ smb_server_start(struct smb_io_start *io_start)
 		sv->sv_lmshrd = smb_kshare_init(io_start->lmshrd);
 		if (sv->sv_lmshrd == NULL)
 			break;
-		if (rc = smb_kdoor_clnt_start(io_start->udoor))
+		if (rc = smb_kdoor_clnt_open(io_start->udoor))
 			break;
-		if (rc = smb_kdoor_srv_set_dwncall())
+		if (rc = smb_kdoor_srv_set_downcall()) {
+			cmn_err(CE_WARN, "Cannot set downcall descriptor");
 			break;
+		}
 		if (rc = smb_thread_start(&sv->si_thread_timers))
 			break;
 		/*
@@ -1173,13 +1175,19 @@ smb_server_stop(smb_server_t *sv)
 
 	smb_opipe_door_close();
 	smb_thread_stop(&sv->si_thread_timers);
-	smb_kdoor_clnt_stop();
+	smb_kdoor_clnt_close();
 	smb_kshare_fini(sv->sv_lmshrd);
 	sv->sv_lmshrd = NULL;
 	smb_server_fsop_stop(sv);
+
 	if (sv->sv_session) {
 		smb_session_delete(sv->sv_session);
 		sv->sv_session = NULL;
+	}
+
+	if (sv->sv_thread_pool) {
+		taskq_destroy(sv->sv_thread_pool);
+		sv->sv_thread_pool = NULL;
 	}
 }
 

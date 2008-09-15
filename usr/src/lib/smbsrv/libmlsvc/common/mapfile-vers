@@ -30,11 +30,16 @@ SUNWprivate {
 	lsa_enum_trusted_domains;
 	lsa_query_account_domain_info;
 	lsa_query_primary_domain_info;
+	mlsvc_get_door_fd;
+	mlsvc_get_num_users;
+	mlsvc_get_user_list;
 	mlsvc_init;
 	mlsvc_join;
 	mlsvc_lookup_name;
 	mlsvc_lookup_sid;
 	mlsvc_netlogon;
+	mlsvc_set_door_fd;
+	mlsvc_set_share;
 	smb_autohome_add;
 	smb_autohome_remove;
 	smb_logon;

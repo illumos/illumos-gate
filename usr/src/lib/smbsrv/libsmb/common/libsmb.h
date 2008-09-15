@@ -26,8 +26,6 @@
 #ifndef	_LIBSMB_H
 #define	_LIBSMB_H
 
-#pragma ident	"@(#)libsmb.h	1.12	08/07/30 SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -231,13 +229,6 @@ extern void smb_setdomaininfo(char *, char *, uint32_t);
 extern void smb_logdomaininfo(smb_ntdomain_t *);
 extern uint32_t smb_get_dcinfo(smb_ntdomain_t *);
 extern bool_t xdr_smb_dr_domain_t(XDR *, smb_ntdomain_t *);
-
-/*
- * Following set of function, handle calls to SMB Kernel driver, via
- * Kernel doors interface.
- */
-extern uint64_t smb_dwncall_user_num(void);
-extern int smb_dwncall_share(int, char *, char *);
 
 /*
  * buffer context structure. This is used to keep track of the buffer

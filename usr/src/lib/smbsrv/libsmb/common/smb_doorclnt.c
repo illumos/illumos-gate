@@ -19,17 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * User-space door client routines for both SMB daemon and CLIs.
  */
 
-#include <fcntl.h>
 #include <syslog.h>
 #include <door.h>
 #include <string.h>
@@ -42,107 +39,76 @@
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_common_door.h>
 
+#define	SMB_DOOR_CALL_RETRIES		3
+
+void
+smb_dr_clnt_setup(door_arg_t *arg, char *buf, size_t buflen)
+{
+	arg->data_ptr = buf;
+	arg->data_size = buflen;
+	arg->desc_ptr = NULL;
+	arg->desc_num = 0;
+	arg->rbuf = buf;
+	arg->rsize = buflen;
+}
+
 /*
- * Returns 0 on success. Otherwise, -1.
+ * Free resources allocated for a door call.  If the result buffer provided
+ * by the client is too small, the doorfs will have allocated a new buffer,
+ * which must be unmapped here.
+ *
+ * This function must be called to free both the argument and result door
+ * buffers regardless of the status of the door call.
+ */
+void
+smb_dr_clnt_cleanup(door_arg_t *arg)
+{
+	if (arg->rbuf && (arg->rbuf != arg->data_ptr))
+		(void) munmap(arg->rbuf, arg->rsize);
+
+	free(arg->data_ptr);
+}
+
+/*
+ * Make a door call to the server function associated with the door
+ * descriptor fd.
+ *
+ * After a successful door call the local door_arg->data_ptr is assigned
+ * to the caller's arg->rbuf so that arg has references to both input and
+ * response buffers, which is required by smb_dr_clnt_free.
+ *
+ * On success, 0 will be returned and the call results can be referenced
+ * via arg->rbuf and arg->rsize.  Otherwise -1 will be returned.
  */
 int
-smb_dr_clnt_open(int *fd, char *path, char *op_desc)
+smb_dr_clnt_call(int fd, door_arg_t *arg)
 {
-	int rc = 0;
+	door_arg_t door_arg;
+	int rc;
+	int i;
 
-	if (!op_desc)
-		op_desc = "unknown operation";
-
-	if (!path || !fd)
+	if (fd < 0 || arg == NULL)
 		return (-1);
 
-	if ((*fd = open(path, O_RDONLY)) < 0) {
-		syslog(LOG_ERR, "%s: open %s failed %s", op_desc,
-		    path, strerror(errno));
+	bcopy(arg, &door_arg, sizeof (door_arg_t));
+
+	for (i = 0; i < SMB_DOOR_CALL_RETRIES; ++i) {
+		errno = 0;
+
+		if ((rc = door_call(fd, &door_arg)) == 0)
+			break;
+
+		if (errno != EAGAIN && errno != EINTR)
+			return (-1);
+	}
+
+	if (rc != 0)
+		return (-1);
+
+	if ((rc = smb_dr_get_res_stat(door_arg.data_ptr, door_arg.rsize)) != 0)
 		rc = -1;
-	}
 
+	arg->rbuf = door_arg.data_ptr;
+	arg->rsize = door_arg.rsize;
 	return (rc);
-}
-
-/*
- * smb_dr_clnt_call
- *
- * This function will make a door call to the server function
- * associated with the door descriptor fd. The specified door
- * request buffer (i.e. argp) will be passed as the argument to the
- * door_call(). Upon success, the result buffer is returned. Otherwise,
- * NULL pointer is returned. The size of the result buffer is returned
- * via rbufsize.
- */
-char *
-smb_dr_clnt_call(int fd, char *argp, size_t arg_size, size_t *rbufsize,
-    char *op_desc)
-{
-	door_arg_t arg;
-
-	if (!argp) {
-		syslog(LOG_ERR, "smb_dr_clnt_call: invalid parameter");
-		return (NULL);
-	}
-
-	arg.data_ptr = argp;
-	arg.data_size = arg_size;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = argp;
-	arg.rsize = arg_size;
-
-	if (!op_desc)
-		op_desc = "unknown operation";
-
-	if (door_call(fd, &arg) < 0) {
-		syslog(LOG_ERR, "%s: Door call failed %s", op_desc,
-		    strerror(errno));
-		free(argp);
-		argp = NULL;
-		return (NULL);
-	}
-
-	if (smb_dr_get_res_stat(arg.data_ptr, arg.rsize)
-	    != SMB_DR_OP_SUCCESS) {
-		smb_dr_clnt_free(argp, arg_size, arg.rbuf, arg.rsize);
-		*rbufsize = 0;
-		return (NULL);
-	}
-	*rbufsize = arg.rsize;
-	return (arg.data_ptr);
-}
-
-/*
- * smb_dr_clnt_free
- *
- * This function should be invoked to free both the argument/result door buffer
- * regardless of the status of the door call.
- *
- * The doorfs allocates a new buffer if the result buffer passed by the client
- * is too small. This function will munmap if that happens.
- */
-/*ARGSUSED*/
-void
-smb_dr_clnt_free(char *argp, size_t arg_size, char *rbufp, size_t rbuf_size)
-{
-	if (argp) {
-		if (argp == rbufp) {
-			free(argp);
-			argp = NULL;
-		} else if (rbufp) {
-			free(argp);
-			argp = NULL;
-			if (munmap(rbufp, rbuf_size) != 0) {
-				syslog(LOG_ERR, "munmap failed");
-			}
-		}
-	} else {
-		if (rbufp) {
-			if (munmap(rbufp, rbuf_size) != 0) {
-				syslog(LOG_ERR, "munmap failed");
-			}
-		}
-	}
 }

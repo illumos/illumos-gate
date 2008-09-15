@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel door service
  * It has dependency on the kernel door client interface because the downcall
@@ -79,31 +77,24 @@ smb_kdoor_srv_start(void)
 }
 
 /*
- * smb_kdoor_srv_set_dwncall
+ * smb_kdoor_srv_set_downcall
  *
  * The door descriptor will be passed up to the user-space SMB daemon.
  */
 int
-smb_kdoor_srv_set_dwncall(void)
+smb_kdoor_srv_set_downcall(void)
 {
 	door_desc_t	smb_kdoor_desc;
-	int		rc;
 
 	bzero(&smb_kdoor_desc, sizeof (smb_kdoor_desc));
 
 	smb_kdoor_desc.d_attributes = DOOR_HANDLE;
 	smb_kdoor_desc.d_data.d_handle = smb_kdoor_hdl;
 
-	rc = smb_upcall_set_dwncall_desc(SMB_DR_SET_DWNCALL_DESC,
-	    &smb_kdoor_desc, 1);
+	if (smb_set_downcall_desc(&smb_kdoor_desc, 1) != 0)
+		return (EIO);
 
-	if (rc != SMB_DR_OP_SUCCESS) {
-		cmn_err(CE_WARN, "SmbKdoorInit: smbd failed to set the"
-		    " downcall descriptor res=%d", rc);
-		rc = EIO;
-	}
-
-	return (rc);
+	return (0);
 }
 
 door_handle_t

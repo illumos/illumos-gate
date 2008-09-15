@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbd_door_ops.c	1.6	08/07/16 SMI"
-
 /*
  * SMBd door operations
  */
@@ -37,10 +35,7 @@
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
-static int smb_set_downcall_desc(int desc);
-static int smb_get_downcall_desc(void);
-
-static char *smb_dop_set_dwncall_desc(char *argp, size_t arg_size,
+static char *smb_dop_set_downcall_fd(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_user_auth_logon(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
@@ -65,7 +60,7 @@ static char *smb_dop_get_dcinfo(char *argp, size_t arg_size,
 smb_dr_op_t smb_doorsrv_optab[] =
 {
 	smb_dop_user_auth_logon,
-	smb_dop_set_dwncall_desc,
+	smb_dop_set_downcall_fd,
 	smb_dop_user_nonauth_logon,
 	smb_dop_user_auth_logoff,
 	smb_dop_user_list,
@@ -128,45 +123,6 @@ smb_dop_user_auth_logoff(char *argp, size_t arg_size, door_desc_t *dp,
 }
 
 /*
- * smb_downcall_desc
- *
- * This downcall descriptor will be initialized when the SMB Kmod
- * makes a upcall for the SMBD_DOOR_SET_DOWNCALL_DESC.
- * This descriptor should be passed as the 1st argument to the
- * door_call() whenever the SMBD is making a downcall to SMB Kmod.
- */
-static int smb_downcall_desc = -1;
-static mutex_t smb_downcall_mutex;
-
-/*
- * Get and set the smb downcall descriptor.
- */
-static int
-smb_set_downcall_desc(int desc)
-{
-	(void) mutex_lock(&smb_downcall_mutex);
-	smb_downcall_desc = desc;
-	(void) mutex_unlock(&smb_downcall_mutex);
-	return (0);
-}
-
-/*
- * smb_get_downcall_desc
- *
- * Returns the downcall descriptor.
- */
-static int
-smb_get_downcall_desc(void)
-{
-	int rc;
-
-	(void) mutex_lock(&smb_downcall_mutex);
-	rc = smb_downcall_desc;
-	(void) mutex_unlock(&smb_downcall_mutex);
-	return (rc);
-}
-
-/*
  * smb_dr_is_valid_opcode
  *
  * Validates the given door opcode.
@@ -219,13 +175,11 @@ smb_dop_user_auth_logon(char *argp, size_t arg_size, door_desc_t *dp,
 }
 
 /*
- * smb_dop_set_dwncall_desc
- *
- * Set the downcall descriptor.
+ * Set the downcall file descriptor.
  */
 /*ARGSUSED*/
 static char *
-smb_dop_set_dwncall_desc(char *argp, size_t arg_size,
+smb_dop_set_downcall_fd(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
 	char *buf = NULL;
@@ -234,14 +188,13 @@ smb_dop_set_dwncall_desc(char *argp, size_t arg_size,
 	*rbufsize = 0;
 	*err = 0;
 
-	if (n_desc != 1 ||
-	    smb_set_downcall_desc(dp->d_data.d_desc.d_descriptor) != 0) {
-		stat = SMB_DR_OP_ERR;
-	} else {
-		/* install get downcall descriptor callback */
-		(void) smb_dwncall_install_callback(smb_get_downcall_desc);
+	if (n_desc == 1) {
+		mlsvc_set_door_fd(dp->d_data.d_desc.d_descriptor);
 		stat = SMB_DR_OP_SUCCESS;
+	} else {
+		stat = SMB_DR_OP_ERR;
 	}
+
 	if ((buf = smb_dr_set_res_stat(stat, rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
@@ -284,7 +237,7 @@ smb_dop_user_list(char *argp, size_t arg_size,
 		return (NULL);
 	}
 
-	cnt = smb_dwncall_get_users(offset, ulist);
+	cnt = mlsvc_get_user_list(offset, ulist);
 	if (cnt < 0) {
 		*err = SMB_DR_OP_ERR_EMPTYBUF;
 		free(ulist);

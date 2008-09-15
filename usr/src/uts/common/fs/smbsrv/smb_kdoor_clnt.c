@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/ddi.h>
@@ -34,7 +32,149 @@
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_common_door.h>
 
-door_handle_t smb_kdoor_clnt_dh = NULL;
+#define	SMB_KDOOR_RETRIES	3
+
+static char *smb_kdoor_upcall(char *, size_t, door_desc_t *, uint_t, size_t *);
+
+door_handle_t smb_kdoor_clnt_hd = NULL;
+static int smb_kdoor_clnt_id = -1;
+static uint64_t smb_kdoor_clnt_ncall = 0;
+static kmutex_t smb_kdoor_clnt_mutex;
+static kcondvar_t smb_kdoor_clnt_cv;
+
+void
+smb_kdoor_clnt_init(void)
+{
+	mutex_init(&smb_kdoor_clnt_mutex, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&smb_kdoor_clnt_cv, NULL, CV_DEFAULT, NULL);
+}
+
+void
+smb_kdoor_clnt_fini(void)
+{
+	smb_kdoor_clnt_close();
+	cv_destroy(&smb_kdoor_clnt_cv);
+	mutex_destroy(&smb_kdoor_clnt_mutex);
+}
+
+/*
+ * Open the door.  If the door is already open, close it first
+ * because the door-id has probably changed.
+ */
+int
+smb_kdoor_clnt_open(int door_id)
+{
+	int rc;
+
+	smb_kdoor_clnt_close();
+
+	mutex_enter(&smb_kdoor_clnt_mutex);
+	smb_kdoor_clnt_ncall = 0;
+
+	if (smb_kdoor_clnt_hd == NULL) {
+		smb_kdoor_clnt_id = door_id;
+		smb_kdoor_clnt_hd = door_ki_lookup(door_id);
+	}
+
+	rc = (smb_kdoor_clnt_hd == NULL)  ? -1 : 0;
+	mutex_exit(&smb_kdoor_clnt_mutex);
+	return (rc);
+}
+
+/*
+ * Close the door.
+ */
+void
+smb_kdoor_clnt_close(void)
+{
+	mutex_enter(&smb_kdoor_clnt_mutex);
+
+	if (smb_kdoor_clnt_hd != NULL) {
+		while (smb_kdoor_clnt_ncall > 0)
+			cv_wait(&smb_kdoor_clnt_cv, &smb_kdoor_clnt_mutex);
+
+		door_ki_rele(smb_kdoor_clnt_hd);
+		smb_kdoor_clnt_hd = NULL;
+	}
+
+	mutex_exit(&smb_kdoor_clnt_mutex);
+}
+
+/*
+ * smb_kdoor_clnt_upcall
+ *
+ * Wrapper to handle door call reference counting.
+ */
+char *
+smb_kdoor_clnt_upcall(char *argp, size_t arg_size, door_desc_t *dp,
+    uint_t desc_num, size_t *rbufsize)
+{
+	char *rbufp;
+
+	if (argp == NULL)
+		return (NULL);
+
+	mutex_enter(&smb_kdoor_clnt_mutex);
+
+	if (smb_kdoor_clnt_hd == NULL) {
+		mutex_exit(&smb_kdoor_clnt_mutex);
+
+		if (smb_kdoor_clnt_open(smb_kdoor_clnt_id) != 0)
+			return (NULL);
+
+		mutex_enter(&smb_kdoor_clnt_mutex);
+	}
+
+	++smb_kdoor_clnt_ncall;
+	mutex_exit(&smb_kdoor_clnt_mutex);
+
+	rbufp = smb_kdoor_upcall(argp, arg_size, dp, desc_num, rbufsize);
+
+	mutex_enter(&smb_kdoor_clnt_mutex);
+	--smb_kdoor_clnt_ncall;
+	cv_signal(&smb_kdoor_clnt_cv);
+	mutex_exit(&smb_kdoor_clnt_mutex);
+	return (rbufp);
+}
+
+/*
+ * On success, the result buffer is returned, with rbufsize set to the
+ * size of the result buffer.  Otherwise, a NULL pointer is returned.
+ */
+static char *
+smb_kdoor_upcall(char *argp, size_t arg_size, door_desc_t *dp,
+    uint_t desc_num, size_t *rbufsize)
+{
+	door_arg_t door_arg;
+	int i;
+	int rc;
+
+	door_arg.data_ptr = argp;
+	door_arg.data_size = arg_size;
+	door_arg.desc_ptr = dp;
+	door_arg.desc_num = desc_num;
+	door_arg.rbuf = argp;
+	door_arg.rsize = arg_size;
+
+	for (i = 0; i < SMB_KDOOR_RETRIES; ++i) {
+		if ((rc = door_ki_upcall_limited(smb_kdoor_clnt_hd, &door_arg,
+		    NULL, SIZE_MAX, 0)) == 0)
+			break;
+
+		if (rc != EAGAIN && rc != EINTR)
+			return (NULL);
+	}
+
+	if (rc != 0)
+		return (NULL);
+
+	rc = smb_dr_get_res_stat(door_arg.data_ptr, door_arg.rsize);
+	if (rc != SMB_DR_OP_SUCCESS)
+		return (NULL);
+
+	*rbufsize = door_arg.rsize;
+	return (door_arg.data_ptr);
+}
 
 /*
  * smb_kdoor_clnt_free
@@ -48,99 +188,9 @@ door_handle_t smb_kdoor_clnt_dh = NULL;
 void
 smb_kdoor_clnt_free(char *argp, size_t arg_size, char *rbufp, size_t rbuf_size)
 {
-	if (argp) {
-		if (argp == rbufp) {
-			kmem_free(argp, arg_size);
-		} else if (rbufp) {
-			kmem_free(argp, arg_size);
-			kmem_free(rbufp, rbuf_size);
-		}
-	} else {
-		if (rbufp)
-			kmem_free(rbufp, rbuf_size);
-	}
-}
-
-/*
- * smb_kdoor_clnt_start
- *
- * The SMB kernel module should invoke this function upon startup.
- */
-int
-smb_kdoor_clnt_start(int door_id)
-{
-	int	rc = 0;
-
-	if (smb_kdoor_clnt_dh == NULL) {
-		smb_kdoor_clnt_dh = door_ki_lookup(door_id);
-		if (smb_kdoor_clnt_dh == NULL) {
-			cmn_err(CE_WARN, "kdoor_clnt: lookup failed");
-			rc = -1;
-		}
-	}
-
-	return (rc);
-}
-
-/*
- * smb_kdoor_clnt_stop
- *
- * The SMB kernel module should invoke this function upon unload.
- */
-void
-smb_kdoor_clnt_stop()
-{
-	if (smb_kdoor_clnt_dh) {
-		door_ki_rele(smb_kdoor_clnt_dh);
-		smb_kdoor_clnt_dh = NULL;
-	}
-}
-
-/*
- * smb_kdoor_clnt_upcall
- *
- * This function will make a door up-call to the server function
- * associated with the door descriptor fp. The specified door
- * request buffer (i.e. argp) will be passed as the argument to the
- * door_ki_upcall(). Upon success, the result buffer is returned. Otherwise,
- * NULL pointer is returned. The size of the result buffer is returned
- * via rbufsize.
- */
-char *
-smb_kdoor_clnt_upcall(char *argp, size_t arg_size, door_desc_t *dp,
-    uint_t desc_num, size_t *rbufsize)
-{
-	door_arg_t door_arg;
-	int err;
-
-	if (!argp) {
-		cmn_err(CE_WARN, "smb_kdoor_clnt_upcall: invalid parameter");
-		return (NULL);
-	}
-
-	door_arg.data_ptr = argp;
-	door_arg.data_size = arg_size;
-	door_arg.desc_ptr = dp;
-	door_arg.desc_num = desc_num;
-	door_arg.rbuf = argp;
-	door_arg.rsize = arg_size;
-
-	if ((err = door_ki_upcall_limited(smb_kdoor_clnt_dh, &door_arg, NULL,
-	    SIZE_MAX, 0)) != 0) {
-		cmn_err(CE_WARN, "smb_kdoor_clnt_upcall: failed(%d)", err);
+	if (argp)
 		kmem_free(argp, arg_size);
-		argp = NULL;
-		return (NULL);
-	}
 
-	if (smb_dr_get_res_stat(door_arg.data_ptr, door_arg.rsize) !=
-	    SMB_DR_OP_SUCCESS) {
-		smb_kdoor_clnt_free(argp, arg_size, door_arg.rbuf,
-		    door_arg.rsize);
-		*rbufsize = 0;
-		return (NULL);
-	}
-	*rbufsize = door_arg.rsize;
-	return (door_arg.data_ptr);
-
+	if (rbufp && rbufp != argp)
+		kmem_free(rbufp, rbuf_size);
 }

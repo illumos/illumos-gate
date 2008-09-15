@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_share.c	1.7	08/08/07 SMI"
-
 /*
  * Lan Manager (SMB/CIFS) share interface implementation. This interface
  * returns Win32 error codes, usually network error values (lmerr.h).
@@ -50,6 +48,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
+#include <smbsrv/libmlsvc.h>
 
 #include <libshare.h>
 
@@ -265,7 +264,7 @@ smb_shr_create(smb_share_t *si, boolean_t store)
 		}
 	}
 
-	rc = smb_dwncall_share(SMB_SHROP_ADD, si->shr_path, si->shr_name);
+	rc = mlsvc_set_share(SMB_SHROP_ADD, si->shr_path, si->shr_name);
 
 	if (rc == 0) {
 		smb_shr_publish(si->shr_name, si->shr_container,
@@ -317,7 +316,7 @@ smb_shr_delete(char *sharename, boolean_t store)
 
 	smb_shr_cache_delent(si.shr_name);
 	smb_shr_publish(si.shr_name, si.shr_container, SMB_SHR_UNPUBLISH);
-	(void) smb_dwncall_share(SMB_SHROP_DELETE, si.shr_path, si.shr_name);
+	(void) mlsvc_set_share(SMB_SHROP_DELETE, si.shr_path, si.shr_name);
 
 	return (NERR_Success);
 }
@@ -822,8 +821,7 @@ smb_shr_create_autohome(smb_share_t *si)
 		if ((status = smb_shr_cache_addent(si)) != NERR_Success)
 			return (status);
 
-		rc = smb_dwncall_share(SMB_SHROP_ADD, si->shr_path,
-		    si->shr_name);
+		rc = mlsvc_set_share(SMB_SHROP_ADD, si->shr_path, si->shr_name);
 
 		if (rc != 0) {
 			smb_shr_cache_delent(si->shr_name);

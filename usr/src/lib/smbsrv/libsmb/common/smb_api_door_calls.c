@@ -23,13 +23,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_api_door_calls.c	1.6	08/07/16 SMI"
-
 /*
  * Door calls invoked by CLIs to obtain various SMB door service provided
  * by SMB daemon.
  */
 
+#include <fcntl.h>
 #include <syslog.h>
 #include <string.h>
 #include <strings.h>
@@ -40,20 +39,6 @@
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_common_door.h>
-
-/* indexed via opcode (smb_dr_opcode_t) */
-char *smbapi_desc[] = {
-	"",
-	"",
-	"",
-	"",
-	"SmbapiUserList",
-	"SmbLookupSid",
-	"SmbLookupName",
-	"SmbJoin",
-	"SmbGetDCInfo",
-	0
-};
 
 /*
  * This function will return information on the connected users
@@ -69,28 +54,33 @@ char *smbapi_desc[] = {
 int
 smb_api_ulist(int offset, smb_dr_ulist_t *users)
 {
-	char *buf, *rbufp;
-	size_t buflen, rbufsize;
+	door_arg_t arg;
+	char *buf;
+	size_t len;
 	int rc = -1;
 	uint_t opcode = SMB_DR_USER_LIST;
 	int fd;
 
 	bzero(users, sizeof (smb_dr_ulist_t));
-	buf = smb_dr_encode_common(opcode, &offset, xdr_uint32_t, &buflen);
-	if (!buf)
+
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (-1);
 
-	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1)
+	buf = smb_dr_encode_common(opcode, &offset, xdr_uint32_t, &len);
+	if (buf == NULL) {
+		(void) close(fd);
 		return (-1);
-
-	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
-	    smbapi_desc[opcode]);
-	if (rbufp) {
-		rc = smb_dr_decode_common(rbufp + SMB_DR_DATA_OFFSET,
-		    rbufsize - SMB_DR_DATA_OFFSET, xdr_smb_dr_ulist_t, users);
-
 	}
-	smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
+
+	smb_dr_clnt_setup(&arg, buf, len);
+
+	if (smb_dr_clnt_call(fd, &arg) == 0) {
+		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
+		len = arg.rsize - SMB_DR_DATA_OFFSET;
+		rc = smb_dr_decode_common(buf, len, xdr_smb_dr_ulist_t, users);
+	}
+
+	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
 	return (rc);
 }
@@ -109,8 +99,9 @@ smb_api_ulist(int offset, smb_dr_ulist_t *users)
 int
 smb_lookup_sid(smb_sid_t *sid, char *namebuf, int namebuflen)
 {
-	char *buf, *rbufp;
-	size_t buflen, rbufsize;
+	door_arg_t arg;
+	char *buf;
+	size_t len;
 	int opcode = SMB_DR_LOOKUP_SID;
 	char *name = NULL;
 	int fd;
@@ -122,28 +113,26 @@ smb_lookup_sid(smb_sid_t *sid, char *namebuf, int namebuflen)
 
 	smb_sid_tostr(sid, namebuf);
 
-	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1) {
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0) {
 		/* returning string SID */
 		return (NT_STATUS_SUCCESS);
 	}
 
-	/* Encode */
-	if ((buf = smb_dr_encode_string(opcode, namebuf, &buflen)) == 0) {
+	if ((buf = smb_dr_encode_string(opcode, namebuf, &len)) == 0) {
 		/* returning string SID */
 		(void) close(fd);
 		return (NT_STATUS_SUCCESS);
 	}
 
-	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
-	    smbapi_desc[opcode]);
+	smb_dr_clnt_setup(&arg, buf, len);
 
-	/* Decode Result. */
-	if (rbufp) {
-		name = smb_dr_decode_string(rbufp + SMB_DR_DATA_OFFSET,
-		    rbufsize - SMB_DR_DATA_OFFSET);
+	if (smb_dr_clnt_call(fd, &arg) == 0) {
+		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
+		len = arg.rsize - SMB_DR_DATA_OFFSET;
+		name = smb_dr_decode_string(buf, len);
 	}
 
-	smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
+	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
 
 	if (name) {
@@ -166,8 +155,9 @@ smb_lookup_sid(smb_sid_t *sid, char *namebuf, int namebuflen)
 int
 smb_lookup_name(char *name, smb_gsid_t *sid)
 {
-	char *buf, *rbufp;
-	size_t buflen, rbufsize;
+	door_arg_t arg;
+	char *buf;
+	size_t len;
 	int opcode = SMB_DR_LOOKUP_NAME;
 	char *strsid = NULL;
 	char *p;
@@ -178,31 +168,27 @@ smb_lookup_name(char *name, smb_gsid_t *sid)
 	if (*name == '\0')
 		return (NT_STATUS_NONE_MAPPED);
 
-	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1)
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	/* Encode */
-	if ((buf = smb_dr_encode_string(opcode, name, &buflen)) == 0) {
+	if ((buf = smb_dr_encode_string(opcode, name, &len)) == 0) {
 		(void) close(fd);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
-	    smbapi_desc[opcode]);
+	smb_dr_clnt_setup(&arg, buf, len);
 
-	/* Decode Result. */
-	if (rbufp) {
-		strsid = smb_dr_decode_string(rbufp + SMB_DR_DATA_OFFSET,
-		    rbufsize - SMB_DR_DATA_OFFSET);
-		if (strsid == NULL) {
-			smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
-			(void) close(fd);
-			return (NT_STATUS_INTERNAL_ERROR);
-		}
+	if (smb_dr_clnt_call(fd, &arg) == 0) {
+		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
+		len = arg.rsize - SMB_DR_DATA_OFFSET;
+		strsid = smb_dr_decode_string(buf, len);
 	}
 
-	smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
+	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
+
+	if (strsid == NULL)
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	p = strchr(strsid, '-');
 	if (p == NULL) {
@@ -220,38 +206,38 @@ smb_lookup_name(char *name, smb_gsid_t *sid)
 uint32_t
 smb_join(smb_joininfo_t *jdi)
 {
-	char *buf, *rbufp;
-	size_t buflen, rbufsize;
+	door_arg_t arg;
+	char *buf;
+	size_t len;
 	int opcode = SMB_DR_JOIN;
 	uint32_t status;
 	int fd, rc;
 
-	if (jdi == NULL) {
-		syslog(LOG_ERR, "%s: invalid parameter", smbapi_desc[opcode]);
+	if (jdi == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
-	}
 
-	buf = smb_dr_encode_common(opcode, jdi, xdr_smb_dr_joininfo_t, &buflen);
-	if (buf == NULL)
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME, smbapi_desc[opcode]) == -1) {
-		free(buf);
+	buf = smb_dr_encode_common(opcode, jdi, xdr_smb_dr_joininfo_t, &len);
+	if (buf == NULL) {
+		(void) close(fd);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
-	    smbapi_desc[opcode]);
-	if (rbufp) {
-		rc = smb_dr_decode_common(rbufp + SMB_DR_DATA_OFFSET,
-		    rbufsize - SMB_DR_DATA_OFFSET, xdr_uint32_t, &status);
+	smb_dr_clnt_setup(&arg, buf, len);
+
+	if (smb_dr_clnt_call(fd, &arg) == 0) {
+		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
+		len = arg.rsize - SMB_DR_DATA_OFFSET;
+		rc = smb_dr_decode_common(buf, len, xdr_uint32_t, &status);
 		if (rc != 0)
 			status = NT_STATUS_INTERNAL_ERROR;
 	} else {
 		status = NT_STATUS_INTERNAL_ERROR;
 	}
 
-	smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
+	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
 	return (status);
 }
@@ -265,31 +251,33 @@ smb_join(smb_joininfo_t *jdi)
 uint32_t
 smb_get_dcinfo(smb_ntdomain_t *dc_info)
 {
-	char *buf = NULL, *rbufp;
-	size_t buflen, rbufsize;
+	door_arg_t arg;
+	char *buf;
+	size_t len;
 	int opcode = SMB_DR_GET_DCINFO;
 	int fd, rc = NT_STATUS_SUCCESS;
 
-	if ((buf = smb_dr_set_opcode(opcode, &buflen)) == NULL)
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	if (smb_dr_clnt_open(&fd, SMB_DR_SVC_NAME,
-	    smbapi_desc[opcode]) == -1) {
-		free(buf);
+	if ((buf = smb_dr_set_opcode(opcode, &len)) == NULL) {
+		(void) close(fd);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
-	    smbapi_desc[opcode]);
-	if (rbufp) {
-		if (smb_dr_decode_common(rbufp + SMB_DR_DATA_OFFSET,
-		    rbufsize - SMB_DR_DATA_OFFSET, xdr_smb_dr_domain_t,
-		    dc_info) != NULL)
+	smb_dr_clnt_setup(&arg, buf, len);
+
+	if (smb_dr_clnt_call(fd, &arg) == 0) {
+		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
+		len = arg.rsize - SMB_DR_DATA_OFFSET;
+		rc = smb_dr_decode_common(buf, len, xdr_smb_dr_domain_t,
+		    dc_info);
+		if (rc != 0)
 			rc = NT_STATUS_INTERNAL_ERROR;
 	}
-	smb_dr_clnt_free(buf, buflen, rbufp, rbufsize);
-	(void) close(fd);
 
+	smb_dr_clnt_cleanup(&arg);
+	(void) close(fd);
 	return (rc);
 }
 

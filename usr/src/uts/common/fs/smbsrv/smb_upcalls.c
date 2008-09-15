@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -67,38 +65,36 @@ smb_user_auth_logoff(uint32_t audit_sid)
 smb_token_t *
 smb_upcall_get_token(netr_client_t *clnt_info)
 {
-	char *argp, *rbufp;
-	size_t arg_size, rbuf_size;
+	char *arg, *rsp;
+	size_t arg_size, rsp_size;
 	smb_token_t *token = NULL;
 
-	argp = smb_dr_encode_arg_get_token(clnt_info, &arg_size);
-	rbufp = smb_kdoor_clnt_upcall(argp, arg_size, NULL, 0, &rbuf_size);
-	if (rbufp)
-		token = smb_dr_decode_res_token(rbufp + SMB_DR_DATA_OFFSET,
-		    rbuf_size - SMB_DR_DATA_OFFSET);
+	if ((arg = smb_dr_encode_arg_get_token(clnt_info, &arg_size)) == NULL)
+		return (NULL);
 
-	smb_kdoor_clnt_free(argp, arg_size, rbufp, rbuf_size);
+	rsp = smb_kdoor_clnt_upcall(arg, arg_size, NULL, 0, &rsp_size);
+	if (rsp) {
+		token = smb_dr_decode_res_token(rsp + SMB_DR_DATA_OFFSET,
+		    rsp_size - SMB_DR_DATA_OFFSET);
+	}
+
+	smb_kdoor_clnt_free(arg, arg_size, rsp, rsp_size);
 	return (token);
 
 }
 
 int
-smb_upcall_set_dwncall_desc(uint32_t opcode, door_desc_t *dp, uint_t n_desc)
+smb_set_downcall_desc(door_desc_t *dp, uint_t n_desc)
 {
-	char *argp, *rbufp;
-	size_t arg_size, rbuf_size;
+	char *arg, *rsp;
+	size_t arg_size, rsp_size;
 
-	argp = smb_dr_set_opcode(opcode, &arg_size);
-	if (argp == NULL) {
-		return (SMB_DR_OP_ERR_ENCODE);
-	}
+	arg = smb_dr_set_opcode(SMB_DR_SET_DWNCALL_DESC, &arg_size);
+	if (arg == NULL)
+		return (-1);
 
-	rbufp = smb_kdoor_clnt_upcall(argp, arg_size, dp, n_desc, &rbuf_size);
-	if (rbufp == NULL) {
-		return (SMB_DR_OP_ERR);
-	}
+	rsp = smb_kdoor_clnt_upcall(arg, arg_size, dp, n_desc, &rsp_size);
 
-	smb_kdoor_clnt_free(argp, arg_size, rbufp, rbuf_size);
-
-	return (SMB_DR_OP_SUCCESS);
+	smb_kdoor_clnt_free(arg, arg_size, rsp, rsp_size);
+	return ((rsp == NULL) ? -1 : 0);
 }

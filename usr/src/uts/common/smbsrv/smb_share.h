@@ -26,8 +26,6 @@
 #ifndef _SMB_SHARE_H
 #define	_SMB_SHARE_H
 
-#pragma ident	"@(#)smb_share.h	1.7	08/08/07 SMI"
-
 /*
  * This file defines the LanMan (CIFS/SMB) resource share interface.
  */
@@ -231,7 +229,8 @@ uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 void smb_dr_get_share(smb_dr_ctx_t *, smb_share_t *);
 void smb_dr_put_share(smb_dr_ctx_t *, smb_share_t *);
 
-void smb_share_dclose(void);
+void smb_share_door_clnt_init(void);
+void smb_share_door_clnt_fini(void);
 
 #ifdef __cplusplus
 }

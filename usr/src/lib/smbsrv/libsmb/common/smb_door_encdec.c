@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <strings.h>
 #include <rpc/xdr.h>
@@ -46,15 +44,13 @@ smb_dr_decode_common(char *buf, size_t len, xdrproc_t proc, void *data)
 	XDR xdrs;
 	int rc = 0;
 
-	if (!data) {
-		syslog(LOG_ERR, "smb_dr_decode_common: invalid param");
+	if (!data)
 		return (-1);
-	}
 
 	xdrmem_create(&xdrs, buf, len, XDR_DECODE);
-	if (!proc(&xdrs, data)) {
+	if (!proc(&xdrs, data))
 		rc = -1;
-	}
+
 	xdr_destroy(&xdrs);
 	return (rc);
 }
@@ -144,10 +140,12 @@ smb_dr_set_opcode(uint32_t opcode, size_t *len)
 int
 smb_dr_get_res_stat(char *rbufp, size_t rbuf_size)
 {
-	int stat;
-	if (smb_dr_decode_common(rbufp, rbuf_size, xdr_uint32_t, &stat) != 0)
-		stat = -1;
-	return (stat);
+	int status;
+
+	if (smb_dr_decode_common(rbufp, rbuf_size, xdr_uint32_t, &status) != 0)
+		status = -1;
+
+	return (status);
 }
 
 /*
@@ -194,10 +192,6 @@ smb_dr_encode_kshare(smb_dr_kshare_t *kshare, size_t *buflen)
 	char *buf = NULL;
 
 	res.bytes_val = smb_kshare_mkselfrel(kshare, &res.bytes_len);
-
-	free(kshare->k_path);
-	free(kshare->k_sharename);
-
 	if (!res.bytes_val)
 		return (NULL);
 
@@ -205,7 +199,6 @@ smb_dr_encode_kshare(smb_dr_kshare_t *kshare, size_t *buflen)
 	    buflen);
 
 	free(res.bytes_val);
-
 	return (buf);
 }
 

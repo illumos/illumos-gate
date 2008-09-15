@@ -26,8 +26,6 @@
 #ifndef	_SMBSRV_SMB_DOOR_SVC_H
 #define	_SMBSRV_SMB_DOOR_SVC_H
 
-#pragma ident	"@(#)smb_door_svc.h	1.5	08/07/16 SMI"
-
 #include <sys/door.h>
 #include <smbsrv/smb_token.h>
 
@@ -126,7 +124,7 @@ typedef struct smb_kdoor_cb_arg {
  * NOTE: smb_kdoor_srv_init()/smb_kdoor_srv_fini() are noops.
  */
 int smb_kdoor_srv_start(void);
-int smb_kdoor_srv_set_dwncall(void);
+int smb_kdoor_srv_set_downcall(void);
 void smb_kdoor_srv_stop(void);
 int smb_kdr_is_valid_opcode(int);
 
@@ -139,16 +137,18 @@ char *smb_kdr_op_share(char *, size_t, size_t *, int *);
  * ------------------------
  * NOTE: smb_kdoor_clnt_init()/smb_kdoor_clnt_fini() are noops.
  */
-int smb_kdoor_clnt_start(int);
-void smb_kdoor_clnt_stop(void);
-void smb_kdoor_clnt_free(char *, size_t, char *, size_t);
+void smb_kdoor_clnt_init(void);
+void smb_kdoor_clnt_fini(void);
+int smb_kdoor_clnt_open(int);
+void smb_kdoor_clnt_close(void);
 char *smb_kdoor_clnt_upcall(char *, size_t, door_desc_t *, uint_t, size_t *);
+void smb_kdoor_clnt_free(char *, size_t, char *, size_t);
 
 /*
  * SMB upcalls
  */
 smb_token_t *smb_upcall_get_token(netr_client_t *);
-int smb_upcall_set_dwncall_desc(uint32_t, door_desc_t *, uint_t);
+int smb_set_downcall_desc(door_desc_t *, uint_t);
 void smb_user_nonauth_logon(uint32_t);
 void smb_user_auth_logoff(uint32_t);
 #else /* _KERNEL */
@@ -159,23 +159,14 @@ void smb_user_auth_logoff(uint32_t);
 int smb_door_srv_start(void);
 void smb_door_srv_stop(void);
 
-/* downcall descriptor */
-typedef int (*smb_dwncall_get_desc_t)(void);
-int smb_dwncall_install_callback(smb_dwncall_get_desc_t get_desc_cb);
-
 int smb_dr_is_valid_opcode(int);
 
 /*
  * SMB user-space door client
  */
-int smb_dr_clnt_open(int *, char *, char *);
-char *smb_dr_clnt_call(int, char *, size_t, size_t *, char *);
-void smb_dr_clnt_free(char *, size_t, char *, size_t);
-/*
- * SMB downcalls
- */
-int smb_dwncall_get_users(int, smb_dr_ulist_t *);
-int smb_dwncall_share(int, char *, char *);
+int smb_dr_clnt_call(int, door_arg_t *);
+void smb_dr_clnt_setup(door_arg_t *, char *, size_t);
+void smb_dr_clnt_cleanup(door_arg_t *);
 
 #endif /* _KERNEL */
 

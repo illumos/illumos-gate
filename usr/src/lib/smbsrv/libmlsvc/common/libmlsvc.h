@@ -26,8 +26,6 @@
 #ifndef	_LIBMLSVC_H
 #define	_LIBMLSVC_H
 
-#pragma ident	"@(#)libmlsvc.h	1.7	08/08/05 SMI"
-
 #include <sys/types.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/hash_table.h>
@@ -35,12 +33,18 @@
 #include <smbsrv/smb_privilege.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/libsmb.h>
+#include <smbsrv/smb_xdr.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+extern int mlsvc_get_door_fd(void);
+extern uint64_t mlsvc_get_num_users(void);
+extern int mlsvc_get_user_list(int, smb_dr_ulist_t *);
 extern int mlsvc_init(void);
+extern void mlsvc_set_door_fd(int);
+extern int mlsvc_set_share(int, char *, char *);
 extern uint32_t mlsvc_lookup_name(char *, smb_sid_t **, uint16_t *);
 extern uint32_t mlsvc_lookup_sid(smb_sid_t *, char **);
 extern DWORD mlsvc_netlogon(char *, char *);

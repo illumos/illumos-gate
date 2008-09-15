@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbadm.c	1.9	08/07/30 SMI"
-
 /*
  * This module contains smbadm CLI which offers smb configuration
  * functionalities.
@@ -40,7 +38,6 @@
 #include <grp.h>
 #include <libgen.h>
 #include <netinet/in.h>
-
 #include <smbsrv/libsmb.h>
 
 typedef enum {
@@ -367,23 +364,21 @@ smbadm_join_prompt(char *curdom, int prmpt_type)
 	boolean_t ret = B_FALSE;
 
 	switch (prmpt_type) {
+	case SMBADM_CHANGE_SECMODE:
+		(void) printf(gettext("This operation requires that "
+		    "the service be restarted.\n"));
+		ret = smbadm_confirm("Would you like to continue?", "no");
+		break;
 
-		case SMBADM_CHANGE_SECMODE:
-			(void) printf(gettext("This operation requires that "
-			    "the service be restarted.\n"));
-			ret = smbadm_confirm(
-			    "Would you like to continue ?", "no");
-			break;
+	case SMBADM_CHANGE_DOMAIN:
+		(void) printf(gettext("This system is already a member "
+		    "of %s.\n"), curdom);
+		ret = smbadm_confirm("Would you like to join the new domain?",
+		    "no");
+		break;
 
-		case SMBADM_CHANGE_DOMAIN:
-			(void) printf(gettext("This system has already "
-			    "joined to '%s' domain.\n"), curdom);
-			ret = smbadm_confirm(
-			    "Would you like to join the new domain ?", "no");
-			break;
-
-		default:
-			break;
+	default:
+		break;
 	}
 
 	return (ret);

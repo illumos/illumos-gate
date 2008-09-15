@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)libshare_smb.c	1.16	08/08/05 SMI"
-
 /*
  * SMB specific functions
  */
@@ -939,15 +937,15 @@ ip_address_csv_list_validator_empty_ok(int index, char *value)
  */
 /*ARGSUSED*/
 static int
-path_validator(int index, char *value)
+path_validator(int index, char *path)
 {
 	struct stat buffer;
 	int fd, status;
 
-	if (value == NULL)
+	if (path == NULL)
 		return (SA_BAD_VALUE);
 
-	fd = open(value, O_RDONLY);
+	fd = open(path, O_RDONLY);
 	if (fd < 0)
 		return (SA_BAD_VALUE);
 
@@ -1030,6 +1028,7 @@ smb_share_init(void)
 	if (sa_plugin_ops.sa_init != smb_share_init)
 		return (SA_SYSTEM_ERR);
 
+	smb_share_door_clnt_init();
 	return (smb_load_proto_properties());
 }
 
@@ -1043,7 +1042,7 @@ smb_share_fini(void)
 	xmlFreeNode(protoset);
 	protoset = NULL;
 
-	(void) smb_share_dclose();
+	smb_share_door_clnt_fini();
 }
 
 /*

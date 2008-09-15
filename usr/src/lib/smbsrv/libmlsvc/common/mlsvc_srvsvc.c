@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)mlsvc_srvsvc.c	1.8	08/08/07 SMI"
-
 /*
  * Server Service RPC (SRVSVC) server-side interface definition.
  * The server service provides a remote administration interface.
@@ -686,7 +684,7 @@ srvsvc_s_NetSessionEnum(void *arg, struct mlrpc_xaction *mxa)
 	param->total_entries = 1;
 	param->status = ERROR_SUCCESS;
 
-	n_sessions = (DWORD) smb_dwncall_user_num();
+	n_sessions = (DWORD) mlsvc_get_num_users();
 
 	switch (param->level) {
 	case 0:
@@ -740,7 +738,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
 	for (total = 0, offset = 0;
-	    (cnt = smb_dwncall_get_users(offset, ulist)) > 0;
+	    (cnt = mlsvc_get_user_list(offset, ulist)) > 0;
 	    offset += cnt) {
 		for (i = 0; i < cnt && total < n_sessions; i++, total++) {
 			user = &ulist->dul_users[i];
@@ -811,7 +809,7 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
 	for (total = 0, offset = 0;
-	    (cnt = smb_dwncall_get_users(offset, ulist)) > 0;
+	    (cnt = mlsvc_get_user_list(offset, ulist)) > 0;
 	    offset += cnt) {
 		for (i = 0; i < cnt && total < n_sessions; i++, total++) {
 			user = &ulist->dul_users[i];
