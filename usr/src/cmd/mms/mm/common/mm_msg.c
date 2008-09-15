@@ -22,7 +22,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <mms_list.h>
 #include <mms_parser.h>
@@ -36,6 +35,7 @@
 #include <syslog.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <libintl.h>
 #include <locale.h>
@@ -1142,7 +1142,10 @@ mm_slog(mm_msg_t *mess)
 {
 	char	*buf;
 	int	len;
+	int	oflags = O_CREAT | O_RDWR | O_APPEND;
 	char	*localized;
+	pid_t	shpid;
+	char	size[20];
 
 	/*
 	 * Write message to system log file.
@@ -1195,7 +1198,31 @@ mm_slog(mm_msg_t *mess)
 		mm_slog_flush();
 		mm_msg_data.slog_count = 0;
 	}
+	if (mm_msg_data.slog_size > mm_msg_data.slog_rot_size) {
+		mm_slog_flush();
+		(void) close(mm_msg_data.slog_fd);
+		if ((shpid = fork()) < 0) {
+			mms_trace(MMS_DEBUG,
+			    "mm_slog: fork failed");
+			return (-1);
+		} else if (shpid == 0) { /* child */
+			(void) snprintf(size, sizeof (size), "%lldb",
+			    mm_msg_data.slog_size);
+			(void) execl(MMS_LOGADM, MMS_LOGADM,
+			    "-f", MMS_LOGADM_CONF,
+			    "-s", size,
+			    mm_msg_data.slog_fname,
+			    (char *)0);
+			exit(1);
+		}
+		if (waitpid(shpid, NULL, 0) < 0) /* parent */
+			mms_trace(MMS_DEBUG,
+			    "mm_slog: wait failed");
 
+		mm_msg_data.slog_size = 0;
+		mm_msg_data.slog_fd =
+		    open(mm_msg_data.slog_fname, oflags, 0644);
+	}
 	pthread_mutex_unlock(&mm_msg_data.slog_mutex);
 	return (0);
 }
