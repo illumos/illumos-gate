@@ -14583,9 +14583,6 @@ sd_return_command(struct sd_lun *un, struct buf *bp)
 	struct sd_xbuf *xp;
 	struct scsi_pkt *pktp;
 	struct sd_fm_internal *sfip;
-	int ssc_invalid_flags = SSC_FLAGS_INVALID_PKT_REASON |
-	    SSC_FLAGS_INVALID_STATUS |
-	    SSC_FLAGS_INVALID_SENSE;
 
 	ASSERT(bp != NULL);
 	ASSERT(un != NULL);
@@ -14650,14 +14647,11 @@ sd_return_command(struct sd_lun *un, struct buf *bp)
 		}
 	} else {
 		/*
-		 * If this is a failed non-USCSI command or it is a command
-		 * which encountered invalid data(pkt-reason, stat-code,
-		 * sense-data) during execution last time, we will post an
+		 * If this is a failed non-USCSI command we will post an
 		 * ereport with driver-assessment set accordingly("fail" or
 		 * "fatal").
 		 */
-		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD) ||
-		    (sfip->fm_ssc.ssc_flags & ssc_invalid_flags)) {
+		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
 			sd_ssc_extract_info(&sfip->fm_ssc, un, pktp, bp, xp);
 			sd_ssc_post(&sfip->fm_ssc, SD_FM_DRV_FATAL);
 		}
@@ -14865,9 +14859,6 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 	struct sd_xbuf	*xp;
 	struct scsi_pkt	*pktp;
 	struct sd_fm_internal *sfip;
-	int ssc_invalid_flags = SSC_FLAGS_INVALID_PKT_REASON |
-	    SSC_FLAGS_INVALID_STATUS |
-	    SSC_FLAGS_INVALID_SENSE;
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -15116,15 +15107,17 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 	xp->xb_pktp->pkt_flags |= FLAG_HEAD;
 
 	/*
-	 * If this is a non-USCSI command being retried or it is a command
-	 * which encountered invalid data(pkt-reason, stat-code, sense-data)
+	 * If this is a non-USCSI command being retried
 	 * during execution last time, we should post an ereport with
 	 * driver-assessment of the value "retry".
+	 * For partial DMA, request sense and STATUS_QFULL, there are no
+	 * hardware errors, we bypass ereport posting.
 	 */
-	if (!(xp->xb_pkt_flags & SD_XB_USCSICMD) ||
-	    (sfip->fm_ssc.ssc_flags & ssc_invalid_flags)) {
-		sd_ssc_extract_info(&sfip->fm_ssc, un, pktp, bp, xp);
-		sd_ssc_post(&sfip->fm_ssc, SD_FM_DRV_RETRY);
+	if (failure_code != 0) {
+		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+			sd_ssc_extract_info(&sfip->fm_ssc, un, pktp, bp, xp);
+			sd_ssc_post(&sfip->fm_ssc, SD_FM_DRV_RETRY);
+		}
 	}
 
 	/*
@@ -16323,11 +16316,13 @@ not_successful:
 			    "Unexpected SCSI status received: 0x%x\n",
 			    SD_GET_PKT_STATUS(pktp));
 			/*
-			 * Mark the ssc_flags for detecting invalid status
-			 * code.
+			 * Mark the ssc_flags when detected invalid status
+			 * code for non-USCSI command.
 			 */
-			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_STATUS,
-			    "stat-code");
+			if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+				sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_STATUS,
+				    "stat-code");
+			}
 			sd_return_failed_command(un, bp, EIO);
 			break;
 
@@ -16335,8 +16330,10 @@ not_successful:
 			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "Invalid SCSI status received: 0x%x\n",
 			    SD_GET_PKT_STATUS(pktp));
-			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_STATUS,
-			    "stat-code");
+			if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+				sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_STATUS,
+				    "stat-code");
+			}
 			sd_return_failed_command(un, bp, EIO);
 			break;
 
@@ -16384,8 +16381,10 @@ not_successful:
 		/*
 		 * Mark the ssc_flags for detecting invliad pkt_reason.
 		 */
-		sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_PKT_REASON,
-		    "pkt-reason");
+		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_PKT_REASON,
+			    "pkt-reason");
+		}
 		sd_pkt_reason_default(un, bp, xp, pktp);
 		break;
 	}
@@ -16832,8 +16831,10 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	if (actual_len < SUN_MIN_SENSE_LENGTH) {
 		msgp = "Not enough sense information\n";
 		/* Mark the ssc_flags for detecting invalid sense data */
-		sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
-		    "sense-data");
+		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
+			    "sense-data");
+		}
 		goto sense_failed;
 	}
 
@@ -16861,8 +16862,10 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 		}
 
 		/* Mark the ssc_flags for detecting invalid sense data */
-		sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
-		    "sense-data");
+		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
+			    "sense-data");
+		}
 
 		/* Note: Legacy behavior, fail the command with no retry */
 		sd_return_failed_command(un, bp, EIO);
@@ -16881,8 +16884,10 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	    (esp->es_code != CODE_FMT_DESCR_DEFERRED) &&
 	    (esp->es_code != CODE_FMT_VENDOR_SPECIFIC)) {
 		/* Mark the ssc_flags for detecting invalid sense data */
-		sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
-		    "sense-data");
+		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
+			    "sense-data");
+		}
 		goto sense_failed;
 	}
 
@@ -30156,6 +30161,13 @@ sd_ssc_ereport_post(sd_ssc_t *ssc, enum sd_driver_assessment drv_assess)
 				}
 		} else {
 			/*
+			 * For stat_code == STATUS_GOOD, this is not a
+			 * hardware error.
+			 */
+			if (ssc->ssc_uscsi_cmd->uscsi_status == STATUS_GOOD)
+				return;
+
+			/*
 			 * Post ereport.io.scsi.cmd.disk.dev.serr if we got the
 			 * stat-code but with sense data unavailable.
 			 * driver-assessment will be set based on parameter
@@ -30196,22 +30208,20 @@ static void
 sd_ssc_extract_info(sd_ssc_t *ssc, struct sd_lun *un, struct scsi_pkt *pktp,
     struct buf *bp, struct sd_xbuf *xp)
 {
+	size_t senlen = 0;
+	union scsi_cdb *cdbp;
+	int path_instance;
+	/*
+	 * Need scsi_cdb_size array to determine the cdb length.
+	 */
+	extern uchar_t	scsi_cdb_size[];
+
 	ASSERT(un != NULL);
 	ASSERT(pktp != NULL);
 	ASSERT(bp != NULL);
 	ASSERT(xp != NULL);
 	ASSERT(ssc != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
-
-	size_t senlen = 0;
-	union scsi_cdb *cdbp;
-	int path_instance;
-	struct uscsi_cmd *uscmd;
-
-	/*
-	 * Need scsi_cdb_size array to determine the cdb length.
-	 */
-	extern uchar_t	scsi_cdb_size[];
 
 	/*
 	 * Transfer the cdb buffer pointer here.
@@ -30225,42 +30235,25 @@ sd_ssc_extract_info(sd_ssc_t *ssc, struct sd_lun *un, struct scsi_pkt *pktp,
 	 * Transfer the sense data buffer pointer if sense data is available,
 	 * calculate the sense data length first.
 	 */
-
-	uscmd = (struct uscsi_cmd *)xp->xb_pktinfo;
-	/*
-	 * For non-arq case, we will enter this branch.
-	 * The algorithm is excerpted from sd_handle_request_sense.
-	 */
-	if (!(xp->xb_sense_state & STATE_XARQ_DONE) &&
-	    !(xp->xb_sense_state & STATE_ARQ_DONE)) {
-		if (SD_GET_PKT_STATUS(pktp) == STATUS_CHECK &&
-		    xp->xb_sense_state == STATE_XFERRED_DATA) {
-			if ((xp->xb_pkt_flags & SD_XB_USCSICMD) &&
-			    uscmd->uscsi_rqlen > SENSE_LENGTH)
-				senlen = MAX_SENSE_LENGTH - xp->xb_sense_resid;
-			else
-				senlen = SENSE_LENGTH - xp->xb_sense_resid;
-		}
-	} else {
+	if ((xp->xb_sense_state & STATE_XARQ_DONE) ||
+	    (xp->xb_sense_state & STATE_ARQ_DONE)) {
 		/*
 		 * For arq case, we will enter here.
-		 * The algorithm is excerpted from
-		 * sd_handle_auto_request_sense.
 		 */
 		if (xp->xb_sense_state & STATE_XARQ_DONE) {
 			senlen = MAX_SENSE_LENGTH - xp->xb_sense_resid;
 		} else {
-			if (xp->xb_pkt_flags & SD_XB_USCSICMD)
-				senlen = SENSE_LENGTH;
-			else {
-				if (xp->xb_sense_resid > SENSE_LENGTH) {
-					senlen = SENSE_LENGTH;
-				} else {
-					senlen = SENSE_LENGTH -
-					    xp->xb_sense_resid;
-				}
-			}
+			senlen = SENSE_LENGTH;
 		}
+	} else {
+		/*
+		 * For non-arq case, we will enter this branch.
+		 */
+		if (SD_GET_PKT_STATUS(pktp) == STATUS_CHECK &&
+		    (xp->xb_sense_state & STATE_XFERRED_DATA)) {
+			senlen = SENSE_LENGTH - xp->xb_sense_resid;
+		}
+
 	}
 
 	ssc->ssc_uscsi_cmd->uscsi_rqlen = (senlen & 0xff);
@@ -30285,6 +30278,16 @@ sd_ssc_extract_info(sd_ssc_t *ssc, struct sd_lun *un, struct scsi_pkt *pktp,
 	ssc->ssc_uscsi_info->ui_pkt_state = pktp->pkt_state;
 	ssc->ssc_uscsi_info->ui_pkt_statistics = pktp->pkt_statistics;
 	ssc->ssc_uscsi_info->ui_lba = (uint64_t)SD_GET_BLKNO(bp);
+
+	/*
+	 * For partially read/write command, we will not create ena
+	 * in case of a successful command be reconized as recovered.
+	 */
+	if ((pktp->pkt_reason == CMD_CMPLT) &&
+	    (ssc->ssc_uscsi_cmd->uscsi_status == STATUS_GOOD) &&
+	    (senlen == 0)) {
+		return;
+	}
 
 	/*
 	 * To associate ereports of a single command execution flow, we
