@@ -4212,5 +4212,67 @@ ftrace_interrupt_enable(ftrace_icookie_t cookie)
 	ret
 	SET_SIZE(ftrace_interrupt_enable)
 
-#endif	/* __i386 */	
+#endif	/* __i386 */
 #endif	/* __lint */
+
+#if defined (__lint)
+
+/*ARGSUSED*/
+void
+iommu_cpu_nop(void)
+{}
+
+#else /* __lint */
+
+	ENTRY(iommu_cpu_nop)
+	rep;	nop
+	ret
+	SET_SIZE(iommu_cpu_nop)
+
+#endif /* __lint */
+
+#if defined (__lint)
+
+/*ARGSUSED*/
+void
+clflush_insn(caddr_t addr)
+{}
+
+#else /* __lint */
+
+#if defined (__amd64)
+	ENTRY(clflush_insn)
+	clflush (%rdi)
+	ret
+	SET_SIZE(clflush_insn)
+#elif defined (__i386)
+	ENTRY(clflush_insn)
+	movl	4(%esp), %eax
+	clflush (%eax)
+	ret
+	SET_SIZE(clflush_insn)
+
+#endif /* __i386 */
+#endif /* __lint */
+
+#if defined (__lint)
+/*ARGSUSED*/
+void
+mfence_insn(void)
+{}
+
+#else /* __lint */
+
+#if defined (__amd64)
+	ENTRY(mfence_insn)
+	mfence
+	ret
+	SET_SIZE(mfence_insn)
+#elif defined (__i386)
+	ENTRY(mfence_insn)
+	mfence
+	ret
+	SET_SIZE(mfence_insn)
+
+#endif /* __i386 */
+#endif /* __lint */

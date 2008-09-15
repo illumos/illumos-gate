@@ -184,7 +184,7 @@ PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 
 ACPIPPM_OBJS	+= acpippm.o acpisleep.o
 
-ROOTNEX_OBJS += rootnex.o
+ROOTNEX_OBJS += rootnex.o iommu_rscs.o dmar_acpi.o intel_iommu.o
 TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o

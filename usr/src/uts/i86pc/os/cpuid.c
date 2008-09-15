@@ -105,6 +105,7 @@
 uint_t x86_feature = 0;
 uint_t x86_vendor = X86_VENDOR_IntelClone;
 uint_t x86_type = X86_TYPE_OTHER;
+uint_t x86_clflush_size = 0;
 
 uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
@@ -778,6 +779,15 @@ cpuid_pass1(cpu_t *cpu)
 	if (cp->cp_ecx & CPUID_INTC_ECX_MON) {
 		cpi->cpi_mwait.support |= MWAIT_SUPPORT;
 		feature |= X86_MWAIT;
+	}
+
+	/*
+	 * Only need it first time, rest of the cpus would follow suite.
+	 * we only capture this for the bootcpu.
+	 */
+	if (cp->cp_edx & CPUID_INTC_EDX_CLFSH) {
+		feature |= X86_CLFSH;
+		x86_clflush_size = (BITX(cp->cp_ebx, 15, 8) * 8);
 	}
 
 	if (feature & X86_PAE)

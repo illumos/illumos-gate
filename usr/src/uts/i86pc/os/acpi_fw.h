@@ -26,8 +26,6 @@
 #ifndef _ACPI_FW_H
 #define	_ACPI_FW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -162,6 +160,14 @@ struct slit {
  * Pointer to System Locality Information Table (SLIT)
  */
 extern struct slit	*slit_ptr;
+
+struct dmar {
+	struct table_header hdr;
+	uint8_t width;
+	uint8_t flags;
+	uint8_t rsvd[10];
+};
+
 
 /*
  * Arbitrary limit on number of localities we handle; if

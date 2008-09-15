@@ -69,6 +69,13 @@
 #include <vm/kboot_mmu.h>
 #endif
 
+#include <sys/intel_iommu.h>
+
+/*
+ * add to support dmar fault interrupt, will change soon
+ */
+char _depends_on[] = "mach/pcplusmp";
+
 /*
  * enable/disable extra checking of function parameters. Useful for debugging
  * drivers.
@@ -399,6 +406,7 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rootnex_state->r_err_ibc = (ddi_iblock_cookie_t)ipltospl(15);
 	rootnex_state->r_reserved_msg_printed = B_FALSE;
 	rootnex_cnt = &rootnex_state->r_counters[0];
+	rootnex_state->r_intel_iommu_enabled = B_FALSE;
 
 	/*
 	 * Set minimum fm capability level for i86pc platforms and then
@@ -425,6 +433,20 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Initialize rootnex event handle */
 	i_ddi_rootnex_init_events(dip);
+
+#if defined(__amd64)
+	/* probe intel iommu */
+	intel_iommu_probe_and_parse();
+
+	/* attach the iommu nodes */
+	if (intel_iommu_support) {
+		if (intel_iommu_attach_dmar_nodes() == DDI_SUCCESS) {
+			rootnex_state->r_intel_iommu_enabled = B_TRUE;
+		} else {
+			intel_iommu_release_dmar_info();
+		}
+	}
+#endif
 
 	return (DDI_SUCCESS);
 }
@@ -1757,6 +1779,34 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	/* save away the original bind info */
 	dma->dp_dma = dmareq->dmar_object;
 
+	if (rootnex_state->r_intel_iommu_enabled) {
+		e = intel_iommu_map_sgl(handle, dmareq,
+		    rootnex_state->r_prealloc_cookies);
+
+		switch (e) {
+		case IOMMU_SGL_SUCCESS:
+			goto rootnex_sgl_end;
+
+		case IOMMU_SGL_DISABLE:
+			goto rootnex_sgl_start;
+
+		case IOMMU_SGL_NORESOURCES:
+			cmn_err(CE_WARN, "iommu map sgl failed for %s",
+			    ddi_node_name(dma->dp_dip));
+			rootnex_clean_dmahdl(hp);
+			return (DDI_DMA_NORESOURCES);
+
+		default:
+			cmn_err(CE_WARN,
+			    "undefined value returned from"
+			    " intel_iommu_map_sgl: %d",
+			    e);
+			rootnex_clean_dmahdl(hp);
+			return (DDI_DMA_NORESOURCES);
+		}
+	}
+
+rootnex_sgl_start:
 	/*
 	 * Figure out a rough estimate of what maximum number of pages this
 	 * buffer could use (a high estimate of course).
@@ -1818,8 +1868,9 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	 */
 	rootnex_get_sgl(&dmareq->dmar_object, dma->dp_cookies,
 	    &dma->dp_sglinfo);
-	ASSERT(sinfo->si_sgl_size <= sinfo->si_max_pages);
 
+rootnex_sgl_end:
+	ASSERT(sinfo->si_sgl_size <= sinfo->si_max_pages);
 	/* if we don't need a copy buffer, we don't need to sync */
 	if (sinfo->si_copybuf_req == 0) {
 		hp->dmai_rflags |= DMP_NOSYNC;
@@ -1968,6 +2019,13 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	 */
 	rootnex_teardown_copybuf(dma);
 	rootnex_teardown_windows(dma);
+
+	/*
+	 * If intel iommu enabled, clean up the page tables and free the dvma
+	 */
+	if (rootnex_state->r_intel_iommu_enabled) {
+		intel_iommu_unmap_sgl(handle);
+	}
 
 	/*
 	 * If we had to allocate space to for the worse case sgl (it didn't

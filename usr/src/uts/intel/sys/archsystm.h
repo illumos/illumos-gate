@@ -45,6 +45,9 @@ extern int getpil(void);
 extern ulong_t getcr0(void);
 extern void setcr0(ulong_t);
 extern ulong_t getcr2(void);
+extern void iommu_cpu_nop(void);
+extern void clflush_insn(caddr_t addr);
+extern void mfence_insn(void);
 
 #if defined(__i386)
 extern uint16_t getgs(void);

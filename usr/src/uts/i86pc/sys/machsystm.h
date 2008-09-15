@@ -27,8 +27,6 @@
 #ifndef _SYS_MACHSYSTM_H
 #define	_SYS_MACHSYSTM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Numerous platform-dependent interfaces that don't seem to belong
  * in any other header file.
@@ -132,7 +130,8 @@ extern caddr_t  kpm_vbase;
 struct memlist;
 extern void memlist_add(uint64_t, uint64_t, struct memlist *,
     struct memlist **);
-extern page_t *page_get_physical(uintptr_t);
+extern page_t *page_get_physical(int flags);
+extern void page_free_physical(page_t *);
 extern int linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 extern int dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 

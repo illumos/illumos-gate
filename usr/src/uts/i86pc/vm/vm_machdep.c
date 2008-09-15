@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * UNIX machine dependent virtual memory support.
  */
@@ -3708,34 +3706,25 @@ exec_get_spslew(void)
  * available - this would have a minimal impact on page coloring.
  */
 page_t *
-page_get_physical(uintptr_t seed)
+page_get_physical(int flags)
 {
 	page_t *pp;
-	u_offset_t offset;
+	u_offset_t offset = (u_offset_t)1 << 41;	/* in VA hole */
 	static struct seg tmpseg;
 	static uintptr_t ctr = 0;
+	static kmutex_t pgp_mutex;
 
 	/*
 	 * This code is gross, we really need a simpler page allocator.
 	 *
-	 * We need assign an offset for the page to call page_create_va().
 	 * To avoid conflicts with other pages, we get creative with the offset.
-	 * For 32 bits, we pick an offset > 4Gig
-	 * For 64 bits, pick an offset somewhere in the VA hole.
+	 * For 32 bits, we need an offset > 4Gig
+	 * For 64 bits, need an offset somewhere in the VA hole.
 	 */
-	offset = seed;
-	if (offset > kernelbase)
-		offset -= kernelbase;
-	offset <<= MMU_PAGESHIFT;
-#if defined(__amd64)
-	offset += mmu.hole_start;	/* something in VA hole */
-#else
-	offset += 1ULL << 40;		/* something > 4 Gig */
-#endif
-
-	if (page_resv(1, KM_NOSLEEP) == 0)
+	if (page_resv(1, flags & KM_NOSLEEP) == 0)
 		return (NULL);
 
+	mutex_enter(&pgp_mutex);
 #ifdef	DEBUG
 	pp = page_exists(&kvp, offset);
 	if (pp != NULL)
@@ -3744,9 +3733,32 @@ page_get_physical(uintptr_t seed)
 
 	pp = page_create_va(&kvp, offset, MMU_PAGESIZE, PG_EXCL,
 	    &tmpseg, (caddr_t)(ctr += MMU_PAGESIZE));	/* changing VA usage */
-	if (pp == NULL)
-		return (NULL);
-	page_io_unlock(pp);
-	page_hashout(pp, NULL);
+	if (pp != NULL) {
+		page_io_unlock(pp);
+		page_hashout(pp, NULL);
+	}
+	mutex_exit(&pgp_mutex);
+	page_downgrade(pp);
 	return (pp);
+}
+
+void
+page_free_physical(page_t *pp)
+{
+	/*
+	 * Get an exclusive lock, might have to wait for a kmem reader.
+	 */
+	ASSERT(PAGE_SHARED(pp));
+	if (!page_tryupgrade(pp)) {
+		page_unlock(pp);
+		/*
+		 * RFE: we could change this to not loop forever
+		 * George Cameron had some idea on how to do that.
+		 * For now looping works - it's just like sfmmu.
+		 */
+		while (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_RECLAIM))
+			continue;
+	}
+	page_free(pp, 1);
+	page_unresv(1);
 }

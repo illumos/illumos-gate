@@ -26,8 +26,6 @@
 #ifndef _SYS_DDI_IMPLDEFS_H
 #define	_SYS_DDI_IMPLDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -223,6 +221,9 @@ struct dev_info  {
 	/* Declarations of the pure dynamic properties to snapshot */
 	struct i_ddi_prop_dyn	*devi_prop_dyn_driver;	/* prop_op */
 	struct i_ddi_prop_dyn	*devi_prop_dyn_parent;	/* bus_prop_op */
+
+	/* For intel iommu support */
+	void		*devi_iommu_private;
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

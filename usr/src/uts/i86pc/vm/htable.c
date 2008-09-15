@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/kmem.h>
@@ -266,7 +264,7 @@ xen_map(uint64_t pte, caddr_t va)
  * A wrapper around page_get_physical(), with some extra checks.
  */
 static pfn_t
-ptable_alloc(uintptr_t seed)
+ptable_alloc(void)
 {
 	pfn_t pfn;
 	page_t *pp;
@@ -300,13 +298,11 @@ ptable_alloc(uintptr_t seed)
 	}
 #endif /* DEBUG */
 
-	pp = page_get_physical(seed);
+	pp = page_get_physical(KM_NOSLEEP);
 	if (pp == NULL)
 		return (PFN_INVALID);
-	pfn = pp->p_pagenum;
-	page_downgrade(pp);
 	ASSERT(PAGE_SHARED(pp));
-
+	pfn = pp->p_pagenum;
 	if (pfn == PFN_INVALID)
 		panic("ptable_alloc(): Invalid PFN!!");
 	HATSTAT_INC(hs_ptable_allocs);
@@ -330,29 +326,13 @@ ptable_free(pfn_t pfn)
 	atomic_add_32(&active_ptables, -1);
 	if (pp == NULL)
 		panic("ptable_free(): no page for pfn!");
-	ASSERT(PAGE_SHARED(pp));
 	ASSERT(pfn == pp->p_pagenum);
 	ASSERT(!IN_XPV_PANIC());
-
-	/*
-	 * Get an exclusive lock, might have to wait for a kmem reader.
-	 */
-	if (!page_tryupgrade(pp)) {
-		page_unlock(pp);
-		/*
-		 * RFE: we could change this to not loop forever
-		 * George Cameron had some idea on how to do that.
-		 * For now looping works - it's just like sfmmu.
-		 */
-		while (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_RECLAIM))
-			continue;
-	}
 #ifdef __xpv
 	if (kpm_vbase && xen_kpm_page(pfn, PT_VALID | PT_WRITABLE) < 0)
 		panic("failure making kpm r/w pfn=0x%lx", pfn);
 #endif
-	page_free(pp, 1);
-	page_unresv(1);
+	page_free_physical(pp);
 }
 
 /*
@@ -680,7 +660,6 @@ htable_steal(uint_t cnt)
 	return (list);
 }
 
-
 /*
  * This is invoked from kmem when the system is low on memory.  We try
  * to free hments, htables, and ptables to improve the memory situation.
@@ -788,7 +767,7 @@ htable_alloc(
 		 */
 		if (ht != NULL && !is_bare) {
 			ht->ht_hat = hat;
-			ht->ht_pfn = ptable_alloc((uintptr_t)ht);
+			ht->ht_pfn = ptable_alloc();
 			if (ht->ht_pfn == PFN_INVALID) {
 				if (USE_HAT_RESERVES())
 					htable_put_reserve(ht);
@@ -851,7 +830,7 @@ htable_alloc(
 		for (;;) {
 			htable_t *stolen;
 
-			hat->hat_user_ptable = ptable_alloc((uintptr_t)ht + 1);
+			hat->hat_user_ptable = ptable_alloc();
 			if (hat->hat_user_ptable != PFN_INVALID)
 				break;
 			stolen = htable_steal(1);
