@@ -249,33 +249,32 @@ typedef struct tcp_s {
 		tcp_unbind_pending : 1, /* Client sent T_UNBIND_REQ */
 		tcp_deferred_clean_death : 1,
 					/* defer tcp endpoint cleanup etc. */
-		tcp_conn_def_q0: 1,	/* move from q0 to q deferred */
-
 		tcp_ka_enabled: 1,	/* Connection KeepAlive Timer needed */
+
 		tcp_zero_win_probe: 1,	/* Zero win probing is in progress */
 		tcp_loopback: 1,	/* src and dst are the same machine */
 		tcp_localnet: 1,	/* src and dst are on the same subnet */
-
 		tcp_syn_defense: 1,	/* For defense against SYN attack */
 #define	tcp_dontdrop	tcp_syn_defense
+
 		tcp_set_timer : 1,
 		tcp_active_open: 1,	/* This is a active open */
 		tcp_timeout : 1,	/* qbufcall failed, qtimeout pending */
-
 		tcp_rexmit : 1,		/* TCP is retransmitting */
+
 		tcp_snd_sack_ok : 1,	/* Can use SACK for this connection */
 		tcp_empty_flag : 1,	/* Empty flag for future use */
 		tcp_recvdstaddr : 1,	/* return T_EXTCONN_IND with dst addr */
-
 		tcp_hwcksum : 1,	/* The NIC is capable of hwcksum */
+
 		tcp_ip_forward_progress : 1,
 		tcp_anon_priv_bind : 1,
 		tcp_ecn_ok : 1,		/* Can use ECN for this connection */
-
 		tcp_ecn_echo_on : 1,	/* Need to do ECN echo */
+
 		tcp_ecn_cwr_sent : 1,	/* ECN_CWR has been sent */
 		tcp_cwr : 1,		/* Cwnd has reduced recently */
-		tcp_pad_to_bit31 : 1;
+		tcp_pad_to_bit31 : 2;
 	/* Following manipulated by TCP under squeue protection */
 	uint32_t
 		tcp_mdt : 1,		/* Lower layer is capable of MDT */
@@ -373,6 +372,8 @@ typedef struct tcp_s {
 	struct tcp_s *tcp_eager_next_q0; /* next eager in SYN_RCVD state */
 	struct tcp_s *tcp_eager_prev_q0; /* prev eager in SYN_RCVD state */
 					/* all eagers form a circular list */
+	boolean_t tcp_conn_def_q0;	/* move from q0 to q deferred */
+
 	union {
 	    mblk_t *tcp_eager_conn_ind; /* T_CONN_IND waiting for 3rd ack. */
 	    mblk_t *tcp_opts_conn_req; /* T_CONN_REQ w/ options processed */

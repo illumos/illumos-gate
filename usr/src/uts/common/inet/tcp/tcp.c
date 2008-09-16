@@ -18230,6 +18230,8 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	 */
 	CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
 
+	tcp->tcp_detached = B_FALSE;
+
 	if (tcp->tcp_state <= TCPS_BOUND || tcp->tcp_accept_error) {
 		/*
 		 * Someone blewoff the eager before we could finish
@@ -18279,7 +18281,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			tcp->tcp_hard_binding = B_FALSE;
 			tcp->tcp_hard_bound = B_TRUE;
 		}
-		tcp->tcp_detached = B_FALSE;
 		return;
 	}
 
@@ -18816,11 +18817,8 @@ no_more_eagers:
 		 * but we still have an extra refs on eager (apart from the
 		 * usual tcp references). The ref was placed in tcp_rput_data
 		 * before sending the conn_ind in tcp_send_conn_ind.
-		 * The ref will be dropped in tcp_accept_finish(). As sockfs
-		 * has already established this tcp with it's own stream,
-		 * it's OK to set tcp_detached to B_FALSE.
+		 * The ref will be dropped in tcp_accept_finish().
 		 */
-		econnp->conn_tcp->tcp_detached = B_FALSE;
 		squeue_enter_nodrain(econnp->conn_sqp, opt_mp,
 		    tcp_accept_finish, econnp, SQTAG_TCP_ACCEPT_FINISH_Q0);
 		return;
