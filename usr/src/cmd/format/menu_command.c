@@ -303,6 +303,11 @@ found:
 	if (nhead != 0 && nsect != 0)
 		(void) copy_solaris_part(&cur_disk->fdisk_part);
 
+	if (cur_disk->fdisk_part.numsect == 0) {
+		err_print("\nNo fdisk solaris partition found.\n");
+		goto exit;
+	}
+
 	if ((cur_disk->label_type == L_TYPE_EFI) &&
 	    (cur_disk->disk_parts->etoc->efi_flags &
 		EFI_GPT_PRIMARY_CORRUPT)) {
@@ -324,6 +329,7 @@ found:
 			}
 		}
 	}
+exit:
 	return (0);
 }
 
