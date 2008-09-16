@@ -108,7 +108,7 @@ dlmgmt_upcall_create(void *argp, void *retp)
 	dlmgmt_link_t		*linkp;
 	char			link[MAXLINKNAMELEN];
 	uint32_t		flags;
-	int			err;
+	int			err = 0;
 	boolean_t		created = B_FALSE;
 
 	/*
@@ -131,6 +131,18 @@ dlmgmt_upcall_create(void *argp, void *retp)
 	 */
 	if ((class == DATALINK_CLASS_PHYS) &&
 	    (linkp = dlmgmt_getlink_by_dev(create->ld_devname)) != NULL) {
+
+		if (linkattr_equal(&(linkp->ll_head), FPHYMAJ,
+		    &create->ld_phymaj, sizeof (uint64_t)) &&
+		    linkattr_equal(&(linkp->ll_head), FPHYINST,
+		    &create->ld_phyinst, sizeof (uint64_t)) &&
+		    (linkp->ll_flags & flags) == flags) {
+			/*
+			 * If nothing has been changed, directly return.
+			 */
+			goto noupdate;
+		}
+
 		err = linkattr_set(&(linkp->ll_head), FPHYMAJ,
 		    &create->ld_phymaj, sizeof (uint64_t), DLADM_TYPE_UINT64);
 		if (err != 0)
@@ -184,7 +196,6 @@ dlmgmt_upcall_create(void *argp, void *retp)
 	    ((err = linkattr_set(&linkp->ll_head, FPHYINST, &create->ld_phyinst,
 	    sizeof (uint64_t), DLADM_TYPE_UINT64)) != 0))) {
 		(void) dlmgmt_destroy_common(linkp, flags);
-		goto done;
 	}
 
 done:
@@ -193,12 +204,13 @@ done:
 		(void) dlmgmt_destroy_common(linkp, flags);
 	}
 
+noupdate:
 	if (err == 0)
 		retvalp->lr_linkid = linkp->ll_linkid;
 
 	dlmgmt_table_unlock();
 
-	if (err == 0) {
+	if ((err == 0) && (class == DATALINK_CLASS_PHYS)) {
 		/*
 		 * Post the ESC_DATALINK_PHYS_ADD sysevent. This sysevent
 		 * is consumed by the datalink sysevent module which in
@@ -268,10 +280,11 @@ dlmgmt_upcall_update(void *argp, void *retp)
 		goto done;
 	}
 
-	linkp->ll_media = media;
-	linkp->ll_gen++;
-
-	(void) dlmgmt_write_db_entry(linkp->ll_linkid, linkp->ll_flags);
+	if (linkp->ll_media != media) {
+		linkp->ll_media = media;
+		linkp->ll_gen++;
+		(void) dlmgmt_write_db_entry(linkp->ll_linkid, linkp->ll_flags);
+	}
 
 done:
 	dlmgmt_table_unlock();
