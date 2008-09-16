@@ -326,6 +326,8 @@ hxge_set_hw_dma_config(p_hxge_t hxgep)
 	hxgep->nrdc = p_cfgp->max_rdcs;
 
 	p_dma_cfgp->rbr_size = hxge_rbr_size;
+	if (hxge_rcr_size > HXGE_RCR_MAX)
+		hxge_rcr_size = HXGE_RCR_MAX;
 	p_dma_cfgp->rcr_size = hxge_rcr_size;
 
 	HXGE_DEBUG_MSG((hxgep, CFG_CTL, " <== hxge_set_hw_dma_config"));

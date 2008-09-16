@@ -266,6 +266,12 @@ typedef struct _hxge_rx_ring_stats_t {
 	uint32_t 	rcrfull;		/* rcr_full */
 	uint32_t 	rbr_empty;		/* rbr_empty */
 	uint32_t 	rbrfull;		/* rbr_full */
+	/*
+	 * RCR invalids: when processing RCR entries, can
+	 * run into invalid RCR entries.  This counter provides
+	 * a means to account for invalid RCR entries.
+	 */
+	uint32_t 	rcr_invalids;		/* rcr invalids */
 	uint32_t 	rcr_to;			/* rcr_to */
 	uint32_t 	rcr_thres;		/* rcr_thres */
 	rdc_errlog_t	errlog;

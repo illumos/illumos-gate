@@ -127,7 +127,7 @@ static hxge_status_t hxge_alloc_rx_buf_dma(p_hxge_t, uint16_t,
     p_hxge_dma_common_t *, size_t, size_t, uint32_t *);
 static void hxge_free_rx_buf_dma(p_hxge_t, p_hxge_dma_common_t, uint32_t);
 static hxge_status_t hxge_alloc_rx_cntl_dma(p_hxge_t, uint16_t,
-    p_hxge_dma_common_t *, size_t);
+    p_hxge_dma_common_t *, struct ddi_dma_attr *, size_t);
 static void hxge_free_rx_cntl_dma(p_hxge_t, p_hxge_dma_common_t);
 static hxge_status_t hxge_alloc_tx_buf_dma(p_hxge_t, uint16_t,
     p_hxge_dma_common_t *, size_t, size_t, uint32_t *);
@@ -265,7 +265,22 @@ static ddi_device_acc_attr_t hxge_dev_buf_dma_acc_attr = {
 	DDI_STRICTORDER_ACC
 };
 
-ddi_dma_attr_t hxge_desc_dma_attr = {
+ddi_dma_attr_t hxge_rx_rcr_desc_dma_attr = {
+	DMA_ATTR_V0,		/* version number. */
+	0,			/* low address */
+	0xffffffffffffffff,	/* high address */
+	0xffffffffffffffff,	/* address counter max */
+	0x80000,		/* alignment */
+	0xfc00fc,		/* dlim_burstsizes */
+	0x1,			/* minimum transfer size */
+	0xffffffffffffffff,	/* maximum transfer size */
+	0xffffffffffffffff,	/* maximum segment size */
+	1,			/* scatter/gather list length */
+	(unsigned int)1,	/* granularity */
+	0			/* attribute flags */
+};
+
+ddi_dma_attr_t hxge_tx_desc_dma_attr = {
 	DMA_ATTR_V0,		/* version number. */
 	0,			/* low address */
 	0xffffffffffffffff,	/* high address */
@@ -276,6 +291,40 @@ ddi_dma_attr_t hxge_desc_dma_attr = {
 	0xffffffffffffffff,	/* maximum transfer size */
 	0xffffffffffffffff,	/* maximum segment size */
 	1,			/* scatter/gather list length */
+	(unsigned int)1,	/* granularity */
+	0			/* attribute flags */
+};
+
+ddi_dma_attr_t hxge_rx_rbr_desc_dma_attr = {
+	DMA_ATTR_V0,		/* version number. */
+	0,			/* low address */
+	0xffffffffffffffff,	/* high address */
+	0xffffffffffffffff,	/* address counter max */
+	0x40000,		/* alignment */
+	0xfc00fc,		/* dlim_burstsizes */
+	0x1,			/* minimum transfer size */
+	0xffffffffffffffff,	/* maximum transfer size */
+	0xffffffffffffffff,	/* maximum segment size */
+	1,			/* scatter/gather list length */
+	(unsigned int)1,	/* granularity */
+	0			/* attribute flags */
+};
+
+ddi_dma_attr_t hxge_rx_mbox_dma_attr = {
+	DMA_ATTR_V0,		/* version number. */
+	0,			/* low address */
+	0xffffffffffffffff,	/* high address */
+	0xffffffffffffffff,	/* address counter max */
+#if defined(_BIG_ENDIAN)
+	0x2000,			/* alignment */
+#else
+	0x1000,			/* alignment */
+#endif
+	0xfc00fc,		/* dlim_burstsizes */
+	0x1,			/* minimum transfer size */
+	0xffffffffffffffff,	/* maximum transfer size */
+	0xffffffffffffffff,	/* maximum segment size */
+	5,			/* scatter/gather list length */
 	(unsigned int)1,	/* granularity */
 	0			/* attribute flags */
 };
@@ -1345,7 +1394,6 @@ hxge_setup_system_dma_pages(p_hxge_t hxgep)
 
 	hxge_rx_dma_attr.dma_attr_align = hxgep->sys_page_sz;
 	hxge_tx_dma_attr.dma_attr_align = hxgep->sys_page_sz;
-	hxge_desc_dma_attr.dma_attr_align = hxgep->sys_page_sz;
 
 	/*
 	 * Get the system DMA burst size.
@@ -1428,10 +1476,16 @@ hxge_alloc_rx_mem_pool(p_hxge_t hxgep)
 	p_hxge_hw_pt_cfg_t	p_cfgp;
 	p_hxge_dma_pool_t	dma_poolp;
 	p_hxge_dma_common_t	*dma_buf_p;
-	p_hxge_dma_pool_t	dma_cntl_poolp;
-	p_hxge_dma_common_t	*dma_cntl_p;
+	p_hxge_dma_pool_t	dma_rbr_cntl_poolp;
+	p_hxge_dma_common_t	*dma_rbr_cntl_p;
+	p_hxge_dma_pool_t	dma_rcr_cntl_poolp;
+	p_hxge_dma_common_t	*dma_rcr_cntl_p;
+	p_hxge_dma_pool_t	dma_mbox_cntl_poolp;
+	p_hxge_dma_common_t	*dma_mbox_cntl_p;
 	size_t			rx_buf_alloc_size;
-	size_t			rx_cntl_alloc_size;
+	size_t			rx_rbr_cntl_alloc_size;
+	size_t			rx_rcr_cntl_alloc_size;
+	size_t			rx_mbox_cntl_alloc_size;
 	uint32_t		*num_chunks;	/* per dma */
 	hxge_status_t		status = HXGE_OK;
 
@@ -1457,9 +1511,17 @@ hxge_alloc_rx_mem_pool(p_hxge_t hxgep)
 	dma_buf_p = (p_hxge_dma_common_t *)KMEM_ZALLOC(
 	    sizeof (p_hxge_dma_common_t) * ndmas, KM_SLEEP);
 
-	dma_cntl_poolp = (p_hxge_dma_pool_t)
+	dma_rbr_cntl_poolp = (p_hxge_dma_pool_t)
 	    KMEM_ZALLOC(sizeof (hxge_dma_pool_t), KM_SLEEP);
-	dma_cntl_p = (p_hxge_dma_common_t *)KMEM_ZALLOC(
+	dma_rbr_cntl_p = (p_hxge_dma_common_t *)KMEM_ZALLOC(
+	    sizeof (p_hxge_dma_common_t) * ndmas, KM_SLEEP);
+	dma_rcr_cntl_poolp = (p_hxge_dma_pool_t)
+	    KMEM_ZALLOC(sizeof (hxge_dma_pool_t), KM_SLEEP);
+	dma_rcr_cntl_p = (p_hxge_dma_common_t *)KMEM_ZALLOC(
+	    sizeof (p_hxge_dma_common_t) * ndmas, KM_SLEEP);
+	dma_mbox_cntl_poolp = (p_hxge_dma_pool_t)
+	    KMEM_ZALLOC(sizeof (hxge_dma_pool_t), KM_SLEEP);
+	dma_mbox_cntl_p = (p_hxge_dma_common_t *)KMEM_ZALLOC(
 	    sizeof (p_hxge_dma_common_t) * ndmas, KM_SLEEP);
 
 	num_chunks = (uint32_t *)KMEM_ZALLOC(sizeof (uint32_t) * ndmas,
@@ -1496,10 +1558,10 @@ hxge_alloc_rx_mem_pool(p_hxge_t hxgep)
 	 * Addresses of receive block ring, receive completion ring and the
 	 * mailbox must be all cache-aligned (64 bytes).
 	 */
-	rx_cntl_alloc_size = hxge_port_rbr_size + hxge_port_rbr_spare_size;
-	rx_cntl_alloc_size *= (sizeof (rx_desc_t));
-	rx_cntl_alloc_size += (sizeof (rcr_entry_t) * hxge_port_rcr_size);
-	rx_cntl_alloc_size += sizeof (rxdma_mailbox_t);
+	rx_rbr_cntl_alloc_size = hxge_port_rbr_size + hxge_port_rbr_spare_size;
+	rx_rbr_cntl_alloc_size *= sizeof (rx_desc_t);
+	rx_rcr_cntl_alloc_size = sizeof (rcr_entry_t) * hxge_port_rcr_size;
+	rx_mbox_cntl_alloc_size = sizeof (rxdma_mailbox_t);
 
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL, "==> hxge_alloc_rx_mem_pool: "
 	    "hxge_port_rbr_size = %d hxge_port_rbr_spare_size = %d "
@@ -1549,9 +1611,21 @@ hxge_alloc_rx_mem_pool(p_hxge_t hxgep)
 	 */
 	st_rdc = p_cfgp->start_rdc;
 	for (j = 0; j < ndmas; j++) {
-		status = hxge_alloc_rx_cntl_dma(hxgep, st_rdc, &dma_cntl_p[j],
-		    rx_cntl_alloc_size);
-		if (status != HXGE_OK) {
+		if ((status = hxge_alloc_rx_cntl_dma(hxgep, st_rdc,
+		    &dma_rbr_cntl_p[j], &hxge_rx_rbr_desc_dma_attr,
+		    rx_rbr_cntl_alloc_size)) != HXGE_OK) {
+			break;
+		}
+
+		if ((status = hxge_alloc_rx_cntl_dma(hxgep, st_rdc,
+		    &dma_rcr_cntl_p[j], &hxge_rx_rcr_desc_dma_attr,
+		    rx_rcr_cntl_alloc_size)) != HXGE_OK) {
+			break;
+		}
+
+		if ((status = hxge_alloc_rx_cntl_dma(hxgep, st_rdc,
+		    &dma_mbox_cntl_p[j], &hxge_rx_mbox_dma_attr,
+		    rx_mbox_cntl_alloc_size)) != HXGE_OK) {
 			break;
 		}
 		st_rdc++;
@@ -1567,21 +1641,34 @@ hxge_alloc_rx_mem_pool(p_hxge_t hxgep)
 	hxgep->rx_buf_pool_p = dma_poolp;
 	dma_poolp->dma_buf_pool_p = dma_buf_p;
 
-	dma_cntl_poolp->ndmas = ndmas;
-	dma_cntl_poolp->buf_allocated = B_TRUE;
-	hxgep->rx_cntl_pool_p = dma_cntl_poolp;
-	dma_cntl_poolp->dma_buf_pool_p = dma_cntl_p;
+	dma_rbr_cntl_poolp->ndmas = ndmas;
+	dma_rbr_cntl_poolp->buf_allocated = B_TRUE;
+	hxgep->rx_rbr_cntl_pool_p = dma_rbr_cntl_poolp;
+	dma_rbr_cntl_poolp->dma_buf_pool_p = dma_rbr_cntl_p;
+
+	dma_rcr_cntl_poolp->ndmas = ndmas;
+	dma_rcr_cntl_poolp->buf_allocated = B_TRUE;
+	hxgep->rx_rcr_cntl_pool_p = dma_rcr_cntl_poolp;
+	dma_rcr_cntl_poolp->dma_buf_pool_p = dma_rcr_cntl_p;
+
+	dma_mbox_cntl_poolp->ndmas = ndmas;
+	dma_mbox_cntl_poolp->buf_allocated = B_TRUE;
+	hxgep->rx_mbox_cntl_pool_p = dma_mbox_cntl_poolp;
+	dma_mbox_cntl_poolp->dma_buf_pool_p = dma_mbox_cntl_p;
 
 	goto hxge_alloc_rx_mem_pool_exit;
 
 hxge_alloc_rx_mem_fail2:
 	/* Free control buffers */
-	j--;
 	HXGE_DEBUG_MSG((hxgep, DMA_CTL,
 	    "==> hxge_alloc_rx_mem_pool: freeing control bufs (%d)", j));
 	for (; j >= 0; j--) {
 		hxge_free_rx_cntl_dma(hxgep,
-		    (p_hxge_dma_common_t)dma_cntl_p[j]);
+		    (p_hxge_dma_common_t)dma_rbr_cntl_p[j]);
+		hxge_free_rx_cntl_dma(hxgep,
+		    (p_hxge_dma_common_t)dma_rcr_cntl_p[j]);
+		hxge_free_rx_cntl_dma(hxgep,
+		    (p_hxge_dma_common_t)dma_mbox_cntl_p[j]);
 		HXGE_DEBUG_MSG((hxgep, DMA_CTL,
 		    "==> hxge_alloc_rx_mem_pool: control bufs freed (%d)", j));
 	}
@@ -1603,8 +1690,12 @@ hxge_alloc_rx_mem_fail1:
 	KMEM_FREE(num_chunks, sizeof (uint32_t) * ndmas);
 	KMEM_FREE(dma_poolp, sizeof (hxge_dma_pool_t));
 	KMEM_FREE(dma_buf_p, ndmas * sizeof (p_hxge_dma_common_t));
-	KMEM_FREE(dma_cntl_poolp, sizeof (hxge_dma_pool_t));
-	KMEM_FREE(dma_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
+	KMEM_FREE(dma_rbr_cntl_poolp, sizeof (hxge_dma_pool_t));
+	KMEM_FREE(dma_rbr_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
+	KMEM_FREE(dma_rcr_cntl_poolp, sizeof (hxge_dma_pool_t));
+	KMEM_FREE(dma_rcr_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
+	KMEM_FREE(dma_mbox_cntl_poolp, sizeof (hxge_dma_pool_t));
+	KMEM_FREE(dma_mbox_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
 
 hxge_alloc_rx_mem_pool_exit:
 	HXGE_DEBUG_MSG((hxgep, DMA_CTL,
@@ -1619,8 +1710,12 @@ hxge_free_rx_mem_pool(p_hxge_t hxgep)
 	uint32_t		i, ndmas;
 	p_hxge_dma_pool_t	dma_poolp;
 	p_hxge_dma_common_t	*dma_buf_p;
-	p_hxge_dma_pool_t	dma_cntl_poolp;
-	p_hxge_dma_common_t	*dma_cntl_p;
+	p_hxge_dma_pool_t	dma_rbr_cntl_poolp;
+	p_hxge_dma_common_t	*dma_rbr_cntl_p;
+	p_hxge_dma_pool_t	dma_rcr_cntl_poolp;
+	p_hxge_dma_common_t	*dma_rcr_cntl_p;
+	p_hxge_dma_pool_t	dma_mbox_cntl_poolp;
+	p_hxge_dma_common_t	*dma_mbox_cntl_p;
 	uint32_t		*num_chunks;
 
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL, "==> hxge_free_rx_mem_pool"));
@@ -1632,42 +1727,73 @@ hxge_free_rx_mem_pool(p_hxge_t hxgep)
 		return;
 	}
 
-	dma_cntl_poolp = hxgep->rx_cntl_pool_p;
-	if (dma_cntl_poolp == NULL || (!dma_cntl_poolp->buf_allocated)) {
+	dma_rbr_cntl_poolp = hxgep->rx_rbr_cntl_pool_p;
+	if (dma_rbr_cntl_poolp == NULL ||
+	    (!dma_rbr_cntl_poolp->buf_allocated)) {
 		HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 		    "<== hxge_free_rx_mem_pool "
-		    "(null rx cntl buf pool or cntl buf not allocated"));
+		    "(null rbr cntl buf pool or rbr cntl buf not allocated"));
+		return;
+	}
+
+	dma_rcr_cntl_poolp = hxgep->rx_rcr_cntl_pool_p;
+	if (dma_rcr_cntl_poolp == NULL ||
+	    (!dma_rcr_cntl_poolp->buf_allocated)) {
+		HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
+		    "<== hxge_free_rx_mem_pool "
+		    "(null rcr cntl buf pool or rcr cntl buf not allocated"));
+		return;
+	}
+
+	dma_mbox_cntl_poolp = hxgep->rx_mbox_cntl_pool_p;
+	if (dma_mbox_cntl_poolp == NULL ||
+	    (!dma_mbox_cntl_poolp->buf_allocated)) {
+		HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
+		    "<== hxge_free_rx_mem_pool "
+		    "(null mbox cntl buf pool or mbox cntl buf not allocated"));
 		return;
 	}
 
 	dma_buf_p = dma_poolp->dma_buf_pool_p;
 	num_chunks = dma_poolp->num_chunks;
 
-	dma_cntl_p = dma_cntl_poolp->dma_buf_pool_p;
-	ndmas = dma_cntl_poolp->ndmas;
+	dma_rbr_cntl_p = dma_rbr_cntl_poolp->dma_buf_pool_p;
+	dma_rcr_cntl_p = dma_rcr_cntl_poolp->dma_buf_pool_p;
+	dma_mbox_cntl_p = dma_mbox_cntl_poolp->dma_buf_pool_p;
+	ndmas = dma_rbr_cntl_poolp->ndmas;
 
 	for (i = 0; i < ndmas; i++) {
 		hxge_free_rx_buf_dma(hxgep, dma_buf_p[i], num_chunks[i]);
 	}
 
 	for (i = 0; i < ndmas; i++) {
-		hxge_free_rx_cntl_dma(hxgep, dma_cntl_p[i]);
+		hxge_free_rx_cntl_dma(hxgep, dma_rbr_cntl_p[i]);
+		hxge_free_rx_cntl_dma(hxgep, dma_rcr_cntl_p[i]);
+		hxge_free_rx_cntl_dma(hxgep, dma_mbox_cntl_p[i]);
 	}
 
 	for (i = 0; i < ndmas; i++) {
 		KMEM_FREE(dma_buf_p[i],
 		    sizeof (hxge_dma_common_t) * HXGE_DMA_BLOCK);
-		KMEM_FREE(dma_cntl_p[i], sizeof (hxge_dma_common_t));
+		KMEM_FREE(dma_rbr_cntl_p[i], sizeof (hxge_dma_common_t));
+		KMEM_FREE(dma_rcr_cntl_p[i], sizeof (hxge_dma_common_t));
+		KMEM_FREE(dma_mbox_cntl_p[i], sizeof (hxge_dma_common_t));
 	}
 
 	KMEM_FREE(num_chunks, sizeof (uint32_t) * ndmas);
-	KMEM_FREE(dma_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
-	KMEM_FREE(dma_cntl_poolp, sizeof (hxge_dma_pool_t));
+	KMEM_FREE(dma_rbr_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
+	KMEM_FREE(dma_rbr_cntl_poolp, sizeof (hxge_dma_pool_t));
+	KMEM_FREE(dma_rcr_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
+	KMEM_FREE(dma_rcr_cntl_poolp, sizeof (hxge_dma_pool_t));
+	KMEM_FREE(dma_mbox_cntl_p, ndmas * sizeof (p_hxge_dma_common_t));
+	KMEM_FREE(dma_mbox_cntl_poolp, sizeof (hxge_dma_pool_t));
 	KMEM_FREE(dma_buf_p, ndmas * sizeof (p_hxge_dma_common_t));
 	KMEM_FREE(dma_poolp, sizeof (hxge_dma_pool_t));
 
 	hxgep->rx_buf_pool_p = NULL;
-	hxgep->rx_cntl_pool_p = NULL;
+	hxgep->rx_rbr_cntl_pool_p = NULL;
+	hxgep->rx_rcr_cntl_pool_p = NULL;
+	hxgep->rx_mbox_cntl_pool_p = NULL;
 
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL, "<== hxge_free_rx_mem_pool"));
 }
@@ -1788,7 +1914,7 @@ hxge_free_rx_buf_dma(p_hxge_t hxgep, p_hxge_dma_common_t dmap,
 /*ARGSUSED*/
 static hxge_status_t
 hxge_alloc_rx_cntl_dma(p_hxge_t hxgep, uint16_t dma_channel,
-    p_hxge_dma_common_t *dmap, size_t size)
+    p_hxge_dma_common_t *dmap, struct ddi_dma_attr *attr, size_t size)
 {
 	p_hxge_dma_common_t	rx_dmap;
 	hxge_status_t		status = HXGE_OK;
@@ -1801,7 +1927,7 @@ hxge_alloc_rx_cntl_dma(p_hxge_t hxgep, uint16_t dma_channel,
 	rx_dmap->contig_alloc_type = B_FALSE;
 
 	status = hxge_dma_mem_alloc(hxgep, hxge_force_dma,
-	    &hxge_desc_dma_attr, size, &hxge_dev_desc_dma_acc_attr,
+	    attr, size, &hxge_dev_desc_dma_acc_attr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, rx_dmap);
 	if (status != HXGE_OK) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
@@ -2089,7 +2215,7 @@ hxge_alloc_tx_cntl_dma(p_hxge_t hxgep, uint16_t dma_channel,
 	tx_dmap->contig_alloc_type = B_FALSE;
 
 	status = hxge_dma_mem_alloc(hxgep, hxge_force_dma,
-	    &hxge_desc_dma_attr, size, &hxge_dev_desc_dma_acc_attr,
+	    &hxge_tx_desc_dma_attr, size, &hxge_dev_desc_dma_acc_attr,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, tx_dmap);
 	if (status != HXGE_OK) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
@@ -2292,6 +2418,9 @@ hxge_dma_mem_alloc(p_hxge_t hxgep, dma_method_t method,
 static void
 hxge_dma_mem_free(p_hxge_dma_common_t dma_p)
 {
+	if (dma_p == NULL)
+		return;
+
 	if (dma_p->dma_handle != NULL) {
 		if (dma_p->ncookies) {
 			(void) ddi_dma_unbind_handle(dma_p->dma_handle);
@@ -2300,11 +2429,13 @@ hxge_dma_mem_free(p_hxge_dma_common_t dma_p)
 		ddi_dma_free_handle(&dma_p->dma_handle);
 		dma_p->dma_handle = NULL;
 	}
+
 	if (dma_p->acc_handle != NULL) {
 		ddi_dma_mem_free(&dma_p->acc_handle);
 		dma_p->acc_handle = NULL;
 		HPI_DMA_ACC_HANDLE_SET(dma_p, NULL);
 	}
+
 	dma_p->kaddrp = NULL;
 	dma_p->alength = NULL;
 }

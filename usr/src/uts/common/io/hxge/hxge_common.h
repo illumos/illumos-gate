@@ -55,15 +55,13 @@ extern "C" {
 #define	HXGE_RCR_MIN		(HXGE_RBR_RBB_MIN * 2)
 #define	HXGE_RCR_MAX		65504			/* 2^16 - 32 */
 
-#if defined(_BIG_ENDIAN)
-#define	HXGE_RCR_DEFAULT	(HXGE_RBR_RBB_DEFAULT * 8)
-#else /* _BIG_ENDIAN */
-#ifdef USE_RX_BIG_BUF
-#define	HXGE_RCR_DEFAULT	(HXGE_RBR_RBB_DEFAULT * 8)
+#if defined(__sparc)
+#define	HXGE_RCR_SZ 		HXGE_RBR_RBB_DEFAULT * (8192 / 256)
 #else
-#define	HXGE_RCR_DEFAULT	(HXGE_RBR_RBB_DEFAULT * 4)
+#define	HXGE_RCR_SZ 		HXGE_RBR_RBB_DEFAULT * (4096 / 256)
 #endif
-#endif /* _BIG_ENDIAN */
+
+#define	HXGE_RCR_DEFAULT	HXGE_RCR_SZ
 
 #define	HXGE_TX_RING_DEFAULT	2048
 #define	HXGE_TX_RING_MAX	(64 * 128 - 1)
