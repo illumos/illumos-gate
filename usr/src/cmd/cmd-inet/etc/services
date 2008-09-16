@@ -1,7 +1,5 @@
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -142,5 +140,6 @@ lockd		4045/tcp
 ipsec-nat-t	4500/udp			# IPsec NAT-Traversal
 mdns		5353/udp			# Multicast DNS
 mdns		5353/tcp
+vnc-server	5900/tcp			# VNC Server
 dtspc		6112/tcp			# CDE subprocess control
 fs		7100/tcp			# Font server
