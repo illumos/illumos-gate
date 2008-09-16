@@ -69,7 +69,7 @@ typedef struct xnb xnb_t;
  * drivers via the xnb_flavour_t structure.
  */
 typedef struct xnb_flavour {
-	void		(*xf_recv)(xnb_t *, mblk_t *);
+	void		(*xf_from_peer)(xnb_t *, mblk_t *);
 	void		(*xf_peer_connected)(xnb_t *);
 	void		(*xf_peer_disconnected)(xnb_t *);
 	boolean_t	(*xf_hotplug_connected)(xnb_t *);
@@ -77,17 +77,17 @@ typedef struct xnb_flavour {
 	uint16_t	(*xf_cksum_to_peer)(xnb_t *, mblk_t *);
 } xnb_flavour_t;
 
-typedef struct xnb_rxbuf {
-	frtn_t			xr_free_rtn;
-	xnb_t			*xr_xnbp;
-	gnttab_map_grant_ref_t	xr_mop;
-	RING_IDX		xr_id;
-	uint16_t		xr_status;
-	unsigned int		xr_flags;
+typedef struct xnb_txbuf {
+	frtn_t			xt_free_rtn;
+	xnb_t			*xt_xnbp;
+	gnttab_map_grant_ref_t	xt_mop;
+	RING_IDX		xt_id;
+	uint16_t		xt_status;
+	unsigned int		xt_flags;
 
-#define	XNB_RXBUF_INUSE	0x01
+#define	XNB_TXBUF_INUSE	0x01
 
-} xnb_rxbuf_t;
+} xnb_txbuf_t;
 
 /* Per network-interface-controller driver private structure */
 struct xnb {
@@ -106,12 +106,12 @@ struct xnb {
 	uint64_t		xnb_stat_obytes;
 
 	uint64_t		xnb_stat_intr;
-	uint64_t		xnb_stat_xmit_defer;
+	uint64_t		xnb_stat_rx_defer;
 
-	uint64_t		xnb_stat_tx_cksum_deferred;
-	uint64_t		xnb_stat_rx_cksum_no_need;
+	uint64_t		xnb_stat_rx_cksum_deferred;
+	uint64_t		xnb_stat_tx_cksum_no_need;
 
-	uint64_t		xnb_stat_tx_rsp_notok;
+	uint64_t		xnb_stat_rx_rsp_notok;
 
 	uint64_t		xnb_stat_tx_notify_sent;
 	uint64_t		xnb_stat_tx_notify_deferred;
@@ -123,7 +123,7 @@ struct xnb {
 	uint64_t		xnb_stat_rx_too_early;
 	uint64_t		xnb_stat_rx_allocb_failed;
 	uint64_t		xnb_stat_tx_allocb_failed;
-	uint64_t		xnb_stat_tx_foreign_page;
+	uint64_t		xnb_stat_rx_foreign_page;
 	uint64_t		xnb_stat_mac_full;
 	uint64_t		xnb_stat_spurious_intr;
 	uint64_t		xnb_stat_allocation_success;
@@ -132,8 +132,8 @@ struct xnb {
 	uint64_t		xnb_stat_small_allocation_failure;
 	uint64_t		xnb_stat_other_allocation_failure;
 
-	uint64_t		xnb_stat_tx_pagebndry_crossed;
-	uint64_t		xnb_stat_tx_cpoparea_grown;
+	uint64_t		xnb_stat_rx_pagebndry_crossed;
+	uint64_t		xnb_stat_rx_cpoparea_grown;
 
 	uint64_t		xnb_stat_csum_hardware;
 	uint64_t		xnb_stat_csum_software;
@@ -147,10 +147,10 @@ struct xnb {
 	kmutex_t		xnb_rx_lock;
 	kmutex_t		xnb_tx_lock;
 
-	int			xnb_rx_unmop_count;
-	int			xnb_rx_buf_count;
-	boolean_t		xnb_rx_pages_writable;
-	boolean_t		xnb_rx_always_copy;
+	int			xnb_tx_unmop_count;
+	int			xnb_tx_buf_count;
+	boolean_t		xnb_tx_pages_writable;
+	boolean_t		xnb_tx_always_copy;
 
 	netif_rx_back_ring_t	xnb_rx_ring;	/* rx interface struct ptr */
 	void			*xnb_rx_ring_addr;
@@ -168,18 +168,18 @@ struct xnb {
 	int			xnb_evtchn;	/* channel to front end */
 	domid_t			xnb_peer;
 
-	xnb_rxbuf_t			*xnb_rx_bufp[NET_TX_RING_SIZE];
-	gnttab_map_grant_ref_t		xnb_rx_mop[NET_TX_RING_SIZE];
-	gnttab_unmap_grant_ref_t	xnb_rx_unmop[NET_TX_RING_SIZE];
+	xnb_txbuf_t			*xnb_tx_bufp[NET_TX_RING_SIZE];
+	gnttab_map_grant_ref_t		xnb_tx_mop[NET_TX_RING_SIZE];
+	gnttab_unmap_grant_ref_t	xnb_tx_unmop[NET_TX_RING_SIZE];
 
 	/* store information for unmop */
-	xnb_rxbuf_t		*xnb_rx_unmop_rxp[NET_TX_RING_SIZE];
+	xnb_txbuf_t		*xnb_tx_unmop_txp[NET_TX_RING_SIZE];
 
-	caddr_t			xnb_tx_va;
-	gnttab_transfer_t	xnb_tx_top[NET_RX_RING_SIZE];
+	caddr_t			xnb_rx_va;
+	gnttab_transfer_t	xnb_rx_top[NET_RX_RING_SIZE];
 
 	boolean_t		xnb_hv_copy;	/* do we do hypervisor copy? */
-	gnttab_copy_t		*xnb_tx_cpop;
+	gnttab_copy_t		*xnb_rx_cpop;
 #define	CPOP_DEFCNT 	8
 	size_t			xnb_cpop_sz; 	/* in elements, not bytes */
 };

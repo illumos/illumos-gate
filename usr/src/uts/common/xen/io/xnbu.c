@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Xen inter-domain backend - GLDv3 driver edition.
  *
@@ -60,7 +58,7 @@ static mblk_t	*xnbu_m_send(void *, mblk_t *);
 
 typedef struct xnbu {
 	mac_handle_t		u_mh;
-	mac_resource_handle_t	u_rx_handle;
+	mac_resource_handle_t	u_mrh;
 	boolean_t		u_need_sched;
 } xnbu_t;
 
@@ -86,9 +84,9 @@ xnbu_to_host(xnb_t *xnbp, mblk_t *mp)
 
 	ASSERT(mp != NULL);
 
-	mac_rx(xnbup->u_mh, xnbup->u_rx_handle, mp);
+	mac_rx(xnbup->u_mh, xnbup->u_mrh, mp);
 
-	mutex_enter(&xnbp->xnb_tx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
 	/*
 	 * If a transmit attempt failed because we ran out of ring
@@ -101,7 +99,7 @@ xnbu_to_host(xnb_t *xnbp, mblk_t *mp)
 		xnbup->u_need_sched = B_FALSE;
 	}
 
-	mutex_exit(&xnbp->xnb_tx_lock);
+	mutex_exit(&xnbp->xnb_rx_lock);
 
 	if (sched)
 		mac_tx_update(xnbup->u_mh);
@@ -305,15 +303,15 @@ xnbu_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 #define	map_stat(q, r)				\
 	case (MAC_STAT_##q):			\
-		*val = xnbp->xnb_stat_##r;		\
+		*val = xnbp->xnb_stat_##r;	\
 		break
 
 	switch (stat) {
 
-	map_stat(IPACKETS, ipackets);
-	map_stat(OPACKETS, opackets);
-	map_stat(RBYTES, rbytes);
-	map_stat(OBYTES, obytes);
+	map_stat(IPACKETS, opackets);
+	map_stat(OPACKETS, ipackets);
+	map_stat(RBYTES, obytes);
+	map_stat(OBYTES, rbytes);
 
 	default:
 		mutex_exit(&xnbp->xnb_rx_lock);
@@ -352,7 +350,7 @@ xnbu_m_resources(void *arg)
 	mrf.mrf_normal_blank_time = 128; /* XXPV dme: see xnbu_m_blank() */
 	mrf.mrf_normal_pkt_count = 8;    /* XXPV dme: see xnbu_m_blank() */
 
-	xnbup->u_rx_handle = mac_resource_add(xnbup->u_mh,
+	xnbup->u_mrh = mac_resource_add(xnbup->u_mh,
 	    (mac_resource_t *)&mrf);
 }
 
@@ -482,7 +480,7 @@ xnbu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_enter(&xnbp->xnb_rx_lock);
 
 	if (!xnbp->xnb_detachable || xnbp->xnb_connected ||
-	    (xnbp->xnb_rx_buf_count > 0)) {
+	    (xnbp->xnb_tx_buf_count > 0)) {
 		mutex_exit(&xnbp->xnb_rx_lock);
 		mutex_exit(&xnbp->xnb_tx_lock);
 
@@ -508,7 +506,7 @@ DDI_DEFINE_STREAM_OPS(ops, nulldev, nulldev, xnbu_attach, xnbu_detach,
     nodev, NULL, D_MP, NULL);
 
 static struct modldrv modldrv = {
-	&mod_driverops, "xnbu driver %I%", &ops
+	&mod_driverops, "xnbu driver", &ops
 };
 
 static struct modlinkage modlinkage = {
