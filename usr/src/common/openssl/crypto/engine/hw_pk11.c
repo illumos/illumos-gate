@@ -4,13 +4,15 @@
  */
 
 /* crypto/engine/hw_pk11.c */
-/* This product includes software developed by the OpenSSL Project for 
+/*
+ * This product includes software developed by the OpenSSL Project for
  * use in the OpenSSL Toolkit (http://www.openssl.org/).
  *
- * This project also referenced hw_pkcs11-0.9.7b.patch written by 
+ * This project also referenced hw_pkcs11-0.9.7b.patch written by
  * Afchine Madjlessi.
  */
-/* ====================================================================
+/*
+ * ====================================================================
  * Copyright (c) 2000-2001 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -18,7 +20,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -242,16 +244,16 @@ static int pk11_engine_ciphers(ENGINE *e, const EVP_CIPHER **cipher,
 	const int **nids, int nid);
 static int pk11_engine_digests(ENGINE *e, const EVP_MD **digest,
 	const int **nids, int nid);
-static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx, 
+static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	const unsigned char *key, CK_KEY_TYPE key_type, PK11_SESSION *sp);
 static int check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key,
 	int key_len);
 static int md_nid_to_pk11(int nid);
 static int pk11_digest_init(EVP_MD_CTX *ctx);
-static int pk11_digest_update(EVP_MD_CTX *ctx,const void *data,
+static int pk11_digest_update(EVP_MD_CTX *ctx, const void *data,
 	size_t count);
-static int pk11_digest_final(EVP_MD_CTX *ctx,unsigned char *md);
-static int pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from);
+static int pk11_digest_final(EVP_MD_CTX *ctx, unsigned char *md);
+static int pk11_digest_copy(EVP_MD_CTX *to, const EVP_MD_CTX *from);
 static int pk11_digest_cleanup(EVP_MD_CTX *ctx);
 
 static int pk11_choose_slots(int *any_slot_found);
@@ -330,7 +332,7 @@ static CK_BBOOL pk11_have_dsa	= CK_FALSE;
 static CK_BBOOL pk11_have_dh	= CK_FALSE;
 static CK_BBOOL pk11_have_random = CK_FALSE;
 
-typedef struct PK11_CIPHER_st 
+typedef struct PK11_CIPHER_st
 	{
 	enum pk11_cipher_id	id;
 	int			nid;
@@ -340,25 +342,40 @@ typedef struct PK11_CIPHER_st
 	CK_MECHANISM_TYPE	mech_type;
 	} PK11_CIPHER;
 
-static PK11_CIPHER ciphers[] = 
+static PK11_CIPHER ciphers[] =
 	{
-	{PK11_DES_CBC,	   NID_des_cbc,      8,  8, CKK_DES,      CKM_DES_CBC, },
-	{PK11_DES3_CBC,	   NID_des_ede3_cbc, 8, 24, CKK_DES3,     CKM_DES3_CBC, },
-	{PK11_DES_ECB,	   NID_des_ecb,      0,  8, CKK_DES,      CKM_DES_ECB, },
-	{PK11_DES3_ECB,	   NID_des_ede3_ecb, 0, 24, CKK_DES3,     CKM_DES3_ECB, },
-	{PK11_RC4,	   NID_rc4,          0, 16, CKK_RC4,      CKM_RC4, },
-	{PK11_AES_128_CBC, NID_aes_128_cbc, 16, 16, CKK_AES,      CKM_AES_CBC, },
-	{PK11_AES_192_CBC, NID_aes_192_cbc, 16, 24, CKK_AES,      CKM_AES_CBC, },
-	{PK11_AES_256_CBC, NID_aes_256_cbc, 16, 32, CKK_AES,      CKM_AES_CBC, },
-	{PK11_AES_128_ECB, NID_aes_128_ecb,  0, 16, CKK_AES,      CKM_AES_ECB, },
-	{PK11_AES_192_ECB, NID_aes_192_ecb,  0, 24, CKK_AES,      CKM_AES_ECB, },
-	{PK11_AES_256_ECB, NID_aes_256_ecb,  0, 32, CKK_AES,      CKM_AES_ECB, },
-	{PK11_BLOWFISH_CBC,NID_bf_cbc,       8, 16, CKK_BLOWFISH, CKM_BLOWFISH_CBC,},
+	{ PK11_DES_CBC,		NID_des_cbc,		8,	8,
+		CKK_DES,	CKM_DES_CBC, },
+	{ PK11_DES3_CBC,	NID_des_ede3_cbc,	8,	24,
+		CKK_DES3,	CKM_DES3_CBC, },
+	{ PK11_DES_ECB,		NID_des_ecb,		0,	8,
+		CKK_DES,	CKM_DES_ECB, },
+	{ PK11_DES3_ECB,	NID_des_ede3_ecb,	0,	24,
+		CKK_DES3,	CKM_DES3_ECB, },
+	{ PK11_RC4,		NID_rc4,		0,	16,
+		CKK_RC4,	CKM_RC4, },
+	{ PK11_AES_128_CBC,	NID_aes_128_cbc,	16,	16,
+		CKK_AES,	CKM_AES_CBC, },
+	{ PK11_AES_192_CBC,	NID_aes_192_cbc,	16,	24,
+		CKK_AES,	CKM_AES_CBC, },
+	{ PK11_AES_256_CBC,	NID_aes_256_cbc,	16,	32,
+		CKK_AES,	CKM_AES_CBC, },
+	{ PK11_AES_128_ECB,	NID_aes_128_ecb,	0,	16,
+		CKK_AES,	CKM_AES_ECB, },
+	{ PK11_AES_192_ECB,	NID_aes_192_ecb,	0,	24,
+		CKK_AES,	CKM_AES_ECB, },
+	{ PK11_AES_256_ECB,	NID_aes_256_ecb,	0,	32,
+		CKK_AES,	CKM_AES_ECB, },
+	{ PK11_BLOWFISH_CBC,	NID_bf_cbc,		8,	16,
+		CKK_BLOWFISH,	CKM_BLOWFISH_CBC, },
 #ifdef	SOLARIS_AES_CTR
 	/* we don't know the correct NIDs until the engine is initialized */
-	{PK11_AES_128_CTR, NID_undef,	    16, 16, CKK_AES,      CKM_AES_CTR, },
-	{PK11_AES_192_CTR, NID_undef,	    16, 24, CKK_AES,      CKM_AES_CTR, },
-	{PK11_AES_256_CTR, NID_undef,	    16, 32, CKK_AES,      CKM_AES_CTR, },
+	{ PK11_AES_128_CTR,	NID_undef,		16,	16,
+		CKK_AES,	CKM_AES_CTR, },
+	{ PK11_AES_192_CTR,	NID_undef,		16,	24,
+		CKK_AES,	CKM_AES_CTR, },
+	{ PK11_AES_256_CTR,	NID_undef,		16,	32,
+		CKK_AES,	CKM_AES_CTR, },
 #endif	/* SOLARIS_AES_CTR */
 	};
 
@@ -369,7 +386,7 @@ typedef struct PK11_DIGEST_st
 	CK_MECHANISM_TYPE	mech_type;
 	} PK11_DIGEST;
 
-static PK11_DIGEST digests[] = 
+static PK11_DIGEST digests[] =
 	{
 	{PK11_MD5,	NID_md5,	CKM_MD5, },
 	{PK11_SHA1,	NID_sha1,	CKM_SHA_1, },
@@ -380,9 +397,10 @@ static PK11_DIGEST digests[] =
 	{0,		NID_undef,	0xFFFF, },
 	};
 
-/* Structure to be used for the cipher_data/md_data in 
- * EVP_CIPHER_CTX/EVP_MD_CTX structures in order to use the same 
- * pk11 session in multiple cipher_update calls
+/*
+ * Structure to be used for the cipher_data/md_data in
+ * EVP_CIPHER_CTX/EVP_MD_CTX structures in order to use the same pk11
+ * session in multiple cipher_update calls
  */
 typedef struct PK11_CIPHER_STATE_st
 	{
@@ -398,7 +416,7 @@ typedef struct PK11_CIPHER_STATE_st
  */
 
 /* DES CBC EVP */
-static const EVP_CIPHER pk11_des_cbc = 
+static const EVP_CIPHER pk11_des_cbc =
 	{
 	NID_des_cbc,
 	8, 8, 8,
@@ -406,14 +424,14 @@ static const EVP_CIPHER pk11_des_cbc =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
 	};
 
 /* 3DES CBC EVP */
-static const EVP_CIPHER pk11_3des_cbc = 
+static const EVP_CIPHER pk11_3des_cbc =
 	{
 	NID_des_ede3_cbc,
 	8, 24, 8,
@@ -421,7 +439,7 @@ static const EVP_CIPHER pk11_3des_cbc =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
@@ -431,7 +449,7 @@ static const EVP_CIPHER pk11_3des_cbc =
  * ECB modes don't use an Initial Vector so that's why set_asn1_parameters and
  * get_asn1_parameters fields are set to NULL.
  */
-static const EVP_CIPHER pk11_des_ecb = 
+static const EVP_CIPHER pk11_des_ecb =
 	{
 	NID_des_ecb,
 	8, 8, 8,
@@ -439,13 +457,13 @@ static const EVP_CIPHER pk11_des_ecb =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	NULL,
 	NULL,
 	NULL
 	};
 
-static const EVP_CIPHER pk11_3des_ecb = 
+static const EVP_CIPHER pk11_3des_ecb =
 	{
 	NID_des_ede3_ecb,
 	8, 24, 8,
@@ -453,14 +471,14 @@ static const EVP_CIPHER pk11_3des_ecb =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	NULL,
 	NULL,
 	NULL
 	};
 
 
-static const EVP_CIPHER pk11_aes_128_cbc = 
+static const EVP_CIPHER pk11_aes_128_cbc =
 	{
 	NID_aes_128_cbc,
 	16, 16, 16,
@@ -468,13 +486,13 @@ static const EVP_CIPHER pk11_aes_128_cbc =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
 	};
 
-static const EVP_CIPHER pk11_aes_192_cbc = 
+static const EVP_CIPHER pk11_aes_192_cbc =
 	{
 	NID_aes_192_cbc,
 	16, 24, 16,
@@ -482,13 +500,13 @@ static const EVP_CIPHER pk11_aes_192_cbc =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
 	};
 
-static const EVP_CIPHER pk11_aes_256_cbc = 
+static const EVP_CIPHER pk11_aes_256_cbc =
 	{
 	NID_aes_256_cbc,
 	16, 32, 16,
@@ -496,7 +514,7 @@ static const EVP_CIPHER pk11_aes_256_cbc =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
@@ -506,7 +524,7 @@ static const EVP_CIPHER pk11_aes_256_cbc =
  * ECB modes don't use IV so that's why set_asn1_parameters and
  * get_asn1_parameters are set to NULL.
  */
-static const EVP_CIPHER pk11_aes_128_ecb = 
+static const EVP_CIPHER pk11_aes_128_ecb =
 	{
 	NID_aes_128_ecb,
 	16, 16, 0,
@@ -514,13 +532,13 @@ static const EVP_CIPHER pk11_aes_128_ecb =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	NULL,
 	NULL,
 	NULL
 	};
 
-static const EVP_CIPHER pk11_aes_192_ecb = 
+static const EVP_CIPHER pk11_aes_192_ecb =
 	{
 	NID_aes_192_ecb,
 	16, 24, 0,
@@ -528,13 +546,13 @@ static const EVP_CIPHER pk11_aes_192_ecb =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	NULL,
 	NULL,
 	NULL
 	};
 
-static const EVP_CIPHER pk11_aes_256_ecb = 
+static const EVP_CIPHER pk11_aes_256_ecb =
 	{
 	NID_aes_256_ecb,
 	16, 32, 0,
@@ -542,7 +560,7 @@ static const EVP_CIPHER pk11_aes_256_ecb =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	NULL,
 	NULL,
 	NULL
@@ -554,7 +572,7 @@ static const EVP_CIPHER pk11_aes_256_ecb =
  * created in pk11_library_init(). Note that the need to change these structures
  * is the reason why we don't define them with the const keyword.
  */
-static EVP_CIPHER pk11_aes_128_ctr = 
+static EVP_CIPHER pk11_aes_128_ctr =
 	{
 	NID_undef,
 	16, 16, 16,
@@ -562,13 +580,13 @@ static EVP_CIPHER pk11_aes_128_ctr =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
 	};
 
-static EVP_CIPHER pk11_aes_192_ctr = 
+static EVP_CIPHER pk11_aes_192_ctr =
 	{
 	NID_undef,
 	16, 24, 16,
@@ -576,13 +594,13 @@ static EVP_CIPHER pk11_aes_192_ctr =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
 	};
 
-static EVP_CIPHER pk11_aes_256_ctr = 
+static EVP_CIPHER pk11_aes_256_ctr =
 	{
 	NID_undef,
 	16, 32, 16,
@@ -590,14 +608,14 @@ static EVP_CIPHER pk11_aes_256_ctr =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
 	};
 #endif	/* SOLARIS_AES_CTR */
 
-static const EVP_CIPHER pk11_bf_cbc = 
+static const EVP_CIPHER pk11_bf_cbc =
 	{
 	NID_bf_cbc,
 	8, 16, 8,
@@ -605,7 +623,7 @@ static const EVP_CIPHER pk11_bf_cbc =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	EVP_CIPHER_set_asn1_iv,
 	EVP_CIPHER_get_asn1_iv,
 	NULL
@@ -619,7 +637,7 @@ static const EVP_CIPHER pk11_rc4 =
 	pk11_cipher_init,
 	pk11_cipher_do_cipher,
 	pk11_cipher_cleanup,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	NULL,
 	NULL,
 	NULL
@@ -638,7 +656,7 @@ static const EVP_MD pk11_md5 =
 	pk11_digest_cleanup,
 	EVP_PKEY_RSA_method,
 	MD5_CBLOCK,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	};
 
 static const EVP_MD pk11_sha1 =
@@ -654,7 +672,7 @@ static const EVP_MD pk11_sha1 =
 	pk11_digest_cleanup,
 	EVP_PKEY_RSA_method,
 	SHA_CBLOCK,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	};
 
 static const EVP_MD pk11_sha224 =
@@ -671,7 +689,7 @@ static const EVP_MD pk11_sha224 =
 	EVP_PKEY_RSA_method,
 	/* SHA-224 uses the same cblock size as SHA-256 */
 	SHA256_CBLOCK,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	};
 
 static const EVP_MD pk11_sha256 =
@@ -687,7 +705,7 @@ static const EVP_MD pk11_sha256 =
 	pk11_digest_cleanup,
 	EVP_PKEY_RSA_method,
 	SHA256_CBLOCK,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	};
 
 static const EVP_MD pk11_sha384 =
@@ -704,7 +722,7 @@ static const EVP_MD pk11_sha384 =
 	EVP_PKEY_RSA_method,
 	/* SHA-384 uses the same cblock size as SHA-512 */
 	SHA512_CBLOCK,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	};
 
 static const EVP_MD pk11_sha512 =
@@ -720,14 +738,14 @@ static const EVP_MD pk11_sha512 =
 	pk11_digest_cleanup,
 	EVP_PKEY_RSA_method,
 	SHA512_CBLOCK,
-	sizeof(PK11_CIPHER_STATE),
+	sizeof (PK11_CIPHER_STATE),
 	};
 
-/* Initialization function. Sets up various pk11 library components.
+/*
+ * Initialization function. Sets up various PKCS#11 library components.
+ * The definitions for control commands specific to this engine
  */
-/* The definitions for control commands specific to this engine
- */
-#define PK11_CMD_SO_PATH		ENGINE_CMD_BASE
+#define	PK11_CMD_SO_PATH		ENGINE_CMD_BASE
 static const ENGINE_CMD_DEFN pk11_cmd_defns[] =
 	{
 		{
@@ -751,15 +769,15 @@ static RAND_METHOD pk11_random =
 	};
 
 
-/* Constants used when creating the ENGINE
- */
+/* Constants used when creating the ENGINE */
 static const char *engine_pk11_id = "pkcs11";
 static const char *engine_pk11_name = "PKCS #11 engine support";
 
 CK_FUNCTION_LIST_PTR pFuncList = NULL;
 static const char PK11_GET_FUNCTION_LIST[] = "C_GetFunctionList";
 
-/* These are the static string constants for the DSO file name and the function
+/*
+ * These are the static string constants for the DSO file name and the function
  * symbol names to bind to.
  */
 #if defined(__sparcv9) || defined(__x86_64) || defined(__amd64)
@@ -874,87 +892,88 @@ static int bind_pk11(ENGINE *e)
 	if (!pk11_library_initialized)
 		(void) pk11_library_init(e);
 
-	if(!ENGINE_set_id(e, engine_pk11_id) ||
-	   !ENGINE_set_name(e, engine_pk11_name) ||
-	   !ENGINE_set_ciphers(e, pk11_engine_ciphers) ||
-	   !ENGINE_set_digests(e, pk11_engine_digests))
-	   	return 0;
+	if (!ENGINE_set_id(e, engine_pk11_id) ||
+	    !ENGINE_set_name(e, engine_pk11_name) ||
+	    !ENGINE_set_ciphers(e, pk11_engine_ciphers) ||
+	    !ENGINE_set_digests(e, pk11_engine_digests))
+		return (0);
 #ifndef OPENSSL_NO_RSA
-	if(pk11_have_rsa == CK_TRUE)
+	if (pk11_have_rsa == CK_TRUE)
 		{
-		if(!ENGINE_set_RSA(e, PK11_RSA()) ||
-	           !ENGINE_set_load_privkey_function(e, pk11_load_privkey) ||
-	           !ENGINE_set_load_pubkey_function(e, pk11_load_pubkey))
-			return 0;
+		if (!ENGINE_set_RSA(e, PK11_RSA()) ||
+		    !ENGINE_set_load_privkey_function(e, pk11_load_privkey) ||
+		    !ENGINE_set_load_pubkey_function(e, pk11_load_pubkey))
+			return (0);
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, "%s: registered RSA\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
 		}
 #endif	/* OPENSSL_NO_RSA */
 #ifndef OPENSSL_NO_DSA
-	if(pk11_have_dsa == CK_TRUE)
-		{	
-	  	if (!ENGINE_set_DSA(e, PK11_DSA()))
-			return 0;
+	if (pk11_have_dsa == CK_TRUE)
+		{
+		if (!ENGINE_set_DSA(e, PK11_DSA()))
+			return (0);
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, "%s: registered DSA\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
-	    	}
+		}
 #endif	/* OPENSSL_NO_DSA */
 #ifndef OPENSSL_NO_DH
-	if(pk11_have_dh == CK_TRUE)
+	if (pk11_have_dh == CK_TRUE)
 		{
-	  	if (!ENGINE_set_DH(e, PK11_DH()))
-			return 0;
+		if (!ENGINE_set_DH(e, PK11_DH()))
+			return (0);
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, "%s: registered DH\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
-	    	}
+		}
 #endif	/* OPENSSL_NO_DH */
-	if(pk11_have_random)
+	if (pk11_have_random)
 		{
-		if(!ENGINE_set_RAND(e, &pk11_random))
-			return 0;
+		if (!ENGINE_set_RAND(e, &pk11_random))
+			return (0);
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, "%s: registered random\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
 		}
-	if(!ENGINE_set_init_function(e, pk11_init) ||
-	   !ENGINE_set_destroy_function(e, pk11_destroy) ||
-	   !ENGINE_set_finish_function(e, pk11_finish) ||
-	   !ENGINE_set_ctrl_function(e, pk11_ctrl) ||
-	   !ENGINE_set_cmd_defns(e, pk11_cmd_defns))
-		return 0;
+	if (!ENGINE_set_init_function(e, pk11_init) ||
+	    !ENGINE_set_destroy_function(e, pk11_destroy) ||
+	    !ENGINE_set_finish_function(e, pk11_finish) ||
+	    !ENGINE_set_ctrl_function(e, pk11_ctrl) ||
+	    !ENGINE_set_cmd_defns(e, pk11_cmd_defns))
+		return (0);
 
-/* Apache calls OpenSSL function RSA_blinding_on() once during startup
+/*
+ * Apache calls OpenSSL function RSA_blinding_on() once during startup
  * which in turn calls bn_mod_exp. Since we do not implement bn_mod_exp
- * here, we wire it back to the OpenSSL software implementation. 
- * Since it is used only once, performance is not a concern. */
+ * here, we wire it back to the OpenSSL software implementation.
+ * Since it is used only once, performance is not a concern.
+ */
 #ifndef OPENSSL_NO_RSA
-        rsa = RSA_PKCS1_SSLeay();
-        pk11_rsa->rsa_mod_exp = rsa->rsa_mod_exp;
-        pk11_rsa->bn_mod_exp = rsa->bn_mod_exp;
+	rsa = RSA_PKCS1_SSLeay();
+	pk11_rsa->rsa_mod_exp = rsa->rsa_mod_exp;
+	pk11_rsa->bn_mod_exp = rsa->bn_mod_exp;
 #endif	/* OPENSSL_NO_RSA */
 
 	/* Ensure the pk11 error handling is set up */
 	ERR_load_pk11_strings();
-	
-	return 1;
+
+	return (1);
 	}
 
-/* Dynamic engine support is disabled at a higher level for Solaris
- */
+/* Dynamic engine support is disabled at a higher level for Solaris */
 #ifdef	ENGINE_DYNAMIC_SUPPORT
 static int bind_helper(ENGINE *e, const char *id)
 	{
 	if (id && (strcmp(id, engine_pk11_id) != 0))
-		return 0;
+		return (0);
 
 	if (!bind_pk11(e))
-		return 0;
+		return (0);
 
-	return 1;
-	}	   
+	return (1);
+	}
 
 IMPLEMENT_DYNAMIC_CHECK_FN()
 IMPLEMENT_DYNAMIC_BIND_FN(bind_helper)
@@ -965,26 +984,27 @@ static ENGINE *engine_pk11(void)
 	ENGINE *ret = ENGINE_new();
 
 	if (!ret)
-		return NULL;
+		return (NULL);
 
 	if (!bind_pk11(ret))
 		{
 		ENGINE_free(ret);
-		return NULL;
+		return (NULL);
 		}
 
-	return ret;
+	return (ret);
 	}
 
-void ENGINE_load_pk11(void)
+void
+ENGINE_load_pk11(void)
 	{
 	ENGINE *e_pk11 = NULL;
 
-	/* Do not use dynamic PKCS#11 library on Solaris due to 
-	 * security reasons. We will link it in statically
+	/*
+	 * Do not use dynamic PKCS#11 library on Solaris due to
+	 * security reasons. We will link it in statically.
 	 */
-	/* Attempt to load PKCS#11 library 
-	 */
+	/* Attempt to load PKCS#11 library */
 	if (!pk11_dso)
 		pk11_dso = DSO_load(NULL, get_PK11_LIBNAME(), NULL, 0);
 
@@ -995,16 +1015,17 @@ void ENGINE_load_pk11(void)
 		}
 
 	e_pk11 = engine_pk11();
-	if (!e_pk11) 
+	if (!e_pk11)
 		{
 		DSO_free(pk11_dso);
 		pk11_dso = NULL;
 		return;
 		}
 
-	/* At this point, the pk11 shared library is either dynamically
-	 * loaded or statically linked in. So, initialize the pk11 
-	 * library before calling ENGINE_set_default since the latter 
+	/*
+	 * At this point, the pk11 shared library is either dynamically
+	 * loaded or statically linked in. So, initialize the pk11
+	 * library before calling ENGINE_set_default since the latter
 	 * needs cipher and digest algorithm information
 	 */
 	if (!pk11_library_init(e_pk11))
@@ -1022,17 +1043,18 @@ void ENGINE_load_pk11(void)
 	}
 #endif	/* ENGINE_DYNAMIC_SUPPORT */
 
-/* These are the static string constants for the DSO file name and 
- * the function symbol names to bind to. 
+/*
+ * These are the static string constants for the DSO file name and
+ * the function symbol names to bind to.
  */
 static const char *PK11_LIBNAME = NULL;
 
 static const char *get_PK11_LIBNAME(void)
 	{
 	if (PK11_LIBNAME)
-		return PK11_LIBNAME;
+		return (PK11_LIBNAME);
 
-	return def_PK11_LIBNAME;
+	return (def_PK11_LIBNAME);
 	}
 
 static void free_PK11_LIBNAME(void)
@@ -1107,10 +1129,11 @@ static void pk11_fork_child(void)
 /* Initialization function for the pk11 engine */
 static int pk11_init(ENGINE *e)
 {
-	return pk11_library_init(e);
+	return (pk11_library_init(e));
 }
 
-/* Initialization function. Sets up various pk11 library components.
+/*
+ * Initialization function. Sets up various PKCS#11 library components.
  * It selects a slot based on predefined critiera. In the process, it also
  * count how many ciphers and digests to support. Since the cipher and
  * digest information is needed when setting default engine, this function
@@ -1141,7 +1164,7 @@ static int pk11_library_init(ENGINE *e)
 		{
 		if (pk11_pid == getpid())
 			{
-			return 1;
+			return (1);
 			}
 		else
 			{
@@ -1154,7 +1177,7 @@ static int pk11_library_init(ENGINE *e)
 			pk11_free_all_locks();
 			}
 		}
-	
+
 	if (pk11_dso == NULL)
 		{
 		PK11err(PK11_F_LIBRARY_INIT, PK11_R_DSO_FAILURE);
@@ -1175,25 +1198,23 @@ static int pk11_library_init(ENGINE *e)
 		goto err;
 #endif	/* SOLARIS_HW_SLOT_SELECTION */
 
-	/* get the C_GetFunctionList function from the loaded library
-	 */
-	p = (CK_C_GetFunctionList)DSO_bind_func(pk11_dso, 
+	/* get the C_GetFunctionList function from the loaded library */
+	p = (CK_C_GetFunctionList)DSO_bind_func(pk11_dso,
 		PK11_GET_FUNCTION_LIST);
-	if ( !p )
+	if (!p)
 		{
 		PK11err(PK11_F_LIBRARY_INIT, PK11_R_DSO_FAILURE);
 		goto err;
 		}
- 
-	/* get the full function list from the loaded library 
-	 */
+
+	/* get the full function list from the loaded library */
 	rv = p(&pFuncList);
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_LIBRARY_INIT, PK11_R_DSO_FAILURE, rv);
 		goto err;
 		}
- 
+
 	rv = pFuncList->C_Initialize(NULL_PTR);
 	if ((rv != CKR_OK) && (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED))
 		{
@@ -1202,7 +1223,7 @@ static int pk11_library_init(ENGINE *e)
 		}
 
 	rv = pFuncList->C_GetInfo(&info);
-	if (rv != CKR_OK) 
+	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_LIBRARY_INIT, PK11_R_GETINFO, rv);
 		goto err;
@@ -1219,7 +1240,7 @@ static int pk11_library_init(ENGINE *e)
 	 * because no slot was present.
 	 */
 	if (any_slot_found == 0)
-		return 1;
+		return (1);
 
 	if (global_session == CK_INVALID_HANDLE)
 		{
@@ -1234,8 +1255,10 @@ static int pk11_library_init(ENGINE *e)
 			}
 		}
 
-	/* Disable digest if C_GetOperationState is not supported since
-	 * this function is required by OpenSSL digest copy function */
+	/*
+	 * Disable digest if C_GetOperationState is not supported since
+	 * this function is required by OpenSSL digest copy function
+	 */
 	if (pFuncList->C_GetOperationState(global_session, NULL, &ul_state_len)
 			== CKR_FUNCTION_NOT_SUPPORTED) {
 #ifdef	DEBUG_SLOT_SELECTION
@@ -1273,24 +1296,24 @@ static int pk11_library_init(ENGINE *e)
 		pk11_atfork_initialized = TRUE;
 		}
 
-	return 1;
+	return (1);
 
 err:
-	return 0;
+	return (0);
 	}
 
-/* Destructor (complements the "ENGINE_pk11()" constructor)
- */
+/* Destructor (complements the "ENGINE_pk11()" constructor) */
 /* ARGSUSED */
 static int pk11_destroy(ENGINE *e)
 	{
 	free_PK11_LIBNAME();
 	ERR_unload_pk11_strings();
-	return 1;
+	return (1);
 	}
 
-/* Termination function to clean up the session, the token, and 
- * the pk11 library.
+/*
+ * Termination function to clean up the session, the token, and the pk11
+ * library.
  */
 /* ARGSUSED */
 static int pk11_finish(ENGINE *e)
@@ -1341,10 +1364,10 @@ static int pk11_finish(ENGINE *e)
 	 */
 	pk11_free_all_locks();
 
-	return 1;
+	return (1);
 
 err:
-	return 0;
+	return (0);
 	}
 
 /* Standard engine interface function to set the dynamic library path */
@@ -1353,34 +1376,33 @@ static int pk11_ctrl(ENGINE *e, int cmd, long i, void *p, void (*f)())
 	{
 	int initialized = ((pk11_dso == NULL) ? 0 : 1);
 
-	switch(cmd)
+	switch (cmd)
 		{
 	case PK11_CMD_SO_PATH:
 		if (p == NULL)
 			{
 			PK11err(PK11_F_CTRL, ERR_R_PASSED_NULL_PARAMETER);
-			return 0;
+			return (0);
 			}
 
 		if (initialized)
 			{
 			PK11err(PK11_F_CTRL, PK11_R_ALREADY_LOADED);
-			return 0;
+			return (0);
 			}
 
-		return set_PK11_LIBNAME((const char*)p);
+		return (set_PK11_LIBNAME((const char *)p));
 	default:
 		break;
 		}
 
-	PK11err(PK11_F_CTRL,PK11_R_CTRL_COMMAND_NOT_IMPLEMENTED);
+	PK11err(PK11_F_CTRL, PK11_R_CTRL_COMMAND_NOT_IMPLEMENTED);
 
-	return 0;
+	return (0);
 	}
 
 
-/* Required function by the engine random interface. It does nothing here
- */
+/* Required function by the engine random interface. It does nothing here */
 static void pk11_rand_cleanup(void)
 	{
 	return;
@@ -1394,7 +1416,8 @@ static void pk11_rand_add(const void *buf, int num, double add)
 	if ((sp = pk11_get_session(OP_RAND)) == NULL)
 		return;
 
-	/* Ignore any errors (e.g. CKR_RANDOM_SEED_NOT_SUPPORTED) since 
+	/*
+	 * Ignore any errors (e.g. CKR_RANDOM_SEED_NOT_SUPPORTED) since
 	 * the calling functions do not care anyway
 	 */
 	pFuncList->C_SeedRandom(sp->session, (unsigned char *) buf, num);
@@ -1412,32 +1435,29 @@ static int pk11_rand_bytes(unsigned char *buf, int num)
 	{
 	CK_RV rv;
 	PK11_SESSION *sp;
-	
+
 	if ((sp = pk11_get_session(OP_RAND)) == NULL)
-		return 0;
-	
+		return (0);
+
 	rv = pFuncList->C_GenerateRandom(sp->session, buf, num);
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_RAND_BYTES, PK11_R_GENERATERANDOM, rv);
 		pk11_return_session(sp, OP_RAND);
-		return 0;
+		return (0);
 		}
 
 	pk11_return_session(sp, OP_RAND);
-	return 1;
+	return (1);
 	}
 
-/* Required function by the engine random interface. It does nothing here
- */
+/* Required function by the engine random interface. It does nothing here */
 static int pk11_rand_status(void)
 	{
-	return 1;
+	return (1);
 	}
 
-/*
- * Free all BIGNUM structures from PK11_SESSION.
- */
+/* Free all BIGNUM structures from PK11_SESSION. */
 static void pk11_free_nums(PK11_SESSION *sp, PK11_OPTYPE optype)
 	{
 	switch (optype)
@@ -1495,7 +1515,8 @@ static void pk11_free_nums(PK11_SESSION *sp, PK11_OPTYPE optype)
  * by destroying the old and creating new freelist.
  * The returned PK11_SESSION structure is disconnected from the freelist.
  */
-PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
+PK11_SESSION *
+pk11_get_session(PK11_OPTYPE optype)
 	{
 	PK11_SESSION *sp = NULL, *sp1, *freelist;
 	pthread_mutex_t *freelist_lock;
@@ -1512,7 +1533,7 @@ PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 			freelist_lock = session_cache[optype].lock;
 			break;
 		default:
-			PK11err(PK11_F_GET_SESSION, 
+			PK11err(PK11_F_GET_SESSION,
 				PK11_R_INVALID_OPERATION_TYPE);
 			return (NULL);
 		}
@@ -1527,13 +1548,13 @@ PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 	 */
 	if (sp == NULL)
 		{
-		if ((sp = OPENSSL_malloc(sizeof(PK11_SESSION))) == NULL)
+		if ((sp = OPENSSL_malloc(sizeof (PK11_SESSION))) == NULL)
 			{
-			PK11err(PK11_F_GET_SESSION, 
+			PK11err(PK11_F_GET_SESSION,
 				PK11_R_MALLOC_FAILURE);
 			goto err;
 			}
-		(void) memset(sp, 0, sizeof(PK11_SESSION));
+		(void) memset(sp, 0, sizeof (PK11_SESSION));
 		}
 	else
 		{
@@ -1598,15 +1619,14 @@ PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 			goto err;
 			}
 
-		/* It is an inherited session and needs re-initialization.
-		 */
+		/* It is an inherited session and needs re-initialization. */
 		if (pk11_setup_session(sp, optype) == 0)
 			{
 			OPENSSL_free(sp);
 			sp = NULL;
 			}
 		}
-	else if (sp->pid == 0)
+	if (sp->pid == 0)
 		{
 		/* It is a new session and needs initialization. */
 		if (pk11_setup_session(sp, optype) == 0)
@@ -1625,18 +1645,19 @@ err:
 
 	(void) pthread_mutex_unlock(freelist_lock);
 
-	return sp;
+	return (sp);
 	}
 
 
-void pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype)
+void
+pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 	{
 	pthread_mutex_t *freelist_lock;
 	PK11_SESSION *freelist;
 
 	if (sp == NULL || sp->pid != getpid())
 		return;
-	
+
 	switch (optype)
 		{
 		case OP_RSA:
@@ -1661,8 +1682,7 @@ void pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 	}
 
 
-/* Destroy all objects. This function is called when the engine is finished
- */
+/* Destroy all objects. This function is called when the engine is finished */
 static int pk11_free_all_sessions()
 	{
 	int ret = 1;
@@ -1689,9 +1709,9 @@ static int pk11_free_all_sessions()
 			ret = 0;
 		}
 
-	return ret;
+	return (ret);
 	}
-	
+
 /*
  * Destroy session structures from the linked list specified. Free as many
  * sessions as possible but any failure in C_CloseSession() means that we
@@ -1731,7 +1751,7 @@ static int pk11_free_session_list(PK11_OPTYPE optype)
 			rv = pFuncList->C_CloseSession(sp->session);
 			if (rv != CKR_OK)
 				{
-				PK11err_add_data(PK11_F_FREE_ALL_SESSIONS, 
+				PK11err_add_data(PK11_F_FREE_ALL_SESSIONS,
 					PK11_R_CLOSESESSION, rv);
 				ret = 0;
 				}
@@ -1742,7 +1762,7 @@ static int pk11_free_session_list(PK11_OPTYPE optype)
 		}
 
 	(void) pthread_mutex_unlock(freelist_lock);
-	return ret;
+	return (ret);
 	}
 
 
@@ -1768,7 +1788,7 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 		default:
 			PK11err(PK11_F_SETUP_SESSION,
 			    PK11_R_INVALID_OPERATION_TYPE);
-			return 0;
+			return (0);
 		}
 
 	sp->session = CK_INVALID_HANDLE;
@@ -1791,7 +1811,7 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_SETUP_SESSION, PK11_R_OPENSESSION, rv);
-		return 0;
+		return (0);
 		}
 
 	sp->pid = getpid();
@@ -1832,12 +1852,13 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 			break;
 		}
 
-	return 1;
+	return (1);
 	}
 
 #ifndef OPENSSL_NO_RSA
 /* Destroy RSA public key from single session. */
-int pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
+int
+pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
@@ -1863,7 +1884,8 @@ int pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
 	}
 
 /* Destroy RSA private key from single session. */
-int pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
+int
+pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
@@ -1887,7 +1909,8 @@ int pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
  * Destroy RSA key object wrapper. If session is NULL, try to destroy all
  * objects in the free list.
  */
-int pk11_destroy_rsa_key_objects(PK11_SESSION *session)
+int
+pk11_destroy_rsa_key_objects(PK11_SESSION *session)
 	{
 	int ret = 1;
 	PK11_SESSION *sp = NULL;
@@ -1929,13 +1952,14 @@ int pk11_destroy_rsa_key_objects(PK11_SESSION *session)
 	if (session == NULL)
 		(void) pthread_mutex_unlock(session_cache[OP_RSA].lock);
 
-	return ret;
+	return (ret);
 	}
 #endif	/* OPENSSL_NO_RSA */
 
 #ifndef OPENSSL_NO_DSA
 /* Destroy DSA public key from single session. */
-int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
+int
+pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
@@ -1956,7 +1980,8 @@ int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
 	}
 
 /* Destroy DSA private key from single session. */
-int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
+int
+pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
@@ -1980,7 +2005,8 @@ int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
  * Destroy DSA key object wrapper. If session is NULL, try to destroy all
  * objects in the free list.
  */
-int pk11_destroy_dsa_key_objects(PK11_SESSION *session)
+int
+pk11_destroy_dsa_key_objects(PK11_SESSION *session)
 	{
 	int ret = 1;
 	PK11_SESSION *sp = NULL;
@@ -2022,13 +2048,14 @@ int pk11_destroy_dsa_key_objects(PK11_SESSION *session)
 	if (session == NULL)
 		(void) pthread_mutex_unlock(session_cache[OP_DSA].lock);
 
-	return ret;
+	return (ret);
 	}
 #endif	/* OPENSSL_NO_DSA */
 
 #ifndef OPENSSL_NO_DH
 /* Destroy DH key from single session. */
-int pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock)
+int
+pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
@@ -2054,7 +2081,8 @@ int pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock)
  * arg0: pointer to PKCS#11 engine session structure
  *       if session is NULL, try to destroy all objects in the free list
  */
-int pk11_destroy_dh_key_objects(PK11_SESSION *session)
+int
+pk11_destroy_dh_key_objects(PK11_SESSION *session)
 	{
 	int ret = 1;
 	PK11_SESSION *sp = NULL;
@@ -2088,7 +2116,7 @@ err:
 	if (session == NULL)
 		(void) pthread_mutex_unlock(session_cache[OP_DH].lock);
 
-	return ret;
+	return (ret);
 	}
 #endif	/* OPENSSL_NO_DH */
 
@@ -2100,15 +2128,14 @@ static int pk11_destroy_object(CK_SESSION_HANDLE session, CK_OBJECT_HANDLE oh)
 		{
 		PK11err_add_data(PK11_F_DESTROY_OBJECT, PK11_R_DESTROYOBJECT,
 		    rv);
-		return 0;
+		return (0);
 		}
 
-	return 1;
+	return (1);
 	}
 
 
-/* Symmetric ciphers and digests support functions
- */
+/* Symmetric ciphers and digests support functions */
 
 static int
 cipher_nid_to_pk11(int nid)
@@ -2151,7 +2178,7 @@ static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_CIPHER *pcipher,
 #ifdef	SOLARIS_AES_CTR
 	CK_AES_CTR_PARAMS ctr_params;
 #endif	/* SOLARIS_AES_CTR */
-	
+
 	/*
 	 * We expect pmech->mechanism to be already set and
 	 * pParameter/ulParameterLen initialized to NULL/0 before
@@ -2167,7 +2194,7 @@ static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_CIPHER *pcipher,
 	    ctx->cipher->nid == NID_aes_256_ctr)
 		{
 		pmech->pParameter = (void *)(&ctr_params);
-		pmech->ulParameterLen = sizeof(ctr_params);
+		pmech->ulParameterLen = sizeof (ctr_params);
 		/*
 		 * For now, we are limited to the fixed length of the counter,
 		 * it covers the whole counter block. That's what RFC 4344
@@ -2219,12 +2246,12 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	PK11_CIPHER_STATE *state = (PK11_CIPHER_STATE *) ctx->cipher_data;
 	PK11_SESSION *sp;
 	PK11_CIPHER *p_ciph_table_row;
-	
+
 	state->sp = NULL;
 
 	index = cipher_nid_to_pk11(ctx->cipher->nid);
 	if (index < 0 || index >= PK11_CIPHER_MAX)
-		return 0;
+		return (0);
 
 	p_ciph_table_row = &ciphers[index];
 	/*
@@ -2243,23 +2270,23 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	    ctx->key_len != p_ciph_table_row->key_len)
 		{
 		PK11err(PK11_F_CIPHER_INIT, PK11_R_KEY_OR_IV_LEN_PROBLEM);
-		return 0;
+		return (0);
 		}
 
 	if ((sp = pk11_get_session(OP_CIPHER)) == NULL)
-		return 0;
+		return (0);
 
 	/* if applicable, the mechanism parameter is used for IV */
 	mech.mechanism = p_ciph_table_row->mech_type;
 	mech.pParameter = NULL;
 	mech.ulParameterLen = 0;
 
-	/* The key object is destroyed here if it is not the current key
-	 */
+	/* The key object is destroyed here if it is not the current key. */
 	(void) check_new_cipher_key(sp, key, p_ciph_table_row->key_len);
-	
-	/* If the key is the same and the encryption is also the same,
-	 * then just reuse it. However, we must not forget to reinitialize the
+
+	/*
+	 * If the key is the same and the encryption is also the same, then
+	 * just reuse it. However, we must not forget to reinitialize the
 	 * context that was finalized in pk11_cipher_cleanup().
 	 */
 	if (sp->opdata_cipher_key != CK_INVALID_HANDLE &&
@@ -2272,7 +2299,8 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 		return (1);
 		}
 
-	/* Check if the key has been invalidated. If so, a new key object
+	/*
+	 * Check if the key has been invalidated. If so, a new key object
 	 * needs to be created.
 	 */
 	if (sp->opdata_cipher_key == CK_INVALID_HANDLE)
@@ -2283,21 +2311,21 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 
 	if (sp->opdata_encrypt != ctx->encrypt && sp->opdata_encrypt != -1)
 		{
-		/* The previous encryption/decryption
-		 * is different. Need to terminate the previous
-		 * active encryption/decryption here
+		/*
+		 * The previous encryption/decryption is different. Need to
+		 * terminate the previous * active encryption/decryption here.
 		 */
 		if (!pk11_cipher_final(sp))
 			{
 			pk11_return_session(sp, OP_CIPHER);
-			return 0;
+			return (0);
 			}
 		}
 
 	if (sp->opdata_cipher_key == CK_INVALID_HANDLE)
 		{
 		pk11_return_session(sp, OP_CIPHER);
-		return 0;
+		return (0);
 		}
 
 	/* now initialize the context with a new key */
@@ -2307,10 +2335,11 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	sp->opdata_encrypt = ctx->encrypt;
 	state->sp = sp;
 
-	return 1;
+	return (1);
 	}
 
-/* When reusing the same key in an encryption/decryption session for a 
+/*
+ * When reusing the same key in an encryption/decryption session for a
  * decryption/encryption session, we need to close the active session
  * and recreate a new one. Note that the key is in the global session so
  * that it needs not be recreated.
@@ -2330,7 +2359,7 @@ pk11_cipher_final(PK11_SESSION *sp)
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_CIPHER_FINAL, PK11_R_CLOSESESSION, rv);
-		return 0;
+		return (0);
 		}
 
 	rv = pFuncList->C_OpenSession(SLOTID, CKF_SERIAL_SESSION,
@@ -2338,14 +2367,16 @@ pk11_cipher_final(PK11_SESSION *sp)
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_CIPHER_FINAL, PK11_R_OPENSESSION, rv);
-		return 0;
+		return (0);
 		}
 
-	return 1;
+	return (1);
 	}
 
-/* An engine interface function. The calling function allocates sufficient
- * memory for the output buffer "out" to hold the results */
+/*
+ * An engine interface function. The calling function allocates sufficient
+ * memory for the output buffer "out" to hold the results.
+ */
 static int
 pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 	const unsigned char *in, unsigned int inl)
@@ -2356,16 +2387,16 @@ pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 	unsigned long outl = inl;
 
 	if (state == NULL || state->sp == NULL)
-		return 0;
+		return (0);
 
 	sp = (PK11_SESSION *) state->sp;
 
 	if (!inl)
-		return 1;
+		return (1);
 
 	/* RC4 is the only stream cipher we support */
 	if (ctx->cipher->nid != NID_rc4 && (inl % ctx->cipher->block_size) != 0)
-		return 0;
+		return (0);
 
 	if (ctx->encrypt)
 		{
@@ -2374,9 +2405,9 @@ pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
 		if (rv != CKR_OK)
 			{
-			PK11err_add_data(PK11_F_CIPHER_DO_CIPHER, 
+			PK11err_add_data(PK11_F_CIPHER_DO_CIPHER,
 			    PK11_R_ENCRYPTUPDATE, rv);
-			return 0;
+			return (0);
 			}
 		}
 	else
@@ -2388,19 +2419,20 @@ pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 			{
 			PK11err_add_data(PK11_F_CIPHER_DO_CIPHER,
 			    PK11_R_DECRYPTUPDATE, rv);
-			return 0;
+			return (0);
 			}
 		}
 
-	/* for DES_CBC, DES3_CBC, AES_CBC, and RC4, the output size is always
-	 * the same size of input
-	 * The application has guaranteed to call the block ciphers with 
+	/*
+	 * For DES_CBC, DES3_CBC, AES_CBC, and RC4, the output size is always
+	 * the same size of input.
+	 * The application has guaranteed to call the block ciphers with
 	 * correctly aligned buffers.
 	 */
 	if (inl != outl)
-		return 0;
+		return (0);
 
-	return 1;
+	return (1);
 	}
 
 /*
@@ -2449,7 +2481,8 @@ pk11_cipher_cleanup(EVP_CIPHER_CTX *ctx)
 	return (1);
 	}
 
-/* Registered by the ENGINE when used to find out how to deal with
+/*
+ * Registered by the ENGINE when used to find out how to deal with
  * a particular NID in the ENGINE. This says what we'll do at the
  * top level - note, that list is restricted by what we answer with
  */
@@ -2530,22 +2563,22 @@ pk11_engine_digests(ENGINE *e, const EVP_MD **digest,
 	switch (nid)
 		{
 		case NID_md5:
-			*digest = &pk11_md5; 
+			*digest = &pk11_md5;
 			break;
 		case NID_sha1:
-			*digest = &pk11_sha1; 
+			*digest = &pk11_sha1;
 			break;
 		case NID_sha224:
-			*digest = &pk11_sha224; 
+			*digest = &pk11_sha224;
 			break;
 		case NID_sha256:
-			*digest = &pk11_sha256; 
+			*digest = &pk11_sha256;
 			break;
 		case NID_sha384:
-			*digest = &pk11_sha384; 
+			*digest = &pk11_sha384;
 			break;
 		case NID_sha512:
-			*digest = &pk11_sha512; 
+			*digest = &pk11_sha512;
 			break;
 		default:
 			*digest = NULL;
@@ -2555,9 +2588,8 @@ pk11_engine_digests(ENGINE *e, const EVP_MD **digest,
 	}
 
 
-/* Create a secret key object in a PKCS#11 session
- */
-static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx, 
+/* Create a secret key object in a PKCS#11 session */
+static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	const unsigned char *key, CK_KEY_TYPE key_type, PK11_SESSION *sp)
 	{
 	CK_RV rv;
@@ -2567,23 +2599,24 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 
 	CK_ATTRIBUTE  a_key_template[] =
 		{
-		{CKA_CLASS, (void*) NULL, sizeof(CK_OBJECT_CLASS)},
-		{CKA_KEY_TYPE, (void*) NULL, sizeof(CK_KEY_TYPE)},
-		{CKA_TOKEN, &false, sizeof(false)},
-		{CKA_ENCRYPT, &true, sizeof(true)},
-		{CKA_DECRYPT, &true, sizeof(true)},
+		{CKA_CLASS, (void*) NULL, sizeof (CK_OBJECT_CLASS)},
+		{CKA_KEY_TYPE, (void*) NULL, sizeof (CK_KEY_TYPE)},
+		{CKA_TOKEN, &false, sizeof (false)},
+		{CKA_ENCRYPT, &true, sizeof (true)},
+		{CKA_DECRYPT, &true, sizeof (true)},
 		{CKA_VALUE, (void*) NULL, 0},
 		};
 
-	/* Create secret key object in global_session. All other sessions
+	/*
+	 * Create secret key object in global_session. All other sessions
 	 * can use the key handles. Here is why:
 	 * OpenSSL will call EncryptInit and EncryptUpdate using a secret key.
 	 * It may then call DecryptInit and DecryptUpdate using the same key.
 	 * To use the same key object, we need to call EncryptFinal with
-	 * a 0 length message. Currently, this does not work for 3DES 
+	 * a 0 length message. Currently, this does not work for 3DES
 	 * mechanism. To get around this problem, we close the session and
 	 * then create a new session to use the same key object. When a session
-	 * is closed, all the object handles will be invalid. Thus, create key 
+	 * is closed, all the object handles will be invalid. Thus, create key
 	 * objects in a global session, an individual session may be closed to
 	 * terminate the active operation.
 	 */
@@ -2593,7 +2626,7 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	a_key_template[5].pValue = (void *) key;
 	a_key_template[5].ulValueLen = (unsigned long) ctx->key_len;
 
-	rv = pFuncList->C_CreateObject(session, 
+	rv = pFuncList->C_CreateObject(session,
 		a_key_template, ul_key_attr_count, &h_key);
 	if (rv != CKR_OK)
 		{
@@ -2602,7 +2635,8 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 		goto err;
 		}
 
-	/* Save the key information used in this session.
+	/*
+	 * Save the key information used in this session.
 	 * The max can be saved is PK11_KEY_LEN_MAX.
 	 */
 	sp->opdata_key_len = ctx->key_len > PK11_KEY_LEN_MAX ?
@@ -2610,7 +2644,7 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	(void) memcpy(sp->opdata_key, key, sp->opdata_key_len);
 err:
 
-	return h_key;
+	return (h_key);
 	}
 
 static int
@@ -2624,25 +2658,25 @@ md_nid_to_pk11(int nid)
 	return (-1);
 	}
 
-static int 
+static int
 pk11_digest_init(EVP_MD_CTX *ctx)
-        { 
+	{
 	CK_RV rv;
 	CK_MECHANISM mech;
 	int index;
 	PK11_SESSION *sp;
 	PK11_DIGEST *pdp;
 	PK11_CIPHER_STATE *state = (PK11_CIPHER_STATE *) ctx->md_data;
-	
+
 	state->sp = NULL;
 
 	index = md_nid_to_pk11(ctx->digest->type);
 	if (index < 0 || index >= PK11_DIGEST_MAX)
-		return 0;
+		return (0);
 
 	pdp = &digests[index];
 	if ((sp = pk11_get_session(OP_DIGEST)) == NULL)
-		return 0;
+		return (0);
 
 	/* at present, no parameter is needed for supported digests */
 	mech.mechanism = pdp->mech_type;
@@ -2655,26 +2689,26 @@ pk11_digest_init(EVP_MD_CTX *ctx)
 		{
 		PK11err_add_data(PK11_F_DIGEST_INIT, PK11_R_DIGESTINIT, rv);
 		pk11_return_session(sp, OP_DIGEST);
-		return 0;
+		return (0);
 		}
 
 	state->sp = sp;
 
-	return 1;
+	return (1);
 	}
 
-static int 
-pk11_digest_update(EVP_MD_CTX *ctx,const void *data,size_t count)
-        { 
+static int
+pk11_digest_update(EVP_MD_CTX *ctx, const void *data, size_t count)
+	{
 	CK_RV rv;
 	PK11_CIPHER_STATE *state = (PK11_CIPHER_STATE *) ctx->md_data;
-	
+
 	/* 0 length message will cause a failure in C_DigestFinal */
 	if (count == 0)
-		return 1;
+		return (1);
 
 	if (state == NULL || state->sp == NULL)
-		return 0;
+		return (0);
 
 	rv = pFuncList->C_DigestUpdate(state->sp->session, (CK_BYTE *) data,
 		count);
@@ -2684,22 +2718,22 @@ pk11_digest_update(EVP_MD_CTX *ctx,const void *data,size_t count)
 		PK11err_add_data(PK11_F_DIGEST_UPDATE, PK11_R_DIGESTUPDATE, rv);
 		pk11_return_session(state->sp, OP_DIGEST);
 		state->sp = NULL;
-		return 0;
+		return (0);
 		}
 
-	return 1;
+	return (1);
 	}
 
-static int 
-pk11_digest_final(EVP_MD_CTX *ctx,unsigned char *md)
-        { 
+static int
+pk11_digest_final(EVP_MD_CTX *ctx, unsigned char *md)
+	{
 	CK_RV rv;
 	unsigned long len;
 	PK11_CIPHER_STATE *state = (PK11_CIPHER_STATE *) ctx->md_data;
 	len = ctx->digest->md_size;
-	
+
 	if (state == NULL || state->sp == NULL)
-		return 0;
+		return (0);
 
 	rv = pFuncList->C_DigestFinal(state->sp->session, md, &len);
 
@@ -2708,30 +2742,31 @@ pk11_digest_final(EVP_MD_CTX *ctx,unsigned char *md)
 		PK11err_add_data(PK11_F_DIGEST_FINAL, PK11_R_DIGESTFINAL, rv);
 		pk11_return_session(state->sp, OP_DIGEST);
 		state->sp = NULL;
-		return 0;
+		return (0);
 		}
 
 	if (ctx->digest->md_size != len)
-		return 0;
+		return (0);
 
-	/* Final is called and digest is returned, so return the session
+	/*
+	 * Final is called and digest is returned, so return the session
 	 * to the pool
 	 */
 	pk11_return_session(state->sp, OP_DIGEST);
 	state->sp = NULL;
 
-	return 1;
+	return (1);
 	}
 
-static int 
-pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from)
-        { 
+static int
+pk11_digest_copy(EVP_MD_CTX *to, const EVP_MD_CTX *from)
+	{
 	CK_RV rv;
 	int ret = 0;
 	PK11_CIPHER_STATE *state, *state_to;
 	CK_BYTE_PTR pstate = NULL;
 	CK_ULONG ul_state_len;
-	
+
 	/* The copy-from state */
 	state = (PK11_CIPHER_STATE *) from->md_data;
 	if (state == NULL || state->sp == NULL)
@@ -2743,7 +2778,7 @@ pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from)
 	state_to = (PK11_CIPHER_STATE *) to->md_data;
 
 	/* Get the size of the operation state of the copy-from session */
-	rv = pFuncList->C_GetOperationState(state->sp->session, NULL, 
+	rv = pFuncList->C_GetOperationState(state->sp->session, NULL,
 		&ul_state_len);
 
 	if (rv != CKR_OK)
@@ -2765,7 +2800,7 @@ pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from)
 		}
 
 	/* Get the operation state of the copy-from session */
-	rv = pFuncList->C_GetOperationState(state->sp->session, pstate, 
+	rv = pFuncList->C_GetOperationState(state->sp->session, pstate,
 		&ul_state_len);
 
 	if (rv != CKR_OK)
@@ -2776,12 +2811,13 @@ pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from)
 		}
 
 	/* Set the operation state of the copy-to session */
-	rv = pFuncList->C_SetOperationState(state_to->sp->session, pstate, 
+	rv = pFuncList->C_SetOperationState(state_to->sp->session, pstate,
 		ul_state_len, 0, 0);
 
 	if (rv != CKR_OK)
 		{
-		PK11err_add_data(PK11_F_DIGEST_COPY, PK11_R_SET_OPERATION_STATE, rv);
+		PK11err_add_data(PK11_F_DIGEST_COPY,
+		    PK11_R_SET_OPERATION_STATE, rv);
 		goto err;
 		}
 
@@ -2790,7 +2826,7 @@ err:
 	if (pstate != NULL)
 		OPENSSL_free(pstate);
 
-	return ret;
+	return (ret);
 	}
 
 /* Return any pending session state to the pool */
@@ -2813,7 +2849,7 @@ pk11_digest_cleanup(EVP_MD_CTX *ctx)
 		state->sp = NULL;
 		}
 
-	return 1;
+	return (1);
 	}
 
 /*
@@ -2836,8 +2872,7 @@ static int check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key,
 	return (1);
 	}
 
-/* Destroy one or more secret key objects. 
- */
+/* Destroy one or more secret key objects. */
 static int pk11_destroy_cipher_key_objects(PK11_SESSION *session)
 	{
 	int ret = 0;
@@ -2858,10 +2893,11 @@ static int pk11_destroy_cipher_key_objects(PK11_SESSION *session)
 
 		if (sp->opdata_cipher_key != CK_INVALID_HANDLE)
 			{
-			/* The secret key object is created in the 
+			/*
+			 * The secret key object is created in the
 			 * global_session. See pk11_get_cipher_key
 			 */
-			if (pk11_destroy_object(global_session, 
+			if (pk11_destroy_object(global_session,
 				sp->opdata_cipher_key) == 0)
 				goto err;
 			sp->opdata_cipher_key = CK_INVALID_HANDLE;
@@ -2873,7 +2909,7 @@ err:
 	if (session == NULL)
 		(void) pthread_mutex_unlock(session_cache[OP_CIPHER].lock);
 
-	return ret;
+	return (ret);
 	}
 
 
@@ -2914,7 +2950,7 @@ err:
  * variables carry information about which slot was chosen for (a) public key
  * mechanisms, (b) random operations, and (c) symmetric ciphers and digests.
  */
-static int 
+static int
 pk11_choose_slots(int *any_slot_found)
 	{
 	CK_SLOT_ID_PTR pSlotList = NULL_PTR;
@@ -2944,33 +2980,33 @@ pk11_choose_slots(int *any_slot_found)
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_CHOOSE_SLOT, PK11_R_GETSLOTLIST, rv);
-		return 0;
+		return (0);
 		}
 
 	/* it's not an error if we didn't find any providers */
-	if (ulSlotCount == 0) 
+	if (ulSlotCount == 0)
 		{
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, "%s: no crypto providers found\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
-		return 1;
+		return (1);
 		}
 
 	pSlotList = OPENSSL_malloc(ulSlotCount * sizeof (CK_SLOT_ID));
 
-	if (pSlotList == NULL) 
+	if (pSlotList == NULL)
 		{
 		PK11err(PK11_F_CHOOSE_SLOT, PK11_R_MALLOC_FAILURE);
-		return 0;
+		return (0);
 		}
 
 	/* Get the slot list for processing */
 	rv = pFuncList->C_GetSlotList(0, pSlotList, &ulSlotCount);
-	if (rv != CKR_OK) 
+	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_CHOOSE_SLOT, PK11_R_GETSLOTLIST, rv);
 		OPENSSL_free(pSlotList);
-		return 0;
+		return (0);
 		}
 
 #ifdef	DEBUG_SLOT_SELECTION
@@ -2979,7 +3015,7 @@ pk11_choose_slots(int *any_slot_found)
 
 	fprintf(stderr, "%s: == checking rand slots ==\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
-	for (i = 0; i < ulSlotCount; i++) 
+	for (i = 0; i < ulSlotCount; i++)
 		{
 		current_slot = pSlotList[i];
 
@@ -3008,7 +3044,7 @@ pk11_choose_slots(int *any_slot_found)
 #ifdef	DEBUG_SLOT_SELECTION
 	fprintf(stderr, "%s: == checking pubkey slots ==\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
-	for (i = 0; i < ulSlotCount; i++) 
+	for (i = 0; i < ulSlotCount; i++)
 		{
 		CK_BBOOL slot_has_rsa = CK_FALSE;
 		CK_BBOOL slot_has_dsa = CK_FALSE;
@@ -3031,7 +3067,7 @@ pk11_choose_slots(int *any_slot_found)
 		 * Check if this slot is capable of signing and
 		 * verifying with CKM_RSA_PKCS.
 		 */
-		rv = pFuncList->C_GetMechanismInfo(current_slot, CKM_RSA_PKCS, 
+		rv = pFuncList->C_GetMechanismInfo(current_slot, CKM_RSA_PKCS,
 			&mech_info);
 
 		if (rv == CKR_OK && ((mech_info.flags & CKF_SIGN) &&
@@ -3042,7 +3078,7 @@ pk11_choose_slots(int *any_slot_found)
 			 * decryption, sign, and verify with CKM_RSA_X_509.
 			 */
 			rv = pFuncList->C_GetMechanismInfo(current_slot,
-			  CKM_RSA_X_509, &mech_info);
+			    CKM_RSA_X_509, &mech_info);
 
 			if (rv == CKR_OK && ((mech_info.flags & CKF_SIGN) &&
 			    (mech_info.flags & CKF_VERIFY) &&
@@ -3060,7 +3096,7 @@ pk11_choose_slots(int *any_slot_found)
 		 * Check if this slot is capable of signing and
 		 * verifying with CKM_DSA.
 		 */
-		rv = pFuncList->C_GetMechanismInfo(current_slot, CKM_DSA, 
+		rv = pFuncList->C_GetMechanismInfo(current_slot, CKM_DSA,
 			&mech_info);
 		if (rv == CKR_OK && ((mech_info.flags & CKF_SIGN) &&
 		    (mech_info.flags & CKF_VERIFY)))
@@ -3076,10 +3112,10 @@ pk11_choose_slots(int *any_slot_found)
 		 * derivation.
 		 */
 		rv = pFuncList->C_GetMechanismInfo(current_slot,
-		  CKM_DH_PKCS_KEY_PAIR_GEN, &mech_info);
+		    CKM_DH_PKCS_KEY_PAIR_GEN, &mech_info);
 
 		if (rv == CKR_OK && (mech_info.flags & CKF_GENERATE_KEY_PAIR))
-			{    
+			{
 			rv = pFuncList->C_GetMechanismInfo(current_slot,
 				CKM_DH_PKCS_DERIVE, &mech_info);
 			if (rv == CKR_OK && (mech_info.flags & CKF_DERIVE))
@@ -3094,7 +3130,7 @@ pk11_choose_slots(int *any_slot_found)
 			{
 #ifdef	DEBUG_SLOT_SELECTION
 			fprintf(stderr,
-			  "%s: potential slot: %d\n", PK11_DBG, current_slot);
+			    "%s: potential slot: %d\n", PK11_DBG, current_slot);
 #endif	/* DEBUG_SLOT_SELECTION */
 			best_slot_sofar = current_slot;
 			pk11_have_rsa = slot_has_rsa;
@@ -3103,16 +3139,16 @@ pk11_choose_slots(int *any_slot_found)
 			found_candidate_slot = CK_TRUE;
 #ifdef	DEBUG_SLOT_SELECTION
 			fprintf(stderr,
-		            "%s: setting found_candidate_slot to CK_TRUE\n",
+			    "%s: setting found_candidate_slot to CK_TRUE\n",
 			    PK11_DBG);
 			fprintf(stderr,
-		            "%s: best so far slot: %d\n", PK11_DBG,
-		    	    best_slot_sofar);
+			    "%s: best so far slot: %d\n", PK11_DBG,
+			    best_slot_sofar);
 			}
 		else
 			{
 			fprintf(stderr,
-			  "%s: no rsa/dsa/dh\n", PK11_DBG);
+			    "%s: no rsa/dsa/dh\n", PK11_DBG);
 			}
 #else
 			} /* if */
@@ -3130,7 +3166,7 @@ pk11_choose_slots(int *any_slot_found)
 #ifdef	DEBUG_SLOT_SELECTION
 	fprintf(stderr, "%s: == checking cipher/digest ==\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
-	for (i = 0; i < ulSlotCount; i++) 
+	for (i = 0; i < ulSlotCount; i++)
 		{
 #ifdef	DEBUG_SLOT_SELECTION
 	fprintf(stderr, "%s: checking slot: %d\n", PK11_DBG, i);
@@ -3139,8 +3175,8 @@ pk11_choose_slots(int *any_slot_found)
 		current_slot = pSlotList[i];
 		current_slot_n_cipher = 0;
 		current_slot_n_digest = 0;
-		(void) memset(local_cipher_nids, 0, sizeof(local_cipher_nids));
-		(void) memset(local_digest_nids, 0, sizeof(local_digest_nids));
+		(void) memset(local_cipher_nids, 0, sizeof (local_cipher_nids));
+		(void) memset(local_digest_nids, 0, sizeof (local_digest_nids));
 
 		pk11_find_symmetric_ciphers(pFuncList, current_slot,
 		    &current_slot_n_cipher, local_cipher_nids);
@@ -3158,7 +3194,7 @@ pk11_choose_slots(int *any_slot_found)
 #endif	/* DEBUG_SLOT_SELECTION */
 
 		/*
-		 * If the current slot supports more ciphers/digests than 
+		 * If the current slot supports more ciphers/digests than
 		 * the previous best one we change the current best to this one,
 		 * otherwise leave it where it is.
 		 */
@@ -3200,7 +3236,7 @@ pk11_choose_slots(int *any_slot_found)
 	fprintf(stderr,
 	    "%s: digest_count %d\n", PK11_DBG, digest_count);
 #endif	/* DEBUG_SLOT_SELECTION */
-		
+
 	if (pSlotList != NULL)
 		OPENSSL_free(pSlotList);
 
@@ -3211,7 +3247,7 @@ pk11_choose_slots(int *any_slot_found)
 
 	if (any_slot_found != NULL)
 		*any_slot_found = 1;
-	return 1;
+	return (1);
 	}
 
 static void pk11_get_symmetric_cipher(CK_FUNCTION_LIST_PTR pflist,
@@ -3226,7 +3262,7 @@ static void pk11_get_symmetric_cipher(CK_FUNCTION_LIST_PTR pflist,
 #endif	/* DEBUG_SLOT_SELECTION */
 	rv = pflist->C_GetMechanismInfo(slot_id, mech, &mech_info);
 
-	if (rv != CKR_OK) 
+	if (rv != CKR_OK)
 		{
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, " not found\n");
@@ -3278,7 +3314,7 @@ static void pk11_get_digest(CK_FUNCTION_LIST_PTR pflist, int slot_id,
 #endif	/* DEBUG_SLOT_SELECTION */
 	rv = pflist->C_GetMechanismInfo(slot_id, mech, &mech_info);
 
-	if (rv != CKR_OK) 
+	if (rv != CKR_OK)
 		{
 #ifdef	DEBUG_SLOT_SELECTION
 		fprintf(stderr, " not found\n");
@@ -3289,7 +3325,7 @@ static void pk11_get_digest(CK_FUNCTION_LIST_PTR pflist, int slot_id,
 	if (mech_info.flags & CKF_DIGEST)
 		{
 #ifdef	SOLARIS_HW_SLOT_SELECTION
-	    	if (nid_in_table(digests[id].nid, hw_dnids))
+		if (nid_in_table(digests[id].nid, hw_dnids))
 #endif	/* SOLARIS_HW_SLOT_SELECTION */
 			{
 #ifdef	DEBUG_SLOT_SELECTION
@@ -3327,7 +3363,7 @@ static int pk11_add_NID(char *sn, char *ln)
 	if ((o = ASN1_OBJECT_create(OBJ_new_nid(1), (unsigned char *)"",
 	    1, sn, ln)) == NULL)
 		{
-		return 0;
+		return (0);
 		}
 
 	/* will return NID_undef on error */
@@ -3345,7 +3381,7 @@ static int pk11_add_aes_ctr_NIDs(void)
 	{
 	/* are we already set? */
 	if (NID_aes_256_ctr != NID_undef)
-		return 1;
+		return (1);
 
 	/*
 	 * There are no official names for AES counter modes yet so we just
@@ -3363,11 +3399,11 @@ static int pk11_add_aes_ctr_NIDs(void)
 	    NID_undef)
 		goto err;
 	ciphers[PK11_AES_256_CTR].nid = pk11_aes_256_ctr.nid = NID_aes_256_ctr;
-	return 1;
+	return (1);
 
 err:
 	PK11err(PK11_F_ADD_AES_CTR_NIDS, PK11_R_ADD_NID_FAILED);
-	return 0;
+	return (0);
 	}
 #endif	/* SOLARIS_AES_CTR */
 
@@ -3479,21 +3515,20 @@ static int check_hw_mechanisms(void)
 		goto err;
 		}
 
-	if ((p = (CK_C_GetFunctionList)dlsym(handle, 
+	if ((p = (CK_C_GetFunctionList)dlsym(handle,
 	    PK11_GET_FUNCTION_LIST)) == NULL)
 		{
 		PK11err(PK11_F_CHECK_HW_MECHANISMS, PK11_R_DSO_FAILURE);
 		goto err;
 		}
- 
-	/* get the full function list from the loaded library 
-	 */
+
+	/* get the full function list from the loaded library */
 	if (p(&pflist) != CKR_OK)
 		{
 		PK11err(PK11_F_CHECK_HW_MECHANISMS, PK11_R_DSO_FAILURE);
 		goto err;
 		}
- 
+
 	rv = pflist->C_Initialize(NULL_PTR);
 	if ((rv != CKR_OK) && (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED))
 		{
@@ -3529,7 +3564,7 @@ static int check_hw_mechanisms(void)
 		}
 
 	pSlotList = OPENSSL_malloc(ulSlotCount * sizeof (CK_SLOT_ID));
-	if (pSlotList == NULL) 
+	if (pSlotList == NULL)
 		{
 		PK11err(PK11_F_CHECK_HW_MECHANISMS, PK11_R_MALLOC_FAILURE);
 		goto err;
@@ -3570,10 +3605,10 @@ static int check_hw_mechanisms(void)
 	fprintf(stderr, "%s: provider: %s\n", PK11_DBG, pkcs11_kernel);
 	fprintf(stderr, "%s: found %d hardware slots\n", PK11_DBG, ulSlotCount);
 	fprintf(stderr, "%s: now looking for mechs supported in hw\n",
-	    PK11_DBG); 
+	    PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
 
-	for (i = 0; i < ulSlotCount; i++) 
+	for (i = 0; i < ulSlotCount; i++)
 		{
 		if (pflist->C_GetTokenInfo(pSlotList[i], &token_info) != CKR_OK)
 			continue;

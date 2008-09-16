@@ -4,13 +4,15 @@
  */
 
 /* crypto/engine/hw_pk11_err.h */
-/* This product includes software developed by the OpenSSL Project for 
+/*
+ * This product includes software developed by the OpenSSL Project for
  * use in the OpenSSL Toolkit (http://www.openssl.org/).
  *
- * This project also referenced hw_pkcs11-0.9.7b.patch written by 
+ * This project also referenced hw_pkcs11-0.9.7b.patch written by
  * Afchine Madjlessi.
  */
-/* ====================================================================
+/*
+ * ====================================================================
  * Copyright (c) 2000-2001 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -18,7 +20,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -64,8 +66,8 @@
  *
  */
 
-#ifndef HW_PK11_ERR_H
-#define HW_PK11_ERR_H
+#ifndef	HW_PK11_ERR_H
+#define	HW_PK11_ERR_H
 
 void ERR_pk11_error(int function, int reason, char *file, int line);
 void PK11err_add_data(int function, int reason, CK_RV rv);
