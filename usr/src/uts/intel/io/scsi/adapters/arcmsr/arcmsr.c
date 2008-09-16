@@ -1501,7 +1501,9 @@ arcmsr_dma_alloc(struct ACB *acb, struct scsi_pkt *pkt,
 		    "arcmsr%d: dma map got 'unknown failure 0x%x' "
 		    "(should not happen)",
 		    ddi_get_instance(acb->dev_info), i);
+#ifdef ARCMSR_DEBUG
 		arcmsr_dump_scsi_cdb(&pkt->pkt_address, pkt);
+#endif
 		break;
 	}
 
