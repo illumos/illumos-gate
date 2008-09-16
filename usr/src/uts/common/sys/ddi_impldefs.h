@@ -88,6 +88,9 @@ typedef struct devi_bus_priv {
 	devi_port_t port_down;
 } devi_bus_priv_t;
 
+struct iommulib_unit;
+typedef struct iommulib_unit *iommulib_handle_t;
+
 struct dev_info  {
 
 	struct dev_info *devi_parent;	/* my parent node in tree	*/
@@ -224,6 +227,9 @@ struct dev_info  {
 
 	/* For intel iommu support */
 	void		*devi_iommu_private;
+
+	/* IOMMU handle */
+	iommulib_handle_t	devi_iommulib_handle;
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

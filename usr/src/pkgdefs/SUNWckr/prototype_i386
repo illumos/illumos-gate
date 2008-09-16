@@ -204,6 +204,7 @@ f none kernel/misc/gld 755 root sys
 f none kernel/misc/hook 755 root sys
 f none kernel/misc/hpcsvc 755 root sys
 f none kernel/misc/idmap 755 root sys
+f none kernel/misc/iommulib 755 root sys
 f none kernel/misc/ipc 755 root sys
 f none kernel/misc/kbtrans 755 root sys
 f none kernel/misc/kcf 755 root sys
@@ -415,6 +416,7 @@ f none kernel/misc/amd64/gld 755 root sys
 f none kernel/misc/amd64/hook 755 root sys
 f none kernel/misc/amd64/hpcsvc 755 root sys
 f none kernel/misc/amd64/idmap 755 root sys
+f none kernel/misc/amd64/iommulib 755 root sys
 f none kernel/misc/amd64/ipc 755 root sys
 f none kernel/misc/amd64/kbtrans 755 root sys
 f none kernel/misc/amd64/kcf 755 root sys

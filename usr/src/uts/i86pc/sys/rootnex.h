@@ -34,6 +34,7 @@
 #include <sys/conf.h>
 #include <sys/modctl.h>
 #include <sys/sunddi.h>
+#include <sys/iommulib.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -340,6 +341,7 @@ typedef struct rootnex_state_s {
 	boolean_t		r_reserved_msg_printed;
 	uint64_t		r_counters[ROOTNEX_CNT_LAST];
 	boolean_t		r_intel_iommu_enabled;
+	iommulib_nexhandle_t    r_iommulib_handle;
 } rootnex_state_t;
 
 

@@ -550,6 +550,7 @@ MISC_KMODS	+= ibdm
 MISC_KMODS	+= ibmf
 MISC_KMODS	+= ibtl
 MISC_KMODS	+= idmap
+MISC_KMODS	+= iommulib
 MISC_KMODS	+= ipc
 MISC_KMODS	+= kbtrans
 MISC_KMODS	+= kcf

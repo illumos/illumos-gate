@@ -252,6 +252,11 @@ CORE_PCBE_OBJS = core_pcbe.o
 AMR_OBJS = amr.o
 
 #
+#	IOMMULIB module
+#
+IOMMULIB_OBJS = iommulib.o
+
+#
 #	Brand modules
 #
 SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o

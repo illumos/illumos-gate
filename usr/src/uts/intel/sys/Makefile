@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../../../Makefile.master
@@ -47,6 +46,7 @@ HDRS	=			\
 	fp.h			\
 	frame.h			\
 	inline.h		\
+	iommulib.h		\
 	hypervisor.h		\
 	kd.h			\
 	kdi_machimpl.h		\

@@ -27,8 +27,6 @@
 #ifndef _SYS_DDI_IMPLFUNCS_H
 #define	_SYS_DDI_IMPLFUNCS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -249,6 +247,8 @@ dev_info_t *i_ddi_attach_pseudo_node(char *);
 int i_ddi_attach_hw_nodes(char *);
 int i_ddi_devs_attached(major_t);
 int i_ddi_minor_node_count(dev_info_t *, const char *);
+int ddi_find_pci_parent(char *pathname, dev_info_t **pci_dipp);
+int ddi_is_pci_dip(dev_info_t *dip);
 
 /* non-DDI functions: wrapper around mod_hold/rele_dev_by_major() */
 struct dev_ops *ddi_hold_driver(major_t);
