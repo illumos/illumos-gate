@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of all implementation architecture
 #	dependent modules for the i86pc architecture.
 #
@@ -165,9 +163,9 @@ include ../Makefile.targ
 # Cross-reference customization: build a cross-reference over all of the
 # i86pc-related directories.
 #
-SHARED_XRDIRS	= ../i86pc ../intel ../common
-XRDIRS		= $(SHARED_XRDIRS)
-$(CLOSED_BUILD)XRDIRS	= $(SHARED_XRDIRS:../%=../% ../../../closed/uts/%)
+XRDIRS		= ../i86pc ../intel ../common
+$(CLOSED_BUILD)XRDIRS	+= ../../../closed/uts/intel ../../../closed/uts/common
+
 XRPRUNE	= sun4u sun4
 
 cscope.out tags: FRC

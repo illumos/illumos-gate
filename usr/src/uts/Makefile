@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # include global definitions
 include ../Makefile.master
 
@@ -186,15 +184,16 @@ ONC_PLUS:	$(ONC_FILES:%=%_onc_plus)
 # the user will be interested in), it's historically been set to
 # mirror the $(XRDIRS) list, and that works kinda sorta okay.
 #
-# We need to manually prune usr/closed/uts/{i86xpv|sfmmu} since neither
-# of them exist.
+# We need to manually prune usr/closed/uts/{i86xpv|sfmmu|i86pc} since
+# none of them exist.
 #
 SHARED_XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
 	sun common
 CLOSED_XRDIRS = $(SHARED_XRDIRS:%=% ../../closed/uts/%)
 XRDIRS = $(SHARED_XRDIRS)
 CLOSED_XRDIRS_XEN = $(CLOSED_XRDIRS:../../closed/uts/i86xpv=)
-$(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS_XEN:../../closed/uts/sfmmu=)
+CLOSED_XRDIRS_1 = $(CLOSED_XRDIRS_XEN:../../closed/uts/i86pc=)
+$(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS_1:../../closed/uts/sfmmu=)
 
 XRINCDIRS = $(XRDIRS)
 
