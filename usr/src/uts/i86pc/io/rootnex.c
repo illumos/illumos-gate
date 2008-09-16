@@ -220,10 +220,12 @@ static int rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
 static int rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle);
+#if !defined(__xpv)
 static void rootnex_coredma_reset_cookies(dev_info_t *dip,
     ddi_dma_handle_t handle);
 static int rootnex_coredma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+#endif
 static int rootnex_coredma_sync(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
 static int rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip,
@@ -295,6 +297,7 @@ static struct modlinkage rootnex_modlinkage = {
 	NULL
 };
 
+#if !defined(__xpv)
 static iommulib_nexops_t iommulib_nexops = {
 	IOMMU_NEXOPS_VERSION,
 	"Rootnex IOMMU ops Vers 1.1",
@@ -310,6 +313,7 @@ static iommulib_nexops_t iommulib_nexops = {
 	rootnex_coredma_map,
 	rootnex_coredma_mctl
 };
+#endif
 
 /*
  *  extern hacks
@@ -2170,6 +2174,7 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	return (rootnex_coredma_unbindhdl(dip, rdip, handle));
 }
 
+#if !defined(__xpv)
 /*ARGSUSED*/
 static void
 rootnex_coredma_reset_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
@@ -2203,6 +2208,7 @@ rootnex_coredma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
 
 	return (DDI_SUCCESS);
 }
+#endif
 
 /*
  * rootnex_verify_buffer()
