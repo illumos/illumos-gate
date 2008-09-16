@@ -154,6 +154,7 @@ f none usr/bin/infocmp 555 root bin
 f none usr/bin/iostat 555 root bin
 f none usr/bin/isainfo 555 root bin
 f none usr/bin/isalist 555 root bin
+f none usr/bin/itu 555 root bin
 l none usr/bin/jobs=../../usr/bin/alias
 f none usr/bin/join 555 root bin
 s none usr/bin/jsh=../../sbin/sh
@@ -186,6 +187,7 @@ l none usr/bin/mc68020=../../usr/bin/i286
 l none usr/bin/mc68030=../../usr/bin/i286
 l none usr/bin/mc68040=../../usr/bin/i286
 f none usr/bin/mesg 555 root bin
+f none usr/bin/mkbootmedia 555 root bin
 f none usr/bin/mkdir 555 root bin
 f none usr/bin/mkpwdict 555 root bin
 f none usr/bin/mktemp 555 root bin
@@ -214,6 +216,7 @@ l none usr/bin/pfksh=../../usr/bin/ksh
 s none usr/bin/pfsh=../../sbin/sh
 f none usr/bin/pg 555 root bin
 f none usr/bin/pgrep 555 root bin
+f none usr/bin/pkg2du 555 root bin
 l none usr/bin/pkill=../../usr/bin/pgrep
 f none usr/bin/pktool 555 root bin
 f none usr/bin/pr 555 root bin
@@ -291,6 +294,7 @@ l none usr/bin/ulimit=../../usr/bin/alias
 l none usr/bin/umask=../../usr/bin/alias
 l none usr/bin/unalias=../../usr/bin/alias
 s none usr/bin/uname=../../sbin/uname
+f none usr/bin/updatemedia 555 root bin
 l none usr/bin/uptime=../../usr/lib/isaexec
 l none usr/bin/vax=../../usr/bin/i286
 l none usr/bin/vedit=../../usr/bin/edit

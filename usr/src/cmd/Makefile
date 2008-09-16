@@ -208,6 +208,7 @@ COMMON_SUBDIRS=		\
 	isainfo		\
 	isalist		\
 	iscsi		\
+	itutools	\
 	java		\
 	join		\
 	kbd		\
