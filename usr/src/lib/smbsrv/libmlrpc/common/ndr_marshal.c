@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <sys/param.h>
@@ -138,7 +136,7 @@ mlrpc_decode_return(struct mlrpc_xaction *mxa, void *params)
 int
 mlrpc_decode_pdu_hdr(struct mlrpc_xaction *mxa)
 {
-	mlrpcconn_common_header_t *hdr = &mxa->recv_hdr.common_hdr;
+	ndr_common_header_t *hdr = &mxa->recv_hdr.common_hdr;
 	struct mlndr_stream 	*mlnds = &mxa->recv_mlnds;
 	int			ptype;
 	int			rc;
@@ -151,7 +149,7 @@ mlrpc_decode_pdu_hdr(struct mlrpc_xaction *mxa)
 	/*
 	 * All PDU headers are at least this big
 	 */
-	rc = MLNDS_GROW_PDU(mlnds, sizeof (mlrpcconn_common_header_t), 0);
+	rc = MLNDS_GROW_PDU(mlnds, sizeof (ndr_common_header_t), 0);
 	if (!rc)
 		return (MLRPC_DRC_FAULT_RECEIVED_RUNT + 0xFF);
 
@@ -193,7 +191,7 @@ mlrpc_decode_pdu_hdr(struct mlrpc_xaction *mxa)
 
 	rc = mlrpc_encode_decode_common(mxa,
 	    NDR_M_OP_AND_DIR_TO_MODE(mlnds->m_op, mlnds->dir),
-	    ptype, &TYPEINFO(mlrpcconn_hdr), hdr);
+	    ptype, &TYPEINFO(ndr_hdr), hdr);
 
 	return (rc + 0xFF);
 }
@@ -204,10 +202,9 @@ mlrpc_decode_pdu_hdr(struct mlrpc_xaction *mxa)
  * fragment headers.
  */
 void
-mlrpc_decode_frag_hdr(struct mlndr_stream *mlnds,
-    mlrpcconn_common_header_t *hdr)
+mlrpc_decode_frag_hdr(struct mlndr_stream *mlnds, ndr_common_header_t *hdr)
 {
-	mlrpcconn_common_header_t *tmp;
+	ndr_common_header_t *tmp;
 	uint8_t *pdu;
 	int byte_order;
 
@@ -222,7 +219,7 @@ mlrpc_decode_frag_hdr(struct mlndr_stream *mlnds,
 
 	if (byte_order != mlrpc_native_byte_order) {
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		tmp = (mlrpcconn_common_header_t *)pdu;
+		tmp = (ndr_common_header_t *)pdu;
 
 		mlnds_bswap(&tmp->frag_length, &hdr->frag_length,
 		    sizeof (WORD));
@@ -235,7 +232,7 @@ mlrpc_decode_frag_hdr(struct mlndr_stream *mlnds,
 int
 mlrpc_encode_pdu_hdr(struct mlrpc_xaction *mxa)
 {
-	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
+	ndr_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 	struct mlndr_stream 	*mlnds = &mxa->send_mlnds;
 	int			ptype;
 	int			rc;
@@ -251,7 +248,7 @@ mlrpc_encode_pdu_hdr(struct mlrpc_xaction *mxa)
 
 	rc = mlrpc_encode_decode_common(mxa,
 	    NDR_M_OP_AND_DIR_TO_MODE(mlnds->m_op, mlnds->dir),
-	    ptype, &TYPEINFO(mlrpcconn_hdr), hdr);
+	    ptype, &TYPEINFO(ndr_hdr), hdr);
 
 	return (rc + 0xFF);
 }
@@ -266,12 +263,12 @@ extern struct ndr_typeinfo ndt__uchar;
 extern struct ndr_typeinfo ndt__ushort;
 extern struct ndr_typeinfo ndt__ulong;
 
-int mlndr__mlrpcconn_bind_ack_hdr(struct ndr_reference *encl_ref);
-struct ndr_typeinfo ndt__mlrpcconn_bind_ack_hdr = {
+int mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref);
+struct ndr_typeinfo ndt__ndr_bind_ack_hdr = {
     1,		/* NDR version */
     3,		/* alignment */
     NDR_F_STRUCT,	/* flags */
-    mlndr__mlrpcconn_bind_ack_hdr,	/* ndr_func */
+    mlndr__ndr_bind_ack_hdr,	/* ndr_func */
     68,		/* pdu_size_fixed_part */
     0,		/* pdu_size_variable_part */
     68,		/* c_size_fixed_part */
@@ -282,11 +279,11 @@ struct ndr_typeinfo ndt__mlrpcconn_bind_ack_hdr = {
  * [_no_reorder]
  */
 int
-mlndr__mlrpcconn_bind_ack_hdr(struct ndr_reference *encl_ref)
+mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref)
 {
-	struct mlndr_stream 		*mlnds = encl_ref->stream;
-	struct mlrpcconn_bind_ack_hdr   *val = /*LINTED E_BAD_PTR_CAST_ALIGN*/
-	    (struct mlrpcconn_bind_ack_hdr *)encl_ref->datum;
+	struct mlndr_stream 	*mlnds = encl_ref->stream;
+	struct ndr_bind_ack_hdr	*val = /*LINTED E_BAD_PTR_CAST_ALIGN*/
+	    (struct ndr_bind_ack_hdr *)encl_ref->datum;
 	struct ndr_reference	myref;
 	unsigned long		offset;
 
@@ -296,7 +293,7 @@ mlndr__mlrpcconn_bind_ack_hdr(struct ndr_reference *encl_ref)
 	myref.packed_alignment = 0;
 
 	/* do all members in order */
-	NDR_MEMBER(_mlrpcconn_common_header, common_hdr, 0UL);
+	NDR_MEMBER(_ndr_common_header, common_hdr, 0UL);
 	NDR_MEMBER(_ushort, max_xmit_frag, 16UL);
 	NDR_MEMBER(_ushort, max_recv_frag, 18UL);
 	NDR_MEMBER(_ulong, assoc_group_id, 20UL);
@@ -330,9 +327,13 @@ mlndr__mlrpcconn_bind_ack_hdr(struct ndr_reference *encl_ref)
 	return (1);
 }
 
+/*
+ * Assume a single presentation context element in the result list.
+ */
 unsigned
-mlrpc_bind_ack_hdr_size(struct mlrpcconn_bind_ack_hdr *bahdr)
+mlrpc_bind_ack_hdr_size(struct mlrpc_xaction *mxa)
 {
+	ndr_bind_ack_hdr_t *bahdr = &mxa->send_hdr.bind_ack_hdr;
 	unsigned	offset;
 	unsigned	length;
 
@@ -344,6 +345,88 @@ mlrpc_bind_ack_hdr_size(struct mlrpcconn_bind_ack_hdr *bahdr)
 	offset += 2;
 	offset += length;
 	offset += (4 - offset) & 3;
-	offset += sizeof (bahdr->p_result_list);
+	offset += sizeof (mlrpc_p_result_list_t);
+	return (offset);
+}
+
+/*
+ * This is a hand-coded derivative of the automatically generated
+ * (un)marshalling routine for alter_context_rsp headers.
+ * Alter context response headers have an interior conformant array,
+ * which is inconsistent with IDL/NDR rules.
+ */
+int mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref);
+struct ndr_typeinfo ndt__ndr_alter_context_rsp_hdr = {
+    1,			/* NDR version */
+    3,			/* alignment */
+    NDR_F_STRUCT,	/* flags */
+    mlndr__ndr_alter_context_rsp_hdr,	/* ndr_func */
+    56,			/* pdu_size_fixed_part */
+    0,			/* pdu_size_variable_part */
+    56,			/* c_size_fixed_part */
+    0,			/* c_size_variable_part */
+};
+
+/*
+ * [_no_reorder]
+ */
+int
+mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref)
+{
+	struct mlndr_stream 	*mlnds = encl_ref->stream;
+	ndr_alter_context_rsp_hdr_t *val = /*LINTED E_BAD_PTR_CAST_ALIGN*/
+	    (ndr_alter_context_rsp_hdr_t *)encl_ref->datum;
+	struct ndr_reference	myref;
+	unsigned long		offset;
+
+	bzero(&myref, sizeof (myref));
+	myref.enclosing = encl_ref;
+	myref.stream = encl_ref->stream;
+	myref.packed_alignment = 0;
+
+	/* do all members in order */
+	NDR_MEMBER(_ndr_common_header, common_hdr, 0UL);
+	NDR_MEMBER(_ushort, max_xmit_frag, 16UL);
+	NDR_MEMBER(_ushort, max_recv_frag, 18UL);
+	NDR_MEMBER(_ulong, assoc_group_id, 20UL);
+
+	offset = 24UL;	/* offset of sec_addr */
+
+	switch (mlnds->m_op) {
+	case NDR_M_OP_MARSHALL:
+		val->sec_addr.length = 0;
+		break;
+
+	case NDR_M_OP_UNMARSHALL:
+		break;
+
+	default:
+		NDR_SET_ERROR(encl_ref, NDR_ERR_M_OP_INVALID);
+		return (0);
+	}
+
+	NDR_MEMBER(_ushort, sec_addr.length, offset);
+	NDR_MEMBER_ARR_WITH_DIMENSION(_uchar, sec_addr.port_spec,
+	    offset+2UL, val->sec_addr.length);
+
+	offset += 2;	/* sizeof (sec_addr.length) */
+	offset += (4 - offset) & 3;
+
+	NDR_MEMBER(_mlrpc_p_result_list, p_result_list, offset);
+	return (1);
+}
+
+/*
+ * Assume a single presentation context element in the result list.
+ */
+unsigned
+mlrpc_alter_context_rsp_hdr_size(void)
+{
+	unsigned	offset;
+
+	offset = 24UL;	/* offset of sec_addr */
+	offset += 2;	/* sizeof (sec_addr.length) */
+	offset += (4 - offset) & 3;
+	offset += sizeof (mlrpc_p_result_list_t);
 	return (offset);
 }

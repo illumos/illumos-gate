@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_NETRAUTH_H
 #define	_SMBSRV_NETRAUTH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Interface definitions for the NETR remote authentication and logon
@@ -55,20 +53,12 @@ extern "C" {
 /*
  * Negotiation flags for challenge/response authentication.
  */
-#define	NETR_NEGOTIATE_STRONG_KEY		1
+#define	NETR_NEGOTIATE_BASE_FLAGS		0x000001FF
+#define	NETR_NEGOTIATE_STRONGKEY_FLAG		0x00004000
 
-#ifdef NETR_NEGOTIATE_STRONG_KEY
-#define	NETR_NEGOTIATE_FLAGS			0x000041FF
-#else
-#define	NETR_NEGOTIATE_FLAGS			0x000001FF
-#endif
-
-#ifdef NETR_NEGOTIATE_STRONG_KEY
-#define	NETR_SESSION_KEY_SZ			16
-#else
-#define	NETR_SESSION_KEY_SZ			8
-#endif
-
+#define	NETR_SESSKEY64_SZ			8
+#define	NETR_SESSKEY128_SZ			16
+#define	NETR_SESSKEY_MAXSZ			NETR_SESSKEY128_SZ
 #define	NETR_CRED_DATA_SZ			8
 #define	NETR_OWF_PASSWORD_SZ			16
 
@@ -91,10 +81,13 @@ extern "C" {
  * from netlogon.ndl.
  */
 typedef struct netr_cred {
-    BYTE data[NETR_CRED_DATA_SZ];
+	BYTE data[NETR_CRED_DATA_SZ];
 } netr_cred_t;
 
-
+typedef struct netr_session_key {
+	BYTE key[NETR_SESSKEY_MAXSZ];
+	short len;
+} netr_session_key_t;
 
 #define	NETR_FLG_NULL		0x00000001
 #define	NETR_FLG_VALID		0x00000001
@@ -109,7 +102,7 @@ typedef struct netr_info {
 	netr_cred_t server_challenge;
 	netr_cred_t client_credential;
 	netr_cred_t server_credential;
-	BYTE session_key[NETR_SESSION_KEY_SZ];
+	netr_session_key_t session_key;
 	BYTE password[MLSVC_MACHINE_ACCT_PASSWD_MAX];
 	time_t timestamp;
 } netr_info_t;
@@ -156,10 +149,10 @@ typedef struct netr_client {
 /*
  * NETLOGON private interface.
  */
-int netr_gen_session_key(netr_info_t *netr_info);
+int netr_gen_skey64(netr_info_t *);
+int netr_gen_skey128(netr_info_t *);
 
-int netr_gen_credentials(BYTE *session_key, netr_cred_t *challenge,
-    DWORD timestamp, netr_cred_t *out_cred);
+int netr_gen_credentials(BYTE *, netr_cred_t *, DWORD, netr_cred_t *);
 
 
 #define	NETR_A2H(c) (isdigit(c)) ? ((c) - '0') : ((c) - 'A' + 10)

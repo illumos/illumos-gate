@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_MLRPC_H
 #define	_SMBSRV_MLRPC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MSRPC Like RPC (MLRPC) is an MSRPC compatible implementation of OSF
  * DCE RPC.  DCE RPC is derived from the Apollo Network Computing
@@ -322,7 +320,7 @@ typedef struct mlrpc_heapref {
  * Alternate varying/conformant string definition
  * - for non-null-terminated strings.
  */
-struct mlrpc_vcb {
+struct mlrpc_vcs {
 	/*
 	 * size_is (actually a copy of length_is) will
 	 * be inserted here by the marshalling library.
@@ -332,9 +330,25 @@ struct mlrpc_vcb {
 	WORD buffer[ANY_SIZE_ARRAY];
 };
 
-typedef struct mlrpc_vcbuf {
+typedef struct mlrpc_vcstr {
 	WORD wclen;
 	WORD wcsize;
+	struct mlrpc_vcs *vcs;
+} mlrpc_vcstr_t;
+
+struct mlrpc_vcb {
+	/*
+	 * size_is (actually a copy of length_is) will
+	 * be inserted here by the marshalling library.
+	 */
+	DWORD vc_first_is;
+	DWORD vc_length_is;
+	BYTE buffer[ANY_SIZE_ARRAY];
+};
+
+typedef struct mlrpc_vcbuf {
+	WORD len;
+	WORD size;
 	struct mlrpc_vcb *vcb;
 } mlrpc_vcbuf_t;
 
@@ -342,7 +356,8 @@ mlrpc_heap_t *mlrpc_heap_create(void);
 void mlrpc_heap_destroy(mlrpc_heap_t *);
 void *mlrpc_heap_malloc(mlrpc_heap_t *, unsigned);
 void *mlrpc_heap_strsave(mlrpc_heap_t *, char *);
-void mlrpc_heap_mkvcs(mlrpc_heap_t *, char *, mlrpc_vcbuf_t *);
+void mlrpc_heap_mkvcs(mlrpc_heap_t *, char *, mlrpc_vcstr_t *);
+void mlrpc_heap_mkvcb(mlrpc_heap_t *, uint8_t *, uint32_t, mlrpc_vcbuf_t *);
 int mlrpc_heap_used(mlrpc_heap_t *);
 int mlrpc_heap_avail(mlrpc_heap_t *);
 
@@ -363,9 +378,9 @@ typedef struct mlrpc_xaction {
 	unsigned short		ptype;		/* just handy, hi bits spcl */
 	unsigned short		opnum;		/* for requests */
 	struct mlndr_stream	recv_mlnds;
-	mlrpcconn_hdr_t		recv_hdr;
+	ndr_hdr_t		recv_hdr;
 	struct mlndr_stream	send_mlnds;
-	mlrpcconn_hdr_t		send_hdr;
+	ndr_hdr_t		send_hdr;
 	struct mlrpc_binding	*binding;	/* what we're using */
 	struct mlrpc_binding	*binding_list;	/* from connection */
 	mlrpc_heap_t		*heap;
@@ -407,8 +422,9 @@ int mlrpc_encode_call(struct mlrpc_xaction *, void *);
 int mlrpc_decode_return(struct mlrpc_xaction *, void *);
 int mlrpc_decode_pdu_hdr(struct mlrpc_xaction *);
 int mlrpc_encode_pdu_hdr(struct mlrpc_xaction *);
-void mlrpc_decode_frag_hdr(struct mlndr_stream *, mlrpcconn_common_header_t *);
-unsigned mlrpc_bind_ack_hdr_size(struct mlrpcconn_bind_ack_hdr *);
+void mlrpc_decode_frag_hdr(struct mlndr_stream *, ndr_common_header_t *);
+unsigned mlrpc_bind_ack_hdr_size(struct mlrpc_xaction *);
+unsigned mlrpc_alter_context_rsp_hdr_size(void);
 
 /* ndr_server.c */
 int mlrpc_generic_call_stub(struct mlrpc_xaction *);

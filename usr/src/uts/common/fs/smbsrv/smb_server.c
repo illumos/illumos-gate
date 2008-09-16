@@ -243,6 +243,9 @@ static void smb_server_stop(smb_server_t *);
 static int smb_server_fsop_start(smb_server_t *);
 static void smb_server_fsop_stop(smb_server_t *);
 
+static void smb_server_disconnect_share(char *, smb_server_t *);
+static void smb_server_thread_unexport(smb_thread_t *, void *);
+
 static smb_llist_t	smb_servers;
 
 /*
@@ -350,9 +353,14 @@ smb_server_create(void)
 	smb_llist_constructor(&sv->sv_vfs_list, sizeof (smb_vfs_t),
 	    offsetof(smb_vfs_t, sv_lnd));
 
+	smb_slist_constructor(&sv->sv_unexport_list, sizeof (smb_unexport_t),
+	    offsetof(smb_unexport_t, ux_lnd));
+
 	smb_session_list_constructor(&sv->sv_nbt_daemon.ld_session_list);
 	smb_session_list_constructor(&sv->sv_tcp_daemon.ld_session_list);
 
+	sv->si_cache_unexport = kmem_cache_create("smb_unexport_cache",
+	    sizeof (smb_unexport_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 	sv->si_cache_vfs = kmem_cache_create("smb_vfs_cache",
 	    sizeof (smb_vfs_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 	sv->si_cache_request = kmem_cache_create("smb_request_cache",
@@ -373,6 +381,9 @@ smb_server_create(void)
 	smb_thread_init(&sv->si_thread_timers,
 	    "smb_timers", smb_server_timers, sv,
 	    NULL, NULL);
+
+	smb_thread_init(&sv->si_thread_unexport, "smb_thread_unexport",
+	    smb_server_thread_unexport, sv, NULL, NULL);
 
 	sv->sv_pid = curproc->p_pid;
 
@@ -401,6 +412,7 @@ int
 smb_server_delete(void)
 {
 	smb_server_t	*sv;
+	smb_unexport_t	*ux;
 	int		rc;
 
 	rc = smb_server_lookup(&sv);
@@ -460,6 +472,14 @@ smb_server_delete(void)
 	smb_kdoor_clnt_fini();
 	smb_server_kstat_fini(sv);
 	smb_llist_destructor(&sv->sv_vfs_list);
+
+	while ((ux = list_head(&sv->sv_unexport_list.sl_list)) != NULL) {
+		smb_slist_remove(&sv->sv_unexport_list, ux);
+		kmem_cache_free(sv->si_cache_unexport, ux);
+	}
+	smb_slist_destructor(&sv->sv_unexport_list);
+
+	kmem_cache_destroy(sv->si_cache_unexport);
 	kmem_cache_destroy(sv->si_cache_vfs);
 	kmem_cache_destroy(sv->si_cache_request);
 	kmem_cache_destroy(sv->si_cache_session);
@@ -470,6 +490,7 @@ smb_server_delete(void)
 	kmem_cache_destroy(sv->si_cache_node);
 
 	smb_thread_destroy(&sv->si_thread_timers);
+	smb_thread_destroy(&sv->si_thread_unexport);
 	mutex_destroy(&sv->sv_mutex);
 	cv_destroy(&sv->sv_cv);
 	sv->sv_magic = 0;
@@ -562,6 +583,8 @@ smb_server_start(struct smb_io_start *io_start)
 			break;
 		}
 		if (rc = smb_thread_start(&sv->si_thread_timers))
+			break;
+		if (rc = smb_thread_start(&sv->si_thread_unexport))
 			break;
 		/*
 		 * XXX We give up the NET_MAC_AWARE privilege because it keeps
@@ -806,41 +829,18 @@ smb_server_get_session_count(void)
 }
 
 /*
- * smb_session_disconnect_share
+ * smb_server_disconnect_share
  *
  * Disconnects the specified share. This function should be called after the
  * share passed in has been made unavailable by the "share manager".
  */
-void
-smb_server_disconnect_share(char *sharename)
+static void
+smb_server_disconnect_share(char *sharename, smb_server_t *sv)
 {
-	smb_server_t	*sv;
-
-	if (smb_server_lookup(&sv))
-		return;
-
 	smb_session_disconnect_share(&sv->sv_nbt_daemon.ld_session_list,
 	    sharename);
 	smb_session_disconnect_share(&sv->sv_tcp_daemon.ld_session_list,
 	    sharename);
-
-	smb_server_release(sv);
-}
-
-void
-smb_server_disconnect_volume(const char *volname)
-{
-	smb_server_t	*sv;
-
-	if (smb_server_lookup(&sv))
-		return;
-
-	smb_session_disconnect_volume(&sv->sv_nbt_daemon.ld_session_list,
-	    volname);
-	smb_session_disconnect_volume(&sv->sv_tcp_daemon.ld_session_list,
-	    volname);
-
-	smb_server_release(sv);
 }
 
 int
@@ -950,66 +950,108 @@ smb_server_share_export(char *path)
 /*
  * smb_server_share_unexport()
  *
- * This function handles kernel processing at share disable time.
+ * This function is invoked when a share is disabled to disconnect trees
+ * and close files.  Cleaning up may involve VOP and/or VFS calls, which
+ * may conflict/deadlock with stuck threads if something is amiss with the
+ * file system.  Queueing the request for asynchronous processing allows the
+ * call to return immediately so that, if the unshare is being done in the
+ * context of a forced unmount, the forced unmount will always be able to
+ * proceed (unblocking stuck I/O and eventually allowing all blocked unshare
+ * processes to complete).
  *
- * At share-disable time (LMSHRD_DELETE), the reference count on the
- * corresponding smb_vfs_t is decremented.  If this is the last share
- * on the file system, the hold on the root vnode of the file system
- * will be released.  (See smb_vfs_rele().)
+ * The path lookup to find the root vnode of the VFS in question and the
+ * release of this vnode are done synchronously prior to any associated
+ * unmount.  Doing these asynchronous to an associated unmount could run
+ * the risk of a spurious EBUSY for a standard unmount or an EIO during
+ * the path lookup due to a forced unmount finishing first.
  */
 
 int
 smb_server_share_unexport(char *path, char *sharename)
 {
 	smb_server_t	*sv;
-	int		error;
+	smb_request_t	*sr;
+	smb_unexport_t	*ux;
 	smb_node_t	*fnode = NULL;
 	smb_node_t	*dnode;
 	smb_attr_t	ret_attr;
 	char		last_comp[MAXNAMELEN];
-	smb_request_t	*sr;
+	int		rc;
 
-	if (smb_server_lookup(&sv))
-		return (EINVAL);
+	if ((rc = smb_server_lookup(&sv)))
+		return (rc);
 
 	sr = smb_request_alloc(sv->sv_session, 0);
+
 	if (sr == NULL) {
 		smb_server_release(sv);
 		return (ENOMEM);
 	}
+
 	sr->user_cr = kcred;
 
-	error = smb_pathname_reduce(sr, kcred, path, NULL, NULL, &dnode,
+	rc = smb_pathname_reduce(sr, kcred, path, NULL, NULL, &dnode,
 	    last_comp);
 
-	if (error) {
+	if (rc) {
 		smb_request_free(sr);
 		smb_server_release(sv);
-		return (error);
+		return (rc);
 	}
 
-	error = smb_fsop_lookup(sr, kcred, SMB_FOLLOW_LINKS, NULL, dnode,
+	rc = smb_fsop_lookup(sr, kcred, SMB_FOLLOW_LINKS, NULL, dnode,
 	    last_comp, &fnode, &ret_attr, NULL, NULL);
 
 	smb_node_release(dnode);
+	smb_request_free(sr);
 
-	if (error) {
-		smb_request_free(sr);
+	if (rc) {
 		smb_server_release(sv);
-		return (error);
+		return (rc);
 	}
 
 	ASSERT(fnode->vp && fnode->vp->v_vfsp);
 
-	smb_session_disconnect_share(&sv->sv_nbt_daemon.ld_session_list,
-	    sharename);
-	smb_session_disconnect_share(&sv->sv_tcp_daemon.ld_session_list,
-	    sharename);
 	smb_vfs_rele(sv, fnode->vp->v_vfsp);
+
 	smb_node_release(fnode);
-	smb_request_free(sr);
+
+	ux = kmem_cache_alloc(sv->si_cache_unexport, KM_SLEEP);
+
+	(void) strlcpy(ux->ux_sharename, sharename, MAXNAMELEN);
+
+	smb_slist_insert_tail(&sv->sv_unexport_list, ux);
+	smb_thread_signal(&sv->si_thread_unexport);
+
 	smb_server_release(sv);
 	return (0);
+}
+
+/*
+ * smb_server_thread_unexport
+ *
+ * This function processes the unexport event list and disconnects shares
+ * asynchronously.  The function executes as a zone-specific thread.
+ *
+ * The server arg passed in is safe to use without a reference count, because
+ * the server cannot be deleted until smb_thread_stop()/destroy() return,
+ * which is also when the thread exits.
+ */
+
+static void
+smb_server_thread_unexport(smb_thread_t *thread, void *arg)
+{
+	smb_server_t *sv = (smb_server_t *)arg;
+	smb_unexport_t	*ux;
+
+	while (smb_thread_continue(thread)) {
+		while ((ux = list_head(&sv->sv_unexport_list.sl_list))
+		    != NULL) {
+			smb_slist_remove(&sv->sv_unexport_list, ux);
+			smb_server_disconnect_share(ux->ux_sharename, sv);
+			kmem_cache_free(sv->si_cache_unexport, ux);
+		}
+	}
 }
 
 /*
@@ -1175,6 +1217,7 @@ smb_server_stop(smb_server_t *sv)
 
 	smb_opipe_door_close();
 	smb_thread_stop(&sv->si_thread_timers);
+	smb_thread_stop(&sv->si_thread_unexport);
 	smb_kdoor_clnt_close();
 	smb_kshare_fini(sv->sv_lmshrd);
 	sv->sv_lmshrd = NULL;

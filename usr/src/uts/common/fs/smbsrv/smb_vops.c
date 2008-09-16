@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_vops.c	1.13	08/07/30 SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -266,7 +264,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
 		XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
 
-		if ((error = VOP_GETATTR(use_vp, (vattr_t *)&tmp_xvattr, flags,
+		if ((error = VOP_GETATTR(use_vp, &tmp_xvattr.xva_vattr, flags,
 		    cr, &smb_ct)) != 0)
 			return (error);
 
@@ -319,7 +317,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 
 			tmp_xvattr.xva_vattr.va_mask = AT_SIZE;
 
-			if ((error = VOP_GETATTR(vp, (vattr_t *)&tmp_xvattr,
+			if ((error = VOP_GETATTR(vp, &tmp_xvattr.xva_vattr,
 			    flags, cr, &smb_ct)) != 0)
 				return (error);
 
@@ -353,7 +351,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 	 */
 
 	ret_attr->sa_dosattr = 0;
-	ret_attr->sa_crtime = ret_attr->sa_vattr.va_ctime;
+	ret_attr->sa_crtime = ret_attr->sa_vattr.va_mtime;
 
 	if (unnamed_vp && (ret_attr->sa_mask & SMB_AT_SIZE)) {
 		/*
@@ -432,9 +430,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 
 	if ((no_xvattr == B_FALSE) &&
 	    vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
-
 		smb_vop_setup_xvattr(set_attr, &xvattr);
-		vap = (vattr_t *)&xvattr;
+		vap = &xvattr.xva_vattr;
 	} else {
 		smb_sa_to_va_mask(set_attr->sa_mask,
 		    &set_attr->sa_vattr.va_mask);
@@ -603,7 +600,7 @@ smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 
 	if (vfs_has_feature(dvp->v_vfsp, VFSFT_XVATTR)) {
 		smb_vop_setup_xvattr(attr, &xvattr);
-		vap = (vattr_t *)&xvattr;
+		vap = &xvattr.xva_vattr;
 	} else {
 		smb_sa_to_va_mask(attr->sa_mask, &attr->sa_vattr.va_mask);
 		vap = &attr->sa_vattr;
@@ -658,15 +655,23 @@ smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 {
 	int error;
 	int option_flags = 0;
-
-
+	xvattr_t xvattr;
+	vattr_t *vap;
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
 
-	smb_sa_to_va_mask(attr->sa_mask, &attr->sa_vattr.va_mask);
+	attr->sa_vattr.va_mask = 0;
 
-	error = VOP_MKDIR(dvp, name, &attr->sa_vattr, vpp, cr, &smb_ct,
+	if (vfs_has_feature(dvp->v_vfsp, VFSFT_XVATTR)) {
+		smb_vop_setup_xvattr(attr, &xvattr);
+		vap = &xvattr.xva_vattr;
+	} else {
+		smb_sa_to_va_mask(attr->sa_mask, &attr->sa_vattr.va_mask);
+		vap = &attr->sa_vattr;
+	}
+
+	error = VOP_MKDIR(dvp, name, vap, vpp, cr, &smb_ct,
 	    option_flags, vsap);
 
 	return (error);

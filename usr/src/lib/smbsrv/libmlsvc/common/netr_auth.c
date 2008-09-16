@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NETR challenge/response client functions.
  *
@@ -52,6 +50,7 @@
 #include <smbsrv/netrauth.h>
 
 #define	NETR_SESSKEY_ZEROBUF_SZ		4
+/* The DES algorithm uses a 56-bit encryption key. */
 #define	NETR_DESKEY_LEN			7
 
 int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
@@ -234,28 +233,32 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	(void) snprintf(account_name, sizeof (account_name), "%s$",
 	    netr_info->hostname);
 
+	smb_tracef("server=[%s] account_name=[%s] hostname=[%s]\n",
+	    netr_info->server, account_name, netr_info->hostname);
+
 	arg.servername = (unsigned char *)netr_info->server;
 	arg.account_name = (unsigned char *)account_name;
 	arg.account_type = NETR_WKSTA_TRUST_ACCOUNT_TYPE;
 	arg.hostname = (unsigned char *)netr_info->hostname;
-	arg.negotiate_flags = NETR_NEGOTIATE_FLAGS;
+	arg.negotiate_flags = NETR_NEGOTIATE_BASE_FLAGS;
 
-	smb_tracef("server=[%s] account_name=[%s] hostname=[%s]\n",
-	    netr_info->server, account_name, netr_info->hostname);
+	if (netr_handle->context->server_os != NATIVE_OS_WINNT) {
+		arg.negotiate_flags |= NETR_NEGOTIATE_STRONGKEY_FLAG;
+		if (netr_gen_skey128(netr_info) != SMBAUTH_SUCCESS)
+			return (-1);
+	} else {
+		if (netr_gen_skey64(netr_info) != SMBAUTH_SUCCESS)
+			return (-1);
+	}
 
-	if (netr_gen_session_key(netr_info) != SMBAUTH_SUCCESS)
-		return (-1);
-
-	if (netr_gen_credentials(netr_info->session_key,
-	    &netr_info->client_challenge,
-	    0,
+	if (netr_gen_credentials(netr_info->session_key.key,
+	    &netr_info->client_challenge, 0,
 	    &netr_info->client_credential) != SMBAUTH_SUCCESS) {
 		return (-1);
 	}
 
-	if (netr_gen_credentials(netr_info->session_key,
-	    &netr_info->server_challenge,
-	    0,
+	if (netr_gen_credentials(netr_info->session_key.key,
+	    &netr_info->server_challenge, 0,
 	    &netr_info->server_credential) != SMBAUTH_SUCCESS) {
 		return (-1);
 	}
@@ -282,37 +285,13 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 }
 
 /*
- * netr_gen_session_key
+ * netr_gen_skey128
  *
- * Generate a session key from the client and server challenges. The
- * algorithm is a two stage hash. For the first hash, the input is
- * the combination of the client and server challenges, the key is
- * the first 8 bytes of the password. The initial password is formed
- * using the NT password hash on the local hostname in lower case.
- * The result is stored in a temporary buffer.
- *
- *		input:	challenge
- *		key:	passwd lower 8 bytes
- *		output:	intermediate result
- *
- * For the second hash, the input is the result of the first hash and
- * the key is the last 8 bytes of the password.
- *
- *		input:	result of first hash
- *		key:	passwd upper 8 bytes
- *		output:	session_key
- *
- * The final output should be the session key.
- *
- *		FYI: smb_auth_DES(output, key, input)
- *
- * If any difficulties occur using the cryptographic framework, the
- * function returns SMBAUTH_FAILURE.  Otherwise SMBAUTH_SUCCESS is
- * returned.
+ * Generate a 128-bit session key from the client and server challenges.
+ * See "Session-Key Computation" section of MS-NRPC document.
  */
-#ifdef NETR_NEGOTIATE_STRONG_KEY
 int
-netr_gen_session_key(netr_info_t *netr_info)
+netr_gen_skey128(netr_info_t *netr_info)
 {
 	unsigned char ntlmhash[SMBAUTH_HASH_SZ];
 	int rc = SMBAUTH_FAILURE;
@@ -375,16 +354,47 @@ netr_gen_session_key(netr_info_t *netr_info)
 		goto cleanup;
 
 	rc = smb_auth_hmac_md5(md5digest, diglen, ntlmhash, SMBAUTH_HASH_SZ,
-	    netr_info->session_key);
+	    netr_info->session_key.key);
 
+	netr_info->session_key.len = NETR_SESSKEY128_SZ;
 cleanup:
 	(void) C_CloseSession(hSession);
 	return (rc);
 
 }
-#else
+/*
+ * netr_gen_skey64
+ *
+ * Generate a 64-bit session key from the client and server challenges.
+ * See "Session-Key Computation" section of MS-NRPC document.
+ *
+ * The algorithm is a two stage hash. For the first hash, the input is
+ * the combination of the client and server challenges, the key is
+ * the first 7 bytes of the password. The initial password is formed
+ * using the NT password hash on the local hostname in lower case.
+ * The result is stored in a temporary buffer.
+ *
+ *		input:	challenge
+ *		key:	passwd lower 7 bytes
+ *		output:	intermediate result
+ *
+ * For the second hash, the input is the result of the first hash and
+ * the key is the last 7 bytes of the password.
+ *
+ *		input:	result of first hash
+ *		key:	passwd upper 7 bytes
+ *		output:	session_key
+ *
+ * The final output should be the session key.
+ *
+ *		FYI: smb_auth_DES(output, key, input)
+ *
+ * If any difficulties occur using the cryptographic framework, the
+ * function returns SMBAUTH_FAILURE.  Otherwise SMBAUTH_SUCCESS is
+ * returned.
+ */
 int
-netr_gen_session_key(netr_info_t *netr_info)
+netr_gen_skey64(netr_info_t *netr_info)
 {
 	unsigned char md4hash[32];
 	unsigned char buffer[8];
@@ -420,15 +430,19 @@ netr_gen_session_key(netr_info_t *netr_info)
 	data[1] = LE_IN32(&client_challenge[1]) + LE_IN32(&server_challenge[1]);
 	LE_OUT32(&le_data[0], data[0]);
 	LE_OUT32(&le_data[1], data[1]);
+	rc = smb_auth_DES(buffer, 8, md4hash, NETR_DESKEY_LEN,
+	    (unsigned char *)le_data, 8);
 
-	rc = smb_auth_DES(buffer, 8, md4hash, 8, (unsigned char *)le_data, 8);
 	if (rc != SMBAUTH_SUCCESS)
 		return (rc);
 
-	rc = smb_auth_DES(netr_info->session_key, 8, &md4hash[9], 8, buffer, 8);
+	netr_info->session_key.len = NETR_SESSKEY64_SZ;
+	rc = smb_auth_DES(netr_info->session_key.key,
+	    netr_info->session_key.len, &md4hash[9], NETR_DESKEY_LEN, buffer,
+	    8);
+
 	return (rc);
 }
-#endif
 
 /*
  * netr_gen_credentials
@@ -529,7 +543,7 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	/*
 	 * Generate a new password from the old password.
 	 */
-	if (netr_gen_password(netr_info->session_key,
+	if (netr_gen_password(netr_info->session_key.key,
 	    netr_info->password, new_password) == SMBAUTH_FAILURE) {
 		return (-1);
 	}

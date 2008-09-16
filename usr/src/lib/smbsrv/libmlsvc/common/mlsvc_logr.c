@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Event Log Service RPC (LOGR) interface definition.
  */
@@ -540,7 +538,7 @@ fixup_logr_EventLogRead(void *xarg)
 	};
 
 	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (mlrpcconn_request_hdr_t) + sizeof (DWORD);
+	size3 = size2 + sizeof (ndr_request_hdr_t) + sizeof (DWORD);
 
 	FIXUP_PDU_SIZE(logr_read_u, size1);
 	FIXUP_PDU_SIZE(logr_read_info, size2);

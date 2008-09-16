@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 #include <smbsrv/libsmb.h>
 
@@ -343,25 +341,28 @@ idmap_stat
 smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 {
 	idmap_stat stat = IDMAP_SUCCESS;
+	smb_idmap_t *sim;
 	int i;
 
-	stat = idmap_get_mappings(sib->sib_idmaph);
-	if (stat != IDMAP_SUCCESS) {
+	if ((stat = idmap_get_mappings(sib->sib_idmaph)) != IDMAP_SUCCESS)
 		return (stat);
-	}
 
 	/*
 	 * Check the status for all the queued requests
 	 */
-	for (i = 0; i < sib->sib_nmap; i++) {
-		if (sib->sib_maps[i].sim_stat != IDMAP_SUCCESS) {
-			return (sib->sib_maps[i].sim_stat);
+	for (i = 0, sim = sib->sib_maps; i < sib->sib_nmap; i++, sim++) {
+		if (sim->sim_stat != IDMAP_SUCCESS) {
+			if (sib->sib_flags == SMB_IDMAP_SID2ID) {
+				syslog(LOG_DEBUG, "[%d] %s-%d (%d)",
+				    sim->sim_idtype, sim->sim_sid,
+				    sim->sim_rid, sim->sim_stat);
+			}
+			return (sim->sim_stat);
 		}
 	}
 
-	if (smb_idmap_batch_binsid(sib) != 0) {
+	if (smb_idmap_batch_binsid(sib) != 0)
 		stat = IDMAP_ERR_OTHER;
-	}
 
 	return (stat);
 }

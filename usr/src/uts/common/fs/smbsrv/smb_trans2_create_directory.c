@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB: trans2_create_directory
  *
@@ -73,7 +71,7 @@ smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_mbc_decodef(&xa->req_param_mb, "%4.s",
+	if (smb_mbc_decodef(&xa->req_param_mb, "%4.u",
 	    sr, &sr->arg.dirop.fqi.path) != 0) {
 		return (SDRC_ERROR);
 	}

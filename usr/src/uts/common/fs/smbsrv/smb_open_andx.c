@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_open_andx.c	1.8	08/08/07 SMI"
-
 #include <smbsrv/smb_vops.h>
 
 /*
@@ -268,8 +266,9 @@ smb_com_open(smb_request_t *sr)
 	op->dsize = 0; /* Don't set spurious size */
 	op->crtime.tv_sec = op->crtime.tv_nsec = 0;
 	op->create_disposition = FILE_OPEN;
-	op->create_options = (op->omode & SMB_DA_WRITE_THROUGH)
-	    ? FILE_WRITE_THROUGH : 0;
+	op->create_options = FILE_NON_DIRECTORY_FILE;
+	if (op->omode & SMB_DA_WRITE_THROUGH)
+		op->create_options |= FILE_WRITE_THROUGH;
 
 	if (sr->smb_flg & SMB_FLAGS_OPLOCK) {
 		if (sr->smb_flg & SMB_FLAGS_OPLOCK_NOTIFY_ANY) {
@@ -307,20 +306,25 @@ smb_com_open(smb_request_t *sr)
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
+/*
+ * smb_pre_open_andx
+ * For compatibility with windows servers, the search attributes
+ * specified in the request are ignored.
+ */
 smb_sdrc_t
 smb_pre_open_andx(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint16_t flags;
 	uint32_t creation_time;
-	uint16_t file_attr;
+	uint16_t file_attr, sattr;
 	uint16_t ofun;
 	int rc;
 
 	bzero(op, sizeof (sr->arg.open));
 
 	rc = smbsr_decode_vwv(sr, "b.wwwwwlwll4.", &sr->andx_com,
-	    &sr->andx_off, &flags, &op->omode, &op->fqi.srch_attr,
+	    &sr->andx_off, &flags, &op->omode, &sattr,
 	    &file_attr, &creation_time, &ofun, &op->dsize, &op->timeo);
 
 	if (rc == 0) {
@@ -375,8 +379,9 @@ smb_com_open_andx(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	op->create_options = (op->omode & SMB_DA_WRITE_THROUGH)
-	    ? FILE_WRITE_THROUGH : 0;
+	op->create_options = FILE_NON_DIRECTORY_FILE;
+	if (op->omode & SMB_DA_WRITE_THROUGH)
+		op->create_options |= FILE_WRITE_THROUGH;
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);

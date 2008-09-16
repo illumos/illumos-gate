@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_fsops.c	1.16	08/08/07 SMI"
-
 #include <sys/sid.h>
 #include <sys/nbmlock.h>
 #include <smbsrv/smb_fsops.h>
@@ -147,7 +145,7 @@ static int
 smb_fsop_create_with_sd(
 	smb_request_t *sr,
 	cred_t *cr,
-	smb_node_t *snode,
+	smb_node_t *dir_snode,
 	char *name,
 	smb_attr_t *attr,
 	smb_node_t **ret_snode,
@@ -161,8 +159,8 @@ smb_fsop_create_with_sd(
 	vnode_t *vp;
 	int aclbsize = 0;	/* size of acl list in bytes */
 	int flags = 0;
-	int is_dir;
 	int rc;
+	boolean_t is_dir;
 	boolean_t no_xvattr = B_FALSE;
 
 	ASSERT(fs_sd);
@@ -192,20 +190,20 @@ smb_fsop_create_with_sd(
 			if (dacl && sacl)
 				acl_free(acl);
 
-			if (rc)
+			if (rc != 0)
 				return (rc);
 
 			vsap = &vsecattr;
-		}
-		else
+		} else {
 			vsap = NULL;
+		}
 
 		if (is_dir) {
-			rc = smb_vop_mkdir(snode->vp, name, attr, &vp, flags,
-			    cr, vsap);
+			rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp,
+			    flags, cr, vsap);
 		} else {
-			rc = smb_vop_create(snode->vp, name, attr, &vp, flags,
-			    cr, vsap);
+			rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
+			    flags, cr, vsap);
 		}
 
 		if (vsap != NULL)
@@ -235,10 +233,19 @@ smb_fsop_create_with_sd(
 		if (set_attr.sa_mask) {
 			if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
 				no_xvattr = B_TRUE;
-			rc = smb_vop_setattr(snode->vp, NULL, &set_attr,
-			    0, kcred, no_xvattr);
+			rc = smb_vop_setattr(vp, NULL, &set_attr, 0, kcred,
+			    no_xvattr);
 		}
 
+		if (rc == 0) {
+			*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
+			    name, dir_snode, NULL, ret_attr);
+
+			if (*ret_snode == NULL) {
+				VN_RELE(vp);
+				rc = ENOMEM;
+			}
+		}
 	} else {
 		/*
 		 * For filesystems that don't support ACL-on-create, try
@@ -250,36 +257,35 @@ smb_fsop_create_with_sd(
 		 */
 
 		if (is_dir) {
-			rc = smb_vop_mkdir(snode->vp, name, attr, &vp, flags,
-			    cr, NULL);
+			rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp,
+			    flags, cr, NULL);
 		} else {
-			rc = smb_vop_create(snode->vp, name, attr, &vp, flags,
-			    cr, NULL);
+			rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
+			    flags, cr, NULL);
 		}
 
 		if (rc != 0)
 			return (rc);
 
-		if (!smb_tree_has_feature(sr->tid_tree, SMB_TREE_NFS_MOUNTED))
-			rc = smb_fsop_sdwrite(sr, kcred, snode, fs_sd, 1);
-	}
+		*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
+		    name, dir_snode, NULL, ret_attr);
 
-	if (rc == 0) {
-		*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp, name,
-		    snode, NULL, ret_attr);
-
-		if (*ret_snode == NULL) {
+		if (*ret_snode != NULL) {
+			if (!smb_tree_has_feature(sr->tid_tree,
+			    SMB_TREE_NFS_MOUNTED))
+				rc = smb_fsop_sdwrite(sr, kcred, *ret_snode,
+				    fs_sd, 1);
+		} else {
 			VN_RELE(vp);
 			rc = ENOMEM;
 		}
 	}
 
 	if (rc != 0) {
-		if (is_dir) {
-			(void) smb_vop_rmdir(snode->vp, name, flags, cr);
-		} else {
-			(void) smb_vop_remove(snode->vp, name, flags, cr);
-		}
+		if (is_dir)
+			(void) smb_vop_rmdir(dir_snode->vp, name, flags, cr);
+		else
+			(void) smb_vop_remove(dir_snode->vp, name, flags, cr);
 	}
 
 	return (rc);
@@ -1260,9 +1266,10 @@ smb_fsop_setattr(
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
 	uint32_t status;
-	uint32_t access = 0;
+	uint32_t access;
 	int rc = 0;
 	int flags = 0;
+	uint_t sa_mask;
 	boolean_t no_xvattr = B_FALSE;
 
 	ASSERT(cr);
@@ -1288,13 +1295,20 @@ smb_fsop_setattr(
 
 	/* sr could be NULL in some cases */
 	if (sr && sr->fid_ofile) {
+		sa_mask = set_attr->sa_mask;
+		access = 0;
 
-		/* if uid and/or gid is requested */
-		if (set_attr->sa_mask & (SMB_AT_UID|SMB_AT_GID))
+		if (sa_mask & SMB_AT_SIZE) {
+			access |= FILE_WRITE_DATA;
+			sa_mask &= ~SMB_AT_SIZE;
+		}
+
+		if (sa_mask & (SMB_AT_UID|SMB_AT_GID)) {
 			access |= WRITE_OWNER;
+			sa_mask &= ~(SMB_AT_UID|SMB_AT_GID);
+		}
 
-		/* if anything else is also requested */
-		if (set_attr->sa_mask & ~(SMB_AT_UID|SMB_AT_GID))
+		if (sa_mask)
 			access |= FILE_WRITE_ATTRIBUTES;
 
 		status = smb_ofile_access(sr->fid_ofile, cr, access);
@@ -2341,6 +2355,16 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
  * be done via two separate FS operations: VOP_SETATTR and
  * VOP_SETSECATTR. Therefore, this function has to simulate the
  * atomicity as well as it can.
+ *
+ * Get the current uid, gid before setting the new uid/gid
+ * so if smb_fsop_aclwrite fails they can be restored. root cred is
+ * used to get currend uid/gid since this operation is performed on
+ * behalf of the server not the user.
+ *
+ * If setting uid/gid fails with EPERM it means that and invalid
+ * owner has been specified. Callers should translate this to
+ * STATUS_INVALID_OWNER which is not the normal mapping for EPERM
+ * in upper layers, so EPERM is mapped to EBADE.
  */
 int
 smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
@@ -2364,11 +2388,13 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if (fs_sd->sd_secinfo & SMB_OWNER_SECINFO) {
 		set_attr.sa_vattr.va_uid = fs_sd->sd_uid;
 		set_attr.sa_mask |= SMB_AT_UID;
+		access |= WRITE_OWNER;
 	}
 
 	if (fs_sd->sd_secinfo & SMB_GROUP_SECINFO) {
 		set_attr.sa_vattr.va_gid = fs_sd->sd_gid;
 		set_attr.sa_mask |= SMB_AT_GID;
+		access |= WRITE_OWNER;
 	}
 
 	if (fs_sd->sd_secinfo & SMB_DACL_SECINFO)
@@ -2386,19 +2412,14 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		return (EACCES);
 
 	if (set_attr.sa_mask) {
-		/*
-		 * Get the current uid, gid so if smb_fsop_aclwrite fails
-		 * we can revert uid, gid changes.
-		 *
-		 * We use root cred here so the operation doesn't fail
-		 * due to lack of permission for the user to read the attrs
-		 */
-
 		orig_attr.sa_mask = SMB_AT_UID | SMB_AT_GID;
 		error = smb_fsop_getattr(sr, kcred, snode, &orig_attr);
-		if (error == 0)
+		if (error == 0) {
 			error = smb_fsop_setattr(sr, cr, snode, &set_attr,
 			    NULL);
+			if (error == EPERM)
+				error = EBADE;
+		}
 
 		if (error)
 			return (error);

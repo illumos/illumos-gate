@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_common_open.c	1.13	08/08/08 SMI"
-
 /*
  * This module provides the common open functionality to the various
  * open and create SMB interface functions.
@@ -268,6 +266,33 @@ smb_common_open(smb_request_t *sr)
  *
  * In the current implementation, the file size cannot be changed (except for
  * the exceptions in #1 and #2, above).
+ *
+ *
+ * DOS attribute rules
+ *
+ * These rules are specific to creating / opening files and directories.
+ * How the attribute value (specifically ZERO or FILE_ATTRIBUTE_NORMAL)
+ * should be interpreted may differ in other requests.
+ *
+ * - An attribute value equal to ZERO or FILE_ATTRIBUTE_NORMAL means that the
+ *   file's attributes should be cleared.
+ * - If FILE_ATTRIBUTE_NORMAL is specified with any other attributes,
+ *   FILE_ATTRIBUTE_NORMAL is ignored.
+ *
+ * 1. Creating a new file
+ * - The request attributes + FILE_ATTRIBUTE_ARCHIVE are applied to the file.
+ *
+ * 2. Creating a new directory
+ * - The request attributes + FILE_ATTRIBUTE_DIRECTORY are applied to the file.
+ * - FILE_ATTRIBUTE_ARCHIVE does not get set.
+ *
+ * 3. Overwriting an existing file
+ * - the request attributes are used as search attributes. If the existing
+ *   file does not meet the search criteria access is denied.
+ * - otherwise, applies attributes + FILE_ATTRIBUTE_ARCHIVE.
+ *
+ * 4. Opening an existing file or directory
+ *    The request attributes are ignored.
  */
 
 static uint32_t
@@ -438,27 +463,14 @@ smb_open_subr(smb_request_t *sr)
 		dnode = op->fqi.dir_snode;
 
 		/*
-		 * Reject this request if the target is a directory
-		 * and the client has specified that it must not be
-		 * a directory (required by Lotus Notes).
+		 * Reject this request if either:
+		 * - the target IS a directory and the client requires that
+		 *   it must NOT be (required by Lotus Notes)
+		 * - the target is NOT a directory and client requires that
+		 *   it MUST be.
 		 */
-		if ((op->create_options & FILE_NON_DIRECTORY_FILE) &&
-		    (op->fqi.last_attr.sa_vattr.va_type == VDIR)) {
-			smb_node_release(node);
-			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
-			smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
-			    ERRDOS, ERROR_ACCESS_DENIED);
-			return (NT_STATUS_FILE_IS_A_DIRECTORY);
-		}
-
 		if (op->fqi.last_attr.sa_vattr.va_type == VDIR) {
-			if ((sr->smb_com == SMB_COM_OPEN_ANDX) ||
-			    (sr->smb_com == SMB_COM_OPEN)) {
-				/*
-				 * Directories cannot be opened
-				 * with the above commands
-				 */
+			if (op->create_options & FILE_NON_DIRECTORY_FILE) {
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
@@ -466,13 +478,16 @@ smb_open_subr(smb_request_t *sr)
 				    ERRDOS, ERROR_ACCESS_DENIED);
 				return (NT_STATUS_FILE_IS_A_DIRECTORY);
 			}
-		} else if (op->my_flags & MYF_MUST_BE_DIRECTORY) {
-			smb_node_release(node);
-			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
-			smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
-			    ERRDOS, ERROR_DIRECTORY);
-			return (NT_STATUS_NOT_A_DIRECTORY);
+		} else {
+			if ((op->create_options & FILE_DIRECTORY_FILE) ||
+			    (op->my_flags & MYF_MUST_BE_DIRECTORY)) {
+				smb_node_release(node);
+				smb_node_release(dnode);
+				SMB_NULL_FQI_NODES(op->fqi);
+				smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
+				    ERRDOS, ERROR_DIRECTORY);
+				return (NT_STATUS_NOT_A_DIRECTORY);
+			}
 		}
 
 		/*
@@ -531,9 +546,10 @@ smb_open_subr(smb_request_t *sr)
 		    (op->create_disposition == FILE_OVERWRITE_IF) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
 
-			if (!(op->desired_access &
+			if ((!(op->desired_access &
 			    (FILE_WRITE_DATA | FILE_APPEND_DATA |
-			    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))) {
+			    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))) ||
+			    (!smb_sattr_check(&node->attr, NULL, op->dattr))) {
 				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);
@@ -615,6 +631,15 @@ smb_open_subr(smb_request_t *sr)
 				op->dsize = op->fqi.last_attr.sa_vattr.va_size;
 			}
 
+			op->dattr |= FILE_ATTRIBUTE_ARCHIVE;
+			if (op->dattr & FILE_ATTRIBUTE_READONLY) {
+				op->created_readonly = B_TRUE;
+				op->dattr &= ~FILE_ATTRIBUTE_READONLY;
+			}
+
+			smb_node_set_dosattr(node, op->dattr);
+			(void) smb_sync_fsattr(sr, sr->user_cr, node);
+
 			/*
 			 * If file is being replaced,
 			 * we should remove existing streams
@@ -658,6 +683,8 @@ smb_open_subr(smb_request_t *sr)
 		smb_rwx_rwenter(&dnode->n_lock, RW_WRITER);
 
 		bzero(&new_attr, sizeof (new_attr));
+		new_attr.sa_dosattr = op->dattr;
+		new_attr.sa_mask |= SMB_AT_DOSATTR;
 
 		/*
 		 * A file created with the readonly bit should not
@@ -667,17 +694,9 @@ smb_open_subr(smb_request_t *sr)
 		 * for on other fids and on queries based on the node
 		 * state.
 		 */
+		if (op->dattr & FILE_ATTRIBUTE_READONLY)
+			new_attr.sa_dosattr &= ~FILE_ATTRIBUTE_READONLY;
 
-		if (op->dattr) {
-			new_attr.sa_dosattr = op->dattr;
-
-			if (op->dattr & FILE_ATTRIBUTE_READONLY)
-				new_attr.sa_dosattr &=
-				    ~FILE_ATTRIBUTE_READONLY;
-
-			if (new_attr.sa_dosattr)
-				new_attr.sa_mask |= SMB_AT_DOSATTR;
-		}
 
 		if ((op->crtime.tv_sec != 0) &&
 		    (op->crtime.tv_sec != UINT_MAX)) {
@@ -687,6 +706,7 @@ smb_open_subr(smb_request_t *sr)
 		}
 
 		if (is_dir == 0) {
+			new_attr.sa_dosattr |= FILE_ATTRIBUTE_ARCHIVE;
 			new_attr.sa_vattr.va_type = VREG;
 			new_attr.sa_vattr.va_mode = is_stream ? S_IRUSR :
 			    S_IRUSR | S_IRGRP | S_IROTH |
@@ -752,45 +772,30 @@ smb_open_subr(smb_request_t *sr)
 
 		created = 1;
 		op->action_taken = SMB_OACT_CREATED;
-	}
-
-	if (max_requested) {
-		smb_fsop_eaccess(sr, sr->user_cr, node, &max_allowed);
-		op->desired_access |= max_allowed;
-	}
-
-	if (created) {
 		node->flags |= NODE_FLAGS_CREATED;
 
 		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
 			op->created_readonly = B_TRUE;
 			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
 		}
-	} else {
-		/*
-		 * If we reach here, it means that the file already exists.
-		 * If create disposition is one of FILE_SUPERSEDE,
-		 * FILE_OVERWRITE_IF, or FILE_OVERWRITE, the client wants to
-		 * overwrite or truncate the existing file and we have to
-		 * replace the destination file's DOS attributes with those
-		 * from the source file.
-		 */
-
-		switch (op->create_disposition) {
-		case FILE_SUPERSEDE:
-		case FILE_OVERWRITE_IF:
-		case FILE_OVERWRITE:
-			if (op->dattr & FILE_ATTRIBUTE_READONLY) {
-				op->created_readonly = B_TRUE;
-				op->dattr &= ~FILE_ATTRIBUTE_READONLY;
-			}
-
-			smb_node_set_dosattr(node, op->dattr);
-			(void) smb_sync_fsattr(sr, sr->user_cr, node);
-		}
 	}
 
 	op->dattr = smb_node_get_dosattr(node);
+
+	if (max_requested) {
+		smb_fsop_eaccess(sr, sr->user_cr, node, &max_allowed);
+		op->desired_access |= max_allowed;
+	}
+
+	/*
+	 * if last_write time was in request and is not 0 or -1,
+	 * use it as file's mtime
+	 */
+	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX)) {
+		smb_node_set_time(node, NULL, &op->mtime, NULL, NULL,
+		    SMB_AT_MTIME);
+		(void) smb_sync_fsattr(sr, sr->user_cr, node);
+	}
 
 	/*
 	 * smb_ofile_open() will copy node to of->node.  Hence

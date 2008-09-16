@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_user.c	1.3	08/08/07 SMI"
-
 /*
  * General Structures Layout
  * -------------------------
@@ -739,32 +737,6 @@ smb_user_disconnect_share(
 		smb_session_cancel_requests(user->u_session, tree, NULL);
 		smb_tree_disconnect(tree);
 		next = smb_user_lookup_share(user, sharename, tree);
-		smb_tree_release(tree);
-		tree = next;
-	}
-}
-
-/*
- * Disconnect all trees that match the specified volume name.
- */
-void
-smb_user_disconnect_volume(
-    smb_user_t	*user,
-    const char	*volname)
-{
-	smb_tree_t	*tree;
-	smb_tree_t	*next;
-
-	ASSERT(user);
-	ASSERT(user->u_magic == SMB_USER_MAGIC);
-	ASSERT(user->u_refcnt);
-
-	tree = smb_user_lookup_volume(user, volname, NULL);
-	while (tree) {
-		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		smb_session_cancel_requests(user->u_session, tree, NULL);
-		smb_tree_disconnect(tree);
-		next = smb_user_lookup_volume(user, volname, tree);
 		smb_tree_release(tree);
 		tree = next;
 	}

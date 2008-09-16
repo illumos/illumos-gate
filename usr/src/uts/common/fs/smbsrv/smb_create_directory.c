@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB: create_directory
  *
@@ -190,10 +188,16 @@ smb_common_create_directory(smb_request_t *sr)
 	 */
 	dnode = sr->arg.dirop.fqi.dir_snode;
 
+	/*
+	 * Explicitly set sa_dosattr, otherwise the file system may
+	 * automatically apply FILE_ATTRIBUTE_ARCHIVE which, for
+	 * compatibility with windows servers, should not be set.
+	 */
 	bzero(&new_attr, sizeof (new_attr));
+	new_attr.sa_dosattr = FILE_ATTRIBUTE_DIRECTORY;
 	new_attr.sa_vattr.va_type = VDIR;
 	new_attr.sa_vattr.va_mode = 0777;
-	new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
+	new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE | SMB_AT_DOSATTR;
 
 	if ((rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
 	    sr->arg.dirop.fqi.last_comp, &new_attr,

@@ -22,18 +22,18 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"@(#)Makefile.com	1.5	08/08/05 SMI"
 #
 
 LIBRARY =	libmlsvc.a
 VERS =		.1
 
 OBJS_COMMON =		\
+	dssetup_clnt.o	\
+	dssetup_svc.o	\
 	lsalib.o	\
 	lsar_lookup.o	\
 	lsar_open.o	\
 	mlsvc_client.o	\
-	mlsvc_dssetup.o	\
 	mlsvc_init.o	\
 	mlsvc_logr.o	\
 	mlsvc_lsa.o	\

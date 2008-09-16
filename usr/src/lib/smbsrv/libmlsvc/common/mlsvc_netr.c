@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NetLogon RPC (NETR) interface definition. This module provides
@@ -194,7 +192,7 @@ fixup_netr_SamLogon(struct netr_SamLogon *arg)
 	};
 
 	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (mlrpcconn_request_hdr_t) + sizeof (DWORD);
+	size3 = size2 + sizeof (ndr_request_hdr_t) + sizeof (DWORD);
 
 	FIXUP_PDU_SIZE(netr_validation_u, size1);
 	FIXUP_PDU_SIZE(netr_validation_info, size2);

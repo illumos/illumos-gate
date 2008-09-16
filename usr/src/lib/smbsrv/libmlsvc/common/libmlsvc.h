@@ -42,6 +42,7 @@ extern "C" {
 extern int mlsvc_get_door_fd(void);
 extern uint64_t mlsvc_get_num_users(void);
 extern int mlsvc_get_user_list(int, smb_dr_ulist_t *);
+extern void dssetup_clear_domain_info(void);
 extern int mlsvc_init(void);
 extern void mlsvc_set_door_fd(int);
 extern int mlsvc_set_share(int, char *, char *);

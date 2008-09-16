@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MLRPC heap management. The heap is used for temporary storage by
@@ -190,22 +188,47 @@ mlrpc_heap_strsave(mlrpc_heap_t *heap, char *s)
  * aware that this is really a string.
  */
 void
-mlrpc_heap_mkvcs(mlrpc_heap_t *heap, char *s, mlrpc_vcbuf_t *vcs)
+mlrpc_heap_mkvcs(mlrpc_heap_t *heap, char *s, mlrpc_vcstr_t *vc)
 {
 	int mlen;
 
-	vcs->wclen = mts_wcequiv_strlen(s);
-	vcs->wcsize = vcs->wclen;
+	vc->wclen = mts_wcequiv_strlen(s);
+	vc->wcsize = vc->wclen;
 
-	mlen = sizeof (struct mlrpc_vcb) + vcs->wcsize + sizeof (mts_wchar_t);
+	mlen = sizeof (struct mlrpc_vcs) + vc->wcsize + sizeof (mts_wchar_t);
 
-	vcs->vcb = (struct mlrpc_vcb *)mlrpc_heap_malloc(heap, mlen);
+	vc->vcs = mlrpc_heap_malloc(heap, mlen);
 
-	if (vcs->vcb) {
-		vcs->vcb->vc_first_is = 0;
-		vcs->vcb->vc_length_is = vcs->wclen / sizeof (mts_wchar_t);
-		(void) mts_mbstowcs((mts_wchar_t *)vcs->vcb->buffer, s,
-		    vcs->vcb->vc_length_is);
+	if (vc->vcs) {
+		vc->vcs->vc_first_is = 0;
+		vc->vcs->vc_length_is = vc->wclen / sizeof (mts_wchar_t);
+		(void) mts_mbstowcs((mts_wchar_t *)vc->vcs->buffer, s,
+		    vc->vcs->vc_length_is);
+	}
+}
+
+void
+mlrpc_heap_mkvcb(mlrpc_heap_t *heap, uint8_t *data, uint32_t datalen,
+    mlrpc_vcbuf_t *vcbuf)
+{
+	int mlen;
+
+	if (data == NULL || datalen == 0) {
+		bzero(vcbuf, sizeof (mlrpc_vcbuf_t));
+		return;
+	}
+
+	vcbuf->len = datalen;
+	vcbuf->size = datalen;
+
+	mlen = sizeof (mlrpc_vcbuf_t) + datalen;
+
+	vcbuf->vcb = mlrpc_heap_malloc(heap, mlen);
+
+	if (vcbuf->vcb) {
+		vcbuf->vcb->vc_first_is = 0;
+		vcbuf->vcb->vc_length_is = datalen;
+		bcopy(data, vcbuf->vcb->buffer, datalen);
 	}
 }
 

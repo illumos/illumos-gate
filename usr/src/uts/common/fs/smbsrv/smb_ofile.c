@@ -302,6 +302,7 @@ smb_ofile_close(
 			}
 
 			smb_ofile_close_timestamp_update(of, last_wtime);
+			(void) smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 			smb_commit_delete_on_close(of);
 			smb_oplock_release(of->f_node, B_FALSE);
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
@@ -592,7 +593,6 @@ smb_ofile_close_timestamp_update(
 	}
 
 	smb_node_set_time(node, 0, &mtime, &atime, 0, what);
-	(void) smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 }
 
 /*

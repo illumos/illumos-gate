@@ -19,17 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DSSETUP_NDL_
 #define	_DSSETUP_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Active Directory Service Setup
+ *
+ * Originally this interface contained a number of operations, as listed
+ * below, but due to a buffer overflow security issue, all operations
+ * except DsRoleGetPrimaryDomainInfo have been deprecated (MS04-011).
  */
 
 #include "ndrtypes.ndl"
@@ -111,6 +113,7 @@ struct dssetup_DsRolePrimaryDomInfo1 {
 	LPTSTR forest;
 	dssetup_uuid_t domain_guid;
 };
+typedef struct dssetup_DsRolePrimaryDomInfo1 ds_primary_domain_info_t;
 
 /*
  * DS_ROLE_UPGRADE_STATUS
@@ -134,22 +137,21 @@ union dssetup_GetPrimaryDomainInfo_ru {
 	DEFAULT	char *nullptr;
 };
 
-struct dssetup_GetPrimaryDomainInfoRes {
-	DWORD address;
+struct dssetup_GetPrimaryDomainInfo {
 	WORD switch_value;
-	SWITCH(switch_value)
-		union dssetup_GetPrimaryDomainInfo_ru ru;
+    SWITCH(switch_value)
+	union dssetup_GetPrimaryDomainInfo_ru ru;
 };
+typedef struct dssetup_GetPrimaryDomainInfo dssetup_GetPrimaryDomainInfo_t;
 
 OPERATION(DSSETUP_OPNUM_DsRoleGetPrimaryDomainInfo)
 struct dssetup_DsRoleGetPrimaryDomainInfo {
 	IN	WORD level;
-	OUT	DWORD address;
-	OUT	WORD switch_value;
-  SWITCH(level)
-	OUT	union dssetup_GetPrimaryDomainInfo_ru ru;
+	OUT	struct dssetup_GetPrimaryDomainInfo *info;
 	OUT	DWORD status;
 };
+typedef struct dssetup_DsRoleGetPrimaryDomainInfo
+    dssetup_DsRoleGetPrimaryDomainInfo_t;
 
 
 /*

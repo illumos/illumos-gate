@@ -26,8 +26,6 @@
 #ifndef _MLSVC_NETR_NDL_
 #define _MLSVC_NETR_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  ***********************************************************************
  *
@@ -83,7 +81,7 @@ typedef struct netr_string netr_string_t;
  * non-null terminated strings. This definition must match
  * mlrpc_vcbuf_t.
  */
-struct netr_vcb {
+struct netr_vcs {
 	/*
 	 * size_is (actually a copy of length_is) will
 	 * be inserted here by the marshalling library.
@@ -94,18 +92,34 @@ struct netr_vcb {
 	WORD buffer[ANY_SIZE_ARRAY];
 };
 
-struct netr_vcbuf {
+struct netr_vcstr {
 	WORD wclen;
 	WORD wcsize;
+	struct netr_vcs *vcs;
+};
+typedef struct netr_vcstr netr_vcstr_t;
+
+struct netr_vcb {
+	/*
+	 * size_is (actually a copy of length_is) will
+	 * be inserted here by the marshalling library.
+	 */
+	DWORD vc_first_is;
+	DWORD vc_length_is;
+  SIZE_IS(vc_length_is)
+	BYTE buffer[ANY_SIZE_ARRAY];
+};
+
+struct netr_vcbuf {
+	WORD len;
+	WORD size;
 	struct netr_vcb *vcb;
 };
 typedef struct netr_vcbuf netr_vcbuf_t;
 
-
 struct netr_credential {
 	BYTE data[8];
 };
-
 
 struct netr_authenticator {
 	struct netr_credential credential;
@@ -209,32 +223,15 @@ struct lm_challenge {
 };
 typedef struct lm_challenge lm_challenge_t;
 
-
-struct netr_response {
-	DWORD 	length;
-	DWORD	start;
-	DWORD 	max_length;
-	BYTE	data[NETR_CR_PASSWORD_SIZE];
-};
-typedef struct netr_response netr_response_t;
-
-
-struct netr_response_desc {
-	WORD 	length;
-	WORD	max_length;	
-	netr_response_t *data;
-};
-typedef struct netr_response_desc netr_response_desc_t;
-
 /*
  * Input data
  */
 struct netr_logon_identity_info {
-	netr_vcbuf_t domain_name;
+	netr_vcstr_t domain_name;
 	DWORD parameter_control;
 	struct OLD_LARGE_INTEGER logon_id;
-	netr_vcbuf_t username;
-	netr_vcbuf_t workstation;
+	netr_vcstr_t username;
+	netr_vcstr_t workstation;
 };
 typedef struct netr_logon_identity_info netr_logon_id_t;
 
@@ -255,8 +252,8 @@ struct netr_logon_info1 {
 struct netr_logon_info2 {
 	netr_logon_id_t identity;
 	lm_challenge_t lm_challenge;
-	netr_response_desc_t nt_response;
-	netr_response_desc_t lm_response;
+	netr_vcbuf_t nt_response;
+	netr_vcbuf_t lm_response;
 };
 
 

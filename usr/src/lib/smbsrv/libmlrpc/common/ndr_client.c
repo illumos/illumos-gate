@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <string.h>
@@ -47,9 +45,9 @@ mlrpc_c_bind(struct mlrpc_client *mcli, char *service_name,
 	struct mlrpc_service 	*msvc;
 	struct mlrpc_binding 	*mbind;
 	struct mlrpc_xaction	mxa;
-	mlrpcconn_bind_hdr_t 	*bhdr;
+	ndr_bind_hdr_t		*bhdr;
 	mlrpc_p_cont_elem_t 	*pce;
-	mlrpcconn_bind_ack_hdr_t *bahdr;
+	ndr_bind_ack_hdr_t	*bahdr;
 	mlrpc_p_result_t 	*pre;
 	int			rc;
 
@@ -146,8 +144,8 @@ mlrpc_c_call(struct mlrpc_binding *mbind, int opnum, void *params,
 	struct mlrpc_client 	*mcli = mbind->context;
 	struct mlrpc_service	*msvc = mbind->service;
 	struct mlrpc_xaction	mxa;
-	mlrpcconn_request_hdr_t *reqhdr;
-	mlrpcconn_common_header_t *rsphdr;
+	ndr_request_hdr_t	*reqhdr;
+	ndr_common_header_t	*rsphdr;
 	unsigned long recv_pdu_scan_offset;
 	int			rc;
 
@@ -185,7 +183,7 @@ mlrpc_c_call(struct mlrpc_binding *mbind, int opnum, void *params,
 	 */
 	mxa.send_hdr.common_hdr.frag_length = mxa.send_mlnds.pdu_size;
 	reqhdr->alloc_hint = mxa.send_mlnds.pdu_size -
-	    sizeof (mlrpcconn_request_hdr_t);
+	    sizeof (ndr_request_hdr_t);
 
 	rc = mlrpc_encode_pdu_hdr(&mxa);
 	if (MLRPC_DRC_IS_FAULT(rc))
@@ -251,7 +249,7 @@ mlrpc_c_free_heap(struct mlrpc_binding *mbind, mlrpc_heapref_t *heapref)
 static void
 mlrpc_c_init_hdr(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
 {
-	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
+	ndr_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 
 	hdr->rpc_vers = 5;
 	hdr->rpc_vers_minor = 0;
@@ -330,7 +328,7 @@ static int
 mlrpc_c_get_frags(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
 {
 	struct mlndr_stream *mlnds = &mxa->recv_mlnds;
-	mlrpcconn_common_header_t hdr;
+	ndr_common_header_t hdr;
 	int frag_rcvd;
 	int frag_size;
 	int last_frag;

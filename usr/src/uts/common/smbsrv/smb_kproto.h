@@ -30,8 +30,6 @@
 #ifndef _SMB_KPROTO_H_
 #define	_SMB_KPROTO_H_
 
-#pragma ident	"@(#)smb_kproto.h	1.18	08/08/08 SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -354,8 +352,6 @@ int smb_server_nbt_receive(void);
 int smb_server_tcp_receive(void);
 uint32_t smb_server_get_user_count(void);
 uint32_t smb_server_get_session_count(void);
-void smb_server_disconnect_share(char *);
-void smb_server_disconnect_volume(const char *);
 int smb_server_dr_ulist_get(int, smb_dr_ulist_t *, int);
 int smb_server_share_export(char *);
 int smb_server_share_unexport(char *, char *);
@@ -502,7 +498,6 @@ void smb_session_cancel_requests(smb_session_t *, smb_tree_t *,
     smb_request_t *);
 void smb_session_config(smb_session_t *session);
 void smb_session_disconnect_share(smb_session_list_t *, char *);
-void smb_session_disconnect_volume(smb_session_list_t *, const char *);
 void smb_session_list_constructor(smb_session_list_t *);
 void smb_session_list_destructor(smb_session_list_t *);
 void smb_session_list_append(smb_session_list_t *, smb_session_t *);
@@ -570,7 +565,6 @@ boolean_t smb_user_is_admin(smb_user_t *);
 void smb_user_close_pid(smb_user_t *, uint16_t);
 void smb_user_disconnect_trees(smb_user_t *user);
 void smb_user_disconnect_share(smb_user_t *, const char *);
-void smb_user_disconnect_volume(smb_user_t *, const char *);
 void smb_user_release(smb_user_t *);
 
 /*

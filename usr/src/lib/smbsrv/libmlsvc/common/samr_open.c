@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Security Access Manager RPC (SAMR) library interface functions for
  * connect, open and close calls.  The SAM is a hierarchical database.
@@ -635,7 +633,7 @@ samr_create_user(mlsvc_handle_t *domain_handle, char *username,
 	    sizeof (ms_handle_t));
 
 	(void) mlsvc_rpc_init(&heap);
-	mlrpc_heap_mkvcs(heap.heap, username, (mlrpc_vcbuf_t *)&arg.username);
+	mlrpc_heap_mkvcs(heap.heap, username, (mlrpc_vcstr_t *)&arg.username);
 
 	arg.account_flags = account_flags;
 	arg.unknown_e00500b0 = 0xE00500B0;

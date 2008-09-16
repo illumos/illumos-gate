@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_session.c	1.7	08/08/07 SMI"
-
 #include <sys/atomic.h>
 #include <sys/strsubr.h>
 #include <sys/synch.h>
@@ -830,55 +828,6 @@ smb_session_disconnect_share(smb_session_list_t *se, char *sharename)
 			user = smb_user_lookup_by_state(session, NULL);
 			while (user) {
 				smb_user_disconnect_share(user, sharename);
-				next = smb_user_lookup_by_state(session, user);
-				smb_user_release(user);
-				user = next;
-			}
-			break;
-
-		}
-		default:
-			break;
-		}
-		smb_rwx_rwexit(&session->s_lock);
-		session = list_next(&se->se_act.lst, session);
-	}
-	rw_exit(&se->se_lock);
-}
-
-/*
- * smb_session_disconnect_volume
- *
- * This function is called when a volume is deleted. We need to ensure
- * all trees with a reference to the volume are destroyed before we
- * discard the fs_online. Before destroying each tree, we notify any
- * in-progress requests and give them a chance to complete.
- *
- * NOTE:
- * We shouldn't be accepting any new connection on this volume while
- * we are in this function.
- */
-void
-smb_session_disconnect_volume(smb_session_list_t *se, const char *volname)
-{
-	smb_session_t	*session;
-
-	rw_enter(&se->se_lock, RW_READER);
-	session = list_head(&se->se_act.lst);
-	while (session) {
-
-		ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-		smb_rwx_rwenter(&session->s_lock, RW_READER);
-		switch (session->s_state) {
-		case SMB_SESSION_STATE_NEGOTIATED:
-		case SMB_SESSION_STATE_OPLOCK_BREAKING:
-		case SMB_SESSION_STATE_WRITE_RAW_ACTIVE: {
-			smb_user_t	*user;
-			smb_user_t	*next;
-
-			user = smb_user_lookup_by_state(session, NULL);
-			while (user) {
-				smb_user_disconnect_volume(user, volname);
 				next = smb_user_lookup_by_state(session, user);
 				smb_user_release(user);
 				user = next;

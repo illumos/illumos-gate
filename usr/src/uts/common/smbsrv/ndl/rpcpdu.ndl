@@ -26,8 +26,6 @@
 #ifndef _MLRPCPDU_NDL_
 #define _MLRPCPDU_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ndrtypes.ndl"
 
 /*
@@ -147,7 +145,7 @@ struct mlrpc_representation_label {
  * (X/Open CAE Spec 12.6.3.1)
  */
 _NO_REORDER_
-struct mlrpcconn_common_header {
+struct ndr_common_header {
 	BYTE		rpc_vers;	/* 00:01 5 */
 	BYTE		rpc_vers_minor;	/* 01:01 0 */
 	BYTE		ptype;		/* 02:01 MLRPC_PTYPE_... */
@@ -159,8 +157,8 @@ struct mlrpcconn_common_header {
 	DWORD		call_id;	/* 12:04 call identifier */
 					/* 16: */
 };
-typedef struct mlrpcconn_common_header	mlrpcconn_common_header_t;
-EXTERNTYPEINFO(mlrpcconn_common_header)
+typedef struct ndr_common_header	ndr_common_header_t;
+EXTERNTYPEINFO(ndr_common_header)
 
 
 /*
@@ -250,12 +248,12 @@ EXTERNTYPEINFO(mlrpc_port_any)
  * (X/Open CAE Spec 12.6.4.1)
  */
 _NO_REORDER_
-struct mlrpcconn_alter_context_hdr {
-	mlrpcconn_common_header_t common_hdr; /* 00:16 (see above) */
+struct ndr_alter_context_hdr {
+	ndr_common_header_t common_hdr; /* 00:16 (see above) */
 
 	WORD max_xmit_frag;		/* 16:02 ignored */
 	WORD max_recv_frag;		/* 18:02 ignored */
-	DWORD assoc_group_id;	/* 20:04 ignored */
+	DWORD assoc_group_id;		/* 20:04 ignored */
 
 	/* 
 	 * Presentation context list (see bind hdr comments).
@@ -265,19 +263,25 @@ struct mlrpcconn_alter_context_hdr {
 	/* optional authentication verifier if auth_length != 0 */
 	/* auth_verifier_co_t auth_verifier; */
 };
-typedef struct mlrpcconn_alter_context_hdr mlrpcconn_alter_context_hdr_t;
+typedef struct ndr_alter_context_hdr ndr_alter_context_hdr_t;
 
 
 /*
  * Alter Context Response PDU (0x0F)
  * (X/Open CAE Spec 12.6.4.2)
+ *
+ * We can't automatically generate an alter context response header because
+ * the sec_addr is an interior conformant (variable length) array, which is
+ * inconsistent with IDL/NDR rules.  We mark this import-extern and provide
+ * a hand-coded marshalling function.
  */
+IMPORT_EXTERN
 _NO_REORDER_
-struct mlrpcconn_alter_context_rsp_hdr {
-	mlrpcconn_common_header_t common_hdr; /* 00:16 (see above) */
+struct ndr_alter_context_rsp_hdr {
+	ndr_common_header_t common_hdr; /* 00:16 (see above) */
 
-	WORD max_xmit_frag;			/* 16:02 ignored */
-	WORD max_recv_frag;			/* 18:02 ignored */
+	WORD max_xmit_frag;		/* 16:02 ignored */
+	WORD max_recv_frag;		/* 18:02 ignored */
 	DWORD assoc_group_id;		/* 20:04 ignored */
 	mlrpc_port_any_t sec_addr;	/* 24:20 ignored */
 
@@ -289,68 +293,57 @@ struct mlrpcconn_alter_context_rsp_hdr {
 	/* optional authentication verifier if auth_length != 0 */
 	/* auth_verifier_co_t auth_verifier; */
 };
-typedef struct mlrpcconn_alter_context_rsp_hdr mlrpcconn_alter_context_rsp_hdr_t;
+typedef struct ndr_alter_context_rsp_hdr ndr_alter_context_rsp_hdr_t;
 
 
 /*
  * Bind PDU (0x0B)
- ****************************************************************
  * (X/Open CAE Spec 12.6.4.3)
  */
-
 _NO_REORDER_
-struct mlrpcconn_bind_hdr {
-	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+struct ndr_bind_hdr {
+	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	WORD		max_xmit_frag;	/* 16:02 max xmit frag size, bytes */
 	WORD		max_recv_frag;	/* 18:02 max recv frag size, bytes */
-	DWORD		assoc_group_id;	/* 20:04 incarnation of client-server
-					 * association group (???) */
+	DWORD		assoc_group_id;	/* 20:04 association group */
 					/* 24: */
 
 	/* presentation, a variable**2 list, of presentation contexts */
 	mlrpc_p_cont_list_t p_context_elem;
+
 	/*
-	 * This could be follow by more transfer_syntaxes[] for
-	 * the p_cont_elem[0], and subsequently followed by
-	 * more p_cont_elem[] each with one ore more
-	 * transfer_syntaxes[]. The single p_cont_elem[]
-	 * with a single transfer_syntaxes[] is so common,
-	 * though, we embed such right in the bind_hdr.
-	 * The mlrpc_s_bind() processor must walk through
-	 * this tail if there is one.
+	 * This could be followed by more transfer_syntaxes[] for the
+	 * p_cont_elem[0], and subsequently followed by more p_cont_elem[],
+	 * each with one or more transfer_syntaxes[].  A single
+	 * p_cont_elem[] with a single transfer_syntaxes[] is so common,
+	 * though, we embed it in the bind_hdr but the bind processor must
+	 * walk through this tail if there is one.
 	 */
 
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */
 };
-typedef struct mlrpcconn_bind_hdr	mlrpcconn_bind_hdr_t;
-
-
+typedef struct ndr_bind_hdr	ndr_bind_hdr_t;
 
 
 /*
  * Bind_Ack PDU (0x0C)
- ****************************************************************
  * (X/Open CAE Spec 12.6.4.4)
+ *
+ * We can't automatically generate a bind ack header because the sec_addr
+ * is an interior conformant (variable length) array, which is inconsistent
+ * with IDL/NDR rules.  We mark this import-extern and provide a hand-coded
+ * marshalling function.
  */
-
-/*
- * hand coded in mlrpc_encdec.c because sec_addr is an
- * interior conformant (variable length) array.
- */
-
-IMPORT_EXTERN /* don't generate function */
+IMPORT_EXTERN
 _NO_REORDER_
-struct mlrpcconn_bind_ack_hdr {
-	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+struct ndr_bind_ack_hdr {
+	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	WORD		max_xmit_frag;	/* 16:02 max xmit frag size, bytes */
 	WORD		max_recv_frag;	/* 18:02 max recv frag size, bytes */
-	DWORD		assoc_group_id;	/* 20:04 incarnation of client-server
-					 * association group (???) */
-					/* 24: */
-
+	DWORD		assoc_group_id;	/* 20:04 association group */
 	mlrpc_port_any_t sec_addr;	/* 24:20 */
 
 	mlrpc_p_result_list_t p_result_list; /* 44:nn */
@@ -359,9 +352,7 @@ struct mlrpcconn_bind_ack_hdr {
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */
 };
-typedef struct mlrpcconn_bind_ack_hdr	mlrpcconn_bind_ack_hdr_t;
-
-
+typedef struct ndr_bind_ack_hdr	ndr_bind_ack_hdr_t;
 
 
 /*
@@ -374,14 +365,12 @@ typedef struct mlrpcconn_bind_ack_hdr	mlrpcconn_bind_ack_hdr_t;
  */
 
 _NO_REORDER_
-struct mlrpcconn_request_hdr {
-	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+struct ndr_request_hdr {
+	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t
-			p_cont_id;	/* 20:02 pres context, i.e. data rep */
-
+	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 	WORD		opnum;		/* 22:02 op number w/i interface */
 
 	/* optional field if PFC_OBJECT_UUID, not present */
@@ -393,17 +382,15 @@ struct mlrpcconn_request_hdr {
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */
 };
-typedef struct mlrpcconn_request_hdr	mlrpcconn_request_hdr_t;
+typedef struct ndr_request_hdr	ndr_request_hdr_t;
 
 _NO_REORDER_
-struct mlrpcconn_request_hdr_with_object {
-	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+struct ndr_request_hdr_with_object {
+	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t
-			p_cont_id;	/* 20:02 pres context, i.e. data rep */
-
+	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 	WORD		opnum;		/* 22:02 op number w/i interface */
 
 	/* optional field if PFC_OBJECT_UUID, is present */
@@ -432,13 +419,12 @@ struct mlrpcconn_request_hdr_with_object {
  */
 
 _NO_REORDER_
-struct mlrpcconn_response_hdr {
-	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+struct ndr_response_hdr {
+	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t
-			p_cont_id;	/* 20:02 pres context, i.e. data rep */
+	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
 	/* needed for response or fault */
 	BYTE		cancel_count;	/* 22:01 cancel count */
@@ -450,7 +436,7 @@ struct mlrpcconn_response_hdr {
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */
 };
-typedef struct mlrpcconn_response_hdr	mlrpcconn_response_hdr_t;
+typedef struct ndr_response_hdr	ndr_response_hdr_t;
 
 
 
@@ -460,12 +446,11 @@ typedef struct mlrpcconn_response_hdr	mlrpcconn_response_hdr_t;
  */
 
 _NO_REORDER_
-struct mlrpcconn_fault_hdr {
-	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+struct ndr_fault_hdr {
+	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t
-			p_cont_id;	/* 20:02 pres context, i.e. data rep */
+	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
 	/* needed for response or fault */
 	BYTE		cancel_count;	/* 22:01 cancel count */
@@ -482,7 +467,7 @@ struct mlrpcconn_fault_hdr {
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */
 };
-typedef struct mlrpcconn_fault_hdr	mlrpcconn_fault_hdr_t;
+typedef struct ndr_fault_hdr	ndr_fault_hdr_t;
 
 
 /* Fault status code (X/Open CAE Spec Appendix E) */
@@ -517,36 +502,36 @@ typedef struct mlrpcconn_fault_hdr	mlrpcconn_fault_hdr_t;
 
 
 INTERFACE(0)
-union mlrpcconn_hdr {
+union ndr_hdr {
     CASE(MLRPC_PTYPE_COMMON)	/* exceeds BYTE range, obtains common hdr */
-	struct mlrpcconn_common_header		common_hdr;
+	struct ndr_common_header		common_hdr;
 
     CASE(MLRPC_PTYPE_BIND)
-	struct mlrpcconn_bind_hdr		bind_hdr;
+	struct ndr_bind_hdr			bind_hdr;
 
     CASE(MLRPC_PTYPE_BIND_ACK)
-	struct mlrpcconn_bind_ack_hdr		bind_ack_hdr;
+	struct ndr_bind_ack_hdr			bind_ack_hdr;
 
     CASE(MLRPC_PTYPE_REQUEST)
-	struct mlrpcconn_request_hdr		request_hdr;
+	struct ndr_request_hdr			request_hdr;
 
     CASE(MLRPC_PTYPE_REQUEST_WITH)	/* exceeds BYTE range, ... */
-	struct mlrpcconn_request_hdr_with_object request_hdr_with;
+	struct ndr_request_hdr_with_object	request_hdr_with;
 
     CASE(MLRPC_PTYPE_RESPONSE)
-	struct mlrpcconn_response_hdr		response_hdr;
+	struct ndr_response_hdr			response_hdr;
 
     CASE(MLRPC_PTYPE_ALTER_CONTEXT)
-	struct mlrpcconn_alter_context_hdr	alter_context_hdr;
+	struct ndr_alter_context_hdr		alter_context_hdr;
 
     CASE(MLRPC_PTYPE_ALTER_CONTEXT_RESP)
-	struct mlrpcconn_alter_context_rsp_hdr	alter_context_rsp_hdr;
+	struct ndr_alter_context_rsp_hdr	alter_context_rsp_hdr;
 
     CASE(MLRPC_PTYPE_FAULT)
-	struct mlrpcconn_fault_hdr		fault_hdr;
+	struct ndr_fault_hdr			fault_hdr;
 };
-typedef union mlrpcconn_hdr	mlrpcconn_hdr_t;
-EXTERNTYPEINFO(mlrpcconn_hdr)
+typedef union ndr_hdr	ndr_hdr_t;
+EXTERNTYPEINFO(ndr_hdr)
 
 #endif /* _MLRPCPDU_NDL_ */
 

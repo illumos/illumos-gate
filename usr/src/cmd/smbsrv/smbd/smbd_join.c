@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbd_join.c	1.9	08/07/17 SMI"
-
 #include <syslog.h>
 #include <synch.h>
 #include <pthread.h>
@@ -152,6 +150,8 @@ smbd_join(smb_joininfo_t *info)
 
 	(void) smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kpasswd_domain,
 	    MAXHOSTNAMELEN);
+
+	dssetup_clear_domain_info();
 
 	if (info->mode == SMB_SECMODE_WORKGRP) {
 		if ((smb_config_get_secmode() == SMB_SECMODE_DOMAIN) &&

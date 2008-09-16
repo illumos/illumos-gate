@@ -30,8 +30,6 @@
 #ifndef _SMBSRV_SMB_KTYPES_H
 #define	_SMBSRV_SMB_KTYPES_H
 
-#pragma ident	"@(#)smb_ktypes.h	1.17	08/08/07 SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -75,6 +73,11 @@ int smb_noop(void *, size_t, int);
  * with Windows.
  */
 #define	SMB_MAX_SEARCH		10
+
+#define	SMB_SEARCH_HIDDEN(sattr) ((sattr) & FILE_ATTRIBUTE_HIDDEN)
+#define	SMB_SEARCH_SYSTEM(sattr) ((sattr) & FILE_ATTRIBUTE_SYSTEM)
+#define	SMB_SEARCH_DIRECTORY(sattr) ((sattr) & FILE_ATTRIBUTE_DIRECTORY)
+
 
 extern uint32_t smb_audit_flags;
 
@@ -417,6 +420,11 @@ typedef struct smb_vfs {
 	vfs_t			*sv_vfsp;
 	vnode_t			*sv_rootvp;
 } smb_vfs_t;
+
+typedef struct smb_unexport {
+	list_node_t	ux_lnd;
+	char		ux_sharename[MAXNAMELEN];
+} smb_unexport_t;
 
 #define	SMB_NODE_MAGIC 0x4E4F4445	/* 'NODE' */
 
@@ -768,6 +776,15 @@ typedef struct smb_user {
 #define	SMB_TREE_ACLONCREATE		0x00000400
 #define	SMB_TREE_ACEMASKONACCESS	0x00000800
 #define	SMB_TREE_NFS_MOUNTED		0x00001000
+
+/*
+ * Currently, the VFSFT_XVATTR feature is defined for file systems
+ * which understand the xvattr_t interface as well as for file systems
+ * which do not, but which understand the system attribute "view" interface.
+ * Since we need to be able to differentiate between these two for UFS,
+ * for now we use SMB_TREE_UFS so that we do the right thing.
+ */
+
 #define	SMB_TREE_UFS			0x00002000
 
 typedef enum {
@@ -1311,6 +1328,7 @@ typedef struct smb_request {
 		uint32_t	timeo;
 		uint32_t	dattr;
 		timestruc_t	crtime;
+		timestruc_t	mtime;
 		uint64_t	dsize;
 		uint32_t	desired_access;
 		uint32_t	share_access;
@@ -1478,9 +1496,11 @@ typedef struct smb_server {
 	int32_t			si_gmtoff;
 
 	smb_thread_t		si_thread_timers;
+	smb_thread_t		si_thread_unexport;
 
 	taskq_t			*sv_thread_pool;
 
+	kmem_cache_t		*si_cache_unexport;
 	kmem_cache_t		*si_cache_vfs;
 	kmem_cache_t		*si_cache_request;
 	kmem_cache_t		*si_cache_session;
@@ -1496,6 +1516,7 @@ typedef struct smb_server {
 
 	smb_node_t		*si_root_smb_node;
 	smb_llist_t		sv_vfs_list;
+	smb_slist_t		sv_unexport_list;
 } smb_server_t;
 
 #define	SMB_INFO_NETBIOS_SESSION_SVC_RUNNING	0x0001

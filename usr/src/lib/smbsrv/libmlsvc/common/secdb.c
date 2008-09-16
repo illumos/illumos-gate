@@ -34,6 +34,7 @@
 #include <grp.h>
 #include <time.h>
 #include <syslog.h>
+#include <assert.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -88,7 +89,7 @@ smb_token_idmap(smb_token_t *token, smb_idmap_batch_t *sib)
 		id = token->tkn_owner;
 		sim->sim_id = &id->i_id;
 		stat = smb_idmap_batch_getid(sib->sib_idmaph, sim++,
-		    id->i_sidattr.sid, SMB_IDMAP_UNKNOWN);
+		    id->i_sidattr.sid, SMB_IDMAP_USER);
 
 		if (stat != IDMAP_SUCCESS)
 			return (stat);
@@ -147,11 +148,8 @@ smb_token_sids2ids(smb_token_t *token)
 
 	do {
 		stat = smb_idmap_batch_create(&sib, nmaps, SMB_IDMAP_SID2ID);
-		if (stat != IDMAP_SUCCESS) {
-			syslog(LOG_ERR, "smb_token_sids2ids:"
-			    " idmap_get_create failed (%d)", stat);
+		if (stat != IDMAP_SUCCESS)
 			return (-1);
-		}
 
 		stat = smb_token_idmap(token, &sib);
 		if (stat != IDMAP_SUCCESS) {
@@ -291,8 +289,7 @@ smb_token_create_id(smb_sid_t *sid)
 {
 	smb_id_t *id;
 
-	id = (smb_id_t *)malloc(sizeof (smb_id_t));
-	if (id == NULL)
+	if ((id = malloc(sizeof (smb_id_t))) == NULL)
 		return (NULL);
 
 	id->i_id = (uid_t)-1;
@@ -316,21 +313,18 @@ smb_token_create_id(smb_sid_t *sid)
 static smb_id_t *
 smb_token_create_owner(smb_userinfo_t *user_info)
 {
-	smb_id_t *owner;
+	smb_sid_t *owner_sid;
+	smb_wka_t *wka;
 
-#ifdef PBSHORTCUT
 	if (user_info->flags & SMB_UINFO_FLAG_ADMIN) {
-		smb_wka_t *wka;
-		/*
-		 * Need Winchester update on Group ID as file owner issue.
-		 * For now, the file owner will always be set with user SID.
-		 */
-		wka = smb_wka_lookup("Administratrors");
-		owner = smb_token_create_id(wka->wka_binsid);
-	} else
-#endif
-	owner = smb_token_create_id(user_info->user_sid);
-	return (owner);
+		wka = smb_wka_lookup("Administrators");
+		assert(wka);
+		owner_sid = wka->wka_binsid;
+	} else {
+		owner_sid = user_info->user_sid;
+	}
+
+	return (smb_token_create_id(owner_sid));
 }
 
 static smb_privset_t *
@@ -416,9 +410,8 @@ smb_token_create(smb_userinfo_t *user_info)
 {
 	smb_token_t *token;
 
-	if (user_info->sid_name_use != SidTypeUser) {
+	if (user_info->sid_name_use != SidTypeUser)
 		return (NULL);
-	}
 
 	token = (smb_token_t *)malloc(sizeof (smb_token_t));
 	if (token == NULL) {
@@ -431,14 +424,12 @@ smb_token_create(smb_userinfo_t *user_info)
 	token->tkn_user = smb_token_create_id(user_info->user_sid);
 	if (token->tkn_user == NULL) {
 		smb_token_destroy(token);
-		syslog(LOG_ERR, "smb_token_create: resource shortage");
 		return (NULL);
 	}
 
 	/* Owner */
 	token->tkn_owner = smb_token_create_owner(user_info);
 	if (token->tkn_owner == NULL) {
-		syslog(LOG_ERR, "smb_token_create: resource shortage");
 		smb_token_destroy(token);
 		return (NULL);
 	}
@@ -446,7 +437,6 @@ smb_token_create(smb_userinfo_t *user_info)
 	/* Primary Group */
 	token->tkn_primary_grp = smb_token_create_id(user_info->pgrp_sid);
 	if (token->tkn_primary_grp == NULL) {
-		syslog(LOG_ERR, "smb_token_create: resource shortage");
 		smb_token_destroy(token);
 		return (NULL);
 	}
@@ -455,7 +445,6 @@ smb_token_create(smb_userinfo_t *user_info)
 	token->tkn_privileges = smb_token_create_privs(user_info);
 	if (token->tkn_privileges == NULL) {
 		smb_token_destroy(token);
-		syslog(LOG_ERR, "smb_token_create: resource shortage");
 		return (NULL);
 	}
 
@@ -472,7 +461,9 @@ smb_token_create(smb_userinfo_t *user_info)
 	 * groups) and before setting up Solaris groups.
 	 */
 	if (smb_token_sids2ids(token) != 0) {
-		syslog(LOG_ERR, "smb_token_create: idmap failed");
+		syslog(LOG_ERR, "%s\\%s: idmap failed",
+		    (user_info->domain_name) ? user_info->domain_name : "",
+		    (user_info->name) ? user_info->name : "");
 		smb_token_destroy(token);
 		return (NULL);
 	}
@@ -483,7 +474,6 @@ smb_token_create(smb_userinfo_t *user_info)
 	if (user_info->session_key) {
 		token->tkn_session_key = malloc(sizeof (smb_session_key_t));
 		if (token->tkn_session_key == NULL) {
-			syslog(LOG_ERR, "smb_token_create: resource shortage");
 			smb_token_destroy(token);
 			return (NULL);
 		}

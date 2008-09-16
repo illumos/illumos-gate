@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_create.c	1.7	08/08/08 SMI"
-
 #include <smbsrv/smb_incl.h>
 
 #define	SMB_CREATE_NAMEBUF_SZ	16
@@ -44,11 +42,12 @@ smb_pre_create(smb_request_t *sr)
 
 	bzero(op, sizeof (sr->arg.open));
 
-	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->crtime.tv_sec);
+	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->mtime.tv_sec);
 	if (rc == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
 
 	op->create_disposition = FILE_OVERWRITE_IF;
+	op->create_options = FILE_NON_DIRECTORY_FILE;
 
 	DTRACE_SMB_2(op__Create__start, smb_request_t *, sr,
 	    struct open_param *, op);
@@ -86,7 +85,7 @@ smb_pre_create_new(smb_request_t *sr)
 
 	bzero(op, sizeof (sr->arg.open));
 
-	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->crtime.tv_sec);
+	rc = smbsr_decode_vwv(sr, "wl", &op->dattr, &op->mtime.tv_sec);
 	if (rc == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
 
@@ -129,7 +128,7 @@ smb_pre_create_temporary(smb_request_t *sr)
 
 	bzero(op, sizeof (sr->arg.open));
 
-	rc = smbsr_decode_vwv(sr, "wl", &reserved, &op->crtime.tv_sec);
+	rc = smbsr_decode_vwv(sr, "wl", &reserved, &op->mtime.tv_sec);
 	if (rc == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &op->fqi.path);
 
@@ -184,9 +183,9 @@ smb_common_create(smb_request_t *sr)
 	struct open_param *op = &sr->arg.open;
 	uint32_t status;
 
-	if ((op->crtime.tv_sec != 0) && (op->crtime.tv_sec != UINT_MAX))
-		op->crtime.tv_sec = smb_local2gmt(sr, op->crtime.tv_sec);
-	op->crtime.tv_nsec = 0;
+	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX))
+		op->mtime.tv_sec = smb_local2gmt(sr, op->mtime.tv_sec);
+	op->mtime.tv_nsec = 0;
 	op->omode = SMB_DA_ACCESS_READ_WRITE | SMB_DA_SHARE_COMPATIBILITY;
 	op->desired_access = smb_omode_to_amask(op->omode);
 	op->share_access = smb_denymode_to_sharemode(op->omode, op->fqi.path);

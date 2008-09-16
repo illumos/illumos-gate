@@ -23,10 +23,10 @@
 # Use is subject to license terms.
 #
 #
-# ident	"@(#)mapfile-vers	1.8	08/08/05 SMI"
 
 SUNWprivate {
     global:
+	dssetup_clear_domain_info;
 	lsa_enum_trusted_domains;
 	lsa_query_account_domain_info;
 	lsa_query_primary_domain_info;

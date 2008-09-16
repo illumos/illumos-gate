@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_trans2_set_information.c	1.9	08/08/08 SMI"
-
 /*
  * This file contains the common code used by
  * Trans2SetFileInfo and Trans2SetPathInfo SMBs.
@@ -286,8 +284,25 @@ smb_set_basic_info(
 		what |= SMB_AT_ATIME;
 	}
 
-	if (Attributes != 0)
+	/*
+	 * If Attributes are 0 this means that the file's attributes
+	 * should be left unchanged. If the client wanted to 0 (clear)
+	 * all of the attributes Attributes would be FILE_ATTRIBUTE_NORMAL.
+	 * Note - this is different from SMBsetatr (SMBSetInformation).
+	 *
+	 * It is not valid to set FILE_ATTRIBUTE_DIRECTORY if the
+	 * target is not a directory.
+	 */
+	if (Attributes != 0) {
+		if ((Attributes & FILE_ATTRIBUTE_DIRECTORY) &&
+		    (node->attr.sa_vattr.va_type != VDIR)) {
+			smberr->status = NT_STATUS_INVALID_PARAMETER;
+			smberr->errcls = ERRDOS;
+			smberr->errcode = ERROR_INVALID_PARAMETER;
+			return (NT_STATUS_UNSUCCESSFUL);
+		}
 		smb_node_set_dosattr(node, Attributes);
+	}
 
 	smb_node_set_time(node, &crtime, &mtime, &atime, &ctime, what);
 	rc = smb_sync_fsattr(sr, sr->user_cr, node);

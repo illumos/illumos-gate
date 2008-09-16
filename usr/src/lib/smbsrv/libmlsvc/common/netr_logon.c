@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)netr_logon.c	1.8	08/08/08 SMI"
-
 /*
  * NETR SamLogon and SamLogoff RPC client functions.
  */
@@ -61,8 +59,8 @@ static DWORD netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
 static void netr_invalidate_chain(void);
 static void netr_interactive_samlogon(netr_info_t *, netr_client_t *,
     struct netr_logon_info1 *);
-static void netr_network_samlogon(netr_info_t *, netr_client_t *,
-    netr_response_t *, netr_response_t *, struct netr_logon_info2 *);
+static void netr_network_samlogon(mlrpc_heap_t *, netr_info_t *,
+    netr_client_t *, struct netr_logon_info2 *);
 static void netr_setup_identity(mlrpc_heap_t *, netr_client_t *,
     netr_logon_id_t *);
 
@@ -228,7 +226,7 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 	if ((user_info->session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
 		return (NT_STATUS_NO_MEMORY);
 	bzero(rc4key, SMBAUTH_SESSION_KEY_SZ);
-	bcopy(netr_info->session_key, rc4key, NETR_SESSION_KEY_SZ);
+	bcopy(netr_info->session_key.key, rc4key, netr_info->session_key.len);
 	bcopy(info3->UserSessionKey.data, user_info->session_key,
 	    SMBAUTH_SESSION_KEY_SZ);
 	rand_hash((unsigned char *)user_info->session_key,
@@ -271,8 +269,6 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	struct netr_logon_info1 info1;
 	struct netr_logon_info2 info2;
 	struct netr_validation_info3 *info3;
-	netr_response_t nt_rsp;
-	netr_response_t lm_rsp;
 	mlrpc_heapref_t heap;
 	int opnum;
 	int rc, len;
@@ -317,8 +313,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 
 	case NETR_NETWORK_LOGON:
 		netr_setup_identity(heap.heap, clnt, &info2.identity);
-		netr_network_samlogon(netr_info, clnt, &nt_rsp, &lm_rsp,
-		    &info2);
+		netr_network_samlogon(heap.heap, netr_info, clnt, &info2);
 		arg.logon_info.ru.info2 = &info2;
 		break;
 
@@ -377,7 +372,8 @@ netr_interactive_samlogon(netr_info_t *netr_info, netr_client_t *clnt,
 	    clnt->nt_password.nt_password_val, sizeof (netr_owf_password_t));
 
 	(void) memset(key, 0, NETR_OWF_PASSWORD_SZ);
-	(void) memcpy(key, netr_info->session_key, NETR_SESSION_KEY_SZ);
+	(void) memcpy(key, netr_info->session_key.key,
+	    netr_info->session_key.len);
 
 	rand_hash((unsigned char *)&info1->lm_owf_password,
 	    NETR_OWF_PASSWORD_SZ, key, NETR_OWF_PASSWORD_SZ);
@@ -396,42 +392,26 @@ netr_interactive_samlogon(netr_info_t *netr_info, netr_client_t *clnt,
  */
 /*ARGSUSED*/
 static void
-netr_network_samlogon(netr_info_t *netr_info, netr_client_t *clnt,
-    netr_response_t *ntr, netr_response_t *lmr, struct netr_logon_info2 *info2)
+netr_network_samlogon(mlrpc_heap_t *heap, netr_info_t *netr_info,
+    netr_client_t *clnt, struct netr_logon_info2 *info2)
 {
+	uint32_t len;
+
 	bcopy(clnt->challenge_key.challenge_key_val, info2->lm_challenge.data,
 	    8);
 
-	if (clnt->nt_password.nt_password_len == NETR_CR_PASSWORD_SIZE) {
-		ntr->length = NETR_CR_PASSWORD_SIZE;
-		ntr->start = 0;
-		ntr->max_length = NETR_CR_PASSWORD_SIZE;
-		bcopy(clnt->nt_password.nt_password_val, ntr->data,
-		    NETR_CR_PASSWORD_SIZE);
-
-		info2->nt_response.length = NETR_CR_PASSWORD_SIZE;
-		info2->nt_response.max_length = NETR_CR_PASSWORD_SIZE;
-		info2->nt_response.data = ntr;
+	if ((len = clnt->nt_password.nt_password_len) != 0) {
+		mlrpc_heap_mkvcb(heap, clnt->nt_password.nt_password_val, len,
+		    (mlrpc_vcbuf_t *)&info2->nt_response);
 	} else {
-		info2->nt_response.length = 0;
-		info2->nt_response.max_length = 0;
-		info2->nt_response.data = 0;
+		bzero(&info2->nt_response, sizeof (netr_vcbuf_t));
 	}
 
-	if (clnt->lm_password.lm_password_len == NETR_CR_PASSWORD_SIZE) {
-		lmr->length = NETR_CR_PASSWORD_SIZE;
-		lmr->start = 0;
-		lmr->max_length = NETR_CR_PASSWORD_SIZE;
-		bcopy(clnt->lm_password.lm_password_val, lmr->data,
-		    NETR_CR_PASSWORD_SIZE);
-
-		info2->lm_response.length = NETR_CR_PASSWORD_SIZE;
-		info2->lm_response.max_length = NETR_CR_PASSWORD_SIZE;
-		info2->lm_response.data = lmr;
+	if ((len = clnt->lm_password.lm_password_len) != 0) {
+		mlrpc_heap_mkvcb(heap, clnt->lm_password.lm_password_val, len,
+		    (mlrpc_vcbuf_t *)&info2->lm_response);
 	} else {
-		info2->lm_response.length = 0;
-		info2->lm_response.max_length = 0;
-		info2->lm_response.data = 0;
+		bzero(&info2->lm_response, sizeof (netr_vcbuf_t));
 	}
 }
 
@@ -460,7 +440,7 @@ netr_setup_authenticator(netr_info_t *netr_info,
 	netr_info->timestamp = time(0);
 	auth->timestamp = netr_info->timestamp;
 
-	if (netr_gen_credentials(netr_info->session_key,
+	if (netr_gen_credentials(netr_info->session_key.key,
 	    &netr_info->client_credential,
 	    netr_info->timestamp,
 	    (netr_cred_t *)&auth->credential) != SMBAUTH_SUCCESS)
@@ -502,7 +482,7 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 
 	++netr_info->timestamp;
 
-	if (netr_gen_credentials(netr_info->session_key,
+	if (netr_gen_credentials(netr_info->session_key.key,
 	    &netr_info->client_credential,
 	    netr_info->timestamp, &cred) != SMBAUTH_SUCCESS)
 		return (NT_STATUS_INTERNAL_ERROR);
@@ -577,10 +557,10 @@ netr_setup_identity(mlrpc_heap_t *heap, netr_client_t *clnt,
 	identity->logon_id.HighPart = 0;
 
 	mlrpc_heap_mkvcs(heap, clnt->domain,
-	    (mlrpc_vcbuf_t *)&identity->domain_name);
+	    (mlrpc_vcstr_t *)&identity->domain_name);
 
 	mlrpc_heap_mkvcs(heap, clnt->username,
-	    (mlrpc_vcbuf_t *)&identity->username);
+	    (mlrpc_vcstr_t *)&identity->username);
 
 	/*
 	 * Some systems prefix the client workstation name with \\.
@@ -588,5 +568,5 @@ netr_setup_identity(mlrpc_heap_t *heap, netr_client_t *clnt,
 	 * or not.
 	 */
 	mlrpc_heap_mkvcs(heap, clnt->workstation,
-	    (mlrpc_vcbuf_t *)&identity->workstation);
+	    (mlrpc_vcstr_t *)&identity->workstation);
 }

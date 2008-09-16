@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Security Accounts Manager RPC (SAMR) interface definition.
  */
@@ -1585,7 +1583,7 @@ fixup_samr_QueryAliasInfo(struct samr_QueryAliasInfo *val)
 	};
 
 	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (mlrpcconn_request_hdr_t) + sizeof (DWORD);
+	size3 = size2 + sizeof (ndr_request_hdr_t) + sizeof (DWORD);
 
 	FIXUP_PDU_SIZE(samr_QueryAliasInfo_ru, size1);
 	FIXUP_PDU_SIZE(samr_QueryAliasInfoRes, size2);
@@ -1612,7 +1610,7 @@ fixup_samr_QueryUserInfo(struct samr_QueryUserInfo *val)
 	};
 
 	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (mlrpcconn_request_hdr_t) + sizeof (DWORD);
+	size3 = size2 + sizeof (ndr_request_hdr_t) + sizeof (DWORD);
 
 	FIXUP_PDU_SIZE(QueryUserInfo_result_u, size1);
 	FIXUP_PDU_SIZE(QueryUserInfo_result, size2);

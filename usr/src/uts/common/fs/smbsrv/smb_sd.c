@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides Security Descriptor handling functions.
  */
@@ -181,6 +179,8 @@ smb_sd_write(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 	smb_fssd_term(&fs_sd);
 
 	if (error) {
+		if (error == EBADE)
+			return (NT_STATUS_INVALID_OWNER);
 		smbsr_map_errno(error, &smb_err);
 		return (smb_err.status);
 	}
@@ -227,7 +227,7 @@ smb_sd_tofs(smb_sd_t *sd, smb_fssd_t *fs_sd)
 		if (!smb_sid_isvalid(sid))
 			return (NT_STATUS_INVALID_SID);
 
-		idtype = SMB_IDMAP_UNKNOWN;
+		idtype = SMB_IDMAP_USER;
 		idm_stat = smb_idmap_getid(sid, &fs_sd->sd_uid, &idtype);
 		if (idm_stat != IDMAP_SUCCESS) {
 			return (NT_STATUS_NONE_MAPPED);
@@ -240,7 +240,7 @@ smb_sd_tofs(smb_sd_t *sd, smb_fssd_t *fs_sd)
 		if (!smb_sid_isvalid(sid))
 			return (NT_STATUS_INVALID_SID);
 
-		idtype = SMB_IDMAP_UNKNOWN;
+		idtype = SMB_IDMAP_GROUP;
 		idm_stat = smb_idmap_getid(sid, &fs_sd->sd_gid, &idtype);
 		if (idm_stat != IDMAP_SUCCESS) {
 			return (NT_STATUS_NONE_MAPPED);

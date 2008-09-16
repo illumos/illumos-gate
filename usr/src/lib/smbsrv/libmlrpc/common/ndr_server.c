@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Server side RPC handler.
  */
@@ -75,7 +73,6 @@ static int mlrpc_s_bind(struct mlrpc_xaction *);
 static int mlrpc_s_request(struct mlrpc_xaction *);
 static void mlrpc_reply_prepare_hdr(struct mlrpc_xaction *);
 static int mlrpc_s_alter_context(struct mlrpc_xaction *);
-static void mlrpc_reply_bind_ack(struct mlrpc_xaction *);
 static void mlrpc_reply_fault(struct mlrpc_xaction *, unsigned long);
 static int mlrpc_build_reply(struct mlrpc_xaction *);
 static void mlrpc_build_frag(struct mlndr_stream *, uint8_t *, uint32_t);
@@ -587,16 +584,6 @@ mlrpc_s_bind(struct mlrpc_xaction *mxa)
 	result->transfer_syntax =
 	    cont_list->p_cont_elem[0].transfer_syntaxes[0];
 
-	/*
-	 * Special rejection of Windows 2000 DSSETUP interface.
-	 * This interface was introduced in Windows 2000 but has
-	 * been subsequently deprecated due to problems.
-	 */
-	if (strcmp(msvc->name, "DSSETUP") == 0) {
-		result->result = MLRPC_PCDR_PROVIDER_REJECTION;
-		result->reason = MLRPC_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED;
-	}
-
 	return (MLRPC_DRC_BINDING_MADE);
 }
 
@@ -604,12 +591,8 @@ mlrpc_s_bind(struct mlrpc_xaction *mxa)
  * mlrpc_s_alter_context
  *
  * The alter context request is used to request additional presentation
- * context for another interface and/or version. It's very similar to a
- * bind request.
- *
- * We don't fully support multiple contexts so, for now, we reject this
- * request.  Windows 2000 clients attempt to use an alternate LSA context
- * when ACLs are modified.
+ * context for another interface and/or version.  It is very similar to
+ * a bind request.
  */
 static int
 mlrpc_s_alter_context(struct mlrpc_xaction *mxa)
@@ -626,7 +609,7 @@ mlrpc_s_alter_context(struct mlrpc_xaction *mxa)
 	int ts_vers;
 	mlrpc_port_any_t *sec_addr;
 
-	result_list = &mxa->send_hdr.bind_ack_hdr.p_result_list;
+	result_list = &mxa->send_hdr.alter_context_rsp_hdr.p_result_list;
 	result_list->n_results = 1;
 	result_list->reserved = 0;
 	result_list->reserved2 = 0;
@@ -636,16 +619,10 @@ mlrpc_s_alter_context(struct mlrpc_xaction *mxa)
 	result->reason = 0;
 	bzero(&result->transfer_syntax, sizeof (result->transfer_syntax));
 
-	if (mxa != NULL) {
-		result->result = MLRPC_PCDR_PROVIDER_REJECTION;
-		result->reason = MLRPC_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED;
-		return (MLRPC_DRC_OK);
-	}
-
-	cont_list = &mxa->recv_hdr.bind_hdr.p_context_elem;
+	cont_list = &mxa->recv_hdr.alter_context_hdr.p_context_elem;
 	p_cont_id = cont_list->p_cont_elem[0].p_cont_id;
 
-	if ((mbind = mlrpc_find_binding(mxa, p_cont_id)) != NULL)
+	if (mlrpc_find_binding(mxa, p_cont_id) != NULL)
 		return (MLRPC_DRC_FAULT_BIND_PCONT_BUSY);
 
 	if ((mbind = mlrpc_new_binding(mxa)) == NULL) {
@@ -674,7 +651,7 @@ mlrpc_s_alter_context(struct mlrpc_xaction *mxa)
 	mbind->instance_specific = 0;
 	mxa->binding = mbind;
 
-	sec_addr = &mxa->send_hdr.bind_ack_hdr.sec_addr;
+	sec_addr = &mxa->send_hdr.alter_context_rsp_hdr.sec_addr;
 	sec_addr->length = 0;
 	bzero(sec_addr->port_spec, MLRPC_PORT_ANY_MAX_PORT_SPEC);
 
@@ -771,8 +748,8 @@ mlrpc_generic_call_stub(struct mlrpc_xaction *mxa)
 static void
 mlrpc_reply_prepare_hdr(struct mlrpc_xaction *mxa)
 {
-	mlrpcconn_common_header_t *rhdr = &mxa->recv_hdr.common_hdr;
-	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
+	ndr_common_header_t *rhdr = &mxa->recv_hdr.common_hdr;
+	ndr_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 
 	hdr->rpc_vers = 5;
 	hdr->rpc_vers_minor = 0;
@@ -826,29 +803,20 @@ mlrpc_reply_prepare_hdr(struct mlrpc_xaction *mxa)
 	case MLRPC_PTYPE_ALTER_CONTEXT:
 		hdr->ptype = MLRPC_PTYPE_ALTER_CONTEXT_RESP;
 		/*
-		 * The max_xmit_frag, max_recv_frag
-		 * and assoc_group_id are ignored.
+		 * The max_xmit_frag, max_recv_frag and assoc_group_id are
+		 * ignored by the client but it's useful to fill them in.
 		 */
+		mxa->send_hdr.alter_context_rsp_hdr.max_xmit_frag =
+		    mxa->recv_hdr.alter_context_hdr.max_xmit_frag;
+		mxa->send_hdr.alter_context_rsp_hdr.max_recv_frag =
+		    mxa->recv_hdr.alter_context_hdr.max_recv_frag;
+		mxa->send_hdr.alter_context_rsp_hdr.assoc_group_id =
+		    mxa->recv_hdr.alter_context_hdr.assoc_group_id;
 		break;
 
 	default:
 		hdr->ptype = 0xFF;
 	}
-}
-
-/*
- * Finish and encode the bind acknowledge (MLRPC_PTYPE_BIND_ACK) header.
- * The frag_length is different from a regular RPC response.
- */
-static void
-mlrpc_reply_bind_ack(struct mlrpc_xaction *mxa)
-{
-	mlrpcconn_common_header_t	*hdr;
-	mlrpcconn_bind_ack_hdr_t	*bahdr;
-
-	hdr = &mxa->send_hdr.common_hdr;
-	bahdr = &mxa->send_hdr.bind_ack_hdr;
-	hdr->frag_length = mlrpc_bind_ack_hdr_size(bahdr);
 }
 
 /*
@@ -858,8 +826,8 @@ mlrpc_reply_bind_ack(struct mlrpc_xaction *mxa)
 static void
 mlrpc_reply_fault(struct mlrpc_xaction *mxa, unsigned long drc)
 {
-	mlrpcconn_common_header_t *rhdr = &mxa->recv_hdr.common_hdr;
-	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
+	ndr_common_header_t *rhdr = &mxa->recv_hdr.common_hdr;
+	ndr_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 	struct mlndr_stream *mlnds = &mxa->send_mlnds;
 	unsigned long fault_status;
 
@@ -909,10 +877,14 @@ mlrpc_reply_fault(struct mlrpc_xaction *mxa, unsigned long drc)
 	mxa->send_hdr.response_hdr.alloc_hint = hdr->frag_length;
 }
 
+/*
+ * Note that the frag_length for bind ack and alter context is
+ * non-standard.
+ */
 static int
 mlrpc_build_reply(struct mlrpc_xaction *mxa)
 {
-	mlrpcconn_common_header_t *hdr = &mxa->send_hdr.common_hdr;
+	ndr_common_header_t *hdr = &mxa->send_hdr.common_hdr;
 	struct mlndr_stream *mlnds = &mxa->send_mlnds;
 	uint8_t *pdu_buf;
 	unsigned long pdu_size;
@@ -933,7 +905,7 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 		 */
 		switch (hdr->ptype) {
 		case MLRPC_PTYPE_BIND_ACK:
-			mlrpc_reply_bind_ack(mxa);
+			hdr->frag_length = mlrpc_bind_ack_hdr_size(mxa);
 			break;
 
 		case MLRPC_PTYPE_FAULT:
@@ -944,6 +916,10 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 			hdr->frag_length = pdu_size;
 			mxa->send_hdr.response_hdr.alloc_hint =
 			    hdr->frag_length;
+			break;
+
+		case MLRPC_PTYPE_ALTER_CONTEXT_RESP:
+			hdr->frag_length = mlrpc_alter_context_rsp_hdr_size();
 			break;
 
 		default:

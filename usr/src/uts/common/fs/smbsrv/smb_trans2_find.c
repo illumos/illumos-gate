@@ -723,7 +723,7 @@ int smb_get_dents(
 			return (rc);
 		}
 
-		(void) strlcpy(namebuf, ihdr->pattern, MAXNAMELEN);
+		(void) strlcpy(namebuf, snode->od_name, MAXNAMELEN);
 
 		/*
 		 * It is not necessary to set the "force" flag (i.e. to

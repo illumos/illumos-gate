@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_set_information.c	1.7	08/08/08 SMI"
-
 /*
  * SMB: set_information
  *
@@ -119,6 +117,17 @@ smb_com_set_information(smb_request_t *sr)
 
 	smb_node_release(dir_node);
 
+	/*
+	 * It is not valid to set FILE_ATTRIBUTE_DIRECTORY if the
+	 * target is not a directory.
+	 */
+	if ((dattr & FILE_ATTRIBUTE_DIRECTORY) &&
+	    (node->attr.sa_vattr.va_type != VDIR)) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+		    ERRDOS, ERROR_INVALID_PARAMETER);
+		return (SDRC_ERROR);
+	}
+
 	if (smb_oplock_conflict(node, sr->session, NULL)) {
 		/*
 		 * for the benefit of attribute setting later on
@@ -126,7 +135,14 @@ smb_com_set_information(smb_request_t *sr)
 		smb_oplock_break(node);
 	}
 
-	smb_node_set_dosattr(node, dattr);
+	/*
+	 * For compatibility with Windows Servers, if the specified
+	 * attributes have ONLY FILE_ATTRIBUTE_NORMAL set do NOT change
+	 * the file's attributes.
+	 * Note - this is different from TRANS2_SET_PATH/FILE_INFORMATION
+	 */
+	if (dattr != FILE_ATTRIBUTE_NORMAL)
+		smb_node_set_dosattr(node, dattr);
 
 	/*
 	 * The behaviour when the time field is set to -1
