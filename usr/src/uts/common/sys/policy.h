@@ -143,6 +143,7 @@ int secpolicy_sys_devices(const cred_t *);
 int secpolicy_systeminfo(const cred_t *);
 int secpolicy_tasksys(const cred_t *);
 int secpolicy_vnode_access(const cred_t *, vnode_t *, uid_t, mode_t);
+int secpolicy_vnode_chown(const cred_t *, boolean_t);
 int secpolicy_vnode_create_gid(const cred_t *);
 int secpolicy_vnode_owner(const cred_t *, uid_t);
 int secpolicy_vnode_remove(const cred_t *);

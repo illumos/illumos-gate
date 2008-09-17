@@ -920,19 +920,37 @@ secpolicy_vnode_setids_setgids(const cred_t *cred, gid_t gid)
 }
 
 /*
- * Create a file with a group different than any of the groups allowed:
- * the group of the directory the file is created in, the effective
- * group or any of the supplementary groups.
+ * Name:	secpolicy_vnode_chown
+ *
+ * Normal:	Determine if subject can chown owner of a file.
+ *
+ * Output:	EPERM - if access denied
  */
+
 int
-secpolicy_vnode_create_gid(const cred_t *cred)
+secpolicy_vnode_chown(const cred_t *cred, boolean_t check_self)
 {
 	if (HAS_PRIVILEGE(cred, PRIV_FILE_CHOWN))
 		return (PRIV_POLICY(cred, PRIV_FILE_CHOWN, B_FALSE, EPERM,
 		    NULL));
-	else
+	else if (check_self)
 		return (PRIV_POLICY(cred, PRIV_FILE_CHOWN_SELF, B_FALSE, EPERM,
 		    NULL));
+	else
+		return (EPERM);
+}
+
+/*
+ * Name:	secpolicy_vnode_create_gid
+ *
+ * Normal:	Determine if subject can change group ownership of a file.
+ *
+ * Output:	EPERM - if access denied
+ */
+int
+secpolicy_vnode_create_gid(const cred_t *cred)
+{
+	return (secpolicy_vnode_chown(cred, B_TRUE));
 }
 
 /*

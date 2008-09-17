@@ -2422,10 +2422,10 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 			working_mode &= ~(ACE_READ_ACL|ACE_READ_ATTRIBUTES);
 
 		if (working_mode & (ACE_READ_DATA|ACE_READ_NAMED_ATTRS|
-		    ACE_READ_ACL|ACE_READ_ATTRIBUTES))
+		    ACE_READ_ACL|ACE_READ_ATTRIBUTES|ACE_SYNCHRONIZE))
 			checkmode |= VREAD;
 		if (working_mode & (ACE_WRITE_DATA|ACE_WRITE_NAMED_ATTRS|
-		    ACE_APPEND_DATA|ACE_WRITE_ATTRIBUTES))
+		    ACE_APPEND_DATA|ACE_WRITE_ATTRIBUTES|ACE_SYNCHRONIZE))
 			checkmode |= VWRITE;
 		if (working_mode & ACE_EXECUTE)
 			checkmode |= VEXEC;
@@ -2435,7 +2435,7 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 			    owner, checkmode);
 
 		if (error == 0 && (working_mode & ACE_WRITE_OWNER))
-			error = secpolicy_vnode_create_gid(cr);
+			error = secpolicy_vnode_chown(cr, B_TRUE);
 		if (error == 0 && (working_mode & ACE_WRITE_ACL))
 			error = secpolicy_vnode_setdac(cr, owner);
 
@@ -2443,9 +2443,9 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 		    (ACE_DELETE|ACE_DELETE_CHILD)))
 			error = secpolicy_vnode_remove(cr);
 
-		if (error == 0 && (working_mode & ACE_SYNCHRONIZE))
-			error = secpolicy_vnode_owner(cr, owner);
-
+		if (error == 0 && (working_mode & ACE_SYNCHRONIZE)) {
+			error = secpolicy_vnode_chown(cr, B_FALSE);
+		}
 		if (error == 0) {
 			/*
 			 * See if any bits other than those already checked
