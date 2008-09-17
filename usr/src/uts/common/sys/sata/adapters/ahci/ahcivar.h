@@ -28,8 +28,6 @@
 #ifndef _AHCIVAR_H
 #define	_AHCIVAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -317,9 +315,9 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 9)
 
 /* Interval used for delay */
-#define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 millisec */
-#define	AHCI_1MS_TICKS	(drv_usectohz(1000))	/* ticks in 1 millisec */
-#define	AHCI_100US_TICKS	(drv_usectohz(100))	/* ticks in 100  */
+#define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 ms */
+#define	AHCI_1MS_TICKS	(drv_usectohz(1000))	/* ticks in 1 ms */
+#define	AHCI_100US_TICKS	(drv_usectohz(100))	/* ticks in 100 us */
 #define	AHCI_1MS_USECS	(1000)			/* usecs in 1 millisec */
 
 /*
