@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PTHREAD_H
 #define	_PTHREAD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -128,7 +126,7 @@ extern "C" {
 /* pthread_once related values */
 #define	PTHREAD_ONCE_NOTDONE	0
 #define	PTHREAD_ONCE_DONE	1
-#define	PTHREAD_ONCE_INIT	{0, 0, 0, PTHREAD_ONCE_NOTDONE}
+#define	PTHREAD_ONCE_INIT	{ {0, 0, 0, PTHREAD_ONCE_NOTDONE} }
 
 /*
  * The key to be created by pthread_key_create_once_np()
