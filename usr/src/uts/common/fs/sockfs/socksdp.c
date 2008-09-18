@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -357,7 +355,8 @@ sosdp_create(vnode_t *accessvp, int domain, int type, int protocol,
 	}
 	so = VTOSO(vp);
 
-	dprint(2, ("sosdp_create: %p domain %d type %d\n", so, domain, type));
+	dprint(2, ("sosdp_create: %p domain %d type %d\n", (void *)so,
+	    domain, type));
 
 	if (version == SOV_DEFAULT) {
 		version = so_default_version;
@@ -455,7 +454,7 @@ sosdp_accept(struct sonode *lso, int fflag, struct sonode **nsop)
 	 */
 	(void) sosdp_getpeername(nso);
 
-	dprint(2, ("sosdp_accept: new %p\n", nso));
+	dprint(2, ("sosdp_accept: new %p\n", (void *)nso));
 
 	*nsop = nso;
 	return (0);
@@ -1296,7 +1295,7 @@ sdp_sock_newconn(void *parenthandle, void *connind)
 		return (NULL);
 	}
 
-	dprint(2, ("sdp_stream_newconn: new %p\n", nso));
+	dprint(2, ("sdp_stream_newconn: new %p\n", (void *)nso));
 	nss = SOTOSDO(nso);
 
 	/*

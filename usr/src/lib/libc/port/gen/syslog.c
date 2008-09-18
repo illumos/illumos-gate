@@ -37,7 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SYSLOG -- print message on log file
@@ -216,7 +215,7 @@ vsyslog(int pri, const char *fmt, va_list ap)
 	 */
 	showpid = 0;
 	if (OpenLogCalled == 0) {
-		(void) sprintf(procfile, "/proc/%d/psinfo", getpid());
+		(void) sprintf(procfile, "/proc/%d/psinfo", (int)getpid());
 		if ((procfd = open(procfile, O_RDONLY)) >= 0) {
 			if (read(procfd, &p, sizeof (psinfo_t)) >= 0) {
 				(void) strncpy(ProcName, p.pr_fname, PRFNSZ);
@@ -266,7 +265,7 @@ vsyslog(int pri, const char *fmt, va_list ap)
 		o += strlen(o);
 	}
 	if (LogStat & LOG_PID) {
-		(void) sprintf(o, "[%d]", getpid());
+		(void) sprintf(o, "[%d]", (int)getpid());
 		o += strlen(o);
 	}
 	if (LogTag) {

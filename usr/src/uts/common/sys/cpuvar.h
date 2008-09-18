@@ -27,8 +27,6 @@
 #ifndef _SYS_CPUVAR_H
 #define	_SYS_CPUVAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/thread.h>
 #include <sys/sysinfo.h>	/* has cpu_stat_t definition */
 #include <sys/disp.h>

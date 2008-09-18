@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_NCA_H
 #define	_INET_NCA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -296,8 +294,8 @@ typedef struct tw_s {
 	clock_t	lbolt1;		/* phase1 lbolt value (0 = NONE) */
 	clock_t	lbolt2;		/* phase2 lbolt value  */
 	clock_t	lbolt3;		/* phase3 lbolt value  */
-	struct conn_s *head;	/* Head of nca_conn_t list */
-	struct conn_s *tail;	/* Tail of nca_conn_t list */
+	struct nca_conn_s *head;	/* Head of nca_conn_t list */
+	struct nca_conn_s *tail;	/* Tail of nca_conn_t list */
 	timeout_id_t tid;	/* Timer id of pending timeout() (0 = NONE) */
 	void	*ep;		/* pointer to encapsulating struct */
 } tw_t;
@@ -379,8 +377,8 @@ typedef struct node_s {
 	nodef_t	*ctaghashfanout;	/* ctaghash bucket we're part off */
 	struct node_s *hashnext;	/* hash list next node_t */
 	struct node_s *ctaghashnext;	/* ctaghash list next node_t */
-	struct conn_s *connhead;	/* head of list of conn(s) in miss */
-	struct conn_s *conntail;	/* tail of list of conn(s) in miss */
+	struct nca_conn_s *connhead;	/* head of list of conn(s) in miss */
+	struct nca_conn_s *conntail;	/* tail of list of conn(s) in miss */
 	struct node_s *next;		/* needed if data is in chunks */
 	struct node_s *back;		/* needed if data is in chunks */
 
@@ -727,7 +725,7 @@ extern struct node_ts *node_tp;
 #define	DOOR_STK_DEPTH	6
 
 struct door_ts {
-	struct conn_s *cp;
+	struct nca_conn_s *cp;
 	unsigned action;
 	node_t	*np;
 	int	ref;
@@ -1086,7 +1084,7 @@ typedef struct if_s {
 
 typedef struct connf_s {
 	uint32_t	max;
-	struct conn_s	*head;
+	struct nca_conn_s	*head;
 	kmutex_t	lock;
 } connf_t;
 
@@ -1146,24 +1144,24 @@ typedef struct connp_s {
 
 #define	TCP_XMIT_MAX_IX	5		/* Max xmit descriptors */
 
-typedef struct conn_s {
+typedef struct nca_conn_s {
 
 	int32_t ref;			/* Reference counter */
 
 	te_t	tcp_ti;			/* TCP TIMER timer entry */
 
-	struct conn_s	*twnext;	/* TIME_WAIT next */
-	struct conn_s	*twprev;	/* TIME_WAIT prev */
+	struct nca_conn_s	*twnext;	/* TIME_WAIT next */
+	struct nca_conn_s	*twprev;	/* TIME_WAIT prev */
 	clock_t	twlbolt;		/* TIME_WAIT lbolt */
 
 	clock_t create;			/* Create lbolt time */
 
 	connf_t	*hashfanout;		/* Hash bucket we're part of */
-	struct conn_s	*hashnext;	/* Hash chain next */
-	struct conn_s	*hashprev;	/* Hash chain prev */
+	struct nca_conn_s	*hashnext;	/* Hash chain next */
+	struct nca_conn_s	*hashprev;	/* Hash chain prev */
 
-	struct conn_s	*bindnext;	/* Next conn_s in bind list. */
-	struct conn_s	*bindprev;	/* Prev conn_s in bind list. */
+	struct nca_conn_s	*bindnext;	/* Next conn_s in bind list. */
+	struct nca_conn_s	*bindprev;	/* Prev conn_s in bind list. */
 	void		*tbf;		/* Pointer to bind hash list struct. */
 	/*
 	 * Note: atomic access of memebers above is guaranteed by the
@@ -1201,7 +1199,7 @@ typedef struct conn_s {
 	int	reqrefersz;		/* size of above */
 	char	*requagent;		/* HTTP "User-Agent:" string */
 	int	requagentsz;		/* size of above */
-	struct conn_s *nodenext;	/* Node_t nca_conn_t list */
+	struct nca_conn_s *nodenext;	/* Node_t nca_conn_t list */
 
 	clock_t	http_count;		/* HTTP Keep-Alive request count */
 
@@ -1230,8 +1228,8 @@ typedef struct conn_s {
 	 * Connection NCA_IO_DIRECT_SPLICE & NCA_IO_DIRECT_TEE reference,
 	 * see direct_splice and direct_tee below for type of send too.
 	 */
-	struct conn_s	*direct;	/* nca_conn_t to send recv data too */
-	mblk_t		*direct_mp;	/* mblk_t to use for tcp_close() */
+	struct nca_conn_s	*direct; /* nca_conn_t to send recv data too */
+	mblk_t		*direct_mp;	 /* mblk_t to use for tcp_close() */
 
 	/*
 	 * nca_conn_t state.

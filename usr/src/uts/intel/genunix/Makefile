@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile drives the production of the generic
@@ -97,6 +95,12 @@ LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+#
+# Ensure that lint sees 'struct cpu' containing a fully declared
+# embedded 'struct machcpu'
+#
+LINTFLAGS	+= -D_MACHDEP -I../../i86pc
 
 #
 #	Default build targets.

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Big Theory Statement for turnstiles.
  *
@@ -752,7 +750,7 @@ turnstile_wakeup(turnstile_t *ts, int qnum, int nthreads, kthread_t *owner)
 		thread_unlock_high(t);		/* drop run queue lock */
 	}
 	if (owner != NULL)
-		panic("turnstile_wakeup: owner %p not woken", owner);
+		panic("turnstile_wakeup: owner %p not woken", (void *)owner);
 	disp_lock_exit(&tc->tc_lock);
 }
 

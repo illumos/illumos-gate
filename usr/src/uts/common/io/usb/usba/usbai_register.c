@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * USBA: Solaris USB Architecture support
  *
@@ -1312,7 +1311,7 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 		/* Place in sparse array based on key. */
 		USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 		    "move %lu bytes (key %d) from 0x%p to 0x%p",
-		    sizeof (usb_alt_if_data_t), curr_value,
+		    (unsigned long)sizeof (usb_alt_if_data_t), curr_value,
 		    (void *)&orig_addr[i], (void *)&repl_array[curr_value]);
 
 		bcopy((char *)&orig_addr[i], (char *)&repl_array[curr_value],

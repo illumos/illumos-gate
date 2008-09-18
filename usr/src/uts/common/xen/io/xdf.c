@@ -999,7 +999,7 @@ xdf_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 		return (ENXIO);
 
 	DPRINTF(IO_DBG, ("xdf: dump addr (0x%p) blk (%ld) nblks (%d)\n",
-	    addr, blkno, nblk));
+	    (void *)addr, blkno, nblk));
 
 	part = XDF_PART(minor);
 	if (!xdf_isopen(vdp, part))

@@ -22,7 +22,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * UGEN: USB Generic Driver support code
  *
@@ -4282,7 +4281,7 @@ ugen_minor_index_create(ugen_state_t *ugenp, ugen_minor_t minor)
 		USB_DPRINTF_L4(UGEN_PRINT_ATTA, ugenp->ug_log_hdl,
 		    "ugen_minor_index_create: %d: 0x%lx",
 		    ugenp->ug_minor_node_table_index,
-		    minor);
+		    (unsigned long)minor);
 
 		return (ugenp->ug_minor_node_table_index++);
 	} else {

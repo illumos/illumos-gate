@@ -35,11 +35,6 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/socketvar.h>
-/* swilly code in sys/socketvar.h turns off DEBUG */
-#ifdef __lint
-#define	DEBUG
-#endif
-
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/ip.h>

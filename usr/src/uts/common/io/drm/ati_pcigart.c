@@ -34,8 +34,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "drmP.h"
 
 #define	ATI_PCIGART_PAGE_SIZE		4096	/* PCI GART page size */
@@ -77,6 +75,7 @@ drm_ati_pcigart_init(drm_device_t *dev, drm_ati_pcigart_info *gart_info)
 
 	pages = DRM_MIN(entry->pages, ATI_MAX_PCIGART_PAGES);
 	bzero(pci_gart, ATI_PCIGART_TABLE_SIZE);
+	/*CONSTCOND*/
 	ASSERT(PAGE_SIZE >= ATI_PCIGART_PAGE_SIZE);
 
 	dmah = entry->dmah_sg;

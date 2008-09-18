@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * VM - physical page management.
  */
@@ -2645,7 +2643,7 @@ page_free(page_t *pp, int dontneed)
 	if (hat_page_is_mapped(pp) || pp->p_lckcnt != 0 || pp->p_cowcnt != 0 ||
 	    pp->p_slckcnt != 0) {
 		panic("page_free pp=%p, pfn=%lx, lckcnt=%d, cowcnt=%d "
-		    "slckcnt = %d", pp, page_pptonum(pp), pp->p_lckcnt,
+		    "slckcnt = %d", (void *)pp, page_pptonum(pp), pp->p_lckcnt,
 		    pp->p_cowcnt, pp->p_slckcnt);
 		/*NOTREACHED*/
 	}
@@ -6393,7 +6391,8 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 			while (tp1 != &page_capture_hash[index].lists[l]) {
 				if (tp1->pp == pp) {
 					panic("page pp 0x%p already on hash "
-					    "at 0x%p\n", pp, tp1);
+					    "at 0x%p\n",
+					    (void *)pp, (void *)tp1);
 				}
 				tp1 = tp1->next;
 			}
@@ -6460,7 +6459,8 @@ page_capture_add_hash(page_t *pp, uint_t szc, uint_t flags, void *datap)
 	 * and thus it either has to be set or not set and can't change
 	 * while holding the mutex above.
 	 */
-	panic("page_capture_add_hash, PR_CAPTURE flag set on pp %p\n", pp);
+	panic("page_capture_add_hash, PR_CAPTURE flag set on pp %p\n",
+	    (void *)pp);
 }
 
 /*
@@ -6855,7 +6855,7 @@ page_capture_take_action(page_t *pp, uint_t flags, void *datap)
 			bp2 = bp2->next;
 		}
 	}
-	panic("PR_CAPTURE set but not on hash for pp 0x%p\n", pp);
+	panic("PR_CAPTURE set but not on hash for pp 0x%p\n", (void *)pp);
 	/*NOTREACHED*/
 }
 

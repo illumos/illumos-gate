@@ -13758,7 +13758,7 @@ ip_check_and_align_header(queue_t *q, mblk_t *mp, ip_stack_t *ipst)
 			(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 			    "ip_check_and_align_header: %s forced us to "
 			    " pullup pkt, hdr len %ld, hdr addr %p",
-			    ill->ill_name, len, ipha);
+			    ill->ill_name, len, (void *)ipha);
 		}
 		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
 			/* clear b_prev - used by ip_mroute_decap */

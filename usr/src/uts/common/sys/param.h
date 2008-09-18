@@ -39,8 +39,6 @@
 #ifndef _SYS_PARAM_H
 #define	_SYS_PARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _ASM		/* Avoid typedef headaches for assembly files */
 #include <sys/types.h>
 #include <sys/isa_defs.h>
@@ -339,6 +337,17 @@ extern uintptr_t _userlimit;
 extern uintptr_t _userlimit32;
 #endif  /* defined(_KERNEL) && !defined(_ASM) */
 
+/*
+ * These three variables have been added within the #if defined(lint)
+ * below to ensure visibility to lint. This is a short term workaround
+ * to handle poor interaction between SS12 lint and these variables.
+ * CR 6742611 has been logged to address these issues.
+ */
+#if defined(lint)
+extern int snooping;
+extern uint_t snoop_interval;
+extern const unsigned int _pageshift;
+#endif	/* lint */
 
 #if !defined(_MACHDEP)
 

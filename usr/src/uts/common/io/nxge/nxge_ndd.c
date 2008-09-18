@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_hio.h>
 
@@ -1061,8 +1059,8 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 			    rdc,
 			    p_dma_cfgp->rcr_timeout[rdc],
 			    p_dma_cfgp->rcr_threshold[rdc],
-			    rbr_rings[rdc],
-			    rbr_rings[rdc]->num_blocks, rcr_rings[rdc]);
+			    (void *)rbr_rings[rdc],
+			    rbr_rings[rdc]->num_blocks, (void *)rcr_rings[rdc]);
 			((mblk_t *)np)->b_wptr += print_len;
 			buf_len -= print_len;
 		}
@@ -2300,7 +2298,7 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 	    "nxgep (nxge_t) $%p\n"
 	    "dev_regs (dev_regs_t) $%p\n",
-	    nxgep, nxgep->dev_regs);
+	    (void *)nxgep, (void *)nxgep->dev_regs);
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 
@@ -2308,8 +2306,8 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 	    "reg base (npi_reg_ptr_t) $%p\t "
 	    "pci reg (npi_reg_ptr_t) $%p\n",
-	    nxgep->dev_regs->nxge_regp,
-	    nxgep->dev_regs->nxge_pciregp);
+	    (void *)nxgep->dev_regs->nxge_regp,
+	    (void *)nxgep->dev_regs->nxge_pciregp);
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 
@@ -2341,8 +2339,8 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	for (rdc = 0; rdc < p_cfgp->max_rdcs; rdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		    " %d\t  $%p\t\t   $%p\n",
-		    rdc, rcr_rings[rdc],
-		    rbr_rings[rdc]);
+		    rdc, (void *)rcr_rings[rdc],
+		    (void *)rbr_rings[rdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	}
 
@@ -2353,7 +2351,7 @@ nxge_param_dump_ptrs(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	tx_rings = nxgep->tx_rings->rings;
 	for (tdc = 0; tdc < p_cfgp->tdc.count; tdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-		    " %d\t  $%p\n", tdc, tx_rings[tdc]);
+		    " %d\t  $%p\n", tdc, (void *)tx_rings[tdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	}
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/stat.h>
@@ -813,7 +811,7 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 
 	if (pcitool_debug)
 		prom_printf("pcitool_map: Called with PA:0x%p\n",
-		    (uint8_t *)(uintptr_t)phys_addr);
+		    (void *)(uintptr_t)phys_addr);
 
 	*num_pages = 1;
 

@@ -40,8 +40,6 @@
 #ifndef _SYS_SOCKETVAR_H
 #define	_SYS_SOCKETVAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/t_lock.h>
@@ -651,7 +649,7 @@ int	so_verify_oobstate(struct sonode *);
 /*
  * DEBUG macros
  */
-#if defined(DEBUG) && !defined(__lint)
+#if defined(DEBUG)
 #define	SOCK_DEBUG
 
 extern int sockdebug;
@@ -670,13 +668,13 @@ extern int sockprinterr;
 #define	eprintsoline(so, error)					\
 { if (sockprinterr && ((so)->so_options & SO_DEBUG))		\
 	printf("socket(%p) error %d: line %d file %s\n",	\
-		(so), (error), __LINE__, __FILE__);		\
+		(void *)(so), (error), __LINE__, __FILE__);	\
 }
 #define	dprint(level, args)	{ if (sockdebug > (level)) printf args; }
 #define	dprintso(so, level, args) \
 { if (sockdebug > (level) && ((so)->so_options & SO_DEBUG)) printf args; }
 
-#else /* define(DEBUG) && !defined(__lint) */
+#else /* define(DEBUG) */
 
 #define	eprint(args)		{}
 #define	eprintso(so, args)	{}
@@ -684,11 +682,8 @@ extern int sockprinterr;
 #define	eprintsoline(so, error)	{}
 #define	dprint(level, args)	{}
 #define	dprintso(so, level, args) {}
-#ifdef DEBUG
-#undef DEBUG
-#endif
 
-#endif /* defined(DEBUG) && !defined(__lint) */
+#endif /* defined(DEBUG) */
 
 extern struct vfsops			sock_vfsops;
 extern struct vnodeops			*socktpi_vnodeops;

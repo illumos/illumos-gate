@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -97,8 +94,8 @@ stream_buf_init(struct sbus_soft_state *softsp, caddr_t address)
 
 	DPRINTF(IOCACHE_REGISTERS_DEBUG, ("Streaming buffer control reg: 0x%p, "
 	    "Streaming buffer flush reg: 0x%p, Streaming buffer sync reg: 0x%p",
-	    softsp->str_buf_ctrl_reg, softsp->str_buf_flush_reg,
-	    softsp->str_buf_sync_reg));
+	    (void *)softsp->str_buf_ctrl_reg, (void *)softsp->str_buf_flush_reg,
+	    (void *)softsp->str_buf_sync_reg));
 
 	/* Initialize stream buffer sync reg mutex */
 	mutex_init(&softsp->sync_reg_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -174,7 +171,7 @@ sync_stream_buf(struct sbus_soft_state *softsp, ioaddr_t addr, uint_t npages,
 
 	DPRINTF(IOCACHE_SYNC_DEBUG, ("sync_stream_buf: ioaddr 0x%x, page cnt "
 	    "0x%x, sync flag 0x%p, sync flag pf 0x%lx\n", addr, npages,
-	    sync_flag, phys_sync_flag));
+	    (void *)sync_flag, phys_sync_flag));
 
 	ASSERT(npages > (uint_t)0);
 
@@ -204,7 +201,7 @@ sync_stream_buf(struct sbus_soft_state *softsp, ioaddr_t addr, uint_t npages,
 				DPRINTF(IOCACHE_DIAG_REG_DEBUG,
 				    ("IO cache line diag "
 				    "reg addr 0x%p, hi0x%x lo0x%x\n",
-				    reg_addr, hi, lo));
+				    (void *)reg_addr, hi, lo));
 			}
 #endif /* DEBUG */
 			/* Check for a valid line */
@@ -272,7 +269,7 @@ sync_stream_buf(struct sbus_soft_state *softsp, ioaddr_t addr, uint_t npages,
 				 */
 				nsec_current = gethrtime();
 				if ((nsec_current - nsec_start) > nsectowait &&
-				!*((volatile int *)sync_flag)) {
+				    !*((volatile int *)sync_flag)) {
 					/*
 					 * Trouble.  The SYSIO chip has
 					 * seemingly gone AWOL.  Vomit.

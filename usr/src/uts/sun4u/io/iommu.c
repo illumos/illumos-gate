@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -227,8 +224,9 @@ iommu_init(struct sbus_soft_state *softsp, caddr_t address)
 
 	DPRINTF(IOMMU_REGISTERS_DEBUG, ("IOMMU Control reg: %p IOMMU TSB "
 	    "base reg: %p IOMMU flush reg: %p TSB base addr %p\n",
-	    softsp->iommu_ctrl_reg, softsp->tsb_base_addr,
-	    softsp->iommu_flush_reg, softsp->soft_tsb_base_addr));
+	    (void *)softsp->iommu_ctrl_reg, (void *)softsp->tsb_base_addr,
+	    (void *)softsp->iommu_flush_reg,
+	    (void *)softsp->soft_tsb_base_addr));
 
 	return (DDI_SUCCESS);
 }
@@ -245,7 +243,7 @@ iommu_uninit(struct sbus_soft_state *softsp)
 
 	/* flip off the IOMMU enable switch */
 	*softsp->iommu_ctrl_reg &=
-		(TSB_SIZE << TSB_SIZE_SHIFT | IOMMU_DISABLE);
+	    (TSB_SIZE << TSB_SIZE_SHIFT | IOMMU_DISABLE);
 
 	iommu_tsb_free(softsp->iommu_tsb_cookie);
 
@@ -318,14 +316,14 @@ iommu_tlb_flush(struct sbus_soft_state *softsp, ioaddr_t addr, pgcnt_t npages)
 		DPRINTF(IOMMU_TLB, ("Vaddr reg 0x%p, "
 		    "TLB vaddr reg %lx, IO addr 0x%x "
 		    "Base addr 0x%x, Hi addr 0x%x\n",
-		    vaddr_reg, tmpreg, ioaddr, addr, hiaddr));
+		    (void *)vaddr_reg, tmpreg, ioaddr, addr, hiaddr));
 
 		if (ioaddr >= addr && ioaddr <= hiaddr) {
 			tmpreg = *valid_bit_reg;
 
 			DPRINTF(IOMMU_TLB, ("Valid reg addr 0x%p, "
 			    "TLB valid reg %lx\n",
-			    valid_bit_reg, tmpreg));
+			    (void *)valid_bit_reg, tmpreg));
 
 			if (tmpreg & IOMMU_TLB_VALID) {
 				*softsp->iommu_flush_reg = (uint64_t)ioaddr;
@@ -533,7 +531,7 @@ iommu_create_vaddr_mappings(ddi_dma_impl_t *mp, uintptr_t addr)
 
 		DPRINTF(IOMMU_TTE, ("vaddr mapping: tte index %p pfn %lx "
 		    "tte flag %lx addr %lx ioaddr %x\n",
-		    iotte_ptr, pfn, iotte_flag, addr, ioaddr));
+		    (void *)iotte_ptr, pfn, iotte_flag, addr, ioaddr));
 
 		/* Flush the IOMMU TLB before loading a new mapping */
 		if (!diag_tlb_flush)
@@ -643,7 +641,7 @@ iommu_create_pp_mappings(ddi_dma_impl_t *mp, page_t *pp, page_t **pplist)
 		}
 
 		DPRINTF(IOMMU_TTE, ("pp mapping TTE index %p pfn %lx "
-		    "tte flag %lx ioaddr %x\n", iotte_ptr,
+		    "tte flag %lx ioaddr %x\n", (void *)iotte_ptr,
 		    pfn, iotte_flag, ioaddr));
 
 		/* Flush the IOMMU TLB before loading a new mapping */
@@ -776,7 +774,8 @@ iommu_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 
 	if (mppriv == NULL) {
 		if (waitfp != DDI_DMA_DONTWAIT) {
-		    ddi_set_callback(waitfp, arg, &softsp->dvma_call_list_id);
+			ddi_set_callback(waitfp, arg,
+			    &softsp->dvma_call_list_id);
 		}
 		return (DDI_DMA_NORESOURCES);
 	}
@@ -784,7 +783,7 @@ iommu_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 
 	DPRINTF(IOMMU_DMA_ALLOCHDL_DEBUG, ("dma_allochdl: (%s) handle %p "
 	    "hi %x lo %x min %x burst %x\n",
-	    ddi_get_name(dip), mp, addrhigh, addrlow,
+	    ddi_get_name(dip), (void *)mp, addrhigh, addrlow,
 	    dma_attr->dma_attr_minxfer, dma_attr->dma_attr_burstsizes));
 
 	mp->dmai_rdip = rdip;
@@ -1025,7 +1024,7 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 
 			DPRINTF(IOMMU_TTE, ("speed loading: TTE index %p "
 			    "pfn %lx tte flag %lx addr %lx ioaddr %x\n",
-			    iotte_ptr, pfn, iotte_flag, addr, ioaddr));
+			    (void *)iotte_ptr, pfn, iotte_flag, addr, ioaddr));
 
 #if defined(DEBUG) && defined(IO_MEMUSAGE)
 			iomemp = kmem_alloc(sizeof (struct io_mem_list),
@@ -1052,7 +1051,7 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		    (uint_t)dma_attr->dma_attr_seg + 1,
 		    (void *)(uintptr_t)(ioaddr_t)dma_attr->dma_attr_addr_lo,
 		    (void *)(uintptr_t)
-			((ioaddr_t)dma_attr->dma_attr_addr_hi + 1),
+		    ((ioaddr_t)dma_attr->dma_attr_addr_hi + 1),
 		    dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP);
 	}
 
@@ -1317,8 +1316,8 @@ iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
 	ioaddr_t segalign;
 	int rval;
 	struct sbus_soft_state *softsp =
-		(struct sbus_soft_state *)ddi_get_soft_state(sbusp,
-		ddi_get_instance(dip));
+	    (struct sbus_soft_state *)ddi_get_soft_state(sbusp,
+	    ddi_get_instance(dip));
 
 	addrlow = dma_lim->dlim_addr_lo;
 	addrhigh = dma_lim->dlim_addr_hi;
@@ -1331,8 +1330,8 @@ iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
 	 * Setup DMA burstsizes and min-xfer counts.
 	 */
 	(void) iommu_dma_lim_setup(dip, rdip, softsp, &dma_lim->dlim_burstsizes,
-		(uint_t)dma_lim->dlim_burstsizes, &dma_lim->dlim_minxfer,
-		dmareq->dmar_flags);
+	    (uint_t)dma_lim->dlim_burstsizes, &dma_lim->dlim_minxfer,
+	    dmareq->dmar_flags);
 
 	if (dma_lim->dlim_burstsizes == 0)
 		return (DDI_DMA_NOMAPPING);
@@ -1376,7 +1375,7 @@ iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
 	dma_attr->dma_attr_seg = segalign;
 	dma_attr->dma_attr_burstsizes = dma_lim->dlim_burstsizes;
 	rval = iommu_dma_bindhdl(dip, rdip, (ddi_dma_handle_t)mp,
-		dmareq, NULL, NULL);
+	    dmareq, NULL, NULL);
 	if (rval && (rval != DDI_DMA_PARTIAL_MAP)) {
 		kmem_free(mppriv, sizeof (*mppriv));
 	} else {
@@ -1398,7 +1397,7 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_cookie_t *cp;
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 
-	DPRINTF(IOMMU_DMAMCTL_DEBUG, ("dma_mctl: handle %p ", mp));
+	DPRINTF(IOMMU_DMAMCTL_DEBUG, ("dma_mctl: handle %p ", (void *)mp));
 	switch (request) {
 	case DDI_DMA_FREE:
 	{
@@ -1742,7 +1741,7 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 
 		DPRINTF(IOMMU_FASTDMA_RESERVE,
 		    ("Reserve: mapping object %p base addr %lx size %x\n",
-		    mp, mp->dmai_mapping, mp->dmai_ndvmapages));
+		    (void *)mp, mp->dmai_mapping, mp->dmai_ndvmapages));
 
 		break;
 	}
@@ -1947,15 +1946,15 @@ iommu_dvma_unload(ddi_dma_handle_t h, uint_t index, uint_t view)
 #endif /* DEBUG && IO_MEMUSAGE */
 
 	DPRINTF(IOMMU_FASTDMA_SYNC, ("kaddr_unload: handle %p sync flag "
-	    "addr %p sync flag pfn %llx index %x page count %lx\n", mp,
-	    &iommu_fast_dvma->sync_flag[index],
+	    "addr %p sync flag pfn %llx index %x page count %lx\n", (void *)mp,
+	    (void *)&iommu_fast_dvma->sync_flag[index],
 	    iommu_fast_dvma->phys_sync_flag[index],
 	    index, npages));
 
 	if ((mp->dmai_rflags & DMP_NOSYNC) != DMP_NOSYNC) {
 		sync_stream_buf(softsp, ioaddr, npages,
-			(int *)&iommu_fast_dvma->sync_flag[index],
-			iommu_fast_dvma->phys_sync_flag[index]);
+		    (int *)&iommu_fast_dvma->sync_flag[index],
+		    iommu_fast_dvma->phys_sync_flag[index]);
 	}
 }
 
@@ -1979,8 +1978,8 @@ iommu_dvma_sync(ddi_dma_handle_t h, uint_t index, uint_t view)
 	npages = iommu_fast_dvma->pagecnt[index];
 
 	DPRINTF(IOMMU_FASTDMA_SYNC, ("kaddr_sync: handle %p, "
-	    "sync flag addr %p, sync flag pfn %llx\n", mp,
-	    &iommu_fast_dvma->sync_flag[index],
+	    "sync flag addr %p, sync flag pfn %llx\n", (void *)mp,
+	    (void *)&iommu_fast_dvma->sync_flag[index],
 	    iommu_fast_dvma->phys_sync_flag[index]));
 
 	sync_stream_buf(softsp, ioaddr, npages,

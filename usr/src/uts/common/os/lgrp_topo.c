@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lgroup topology
@@ -266,7 +264,7 @@ lgrp_ancestor_delete(lgrp_t *child, klgrpset_t *changed)
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 1) {
 		prom_printf("lgrp_ancestor_delete(0x%p[%d],0x%p)\n",
-		    child, child->lgrp_id, changed);
+		    (void *)child, child->lgrp_id, (void *)changed);
 	}
 #endif	/* DEBUG */
 
@@ -307,7 +305,7 @@ lgrp_ancestor_delete(lgrp_t *child, klgrpset_t *changed)
 		if (lgrp_topo_debug > 0)
 			prom_printf("lgrp_ancestor_delete: destroy"
 			    " lgrp %d at 0x%p\n",
-			    current->lgrp_id, current);
+			    current->lgrp_id, (void *)current);
 #endif	/* DEBUG */
 		lgrp_destroy(current);
 	}
@@ -344,7 +342,8 @@ lgrp_consolidate(lgrp_t *lgrp1, lgrp_t *lgrp2, klgrpset_t *changed)
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 0)
 		prom_printf("lgrp_consolidate(0x%p[%d],0x%p[%d],0x%p)\n",
-		    lgrp1, lgrp1->lgrp_id, lgrp2, lgrp2->lgrp_id, changed);
+		    (void *)lgrp1, lgrp1->lgrp_id, (void *)lgrp2,
+		    lgrp2->lgrp_id, (void *)changed);
 #endif	/* DEBUG */
 
 	count = 0;
@@ -416,7 +415,7 @@ lgrp_consolidate(lgrp_t *lgrp1, lgrp_t *lgrp2, klgrpset_t *changed)
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 0)
 		prom_printf("lgrp_consolidate: destroy lgrp %d at 0x%p\n",
-		    lgrp1->lgrp_id, lgrp1);
+		    lgrp1->lgrp_id, (void *)lgrp1);
 	if (lgrp_topo_debug > 1 && changed)
 		prom_printf("lgrp_consolidate: changed %d lgrps: 0x%llx\n",
 		    count, (u_longlong_t)*changed);
@@ -477,7 +476,7 @@ lgrp_collapse_dups(klgrpset_t target_set, int equidist_only,
 		if (lgrp_topo_debug > 1)
 			prom_printf("lgrp_collapse_dups: find "
 			    "dups of lgrp %d at 0x%p\n",
-			    target->lgrp_id, target);
+			    target->lgrp_id, (void *)target);
 #endif	/* DEBUG */
 		keep = NULL;
 		for (j = 0; j <= lgrp_alloc_max; j++) {
@@ -508,7 +507,7 @@ lgrp_collapse_dups(klgrpset_t target_set, int equidist_only,
 				if (lgrp_topo_debug > 1)
 					prom_printf("lgrp_collapse_dups: "
 					    "keep lgrp %d at 0x%p\n",
-					    keep->lgrp_id, keep);
+					    keep->lgrp_id, (void *)keep);
 #endif	/* DEBUG */
 			} else {
 				if (lgrp == lgrp_root) {
@@ -520,8 +519,8 @@ lgrp_collapse_dups(klgrpset_t target_set, int equidist_only,
 					prom_printf("lgrp_collapse_dups:"
 					    " consolidate lgrp %d at 0x%p"
 					    " into lgrp %d at 0x%p\n",
-					    lgrp->lgrp_id, lgrp,
-					    keep->lgrp_id, keep);
+					    lgrp->lgrp_id, (void *)lgrp,
+					    keep->lgrp_id, (void *)keep);
 #endif	/* DEBUG */
 				count += lgrp_consolidate(lgrp, keep,
 				    &changes);
@@ -645,14 +644,14 @@ lgrp_proprogate(lgrp_t *newleaf, lgrp_t *child, int latency,
 	if (lgrp_topo_debug > 1) {
 		prom_printf("lgrp_proprogate: newleaf %d(0x%p), "
 		    "latency %d, child %d(0x%p), parent %d(0x%p)\n",
-		    newleaf->lgrp_id, newleaf, latency, child->lgrp_id,
-		    child, parent->lgrp_id, parent);
+		    newleaf->lgrp_id, (void *)newleaf, latency, child->lgrp_id,
+		    (void *)child, parent->lgrp_id, (void *)parent);
 		prom_printf("lgrp_proprogate: parent's leaves becomes 0x%llx\n",
 		    (u_longlong_t)parent->lgrp_leaves);
 	}
 	if (lgrp_topo_debug > 0) {
 		prom_printf("lgrp_proprogate: adding to parent %d (0x%p)\n",
-		    parent->lgrp_id, parent);
+		    parent->lgrp_id, (void *)parent);
 		lgrp_rsets_print("parent resources become:", parent->lgrp_set);
 	}
 
@@ -699,8 +698,9 @@ lgrp_split(lgrp_t *oldleaf, lgrp_t *newleaf, lgrp_t *child,
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 1)
 		prom_printf("lgrp_split(0x%p[%d],0x%p[%d],0x%p[%d],0x%p)\n",
-		    oldleaf, oldleaf->lgrp_id, newleaf, newleaf->lgrp_id,
-		    child, child->lgrp_id, changed);
+		    (void *)oldleaf, oldleaf->lgrp_id,
+		    (void *)newleaf, newleaf->lgrp_id,
+		    (void *)child, child->lgrp_id, (void *)changed);
 #endif	/* DEBUG */
 
 	/*
@@ -778,7 +778,8 @@ lgrp_split(lgrp_t *oldleaf, lgrp_t *newleaf, lgrp_t *child,
 		if (lgrp_topo_debug > 0) {
 			prom_printf("lgrp_split: new parent %d (0x%p) for"
 			    " lgrp %d (0x%p)\n",
-			    parent->lgrp_id, parent, child->lgrp_id, child);
+			    parent->lgrp_id, (void *)parent,
+			    child->lgrp_id, (void *)child);
 			lgrp_rsets_print("new parent resources:",
 			    parent->lgrp_set);
 		}
@@ -854,8 +855,9 @@ lgrp_lineage_add(lgrp_t *newleaf, lgrp_t *oldleaf, klgrpset_t *changed)
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 0)
 		prom_printf("\nlgrp_lineage_add(0x%p[%d],0x%p[%d],0x%p)\n",
-		    newleaf, newleaf->lgrp_id, oldleaf, oldleaf->lgrp_id,
-		    changed);
+		    (void *)newleaf, newleaf->lgrp_id,
+		    (void *)oldleaf, oldleaf->lgrp_id,
+		    (void *)changed);
 #endif	/* DEBUG */
 
 	/*
@@ -903,7 +905,8 @@ lgrp_lineage_add(lgrp_t *newleaf, lgrp_t *oldleaf, klgrpset_t *changed)
 		if (lgrp_topo_debug > 1)
 			prom_printf("lgrp_lineage_add: child %d (0x%p), parent"
 			    " %d (0x%p)\n",
-			    child->lgrp_id, child, parent->lgrp_id, parent);
+			    child->lgrp_id, (void *)child,
+			    parent->lgrp_id, (void *)parent);
 #endif	/* DEBUG */
 
 		/*
@@ -987,7 +990,7 @@ lgrp_lineage_add(lgrp_t *newleaf, lgrp_t *oldleaf, klgrpset_t *changed)
 					prom_printf("lgrp_lineage_add: "
 					    "replaced parent lgrp %d at 0x%p"
 					    " for lgrp %d\n",
-					    parent->lgrp_id, parent,
+					    parent->lgrp_id, (void *)parent,
 					    child->lgrp_id);
 					lgrp_rsets_print("old parent"
 					    " resources:", parent->lgrp_set);
@@ -1020,7 +1023,7 @@ lgrp_lineage_add(lgrp_t *newleaf, lgrp_t *oldleaf, klgrpset_t *changed)
 					prom_printf("lgrp_lineage_add: new "
 					    "parent lgrp %d at 0x%p for "
 					    "lgrp %d\n", intermed->lgrp_id,
-					    intermed, child->lgrp_id);
+					    (void *)intermed, child->lgrp_id);
 					lgrp_rsets_print("new parent "
 					    "resources:", rset);
 				}
@@ -1101,7 +1104,8 @@ lgrp_leaf_add(lgrp_t *leaf, lgrp_t **lgrps, int lgrp_count,
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 1)
 		prom_printf("\nlgrp_leaf_add(0x%p[%d],0x%p,%d,0x%p)\n",
-		    leaf, leaf->lgrp_id, lgrps, lgrp_count, changed);
+		    (void *)leaf, leaf->lgrp_id, (void *)lgrps, lgrp_count,
+		    (void *)changed);
 #endif	/* DEBUG */
 
 	count = 0;
@@ -1172,7 +1176,7 @@ lgrp_leaf_add(lgrp_t *leaf, lgrp_t **lgrps, int lgrp_count,
 			if (lgrp_topo_debug > 1)
 				prom_printf("lgrp_leaf_add: skip "
 				    "lgrp %d at 0x%p\n",
-				    lgrp->lgrp_id, lgrp);
+				    lgrp->lgrp_id, (void *)lgrp);
 #endif	/* DEBUG */
 			continue;
 		}
@@ -1181,7 +1185,8 @@ lgrp_leaf_add(lgrp_t *leaf, lgrp_t **lgrps, int lgrp_count,
 		if (lgrp_topo_debug > 0)
 			prom_printf("lgrp_leaf_add: lgrp %d (0x%p) =>"
 			    " lgrp %d (0x%p)\n",
-			    leaf->lgrp_id, leaf, lgrp->lgrp_id, lgrp);
+			    leaf->lgrp_id, (void *)leaf, lgrp->lgrp_id,
+			    (void *)lgrp);
 #endif	/* DEBUG */
 
 		count += lgrp_lineage_add(leaf, lgrp, &changes);
@@ -1233,7 +1238,8 @@ lgrp_leaf_delete(lgrp_t *leaf, lgrp_t **lgrps, int lgrp_count,
 #ifdef	DEBUG
 	if (lgrp_topo_debug > 0)
 		prom_printf("lgrp_leaf_delete(0x%p[%d],0x%p,%d,0x%p)\n",
-		    leaf, leaf->lgrp_id, lgrps, lgrp_count, changed);
+		    (void *)leaf, leaf->lgrp_id, (void *)lgrps, lgrp_count,
+		    (void *)changed);
 #endif	/* DEBUG */
 
 	/*
@@ -1248,7 +1254,7 @@ lgrp_leaf_delete(lgrp_t *leaf, lgrp_t **lgrps, int lgrp_count,
 #ifdef	DEBUG
 		if (lgrp_topo_debug > 0)
 			prom_printf("lgrp_leaf_delete: remove leaf from"
-			    " lgrp %d at %p\n", lgrp->lgrp_id, lgrp);
+			    " lgrp %d at %p\n", lgrp->lgrp_id, (void *)lgrp);
 #endif	/* DEBUG */
 
 		lgrp_rsets_delete(lgrp, leaf->lgrp_id, 0);
@@ -1465,7 +1471,8 @@ lgrp_topo_update(lgrp_t **lgrps, int lgrp_count, klgrpset_t *changed)
 #ifdef	DEBUG
 		if (lgrp_topo_debug > 1) {
 			prom_printf("\nlgrp_topo_update: updating lineage "
-			    "of lgrp %d at 0x%p\n", lgrp->lgrp_id, lgrp);
+			    "of lgrp %d at 0x%p\n", lgrp->lgrp_id,
+			    (void *)lgrp);
 		}
 #endif	/* DEBUG */
 
@@ -1513,7 +1520,7 @@ lgrp_print(lgrp_t *lgrp)
 	lgrp_rsets_print("\tresources", lgrp->lgrp_set);
 
 	parent = lgrp->lgrp_parent;
-	prom_printf("\tparent 0x%p", parent);
+	prom_printf("\tparent 0x%p", (void *)parent);
 	if (parent)
 		prom_printf("[%d]\n", parent->lgrp_id);
 	else

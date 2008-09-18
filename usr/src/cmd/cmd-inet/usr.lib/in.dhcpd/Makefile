@@ -19,12 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cmd-inet/usr.lib/in.dhcpd/%M%
+# cmd/cmd-inet/usr.lib/in.dhcpd/Makefile
 #
 
 CMN_DIR = $(SRC)/common/net/dhcp
@@ -48,7 +46,10 @@ include ../../../Makefile.cmd
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 
 CPPFLAGS  += -DNDEBUG -DNPROBE -D_REENTRANT -I./ -I$(CMN_DIR)
-LINTFLAGS += -u
+#
+# -erroff=E_BAD_FORMAT_STR2 added to workaround bug 6696366 
+#
+LINTFLAGS += -u -erroff=E_BAD_FORMAT_STR2
 LDFLAGS	  += -L$(NSU_DIR) -R/usr/lib/inet/dhcp/nsu $(MAPFILE.NGB:%=-M%)
 LDLIBS    += $(NSU_DIR)/rfc2136.so.1 -ldhcpsvc -ldhcputil -linetutil \
 	     -lsocket -lnsl -lmtmalloc -lresolv

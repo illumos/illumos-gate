@@ -188,18 +188,6 @@ $(IF_DEBUG_OBJ)clock.o		:=	DEBUG_DEFS	+= -DKSLICE=1
 # $(IF_DEBUG_OBJ)disp_lock.o	:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
 
 #
-# This rather strange collection of definitions ensures that lint sees
-# 'struct cpu' containing a fully declared embedded 'struct machcpu'
-#
-# There's something deeply dissatisfying about this.
-#
-LINTMACHFLAGS = -D_MACHDEP -I../../sun4 -I../../$(PLATFORM) -I../../sfmmu
-$(LINTS_DIR)/kcpc.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
-$(LINTS_DIR)/kdi.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
-$(LINTS_DIR)/msacct.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
-$(LINTS_DIR)/thread.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
-
-#
 #	Collect the preprocessor definitions to be associated with *all*
 #	files.
 #

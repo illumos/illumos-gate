@@ -23,9 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #
 #	This makefile drives the production of the generic
 #	unix kernel module.
@@ -55,6 +52,15 @@ ROOTMODULE	= $(ROOT_PSM_KERN_DIR)/$(MODULE)
 PLATFORM	= sun4v
 LIBGEN		= $(OBJS_DIR)/libgenunix.so
 LIBSTUBS	= $(GENSTUBS_OBJS:%=$(OBJS_DIR)/%)
+
+# LINTFLAGS will be set to include definitions so that the cpu_t
+# structure is expanded. However this could be set to look at the
+# sun4u version which is not correct for sun4v. Therefore we only
+# want to use the LINTFLAGS modification in this Makefile and so
+# suppress the usage of the LINTFLAGS setting in the Makefile.sparc
+# file.
+#
+LINTFLAGSUPPRESS	= $(POUND_SIGN)
 
 #
 #	Include common rules.
@@ -109,6 +115,11 @@ LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+# Ensure that lint sees 'struct cpu' containing a fully declared
+# embedded 'struct machcpu'.
+#
+LINTFLAGS	+= -D_MACHDEP -I../../sun4 -I../../$(PLATFORM) -I../../sfmmu
 
 #
 #	Default build targets.

@@ -53,10 +53,6 @@
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-/* swilly code in sys/socketvar.h turns off DEBUG */
-#ifdef __lint
-#define	DEBUG
-#endif
 
 #include <netinet/in.h>
 #include <sys/sendfile.h>

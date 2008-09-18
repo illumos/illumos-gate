@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -296,7 +294,7 @@ waitq_setrun(kthread_t *t)
 
 	ASSERT(ISWAITING(t));
 	if (wq == NULL)
-		panic("waitq_setrun: thread %p is not on waitq", t);
+		panic("waitq_setrun: thread %p is not on waitq", (void *)t);
 	waitq_dequeue(wq, t);
 	CL_SETRUN(t);
 }

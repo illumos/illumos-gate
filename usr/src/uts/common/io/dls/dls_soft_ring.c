@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * General Soft rings - Simulating Rx rings in S/W.
  *
@@ -612,7 +610,7 @@ dls_soft_ring_enable(dls_channel_t dc, dl_capab_dls_t *soft_ringp)
 	dip->di_soft_ring_size = 0;
 
 	bzero(name, sizeof (name));
-	(void) snprintf(name, sizeof (name), "dls_soft_ring_%p", dip);
+	(void) snprintf(name, sizeof (name), "dls_soft_ring_%p", (void *)dip);
 	dip->di_soft_ring_list = soft_ring_set_create(name, S_RING_BIND_NONE,
 	    0, S_RING_WORKER_ONLY, minclsyspri, soft_ringp->dls_ring_cnt);
 

@@ -37,7 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines to read and write the /etc/utmpx file. Also contains
@@ -510,7 +509,7 @@ invoke_utmp_update(const struct utmpx *entryx)
 	id[sizeof (entryx->ut_id)] = '\0';
 	(void) strncpy(line, entryx->ut_line, sizeof (entryx->ut_line));
 	line[sizeof (entryx->ut_line)] = '\0';
-	(void) sprintf(pid, "%d", entryx->ut_pid);
+	(void) sprintf(pid, "%d", (int)entryx->ut_pid);
 	(void) sprintf(type, "%d", entryx->ut_type);
 	(void) sprintf(term, "%d", entryx->ut_exit.e_termination);
 	(void) sprintf(exit, "%d", entryx->ut_exit.e_exit);

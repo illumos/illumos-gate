@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -93,7 +91,12 @@ C99LMODE=	-Xc99=%all
 
 LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
 
-LINTFLAGS += -n -errtags=yes
+#
+# -erroff=E_INCONS_ARG_DECL2 works around a problem where lint gets confused
+# about how struct mdb_tgt_gregset is used in mdb_tgt_stack_f() and
+# mdb_tgt_stack_iter_f(). Will be resolved as part of fix for CR 6749868.
+#
+LINTFLAGS += -n -errtags=yes -erroff=E_INCONS_ARG_DECL2
 LINTFILES = $(SRCS:%.c=%.ln)
 
 PROG = mdb

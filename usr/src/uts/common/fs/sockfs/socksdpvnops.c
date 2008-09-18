@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -184,7 +182,8 @@ socksdpv_close(struct vnode *vp, int flag, int count, offset_t offset,
 	ASSERT(so->so_count > 0);
 	so->so_count--;			/* one fewer open reference */
 
-	dprint(2, ("socksdpv_close: %p so_count %d\n", so, so->so_count));
+	dprint(2, ("socksdpv_close: %p so_count %d\n", (void *)so,
+	    so->so_count));
 
 	if (so->so_count == 0) {
 		/*

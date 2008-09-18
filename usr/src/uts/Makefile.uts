@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This Makefile contains the common targets and definitions for
@@ -163,7 +161,8 @@ LINT.c =	$(LINT) -c -dirout=$(LINTS_DIR) $(LINTFLAGS) $(LINT_DEFS) $(CPPFLAGS)
 # lint warnings in your module for things that cannot be fixed in any
 # reasonable manner, please augment LINTTAGS in your module Makefile
 # instead.
-LINTTAGS	=
+LINTTAGS	= -erroff=E_INCONS_ARG_DECL2
+LINTTAGS	+= -erroff=E_INCONS_VAL_TYPE_DECL2
 
 LINTFLAGS_sparc_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
 LINTFLAGS_sparc_64	= $(LINTFLAGS_sparc_32) -Xarch=v9

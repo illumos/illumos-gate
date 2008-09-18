@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -128,7 +126,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* module type, this one is a driver */
-	"Memory-controller: %I%",	/* module name */
+	"Memory-controller",		/* module name */
 	&mc_ops,			/* driver ops */
 };
 
@@ -316,12 +314,12 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		softsp->size = 0;
 	} else {
 		DPRINTF(MC_ATTACH_DEBUG, ("mc%d is disabled: dimminfop %p\n",
-		    instance, dimminfop));
+		    instance, (void *)dimminfop));
 		goto bad2;
 	}
 
 	DPRINTF(MC_ATTACH_DEBUG, ("mc%d: dimminfop=0x%p data=0x%lx len=%d\n",
-	    instance, dimminfop, *(uint64_t *)dimminfop, len));
+	    instance, (void *)dimminfop, *(uint64_t *)dimminfop, len));
 
 	/* Get MC registers and construct all needed data structure */
 	if (mc_get_mcregs(softsp) == -1)
@@ -625,7 +623,7 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		bank = seg->hb_inseg;
 
 		DPRINTF(MC_CMD_DEBUG, ("MCIOC_SEG:nbanks %d seg 0x%p bank %p\n",
-		    seg->nbanks, seg, bank));
+		    seg->nbanks, (void *)seg, (void *)bank));
 
 		i = 0;
 		while (bank != NULL) {
@@ -669,7 +667,7 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		}
 
 		DPRINTF(MC_CMD_DEBUG, ("MCIOC_BANK: bank %d (0x%p) valid %hu\n",
-		    bank->bank_node.id, bank, bank->valid));
+		    bank->bank_node.id, (void *)bank, bank->valid));
 
 		/*
 		 * If (Physic Address & MASK) == MATCH, Physic Address is
@@ -889,7 +887,8 @@ mc_get_mcregs(struct mc_soft_state *softsp)
 	 */
 	for (i = 0; i < NBANKS; i++) {
 		DPRINTF(MC_REG_DEBUG, ("get_mcregs: mapreg=0x%p portid=%d "
-		    "cpu=%d\n", softsp->mc_base, softsp->portid, CPU->cpu_id));
+		    "cpu=%d\n", (void *)softsp->mc_base, softsp->portid,
+		    CPU->cpu_id));
 
 		kpreempt_disable();
 		if (softsp->portid == (cpunodes[CPU->cpu_id].portid))
@@ -1655,9 +1654,22 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 	bank_curr->pos = bank_no >> 1;
 	ASSERT((bank_curr->pos == 0) || (bank_curr->pos == 1));
 
+	/*
+	 * Workaround to keep gcc and SS12 lint happy.
+	 * Lint expects lk, uk and um in the format statement below
+	 * to use %lx, but this produces a warning when compiled with
+	 * gcc.
+	 */
+
+#if defined(lint)
 	DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add 3: logical bank num %d, "
-	"lk 0x%x uk 0x%x um 0x%x ifactor 0x%x size 0x%lx base 0x%lx\n",
+	    "lk 0x%lx uk 0x%lx um 0x%lx ifactor 0x%x size 0x%lx base 0x%lx\n",
 	    idx, mcreg._s.lk, mcreg._s.uk, mcreg._s.um, ifactor, size, base));
+#else /* lint */
+	DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add 3: logical bank num %d, "
+	    "lk 0x%x uk 0x%x um 0x%x ifactor 0x%x size 0x%lx base 0x%lx\n",
+	    idx, mcreg._s.lk, mcreg._s.uk, mcreg._s.um, ifactor, size, base));
+#endif /* lint */
 
 	/* connect the entry and update the size on dgrp_info list */
 	idx = mc_id * NDGRPS + (bank_no % NDGRPS);
@@ -1924,7 +1936,7 @@ static void
 mc_node_add(mc_dlist_t *node, mc_dlist_t **head, mc_dlist_t **tail)
 {
 	DPRINTF(MC_LIST_DEBUG, ("mc_node_add: node->id %d head %p tail %p\n",
-	    node->id, *head, *tail));
+	    node->id, (void *)*head, (void *)*tail));
 
 	if (*head != NULL) {
 		node->prev = *tail;

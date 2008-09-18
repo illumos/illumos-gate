@@ -417,7 +417,7 @@ usba_devdb_compare(const void *p1, const void *p2)
 
 	USB_DPRINTF_L4(DPRINT_MASK_DEVDB, usba_devdb_log_handle,
 	    "usba_devdb_compare: p1=0x%p u1=0x%p p2=0x%p u2=0x%p",
-	    p1, (void *)u1, p2, u2);
+	    p1, (void *)u1, p2, (void *)u2);
 
 	/* first match vendor id */
 	if (u1->idVendor < u2->idVendor) {

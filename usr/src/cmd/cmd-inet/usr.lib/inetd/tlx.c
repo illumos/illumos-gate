@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Contains routines that deal with TLI/XTI endpoints and rpc services.
  */
@@ -514,7 +512,7 @@ process_tlook(const char *fmri, tlx_info_t *tlx_info)
 		break;
 	}
 	case -1:
-		error_msg("t_look: %s", t_errno);
+		error_msg("t_look: %s", t_strerror(t_errno));
 		return (-1);
 	default:
 		error_msg(gettext("do_tlook: unexpected t_look event: %d"),

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Big Theory Statement for mutual exclusion locking primitives.
  *
@@ -249,7 +247,8 @@ mutex_panic(char *msg, mutex_impl_t *lp)
 		panic_mutex = *lp;
 
 	panic("%s, lp=%p owner=%p thread=%p",
-	    msg, lp, MUTEX_OWNER(&panic_mutex), curthread);
+	    msg, (void *)lp, (void *)MUTEX_OWNER(&panic_mutex),
+	    (void *)curthread);
 }
 
 /* "tunables" for per-platform backoff constants. */
@@ -655,7 +654,7 @@ lock_set_spin(lock_t *lp)
 		return;
 
 	if (ncpus == 1)
-		panic("lock_set: %p lock held and only one CPU", lp);
+		panic("lock_set: %p lock held and only one CPU", (void *)lp);
 
 	spin_time = LOCKSTAT_START_TIME(LS_LOCK_SET_SPIN);
 
@@ -689,7 +688,8 @@ lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 		return;
 
 	if (ncpus == 1)
-		panic("lock_set_spl: %p lock held and only one CPU", lp);
+		panic("lock_set_spl: %p lock held and only one CPU",
+		    (void *)lp);
 
 	ASSERT(new_pil > LOCK_LEVEL);
 

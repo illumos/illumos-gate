@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * cprboot - prom client that restores kadb/kernel pages
  *
@@ -101,7 +99,7 @@ cb_intro(void)
 	if ((uintptr_t)_end > CB_SRC_VIRT) {
 		prom_printf("\ndata collision:\n"
 		    "(_end=0x%p > CB_LOW_VIRT=0x%x), recompile...\n",
-		    _end, CB_SRC_VIRT);
+		    (void *)_end, CB_SRC_VIRT);
 		return (ERR);
 	}
 
@@ -150,8 +148,8 @@ get_bootargs(void)
 
 	if (verbose) {
 		for (argv = cb_args; *argv; argv++) {
-			prom_printf("    %ld: \"%s\"\n",
-			    (argv - cb_args), *argv);
+			prom_printf("    %d: \"%s\"\n",
+			    (int)(argv - cb_args), *argv);
 		}
 	}
 }
@@ -378,7 +376,7 @@ cb_read_statefile(void)
 	err = cb_alloc(alsize, MMU_PAGESIZE512K, &sfile.buf, &phys);
 	CB_VPRINTF(("%s:\n    alloc size 0x%lx, buf size 0x%lx\n"
 	    "    virt 0x%p, phys 0x%llx\n",
-	    str, alsize, sfile.size, sfile.buf, phys));
+	    str, alsize, sfile.size, (void *)sfile.buf, phys));
 	if (err) {
 		prom_printf("%s: cant alloc statefile buf, size 0x%lx\n%s\n",
 		    str, sfile.size, rsvp);
@@ -448,8 +446,10 @@ cb_read_statefile(void)
 	if (alsize > sfile.size) {
 		len = alsize - sfile.size;
 		prom_free_phys(len, phys + sfile.size);
-		CB_VPRINTF(("%s: freed %ld phys pages (0x%lx - 0x%lx)\n",
-		    str, mmu_btop(len), phys + sfile.size, phys + alsize));
+		CB_VPRINTF(("%s: freed %ld phys pages (0x%llx - 0x%llx)\n",
+		    str, mmu_btop(len),
+		    (unsigned long long)(phys + sfile.size),
+		    (unsigned long long)(phys + alsize)));
 	}
 
 	/*
@@ -578,7 +578,7 @@ main(void *cookie, int first)
 			prom_printf("%s: resume pc 0x%lx\n",
 			    prog, mdinfo.func);
 			prom_printf("%s: exit_to_kernel(0x%p, 0x%p)\n\n",
-			    prog, cookie, &mdinfo);
+			    prog, cookie, (void *)&mdinfo);
 		}
 		check_halt("exit_to_kernel");
 		exit_to_kernel(cookie, &mdinfo);

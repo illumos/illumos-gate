@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/psm.h>
 #include <sys/vmem.h>
 #include <vm/hat.h>
 #include <sys/modctl.h>

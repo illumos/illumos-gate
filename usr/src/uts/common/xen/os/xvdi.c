@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Xen virtual device driver interfaces
  */
@@ -2106,7 +2104,7 @@ i_xvdi_probe_path_handler(void *arg)
 			goto done;
 		}
 	} else {
-		if (sscanf(p, "/%d/%d/", &dom, &vdev) != 2) {
+		if (sscanf(p, "/%hu/%d/", &dom, &vdev) != 2) {
 			XVDI_DPRINTF(XVDI_DBG_PROBE,
 			    "i_xvdi_probe_path_handler: "
 			    "cannot parse backend path %s",

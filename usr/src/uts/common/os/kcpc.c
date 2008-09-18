@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/thread.h>
 #include <sys/cpuvar.h>
@@ -471,7 +469,7 @@ kcpc_unbind(kcpc_set_t *set)
 		if (removectx(t, ctx, kcpc_save, kcpc_restore, NULL,
 		    kcpc_lwp_create, NULL, kcpc_free) == 0)
 			panic("kcpc_unbind: context %p not preset on thread %p",
-			    ctx, t);
+			    (void *)ctx, (void *)t);
 #else
 		(void) removectx(t, ctx, kcpc_save, kcpc_restore, NULL,
 		    kcpc_lwp_create, NULL, kcpc_free);

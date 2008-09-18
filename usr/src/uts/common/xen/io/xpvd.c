@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Host to hypervisor virtual devices nexus driver
  *
@@ -195,7 +193,7 @@ static ndi_event_hdl_t xpvd_ndi_event_handle;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"virtual device nexus driver %I%",
+	"virtual device nexus driver",
 	&xpvd_ops,	/* driver ops */
 };
 
@@ -873,7 +871,7 @@ i_xpvd_parse_devname(char *name, xendev_devclass_t *devclassp,
 	 */
 
 	/* Backend format is "<domain>,<vdev>". */
-	if (sscanf(caddr, "%d,%d", domp, vdevp) == 2) {
+	if (sscanf(caddr, "%hu,%d", domp, vdevp) == 2) {
 		ret = B_TRUE;
 		goto done;
 	}

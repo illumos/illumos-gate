@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/thread.h>
 #include <sys/cmn_err.h>
@@ -182,7 +180,7 @@ rw_panic(char *msg, rwlock_impl_t *lp)
 		panic_rwlock = *lp;
 
 	panic("%s, lp=%p wwwh=%lx thread=%p",
-	    msg, lp, panic_rwlock.rw_wwwh, curthread);
+	    msg, (void *)lp, panic_rwlock.rw_wwwh, (void *)curthread);
 }
 
 /* ARGSUSED */

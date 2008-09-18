@@ -19,12 +19,18 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 UTSTREE=$(UTSBASE)
 
 include $(UTSBASE)/sparc/Makefile.sparc.shared
+
+#
+# Ensure that the variable member of the cpu_t (cpu_m) is defined
+# for the lint builds so as not to cause lint errors during the
+# global cross check.
+#
+$(LINTFLAGSUPPRESS)LINTFLAGS	+= -D_MACHDEP -I../../sun4 -I../../sun4u \
+       				   -I../../sfmmu

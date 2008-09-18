@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Finite State Machines for ATA controller and ATAPI devices
@@ -60,7 +58,7 @@ atapi_fsm_error(
 	uchar_t	   event)
 {
 	ADBG_ERROR(("atapi protocol error: 0x%p 0x%x 0x%x\n",
-	    ata_ctlp->ac_data, state, event));
+	    (void *)ata_ctlp->ac_data, state, event));
 }
 
 

@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * VM - anonymous pages.
  *
@@ -2398,7 +2396,7 @@ anon_private(
 		 * but to do so now.
 		 */
 		panic("anon_private, ppcopy failed, opp = 0x%p, pp = 0x%p",
-		    opp, pp);
+		    (void *)opp, (void *)pp);
 	}
 
 	hat_setrefmod(pp);		/* mark as modified */

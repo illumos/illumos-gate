@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Failure routines for libumem (not standalone)
  */
@@ -143,7 +141,6 @@ __umem_assert_failed(const char *assertion, const char *file, int line)
 {
 	umem_panic("Assertion failed: %s, file %s, line %d\n",
 	    assertion, file, line);
-	umem_do_abort();
 	/*NOTREACHED*/
 	return (0);
 }

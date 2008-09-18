@@ -6507,7 +6507,8 @@ th_trace_gethash(ip_stack_t *ipst)
 
 		if ((thh = kmem_alloc(sizeof (*thh), KM_NOSLEEP)) == NULL)
 			return (NULL);
-		(void) snprintf(name, sizeof (name), "th_trace_%p", curthread);
+		(void) snprintf(name, sizeof (name), "th_trace_%p",
+		    (void *)curthread);
 
 		/*
 		 * We use mod_hash_create_extended here rather than the more

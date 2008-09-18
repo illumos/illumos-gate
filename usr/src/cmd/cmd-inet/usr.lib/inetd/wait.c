@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains a set of routines used to perform wait based method
  * reaping.
@@ -353,7 +351,7 @@ process_terminated_methods(void)
 		default:				/* child terminated */
 			if (WIFEXITED(status)) {
 				ret = WEXITSTATUS(status);
-				debug_msg("process %d of instance %s returned "
+				debug_msg("process %ld of instance %s returned "
 				    "%d", pid, me->inst->fmri, ret);
 			} else if (WIFSIGNALED(status)) {
 				/*
@@ -364,7 +362,7 @@ process_terminated_methods(void)
 				 * in the case of non-start methods, or when
 				 * the instance is still enabled.
 				 */
-				debug_msg("process %d of instance %s exited "
+				debug_msg("process %ld of instance %s exited "
 				    "due to signal %d", pid, me->inst->fmri,
 				    WTERMSIG(status));
 				ret = IMRET_FAILURE;

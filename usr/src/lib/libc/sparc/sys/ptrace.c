@@ -28,7 +28,6 @@
  * ptrace(2) interface built on top of proc(4).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _ptrace = ptrace
 
@@ -476,7 +475,7 @@ Dupfd(int fd, int dfd)
 static void
 MakeProcName(char *procname, pid_t pid)
 {
-	(void) sprintf(procname, "/proc/%d", pid);
+	(void) sprintf(procname, "/proc/%d", (int)pid);
 }
 
 /*

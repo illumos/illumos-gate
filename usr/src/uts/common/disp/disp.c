@@ -27,8 +27,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.30 */
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -1831,7 +1829,7 @@ disp_swapped_setrun(kthread_t *tp)
 	case TS_RUN:				/* called from ts_update */
 		break;
 	default:
-		panic("disp_swapped_setrun: tp: %p bad t_state", tp);
+		panic("disp_swapped_setrun: tp: %p bad t_state", (void *)tp);
 	}
 }
 

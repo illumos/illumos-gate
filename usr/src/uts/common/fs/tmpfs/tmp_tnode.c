@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -142,7 +140,7 @@ tmpnode_growmap(struct tmpnode *tp, ulong_t newsize)
 		return;
 
 	if (newsize > MAXOFF_T)
-		np = btopr(MAXOFF_T);
+		np = btopr((u_offset_t)MAXOFF_T);
 
 	if (tp->tn_anon == NULL) {
 		tp->tn_anon = anon_create(MAX(np, TMP_INIT_SZ), ANON_SLEEP);

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	_doprnt: common code for printf, fprintf, sprintf
  */
@@ -225,7 +223,7 @@ typedef struct stva_list {
 static void _wmkarglst(wchar_t *, stva_list, stva_list [], int);
 static void _wgetarg(wchar_t *, stva_list *, long, int);
 #else  /* _WIDE */
-void _mkarglst(char *, stva_list, stva_list [], int);
+static void _mkarglst(char *, stva_list, stva_list [], int);
 void _getarg(char *, stva_list *, long, int);
 #endif /* _WIDE */
 
@@ -2254,7 +2252,7 @@ _watoi(wchar_t *fmt)
 static void
 _wmkarglst(wchar_t *fmt, stva_list args, stva_list arglst[], int prflag)
 #else  /* _WIDE */
-void
+static void
 _mkarglst(char *fmt, stva_list args, stva_list arglst[], int prflag)
 #endif /* _WIDE */
 {
