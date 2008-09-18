@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * An implementation of the IPoIB standard based on PSARC 2001/289.
  */
@@ -84,17 +82,17 @@ typedef enum {IBD_LINK_DOWN, IBD_LINK_UP, IBD_LINK_UP_ABSENT} ibd_link_op_t;
 /*
  * Per interface tunable parameters.
  */
-static uint_t ibd_rx_threshold = 16;
-static uint_t ibd_tx_current_copy_threshold = 0x10000000;
+uint_t ibd_rx_threshold = 16;
+uint_t ibd_tx_current_copy_threshold = 0x10000000;
 /* should less than max Tavor CQsize and be 2^n - 1 */
-static uint_t ibd_num_rwqe = 511;
-static uint_t ibd_num_swqe = 511;
-static uint_t ibd_num_ah = 16;
-static uint_t ibd_hash_size = 16;
-static uint_t ibd_srv_fifos = 0x0;
-static uint_t ibd_fifo_depth = 0;
-static ibd_csum_type_t ibd_csum_send = IBD_CSUM_NONE;
-static ibd_csum_type_t ibd_csum_recv = IBD_CSUM_NONE;
+uint_t ibd_num_rwqe = 511;
+uint_t ibd_num_swqe = 511;
+uint_t ibd_num_ah = 16;
+uint_t ibd_hash_size = 16;
+uint_t ibd_srv_fifos = 0x0;
+uint_t ibd_fifo_depth = 0;
+ibd_csum_type_t ibd_csum_send = IBD_CSUM_NONE;
+ibd_csum_type_t ibd_csum_recv = IBD_CSUM_NONE;
 
 /*
  * The driver can use separate CQs for send and receive queueus.
@@ -114,8 +112,8 @@ static ibd_csum_type_t ibd_csum_recv = IBD_CSUM_NONE;
  * the id_txwcs is used to fetch Tx completions in the separate CQs
  * case.
  */
-static uint_t ibd_separate_cqs = 1;
-static uint_t ibd_txcomp_poll = 0;
+uint_t ibd_separate_cqs = 1;
+uint_t ibd_txcomp_poll = 0;
 
 /*
  * the softintr is introduced to avoid Event Queue overflow. It
@@ -123,8 +121,8 @@ static uint_t ibd_txcomp_poll = 0;
  * If service fifos is enabled, this is not required, because
  * mac_rx() will be called by service threads.
  */
-static uint_t ibd_rx_softintr = 1;
-static uint_t ibd_tx_softintr = 1;
+uint_t ibd_rx_softintr = 1;
+uint_t ibd_tx_softintr = 1;
 
 /*
  * Initial number of IBA resources allocated.
