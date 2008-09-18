@@ -410,6 +410,287 @@ add_string(char *old, char *str)
 }
 
 /*
+ * Determine whether this string, possibly with an associated option, should be
+ * translated to an option character.  If so, update the optind and optarg
+ * as described for short options in getopt(3c).
+ */
+static int
+str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
+    const char *opt, size_t optsz)
+{
+	if (optsz == 0) {
+		/*
+		 * Compare a single option (ie. there's no associated option
+		 * argument).
+		 */
+		if (strcmp(arg, opt) == 0) {
+			DBG_CALL(Dbg_args_str2chr(lml, ndx, opt, c));
+			optind += 1;
+			return (c);
+		}
+
+	} else if (strncmp(arg, opt, optsz) == 0) {
+		/*
+		 * Otherwise, compare the option name, which may be
+		 * concatenated with the option argument.
+		 */
+		DBG_CALL(Dbg_args_str2chr(lml, ndx, opt, c));
+
+		if (arg[optsz] == '\0') {
+			/*
+			 * Optarg is the next argument (white space separated).
+			 * Make sure an optarg is available, and if not return
+			 * a failure to prevent any fall-through to the generic
+			 * getopt() processing.
+			 */
+			if ((++optind + 1) > argc) {
+				return ('?');
+			}
+			optarg = argv[optind];
+			optind++;
+		} else {
+			/*
+			 * Optarg concatenated to option (no white space).
+			 * GNU option/option argument pairs can be represented
+			 * with a "=" separator.  If this is the case, remove
+			 * the separator.
+			 */
+			optarg = &arg[optsz];
+			optind++;
+			if (*optarg == '=') {
+				if (*(++optarg) == '\0')
+					return ('?');
+			}
+		}
+		return (c);
+	}
+	return (0);
+}
+
+/*
+ * Parse an individual option.  The intent of this function is to determine if
+ * any known, non-Solaris options have been passed to ld(1).  This condition
+ * can occur as a result of build configuration tools, because of users
+ * familiarity with other systems, or simply the users preferences.  If a known
+ * non-Solaris option can be determined, translate that option into the Solaris
+ * counterpart.
+ *
+ * This function will probably never be a complete solution, as new, non-Solaris
+ * options are discovered, their translation will have to be added.  Other
+ * non-Solaris options are incompatible with the Solaris link-editor, and will
+ * never be recognized.  We support what we can.
+ */
+int
+ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
+{
+	int	c;
+
+	if ((optind < argc) && argv[optind] && (argv[optind][0] == '-')) {
+		char	*arg = &argv[optind][1];
+
+		switch (*arg) {
+		case 'r':
+			/* Translate -rpath <optarg> to -R <optarg> */
+			if ((c = str2chr(lml, ndx, argc, argv, arg, 'R',
+			    MSG_ORIG(MSG_ARG_T_RPATH),
+			    MSG_ARG_T_RPATH_SIZE)) != 0) {
+				return (c);
+			}
+			break;
+		case 's':
+			/* Translate -shared to -G */
+			if ((c = str2chr(lml, ndx, argc, argv, arg, 'G',
+			    MSG_ORIG(MSG_ARG_T_SHARED), 0)) != 0) {
+				return (c);
+
+			/* Translate -soname <optarg> to -h <optarg> */
+			} else if ((c = str2chr(lml, ndx, argc, argv, arg, 'h',
+			    MSG_ORIG(MSG_ARG_T_SONAME),
+			    MSG_ARG_T_SONAME_SIZE)) != 0) {
+				return (c);
+			}
+			break;
+		case '-':
+			switch (*(arg + 1)) {
+			case 'a':
+				/*
+				 * Translate --allow-multiple-definition to
+				 * -zmuldefs
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_MULDEFS), 0)) != 0) {
+					optarg =
+					    (char *)MSG_ORIG(MSG_ARG_MULDEFS);
+					return (c);
+
+				/*
+				 * Translate --auxiliary <optarg> to
+				 * -f <optarg>
+				 */
+				} else if ((c = str2chr(lml, argc, ndx, argv,
+				    arg, 'f', MSG_ORIG(MSG_ARG_T_AUXFLTR),
+				    MSG_ARG_T_AUXFLTR_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'd':
+				/*
+				 * Translate --dynamic-linker <optarg> to
+				 * -I <optarg>
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'I',
+				    MSG_ORIG(MSG_ARG_T_INTERP),
+				    MSG_ARG_T_INTERP_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'e':
+				/* Translate --entry <optarg> to -e <optarg> */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'e',
+				    MSG_ORIG(MSG_ARG_T_ENTRY),
+				    MSG_ARG_T_ENTRY_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'f':
+				/* Translate --filter <optarg> to -F <optarg> */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'F',
+				    MSG_ORIG(MSG_ARG_T_STDFLTR),
+				    MSG_ARG_T_STDFLTR_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'h':
+				/* Translate --help to -zhelp */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_HELP), 0)) != 0) {
+					optarg = (char *)MSG_ORIG(MSG_ARG_HELP);
+					return (c);
+				}
+				break;
+			case 'l':
+				/*
+				 * Translate --library <optarg> to -l <optarg>
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'l',
+				    MSG_ORIG(MSG_ARG_T_LIBRARY),
+				    MSG_ARG_T_LIBRARY_SIZE)) != 0) {
+					return (c);
+
+				/*
+				 * Translate --library-path <optarg> to
+				 * -L <optarg>
+				 */
+				} else if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'L', MSG_ORIG(MSG_ARG_T_LIBPATH),
+				    MSG_ARG_T_LIBPATH_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'n':
+				/* Translate --no-undefined to -zdefs */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_NOUNDEF), 0)) != 0) {
+					optarg = (char *)MSG_ORIG(MSG_ARG_DEFS);
+					return (c);
+
+				/*
+				 * Translate --no-whole-archive to
+				 * -z defaultextract
+				 */
+				} else if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_NOWHOLEARC), 0)) != 0) {
+					optarg =
+					    (char *)MSG_ORIG(MSG_ARG_DFLEXTRT);
+					return (c);
+				}
+				break;
+			case 'o':
+				/* Translate --output <optarg> to -o <optarg> */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'o',
+				    MSG_ORIG(MSG_ARG_T_OUTPUT),
+				    MSG_ARG_T_OUTPUT_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'r':
+				/* Translate --relocatable to -r */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'r',
+				    MSG_ORIG(MSG_ARG_T_RELOCATABLE), 0)) != 0) {
+					return (c);
+				}
+				break;
+			case 's':
+				/* Translate --strip-all to -s */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 's',
+				    MSG_ORIG(MSG_ARG_T_STRIP), 0)) != 0) {
+					return (c);
+				}
+				break;
+			case 'u':
+				/*
+				 * Translate --undefined <optarg> to
+				 * -u <optarg>
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'u',
+				    MSG_ORIG(MSG_ARG_T_UNDEF),
+				    MSG_ARG_T_UNDEF_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'v':
+				/* Translate --version to -V */
+				if ((c = str2chr(lml, ndx, argc, argv, arg, 'V',
+				    MSG_ORIG(MSG_ARG_T_VERSION), 0)) != 0) {
+					return (c);
+
+				/*
+				 * Translate --version-script <optarg> to
+				 * -M <optarg>
+				 */
+				} else if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'M', MSG_ORIG(MSG_ARG_T_VERSCRIPT),
+				    MSG_ARG_T_VERSCRIPT_SIZE)) != 0) {
+					return (c);
+				}
+				break;
+			case 'w':
+				/*
+				 * Translate --whole-archive to -z alltextract
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_WHOLEARC), 0)) != 0) {
+					optarg =
+					    (char *)MSG_ORIG(MSG_ARG_ALLEXTRT);
+					return (c);
+				}
+				break;
+			}
+			break;
+		}
+	}
+	if ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
+		/*
+		 * It is possible that a "-Wl," argument has been used to
+		 * specify an option.  This isn't advertized ld(1) syntax, but
+		 * compiler drivers and configuration tools, have been known to
+		 * pass this compiler option to ld(1).  Strip off the "-Wl,"
+		 * prefix and pass the option through.
+		 */
+		if ((c == 'W') && (strncmp(optarg,
+		    MSG_ORIG(MSG_ARG_T_WL), MSG_ARG_T_WL_SIZE) == 0)) {
+			DBG_CALL(Dbg_args_Wldel(lml, ndx, optarg));
+			c = optarg[MSG_ARG_T_WL_SIZE];
+			optarg += MSG_ARG_T_WL_SIZE + 1;
+		}
+	}
+
+	return (c);
+}
+
+/*
  * Messaging support - funnel everything through dgettext().
  */
 

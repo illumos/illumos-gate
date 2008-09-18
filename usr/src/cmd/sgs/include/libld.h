@@ -1112,6 +1112,8 @@ typedef struct ar_desc {
 
 #endif
 
+extern int		ld_getopt(Lm_list *, int, int, char **);
+
 extern int		ld32_main(int, char **, Half);
 extern int		ld64_main(int, char **, Half);
 

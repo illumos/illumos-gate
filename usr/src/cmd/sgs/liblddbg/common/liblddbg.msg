@@ -283,7 +283,11 @@
 
 # Argument messages
 
-@ MSG_ARG_FLAG		"arg[%d]\tflag=-%c"
+@ MSG_ARG_OPTION	"arg[%d]\toption=-%c"
+@ MSG_ARG_OPTARG	"arg[%d]\toption=-%c:  option-argument: %s"
+@ MSG_ARG_STR2CHR	"arg[%d]\toption=-%s:  translated: new option=-%c"
+@ MSG_ARG_WLDEL		"arg[%d]\toption=-W%s:  translated: prefix -Wl,: \
+			 removed"
 @ MSG_ARG_FILE		"arg[%d]\tfile=%s"
 
 

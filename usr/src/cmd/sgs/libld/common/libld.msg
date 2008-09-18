@@ -77,26 +77,31 @@
 @ MSG_ARG_DETAIL_CC	"\t[-C]\t\tdemangle C++ symbol name diagnostics\n"
 @ MSG_ARG_DETAIL_D	"\t[-d y | n]\toperate in dynamic|static mode\n"
 @ MSG_ARG_DETAIL_CD	"\t[-D token,...]\tprint diagnostic messages\n"
-@ MSG_ARG_DETAIL_E	"\t[-e epsym]\tuse `epsym' as entry point address\n"
-@ MSG_ARG_DETAIL_F	"\t[-f name]\tspecify library for which this file is \
-			 an auxiliary\n\
-			 \t\t\tfilter\n"
-@ MSG_ARG_DETAIL_CF	"\t[-F name]\tspecify library for which this file is \
-			 a filter\n"
-@ MSG_ARG_DETAIL_CG	"\t[-G]\t\tcreate a shared object\n"
-@ MSG_ARG_DETAIL_H	"\t[-h name]\tuse `name' as internal shared object \
-			 identifier\n"
+@ MSG_ARG_DETAIL_E	"\t[-e epsym], [--entry epsym]\n\
+			 \t\t\tuse `epsym' as entry point address\n"
+@ MSG_ARG_DETAIL_F	"\t[-f name], [--auxiliary name]\n\
+			 \t\t\tspecify library for which this file is an \
+			 auxiliary\n\t\t\tfilter\n"
+@ MSG_ARG_DETAIL_CF	"\t[-F name], [--filter name]\n\
+			 \t\t\tspecify library for which this file is a filter\n"
+@ MSG_ARG_DETAIL_CG	"\t[-G], [-shared]\n\
+			 \t\t\tcreate a shared object\n"
+@ MSG_ARG_DETAIL_H	"\t[-h name], [--soname name]\n\
+			 \t\t\tuse `name' as internal shared object identifier\n"
 @ MSG_ARG_DETAIL_I	"\t[-i]\t\tignore LD_LIBRARY_PATH setting\n"
 @ MSG_ARG_DETAIL_CI	"\t[-I name]\tuse `name' as path of interpreter\n"
-@ MSG_ARG_DETAIL_L	"\t[-l x]\t\tsearch for libx.so or libx.a\n"
-@ MSG_ARG_DETAIL_CL	"\t[-L path]\tsearch for libraries in directory \
-			 `path'\n"
+@ MSG_ARG_DETAIL_L	"\t[-l x], [--library x]\n\
+			 \t\t\tsearch for libx.so or libx.a\n"
+@ MSG_ARG_DETAIL_CL	"\t[-L path], [--library-path path]\n\
+			 \t\t\tsearch for libraries in directory `path'\n"
 @ MSG_ARG_DETAIL_M	"\t[-m]\t\tprint memory map\n"
-@ MSG_ARG_DETAIL_CM	"\t[-M mapfile]\tuse processing directives contained \
+@ MSG_ARG_DETAIL_CM	"\t[-M mapfile], [--version-script mapfile]\n\
+			 \t\t\tuse processing directives contained \
 			 in `mapfile'\n"
 @ MSG_ARG_DETAIL_CN	"\t[-N string]\tcreate a dynamic dependency for \
 			 `string'\n"
-@ MSG_ARG_DETAIL_O	"\t[-o outfile]\tname the output file `outfile'\n"
+@ MSG_ARG_DETAIL_O	"\t[-o outfile], [--output outfile]\n\
+			 \t\t\tname the output file `outfile'\n"
 @ MSG_ARG_DETAIL_P	"\t[-p auditlib]\tidentify audit library to accompany \
 			 this object\n"
 @ MSG_ARG_DETAIL_CP	"\t[-P auditlib]\tidentify audit library for \
@@ -104,16 +109,21 @@
 			 \t\t\tof this object\n"
 @ MSG_ARG_DETAIL_CQ	"\t[-Q y | n]\tdo|do not place version information in \
 			 output file\n"
-@ MSG_ARG_DETAIL_R	"\t[-r]\t\tcreate a relocatable object\n"
-@ MSG_ARG_DETAIL_CR	"\t[-R path]\tspecify a library search path to be \
-			 used at run time\n"
-@ MSG_ARG_DETAIL_S	"\t[-s]\t\tstrip any symbol and debugging information\n"
+@ MSG_ARG_DETAIL_R	"\t[-r], [--relocatable]\n\
+			 \t\t\tcreate a relocatable object\n"
+@ MSG_ARG_DETAIL_CR	"\t[-R path], [-rpath path]\n\
+			 \t\t\tspecify a library search path to be used at run \
+			 time\n"
+@ MSG_ARG_DETAIL_S	"\t[-s], [--strip-all]\n\
+			 \t\t\tstrip any symbol and debugging information\n"
 @ MSG_ARG_DETAIL_CS	"\t[-S supportlib]\n\
 			 \t\t\tspecify a link-edit support library\n"
 @ MSG_ARG_DETAIL_T	"\t[-t]\t\tdo not warn of multiply-defined symbols \
 			 that have\n\t\t\tdifferent sizes or alignments\n"
-@ MSG_ARG_DETAIL_U	"\t[-u symname]\tcreate an undefined symbol `symname'\n"
-@ MSG_ARG_DETAIL_CV	"\t[-V]\t\tprint version information\n"
+@ MSG_ARG_DETAIL_U	"\t[-u symname], [--undefined symname]\n\
+			 \t\t\tcreate an undefined symbol `symname'\n"
+@ MSG_ARG_DETAIL_CV	"\t[-V], [--version]\n\
+			 \t\t\tprint version information\n"
 @ MSG_ARG_DETAIL_CY	"\t[-Y P,dirlist]\tuse `dirlist' as a default path \
 			 when searching for\n\
 			 \t\t\tlibraries\n"
@@ -121,19 +131,22 @@
 			 symbols\n \
 			 \t\t\treferenced in dynamic objects are promoted to\n \
 			 \t\t\tthe executable\n"
-@ MSG_ARG_DETAIL_ZAE	"\t[-z allextract | defaultextract | weakextract]\n\
+@ MSG_ARG_DETAIL_ZAE	"\t[-z allextract | defaultextract | weakextract],\n\
+			 \t[--whole-archive | --no-whole-archive]\n\
 			 \t\t\textract all member files, only members that \
 			 resolve\n\
-			 \t\t\tundefined tor tentative symbols, or \
+			 \t\t\tundefined or tentative symbols, or \
 			 allow extraction of\n\
-			 \t\t\tarchive members to resolvetweak references from \
+			 \t\t\tarchive members to resolve weak references from \
 			 \n\t\t\t\archive files\n"
 @ MSG_ARG_DETAIL_ZAL	"\t[-z altexec64]\texecute the 64-bit link-editor\n"
 @ MSG_ARG_DETAIL_ZC	"\t[-z combreloc | nocombreloc]\n\
-			 combine|do not combine multiple relocation sections\n"
+			 \t\t\tcombine|do not combine multiple relocation \
+			 sections\n"
 @ MSG_ARG_DETAIL_ZNC	"\t[-z nocompstrtab]\n\t\t\tdisable compression of \
 			 string tables\n"
-@ MSG_ARG_DETAIL_ZDFS	"\t[-z defs]\tdisallow undefined symbol references\n"
+@ MSG_ARG_DETAIL_ZDFS	"\t[-z defs], [--no-undefined]\n\
+			 \t\t\tdisallow undefined symbol references\n"
 @ MSG_ARG_DETAIL_ZDRS	"\t[-z direct | nodirect]\n\
 			 \t\t\tenable|disable direct binding to shared object\n\
 			 \t\t\tdependencies\n"
@@ -145,7 +158,8 @@
 @ MSG_ARG_DETAIL_ZGP	"\t[-z groupperm | nogroupperm]\n\
 			 \t\t\tenable|disable setting of group permissions\n\
 			 \t\t\ton dynamic dependencies\n"
-@ MSG_ARG_DETAIL_ZH	"\t[-z help ]\tprint this usage message\n"
+@ MSG_ARG_DETAIL_ZH	"\t[-z help], [--help]\n\
+			 \t\t\tprint this usage message\n"
 @ MSG_ARG_DETAIL_ZIG	"\t[-z ignore | record]\n\
 			 \t\t\tignore|record unused dynamic dependencies\n"
 @ MSG_ARG_DETAIL_ZINA	"\t[-z initarray=function]\n\
@@ -170,7 +184,8 @@
 @ MSG_ARG_DETAIL_ZLO	"\t[-z loadfltr]\tmark filter as requiring immediate \
 			 loading of its\n\
 			 \t\t\tfiltees at runtime\n"
-@ MSG_ARG_DETAIL_ZM	"\t[-z muldefs]\tallow multiply-defined symbols\n"
+@ MSG_ARG_DETAIL_ZM	"\t[-z muldefs], [--allow-multiple-definition]\n\
+			 \t\t\tallow multiply-defined symbols\n"
 @ MSG_ARG_DETAIL_ZNDFS	"\t[-z nodefs]\tallow undefined symbol references\n"
 @ MSG_ARG_DETAIL_ZNDEF	"\t[-z nodefaultlib]\n\
 			 \t\t\tmark object to ignore any default library \
@@ -780,8 +795,10 @@
 
 # Argument processing messages
 
-@ MSG_ARG_DYNINCOMP	"option %s and building \
-			 a dynamic executable are incompatible"
+@ MSG_ARG_DY_INCOMP	"option %s is incompatible with building a dynamic \
+			 executable"
+@ MSG_ARG_ST_INCOMP	"option %s is incompatible with building a static \
+			 object (-dn/-r)"
 @ MSG_ARG_INCOMP	"option %s and %s are incompatible"
 @ MSG_ARG_MTONCE	"option %s appears more than once, first setting taken"
 @ MSG_ARG_ILLEGAL	"option %s has illegal argument `%s'"
@@ -891,7 +908,7 @@
 @ MSG_MAP_NOTERM	"%s: %lld: string does not terminate with a `\"'"
 @ MSG_MAP_SECINSEG	"%s: %lld: section within segment ordering done on \
 			 a non-existent segment `%s'"
-@ MSG_MAP_INCOMFLG	"%s: %lld: incompatible flags $SPECVERS and $ADDVERS \
+@ MSG_MAP_INCOMPFLG	"%s: %lld: incompatible flags $SPECVERS and $ADDVERS \
 			 used on the same object `%s'"
 @ MSG_MAP_MULSONAME	"%s: %lld: multiple definition of SONAME field for %s: \
 			 first `%s', second `%s'; first value used"
@@ -1046,7 +1063,7 @@
 @ MSG_STR_SFCAP_1	"sfcap_1"
 
 @ MSG_STR_OPTIONS	"6:abc:d:e:f:h:il:mo:p:rstu:z:B:CD:F:GI:L:M:N:P:Q:R:\
-			 S:VY:?"
+			 S:VW:Y:?"
 
 
 # Argument processing strings
@@ -1066,7 +1083,6 @@
 @ MSG_ARG_C		"-c"
 @ MSG_ARG_D		"-d"
 @ MSG_ARG_E		"-e"
-@ MSG_ARG_DN		"-dn"
 @ MSG_ARG_DY		"-dy"
 @ MSG_ARG_F		"-f"
 @ MSG_ARG_CF		"-F"
@@ -1148,7 +1164,6 @@
 @ MSG_ARG_NORELAXRELOC	"norelaxreloc"
 @ MSG_ARG_GLOBAUDIT	"globalaudit"
 @ MSG_ARG_TARGET	"target="
-
 @ MSG_ARG_HELP		"help"
 @ MSG_ARG_GROUP		"group"
 @ MSG_ARG_REDUCE	"reduce"
@@ -1158,6 +1173,28 @@
 @ MSG_ARG_PCOM		"P,"
 @ MSG_ARG_UCOM		"U,"
 
+@ MSG_ARG_T_RPATH	"rpath"
+@ MSG_ARG_T_SHARED	"shared"
+@ MSG_ARG_T_SONAME	"soname"
+@ MSG_ARG_T_WL		"l,-"
+
+@ MSG_ARG_T_AUXFLTR	"-auxiliary"
+@ MSG_ARG_T_MULDEFS	"-allow-multiple-definition"
+@ MSG_ARG_T_INTERP	"-dynamic-linker"
+@ MSG_ARG_T_ENTRY	"-entry"
+@ MSG_ARG_T_STDFLTR	"-filter"
+@ MSG_ARG_T_HELP	"-help"
+@ MSG_ARG_T_LIBRARY	"-library"
+@ MSG_ARG_T_LIBPATH	"-library-path"
+@ MSG_ARG_T_NOUNDEF	"-no-undefined"
+@ MSG_ARG_T_NOWHOLEARC	"-no-whole-archive"
+@ MSG_ARG_T_OUTPUT	"-output"
+@ MSG_ARG_T_RELOCATABLE	"-relocatable"
+@ MSG_ARG_T_STRIP	"-strip-all"
+@ MSG_ARG_T_UNDEF	"-undefined"
+@ MSG_ARG_T_VERSION	"-version"
+@ MSG_ARG_T_VERSCRIPT	"-version-script"
+@ MSG_ARG_T_WHOLEARC	"-whole-archive"
 
 # File and pathname strings
 

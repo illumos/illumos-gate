@@ -1216,7 +1216,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 				    FLG_SDF_ADDVER)) == (FLG_SDF_SPECVER |
 				    FLG_SDF_ADDVER)) {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_INCOMFLG),
+					    MSG_INTL(MSG_MAP_INCOMPFLG),
 					    mapfile, EC_XWORD(Line_num),
 					    sdf->sdf_name);
 					return (S_ERROR);

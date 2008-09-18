@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libld.h"
 
 /*
@@ -41,6 +39,8 @@ uintptr_t	ld64_ent_setup(Ofl_desc *, Xword);
 
 uintptr_t	ld32_init_strings(Ofl_desc *);
 uintptr_t	ld64_init_strings(Ofl_desc *);
+
+int		ld_getopt(Lm_list *, int, int, char **);	
 
 int		ld32_main(int, char **, Elf32_Half);
 int		ld64_main(int, char **, Elf64_Half);

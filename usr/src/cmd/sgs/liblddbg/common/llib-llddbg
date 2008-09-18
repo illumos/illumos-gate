@@ -36,7 +36,9 @@ const char *
 	Dbg_demangle_name(const char *);
 
 void	Dbg_args_files(Lm_list *, int, char *);
-void	Dbg_args_flags(Lm_list *, int, int);
+void	Dbg_args_opts(Lm_list *, int, int, char *);
+void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
+void	Dbg_args_Wldel(Lm_list *, int, const char *);
 void	Dbg_audit_ignore(Rt_map *);
 void	Dbg_audit_interface(Lm_list *, const char *, const char *);
 void	Dbg_audit_lib(Lm_list *, const char *);

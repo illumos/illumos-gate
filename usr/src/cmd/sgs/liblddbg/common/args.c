@@ -20,23 +20,42 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<debug.h>
 #include	"_debug.h"
 #include	"msg.h"
 
 void
-Dbg_args_flags(Lm_list *lml, int ndx, int c)
+Dbg_args_opts(Lm_list *lml, int ndx, int c, char *optarg)
 {
 	if (DBG_NOTCLASS(DBG_C_ARGS))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_ARG_FLAG), ndx, c);
+	if (optarg)
+		dbg_print(lml, MSG_INTL(MSG_ARG_OPTARG), ndx, c, optarg);
+	else
+		dbg_print(lml, MSG_INTL(MSG_ARG_OPTION), ndx, c);
+}
+
+void
+Dbg_args_str2chr(Lm_list *lml, int ndx, const char *opt, int c)
+{
+	if (DBG_NOTCLASS(DBG_C_ARGS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_ARG_STR2CHR), ndx, opt, c);
+}
+
+void
+Dbg_args_Wldel(Lm_list *lml, int ndx, const char *opt)
+{
+	if (DBG_NOTCLASS(DBG_C_ARGS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_ARG_WLDEL), ndx, opt);
 }
 
 void

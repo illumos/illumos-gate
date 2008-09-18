@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
 
@@ -59,9 +58,6 @@
 @ MSG_STR_LDDIAG	"ld: "
 @ MSG_STR_ELFDIAG	": %s"
 
-@ MSG_STR_OPTIONS	"6:abc:d:e:f:h:il:mo:p:rstu:z:B:CD:F:GI:L:M:N:P:Q:R:\
-			 S:VY:?"
-
 @ MSG_ARG_FOUR		"4"
 @ MSG_ARG_ALTEXEC64	"altexec64"
 @ MSG_ARG_TARGET	"target="
@@ -73,4 +69,3 @@
 
 @ MSG_TARG_SPARC	"sparc"
 @ MSG_TARG_X86		"x86"
-

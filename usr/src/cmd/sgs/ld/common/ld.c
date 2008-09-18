@@ -23,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -117,7 +115,6 @@ process_args(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass,
 	Half	mach32 = EM_NONE, mach64 = EM_NONE;
 	int	c;
 
-getmore:
 	/*
 	 * In general, libld.so is responsible for processing the
 	 * command line options. The exception to this are those options
@@ -128,7 +125,7 @@ getmore:
 	 *	-64
 	 *		Produce an ELFCLASS64 object. Use the 64-bit linker.
 	 *
-	 *	-zaltexec64
+	 *	-z altexec64
 	 *		Use the 64-bit linker regardless of the class
 	 *		of the output object.
 	 *
@@ -144,49 +141,45 @@ getmore:
 	 * default error message.
 	 */
 	opterr = 0;
-	while ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
+	optind = 1;
+getmore:
+	while ((c = ld_getopt(0, optind, argc, argv)) != -1) {
 		switch (c) {
-			case '6':
-				if (strncmp(optarg, MSG_ORIG(MSG_ARG_FOUR),
-				    MSG_ARG_FOUR_SIZE) == 0)
-					aclass = ELFCLASS64;
-				break;
+		case '6':
+			if (strncmp(optarg, MSG_ORIG(MSG_ARG_FOUR),
+			    MSG_ARG_FOUR_SIZE) == 0)
+				aclass = ELFCLASS64;
+			break;
 
-			case 'z':
+		case 'z':
 #if	!defined(_LP64)
-				/* -z altexec64 */
-				if (strncmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64),
-				    MSG_ARG_ALTEXEC64_SIZE) == 0) {
-					lclass = ELFCLASS64;
-					break;
-				}
+			/* -z altexec64 */
+			if (strncmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64),
+			    MSG_ARG_ALTEXEC64_SIZE) == 0) {
+				lclass = ELFCLASS64;
+				break;
+			}
 #endif
+			/* -z target=platform */
+			if (strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
+			    MSG_ARG_TARGET_SIZE) == 0) {
+				char *pstr = optarg + MSG_ARG_TARGET_SIZE;
 
-				/* -z target=platform */
-				if (strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
-				    MSG_ARG_TARGET_SIZE) == 0) {
-					char *pstr =
-					    optarg + MSG_ARG_TARGET_SIZE;
-
-					if (strcasecmp(pstr,
-					    MSG_ORIG(MSG_TARG_SPARC)) == 0) {
-						mach32 = EM_SPARC;
-						mach64 = EM_SPARCV9;
-					} else if (strcasecmp(pstr,
-					    MSG_ORIG(MSG_TARG_X86)) == 0) {
-						mach32 = EM_386;
-						mach64 = EM_AMD64;
-					} else {
-						eprintf(0, ERR_FATAL,
-						    MSG_INTL(MSG_ERR_BADTARG),
-						    pstr);
-						return (1);
-					}
+				if (strcasecmp(pstr,
+				    MSG_ORIG(MSG_TARG_SPARC)) == 0) {
+					mach32 = EM_SPARC;
+					mach64 = EM_SPARCV9;
+				} else if (strcasecmp(pstr,
+				    MSG_ORIG(MSG_TARG_X86)) == 0) {
+					mach32 = EM_386;
+					mach64 = EM_AMD64;
+				} else {
+					eprintf(0, ERR_FATAL,
+					    MSG_INTL(MSG_ERR_BADTARG), pstr);
+					return (1);
 				}
-				break;
-
-			default:
-				break;
+			}
+			break;
 		}
 	}
 
@@ -313,51 +306,97 @@ getmore:
 }
 
 /*
- * Prepend environment string as a series of options to the argv array.
+ * Process an LD_OPTIONS environment string.  This routine is first called to
+ * count the number of options, and second to initialize a new argument array
+ * with each option.
  */
 static int
-prepend_ldoptions(char *ld_options, int *argcp, char ***argvp)
+process_ldoptions(char *str, char **nargv)
 {
-	int	nargc;			/* new argc */
-	char	**nargv;		/* new argv */
-	char	*arg, *string;
-	int	count;
+	int	argc = 0;
+	char	*arg = str;
 
 	/*
-	 * Get rid of leading white space, and make sure the string has size.
+	 * Walk the environment string processing any arguments that are
+	 * separated by white space.
+	 */
+	while (*str != '\0') {
+		if (isspace(*str)) {
+			/*
+			 * If a new argument array has been provided, terminate
+			 * the original environment string, and initialize the
+			 * appropriate argument array entry.
+			 */
+			if (nargv) {
+				*str++ = '\0';
+				nargv[argc] = arg;
+			}
+
+			argc++;
+			while (isspace(*str))
+				str++;
+			arg = str;
+		} else
+			str++;
+	}
+	if (arg != str) {
+		/*
+		 * If a new argument array has been provided, initialize the
+		 * final argument array entry.
+		 */
+		if (nargv)
+			nargv[argc] = arg;
+		argc++;
+	}
+
+	return (argc);
+}
+
+/*
+ * Determine whether an LD_OPTIONS environment variable is set, and if so,
+ * prepend environment string as a series of options to the argv array.
+ */
+static int
+prepend_ldoptions(int *argcp, char ***argvp)
+{
+	int	nargc;
+	char	**nargv, *ld_options;
+	int	err, count;
+
+	if ((ld_options = getenv(MSG_ORIG(MSG_LD_OPTIONS))) == NULL)
+		return (0);
+
+	/*
+	 * Prevent modification of actual environment strings.
+	 */
+	if ((ld_options = strdup(ld_options)) == NULL) {
+		err = errno;
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(err));
+		return (1);
+	}
+
+	/*
+	 * Get rid of any leading white space, and make sure the environment
+	 * string has size.
 	 */
 	while (isspace(*ld_options))
 		ld_options++;
 	if (*ld_options == '\0')
 		return (1);
 
-	nargc = 0;
-	arg = string = ld_options;
-
 	/*
-	 * Walk the environment string counting any arguments that are
-	 * separated by white space.
+	 * Determine the number of options provided.
 	 */
-	while (*string != '\0') {
-		if (isspace(*string)) {
-			nargc++;
-			while (isspace(*string))
-				string++;
-			arg = string;
-		} else
-			string++;
-	}
-	if (arg != string)
-		nargc++;
+	nargc = process_ldoptions(ld_options, NULL);
 
 	/*
 	 * Allocate a new argv array big enough to hold the new options from
 	 * the environment string and the old argv options.
 	 */
-	if ((nargv = calloc(nargc + *argcp, sizeof (char *))) == 0) {
-		int	err = errno;
+	if ((nargv = malloc((nargc + *argcp + 1) * sizeof (char *))) == NULL) {
+		err = errno;
 		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(err));
-		return (0);
+		return (1);
 	}
 
 	/*
@@ -365,37 +404,24 @@ prepend_ldoptions(char *ld_options, int *argcp, char ***argvp)
 	 * of the old argv array (ie. calling programs name).  Then add the new
 	 * args obtained from the environment.
 	 */
-	nargv[0] = (*argvp)[0];
 	nargc = 0;
-	arg = string = ld_options;
-	while (*string != '\0') {
-		if (isspace(*string)) {
-			nargc++;
-			*string++ = '\0';
-			nargv[nargc] = arg;
-			while (isspace(*string))
-				string++;
-			arg = string;
-		} else
-			string++;
-	}
-	if (arg != string) {
-		nargc++;
-		nargv[nargc] = arg;
-	}
+	nargv[nargc++] = (*argvp)[0];
+	nargc += process_ldoptions(ld_options, &nargv[nargc]);
 
 	/*
 	 * Now add the original argv array (skipping argv[0]) to the end of the
-	 * new argv array, and overwrite the old argc and argv.
+	 * new argv array, and re-vector argc and argv to reference this new
+	 * array
 	 */
-	for (count = 1; count < *argcp; count++) {
-		nargc++;
+	for (count = 1; count < *argcp; count++, nargc++)
 		nargv[nargc] = (*argvp)[count];
-	}
-	*argcp = ++nargc;
+
+	nargv[nargc] = NULL;
+
+	*argcp = nargc;
 	*argvp = nargv;
 
-	return (1);
+	return (0);
 }
 
 /*
@@ -461,25 +487,9 @@ ld_altexec(char **argv, char **envp)
 int
 main(int argc, char **argv, char **envp)
 {
-	char		*ld_options, **oargv = argv;
+	char		**oargv = argv;
 	uchar_t 	aoutclass, ldclass, checkclass;
 	Half		mach;
-
-	/*
-	 * XX64 -- Strip "-Wl," from the head of each argument.  This is to
-	 * accommodate awkwardness in passing ld arguments to gcc while
-	 * maintaining the structure of the OSNet build environment's Makefiles.
-	 */
-	{
-		int i;
-		char *p;
-
-		for (i = 0; i < argc; i++) {
-			p = argv[i];
-			while (*(p + 1) == 'W' && strncmp(p, "-Wl,-", 5) == 0)
-				argv[i] = (p += 4);
-		}
-	}
 
 	/*
 	 * Establish locale.
@@ -498,14 +508,8 @@ main(int argc, char **argv, char **envp)
 	 * Check the LD_OPTIONS environment variable, and if present prepend
 	 * the arguments specified to the command line argument list.
 	 */
-	if ((ld_options = getenv(MSG_ORIG(MSG_LD_OPTIONS))) != NULL) {
-		/*
-		 * Prevent modification of actual environment strings.
-		 */
-		if (((ld_options = strdup(ld_options)) == NULL) ||
-		    (prepend_ldoptions(ld_options, &argc, &argv) == 0))
-			return (1);
-	}
+	if (prepend_ldoptions(&argc, &argv))
+		return (1);
 
 	/*
 	 * Examine the command arguments to determine:
@@ -534,7 +538,6 @@ main(int argc, char **argv, char **envp)
 	 * Reset the getopt(3c) error message flag, and call the generic entry
 	 * point using the appropriate class.
 	 */
-	optind = opterr = 1;
 	if (aoutclass == ELFCLASS64)
 		return (ld64_main(argc, argv, mach));
 	else

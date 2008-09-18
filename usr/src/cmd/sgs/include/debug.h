@@ -631,7 +631,9 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
  * External Dbg_*() interface routines.
  */
 extern	void	Dbg_args_files(Lm_list *, int, char *);
-extern	void	Dbg_args_flags(Lm_list *, int, int);
+extern	void	Dbg_args_opts(Lm_list *, int, int, char *);
+extern	void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
+extern	void	Dbg_args_Wldel(Lm_list *, int, const char *);
 extern	void	Dbg_audit_ignore(Rt_map *);
 extern	void	Dbg_audit_interface(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_lib(Lm_list *, const char *);
