@@ -88,6 +88,21 @@
  *   receipt of the refresh command from svcadm.  In addition, the graph engine
  *   updates the "start" snapshot from the "running" snapshot whenever a service
  *   comes online.
+ *
+ *   When a DISABLE event is requested by the administrator, svc.startd shutdown
+ *   the dependents first before shutting down the requested service.
+ *   In graph_enable_by_vertex, we create a subtree that contains the dependent
+ *   vertices by marking those vertices with the GV_TOOFFLINE flag. And we mark
+ *   the vertex to disable with the GV_TODISABLE flag. Once the tree is created,
+ *   we send the _ADMIN_DISABLE event to the leaves. The leaves will then
+ *   transition from STATE_ONLINE/STATE_DEGRADED to STATE_OFFLINE/STATE_MAINT.
+ *   In gt_enter_offline and gt_enter_maint if the vertex was in a subtree then
+ *   we clear the GV_TOOFFLINE flag and walk the dependencies to offline the new
+ *   exposed leaves. We do the same until we reach the last leaf (the one with
+ *   the GV_TODISABLE flag). If the vertex to disable is also part of a larger
+ *   subtree (eg. multiple DISABLE events on vertices in the same subtree) then
+ *   once the first vertex is disabled (GV_TODISABLE flag is removed), we
+ *   continue to propagate the offline event to the vertex's dependencies.
  */
 
 #include <sys/uadmin.h>
@@ -222,6 +237,8 @@ static char target_milestone_as_runlevel(void);
 static void graph_runlevel_changed(char rl, int online);
 static int dgraph_set_milestone(const char *, scf_handle_t *, boolean_t);
 static boolean_t should_be_in_subgraph(graph_vertex_t *v);
+static int mark_subtree(graph_edge_t *, void *);
+static boolean_t insubtree_dependents_down(graph_vertex_t *);
 
 /*
  * graph_vertex_compare()
@@ -1518,6 +1535,15 @@ dependency_satisfied(graph_vertex_t *v, boolean_t satbility)
 		switch (v->gv_state) {
 		case RESTARTER_STATE_ONLINE:
 		case RESTARTER_STATE_DEGRADED:
+			/*
+			 * An instance that goes offline because one of its
+			 * dependencies is in the process of being disabled,
+			 * should not be able to return online yet. Those
+			 * instances have the GV_TOOFFLINE flag and they can
+			 * not be used to satisfy dependency.
+			 */
+			if (v->gv_flags & GV_TOOFFLINE)
+				return (0);
 			return (1);
 
 		case RESTARTER_STATE_OFFLINE:
@@ -1733,6 +1759,84 @@ propagate_stop(graph_vertex_t *v, void *arg)
 	}
 }
 
+static void
+offline_vertex(graph_vertex_t *v)
+{
+	scf_handle_t *h = libscf_handle_create_bound_loop();
+	scf_instance_t *scf_inst = safe_scf_instance_create(h);
+	scf_propertygroup_t *pg = safe_scf_pg_create(h);
+	restarter_instance_state_t state, next_state;
+	int r;
+
+	assert(v->gv_type == GVT_INST);
+
+	if (scf_inst == NULL)
+		bad_error("safe_scf_instance_create", scf_error());
+	if (pg == NULL)
+		bad_error("safe_scf_pg_create", scf_error());
+
+	/* if the vertex is already going offline, return */
+rep_retry:
+	if (scf_handle_decode_fmri(h, v->gv_name, NULL, NULL, scf_inst, NULL,
+	    NULL, SCF_DECODE_FMRI_EXACT) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			libscf_handle_rebind(h);
+			goto rep_retry;
+
+		case SCF_ERROR_NOT_FOUND:
+			scf_pg_destroy(pg);
+			scf_instance_destroy(scf_inst);
+			(void) scf_handle_unbind(h);
+			scf_handle_destroy(h);
+			return;
+		}
+		uu_die("Can't decode FMRI %s: %s\n", v->gv_name,
+		    scf_strerror(scf_error()));
+	}
+
+	r = scf_instance_get_pg(scf_inst, SCF_PG_RESTARTER, pg);
+	if (r != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			libscf_handle_rebind(h);
+			goto rep_retry;
+
+		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_NOT_FOUND:
+			scf_pg_destroy(pg);
+			scf_instance_destroy(scf_inst);
+			(void) scf_handle_unbind(h);
+			scf_handle_destroy(h);
+			return;
+
+		default:
+			bad_error("scf_instance_get_pg", scf_error());
+		}
+	} else {
+		r = libscf_read_states(pg, &state, &next_state);
+		if (r == 0 && (next_state == RESTARTER_STATE_OFFLINE ||
+		    next_state == RESTARTER_STATE_DISABLED)) {
+			log_framework(LOG_DEBUG,
+			    "%s: instance is already going down.\n",
+			    v->gv_name);
+			scf_pg_destroy(pg);
+			scf_instance_destroy(scf_inst);
+			(void) scf_handle_unbind(h);
+			scf_handle_destroy(h);
+			return;
+		}
+	}
+
+	scf_pg_destroy(pg);
+	scf_instance_destroy(scf_inst);
+
+	(void) stop_instance_fmri(h, v->gv_name,  RSTOP_DEPENDENCY);
+
+	(void) scf_handle_unbind(h);
+	scf_handle_destroy(h);
+}
+
 /*
  * void graph_enable_by_vertex()
  *   If admin is non-zero, this is an administrative request for change
@@ -1742,6 +1846,9 @@ propagate_stop(graph_vertex_t *v, void *arg)
 void
 graph_enable_by_vertex(graph_vertex_t *vertex, int enable, int admin)
 {
+	graph_vertex_t *v;
+	int r;
+
 	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
 	assert((vertex->gv_flags & GV_CONFIGURED));
 
@@ -1751,23 +1858,97 @@ graph_enable_by_vertex(graph_vertex_t *vertex, int enable, int admin)
 	if (enable) {
 		if (vertex->gv_state != RESTARTER_STATE_OFFLINE &&
 		    vertex->gv_state != RESTARTER_STATE_DEGRADED &&
-		    vertex->gv_state != RESTARTER_STATE_ONLINE)
+		    vertex->gv_state != RESTARTER_STATE_ONLINE) {
+			/*
+			 * In case the vertex was notified to go down,
+			 * but now can return online, clear the _TOOFFLINE
+			 * and _TODISABLE flags.
+			 */
+			vertex->gv_flags &= ~GV_TOOFFLINE;
+			vertex->gv_flags &= ~GV_TODISABLE;
+
 			vertex_send_event(vertex, RESTARTER_EVENT_TYPE_ENABLE);
-	} else {
-		if (vertex->gv_state != RESTARTER_STATE_DISABLED) {
-			if (admin)
-				vertex_send_event(vertex,
-				    RESTARTER_EVENT_TYPE_ADMIN_DISABLE);
-			else
-				vertex_send_event(vertex,
-				    RESTARTER_EVENT_TYPE_DISABLE);
 		}
+
+		/*
+		 * Wait for state update from restarter before sending _START or
+		 * _STOP.
+		 */
+
+		return;
+	}
+
+	if (vertex->gv_state == RESTARTER_STATE_DISABLED)
+		return;
+
+	if (!admin) {
+		vertex_send_event(vertex, RESTARTER_EVENT_TYPE_DISABLE);
+
+		/*
+		 * Wait for state update from restarter before sending _START or
+		 * _STOP.
+		 */
+
+		return;
 	}
 
 	/*
-	 * Wait for state update from restarter before sending _START or
-	 * _STOP.
+	 * If it is a DISABLE event requested by the administrator then we are
+	 * offlining the dependents first.
 	 */
+
+	/*
+	 * Set GV_TOOFFLINE for the services we are offlining. We cannot
+	 * clear the GV_TOOFFLINE bits from all the services because
+	 * other DISABLE events might be handled at the same time.
+	 */
+	vertex->gv_flags |= GV_TOOFFLINE;
+
+	/* remember which vertex to disable... */
+	vertex->gv_flags |= GV_TODISABLE;
+
+	/* set GV_TOOFFLINE for its dependents */
+	r = uu_list_walk(vertex->gv_dependents, (uu_walk_fn_t *)mark_subtree,
+	    NULL, 0);
+	assert(r == 0);
+
+	/* disable the instance now if there is nothing else to offline */
+	if (insubtree_dependents_down(vertex) == B_TRUE) {
+		vertex_send_event(vertex, RESTARTER_EVENT_TYPE_ADMIN_DISABLE);
+		return;
+	}
+
+	/*
+	 * This loop is similar to the one used for the graph reversal shutdown
+	 * and could be improved in term of performance for the subtree reversal
+	 * disable case.
+	 */
+	for (v = uu_list_first(dgraph); v != NULL;
+	    v = uu_list_next(dgraph, v)) {
+		/* skip the vertex we are disabling for now */
+		if (v == vertex)
+			continue;
+
+		if (v->gv_type != GVT_INST ||
+		    (v->gv_flags & GV_CONFIGURED) == 0 ||
+		    (v->gv_flags & GV_ENABLED) == 0 ||
+		    (v->gv_flags & GV_TOOFFLINE) == 0)
+			continue;
+
+		if ((v->gv_state != RESTARTER_STATE_ONLINE) &&
+		    (v->gv_state != RESTARTER_STATE_DEGRADED)) {
+			/* continue if there is nothing to offline */
+			continue;
+		}
+
+		/*
+		 * Instances which are up need to come down before we're
+		 * done, but we can only offline the leaves here. An
+		 * instance is a leaf when all its dependents are down.
+		 */
+		if (insubtree_dependents_down(v) == B_TRUE)
+			offline_vertex(v);
+	}
 }
 
 static int configure_vertex(graph_vertex_t *, scf_instance_t *);
@@ -3951,6 +4132,45 @@ dgraph_refresh_instance(graph_vertex_t *v, scf_instance_t *inst)
 }
 
 /*
+ * Returns true only if none of this service's dependents are 'up' -- online
+ * or degraded (offline is considered down in this situation). This function
+ * is somehow similar to is_nonsubgraph_leaf() but works on subtrees.
+ */
+static boolean_t
+insubtree_dependents_down(graph_vertex_t *v)
+{
+	graph_vertex_t *vv;
+	graph_edge_t *e;
+
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+
+	for (e = uu_list_first(v->gv_dependents); e != NULL;
+	    e = uu_list_next(v->gv_dependents, e)) {
+		vv = e->ge_vertex;
+		if (vv->gv_type == GVT_INST) {
+			if ((vv->gv_flags & GV_CONFIGURED) == 0)
+				continue;
+
+			if ((vv->gv_flags & GV_TOOFFLINE) == 0)
+				continue;
+
+			if ((vv->gv_state == RESTARTER_STATE_ONLINE) ||
+			    (vv->gv_state == RESTARTER_STATE_DEGRADED))
+				return (B_FALSE);
+		} else {
+			/*
+			 * For dependency groups or service vertices, keep
+			 * traversing to see if instances are running.
+			 */
+			if (insubtree_dependents_down(vv) == B_FALSE)
+				return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * Returns true only if none of this service's dependents are 'up' -- online,
  * degraded, or offline.
  */
@@ -3980,7 +4200,17 @@ is_nonsubgraph_leaf(graph_vertex_t *v)
 			/*
 			 * For dependency group or service vertices, keep
 			 * traversing to see if instances are running.
+			 *
+			 * We should skip exclude_all dependencies otherwise
+			 * the vertex will never be considered as a leaf
+			 * if the dependent is offline. The main reason for
+			 * this is that disable_nonsubgraph_leaves() skips
+			 * exclusion dependencies.
 			 */
+			if (vv->gv_type == GVT_GROUP &&
+			    vv->gv_depgroup == DEPGRP_EXCLUDE_ALL)
+				continue;
+
 			if (!is_nonsubgraph_leaf(vv))
 				return (0);
 		}
@@ -4074,6 +4304,52 @@ disable_service_temporarily(graph_vertex_t *v, scf_handle_t *h)
 		/* NOTREACHED */
 	}
 }
+
+/*
+ * Of the transitive instance dependencies of v, offline those which are
+ * in the subtree and which are leaves (i.e., have no dependents which are
+ * "up").
+ */
+void
+offline_subtree_leaves(graph_vertex_t *v, void *arg)
+{
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+
+	/* If v isn't an instance, recurse on its dependencies. */
+	if (v->gv_type != GVT_INST) {
+		graph_walk_dependencies(v, offline_subtree_leaves, arg);
+		return;
+	}
+
+	/*
+	 * If v is not in the subtree, so should all of its dependencies,
+	 * so do nothing.
+	 */
+	if ((v->gv_flags & GV_TOOFFLINE) == 0)
+		return;
+
+	/* If v isn't a leaf because it's already down, recurse. */
+	if (!up_state(v->gv_state)) {
+		graph_walk_dependencies(v, offline_subtree_leaves, arg);
+		return;
+	}
+
+	/* if v is a leaf, offline it or disable it if it's the last one */
+	if (insubtree_dependents_down(v) == B_TRUE) {
+		if (v->gv_flags & GV_TODISABLE)
+			vertex_send_event(v,
+			    RESTARTER_EVENT_TYPE_ADMIN_DISABLE);
+		else
+			offline_vertex(v);
+	}
+}
+
+void
+graph_offline_subtree_leaves(graph_vertex_t *v, void *h)
+{
+	graph_walk_dependencies(v, offline_subtree_leaves, (void *)h);
+}
+
 
 /*
  * Of the transitive instance dependencies of v, disable those which are not
@@ -4772,6 +5048,49 @@ nolock_out:
 	}
 
 	return (rebound ? ECONNRESET : 0);
+}
+
+/*
+ * mark_subtree walks the dependents and add the GV_TOOFFLINE flag
+ * to the instances that are supposed to go offline during an
+ * administrative disable operation.
+ */
+static int
+mark_subtree(graph_edge_t *e, void *arg)
+{
+	graph_vertex_t *v;
+	int r;
+
+	v = e->ge_vertex;
+
+	/* If it's already in the subgraph, skip. */
+	if (v->gv_flags & GV_TOOFFLINE)
+		return (UU_WALK_NEXT);
+
+	switch (v->gv_type) {
+	case GVT_INST:
+		/* If the instance is already disabled, skip it. */
+		if (!(v->gv_flags & GV_ENABLED))
+			return (UU_WALK_NEXT);
+
+		v->gv_flags |= GV_TOOFFLINE;
+		log_framework(LOG_DEBUG, "%s added to subtree\n", v->gv_name);
+		break;
+	case GVT_GROUP:
+		/*
+		 * Skip all excluded dependencies and decide whether to offline
+		 * the service based on restart_on attribute.
+		 */
+		if (v->gv_depgroup == DEPGRP_EXCLUDE_ALL ||
+		    v->gv_restart < RERR_RESTART)
+			return (UU_WALK_NEXT);
+		break;
+	}
+
+	r = uu_list_walk(v->gv_dependents, (uu_walk_fn_t *)mark_subtree, arg,
+	    0);
+	assert(r == 0);
+	return (UU_WALK_NEXT);
 }
 
 static int

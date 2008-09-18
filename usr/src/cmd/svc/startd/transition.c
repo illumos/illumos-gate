@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * transition.c - Graph State Machine
@@ -111,8 +110,22 @@ gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
 	 * service was not running the maintenance transition may satisfy
 	 * optional dependencies and should be propagated to determine
 	 * whether new dependents are satisfiable.
+	 * Instances that transition to maintenance and have the GV_TOOFFLINE
+	 * flag are special because they can expose new subtree leaves so
+	 * propagate the offline to the instance dependencies.
 	 */
 	if (gt_running(old_state)) {
+		/*
+		 * Handle state change during instance disabling.
+		 * Propagate offline to the new exposed leaves.
+		 */
+		if (v->gv_flags & GV_TOOFFLINE) {
+			v->gv_flags &= ~GV_TOOFFLINE;
+			log_framework(LOG_DEBUG, "%s removed from subtree\n",
+			    v->gv_name);
+			graph_offline_subtree_leaves(v, (void *)h);
+		}
+
 		log_framework(LOG_DEBUG, "Propagating maintenance (stop) of "
 		    "%s.\n", v->gv_name);
 
@@ -136,12 +149,16 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 	/*
 	 * If the instance should be enabled, see if we can start it.
 	 * Otherwise send a disable command.
+	 * If a instance has the GV_TOOFFLINE flag set then it must
+	 * remains offline until the disable process completes.
 	 */
 	if (v->gv_flags & GV_ENABLED) {
-		graph_start_if_satisfied(v);
+		if (!(v->gv_flags & GV_TOOFFLINE))
+			graph_start_if_satisfied(v);
 	} else {
 		if (gt_running(old_state) && v->gv_post_disable_f)
 			v->gv_post_disable_f();
+
 		vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
 	}
 
@@ -150,8 +167,22 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 	 * service was not running the offline transition may satisfy
 	 * optional dependencies and should be propagated to determine
 	 * whether new dependents are satisfiable.
+	 * Instances that transition to offline and have the GV_TOOFFLINE flag
+	 * are special because they can expose new subtree leaves so propagate
+	 * the offline to the instance dependencies.
 	 */
 	if (gt_running(old_state)) {
+		/*
+		 * Handle state change during instance disabling.
+		 * Propagate offline to the new exposed leaves.
+		 */
+		if (v->gv_flags & GV_TOOFFLINE) {
+			v->gv_flags &= ~GV_TOOFFLINE;
+			log_framework(LOG_DEBUG, "%s removed from subtree\n",
+			    v->gv_name);
+			graph_offline_subtree_leaves(v, (void *)h);
+		}
+
 		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
 		    v->gv_name);
 
@@ -172,10 +203,12 @@ static int
 gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
+
 	/*
 	 * If the instance should be disabled, no problem.  Otherwise,
 	 * send an enable command, which should result in the instance
-	 * moving to OFFLINE.
+	 * moving to OFFLINE unless the instance is part of a subtree
+	 * (non root) and in this case the result is unpredictable.
 	 */
 	if (v->gv_flags & GV_ENABLED) {
 		vertex_send_event(v, RESTARTER_EVENT_TYPE_ENABLE);
@@ -190,6 +223,30 @@ gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
 	 * whether new dependents are satisfiable.
 	 */
 	if (gt_running(old_state)) {
+		/*
+		 * We need to propagate the offline to new exposed leaves in
+		 * case we've just disabled an instance that was part of a
+		 * subtree.
+		 */
+		if (v->gv_flags & GV_TOOFFLINE) {
+			/*
+			 * If the vertex is in the subtree and is transitionning
+			 * to DISABLED then remove the GV_TODISABLE flag also.
+			 */
+			v->gv_flags &= ~GV_TODISABLE;
+			v->gv_flags &= ~GV_TOOFFLINE;
+
+			log_framework(LOG_DEBUG, "%s removed from subtree\n",
+			    v->gv_name);
+
+			/*
+			 * Handle state change during instance disabling.
+			 * Propagate offline to the new exposed leaves.
+			 */
+			graph_offline_subtree_leaves(v, (void *)h);
+		}
+
+
 		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
 		    v->gv_name);
 

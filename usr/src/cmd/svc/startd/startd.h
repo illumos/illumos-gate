@@ -287,6 +287,8 @@ typedef enum {
 #define	GV_ENBLD_NOOVR	0x04	/* GV_ENABLED, ignoring override */
 #define	GV_INSUBGRAPH	0x08	/* Current milestone depends on service */
 #define	GV_DEATHROW	0x10	/* Service is on deathrow */
+#define	GV_TOOFFLINE	0x20	/* Services in subtree to offline */
+#define	GV_TODISABLE	0x40	/* Services in subtree to disable */
 
 /* ID must come first to support search */
 typedef struct graph_vertex {
@@ -605,6 +607,7 @@ void graph_transition_sulogin(restarter_instance_state_t,
     restarter_instance_state_t);
 void graph_transition_propagate(graph_vertex_t *, propagate_event_t,
     restarter_error_t);
+void graph_offline_subtree_leaves(graph_vertex_t *, void *);
 
 /* libscf.c - common */
 char *inst_fmri_to_svc_fmri(const char *);
