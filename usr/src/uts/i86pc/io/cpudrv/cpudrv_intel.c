@@ -69,7 +69,8 @@ cpudrv_intel_init(cpudrv_devstate_t *cpudsp)
 	if (speedstep_supported(family, model)) {
 		mach_state->cpupm_pstate_ops = &speedstep_ops;
 		cpudrv_intel_pdccap = CPUDRV_INTEL_PDC_PS_MSR |
-		    CPUDRV_INTEL_PDC_MP | CPUDRV_INTEL_PDC_PSD;
+		    CPUDRV_INTEL_PDC_C1_HALT | CPUDRV_INTEL_PDC_MP |
+		    CPUDRV_INTEL_PDC_PSD;
 	} else {
 		mach_state->cpupm_pstate_ops = NULL;
 	}
