@@ -22752,6 +22752,16 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 				}
 			} else if (skey == KEY_NOT_READY) {
 				/*
+				 * Sense data of 02/06/00 means that the
+				 * drive could not read the media (No
+				 * reference position found). In this case
+				 * to prevent a hang on the DKIOCSTATE IOCTL
+				 * we set the media state to DKIO_INSERTED.
+				 */
+				if (asc == 0x06 && ascq == 0x00)
+					state = DKIO_INSERTED;
+
+				/*
 				 * if 02/04/02  means that the host
 				 * should send start command. Explicitly
 				 * leave the media state as is
