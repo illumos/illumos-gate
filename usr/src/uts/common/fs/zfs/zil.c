@@ -1453,6 +1453,7 @@ zil_resume(zilog_t *zilog)
 typedef struct zil_replay_arg {
 	objset_t	*zr_os;
 	zil_replay_func_t **zr_replay;
+	zil_replay_cleaner_t *zr_replay_cleaner;
 	void		*zr_arg;
 	uint64_t	*zr_txgp;
 	boolean_t	zr_byteswap;
@@ -1583,6 +1584,8 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 		 * transaction.
 		 */
 		if (error != ERESTART && !sunk) {
+			if (zr->zr_replay_cleaner)
+				zr->zr_replay_cleaner(zr->zr_arg);
 			txg_wait_synced(spa_get_dsl(zilog->zl_spa), 0);
 			sunk = B_TRUE;
 			continue; /* retry */
@@ -1621,7 +1624,8 @@ zil_incr_blks(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
  */
 void
 zil_replay(objset_t *os, void *arg, uint64_t *txgp,
-	zil_replay_func_t *replay_func[TX_MAX_TYPE])
+	zil_replay_func_t *replay_func[TX_MAX_TYPE],
+	zil_replay_cleaner_t *replay_cleaner)
 {
 	zilog_t *zilog = dmu_objset_zil(os);
 	const zil_header_t *zh = zilog->zl_header;
@@ -1634,6 +1638,7 @@ zil_replay(objset_t *os, void *arg, uint64_t *txgp,
 
 	zr.zr_os = os;
 	zr.zr_replay = replay_func;
+	zr.zr_replay_cleaner = replay_cleaner;
 	zr.zr_arg = arg;
 	zr.zr_txgp = txgp;
 	zr.zr_byteswap = BP_SHOULD_BYTESWAP(&zh->zh_log);

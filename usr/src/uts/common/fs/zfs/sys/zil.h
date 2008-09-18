@@ -26,8 +26,6 @@
 #ifndef	_SYS_ZIL_H
 #define	_SYS_ZIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/spa.h>
 #include <sys/zio.h>
@@ -337,6 +335,7 @@ typedef void zil_parse_blk_func_t(zilog_t *zilog, blkptr_t *bp, void *arg,
 typedef void zil_parse_lr_func_t(zilog_t *zilog, lr_t *lr, void *arg,
     uint64_t txg);
 typedef int zil_replay_func_t();
+typedef void zil_replay_cleaner_t();
 typedef int zil_get_data_t(void *arg, lr_write_t *lr, char *dbuf, zio_t *zio);
 
 extern uint64_t	zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
@@ -352,7 +351,8 @@ extern zilog_t	*zil_open(objset_t *os, zil_get_data_t *get_data);
 extern void	zil_close(zilog_t *zilog);
 
 extern void	zil_replay(objset_t *os, void *arg, uint64_t *txgp,
-    zil_replay_func_t *replay_func[TX_MAX_TYPE]);
+    zil_replay_func_t *replay_func[TX_MAX_TYPE],
+    zil_replay_cleaner_t *replay_cleaner);
 extern void	zil_destroy(zilog_t *zilog, boolean_t keep_first);
 extern void	zil_rollback_destroy(zilog_t *zilog, dmu_tx_t *tx);
 

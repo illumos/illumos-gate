@@ -713,7 +713,7 @@ zvol_create_minor(const char *name, major_t maj)
 	ASSERT(error == 0);
 	zv->zv_volblocksize = doi.doi_data_block_size;
 
-	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector);
+	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector, NULL);
 	zvol_size_changed(zv, maj);
 
 	/* XXX this should handle the possible i/o error */

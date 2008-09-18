@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -559,7 +557,6 @@ unregister:
 static int
 zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 {
-	uint_t readonly;
 	int error;
 
 	error = zfs_register_callbacks(zfsvfs->z_vfs);
@@ -579,44 +576,22 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	 * operations out since we closed the ZIL.
 	 */
 	if (mounting) {
+		boolean_t readonly;
+
 		/*
 		 * During replay we remove the read only flag to
 		 * allow replays to succeed.
 		 */
 		readonly = zfsvfs->z_vfs->vfs_flag & VFS_RDONLY;
-		if (readonly != 0)
-			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
-		else
-			zfs_unlinked_drain(zfsvfs);
+		zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
 
 		/*
 		 * Parse and replay the intent log.
-		 *
-		 * Because of ziltest, this must be done after
-		 * zfs_unlinked_drain().  (Further note: ziltest doesn't
-		 * use readonly mounts, where zfs_unlinked_drain() isn't
-		 * called.)  This is because ziltest causes spa_sync()
-		 * to think it's committed, but actually it is not, so
-		 * the intent log contains many txg's worth of changes.
-		 *
-		 * In particular, if object N is in the unlinked set in
-		 * the last txg to actually sync, then it could be
-		 * actually freed in a later txg and then reallocated in
-		 * a yet later txg.  This would write a "create object
-		 * N" record to the intent log.  Normally, this would be
-		 * fine because the spa_sync() would have written out
-		 * the fact that object N is free, before we could write
-		 * the "create object N" intent log record.
-		 *
-		 * But when we are in ziltest mode, we advance the "open
-		 * txg" without actually spa_sync()-ing the changes to
-		 * disk.  So we would see that object N is still
-		 * allocated and in the unlinked set, and there is an
-		 * intent log record saying to allocate it.
 		 */
 		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
-		    zfs_replay_vector);
+		    zfs_replay_vector, zfs_unlinked_drain);
 
+		zfs_unlinked_drain(zfsvfs);
 		zfsvfs->z_vfs->vfs_flag |= readonly; /* restore readonly bit */
 	}
 

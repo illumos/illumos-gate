@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -562,6 +560,24 @@ zfs_rmnode(znode_t *zp)
 
 	ASSERT(ZTOV(zp)->v_count == 0);
 	ASSERT(zp->z_phys->zp_links == 0);
+
+	/*
+	 * If this is a ZIL replay then leave the object in the unlinked set.
+	 * Otherwise we can get a deadlock, because the delete can be
+	 * quite large and span multiple tx's and txgs, but each replay
+	 * creates a tx to atomically run the replay function and mark the
+	 * replay record as complete. We deadlock trying to start a tx in
+	 * a new txg to further the deletion but can't because the replay
+	 * tx hasn't finished.
+	 *
+	 * We actually delete the object if we get a failure to create an
+	 * object in zil_replay_log_record(), or after calling zil_replay().
+	 */
+	if (zfsvfs->z_assign >= TXG_INITIAL) {
+		zfs_znode_dmu_fini(zp);
+		zfs_znode_free(zp);
+		return;
+	}
 
 	/*
 	 * If this is an attribute directory, purge its contents.
