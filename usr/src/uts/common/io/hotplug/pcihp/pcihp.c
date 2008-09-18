@@ -4007,7 +4007,7 @@ pcihp_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 
 	if (strcmp(name, "pci-occupant") == 0) {
 		pci_dev = PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(getminor(dev));
-		pcihp_create_occupant_props_nolock(dip, dev, pci_dev);
+		pcihp_create_occupant_props(dip, dev, pci_dev);
 	}
 	/* other cases... */
 skip:

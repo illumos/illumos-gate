@@ -3073,11 +3073,11 @@ di_getprop(int list, struct ddi_prop **pprop, di_off_t *off_p,
 
 	/*
 	 * Form private list of properties, holding devi_lock for properties
-	 * than hang off the dip.
+	 * that hang off the dip.
 	 */
 	if (dip)
 		mutex_enter(&(dip->devi_lock));
-	for (plp = &pl0, prop = *pprop;
+	for (pl0 = NULL, plp = &pl0, prop = *pprop;
 	    prop; plp = &pl->pl_next, prop = prop->prop_next) {
 		pl = kmem_alloc(sizeof (*pl), KM_SLEEP);
 		*plp = pl;
