@@ -176,6 +176,13 @@ static int check_new_dh_key(PK11_SESSION *sp, DH *dh);
 static int init_template_value(BIGNUM *bn, CK_VOID_PTR *pValue,
 	CK_ULONG *ulValueLen);
 
+/* Read mode string to be used for fopen() */
+#if SOLARIS_OPENSSL
+static char *read_mode_flags = "rF";
+#else
+static char *read_mode_flags = "r";
+#endif
+
 /*
  * increment/create reference for an asymmetric key handle via active list
  * manipulation. If active list operation fails, unlock (if locked), set error
@@ -1025,7 +1032,7 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 		}
 
 	j = RSA_size(rsa);
-	if ((i-RSA_PKCS1_PADDING) > j)
+	if ((i - RSA_PKCS1_PADDING) > j)
 		{
 		PK11err(PK11_F_RSA_SIGN, PK11_R_DIGEST_TOO_BIG);
 		goto err;
@@ -1145,7 +1152,7 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 		}
 
 	j = RSA_size(rsa);
-	if ((i-RSA_PKCS1_PADDING) > j)
+	if ((i - RSA_PKCS1_PADDING) > j)
 		{
 		PK11err(PK11_F_RSA_VERIFY, PK11_R_DIGEST_TOO_BIG);
 		goto err;
@@ -1160,7 +1167,7 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 			goto err;
 			}
 		p = s;
-		i2d_X509_SIG(&sig, &p);
+		(void) i2d_X509_SIG(&sig, &p);
 		}
 
 	if ((sp = pk11_get_session(OP_RSA)) == NULL)
@@ -1222,7 +1229,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char *privkey_file,
 	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return (NULL);
 
-	if ((pubkey = fopen(privkey_file, "r")) != NULL)
+	if ((pubkey = fopen(privkey_file, read_mode_flags)) != NULL)
 		{
 		pkey = PEM_read_PrivateKey(pubkey, NULL, NULL, NULL);
 		(void) fclose(pubkey);
@@ -1269,7 +1276,7 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char *pubkey_file,
 	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return (NULL);
 
-	if ((pubkey = fopen(pubkey_file, "r")) != NULL)
+	if ((pubkey = fopen(pubkey_file, read_mode_flags)) != NULL)
 		{
 		pkey = PEM_read_PUBKEY(pubkey, NULL, NULL, NULL);
 		(void) fclose(pubkey);
@@ -1423,6 +1430,10 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 err:
 	if (rollback)
 		{
+		/*
+		 * We do not care about the return value from C_DestroyObject()
+		 * since we are doing rollback.
+		 */
 		if (found == 0)
 			(void) pFuncList->C_DestroyObject(session, h_key);
 		h_key = CK_INVALID_HANDLE;
@@ -1561,6 +1572,10 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 err:
 	if (rollback)
 		{
+		/*
+		 * We do not care about the return value from C_DestroyObject()
+		 * since we are doing rollback.
+		 */
 		if (found == 0)
 			(void) pFuncList->C_DestroyObject(session, h_key);
 		h_key = CK_INVALID_HANDLE;
@@ -1962,6 +1977,10 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 err:
 	if (rollback)
 		{
+		/*
+		 * We do not care about the return value from C_DestroyObject()
+		 * since we are doing rollback.
+		 */
 		if (found == 0)
 			(void) pFuncList->C_DestroyObject(session, h_key);
 		h_key = CK_INVALID_HANDLE;
@@ -2087,6 +2106,10 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 err:
 	if (rollback)
 		{
+		/*
+		 * We do not care about the return value from C_DestroyObject()
+		 * since we are doing rollback.
+		 */
 		if (found == 0)
 			(void) pFuncList->C_DestroyObject(session, h_key);
 		h_key = CK_INVALID_HANDLE;
@@ -2702,6 +2725,10 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 err:
 	if (rollback)
 		{
+		/*
+		 * We do not care about the return value from C_DestroyObject()
+		 * since we are doing rollback.
+		 */
 		if (found == 0)
 			(void) pFuncList->C_DestroyObject(session, h_key);
 		h_key = CK_INVALID_HANDLE;

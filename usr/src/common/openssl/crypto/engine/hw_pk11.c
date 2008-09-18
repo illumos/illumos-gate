@@ -890,7 +890,8 @@ static int bind_pk11(ENGINE *e)
 	RSA_METHOD *pk11_rsa = PK11_RSA();
 #endif	/* OPENSSL_NO_RSA */
 	if (!pk11_library_initialized)
-		(void) pk11_library_init(e);
+		if (!pk11_library_init(e))
+			return (0);
 
 	if (!ENGINE_set_id(e, engine_pk11_id) ||
 	    !ENGINE_set_name(e, engine_pk11_name) ||
@@ -1804,7 +1805,8 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 		 * reinitialize of the session
 		 */
 		pk11_library_initialized = FALSE;
-		(void) pk11_library_init(NULL);
+		if (!pk11_library_init(NULL))
+			return (0);
 		rv = pFuncList->C_OpenSession(myslot, CKF_SERIAL_SESSION,
 			NULL_PTR, NULL_PTR, &sp->session);
 		}
@@ -2842,11 +2844,11 @@ pk11_digest_cleanup(EVP_MD_CTX *ctx)
 		 * If state->sp is not NULL then pk11_digest_final() has not
 		 * been called yet. We must call it now to free any memory
 		 * that might have been allocated in the token when
-		 * pk11_digest_init() was called.
+		 * pk11_digest_init() was called. pk11_digest_final()
+		 * will return the session to the cache.
 		 */
-		(void) pk11_digest_final(ctx, buf);
-		pk11_return_session(state->sp, OP_DIGEST);
-		state->sp = NULL;
+		if (!pk11_digest_final(ctx, buf))
+			return (0);
 		}
 
 	return (1);
