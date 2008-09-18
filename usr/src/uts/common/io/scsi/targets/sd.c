@@ -22315,6 +22315,12 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 
 			if (rtn) {
 				/*
+				 * We ignore all failures for CD and need to
+				 * put the assessment before processing code
+				 * to avoid missing assessment for FMA.
+				 */
+				sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+				/*
 				 * Failed for other than an illegal request
 				 * or command not supported
 				 */
@@ -22323,11 +22329,9 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 					if ((rqbuf[2] != KEY_ILLEGAL_REQUEST) ||
 					    (rqbuf[12] != 0x20)) {
 						rval = EIO;
-						goto done;
+						goto no_assessment;
 					}
 				}
-				else
-					sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 			} else {
 				/*
 				 * The GET CONFIGURATION command succeeded
