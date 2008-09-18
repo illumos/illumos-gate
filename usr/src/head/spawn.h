@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SPAWN_H
 #define	_SPAWN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -52,6 +50,7 @@ extern "C" {
  */
 #define	POSIX_SPAWN_NOSIGCHLD_NP	0x1000
 #define	POSIX_SPAWN_WAITPID_NP		0x2000
+#define	POSIX_SPAWN_NOEXECERR_NP	0x4000
 
 typedef struct {
 	void *__spawn_attrp;	/* implementation-private */

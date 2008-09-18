@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _pclose = pclose
 #pragma weak _popen = popen
 
@@ -178,9 +176,15 @@ popen(const char *cmd, const char *mode)
 			error = posix_spawn_file_actions_addclose(&fact,
 			    yourside);
 	}
+	/*
+	 * See the comments in port/stdio/system.c for why these
+	 * non-portable posix_spawn() attributes are being used.
+	 */
 	if (error == 0)
 		error = posix_spawnattr_setflags(&attr,
-		    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP);
+		    POSIX_SPAWN_NOSIGCHLD_NP |
+		    POSIX_SPAWN_WAITPID_NP |
+		    POSIX_SPAWN_NOEXECERR_NP);
 	if (error) {
 		lmutex_unlock(&popen_lock);
 		lfree(node, sizeof (node_t));

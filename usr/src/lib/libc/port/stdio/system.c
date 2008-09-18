@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "mtlib.h"
 #include <sys/types.h>
@@ -154,6 +152,7 @@ system(const char *cmd)
 
 	/*
 	 * Initialize the posix_spawn() attributes structure.
+	 *
 	 * The setting of POSIX_SPAWN_WAITPID_NP ensures that no
 	 * wait-for-multiple wait() operation will reap our child
 	 * and that the child will not be automatically reaped due
@@ -161,12 +160,25 @@ system(const char *cmd)
 	 * Only a specific wait for the specific pid will be able
 	 * to reap the child.  Since no other thread knows the pid
 	 * of our child, this should be safe enough.
+	 *
+	 * The POSIX_SPAWN_NOEXECERR_NP flag tells posix_spawn() not
+	 * to fail if the shell cannot be executed, but rather cause
+	 * a child to be created that simply performs _exit(127).
+	 * This is in order to satisfy the Posix requirement on system():
+	 *	The system function shall behave as if a child process were
+	 *	created using fork(), and the child process invoked the sh
+	 *	utility using execl().  If some error prevents the command
+	 *	language interpreter from executing after the child process
+	 *	is created, the return value from system() shall be as if
+	 *	the command language interpreter had terminated using
+	 *	exit(127) or _exit(127).
 	 */
 	error = posix_spawnattr_init(&attr);
 	if (error == 0)
 		error = posix_spawnattr_setflags(&attr,
 		    POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF |
-		    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP);
+		    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP |
+		    POSIX_SPAWN_NOEXECERR_NP);
 
 	/*
 	 * The POSIX spec for system() requires us to block SIGCHLD,

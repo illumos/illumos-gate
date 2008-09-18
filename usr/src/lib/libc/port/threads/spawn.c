@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/libc_kernel.h>
@@ -42,7 +40,8 @@
 		POSIX_SPAWN_SETSCHEDPARAM |	\
 		POSIX_SPAWN_SETSCHEDULER |	\
 		POSIX_SPAWN_NOSIGCHLD_NP |	\
-		POSIX_SPAWN_WAITPID_NP)
+		POSIX_SPAWN_WAITPID_NP |	\
+		POSIX_SPAWN_NOEXECERR_NP)
 
 typedef struct {
 	int		sa_psflags;	/* POSIX_SPAWN_* flags */
@@ -228,6 +227,8 @@ posix_spawn(
 
 	(void) set_error(&error, 0);
 	(void) execve(path, argv, envp);
+	if (sap != NULL && (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP))
+		_exit(127);
 	(void) set_error(&error, errno);
 	_exit(_EVAPORATE);
 	return (0);	/* not reached */
@@ -380,6 +381,9 @@ posix_spawnp(
 			(void) set_error(&error, 0);
 			(void) execve(xpg4? xpg4_path : sun_path,
 			    newargs, envp);
+			if (sap != NULL &&
+			    (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP))
+				_exit(127);
 			(void) set_error(&error, errno);
 			_exit(_EVAPORATE);
 		}
