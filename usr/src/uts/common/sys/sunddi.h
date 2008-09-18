@@ -1617,6 +1617,9 @@ char *
 ddi_pathname(dev_info_t *dip, char *path);
 
 char *
+ddi_pathname_minor(struct ddi_minor_data *dmdp, char *path);
+
+char *
 ddi_pathname_obp(dev_info_t *dip, char *path);
 
 int

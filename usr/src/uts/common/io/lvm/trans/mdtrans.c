@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -146,7 +145,7 @@ shadow_debug(mt_unit_t	*un,		/* trans unit info */
 	sb = kmem_cache_alloc(trans_child_cache, MD_ALLOCFLAGS);
 	trans_child_init(sb);
 	sb = bioclone(pb, 0, pb->b_bcount, md_dev64_to_dev(un->un_s_dev),
-		pb->b_blkno, trans_done_shadow, sb, KM_NOSLEEP);
+	    pb->b_blkno, trans_done_shadow, sb, KM_NOSLEEP);
 
 	sb->b_flags |= B_ASYNC;
 	sb->b_chain = (void *)ps;
@@ -259,7 +258,7 @@ trans_open_all_devs(mt_unit_t *un)
 	 * Do the open by device id if it is regular device
 	 */
 	if ((md_getmajor(tmpdev) != md_major) &&
-		md_devid_found(setno, side, un->un_m_key) == 1) {
+	    md_devid_found(setno, side, un->un_m_key) == 1) {
 		tmpdev = md_resolve_bydevid(mnum, tmpdev, un->un_m_key);
 	}
 	err = md_layered_open(mnum, &tmpdev, MD_OFLG_NULL);
@@ -307,7 +306,7 @@ trans_build_incore(void *p, int snarfing)
 	 */
 	if (snarfing) {
 		un->un_m_dev =  md_getdevnum(setno, mddb_getsidenum(setno),
-						un->un_m_key, MD_NOTRUST_DEVT);
+		    un->un_m_key, MD_NOTRUST_DEVT);
 	}
 
 	/*
@@ -326,7 +325,7 @@ trans_build_incore(void *p, int snarfing)
 	 * and resolve the devt at the open time
 	 */
 	if ((md_getmajor(un->un_m_dev) == md_major) &&
-		(md_dev_exists(un->un_m_dev) == 0)) {
+	    (md_dev_exists(un->un_m_dev) == 0)) {
 		return (1);
 	}
 
@@ -378,6 +377,8 @@ trans_build_incore(void *p, int snarfing)
 		un->c.un_total_blocks = c->un_total_blocks;
 	}
 
+	/* place various information in the in-core data structures */
+	md_nblocks_set(mnum, un->c.un_total_blocks);
 	MD_UNIT(mnum) = un;
 
 	return (0);
@@ -511,6 +512,7 @@ trans_reset(mt_unit_t *un, minor_t mnum, int removing, int force)
 
 	md_destroy_unit_incore(mnum, &trans_md_ops);
 
+	md_nblocks_set(mnum, -1ULL);
 	MD_UNIT(mnum) = NULL;
 
 	if (!removing)
@@ -603,7 +605,7 @@ trans_done(struct buf *cb)
 		 */
 		if (!ldl_isherror(ps->ps_un->un_l_unit)) {
 			daemon_request(&md_done_daemon, trans_error,
-				(daemon_queue_t *)ps, REQ_OLD);
+			    (daemon_queue_t *)ps, REQ_OLD);
 
 			if (cb->b_flags & B_REMAPPED)
 				bp_mapout(cb);
@@ -680,7 +682,7 @@ md_trans_strategy(buf_t *pb, int flag, void *private)
 	trans_child_init(cb);
 
 	cb = bioclone(pb, 0, pb->b_bcount, md_dev64_to_dev(un->un_m_dev),
-		pb->b_blkno, trans_done, cb, KM_NOSLEEP);
+	    pb->b_blkno, trans_done, cb, KM_NOSLEEP);
 
 	cb->b_chain = (void *)ps;
 
@@ -849,7 +851,7 @@ trans_snarf(md_snarfcmd_t cmd, set_t setno)
 			newreqsize = sizeof (ml_unit_t);
 			big_ul = (ml_unit_t *)kmem_zalloc(newreqsize, KM_SLEEP);
 			trans_log_convert((caddr_t)small_ul, (caddr_t)big_ul,
-								SMALL_2_BIG);
+			    SMALL_2_BIG);
 			kmem_free(small_ul, dep->de_reqsize);
 			/*
 			 * Update userdata and incore userdata
@@ -902,7 +904,7 @@ trans_snarf(md_snarfcmd_t cmd, set_t setno)
 			newreqsize = sizeof (mt_unit_t);
 			big_un = (mt_unit_t *)kmem_zalloc(newreqsize, KM_SLEEP);
 			trans_master_convert((caddr_t)small_un, (caddr_t)big_un,
-								SMALL_2_BIG);
+			    SMALL_2_BIG);
 			kmem_free(small_un, dep->de_reqsize);
 			/*
 			 * Update userdata and incore userdata
@@ -1166,7 +1168,7 @@ trans_imp_set(
 		 */
 		*record_id = MAKERECID(setno, DBID(*record_id));
 		if (!md_update_minor(setno, mddb_getsidenum
-			(setno), ul32->un_key))
+		    (setno), ul32->un_key))
 			goto out;
 		mddb_setrecprivate(recid, MD_PRV_GOTIT);
 	}
@@ -1194,7 +1196,7 @@ trans_imp_set(
 		*record_id = MAKERECID(setno, DBID(*record_id));
 		*self_id = MD_MKMIN(setno, MD_MIN2UNIT(*self_id));
 		if (!md_update_minor(setno, mddb_getsidenum
-			(setno), un32->un_m_key))
+		    (setno), un32->un_m_key))
 			goto out;
 		mddb_setrecprivate(recid, MD_PRV_GOTIT);
 

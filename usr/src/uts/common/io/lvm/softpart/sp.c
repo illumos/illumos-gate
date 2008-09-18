@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Soft partitioning metadevice driver (md_sp).
@@ -237,8 +236,10 @@ sp_build_incore(void *p, int snarfing)
 		un->un_dev = tmpdev;
 	}
 
-	/* place unit in in-core array */
+	/* place various information in the in-core data structures */
+	md_nblocks_set(mnum, un->c.un_total_blocks);
 	MD_UNIT(mnum) = un;
+
 	return (0);
 }
 
@@ -263,6 +264,7 @@ reset_sp(mp_unit_t *un, minor_t mnum, int removing)
 	/* clean up in-core structures */
 	md_destroy_unit_incore(mnum, &sp_md_ops);
 
+	md_nblocks_set(mnum, -1ULL);
 	MD_UNIT(mnum) = NULL;
 
 	/*
@@ -458,7 +460,7 @@ sp_send_stat_ok(mp_unit_t *un)
 	ps->ps_ui = MDI_UNIT(mnum);
 
 	daemon_request(&md_sp_daemon, sp_xmit_ok, (daemon_queue_t *)ps,
-	REQ_OLD);
+	    REQ_OLD);
 }
 
 static void
@@ -473,7 +475,7 @@ sp_send_stat_err(mp_unit_t *un)
 	ps->ps_ui = MDI_UNIT(mnum);
 
 	daemon_request(&md_sp_daemon, sp_xmit_error, (daemon_queue_t *)ps,
-	REQ_OLD);
+	    REQ_OLD);
 }
 
 
@@ -1036,9 +1038,9 @@ md_sp_strategy(buf_t *parent_buf, int flag, void *private)
 		}
 
 		child_buf = md_bioclone(parent_buf, current_offset,
-					child_buf->b_bcount, child_buf->b_edev,
-					child_buf->b_blkno, sp_done, child_buf,
-					KM_NOSLEEP);
+		    child_buf->b_bcount, child_buf->b_edev,
+		    child_buf->b_blkno, sp_done, child_buf,
+		    KM_NOSLEEP);
 		/* calculate new offset, counts, etc... */
 		current_offset += child_buf->b_bcount;
 		current_count -=  child_buf->b_bcount;
@@ -1179,9 +1181,9 @@ sp_directed_read(minor_t mnum, vol_directed_rd_t *vdr, int mode)
 		useroff = useroff + (offset_t)current_offset;
 		cvdr.vdr_data = (void *)(uintptr_t)useroff;
 		child_buf = md_bioclone(parent_buf, current_offset,
-					child_buf->b_bcount, child_buf->b_edev,
-					child_buf->b_blkno, NULL,
-					child_buf, KM_NOSLEEP);
+		    child_buf->b_bcount, child_buf->b_edev,
+		    child_buf->b_blkno, NULL,
+		    child_buf, KM_NOSLEEP);
 		/* calculate new offset, counts, etc... */
 		current_offset += child_buf->b_bcount;
 		current_count -=  child_buf->b_bcount;
@@ -1308,12 +1310,12 @@ sp_snarf(md_snarfcmd_t cmd, set_t setno)
 				small_un =
 				    (mp_unit32_od_t *)mddb_getrecaddr(recid);
 				newreqsize = sizeof (mp_unit_t) +
-						((small_un->un_numexts - 1) *
-						sizeof (struct mp_ext));
+				    ((small_un->un_numexts - 1) *
+				    sizeof (struct mp_ext));
 				big_un = (mp_unit_t *)kmem_zalloc(newreqsize,
-					KM_SLEEP);
+				    KM_SLEEP);
 				softpart_convert((caddr_t)small_un,
-					(caddr_t)big_un, SMALL_2_BIG);
+				    (caddr_t)big_un, SMALL_2_BIG);
 				kmem_free(small_un, dep->de_reqsize);
 				dep->de_rb_userdata = big_un;
 				dep->de_reqsize = newreqsize;
@@ -1443,7 +1445,7 @@ sp_open_dev(mp_unit_t *un, int oflags)
 	 * Do the open by device id if underlying is regular
 	 */
 	if ((md_getmajor(tmpdev) != md_major) &&
-		md_devid_found(setno, side, un->un_key) == 1) {
+	    md_devid_found(setno, side, un->un_key) == 1) {
 		tmpdev = md_resolve_bydevid(mnum, tmpdev, un->un_key);
 	}
 	err = md_layered_open(mnum, &tmpdev, oflags);
@@ -1728,7 +1730,7 @@ sp_imp_set(
 	gotsomething = 0;
 
 	rec_type = (mddb_type_t)md_getshared_key(setno,
-		sp_md_ops.md_driver.md_drivername);
+	    sp_md_ops.md_driver.md_drivername);
 	recid = mddb_makerecid(setno, 0);
 
 	while ((recid = mddb_getnextrec(recid, rec_type, 0)) > 0) {
@@ -1750,7 +1752,7 @@ sp_imp_set(
 			record_id = &(un32->c.un_record_id);
 
 			if (!md_update_minor(setno, mddb_getsidenum
-				(setno), un32->un_key))
+			    (setno), un32->un_key))
 				goto out;
 			break;
 
@@ -1762,7 +1764,7 @@ sp_imp_set(
 			record_id = &(un64->c.un_record_id);
 
 			if (!md_update_minor(setno, mddb_getsidenum
-				(setno), un64->un_key))
+			    (setno), un64->un_key))
 				goto out;
 			break;
 		}

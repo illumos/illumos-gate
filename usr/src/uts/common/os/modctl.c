@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * modctl system call for loadable module support.
  */
@@ -1206,12 +1204,7 @@ modctl_devid2paths(ddi_devid_t udevid, char *uminor_name, uint_t flag,
 					continue;
 			}
 
-			/* XXX need ddi_pathname_minor(dmdp, path); interface */
-			if (ddi_dev_pathname(dmdp->ddm_dev, dmdp->ddm_spec_type,
-			    path) != DDI_SUCCESS) {
-				ret = EAGAIN;
-				goto out;
-			}
+			(void) ddi_pathname_minor(dmdp, path);
 			len = strlen(path) + 1;
 			*(path + len) = '\0';	/* set double termination */
 			lens += len;

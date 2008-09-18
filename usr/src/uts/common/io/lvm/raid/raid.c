@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NAME:	raid.c
@@ -197,9 +196,7 @@ raid_set_state(mr_unit_t *un, int col, rcs_state_t newstate, int force)
 	rus_state_t	unitstate, origstate;
 	rcs_state_t	colstate;
 	rcs_state_t	orig_colstate;
-	int		errcnt = 0,
-			okaycnt = 0,
-			resynccnt = 0;
+	int		errcnt = 0, okaycnt = 0, resynccnt = 0;
 	int		i;
 	char		*devname;
 
@@ -293,7 +290,7 @@ raid_set_state(mr_unit_t *un, int col, rcs_state_t newstate, int force)
 	if ((! (origstate & (RUS_ERRED|RUS_LAST_ERRED|RUS_DOI))) &&
 	    (unitstate & (RUS_ERRED|RUS_LAST_ERRED|RUS_DOI))) {
 		devname = md_devname(MD_UN2SET(un),
-			un->un_column[col].un_dev, NULL, 0);
+		    un->un_column[col].un_dev, NULL, 0);
 
 		cmn_err(CE_WARN, "md: %s: %s needs maintenance",
 		    md_shortname(MD_SID(un)), devname);
@@ -856,8 +853,7 @@ raid_build_incore(void *p, int snarfing)
 	mr_column_t	*column;
 	int		iosize;
 	md_dev64_t	hs, dev;
-	int		resync_cnt = 0,
-			error_cnt = 0;
+	int		resync_cnt = 0, error_cnt = 0;
 
 	hs = NODEV64;
 	dev = NODEV64;
@@ -881,7 +877,7 @@ raid_build_incore(void *p, int snarfing)
 
 	un->un_column_ic = (mr_column_ic_t *)
 	    kmem_zalloc(sizeof (mr_column_ic_t) *
-		un->un_totalcolumncnt, KM_SLEEP);
+	    un->un_totalcolumncnt, KM_SLEEP);
 
 	for (i = 0; i < un->un_totalcolumncnt; i++) {
 
@@ -957,12 +953,13 @@ raid_build_incore(void *p, int snarfing)
 					if ((preserve_flags &
 					    (MD_RAID_COPY_RESYNC |
 					    MD_RAID_REGEN_RESYNC)) == 0) {
-					if (column->un_alt_dev != NODEV64)
-						preserve_flags |=
-						MD_RAID_COPY_RESYNC;
-					else
-					    preserve_flags |=
-						MD_RAID_REGEN_RESYNC;
+						if (column->un_alt_dev !=
+						    NODEV64)
+							preserve_flags |=
+							    MD_RAID_COPY_RESYNC;
+						else
+							preserve_flags |=
+							   MD_RAID_REGEN_RESYNC;
 					}
 				}
 			} else { /* no hot spares */
@@ -1026,8 +1023,10 @@ raid_build_incore(void *p, int snarfing)
 	mutex_init(&un->un_linlck_mx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&un->un_linlck_cv, NULL, CV_DEFAULT, NULL);
 	un->un_linlck_chn = NULL;
-	MD_UNIT(mnum) = un;
 
+	/* place various information in the in-core data structures */
+	md_nblocks_set(mnum, un->c.un_total_blocks);
+	MD_UNIT(mnum) = un;
 
 	return (0);
 }
@@ -1055,6 +1054,7 @@ reset_raid(mr_unit_t *un, minor_t mnum, int removing)
 
 	md_destroy_unit_incore(mnum, &raid_md_ops);
 
+	md_nblocks_set(mnum, -1ULL);
 	MD_UNIT(mnum) = NULL;
 
 	if (un->un_pbuffer) {
@@ -1071,7 +1071,7 @@ reset_raid(mr_unit_t *un, minor_t mnum, int removing)
 		raid_free_pw_reservation(un, i);
 
 	kmem_free(un->un_column_ic, sizeof (mr_column_ic_t) *
-		un->un_totalcolumncnt);
+	    un->un_totalcolumncnt);
 
 	kmem_free(un->mr_ic, sizeof (*un->mr_ic));
 
@@ -1609,7 +1609,7 @@ raid_read_error(md_raidcs_t *cs)
 
 	/* now schedule processing for possible state change */
 	daemon_request(&md_mstr_daemon, raid_rderr,
-		(daemon_queue_t *)cs, REQ_OLD);
+	    (daemon_queue_t *)cs, REQ_OLD);
 
 }
 
@@ -2004,11 +2004,11 @@ raid_dcolumn(diskaddr_t segment, mr_unit_t *un)
 	if (segment >= max_orig_segment) {
 		adj_seg = segment - max_orig_segment;
 		column = un->un_origcolumncnt  +
-			(uint_t)(adj_seg / un->un_segsincolumn);
+		    (uint_t)(adj_seg / un->un_segsincolumn);
 	} else {
 		line = segment / (un->un_origcolumncnt - 1);
-		column = (uint_t)((segment % (un->un_origcolumncnt - 1) + line)
-		    % un->un_origcolumncnt);
+		column = (uint_t)((segment %
+		    (un->un_origcolumncnt - 1) + line) % un->un_origcolumncnt);
 	}
 	return (column);
 }
@@ -2028,8 +2028,8 @@ raid_pcolumn(diskaddr_t segment, mr_unit_t *un)
 	} else {
 		line = segment / (un->un_origcolumncnt - 1);
 	}
-	column = (uint_t)((line + (un->un_origcolumncnt - 1))
-				% un->un_origcolumncnt);
+	column = (uint_t)((line + (un->un_origcolumncnt - 1)) %
+	    un->un_origcolumncnt);
 	return (column);
 }
 
@@ -2067,7 +2067,7 @@ raid_check_cols(mr_unit_t *un)
 		 * use the hotspare key
 		 */
 		tmpdev = md_resolve_bydevid(mnum, tmpdev, HOTSPARED(un, i) ?
-			colptr->un_hs_key : colptr->un_orig_key);
+		    colptr->un_hs_key : colptr->un_orig_key);
 
 		if (tmpdev == NODEV64) {
 			err = 1;
@@ -2254,7 +2254,7 @@ raid_done(struct buf *bp)
 	if (flags & MD_RCS_ERROR) {
 		if (cs->cs_error_call) {
 			daemon_request(&md_done_daemon, cs->cs_error_call,
-				(daemon_queue_t *)cs, REQ_OLD);
+			    (daemon_queue_t *)cs, REQ_OLD);
 		}
 		return;
 	}
@@ -2265,7 +2265,7 @@ raid_done(struct buf *bp)
 		return;
 	}
 	daemon_request(&md_done_daemon, cs->cs_call,
-					(daemon_queue_t *)cs, REQ_OLD);
+	    (daemon_queue_t *)cs, REQ_OLD);
 }
 /*
  * the flag RIO_EXTRA is used when dealing with a column in the process
@@ -2429,12 +2429,12 @@ genstandardparity(md_raidcs_t *cs)
 	}
 
 	RAID_FILLIN_RPW(cs->cs_dbuffer, cs->cs_un, dsum, cs->cs_pcolumn,
-			cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-			2, cs->cs_dcolumn, RAID_PWMAGIC);
+	    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+	    2, cs->cs_dcolumn, RAID_PWMAGIC);
 
 	RAID_FILLIN_RPW(cs->cs_pbuffer, cs->cs_un, psum, cs->cs_dcolumn,
-			cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-			2, cs->cs_pcolumn, RAID_PWMAGIC);
+	    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+	    2, cs->cs_pcolumn, RAID_PWMAGIC);
 }
 
 static void
@@ -2493,8 +2493,8 @@ genlineparity(md_raidcs_t *cs)
 	}
 
 	RAID_FILLIN_RPW(cs->cs_dbuffer, un, dsum, cs->cs_pcolumn,
-			cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-			un->un_totalcolumncnt, cs->cs_dcolumn, RAID_PWMAGIC);
+	    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+	    un->un_totalcolumncnt, cs->cs_dcolumn, RAID_PWMAGIC);
 
 	raidio(cs, RIO_PREWRITE | RIO_DATA);
 
@@ -2574,8 +2574,8 @@ genlineparity(md_raidcs_t *cs)
 			}
 		}
 		RAID_FILLIN_RPW(cbuf->cbuf_buffer, un, dsum, cs->cs_pcolumn,
-				cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-				un->un_totalcolumncnt, col, RAID_PWMAGIC);
+		    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+		    un->un_totalcolumncnt, col, RAID_PWMAGIC);
 
 		/*
 		 * fill in buffer for write to prewrite area
@@ -2593,12 +2593,12 @@ genlineparity(md_raidcs_t *cs)
 		bp->b_edev = md_dev64_to_dev(un->un_column[col].un_dev);
 		bp->b_chain = (struct buf *)cs;
 		md_call_strategy(bp,
-			cs->cs_strategy_flag, cs->cs_strategy_private);
+		    cs->cs_strategy_flag, cs->cs_strategy_private);
 	}
 
 	RAID_FILLIN_RPW(cs->cs_pbuffer, un, psum, cs->cs_dcolumn,
-			cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-			un->un_totalcolumncnt, cs->cs_pcolumn, RAID_PWMAGIC);
+	    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+	    un->un_totalcolumncnt, cs->cs_pcolumn, RAID_PWMAGIC);
 
 	raidio(cs, RIO_PREWRITE | RIO_PARITY);
 }
@@ -2676,14 +2676,14 @@ raid_read_io(mr_unit_t *un, md_raidcs_t *cs)
 
 	if (COLUMN_ISOKAY(un, cs->cs_dcolumn) ||
 	    (COLUMN_ISLASTERR(un, cs->cs_dcolumn) &&
-		    (cs->cs_flags & MD_RCS_RECOVERY) == 0)) {
+	    (cs->cs_flags & MD_RCS_RECOVERY) == 0)) {
 		dev_t ddi_dev; /* needed for bioclone, so not md_dev64_t */
 		ddi_dev = md_dev64_to_dev(column->un_dev);
 
 		bp = &cs->cs_dbuf;
 		bp = md_bioclone(pb, cs->cs_offset, cs->cs_bcount, ddi_dev,
-				column->un_devstart + cs->cs_blkno,
-				(int (*)())raid_done, bp, KM_NOSLEEP);
+		    column->un_devstart + cs->cs_blkno,
+		    (int (*)())raid_done, bp, KM_NOSLEEP);
 
 		bp->b_chain = (buf_t *)cs;
 
@@ -2973,7 +2973,7 @@ raid_write_error(md_raidcs_t *cs)
 			cmn_err(CE_WARN, "md %s: write error on %s",
 			    md_shortname(MD_SID(un)),
 			    md_devname(setno, md_expldev(cbuf->cbuf_bp.b_edev),
-					NULL, 0));
+			    NULL, 0));
 
 	md_unit_readerexit(ui);
 
@@ -2981,7 +2981,7 @@ raid_write_error(md_raidcs_t *cs)
 
 	/* now schedule processing for possible state change */
 	daemon_request(&md_mstr_daemon, raid_wrerr,
-		(daemon_queue_t *)cs, REQ_OLD);
+	    (daemon_queue_t *)cs, REQ_OLD);
 
 }
 
@@ -3057,8 +3057,8 @@ raid_write_ploop(md_raidcs_t *cs)
 		pbuf++;
 	}
 	RAID_FILLIN_RPW(cs->cs_pbuffer, un, psum, -1,
-			cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-			1, cs->cs_pcolumn, RAID_PWMAGIC);
+	    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+	    1, cs->cs_pcolumn, RAID_PWMAGIC);
 
 	cs->cs_stage = RAID_NONE;
 	cs->cs_call = raid_write_ponly;
@@ -3217,8 +3217,8 @@ raid_write_io(mr_unit_t *un, md_raidcs_t *cs)
 			ubuf++;
 		}
 		RAID_FILLIN_RPW(cs->cs_dbuffer, un, dsum, -1,
-				cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
-				1, cs->cs_dcolumn, RAID_PWMAGIC);
+		    cs->cs_blkno, cs->cs_blkcnt, cs->cs_pwid,
+		    1, cs->cs_dcolumn, RAID_PWMAGIC);
 		cs->cs_frags = 1;
 		cs->cs_stage = RAID_NONE;
 		cs->cs_call = raid_write_donly;
@@ -3383,15 +3383,15 @@ raid_stage(md_raidcs_t *cs)
 	int		flag;
 
 	switch (cs->cs_stage) {
-	    case RAID_READ_DONE:
+	case RAID_READ_DONE:
 		raid_free_child(cs, 1);
 		/* decrement readfrags */
 		raid_free_parent(ps, RFP_DECR_READFRAGS | RFP_RLS_LOCK);
 		return;
 
-	    case RAID_WRITE_DONE:
-	    case RAID_WRITE_PONLY_DONE:
-	    case RAID_WRITE_DONLY_DONE:
+	case RAID_WRITE_DONE:
+	case RAID_WRITE_PONLY_DONE:
+	case RAID_WRITE_DONLY_DONE:
 		/*
 		 *  Completed writing real parity and/or data.
 		 */
@@ -3401,7 +3401,7 @@ raid_stage(md_raidcs_t *cs)
 		raid_free_parent(ps, RFP_DECR_FRAGS | RFP_RLS_LOCK);
 		return;
 
-	    case RAID_PREWRITE_DONE:
+	case RAID_PREWRITE_DONE:
 		/*
 		 * completed writing data and parity to prewrite entries
 		 */
@@ -3433,7 +3433,7 @@ raid_stage(md_raidcs_t *cs)
 		}
 		return;
 
-	    case RAID_LINE_PWDONE:
+	case RAID_LINE_PWDONE:
 		ASSERT(cs->cs_frags == 0);
 		raid_free_parent(ps, RFP_DECR_PWFRAGS);
 		cs->cs_flags |= MD_RCS_PWDONE;
@@ -3460,7 +3460,7 @@ raid_stage(md_raidcs_t *cs)
 			bp->b_flags |= B_WRITE | B_BUSY;
 			bp->b_iodone = (int (*)())raid_done;
 			bp->b_edev = md_dev64_to_dev(
-				un->un_column[cbuf->cbuf_column].un_dev);
+			    un->un_column[cbuf->cbuf_column].un_dev);
 			bp->b_chain = (struct buf *)cs;
 			private = cs->cs_strategy_private;
 			flag = cs->cs_strategy_flag;
@@ -3473,7 +3473,7 @@ raid_stage(md_raidcs_t *cs)
 		}
 		return;
 
-	    default:
+	default:
 		ASSERT(0);
 		break;
 	}
@@ -3676,11 +3676,11 @@ raid_snarf(md_snarfcmd_t cmd, set_t setno)
 				    (mr_unit32_od_t *)mddb_getrecaddr(recid);
 				ncol = small_un->un_totalcolumncnt;
 				newreqsize = sizeof (mr_unit_t) +
-					((ncol - 1) * sizeof (mr_column_t));
+				    ((ncol - 1) * sizeof (mr_column_t));
 				big_un = (mr_unit_t *)kmem_zalloc(newreqsize,
-					KM_SLEEP);
+				    KM_SLEEP);
 				raid_convert((caddr_t)small_un, (caddr_t)big_un,
-					SMALL_2_BIG);
+				    SMALL_2_BIG);
 				kmem_free(small_un, dep->de_reqsize);
 				dep->de_rb_userdata = big_un;
 				dep->de_reqsize = newreqsize;
@@ -3717,12 +3717,11 @@ raid_snarf(md_snarfcmd_t cmd, set_t setno)
 		all_raid_gotten = 0;
 		if (raid_build_incore((void *)un, 1) == 0) {
 			mddb_setrecprivate(recid, MD_PRV_GOTIT);
-			md_create_unit_incore(MD_SID(un), &raid_md_ops,
-			    1);
+			md_create_unit_incore(MD_SID(un), &raid_md_ops, 1);
 			gotsomething = 1;
 		} else if (un->mr_ic) {
 			kmem_free(un->un_column_ic, sizeof (mr_column_ic_t) *
-				un->un_totalcolumncnt);
+			    un->un_totalcolumncnt);
 			kmem_free(un->mr_ic, sizeof (*un->mr_ic));
 		}
 	}
@@ -3808,7 +3807,7 @@ raid_close_all_devs(mr_unit_t *un, int init_pw, int md_cflags)
 			    (device->un_dev != NODEV64));
 			if ((device->un_devstate & RCS_OKAY) && init_pw)
 				(void) init_pw_area(un, device->un_dev,
-							device->un_pwstart, i);
+				    device->un_pwstart, i);
 			md_layered_close(device->un_dev, md_cflags);
 			device->un_devflags &= ~MD_RAID_DEV_ISOPEN;
 		}
@@ -3855,9 +3854,9 @@ raid_open_all_devs(mr_unit_t *un, int md_oflags)
 		 * Open by device id
 		 */
 		key = HOTSPARED(un, i) ?
-			device->un_hs_key : device->un_orig_key;
+		    device->un_hs_key : device->un_orig_key;
 		if ((md_getmajor(tmpdev) != md_major) &&
-			md_devid_found(setno, side, key) == 1) {
+		    md_devid_found(setno, side, key) == 1) {
 			tmpdev = md_resolve_bydevid(mnum, tmpdev, key);
 		}
 		if (md_layered_open(mnum, &tmpdev, md_oflags)) {
@@ -3872,10 +3871,9 @@ raid_open_all_devs(mr_unit_t *un, int md_oflags)
 	/* if open errors and errored devices are 1 then device can run */
 	if (not_opened > 1) {
 		cmn_err(CE_WARN,
-		"md: %s failed to open. open error on %s\n",
-			md_shortname(MD_SID(un)),
-			md_devname(MD_UN2SET(un), device->un_orig_dev,
-					NULL, 0));
+		    "md: %s failed to open. open error on %s\n",
+		    md_shortname(MD_SID(un)),
+		    md_devname(MD_UN2SET(un), device->un_orig_dev, NULL, 0));
 
 		ui->ui_tstate |= MD_INACCESSIBLE;
 
@@ -3952,7 +3950,7 @@ raid_internal_open(minor_t mnum, int flag, int otyp, int md_oflags)
 	 * raid_init_columns sets md_unit_isopen to block reset, halt.
 	 */
 	if ((UNIT_STATE(un) & (RUS_INIT | RUS_DOI)) &&
-			!(md_oflags & MD_OFLG_ISINIT)) {
+	    !(md_oflags & MD_OFLG_ISINIT)) {
 		md_unit_openclose_exit(ui);
 		return (EAGAIN);
 	}
@@ -4101,7 +4099,7 @@ raid_probe_close_all_devs(mr_unit_t *un)
 
 		if (device->un_devflags & MD_RAID_DEV_PROBEOPEN) {
 			md_layered_close(device->un_dev,
-				MD_OFLG_PROBEDEV);
+			    MD_OFLG_PROBEDEV);
 			device->un_devflags &= ~MD_RAID_DEV_PROBEOPEN;
 		}
 	}
@@ -4155,9 +4153,9 @@ raid_probe_dev(mdi_unit_t *ui, minor_t mnum)
 		 * Open by device id
 		 */
 		tmpdev = md_resolve_bydevid(mnum, tmpdev, HOTSPARED(un, i)?
-			device->un_hs_key : device->un_orig_key);
+		    device->un_hs_key : device->un_orig_key);
 		if (md_layered_open(mnum, &tmpdev,
-				MD_OFLG_CONT_ERRS | MD_OFLG_PROBEDEV)) {
+		    MD_OFLG_CONT_ERRS | MD_OFLG_PROBEDEV)) {
 			device->un_dev = tmpdev;
 			not_opened++;
 			continue;
@@ -4188,10 +4186,9 @@ raid_probe_dev(mdi_unit_t *ui, minor_t mnum)
 
 	if (not_opened > 1 && !md_devopen) {
 		cmn_err(CE_WARN,
-			"md: %s failed to open. open error on %s\n",
-				md_shortname(MD_SID(un)),
-				md_devname(MD_UN2SET(un), device->un_orig_dev,
-						NULL, 0));
+		    "md: %s failed to open. open error on %s\n",
+		    md_shortname(MD_SID(un)),
+		    md_devname(MD_UN2SET(un), device->un_orig_dev, NULL, 0));
 		SE_NOTIFY(EC_SVM_STATE, ESC_SVM_OPEN_FAIL, SVM_TAG_METADEVICE,
 		    MD_UN2SET(un), MD_SID(un));
 		raid_probe_close_all_devs(un);
@@ -4310,16 +4307,16 @@ raid_imp_set(
 			hsp_id = &(un32->un_hsp_id);
 
 			for (i = 0; i < un32->un_totalcolumncnt; i++) {
-			    mr_column32_od_t *device;
+				mr_column32_od_t *device;
 
-			    device = &un32->un_column[i];
-			    if (!md_update_minor(setno, mddb_getsidenum
-				(setno), device->un_orig_key))
-				goto out;
+				device = &un32->un_column[i];
+				if (!md_update_minor(setno, mddb_getsidenum
+				    (setno), device->un_orig_key))
+					goto out;
 
-			    if (device->un_hs_id != 0)
-				device->un_hs_id = MAKERECID(
-				setno, device->un_hs_id);
+				if (device->un_hs_id != 0)
+					device->un_hs_id =
+					    MAKERECID(setno, device->un_hs_id);
 			}
 			break;
 		case MDDB_REV_RB64:
@@ -4331,16 +4328,16 @@ raid_imp_set(
 			hsp_id = &(un64->un_hsp_id);
 
 			for (i = 0; i < un64->un_totalcolumncnt; i++) {
-			    mr_column_t	*device;
+				mr_column_t	*device;
 
-			    device = &un64->un_column[i];
-			    if (!md_update_minor(setno, mddb_getsidenum
-				(setno), device->un_orig_key))
-				goto out;
+				device = &un64->un_column[i];
+				if (!md_update_minor(setno, mddb_getsidenum
+				    (setno), device->un_orig_key))
+					goto out;
 
-			    if (device->un_hs_id != 0)
-				device->un_hs_id = MAKERECID(
-				setno, device->un_hs_id);
+				if (device->un_hs_id != 0)
+					device->un_hs_id =
+					    MAKERECID(setno, device->un_hs_id);
 			}
 			break;
 		}

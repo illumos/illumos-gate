@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1884,7 +1883,10 @@ mirror_build_incore(mm_unit_t *un, int snarfing)
 	mutex_init(&un->un_dmr_mx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&un->un_dmr_cv, NULL, CV_DEFAULT, NULL);
 
+	/* place various information in the in-core data structures */
+	md_nblocks_set(MD_SID(un), un->c.un_total_blocks);
 	MD_UNIT(MD_SID(un)) = un;
+
 	return (0);
 }
 
@@ -1916,6 +1918,7 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 	if (un->un_resync_bm)
 		kmem_free((caddr_t)un->un_resync_bm, bitcnt);
 
+	md_nblocks_set(mnum, -1ULL);
 	MD_UNIT(mnum) = NULL;
 
 	/*

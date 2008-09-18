@@ -231,7 +231,9 @@ stripe_set(void *d, int mode)
 	un->c.un_revision |= MD_FN_META_DEV;
 
 	if (err = stripe_build_incore(p, 0)) {
+		md_nblocks_set(mnum, -1ULL);
 		MD_UNIT(mnum) = NULL;
+
 		mddb_deleterec_wrapper(recids[0]);
 		kmem_free(recids, num_recs * sizeof (mddb_recid_t));
 		return (err);
@@ -249,7 +251,9 @@ stripe_set(void *d, int mode)
 
 
 	if (err) {
+		md_nblocks_set(mnum, -1ULL);
 		MD_UNIT(mnum) = NULL;
+
 		mddb_deleterec_wrapper(recids[0]);
 		kmem_free(recids, num_recs * sizeof (mddb_recid_t));
 		return (mdhsperror(mdep, MDE_INVAL_HSP, un->un_hsp_id));
@@ -553,6 +557,7 @@ stripe_grow(void *d, int mode, IOLOCK *lockp)
 	 * Restore the saved stuff.
 	 */
 	new_un->c.un_total_blocks = tb;
+	md_nblocks_set(mnum, new_un->c.un_total_blocks);
 	new_un->c.un_actual_tb = atb;
 	new_un->un_nrows = nr;
 	new_un->un_ocomp = oc;
@@ -638,6 +643,9 @@ stripe_grow(void *d, int mode, IOLOCK *lockp)
 
 	/* delete old unit struct */
 	mddb_deleterec_wrapper(un->c.un_record_id);
+
+	/* place new unit in in-core array */
+	md_nblocks_set(mnum, new_un->c.un_total_blocks);
 	MD_UNIT(mnum) = new_un;
 
 	/*

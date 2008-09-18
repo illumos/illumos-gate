@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * driver for accessing kernel devinfo tree.
@@ -364,7 +363,7 @@ static struct dev_ops di_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"DEVINFO Driver %I%",
+	"DEVINFO Driver",
 	&di_ops
 };
 
@@ -2951,8 +2950,22 @@ di_getprop_add(int list, int dyn, struct di_state *st, struct dev_info *dip,
 		pflags = aflags & ~DDI_PROP_TYPE_MASK;
 		pflags |= DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
 		    DDI_PROP_CONSUMER_TYPED;
-		rv = (*prop_op)(pdevt, (dev_info_t)dip, PROP_LEN_AND_VAL_ALLOC,
-		    pflags, name, &val, &len);
+
+		/*
+		 * Hold and exit across prop_op(9E) to avoid lock order
+		 * issues between
+		 *   [ndi_devi_enter() ..prop_op(9E).. driver-lock]
+		 * .vs.
+		 *   [..ioctl(9E).. driver-lock ..ddi_remove_minor_node(9F)..
+		 *   ndi_devi_enter()]
+		 * ordering.
+		 */
+		ndi_hold_devi((dev_info_t *)dip);
+		ndi_devi_exit((dev_info_t *)dip, dip->devi_circular);
+		rv = (*prop_op)(pdevt, (dev_info_t *)dip,
+		    PROP_LEN_AND_VAL_ALLOC, pflags, name, &val, &len);
+		ndi_devi_enter((dev_info_t *)dip, &dip->devi_circular);
+		ndi_rele_devi((dev_info_t *)dip);
 
 		if (rv == DDI_PROP_SUCCESS) {
 			need_free = 1;		/* dynamic prop obtained */

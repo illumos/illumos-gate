@@ -1282,6 +1282,7 @@ trans_grow(void *d, int mode, IOLOCK  *lock)
 		} else {
 			un->c.un_total_blocks = c->un_total_blocks;
 		}
+		md_nblocks_set(MD_SID(un), un->c.un_total_blocks);
 	}
 
 	return (0);

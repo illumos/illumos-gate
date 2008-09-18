@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -160,8 +159,7 @@ stripe_close_all_devs(ms_unit_t *un, int md_cflags)
 			    (mdc->un_mirror.ms_flags & MDM_S_PROBEOPEN)) {
 				md_layered_close(mdc->un_dev,
 				    md_cflags);
-				mdc->un_mirror.ms_flags &=
-						~MDM_S_PROBEOPEN;
+				mdc->un_mirror.ms_flags &= ~MDM_S_PROBEOPEN;
 			} else if (mdc->un_mirror.ms_flags & MDM_S_ISOPEN) {
 				md_layered_close(mdc->un_dev, md_cflags);
 				mdc->un_mirror.ms_flags &= ~MDM_S_ISOPEN;
@@ -268,7 +266,7 @@ stripe_open_all_devs(ms_unit_t *un, int md_oflags)
 			} else {
 				if (md_oflags & MD_OFLG_PROBEDEV) {
 					mdc->un_mirror.ms_flags |=
-						MDM_S_PROBEOPEN;
+					    MDM_S_PROBEOPEN;
 				} else
 					mdc->un_mirror.ms_flags |= MDM_S_ISOPEN;
 			}
@@ -347,7 +345,10 @@ stripe_build_incore(void *p, int snarfing)
 		}
 	}
 
+	/* place various information in the in-core data structures */
+	md_nblocks_set(mnum, un->c.un_total_blocks);
 	MD_UNIT(mnum) = un;
+
 	return (0);
 }
 
@@ -367,6 +368,7 @@ reset_stripe(ms_unit_t *un, minor_t mnum, int removing)
 
 	md_destroy_unit_incore(mnum, &stripe_md_ops);
 
+	md_nblocks_set(mnum, -1ULL);
 	MD_UNIT(mnum) = NULL;
 
 	/*
@@ -657,8 +659,8 @@ md_mapbuf(
 		stripe_blk = blk_in_row / interlace;
 		dev_index = (size_t)(stripe_blk % mdr->un_ncomp);
 		wmdc = &mdcomp[mdr->un_icomp + dev_index];
-		wb_blkno = (diskaddr_t)(((stripe_blk / mdr->un_ncomp)
-			* interlace) + fragment);
+		wb_blkno = (diskaddr_t)(((stripe_blk / mdr->un_ncomp) *
+		    interlace) + fragment);
 	}
 
 	wb_blkno += wmdc->un_start_block;
@@ -780,10 +782,10 @@ md_stripe_strategy(buf_t *pb, int flag, void *private)
 		cb = &cs->cs_buf;
 		cs->cs_ps = ps;
 		more = md_mapbuf(un, current_blkno, current_count, cb,
-			&cs->cs_comp);
+		    &cs->cs_comp);
 
 		cb = md_bioclone(pb, current_offset, cb->b_bcount, cb->b_edev,
-				cb->b_lblkno, stripe_done, cb, KM_NOSLEEP);
+		    cb->b_lblkno, stripe_done, cb, KM_NOSLEEP);
 		/*
 		 * Do these calculations now,
 		 *  so that we pickup a valid b_bcount from the chld_bp.
@@ -862,11 +864,11 @@ stripe_snarf(md_snarfcmd_t cmd, set_t setno)
 				small_un =
 				    (ms_unit32_od_t *)mddb_getrecaddr(recid);
 				newreqsize = get_big_stripe_req_size(small_un,
-						COMPLETE_STRUCTURE);
+				    COMPLETE_STRUCTURE);
 				big_un = (ms_unit_t *)kmem_zalloc(newreqsize,
-					KM_SLEEP);
+				    KM_SLEEP);
 				stripe_convert((caddr_t)small_un,
-					(caddr_t)big_un, SMALL_2_BIG);
+				    (caddr_t)big_un, SMALL_2_BIG);
 				kmem_free(small_un, dep->de_reqsize);
 				dep->de_rb_userdata = big_un;
 				dep->de_reqsize = newreqsize;
@@ -1080,7 +1082,7 @@ stripe_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 			 * 32 bit wide blkno's.
 			 */
 			result = bdev_dump(bp->b_edev, addr, (daddr_t)mapblk,
-						nblk);
+			    nblk);
 			if (result)
 				saveresult = result;
 		}
@@ -1163,8 +1165,8 @@ stripe_block_count_skip_size(
 	} else {			/* Stripes */
 		*block = (mdr->un_cum_blocks - mdr->un_blocks) +
 		    ((ci - cmpcount) * mdr->un_interlace);
-		*count	= (size_t)(mdr->un_blocks / (mdr->un_interlace
-			* mdr->un_ncomp));
+		*count	= (size_t)(mdr->un_blocks / (mdr->un_interlace *
+		    mdr->un_ncomp));
 		*skip = (mdr->un_interlace * mdr->un_ncomp) - mdr->un_interlace;
 		*size = mdr->un_interlace;
 	}
@@ -1230,9 +1232,9 @@ stripe_get_dev(md_dev64_t dev, void *junk, int indx, ms_cd_info_t *cd)
 	 */
 	if (tmpdev == NODEV64) {
 		tmpdev = md_resolve_bydevid(md_getminor(dev), tmpdev,
-			comp->un_mirror.ms_hs_id ?
-			comp->un_mirror.ms_hs_key :
-			comp->un_key);
+		    comp->un_mirror.ms_hs_id ?
+		    comp->un_mirror.ms_hs_key :
+		    comp->un_key);
 		comp->un_dev = tmpdev;
 	}
 
@@ -1461,7 +1463,7 @@ stripe_replace_dev(md_dev64_t dev, void *junk, int ci, ms_new_dev_t *nd,
 		setno = MD_MIN2SET(mnum);
 
 		(void) md_devname(setno, comp->un_mirror.ms_orig_dev, devname,
-					sizeof (devname));
+		    sizeof (devname));
 		(void) md_devname(setno, nd->nd_dev, hs_devname,
 		    sizeof (hs_devname));
 
@@ -1581,7 +1583,7 @@ again:
 	}
 
 	if (stripe_replace_dev(dev, junk, ci, &nd, recids, nrecids,
-		replace_done, replace_data)) {
+	    replace_done, replace_data)) {
 
 		(void) md_hot_spare_ifc(HS_BAD, un->un_hsp_id, 0, 0,
 		    &nd.nd_hs_id, &nd.nd_key, NULL, NULL);
@@ -1646,23 +1648,26 @@ stripe_imp_set(
 			record_id = &(un32->c.un_record_id);
 			hsp_id = &(un32->un_hsp_id);
 
-			comp32 = (ms_comp32_od_t *)((void *)&((char *)un32)
-				[un32->un_ocomp]);
+			comp32 = (ms_comp32_od_t *)
+			    ((void *)&((char *)un32)[un32->un_ocomp]);
 			for (row = 0; row < un32->un_nrows; row++) {
-			    struct ms_row32_od *mdr = &un32->un_row[row];
-			    for (i = 0, c = mdr->un_icomp;
-				i < mdr->un_ncomp; i++) {
-				ms_comp32_od_t *mdc;
-				mdc = &comp32[c++];
+				struct ms_row32_od *mdr = &un32->un_row[row];
+				for (i = 0, c = mdr->un_icomp;
+				    i < mdr->un_ncomp; i++) {
+					ms_comp32_od_t *mdc;
 
-				if (!md_update_minor(setno, mddb_getsidenum
-				    (setno), mdc->un_key))
-					goto out;
+					mdc = &comp32[c++];
 
-				if (mdc->un_mirror.ms_hs_id != 0)
-				    mdc->un_mirror.ms_hs_id = MAKERECID(
-				    setno, mdc->un_mirror.ms_hs_id);
-			    }
+					if (!md_update_minor(setno,
+					    mddb_getsidenum(setno),
+					    mdc->un_key))
+						goto out;
+
+					if (mdc->un_mirror.ms_hs_id != 0)
+						mdc->un_mirror.ms_hs_id =
+						    MAKERECID(setno,
+						    mdc->un_mirror.ms_hs_id);
+				}
 			}
 			break;
 		case MDDB_REV_RB64:
@@ -1673,23 +1678,27 @@ stripe_imp_set(
 			record_id = &(un64->c.un_record_id);
 			hsp_id = &(un64->un_hsp_id);
 
-			comp64 = (ms_comp_t *)((void *)&((char *)un64)
-				[un64->un_ocomp]);
+			comp64 = (ms_comp_t *)
+			    ((void *)&((char *)un64)[un64->un_ocomp]);
 			for (row = 0; row < un64->un_nrows; row++) {
-			    struct ms_row *mdr = &un64->un_row[row];
-			    for (i = 0, c = mdr->un_icomp;
-				i < mdr->un_ncomp; i++) {
-				ms_comp_t *mdc;
-				mdc = &comp64[c++];
+				struct ms_row *mdr = &un64->un_row[row];
 
-				if (!md_update_minor(setno, mddb_getsidenum
-				    (setno), mdc->un_key))
-					goto out;
+				for (i = 0, c = mdr->un_icomp;
+				    i < mdr->un_ncomp; i++) {
+					ms_comp_t *mdc;
 
-				if (mdc->un_mirror.ms_hs_id != 0)
-				    mdc->un_mirror.ms_hs_id = MAKERECID(
-				    setno, mdc->un_mirror.ms_hs_id);
-			    }
+					mdc = &comp64[c++];
+
+					if (!md_update_minor(setno,
+					    mddb_getsidenum(setno),
+					    mdc->un_key))
+						goto out;
+
+					if (mdc->un_mirror.ms_hs_id != 0)
+						mdc->un_mirror.ms_hs_id =
+						    MAKERECID(setno,
+						    mdc->un_mirror.ms_hs_id);
+				}
 			}
 			break;
 		}

@@ -622,7 +622,7 @@ extern void	get_info(struct dk_cinfo *, minor_t);
 extern void	get_minfo(struct dk_minfo *, minor_t);
 extern int	mdstrategy(buf_t *);
 extern int	md_create_minor_node(set_t, minor_t);
-
+extern void	md_nblocks_set(minor_t mnum, uint64_t nblocks);
 
 /* External from md_subr.c */
 extern int	md_inc_iocount(set_t);

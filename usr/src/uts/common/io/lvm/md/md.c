@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Md - is the meta-disk driver.   It sits below the UFS file system
@@ -75,6 +74,7 @@
 #include <sys/kmem.h>
 #include <sys/cladm.h>
 #include <sys/priv_names.h>
+#include <sys/modhash.h>
 
 #ifndef	lint
 char 		_depends_on[] = "strmod/rpcmod";
@@ -283,6 +283,76 @@ int		md_maxphys	= 0;	/* maximum io size in bytes */
 #define		MD_MAXBCOUNT	(1024 * 1024)
 unsigned	md_maxbcount	= 0;	/* maximum physio size in bytes */
 
+/*
+ * Some md ioctls trigger io framework device tree operations.  An
+ * example is md ioctls that call md_resolve_bydevid(): which uses the
+ * io framework to resolve a devid. Such operations result in acquiring
+ * io framework locks (like ndi_devi_enter() of "/") while holding
+ * driver locks (like md_unit_writerlock()).
+ *
+ * The prop_op(9E) entry point is called from the devinfo driver with
+ * an active ndi_devi_enter of "/". To avoid deadlock, md's prop_op
+ * implementation must avoid taking a lock that is held per above md
+ * ioctl description: i.e. mdprop_op(9E) can't call md_unit_readerlock()
+ * without risking deadlock.
+ *
+ * To service "size" requests without risking deadlock, we maintain a
+ * "mnum->nblocks" sizemap (protected by a short-term global mutex).
+ */
+static kmutex_t		md_nblocks_mutex;
+static mod_hash_t	*md_nblocksmap;		/* mnum -> nblocks */
+int			md_nblocksmap_size = 512;
+
+/*
+ * Maintain "mnum->nblocks" sizemap for mdprop_op use:
+ *
+ * Create: any code that establishes a unit's un_total_blocks needs the
+ * following type of call to establish nblocks for mdprop_op():
+ *	md_nblocks_set(mnum, un->c.un_total_blocks);"
+ *	NOTE: locate via cscope md_create_minor_node/md_create_unit_incore
+ *		...or  "MD_UNIT..*="
+ *
+ * Change: any code that changes a unit's un_total_blocks needs the
+ * following type of call to sync nblocks for mdprop_op():
+ *	md_nblocks_set(mnum, un->c.un_total_blocks);"
+ *	NOTE: locate via cscope for "un_total_blocks[ \t]*="
+ *
+ * Destroy: any code that deletes a unit needs the following type of call
+ * to sync nblocks for mdprop_op():
+ *	md_nblocks_set(mnum, -1ULL);
+ *	NOTE: locate via cscope md_remove_minor_node/md_destroy_unit_incore
+ *		...or  "MD_UNIT..*="
+ */
+void
+md_nblocks_set(minor_t mnum, uint64_t nblocks)
+{
+	mutex_enter(&md_nblocks_mutex);
+	if (nblocks == -1ULL)
+		(void) mod_hash_destroy(md_nblocksmap,
+		    (mod_hash_key_t)(intptr_t)mnum);
+	else
+		(void) mod_hash_replace(md_nblocksmap,
+		    (mod_hash_key_t)(intptr_t)mnum,
+		    (mod_hash_val_t)(intptr_t)nblocks);
+	mutex_exit(&md_nblocks_mutex);
+}
+
+/* get the size of a mnum from "mnum->nblocks" sizemap */
+uint64_t
+md_nblocks_get(minor_t mnum)
+{
+	mod_hash_val_t	hv;
+
+	mutex_enter(&md_nblocks_mutex);
+	if (mod_hash_find(md_nblocksmap,
+	    (mod_hash_key_t)(intptr_t)mnum, &hv) == 0) {
+		mutex_exit(&md_nblocks_mutex);
+		return ((uint64_t)(intptr_t)hv);
+	}
+	mutex_exit(&md_nblocks_mutex);
+	return (0);
+}
+
 /* allocate/free dynamic space associated with driver globals */
 void
 md_global_alloc_free(int alloc)
@@ -298,7 +368,8 @@ md_global_alloc_free(int alloc)
 		rw_init(&ni_rwlp.lock, NULL, RW_DRIVER, NULL);
 		rw_init(&hsp_rwlp.lock, NULL, RW_DRIVER, NULL);
 		mutex_init(&md_cpr_resync.md_resync_mutex, NULL,
-			MUTEX_DEFAULT, NULL);
+		    MUTEX_DEFAULT, NULL);
+		mutex_init(&md_nblocks_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 		/* initialize per set driver global locks */
 		for (s = 0; s < MD_MAXSETS; s++) {
@@ -319,6 +390,7 @@ md_global_alloc_free(int alloc)
 		}
 
 		/* destroy driver global locks */
+		mutex_destroy(&md_nblocks_mutex);
 		mutex_destroy(&md_cpr_resync.md_resync_mutex);
 		rw_destroy(&hsp_rwlp.lock);
 		rw_destroy(&ni_rwlp.lock);
@@ -500,8 +572,9 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    &md_majortab_len) != DDI_PROP_SUCCESS) {
 				md_majortab_len = 0;
 				if (md_init_debug)
-				    cmn_err(CE_WARN, "md_targ_nm_table "
-				    "ddi_prop_lookup_string_array failed");
+					cmn_err(CE_WARN, "md_targ_nm_table "
+					    "ddi_prop_lookup_string_array "
+					    "failed");
 				goto attach_failure;
 			}
 
@@ -523,9 +596,9 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				str2 = str + 1;
 				md_major_tuple_table[i].targ_maj = 0;
 				while ((*str2 >= '0') && (*str2 <= '9')) {
-				    md_major_tuple_table[i].targ_maj *= 10;
-				    md_major_tuple_table[i].targ_maj +=
-					*str2++ - '0';
+					md_major_tuple_table[i].targ_maj *= 10;
+					md_major_tuple_table[i].targ_maj +=
+					    *str2++ - '0';
 				}
 				*str = ' ';
 			}
@@ -543,10 +616,10 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * and set globals if these exist.
 	 */
 	md_keep_repl_state = ddi_getprop(DDI_DEV_T_ANY, dip,
-				    0, "md_keep_repl_state", 0);
+	    0, "md_keep_repl_state", 0);
 
 	md_devid_destroy = ddi_getprop(DDI_DEV_T_ANY, dip,
-				    0, "md_devid_destroy", 0);
+	    0, "md_devid_destroy", 0);
 
 	if (MD_UPGRADE)
 		md_major_targ = md_targ_name_to_major("md");
@@ -617,6 +690,10 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto attach_failure;
 		}
 	}
+
+	/* create the hash to store the meta device sizes */
+	md_nblocksmap = mod_hash_create_idhash("md_nblocksmap",
+	    md_nblocksmap_size, mod_hash_null_valdtor);
 
 	MD_CLR_IN(IN_ATTACH);
 	return (DDI_SUCCESS);
@@ -700,7 +777,8 @@ mddetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		int	i;
 
 		for (i = 0; non_ff_drivers[i] != NULL; i++)
-		    kmem_free(non_ff_drivers[i], strlen(non_ff_drivers[i]) + 1);
+			kmem_free(non_ff_drivers[i],
+			    strlen(non_ff_drivers[i]) + 1);
 
 		/* free i+1 entries because there is a null entry at list end */
 		kmem_free(non_ff_drivers, (i + 1) * sizeof (char *));
@@ -739,6 +817,9 @@ mddetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_remove_minor_node(dip, NULL);
 
 	med_fini();
+
+	mod_hash_destroy_idhash(md_nblocksmap);
+
 	md_devinfo = NULL;
 
 	MD_CLR_IN(IN_DETACH);
@@ -786,43 +867,8 @@ mdprop_op(
 	caddr_t valuep,		/* where to put property value */
 	int *lengthp)		/* put length of property here */
 {
-	minor_t		mnum;
-	set_t		setno;
-	md_unit_t	*un;
-	mdi_unit_t	*ui;
-	uint64_t	nblocks64;
-
-	/*
-	 * Our dynamic properties are all device specific and size oriented.
-	 * Requests issued under conditions where size is valid are passed
-	 * to ddi_prop_op_nblocks with the size information, otherwise the
-	 * request is passed to ddi_prop_op. Make sure that the minor device
-	 * is a valid part of the Virtual Disk subsystem.
-	 */
-	mnum = getminor(dev);
-	setno = MD_MIN2SET(mnum);
-	if ((dev == DDI_DEV_T_ANY) || (mnum == MD_ADM_MINOR) ||
-	    (setno >= md_nsets) || (MD_MIN2UNIT(mnum) >= md_nunits)) {
-pass:		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp));
-	} else {
-		rw_enter(&md_unit_array_rw.lock, RW_READER);
-		if (((md_get_setstatus(setno) & MD_SET_SNARFED) == 0) ||
-		    ((ui = MDI_UNIT(mnum)) == NULL)) {
-			rw_exit(&md_unit_array_rw.lock);
-			goto pass;
-		}
-
-		/* get nblocks value */
-		un = (md_unit_t *)md_unit_readerlock(ui);
-		nblocks64 = un->c.un_total_blocks;
-		md_unit_readerexit(ui);
-		rw_exit(&md_unit_array_rw.lock);
-
-		return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp, nblocks64));
-	}
-
+	return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, md_nblocks_get(getminor(dev))));
 }
 
 static void
@@ -871,15 +917,14 @@ md_print_block_usage(mddb_set_t *s, uint_t blks)
 
 	max_blk_needed = s->s_totalblkcnt - s->s_freeblkcnt + blks;
 
-
 	cmn_err(CE_WARN, "Blocks in Metadevice State Database: %d\n"
-		"            Additional Blocks Needed:            %d\n\n"
-		"            Increase size of following replicas for\n"
-		"            device relocatability by deleting listed\n"
-		"            replica and re-adding replica with\n"
-		"            increased size (see metadb(1M)):\n"
-		"                Replica                   Increase By",
-		s->s_totalblkcnt, (blks - s->s_freeblkcnt));
+	    "            Additional Blocks Needed:            %d\n\n"
+	    "            Increase size of following replicas for\n"
+	    "            device relocatability by deleting listed\n"
+	    "            replica and re-adding replica with\n"
+	    "            increased size (see metadb(1M)):\n"
+	    "                Replica                   Increase By",
+	    s->s_totalblkcnt, (blks - s->s_freeblkcnt));
 
 	lbp = s->s_lbp;
 
@@ -897,7 +942,7 @@ md_print_block_usage(mddb_set_t *s, uint_t blks)
 			slp = &lbp->lb_sidelocators[s->s_sideno][li];
 			drv_index = slp->l_drvnm_index;
 			mddb_locatorblock2splitname(s->s_lnp, li, s->s_sideno,
-				&sn);
+			    &sn);
 			prefixlen = SPN_PREFIX(&sn).pre_len;
 			suffixlen = SPN_SUFFIX(&sn).suf_len;
 			alloc_sz = (int)(prefixlen + suffixlen + 2);
@@ -910,10 +955,10 @@ md_print_block_usage(mddb_set_t *s, uint_t blks)
 			    suffixlen);
 			name[prefixlen + suffixlen + 1] = '\0';
 			cmn_err(CE_WARN,
-				"  %s (%s:%d:%d)   %d blocks",
-				name, lbp->lb_drvnm[drv_index].dn_data,
-				slp->l_mnum, lbp->lb_locators[li].l_blkno,
-				(max_blk_needed - ib));
+			    "  %s (%s:%d:%d)   %d blocks",
+			    name, lbp->lb_drvnm[drv_index].dn_data,
+			    slp->l_mnum, lbp->lb_locators[li].l_blkno,
+			    (max_blk_needed - ib));
 			kmem_free(name, alloc_sz);
 		}
 	}
@@ -945,14 +990,14 @@ md_create_minor_node(set_t setno, minor_t mnum)
 		return (1);
 
 	(void) snprintf(name, 20, "%u,%u,blk",
-		(unsigned)setno, (unsigned)MD_MIN2UNIT(mnum));
+	    (unsigned)setno, (unsigned)MD_MIN2UNIT(mnum));
 
 	if (ddi_create_minor_node(md_devinfo, name, S_IFBLK,
 	    MD_MKMIN(setno, mnum), DDI_PSEUDO, 0))
 		return (1);
 
 	(void) snprintf(name, 20, "%u,%u,raw",
-		(unsigned)setno, (unsigned)MD_MIN2UNIT(mnum));
+	    (unsigned)setno, (unsigned)MD_MIN2UNIT(mnum));
 
 	if (ddi_create_minor_node(md_devinfo, name, S_IFCHR,
 	    MD_MKMIN(setno, mnum), DDI_PSEUDO, 0))
@@ -993,7 +1038,7 @@ md_verify_orphaned_record(set_t setno, mdkey_t key)
 		if ((odev == NODEV64) || (md_getmajor(odev) == md_major))
 			return (0);
 		if (lookup_entry(did_nh, setno, side, key, odev, NM_DEVID) ==
-									NULL)
+		    NULL)
 			return (1);
 	}
 	return (0);
@@ -1152,7 +1197,7 @@ md_snarf_db_set(set_t setno, md_error_t *ep)
 		if (md_loadsubmod(setno, md_getshared_name(setno, drvrid),
 		    drvrid) < 0) {
 			cmn_err(CE_NOTE, "md: could not load misc/%s",
-				md_getshared_name(setno, drvrid));
+			    md_getshared_name(setno, drvrid));
 		}
 	}
 
@@ -1874,7 +1919,7 @@ mdioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred_p,
 	 */
 	if (mnum == MD_ADM_MINOR) {
 		err = md_admin_ioctl(md_expldev(dev), cmd, (void *) data,
-					mode, &lock);
+		    mode, &lock);
 	}
 
 	/*

@@ -546,7 +546,9 @@ sp_set(void *d, int mode)
 	 * build the incore structures.
 	 */
 	if (err = sp_build_incore(rec_addr, 0)) {
+		md_nblocks_set(mnum, -1ULL);
 		MD_UNIT(mnum) = NULL;
+
 		mddb_deleterec_wrapper(recids[0]);
 		return (err);
 	}
@@ -862,7 +864,11 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 	 * delete old unit struct.
 	 */
 	mddb_deleterec_wrapper(MD_RECID(un));
+
+	/* place new unit in in-core array */
+	md_nblocks_set(mnum, new_un->c.un_total_blocks);
 	MD_UNIT(mnum) = new_un;
+
 	SE_NOTIFY(EC_SVM_CONFIG, ESC_SVM_GROW, TAG_METADEVICE,
 	    MD_UN2SET(new_un), MD_SID(new_un));
 

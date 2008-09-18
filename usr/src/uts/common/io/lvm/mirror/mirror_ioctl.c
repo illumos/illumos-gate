@@ -249,14 +249,18 @@ mirror_set(
 			continue;
 
 		/* mirror creation should fail here */
+		md_nblocks_set(mnum, -1ULL);
 		MD_UNIT(mnum) = NULL;
+
 		mddb_deleterec_wrapper(recid);
 		return (mdmderror(&msp->mde, MDE_IN_USE,
 		    md_getminor(sm->sm_dev)));
 	}
 
 	if (err = mirror_build_incore(un, 0)) {
+		md_nblocks_set(mnum, -1ULL);
 		MD_UNIT(mnum) = NULL;
+
 		mddb_deleterec_wrapper(recid);
 		return (err);
 	}
@@ -1366,6 +1370,7 @@ mirror_grow_unit(
 	current_tb = (total_blocks/spc) * spc;
 
 	un->c.un_total_blocks = current_tb;
+	md_nblocks_set(mnum, un->c.un_total_blocks);
 	un->c.un_actual_tb = total_blocks;
 
 	/* Is the mirror growing from 32 bit device to 64 bit device? */

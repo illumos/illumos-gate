@@ -6678,6 +6678,21 @@ ddi_pathname(dev_info_t *dip, char *path)
 	return (pathname_work(dip, path));
 }
 
+char *
+ddi_pathname_minor(struct ddi_minor_data *dmdp, char *path)
+{
+	if (dmdp->dip == NULL)
+		*path = '\0';
+	else {
+		(void) ddi_pathname(dmdp->dip, path);
+		if (dmdp->ddm_name) {
+			(void) strcat(path, ":");
+			(void) strcat(path, dmdp->ddm_name);
+		}
+	}
+	return (path);
+}
+
 static char *
 pathname_work_obp(dev_info_t *dip, char *path)
 {

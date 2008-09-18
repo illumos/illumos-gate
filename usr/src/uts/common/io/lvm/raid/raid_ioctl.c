@@ -603,6 +603,7 @@ raid_init_columns(minor_t mnum)
 			un->un_state = RUS_OKAY;
 		else {
 			un->c.un_total_blocks = un->un_grow_tb;
+			md_nblocks_set(mnum, un->c.un_total_blocks);
 			un->un_grow_tb = 0;
 			if (raid_state_cnt(un, RCS_OKAY) ==
 			    un->un_totalcolumncnt)
@@ -979,7 +980,10 @@ raid_set(void	*d, int mode)
 			    un->un_totalcolumncnt);
 			kmem_free(un->mr_ic, sizeof (*un->mr_ic));
 		}
+
+		md_nblocks_set(mnum, -1ULL);
 		MD_UNIT(mnum) = NULL;
+
 		mddb_deleterec_wrapper(mr_recid);
 		goto out;
 	}
@@ -995,7 +999,9 @@ raid_set(void	*d, int mode)
 		err = md_hot_spare_ifc(HSP_INCREF, un->un_hsp_id, 0, 0,
 		    &recids[rid], NULL, NULL, NULL);
 		if (err) {
+			md_nblocks_set(mnum, -1ULL);
 			MD_UNIT(mnum) = NULL;
+
 			mddb_deleterec_wrapper(mr_recid);
 			goto out;
 		}
@@ -1914,6 +1920,9 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 
 	/* delete old unit struct */
 	mddb_deleterec_wrapper(un->c.un_record_id);
+
+	/* place new unit in in-core array */
+	md_nblocks_set(mnum, new_un->c.un_total_blocks);
 	MD_UNIT(mnum) = new_un;
 
 	/*
