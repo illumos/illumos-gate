@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -3391,6 +3389,7 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 				ret = SA_INVALID_NAME;
 				(void) printf(gettext("Invalid resource name: "
 				    "%s\n"), newname);
+				newname = NULL;
 			} else {
 				newrsrc = conv_to_utf8(newname);
 			}
