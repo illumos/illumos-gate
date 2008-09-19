@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -87,13 +86,12 @@ pop(void)
 {
 	struct fileblk *f;
 
-	if ((f = standin)->fstak)
-	{
+	if ((f = standin)->fstak) {
 		if (f->fdes >= 0)
 			close(f->fdes);
 		standin = f->fstak;
 		return (TRUE);
-	}else
+	} else
 		return (FALSE);
 }
 
@@ -110,11 +108,11 @@ pushtemp(int fd, struct tempblk *tb)
 int
 poptemp(void)
 {
-	if (tmpfptr){
+	if (tmpfptr) {
 		close(tmpfptr->fdes);
 		tmpfptr = tmpfptr->fstak;
 		return (TRUE);
-	}else
+	} else
 		return (FALSE);
 }
 
@@ -145,8 +143,7 @@ void
 renamef(int f1, int f2)
 {
 #ifdef RES
-	if (f1 != f2)
-	{
+	if (f1 != f2) {
 		dup(f1 | DUPFLG, f2);
 		close(f1);
 		if (f2 == 0)
@@ -155,8 +152,7 @@ renamef(int f1, int f2)
 #else
 	int	fs;
 
-	if (f1 != f2)
-	{
+	if (f1 != f2) {
 		fs = fcntl(f2, 1, 0);
 		close(f2);
 		fcntl(f1, 0, f2);
@@ -234,8 +230,7 @@ copy(struct ionod	*ioparg)
 	unsigned char	*pc;
 
 
-	if (iop = ioparg)
-	{
+	if (iop = ioparg) {
 		struct tempblk tb;
 		copy(iop->iolst);
 		ends = mactrim(iop->ioname);
@@ -245,32 +240,28 @@ copy(struct ionod	*ioparg)
 		fd = tmpfil(&tb);
 
 		if (fndef)
-			iop->ioname = (char *) make(tmpout);
+			iop->ioname = (char *)make(tmpout);
 		else
-			iop->ioname = (char *) cpystak(tmpout);
+			iop->ioname = (char *)cpystak(tmpout);
 
 		iop->iolst = iotemp;
 		iotemp = iop;
 
 		cline = clinep = start = locstak();
-		if (stripflg)
-		{
+		if (stripflg) {
 			iop->iofile &= ~IOSTRIP;
 			while (*ends == '\t')
 				ends++;
 		}
-		for (;;)
-		{
+		for (;;) {
 			chkpr();
-			if (nosubst)
-			{
+			if (nosubst) {
 				c = readwc();
 				if (stripflg)
 					while (c == '\t')
 						c = readwc();
 
-				while (!eolchar(c))
-				{
+				while (!eolchar(c)) {
 					pc = readw(c);
 					while (*pc) {
 						if (clinep >= brkend)
@@ -279,24 +270,23 @@ copy(struct ionod	*ioparg)
 					}
 					c = readwc();
 				}
-			}else{
+			} else {
 				c = nextwc();
 				if (stripflg)
 					while (c == '\t')
 						c = nextwc();
 
-				while (!eolchar(c))
-				{
+				while (!eolchar(c)) {
 					pc = readw(c);
 					while (*pc) {
 						if (clinep >= brkend)
 							growstak(clinep);
 						*clinep++ = *pc++;
 					}
-					if (c == '\\')
-					{
+					if (c == '\\') {
 						pc = readw(readwc());
 						/* *pc might be NULL */
+						/* BEGIN CSTYLED */
 						if (*pc) {
 							while (*pc) {
 								if (clinep >= brkend)
@@ -308,6 +298,7 @@ copy(struct ionod	*ioparg)
 								growstak(clinep);
 							*clinep++ = *pc;
 						}
+						/* END CSTYLED */
 					}
 					c = nextwc();
 				}
@@ -316,12 +307,11 @@ copy(struct ionod	*ioparg)
 			if (clinep >= brkend)
 				growstak(clinep);
 			*clinep = 0;
-			if (eof || eq(cline, ends))
-			{
+			if (eof || eq(cline, ends)) {
 				if ((i = cline - start) > 0)
 					write(fd, start, i);
 				break;
-			}else{
+			} else {
 				if (clinep >= brkend)
 					growstak(clinep);
 				*clinep++ = NL;
@@ -336,10 +326,11 @@ copy(struct ionod	*ioparg)
 			}
 		}
 
-		poptemp();	/*
-				 * pushed in tmpfil -- bug fix for problem
-				 * deleting in-line scripts
-				 */
+		/*
+		 * Pushed in tmpfil -- bug fix for problem
+		 * deleting in-line script.
+		 */
+		poptemp();
 	}
 }
 
@@ -363,7 +354,7 @@ link_iodocs(struct ionod *i)
 			/*
 			 * We've already cycled through all the possible
 			 * numbers or the tmp file name is being
-			 * truncated anyway, so start over. 
+			 * truncated anyway, so start over.
 			 */
 				serial = 0;
 				break;
@@ -382,8 +373,7 @@ link_iodocs(struct ionod *i)
 void
 swap_iodoc_nm(struct ionod *i)
 {
-	while (i)
-	{
+	while (i) {
 		free(i->ioname);
 		i->ioname = i->iolink;
 		i->iolink = 0;
@@ -398,6 +388,8 @@ savefd(int fd)
 	int	f;
 
 	f = fcntl(fd, F_DUPFD, 10);
+	/* this saved fd should not be found in an exec'ed cmd */
+	(void) fcntl(f, F_SETFD, FD_CLOEXEC);
 	return (f);
 }
 
@@ -407,8 +399,7 @@ restore(int last)
 	int 	i;
 	int	dupfd;
 
-	for (i = topfd - 1; i >= last; i--)
-	{
+	for (i = topfd - 1; i >= last; i--) {
 		if ((dupfd = fdmap[i].dup_fd) > 0)
 			renamef(dupfd, fdmap[i].org_fd);
 		else
