@@ -93,7 +93,7 @@ int i;
 	if (start_seqnum < 0)
 		start_seqnum = 0;
 	for (i = start_seqnum; i <= start_seqnum + 6; i++) {
-		smb_sign_calc(command, sign, i, mac_sig);
+		(void) smb_sign_calc(command, sign, i, mac_sig);
 		if (memcmp(mac_sig, sr_sig, SMB_SIG_SIZE) == 0) {
 			sign->seqnum = i;
 			*found = B_TRUE;
