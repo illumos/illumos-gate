@@ -243,7 +243,7 @@ static cmdfunc_t do_show_ether;
 static void	altroot_cmd(char *, int, char **);
 static int	show_linkprop_onelink(datalink_id_t, void *);
 
-static void	link_stats(datalink_id_t, uint_t);
+static void	link_stats(datalink_id_t, uint_t, char *, show_state_t *);
 static void	aggr_stats(datalink_id_t, show_grp_state_t *, uint_t);
 static void	dev_stats(const char *dev, uint32_t, char *, show_state_t *);
 
@@ -685,7 +685,7 @@ static print_field_t phys_fields[] = {
     offsetof(link_fields_buf_t, link_phys_media),	CMD_TYPE_ANY},
 { "state",	"STATE",		10,
     offsetof(link_fields_buf_t, link_phys_state),	CMD_TYPE_ANY},
-{ "speed",	"SPEED",		4,
+{ "speed",	"SPEED",		6,
     offsetof(link_fields_buf_t, link_phys_speed),	CMD_TYPE_ANY},
 { "duplex",	"DUPLEX",		9,
     offsetof(link_fields_buf_t, link_phys_duplex),	CMD_TYPE_ANY},
@@ -1852,6 +1852,7 @@ show_link_stats(datalink_id_t linkid, void *arg)
 	show_state_t		*state = (show_state_t *)arg;
 	pktsum_t		stats, diff_stats;
 	dladm_phys_attr_t	dpa;
+	dev_args_t largs;
 
 	if (state->ls_firstonly) {
 		if (state->ls_donefirst)
@@ -1880,13 +1881,10 @@ show_link_stats(datalink_id_t linkid, void *arg)
 	}
 	stats_diff(&diff_stats, &stats, &state->ls_prevstats);
 
-	(void) printf("%-12s", link);
-	(void) printf("%-10llu", diff_stats.ipackets);
-	(void) printf("%-12llu", diff_stats.rbytes);
-	(void) printf("%-8u", diff_stats.ierrors);
-	(void) printf("%-10llu", diff_stats.opackets);
-	(void) printf("%-12llu", diff_stats.obytes);
-	(void) printf("%-8u\n", diff_stats.oerrors);
+	largs.devs_link = link;
+	largs.devs_psum = &diff_stats;
+	dladm_print_output(&state->ls_print, state->ls_parseable,
+	    print_dev_stats, &largs);
 
 	state->ls_prevstats = stats;
 	return (DLADM_WALK_CONTINUE);
@@ -2511,6 +2509,8 @@ do_show_link(int argc, char *argv[], const char *use)
 	uint_t		nfields;
 	char		*all_active_fields = "link,class,mtu,state,over";
 	char		*all_inactive_fields = "link,class,over";
+	char		*allstat_fields =
+	    "link,ipackets,rbytes,ierrors,opackets,obytes,oerrors";
 
 	bzero(&state, sizeof (state));
 
@@ -2557,8 +2557,8 @@ do_show_link(int argc, char *argv[], const char *use)
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");
 
-	if (s_arg && (p_arg || flags != DLADM_OPT_ACTIVE))
-		die("the option -%c cannot be used with -s", p_arg ? 'p' : 'P');
+	if (s_arg && flags != DLADM_OPT_ACTIVE)
+		die("the option -P cannot be used with -s");
 
 	/* get link name (optional last argument) */
 	if (optind == (argc-1)) {
@@ -2578,15 +2578,6 @@ do_show_link(int argc, char *argv[], const char *use)
 		usage();
 	}
 
-	if (s_arg) {
-		link_stats(linkid, interval);
-		return;
-	}
-
-	state.ls_parseable = p_arg;
-	state.ls_flags = flags;
-	state.ls_donefirst = B_FALSE;
-
 	if (p_arg && !o_arg)
 		die("-p requires -o");
 
@@ -2594,10 +2585,21 @@ do_show_link(int argc, char *argv[], const char *use)
 		die("\"-o all\" is invalid with -p");
 
 	if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0)) {
-		if (state.ls_flags & DLADM_OPT_ACTIVE)
+		if (s_arg)
+			fields_str = allstat_fields;
+		else if (flags & DLADM_OPT_ACTIVE)
 			fields_str = all_active_fields;
 		else
 			fields_str = all_inactive_fields;
+	}
+
+	state.ls_parseable = p_arg;
+	state.ls_flags = flags;
+	state.ls_donefirst = B_FALSE;
+
+	if (s_arg) {
+		link_stats(linkid, interval, fields_str, &state);
+		return;
 	}
 
 
@@ -3263,30 +3265,38 @@ do_show_vlan(int argc, char *argv[], const char *use)
 }
 
 static void
-link_stats(datalink_id_t linkid, uint_t interval)
+link_stats(datalink_id_t linkid, uint_t interval, char *fields_str,
+    show_state_t *state)
 {
-	show_state_t	state;
+	print_field_t	**fields;
+	uint_t		nfields;
 
-	bzero(&state, sizeof (state));
+	fields = parse_output_fields(fields_str, devs_fields, DEVS_MAX_FIELDS,
+	    CMD_TYPE_ANY, &nfields);
+	if (fields == NULL) {
+		die("invalid field(s) specified");
+		return;
+	}
+
+	state->ls_print.ps_fields = fields;
+	state->ls_print.ps_nfields = nfields;
 
 	/*
 	 * If an interval is specified, continuously show the stats
 	 * only for the first MAC port.
 	 */
-	state.ls_firstonly = (interval != 0);
+	state->ls_firstonly = (interval != 0);
 
+	if (!state->ls_parseable)
+		print_header(&state->ls_print);
 	for (;;) {
-		(void) printf("%-12s%-10s%-12s%-8s%-10s%-12s%-8s\n",
-		    "LINK", "IPACKETS", "RBYTES", "IERRORS", "OPACKETS",
-		    "OBYTES", "OERRORS");
-
-		state.ls_donefirst = B_FALSE;
+		state->ls_donefirst = B_FALSE;
 		if (linkid == DATALINK_ALL_LINKID) {
-			(void) dladm_walk_datalink_id(show_link_stats, &state,
+			(void) dladm_walk_datalink_id(show_link_stats, state,
 			    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE,
 			    DLADM_OPT_ACTIVE);
 		} else {
-			(void) show_link_stats(linkid, &state);
+			(void) show_link_stats(linkid, state);
 		}
 
 		if (interval == 0)
@@ -3690,7 +3700,7 @@ print_field(print_state_t *statep, print_field_t *pfp, const char *value,
     boolean_t parseable)
 {
 	uint_t	width = pfp->pf_width;
-	uint_t	valwidth = strlen(value);
+	uint_t	valwidth;
 	uint_t	compress;
 
 	/*
@@ -3717,9 +3727,11 @@ print_field(print_state_t *statep, print_field_t *pfp, const char *value,
 			value = STR_UNDEF_VAL;
 		if (statep->ps_lastfield) {
 			(void) printf("%s", value);
+			statep->ps_overflow = 0;
 			return;
 		}
 
+		valwidth = strlen(value);
 		if (valwidth > width) {
 			statep->ps_overflow += valwidth - width;
 		} else if (valwidth < width && statep->ps_overflow > 0) {
