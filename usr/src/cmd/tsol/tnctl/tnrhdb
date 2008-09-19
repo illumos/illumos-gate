@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # The following are the boot-time defaults.  These establish all IPv4 and
 # IPv6 addresses as unlabeled.  Both are removed if this file contains any
@@ -31,9 +29,16 @@
 #0.0.0.0/0:_unlab
 #\:\:0/0:_unlab
 #
-# Default value shipped with system. This allows global zone of the
-# system to obtain various services during initial boot. Administrators
-# should remove this entry after the system is fully configured.
+# The following is a sample 32-bit match for the literal address 0.0.0.0,
+# not a wildcard.  Uncomment this if the global zone should respond
+# to 0.0.0.0 (literal), such as for dhcp or some third-party network
+# applications.
+#
+#0.0.0.0/32:admin_low
+#
+# Default wildcard value shipped with system. This allows the global zone
+# of the system to obtain various services during initial boot. Administrators
+# should remove this wildcard entry after the system is fully configured.
 #
 0.0.0.0:admin_low
 #\:\:0:admin_low
