@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -233,6 +231,24 @@ do
 			printf '/^mysql::70:\ni\n%s\n.\nw\nq\n' \
                             "$XVMGROUP_LINE" | ed -s $dest > /dev/null
 		fi
+                #
+                # Add the 'slocate' group if it doesn't already exist.
+                #
+                SLOCATEGROUP_LINE="slocate::95:"
+                cur_name=`awk -F: '$3 == 95 {print $1}' $dest`
+                cur_id=`awk -F: '$1 == "slocate" {print $3}' $dest`
+                if [ ! -z "$cur_name" -a "$cur_name" != "slocate" ]; then
+                        echo "ERROR: Reserved GID 95 already assigned" \
+                            "to '$cur_name'" >> /tmp/CLEANUP
+                elif [ ! -z "$cur_id" -a "$cur_id" != "95" ]; then
+                        echo "NOTE: slocate group already assigned" \
+                            "to id '$cur_id'" >> /tmp/CLEANUP
+                elif grep "$SLOCATEGROUP_LINE" $dest 2>&1 >/dev/null; then
+                        :
+                else
+                        printf '/^postgres::90:\na\n%s\n.\nw\nq\n' \
+                            "$SLOCATEGROUP_LINE" | ed -s $dest > /dev/null
+                fi
 	fi
 done
 exit 0

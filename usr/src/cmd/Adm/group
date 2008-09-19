@@ -18,6 +18,7 @@ xvm::60:
 mysql::70:
 webservd::80:
 postgres::90:
+slocate::95:
 nobody::60001:
 noaccess::60002:
 nogroup::65534:

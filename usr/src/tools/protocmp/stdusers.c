@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include "stdusers.h"
 
@@ -72,6 +70,7 @@ const struct stdlist groupnames[] = {
 	{ "mysql", 70 },
 	{ "webservd", 80 },
 	{ "postgres", 90 },
+	{ "slocate", 95 },
 	{ "nobody", 60001 },
 	{ "noaccess", 60002 },
 	{ "nogroup", 65534 },
