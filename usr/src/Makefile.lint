@@ -361,6 +361,7 @@ COMMON_SUBDIRS = \
 	lib/libmtmalloc \
 	lib/libnsl \
 	lib/libnvpair \
+	lib/libnwam \
 	lib/libpam \
 	lib/libpctx \
 	lib/libpicl \

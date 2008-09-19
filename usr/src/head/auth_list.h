@@ -42,11 +42,12 @@ extern "C" {
 #define	CRONUSER_AUTH		"solaris.jobs.user"
 #define	DEFAULT_DEV_ALLOC_AUTH	"solaris.device.allocate"
 #define	DEVICE_REVOKE_AUTH	"solaris.device.revoke"
+#define	LINK_SEC_AUTH		"solaris.network.link.security"
 #define	MAILQ_AUTH		"solaris.mail.mailq"
+#define	NET_AUTOCONF_AUTH	"solaris.network.autoconf"
 #define	SET_DATE_AUTH		"solaris.system.date"
 #define	WIFI_CONFIG_AUTH	"solaris.network.wifi.config"
 #define	WIFI_WEP_AUTH		"solaris.network.wifi.wep"
-#define	LINK_SEC_AUTH		"solaris.network.link.security"
 
 /*
  * Authorizations used by Trusted Solaris.

@@ -18,54 +18,35 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/cmd/cmd-inet/lib/nwamd/Makefile
-#
 
-# Needed for ROOTFS_LIBDIR definition
-include		../../../../lib/Makefile.lib
+include $(SRC)/lib/Makefile.lib
 
-PROG=		nwamd
-OBJS=		door.o events.o interface.o llp.o main.o \
-		state_machine.o util.o wireless.o
-SRCS=		$(OBJS:%.o=%.c)
-HEADERS=	defines.h functions.h structures.h variables.h
+HDRS =		libnwam.h
+HDRDIR =	common
+SUBDIRS =	$(MACH)
 
-include		../../../Makefile.cmd
-
-POFILE=		$(PROG).po
-POFILES=	interface.po wireless.po
-
-ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
-
-LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
-		-lgen -ldoor -lsecdb -lbsm -lsysevent -lnvpair
+all :=		TARGET = all
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
+install :=	TARGET = install
+lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-.PARALLEL:
+all clean clobber install lint: $(SUBDIRS)
 
-all: $(PROG)
+install_h:	$(ROOTHDRS)
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
+check:
 
-install: $(ROOTCMD)
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-check:  $(SRCS) $(HEADERS)
-	$(CSTYLE) -cpP $(SRCS) $(HEADERS)
+FRC:
 
-$(ROOTCMD): $(PROG)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-include		../../../Makefile.targ
-include		../../Makefile.msg
+include $(SRC)/Makefile.msg.targ
+include $(SRC)/lib/Makefile.targ

@@ -24,16 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the routines that manipulate interfaces, the
  * list of interfaces present on the system, and upper layer profiles;
- * and various support functions.  It also contains the functions used
- * to display various bits of informations and queries for the user
- * using /usr/bin/zenity, and a set of functions to read property
- * values stored in the SMF repository.  Finally, it contains the
- * functions required for the "gather info" threads.
+ * and various support functions.  It also contains a set of functions
+ * to read property values stored in the SMF repository.  Finally, it
+ * contains the functions required for the "gather info" threads.
  *
  * The daemon maintains a list of structures that represent each IPv4
  * interface found on the system (after doing 'ifconfig -a plumb').
@@ -72,6 +68,20 @@
  * found at startup.  This thread will do a scan on a wireless interface,
  * and initiate DHCP on a wired interface.  It will then generate an event
  * for the state machine that indicates the availability of a new interface.
+ *
+ * The ifs_head and associated list pointers are protected by ifs_lock.  Only
+ * the main thread may modify the list (single writer), and it does so with the
+ * lock held.  As a consequence, the main thread alone may read the list (and
+ * examine pointers) without holding any locks.  All other threads must hold
+ * ifs_lock for the duration of any examination of the data structures, and
+ * must not deal directly in interface pointers.  (A thread may also hold
+ * machine_lock to block the main thread entirely in order to manipulate the
+ * data; such use is isolated to the door interface.)
+ *
+ * Functions in this file have comments noting where the main thread alone is
+ * the caller.  These functions do not need to acquire the lock.
+ *
+ * If you hold both ifs_lock and llp_lock, you must take ifs_lock first.
  */
 
 #include <errno.h>
@@ -80,22 +90,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <assert.h>
 #include <pthread.h>
-#include <sys/sockio.h>
 #include <syslog.h>
 #include <unistd.h>
 #include <libscf.h>
-#include <utmpx.h>
-#include <pwd.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <inetcfg.h>
-#include <locale.h>
-#include <libintl.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <sys/sysmacros.h>
+#include <sys/wait.h>
 #include <libdllink.h>
 
 #include "defines.h"
@@ -103,35 +108,19 @@
 #include "functions.h"
 #include "variables.h"
 
-static struct interface *ifs_head = NULL;
-static struct interface *ifs_wired = NULL;
-static struct interface *ifs_wireless = NULL;
+static pthread_mutex_t ifs_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static struct interface *ifs_head;
+static struct interface *ifs_wired, *ifs_wired_last;
+static struct interface *ifs_wireless, *ifs_wireless_last;
 
 static char upper_layer_profile[MAXHOSTNAMELEN];
-
-static void print_interface_list();
-static struct interface *get_next_interface(struct interface *);
 
 #define	LOOPBACK_IF	"lo0"
 
 void
-display(const char *msg)
-{
-	char cmd[1024];
-
-	dprintf("display('%s')", STRING(msg));
-	if (valid_graphical_user(B_FALSE)) {
-		(void) snprintf(cmd, sizeof (cmd), "--text=%s", msg);
-		(void) start_child(ZENITY, "--info", cmd, NULL);
-	} else {
-		syslog(LOG_INFO, "%s", msg);
-	}
-}
-
-void
 show_if_status(const char *ifname)
 {
-	char msg[128];
 	icfg_if_t intf;
 	icfg_handle_t h;
 	struct sockaddr_in sin;
@@ -152,15 +141,13 @@ show_if_status(const char *ifname)
 		return;
 	}
 	icfg_close(h);
-	(void) snprintf(msg, sizeof (msg),
-	    gettext("Brought interface %s up, got address %s."), ifname,
-	    inet_ntoa(sin.sin_addr));
-	display(msg);
+	report_interface_up(ifname, sin.sin_addr, prefixlen);
 }
 
 /*
  * If this interface matches the currently active llp, return B_TRUE.
  * Otherwise, return B_FALSE.
+ * Called only from main thread.
  */
 boolean_t
 interface_is_active(const struct interface *ifp)
@@ -181,13 +168,25 @@ start_dhcp(struct interface *ifp)
 	uint32_t now_s;
 	uint64_t timer_s;
 
-	if ((ifp->if_lflags & IF_DHCPSTARTED) != 0) {
+	if (ifp->if_lflags & IF_DHCPSTARTED) {
 		dprintf("start_dhcp: already started; returning");
 		return;
 	}
 	ifp->if_lflags |= IF_DHCPSTARTED;
 
-	(void) start_child(IFCONFIG, ifp->if_name, "dhcp", "wait", "0", NULL);
+	/*
+	 * If we need to use DHCP and DHCP is already controlling the
+	 * interface, we don't need to do anything.  Otherwise, start it now.
+	 */
+	if (!(ifp->if_flags & IFF_DHCPRUNNING)) {
+		dprintf("launching DHCP on %s", ifp->if_name);
+		(void) start_child(IFCONFIG, ifp->if_name, "dhcp", "wait", "0",
+		    NULL);
+	} else {
+		dprintf("DHCP already running on %s; resetting timer",
+		    ifp->if_name);
+	}
+	ifp->if_lflags &= ~IF_DHCPFAILED;
 
 	/* start dhcp timer */
 	res = lookup_count_property(OUR_PG, "dhcp_wait_time", &timer_s);
@@ -429,7 +428,7 @@ void
 activate_upper_layer_profile(boolean_t do_dhcp, const char *ifname)
 {
 	FILE *f;
-	char buffer[1024];
+	char buffer[1024], *cp;
 	size_t buflen;
 	size_t offset;
 	const char bringup[] = "/bringup";
@@ -452,33 +451,65 @@ activate_upper_layer_profile(boolean_t do_dhcp, const char *ifname)
 		}
 	}
 	f = popen(ULP_DIR "/check-conditions", "r");
-	if (f == NULL)
+	if (f == NULL) {
+		/* note that this doesn't happen if the file is missing */
+		syslog(LOG_ERR, "popen: check-conditions: %m");
 		return;
+	}
 	/*
 	 * We want to build a path to the user's upper layer profile script
 	 * that looks like ULP_DIR "/<string we read here>/bringup".  If we
 	 * leave some space at the beginning of this buffer for ULP_DIR "/"
 	 * that saves us some shuffling later.
 	 */
-	offset = sizeof (ULP_DIR);
-	if (fgets(buffer + offset,
+	offset = strlcpy(buffer, ULP_DIR "/", sizeof (buffer));
+	cp = fgets(buffer + offset,
 	    MIN(sizeof (upper_layer_profile), sizeof (buffer) - offset),
-	    f) == NULL) {
-		(void) pclose(f);
-		return; /* EOF before anything read */
-	}
-	(void) pclose(f);
-	(void) memcpy(buffer, ULP_DIR "/", sizeof (ULP_DIR));
+	    f);
 	buflen = strlen(buffer);
 	if (buffer[buflen - 1] == '\n')
 		buffer[--buflen] = '\0';
-	(void) memcpy(upper_layer_profile, buffer + offset,
-	    buflen + 1 - offset);
-	(void) strlcpy(buffer + buflen, bringup, sizeof (buffer) - buflen);
-	(void) start_child(PFEXEC, "-P", "basic", buffer, NULL);
 
-	syslog(LOG_NOTICE, "upper layer profile %s activated",
-	    upper_layer_profile);
+	/* Need to check for script error before interpreting result */
+	res = pclose(f);
+	if (res == -1) {
+		syslog(LOG_ERR, "check-conditions: pclose: %m");
+		return;
+	}
+	if (WIFEXITED(res)) {
+		if (WEXITSTATUS(res) == 0) {
+			if (cp == NULL || *cp == '\0') {
+				syslog(LOG_DEBUG,
+				    "check-conditions returned no information");
+			} else {
+				(void) strlcpy(upper_layer_profile,
+				    buffer + offset,
+				    sizeof (upper_layer_profile));
+				(void) strlcpy(buffer + buflen, bringup,
+				    sizeof (buffer) - buflen);
+				(void) start_child(PFEXEC, "-P", "basic",
+				    buffer, NULL);
+				syslog(LOG_NOTICE,
+				    "upper layer profile %s activated",
+				    upper_layer_profile);
+				report_ulp_activated(upper_layer_profile);
+			}
+		} else if (access(ULP_DIR "/check-conditions", X_OK) == 0) {
+			syslog(LOG_ERR,
+			    "check-conditions exited with status %d",
+			    WEXITSTATUS(res));
+		} else if (errno == ENOENT) {
+			syslog(LOG_DEBUG, "check-conditions not present");
+		} else {
+			syslog(LOG_ERR, "check-conditions: %m");
+		}
+	} else if (WIFSIGNALED(res)) {
+		syslog(LOG_ERR, "check-conditions exit on SIG%s",
+		    strsignal(WTERMSIG(res)));
+	} else {
+		syslog(LOG_ERR,
+		    "check-conditions terminated in unknown manner");
+	}
 }
 
 void
@@ -499,33 +530,54 @@ deactivate_upper_layer_profile(void)
 	syslog(LOG_NOTICE, "upper layer profile %s deactivated",
 	    upper_layer_profile);
 
+	report_ulp_deactivated(upper_layer_profile);
+
 	upper_layer_profile[0] = '\0';
 }
 
 /*
- * Returns B_TRUE if the interface is successfully brought up;
- * B_FALSE if bringup fails.
+ * Returns SUCCESS if the interface is successfully brought up,
+ * FAILURE if bringup fails, or WAITING if we'll need to wait on the GUI to run.
+ * Called only in the main thread or a thread holding machine_lock.
  */
-boolean_t
+return_vals_t
 bringupinterface(const char *ifname, const char *host, const char *ipv6addr,
     boolean_t ipv6onlink)
 {
-	boolean_t do_dhcp;
 	struct interface *intf;
-	uint64_t ifflags;
 
 	intf = get_interface(ifname);
 	if (intf == NULL) {
 		syslog(LOG_ERR, "could not bring up interface %s: not in list",
 		    ifname);
-		return (B_FALSE);
+		return (FAILURE);
 	}
 
 	/* check current state; no point going on if flags are 0 */
-	if ((ifflags = get_ifflags(ifname, intf->if_family)) == 0) {
+	if ((intf->if_flags = get_ifflags(ifname, intf->if_family)) == 0) {
 		dprintf("bringupinterface(%s): get_ifflags() returned 0",
 		    ifname);
-		return (B_FALSE);
+		return (FAILURE);
+	}
+
+	if (intf->if_type == IF_WIRELESS) {
+		switch (handle_wireless_lan(ifname)) {
+		case WAITING:
+			intf->if_up_attempted = B_TRUE;
+			return (WAITING);
+		case FAILURE:
+			syslog(LOG_INFO, "Could not connect to any WLAN, not "
+			    "bringing %s up", ifname);
+			return (FAILURE);
+		}
+	}
+	intf->if_up_attempted = B_TRUE;
+
+	/* physical level must now be up; bail out if not */
+	intf->if_flags = get_ifflags(ifname, intf->if_family);
+	if (!(intf->if_flags & IFF_RUNNING)) {
+		dprintf("bringupinterface(%s): physical layer down", ifname);
+		return (FAILURE);
 	}
 
 	/*
@@ -541,63 +593,36 @@ bringupinterface(const char *ifname, const char *host, const char *ipv6addr,
 			    ipv6addr, "up", NULL);
 		}
 	}
+	intf->if_v6onlink = ipv6onlink;
 
-	do_dhcp = (strcmp(host, "dhcp") == 0);
-
-	/*
-	 * If we need to use DHCP and DHCP is already controlling
-	 * the interface, we don't need to do anything.
-	 */
-	if (do_dhcp && (ifflags & IFF_DHCPRUNNING) != 0) {
-		dprintf("bringupinterface: nothing to do");
-		return (B_TRUE);
-	}
-
-	if (intf->if_type == IF_WIRELESS) {
-		if (!handle_wireless_lan(intf)) {
-			syslog(LOG_INFO, "Could not connect to any WLAN, not "
-			    "bringing %s up", ifname);
-			return (B_FALSE);
-		}
-	}
-
-	if (do_dhcp) {
+	if (strcmp(host, "dhcp") == 0) {
 		start_dhcp(intf);
 	} else {
 		(void) start_child(IFCONFIG, ifname, host, NULL);
 		(void) start_child(IFCONFIG, ifname, "up", NULL);
 	}
 
-	return (B_TRUE);
+	syslog(LOG_DEBUG, "brought up %s", ifname);
+
+	return (SUCCESS);
 }
 
+/* Called only in the main thread */
 void
-takedowninterface(const char *ifname, boolean_t popup, boolean_t v6onlink)
+takedowninterface(const char *ifname, libnwam_diag_cause_t cause)
 {
 	uint64_t flags;
 	struct interface *ifp;
 
-	dprintf("takedowninterface(%s, %s, %s)", ifname,
-	    BOOLEAN_TO_STRING(popup), BOOLEAN_TO_STRING(v6onlink));
+	dprintf("takedowninterface(%s, %d)", ifname, (int)cause);
 
 	if ((ifp = get_interface(ifname)) == NULL) {
 		dprintf("takedowninterface: can't find interface struct for %s",
 		    ifname);
-	} else {
-		if (ifp->if_lflags & IF_DHCPFAILED) {
-			/*
-			 * We're here because of a dhcp failure, and
-			 * we actually want dhcp to keep trying.  So
-			 * don't take the interface down.
-			 */
-			dprintf("takedowninterface: still trying for dhcp on "
-			    "%s, so will not take down interface", ifname);
-			return;
-		}
 	}
 
 	flags = get_ifflags(ifname, AF_INET);
-	if ((flags & IFF_DHCPRUNNING) != 0) {
+	if (flags & IFF_DHCPRUNNING) {
 		/*
 		 * We generally prefer doing a release, as that tells the
 		 * server that it can relinquish the lease, whereas drop is
@@ -612,14 +637,14 @@ takedowninterface(const char *ifname, boolean_t popup, boolean_t v6onlink)
 			    NULL);
 		}
 	} else {
-		if ((flags & IFF_UP) != 0)
+		if (flags & IFF_UP)
 			(void) start_child(IFCONFIG, ifname, "down", NULL);
 		/* need to unset a statically configured addr */
 		(void) start_child(IFCONFIG, ifname, "0.0.0.0", "netmask",
 		    "0", "broadcast", "0.0.0.0", NULL);
 	}
 
-	if (v6onlink) {
+	if (ifp == NULL || ifp->if_v6onlink) {
 		/*
 		 * Unplumbing the link local interface causes dhcp and ndpd to
 		 * remove other addresses they have added.
@@ -627,53 +652,37 @@ takedowninterface(const char *ifname, boolean_t popup, boolean_t v6onlink)
 		(void) start_child(IFCONFIG, ifname, "inet6", "unplumb", NULL);
 	}
 
-	if (ifp->if_type == IF_WIRELESS)
-		(void) dladm_wlan_disconnect(ifp->if_linkid);
+	if (ifp == NULL || ifp->if_up_attempted)
+		report_interface_down(ifname, cause);
 
-	dprintf("takedown interface, free cached ip address");
 	if (ifp != NULL) {
-		free(ifp->if_ipaddr);
-		ifp->if_ipaddr = NULL;
-	}
-	if (popup) {
-		char msg[64]; /* enough to hold this string */
-
-		(void) snprintf(msg, sizeof (msg),
-		    gettext("Took interface %s down."), ifname);
-		display(msg);
+		if (ifp->if_type == IF_WIRELESS)
+			disconnect_wlan(ifp->if_name);
+		dprintf("takedown interface, zero cached ip address");
+		ifp->if_flags = flags;
+		ifp->if_lflags &= ~IF_DHCPSTARTED & ~IF_DHCPACQUIRED;
+		ifp->if_ipv4addr = INADDR_ANY;
+		ifp->if_up_attempted = B_FALSE;
 	}
 }
 
-/*
- * Take down all known interfaces.  If ignore_if is non-null, an
- * active (IFF_UP) interface whose name matches ignore_if will *not*
- * be taken down.
- */
+/* Called only in the main thread */
 void
-take_down_all_ifs(const char *ignore_if)
+clear_cached_address(const char *ifname)
 {
 	struct interface *ifp;
-	uint64_t flags;
-	boolean_t ignore_set = (ignore_if != NULL);
+	uint64_t ifflags;
 
-	deactivate_upper_layer_profile();
-
-	for (ifp = get_next_interface(NULL); ifp != NULL;
-	    ifp = get_next_interface(ifp)) {
-		if (ignore_set && strcmp(ifp->if_name, ignore_if) == 0)
-			continue;
-		flags = get_ifflags(ifp->if_name, ifp->if_family);
-		if ((flags & IFF_UP) != 0) {
-			takedowninterface(ifp->if_name, B_FALSE,
-			    ifp->if_family == AF_INET6);
-		}
+	if ((ifp = get_interface(ifname)) == NULL) {
+		dprintf("clear_cached_address: can't find interface struct "
+		    "for %s", ifname);
+		return;
 	}
-}
-
-static struct interface *
-get_next_interface(struct interface *ifp)
-{
-	return (ifp == NULL ? ifs_head : ifp->if_next);
+	ifflags = get_ifflags(ifname, AF_INET);
+	if ((ifflags & IFF_UP) && !(ifflags & IFF_RUNNING))
+		zero_out_v4addr(ifname);
+	ifp->if_ipv4addr = INADDR_ANY;
+	ifp->if_lflags &= ~IF_DHCPFLAGS;
 }
 
 /*
@@ -685,70 +694,73 @@ get_next_interface(struct interface *ifp)
 static void
 interface_list_insert(struct interface *ifp)
 {
-	struct interface **wpp;
-	struct interface *endp;
-	boolean_t first_wireless = B_FALSE;
-	boolean_t first_wired = B_FALSE;
+	struct interface **headpp, **lastpp;
+	struct interface *pchain, *nextp;
+
+	if (pthread_mutex_lock(&ifs_lock) != 0)
+		return;
 
 	switch (ifp->if_type) {
 	case IF_WIRELESS:
-		first_wireless = (ifs_wireless == NULL);
-		wpp = &ifs_wireless;
-		endp = NULL;
+		/*
+		 * Wireless entries are in the wireless list, and are chained
+		 * after the wired entries.  If there are no wired entries, then
+		 * chain on main list.
+		 */
+		headpp = &ifs_wireless;
+		lastpp = &ifs_wireless_last;
+		pchain = ifs_wired_last;
+		nextp = NULL;
 		break;
 
 	case IF_WIRED:
-		first_wired = (ifs_wired == NULL);
-		wpp = &ifs_wired;
-		endp = ifs_wireless;
+		/*
+		 * Wired entries are on the wired list, and are chained before
+		 * the wireless entries.
+		 */
+		headpp = &ifs_wired;
+		lastpp = &ifs_wired_last;
+		pchain = NULL;
+		nextp = ifs_wireless;
 		break;
 
 	default:
 		/* don't add to the list */
+		(void) pthread_mutex_unlock(&ifs_lock);
 		return;
 	}
 
-	/* set list head if this is the first entry */
-	if (ifs_head == NULL) {
-		ifs_head = *wpp = ifp;
-		ifp->if_next = NULL;
-		return;
+	/* Connect into the correct list */
+	if (*lastpp == NULL) {
+		/*
+		 * If there's a previous list, then wire to the end of
+		 * that, as we're the new head here.
+		 */
+		if (pchain != NULL)
+			pchain->if_next = ifp;
+		*headpp = ifp;
+	} else {
+		(*lastpp)->if_next = ifp;
 	}
+	*lastpp = ifp;
 
-	if (*wpp != NULL) {
-		while (*wpp != endp)
-			wpp = &(*wpp)->if_next;
-	}
-	*wpp = ifp;
-	ifp->if_next = endp;
+	ifp->if_next = nextp;
 
-	/* update list head if we just inserted the first wired interface */
-	if (first_wired)
-		ifs_head = ifs_wired;
+	/* Fix up the main list; it's always wired-first */
+	ifs_head = ifs_wired == NULL ? ifs_wireless : ifs_wired;
 
-	/* link sections if we just inserted the first wireless interface */
-	if (first_wireless) {
-		wpp = &ifs_wired;
-		while (*wpp != NULL)
-			wpp = &(*wpp)->if_next;
-		*wpp = ifs_wireless;
-	}
+	(void) pthread_mutex_unlock(&ifs_lock);
 }
 
 /*
  * Returns the interface structure upon success.  Returns NULL and sets
- * errno upon error.  If lr is null then it will look up the information
- * needed.
- *
- * Note that given the MT nature of this program we are almost certainly
- * racing for this structure.  That needs to be fixed.
+ * errno upon error.
  */
 struct interface *
 add_interface(sa_family_t family, const char *name, uint64_t flags)
 {
 	struct interface *i;
-	datalink_id_t linkid = DATALINK_INVALID_LINKID;
-	enum interface_type iftype;
+	libnwam_interface_type_t iftype;
 
 	if (name == NULL)
 		return (NULL);
@@ -780,77 +792,109 @@ add_interface(sa_family_t family, const char *name, uint64_t flags)
 		return (NULL);
 	}
 
-	if ((i = malloc(sizeof (*i))) == NULL) {
+	if ((i = calloc(1, sizeof (*i))) == NULL) {
 		dprintf("add_interface: malloc failed");
 		return (NULL);
 	}
 
-	i->if_name = strdup(name);
-	if (i->if_name == NULL) {
-		free(i);
-		dprintf("add_interface: malloc failed");
-		return (NULL);
-	}
-	i->if_ipaddr = NULL;
+	(void) strlcpy(i->if_name, name, sizeof (i->if_name));
 	i->if_family = family;
 	i->if_type = iftype;
 	i->if_flags = flags == 0 ? get_ifflags(name, family) : flags;
-	i->if_lflags = 0;
-	i->if_timer_expire = 0;
-
-	/*
-	 * If linkid is DATALINK_INVALID_LINKID, it is an IP-layer only
-	 * interface.
-	 */
-	(void) dladm_name2info(name, &linkid, NULL, NULL, NULL);
-	i->if_linkid = linkid;
 
 	dprintf("added interface %s of type %s af %d; is %savailable",
 	    i->if_name, if_type_str(i->if_type), i->if_family,
-	    ((i->if_type == IF_WIRELESS) ||
-	    ((i->if_flags & IFF_RUNNING) != 0)) ? "" : "not ");
+	    (i->if_flags & IFF_RUNNING) ? "" : "not ");
 
 	interface_list_insert(i);
+
+	if (iftype == IF_WIRELESS)
+		add_wireless_if(name);
 
 	return (i);
 }
 
 /*
+ * This is called only by the main thread.
+ */
+void
+remove_interface(const char *ifname)
+{
+	struct interface *ifp, *prevp = NULL;
+
+	if (pthread_mutex_lock(&ifs_lock) != 0)
+		return;
+	for (ifp = ifs_head; ifp != NULL; ifp = ifp->if_next) {
+		if (strcmp(ifname, ifp->if_name) == 0) {
+			if (prevp == NULL)
+				ifs_head = ifp->if_next;
+			else
+				prevp->if_next = ifp->if_next;
+			if (ifp == ifs_wired_last) {
+				if ((ifs_wired_last = prevp) == NULL)
+					ifs_wired = NULL;
+			} else if (ifp == ifs_wired) {
+				ifs_wired = ifp->if_next;
+			}
+			if (ifp == ifs_wireless_last) {
+				if (prevp != NULL &&
+				    prevp->if_type != IF_WIRELESS)
+					prevp = NULL;
+				if ((ifs_wireless_last = prevp) == NULL)
+					ifs_wireless = NULL;
+			} else if (ifp == ifs_wireless) {
+				ifs_wireless = ifp->if_next;
+			}
+			break;
+		}
+		prevp = ifp;
+	}
+	(void) pthread_mutex_unlock(&ifs_lock);
+
+	remove_wireless_if(ifname);
+
+	if (ifp != NULL && ifp->if_thr != 0) {
+		(void) pthread_cancel(ifp->if_thr);
+		(void) pthread_join(ifp->if_thr, NULL);
+	}
+	free(ifp);
+}
+
+/*
  * Searches for an interface and returns the interface structure if found.
- * Returns NULL otherwise.  errno is set upon error exit.
+ * Returns NULL otherwise.  The caller must either be holding ifs_lock, or be
+ * in the main thread.
  */
 struct interface *
 get_interface(const char *name)
 {
-	struct interface *i;
+	struct interface *ifp;
 
 	if (name == NULL)
 		return (NULL);
 
-	for (i = ifs_head; i != NULL; i = i->if_next) {
-		if (strcmp(name, i->if_name) == 0) {
-			return (i);
-		}
+	for (ifp = ifs_head; ifp != NULL; ifp = ifp->if_next) {
+		if (strcmp(name, ifp->if_name) == 0)
+			break;
 	}
-
-	return (NULL);
+	return (ifp);
 }
 
 /*
- * Checks interface flags and, if IFF_DHCPRUNNING and !IFF_UP, does
- * an 'ifconfig ifname dhcp drop'.
+ * Check to see whether the interface could be started.  If the IFF_RUNNING
+ * flag is set, then we're in good shape.  Otherwise, wireless interfaces are
+ * special: we'll attempt to connect to an Access Point as part of the start-up
+ * procedure, and IFF_RUNNING won't be present until that's done, so assume
+ * that all wireless interfaces are good to go.  This is just an optimization;
+ * we could start everything.
  */
-void
-check_drop_dhcp(struct interface *ifp)
+static boolean_t
+is_startable(struct interface *ifp)
 {
-	uint64_t flags = get_ifflags(ifp->if_name, ifp->if_family);
-
-	if (!(flags & IFF_DHCPRUNNING) || (flags & IFF_UP)) {
-		dprintf("check_drop_dhcp: nothing to do (flags=0x%llx)", flags);
-		return;
-	}
-
-	(void) start_child(IFCONFIG, ifp->if_name, "dhcp", "drop", NULL);
+	ifp->if_flags = get_ifflags(ifp->if_name, ifp->if_family);
+	if (ifp->if_flags & IFF_RUNNING)
+		return (B_TRUE);
+	return (ifp->if_type == IF_WIRELESS);
 }
 
 /*
@@ -860,94 +904,63 @@ check_drop_dhcp(struct interface *ifp)
  *
  * For the real code, we should pass back the network information
  * gathered.  Note that the state engine will then use the llp to
- * determine which interface should be set up...
+ * determine which interface should be set up.
+ *
+ * ifs_lock is not held on entry.  The caller will cancel this thread and wait
+ * for it to exit if the interface is to be deleted.
  */
 static void *
 gather_interface_info(void *arg)
 {
 	struct interface *i = arg;
-	llp_t *llp;
-
-	assert(i != NULL);
+	int retv;
 
 	dprintf("Start gathering info for %s", i->if_name);
 
 	switch (i->if_type) {
 	case IF_WIRELESS:
-		(void) scan_wireless_nets(i);
+		/* This generates EV_NEWAP when successful */
+		retv = launch_wireless_scan(i->if_name);
+		if (retv != 0)
+			dprintf("didn't launch wireless scan: %s",
+			    strerror(retv));
 		break;
 	case IF_WIRED:
-		/*
-		 * It should not happen as the llp list should be done when
-		 * this function is called.  But let the state engine decide
-		 * what to do.
-		 */
-		if ((llp = llp_lookup(i->if_name)) == NULL)
-			break;
-		/*
-		 * The following is to avoid locking up the state machine
-		 * as it is currently the choke point.  We start dhcp with
-		 * a wait time of 0; later, if we see the link go down
-		 * (IFF_RUNNING is cleared), we will drop the attempt.
-		 */
-		if (llp->llp_ipv4src == IPV4SRC_DHCP && is_plugged_in(i))
-			start_dhcp(i);
+		if (llp_get_ipv4src(i->if_name) == IPV4SRC_DHCP) {
+			/*
+			 * The following is to avoid locking up the state
+			 * machine as it is currently the choke point.  We
+			 * start dhcp with a wait time of 0; later, if we see
+			 * the link go down (IFF_RUNNING is cleared), we will
+			 * drop the attempt.
+			 */
+			if (is_startable(i))
+				start_dhcp(i);
+		}
+		(void) np_queue_add_event(EV_LINKUP, i->if_name);
 		break;
-	default:
-		/* For other types, do not do anything. */
-		return (NULL);
 	}
-
-	gen_newif_event(i);
 
 	dprintf("Done gathering info for %s", i->if_name);
+	i->if_thr = 0;
 	return (NULL);
-}
-
-void
-gen_newif_event(struct interface *i)
-{
-	struct np_event *e;
-
-	e = calloc(1, sizeof (struct np_event));
-	if (e == NULL) {
-		dprintf("gen_newif_event: calloc failed");
-		return;
-	}
-	e->npe_name = strdup(i->if_name);
-	if (e->npe_name == NULL) {
-		dprintf("gen_newif_event: strdup failed");
-		free(e);
-		return;
-	}
-	e->npe_type = EV_ROUTING;
-
-	/*
-	 * This event notifies the state machine that a new interface is
-	 * (at least nominally) available to be brought up.  When the state
-	 * machine processes the event, it will look at the entire list of
-	 * interfaces and corresponding LLPs, and make a determination about
-	 * the best available LLP under current conditions.
-	 */
-	np_queue_add_event(e);
-	dprintf("gen_newif_event: generated event for if %s", i->if_name);
 }
 
 /*
  * Caller uses this function to walk through the whole interface list.
  * For each interface, the caller provided walker is called with
- * the interface and arg as parameters.
- *
- * XXX There is no lock held right now for accessing the interface
- * list.  We probably need that in future.
+ * the interface and arg as parameters, and with the ifs_lock held.
  */
 void
 walk_interface(void (*walker)(struct interface *, void *), void *arg)
 {
-	struct interface *i;
+	struct interface *ifp;
 
-	for (i = ifs_head; i != NULL; i = i->if_next)
-		walker(i, arg);
+	if (pthread_mutex_lock(&ifs_lock) != 0)
+		return;
+	for (ifp = ifs_head; ifp != NULL; ifp = ifp->if_next)
+		walker(ifp, arg);
+	(void) pthread_mutex_unlock(&ifs_lock);
 }
 
 static void
@@ -1013,11 +1026,6 @@ initialize_interfaces(void)
 	int numifs;
 	unsigned int wait_time = 1;
 	boolean_t found_nonlo_if;
-
-	dprintf("initialize_interfaces: setting link_layer_profile(%p) to NULL",
-	    (void *)link_layer_profile);
-	link_layer_profile = NULL;
-	upper_layer_profile[0] = '\0';
 
 	/*
 	 * Bring down all interfaces bar lo0.
@@ -1090,12 +1098,13 @@ initialize_interfaces(void)
 }
 
 /*
- * Walker function used to start info gathering of each interface.
+ * Walker function used to start info gathering of each interface.  Caller
+ * holds ifs_lock.
  */
 void
 start_if_info_collect(struct interface *ifp, void *arg)
 {
-	pthread_t if_thr;
+	int retv;
 	pthread_attr_t attr;
 
 	/*
@@ -1104,15 +1113,17 @@ start_if_info_collect(struct interface *ifp, void *arg)
 	 * event after we initialize interfaces before the routing thread
 	 * is launched.
 	 */
-	if (arg != NULL && *(boolean_t *)arg)
+	if (arg != NULL)
 		ifp->if_flags = get_ifflags(ifp->if_name, ifp->if_family);
 
 	/*
 	 * Only if the cable of the wired interface is
 	 * plugged in, start gathering info from it.
 	 */
-	if (!is_plugged_in(ifp))
+	if (!is_startable(ifp)) {
+		dprintf("not gathering info on %s; not running", ifp->if_name);
 		return;
+	}
 
 	/*
 	 * This is a "fresh start" for the interface, so clear old DHCP flags.
@@ -1121,12 +1132,14 @@ start_if_info_collect(struct interface *ifp, void *arg)
 
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	if (pthread_create(&if_thr, &attr, gather_interface_info,
-	    (void *)ifp) != 0) {
-		syslog(LOG_ERR, "create interface gathering thread: %m");
+	if ((retv = pthread_create(&ifp->if_thr, &attr, gather_interface_info,
+	    ifp)) != 0) {
+		syslog(LOG_ERR, "create interface gathering thread: %s",
+		    strerror(retv));
 		exit(EXIT_FAILURE);
 	} else {
-		dprintf("interface info thread: %d", if_thr);
+		dprintf("interface info thread for %s: %d", ifp->if_name,
+		    ifp->if_thr);
 	}
 }
 
@@ -1135,12 +1148,10 @@ start_if_info_collect(struct interface *ifp, void *arg)
  * If timer has expired, generate a timer event for the
  * interface.
  */
-/* ARGSUSED */
-void
-check_interface_timer(struct interface *ifp, void *arg)
+static void
+iftimer(struct interface *ifp, void *arg)
 {
-	uint32_t now = *(uint32_t *)arg;
-	struct np_event *ev;
+	uint32_t now = (uint32_t)(uintptr_t)arg;
 
 	if (ifp->if_timer_expire == 0)
 		return;
@@ -1152,27 +1163,20 @@ check_interface_timer(struct interface *ifp, void *arg)
 
 	ifp->if_timer_expire = 0;
 
-	if ((ev = calloc(1, sizeof (*ev))) == NULL) {
-		dprintf("could not allocate timer event for %s; ignoring timer",
-		    ifp->if_name);
-		return;
-	}
-	ev->npe_type = EV_TIMER;
-	ev->npe_name = strdup(ifp->if_name);
-	if (ev->npe_name == NULL) {
-		dprintf("could not strdup name for timer event on %s; ignoring",
-		    ifp->if_name);
-		free(ev);
-		return;
-	}
-	np_queue_add_event(ev);
+	(void) np_queue_add_event(EV_TIMER, ifp->if_name);
 }
 
-enum interface_type
+void
+check_interface_timers(uint32_t now)
+{
+	walk_interface(iftimer, (void *)(uint32_t)now);
+}
+
+libnwam_interface_type_t
 find_if_type(const char *name)
 {
 	uint32_t media;
-	enum interface_type type;
+	libnwam_interface_type_t type;
 
 	if (name == NULL) {
 		dprintf("find_if_type: no ifname; returning IF_UNKNOWN");
@@ -1199,7 +1203,7 @@ find_if_type(const char *name)
 }
 
 const char *
-if_type_str(enum interface_type type)
+if_type_str(libnwam_interface_type_t type)
 {
 	switch (type) {
 	case IF_WIRED:
@@ -1211,5 +1215,172 @@ if_type_str(enum interface_type type)
 	case IF_UNKNOWN:
 	default:
 		return ("unknown type");
+	}
+}
+
+/*
+ * This is called by the routing socket thread to update the IPv4 address on an
+ * interface.  The routing socket thread cannot touch the interface structures
+ * without holding the global lock, because interface structures can be
+ * deleted.
+ */
+void
+update_interface_v4_address(const char *ifname, in_addr_t addr)
+{
+	struct in_addr in;
+	struct interface *ifp;
+
+	if (pthread_mutex_lock(&ifs_lock) == 0) {
+		if ((ifp = get_interface(ifname)) == NULL) {
+			dprintf("no interface struct for %s; ignoring message",
+			    ifname);
+		} else if (ifp->if_ipv4addr != addr) {
+			ifp->if_ipv4addr = addr;
+			in.s_addr = addr;
+			dprintf("cached new address %s for link %s",
+			    inet_ntoa(in), ifname);
+			(void) np_queue_add_event(EV_NEWADDR, ifname);
+		} else {
+			dprintf("same address on %s; no event", ifname);
+		}
+		(void) pthread_mutex_unlock(&ifs_lock);
+	}
+}
+
+/*
+ * This is called by the routing socket thread to update the flags on a given
+ * IPv4 interface.  If the interface has changed state, then we launch an event
+ * or a thread as appropriate.
+ */
+void
+update_interface_flags(const char *ifname, int newflags)
+{
+	struct interface *ifp;
+	int oldflags;
+
+	if (pthread_mutex_lock(&ifs_lock) == 0) {
+		if ((ifp = get_interface(ifname)) == NULL) {
+			dprintf("no interface data for %s; ignoring message",
+			    ifname);
+		} else {
+			/*
+			 * Check for toggling of the IFF_RUNNING flag.
+			 *
+			 * On any change in the flag value, we turn off the
+			 * DHCP flags; the change in the RUNNING state
+			 * indicates a "fresh start" for the interface, so we
+			 * should try dhcp again.
+			 *
+			 * If the interface was not plugged in and now it is,
+			 * start info collection.
+			 *
+			 * If it was plugged in and now it is unplugged,
+			 * generate an event.
+			 */
+			oldflags = ifp->if_flags;
+			if ((oldflags & IFF_RUNNING) !=
+			    (newflags & IFF_RUNNING)) {
+				ifp->if_lflags &= ~IF_DHCPFLAGS;
+			}
+			if (!(newflags & IFF_DHCPRUNNING))
+				ifp->if_lflags &= ~IF_DHCPFLAGS;
+			ifp->if_flags = newflags;
+			if (!(oldflags & IFF_RUNNING) &&
+			    (newflags & IFF_RUNNING)) {
+				start_if_info_collect(ifp, NULL);
+			} else if ((oldflags & IFF_RUNNING) &&
+			    !(newflags & IFF_RUNNING)) {
+				(void) np_queue_add_event(EV_LINKDROP, ifname);
+			} else {
+				dprintf("no-event flag change on %s: %x -> %x",
+				    ifp->if_name, oldflags, newflags);
+			}
+		}
+		(void) pthread_mutex_unlock(&ifs_lock);
+	}
+}
+
+/*
+ * Called only in main thread.  Note that wireless interfaces are considered
+ * "ok" even if the IFF_RUNNING bit isn't set.  This is because AP attach
+ * occurs as part of the LLP selection process.
+ */
+boolean_t
+is_interface_ok(const char *ifname)
+{
+	boolean_t is_ok = B_FALSE;
+	struct interface *ifp;
+
+	if ((ifp = get_interface(ifname)) != NULL &&
+	    !(ifp->if_lflags & IF_DHCPFAILED) && is_startable(ifp))
+		is_ok = B_TRUE;
+	return (is_ok);
+}
+
+/*
+ * Return the interface type for a given interface name.
+ */
+libnwam_interface_type_t
+get_if_type(const char *ifname)
+{
+	libnwam_interface_type_t ift = IF_UNKNOWN;
+	struct interface *ifp;
+
+	if (pthread_mutex_lock(&ifs_lock) == 0) {
+		if ((ifp = get_interface(ifname)) != NULL)
+			ift = ifp->if_type;
+		(void) pthread_mutex_unlock(&ifs_lock);
+	}
+	return (ift);
+}
+
+/*
+ * Get the interface state for storing in llp_t.  This is used only with the
+ * doors interface to return status flags.
+ */
+void
+get_interface_state(const char *ifname, boolean_t *dhcp_failed,
+    boolean_t *link_up)
+{
+	struct interface *ifp;
+
+	*dhcp_failed = *link_up = B_FALSE;
+	if (pthread_mutex_lock(&ifs_lock) == 0) {
+		if ((ifp = get_interface(ifname)) != NULL) {
+			if (ifp->if_lflags & IF_DHCPFAILED)
+				*dhcp_failed = B_TRUE;
+			if (ifp->if_flags & IFF_UP)
+				*link_up = B_TRUE;
+		}
+		(void) pthread_mutex_unlock(&ifs_lock);
+	}
+}
+
+/*
+ * Dump out the interface state via debug messages.
+ */
+void
+print_interface_status(void)
+{
+	struct interface *ifp;
+	struct in_addr ina;
+
+	if (pthread_mutex_lock(&ifs_lock) == 0) {
+		if (upper_layer_profile[0] != '\0')
+			dprintf("upper layer profile %s active",
+			    upper_layer_profile);
+		else
+			dprintf("no upper layer profile active");
+		for (ifp = ifs_head; ifp != NULL; ifp = ifp->if_next) {
+			ina.s_addr = ifp->if_ipv4addr;
+			dprintf("I/F %s af %d flags %llX lflags %X type %d "
+			    "expire %u v6 %son-link up %sattempted addr %s",
+			    ifp->if_name, ifp->if_family, ifp->if_flags,
+			    ifp->if_lflags, ifp->if_type, ifp->if_timer_expire,
+			    ifp->if_v6onlink ? "" : "not ",
+			    ifp->if_up_attempted ? "" : "not ",
+			    inet_ntoa(ina));
+		}
+		(void) pthread_mutex_unlock(&ifs_lock);
 	}
 }

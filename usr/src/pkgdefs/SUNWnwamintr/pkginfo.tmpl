@@ -18,54 +18,26 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/cmd/cmd-inet/lib/nwamd/Makefile
+# This required package information file describes characteristics of the
+# package, such as package abbreviation, full package name, package version,
+# and package architecture.
 #
-
-# Needed for ROOTFS_LIBDIR definition
-include		../../../../lib/Makefile.lib
-
-PROG=		nwamd
-OBJS=		door.o events.o interface.o llp.o main.o \
-		state_machine.o util.o wireless.o
-SRCS=		$(OBJS:%.o=%.c)
-HEADERS=	defines.h functions.h structures.h variables.h
-
-include		../../../Makefile.cmd
-
-POFILE=		$(PROG).po
-POFILES=	interface.po wireless.po
-
-ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
-
-LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
-		-lgen -ldoor -lsecdb -lbsm -lsysevent -lnvpair
-
-.KEEP_STATE:
-
-.PARALLEL:
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-install: $(ROOTCMD)
-
-check:  $(SRCS) $(HEADERS)
-	$(CSTYLE) -cpP $(SRCS) $(HEADERS)
-
-$(ROOTCMD): $(PROG)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-include		../../../Makefile.targ
-include		../../Makefile.msg
+PKG="SUNWnwamintr"
+NAME="Solaris NWAM Internal Files - root"
+ARCH="ISA"
+VERSION="ONVERS,REV=0.0.0"
+SUNW_PRODNAME="SunOS"
+SUNW_PRODVERS="RELEASE/VERSION"
+SUNW_PKGTYPE="root"
+MAXINST="1000"
+CATEGORY="system"
+DESC="Solaris NWAM internal files - root"
+VENDOR="Sun Microsystems, Inc."
+HOTLINE="Please contact your local service provider"
+EMAIL=""
+CLASSES="none"
+BASEDIR=/
+SUNW_PKGVERS="1.0"

@@ -108,6 +108,7 @@ HTMLENTS = \
 	SmfValueVscan.html \
 	SmfVscanStates.html \
 	SmfWpaStates.html \
+	NetworkAutoconf.html \
 	NetworkHeader.html \
 	WifiConfig.html \
 	WifiWep.html \

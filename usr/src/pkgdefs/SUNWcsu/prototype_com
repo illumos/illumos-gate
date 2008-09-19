@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -473,6 +472,7 @@ f none usr/lib/help/auths/locale/C/JobsGrant.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginEnable.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginRemote.html 444 root bin
+f none usr/lib/help/auths/locale/C/NetworkAutoconf.html 444 root bin
 f none usr/lib/help/auths/locale/C/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/PriAdmin.html 444 root bin
 f none usr/lib/help/auths/locale/C/ProfmgrHeader.html 444 root bin
@@ -571,6 +571,7 @@ f none usr/lib/help/profiles/locale/C/RtMediaBkup.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNameServiceAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNameServiceSecure.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtNetAutoconf.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetIPsec.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetSecure.html 444 root bin

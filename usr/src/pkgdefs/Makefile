@@ -298,6 +298,8 @@ COMMON_SUBDIRS= \
 	SUNWnisu  \
 	SUNWntpr  \
 	SUNWntpu  \
+	SUNWnwamintr \
+	SUNWnwamintu \
 	SUNWocf \
 	SUNWocfd \
 	SUNWocfh \

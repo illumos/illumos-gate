@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/libsecdb/help/profiles/Makefile
 #
 
@@ -58,6 +56,7 @@ HTMLENTS = \
 	RtNDMPMngmnt.html \
 	RtNameServiceAdmin.html \
 	RtNameServiceSecure.html \
+	RtNetAutoconf.html \
 	RtNetIPsec.html \
 	RtNetMngmnt.html \
 	RtNetSecure.html \

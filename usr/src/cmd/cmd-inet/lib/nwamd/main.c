@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * nwamd - NetWork Auto-Magic Daemon
@@ -62,6 +60,7 @@ boolean_t fg = B_FALSE;
 boolean_t shutting_down;
 sigset_t original_sigmask;
 char zonename[ZONENAME_MAX];
+pthread_mutex_t machine_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /*
  * nwamd
@@ -161,11 +160,14 @@ lookup_daemon_properties(void)
 {
 	boolean_t debug_set;
 	uint64_t scan_interval;
+	uint64_t idle_time;
 
 	if (lookup_boolean_property(OUR_PG, "debug", &debug_set) == 0)
 		debug = debug_set;
 	if (lookup_count_property(OUR_PG, "scan_interval", &scan_interval) == 0)
 		wlan_scan_interval = scan_interval;
+	if (lookup_count_property(OUR_PG, "idle_time", &idle_time) == 0)
+		door_idle_time = idle_time;
 	dprintf("Read daemon configuration properties.");
 }
 
@@ -173,14 +175,13 @@ lookup_daemon_properties(void)
 static void *
 sighandler(void *arg)
 {
-	struct np_event *ev;
 	sigset_t sigset;
 	int sig;
 	uint32_t now;
 
 	(void) sigfillset(&sigset);
 
-	for (;;) {
+	while (!shutting_down) {
 		sig = sigwait(&sigset);
 		dprintf("signal %d caught", sig);
 		switch (sig) {
@@ -192,7 +193,8 @@ sighandler(void *arg)
 			 */
 			timer_expire = TIMER_INFINITY;
 			now = NSEC_TO_SEC(gethrtime());
-			walk_interface(check_interface_timer, &now);
+			check_interface_timers(now);
+			check_door_life(now);
 			break;
 		case SIGHUP:
 			/*
@@ -200,25 +202,27 @@ sighandler(void *arg)
 			 */
 			lookup_daemon_properties();
 			break;
+		case SIGINT:
+			/*
+			 * Undocumented "print debug status" signal.
+			 */
+			print_llp_status();
+			print_interface_status();
+			print_wireless_status();
+			break;
 		default:
 			syslog(LOG_NOTICE, "%s received, shutting down",
 			    strsignal(sig));
 			shutting_down = B_TRUE;
-			if ((ev = malloc(sizeof (*ev))) == NULL) {
+			if (!np_queue_add_event(EV_SHUTDOWN, NULL)) {
 				dprintf("could not allocate shutdown event");
 				cleanup();
 				exit(EXIT_FAILURE);
 			}
-			ev->npe_type = EV_SHUTDOWN;
-			ev->npe_name = NULL;
-			np_queue_add_event(ev);
 			break;
 		}
-
-		/* if we're shutting down, exit this thread */
-		if (shutting_down)
-			return (NULL);
 	}
+	return (NULL);
 }
 
 static void
@@ -270,8 +274,10 @@ change_user_set_privs(void)
 	(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
 	(void) priv_addset(priv_set, PRIV_NET_PRIVADDR);
 	(void) priv_addset(priv_set, PRIV_NET_RAWACCESS);
+	(void) priv_addset(priv_set, PRIV_PROC_AUDIT);
 	(void) priv_addset(priv_set, PRIV_PROC_OWNER);
 	(void) priv_addset(priv_set, PRIV_PROC_SETID);
+	(void) priv_addset(priv_set, PRIV_SYS_CONFIG);
 	(void) priv_addset(priv_set, PRIV_SYS_IP_CONFIG);
 	(void) priv_addset(priv_set, PRIV_SYS_IPC_CONFIG);
 	(void) priv_addset(priv_set, PRIV_SYS_NET_CONFIG);
@@ -299,12 +305,27 @@ change_user_set_privs(void)
 	priv_freeset(priv_set);
 }
 
+static void
+init_machine_mutex(void)
+{
+	pthread_mutexattr_t attrs;
+
+	(void) pthread_mutexattr_init(&attrs);
+	(void) pthread_mutexattr_settype(&attrs, PTHREAD_MUTEX_ERRORCHECK);
+	if (pthread_mutex_init(&machine_lock, &attrs) != 0) {
+		syslog(LOG_ERR, "unable to set up machine lock");
+		exit(EXIT_FAILURE);
+	}
+	(void) pthread_mutexattr_destroy(&attrs);
+}
+
 int
 main(int argc, char *argv[])
 {
 	int c;
 	int scan_lev;
 	struct np_event *e;
+	enum np_event_type etype;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -342,46 +363,45 @@ main(int argc, char *argv[])
 	if (!fg)
 		daemonize();
 
+	initialize_llp();
+
 	init_signalhandling();
 
-	init_mutexes();
+	initialize_wireless();
 
 	lookup_zonename(zonename, sizeof (zonename));
+
+	init_machine_mutex();
 
 	initialize_interfaces();
 
 	llp_parse_config();
 
+	initialize_door();
+
 	(void) start_event_collection();
 
-	while ((e = np_queue_get_event()) != NULL) { /* forever */
+	while ((e = np_queue_get_event()) != NULL) {
 
-		syslog(LOG_INFO, "got event type %s",
-		    npe_type_str(e->npe_type));
-		switch (e->npe_type) {
-			case EV_ROUTING:
-			case EV_NEWADDR:
-			case EV_TIMER:
-				state_machine(e);
-				free_event(e);
-				break;
-			case EV_SYS:
-				free_event(e);
-				break;
-			case EV_SHUTDOWN:
-				state_machine(e);
-				(void) pthread_cancel(routing);
-				(void) pthread_cancel(scan);
-				(void) pthread_join(routing, NULL);
-				(void) pthread_join(scan, NULL);
-				syslog(LOG_INFO, "nwamd shutting down");
-				exit(EXIT_SUCCESS);
-				/* NOTREACHED */
-			default:
-				free_event(e);
-				syslog(LOG_NOTICE, "unknown event");
-				break;
+		etype = e->npe_type;
+		syslog(LOG_INFO, "got event type %s", npe_type_str(etype));
+		if (etype == EV_SHUTDOWN)
+			terminate_door();
+		if (pthread_mutex_lock(&machine_lock) != 0) {
+			syslog(LOG_ERR, "mutex lock");
+			exit(EXIT_FAILURE);
 		}
+		state_machine(e);
+		(void) pthread_mutex_unlock(&machine_lock);
+		free_event(e);
+		if (etype == EV_SHUTDOWN)
+			break;
 	}
-	return (0);
+	syslog(LOG_DEBUG, "terminating routing and scanning threads");
+	(void) pthread_cancel(routing);
+	(void) pthread_cancel(scan);
+	(void) pthread_join(routing, NULL);
+	(void) pthread_join(scan, NULL);
+	syslog(LOG_INFO, "nwamd shutting down");
+	return (EXIT_SUCCESS);
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -111,11 +109,10 @@
 		<stability value='Unstable' />
 		<propval name='debug' type='boolean' value='false' />
 		<propval name='use_net_svc' type='boolean' value='true' />
-		<propval name='popup_info' type='boolean' value='true' />
-		<propval name='popup_query' type='boolean' value='true' />
 		<propval name='autoconf' type='boolean' value='false' />
 		<propval name='dhcp_wait_time' type='count' value='60' />
 		<propval name='scan_interval' type='count' value='120' />
+		<propval name='idle_time' type='count' value='10' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.nwam' />
 	</property_group>

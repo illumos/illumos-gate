@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -281,6 +280,7 @@ f none usr/lib/help/auths/locale/SmfValueSMB.html 444 root bin
 f none usr/lib/help/auths/locale/AuthReadSMB.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueVscan.html 444 root bin
 f none usr/lib/help/auths/locale/SmfWpaStates.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkAutoconf.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/WifiWep.html 444 root bin
@@ -349,6 +349,7 @@ f none usr/lib/help/profiles/locale/RtMediaBkup.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceSecure.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetAutoconf.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetIPsec.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetSecure.html 444 root bin

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the core logic of nwamd.
@@ -39,35 +37,30 @@
  *
  * state_machine() calls high level routines in llp.c and interface.c to act on
  * the state of the machine in response to events.
+ *
+ * This function is called by the main thread in the program with machine_lock
+ * held.  This is the only thread that can add or remove interface and LLP
+ * structures, and thus it's safe for this function to use those structures
+ * without locks.  See also the locking comments in the interface.c and llp.c
+ * block comments.
  */
 
-#include <assert.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <libsysevent.h>
-#include <net/if.h>
-#include <net/if_dl.h>
-#include <net/route.h>
-#include <netinet/in.h>
-#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <libsysevent.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <netinet/in.h>
 #include <sys/nvpair.h>
 #include <sys/socket.h>
-#include <sys/sockio.h>
 #include <sys/types.h>
 #include <syslog.h>
-#include <unistd.h>
 
 #include "defines.h"
 #include "structures.h"
 #include "functions.h"
 #include "variables.h"
-
-static struct sockaddr sinzero = { AF_INET, 0 };
 
 void
 state_machine(struct np_event *e)
@@ -88,8 +81,9 @@ state_machine(struct np_event *e)
 			break;
 		}
 		flags = get_ifflags(evif->if_name, evif->if_family);
-		if ((flags & IFF_DHCPRUNNING) == 0 || ((flags & IFF_UP) &&
-		    !cmpsockaddr(evif->if_ipaddr, &sinzero))) {
+		if ((!(evif->if_lflags & IF_DHCPSTARTED) &&
+		    !(flags & IFF_DHCPRUNNING)) || ((flags & IFF_UP) &&
+		    evif->if_ipv4addr != INADDR_ANY)) {
 			/*
 			 * Either DHCP came up successfully, or we're no
 			 * longer trying to do DHCP on this interface;
@@ -97,6 +91,10 @@ state_machine(struct np_event *e)
 			 */
 			dprintf("timer popped for %s, but dhcp state is okay "
 			    "(ifflags 0x%llx)", evif->if_name, flags);
+			break;
+		}
+		if (evif->if_lflags & IF_DHCPFAILED) {
+			dprintf("ignoring timer; interface already failed");
 			break;
 		}
 		/*
@@ -107,28 +105,90 @@ state_machine(struct np_event *e)
 		dprintf("giving up on dhcp on %s (ifflags 0x%llx)",
 		    evif->if_name, flags);
 		evif->if_lflags |= IF_DHCPFAILED;
-		if (interface_is_active(evif))
-			llp_swap(llp_best_avail());
+		if (interface_is_active(evif)) {
+			if ((prefllp = llp_best_avail()) != NULL) {
+				llp_swap(prefllp, dcTimer);
+			} else {
+				dprintf("DHCP timed out, but no better link is "
+				    "available");
+				report_interface_down(evif->if_name, dcTimer);
+			}
+		} else {
+			dprintf("DHCP failed on inactive link");
+			report_interface_down(evif->if_name, dcTimer);
+		}
 
 		break;
 
-	case EV_ROUTING:
+	case EV_NEWAP:
+		if ((evllp = llp_lookup(e->npe_name)) == NULL) {
+			dprintf("state_machine: no llp for %s; ignoring "
+			    "EV_NEWAP event", STRING(e->npe_name));
+			break;
+		}
+
+		if (evllp == link_layer_profile) {
+			llp_reselect();
+		} else {
+			evllp->llp_waiting = B_FALSE;
+			evllp->llp_failed = B_FALSE;
+			prefllp = llp_best_avail();
+			if (prefllp == NULL) {
+				dprintf("new APs on %s, but no best link is "
+				    "available", llp_prnm(evllp));
+			} else if (prefllp != link_layer_profile) {
+				dprintf("state_machine: new APs on link %s "
+				    "caused new preferred llp: %s (was %s)",
+				    llp_prnm(evllp), llp_prnm(prefllp),
+				    llp_prnm(link_layer_profile));
+				llp_swap(prefllp, dcNewAP);
+			}
+		}
+		break;
+
+	case EV_LINKDROP:
+	case EV_LINKUP:
+	case EV_LINKFADE:
+	case EV_LINKDISC:
+	case EV_USER:
 		if ((evif = get_interface(e->npe_name)) == NULL ||
 		    (evllp = llp_lookup(e->npe_name)) == NULL) {
 			dprintf("state_machine: either no intf (%p) or no llp "
-			    "(%p) for %s; ignoring EV_ROUTING event",
-			    (void *)evif, (void *)evllp, STRING(e->npe_name));
+			    "(%p) for %s; ignoring EV_%s event",
+			    (void *)evif, (void *)evllp, STRING(e->npe_name),
+			    npe_type_str(e->npe_type));
 			break;
 		}
+
+		if (e->npe_type == EV_LINKUP || e->npe_type == EV_USER)
+			evllp->llp_failed = B_FALSE;
+
+		/*
+		 * If we're here because wireless has disconnected, then clear
+		 * the DHCP failure flag on this interface; this is a "fresh
+		 * start" for the interface, so we should retry DHCP.
+		 */
+		if (e->npe_type == EV_LINKFADE || e->npe_type == EV_LINKDISC)
+			evif->if_lflags &= ~IF_DHCPFAILED;
+
 		prefllp = llp_best_avail();
-		if (prefllp != link_layer_profile) {
+		if (prefllp == NULL) {
+			dprintf("state changed on %s, but no best link is "
+			    "available", llp_prnm(evllp));
+		} else if (prefllp != link_layer_profile) {
 			dprintf("state_machine: change in state of link %s "
 			    "resulted in new preferred llp: %s (was %s)",
 			    llp_prnm(evllp), llp_prnm(prefllp),
 			    llp_prnm(link_layer_profile));
-			llp_swap(prefllp);
+			llp_swap(prefllp,
+			    e->npe_type == EV_LINKDROP ? dcUnplugged :
+			    e->npe_type == EV_LINKFADE ? dcFaded :
+			    e->npe_type == EV_LINKDISC ? dcGone :
+			    e->npe_type == EV_USER ? dcUser :
+			    dcBetter);
 		}
-
+		if (e->npe_type == EV_USER)
+			llp_write_changed_priority(evllp);
 		break;
 
 	case EV_NEWADDR:
@@ -139,19 +199,45 @@ state_machine(struct np_event *e)
 			    (void *)evif, (void *)evllp, STRING(e->npe_name));
 			break;
 		}
+		evllp->llp_failed = B_FALSE;
 		if (evllp->llp_ipv4src == IPV4SRC_DHCP) {
 			flags = get_ifflags(evif->if_name, evif->if_family);
 			if (!(flags & IFF_DHCPRUNNING) || !(flags & IFF_UP) ||
-			    cmpsockaddr(evif->if_ipaddr, &sinzero)) {
+			    evif->if_ipv4addr == INADDR_ANY) {
 				/*
 				 * We don't have a DHCP lease.  If we used to
 				 * have one, then switch to another profile.
+				 * Note that if *we* took the interface down
+				 * (which happens if this isn't the one
+				 * preferred interface), then this doesn't
+				 * signal a DHCP failure.
 				 */
-				if ((evif->if_lflags & IF_DHCPACQUIRED) != 0) {
+				if (!(flags & IFF_DHCPRUNNING))
+					evif->if_lflags &= ~IF_DHCPSTARTED;
+				if (evif->if_lflags & IF_DHCPACQUIRED) {
 					evif->if_lflags &= ~IF_DHCPACQUIRED;
-					evif->if_lflags |= IF_DHCPFAILED;
-					if (interface_is_active(evif))
-						llp_swap(llp_best_avail());
+					if (interface_is_active(evif)) {
+						evif->if_lflags |=
+						    IF_DHCPFAILED;
+						prefllp = llp_best_avail();
+						if (prefllp != NULL) {
+							dprintf("DHCP has "
+							    "failed, switch "
+							    "interfaces");
+							llp_swap(prefllp,
+							    dcDHCP);
+						} else {
+							dprintf("DHCP failed, "
+							    "but no better link"
+							    " is available");
+							report_interface_down(
+							    evif->if_name,
+							    dcDHCP);
+						}
+					} else {
+						dprintf("DHCP not acquired and "
+						    "not active");
+					}
 				}
 				break;
 			}
@@ -162,7 +248,7 @@ state_machine(struct np_event *e)
 			 */
 			evif->if_timer_expire = 0;
 			evif->if_lflags |= IF_DHCPACQUIRED;
-			if ((evif->if_lflags & IF_DHCPFAILED) != 0) {
+			if (evif->if_lflags & IF_DHCPFAILED) {
 				evif->if_lflags &= ~IF_DHCPFAILED;
 				dhcp_restored = B_TRUE;
 			}
@@ -173,15 +259,14 @@ state_machine(struct np_event *e)
 				dprintf("state_machine: dhcp completed on "
 				    "higher priority llp (%s); swapping",
 				    llp_prnm(evllp));
-				llp_swap(evllp);
+				llp_swap(evllp, dcBetter);
 			} else {
 				dprintf("state_machine: newaddr event was for "
 				    "%s, not for current active link (%s); "
 				    "taking down %s", evllp->llp_lname,
 				    llp_prnm(link_layer_profile),
 				    evllp->llp_lname);
-				takedowninterface(evllp->llp_lname, B_FALSE,
-				    evllp->llp_ipv6onlink);
+				takedowninterface(evllp->llp_lname, dcUnwanted);
 				break;
 			}
 		}
@@ -202,6 +287,80 @@ state_machine(struct np_event *e)
 		}
 		break;
 
+	case EV_ADDIF:
+		/* Plumb the interface */
+		if (start_child(IFCONFIG, e->npe_name, "plumb", NULL) != 0) {
+			syslog(LOG_ERR, "could not plumb interface %s",
+			    e->npe_name);
+			return;
+		}
+		report_interface_added(e->npe_name);
+		evllp = llp_lookup(e->npe_name);
+		/* Add interface to interface list. */
+		evif = add_interface(AF_INET, e->npe_name, 0);
+		if (evllp == NULL) {
+			/*
+			 * Create a new llp entry, and add it to llp list
+			 * and /etc/nwam/llp. By default, the llp
+			 * has a DHCP IPv4 address source, and IPv6 is
+			 * used on the link.  We don't plumb the
+			 * IPv6 link yet - this is done for us by
+			 * bringupinterface().
+			 */
+			if ((evllp = llp_add(e->npe_name)) != NULL)
+				llp_add_file(evllp);
+		}
+
+		/*
+		 * start_if_info_collect will launch the gather_interface_info
+		 * thread, which will start a scan for wireless interfaces, or
+		 * start DHCP on wired interfaces.
+		 */
+		start_if_info_collect(evif, "check");
+		break;
+
+	case EV_REMIF:
+		/* Unplumb the interface */
+		if (start_child(IFCONFIG, e->npe_name, "unplumb", NULL) != 0) {
+			syslog(LOG_ERR, "could not unplumb interface %s",
+			    e->npe_name);
+			return;
+		}
+		evllp = llp_lookup(e->npe_name);
+		remove_interface(e->npe_name);
+		if (evllp != NULL) {
+			/* Unplumb IPv6 interface if IPv6 is used on the link */
+			if (evllp->llp_ipv6onlink) {
+				(void) start_child(IFCONFIG, e->npe_name,
+				    "inet6", "unplumb", NULL);
+			}
+			/* If this llp is active, deactivate it. */
+			if (evllp == link_layer_profile)
+				llp_swap(NULL, dcRemoved);
+			llp_delete(evllp);
+		}
+		report_interface_removed(e->npe_name);
+		break;
+
+	case EV_TAKEDOWN:
+		takedowninterface(e->npe_name, dcSelect);
+		break;
+
+	case EV_RESELECT:
+		if (link_layer_profile == NULL &&
+		    (prefllp = llp_best_avail()) != NULL) {
+			dprintf("reselect: activating LLP %s",
+			    llp_prnm(prefllp));
+			llp_swap(prefllp, dcNone);
+		} else {
+			llp_reselect();
+		}
+		break;
+
+	case EV_DOOR_TIME:
+		check_door_life(NSEC_TO_SEC(gethrtime()));
+		break;
+
 	case EV_SHUTDOWN:
 		/* Cleanup not expecting to see any more events after this */
 		cleanup();
@@ -217,10 +376,9 @@ state_machine(struct np_event *e)
 void
 cleanup(void)
 {
+	deactivate_upper_layer_profile();
 	if (link_layer_profile != NULL) {
-		deactivate_upper_layer_profile();
-		takedowninterface(link_layer_profile->llp_lname, B_FALSE,
-		    link_layer_profile->llp_ipv6onlink);
+		takedowninterface(link_layer_profile->llp_lname, dcShutdown);
 	}
 	/*
 	 * Since actions taken in nwamd result in dhcpagent being

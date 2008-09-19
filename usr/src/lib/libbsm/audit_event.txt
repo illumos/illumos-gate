@@ -22,8 +22,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Audit Event Database
 #
 # File Format:
@@ -498,6 +496,11 @@
 6290:AUE_smf_create_prop:create service instance property:as
 6291:AUE_smf_change_prop:change service instance property:as
 6292:AUE_smf_delete_prop:delete service instance property:as
+#
+# nwamd(1M) events
+#
+6300:AUE_nwam_attach:attach nwam user:ss
+6301:AUE_nwam_detach:detach nwam user:ss
 #
 # Trusted Extensions events:
 #

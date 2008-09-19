@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains routines to retrieve events from the system and package
@@ -40,6 +38,11 @@
  * Functions of the form addevent_*() provide the mechanism to cook down a
  * higher level event into an np_event and put it on the queue.
  *
+ * hotplug_handler() is called for EC_DEV_ADD and EC_DEV_REMOVE hotplug events
+ * of class ESC_NETWORK - i.e. hotplug insertion/removal of network card -
+ * and plumbs/unplumbs the interface, adding/removing it from running
+ * configuration (the interface and llp lists).
+ *
  * routing_events() reads routing messages off of an IPv4 routing socket and
  * by calling addevent_*() functions places appropriate events on the queue.
  *
@@ -49,32 +52,35 @@
  */
 
 #include <arpa/inet.h>
-#include <assert.h>
 #include <errno.h>
 #include <libsysevent.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/dev.h>
+#include <libnvpair.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/fcntl.h>
-#include <sys/sysevent/eventdefs.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include "defines.h"
 #include "structures.h"
 #include "functions.h"
 #include "variables.h"
 
-struct np_event *equeue = NULL;
-static struct np_event *equeue_end = NULL;
+struct np_event *equeue;
+static struct np_event *equeue_end;
 
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
 pthread_t routing, scan;
 
+static sysevent_handle_t *sysevent_handle;
+
+static void hotplug_handler(sysevent_t *ev);
 static void printaddrs(int mask, void *address);
 static char *printaddr(void **address);
 static void *getaddr(int addrid, int mask, void *address);
@@ -104,25 +110,40 @@ union rtm_buf
 };
 
 void
-free_event(struct np_event *e)
+free_event(struct np_event *npe)
 {
-	free(e->npe_name);
-	free(e);
+	free(npe);
 }
 
-void
-np_queue_add_event(struct np_event *e)
+boolean_t
+np_queue_add_event(enum np_event_type evt, const char *ifname)
 {
+	struct np_event *npe;
+	size_t slen;
+
+	slen = ifname == NULL ? 0 : (strlen(ifname) + 1);
+	if ((npe = calloc(1, sizeof (*npe) + slen)) == NULL) {
+		syslog(LOG_ERR, "event %s alloc for %s failed",
+		    npe_type_str(evt), STRING(ifname));
+		return (B_FALSE);
+	}
+	if (ifname != NULL)
+		npe->npe_name = strcpy((char *)(npe + 1), ifname);
+	npe->npe_type = evt;
+
 	(void) pthread_mutex_lock(&queue_mutex);
+	dprintf("adding event type %s name %s to queue",
+	    npe_type_str(evt), STRING(ifname));
 	if (equeue_end != NULL) {
-		equeue_end->npe_next = e;
-		equeue_end = e;
+		equeue_end->npe_next = npe;
+		equeue_end = npe;
 	} else {
-		equeue = equeue_end = e;
+		equeue = equeue_end = npe;
 	}
 	equeue_end->npe_next = NULL;
 	(void) pthread_cond_signal(&queue_cond);
 	(void) pthread_mutex_unlock(&queue_mutex);
+	return (B_TRUE);
 }
 
 /*
@@ -154,99 +175,36 @@ const char *
 npe_type_str(enum np_event_type type)
 {
 	switch (type) {
-		case EV_ROUTING:
-			return ("ROUTING");
-		case EV_SYS:
-			return ("SYS");
-		case EV_TIMER:
-			return ("TIMER");
-		case EV_SHUTDOWN:
-			return ("SHUTDOWN");
-		case EV_NEWADDR:
-			return ("NEWADDR");
-		default:
-			return ("unknown");
-	}
-}
-
-static void
-addevent_routing_ifa(struct ifa_msghdr *ifa, const char *name)
-{
-	struct np_event *e;
-
-	dprintf("addevent_routing_ifa");
-	if (ifa->ifam_index == 0) {
-		/* what is this? */
-		dprintf("tossing index 0 routing event");
-		return;
-	}
-
-	e = calloc(1, sizeof (*e));
-	if (e == NULL) {
-		syslog(LOG_ERR, "calloc failed");
-		return;
-	}
-
-	switch (ifa->ifam_type) {
-	case RTM_NEWADDR:
-		assert(name != NULL);
-		e->npe_type = EV_NEWADDR;
-		if ((e->npe_name = strdup(name)) == NULL) {
-			syslog(LOG_ERR, "strdup failed");
-			free(e);
-			return;
-		}
-		dprintf("adding event type %s name %s to queue",
-		    npe_type_str(e->npe_type), STRING(e->npe_name));
-		np_queue_add_event(e);
-		break;
-
+	case EV_LINKDROP:
+		return ("LINKDROP");
+	case EV_LINKUP:
+		return ("LINKUP");
+	case EV_LINKFADE:
+		return ("LINKFADE");
+	case EV_LINKDISC:
+		return ("LINKDISC");
+	case EV_NEWAP:
+		return ("NEWAP");
+	case EV_USER:
+		return ("USER");
+	case EV_TIMER:
+		return ("TIMER");
+	case EV_SHUTDOWN:
+		return ("SHUTDOWN");
+	case EV_NEWADDR:
+		return ("NEWADDR");
+	case EV_RESELECT:
+		return ("RESELECT");
+	case EV_DOOR_TIME:
+		return ("DOOR_TIME");
+	case EV_ADDIF:
+		return ("ADDIF");
+	case EV_REMIF:
+		return ("REMIF");
+	case EV_TAKEDOWN:
+		return ("TAKEDOWN");
 	default:
-		free(e);
-		dprintf("unhandled type in addevent_routing_ifa %d",
-		    ifa->ifam_type);
-		break;
-	}
-}
-
-static void
-addevent_routing_msghdr(struct if_msghdr *ifm, const char *name)
-{
-	struct np_event *e;
-
-	dprintf("addevent_routing_msghdr");
-	if (ifm->ifm_index == 0) {
-		/* what is this? */
-		dprintf("tossing index 0 routing event");
-		return;
-	}
-
-	switch (ifm->ifm_type) {
-	case RTM_IFINFO:
-		assert(name != NULL);
-		e = calloc(1, sizeof (*e));
-		if (e == NULL) {
-			syslog(LOG_ERR, "calloc failed");
-			return;
-		}
-
-		e->npe_type = EV_ROUTING;
-		if ((e->npe_name = strdup(name)) == NULL) {
-			syslog(LOG_ERR, "strdup failed");
-			free(e);
-			return;
-		}
-		dprintf("flags = %x, IFF_RUNNING = %x", ifm->ifm_flags,
-		    IFF_RUNNING);
-		dprintf("adding event type %s name %s to queue",
-		    npe_type_str(e->npe_type), STRING(e->npe_name));
-		np_queue_add_event(e);
-		break;
-
-	default:
-		dprintf("unhandled type in addevent_routing_msghdr %d",
-		    ifm->ifm_type);
-		break;
+		return ("unknown");
 	}
 }
 
@@ -273,6 +231,98 @@ rtmtype_str(int type)
 	}
 }
 
+/*
+ * At present, we only handle EC_DEV_ADD/EC_DEV_REMOVE sysevents of
+ * subclass ESC_NETWORK.  These signify hotplug addition/removal.
+ *
+ * The sysevents are converted into NWAM events so that we can process them in
+ * the main loop.  If we didn't do this, we'd either have bad pointer
+ * references or need to have reference counts on everything.  Serializing
+ * through the event mechanism is much simpler.
+ */
+static void
+hotplug_handler(sysevent_t *ev)
+{
+	int32_t instance;
+	char *driver;
+	char ifname[LIFNAMSIZ];
+	nvlist_t *attr_list;
+	char *event_class = sysevent_get_class_name(ev);
+	char *event_subclass = sysevent_get_subclass_name(ev);
+	int retv;
+
+	dprintf("hotplug_handler: event %s/%s", event_class,
+	    event_subclass);
+
+	/* Make sure sysevent is of expected class/subclass */
+	if ((strcmp(event_class, EC_DEV_ADD) != 0 &&
+	    strcmp(event_class, EC_DEV_REMOVE) != 0) ||
+	    strcmp(event_subclass, ESC_NETWORK) != 0) {
+		syslog(LOG_ERR, "hotplug_handler: unexpected sysevent "
+		    "class/subclass %s/%s", event_class, event_subclass);
+		return;
+	}
+
+	/*
+	 * Retrieve driver name and instance attributes, and combine to
+	 * get interface name.
+	 */
+	if (sysevent_get_attr_list(ev, &attr_list) != 0) {
+		syslog(LOG_ERR, "hotplug_handler: sysevent_get_attr_list: %m");
+		return;
+	}
+	retv = nvlist_lookup_string(attr_list, DEV_DRIVER_NAME, &driver);
+	if (retv == 0)
+		retv = nvlist_lookup_int32(attr_list, DEV_INSTANCE, &instance);
+	if (retv != 0) {
+		syslog(LOG_ERR, "handle_hotplug_interface: nvlist_lookup "
+		    "of attributes failed: %s", strerror(retv));
+	} else {
+		(void) snprintf(ifname, LIFNAMSIZ, "%s%d", driver, instance);
+		(void) np_queue_add_event(strcmp(event_class, EC_DEV_ADD) == 0 ?
+		    EV_ADDIF : EV_REMIF, ifname);
+	}
+	nvlist_free(attr_list);
+}
+
+static void
+hotplug_events_unregister(void)
+{
+	/* Unsubscribe to sysevents */
+	sysevent_unbind_handle(sysevent_handle);
+	sysevent_handle = NULL;
+}
+
+static void
+hotplug_events_register(void)
+{
+	const char *subclass = ESC_NETWORK;
+
+	sysevent_handle = sysevent_bind_handle(hotplug_handler);
+	if (sysevent_handle == NULL) {
+		syslog(LOG_ERR, "sysevent_bind_handle: %s", strerror(errno));
+		return;
+	}
+	/*
+	 * Subscribe to ESC_NETWORK subclass of EC_DEV_ADD and EC_DEV_REMOVE
+	 * events.  As a result,  we get sysevent notification of hotplug
+	 * add/remove events,  which we handle above in hotplug_event_handler().
+	 */
+	if (sysevent_subscribe_event(sysevent_handle, EC_DEV_ADD, &subclass, 1)
+	    != 0 || sysevent_subscribe_event(sysevent_handle, EC_DEV_REMOVE,
+	    &subclass, 1) != 0) {
+		syslog(LOG_ERR, "sysevent_subscribe_event: %s",
+		    strerror(errno));
+		hotplug_events_unregister();
+	}
+}
+
+/*
+ * This thread reads routing socket events and sends them to the main state
+ * machine.  We must be careful with access to interface data structures here,
+ * as we're not the main thread, which may delete things.  Holding a pointer is
+ * not allowed.
+ */
 /* ARGSUSED */
 static void *
 routing_events(void *arg)
@@ -299,10 +349,9 @@ routing_events(void *arg)
 	dprintf("routing socket %d", rtsock);
 
 	for (;;) {
-		struct interface *ifp;
-		char *addrs, *if_name;
+		char *addrs;
 		struct sockaddr_dl *addr_dl;
-		struct sockaddr *addr;
+		struct sockaddr_in *addr_in;
 
 		rtm = &buffer.r.rtm;
 		n = read(rtsock, &buffer, sizeof (buffer));
@@ -336,6 +385,56 @@ routing_events(void *arg)
 		}
 
 		switch (rtm->rtm_type) {
+		case RTM_DELADDR: {
+			uint64_t ifflags;
+
+			/*
+			 * Check for failure due to CR 6745448: if we get a
+			 * report that an address has been deleted, then check
+			 * for interface up, datalink down, and actual address
+			 * non-zero.  If that combination is seen, then this is
+			 * a DHCP cached lease, and we need to remove it from
+			 * the system, or it'll louse up the kernel routes
+			 * (which aren't smart enough to avoid dead
+			 * interfaces).
+			 */
+			ifa = (void *)rtm;
+			addrs = (char *)ifa + sizeof (*ifa);
+
+			dprintf("routing message DELADDR: index %d flags %x",
+			    ifa->ifam_index, ifa->ifam_flags);
+			printaddrs(ifa->ifam_addrs, addrs);
+
+			if (ifa->ifam_index == 0) {
+				/* what is this? */
+				dprintf("tossing index 0 routing event");
+				break;
+			}
+
+			addr_in = getaddr(RTA_IFA, ifa->ifam_addrs, addrs);
+			if (addr_in == NULL) {
+				dprintf("no RTA_IFA in RTM_DELADDR message");
+				break;
+			}
+
+			addr_dl = getaddr(RTA_IFP, ifa->ifam_addrs, addrs);
+			if (addr_dl == NULL) {
+				dprintf("no RTA_IFP in RTM_DELADDR message");
+				break;
+			}
+
+			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
+
+			if (addr_in->sin_addr.s_addr == INADDR_ANY) {
+				ifflags = get_ifflags(addr_dl->sdl_data,
+				    AF_INET);
+				if ((ifflags & IFF_UP) &&
+				    !(ifflags & IFF_RUNNING))
+					zero_out_v4addr(addr_dl->sdl_data);
+			}
+			break;
+		}
+
 		case RTM_NEWADDR:
 			ifa = (void *)rtm;
 			addrs = (char *)ifa + sizeof (*ifa);
@@ -344,106 +443,62 @@ routing_events(void *arg)
 			    ifa->ifam_index, ifa->ifam_flags);
 			printaddrs(ifa->ifam_addrs, addrs);
 
-			if ((addr = (struct sockaddr *)getaddr(RTA_IFA,
-			    ifa->ifam_addrs, addrs)) == NULL)
+			if (ifa->ifam_index == 0) {
+				/* what is this? */
+				dprintf("tossing index 0 routing event");
 				break;
+			}
 
-			if ((addr_dl = (struct sockaddr_dl *)getaddr
-			    (RTA_IFP, ifa->ifam_addrs, addrs)) == NULL)
+			addr_in = getaddr(RTA_IFA, ifa->ifam_addrs, addrs);
+			if (addr_in == NULL) {
+				dprintf("no RTA_IFA in RTM_NEWADDR message");
 				break;
+			}
+
+			addr_dl = getaddr(RTA_IFP, ifa->ifam_addrs, addrs);
+			if (addr_dl == NULL) {
+				dprintf("no RTA_IFP in RTM_NEWADDR message");
+				break;
+			}
+
 			/*
 			 * We don't use the lladdr in this structure so we can
 			 * run over it.
 			 */
 			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
-			if_name = addr_dl->sdl_data;
-			ifp = get_interface(if_name);
-			if (ifp == NULL) {
-				dprintf("no interface struct for %s; ignoring "
-				    "message", STRING(if_name));
-				break;
-			}
 
-			/* if no cached address, cache it */
-			if (ifp->if_ipaddr == NULL) {
-				ifp->if_ipaddr = dupsockaddr(addr);
-				dprintf("cached address %s for link %s",
-				    printaddr((void **)&addr), if_name);
-				addevent_routing_ifa(ifa, if_name);
-			} else if (!cmpsockaddr(addr, ifp->if_ipaddr)) {
-				free(ifp->if_ipaddr);
-				ifp->if_ipaddr = dupsockaddr(addr);
-				addevent_routing_ifa(ifa, if_name);
-			}
+			update_interface_v4_address(addr_dl->sdl_data,
+			    addr_in->sin_addr.s_addr);
 			break;
-		case RTM_IFINFO:
-		{
-			boolean_t plugged_in;
 
+		case RTM_IFINFO:
 			ifm = (void *)rtm;
 			addrs = (char *)ifm + sizeof (*ifm);
 			dprintf("routing message IFINFO: index %d flags %x",
 			    ifm->ifm_index, ifm->ifm_flags);
 			printaddrs(ifm->ifm_addrs, addrs);
 
-			if ((addr_dl = (struct sockaddr_dl *)getaddr(RTA_IFP,
-			    ifm->ifm_addrs, addrs)) == NULL)
+			if (ifm->ifm_index == 0) {
+				dprintf("tossing index 0 routing event");
 				break;
+			}
+
+			addr_dl = getaddr(RTA_IFP, ifm->ifm_addrs, addrs);
+			if (addr_dl == NULL) {
+				dprintf("no RTA_IFP in RTM_IFINFO message");
+				break;
+			}
+
 			/*
 			 * We don't use the lladdr in this structure so we can
 			 * run over it.
 			 */
 			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
-			if_name = addr_dl->sdl_data;
-			ifp = get_interface(if_name);
-			if (ifp == NULL) {
-				dprintf("no interface struct for %s; ignoring "
-				    "message", STRING(if_name));
-				break;
-			}
 
-			/*
-			 * Check for toggling of the IFF_RUNNING flag.
-			 *
-			 * On any change in the flag value, we turn off the
-			 * DHCP flags; the change in the RUNNING state
-			 * indicates a "fresh start" for the interface, so we
-			 * should try dhcp again.
-			 *
-			 * Ignore specific IFF_RUNNING changes for
-			 * wireless interfaces; their semantics are
-			 * a bit different (either the flag is always
-			 * on, or, with newer drivers, it indicates
-			 * whether or not they are connected to an AP).
-			 *
-			 * For wired interfaces, if the interface was
-			 * not plugged in and now it is, start info
-			 * collection.
-			 *
-			 * If it was plugged in and now it is
-			 * unplugged, generate an event.
-			 *
-			 * XXX We probably need a lock to protect
-			 * if_flags setting and getting.
-			 */
-			if ((ifp->if_flags & IFF_RUNNING) !=
-			    (ifm->ifm_flags & IFF_RUNNING)) {
-				ifp->if_lflags &= ~IF_DHCPFLAGS;
-			}
-			if (ifp->if_type == IF_WIRELESS)
-				break;
-			plugged_in = ((ifp->if_flags & IFF_RUNNING) != 0);
-			ifp->if_flags = ifm->ifm_flags;
-			if (!plugged_in &&
-			    (ifm->ifm_flags & IFF_RUNNING)) {
-				start_if_info_collect(ifp, NULL);
-			} else if (plugged_in &&
-			    !(ifm->ifm_flags & IFF_RUNNING)) {
-				check_drop_dhcp(ifp);
-				addevent_routing_msghdr(ifm, if_name);
-			}
+			update_interface_flags(addr_dl->sdl_data,
+			    ifm->ifm_flags);
 			break;
-		}
+
 		default:
 			dprintf("routing message %s socket %d discarded",
 			    rtmtype_str(rtm->rtm_type), rtsock);
@@ -564,7 +619,6 @@ boolean_t
 start_event_collection(void)
 {
 	int err;
-	boolean_t check_cache = B_TRUE;
 
 	/*
 	 * if these are ever created/destroyed repetitively then we will
@@ -586,7 +640,14 @@ start_event_collection(void)
 		dprintf("scan thread: %d", scan);
 	}
 
-	walk_interface(start_if_info_collect, &check_cache);
+	/*
+	 * This function registers a callback which will get a dedicated thread
+	 * for handling of hotplug sysevents when they occur.
+	 */
+	hotplug_events_register();
+
+	dprintf("initial interface scan");
+	walk_interface(start_if_info_collect, "check");
 
 	return (B_TRUE);
 }

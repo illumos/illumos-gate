@@ -122,6 +122,7 @@ SUBDIRS += \
 	libmapmalloc	\
 	libmtmalloc	\
 	libnls		\
+	libnwam		\
 	libsmbios	\
 	libtecla	\
 	libumem		\
@@ -383,6 +384,7 @@ HDRSUBDIRS=		\
 	libmtmalloc	\
 	libnvpair	\
 	libnsl		\
+	libnwam		\
 	libpam		\
 	libpctx		\
 	libpicl		\
@@ -523,6 +525,7 @@ libinetcfg:	libnsl libsocket libdlpi
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv
+libnwam:	libdoor
 libuuid:	libdlpi
 libinetutil:	libsocket
 libsecdb:	libnsl

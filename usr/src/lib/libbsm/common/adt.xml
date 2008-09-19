@@ -1838,8 +1838,36 @@ Use is subject to license terms.
 	</entry>
     </event>
 
+<!-- NWAM events -->
+
+    <event id="AUE_nwam_attach" header="0" idNo="97" omit="JNI">
+	<title>Network Autoconfig Client</title>
+	<program>nwamd</program>
+	<see>nwamd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_nwam_detach" instance_of="AUE_generic_basic" header="0"
+	idNo="98" omit="JNI">
+	<title>Network Autoconfig Client</title>
+	<program>nwamd</program>
+	<see>nwamd(1M)</see>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 96, so next is 97, then fix this comment -->
+<!-- Highest idNo is 98, so next is 99, then fix this comment -->
 <!-- end of C Only events -->
 
 

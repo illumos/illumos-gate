@@ -24,41 +24,32 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * This file containes all the routines to handle wireless (more
+ * This file contains all the routines to handle wireless (more
  * accurately, 802.11 "WiFi" family only at this moment) operations.
  * This is only phase 0 work so the handling is pretty simple.
  *
  * When the daemon starts up, for each WiFi interface detected, it'll
  * spawn a thread doing an access point (AP) scanning.  After the scans
  * finish and if one of the WiFi interfaces is chosen to be active, the
- * code will pop up a window showing the scan results and wait for the
- * user's input on which AP to connect to and then complete the AP
- * connection and IP interface set up.  WEP/WPA is supported to connect to
- * those APs which require it.  The code also maintains a list of known
- * WiFi APs in the file KNOWN_WIFI_NETS.  Whenever the code successfully
- * connects to an AP, the AP's ESSID/BSSID will be added to that file.
- * This file is used in the following way.
+ * code will send a message to the GUI, which then must gather the results.
  *
- * If the AP scan results contain one known AP, the code will automatically
- * connect to that AP without asking the user.  But if the detected signal
- * strength of that AP is weaker than some other AP's, the code will still
- * pop up a window asking for user input.
+ * WEP/WPA is supported to connect to those APs which require it.  The code
+ * also maintains a list of known WiFi APs in the file KNOWN_WIFI_NETS.
+ * Whenever the code successfully connects to an AP, the AP's ESSID/BSSID will
+ * be added to that file.  This file is used in the following way.
  *
- * If the AP scan results contain more than one known APs, the code will
- * pop up a window listing those known APs only.  If the user does not
- * make a choice, the full list of available APs will be shown.
+ * If the AP scan results contain one known AP (plus any number of unknown
+ * APs), the code will automatically connect to that AP without contacting the
+ * GUI.  But if the detected signal strength of that one known AP is weaker
+ * than any of the unknown APs, the code will block on the GUI.
  *
- * If the AP scan results contain no known AP, the full list of available
- * APs is shown and the user is asked which AP to connect to.
+ * If the AP scan results contain more than one known APs or no known APs, the
+ * GUI is notified.
  *
  * Note that not all APs broadcast the Beacon.  And some events may
  * happen during the AP scan such that not all available APs are found.
- * So the code also allows a user to manually input an AP's data in the
- * pop up window.  This allows a user to connect to the aforementioned
- * "hidden" APs.
+ * Thus, the GUI can specify an AP's data.
  *
  * The code also periodically (specified by wlan_scan_interval) checks
  * for the health of the AP connection.  If the signal strength of the
@@ -68,13 +59,8 @@
  * periodically to look for available APs.  In both cases, if there are
  * new APs, the above AP connection procedure will be performed.
  *
- * One limitation of the current code is that a user cannot initiate a
- * WiFi APs scan manually.  A manual scan can only be done when the code
- * shows a pop up window asking for user input.  Suppose there is no
- * connected AP and periodic scan is going on.  If a user wants to
- * connect to a hidden AP, this is only possible if there is another
- * non-hidden AP available such that after a periodic scan, the pop up
- * window is shown.  This will be fixed in a later phase.
+ * Lock ordering note: wifi_mutex and wifi_init_mutex are not held at the same
+ * time.
  */
 
 #include <unistd.h>
@@ -83,7 +69,6 @@
 #include <stdio.h>
 #include <strings.h>
 #include <syslog.h>
-#include <assert.h>
 #include <limits.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -93,8 +78,6 @@
 #include <stropts.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#include <locale.h>
-#include <libintl.h>
 #include <libdladm.h>
 #include <libdllink.h>
 #include <libinetutil.h>
@@ -113,15 +96,6 @@
 	(sec == DLADM_WLAN_SECMODE_WPA || sec == DLADM_WLAN_SECMODE_WEP)
 
 static pthread_mutex_t wifi_mutex;
-static pthread_mutexattr_t wifi_mutex_attr;
-static pthread_mutex_t wifi_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t wifi_init_cond = PTHREAD_COND_INITIALIZER;
-
-typedef enum {
-	SUCCESS = 0,
-	FAILURE,
-	TRY_AGAIN
-} return_vals_t;
 
 typedef enum {
 	ESSID = 0,
@@ -130,18 +104,29 @@ typedef enum {
 } known_wifi_nets_fields_t;
 
 /*
+ * List of wireless interfaces; protected by wifi_mutex.
+ */
+static struct qelem wi_list;
+static uint_t wi_link_count;
+
+/*
  * Is a wireless interface doing a scan currently?  We only allow one
  * wireless interface to do a scan at any one time.  This is to
  * avoid unnecessary interference.  The following variable is used
  * to store the interface doing the scan.  It is protected by
  * wifi_init_mutex.
  */
-static struct interface *wifi_scan_intf = NULL;
+static char wifi_scan_intf[LIFNAMSIZ];
+static pthread_mutex_t wifi_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t wifi_init_cond = PTHREAD_COND_INITIALIZER;
 
-/* used entries have non NULL memebers */
-static struct wireless_lan *wlans = NULL;
-static uint_t wireless_lan_count = 0; /* allocated */
-static uint_t wireless_lan_used = 0; /* used entries */
+/*
+ * Array of wireless LAN entries; protected by wifi_mutex.
+ */
+static struct wireless_lan *wlans;
+static uint_t wireless_lan_count; /* allocated */
+static uint_t wireless_lan_used; /* used entries */
+static boolean_t new_ap_found;
 
 static int key_string_to_secobj_value(char *, uint8_t *, uint_t *,
     dladm_secobj_class_t);
@@ -149,33 +134,23 @@ static int store_key(struct wireless_lan *);
 static dladm_wlan_key_t *retrieve_key(const char *, const char *,
     dladm_secobj_class_t);
 
-static boolean_t add_wlan_entry(struct interface *, char *, char *, char *,
-    dladm_wlan_secmode_t);
-static boolean_t already_in_visited_wlan_list(const struct wireless_lan *);
-static boolean_t check_wlan(struct interface *, const char *);
-static boolean_t connect_or_autoconf(struct wireless_lan *, struct interface *);
-static return_vals_t connect_to_new_wlan(const struct wireless_lan *, int,
-    struct interface *);
-static boolean_t find_wlan_entry(struct interface *, char *, char *);
+static struct wireless_lan *add_wlan_entry(const char *, const char *,
+    const char *, dladm_wlan_attr_t *);
+static boolean_t check_wlan(const wireless_if_t *, const char *, const char *,
+    boolean_t);
+static return_vals_t connect_or_autoconf(struct wireless_lan *,
+    wireless_if_t *);
+static struct wireless_lan *find_wlan_entry(const char *, const char *,
+    const char *);
 static void free_wireless_lan(struct wireless_lan *);
-static struct wireless_lan *get_specific_lan(void);
-static void get_user_key(struct wireless_lan *);
-static int get_user_preference(char *const *, const char *, const char *,
-    struct wireless_lan **, const struct wireless_lan *);
-static char **alloc_argv(int, size_t);
-static void free_argv(char **);
-static char **build_wlanlist_zargv(const struct wireless_lan *, int,
-    const char *, int, const char **, int);
-static char *get_zenity_response(char *const *);
-static boolean_t wlan_autoconf(struct interface *);
-static int zenity_height(int);
+static return_vals_t get_user_key(struct wireless_lan *);
+static boolean_t wlan_autoconf(const wireless_if_t *);
 static boolean_t get_scan_results(void *, dladm_wlan_attr_t *);
+static int add_known_wifi_nets_file(const char *, const char *);
 static boolean_t known_wifi_nets_lookup(const char *, const char *, char *);
-
+static return_vals_t connect_chosen_lan(struct wireless_lan *, wireless_if_t *);
 
 #define	WIRELESS_LAN_INIT_COUNT	8
-
-struct visited_wlans_list *visited_wlan_list = NULL;
 
 /*
  * The variable wlan_scan_interval controls the interval in seconds
@@ -189,167 +164,116 @@ uint_t wlan_scan_interval = 120;
  */
 dladm_wlan_strength_t wireless_scan_level = DLADM_WLAN_STRENGTH_VERY_WEAK;
 
-/*
- * Some constants for zenity args
- */
-/*
- * For a wlan table, command begins with 5 general args:
- * cmdname (argv[0]), window type (list), title, height, and width.
- */
-#define	ZENITY_LIST_INIT_ARGS	5
-/*
- * Columns: index, ESSID, BSSID, Encryption Type, Signal Strength
- */
-#define	ZENITY_COLUMNS_PER_WLAN	5
-/*
- * Cap the length of an individual arg at 64 bytes.
- * Longest args tend to be extra row strings.
- */
-#define	ZENITY_ARG_LEN		64
-/*
- * Typical zenity return buffers are index number strings
- * or extra row strings; 1024 should be sufficient.
- */
-#define	ZENITY_RTN_BUF_SIZE	1024
-
-/*
- * Alloc an array of (cnt + 1) pointers, where the first cnt pointers
- * point to an alloc'd buffer of specified len.  The last pointer in
- * the array is NULL.
- */
-static char **
-alloc_argv(int cnt, size_t buflen)
-{
-	int i;
-	char **argv;
-
-	if ((argv = calloc(cnt + 1, sizeof (char *))) == NULL) {
-		syslog(LOG_ERR, "calloc failed: %m");
-		return (NULL);
-	}
-	for (i = 0; i < cnt; i++) {
-		if ((argv[i] = malloc(buflen)) == NULL) {
-			syslog(LOG_ERR, "malloc failed: %m");
-			free_argv(argv);
-			return (NULL);
-		}
-	}
-	argv[cnt] = NULL;
-
-	return (argv);
-}
-
-/*
- * Free an argv.  Assumes that the first NULL pointer encountered
- * indicates the end of the array: that is, that the array is null-
- * terminated and that no other elements are NULL.
- */
-static void
-free_argv(char **argv)
-{
-	int i = 0;
-
-	if (argv == NULL)
-		return;
-
-	while (argv[i] != NULL)
-		free(argv[i++]);
-	free(argv);
-}
-
 void
-init_mutexes(void)
+initialize_wireless(void)
 {
+	pthread_mutexattr_t wifi_mutex_attr;
+
 	(void) pthread_mutexattr_init(&wifi_mutex_attr);
 	(void) pthread_mutexattr_settype(&wifi_mutex_attr,
 	    PTHREAD_MUTEX_RECURSIVE);
 	(void) pthread_mutex_init(&wifi_mutex, &wifi_mutex_attr);
+	wi_list.q_forw = wi_list.q_back = &wi_list;
+}
+
+void
+add_wireless_if(const char *ifname)
+{
+	wireless_if_t *wip;
+
+	if ((wip = calloc(1, sizeof (*wip))) != NULL) {
+		(void) strlcpy(wip->wi_name, ifname, sizeof (wip->wi_name));
+		(void) dladm_name2info(ifname, &wip->wi_linkid, NULL, NULL,
+		    NULL);
+		if (pthread_mutex_lock(&wifi_mutex) == 0) {
+			insque(&wip->wi_links, wi_list.q_back);
+			wi_link_count++;
+			(void) pthread_mutex_unlock(&wifi_mutex);
+		} else {
+			free(wip);
+		}
+	}
+}
+
+static wireless_if_t *
+find_wireless_if(const char *ifname)
+{
+	wireless_if_t *wip;
+
+	for (wip = (wireless_if_t *)wi_list.q_forw;
+	    wip != (wireless_if_t *)&wi_list;
+	    wip = (wireless_if_t *)wip->wi_links.q_forw) {
+		if (strcmp(wip->wi_name, ifname) == 0)
+			return (wip);
+	}
+	return (NULL);
+}
+
+void
+remove_wireless_if(const char *ifname)
+{
+	wireless_if_t *wip;
+
+	if (pthread_mutex_lock(&wifi_mutex) == 0) {
+		if ((wip = find_wireless_if(ifname)) != NULL) {
+			remque(&wip->wi_links);
+			wi_link_count--;
+		}
+		(void) pthread_mutex_unlock(&wifi_mutex);
+		free(wip);
+	}
 }
 
 /*
  * wlan is expected to be non-NULL.
  */
-static void
+static return_vals_t
 get_user_key(struct wireless_lan *wlan)
 {
 	dladm_secobj_class_t class;
-	int zargc, cur;
-	char **zargv;
 
 	/*
 	 * First, test if we have key stored as secobj. If so,
 	 * no need to prompt for it.
 	 */
-	class = (wlan->sec_mode == DLADM_WLAN_SECMODE_WEP ?
+	class = (wlan->attrs.wa_secmode == DLADM_WLAN_SECMODE_WEP ?
 	    DLADM_SECOBJ_CLASS_WEP : DLADM_SECOBJ_CLASS_WPA);
 	wlan->cooked_key = retrieve_key(wlan->essid, wlan->bssid, class);
 	if (wlan->cooked_key != NULL) {
 		dprintf("get_user_key: retrieve_key() returns non NULL");
-		return;
+		return (SUCCESS);
+	} else if (request_wlan_key(wlan)) {
+		return (WAITING);
+	} else {
+		return (FAILURE);
 	}
-
-	if (!valid_graphical_user(B_TRUE))
-		return;
-
-	/*
-	 * build zenity 'entry' argv, with text hidden:
-	 *	'zenity --entry --title=foo --text=bar --hide-text'
-	 * Five args needed.
-	 */
-	zargc = 5;
-	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL)
-		return;
-
-	cur = 0;
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--entry");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s",
-	    gettext("Enter Key"));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--text=%s %s",
-	    gettext("Enter key for WiFi network"), wlan->essid);
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--hide-text");
-
-	wlan->raw_key = get_zenity_response(zargv);
-	if (wlan->raw_key == NULL) {
-		dprintf("get_user_key: failed to obtain user-specified key");
-		goto cleanup;
-	}
-
-	/* Store key persistently */
-	if (store_key(wlan) != 0) {
-		syslog(LOG_ERR, "get_user_key: failed to store user-specified "
-		    "key");
-	}
-
-cleanup:
-	free_argv(zargv);
 }
 
-static boolean_t
-find_wlan_entry(struct interface *intf, char *essid, char *bssid)
+/*
+ * This function assumes that wifi_mutex is held.  If bssid is specified, then
+ * an exact match is returned.  If it's not specified, then the best match is
+ * returned.
+ */
+static struct wireless_lan *
+find_wlan_entry(const char *ifname, const char *essid, const char *bssid)
 {
-	int i;
+	struct wireless_lan *wlan, *best;
 
-	(void) pthread_mutex_lock(&wifi_mutex);
-	/* Check if the new entry is already there. */
-	for (i = 0; i < wireless_lan_used; i++) {
-		/*
-		 * Assume that essid and bssid are already NULL terminated.
-		 * Note that we also check for the interface name here.
-		 * If there is only one wireless interface, it should not
-		 * matter.  But if there are more than 1, then it is safer
-		 * to use the interface which finds the AP to connect to
-		 * it.
-		 */
-		if (strcmp(wlans[i].essid, essid) == 0 &&
-		    strcmp(wlans[i].bssid, bssid) == 0 &&
-		    strcmp(wlans[i].wl_if_name, intf->if_name) == 0) {
-			(void) pthread_mutex_unlock(&wifi_mutex);
-			return (B_TRUE);
+	best = NULL;
+	for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
+		if (strcmp(wlan->essid, essid) != 0 ||
+		    strcmp(wlan->wl_if_name, ifname) != 0)
+			continue;
+		if (bssid[0] == '\0') {
+			if (best == NULL ||
+			    wlan->attrs.wa_strength > best->attrs.wa_strength)
+				best = wlan;
+		} else {
+			if (strcmp(wlan->bssid, bssid) == 0)
+				return (wlan);
 		}
 	}
-	(void) pthread_mutex_unlock(&wifi_mutex);
-	return (B_FALSE);
+	return (best);
 }
 
 static void
@@ -357,7 +281,9 @@ free_wireless_lan(struct wireless_lan *wlp)
 {
 	free(wlp->essid);
 	wlp->essid = NULL;
-	free(wlp->bssid);
+	/* empty string is not allocated */
+	if (wlp->bssid != NULL && wlp->bssid[0] != '\0')
+		free(wlp->bssid);
 	wlp->bssid = NULL;
 	free(wlp->signal_strength);
 	wlp->signal_strength = NULL;
@@ -365,189 +291,435 @@ free_wireless_lan(struct wireless_lan *wlp)
 	wlp->raw_key = NULL;
 	free(wlp->cooked_key);
 	wlp->cooked_key = NULL;
-	free(wlp->wl_if_name);
-	wlp->wl_if_name = NULL;
-}
-
-static boolean_t
-add_wlan_entry(struct interface *intf, char *essid, char *bssid,
-    char *signal_strength, dladm_wlan_secmode_t sec)
-{
-	int n;
-
-	(void) pthread_mutex_lock(&wifi_mutex);
-
-	if (wireless_lan_used == wireless_lan_count) {
-		int newcnt;
-		struct wireless_lan *r;
-
-		newcnt = (wireless_lan_count == 0) ?
-		    WIRELESS_LAN_INIT_COUNT : wireless_lan_count * 2;
-		r = realloc(wlans, newcnt * sizeof (*wlans));
-		if (r == NULL) {
-			syslog(LOG_ERR, "add_wlan_entry: realloc failed");
-			(void) pthread_mutex_unlock(&wifi_mutex);
-			return (B_FALSE);
-		}
-		(void) memset((void *)(r + wireless_lan_count), 0,
-		    (newcnt - wireless_lan_count) * sizeof (*r));
-		wireless_lan_count = newcnt;
-		wlans = r;
-	}
-
-	n = wireless_lan_used;
-	wlans[n].essid = strdup(essid);
-	wlans[n].bssid = strdup(bssid);
-	wlans[n].signal_strength = strdup(signal_strength);
-	wlans[n].wl_if_name = strdup(intf->if_name);
-	wlans[n].sec_mode = sec;
-	wlans[n].raw_key = NULL;
-	wlans[n].cooked_key = NULL;
-	if (wlans[n].essid == NULL || wlans[n].bssid == NULL ||
-	    wlans[n].signal_strength == NULL || wlans[n].wl_if_name == NULL) {
-		syslog(LOG_ERR, "add_wlan_entry: strdup failed");
-		free_wireless_lan(&(wlans[n]));
-		(void) pthread_mutex_unlock(&wifi_mutex);
-		return (B_FALSE);
-	}
-	wireless_lan_used++;
-	(void) pthread_mutex_unlock(&wifi_mutex);
-	return (B_TRUE);
-}
-
-static void
-clear_lan_entries(void)
-{
-	int i;
-
-	(void) pthread_mutex_lock(&wifi_mutex);
-	for (i = 0; i < wireless_lan_used; i++)
-		free_wireless_lan(&(wlans[i]));
-	wireless_lan_used = 0;
-	(void) pthread_mutex_unlock(&wifi_mutex);
 }
 
 /*
- * Verify if a WiFi NIC is associated with the given ESSID.  If the given
- * ESSID is NULL, and if the NIC is already connected,  return true.
- * Otherwise,
- *
- * 1. If the NIC is associated with the given ESSID, return true.
- * 2. If the NIC is not associated with any AP, return false.
- * 3. If the NIC is associated with a different AP, tell the driver
- *    to disassociate with it and then return false.
+ * This function assumes that wifi_mutex is held.
+ */
+static struct wireless_lan *
+add_wlan_entry(const char *ifname, const char *essid, const char *bssid,
+    dladm_wlan_attr_t *attrp)
+{
+	char strength[DLADM_STRSIZE];
+	struct wireless_lan *wlan;
+
+	if (wireless_lan_used == wireless_lan_count) {
+		int newcnt;
+
+		newcnt = (wireless_lan_count == 0) ?
+		    WIRELESS_LAN_INIT_COUNT : wireless_lan_count * 2;
+		wlan = realloc(wlans, newcnt * sizeof (*wlans));
+		if (wlan == NULL) {
+			syslog(LOG_ERR, "add_wlan_entry: realloc failed");
+			return (NULL);
+		}
+		wireless_lan_count = newcnt;
+		wlans = wlan;
+	}
+
+	(void) dladm_wlan_strength2str(&attrp->wa_strength, strength);
+
+	wlan = wlans + wireless_lan_used;
+	(void) memset(wlan, 0, sizeof (*wlan));
+	wlan->attrs = *attrp;
+	wlan->essid = strdup(essid);
+	/* do not do allocation for zero-length */
+	wlan->bssid = *bssid == '\0' ? "" : strdup(bssid);
+	wlan->signal_strength = strdup(strength);
+	(void) strlcpy(wlan->wl_if_name, ifname, sizeof (wlan->wl_if_name));
+	wlan->scanned = B_TRUE;
+	if (wlan->essid == NULL || wlan->bssid == NULL ||
+	    wlan->signal_strength == NULL) {
+		syslog(LOG_ERR, "add_wlan_entry: strdup failed");
+		free_wireless_lan(wlan);
+		return (NULL);
+	}
+	wireless_lan_used++;
+	new_ap_found = B_TRUE;
+	return (wlan);
+}
+
+/*
+ * Remove entries that are no longer seen on the network.  The caller does not
+ * hold wifi_mutex, but is the only thread that can modify the wlan list.
+ * Retain connected entries, as lack of visibility in a scan may just be a
+ * temporary condition (driver problem) and may not reflect an actual
+ * disconnect.
  */
 static boolean_t
-check_wlan(struct interface *intf, const char *exp_essid)
+clear_unscanned_entries(const char *ifname)
+{
+	struct wireless_lan *wlan, *wlput;
+	boolean_t dropped;
+
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		return (B_FALSE);
+	wlput = wlans;
+	dropped = B_FALSE;
+	for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
+		if (strcmp(ifname, wlan->wl_if_name) != 0 || wlan->scanned ||
+		    wlan->connected) {
+			if (wlput != wlan)
+				*wlput = *wlan;
+			wlput++;
+		} else {
+			dprintf("dropping unseen AP %s %s", wlan->essid,
+			    wlan->bssid);
+			dropped = B_TRUE;
+			free_wireless_lan(wlan);
+		}
+	}
+	wireless_lan_used = wlput - wlans;
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	return (dropped);
+}
+
+/*
+ * Verify if a WiFi NIC is associated with the given ESSID and BSSID.  If the
+ * given ESSID is NULL, and if the NIC is already connected, return true.
+ * Otherwise,
+ *
+ * 1. If the NIC is associated with the given ESSID/BSSID, return true.
+ * 2. If the NIC is not associated with any AP, return false.
+ * 3. If the NIC is associated with a different AP, tear down IP interface,
+ *    tell the driver to disassociate with AP, and then return false.
+ */
+static boolean_t
+check_wlan(const wireless_if_t *wip, const char *exp_essid,
+    const char *exp_bssid, boolean_t sendevent)
 {
 	dladm_wlan_linkattr_t attr;
 	dladm_status_t status;
 	char cur_essid[DLADM_STRSIZE];
+	char cur_bssid[DLADM_STRSIZE];
 	char errmsg[DLADM_STRSIZE];
 
-	status = dladm_wlan_get_linkattr(intf->if_linkid, &attr);
+	status = dladm_wlan_get_linkattr(wip->wi_linkid, &attr);
 	if (status != DLADM_STATUS_OK) {
 		dprintf("check_wlan: dladm_wlan_get_linkattr() for %s "
-		    "failed: %s", intf->if_name,
+		    "failed: %s", wip->wi_name,
 		    dladm_status2str(status, errmsg));
 		return (B_FALSE);
 	}
 	if (attr.la_status == DLADM_WLAN_LINK_DISCONNECTED)
 		return (B_FALSE);
+
+	/* If we're expecting "any" connection, then we're done. */
 	if (exp_essid == NULL)
 		return (B_TRUE);
-	(void) dladm_wlan_essid2str(&attr.la_wlan_attr.wa_essid, cur_essid);
 
-	/* Is the NIC associated with the expected one? */
-	if (strcmp(cur_essid, exp_essid) == 0)
+	/* Is the NIC associated with the expected access point? */
+	(void) dladm_wlan_essid2str(&attr.la_wlan_attr.wa_essid, cur_essid);
+	if (strcmp(cur_essid, exp_essid) != 0) {
+		dprintf("wrong ESSID: have %s expect %s; taking down",
+		    cur_essid, exp_essid);
+		goto unexpected;
+	}
+
+	if (exp_bssid == NULL)
 		return (B_TRUE);
 
-	/* Tell the driver to disassociate with the current AP. */
-	if (dladm_wlan_disconnect(intf->if_linkid) != DLADM_STATUS_OK) {
-		dprintf("check_wlan: dladm_wlan_disconnect() for %s fails",
-		    intf->if_name);
+	(void) dladm_wlan_bssid2str(&attr.la_wlan_attr.wa_bssid, cur_bssid);
+	if (strcmp(cur_bssid, exp_bssid) == 0)
+		return (B_TRUE);
+	dprintf("wrong BSSID: have %s expect %s; taking down",
+	    cur_bssid, exp_bssid);
+
+unexpected:
+	if (sendevent) {
+		/* If not, then shut the interface down normally */
+		(void) np_queue_add_event(EV_TAKEDOWN, wip->wi_name);
+		(void) dladm_wlan_disconnect(wip->wi_linkid);
 	}
 	return (B_FALSE);
 }
 
 /*
- * Given a wireless interface, use it to scan for available networks.
+ * Examine all WLANs associated with an interface, and update the 'connected'
+ * and 'known' attributes appropriately.  The caller holds wifi_mutex.
  */
-boolean_t
-scan_wireless_nets(struct interface *intf)
+static boolean_t
+update_connected_wlan(wireless_if_t *wip)
 {
-	boolean_t	new_ap = B_FALSE;
-	dladm_status_t	status;
-	int		num_ap;
+	dladm_wlan_linkattr_t attr;
+	struct wireless_lan *wlan, *lastconn, *newconn;
+	char essid[DLADM_STRSIZE];
+	char bssid[DLADM_STRSIZE];
+	boolean_t connected, wasconn;
+	int retries = 0;
 
-	assert(intf->if_type == IF_WIRELESS);
 	/*
-	 * If there is already a scan in progress, wait until the
-	 * scan is done to avoid interference.  But if the interface
-	 * doing the scan is the same as the one requesting the new
-	 * scan, just return.
-	 *
-	 * Whenever a wireless scan is in progress, all the other
-	 * threads checking the wireless AP list should wait.
+	 * This is awful, but some wireless drivers (particularly 'ath') will
+	 * erroneously report "disconnected" if queried right after a scan.  If
+	 * we see 'down' reported here, we retry a few times to make sure.
 	 */
-	(void) pthread_mutex_lock(&wifi_init_mutex);
-	while (wifi_scan_intf != NULL) {
-		dprintf("scan_wireless_nets in progress: old %s new %s",
-		    wifi_scan_intf->if_name, intf->if_name);
-		if (strcmp(wifi_scan_intf->if_name, intf->if_name) == 0) {
-			(void) pthread_mutex_unlock(&wifi_init_mutex);
-			return (B_FALSE);
-		}
-		(void) pthread_cond_wait(&wifi_init_cond, &wifi_init_mutex);
+	while (retries++ < 4) {
+		if (dladm_wlan_get_linkattr(wip->wi_linkid, &attr) !=
+		    DLADM_STATUS_OK)
+			attr.la_status = DLADM_WLAN_LINK_DISCONNECTED;
+		else if (attr.la_status == DLADM_WLAN_LINK_CONNECTED)
+			break;
 	}
-	wifi_scan_intf = intf;
-	(void) pthread_mutex_unlock(&wifi_init_mutex);
-
-	/*
-	 * Since only one scan is allowed at any one time, no need to grab
-	 * a lock in checking wireless_lan_used.
-	 */
-	num_ap = wireless_lan_used;
-	status = dladm_wlan_scan(intf->if_linkid, intf, get_scan_results);
-	if (status != DLADM_STATUS_OK)
-		syslog(LOG_NOTICE, "cannot scan link '%s'", intf->if_name);
-	else
-		new_ap = (wireless_lan_used > num_ap);
-
-	(void) pthread_mutex_lock(&wifi_init_mutex);
-	wifi_scan_intf = NULL;
-	(void) pthread_cond_signal(&wifi_init_cond);
-	(void) pthread_mutex_unlock(&wifi_init_mutex);
-
-	return (new_ap);
+	if (attr.la_status == DLADM_WLAN_LINK_CONNECTED) {
+		(void) dladm_wlan_essid2str(&attr.la_wlan_attr.wa_essid, essid);
+		(void) dladm_wlan_bssid2str(&attr.la_wlan_attr.wa_bssid, bssid);
+		connected = B_TRUE;
+		wip->wi_wireless_done = B_TRUE;
+		dprintf("update: %s is connected to %s %s", wip->wi_name, essid,
+		    bssid);
+	} else {
+		connected = B_FALSE;
+		dprintf("update: %s is currently unconnected", wip->wi_name);
+	}
+	wasconn = B_FALSE;
+	lastconn = newconn = NULL;
+	for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
+		if (strcmp(wlan->wl_if_name, wip->wi_name) != 0)
+			continue;
+		if (connected && strcmp(wlan->essid, essid) == 0 &&
+		    strcmp(wlan->bssid, bssid) == 0) {
+			wasconn = wlan->connected;
+			wlan->connected = connected;
+			newconn = wlan;
+		} else {
+			if (wlan->connected)
+				lastconn = wlan;
+			wlan->connected = B_FALSE;
+		}
+	}
+	if (newconn == NULL && connected) {
+		newconn = add_wlan_entry(wip->wi_name, essid, bssid,
+		    &attr.la_wlan_attr);
+		if (newconn != NULL)
+			newconn->connected = connected;
+	}
+	if (lastconn != NULL)
+		report_wlan_disconnect(lastconn);
+	if (newconn != NULL && !wasconn && connected) {
+		/*
+		 * If we're already connected but not yet known, then it's
+		 * clear that this is a "known wlan" for the user.  He must
+		 * have issued a dladm connect-wifi command to get here.
+		 */
+		if (!newconn->known) {
+			newconn->known = B_TRUE;
+			(void) add_known_wifi_nets_file(newconn->essid,
+			    newconn->bssid);
+		}
+		report_wlan_connected(newconn);
+	}
+	return (connected);
 }
 
-/* ARGSUSED */
+/*
+ * Given a wireless interface, use it to scan for available networks.  The
+ * caller must not hold wifi_mutex.
+ */
 static void
-wireless_scan(struct interface *ifp, void *arg)
+scan_wireless_nets(const char *ifname)
 {
-	if (ifp->if_type == IF_WIRELESS) {
-		dprintf("periodic_wireless_scan: %s", ifp->if_name);
-		if (scan_wireless_nets(ifp)) {
-			dprintf("new AP added: %s", ifp->if_name);
-			gen_newif_event(ifp);
+	boolean_t	already_done;
+	boolean_t	dropped;
+	boolean_t	new_found;
+	dladm_status_t	status;
+	int		i;
+	datalink_id_t	linkid;
+	wireless_if_t	*wip;
+
+	/*
+	 * If there is already a scan in progress, defer until the scan is done
+	 * to avoid radio interference.  But if the interface doing the scan is
+	 * the same as the one requesting the new scan, then wait for it to
+	 * finish, and then we're done.
+	 */
+	if (pthread_mutex_lock(&wifi_init_mutex) != 0)
+		return;
+	already_done = B_FALSE;
+	while (wifi_scan_intf[0] != '\0') {
+		dprintf("scan_wireless_nets in progress: old %s new %s",
+		    wifi_scan_intf, ifname);
+		if (strcmp(wifi_scan_intf, ifname) == 0)
+			already_done = B_TRUE;
+		(void) pthread_cond_wait(&wifi_init_cond, &wifi_init_mutex);
+		if (already_done) {
+			(void) pthread_mutex_unlock(&wifi_init_mutex);
+			return;
 		}
+	}
+	(void) strlcpy(wifi_scan_intf, ifname, sizeof (wifi_scan_intf));
+	(void) pthread_mutex_unlock(&wifi_init_mutex);
+
+	/* Grab the linkid from the wireless interface */
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		goto scan_end;
+	if ((wip = find_wireless_if(ifname)) == NULL) {
+		(void) pthread_mutex_unlock(&wifi_mutex);
+		dprintf("aborted scan on %s; unable to locate interface",
+		    ifname);
+		goto scan_end;
+	}
+	linkid = wip->wi_linkid;
+	(void) pthread_mutex_unlock(&wifi_mutex);
+
+	/*
+	 * Since only one scan is allowed at any one time, and only scans can
+	 * modify the list, there's no need to grab a lock in checking
+	 * wireless_lan_used or the wlans list itself, or for the new_ap_found
+	 * global.
+	 *
+	 * All other threads must hold the mutex when reading this data, and
+	 * this thread must hold the mutex only when writing portions that
+	 * those other threads may read.
+	 */
+	for (i = 0; i < wireless_lan_used; i++)
+		wlans[i].scanned = B_FALSE;
+	new_ap_found = B_FALSE;
+	dprintf("starting scan on %s", ifname);
+	status = dladm_wlan_scan(linkid, (char *)ifname, get_scan_results);
+	if (status == DLADM_STATUS_OK) {
+		dropped = clear_unscanned_entries(ifname);
+	} else {
+		dropped = B_FALSE;
+		syslog(LOG_NOTICE, "cannot scan link '%s'", ifname);
+	}
+
+scan_end:
+	/* Need to sample this global before clearing out scan lock */
+	new_found = new_ap_found;
+
+	if (pthread_mutex_lock(&wifi_mutex) == 0) {
+		if ((wip = find_wireless_if(ifname)) != NULL) {
+			wip->wi_scan_running = B_FALSE;
+			(void) update_connected_wlan(wip);
+		}
+		(void) pthread_mutex_unlock(&wifi_mutex);
+	}
+
+	(void) pthread_mutex_lock(&wifi_init_mutex);
+	wifi_scan_intf[0] = '\0';
+	(void) pthread_cond_broadcast(&wifi_init_cond);
+	(void) pthread_mutex_unlock(&wifi_init_mutex);
+
+	if (status == DLADM_STATUS_OK)
+		report_scan_complete(ifname, dropped || new_found, wlans,
+		    wireless_lan_used);
+
+	if (new_found) {
+		dprintf("new AP added: %s", ifname);
+		(void) np_queue_add_event(EV_NEWAP, ifname);
 	}
 }
 
+/*
+ * Rescan all wireless interfaces.  This routine intentionally does not hold
+ * wifi_mutex during the scan, as scans can take a long time to accomplish, and
+ * there may be more than one wireless interface.  The counter is used to make
+ * sure that we don't run "forever" if the list is changing quickly.
+ */
+static void
+rescan_wifi_no_lock(void)
+{
+	uint_t cnt = 0;
+	wireless_if_t *wip;
+	char ifname[LIFNAMSIZ];
+
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		return;
+	wip = (wireless_if_t *)wi_list.q_forw;
+	while (cnt++ < wi_link_count && wip != (wireless_if_t *)&wi_list) {
+		(void) strlcpy(ifname, wip->wi_name, sizeof (ifname));
+		dprintf("periodic wireless scan: %s", ifname);
+		/* Even less than "very weak" */
+		wip->wi_strength = 0;
+		wip->wi_scan_running = B_TRUE;
+		(void) pthread_mutex_unlock(&wifi_mutex);
+
+		scan_wireless_nets(ifname);
+
+		if (pthread_mutex_lock(&wifi_mutex) != 0)
+			return;
+		if ((wip = find_wireless_if(ifname)) == NULL)
+			wip = (wireless_if_t *)&wi_list;
+		else
+			wip = (wireless_if_t *)wip->wi_links.q_forw;
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+}
+
+/*
+ * This thread is given the name of the interface to scan, and must free that
+ * name when done.
+ */
+static void *
+scan_thread(void *arg)
+{
+	char *ifname = arg;
+
+	scan_wireless_nets(ifname);
+	free(ifname);
+
+	return (NULL);
+}
+
+/*
+ * Launch a thread to scan the given wireless interface.  We copy the interface
+ * name over to allocated storage because it's not possible to hand off a lock
+ * on the interface list to the new thread, and the caller's storage (our input
+ * argument) isn't guaranteed to be stable after we return to the caller.
+ */
+int
+launch_wireless_scan(const char *ifname)
+{
+	int retv;
+	wireless_if_t *wip;
+	pthread_t if_thr;
+	pthread_attr_t attr;
+	char *winame;
+
+	if ((winame = strdup(ifname)) == NULL)
+		return (ENOMEM);
+
+	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0) {
+		free(winame);
+		return (retv);
+	}
+
+	if ((wip = find_wireless_if(ifname)) == NULL) {
+		retv = ENXIO;
+	} else if (wip->wi_scan_running) {
+		retv = EINPROGRESS;
+	} else {
+		(void) pthread_attr_init(&attr);
+		(void) pthread_attr_setdetachstate(&attr,
+		    PTHREAD_CREATE_DETACHED);
+		retv = pthread_create(&if_thr, &attr, scan_thread, winame);
+		if (retv == 0)
+			wip->wi_scan_running = B_TRUE;
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+
+	/* If thread not started, then discard the name. */
+	if (retv != 0)
+		free(winame);
+
+	return (retv);
+}
+
+/*
+ * Caller does not hold wifi_mutex.
+ */
 static boolean_t
 get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 {
-	dladm_wlan_secmode_t	sec;
+	const char *ifname = arg;
+	wireless_if_t *wip;
+	struct wireless_lan *wlan;
 	char		essid_name[DLADM_STRSIZE];
 	char		bssid_name[DLADM_STRSIZE];
-	char		strength[DLADM_STRSIZE];
+	boolean_t	retv;
 
 	(void) dladm_wlan_essid2str(&attrp->wa_essid, essid_name);
 	(void) dladm_wlan_bssid2str(&attrp->wa_bssid, bssid_name);
-	(void) dladm_wlan_strength2str(&attrp->wa_strength, strength);
-
-	sec = attrp->wa_secmode;
 
 	/*
 	 * Check whether ESSID is "hidden".
@@ -556,25 +728,48 @@ get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 	 */
 	if (essid_name[0] == '\0') {
 		if (known_wifi_nets_lookup(essid_name, bssid_name,
-		    essid_name)) {
+		    essid_name) &&
+		    dladm_wlan_str2essid(essid_name, &attrp->wa_essid) ==
+		    DLADM_STATUS_OK) {
 			dprintf("Using ESSID %s with BSSID %s",
 			    essid_name, bssid_name);
 		}
 	}
 
-	if (!find_wlan_entry(arg, essid_name, bssid_name) &&
-	    add_wlan_entry(arg, essid_name, bssid_name, strength, sec)) {
-		return (B_TRUE);
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		return (B_FALSE);
+
+	if ((wip = find_wireless_if(ifname)) == NULL) {
+		(void) pthread_mutex_unlock(&wifi_mutex);
+		return (B_FALSE);
 	}
-	return (B_FALSE);
+
+	/* Remember the strongest we encounter */
+	if (attrp->wa_strength > wip->wi_strength)
+		wip->wi_strength = attrp->wa_strength;
+
+	wlan = find_wlan_entry(ifname, essid_name, bssid_name);
+	if (wlan != NULL) {
+		if (wlan->rescan)
+			new_ap_found = B_TRUE;
+		wlan->rescan = B_FALSE;
+		wlan->scanned = B_TRUE;
+		wlan->attrs = *attrp;
+		retv = B_TRUE;
+	} else if (add_wlan_entry(ifname, essid_name, bssid_name, attrp) !=
+	    NULL) {
+		retv = B_TRUE;
+	} else {
+		retv = B_FALSE;
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	return (retv);
 }
 
 /* ARGSUSED */
 void *
 periodic_wireless_scan(void *arg)
 {
-	datalink_id_t	linkid;
-
 	/*
 	 * No periodic scan if the "-i" option is used to change the
 	 * interval to 0.
@@ -585,73 +780,94 @@ periodic_wireless_scan(void *arg)
 	for (;;) {
 		int ret;
 		dladm_wlan_linkattr_t attr;
-		llp_t *cur_llp;
-		struct interface *ifp;
+		char ifname[LIFNAMSIZ];
+		libnwam_interface_type_t ift;
+		datalink_id_t linkid;
 
 		ret = poll(NULL, 0, wlan_scan_interval * MILLISEC);
+		if (ret == -1) {
+			if (errno == EINTR)
+				continue;
+			syslog(LOG_INFO, "periodic_wireless_scan: poll failed");
+			break;
+		}
 
-		/*
-		 * We assume that once an llp is created, it will never be
-		 * deleted in the lifetime of the process.  So it is OK
-		 * to do this assignment without a lock.
-		 */
-		cur_llp = link_layer_profile;
+		/* Get current profile name, if any */
+		llp_get_name_and_type(ifname, sizeof (ifname), &ift);
 
 		/*
 		 * We do a scan if
 		 *
 		 * 1. There is no active profile.  Or
-		 * 2. We are now disconnected from the AP.  Or
+		 * 2. Profile is wireless and we're not connected to the AP.  Or
 		 * 3. The signal strength falls below a certain specified level.
 		 */
-		if (ret == 0) {
-			if (cur_llp != NULL) {
-				if (cur_llp->llp_type != IF_WIRELESS)
-					continue;
+		if (ifname[0] != '\0') {
+			if (ift != IF_WIRELESS)
+				continue;
 
-				if (dladm_name2info(cur_llp->llp_lname, &linkid,
-				    NULL, NULL, NULL) != DLADM_STATUS_OK ||
-				    dladm_wlan_get_linkattr(linkid, &attr) !=
-				    DLADM_STATUS_OK) {
-					continue;
-				}
+			/*
+			 * If these things fail, it means that our wireless
+			 * link isn't viable.  Proceed in that way.
+			 */
+			if (dladm_name2info(ifname, &linkid, NULL, NULL,
+			    NULL) != DLADM_STATUS_OK ||
+			    dladm_wlan_get_linkattr(linkid, &attr) !=
+			    DLADM_STATUS_OK) {
+				attr.la_status = DLADM_WLAN_LINK_DISCONNECTED;
+				attr.la_wlan_attr.wa_strength = 0;
+			}
 
+			if (attr.la_status == DLADM_WLAN_LINK_CONNECTED &&
+			    attr.la_wlan_attr.wa_strength >
+			    wireless_scan_level) {
+				continue;
+			}
+		}
+
+		/* Rescan the wireless interfaces */
+		rescan_wifi_no_lock();
+
+		if (ifname[0] != '\0') {
+			wireless_if_t *wip;
+
+			/*
+			 * If we're still connected and there's nothing better
+			 * around, then there's no point in switching now.
+			 */
+			if (pthread_mutex_lock(&wifi_mutex) != 0)
+				continue;
+			if ((wip = find_wireless_if(ifname)) != NULL) {
 				if (attr.la_status ==
 				    DLADM_WLAN_LINK_CONNECTED &&
-				    attr.la_wlan_attr.wa_strength >
-				    wireless_scan_level) {
+				    wip->wi_strength <=
+				    attr.la_wlan_attr.wa_strength) {
+					(void) pthread_mutex_unlock(&
+					    wifi_mutex);
 					continue;
 				}
-				/*
-				 * Clear the DHCP flags on this interface;
-				 * this is a "fresh start" for the interface,
-				 * so we should retry dhcp.
-				 */
-				ifp = get_interface(cur_llp->llp_lname);
-				if (ifp != NULL)
-					ifp->if_lflags &= ~IF_DHCPFLAGS;
-
-				/*
-				 * Deactivate the original llp.
-				 * If we reached this point, we either were
-				 * not connected, or were connected with
-				 * "very weak" signal strength; so we're
-				 * assuming that having this llp active was
-				 * not very useful.  So we deactivate.
-				 */
-				llp_deactivate();
 			}
-			/* We should start from fresh. */
-			clear_lan_entries();
-			walk_interface(wireless_scan, NULL);
-		} else if (ret == -1) {
-			if (errno == EINTR)
-				continue;
-			syslog(LOG_INFO, "periodic_wireless_scan: poll failed");
-			return (NULL);
+			(void) pthread_mutex_unlock(&wifi_mutex);
+
+			/*
+			 * Try to work around known driver bugs: if the driver
+			 * says we're disconnected, then tell it to disconnect
+			 * for sure.
+			 */
+			(void) dladm_wlan_disconnect(linkid);
+
+			/*
+			 * Deactivate the original AP.  If we reached this
+			 * point, we either were not connected, or were
+			 * connected with "very weak" signal strength; so we're
+			 * assuming that having this llp active was not very
+			 * useful.  So we deactivate.
+			 */
+			(void) np_queue_add_event(
+			    (attr.la_status == DLADM_WLAN_LINK_CONNECTED ?
+			    EV_LINKFADE : EV_LINKDISC), ifname);
 		}
 	}
-	/* NOTREACHED */
 	return (NULL);
 }
 
@@ -674,9 +890,8 @@ key_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp,
 
 	dprintf("before: key_string_to_secobj_value: buf_len = %d", buf_len);
 	if (buf_len == 0) {
-		syslog(LOG_ERR,
-		    "key_string_to_secobj_value: empty key");
-		return (-1);
+		/* length zero means "delete" */
+		return (0);
 	}
 
 	if (buf[buf_len - 1] == '\n')
@@ -738,13 +953,17 @@ key_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp,
  * characters to ".", as ":[1-4]" is the slot indicator, which otherwise
  * would trip us up.  The third parameter is expected to be of size
  * DLADM_SECOBJ_NAME_MAX.
+ *
+ * (Note that much of the system uses DLADM_WLAN_MAX_KEYNAME_LEN, which is 64
+ * rather than 32, but that dladm_get_secobj will fail if a length greater than
+ * DLD_SECOBJ_NAME_MAX is seen, and that's 32.  This is all horribly broken.)
  */
 static void
 set_key_name(const char *essid, const char *bssid, char *name, size_t nsz)
 {
 	int i, rtn, len;
 
-	if (bssid == NULL)
+	if (bssid[0] == '\0')
 		rtn = snprintf(name, nsz, "nwam-%s", essid);
 	else
 		rtn = snprintf(name, nsz, "nwam-%s-%s", essid, bssid);
@@ -771,13 +990,27 @@ store_key(struct wireless_lan *wlan)
 	set_key_name(wlan->essid, wlan->bssid, obj_name, sizeof (obj_name));
 	dprintf("store_key: obj_name is %s", obj_name);
 
-	class = (wlan->sec_mode == DLADM_WLAN_SECMODE_WEP ?
+	class = (wlan->attrs.wa_secmode == DLADM_WLAN_SECMODE_WEP ?
 	    DLADM_SECOBJ_CLASS_WEP : DLADM_SECOBJ_CLASS_WPA);
 	if (key_string_to_secobj_value(wlan->raw_key, obj_val, &obj_len,
 	    class) != 0) {
 		/* above function logs internally on failure */
 		return (-1);
 	}
+
+	/* we've validated the new key, so remove the old one */
+	status = dladm_unset_secobj(obj_name,
+	    DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
+	if (status != DLADM_STATUS_OK && status != DLADM_STATUS_NOTFOUND) {
+		syslog(LOG_ERR, "store_key: could not remove old secure object "
+		    "'%s' for key: %s", obj_name,
+		    dladm_status2str(status, errmsg));
+		return (-1);
+	}
+
+	/* if we're just deleting the key, then we're done */
+	if (wlan->raw_key[0] == '\0')
+		return (0);
 
 	status = dladm_set_secobj(obj_name, class,
 	    obj_val, obj_len,
@@ -825,9 +1058,12 @@ retrieve_key(const char *essid, const char *bssid, dladm_secobj_class_t req)
 		return (NULL);
 	}
 
-	/* Set name appropriately to retrieve key for this WLAN */
-	set_key_name(essid, bssid, cooked_key->wk_name,
-	    DLADM_SECOBJ_NAME_MAX);
+	/*
+	 * Set name appropriately to retrieve key for this WLAN.  Note that we
+	 * cannot use the actual wk_name buffer size, as it's two times too
+	 * large for dladm_get_secobj.
+	 */
+	set_key_name(essid, bssid, cooked_key->wk_name, DLADM_SECOBJ_NAME_MAX);
 	dprintf("retrieve_key: len = %d, object = %s\n",
 	    strlen(cooked_key->wk_name), cooked_key->wk_name);
 	cooked_key->wk_len = sizeof (cooked_key->wk_val);
@@ -875,66 +1111,111 @@ retrieve_key(const char *essid, const char *bssid, dladm_secobj_class_t req)
 	return (cooked_key);
 }
 
-/* Create the KNOWN_WIFI_NETS using info from the interface list.  */
-void
-create_known_wifi_nets_file(void)
+/*
+ * Add an entry to known_wifi_nets file given the parameters.  The caller holds
+ * wifi_mutex.
+ */
+static int
+add_known_wifi_nets_file(const char *essid, const char *bssid)
 {
-	FILE *fp;
-	int dirmode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+	int retv;
+	FILE *fp = NULL;
+
+	dprintf("add_known_wifi_nets_file(%s, %s)", essid, bssid);
 
 	/* Create the NWAM directory in case it does not exist. */
-	if (mkdir(LLPDIR, dirmode) != 0) {
-		if (errno != EEXIST) {
-			syslog(LOG_ERR, "could not create %s: %m", LLPDIR);
-			return;
-		}
+	if (mkdir(LLPDIRNAME, LLPDIRMODE) != 0 &&
+	    errno != EEXIST) {
+		retv = errno;
+		syslog(LOG_ERR, "could not create %s: %m", LLPDIRNAME);
+	} else if ((fp = fopen(KNOWN_WIFI_NETS, "a+")) == NULL) {
+		retv = errno;
+		syslog(LOG_ERR, "fopen(%s) failed: %m", KNOWN_WIFI_NETS);
+	} else if (known_wifi_nets_lookup(essid, bssid, NULL)) {
+		retv = EEXIST;
+	} else {
+		/* now add this to the file */
+		(void) fprintf(fp, "%s\t%s\n", essid, bssid);
+		retv = 0;
 	}
-	if ((fp = fopen(KNOWN_WIFI_NETS, "a+")) == NULL) {
-		syslog(LOG_ERR, "could not open %s: %m", KNOWN_WIFI_NETS);
-		return;
-	}
-	dprintf("Creating %s", KNOWN_WIFI_NETS);
-	(void) fclose(fp);
+	if (fp != NULL)
+		(void) fclose(fp);
+	return (retv);
 }
 
-/*
- * Add an entry to known_wifi_nets file given the parameters.
- */
-void
-update_known_wifi_nets_file(const char *essid, const char *bssid)
+static int
+delete_known_wifi_nets_file(const char *essid, const char *bssid)
 {
-	FILE *fp;
+	FILE *fpin, *fpout;
+	char line[LINE_MAX];
+	char *cp;
+	int retv;
+	size_t essidlen, bssidlen;
+	boolean_t found;
 
-	dprintf("update_known_wifi_nets_file(%s, %s)", essid, STRING(bssid));
-	fp = fopen(KNOWN_WIFI_NETS, "a+");
-	if (fp == NULL) {
-		if (errno != ENOENT) {
-			syslog(LOG_ERR, "fopen(%s) failed: %m",
-			    KNOWN_WIFI_NETS);
-			return;
+	if ((fpin = fopen(KNOWN_WIFI_NETS, "r")) == NULL)
+		return (errno);
+
+	if ((fpout = fopen(KNOWN_WIFI_TMP, "w")) == NULL) {
+		retv = errno;
+		(void) fclose(fpin);
+		return (retv);
+	}
+
+	found = B_FALSE;
+	essidlen = strlen(essid);
+	bssidlen = strlen(bssid);
+	while (fgets(line, sizeof (line), fpin) != NULL) {
+		cp = line;
+		while (isspace(*cp))
+			cp++;
+
+		if (*cp == '#' || *cp == '\0' ||
+		    strncmp(essid, cp, essidlen) != 0 ||
+		    (cp[essidlen] != '\0' && !isspace(cp[essidlen]))) {
+			(void) fputs(line, fpout);
+			continue;
 		}
+
+		/* skip over the essid to examine bssid */
+		while (*cp != '\0' && !isspace(*cp))
+			cp++;
+		while (isspace(*cp))
+			cp++;
 
 		/*
-		 * If there is none, we should create one instead.
-		 * For now, we will use the order of seeing each new net
-		 * for the priority.  We should have a priority field
-		 * in the known_wifi_nets file eventually...
+		 * Deleting with bssid empty means "all entries under this
+		 * essid."  As a result, deleting a wildcard entry for a bssid
+		 * means deleting all entries for that bssid.
 		 */
-		create_known_wifi_nets_file();
-		fp = fopen(KNOWN_WIFI_NETS, "a");
-		if (fp == NULL) {
-			syslog(LOG_ERR, "second fopen(%s) failed: %m",
-			    KNOWN_WIFI_NETS);
-			return;
+
+		if (bssidlen == 0 ||
+		    (strncmp(bssid, cp, bssidlen) == 0 &&
+		    (cp[bssidlen] == '\0' || isspace(cp[bssidlen])))) {
+			/* delete this entry */
+			found = B_TRUE;
+			continue;
 		}
+
+		(void) fputs(line, fpout);
 	}
-	/* now see if this info is already in the file */
-	if (!known_wifi_nets_lookup(essid, bssid, NULL)) {
-		/* now add this to the file */
-		(void) fprintf(fp, "%s\t%s\n", essid,
-		    bssid == NULL ? "" : bssid);
+
+	(void) fclose(fpin);
+	(void) fclose(fpout);
+
+	if (found) {
+		if (rename(KNOWN_WIFI_TMP, KNOWN_WIFI_NETS) == 0) {
+			retv = 0;
+		} else {
+			retv = errno;
+			(void) unlink(KNOWN_WIFI_TMP);
+		}
+	} else {
+		retv = ENXIO;
+		(void) unlink(KNOWN_WIFI_TMP);
 	}
-	(void) fclose(fp);
+
+	return (retv);
 }
 
 /*
@@ -959,16 +1240,9 @@ known_wifi_nets_lookup(const char *new_essid, const char *new_bssid,
 	 * essid\tbssid
 	 * (essid followed by tab followed by bssid)
 	 */
-	fp = fopen(KNOWN_WIFI_NETS, "r+");
-	if (fp == NULL) {
-		if (errno != ENOENT) {
-			syslog(LOG_ERR, "fopen(%s) failed: %m",
-			    KNOWN_WIFI_NETS);
-			return (B_FALSE);
-		}
-		create_known_wifi_nets_file();
+	fp = fopen(KNOWN_WIFI_NETS, "r");
+	if (fp == NULL)
 		return (B_FALSE);
-	}
 	for (line_num = 1; fgets(line, sizeof (line), fp) != NULL; line_num++) {
 
 		cp = line;
@@ -1012,12 +1286,179 @@ known_wifi_nets_lookup(const char *new_essid, const char *new_bssid,
 	return (found);
 }
 
+static uint_t
+extract_known_aps(FILE *fp, libnwam_known_ap_t *kap, char *sbuf, size_t *totstr)
+{
+	char line[LINE_MAX];
+	char *cp;
+	char *tok[MAX_FIELDS];
+	size_t accstr = 0;
+	uint_t count = 0;
+	char key[DLADM_SECOBJ_NAME_MAX];
+	uint8_t keyval[DLADM_SECOBJ_VAL_MAX];
+	dladm_secobj_class_t class;
+	uint_t keylen;
+
+	while (fgets(line, sizeof (line), fp) != NULL) {
+		cp = line;
+		while (isspace(*cp))
+			cp++;
+
+		if (*cp == '#' || *cp == '\0')
+			continue;
+
+		if (bufsplit(cp, MAX_FIELDS, tok) != MAX_FIELDS)
+			continue;
+
+		if (totstr != NULL)
+			accstr += strlen(tok[BSSID]) + strlen(tok[ESSID]) + 2;
+		count++;
+
+		if (kap != NULL) {
+			kap->ka_essid = strcpy(sbuf, tok[ESSID]);
+			sbuf += strlen(sbuf) + 1;
+			kap->ka_bssid = strcpy(sbuf, tok[BSSID]);
+			sbuf += strlen(sbuf) + 1;
+			set_key_name(tok[ESSID], tok[BSSID], key, sizeof (key));
+			keylen = sizeof (keyval);
+			if (dladm_get_secobj(key, &class, keyval, &keylen,
+			    DLADM_OPT_ACTIVE) == DLADM_STATUS_OK)
+				kap->ka_haskey = B_TRUE;
+			else
+				kap->ka_haskey = B_FALSE;
+			kap++;
+		}
+	}
+	if (totstr != NULL)
+		*totstr = accstr;
+	return (count);
+}
+
+libnwam_known_ap_t *
+get_known_ap_list(size_t *kasizep, uint_t *countp)
+{
+	FILE *fp;
+	libnwam_known_ap_t *kap = NULL;
+	size_t kasize;
+	uint_t count;
+	int retv;
+
+	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0) {
+		errno = retv;
+		return (kap);
+	}
+	if ((fp = fopen(KNOWN_WIFI_NETS, "r")) != NULL) {
+		count = extract_known_aps(fp, NULL, NULL, &kasize);
+		rewind(fp);
+		kasize += count * sizeof (*kap);
+		if (count != 0 && (kap = malloc(kasize)) != NULL) {
+			(void) extract_known_aps(fp, kap, (char *)(kap + count),
+			    NULL);
+			*kasizep = kasize;
+			*countp = count;
+		}
+		(void) fclose(fp);
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	return (kap);
+}
+
+int
+add_known_ap(const char *essid, const char *bssid)
+{
+	int retv;
+	char ifname[LIFNAMSIZ];
+	libnwam_interface_type_t ift;
+	struct wireless_lan *wlan, *savedwlan;
+
+	/*
+	 * First check the current LLP.  If there is one, then its connection
+	 * state determines what to do after adding the known AP to the list.
+	 * If not, then we act if there are no connected APs.
+	 */
+	llp_get_name_and_type(ifname, sizeof (ifname), &ift);
+
+	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0)
+		return (retv);
+
+	retv = add_known_wifi_nets_file(essid, bssid);
+	if (retv == 0 && (ift == IF_UNKNOWN || ift == IF_WIRELESS)) {
+		boolean_t any_connected, one_matches;
+
+		/*
+		 * If this is in our list of scanned APs and if no interface is
+		 * connected, then we have a reevaluation event.
+		 */
+		any_connected = one_matches = B_FALSE;
+		for (wlan = wlans; wlan < wlans + wireless_lan_used;
+		    wlan++) {
+			/*
+			 * If LLP is selected, then ignore all others.  Only
+			 * the state of this one interface is at issue.
+			 */
+			if (ifname[0] != '\0' &&
+			    strcmp(ifname, wlan->wl_if_name) != 0)
+				continue;
+			if (wlan->connected)
+				any_connected = B_TRUE;
+			if (strcmp(essid, wlan->essid) == 0 &&
+			    (bssid[0] == '\0' ||
+			    strcmp(bssid, wlan->bssid) == 0)) {
+				one_matches = B_TRUE;
+				savedwlan = wlan;
+			}
+		}
+		if (!any_connected && one_matches) {
+			(void) np_queue_add_event(EV_RESELECT,
+			    savedwlan->wl_if_name);
+		}
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	return (retv);
+}
+
+int
+delete_known_ap(const char *essid, const char *bssid)
+{
+	int retv;
+	struct wireless_lan *wlan;
+	wireless_if_t *wip;
+
+	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0)
+		return (retv);
+
+	retv = delete_known_wifi_nets_file(essid, bssid);
+	if (retv == 0) {
+		for (wlan = wlans; wlan < wlans + wireless_lan_used;
+		    wlan++) {
+			if (wlan->connected &&
+			    strcmp(essid, wlan->essid) == 0 &&
+			    (bssid[0] == '\0' ||
+			    strcmp(bssid, wlan->bssid) == 0)) {
+				wlan->connected = B_FALSE;
+				report_wlan_disconnect(wlan);
+				wip = find_wireless_if(wlan->wl_if_name);
+				if (wip != NULL) {
+					wip->wi_wireless_done = B_FALSE;
+					wip->wi_need_key = B_FALSE;
+					(void) dladm_wlan_disconnect(wip->
+					    wi_linkid);
+				}
+				(void) np_queue_add_event(EV_RESELECT,
+				    wlan->wl_if_name);
+			}
+		}
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	return (retv);
+}
+
 /*
- * reqlan->essid is required (i.e., cannot be NULL)
- * reqlan->bssid is optional (i.e., may be NULL)
+ * reqlan->essid is required (i.e., cannot be zero-length)
+ * reqlan->bssid is optional (i.e., may be zero-length)
  */
-boolean_t
-connect_chosen_lan(struct wireless_lan *reqlan, struct interface *intf)
+static return_vals_t
+connect_chosen_lan(struct wireless_lan *reqlan, wireless_if_t *wip)
 {
 	uint_t	keycount;
 	dladm_wlan_key_t *key;
@@ -1026,44 +1467,50 @@ connect_chosen_lan(struct wireless_lan *reqlan, struct interface *intf)
 	uint_t flags = DLADM_WLAN_CONNECT_NOSCAN;
 	int timeout = DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT;
 	char errmsg[DLADM_STRSIZE];
+	return_vals_t rval;
+
+	wip->wi_need_key = B_FALSE;
 
 	(void) memset(&attr, 0, sizeof (attr));
 	/* try to apply essid selected by the user */
 	if (reqlan->essid == NULL)
-		return (B_FALSE);
+		return (FAILURE);
 	dprintf("connect_chosen_lan(%s, %s, %s)", reqlan->essid,
-	    STRING(reqlan->bssid), intf->if_name);
+	    reqlan->bssid, wip->wi_name);
 
 	/* If it is already connected to the required AP, just return. */
-	if (check_wlan(intf, reqlan->essid))
-		return (B_TRUE);
+	if (check_wlan(wip, reqlan->essid, NULL, B_TRUE))
+		return (SUCCESS);
 
 	if (dladm_wlan_str2essid(reqlan->essid, &attr.wa_essid) !=
 	    DLADM_STATUS_OK) {
 		syslog(LOG_ERR,
 		    "connect_chosen_lan: invalid ESSID '%s' for '%s'",
-		    reqlan->essid, intf->if_name);
-		return (B_FALSE);
+		    reqlan->essid, wip->wi_name);
+		return (FAILURE);
 	}
 	attr.wa_valid = DLADM_WLAN_ATTR_ESSID;
-	if (reqlan->bssid != NULL) {
+	if (reqlan->bssid[0] != '\0') {
 		if (dladm_wlan_str2bssid(reqlan->bssid, &attr.wa_bssid) !=
 		    DLADM_STATUS_OK) {
 			syslog(LOG_ERR,
 			    "connect_chosen_lan: invalid BSSID '%s' for '%s'",
-			    reqlan->bssid, intf->if_name);
-			return (B_FALSE);
+			    reqlan->bssid, wip->wi_name);
+			return (FAILURE);
 		}
 		attr.wa_valid |= DLADM_WLAN_ATTR_BSSID;
 	}
 
 	/* First check for the key */
-	if (NEED_ENC(reqlan->sec_mode)) {
-		get_user_key(reqlan);
-		if (reqlan->cooked_key == NULL)
-			return (B_FALSE);
+	if (NEED_ENC(reqlan->attrs.wa_secmode)) {
+		/* Note that this happens only for known APs from the list */
+		if ((rval = get_user_key(reqlan)) != SUCCESS) {
+			if (rval == WAITING)
+				wip->wi_need_key = B_TRUE;
+			return (rval);
+		}
 		attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
-		attr.wa_secmode = reqlan->sec_mode;
+		attr.wa_secmode = reqlan->attrs.wa_secmode;
 		key = reqlan->cooked_key;
 		keycount = 1;
 		dprintf("connect_chosen_lan: retrieved key");
@@ -1078,325 +1525,231 @@ connect_chosen_lan(struct wireless_lan *reqlan, struct interface *intf)
 	 * try a second time with just the ESSID.
 	 */
 
-	status = dladm_wlan_connect(intf->if_linkid, &attr, timeout, key,
+	status = dladm_wlan_connect(wip->wi_linkid, &attr, timeout, key,
 	    keycount, flags);
 	dprintf("connect_chosen_lan: dladm_wlan_connect returned %s",
 	    dladm_status2str(status, errmsg));
-	if (status == DLADM_STATUS_TIMEDOUT && reqlan->bssid != NULL) {
+	if (status == DLADM_STATUS_TIMEDOUT && reqlan->bssid[0] != '\0') {
 		syslog(LOG_INFO, "connect_chosen_lan: failed for (%s, %s), "
 		    "trying again with just (%s)",
 		    reqlan->essid, reqlan->bssid, reqlan->essid);
 		attr.wa_valid &= ~DLADM_WLAN_ATTR_BSSID;
 		flags = 0;
-		status = dladm_wlan_connect(intf->if_linkid, &attr, timeout,
+		status = dladm_wlan_connect(wip->wi_linkid, &attr, timeout,
 		    key, keycount, flags);
 	}
-	if (status != DLADM_STATUS_OK) {
+	if (status == DLADM_STATUS_OK) {
+		return (SUCCESS);
+	} else {
 		syslog(LOG_ERR,
 		    "connect_chosen_lan: connect to '%s' failed on '%s': %s",
-		    reqlan->essid, intf->if_name,
+		    reqlan->essid, wip->wi_name,
 		    dladm_status2str(status, errmsg));
-		return (B_FALSE);
+		return (FAILURE);
 	}
-	return (B_TRUE);
 }
 
 /*
  * First attempt to connect to the network specified by essid.
  * If that fails, attempt to connect using autoconf.
  */
-static boolean_t
-connect_or_autoconf(struct wireless_lan *reqlan, struct interface *intf)
+static return_vals_t
+connect_or_autoconf(struct wireless_lan *reqlan, wireless_if_t *wip)
 {
-	if (!connect_chosen_lan(reqlan, intf)) {
+	return_vals_t rval;
+
+	rval = connect_chosen_lan(reqlan, wip);
+	if (rval == FAILURE) {
+		report_wlan_connect_fail(wip->wi_name);
+		reqlan->rescan = B_TRUE;
 		syslog(LOG_WARNING,
 		    "Could not connect to chosen WLAN %s, going to auto-conf",
 		    reqlan->essid);
-		return (wlan_autoconf(intf));
+		rval = (wlan_autoconf(wip) ? SUCCESS : FAILURE);
 	}
-	return (B_TRUE);
+	return (rval);
 }
 
 /*
- * The +1 is for the extra "compare" row, the 24 is for the font spacing
- * and the 125 if extra for the buttons et al.
+ * Check that the wireless LAN is connected to the desired ESSID/BSSID.  This
+ * is used by the GUI to check for connectivity before doing anything
+ * destructive.
  */
-static int
-zenity_height(int rows)
+boolean_t
+check_wlan_connected(const char *ifname, const char *essid, const char *bssid)
 {
-	return (((rows + 1) * 24) + 125);
+	wireless_if_t *wip;
+	boolean_t retv;
+
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		return (B_FALSE);
+
+	if ((wip = find_wireless_if(ifname)) == NULL) {
+		retv = B_FALSE;
+	} else {
+		if (essid[0] == '\0' && bssid[0] == '\0')
+			essid = NULL;
+		retv = check_wlan(wip, essid, bssid, B_FALSE);
+	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	return (retv);
 }
 
 /*
- * Construct an arg vector for zenity which displays a list of wlans.
- * Additional options may be added at the end of the list of wlans with
- * the "extra_rows" arg.
- *
- * Parameters include:
- *	lanlist: a linked list of wlans; one row per list node.
- *	nlans: the number of nodes in lanlist.
- *	title: the string that should be the zenity window title.
- *	width: the width of the zenity window.
- *	extra_rows: pointer to an array of strings; each string will
- *	    appear on its own row in the table, in the first column
- *	    of that row.
- *	nrows: the number of extra row strings.
- *
- * A pointer to the arg vector is returned; the caller must free that
- * memory using free_argv().
+ * This is the entry point for GUI "select access point" requests.  We attempt
+ * to do what the GUI requested.  If we fail, then there will be a new request
+ * enqueued for the GUI to act on.
+ * Returns:
+ *	0	- ok (or more data requested with new event)
+ *	ENXIO	- no such interface
+ *	ENODEV	- requested access point unknown
+ *	EINVAL	- failed to perform requested action
  */
-static char **
-build_wlanlist_zargv(const struct wireless_lan *lanlist, int nlans,
-    const char *title, int width, const char **extra_rows, int nrows)
+int
+set_specific_lan(const char *ifname, const char *essid, const char *bssid)
 {
-	int cur, i, j;
-	int zargc, hdrargc, wlanargc;
-	char **zargv;
+	libnwam_interface_type_t ift;
+	wireless_if_t *wip;
+	struct wireless_lan *wlan, local_wlan;
+	int retv;
+	boolean_t key_wait = B_FALSE;
+
+	ift = get_if_type(ifname);
+	if (ift != IF_UNKNOWN && ift != IF_WIRELESS)
+		return (EINVAL);
+
+	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0)
+		return (retv);
+
+	if ((wip = find_wireless_if(ifname)) == NULL) {
+		retv = ENXIO;
+		goto done;
+	}
+
+	/* This is an autoconf request. */
+	if (essid[0] == '\0' && bssid[0] == '\0') {
+		retv = (wlan_autoconf(wip) ? 0 : EINVAL);
+		goto done;
+	}
+
+	if ((wlan = find_wlan_entry(ifname, essid, bssid)) == NULL) {
+		local_wlan.essid = (char *)essid;
+		local_wlan.bssid = (char *)bssid;
+		wlan = &local_wlan;
+	}
+
+	retv = 0;
 
 	/*
-	 * There are three sections of arguments: the initial args, specifying
-	 * general formatting info; the column titles (one arg per column);
-	 * and the row data (one row per wlan, plus any extra rows; and one
-	 * arg per column per row).
+	 * now attempt to connect to selection
 	 */
-	hdrargc = ZENITY_LIST_INIT_ARGS + ZENITY_COLUMNS_PER_WLAN;
-	wlanargc = (nlans + nrows) * ZENITY_COLUMNS_PER_WLAN;
-	zargc = hdrargc + wlanargc;
-	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL)
-		return (NULL);
-
-	/* initial args */
-	cur = 0;
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--list");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s", title);
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--height=%d",
-	    zenity_height(nlans + nrows));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--width=%d", width);
-
-	/* column titles */
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=#");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=ESSID");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=BSSID");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=%s",
-	    gettext("Encryption"));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=%s",
-	    gettext("Signal"));
-
-	/* wlan rows */
-	for (i = 0; i < nlans; i++) {
-		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%d", i + 1);
-		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
-		    lanlist[i].essid);
-		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
-		    lanlist[i].bssid);
-		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
-		    WLAN_ENC(lanlist[i].sec_mode));
-		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
-		    lanlist[i].signal_strength);
-	}
-
-	/* extra rows */
-	for (i = 0; i < nrows; i++) {
-		/* all columns are empty except the first */
-		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, extra_rows[i]);
-		for (j = 0; j < ZENITY_COLUMNS_PER_WLAN - 1; j++)
-			*zargv[cur++] = '\0';
-	}
-
-	return (zargv);
-}
-
-static return_vals_t
-connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
-    struct interface *intf)
-{
-	int i, dlist_cnt;
-	int rtn;
-	char **zargv;
-	const char *title = gettext("Choose WiFi network you wish to activate");
-	const char *extra_rows[2];
-	struct wireless_lan *dlist, *reqlan;
-	boolean_t autoconf = B_FALSE;
-
-	dprintf("connect_to_new_wlan(..., %d, %s)", nlans, intf->if_name);
-
-	if (nlans == 0) {
-		display(gettext("No Wifi networks found; continuing in case "
-		    "you know of any which do not broadcast."));
-	}
-
-	/* build list of wlans to be displayed */
-	if ((dlist = calloc(nlans, sizeof (struct wireless_lan))) == NULL)
-		return (FAILURE);
-
-	for (i = 0, dlist_cnt = 0; i < nlans; i++) {
-		if ((lanlist[i].essid == NULL) || (lanlist[i].bssid == NULL)) {
-			syslog(LOG_WARNING, "wifi list entry %d broken: "
-			    "essid %s, bssid %s; ignoring", i,
-			    STRING(lanlist[i].essid), STRING(lanlist[i].bssid));
-			continue;
-		}
-		/*
-		 * Only use the interface which finds the AP to connect to it.
-		 */
-		if (strcmp(lanlist[i].wl_if_name, intf->if_name) != 0) {
-			dprintf("connect_to_new_wlan: wrong interface (%s) for "
-			    "%s (should be %s)", intf->if_name,
-			    lanlist[i].essid, lanlist[i].wl_if_name);
-			continue;
-		}
-
-		dlist[dlist_cnt++] = lanlist[i];
-	}
-
-	extra_rows[0] = gettext("Other");
-	extra_rows[1] = gettext("Rescan");
-	/* width = 500 is the result of trial-and-error testing */
-	zargv = build_wlanlist_zargv(dlist, dlist_cnt, title, 500, extra_rows,
-	    sizeof (extra_rows) / sizeof (extra_rows[0]));
-	if (zargv == NULL) {
-		free(dlist);
-		return (FAILURE);
-	}
-
-	/* present list to user and get selection */
-	rtn = get_user_preference(zargv, extra_rows[0], extra_rows[1],
-	    &reqlan, dlist);
-	switch (rtn) {
-	case 1:
-		/* user chose "other"; pop-up for specific essid */
-		reqlan = get_specific_lan();
+	switch (connect_chosen_lan(wlan, wip)) {
+	case WAITING:
+		key_wait = B_TRUE;
 		break;
-	case 2:
-		/* user chose "Rescan" */
-		(void) scan_wireless_nets(intf);
-		rtn = TRY_AGAIN;
-		goto cleanup;
-	case -1:
-		reqlan = NULL;
-		break;
-	default:
-		/* common case: reqlan was set in get_user_preference() */
-		break;
-	}
 
-	if ((reqlan == NULL) || (reqlan->essid == NULL)) {
-		dprintf("did not get user preference; attempting autoconf");
-		rtn = wlan_autoconf(intf) ? SUCCESS : FAILURE;
-		goto cleanup;
-	}
-	dprintf("get_user_preference() returned essid %s, bssid %s, encr %s",
-	    reqlan->essid, STRING(reqlan->bssid),
-	    WLAN_ENC(reqlan->sec_mode));
-
-	/* set key before first time connection */
-	if (NEED_ENC(reqlan->sec_mode) && reqlan->raw_key == NULL &&
-	    reqlan->cooked_key == NULL)
-		get_user_key(reqlan);
-
-	/*
-	 * now attempt to connect to selection, backing
-	 * off to autoconf if the connect fails
-	 */
-	if (connect_chosen_lan(reqlan, intf)) {
+	case SUCCESS:
 		/*
 		 * Succeeded, so add entry to known_essid_list_file;
-		 * but first make sure the reqlan->bssid isn't empty.
+		 * but first make sure the wlan->bssid isn't empty.
+		 * Note that empty bssid is never allocated.
 		 */
-		if (reqlan->bssid == NULL) {
+		if (wlan->bssid[0] == '\0') {
 			dladm_status_t		status;
 			dladm_wlan_linkattr_t	attr;
-			char			bssid[DLADM_STRSIZE];
+			char			lclbssid[DLADM_STRSIZE];
 
-			status = dladm_wlan_get_linkattr(intf->if_linkid,
+			status = dladm_wlan_get_linkattr(wip->wi_linkid,
 			    &attr);
 
 			if (status == DLADM_STATUS_OK) {
 				(void) dladm_wlan_bssid2str(
-				    &attr.la_wlan_attr.wa_bssid, bssid);
-				reqlan->bssid = strdup(bssid);
+				    &attr.la_wlan_attr.wa_bssid, lclbssid);
+				wlan->bssid = strdup(lclbssid);
 			} else {
 				dprintf("failed to get linkattr after "
-				    "connecting to %s", reqlan->essid);
+				    "connecting to %s", wlan->essid);
 			}
 		}
-		update_known_wifi_nets_file(reqlan->essid, reqlan->bssid);
-	} else {
-		/* failed to connect; try auto-conf */
-		syslog(LOG_WARNING, "Could not connect to chosen WLAN "
-		    "%s; going to auto-conf", reqlan->essid);
-		autoconf = B_TRUE;
-	}
-	free_wireless_lan(reqlan);
-
-	if (autoconf)
-		rtn = wlan_autoconf(intf) ? SUCCESS : FAILURE;
-	else
-		rtn = SUCCESS;
-
-cleanup:
-	free_argv(zargv);
-	free(dlist);
-
-	return (rtn);
-}
-
-struct wireless_lan *
-prompt_for_visited(void)
-{
-	int dlist_cnt;
-	char **zargv;
-	const char *title = gettext("Choose from pre-visited WiFi network");
-	const char *extra_rows[1];
-	struct wireless_lan *req_conf, *dlist;
-	struct visited_wlans *vlp;
-	struct wireless_lan *wlp;
-
-	/* build list of wlans to be displayed */
-	dlist = calloc(visited_wlan_list->total, sizeof (struct wireless_lan));
-	if (dlist == NULL) {
-		syslog(LOG_ERR, "prompt_for_visited: calloc failed");
-		return (NULL);
-	}
-	dlist_cnt = 0;
-	for (vlp = visited_wlan_list->head; vlp != NULL; vlp = vlp->next) {
-		wlp = vlp->wifi_net;
-		if (wlp->essid == NULL || wlp->bssid == NULL) {
-			dprintf("Invalid essid/bssid values");
-			continue;
+		if (wlan->bssid != NULL && wlan->bssid[0] != '\0') {
+			wlan->known = B_TRUE;
+			(void) add_known_wifi_nets_file(wlan->essid,
+			    wlan->bssid);
+			if (wlan == &local_wlan && local_wlan.bssid != bssid)
+				free(local_wlan.bssid);
+		} else {
+			/* Don't leave it as NULL (for simplicity) */
+			wlan->bssid = "";
+			retv = EINVAL;
 		}
-		dlist[dlist_cnt++] = *wlp;
+		break;
+
+	default:
+		retv = EINVAL;
+		break;
 	}
 
-	extra_rows[0] = gettext("Select from all available WiFi networks");
-	/* width = 670 is the result of trial-and-error testing */
-	zargv = build_wlanlist_zargv(dlist, dlist_cnt, title, 670, extra_rows,
-	    sizeof (extra_rows) / sizeof (extra_rows[0]));
-	if (zargv == NULL) {
-		free(dlist);
-		return (NULL);
+done:
+	if (retv == 0 && !update_connected_wlan(wip))
+		retv = EINVAL;
+	if (retv != 0) {
+		/*
+		 * Failed to connect.  Set 'rescan' flag so that we treat this
+		 * AP as new if it's seen again, because the wireless radio may
+		 * have just been off briefly while we were trying to connect.
+		 */
+		syslog(LOG_WARNING, "Could not connect to chosen WLAN %s",
+		    wlan->essid);
+		report_wlan_connect_fail(ifname);
+		wip->wi_need_key = B_FALSE;
+		wip->wi_wireless_done = B_FALSE;
+		wlan->rescan = B_TRUE;
 	}
+	(void) pthread_mutex_unlock(&wifi_mutex);
 
 	/*
-	 * If the user doesn't make a choice or something goes wrong
-	 * (get_user_preference() returned -1), or if the user chooses
-	 * the "select from all available" string (get_user_preference()
-	 * returned 1), we simply return NULL: there was no selection
-	 * made from the visited list.  If the user *did* make a choice
-	 * (get_user_preference() returned 0), return the alloc'd struct.
+	 * If this is the selected profile, then go ahead and bring up IP now.
 	 */
-	if (get_user_preference(zargv, extra_rows[0], NULL, &req_conf,
-	    dlist) != 0)
-		req_conf = NULL;
+	if (retv == 0 && !key_wait)
+		(void) np_queue_add_event(EV_RESELECT, ifname);
+	return (retv);
+}
 
-	free(dlist);
-	free_argv(zargv);
-	return (req_conf);
+int
+set_wlan_key(const char *ifname, const char *essid, const char *bssid,
+    const char *key)
+{
+	libnwam_interface_type_t ift;
+	struct wireless_lan *wlan;
+	int retv;
+
+	ift = get_if_type(ifname);
+	if (ift == IF_UNKNOWN)
+		return (ENXIO);
+	if (ift != IF_WIRELESS)
+		return (EINVAL);
+
+	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0)
+		return (retv);
+
+	if ((wlan = find_wlan_entry(ifname, essid, bssid)) == NULL)
+		retv = ENODEV;
+	else if ((wlan->raw_key = strdup(key)) == NULL)
+		retv = ENOMEM;
+	else if (store_key(wlan) != 0)
+		retv = EINVAL;
+	else
+		retv = 0;
+	(void) pthread_mutex_unlock(&wifi_mutex);
+
+	if (retv == 0)
+		retv = set_specific_lan(ifname, essid, bssid);
+
+	return (retv);
 }
 
 static boolean_t
-wlan_autoconf(struct interface *intf)
+wlan_autoconf(const wireless_if_t *wip)
 {
 	dladm_status_t status;
 	boolean_t autoconf;
@@ -1407,7 +1760,7 @@ wlan_autoconf(struct interface *intf)
 	}
 
 	/* If the NIC is already associated with something, just return. */
-	if (check_wlan(intf, NULL))
+	if (check_wlan(wip, NULL, NULL, B_TRUE))
 		return (B_TRUE);
 
 	/*
@@ -1415,348 +1768,75 @@ wlan_autoconf(struct interface *intf)
 	 * to cycle through WLANs detected in priority order, attempting
 	 * to connect.
 	 */
-	status = dladm_wlan_connect(intf->if_linkid, NULL,
+	status = dladm_wlan_connect(wip->wi_linkid, NULL,
 	    DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT, NULL, 0, 0);
 	if (status != DLADM_STATUS_OK) {
 		char errmsg[DLADM_STRSIZE];
 
 		syslog(LOG_ERR,
 		    "wlan_autoconf: dladm_wlan_connect failed for '%s': %s",
-		    intf->if_name, dladm_status2str(status, errmsg));
+		    wip->wi_name, dladm_status2str(status, errmsg));
 		return (B_FALSE);
 	}
 	return (B_TRUE);
 }
 
 /*
- * Returns:
- * B_TRUE if this info is already in visited_wlan_list
- * B_FALSE if not
- */
-static boolean_t
-already_in_visited_wlan_list(const struct wireless_lan *new_wlan)
-{
-	struct visited_wlans *vwlp;
-
-	vwlp = visited_wlan_list->head;
-	while (vwlp != NULL && vwlp->wifi_net != NULL) {
-		if (strcmp(vwlp->wifi_net->essid, new_wlan->essid) == 0) {
-			dprintf("%s already in visited_wlan_list",
-			    vwlp->wifi_net->essid);
-			return (B_TRUE);
-		} else {
-			vwlp = vwlp->next;
-		}
-	}
-	return (B_FALSE);
-}
-
-static char *
-get_zenity_response(char *const *zargv)
-{
-	int pfds[2];
-	pid_t pid;
-	int status, i;
-	char inbuf[ZENITY_RTN_BUF_SIZE];
-	ssize_t n, bytes_read;
-	char *rtnp = NULL;
-
-	if (!valid_graphical_user(B_TRUE))
-		return (NULL);
-
-	if (pipe(pfds) < 0) {
-		syslog(LOG_ERR, "pipe() failed: %m");
-		return (NULL);
-	}
-	if ((pid = fork()) < 0) {
-		syslog(LOG_ERR, "fork() failed: %m");
-		return (NULL);
-	} else if (pid == 0) {
-		/*
-		 * child: close read side of pipe, point stdout at write side
-		 */
-		(void) close(pfds[0]);
-		if (dup2(pfds[1], STDOUT_FILENO) < 0) {
-			syslog(LOG_ERR, "dup2() failed: %m");
-			_exit(EXIT_FAILURE);
-		}
-		(void) close(pfds[1]);
-		(void) execv(ZENITY, zargv);
-		syslog(LOG_ERR, "execv() failed: %m");
-		_exit(EXIT_FAILURE);
-	} else {
-		/*
-		 * parent: close write side of pipe, read from read side
-		 * to get zenity output from child.
-		 */
-		(void) close(pfds[1]);
-		(void) waitpid(pid, &status, 0);
-		if (WIFSIGNALED(status) || WIFSTOPPED(status)) {
-			i = WIFSIGNALED(status) ? WTERMSIG(status) :
-			    WSTOPSIG(status);
-			syslog(LOG_ERR, "%s %s with signal %d (%s)",
-			    ZENITY, (WIFSIGNALED(status) ? "terminated" :
-			    "stopped"), i, strsignal(i));
-			return (NULL);
-		}
-		bytes_read = 0;
-		do {
-			n = read(pfds[0], inbuf + bytes_read,
-			    sizeof (inbuf) - bytes_read);
-			if (n < 0) {
-				if (errno != EINTR) {
-					syslog(LOG_ERR, "read() failed: %m");
-					break;
-				}
-			} else {
-				bytes_read += n;
-			}
-			if (bytes_read == sizeof (inbuf)) {
-				bytes_read--;
-				syslog(LOG_WARNING, "get_zenity_response: too "
-				    "much data; input read will be limited to "
-				    "%d bytes", bytes_read);
-				break;
-			}
-		} while (n != 0);
-		(void) close(pfds[0]);
-		if (bytes_read == 0) {
-			syslog(LOG_ERR, "failed to read zenity output");
-			return (NULL);
-		}
-		if (inbuf[bytes_read - 1] == '\n')
-			inbuf[bytes_read - 1] = '\0';
-		else
-			inbuf[bytes_read] = '\0';
-
-		if ((rtnp = strdup(inbuf)) == NULL)
-			syslog(LOG_ERR, "get_zenity_response: strdup failed");
-	}
-
-	return (rtnp);
-}
-
-/*
- * get_user_preference():  Present a list of essid/bssid pairs to the
- * user via zenity (passed in in a pre-formatted zenity string in the
- * param cmd).  If there's a final list item ("Other", "Select from
- * full list", etc.) that may be selected and should be differentiated,
- * that item should be passed in in compare param.
+ * This function searches through the wlans[] array and determines which ones
+ * have been visited before.
  *
- * Four possible return values:
- * -1: No response from user, or other error.  *req_lan is undefined.
- *  0: essid/bssid pair was selected.  *req_lan has these values in
- *     a malloc'd buffer, which the caller is responsible for freeing.
- *  1: a compare string ("Other") was given, and the user response matched
- *     that string.  *req_lan is undefined.
- *  2: a compare string ("Rescan") was given, and the user response matched
- *     that string.  *req_lan is undefined.
+ * If exactly one has been visited before, and it has the highest signal
+ * strength, then we attempt to connect to it right away.
+ *
+ * In all other cases -- if none have been visited before, or more than one was
+ * visited, or if the one that was visited doesn't have the highest signal
+ * strength, or if the automatic connect attempt fails for any reason -- then
+ * we hand over the data to the GUI for resolution.  The user will have to be
+ * prompted for a choice.
+ *
+ * If no GUI exists, we'll get back FAILURE (instead of WAITING), which will
+ * cause the autoconf mechanism to run instead.
  */
-static int
-get_user_preference(char *const *zargv, const char *compare_other,
-    const char *compare_rescan, struct wireless_lan **req_lan,
-    const struct wireless_lan *list)
+return_vals_t
+handle_wireless_lan(const char *ifname)
 {
-	char *response;
-	struct wireless_lan *wlp;
-	const struct wireless_lan *sel;
-	int answer;
-
-	assert(req_lan != NULL);
-	wlp = calloc(1, sizeof (struct wireless_lan));
-	if (wlp == NULL) {
-		syslog(LOG_ERR, "calloc failed");
-		return (-1);
-	}
-
-	response = get_zenity_response(zargv);
-	if (response == NULL) {
-		free(wlp);
-		return (-1);
-	}
-	if (compare_other != NULL && strcmp(response, compare_other) == 0) {
-		free(response);
-		free(wlp);
-		return (1);
-	}
-	if (compare_rescan != NULL && strcmp(response, compare_rescan) == 0) {
-		free(response);
-		free(wlp);
-		return (2);
-	}
-	answer = atoi(response);
-	if (answer <= 0) {
-		dprintf("%s returned invalid string", ZENITY);
-		free(response);
-		free(wlp);
-		return (-1);
-	}
-	sel = &list[answer - 1];
-
-	if ((wlp->essid = strdup(sel->essid)) == NULL)
-		goto dup_error;
-
-	if ((sel->bssid != NULL) && ((wlp->bssid = strdup(sel->bssid)) == NULL))
-		goto dup_error;
-
-	wlp->sec_mode = sel->sec_mode;
-
-	if ((sel->raw_key != NULL) &&
-	    ((wlp->raw_key = strdup(sel->raw_key)) == NULL))
-		goto dup_error;
-
-	if (sel->cooked_key != NULL) {
-		wlp->cooked_key = malloc(sizeof (dladm_wlan_key_t));
-		if (wlp->cooked_key == NULL)
-			goto dup_error;
-		*(wlp->cooked_key) = *(sel->cooked_key);
-	}
-
-	if ((sel->signal_strength != NULL) &&
-	    ((wlp->signal_strength = strdup(sel->signal_strength)) == NULL))
-		goto dup_error;
-
-	if ((sel->wl_if_name != NULL) &&
-	    ((wlp->wl_if_name = strdup(sel->wl_if_name)) == NULL))
-		goto dup_error;
-
-	dprintf("selected: %s, %s, %s, '%s', %s", wlp->essid,
-	    STRING(wlp->bssid), WLAN_ENC(wlp->sec_mode),
-	    STRING(wlp->signal_strength), STRING(wlp->wl_if_name));
-
-	free(response);
-
-	*req_lan = wlp;
-	return (0);
-
-dup_error:
-	syslog(LOG_ERR, "get_user_preference: strdup failed");
-	free_wireless_lan(wlp);
-	free(wlp);
-	free(response);
-	return (-1);
-}
-
-/*
- * Returns a pointer to an alloc'd struct wireless lan if a response
- * is received from the user; only the essid will be valid in this
- * case.  If no response received, or other failure, returns NULL.
- */
-static struct wireless_lan *
-get_specific_lan(void)
-{
-	int zargc, cur;
-	char **zargv;
-	char *response;
-	struct wireless_lan *wlp = NULL;
-
-	/*
-	 * build zenity 'entry' argv to get an ESSID:
-	 *	'zenity --entry --title=foo --text=bar'
-	 * Four args needed.
-	 */
-	zargc = 4;
-	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL)
-		return (NULL);
-
-	cur = 0;
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--entry");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s",
-	    gettext("Specify WiFi Network"));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--text=%s %s",
-	    gettext("Enter"), "ESSID");
-
-	response = get_zenity_response(zargv);
-	if (response == NULL)
-		goto cleanup;
-	free_argv(zargv);
-
-	wlp = calloc(1, sizeof (struct wireless_lan));
-	if (wlp == NULL) {
-		syslog(LOG_ERR, "calloc failed: %m");
-		goto cleanup;
-	}
-	wlp->essid = response;
-	wlp->sec_mode = DLADM_WLAN_SECMODE_NONE;
-
-	/*
-	 * build zenity 'list' argv to get security mode:
-	 *	'zenity --list --title=foo --text=bar --column=baz <3 modes>'
-	 * Eight args needed.
-	 */
-	zargc = 8;
-	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL) {
-		/* assume the default security mode, "none" */
-		return (wlp);
-	}
-
-	cur = 0;
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--list");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s",
-	    gettext("Security"));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--text=%s",
-	    gettext("Enter security mode"));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=%s",
-	    gettext("Type"));
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "None");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "WEP");
-	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "WPA");
-
-	response = get_zenity_response(zargv);
-	/* "none" was set as the default earlier */
-	if (response != NULL) {
-		if (strcmp(response, "WEP") == 0)
-			wlp->sec_mode = DLADM_WLAN_SECMODE_WEP;
-		else if (strcmp(response, "WPA") == 0)
-			wlp->sec_mode = DLADM_WLAN_SECMODE_WPA;
-	}
-cleanup:
-	free_argv(zargv);
-	free(response);
-
-	return (wlp);
-}
-
-/*
- * Returns:
- * B_TRUE if things go well
- * B_FALSE if we were unable to connect to anything
- */
-boolean_t
-handle_wireless_lan(struct interface *intf)
-{
-	const struct wireless_lan *cur_wlans;
-	int i, num_wlans;
-	struct wireless_lan *req_conf = NULL;
-	boolean_t result;
+	wireless_if_t *wip;
+	struct wireless_lan *cur_wlan, *max_wlan;
+	struct wireless_lan *most_recent;
+	boolean_t many_present;
 	dladm_wlan_strength_t strongest = DLADM_WLAN_STRENGTH_VERY_WEAK;
-	dladm_wlan_strength_t strength;
 	return_vals_t connect_result;
-
-start_over:
-	if (visited_wlan_list == NULL) {
-		if ((visited_wlan_list = calloc(1,
-		    sizeof (struct visited_wlans_list))) == NULL) {
-			syslog(LOG_ERR, "handle_wireless_lan: calloc failed");
-			return (B_FALSE);
-		}
-	}
 
 	/*
 	 * We wait while a scan is in progress.  Since we allow a user
 	 * to initiate a re-scan, we can proceed even when no scan
 	 * has been done to fill in the AP list.
 	 */
-	(void) pthread_mutex_lock(&wifi_init_mutex);
-	while (wifi_scan_intf != NULL)
+	if (pthread_mutex_lock(&wifi_init_mutex) != 0)
+		return (FAILURE);
+	while (wifi_scan_intf[0] != '\0')
 		(void) pthread_cond_wait(&wifi_init_cond, &wifi_init_mutex);
 	(void) pthread_mutex_unlock(&wifi_init_mutex);
 
-	(void) pthread_mutex_lock(&wifi_mutex);
-	num_wlans = wireless_lan_used;
-	cur_wlans = wlans;
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		return (FAILURE);
+
+	if ((wip = find_wireless_if(ifname)) == NULL) {
+		connect_result = FAILURE;
+		goto finished;
+	}
+
+	if (wip->wi_wireless_done) {
+		dprintf("handle_wireless_lan: skipping policy scan; done");
+		connect_result = SUCCESS;
+		goto finished;
+	}
+
+	dprintf("handle_wireless_lan: starting policy scan");
+	cur_wlan = wlans;
+	max_wlan = wlans + wireless_lan_used;
+	most_recent = NULL;
+	many_present = B_FALSE;
 
 	/*
 	 * Try to see if any of the wifi nets currently available
@@ -1765,140 +1845,143 @@ start_over:
 	 * all the applicable previously wifi nets, and ask which
 	 * one to connect to.
 	 */
-	for (i = 0; i < num_wlans; i++) {
-		struct visited_wlans *new_wlan;
-
+	for (; cur_wlan < max_wlan; cur_wlan++) {
 		/* Find the AP with the highest signal. */
-		if (dladm_wlan_str2strength(cur_wlans[i].signal_strength,
-		    &strength) != DLADM_STATUS_OK) {
-			continue;
-		}
-		if (strength > strongest)
-			strongest = strength;
+		if (cur_wlan->attrs.wa_strength > strongest)
+			strongest = cur_wlan->attrs.wa_strength;
 
-		if (!known_wifi_nets_lookup(cur_wlans[i].essid,
-		    cur_wlans[i].bssid, NULL))
-			continue;
+		if (known_wifi_nets_lookup(cur_wlan->essid, cur_wlan->bssid,
+		    NULL))
+			cur_wlan->known = B_TRUE;
 
-		if (already_in_visited_wlan_list(&cur_wlans[i])) {
-			/* don't have to add it again */
-			continue;
-		}
-
-		/* add this to the visited_wlan_list */
-		dprintf("adding essid %s, bssid %s to visited list",
-		    cur_wlans[i].essid, STRING(cur_wlans[i].bssid));
-
-		new_wlan = calloc(1, sizeof (struct visited_wlans));
-		if (new_wlan == NULL) {
-			syslog(LOG_ERR, "handle_wireless_lan: calloc failed");
-			result = B_FALSE;
-			connect_result = FAILURE;
-			goto all_done;
-		}
-		new_wlan->wifi_net = calloc(1, sizeof (struct wireless_lan));
-		if (new_wlan->wifi_net == NULL) {
-			free(new_wlan);
-			syslog(LOG_ERR, "handle_wireless_lan: calloc failed");
-			result = B_FALSE;
-			connect_result = FAILURE;
-			goto all_done;
-		}
-		new_wlan->wifi_net->essid = strdup(cur_wlans[i].essid);
-		new_wlan->wifi_net->bssid = strdup(cur_wlans[i].bssid);
-		new_wlan->wifi_net->raw_key = NULL;
-		new_wlan->wifi_net->cooked_key = NULL;
-		new_wlan->wifi_net->sec_mode = cur_wlans[i].sec_mode;
-		new_wlan->wifi_net->signal_strength =
-		    strdup(cur_wlans[i].signal_strength);
-		new_wlan->wifi_net->wl_if_name =
-		    strdup(cur_wlans[i].wl_if_name);
-		if (new_wlan->wifi_net->essid == NULL ||
-		    new_wlan->wifi_net->bssid == NULL ||
-		    new_wlan->wifi_net->signal_strength == NULL ||
-		    new_wlan->wifi_net->wl_if_name == NULL) {
-			syslog(LOG_ERR, "handle_wireless_lan: strdup failed");
-			free_wireless_lan(new_wlan->wifi_net);
-			free(new_wlan->wifi_net);
-			free(new_wlan);
-			result = B_FALSE;
-			connect_result = FAILURE;
-			goto all_done;
-		}
-
-		new_wlan->next = visited_wlan_list->head;
-		visited_wlan_list->head = new_wlan;
-		visited_wlan_list->total++;
-	}
-
-	if (visited_wlan_list->total == 1) {
-		struct wireless_lan *target = visited_wlan_list->head->wifi_net;
-
-		/*
-		 * only one previously visited wifi net, connect to it
-		 * (falling back to autoconf if the connect fails) if there
-		 * is no AP with a better signal strength.
-		 */
-		if (dladm_wlan_str2strength(target->signal_strength,
-		    &strength) == DLADM_STATUS_OK) {
-			if (strength < strongest)
-				goto connect_any;
-		}
-		result = connect_or_autoconf(target, intf);
-		connect_result = result ? SUCCESS : FAILURE;
-
-	} else if (visited_wlan_list->total > 1) {
-		/*
-		 * more than one previously visited wifi nets seen.
-		 * prompt user for which one should we connect to
-		 */
-		if ((req_conf = prompt_for_visited()) != NULL) {
-			result = connect_or_autoconf(req_conf, intf);
-			connect_result = result ? SUCCESS : FAILURE;
-		} else {
+		if (cur_wlan->known || cur_wlan->connected) {
 			/*
-			 * The user didn't make a choice; offer the full list.
+			 * The ESSID comparison here mimics what the "already
+			 * in visited wlan list" function once did, but
+			 * slightly better as we also pay attention to signal
+			 * strength to pick the best of the duplicates.
 			 */
-			connect_result = connect_to_new_wlan(cur_wlans,
-			    num_wlans, intf);
-			result = (connect_result == SUCCESS);
-		}
-	} else {
-connect_any:
-		/* last case, no previously visited wlan found */
-		connect_result = connect_to_new_wlan(cur_wlans, num_wlans,
-		    intf);
-		result = (connect_result == SUCCESS);
-	}
-
-all_done:
-	/*
-	 * We locked down the list above; free it now that we're done.
-	 */
-	(void) pthread_mutex_unlock(&wifi_mutex);
-	if (visited_wlan_list != NULL) {
-		struct visited_wlans *vwlp = visited_wlan_list->head, *next;
-
-		for (; vwlp != NULL; vwlp = next) {
-			if (vwlp->wifi_net != NULL) {
-				free_wireless_lan(vwlp->wifi_net);
-				free(vwlp->wifi_net);
-				vwlp->wifi_net = NULL;
+			if (most_recent == NULL) {
+				most_recent = cur_wlan;
+			} else if (strcmp(cur_wlan->essid,
+			    most_recent->essid) != 0) {
+				many_present = B_TRUE;
+			} else if (cur_wlan->attrs.wa_strength >
+			    most_recent->attrs.wa_strength) {
+				if (most_recent->connected) {
+					(void) dladm_wlan_disconnect(
+					    wip->wi_linkid);
+					most_recent->connected = B_FALSE;
+					report_wlan_disconnect(most_recent);
+					wip->wi_wireless_done = B_FALSE;
+				}
+				most_recent = cur_wlan;
 			}
-			next = vwlp->next;
-			free(vwlp);
 		}
-		free(visited_wlan_list);
-		visited_wlan_list = NULL;
+
+		/* Reset any security information we may have had. */
+		free(cur_wlan->raw_key);
+		cur_wlan->raw_key = NULL;
+		free(cur_wlan->cooked_key);
+		cur_wlan->cooked_key = NULL;
 	}
-	if (req_conf != NULL) {
-		free_wireless_lan(req_conf);
-		free(req_conf);
-		req_conf = NULL;
+
+	if (most_recent != NULL && !many_present &&
+	    most_recent->attrs.wa_strength >= strongest) {
+		if (most_recent->connected) {
+			dprintf("%s already connected to %s", ifname,
+			    most_recent->essid);
+			connect_result = SUCCESS;
+		} else {
+			dprintf("%s auto-connect to %s", ifname,
+			    most_recent->essid);
+			connect_result = connect_or_autoconf(most_recent, wip);
+		}
+	} else if (request_wlan_selection(ifname, wlans, wireless_lan_used)) {
+		dprintf("%s is unknown and not connected; requested help",
+		    ifname);
+		connect_result = WAITING;
+	} else {
+		dprintf("%s has no connected AP or GUI; try auto", ifname);
+		connect_result = wlan_autoconf(wip) ? SUCCESS : FAILURE;
 	}
-	if (connect_result == TRY_AGAIN) {
-		dprintf("end of handle_wireless_lan() TRY_AGAIN");
-		goto start_over;
+
+finished:
+	if (connect_result == SUCCESS && !update_connected_wlan(wip))
+		connect_result = FAILURE;
+	(void) pthread_mutex_unlock(&wifi_mutex);
+
+	return (connect_result);
+}
+
+void
+disconnect_wlan(const char *ifname)
+{
+	wireless_if_t *wip;
+	struct wireless_lan *wlan;
+
+	if (pthread_mutex_lock(&wifi_mutex) == 0) {
+		if ((wip = find_wireless_if(ifname)) != NULL) {
+			wip->wi_wireless_done = B_FALSE;
+			wip->wi_need_key = B_FALSE;
+			(void) dladm_wlan_disconnect(wip->wi_linkid);
+		}
+		for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
+			if (strcmp(ifname, wlan->wl_if_name) == 0 &&
+			    wlan->connected) {
+				wlan->connected = B_FALSE;
+				report_wlan_disconnect(wlan);
+			}
+		}
+		(void) pthread_mutex_unlock(&wifi_mutex);
 	}
-	return (result);
+}
+
+void
+get_wireless_state(const char *ifname, boolean_t *need_wlan,
+    boolean_t *need_key)
+{
+	wireless_if_t *wip;
+
+	*need_wlan = *need_key = B_FALSE;
+	if (pthread_mutex_lock(&wifi_mutex) == 0) {
+		if ((wip = find_wireless_if(ifname)) != NULL) {
+			*need_key = wip->wi_need_key;
+			if (!wip->wi_need_key && !wip->wi_wireless_done)
+				*need_wlan = B_TRUE;
+		}
+		(void) pthread_mutex_unlock(&wifi_mutex);
+	}
+}
+
+void
+print_wireless_status(void)
+{
+	wireless_if_t *wip;
+	struct wireless_lan *wlan;
+
+	if (pthread_mutex_lock(&wifi_mutex) == 0) {
+		for (wip = (wireless_if_t *)wi_list.q_forw;
+		    wip != (wireless_if_t *)&wi_list;
+		    wip = (wireless_if_t *)wip->wi_links.q_forw) {
+			dprintf("WIF %s linkid %d scan %srunning "
+			    "wireless %sdone %sneed key strength %d",
+			    wip->wi_name, wip->wi_linkid,
+			    wip->wi_scan_running ? "" : "not ",
+			    wip->wi_wireless_done ? "" : "not ",
+			    wip->wi_need_key ? "" : "don't ",
+			    wip->wi_strength);
+		}
+		for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
+			dprintf("WLAN I/F %s ESS %s BSS %s signal %s key %sset "
+			    "%sknown %sconnected %sscanned",
+			    wlan->wl_if_name, wlan->essid, wlan->bssid,
+			    wlan->signal_strength,
+			    wlan->raw_key == NULL ? "un" : "",
+			    wlan->known ? "" : "not ",
+			    wlan->connected ? "" : "not ",
+			    wlan->scanned ? "" : "not ");
+		}
+		(void) pthread_mutex_unlock(&wifi_mutex);
+	}
 }

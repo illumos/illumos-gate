@@ -18,54 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/cmd/cmd-inet/lib/nwamd/Makefile
-#
+# lib/libnwam/i386/Makefile
 
-# Needed for ROOTFS_LIBDIR definition
-include		../../../../lib/Makefile.lib
+include ../Makefile.com
 
-PROG=		nwamd
-OBJS=		door.o events.o interface.o llp.o main.o \
-		state_machine.o util.o wireless.o
-SRCS=		$(OBJS:%.o=%.c)
-HEADERS=	defines.h functions.h structures.h variables.h
-
-include		../../../Makefile.cmd
-
-POFILE=		$(PROG).po
-POFILES=	interface.po wireless.po
-
-ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
-
-LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
-		-lgen -ldoor -lsecdb -lbsm -lsysevent -lnvpair
-
-.KEEP_STATE:
-
-.PARALLEL:
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-install: $(ROOTCMD)
-
-check:  $(SRCS) $(HEADERS)
-	$(CSTYLE) -cpP $(SRCS) $(HEADERS)
-
-$(ROOTCMD): $(PROG)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-include		../../../Makefile.targ
-include		../../Makefile.msg
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

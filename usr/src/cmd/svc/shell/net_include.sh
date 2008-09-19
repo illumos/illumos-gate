@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 #
@@ -595,8 +593,8 @@ net_reconfigure ()
 	# Is this a reconfigure boot?  If not, then there's nothing
 	# for us to do.
 	#
-	svcprop -q -p system/reconfigure system/svc/restarter:default
-	if [ $? -ne 0 ]; then
+	reconfig=`svcprop -c -p system/reconfigure system/svc/restarter:default`
+	if [ $? -ne 0 -o "$reconfig" = false ]; then
 		return 0
 	fi
 

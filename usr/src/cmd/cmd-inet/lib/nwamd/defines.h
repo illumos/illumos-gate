@@ -20,36 +20,34 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DEFINES_H
 #define	_DEFINES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/time.h>
 
 #define	PKILL		"/usr/bin/pkill"
-#define	ZENITY		"/usr/bin/zenity"
-#define	SVCADM		"/usr/sbin/svcadm"
 #define	IFCONFIG	"/sbin/ifconfig"
 #define	NET_SVC_METHOD	"/lib/svc/method/net-svc"
-#define	NET_SVC_FMRI	"svc:/network/service:default"
 #define	DEV_LOCAL_SVC_FMRI "svc:/system/device/local:default"
 #define	PFEXEC		"/usr/bin/pfexec"
 
 #define	ULP_DIR		"/etc/nwam/ulp"
-#define	LLPDIR		"/etc/nwam"
-#define	LLPFILE		LLPDIR"/llp"
-#define	KNOWN_WIFI_NETS	LLPDIR"/known_wifi_nets"
+#define	LLPDIRNAME	"/etc/nwam"
+#define	LLPDIRMODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
+#define	LLPFILE		LLPDIRNAME "/llp"
+#define	LLPFILETMP	LLPDIRNAME "/llp.tmp"
+#define	KNOWN_WIFI_NETS	LLPDIRNAME "/known_wifi_nets"
+#define	KNOWN_WIFI_TMP	LLPDIRNAME "/known_wifi_nets.tmp"
+
+#define	DOOR_FILENAME	"/etc/svc/volatile/nwam_door"
+#define	DOOR_FILEMODE	S_IRUSR | S_IRGRP | S_IROTH
 
 #define	BOOLEAN_TO_STRING(x) ((x) ? "TRUE" : "FALSE")
 #define	STRING(s) (((s) == NULL) ? "NULL" : (s))
-
-/* IPC listening port */
-#define	NP_LISTEN_PORT		12340
 
 #define	NWAM_DEFAULT_DHCP_WAIT_TIME	60	/* 1 minute */
 #define	NWAM_IF_WAIT_DELTA_MAX		300	/* 5 minutes poll rate max */

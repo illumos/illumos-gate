@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the routines that manipulate Link Layer Profiles
@@ -52,13 +50,25 @@
  * administrator creates the file with wireless entries before wired,
  * that priority order will be respected.
  *
- * The llp list (pointed to by the global llp_head) is protected by
- * the global llp_lock, which should be pthread_mutex_lock()'d before
- * reading or writing the list.
+ * The llp list is protected by the global llp_lock, which must be
+ * pthread_mutex_lock()'d before reading or writing the list.  Only the main
+ * thread can write to the list; this allows the main thread to deal with read
+ * access to structure pointers without holding locks and without the
+ * complexity of reference counts.  All other threads must hold llp_lock for
+ * the duration of any read access to the data, and must not deal directly in
+ * structure pointers.  (A thread may also hold machine_lock to block the main
+ * thread entirely in order to manipulate the data; such use is isolated to the
+ * door interface.)
+ *
+ * Functions in this file have comments noting where the main thread alone is
+ * the caller.  These functions do not need to acquire the lock.
+ *
+ * If you hold both ifs_lock and llp_lock, you must take ifs_lock first.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <limits.h>
 #include <strings.h>
 #include <string.h>
@@ -82,16 +92,25 @@
 /* Lock to protect the llp list. */
 static pthread_mutex_t llp_lock = PTHREAD_MUTEX_INITIALIZER;
 
-llp_t *llp_head = NULL;
-llp_t *link_layer_profile = NULL;
+/* Accessed only from main thread or with llp_lock held */
+llp_t *link_layer_profile;
+
+static struct qelem llp_list;
+static llp_t *locked_llp;
 
 /*
  * Global variable to hold the highest priority.  Need to use the atomic
  * integer arithmetic functions to update it.
  */
-static uint32_t llp_highest_pri = 0;
+static uint32_t llp_highest_pri;
 
 static void print_llp_list(void);
+
+void
+initialize_llp(void)
+{
+	llp_list.q_forw = llp_list.q_back = &llp_list;
+}
 
 char *
 llp_prnm(llp_t *llp)
@@ -104,27 +123,51 @@ llp_prnm(llp_t *llp)
 		return (llp->llp_lname);
 }
 
-static void
-llp_list_free(llp_t *head)
+/*
+ * This function removes a given LLP from the global list and discards it.
+ * Called only from the main thread.
+ */
+void
+llp_delete(llp_t *llp)
 {
-	llp_t **llpp;
-	llp_t *llpfree;
+	if (pthread_mutex_lock(&llp_lock) == 0) {
+		if (llp == locked_llp)
+			locked_llp = NULL;
+		assert(llp != link_layer_profile);
+		remque(&llp->llp_links);
+		(void) pthread_mutex_unlock(&llp_lock);
+		free(llp->llp_ipv6addrstr);
+		free(llp->llp_ipv4addrstr);
+		free(llp);
+	}
+}
 
-	if (pthread_mutex_lock(&llp_lock) != 0) {
+static void
+llp_list_free(void)
+{
+	int retv;
+	llp_t *llp;
+
+	locked_llp = NULL;
+	if ((retv = pthread_mutex_lock(&llp_lock)) != 0) {
 		/* Something very serious is wrong... */
-		syslog(LOG_ERR, "llp_list_free: cannot lock mutex: %m");
+		syslog(LOG_ERR, "llp_list_free: cannot lock mutex: %s",
+		    strerror(retv));
 		return;
 	}
-	llpp = &head;
-	while (*llpp != NULL) {
-		llpfree = *llpp;
-		*llpp = llpfree->llp_next;
-		free(llpfree->llp_ipv4addrstr);
-		free(llpfree);
+	while (llp_list.q_forw != &llp_list) {
+		llp = (llp_t *)llp_list.q_forw;
+		remque(&llp->llp_links);
+		free(llp->llp_ipv6addrstr);
+		free(llp->llp_ipv4addrstr);
+		free(llp);
 	}
 	(void) pthread_mutex_unlock(&llp_lock);
 }
 
+/*
+ * Called either from main thread or with llp_lock held.
+ */
 llp_t *
 llp_lookup(const char *link)
 {
@@ -133,17 +176,13 @@ llp_lookup(const char *link)
 	if (link == NULL)
 		return (NULL);
 
-	/* The name may change.  Better hold the lock. */
-	if (pthread_mutex_lock(&llp_lock) != 0) {
-		/* Something very serious is wrong... */
-		syslog(LOG_ERR, "llp_lookup: cannot lock mutex: %m");
-		return (NULL);
-	}
-	for (llp = llp_head; llp != NULL; llp = llp->llp_next) {
+	for (llp = (llp_t *)llp_list.q_forw; llp != (llp_t *)&llp_list;
+	    llp = (llp_t *)llp->llp_links.q_forw) {
 		if (strcmp(link, llp->llp_lname) == 0)
 			break;
 	}
-	(void) pthread_mutex_unlock(&llp_lock);
+	if (llp == (llp_t *)&llp_list)
+		llp = NULL;
 	return (llp);
 }
 
@@ -158,56 +197,57 @@ llp_lookup(const char *link)
 llp_t *
 llp_high_pri(llp_t *a, llp_t *b)
 {
-	if (a == NULL)
+	if (a == NULL || a->llp_links.q_forw == NULL)
 		return (b);
-	else if (b == NULL)
+	else if (b == NULL || b->llp_links.q_forw == NULL)
+		return (a);
+
+	/* Check for locked LLP selection for user interface */
+	if (a == locked_llp)
+		return (a);
+	else if (b == locked_llp)
+		return (b);
+
+	if (a->llp_failed && !b->llp_failed)
+		return (b);
+	if (!a->llp_failed && b->llp_failed)
 		return (a);
 
 	/*
 	 * Higher priority is represented by a lower number.  This seems a
 	 * bit backwards, but for now it makes assigning priorities very easy.
-	 *
-	 * We shouldn't have ties right now, but just in case, tie goes to a.
 	 */
 	return ((a->llp_pri <= b->llp_pri) ? a : b);
 }
 
 /*
- * Chooses the highest priority link that corresponds to an
- * available interface.
+ * Chooses the highest priority link that corresponds to an available
+ * interface.  Called only in the main thread.
  */
 llp_t *
 llp_best_avail(void)
 {
-	llp_t *p, *rtnllp = NULL;
-	struct interface *ifp;
+	llp_t *llp, *rtnllp;
 
-	/* The priority may change.  Better hold the lock. */
-	if (pthread_mutex_lock(&llp_lock) != 0) {
-		/* Something very serious is wrong... */
-		syslog(LOG_ERR, "llp_best_avail: cannot lock mutex: %m");
-		return (NULL);
+	if ((rtnllp = locked_llp) == NULL) {
+		for (llp = (llp_t *)llp_list.q_forw; llp != (llp_t *)&llp_list;
+		    llp = (llp_t *)llp->llp_links.q_forw) {
+			if (is_interface_ok(llp->llp_lname))
+				rtnllp = llp_high_pri(llp, rtnllp);
+		}
 	}
-	for (p = llp_head; p != NULL; p = p->llp_next) {
-		ifp = get_interface(p->llp_lname);
-		if (ifp == NULL || !is_plugged_in(ifp) ||
-		    (ifp->if_lflags & IF_DHCPFAILED) != 0)
-			continue;
-		rtnllp = llp_high_pri(p, rtnllp);
-	}
-	(void) pthread_mutex_unlock(&llp_lock);
 
 	return (rtnllp);
 }
 
 /*
- * Returns B_TRUE if llp is successfully activated;
- * B_FALSE if activation fails.
+ * Called only by the main thread.  Note that this leaves link_layer_profile
+ * set to NULL only in the case of abject failure, and then leaves llp_failed
+ * set.
  */
-boolean_t
+static void
 llp_activate(llp_t *llp)
 {
-	boolean_t rtn;
 	char *host;
 	/*
 	 * Choosing "dhcp" as a hostname is unsupported right now.
@@ -216,40 +256,33 @@ llp_activate(llp_t *llp)
 	 */
 	char *dhcpstr = "dhcp";
 
-	llp_deactivate();
+	assert(link_layer_profile == NULL);
 
 	host = (llp->llp_ipv4src == IPV4SRC_DHCP) ? dhcpstr :
 	    llp->llp_ipv4addrstr;
 
-	if (bringupinterface(llp->llp_lname, host, llp->llp_ipv6addrstr,
+	report_llp_selected(llp->llp_lname);
+	switch (bringupinterface(llp->llp_lname, host, llp->llp_ipv6addrstr,
 	    llp->llp_ipv6onlink)) {
+	case SUCCESS:
+		llp->llp_failed = B_FALSE;
+		llp->llp_waiting = B_FALSE;
 		link_layer_profile = llp;
 		dprintf("llp_activate: activated llp for %s", llp_prnm(llp));
-		rtn = B_TRUE;
-	} else {
-		dprintf("llp_activate: failed to bringup %s", llp_prnm(llp));
+		break;
+	case FAILURE:
+		llp->llp_failed = B_TRUE;
+		llp->llp_waiting = B_FALSE;
+		dprintf("llp_activate: failed to bring up %s", llp_prnm(llp));
+		report_llp_unselected(llp->llp_lname, dcFailed);
 		link_layer_profile = NULL;
-		rtn = B_FALSE;
+		break;
+	case WAITING:
+		llp->llp_failed = B_FALSE;
+		llp->llp_waiting = B_TRUE;
+		link_layer_profile = llp;
+		dprintf("llp_activate: waiting for %s", llp_prnm(llp));
 	}
-
-	return (rtn);
-}
-
-/*
- * Deactivate the current active llp (link_layer_profile)
- */
-void
-llp_deactivate(void)
-{
-	if (link_layer_profile == NULL)
-		return;
-
-	takedowninterface(link_layer_profile->llp_lname, B_TRUE,
-	    link_layer_profile->llp_ipv6onlink);
-
-	dprintf("llp_deactivate: setting link_layer_profile(%p) to NULL",
-	    (void *)link_layer_profile);
-	link_layer_profile = NULL;
 }
 
 /*
@@ -263,222 +296,120 @@ llp_deactivate(void)
  * If the new llp is the same as the currently active one, don't
  * do anything.
  *
- * If the new llp is NULL, just take down the currently active one.
+ * Called only by the main thread.
  */
 void
-llp_swap(llp_t *newllp)
+llp_swap(llp_t *newllp, libnwam_diag_cause_t cause)
 {
-	char *upifname;
+	int minpri;
 
 	if (newllp == link_layer_profile)
 		return;
 
 	deactivate_upper_layer_profile();
 
-	if (link_layer_profile == NULL) {
-		/*
-		 * there shouldn't be anything else running;
-		 * make sure that's the case!
-		 */
-		upifname = (newllp == NULL) ? NULL : newllp->llp_lname;
-		take_down_all_ifs(upifname);
-	} else {
+	if (link_layer_profile != NULL) {
 		dprintf("taking down current link layer profile (%s)",
 		    llp_prnm(link_layer_profile));
-		llp_deactivate();
+		report_llp_unselected(link_layer_profile->llp_lname, cause);
+		link_layer_profile->llp_waiting = B_FALSE;
+		link_layer_profile = NULL;
 	}
-	if (newllp != NULL) {
+
+	/*
+	 * Establish the new link layer profile.  If we have trouble setting
+	 * it, then try to get another.  Note that llp_activate sets llp_failed
+	 * on failure, so this loop is guaranteed to terminate.
+	 */
+	while (newllp != NULL) {
 		dprintf("bringing up new link layer profile (%s)",
 		    llp_prnm(newllp));
-		(void) llp_activate(newllp);
+		llp_activate(newllp);
+		newllp = NULL;
+		if (link_layer_profile == NULL &&
+		    (newllp = llp_best_avail()) != NULL &&
+		    newllp->llp_failed)
+			newllp = NULL;
+	}
+
+	/*
+	 * Knock down all interfaces that are at a lower (higher-numbered)
+	 * priority than the new one.  If there isn't a new one, then leave
+	 * everything as it is.
+	 */
+	if (link_layer_profile == NULL) {
+		minpri = -1;
+		if (locked_llp != NULL)
+			dprintf("taking down all but %s", llp_prnm(locked_llp));
+	} else {
+		minpri = link_layer_profile->llp_pri;
+		dprintf("taking down remaining interfaces below priority %d",
+		    minpri);
+	}
+	for (newllp = (llp_t *)llp_list.q_forw; newllp != (llp_t *)&llp_list;
+	    newllp = (llp_t *)newllp->llp_links.q_forw) {
+		if (newllp == link_layer_profile)
+			continue;
+		if ((link_layer_profile != NULL && newllp->llp_pri > minpri) ||
+		    (locked_llp != NULL && newllp != locked_llp))
+			takedowninterface(newllp->llp_lname, cause);
+		else
+			clear_cached_address(newllp->llp_lname);
 	}
 }
 
 /*
- *
- * ifp->if_family == AF_INET, addr_src == DHCP ==> addr == NULL
- * ifp->if_family == AF_INET, addr_src == STATIC ==> addr non null sockaddr_in
- * ifp->if_family == AF_INET6, ipv6onlink == FALSE ==> addr == NULL
- * ifp->if_family == AF_INET6, ipv6onlink == TRUE,
- *     if addr non NULL then it is the textual representation of the address
- *     and prefix.
- *
- * The above set of conditions describe what the inputs to this fuction are
- * expected to be.  Given input which meets those conditions this functions
- * then outputs a line of configuration describing the inputs.
- *
- * Note that it is assumed only one thread can call this function at
- * any time.  So there is no lock to protect the file writing.  This
- * is true as the only caller of this function should originate from
- * llp_parse_config(), which is done at program initialization time.
+ * Create the named LLP with default settings.  Called only in main thread.
  */
-static void
-add_if_file(FILE *fp, struct interface *ifp, ipv4src_t addr_src,
-    boolean_t ipv6onlink, void *addr)
+llp_t *
+llp_add(const char *name)
 {
-	char addr_buf[INET6_ADDRSTRLEN];
+	int retv;
+	llp_t *llp;
 
-	switch (ifp->if_family) {
-	case AF_INET:
-		switch (addr_src) {
-		case IPV4SRC_STATIC:
-			/* This is not supposed to happen... */
-			if (addr == NULL) {
-				(void) fprintf(fp, "%s\tdhcp\n", ifp->if_name);
-				break;
-			}
-			(void) inet_ntop(AF_INET, addr, addr_buf,
-			    INET6_ADDRSTRLEN);
-			(void) fprintf(fp, "%s\tstatic\t%s\n", ifp->if_name,
-			    addr_buf);
-			break;
-		case IPV4SRC_DHCP:
-			/* Default is DHCP for now. */
-		default:
-			(void) fprintf(fp, "%s\tdhcp\n", ifp->if_name);
-			break;
-		}
-		break;
-
-	case AF_INET6:
-		if (ipv6onlink)
-			(void) fprintf(fp, "%s\tipv6\n", ifp->if_name);
-		break;
-
-	default:
-		syslog(LOG_ERR, "interface %s of type %d?!", ifp->if_name,
-		    ifp->if_family);
-		break;
+	if ((llp = calloc(1, sizeof (llp_t))) == NULL) {
+		syslog(LOG_ERR, "cannot allocate LLP: %m");
+		return (NULL);
 	}
-}
 
-/*
- * Walker function to pass to walk_interface() to add a default
- * interface description to the LLPFILE.
- *
- * Regarding IF_TUN interfaces: see comments before find_and_add_llp()
- * for an explanation of why we skip them.
- */
-static void
-add_if_default(struct interface *ifp, void *arg)
-{
-	FILE *fp = (FILE *)arg;
-
-	if (ifp->if_type != IF_TUN)
-		add_if_file(fp, ifp, IPV4SRC_DHCP, B_TRUE, NULL);
-}
-
-/* Create the LLPFILE using info from the interface list. */
-static void
-create_llp_file(void)
-{
-	FILE *fp;
-	int dirmode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-
-	/* Create the NWAM directory in case it does not exist. */
-	if (mkdir(LLPDIR, dirmode) != 0) {
-		if (errno != EEXIST) {
-			syslog(LOG_ERR, "create NWAM directory: %m");
-			return;
-		}
+	if (strlcpy(llp->llp_lname, name, sizeof (llp->llp_lname)) >=
+	    sizeof (llp->llp_lname)) {
+		syslog(LOG_ERR, "llp: link name '%s' too long; ignoring entry",
+		    name);
+		free(llp);
+		return (NULL);
 	}
-	if ((fp = fopen(LLPFILE, "w")) == NULL) {
-		syslog(LOG_ERR, "create LLP config file: %m");
-		return;
-	}
-	syslog(LOG_INFO, "Creating %s", LLPFILE);
-	walk_interface(add_if_default, fp);
-	(void) fclose(fp);
-}
 
-/*
- * Append an llp struct to the end of the llp list.
- */
-static void
-llp_list_append(llp_t *llp)
-{
-	llp_t **wpp = &llp_head;
+	llp->llp_fileorder = llp->llp_pri =
+	    atomic_add_32_nv(&llp_highest_pri, 1);
+	llp->llp_ipv4src = IPV4SRC_DHCP;
+	llp->llp_type = find_if_type(llp->llp_lname);
+	llp->llp_ipv6onlink = B_TRUE;
 
 	/*
 	 * should be a no-op, but for now, make sure we only
 	 * create llps for wired and wireless interfaces.
 	 */
-	if (llp->llp_type != IF_WIRED && llp->llp_type != IF_WIRELESS)
-		return;
-
-	if (pthread_mutex_lock(&llp_lock) != 0) {
-		/* Something very serious is wrong... */
-		syslog(LOG_ERR, "llp_list_append: cannot lock mutex: %m");
-		return;
+	if (llp->llp_type != IF_WIRED && llp->llp_type != IF_WIRELESS) {
+		syslog(LOG_ERR, "llp: wrong type of interface for %s", name);
+		free(llp);
+		return (NULL);
 	}
 
-	while (*wpp != NULL)
-		wpp = &(*wpp)->llp_next;
-	*wpp = llp;
-	llp->llp_next = NULL;
+	if ((retv = pthread_mutex_lock(&llp_lock)) != 0) {
+		/* Something very serious is wrong... */
+		syslog(LOG_ERR, "llp: cannot lock mutex: %s", strerror(retv));
+		free(llp);
+		return (NULL);
+	}
+
+	insque(&llp->llp_links, llp_list.q_back);
 
 	(void) pthread_mutex_unlock(&llp_lock);
-}
 
-/*
- * Create a llp given the parameters and add it to the global list.
- */
-static void
-create_and_add_llp(const char *name, ipv4src_t ipv4src, const char *addrstr,
-    boolean_t ipv6onlink, const char *ipv6addrstr)
-{
-	llp_t *newllp;
-	int lnamelen;
-
-	if ((newllp = llp_lookup(name)) != NULL) {
-		if (ipv6addrstr != NULL) {
-			newllp->llp_ipv6addrstr = strdup(ipv6addrstr);
-			if (newllp->llp_ipv6addrstr == NULL) {
-				syslog(LOG_ERR, "could not save ipv6 static "
-				    "address for %s", name);
-			}
-		}
-		newllp->llp_ipv6onlink = ipv6onlink;
-		return;
-	} else if ((newllp = calloc(1, sizeof (llp_t))) == NULL) {
-		syslog(LOG_ERR, "calloc llp: %m");
-		return;
-	}
-
-	lnamelen = sizeof (newllp->llp_lname);
-	if (strlcpy(newllp->llp_lname, name, lnamelen) >= lnamelen) {
-		syslog(LOG_ERR, "llp: link name too long; ignoring entry");
-		free(newllp);
-		return;
-	}
-	if (ipv4src == IPV4SRC_STATIC) {
-		if ((newllp->llp_ipv4addrstr = strdup(addrstr)) == NULL) {
-			syslog(LOG_ERR, "malloc ipaddrstr: %m");
-			free(newllp);
-			return;
-		}
-	} else {
-		newllp->llp_ipv4addrstr = NULL;
-	}
-	newllp->llp_next = NULL;
-	newllp->llp_pri = atomic_add_32_nv(&llp_highest_pri, 1);
-	newllp->llp_ipv4src = ipv4src;
-	newllp->llp_type = find_if_type(newllp->llp_lname);
-	newllp->llp_ipv6onlink = ipv6onlink;
-
-	if (ipv6onlink && ipv6addrstr != NULL) {
-		newllp->llp_ipv6addrstr = strdup(ipv6addrstr);
-		if (newllp->llp_ipv6addrstr == NULL)
-			syslog(LOG_WARNING, "could not store static address %s"
-			    "on interface %s", ipv6addrstr, newllp->llp_lname);
-	} else {
-		newllp->llp_ipv6addrstr = NULL;
-	}
-
-	llp_list_append(newllp);
-
-	dprintf("created llp for link %s, pri %d", newllp->llp_lname,
-	    newllp->llp_pri);
+	dprintf("created llp for link %s, priority %d", llp->llp_lname,
+	    llp->llp_pri);
+	return (llp);
 }
 
 /*
@@ -491,30 +422,33 @@ create_and_add_llp(const char *name, ipv4src_t ipv4src, const char *addrstr,
  * as part of a higher-layer profile, for example).  Thus, they
  * shouldn't be considered when looking at the llp list, so don't
  * add them here.
+ *
+ * ifs_lock is held when this function is called.  Called only in main thread.
  */
 static void
 find_and_add_llp(struct interface *ifp, void *arg)
 {
-	FILE *fp = (FILE *)arg;
+	FILE *fp = arg;
 
-	if (ifp->if_type != IF_TUN && (llp_lookup(ifp->if_name) == NULL)) {
-		dprintf("Adding %s to %s", ifp->if_name, LLPFILE);
-		add_if_file(fp, ifp, IPV4SRC_DHCP, B_TRUE, NULL);
+	if (ifp->if_type != IF_TUN && llp_lookup(ifp->if_name) == NULL) {
+		switch (ifp->if_family) {
+		case AF_INET:
+			(void) fprintf(fp, "%s\tdhcp\n", ifp->if_name);
+			break;
+
+		case AF_INET6:
+			(void) fprintf(fp, "%s\tipv6\n", ifp->if_name);
+			break;
+
+		default:
+			syslog(LOG_ERR, "interface %s family %d?!",
+			    ifp->if_name, ifp->if_family);
+			return;
+		}
+		dprintf("Added %s to %s", ifp->if_name, LLPFILE);
 		/* If we run out of memory, ignore this interface for now. */
-		create_and_add_llp(ifp->if_name, IPV4SRC_DHCP, NULL,
-		    B_TRUE, NULL);
+		(void) llp_add(ifp->if_name);
 	}
-}
-
-/*
- * This is a very "slow" function.  It uses walk_interface() to find
- * out if any of the interface is missing from the LLPFILE.  For the
- * missing ones, add them to the LLPFILE.
- */
-static void
-add_missing_if_llp(FILE *fp)
-{
-	walk_interface(find_and_add_llp, fp);
 }
 
 static void
@@ -523,7 +457,8 @@ print_llp_list(void)
 	llp_t *wp;
 
 	dprintf("Walking llp list");
-	for (wp = llp_head; wp != NULL; wp = wp->llp_next)
+	for (wp = (llp_t *)llp_list.q_forw; wp != (llp_t *)&llp_list;
+	    wp = (llp_t *)wp->llp_links.q_forw)
 		dprintf("==> %s", wp->llp_lname);
 }
 
@@ -533,7 +468,7 @@ print_llp_list(void)
  * delimited fields.  Each address family (IPv4, IPv6) is described on a
  * separate line.
  * The first field is a link name.
- * The second field can be either static, dhcp, ipv6, or noipv6.
+ * The second field can be either static, dhcp, ipv6, noipv6, or priority.
  * If the second field is static then the next field is an ipv4 address which
  *    can contain a prefix.  Previous versions of this file could contain a
  *    hostname in this field which is no longer supported.
@@ -545,6 +480,10 @@ print_llp_list(void)
  *    and possible prefix which are applied to the interface.
  * If the second field is noipv6 then no ipv6 interfaces will be put on that
  *    link.
+ * If the second field is priority, then the next field is an integer
+ *    specifying the link priority.
+ *
+ * Called only in main thread.
  */
 void
 llp_parse_config(void)
@@ -553,50 +492,35 @@ llp_parse_config(void)
 	static const char DHCP[] = "dhcp";
 	static const char IPV6[] = "ipv6";
 	static const char NOIPV6[] = "noipv6";
+	static const char PRIORITY[] = "priority";
 	FILE *fp;
 	char line[LINE_MAX];
-	char *cp, *lasts, *lstr, *srcstr, *addrstr, *v6addrstr;
+	char *cp, *lasts, *lstr, *srcstr, *addrstr;
 	int lnum;
-	ipv4src_t ipv4src;
-	boolean_t ipv6onlink;
+	llp_t *llp;
+
+	/* Create the NWAM directory in case it does not exist. */
+	if (mkdir(LLPDIRNAME, LLPDIRMODE) != 0 &&
+	    errno != EEXIST) {
+		syslog(LOG_ERR, "could not create %s: %m", LLPDIRNAME);
+		return;
+	}
 
 	fp = fopen(LLPFILE, "r+");
 	if (fp == NULL) {
 		if (errno != ENOENT) {
-			/*
-			 * XXX See comment before create_llp_file() re
-			 * better error handling.
-			 */
 			syslog(LOG_ERR, "open LLP config file: %m");
 			return;
 		}
-
-		/*
-		 * If there is none, we should create one instead.
-		 * For now, we will use the order of the interface list
-		 * for the priority.  We should have a priority field
-		 * in the llp file eventually...
-		 */
-		create_llp_file();
-
-		/* Now we can try to reopen the file for processing. */
-		fp = fopen(LLPFILE, "r+");
-		if (fp == NULL) {
-			syslog(LOG_ERR, "2nd open LLP config file: %m");
+		if ((fp = fopen(LLPFILE, "w+")) == NULL) {
+			syslog(LOG_ERR, "create LLP config file: %m");
 			return;
 		}
 	}
 
-	if (llp_head != NULL)
-		llp_list_free(llp_head);
-	llp_head = NULL;
+	llp_list_free();
 
 	for (lnum = 1; fgets(line, sizeof (line), fp) != NULL; lnum++) {
-		ipv4src = IPV4SRC_DHCP;
-		ipv6onlink = B_FALSE;
-		addrstr = NULL;
-		v6addrstr = NULL;
-
 		if (line[strlen(line) - 1] == '\n')
 			line[strlen(line) - 1] = '\0';
 
@@ -615,51 +539,474 @@ llp_parse_config(void)
 			    "ignoring entry", lnum);
 			continue;
 		}
+
+		if ((llp = llp_lookup(lstr)) == NULL &&
+		    (llp = llp_add(lstr)) == NULL) {
+			syslog(LOG_ERR, "llp:%d: cannot add entry", lnum);
+			continue;
+		}
+
 		if (strcasecmp(srcstr, STATICSTR) == 0) {
 			if ((addrstr = strtok_r(NULL, " \t", &lasts)) == NULL ||
 			    atoi(addrstr) == 0) { /* crude check for number */
 				syslog(LOG_ERR, "llp:%d: missing ipaddr "
-				    "for static config; ignoring entry",
+				    "for static config", lnum);
+			} else if ((addrstr = strdup(addrstr)) == NULL) {
+				syslog(LOG_ERR, "llp:%d: cannot save address",
 				    lnum);
-				continue;
-			}
-			ipv4src = IPV4SRC_STATIC;
-		} else if (strcasecmp(srcstr, DHCP) == 0) {
-			ipv4src = IPV4SRC_DHCP;
-		} else if (strcasecmp(srcstr, IPV6) == 0) {
-			ipv6onlink = B_TRUE;
-			if ((addrstr = strtok_r(NULL, " \t", &lasts)) != NULL) {
-				v6addrstr = strdup(addrstr);
-				if (v6addrstr == NULL) {
-					syslog(LOG_ERR, "could not store v6 "
-					    "static address %s for %s",
-					    v6addrstr, lstr);
-				}
 			} else {
-				v6addrstr = NULL;
+				free(llp->llp_ipv4addrstr);
+				llp->llp_ipv4src = IPV4SRC_STATIC;
+				llp->llp_ipv4addrstr = addrstr;
 			}
-		} else if (strcasecmp(srcstr, NOIPV6) == 0) {
-			ipv6onlink = B_FALSE;
-		} else {
-			syslog(LOG_ERR, "llp:%d: unrecognized "
-			    "field; ignoring entry", lnum);
-			continue;
-		}
 
-		create_and_add_llp(lstr, ipv4src, addrstr, ipv6onlink,
-		    v6addrstr);
+		} else if (strcasecmp(srcstr, DHCP) == 0) {
+			llp->llp_ipv4src = IPV4SRC_DHCP;
+
+		} else if (strcasecmp(srcstr, IPV6) == 0) {
+			llp->llp_ipv6onlink = B_TRUE;
+			if ((addrstr = strtok_r(NULL, " \t", &lasts)) == NULL) {
+				(void) 0;
+			} else if ((addrstr = strdup(addrstr)) == NULL) {
+				syslog(LOG_ERR, "llp:%d: cannot save address",
+				    lnum);
+			} else {
+				free(llp->llp_ipv6addrstr);
+				llp->llp_ipv6addrstr = addrstr;
+			}
+
+		} else if (strcasecmp(srcstr, NOIPV6) == 0) {
+			llp->llp_ipv6onlink = B_FALSE;
+
+		} else if (strcasecmp(srcstr, PRIORITY) == 0) {
+			if ((addrstr = strtok_r(NULL, " \t", &lasts)) == NULL) {
+				syslog(LOG_ERR,
+				    "llp:%d: missing priority value", lnum);
+			} else {
+				llp->llp_pri = atoi(addrstr);
+			}
+
+		} else {
+			syslog(LOG_ERR, "llp:%d: unrecognized field '%s'", lnum,
+			    srcstr);
+		}
 	}
 
 	/*
 	 * So we have read in the llp file, is there an interface which
 	 * it does not describe?  If yes, we'd better add it to the
-	 * file for future reference.  Again, since we don't have a
-	 * priority field yet, we will add the interface in the order
-	 * in the interface list.
+	 * file for future reference.
 	 */
-	add_missing_if_llp(fp);
+	walk_interface(find_and_add_llp, fp);
 
 	(void) fclose(fp);
 
 	print_llp_list();
+}
+
+/*
+ * Called only from the main thread.
+ */
+void
+llp_add_file(const llp_t *llp)
+{
+	FILE *fp;
+
+	if ((fp = fopen(LLPFILE, "a")) == NULL)
+		return;
+	(void) fprintf(fp, "%s\tdhcp\n", llp->llp_lname);
+	(void) fclose(fp);
+}
+
+/*
+ * This function rewrites the LLP configuration file entry for a given
+ * interface and keyword.  If the keyword is present, then it is updated if
+ * removeonly is B_FALSE, otherwise it's removed.  If the keyword is not
+ * present, then it is added immediately after the last entry for that
+ * interface if removeonly is B_FALSE, otherwise no action is taken.  User
+ * comments are preserved.
+ *
+ * To preserve file integrity, this is called only from the main thread.
+ */
+static void
+llp_update_config(const char *ifname, const char *keyword, const char *optval,
+    boolean_t removeonly)
+{
+	FILE *fpin, *fpout;
+	char line[LINE_MAX];
+	char *cp, *lstr, *keystr, *valstr, *lasts;
+	boolean_t matched_if, copying;
+	long match_pos;
+
+	if ((fpin = fopen(LLPFILE, "r")) == NULL)
+		return;
+	if ((fpout = fopen(LLPFILETMP, "w")) == NULL) {
+		syslog(LOG_ERR, "create LLP temporary config file: %m");
+		(void) fclose(fpin);
+		return;
+	}
+	matched_if = copying = B_FALSE;
+restart:
+	while (fgets(line, sizeof (line), fpin) != NULL) {
+		cp = line + strlen(line) - 1;
+		if (cp >= line && *cp == '\n')
+			*cp = '\0';
+
+		cp = line;
+		while (isspace(*cp))
+			cp++;
+
+		lstr = NULL;
+		if (copying || *cp == '#' ||
+		    (lstr = strtok_r(cp, " \t", &lasts)) == NULL ||
+		    strcmp(lstr, ifname) != 0) {
+			if (!matched_if || copying) {
+				/*
+				 * It's ugly to write through the pointer
+				 * returned as the third argument of strtok_r,
+				 * but doing so saves a data copy.
+				 */
+				if (lstr != NULL && lasts != NULL)
+					lasts[-1] = '\t';
+				(void) fprintf(fpout, "%s\n", line);
+			}
+			continue;
+		}
+
+		if (lasts != NULL)
+			lasts[-1] = '\t';
+
+		/*
+		 * If we've found the keyword, then process removal or update
+		 * of the value.
+		 */
+		if ((keystr = strtok_r(NULL, " \t", &lasts)) != NULL &&
+		    strcmp(keystr, keyword) == 0) {
+			matched_if = copying = B_TRUE;
+			if (removeonly)
+				continue;
+			valstr = strtok_r(NULL, " \t", &lasts);
+			if ((valstr == NULL && optval == NULL) ||
+			    (valstr != NULL && optval != NULL &&
+			    strcmp(valstr, optval) == 0)) {
+				/* Value identical; abort update */
+				goto no_change;
+			}
+			if (optval == NULL) {
+				(void) fprintf(fpout, "%s\t%s\n", ifname,
+				    keyword);
+			} else {
+				(void) fprintf(fpout, "%s\t%s %s\n", ifname,
+				    keyword, optval);
+			}
+			continue;
+		}
+
+		/* Otherwise, record the last possible insertion point */
+		matched_if = B_TRUE;
+		match_pos = ftell(fpin);
+		if (lasts != NULL)
+			lasts[-1] = '\t';
+		(void) fprintf(fpout, "%s\n", line);
+	}
+	if (!copying) {
+		/* keyword not encountered; we're done if deleting */
+		if (removeonly)
+			goto no_change;
+		/* need to add keyword and value */
+		if (optval == NULL) {
+			(void) fprintf(fpout, "%s\t%s\n", ifname, keyword);
+		} else {
+			(void) fprintf(fpout, "%s\t%s %s\n", ifname, keyword,
+			    optval);
+		}
+		/* copy the rest of the file */
+		(void) fseek(fpin, match_pos, SEEK_SET);
+		copying = B_TRUE;
+		goto restart;
+	}
+	(void) fclose(fpin);
+	(void) fclose(fpout);
+	if (rename(LLPFILETMP, LLPFILE) != 0) {
+		syslog(LOG_ERR, "rename LLP temporary config file: %m");
+		(void) unlink(LLPFILETMP);
+	}
+	return;
+
+no_change:
+	(void) fclose(fpin);
+	(void) fclose(fpout);
+	(void) unlink(LLPFILETMP);
+}
+
+/*
+ * This is called back from the main thread by the state machine.
+ */
+void
+llp_write_changed_priority(llp_t *llp)
+{
+	if (llp->llp_pri == llp->llp_fileorder) {
+		llp_update_config(llp->llp_lname, "priority", NULL, B_TRUE);
+	} else {
+		char prival[32];
+
+		(void) snprintf(prival, sizeof (prival), "%d", llp->llp_pri);
+		llp_update_config(llp->llp_lname, "priority", prival, B_FALSE);
+	}
+}
+
+/*
+ * Called by the door interface: set LLP priority and schedule an LLP update if
+ * this interface has changed.
+ */
+int
+set_llp_priority(const char *ifname, int prio)
+{
+	llp_t *llp;
+	int retv;
+
+	if (prio < 0)
+		return (EINVAL);
+
+	if ((retv = pthread_mutex_lock(&llp_lock)) != 0)
+		return (retv);
+	if ((llp = llp_lookup(ifname)) != NULL) {
+		llp->llp_failed = B_FALSE;
+		if (llp->llp_pri != prio) {
+			llp->llp_pri = prio;
+			(void) np_queue_add_event(EV_USER, ifname);
+		}
+		retv = 0;
+	} else {
+		retv = ENXIO;
+	}
+	(void) pthread_mutex_unlock(&llp_lock);
+	return (retv);
+}
+
+/*
+ * Called by the door interface: set a locked LLP and schedule an LLP update if
+ * the locked LLP has changed.
+ */
+int
+set_locked_llp(const char *ifname)
+{
+	llp_t *llp;
+	int retv;
+
+	if ((retv = pthread_mutex_lock(&llp_lock)) != 0)
+		return (retv);
+	if (ifname[0] == '\0') {
+		if (locked_llp != NULL) {
+			ifname = locked_llp->llp_lname;
+			locked_llp = NULL;
+			(void) np_queue_add_event(EV_USER, ifname);
+		}
+	} else if ((llp = llp_lookup(ifname)) != NULL) {
+		locked_llp = llp;
+		if (llp != link_layer_profile)
+			(void) np_queue_add_event(EV_USER, ifname);
+	} else {
+		retv = ENXIO;
+	}
+	(void) pthread_mutex_unlock(&llp_lock);
+	return (retv);
+}
+
+/* Copy string to pre-allocated buffer. */
+static void
+strinsert(char **dest, const char *src, char **buf)
+{
+	if (*dest != NULL) {
+		*dest = strcpy(*buf, src);
+		*buf += strlen(src) + 1;
+	}
+}
+
+/*
+ * Sample the list of LLPs and copy to a single buffer for return through the
+ * door interface.
+ */
+llp_t *
+get_llp_list(size_t *lsize, uint_t *countp, char *selected, char *locked)
+{
+	llp_t *llplist, *llpl, *llp;
+	char *strptr;
+	uint_t nllp;
+	size_t strspace;
+	int retv;
+
+	*lsize = 0;
+	if ((retv = pthread_mutex_lock(&llp_lock)) != 0) {
+		errno = retv;
+		return (NULL);
+	}
+	(void) strlcpy(selected, link_layer_profile == NULL ? "" :
+	    link_layer_profile->llp_lname, LIFNAMSIZ);
+	(void) strlcpy(locked, locked_llp == NULL ? "" :
+	    locked_llp->llp_lname, LIFNAMSIZ);
+	nllp = 0;
+	strspace = 0;
+	for (llp = (llp_t *)llp_list.q_forw; llp != (llp_t *)&llp_list;
+	    llp = (llp_t *)llp->llp_links.q_forw) {
+		nllp++;
+		if (llp->llp_ipv4addrstr != NULL)
+			strspace += strlen(llp->llp_ipv4addrstr) + 1;
+		if (llp->llp_ipv6addrstr != NULL)
+			strspace += strlen(llp->llp_ipv6addrstr) + 1;
+	}
+	*countp = nllp;
+	/* Note that malloc doesn't guarantee a NULL return for zero count */
+	llplist = nllp == 0 ? NULL :
+	    malloc(sizeof (*llplist) * nllp + strspace);
+	if (llplist != NULL) {
+		*lsize = sizeof (*llplist) * nllp + strspace;
+		llpl = llplist;
+		strptr = (char *)(llplist + nllp);
+		for (llp = (llp_t *)llp_list.q_forw; llp != (llp_t *)&llp_list;
+		    llp = (llp_t *)llp->llp_links.q_forw) {
+			*llpl = *llp;
+			strinsert(&llpl->llp_ipv4addrstr, llp->llp_ipv4addrstr,
+			    &strptr);
+			strinsert(&llpl->llp_ipv6addrstr, llp->llp_ipv6addrstr,
+			    &strptr);
+			llpl++;
+		}
+	}
+	(void) pthread_mutex_unlock(&llp_lock);
+
+	/* Add in the special door-only state flags */
+	llpl = llplist;
+	while (nllp-- > 0) {
+		get_interface_state(llpl->llp_lname, &llpl->llp_dhcp_failed,
+		    &llpl->llp_link_up);
+		if (llpl->llp_type == IF_WIRELESS) {
+			get_wireless_state(llpl->llp_lname,
+			    &llpl->llp_need_wlan, &llpl->llp_need_key);
+		}
+		llpl++;
+	}
+	return (llplist);
+}
+
+/*
+ * This is called for the special case when there are outstanding requests sent
+ * to the user interface, and the user interface disappears.  We handle this
+ * case by re-running bringupinterface() without deselecting.  That function
+ * will call the wireless and DHCP-related parts again, and they should proceed
+ * in automatic mode, because the UI is now gone.
+ *
+ * Called only by the main thread or by a thread holding machine_lock.
+ */
+void
+llp_reselect(void)
+{
+	llp_t *llp;
+	const char *host;
+
+	/*
+	 * If there's no active profile, or if the active profile isn't waiting
+	 * on the UI, then just return; nothing to do.
+	 */
+	if ((llp = link_layer_profile) == NULL || !llp->llp_waiting)
+		return;
+
+	host = (llp->llp_ipv4src == IPV4SRC_DHCP) ? "dhcp" :
+	    llp->llp_ipv4addrstr;
+
+	dprintf("llp_reselect: bringing up %s", llp_prnm(llp));
+	switch (bringupinterface(llp->llp_lname, host, llp->llp_ipv6addrstr,
+	    llp->llp_ipv6onlink)) {
+	case SUCCESS:
+		llp->llp_failed = B_FALSE;
+		llp->llp_waiting = B_FALSE;
+		dprintf("llp_reselect: activated llp for %s", llp_prnm(llp));
+		break;
+	case FAILURE:
+		llp->llp_failed = B_TRUE;
+		llp->llp_waiting = B_FALSE;
+		dprintf("llp_reselect: failed to bring up %s", llp_prnm(llp));
+		report_llp_unselected(llp->llp_lname, dcFailed);
+		link_layer_profile = NULL;
+		break;
+	case WAITING:
+		llp->llp_failed = B_FALSE;
+		dprintf("llp_reselect: waiting for %s", llp_prnm(llp));
+	}
+}
+
+/*
+ * This is used by the wireless module to check on the selected LLP.  We don't
+ * do periodic rescans if a wireless interface is current and if its connection
+ * state is good.
+ */
+void
+llp_get_name_and_type(char *ifname, size_t ifnlen,
+    libnwam_interface_type_t *iftype)
+{
+	*ifname = '\0';
+	*iftype = IF_UNKNOWN;
+
+	if (pthread_mutex_lock(&llp_lock) == 0) {
+		if (link_layer_profile != NULL) {
+			(void) strlcpy(ifname, link_layer_profile->llp_lname,
+			    ifnlen);
+			*iftype = link_layer_profile->llp_type;
+		}
+		(void) pthread_mutex_unlock(&llp_lock);
+	}
+}
+
+/*
+ * This is called by the interface.c module to check if an interface needs to
+ * run DHCP.  It's intentionally called without ifs_lock held.
+ */
+libnwam_ipv4src_t
+llp_get_ipv4src(const char *ifname)
+{
+	libnwam_ipv4src_t src = IPV4SRC_DHCP;
+	llp_t *llp;
+
+	if (pthread_mutex_lock(&llp_lock) == 0) {
+		if ((llp = llp_lookup(ifname)) != NULL)
+			src = llp->llp_ipv4src;
+		(void) pthread_mutex_unlock(&llp_lock);
+	}
+	return (src);
+}
+
+/*
+ * Dump out the LLP state via debug messages.
+ */
+void
+print_llp_status(void)
+{
+	llp_t *llp;
+
+	if (pthread_mutex_lock(&llp_lock) == 0) {
+		if (link_layer_profile == NULL)
+			dprintf("no LLP selected");
+		else
+			dprintf("LLP %s selected",
+			    link_layer_profile->llp_lname);
+		if (locked_llp == NULL)
+			dprintf("no LLP locked");
+		else
+			dprintf("LLP %s locked", locked_llp->llp_lname);
+		for (llp = (llp_t *)llp_list.q_forw;
+		    llp != (llp_t *)&llp_list;
+		    llp = (llp_t *)llp->llp_links.q_forw) {
+			dprintf("LLP %s pri %d file order %d type %d "
+			    "%sfailed %swaiting src %d v4addr %s v6addr %s "
+			    "v6 %son-link",
+			    llp->llp_lname, llp->llp_pri, llp->llp_fileorder,
+			    (int)llp->llp_type, llp->llp_failed ? "" : "not ",
+			    llp->llp_waiting ? "" : "not ",
+			    (int)llp->llp_ipv4src,
+			    STRING(llp->llp_ipv4addrstr),
+			    STRING(llp->llp_ipv6addrstr),
+			    llp->llp_ipv6onlink ? "not " : "");
+		}
+		(void) pthread_mutex_unlock(&llp_lock);
+	}
 }

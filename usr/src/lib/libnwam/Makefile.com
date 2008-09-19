@@ -18,54 +18,35 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/cmd/cmd-inet/lib/nwamd/Makefile
-#
 
-# Needed for ROOTFS_LIBDIR definition
-include		../../../../lib/Makefile.lib
+LIBRARY =	libnwam.a
+VERS =		.1
+OBJECTS =	door.o
 
-PROG=		nwamd
-OBJS=		door.o events.o interface.o llp.o main.o \
-		state_machine.o util.o wireless.o
-SRCS=		$(OBJS:%.o=%.c)
-HEADERS=	defines.h functions.h structures.h variables.h
+include ../../Makefile.lib
+include ../../Makefile.rootfs
 
-include		../../../Makefile.cmd
+LIBS =		$(DYNLIB) $(LINTLIB)
 
-POFILE=		$(PROG).po
-POFILES=	interface.po wireless.po
+NWAMDIR=	$(SRC)/cmd/cmd-inet/lib/nwamd
+SRCDIR =	../common
+SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
+$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
-		-lgen -ldoor -lsecdb -lbsm -lsysevent -lnvpair
+LDLIBS +=	-ldoor -ldladm -lc
+
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-I$(SRCDIR) -I$(NWAMDIR)
 
 .KEEP_STATE:
 
-.PARALLEL:
+all: $(LIBS)
 
-all: $(PROG)
+lint: lintcheck
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-install: $(ROOTCMD)
-
-check:  $(SRCS) $(HEADERS)
-	$(CSTYLE) -cpP $(SRCS) $(HEADERS)
-
-$(ROOTCMD): $(PROG)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-include		../../../Makefile.targ
-include		../../Makefile.msg
+include ../../Makefile.targ
