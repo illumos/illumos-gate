@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include "tables.h"
@@ -688,7 +686,7 @@ incoming_prefix_stateful(struct phyint *pi, uchar_t *opt)
 		    po->nd_opt_pi_prefix_len);
 	foundpref = _B_FALSE;
 	for (pr = pi->pi_prefix_list; pr != NULL; pr = pr->pr_next) {
-		if (prefix_equal(po->nd_opt_pi_prefix, pr->pr_address,
+		if (prefix_equal(po->nd_opt_pi_prefix, pr->pr_prefix,
 		    po->nd_opt_pi_prefix_len)) {
 			if ((pr->pr_flags & IFF_DHCPRUNNING) &&
 			    pr->pr_prefix_len != po->nd_opt_pi_prefix_len) {
