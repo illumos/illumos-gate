@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <alloca.h>
@@ -121,6 +119,11 @@ event_valid(int picnum, char *event)
 
 
 	cpc_walk_events_pic(cpc, picnum, event, event_walker);
+
+	if (found)
+		return (1);
+
+	cpc_walk_generic_events_pic(cpc, picnum, event, event_walker);
 
 	if (found)
 		return (1);

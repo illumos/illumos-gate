@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libcpc.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -809,12 +807,73 @@ cpc_walk_events_all(cpc_t *cpc, void *arg,
 		p = list[i];
 		while ((e = strchr(p, ',')) != NULL) {
 			*e = '\0';
+
+			/* Skip any generic event names we find. */
+			if ((strncmp(p, "PAPI", 4)) == 0) {
+				p = e + 1;
+				continue;
+			}
+
 			if (__cpc_strhash_add(hash, p) == -1)
 				goto err;
 			p = e + 1;
 		}
-		if (__cpc_strhash_add(hash, p) == -1)
+		if ((strncmp(p, "PAPI", 4)) != 0) {
+			if (__cpc_strhash_add(hash, p) == -1)
+				goto err;
+		}
+	}
+
+	while ((p = __cpc_strhash_next(hash)) != NULL)
+		action(arg, p);
+
+err:
+	__cpc_strhash_free(hash);
+	for (i = 0; i < ncounters; i++)
+		free(list[i]);
+	free(list);
+}
+
+/*ARGSUSED*/
+void
+cpc_walk_generic_events_all(cpc_t *cpc, void *arg,
+    void (*action)(void *arg, const char *event))
+{
+	char		**list;
+	char		*p, *e;
+	int		i;
+	int		ncounters = cpc_npic(cpc);
+	cpc_strhash_t	*hash;
+
+	if ((list = malloc(ncounters * sizeof (char *))) == NULL)
+		return;
+
+	if ((hash = __cpc_strhash_alloc()) == NULL) {
+		free(list);
+		return;
+	}
+
+	for (i = 0; i < ncounters; i++) {
+		if ((list[i] = strdup(cpc->cpc_evlist[i])) == NULL)
 			goto err;
+		p = list[i];
+		while ((e = strchr(p, ',')) != NULL) {
+			*e = '\0';
+
+			/* Skip any platform specific event names we find. */
+			if ((strncmp(p, "PAPI", 4)) != 0) {
+				p = e + 1;
+				continue;
+			}
+
+			if (__cpc_strhash_add(hash, p) == -1)
+				goto err;
+			p = e + 1;
+		}
+		if ((strncmp(p, "PAPI", 4)) == 0) {
+			if (__cpc_strhash_add(hash, p) == -1)
+				goto err;
+		}
 	}
 
 	while ((p = __cpc_strhash_next(hash)) != NULL)
@@ -851,11 +910,67 @@ cpc_walk_events_pic(cpc_t *cpc, uint_t picno, void *arg,
 	p = list;
 	while ((e = strchr(p, ',')) != NULL) {
 		*e = '\0';
+
+		/* Skip any generic event names we find. */
+		if ((strncmp(p, "PAPI", 4)) == 0) {
+			p = e + 1;
+			continue;
+		}
+
 		action(arg, picno, p);
 		p = e + 1;
 	}
+
+	if ((strncmp(p, "PAPI", 4)) == 0)
+		goto out;
+
 	action(arg, picno, p);
 
+out:
+	free(list);
+}
+
+/*ARGSUSED*/
+void
+cpc_walk_generic_events_pic(cpc_t *cpc, uint_t picno, void *arg,
+    void (*action)(void *arg, uint_t picno, const char *event))
+{
+	char	*p;
+	char	*e;
+	char	*list;
+
+	if (picno >= cpc->cpc_npic) {
+		errno = EINVAL;
+		return;
+	}
+
+	if ((list = strdup(cpc->cpc_evlist[picno])) == NULL)
+		return;
+
+	/*
+	 * List now points to a comma-separated list of events supported by
+	 * the designated pic.
+	 */
+	p = list;
+	while ((e = strchr(p, ',')) != NULL) {
+		*e = '\0';
+
+		/* Skip any platform specific event names we find. */
+		if ((strncmp(p, "PAPI", 4)) != 0) {
+			p = e + 1;
+			continue;
+		}
+
+		action(arg, picno, p);
+		p = e + 1;
+	}
+
+	if ((strncmp(p, "PAPI", 4)) != 0)
+		goto out;
+
+	action(arg, picno, p);
+
+out:
 	free(list);
 }
 
@@ -1078,6 +1193,10 @@ cpc_valid_event(cpc_t *cpc, uint_t pic, const char *ev)
 
 	pr.name = ev;
 	cpc_walk_events_pic(cpc, pic, &pr, ev_walker);
+	if (pr.found)
+		return (1);
+
+	cpc_walk_generic_events_pic(cpc, pic, &pr, ev_walker);
 	if (pr.found)
 		return (1);
 

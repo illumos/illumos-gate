@@ -23,7 +23,45 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
+ */
 
 /*
  * Performance Counter Back-End for Pentium 4.
@@ -306,7 +344,15 @@ typedef struct _p4_event {
 	uint32_t	pe_ctr_mask;	/* Bitmap of capable counters */
 } p4_event_t;
 
+typedef struct _p4_generic_event {
+	char		*name;
+	char		*event;
+	uint16_t	emask;
+	uint32_t	ctr_mask;
+} p4_generic_event_t;
+
 #define	C(n) (1 << n)
+#define	GEN_EVT_END { NULL, NULL, 0x0, 0x0 }
 
 p4_event_t p4_events[] = {
 { "branch_retired", CRU2|CRU3, 0xF, 0x6, 0x5, C(12)|C(13)|C(14)|C(15)|C(16) },
@@ -339,7 +385,7 @@ p4_event_t p4_events[] = {
 { "x87_SIMD_moves_uop", FIRM0|FIRM1, 0x18, 0x2E, 0x1, C(8)|C(9)|C(10)|C(11) },
 { "machine_clear", CRU2|CRU3, 0xD, 0x2, 0x5,
 	C(12)|C(13)|C(14)|C(15)|C(16)|C(17)},
-{ "global_power_events", FSB0|FSB1, 0x1, 0x5, 0x6, C(0)|C(1)|C(2)|C(3) },
+{ "global_power_events", FSB0|FSB1, 0x1, 0x13, 0x6, C(0)|C(1)|C(2)|C(3) },
 { "tc_ms_xfer", MS0|MS1, 0x1, 0x5, 0x0, C(4)|C(5)|C(6)|C(7) },
 { "uop_queue_writes", MS0|MS1, 0x7, 0x9, 0x0, C(4)|C(5)|C(6)|C(7) },
 { "front_end_event", CRU2|CRU3, 0x3, 0x8, 0x5,
@@ -357,6 +403,24 @@ p4_event_t p4_events[] = {
 	C(4)|C(5)|C(6)|C(7)},
 { "retired_branch_type", TBPU0|TBPU1, 0x1F, 0x4, 0x2, C(4)|C(5)|C(6)|C(7) },
 { NULL, 0, 0, 0, 0 }
+};
+
+static p4_generic_event_t p4_generic_events[] = {
+{ "PAPI_br_msp", "branch_retired", 0xa, C(12)|C(13)|C(14)|C(15)|C(16) },
+{ "PAPI_br_ins", "branch_retired", 0xf, C(12)|C(13)|C(14)|C(15)|C(16) },
+{ "PAPI_br_tkn", "branch_retired", 0xc, C(12)|C(13)|C(14)|C(15)|C(16) },
+{ "PAPI_br_ntk", "branch_retired", 0x3, C(12)|C(13)|C(14)|C(15)|C(16) },
+{ "PAPI_br_prc", "branch_retired", 0x5, C(12)|C(13)|C(14)|C(15)|C(16) },
+{ "PAPI_tot_ins", "instr_retired", 0x3, C(12)|C(13)|C(14)|C(15)|C(16)|C(17) },
+{ "PAPI_tot_cyc", "global_power_events", 0x1, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_tlb_dm", "page_walk_type", 0x1, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_tlb_im", "page_walk_type", 0x2, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_tlb_tm", "page_walk_type", 0x3, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_l1_icm", "BPU_fetch_request", 0x1, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_l2_ldm", "BSQ_cache_reference", 0x100, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_l2_stm", "BSQ_cache_reference", 0x400, C(0)|C(1)|C(2)|C(3) },
+{ "PAPI_l2_tcm", "BSQ_cache_reference", 0x500, C(0)|C(1)|C(2)|C(3) },
+GEN_EVT_END
 };
 
 /*
@@ -378,9 +442,10 @@ static int p4_htt = 0;
 static int
 p4_pcbe_init(void)
 {
-	int		i;
-	size_t		size;
-	p4_event_t	*ev;
+	int			i;
+	size_t			size;
+	p4_event_t		*ev;
+	p4_generic_event_t	*gevp;
 
 	/*
 	 * If we're not running on a P4, refuse to load.
@@ -397,9 +462,15 @@ p4_pcbe_init(void)
 	 */
 	for (i = 0; i < 18; i++) {
 		size = 0;
+
 		for (ev = p4_events; ev->pe_name != NULL; ev++) {
 			if (ev->pe_ctr_mask & C(i))
 				size += strlen(ev->pe_name) + 1;
+		}
+
+		for (gevp = p4_generic_events; gevp->name != NULL; gevp++) {
+			if (gevp->ctr_mask & C(i))
+				size += strlen(gevp->name) + 1;
 		}
 
 		/*
@@ -415,6 +486,14 @@ p4_pcbe_init(void)
 				(void) strcat(p4_eventlist[i], ",");
 			}
 		}
+
+		for (gevp = p4_generic_events; gevp->name != NULL; gevp++) {
+			if (gevp->ctr_mask & C(i)) {
+				(void) strcat(p4_eventlist[i], gevp->name);
+				(void) strcat(p4_eventlist[i], ",");
+			}
+		}
+
 		/*
 		 * Remove trailing ','
 		 */
@@ -474,14 +553,41 @@ p4_pcbe_list_attrs(void)
 	return (P4_ATTRS);
 }
 
+static p4_generic_event_t *
+find_generic_event(char *name)
+{
+	p4_generic_event_t	*gevp;
+
+	for (gevp = p4_generic_events; gevp != NULL; gevp++)
+		if (strcmp(name, gevp->name) == 0)
+			return (gevp);
+
+	return (NULL);
+}
+
+static p4_event_t *
+find_event(char *name)
+{
+	p4_event_t		*evp;
+
+	for (evp = p4_events; evp->pe_name != NULL; evp++)
+		if (strcmp(name, evp->pe_name) == 0)
+			return (evp);
+
+	return (NULL);
+}
+
 static uint64_t
 p4_pcbe_event_coverage(char *event)
 {
-	p4_event_t *ev;
+	p4_event_t		*ev;
+	p4_generic_event_t	*gevp;
 
-	for (ev = p4_events; ev->pe_name != NULL; ev++) {
-		if (strcmp(event, ev->pe_name) == 0)
-			break;
+	if ((ev = find_event(event)) == NULL) {
+		if ((gevp = find_generic_event(event)) != NULL)
+			return (gevp->ctr_mask);
+		else
+			return (0);
 	}
 
 	return (ev->pe_ctr_mask);
@@ -568,6 +674,7 @@ p4_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 	p4_pcbe_config_t	*cfgs[18];
 	p4_pcbe_config_t	*cfg;
 	p4_event_t		*ev;
+	p4_generic_event_t	*gevp;
 	int			escr_ndx;
 	int			i;
 	uint16_t		emask = 0;
@@ -580,6 +687,7 @@ p4_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 	int			edge = 0;
 	int			sibling_usr = 0; /* count usr on other cpu */
 	int			sibling_sys = 0; /* count sys on other cpu */
+	int			invalid_attr = 0;
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -594,12 +702,31 @@ p4_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 	if (picnum < 0 || picnum >= 18)
 		return (CPC_INVALID_PICNUM);
 
-	for (ev = p4_events; ev->pe_name != NULL; ev++) {
-		if (strcmp(eventname, ev->pe_name) == 0)
-			break;
+	if ((ev	= find_event(eventname)) == NULL) {
+		if ((gevp = find_generic_event(eventname)) != NULL) {
+			ev = find_event(gevp->event);
+			ASSERT(ev != NULL);
+
+			/*
+			 * For generic events a HTT processor is only allowed
+			 * to specify the 'active_thread', 'count_sibling_usr'
+			 * and 'count_sibling_sys' attributes.
+			 */
+			if (p4_htt)
+				for (i = 0; i < nattrs; i++)
+					if (strstr(P4_ATTRS,
+					    attrs[i].ka_name) != NULL)
+						invalid_attr = 1;
+
+			if ((p4_htt && invalid_attr) ||
+			    (!p4_htt && nattrs > 0))
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+
+			emask = gevp->emask;
+		} else {
+			return (CPC_INVALID_EVENT);
+		}
 	}
-	if (ev->pe_name == NULL)
-		return (CPC_INVALID_EVENT);
 
 	build_cfgs(cfgs, NULL, token);
 

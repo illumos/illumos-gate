@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	 __EXTENSIONS__	/* header bug! strtok_r is overly hidden */
 #include <string.h>
@@ -139,7 +136,7 @@ allpics_equal(cpc_t *cpc)
 	for (i = 1; i < npics; i++)
 		if (lists[i]->size != lists[0]->size ||
 		    strncmp(lists[i]->list, lists[0]->list,
-			lists[0]->size) != 0) {
+		    lists[0]->size) != 0) {
 			ret = 0;
 			break;
 		}
@@ -160,7 +157,7 @@ capabilities(cpc_t *cpc, FILE *fp)
 	char *text, *tok, *cp;
 	const char *ccp;
 	int npic = cpc_npic(cpc);
-	int i;
+	int i, pics_equal = allpics_equal(cpc);
 
 	args->fp = fp;
 
@@ -174,7 +171,30 @@ capabilities(cpc_t *cpc, FILE *fp)
 	(void) fprintf(args->fp, "\t[picn=]<eventn>[,attr[n][=<val>]]"
 	    "[,[picn=]<eventn>[,attr[n][=<val>]],...]\n");
 
-	if (allpics_equal(cpc)) {
+	(void) fprintf(args->fp, gettext("\n\tGeneric Events:\n"));
+
+	if (pics_equal) {
+		args->margin = args->colnum = EVENT_MARGIN;
+		(void) fprintf(args->fp, "\n\tevent[0-%d]: ", npic - 1);
+		cpc_walk_generic_events_pic(cpc, 0, args, list_cap);
+		(void) fprintf(args->fp, "\n");
+	} else {
+		args->margin = EVENT_MARGIN;
+		for (i = 0; i < npic; i++) {
+			(void) fprintf(args->fp, "\n\tevent%d: ", i);
+			if (i < 10) (void) fprintf(args->fp, " ");
+			args->colnum = EVENT_MARGIN;
+			cpc_walk_generic_events_pic(cpc, i, args, list_cap);
+			(void) fprintf(args->fp, "\n");
+		}
+	}
+
+	(void) fprintf(args->fp, gettext("\n\tSee generic_events(3CPC) for"
+	    " descriptions of these events\n\n"));
+
+	(void) fprintf(args->fp, gettext("\tPlatform Specific Events:\n"));
+
+	if (pics_equal) {
 		args->margin = args->colnum = EVENT_MARGIN;
 		(void) fprintf(args->fp, "\n\tevent[0-%d]: ", npic - 1);
 		cpc_walk_events_pic(cpc, 0, args, list_cap);

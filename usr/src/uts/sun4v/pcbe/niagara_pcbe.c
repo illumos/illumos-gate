@@ -24,10 +24,48 @@
  */
 
 /*
- * Niagara Performance Counter Backend
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Niagara Performance Counter Backend
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
@@ -90,8 +128,14 @@ struct nametable {
 	const char	*name;
 };
 
+typedef struct _ni_generic_events {
+	char *name;
+	char *event;
+} ni_generic_event_t;
+
 #define	ULTRA_PCR_PRIVPIC	(UINT64_C(1) << CPC_NIAGARA_PCR_PRIVPIC)
 #define	NT_END 0xFF
+#define	GEN_EVT_END { NULL, NULL }
 
 static const uint64_t   allstopped = ULTRA_PCR_PRIVPIC;
 
@@ -117,7 +161,29 @@ static const struct nametable *Niagara_names[2] = {
 	Niagara_names1
 };
 
+static const ni_generic_event_t Niagara_generic_names1[] = {
+	{ "PAPI_tot_ins",	"Instr_cnt" },
+	{ NULL,			NULL }
+};
+
+static const ni_generic_event_t Niagara_generic_names0[] = {
+	{ "PAPI_l2_icm",	"L2_imiss" },
+	{ "PAPI_l2_ldm",	"L2_dmiss_ld" },
+	{ "PAPI_fp_ops",	"FP_instr_cnt" },
+	{ "PAPI_l1_icm",	"IC_miss" },
+	{ "PAPI_l1_dcm",	"DC_miss" },
+	{ "PAPI_tlb_im",	"ITLB_miss" },
+	{ "PAPI_tlb_dm",	"DTLB_miss" },
+	{ NULL,			NULL }
+};
+
+static const ni_generic_event_t *Niagara_generic_names[2] = {
+	Niagara_generic_names0,
+	Niagara_generic_names1
+};
+
 static const struct nametable **events;
+static const ni_generic_event_t **generic_events;
 static const char *ni_impl_name = "UltraSPARC T1";
 static char *pic_events[2];
 static uint16_t pcr_pic0_mask;
@@ -132,11 +198,13 @@ static const char *niagara_cpuref = "See the \"UltraSPARC T1 User's Manual\" "
 static int
 ni_pcbe_init(void)
 {
-	const struct nametable	*n;
-	int			i;
-	size_t			size;
+	const struct nametable		*n;
+	const ni_generic_event_t	*gevp;
+	int				i;
+	size_t				size;
 
 	events = Niagara_names;
+	generic_events = Niagara_generic_names;
 	pcr_pic0_mask = CPC_NIAGARA_PCR_PIC0_MASK;
 	pcr_pic1_mask = CPC_NIAGARA_PCR_PIC1_MASK;
 
@@ -149,10 +217,16 @@ ni_pcbe_init(void)
 		size = 0;
 		for (n = events[i]; n->bits != NT_END; n++)
 			size += strlen(n->name) + 1;
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++)
+			size += strlen(gevp->name) + 1;
 		pic_events[i] = kmem_alloc(size + 1, KM_SLEEP);
 		*pic_events[i] = '\0';
 		for (n = events[i]; n->bits != NT_END; n++) {
 			(void) strcat(pic_events[i], n->name);
+			(void) strcat(pic_events[i], ",");
+		}
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++) {
+			(void) strcat(pic_events[i], gevp->name);
 			(void) strcat(pic_events[i], ",");
 		}
 		/*
@@ -196,10 +270,23 @@ ni_pcbe_list_attrs(void)
 	return ("");
 }
 
+static const ni_generic_event_t *
+find_generic_event(int regno, char *name)
+{
+	const ni_generic_event_t *gevp;
+
+	for (gevp = generic_events[regno]; gevp->name != NULL; gevp++) {
+		if (strcmp(gevp->name, name) == 0)
+			return (gevp);
+	}
+
+	return (NULL);
+}
+
 static const struct nametable *
 find_event(int regno, char *name)
 {
-	const struct nametable *n;
+	const struct nametable		*n;
 
 	n = events[regno];
 
@@ -215,9 +302,11 @@ ni_pcbe_event_coverage(char *event)
 {
 	uint64_t bitmap = 0;
 
-	if (find_event(0, event) != NULL)
+	if ((find_event(0, event) != NULL) ||
+	    (find_generic_event(0, event) != NULL))
 		bitmap = 0x1;
-	if (find_event(1, event) != NULL)
+	if ((find_event(1, event) != NULL) ||
+	    (find_generic_event(1, event) != NULL))
 		bitmap |= 0x2;
 
 	return (bitmap);
@@ -252,9 +341,10 @@ static int
 ni_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
     uint_t nattrs, kcpc_attr_t *attrs, void **data, void *token)
 {
-	ni_pcbe_config_t *conf;
-	const struct nametable *n;
-	ni_pcbe_config_t *other_config;
+	ni_pcbe_config_t		*conf;
+	const struct nametable		*n;
+	const ni_generic_event_t	*gevp;
+	ni_pcbe_config_t		*other_config;
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -279,8 +369,14 @@ ni_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	    (other_config->pcbe_flags != flags))
 		return (CPC_CONFLICTING_REQS);
 
-	if ((n = find_event(picnum, event)) == NULL)
-		return (CPC_INVALID_EVENT);
+	if ((n = find_event(picnum, event)) == NULL) {
+		if ((gevp = find_generic_event(picnum, event)) != NULL) {
+			n = find_event(picnum, gevp->event);
+			ASSERT(n != NULL);
+		} else {
+			return (CPC_INVALID_EVENT);
+		}
+	}
 
 	conf = kmem_alloc(sizeof (ni_pcbe_config_t), KM_SLEEP);
 

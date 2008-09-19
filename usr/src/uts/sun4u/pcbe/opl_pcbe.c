@@ -24,10 +24,48 @@
  */
 
 /*
- * SPARC64 VI & VII Performance Counter Backend
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * SPARC64 VI & VII Performance Counter Backend
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
@@ -89,6 +127,11 @@ struct nametable {
 	const uint8_t	bits;
 	const char	*name;
 };
+
+typedef struct _opl_generic_event {
+	char *name;
+	char *event;
+} opl_generic_event_t;
 
 /*
  * Performance Control Register (PCR)
@@ -178,6 +221,7 @@ struct nametable {
 }
 
 #define	NT_END 0xFF
+#define	CPC_GEN_END { NULL, NULL }
 
 static const uint64_t   allstopped = SPARC64_VI_PCR_PRIVPIC |
 	SPARC64_VI_PCR_ULRO | SPARC64_VI_PCR_OVRO;
@@ -395,7 +439,71 @@ opl_pcbe_config_t nullpic[CPC_SPARC64_VI_NPIC] = {
 	{7, 0x3f, 0, 0}
 };
 
+#define	SPARC64_VI_GENERIC_EVENTS_comm				\
+	{ "PAPI_tot_cyc",	"cycle_counts" },		\
+	{ "PAPI_tot_ins",	"instruction_counts" },		\
+	{ "PAPI_br_tkn",	"branch_instructions" },	\
+	{ "PAPI_fp_ops",	"floating_instructions" },	\
+	{ "PAPI_fma_ins",	"impdep2_instructions" }
+
+static const opl_generic_event_t SPARC64_VI_generic_names_l0[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_u0[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_l1[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_u1[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_l2[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	{ "PAPI_l1_dcm",	"op_r_iu_req_mi_go" },
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_u2[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	{ "PAPI_l1_icm",	"if_r_iu_req_mi_go" },
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_l3[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	{ "PAPI_tlb_dm",	"trap_DMMU_miss" },
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t SPARC64_VI_generic_names_u3[] = {
+	SPARC64_VI_GENERIC_EVENTS_comm,
+	{ "PAPI_tlb_im",	"trap_IMMU_miss" },
+	CPC_GEN_END
+};
+
+static const opl_generic_event_t
+	*SPARC64_VI_generic_names[CPC_SPARC64_VI_NPIC] = {
+	SPARC64_VI_generic_names_l0,
+	SPARC64_VI_generic_names_u0,
+	SPARC64_VI_generic_names_l1,
+	SPARC64_VI_generic_names_u1,
+	SPARC64_VI_generic_names_l2,
+	SPARC64_VI_generic_names_u2,
+	SPARC64_VI_generic_names_l3,
+	SPARC64_VI_generic_names_u3
+};
+
 static const struct nametable **events;
+static const opl_generic_event_t **generic_events;
 static const char *opl_impl_name;
 static const char *opl_cpuref;
 static char *pic_events[CPC_SPARC64_VI_NPIC];
@@ -406,9 +514,10 @@ static const char *sp_6_ref = "See the \"SPARC64 VI extensions\" and "
 static int
 opl_pcbe_init(void)
 {
-	const struct nametable	*n;
-	int			i;
-	size_t			size;
+	const struct nametable		*n;
+	const opl_generic_event_t	*gevp;
+	int				i;
+	size_t				size;
 
 	/*
 	 * Discover type of CPU
@@ -419,6 +528,7 @@ opl_pcbe_init(void)
 	case OLYMPUS_C_IMPL:
 	case JUPITER_IMPL:
 		events = SPARC64_VI_names;
+		generic_events = SPARC64_VI_generic_names;
 		opl_impl_name = "SPARC64 VI & VII";
 		opl_cpuref = sp_6_ref;
 		break;
@@ -435,12 +545,19 @@ opl_pcbe_init(void)
 		size = 0;
 		for (n = events[i]; n->bits != NT_END; n++)
 			size += strlen(n->name) + 1;
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++)
+			size += strlen(gevp->name) + 1;
 		pic_events[i] = kmem_alloc(size + 1, KM_SLEEP);
 		*pic_events[i] = '\0';
 		for (n = events[i]; n->bits != NT_END; n++) {
 			(void) strcat(pic_events[i], n->name);
 			(void) strcat(pic_events[i], ",");
 		}
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++) {
+			(void) strcat(pic_events[i], gevp->name);
+			(void) strcat(pic_events[i], ",");
+		}
+
 		/*
 		 * Remove trailing comma.
 		 */
@@ -482,6 +599,18 @@ opl_pcbe_list_attrs(void)
 	return ("");
 }
 
+static const opl_generic_event_t *
+find_generic_event(int regno, char *name)
+{
+	const opl_generic_event_t *gevp;
+
+	for (gevp = generic_events[regno]; gevp->name != NULL; gevp++)
+		if (strcmp(name, gevp->name) == 0)
+			return (gevp);
+
+	return (NULL);
+}
+
 static const struct nametable *
 find_event(int regno, char *name)
 {
@@ -503,7 +632,8 @@ opl_pcbe_event_coverage(char *event)
 
 	int	i;
 	for (i = 0; i < CPC_SPARC64_VI_NPIC; i++) {
-		if (find_event(i, event) != NULL)
+		if ((find_event(i, event) != NULL) ||
+		    (find_generic_event(i, event) != NULL))
 			bitmap |= (1 << i);
 	}
 
@@ -529,9 +659,10 @@ static int
 opl_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
     uint_t nattrs, kcpc_attr_t *attrs, void **data, void *token)
 {
-	opl_pcbe_config_t *conf;
-	const struct nametable *n;
-	opl_pcbe_config_t *other_config;
+	opl_pcbe_config_t		*conf;
+	const struct nametable		*n;
+	const opl_generic_event_t	*gevp;
+	opl_pcbe_config_t		*other_config;
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -557,8 +688,14 @@ opl_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	    (other_config->opl_flags != flags))
 		return (CPC_CONFLICTING_REQS);
 
-	if ((n = find_event(picnum, event)) == NULL)
-		return (CPC_INVALID_EVENT);
+	if ((n = find_event(picnum, event)) == NULL) {
+		if ((gevp = find_generic_event(picnum, event)) != NULL) {
+			n = find_event(picnum, gevp->event);
+			ASSERT(n != NULL);
+		} else {
+			return (CPC_INVALID_EVENT);
+		}
+	}
 
 	conf = kmem_alloc(sizeof (opl_pcbe_config_t), KM_SLEEP);
 

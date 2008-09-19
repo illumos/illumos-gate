@@ -155,6 +155,9 @@ usr/src/uts/intel/THIRDPARTYLICENSE
 usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE
 usr/src/uts/intel/io/amd8111s/THIRDPARTYLICENSE.amd8111s
 usr/src/uts/intel/io/amr/THIRDPARTYLICENSE
+usr/src/uts/intel/pcbe/THIRDPARTYLICENSE
+usr/src/uts/sun4u/pcbe/THIRDPARTYLICENSE
+usr/src/uts/sun4v/pcbe/THIRDPARTYLICENSE
 usr/src/common/mpi/THIRDPARTYLICENSE
 usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple
 usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov

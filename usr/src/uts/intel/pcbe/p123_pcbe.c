@@ -23,7 +23,45 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
+ */
 
 /*
  * Performance Counter Back-End for Pentiums I, II, and III.
@@ -109,7 +147,14 @@ struct nametable {
 	const char	*name;
 };
 
+typedef struct _ptm_generic_events {
+	char *name;
+	char *event;
+	uint8_t umask;
+} ptm_generic_event_t;
+
 #define	NT_END 0xFF
+#define	CPC_GEN_END { NULL, NULL }
 
 /*
  * Basic Pentium events
@@ -347,7 +392,69 @@ static const struct nametable *P6_names[2] = {
 	_P6_names
 };
 
+#define	P5_GENERIC_EVENTS					\
+	{ "PAPI_tot_ins",	"instr_exec",	 0x0 },		\
+	{ "PAPI_tlb_dm",	"data_tlb_miss", 0x0 },		\
+	{ "PAPI_tlb_im",	"code_tlb_miss", 0x0 },		\
+	{ "PAPI_fp_ops",	"flops" }
+
+static const ptm_generic_event_t P5mmx_generic_names0[] = {
+	P5_GENERIC_EVENTS,
+	{ "PAPI_tot_cyc",	"clks_not_HLT", 0x0 },
+	CPC_GEN_END
+};
+
+static const ptm_generic_event_t P5mmx_generic_names1[] = {
+	P5_GENERIC_EVENTS,
+	{ "PAPI_br_ins",	"taken_br",	0x0 },
+	CPC_GEN_END
+};
+
+static const ptm_generic_event_t *P5mmx_generic_names[2] = {
+	P5mmx_generic_names0,
+	P5mmx_generic_names1
+};
+
+static const ptm_generic_event_t _P6_generic_names[] = {
+	{ "PAPI_ca_shr",	"l2_ifetch",		0xf },
+	{ "PAPI_ca_cln",	"bus_tran_rfo",		0x0 },
+	{ "PAPI_ca_itv",	"bus_tran_inval",	0x0 },
+	{ "PAPI_tlb_im",	"itlb_miss",		0x0 },
+	{ "PAPI_btac_m",	"btb_misses",		0x0 },
+	{ "PAPI_hw_int",	"hw_int_rx",		0x0 },
+	{ "PAPI_br_cn",		"br_inst_retired",	0x0 },
+	{ "PAPI_br_tkn",	"br_taken_retired",	0x0 },
+	{ "PAPI_br_msp",	"br_miss_pred_taken_ret", 0x0 },
+	{ "PAPI_br_ins",	"br_inst_retired",	0x0 },
+	{ "PAPI_res_stl",	"resource_stalls",	0x0 },
+	{ "PAPI_tot_iis",	"inst_decoder",		0x0 },
+	{ "PAPI_tot_ins",	"inst_retired",		0x0 },
+	{ "PAPI_tot_cyc",	"cpu_clk_unhalted",	0x0 },
+	{ "PAPI_l1_dcm",	"dcu_lines_in",		0x0 },
+	{ "PAPI_l1_icm",	"l2_ifetch",		0xf },
+	{ "PAPI_l1_tcm",	"l2_rqsts",		0xf },
+	{ "PAPI_l1_dca",	"data_mem_refs",	0x0 },
+	{ "PAPI_l1_stm",	"l2_st",		0xf },
+	{ "PAPI_l2_icm",	"bus_tran_ifetch",	0x0 },
+	{ "PAPI_l2_dcr",	"l2_ld",		0xf },
+	{ "PAPI_l2_dcw",	"l2_st",		0xf },
+	{ "PAPI_l2_tcm",	"l2_lines_in",		0x0 },
+	{ "PAPI_l2_tca",	"l2_rqsts",		0xf },
+	{ "PAPI_l2_tcw",	"l2_st",		0xf },
+	{ "PAPI_l2_stm",	"l2_m_lines_inm",	0x0 },
+	{ "PAPI_fp_ins",	"flops",		0x0 },
+	{ "PAPI_fp_ops",	"flops",		0x0 },
+	{ "PAPI_fml_ins",	"mul",			0x0 },
+	{ "PAPI_fdv_ins",	"div",			0x0 }
+};
+
+static const ptm_generic_event_t *P6_generic_names[2] = {
+	_P6_generic_names,
+	_P6_generic_names
+};
+
 static const struct nametable **events;
+static const ptm_generic_event_t **generic_events;
 
 #define	BITS(v, u, l)	\
 	(((v) >> (l)) & ((1 << (1 + (u) - (l))) - 1))
@@ -424,9 +531,10 @@ static const struct nametable **events;
 static int
 ptm_pcbe_init(void)
 {
-	const struct nametable	*n;
-	int			i;
-	size_t			size;
+	const struct nametable		*n;
+	const ptm_generic_event_t	*gevp;
+	int				i;
+	size_t				size;
 
 	if (x86_feature & X86_MMX)
 		ptm_rdpmc_avail = 1;
@@ -445,6 +553,7 @@ ptm_pcbe_init(void)
 	switch (cpuid_getfamily(CPU)) {
 	case 5:		/* Pentium and Pentium with MMX */
 		events = P5mmx_names;
+		generic_events = P5mmx_generic_names;
 		ptm_ver = PTM_VER_P5;
 		ptm_cpuref = P5_CPUREF;
 		if (cpuid_getmodel(CPU) < 4)
@@ -454,6 +563,7 @@ ptm_pcbe_init(void)
 		break;
 	case 6:		/* Pentium Pro and Pentium II and III */
 		events = P6_names;
+		generic_events = P6_generic_names;
 		ptm_ver = PTM_VER_P6;
 		ptm_cpuref = P6_CPUREF;
 		ptm_pcbe_ops.pcbe_caps = CPC_CAP_OVERFLOW_INTERRUPT;
@@ -475,12 +585,19 @@ ptm_pcbe_init(void)
 		size = 0;
 		for (n = events[i]; n->bits != NT_END; n++)
 			size += strlen(n->name) + 1;
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++)
+			size += strlen(gevp->name) + 1;
 		pic_events[i] = kmem_alloc(size + 1, KM_SLEEP);
 		*pic_events[i] = '\0';
 		for (n = events[i]; n->bits != NT_END; n++) {
 			(void) strcat(pic_events[i], n->name);
 			(void) strcat(pic_events[i], ",");
 		}
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++) {
+			(void) strcat(pic_events[i], gevp->name);
+			(void) strcat(pic_events[i], ",");
+		}
+
 		/*
 		 * Remove trailing comma.
 		 */
@@ -529,6 +646,18 @@ ptm_pcbe_list_attrs(void)
 		return ("noedge,pc,inv,int,umask,cmask");
 }
 
+static const ptm_generic_event_t *
+find_generic_event(int regno, char *name)
+{
+	const ptm_generic_event_t	*gevp;
+
+	for (gevp = generic_events[regno]; gevp->name != NULL; gevp++)
+		if (strcmp(name, gevp->name) == 0)
+			return (gevp);
+
+	return (NULL);
+}
+
 static const struct nametable *
 find_event(int regno, char *name)
 {
@@ -548,9 +677,11 @@ ptm_pcbe_event_coverage(char *event)
 {
 	uint64_t bitmap = 0;
 
-	if (find_event(0, event) != NULL)
+	if ((find_event(0, event) != NULL) ||
+	    (find_generic_event(0, event) != NULL))
 		bitmap = 0x1;
-	if (find_event(1, event) != NULL)
+	if ((find_event(1, event) != NULL) ||
+	    (find_generic_event(1, event) != NULL))
 		bitmap |= 0x2;
 
 	return (bitmap);
@@ -599,11 +730,12 @@ ptm_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
     uint32_t flags, uint_t nattrs, kcpc_attr_t *attrs, void **data,
     void *token)
 {
-	ptm_pcbe_config_t	*conf;
-	const struct nametable	*n;
-	struct nametable	nt_raw = { 0, "raw" };
-	int			i;
-	int			ptm_flags = 0;
+	ptm_pcbe_config_t		*conf;
+	const struct nametable		*n;
+	const ptm_generic_event_t	*gevp;
+	struct nametable		nt_raw = { 0, "raw" };
+	int				i;
+	int				ptm_flags = 0;
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -618,30 +750,47 @@ ptm_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 	if (picnum != 0 && picnum != 1)
 		return (CPC_INVALID_PICNUM);
 
-	if ((n = find_event(picnum, eventname)) == NULL) {
-		long tmp;
-
-		/*
-		 * If ddi_strtol() likes this event, use it as a raw event code.
-		 */
-		if (ddi_strtol(eventname, NULL, 0, &tmp) != 0)
-			return (CPC_INVALID_EVENT);
-
-		nt_raw.bits = tmp;
-
-		if (ptm_ver == PTM_VER_P5)
-			nt_raw.bits &= CPC_P5_CESR_ES0_MASK;
-		else
-			nt_raw.bits &= CPC_P6_PES_PIC0_MASK;
-
-		n = &nt_raw;
-	}
-
 	conf = kmem_alloc(sizeof (ptm_pcbe_config_t), KM_SLEEP);
 
 	conf->ptm_picno = picnum;
 	conf->ptm_rawpic = trunc3931(preset);
 	conf->ptm_ctl = 0;
+
+	if ((n = find_event(picnum, eventname)) == NULL) {
+		if ((gevp = find_generic_event(picnum, eventname)) != NULL) {
+			n = find_event(picnum, gevp->event);
+			ASSERT(n != NULL);
+
+			if (nattrs > 0) {
+				kmem_free(conf, sizeof (ptm_pcbe_config_t));
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+			}
+
+			if (ptm_ver == PTM_VER_P6)
+				conf->ptm_ctl |= gevp->umask <<
+				    CPC_P6_PES_UMASK_SHIFT;
+		} else {
+			long tmp;
+
+			/*
+			 * If ddi_strtol() likes this event, use it as a raw
+			 * event code.
+			 */
+			if (ddi_strtol(eventname, NULL, 0, &tmp) != 0) {
+				kmem_free(conf, sizeof (ptm_pcbe_config_t));
+				return (CPC_INVALID_EVENT);
+			}
+
+			nt_raw.bits = tmp;
+
+			if (ptm_ver == PTM_VER_P5)
+				nt_raw.bits &= CPC_P5_CESR_ES0_MASK;
+			else
+				nt_raw.bits &= CPC_P6_PES_PIC0_MASK;
+
+			n = &nt_raw;
+		}
+	}
 
 	if (ptm_ver == PTM_VER_P5) {
 		int picshift;

@@ -24,6 +24,46 @@
  */
 
 /*
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
+ */
+
+/*
  * Niagara2 Performance Counter Backend
  */
 
@@ -95,8 +135,14 @@ typedef struct _ni2_event {
 	const uint32_t	emask_valid;	/* Mask of unreserved MASK bits */
 } ni2_event_t;
 
+typedef struct _ni2_generic_event {
+	char *name;
+	char *event;
+} ni2_generic_event_t;
+
 #define	ULTRA_PCR_PRIVPIC	(UINT64_C(1) << CPC_NIAGARA2_PCR_PRIV_SHIFT)
 #define	EV_END {NULL, 0, 0}
+#define	GEN_EV_END {NULL, NULL}
 
 static const uint64_t	allstopped = (ULTRA_PCR_PRIVPIC |
 	CPC_NIAGARA2_PCR_HOLDOV0 | CPC_NIAGARA2_PCR_HOLDOV1);
@@ -151,6 +197,22 @@ static ni2_event_t ni2_events[] = {
 	EV_END
 };
 
+static ni2_generic_event_t ni2_generic_events[] = {
+	{ "PAPI_tot_ins",	"Instr_cnt" },
+	{ "PAPI_l1_dcm",	"DC_miss" },
+	{ "PAPI_l1_icm",	"IC_miss" },
+	{ "PAPI_l2_icm",	"L2_imiss" },
+	{ "PAPI_l2_ldm",	"L2_dmiss_ld" },
+	{ "PAPI_tlb_dm",	"DTLB_miss" },
+	{ "PAPI_tlb_im",	"ITLB_miss" },
+	{ "PAPI_tlb_tm",	"TLB_miss" },
+	{ "PAPI_br_tkn",	"Br_taken" },
+	{ "PAPI_br_ins",	"Br_completed" },
+	{ "PAPI_ld_ins",	"Instr_ld" },
+	{ "PAPI_sr_ins",	"Instr_st" },
+	GEN_EV_END
+};
+
 static char		*evlist;
 static size_t		evlist_sz;
 static uint16_t 	pcr_pic0_mask;
@@ -174,16 +236,17 @@ static boolean_t cpu_hsvc_available = B_TRUE;
 static int
 ni2_pcbe_init(void)
 {
-	ni2_event_t	*evp;
-	int		status;
-	uint64_t	cpu_hsvc_major;
-	uint64_t	cpu_hsvc_minor;
+	ni2_event_t		*evp;
+	ni2_generic_event_t	*gevp;
+	int			status;
+	uint64_t		cpu_hsvc_major;
+	uint64_t		cpu_hsvc_minor;
 #if defined(NIAGARA2_IMPL)
-	uint64_t	hsvc_cpu_group = HSVC_GROUP_NIAGARA2_CPU;
-	uint64_t	hsvc_cpu_major = NIAGARA2_HSVC_MAJOR;
+	uint64_t		hsvc_cpu_group = HSVC_GROUP_NIAGARA2_CPU;
+	uint64_t		hsvc_cpu_major = NIAGARA2_HSVC_MAJOR;
 #elif defined(VFALLS_IMPL)
-	uint64_t	hsvc_cpu_group = HSVC_GROUP_VFALLS_CPU;
-	uint64_t	hsvc_cpu_major = VFALLS_HSVC_MAJOR;
+	uint64_t		hsvc_cpu_group = HSVC_GROUP_VFALLS_CPU;
+	uint64_t		hsvc_cpu_major = VFALLS_HSVC_MAJOR;
 #endif
 
 	pcr_pic0_mask = CPC_NIAGARA2_PCR_PIC0_MASK;
@@ -213,6 +276,9 @@ ni2_pcbe_init(void)
 	for (evp = ni2_events; evp->name != NULL; evp++)
 		evlist_sz += strlen(evp->name) + 1;
 
+	for (gevp = ni2_generic_events; gevp->name != NULL; gevp++)
+		evlist_sz += strlen(gevp->name) + 1;
+
 	evlist = kmem_alloc(evlist_sz + 1, KM_SLEEP);
 	evlist[0] = '\0';
 
@@ -220,6 +286,12 @@ ni2_pcbe_init(void)
 		(void) strcat(evlist, evp->name);
 		(void) strcat(evlist, ",");
 	}
+
+	for (gevp = ni2_generic_events; gevp->name != NULL; gevp++) {
+		(void) strcat(evlist, gevp->name);
+		(void) strcat(evlist, ",");
+	}
+
 	/*
 	 * Remove trailing comma.
 	 */
@@ -267,10 +339,23 @@ ni2_pcbe_list_attrs(void)
 		return ("emask");
 }
 
+static ni2_generic_event_t *
+find_generic_event(char *name)
+{
+	ni2_generic_event_t	*gevp;
+
+	for (gevp = ni2_generic_events; gevp->name != NULL; gevp++) {
+		if (strcmp(name, gevp->name) == 0)
+			return (gevp);
+	}
+
+	return (NULL);
+}
+
 static ni2_event_t *
 find_event(char *name)
 {
-	ni2_event_t	*evp;
+	ni2_event_t		*evp;
 
 	for (evp = ni2_events; evp->name != NULL; evp++)
 		if (strcmp(name, evp->name) == 0)
@@ -350,6 +435,7 @@ ni2_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	ni2_pcbe_config_t	*cfg;
 	ni2_pcbe_config_t	*other_config;
 	ni2_event_t		*evp;
+	ni2_generic_event_t	*gevp;
 	int			i;
 	uint32_t		evsel;
 #if defined(VFALLS_IMPL)
@@ -369,8 +455,18 @@ ni2_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	if (picnum > 1)
 		return (CPC_INVALID_PICNUM);
 
-	if ((evp = find_event(event)) == NULL)
-		return (CPC_INVALID_EVENT);
+
+	if ((evp = find_event(event)) == NULL) {
+		if ((gevp = find_generic_event(event)) != NULL) {
+			evp = find_event(gevp->event);
+			ASSERT(evp != NULL);
+
+			if (nattrs > 0)
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+		} else {
+			return (CPC_INVALID_EVENT);
+		}
+	}
 
 	evsel = evp->emask;
 

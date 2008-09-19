@@ -23,7 +23,45 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *	notice, this list of conditions and the following disclaimer in the
+ *	documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *	this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
+ */
 
 /*
  * Performance Counter Back-End for AMD Opteron and AMD Athlon 64 processors.
@@ -124,6 +162,12 @@ typedef struct _amd_event {
 	uint8_t		umask_valid;	/* Mask of unreserved UNIT_MASK bits */
 } amd_event_t;
 
+typedef struct _amd_generic_event {
+	char *name;
+	char *event;
+	uint8_t umask;
+} amd_generic_event_t;
+
 /*
  * Base MSR addresses for the PerfEvtSel registers and the counters themselves.
  * Add counter number to base address to get corresponding MSR address.
@@ -134,6 +178,7 @@ typedef struct _amd_event {
 #define	MASK48		0xFFFFFFFFFFFF
 
 #define	EV_END {NULL, 0, 0}
+#define	GEN_EV_END {NULL, NULL, 0 }
 
 #define	AMD_cmn_events							\
 	{ "FP_dispatched_fpu_ops",			0x0, 0x3F },	\
@@ -282,6 +327,51 @@ typedef struct _amd_event {
 	{ "L3_l2_eviction_l3_fill",			0x4E2, 0xFF },	\
 	{ "L3_eviction",				0x4E3, 0xF  }
 
+#define	AMD_cmn_generic_events						\
+	{ "PAPI_br_ins",	"FR_retired_branches_w_excp_intr", 0x0 },\
+	{ "PAPI_br_msp",	"FR_retired_branches_mispred",	0x0 },	\
+	{ "PAPI_br_tkn",	"FR_retired_taken_branches",	0x0 },	\
+	{ "PAPI_fp_ops",	"FP_dispatched_fpu_ops",	0x3 },	\
+	{ "PAPI_fad_ins",	"FP_dispatched_fpu_ops",	0x1 },	\
+	{ "PAPI_fml_ins",	"FP_dispatched_fpu_ops",	0x2 },	\
+	{ "PAPI_fpu_idl",	"FP_cycles_no_fpu_ops_retired",	0x0 },	\
+	{ "PAPI_tot_cyc",	"BU_cpu_clk_unhalted",		0x0 },	\
+	{ "PAPI_tot_ins",	"FR_retired_x86_instr_w_excp_intr", 0x0 }, \
+	{ "PAPI_l1_dca",	"DC_access",			0x0 },	\
+	{ "PAPI_l1_dcm",	"DC_miss",			0x0 },	\
+	{ "PAPI_l1_ldm",	"DC_refill_from_L2",		0xe },	\
+	{ "PAPI_l1_stm",	"DC_refill_from_L2",		0x10 },	\
+	{ "PAPI_l1_ica",	"IC_fetch",			0x0 },	\
+	{ "PAPI_l1_icm",	"IC_miss",			0x0 },	\
+	{ "PAPI_l1_icr",	"IC_fetch",			0x0 },	\
+	{ "PAPI_l2_dch",	"DC_refill_from_L2",		0x1e },	\
+	{ "PAPI_l2_dcm",	"DC_refill_from_system",	0x1e },	\
+	{ "PAPI_l2_dcr",	"DC_refill_from_L2",		0xe },	\
+	{ "PAPI_l2_dcw",	"DC_refill_from_L2",		0x10 },	\
+	{ "PAPI_l2_ich",	"IC_refill_from_L2",		0x0 },	\
+	{ "PAPI_l2_icm",	"IC_refill_from_system",	0x0 },	\
+	{ "PAPI_l2_ldm",	"DC_refill_from_system",	0xe },	\
+	{ "PAPI_l2_stm",	"DC_refill_from_system",	0x10 },	\
+	{ "PAPI_res_stl",	"FR_dispatch_stalls",		0x0 },	\
+	{ "PAPI_stl_icy",	"FR_nothing_to_dispatch",	0x0 },	\
+	{ "PAPI_hw_int",	"FR_taken_hardware_intrs",	0x0 }
+
+#define	OPT_cmn_generic_events						\
+	{ "PAPI_tlb_dm",	"DC_dtlb_L1_miss_L2_miss",	0x0 },	\
+	{ "PAPI_tlb_im",	"IC_itlb_L1_miss_L2_miss",	0x0 },	\
+	{ "PAPI_fp_ins",	"FR_retired_fpu_instr",		0xd },	\
+	{ "PAPI_vec_ins",	"FR_retired_fpu_instr",		0x4 }
+
+#define	AMD_FAMILY_10h_generic_events					\
+	{ "PAPI_tlb_dm",	"DC_dtlb_L1_miss_L2_miss",	0x7 },	\
+	{ "PAPI_tlb_im",	"IC_itlb_L1_miss_L2_miss",	0x3 },	\
+	{ "PAPI_l3_dcr",	"L3_read_req",			0xf1 }, \
+	{ "PAPI_l3_icr",	"L3_read_req",			0xf2 }, \
+	{ "PAPI_l3_tcr",	"L3_read_req",			0xf7 }, \
+	{ "PAPI_l3_stm",	"L3_miss",			0xf4 }, \
+	{ "PAPI_l3_ldm",	"L3_miss",			0xf3 }, \
+	{ "PAPI_l3_tcm",	"L3_miss",			0xf7 }
+
 static amd_event_t opt_events[] = {
 	AMD_cmn_events,
 	OPT_events,
@@ -310,10 +400,23 @@ static amd_event_t family_10h_events[] = {
 	EV_END
 };
 
+static amd_generic_event_t opt_generic_events[] = {
+	AMD_cmn_generic_events,
+	OPT_cmn_generic_events,
+	GEN_EV_END
+};
+
+static amd_generic_event_t family_10h_generic_events[] = {
+	AMD_cmn_generic_events,
+	AMD_FAMILY_10h_generic_events,
+	GEN_EV_END
+};
+
 static char	*evlist;
 static size_t	evlist_sz;
 static amd_event_t *amd_events = NULL;
 static uint_t amd_family;
+static amd_generic_event_t *amd_generic_events = NULL;
 
 #define	BITS(v, u, l)   \
 	(((v) >> (l)) & ((1 << (1 + (u) - (l))) - 1))
@@ -325,6 +428,7 @@ static int
 opt_pcbe_init(void)
 {
 	amd_event_t		*evp;
+	amd_generic_event_t	*gevp;
 	uint32_t		rev;
 
 	amd_family = cpuid_getfamily(CPU);
@@ -346,6 +450,7 @@ opt_pcbe_init(void)
 	rev = cpuid_getchiprev(CPU);
 
 	if (amd_family == OPTERON_FAMILY) {
+		amd_generic_events = opt_generic_events;
 		if (!X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_D)) {
 			amd_events = opt_events;
 		} else if X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_D) {
@@ -359,6 +464,7 @@ opt_pcbe_init(void)
 		}
 	} else {
 		amd_events = family_10h_events;
+		amd_generic_events = family_10h_generic_events;
 	}
 
 	/*
@@ -372,6 +478,9 @@ opt_pcbe_init(void)
 	for (evp = amd_events; evp->name != NULL; evp++)
 		evlist_sz += strlen(evp->name) + 1;
 
+	for (gevp = amd_generic_events; gevp->name != NULL; gevp++)
+		evlist_sz += strlen(gevp->name) + 1;
+
 	evlist = kmem_alloc(evlist_sz + 1, KM_SLEEP);
 	evlist[0] = '\0';
 
@@ -379,6 +488,12 @@ opt_pcbe_init(void)
 		(void) strcat(evlist, evp->name);
 		(void) strcat(evlist, ",");
 	}
+
+	for (gevp = amd_generic_events; gevp->name != NULL; gevp++) {
+		(void) strcat(evlist, gevp->name);
+		(void) strcat(evlist, ",");
+	}
+
 	/*
 	 * Remove trailing comma.
 	 */
@@ -454,10 +569,22 @@ opt_pcbe_overflow_bitmap(void)
 	return (0xF);
 }
 
+static amd_generic_event_t *
+find_generic_event(char *name)
+{
+	amd_generic_event_t	*gevp;
+
+	for (gevp = amd_generic_events; gevp->name != NULL; gevp++)
+		if (strcmp(name, gevp->name) == 0)
+			return (gevp);
+
+	return (NULL);
+}
+
 static amd_event_t *
 find_event(char *name)
 {
-	amd_event_t	*evp;
+	amd_event_t		*evp;
 
 	for (evp = amd_events; evp->name != NULL; evp++)
 		if (strcmp(name, evp->name) == 0)
@@ -474,6 +601,7 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	opt_pcbe_config_t	*cfg;
 	amd_event_t		*evp;
 	amd_event_t		ev_raw = { "raw", 0, 0xFF };
+	amd_generic_event_t	*gevp;
 	int			i;
 	uint64_t		evsel = 0, evsel_tmp = 0;
 
@@ -491,16 +619,27 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 		return (CPC_INVALID_PICNUM);
 
 	if ((evp = find_event(event)) == NULL) {
-		long tmp;
+		if ((gevp = find_generic_event(event)) != NULL) {
+			evp = find_event(gevp->event);
+			ASSERT(evp != NULL);
 
-		/*
-		 * If ddi_strtol() likes this event, use it as a raw event code.
-		 */
-		if (ddi_strtol(event, NULL, 0, &tmp) != 0)
-			return (CPC_INVALID_EVENT);
+			if (nattrs > 0)
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 
-		ev_raw.emask = tmp;
-		evp = &ev_raw;
+			evsel |= gevp->umask << OPT_PES_UMASK_SHIFT;
+		} else {
+			long tmp;
+
+			/*
+			 * If ddi_strtol() likes this event, use it as a raw
+			 * event code.
+			 */
+			if (ddi_strtol(event, NULL, 0, &tmp) != 0)
+				return (CPC_INVALID_EVENT);
+
+			ev_raw.emask = tmp;
+			evp = &ev_raw;
+		}
 	}
 
 	/*

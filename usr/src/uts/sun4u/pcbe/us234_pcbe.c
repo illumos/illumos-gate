@@ -24,10 +24,48 @@
  */
 
 /*
- * UltraSPARC Performance Counter Backend
+ * This file contains preset event names from the Performance Application
+ * Programming Interface v3.5 which included the following notice:
+ *
+ *                             Copyright (c) 2005,6
+ *                           Innovative Computing Labs
+ *                         Computer Science Department,
+ *                            University of Tennessee,
+ *                                 Knoxville, TN.
+ *                              All Rights Reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *    * Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in the
+ *      documentation and/or other materials provided with the distribution.
+ *    * Neither the name of the University of Tennessee nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ *
+ * This open source software license conforms to the BSD License template.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * UltraSPARC Performance Counter Backend
+ */
 
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
@@ -91,6 +129,11 @@ struct nametable {
 	const char	*name;
 };
 
+typedef struct _us_generic_event {
+	char *name;
+	char *event;
+} us_generic_event_t;
+
 #define	PIC0_MASK (((uint64_t)1 << 32) - 1)
 
 #define	ULTRA_PCR_SYS		(UINT64_C(1) << CPC_ULTRA_PCR_SYS)
@@ -106,6 +149,7 @@ struct nametable {
 #define	CPC_ULTRA_PCR_PIC1_SHIFT	11
 
 #define	NT_END 0xFF
+#define	CPC_GEN_END { NULL, NULL }
 
 static const uint64_t   allstopped = ULTRA_PCR_PRIVPIC;
 
@@ -412,7 +456,115 @@ static const struct nametable *US3_I_names[2] = {
 	US3_I_names1
 };
 
+static const us_generic_event_t US12_generic_names0[] = {
+	{ "PAPI_tot_cyc",  "Cycle_cnt" },
+	{ "PAPI_tot_ins",  "Instr_cnt" },
+	{ "PAPI_tot_iis",  "Instr_cnt" },
+	{ "PAPI_l1_dcr",   "DC_rd" },
+	{ "PAPI_l1_dcw",   "DC_wr" },
+	{ "PAPI_l1_ica",   "IC_ref" },
+	{ "PAPI_l2_tca",   "EC_ref" },
+	{ "PAPI_l2_dch",   "EC_rd_hit" },
+	{ "PAPI_ca_inv",   "EC_snoop_inv" },
+	CPC_GEN_END
+};
+
+static const us_generic_event_t US12_generic_names1[] = {
+	{ "PAPI_tot_cyc",  "Cycle_cnt" },
+	{ "PAPI_tot_ins",  "Instr_cnt" },
+	{ "PAPI_tot_iis",  "Instr_cnt" },
+	{ "PAPI_br_msp",   "Dispatch0_mispred" },
+	{ "PAPI_ca_snp",   "EC_snoop_cb" },
+	{ "PAPI_l1_ich",   "IC_hit" },
+	{ "PAPI_l2_tch",   "EC_hit" },
+	{ "PAPI_l2_ich",   "EC_ic_hit" },
+	CPC_GEN_END
+};
+
+static const us_generic_event_t US3_generic_names0[] = {
+	{ "PAPI_tot_cyc",  "Cycle_cnt" },
+	{ "PAPI_tot_ins",  "Instr_cnt" },
+	{ "PAPI_tot_iis",  "Instr_cnt" },
+	{ "PAPI_fad_ins",  "FA_pipe_completion" },
+	{ "PAPI_l1_dcr",   "DC_rd" },
+	{ "PAPI_l1_dcw",   "DC_wr" },
+	{ "PAPI_l1_ica",   "IC_ref" },
+	{ "PAPI_l2_tca",   "EC_ref" },
+	{ "PAPI_l2_ldm",   "EC_rd_miss" },
+	{ "PAPI_ca_inv",   "EC_snoop_inv" },
+	{ "PAPI_br_tkn",   "IU_Stat_Br_count_taken" },
+	CPC_GEN_END
+};
+
+static const us_generic_event_t US3_generic_names1[] = {
+	{ "PAPI_tot_cyc",  "Cycle_cnt" },
+	{ "PAPI_tot_ins",  "Instr_cnt" },
+	{ "PAPI_tot_iis",  "Instr_cnt" },
+	{ "PAPI_fml_ins",  "FM_pipe_completion" },
+	{ "PAPI_l1_icm",   "IC_miss" },
+	{ "PAPI_l1_ldm",   "DC_rd_miss" },
+	{ "PAPI_l1_stm",   "DC_wr_miss" },
+	{ "PAPI_l2_tcm",   "EC_misses" },
+	{ "PAPI_l2_icm",   "EC_ic_miss" },
+	{ "PAPI_tlb_dm",   "DTLB_miss" },
+	{ "PAPI_tlb_im",   "ITLB_miss" },
+	{ "PAPI_br_ntk",   "IU_Stat_Br_count_untaken" },
+	{ "PAPI_br_msp",   "Dispatch0_mispred" },
+	{ "PAPI_ca_snp",   "EC_snoop_cb" },
+	CPC_GEN_END
+};
+
+static const us_generic_event_t US4_PLUS_generic_names0[] = {
+	{ "PAPI_tot_cyc",  "Cycle_cnt" },
+	{ "PAPI_tot_ins",  "Instr_cnt" },
+	{ "PAPI_tot_iis",  "Instr_cnt" },
+	{ "PAPI_fma_ins",  "FA_pipe_completion" },
+	{ "PAPI_l1_dcr",   "DC_rd" },
+	{ "PAPI_l1_stm",   "DC_wr_miss" },
+	{ "PAPI_l1_ica",   "IC_ref" },
+	{ "PAPI_l2_tca",   "L2_ref" },
+	{ "PAPI_l2_ldm",   "L2_rd_miss" },
+	{ "PAPI_l2_icm",   "L2_IC_miss" },
+	{ "PAPI_l2_stm",   "L2_write_miss" },
+	{ "PAPI_l3_ldm",   "L3_rd_miss" },
+	{ "PAPI_br_ntk",   "IU_stat_br_count_untaken" },
+	CPC_GEN_END
+};
+
+static const us_generic_event_t US4_PLUS_generic_names1[] = {
+	{ "PAPI_tot_cyc", "Cycle_cnt" },
+	{ "PAPI_tot_ins", "Instr_cnt" },
+	{ "PAPI_tot_iis",  "Instr_cnt" },
+	{ "PAPI_fml_ins",  "FM_pipe_completion" },
+	{ "PAPI_l1_icm",   "IC_L2_req" },
+	{ "PAPI_l1_ldm",   "DC_rd_miss" },
+	{ "PAPI_l1_dcw",   "DC_wr" },
+	{ "PAPI_l2_tcm",   "L2_miss" },
+	{ "PAPI_l3_tcm",   "L3_miss" },
+	{ "PAPI_l3_icm",   "L3_IC_miss" },
+	{ "PAPI_tlb_im",   "ITLB_miss" },
+	{ "PAPI_tlb_dm",   "DTLB_miss" },
+	{ "PAPI_br_tkn",   "IU_stat_br_count_taken" },
+	CPC_GEN_END
+};
+
+static const us_generic_event_t *US12_generic_names[2] = {
+	US12_generic_names0,
+	US12_generic_names1
+};
+
+static const us_generic_event_t *US3_generic_names[2] = {
+	US3_generic_names0,
+	US3_generic_names1
+};
+
+static const us_generic_event_t *US4_PLUS_generic_names[2] = {
+	US4_PLUS_generic_names0,
+	US4_PLUS_generic_names1
+};
+
 static const struct nametable **events;
+static const us_generic_event_t **generic_events;
 static const char *us_impl_name;
 static const char *us_cpuref;
 static char *pic_events[2];
@@ -437,9 +589,10 @@ static const char *us_3i_ref = "See the \"UltraSPARC IIIi User's Manual\"  "
 static int
 us_pcbe_init(void)
 {
-	const struct nametable	*n;
-	int			i;
-	size_t			size;
+	const struct nametable		*n;
+	const us_generic_event_t	*gevp;
+	int				i;
+	size_t				size;
 
 	/*
 	 * Discover type of CPU
@@ -452,6 +605,7 @@ us_pcbe_init(void)
 	case SABRE_IMPL:
 	case HUMMBRD_IMPL:
 		events = US12_names;
+		generic_events = US12_generic_names;
 		us_impl_name = "UltraSPARC I&II";
 		us_cpuref = us_2_ref;
 		pcr_pic_mask = CPC_ULTRA2_PCR_PIC_MASK;
@@ -459,6 +613,7 @@ us_pcbe_init(void)
 		break;
 	case CHEETAH_IMPL:
 		events = US3_names;
+		generic_events = US3_generic_names;
 		us_impl_name = "UltraSPARC III";
 		us_cpuref = us_3cu_ref;
 		pcr_pic_mask = CPC_ULTRA3_PCR_PIC_MASK;
@@ -466,12 +621,14 @@ us_pcbe_init(void)
 	case CHEETAH_PLUS_IMPL:
 	case JAGUAR_IMPL:
 		events = US3_PLUS_names;
+		generic_events = US3_generic_names;
 		us_impl_name = "UltraSPARC III+ & IV";
 		us_cpuref = us_3cu_ref;
 		pcr_pic_mask = CPC_ULTRA3_PCR_PIC_MASK;
 		break;
 	case PANTHER_IMPL:
 		events = US4_PLUS_names;
+		generic_events = US4_PLUS_generic_names;
 		us_impl_name = "UltraSPARC IV+";
 		us_cpuref = us4_plus_ref;
 		pcr_pic_mask = CPC_ULTRA3_PCR_PIC_MASK;
@@ -479,6 +636,7 @@ us_pcbe_init(void)
 	case JALAPENO_IMPL:
 	case SERRANO_IMPL:
 		events = US3_I_names;
+		generic_events = US3_generic_names;
 		us_impl_name = "UltraSPARC IIIi & IIIi+";
 		us_cpuref = us_3i_ref;
 		pcr_pic_mask = CPC_ULTRA3_PCR_PIC_MASK;
@@ -496,12 +654,19 @@ us_pcbe_init(void)
 		size = 0;
 		for (n = events[i]; n->bits != NT_END; n++)
 			size += strlen(n->name) + 1;
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++)
+			size += strlen(gevp->name) + 1;
 		pic_events[i] = kmem_alloc(size + 1, KM_SLEEP);
 		*pic_events[i] = '\0';
 		for (n = events[i]; n->bits != NT_END; n++) {
 			(void) strcat(pic_events[i], n->name);
 			(void) strcat(pic_events[i], ",");
 		}
+		for (gevp = generic_events[i]; gevp->name != NULL; gevp++) {
+			(void) strcat(pic_events[i], gevp->name);
+			(void) strcat(pic_events[i], ",");
+		}
+
 		/*
 		 * Remove trailing comma.
 		 */
@@ -543,6 +708,18 @@ us_pcbe_list_attrs(void)
 	return ("");
 }
 
+static const us_generic_event_t *
+find_generic_event(int regno, char *name)
+{
+	const us_generic_event_t *gevp;
+
+	for (gevp = generic_events[regno]; gevp->name != NULL; gevp++)
+		if (strcmp(name, gevp->name) == 0)
+			return (gevp);
+
+	return (NULL);
+}
+
 static const struct nametable *
 find_event(int regno, char *name)
 {
@@ -562,9 +739,11 @@ us_pcbe_event_coverage(char *event)
 {
 	uint64_t bitmap = 0;
 
-	if (find_event(0, event) != NULL)
+	if ((find_event(0, event) != NULL) ||
+	    (find_generic_event(0, event) != NULL))
 		bitmap = 0x1;
-	if (find_event(1, event) != NULL)
+	if ((find_event(1, event) != NULL) ||
+	    (find_generic_event(1, event) != NULL))
 		bitmap |= 0x2;
 
 	return (bitmap);
@@ -585,9 +764,10 @@ static int
 us_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
     uint_t nattrs, kcpc_attr_t *attrs, void **data, void *token)
 {
-	us_pcbe_config_t *conf;
-	const struct nametable *n;
-	us_pcbe_config_t *other_config;
+	us_pcbe_config_t		*conf;
+	const struct nametable		*n;
+	const us_generic_event_t	*gevp;
+	us_pcbe_config_t		*other_config;
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -613,8 +793,14 @@ us_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	    (other_config->us_flags != flags))
 		return (CPC_CONFLICTING_REQS);
 
-	if ((n = find_event(picnum, event)) == NULL)
-		return (CPC_INVALID_EVENT);
+	if ((n = find_event(picnum, event)) == NULL) {
+		if ((gevp = find_generic_event(picnum, event)) != NULL) {
+			n = find_event(picnum, gevp->event);
+			ASSERT(n != NULL);
+		} else {
+			return (CPC_INVALID_EVENT);
+		}
+	}
 
 	conf = kmem_alloc(sizeof (us_pcbe_config_t), KM_SLEEP);
 
