@@ -279,7 +279,7 @@ posix_spawnp(
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
 	const char *pathstr = (strchr(file, '/') == NULL)? getenv("PATH") : "";
 	int xpg4 = libc__xpg4;
-	int error;		/* this will be set by the child */
+	int error = 0;		/* this will be set by the child */
 	char path[PATH_MAX+4];
 	const char *cp;
 	pid_t pid;
@@ -388,6 +388,12 @@ posix_spawnp(
 			_exit(_EVAPORATE);
 		}
 	} while (cp);
+
+	if (sap != NULL &&
+	    (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP)) {
+		(void) set_error(&error, 0);
+		_exit(127);
+	}
 	_exit(_EVAPORATE);
 	return (0);	/* not reached */
 }
