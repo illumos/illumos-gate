@@ -1,7 +1,7 @@
 /*
  * sppp.h - Solaris STREAMS PPP multiplexing pseudo-driver definitions
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -49,8 +49,6 @@
 
 #ifndef __SPPP_H
 #define	__SPPP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dlpi.h>
 #include <net/ppp_defs.h>
@@ -219,6 +217,7 @@ typedef struct spppstr {
 #define	SPS_PIOATTACH	0x00000020	/* attached using PPPIO_ATTACH */
 #define	SPS_KDEBUG	0x00000040	/* stream has kdebug turned on */
 #define	SPS_CACHED	0x00000080	/* network stream pointer is cached */
+#define	SPS_IOCQ	0x00000100	/* queue ioctls */
 
 #define	IS_SPS_CONTROL(x)	\
 	((x)->sps_flags & SPS_CONTROL)
@@ -234,6 +233,8 @@ typedef struct spppstr {
 	((x)->sps_flags & SPS_KDEBUG)
 #define	IS_SPS_CACHED(x)	\
 	((x)->sps_flags & SPS_CACHED)
+#define	IS_SPS_IOCQ(x)		\
+	((x)->sps_flags & SPS_IOCQ)
 
 /*
  * Bit format (octal based) string for cmn_err, which represents the flags.

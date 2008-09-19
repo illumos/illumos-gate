@@ -1,7 +1,7 @@
 /*
  * sppp.c - Solaris STREAMS PPP multiplexing pseudo-driver
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -45,7 +45,6 @@
  * for improved performance and scalability.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define	RCSID	"$Id: sppp.c,v 1.0 2000/05/08 01:10:12 masputra Exp $"
 
 #include <sys/types.h>
@@ -574,14 +573,29 @@ sppp_ioctl(struct queue *q, mblk_t *mp)
 		} else if ((ppa->ppa_lower_wq != NULL) &&
 		    !IS_PPA_LASTMOD(ppa)) {
 			mutex_enter(&ppa->ppa_sta_lock);
-			ppa->ppa_ioctlsfwd++;
-			mutex_exit(&ppa->ppa_sta_lock);
 			/*
-			 * Record the ioctl CMD & ID - this will be
-			 * used to check the ACK or NAK responses
-			 * coming from below.
+			 * We match sps_ioc_id on the M_IOC{ACK,NAK},
+			 * so if the response hasn't come back yet,
+			 * new ioctls must be queued instead.
 			 */
-			sps->sps_ioc_id = iop->ioc_id;
+			if (IS_SPS_IOCQ(sps)) {
+				mutex_exit(&ppa->ppa_sta_lock);
+				if (!putq(q, mp)) {
+					error = EAGAIN;
+					break;
+				}
+				return;
+			} else {
+				ppa->ppa_ioctlsfwd++;
+				/*
+				 * Record the ioctl CMD & ID - this will be
+				 * used to check the ACK or NAK responses
+				 * coming from below.
+				 */
+				sps->sps_ioc_id = iop->ioc_id;
+				sps->sps_flags |= SPS_IOCQ;
+				mutex_exit(&ppa->ppa_sta_lock);
+			}
 			putnext(ppa->ppa_lower_wq, mp);
 			return;	/* don't ack or nak the request */
 		}
@@ -615,14 +629,28 @@ sppp_ioctl(struct queue *q, mblk_t *mp)
 		} else if ((ppa->ppa_lower_wq != NULL) &&
 		    !IS_PPA_LASTMOD(ppa)) {
 			mutex_enter(&ppa->ppa_sta_lock);
-			ppa->ppa_ioctlsfwd++;
-			mutex_exit(&ppa->ppa_sta_lock);
 			/*
-			 * Record the ioctl CMD & ID - this will be
-			 * used to check the ACK or NAK responses
-			 * coming from below.
+			 * See comments in PPPIO_GETSTAT64 case
+			 * in sppp_ioctl().
 			 */
-			sps->sps_ioc_id = iop->ioc_id;
+			if (IS_SPS_IOCQ(sps)) {
+				mutex_exit(&ppa->ppa_sta_lock);
+				if (!putq(q, mp)) {
+					error = EAGAIN;
+					break;
+				}
+				return;
+			} else {
+				ppa->ppa_ioctlsfwd++;
+				/*
+				 * Record the ioctl CMD & ID - this will be
+				 * used to check the ACK or NAK responses
+				 * coming from below.
+				 */
+				sps->sps_ioc_id = iop->ioc_id;
+				sps->sps_flags |= SPS_IOCQ;
+				mutex_exit(&ppa->ppa_sta_lock);
+			}
 			putnext(ppa->ppa_lower_wq, mp);
 			return;	/* don't ack or nak the request */
 		}
@@ -759,13 +787,28 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 				break;		/* return EINVAL */
 			}
 			mutex_enter(&ppa->ppa_sta_lock);
-			ppa->ppa_ioctlsfwd++;
-			mutex_exit(&ppa->ppa_sta_lock);
 			/*
-			 * Record the ioctl CMD & ID - this will be used to
-			 * check the ACK or NAK responses coming from below.
+			 * See comments in PPPIO_GETSTAT64 case
+			 * in sppp_ioctl().
 			 */
-			sps->sps_ioc_id = iop->ioc_id;
+			if (IS_SPS_IOCQ(sps)) {
+				mutex_exit(&ppa->ppa_sta_lock);
+				if (!putq(q, mp)) {
+					error = EAGAIN;
+					break;
+				}
+				return;
+			} else {
+				ppa->ppa_ioctlsfwd++;
+				/*
+				 * Record the ioctl CMD & ID -
+				 * this will be used to check the
+				 * ACK or NAK responses coming from below.
+				 */
+				sps->sps_ioc_id = iop->ioc_id;
+				sps->sps_flags |= SPS_IOCQ;
+				mutex_exit(&ppa->ppa_sta_lock);
+			}
 			putnext(ppa->ppa_lower_wq, mp);
 			return;		/* don't ack or nak the request */
 		}
@@ -807,13 +850,42 @@ void
 sppp_uwsrv(queue_t *q)
 {
 	spppstr_t	*sps;
+	sppa_t		*ppa;
 	mblk_t		*mp;
 	queue_t		*nextq;
+	struct iocblk	*iop;
 
 	ASSERT(q != NULL && q->q_ptr != NULL);
 	sps = (spppstr_t *)q->q_ptr;
+
 	while ((mp = getq(q)) != NULL) {
-		if ((nextq = sppp_outpkt(q, &mp, msgdsize(mp), sps)) == NULL) {
+		if (MTYPE(mp) == M_IOCTL) {
+			ppa = sps->sps_ppa;
+			if ((ppa == NULL) || (ppa->ppa_lower_wq == NULL)) {
+				miocnak(q, mp, 0, EINVAL);
+				continue;
+			}
+
+			iop = (struct iocblk *)mp->b_rptr;
+			mutex_enter(&ppa->ppa_sta_lock);
+			/*
+			 * See comments in PPPIO_GETSTAT64 case
+			 * in sppp_ioctl().
+			 */
+			if (IS_SPS_IOCQ(sps)) {
+				mutex_exit(&ppa->ppa_sta_lock);
+				if (putbq(q, mp) == 0)
+					miocnak(q, mp, 0, EAGAIN);
+				break;
+			} else {
+				ppa->ppa_ioctlsfwd++;
+				sps->sps_ioc_id = iop->ioc_id;
+				sps->sps_flags |= SPS_IOCQ;
+				mutex_exit(&ppa->ppa_sta_lock);
+				putnext(ppa->ppa_lower_wq, mp);
+			}
+		} else if ((nextq =
+		    sppp_outpkt(q, &mp, msgdsize(mp), sps)) == NULL) {
 			if (mp != NULL) {
 				if (putbq(q, mp) == 0)
 					freemsg(mp);
@@ -1074,13 +1146,28 @@ sppp_inner_ioctl(queue_t *q, mblk_t *mp)
 			break;
 		}
 		mutex_enter(&ppa->ppa_sta_lock);
-		ppa->ppa_ioctlsfwd++;
-		mutex_exit(&ppa->ppa_sta_lock);
 		/*
-		 * Record the ioctl CMD & ID - this will be used to check the
-		 * ACK or NAK responses coming from below.
+		 * See comments in PPPIO_GETSTAT64 case
+		 * in sppp_ioctl().
 		 */
-		sps->sps_ioc_id = iop->ioc_id;
+		if (IS_SPS_IOCQ(sps)) {
+			mutex_exit(&ppa->ppa_sta_lock);
+			if (!putq(q, mp)) {
+				error = EAGAIN;
+				break;
+			}
+			return;
+		} else {
+			ppa->ppa_ioctlsfwd++;
+			/*
+			 * Record the ioctl CMD & ID -
+			 * this will be used to check the
+			 * ACK or NAK responses coming from below.
+			 */
+			sps->sps_ioc_id = iop->ioc_id;
+			sps->sps_flags |= SPS_IOCQ;
+			mutex_exit(&ppa->ppa_sta_lock);
+		}
 		putnext(ppa->ppa_lower_wq, mp);
 		return;			/* don't ack or nak the request */
 	case PPPIO_DETACH:
@@ -1785,7 +1872,17 @@ sppp_recv_nondata(queue_t *q, mblk_t *mp, spppstr_t *ctlsps)
 		}
 		mutex_enter(&ppa->ppa_sta_lock);
 		ppa->ppa_ioctlsfwdok++;
+
+		/*
+		 * Clear SPS_IOCQ and enable the lower write side queue,
+		 * this would allow the upper stream service routine
+		 * to start processing the queue for pending messages.
+		 * sppp_lwsrv -> sppp_uwsrv.
+		 */
+		destsps->sps_flags &= ~SPS_IOCQ;
 		mutex_exit(&ppa->ppa_sta_lock);
+		qenable(WR(destsps->sps_rq));
+
 		putnext(destsps->sps_rq, mp);
 		break;
 	case M_HANGUP:
