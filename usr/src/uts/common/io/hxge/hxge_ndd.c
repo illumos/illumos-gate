@@ -568,8 +568,8 @@ hxge_param_get_rxdma_info(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	for (rdc = 0; rdc < p_cfgp->max_rdcs; rdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		    " %d\t  %d\t $%p\t 0x%x\t $%p\n",
-		    rdc, hxgep->rdc[rdc], rbr_rings[rdc],
-		    rbr_rings[rdc]->num_blocks, rcr_rings[rdc]);
+		    rdc, hxgep->rdc[rdc], (void *)rbr_rings[rdc],
+		    rbr_rings[rdc]->num_blocks, (void *)rcr_rings[rdc]);
 		((mblk_t *)np)->b_wptr += print_len;
 		buf_len -= print_len;
 	}
@@ -1209,13 +1209,14 @@ hxge_param_dump_ptrs(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	rbr_rings = rx_rbr_rings->rbr_rings;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 	    "hxgep (hxge_t) $%p\n dev_regs (dev_regs_t) $%p\n",
-	    hxgep, hxgep->dev_regs);
+	    (void *)hxgep, (void *)hxgep->dev_regs);
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	/* do register pointers */
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 	    "reg base (hpi_reg_ptr_t) $%p\t pci reg (hpi_reg_ptr_t) $%p\n",
-	    hxgep->dev_regs->hxge_regp, hxgep->dev_regs->hxge_pciregp);
+	    (void *)hxgep->dev_regs->hxge_regp,
+	    (void *)hxgep->dev_regs->hxge_pciregp);
 
 	ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 
@@ -1245,7 +1246,7 @@ hxge_param_dump_ptrs(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	for (rdc = 0; rdc < p_cfgp->max_rdcs; rdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 		    " %d\t  $%p\t\t   $%p\n",
-		    rdc, rcr_rings[rdc], rbr_rings[rdc]);
+		    rdc, (void *)rcr_rings[rdc], (void *)rbr_rings[rdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	}
 
@@ -1256,7 +1257,7 @@ hxge_param_dump_ptrs(p_hxge_t hxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	tx_rings = hxgep->tx_rings->rings;
 	for (tdc = 0; tdc < p_cfgp->max_tdcs; tdc++) {
 		print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
-		    " %d\t  $%p\n", tdc, tx_rings[tdc]);
+		    " %d\t  $%p\n", tdc, (void *)tx_rings[tdc]);
 		ADVANCE_PRINT_BUFFER(np, print_len, buf_len);
 	}
 

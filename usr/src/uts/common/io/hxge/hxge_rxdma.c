@@ -1017,6 +1017,7 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 	/*
 	 * Get the rbr header pointer and its offset index.
 	 */
+	MUTEX_ENTER(&rx_rbr_p->post_lock);
 	rx_rbr_p->rbr_wr_index = ((rx_rbr_p->rbr_wr_index + 1) &
 	    rx_rbr_p->rbr_wrap_mask);
 	rx_rbr_p->rbr_desc_vp[rx_rbr_p->rbr_wr_index] = rx_msg_p->shifted_addr;
@@ -1055,6 +1056,7 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 		hpi_rxdma_rdc_rbr_kick(handle, rx_rbr_p->rdc, blocks_to_post);
 		rx_rbr_p->pages_to_post -= blocks_to_post;
 	}
+	MUTEX_EXIT(&rx_rbr_p->post_lock);
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
 	    "<== hxge_post_page (channel %d post_next_index %d)",
@@ -1076,8 +1078,6 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 	    "hxge_freeb:rx_msg_p = $%p (block pending %d)",
 	    rx_msg_p, hxge_mblks_pending));
 
-	MUTEX_ENTER(&ring->post_lock);
-
 	/*
 	 * First we need to get the free state, then
 	 * atomic decrement the reference count to prevent
@@ -1085,7 +1085,6 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 	 * is processing a loaned up buffer block.
 	 */
 	free_state = rx_msg_p->free;
-
 	ref_cnt = atomic_add_32_nv(&rx_msg_p->ref_cnt, -1);
 	if (!ref_cnt) {
 		atomic_dec_32(&hxge_mblks_pending);
@@ -1102,17 +1101,23 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 		}
 
 		KMEM_FREE(rx_msg_p, sizeof (rx_msg_t));
-		/* Decrement the receive buffer ring's reference count, too. */
-		atomic_dec_32(&ring->rbr_ref_cnt);
+		if (ring) {
+			/*
+			 * Decrement the receive buffer ring's reference
+			 * count, too.
+			 */
+			atomic_dec_32(&ring->rbr_ref_cnt);
 
-		/*
-		 * Free the receive buffer ring, iff
-		 * 1. all the receive buffers have been freed
-		 * 2. and we are in the proper state (that is,
-		 *    we are not UNMAPPING).
-		 */
-		if (ring->rbr_ref_cnt == 0 && ring->rbr_state == RBR_UNMAPPED) {
-			KMEM_FREE(ring, sizeof (*ring));
+			/*
+			 * Free the receive buffer ring, iff
+			 * 1. all the receive buffers have been freed
+			 * 2. and we are in the proper state (that is,
+			 *    we are not UNMAPPING).
+			 */
+			if (ring->rbr_ref_cnt == 0 &&
+			    ring->rbr_state == RBR_UNMAPPED) {
+				KMEM_FREE(ring, sizeof (*ring));
+			}
 		}
 		goto hxge_freeb_exit;
 	}
@@ -1120,7 +1125,7 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 	/*
 	 * Repost buffer.
 	 */
-	if (free_state && (ref_cnt == 1)) {
+	if ((ring != NULL) && free_state && (ref_cnt == 1)) {
 		HXGE_DEBUG_MSG((NULL, RX_CTL,
 		    "hxge_freeb: post page $%p:", rx_msg_p));
 		if (ring->rbr_state == RBR_POSTING)
@@ -1128,7 +1133,6 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 	}
 
 hxge_freeb_exit:
-	MUTEX_EXIT(&ring->post_lock);
 	HXGE_DEBUG_MSG((NULL, MEM2_CTL, "<== hxge_freeb"));
 }
 
