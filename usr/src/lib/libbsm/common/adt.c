@@ -216,7 +216,7 @@ adt_get_mask_from_user(uid_t uid, au_mask_t *mask)
  * see a need to put a lock around it.
  */
 
-au_id_t
+au_asid_t
 adt_get_unique_id(au_id_t uid)
 {
 	char		hostname[MAXHOSTNAMELEN];
@@ -231,7 +231,7 @@ adt_get_unique_id(au_id_t uid)
 	int		count = noise++;
 	time_t		timebits = time(NULL);
 	pid_t		pidbits = getpid();
-	au_id_t		retval = 0;
+	au_asid_t	retval = 0;
 
 	if (gethostname(hostname, MAXHOSTNAMELEN)) {
 		adt_write_syslog("gethostname call failed", errno);
