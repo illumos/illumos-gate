@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -488,18 +486,18 @@ sysevent_pwrctl(gchar *class, gchar *subclass, gchar *phys_path,
 
 	if (strcmp(dev_hid, "PNP0C0A") == 0) {
 		snprintf(udi, sizeof(udi), "%s_battery%d_0", prefix, dev_index);
-		devinfo_battery_device_rescan(phys_path, udi);
+		devinfo_battery_rescan(phys_path, udi);
 	} else if (strcmp(dev_hid, "ACPI0003") == 0) {
 		snprintf(udi, sizeof (udi), "%s_ac%d_0", prefix, dev_index);
-		devinfo_battery_device_rescan(phys_path, udi);
+		devinfo_battery_rescan(phys_path, udi);
 	} else if (strcmp(dev_hid, "PNP0C0D") == 0) {
 		snprintf(udi, sizeof (udi), "%s_lid_0", prefix);
-		devinfo_lid_device_rescan(subclass, udi);
+		devinfo_lid_event(subclass, udi);
 	} else if (strcmp(subclass, ESC_PWRCTL_POWER_BUTTON) == 0) {
-		devinfo_power_button_rescan();
+		devinfo_power_button_event();
 	} else if ((strcmp(subclass, ESC_PWRCTL_BRIGHTNESS_UP) == 0) ||
 	    (strcmp(subclass, ESC_PWRCTL_BRIGHTNESS_DOWN) == 0)) {
-		devinfo_brightness_hotkeys_rescan(subclass);
+		devinfo_brightness_hotkeys_event(subclass);
 	} else {
 		HAL_INFO(("Unmatched EC_PWRCTL"));
 	}

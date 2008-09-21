@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -82,31 +80,59 @@ lid_update(LibHalContext *ctx, const char *udi, int fd)
 {
 	LibHalChangeSet *cs;
 	DBusError error;
+	int lid_state;
 
 	HAL_DEBUG(("lid_update() enter"));
 
+	if ((cs = libhal_device_new_changeset(udi)) == NULL) {
+		return (FALSE);
+	}
 	dbus_error_init(&error);
 	if (!libhal_device_query_capability(ctx, udi, "button", &error)) {
 		my_dbus_error_free(&error);
 		libhal_device_add_capability(ctx, udi, "button", &error);
-		if ((cs = libhal_device_new_changeset(udi)) == NULL) {
-			my_dbus_error_free(&error);
-			return (FALSE);
-		}
+		my_dbus_error_free(&error);
 		libhal_changeset_set_property_bool(cs, "button.has_state",
 		    TRUE);
-		libhal_changeset_set_property_bool(cs, "button.state.value",
-		    FALSE);
+
+		if (ioctl(fd, ACPI_DRV_IOC_LID_STATUS, &lid_state) < 0) {
+			return (FALSE);
+		}
+		if (lid_state != 0) {
+			/* lid open */
+			libhal_changeset_set_property_bool(cs,
+			    "button.state.value", FALSE);
+		} else {
+			/* lid closed */
+			libhal_changeset_set_property_bool(cs,
+			    "button.state.value", TRUE);
+		}
+		libhal_changeset_set_property_bool(cs, "button.workaround",
+		    TRUE);
 		libhal_changeset_set_property_string(cs, "button.type",
 		    "lid");
 		libhal_changeset_set_property_string(cs, "info.product",
 		    "Lid Switch");
 		libhal_changeset_set_property_string(cs, "info.category",
 		    "button");
+	} else {
 		my_dbus_error_free(&error);
-		libhal_device_commit_changeset(ctx, cs, &error);
-		libhal_device_free_changeset(cs);
+		if (ioctl(fd, ACPI_DRV_IOC_LID_UPDATE, &lid_state) < 0) {
+			return (FALSE);
+		}
+		if (lid_state != 0) {
+			/* lid open */
+			libhal_changeset_set_property_bool(cs,
+			    "button.state.value", FALSE);
+		} else {
+			/* lid closed */
+			libhal_changeset_set_property_bool(cs,
+			    "button.state.value", TRUE);
+		}
 	}
+
+	libhal_device_commit_changeset(ctx, cs, &error);
+	libhal_device_free_changeset(cs);
 	my_dbus_error_free(&error);
 	HAL_DEBUG(("update_lid() exit"));
 	return (TRUE);

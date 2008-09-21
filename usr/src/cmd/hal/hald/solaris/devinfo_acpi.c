@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -34,7 +32,7 @@
 #include "../hald_runner.h"
 #include "devinfo_acpi.h"
 
-#define		DEVINFO_PROBE_BATTERY_TIMEOUT	30000
+#define		DEVINFO_PROBE_ACPI_TIMEOUT	30000
 
 static HalDevice *devinfo_acpi_add(HalDevice *, di_node_t, char *, char *);
 static HalDevice *devinfo_power_button_add(HalDevice *parent, di_node_t node,
@@ -156,7 +154,7 @@ devinfo_power_button_add(HalDevice *parent, di_node_t node, char *devfs_path,
 }
 
 void
-devinfo_power_button_rescan(void)
+devinfo_power_button_event(void)
 {
 	HalDevice *d = NULL;
 	HalDeviceStore *store = hald_get_gdl();
@@ -169,7 +167,7 @@ devinfo_power_button_rescan(void)
 }
 
 void
-devinfo_brightness_hotkeys_rescan(char *subclass)
+devinfo_brightness_hotkeys_event(char *subclass)
 {
 	HalDevice *d = NULL;
 
@@ -184,11 +182,11 @@ devinfo_brightness_hotkeys_rescan(char *subclass)
 			device_send_signal_condition(d, "ButtonPressed",
 			    "brightness-down");
 		}
-        }
+	}
 }
 
 void
-devinfo_battery_device_rescan(char *parent_devfs_path, gchar *udi)
+devinfo_battery_rescan(char *parent_devfs_path, gchar *udi)
 {
 	HalDevice *d = NULL;
 
@@ -199,12 +197,12 @@ devinfo_battery_device_rescan(char *parent_devfs_path, gchar *udi)
 	}
 
 	hald_runner_run(d, "hald-probe-acpi", NULL,
-	    DEVINFO_PROBE_BATTERY_TIMEOUT, devinfo_battery_rescan_probing_done,
+	    DEVINFO_PROBE_ACPI_TIMEOUT, devinfo_battery_rescan_probing_done,
 	    NULL, NULL);
 }
 
 void
-devinfo_lid_device_rescan(char *subclass, gchar *udi)
+devinfo_lid_event(char *subclass, gchar *udi)
 {
 	HalDevice *d = NULL;
 
@@ -215,8 +213,23 @@ devinfo_lid_device_rescan(char *subclass, gchar *udi)
 	}
 
 	hal_device_property_set_bool(d, "button.state.value",
-		(strcmp(subclass, ESC_PWRCTL_REMOVE) == 0));
+	    (strcmp(subclass, ESC_PWRCTL_REMOVE) == 0));
 	device_send_signal_condition(d, "ButtonPressed", "lid");
+}
+
+gboolean
+devinfo_lid_rescan(HalDevice *d)
+{
+	if (hal_device_property_get_bool(d, "button.workaround")) {
+		/* Set lid state to open for workaround */
+		hal_device_property_set_bool(d, "button.state.value", FALSE);
+	} else {
+		hald_runner_run(d, "hald-probe-acpi", NULL,
+		    DEVINFO_PROBE_ACPI_TIMEOUT,
+		    devinfo_battery_rescan_probing_done, NULL, NULL);
+	}
+
+	return (TRUE);
 }
 
 static void
@@ -229,6 +242,6 @@ devinfo_battery_rescan_probing_done(HalDevice *d, guint32 exit_type,
 const gchar *
 devinfo_acpi_get_prober(HalDevice *d, int *timeout)
 {
-	*timeout = DEVINFO_PROBE_BATTERY_TIMEOUT;    /* 30 second timeout */
+	*timeout = DEVINFO_PROBE_ACPI_TIMEOUT;    /* 30 second timeout */
 	return ("hald-probe-acpi");
 }

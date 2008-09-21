@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef DEVINFO_ACPI_H
 #define	DEVINFO_ACPI_H
 
@@ -35,11 +33,12 @@ HalDevice *devinfo_battery_add_major(HalDevice *parent, di_node_t node,
 void devinfo_acpi_add_minor(HalDevice *parent, di_node_t node,
     char *minor_path, dev_t dev);
 void devinfo_battery_remove_minor(char *parent_devfs_path, gchar *udi);
-void devinfo_battery_device_rescan(char *parent_devfs_path, gchar *udi);
+void devinfo_battery_rescan(char *parent_devfs_path, gchar *udi);
 const gchar *devinfo_acpi_get_prober(HalDevice *d, int *timeout);
-void devinfo_power_button_rescan(void);
-void devinfo_brightness_hotkeys_rescan(char *subclass);
+void devinfo_power_button_event(void);
+void devinfo_brightness_hotkeys_event(char *subclass);
 
-void devinfo_lid_device_rescan(char *subclass, gchar *udi);
+void devinfo_lid_event(char *subclass, gchar *udi);
+gboolean devinfo_lid_rescan(HalDevice *d);
 
 #endif /* DEVINFO_ACPI_H */

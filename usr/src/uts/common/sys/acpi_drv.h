@@ -27,8 +27,6 @@
 #ifndef _ACPI_DRV_H
 #define	_ACPI_DRV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -45,6 +43,7 @@ enum acpi_drv_ioctl {
 	ACPI_DRV_IOC_SET_WARNING,
 	ACPI_DRV_IOC_GET_WARNING,
 	ACPI_DRV_IOC_LID_STATUS,
+	ACPI_DRV_IOC_LID_UPDATE,
 	ACPI_DRV_IOC_LEVELS,
 	ACPI_DRV_IOC_SET_BRIGHTNESS
 };

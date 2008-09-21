@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -386,6 +384,8 @@ devinfo_device_rescan (HalDevice *d)
 {
 	if (hal_device_has_capability (d, "block")) {
 		return (devinfo_storage_device_rescan (d));
+	} else if (hal_device_has_capability (d, "button")) {
+		return (devinfo_lid_rescan (d));
         } else { 
 		return (FALSE);
 	}

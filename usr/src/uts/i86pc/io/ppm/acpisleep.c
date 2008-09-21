@@ -170,10 +170,10 @@ acpi_exit_sleepstate(s3a_t *s3ap)
 		PMD(PMD_SX, ("Problem with LeaveSleepState!\n"))
 	}
 
-	PT(PT_DPB);
-	if (AcpiDisableEvent(ACPI_EVENT_POWER_BUTTON, 0) != AE_OK) {
-		PT(PT_DPB_FAIL);
-		PMD(PMD_SX, ("Problem w/ DisableEvent(POWER_BUTTON)\n"))
+	PT(PT_CPB);
+	if (AcpiClearEvent(ACPI_EVENT_POWER_BUTTON) != AE_OK) {
+		PT(PT_CPB_FAIL);
+		PMD(PMD_SX, ("Problem w/ ClearEvent(POWER_BUTTON)\n"))
 	}
 	if (acpi_rtc_wake > 0 &&
 	    AcpiDisableEvent(ACPI_EVENT_RTC, 0) != AE_OK) {

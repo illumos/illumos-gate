@@ -26,8 +26,6 @@
 #ifndef	_SYS_EPM_H
 #define	_SYS_EPM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/pm.h>
 #include <sys/dditypes.h>
 #include <sys/devops.h>
@@ -737,8 +735,8 @@ extern clock_t pt_sleep;
 #define	PT_UNDO1to1	0x21	/* Undo 1:1 mapping */
 #define	PT_LSS		0x22	/* leave sleep state */
 #define	PT_LSS_FAIL	0x23	/* leave sleep state failed */
-#define	PT_DPB		0x24	/* disable power button */
-#define	PT_DPB_FAIL	0x25	/* disable power button failed */
+#define	PT_CPB		0x24	/* clear power button event */
+#define	PT_CPB_FAIL	0x25	/* clear power button event failed */
 #define	PT_DRTC_FAIL	0x26	/* disable rtc fails */
 #define	PT_ACPIREINIT	0x27	/* reinit apic */
 #define	PT_ACPIRESTORE	0x28	/* restore apic */
