@@ -27,7 +27,6 @@
 
 /* $Id: lpstat.c 173 2006-05-25 04:52:06Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -411,7 +410,7 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 		(void) papiAttributeListGetString(attrs, NULL,
 					"lpsched-dial-info", &str);
 		printf(gettext("\tConnection: %s\n"),
-			((str[0] != '\0') ? gettext("direct") : str));
+		    ((str[0] == '\0') ? gettext("direct") : str));
 
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
