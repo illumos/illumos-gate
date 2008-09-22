@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -139,10 +137,14 @@ vnic_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain)
 	uint64_t gen;
 	uint_t i;
 	mblk_t *mp_chain1;
-	vnic_mac_t *vnic_mac = grp->vbg_vnics[0]->vn_vnic_mac;
+	vnic_mac_t *vnic_mac;
 
 	VNIC_BCAST_GRP_REFHOLD(grp);
 	rw_enter(grp_lock, RW_READER);
+
+	if (grp->vbg_nvnics == 0)
+		goto bail;
+	vnic_mac = grp->vbg_vnics[0]->vn_vnic_mac;
 
 	/*
 	 * Pass a copy of the mp chain to every VNIC except the sender
