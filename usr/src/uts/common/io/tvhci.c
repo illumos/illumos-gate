@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The tvhci driver can be used to exercise the mpxio framework together
@@ -145,13 +144,14 @@ static struct dev_ops tvhci_ops = {
 	&tvhci_cb_ops,		/* cb_ops */
 	&tvhci_bus_ops,		/* bus_ops */
 	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"test vhci driver %I%",
+	"test vhci driver",
 	&tvhci_ops
 };
 
@@ -477,8 +477,8 @@ tvhci_ctl(dev_info_t *dip, dev_info_t *rdip,
 		 * by a pseudo driver.  So we whine when we're called.
 		 */
 		cmn_err(CE_CONT, "%s%d: invalid op (%d) from %s%d\n",
-			ddi_get_name(dip), ddi_get_instance(dip),
-			ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(dip), ddi_get_instance(dip),
+		    ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
 		return (DDI_FAILURE);
 
 	case DDI_CTLOPS_ATTACH:

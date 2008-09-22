@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lofi (loopback file) driver - allows you to attach a file to a device,
@@ -1723,12 +1722,14 @@ static struct dev_ops lofi_ops = {
 	lofi_detach,		/* detach */
 	nodev,			/* reset */
 	&lofi_cb_ops,		/* driver operations */
-	NULL			/* no bus operations */
+	NULL,			/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"loopback file driver (%I%)",
+	"loopback file driver",
 	&lofi_ops,
 };
 

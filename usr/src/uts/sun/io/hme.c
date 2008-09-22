@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SunOS MT STREAMS FEPS(SBus)/Cheerio(PCI) 10/100Mb Ethernet Device Driver
@@ -494,7 +493,7 @@ static mac_callbacks_t hme_m_callbacks = {
 };
 
 DDI_DEFINE_STREAM_OPS(hme_dev_ops, nulldev, nulldev, hmeattach, hmedetach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 #define	HME_FAULT_MSG1(p, s, t, f) \
     hme_fault_msg(__FILE__, __LINE__, (p), (s), (t), (f));

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -125,12 +123,14 @@ static struct dev_ops pca9556_dev_ops = {
 	pca9556_s_detach,
 	nodev,
 	&pca9556_cb_ops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv pca9556_modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"pca9556 device driver v%I%",
+	"pca9556 device driver",
 	&pca9556_dev_ops,
 };
 
@@ -226,7 +226,7 @@ pca9556_resume(dev_info_t *dip)
 			    pcap->pca9556_cpr_state[reg_num++];
 
 			if (i2c_transfer(pcap->pca9556_hdl,
-				pcap->pca9556_transfer) != DDI_SUCCESS) {
+			    pcap->pca9556_transfer) != DDI_SUCCESS) {
 				err = EIO;
 
 				goto done;
@@ -328,7 +328,7 @@ pca9556_attach(dev_info_t *dip)
 		}
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-			PCA9556_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    PCA9556_NODE_TYPE, NULL) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s: failed to create node for %s",
 			    pcap->pca9556_name, name);
 			pca9556_detach(dip);
@@ -486,7 +486,7 @@ pca9556_suspend(dev_info_t *dip)
 			 */
 			pcap->pca9556_transfer->i2c_wbuf[0] = reg + i;
 			if (i2c_transfer(pcap->pca9556_hdl,
-				pcap->pca9556_transfer) != DDI_SUCCESS) {
+			    pcap->pca9556_transfer) != DDI_SUCCESS) {
 				err = EIO;
 				goto done;
 			}

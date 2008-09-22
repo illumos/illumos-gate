@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * "Workstation console" multiplexor driver for Sun.
@@ -170,7 +169,7 @@ static int wc_attach(dev_info_t *, ddi_attach_cmd_t);
 static dev_info_t *wc_dip;
 
 DDI_DEFINE_STREAM_OPS(wc_ops, nulldev, nulldev, wc_attach, nodev, nodev,
-    wc_info, D_MTPERMOD | D_MP, &wcinfo);
+    wc_info, D_MTPERMOD | D_MP, &wcinfo, ddi_quiesce_not_supported);
 
 static void	wcreioctl(void *);
 static void 	wcioctl(queue_t *, mblk_t *);
@@ -236,7 +235,7 @@ uint_t	wc_errlevel = PRINT_L2;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Workstation multiplexer Driver 'wc' %I%",
+	"Workstation multiplexer Driver 'wc'",
 	&wc_ops,	/* driver ops */
 };
 

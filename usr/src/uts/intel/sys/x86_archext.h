@@ -338,6 +338,7 @@ extern "C" {
 #define	X86_SSE4_2	0x08000000
 #define	X86_1GPG	0x10000000
 #define	X86_CLFSH	0x20000000
+#define	X86_64		0x40000000
 
 /*
  * flags to patch tsc_read routine.

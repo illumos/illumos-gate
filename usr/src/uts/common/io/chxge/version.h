@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,15 +33,12 @@
 #ifndef CHELSIO_VERSION_H
 #define	CHELSIO_VERSION_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This version string is set at 31 characters, please
  * make sure when adjusting this you stay within that
  * limit, going above that limit will cause the message
  * to get truncated when displayed by 'modinfo'.
  */
-#define	VERSION_NUMBER "2.1.2"
-#define	VERSION "Chelsio 10Gb Ethernet v" VERSION_NUMBER
+#define	VERSION "Chelsio 10Gb Ethernet v"
 
 #endif	/* CHELSIO_VERSION_H */

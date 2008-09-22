@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,6 @@
  *	Serial I/O driver for Z8530 chips
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/param.h>
@@ -196,7 +195,8 @@ struct dev_ops zs_ops = {
 	nodev,			/* devo_reset */
 	&cb_zs_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	ddi_power		/* devo_power */
+	ddi_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -214,7 +214,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 		&mod_driverops, /* Type of module.  This one is a driver */
-		"Z8530 serial driver V%I%",
+		"Z8530 serial driver",
 		&zs_ops,	/* driver ops */
 };
 

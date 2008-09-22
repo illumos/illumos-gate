@@ -96,7 +96,8 @@ static struct dev_ops mc_ops = {
 	nulldev,			/* reset */
 	&mc_cb_ops,			/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 /*

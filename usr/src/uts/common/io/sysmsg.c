@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * System message redirection driver for Sun.
@@ -114,7 +113,8 @@ static struct dev_ops sysm_ops = {
 	nodev,			/* reset */
 	&sysm_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 
 };
 
@@ -157,7 +157,7 @@ static boolean_t msglog_opened;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"System message redirection (fanout) driver %I%",
+	"System message redirection (fanout) driver",
 	&sysm_ops,	/* driver ops */
 };
 
@@ -198,9 +198,9 @@ sysm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ASSERT(sysm_dip == NULL);
 
 		if (ddi_create_minor_node(devi, "sysmsg", S_IFCHR,
-			SYS_SYSMIN, DDI_PSEUDO, NULL) == DDI_FAILURE ||
-			ddi_create_minor_node(devi, "msglog", S_IFCHR,
-			SYS_MSGMIN, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    SYS_SYSMIN, DDI_PSEUDO, NULL) == DDI_FAILURE ||
+		    ddi_create_minor_node(devi, "msglog", S_IFCHR,
+		    SYS_MSGMIN, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(devi, NULL);
 			return (DDI_FAILURE);
 		}
@@ -256,7 +256,7 @@ sysm_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
 		if (sysm_dip != NULL &&
-			(instance == SYS_SYSMIN || instance == SYS_MSGMIN)) {
+		    (instance == SYS_SYSMIN || instance == SYS_MSGMIN)) {
 			*result = sysm_dip;
 			rval = DDI_SUCCESS;
 		}
@@ -312,8 +312,8 @@ parse_buffer(char *buf, ssize_t fsize)
 			if (devname == NULL)
 				break;
 			(void) sysmioctl(NODEV, CIOCSETCONSOLE,
-				(intptr_t)devname, FNATIVE|FKIOCTL|FREAD|FWRITE,
-				kcred, NULL);
+			    (intptr_t)devname, FNATIVE|FKIOCTL|FREAD|FWRITE,
+			    kcred, NULL);
 			devname = NULL;
 			break;
 		default:
@@ -340,16 +340,16 @@ bind_consadm_conf(char *path)
 	vattr.va_mask = AT_SIZE;
 	if ((err = VOP_GETATTR(vp, &vattr, 0, kcred, NULL)) != 0) {
 		cmn_err(CE_WARN, "sysmsg: getattr: '%s': error %d",
-			path, err);
+		    path, err);
 		goto closevp;
 	}
 
 	size = vattr.va_size > CNSADM_BYTES_MAX ?
-		CNSADM_BYTES_MAX : (ssize_t)vattr.va_size;
+	    CNSADM_BYTES_MAX : (ssize_t)vattr.va_size;
 	buf = kmem_alloc(size, KM_SLEEP);
 
 	if ((err = vn_rdwr(UIO_READ, vp, buf, size, (offset_t)0,
-		UIO_SYSSPACE, 0, (rlim64_t)0, kcred, &resid)) != 0)
+	    UIO_SYSSPACE, 0, (rlim64_t)0, kcred, &resid)) != 0)
 		cmn_err(CE_WARN, "sysmsg: vn_rdwr: '%s': error %d",
 		    path, err);
 	else
@@ -377,7 +377,7 @@ sysmopen(dev_t *dev, int flag, int state, cred_t *cred)
 
 	mutex_enter(&dcvp_mutex);
 	if ((dcvp == NULL) && (vn_open("/dev/console",
-		UIO_SYSSPACE, FWRITE, 0, &dcvp, 0, 0) != 0)) {
+	    UIO_SYSSPACE, FWRITE, 0, &dcvp, 0, 0) != 0)) {
 		mutex_exit(&dcvp_mutex);
 		return (ENXIO);
 	}
@@ -396,7 +396,7 @@ sysmopen(dev_t *dev, int flag, int state, cred_t *cred)
 	for (i = 0; i < MAXDEVS; i++) {
 		rw_enter(&sysmcache[i].dca_lock, RW_WRITER);
 		if ((sysmcache[i].dca_flags & SYSM_ENABLED) &&
-			sysmcache[i].dca_vp == NULL) {
+		    sysmcache[i].dca_vp == NULL) {
 			/*
 			 * 4196476 - FTRUNC was causing E10K to return EINVAL
 			 * on open
@@ -411,7 +411,7 @@ sysmopen(dev_t *dev, int flag, int state, cred_t *cred)
 			 * Set NONBLOCK|NDELAY in case there's no carrier.
 			 */
 			if (vn_open(sysmcache[i].dca_name, UIO_SYSSPACE,
-				flag | FNONBLOCK | FNDELAY, 0, &vp, 0, 0) == 0)
+			    flag | FNONBLOCK | FNDELAY, 0, &vp, 0, 0) == 0)
 				sysmcache[i].dca_vp = vp;
 		}
 		rw_exit(&sysmcache[i].dca_lock);
@@ -458,7 +458,7 @@ sysmclose(dev_t dev, int flag, int state, cred_t *cred)
 		rw_enter(&sysmcache[i].dca_lock, RW_WRITER);
 		if (sysmcache[i].dca_vp != NULL) {
 			(void) VOP_CLOSE(sysmcache[i].dca_vp, flag,
-				1, (offset_t)0, cred, NULL);
+			    1, (offset_t)0, cred, NULL);
 			VN_RELE(sysmcache[i].dca_vp);
 			sysmcache[i].dca_vp = NULL;
 		}
@@ -492,12 +492,12 @@ sysmwrite(dev_t dev, struct uio *uio, cred_t *cred)
 	for (i = 0; i < MAXDEVS; i++) {
 		rw_enter(&sysmcache[i].dca_lock, RW_READER);
 		if (sysmcache[i].dca_vp != NULL &&
-			(sysmcache[i].dca_flags & SYSM_ENABLED)) {
+		    (sysmcache[i].dca_flags & SYSM_ENABLED)) {
 			tuio = *uio;
 			uio_iov = *(uio->uio_iov);
 			tuio.uio_iov = &uio_iov;
 			(void) VOP_WRITE(sysmcache[i].dca_vp, &tuio, 0, cred,
-				NULL);
+			    NULL);
 		}
 		rw_exit(&sysmcache[i].dca_lock);
 	}
@@ -593,7 +593,7 @@ sysmioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred, int *rvalp)
 
 	if (infop[0] != NULL) {
 		if ((rval = lookupname(infop, UIO_SYSSPACE, FOLLOW,
-			NULLVPP, &vp)) == 0) {
+		    NULLVPP, &vp)) == 0) {
 			if (vp->v_type != VCHR) {
 				VN_RELE(vp);
 				rval = EINVAL;
@@ -633,13 +633,13 @@ sysmioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred, int *rvalp)
 		for (i = 0; i < MAXDEVS; i++) {
 			rw_enter(&sysmcache[i].dca_lock, RW_WRITER);
 			if (sysmcache[i].dca_devt == newdevt &&
-				(sysmcache[i].dca_flags & SYSM_ENABLED)) {
+			    (sysmcache[i].dca_flags & SYSM_ENABLED)) {
 				(void) strcpy(sysmcache[i].dca_name, infop);
 				rval = EEXIST;
 				rw_exit(&sysmcache[i].dca_lock);
 				break;
 			} else if (sysmcache[i].dca_devt == newdevt &&
-				sysmcache[i].dca_flags == SYSM_DISABLED) {
+			    sysmcache[i].dca_flags == SYSM_DISABLED) {
 				sysmcache[i].dca_flags |= SYSM_ENABLED;
 				(void) strcpy(sysmcache[i].dca_name, infop);
 				rw_exit(&sysmcache[i].dca_lock);
@@ -647,7 +647,7 @@ sysmioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred, int *rvalp)
 				break;
 			} else if (sysmcache[i].dca_devt == 0) {
 				ASSERT(sysmcache[i].dca_vp == NULL &&
-				sysmcache[i].dca_flags == SYSM_DISABLED);
+				    sysmcache[i].dca_flags == SYSM_DISABLED);
 				(void) strcpy(sysmcache[i].dca_name, infop);
 				sysmcache[i].dca_flags = SYSM_ENABLED;
 				sysmcache[i].dca_devt = newdevt;

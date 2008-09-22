@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/debug.h>
@@ -49,8 +47,8 @@
 const char sppptun_driver_description[] = "PPP 4.0 tunnel driver";
 const char sppptun_module_description[] = "PPP 4.0 tunnel module";
 #else
-const char sppptun_driver_description[] = "ANU PPP tundrv $Revision: $";
-const char sppptun_module_description[] = "ANU PPP tunmod $Revision: $";
+const char sppptun_driver_description[] = "ANU PPP tundrv";
+const char sppptun_module_description[] = "ANU PPP tunmod";
 
 /* LINTED */
 static const char buildtime[] = "Built " __DATE__ " at " __TIME__

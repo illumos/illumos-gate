@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Overview of the RSM Kernel Agent:
@@ -400,7 +399,8 @@ static struct dev_ops rsm_ops = {
 	nodev,			/* reset */
 	&rsm_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	0
+	0,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -409,7 +409,7 @@ static struct dev_ops rsm_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Remote Shared Memory Driver %I%",
+	"Remote Shared Memory Driver",
 	&rsm_ops,	/* driver ops */
 };
 
@@ -742,8 +742,8 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	rsm_enable_dr = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
-			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-			    "enable-dynamic-reconfiguration", 1);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "enable-dynamic-reconfiguration", 1);
 
 	mutex_enter(&rsm_drv_data.drv_lock);
 	rsm_drv_data.drv_state = RSM_DRV_REG_PROCESSING;
@@ -778,8 +778,8 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 
 	rsm_hash_size = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
-			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-			    "segment-hashtable-size", RSM_HASHSZ);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "segment-hashtable-size", RSM_HASHSZ);
 	if (rsm_hash_size == 0) {
 		DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
 		    "rsm: segment-hashtable-size in rsm.conf "
@@ -840,8 +840,7 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	rsmhash_alloc(&rsm_import_segs, rsm_hash_size);
 
 	importer_list.bucket = (importing_token_t **)
-		kmem_zalloc(rsm_hash_size * sizeof (importing_token_t *),
-		    KM_SLEEP);
+	    kmem_zalloc(rsm_hash_size * sizeof (importing_token_t *), KM_SLEEP);
 
 	/*
 	 * Allocate a resource struct
@@ -864,8 +863,8 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	/* First get the max number of segments from the rsm.conf file */
 	max_segs = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
-			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-			    "max-segments", 0);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "max-segments", 0);
 	if (max_segs == 0) {
 		/* Use default number of segments */
 		max_segs = RSM_MAX_NUM_SEG;
@@ -877,13 +876,13 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * a slot
 	 */
 	barrier_size = roundup((max_segs + 1) * sizeof (rsm_gnum_t),
-			    PAGESIZE);
+	    PAGESIZE);
 
 	/*
 	 * allocation of the barrier failure page
 	 */
 	bar_va = (rsm_gnum_t *)ddi_umem_alloc(barrier_size,
-				    DDI_UMEM_SLEEP, &bar_cookie);
+	    DDI_UMEM_SLEEP, &bar_cookie);
 
 	/*
 	 * Set the barrier_offset
@@ -896,7 +895,7 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * trash memory with a large size which is page aligned.
 	 */
 	(void) ddi_umem_alloc((size_t)TRASHSIZE,
-		    DDI_UMEM_TRASH, &remap_cookie);
+	    DDI_UMEM_TRASH, &remap_cookie);
 
 	/* initialize user segment id allocation variable */
 	rsm_nextavail_segmentid = (rsm_memseg_id_t)RSM_USER_APP_ID_BASE;
@@ -1149,8 +1148,7 @@ rsmresource_alloc(minor_t *rnum)
 							    "_alloc failed:"
 							    "not enough res"
 							    "%d\n", *rnum));
-							return (
-RSMERR_INSUFFICIENT_RESOURCES);
+					return (RSMERR_INSUFFICIENT_RESOURCES);
 						} else {
 							/* use empty slot */
 							break;
@@ -1184,7 +1182,7 @@ RSMERR_INSUFFICIENT_RESOURCES);
 			 */
 			rsmresource_blk_t	**p;
 			uint_t newsz = (uint_t)rsm_resource.rsmrc_sz +
-								RSMRC_BLKSZ;
+			    RSMRC_BLKSZ;
 			/*
 			 * Don't allocate more that max valid rnum
 			 */
@@ -2804,8 +2802,8 @@ rsmsegacl_validate(rsmipc_request_t *req, rsm_node_id_t rnode,
 		ASSERT(seg->s_acl != NULL);
 		for (i = 0; i < seg->s_acl_len; i++) {
 			if (seg->s_acl[i].ae_node == rnode) {
-			    perm &= seg->s_acl[i].ae_permission;
-			    goto found;
+				perm &= seg->s_acl[i].ae_permission;
+				goto found;
 			}
 		}
 		/* rnode is not found in the list */
@@ -3531,7 +3529,7 @@ rsm_send_importer_disconnects(rsm_memseg_id_t ex_segid,
 	}
 
 	DBG_PRINTF((RSM_KERNEL_AGENT | RSM_EXPORT, RSM_DEBUG_VERBOSE,
-			"rsm_send_importer_disconnects done\n"));
+	    "rsm_send_importer_disconnects done\n"));
 }
 
 /*
@@ -3923,7 +3921,7 @@ rsm_proc_sqready_ack(rsmipc_controlmsg_t *msg, rsm_addr_t src_hwaddr,
 	}
 
 	DBG_PRINTF((category, RSM_DEBUG, "rsm_proc_sqready_ack:path=%lx "
-		" src=%lx:%llx\n", path, msghdr->rsmipc_src, src_hwaddr));
+	    " src=%lx:%llx\n", path, msghdr->rsmipc_src, src_hwaddr));
 
 	/*
 	 * clear the WAIT_FOR_SQACK flag since we have recvd the ack
@@ -3959,7 +3957,8 @@ rsm_add_credits(rsmipc_controlmsg_t *msg, rsm_addr_t src_hwaddr,
 	srv_handler_arg_t	*hdlr_argp = (srv_handler_arg_t *)arg;
 	path_t			*path;
 	DBG_DEFINE(category,
-	RSM_KERNEL_AGENT | RSM_FUNC_ALL | RSM_INTR_CALLBACK | RSM_FLOWCONTROL);
+	    RSM_KERNEL_AGENT | RSM_FUNC_ALL |
+	    RSM_INTR_CALLBACK | RSM_FLOWCONTROL);
 
 	DBG_PRINTF((category, RSM_DEBUG_VERBOSE, "rsm_add_credits enter\n"));
 
@@ -4403,7 +4402,7 @@ rsmseg_suspend(rsmseg_t *seg, int *susp_flg)
 				hdl = seg->s_ckl;
 				for (; hdl != NULL; hdl = hdl->c_next) {
 					(void) devmap_unload(hdl->c_dhp,
-						    hdl->c_off, hdl->c_len);
+					    hdl->c_off, hdl->c_len);
 				}
 			}
 			seg->s_mapinfo = NULL;
@@ -4546,7 +4545,7 @@ importer_resume(rsm_node_id_t src_node)
 				request.rsmipc_segment_cookie = cookie;
 				rsmseglock_release(seg);
 				(void) rsmipc_send(seg->s_node, &request,
-					    RSM_NO_REPLY);
+				    RSM_NO_REPLY);
 			} else {
 				rsmseglock_release(seg);
 			}
@@ -4854,7 +4853,7 @@ rsmsegshare_resume(rsmseg_t *seg)
 			sharedp->rsmsi_mapinfo = NULL;
 
 			err = adapter->rsmpi_ops->
-				    rsm_disconnect(sharedp->rsmsi_handle);
+			    rsm_disconnect(sharedp->rsmsi_handle);
 
 			DBG_PRINTF((category, RSM_DEBUG,
 			    "rsmsegshare_resume:disconn seg=%x:err=%d\n",
@@ -5316,7 +5315,7 @@ rsmipc_send(rsm_node_id_t dest, rsmipc_request_t *req, rsmipc_reply_t *reply)
 		switch (req->rsmipc_hdr.rsmipc_type) {
 		case RSMIPC_MSG_SEGCONNECT:
 			reply->rsmipc_status = (short)rsmsegacl_validate(
-							    req, dest, reply);
+			    req, dest, reply);
 			break;
 		case RSMIPC_MSG_BELL:
 			req->rsmipc_hdr.rsmipc_src = dest;
@@ -5400,7 +5399,7 @@ again:
 
 	if ((sendq_token == used_sendq_token) &&
 	    ((e == RSMERR_CONN_ABORTED) || (e == RSMERR_TIMEOUT) ||
-		(e == RSMERR_COMM_ERR_MAYBE_DELIVERED))) {
+	    (e == RSMERR_COMM_ERR_MAYBE_DELIVERED))) {
 		rele_sendq_token(sendq_token);
 		DBG_PRINTF((category, RSM_DEBUG, "rsmipc_send done=%d\n", e));
 		return (RSMERR_CONN_ABORTED);
@@ -5650,7 +5649,7 @@ again:
 		(void) drv_getparm(LBOLT, &ticks);
 		ticks += drv_usectohz(5000000);
 		e = cv_timedwait_sig(&rslot->rsmipc_cv, &rslot->rsmipc_lock,
-			ticks);
+		    ticks);
 		if (e < 0) {
 			/* timed out - retry */
 			e = RSMERR_TIMEOUT;
@@ -5792,7 +5791,7 @@ rsm_send_suspend()
 
 			if (tokp == NULL) { /* not in suspend list */
 				tokp = kmem_zalloc(sizeof (list_element_t),
-						KM_SLEEP);
+				    KM_SLEEP);
 				tokp->nodeid = token->importing_node;
 				tokp->next = head;
 				head = tokp;
@@ -6360,8 +6359,8 @@ rsm_connect(rsmseg_t *seg, rsm_ioctlmsg_t *msg, cred_t *cred,
 	 * We need to verify that this process has access
 	 */
 	e = rsm_access(sharedp->rsmsi_uid, sharedp->rsmsi_gid,
-			    access & sharedp->rsmsi_mode,
-			    (int)(msg->perm & RSM_PERM_RDWR), cred);
+	    access & sharedp->rsmsi_mode,
+	    (int)(msg->perm & RSM_PERM_RDWR), cred);
 	if (e) {
 		rsmsharelock_release(seg);
 		seg->s_state = RSM_STATE_NEW;
@@ -6439,7 +6438,7 @@ rsm_connect(rsmseg_t *seg, rsm_ioctlmsg_t *msg, cred_t *cred,
 					return (
 					    RSMERR_SEG_NOT_PUBLISHED_TO_NODE);
 				else if ((e == RSMERR_RSM_ADDR_UNREACHABLE) ||
-					(e == RSMERR_UNKNOWN_RSM_ADDR))
+				    (e == RSMERR_UNKNOWN_RSM_ADDR))
 					return (RSMERR_REMOTE_NODE_UNREACHABLE);
 				else
 					return (e);
@@ -6613,7 +6612,7 @@ rsm_closeconnection(rsmseg_t *seg, void **cookie)
 	DBG_DEFINE(category, RSM_KERNEL_AGENT | RSM_IMPORT);
 
 	DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
-					"rsm_closeconnection enter\n"));
+	    "rsm_closeconnection enter\n"));
 
 	*cookie = (void *)NULL;
 
@@ -7054,7 +7053,7 @@ importbell_ioctl(rsmseg_t *seg, int cmd /*ARGSUSED*/)
 			request.rsmipc_segment_cookie =
 			    token->import_segment_cookie;
 			(void) rsmipc_send(token->importing_node,
-				    &request, RSM_NO_REPLY);
+			    &request, RSM_NO_REPLY);
 		}
 		token = token->next;
 	}
@@ -7333,7 +7332,7 @@ iovec_copyin(caddr_t user_vec, rsmka_iovec_t *iovec, int count, int mode)
 			iovec->io_type = (int)iovec32->io_type;
 			if (iovec->io_type == RSM_HANDLE_TYPE)
 				iovec->local.segid = (rsm_memseg_id_t)
-							iovec32->local;
+				    iovec32->local;
 			else
 				iovec->local.vaddr =
 				    (caddr_t)(uintptr_t)iovec32->local;
@@ -7628,7 +7627,7 @@ rsm_iovec_ioctl(dev_t dev, caddr_t arg, int cmd, int mode, cred_t *credp)
 			} else {
 				iovec->local_mem.ms_type = RSM_MEM_HANDLE;
 				iovec->local_mem.ms_memory.handle =
-					ex_seg->s_handle.out;
+				    ex_seg->s_handle.out;
 			}
 			ex_seg->s_rdmacnt++; /* refcnt the handle */
 			rsmseglock_release(ex_seg);
@@ -7858,7 +7857,7 @@ rsmattr_ddi_copyout(adapter_t *adapter, caddr_t arg, int mode)
 {
 	rsmka_int_controller_attr_t	rsm_cattr;
 	DBG_DEFINE(category,
-		RSM_KERNEL_AGENT | RSM_FUNC_ALL | RSM_IOCTL | RSM_DDI);
+	    RSM_KERNEL_AGENT | RSM_FUNC_ALL | RSM_IOCTL | RSM_DDI);
 
 	DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
 	    "rsmattr_ddi_copyout enter\n"));
@@ -8542,7 +8541,7 @@ rsm_devmap(dev_t dev, devmap_cookie_t dhc, offset_t off, size_t len,
 		if (err != 0) {
 			DBG_PRINTF((category, RSM_DEBUG,
 			    "rsm_devmap: devmap_umem_setup failed %d\n",
-				err));
+			    err));
 			return (RSMERR_MAP_FAILED);
 		}
 		DBG_PRINTF((category, RSM_DEBUG_VERBOSE,
@@ -8830,7 +8829,7 @@ rsm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 				/* unmap the shared RSMPI mapping */
 				ASSERT(sharedp->rsmsi_handle != NULL);
 				(void) adapter->rsmpi_ops->
-					    rsm_unmap(sharedp->rsmsi_handle);
+				    rsm_unmap(sharedp->rsmsi_handle);
 				rsm_free_mapinfo(sharedp->rsmsi_mapinfo);
 				sharedp->rsmsi_mapinfo = NULL;
 				sharedp->rsmsi_state = RSMSI_STATE_CONNECTED;

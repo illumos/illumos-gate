@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Console kbd multiplexor driver for Sun.
@@ -201,7 +200,8 @@ static struct dev_ops conskbd_ops = {
 	nodev,			/* devo_reset */
 	&(cb_conskbd_ops),	/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -209,7 +209,7 @@ static struct dev_ops conskbd_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"conskbd multiplexer driver %I%",
+	"conskbd multiplexer driver",
 	&conskbd_ops,	/* driver ops */
 };
 

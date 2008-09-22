@@ -532,7 +532,8 @@ static struct dev_ops ops = {
 	nodev,			/* devo_reset */
 	&cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)0,	/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Dump driver.  Provides ioctls to get/set crash dump configuration.
@@ -227,11 +226,13 @@ struct dev_ops dump_ops = {
 	dump_detach,		/* detach */
 	nodev,			/* reset */
 	&dump_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops, "crash dump driver %I%", &dump_ops,
+	&mod_driverops, "crash dump driver", &dump_ops,
 };
 
 static struct modlinkage modlinkage = {

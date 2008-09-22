@@ -2934,10 +2934,13 @@ nextfreebin:
 			if (plw.plw_do_split) {
 				pp = page_freelist_split(szc, bin, mnode,
 				    mtype,
+				    mmu_btop(dma_attr->dma_attr_addr_lo),
 				    mmu_btop(dma_attr->dma_attr_addr_hi + 1),
 				    &plw);
-				if (pp != NULL)
+				if (pp != NULL) {
+					check_dma(dma_attr, pp, 1);
 					return (pp);
+				}
 			}
 
 			bin = page_list_walk_next_bin(szc, bin, &plw);

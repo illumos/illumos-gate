@@ -76,7 +76,8 @@ static struct dev_ops hubd_ops = {
 	nodev,			/* reset */
 	&hubd_cb_ops,		/* driver operations */
 	&usba_hubdi_busops,	/* bus operations */
-	usba_hubdi_power	/* power */
+	usba_hubdi_power,	/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

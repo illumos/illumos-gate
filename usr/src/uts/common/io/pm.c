@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * pm	This driver now only handles the ioctl interface.  The scanning
@@ -146,12 +145,13 @@ static struct dev_ops pm_ops = {
 	nodev,			/* reset */
 	&pm_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"power management driver v%I%",
+	"power management driver",
 	&pm_ops
 };
 

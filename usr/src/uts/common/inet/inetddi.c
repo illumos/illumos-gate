@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -168,7 +167,8 @@ inet_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 }
 
 DDI_DEFINE_STREAM_OPS(inet_devops, nulldev, nulldev, inet_attach, inet_detach,
-    nulldev, inet_info, INET_DEVMTFLAGS, &INET_DEVSTRTAB);
+    nulldev, inet_info, INET_DEVMTFLAGS, &INET_DEVSTRTAB,
+    ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,

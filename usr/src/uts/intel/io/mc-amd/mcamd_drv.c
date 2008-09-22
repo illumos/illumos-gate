@@ -1689,6 +1689,7 @@ mc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 }
 
+
 static struct dev_ops mc_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* devo_refcnt */
@@ -1700,7 +1701,8 @@ static struct dev_ops mc_ops = {
 	nodev,			/* devo_reset */
 	&mc_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

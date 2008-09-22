@@ -261,7 +261,7 @@ unsigned char xnf_broadcastaddr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 int xnf_diagnose = 0; /* Patchable global for diagnostic purposes */
 
 DDI_DEFINE_STREAM_OPS(xnf_dev_ops, nulldev, nulldev, xnf_attach, xnf_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv xnf_modldrv = {
 	&mod_driverops,

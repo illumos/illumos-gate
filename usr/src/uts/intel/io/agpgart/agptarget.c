@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -860,6 +859,7 @@ static struct dev_ops agp_target_ops = {
 	&agp_target_cb_ops,	/* devo_cb_ops */
 	0,			/* devo_bus_ops */
 	0,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static  struct modldrv modldrv = {

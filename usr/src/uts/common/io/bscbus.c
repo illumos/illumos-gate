@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "bscbus" driver provides access to the LOMlite2 virtual registers,
@@ -32,7 +32,6 @@
  * registers signify - only the clients need this information.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/types.h>
@@ -392,7 +391,7 @@ bscbus_trace(struct bscbus_channel_state *csp, char code, const char *caller,
 	if (csp->ssp->debug & (1 << (code-'@'))) {
 		p = buf;
 		(void) snprintf(p, sizeof (buf) - (p - buf),
-			"%s/%s: ", MYNAME, caller);
+		    "%s/%s: ", MYNAME, caller);
 		p += strlen(p);
 
 		va_start(va, fmt);
@@ -482,7 +481,7 @@ static void
 bscbus_check_fault_status(struct bscbus_channel_state *csp)
 {
 	csp->xio_fault =
-		ddi_check_acc_handle(csp->ch_handle) != DDI_SUCCESS;
+	    ddi_check_acc_handle(csp->ch_handle) != DDI_SUCCESS;
 }
 
 static boolean_t
@@ -630,7 +629,7 @@ bscbus_process_sending(struct bscbus_channel_state *csp, uint8_t status)
 			csp->cmdstate = BSCBUS_CMDSTATE_WAITING;
 			/* Extend deadline because time has moved on */
 			csp->deadline = ddi_get_lbolt() +
-				drv_usectohz(LOMBUS_CMD_TIMEOUT/1000);
+			    drv_usectohz(LOMBUS_CMD_TIMEOUT/1000);
 		} else {
 			/* Wait for ack of this byte */
 			bscbus_cmd_log(csp, BSC_CMD_SENDING,
@@ -1012,8 +1011,8 @@ bscbus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 	}
 
 	csp->poll_hz = drv_usectohz(
-		(csp->interrupt_failed ?
-		    BSCBUS_CMD_POLLNOINTS : BSCBUS_CMD_POLL) / 1000);
+	    (csp->interrupt_failed ?
+	    BSCBUS_CMD_POLLNOINTS : BSCBUS_CMD_POLL) / 1000);
 
 	while ((csp->cmdstate != BSCBUS_CMDSTATE_READY) &&
 	    (csp->cmdstate != BSCBUS_CMDSTATE_ERROR)) {
@@ -1028,7 +1027,7 @@ bscbus_cmd(HANDLE_TYPE *hdlp, ptrdiff_t vreg, uint_t val, uint_t cmd)
 				    "interrupt_failed channel %d", csp->chno);
 				csp->interrupt_failed = B_TRUE;
 				csp->poll_hz = drv_usectohz(
-					BSCBUS_CMD_POLLNOINTS / 1000);
+				    BSCBUS_CMD_POLLNOINTS / 1000);
 			}
 			bscbus_poll(csp);
 		}
@@ -1869,9 +1868,8 @@ bscbus_release_channel(struct bscbus_channel_state *csp)
 		    csp->chno, csp->map_count);
 
 		if (csp->map_dog == 0) {
-		    ASSERT(!ddi_intr_hilevel(csp->ssp->dip, csp->chno));
-		    ddi_remove_intr(csp->ssp->dip, csp->chno,
-				    csp->lo_iblk);
+			ASSERT(!ddi_intr_hilevel(csp->ssp->dip, csp->chno));
+			ddi_remove_intr(csp->ssp->dip, csp->chno, csp->lo_iblk);
 		}
 		cv_destroy(csp->lo_cv);
 		mutex_destroy(csp->lo_mutex);
@@ -1991,7 +1989,7 @@ bscbus_map_handle(struct bscbus_channel_state *csp, ddi_map_op_t op,
 
 	case DDI_MO_MAP_LOCKED:
 		if (bscbus_claim_channel(csp,
-			(space == LOMBUS_PAT_SPACE)) == 0) {
+		    (space == LOMBUS_PAT_SPACE)) == 0) {
 			return (DDI_ME_GENERIC);
 		}
 
@@ -2039,7 +2037,7 @@ bscbus_map_handle(struct bscbus_channel_state *csp, ddi_map_op_t op,
 
 	case DDI_MO_MAP_LOCKED:
 		if (bscbus_claim_channel(csp,
-			(space == LOMBUS_PAT_SPACE)) == 0) {
+		    (space == LOMBUS_PAT_SPACE)) == 0) {
 			return (DDI_ME_GENERIC);
 		}
 
@@ -2172,12 +2170,9 @@ bscbus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		return (DDI_ME_INVAL);
 
 	return (bscbus_map_handle(
-			&ssp->channel[
-				LOMBUS_SPACE_TO_CHANNEL(rsp->lombus_space)],
-			    mp->map_op,
-			    LOMBUS_SPACE_TO_REGSET(rsp->lombus_space),
-			    VREG_TO_ADDR(rsp->lombus_base+off), len,
-			    mp->map_handlep, addrp));
+	    &ssp->channel[LOMBUS_SPACE_TO_CHANNEL(rsp->lombus_space)],
+	    mp->map_op, LOMBUS_SPACE_TO_REGSET(rsp->lombus_space),
+	    VREG_TO_ADDR(rsp->lombus_base+off), len, mp->map_handlep, addrp));
 }
 
 
@@ -2219,7 +2214,7 @@ bscbus_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 		 */
 		cdip = arg;
 		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, cdip,
-			DDI_PROP_DONTPASS, "reg", &regs, &nregs);
+		    DDI_PROP_DONTPASS, "reg", &regs, &nregs);
 		if (err != DDI_PROP_SUCCESS)
 			return (DDI_FAILURE);
 
@@ -2274,7 +2269,7 @@ bscbus_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 		ddi_set_parent_data(cdip, lcip);
 
 		(void) snprintf(addr, sizeof (addr),
-			"%x,%x", rsp[0].lombus_space, rsp[0].lombus_base);
+		    "%x,%x", rsp[0].lombus_space, rsp[0].lombus_base);
 		ddi_set_name_addr(cdip, addr);
 
 		return (DDI_SUCCESS);
@@ -2293,8 +2288,8 @@ bscbus_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 			return (DDI_FAILURE);
 
 		cmn_err(CE_CONT, "?BSC device: %s@%s, %s#%d\n",
-			ddi_node_name(rdip), ddi_get_name_addr(rdip),
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_node_name(rdip), ddi_get_name_addr(rdip),
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 		return (DDI_SUCCESS);
 
@@ -2404,7 +2399,7 @@ bscbus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 *  Set various options from .conf properties
 	 */
 	ssp->debug = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "debug", 0);
+	    DDI_PROP_DONTPASS, "debug", 0);
 
 	mutex_init(ssp->ch_mutex, NULL, MUTEX_DRIVER, NULL);
 
@@ -2412,10 +2407,8 @@ bscbus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ssp->cmd_log_size = bscbus_cmd_log_size;
 	if (ssp->cmd_log_size != 0) {
 		ssp->cmd_log_idx = 0;
-		ssp->cmd_log =
-			kmem_zalloc(ssp->cmd_log_size *
-			    sizeof (bsc_cmd_log_t),
-			    KM_SLEEP);
+		ssp->cmd_log = kmem_zalloc(ssp->cmd_log_size *
+		    sizeof (bsc_cmd_log_t), KM_SLEEP);
 	}
 #endif /* BSCBUS_LOGSTATUS */
 
@@ -2554,13 +2547,15 @@ static struct dev_ops bscbus_dev_ops =
 	bscbus_detach,			/* detach		*/
 	bscbus_reset,			/* reset		*/
 	&bscbus_cb_ops,			/* driver operations	*/
-	&bscbus_bus_ops			/* bus operations	*/
+	&bscbus_bus_ops,		/* bus operations	*/
+	NULL,				/* power		*/
+	ddi_quiesce_not_needed,			/* quiesce		*/
 };
 
 static struct modldrv modldrv =
 {
 	&mod_driverops,
-	"bscbus driver, v%I%",
+	"bscbus driver",
 	&bscbus_dev_ops
 };
 
@@ -2584,7 +2579,7 @@ _init(void)
 	int err;
 
 	err = ddi_soft_state_init(&bscbus_statep,
-		sizeof (struct bscbus_state), 0);
+	    sizeof (struct bscbus_state), 0);
 	if (err == DDI_SUCCESS)
 		if ((err = mod_install(&modlinkage)) != DDI_SUCCESS) {
 			ddi_soft_state_fini(&bscbus_statep);

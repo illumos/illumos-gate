@@ -815,16 +815,19 @@ zfs_parse_bootfs(char *bpath, char *outpath)
 	if (*bpath == 0 || *bpath == '/')
 		return (EINVAL);
 
+	(void) strcpy(outpath, bpath);
+
 	slashp = strchr(bpath, '/');
 
 	/* if no '/', just return the pool name */
 	if (slashp == NULL) {
-		(void) strcpy(outpath, bpath);
 		return (0);
 	}
 
-	if (error = str_to_uint64(slashp+1, &objnum))
-		return (error);
+	/* if not a number, just return the root dataset name */
+	if (str_to_uint64(slashp+1, &objnum)) {
+		return (0);
+	}
 
 	*slashp = '\0';
 	error = dsl_dsobj_to_dsname(bpath, objnum, outpath);

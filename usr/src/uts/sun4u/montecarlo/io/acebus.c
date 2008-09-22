@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -135,7 +134,9 @@ static struct dev_ops acebus_ops = {
 	acebus_detach,
 	nodev,
 	(struct cb_ops *)0,
-	&acebus_bus_ops
+	&acebus_bus_ops,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -146,7 +147,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module.  This one is a driver */
-	"Alarm Card ebus nexus v%I%",	/* Name of module. */
+	"Alarm Card ebus nexus",	/* Name of module. */
 	&acebus_ops,		/* driver ops */
 };
 
@@ -233,7 +234,7 @@ acebus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		instance = ddi_get_instance(dip);
 		if (ddi_soft_state_zalloc(per_acebus_state, instance)
-				!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			DBG(D_ATTACH, NULL, "failed to alloc soft state\n");
 			return (DDI_FAILURE);
 		}
@@ -250,7 +251,7 @@ acebus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
-			DDI_PROP_CANSLEEP, "no-dma-interrupt-sync", NULL, 0);
+		    DDI_PROP_CANSLEEP, "no-dma-interrupt-sync", NULL, 0);
 		/* Get our ranges property for mapping child registers. */
 		if (acebus_get_ranges_prop(ebus_p) != DDI_SUCCESS) {
 			free_acebus_soft_state(instance);
@@ -334,16 +335,17 @@ acebus_get_ranges_prop(ebus_devstate_t *ebus_p)
 	}
 
 #ifdef	DEBUG
-	/* */ {
-	int i;
+	{
+		int i;
 
-	for (i = 0; i < nrange; i++) {
-		DBG5(D_MAP, ebus_p, "ebus range addr 0x%x.0x%x PCI range "
-			"addr 0x%x.0x%x.0x%x ", rangep[i].ebus_phys_hi,
+		for (i = 0; i < nrange; i++) {
+			DBG5(D_MAP, ebus_p,
+			    "ebus range addr 0x%x.0x%x PCI range "
+			    "addr 0x%x.0x%x.0x%x ", rangep[i].ebus_phys_hi,
 			    rangep[i].ebus_phys_low, rangep[i].pci_phys_hi,
 			    rangep[i].pci_phys_mid, rangep[i].pci_phys_low);
-		DBG1(D_MAP, ebus_p, "Size 0x%x\n", rangep[i].rng_size);
-	}
+			DBG1(D_MAP, ebus_p, "Size 0x%x\n", rangep[i].rng_size);
+		}
 	}
 #endif /* DEBUG */
 
@@ -390,8 +392,8 @@ acebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 * the request to our parent.
 		 */
 		DBG3(D_MAP, ebus_p, "rdip=%s%d: REGSPEC - handlep=%x\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip),
-			mp->map_handlep);
+		    ddi_get_name(rdip), ddi_get_instance(rdip),
+		    mp->map_handlep);
 		ebus_rp = (ebus_regspec_t *)mp->map_obj.rp;
 		break;
 
@@ -403,8 +405,8 @@ acebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 */
 		rnumber = mp->map_obj.rnumber;
 		DBG4(D_MAP, ebus_p, "rdip=%s%d: rnumber=%x handlep=%x\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip),
-			rnumber, mp->map_handlep);
+		    ddi_get_name(rdip), ddi_get_instance(rdip),
+		    rnumber, mp->map_handlep);
 
 		if (getprop(rdip, "reg", &ebus_regs, &i) != DDI_SUCCESS) {
 			DBG(D_MAP, ebus_p, "can't get reg property\n");
@@ -461,11 +463,11 @@ acebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 #endif
 #ifdef DEBUG
 	DBG5(D_MAP, ebus_p, "(%x,%x,%x)(%x,%x)\n",
-		pci_reg.pci_phys_hi,
-		pci_reg.pci_phys_mid,
-		pci_reg.pci_phys_low,
-		pci_reg.pci_size_hi,
-		pci_reg.pci_size_low);
+	    pci_reg.pci_phys_hi,
+	    pci_reg.pci_phys_mid,
+	    pci_reg.pci_phys_low,
+	    pci_reg.pci_size_hi,
+	    pci_reg.pci_size_low);
 #endif
 
 	p_map_request = *mp;
@@ -499,8 +501,8 @@ acebus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
 			if ((ebus_rp->addr_low >=
 			    rangep->ebus_phys_low) &&
 			    ((ebus_rp->addr_low + ebus_rp->size - 1)
-				<= (rangep->ebus_phys_low +
-				    rangep->rng_size - 1))) {
+			    <= (rangep->ebus_phys_low +
+			    rangep->rng_size - 1))) {
 				uint_t addr_offset = ebus_rp->addr_low -
 				    rangep->ebus_phys_low;
 				/*
@@ -516,17 +518,17 @@ acebus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
 				rp->pci_size_hi = 0;
 				rp->pci_size_low =
 				    min(ebus_rp->size, (rangep->rng_size -
-					addr_offset));
+				    addr_offset));
 
 				DBG2(D_MAP, ebus_p, "Child hi0x%x lo0x%x ",
 				    rangep->ebus_phys_hi,
 				    rangep->ebus_phys_low);
 				DBG4(D_MAP, ebus_p, "Parent hi0x%x "
-					"mid0x%x lo0x%x size 0x%x\n",
-					    rangep->pci_phys_hi,
-					    rangep->pci_phys_mid,
-					    rangep->pci_phys_low,
-					    rangep->rng_size);
+				    "mid0x%x lo0x%x size 0x%x\n",
+				    rangep->pci_phys_hi,
+				    rangep->pci_phys_mid,
+				    rangep->pci_phys_low,
+				    rangep->rng_size);
 
 				break;
 			}
@@ -596,8 +598,8 @@ acebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_UNINITCHILD:
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_UNINITCHILD: rdip=%s%d\n",
-			ddi_get_name((dev_info_t *)arg),
-			ddi_get_instance((dev_info_t *)arg));
+		    ddi_get_name((dev_info_t *)arg),
+		    ddi_get_instance((dev_info_t *)arg));
 		ddi_set_name_addr((dev_info_t *)arg, NULL);
 		ddi_remove_minor_node((dev_info_t *)arg, NULL);
 		impl_rem_dev_props((dev_info_t *)arg);
@@ -606,17 +608,17 @@ acebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_REPORTDEV:
 
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_REPORTDEV: rdip=%s%d\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		cmn_err(CE_CONT, "?%s%d at %s%d: offset %s\n",
-			ddi_driver_name(rdip), ddi_get_instance(rdip),
-			ddi_driver_name(dip), ddi_get_instance(dip),
-			ddi_get_name_addr(rdip));
+		    ddi_driver_name(rdip), ddi_get_instance(rdip),
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    ddi_get_name_addr(rdip));
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_REGSIZE:
 
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_REGSIZE: rdip=%s%d\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		if (getprop(rdip, "reg", &ebus_rp, &i) != DDI_SUCCESS) {
 			DBG(D_CTLOPS, ebus_p, "can't get reg property\n");
 			return (DDI_FAILURE);
@@ -634,7 +636,7 @@ acebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_NREGS:
 
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_NREGS: rdip=%s%d\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		if (getprop(rdip, "reg", &ebus_rp, &i) != DDI_SUCCESS) {
 			DBG(D_CTLOPS, ebus_p, "can't get reg property\n");
 			return (DDI_FAILURE);
@@ -648,7 +650,7 @@ acebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	 * Now pass the request up to our parent.
 	 */
 	DBG2(D_CTLOPS, ebus_p, "passing request to parent: rdip=%s%d\n",
-		ddi_get_name(rdip), ddi_get_instance(rdip));
+	    ddi_get_name(rdip), ddi_get_instance(rdip));
 	return (ddi_ctlops(dip, rdip, op, arg, result));
 }
 
@@ -796,7 +798,7 @@ acebus_config(ebus_devstate_t *ebus_p)
 	pci_config_put16(conf_handle, PCI_CONF_COMM, comm),
 #ifdef DEBUG
 	    DBG1(D_MAP, ebus_p, "command register is now 0x%x\n",
-		pci_config_get16(conf_handle, PCI_CONF_COMM));
+	    pci_config_get16(conf_handle, PCI_CONF_COMM));
 #endif
 	pci_config_put8(conf_handle, PCI_CONF_CACHE_LINESZ,
 	    (uchar_t)acebus_cache_line_size);
@@ -822,54 +824,54 @@ acebus_config(ebus_devstate_t *ebus_p)
 #ifdef	DEBUG
 	if (acebus_debug_flags) {
 		DBG3(D_ATTACH, ebus_p, "tcr[123] = %x,%x,%x\n",
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR1_OFF)),
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR2_OFF)),
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR3_OFF)));
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    TCR1_OFF)),
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    TCR2_OFF)),
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    TCR3_OFF)));
 		DBG2(D_ATTACH, ebus_p, "pmd-aux=%x, freq-aux=%x\n",
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-							PMD_AUX_OFF)),
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-							FREQ_AUX_OFF)));
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    PMD_AUX_OFF)),
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    FREQ_AUX_OFF)));
 #ifdef ACEBUS_DEBUG
 		for (comm = 0; comm < 4; comm++)
 			prom_printf("dcsr%d=%x, dacr%d=%x, dbcr%d=%x\n", comm,
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-					0x700000+(0x2000*comm))), comm,
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-					0x700000+(0x2000*comm)+4)), comm,
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-					0x700000+(0x2000*comm)+8)));
+			    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+			    0x700000+(0x2000*comm))), comm,
+			    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+			    0x700000+(0x2000*comm)+4)), comm,
+			    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+			    0x700000+(0x2000*comm)+8)));
 #endif
 	} /* acebus_debug_flags */
 #endif
 	/* If TCR registers are not initialized, initialize them here */
 	tcr_reg = ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR1_OFF));
+	    TCR1_OFF));
 	if ((tcr_reg == 0) || (tcr_reg == -1))
 		ddi_put32(csr_handle, (uint32_t *)((caddr_t)csr_io + TCR1_OFF),
-								TCR1_REGVAL);
+		    TCR1_REGVAL);
 	tcr_reg = ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR2_OFF));
+	    TCR2_OFF));
 	if ((tcr_reg == 0) || (tcr_reg == -1))
 		ddi_put32(csr_handle, (uint32_t *)((caddr_t)csr_io + TCR2_OFF),
-								TCR2_REGVAL);
+		    TCR2_REGVAL);
 	tcr_reg = ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR3_OFF));
+	    TCR3_OFF));
 	if ((tcr_reg == 0) || (tcr_reg == -1))
 		ddi_put32(csr_handle, (uint32_t *)((caddr_t)csr_io + TCR3_OFF),
-								TCR3_REGVAL);
+		    TCR3_REGVAL);
 #ifdef	DEBUG
 	if (acebus_debug_flags) {
 		DBG3(D_ATTACH, ebus_p, "wrote tcr[123] = %x,%x,%x\n",
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR1_OFF)),
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR2_OFF)),
-			ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
-								TCR3_OFF)));
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    TCR1_OFF)),
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    TCR2_OFF)),
+		    ddi_get32(csr_handle, (uint32_t *)((caddr_t)csr_io +
+		    TCR3_OFF)));
 	}
 #endif
 
@@ -902,8 +904,8 @@ acebus_debug(uint_t flag, ebus_devstate_t *ebus_p, char *fmt,
 		}
 		if (ebus_p)
 			cmn_err(CE_CONT, "%s%d: %s: ",
-				ddi_get_name(ebus_p->dip),
-				ddi_get_instance(ebus_p->dip), s);
+			    ddi_get_name(ebus_p->dip),
+			    ddi_get_instance(ebus_p->dip), s);
 		else
 			cmn_err(CE_CONT, "ebus: ");
 		cmn_err(CE_CONT, fmt, a1, a2, a3, a4, a5);
@@ -951,11 +953,10 @@ acebus_update_props(ebus_devstate_t *ebus_p)
 	 * ie. there are 2 entries in its ranges property.
 	 */
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "assigned-addresses",
-			(int **)&pci_rp, (uint_t *)&length)
-						!= DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "assigned-addresses",
+	    (int **)&pci_rp, (uint_t *)&length) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: Could not get assigned-addresses",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 	/*
@@ -1011,7 +1012,7 @@ acebus_update_props(ebus_devstate_t *ebus_p)
 	if (ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "ranges", (int *)er, length) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: Could not create ranges property",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 	/* The following properties are as defined by PCI 1275 bindings. */
@@ -1089,7 +1090,7 @@ acebus_set_imap(dev_info_t *dip)
 		tdip = ddi_get_parent(tdip);
 		if (tdip == NULL) {
 			cmn_err(CE_WARN, "%s%d: Could not get imap parent",
-				ddi_driver_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 			if (!default_ival)
 				ddi_prop_free(imapp);
 			return (DDI_FAILURE);
@@ -1101,9 +1102,9 @@ acebus_set_imap(dev_info_t *dip)
 	}
 
 	if (ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-			"interrupt-map", imapp, ilength) != DDI_PROP_SUCCESS) {
+	    "interrupt-map", imapp, ilength) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: Could not update AC imap property",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		if (!default_ival)
 			ddi_prop_free(imapp);
 		return (DDI_FAILURE);

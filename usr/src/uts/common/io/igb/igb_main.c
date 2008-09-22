@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,15 +20,18 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 
 #include "igb_sw.h"
 
-static char ident[] = "Intel 1Gb Ethernet 1.1.3";
+static char ident[] = "Intel 1Gb Ethernet";
 
 /*
  * Local function protoypes
@@ -103,6 +104,7 @@ static int igb_attach(dev_info_t *, ddi_attach_cmd_t);
 static int igb_detach(dev_info_t *, ddi_detach_cmd_t);
 static int igb_resume(dev_info_t *);
 static int igb_suspend(dev_info_t *);
+static int igb_quiesce(dev_info_t *);
 static void igb_unconfigure(dev_info_t *, igb_t *);
 static int igb_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
     const void *);
@@ -142,7 +144,8 @@ static struct dev_ops igb_dev_ops = {
 	nodev,			/* devo_reset */
 	&igb_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	ddi_power		/* devo_power */
+	ddi_power,		/* devo_power */
+	igb_quiesce,	/* devo_quiesce */
 };
 
 static struct modldrv igb_modldrv = {
@@ -517,6 +520,52 @@ igb_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 }
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+igb_quiesce(dev_info_t *devinfo)
+{
+	igb_t *igb;
+	struct e1000_hw *hw;
+
+	igb = (igb_t *)ddi_get_driver_private(devinfo);
+
+	if (igb == NULL)
+		return (DDI_FAILURE);
+
+	hw = &igb->hw;
+
+	/*
+	 * Disable the adapter interrupts
+	 */
+	igb_disable_adapter_interrupts(igb);
+
+	/* Tell firmware driver is no longer in control */
+	igb_release_driver_control(hw);
+
+	/*
+	 * Reset the chipset
+	 */
+	(void) e1000_reset_hw(hw);
+
+	/*
+	 * Reset PHY if possible
+	 */
+	if (e1000_check_reset_block(hw) == E1000_SUCCESS)
+		(void) e1000_phy_hw_reset(hw);
+
+	return (DDI_SUCCESS);
+}
+
 
 static void
 igb_unconfigure(dev_info_t *devinfo, igb_t *igb)

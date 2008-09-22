@@ -1292,7 +1292,7 @@ ioapic_init_intr(int mask_apic)
 		/* Bits 23-16 define the maximum redirection entries */
 		intin_max = (ioapic_read(ioapic_ix, APIC_VERS_CMD) >> 16)
 		    & 0xff;
-		for (i = 0; i < intin_max; i++)
+		for (i = 0; i <= intin_max; i++)
 			ioapic_write(ioapic_ix, APIC_RDT_CMD + 2 * i, AV_MASK);
 	}
 
@@ -3429,7 +3429,7 @@ apic_intr_redistribute()
 		max_busy = 0;
 		min_busy_irq = max_busy_irq = NULL;
 		i = apic_min_device_irq;
-		for (; i < apic_max_device_irq; i++) {
+		for (; i <= apic_max_device_irq; i++) {
 			apic_irq_t *irq_ptr;
 			/* Change to linked list per CPU ? */
 			if ((irq_ptr = apic_irq_table[i]) == NULL)
@@ -3551,7 +3551,7 @@ apic_cleanup_busy()
 		apic_cpus[i].aci_busy = 0;
 	}
 
-	for (i = apic_min_device_irq; i < apic_max_device_irq; i++) {
+	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {
 		if ((irq_ptr = apic_irq_table[i]) != NULL)
 			irq_ptr->airq_busy = 0;
 	}
@@ -3983,7 +3983,7 @@ ioapic_disable_redirection()
 		intin_max = (ioapic_read(ioapic_ix, APIC_VERS_CMD) >> 16)
 		    & 0xff;
 
-		for (intin_ix = 0; intin_ix < intin_max; intin_ix++) {
+		for (intin_ix = 0; intin_ix <= intin_max; intin_ix++) {
 			/*
 			 * The assumption here is that this is safe, even for
 			 * systems with IOAPICs that suffer from the hardware

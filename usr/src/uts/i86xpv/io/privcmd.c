@@ -368,13 +368,15 @@ static struct dev_ops privcmd_dv_ops = {
 	DEVO_REV,
 	0,
 	privcmd_getinfo,
-	nulldev,	/* identify */
-	nulldev,	/* probe */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
 	privcmd_attach,
 	privcmd_detach,
-	nodev,		/* reset */
+	nodev,			/* reset */
 	&privcmd_cb_ops,
-	0		/* struct bus_ops */
+	0,			/* struct bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

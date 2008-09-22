@@ -96,7 +96,7 @@ mac_callbacks_t pcwl_m_callbacks = {
 static char *pcwl_name_str = "pcwl";
 
 DDI_DEFINE_STREAM_OPS(pcwl_dev_ops, nulldev, pcwl_probe, pcwl_attach,
-    pcwl_detach, nodev, NULL, D_MP, NULL);
+    pcwl_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {

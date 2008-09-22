@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
  * Solaris support routines for common code part of
  * Chelsio PCI Ethernet Driver.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -403,7 +401,7 @@ t1_fatal_err(ch_t *adapter)
 		t1_interrupts_disable(adapter);
 	}
 	CH_ALERT("%s: encountered fatal error, operation suspended\n",
-		adapter_name(adapter));
+	    adapter_name(adapter));
 }
 
 void
@@ -498,7 +496,7 @@ ch_cyclic(p_ch_cyclic_t cyclic)
 	if (cyclic->timer != 0) {
 		cyclic->func(cyclic->arg);
 		cyclic->timer = timeout((void(*)(void  *))ch_cyclic,
-			(void *)cyclic, cyclic->period);
+		    (void *)cyclic, cyclic->period);
 	}
 }
 
@@ -511,7 +509,7 @@ ch_start_cyclic(p_ch_cyclic_t cyclic, unsigned long period)
 	cyclic->period = drv_usectohz(period * 1000);
 	if (cyclic->timer == 0) {
 		cyclic->timer = timeout((void(*)(void  *))ch_cyclic,
-			(void *)cyclic, cyclic->period);
+		    (void *)cyclic, cyclic->period);
 	}
 }
 
@@ -529,6 +527,6 @@ ch_stop_cyclic(p_ch_cyclic_t cyclic)
 		cyclic->timer = 0;
 		value = untimeout(timer);
 		if (value == 0)
-			delay(2 * cyclic->period);
+			drv_usecwait(drv_hztousec(2 * cyclic->period));
 	} while ((timer != 0) && (value == 0));
 }

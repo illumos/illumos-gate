@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * dnet -- DEC 21x4x
@@ -336,7 +335,9 @@ static struct dev_ops dnetops = {
 	dnetdetach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_dnetops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL	/* devo_bus_ops */
+	(struct bus_ops *)NULL,	/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

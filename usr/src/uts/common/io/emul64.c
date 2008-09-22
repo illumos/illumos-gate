@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SCSA HBA nexus driver that emulates an HBA connected to SCSI target
@@ -201,7 +199,9 @@ static struct dev_ops emul64_ops = {
 	emul64_detach,			/* detach */
 	nodev,				/* reset */
 	&emul64_cbops,			/* char/block ops */
-	NULL				/* bus ops */
+	NULL,				/* bus ops */
+	NULL,				/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 char _depends_on[] = "misc/scsi";
@@ -351,15 +351,15 @@ emul64_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (ddi_soft_state_zalloc(emul64_state, instance) != DDI_SUCCESS) {
 		emul64_i_log(NULL, CE_WARN,
-			"emul64%d: Failed to alloc soft state",
-			instance);
+		    "emul64%d: Failed to alloc soft state",
+		    instance);
 		return (DDI_FAILURE);
 	}
 
 	emul64 = (struct emul64 *)ddi_get_soft_state(emul64_state, instance);
 	if (emul64 == (struct emul64 *)NULL) {
 		emul64_i_log(NULL, CE_WARN, "emul64%d: Bad soft state",
-			instance);
+		    instance);
 		ddi_soft_state_free(emul64_state, instance);
 		return (DDI_FAILURE);
 	}
@@ -412,8 +412,8 @@ emul64_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Look up the scsi-options property
 	 */
 	emul64->emul64_scsi_options =
-		ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0, "scsi-options",
-		    EMUL64_DEFAULT_SCSI_OPTIONS);
+	    ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0, "scsi-options",
+	    EMUL64_DEFAULT_SCSI_OPTIONS);
 	EMUL64_DEBUG(emul64, SCSI_DEBUG, "emul64 scsi-options=%x",
 	    emul64->emul64_scsi_options);
 
@@ -438,7 +438,7 @@ emul64_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	ddi_report_dev(dip);
 	emul64->emul64_taskq = taskq_create("emul64_comp",
-		emul64_task_nthreads, MINCLSYSPRI, 1, emul64_max_task, 0);
+	    emul64_task_nthreads, MINCLSYSPRI, 1, emul64_max_task, 0);
 
 	return (DDI_SUCCESS);
 
@@ -553,7 +553,7 @@ emul64_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		goto out;
 	if (length < 2) {
 		cmn_err(CE_WARN, "emul64: %s property does not have 2 "
-			"elements", prop_name);
+		    "elements", prop_name);
 		goto out;
 	}
 
@@ -569,7 +569,7 @@ emul64_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 	if (length2 < 6) {
 		cmn_err(CE_WARN, "emul64: property %s does not have 6 "
-			"elements", *geo_vidpid);
+		    "elements", *geo_vidpid);
 		goto out;
 	}
 
@@ -580,12 +580,12 @@ emul64_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	/* create avl for data block storage */
 	avl_create(&tgt->emul64_tgt_data, emul64_bsd_blkcompare,
-		sizeof (blklist_t), offsetof(blklist_t, bl_node));
+	    sizeof (blklist_t), offsetof(blklist_t, bl_node));
 
 	/* save scsi_address and vidpid */
 	bcopy(sd, &tgt->emul64_tgt_saddr, sizeof (struct scsi_address));
 	(void) strncpy(tgt->emul64_tgt_inq, vidpid,
-		sizeof (emul64->emul64_tgt->emul64_tgt_inq));
+	    sizeof (emul64->emul64_tgt->emul64_tgt_inq));
 
 	/*
 	 * The high order 4 bytes of the sector count always come first in
@@ -821,11 +821,11 @@ emul64_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	 */
 	if (pkt == NULL) {
 		pkt = scsi_hba_pkt_alloc(emul64->emul64_dip, ap, cmdlen,
-			statuslen,
-			tgtlen, sizeof (struct emul64_cmd), callback, arg);
+		    statuslen,
+		    tgtlen, sizeof (struct emul64_cmd), callback, arg);
 		if (pkt == NULL) {
 			cmn_err(CE_WARN, "emul64_scsi_init_pkt: "
-				"scsi_hba_pkt_alloc failed");
+			    "scsi_hba_pkt_alloc failed");
 			return (NULL);
 		}
 
@@ -964,12 +964,12 @@ void (*callback)(caddr_t), caddr_t arg)
 			beforep->next = p->next;
 		}
 		kmem_free((caddr_t)p,
-			sizeof (struct emul64_reset_notify_entry));
+		    sizeof (struct emul64_reset_notify_entry));
 		rval = DDI_SUCCESS;
 
 	} else if ((flag & SCSI_RESET_NOTIFY) && (p == NULL)) {
 		p = kmem_zalloc(sizeof (struct emul64_reset_notify_entry),
-			KM_SLEEP);
+		    KM_SLEEP);
 		p->ap = ap;
 		p->callback = callback;
 		p->arg = arg;
@@ -1042,8 +1042,7 @@ emul64_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			 * sleep mode below.
 			 */
 			dispatched = taskq_dispatch(emul64->emul64_taskq,
-						emul64_pkt_comp,
-						(void *)pkt, TQ_NOSLEEP);
+			    emul64_pkt_comp, (void *)pkt, TQ_NOSLEEP);
 			if (dispatched == NULL) {
 				/* Queue was full.  dispatch failed. */
 				mutex_enter(&emul64_stats_mutex);
@@ -1053,7 +1052,7 @@ emul64_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		}
 		if (dispatched == NULL) {
 			(void) taskq_dispatch(emul64->emul64_taskq,
-				emul64_pkt_comp, (void *)pkt, TQ_SLEEP);
+			    emul64_pkt_comp, (void *)pkt, TQ_SLEEP);
 		}
 	}
 
@@ -1068,7 +1067,7 @@ void
 emul64_check_cond(struct scsi_pkt *pkt, uchar_t key, uchar_t asc, uchar_t ascq)
 {
 	struct scsi_arq_status *arq =
-			(struct scsi_arq_status *)pkt->pkt_scbp;
+	    (struct scsi_arq_status *)pkt->pkt_scbp;
 
 	/* got check, no data transferred and ARQ done */
 	arq->sts_status.sts_chk = 1;
@@ -1093,12 +1092,12 @@ emul64_error_inject(struct scsi_pkt *pkt)
 	struct emul64_cmd	*sp	= PKT2CMD(pkt);
 	emul64_tgt_t		*tgt;
 	struct scsi_arq_status *arq =
-			(struct scsi_arq_status *)pkt->pkt_scbp;
+	    (struct scsi_arq_status *)pkt->pkt_scbp;
 	uint_t			max_sense_len;
 
 	EMUL64_MUTEX_ENTER(sp->cmd_emul64);
 	tgt = find_tgt(sp->cmd_emul64,
-		pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
+	    pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
 	EMUL64_MUTEX_EXIT(sp->cmd_emul64);
 
 	/*
@@ -1123,7 +1122,7 @@ emul64_error_inject(struct scsi_pkt *pkt)
 		 */
 		max_sense_len = sp->cmd_scblen  -
 		    (sizeof (struct scsi_arq_status) -
-			sizeof (struct scsi_extended_sense));
+		    sizeof (struct scsi_extended_sense));
 		if (max_sense_len > tgt->emul64_einj_sense_length) {
 			max_sense_len = tgt->emul64_einj_sense_length;
 		}
@@ -1200,8 +1199,8 @@ emul64_error_inject_req(struct emul64 *emul64, intptr_t arg)
 			    kmem_alloc(error_inj_req.eccd_sns_dlen, KM_SLEEP);
 			/* Copy sense data */
 			if (ddi_copyin((void *)(arg + sizeof (error_inj_req)),
-				tgt->emul64_einj_sense_data,
-				error_inj_req.eccd_sns_dlen, 0) != 0) {
+			    tgt->emul64_einj_sense_data,
+			    error_inj_req.eccd_sns_dlen, 0) != 0) {
 				cmn_err(CE_WARN,
 				    "emul64: sense data copy in failed\n");
 				return (EFAULT);
@@ -1294,7 +1293,7 @@ emul64_handle_cmd(struct scsi_pkt *pkt)
 			(void) bsd_scsi_read_capacity_16(pkt);
 		} else {
 			cmn_err(CE_WARN, "emul64: unrecognized G4 service "
-				"action 0x%x", pkt->pkt_cdbp[1]);
+			    "action 0x%x", pkt->pkt_cdbp[1]);
 		}
 		break;
 	case SCMD_RESERVE:
@@ -1338,7 +1337,7 @@ emul64_pkt_comp(void * arg)
 
 	EMUL64_MUTEX_ENTER(sp->cmd_emul64);
 	tgt = find_tgt(sp->cmd_emul64,
-		pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
+	    pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
 	EMUL64_MUTEX_EXIT(sp->cmd_emul64);
 	if (!tgt) {
 		pkt->pkt_reason = CMD_TIMEOUT;
@@ -1384,8 +1383,8 @@ emul64_get_tgtrange(struct emul64 *emul64,
 	EMUL64_MUTEX_EXIT(emul64);
 	if (*tgtp == NULL) {
 		cmn_err(CE_WARN, "emul64: ioctl - no target for %d,%d on %d",
-			tgtr->emul64_target, tgtr->emul64_lun,
-			ddi_get_instance(emul64->emul64_dip));
+		    tgtr->emul64_target, tgtr->emul64_lun,
+		    ddi_get_instance(emul64->emul64_dip));
 		return (ENXIO);
 	}
 	return (0);
@@ -1409,7 +1408,7 @@ emul64_ioctl(dev_t dev,
 	emul64 = (struct emul64 *)ddi_get_soft_state(emul64_state, instance);
 	if (emul64 == NULL) {
 		cmn_err(CE_WARN, "emul64: ioctl - no softstate for %d\n",
-			getminor(dev));
+		    getminor(dev));
 		return (ENXIO);
 	}
 
@@ -1512,7 +1511,7 @@ emul64_write_on(struct emul64 *emul64,
 	switch (overlap) {
 	case O_NONE:
 		cmn_err(CE_WARN, "emul64: EMUL64_WRITE_ON 0x%llx,0x%lx "
-			"range not found\n", sb, blkcnt);
+		    "range not found\n", sb, blkcnt);
 		rv = ENXIO;
 		break;
 	case O_SAME:
@@ -1526,9 +1525,9 @@ emul64_write_on(struct emul64 *emul64,
 	case O_OVERLAP:
 	case O_SUBSET:
 		cmn_err(CE_WARN, "emul64: EMUL64_WRITE_ON 0x%llx,0x%lx "
-			"overlaps 0x%llx,0x%" PRIx64 "\n",
-			sb, blkcnt, cur->emul64_blocked.emul64_sb,
-			cur->emul64_blocked.emul64_blkcnt);
+		    "overlaps 0x%llx,0x%" PRIx64 "\n",
+		    sb, blkcnt, cur->emul64_blocked.emul64_sb,
+		    cur->emul64_blocked.emul64_blkcnt);
 		rv = EINVAL;
 		break;
 	}
@@ -1568,8 +1567,8 @@ emul64_nowrite_alloc(emul64_range_t *range)
 
 	nw = kmem_zalloc(sizeof (*nw), KM_SLEEP);
 	bcopy((void *) range,
-		(void *) &nw->emul64_blocked,
-		sizeof (nw->emul64_blocked));
+	    (void *) &nw->emul64_blocked,
+	    sizeof (nw->emul64_blocked));
 	return (nw);
 }
 
@@ -1632,8 +1631,8 @@ emul64_debug_dump_cdb(struct scsi_address *ap, struct scsi_pkt *pkt)
 	int		i;
 
 	(void) snprintf(buf, sizeof (buf), "emul64%d: <%d,%d> ",
-		ddi_get_instance(emul64->emul64_dip),
-		ap->a_target, ap->a_lun);
+	    ddi_get_instance(emul64->emul64_dip),
+	    ap->a_target, ap->a_lun);
 
 	p = buf + strlen(buf);
 

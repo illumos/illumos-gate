@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * audio1575 Audio Driver
@@ -265,12 +264,13 @@ static struct dev_ops audio1575_dev_ops = {
 	&audio1575_cb_ops,	/* devi_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
 static struct modldrv audio1575_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	M1575_MOD_NAME " %I%",	/* drv_linkinfo */
+	M1575_MOD_NAME,		/* drv_linkinfo */
 	&audio1575_dev_ops,	/* drv_dev_ops */
 };
 
@@ -1678,7 +1678,7 @@ audio1575_ad_stop_record(audiohdl_t ahandle, int stream)
 	/* reset the DMA input registers */
 	if ((audio1575_dma_reset(statep, M1575_DMA_PCM_IN)) ==
 	    AUDIO_FAILURE) {
-	    ATRACE("audio1575_ad_stop_record() failure", NULL);
+		ATRACE("audio1575_ad_stop_record() failure", NULL);
 		goto done;
 	}
 

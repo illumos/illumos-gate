@@ -131,7 +131,8 @@ static struct dev_ops xpv_dv_ops = {
 	nodev,		/* reset */
 	&xpv_cb_ops,
 	NULL,		/* struct bus_ops */
-	NULL		/* power */
+	NULL,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

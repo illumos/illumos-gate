@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Direct Attached  disk driver for SPARC machines.
@@ -332,7 +331,8 @@ static struct dev_ops dcd_ops = {
 	dcdreset,		/* reset */
 	&dcd_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	dcdpower		/* power */
+	dcdpower,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -343,7 +343,7 @@ static struct dev_ops dcd_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"DAD Disk Driver %I%",	/* Name of the module. */
+	"DAD Disk Driver",	/* Name of the module. */
 	&dcd_ops,	/* driver ops */
 };
 

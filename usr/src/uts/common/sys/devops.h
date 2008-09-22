@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DEVOPS_H
 #define	_SYS_DEVOPS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 */
 
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -326,9 +324,10 @@ struct bus_ops_rev1 {
  *	devo_attach		-  Attach driver to dev_info
  *	devo_detach		-  Detach/prepare driver to unload
  *	devo_reset		-  Reset device
+ *	devo_quiesce		-  Quiesce device
  */
 
-#define		DEVO_REV		3
+#define		DEVO_REV		4
 #define		CB_REV			1
 
 /*
@@ -368,7 +367,6 @@ typedef enum {
 	DDI_RESET_FORCE = 0
 } ddi_reset_cmd_t;
 
-
 struct dev_ops  {
 	int		devo_rev;	/* Driver build version		*/
 	int		devo_refcnt;	/* device reference count	*/
@@ -385,6 +383,7 @@ struct dev_ops  {
 	struct bus_ops	*devo_bus_ops;	/* bus_ops pointer for nexus drivers */
 	int		(*devo_power)(dev_info_t *dip, int component,
 			    int level);
+	int		(*devo_quiesce)(dev_info_t *dip);
 };
 
 /*
@@ -405,6 +404,8 @@ struct dev_ops  {
  *	XXinfo is the name of the info routine
  *	XXflag is driver flag (cb_flag) in cb_ops,
  *	XXstream_tab is the obvious.
+ *	XXquiesce is the name of the quiesce routine. It must be implemented
+ *		for fast reboot to succeed.
  *	cb_##XXname is the name of the internally defined cb_ops struct.
  *
  * uses cb_XXname as name of static cb_ops structure.
@@ -416,7 +417,7 @@ struct dev_ops  {
  * to reformat it to satisfy Cstyle because genassym.c won't compile.
  */
 /* CSTYLED */
-#define	DDI_DEFINE_STREAM_OPS(XXname, XXidentify, XXprobe, XXattach, XXdetach, XXreset, XXgetinfo, XXflag, XXstream_tab) \
+#define	DDI_DEFINE_STREAM_OPS(XXname, XXidentify, XXprobe, XXattach, XXdetach, XXreset, XXgetinfo, XXflag, XXstream_tab, XXquiesce) \
 static struct cb_ops cb_##XXname = {					\
 	nulldev,		/* cb_open */				\
 	nulldev,		/* cb_close */				\
@@ -449,7 +450,8 @@ static struct dev_ops XXname = {					\
 	(XXreset),		/* devo_reset */			\
 	&(cb_##XXname),		/* devo_cb_ops */			\
 	(struct bus_ops *)NULL,	/* devo_bus_ops */			\
-	NULL			/* devo_power */			\
+	NULL,			/* devo_power */			\
+	(XXquiesce)		/* devo_quiesce */			\
 }
 
 #endif	/* _KERNEL */

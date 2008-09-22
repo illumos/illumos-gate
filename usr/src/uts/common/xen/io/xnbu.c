@@ -503,7 +503,7 @@ xnbu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 }
 
 DDI_DEFINE_STREAM_OPS(ops, nulldev, nulldev, xnbu_attach, xnbu_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops, "xnbu driver", &ops

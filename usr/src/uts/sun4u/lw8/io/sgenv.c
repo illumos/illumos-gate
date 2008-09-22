@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Serengeti Environmental Information driver (sgenv)
@@ -168,7 +167,8 @@ static struct dev_ops sgenv_ops = {
 	nodev,			/* reset */
 	&sgenv_cb_ops,		/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_needed,		/* quiesce() */
 };
 
 /*
@@ -178,7 +178,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"Environmental Driver v%I%",	/* Name of the module */
+	"Environmental Driver",		/* Name of the module */
 	&sgenv_ops			/* pointer to the dev_ops structure */
 };
 
@@ -416,7 +416,7 @@ _init(void)
 	int	error = 0;
 
 	error = ddi_soft_state_init(&sgenv_statep,
-		sizeof (sgenv_soft_state_t), 1);
+	    sizeof (sgenv_soft_state_t), 1);
 
 	if (error)
 		return (error);
@@ -497,7 +497,7 @@ sgenv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		err = ddi_soft_state_zalloc(sgenv_statep, instance);
 		if (err != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "attach: could not allocate state "
-					"structure for inst %d.", instance);
+			    "structure for inst %d.", instance);
 			return (DDI_FAILURE);
 		}
 
@@ -505,7 +505,7 @@ sgenv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (softsp == NULL) {
 			ddi_soft_state_free(sgenv_statep, instance);
 			cmn_err(CE_WARN, "attach: could not get state "
-					"structure for inst %d.", instance);
+			    "structure for inst %d.", instance);
 			return (DDI_FAILURE);
 		}
 
@@ -546,7 +546,7 @@ sgenv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		err = ddi_create_minor_node(dip, SGENV_DRV_NAME, S_IFCHR,
-			instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, NULL);
 		if (err != DDI_SUCCESS) {
 			sgenv_remove_kstats(softsp);
 			sgenv_remove_cache_update_threads();
@@ -597,7 +597,7 @@ sgenv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		softsp = ddi_get_soft_state(sgenv_statep, instance);
 		if (softsp == NULL) {
 			cmn_err(CE_WARN, "detach: could not get state "
-					"structure for inst %d.", instance);
+			    "structure for inst %d.", instance);
 			return (DDI_FAILURE);
 		}
 
@@ -644,15 +644,15 @@ sgenv_add_kstats(sgenv_soft_state_t *softsp)
 	 * Create the 'keyswitch position' named kstat.
 	 */
 	ksp = kstat_create(SGENV_DRV_NAME, inst, SG_KEYSWITCH_KSTAT_NAME,
-			"misc", KSTAT_TYPE_NAMED, 1, NULL);
+	    "misc", KSTAT_TYPE_NAMED, 1, NULL);
 
 	if (ksp != NULL) {
 		/* initialize the named kstat */
 		keyswitch_named_data = (struct kstat_named *)(ksp->ks_data);
 
 		kstat_named_init(&keyswitch_named_data[0],
-			POSITION_KSTAT_NAME,
-			KSTAT_DATA_INT32);
+		    POSITION_KSTAT_NAME,
+		    KSTAT_DATA_INT32);
 
 		ksp->ks_update = sgenv_keyswitch_kstat_update;
 		kstat_install(ksp);
@@ -670,8 +670,8 @@ sgenv_add_kstats(sgenv_soft_state_t *softsp)
 	 * Environmental Information.
 	 */
 	ksp = kstat_create(SGENV_DRV_NAME, inst, SG_ENV_INFO_KSTAT_NAME,
-		"misc", KSTAT_TYPE_RAW, 0,
-		KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
+	    "misc", KSTAT_TYPE_RAW, 0,
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
 
 	if (ksp != NULL) {
 		ksp->ks_data = NULL;
@@ -695,8 +695,8 @@ sgenv_add_kstats(sgenv_soft_state_t *softsp)
 	 * Board Status Information.
 	 */
 	ksp = kstat_create(SGENV_DRV_NAME, inst, SG_BOARD_STATUS_KSTAT_NAME,
-		"misc", KSTAT_TYPE_RAW, 0,
-		KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
+	    "misc", KSTAT_TYPE_RAW, 0,
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
 
 	if (ksp != NULL) {
 		ksp->ks_data = NULL;
@@ -775,10 +775,10 @@ sgenv_add_intr_handlers(void)
 	keysw_payload_msg.msg_len = sizeof (keysw_payload);
 
 	err = sbbc_mbox_reg_intr(MBOX_EVENT_KEY_SWITCH, sgenv_keyswitch_handler,
-		&keysw_payload_msg, NULL, &keysw_hdlr_lock);
+	    &keysw_payload_msg, NULL, &keysw_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_KEY_SWITCH "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		return (DDI_FAILURE);
 	}
 
@@ -792,10 +792,10 @@ sgenv_add_intr_handlers(void)
 	env_payload_msg.msg_len = sizeof (env_payload);
 
 	err = sbbc_mbox_reg_intr(MBOX_EVENT_ENV, sgenv_env_data_handler,
-		&env_payload_msg, NULL, &env_hdlr_lock);
+	    &env_payload_msg, NULL, &env_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_ENV "
-			"(env) handler. Err=%d", err);
+		    "(env) handler. Err=%d", err);
 		return (DDI_FAILURE);
 	}
 
@@ -809,10 +809,10 @@ sgenv_add_intr_handlers(void)
 	fan_payload_msg.msg_len = sizeof (fan_payload);
 
 	err = sbbc_mbox_reg_intr(MBOX_EVENT_ENV, sgenv_fan_status_handler,
-		&fan_payload_msg, NULL, &env_hdlr_lock);
+	    &fan_payload_msg, NULL, &env_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_ENV (fan)"
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		return (DDI_FAILURE);
 	}
 
@@ -825,10 +825,10 @@ sgenv_add_intr_handlers(void)
 	dr_payload_msg.msg_len = sizeof (dr_payload);
 
 	err = sbbc_mbox_reg_intr(MBOX_EVENT_GENERIC, sgenv_dr_event_handler,
-		&dr_payload_msg, NULL, &dr_hdlr_lock);
+	    &dr_payload_msg, NULL, &dr_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_GENERIC (DR)"
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		return (DDI_FAILURE);
 	}
 
@@ -849,31 +849,31 @@ sgenv_remove_intr_handlers(void)
 	int	err;
 
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_KEY_SWITCH,
-		sgenv_keyswitch_handler);
+	    sgenv_keyswitch_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_KEY_SWITCH "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_ENV, sgenv_env_data_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_ENV (env)"
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_ENV, sgenv_fan_status_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_ENV (fan)"
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, sgenv_dr_event_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_GENERIC (DR) "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 
@@ -973,7 +973,7 @@ sgenv_keyswitch_kstat_update(kstat_t *ksp, int rw)
 			rv = -1;
 
 		} else if ((rv = iosram_read(SBBC_KEYSWITCH_KEY, 0,
-			(char *)&posn, size)) != 0) {
+		    (char *)&posn, size)) != 0) {
 			posn = SG_KEYSWITCH_POSN_UNKNOWN;
 
 		} else {
@@ -1126,9 +1126,9 @@ sgenv_env_info_kstat_update(kstat_t *ksp, int rw)
 		 * it here.
 		 */
 		if ((env_cache_snapshot != NULL) &&
-			(env_cache_snapshot_size > 0)) {
+		    (env_cache_snapshot_size > 0)) {
 			DCMN_ERR_CACHE(CE_NOTE, "%s freeing "
-				"env_cache_snapshot buf", f);
+			    "env_cache_snapshot buf", f);
 			kmem_free(env_cache_snapshot, env_cache_snapshot_size);
 		}
 
@@ -1137,7 +1137,7 @@ sgenv_env_info_kstat_update(kstat_t *ksp, int rw)
 		 */
 		env_cache_snapshot_size = ksp->ks_data_size;
 		env_cache_snapshot = kmem_zalloc(
-			env_cache_snapshot_size, KM_SLEEP);
+		    env_cache_snapshot_size, KM_SLEEP);
 
 		/*
 		 * We need to take a fresh snapshot of the env_cache here.
@@ -1151,7 +1151,7 @@ sgenv_env_info_kstat_update(kstat_t *ksp, int rw)
 				continue;
 
 			ASSERT(vol_sensor_count[key_posn] <=
-				SGENV_MAX_SENSORS_PER_KEY);
+			    SGENV_MAX_SENSORS_PER_KEY);
 
 			/*
 			 * <env_cache> entry should have been allocated
@@ -1163,7 +1163,7 @@ sgenv_env_info_kstat_update(kstat_t *ksp, int rw)
 			 */
 			if (env_cache[key_posn] == NULL) {
 				DCMN_ERR(CE_NOTE, "!Cache entry %d has "
-					"disappeared", key_posn);
+				    "disappeared", key_posn);
 				vol_sensor_count[key_posn] = 0;
 				continue;
 			}
@@ -1412,8 +1412,8 @@ sgenv_board_info_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 		for (i = 0; i < SG_MAX_BDS; i++) {
 			bdp = &board_cache_snapshot[i];
 			DCMN_ERR_CACHE(CE_NOTE, "%s: looking at "
-				"cache_snapshot entry[%d], node=%d",
-				f, i, bdp->node_id);
+			    "cache_snapshot entry[%d], node=%d",
+			    f, i, bdp->node_id);
 			if (bdp->node_id >= 0) {
 				/*
 				 * Need a check to ensure that the buf
@@ -1432,9 +1432,9 @@ sgenv_board_info_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 				}
 
 				DCMN_ERR_CACHE(CE_NOTE, "%s: about to bcopy"
-					" cache_snapshot entry[%d], node=%d,"
-					" board=%d", f, i, bdp->node_id,
-					bdp->board_num);
+				    " cache_snapshot entry[%d], node=%d,"
+				    " board=%d", f, i, bdp->node_id,
+				    bdp->board_num);
 				bcopy(bdp, buf, sizeof (sg_board_info_t));
 				buf = ((sg_board_info_t *)buf) + 1;
 			}
@@ -1503,11 +1503,11 @@ sgenv_get_env_info_data(void)
 			 */
 			ASSERT(env_cache[i] != NULL);
 			ASSERT(env_cache[i][0].sd_id.id.sensor_part ==
-				SG_SENSOR_PART_SCAPP);
+			    SG_SENSOR_PART_SCAPP);
 			ASSERT(env_cache[i][0].sd_id.id.sensor_type ==
-				SG_SENSOR_TYPE_ENVDB);
+			    SG_SENSOR_TYPE_ENVDB);
 			ASSERT(SG_INFO_VALUESTATUS(env_cache[i][0].sd_infostamp)
-				== SG_INFO_VALUE_OK);
+			    == SG_INFO_VALUE_OK);
 
 			old_key = env_cache[i][0].sd_value;
 		}
@@ -1589,10 +1589,10 @@ sgenv_get_env_info_data(void)
 			}
 
 			err = sgenv_get_env_data(new_keys[i], i,
-				SG_GET_ENV_CONSTANTS, &status);
+			    SG_GET_ENV_CONSTANTS, &status);
 			if (err) {
 				err = sgenv_handle_env_data_error(err, status,
-					i, old_key, "Constant Data");
+				    i, old_key, "Constant Data");
 				mutex_exit(&env_cache_lock);
 				if (err != DDI_FAILURE) {
 					continue;
@@ -1604,10 +1604,10 @@ sgenv_get_env_info_data(void)
 			}
 
 			err = sgenv_get_env_data(new_keys[i], i,
-				SG_GET_ENV_THRESHOLDS, &status);
+			    SG_GET_ENV_THRESHOLDS, &status);
 			if (err) {
 				err = sgenv_handle_env_data_error(err, status,
-					i, old_key, "Threshold Data");
+				    i, old_key, "Threshold Data");
 				mutex_exit(&env_cache_lock);
 				if (err != DDI_FAILURE) {
 					continue;
@@ -1619,10 +1619,10 @@ sgenv_get_env_info_data(void)
 			}
 
 			err = sgenv_get_env_data(new_keys[i], i,
-				SG_GET_ENV_VOLATILES, &status);
+			    SG_GET_ENV_VOLATILES, &status);
 			if (err) {
 				err = sgenv_handle_env_data_error(err, status,
-					i, old_key, "Volatile Data (fresh)");
+				    i, old_key, "Volatile Data (fresh)");
 				mutex_exit(&env_cache_lock);
 				if (err != DDI_FAILURE) {
 					continue;
@@ -1662,10 +1662,10 @@ sgenv_get_env_info_data(void)
 
 			/* Update the volatile data */
 			err = sgenv_get_env_data(new_keys[i], i,
-				SG_GET_ENV_VOLATILES, &status);
+			    SG_GET_ENV_VOLATILES, &status);
 			if (err) {
 				err = sgenv_handle_env_data_error(err, status,
-					i, old_key, "Volatile Data (update)");
+				    i, old_key, "Volatile Data (update)");
 				mutex_exit(&env_cache_lock);
 				if (err == DDI_FAILURE) {
 					return (0);
@@ -1765,12 +1765,12 @@ sgenv_get_board_info_data(void)
 			 * Any incorrect values are reset to the default time.
 			 */
 			if (sgenv_max_mbox_wait_time <=
-				max(sbbc_mbox_min_timeout, 0))
+			    max(sbbc_mbox_min_timeout, 0))
 				sgenv_max_mbox_wait_time =
-					sbbc_mbox_default_timeout;
+				    sbbc_mbox_default_timeout;
 
 			rv = sbbc_mbox_request_response(&req, &resp,
-				sgenv_max_mbox_wait_time);
+			    sgenv_max_mbox_wait_time);
 			status = resp.msg_status;
 
 			if ((rv) || (status != SG_MBOX_STATUS_SUCCESS)) {
@@ -1779,7 +1779,7 @@ sgenv_get_board_info_data(void)
 				 */
 				if (status > SG_MBOX_STATUS_SUCCESS) {
 					sgenv_mbox_error_msg("Board Info", rv,
-						resp.msg_status);
+					    resp.msg_status);
 					return (rv);
 				}
 
@@ -1788,9 +1788,9 @@ sgenv_get_board_info_data(void)
 				 */
 				if (status == SG_MBOX_STATUS_ILLEGAL_NODE) {
 					sgenv_mbox_error_msg("Board Info", rv,
-						resp.msg_status);
+					    resp.msg_status);
 					node_present[node] =
-						SGENV_NO_NODE_EXISTS;
+					    SGENV_NO_NODE_EXISTS;
 
 					/*
 					 * No point looping through the rest of
@@ -1799,7 +1799,7 @@ sgenv_get_board_info_data(void)
 					break;
 
 				} else if (status ==
-					SG_MBOX_STATUS_ILLEGAL_SLOT) {
+				    SG_MBOX_STATUS_ILLEGAL_SLOT) {
 
 					/*
 					 * We clear the bit representing <board>
@@ -1807,11 +1807,11 @@ sgenv_get_board_info_data(void)
 					 * cannot exist on this chassis.
 					 */
 					node_present[node] &= (~(1 << board) &
-						SGENV_NODE_TYPE_DS);
+					    SGENV_NODE_TYPE_DS);
 					continue;
 
 				} else if (status ==
-					SG_MBOX_STATUS_BOARD_ACCESS_DENIED) {
+				    SG_MBOX_STATUS_BOARD_ACCESS_DENIED) {
 					/*
 					 * We cannot access data for this slot,
 					 * however we may be able to do so in
@@ -1822,9 +1822,9 @@ sgenv_get_board_info_data(void)
 					char	err_msg[40];
 
 					sprintf(err_msg, "Board data for "
-						"Node%d/Slot%d", node, board);
+					    "Node%d/Slot%d", node, board);
 					sgenv_mbox_error_msg(err_msg, rv,
-						resp.msg_status);
+					    resp.msg_status);
 
 					if (rv == 0)
 						rv = status;
@@ -1855,8 +1855,8 @@ sgenv_get_board_info_data(void)
 					 */
 					ptr->node_id = -1;
 					DCMN_ERR_CACHE(CE_NOTE, "%s: "
-						"Clearing cache line %d [%p]",
-						f, board, ptr);
+					    "Clearing cache line %d [%p]",
+					    f, board, ptr);
 				}
 			} else {
 				/*
@@ -1871,9 +1871,9 @@ sgenv_get_board_info_data(void)
 				 * update the board_cache entry
 				 */
 				DCMN_ERR_CACHE(CE_NOTE, "%s: "
-					"Writing data for bd=%d into "
-					" the board_cache at [%p]",
-					f, board, ptr);
+				    "Writing data for bd=%d into "
+				    " the board_cache at [%p]",
+				    f, board, ptr);
 				ptr->node_id = node;
 				ptr->board_num = board;
 				ptr->condition = shbp->s_cond;
@@ -1881,7 +1881,7 @@ sgenv_get_board_info_data(void)
 				ptr->claimed = shbp->s_claimed;
 				ptr->present = shbp->s_present;
 				ptr->led.led_status =
-					shbp->s_ledstatus;
+				    shbp->s_ledstatus;
 				last_board_read_time = gethrtime();
 			}
 			mutex_exit(&board_cache_lock);
@@ -2058,25 +2058,25 @@ sgenv_get_env_data(envresp_key_t key, int key_posn, uint16_t flag, int *status)
 
 		if (flag == SG_GET_ENV_CONSTANTS) {
 			env_cache[key_posn][i].sd_id.tag_id =
-				buf.con[i].id.tag_id;
+			    buf.con[i].id.tag_id;
 			env_cache[key_posn][i].sd_lo =
-				buf.con[i].lo;
+			    buf.con[i].lo;
 			env_cache[key_posn][i].sd_hi =
-				buf.con[i].hi;
+			    buf.con[i].hi;
 
 		} else if (flag == SG_GET_ENV_VOLATILES) {
 			env_cache[key_posn][i].sd_value =
-				buf.vol[i].value;
+			    buf.vol[i].value;
 			env_cache[key_posn][i].sd_infostamp =
-				buf.vol[i].info;
+			    buf.vol[i].info;
 
 			sgenv_set_sensor_status(&env_cache[key_posn][i]);
 
 		} else if (flag == SG_GET_ENV_THRESHOLDS) {
 			env_cache[key_posn][i].sd_lo_warn =
-				buf.thr[i].lo_warn;
+			    buf.thr[i].lo_warn;
 			env_cache[key_posn][i].sd_hi_warn =
-				buf.thr[i].hi_warn;
+			    buf.thr[i].hi_warn;
 		}
 	}
 
@@ -2126,7 +2126,7 @@ sgenv_handle_env_data_error(int err, int status, int key_posn,
 		 * correct key values and we can get the correct data.
 		 */
 		DCMN_ERR_CACHE(CE_NOTE, "key @ posn %d has changed from %d"
-			" while %s", key_posn, key, str);
+		    " while %s", key_posn, key, str);
 		rv = ENXIO;
 		break;
 
@@ -2158,7 +2158,7 @@ sgenv_clear_env_cache_entry(int key_posn)
 
 	if (env_cache[key_posn] != NULL) {
 		kmem_free(env_cache[key_posn], sizeof (env_sensor_t) *
-			SGENV_MAX_SENSORS_PER_KEY);
+		    SGENV_MAX_SENSORS_PER_KEY);
 		env_cache[key_posn] = NULL;
 		vol_sensor_count[key_posn] = 0;
 	}
@@ -2184,15 +2184,15 @@ sgenv_mbox_error_msg(char *str, int err, int status)
 	switch (err) {
 	case ENOTSUP:
 		DCMN_ERR(CE_WARN, "!This system configuration does not "
-					"support SGENV");
+		"support SGENV");
 		break;
 	case ETIMEDOUT:
 		DCMN_ERR(CE_WARN, "!Mailbox timed out while servicing "
-					"SGENV request for %s", str);
+		"SGENV request for %s", str);
 		break;
 	default:
 		DCMN_ERR(CE_WARN, "!Error occurred reading %s, Errno=%d,"
-					" Status=%d", str, err, status);
+		" Status=%d", str, err, status);
 		break;
 	}
 #endif
@@ -2218,10 +2218,10 @@ sgenv_create_env_cache_entry(int key_posn)
 	ASSERT(key_posn >= 0);
 
 	env_cache[key_posn] = (env_sensor_t *)kmem_zalloc(
-		sizeof (env_sensor_t) * SGENV_MAX_SENSORS_PER_KEY, KM_NOSLEEP);
+	    sizeof (env_sensor_t) * SGENV_MAX_SENSORS_PER_KEY, KM_NOSLEEP);
 	if (env_cache[key_posn] == NULL) {
 		cmn_err(CE_WARN, "Failed to allocate memory for env_cache[%d]",
-				key_posn);
+		    key_posn);
 		return (DDI_FAILURE);
 	}
 
@@ -2242,7 +2242,7 @@ sgenv_destroy_env_cache(void)
 	for (i = 0; i < SGENV_MAX_HPU_KEYS; i++) {
 		if (env_cache[i] != NULL) {
 			kmem_free(env_cache[i], sizeof (env_sensor_t) *
-				SGENV_MAX_SENSORS_PER_KEY);
+			    SGENV_MAX_SENSORS_PER_KEY);
 			env_cache[i] = NULL;
 			vol_sensor_count[i] = 0;
 		}
@@ -2273,7 +2273,7 @@ sgenv_update_env_kstat_size(kstat_t *ksp)
 		 * sensors in the collection <i>.
 		 */
 		ksp->ks_data_size += vol_sensor_count[i] *
-			sizeof (env_sensor_t);
+		    sizeof (env_sensor_t);
 	}
 	ASSERT(ksp->ks_data_size >= 0);
 }
@@ -2310,7 +2310,7 @@ sgenv_check_sensor_thresholds(void)
 			status = sensor.sd_status;
 
 			if (SG_GET_SENSOR_STATUS(status) ==
-				SG_GET_PREV_SENSOR_STATUS(status)) {
+			    SG_GET_PREV_SENSOR_STATUS(status)) {
 				continue;
 			}
 
@@ -2363,12 +2363,12 @@ sgenv_set_valid_node_positions(uint_t *node_present)
 	rdip = ddi_root_node();
 
 	for (dip = ddi_get_child(rdip); dip != NULL;
-		dip = ddi_get_next_sibling(dip)) {
+	    dip = ddi_get_next_sibling(dip)) {
 		if (strncmp("ssm", ddi_node_name(dip), 3) == 0) {
 			int	value;
 
 			value = ddi_getprop(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "nodeid", 0);
+			    DDI_PROP_DONTPASS, "nodeid", 0);
 
 			/*
 			 * If we get a valid nodeID which has not already
@@ -2388,8 +2388,8 @@ sgenv_set_valid_node_positions(uint_t *node_present)
 			 * this out from the msg_status from the mailbox.
 			 */
 			if ((value >= 0) &&
-				(value < SSM_MAX_INSTANCES) &&
-				(node_present[value] == SGENV_NO_NODE_EXISTS)) {
+			    (value < SSM_MAX_INSTANCES) &&
+			    (node_present[value] == SGENV_NO_NODE_EXISTS)) {
 				node_present[value] = SGENV_NODE_TYPE_DS;
 			}
 
@@ -2428,7 +2428,7 @@ sgenv_set_sensor_status(env_sensor_t *sensor)
 		 */
 		if (sensor->sd_value == SGENV_FAN_SPEED_HIGH) {
 			SG_SET_SENSOR_STATUS(*status,
-				SG_SENSOR_STATUS_FAN_HIGH);
+			    SG_SENSOR_STATUS_FAN_HIGH);
 
 		} else if (sensor->sd_value == SGENV_FAN_SPEED_LOW) {
 			SG_SET_SENSOR_STATUS(*status, SG_SENSOR_STATUS_FAN_LOW);
@@ -2438,7 +2438,7 @@ sgenv_set_sensor_status(env_sensor_t *sensor)
 
 		} else {
 			SG_SET_SENSOR_STATUS(*status,
-				SG_SENSOR_STATUS_FAN_FAIL);
+			    SG_SENSOR_STATUS_FAN_FAIL);
 		}
 
 		/*
@@ -2460,14 +2460,14 @@ sgenv_set_sensor_status(env_sensor_t *sensor)
 	default:
 		if (sensor->sd_value > sensor->sd_hi) {
 			SG_SET_SENSOR_STATUS(*status,
-				SG_SENSOR_STATUS_HI_DANGER);
+			    SG_SENSOR_STATUS_HI_DANGER);
 
 		} else if (sensor->sd_value > sensor->sd_hi_warn) {
 			SG_SET_SENSOR_STATUS(*status, SG_SENSOR_STATUS_HI_WARN);
 
 		} else if (sensor->sd_value < sensor->sd_lo) {
 			SG_SET_SENSOR_STATUS(*status,
-				SG_SENSOR_STATUS_LO_DANGER);
+			    SG_SENSOR_STATUS_LO_DANGER);
 
 		} else if (sensor->sd_value < sensor->sd_lo_warn) {
 			SG_SET_SENSOR_STATUS(*status, SG_SENSOR_STATUS_LO_WARN);
@@ -2557,14 +2557,14 @@ sgenv_tagid_to_string(sensor_id_t id, char *str)
 	type_str = sgenv_get_type_str(id.id.sensor_type);
 
 	sprintf(str, "Sensor: Node=%d, Board=%s%d, Device=%s%d, Type=%s%d"
-		": reading has ",
-			id.id.node_id,
-			((hpu_str != NULL) ? hpu_str : ""),
-			id.id.hpu_slot,
-			((part_str != NULL) ? part_str : ""),
-			id.id.sensor_partnum,
-			((type_str != NULL) ? type_str : ""),
-			id.id.sensor_typenum);
+	    ": reading has ",
+	    id.id.node_id,
+	    ((hpu_str != NULL) ? hpu_str : ""),
+	    id.id.hpu_slot,
+	    ((part_str != NULL) ? part_str : ""),
+	    id.id.sensor_partnum,
+	    ((type_str != NULL) ? type_str : ""),
+	    id.id.sensor_typenum);
 
 }
 
@@ -2613,10 +2613,10 @@ sgenv_keyswitch_handler(char *arg)
 	 * Allocate memory for sysevent buffer.
 	 */
 	ev = sysevent_alloc(EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE,
-		EP_SGENV, SE_NOSLEEP);
+	    EP_SGENV, SE_NOSLEEP);
 	if (ev == NULL) {
 		cmn_err(CE_WARN, "%s: Failed to alloc mem for %s/%s event",
-			f, EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE);
+		    f, EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE);
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -2627,11 +2627,11 @@ sgenv_keyswitch_handler(char *arg)
 	se_val.value_type = SE_DATA_TYPE_STRING;
 	se_val.value.sv_string = DOMAIN_KEYSWITCH;
 	err = sysevent_add_attr(&ev_attr_list, DOMAIN_WHAT_CHANGED,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			DOMAIN_WHAT_CHANGED, EC_DOMAIN,
-			ESC_DOMAIN_STATE_CHANGE);
+		    DOMAIN_WHAT_CHANGED, EC_DOMAIN,
+		    ESC_DOMAIN_STATE_CHANGE);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2642,7 +2642,7 @@ sgenv_keyswitch_handler(char *arg)
 	 */
 	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
 		cmn_err(CE_WARN, "Failed to attach attr list for %s/%s event",
-			EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE);
+		    EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
@@ -2650,7 +2650,7 @@ sgenv_keyswitch_handler(char *arg)
 	err = log_sysevent(ev, SE_NOSLEEP, &eid);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to log %s/%s event",
-			EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE);
+		    EC_DOMAIN, ESC_DOMAIN_STATE_CHANGE);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2765,7 +2765,7 @@ sgenv_fan_status_handler(char *arg)
 	ev = sysevent_alloc(EC_ENV, ESC_ENV_FAN, EP_SGENV, SE_NOSLEEP);
 	if (ev == NULL) {
 		cmn_err(CE_WARN, "%s: Failed to alloc mem for %s/%s event",
-			f, EC_ENV, ESC_ENV_FAN);
+		    f, EC_ENV, ESC_ENV_FAN);
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -2785,7 +2785,7 @@ sgenv_fan_status_handler(char *arg)
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_ID, &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_ID, EC_ENV, ESC_ENV_FAN);
+		    ENV_FRU_ID, EC_ENV, ESC_ENV_FAN);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2793,10 +2793,10 @@ sgenv_fan_status_handler(char *arg)
 	se_val.value_type = SE_DATA_TYPE_STRING;
 	se_val.value.sv_string = ENV_RESERVED_ATTR;
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_RESOURCE_ID,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_RESOURCE_ID, EC_ENV, ESC_ENV_FAN);
+		    ENV_FRU_RESOURCE_ID, EC_ENV, ESC_ENV_FAN);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
@@ -2805,10 +2805,10 @@ sgenv_fan_status_handler(char *arg)
 	se_val.value_type = SE_DATA_TYPE_STRING;
 	se_val.value.sv_string = ENV_RESERVED_ATTR;
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_DEVICE,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_DEVICE, EC_ENV, ESC_ENV_FAN);
+		    ENV_FRU_DEVICE, EC_ENV, ESC_ENV_FAN);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
@@ -2832,10 +2832,10 @@ sgenv_fan_status_handler(char *arg)
 	}
 
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_STATE,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_STATE, EC_ENV, ESC_ENV_FAN);
+		    ENV_FRU_STATE, EC_ENV, ESC_ENV_FAN);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
@@ -2846,7 +2846,7 @@ sgenv_fan_status_handler(char *arg)
 	 * Create the message to be sent to sysevent.
 	 */
 	sprintf(fan_str, "The status of the fan in Node%d/Slot%d is now ",
-		payload->node_id, payload->slot_number);
+	    payload->node_id, payload->slot_number);
 	switch (payload->fan_speed) {
 	case SGENV_FAN_SPEED_OFF:
 		strcat(fan_str, SGENV_FAN_SPEED_OFF_STR);
@@ -2873,7 +2873,7 @@ sgenv_fan_status_handler(char *arg)
 	err = sysevent_add_attr(&ev_attr_list, ENV_MSG, &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_MSG, EC_ENV, ESC_ENV_FAN);
+		    ENV_MSG, EC_ENV, ESC_ENV_FAN);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
@@ -2885,7 +2885,7 @@ sgenv_fan_status_handler(char *arg)
 	 */
 	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
 		cmn_err(CE_WARN, "Failed to attach attr list for %s/%s event",
-			EC_ENV, ESC_ENV_FAN);
+		    EC_ENV, ESC_ENV_FAN);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
@@ -2893,7 +2893,7 @@ sgenv_fan_status_handler(char *arg)
 	err = log_sysevent(ev, SE_NOSLEEP, &eid);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to log %s/%s event",
-			EC_ENV, ESC_ENV_FAN);
+		    EC_ENV, ESC_ENV_FAN);
 		sysevent_free(ev);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2946,7 +2946,7 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 		ev = sysevent_alloc(EC_ENV, ESC_ENV_TEMP, EP_SGENV, SE_NOSLEEP);
 		if (ev == NULL) {
 			cmn_err(CE_WARN, "Failed to allocate sysevent buffer "
-				"for %s/%s event", EC_ENV, ESC_ENV_TEMP);
+			    "for %s/%s event", EC_ENV, ESC_ENV_TEMP);
 			return (DDI_FAILURE);
 		}
 		break;
@@ -2954,10 +2954,10 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	default:
 		temp_event_type = FALSE;
 		ev = sysevent_alloc(EC_ENV, ESC_ENV_POWER,
-					EP_SGENV, SE_NOSLEEP);
+		    EP_SGENV, SE_NOSLEEP);
 		if (ev == NULL) {
 			cmn_err(CE_WARN, "Failed to allocate sysevent buffer "
-				"for %s/%s event", EC_ENV, ESC_ENV_POWER);
+			    "for %s/%s event", EC_ENV, ESC_ENV_POWER);
 			return (DDI_FAILURE);
 		}
 		break;
@@ -2979,8 +2979,8 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_ID, &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_ID, EC_ENV,
-			(temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
+		    ENV_FRU_ID, EC_ENV,
+		    (temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
 		sysevent_free(ev);
 		return (DDI_FAILURE);
 	}
@@ -2988,11 +2988,11 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	se_val.value_type = SE_DATA_TYPE_STRING;
 	se_val.value.sv_string = ENV_RESERVED_ATTR;
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_RESOURCE_ID,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_RESOURCE_ID, EC_ENV,
-			(temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
+		    ENV_FRU_RESOURCE_ID, EC_ENV,
+		    (temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_FAILURE);
@@ -3001,11 +3001,11 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	se_val.value_type = SE_DATA_TYPE_STRING;
 	se_val.value.sv_string = ENV_RESERVED_ATTR;
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_DEVICE,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_FRU_DEVICE, EC_ENV,
-			(temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
+		    ENV_FRU_DEVICE, EC_ENV,
+		    (temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_FAILURE);
@@ -3037,12 +3037,12 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	 * Add ENV_FRU_STATE attribute.
 	 */
 	err = sysevent_add_attr(&ev_attr_list, ENV_FRU_STATE,
-		&se_val, SE_NOSLEEP);
+	    &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr[%s] for %s/%s event "
-			"(Err=%d)", ENV_FRU_STATE, EC_ENV,
-				(temp_event_type ? ESC_ENV_TEMP: ESC_ENV_POWER),
-				err);
+		    "(Err=%d)", ENV_FRU_STATE, EC_ENV,
+		    (temp_event_type ? ESC_ENV_TEMP: ESC_ENV_POWER),
+		    err);
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_FAILURE);
@@ -3095,8 +3095,8 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	err = sysevent_add_attr(&ev_attr_list, ENV_MSG, &se_val, SE_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to add attr [%s] for %s/%s event",
-			ENV_MSG, EC_ENV,
-			(temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
+		    ENV_MSG, EC_ENV,
+		    (temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_FAILURE);
@@ -3108,8 +3108,8 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	 */
 	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
 		cmn_err(CE_WARN, "Failed to attach attr list for %s/%s event",
-			EC_ENV,
-			(temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
+		    EC_ENV,
+		    (temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
 		sysevent_free_attr(ev_attr_list);
 		sysevent_free(ev);
 		return (DDI_FAILURE);
@@ -3117,7 +3117,7 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 	err = log_sysevent(ev, SE_NOSLEEP, &eid);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to log %s/%s event", EC_ENV,
-			(temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
+		    (temp_event_type ? ESC_ENV_TEMP : ESC_ENV_POWER));
 		sysevent_free(ev);
 		return (DDI_FAILURE);
 	}
@@ -3180,7 +3180,7 @@ sgenv_dr_event_handler(char *arg)
 		 * env_cache and the board_cache to be updated.
 		 */
 		DCMN_ERR_EVENT(CE_NOTE, "%s: about to signal to background "
-			"threads due to event %d.", f, payload->event_details);
+		    "threads due to event %d.", f, payload->event_details);
 
 		sgenv_indicate_cache_update_needed(ENV_CACHE);
 		sgenv_indicate_cache_update_needed(BOARD_CACHE);
@@ -3222,12 +3222,12 @@ sgenv_indicate_cache_update_needed(int cache_type)
 		mutex_enter(&env_flag_lock);
 		if (env_cache_updating) {
 			DCMN_ERR_THREAD(CE_NOTE, "%s: Thread already "
-				"updating env cache", f);
+			    "updating env cache", f);
 			env_cache_update_needed = B_TRUE;
 
 		} else {
 			DCMN_ERR_THREAD(CE_NOTE, "%s: Sending signal "
-				"to env thread", f);
+			    "to env thread", f);
 			cv_signal(&env_flag_cond);
 		}
 		mutex_exit(&env_flag_lock);
@@ -3237,12 +3237,12 @@ sgenv_indicate_cache_update_needed(int cache_type)
 		mutex_enter(&board_flag_lock);
 		if (board_cache_updating) {
 			DCMN_ERR_THREAD(CE_NOTE, "%s: Thread already "
-				"updating board cache", f);
+			    "updating board cache", f);
 			board_cache_update_needed = B_TRUE;
 
 		} else {
 			DCMN_ERR_THREAD(CE_NOTE, "%s: Sending signal "
-				"to board thread", f);
+			    "to board thread", f);
 			cv_signal(&board_flag_cond);
 		}
 		mutex_exit(&board_flag_lock);

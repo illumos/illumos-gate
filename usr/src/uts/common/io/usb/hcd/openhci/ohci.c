@@ -507,6 +507,11 @@ static int	ohci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 static int	ohci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int	ohci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+
+#ifndef	__sparc
+static int	ohci_quiesce(dev_info_t *dip);
+#endif	/* __sparc */
+
 static int	ohci_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
 				void *arg, void **result);
 
@@ -539,7 +544,12 @@ static struct dev_ops ohci_ops = {
 	nodev,				/* Reset */
 	&ohci_cb_ops,			/* Driver operations */
 	&usba_hubdi_busops,		/* Bus operations */
-	usba_hubdi_root_hub_power	/* Power */
+	usba_hubdi_root_hub_power,	/* Power */
+#ifdef	__sparc
+	ddi_quiesce_not_supported,	/* Quiesce */
+#else
+	ohci_quiesce,			/* Quiesce */
+#endif	/* __sparc */
 };
 
 /*
@@ -11230,3 +11240,71 @@ ohci_print_td(
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "\tctrl_phase: 0x%x ", Get_TD(td->hctd_ctrl_phase));
 }
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+#ifndef	__sparc
+int
+ohci_quiesce(dev_info_t *dip)
+{
+	ohci_state_t	*ohcip = ohci_obtain_state(dip);
+
+	if (ohcip == NULL)
+		return (DDI_FAILURE);
+
+	if (ohcip->ohci_flags & OHCI_INTR) {
+
+		/* Disable all HC ED list processing */
+		Set_OpReg(hcr_control,
+		    (Get_OpReg(hcr_control) & ~(HCR_CONTROL_CLE |
+		    HCR_CONTROL_BLE | HCR_CONTROL_PLE | HCR_CONTROL_IE)));
+
+		/* Disable all HC interrupts */
+		Set_OpReg(hcr_intr_disable,
+		    (HCR_INTR_SO | HCR_INTR_WDH | HCR_INTR_RD | HCR_INTR_UE));
+
+		/* Disable Master and SOF interrupts */
+		Set_OpReg(hcr_intr_disable, (HCR_INTR_MIE | HCR_INTR_SOF));
+
+		/* Set the Host Controller Functional State to Reset */
+		Set_OpReg(hcr_control, ((Get_OpReg(hcr_control) &
+		    (~HCR_CONTROL_HCFS)) | HCR_CONTROL_RESET));
+
+		/*
+		 * Workaround for ULI1575 chipset. Following OHCI Operational
+		 * Memory Registers are not cleared to their default value
+		 * on reset. Explicitly set the registers to default value.
+		 */
+		if (ohcip->ohci_vendor_id == PCI_ULI1575_VENID &&
+		    ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
+			Set_OpReg(hcr_control, HCR_CONTROL_DEFAULT);
+			Set_OpReg(hcr_intr_enable, HCR_INT_ENABLE_DEFAULT);
+			Set_OpReg(hcr_HCCA, HCR_HCCA_DEFAULT);
+			Set_OpReg(hcr_ctrl_head, HCR_CONTROL_HEAD_ED_DEFAULT);
+			Set_OpReg(hcr_bulk_head, HCR_BULK_HEAD_ED_DEFAULT);
+			Set_OpReg(hcr_frame_interval,
+			    HCR_FRAME_INTERVAL_DEFAULT);
+			Set_OpReg(hcr_periodic_strt,
+			    HCR_PERIODIC_START_DEFAULT);
+		}
+
+		ohcip->ohci_hc_soft_state = OHCI_CTLR_SUSPEND_STATE;
+	}
+
+	/* Unmap the OHCI registers */
+	if (ohcip->ohci_regs_handle) {
+		/* Reset the host controller */
+		Set_OpReg(hcr_cmd_status, HCR_STATUS_RESET);
+	}
+
+	return (DDI_SUCCESS);
+}
+#endif	/* __sparc */

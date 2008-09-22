@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -113,7 +111,8 @@ static struct dev_ops gpio_dev_ops = {
 	nulldev,			/* reset */
 	&gpio_cb_ops,
 	(struct bus_ops *)NULL,
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 /* module configuration stuff */
@@ -121,7 +120,7 @@ static void *statep;
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"gpio driver 1.0",
+	"gpio driver",
 	&gpio_dev_ops
 };
 static struct modlinkage modlinkage = {
@@ -211,78 +210,78 @@ gpio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	    /* Allocate and get the soft state structure for this instance. */
 
-	    instance = ddi_get_instance(dip);
-	    DBG(dip, "attach: instance is %d", instance, 0, 0, 0, 0);
-	    if (ddi_soft_state_zalloc(statep, instance) != DDI_SUCCESS)
+		instance = ddi_get_instance(dip);
+		DBG(dip, "attach: instance is %d", instance, 0, 0, 0, 0);
+		if (ddi_soft_state_zalloc(statep, instance) != DDI_SUCCESS)
 		goto attach_failed;
-	    softc = getsoftc(instance);
-	    softc->gp_dip = dip;
-	    softc->gp_state = 0;
-	    mutex_init(&softc->gp_mutex, NULL, MUTEX_DRIVER, NULL);
+		softc = getsoftc(instance);
+		softc->gp_dip = dip;
+		softc->gp_state = 0;
+		mutex_init(&softc->gp_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	    /* Map in the gpio device registers. */
 
-	    dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
-	    dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
-	    dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-	    if (ddi_regs_map_setup(dip, 0, (caddr_t *)&softc->gp_regs, 0, 0,
+		dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+		dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+		dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+		if (ddi_regs_map_setup(dip, 0, (caddr_t *)&softc->gp_regs, 0, 0,
 		    &dev_attr, &softc->gp_handle) != DDI_SUCCESS)
 		goto attach_failed;
-	    DBG(dip, "attach: regs=0x%p", (uintptr_t)softc->gp_regs,
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 1 data is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[0]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 1 direction is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[1]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 1 output type is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[2]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 1 pull up control type is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[3]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 2 data is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[4]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 2 direction is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[5]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 2 output type is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[6]),
-		0, 0, 0, 0);
-	    DBG(dip, "attach: port 2 pull up control type is %x",
-		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[7]),
-		0, 0, 0, 0);
+		DBG(dip, "attach: regs=0x%p", (uintptr_t)softc->gp_regs,
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 1 data is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[0]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 1 direction is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[1]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 1 output type is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[2]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 1 pull up control type is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[3]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 2 data is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[4]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 2 direction is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[5]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 2 output type is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[6]),
+		    0, 0, 0, 0);
+		DBG(dip, "attach: port 2 pull up control type is %x",
+		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[7]),
+		    0, 0, 0, 0);
 
 	    /* Create device minor nodes. */
 
-	    if (ddi_create_minor_node(dip, "gpio", S_IFCHR,
-		instance, NULL, NULL) == DDI_FAILURE) {
-		ddi_regs_map_free(&softc->gp_handle);
-		goto attach_failed;
-	    }
+		if (ddi_create_minor_node(dip, "gpio", S_IFCHR,
+		    instance, NULL, NULL) == DDI_FAILURE) {
+			ddi_regs_map_free(&softc->gp_handle);
+			goto attach_failed;
+		}
 
-	    ddi_report_dev(dip);
-	    return (DDI_SUCCESS);
+		ddi_report_dev(dip);
+		return (DDI_SUCCESS);
 
 	case DDI_RESUME:
 
 	    /* Nothing to do for a resume. */
 
-	    return (DDI_SUCCESS);
+		return (DDI_SUCCESS);
 
 	default:
-	    return (DDI_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 attach_failed:
 	if (softc) {
-	    mutex_destroy(&softc->gp_mutex);
-	    if (softc->gp_handle)
-		ddi_regs_map_free(&softc->gp_handle);
-	    ddi_soft_state_free(statep, instance);
-	    ddi_remove_minor_node(dip, NULL);
+		mutex_destroy(&softc->gp_mutex);
+		if (softc->gp_handle)
+			ddi_regs_map_free(&softc->gp_handle);
+		ddi_soft_state_free(statep, instance);
+		ddi_remove_minor_node(dip, NULL);
 	}
 	return (DDI_FAILURE);
 }
@@ -434,7 +433,7 @@ gpio_debug(dev_info_t *dip, char *format, uint_t arg1, uint_t arg2, uint_t arg3,
 		prom_printf("gpio: ");
 	} else {
 		prom_printf("%s%d: ", ddi_driver_name(dip),
-			ddi_get_instance(dip));
+		    ddi_get_instance(dip));
 	}
 	prom_printf(format, arg1, arg2, arg3, arg4, arg5);
 	prom_printf("\n");

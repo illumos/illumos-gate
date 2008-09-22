@@ -532,7 +532,12 @@ mutex_owned(const kmutex_t *mp)
 {
 	const mutex_impl_t *lp = (const mutex_impl_t *)mp;
 
+#ifdef	__x86
+	extern int quiesce_active;
+	if (panicstr || quiesce_active)
+#else
 	if (panicstr)
+#endif	/* __x86 */
 		return (1);
 
 	if (MUTEX_TYPE_ADAPTIVE(lp))

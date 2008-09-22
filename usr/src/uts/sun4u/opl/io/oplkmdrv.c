@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * OPL IPSec Key Management Driver.
@@ -135,12 +134,14 @@ struct dev_ops okm_ops = {
 	okm_detach,		/* detach */
 	nodev,			/* reset */
 	&okm_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* no bus operations */
+	(struct bus_ops *)0,	/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 struct modldrv modldrv = {
 	&mod_driverops,
-	"OPL Key Management Driver v%I%",
+	"OPL Key Management Driver",
 	&okm_ops,
 };
 

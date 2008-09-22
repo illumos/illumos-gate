@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Wrapper function to implement reboot w/ arguments on x86
@@ -42,7 +41,7 @@
 #include <sys/stat.h>
 #include <sys/uadmin.h>
 #include <unistd.h>
-#include <string.h>
+#include <strings.h>
 #include <pthread.h>
 #include <zone.h>
 
@@ -71,8 +70,11 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	char *altroot;
 
 	bargs = (char *)mdep;
+
 	if (geteuid() == 0 && getzoneid() == GLOBAL_ZONEID &&
 	    (cmd == A_SHUTDOWN || cmd == A_REBOOT)) {
+		int off = 0;
+
 		switch (fcn) {
 		case AD_IBOOT:
 		case AD_SBOOT:
@@ -97,6 +99,7 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 			}
 			/*FALLTHROUGH*/
 		case AD_BOOT:
+		case AD_FASTREBOOT:
 			if (bargs == 0)
 				break;	/* no args */
 			if (legal_arg(bargs) < 0)
@@ -113,6 +116,36 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 				altroot = "";
 			}
 
+			if (fcn == AD_FASTREBOOT) {
+				char *newarg, *head;
+				char bargs_scratch[BOOTARGS_MAX];
+
+				bzero(bargs_scratch, BOOTARGS_MAX);
+
+				bcopy(bargs, bargs_scratch, strlen(bargs));
+				head = bargs_scratch;
+				newarg = strtok(bargs_scratch, " ");
+
+				if (newarg == NULL)
+					break;
+
+				/* First argument is rootdir */
+				if (newarg[0] != '-' &&
+				    strncmp(&newarg[strlen(newarg)-4],
+				    "unix", 4) != 0) {
+					newarg = strtok(NULL, " ");
+					off = newarg - head;
+				}
+
+				/*
+				 * If we are using alternate root via
+				 * mountpoint or a different BE, don't
+				 * bother to update the temp menu entry.
+				 */
+				if (off > 0)
+					break;
+			}
+
 			/* are we rebooting to a GRUB menu entry? */
 			if (isdigit(bargs[0])) {
 				int entry = strtol(bargs, NULL, 10);
@@ -122,10 +155,12 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 			} else {
 				(void) snprintf(cmdbuf, sizeof (cmdbuf),
 				    "/sbin/bootadm -m update_temp %s"
-				    "-o %s%s%s", altroot, quote, bargs, quote);
+				    "-o %s%s%s", altroot, quote,
+				    &bargs[off], quote);
 			}
 			(void) system(cmdbuf);
 		}
 	}
+
 	return (__uadmin(cmd, fcn, mdep));
 }

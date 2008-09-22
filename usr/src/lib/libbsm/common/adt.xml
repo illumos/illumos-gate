@@ -2054,6 +2054,8 @@ Use is subject to license terms.
 	<msg id="AD_SBOOT">Single-user reboot</msg>
 	<msg id="AD_SIBOOT">Single-user interactive reboot</msg>
 	<msg id="AD_NOSYNC">Do not sync filesystems on next A_DUMP</msg>
+	<msg id="AD_FASTREBOOT">Reboot bypassing BIOS and boot loader</msg>
+	<msg id="AD_FASTREBOOT_DRYRUN">Check if system supports reboot bypassing BIOS and boot loader</msg>
 	<msg id="AD_REUSEINIT">Prepare for AD_REUSABLE</msg>
 	<msg id="AD_REUSABLE">Create reusable statefile</msg>
 	<msg id="AD_REUSEFINI">Revert to normal CPR mode (not reusable)</msg>

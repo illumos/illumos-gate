@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DRT device/interrupt handler
@@ -130,7 +128,8 @@ static struct dev_ops drt_devops = {
 	nulldev,
 	NULL,
 	&pcmciabus_ops,
-	ddi_power
+	ddi_power,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 #if defined(DEBUG)
@@ -218,7 +217,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"STP4020 (SUNW,pcmcia) adapter driver %I%", /* Name of the module. */
+	"STP4020 (SUNW,pcmcia) adapter driver", /* Name of the module. */
 	&drt_devops,		/* driver ops */
 };
 
@@ -232,7 +231,7 @@ _init()
 	int ret;
 
 	mutex_init(&stpra_lock, NULL, MUTEX_DRIVER,
-			(void *)(uintptr_t)__ipltospl(SPL7 - 1));
+	    (void *)(uintptr_t)__ipltospl(SPL7 - 1));
 	if ((ret = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&stpra_lock);
 	}
@@ -251,7 +250,7 @@ _fini()
 		while (stpra_freelist != NULL) {
 			next = stpra_freelist->ra_next;
 			kmem_free((caddr_t)stpra_freelist,
-				sizeof (struct stpramap));
+			    sizeof (struct stpramap));
 			stpra_freelist = next;
 		}
 		mutex_exit(&stpra_lock);
@@ -324,7 +323,7 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		drt = (drt_dev_t *)drt_get_driver_private(dip);
 #if defined(DRT_DEBUG)
 		if (drt_debug) {
-		    cmn_err(CE_CONT, "drt_attach: DDI_RESUME\n");
+			cmn_err(CE_CONT, "drt_attach: DDI_RESUME\n");
 		}
 #endif
 		if (drt != NULL && drt->pc_flags & PCF_SUSPENDED) {
@@ -334,12 +333,12 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				drt_socket_t *sockp = &drt->pc_sockets[sn];
 
 			    /* Restore adapter hardware state */
-			    mutex_enter(&drt->pc_lock);
-			    drt_cpr(drt, DRT_RESTORE_HW_STATE);
-			    drt_new_card(drt, sn);
-			    drt_socket_card_id(drt, sockp,
-						drt->pc_csr->socket[sn].stat0);
-			    mutex_exit(&drt->pc_lock);
+				mutex_enter(&drt->pc_lock);
+				drt_cpr(drt, DRT_RESTORE_HW_STATE);
+				drt_new_card(drt, sn);
+				drt_socket_card_id(drt, sockp,
+				    drt->pc_csr->socket[sn].stat0);
+				mutex_exit(&drt->pc_lock);
 
 			} /* for (sn) */
 			mutex_enter(&drt->pc_lock);
@@ -377,8 +376,8 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		cmn_err(CE_CONT, "drt_attach: drt=%p\n", (void *)drt);
 #endif
 	drt_nexus = (struct pcmcia_adapter_nexus_private *)
-		kmem_zalloc(sizeof (struct pcmcia_adapter_nexus_private),
-				KM_NOSLEEP);
+	    kmem_zalloc(sizeof (struct pcmcia_adapter_nexus_private),
+	    KM_NOSLEEP);
 	if (drt_nexus == NULL) {
 		kmem_free(drt, sizeof (drt_dev_t));
 		return (DDI_FAILURE);
@@ -390,28 +389,28 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 	dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	if (ddi_regs_map_setup(dip, DRMAP_ASIC_CSRS, (caddr_t *)&drt->pc_csr,
-				(off_t)0, sizeof (stp4020_socket_csr_t),
-				&dev_attr, &drt->pc_handle) != 0) {
+	    (off_t)0, sizeof (stp4020_socket_csr_t),
+	    &dev_attr, &drt->pc_handle) != 0) {
 		kmem_free(drt, sizeof (drt_dev_t));
 		kmem_free(drt_nexus,
-			    sizeof (struct pcmcia_adapter_nexus_private *));
+		    sizeof (struct pcmcia_adapter_nexus_private *));
 		return (DDI_FAILURE);
 	}
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "drt_attach: %x->%p\n", DRMAP_ASIC_CSRS,
-				(void *)drt->pc_csr);
+		    (void *)drt->pc_csr);
 	}
 #endif
 
 	i = sizeof (regs);
 	if ((err = ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
-					DDI_PROP_CANSLEEP, "reg",
-			    (caddr_t)regs, &i)) != DDI_SUCCESS) {
+	    DDI_PROP_CANSLEEP, "reg",
+	    (caddr_t)regs, &i)) != DDI_SUCCESS) {
 
 		kmem_free(drt, sizeof (drt_dev_t));
 		kmem_free(drt_nexus,
-			    sizeof (struct pcmcia_adapter_nexus_private));
+		    sizeof (struct pcmcia_adapter_nexus_private));
 		return (DDI_FAILURE);
 	}
 
@@ -430,12 +429,12 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* allow property to override audio */
 	if (ddi_getprop(DDI_DEV_T_NONE, dip,
-			DDI_PROP_DONTPASS, "disable-audio", -1) == -1)
+	    DDI_PROP_DONTPASS, "disable-audio", -1) == -1)
 		drt->pc_flags |= PCF_AUDIO;
 
 	/* now enable both interrupt handlers */
 	if (ddi_add_intr(dip, 1, &drt->pc_icookie_hi, &drt->pc_dcookie_hi,
-				drt_hi_intr, (caddr_t)dip) != DDI_SUCCESS) {
+	    drt_hi_intr, (caddr_t)dip) != DDI_SUCCESS) {
 		/* if it fails, unwind everything */
 		ddi_regs_map_free(&drt->pc_handle);
 		kmem_free((caddr_t)drt, sizeof (drt_dev_t));
@@ -445,7 +444,7 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 #if 0
 	if (ddi_add_intr(dip, 0, &drt->pc_icookie_lo, &drt->pc_dcookie_lo,
-				drt_lo_intr, (caddr_t)dip) != DDI_SUCCESS) {
+	    drt_lo_intr, (caddr_t)dip) != DDI_SUCCESS) {
 		/* if it fails, unwind everything */
 		ddi_remove_intr(dip, 0, &drt->pc_icookie_hi);
 		ddi_regs_map_free(&drt->pc_handle);
@@ -481,7 +480,7 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		/* identify current state of card */
 		drt_socket_card_id(drt, &drt->pc_sockets[i],
-					drt->pc_csr->socket[i].stat0);
+		    drt->pc_csr->socket[i].stat0);
 
 		/* finally, turn it on */
 		drt->pc_csr->socket[i].ctl0 = DRT_CHANGE_DEFAULT;
@@ -543,7 +542,7 @@ drt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 #if defined(DRT_DEBUG)
 		if (drt_debug) {
-		    cmn_err(CE_CONT, "drt_detach: DDI_SUSPEND\n");
+			cmn_err(CE_CONT, "drt_detach: DDI_SUSPEND\n");
 		}
 #endif
 		if (drt != NULL) {
@@ -554,9 +553,10 @@ drt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			mutex_exit(&drt->pc_lock);
 			for (sn = 0; sn < DRSOCKETS; sn++) {
 			    /* drt_stop_intr(drt, sn); XXX ?? */
-			    mutex_enter(&drt->pc_lock);
-			    drt_new_card(drt, sn); /* clears sockp->drt_flags */
-			    mutex_exit(&drt->pc_lock);
+				mutex_enter(&drt->pc_lock);
+				/* clears sockp->drt_flags */
+				drt_new_card(drt, sn);
+				mutex_exit(&drt->pc_lock);
 			}
 			/*
 			 * Save the adapter's hardware state here
@@ -600,7 +600,7 @@ drt_inquire_adapter(dev_info_t *dip, inquire_adapter_t *config)
 	config->NumPower = drt->pc_numpower;
 	config->power_entry = drt->pc_power; /* until we resolve this */
 	config->ResourceFlags = RES_OWN_IRQ | RES_OWN_IO | RES_OWN_MEM |
-		RES_IRQ_NEXUS | RES_IRQ_SHAREABLE;
+	    RES_IRQ_NEXUS | RES_IRQ_SHAREABLE;
 	return (SUCCESS);
 }
 
@@ -618,7 +618,7 @@ drt_callback(dev_info_t *dip, int (*handler)(), int arg)
 	if (drt_debug) {
 #ifdef	XXX
 		cmn_err(CE_CONT, "drt_callback: drt=%x, lock=%x\n",
-						(int)drt, (int)drt->pc_lock);
+		    (int)drt, (int)drt->pc_lock);
 #endif
 		cmn_err(CE_CONT, "\thandler=%p, arg=%x\n", (void *)handler,
 		    arg);
@@ -683,9 +683,9 @@ drt_calc_speed(int speed)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT, "drt_calc_speed: speed=%d, length=%x, "
-			"delay=%x, ret=%x\n",
-			speed, length, delay,
-			(SET_DRWIN_CMDDLY(delay) | SET_DRWIN_CMDLNG(length)));
+		    "delay=%x, ret=%x\n",
+		    speed, length, delay,
+		    (SET_DRWIN_CMDDLY(delay) | SET_DRWIN_CMDLNG(length)));
 #endif
 	return (SET_DRWIN_CMDDLY(delay) | SET_DRWIN_CMDLNG(length));
 }
@@ -714,12 +714,12 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "drt_set_window: entered\n");
 		cmn_err(CE_CONT,
-			"\twindow=%d, socket=%d, WindowSize=%d, speed=%d\n",
-			window->window, window->socket, window->WindowSize,
-			window->speed);
+		    "\twindow=%d, socket=%d, WindowSize=%d, speed=%d\n",
+		    window->window, window->socket, window->WindowSize,
+		    window->speed);
 		cmn_err(CE_CONT,
-			"\tbase=%x, state=%x\n", (int)window->base,
-			window->state);
+		    "\tbase=%x, state=%x\n", (int)window->base,
+		    window->state);
 	}
 #endif
 
@@ -741,7 +741,7 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 	}
 
 	if (!(window->state & WS_IO) && (window->WindowSize != DRWINSIZE &&
-		!(window->state & WS_EXACT_MAPIN)) ||
+	    !(window->state & WS_EXACT_MAPIN)) ||
 	    window->WindowSize > DRWINSIZE) {
 #if defined(DRT_DEBUG)
 		if (drt_debug)
@@ -755,7 +755,7 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT,
-			"\tusing window/socket %d/%d\n", win, window->socket);
+		    "\tusing window/socket %d/%d\n", win, window->socket);
 #endif
 
 	/*
@@ -794,20 +794,20 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 		windex = DRMAP_CARD1_WIN0 + win;
 
 	if ((prevstate & DRW_MAPPED) &&
-			(window->WindowSize != winp->drtw_len)) {
+	    (window->WindowSize != winp->drtw_len)) {
 		mutex_exit(&drt->pc_lock);
 		ddi_regs_map_free(&winp->drtw_handle);
 		mutex_enter(&drt->pc_lock);
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT,
-				"\tunmapped: base being set to NULL\n");
+			    "\tunmapped: base being set to NULL\n");
 #endif
 		winp->drtw_flags &= ~(DRW_MAPPED|DRW_ENABLED);
 		if (prevstate & DRW_IO) {
 			stpra_free(&sockp->drt_iomap,
-				    (uint32_t)(uintptr_t)winp->drtw_reqaddr,
-				    (uint32_t)winp->drtw_len);
+			    (uint32_t)(uintptr_t)winp->drtw_reqaddr,
+			    (uint32_t)winp->drtw_len);
 		}
 		winp->drtw_base = NULL;
 	}
@@ -820,7 +820,7 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 				bzero((caddr_t)&req, sizeof (req));
 				bzero((caddr_t)&ret, sizeof (ret));
 				req.ra_flags = STP_RA_ALLOC_POW2 |
-							STP_RA_ALIGN_SIZE;
+				    STP_RA_ALIGN_SIZE;
 				req.ra_len = window->WindowSize;
 				req.ra_addr_lo = window->base;
 
@@ -828,7 +828,7 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 					req.ra_flags |= STP_RA_ALLOC_SPECIFIED;
 
 				if (stpra_alloc(&sockp->drt_iomap,
-						&req, &ret) != DDI_SUCCESS) {
+				    &req, &ret) != DDI_SUCCESS) {
 					mutex_exit(&drt->pc_lock);
 					return (BAD_BASE);
 				}
@@ -837,12 +837,12 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 			}
 			mutex_exit(&drt->pc_lock);
 			which = ddi_regs_map_setup(drt->pc_devinfo,
-						    windex,
-						    &winp->drtw_base,
-						    (offset_t)window->base,
-						    window->WindowSize,
-						    &window->attr,
-						    &winp->drtw_handle);
+			    windex,
+			    &winp->drtw_base,
+			    (offset_t)window->base,
+			    window->WindowSize,
+			    &window->attr,
+			    &winp->drtw_handle);
 			mutex_enter(&drt->pc_lock);
 			if (which != DDI_SUCCESS) {
 				mutex_exit(&drt->pc_lock);
@@ -851,11 +851,11 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(DRT_DEBUG)
 			if (drt_debug)
 				cmn_err(CE_CONT,
-					"\tmapped: handle = 0x%p base = %p, "
-					"len=%x\n",
-					(void *)winp->drtw_handle,
-					(void *)winp->drtw_base,
-					(int)window->WindowSize);
+				    "\tmapped: handle = 0x%p base = %p, "
+				    "len=%x\n",
+				    (void *)winp->drtw_handle,
+				    (void *)winp->drtw_base,
+				    (int)window->WindowSize);
 #endif
 		}
 		winp->drtw_reqaddr = (caddr_t)(uintptr_t)window->base;
@@ -869,13 +869,13 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 		} else {
 			winp->drtw_flags |= DRW_IO;
 			winp->drtw_ctl0 = DRWIN_ASPSEL_IO |
-				drt_calc_speed(window->speed);
+			    drt_calc_speed(window->speed);
 			winp->drtw_modhandle.ah_addr +=	(int)window->base;
 		}
 		window->handle = winp->drtw_handle;
 		csrp->window[win].ctl0 = winp->drtw_ctl0;
 		csrp->window[win].ctl1 = SET_DRWIN_WAITREQ(1) |
-			SET_DRWIN_WAITDLY(0);
+		    SET_DRWIN_WAITDLY(0);
 		winp->drtw_len = window->WindowSize;
 	} else {
 		if (winp->drtw_flags & DRW_ENABLED) {
@@ -884,8 +884,8 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 #ifdef	XXX
 			if (prevstate & DRW_IO) {
 				stpra_free(&sockp->drt_iomap,
-					(uint32_t)winp->drtw_reqaddr,
-					(uint32_t)winp->drtw_len);
+				    (uint32_t)winp->drtw_reqaddr,
+				    (uint32_t)winp->drtw_len);
 			}
 #endif	/* XXX */
 		}
@@ -895,15 +895,15 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT,
-			"\tbase now set to %p (->%p), csrp=%p, winreg=%p"
-			", len=%x\n",
-			(void *)window->handle,
-			(void *)winp->drtw_base, (void *)csrp,
-			(void *)&csrp->window[win].ctl0,
-			(int)window->WindowSize);
+		    "\tbase now set to %p (->%p), csrp=%p, winreg=%p"
+		    ", len=%x\n",
+		    (void *)window->handle,
+		    (void *)winp->drtw_base, (void *)csrp,
+		    (void *)&csrp->window[win].ctl0,
+		    (int)window->WindowSize);
 		cmn_err(CE_CONT,
-			"\twindow type is now %s\n", window->state & WS_IO ?
-			"I/O" : "memory");
+		    "\twindow type is now %s\n", window->state & WS_IO ?
+		    "I/O" : "memory");
 		if (drt_debug > 1)
 			drt_dmp_regs(csrp);
 	}
@@ -929,19 +929,19 @@ drt_card_state(drt_dev_t *drt, int socket)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "drt_card_state: socket=%d, *lock=%p\n",
-			socket, (void *)&drt->pc_lock);
+		    socket, (void *)&drt->pc_lock);
 		cmn_err(CE_CONT, "\tcsr@%p\n", (void *)drt->pc_csr);
 
 		cmn_err(CE_CONT, "\tstat0=%b\n", value,
-			"\020\1PWRON\2WAIT\3WP\4RDYBSY\5BVD1\6BVD2\7CD1"
-			"\10CD2\011ACCTO\012WPC\013RBC\014BVD1C\015BVD2C"
-			"\016CDSC\017STAT");
+		    "\020\1PWRON\2WAIT\3WP\4RDYBSY\5BVD1\6BVD2\7CD1"
+		    "\10CD2\011ACCTO\012WPC\013RBC\014BVD1C\015BVD2C"
+		    "\016CDSC\017STAT");
 		cmn_err(CE_CONT,
-			"\tstat1=%x\n",
-			(int)drt->pc_csr->socket[socket].stat1);
+		    "\tstat1=%x\n",
+		    (int)drt->pc_csr->socket[socket].stat1);
 		cmn_err(CE_CONT, "\t&stat0=%p, &stat1=%p\n",
-			(void *)&drt->pc_csr->socket[socket].stat0,
-			(void *)&drt->pc_csr->socket[socket].stat1);
+		    (void *)&drt->pc_csr->socket[socket].stat0,
+		    (void *)&drt->pc_csr->socket[socket].stat1);
 	}
 #endif
 
@@ -993,7 +993,7 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT, "drt_set_page: window=%d (%d)\n",
-				page->window, DRWINDOWS);
+			    page->window, DRWINDOWS);
 #endif
 		return (BAD_WINDOW);
 	}
@@ -1006,8 +1006,8 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT,
-			"drt_set_page: window=%d, socket=%d, page=%d\n",
-			win, socket, page->page);
+		    "drt_set_page: window=%d, socket=%d, page=%d\n",
+		    win, socket, page->page);
 	}
 #endif
 
@@ -1042,7 +1042,7 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 	}
 
 	which |= (page->state & PS_ATTRIBUTE) ?
-			DRWIN_ASPSEL_AM : DRWIN_ASPSEL_CM;
+	    DRWIN_ASPSEL_AM : DRWIN_ASPSEL_CM;
 
 	/* if card says Write Protect, enforce it */
 	/* but we don't have hardware support to do it */
@@ -1051,9 +1051,9 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT, "\ta2p=%x, base=%x, csrp=%p\n",
-			(int)ADDR2PAGE(page->offset),
-			SET_DRWIN_BASE(ADDR2PAGE(page->offset)),
-			(void *)csrp);
+		    (int)ADDR2PAGE(page->offset),
+		    SET_DRWIN_BASE(ADDR2PAGE(page->offset)),
+		    (void *)csrp);
 #endif
 	which |= SET_DRWIN_BASE(ADDR2PAGE(page->offset));
 	winp->drtw_addr = (caddr_t)page->offset;
@@ -1072,7 +1072,7 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "\tmemory type = %s\n",
-			(which & DRWIN_ASPSEL_CM) ? "common" : "attribute");
+		    (which & DRWIN_ASPSEL_CM) ? "common" : "attribute");
 	}
 #endif
 
@@ -1080,12 +1080,12 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT,
-			"\tpage offset=%x, base=%p (PC addr=%p, sockets=%d)\n",
-			(int)page->offset, (void *)winp->drtw_base,
-			(void *)winp->drtw_addr, drt->pc_numsockets);
+		    "\tpage offset=%x, base=%p (PC addr=%p, sockets=%d)\n",
+		    (int)page->offset, (void *)winp->drtw_base,
+		    (void *)winp->drtw_addr, drt->pc_numsockets);
 		cmn_err(CE_CONT, "\t*base=%x, win reg=%p\n",
-			*(ushort_t *)winp->drtw_base,
-			(void *)&csrp->window[win].ctl0);
+		    *(ushort_t *)winp->drtw_base,
+		    (void *)&csrp->window[win].ctl0);
 		if (drt_debug > 1)
 			drt_dmp_regs(csrp);
 	}
@@ -1129,7 +1129,7 @@ drt_set_socket(dev_info_t *dip, set_socket_t *socket)
 	if (socket->VccLevel == 0) {
 		powerlevel = 0;
 	} else  if (socket->VccLevel < drt->pc_numpower &&
-		    drt_power[socket->VccLevel].ValidSignals & VCC) {
+	    drt_power[socket->VccLevel].ValidSignals & VCC) {
 		/* enable Vcc */
 		powerlevel = DRCTL_MSTPWR|DRCTL_PCIFOE;
 		sockp->drt_vcc = socket->VccLevel;
@@ -1139,8 +1139,8 @@ drt_set_socket(dev_info_t *dip, set_socket_t *socket)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "\tVccLevel=%d, Vpp1Level=%d, Vpp2Level=%d\n",
-			socket->VccLevel,
-			socket->Vpp1Level, socket->Vpp2Level);
+		    socket->VccLevel,
+		    socket->Vpp1Level, socket->Vpp2Level);
 	}
 #endif
 	ind = 0;		/* default index to 0 power */
@@ -1181,7 +1181,7 @@ drt_set_socket(dev_info_t *dip, set_socket_t *socket)
 	/* handle event mask */
 	sockp->drt_intmask = socket->SCIntMask;
 	value = (drt->pc_csr->socket[sock].ctl0 & ~DRT_CHANGE_MASK) |
-		DRT_CHANGE_DEFAULT; /* always want CD */
+	    DRT_CHANGE_DEFAULT; /* always want CD */
 
 	if (socket->SCIntMask & SBM_CD)
 		value |= DRCTL_CDIE;
@@ -1220,9 +1220,9 @@ drt_set_socket(dev_info_t *dip, set_socket_t *socket)
 #if defined(DRT_DEBUG)
 		if (drt_debug) {
 			cmn_err(CE_CONT,
-				"\tsocket type is I/O and irq %x is %s\n", irq,
-				(socket->IREQRouting & IRQ_ENABLE) ?
-				"enabled" : "not enabled");
+			    "\tsocket type is I/O and irq %x is %s\n", irq,
+			    (socket->IREQRouting & IRQ_ENABLE) ?
+			    "enabled" : "not enabled");
 		}
 #endif
 		sockp->drt_flags |= DRT_SOCKET_IO;
@@ -1233,8 +1233,8 @@ drt_set_socket(dev_info_t *dip, set_socket_t *socket)
 	} else {
 		/* enforce memory mode */
 		value &= ~(DRCTL_IFTYPE_IO | DRCTL_SPKREN |
-				DRCTL_IOILVL_SB1 | DRCTL_IOILVL_SB0 |
-				DRCTL_IOIE);
+		    DRCTL_IOILVL_SB1 | DRCTL_IOILVL_SB0 |
+		    DRCTL_IOIE);
 		sockp->drt_flags &= ~(DRT_INTR_ENABLED|DRT_SOCKET_IO);
 	}
 	drt->pc_csr->socket[sock].ctl0 = (ushort_t)value;
@@ -1248,7 +1248,7 @@ drt_set_socket(dev_info_t *dip, set_socket_t *socket)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT,
-			"\tpowerlevel (socket->ctl1) = %x\n", powerlevel);
+		    "\tpowerlevel (socket->ctl1) = %x\n", powerlevel);
 		if (drt_debug > 1)
 			drt_dmp_regs(&drt->pc_csr->socket[sock]);
 	}
@@ -1303,7 +1303,7 @@ drt_inquire_window(dev_info_t *dip, inquire_window_t *window)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT,
-			"drt_inquire_window: win=%d\n", window->window);
+		    "drt_inquire_window: win=%d\n", window->window);
 #endif
 	window->WndCaps = WC_COMMON|WC_ATTRIBUTE|WC_WAIT|WC_IO;
 
@@ -1317,7 +1317,7 @@ drt_inquire_window(dev_info_t *dip, inquire_window_t *window)
 
 	io = &window->iowin_char;
 	io->IOWndCaps = WC_CALIGN|WC_IO_RANGE_PER_WINDOW|WC_WENABLE|
-		WC_8BIT|WC_16BIT|WC_SIZE;
+	    WC_8BIT|WC_16BIT|WC_SIZE;
 	io->FirstByte = (baseaddr_t)winp->drtw_base;
 	io->LastByte = (baseaddr_t)winp->drtw_base + DRWINSIZE;
 	io->MinSize = 1;
@@ -1332,7 +1332,7 @@ drt_inquire_window(dev_info_t *dip, inquire_window_t *window)
 	mem->LastByte = (baseaddr_t)winp->drtw_base + DRWINSIZE;
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
-	    cmn_err(CE_CONT, "\tFirstByte=%p, LastByte=%p\n",
+		cmn_err(CE_CONT, "\tFirstByte=%p, LastByte=%p\n",
 		    (void *)mem->FirstByte, (void *)mem->LastByte);
 	}
 #endif
@@ -1386,13 +1386,13 @@ drt_get_page(dev_info_t *dip, get_page_t *page)
 	page->state = 0;
 
 	if (winp->drtw_flags & DRW_IO)
-	    page->state |= PS_IO;
+		page->state |= PS_IO;
 
 	if (winp->drtw_flags & DRW_ENABLED)
-	    page->state |= PS_ENABLED;
+		page->state |= PS_ENABLED;
 
 	if (winp->drtw_flags & DRW_ATTRIBUTE)
-	    page->state |= PS_ATTRIBUTE;
+		page->state |= PS_ATTRIBUTE;
 
 	page->offset = (off_t)winp->drtw_addr;
 
@@ -1460,7 +1460,7 @@ drt_get_status(dev_info_t *dip, get_ss_status_t *status)
 	irq_enabled = (sockp->drt_flags & DRT_INTR_ENABLED) ? IRQ_ENABLE : 0;
 	status->IRQRouting = sockp->drt_irq | irq_enabled;
 	status->IFType = (sockp->drt_flags & DRT_SOCKET_IO) ?
-		IF_IO : IF_MEMORY;
+	    IF_IO : IF_MEMORY;
 	return (SUCCESS);
 }
 
@@ -1504,12 +1504,12 @@ drt_get_window(dev_info_t *dip, get_window_t *window)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT,
-			"drt_get_window: socket=%d, window=%d\n", socket, win);
+		    "drt_get_window: socket=%d, window=%d\n", socket, win);
 		cmn_err(CE_CONT,
-			"\tsize=%d, speed=%d, base=%x, state=%x\n",
-			window->size, (int)window->speed,
-			(int)window->base,
-			window->state);
+		    "\tsize=%d, speed=%d, base=%x, state=%x\n",
+		    window->size, (int)window->speed,
+		    (int)window->base,
+		    window->state);
 	}
 #endif
 
@@ -1550,9 +1550,9 @@ drt_ll_reset(drt_dev_t *drt, int socket)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT, "drt_ll_reset: socket=%d, ctl0=%x, ctl1=%x\n",
-			socket,
-			drt->pc_csr->socket[socket].ctl0,
-			drt->pc_csr->socket[socket].ctl1);
+		    socket,
+		    drt->pc_csr->socket[socket].ctl0,
+		    drt->pc_csr->socket[socket].ctl1);
 #endif
 }
 
@@ -1594,7 +1594,7 @@ drt_reset_socket(dev_info_t *dip, int socket, int mode)
 		drt->pc_sockets[socket].drt_state = 0;
 
 		for (window = 0, sockp = &drt->pc_sockets[socket];
-			window < DRT_NUMWINDOWS; window++) {
+		    window < DRT_NUMWINDOWS; window++) {
 			sockp->drt_windows[window].drtw_flags &= ~DRW_ENABLED;
 		}
 	}
@@ -1616,11 +1616,11 @@ drt_set_interrupt(dev_info_t *dip, set_irq_handler_t *handler)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT, "drt_set_interrupt(%p, %p) pc_handlers=%p\n",
-			(void *)dip, (void *)handler, (void *)drt->pc_handlers);
+		    (void *)dip, (void *)handler, (void *)drt->pc_handlers);
 #endif
 
 	intr = (inthandler_t *)kmem_zalloc(sizeof (inthandler_t),
-						KM_NOSLEEP);
+	    KM_NOSLEEP);
 	if (intr == NULL) {
 		return (BAD_IRQ);
 	}
@@ -1674,8 +1674,8 @@ drt_clear_interrupt(dev_info_t *dip, clear_irq_handler_t *handler)
 #if defined(DRT_DEBUG)
 	if (drt_debug)
 		cmn_err(CE_CONT, "drt_clear_interrupt(%p, %p) "
-			"pc_handlers = %p\n",
-			(void *)dip, (void *)handler, (void *)drt->pc_handlers);
+		    "pc_handlers = %p\n",
+		    (void *)dip, (void *)handler, (void *)drt->pc_handlers);
 #endif
 
 	mutex_enter(&drt->pc_lock); /* protect the registers */
@@ -1769,14 +1769,14 @@ drt_do_intr(drt_dev_t *drt, int socket, int priority)
 #if defined(DRT_DEBUG)
 		if (drt_debug > 2)
 			cmn_err(CE_CONT,
-				"\tintr-> socket=%d, priority=%d, intr=%p,"
-				"arg1=%p arg2=%p (drt_flags=%x:%s)\n",
-				intr->socket, intr->priority,
-				(void *)intr->intr, intr->arg1, intr->arg2,
-				drt->pc_sockets[socket].drt_flags,
-				(drt->pc_sockets[socket].drt_flags &
-				    DRT_INTR_ENABLED) ?
-			"true":"false");
+			    "\tintr-> socket=%d, priority=%d, intr=%p,"
+			    "arg1=%p arg2=%p (drt_flags=%x:%s)\n",
+			    intr->socket, intr->priority,
+			    (void *)intr->intr, intr->arg1, intr->arg2,
+			    drt->pc_sockets[socket].drt_flags,
+			    (drt->pc_sockets[socket].drt_flags &
+			    DRT_INTR_ENABLED) ?
+			    "true":"false");
 #endif
 #if 0
 		/* may need to rethink the priority stuff */
@@ -1839,7 +1839,7 @@ drt_hi_intr(caddr_t arg)
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT, "\tstat0=%x, type=%s\n",
-				changes, card_type == IF_IO ? "IO":"MEM");
+			    changes, card_type == IF_IO ? "IO":"MEM");
 #endif
 		/* ack the interrupts we see */
 		drt->pc_csr->socket[i].stat0 = (ushort_t)changes;
@@ -1848,8 +1848,8 @@ drt_hi_intr(caddr_t arg)
 #if defined(DRT_DEBUG)
 			if (drt_debug)
 				cmn_err(CE_CONT,
-					"\tcard status change interrupt"
-					" on socket %d\n", i);
+				    "\tcard status change interrupt"
+				    " on socket %d\n", i);
 #endif
 			/*
 			 * We set the result here mainly for IF_MEMORY cases.
@@ -1870,7 +1870,7 @@ drt_hi_intr(caddr_t arg)
 				    (changes & DRSTAT_CD_MASK) !=
 				    DRSTAT_PRESENT_OK) {
 					sockp->drt_flags &=
-						~DRT_CARD_PRESENT;
+					    ~DRT_CARD_PRESENT;
 					/*
 					 * stop interrupt handler
 					 * then do the callback
@@ -1882,22 +1882,22 @@ drt_hi_intr(caddr_t arg)
 					 */
 					drt_new_card(drt, i); /* paranoia */
 					PC_CALLBACK(drt, arg, x,
-							PCE_CARD_REMOVAL, i);
+					    PCE_CARD_REMOVAL, i);
 					continue;
 				} else {
 					if ((changes & DRSTAT_CD_MASK) ==
 					    DRSTAT_PRESENT_OK &&
 					    !(sockp->drt_flags &
-						DRT_CARD_PRESENT)) {
+					    DRT_CARD_PRESENT)) {
 						drt_new_card(drt, i);
 						drt_ll_reset(drt, i);
 						sockp->drt_state |= SBM_CD;
 						drt_socket_card_id(drt,
-								    sockp,
-								    changes);
+						    sockp,
+						    changes);
 						PC_CALLBACK(drt, arg, x,
-								PCE_CARD_INSERT,
-								i);
+						    PCE_CARD_INSERT,
+						    i);
 						continue;
 					}
 				}
@@ -1913,9 +1913,9 @@ drt_hi_intr(caddr_t arg)
 #if defined(DRT_DEBUG)
 			if (drt_debug && changes & DRSTAT_RDYCHG)
 				cmn_err(CE_CONT, "\trdychg: stat=%x, type=%s\n",
-					changes,
-					card_type == IF_MEMORY ?
-						"memory" : "I/O");
+				    changes,
+				    card_type == IF_MEMORY ?
+				    "memory" : "I/O");
 #endif
 			if (card_type == IF_MEMORY &&
 			    changes & DRSTAT_RDYCHG &&
@@ -1931,7 +1931,7 @@ drt_hi_intr(caddr_t arg)
 				else
 					sockp->drt_state &= ~SBM_WP;
 				PC_CALLBACK(drt, arg, x,
-					    PCE_CARD_WRITE_PROTECT, i);
+				    PCE_CARD_WRITE_PROTECT, i);
 			}
 
 			if (card_type == IF_MEMORY &&
@@ -1949,33 +1949,33 @@ drt_hi_intr(caddr_t arg)
 					if (!(sockp->drt_flags &
 					    DRT_BATTERY_LOW)) {
 						sockp->drt_flags |=
-							DRT_BATTERY_LOW;
+						    DRT_BATTERY_LOW;
 						sockp->drt_state |= SBM_BVD2;
 						sockp->drt_state &= ~SBM_BVD1;
 						PC_CALLBACK(drt, arg, x,
-							PCE_CARD_BATTERY_WARN,
-							i);
+						    PCE_CARD_BATTERY_WARN,
+						    i);
 					}
 					break;
 				case DRSTAT_BATT_OK:
 					sockp->drt_state &=
-						~(DRT_BATTERY_LOW|
-							DRT_BATTERY_DEAD);
+					    ~(DRT_BATTERY_LOW|
+					    DRT_BATTERY_DEAD);
 					sockp->drt_state &=
-						~(SBM_BVD1|SBM_BVD2);
+					    ~(SBM_BVD1|SBM_BVD2);
 					break;
 				default: /* battery failed */
 					if (!(sockp->drt_flags &
 					    DRT_BATTERY_DEAD)) {
 						/* so we only see one of them */
 						sockp->drt_flags |=
-							DRT_BATTERY_DEAD;
+						    DRT_BATTERY_DEAD;
 						sockp->drt_flags &=
-							DRT_BATTERY_LOW;
+						    DRT_BATTERY_LOW;
 						sockp->drt_state |= SBM_BVD1;
 						PC_CALLBACK(drt, arg, x,
-							PCE_CARD_BATTERY_DEAD,
-							i);
+						    PCE_CARD_BATTERY_DEAD,
+						    i);
 					}
 				}
 			}
@@ -1988,12 +1988,12 @@ drt_hi_intr(caddr_t arg)
 				 *	event.
 				 */
 				drt->pc_csr->socket[i].ctl0 &=
-							~DRCTL_BVD1IE;
+				    ~DRCTL_BVD1IE;
 
 				/* we have an I/O status change */
 				PC_CALLBACK(drt, arg, x,
-					    PCE_CARD_STATUS_CHANGE,
-					    i);
+				    PCE_CARD_STATUS_CHANGE,
+				    i);
 			}
 #if 0
 			/*
@@ -2007,12 +2007,12 @@ drt_hi_intr(caddr_t arg)
 					sockp->drt_flags |= DRT_BATTERY_LOW;
 					sockp->drt_state |= SBM_BVD2;
 					PC_CALLBACK(drt, arg, x,
-							PCE_CARD_BATTERY_WARN,
-							i);
+					    PCE_CARD_BATTERY_WARN,
+					    i);
 				} else if (card_type == IF_IO) {
 					PC_CALLBACK(drt, arg, x,
-							PCE_CARD_STATUS_CHANGE,
-							i);
+					    PCE_CARD_STATUS_CHANGE,
+					    i);
 				}
 			}
 
@@ -2024,7 +2024,7 @@ drt_hi_intr(caddr_t arg)
 				sockp->drt_flags |= DRT_BATTERY_DEAD;
 				sockp->drt_state |= SBM_BVD1;
 				PC_CALLBACK(drt, arg, x,
-						PCE_CARD_BATTERY_DEAD, i);
+				    PCE_CARD_BATTERY_DEAD, i);
 			}
 #endif
 		}
@@ -2035,9 +2035,9 @@ drt_hi_intr(caddr_t arg)
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT, "\tsocket %d: ctl0=%x, ctl1=%x\n",
-				i,
-				drt->pc_csr->socket[i].ctl0,
-				drt->pc_csr->socket[i].ctl1);
+			    i,
+			    drt->pc_csr->socket[i].ctl0,
+			    drt->pc_csr->socket[i].ctl1);
 #endif
 	}
 
@@ -2080,7 +2080,7 @@ drt_lo_intr(caddr_t arg)
 #if defined(DRT_DEBUG)
 			if (drt_debug)
 				cmn_err(CE_CONT, "\tsocket=%x, stat0=%x\n",
-					i, drt->pc_csr->socket[i].stat0);
+				    i, drt->pc_csr->socket[i].stat0);
 #endif
 			result |= drt_do_intr(drt, i, 0);
 			drt->pc_csr->socket[i].stat0 |= DRSTAT_IOINT;
@@ -2145,30 +2145,30 @@ drt_dmp_regs(stp4020_socket_csr_t *csrp)
 
 	cmn_err(CE_CONT, "drt_dmp_regs (%p):\n", (void *)csrp);
 	cmn_err(CE_CONT, "\tctl0: %b\n", csrp->ctl0,
-		"\020\1IFTYPE\2SFTRST\3SPKREN\4IOILVL\5IOIE\6RSVD"
-		"\7CTOIE\010WPIE\011RDYIE\012BVD1IE\013BVD2IE\014CDIE"
-		"\015SCILVL\016PROMEN\017RSVDX");
+	    "\020\1IFTYPE\2SFTRST\3SPKREN\4IOILVL\5IOIE\6RSVD"
+	    "\7CTOIE\010WPIE\011RDYIE\012BVD1IE\013BVD2IE\014CDIE"
+	    "\015SCILVL\016PROMEN\017RSVDX");
 	cmn_err(CE_CONT,
-		"\tctl1: %b\n", csrp->ctl1,
-		"\020\1PCIFOE\1MSTPWR\7APWREN"
-		"\10RSVD\11DIAGEN\12WAITDB\13WPDB\14RDYDB\15BVD1DB\16BVD2DB"
-		"\17CD1DB\20LPBKEN");
+	    "\tctl1: %b\n", csrp->ctl1,
+	    "\020\1PCIFOE\1MSTPWR\7APWREN"
+	    "\10RSVD\11DIAGEN\12WAITDB\13WPDB\14RDYDB\15BVD1DB\16BVD2DB"
+	    "\17CD1DB\20LPBKEN");
 	cmn_err(CE_CONT,
-		"\tstat0: %b\n", csrp->stat0,
-		"\020\1PWRON\2WAITST\3WPST"
-		"\4RDYST\5BVD1ST\6BVD2ST\7CD1ST\10CD2ST\11PCTO\12WPCHG"
-		"\13RDCHG\14BVD1CHG\15BVD2CHG\16CDCHG\17SCINT\20IOINT");
+	    "\tstat0: %b\n", csrp->stat0,
+	    "\020\1PWRON\2WAITST\3WPST"
+	    "\4RDYST\5BVD1ST\6BVD2ST\7CD1ST\10CD2ST\11PCTO\12WPCHG"
+	    "\13RDCHG\14BVD1CHG\15BVD2CHG\16CDCHG\17SCINT\20IOINT");
 	cmn_err(CE_CONT,
-		"\tstat1: types=%x, rev=%x\n",
-		(int)(csrp->stat1 & DRSTAT_PCTYS_M),
-		csrp->stat1 & DRSTAT_REV_M);
+	    "\tstat1: types=%x, rev=%x\n",
+	    (int)(csrp->stat1 & DRSTAT_PCTYS_M),
+	    csrp->stat1 & DRSTAT_REV_M);
 	for (i = 0; i < 3; i++) {
 		cmn_err(CE_CONT, "\twin%d:\tctl0: cmdlng=%x, cmddly=%x, "
-			"aspsel=%x, base=%x\n", i,
-			GET_DRWIN_CMDLNG(csrp->window[i].ctl0),
-			GET_DRWIN_CMDDLY(csrp->window[i].ctl0),
-			csrp->window[i].ctl0 & DRWIN_ASPSEL_M,
-			GET_DRWIN_BASE(csrp->window[i].ctl0));
+		    "aspsel=%x, base=%x\n", i,
+		    GET_DRWIN_CMDLNG(csrp->window[i].ctl0),
+		    GET_DRWIN_CMDDLY(csrp->window[i].ctl0),
+		    csrp->window[i].ctl0 & DRWIN_ASPSEL_M,
+		    GET_DRWIN_BASE(csrp->window[i].ctl0));
 		cmn_err(CE_CONT, "\t\tctl1: %x\n", csrp->window[i].ctl1);
 	}
 }
@@ -2184,27 +2184,27 @@ drt_cpr(drt_dev_t *drt, int cmd)
 	int sn, wn;
 
 	switch (cmd) {
-	    case DRT_SAVE_HW_STATE:
+		case DRT_SAVE_HW_STATE:
 		for (sn = 0; sn < DRSOCKETS; sn++) {
 			stp4020_socket_csr_t *drs = &drt->pc_csr->socket[sn];
 			for (wn = 0; wn < DRWINDOWS; wn++) {
 				drt->saved_socket[sn].window[wn].ctl0 =
-					drs->window[wn].ctl0;
+				    drs->window[wn].ctl0;
 				drt->saved_socket[sn].window[wn].ctl1 =
-					drs->window[wn].ctl1;
+				    drs->window[wn].ctl1;
 			}
 			drt->saved_socket[sn].ctl0 = drs->ctl0;
 			drt->saved_socket[sn].ctl1 = drs->ctl1;
 		}
 		break;
-	    case DRT_RESTORE_HW_STATE:
+		case DRT_RESTORE_HW_STATE:
 		for (sn = 0; sn < DRSOCKETS; sn++) {
 			stp4020_socket_csr_t *drs = &drt->pc_csr->socket[sn];
 			for (wn = 0; wn < DRWINDOWS; wn++) {
 				drs->window[wn].ctl0 =
-					drt->saved_socket[sn].window[wn].ctl0;
+				    drt->saved_socket[sn].window[wn].ctl0;
 				drs->window[wn].ctl1 =
-					drt->saved_socket[sn].window[wn].ctl1;
+				    drt->saved_socket[sn].window[wn].ctl1;
 			}
 
 			/* work around for false status bugs */
@@ -2259,7 +2259,7 @@ stpra_alloc_map()
 	mutex_exit(&stpra_lock);
 	if (new == NULL) {
 		new = (struct stpramap *)kmem_zalloc(sizeof (struct stpramap),
-						    KM_SLEEP);
+		    KM_SLEEP);
 	} else {
 		bzero((caddr_t)new, sizeof (struct stpramap));
 	}
@@ -2390,7 +2390,7 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 #if defined(DRT_DEBUG)
 			if (drt_debug)
 				cmn_err(CE_WARN, "ra: bad length (pow2) %d\n",
-					req->ra_len);
+				    req->ra_len);
 #endif
 			ret->ra_addr_hi = 0;
 			ret->ra_addr_lo = 0;
@@ -2416,7 +2416,7 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT, "stpra_alloc: mapp = %p\n",
-				(void *)mapp);
+			    (void *)mapp);
 #endif
 
 	backp = (struct stpramap *)map;
@@ -2433,23 +2433,24 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT, "stpra_alloc(unspecified request)"
-				"lower=%x, upper=%x\n", lower, upper);
+			    "lower=%x, upper=%x\n", lower, upper);
 #endif
 		for (; mapp != NULL; backp = mapp, mapp = mapp->ra_next) {
 #if defined(DRT_DEBUG)
 		if (drt_debug)
 			cmn_err(CE_CONT, "stpra_alloc: ra_len = %x, len = %x",
-					mapp->ra_len, len);
+			    mapp->ra_len, len);
 #endif
 
 			if (mapp->ra_len >= len) {
 				/* a candidate -- apply constraints */
 				base = mapp->ra_base;
 				if (base < lower &&
-					(base + mapp->ra_len) < (lower + len)) {
+				    (base + mapp->ra_len) < (lower + len)) {
 					if (((base + mapp->ra_len) != 0) ||
-					((base + mapp->ra_len) > mapp->ra_len))
-					/* same as the above case */
+					    ((base + mapp->ra_len) >
+					    mapp->ra_len))
+					    /* same as the above case */
 						continue;
 				}
 				if (base < lower)
@@ -2457,9 +2458,9 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 #if defined(DRT_DEBUG)
 				if (drt_debug)
 					cmn_err(CE_CONT,
-						"\tbase=%x, ra_base=%x,"
-						"mask=%x\n",
-						base, mapp->ra_base, mask);
+					    "\tbase=%x, ra_base=%x,"
+					    "mask=%x\n",
+					    base, mapp->ra_base, mask);
 #endif
 				if ((mapp->ra_base & mask) != 0) {
 					/*
@@ -2471,11 +2472,11 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 #if defined(DRT_DEBUG)
 					if (drt_debug)
 						cmn_err(CE_CONT,
-							"\tnew base=%x\n",
-							base);
+						    "\tnew base=%x\n",
+						    base);
 #endif
 					if (len > (mapp->ra_len -
-							(base - mapp->ra_base)))
+					    (base - mapp->ra_base)))
 						continue;
 				}
 				/* we have a fit */
@@ -2496,7 +2497,7 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 						newmap->ra_next = mapp->ra_next;
 						newmap->ra_base = base + len;
 						newmap->ra_len = mapp->ra_len -
-							(len + newlen);
+						    (len + newlen);
 						mapp->ra_len = newlen;
 						mapp->ra_next = newmap;
 						newmap = NULL;
@@ -2521,54 +2522,57 @@ stpra_alloc(struct stpramap **map, stpra_request_t *req, stpra_return_t *ret)
 		base = req->ra_addr_lo;
 		len = req->ra_len;
 		for (; mapp != NULL; backp = mapp, mapp = mapp->ra_next) {
-		    if (base >= mapp->ra_base &&
-			base < (mapp->ra_base + mapp->ra_len)) {
+			if (base >= mapp->ra_base &&
+			    base < (mapp->ra_base + mapp->ra_len)) {
 			    /* this is the node */
-			    if ((base + len) >
-				(mapp->ra_base + mapp->ra_len)) {
+				if ((base + len) >
+				    (mapp->ra_base + mapp->ra_len)) {
 				    /* no match */
-				    base = 0;
-			    } else {
+					base = 0;
+				} else {
 				    /* this is the one */
-				    if (base == mapp->ra_base) {
+					if (base == mapp->ra_base) {
 					    /* at the front */
-					    mapp->ra_base += len;
-					    mapp->ra_len -= len;
-					    if (mapp->ra_len == 0) {
+						mapp->ra_base += len;
+						mapp->ra_len -= len;
+						if (mapp->ra_len == 0) {
 						    /* used it up */
-						    old = mapp;
-						    backp->ra_next =
+							old = mapp;
+							backp->ra_next =
 							    mapp->ra_next;
-					    }
-				    } else {
+						}
+					} else {
 					    /* on the end or in middle */
-					    if ((base + len) ==
-						(mapp->ra_base +
+						if ((base + len) ==
+						    (mapp->ra_base +
 						    mapp->ra_len)) {
 						    /* on end */
-						    mapp->ra_len -= len;
-					    } else {
-						    uint32_t newbase, newlen;
-						    /* in the middle */
-						    newbase = base + len;
-						    newlen = (mapp->ra_base +
-								mapp->ra_len) -
-								newbase;
-						    newmap->ra_base = newbase;
-						    newmap->ra_len = newlen;
-						    newmap->ra_next =
+							mapp->ra_len -= len;
+						} else {
+							uint32_t
+							    newbase, newlen;
+							/* in the middle */
+							newbase = base + len;
+							newlen =
+							    (mapp->ra_base +
+							    mapp->ra_len) -
+							    newbase;
+							newmap->ra_base =
+							    newbase;
+							newmap->ra_len = newlen;
+							newmap->ra_next =
 							    mapp->ra_next;
-						    mapp->ra_next = newmap;
-						    mapp->ra_len -=
+							mapp->ra_next = newmap;
+							mapp->ra_len -=
 							    newlen + len;
-						    newmap = NULL;
-					    }
-				    }
-			    }
-			    rval = DDI_SUCCESS;
-			    break;
-		    }
-	    }
+							newmap = NULL;
+						}
+					}
+				}
+				rval = DDI_SUCCESS;
+				break;
+			}
+		}
 	}
 
 	mutex_exit(&stpra_lock);
@@ -2609,9 +2613,9 @@ stpra_fix_pow2(uint32_t value)
 #if defined(DRT_DEBUG)
 	if (drt_debug)  {
 		cmn_err(CE_CONT, "stpra_fix_pow2(%x)->%x:%x\n", value, i,
-			1 << i);
+		    1 << i);
 		cmn_err(CE_CONT,
-			"\tffs=%d, fls=%d\n", ddi_ffs(value), ddi_fls(value));
+		    "\tffs=%d, fls=%d\n", ddi_ffs(value), ddi_fls(value));
 	}
 #endif
 	return (1 << i);

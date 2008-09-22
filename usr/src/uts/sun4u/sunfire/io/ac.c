@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -142,7 +141,8 @@ static struct dev_ops ac_ops = {
 	nulldev,			/* reset */
 	&ac_cb_ops,			/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 /*
@@ -163,7 +163,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"AC Leaf v%I%",		/* name of module */
+	"AC Leaf",		/* name of module */
 	&ac_ops,		/* driver ops */
 };
 
@@ -257,7 +257,7 @@ ac_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	if (ddi_soft_state_zalloc(acp, instance) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "ddi_soft_state_zalloc failed for ac%d",
-			instance);
+		    instance);
 		return (DDI_FAILURE);
 	}
 
@@ -271,12 +271,12 @@ ac_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if ((softsp->board = (int)ddi_getprop(DDI_DEV_T_ANY, softsp->pdip,
 	    DDI_PROP_DONTPASS, OBP_BOARDNUM, -1)) == -1) {
 		cmn_err(CE_WARN, "ac%d: unable to retrieve %s property",
-			instance, OBP_BOARDNUM);
+		    instance, OBP_BOARDNUM);
 		goto bad;
 	}
 
 	DPRINTF(AC_ATTACH_DEBUG, ("ac%d: devi= 0x%p\n,"
-		" softsp=0x%p\n", instance, devi, softsp));
+	    " softsp=0x%p\n", instance, devi, softsp));
 
 	/* map in the registers for this device. */
 	if (ddi_map_regs(softsp->dip, 0, (caddr_t *)&softsp->ac_base, 0, 0)) {
@@ -287,26 +287,26 @@ ac_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/* Setup the pointers to the hardware registers */
 	softsp->ac_id = (uint32_t *)softsp->ac_base;
 	softsp->ac_memctl = (uint64_t *)((char *)softsp->ac_base +
-		AC_OFF_MEMCTL);
+	    AC_OFF_MEMCTL);
 	softsp->ac_memdecode0 = (uint64_t *)((char *)softsp->ac_base +
-		AC_OFF_MEMDEC0);
+	    AC_OFF_MEMDEC0);
 	softsp->ac_memdecode1 = (uint64_t *)((char *)softsp->ac_base +
-		AC_OFF_MEMDEC1);
+	    AC_OFF_MEMDEC1);
 	softsp->ac_counter = (uint64_t *)((char *)softsp->ac_base +
-		AC_OFF_CNTR);
+	    AC_OFF_CNTR);
 	softsp->ac_mccr = (uint32_t *)((char *)softsp->ac_base +
-		AC_OFF_MCCR);
+	    AC_OFF_MCCR);
 
 	/* nothing to suspend/resume here */
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-		"pm-hardware-state", "no-suspend-resume");
+	    "pm-hardware-state", "no-suspend-resume");
 
 	/* setup the the AC counter registers to allow for hotplug. */
 	list = fhc_bdlist_lock(softsp->board);
 
 	if (list == NULL) {
 		cmn_err(CE_PANIC, "ac%d: Board %d not found in database",
-			instance, softsp->board);
+		    instance, softsp->board);
 	}
 
 	/* set the AC rev into the bd list structure */
@@ -503,7 +503,7 @@ ac_pkt_init(ac_cfga_pkt_t *pkt, intptr_t arg, int flag)
 		ac_cfga_cmd32_t ac_cmd32;
 
 		if (ddi_copyin((void *)arg, &ac_cmd32,
-			sizeof (ac_cfga_cmd32_t), flag) != 0) {
+		    sizeof (ac_cfga_cmd32_t), flag) != 0) {
 			return (EFAULT);
 		}
 		pkt->cmd_cfga.force = ac_cmd32.force;
@@ -511,13 +511,13 @@ ac_pkt_init(ac_cfga_pkt_t *pkt, intptr_t arg, int flag)
 		pkt->cmd_cfga.arg = ac_cmd32.arg;
 		pkt->cmd_cfga.errtype = ac_cmd32.errtype;
 		pkt->cmd_cfga.outputstr =
-			(char *)(uintptr_t)ac_cmd32.outputstr;
+		    (char *)(uintptr_t)ac_cmd32.outputstr;
 		pkt->cmd_cfga.private =
-			(void *)(uintptr_t)ac_cmd32.private;
+		    (void *)(uintptr_t)ac_cmd32.private;
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyin((void *)arg, &(pkt->cmd_cfga),
-		sizeof (ac_cfga_cmd_t), flag) != 0) {
+	    sizeof (ac_cfga_cmd_t), flag) != 0) {
 		return (EFAULT);
 	}
 	pkt->errbuf = kmem_zalloc(SYSC_OUTPUT_LEN, KM_SLEEP);
@@ -533,21 +533,21 @@ ac_pkt_fini(ac_cfga_pkt_t *pkt, intptr_t arg, int flag)
 	if (ddi_model_convert_from(flag & FMODELS) == DDI_MODEL_ILP32) {
 
 		if (ddi_copyout(&(pkt->cmd_cfga.errtype),
-			(void *)&(((ac_cfga_cmd32_t *)arg)->errtype),
-			sizeof (ac_err_t), flag) != 0) {
+		    (void *)&(((ac_cfga_cmd32_t *)arg)->errtype),
+		    sizeof (ac_err_t), flag) != 0) {
 			ret = FALSE;
 		}
 	} else
 #endif
 	if (ddi_copyout(&(pkt->cmd_cfga.errtype),
-		(void *)&(((ac_cfga_cmd_t *)arg)->errtype),
-		sizeof (ac_err_t), flag) != 0) {
+	    (void *)&(((ac_cfga_cmd_t *)arg)->errtype),
+	    sizeof (ac_err_t), flag) != 0) {
 		ret = FALSE;
 	}
 
 	if ((ret != FALSE) && ((pkt->cmd_cfga.outputstr != NULL) &&
-		(ddi_copyout(pkt->errbuf, pkt->cmd_cfga.outputstr,
-			SYSC_OUTPUT_LEN, flag) != 0))) {
+	    (ddi_copyout(pkt->errbuf, pkt->cmd_cfga.outputstr,
+	    SYSC_OUTPUT_LEN, flag) != 0))) {
 			ret = FALSE;
 	}
 
@@ -630,10 +630,10 @@ ac_ioctl(
 		retval = ac_add_memory(pkt);
 		if (!retval)
 			ac_policy_audit_messages(
-					AC_AUDIT_OSTATE_SUCCEEDED, pkt);
+			    AC_AUDIT_OSTATE_SUCCEEDED, pkt);
 		else
 			ac_policy_audit_messages(
-				AC_AUDIT_OSTATE_CONFIGURE_FAILED, pkt);
+			    AC_AUDIT_OSTATE_CONFIGURE_FAILED, pkt);
 		break;
 
 	case AC_MEM_UNCONFIGURE:
@@ -650,10 +650,10 @@ ac_ioctl(
 		retval = ac_del_memory(pkt);
 		if (!retval) {
 			ac_policy_audit_messages(
-					AC_AUDIT_OSTATE_SUCCEEDED, pkt);
+			    AC_AUDIT_OSTATE_SUCCEEDED, pkt);
 		} else
 			ac_policy_audit_messages(
-				AC_AUDIT_OSTATE_UNCONFIGURE_FAILED, pkt);
+			    AC_AUDIT_OSTATE_UNCONFIGURE_FAILED, pkt);
 		break;
 
 	case AC_MEM_STAT:
@@ -737,7 +737,7 @@ ac_add_kstats(struct ac_soft_state *softsp)
 	    sizeof (struct ac_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "ac%d: kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 		return;
 	}
 
@@ -745,32 +745,32 @@ ac_add_kstats(struct ac_soft_state *softsp)
 
 	/* initialize the named kstats */
 	kstat_named_init(&ac_named_ksp->ac_memctl,
-		MEMCTL_KSTAT_NAMED,
-		KSTAT_DATA_UINT64);
+	    MEMCTL_KSTAT_NAMED,
+	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ac_named_ksp->ac_memdecode0,
-		MEMDECODE0_KSTAT_NAMED,
-		KSTAT_DATA_UINT64);
+	    MEMDECODE0_KSTAT_NAMED,
+	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ac_named_ksp->ac_memdecode1,
-		MEMDECODE1_KSTAT_NAMED,
-		KSTAT_DATA_UINT64);
+	    MEMDECODE1_KSTAT_NAMED,
+	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ac_named_ksp->ac_mccr,
-		MCCR_KSTAT_NAMED,
-		KSTAT_DATA_UINT32);
+	    MCCR_KSTAT_NAMED,
+	    KSTAT_DATA_UINT32);
 
 	kstat_named_init(&ac_named_ksp->ac_counter,
-		CNTR_KSTAT_NAMED,
-		KSTAT_DATA_UINT64);
+	    CNTR_KSTAT_NAMED,
+	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ac_named_ksp->ac_bank0_status,
-		BANK_0_KSTAT_NAMED,
-		KSTAT_DATA_CHAR);
+	    BANK_0_KSTAT_NAMED,
+	    KSTAT_DATA_CHAR);
 
 	kstat_named_init(&ac_named_ksp->ac_bank1_status,
-		BANK_1_KSTAT_NAMED,
-		KSTAT_DATA_CHAR);
+	    BANK_1_KSTAT_NAMED,
+	    KSTAT_DATA_CHAR);
 
 	ac_ksp->ks_update = ac_misc_kstat_update;
 	ac_ksp->ks_private = (void *)softsp;
@@ -798,26 +798,26 @@ ac_add_kstats(struct ac_soft_state *softsp)
 	 * The size of this kstat is AC_NUM_PICS + 1 for %pcr
 	 */
 	if ((ac_counters_ksp = kstat_create("ac",
-		ddi_get_instance(softsp->dip), "counters",
-		"bus", KSTAT_TYPE_NAMED, AC_NUM_PICS + 1,
-		KSTAT_FLAG_WRITABLE)) == NULL) {
+	    ddi_get_instance(softsp->dip), "counters",
+	    "bus", KSTAT_TYPE_NAMED, AC_NUM_PICS + 1,
+	    KSTAT_FLAG_WRITABLE)) == NULL) {
 
 		cmn_err(CE_WARN, "ac%d counters: kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 		return;
 	}
 	ac_counters_named_data =
-		(struct kstat_named *)(ac_counters_ksp->ks_data);
+	    (struct kstat_named *)(ac_counters_ksp->ks_data);
 
 	/* initialize the named kstats */
 	kstat_named_init(&ac_counters_named_data[0],
-		"pcr", KSTAT_DATA_UINT64);
+	    "pcr", KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ac_counters_named_data[1],
-		"pic0", KSTAT_DATA_UINT64);
+	    "pic0", KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ac_counters_named_data[2],
-		"pic1", KSTAT_DATA_UINT64);
+	    "pic1", KSTAT_DATA_UINT64);
 
 	ac_counters_ksp->ks_update = ac_counters_kstat_update;
 	ac_counters_ksp->ks_private = (void *)softsp;
@@ -920,11 +920,11 @@ ac_add_picN_kstats(dev_info_t *dip)
 		 */
 		(void) sprintf(pic_name, "pic%d", pic);	/* pic0, pic1 ... */
 		if ((ac_picN_ksp[pic] = kstat_create("ac",
-			instance, pic_name, "bus", KSTAT_TYPE_NAMED,
-			AC_NUM_EVENTS + 1, NULL)) == NULL) {
+		    instance, pic_name, "bus", KSTAT_TYPE_NAMED,
+		    AC_NUM_EVENTS + 1, NULL)) == NULL) {
 
 				cmn_err(CE_WARN, "ac %s: kstat_create failed",
-					pic_name);
+				    pic_name);
 
 				/* remove pic0 kstat if pic1 create fails */
 				if (pic == 1) {
@@ -934,7 +934,7 @@ ac_add_picN_kstats(dev_info_t *dip)
 				return;
 		}
 		ac_pic_named_data =
-			(struct kstat_named *)(ac_picN_ksp[pic]->ks_data);
+		    (struct kstat_named *)(ac_picN_ksp[pic]->ks_data);
 
 		/*
 		 * when we are storing pcr_masks we need to shift bits
@@ -951,12 +951,12 @@ ac_add_picN_kstats(dev_info_t *dip)
 
 			/* pcr_mask */
 			ac_pic_named_data[event].value.ui64 =
-				ac_events_arr[event].pcr_mask << pic_shift;
+			    ac_events_arr[event].pcr_mask << pic_shift;
 
 			/* event-name */
 			kstat_named_init(&ac_pic_named_data[event],
-				ac_events_arr[event].event_name,
-				KSTAT_DATA_UINT64);
+			    ac_events_arr[event].event_name,
+			    KSTAT_DATA_UINT64);
 		}
 
 		/*
@@ -965,12 +965,12 @@ ac_add_picN_kstats(dev_info_t *dip)
 		 */
 		/* pcr mask */
 		ac_pic_named_data[AC_NUM_EVENTS].value.ui64 =
-			ac_clear_pic[pic].pcr_mask;
+		    ac_clear_pic[pic].pcr_mask;
 
 		/* event-name */
 		kstat_named_init(&ac_pic_named_data[AC_NUM_EVENTS],
-			ac_clear_pic[pic].event_name,
-			KSTAT_DATA_UINT64);
+		    ac_clear_pic[pic].event_name,
+		    KSTAT_DATA_UINT64);
 
 		kstat_install(ac_picN_ksp[pic]);
 	}
@@ -1126,7 +1126,7 @@ ac_counters_kstat_update(kstat_t *ksp, int rw)
 		 * %pic.
 		 */
 		*softsp->ac_mccr =
-			(uint32_t)ac_counters_data[0].value.ui64;
+		    (uint32_t)ac_counters_data[0].value.ui64;
 	} else {
 		/*
 		 * Read %pcr and %pic register values and write them
@@ -1145,10 +1145,10 @@ ac_counters_kstat_update(kstat_t *ksp, int rw)
 
 		/* pic0 */
 		ac_counters_data[1].value.ui64 =
-			AC_COUNTER_TO_PIC0(pic_register);
+		    AC_COUNTER_TO_PIC0(pic_register);
 		/* pic1 */
 		ac_counters_data[2].value.ui64 =
-			AC_COUNTER_TO_PIC1(pic_register);
+		    AC_COUNTER_TO_PIC1(pic_register);
 	}
 	return (0);
 }
@@ -1163,7 +1163,7 @@ ac_get_memory_status(struct ac_soft_state *softsp, enum ac_bank_id id)
 	char	*propval;
 	int	proplen;
 	uint64_t memdec = (id == Bank0) ?
-			*(softsp->ac_memdecode0) : *(softsp->ac_memdecode1);
+	    *(softsp->ac_memdecode0) : *(softsp->ac_memdecode1);
 	uint_t		grp_size;
 
 	softsp->bank[id].busy = 0;
@@ -1258,7 +1258,7 @@ static void
 ac_eval_memory_status(struct ac_soft_state *softsp, enum ac_bank_id id)
 {
 	uint64_t memdec = (id == Bank0) ?
-			*(softsp->ac_memdecode0) : *(softsp->ac_memdecode1);
+	    *(softsp->ac_memdecode0) : *(softsp->ac_memdecode1);
 	uint64_t	base_pa;
 
 	/*
@@ -1351,49 +1351,49 @@ ac_policy_audit_messages(ac_audit_evt_t event, ac_cfga_pkt_t *pkt)
 	switch (event) {
 		case AC_AUDIT_OSTATE_CONFIGURE:
 			cmn_err(CE_NOTE,
-				"%s memory bank %d in slot %d",
-				ac_ostate_typestr(SYSC_CFGA_OSTATE_CONFIGURED,
-				event), pkt->bank,
-				softsp->board);
+			    "%s memory bank %d in slot %d",
+			    ac_ostate_typestr(SYSC_CFGA_OSTATE_CONFIGURED,
+			    event), pkt->bank,
+			    softsp->board);
 			break;
 		case AC_AUDIT_OSTATE_UNCONFIGURE:
 			cmn_err(CE_NOTE,
-				"%s memory bank %d in slot %d",
-				ac_ostate_typestr(
-					SYSC_CFGA_OSTATE_UNCONFIGURED,
-					event), pkt->bank,
-				softsp->board);
+			    "%s memory bank %d in slot %d",
+			    ac_ostate_typestr(
+			    SYSC_CFGA_OSTATE_UNCONFIGURED,
+			    event), pkt->bank,
+			    softsp->board);
 			break;
 		case AC_AUDIT_OSTATE_SUCCEEDED:
 			cmn_err(CE_NOTE,
-				"memory bank %d in slot %d is %s",
-				pkt->bank, softsp->board,
-				ac_ostate_typestr(
-				softsp->bank[pkt->bank].ostate,
-					event));
+			    "memory bank %d in slot %d is %s",
+			    pkt->bank, softsp->board,
+			    ac_ostate_typestr(
+			    softsp->bank[pkt->bank].ostate,
+			    event));
 			break;
 		case AC_AUDIT_OSTATE_CONFIGURE_FAILED:
 			cmn_err(CE_NOTE,
 			"memory bank %d in slot %d not %s",
-				pkt->bank,
-				softsp->board,
-				ac_ostate_typestr(
-					SYSC_CFGA_OSTATE_CONFIGURED,
-					event));
+			    pkt->bank,
+			    softsp->board,
+			    ac_ostate_typestr(
+			    SYSC_CFGA_OSTATE_CONFIGURED,
+			    event));
 			break;
 		case AC_AUDIT_OSTATE_UNCONFIGURE_FAILED:
 			cmn_err(CE_NOTE,
-				"memory bank %d in slot %d not %s",
-				pkt->bank,
-				softsp->board,
-				ac_ostate_typestr(
-					SYSC_CFGA_OSTATE_UNCONFIGURED,
-					event));
+			    "memory bank %d in slot %d not %s",
+			    pkt->bank,
+			    softsp->board,
+			    ac_ostate_typestr(
+			    SYSC_CFGA_OSTATE_UNCONFIGURED,
+			    event));
 			break;
 		default:
 			cmn_err(CE_NOTE,
-				"unknown audit of memory bank %d in slot %d",
-				pkt->bank, softsp->board);
+			    "unknown audit of memory bank %d in slot %d",
+			    pkt->bank, softsp->board);
 			break;
 	}
 }

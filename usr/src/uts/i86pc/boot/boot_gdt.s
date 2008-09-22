@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(__lint)
 #pragma pack(1)
@@ -45,7 +44,7 @@ struct {
 #else	/* __lint */
 
 	.align 16
-
+	.data
 	/*
 	 * This must remain in sync with the entries in intel/sys/gdt.h; in
 	 * particular kmdb uses B64CODE_SEL or B32CODE_SEL in perpetuity for
@@ -106,15 +105,42 @@ global_descriptor_table:
 	.long	0
 	.long	0
 
-	/*
-	 * GDT_BGSTMP -- an entry for kmdb to use during boot
-	 */
-	.long	0
-	.long	0
+        /*
+         * GDT_BGSTMP -- an entry for kmdb to use during boot
+         * the fast reboot code uses this entry for memory copies, too.
+         */
+	.value  0x0001	/* segment limit 0..15 */
+
+	.globl fake_cpu_gdt_base_0_15
+fake_cpu_gdt_base_0_15:
+
+	.value  0x0000	/* segment base 0..15 */
+
+	.globl fake_cpu_gdt_base_16_23
+fake_cpu_gdt_base_16_23:
+	.byte   0x0	/* segment base 16..23 */
+	.byte   0x9E	/* P=1, code, exec, readable */
+	.byte   0xC0	/* G=1, D=1, Limit (16..19)=0000 */
+
+	.globl fake_cpu_gdt_base_24_31
+fake_cpu_gdt_base_24_31:
+	.byte   0x0	/* segment base 24..32 */
+
+/	.long	0
+/	.long	0
 
 gdt_info:
 	.value	gdt_info - global_descriptor_table - 1
 	.long	global_descriptor_table
 	.long   0		/* needed for 64 bit */
+
+fake_cpu:
+	.4byte 0
+	.4byte 0
+	.4byte 0
+	.globl fake_cpu_ptr
+fake_cpu_ptr:
+	.4byte 0
+	.skip 0x6c0, 0
 
 #endif	/* __lint */

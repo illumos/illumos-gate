@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -139,7 +137,9 @@ static struct dev_ops ata_ops = {
 		pcata_detach,		/* detach */
 		nulldev,		/* reset */
 		&pcata_cb_ops,		/* driver operations */
-		0
+		NULL,			/* bus operations */
+		NULL,			/* power */
+		ddi_quiesce_not_needed,		/* quiesce */
 	};
 
 
@@ -153,7 +153,7 @@ extern  struct mod_ops  mod_driverops;
 
 static struct modldrv modldrv = {
 		&mod_driverops, /* Type of module. This one is a driver */
-		"PCMCIA ATA disk controller %I%",
+		"PCMCIA ATA disk controller",
 		&ata_ops, /* driver ops */
 	};
 
@@ -204,7 +204,7 @@ pcata_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* resume from a checkpoint */
 	if (cmd == DDI_RESUME)
-	    return (DDI_SUCCESS);
+		return (DDI_SUCCESS);
 
 	if (cmd != DDI_ATTACH) {
 #ifdef  ATA_DEBUG
@@ -278,7 +278,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	 * create ata_mutex
 	 */
 	ret = ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_MED,
-		&softp->soft_blk_cookie);
+	    &softp->soft_blk_cookie);
 	if (ret != DDI_SUCCESS) {
 #ifdef ATA_DEBUG
 		cmn_err(CE_CONT, "_attach: unable to get iblock cookie\n");
@@ -292,7 +292,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	 * Initialize the mutex that protects the ATA registers.
 	 */
 	mutex_init(&softp->ata_mutex, NULL, MUTEX_DRIVER,
-		(void *)(softp->soft_blk_cookie));
+	    (void *)(softp->soft_blk_cookie));
 	mutex_init(&softp->label_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	cv_init(&softp->readywait_cv, NULL, CV_DRIVER, NULL);
@@ -305,7 +305,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	 * link in soft interrupt
 	 */
 	ret = ddi_add_softintr(dip, DDI_SOFTINT_MED, &softp->softint_id,
-		NULL, NULL, pcata_intr, (caddr_t)softp);
+	    NULL, NULL, pcata_intr, (caddr_t)softp);
 	if (ret != DDI_SUCCESS) {
 #ifdef ATA_DEBUG
 		cmn_err(CE_CONT, "_attach: unable to get soft interrupt\n");
@@ -319,16 +319,16 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	 * Register with Card Services
 	 */
 	client_reg.Attributes =
-		INFO_IO_CLIENT | INFO_CARD_SHARE | INFO_CARD_EXCL;
+	    INFO_IO_CLIENT | INFO_CARD_SHARE | INFO_CARD_EXCL;
 
 	client_reg.EventMask =
-		CS_EVENT_CARD_INSERTION |
-		CS_EVENT_CARD_REMOVAL |
-		CS_EVENT_CARD_REMOVAL_LOWP |
-		CS_EVENT_PM_RESUME |
-		CS_EVENT_CLIENT_INFO |
-		CS_EVENT_PM_SUSPEND |
-		CS_EVENT_REGISTRATION_COMPLETE;
+	    CS_EVENT_CARD_INSERTION |
+	    CS_EVENT_CARD_REMOVAL |
+	    CS_EVENT_CARD_REMOVAL_LOWP |
+	    CS_EVENT_PM_RESUME |
+	    CS_EVENT_CLIENT_INFO |
+	    CS_EVENT_PM_SUSPEND |
+	    CS_EVENT_REGISTRATION_COMPLETE;
 
 	client_reg.event_handler = (csfunction_t *)pcata_event;
 	client_reg.event_callback_args.client_data = softp;
@@ -340,13 +340,13 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	if (ret != CS_SUCCESS) {
 #ifdef  ATA_DEBUG
 		cmn_err(CE_CONT, "_attach RegisterClient failed %s\n",
-			pcata_CS_etext(ret));
+		    pcata_CS_etext(ret));
 #endif
 		return (DDI_FAILURE);
 	}
 
 	mutex_init(&softp->event_hilock, NULL, MUTEX_DRIVER,
-		*(client_reg.iblk_cookie));
+	    *(client_reg.iblk_cookie));
 
 	softp->flags |= PCATA_REGCLIENT;
 
@@ -358,7 +358,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	if (ret != CS_SUCCESS) {
 #ifdef  ATA_DEBUG
 		cmn_err(CE_CONT, "_attach: MapLogSocket failed %s\n",
-				pcata_CS_etext(ret));
+		    pcata_CS_etext(ret));
 #endif
 		return (DDI_FAILURE);
 	}
@@ -375,7 +375,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	if ((ret = csx_CS_DDI_Info(&cs_ddi_info)) != CS_SUCCESS) {
 #ifdef  ATA_DEBUG
 		cmn_err(CE_CONT, "_attach: socket %d CS_DDI_Info failed %s\n",
-			softp->sn, pcata_CS_etext(ret));
+		    softp->sn, pcata_CS_etext(ret));
 #endif
 		return (DDI_FAILURE);
 	}
@@ -388,7 +388,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 	if (ret != CS_SUCCESS) {
 #ifdef  ATA_DEBUG
 		cmn_err(CE_CONT, "_attach: RequestSocketMask failed %s\n",
-			pcata_CS_etext(ret));
+		    pcata_CS_etext(ret));
 #endif
 		return (DDI_FAILURE);
 	}
@@ -409,7 +409,7 @@ pcata_att1(dev_info_t *dip, ata_soft_t *softp)
 		(void) pcata_readywait(softp);
 
 		if ((softp->card_state & PCATA_CARD_INSERTED) == 0 ||
-				(softp->flags & PCATA_READY) == 0) {
+		    (softp->flags & PCATA_READY) == 0) {
 
 			mutex_enter(&softp->ata_mutex);
 			mutex_enter(&softp->event_hilock);
@@ -442,7 +442,7 @@ pcata_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	int	ret;
 
 	if (cmd == DDI_SUSPEND)
-	    return (DDI_SUCCESS);
+		return (DDI_SUCCESS);
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
@@ -472,8 +472,8 @@ pcata_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (ret != CS_SUCCESS) {
 #ifdef ATA_DEBUG
 			cmn_err(CE_CONT, "_detach "
-				"ReleaseSocketMask failed %s\n",
-				pcata_CS_etext(ret));
+			    "ReleaseSocketMask failed %s\n",
+			    pcata_CS_etext(ret));
 #endif
 		}
 	}
@@ -488,8 +488,8 @@ pcata_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (ret != CS_SUCCESS) {
 #ifdef ATA_DEBUG
 			cmn_err(CE_CONT, "_detach: "
-				"DeregisterClient failed %s\n",
-				pcata_CS_etext(ret));
+			    "DeregisterClient failed %s\n",
+			    pcata_CS_etext(ret));
 #endif
 			return (DDI_FAILURE);
 
@@ -555,9 +555,9 @@ pcata_start(ata_unit_t *unitp, buf_t *bp, int blkno)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DENT) {
 		cmn_err(CE_CONT, "_start unitp=%p, bp=%p bp->b_private=%p\n",
-			(void *)unitp,
-			(void *)bp,
-			bp->b_private);
+		    (void *)unitp,
+		    (void *)bp,
+		    bp->b_private);
 	}
 #endif
 
@@ -613,7 +613,7 @@ pcata_start(ata_unit_t *unitp, buf_t *bp, int blkno)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DIO) {
 		cmn_err(CE_CONT, "passthru command seen: 0x%p\n",
-			pktp->cp_passthru);
+		    pktp->cp_passthru);
 	}
 #endif
 
@@ -623,8 +623,8 @@ pcata_start(ata_unit_t *unitp, buf_t *bp, int blkno)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DIO) {
 		cmn_err(CE_CONT, "_start: active: %c  head: %c\n",
-			(softp->ab_active == NULL ? 'N' : 'Y'),
-			(softp->ab_head == NULL ? 'N' : 'Y'));
+		    (softp->ab_active == NULL ? 'N' : 'Y'),
+		    (softp->ab_head == NULL ? 'N' : 'Y'));
 	}
 #endif
 
@@ -702,9 +702,9 @@ pcata_go(ata_unit_t *unitp)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DENT) {
 		cmn_err(CE_CONT, "_go (%p) altstatus %x error %x\n",
-			(void *)unitp,
-			csx_Get8(softp->handle, AT_ALTSTATUS),
-			csx_Get8(softp->handle, AT_ERROR));
+		    (void *)unitp,
+		    csx_Get8(softp->handle, AT_ALTSTATUS),
+		    csx_Get8(softp->handle, AT_ERROR));
 		cmn_err(CE_CONT, "_go handle=%p\n", softp->handle);
 	}
 #endif
@@ -729,12 +729,12 @@ pcata_go(ata_unit_t *unitp)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DIO) {
 		cmn_err(CE_CONT,
-			"_go %s at lba=%d (%uc %uh %us) "
-			"%d sectors cmd=%x ctl=%x\n",
-			(pktp->ac_direction == AT_OUT) ? "WT" : "RD",
-			start_sec, cyl, head, ac_sec,
-			ac_count,
-			pktp->ac_cmd, ac_devctl);
+		    "_go %s at lba=%d (%uc %uh %us) "
+		    "%d sectors cmd=%x ctl=%x\n",
+		    (pktp->ac_direction == AT_OUT) ? "WT" : "RD",
+		    start_sec, cyl, head, ac_sec,
+		    ac_count,
+		    pktp->ac_cmd, ac_devctl);
 	}
 #endif
 
@@ -828,9 +828,9 @@ pcata_iocmpl(ata_soft_t *softp)
 #ifdef ATA_DEBUG
 		if (pcata_debug & DIO)
 			cmn_err(CE_CONT,
-				"_iocmpl I/O error status=%04x error=%04x\n",
-				status,
-				error);
+			    "_iocmpl I/O error status=%04x error=%04x\n",
+			    status,
+			    error);
 #endif
 		pktp->cp_reason = CPS_CHKERR;
 		return;
@@ -915,8 +915,8 @@ pcata_intr_hi(ata_soft_t *softp)
 	    ((status & ATS_BSY) == 0) &&
 	    (softp->intr_pending > 0)) {
 		cmn_err(CE_CONT,
-			"?_intr_hi  sn=%d status=%x\n",
-			softp->sn, status);
+		    "?_intr_hi  sn=%d status=%x\n",
+		    softp->sn, status);
 		/* handle aborted commands */
 		error = csx_Get8(softp->handle, AT_ERROR);
 		if ((error & ATE_ABORT) &&
@@ -952,10 +952,10 @@ pcata_intr_hi(ata_soft_t *softp)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DENT)
 		cmn_err(CE_CONT,
-			"_intr_hi status=%x error=%x claimed=%d pending=%d\n",
-			status, error,
-			(rval == DDI_INTR_CLAIMED),
-			softp->intr_pending);
+		    "_intr_hi status=%x error=%x claimed=%d pending=%d\n",
+		    status, error,
+		    (rval == DDI_INTR_CLAIMED),
+		    softp->intr_pending);
 #endif
 
 	if ((rval == DDI_INTR_CLAIMED) &&
@@ -1106,9 +1106,9 @@ pcata_intr(char *parm)
 #ifdef ATA_DEBUG
 		if (pcata_debug & DIO) {
 			cmn_err(CE_CONT,
-				"_start_next_cmd current:%p head:%p\n",
-				(void *)softp->ab_active,
-				(void *)softp->ab_head);
+			    "_start_next_cmd current:%p head:%p\n",
+			    (void *)softp->ab_active,
+			    (void *)softp->ab_head);
 		}
 #endif
 	}
@@ -1220,7 +1220,7 @@ pcata_wait(uint32_t port, ushort_t onbits, ushort_t offbits, ata_soft_t *softp)
 	for (i = 400000; i && (CARD_PRESENT_VALID(softp)); i--) {
 		maskval = csx_Get8(softp->handle, port);
 		if (((maskval & onbits) == onbits) &&
-			((maskval & offbits) == 0))
+		    ((maskval & offbits) == 0))
 			return (0);
 		drv_usecwait(10);
 	}
@@ -1247,7 +1247,7 @@ pcata_wait1(uint32_t port, ushort_t onbits, ushort_t offbits, int interval,
 	for (i = interval; i && (CARD_PRESENT_VALID(softp)); i--) {
 		maskval = csx_Get8(softp->handle, port);
 		if (((maskval & onbits) == onbits) &&
-			((maskval & offbits) == 0))
+		    ((maskval & offbits) == 0))
 			return (0);
 		drv_usecwait(10);
 	}
@@ -1279,7 +1279,7 @@ pcata_send_data(ata_unit_t *unitp, int count)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DENT) {
 		cmn_err(CE_CONT, "_send_data (%p, %x)\n",
-			(void *)unitp, count);
+		    (void *)unitp, count);
 	}
 #endif
 	if (pcata_wait(AT_ALTSTATUS, ATS_DRQ, 0, softp)) {
@@ -1296,9 +1296,9 @@ pcata_send_data(ata_unit_t *unitp, int count)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DIO) {
 		cmn_err(CE_CONT, "_send_data: port=%x addr=0x%p count=0x%x\n",
-			unitp->a_blkp->ab_data,
-			(void *)pktp->ac_v_addr,
-			count);
+		    unitp->a_blkp->ab_data,
+		    (void *)pktp->ac_v_addr,
+		    count);
 	}
 #endif
 
@@ -1311,7 +1311,7 @@ pcata_send_data(ata_unit_t *unitp, int count)
 
 	mutex_enter(&softp->hi_mutex);
 	csx_RepPut16(softp->handle, (ushort_t *)pktp->ac_v_addr, AT_DATA,
-		(count >> 1), DDI_DEV_NO_AUTOINCR);
+	    (count >> 1), DDI_DEV_NO_AUTOINCR);
 	if (softp->write_in_progress > 0)
 		softp->write_in_progress--;
 	mutex_exit(&softp->hi_mutex);
@@ -1352,7 +1352,7 @@ pcata_get_data(ata_unit_t *unitp, int count)
 		return (DDI_FAILURE);
 
 	csx_RepGet8(softp->handle, (uchar_t *)pktp->ac_v_addr,
-		AT_DATA, count, DDI_DEV_NO_AUTOINCR);
+	    AT_DATA, count, DDI_DEV_NO_AUTOINCR);
 
 #ifdef ATA_DEBUG
 	if (pcata_debug & DIO)
@@ -1400,7 +1400,7 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 
 	for (dcount = drive = 0; drive < dmax; drive++) {
 		if (!(rpbp = (struct atarpbuf *)kmem_zalloc(
-				(sizeof (struct atarpbuf) +
+		    (sizeof (struct atarpbuf) +
 				sizeof (struct scsi_inquiry)), KM_NOSLEEP))) {
 			kmem_free(secbuf, NBPSCTR);
 			return (DDI_FAILURE);
@@ -1420,7 +1420,7 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 
 		if (softp->ab_dev_type[drive] == ATA_DEV_NONE) {
 			kmem_free(rpbp, (sizeof (struct atarpbuf) +
-					    sizeof (struct scsi_inquiry)));
+			    sizeof (struct scsi_inquiry)));
 			continue;
 		}
 		dcount++;
@@ -1429,7 +1429,7 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 		mutex_enter(&softp->ata_mutex);
 		if (!(softp->card_state & PCATA_CARD_INSERTED)) {
 			kmem_free(rpbp, (sizeof (struct atarpbuf) +
-				sizeof (struct scsi_inquiry)));
+			    sizeof (struct scsi_inquiry)));
 			dcount--;
 			mutex_exit(&softp->ata_mutex);
 			break;
@@ -1444,7 +1444,7 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 		pcata_byte_swap((char *)rpbp, sizeof (*rpbp));
 #else
 		pcata_byte_swap(rpbp->atarp_drvser,
-			sizeof (rpbp->atarp_drvser));
+		    sizeof (rpbp->atarp_drvser));
 		pcata_byte_swap(rpbp->atarp_fw, sizeof (rpbp->atarp_fw));
 		pcata_byte_swap(rpbp->atarp_model, sizeof (rpbp->atarp_model));
 #endif
@@ -1454,41 +1454,41 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 #ifdef	ATA_DEBUG
 		if (pcata_debug & DINIT) {
 			(void) strncpy(buf,
-				rpbp->atarp_model, sizeof (rpbp->atarp_model));
+			    rpbp->atarp_model, sizeof (rpbp->atarp_model));
 		buf[sizeof (rpbp->atarp_model)-1] = '\0';
 
 		/* truncate model */
 		for (i = sizeof (rpbp->atarp_model) - 2; i && buf[i] == ' ';
-							i--) {
+		    i--) {
 			buf[i] = '\0';
 		}
 		cmn_err(CE_CONT, "_getedt model %s, targ %d, stat %x, err %x\n",
-			buf,
-			drive,
-			csx_Get8(softp->handle, AT_STATUS),
-			csx_Get8(softp->handle, AT_ERROR));
+		    buf,
+		    drive,
+		    csx_Get8(softp->handle, AT_STATUS),
+		    csx_Get8(softp->handle, AT_ERROR));
 		cmn_err(CE_CONT, "	cfg 0x%x, cyl %d, hd %d, sec/trk %d\n",
-			rpbp->atarp_config,
-			rpbp->atarp_fixcyls,
-			rpbp->atarp_heads,
-			rpbp->atarp_sectors);
+		    rpbp->atarp_config,
+		    rpbp->atarp_fixcyls,
+		    rpbp->atarp_heads,
+		    rpbp->atarp_sectors);
 		cmn_err(CE_CONT, "	mult1 0x%x, mult2 0x%x, dwcap 0x%x,"
-			" cap 0x%x\n",
-			rpbp->atarp_mult1,
-			rpbp->atarp_mult2,
-			rpbp->atarp_dwcap,
-			rpbp->atarp_cap);
+		    " cap 0x%x\n",
+		    rpbp->atarp_mult1,
+		    rpbp->atarp_mult2,
+		    rpbp->atarp_dwcap,
+		    rpbp->atarp_cap);
 		cmn_err(CE_CONT, "	piomode 0x%x, dmamode 0x%x,"
-			" advpiomode 0x%x\n",
-			rpbp->atarp_piomode,
-			rpbp->atarp_dmamode,
-			rpbp->atarp_advpiomode);
+		    " advpiomode 0x%x\n",
+		    rpbp->atarp_piomode,
+		    rpbp->atarp_dmamode,
+		    rpbp->atarp_advpiomode);
 		cmn_err(CE_CONT, "	minpio %d, minpioflow %d",
-			rpbp->atarp_minpio,
-			rpbp->atarp_minpioflow);
+		    rpbp->atarp_minpio,
+		    rpbp->atarp_minpioflow);
 		cmn_err(CE_CONT, " valid 0x%x, dwdma 0x%x\n",
-			rpbp->atarp_validinfo,
-			rpbp->atarp_dworddma);
+		    rpbp->atarp_validinfo,
+		    rpbp->atarp_dworddma);
 		}
 #endif
 
@@ -1510,7 +1510,7 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 
 		if (softp->ab_dev_type[drive] != ATA_DEV_DISK) {
 			cmn_err(CE_CONT, "Unknown IDE attachment at 0x%x.\n",
-					softp->ab_cmd - AT_CMD);
+			    softp->ab_cmd - AT_CMD);
 			continue;
 		}
 
@@ -1519,16 +1519,16 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 		 */
 		mutex_enter(&softp->ata_mutex);
 		if (pcata_setpar(drive, rpbp->atarp_heads,
-			rpbp->atarp_sectors, softp)
-			== DDI_FAILURE) {
+		    rpbp->atarp_sectors, softp)
+		    == DDI_FAILURE) {
 			/*
 			 * there should have been a drive here but it
 			 * didn't respond properly. It stayed BUSY.
 			 */
 			if (softp->ab_rpbp[drive]) {
 				kmem_free(rpbp,
-					(sizeof (struct atarpbuf) +
-					sizeof (struct scsi_inquiry)));
+				    (sizeof (struct atarpbuf) +
+				    sizeof (struct scsi_inquiry)));
 			}
 			softp->ab_rpbp[drive] = NULL;
 			softp->ab_dev_type[drive] = ATA_DEV_NONE;
@@ -1542,8 +1542,8 @@ pcata_getedt(ata_soft_t *softp, int dmax)
 #ifdef ATA_DEBUG
 	if (pcata_debug)
 		cmn_err(CE_CONT, "**** probed %d device%s 0x%x\n",
-			dcount, dcount == 1 ? "." : "s.",
-			softp->ab_cmd - AT_CMD);
+		    dcount, dcount == 1 ? "." : "s.",
+		    softp->ab_cmd - AT_CMD);
 #endif
 
 	return (dcount ? DDI_SUCCESS : DDI_FAILURE);
@@ -1585,18 +1585,18 @@ pcata_drive_type(ata_soft_t *softp, ushort_t *buf)
 	}
 
 	csx_RepGet16(softp->handle, (ushort_t *)buf, AT_DATA, NBPSCTR >> 1,
-		DDI_DEV_NO_AUTOINCR);
+	    DDI_DEV_NO_AUTOINCR);
 
 #ifdef ATA_DEBUG
 	if (pcata_debug) {
 		if ((csx_Get8(softp->handle, AT_STATUS) & ATS_ERR) == 0) {
 			pcata_byte_swap(rpbp->atarp_model,
-				sizeof (rpbp->atarp_model));
+			    sizeof (rpbp->atarp_model));
 			rpbp->atarp_model[sizeof (rpbp->atarp_model)-1] = '\0';
 			cmn_err(CE_CONT, "succeeded: %s\n",
-				rpbp->atarp_model);
+			    rpbp->atarp_model);
 			pcata_byte_swap(rpbp->atarp_model,
-				sizeof (rpbp->atarp_model));
+			    sizeof (rpbp->atarp_model));
 		} else {
 			cmn_err(CE_CONT, "failed drive drive read error.\n");
 		}
@@ -1631,7 +1631,7 @@ pcata_setpar(int drive, int heads, int sectors, ata_soft_t *softp)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DINIT)
 		cmn_err(CE_CONT, "_setpar status=0x%x drive=%d heads=%d\n",
-			csx_Get8(softp->handle, AT_STATUS), drive, heads);
+		    csx_Get8(softp->handle, AT_STATUS), drive, heads);
 #endif
 	if (!CARD_PRESENT_VALID(softp))
 		return (DDI_FAILURE);
@@ -1642,7 +1642,7 @@ pcata_setpar(int drive, int heads, int sectors, ata_soft_t *softp)
 	pcata_wait_complete(softp);
 
 	PCIDE_OUTB(softp->handle, AT_DRVHD, (heads - 1) |
-		(drive == 0 ? ATDH_DRIVE0 : ATDH_DRIVE1));
+	    (drive == 0 ? ATDH_DRIVE0 : ATDH_DRIVE1));
 	PCIDE_OUTB(softp->handle, AT_COUNT, sectors);
 
 	mutex_enter(&softp->hi_mutex);
@@ -1681,7 +1681,7 @@ pcata_set_rw_multiple(ata_soft_t *softp, int drive)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DENT) {
 		cmn_err(CE_CONT, "_set_rw_multiple (%p, %d)\n",
-			(void *)softp, drive);
+		    (void *)softp, drive);
 	}
 #endif
 
@@ -1698,10 +1698,10 @@ pcata_set_rw_multiple(ata_soft_t *softp, int drive)
 	 * set drive number
 	 */
 	PCIDE_OUTB(softp->handle, AT_DRVHD, drive == 0 ? ATDH_DRIVE0 :
-		ATDH_DRIVE1);
+	    ATDH_DRIVE1);
 
 	for (size = 32; size > 0 && accepted_size == -1 &&
-			CARD_PRESENT_VALID(softp); size >>= 1) {
+	    CARD_PRESENT_VALID(softp); size >>= 1) {
 
 		if (pcata_wait(AT_ALTSTATUS, ATS_DRDY, ATS_BSY, softp))
 			return (DDI_FAILURE);
@@ -1729,9 +1729,9 @@ pcata_set_rw_multiple(ata_soft_t *softp, int drive)
 		 * Wait for DRDY or error status
 		 */
 		for (i = 0; i < ATA_LOOP_CNT && CARD_PRESENT_VALID(softp);
-			i++) {
+		    i++) {
 			if (((laststat = csx_Get8(softp->handle, AT_ALTSTATUS))
-				& (ATS_DRDY | ATS_ERR)) != 0)
+			    & (ATS_DRDY | ATS_ERR)) != 0)
 				break;
 			drv_usecwait(10);
 		}
@@ -1769,7 +1769,7 @@ pcata_set_rw_multiple(ata_soft_t *softp, int drive)
 #ifdef ATA_DEBUG
 		if (pcata_debug & DENT) {
 			cmn_err(CE_CONT, "Using STD R/W cmds and setting"
-				"block factor to 1\n");
+			    "block factor to 1\n");
 		}
 #endif
 		softp->ab_rd_cmd[drive] = ATC_RDSEC;
@@ -1896,7 +1896,7 @@ pcata_print(dev_t dev, char *str)
 	if (pcata_getinfo(NULL, DDI_INFO_DEVT2INSTANCE, (void *)dev,
 	    &instance) != DDI_SUCCESS) {
 		cmn_err(CE_CONT, "_print: pcata_getinfo"
-			"return ENODEV\n");
+		    "return ENODEV\n");
 		return (ENODEV);
 	}
 
@@ -1948,7 +1948,7 @@ pcata_min(buf_t *bp)
 	softp = ddi_get_soft_state(pcata_soft, (int)(uintptr_t)instance);
 
 	if ((ROUNDUP(bp->b_bcount, NBPSCTR) >> SCTRSHFT) >
-			softp->ab_max_transfer)
+	    softp->ab_max_transfer)
 
 		bp->b_bcount = softp->ab_max_transfer << SCTRSHFT;
 }
@@ -1961,7 +1961,7 @@ pcata_iosetup(ata_unit_t *unitp, struct ata_cmpkt *pktp)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DENT) {
 		cmn_err(CE_CONT, "_iosetup (%p, %p)\n",
-			(void *)unitp, (void *)pktp);
+		    (void *)unitp, (void *)pktp);
 	}
 #endif
 
@@ -1987,8 +1987,8 @@ pcata_iosetup(ata_unit_t *unitp, struct ata_cmpkt *pktp)
 #ifdef ATA_DEBUG
 	if (pcata_debug & DIO) {
 		cmn_err(CE_CONT,
-			"_iosetup: asking for start 0x%lx count 0x%x\n",
-			pktp->cp_srtsec, pktp->cp_bytexfer >> SCTRSHFT);
+		    "_iosetup: asking for start 0x%lx count 0x%x\n",
+		    pktp->cp_srtsec, pktp->cp_bytexfer >> SCTRSHFT);
 	}
 #endif
 	/*
@@ -2038,8 +2038,8 @@ pcata_iosetup(ata_unit_t *unitp, struct ata_cmpkt *pktp)
 			break;
 		default:
 			cmn_err(CE_CONT, "_iosetup: "
-				"unrecognized cmd 0x%x\n",
-				pktp->ac_cdb);
+			    "unrecognized cmd 0x%x\n",
+			    pktp->ac_cdb);
 			break;
 		}
 	}

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The ioctl interface for administrative commands.
@@ -98,6 +97,7 @@ static struct dev_ops devops = {
 	&cbops,			/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

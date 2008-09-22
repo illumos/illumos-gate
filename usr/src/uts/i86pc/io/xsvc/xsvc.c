@@ -93,7 +93,8 @@ static struct dev_ops xsvc_dev_ops = {
 	nodev,			/* devo_reset */
 	&xsvc_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv xsvc_modldrv = {

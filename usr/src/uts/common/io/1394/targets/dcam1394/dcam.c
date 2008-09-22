@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * dcam.c
@@ -127,13 +125,14 @@ static struct dev_ops dcam_dev_ops = {
 	&dcam_cb_ops,		/* ptr to cb_ops struct		*/
 	NULL,			/* ptr to bus_ops struct; none	*/
 	dcam_power,		/* power			*/
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 extern	struct	mod_ops mod_driverops;
 
 static	struct modldrv modldrv = {
 	&mod_driverops,
-	"SUNW 1394-based Digital Camera driver 1.0",
+	"SUNW 1394-based Digital Camera driver",
 	&dcam_dev_ops,
 };
 
@@ -742,7 +741,7 @@ dcam_read(dev_t dev, struct uio *uio_p, cred_t *cred_p)
 			 */
 			index = 0;
 			buff_info_p =
-				&(ring_buff_p->buff_info_array_p[read_ptr_pos]);
+			    &(ring_buff_p->buff_info_array_p[read_ptr_pos]);
 
 			vid_mode = softc_p->cur_vid_mode;
 			seq_num  = buff_info_p->seq_num;
@@ -1251,7 +1250,7 @@ dcam_reset(dcam_state_t *softc_p)
 	 * to "on" and value 4.
 	 */
 	dcam_reg_io.offs = DCAM1394_REG_OFFS_FEATURE_CSR_BASE +
-			    DCAM1394_REG_OFFS_IRIS_CSR;
+	    DCAM1394_REG_OFFS_IRIS_CSR;
 	dcam_reg_io.val  = 0x82000004;
 
 	if (dcam_reg_write(softc_p, &dcam_reg_io)) {

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/dld.h>
@@ -92,7 +91,8 @@ static struct streamtab softmac_tab = {
 };
 
 DDI_DEFINE_STREAM_OPS(softmac_ops, nulldev, nulldev, softmac_attach,
-    softmac_detach, nodev, softmac_info, D_MP, &softmac_tab);
+    softmac_detach, nodev, softmac_info, D_MP, &softmac_tab,
+    ddi_quiesce_not_supported);
 
 static struct qinit softmac_dld_r_qinit = {
 	NULL, NULL, dld_open, dld_close, NULL, &softmac_dld_modinfo

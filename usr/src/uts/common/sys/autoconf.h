@@ -26,7 +26,6 @@
 #ifndef _SYS_AUTOCONF_H
 #define	_SYS_AUTOCONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Derived from autoconf.h, SunOS 4.1.1 1.15 */
 
@@ -241,6 +240,7 @@ extern void setcputype(void);
 #endif
 extern void devtree_freeze(void);
 extern void reset_leaves(void);
+extern void quiesce_devices(dev_info_t *, void *);
 
 extern void setup_ddi(void);
 extern void setup_ddi_poststartup(void);
@@ -280,6 +280,8 @@ extern int e_ddi_retire_notify(dev_info_t *dip, void *arg);
 extern int e_ddi_retire_finalize(dev_info_t *dip, void *arg);
 extern void e_ddi_degrade_finalize(dev_info_t *dip);
 extern void e_ddi_undegrade_finalize(dev_info_t *dip);
+
+extern int check_driver_quiesce(dev_info_t *dip, void *arg);
 
 #endif /* _KERNEL */
 

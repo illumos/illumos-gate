@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 
@@ -155,14 +153,16 @@ static struct dev_ops pcf8591_ops = {
 	pcf8591_detach,
 	nodev,
 	&pcf8591_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv pcf8591_modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"Netract pcf8591 (adio) %I% ",
+	"Netract pcf8591 (adio)",
 	&pcf8591_ops,
 };
 
@@ -185,7 +185,7 @@ _init(void)
 	error = mod_install(&pcf8591_modlinkage);
 	if (error == 0) {
 		(void) ddi_soft_state_init(&pcf8591_soft_statep,
-			sizeof (struct pcf8591_unit), PCF8591_MAX_DEVS);
+		    sizeof (struct pcf8591_unit), PCF8591_MAX_DEVS);
 	}
 
 	return (error);
@@ -226,7 +226,7 @@ pcf8591_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591_soft_statep, instance);
+	    ddi_get_soft_state(pcf8591_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -277,7 +277,7 @@ pcf8591_close(dev_t devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591_soft_statep, instance);
+	    ddi_get_soft_state(pcf8591_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -317,7 +317,7 @@ pcf8591_io(dev_t dev, struct uio *uiop, int rw)
 	}
 
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591_soft_statep, instance);
+	    ddi_get_soft_state(pcf8591_soft_statep, instance);
 	if (unitp == NULL) {
 		return (ENXIO);
 	}
@@ -359,14 +359,14 @@ pcf8591_io(dev_t dev, struct uio *uiop, int rw)
 	unitp->i2c_tran->i2c_flags = I2C_WR_RD;
 	unitp->i2c_tran->i2c_wlen = 1;
 	unitp->i2c_tran->i2c_wbuf[0] = (unitp->pcf8591_inprog |
-		channel);
+	    channel);
 	/*
 	 * read extra byte to throw away the first, (PCF8591 datasheet)
 	 */
 	unitp->i2c_tran->i2c_rlen = bytes_to_rw + 1;
 
 	if (nct_i2c_transfer(unitp->pcf8591_hdl,
-			unitp->i2c_tran) != I2C_SUCCESS) {
+	    unitp->i2c_tran) != I2C_SUCCESS) {
 		err = EIO;
 	} else {
 		/*
@@ -375,17 +375,17 @@ pcf8591_io(dev_t dev, struct uio *uiop, int rw)
 		 */
 		if (translate) {
 			unitp->i2c_tran->i2c_rbuf[0] =
-				translate_cputemp(unitp->i2c_tran->i2c_rbuf[1]);
+			    translate_cputemp(unitp->i2c_tran->i2c_rbuf[1]);
 		} else {
 			unitp->i2c_tran->i2c_rbuf[0] =
-				unitp->i2c_tran->i2c_rbuf[1];
+			    unitp->i2c_tran->i2c_rbuf[1];
 			unitp->i2c_tran->i2c_rbuf[1] = 0;
 		}
 
 		err = uiomove(unitp->i2c_tran->i2c_rbuf,
-			bytes_to_rw,
-			UIO_READ,
-			uiop);
+		    bytes_to_rw,
+		    UIO_READ,
+		    uiop);
 	}
 	mutex_enter(&unitp->umutex);
 	unitp->pcf8591_flags = 0;
@@ -413,7 +413,7 @@ call_copyin(caddr_t arg, struct pcf8591_unit *unitp, int mode)
 
 	if (ddi_copyin((void *)arg, (caddr_t)&i2ct,
 	    sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
-	    return (I2C_FAILURE);
+		return (I2C_FAILURE);
 	}
 
 	/*
@@ -436,7 +436,7 @@ call_copyin(caddr_t arg, struct pcf8591_unit *unitp, int mode)
 
 	if (i2ct.i2c_wlen != 0) {
 		if (ddi_copyin(i2ct.i2c_wbuf, (caddr_t)i2ctp->i2c_wbuf,
-			i2ct.i2c_wlen, mode) != DDI_SUCCESS) {
+		    i2ct.i2c_wlen, mode) != DDI_SUCCESS) {
 				return (I2C_FAILURE);
 			}
 		}
@@ -458,7 +458,7 @@ call_copyout(caddr_t arg, struct pcf8591_unit *unitp, int mode)
 	 */
 
 	int uskip = sizeof (i2c_transfer_t) - 3*sizeof (int16_t),
-		kskip = sizeof (i2c_transfer_t) - 3*sizeof (int16_t);
+	    kskip = sizeof (i2c_transfer_t) - 3*sizeof (int16_t);
 
 	/*
 	 * First copyin the user structure to the temporary i2ct,
@@ -472,8 +472,8 @@ call_copyout(caddr_t arg, struct pcf8591_unit *unitp, int mode)
 	 */
 
 	if (ddi_copyout((void *)((intptr_t)i2ctp+kskip), (void *)
-		((intptr_t)arg + uskip), 3*sizeof (uint16_t), mode)
-		!= DDI_SUCCESS) {
+	    ((intptr_t)arg + uskip), 3*sizeof (uint16_t), mode)
+	    != DDI_SUCCESS) {
 		return (I2C_FAILURE);
 		}
 
@@ -485,7 +485,7 @@ call_copyout(caddr_t arg, struct pcf8591_unit *unitp, int mode)
 	if (i2ctp->i2c_rlen - i2ctp->i2c_r_resid > 0) {
 
 	if (ddi_copyin((void *)arg, &i2ct,
-		sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
+	    sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
 		return (I2C_FAILURE);
 	}
 
@@ -495,7 +495,7 @@ call_copyout(caddr_t arg, struct pcf8591_unit *unitp, int mode)
 
 		i2c_actlen = i2ctp->i2c_rlen - i2ctp->i2c_r_resid;
 		if (ddi_copyout(i2ctp->i2c_rbuf, i2ct.i2c_rbuf,
-				i2c_actlen, mode) != DDI_SUCCESS) {
+		    i2c_actlen, mode) != DDI_SUCCESS) {
 				return (I2C_FAILURE);
 			}
 		}
@@ -528,7 +528,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	int channel = PCF8591_MINOR_TO_CHANNEL(minor);
 
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591_soft_statep, instance);
+	    ddi_get_soft_state(pcf8591_soft_statep, instance);
 
 	mutex_enter(&unitp->umutex);
 	while (unitp->pcf8591_flags == PCF8591_BUSY) {
@@ -550,7 +550,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		 */
 		pcf8591_read_chip(unitp, channel, 1);
 		if (ddi_copyout(unitp->i2c_tran->i2c_rbuf,
-			(caddr_t)arg, sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    (caddr_t)arg, sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
@@ -560,7 +560,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		uint8_t curr_mode = unitp->current_mode;
 
 		if (ddi_copyout((caddr_t)&curr_mode, (caddr_t)arg,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
@@ -569,12 +569,12 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	case ENVC_IOC_SETMODE: {
 		uint8_t curr_mode;
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&curr_mode,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 				err = EFAULT;
 				break;
 		}
 		if (curr_mode == ENVCTRL_DIAG_MODE ||
-			curr_mode == ENVCTRL_NORMAL_MODE) {
+		    curr_mode == ENVCTRL_NORMAL_MODE) {
 			unitp->current_mode = curr_mode; /* Don't do anything */
 		}
 		break;
@@ -587,7 +587,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 		if (nct_i2c_transfer(unitp->pcf8591_hdl, unitp->i2c_tran)
-			    != I2C_SUCCESS) {
+		    != I2C_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
@@ -618,21 +618,22 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		 */
 		tp->i2c_rlen = 2;
 		if (nct_i2c_transfer(unitp->pcf8591_hdl, unitp->i2c_tran)
-			    != I2C_SUCCESS) {
+		    != I2C_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
 #ifdef DEBUG
 		if (pcf8591_debug & 0x0010)
 			cmn_err(CE_NOTE,
-			"pcf8591_ioctl: i2c_rlen=%d; i2c_rbuf[0,1]=0x%x,0x%x\n",
-			tp->i2c_rlen, tp->i2c_rbuf[0], tp->i2c_rbuf[1]);
+			    "pcf8591_ioctl: i2c_rlen=%d; "
+			    "i2c_rbuf[0,1]=0x%x,0x%x\n",
+			    tp->i2c_rlen, tp->i2c_rbuf[0], tp->i2c_rbuf[1]);
 #endif /* DEBUG */
 		/*
 		 * Throw away the first byte according to PCF8591 datasheet
 		 */
 		if ((tp->i2c_rbuf[0] = translate_cputemp(tp->i2c_rbuf[1]))
-				== 0) {
+		    == 0) {
 			err = EINVAL;
 			break;
 		}
@@ -725,7 +726,7 @@ pcf8591_do_suspend(dev_info_t *dip)
 {
 	int instance = ddi_get_instance(dip);
 	struct pcf8591_unit *unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591_soft_statep, instance);
+	    ddi_get_soft_state(pcf8591_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -738,7 +739,7 @@ pcf8591_do_suspend(dev_info_t *dip)
 	mutex_enter(&unitp->umutex);
 	while (unitp->pcf8591_flags == PCF8591_BUSY) {
 		if (cv_wait_sig(&unitp->pcf8591_cv,
-			&unitp->umutex) <= 0) {
+		    &unitp->umutex) <= 0) {
 			mutex_exit(&unitp->umutex);
 
 			return (DDI_FAILURE);
@@ -755,7 +756,7 @@ pcf8591_do_resume(dev_info_t *dip)
 {
 	int instance = ddi_get_instance(dip);
 	struct pcf8591_unit *unitp = (struct pcf8591_unit *)
-			ddi_get_soft_state(pcf8591_soft_statep, instance);
+	    ddi_get_soft_state(pcf8591_soft_statep, instance);
 	if (unitp == NULL) {
 		return (ENXIO);
 	}
@@ -806,7 +807,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	unitp->current_mode = ENVCTRL_NORMAL_MODE; /* normal mode */
 
 	snprintf(unitp->pcf8591_name, PCF8591_NAMELEN,
-		"%s%d", ddi_driver_name(dip), instance);
+	    "%s%d", ddi_driver_name(dip), instance);
 
 	/*
 	 * Create a minor node corresponding to channel 0 to 3
@@ -819,7 +820,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	}
 	minor = PCF8591_MINOR_NUM(instance, i);
 	if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-		PCF8591_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    PCF8591_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
 			pcf8591_do_detach(dip);
 
@@ -830,7 +831,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	unitp->attach_flag |= PCF8591_MINORS_CREATED;
 
 	if (i2c_client_register(dip, &unitp->pcf8591_hdl)
-		!= I2C_SUCCESS) {
+	    != I2C_SUCCESS) {
 		pcf8591_do_detach(dip);
 
 		return (DDI_FAILURE);
@@ -843,7 +844,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	 * i2c transactions.
 	 */
 	if (i2c_transfer_alloc(unitp->pcf8591_hdl, &unitp->i2c_tran,
-		MAX_WLEN, MAX_RLEN, KM_SLEEP) != I2C_SUCCESS) {
+	    MAX_WLEN, MAX_RLEN, KM_SLEEP) != I2C_SUCCESS) {
 		pcf8591_do_detach(dip);
 
 		return (DDI_FAILURE);
@@ -947,9 +948,9 @@ static int
 pcf8591_add_kstats(struct pcf8591_unit *unitp)
 {
 	if ((unitp->tempksp = kstat_create(I2C_PCF8591_NAME,
-		unitp->instance, I2C_KSTAT_CPUTEMP, "misc",
-		KSTAT_TYPE_RAW, sizeof (unitp->temp_kstats),
-		KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
+	    unitp->instance, I2C_KSTAT_CPUTEMP, "misc",
+	    KSTAT_TYPE_RAW, sizeof (unitp->temp_kstats),
+	    KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
 
 		return (DDI_FAILURE);
 	}
@@ -962,7 +963,7 @@ pcf8591_add_kstats(struct pcf8591_unit *unitp)
 	unitp->tempksp->ks_private = (void *)unitp;
 
 	strcpy(unitp->temp_kstats.label,
-		unitp->props.channels_description[0]);
+	    unitp->props.channels_description[0]);
 	unitp->temp_kstats.type = ENVC_NETRACT_CPU_SENSOR;
 
 	kstat_install(unitp->tempksp);
@@ -991,7 +992,7 @@ pcf8591_temp_kstat_update(kstat_t *ksp, int rw)
 	mutex_enter(&unitp->umutex);
 	while (unitp->pcf8591_flags == PCF8591_BUSY) {
 		if (cv_wait_sig(&unitp->pcf8591_cv,
-			&unitp->umutex) <= 0) {
+		    &unitp->umutex) <= 0) {
 			mutex_exit(&unitp->umutex);
 
 			return (EINTR);
@@ -1015,7 +1016,7 @@ pcf8591_temp_kstat_update(kstat_t *ksp, int rw)
 		shutdown_temp = ((envctrl_temp_t *)kstatp)->shutdown_threshold;
 
 		if (shutdown_temp < SHUTDOWN_TEMP_MIN || shutdown_temp >
-							SHUTDOWN_TEMP_MAX) {
+		    SHUTDOWN_TEMP_MAX) {
 			err = EIO;
 			goto bail;
 		}
@@ -1033,9 +1034,9 @@ pcf8591_temp_kstat_update(kstat_t *ksp, int rw)
 
 		pcf8591_read_chip(unitp, channel, 1);
 		unitp->temp_kstats.value =
-			unitp->i2c_tran->i2c_rbuf[0];
+		    unitp->i2c_tran->i2c_rbuf[0];
 		bcopy((caddr_t)&unitp->temp_kstats, kstatp,
-			sizeof (unitp->temp_kstats));
+		    sizeof (unitp->temp_kstats));
 	}
 
 bail:
@@ -1063,7 +1064,7 @@ int size)
 	tp->i2c_rlen = size+1;
 	tp->i2c_wlen = 1;
 	tp->i2c_wbuf[0] = (unitp->pcf8591_inprog |
-		channel);
+	    channel);
 
 	retval = nct_i2c_transfer(unitp->pcf8591_hdl, tp);
 	if (retval == I2C_SUCCESS) {
@@ -1100,7 +1101,7 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 	 * cputemp.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"pcf8591_function", &function) != DDI_SUCCESS) {
+	    "pcf8591_function", &function) != DDI_SUCCESS) {
 		dbg_print(CE_WARN, "Couldn't find pcf8591_function property");
 
 		return (DDI_FAILURE);
@@ -1116,7 +1117,7 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 	ddi_prop_free(function);
 
 	retval = ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"name", &unitp->props.name);
+	    "name", &unitp->props.name);
 	if (retval != DDI_PROP_SUCCESS) {
 
 		return (retval);
@@ -1124,13 +1125,13 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 #ifdef DEBUG
 	else if (pcf8591_debug & 0x02)
 		cmn_err(CE_NOTE,
-			"pcf8591_read_props:ddi_prop_lookup_string(%s): \
+		    "pcf8591_read_props:ddi_prop_lookup_string(%s): \
 			found  %s ", "name", unitp->props.name);
 #endif /* DEBUG */
 
 	retval = ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
-		    "reg", (caddr_t)&prop_value, &prop_len);
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
+	    "reg", (caddr_t)&prop_value, &prop_len);
 	if (retval == DDI_PROP_SUCCESS) {
 		unitp->props.i2c_bus		= (uint16_t)prop_value[0];
 		unitp->props.slave_address	= (uint16_t)prop_value[1];
@@ -1138,29 +1139,29 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 #ifdef DEBUG
 		if (pcf8591_debug & 0x02)
 			cmn_err(CE_NOTE,
-				"pcf8591:ddi_getlongprop(%s) returns %d,"
-				" i2c_bus,slave=0x%x,0x%x",
-					"reg", retval,  unitp->props.i2c_bus,
-					unitp->props.slave_address);
+			    "pcf8591:ddi_getlongprop(%s) returns %d,"
+			    " i2c_bus,slave=0x%x,0x%x",
+			    "reg", retval,  unitp->props.i2c_bus,
+			    unitp->props.slave_address);
 #endif /* DEBUG */
 	} else {
 		unitp->props.i2c_bus		= (uint16_t)-1;
 		unitp->props.slave_address	= (uint16_t)-1;
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-			"pcf8591_read_props:ddi_getlongprop(%s) returns %d,"
-			" default it to 0x%x:0x%X",
-				"reg", retval,  unitp->props.i2c_bus,
-				unitp->props.slave_address);
+		    "pcf8591_read_props:ddi_getlongprop(%s) returns %d,"
+		    " default it to 0x%x:0x%X",
+		    "reg", retval,  unitp->props.i2c_bus,
+		    unitp->props.slave_address);
 #endif /* DEBUG */
 	}
 	ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-					"channels-in-use", &prop_len);
+	    "channels-in-use", &prop_len);
 	retval = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY,
-				dip, DDI_PROP_DONTPASS,
-				"channels-in-use",
-				(uchar_t **)&unitp->props.channels_in_use,
-				&unitp->props.num_chans_used);
+	    dip, DDI_PROP_DONTPASS,
+	    "channels-in-use",
+	    (uchar_t **)&unitp->props.channels_in_use,
+	    &unitp->props.num_chans_used);
 	if (retval == DDI_PROP_SUCCESS) {
 		unitp->props.num_chans_used /= sizeof (pcf8591_channel_t);
 	} else {
@@ -1170,17 +1171,17 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 #ifdef DEBUG
 	if (pcf8591_debug & 0x0002)
 		cmn_err(CE_NOTE,
-			"pcf8591_read_props:ddi_prop_lookup_byte_array(%s)"
-			"returns %d\n"
-			"\t\tlength=%d, #elements=%d",
-			"channels-in-use", retval,
-			prop_len, unitp->props.num_chans_used);
+		    "pcf8591_read_props:ddi_prop_lookup_byte_array(%s)"
+		    "returns %d\n"
+		    "\t\tlength=%d, #elements=%d",
+		    "channels-in-use", retval,
+		    prop_len, unitp->props.num_chans_used);
 #endif /* DEBUG */
 
 	retval = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "channels-description",
-		(char ***)&unitp->props.channels_description,
-		(uint_t *)&prop_len);
+	    DDI_PROP_DONTPASS, "channels-description",
+	    (char ***)&unitp->props.channels_description,
+	    (uint_t *)&prop_len);
 
 	if (retval != DDI_PROP_SUCCESS) {
 		prop_len = 0;
@@ -1190,12 +1191,12 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 #ifdef DEBUG
 	if (pcf8591_debug & 0x0002) {
 		cmn_err(CE_NOTE,
-			"pcf8591_read_props:ddi_prop_lookup_string_array(%s)"
-			"returns %d, length=%d",
-			"channels-description", retval, prop_len);
+		    "pcf8591_read_props:ddi_prop_lookup_string_array(%s)"
+		    "returns %d, length=%d",
+		    "channels-description", retval, prop_len);
 		for (i = 0; i < prop_len; ++i) {
 			cmn_err(CE_NOTE, "channels-description[%d]=<%s>",
-				i, unitp->props.channels_description[i]);
+			    i, unitp->props.channels_description[i]);
 		}
 	}
 #endif /* DEBUG */
@@ -1205,12 +1206,12 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 	 * I haven't yet investigated why the copy target is index + 2
 	 */
 	retval = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "tables", &creg_prop, (uint_t *)&prop_len);
+	    DDI_PROP_DONTPASS, "tables", &creg_prop, (uint_t *)&prop_len);
 
 	if (retval != DDI_PROP_SUCCESS) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "%s%d: Unable to read pcf8591 tables property",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 #endif /* DEBUG */
 
 		return (DDI_NOT_WELL_FORMED);
@@ -1225,7 +1226,7 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 #ifdef DEBUG
 	if (pcf8591_debug & 0x0002)
 		cmn_err(CE_NOTE, "pcf8591_read_props: _cpu_temps size=%d; "
-			"tables prop_len=%d\n", tblsz, prop_len);
+		    "tables prop_len=%d\n", tblsz, prop_len);
 #endif /* DEBUG */
 
 	ddi_prop_free(creg_prop);
@@ -1234,10 +1235,10 @@ pcf8591_read_props(struct pcf8591_unit *unitp)
 	 * Read shutdown temp and warning temp properties.
 	 */
 	warning_temp = (int)ddi_getprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "warning-temp", PCF8591_WARNING_TEMP);
+	    DDI_PROP_DONTPASS, "warning-temp", PCF8591_WARNING_TEMP);
 
 	shutdown_temp = (int)ddi_getprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "shutdown-temp", PCF8591_SHUTDOWN_TEMP);
+	    DDI_PROP_DONTPASS, "shutdown-temp", PCF8591_SHUTDOWN_TEMP);
 
 	/*
 	 * Fill up the warning and shutdown temp values in kstat structure.

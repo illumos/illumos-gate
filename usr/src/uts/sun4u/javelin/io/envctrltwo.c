@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ENVCTRLTWO_ Environment Monitoring driver for i2c on Javelin
@@ -210,22 +209,23 @@ static struct cb_ops envctrl_cb_ops = {
 struct dev_ops  envctrltwo_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* devo_refcnt */
-	envctrl_getinfo,		/* devo_getinfo */
+	envctrl_getinfo,	/* devo_getinfo */
 	nulldev,		/* devo_identify */
 	nulldev,		/* devo_probe */
 	envctrl_attach,		/* devo_attach */
 	envctrl_detach,		/* devo_detach */
 	nodev,			/* devo_reset */
-	&envctrl_cb_ops,		/* devo_cb_ops */
+	&envctrl_cb_ops,	/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv envctrlmodldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"I2C ENVCTRLTWO_driver: %I%",
+	"I2C ENVCTRLTWO_driver",
 	&envctrltwo_ops,
 };
 
@@ -242,7 +242,7 @@ _init(void)
 
 	if ((error = mod_install(&envctrlmodlinkage)) == 0) {
 		(void) ddi_soft_state_init(&envctrlsoft_statep,
-			sizeof (struct envctrlunit), 1);
+		    sizeof (struct envctrlunit), 1);
 	}
 
 	return (error);
@@ -317,28 +317,28 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	overtemp_timeout_hz = drv_usectohz(ENVCTRL_UE250_OVERTEMP_TIMEOUT_USEC);
 	blink_timeout_hz = drv_usectohz(ENVCTRL_UE250_BLINK_TIMEOUT_USEC);
 	pshotplug_timeout_hz =
-		drv_usectohz(ENVCTRL_UE250_BLINK_TIMEOUT_USEC * 2);
+	    drv_usectohz(ENVCTRL_UE250_BLINK_TIMEOUT_USEC * 2);
 	/*
 	 * On a cooling failure, either a fan failure or temperature
 	 * exceeding a WARNING level, the temperature poll thread
 	 * will run every 6 seconds.
 	 */
 	warning_timeout_hz =
-		drv_usectohz(ENVCTRL_UE250_OVERTEMP_TIMEOUT_USEC / 6);
+	    drv_usectohz(ENVCTRL_UE250_OVERTEMP_TIMEOUT_USEC / 6);
 
 	if (ddi_soft_state_zalloc(envctrlsoft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d: failed to zalloc softstate\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		goto failed;
 	}
 
 	unitp = ddi_get_soft_state(envctrlsoft_statep, instance);
 
 	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&unitp->bus_ctl_regs, 0,
-			sizeof (struct ehc_pcd8584_regs), &attr,
-			&unitp->ctlr_handle) != DDI_SUCCESS) {
+	    sizeof (struct ehc_pcd8584_regs), &attr,
+	    &unitp->ctlr_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: failed to map in bus_control regs\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -356,28 +356,28 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* add interrupts */
 
 	if (ddi_get_iblock_cookie(dip, 1,
-			&unitp->ic_trap_cookie) != DDI_SUCCESS)  {
+	    &unitp->ic_trap_cookie) != DDI_SUCCESS)  {
 		cmn_err(CE_WARN, "%s%d: ddi_get_iblock_cookie FAILED \n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		goto failed;
 	}
 
 	mutex_init(&unitp->umutex, NULL, MUTEX_DRIVER,
-		(void *)unitp->ic_trap_cookie);
+	    (void *)unitp->ic_trap_cookie);
 
 
 	if (ddi_add_intr(dip, 0, &unitp->ic_trap_cookie, NULL, envctrl_bus_isr,
-			(caddr_t)unitp) != DDI_SUCCESS) {
+	    (caddr_t)unitp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: failed to add hard intr \n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		goto remlock;
 	}
 
 
 	if (ddi_add_intr(dip, 1, &unitp->ic_trap_cookie, NULL, envctrl_dev_isr,
-			(caddr_t)unitp) != DDI_SUCCESS) {
+	    (caddr_t)unitp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: failed to add hard intr \n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		goto remhardintr;
 	}
 
@@ -406,7 +406,7 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	envctrl_probe_cpus(unitp);
 	if ((unitp->cpu_pr_location[ENVCTRL_CPU0] == B_FALSE) ||
-		(unitp->cpu_pr_location[ENVCTRL_CPU1] == B_FALSE))
+	    (unitp->cpu_pr_location[ENVCTRL_CPU1] == B_FALSE))
 		/* Only one CPU in the system */
 		unitp->num_temps_present = 5;
 	else
@@ -419,8 +419,8 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "cpu-temp-factors", &creg_prop, &len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
-			"%s%d: Unable to read cpu-temp-factors property",
-			ddi_get_name(dip), instance);
+		    "%s%d: Unable to read cpu-temp-factors property",
+		    ddi_get_name(dip), instance);
 		return (DDI_NOT_WELL_FORMED);
 	}
 	tblsz = (sizeof (_cpu_temps) / sizeof (uchar_t));
@@ -437,8 +437,8 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "cpu-fan-speeds", &creg_prop, &len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
-			"%s%d: Unable to read cpu-fan-speeds property",
-			ddi_get_name(dip), instance);
+		    "%s%d: Unable to read cpu-fan-speeds property",
+		    ddi_get_name(dip), instance);
 		return (DDI_NOT_WELL_FORMED);
 	}
 	tblsz = (sizeof (_cpu_fan_speeds) / sizeof (uchar_t));
@@ -455,8 +455,8 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "thermisters", &creg_prop, &len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
-			"%s%d: Unable to read thermisters property",
-			ddi_get_name(dip), instance);
+		    "%s%d: Unable to read thermisters property",
+		    ddi_get_name(dip), instance);
 		return (DDI_NOT_WELL_FORMED);
 	}
 
@@ -468,42 +468,43 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		unitp->temp_kstats[k].type = sensor_types[i];
 		/* Address */
 		t_addr[k] = creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		/* Port */
 		t_port[k] = creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		/* Min */
 		unitp->temp_kstats[k].min =
-			creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j] << 24 | creg_prop[j+1] << 16 |
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		/* Warning threshold */
 		unitp->temp_kstats[k].warning_threshold =
-			creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j] << 24 | creg_prop[j+1] << 16 |
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		/* Shutdown threshold */
 		unitp->temp_kstats[k].shutdown_threshold =
-			creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j] << 24 | creg_prop[j+1] << 16 |
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		/* Numerator of scale factor */
 		t_scale_num[k] = creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		/* Denominator of scale factor */
 		t_scale_den[k] = creg_prop[j] << 24 | creg_prop[j+1] << 16 |
-			creg_prop[j+2] << 8 | creg_prop[j+3];
+		    creg_prop[j+2] << 8 | creg_prop[j+3];
 		j += 4;
 		bcopy((caddr_t)&creg_prop[j], unitp->temp_kstats[k].label,
-			(size_t)sizeof (&creg_prop[j]));
+		    (size_t)sizeof (&creg_prop[j]));
 		while (creg_prop[j] != '\0') j++;
 		j++;
 		if (t_addr[k] == ENVCTRL_UE250_CPU_TEMP_DEV) {
 			if (((t_port[k] == ENVCTRL_UE250_CPU0_PORT) &&
-			(unitp->cpu_pr_location[ENVCTRL_CPU0] == B_FALSE)) ||
+			    (unitp->cpu_pr_location[ENVCTRL_CPU0] ==
+			    B_FALSE)) ||
 			    ((t_port[k] == ENVCTRL_UE250_CPU1_PORT) &&
 			    (unitp->cpu_pr_location[ENVCTRL_CPU1] == B_FALSE)))
 				/* Don't increment the kstat line count */
@@ -546,10 +547,10 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	fanspeed = 0x0;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8591, EHC_DEV2, 0,
-			&fanspeed, 1);
+	    &fanspeed, 1);
 	if (status == DDI_FAILURE)
 		cmn_err(CE_WARN, "%s%d: Write to PCF8591 (SETFAN) failed\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 
 	/*
 	 * we need to init the fan kstats before the tempr_poll
@@ -658,11 +659,11 @@ envctrl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	case DDI_SUSPEND:
 		if (!(unitp = ddi_get_soft_state(envctrlsoft_statep, instance)))
-		    return (DDI_FAILURE);
+			return (DDI_FAILURE);
 		mutex_enter(&unitp->umutex);
 		if (unitp->suspended) {
 			cmn_err(CE_WARN, "%s%d: envctrltwo already suspended\n",
-				ddi_get_name(dip), instance);
+			    ddi_get_name(dip), instance);
 			mutex_exit(&unitp->umutex);
 			return (DDI_FAILURE);
 		}
@@ -672,7 +673,7 @@ envctrl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	default:
 		cmn_err(CE_WARN, "%s%d: suspend general fault\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -696,8 +697,8 @@ envctrl_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 	switch (infocmd) {
 		case DDI_INFO_DEVT2DEVINFO:
 			if ((unitp = (struct envctrlunit *)
-				ddi_get_soft_state(envctrlsoft_statep,
-				    instance)) != NULL) {
+			    ddi_get_soft_state(envctrlsoft_statep,
+			    instance)) != NULL) {
 				*result = unitp->dip;
 				ret = DDI_SUCCESS;
 			} else {
@@ -729,7 +730,7 @@ envctrl_open(dev_t *dev, int flag, int otyp, cred_t *cred_p)
 	if (instance < 0)
 		return (ENXIO);
 	unitp = (struct envctrlunit *)
-		    ddi_get_soft_state(envctrlsoft_statep, instance);
+	    ddi_get_soft_state(envctrlsoft_statep, instance);
 
 	if (unitp == NULL)
 		return (ENXIO);
@@ -763,7 +764,7 @@ envctrl_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	if (instance < 0)
 		return (ENXIO);
 	unitp = (struct envctrlunit *)
-		ddi_get_soft_state(envctrlsoft_statep, instance);
+	    ddi_get_soft_state(envctrlsoft_statep, instance);
 	if (unitp == NULL)
 		return (ENXIO);
 
@@ -798,7 +799,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 #endif
 	instance = getminor(dev);
 	unitp = (struct envctrlunit *)
-		    ddi_get_soft_state(envctrlsoft_statep, instance);
+	    ddi_get_soft_state(envctrlsoft_statep, instance);
 
 	if ((cmd == ENVCTRL_IOC_SETFAN2) ||
 	    (cmd == ENVCTRL_IOC_GETFAN2) ||
@@ -817,12 +818,12 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	case ENVCTRL_IOC_SETMODE:
 		/* Set mode */
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&wdval, sizeof (uint8_t),
-			flag)) {
+		    flag)) {
 			rval = EFAULT;
 			break;
 		}
 		if (wdval == ENVCTRL_DIAG_MODE ||
-			wdval == ENVCTRL_NORMAL_MODE) {
+		    wdval == ENVCTRL_NORMAL_MODE) {
 			mutex_enter(&unitp->umutex);
 			unitp->current_mode = wdval;
 			if (unitp->timeout_id != 0 &&
@@ -838,12 +839,13 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 				 */
 				tempr = 0x0;
 				status = envctrl_write_chip(unitp,
-					ENVCTRL_PCF8591, EHC_DEV2, 0,
-					&tempr, 1);
+				    ENVCTRL_PCF8591, EHC_DEV2, 0,
+				    &tempr, 1);
 				if (status == DDI_FAILURE)
-				cmn_err(CE_WARN,
-				"%s%d: Write to PCF8591 (SETMODE) failed\n",
-				driver_name, unitp->instance);
+					cmn_err(CE_WARN,
+					    "%s%d: Write to PCF8591 "
+					    "(SETMODE) failed\n",
+					    driver_name, unitp->instance);
 
 				/*
 				 * This delay allows the fans to time to
@@ -863,7 +865,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	case ENVCTRL_IOC_GETMODE:
 		wdval = unitp->current_mode;
 		if (ddi_copyout((caddr_t)&wdval, (caddr_t)arg,
-			sizeof (uint8_t), flag)) {
+		    sizeof (uint8_t), flag)) {
 			rval = EFAULT;
 		}
 		break;
@@ -891,19 +893,19 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			break;
 		}
 		if (((temp.chip_num != ENVCTRL_DEV2) &&
-			(temp.chip_num != ENVCTRL_DEV7)) ||
-			(temp.index > EHC_PCF8591_CH_3)) {
+		    (temp.chip_num != ENVCTRL_DEV7)) ||
+		    (temp.index > EHC_PCF8591_CH_3)) {
 			rval = EINVAL;
 			break;
 		}
 		mutex_enter(&unitp->umutex);
 		status = envctrl_read_chip(unitp, ENVCTRL_PCF8591,
-			temp.chip_num, temp.index, &temp.val, 1);
+		    temp.chip_num, temp.index, &temp.val, 1);
 		mutex_exit(&unitp->umutex);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-				"%s%d: Read from PCF8591 (IOC_GETTEMP) failed",
-				driver_name, unitp->instance);
+			    "%s%d: Read from PCF8591 (IOC_GETTEMP) failed",
+			    driver_name, unitp->instance);
 			rval = EINVAL;
 			break;
 		}
@@ -927,8 +929,8 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 				break;
 			}
 			if ((fanspeed.type != ENVCTRL_PCF8591) ||
-				(fanspeed.chip_num != ENVCTRL_DEV2) ||
-				(fanspeed.index > EHC_PCF8591_CH_3)) {
+			    (fanspeed.chip_num != ENVCTRL_DEV2) ||
+			    (fanspeed.index > EHC_PCF8591_CH_3)) {
 				rval = EINVAL;
 				break;
 			}
@@ -936,8 +938,9 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			status = envctrl_set_fanspeed(unitp, &fanspeed);
 			if (status == DDI_FAILURE) {
 				cmn_err(CE_WARN,
-				"%s%d: Write to PCF8591 (IOC_SETFAN) failed",
-				driver_name, unitp->instance);
+				    "%s%d: Write to PCF8591 "
+				    "(IOC_SETFAN) failed",
+				    driver_name, unitp->instance);
 				rval = EINVAL;
 			}
 			mutex_exit(&unitp->umutex);
@@ -952,20 +955,20 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			break;
 		}
 		if ((a_fanspeed.type != ENVCTRL_PCF8591) ||
-			(a_fanspeed.chip_num != ENVCTRL_DEV2) ||
-			(a_fanspeed.index != EHC_PCF8591_CH_1)) {
+		    (a_fanspeed.chip_num != ENVCTRL_DEV2) ||
+		    (a_fanspeed.index != EHC_PCF8591_CH_1)) {
 			rval = EINVAL;
 			break;
 		}
 		mutex_enter(&unitp->umutex);
 		status = envctrl_read_chip(unitp, ENVCTRL_PCF8591,
-			a_fanspeed.chip_num, a_fanspeed.index,
-			&a_fanspeed.val, 1);
+		    a_fanspeed.chip_num, a_fanspeed.index,
+		    &a_fanspeed.val, 1);
 		mutex_exit(&unitp->umutex);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-			"%s%d: Read of PCF8591 (IOC_GETFAN) failed",
-			driver_name, unitp->instance);
+			    "%s%d: Read of PCF8591 (IOC_GETFAN) failed",
+			    driver_name, unitp->instance);
 			rval = EINVAL;
 			break;
 		}
@@ -976,7 +979,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		 * to more closely match the set value.
 		 */
 		if ((tfanspeed = ((int)a_fanspeed.val * JAV_FAN_SPEED_SF_NUM) /
-				JAV_FAN_SPEED_SF_DEN) > 255)
+		    JAV_FAN_SPEED_SF_DEN) > 255)
 			a_fanspeed.val = 255;
 		else
 			a_fanspeed.val = tfanspeed & 0xFF;
@@ -993,7 +996,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			break;
 		}
 		if ((envcchip.type != ENVCTRL_PCF8574A) ||
-			(envcchip.chip_num != ENVCTRL_DEV6)) {
+		    (envcchip.chip_num != ENVCTRL_DEV6)) {
 			rval = EINVAL;
 			break;
 		}
@@ -1019,8 +1022,8 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		mutex_exit(&unitp->umutex);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-				"%s%d: Read of PCF8574A (IOC_SETFSP) failed",
-				driver_name, unitp->instance);
+			    "%s%d: Read of PCF8574A (IOC_SETFSP) failed",
+			    driver_name, unitp->instance);
 			rval = EINVAL;
 		}
 		break;
@@ -1031,7 +1034,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			break;
 		}
 		if ((envcchip.type != ENVCTRL_PCF8574A) ||
-			(envcchip.chip_num != ENVCTRL_DEV6)) {
+		    (envcchip.chip_num != ENVCTRL_DEV6)) {
 			rval = EINVAL;
 			break;
 		}
@@ -1040,8 +1043,8 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		mutex_exit(&unitp->umutex);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-				"%s%d: Read of PCF8574A (IOC_GETFSP) failed",
-				driver_name, unitp->instance);
+			    "%s%d: Read of PCF8574A (IOC_GETFSP) failed",
+			    driver_name, unitp->instance);
 			rval = EINVAL;
 		} else {
 			envcchip.val = wdval;
@@ -1058,7 +1061,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			break;
 		}
 		if ((ledchip.type != ENVCTRL_PCF8574A) ||
-			(ledchip.chip_num != ENVCTRL_DEV7)) {
+		    (ledchip.chip_num != ENVCTRL_DEV7)) {
 			rval = EINVAL;
 			break;
 		}
@@ -1075,7 +1078,7 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			break;
 		}
 		if ((ledchip.type != ENVCTRL_PCF8574A) ||
-			(ledchip.chip_num != ENVCTRL_DEV7)) {
+		    (ledchip.chip_num != ENVCTRL_DEV7)) {
 			rval = EINVAL;
 			break;
 		}
@@ -1102,11 +1105,11 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		}
 		mutex_enter(&unitp->umutex);
 		status = envctrl_write_chip(unitp, temp.type, temp.chip_num,
-			temp.index, &temp.val, 1);
+		    temp.index, &temp.val, 1);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-				"%s%d: Write to chip (IOC_SETRAW) failed",
-				driver_name, unitp->instance);
+			    "%s%d: Write to chip (IOC_SETRAW) failed",
+			    driver_name, unitp->instance);
 			rval = EINVAL;
 		}
 		mutex_exit(&unitp->umutex);
@@ -1119,11 +1122,11 @@ envctrl_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		}
 		mutex_enter(&unitp->umutex);
 		status = envctrl_read_chip(unitp, temp.type, temp.chip_num,
-			temp.index, &temp.val, 1);
+		    temp.index, &temp.val, 1);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN,
-				"%s%d: Read of chip (IOC_GETRAW) failed",
-				driver_name, unitp->instance);
+			    "%s%d: Read of chip (IOC_GETRAW) failed",
+			    driver_name, unitp->instance);
 			rval = EINVAL;
 		}
 		mutex_exit(&unitp->umutex);
@@ -1193,8 +1196,8 @@ envctrl_dev_isr(caddr_t arg)
 
 	do {
 		status = ehc_read_pcf8574a((struct ehc_envcunit *)unitp,
-			ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
-			&recv_data, 1);
+		    ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
+		    &recv_data, 1);
 
 		/*
 		 * This extra read is needed since the first read is discarded
@@ -1202,8 +1205,8 @@ envctrl_dev_isr(caddr_t arg)
 		 */
 		if (recv_data == 0xFF) {
 			status = ehc_read_pcf8574a((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
-				&recv_data, 1);
+			    ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
+			    &recv_data, 1);
 		}
 
 		/*
@@ -1218,8 +1221,8 @@ envctrl_dev_isr(caddr_t arg)
 				retrys++;
 			} else {
 				cmn_err(CE_WARN,
-					"%s%d: Read of PCF8574A (INT) failed\n",
-					driver_name, unitp->instance);
+				    "%s%d: Read of PCF8574A (INT) failed\n",
+				    driver_name, unitp->instance);
 				ehc_init_pcf8584((struct ehc_envcunit *)unitp);
 				mutex_exit(&unitp->umutex);
 				ic = DDI_INTR_CLAIMED;
@@ -1295,8 +1298,8 @@ envctrl_dev_isr(caddr_t arg)
 	if ((recv_data == 0xFF)) {
 		if (spurious_intr_count == 255)
 			cmn_err(CE_WARN,
-				"%s%d: Received 256 spurious interrupts\n",
-					driver_name, unitp->instance);
+			    "%s%d: Received 256 spurious interrupts\n",
+			    driver_name, unitp->instance);
 		spurious_intr_count++;
 		ic = DDI_INTR_CLAIMED;
 	} else
@@ -1324,16 +1327,16 @@ envctrl_read_chip(struct envctrlunit *unitp, int type, int chip_num, int port,
 	do {
 		if (type == ENVCTRL_PCF8574A) {
 			status = ehc_read_pcf8574a((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8574A_BASE_ADDR | chip_num,
-				data, num);
+			    ENVCTRL_UE250_PCF8574A_BASE_ADDR | chip_num,
+			    data, num);
 		} else if (type == ENVCTRL_PCF8574) {
 			status = ehc_read_pcf8574((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8574_BASE_ADDR | chip_num,
-				data, num);
+			    ENVCTRL_UE250_PCF8574_BASE_ADDR | chip_num,
+			    data, num);
 		} else if (type == ENVCTRL_PCF8591) {
 			status = ehc_read_pcf8591((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8591_BASE_ADDR | chip_num,
-				port, autoincr, 0, 1, data, num);
+			    ENVCTRL_UE250_PCF8591_BASE_ADDR | chip_num,
+			    port, autoincr, 0, 1, data, num);
 		}
 		/*
 		 * If the bus hangs, attempt a recovery
@@ -1373,17 +1376,17 @@ envctrl_write_chip(struct envctrlunit *unitp, int type, int chip_num, int port,
 	do {
 		if (type == ENVCTRL_PCF8574A) {
 			status = ehc_write_pcf8574a(
-				(struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8574A_BASE_ADDR | chip_num,
-				data, num);
+			    (struct ehc_envcunit *)unitp,
+			    ENVCTRL_UE250_PCF8574A_BASE_ADDR | chip_num,
+			    data, num);
 		} else if (type == ENVCTRL_PCF8574) {
 			status = ehc_write_pcf8574((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8574_BASE_ADDR | chip_num,
-				data, num);
+			    ENVCTRL_UE250_PCF8574_BASE_ADDR | chip_num,
+			    data, num);
 		} else if (type == ENVCTRL_PCF8591) {
 			status = ehc_write_pcf8591((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8591_BASE_ADDR | chip_num,
-				port, autoincr, 0, 1, data, num);
+			    ENVCTRL_UE250_PCF8591_BASE_ADDR | chip_num,
+			    port, autoincr, 0, 1, data, num);
 		}
 
 		/*
@@ -1421,10 +1424,10 @@ envctrl_get_cpu_temp(struct envctrlunit *unitp, int cpunum)
 	 */
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8591, EHC_DEV7, cpunum,
-			&recv_data, 1);
+	    &recv_data, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: CPU TEMP read failed\n",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (ENVCTRL_UE250_MAX_CPU_TEMP - 10);
 	}
 
@@ -1461,7 +1464,7 @@ envctrl_tempr_poll(void *arg)
 		if (envctrl_debug_flags) {
 			cmn_err(CE_WARN, "%s%d: "
 			    "Tempr poll went off while in DIAG MODE\n",
-				driver_name, unitp->instance);
+			    driver_name, unitp->instance);
 		}
 	}
 	unitp->current_mode = ENVCTRL_NORMAL_MODE;
@@ -1469,8 +1472,8 @@ envctrl_tempr_poll(void *arg)
 	status = envctrl_check_sys_temperatures(unitp);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN,
-			"%s%d: Failure detected during temperature poll",
-			driver_name, unitp->instance);
+		    "%s%d: Failure detected during temperature poll",
+		    driver_name, unitp->instance);
 	}
 
 	if (diag_flag == 0) {
@@ -1489,14 +1492,14 @@ envctrl_tempr_poll(void *arg)
 		if (unitp->timeout_id != 0)
 			(void) untimeout(unitp->timeout_id);
 		unitp->timeout_id = (timeout(envctrl_tempr_poll,
-			(caddr_t)unitp, warning_timeout_hz));
+		    (caddr_t)unitp, warning_timeout_hz));
 	} else {
 		/*
 		 * No thermal warning or fan failure condition exists.
 		 * This thread is set to run every 60 seconds.
 		 */
 		unitp->timeout_id = (timeout(envctrl_tempr_poll,
-			(caddr_t)unitp, overtemp_timeout_hz));
+		    (caddr_t)unitp, overtemp_timeout_hz));
 	}
 
 	mutex_exit(&unitp->umutex);
@@ -1512,13 +1515,13 @@ envctrl_led_blink(void *arg)
 	mutex_enter(&unitp->umutex);
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV6,
-		0, &val, 1);
+	    0, &val, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Failed to read FSP LEDs",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		/* now have this thread sleep for a while */
 		unitp->blink_timeout_id = (timeout(envctrl_led_blink,
-			(caddr_t)unitp, blink_timeout_hz));
+		    (caddr_t)unitp, blink_timeout_hz));
 		mutex_exit(&unitp->umutex);
 		return;
 	}
@@ -1556,13 +1559,13 @@ envctrl_led_blink(void *arg)
 	val = ~tmpval;
 
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV6,
-		0, &val, 1);
+	    0, &val, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Failed to blink activity LED",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		/* now have this thread sleep for a while */
 		unitp->blink_timeout_id = (timeout(envctrl_led_blink,
-			(caddr_t)unitp, blink_timeout_hz));
+		    (caddr_t)unitp, blink_timeout_hz));
 		mutex_exit(&unitp->umutex);
 		return;
 	}
@@ -1584,15 +1587,15 @@ envctrl_check_sys_temperatures(struct envctrlunit *unitp)
 
 retrytemp1:
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8591, EHC_DEV2,
-		0, buf, 4);
+	    0, buf, 4);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Temperature read failed (PDB)",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (status);
 	}
 
 	warning_level = envctrl_check_tempr_levels(unitp, EHC_DEV2,
-				buf, warning_count);
+	    buf, warning_count);
 	level = warning_level;
 
 	if (warning_level != green) {
@@ -1613,15 +1616,15 @@ retrytemp1:
 	warning_count = 0;
 retrytemp2:
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8591, EHC_DEV7,
-		0, buf+4, 4);
+	    0, buf+4, 4);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Temperature read failed (MBD)",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (status);
 	}
 
 	warning_level = envctrl_check_tempr_levels(unitp, EHC_DEV7,
-				buf+4, warning_count);
+	    buf+4, warning_count);
 
 	if (warning_level != green) {
 		if (warning_count == 0) {
@@ -1650,27 +1653,27 @@ retrytemp2:
 	status = envctrl_get_fpm_status(unitp, &fspval);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN,
-			"%s%d: Read of Front Status Panel LEDs failed",
-			driver_name, unitp->instance);
+		    "%s%d: Read of Front Status Panel LEDs failed",
+		    driver_name, unitp->instance);
 	}
 
 	if ((unitp->tempr_warning == B_TRUE) || (unitp->shutdown == B_TRUE))
 		fspval |= (ENVCTRL_UE250_FSP_TEMP_ERR |
-				ENVCTRL_UE250_FSP_GEN_ERR);
+		    ENVCTRL_UE250_FSP_GEN_ERR);
 	else {
 		if (envctrl_isother_fault_led(unitp, fspval,
-			ENVCTRL_UE250_FSP_TEMP_ERR)) {
+		    ENVCTRL_UE250_FSP_TEMP_ERR)) {
 			fspval &= ~(ENVCTRL_UE250_FSP_TEMP_ERR);
 		} else {
 			fspval &= ~(ENVCTRL_UE250_FSP_TEMP_ERR |
-					ENVCTRL_UE250_FSP_GEN_ERR);
+			    ENVCTRL_UE250_FSP_GEN_ERR);
 		}
 	}
 	status = envctrl_set_fsp(unitp, &fspval);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN,
-			"%s%d: Setting of Front Status Panel LEDs failed",
-			driver_name, unitp->instance);
+		    "%s%d: Setting of Front Status Panel LEDs failed",
+		    driver_name, unitp->instance);
 	}
 
 	/*
@@ -1680,7 +1683,7 @@ retrytemp2:
 		if (unitp->timeout_id != 0) {
 			(void) untimeout(unitp->timeout_id);
 			unitp->timeout_id = (timeout(envctrl_tempr_poll,
-			(caddr_t)unitp, warning_timeout_hz));
+			    (caddr_t)unitp, warning_timeout_hz));
 		}
 	}
 
@@ -1703,32 +1706,32 @@ envctrl_check_tempr_levels(struct envctrlunit *unitp, int chip_num,
 		if (chip_num == EHC_DEV2) {
 			if (i == 1) {
 				tval = ((int)data[i] * JAV_FAN_SPEED_SF_NUM) /
-					JAV_FAN_SPEED_SF_DEN;
+				    JAV_FAN_SPEED_SF_DEN;
 				if (tval > 255)
 					unitp->fan_kstats.fanspeed = 255;
 				else
 					unitp->fan_kstats.fanspeed = tval;
 				DPRINTF1("device %X, fan = %d %d\n", chip_num,
-					unitp->fan_kstats.fanspeed, data[i]);
+				    unitp->fan_kstats.fanspeed, data[i]);
 				continue;
 			} else if (i == 2)
 				continue;
 		}
 		if ((chip_num == EHC_DEV7) && ((i == ENVCTRL_UE250_CPU0_PORT) ||
-			(i == ENVCTRL_UE250_CPU1_PORT)))
+		    (i == ENVCTRL_UE250_CPU1_PORT)))
 			if (unitp->cpu_pr_location[i] == B_FALSE)
 				continue;
 
 		j = 0;
 		while ((((t_addr[j] & 0xF) != chip_num) || (t_port[j] != i)) &&
-				(j < unitp->num_temps_present))
+		    (j < unitp->num_temps_present))
 			j++;
 		if ((chip_num == EHC_DEV7) && ((i == ENVCTRL_UE250_CPU0_PORT) ||
-			(i == ENVCTRL_UE250_CPU1_PORT)))
+		    (i == ENVCTRL_UE250_CPU1_PORT)))
 			temp_degree_c = _cpu_temps[data[i]];
 		else
 			temp_degree_c = ((int)data[i] * t_scale_num[j]) /
-				t_scale_den[j];
+			    t_scale_den[j];
 
 		/*
 		 * Javelin hardware will not control fan speeds based on
@@ -1740,29 +1743,31 @@ envctrl_check_tempr_levels(struct envctrlunit *unitp, int chip_num,
 		 * if cpu temperatures rise.
 		 */
 		if ((chip_num == EHC_DEV7) && ((i == ENVCTRL_UE250_CPU0_PORT) ||
-			(i == ENVCTRL_UE250_CPU1_PORT)) &&
-			(unitp->current_mode == ENVCTRL_NORMAL_MODE)) {
+		    (i == ENVCTRL_UE250_CPU1_PORT)) &&
+		    (unitp->current_mode == ENVCTRL_NORMAL_MODE)) {
 			if (_cpu_fan_speeds[data[ENVCTRL_UE250_CPU0_PORT]] >
-				_cpu_fan_speeds[data[ENVCTRL_UE250_CPU1_PORT]])
+			    _cpu_fan_speeds[data[ENVCTRL_UE250_CPU1_PORT]])
 				fanspeed =
-				_cpu_fan_speeds[data[ENVCTRL_UE250_CPU0_PORT]];
+				    _cpu_fan_speeds[
+				    data[ENVCTRL_UE250_CPU0_PORT]];
 			else
 				fanspeed =
-				_cpu_fan_speeds[data[ENVCTRL_UE250_CPU1_PORT]];
+				    _cpu_fan_speeds[
+				    data[ENVCTRL_UE250_CPU1_PORT]];
 			status = envctrl_write_chip(unitp, ENVCTRL_PCF8591,
-				EHC_DEV2, 0, &fanspeed, 1);
+			    EHC_DEV2, 0, &fanspeed, 1);
 			if (status == DDI_FAILURE)
 				cmn_err(CE_WARN,
-				"%s%d: Write to PCF8591 (SETFAN) failed\n",
-				driver_name, unitp->instance);
+				    "%s%d: Write to PCF8591 (SETFAN) failed\n",
+				    driver_name, unitp->instance);
 			status = envctrl_read_chip(unitp, ENVCTRL_PCF8591,
-				EHC_DEV2, 0, buf, 4);
+			    EHC_DEV2, 0, buf, 4);
 			if (status == DDI_FAILURE)
 				cmn_err(CE_WARN,
-					"%s%d: Fan speed read failed (PDB)",
-					driver_name, unitp->instance);
+				    "%s%d: Fan speed read failed (PDB)",
+				    driver_name, unitp->instance);
 			tval = ((int)buf[1] * JAV_FAN_SPEED_SF_NUM) /
-				JAV_FAN_SPEED_SF_DEN;
+			    JAV_FAN_SPEED_SF_DEN;
 			if (tval > 255)
 				unitp->fan_kstats.fanspeed = 255;
 			else
@@ -1770,30 +1775,33 @@ envctrl_check_tempr_levels(struct envctrlunit *unitp, int chip_num,
 		}
 
 		DPRINTF1("device %X, temp = %d %d loc = %s\n", chip_num,
-			temp_degree_c, data[i], unitp->temp_kstats[j].label);
+		    temp_degree_c, data[i], unitp->temp_kstats[j].label);
 
 		unitp->temp_kstats[j].value = temp_degree_c;
 		if ((temp_degree_c >=
-			unitp->temp_kstats[j].warning_threshold) ||
-			(temp_degree_c < unitp->temp_kstats[j].min)) {
+		    unitp->temp_kstats[j].warning_threshold) ||
+		    (temp_degree_c < unitp->temp_kstats[j].min)) {
 			if (warning_level < yellow)
 				warning_level = yellow;
 			if (count != 0)
 				cmn_err(CE_WARN,
-		"TEMPERATURE WARNING: %d degrees celsius at location %s",
-				temp_degree_c, unitp->temp_kstats[j].label);
+				    "TEMPERATURE WARNING: %d degrees "
+				    "celsius at location %s",
+				    temp_degree_c, unitp->temp_kstats[j].label);
 		}
 		if (temp_degree_c >=
-			unitp->temp_kstats[j].shutdown_threshold) {
+		    unitp->temp_kstats[j].shutdown_threshold) {
 			if (warning_level < red)
 				warning_level = red;
 			if (count != 0) {
 				cmn_err(CE_WARN,
-		"TEMPERATURE CRITICAL: %d degrees celsius at location %s",
-				temp_degree_c, unitp->temp_kstats[j].label);
+				    "TEMPERATURE CRITICAL: %d "
+				    "degrees celsius at location %s",
+				    temp_degree_c, unitp->temp_kstats[j].label);
 				if (!envctrl_power_off_overide)
 					cmn_err(CE_WARN,
-					"System shutdown in 10 seconds ...");
+					    "System shutdown in "
+					    "10 seconds ...");
 			}
 		}
 	}
@@ -1808,14 +1816,14 @@ envctrl_update_fanspeed(struct envctrlunit *unitp)
 	int status;
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8591, EHC_DEV2,
-		0, buf, 4);
+	    0, buf, 4);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Fan speed read failed ",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 
 	tval = ((int)buf[ENVCTRL_PORT1] * JAV_FAN_SPEED_SF_NUM) /
-		JAV_FAN_SPEED_SF_DEN;
+	    JAV_FAN_SPEED_SF_DEN;
 	if (tval > 255)
 		unitp->fan_kstats.fanspeed = 255;
 	else
@@ -1844,16 +1852,16 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 
 	do {
 		status = ehc_read_pcf8574a((struct ehc_envcunit *)unitp,
-			ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
-			&recv_data, 1);
+		    ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
+		    &recv_data, 1);
 		/*
 		 * This extra read is needed since the first read is discarded
 		 * and the second read seems to return 0xFF.
 		 */
 		if (recv_data == 0xFF) {
 			status = ehc_read_pcf8574a((struct ehc_envcunit *)unitp,
-				ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
-				&recv_data, 1);
+			    ENVCTRL_UE250_PCF8574A_BASE_ADDR | EHC_DEV0,
+			    &recv_data, 1);
 		}
 
 		if (status == DDI_FAILURE) {
@@ -1863,7 +1871,7 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 			} else {
 				cmn_err(CE_WARN,
 				"%s%d: Read of PCF8574A (INTFAN) failed",
-					driver_name, unitp->instance);
+				    driver_name, unitp->instance);
 				ehc_init_pcf8584((struct ehc_envcunit *)unitp);
 				return;
 			}
@@ -1875,7 +1883,7 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 		if (unitp->fan_failed == B_TRUE) {
 			if (unitp->current_mode == ENVCTRL_NORMAL_MODE)
 				cmn_err(CE_CONT,
-					"Fan failure has been cleared\n");
+				    "Fan failure has been cleared\n");
 			unitp->fan_kstats.fans_ok = B_TRUE;
 			/*
 			 * Clear general fault LED if no other faults
@@ -1883,8 +1891,9 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 			status = envctrl_get_fpm_status(unitp, &fpmstat);
 			if (status == DDI_FAILURE) {
 				cmn_err(CE_WARN,
-				"%s%d: Read of Front Status Panel LEDs failed",
-				driver_name, unitp->instance);
+				    "%s%d: Read of Front Status "
+				    "Panel LEDs failed",
+				    driver_name, unitp->instance);
 			}
 			if (!(envctrl_isother_fault_led(unitp, fpmstat, 0))) {
 				fpmstat &= ~(ENVCTRL_UE250_FSP_GEN_ERR);
@@ -1893,8 +1902,9 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 				status = envctrl_set_fsp(unitp, &fpmstat);
 				if (status == DDI_FAILURE) {
 					cmn_err(CE_WARN, "%s%d: "
-				"Setting of Front Status Panel LEDs failed",
-					driver_name, unitp->instance);
+					    "Setting of Front Status "
+					    "Panel LEDs failed",
+					    driver_name, unitp->instance);
 				}
 			}
 			/*
@@ -1907,7 +1917,7 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 		if (unitp->fan_failed == B_FALSE) {
 			if (unitp->current_mode == ENVCTRL_NORMAL_MODE)
 				cmn_err(CE_WARN,
-					"Fan failure has been detected");
+				    "Fan failure has been detected");
 			unitp->fan_failed = B_TRUE;
 			unitp->fan_kstats.fans_ok = B_FALSE;
 			/*
@@ -1916,16 +1926,17 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 			status = envctrl_get_fpm_status(unitp, &fpmstat);
 			if (status == DDI_FAILURE) {
 				cmn_err(CE_WARN,
-				"%s%d: Read of Front Status Panel LEDs failed",
-				driver_name, unitp->instance);
+				    "%s%d: Read of Front Status "
+				    "Panel LEDs failed",
+				    driver_name, unitp->instance);
 				return;
 			}
 			fpmstat |= ENVCTRL_UE250_FSP_GEN_ERR;
 			status = envctrl_set_fsp(unitp, &fpmstat);
 			if (status == DDI_FAILURE) {
 				cmn_err(CE_WARN, "%s%d: "
-				"Setting of Front Status Panel LEDs failed",
-				driver_name, unitp->instance);
+				    "Setting of Front Status Panel LEDs failed",
+				    driver_name, unitp->instance);
 			}
 			/*
 			 * A fan failure condition exists.
@@ -1933,8 +1944,9 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 			 */
 			if (unitp->timeout_id != 0) {
 				(void) untimeout(unitp->timeout_id);
-				unitp->timeout_id = (timeout(envctrl_tempr_poll,
-				(caddr_t)unitp, warning_timeout_hz));
+				unitp->timeout_id =
+				    (timeout(envctrl_tempr_poll,
+				    (caddr_t)unitp, warning_timeout_hz));
 			}
 		}
 	}
@@ -1999,18 +2011,18 @@ envctrl_reset_dflop(struct envctrlunit *unitp)
 
 	value = ENVCTRL_UE250_DFLOP_INIT0;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV0,
-		0, &value, 1);
+	    0, &value, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (DFLOP_INIT0) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 
 	value = ENVCTRL_UE250_DFLOP_INIT1;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV0,
-		0, &value, 1);
+	    0, &value, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (DFLOP_INIT1) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 }
 
@@ -2025,18 +2037,18 @@ envctrl_enable_devintrs(struct envctrlunit *unitp)
 
 	value = ENVCTRL_UE250_DEVINTR_INIT0;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV0,
-		0, &value, 1);
+	    0, &value, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (INTR_INIT0) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 
 	value = ENVCTRL_UE250_DEVINTR_INIT1;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV0,
-		0, &value, 1);
+	    0, &value, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (INTR_INIT1) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 }
 
@@ -2050,18 +2062,18 @@ envctrl_intr_latch_clr(struct envctrlunit *unitp)
 
 	value = ENVCTRL_UE250_INTR_LATCH_INIT0;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV0,
-		0, &value, 1);
+	    0, &value, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (INTR_LATCH0) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 
 	value = ENVCTRL_UE250_INTR_LATCH_INIT1;
 	status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV0,
-		0, &value, 1);
+	    0, &value, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (INTR_LATCH1) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 }
 
@@ -2081,10 +2093,10 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 	unitp->num_ps_present = 0;
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV1,
-		0, &recv_data, 1);
+	    0, &recv_data, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574 (PS) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2126,7 +2138,7 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 
 			if (pspr[i] == 0) {
 				cmn_err(CE_NOTE,
-					"Power Supply %d inserted\n", i);
+				    "Power Supply %d inserted\n", i);
 			}
 			pspr[i] = 1;
 
@@ -2140,7 +2152,7 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 				unitp->ps_kstats[j].ps_ok = B_TRUE;
 				if (psok[i] == 0)
 					cmn_err(CE_NOTE,
-						"Power Supply %d okay\n", i);
+					    "Power Supply %d okay\n", i);
 				psok[i] = 1;
 			}
 
@@ -2171,7 +2183,7 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 		} else {
 			if (pspr[i] == 1) {
 				cmn_err(CE_NOTE,
-					"Power Supply %d removed\n", i);
+				    "Power Supply %d removed\n", i);
 			}
 			pspr[i] = 0;
 		}
@@ -2180,14 +2192,14 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 	status = envctrl_get_fpm_status(unitp, &fpmstat);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of Front Status Panel LEDs failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 	if (ps_error) {
 		fpmstat |= (ENVCTRL_UE250_FSP_PS_ERR |
-				ENVCTRL_UE250_FSP_GEN_ERR);
+		    ENVCTRL_UE250_FSP_GEN_ERR);
 	} else {
 		if (envctrl_isother_fault_led(unitp, fpmstat,
-			ENVCTRL_UE250_FSP_PS_ERR)) {
+		    ENVCTRL_UE250_FSP_PS_ERR)) {
 			fpmstat &= ~(ENVCTRL_UE250_FSP_PS_ERR);
 		} else {
 			fpmstat &= ~(ENVCTRL_UE250_FSP_PS_ERR |
@@ -2197,8 +2209,8 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 	status = envctrl_set_fsp(unitp, &fpmstat);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN,
-			"%s%d: Setting of Front Status Panel LEDs failed",
-			driver_name, unitp->instance);
+		    "%s%d: Setting of Front Status Panel LEDs failed",
+		    driver_name, unitp->instance);
 	}
 
 	if (ps_error) {
@@ -2225,7 +2237,7 @@ envctrl_abort_seq_handler(char *msg)
 	 */
 	for (i = 0; i < MAX_DEVS; i++) {
 		if (unitp = (struct envctrlunit *)
-				ddi_get_soft_state(envctrlsoft_statep, i))
+		    ddi_get_soft_state(envctrlsoft_statep, i))
 			break;
 	}
 
@@ -2234,14 +2246,14 @@ envctrl_abort_seq_handler(char *msg)
 	secure = unitp->encl_kstats.value;
 
 	if ((secure & ENVCTRL_UE250_FSP_KEYMASK) ==
-		ENVCTRL_UE250_FSP_KEYLOCKED) {
+	    ENVCTRL_UE250_FSP_KEYLOCKED) {
 			cmn_err(CE_CONT,
-				"%s%d: ignoring debug enter sequence\n",
-				driver_name, unitp->instance);
+			    "%s%d: ignoring debug enter sequence\n",
+			    driver_name, unitp->instance);
 	} else {
 		if (envctrl_debug_flags) {
 			cmn_err(CE_CONT, "%s%d: allowing debug enter\n",
-				driver_name, unitp->instance);
+			    driver_name, unitp->instance);
 		}
 		debug_enter(msg);
 	}
@@ -2261,10 +2273,10 @@ envctrl_get_fpm_status(struct envctrlunit *unitp, uint8_t *val)
 	ASSERT(MUTEX_HELD(&unitp->umutex));
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV6,
-		0, &recv_data, 1);
+	    0, &recv_data, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read from PCF8574A (FSP) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (status);
 	}
 
@@ -2294,7 +2306,7 @@ envctrl_set_fsp(struct envctrlunit *unitp, uint8_t *val)
 	 * strip off bits that are R/O
 	 */
 	value = (~(ENVCTRL_UE250_FSP_KEYMASK | ENVCTRL_UE250_FSP_POMASK) &
-			(*val));
+	    (*val));
 
 	confirm_val_hold = value;
 
@@ -2302,10 +2314,10 @@ envctrl_set_fsp(struct envctrlunit *unitp, uint8_t *val)
 
 	while (confirm_count < confirm_max) {
 		status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV6,
-			0, &value, 1);
+		    0, &value, 1);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s%d: Write to PCF8574A (FSP) failed",
-				driver_name, unitp->instance);
+			    driver_name, unitp->instance);
 			break;
 		} else {
 			/*
@@ -2317,11 +2329,11 @@ envctrl_set_fsp(struct envctrlunit *unitp, uint8_t *val)
 			 */
 			status = envctrl_get_fpm_status(unitp, &confirm_val);
 			confirm_val = ~(ENVCTRL_UE250_FSP_KEYMASK |
-				ENVCTRL_UE250_FSP_POMASK) & confirm_val;
+			    ENVCTRL_UE250_FSP_POMASK) & confirm_val;
 			if (status == DDI_FAILURE) {
 				cmn_err(CE_WARN,
 				"%s%d: Read of PCF8574A (FSP) failed",
-					driver_name, unitp->instance);
+				    driver_name, unitp->instance);
 				break;
 			} else if (confirm_val != confirm_val_hold) {
 				confirm_count++;
@@ -2350,15 +2362,15 @@ envctrl_get_dskled(struct envctrlunit *unitp, struct envctrl_chip *chip)
 	ASSERT(MUTEX_HELD(&unitp->umutex));
 
 	if (chip->chip_num != EHC_DEV7 ||
-		chip->type != ENVCTRL_PCF8574A) {
+	    chip->type != ENVCTRL_PCF8574A) {
 		return (DDI_FAILURE);
 	}
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV7,
-		0, &chip->val, 1);
+	    0, &chip->val, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574A (DISKFL) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 	chip->val = ~chip->val;
 
@@ -2389,42 +2401,42 @@ envctrl_set_dskled(struct envctrlunit *unitp, struct envctrl_chip *chip)
 		return (DDI_FAILURE);
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV6,
-		0, &val, 1);
+	    0, &val, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574A (FSP) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (status);
 	}
 
 	val = ~val;
 	if ((chip->val & 0x3F) == 0) {
 		if (!(envctrl_isother_fault_led(unitp, val,
-			ENVCTRL_UE250_FSP_DISK_ERR))) {
+		    ENVCTRL_UE250_FSP_DISK_ERR))) {
 			val &= ~(ENVCTRL_UE250_FSP_DISK_ERR);
 		} else {
 			val &= ~(ENVCTRL_UE250_FSP_DISK_ERR |
 			    ENVCTRL_UE250_FSP_GEN_ERR);
 		}
 		val = (val & ~(ENVCTRL_UE250_FSP_DISK_ERR |
-			ENVCTRL_UE250_FSP_GEN_ERR));
+		    ENVCTRL_UE250_FSP_GEN_ERR));
 	} else {
 		val = (val | (ENVCTRL_UE250_FSP_DISK_ERR |
-			ENVCTRL_UE250_FSP_GEN_ERR));
+		    ENVCTRL_UE250_FSP_GEN_ERR));
 	}
 
 	status = envctrl_set_fsp(unitp, &val);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Write to PCF8574A (FSP) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (status);
 	}
 
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV5,
-		0, &val, 1);
+	    0, &val, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574A (DISKFL) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return (status);
 	}
 
@@ -2443,10 +2455,10 @@ envctrl_set_dskled(struct envctrlunit *unitp, struct envctrl_chip *chip)
 
 	while (confirm_count < confirm_max) {
 		status = envctrl_write_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV7,
-			0, &chip->val, 1);
+		    0, &chip->val, 1);
 		if (status == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s%d: Write PCF8574A (DISKFL) failed",
-				driver_name, unitp->instance);
+			    driver_name, unitp->instance);
 			return (status);
 		} else {
 			/*
@@ -2497,12 +2509,12 @@ envctrl_set_fanspeed(struct envctrlunit *unitp, struct envctrl_chip *fanspeed)
 	fanspeed_hold = fanspeed->val;
 	while (confirm_count < confirm_max) {
 		status = envctrl_write_chip(unitp, ENVCTRL_PCF8591,
-			EHC_DEV2, 0, &fanspeed->val, 1);
+		    EHC_DEV2, 0, &fanspeed->val, 1);
 		if (status == DDI_FAILURE) {
 			envctrl_fan_fail_service(unitp);
 			cmn_err(CE_WARN,
 			"%s%d: Set fanspeed failed", driver_name,
-				unitp->instance);
+			    unitp->instance);
 			return (status);
 		} else {
 			drv_usecwait(100000);
@@ -2510,11 +2522,12 @@ envctrl_set_fanspeed(struct envctrlunit *unitp, struct envctrl_chip *fanspeed)
 			readback_speed = unitp->fan_kstats.fanspeed;
 			if (fanspeed_hold > idle_fanspeed) {
 				max_speed =
-				(fanspeed->val + FAN_DRIFT > MAX_FAN_SPEED) ?
-				MAX_FAN_SPEED : (fanspeed->val + FAN_DRIFT);
+				    (fanspeed->val + FAN_DRIFT >
+				    MAX_FAN_SPEED) ?  MAX_FAN_SPEED :
+				    (fanspeed->val + FAN_DRIFT);
 				if ((readback_speed < fanspeed->val -
-					FAN_DRIFT) ||
-					(readback_speed > max_speed)) {
+				    FAN_DRIFT) ||
+				    (readback_speed > max_speed)) {
 					confirm_count++;
 					drv_usecwait(1000);
 					continue;
@@ -2541,7 +2554,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->encl_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "%s%d: encl raw kstat_create failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2555,7 +2568,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->fan_kstats),
 	    KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
 		cmn_err(CE_WARN, "%s%d: fans kstat_create failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2568,7 +2581,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->ps_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "%s%d: ps name kstat_create failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2581,7 +2594,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->temp_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "%s%d: temp name kstat_create failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2594,7 +2607,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->disk_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "%s%d: disk name kstat_create failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2679,7 +2692,7 @@ envctrl_encl_kstat_update(kstat_t *ksp, int rw)
 		status = envctrl_get_fpm_status(unitp, (uint8_t *)NULL);
 		if (status == DDI_SUCCESS)
 			bcopy((caddr_t)&unitp->encl_kstats, kstatp,
-				sizeof (unitp->encl_kstats));
+			    sizeof (unitp->encl_kstats));
 	}
 	mutex_exit(&unitp->umutex);
 	return (DDI_SUCCESS);
@@ -2742,10 +2755,10 @@ envctrl_init_encl_kstats(struct envctrlunit *unitp)
 	ASSERT(MUTEX_HELD(&unitp->umutex));
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV6,
-		0, &val, 1);
+	    0, &val, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574A (FSP) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 		return;
 	}
 
@@ -2761,17 +2774,17 @@ envctrl_check_disk_kstats(struct envctrlunit *unitp)
 	ASSERT(MUTEX_HELD(&unitp->umutex));
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV5,
-		0, &diskpr, 1);
+	    0, &diskpr, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574A (DISKPR) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 
 	status = envctrl_read_chip(unitp, ENVCTRL_PCF8574A, EHC_DEV7,
-		0, &diskfl, 1);
+	    0, &diskfl, 1);
 	if (status == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s%d: Read of PCF8574A (DISKFL) failed",
-			driver_name, unitp->instance);
+		    driver_name, unitp->instance);
 	}
 
 	envctrl_update_disk_kstats(unitp, diskpr, diskfl);
@@ -2837,12 +2850,12 @@ envctrl_match_cpu(dev_info_t *dip, void *arg)
 	(void) sprintf(name1, "%s", ENVCTRL_ULTRA2CPU_STRING);
 
 	if ((strcmp(ddi_node_name(dip), name) == 0) ||
-		(strcmp(ddi_node_name(dip), name1) == 0)) {
+	    (strcmp(ddi_node_name(dip), name1) == 0)) {
 		if ((cpu_slot = (int)ddi_getprop(DDI_DEV_T_ANY, dip,
-			    DDI_PROP_DONTPASS, "upa-portid",
-				    -1)) == -1) {
+		    DDI_PROP_DONTPASS, "upa-portid",
+		    -1)) == -1) {
 			cmn_err(CE_WARN, "%s%d: no cpu upa-portid",
-				driver_name, unitp->instance);
+			    driver_name, unitp->instance);
 		} else {
 			unitp->cpu_pr_location[cpu_slot] = B_TRUE;
 			unitp->num_cpus_present++;

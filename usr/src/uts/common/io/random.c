@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Random number generator pseudo-driver
@@ -105,13 +104,14 @@ static struct dev_ops rnd_ops = {
 	nodev,			/* reset */
 	&rnd_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /* Modlinkage */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"random number device v%I%",
+	"random number device",
 	&rnd_ops
 };
 

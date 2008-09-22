@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DR control module for LDoms
@@ -95,11 +94,12 @@ static struct dev_ops drctl_ops = {
 	&drctl_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
 	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"DR Control pseudo driver v%I%",
+	"DR Control pseudo driver",
 	&drctl_ops
 };
 

@@ -89,7 +89,8 @@ static struct dev_ops pit_beep_ops = {
 	nodev,			/* Reset */
 	&pit_beep_cb_ops,	/* Driver operations */
 	0,			/* Bus operations */
-	NULL			/* Power */
+	NULL,			/* Power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 

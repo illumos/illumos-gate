@@ -259,7 +259,7 @@ static int ural_detach(dev_info_t *, ddi_detach_cmd_t);
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ural_dev_ops, nulldev, nulldev, ural_attach,
-    ural_detach, nodev, NULL, D_MP, NULL);
+    ural_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv ural_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */

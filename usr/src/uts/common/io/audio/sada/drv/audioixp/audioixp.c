@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * audioixp Audio Driver
@@ -236,13 +235,14 @@ static struct dev_ops audioixp_dev_ops = {
 	nodev,			/* devo_reset */
 	&audioixp_cb_ops,	/* devi_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
 static struct modldrv audioixp_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	IXP_MOD_NAME" %I%",	/* drv_linkinfo */
+	IXP_MOD_NAME,		/* drv_linkinfo */
 	&audioixp_dev_ops,	/* drv_dev_ops */
 };
 
@@ -374,9 +374,9 @@ _init(void)
 	ATRACE("in audioixp _init()", NULL);
 
 	if ((error = ddi_soft_state_init(&audioixp_statep,
-		sizeof (audioixp_state_t), 1)) != 0) {
+	    sizeof (audioixp_state_t), 1)) != 0) {
 		ATRACE("audioixp ddi_soft_state_init() failed",
-			audioixp_statep);
+		    audioixp_statep);
 		return (error);
 	}
 
@@ -470,7 +470,7 @@ audioixp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,
 	case DDI_INFO_DEVT2DEVINFO:
 		instance = audio_sup_devt_to_instance((dev_t)arg);
 		if ((state = ddi_get_soft_state(audioixp_statep,
-			instance)) != NULL) {
+		    instance)) != NULL) {
 			*result = state->dip;
 			error = DDI_SUCCESS;
 		} else {
@@ -480,7 +480,7 @@ audioixp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,
 
 	case DDI_INFO_DEVT2INSTANCE:
 		*result = (void*)(uintptr_t)
-		audio_sup_devt_to_instance((dev_t)arg);
+		    audio_sup_devt_to_instance((dev_t)arg);
 		error = DDI_SUCCESS;
 		break;
 
@@ -524,7 +524,7 @@ audioixp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	instance = ddi_get_instance(dip);
 
 	ATRACE("audioixp_attach() audioixp_statep",
-		audioixp_statep);
+	    audioixp_statep);
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -536,40 +536,40 @@ audioixp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_RESUME:
 		ATRACE("audioixp_attach() DDI_RESUME", NULL);
 		audio_sup_log(NULL, CE_WARN,
-			"%s%d: audioixp_attach() resume is not supported yet",
-			audioixp_name, instance);
+		    "%s%d: audioixp_attach() resume is not supported yet",
+		    audioixp_name, instance);
 		return (DDI_FAILURE);
 
 	default:
 		audio_sup_log(NULL, CE_WARN,
-			"!%s%d: audioixp_attach() unknown command: 0x%x",
-			audioixp_name, instance, cmd);
+		    "!%s%d: audioixp_attach() unknown command: 0x%x",
+		    audioixp_name, instance, cmd);
 		return (DDI_FAILURE);
 	}
 
 	/* we don't support high level interrupts in the driver */
 	if (ddi_intr_hilevel(dip, 0) != 0) {
 		audio_sup_log(NULL, CE_WARN,
-			"!%s%d: audioixp_attach()"
-			" unsupported high level interrupt",
-			audioixp_name, instance);
+		    "!%s%d: audioixp_attach()"
+		    " unsupported high level interrupt",
+		    audioixp_name, instance);
 		return (DDI_FAILURE);
 	}
 
 	/* allocate the soft state structure */
 	if (ddi_soft_state_zalloc(audioixp_statep, instance) !=
-		DDI_SUCCESS) {
+	    DDI_SUCCESS) {
 		audio_sup_log(NULL, CE_WARN,
-			"!%s%d: audioixp_attach() soft state allocate failed",
-			audioixp_name, instance);
+		    "!%s%d: audioixp_attach() soft state allocate failed",
+		    audioixp_name, instance);
 		return (DDI_FAILURE);
 	}
 
 	if ((statep = ddi_get_soft_state(audioixp_statep, instance)) ==
-		NULL) {
+	    NULL) {
 		audio_sup_log(NULL, CE_WARN,
-			"!%s%d: audioixp_attach() soft state failed",
-			audioixp_name, instance);
+		    "!%s%d: audioixp_attach() soft state failed",
+		    audioixp_name, instance);
 		goto error_state;
 	}
 
@@ -577,8 +577,8 @@ audioixp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	data.asrd_key = NULL;
 	if ((statep->audio_handle = audio_sup_register(dip, &data)) == NULL) {
 		audio_sup_log(NULL, CE_WARN,
-			"!%s%d: audioixp_attach() audio_sup_register() failed",
-			audioixp_name, instance);
+		    "!%s%d: audioixp_attach() audio_sup_register() failed",
+		    audioixp_name, instance);
 		goto error_state;
 	}
 
@@ -587,35 +587,35 @@ audioixp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if ((audioixp_init_state(statep, dip)) != AUDIO_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() init state structure failed");
+		    "!audioixp_attach() init state structure failed");
 		goto error_audiosup;
 	}
 
 	/* map in the registers, allocate DMA buffers, etc. */
 	if (audioixp_map_regs(dip, statep) != AUDIO_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() couldn't map registers");
+		    "!audioixp_attach() couldn't map registers");
 		goto error_destroy;
 	}
 
 	/* set PCI command register */
 	cmdeg = pci_config_get16(statep->pci_conf_handle, PCI_CONF_COMM);
 	pci_config_put16(statep->pci_conf_handle, PCI_CONF_COMM,
-		cmdeg | PCI_COMM_IO | PCI_COMM_MAE);
+	    cmdeg | PCI_COMM_IO | PCI_COMM_MAE);
 
 	if (audioixp_alloc_sample_buf(statep, IXP_DMA_PCM_OUT,
-		statep->play_buf_size) == AUDIO_FAILURE) {
+	    statep->play_buf_size) == AUDIO_FAILURE) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() couldn't allocate play sample "
-			"buffers");
+		    "!audioixp_attach() couldn't allocate play sample "
+		    "buffers");
 		goto error_unmap;
 	}
 
 	if (audioixp_alloc_sample_buf(statep, IXP_DMA_PCM_IN,
-		statep->record_buf_size) == AUDIO_FAILURE) {
+	    statep->record_buf_size) == AUDIO_FAILURE) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() couldn't allocate record sample "
-			"buffers");
+		    "!audioixp_attach() couldn't allocate record sample "
+		    "buffers");
 		goto error_dealloc_play;
 	}
 
@@ -623,32 +623,32 @@ audioixp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* set up kernel statistics */
 	if ((statep->ixp_ksp = kstat_create(IXP_NAME, instance,
-		IXP_NAME, "controller", KSTAT_TYPE_INTR, 1,
-		KSTAT_FLAG_PERSISTENT)) != NULL) {
+	    IXP_NAME, "controller", KSTAT_TYPE_INTR, 1,
+	    KSTAT_FLAG_PERSISTENT)) != NULL) {
 		kstat_install(statep->ixp_ksp);
 	}
 
 	/* set up the interrupt handler */
 	if (ddi_add_intr(dip, 0, &statep->intr_iblock,
-		(ddi_idevice_cookie_t *)NULL, audioixp_intr, (caddr_t)statep) !=
-		DDI_SUCCESS) {
+	    (ddi_idevice_cookie_t *)NULL, audioixp_intr, (caddr_t)statep) !=
+	    DDI_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() bad interrupt specification ");
+		    "!audioixp_attach() bad interrupt specification ");
 		goto error_kstat;
 	}
 
 	if (audioixp_chip_init(statep, IXP_INIT_NO_RESTORE) !=
-		AUDIO_SUCCESS) {
+	    AUDIO_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() failed to init chip");
+		    "!audioixp_attach() failed to init chip");
 		goto error_intr;
 	}
 
 	/* call the mixer attach() routine */
 	if (am_attach(statep->audio_handle, cmd, &statep->ad_info) !=
-		AUDIO_SUCCESS) {
+	    AUDIO_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_attach() am_attach() failed");
+		    "!audioixp_attach() am_attach() failed");
 		goto error_intr;
 	}
 
@@ -717,13 +717,13 @@ audioixp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	ATRACE_32("audioixp_detach() instance", instance);
 	ATRACE("audioixp_detach() audioixp_statep",
-		audioixp_statep);
+	    audioixp_statep);
 
 	if ((statep = ddi_get_soft_state(audioixp_statep, instance)) ==
-		NULL) {
+	    NULL) {
 		audio_sup_log(NULL, CE_WARN,
-			"!%s%d: audioixp_detach() get soft state failed",
-			audioixp_name, instance);
+		    "!%s%d: audioixp_detach() get soft state failed",
+		    audioixp_name, instance);
 		return (DDI_FAILURE);
 	}
 
@@ -737,13 +737,13 @@ audioixp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		ATRACE("audioixp_detach() SUSPEND", statep);
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"audioixp_detach() suspend is not supported yet");
+		    "audioixp_detach() suspend is not supported yet");
 		return (DDI_FAILURE);
 
 	default:
 		ATRACE("audioixp_detach() unknown command", cmd);
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_detach() unknown command: 0x%x", cmd);
+		    "!audioixp_detach() unknown command: 0x%x", cmd);
 		return (DDI_FAILURE);
 	}
 
@@ -856,21 +856,21 @@ audioixp_intr(caddr_t arg)
 		intr_claimed = DDI_INTR_CLAIMED;
 		IXP_AM_PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_CODEC0_NOT_READY);
 		statep -> ixp_codec_not_ready_bits |=
-			IXP_AUDIO_INT_CODEC0_NOT_READY;
+		    IXP_AUDIO_INT_CODEC0_NOT_READY;
 	}
 
 	if (sr & IXP_AUDIO_INT_CODEC1_NOT_READY) {
 		intr_claimed = DDI_INTR_CLAIMED;
 		IXP_AM_PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_CODEC1_NOT_READY);
 		statep -> ixp_codec_not_ready_bits |=
-			IXP_AUDIO_INT_CODEC1_NOT_READY;
+		    IXP_AUDIO_INT_CODEC1_NOT_READY;
 	}
 
 	if (sr & IXP_AUDIO_INT_CODEC2_NOT_READY) {
 		intr_claimed = DDI_INTR_CLAIMED;
 		IXP_AM_PUT32(IXP_AUDIO_INT, IXP_AUDIO_INT_CODEC2_NOT_READY);
 		statep -> ixp_codec_not_ready_bits |=
-			IXP_AUDIO_INT_CODEC2_NOT_READY;
+		    IXP_AUDIO_INT_CODEC2_NOT_READY;
 	}
 
 	if (sr & IXP_AUDIO_INT_NEW_FRAME) {
@@ -992,22 +992,22 @@ audioixp_ad_set_config(audiohdl_t ahandle, int stream, int command,
 		if (arg1) {	/* mute */
 			if (statep->swap_out == B_FALSE) {
 				(void) audioixp_or_ac97(statep,
-					AC97_MASTER_VOLUME_REGISTER, MVR_MUTE);
+				    AC97_MASTER_VOLUME_REGISTER, MVR_MUTE);
 			} else {
 				(void) audioixp_or_ac97(statep,
-					AC97_EXTENDED_LRS_VOLUME_REGISTER,
-					AD1980_SURR_MUTE);
+				    AC97_EXTENDED_LRS_VOLUME_REGISTER,
+				    AD1980_SURR_MUTE);
 			}
 			(void) audioixp_or_ac97(statep,
-				AC97_HEADPHONE_VOLUME_REGISTER, HPVR_MUTE);
+			    AC97_HEADPHONE_VOLUME_REGISTER, HPVR_MUTE);
 			(void) audioixp_or_ac97(statep,
-				AC97_MONO_MASTER_VOLUME_REGSITER, MMVR_MUTE);
+			    AC97_MONO_MASTER_VOLUME_REGSITER, MMVR_MUTE);
 
 		} else {	/* not muted */
 
 			/* by setting the port we unmute only active ports */
 			(void) audioixp_set_port(statep,
-				AUDIO_PLAY, statep->ixp_output_port);
+			    AUDIO_PLAY, statep->ixp_output_port);
 		}
 		break;
 
@@ -1021,14 +1021,14 @@ audioixp_ad_set_config(audiohdl_t ahandle, int stream, int command,
 		 */
 		if (arg1) {	/* enable */
 			(void) audioixp_or_ac97(statep,
-				AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+			    AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
 			statep->ad_info.ad_add_mode |= AM_ADD_MODE_MIC_BOOST;
 		} else {	/* disable */
 			(void) audioixp_and_ac97(statep,
-				AC97_MIC_VOLUME_REGISTER,
-				(uint16_t)~MICVR_20dB_BOOST);
+			    AC97_MIC_VOLUME_REGISTER,
+			    (uint16_t)~MICVR_20dB_BOOST);
 			statep->ad_info.ad_add_mode &=
-				~AM_ADD_MODE_MIC_BOOST;
+			    ~AM_ADD_MODE_MIC_BOOST;
 		}
 		break;
 
@@ -1046,7 +1046,7 @@ audioixp_ad_set_config(audiohdl_t ahandle, int stream, int command,
 		 */
 		rc = AUDIO_FAILURE;
 		ATRACE_32("audioixp_ad_set_config() unsupported command",
-			command);
+		    command);
 		break;
 	}
 	mutex_exit(&statep->inst_lock);
@@ -1108,8 +1108,8 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 
 		if (sample_rate != IXP_SAMPR48000) {
 			audio_sup_log(statep->audio_handle, CE_NOTE,
-				"!audioixp_ad_set_format() bad sample"
-				" rate %d\n", sample_rate);
+			    "!audioixp_ad_set_format() bad sample"
+			    " rate %d\n", sample_rate);
 			mutex_exit(&statep->inst_lock);
 			return (AUDIO_FAILURE);
 		}
@@ -1125,7 +1125,7 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 		case IXP_SAMPR48000:	break;
 		default:
 			ATRACE_32("audioixp_ad_set_format() bad SR",
-				sample_rate);
+			    sample_rate);
 			mutex_exit(&statep->inst_lock);
 			return (AUDIO_FAILURE);
 		}
@@ -1134,7 +1134,7 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 	if (dir == AUDIO_PLAY) {
 
 		(void) audioixp_write_ac97(statep,
-			AC97_EXTENDED_FRONT_DAC_RATE_REGISTER, sample_rate);
+		    AC97_EXTENDED_FRONT_DAC_RATE_REGISTER, sample_rate);
 
 		/*
 		 * Some codecs before ac97 2.2, such as YMF753 produced by
@@ -1144,13 +1144,13 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 		 */
 		if (statep->var_sr == B_TRUE) {
 			(void) audioixp_read_ac97(statep,
-				AC97_EXTENDED_FRONT_DAC_RATE_REGISTER, &val);
+			    AC97_EXTENDED_FRONT_DAC_RATE_REGISTER, &val);
 			if (val != sample_rate) {
 				ATRACE_32("audioixp_ad_set_format()"
-					" bad out SR", sample_rate);
+				    " bad out SR", sample_rate);
 				audio_sup_log(statep->audio_handle, CE_NOTE,
-					"!audioixp_ad_set_format() bad out"
-					" SR %d\n", sample_rate);
+				    "!audioixp_ad_set_format() bad out"
+				    " SR %d\n", sample_rate);
 				mutex_exit(&statep->inst_lock);
 				return (AUDIO_FAILURE);
 			}
@@ -1158,15 +1158,15 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 
 		slot = IXP_AM_GET32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD);
 		slot |= IXP_AUDIO_OUT_DMA_SLOT_3
-			| IXP_AUDIO_OUT_DMA_SLOT_4;
+		    | IXP_AUDIO_OUT_DMA_SLOT_4;
 		slot &= ~ (IXP_AUDIO_OUT_DMA_SLOT_5
-			|IXP_AUDIO_OUT_DMA_SLOT_6
-			|IXP_AUDIO_OUT_DMA_SLOT_7
-			|IXP_AUDIO_OUT_DMA_SLOT_8
-			|IXP_AUDIO_OUT_DMA_SLOT_9
-			|IXP_AUDIO_OUT_DMA_SLOT_10
-			|IXP_AUDIO_OUT_DMA_SLOT_11
-			|IXP_AUDIO_OUT_DMA_SLOT_12);
+		    |IXP_AUDIO_OUT_DMA_SLOT_6
+		    |IXP_AUDIO_OUT_DMA_SLOT_7
+		    |IXP_AUDIO_OUT_DMA_SLOT_8
+		    |IXP_AUDIO_OUT_DMA_SLOT_9
+		    |IXP_AUDIO_OUT_DMA_SLOT_10
+		    |IXP_AUDIO_OUT_DMA_SLOT_11
+		    |IXP_AUDIO_OUT_DMA_SLOT_12);
 
 		IXP_AM_PUT32(IXP_AUDIO_OUT_DMA_SLOT_EN_THRESHOLD, slot);
 
@@ -1179,7 +1179,7 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 		statep->ixp_pprecision = precision;
 	} else {
 		(void) audioixp_write_ac97(statep,
-			AC97_EXTENDED_LR_DAC_RATE_REGISTER, sample_rate);
+		    AC97_EXTENDED_LR_DAC_RATE_REGISTER, sample_rate);
 
 		/*
 		 * Some codecs before ac97 2.2, such as YMF753 produced by
@@ -1189,13 +1189,13 @@ audioixp_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 		 */
 		if (statep->var_sr == B_TRUE) {
 			(void) audioixp_read_ac97(statep,
-				AC97_EXTENDED_LR_DAC_RATE_REGISTER, &val);
+			    AC97_EXTENDED_LR_DAC_RATE_REGISTER, &val);
 			if (val != sample_rate) {
 				ATRACE_32("audioixp_ad_set_format() bad"
-					" in SR", sample_rate);
+				    " in SR", sample_rate);
 				audio_sup_log(statep->audio_handle, CE_NOTE,
-					"!audioixp_ad_set_format() bad in"
-					" SR %d\n", sample_rate);
+				    "!audioixp_ad_set_format() bad in"
+				    " SR %d\n", sample_rate);
 				mutex_exit(&statep->inst_lock);
 				return (AUDIO_FAILURE);
 			}
@@ -1252,9 +1252,9 @@ audioixp_ad_start_play(audiohdl_t ahandle, int stream)
 		statep->flags &= ~IXP_DMA_PLAY_PAUSED;
 		audioixp_start_dma(statep, AUDIO_PLAY);
 		IXP_AM_UPDATE32(
-			IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_OUT,
-			IXP_AUDIO_CMD_EN_OUT);
+		    IXP_AUDIO_CMD,
+		    IXP_AUDIO_CMD_EN_OUT,
+		    IXP_AUDIO_CMD_EN_OUT);
 		goto done;
 	}
 
@@ -1347,7 +1347,7 @@ audioixp_ad_stop_play(audiohdl_t ahandle, int stream)
 	buf = &statep->play_buf;
 	buf->io_started = B_FALSE;
 	statep->flags &= ~(IXP_DMA_PLAY_STARTED
-		| IXP_DMA_PLAY_PAUSED | IXP_DMA_PLAY_EMPTY);
+	    | IXP_DMA_PLAY_PAUSED | IXP_DMA_PLAY_EMPTY);
 
 	mutex_exit(&statep->inst_lock);
 
@@ -1472,54 +1472,54 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	statep->vol_bits_mask = 5;
 
 	cdrom = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"cdrom", 0);
+	    "cdrom", 0);
 
 	/* get the mode from the .conf file */
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"mixer-mode", 1)) {
+	    "mixer-mode", 1)) {
 		mode = AM_MIXER_MODE;
 	} else {
 		mode = AM_COMPAT_MODE;
 	}
 
 	pints = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "play-interrupts", IXP_INTS);
+	    DDI_PROP_DONTPASS, "play-interrupts", IXP_INTS);
 	if (pints > IXP_MAX_INTS) {
 		ATRACE_32("audioixp_init_state() "
-			"play interrupt rate too high, resetting", pints);
+		    "play interrupt rate too high, resetting", pints);
 		audio_sup_log(statep->audio_handle, CE_NOTE,
-			"audioixp_init_state() "
-			"play interrupt rate set too high, %d, resetting to %d",
-			pints, IXP_INTS);
+		    "audioixp_init_state() "
+		    "play interrupt rate set too high, %d, resetting to %d",
+		    pints, IXP_INTS);
 		pints = IXP_INTS;
 	} else if (pints < IXP_MIN_INTS) {
 		ATRACE_32("audioixp_init_state() "
-			"play interrupt rate too low, resetting", pints);
+		    "play interrupt rate too low, resetting", pints);
 		audio_sup_log(statep->audio_handle, CE_NOTE,
-			"audioixp_init_state() "
-			"play interrupt rate set too low, %d, resetting to %d",
-			pints, IXP_INTS);
+		    "audioixp_init_state() "
+		    "play interrupt rate set too low, %d, resetting to %d",
+		    pints, IXP_INTS);
 		pints = IXP_INTS;
 	}
 	rints = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "record-interrupts", IXP_INTS);
+	    DDI_PROP_DONTPASS, "record-interrupts", IXP_INTS);
 	if (rints > IXP_MAX_INTS) {
 		ATRACE_32("audioixp_init_state() "
-			"record interrupt rate too high, resetting", rints);
+		    "record interrupt rate too high, resetting", rints);
 		audio_sup_log(statep->audio_handle, CE_NOTE,
-			"audioixp_init_state() "
-			"record interrupt rate set too high, %d, resetting to "
-			"%d",
-			rints, IXP_INTS);
+		    "audioixp_init_state() "
+		    "record interrupt rate set too high, %d, resetting to "
+		    "%d",
+		    rints, IXP_INTS);
 		rints = IXP_INTS;
 	} else if (rints < IXP_MIN_INTS) {
 		ATRACE_32("audioixp_init_state() "
-			"record interrupt rate too low, resetting", rints);
+		    "record interrupt rate too low, resetting", rints);
 		audio_sup_log(statep->audio_handle, CE_NOTE,
-			"audioixp_init_state() "
-			"record interrupt rate set too low, %d, resetting to "
-			"%d",
-			rints, IXP_INTS);
+		    "audioixp_init_state() "
+		    "record interrupt rate set too low, %d, resetting to "
+		    "%d",
+		    rints, IXP_INTS);
 		rints = IXP_INTS;
 	}
 
@@ -1530,11 +1530,11 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	statep->ixp_defaults.play.encoding = IXP_DEFAULT_ENC;
 	statep->ixp_defaults.play.gain = IXP_DEFAULT_PGAIN;
 	statep->ixp_defaults.play.port =
-		AUDIO_SPEAKER | AUDIO_LINE_OUT;
+	    AUDIO_SPEAKER | AUDIO_LINE_OUT;
 	statep->ixp_defaults.play.avail_ports =
-		AUDIO_SPEAKER | AUDIO_LINE_OUT;
+	    AUDIO_SPEAKER | AUDIO_LINE_OUT;
 	statep->ixp_defaults.play.mod_ports =
-		AUDIO_SPEAKER | AUDIO_LINE_OUT;
+	    AUDIO_SPEAKER | AUDIO_LINE_OUT;
 	statep->ixp_defaults.play.buffer_size = IXP_BSIZE;
 	statep->ixp_defaults.play.balance = IXP_DEFAULT_BAL;
 
@@ -1545,9 +1545,9 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	statep->ixp_defaults.record.gain = IXP_DEFAULT_PGAIN;
 	statep->ixp_defaults.record.port = AUDIO_MICROPHONE;
 	statep->ixp_defaults.record.avail_ports =
-		AUDIO_MICROPHONE|AUDIO_LINE_IN|AUDIO_CODEC_LOOPB_IN;
+	    AUDIO_MICROPHONE|AUDIO_LINE_IN|AUDIO_CODEC_LOOPB_IN;
 	statep->ixp_defaults.record.mod_ports =
-		AUDIO_MICROPHONE|AUDIO_LINE_IN|AUDIO_CODEC_LOOPB_IN;
+	    AUDIO_MICROPHONE|AUDIO_LINE_IN|AUDIO_CODEC_LOOPB_IN;
 	statep->ixp_defaults.record.buffer_size = IXP_BSIZE;
 	statep->ixp_defaults.record.balance = IXP_DEFAULT_BAL;
 
@@ -1555,8 +1555,8 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	statep->ixp_defaults.output_muted = B_FALSE;
 	statep->ixp_defaults.ref_cnt = B_FALSE;
 	statep->ixp_defaults.hw_features =
-		AUDIO_HWFEATURE_DUPLEX | AUDIO_HWFEATURE_PLAY |
-		AUDIO_HWFEATURE_IN2OUT | AUDIO_HWFEATURE_RECORD;
+	    AUDIO_HWFEATURE_DUPLEX | AUDIO_HWFEATURE_PLAY |
+	    AUDIO_HWFEATURE_IN2OUT | AUDIO_HWFEATURE_RECORD;
 	statep->ixp_defaults.sw_features = AUDIO_SWFEATURE_MIXER;
 
 	if (cdrom) {
@@ -1565,17 +1565,17 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	}
 
 	statep->ixp_psample_rate =
-		statep->ixp_defaults.play.sample_rate;
+	    statep->ixp_defaults.play.sample_rate;
 	statep->ixp_pchannels =
-		statep->ixp_defaults.play.channels;
+	    statep->ixp_defaults.play.channels;
 	statep->ixp_pprecision =
-		statep->ixp_defaults.play.precision;
+	    statep->ixp_defaults.play.precision;
 	statep->ixp_csample_rate =
-		statep->ixp_defaults.record.sample_rate;
+	    statep->ixp_defaults.record.sample_rate;
 	statep->ixp_cchannels =
-		statep->ixp_defaults.record.channels;
+	    statep->ixp_defaults.record.channels;
 	statep->ixp_cprecision =
-		statep->ixp_defaults.record.precision;
+	    statep->ixp_defaults.record.precision;
 
 	/*
 	 * fill in the ad_info structure
@@ -1591,16 +1591,16 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	statep->ad_info.ad_dev_info = &statep->ixp_dev_info;
 	statep->ad_info.ad_diag_flags = AM_DIAG_INTERNAL_LOOP;
 	statep->ad_info.ad_diff_flags =
-		AM_DIFF_SR | AM_DIFF_CH | AM_DIFF_PREC | AM_DIFF_ENC;
+	    AM_DIFF_SR | AM_DIFF_CH | AM_DIFF_PREC | AM_DIFF_ENC;
 	statep->ad_info.ad_assist_flags = AM_ASSIST_MIC;
 	statep->ad_info.ad_misc_flags = AM_MISC_RP_EXCL | AM_MISC_MONO_DUP;
 	statep->ad_info.ad_num_mics = 1;
 
 	/* play capabilities */
 	statep->ad_info.ad_play.ad_mixer_srs =
-		audioixp_mixer_sample_rates;
+	    audioixp_mixer_sample_rates;
 	statep->ad_info.ad_play.ad_compat_srs =
-		audioixp_compat_sample_rates;
+	    audioixp_compat_sample_rates;
 	statep->ad_info.ad_play.ad_conv = &am_src2;
 	statep->ad_info.ad_play.ad_sr_info = NULL;
 	statep->ad_info.ad_play.ad_chs = audioixp_channels;
@@ -1610,9 +1610,9 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 
 	/* record capabilities */
 	statep->ad_info.ad_record.ad_mixer_srs =
-		audioixp_mixer_sample_rates;
+	    audioixp_mixer_sample_rates;
 	statep->ad_info.ad_record.ad_compat_srs =
-		audioixp_compat_sample_rates;
+	    audioixp_compat_sample_rates;
 	statep->ad_info.ad_record.ad_conv = &am_src2;
 	statep->ad_info.ad_record.ad_sr_info = NULL;
 	statep->ad_info.ad_record.ad_chs = audioixp_channels;
@@ -1621,9 +1621,9 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	statep->ad_info.ad_record.ad_bsize = IXP_BSIZE;
 
 	if (ddi_get_iblock_cookie(dip, (uint_t)0, &statep->intr_iblock) !=
-		DDI_SUCCESS) {
+	    DDI_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_init_state() cannot get iblock cookie");
+		    "!audioixp_init_state() cannot get iblock cookie");
 		return (AUDIO_FAILURE);
 	}
 	mutex_init(&statep->inst_lock, NULL, MUTEX_DRIVER, statep->intr_iblock);
@@ -1634,11 +1634,11 @@ audioixp_init_state(audioixp_state_t *statep, dev_info_t *dip)
 	(void) strcpy(statep->ixp_dev_info.version, IXP_DEV_VERSION);
 
 	statep->play_buf_size = IXP_SAMPR48000 * AUDIO_CHANNELS_STEREO *
-		(AUDIO_PRECISION_16 >> AUDIO_PRECISION_SHIFT) / pints;
+	    (AUDIO_PRECISION_16 >> AUDIO_PRECISION_SHIFT) / pints;
 	statep->play_buf_size += IXP_MOD_SIZE -
-		(statep->play_buf_size % IXP_MOD_SIZE);
+	    (statep->play_buf_size % IXP_MOD_SIZE);
 	statep->record_buf_size = IXP_SAMPR48000 * AUDIO_CHANNELS_STEREO *
-		(AUDIO_PRECISION_16 >> AUDIO_PRECISION_SHIFT) / rints;
+	    (AUDIO_PRECISION_16 >> AUDIO_PRECISION_SHIFT) / rints;
 	statep->record_buf_size += IXP_MOD_SIZE - 1;
 	statep->record_buf_size -= statep->record_buf_size % IXP_MOD_SIZE;
 
@@ -1675,21 +1675,21 @@ audioixp_map_regs(dev_info_t *dip, audioixp_state_t *statep)
 
 	/* map PCI config space */
 	if (pci_config_setup(statep->dip, &statep->pci_conf_handle) ==
-		DDI_FAILURE) {
+	    DDI_FAILURE) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_map_regs() configuration "
-			"memory mapping failed");
+		    "!audioixp_map_regs() configuration "
+		    "memory mapping failed");
 		goto error;
 	}
 	statep->ixp_res_flags |= IXP_RS_PCI_REGS;
 
 	/* map audio mixer register */
 	if ((ddi_regs_map_setup(dip, IXP_IO_AM_REGS,
-		(caddr_t *)&statep->am_regs_base, 0, 0,
-		&dev_attr, &statep->am_regs_handle)) != DDI_SUCCESS) {
+	    (caddr_t *)&statep->am_regs_base, 0, 0,
+	    &dev_attr, &statep->am_regs_handle)) != DDI_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_map_regs() audio mixer "
-			"memory mapping failed");
+		    "!audioixp_map_regs() audio mixer "
+		    "memory mapping failed");
 		goto error;
 	}
 	statep->ixp_res_flags |= IXP_RS_AM_REGS;
@@ -1699,31 +1699,31 @@ audioixp_map_regs(dev_info_t *dip, audioixp_state_t *statep)
 	 * we allocate adjacent DMA memory for all DMA engines.
 	 */
 	if (ddi_dma_alloc_handle(dip, &bdlist_dma_attr, DDI_DMA_SLEEP,
-		(caddr_t)0, &statep->bdl_dma_handle) != DDI_SUCCESS) {
+	    (caddr_t)0, &statep->bdl_dma_handle) != DDI_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_map_regs() ddi_dma_alloc_handle(bdlist)"
-			" failed");
+		    "!audioixp_map_regs() ddi_dma_alloc_handle(bdlist)"
+		    " failed");
 		goto error;
 	}
 	statep->ixp_res_flags |= IXP_RS_DMA_BDL_HANDLE;
 
 	if (ddi_dma_mem_alloc(statep->bdl_dma_handle,
-		sizeof (audioixp_bd_list_t), &dev_attr, DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP, NULL, (caddr_t *)&statep->bdl_virtual,
-		&statep->bdl_size, &statep->bdl_acc_handle) != DDI_SUCCESS) {
+	    sizeof (audioixp_bd_list_t), &dev_attr, DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, NULL, (caddr_t *)&statep->bdl_virtual,
+	    &statep->bdl_size, &statep->bdl_acc_handle) != DDI_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_map_regs() ddi_dma_mem_alloc(bdlist) "
-			"failed");
+		    "!audioixp_map_regs() ddi_dma_mem_alloc(bdlist) "
+		    "failed");
 		goto error;
 	}
 	statep->ixp_res_flags |= IXP_RS_DMA_BDL_MEM;
 
 	if (ddi_dma_addr_bind_handle(statep->bdl_dma_handle, NULL,
-		(caddr_t)statep->bdl_virtual, statep->bdl_size,
-		DDI_DMA_RDWR|DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &cookie,
-		&count) != DDI_DMA_MAPPED) {
+	    (caddr_t)statep->bdl_virtual, statep->bdl_size,
+	    DDI_DMA_RDWR|DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &cookie,
+	    &count) != DDI_DMA_MAPPED) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_map_regs() addr_bind_handle failed");
+		    "!audioixp_map_regs() addr_bind_handle failed");
 		goto error;
 	}
 
@@ -1734,13 +1734,13 @@ audioixp_map_regs(dev_info_t *dip, audioixp_state_t *statep)
 	if (count != 1) {
 		(void) ddi_dma_unbind_handle(statep->bdl_dma_handle);
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_map_regs() addr_bind_handle failed,"
-			" cookies > 1");
+		    "!audioixp_map_regs() addr_bind_handle failed,"
+		    " cookies > 1");
 		goto error;
 	}
 
 	statep->bdl_phys =
-		(audioixp_bd_list_t *)(long)(cookie.dmac_address);
+	    (audioixp_bd_list_t *)(long)(cookie.dmac_address);
 	statep->ixp_res_flags |= IXP_RS_DMA_BDL_BIND;
 
 	return (AUDIO_SUCCESS);
@@ -1838,23 +1838,23 @@ audioixp_alloc_sample_buf(audioixp_state_t *statep, int which, int len)
 		chunk = &(buf->chunk[i]);
 
 		if (ddi_dma_alloc_handle(statep->dip, &sample_buf_dma_attr,
-			DDI_DMA_SLEEP, NULL, &chunk->dma_handle) !=
-			DDI_SUCCESS) {
+		    DDI_DMA_SLEEP, NULL, &chunk->dma_handle) !=
+		    DDI_SUCCESS) {
 			goto error;
 		}
 
 		if (ddi_dma_mem_alloc(chunk->dma_handle, len, &dev_attr,
-			DDI_DMA_STREAMING, DDI_DMA_SLEEP, NULL,
-			&chunk->data_buf, &chunk->real_len,
-			&chunk->acc_handle) != DDI_SUCCESS) {
+		    DDI_DMA_STREAMING, DDI_DMA_SLEEP, NULL,
+		    &chunk->data_buf, &chunk->real_len,
+		    &chunk->acc_handle) != DDI_SUCCESS) {
 			ddi_dma_free_handle(&chunk->dma_handle);
 			goto error;
 		}
 
 		if (ddi_dma_addr_bind_handle(chunk->dma_handle, NULL,
-			chunk->data_buf, chunk->real_len, DDI_DMA_WRITE,
-			DDI_DMA_SLEEP, NULL, &cookie, &count) !=
-			DDI_DMA_MAPPED) {
+		    chunk->data_buf, chunk->real_len, DDI_DMA_WRITE,
+		    DDI_DMA_SLEEP, NULL, &cookie, &count) !=
+		    DDI_DMA_MAPPED) {
 			ddi_dma_mem_free(&chunk->acc_handle);
 			ddi_dma_free_handle(&chunk->dma_handle);
 			goto error;
@@ -1942,25 +1942,25 @@ static void audioixp_setup_bdl(audioixp_state_t *statep)
 	/* setup playback bdlist */
 	for (i = 0; i < IXP_BD_NUMS; i ++) {
 		bd_p = &(((audioixp_bd_list_t *)(statep->bdl_virtual))
-			->pcm_out[i]);
+		    ->pcm_out[i]);
 		bd_p->buf_base = statep->play_buf.chunk[i&IXP_CHUNK_MASK]
-				.addr_phy;
+		    .addr_phy;
 		bd_p->status = 0;
 		bd_p->buf_len = 0;
 		bd_p->next = (uintptr_t)&(((audioixp_bd_list_t *)
-			(statep->bdl_phys))->pcm_out[(i+1)%IXP_BD_NUMS]);
+		    (statep->bdl_phys))->pcm_out[(i+1)%IXP_BD_NUMS]);
 	}
 
 	/* setup record bdlist */
 	for (i = 0; i < IXP_BD_NUMS; i ++) {
 		bd_p = &(((audioixp_bd_list_t *)(statep->bdl_virtual))
-			->pcm_in[i]);
+		    ->pcm_in[i]);
 		bd_p->buf_base = statep->record_buf.chunk[i&IXP_CHUNK_MASK]
-				.addr_phy;
+		    .addr_phy;
 		bd_p->status = 0;
 		bd_p->buf_len = 0;
 		bd_p->next = (uintptr_t)&(((audioixp_bd_list_t *)
-			(statep->bdl_phys))->pcm_in[(i+1)%IXP_BD_NUMS]);
+		    (statep->bdl_phys))->pcm_in[(i+1)%IXP_BD_NUMS]);
 	}
 }	/* audioixp_setup_bdl() */
 
@@ -1985,13 +1985,13 @@ audioixp_start_dma(audioixp_state_t *statep, int dir)
 	if (dir == AUDIO_PLAY) {
 		IXP_AM_PUT32(IXP_AUDIO_FIFO_FLUSH, IXP_AUDIO_FIFO_FLUSH_OUT);
 		IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_OUT_DMA,
-			IXP_AUDIO_CMD_EN_OUT_DMA);
+		    IXP_AUDIO_CMD_EN_OUT_DMA,
+		    IXP_AUDIO_CMD_EN_OUT_DMA);
 	} else {
 		IXP_AM_PUT32(IXP_AUDIO_FIFO_FLUSH, IXP_AUDIO_FIFO_FLUSH_IN);
 		IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_IN_DMA,
-			IXP_AUDIO_CMD_EN_IN_DMA);
+		    IXP_AUDIO_CMD_EN_IN_DMA,
+		    IXP_AUDIO_CMD_EN_IN_DMA);
 	}
 
 }	/* audioixp_start_dma() */
@@ -2018,12 +2018,12 @@ audioixp_stop_dma(audioixp_state_t *statep, int dir)
 
 	if (dir == AUDIO_PLAY) {
 		IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_OUT_DMA,
-			0);
+		    IXP_AUDIO_CMD_EN_OUT_DMA,
+		    0);
 	} else {
 		IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_IN_DMA,
-			0);
+		    IXP_AUDIO_CMD_EN_IN_DMA,
+		    0);
 	}
 
 }	/* audioixp_stop_dma() */
@@ -2055,12 +2055,12 @@ audioixp_codec_ready(audioixp_state_t *statep)
 	old_reg = IXP_AM_GET32(IXP_AUDIO_INT_EN);
 
 	IXP_AM_UPDATE32(IXP_AUDIO_INT_EN,
-		IXP_AUDIO_INT_EN_CODEC0_NOT_READY
-		| IXP_AUDIO_INT_EN_CODEC1_NOT_READY
-		| IXP_AUDIO_INT_EN_CODEC2_NOT_READY,
-		IXP_AUDIO_INT_EN_CODEC0_NOT_READY
-		| IXP_AUDIO_INT_EN_CODEC1_NOT_READY
-		| IXP_AUDIO_INT_EN_CODEC2_NOT_READY);
+	    IXP_AUDIO_INT_EN_CODEC0_NOT_READY
+	    | IXP_AUDIO_INT_EN_CODEC1_NOT_READY
+	    | IXP_AUDIO_INT_EN_CODEC2_NOT_READY,
+	    IXP_AUDIO_INT_EN_CODEC0_NOT_READY
+	    | IXP_AUDIO_INT_EN_CODEC1_NOT_READY
+	    | IXP_AUDIO_INT_EN_CODEC2_NOT_READY);
 
 	drv_usecwait(1000);
 	IXP_AM_PUT32(IXP_AUDIO_INT_EN, old_reg);
@@ -2135,10 +2135,10 @@ audioixp_read_ac97(audioixp_state_t *statep, int reg, uint16_t *data)
 	}
 
 	value = IXP_AUDIO_OUT_PHY_PRIMARY_CODEC
-		| IXP_AUDIO_OUT_PHY_READ
-		| IXP_AUDIO_OUT_PHY_EN
-		| ((reg << IXP_AUDIO_OUT_PHY_ADDR_SHIFT)
-			& IXP_AUDIO_OUT_PHY_ADDR_MASK);
+	    | IXP_AUDIO_OUT_PHY_READ
+	    | IXP_AUDIO_OUT_PHY_EN
+	    | ((reg << IXP_AUDIO_OUT_PHY_ADDR_SHIFT)
+	    & IXP_AUDIO_OUT_PHY_ADDR_MASK);
 	IXP_AM_PUT32(IXP_AUDIO_OUT_PHY_ADDR_DATA, value);
 
 	if (audioixp_codec_sync(statep) != AUDIO_SUCCESS) {
@@ -2150,7 +2150,7 @@ audioixp_read_ac97(audioixp_state_t *statep, int reg, uint16_t *data)
 		result = IXP_AM_GET32(IXP_AUDIO_IN_PHY_ADDR_DATA);
 		if (result & IXP_AUDIO_IN_PHY_READY)	{
 			*data = (result & IXP_AUDIO_IN_PHY_DATA_MASK)
-				>> IXP_AUDIO_IN_PHY_DATA_SHIFT;
+			    >> IXP_AUDIO_IN_PHY_DATA_SHIFT;
 			statep->codec_shadow[IXP_CODEC_REG(reg)] = *data;
 			return (AUDIO_SUCCESS);
 		}
@@ -2188,12 +2188,12 @@ audioixp_write_ac97(audioixp_state_t *statep, int reg, uint16_t data)
 	}
 
 	value = IXP_AUDIO_OUT_PHY_PRIMARY_CODEC
-		| IXP_AUDIO_OUT_PHY_WRITE
-		| IXP_AUDIO_OUT_PHY_EN
-		| ((reg << IXP_AUDIO_OUT_PHY_ADDR_SHIFT)
-			& IXP_AUDIO_OUT_PHY_ADDR_MASK)
-		| ((data << IXP_AUDIO_OUT_PHY_DATA_SHIFT)
-			& IXP_AUDIO_OUT_PHY_DATA_MASK);
+	    | IXP_AUDIO_OUT_PHY_WRITE
+	    | IXP_AUDIO_OUT_PHY_EN
+	    | ((reg << IXP_AUDIO_OUT_PHY_ADDR_SHIFT)
+	    & IXP_AUDIO_OUT_PHY_ADDR_MASK)
+	    | ((data << IXP_AUDIO_OUT_PHY_DATA_SHIFT)
+	    & IXP_AUDIO_OUT_PHY_DATA_MASK);
 	IXP_AM_PUT32(IXP_AUDIO_OUT_PHY_ADDR_DATA, value);
 
 	(void) audioixp_read_ac97(statep, reg, &tmp);
@@ -2280,13 +2280,13 @@ audioixp_reset_ac97(audioixp_state_t *statep)
 
 	/* register reset */
 	IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-		IXP_AUDIO_CMD_AC_SOFT_RESET,
-		IXP_AUDIO_CMD_AC_SOFT_RESET);
+	    IXP_AUDIO_CMD_AC_SOFT_RESET,
+	    IXP_AUDIO_CMD_AC_SOFT_RESET);
 
 	drv_usecwait(10);
 	IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-		IXP_AUDIO_CMD_AC_SOFT_RESET,
-		0);
+	    IXP_AUDIO_CMD_AC_SOFT_RESET,
+	    0);
 
 	/* cold reset */
 	for (i = 0; i < 300; i++) {
@@ -2361,7 +2361,7 @@ audioixp_chunk_processed(audioixp_state_t *statep, int dir)
 				bd = &statep->bdl_virtual->pcm_in[i];
 
 			if (hw_pointer >= bd->buf_base &&
-				hw_pointer < bd->buf_base + bd->buf_len*4)
+			    hw_pointer < bd->buf_base + bd->buf_len*4)
 				break;
 		}
 
@@ -2375,7 +2375,7 @@ audioixp_chunk_processed(audioixp_state_t *statep, int dir)
 	 */
 	if (retry_count == 100) {
 		cmn_err(CE_WARN, "!bad hw_pointer, hw_pointer=0x%08x",
-			hw_pointer);
+		    hw_pointer);
 		for (i = 0; i < IXP_BD_NUMS; i ++) {
 			if (dir == AUDIO_PLAY)
 				bd = &statep->bdl_virtual->pcm_out[i];
@@ -2383,14 +2383,14 @@ audioixp_chunk_processed(audioixp_state_t *statep, int dir)
 				bd = &statep->bdl_virtual->pcm_in[i];
 
 			cmn_err(CE_WARN, "!bd[%d], base=0x%08x, len=0x%x",
-				i, bd->buf_base, bd->buf_len);
+			    i, bd->buf_base, bd->buf_len);
 		}
 		return (0);
 	}
 
 	if (buf->last_hw_pointer >= bd->buf_base && /* case 1 */
-		hw_pointer > buf->last_hw_pointer &&
-		hw_pointer < bd->buf_base + bd->buf_len * 4)
+	    hw_pointer > buf->last_hw_pointer &&
+	    hw_pointer < bd->buf_base + bd->buf_len * 4)
 		result = 0;
 	else if (buf->last_hw_pointer == hw_pointer) /* case 2 */
 		result = 2;
@@ -2434,9 +2434,9 @@ audioixp_fill_play_buf(audioixp_state_t *statep)
 		 * ready to start PCM out engine
 		 */
 		IXP_AM_PUT32(
-			IXP_AUDIO_OUT_DMA_LINK_P,
-			(uint32_t)(uintptr_t)statep->bdl_phys->pcm_out |
-			IXP_AUDIO_OUT_DMA_LINK_P_EN);
+		    IXP_AUDIO_OUT_DMA_LINK_P,
+		    (uint32_t)(uintptr_t)statep->bdl_phys->pcm_out |
+		    IXP_AUDIO_OUT_DMA_LINK_P_EN);
 
 		buf->next = 0;
 		buf->avail = 2;	/* have only two buffers for playback */
@@ -2448,7 +2448,7 @@ audioixp_fill_play_buf(audioixp_state_t *statep)
 	}
 
 	samples = statep->ixp_psample_rate * statep->ixp_pchannels /
-		statep->ad_info.ad_play.ad_int_rate;
+	    statep->ad_info.ad_play.ad_int_rate;
 
 	/* if not an even number of samples we panic! */
 	if ((samples & 1) != 0) {
@@ -2459,12 +2459,12 @@ audioixp_fill_play_buf(audioixp_state_t *statep)
 		chunk = &(buf->chunk[buf->next & 1]);
 		mutex_exit(&statep->inst_lock);
 		rs = am_get_audio(statep->audio_handle,
-			(char *)(chunk->data_buf), AUDIO_NO_CHANNEL, samples);
+		    (char *)(chunk->data_buf), AUDIO_NO_CHANNEL, samples);
 
 		mutex_enter(&statep->inst_lock);
 
 		if (((statep->flags & IXP_DMA_PLAY_STARTED) == 0) &&
-			(buf->io_started)) {
+		    (buf->io_started)) {
 			return (AUDIO_FAILURE);
 		}
 
@@ -2493,14 +2493,14 @@ audioixp_fill_play_buf(audioixp_state_t *statep)
 
 				/* Finished playing, then stop it */
 				IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-					IXP_AUDIO_CMD_EN_OUT,
-					0);
+				    IXP_AUDIO_CMD_EN_OUT,
+				    0);
 
 				buf->io_started = B_FALSE;
 
 				/* clr the flags getting ready for next start */
 				statep->flags &= ~(IXP_DMA_PLAY_PAUSED |
-					IXP_DMA_PLAY_EMPTY);
+				    IXP_DMA_PLAY_EMPTY);
 
 				return (AUDIO_FAILURE);
 			} else {
@@ -2515,7 +2515,7 @@ audioixp_fill_play_buf(audioixp_state_t *statep)
 			/* we got at least one sample */
 			statep->flags &= ~IXP_DMA_PLAY_EMPTY;
 			(void) ddi_dma_sync(chunk->dma_handle, 0, rs<<1,
-				DDI_DMA_SYNC_FORDEV);
+			    DDI_DMA_SYNC_FORDEV);
 		}
 
 		/* put the samples into buffer descriptor list entry */
@@ -2530,9 +2530,9 @@ audioixp_fill_play_buf(audioixp_state_t *statep)
 	/* start PCM out engine */
 	if (!buf->io_started) {
 		IXP_AM_UPDATE32(
-			IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_OUT,
-			IXP_AUDIO_CMD_EN_OUT);
+		    IXP_AUDIO_CMD,
+		    IXP_AUDIO_CMD_EN_OUT,
+		    IXP_AUDIO_CMD_EN_OUT);
 
 		buf->io_started = B_TRUE;
 	}
@@ -2598,8 +2598,8 @@ audioixp_prepare_record_buf(audioixp_state_t *statep)
 
 		/* buffer base */
 		IXP_AM_PUT32(IXP_AUDIO_IN_DMA_LINK_P,
-			(uint32_t)(uintptr_t)statep->bdl_phys->pcm_in |
-			IXP_AUDIO_IN_DMA_LINK_P_EN);
+		    (uint32_t)(uintptr_t)statep->bdl_phys->pcm_in |
+		    IXP_AUDIO_IN_DMA_LINK_P_EN);
 		buf->next = 0;
 		buf->avail = 2;
 		buf->last_hw_pointer = statep->bdl_virtual->pcm_in[0].buf_base;
@@ -2610,7 +2610,7 @@ audioixp_prepare_record_buf(audioixp_state_t *statep)
 	}
 
 	samples = statep->ixp_csample_rate * statep->ixp_cchannels /
-		statep->ad_info.ad_record.ad_int_rate;
+	    statep->ad_info.ad_record.ad_int_rate;
 
 	/* if not an even number of samples we panic! */
 	if ((samples & 1) != 0) {
@@ -2628,8 +2628,8 @@ audioixp_prepare_record_buf(audioixp_state_t *statep)
 	if (!buf->io_started) {
 		buf->io_started = B_TRUE;
 		IXP_AM_UPDATE32(IXP_AUDIO_CMD,
-			IXP_AUDIO_CMD_EN_IN,
-			IXP_AUDIO_CMD_EN_IN);
+		    IXP_AUDIO_CMD_EN_IN,
+		    IXP_AUDIO_CMD_EN_IN);
 	}
 
 	return (AUDIO_SUCCESS);
@@ -2665,10 +2665,10 @@ audioixp_reclaim_record_buf(audioixp_state_t *statep)
 	while (buf->avail > 0) {
 		chunk = &buf->chunk[buf->next & 1];
 		(void) ddi_dma_sync(chunk->dma_handle, 0,
-			samples<<1, DDI_DMA_SYNC_FORCPU);
+		    samples<<1, DDI_DMA_SYNC_FORCPU);
 		mutex_exit(&statep->inst_lock);
 		am_send_audio(statep->audio_handle, chunk->data_buf,
-			AUDIO_NO_CHANNEL, samples);
+		    AUDIO_NO_CHANNEL, samples);
 		mutex_enter(&statep->inst_lock);
 		buf->avail --;
 		buf->next ++;
@@ -2737,7 +2737,7 @@ audioixp_set_gain(audioixp_state_t *statep, int dir, int gain,
 		ASSERT(dir == AUDIO_RECORD);
 
 		(void) audioixp_read_ac97(statep,
-			AC97_RECORD_GAIN_REGISTER, &tmp);
+		    AC97_RECORD_GAIN_REGISTER, &tmp);
 
 		if (channel == 0) {	/* left channel */
 			tmp &= ~RGR_LEFT_MASK;
@@ -2749,7 +2749,7 @@ audioixp_set_gain(audioixp_state_t *statep, int dir, int gain,
 			tmp |= gain & RGR_RIGHT_MASK;
 		}
 		(void) audioixp_write_ac97(statep,
-			AC97_RECORD_GAIN_REGISTER, tmp);
+		    AC97_RECORD_GAIN_REGISTER, tmp);
 	}
 
 	return (AUDIO_SUCCESS);
@@ -2793,44 +2793,44 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 
 		if (port & AUDIO_SPEAKER) {
 			(void) audioixp_and_ac97(statep,
-				AC97_MONO_MASTER_VOLUME_REGSITER,
-				(uint16_t)~MVR_MUTE);
+			    AC97_MONO_MASTER_VOLUME_REGSITER,
+			    (uint16_t)~MVR_MUTE);
 			tmp |= AUDIO_SPEAKER;
 		} else {
 			(void) audioixp_or_ac97(statep,
-				AC97_MONO_MASTER_VOLUME_REGSITER, MVR_MUTE);
+			    AC97_MONO_MASTER_VOLUME_REGSITER, MVR_MUTE);
 		}
 
 		if (port & AUDIO_LINE_OUT) {
 			if (statep->swap_out == B_FALSE) {
 				(void) audioixp_and_ac97(statep,
-					AC97_MASTER_VOLUME_REGISTER,
-					(uint16_t)~MVR_MUTE);
+				    AC97_MASTER_VOLUME_REGISTER,
+				    (uint16_t)~MVR_MUTE);
 			} else {
 				(void) audioixp_and_ac97(statep,
-					AC97_EXTENDED_LRS_VOLUME_REGISTER,
-					(uint16_t)~AD1980_SURR_MUTE);
+				    AC97_EXTENDED_LRS_VOLUME_REGISTER,
+				    (uint16_t)~AD1980_SURR_MUTE);
 			}
 			tmp |= AUDIO_LINE_OUT;
 		} else {
 			if (statep->swap_out == B_FALSE) {
 				(void) audioixp_or_ac97(statep,
-					AC97_MASTER_VOLUME_REGISTER, MVR_MUTE);
+				    AC97_MASTER_VOLUME_REGISTER, MVR_MUTE);
 			} else {
 				(void) audioixp_or_ac97(statep,
-					AC97_EXTENDED_LRS_VOLUME_REGISTER,
-					AD1980_SURR_MUTE);
+				    AC97_EXTENDED_LRS_VOLUME_REGISTER,
+				    AD1980_SURR_MUTE);
 			}
 		}
 
 		if (port & AUDIO_HEADPHONE) {
 			(void) audioixp_and_ac97(statep,
-				AC97_HEADPHONE_VOLUME_REGISTER,
-				(uint16_t)~MVR_MUTE);
+			    AC97_HEADPHONE_VOLUME_REGISTER,
+			    (uint16_t)~MVR_MUTE);
 			tmp |= AUDIO_HEADPHONE;
 		} else {
 			(void) audioixp_or_ac97(statep,
-				AC97_HEADPHONE_VOLUME_REGISTER, MVR_MUTE);
+			    AC97_HEADPHONE_VOLUME_REGISTER, MVR_MUTE);
 		}
 
 		ATRACE_32("audioixp_set_port() out port", tmp);
@@ -2850,24 +2850,24 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 
 			/* mute the master record input */
 			(void) audioixp_or_ac97(statep,
-				AC97_RECORD_GAIN_REGISTER, RGR_MUTE);
+			    AC97_RECORD_GAIN_REGISTER, RGR_MUTE);
 
 			if (statep->ixp_monitor_gain) {
 				if (statep->ixp_input_port ==
-					AUDIO_MICROPHONE) {
+				    AUDIO_MICROPHONE) {
 					(void) audioixp_or_ac97(statep,
-						AC97_MIC_VOLUME_REGISTER,
-						MICVR_MUTE);
+					    AC97_MIC_VOLUME_REGISTER,
+					    MICVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_LINE_IN) {
+				    AUDIO_LINE_IN) {
 					(void) audioixp_or_ac97(statep,
-						AC97_LINE_IN_VOLUME_REGISTER,
-						LIVR_MUTE);
+					    AC97_LINE_IN_VOLUME_REGISTER,
+					    LIVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_CD) {
+				    AUDIO_CD) {
 					(void) audioixp_or_ac97(statep,
-						AC97_CD_VOLUME_REGISTER,
-						CDVR_MUTE);
+					    AC97_CD_VOLUME_REGISTER,
+					    CDVR_MUTE);
 				}
 			}
 			break;
@@ -2878,19 +2878,19 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 
 			if (statep->ixp_monitor_gain) {
 				if (statep->ixp_input_port ==
-					AUDIO_LINE_IN) {
+				    AUDIO_LINE_IN) {
 					(void) audioixp_or_ac97(statep,
-						AC97_LINE_IN_VOLUME_REGISTER,
-						LIVR_MUTE);
+					    AC97_LINE_IN_VOLUME_REGISTER,
+					    LIVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_CD) {
+				    AUDIO_CD) {
 					(void) audioixp_or_ac97(statep,
-						AC97_CD_VOLUME_REGISTER,
-						CDVR_MUTE);
+					    AC97_CD_VOLUME_REGISTER,
+					    CDVR_MUTE);
 				}
 				(void) audioixp_write_ac97(statep,
-					AC97_MIC_VOLUME_REGISTER,
-					statep->ixp_monitor_gain);
+				    AC97_MIC_VOLUME_REGISTER,
+				    statep->ixp_monitor_gain);
 			}
 			break;
 
@@ -2901,19 +2901,19 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 			/* see if we need to update monitor loopback */
 			if (statep->ixp_monitor_gain) {
 				if (statep->ixp_input_port ==
-					AUDIO_MICROPHONE) {
+				    AUDIO_MICROPHONE) {
 					(void) audioixp_or_ac97(statep,
-						AC97_MIC_VOLUME_REGISTER,
-						MICVR_MUTE);
+					    AC97_MIC_VOLUME_REGISTER,
+					    MICVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_CD) {
+				    AUDIO_CD) {
 					(void) audioixp_or_ac97(statep,
-						AC97_CD_VOLUME_REGISTER,
-						CDVR_MUTE);
+					    AC97_CD_VOLUME_REGISTER,
+					    CDVR_MUTE);
 				}
 				(void) audioixp_write_ac97(statep,
-					AC97_LINE_IN_VOLUME_REGISTER,
-					statep->ixp_monitor_gain);
+				    AC97_LINE_IN_VOLUME_REGISTER,
+				    statep->ixp_monitor_gain);
 			}
 			break;
 
@@ -2924,19 +2924,19 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 			/* see if we need to update monitor loopback */
 			if (statep->ixp_monitor_gain) {
 				if (statep->ixp_input_port ==
-					AUDIO_MICROPHONE) {
+				    AUDIO_MICROPHONE) {
 					(void) audioixp_or_ac97(statep,
-						AC97_MIC_VOLUME_REGISTER,
-						MICVR_MUTE);
+					    AC97_MIC_VOLUME_REGISTER,
+					    MICVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_LINE_IN) {
+				    AUDIO_LINE_IN) {
 					(void) audioixp_or_ac97(statep,
-						AC97_LINE_IN_VOLUME_REGISTER,
-						LIVR_MUTE);
+					    AC97_LINE_IN_VOLUME_REGISTER,
+					    LIVR_MUTE);
 				}
 				(void) audioixp_write_ac97(statep,
-					AC97_CD_VOLUME_REGISTER,
-					statep->ixp_monitor_gain);
+				    AC97_CD_VOLUME_REGISTER,
+				    statep->ixp_monitor_gain);
 			}
 			break;
 
@@ -2946,20 +2946,20 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 
 			if (statep->ixp_monitor_gain) {
 				if (statep->ixp_input_port ==
-					AUDIO_LINE_IN) {
+				    AUDIO_LINE_IN) {
 					(void) audioixp_or_ac97(statep,
-						AC97_LINE_IN_VOLUME_REGISTER,
-						LIVR_MUTE);
+					    AC97_LINE_IN_VOLUME_REGISTER,
+					    LIVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_MICROPHONE) {
+				    AUDIO_MICROPHONE) {
 					(void) audioixp_or_ac97(statep,
-						AC97_MIC_VOLUME_REGISTER,
-						MICVR_MUTE);
+					    AC97_MIC_VOLUME_REGISTER,
+					    MICVR_MUTE);
 				} else if (statep->ixp_input_port ==
-					AUDIO_CD) {
+				    AUDIO_CD) {
 					(void) audioixp_or_ac97(statep,
-						AC97_CD_VOLUME_REGISTER,
-						CDVR_MUTE);
+					    AC97_CD_VOLUME_REGISTER,
+					    CDVR_MUTE);
 				}
 			}
 			break;
@@ -2971,13 +2971,13 @@ audioixp_set_port(audioixp_state_t *statep, int dir, int port)
 
 		/* select the input */
 		(void) audioixp_write_ac97(statep,
-			AC97_RECORD_SELECT_CTRL_REGISTER, tmp);
+		    AC97_RECORD_SELECT_CTRL_REGISTER, tmp);
 		if ((port != AUDIO_NONE) &&
-			(statep->codec_shadow[IXP_CODEC_REG(
-			AC97_RECORD_GAIN_REGISTER)] & RGR_MUTE)) {
+		    (statep->codec_shadow[IXP_CODEC_REG(
+		    AC97_RECORD_GAIN_REGISTER)] & RGR_MUTE)) {
 			(void) audioixp_and_ac97(statep,
-				AC97_RECORD_GAIN_REGISTER,
-				(uint16_t)~RGR_MUTE);
+			    AC97_RECORD_GAIN_REGISTER,
+			    (uint16_t)~RGR_MUTE);
 		}
 		statep->ixp_input_port = port;
 	}
@@ -3019,10 +3019,10 @@ audioixp_set_monitor_gain(audioixp_state_t *statep, int gain)
 	} else {
 		/* Adjust the value of gain to the requirement of AC'97 */
 		tmp_short = AUDIO_MAX_GAIN - gain;
-		tmp_short = ((tmp_short << statep->vol_bits_mask) - tmp_short) /
-		AUDIO_MAX_GAIN;
+		tmp_short = ((tmp_short << statep->vol_bits_mask) - tmp_short)
+		    / AUDIO_MAX_GAIN;
 		tmp_short |= (((tmp_short << statep->vol_bits_mask) -
-		tmp_short) / AUDIO_MAX_GAIN) << 8;
+		    tmp_short) / AUDIO_MAX_GAIN) << 8;
 	}
 
 	switch (statep->ixp_input_port) {
@@ -3039,20 +3039,20 @@ audioixp_set_monitor_gain(audioixp_state_t *statep, int gain)
 		 * MIC input has 20dB boost, we just preserve it
 		 */
 		tmp_short |=
-			statep->codec_shadow[IXP_CODEC_REG(
-			AC97_MIC_VOLUME_REGISTER)] & MICVR_20dB_BOOST;
+		    statep->codec_shadow[IXP_CODEC_REG(
+		    AC97_MIC_VOLUME_REGISTER)] & MICVR_20dB_BOOST;
 		(void) audioixp_write_ac97(statep,
-			AC97_MIC_VOLUME_REGISTER, tmp_short);
+		    AC97_MIC_VOLUME_REGISTER, tmp_short);
 		break;
 
 	case AUDIO_LINE_IN:
 		(void) audioixp_write_ac97(statep,
-			AC97_LINE_IN_VOLUME_REGISTER, tmp_short);
+		    AC97_LINE_IN_VOLUME_REGISTER, tmp_short);
 		break;
 
 	case AUDIO_CD:
 		(void) audioixp_write_ac97(statep,
-			AC97_CD_VOLUME_REGISTER, tmp_short);
+		    AC97_CD_VOLUME_REGISTER, tmp_short);
 		break;
 
 	case AUDIO_CODEC_LOOPB_IN:
@@ -3063,7 +3063,7 @@ audioixp_set_monitor_gain(audioixp_state_t *statep, int gain)
 	default:
 		/* this should never happen! */
 		ATRACE("audioixp_ad_set_config() monitor gain bad device",
-			NULL);
+		    NULL);
 		rc = AUDIO_FAILURE;
 		goto done;
 	}
@@ -3119,13 +3119,13 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 	/* AC97 reset */
 	if (audioixp_reset_ac97(statep) != AUDIO_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_chip_init() AC97 codec reset failed");
+		    "!audioixp_chip_init() AC97 codec reset failed");
 		return (AUDIO_FAILURE);
 	}
 
 	if (audioixp_codec_ready(statep) != AUDIO_SUCCESS) {
 		audio_sup_log(statep->audio_handle, CE_WARN,
-			"!audioixp_chip_init() AC97 codec not ready");
+		    "!audioixp_chip_init() AC97 codec not ready");
 		return (AUDIO_FAILURE);
 	}
 
@@ -3134,24 +3134,24 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 	if (restore == IXP_INIT_NO_RESTORE) {
 		for (i = 0; i <= IXP_LAST_AC_REG; i += 2) {
 			(void) audioixp_read_ac97(statep, i,
-				&(shadow[IXP_CODEC_REG(i)]));
+			    &(shadow[IXP_CODEC_REG(i)]));
 		}
 
 		/* 02h - set master line out volume, muted, 0dB */
 		shadow[IXP_CODEC_REG(AC97_MASTER_VOLUME_REGISTER)] =
-			MVR_MUTE;
+		    MVR_MUTE;
 
 		/* 04h - set alternate line out volume, muted, 0dB */
 		shadow[IXP_CODEC_REG(AC97_HEADPHONE_VOLUME_REGISTER)] =
-			HPVR_MUTE;
+		    HPVR_MUTE;
 
 		/* 06h - set master mono volume, muted, 0dB */
 		shadow[IXP_CODEC_REG(AC97_MONO_MASTER_VOLUME_REGSITER)] =
-			MMVR_MUTE;
+		    MMVR_MUTE;
 
 		/* 08h - set master tone control to no modification */
 		shadow[IXP_CODEC_REG(AC97_MASTER_TONE_CONTROL_REGISTER)] =
-			MTCR_BASS_BYPASS|MTCR_TREBLE_BYPASS;
+		    MTCR_BASS_BYPASS|MTCR_TREBLE_BYPASS;
 
 		/*
 		 * 0ah - turn pc beep mute off, 0dB
@@ -3163,55 +3163,55 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 		 * is, enable the PC Beep support.
 		 */
 		shadow[IXP_CODEC_REG(AC97_PC_BEEP_REGISTER)] =
-			PCBR_0dB_ATTEN;
+		    PCBR_0dB_ATTEN;
 
 		/* 0ch - set phone input, mute, 0dB attenuation */
 		shadow[IXP_CODEC_REG(AC97_PHONE_VOLUME_REGISTER)] =
-			PVR_MUTE|PVR_0dB_GAIN;
+		    PVR_MUTE|PVR_0dB_GAIN;
 
 		/* 0eh - set mic input, mute, 0dB attenuation */
 		shadow[IXP_CODEC_REG(AC97_MIC_VOLUME_REGISTER)] =
-			MICVR_MUTE|MICVR_0dB_GAIN;
+		    MICVR_MUTE|MICVR_0dB_GAIN;
 
 		/* 10h - set line input, mute, 0dB attenuation */
 		shadow[IXP_CODEC_REG(AC97_LINE_IN_VOLUME_REGISTER)] =
-			LIVR_MUTE|LIVR_RIGHT_0dB_GAIN|LIVR_LEFT_0dB_GAIN;
+		    LIVR_MUTE|LIVR_RIGHT_0dB_GAIN|LIVR_LEFT_0dB_GAIN;
 
 		/* 12h - set cd input, mute, 0dB attenuation */
 		shadow[IXP_CODEC_REG(AC97_CD_VOLUME_REGISTER)] =
-			CDVR_MUTE|CDVR_RIGHT_0dB_GAIN|CDVR_LEFT_0dB_GAIN;
+		    CDVR_MUTE|CDVR_RIGHT_0dB_GAIN|CDVR_LEFT_0dB_GAIN;
 
 		/* 14h - set video input, mute, 0dB attenuation */
 		shadow[IXP_CODEC_REG(AC97_VIDEO_VOLUME_REGISTER)] =
-			VIDVR_MUTE|VIDVR_RIGHT_0dB_GAIN|VIDVR_LEFT_0dB_GAIN;
+		    VIDVR_MUTE|VIDVR_RIGHT_0dB_GAIN|VIDVR_LEFT_0dB_GAIN;
 
 		/* 16h - set aux input, mute, 0dB attenuation */
 		shadow[IXP_CODEC_REG(AC97_AUX_VOLUME_REGISTER)] =
-			AUXVR_MUTE|AUXVR_RIGHT_0dB_GAIN|AUXVR_LEFT_0dB_GAIN;
+		    AUXVR_MUTE|AUXVR_RIGHT_0dB_GAIN|AUXVR_LEFT_0dB_GAIN;
 
 		/* 18h - set PCM out input, NOT muted, 0dB gain */
 		shadow[IXP_CODEC_REG(AC97_PCM_OUT_VOLUME_REGISTER)] =
-			PCMOVR_RIGHT_0dB_GAIN|PCMOVR_LEFT_0dB_GAIN;
+		    PCMOVR_RIGHT_0dB_GAIN|PCMOVR_LEFT_0dB_GAIN;
 
 		/* 1ah - set input device as mic */
 		shadow[IXP_CODEC_REG(AC97_RECORD_SELECT_CTRL_REGISTER)] =
-			RSCR_R_MIC|RSCR_L_MIC;
+		    RSCR_R_MIC|RSCR_L_MIC;
 
 		/* 1ch - set record gain to 0dB and not muted */
 		shadow[IXP_CODEC_REG(AC97_RECORD_GAIN_REGISTER)] =
-			RGR_RIGHT_0db_GAIN|RGR_LEFT_0db_GAIN;
+		    RGR_RIGHT_0db_GAIN|RGR_LEFT_0db_GAIN;
 
 		/* 1eh - set record mic gain to 0dB and not muted */
 		shadow[IXP_CODEC_REG(AC97_RECORD_GAIN_MIC_REGISTER)] =
-			RGMR_0db_GAIN;
+		    RGMR_0db_GAIN;
 
 		/* 20h - set GP register, mic 1, everything else off */
 		shadow[IXP_CODEC_REG(AC97_GENERAL_PURPOSE_REGISTER)] =
-			GPR_MS_MIC1|GPR_MONO_MIX_IN;
+		    GPR_MS_MIC1|GPR_MONO_MIX_IN;
 
 		/* 22h - set 3D control to NULL */
 		shadow[IXP_CODEC_REG(AC97_THREE_D_CONTROL_REGISTER)] =
-			TDCR_NULL;
+		    TDCR_NULL;
 
 		/*
 		 * The rest we ignore, most are reserved.
@@ -3222,19 +3222,19 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 	if (restore == IXP_INIT_RESTORE) {
 		/* Restore from saved values */
 		shadow[IXP_CODEC_REG(AC97_MASTER_VOLUME_REGISTER)] =
-			MVR_MUTE;
+		    MVR_MUTE;
 		shadow[IXP_CODEC_REG(AC97_HEADPHONE_VOLUME_REGISTER)] =
-			HPVR_MUTE;
+		    HPVR_MUTE;
 		shadow[IXP_CODEC_REG(AC97_MONO_MASTER_VOLUME_REGSITER)] =
-			MMVR_MUTE;
+		    MMVR_MUTE;
 		shadow[IXP_CODEC_REG(AC97_PCM_OUT_VOLUME_REGISTER)] =
-			PCMOVR_MUTE;
+		    PCMOVR_MUTE;
 	}
 
 	/* Now we set the AC97 codec registers to the saved values */
 	for (i = 2; i <= IXP_LAST_AC_REG; i += 2)
 		(void) audioixp_write_ac97(statep, i,
-			shadow[IXP_CODEC_REG(i)]);
+		    shadow[IXP_CODEC_REG(i)]);
 
 	(void) audioixp_read_ac97(statep, AC97_RESET_REGISTER, &tmp);
 	if (tmp & RR_HEADPHONE_SUPPORT) {
@@ -3257,15 +3257,15 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 	(void) audioixp_read_ac97(statep, AC97_VENDOR_ID1_REGISTER, &vid1);
 	(void) audioixp_read_ac97(statep, AC97_VENDOR_ID2_REGISTER, &vid2);
 	if (vid1 == AD1980_VID1 &&
-		(vid2 == AD1980_VID2 || vid2 == AD1985_VID2)) {
+	    (vid2 == AD1980_VID2 || vid2 == AD1985_VID2)) {
 		if (ddi_prop_get_int(DDI_DEV_T_ANY, statep->dip,
-			DDI_PROP_DONTPASS, "ad198x-swap-output", 1) == 1) {
+		    DDI_PROP_DONTPASS, "ad198x-swap-output", 1) == 1) {
 			statep->swap_out = B_TRUE;
 			(void) audioixp_read_ac97(statep, CODEC_AD_REG_MISC,
-				&tmp);
+			    &tmp);
 			(void) audioixp_write_ac97(statep,
-				CODEC_AD_REG_MISC,
-				tmp | AD1980_MISC_LOSEL | AD1980_MISC_HPSEL);
+			    CODEC_AD_REG_MISC,
+			    tmp | AD1980_MISC_LOSEL | AD1980_MISC_HPSEL);
 		}
 	}
 
@@ -3277,11 +3277,11 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 	 */
 	if (!(vid1 == ALC202_VID1 && vid2 == ALC202_VID2)) {
 		(void) audioixp_write_ac97(statep,
-			AC97_MASTER_VOLUME_REGISTER, MVR_MUTE |
-			MVR_RIGHT_OPTIONAL_MASK | MVR_LEFT_OPTIONAL_MASK);
+		    AC97_MASTER_VOLUME_REGISTER, MVR_MUTE |
+		    MVR_RIGHT_OPTIONAL_MASK | MVR_LEFT_OPTIONAL_MASK);
 
 		(void) audioixp_read_ac97(statep,
-			AC97_MASTER_VOLUME_REGISTER, &tmp);
+		    AC97_MASTER_VOLUME_REGISTER, &tmp);
 
 		if ((tmp & 0x7fff) != (MVR_RIGHT_MASK | MVR_LEFT_MASK)) {
 			statep->vol_bits_mask = 6;
@@ -3290,46 +3290,46 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 
 	/* resume the master volume to the max */
 	(void) audioixp_write_ac97(statep, AC97_MASTER_VOLUME_REGISTER,
-		MVR_MUTE);
+	    MVR_MUTE);
 
 	/*
 	 * if the codec chip does not support variable sample rate,
 	 * we set the sample rate to 48K
 	 */
 	(void) audioixp_read_ac97(statep, AC97_EXTENDED_AUDIO_REGISTER,
-		&xid);
+	    &xid);
 	audio_sup_log(statep->audio_handle, CE_NOTE,
-		"!%s%d: xid=0x%04x, vid1=0x%04x, vid2=0x%04x",
-		audioixp_name,  ddi_get_instance(statep->dip), xid, vid1, vid2);
+	    "!%s%d: xid=0x%04x, vid1=0x%04x, vid2=0x%04x",
+	    audioixp_name,  ddi_get_instance(statep->dip), xid, vid1, vid2);
 	if (!(xid & EAR_VRA)) {
 		statep->var_sr = B_FALSE;
 		statep->ad_info.ad_record.ad_compat_srs =
-			audioixp_min_compat_sample_rates;
+		    audioixp_min_compat_sample_rates;
 		statep->ad_info.ad_play.ad_compat_srs =
-			audioixp_min_compat_sample_rates;
+		    audioixp_min_compat_sample_rates;
 		statep->ixp_defaults.play.sample_rate =
-			IXP_SAMPR48000;
+		    IXP_SAMPR48000;
 		statep->ixp_defaults.record.sample_rate =
-			IXP_SAMPR48000;
+		    IXP_SAMPR48000;
 	} else {	/* variable sample rate supported */
 		statep->var_sr = B_TRUE;
 
 		/* set variable rate mode */
 		(void) audioixp_write_ac97(statep,
-			AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER, EASCR_VRA);
+		    AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER, EASCR_VRA);
 
 		/* check the sample rates supported */
 		for (i = 0, j = 0; audioixp_compat_srs[i] != 0; i++) {
 			(void) audioixp_write_ac97(statep,
-				AC97_EXTENDED_FRONT_DAC_RATE_REGISTER,
-				audioixp_compat_srs[i]);
+			    AC97_EXTENDED_FRONT_DAC_RATE_REGISTER,
+			    audioixp_compat_srs[i]);
 			(void) audioixp_read_ac97(statep,
-				AC97_EXTENDED_FRONT_DAC_RATE_REGISTER, &sr);
+			    AC97_EXTENDED_FRONT_DAC_RATE_REGISTER, &sr);
 
 			if (sr == audioixp_compat_srs[i]) {
 				if (i != j) {
 					audioixp_compat_srs[j] =
-						audioixp_compat_srs[i];
+					    audioixp_compat_srs[i];
 				}
 				j++;
 			}
@@ -3337,7 +3337,7 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 
 		if (j < 1) {
 			audio_sup_log(statep->audio_handle, CE_WARN,
-				"!No standard sample rate is supported");
+			    "!No standard sample rate is supported");
 			return (AUDIO_FAILURE);
 		}
 		audioixp_compat_srs[j] = 0;
@@ -3353,19 +3353,19 @@ audioixp_chip_init(audioixp_state_t *statep, int restore)
 		}
 		if (audioixp_compat_srs[i] != IXP_SAMPR8000) {
 			statep->ixp_defaults.play.sample_rate =
-				audioixp_compat_srs[0];
+			    audioixp_compat_srs[0];
 			statep->ixp_defaults.record.sample_rate =
-				audioixp_compat_srs[0];
+			    audioixp_compat_srs[0];
 		}
 	}
 
 	/* enable interrupts */
 	IXP_AM_PUT32(IXP_AUDIO_INT, 0xffffffff);
 	IXP_AM_PUT32(
-		IXP_AUDIO_INT_EN,
-		IXP_AUDIO_INT_EN_IN_DMA_OVERFLOW |
-		IXP_AUDIO_INT_EN_STATUS |
-		IXP_AUDIO_INT_EN_OUT_DMA_UNDERFLOW);
+	    IXP_AUDIO_INT_EN,
+	    IXP_AUDIO_INT_EN_IN_DMA_OVERFLOW |
+	    IXP_AUDIO_INT_EN_STATUS |
+	    IXP_AUDIO_INT_EN_OUT_DMA_UNDERFLOW);
 	return (AUDIO_SUCCESS);
 
 }	/* audioixp_chip_init() */

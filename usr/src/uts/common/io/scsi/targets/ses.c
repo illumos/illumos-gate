@@ -164,7 +164,8 @@ static struct dev_ops ses_dev_ops = {
 	nodev,			/* reset */
 	&ses_cb_ops,		/* driver operations */
 	(struct bus_ops *)NULL,	/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static void *estate  = NULL;
@@ -181,7 +182,9 @@ static const char *fail_msg = "%stransport failed: reason '%s': %s";
 char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
-	&mod_driverops, "SCSI Enclosure Services 1.51", &ses_dev_ops
+	&mod_driverops,
+	"SCSI Enclosure Services",
+	&ses_dev_ops
 };
 
 static struct modlinkage modlinkage = {
@@ -643,6 +646,7 @@ ses_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	}
 	return (error);
 }
+
 
 /*
  * Unix Entry Points

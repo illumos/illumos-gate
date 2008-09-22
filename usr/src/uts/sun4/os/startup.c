@@ -3097,6 +3097,7 @@ vmem_t *texthole_arena[HEAPTEXT_NARENAS];
 kmutex_t texthole_lock;
 
 char kern_bootargs[OBP_MAXPATHLEN];
+char kern_bootfile[OBP_MAXPATHLEN];
 
 void
 kobj_vmem_init(vmem_t **text_arena, vmem_t **data_arena)

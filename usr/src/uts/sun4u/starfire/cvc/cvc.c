@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MT STREAMS Virtual Console Device Driver
@@ -189,11 +187,12 @@ static processorid_t	cvc_iocpu = -1;	/* cpu id of cpu zero */
  */
 
 DDI_DEFINE_STREAM_OPS(cvcops, nulldev, nulldev, cvc_attach, cvc_detach,
-			nodev, cvc_info, (D_MTPERQ | D_MP), &cvcinfo);
+		    nodev, cvc_info, (D_MTPERQ | D_MP), &cvcinfo,
+		    ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"CVC driver 'cvc' v%I%",
+	"CVC driver 'cvc'",
 	&cvcops,	/* driver ops */
 };
 
@@ -250,14 +249,14 @@ cvc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		rw_init(&cvclock, NULL, RW_DRIVER, NULL);
 		rw_enter(&cvclock, RW_WRITER);
 		cvc_timeout_id = timeout(cvc_flush_buf, NULL,
-			drv_usectohz(TIMEOUT_DELAY));
+		    drv_usectohz(TIMEOUT_DELAY));
 		rw_exit(&cvclock);
 		cvc_instance = ddi_get_instance(devi);
 	} else {
 #if defined(DEBUG)
 		cmn_err(CE_NOTE,
-			"cvc_attach: called multiple times!! (instance = %d)",
-			ddi_get_instance(devi));
+		    "cvc_attach: called multiple times!! (instance = %d)",
+		    ddi_get_instance(devi));
 #endif /* DEBUG */
 		return (DDI_SUCCESS);
 	}
@@ -452,7 +451,7 @@ cvc_wput(register queue_t *q, register mblk_t *mp)
 		default:
 			cmn_err(CE_WARN, "cvc_wput: illegal mblk = 0x%p", mp);
 			cmn_err(CE_WARN, "cvc_wput: type = 0x%x",
-				mp->b_datap->db_type);
+			    mp->b_datap->db_type);
 			/* FALLTHROUGH */
 #ifdef lint
 			break;
@@ -710,7 +709,7 @@ cvc_register(queue_t *q)
 			cmn_err(CE_WARN, "cvc_register: duplicate q!");
 		else
 			cmn_err(CE_WARN, "cvc_register: nondup q = 0x%p",
-				q);
+			    q);
 		return (error);
 	}
 
@@ -754,7 +753,7 @@ cvc_unregister(queue_t *q)
 	if (cvc_timeout_id == (timeout_id_t)-1) {
 		stop_timeout = 0;
 		cvc_timeout_id = timeout(cvc_flush_buf, NULL,
-			drv_usectohz(TIMEOUT_DELAY));
+		    drv_usectohz(TIMEOUT_DELAY));
 	}
 	rw_exit(&cvclock);
 }
@@ -854,7 +853,7 @@ cvc_bbsram_ops(volatile unsigned char *op_reg)
 		break;
 	default:
 		cmn_err(CE_WARN, "cvc: unknown BBSRAM opcode %d\n",
-			(unsigned int)op);
+		    (unsigned int)op);
 		break;
 	}
 	*op_reg = 0;
@@ -905,8 +904,8 @@ cvc_putc(register int c)
 			DELAY(1000);
 		}
 		bcopy((caddr_t)cvc_output_buffer,
-			(caddr_t)(BBSRAM_OUTPUT_BUF - cvc_output_count),
-			cvc_output_count);
+		    (caddr_t)(BBSRAM_OUTPUT_BUF - cvc_output_count),
+		    cvc_output_count);
 
 		BBSRAM_OUTPUT_COUNT = cvc_output_count;
 		cvc_output_count = 0;
@@ -942,8 +941,8 @@ cvc_flush_buf(void *notused)
 		}
 
 		bcopy((caddr_t)cvc_output_buffer,
-			(caddr_t)BBSRAM_OUTPUT_BUF - cvc_output_count,
-			cvc_output_count);
+		    (caddr_t)BBSRAM_OUTPUT_BUF - cvc_output_count,
+		    cvc_output_count);
 
 		BBSRAM_OUTPUT_COUNT = cvc_output_count;
 		cvc_output_count = 0;
@@ -952,7 +951,7 @@ exit:
 	mutex_exit(&cvc_buf_mutex);
 	/* rw_enter(&cvclock, RW_WRITER); */
 	cvc_timeout_id = timeout(cvc_flush_buf, NULL,
-		drv_usectohz(TIMEOUT_DELAY));
+	    drv_usectohz(TIMEOUT_DELAY));
 	/* rw_exit(&cvclock); */
 }
 
@@ -1154,7 +1153,7 @@ cvc_iobuf_mapin(processorid_t cpu_id)
 
 	/* Calculate how many pages we need to map in */
 	num_pages = mmu_btopr(((uint_t)(cvc_iobuf_physaddr
-		& MMU_PAGEOFFSET) + sizeof (sigb_cvc_t)));
+	    & MMU_PAGEOFFSET) + sizeof (sigb_cvc_t)));
 
 	/*
 	 * Map in the cvc iobuf
@@ -1165,7 +1164,7 @@ cvc_iobuf_mapin(processorid_t cpu_id)
 	    PROT_READ | PROT_WRITE, HAT_LOAD_LOCK);
 
 	return ((caddr_t)(cvaddr + (uint_t)(cvc_iobuf_physaddr
-		& MMU_PAGEOFFSET)));
+	    & MMU_PAGEOFFSET)));
 }
 
 
@@ -1186,7 +1185,7 @@ cvc_iobuf_mapout(processorid_t cpu_id)
 
 	/* Calculate how many pages we need to map out */
 	num_pages = mmu_btopr(((size_t)((uint64_t)cvaddr & MMU_PAGEOFFSET) +
-		sizeof (sigb_cvc_t)));
+	    sizeof (sigb_cvc_t)));
 
 	/* Get cvaddr to the start of the page boundary */
 	cvaddr = (caddr_t)(((uint64_t)cvaddr & MMU_PAGEMASK));

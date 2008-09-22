@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Source code for the bidirectional parallel port
@@ -204,6 +203,8 @@ static struct dev_ops bpp_ops =
 	nodev,				/* device reset routine		*/
 	&bpp_cb_ops,			/* device operations struct	*/
 	(struct bus_ops *)0,		/* bus operations		*/
+	NULL,				/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -214,7 +215,7 @@ static struct dev_ops bpp_ops =
  */
 static	struct modldrv modldrv = {
 	&mod_driverops,				/* type of module - driver */
-	"pport driver: bpp %I% %E%",		/* name of module  */
+	"pport driver: bpp",			/* name of module  */
 	&bpp_ops				/* *Drv_dev_ops		*/
 };
 
@@ -275,8 +276,8 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Make sure we're not in a slave-only slot */
 	if (ddi_slaveonly(dip) == DDI_SUCCESS) {
 		cmn_err(CE_NOTE,
-			"bpp unit %d: NOT used - SBus slot is slave only.",
-			unit_no);
+		    "bpp unit %d: NOT used - SBus slot is slave only.",
+		    unit_no);
 		return (DDI_FAILURE);
 	}
 
@@ -287,7 +288,7 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Store away its address for future use.
 	 */
 	BPP_PRINT(5, (CE_CONT, "Allocating unit struct for unit %d.\n",
-		unit_no));
+	    unit_no));
 	if (ddi_soft_state_zalloc(bpp_state_head, unit_no) != 0)
 		return (DDI_FAILURE);
 	/* assign a pointer to this unit's state struct */
@@ -306,10 +307,10 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * This must be done before expecting to receive any interrupts.
 	 */
 	if (ddi_add_intr(dip, 0, &bpp_p->bpp_block_cookie,
-		(ddi_idevice_cookie_t *)0, bpp_intr,
-		(caddr_t)(uintptr_t)unit_no) != DDI_SUCCESS) {
+	    (ddi_idevice_cookie_t *)0, bpp_intr,
+	    (caddr_t)(uintptr_t)unit_no) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE,
-			"bpp_attach unit %d: cannot add interrupt!", unit_no);
+		    "bpp_attach unit %d: cannot add interrupt!", unit_no);
 		ddi_soft_state_free(bpp_state_head, unit_no);
 		return (DDI_FAILURE);
 	}
@@ -360,9 +361,9 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 
 	sbus_frequency = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
-				"clock-frequency", 1000000);
+	"clock-frequency", 1000000);
 	BPP_PRINT(5, (CE_CONT,
-		"clock-frequency prop is:    %d\n", sbus_frequency));
+	    "clock-frequency prop is:    %d\n", sbus_frequency));
 	sbus_clock = sbus_frequency/1000000;
 	if (sbus_clock >= 10 && sbus_clock <= 25) {
 		BPP_PRINT(5, (CE_CONT, "SBus clock is %d MHz.\n", sbus_clock));
@@ -376,7 +377,7 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 	BPP_PRINT(5, (CE_CONT, "SBus Clock period is %d nsec.\n",
-		bpp_p->sbus_clock_cycle));
+	    bpp_p->sbus_clock_cycle));
 
 
 	/*
@@ -390,7 +391,7 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    0, sizeof (struct bpp_regs),
 	    &bpp_acc_attr, &bpp_p->bpp_acc_handle) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE,
-			"bpp_attach unit %d: regs_map_setup failed!", unit_no);
+		    "bpp_attach unit %d: regs_map_setup failed!", unit_no);
 		cv_destroy(&bpp_p->wr_cv);
 		mutex_destroy(&bpp_p->bpp_mutex);
 		ddi_remove_intr(bpp_p->dip, 0, bpp_p->bpp_block_cookie);
@@ -401,7 +402,7 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (check_bpp_registers(unit_no)) {	/* registers don't seem right */
 		cmn_err(CE_NOTE,
-			"bpp_attach unit %d: register check failed!", unit_no);
+		    "bpp_attach unit %d: register check failed!", unit_no);
 		ddi_regs_map_free(&bpp_p->bpp_acc_handle);
 		cv_destroy(&bpp_p->wr_cv);
 		mutex_destroy(&bpp_p->bpp_mutex);
@@ -413,8 +414,8 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_dma_alloc_handle(dip, &bpp_dma_attr, DDI_DMA_DONTWAIT, NULL,
 	    &bpp_p->bpp_dma_handle) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE,
-			"bpp_attach unit %d: dma_alloc_handle failed!",
-			unit_no);
+		    "bpp_attach unit %d: dma_alloc_handle failed!",
+		    unit_no);
 		ddi_regs_map_free(&bpp_p->bpp_acc_handle);
 		cv_destroy(&bpp_p->wr_cv);
 		mutex_destroy(&bpp_p->bpp_mutex);
@@ -430,7 +431,7 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    unit_no, DDI_NT_PRINTER, NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		cmn_err(CE_NOTE, "ddi_create_minor_node failed for unit %d",
-			unit_no);
+		    unit_no);
 		ddi_dma_free_handle(&bpp_p->bpp_dma_handle);
 		ddi_regs_map_free(&bpp_p->bpp_acc_handle);
 		cv_destroy(&bpp_p->wr_cv);
@@ -444,7 +445,7 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	(void) sprintf(name, "bppc%d", unit_no);
 	bpp_p->intrstats = kstat_create("bpp", unit_no, name, "controller",
-		KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (bpp_p->intrstats) {
 		kstat_install(bpp_p->intrstats);
 	}
@@ -460,7 +461,7 @@ initialise:
 	 */
 	burst_sizes = ddi_getprop(DDI_DEV_T_ANY, dip, 0, "burst-sizes", -1);
 	BPP_PRINT(5, (CE_CONT,
-		"^burst-sizes prop is:    0x%x\n", burst_sizes));
+	    "^burst-sizes prop is:    0x%x\n", burst_sizes));
 
 	/*
 	 * Starting with the DMA2P, the bpp lives with a DMA controller
@@ -478,35 +479,35 @@ initialise:
 		 * programmable register.
 		 */
 		BPP_PRINT(5, (CE_CONT,
-			"bpp_attach: devid field indicates HIOD bpp DMA\n"));
+		    "bpp_attach: devid field indicates HIOD bpp DMA\n"));
 		/* no register, so do nothing here */
 	} else
 #endif /* BPP_DEBUG */
 	if ((bpp_regs_p->dma_csr & BPP_DEVICE_ID_MASK) == BPP_DMA2P_DEVID) {
 		BPP_PRINT(5, (CE_CONT,
-			"bpp_attach: devid field indicates DMA2P bpp DMA\n"));
+		    "bpp_attach: devid field indicates DMA2P bpp DMA\n"));
 		if ((burst_sizes == 0xff) ||
-			(!((burst_sizes & BURST16) ||
-			(burst_sizes & BURST32)))) {
+		    (!((burst_sizes & BURST16) ||
+		    (burst_sizes & BURST32)))) {
 			BPP_PRINT(5, (CE_CONT,
-				"bad burst-sizes 0x%x, setting to %x\n",
-				burst_sizes, BPP_BURST_DEFAULT));
+			    "bad burst-sizes 0x%x, setting to %x\n",
+			    burst_sizes, BPP_BURST_DEFAULT));
 			bpp_regs_p->dma_csr |= BPP_BURST_DEFAULT;
 		} else if (burst_sizes & BURST32) {	/* largest possible */
 			BPP_PRINT(5, (CE_CONT,
-				"Setting P_BURST_SIZE for 8-word bursts\n"));
+			    "Setting P_BURST_SIZE for 8-word bursts\n"));
 			bpp_regs_p->dma_csr |= BPP_BURST_8WORD;
 		} else if (burst_sizes & BURST16) {
 			BPP_PRINT(5, (CE_CONT,
-				"Setting P_BURST_SIZE for 4-word bursts\n"));
+			    "Setting P_BURST_SIZE for 4-word bursts\n"));
 			bpp_regs_p->dma_csr |= BPP_BURST_4WORD;
 		}
 	} else if ((bpp_regs_p->dma_csr & BPP_DEVICE_ID_MASK) !=
 	    BPP_HIOD_DEVID) {
 		BPP_PRINT(5, (CE_CONT,
-			"bpp_attach: undefined bpp DMA"));
+		    "bpp_attach: undefined bpp DMA"));
 		BPP_PRINT(5, (CE_CONT,
-			"using 0x%x for bursts.\n", BPP_BURST_DEFAULT));
+		    "using 0x%x for bursts.\n", BPP_BURST_DEFAULT));
 		bpp_regs_p->dma_csr |= BPP_BURST_DEFAULT;
 	}
 
@@ -526,7 +527,7 @@ initialise:
 	 * This setup corresponds to the default handshakes.
 	 */
 	BPP_PRINT(5, (CE_CONT, "Before setting polarities, int_cntl = 0x%x\n",
-			bpp_regs_p->int_cntl));
+	    bpp_regs_p->int_cntl));
 	bpp_regs_p->int_cntl |= BPP_ERR_IRP;	/* ERR rising edge */
 	bpp_regs_p->int_cntl |= BPP_SLCT_IRP;	/* SLCT rising edge */
 						/* SLCT+ means off-line */
@@ -535,7 +536,7 @@ initialise:
 	/* clear any stray interrupts */
 	bpp_regs_p->int_cntl |= BPP_ALL_IRQS;
 	BPP_PRINT(5, (CE_CONT, "After setting polarities, int_cntl = 0x%x\n",
-			bpp_regs_p->int_cntl));
+	    bpp_regs_p->int_cntl));
 
 	/* Turn on interrupts */
 	bpp_p->bpp_regs_p->dma_csr |= BPP_INT_EN;
@@ -669,12 +670,13 @@ bpp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		bpp_p->flags |= BPP_SUSPENDED;
 		mutex_exit(&bpp_p->bpp_mutex);
 		/* XXX - Need to Wait for pending ops to finish */
-		while (bpp_p->timeouts);	/* Yuck! */
+		while (bpp_p->timeouts) {
+			}		/* Yuck! */
 		return (DDI_SUCCESS);
 
 	default:
 		BPP_PRINT(3, (CE_CONT,
-			"Invalid detach cmd 0x%x in bpp_detach\n", cmd));
+		    "Invalid detach cmd 0x%x in bpp_detach\n", cmd));
 		goto detach_failed;
 	}
 
@@ -686,7 +688,7 @@ bpp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* was transferring */
 		cmn_err(CE_NOTE,
 		"ERROR: bpp unload of unit %d while DMA active!",
-			unit_no);
+		    unit_no);
 		/* turn off DMA  and byte count */
 		bpp_regs_p->dma_csr &= ~BPP_ENABLE_DMA;
 		bpp_regs_p->dma_csr &= ~BPP_ENABLE_BCNT;
@@ -771,14 +773,14 @@ bpp_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 	unit_no = BPP_UNIT(dev);
 	bpp_p = getsoftc(unit_no);
 	BPP_PRINT(2, (CE_CONT,
-		"bpp%d: Entering bpp_open, flags %d.\n", unit_no, openflags));
+	    "bpp%d: Entering bpp_open, flags %d.\n", unit_no, openflags));
 	/*
 	 * Assure that the device is being opened as a character device.
 	 */
 	if (otyp != OTYP_CHR) {
 		cmn_err(CE_NOTE,
-			"bpp%d attempted open as non-character device!",
-			unit_no);
+		    "bpp%d attempted open as non-character device!",
+		    unit_no);
 		retval = EINVAL;
 		goto out;
 	}
@@ -789,7 +791,7 @@ bpp_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 	 */
 	if (bpp_p == NULL) {
 		cmn_err(CE_NOTE,
-			"bpp%d unit pointer is NULL!", unit_no);
+		    "bpp%d unit pointer is NULL!", unit_no);
 		retval = ENXIO;			/* attach failed ?? */
 		goto out;
 	}
@@ -824,7 +826,7 @@ bpp_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 
 out:
 	BPP_PRINT(2, (CE_CONT, "Leaving bpp_open, unit %d: errno %d.\n",
-							unit_no, retval));
+	    unit_no, retval));
 	return (retval);
 }
 
@@ -844,10 +846,10 @@ bpp_close(dev_t dev, int openflags, int otyp, cred_t *credp)
 	unit_no = BPP_UNIT(&dev);
 	bpp_p = getsoftc(unit_no);
 	BPP_PRINT(2, (CE_CONT,
-		"Entering bpp_close, unit number %d.\n", unit_no));
+	    "Entering bpp_close, unit number %d.\n", unit_no));
 
 	BPP_PRINT(5, (CE_CONT, "In bpp_close, Timeout block is 0x%x.\n",
-		bpp_p->timeouts));
+	    bpp_p->timeouts));
 	mutex_enter(&bpp_p->bpp_mutex);
 	if (bpp_p->timeouts) {			 /* any timeouts pending? */
 		BPP_PRINT(5, (CE_CONT, "Some timeouts still pending.\n"));
@@ -863,7 +865,7 @@ bpp_close(dev_t dev, int openflags, int otyp, cred_t *credp)
 
 	bpp_p->timeouts = NO_TIMEOUTS;
 	BPP_PRINT(5, (CE_CONT, "At end of  bpp_close, Timeout block is 0x%x.\n",
-		bpp_p->timeouts));
+	    bpp_p->timeouts));
 
 	/*
 	 * Mark unit closed.
@@ -898,7 +900,7 @@ bpp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	unit_no = BPP_UNIT(&dev);
 	bpp_p = getsoftc(unit_no);
 	BPP_PRINT(2, (CE_CONT, "Entering bpp_read, unit number %d.\n",
-								unit_no));
+	    unit_no));
 
 	mutex_enter(&bpp_p->bpp_mutex);
 
@@ -943,7 +945,7 @@ bpp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		bpp_regs_p->op_config &= ~BPP_BUSY_OP;
 		bpp_regs_p->op_config |= BPP_ACK_OP;
 		bpp_regs_p->op_config |=
-			(BPP_DS_BIDIR | BPP_ACK_BIDIR | BPP_BUSY_BIDIR);
+		    (BPP_DS_BIDIR | BPP_ACK_BIDIR | BPP_BUSY_BIDIR);
 		break;
 	case BPP_BUSY_HS:
 	case BPP_HSCAN_HS:
@@ -956,7 +958,7 @@ bpp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		BPP_PRINT(5, (CE_CONT, "BPP_ACK_BUSY_HS case\n"));
 		bpp_regs_p->op_config |= (BPP_BUSY_OP | BPP_ACK_OP);
 		bpp_regs_p->op_config |=
-			(BPP_DS_BIDIR | BPP_ACK_BIDIR | BPP_BUSY_BIDIR);
+		    (BPP_DS_BIDIR | BPP_ACK_BIDIR | BPP_BUSY_BIDIR);
 		break;
 	case BPP_XSCAN_HS:
 		/*
@@ -967,7 +969,7 @@ bpp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		bpp_regs_p->op_config &= ~BPP_BUSY_OP;
 		bpp_regs_p->op_config |= BPP_ACK_OP;
 		bpp_regs_p->op_config &=
-			~(BPP_DS_BIDIR | BPP_BUSY_BIDIR | BPP_ACK_BIDIR);
+		    ~(BPP_DS_BIDIR | BPP_BUSY_BIDIR | BPP_ACK_BIDIR);
 		break;
 	case BPP_CLEAR_MEM:
 		BPP_PRINT(5, (CE_CONT, "BPP_CLEAR_MEM case\n"));
@@ -1006,7 +1008,7 @@ bpp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	mutex_exit(&bpp_p->bpp_mutex);
 	BPP_PRINT(5, (CE_CONT, "bpp_read, calling physio\n"));
 	retval = physio(bpp_strategy, (struct buf *)0, dev,
-			B_READ, bpp_minphys, uiop);
+	    B_READ, bpp_minphys, uiop);
 
 	mutex_enter(&bpp_p->bpp_mutex);
 	bpp_p->flags &= ~BPP_BUSY;
@@ -1014,8 +1016,8 @@ bpp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	mutex_exit(&bpp_p->bpp_mutex);
 
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving bpp_read, unit %d: errno %d.\n",
-							unit_no, retval));
+	    "Leaving bpp_read, unit %d: errno %d.\n",
+	    unit_no, retval));
 	return (retval);
 }
 
@@ -1037,7 +1039,7 @@ bpp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	unit_no = BPP_UNIT(&dev);
 	BPP_PRINT(2, (CE_CONT,
-		"Entering bpp_write, unit number %d.\n", unit_no));
+	    "Entering bpp_write, unit number %d.\n", unit_no));
 
 	bpp_p = getsoftc(unit_no);
 
@@ -1066,7 +1068,7 @@ bpp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * This setup corresponds to the default handshakes.
 	 */
 	BPP_PRINT(5, (CE_CONT, "Before setting polarities, int_cntl = 0x%x\n",
-			bpp_regs_p->int_cntl));
+	    bpp_regs_p->int_cntl));
 	bpp_regs_p->int_cntl |= BPP_ERR_IRP;	/* ERR rising edge */
 	bpp_regs_p->int_cntl |= BPP_SLCT_IRP;	/* SLCT rising edge */
 						/* SLCT+ is off-line */
@@ -1075,7 +1077,7 @@ bpp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	bpp_regs_p->int_cntl |= (BPP_ERR_IRQ | BPP_SLCT_IRQ | BPP_PE_IRQ);
 
 	BPP_PRINT(5, (CE_CONT, "After setting polarities, int_cntl = 0x%x\n",
-			bpp_regs_p->int_cntl));
+	    bpp_regs_p->int_cntl));
 
 	check_for_active_pins(unit_no);
 
@@ -1099,7 +1101,7 @@ bpp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		    (BPP_ERR_ERR | BPP_SLCT_ERR | BPP_PE_ERR))) {
 			/* printer error - no transfer allowed */
 			BPP_PRINT(5, (CE_CONT,
-				"In bpp_write, pending error pin condition\n"));
+			    "In bpp_write, pending error pin condition\n"));
 			retval = ENXIO;
 			mutex_exit(&bpp_p->bpp_mutex);
 			goto out;
@@ -1141,7 +1143,7 @@ bpp_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	BPP_PRINT(5, (CE_CONT, "bpp_write, calling physio\n"));
 	retval = physio(bpp_strategy, (struct buf *)0, dev,
-			B_WRITE, bpp_minphys, uiop);
+	    B_WRITE, bpp_minphys, uiop);
 
 out:
 	mutex_enter(&bpp_p->bpp_mutex);
@@ -1150,7 +1152,7 @@ out:
 	mutex_exit(&bpp_p->bpp_mutex);
 
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving bpp_write, unit %d: errno %d.\n", unit_no, retval));
+	    "Leaving bpp_write, unit %d: errno %d.\n", unit_no, retval));
 	return (retval);
 }
 
@@ -1183,45 +1185,45 @@ check_for_active_pins(int unit_no)
 	bpp_errorstat_p = &bpp_p->error_stat;
 
 	BPP_PRINT(2, (CE_CONT,
-		"Entering check_for_active_pins, unit number %d.\n", unit_no));
+	    "Entering check_for_active_pins, unit number %d.\n", unit_no));
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 	/*
 	 * Check that there are no pending ERR, SLCT or PE error
 	 * conditions. If there are, do not attempt the transfer.
 	 */
 	BPP_PRINT(5, (CE_CONT, "check_active_pins: in_pins = 0x%x\n",
-			bpp_regs_p->in_pins));
+	    bpp_regs_p->in_pins));
 	BPP_PRINT(5, (CE_CONT, "check_active_pins: int_cntl = 0x%x\n",
-			bpp_regs_p->int_cntl));
+	    bpp_regs_p->int_cntl));
 
 	if (((bpp_regs_p->in_pins & BPP_ERR_PIN) &&
-		(bpp_regs_p->int_cntl & BPP_ERR_IRP)) ||
-		((~bpp_regs_p->in_pins & BPP_ERR_PIN)&&
-		(~bpp_regs_p->int_cntl & BPP_ERR_IRP))) { /* ERR active */
+	    (bpp_regs_p->int_cntl & BPP_ERR_IRP)) ||
+	    ((~bpp_regs_p->in_pins & BPP_ERR_PIN)&&
+	    (~bpp_regs_p->int_cntl & BPP_ERR_IRP))) { /* ERR active */
 			BPP_PRINT(5, (CE_CONT,
-				"In ck_active_pins, pending ERR condition\n"));
+			    "In ck_active_pins, pending ERR condition\n"));
 			bpp_errorstat_p->pin_status |= BPP_ERR_ERR;
 	}
 
 	if (((bpp_regs_p->in_pins & BPP_SLCT_PIN) &&
-		(bpp_regs_p->int_cntl & BPP_SLCT_IRP)) ||
-		((~bpp_regs_p->in_pins & BPP_SLCT_PIN)&&
-		(~bpp_regs_p->int_cntl & BPP_SLCT_IRP))) { /* SLCT active */
+	    (bpp_regs_p->int_cntl & BPP_SLCT_IRP)) ||
+	    ((~bpp_regs_p->in_pins & BPP_SLCT_PIN)&&
+	    (~bpp_regs_p->int_cntl & BPP_SLCT_IRP))) { /* SLCT active */
 			BPP_PRINT(5, (CE_CONT,
-				"In ck_active_pins, pending SLCT condition\n"));
+			    "In ck_active_pins, pending SLCT condition\n"));
 			bpp_errorstat_p->pin_status |= BPP_SLCT_ERR;
 	}
 
 	if (((bpp_regs_p->in_pins & BPP_PE_PIN) &&
-		(bpp_regs_p->int_cntl & BPP_PE_IRP)) ||
-		((~bpp_regs_p->in_pins & BPP_PE_PIN)&&
-		(~bpp_regs_p->int_cntl & BPP_PE_IRP))) { /* PE active */
+	    (bpp_regs_p->int_cntl & BPP_PE_IRP)) ||
+	    ((~bpp_regs_p->in_pins & BPP_PE_PIN)&&
+	    (~bpp_regs_p->int_cntl & BPP_PE_IRP))) { /* PE active */
 			BPP_PRINT(5, (CE_CONT,
 			    "In check_active_pins, pending PE condition\n"));
 			bpp_errorstat_p->pin_status |= BPP_PE_ERR;
 	}
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving check_for_active_pins, unit number %d.\n", unit_no));
+	    "Leaving check_for_active_pins, unit number %d.\n", unit_no));
 }
 
 /*
@@ -1246,8 +1248,8 @@ bpp_strategy(register struct buf *bp)
 
 	unit_no = BPP_UNIT(&(bp->b_edev));
 	BPP_PRINT(2, (CE_CONT,
-		"bpp%d:Entering bpp_strategy: length 0x%x.\n",
-		unit_no, bp->b_bcount));
+	    "bpp%d:Entering bpp_strategy: length 0x%x.\n",
+	    unit_no, bp->b_bcount));
 
 	/*
 	 * Use the unit number to locate our data structures.
@@ -1274,8 +1276,8 @@ bpp_strategy(register struct buf *bp)
 		flags = DDI_DMA_WRITE;
 
 	BPP_PRINT(5, (CE_CONT,
-		"Before dma_buf_bind, b_addr = 0x%p, b_bcount = 0x%x\n",
-		(void *)bp->b_un.b_addr, bp->b_bcount));
+	    "Before dma_buf_bind, b_addr = 0x%p, b_bcount = 0x%x\n",
+	    (void *)bp->b_un.b_addr, bp->b_bcount));
 	/*
 	 * Get dvma bus resource, sleeping if necessary.
 	 */
@@ -1283,8 +1285,8 @@ bpp_strategy(register struct buf *bp)
 	    flags | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, 0,
 	    &dma_cookie, &dma_cookie_cnt) != DDI_DMA_MAPPED) {
 		cmn_err(CE_NOTE,
-			"ERROR: bpp%d: dma_buf_bind failed mapping",
-				unit_no);
+		    "ERROR: bpp%d: dma_buf_bind failed mapping",
+		    unit_no);
 		bioerror(bp, ENOMEM);
 		bp->b_resid = bp->b_bcount;
 		biodone(bp);
@@ -1293,12 +1295,12 @@ bpp_strategy(register struct buf *bp)
 	ASSERT(dma_cookie_cnt == 1);
 
 	BPP_PRINT(5, (CE_CONT,
-		"After dma_buf_bind, b_addr = 0x%p, b_bcount = 0x%x\n",
-		(void *)bp->b_un.b_addr, bp->b_bcount));
+	    "After dma_buf_bind, b_addr = 0x%p, b_bcount = 0x%x\n",
+	    (void *)bp->b_un.b_addr, bp->b_bcount));
 
 	start_address = dma_cookie.dmac_address;
 	BPP_PRINT(5, (CE_CONT,
-		"start_address = 0x%x\n", start_address));
+	    "start_address = 0x%x\n", start_address));
 
 	size = bp->b_bcount;
 
@@ -1307,17 +1309,17 @@ bpp_strategy(register struct buf *bp)
 	 * Write the transfer byte count to the hardware.
 	 */
 	BPP_PRINT(5, (CE_CONT, "writing start_address 0x%x, size %d to regs\n",
-		start_address, size));
+	    start_address, size));
 
 	bpp_regs_p->dma_addr = start_address;
 	bpp_regs_p->dma_bcnt = (uint_t)size;
 
 	BPP_PRINT(5, (CE_CONT,
-			"bpp_strategy: Transfer %d bytes starting at 0x%x.\n",
-				bpp_regs_p->dma_bcnt, bpp_regs_p->dma_addr));
+	    "bpp_strategy: Transfer %d bytes starting at 0x%x.\n",
+	    bpp_regs_p->dma_bcnt, bpp_regs_p->dma_addr));
 	BPP_PRINT(5, (CE_CONT,
-		"before enabling interrupts, dma csr=0x%x, int_cntl=0x%x.\n",
-		bpp_regs_p->dma_csr, bpp_regs_p->int_cntl));
+	    "before enabling interrupts, dma csr=0x%x, int_cntl=0x%x.\n",
+	    bpp_regs_p->dma_csr, bpp_regs_p->int_cntl));
 
 	/*
 	 * Enable byte-counter during DVMA.
@@ -1336,34 +1338,34 @@ bpp_strategy(register struct buf *bp)
 
 	if (bp->b_flags & B_READ) {
 		BPP_PRINT(5, (CE_CONT,
-			"bp->b_flags indicates READ mode\n"));
+		    "bp->b_flags indicates READ mode\n"));
 		timeout_value = bpp_transfer_parms_p->read_timeout;
 	} else {
 		BPP_PRINT(5, (CE_CONT,
-			"bp->b_flags indicates WRITE mode\n"));
+		    "bp->b_flags indicates WRITE mode\n"));
 		if (!(bpp_p->openflags & FREAD &&
 		    bpp_p->openflags & FWRITE)) {
 			bpp_regs_p->int_cntl |= (BPP_ERR_IRQ_EN |
-				BPP_SLCT_IRQ_EN | BPP_PE_IRQ_EN);
+			    BPP_SLCT_IRQ_EN | BPP_PE_IRQ_EN);
 		}
 		BPP_PRINT(5, (CE_CONT,
-			"after enable error int. int cntl contains 0x%x.\n",
-			bpp_regs_p->int_cntl));
+		    "after enable error int. int cntl contains 0x%x.\n",
+		    bpp_regs_p->int_cntl));
 		timeout_value = bpp_transfer_parms_p->write_timeout;
 	}
 
 	BPP_PRINT(5, (CE_CONT,
 	"after enabling interrupts, dma csr = 0x%x, int_cntl = 0x%x.\n",
-		bpp_regs_p->dma_csr, bpp_regs_p->int_cntl));
+	    bpp_regs_p->dma_csr, bpp_regs_p->int_cntl));
 	BPP_PRINT(5, (CE_CONT,
-		"Setting timeout to call bpp_transfer_timeout in %d sec\n",
-			timeout_value));
+	    "Setting timeout to call bpp_transfer_timeout in %d sec\n",
+	    timeout_value));
 	bpp_p->bpp_transfer_timeout_ident =
 	    timeout(bpp_transfer_timeout, (void *)(uintptr_t)unit_no,
-			drv_usectohz(timeout_value * 1000000));
+	    drv_usectohz(timeout_value * 1000000));
 	bpp_p->timeouts |= TRANSFER_TIMEOUT;
 	BPP_PRINT(5, (CE_CONT, "In bpp_strategy, Timeout block is 0x%x.\n",
-		bpp_p->timeouts));
+	    bpp_p->timeouts));
 	mutex_exit(&bpp_p->bpp_mutex);
 
 	BPP_PRINT(2, (CE_CONT, "Leaving bpp_strategy.\n"));
@@ -1405,7 +1407,7 @@ bpp_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 	read_handshake = bpp_transfer_parms_p->read_handshake;
 
 	BPP_PRINT(2, (CE_CONT,
-		"Entering bpp_ioctl, unit number %d.\n", unit_no));
+	    "Entering bpp_ioctl, unit number %d.\n", unit_no));
 	mutex_enter(&bpp_p->bpp_mutex);
 	if (bpp_p->flags & BPP_SUSPENDED) {
 		mutex_exit(&bpp_p->bpp_mutex);
@@ -1541,7 +1543,7 @@ bpp_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 	mutex_exit(&bpp_p->bpp_mutex);
 
 	BPP_PRINT(2, (CE_CONT, "Leaving bpp_ioctl, unit %d: errno %d.\n",
-							unit_no, retval));
+	    unit_no, retval));
 	return (retval);
 }
 
@@ -1575,7 +1577,7 @@ bpp_intr(caddr_t unit_no)
 	if ((bpp_regs_p->dma_csr & BPP_INT_PEND) ||
 	    (bpp_regs_p->dma_csr & BPP_ERR_PEND)) {
 		BPP_PRINT(5, (CE_CONT, "Interrupt found, unit #%d.\n",
-					bpp_unit_no));
+		    bpp_unit_no));
 		/*
 		 * Mark that we found an interrupting device.
 		 * Call the interrupt service routine.
@@ -1605,7 +1607,8 @@ bpp_intr(caddr_t unit_no)
 #if	BPP_DEBUG
 			BPP_PRINT(5, (CE_CONT, "Error interrupt detected\n"));
 			if (bpp_regs_p->dma_csr & BPP_SLAVE_ERR) {
-			    BPP_PRINT(5, (CE_CONT, "Slave error detected\n"));
+				BPP_PRINT(5,
+				    (CE_CONT, "Slave error detected\n"));
 			}
 #endif	/* BPP_DEBUG */
 			if (bpp_regs_p->dma_csr & BPP_ENABLE_DMA) {
@@ -1645,15 +1648,15 @@ bpp_intr(caddr_t unit_no)
 		if (bpp_regs_p->dma_csr & BPP_INT_PEND) {
 			BPP_PRINT(5, (CE_CONT, "Interrupt pending found.\n"));
 			BPP_PRINT(5, (CE_CONT, "dma csr contains 0x%x.\n",
-						bpp_regs_p->dma_csr));
+			    bpp_regs_p->dma_csr));
 			BPP_PRINT(5, (CE_CONT, "int cntl contains 0x%x.\n",
-						bpp_regs_p->int_cntl));
+			    bpp_regs_p->int_cntl));
 			/* TC case - terminal count */
 			if (bpp_regs_p->dma_csr & BPP_TERMINAL_CNT &&
 			    ((bpp_regs_p->dma_csr & BPP_TC_INTR_DISABLE) ==
 			    0)) {
 				BPP_PRINT(5, (CE_CONT,
-				"Terminal count interrupt found.\n"));
+				    "Terminal count interrupt found.\n"));
 				/* mask this interrupt */
 				bpp_regs_p->dma_csr |= BPP_TC_INTR_DISABLE;
 				bpp_regs_p->dma_csr &= ~BPP_ENABLE_BCNT;
@@ -1663,12 +1666,12 @@ bpp_intr(caddr_t unit_no)
 				bp->b_resid = bpp_p->transfer_remainder;
 				/* Mask the error interrupt conditions */
 				bpp_regs_p->int_cntl &=
-					~(BPP_ERR_IRQ_EN | BPP_SLCT_IRQ_EN |
-					BPP_PE_IRQ_EN);
+				    ~(BPP_ERR_IRQ_EN | BPP_SLCT_IRQ_EN |
+				    BPP_PE_IRQ_EN);
 				BPP_PRINT(5, (CE_CONT, "dma csr 0x%x.\n",
-						bpp_regs_p->dma_csr));
+				    bpp_regs_p->dma_csr));
 				BPP_PRINT(5, (CE_CONT, "int cntl 0x%x.\n",
-						bpp_regs_p->int_cntl));
+				    bpp_regs_p->int_cntl));
 			}
 			/* ERR_IRQ case - error pin interrupt */
 			if ((bpp_regs_p->int_cntl & BPP_ERR_IRQ) &&
@@ -1744,18 +1747,18 @@ bpp_intr(caddr_t unit_no)
 		}		/* end of INT_PEND check */
 
 		BPP_PRINT(5, (CE_CONT,
-			"dma csr 0x%x.\n", bpp_regs_p->dma_csr));
+		    "dma csr 0x%x.\n", bpp_regs_p->dma_csr));
 		BPP_PRINT(5, (CE_CONT,
-			"int cntl 0x%x.\n", bpp_regs_p->int_cntl));
+		    "int cntl 0x%x.\n", bpp_regs_p->int_cntl));
 
 		/* Clear the transfer timeout */
 		BPP_PRINT(5, (CE_CONT,
-			"In bpp_intr, Clearing transfer timeout.\n"));
+		    "In bpp_intr, Clearing transfer timeout.\n"));
 		tid = bpp_p->bpp_transfer_timeout_ident;
 		bpp_p->bpp_transfer_timeout_ident = 0;
 		bpp_p->timeouts &= ~TRANSFER_TIMEOUT;
 		BPP_PRINT(5, (CE_CONT, "In bpp_intr, Timeout block is 0x%x.\n",
-			bpp_p->timeouts));
+		    bpp_p->timeouts));
 		/*
 		 * Release the dvma bus resource.
 		 */
@@ -1763,7 +1766,7 @@ bpp_intr(caddr_t unit_no)
 		(void) ddi_dma_unbind_handle(bpp_p->bpp_dma_handle);
 
 		BPP_PRINT(5, (CE_CONT,
-			"bpp_intr, unit %d, Calling biodone.\n", unit_no));
+		    "bpp_intr, unit %d, Calling biodone.\n", unit_no));
 		/*
 		 * Mark the io on the buf as finished, with the side effect
 		 * of waking up others who want to use the buf.
@@ -1779,7 +1782,7 @@ bpp_intr(caddr_t unit_no)
 		mutex_exit(&bpp_p->bpp_mutex);
 	}
 	BPP_PRINT(2, (CE_CONT, "Leaving bpp_intr, int_serviced = 0x%x.\n",
-		int_serviced));
+	    int_serviced));
 	return (int_serviced);
 }
 
@@ -1822,7 +1825,7 @@ bpp_transfer_failed(int unit_no)
 		BPP_PRINT(1, (CE_CONT, "Warning: DMA is not IDLE!\n"));
 		bpp_regs_p->dma_csr &= ~BPP_ENABLE_BCNT;
 		BPP_PRINT(1, (CE_CONT,
-			"In bpp_strategy, resetting PP state machine\n"));
+		    "In bpp_strategy, resetting PP state machine\n"));
 		bpp_regs_p->op_config |= BPP_SRST;
 		bpp_regs_p->op_config &= ~BPP_SRST;
 
@@ -1832,17 +1835,17 @@ bpp_transfer_failed(int unit_no)
 		 * decremented for it.
 		 */
 		bp->b_resid = ((bpp_regs_p->dma_bcnt - 1) +
-			bpp_p->transfer_remainder);
+		    bpp_p->transfer_remainder);
 	} else {
 		bpp_regs_p->dma_csr &= ~BPP_ENABLE_BCNT;
 		bp->b_resid = (bpp_regs_p->dma_bcnt +
-			bpp_p->transfer_remainder);
+		    bpp_p->transfer_remainder);
 	}
 	/* flush the local cache */
 	bpp_regs_p->dma_csr |= BPP_FLUSH;
 
 	BPP_PRINT(5, (CE_CONT,
-		"In bpp_transfer_failed, Residual is %d.\n", bp->b_resid));
+	    "In bpp_transfer_failed, Residual is %d.\n", bp->b_resid));
 
 	/* make sure the DMA doesn't start again. */
 	bpp_regs_p->dma_bcnt = 0;
@@ -1852,7 +1855,7 @@ bpp_transfer_failed(int unit_no)
 	 */
 	bpp_regs_p->dma_csr |= BPP_TC_INTR_DISABLE;
 	bpp_regs_p->int_cntl &=
-		~(BPP_ERR_IRQ_EN | BPP_SLCT_IRQ_EN | BPP_PE_IRQ_EN);
+	    ~(BPP_ERR_IRQ_EN | BPP_SLCT_IRQ_EN | BPP_PE_IRQ_EN);
 
 	/* Check for any of the input pins active */
 	check_for_active_pins(unit_no);
@@ -1880,8 +1883,8 @@ bpp_transfer_timeout(void *unit_no_arg)
 
 	bpp_p = getsoftc(unit_no);
 	BPP_PRINT(5, (CE_CONT,
-		"In bpp_transfer_timeout, Timeout block is 0x%x.\n",
-		bpp_p->timeouts));
+	    "In bpp_transfer_timeout, Timeout block is 0x%x.\n",
+	    bpp_p->timeouts));
 	mutex_enter(&bpp_p->bpp_mutex);
 	if (bpp_p->bpp_transfer_timeout_ident == 0) {
 		mutex_exit(&bpp_p->bpp_mutex);
@@ -1904,12 +1907,12 @@ bpp_transfer_timeout(void *unit_no_arg)
 	 */
 	BPP_PRINT(5, (CE_CONT, "byte count is %d.\n", bpp_regs_p->dma_bcnt));
 	BPP_PRINT(5, (CE_CONT, "write_timeout is %d.\n",
-			bpp_p->transfer_parms.write_timeout));
+	    bpp_p->transfer_parms.write_timeout));
 	if (bpp_regs_p->trans_cntl & BPP_DIRECTION) {
 		/* read mode - partial reads will time out */
 		BPP_PRINT(5, (CE_CONT, "read timeout, clearing registers.\n"));
 		bp->b_resid = (bpp_regs_p->dma_bcnt +
-			bpp_p->transfer_remainder);
+		    bpp_p->transfer_remainder);
 		/* make sure the DMA doesn't start again. */
 		bpp_regs_p->dma_bcnt = 0;
 		/*
@@ -1920,7 +1923,7 @@ bpp_transfer_timeout(void *unit_no_arg)
 		bpp_regs_p->dma_csr &= ~BPP_ENABLE_BCNT;
 		bpp_regs_p->dma_csr &= ~BPP_ENABLE_DMA;
 		bpp_regs_p->int_cntl &= ~(BPP_ERR_IRQ_EN | BPP_SLCT_IRQ_EN
-						| BPP_PE_IRQ_EN);
+		    | BPP_PE_IRQ_EN);
 	} else if ((bpp_regs_p->trans_cntl & BPP_DIRECTION) == 0) {
 		/* other write cases (read can time out w/no error) */
 		bpp_transfer_failed(unit_no);
@@ -1943,8 +1946,8 @@ bpp_transfer_timeout(void *unit_no_arg)
 	/* mark the error status structure */
 	bpp_p->error_stat.timeout_occurred = 1;
 	BPP_PRINT(5, (CE_CONT,
-		"In bpp_transfer_timeout, Timeout blk is 0x%x.\n",
-		bpp_p->timeouts));
+	    "In bpp_transfer_timeout, Timeout blk is 0x%x.\n",
+	    bpp_p->timeouts));
 
 	/*
 	 * Release the dvma bus resource.
@@ -1952,11 +1955,11 @@ bpp_transfer_timeout(void *unit_no_arg)
 	(void) ddi_dma_unbind_handle(bpp_p->bpp_dma_handle);
 
 	BPP_PRINT(5, (CE_CONT,
-		"bpp_transfer_timeout, unit %d, Calling biodone.\n", unit_no));
+	    "bpp_transfer_timeout, unit %d, Calling biodone.\n", unit_no));
 	mutex_exit(&bpp_p->bpp_mutex);
 	(void) biodone(bp);
 	BPP_PRINT(2, (CE_CONT, "Leaving bpp_transfer_timeout, unit #%d.\n",
-				unit_no));
+	    unit_no));
 }
 
 
@@ -1980,8 +1983,8 @@ set_dss_dsw(int unit_no, int read_mode)
 	register struct	bpp_transfer_parms	*bpp_transfer_parms_p;
 
 	BPP_PRINT(2, (CE_CONT,
-		"Entering set_dss_dsw, unit:%d, read_mode = %x.\n",
-			unit_no, read_mode));
+	    "Entering set_dss_dsw, unit:%d, read_mode = %x.\n",
+	    unit_no, read_mode));
 	bpp_p = getsoftc(unit_no);
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 
@@ -1990,36 +1993,36 @@ set_dss_dsw(int unit_no, int read_mode)
 	if (read_mode) {
 		dss_temp =
 		    bpp_transfer_parms_p->read_setup_time /
-			bpp_p->sbus_clock_cycle;
+		    bpp_p->sbus_clock_cycle;
 		if (bpp_transfer_parms_p->read_setup_time %
-			bpp_p->sbus_clock_cycle)
+		    bpp_p->sbus_clock_cycle)
 			dss_temp ++;	/* round up */
 		dsw_temp =
 		    bpp_transfer_parms_p->read_strobe_width /
-			bpp_p->sbus_clock_cycle;
+		    bpp_p->sbus_clock_cycle;
 		if (bpp_transfer_parms_p->read_strobe_width %
-			bpp_p->sbus_clock_cycle)
+		    bpp_p->sbus_clock_cycle)
 			dsw_temp ++;	/* round up */
 	} else {
 		dss_temp =
 		    bpp_transfer_parms_p->write_setup_time /
-			bpp_p->sbus_clock_cycle;
+		    bpp_p->sbus_clock_cycle;
 		if (bpp_transfer_parms_p->write_setup_time %
-			bpp_p->sbus_clock_cycle)
+		    bpp_p->sbus_clock_cycle)
 			dss_temp ++;	/* round up */
 		dsw_temp =
 		    bpp_transfer_parms_p->write_strobe_width /
-			bpp_p->sbus_clock_cycle;
+		    bpp_p->sbus_clock_cycle;
 		if (bpp_transfer_parms_p->write_strobe_width %
-			bpp_p->sbus_clock_cycle)
+		    bpp_p->sbus_clock_cycle)
 			dsw_temp ++;	/* round up */
 	}
 
 	BPP_PRINT(5, (CE_CONT, "dss = 0x%x, dsw = 0x%x\n", dss_temp, dsw_temp));
 	bpp_p->bpp_regs_p->hw_config =
-			((((uchar_t)dsw_temp) << 8) | ((uchar_t)dss_temp));
+	    ((((uchar_t)dsw_temp) << 8) | ((uchar_t)dss_temp));
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving set_dss_dsw, unit:%d.\n", unit_no));
+	    "Leaving set_dss_dsw, unit:%d.\n", unit_no));
 }
 /*
  * Check the values of the write parameters in the passed bpp_transfer_parms
@@ -2040,11 +2043,11 @@ check_write_params(struct  bpp_transfer_parms *parms_p, int unit, int flags)
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 	retval = 0;
 	BPP_PRINT(2, (CE_CONT,
-		"Entering check_write_params, parms_p = %x.\n", parms_p));
+	    "Entering check_write_params, parms_p = %x.\n", parms_p));
 	BPP_PRINT(5, (CE_CONT, "write_hs %d, write_time %d, \n",
-			parms_p->write_handshake, parms_p->write_setup_time));
+	    parms_p->write_handshake, parms_p->write_setup_time));
 	BPP_PRINT(5, (CE_CONT, "write_width %d, timeout %d.\n",
-			parms_p->write_strobe_width, parms_p->write_timeout));
+	    parms_p->write_strobe_width, parms_p->write_timeout));
 #ifndef	lint
 	/* better rangechecking will be added later */
 	/* check for legal range */
@@ -2058,7 +2061,7 @@ check_write_params(struct  bpp_transfer_parms *parms_p, int unit, int flags)
 	if ((parms_p->write_handshake > BPP_BUSY_HS) &&
 	    (parms_p->write_handshake < BPP_VPRINT_HS)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Handshake out of legal write range!\n"));
+		    "Handshake out of legal write range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
@@ -2078,7 +2081,7 @@ check_write_params(struct  bpp_transfer_parms *parms_p, int unit, int flags)
 	/* versatec handshakes not implemented in current code */
 	if ((parms_p->write_handshake > BPP_BUSY_HS)) {
 		BPP_PRINT(1, (CE_CONT,
-			"No versatec handshakes allowed yet!\n"));
+		    "No versatec handshakes allowed yet!\n"));
 		retval = EINVAL;
 		goto out;
 	}
@@ -2090,14 +2093,14 @@ check_write_params(struct  bpp_transfer_parms *parms_p, int unit, int flags)
 	if ((parms_p->write_setup_time < 0) ||
 	    (parms_p->write_setup_time > max_setup)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Write setup time out of legal range!\n"));
+		    "Write setup time out of legal range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
 	if ((parms_p->write_strobe_width < 0) ||
 	    (parms_p->write_strobe_width > max_width)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Write strobe width out of legal range!\n"));
+		    "Write strobe width out of legal range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
@@ -2106,14 +2109,14 @@ check_write_params(struct  bpp_transfer_parms *parms_p, int unit, int flags)
 	if ((parms_p->write_timeout < 0) ||
 	    (parms_p->write_timeout > MAX_TIMEOUT)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Write timeout out of legal range!\n"));
+		    "Write timeout out of legal range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
 
 out:
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving check_write_params, retval = %d.\n", retval));
+	    "Leaving check_write_params, retval = %d.\n", retval));
 	return (retval);
 }
 
@@ -2136,11 +2139,11 @@ check_read_params(struct  bpp_transfer_parms *parms_p, uint_t unit, int flags)
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 	retval = 0;
 	BPP_PRINT(2, (CE_CONT,
-		"Entering check_read_params, parms_p = %x.\n", parms_p));
+	    "Entering check_read_params, parms_p = %x.\n", parms_p));
 	BPP_PRINT(5, (CE_CONT,
-		"read_hs %d, read_time %d, read_width %d, timeout %d.\n",
-		parms_p->read_handshake, parms_p->read_setup_time,
-		parms_p->read_strobe_width, parms_p->read_timeout));
+	    "read_hs %d, read_time %d, read_width %d, timeout %d.\n",
+	    parms_p->read_handshake, parms_p->read_setup_time,
+	    parms_p->read_strobe_width, parms_p->read_timeout));
 #ifndef	lint
 	/* check for legal range */
 	if ((parms_p->read_handshake < BPP_NO_HS) ||
@@ -2157,14 +2160,14 @@ check_read_params(struct  bpp_transfer_parms *parms_p, uint_t unit, int flags)
 	if ((parms_p->read_setup_time < 0) ||
 	    (parms_p->read_setup_time > max_setup)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Read setup time out of legal range!\n"));
+		    "Read setup time out of legal range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
 	if ((parms_p->read_strobe_width < 0) ||
 	    (parms_p->read_strobe_width > max_width)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Read strobe width out of legal range!\n"));
+		    "Read strobe width out of legal range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
@@ -2173,14 +2176,14 @@ check_read_params(struct  bpp_transfer_parms *parms_p, uint_t unit, int flags)
 	if ((parms_p->read_timeout < 0) ||
 	    (parms_p->read_timeout > MAX_TIMEOUT)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Read timeout out of legal range!\n"));
+		    "Read timeout out of legal range!\n"));
 		retval = EINVAL;
 		goto out;
 	}
 
 out:
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving check_read_params, retval = %d.\n", retval));
+	    "Leaving check_read_params, retval = %d.\n", retval));
 	return (retval);
 }
 
@@ -2196,21 +2199,21 @@ check_read_pins(struct  bpp_pins *pins_p, int flags, uint_t unit,
 	bpp_p = getsoftc(unit);
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 	BPP_PRINT(2, (CE_CONT,
-		"Entering check_read_pins, pins_p = 0x%x \n", pins_p));
+	    "Entering check_read_pins, pins_p = 0x%x \n", pins_p));
 	BPP_PRINT(5, (CE_CONT,
-		"outpins = 0x%x, inpins = 0x%x.\n", pins_p->output_reg_pins,
-		pins_p->input_reg_pins));
+	    "outpins = 0x%x, inpins = 0x%x.\n", pins_p->output_reg_pins,
+	    pins_p->input_reg_pins));
 	/* check for bogus bits turned on */
 	if ((pins_p->output_reg_pins & ~BPP_ALL_OUT_PINS) ||
 	    (pins_p->input_reg_pins  & ~BPP_ALL_IN_PINS)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Check pins : Bogus bit in bpp pins structure!\n"));
+		    "Check pins : Bogus bit in bpp pins structure!\n"));
 		retval = EINVAL;
 		goto out;
 	}
 out:
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving check_read_pins, retval = %d.\n", retval));
+	    "Leaving check_read_pins, retval = %d.\n", retval));
 	return (retval);
 }
 
@@ -2226,14 +2229,14 @@ check_write_pins(struct  bpp_pins *pins_p, int flags, uint_t unit,
 	bpp_p = getsoftc(unit);
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 	BPP_PRINT(2, (CE_CONT,
-		"Entering check_write_pins, pins_p = 0x%x, \n", pins_p));
+	    "Entering check_write_pins, pins_p = 0x%x, \n", pins_p));
 	BPP_PRINT(5, (CE_CONT, "outpins = 0x%x, inpins = 0x%x.\n",
-		pins_p->output_reg_pins, pins_p->input_reg_pins));
+	    pins_p->output_reg_pins, pins_p->input_reg_pins));
 	/* check for bogus bits turned on */
 	if ((pins_p->output_reg_pins & ~BPP_ALL_OUT_PINS) ||
 	    (pins_p->input_reg_pins  & ~BPP_ALL_IN_PINS)) {
 		BPP_PRINT(1, (CE_CONT,
-			"Check pins : Bogus bit in bpp pins structure!\n"));
+		    "Check pins : Bogus bit in bpp pins structure!\n"));
 		retval = EINVAL;
 		goto out;
 	}
@@ -2248,7 +2251,7 @@ check_write_pins(struct  bpp_pins *pins_p, int flags, uint_t unit,
 	/* versatec handshakes not implemented in current code */
 	if ((handshake > BPP_BUSY_HS)) {
 		BPP_PRINT(1, (CE_CONT,
-			"No versatec handshakes allowed yet!\n"));
+		    "No versatec handshakes allowed yet!\n"));
 		/*
 		 * really, need to check for one bit only of remote
 		 * pins set.
@@ -2259,7 +2262,7 @@ check_write_pins(struct  bpp_pins *pins_p, int flags, uint_t unit,
 #endif	/* lint */
 out:
 	BPP_PRINT(2, (CE_CONT,
-		"Leaving check_write_pins, retval = %d.\n", retval));
+	    "Leaving check_write_pins, retval = %d.\n", retval));
 	return (retval);
 }
 
@@ -2271,8 +2274,8 @@ read_outpins(int unit_no, int flags, register enum   handshake_t handshake)
 						/* unit's state struct */
 	uchar_t	temppins;
 	BPP_PRINT(2, (CE_CONT,
-		"Entering read_outpins, unit = %d, flags = 0x%x, \n",
-					unit_no, flags));
+	    "Entering read_outpins, unit = %d, flags = 0x%x, \n",
+	    unit_no, flags));
 	bpp_p = getsoftc(unit_no);
 	ASSERT(MUTEX_HELD(&bpp_p->bpp_mutex));
 
@@ -2282,12 +2285,12 @@ read_outpins(int unit_no, int flags, register enum   handshake_t handshake)
 #if BPP_DEBUG > 0
 		if (handshake > BPP_BUSY_HS) {
 			BPP_PRINT(1, (CE_CONT,
-				"No versatec handshakes allowed yet!\n"));
+			    "No versatec handshakes allowed yet!\n"));
 		}
 #endif /* BPP_DEBUG */
 
 		temppins = bpp_p->bpp_regs_p->out_pins &
-			(BPP_SLCTIN_PIN | BPP_AFX_PIN | BPP_INIT_PIN);
+		    (BPP_SLCTIN_PIN | BPP_AFX_PIN | BPP_INIT_PIN);
 		bpp_p->pins.output_reg_pins |= temppins;
 	}
 
@@ -2312,16 +2315,16 @@ check_bpp_registers(int unit_no)
 						/* unit's state struct */
 
 	BPP_PRINT(2, (CE_CONT, "Entering check_bpp_registers, unit %d.\n",
-				unit_no));
+	    unit_no));
 	bpp_p = getsoftc(unit_no);
-/* check the 32-bit dma registers */
+	/* check the 32-bit dma registers */
 	/* dma csr */
 	l_reg_addr = &(bpp_p->bpp_regs_p->dma_csr);
 	if (ddi_peek32(bpp_p->dip,
 	    (int32_t *)l_reg_addr, (int32_t *)&l_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed dma csr, address %x\n",
-			l_reg_addr));
+		    "ck_bpp_registers: peek failed dma csr, address %x\n",
+		    l_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "dma_csr contains %x\n", l_reg_contents));
@@ -2331,8 +2334,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek32(bpp_p->dip,
 	    (int32_t *)l_reg_addr, (int32_t *)&l_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed dma addr, address %x\n",
-			l_reg_addr));
+		    "ck_bpp_registers: peek failed dma addr, address %x\n",
+		    l_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "dma_addr contains %x\n", l_reg_contents));
@@ -2342,8 +2345,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek32(bpp_p->dip,
 	    (int32_t *)l_reg_addr, (int32_t *)&l_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed dma bcnt, address %x\n",
-			l_reg_addr));
+		    "ck_bpp_registers: peek failed dma bcnt, address %x\n",
+		    l_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "dma_bcnt contains %x\n", l_reg_contents));
@@ -2354,15 +2357,15 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek16(bpp_p->dip,
 	    (int16_t *)s_reg_addr, (int16_t *)&s_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed hw_config, address %x\n",
-			s_reg_addr));
+		    "ck_bpp_registers: peek failed hw_config, address %x\n",
+		    s_reg_addr));
 		return (1);
 	}
 	if (ddi_poke16(bpp_p->dip,
 	    (short *)s_reg_addr, s_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: poke failed hw_config, address %x\n",
-			s_reg_addr));
+		    "ck_bpp_registers: poke failed hw_config, address %x\n",
+		    s_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "hw_config contains %x\n", s_reg_contents));
@@ -2372,8 +2375,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek16(bpp_p->dip,
 	    (short *)s_reg_addr, (short *)&s_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed op_config, address %x\n",
-			s_reg_addr));
+		    "ck_bpp_registers: peek failed op_config, address %x\n",
+		    s_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "op_config contains %x\n", s_reg_contents));
@@ -2383,8 +2386,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek16(bpp_p->dip,
 	    (short *)s_reg_addr, (short *)&s_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed int_cntl, address %x\n",
-			s_reg_addr));
+		    "ck_bpp_registers: peek failed int_cntl, address %x\n",
+		    s_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "int_cntl contains %x\n", s_reg_contents));
@@ -2395,8 +2398,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek8(bpp_p->dip,
 	    (char *)c_reg_addr, (char *)&c_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed data, address %x\n",
-			c_reg_addr));
+		    "ck_bpp_registers: peek failed data, address %x\n",
+		    c_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "data contains %x\n", c_reg_contents));
@@ -2406,8 +2409,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek8(bpp_p->dip,
 	    (char *)c_reg_addr, (char *)&c_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers:peek failed trans_cntl, address %x\n",
-			c_reg_addr));
+		    "ck_bpp_registers:peek failed trans_cntl, address %x\n",
+		    c_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "trans_cntl contains %x\n", c_reg_contents));
@@ -2417,8 +2420,8 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek8(bpp_p->dip,
 	    (char *)c_reg_addr, (char *)&c_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed out_pins, address %x\n",
-			c_reg_addr));
+		    "ck_bpp_registers: peek failed out_pins, address %x\n",
+		    c_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "out_pins contains %x\n", c_reg_contents));
@@ -2428,12 +2431,12 @@ check_bpp_registers(int unit_no)
 	if (ddi_peek8(bpp_p->dip,
 	    (char *)c_reg_addr, (char *)&c_reg_contents) != DDI_SUCCESS) {
 		BPP_PRINT(1, (CE_CONT,
-			"ck_bpp_registers: peek failed in_pins, address %x\n",
-			c_reg_addr));
+		    "ck_bpp_registers: peek failed in_pins, address %x\n",
+		    c_reg_addr));
 		return (1);
 	}
 	BPP_PRINT(5, (CE_CONT, "in_pins contains %x\n", c_reg_contents));
 	BPP_PRINT(5, (CE_CONT,
-		"Leaving check_bpp_registers, unit %d.\n", unit_no));
+	    "Leaving check_bpp_registers, unit %d.\n", unit_no));
 	return (0);
 }

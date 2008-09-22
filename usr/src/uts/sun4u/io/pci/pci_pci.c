@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Sun4u PCI to PCI bus bridge nexus driver
@@ -180,7 +179,8 @@ struct dev_ops ppb_ops = {
 	nulldev,		/* reset */
 	&ppb_cb_ops,		/* driver operations */
 	&ppb_bus_ops,		/* bus operations */
-	ppb_pwr
+	ppb_pwr,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -189,7 +189,7 @@ struct dev_ops ppb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"Standard PCI to PCI bridge nexus driver %I%",
+	"Standard PCI to PCI bridge nexus driver",
 	&ppb_ops,	/* driver ops */
 };
 
@@ -461,8 +461,8 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		}
 
 		DEBUG1(DBG_ATTACH, devi,
-			"ppb_attach(): this nexus %s hotplug slots\n",
-			ppb->hotplug_capable == B_TRUE ? "has":"has no");
+		    "ppb_attach(): this nexus %s hotplug slots\n",
+		    ppb->hotplug_capable == B_TRUE ? "has":"has no");
 
 		ppb_fm_init(ppb);
 		ddi_report_dev(devi);
@@ -474,7 +474,7 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 * Get the soft state structure for the bridge.
 		 */
 		ppb = (ppb_devstate_t *)
-			ddi_get_soft_state(ppb_state, ddi_get_instance(devi));
+		    ddi_get_soft_state(ppb_state, ddi_get_instance(devi));
 
 		pci_pwr_resume(devi, ppb->ppb_pwr_p);
 
@@ -518,7 +518,7 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	case DDI_SUSPEND:
 		ppb = (ppb_devstate_t *)
-			ddi_get_soft_state(ppb_state, ddi_get_instance(devi));
+		    ddi_get_soft_state(ppb_state, ddi_get_instance(devi));
 
 		pci_pwr_suspend(devi, ppb->ppb_pwr_p);
 
@@ -608,8 +608,8 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	*(int *)result = 0;
 	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
-		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
-		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
+	    (caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	totreg = reglen / sizeof (pci_regspec_t);
@@ -622,7 +622,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 		}
 		*(off_t *)result = drv_regp[rn].pci_size_low |
-			((uint64_t)drv_regp[rn].pci_size_hi << 32);
+		    ((uint64_t)drv_regp[rn].pci_size_hi << 32);
 	}
 
 	kmem_free(drv_regp, reglen);
@@ -857,9 +857,9 @@ ppb_initchild(dev_info_t *child)
 	if (ddi_prop_exists(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    "config-regs-saved-by-child") == 1) {
 		DEBUG2(DBG_PWR, ddi_get_parent(child),
-			"INITCHILD: config regs to be restored by child"
-			" for %s@%s\n", ddi_node_name(child),
-				ddi_get_name_addr(child));
+		    "INITCHILD: config regs to be restored by child"
+		    " for %s@%s\n", ddi_node_name(child),
+		    ddi_get_name_addr(child));
 
 		return (DDI_SUCCESS);
 	}
@@ -885,7 +885,7 @@ ppb_initchild(dev_info_t *child)
 	 * Support for the "command-preserve" property.
 	 */
 	command_preserve = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-		DDI_PROP_DONTPASS, "command-preserve", 0);
+	    DDI_PROP_DONTPASS, "command-preserve", 0);
 	command = pci_config_get16(config_handle, PCI_CONF_COMM);
 	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
 	command |= (ppb_command_default & ~command_preserve);
@@ -910,13 +910,13 @@ ppb_initchild(dev_info_t *child)
 	 */
 	if (ppb_set_cache_line_size_register &&
 	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"cache-line-size", 0) == 0) {
+	    "cache-line-size", 0) == 0) {
 		pci_config_put8(config_handle, PCI_CONF_CACHE_LINESZ,
-			ppb->ppb_cache_line_size);
+		    ppb->ppb_cache_line_size);
 		n = pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
 		if (n != 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-					"cache-line-size", n);
+			    "cache-line-size", n);
 		}
 	}
 
@@ -925,23 +925,23 @@ ppb_initchild(dev_info_t *child)
 	 */
 	if (ppb_set_latency_timer_register &&
 	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"latency-timer", 0) == 0) {
+	    "latency-timer", 0) == 0) {
 
 		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
 			latency_timer = ppb->ppb_latency_timer;
 			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-				ppb->ppb_latency_timer);
+			    ppb->ppb_latency_timer);
 		} else {
 			min_gnt = pci_config_get8(config_handle,
-				PCI_CONF_MIN_G);
+			    PCI_CONF_MIN_G);
 			latency_timer = min_gnt * 8;
 		}
 		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-			latency_timer);
+		    latency_timer);
 		n = pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
 		if (n != 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-					"latency-timer", n);
+			    "latency-timer", n);
 		}
 	}
 
@@ -1045,7 +1045,7 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	 * Locate and store the power management cap_ptr for future references.
 	 */
 	if ((PCI_CAP_LOCATE(conf_hdl, PCI_CAP_ID_PM, &ppb->ppb_pm_cap_ptr))
-		== DDI_FAILURE) {
+	    == DDI_FAILURE) {
 		DEBUG0(DBG_PWR, pdip, "bridge does not support PM. PCI"
 		    " PM data structure not found in config header\n");
 		pci_config_teardown(&conf_hdl);
@@ -1061,10 +1061,10 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	ppb->ppb_pwr_p->pwr_fp = 0;
 
 	pmcsr_bse = PCI_CAP_GET8(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
-		PCI_PMCSR_BSE);
+	    PCI_PMCSR_BSE);
 
 	pmcap = PCI_CAP_GET16(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
-		PCI_PMCAP);
+	    PCI_PMCAP);
 
 	if (pmcap == PCI_CAP_EINVAL16 || pmcsr_bse == PCI_CAP_EINVAL8) {
 		pci_config_teardown(&conf_hdl);
@@ -1151,8 +1151,8 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	if (ddi_prop_create(DDI_DEV_T_NONE, pdip, DDI_PROP_CANSLEEP,
 	    "pm-want-child-notification?", NULL, NULL) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
-			"%s%d fail to create pm-want-child-notification? prop",
-			ddi_driver_name(pdip), ddi_get_instance(pdip));
+		    "%s%d fail to create pm-want-child-notification? prop",
+		    ddi_driver_name(pdip), ddi_get_instance(pdip));
 
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, pdip, "pm-components");
 		pci_config_teardown(&conf_hdl);
@@ -1164,7 +1164,7 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	}
 
 	ppb->ppb_pwr_p->current_lvl =
-		pci_pwr_current_lvl(ppb->ppb_pwr_p);
+	    pci_pwr_current_lvl(ppb->ppb_pwr_p);
 }
 
 /*
@@ -1194,7 +1194,7 @@ ppb_pwr_teardown(ppb_devstate_t *ppb, dev_info_t *dip)
 	kmem_free(ppb->ppb_pwr_p, sizeof (pci_pwr_t));
 
 	if (ddi_prop_remove(DDI_DEV_T_NONE, dip, "pm-components") !=
-		DDI_PROP_SUCCESS) {
+	    DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d unable to remove prop pm-components",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 	}
@@ -1224,7 +1224,7 @@ pci_pwr_current_lvl(pci_pwr_t *pwr_p)
 	    ddi_get_instance(pwr_p->pwr_dip));
 
 	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
-		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
+	    ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
 		return (DDI_FAILURE);
 
 	switch (pmcsr & PCI_PMCSR_STATE_MASK) {
@@ -1289,8 +1289,8 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 	if (lowest_lvl > lvl) {
 		pci_pwr_component_busy(ppb->ppb_pwr_p);
 		DEBUG2(DBG_PWR, dip, "ppb_pwr: failing power request "
-			"lowest allowed is %d requested is %d\n",
-				lowest_lvl, lvl);
+		    "lowest allowed is %d requested is %d\n",
+		    lowest_lvl, lvl);
 		mutex_exit(&ppb->ppb_pwr_p->pwr_mutex);
 
 		return (DDI_FAILURE);
@@ -1301,7 +1301,7 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 	}
 
 	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
-		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
+	    ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
 		return (DDI_FAILURE);
 
 	/*
@@ -1380,7 +1380,7 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 		DEBUG0(DBG_PWR, dip, "ppb_pwr(): SAVING CONFIG REGS\n");
 		if (pci_save_config_regs(dip) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s%d Save config regs failed",
-				ddi_driver_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 			mutex_exit(&ppb->ppb_pwr_p->pwr_mutex);
 
 			return (DDI_FAILURE);
@@ -1388,7 +1388,7 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 	}
 
 	PCI_CAP_PUT16(ppb->ppb_conf_hdl, NULL, ppb->ppb_pm_cap_ptr, PCI_PMCSR,
-		pmcsr);
+	    pmcsr);
 
 	/*
 	 * No bus transactions should occur without waiting for
@@ -1465,9 +1465,9 @@ ppb_create_ranges_prop(dev_info_t *dip,
 	 */
 	ranges[i].size_low = ranges[i].size_high = 0;
 	ranges[i].parent_mid = ranges[i].child_mid =
-		ranges[i].parent_high = 0;
+	    ranges[i].parent_high = 0;
 	ranges[i].child_high = ranges[i].parent_high |=
-		(PCI_REG_REL_M | PCI_ADDR_IO);
+	    (PCI_REG_REL_M | PCI_ADDR_IO);
 	base = PPB_16bit_IOADDR(io_base_lo);
 	limit = PPB_16bit_IOADDR(io_limit_lo);
 
@@ -1490,9 +1490,9 @@ ppb_create_ranges_prop(dev_info_t *dip,
 	limit = PPB_32bit_MEMADDR(mem_limit);
 	ranges[i].size_low = ranges[i].size_high = 0;
 	ranges[i].parent_mid = ranges[i].child_mid =
-		ranges[i].parent_high = 0;
+	    ranges[i].parent_high = 0;
 	ranges[i].child_high = ranges[i].parent_high |=
-		(PCI_REG_REL_M | PCI_ADDR_MEM32);
+	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
 	ranges[i].child_low = ranges[i].parent_low = base;
 	if (limit >= base) {
 		ranges[i].size_low = limit - base + PPB_MEMGRAIN;
@@ -1694,7 +1694,7 @@ ppb_fm_init(ppb_devstate_t *ppb_p)
 	char *bus;
 
 	ppb_p->fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
 	 * Request our capability level and get our parents capability
@@ -1751,7 +1751,7 @@ ppb_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 		ddi_iblock_cookie_t *ibc)
 {
 	ppb_devstate_t *ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-			ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 	*ibc = ppb_p->fm_ibc;
 	return (ppb_p->fm_cap);
 }
@@ -1763,7 +1763,7 @@ static int
 ppb_err_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
 	ppb_devstate_t *ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-			ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	/*
 	 * errors handled by SPARC PCI-E framework for PCIe platforms

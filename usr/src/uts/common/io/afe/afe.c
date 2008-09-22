@@ -33,7 +33,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/varargs.h>
 #include <sys/types.h>
@@ -199,7 +198,7 @@ static mac_callbacks_t afe_m_callbacks = {
  * Stream information
  */
 DDI_DEFINE_STREAM_OPS(afe_devops, nulldev, nulldev, afe_attach, afe_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 /*
  * Module linkage information.

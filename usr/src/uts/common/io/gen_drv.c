@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -134,7 +132,8 @@ static struct dev_ops gen_ops = {
 	nodev,			/* reset */
 	&gen_cb_ops,		/* driver ops */
 	(struct bus_ops *)0,	/* bus ops */
-	gen_power		/* power */
+	gen_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -159,7 +158,7 @@ static char *mnodetypes[] = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"generic test driver %I%",
+	"generic test driver",
 	&gen_ops
 };
 
@@ -919,11 +918,11 @@ gen_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	switch (cmd) {
 	case GENDRV_IOFAULT_SIMULATE:
 		if (ddi_get_eventcookie(dstatep->dip, DDI_DEVI_FAULT_EVENT,
-			    &(cookie)) != NDI_SUCCESS)
+		    &(cookie)) != NDI_SUCCESS)
 			return (DDI_FAILURE);
 
 		return (ndi_post_event(dstatep->dip, dstatep->dip, cookie,
-			    NULL));
+		    NULL));
 
 	case GENDRV_NDI_EVENT_TEST:
 		if (ddi_get_eventcookie(dstatep->dip, "pshot_dev_offline",
@@ -1154,7 +1153,7 @@ gen_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		dstatep->flag &= ~LOWER_POWER_FLAG;
 		mutex_exit(&dstatep->lock);
 		GEN_DEBUG((CE_CONT, "%s%d: DEVCTL_PM_NO_LOWER_POWER",
-			    nodename, instance));
+		    nodename, instance));
 		break;
 
 	default:
@@ -1437,7 +1436,7 @@ gen_create_mn_disk_wwn(dev_info_t *devi)
 	int target, lun;
 
 	if (address[0] >= '0' && address[0] <= '9' &&
-			strchr(address, ',')) {
+	    strchr(address, ',')) {
 		target = atod(address);
 		address = strchr(address, ',');
 		lun = atod(++address);

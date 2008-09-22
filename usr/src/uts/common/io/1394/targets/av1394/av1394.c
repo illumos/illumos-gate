@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * av1394 driver
@@ -104,12 +102,13 @@ static struct dev_ops av1394_ops = {
 	nodev,			/* reset */
 	&av1394_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv av1394_modldrv =	{
 	&mod_driverops,
-	"IEEE 1394 AV driver %I%",
+	"IEEE 1394 AV driver",
 	&av1394_ops
 };
 
@@ -227,7 +226,7 @@ av1394_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&avp->av_mutex, NULL, MUTEX_DRIVER,
-			avp->av_attachinfo.iblock_cookie);
+	    avp->av_attachinfo.iblock_cookie);
 
 #ifndef __lock_lint
 	avp->av_dip = dip;
@@ -485,7 +484,7 @@ av1394_t1394_attach(av1394_inst_t *avp, dev_info_t *dip)
 	AV1394_TNF_ENTER(av1394_t1394_attach);
 
 	ret = t1394_attach(dip, T1394_VERSION_V1, 0, &avp->av_attachinfo,
-			&avp->av_t1394_hdl);
+	    &avp->av_t1394_hdl);
 
 	if (ret != DDI_SUCCESS) {
 		TNF_PROBE_1(av1394_t1394_attach_error, AV1394_TNF_INST_ERROR,

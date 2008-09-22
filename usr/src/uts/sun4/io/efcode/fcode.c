@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fcode helper driver -- provide priv. access and kernel communication
@@ -109,7 +108,9 @@ static struct dev_ops fcode_ops = {
 	fc_detach,		/* detach */
 	nodev,			/* reset */
 	&fc_cb_ops,		/* driver operations */
-	NULL			/* bus operations */
+	NULL,			/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -117,7 +118,7 @@ static struct dev_ops fcode_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"FCode driver %I%",
+	"FCode driver",
 	&fcode_ops
 };
 
@@ -295,7 +296,7 @@ fc_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	*devp = makedevice(getmajor(*devp), (minor_t)(m + 1));
 
 	FC_DEBUG2(9, CE_CONT, "fc_open: open count = %d (%d)\n",
-		fc_open_count, m + 1);
+	    fc_open_count, m + 1);
 
 	return (0);
 }
@@ -366,7 +367,7 @@ fc_close(dev_t dev, int flag, int otype, cred_t *cred_p)
 	st->state = FC_STATE_INACTIVE;
 	st->req = 0;
 	FC_DEBUG2(9, CE_CONT, "fc_close: open count = %d (%d)\n",
-		fc_open_count, m + 1);
+	    fc_open_count, m + 1);
 	if (fc_open_count >= fc_max_opens) {
 		cv_broadcast(&fc_open_cv);
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -190,7 +189,9 @@ static struct dev_ops smcg_ops = {
 	SMCG_detach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_smcg_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL	/* devo_bus_ops */
+	(struct bus_ops *)NULL,	/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -374,7 +375,7 @@ SMCG_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_get_iblock_cookie(devinfo, 0, &macinfo->gldm_cookie)
-		!= DDI_SUCCESS)
+	    != DDI_SUCCESS)
 		goto attach_fail_cleanup;
 
 	/*
@@ -813,7 +814,7 @@ SMCG_get_stats(gld_mac_info_t *macinfo, struct gld_stats *g_stats)
 	else smcg->media = GLDM_UNKNOWN;
 
 	smcg->duplex = (pAd->line_speed & LINE_SPEED_FULL_DUPLEX) ?
-		GLD_DUPLEX_FULL: GLD_DUPLEX_HALF;
+	    GLD_DUPLEX_FULL: GLD_DUPLEX_HALF;
 
 	if	(pAd->line_speed & LINE_SPEED_100) smcg->speed = 100000000;
 	else if (pAd->line_speed & LINE_SPEED_10)  smcg->speed = 10000000;
@@ -839,16 +840,16 @@ SMCG_get_stats(gld_mac_info_t *macinfo, struct gld_stats *g_stats)
 
 	/* Stats which are calculated from other stats */
 	g_stats->glds_errxmt =
-		smcg->tx_CD_heartbeat + smcg->tx_max_collisions +
-		smcg->tx_carrier_lost + smcg->tx_underruns +
-		smcg->tx_ow_collision;
+	    smcg->tx_CD_heartbeat + smcg->tx_max_collisions +
+	    smcg->tx_carrier_lost + smcg->tx_underruns +
+	    smcg->tx_ow_collision;
 	g_stats->glds_errrcv =
-		smcg->rx_CRC_errors + smcg->rx_too_big +
-		smcg->rx_align_errors + smcg->rx_overruns +
-		smcg->short_count;
+	    smcg->rx_CRC_errors + smcg->rx_too_big +
+	    smcg->rx_align_errors + smcg->rx_overruns +
+	    smcg->short_count;
 	g_stats->glds_dot3_mac_xmt_error = smcg->tx_underruns;
 	g_stats->glds_dot3_mac_rcv_error =
-		smcg->rx_overruns + smcg->short_count;
+	    smcg->rx_overruns + smcg->short_count;
 	return (GLD_SUCCESS);
 }
 
@@ -921,7 +922,7 @@ SMCG_send(gld_mac_info_t *macinfo, mblk_t *mp)
 #ifdef	DEBUG
 	if (SMCG_debug & SMCGTRACE)
 		cmn_err(CE_WARN, SMCG_NAME
-			"Send bind handle failure = 0x%x", rc);
+		    "Send bind handle failure = 0x%x", rc);
 #endif
 			mutex_exit(&smcg->txbuf_lock);
 			return (GLD_FAILURE);

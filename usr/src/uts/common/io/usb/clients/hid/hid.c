@@ -229,7 +229,8 @@ static struct dev_ops hid_ops = {
 	nodev,			/* reset */
 	&hid_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	hid_power		/* power */
+	hid_power,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv hidmodldrv =	{
@@ -752,7 +753,6 @@ hid_detach(dev_info_t *dip, ddi_detach_cmd_t	cmd)
 
 	return (rval);
 }
-
 
 /*
  * hid_open :

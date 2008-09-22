@@ -282,7 +282,9 @@ static struct dev_ops rootnex_ops = {
 	rootnex_detach,
 	nulldev,
 	&rootnex_cb_ops,
-	&rootnex_bus_ops
+	&rootnex_bus_ops,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv rootnex_modldrv = {

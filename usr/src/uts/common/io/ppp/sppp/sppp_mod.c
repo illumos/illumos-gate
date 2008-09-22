@@ -1,7 +1,7 @@
 /*
  * sppp_mod.c - modload support for PPP pseudo-device driver.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -45,7 +45,6 @@
  * for improved performance and scalability.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define	RCSID	" $Id: sppp_mod.c,v 1.0 2000/05/08 10:53:28 masputra Exp $"
 
 #include <sys/types.h>
@@ -166,7 +165,7 @@ DDI_DEFINE_STREAM_OPS(sppp_ops,						\
 	nulldev, nulldev,						\
 	_mi_driver_attach, _mi_driver_detach, nodev, _mi_driver_info,	\
 	D_NEW | D_MP | D_MTQPAIR | D_MTOUTPERIM | D_MTOCEXCL | D_MTPUTSHARED, \
-	&sppp_tab);
+	&sppp_tab, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,				/* drv_modops */

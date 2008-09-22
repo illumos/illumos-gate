@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/reboot.h>
@@ -55,6 +54,8 @@ bootflags(struct bootops *ops)
 		boothowto |= RB_ASKNAME;
 		return;
 	}
+
+	(void) BOP_GETPROP(ops, "boot-file", kern_bootfile);
 
 	cp = kern_bootargs;
 

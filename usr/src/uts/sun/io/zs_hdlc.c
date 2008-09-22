@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	HDLC protocol handler for Z8530 SCC.
@@ -204,7 +202,7 @@ struct streamtab hdlctab = {
 };
 
 DDI_DEFINE_STREAM_OPS(zsh_ops, nulldev, zsh_probe, zsh_attach,
-    zsh_detach, nodev, zsh_info, D_MP, &hdlctab);
+    zsh_detach, nodev, zsh_info, D_MP, &hdlctab, ddi_quiesce_not_supported);
 
 /*
  * This is the loadable module wrapper.
@@ -219,7 +217,7 @@ DDI_DEFINE_STREAM_OPS(zsh_ops, nulldev, zsh_probe, zsh_attach,
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"Z8530 serial HDLC drv V%I%",
+	"Z8530 serial HDLC drv",
 	&zsh_ops,	/* our own ops for this module */
 };
 
@@ -587,9 +585,9 @@ zsh_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 		tmp = ZSH_MAX_RSTANDBY;
 		ZSH_GETBLOCK(zs, tmp);
 		if (zss->sl_rstandby[0] == NULL) {
-		    cmn_err(CE_WARN, "zsh_open: can't alloc message block");
-		    mutex_exit(zs->zs_excl);
-		    return (ENOSR);
+			cmn_err(CE_WARN, "zsh_open: can't alloc message block");
+			mutex_exit(zs->zs_excl);
+			return (ENOSR);
 		}
 		mutex_enter(zs->zs_excl_hi);
 		ZSH_ALLOCB(zss->sl_ractb);
@@ -851,7 +849,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 	TRACE_0(TR_ZSH, TR_ZSH_WPUT_START, "zsh_wput start");
 
 	if ((mp->b_datap->db_type == M_FLUSH) &&
-		    (stp->str_state == STR_CLONE)) {
+	    (stp->str_state == STR_CLONE)) {
 		if (*mp->b_rptr & FLUSHW) {
 			flushq(wq, FLUSHDATA);
 			*mp->b_rptr &= ~FLUSHW;
@@ -864,12 +862,12 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 	}
 
 	if ((zs == NULL) && (mp->b_datap->db_type != M_PROTO)) {
-	    freemsg(mp);
-	    cmn_err(CE_WARN,
-		"zsh: clone device %d must be attached before use!",
-		stp->str_inst);
-	    (void) putnextctl1(RD(wq), M_ERROR, EPROTO);
-	    return;
+		freemsg(mp);
+		cmn_err(CE_WARN,
+		    "zsh: clone device %d must be attached before use!",
+		    stp->str_inst);
+		(void) putnextctl1(RD(wq), M_ERROR, EPROTO);
+		return;
 	}
 
 	if (stp->str_state == STR_CLONE) {	/* Clone opened, limited. */
@@ -1061,10 +1059,10 @@ end_proto:
 			zss  = (struct syncline *)&zs->zs_priv_str;
 			mutex_enter(zs->zs_excl);
 			error = zsh_setmode(zs, zss,
-				(struct scc_mode *)mp->b_cont->b_rptr);
+			    (struct scc_mode *)mp->b_cont->b_rptr);
 			if (error) {
 				register struct iocblk  *iocp =
-					(struct iocblk *)mp->b_rptr;
+				    (struct iocblk *)mp->b_rptr;
 				mp->b_datap->db_type = M_IOCNAK;
 				iocp->ioc_error = error;
 			} else
@@ -1402,14 +1400,15 @@ zsh_setmode(struct zscom *zs, struct syncline *zss, struct scc_mode *sm)
 		return (EINVAL);		/* not supported */
 	} else {
 		if (((zss->sl_mode.sm_config ^ sm->sm_config) &
-			CONN_SIGNAL) != 0) { /* Changing, going... */
+		    CONN_SIGNAL) != 0) { /* Changing, going... */
 			if (sm->sm_config & CONN_SIGNAL) { /* ...up. */
 				if (zss->sl_mstat == NULL) {
-				    mutex_exit(zs->zs_excl_hi);
-				    mp = allocb(
-					sizeof (struct sl_status), BPRI_MED);
-				    mutex_enter(zs->zs_excl_hi);
-				    zss->sl_mstat = mp;
+					mutex_exit(zs->zs_excl_hi);
+					mp = allocb(
+					    sizeof (struct sl_status),
+					    BPRI_MED);
+					mutex_enter(zs->zs_excl_hi);
+					zss->sl_mstat = mp;
 				}
 			} else {			/* ...down. */
 				if ((mp = zss->sl_mstat) != NULL)
@@ -1637,15 +1636,16 @@ zsh_xsint(struct zscom *zs)
 	}
 
 	if (x0 & s0 & ZSRR0_CTS) {
-	    if (zss->sl_txstate == TX_RTS) {
-		if (!(zss->sl_flags & SF_FDXPTP)) {
-			SCC_BIS(5, ZSWR5_TX_ENABLE);
+		if (zss->sl_txstate == TX_RTS) {
+			if (!(zss->sl_flags & SF_FDXPTP)) {
+				SCC_BIS(5, ZSWR5_TX_ENABLE);
+			}
+			(void) zsh_start(zs, zss);
+		} else if ((zss->sl_mode.sm_config &
+		    (CONN_IBM | CONN_SIGNAL))) {
+			zss->sl_flags &= ~SF_FLUSH_WQ;
+			zsh_setmstat(zs, CS_CTS_UP);
 		}
-		(void) zsh_start(zs, zss);
-	    } else if ((zss->sl_mode.sm_config & (CONN_IBM | CONN_SIGNAL))) {
-		zss->sl_flags &= ~SF_FLUSH_WQ;
-		zsh_setmstat(zs, CS_CTS_UP);
-	    }
 	}
 
 	/*

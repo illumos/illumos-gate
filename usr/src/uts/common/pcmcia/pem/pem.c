@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * pem - PCMCIA Event Manager
@@ -182,7 +181,8 @@ static struct streamtab pem_info = {
 };
 
 DDI_DEFINE_STREAM_OPS(pem_ops, nulldev, nulldev, pem_attach, pem_detach,
-			nodev, pem_devinfo, D_NEW | D_MP, &pem_info);
+			nodev, pem_devinfo, D_NEW | D_MP, &pem_info,
+			ddi_quiesce_not_supported);
 /*
  * Module linkage information for the kernel.
  */
@@ -190,7 +190,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modlmisc = {
 	&mod_driverops,		/* Type of module - a utility provider */
-	"PCMCIA Event Manager %I%",
+	"PCMCIA Event Manager",
 	&pem_ops,		/* driver ops */
 };
 
@@ -206,7 +206,7 @@ _init(void)
 	int e;
 
 	if ((e = ddi_soft_state_init((void **)&pem_instances,
-					sizeof (struct pem_inst), 1)) != 0)
+	    sizeof (struct pem_inst), 1)) != 0)
 		return (e);
 
 	mutex_init(&pem_global_lock, NULL, MUTEX_DRIVER, NULL);
@@ -254,11 +254,11 @@ pem_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		for (i = 0; i < EM_EVENT_SIZE; i++)
 			events[i] = (uchar_t)~0;
 		i = pcmcia_set_em_handler(pem_event_handler,
-					(caddr_t)events,
-					sizeof (events),
-					0x1234,
-					(void **)&cardservices,
-					(void **)&Socket_Services);
+		    (caddr_t)events,
+		    sizeof (events),
+		    0x1234,
+		    (void **)&cardservices,
+		    (void **)&Socket_Services);
 		if (i != 0) {
 #if defined(PEM_DEBUG)
 			if (pem_debug)
@@ -268,12 +268,12 @@ pem_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		(void) ddi_create_minor_node(dip, "pem", S_IFCHR, 0,
-						"pcmcia:event", 0);
+		    "pcmcia:event", 0);
 
 		(void) ddi_add_softintr(dip, DDI_SOFTINT_MED, &pem_intr_id,
-					&pem_iblock,
-					0,
-					pem_soft_intr, (caddr_t)dip);
+		    &pem_iblock,
+		    0,
+		    pem_soft_intr, (caddr_t)dip);
 
 		mutex_init(&pem_intr_lock, NULL, MUTEX_DRIVER,
 		    (void *)(uintptr_t)__ipltospl(SPL7));
@@ -393,7 +393,7 @@ pem_open(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *cred)
 		return (ENXIO);
 	}
 	inst = (struct pem_inst *)ddi_get_soft_state(pem_instances,
-							minordev - 1);
+	    minordev - 1);
 
 	if (inst == NULL) {
 		mutex_exit(&pem_global_lock);
@@ -476,7 +476,7 @@ pem_close(queue_t *q, int flag, cred_t *cred)
 
 	if (pem != NULL && pem_instances != NULL) {
 		inst = (struct pem_inst *)ddi_get_soft_state(pem_instances,
-							pem->pem_minor);
+		    pem->pem_minor);
 		if (inst != NULL) {
 
 			minor = pem->pem_minor;
@@ -729,17 +729,17 @@ pem_info_req(queue_t *q, mblk_t *mp, em_info_req_t *inforeq)
 			infoack->em_event_mask_length = EM_EVENT_SIZE;
 			infoack->em_event_mask_offset = sizeof (em_info_ack_t);
 			bcopy((caddr_t)pem->pem_event_mask,
-				(caddr_t)mp->b_rptr +
-				infoack->em_event_mask_offset, EM_EVENT_SIZE);
+			    (caddr_t)mp->b_rptr +
+			    infoack->em_event_mask_offset, EM_EVENT_SIZE);
 		}
 		if (pem->pem_flags & PEMF_CLASSES) {
 			infoack->em_event_class_length = EM_CLASS_SIZE;
 			infoack->em_event_class_offset =
-				sizeof (em_info_ack_t) +
-				infoack->em_event_mask_length;
+			    sizeof (em_info_ack_t) +
+			    infoack->em_event_mask_length;
 			bcopy((caddr_t)pem->pem_event_class,
-				(caddr_t)mp->b_rptr +
-				infoack->em_event_class_offset, EM_CLASS_SIZE);
+			    (caddr_t)mp->b_rptr +
+			    infoack->em_event_class_offset, EM_CLASS_SIZE);
 		}
 		qreply(q, mp);
 	}
@@ -774,20 +774,20 @@ pem_init_req(queue_t *q, mblk_t *mp, em_init_req_t *initreq)
 
 	if (event != NULL && initreq->em_event_mask_length <= EM_EVENT_SIZE) {
 		bcopy((caddr_t)event, (caddr_t)pem->pem_event_mask,
-			initreq->em_event_mask_length);
+		    initreq->em_event_mask_length);
 		pem->pem_flags |= PEMF_EVENTS;
 	}
 	if (class != NULL && initreq->em_event_mask_length <= EM_CLASS_SIZE) {
 		bcopy((caddr_t)class, (caddr_t)pem->pem_event_class,
-			initreq->em_event_class_length);
+		    initreq->em_event_class_length);
 		pem->pem_flags |= PEMF_CLASSES;
 	}
 #if	defined(PEM_DEBUG)
 	if (pem_debug) {
 		cmn_err(CE_CONT, "pem_init_req:\n");
 		cmn_err(CE_CONT, "\tevent mask = %x (len=%d)\n",
-			(int)(*(uint32_t *)event),
-			(int)initreq->em_event_mask_length);
+		    (int)(*(uint32_t *)event),
+		    (int)initreq->em_event_mask_length);
 	}
 #endif
 	pem->pem_flags |= PEMF_INIT;
@@ -821,7 +821,7 @@ pem_get_first_tuple(queue_t *q, mblk_t *mp, em_get_first_tuple_req_t *treq)
 	if ((result = cardservices(GetFirstTuple, pem_cs_handle, &tuple)) !=
 	    SUCCESS) {
 		pem_error(q, mp, EM_GET_FIRST_TUPLE_REQ, PEME_NO_TUPLE,
-				result);
+		    result);
 		return (PEME_OK);
 	}
 
@@ -905,15 +905,15 @@ pem_event_ind(queue_t *q, uint32_t event, uint32_t socket, void *arg)
 		ind->em_event_info_offset = sizeof (em_event_ind_t);
 		ind->em_event_info_length = strlen((char *)arg) + 1;
 		(void) strncpy((char *)mp->b_rptr + sizeof (em_event_ind_t),
-			(char *)arg, PEMMAXINFO - 1);
+		    (char *)arg, PEMMAXINFO - 1);
 		break;
 	case PCE_INIT_DEV:
 		ind->em_event_info_offset = sizeof (em_event_ind_t);
 		ind->em_event_info_length = sizeof (struct pcm_make_dev);
 		devp = (struct pcm_make_dev *)arg;
 		bcopy((caddr_t)devp,
-			(caddr_t)(mp->b_rptr + sizeof (em_event_ind_t)),
-			PEMMAXINFO);
+		    (caddr_t)(mp->b_rptr + sizeof (em_event_ind_t)),
+		    PEMMAXINFO);
 		break;
 	}
 	(void) putq(q, mp);
@@ -936,8 +936,8 @@ pem_soft_intr(caddr_t arg)
 			if (pe->pe_owner == PE_OWN_HANDLER) {
 				/* have an event */
 				pem_event_dispatch(pe->pe_id, pe->pe_event,
-							pe->pe_socket,
-							pe->pe_info);
+				    pe->pe_socket,
+				    pe->pe_info);
 				mutex_enter(&pem_intr_lock);
 				pe->pe_owner = PE_OWN_FREE;
 				serviced = 1;
@@ -964,13 +964,13 @@ pem_event_dispatch(int id, int event, int socket, void *arg)
 #if	defined(PEM_DEBUG)
 	if (pem_debug)
 		cmn_err(CE_CONT, "pem_event_dispatch(%x, %x, %x, %p)\n",
-			id, event, socket, (void *)arg);
+		    id, event, socket, (void *)arg);
 #endif
 	if (pem_instances == NULL)
 		return;
 	mutex_enter(&pem_global_lock);
 	for (i = 0, minors = pem_minors;
-		minors != 0 && i < 4; minors >>= 1, i++) {
+	    minors != 0 && i < 4; minors >>= 1, i++) {
 		if (minors & 1) {
 			inst = ddi_get_soft_state(pem_instances, i);
 			if (inst == NULL) {
@@ -982,10 +982,10 @@ pem_event_dispatch(int id, int event, int socket, void *arg)
 #if	defined(PEM_DEBUG)
 			if (pem_debug)
 				cmn_err(CE_CONT,
-					"\tflags=%x, id=%x, wanted=%d\n",
-					(int)pem->pem_flags,
-					(int)pem->pem_id,
-					PR_GET(pem->pem_event_mask, event));
+				    "\tflags=%x, id=%x, wanted=%d\n",
+				    (int)pem->pem_flags,
+				    (int)pem->pem_id,
+				    PR_GET(pem->pem_event_mask, event));
 #endif
 			if (pem->pem_flags & PEMF_EVENTS &&
 			    pem->pem_id == id &&
@@ -1008,7 +1008,7 @@ pem_event_handler(int id, int event, int socket, void *arg)
 #if	defined(PEM_DEBUG)
 	if (pem_debug)
 		cmn_err(CE_CONT, "pem_event_handler(%x, %x, %x, %p)\n",
-			id, event, socket, (void *)arg);
+		    id, event, socket, (void *)arg);
 #endif
 	for (i = 0, pe = pem_events; i < PEM_MAX_EVENTS; i++, pe++) {
 		if (pem_claim(pe)) {
@@ -1021,15 +1021,15 @@ pem_event_handler(int id, int event, int socket, void *arg)
 			case PCE_DEV_IDENT:
 				if (arg != NULL)
 					(void) strncpy((char *)pe->pe_info,
-						(char *)arg,
-						MODMAXNAMELEN);
+					    (char *)arg,
+					    MODMAXNAMELEN);
 				break;
 			case PCE_INIT_DEV:
 				devp = (struct pcm_make_dev *)arg;
 				if (arg != NULL)
 					bcopy((caddr_t)devp,
-						(caddr_t)pe->pe_info,
-						PEMMAXINFO);
+					    (caddr_t)pe->pe_info,
+					    PEMMAXINFO);
 			}
 			didevents = 1;
 			break;
@@ -1079,13 +1079,13 @@ pem_adapter_info(queue_t *q, mblk_t *mp)
 			ack->em_num_power = adapt.NumPower;
 			if (adapt.NumPower > 0) {
 				ack->em_power_offset =
-					sizeof (em_adapter_info_ack_t);
+				    sizeof (em_adapter_info_ack_t);
 				ack->em_power_length = adapt.NumPower *
-					sizeof (struct power_entry);
+				    sizeof (struct power_entry);
 				bcopy((caddr_t)adapt.power_entry,
-					(caddr_t)mp->b_rptr +
-					ack->em_power_offset,
-					ack->em_power_length);
+				    (caddr_t)mp->b_rptr +
+				    ack->em_power_offset,
+				    ack->em_power_length);
 			}
 			(void) putq(RD(q), mp);
 		}
@@ -1104,11 +1104,11 @@ pem_socket_info(queue_t *q, mblk_t *mp)
 	socket.socket = req->em_socket;
 	if (Socket_Services(SS_InquireSocket, &socket) == SUCCESS) {
 		mp = mexchange(q, mp, sizeof (em_socket_info_ack_t),
-				M_PCPROTO, EM_SOCKET_INFO_ACK);
+		    M_PCPROTO, EM_SOCKET_INFO_ACK);
 		if (mp != NULL) {
 			ack = (em_socket_info_ack_t *)(mp->b_rptr);
 			mp->b_wptr = mp->b_rptr +
-				sizeof (em_socket_info_ack_t);
+			    sizeof (em_socket_info_ack_t);
 			bzero(mp->b_rptr, sizeof (em_socket_info_ack_t));
 			ack->em_status_int_caps = socket.SCIntCaps;
 			ack->em_status_report_caps = socket.SCRptCaps;
@@ -1132,7 +1132,7 @@ pem_get_socket(queue_t *q, mblk_t *mp)
 
 	if (Socket_Services(SS_GetSocket, &socket) == SUCCESS) {
 		mp = mexchange(q, mp, sizeof (em_get_socket_ack_t),
-				M_PCPROTO, EM_GET_SOCKET_ACK);
+		    M_PCPROTO, EM_GET_SOCKET_ACK);
 		mp->b_wptr = mp->b_rptr + sizeof (em_get_socket_ack_t);
 		ack = (em_get_socket_ack_t *)(mp->b_rptr);
 		ack->em_socket = socket.socket;
@@ -1168,13 +1168,13 @@ pem_ident_socket(queue_t *q, mblk_t *mp)
 	/* OK, have at least a name available */
 
 	pem_event_ind(RD(q), PCE_DEV_IDENT, ident->em_socket,
-			(void *)ddi_get_name(dip));
+	    (void *)ddi_get_name(dip));
 
 	num_minors = pcmcia_get_minors(dip, &minors);
 
 	for (i = 0; i < num_minors; i++) {
 		pem_event_ind(RD(q), PCE_INIT_DEV, ident->em_socket,
-				(void *)(minors + i));
+		    (void *)(minors + i));
 	}
 	if (num_minors > 0)
 		kmem_free(minors, num_minors * sizeof (struct pcm_make_dev));

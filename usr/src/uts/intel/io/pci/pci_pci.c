@@ -172,7 +172,9 @@ struct dev_ops ppb_ops = {
 	ppb_detach,		/* detach */
 	nulldev,		/* reset */
 	&ppb_cb_ops,		/* driver operations */
-	&ppb_bus_ops		/* bus operations */
+	&ppb_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

@@ -96,6 +96,7 @@ static int	ehci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp);
 
 int		usba_hubdi_root_hub_power(dev_info_t *dip, int comp, int level);
+static int	ehci_quiesce(dev_info_t *dip);
 
 static struct cb_ops ehci_cb_ops = {
 	ehci_open,			/* EHCI */
@@ -126,7 +127,8 @@ static struct dev_ops ehci_ops = {
 	ehci_reset,			/* Reset */
 	&ehci_cb_ops,			/* Driver operations */
 	&usba_hubdi_busops,		/* Bus operations */
-	usba_hubdi_root_hub_power	/* Power */
+	usba_hubdi_root_hub_power,	/* Power */
+	ehci_quiesce			/* Quiesce */
 };
 
 /*
@@ -469,6 +471,56 @@ ehci_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 	return (DDI_SUCCESS);
 #endif
 }
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+ehci_quiesce(dev_info_t *dip)
+{
+	ehci_state_t		*ehcip = ehci_obtain_state(dip);
+
+	if (ehcip == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * To reset the host controller, the HCRESET bit should be set to one.
+	 * Software should not set this bit to a one when the HCHalted bit in
+	 * the USBSTS register is a zero. Attempting to reset an actively
+	 * running host controller will result in undefined behavior.
+	 * see EHCI SPEC. for more information.
+	 */
+	if (!(Get_OpReg(ehci_status) & EHCI_STS_HOST_CTRL_HALTED)) {
+
+		/* Stop the EHCI host controller */
+		Set_OpReg(ehci_command,
+		    Get_OpReg(ehci_command) & ~EHCI_CMD_HOST_CTRL_RUN);
+		/*
+		 * When this bit is set to 0, the Host Controller completes the
+		 * current and any actively pipelined transactions on the USB
+		 * and then halts. The Host Controller must halt within 16
+		 * micro-frames after software clears the Run bit.
+		 * The HC Halted bit in the status register indicates when the
+		 * Host Controller has finished its pending pipelined
+		 * transactions and has entered the stopped state.
+		 */
+		drv_usecwait(EHCI_RESET_TIMEWAIT);
+	}
+
+	/* Reset the EHCI host controller */
+	Set_OpReg(ehci_command,
+	    Get_OpReg(ehci_command) | EHCI_CMD_HOST_CTRL_RESET);
+
+	return (DDI_SUCCESS);
+}
+
 
 /*
  * ehci_info:

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1990, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 5.0 */
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -54,7 +53,8 @@ struct dev_ops	options_ops = {
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 
 };
 

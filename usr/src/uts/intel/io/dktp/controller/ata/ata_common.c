@@ -286,6 +286,29 @@ ata_devo_reset(
 	return (0);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+int
+ata_quiesce(dev_info_t *dip)
+{
+#ifdef ATA_DEBUG
+	/*
+	 * Turn off debugging
+	 */
+	ata_debug = 0;
+#endif
+
+	return (ata_devo_reset(dip, DDI_RESET_FORCE));
+}
+
 
 static struct cb_ops ata_cb_ops = {
 	ata_open,		/* open */
@@ -319,7 +342,8 @@ static struct dev_ops	ata_ops = {
 	ata_devo_reset,		/* reset */
 	&ata_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	ata_power		/* power */
+	ata_power,		/* power */
+	ata_quiesce		/* quiesce */
 };
 
 /* driver loadable module wrapper */

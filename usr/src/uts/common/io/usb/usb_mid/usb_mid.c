@@ -178,7 +178,8 @@ static struct dev_ops usb_mid_ops = {
 	nodev,			/* reset */
 	&usb_mid_cb_ops,	/* driver operations */
 	&usb_mid_busops,	/* bus operations */
-	usb_mid_power		/* power */
+	usb_mid_power,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -741,7 +742,6 @@ usb_mid_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	_NOTE(NOT_REACHED)
 	/* NOTREACHED */
 }
-
 
 /*
  * usb_mid_cleanup:

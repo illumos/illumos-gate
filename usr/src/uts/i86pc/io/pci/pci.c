@@ -139,7 +139,9 @@ struct dev_ops pci_ops = {
 	pci_detach,		/* detach */
 	nulldev,		/* reset */
 	&pci_cb_ops,		/* driver operations */
-	&pci_bus_ops		/* bus operations */
+	&pci_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed		/* quiesce */
 };
 
 /*

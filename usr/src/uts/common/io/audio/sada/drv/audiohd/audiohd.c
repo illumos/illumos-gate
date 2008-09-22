@@ -68,6 +68,7 @@
 static int audiohd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int audiohd_attach(dev_info_t *, ddi_attach_cmd_t);
 static int audiohd_detach(dev_info_t *, ddi_detach_cmd_t);
+static int audiohd_quiesce(dev_info_t *);
 static int audiohd_resume(audiohd_state_t *);
 static int audiohd_suspend(audiohd_state_t *);
 
@@ -241,7 +242,8 @@ static struct dev_ops audiohd_dev_ops = {
 	nodev,			/* devo_reset */
 	&audiohd_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	audiohd_quiesce,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
@@ -595,6 +597,35 @@ audiohd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 }	/* audiohd_detach() */
+
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+audiohd_quiesce(dev_info_t *dip)
+{
+	audiohd_state_t		*statep;
+	int			instance;
+
+	instance = ddi_get_instance(dip);
+
+	if ((statep = ddi_get_soft_state(audiohd_statep, instance)) == NULL) {
+		return (DDI_SUCCESS);
+	}
+
+	audiohd_stop_dma(statep);
+	audiohd_disable_intr(statep);
+
+	return (DDI_SUCCESS);
+}
 
 /*
  * audiohd_change_widget_power_state(audiohd_state_t *statep, int off)

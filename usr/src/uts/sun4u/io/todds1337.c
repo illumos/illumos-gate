@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -131,12 +130,14 @@ static struct dev_ops ds1337_ops = {
 	todds1337_detach,	/* detach */
 	nodev,			/* reset */
 	&ds1337_cbops,		/* cb_ops - ds1337 does not need this(?) */
-	NULL
+	NULL,			/* bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv todds1337_modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"tod driver for DS1337 %I%",   /* Name of the module. */
+	"tod driver for DS1337 1.12",   /* Name of the module. */
 	&ds1337_ops,			/* Pointer to dev_ops */
 };
 

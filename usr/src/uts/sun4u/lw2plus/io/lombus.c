@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "lombus" driver provides access to the LOMlite2 virtual registers,
@@ -32,7 +32,6 @@
  * registers signify - only the clients need this information.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Header files
@@ -2235,13 +2234,15 @@ static struct dev_ops lombus_dev_ops =
 	lombus_detach,			/* detach		*/
 	lombus_reset,			/* reset		*/
 	&lombus_cb_ops,			/* driver operations	*/
-	&lombus_bus_ops			/* bus operations	*/
+	&lombus_bus_ops,		/* bus operations	*/
+	NULL,				/* power		*/
+	ddi_quiesce_not_supported,	/* devo_quiesce		*/
 };
 
 static struct modldrv modldrv =
 {
 	&mod_driverops,
-	"lombus driver, v%I%",
+	"lombus driver",
 	&lombus_dev_ops
 };
 

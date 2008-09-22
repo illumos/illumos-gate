@@ -21,6 +21,11 @@
  * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef XGE_HAL_DEVICE_H
 #define XGE_HAL_DEVICE_H
 
@@ -787,6 +792,8 @@ void xge_hal_device_poll(xge_hal_device_h devh);
 xge_hal_card_e xge_hal_device_check_id(xge_hal_device_h devh);
 
 int xge_hal_device_is_slot_freeze(xge_hal_device_h devh);
+
+void xge_hal_device_quiesce(xge_hal_device_t *hldev, xge_hal_device_h devh);
 
 xge_hal_status_e
 xge_hal_device_pci_info_get(xge_hal_device_h devh, xge_hal_pci_mode_e *pci_mode,

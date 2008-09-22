@@ -84,7 +84,8 @@ static struct dev_ops vnic_dev_ops = {
 	nodev,			/* reset */
 	&vnic_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	nodev			/* dev power */
+	nodev,			/* dev power */
+	ddi_quiesce_not_supported,	/* dev quiesce */
 };
 
 static struct modldrv vnic_modldrv = {

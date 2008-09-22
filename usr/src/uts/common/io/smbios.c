@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * smbios(7D) driver
@@ -285,7 +284,9 @@ static struct dev_ops smb_ops = {
 	smb_detach,		/* detach */
 	nodev,			/* reset */
 	&smb_cb_ops,		/* cb ops */
-	NULL			/* bus ops */
+	NULL,			/* bus ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

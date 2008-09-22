@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -267,7 +266,8 @@ static struct dev_ops bofi_ops = {
 	nulldev,		/* reset */
 	&bofi_cb_ops,
 	(struct bus_ops *)NULL,
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /* module configuration stuff */
@@ -275,7 +275,7 @@ static void    *statep;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"bofi driver %I%",
+	"bofi driver",
 	&bofi_ops
 };
 

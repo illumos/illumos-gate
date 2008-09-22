@@ -52,11 +52,18 @@
 #include <sys/sata/adapters/ahci/ahcivar.h>
 
 /*
+ * This is the string displayed by modinfo, etc.
+ * Make sure you keep the version ID up to date!
+ */
+static char ahci_ident[] = "ahci driver";
+
+/*
  * Function prototypes for driver entry points
  */
 static	int ahci_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int ahci_detach(dev_info_t *, ddi_detach_cmd_t);
 static	int ahci_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static	int ahci_quiesce(dev_info_t *);
 
 /*
  * Function prototypes for SATA Framework interfaces
@@ -265,7 +272,8 @@ static struct dev_ops ahcictl_dev_ops = {
 	nodev,			/* no reset */
 	(struct cb_ops *)0,	/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ahci_quiesce,		/* quiesce */
 };
 
 static sata_tran_hotplug_ops_t ahci_tran_hotplug_ops = {
@@ -278,7 +286,7 @@ extern struct mod_ops mod_driverops;
 
 static  struct modldrv modldrv = {
 	&mod_driverops,		/* driverops */
-	"ahci driver",
+	ahci_ident,		/* short description */
 	&ahcictl_dev_ops,	/* driver ops */
 };
 
@@ -5852,7 +5860,7 @@ ahci_put_port_into_notrunning_state(ahci_ctl_t *ahci_ctlp,
 		}
 
 		/* Wait for 10 millisec */
-		delay(AHCI_10MS_TICKS);
+		drv_usecwait(10000);
 	} while (port_cmd_status & AHCI_CMD_STATUS_CR);
 
 	ahci_portp->ahciport_flags &= ~AHCI_PORT_FLAG_STARTED;
@@ -7230,3 +7238,57 @@ ahci_log(ahci_ctl_t *ahci_ctlp, uint_t level, char *fmt, ...)
 	mutex_exit(&ahci_log_mutex);
 }
 #endif
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+ahci_quiesce(dev_info_t *dip)
+{
+	ahci_ctl_t *ahci_ctlp;
+	ahci_port_t *ahci_portp;
+	int instance, port;
+
+	instance = ddi_get_instance(dip);
+	ahci_ctlp = ddi_get_soft_state(ahci_statep, instance);
+
+	if (ahci_ctlp == NULL)
+		return (DDI_FAILURE);
+
+#if AHCI_DEBUG
+	ahci_debug_flags = 0;
+#endif
+
+	/* disable all the interrupts. */
+	ahci_disable_all_intrs(ahci_ctlp);
+
+	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
+		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, port)) {
+			continue;
+		}
+
+		ahci_portp = ahci_ctlp->ahcictl_ports[port];
+
+		/*
+		 * Stop the port by clearing PxCMD.ST
+		 *
+		 * Here we must disable the port interrupt because
+		 * ahci_disable_all_intrs only clear GHC.IE, and IS
+		 * register will be still set if PxIE is enabled.
+		 * When ahci shares one IRQ with other drivers, the
+		 * intr handler may claim the intr mistakenly.
+		 */
+		ahci_disable_port_intrs(ahci_ctlp, port);
+		(void) ahci_put_port_into_notrunning_state(ahci_ctlp,
+		    ahci_portp, port);
+	}
+
+	return (DDI_SUCCESS);
+}

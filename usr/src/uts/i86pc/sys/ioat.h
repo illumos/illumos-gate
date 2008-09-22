@@ -27,8 +27,6 @@
 #ifndef _SYS_IOAT_H
 #define	_SYS_IOAT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -338,6 +336,7 @@ int ioat_channel_init(ioat_state_t *state);
 void ioat_channel_fini(ioat_state_t *state);
 void ioat_channel_suspend(ioat_state_t *state);
 int ioat_channel_resume(ioat_state_t *state);
+void ioat_channel_quiesce(ioat_state_t *);
 
 int ioat_channel_alloc(void *device_private, dcopy_handle_t handle, int flags,
     uint_t size, dcopy_query_channel_t *info, void *channel_private);

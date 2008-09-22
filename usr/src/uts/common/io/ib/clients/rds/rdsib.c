@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -128,13 +127,14 @@ static struct dev_ops rdsib_ops = {
 	nodev,			/* reset */
 	&rdsib_cb_ops,		/* driver ops - devctl interfaces */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
  * Module linkage information.
  */
-#define	RDS_DEVDESC	"RDS IB driver %I%"
+#define	RDS_DEVDESC	"RDS IB driver"
 static struct modldrv rdsib_modldrv = {
 	&mod_driverops,		/* Driver module */
 	RDS_DEVDESC,		/* Driver name and version */

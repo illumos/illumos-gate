@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
@@ -92,14 +91,16 @@ static struct dev_ops ltc1427_ops = {
 	ltc1427_detach,
 	nodev,
 	&ltc1427_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv ltc1427_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"LTC1427 i2c device driver: v%I%",
+	"LTC1427 i2c device driver: v1.8",
 	&ltc1427_ops
 };
 
@@ -119,7 +120,7 @@ _init(void)
 
 	if (!error)
 		(void) ddi_soft_state_init(&ltc1427soft_statep,
-			sizeof (struct ltc1427_unit), 1);
+		    sizeof (struct ltc1427_unit), 1);
 	return (error);
 }
 
@@ -157,7 +158,7 @@ ltc1427_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct ltc1427_unit *)
-		ddi_get_soft_state(ltc1427soft_statep, instance);
+	    ddi_get_soft_state(ltc1427soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -203,7 +204,7 @@ ltc1427_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct ltc1427_unit *)
-		ddi_get_soft_state(ltc1427soft_statep, instance);
+	    ddi_get_soft_state(ltc1427soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -231,31 +232,31 @@ ltc1427_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	if (arg == NULL) {
 		D2CMN_ERR((CE_WARN, "LTC1427: ioctl: arg passed in to ioctl "
-				"= NULL\n"));
+		    "= NULL\n"));
 		err = EINVAL;
 		return (err);
 	}
 	instance = getminor(dev);
 	unitp = (struct ltc1427_unit *)
-		ddi_get_soft_state(ltc1427soft_statep, instance);
+	    ddi_get_soft_state(ltc1427soft_statep, instance);
 
 	mutex_enter(&unitp->ltc1427_mutex);
 
 	switch (cmd) {
 	case I2C_GET_OUTPUT:
 		D1CMN_ERR((CE_NOTE, "current_set_flag = %d\n",
-			unitp->current_set_flag));
+		    unitp->current_set_flag));
 		if (unitp->current_set_flag == 0) {
 			err = EIO;
 			break;
 		} else {
 			if (ddi_copyout((caddr_t)&unitp->current_value,
-				(caddr_t)arg, sizeof (int32_t),
-				mode) != DDI_SUCCESS) {
+			    (caddr_t)arg, sizeof (int32_t),
+			    mode) != DDI_SUCCESS) {
 				D2CMN_ERR((CE_WARN,
 				"%s: Failed in I2C_GET_OUTPUT "
 				"ddi_copyout routine\n",
-					unitp->ltc1427_name));
+				    unitp->ltc1427_name));
 				err = EFAULT;
 				break;
 			}
@@ -264,11 +265,11 @@ ltc1427_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	case I2C_SET_OUTPUT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&fan_speed,
-			sizeof (int32_t), mode) != DDI_SUCCESS) {
+		    sizeof (int32_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN,
-				"%s: Failed in I2C_SET_OUTPUT "
-				"ioctl before switch\n",
-					unitp->ltc1427_name));
+			    "%s: Failed in I2C_SET_OUTPUT "
+			    "ioctl before switch\n",
+			    unitp->ltc1427_name));
 			err = EFAULT;
 			break;
 		}
@@ -277,9 +278,9 @@ ltc1427_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		    &i2c_tran_pointer, 2, 0, I2C_SLEEP);
 		if (i2c_tran_pointer == NULL) {
 			D2CMN_ERR((CE_WARN,
-				"%s: Failed in I2C_SET_OUTPUT "
-				"i2c_transfer_pointer not allocated\n",
-					unitp->ltc1427_name));
+			    "%s: Failed in I2C_SET_OUTPUT "
+			    "i2c_transfer_pointer not allocated\n",
+			    unitp->ltc1427_name));
 			err = ENOMEM;
 			break;
 		}
@@ -299,7 +300,7 @@ ltc1427_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	default:
 		D2CMN_ERR((CE_WARN, "%s: Invalid IOCTL cmd: %x\n",
-			unitp->ltc1427_name, cmd));
+		    unitp->ltc1427_name, cmd));
 		err = EINVAL;
 	}
 
@@ -343,7 +344,7 @@ ltc1427_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(ltc1427soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d: failed to zalloc softstate\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -351,17 +352,17 @@ ltc1427_do_attach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 
 	(void) snprintf(unitp->ltc1427_name, sizeof (unitp->ltc1427_name),
-			"%s%d", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "ltc1427", S_IFCHR, instance,
-			"ddi_i2c:adio",	NULL) == DDI_FAILURE) {
+	    "ddi_i2c:adio",	NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
-			"%s\n", unitp->ltc1427_name, "ltc1427");
+		    "%s\n", unitp->ltc1427_name, "ltc1427");
 		ddi_soft_state_free(ltc1427soft_statep, instance);
 
 		return (DDI_FAILURE);
@@ -407,7 +408,7 @@ ltc1427_do_detach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 

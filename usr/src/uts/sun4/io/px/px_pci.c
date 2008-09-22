@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Sun4 PCI Express to PCI bus bridge nexus driver
@@ -211,7 +210,8 @@ static struct dev_ops pxb_ops = {
 	nulldev,		/* reset */
 	&pxb_cb_ops,		/* driver operations */
 	&pxb_bus_ops,		/* bus operations */
-	pcie_power		/* power entry */
+	pcie_power,		/* power entry */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -220,7 +220,7 @@ static struct dev_ops pxb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe/PCI nexus driver %I%",
+	"PCIe/PCI nexus driver",
 	&pxb_ops,   /* driver ops */
 };
 

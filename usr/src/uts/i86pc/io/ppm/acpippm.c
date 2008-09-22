@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -98,14 +97,15 @@ static struct dev_ops appm_ops = {
 	nodev,			/* reset */
 	&appm_cbops,		/* cb_ops */
 	NULL,			/* bus_ops */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"ACPI ppm driver v1.9",
+	"ACPI ppm driver",
 	&appm_ops,
 };
 

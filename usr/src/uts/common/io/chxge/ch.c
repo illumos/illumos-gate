@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,8 +33,6 @@
 /*
  * Solaris Multithreaded STREAMS DLPI Chelsio PCI Ethernet Driver
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* #define CH_DEBUG 1 */
 #ifdef CH_DEBUG
@@ -73,6 +71,7 @@
 #include "common.h"
 #include "oschtoe.h"
 #include "sge.h"
+#include "regs.h"
 #include "ch.h"			/* Chelsio Driver specific parameters */
 #include "version.h"
 
@@ -81,6 +80,7 @@
  */
 static int ch_attach(dev_info_t *, ddi_attach_cmd_t);
 static int ch_detach(dev_info_t *, ddi_detach_cmd_t);
+static int ch_quiesce(dev_info_t *);
 static void ch_free_dma_handles(ch_t *chp);
 static void ch_set_name(ch_t *chp, int unit);
 static void ch_free_name(ch_t *chp);
@@ -226,7 +226,8 @@ static	struct dev_ops ch_ops = {
 	nodev,		/* funp: reset device (not supported) - dev_ops(9s) */
 	&cb_ch_ops,	/* ptr to cb_ops structure */
 	NULL,		/* ptr to nexus bus operations structure (leaf) */
-	NULL		/* funp: change device power level - power(9e) */
+	NULL,		/* funp: change device power level - power(9e) */
+	ch_quiesce,	/* devo_quiesce */
 };
 
 /*
@@ -427,8 +428,8 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* map in T101 PCI configuration space */
 		rv = pci_config_setup(
-			dip,		/* ptr to dev's dev_info struct */
-			&chp->ch_hpci);	/* ptr to data access handle */
+		    dip,		/* ptr to dev's dev_info struct */
+		    &chp->ch_hpci);	/* ptr to data access handle */
 
 		if (rv != DDI_SUCCESS) {
 			PRINT(("PCI config setup failed\n"));
@@ -437,7 +438,7 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			gchp[unit] = NULL;
 #endif
 			cmn_err(CE_WARN, "%s: ddi_config_setup PCI error %d\n",
-				chp->ch_name, rv);
+			    chp->ch_name, rv);
 
 			ch_free_name(chp);
 			kmem_free(chp, sizeof (ch_t));
@@ -470,7 +471,7 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		macinfo->gldm_saplen = -2;
 		macinfo->gldm_ppa = unit;
 		macinfo->gldm_broadcast_addr =
-				etherbroadcastaddr.ether_addr_octet;
+		    etherbroadcastaddr.ether_addr_octet;
 
 
 		/*
@@ -496,13 +497,13 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #endif
 		/* map in T101 register space (BAR0) */
 		rv = ddi_regs_map_setup(
-			dip,		/* ptr to dev's dev_info struct */
-			BAR0,		/* register address space */
-			&chp->ch_bar0,	/* address of offset */
-			0,		/* offset into register address space */
-			0,		/* length mapped (everything) */
-			&le_attr,	/* ptr to device attr structure */
-			&chp->ch_hbar0);	/* ptr to data access handle */
+		    dip,		/* ptr to dev's dev_info struct */
+		    BAR0,		/* register address space */
+		    &chp->ch_bar0,	/* address of offset */
+		    0,		/* offset into register address space */
+		    0,		/* length mapped (everything) */
+		    &le_attr,	/* ptr to device attr structure */
+		    &chp->ch_hbar0);	/* ptr to data access handle */
 
 		if (rv != DDI_SUCCESS) {
 			PRINT(("map registers failed\n"));
@@ -511,8 +512,8 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			gchp[unit] = NULL;
 #endif
 			cmn_err(CE_WARN,
-				"%s: ddi_regs_map_setup BAR0 error %d\n",
-				chp->ch_name, rv);
+			    "%s: ddi_regs_map_setup BAR0 error %d\n",
+			    chp->ch_name, rv);
 
 			pci_config_teardown(&chp->ch_hpci);
 			ch_free_name(chp);
@@ -524,7 +525,7 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 #ifdef CH_DEBUG
 		Version  = ddi_get32(chp->ch_hbar0,
-			(uint32_t *)(chp->ch_bar0+0x6c));
+		    (uint32_t *)(chp->ch_bar0+0x6c));
 #endif
 
 		(void) ddi_dev_regsize(dip, 1, &chp->ch_bar0sz);
@@ -537,9 +538,9 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * Add interrupt to system.
 		 */
 		rv = ddi_get_iblock_cookie(
-			dip,		   /* ptr to dev's dev_info struct */
-			0,		   /* interrupt # (0) */
-			&chp->ch_icookp); /* ptr to interrupt block cookie */
+		    dip,		   /* ptr to dev's dev_info struct */
+		    0,		   /* interrupt # (0) */
+		    &chp->ch_icookp); /* ptr to interrupt block cookie */
 
 		if (rv != DDI_SUCCESS) {
 			PRINT(("iblock cookie failed\n"));
@@ -548,8 +549,8 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			gchp[unit] = NULL;
 #endif
 			cmn_err(CE_WARN,
-				"%s: ddi_get_iblock_cookie error %d\n",
-				chp->ch_name, rv);
+			    "%s: ddi_get_iblock_cookie error %d\n",
+			    chp->ch_name, rv);
 
 			ddi_regs_map_free(&chp->ch_hbar0);
 			pci_config_teardown(&chp->ch_hpci);
@@ -564,12 +565,12 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * add interrupt handler before card setup.
 		 */
 		rv = ddi_add_intr(
-			dip,		/* ptr to dev's dev_info struct */
-			0,		/* interrupt # (0) */
-			0,		/* iblock cookie ptr (NULL) */
-			0,		/* idevice cookie ptr (NULL) */
-			gld_intr,	/* function ptr to interrupt handler */
-			(caddr_t)macinfo);	/* handler argument */
+		    dip,		/* ptr to dev's dev_info struct */
+		    0,		/* interrupt # (0) */
+		    0,		/* iblock cookie ptr (NULL) */
+		    0,		/* idevice cookie ptr (NULL) */
+		    gld_intr,	/* function ptr to interrupt handler */
+		    (caddr_t)macinfo);	/* handler argument */
 
 		if (rv != DDI_SUCCESS) {
 			PRINT(("add_intr failed\n"));
@@ -578,7 +579,7 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			gchp[unit] = NULL;
 #endif
 			cmn_err(CE_WARN, "%s: ddi_add_intr error %d\n",
-				chp->ch_name, rv);
+			    chp->ch_name, rv);
 
 			ddi_regs_map_free(&chp->ch_hbar0);
 			pci_config_teardown(&chp->ch_hpci);
@@ -591,9 +592,9 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* initalize all the remaining per-card locks */
 		mutex_init(&chp->ch_lock, NULL, MUTEX_DRIVER,
-					(void *)chp->ch_icookp);
+		    (void *)chp->ch_icookp);
 		mutex_init(&chp->ch_intr, NULL, MUTEX_DRIVER,
-					(void *)chp->ch_icookp);
+		    (void *)chp->ch_icookp);
 		mutex_init(&chp->ch_mc_lck, NULL, MUTEX_DRIVER, NULL);
 		mutex_init(&chp->ch_dh_lck, NULL, MUTEX_DRIVER, NULL);
 		mutex_init(&chp->mac_lock, NULL, MUTEX_DRIVER, NULL);
@@ -607,7 +608,7 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			gchp[unit] = NULL;
 #endif
 			cmn_err(CE_WARN, "%s: pe_attach failed\n",
-				chp->ch_name);
+			    chp->ch_name);
 
 			mutex_destroy(&chp->ch_lock);
 			mutex_destroy(&chp->ch_intr);
@@ -642,9 +643,9 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			chp->ch_config.cksum_enabled = 0;
 
 		rv = gld_register(
-			dip,		/* ptr to dev's dev_info struct */
-			(char *)ddi_driver_name(dip),	/* driver name */
-			macinfo);	/* ptr to gld macinfo buffer */
+		    dip,		/* ptr to dev's dev_info struct */
+		    (char *)ddi_driver_name(dip),	/* driver name */
+		    macinfo);	/* ptr to gld macinfo buffer */
 
 		/*
 		 * The Jumbo frames capability is not yet available
@@ -656,9 +657,9 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			cmn_err(CE_NOTE, "Setting MTU to 1500. \n");
 			macinfo->gldm_maxpkt = chp->ch_mtu = 1500;
 			rv = gld_register(
-				dip,	/* ptr to dev's dev_info struct */
-				(char *)ddi_driver_name(dip), /* driver name */
-				macinfo); /* ptr to gld macinfo buffer */
+			    dip,	/* ptr to dev's dev_info struct */
+			    (char *)ddi_driver_name(dip), /* driver name */
+			    macinfo); /* ptr to gld macinfo buffer */
 		}
 
 
@@ -667,7 +668,7 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			DEBUG_ENTER("ch_attach");
 
 			cmn_err(CE_WARN, "%s: gld_register error %d\n",
-				chp->ch_name, rv);
+			    chp->ch_name, rv);
 
 			pe_detach(chp);
 
@@ -713,6 +714,61 @@ ch_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		return (DDI_FAILURE);
 	}
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+ch_quiesce(dev_info_t *dip)
+{
+	ch_t *chp;
+	gld_mac_info_t *macinfo =
+	    (gld_mac_info_t *)ddi_get_driver_private(dip);
+
+	chp = (ch_t *)macinfo->gldm_private;
+	chdebug = 0;
+	ch_abort_debug = 0;
+
+#ifdef CONFIG_CHELSIO_T1_OFFLOAD
+	gchp[chp->ch_unit] = NULL;
+#endif
+
+	/* Set driver state for this card to IDLE */
+	chp->ch_state = PEIDLE;
+
+	/*
+	 * Do a power reset of card
+	 * 1. set PwrState to D3hot (3)
+	 * 2. clear PwrState flags
+	 */
+	pci_config_put32(chp->ch_hpci, 0x44, 3);
+	pci_config_put32(chp->ch_hpci, 0x44, 0);
+
+	/* Wait 0.5 sec */
+	drv_usecwait(500000);
+
+	/*
+	 * Now stop the chip
+	 */
+	chp->ch_refcnt = 0;
+	chp->ch_state = PESTOP;
+
+	/* Disables all interrupts */
+	t1_interrupts_disable(chp);
+
+	/* Disables SGE queues */
+	t1_write_reg_4(chp->sge->obj, A_SG_CONTROL, 0x0);
+	t1_write_reg_4(chp->sge->obj, A_SG_INT_CAUSE, 0x0);
+
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -876,8 +932,8 @@ ch_alloc_dma_mem(ch_t *chp, int type, int flags, int size, uint64_t *paddr,
 	if (rv != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN,
-			"%s: ch_alloc_dma_mem: ddi_dma_alloc_handle error %d\n",
-			chp->ch_name, rv);
+		    "%s: ch_alloc_dma_mem: ddi_dma_alloc_handle error %d\n",
+		    chp->ch_name, rv);
 
 		return (0);
 	}
@@ -902,8 +958,8 @@ ch_alloc_dma_mem(ch_t *chp, int type, int flags, int size, uint64_t *paddr,
 		ddi_dma_free_handle(&ch_dh);
 
 		cmn_err(CE_WARN,
-			"%s: ch_alloc_dma_mem: ddi_dma_mem_alloc error %d\n",
-			chp->ch_name, rv);
+		    "%s: ch_alloc_dma_mem: ddi_dma_mem_alloc error %d\n",
+		    chp->ch_name, rv);
 
 		return (0);
 	}
@@ -924,7 +980,7 @@ ch_alloc_dma_mem(ch_t *chp, int type, int flags, int size, uint64_t *paddr,
 
 		cmn_err(CE_WARN,
 		    "%s: ch_alloc_dma_mem: ddi_dma_addr_bind_handle error %d\n",
-			chp->ch_name, rv);
+		    chp->ch_name, rv);
 
 		return (0);
 	}
@@ -932,7 +988,7 @@ ch_alloc_dma_mem(ch_t *chp, int type, int flags, int size, uint64_t *paddr,
 	if (count != 1) {
 		cmn_err(CE_WARN,
 		    "%s: ch_alloc_dma_mem: ch_alloc_dma_mem cookie count %d\n",
-			chp->ch_name, count);
+		    chp->ch_name, count);
 		PRINT(("ch_alloc_dma_mem cookie count %d\n", count));
 
 		ddi_dma_mem_free(&ch_ah);
@@ -1006,7 +1062,7 @@ ch_get_dma_handle(ch_t *chp)
 
 		cmn_err(CE_WARN,
 		    "%s: ch_get_dma_handle: ddi_dma_alloc_handle error %d\n",
-			chp->ch_name, rv);
+		    chp->ch_name, rv);
 
 		kmem_free(dhe, sizeof (*dhe));
 
@@ -1091,7 +1147,7 @@ ch_bind_dma_handle(ch_t *chp, int size, caddr_t vaddr, cmdQ_ce_t *cmp,
 
 		cmn_err(CE_WARN,
 		    "%s: ch_bind_dma_handle: ddi_dma_addr_bind_handle err %d\n",
-			chp->ch_name, rv);
+		    chp->ch_name, rv);
 
 		return (0);
 	}
@@ -1146,7 +1202,7 @@ ch_unbind_dma_handle(ch_t *chp, free_dh_t *dhe)
 
 	if (ddi_dma_unbind_handle(ch_dh))
 		cmn_err(CE_WARN, "%s: ddi_dma_unbind_handle failed",
-			chp->ch_name);
+		    chp->ch_name);
 
 	mutex_enter(&chp->ch_dh_lck);
 	dhe->dhe_next = chp->ch_dh;
@@ -1182,16 +1238,16 @@ ch_get_dvma_handle(ch_t *chp)
 	ch_dvma_attr.dlim_dmaspeed = 0;
 
 	rv = dvma_reserve(
-		chp->ch_dip,		/* device dev_info */
-		&ch_dvma_attr,		/* DVMA attributes */
-		3,			/* number of pages */
-		&ch_dh);		/* DVMA handle */
+	    chp->ch_dip,		/* device dev_info */
+	    &ch_dvma_attr,		/* DVMA attributes */
+	    3,			/* number of pages */
+	    &ch_dh);		/* DVMA handle */
 
 	if (rv != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN,
 		    "%s: ch_get_dvma_handle: dvma_reserve() error %d\n",
-			chp->ch_name, rv);
+		    chp->ch_name, rv);
 
 		kmem_free(dhe, sizeof (*dhe));
 
@@ -1259,11 +1315,11 @@ ch_bind_dvma_handle(ch_t *chp, int size, caddr_t vaddr, cmdQ_ce_t *cmp,
 	n = cnt;
 
 	dvma_kaddr_load(
-		ch_dh,		/* dvma handle */
-		vaddr,		/* virtual address */
-		size,		/* length of object */
-		0,		/* start at index 0 */
-		&cookie);
+	    ch_dh,		/* dvma handle */
+	    vaddr,		/* virtual address */
+	    size,		/* length of object */
+	    0,		/* start at index 0 */
+	    &cookie);
 
 	dvma_sync(ch_dh, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -1322,7 +1378,7 @@ ch_send_up(ch_t *chp, mblk_t *mp, uint32_t cksum, int flg)
 		 */
 		if (flg)
 			(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, cksum,
-				HCK_FULLCKSUM, 0);
+			    HCK_FULLCKSUM, 0);
 		gld_recv(chp->ch_macp, mp);
 	} else {
 		freemsg(mp);
@@ -1552,28 +1608,28 @@ ch_get_stats(gld_mac_info_t *mp, struct gld_stats *gs)
 	}
 
 	(void) pe_get_stats(chp,
-			&speed,
-			&intrcnt,
-			&norcvbuf,
-			&oerrors,
-			&ierrors,
-			&underrun,
-			&overrun,
-			&framing,
-			&crc,
-			&carrier,
-			&collisions,
-			&xcollisions,
-			&late,
-			&defer,
-			&xerrs,
-			&rerrs,
-			&toolong,
-			&runt,
-			&multixmt,
-			&multircv,
-			&brdcstxmt,
-			&brdcstrcv);
+	    &speed,
+	    &intrcnt,
+	    &norcvbuf,
+	    &oerrors,
+	    &ierrors,
+	    &underrun,
+	    &overrun,
+	    &framing,
+	    &crc,
+	    &carrier,
+	    &collisions,
+	    &xcollisions,
+	    &late,
+	    &defer,
+	    &xerrs,
+	    &rerrs,
+	    &toolong,
+	    &runt,
+	    &multixmt,
+	    &multircv,
+	    &brdcstxmt,
+	    &brdcstrcv);
 
 	gs->glds_speed = speed;
 	gs->glds_media = GLDM_UNKNOWN;
@@ -1638,9 +1694,9 @@ ch_send(gld_mac_info_t *macinfo, mblk_t *mp)
 	if (chp->ch_config.cksum_enabled) {
 		if (is_T2(chp)) {
 			hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
-				NULL, &msg_flg);
+			    NULL, &msg_flg);
 			flg = (msg_flg & HCK_FULLCKSUM)?
-				CH_NO_CPL: CH_NO_HWCKSUM|CH_NO_CPL;
+			    CH_NO_CPL: CH_NO_HWCKSUM|CH_NO_CPL;
 		} else
 			flg = CH_NO_CPL;
 	} else
@@ -1698,7 +1754,7 @@ ch_send(gld_mac_info_t *macinfo, mblk_t *mp)
 			return (GLD_SUCCESS);
 		}
 	} else if ((msg_len > MAX_ALL_HDRLEN) &&
-			(MBLKL(mp) < MAX_ALL_HDRLEN)) {
+	    (MBLKL(mp) < MAX_ALL_HDRLEN)) {
 		chp->sge->intr_cnt.tx_hdr_pullups++;
 		if (pullupmsg(mp, MAX_ALL_HDRLEN) == 0) {
 			freemsg(mp);
@@ -1862,20 +1918,20 @@ ch_get_prop(ch_t *chp)
 	uint32_t prop_len = NULL;
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"enable_dvma", -1);
+	    "enable_dvma", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"enable-dvma", -1);
+		    "enable-dvma", -1);
 	if (val != -1) {
 		if (val != 0)
 			chp->ch_config.enable_dvma = 1;
 	}
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"amd_bug_workaround", -1);
+	    "amd_bug_workaround", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"amd-bug-workaround", -1);
+		    "amd-bug-workaround", -1);
 
 	if (val != -1) {
 		if (val == 0) {
@@ -2001,10 +2057,10 @@ fail_exit:
 	 */
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"pci_burstsize", -1);
+	    "pci_burstsize", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"pci-burstsize", -1);
+		    "pci-burstsize", -1);
 
 	if (val != -1) {
 
@@ -2039,10 +2095,10 @@ fail_exit:
 	 * set transaction count
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"pci_split_transaction_cnt", -1);
+	    "pci_split_transaction_cnt", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"pci-split-transaction-cnt", -1);
+		    "pci-split-transaction-cnt", -1);
 
 	if (val != -1) {
 		switch (val) {
@@ -2101,10 +2157,10 @@ fail_exit:
 	 * set relaxed ordering bit?
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"pci_relaxed_ordering_on", -1);
+	    "pci_relaxed_ordering_on", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"pci-relaxed-ordering-on", -1);
+		    "pci-relaxed-ordering-on", -1);
 
 	/*
 	 * default is to use system default value.
@@ -2117,10 +2173,10 @@ fail_exit:
 	}
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"enable_latency_timer", -1);
+	    "enable_latency_timer", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"enable-latency-timer", -1);
+		    "enable-latency-timer", -1);
 	if (val != -1)
 		enable_latency_timer = (val == 0)? 0: 1;
 
@@ -2129,10 +2185,10 @@ fail_exit:
 	 */
 	chp->ch_maximum_mtu = 9198;	/* tunable via chxge.conf */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"maximum_mtu", -1);
+	    "maximum_mtu", -1);
 	if (val == -1) {
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"maximum-mtu", -1);
+		    "maximum-mtu", -1);
 	}
 	if (val != -1) {
 		if (val > 9582) {
@@ -2157,10 +2213,10 @@ fail_exit:
 	chp->ch_mtu = ETHERMTU;
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"accept_jumbo", -1);
+	    "accept_jumbo", -1);
 	if (val == -1) {
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"accept-jumbo", -1);
+		    "accept-jumbo", -1);
 	}
 	if (val != -1) {
 		if (val)
@@ -2196,10 +2252,10 @@ fail_exit:
 	chp->ch_config.cksum_enabled = 1;
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"enable_checksum_offload", -1);
+	    "enable_checksum_offload", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"enable-checksum-offload", -1);
+		    "enable-checksum-offload", -1);
 	if (val != -1) {
 		if (val == NULL)
 			chp->ch_config.cksum_enabled = 0;
@@ -2209,10 +2265,10 @@ fail_exit:
 	 * Provides a tuning capability for the command queue 0 size.
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"sge_cmdq0_cnt", -1);
+	    "sge_cmdq0_cnt", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"sge-cmdq0-cnt", -1);
+		    "sge-cmdq0-cnt", -1);
 	if (val != -1) {
 		if (val > 10)
 			sge_cmdq0_cnt = val;
@@ -2221,7 +2277,7 @@ fail_exit:
 	if (sge_cmdq0_cnt > 65535) {
 		cmn_err(CE_WARN,
 		    "%s: sge-cmdQ0-cnt > 65535 - resetting value to default",
-			chp->ch_name);
+		    chp->ch_name);
 		sge_cmdq0_cnt = sge_cmdq0_cnt_orig;
 	}
 	tval += sge_cmdq0_cnt;
@@ -2230,10 +2286,10 @@ fail_exit:
 	 * Provides a tuning capability for the command queue 1 size.
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"sge_cmdq1_cnt", -1);
+	    "sge_cmdq1_cnt", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"sge-cmdq1-cnt", -1);
+		    "sge-cmdq1-cnt", -1);
 	if (val != -1) {
 		if (val > 10)
 			sge_cmdq1_cnt = val;
@@ -2242,7 +2298,7 @@ fail_exit:
 	if (sge_cmdq1_cnt > 65535) {
 		cmn_err(CE_WARN,
 		    "%s: sge-cmdQ0-cnt > 65535 - resetting value to default",
-			chp->ch_name);
+		    chp->ch_name);
 		sge_cmdq1_cnt = sge_cmdq1_cnt_orig;
 	}
 
@@ -2250,10 +2306,10 @@ fail_exit:
 	 * Provides a tuning capability for the free list 0 size.
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"sge_flq0_cnt", -1);
+	    "sge_flq0_cnt", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"sge-flq0-cnt", -1);
+		    "sge-flq0-cnt", -1);
 	if (val != -1) {
 		if (val > 512)
 			sge_flq0_cnt = val;
@@ -2262,7 +2318,7 @@ fail_exit:
 	if (sge_flq0_cnt > 65535) {
 		cmn_err(CE_WARN,
 		    "%s: sge-flq0-cnt > 65535 - resetting value to default",
-			chp->ch_name);
+		    chp->ch_name);
 		sge_flq0_cnt = sge_flq0_cnt_orig;
 	}
 
@@ -2272,10 +2328,10 @@ fail_exit:
 	 * Provides a tuning capability for the free list 1 size.
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"sge_flq1_cnt", -1);
+	    "sge_flq1_cnt", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"sge-flq1-cnt", -1);
+		    "sge-flq1-cnt", -1);
 	if (val != -1) {
 		if (val > 512)
 			sge_flq1_cnt = val;
@@ -2284,7 +2340,7 @@ fail_exit:
 	if (sge_flq1_cnt > 65535) {
 		cmn_err(CE_WARN,
 		    "%s: sge-flq1-cnt > 65535 - resetting value to default",
-			chp->ch_name);
+		    chp->ch_name);
 		sge_flq1_cnt = sge_flq1_cnt_orig;
 	}
 
@@ -2294,10 +2350,10 @@ fail_exit:
 	 * Provides a tuning capability for the responce queue size.
 	 */
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-		"sge_respq_cnt", -1);
+	    "sge_respq_cnt", -1);
 	if (val == -1)
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
-			"sge-respq-cnt", -1);
+		    "sge-respq-cnt", -1);
 	if (val != -1) {
 		if (val > 30)
 			sge_respq_cnt = val;
@@ -2306,7 +2362,7 @@ fail_exit:
 	if (sge_respq_cnt > 65535) {
 		cmn_err(CE_WARN,
 		    "%s: sge-respq-cnt > 65535 - resetting value to default",
-			chp->ch_name);
+		    chp->ch_name);
 		sge_respq_cnt = sge_respq_cnt_orig;
 	}
 

@@ -55,6 +55,7 @@ int usba_hubdi_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 int usba_hubdi_attach(dev_info_t *, ddi_attach_cmd_t);
 int usba_hubdi_probe(dev_info_t *);
 int usba_hubdi_detach(dev_info_t *, ddi_detach_cmd_t);
+int usba_hubdi_quiesce(dev_info_t *);
 
 int usba_hubdi_bind_root_hub(dev_info_t *, uchar_t *, size_t,
 				usb_dev_descr_t *);

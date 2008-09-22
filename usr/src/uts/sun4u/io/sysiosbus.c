@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -366,7 +365,8 @@ static struct dev_ops sbus_ops = {
 	nodev,			/* reset */
 	&sbus_cb_ops,		/* driver operations */
 	&sbus_bus_ops,		/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* global data */
@@ -523,10 +523,10 @@ sbus_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 	if (ddi_regs_map_setup(softsp->dip, 0, &softsp->address, 0, 0,
-		&attr, &softsp->ac) != DDI_SUCCESS) {
+	    &attr, &softsp->ac) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: unable to map reg set 0\n",
-			ddi_get_name(softsp->dip),
-			ddi_get_instance(softsp->dip));
+		    ddi_get_name(softsp->dip),
+		    ddi_get_instance(softsp->dip));
 		return (0);
 	}
 	if (softsp->address == (caddr_t)-1) {
@@ -613,7 +613,7 @@ sbus_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		instance = ddi_get_instance(devi);
 
 		if (ddi_soft_state_zalloc(sbus_cprp, instance)
-			!= DDI_SUCCESS)
+		    != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
 		cpr_softsp = ddi_get_soft_state(sbus_cprp, instance);
@@ -830,16 +830,16 @@ sbus_resume_init(struct sbus_soft_state *softsp, int resume)
 	 * 7 bit upaid into a 5bit value.
 	 */
 	*softsp->sysio_ctrl_reg |=
-		(uint64_t)STARFIRE_UPAID2HWIGN(softsp->upa_id)
-				<< SYSIO_IGN;
+	    (uint64_t)STARFIRE_UPAID2HWIGN(softsp->upa_id)
+	    << SYSIO_IGN;
 #else
 	/* for the rest of sun4u's */
 	*softsp->sysio_ctrl_reg |=
-		(uint64_t)softsp->upa_id << 51;
+	    (uint64_t)softsp->upa_id << 51;
 
 	/* Program in the interrupt group number */
 	*softsp->sysio_ctrl_reg |=
-		(uint64_t)softsp->upa_id << SYSIO_IGN;
+	    (uint64_t)softsp->upa_id << SYSIO_IGN;
 #endif /* _STARFIRE */
 
 	/*
@@ -850,10 +850,10 @@ sbus_resume_init(struct sbus_soft_state *softsp, int resume)
 
 	/* Calculate our burstsizes now so we don't have to do it later */
 	sbus_burst_sizes = (SYSIO64_BURST_RANGE << SYSIO64_BURST_SHIFT)
-		| SYSIO_BURST_RANGE;
+	    | SYSIO_BURST_RANGE;
 
 	sbus_burst_sizes = ddi_getprop(DDI_DEV_T_ANY, softsp->dip,
-		DDI_PROP_DONTPASS, "up-burst-sizes", sbus_burst_sizes);
+	    DDI_PROP_DONTPASS, "up-burst-sizes", sbus_burst_sizes);
 
 	softsp->sbus_burst_sizes = sbus_burst_sizes & SYSIO_BURST_MASK;
 	softsp->sbus64_burst_sizes = sbus_burst_sizes & SYSIO64_BURST_MASK;
@@ -1415,7 +1415,7 @@ sbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
     ddi_ctl_enum_t op, void *arg, void *result)
 {
 	struct sbus_soft_state *softsp = (struct sbus_soft_state *)
-		ddi_get_soft_state(sbusp, ddi_get_instance(dip));
+	    ddi_get_soft_state(sbusp, ddi_get_instance(dip));
 
 	switch (op) {
 
@@ -1821,7 +1821,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 #ifdef	_STARFIRE
 			tmp_mondo_vec = pc_translate_tgtid(
 			    softsp->ittrans_cookie, cpu_id,
-				mondo_vec_reg) << IMR_TID_SHIFT;
+			    mondo_vec_reg) << IMR_TID_SHIFT;
 #else
 			tmp_mondo_vec =
 			    cpu_id << IMR_TID_SHIFT;
@@ -2082,7 +2082,7 @@ sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, uint32_t *intr,
 		/* The sunfire i/o board has a soc in the printer slot */
 		if ((ino_table[ino]->clear_reg == PP_CLEAR) &&
 		    ((strcmp(ddi_get_name(rdip), "soc") == 0) ||
-			(strcmp(ddi_get_name(rdip), "SUNW,soc") == 0))) {
+		    (strcmp(ddi_get_name(rdip), "SUNW,soc") == 0))) {
 			*pil = SOC_PRIORITY;
 		} else {
 			/* Figure out the pil associated with this interrupt */
@@ -2230,7 +2230,7 @@ sbus_intrdist(void *arg)
 			continue;
 
 		mondo_vec_reg = (softsp->intr_mapping_reg +
-			ino_table[mondo]->mapping_reg);
+		    ino_table[mondo]->mapping_reg);
 
 		/* Don't reprogram the same register twice */
 		if (mondo_vec_reg == last_mondo_vec_reg)
@@ -2353,7 +2353,7 @@ sbus_intr_reset(void *arg)
 
 	for (mondo = 0; mondo < SZ_INO_TABLE; mondo++) {
 		if (ino_table[mondo] == NULL ||
-			ino_table[mondo]->clear_reg == NULL) {
+		    ino_table[mondo]->clear_reg == NULL) {
 
 			continue;
 		}
@@ -2431,10 +2431,10 @@ sbus_add_picN_kstats(dev_info_t *dip)
 		 */
 		(void) sprintf(pic_name, "pic%d", pic);	/* pic0, pic1 ... */
 		if ((sbus_picN_ksp[pic] = kstat_create("sbus",
-			instance, pic_name, "bus", KSTAT_TYPE_NAMED,
-			SBUS_NUM_EVENTS + 1, NULL)) == NULL) {
+		    instance, pic_name, "bus", KSTAT_TYPE_NAMED,
+		    SBUS_NUM_EVENTS + 1, NULL)) == NULL) {
 				cmn_err(CE_WARN, "sbus %s: kstat_create failed",
-					pic_name);
+				    pic_name);
 
 			/* remove pic0 kstat if pic1 create fails */
 			if (pic == 1) {
@@ -2445,7 +2445,7 @@ sbus_add_picN_kstats(dev_info_t *dip)
 		}
 
 		sbus_pic_named_data =
-			(struct kstat_named *)(sbus_picN_ksp[pic]->ks_data);
+		    (struct kstat_named *)(sbus_picN_ksp[pic]->ks_data);
 
 		/*
 		 * when we are writing pcr_masks to the kstat we need to
@@ -2462,12 +2462,12 @@ sbus_add_picN_kstats(dev_info_t *dip)
 
 			/* pcr_mask */
 			sbus_pic_named_data[event].value.ui64 =
-				sbus_events_arr[event].pcr_mask << pic_shift;
+			    sbus_events_arr[event].pcr_mask << pic_shift;
 
 			/* event-name */
 			kstat_named_init(&sbus_pic_named_data[event],
-				sbus_events_arr[event].event_name,
-				KSTAT_DATA_UINT64);
+			    sbus_events_arr[event].event_name,
+			    KSTAT_DATA_UINT64);
 		}
 
 		/*
@@ -2476,12 +2476,12 @@ sbus_add_picN_kstats(dev_info_t *dip)
 		 */
 		/* pcr mask */
 		sbus_pic_named_data[SBUS_NUM_EVENTS].value.ui64 =
-			sbus_clear_pic[pic].pcr_mask;
+		    sbus_clear_pic[pic].pcr_mask;
 
 		/* event-name */
 		kstat_named_init(&sbus_pic_named_data[SBUS_NUM_EVENTS],
-			sbus_clear_pic[pic].event_name,
-			KSTAT_DATA_UINT64);
+		    sbus_clear_pic[pic].event_name,
+		    KSTAT_DATA_UINT64);
 
 		kstat_install(sbus_picN_ksp[pic]);
 	}
@@ -2514,27 +2514,27 @@ sbus_add_kstats(struct sbus_soft_state *softsp)
 	 * The size of this kstat is SBUS_NUM_PICS + 1 for %pcr
 	 */
 	if ((sbus_counters_ksp = kstat_create("sbus",
-		ddi_get_instance(softsp->dip), "counters",
-		"bus", KSTAT_TYPE_NAMED, SBUS_NUM_PICS + 1,
-		KSTAT_FLAG_WRITABLE)) == NULL) {
+	    ddi_get_instance(softsp->dip), "counters",
+	    "bus", KSTAT_TYPE_NAMED, SBUS_NUM_PICS + 1,
+	    KSTAT_FLAG_WRITABLE)) == NULL) {
 
 			cmn_err(CE_WARN, "sbus%d counters: kstat_create"
-				" failed", ddi_get_instance(softsp->dip));
+			    " failed", ddi_get_instance(softsp->dip));
 		return;
 	}
 
 	sbus_counters_named_data =
-		(struct kstat_named *)(sbus_counters_ksp->ks_data);
+	    (struct kstat_named *)(sbus_counters_ksp->ks_data);
 
 	/* initialize the named kstats */
 	kstat_named_init(&sbus_counters_named_data[0],
-		"pcr", KSTAT_DATA_UINT64);
+	    "pcr", KSTAT_DATA_UINT64);
 
 	kstat_named_init(&sbus_counters_named_data[1],
-		"pic0", KSTAT_DATA_UINT64);
+	    "pic0", KSTAT_DATA_UINT64);
 
 	kstat_named_init(&sbus_counters_named_data[2],
-		"pic1", KSTAT_DATA_UINT64);
+	    "pic1", KSTAT_DATA_UINT64);
 
 	sbus_counters_ksp->ks_update = sbus_counters_kstat_update;
 	sbus_counters_ksp->ks_private = (void *)softsp;
@@ -2564,7 +2564,7 @@ sbus_counters_kstat_update(kstat_t *ksp, int rw)
 		 */
 
 		*softsp->sbus_pcr =
-			(uint32_t)sbus_counters_data[0].value.ui64;
+		    (uint32_t)sbus_counters_data[0].value.ui64;
 
 	} else {
 		/*
@@ -2589,7 +2589,7 @@ sbus_counters_kstat_update(kstat_t *ksp, int rw)
 		sbus_counters_data[1].value.ui64 = pic_register >> 32;
 		/* pic1 */
 		sbus_counters_data[2].value.ui64 =
-			pic_register & SBUS_PIC0_MASK;
+		    pic_register & SBUS_PIC0_MASK;
 
 	}
 	return (0);

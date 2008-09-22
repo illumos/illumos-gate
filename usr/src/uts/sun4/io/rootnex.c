@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4 root nexus driver
@@ -162,15 +161,17 @@ static int rootnex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 
 static struct dev_ops rootnex_ops = {
 	DEVO_REV,
-	0,		/* refcnt */
-	ddi_no_info,	/* info */
+	0,			/* refcnt */
+	ddi_no_info,		/* info */
 	nulldev,
-	nulldev,	/* probe */
+	nulldev,		/* probe */
 	rootnex_attach,
 	rootnex_detach,
-	nodev,		/* reset */
+	nodev,			/* reset */
 	&rootnex_cb_ops,
-	&rootnex_bus_ops
+	&rootnex_bus_ops,
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 

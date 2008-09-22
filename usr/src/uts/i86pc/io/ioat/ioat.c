@@ -45,6 +45,7 @@ static int ioat_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
 static int ioat_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 static int ioat_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
     void **result);
+static int ioat_quiesce(dev_info_t *dip);
 
 static 	struct cb_ops ioat_cb_ops = {
 	ioat_open,		/* cb_open */
@@ -76,7 +77,8 @@ static struct dev_ops ioat_dev_ops = {
 	nodev,			/* devo_reset */
 	&ioat_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* power */
+	NULL,			/* devo_power */
+	ioat_quiesce,		/* devo_quiesce */
 };
 
 static struct modldrv ioat_modldrv = {
@@ -670,4 +672,22 @@ ioat_isr(caddr_t parm)
 	    intrctrl);
 
 	return (r);
+}
+
+static int
+ioat_quiesce(dev_info_t *dip)
+{
+	ioat_state_t *state;
+	int instance;
+
+	instance = ddi_get_instance(dip);
+	state = ddi_get_soft_state(ioat_statep, instance);
+	if (state == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	ioat_intr_disable(state);
+	ioat_channel_quiesce(state);
+
+	return (DDI_SUCCESS);
 }

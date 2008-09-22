@@ -883,6 +883,14 @@ cpuid_pass1(cpu_t *cpu)
 			if (cp->cp_edx & CPUID_AMD_EDX_NX)
 				feature |= X86_NX;
 
+			/*
+			 * Regardless whether or not we boot 64-bit,
+			 * we should have a way to identify whether
+			 * the CPU is capable of running 64-bit.
+			 */
+			if (cp->cp_edx & CPUID_AMD_EDX_LM)
+				feature |= X86_64;
+
 #if defined(__amd64)
 			/* 1 GB large page - enable only for 64 bit kernel */
 			if (cp->cp_edx & CPUID_AMD_EDX_1GPG)

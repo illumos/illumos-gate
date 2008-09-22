@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 5.0 */
 
 #include <sys/types.h>
 #include <sys/cmn_err.h>
@@ -158,8 +157,9 @@ static struct dev_ops pseudo_ops = {
 	vnex_detach,		/* detach */
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
-	&vnex_bus_ops,	/* bus operations */
-	nulldev			/* power */
+	&vnex_bus_ops,		/* bus operations */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -168,7 +168,7 @@ static struct dev_ops pseudo_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"sun4v virtual-devices nexus driver v%I%",
+	"sun4v virtual-devices nexus driver",
 	&pseudo_ops,	/* driver ops */
 };
 

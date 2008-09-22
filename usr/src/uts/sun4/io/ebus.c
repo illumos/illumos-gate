@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -162,7 +161,9 @@ static struct dev_ops ebus_ops = {
 	ebus_detach,
 	nodev,
 	&ebus_cb_ops,
-	&ebus_bus_ops
+	&ebus_bus_ops,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -173,7 +174,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module.  This one is a driver */
-	"ebus nexus driver %I%", /* Name of module. */
+	"ebus nexus driver", /* Name of module. */
 	&ebus_ops,		/* driver ops */
 };
 
@@ -309,7 +310,7 @@ ebus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * create minor node for devctl interfaces
 		 */
 		if (ddi_create_minor_node(dip, "devctl", S_IFCHR, instance,
-			DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
+		    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
 			goto attach_fail;
 		}
 
@@ -390,7 +391,7 @@ int
 ebus_get_ranges_prop(ebus_devstate_t *ebus_p)
 {
 	if (ddi_getlongprop(DDI_DEV_T_ANY, ebus_p->dip, DDI_PROP_DONTPASS,
-		"ranges", (caddr_t)&ebus_p->vrangep, &ebus_p->vrange_len)
+	    "ranges", (caddr_t)&ebus_p->vrangep, &ebus_p->vrange_len)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "Can't get %s ranges property",
 		    ddi_get_name(ebus_p->dip));
@@ -399,7 +400,7 @@ ebus_get_ranges_prop(ebus_devstate_t *ebus_p)
 
 	ebus_p->vrange_cnt = ebus_p->vrange_len /
 	    (ebus_p->ebus_paddr_cells + ebus_p->ebus_addr_cells +
-		ebus_p->ebus_psz_cells);
+	    ebus_p->ebus_psz_cells);
 
 	if (ebus_p->vrange_cnt == 0) {
 		kmem_free(ebus_p->vrangep, ebus_p->vrange_len);
@@ -476,8 +477,8 @@ ebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 * the request to our parent.
 		 */
 		DBG3(D_MAP, ebus_p, "rdip=%s%d: REGSPEC - handlep=%p\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip),
-			mp->map_handlep);
+		    ddi_get_name(rdip), ddi_get_instance(rdip),
+		    mp->map_handlep);
 		ebus_rp = (ebus_regspec_t *)mp->map_obj.rp;
 		break;
 
@@ -489,8 +490,8 @@ ebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 */
 		rnumber = mp->map_obj.rnumber;
 		DBG4(D_MAP, ebus_p, "rdip=%s%d: rnumber=%x handlep=%p\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip),
-			rnumber, mp->map_handlep);
+		    ddi_get_name(rdip), ddi_get_instance(rdip),
+		    rnumber, mp->map_handlep);
 
 		if (getprop(rdip, "reg", &ebus_regs, &i) != DDI_SUCCESS) {
 			DBG(D_MAP, ebus_p, "can't get reg property\n");
@@ -681,8 +682,8 @@ ebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_UNINITCHILD:
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_UNINITCHILD: rdip=%s%d\n",
-			ddi_get_name((dev_info_t *)arg),
-			ddi_get_instance((dev_info_t *)arg));
+		    ddi_get_name((dev_info_t *)arg),
+		    ddi_get_instance((dev_info_t *)arg));
 		ddi_set_name_addr((dev_info_t *)arg, NULL);
 		ddi_remove_minor_node((dev_info_t *)arg, NULL);
 		impl_rem_dev_props((dev_info_t *)arg);
@@ -691,17 +692,17 @@ ebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_REPORTDEV:
 
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_REPORTDEV: rdip=%s%d\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		cmn_err(CE_CONT, "?%s%d at %s%d: offset %s\n",
-			ddi_driver_name(rdip), ddi_get_instance(rdip),
-			ddi_driver_name(dip), ddi_get_instance(dip),
-			ddi_get_name_addr(rdip));
+		    ddi_driver_name(rdip), ddi_get_instance(rdip),
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    ddi_get_name_addr(rdip));
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_REGSIZE:
 
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_REGSIZE: rdip=%s%d\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		if (getprop(rdip, "reg", &ebus_rp, &i) != DDI_SUCCESS) {
 			DBG(D_CTLOPS, ebus_p, "can't get reg property\n");
 			return (DDI_FAILURE);
@@ -719,7 +720,7 @@ ebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_NREGS:
 
 		DBG2(D_CTLOPS, ebus_p, "DDI_CTLOPS_NREGS: rdip=%s%d\n",
-			ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		if (getprop(rdip, "reg", &ebus_rp, &i) != DDI_SUCCESS) {
 			DBG(D_CTLOPS, ebus_p, "can't get reg property\n");
 			return (DDI_FAILURE);
@@ -733,7 +734,7 @@ ebus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	 * Now pass the request up to our parent.
 	 */
 	DBG2(D_CTLOPS, ebus_p, "passing request to parent: rdip=%s%d\n",
-		ddi_get_name(rdip), ddi_get_instance(rdip));
+	    ddi_get_name(rdip), ddi_get_instance(rdip));
 	return (ddi_ctlops(dip, rdip, op, arg, result));
 }
 
@@ -866,8 +867,8 @@ ebus_config(ebus_devstate_t *ebus_p)
 	int devtype_len;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
-		DDI_PROP_DONTPASS, "device_type", (caddr_t)&devtype_str,
-		&devtype_len) != DDI_SUCCESS) {
+	    DDI_PROP_DONTPASS, "device_type", (caddr_t)&devtype_str,
+	    &devtype_len) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "Can't get %s device_type property",
 		    ddi_get_name(ddi_get_parent(dip)));
 
@@ -929,8 +930,8 @@ ebus_debug(uint_t flag, ebus_devstate_t *ebus_p, char *fmt,
 		}
 		if (ebus_p)
 			cmn_err(CE_CONT, "%s%d: %s: ",
-				ddi_get_name(ebus_p->dip),
-				ddi_get_instance(ebus_p->dip), s);
+			    ddi_get_name(ebus_p->dip),
+			    ddi_get_instance(ebus_p->dip), s);
 		else
 			cmn_err(CE_CONT, "ebus: ");
 		cmn_err(CE_CONT, fmt, a1, a2, a3, a4, a5);

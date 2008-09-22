@@ -30,7 +30,6 @@
 #ifndef	_VM_DEP_H
 #define	_VM_DEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -522,7 +521,7 @@ extern size_t page_ctrs_sz(void);
 extern caddr_t page_ctrs_alloc(caddr_t);
 extern void page_ctr_sub(int, int, page_t *, int);
 extern page_t *page_freelist_split(uchar_t,
-    uint_t, int, int, pfn_t, page_list_walker_t *);
+    uint_t, int, int, pfn_t, pfn_t, page_list_walker_t *);
 extern page_t *page_freelist_coalesce(int, uchar_t, uint_t, uint_t, int,
     pfn_t);
 extern uint_t page_get_pagecolors(uint_t);

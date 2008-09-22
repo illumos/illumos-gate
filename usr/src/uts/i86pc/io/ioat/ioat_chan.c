@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -362,6 +360,40 @@ ioat_channel_resume(ioat_state_t *state)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+void
+ioat_channel_quiesce(ioat_state_t *state)
+{
+	int i;
+
+	/*
+	 * Walk through all channels and quiesce
+	 */
+	for (i = 0; i < state->is_num_channels; i++) {
+
+		ioat_channel_t	channel = state->is_channel + i;
+
+		if (!channel->ic_inuse)
+			continue;
+
+		/* disable the interrupts */
+		ddi_put16(state->is_reg_handle,
+		    (uint16_t *)&channel->ic_regs[IOAT_CHAN_CTL],
+		    0x0);
+
+		ioat_channel_reset(channel);
+	}
 }
 
 

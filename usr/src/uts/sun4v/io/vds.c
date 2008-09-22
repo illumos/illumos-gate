@@ -7233,7 +7233,8 @@ static struct dev_ops vds_ops = {
 	nodev,		/* devo_reset */
 	NULL,		/* devo_cb_ops */
 	NULL,		/* devo_bus_ops */
-	nulldev		/* devo_power */
+	nulldev,	/* devo_power */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * 1394 mass storage HBA driver
@@ -181,7 +180,8 @@ static struct dev_ops scsa1394_ops = {
 	nodev,			/* reset */
 	&scsa1394_cb_ops,	/* driver operations */
 	NULL,			/* bus operations */
-	scsa1394_power		/* power */
+	scsa1394_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv scsa1394_modldrv = {

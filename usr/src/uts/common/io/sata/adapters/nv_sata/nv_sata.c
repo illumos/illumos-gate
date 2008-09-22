@@ -83,6 +83,7 @@
  */
 static int nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int nv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static int nv_quiesce(dev_info_t *dip);
 static int nv_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
     void *arg, void **result);
 
@@ -271,7 +272,8 @@ static struct dev_ops nv_dev_ops = {
 	(struct cb_ops *)0,	/* driver operations */
 #endif
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	nv_quiesce		/* quiesce */
 };
 
 
@@ -5190,6 +5192,15 @@ mcp04_set_intr(nv_port_t *nvp, int flag)
 	uint8_t clear_all_bits[] = { MCP04_INT_PDEV_ALL, MCP04_INT_SDEV_ALL };
 	uint8_t int_en, port = nvp->nvp_port_num, intr_status;
 
+	if (flag & NV_INTR_DISABLE_NON_BLOCKING) {
+		int_en = nv_get8(bar5_hdl,
+		    (uint8_t *)(bar5 + MCP04_SATA_INT_EN));
+		int_en &= ~intr_bits[port];
+		nv_put8(bar5_hdl, (uint8_t *)(bar5 + MCP04_SATA_INT_EN),
+		    int_en);
+		return;
+	}
+
 	ASSERT(mutex_owned(&nvp->nvp_mutex));
 
 	/*
@@ -5252,6 +5263,13 @@ mcp55_set_intr(nv_port_t *nvp, int flag)
 	uint16_t intr_bits =
 	    MCP55_INT_ADD|MCP55_INT_REM|MCP55_INT_COMPLETE;
 	uint16_t int_en;
+
+	if (flag & NV_INTR_DISABLE_NON_BLOCKING) {
+		int_en = nv_get16(bar5_hdl, nvp->nvp_mcp55_int_ctl);
+		int_en &= ~intr_bits;
+		nv_put16(bar5_hdl, nvp->nvp_mcp55_int_ctl, int_en);
+		return;
+	}
 
 	ASSERT(mutex_owned(&nvp->nvp_mutex));
 
@@ -5538,7 +5556,6 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 	}
 }
 
-
 /*
  * Get request sense data and stuff it the command's sense buffer.
  * Start a request sense command in order to get sense data to insert
@@ -5634,6 +5651,72 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 	    "nv_start_rqsense_pio: exiting into HP3"));
 
 	return (NV_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+nv_quiesce(dev_info_t *dip)
+{
+	int port, instance = ddi_get_instance(dip);
+	nv_ctl_t *nvc;
+
+	if ((nvc = (nv_ctl_t *)ddi_get_soft_state(nv_statep, instance)) == NULL)
+		return (DDI_FAILURE);
+
+	for (port = 0; port < NV_MAX_PORTS(nvc); port++) {
+		nv_port_t *nvp = &(nvc->nvc_port[port]);
+		ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
+		ddi_acc_handle_t bar5_hdl = nvp->nvp_ctlp->nvc_bar_hdl[5];
+		uint32_t sctrl;
+
+		/*
+		 * Stop the controllers from generating interrupts.
+		 */
+		(*(nvc->nvc_set_intr))(nvp, NV_INTR_DISABLE_NON_BLOCKING);
+
+		/*
+		 * clear signature registers
+		 */
+		nv_put8(cmdhdl, nvp->nvp_sect, 0);
+		nv_put8(cmdhdl, nvp->nvp_lcyl, 0);
+		nv_put8(cmdhdl, nvp->nvp_hcyl, 0);
+		nv_put8(cmdhdl, nvp->nvp_count, 0);
+
+		nvp->nvp_signature = 0;
+		nvp->nvp_type = 0;
+		nvp->nvp_state |= NV_PORT_RESET;
+		nvp->nvp_reset_time = ddi_get_lbolt();
+		nvp->nvp_link_lost_time = 0;
+
+		/*
+		 * assert reset in PHY by writing a 1 to bit 0 scontrol
+		 */
+		sctrl = nv_get32(bar5_hdl, nvp->nvp_sctrl);
+
+		nv_put32(bar5_hdl, nvp->nvp_sctrl,
+		    sctrl | SCONTROL_DET_COMRESET);
+
+		/*
+		 * wait 1ms
+		 */
+		drv_usecwait(1000);
+
+		/*
+		 * de-assert reset in PHY
+		 */
+		nv_put32(bar5_hdl, nvp->nvp_sctrl, sctrl);
+	}
+
+	return (DDI_SUCCESS);
 }
 
 

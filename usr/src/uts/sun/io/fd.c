@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Intel 82077 Floppy Disk Driver
@@ -527,7 +525,8 @@ static struct dev_ops	fd_ops = {
 	nodev, 			/* reset */
 	&fd_cb_ops, 		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	fd_power		/* power */
+	fd_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -557,8 +556,8 @@ static int tosec = 16;  /* long timeouts for sundiag for now */
 
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {
-	&mod_driverops, 		/* Type of module. driver here */
-	"Floppy Driver v%I%", 	/* Name of the module. */
+	&mod_driverops,		/* Type of module. driver here */
+	"Floppy Driver", 	/* Name of the module. */
 	&fd_ops, 		/* Driver ops vector */
 };
 
@@ -613,8 +612,8 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			}
 			quiesce_fd_interrupt(fdc);
 			if (fdc->c_fdtype & FDCTYPE_SB)
-			    if (ddi_add_intr(dip, 0, &fdc->c_block, 0,
-				fdintr_dma, (caddr_t)0) != DDI_SUCCESS) {
+				if (ddi_add_intr(dip, 0, &fdc->c_block, 0,
+				    fdintr_dma, (caddr_t)0) != DDI_SUCCESS) {
 				return (DDI_FAILURE);
 			}
 
@@ -700,7 +699,7 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    (size_t)(32*1024), &dev_attr, DDI_DMA_CONSISTENT,
 			    DDI_DMA_SLEEP, NULL, (caddr_t *)&fdc->dma_buf,
 			    &rlen, &fdc->c_dma_buf_handle) != DDI_SUCCESS) {
-			    fd_cleanup(dip, fdc, hard_intr_set, 0);
+				fd_cleanup(dip, fdc, hard_intr_set, 0);
 				return (DDI_FAILURE);
 			}
 
@@ -758,7 +757,7 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (fdc->c_fdtype & FDCTYPE_SB) {
 		fdc->sb_dma_channel = ddi_getprop(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "dma-channel", 0);
+		    DDI_PROP_DONTPASS, "dma-channel", 0);
 	}
 
 
@@ -778,8 +777,8 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	for (dmdp = fd_minor; dmdp->name != NULL; dmdp++) {
 		if (ddi_create_minor_node(dip, dmdp->name, dmdp->type,
-		(instance << FDINSTSHIFT) | dmdp->minor,
-		DDI_NT_FD, 0) == DDI_FAILURE) {
+		    (instance << FDINSTSHIFT) | dmdp->minor,
+		    DDI_NT_FD, 0) == DDI_FAILURE) {
 			fd_cleanup(dip, fdc, hard_intr_set, 1);
 			return (DDI_FAILURE);
 		}
@@ -817,16 +816,16 @@ fd_attach_map_regs(dev_info_t *dip, struct fdctlr *fdc)
 	/* Map the DMA registers of the platform supports DMA */
 	if (fdc->c_fdtype & FDCTYPE_SB) {
 		if (ddi_regs_map_setup(dip, 1, (caddr_t *)&fdc->c_dma_regs,
-			0, sizeof (struct sb_dma_reg), &attr,
-			&fdc->c_handlep_dma)) {
+		    0, sizeof (struct sb_dma_reg), &attr,
+		    &fdc->c_handlep_dma)) {
 			return (DDI_FAILURE);
 		}
 
 
 	} else if (fdc->c_fdtype & FDCTYPE_CHEERIO) {
 		if (ddi_regs_map_setup(dip, 1, (caddr_t *)&fdc->c_dma_regs,
-			0, sizeof (struct cheerio_dma_reg), &attr,
-			&fdc->c_handlep_dma)) {
+		    0, sizeof (struct cheerio_dma_reg), &attr,
+		    &fdc->c_handlep_dma)) {
 			return (DDI_FAILURE);
 		}
 	}
@@ -850,8 +849,8 @@ fd_attach_map_regs(dev_info_t *dip, struct fdctlr *fdc)
 
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA, ((int)C,
-			(char *)"fdattach: msr/dsr at %p\n",
-			(void *)fdc->c_control));
+		    (char *)"fdattach: msr/dsr at %p\n",
+		    (void *)fdc->c_control));
 
 		/*
 		 * The 82077 doesn't use the first configuration parameter
@@ -882,7 +881,7 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 	FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			    (C, "fdattach_det_cltr: start \n"));
+	    (C, "fdattach_det_cltr: start \n"));
 
 	/*
 	 * First, map in the controller's registers
@@ -891,14 +890,14 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 	 */
 
 	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&fdc->c_reg,
-				0, sizeof (union fdcreg),
-				&attr,
-				&fdc->c_handlep_cont)) {
-			return (DDI_FAILURE);
+	    0, sizeof (union fdcreg),
+	    &attr,
+	    &fdc->c_handlep_cont)) {
+		return (DDI_FAILURE);
 	}
 
 	FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			    (C, "fdattach_det_cltr: mapped floppy regs\n"));
+	    (C, "fdattach_det_cltr: mapped floppy regs\n"));
 
 
 	/*
@@ -914,7 +913,7 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 		fdc->c_auxiodata = (uchar_t)(AUX_MBO4M|AUX_TC4M);
 		fdc->c_auxiodata2 = (uchar_t)AUX_TC4M;
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			    (C, "fdattach: slavio will be used!\n"));
+		    (C, "fdattach: slavio will be used!\n"));
 
 
 /*
@@ -928,7 +927,7 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 		fdc->c_fdtype |= FDCTYPE_DMA;
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: southbridge will be used!\n"));
+		    (C, "fdattach: southbridge will be used!\n"));
 
 		/*
 		 * The driver assumes high density characteristics until
@@ -945,7 +944,7 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 		fdc->c_fdtype |= FDCTYPE_82077;
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			    (C, "fdattach: cheerio will be used!\n"));
+		    (C, "fdattach: cheerio will be used!\n"));
 		/*
 		 * The cheerio auxio register should be memory mapped.  The
 		 * auxio register on other platforms is shared and mapped
@@ -962,8 +961,8 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 		 */
 		Set_auxio(fdc, AUX_HIGH_DENSITY);
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			    (C, "fdattach: auxio register 0x%x\n",
-				 *fdc->c_auxio_reg));
+		    (C, "fdattach: auxio register 0x%x\n",
+		    *fdc->c_auxio_reg));
 
 		fdc->c_fdtype |= FDCTYPE_DMA;
 		FDERRPRINT(FDEP_L1, FDEM_ATTA, (C, "fd_attach: DMA used\n"));
@@ -972,7 +971,7 @@ fd_attach_det_ctlr(dev_info_t *dip, struct fdctlr *fdc)
 
 	if (fdc->c_fdtype == 0) {
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			    (C, "fdattach: no controller!\n"));
+		    (C, "fdattach: no controller!\n"));
 		return (DDI_FAILURE);
 	} else {
 		return (0);
@@ -998,7 +997,7 @@ fd_attach_register_interrupts(dev_info_t *dip, struct fdctlr *fdc, int *hard)
 	 */
 	if (ddi_get_iblock_cookie(dip, 0, &fdc->c_block) != DDI_SUCCESS) {
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-		(C, "fdattach: ddi_get_iblock_cookie failed\n"));
+		    (C, "fdattach: ddi_get_iblock_cookie failed\n"));
 		return (DDI_FAILURE);
 
 	}
@@ -1013,21 +1012,21 @@ fd_attach_register_interrupts(dev_info_t *dip, struct fdctlr *fdc, int *hard)
 
 	if (fdc->c_fdtype & FDCTYPE_DMA) {
 		if (ddi_add_intr(dip, 0, &fdc->c_block, 0,
-			    fdintr_dma, (caddr_t)0) == DDI_SUCCESS) {
-				FDERRPRINT(FDEP_L1, FDEM_ATTA,
-				(C, "fdattach: standard intr\n"));
+		    fdintr_dma, (caddr_t)0) == DDI_SUCCESS) {
+			FDERRPRINT(FDEP_L1, FDEM_ATTA,
+			    (C, "fdattach: standard intr\n"));
 
 				/*
 				 * When DMA is used, the low level lock
 				 * is used in the hard interrupt handler.
 				 */
 				mutex_init(&fdc->c_lolock, NULL,
-					MUTEX_DRIVER, fdc->c_block);
+				    MUTEX_DRIVER, fdc->c_block);
 
 				*hard = 1;
 		} else {
 			FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: can't add dma intr\n"));
+			    (C, "fdattach: can't add dma intr\n"));
 
 			mutex_destroy(&fdc->c_hilock);
 
@@ -1039,17 +1038,17 @@ fd_attach_register_interrupts(dev_info_t *dip, struct fdctlr *fdc, int *hard)
 		 * and soft interrupts.
 		 */
 		if (ddi_add_intr(dip, 0, &fdc->c_block, 0,
-			fd_intr, (caddr_t)0) == DDI_SUCCESS) {
-				FDERRPRINT(FDEP_L1, FDEM_ATTA,
-				(C, "fdattach: standard intr\n"));
-				*hard = 1;
+		    fd_intr, (caddr_t)0) == DDI_SUCCESS) {
+			FDERRPRINT(FDEP_L1, FDEM_ATTA,
+			    (C, "fdattach: standard intr\n"));
+			*hard = 1;
 
 			/* fast traps are not enabled */
 			fdc->c_fasttrap = 0;
 
 		} else {
 			FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: can't add intr\n"));
+			    (C, "fdattach: can't add intr\n"));
 
 			mutex_destroy(&fdc->c_hilock);
 
@@ -1063,7 +1062,7 @@ fd_attach_register_interrupts(dev_info_t *dip, struct fdctlr *fdc, int *hard)
 		 * be initialized before the handler is added.
 		 */
 		status = ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_LOW,
-				&iblock_cookie_soft);
+		    &iblock_cookie_soft);
 
 
 		if (status != DDI_SUCCESS) {
@@ -1076,12 +1075,12 @@ fd_attach_register_interrupts(dev_info_t *dip, struct fdctlr *fdc, int *hard)
 		 * interrupt handler
 		 */
 		mutex_init(&fdc->c_lolock, NULL, MUTEX_DRIVER,
-			iblock_cookie_soft);
+		    iblock_cookie_soft);
 
 		if (ddi_add_softintr(dip, DDI_SOFTINT_LOW, &fdc->c_softid,
-					NULL, NULL,
-					fd_lointr,
-					(caddr_t)fdc) != DDI_SUCCESS) {
+		    NULL, NULL,
+		    fd_lointr,
+		    (caddr_t)fdc) != DDI_SUCCESS) {
 
 			mutex_destroy(&fdc->c_hilock);
 			mutex_destroy(&fdc->c_lolock);
@@ -1091,7 +1090,7 @@ fd_attach_register_interrupts(dev_info_t *dip, struct fdctlr *fdc, int *hard)
 	}
 
 	fdc->c_intrstat = kstat_create("fd", 0, "fdc0", "controller",
-		KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (fdc->c_intrstat) {
 		fdc->c_hiintct = &KIOIP->intrs[KSTAT_INTR_HARD];
 		kstat_install(fdc->c_intrstat);
@@ -1126,7 +1125,7 @@ fd_attach_check_drive(struct fdctlr *fdc)
 	int unit = fdc->c_un->un_unit_no;
 
 	FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fd_attach_check_drive\n"));
+	    (C, "fd_attach_check_drive\n"));
 
 
 	mutex_enter(&fdc->c_lolock);
@@ -1144,7 +1143,7 @@ fd_attach_check_drive(struct fdctlr *fdc)
 		Set_dor(fdc, ~((MOTEN(unit))|DRVSEL|RESET), 0);
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: Dor 0x%x\n", Dor(fdc)));
+		    (C, "fdattach: Dor 0x%x\n", Dor(fdc)));
 
 		drv_usecwait(5);
 		if (unit == 0) {
@@ -1161,10 +1160,10 @@ fd_attach_check_drive(struct fdctlr *fdc)
 		drv_usecwait(5);
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: Dor 0x%x\n", Dor(fdc)));
+		    (C, "fdattach: Dor 0x%x\n", Dor(fdc)));
 
 		if (!((fdc->c_fdtype & FDCTYPE_CHEERIO) ||
-				(fdc->c_fdtype & FDCTYPE_SB))) {
+		    (fdc->c_fdtype & FDCTYPE_SB))) {
 			set_auxioreg(AUX_TC4M, 0);
 		}
 		break;
@@ -1188,7 +1187,7 @@ fd_attach_check_drive(struct fdctlr *fdc)
 	fderrlevel = FDEP_LMAX;
 
 	FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: call fdrecalseek\n"));
+	    (C, "fdattach: call fdrecalseek\n"));
 
 	/* Make sure the drive is present */
 	if (fdrecalseek(fdc, unit, -1, 0) != 0) {
@@ -1238,8 +1237,8 @@ fd_cleanup(dev_info_t *dip, struct fdctlr *fdc, int hard, int locks)
 
 
 	FDERRPRINT(FDEP_L1, FDEM_ATTA,
-		(C, "fd_cleanup instance: %d ctlr: 0x%p\n",
-		ddi_get_instance(dip), (void *)fdc));
+	    (C, "fd_cleanup instance: %d ctlr: 0x%p\n",
+	    ddi_get_instance(dip), (void *)fdc));
 
 
 	if (fdc == NULL) {
@@ -1318,7 +1317,7 @@ fd_cleanup(dev_info_t *dip, struct fdctlr *fdc, int hard, int locks)
 
 	if (fdc->c_intrstat) {
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-				(C, "fd_cleanup: delete intrstat\n"));
+		    (C, "fd_cleanup: delete intrstat\n"));
 
 		kstat_delete(fdc->c_intrstat);
 	}
@@ -1525,9 +1524,9 @@ fd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 		mutex_exit(&fdc->c_lolock);
 		if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-						!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			FDERRPRINT(FDEP_L1, FDEM_PWR, (C, "Power change \
-failed. \n"));
+			    failed. \n"));
 
 				sema_v(&fdc->c_ocsem);
 				(void) pm_idle_component(fdc->c_dip, 0);
@@ -1767,8 +1766,8 @@ fd_strategy(register struct buf *bp)
 	if (bp->b_bcount % un->un_chars->fdc_sec_size)	{
 		FDERRPRINT(FDEP_L3, FDEM_STRA,
 		    (C, "fd%d: requested transfer size(0x%lx) is not"
-			" multiple of sector size(0x%x)\n", 0,
-			bp->b_bcount, un->un_chars->fdc_sec_size));
+		    " multiple of sector size(0x%x)\n", 0,
+		    bp->b_bcount, un->un_chars->fdc_sec_size));
 		FDERRPRINT(FDEP_L3, FDEM_STRA,
 		    (C, "	b_blkno=0x%lx b_flags=0x%x\n",
 		    (long)bp->b_blkno, bp->b_flags));
@@ -1795,14 +1794,14 @@ fd_strategy(register struct buf *bp)
 	if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 		mutex_exit(&fdc->c_lolock);
 		if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-						!= DDI_SUCCESS) {
-				sema_v(&fdc->c_ocsem);
-				(void) pm_idle_component(fdc->c_dip, 0);
-				bp->b_error = EIO;
-				bp->b_resid = bp->b_bcount;
-				bp->b_flags |= B_ERROR;
-				biodone(bp);
-				return (0);
+		    != DDI_SUCCESS) {
+			sema_v(&fdc->c_ocsem);
+			(void) pm_idle_component(fdc->c_dip, 0);
+			bp->b_error = EIO;
+			bp->b_resid = bp->b_bcount;
+			bp->b_flags |= B_ERROR;
+			biodone(bp);
+			return (0);
 		} else {
 			mutex_enter(&fdc->c_lolock);
 		}
@@ -1950,7 +1949,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		cpy.dki.dki_partition = FDPARTITION(dev);
 		cpy.dki.dki_maxtransfer = maxphys / DEV_BSIZE;
 		if (ddi_copyout((caddr_t)&cpy.dki, (caddr_t)arg,
-						sizeof (cpy.dki), flag))
+		    sizeof (cpy.dki), flag))
 			err = EFAULT;
 		break;
 	case DKIOCGGEOM:
@@ -1964,7 +1963,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		    (int)(cpy.dkg.dkg_nsect * cpy.dkg.dkg_rpm * 4) / 60000;
 		cpy.dkg.dkg_write_reinstruct = cpy.dkg.dkg_read_reinstruct;
 		if (ddi_copyout((caddr_t)&cpy.dkg, (caddr_t)arg,
-						sizeof (cpy.dkg), flag))
+		    sizeof (cpy.dkg), flag))
 			err = EFAULT;
 		break;
 	case DKIOCSGEOM:
@@ -1984,7 +1983,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		 */
 		if ((flag & DATAMODEL_MASK) == DATAMODEL_ILP32) {
 			if (ddi_copyout(&un->un_label.dkl_map,
-				(void *)arg, sizeof (struct dk_allmap32), flag))
+			    (void *)arg, sizeof (struct dk_allmap32), flag))
 				err = EFAULT;
 		}
 #ifdef _MULTI_DATAMODEL
@@ -1999,7 +1998,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 				    un->un_label.dkl_map[dkunit].dkl_nblk;
 			}
 			if (ddi_copyout(&dk_allmap, (void *)arg,
-					sizeof (struct dk_allmap), flag))
+			    sizeof (struct dk_allmap), flag))
 				err = EFAULT;
 		}
 #endif /* _MULTI_DATAMODEL */
@@ -2017,7 +2016,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 				mutex_enter(&fdc->c_lolock);
 				for (dkunit = 0; dkunit < NDKMAP; dkunit++) {
 					un->un_label.dkl_map[dkunit] =
-						cpy.dka.dka_map[dkunit];
+					    cpy.dka.dka_map[dkunit];
 				}
 				mutex_exit(&fdc->c_lolock);
 			}
@@ -2121,8 +2120,8 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		 * it helps build the vtoc.
 		 */
 		if ((un->un_chars->fdc_ncyl == 0) ||
-				(un->un_chars->fdc_nhead == 0) ||
-				(un->un_chars->fdc_secptrack == 0)) {
+		    (un->un_chars->fdc_nhead == 0) ||
+		    (un->un_chars->fdc_secptrack == 0)) {
 			mutex_exit(&fdc->c_lolock);
 			err = EINVAL;
 			break;
@@ -2143,7 +2142,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 
 	case DKIOCSTATE:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&state,
-					sizeof (int), flag)) {
+		    sizeof (int), flag)) {
 			err = EFAULT;
 			break;
 		}
@@ -2153,13 +2152,13 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		(void) pm_idle_component(fdc->c_dip, 0);
 
 		if (ddi_copyout((caddr_t)&un->un_media_state,
-					(caddr_t)arg, sizeof (int), flag))
+		    (caddr_t)arg, sizeof (int), flag))
 			err = EFAULT;
 		break;
 
 	case FDIOGCHAR:
 		if (ddi_copyout((caddr_t)un->un_chars, (caddr_t)arg,
-					sizeof (struct fd_char), flag))
+		    sizeof (struct fd_char), flag))
 			err = EFAULT;
 		break;
 
@@ -2179,16 +2178,16 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		if ((transfer_rate != 500) && (transfer_rate != 300) &&
 		    (transfer_rate != 250) && (transfer_rate != 1000)) {
 			FDERRPRINT(FDEP_L3, FDEM_IOCT,
-			(C, "fd_ioctl: FDIOSCHAR odd transfer rate %d\n",
+			    (C, "fd_ioctl: FDIOSCHAR odd transfer rate %d\n",
 			    cpy.fdchar.fdc_transfer_rate));
 			err = EINVAL;
 			break;
 		}
 
 		if ((cpy.fdchar.fdc_nhead < 1) ||
-				(cpy.fdchar.fdc_nhead > 2)) {
+		    (cpy.fdchar.fdc_nhead > 2)) {
 			FDERRPRINT(FDEP_L3, FDEM_IOCT,
-			(C, "fd_ioctl: FDIOSCHAR bad no. of heads %d\n",
+			    (C, "fd_ioctl: FDIOSCHAR bad no. of heads %d\n",
 			    cpy.fdchar.fdc_nhead));
 			err = EINVAL;
 			break;
@@ -2199,7 +2198,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		 */
 		if ((cpy.fdchar.fdc_ncyl < 0) || (cpy.fdchar.fdc_ncyl > 255)) {
 			FDERRPRINT(FDEP_L3, FDEM_IOCT,
-			(C, "fd_ioctl: FDIOSCHAR bad cyl no %d\n",
+			    (C, "fd_ioctl: FDIOSCHAR bad cyl no %d\n",
 			    cpy.fdchar.fdc_ncyl));
 			err = EINVAL;
 			break;
@@ -2235,7 +2234,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 			if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 				mutex_exit(&fdc->c_lolock);
 				if ((pm_raise_power(fdc->c_dip, 0,
-					PM_LEVEL_ON)) != DDI_SUCCESS) {
+				    PM_LEVEL_ON)) != DDI_SUCCESS) {
 					(void) pm_idle_component(fdc->c_dip, 0);
 					err = EIO;
 				}
@@ -2256,7 +2255,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		if (fdc->c_fdtype & FDCTYPE_82077) {
 			if (fdc->c_mtimeid == 0) {
 				fdc->c_mtimeid = timeout(fdmotoff, fdc,
-					Motoff_delay);
+				    Motoff_delay);
 			}
 		}
 
@@ -2264,7 +2263,7 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 	case FDGETCHANGE: /* disk changed */
 
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&cpy.temp,
-						sizeof (int), flag)) {
+		    sizeof (int), flag)) {
 			err = EFAULT;
 			break;
 		}
@@ -2281,9 +2280,9 @@ fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 			mutex_exit(&fdc->c_lolock);
 			if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-						!= DDI_SUCCESS) {
+			    != DDI_SUCCESS) {
 				FDERRPRINT(FDEP_L1, FDEM_PWR, (C, "Power \
-change failed. \n"));
+				    change failed. \n"));
 				(void) pm_idle_component(fdc->c_dip, 0);
 				return (EIO);
 			}
@@ -2363,7 +2362,7 @@ change failed. \n"));
 		mutex_exit(&fdc->c_lolock);
 
 		if (ddi_copyout((caddr_t)&cpy.temp, (caddr_t)arg,
-						sizeof (int), flag))
+		    sizeof (int), flag))
 			err = EFAULT;
 		(void) pm_idle_component(fdc->c_dip, 0);
 		break;
@@ -2388,7 +2387,7 @@ change failed. \n"));
 		/* the rest of the fd_drive struct is meaningless to us */
 
 		if (ddi_copyout((caddr_t)&cpy.drvchar, (caddr_t)arg,
-					sizeof (struct fd_drive), flag))
+		    sizeof (struct fd_drive), flag))
 			err = EFAULT;
 		break;
 
@@ -2510,9 +2509,9 @@ change failed. \n"));
 		if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 			mutex_exit(&fdc->c_lolock);
 			if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-						!= DDI_SUCCESS) {
+			    != DDI_SUCCESS) {
 				FDERRPRINT(FDEP_L1, FDEM_PWR, (C, "Power \
-change failed. \n"));
+				    change failed. \n"));
 				(void) pm_idle_component(fdc->c_dip, 0);
 				return (EIO);
 			}
@@ -2598,7 +2597,7 @@ fdrawioctl(struct fdctlr *fdc, int unit, intptr_t arg, int mode)
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&fdr32,
 		    sizeof (fdr32), mode)) {
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: copyin error, args32\n"));
+			    (C, "fdrawioctl: copyin error, args32\n"));
 			return (EFAULT);
 		}
 		bcopy(fdr32.fdr_cmd, fdr.fdr_cmd, sizeof (fdr.fdr_cmd));
@@ -2614,7 +2613,7 @@ fdrawioctl(struct fdctlr *fdc, int unit, intptr_t arg, int mode)
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&fdr,
 		    sizeof (fdr), mode)) {
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: copyin error, args\n"));
+			    (C, "fdrawioctl: copyin error, args\n"));
 			return (EFAULT);
 		}
 		break;
@@ -2627,9 +2626,9 @@ fdrawioctl(struct fdctlr *fdc, int unit, intptr_t arg, int mode)
 	if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 		mutex_exit(&fdc->c_lolock);
 		if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-					!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			FDERRPRINT(FDEP_L1, FDEM_PWR, (C, "Power change \
-failed. \n"));
+			    failed. \n"));
 
 			(void) pm_idle_component(fdc->c_dip, 0);
 			return (EIO);
@@ -2684,7 +2683,7 @@ failed. \n"));
 
 	case FDRAW_FORMAT:
 		FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: cmd is fdfraw format\n"));
+		    (C, "fdrawioctl: cmd is fdfraw format\n"));
 
 		/* Insert the appropriate drive number */
 		csb->csb_cmds[1] = csb->csb_cmds[1] | (unit & DRV_MASK);
@@ -2702,9 +2701,9 @@ failed. \n"));
 			mutex_enter(&fdc->c_hilock);
 
 			res = ddi_dma_mem_alloc(fdc->c_dmahandle, fc,
-				&attr, DDI_DMA_STREAMING,
-				DDI_DMA_DONTWAIT, 0, &fa, &real_length,
-				&mem_handle);
+			    &attr, DDI_DMA_STREAMING,
+			    DDI_DMA_DONTWAIT, 0, &fa, &real_length,
+			    &mem_handle);
 
 			if (res != DDI_SUCCESS) {
 				fdretcsb(fdc);
@@ -2730,20 +2729,20 @@ failed. \n"));
 
 		/* copy in the user's command bytes */
 		if (ddi_copyin(fdr.fdr_addr, fa,
-				(uint_t)fdr.fdr_nbytes, mode)) {
+		    (uint_t)fdr.fdr_nbytes, mode)) {
 			fdretcsb(fdc);
 			mutex_exit(&fdc->c_lolock);
 
 			if (fdc->c_fdtype & FDCTYPE_DMA) {
 				ddi_dma_mem_free(&mem_handle);
 				FDERRPRINT(FDEP_L1, FDEM_RAWI,
-				(C, "fdrawioctl: (err)free dma memory\n"));
+				    (C, "fdrawioctl: (err)free dma memory\n"));
 			} else {
 				kmem_free(fa, fc);
 			}
 
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: ddi_copyin error\n"));
+			    (C, "fdrawioctl: ddi_copyin error\n"));
 			return (EFAULT);
 		}
 
@@ -2777,7 +2776,7 @@ failed. \n"));
 	csb->csb_opflags |= CSB_OFRAWIOCTL;
 
 	FDERRPRINT(FDEP_L1, FDEM_RAWI,
-		(C, "fdrawioctl: nbytes = %u\n", fdr.fdr_nbytes));
+	    (C, "fdrawioctl: nbytes = %u\n", fdr.fdr_nbytes));
 
 	if ((fdr.fdr_cmd[0] & 0x0f) != FDRAW_FORMAT) {
 		if ((fc = (uint_t)fdr.fdr_nbytes) > 0) {
@@ -2791,9 +2790,9 @@ failed. \n"));
 			if (fdc->c_fdtype & FDCTYPE_DMA) {
 				mutex_enter(&fdc->c_hilock);
 				res = ddi_dma_mem_alloc(fdc->c_dmahandle, fc,
-					&attr, DDI_DMA_STREAMING,
-					DDI_DMA_DONTWAIT, 0, &fa, &real_length,
-					&mem_handle);
+				    &attr, DDI_DMA_STREAMING,
+				    DDI_DMA_DONTWAIT, 0, &fa, &real_length,
+				    &mem_handle);
 
 				if (res != DDI_SUCCESS) {
 					fdretcsb(fdc);
@@ -2828,8 +2827,8 @@ failed. \n"));
 						kmem_free(fa, fc);
 					fdretcsb(fdc);
 					mutex_exit(&fdc->c_lolock);
-					FDERRPRINT(FDEP_L1, FDEM_RAWI,
-					(C, "fdrawioctl: can't copy data\n"));
+					FDERRPRINT(FDEP_L1, FDEM_RAWI, (C,
+					    "fdrawioctl: can't copy data\n"));
 
 					return (EFAULT);
 				}
@@ -2881,7 +2880,7 @@ failed. \n"));
 	    flag == B_READ && err == 0) {
 		if (ddi_copyout(fa, fdr.fdr_addr, fc, mode)) {
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: can't copy read data\n"));
+			    (C, "fdrawioctl: can't copy read data\n"));
 
 			err = EFAULT;
 		}
@@ -2892,7 +2891,7 @@ failed. \n"));
 		if (fdc->c_fdtype & FDCTYPE_DMA) {
 			ddi_dma_mem_free(&mem_handle);
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-				(C, "fdrawioctl: free dma memory\n"));
+			    (C, "fdrawioctl: free dma memory\n"));
 		} else {
 			kmem_free(fa, fc);
 		}
@@ -2915,7 +2914,7 @@ failed. \n"));
 		fdr32.fdr_addr = (caddr32_t)(uintptr_t)fdr.fdr_addr;
 		if (ddi_copyout(&fdr32, (caddr_t)arg, sizeof (fdr32), mode)) {
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: can't copy results32\n"));
+			    (C, "fdrawioctl: can't copy results32\n"));
 			err = EFAULT;
 		}
 		break;
@@ -2924,7 +2923,7 @@ failed. \n"));
 	default:
 		if (ddi_copyout(&fdr, (caddr_t)arg, sizeof (fdr), mode)) {
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
-			(C, "fdrawioctl: can't copy results\n"));
+			    (C, "fdrawioctl: can't copy results\n"));
 			err = EFAULT;
 		}
 		break;
@@ -3016,9 +3015,9 @@ fdformat(struct fdctlr *fdc, int unit, int cyl, int hd)
 		mutex_enter(&fdc->c_hilock);
 
 		cmdresult = ddi_dma_mem_alloc(fdc->c_dmahandle, csb->csb_len,
-			&attr, DDI_DMA_STREAMING,
-			DDI_DMA_DONTWAIT, 0, &fd, &real_length,
-			&mem_handle);
+		    &attr, DDI_DMA_STREAMING,
+		    DDI_DMA_DONTWAIT, 0, &fd, &real_length,
+		    &mem_handle);
 
 		if (cmdresult != DDI_SUCCESS) {
 			mutex_exit(&fdc->c_hilock);
@@ -3169,8 +3168,8 @@ fdstart(struct fdctlr *fdc)
 
 		if (bp->b_flags & B_READ) {
 			if (((fdc->c_fdtype & FDCTYPE_SLAVIO) &&
-				slavio_index_pulse_work_around) ||
-					(fdc->c_fdtype & FDCTYPE_TCBUG))
+			    slavio_index_pulse_work_around) ||
+			    (fdc->c_fdtype & FDCTYPE_TCBUG))
 				csb->csb_cmds[0] = SK | FDRAW_RDCMD | MFM;
 			else
 				csb->csb_cmds[0] = MT | SK | FDRAW_RDCMD | MFM;
@@ -3211,7 +3210,7 @@ fdstart(struct fdctlr *fdc)
 
 		blk = phys_blkno;
 		start_part = (dkm->dkl_cylno * ch->fdc_secptrack
-				* ch->fdc_nhead);
+		    * ch->fdc_nhead);
 		blk = blk + start_part;
 		last_part = start_part + dkm->dkl_nblk;
 
@@ -3251,28 +3250,28 @@ fdstart(struct fdctlr *fdc)
 			 */
 
 			if ((fdc->c_fdtype & FDCTYPE_SLAVIO) &&
-				slavio_index_pulse_work_around &&
-				(fdc->c_csb.csb_read == CSB_READ)) {
+			    slavio_index_pulse_work_around &&
+			    (fdc->c_csb.csb_read == CSB_READ)) {
 
 				tlen = (ch->fdc_secptrack - sect + 1) *
-							ch->fdc_sec_size;
+				    ch->fdc_sec_size;
 				if (len < tlen) {
 					partial_read = 1;
 					temp_addr = (caddr_t)kmem_alloc(tlen,
-								KM_SLEEP);
+					    KM_SLEEP);
 				}
 
 			} else if (fdc->c_fdtype & FDCTYPE_TCBUG) {
 				tlen = len;
 				if (len > ((ch->fdc_secptrack - sect + 1) *
-							ch->fdc_sec_size))
+				    ch->fdc_sec_size))
 					tlen = (ch->fdc_secptrack - sect + 1)
-							* ch->fdc_sec_size;
+					    * ch->fdc_sec_size;
 			} else {
 				if (len > ((secpcyl - bincyl)
-							* ch->fdc_sec_size))
+				    * ch->fdc_sec_size))
 					tlen = (secpcyl - bincyl)
-							* ch->fdc_sec_size;
+					    * ch->fdc_sec_size;
 
 				else
 					tlen = len;
@@ -3308,7 +3307,7 @@ fdstart(struct fdctlr *fdc)
 			csb->csb_cmds[4] = sect;	/* R - sector number */
 			if (fdc->c_fdtype & FDCTYPE_TCBUG)
 				csb->csb_cmds[6] = sect +
-						(tlen / ch->fdc_sec_size) - 1;
+				    (tlen / ch->fdc_sec_size) - 1;
 
 			csb->csb_len = tlen;
 			if (partial_read)
@@ -3335,14 +3334,14 @@ fdstart(struct fdctlr *fdc)
 				mutex_enter(&fdc->c_hilock);
 
 				if (fdstart_dma(fdc, csb->csb_addr,
-								tlen) != 0) {
+				    tlen) != 0) {
 
 					bp->b_flags |= B_ERROR;
 					bp->b_error = EAGAIN;
 
 					mutex_exit(&fdc->c_hilock);
 					FDERRPRINT(FDEP_L1, FDEM_STRT,
-					(C, "fdstart: no dma resources\n"));
+					    (C, "fdstart: no dma resources\n"));
 
 					break;
 				}
@@ -3378,7 +3377,7 @@ fdstart(struct fdctlr *fdc)
 				tlen = len;
 			}
 			if ((fdc->c_fdtype & FDCTYPE_SB) &&
-					(csb->csb_read == CSB_READ)) {
+			    (csb->csb_read == CSB_READ)) {
 				if (sb_temp_buf_used) {
 					bcopy(fdc->dma_buf, addr, tlen);
 					sb_temp_buf_used = 0;
@@ -3402,7 +3401,7 @@ fdstart(struct fdctlr *fdc)
 			if (bp->b_flags & B_READ) {
 				KIOSP->reads++;
 				KIOSP->nread +=
-					(bp->b_bcount - bp->b_resid);
+				    (bp->b_bcount - bp->b_resid);
 			} else {
 				KIOSP->writes++;
 				KIOSP->nwritten += (bp->b_bcount - bp->b_resid);
@@ -3443,7 +3442,7 @@ fdstart_dma(struct fdctlr *fdc, caddr_t addr, uint_t len)
 	flags = flags | DDI_DMA_PARTIAL;
 
 	FDERRPRINT(FDEP_L1, FDEM_SDMA, (C, "fdstart_dma: amt. asked for %d\n",
-					len));
+	    len));
 
 	/*
 	 * Zero out the current cookie.  This is done to ensure that
@@ -3451,14 +3450,14 @@ fdstart_dma(struct fdctlr *fdc, caddr_t addr, uint_t len)
 	 * used.
 	 */
 	bzero((char *)&fdc->c_csb.csb_dmacookie,
-			sizeof (fdc->c_csb.csb_dmacookie));
+	    sizeof (fdc->c_csb.csb_dmacookie));
 	fdc->c_csb.csb_nwin = 0;
 	fdc->c_csb.csb_windex = 0;
 	fdc->c_csb.csb_ccount = 0;
 
 	res = ddi_dma_addr_bind_handle(fdc->c_dmahandle, NULL, addr, len,
-	flags, DDI_DMA_DONTWAIT, 0,  &fdc->c_csb.csb_dmacookie,
-	&fdc->c_csb.csb_ccount);
+	    flags, DDI_DMA_DONTWAIT, 0,  &fdc->c_csb.csb_dmacookie,
+	    &fdc->c_csb.csb_ccount);
 
 	switch (res) {
 		case DDI_DMA_MAPPED:
@@ -3474,7 +3473,7 @@ fdstart_dma(struct fdctlr *fdc, caddr_t addr, uint_t len)
 
 
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-				(C, "fdstart_dma: DDI_DMA_MAPPED\n"));
+			    (C, "fdstart_dma: DDI_DMA_MAPPED\n"));
 
 			break;
 		case DDI_DMA_PARTIAL_MAP:
@@ -3483,14 +3482,14 @@ fdstart_dma(struct fdctlr *fdc, caddr_t addr, uint_t len)
 			 * obtain the number of DMA windows
 			 */
 			if (ddi_dma_numwin(fdc->c_dmahandle,
-				&fdc->c_csb.csb_nwin) != DDI_SUCCESS) {
+			    &fdc->c_csb.csb_nwin) != DDI_SUCCESS) {
 				return (-1);
 			}
 
 
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-			(C, "fdstart_dma: partially mapped %d windows\n",
-			fdc->c_csb.csb_nwin));
+			    (C, "fdstart_dma: partially mapped %d windows\n",
+			    fdc->c_csb.csb_nwin));
 
 			/*
 			 * The DMA window currently in use is window number
@@ -3501,30 +3500,30 @@ fdstart_dma(struct fdctlr *fdc, caddr_t addr, uint_t len)
 			break;
 		case DDI_DMA_NORESOURCES:
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-				(C, "fdstart_dma: no resources\n"));
+			    (C, "fdstart_dma: no resources\n"));
 			return (-1);
 		case DDI_DMA_NOMAPPING:
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-				(C, "fdstart_dma: no mapping\n"));
+			    (C, "fdstart_dma: no mapping\n"));
 			return (-1);
 		case DDI_DMA_TOOBIG:
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-				(C, "fdstart_dma: too big\n"));
+			    (C, "fdstart_dma: too big\n"));
 			return (-1);
 
 		case DDI_DMA_INUSE:
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-				(C, "fdstart_dma: dma inuse\n"));
+			    (C, "fdstart_dma: dma inuse\n"));
 			return (-1);
 		default:
 			FDERRPRINT(FDEP_L1, FDEM_SDMA,
-				(C, "fdstart_dma: result is 0x%x\n", res));
+			    (C, "fdstart_dma: result is 0x%x\n", res));
 			return (-1);
 
 	};
 
 	FDERRPRINT(FDEP_L1, FDEM_SDMA,
-		(C, "fdstart_dma: bound the handle\n"));
+	    (C, "fdstart_dma: bound the handle\n"));
 
 	ASSERT(fdc->c_csb.csb_dmacookie.dmac_size);
 
@@ -3541,8 +3540,8 @@ static int
 fd_unbind_handle(struct fdctlr *fdc)
 {
 	if ((fdc->c_fdtype & FDCTYPE_DMA) &&
-		((fdc->c_csb.csb_read == CSB_READ) ||
-		    (fdc->c_csb.csb_read == CSB_WRITE))) {
+	    ((fdc->c_csb.csb_read == CSB_READ) ||
+	    (fdc->c_csb.csb_read == CSB_WRITE))) {
 		mutex_enter(&fdc->c_hilock);
 
 		if (fdc->c_fdtype & FDCTYPE_SB) {
@@ -3558,16 +3557,16 @@ fd_unbind_handle(struct fdctlr *fdc)
 		 */
 
 		if (get_data_count_register(fdc) != 0) {
-			    FDERRPRINT(FDEP_L1, FDEM_EXEC,
-				(C, "unbind & byte count isn't zero\n"));
+			FDERRPRINT(FDEP_L1, FDEM_EXEC,
+			    (C, "unbind & byte count isn't zero\n"));
 
-				reset_dma_controller(fdc);
-				set_dma_control_register(fdc, DCSR_INIT_BITS);
+			reset_dma_controller(fdc);
+			set_dma_control_register(fdc, DCSR_INIT_BITS);
 		}
 
 		if (ddi_dma_unbind_handle(fdc->c_dmahandle) != DDI_SUCCESS) {
 			FDERRPRINT(FDEP_L1, FDEM_EXEC,
-				(C, "problem unbinding the handle\n"));
+			    (C, "problem unbinding the handle\n"));
 			mutex_exit(&fdc->c_hilock);
 			return (EIO);
 		}
@@ -3618,7 +3617,7 @@ fdexec(struct fdctlr *fdc, int flags)
 
 retry:
 	FDERRPRINT(FDEP_L1, FDEM_EXEC, (C, "fdexec: cmd is %s\n",
-				fdcmds[csb->csb_cmds[0] & 0x1f].cmdname));
+	    fdcmds[csb->csb_cmds[0] & 0x1f].cmdname));
 	FDERRPRINT(FDEP_L1, FDEM_EXEC, (C, "fdexec: transfer rate = %d\n",
 	    fdc->c_un->un_chars->fdc_transfer_rate));
 	FDERRPRINT(FDEP_L1, FDEM_EXEC, (C, "fdexec: sec size = %d\n",
@@ -3713,8 +3712,8 @@ retry:
 	 * (DMA is only used on a read or a write)
 	 */
 	if ((fdc->c_fdtype & FDCTYPE_DMA) &&
-			((fdc->c_csb.csb_read == CSB_READ) ||
-			    (fdc->c_csb.csb_read == CSB_WRITE)))  {
+	    ((fdc->c_csb.csb_read == CSB_READ) ||
+	    (fdc->c_csb.csb_read == CSB_WRITE)))  {
 		mutex_enter(&fdc->c_hilock);
 
 		/* Reset the dcsr to clear it of all errors */
@@ -3725,13 +3724,13 @@ retry:
 		    (void *)fdc->c_csb.csb_dmacookie.dmac_laddress));
 
 		FDERRPRINT(FDEP_L1, FDEM_EXEC, (C, "cookie length %ld\n",
-				fdc->c_csb.csb_dmacookie.dmac_size));
+		    fdc->c_csb.csb_dmacookie.dmac_size));
 		ASSERT(fdc->c_csb.csb_dmacookie.dmac_size);
 
 		set_data_count_register(fdc,
-			fdc->c_csb.csb_dmacookie.dmac_size);
+		    fdc->c_csb.csb_dmacookie.dmac_size);
 		set_data_address_register(fdc,
-			fdc->c_csb.csb_dmacookie.dmac_laddress);
+		    fdc->c_csb.csb_dmacookie.dmac_laddress);
 
 		/* Program the DCSR */
 
@@ -3802,7 +3801,7 @@ retry:
 		if (fdc->c_fdtype & FDCTYPE_82077) {
 			if (fdc->c_mtimeid == 0) {
 				fdc->c_mtimeid = timeout(fdmotoff, a,
-					Motoff_delay);
+				    Motoff_delay);
 			}
 		}
 		FDERRPRINT(FDEP_L1, FDEM_EXEC, (C, "fdexec: O K ..\n"));
@@ -3845,7 +3844,7 @@ retry:
 			 */
 			if ((tmp & (RQM|DIO|CB)) == (RQM|DIO|CB)) {
 				csb->csb_rslt[csb->csb_nrslts++] =
-								Fifo(fdc);
+				    Fifo(fdc);
 				/*
 				 * FDERRPRINT(FDEP_L4, FDEM_EXEC,
 				 *    (C, "fdexec: got result 0x%x\n",
@@ -3860,7 +3859,7 @@ retry:
 				if (fdc->c_fdtype & FDCTYPE_82077) {
 					if (fdc->c_mtimeid == 0) {
 						fdc->c_mtimeid = timeout(
-						fdmotoff, a, Motoff_delay);
+						    fdmotoff, a, Motoff_delay);
 					}
 				}
 				/*
@@ -3901,15 +3900,15 @@ retry:
 	 * or the Dump Registers command.
 	 */
 	if (((csb->csb_rslt[0] & IC_SR0) || (fdc->c_csb.csb_dcsr_rslt) ||
-		(csb->csb_status)) &&
-		((csb->csb_cmds[0] != FDRAW_SENSE_DRV) &&
-		(csb->csb_cmds[0] != DUMPREG))) {
+	    (csb->csb_status)) &&
+	    ((csb->csb_cmds[0] != FDRAW_SENSE_DRV) &&
+	    (csb->csb_cmds[0] != DUMPREG))) {
 		/* if it can restarted OK, then do so, else return error */
 		if (fdrecover(fdc) != 0) {
 			if (fdc->c_fdtype & FDCTYPE_82077) {
 				if (fdc->c_mtimeid == 0) {
 					fdc->c_mtimeid = timeout(fdmotoff,
-						a, Motoff_delay);
+					    a, Motoff_delay);
 				}
 			}
 
@@ -3973,7 +3972,7 @@ fdexec_turn_on_motor(struct fdctlr *fdc, int flags,  uint_t unit)
 		 * Turn on the motor
 		 */
 		FDERRPRINT(FDEP_L1, FDEM_EXEC,
-			(C, "fdexec: turning on motor\n"));
+		    (C, "fdexec: turning on motor\n"));
 
 		/* LINTED */
 		Set_dor(fdc, (MOTEN(unit)), 1);
@@ -4067,11 +4066,11 @@ fdrecover(struct fdctlr *fdc)
 	 * if there was a pci bus error, do not retry
 	 */
 
-	    if (csb->csb_dcsr_rslt == 1) {
+		if (csb->csb_dcsr_rslt == 1) {
 			FDERRPRINT(FDEP_L3, FDEM_RECO,
 			    (C, "fd%d: host bus error\n", 0));
 		return (1);
-	    }
+		}
 
 	/*
 	 * If there was an error with the DMA functions, do not retry
@@ -4199,7 +4198,7 @@ fdintr_dma()
 			/* read/write/format data-xfer case */
 
 			FDERRPRINT(FDEP_L1, FDEM_INTR,
-				(C, "fdintr_dma: opmode 1\n"));
+			    (C, "fdintr_dma: opmode 1\n"));
 
 			/*
 			 * See if the interrupt is from the floppy
@@ -4209,7 +4208,7 @@ fdintr_dma()
 			if (not_cheerio || (tmp_dcsr & DCSR_INT_PEND)) {
 
 				FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C, "fdintr_dma: INT_PEND \n"));
+				    (C, "fdintr_dma: INT_PEND \n"));
 
 				res = DDI_INTR_CLAIMED;
 
@@ -4232,23 +4231,24 @@ fdintr_dma()
 				 * development.
 				 */
 				while (((tmp = Msr(fdc)) & CB) &&
-					(i < 1000001)) {
+				    (i < 1000001)) {
 
 					/*
 					 * If RQM + DIO, then a result byte
 					 * is at hand.
 					 */
 					if ((tmp & (RQM|DIO|CB)) ==
-								(RQM|DIO|CB)) {
+					    (RQM|DIO|CB)) {
 						fdc->c_csb.csb_rslt
-						[fdc->c_csb.csb_nrslts++]
-							    = Fifo(fdc);
+						    [fdc->c_csb.csb_nrslts++]
+						    = Fifo(fdc);
 
 						FDERRPRINT(FDEP_L1, FDEM_INTR,
-						(C, "fdintr_dma: res 0x%x\n",
-							fdc->c_csb.csb_rslt
-							[fdc->c_csb.csb_nrslts
-							- 1]));
+						    (C,
+						    "fdintr_dma: res 0x%x\n",
+						    fdc->c_csb.csb_rslt
+						    [fdc->c_csb.csb_nrslts
+						    - 1]));
 
 					} else if (--to == 0) {
 						/*
@@ -4258,11 +4258,11 @@ fdintr_dma()
 						fdc->c_csb.csb_status = 2;
 						break;
 					}
-				i++;
+					i++;
 				}
 				if (i == 10000) {
 					FDERRPRINT(FDEP_L1, FDEM_INTR,
-						(C, "First loop overran\n"));
+					    (C, "First loop overran\n"));
 				}
 			}
 
@@ -4277,7 +4277,7 @@ fdintr_dma()
 				done = 1;
 				fdc->c_csb.csb_dcsr_rslt = 1;
 				FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C, "fdintr_dma: Error pending\n"));
+				    (C, "fdintr_dma: Error pending\n"));
 				reset_dma_controller(fdc);
 				set_dma_control_register(fdc, DCSR_INIT_BITS);
 				break;
@@ -4285,8 +4285,8 @@ fdintr_dma()
 
 			/* TCBUG kludge */
 			if ((fdc->c_fdtype & FDCTYPE_TCBUG) &&
-				((fdc->c_csb.csb_rslt[0] & IC_SR0) == 0x40) &&
-				(fdc->c_csb.csb_rslt[1] & EN_SR1)) {
+			    ((fdc->c_csb.csb_rslt[0] & IC_SR0) == 0x40) &&
+			    (fdc->c_csb.csb_rslt[1] & EN_SR1)) {
 
 				fdc->c_csb.csb_rslt[0] &= ~IC_SR0;
 
@@ -4302,7 +4302,7 @@ fdintr_dma()
 			    (fdc->c_csb.csb_rslt[2] != 0)) {
 				done = 1;
 				FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C, "fdintr_dma: errors in command\n"));
+				    (C, "fdintr_dma: errors in command\n"));
 
 
 				break;
@@ -4310,8 +4310,8 @@ fdintr_dma()
 
 
 			FDERRPRINT(FDEP_L1, FDEM_INTR,
-				(C, "fdintr_dma: dbcr 0x%x\n",
-				get_data_count_register(fdc)));
+			    (C, "fdintr_dma: dbcr 0x%x\n",
+			    get_data_count_register(fdc)));
 			/*
 			 * The csb_ccount is the number of cookies that still
 			 * need to be processed.  A cookie was just processed
@@ -4389,9 +4389,9 @@ fdintr_dma()
 			ASSERT(fdc->c_csb.csb_dmacookie.dmac_size);
 
 			set_data_count_register(fdc,
-				fdc->c_csb.csb_dmacookie.dmac_size);
+			    fdc->c_csb.csb_dmacookie.dmac_size);
 			set_data_address_register(fdc,
-				fdc->c_csb.csb_dmacookie.dmac_laddress);
+			    fdc->c_csb.csb_dmacookie.dmac_laddress);
 
 			FDERRPRINT(FDEP_L1, FDEM_INTR, (C,
 			    "fdintr_dma: size 0x%lx\n",
@@ -4403,7 +4403,7 @@ fdintr_dma()
 			fdc->c_csb.csb_cmds[3] = fdc->c_csb.csb_rslt[4];
 			fdc->c_csb.csb_cmds[4] = fdc->c_csb.csb_rslt[5];
 			fdc->c_csb.csb_cmds[1] = (fdc->c_csb.csb_cmds[1]
-				& ~0x04) | (fdc->c_csb.csb_rslt[4] << 2);
+			    & ~0x04) | (fdc->c_csb.csb_rslt[4] << 2);
 
 			for (i = 0; i < (int)fdc->c_csb.csb_ncmds; i++) {
 
@@ -4417,8 +4417,9 @@ fdintr_dma()
 				}
 				if (to == 0) {
 					FDERRPRINT(FDEP_L2, FDEM_EXEC,
-					(C,
-					"fdc: no RQM - stat 0x%x\n", Msr(fdc)));
+					    (C,
+					    "fdc: no RQM - stat 0x%x\n",
+					    Msr(fdc)));
 					/* stop the DMA from happening */
 					fdc->c_csb.csb_status = 2;
 					done = 1;
@@ -4428,21 +4429,21 @@ fdintr_dma()
 				Set_Fifo(fdc, fdc->c_csb.csb_cmds[i]);
 
 				FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C,
-					"fdintr_dma: sent 0x%x, Msr 0x%x\n",
-					fdc->c_csb.csb_cmds[i], Msr(fdc)));
+				    (C,
+				    "fdintr_dma: sent 0x%x, Msr 0x%x\n",
+				    fdc->c_csb.csb_cmds[i], Msr(fdc)));
 			}
 
 			/* reenable DMA */
 			if ((!not_cheerio) && (!done))
 				set_dma_control_register(fdc, tmp_dcsr |
-					DCSR_EN_DMA);
+				    DCSR_EN_DMA);
 			break;
 
 		case 0x2:
 		/* seek/recal type cmd */
 			FDERRPRINT(FDEP_L1, FDEM_INTR,
-				(C, "fintr_dma: opmode 2\n"));
+			    (C, "fintr_dma: opmode 2\n"));
 
 			/*
 			 *  See if the interrupt is from the DMA engine,
@@ -4471,7 +4472,7 @@ fdintr_dma()
 				 */
 
 				FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C, "fdintr_dma: interrupt pending\n"));
+				    (C, "fdintr_dma: interrupt pending\n"));
 				i = 0;
 				while (((Msr(fdc) & CB)) && (i < 10000)) {
 					i++;
@@ -4479,7 +4480,7 @@ fdintr_dma()
 
 				if (i == 10000)
 					FDERRPRINT(FDEP_L1, FDEM_INTR,
-						(C, "2nd loop overran !!!\n"));
+					    (C, "2nd loop overran !!!\n"));
 
 				/*
 				 * Check the RQM bit to see if the controller is
@@ -4505,7 +4506,7 @@ fdintr_dma()
 				}
 				if (i == 10000)
 					FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C, "4th loop overran !!!\n"));
+					    (C, "4th loop overran !!!\n"));
 
 				/* Store the first result byte */
 				fdc->c_csb.csb_rslt[0] = Fifo(fdc);
@@ -4516,7 +4517,7 @@ fdintr_dma()
 				}
 				if (i == 10000)
 					FDERRPRINT(FDEP_L1, FDEM_INTR,
-					(C, "5th loop overran !!!\n"));
+					    (C, "5th loop overran !!!\n"));
 
 				/* Store the second  result byte */
 				fdc->c_csb.csb_rslt[1] = Fifo(fdc);
@@ -4564,7 +4565,7 @@ fdintr_dma()
 			 */
 
 			FDERRPRINT(FDEP_L1, FDEM_INTR,
-				(C, "fdintr_dma: signal the waiter\n"));
+			    (C, "fdintr_dma: signal the waiter\n"));
 
 			fdc->c_flags ^= FDCFLG_WAITING;
 			cv_signal(&fdc->c_iocv);
@@ -4575,15 +4576,15 @@ fdintr_dma()
 			 */
 		} else {
 			FDERRPRINT(FDEP_L1, FDEM_INTR,
-				(C, "fdintr_dma: nobody sleeping (%x %x %x)\n",
-			fdc->c_csb.csb_rslt[0], fdc->c_csb.csb_rslt[1],
-			fdc->c_csb.csb_rslt[2]));
+			    (C, "fdintr_dma: nobody sleeping (%x %x %x)\n",
+			    fdc->c_csb.csb_rslt[0], fdc->c_csb.csb_rslt[1],
+			    fdc->c_csb.csb_rslt[2]));
 		}
 		mutex_exit(&fdc->c_lolock);
 	}
 	/* update high level interrupt counter */
 	if (fdc->c_intrstat)
-			KIOIP->intrs[KSTAT_INTR_HARD]++;
+		KIOIP->intrs[KSTAT_INTR_HARD]++;
 
 
 	FDERRPRINT(FDEP_L1, FDEM_INTR, (C, "fdintr_dma: done\n"));
@@ -4673,7 +4674,7 @@ fdwatch(void *arg)
 		 */
 
 		FDERRPRINT(FDEP_L1, FDEM_WATC,
-				(C, "fdwatch: no timeout\n"));
+		    (C, "fdwatch: no timeout\n"));
 
 		mutex_exit(&fdc->c_lolock);
 		return;
@@ -4694,7 +4695,7 @@ fdwatch(void *arg)
 	mutex_exit(&fdc->c_hilock);
 
 	FDERRPRINT(FDEP_L1, FDEM_WATC, (C, "fdwatch: cmd %s timed out\n",
-				fdcmds[csb->csb_cmds[0] & 0x1f].cmdname));
+	    fdcmds[csb->csb_cmds[0] & 0x1f].cmdname));
 	fdc->c_flags |= FDCFLG_TIMEDOUT;
 	csb->csb_status = CSB_CMDTO;
 
@@ -4811,7 +4812,7 @@ fdreset(struct fdctlr *fdc)
 	drv_usecwait(5);
 
 	FDERRPRINT(FDEP_L1, FDEM_RESE,
-			(C, "fdreset: toggled software reset\n"));
+	    (C, "fdreset: toggled software reset\n"));
 
 	/*
 	 * This sets the data rate to 500Kbps (for high density)
@@ -4838,11 +4839,11 @@ fdreset(struct fdctlr *fdc)
 		Set_dor(fdc, DMAGATE|RESET, 1);
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdattach: Dor 0x%x\n", Dor(fdc)));
+		    (C, "fdattach: Dor 0x%x\n", Dor(fdc)));
 
 		local_lbolt = ddi_get_lbolt();
 		if (cv_timedwait(&fdc->c_iocv, &fdc->c_lolock,
-			local_lbolt + drv_usectohz(1000000)) == -1) {
+		    local_lbolt + drv_usectohz(1000000)) == -1) {
 			return (-1);
 		}
 		break;
@@ -5004,7 +5005,7 @@ fdsensedrv(struct fdctlr *fdc, int unit)
 	(void) fdexec(fdc, 0);	/* DON't check changed!, no sleep */
 
 	FDERRPRINT(FDEP_L1, FDEM_CHEK,
-		(C, "fdsensedrv: result 0x%x", csb->csb_rslt[0]));
+	    (C, "fdsensedrv: result 0x%x", csb->csb_rslt[0]));
 
 	return (csb->csb_rslt[0]); /* return status byte 3 */
 }
@@ -5102,7 +5103,7 @@ fdselect(struct fdctlr *fdc, int unit, int on)
 	case FDCTYPE_SLAVIO:
 	case FDCTYPE_CHEERIO:
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdselect: (before) Dor 0x%x\n", Dor(fdc)));
+		    (C, "fdselect: (before) Dor 0x%x\n", Dor(fdc)));
 
 		if (unit == 0) {
 			Set_dor(fdc, DRVSEL, !on);
@@ -5111,7 +5112,7 @@ fdselect(struct fdctlr *fdc, int unit, int on)
 		}
 
 		FDERRPRINT(FDEP_L1, FDEM_ATTA,
-			(C, "fdselect: Dor 0x%x\n", Dor(fdc)));
+		    (C, "fdselect: Dor 0x%x\n", Dor(fdc)));
 
 		break;
 
@@ -5260,7 +5261,7 @@ fdgetlabel(struct fdctlr *fdc, int unit)
 	fderrlevel = FDEP_L4;
 
 	label = (struct dk_label *)
-				kmem_zalloc(sizeof (struct dk_label), KM_SLEEP);
+	    kmem_zalloc(sizeof (struct dk_label), KM_SLEEP);
 
 	/*
 	 * try different characteristics (ie densities) by attempting to read
@@ -5284,7 +5285,7 @@ fdgetlabel(struct fdctlr *fdc, int unit)
 		FDERRPRINT(FDEP_L1, FDEM_GETL,
 		    (C, "fdgetl: un_curfdtype is -1\n"));
 
-	    } else {
+	} else {
 		tries = nfdtypes;
 
 		/* Always start with the highest density (1.7MB) */
@@ -5293,24 +5294,24 @@ fdgetlabel(struct fdctlr *fdc, int unit)
 	}
 
 	FDERRPRINT(FDEP_L1, FDEM_GETL,
-		    (C, "fdgetl: no. of tries %d\n", tries));
+	    (C, "fdgetl: no. of tries %d\n", tries));
 	FDERRPRINT(FDEP_L1, FDEM_GETL,
-		    (C, "fdgetl: no. of curfdtype %d\n", un->un_curfdtype));
+	    (C, "fdgetl: no. of curfdtype %d\n", un->un_curfdtype));
 
 	for (i = 0; i < tries; i++) {
 		FDERRPRINT(FDEP_L1, FDEM_GETL,
 		    (C, "fdgetl: trying %d\n", i));
 
 		if (!(err = fdrw(fdc, unit, FDREAD, 0, 0,
-			un->un_chars->fdc_secptrack, (caddr_t)label,
-			sizeof (struct dk_label))) &&
+		    un->un_chars->fdc_secptrack, (caddr_t)label,
+		    sizeof (struct dk_label))) &&
 
 		    fdrw(fdc, unit, FDREAD, 0, 0,
-			un->un_chars->fdc_secptrack + 1,
-			(caddr_t)label, sizeof (struct dk_label)) &&
+		    un->un_chars->fdc_secptrack + 1,
+		    (caddr_t)label, sizeof (struct dk_label)) &&
 
 		    !(err = fdrw(fdc, unit, FDREAD, 0, 0, 1, (caddr_t)label,
-			sizeof (struct dk_label)))) {
+		    sizeof (struct dk_label)))) {
 
 			FDERRPRINT(FDEP_L1, FDEM_GETL,
 				(C, "fdgetl: succeeded\n"));
@@ -5342,7 +5343,7 @@ fdgetlabel(struct fdctlr *fdc, int unit)
 		fdunpacklabel(&fdlbl_high_80, &un->un_label);
 
 		FDERRPRINT(FDEP_L1, FDEM_GETL,
-			(C, "fdgetl: Can't autosense diskette\n"));
+		    (C, "fdgetl: Can't autosense diskette\n"));
 
 		goto out;
 	}
@@ -5458,9 +5459,9 @@ fdrw(struct fdctlr *fdc, int unit, int rw, int cyl, int head,
 	if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 		mutex_exit(&fdc->c_lolock);
 		if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-					!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			FDERRPRINT(FDEP_L1, FDEM_PWR, (C, "Power change \
-failed. \n"));
+			    failed. \n"));
 			mutex_enter(&fdc->c_lolock);
 			return (EIO);
 		}
@@ -5532,13 +5533,13 @@ failed. \n"));
 		attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 		res = ddi_dma_mem_alloc(fdc->c_dmahandle, len,
-			&attr, DDI_DMA_STREAMING,
-			DDI_DMA_DONTWAIT, 0, &dma_addr, &real_length,
-			&mem_handle);
+		    &attr, DDI_DMA_STREAMING,
+		    DDI_DMA_DONTWAIT, 0, &dma_addr, &real_length,
+		    &mem_handle);
 
 		if (res != DDI_SUCCESS) {
 			FDERRPRINT(FDEP_L1, FDEM_RW,
-				(C, "fdrw: dma mem alloc failed\n"));
+			    (C, "fdrw: dma mem alloc failed\n"));
 
 			fdretcsb(fdc);
 			mutex_exit(&fdc->c_hilock);
@@ -5712,7 +5713,7 @@ fd_build_user_vtoc(struct fdunit *un, struct vtoc *vtoc)
 	vpart = vtoc->v_part;
 
 	nblks = (un->un_chars->fdc_nhead * un->un_chars->fdc_secptrack *
-		un->un_chars->fdc_sec_size) / DEV_BSIZE;
+	    un->un_chars->fdc_sec_size) / DEV_BSIZE;
 
 	for (i = 0; i < V_NUMPAR; i++) {
 		vpart->p_tag	= lpart->p_tag;
@@ -5749,14 +5750,14 @@ fd_build_label_vtoc(struct fdunit *un, struct vtoc *vtoc)
 
 	/* Sanity-check the vtoc */
 	if ((vtoc->v_sanity != VTOC_SANE) ||
-			(vtoc->v_nparts > NDKMAP) || (vtoc->v_nparts <= 0)) {
+	    (vtoc->v_nparts > NDKMAP) || (vtoc->v_nparts <= 0)) {
 		FDERRPRINT(FDEP_L1, FDEM_IOCT,
 		    (C, "fd_build_label:  sanity check on vtoc failed\n"));
 		return (EINVAL);
 	}
 
 	nblks = (un->un_chars->fdc_nhead * un->un_chars->fdc_secptrack *
-		un->un_chars->fdc_sec_size) / DEV_BSIZE;
+	    un->un_chars->fdc_sec_size) / DEV_BSIZE;
 
 	vpart = vtoc->v_part;
 
@@ -5831,8 +5832,8 @@ fd_build_label_vtoc(struct fdunit *un, struct vtoc *vtoc)
 	bcopy(vtoc->v_asciilabel, un->un_label.dkl_asciilabel, LEN_DKL_ASCII);
 
 	FDERRPRINT(FDEP_L1, FDEM_IOCT,
-		    (C, "fd_build_label: asciilabel %s\n",
-			un->un_label.dkl_asciilabel));
+	    (C, "fd_build_label: asciilabel %s\n",
+	    un->un_label.dkl_asciilabel));
 
 	/* Initialize the magic number */
 	un->un_label.dkl_magic = DKL_MAGIC;
@@ -5846,7 +5847,7 @@ fd_build_label_vtoc(struct fdunit *un, struct vtoc *vtoc)
 	 * 512 (DEVBSIZE) byte sectors per track.
 	 */
 	un->un_label.dkl_nsect = (un->un_chars->fdc_secptrack *
-				un->un_chars->fdc_sec_size) / DEV_BSIZE;
+	    un->un_chars->fdc_sec_size) / DEV_BSIZE;
 
 
 	un->un_label.dkl_ncyl = un->un_label.dkl_pcyl;
@@ -5905,7 +5906,7 @@ fd_getauxiova(dev_info_t *dip)
 		return (NULL);
 
 	addr = (caddr_t)(uintptr_t)(caddr32_t)ddi_getprop(DDI_DEV_T_ANY,
-		auxdip, DDI_PROP_DONTPASS, "address", 0);
+	    auxdip, DDI_PROP_DONTPASS, "address", 0);
 
 	return (addr);
 }
@@ -5958,7 +5959,7 @@ set_rotational_speed(struct fdctlr *fdc, int unit)
 		check = 1;
 	} else {
 		check = is_medium ^
-			((fdc->c_un->un_flags & FDUNIT_MEDIUM) ? 1 : 0);
+		    ((fdc->c_un->un_flags & FDUNIT_MEDIUM) ? 1 : 0);
 
 		/* Set the un_flags if necessary */
 
@@ -6029,7 +6030,7 @@ fd_media_watch(void *arg)
 
 	if (un->un_media_timeout) {
 		un->un_media_timeout_id = timeout(fd_media_watch,
-			(void *)(ulong_t)dev, un->un_media_timeout);
+		    (void *)(ulong_t)dev, un->un_media_timeout);
 	}
 }
 
@@ -6073,9 +6074,9 @@ fd_check_media(dev_t dev, enum dkio_state state)
 	if (fdc->c_un->un_state == FD_STATE_STOPPED) {
 		mutex_exit(&fdc->c_lolock);
 		if ((pm_raise_power(fdc->c_dip, 0, PM_LEVEL_ON))
-					!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			FDERRPRINT(FDEP_L1, FDEM_PWR, (C, "Power change \
-failed. \n"));
+			    failed. \n"));
 
 			(void) pm_idle_component(fdc->c_dip, 0);
 			return (EIO);
@@ -6089,7 +6090,7 @@ failed. \n"));
 	/* turn on timeout */
 	un->un_media_timeout = drv_usectohz(fd_check_media_time);
 	un->un_media_timeout_id = timeout(fd_media_watch,
-			(void *)(ulong_t)dev, un->un_media_timeout);
+	    (void *)(ulong_t)dev, un->un_media_timeout);
 
 	while (un->un_media_state == state) {
 		if (cv_wait_sig(&fdc->c_statecv, &fdc->c_lolock) == 0) {
@@ -6135,11 +6136,11 @@ fd_get_media_info(struct fdunit *un, caddr_t buf, int flag)
 	media_info.dki_media_type = DK_FLOPPY;
 	media_info.dki_lbsize = un->un_chars->fdc_sec_size;
 	media_info.dki_capacity = un->un_chars->fdc_ncyl *
-		un->un_chars->fdc_secptrack * un->un_chars->fdc_nhead;
+	    un->un_chars->fdc_secptrack * un->un_chars->fdc_nhead;
 
 	if (ddi_copyout((caddr_t)&media_info, buf,
-					sizeof (struct dk_minfo), flag))
-			err = EFAULT;
+	    sizeof (struct dk_minfo), flag))
+		err = EFAULT;
 	return (err);
 }
 
@@ -6157,7 +6158,7 @@ fd_power(dev_info_t *dip, int component, int level)
 	int rval;
 
 	if ((level < PM_LEVEL_OFF) || (level > PM_LEVEL_ON) ||
-						(component != 0)) {
+	    (component != 0)) {
 		return (DDI_FAILURE);
 	}
 
@@ -6190,7 +6191,7 @@ fd_pm_lower_power(struct fdctlr *fdc)
 	mutex_enter(&fdc->c_lolock);
 
 	if ((fdc->c_un->un_state == FD_STATE_SUSPENDED) ||
-			(fdc->c_un->un_state == FD_STATE_STOPPED)) {
+	    (fdc->c_un->un_state == FD_STATE_STOPPED)) {
 		mutex_exit(&fdc->c_lolock);
 		return (DDI_SUCCESS);
 	}
@@ -6278,7 +6279,7 @@ create_pm_components(dev_info_t *dip)
 	char	*un_pm_comp[] = { "NAME=spindle-motor", "0=off", "1=on"};
 
 	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-		"pm-components", un_pm_comp, 3) == DDI_PROP_SUCCESS) {
+	    "pm-components", un_pm_comp, 3) == DDI_PROP_SUCCESS) {
 
 		(void) pm_raise_power(dip, 0, PM_LEVEL_ON);
 	}
@@ -6301,31 +6302,31 @@ set_data_count_register(struct fdctlr *fdc, uint32_t count)
 		count = count - 1; /* 8237 needs it */
 		dma_reg = (struct sb_dma_reg *)fdc->c_dma_regs;
 		switch (fdc->sb_dma_channel) {
-			case 0 :
-				ddi_put16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_0WCNT],
-				count & 0xFFFF);
-				break;
-			case 1 :
-				ddi_put16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_1WCNT],
-				count & 0xFFFF);
-				break;
-			case 2 :
-				ddi_put16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_2WCNT],
-				count & 0xFFFF);
-				break;
-			case 3 :
-				ddi_put16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_3WCNT],
-				count & 0xFFFF);
-				break;
-			default :
-				FDERRPRINT(FDEP_L3, FDEM_SDMA,
-				(C, "set_data_count: wrong channel %x\n",
-				fdc->sb_dma_channel));
-				break;
+		case 0 :
+			ddi_put16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_0WCNT],
+			    count & 0xFFFF);
+			break;
+		case 1 :
+			ddi_put16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_1WCNT],
+			    count & 0xFFFF);
+			break;
+		case 2 :
+			ddi_put16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_2WCNT],
+			    count & 0xFFFF);
+			break;
+		case 3 :
+			ddi_put16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_3WCNT],
+			    count & 0xFFFF);
+			break;
+		default :
+			FDERRPRINT(FDEP_L3, FDEM_SDMA,
+			    (C, "set_data_count: wrong channel %x\n",
+			    fdc->sb_dma_channel));
+			break;
 		}
 	}
 }
@@ -6347,27 +6348,27 @@ get_data_count_register(struct fdctlr *fdc)
 		struct sb_dma_reg *dma_reg;
 		dma_reg = (struct sb_dma_reg *)fdc->c_dma_regs;
 		switch (fdc->sb_dma_channel) {
-			case 0 :
-				retval = ddi_get16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_0WCNT]);
-				break;
-			case 1 :
-				retval = ddi_get16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_1WCNT]);
-				break;
-			case 2 :
-				retval = ddi_get16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_2WCNT]);
-				break;
-			case 3 :
-				retval = ddi_get16(fdc->c_handlep_dma,
-				(ushort_t *)&dma_reg->sb_dma_regs[DMA_3WCNT]);
-				break;
-			default :
-				FDERRPRINT(FDEP_L3, FDEM_SDMA,
-				(C, "get_data_count: wrong channel %x\n",
-				fdc->sb_dma_channel));
-				break;
+		case 0 :
+			retval = ddi_get16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_0WCNT]);
+			break;
+		case 1 :
+			retval = ddi_get16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_1WCNT]);
+			break;
+		case 2 :
+			retval = ddi_get16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_2WCNT]);
+			break;
+		case 3 :
+			retval = ddi_get16(fdc->c_handlep_dma,
+			    (ushort_t *)&dma_reg->sb_dma_regs[DMA_3WCNT]);
+			break;
+		default :
+			FDERRPRINT(FDEP_L3, FDEM_SDMA,
+			    (C, "get_data_count: wrong channel %x\n",
+			    fdc->sb_dma_channel));
+			break;
 		}
 		retval = (uint32_t)((uint16_t)(retval +1));
 	}
@@ -6388,7 +6389,8 @@ reset_dma_controller(struct fdctlr *fdc)
 		struct cheerio_dma_reg *dma_reg;
 		dma_reg = (struct cheerio_dma_reg *)fdc->c_dma_regs;
 		ddi_put32(fdc->c_handlep_dma, &dma_reg->fdc_dcsr, DCSR_RESET);
-		while (get_dma_control_register(fdc) & DCSR_CYC_PEND);
+		while (get_dma_control_register(fdc) & DCSR_CYC_PEND)
+			;
 		ddi_put32(fdc->c_handlep_dma, &dma_reg->fdc_dcsr, 0);
 	} else if (fdc->c_fdtype & FDCTYPE_SB) {
 		struct sb_dma_reg *dma_reg;
@@ -6479,8 +6481,8 @@ set_data_address_register(struct fdctlr *fdc, uint32_t address)
 				break;
 			default :
 				FDERRPRINT(FDEP_L3, FDEM_SDMA,
-				(C, "set_data_address: wrong channel %x\n",
-				fdc->sb_dma_channel));
+				    (C, "set_data_address: wrong channel %x\n",
+				    fdc->sb_dma_channel));
 			break;
 		}
 	}
@@ -6500,10 +6502,10 @@ set_dma_mode(struct fdctlr *fdc, int val)
 		dma_reg = (struct cheerio_dma_reg *)fdc->c_dma_regs;
 		if (val == CSB_READ)
 			ddi_put32(fdc->c_handlep_dma, &dma_reg->fdc_dcsr,
-				DCSR_INIT_BITS|DCSR_WRITE);
+			    DCSR_INIT_BITS|DCSR_WRITE);
 		else
 			ddi_put32(fdc->c_handlep_dma, &dma_reg->fdc_dcsr,
-				DCSR_INIT_BITS);
+			    DCSR_INIT_BITS);
 
 	} else if (fdc->c_fdtype & FDCTYPE_SB) {
 		uint8_t mode_reg_val, chn_mask;
@@ -6512,16 +6514,16 @@ set_dma_mode(struct fdctlr *fdc, int val)
 
 		if (val == CSB_READ) {
 			mode_reg_val = fdc->sb_dma_channel | DMAMODE_READ
-					| DMAMODE_SINGLE;
+			    | DMAMODE_SINGLE;
 		} else { /* Read operation */
 			mode_reg_val = fdc->sb_dma_channel | DMAMODE_WRITE
-					| DMAMODE_SINGLE;
+			    | DMAMODE_SINGLE;
 		}
 		ddi_put8(fdc->c_handlep_dma, &dma_reg->sb_dma_regs[DMAC1_MODE],
-			mode_reg_val);
+		    mode_reg_val);
 		chn_mask = 1 << (fdc->sb_dma_channel & 0x3);
 		ddi_put8(fdc->c_handlep_dma,
-			&dma_reg->sb_dma_regs[DMAC1_ALLMASK], ~chn_mask);
+		    &dma_reg->sb_dma_regs[DMAC1_ALLMASK], ~chn_mask);
 		fdc->sb_dma_lock = 1;
 	}
 }
@@ -6549,7 +6551,7 @@ release_sb_dma(struct fdctlr *fdc)
 	dma_reg = (struct sb_dma_reg *)fdc->c_dma_regs;
 	/* Unmask all the channels to release the DMA controller */
 	ddi_put8(fdc->c_handlep_dma,
-		&dma_reg->sb_dma_regs[DMAC1_ALLMASK], NULL);
+	    &dma_reg->sb_dma_regs[DMAC1_ALLMASK], NULL);
 	fdc->sb_dma_lock = 0;
 }
 
@@ -6568,10 +6570,10 @@ quiesce_fd_interrupt(struct fdctlr *fdc)
 	 */
 	if (fdc->c_fdtype & FDCTYPE_SB) {
 		ddi_put8(fdc->c_handlep_cont, ((uint8_t *)fdc->c_dor),
-			0x0);
+		    0x0);
 		drv_usecwait(200);
 		ddi_put8(fdc->c_handlep_cont, ((uint8_t *)fdc->c_dor),
-			0xC);
+		    0xC);
 		drv_usecwait(200);
 		Set_Fifo(fdc, 0xE6);
 		drv_usecwait(200);

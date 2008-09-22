@@ -352,7 +352,7 @@ extern pri_t minclsyspri;
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(iwk_devops, nulldev, nulldev, iwk_attach,
-    iwk_detach, nodev, NULL, D_MP, NULL);
+    iwk_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv iwk_modldrv = {
 	&mod_driverops,

@@ -160,7 +160,7 @@ static int rt2560_reset(dev_info_t *, ddi_reset_cmd_t);
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ral_dev_ops, nulldev, nulldev, rt2560_attach,
-    rt2560_detach, rt2560_reset, NULL, D_MP, NULL);
+    rt2560_detach, rt2560_reset, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv ral_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */

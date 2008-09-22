@@ -134,13 +134,9 @@ init_cpu_info(struct cpu *cp)
 	cp->cpu_idstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
 	(void) strcpy(cp->cpu_idstr, buf);
 
-	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
-
 	(void) cpuid_getbrandstr(cp, buf, sizeof (buf));
 	cp->cpu_brandstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
 	(void) strcpy(cp->cpu_brandstr, buf);
-
-	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_brandstr);
 }
 
 /*
@@ -1341,6 +1337,9 @@ start_other_cpus(int cprboot)
 	 */
 	init_cpu_info(CPU);
 
+	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_idstr);
+	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_brandstr);
+
 	/*
 	 * Initialize our syscall handlers
 	 */
@@ -1552,6 +1551,9 @@ mp_startup(void)
 	pg_cmt_cpu_startup(cp);
 
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_EXISTS;
+
+	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
+	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_brandstr);
 
 	if (dtrace_cpu_init != NULL) {
 		(*dtrace_cpu_init)(cp->cpu_id);

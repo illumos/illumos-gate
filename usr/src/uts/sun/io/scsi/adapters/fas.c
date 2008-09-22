@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ISSUES
@@ -379,14 +378,15 @@ static struct dev_ops fas_ops = {
 	nodev,			/* reset */
 	NULL,			/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	"FAS SCSI HBA Driver v%I%", /* Name of the module. */
+	"FAS SCSI HBA Driver", /* Name of the module. */
 	&fas_ops,	/* driver ops */
 };
 
@@ -494,15 +494,15 @@ fas_scsi_tgt_probe(struct scsi_device *sd,
 		if (options != -1) {
 			fas->f_target_scsi_options[tgt] = options;
 			fas_log(fas, CE_NOTE,
-				"?target%x-scsi-options = 0x%x\n", tgt,
-				fas->f_target_scsi_options[tgt]);
+			    "?target%x-scsi-options = 0x%x\n", tgt,
+			    fas->f_target_scsi_options[tgt]);
 			fas_force_renegotiation(fas, tgt);
 		}
 	}
 	mutex_exit(FAS_MUTEX(fas));
 
 	IPRINTF2("target%x-scsi-options= 0x%x\n",
-		tgt, fas->f_target_scsi_options[tgt]);
+	    tgt, fas->f_target_scsi_options[tgt]);
 
 	return (rval);
 }
@@ -515,7 +515,7 @@ fas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 {
 	return (((sd->sd_address.a_target < NTARGETS_WIDE) &&
 	    (sd->sd_address.a_lun < NLUNS_PER_TARGET)) ?
-		DDI_SUCCESS : DDI_FAILURE);
+	    DDI_SUCCESS : DDI_FAILURE);
 }
 
 /*ARGSUSED*/
@@ -663,7 +663,7 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    (uint_t)2*FIFOSIZE,
 	    &dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
 	    NULL, (caddr_t *)&fas->f_cmdarea, &rlen,
-		&fas->f_cmdarea_acc_handle) != DDI_SUCCESS) {
+	    &fas->f_cmdarea_acc_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "fas%d: cannot alloc cmd area", instance);
 		goto fail;
@@ -761,7 +761,7 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (i = 0; i < NTARGETS_WIDE; i++) {
 		fas->f_qfull_retries[i] = QFULL_RETRIES;
 		fas->f_qfull_retry_interval[i] =
-			drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
+		    drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
 
 	}
 
@@ -864,7 +864,7 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (i = 0; i < NTARGETS_WIDE; i++) {
 		(void) sprintf(prop_str, prop_template, i);
 		fas->f_target_scsi_options[i] = ddi_prop_get_int(
-			DDI_DEV_T_ANY, dip, 0, prop_str, -1);
+		    DDI_DEV_T_ANY, dip, 0, prop_str, -1);
 
 		if (fas->f_target_scsi_options[i] != -1) {
 			fas_log(fas, CE_NOTE, "?target%x-scsi-options=0x%x\n",
@@ -884,14 +884,14 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	fas->f_scsi_tag_age_limit =
 	    ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0, "scsi-tag-age-limit",
-		DEFAULT_TAG_AGE_LIMIT);
+	    DEFAULT_TAG_AGE_LIMIT);
 
 	fas->f_scsi_reset_delay = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dip, 0, "scsi-reset-delay", SCSI_DEFAULT_RESET_DELAY);
 	if (fas->f_scsi_reset_delay == 0) {
 		fas_log(fas, CE_NOTE,
-			"scsi_reset_delay of 0 is not recommended,"
-			" resetting to SCSI_DEFAULT_RESET_DELAY\n");
+		    "scsi_reset_delay of 0 is not recommended,"
+		    " resetting to SCSI_DEFAULT_RESET_DELAY\n");
 		fas->f_scsi_reset_delay = SCSI_DEFAULT_RESET_DELAY;
 	}
 
@@ -928,7 +928,7 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	(void) sprintf(buf, "fas%d", instance);
 	fas->f_intr_kstat = kstat_create("fas", instance, buf, "controller", \
-			KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (fas->f_intr_kstat)
 		kstat_install(fas->f_intr_kstat);
 
@@ -959,9 +959,9 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	(void) sprintf(buf, "fas%d_cache", instance);
 	fas->f_kmem_cache = kmem_cache_create(buf,
-		EXTCMD_SIZE, 8,
-		fas_kmem_cache_constructor, fas_kmem_cache_destructor,
-		NULL, (void *)fas, NULL, 0);
+	    EXTCMD_SIZE, 8,
+	    fas_kmem_cache_constructor, fas_kmem_cache_destructor,
+	    NULL, (void *)fas, NULL, 0);
 	if (fas->f_kmem_cache == NULL) {
 		cmn_err(CE_WARN, "fas: cannot create kmem_cache");
 		goto fail;
@@ -990,7 +990,7 @@ fas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(&fas_global_mutex);
 	if (fas_scsi_watchdog_tick == 0) {
 		fas_scsi_watchdog_tick = ddi_prop_get_int(DDI_DEV_T_ANY,
-			dip, 0, "scsi-watchdog-tick", DEFAULT_WD_TICK);
+		    dip, 0, "scsi-watchdog-tick", DEFAULT_WD_TICK);
 		if (fas_scsi_watchdog_tick != DEFAULT_WD_TICK) {
 			fas_log(fas, CE_NOTE, "?scsi-watchdog-tick=%d\n",
 			    fas_scsi_watchdog_tick);
@@ -1202,7 +1202,7 @@ fas_dr_detach(dev_info_t *dip)
 		 */
 		if (f == (struct fas *)NULL) {
 			cmn_err(CE_WARN, "fas_dr_detach: fas instance not"
-				" in softc list!");
+			    " in softc list!");
 			rw_exit(&fas_global_rwlock);
 			return (DDI_FAILURE);
 		}
@@ -1361,7 +1361,7 @@ fas_quiesce_bus(struct fas *fas)
 	mutex_enter(FAS_MUTEX(fas));
 	IPRINTF("fas_quiesce: QUIESCEing\n");
 	IPRINTF3("fas_quiesce: ncmds (%d) ndisc (%d) state (%d)\n",
-		fas->f_ncmds, fas->f_ndisc, fas->f_softstate);
+	    fas->f_ncmds, fas->f_ndisc, fas->f_softstate);
 	fas_set_throttles(fas, 0, N_SLOTS, HOLD_THROTTLE);
 	if (fas_check_outstanding(fas)) {
 		fas->f_softstate |= FAS_SS_DRAINING;
@@ -1422,7 +1422,7 @@ fas_ncmds_checkdrain(void *arg)
 
 	mutex_enter(FAS_MUTEX(fas));
 	IPRINTF3("fas_checkdrain: ncmds (%d) ndisc (%d) state (%d)\n",
-		fas->f_ncmds, fas->f_ndisc, fas->f_softstate);
+	    fas->f_ncmds, fas->f_ndisc, fas->f_softstate);
 	if (fas->f_softstate & FAS_SS_DRAINING) {
 		fas->f_quiesce_timeid = 0;
 		if (fas_check_outstanding(fas) == 0) {
@@ -1621,7 +1621,7 @@ FAS_FLUSH_DMA(struct fas *fas)
 {
 	fas_dma_reg_write(fas, &fas->f_dma->dma_csr, DMA_RESET);
 	fas->f_dma_csr |= (DMA_INTEN|DMA_TWO_CYCLE|DMA_DSBL_PARITY|
-		DMA_DSBL_DRAIN);
+	    DMA_DSBL_DRAIN);
 	fas->f_dma_csr &= ~(DMA_ENDVMA | DMA_WRITE);
 	fas_dma_reg_write(fas, &fas->f_dma->dma_csr, 0);
 	fas_dma_reg_write(fas, &fas->f_dma->dma_csr, fas->f_dma_csr);
@@ -1636,7 +1636,7 @@ FAS_FLUSH_DMA_HARD(struct fas *fas)
 {
 	fas_dma_reg_write(fas, &fas->f_dma->dma_csr, DMA_RESET);
 	fas->f_dma_csr |= (DMA_INTEN|DMA_TWO_CYCLE|DMA_DSBL_PARITY|
-		DMA_DSBL_DRAIN);
+	    DMA_DSBL_DRAIN);
 	fas->f_dma_csr &= ~(DMA_ENDVMA | DMA_WRITE);
 	while (fas_dma_reg_read(fas, &fas->f_dma->dma_csr) & DMA_REQPEND)
 		;
@@ -1685,21 +1685,21 @@ fas_read_fifo(struct fas *fas)
 	fas->f_fifolen = 0;
 	while (i-- > 0) {
 		fas->f_fifo[fas->f_fifolen++] = fas_reg_read(fas,
-			&fasreg->fas_fifo_data);
+		    &fasreg->fas_fifo_data);
 		fas->f_fifo[fas->f_fifolen++] = fas_reg_read(fas,
-			&fasreg->fas_fifo_data);
+		    &fasreg->fas_fifo_data);
 	}
 	if (fas->f_stat2 & FAS_STAT2_ISHUTTLE)	{
 
 		/* write pad byte */
 		fas_reg_write(fas, &fasreg->fas_fifo_data, 0);
 		fas->f_fifo[fas->f_fifolen++] = fas_reg_read(fas,
-			&fasreg->fas_fifo_data);
+		    &fasreg->fas_fifo_data);
 		/* flush pad byte */
 		fas_reg_cmd_write(fas, CMD_FLUSH);
 	}
 	EPRINTF2("fas_read_fifo: fifo len=%x, stat2=%x\n",
-		fas->f_fifolen, stat);
+	    fas->f_fifolen, stat);
 } /* fas_read_fifo */
 
 static void
@@ -1735,7 +1735,7 @@ fas_init_chip(struct fas *fas, uchar_t initiator_id)
 	 * Determine clock frequency of attached FAS chip.
 	 */
 	i = ddi_prop_get_int(DDI_DEV_T_ANY,
-		fas->f_dev, DDI_PROP_DONTPASS, prop_cfreq, -1);
+	    fas->f_dev, DDI_PROP_DONTPASS, prop_cfreq, -1);
 	clock_conv = (i + FIVE_MEG - 1) / FIVE_MEG;
 	if (clock_conv != CLOCK_40MHZ) {
 		fas_log(fas, CE_WARN, "Bad clock frequency");
@@ -1748,8 +1748,8 @@ fas_init_chip(struct fas *fas, uchar_t initiator_id)
 	fas->f_stval = FAS_CLOCK_TIMEOUT(ticks, fas_selection_timeout);
 
 	DPRINTF5("%d mhz, clock_conv %d, clock_cycle %d, ticks %d, stval %d\n",
-		i, fas->f_clock_conv, fas->f_clock_cycle,
-		ticks, fas->f_stval);
+	    i, fas->f_clock_conv, fas->f_clock_cycle,
+	    ticks, fas->f_stval);
 	/*
 	 * set up conf registers
 	 */
@@ -1780,7 +1780,7 @@ fas_init_chip(struct fas *fas, uchar_t initiator_id)
 	for (i = 0; i < NTARGETS_WIDE; i++) {
 		if (fas->f_target_scsi_options[i] & SCSI_OPTIONS_SYNC) {
 			fas->f_offset[i] = fas_default_offset |
-				fas->f_req_ack_delay;
+			    fas->f_req_ack_delay;
 		} else {
 			fas->f_offset[i] = 0;
 		}
@@ -1852,7 +1852,7 @@ fas_internal_reset(struct fas *fas, int reset_action)
 		 * Only load registers which are not loaded in fas_startcmd()
 		 */
 		fas_reg_write(fas, &fasreg->fas_clock_conv,
-			(fas->f_clock_conv & CLOCK_MASK));
+		    (fas->f_clock_conv & CLOCK_MASK));
 
 		fas_reg_write(fas, &fasreg->fas_timeout, fas->f_stval);
 
@@ -1860,7 +1860,7 @@ fas_internal_reset(struct fas *fas, int reset_action)
 		 * enable default configurations
 		 */
 		fas->f_idcode = idcode =
-			fas_reg_read(fas, &fasreg->fas_id_code);
+		    fas_reg_read(fas, &fasreg->fas_id_code);
 		fcode = (uchar_t)(idcode & FAS_FCODE_MASK) >> (uchar_t)3;
 		fas->f_type = FAS366;
 		IPRINTF2("Family code %d, revision %d\n",
@@ -1892,7 +1892,7 @@ fas_internal_reset(struct fas *fas, int reset_action)
 		fas->f_current_sp = NULL;
 		fas->f_fifolen = 0;
 		fas->f_fasconf3_reg_last = fas->f_offset_reg_last =
-			fas->f_period_reg_last = 0xff;
+		    fas->f_period_reg_last = 0xff;
 
 		New_state(fas, STATE_FREE);
 	}
@@ -1932,7 +1932,7 @@ fas_check_ncmds(struct fas *fas)
 
 	if (total != fas->f_ncmds) {
 		IPRINTF2("fas_check_ncmds: total=%x, ncmds=%x\n",
-			total, fas->f_ncmds);
+		    total, fas->f_ncmds);
 	}
 	ASSERT(fas->f_ncmds >= fas->f_ndisc);
 }
@@ -1973,7 +1973,7 @@ fas_scsi_reset(struct scsi_address *ap, int level)
 	int rval;
 
 	IPRINTF3("fas_scsi_reset: target %d.%d, level %d\n",
-		ap->a_target, ap->a_lun, level);
+	    ap->a_target, ap->a_lun, level);
 
 	mutex_enter(FAS_MUTEX(fas));
 	rval = fas_do_scsi_reset(ap, level);
@@ -1991,7 +1991,7 @@ fas_scsi_reset_notify(struct scsi_address *ap, int flag,
 	struct fas	*fas = ADDR2FAS(ap);
 
 	return (scsi_hba_reset_notify_setup(ap, flag, callback, arg,
-		&fas->f_mutex, &fas->f_reset_notify_listf));
+	    &fas->f_mutex, &fas->f_reset_notify_listf));
 }
 
 /*
@@ -2003,7 +2003,7 @@ fas_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 {
 	struct fas *fas = ADDR2FAS(ap);
 	DPRINTF3("fas_scsi_getcap: tgt=%x, cap=%s, whom=%x\n",
-		ap->a_target, cap, whom);
+	    ap->a_target, cap, whom);
 	return (fas_commoncap(ap, cap, 0, whom, 0));
 }
 
@@ -2013,7 +2013,7 @@ fas_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 {
 	struct fas *fas = ADDR2FAS(ap);
 	IPRINTF4("fas_scsi_setcap: tgt=%x, cap=%s, value=%x, whom=%x\n",
-		ap->a_target, cap, value, whom);
+	    ap->a_target, cap, value, whom);
 	return (fas_commoncap(ap, cap, value, whom, 1));
 }
 
@@ -2113,7 +2113,7 @@ fas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			cmd->cmd_scblen 	= statuslen;
 			cmd->cmd_privlen	= tgtlen;
 			cmd->cmd_slot		=
-				(Tgt(cmd) * NLUNS_PER_TARGET) | Lun(cmd);
+			    (Tgt(cmd) * NLUNS_PER_TARGET) | Lun(cmd);
 			failure = 0;
 		}
 		if (failure || (cmdlen > sizeof (cmd->cmd_cdb)) ||
@@ -2132,8 +2132,8 @@ fas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 				 * nothing to deallocate so just return
 				 */
 				TRACE_0(TR_FAC_SCSI_FAS,
-					TR_FAS_SCSI_IMPL_PKTALLOC_END,
-					"fas_scsi_impl_pktalloc_end");
+				    TR_FAS_SCSI_IMPL_PKTALLOC_END,
+				    "fas_scsi_impl_pktalloc_end");
 				return (NULL);
 			}
 		}
@@ -2141,7 +2141,7 @@ fas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		new_cmd = cmd;
 
 		TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_SCSI_IMPL_PKTALLOC_END,
-			"fas_scsi_impl_pktalloc_end");
+		    "fas_scsi_impl_pktalloc_end");
 	} else {
 		cmd = PKT2CMD(pkt);
 		new_cmd = NULL;
@@ -2152,7 +2152,7 @@ fas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	 * bind the buf to the handle
 	 */
 	if (bp && bp->b_bcount != 0 &&
-		    (cmd->cmd_flags & CFLAG_DMAVALID) == 0) {
+	    (cmd->cmd_flags & CFLAG_DMAVALID) == 0) {
 
 		int cmd_flags, dma_flags;
 		uint_t dmacookie_count;
@@ -2179,8 +2179,8 @@ fas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		 */
 		ASSERT(cmd->cmd_dmahandle != NULL);
 		rval = ddi_dma_buf_bind_handle(cmd->cmd_dmahandle, bp,
-			dma_flags, callback, arg, &cmd->cmd_dmacookie,
-			&dmacookie_count);
+		    dma_flags, callback, arg, &cmd->cmd_dmacookie,
+		    &dmacookie_count);
 
 		if (rval && rval != DDI_DMA_PARTIAL_MAP) {
 			switch (rval) {
@@ -2201,7 +2201,7 @@ fas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 				fas_scsi_destroy_pkt(ap, pkt);
 			}
 			TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_SCSI_IMPL_DMAGET_END,
-				"fas_scsi_impl_dmaget_end");
+			    "fas_scsi_impl_dmaget_end");
 			return ((struct scsi_pkt *)NULL);
 		}
 		ASSERT(dmacookie_count == 1);
@@ -2340,7 +2340,7 @@ fas_kmem_cache_constructor(void	*buf, void *cdrarg, int kmflags)
 	struct fas_cmd *cmd = buf;
 	struct fas *fas = cdrarg;
 	int  (*callback)(caddr_t) = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP:
-				DDI_DMA_DONTWAIT;
+	    DDI_DMA_DONTWAIT;
 
 	bzero(buf, EXTCMD_SIZE);
 
@@ -2481,7 +2481,7 @@ fas_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 done:
 	TRACE_1(TR_FAC_SCSI_FAS, TR_FAS_START_END,
-		"fas_scsi_start_end: fas 0x%p", fas);
+	    "fas_scsi_start_end: fas 0x%p", fas);
 	return (rval);
 
 queue_in_waitQ:
@@ -2513,7 +2513,7 @@ queue_in_waitQ:
 	mutex_exit(&fas->f_waitQ_mutex);
 
 	TRACE_1(TR_FAC_SCSI_FAS, TR_FAS_START_END,
-		"fas_scsi_start_end: fas 0x%p", fas);
+	    "fas_scsi_start_end: fas 0x%p", fas);
 	return (rval);
 }
 
@@ -2575,7 +2575,7 @@ fas_prepare_pkt(struct fas *fas, struct fas_cmd *sp)
 		 * (only for data going out)
 		 */
 		if ((sp->cmd_flags & (CFLAG_CMDIOPB | CFLAG_DMASEND)) ==
-				(CFLAG_CMDIOPB | CFLAG_DMASEND)) {
+		    (CFLAG_CMDIOPB | CFLAG_DMASEND)) {
 			(void) ddi_dma_sync(sp->cmd_dmahandle,	0, (uint_t)0,
 			    DDI_DMA_SYNC_FORDEV);
 		}
@@ -2633,7 +2633,7 @@ fas_prepare_pkt(struct fas *fas, struct fas_cmd *sp)
 	}
 
 	sp->cmd_flags = (sp->cmd_flags & ~CFLAG_TRANFLAG) |
-		CFLAG_PREPARED | CFLAG_IN_TRANSPORT;
+	    CFLAG_PREPARED | CFLAG_IN_TRANSPORT;
 
 	TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_PREPARE_PKT_TRAN_ACCEPT_END,
 	    "fas_prepare_pkt_end (tran_accept)");
@@ -2866,20 +2866,20 @@ fas_accept_pkt(struct fas *fas, struct fas_cmd *sp, int flag)
 		 * exceeded
 		 */
 		} else if (TAGGED(Tgt(sp)) &&
-			    (fas->f_tcmds[slot] >= fas->f_throttle[slot]) &&
-			    (fas->f_throttle[slot] > HOLD_THROTTLE) &&
-			    (flag == TRAN_BUSY_OK)) {
-				IPRINTF2(
-				    "transport busy, slot=%x, ncmds=%x\n",
-				    slot, fas->f_ncmds);
-				rval = TRAN_BUSY;
-				fas->f_ncmds--;
-				sp->cmd_flags &=
-				    ~(CFLAG_PREPARED | CFLAG_IN_TRANSPORT);
-				goto done;
-		/*
-		 * append to readyQ or start a new readyQ
-		 */
+		    (fas->f_tcmds[slot] >= fas->f_throttle[slot]) &&
+		    (fas->f_throttle[slot] > HOLD_THROTTLE) &&
+		    (flag == TRAN_BUSY_OK)) {
+			IPRINTF2(
+			    "transport busy, slot=%x, ncmds=%x\n",
+			    slot, fas->f_ncmds);
+			rval = TRAN_BUSY;
+			fas->f_ncmds--;
+			sp->cmd_flags &=
+			    ~(CFLAG_PREPARED | CFLAG_IN_TRANSPORT);
+			goto done;
+			/*
+			 * append to readyQ or start a new readyQ
+			 */
 		} else if (fas->f_readyf[slot]) {
 			struct fas_cmd *dp = fas->f_readyb[slot];
 			ASSERT(dp != 0);
@@ -2947,7 +2947,7 @@ alloc_tag:
 		ASSERT(tag < NTAGS);
 		sp->cmd_tag[1] = (uchar_t)tag;
 		sp->cmd_tag[0] = fas_tag_lookup[((sp->cmd_pkt_flags &
-			FLAG_TAGMASK) >> 12)];
+		    FLAG_TAGMASK) >> 12)];
 		EPRINTF1("tag= %d\n", tag);
 		tag_slots->f_slot[tag] = sp;
 		(fas->f_tcmds[slot])++;
@@ -3391,7 +3391,7 @@ fas_intr(caddr_t arg)
 		} while (INTPENDING(fas));
 
 		if (!kstat_updated && fas->f_intr_kstat &&
-					rval == DDI_INTR_CLAIMED) {
+		    rval == DDI_INTR_CLAIMED) {
 			FAS_KSTAT_INTR(fas);
 			kstat_updated++;
 		}
@@ -3444,7 +3444,7 @@ fas_intr_svc(struct fas *fas)
 	fas->f_stat = fas_reg_read(fas, &fasreg->fas_stat);
 
 	EPRINTF2("fas_intr_svc: state=%x stat=%x\n", fas->f_state,
-		fas->f_stat);
+	    fas->f_stat);
 
 	/*
 	 * this wasn't our interrupt?
@@ -3484,7 +3484,7 @@ fas_intr_svc(struct fas *fas)
 	 * redundant PIOs or extra code in this critical path
 	 */
 	fas->f_intr =
-		intr = fas_reg_read(fas, (uchar_t *)&fasreg->fas_intr);
+	    intr = fas_reg_read(fas, (uchar_t *)&fasreg->fas_intr);
 
 	/*
 	 * read the fifo if there is something there or still in the
@@ -3501,7 +3501,7 @@ fas_intr_svc(struct fas *fas)
 		fas->f_stat2 = fas_reg_read(fas, &fasreg->fas_stat2);
 
 		if (((fas->f_stat2 & FAS_STAT2_EMPTY) == 0) ||
-			(fas->f_stat2 & FAS_STAT2_ISHUTTLE)) {
+		    (fas->f_stat2 & FAS_STAT2_ISHUTTLE)) {
 			fas_read_fifo(fas);
 		}
 	}
@@ -3565,8 +3565,8 @@ start_action:
 	while (action != ACTION_RETURN) {
 		ASSERT((action >= 0) && (action <= ACTION_SELECT));
 		TRACE_3(TR_FAC_SCSI_FAS, TR_FASSVC_ACTION_CALL,
-			"fas_intr_svc call: fas 0x%p, action %d (%d)",
-			fas, action, i);
+		    "fas_intr_svc call: fas 0x%p, action %d (%d)",
+		    fas, action, i);
 		i++;
 		action = (*evec[action])(fas);
 	}
@@ -3603,14 +3603,14 @@ fas_phasemanage(struct fas *fas)
 	int i = 0;
 
 	TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_PHASEMANAGE_START,
-		"fas_phasemanage_start");
+	    "fas_phasemanage_start");
 
 	do {
 		EPRINTF1("fas_phasemanage: %s\n",
 		    fas_state_name(fas->f_state & STATE_ITPHASES));
 
 		TRACE_2(TR_FAC_SCSI_FAS, TR_FAS_PHASEMANAGE_CALL,
-			"fas_phasemanage_call: fas 0x%p (%d)", fas, i++);
+		    "fas_phasemanage_call: fas 0x%p (%d)", fas, i++);
 
 		state = fas->f_state;
 
@@ -3625,7 +3625,7 @@ fas_phasemanage(struct fas *fas)
 	} while (action == ACTION_PHASEMANAGE);
 
 	TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_PHASEMANAGE_END,
-		"fas_phasemanage_end");
+	    "fas_phasemanage_end");
 	return (action);
 }
 
@@ -3843,7 +3843,7 @@ fas_finish(struct fas *fas)
 				struct scsi_arq_status *arqstat;
 				status->sts_chk = 1;
 				arqstat = (struct scsi_arq_status *)
-					(sp->cmd_pkt->pkt_scbp);
+				    (sp->cmd_pkt->pkt_scbp);
 				arqstat->sts_rqpkt_reason = CMD_TRAN_ERR;
 				sp->cmd_pkt->pkt_state |= STATE_ARQ_DONE;
 				fas_arqs_failure = 0;
@@ -4147,13 +4147,13 @@ fas_reconnect(struct fas *fas)
 		lun = tmp & (NLUNS_PER_TARGET-1);
 
 		EPRINTF2("fas_reconnect: target=%x, idmsg=%x\n",
-			target, tmp);
+		    target, tmp);
 
 		fas->f_resel_slot = slot = (target * NLUNS_PER_TARGET) | lun;
 
 		fas_reg_write(fas, (uchar_t *)&fasreg->fas_busid,
-			(target & 0xf) | FAS_BUSID_ENCODID |
-			FAS_BUSID_32BIT_COUNTER);
+		    (target & 0xf) | FAS_BUSID_ENCODID |
+		    FAS_BUSID_32BIT_COUNTER);
 
 		/*
 		 * If tag queueing in use, DMA in tag.
@@ -4164,7 +4164,7 @@ fas_reconnect(struct fas *fas)
 		if (TAGGED(target) && fas->f_tcmds[slot] &&
 		    (fas->f_active[slot]->f_slot[0] == NULL)) {
 			volatile uchar_t *c =
-					(uchar_t *)fas->f_cmdarea;
+			    (uchar_t *)fas->f_cmdarea;
 
 			/*
 			 * If we've been doing tagged queueing and this
@@ -4178,7 +4178,7 @@ fas_reconnect(struct fas *fas)
 			*c   = INVALID_MSG;
 
 			FAS_DMA_WRITE_SETUP(fas, 2,
-				fas->f_dmacookie.dmac_address);
+			    fas->f_dmacookie.dmac_address);
 
 			/*
 			 * For tagged queuing, we should still be in msgin
@@ -4219,7 +4219,7 @@ fas_reconnect(struct fas *fas)
 	case ACTS_RESEL:
 		{
 			volatile uchar_t *c =
-					(uchar_t *)fas->f_cmdarea;
+			    (uchar_t *)fas->f_cmdarea;
 			struct f_slots *tag_slots;
 			int id, tag;
 			uint_t i;
@@ -4244,7 +4244,7 @@ fas_reconnect(struct fas *fas)
 			}
 			fas_reg_cmd_write(fas, CMD_TRAN_INFO|CMD_DMA);
 			fas_dma_reg_write(fas, &fas->f_dma->dma_csr,
-				fas->f_dma_csr);
+			    fas->f_dma_csr);
 
 			fas_reg_cmd_write(fas, CMD_MSG_ACPT);
 
@@ -4256,13 +4256,14 @@ fas_reconnect(struct fas *fas)
 				 */
 				if (INTPENDING(fas)) {
 					fas->f_stat = fas_reg_read(fas,
-					(uchar_t *)&fas->f_reg->fas_stat);
+					    (uchar_t *)&fas->f_reg->fas_stat);
 					fas->f_intr = fas_reg_read(fas,
-					(uchar_t *)&fas->f_reg->fas_intr);
+					    (uchar_t *)&fas->f_reg->fas_intr);
 					if (fas->f_intr & (FAS_INT_RESET |
 					    FAS_INT_ILLEGAL)) {
-					    return (
-					    fas_illegal_cmd_or_bus_reset(fas));
+						return (
+						    fas_illegal_cmd_or_bus_reset
+						    (fas));
 					}
 					if (fas->f_intr & FAS_INT_FCMP) {
 						break;
@@ -4344,7 +4345,7 @@ fas_reconnect(struct fas *fas)
 		}
 #ifdef FAS_TEST
 		if (sp && !(fas_atest_reconn & (1<<Tgt(sp))) &&
-			fas_test_stop) {
+		    fas_test_stop) {
 			debug_enter("bad reconnect");
 		} else {
 			fas_atest_reconn = 0;
@@ -4414,7 +4415,7 @@ bad:
 		sp->cmd_pkt->pkt_statistics |= STAT_PERR;
 	}
 	fas_log(fas, CE_WARN, "target %x: failed reselection (%s)",
-		target, bad_reselect);
+	    target, bad_reselect);
 
 #ifdef FASDEBUG
 	fas_printstate(fas, "failed reselection");
@@ -4515,8 +4516,8 @@ fas_handle_unknown(struct fas *fas)
 			msgout = fas->f_cur_msgout[2];
 		}
 		EPRINTF4("msgout: %x %x %x, last_msgout=%x\n",
-			fas->f_cur_msgout[0], fas->f_cur_msgout[1],
-			fas->f_cur_msgout[2], fas->f_last_msgout);
+		    fas->f_cur_msgout[0], fas->f_cur_msgout[1],
+		    fas->f_cur_msgout[2], fas->f_last_msgout);
 
 		if (msgout == MSG_ABORT || msgout == MSG_ABORT_TAG ||
 		    msgout == MSG_DEVICE_RESET) {
@@ -4600,9 +4601,9 @@ fas_handle_clearing(struct fas *fas)
 			volatile struct fasreg *fasreg = fas->f_reg;
 
 			fas->f_stat = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_stat);
+			    (uchar_t *)&fasreg->fas_stat);
 			fas->f_intr = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_intr);
+			    (uchar_t *)&fasreg->fas_intr);
 			if (fas->f_intr & (FAS_INT_RESET | FAS_INT_ILLEGAL)) {
 				return (fas_illegal_cmd_or_bus_reset(fas));
 			}
@@ -4683,8 +4684,8 @@ fas_handle_clearing(struct fas *fas)
 
 #ifdef FASDEBUG
 		IPRINTF4("msgout: %x %x %x, last_msgout=%x\n",
-			fas->f_cur_msgout[0], fas->f_cur_msgout[1],
-			fas->f_cur_msgout[2], fas->f_last_msgout);
+		    fas->f_cur_msgout[0], fas->f_cur_msgout[1],
+		    fas->f_cur_msgout[2], fas->f_last_msgout);
 		IPRINTF1("last msgin=%x\n", fas->f_last_msgin);
 #endif
 		TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_HANDLE_CLEARING_ABORT_END,
@@ -4737,7 +4738,7 @@ bad:
 	 */
 	ASSERT(sp->cmd_cur_addr >= sp->cmd_dmacookie.dmac_address);
 	end = (uint64_t)sp->cmd_dmacookie.dmac_address +
-		(uint64_t)sp->cmd_dmacookie.dmac_size;
+	    (uint64_t)sp->cmd_dmacookie.dmac_size;
 
 	DPRINTF5(
 	    "cmd_data_count=%x, dmacount=%x, curaddr=%x, end=%"
@@ -4752,7 +4753,7 @@ bad:
 			goto bad;
 		}
 		end = (uint64_t)sp->cmd_dmacookie.dmac_address +
-			(uint64_t)sp->cmd_dmacookie.dmac_size;
+		    (uint64_t)sp->cmd_dmacookie.dmac_size;
 		DPRINTF2("dmac_address=%x, dmac_size=%lx\n",
 		    sp->cmd_dmacookie.dmac_address,
 		    sp->cmd_dmacookie.dmac_size);
@@ -4783,8 +4784,8 @@ bad:
 #endif
 
 	end = (uint64_t)sp->cmd_dmacookie.dmac_address +
-		(uint64_t)sp->cmd_dmacookie.dmac_size -
-		(uint64_t)sp->cmd_cur_addr;
+	    (uint64_t)sp->cmd_dmacookie.dmac_size -
+	    (uint64_t)sp->cmd_cur_addr;
 	if (amt > end) {
 		EPRINTF4("ovflow amt %x s.b. %" PRIx64 " curaddr %x count %x\n",
 		    amt, end, sp->cmd_cur_addr, sp->cmd_dmacount);
@@ -4942,10 +4943,10 @@ fas_handle_data_done(struct fas *fas)
 	}
 
 #ifdef FASDEBUG
-{
+	{
 	int phase = stat & FAS_PHASE_MASK;
 	fas->f_stat2 = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_stat2);
+	    (uchar_t *)&fasreg->fas_stat2);
 
 	if (((fas->f_stat & FAS_STAT_XZERO) == 0) &&
 	    (phase != FAS_PHASE_DATA_IN) &&
@@ -4955,7 +4956,7 @@ fas_handle_data_done(struct fas *fas)
 		    "input shuttle not empty at end of data phase");
 		fas_set_pkt_reason(fas, sp, CMD_TRAN_ERR, 0);
 		TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_HANDLE_DATA_DONE_RESET_END,
-		"fas_handle_data_done_end (ACTION_RESET)");
+		    "fas_handle_data_done_end (ACTION_RESET)");
 		return (ACTION_RESET);
 	}
 }
@@ -5029,7 +5030,7 @@ fas_handle_c_cmplt(struct fas *fas)
 	if (fas->f_laststate == ACTS_UNKNOWN) {
 		if (INTPENDING(fas)) {
 			fas->f_stat = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_stat);
+			    (uchar_t *)&fasreg->fas_stat);
 			intr = fas_reg_read(fas, (uchar_t *)&fasreg->fas_intr);
 			fas->f_intr = intr;
 			if (fas->f_intr & (FAS_INT_RESET | FAS_INT_ILLEGAL)) {
@@ -5118,8 +5119,8 @@ fas_handle_c_cmplt(struct fas *fas)
 			fas->f_omsglen = 1;
 			New_state(fas, ACTS_UNKNOWN);
 			TRACE_0(TR_FAC_SCSI_FAS,
-				TR_FAS_HANDLE_C_CMPLT_ACTION5_END,
-				"fas_handle_c_cmplt_end (action5)");
+			    TR_FAS_HANDLE_C_CMPLT_ACTION5_END,
+			    "fas_handle_c_cmplt_end (action5)");
 			return (ACTION_RETURN);
 		}
 
@@ -5146,8 +5147,8 @@ fas_handle_c_cmplt(struct fas *fas)
 			fas->f_omsglen = 1;
 			New_state(fas, ACTS_UNKNOWN);
 			TRACE_0(TR_FAC_SCSI_FAS,
-				TR_FAS_HANDLE_C_CMPLT_ACTION5_END,
-				"fas_handle_c_cmplt_end (action5)");
+			    TR_FAS_HANDLE_C_CMPLT_ACTION5_END,
+			    "fas_handle_c_cmplt_end (action5)");
 			return (fas_handle_unknown(fas));
 		}
 
@@ -5285,14 +5286,14 @@ fas_handle_msg_in_done(struct fas *fas)
 	if (fas->f_laststate == ACTS_MSG_IN) {
 		if (INTPENDING(fas)) {
 			fas->f_stat = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_stat);
+			    (uchar_t *)&fasreg->fas_stat);
 			fas->f_stat2 = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_stat2);
+			    (uchar_t *)&fasreg->fas_stat2);
 
 			fas_read_fifo(fas);
 
 			fas->f_intr = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_intr);
+			    (uchar_t *)&fasreg->fas_intr);
 			if (fas->f_intr & (FAS_INT_RESET | FAS_INT_ILLEGAL)) {
 				return (fas_illegal_cmd_or_bus_reset(fas));
 			}
@@ -5397,7 +5398,7 @@ reloop:
 			 * error), drive on.
 			 */
 			msgin = fas_reg_read(fas,
-				(uchar_t *)&fasreg->fas_fifo_data);
+			    (uchar_t *)&fasreg->fas_fifo_data);
 			New_state(fas, ACTS_MSG_IN_MORE);
 
 		} else {
@@ -5724,9 +5725,9 @@ fas_onebyte_msg(struct fas *fas)
 			if (fas_restore_pointers(fas, sp)) {
 				msgout = -ACTION_ABORT_CURCMD;
 			} else if ((sp->cmd_pkt->pkt_reason & CMD_TRAN_ERR) &&
-				(sp->cmd_pkt->pkt_statistics & STAT_PERR) &&
-				(sp->cmd_cur_win == 0) &&
-				(sp->cmd_data_count == 0)) {
+			    (sp->cmd_pkt->pkt_statistics & STAT_PERR) &&
+			    (sp->cmd_cur_win == 0) &&
+			    (sp->cmd_data_count == 0)) {
 				sp->cmd_pkt->pkt_reason &= ~CMD_TRAN_ERR;
 			}
 		}
@@ -5914,8 +5915,8 @@ fas_handle_msg_out_done(struct fas *fas)
 		msgout = fas->f_cur_msgout[2];
 	}
 	EPRINTF4("msgout: %x %x %x, last_msgout=%x\n",
-		fas->f_cur_msgout[0], fas->f_cur_msgout[1],
-		fas->f_cur_msgout[2], fas->f_last_msgout);
+	    fas->f_cur_msgout[0], fas->f_cur_msgout[1],
+	    fas->f_cur_msgout[2], fas->f_last_msgout);
 
 	EPRINTF1("fas_handle_msgout_done: msgout=%x\n", msgout);
 
@@ -6178,7 +6179,7 @@ fas_multibyte_msg(struct fas *fas)
 
 			fas->f_offset[tgt] = offset | fas->f_req_ack_delay;
 			fas_reg_write(fas, (uchar_t *)&fasreg->fas_sync_offset,
-				fas->f_offset[tgt]);
+			    fas->f_offset[tgt]);
 
 			/*
 			 * if transferring > 5 MB/sec then enable
@@ -6194,9 +6195,9 @@ fas_multibyte_msg(struct fas *fas)
 			    fas->f_fasconf3[tgt]);
 
 			DPRINTF4("period %d (%d), offset %d to tgt %d\n",
-				period,
-				fas->f_sync_period[tgt] & SYNC_PERIOD_MASK,
-				fas->f_offset[tgt] & 0xf, tgt);
+			    period,
+			    fas->f_sync_period[tgt] & SYNC_PERIOD_MASK,
+			    fas->f_offset[tgt] & 0xf, tgt);
 			DPRINTF1("req/ack delay = %x\n", fas->f_req_ack_delay);
 			DPRINTF1("conf3 = %x\n", fas->f_fasconf3[tgt]);
 #ifdef FASDEBUG
@@ -6207,9 +6208,9 @@ fas_multibyte_msg(struct fas *fas)
 			 * k-bytes/second.
 			 */
 			xfer_freq = FAS_SYNC_KBPS((regval *
-				fas->f_clock_cycle) / 1000);
+			    fas->f_clock_cycle) / 1000);
 			xfer_rate = ((fas->f_nowide & (1<<tgt))? 1 : 2) *
-						xfer_freq;
+			    xfer_freq;
 			xfer_div = xfer_rate / 1000;
 			xfer_mod = xfer_rate % 1000;
 
@@ -6447,11 +6448,11 @@ fas_handle_gross_err(struct fas *fas)
 	volatile struct fasreg *fasreg = fas->f_reg;
 
 	fas_log(fas, CE_WARN,
-		    "gross error in fas status (%x)", fas->f_stat);
+	"gross error in fas status (%x)", fas->f_stat);
 
 	IPRINTF5("fas_cmd=%x, stat=%x, intr=%x, step=%x, fifoflag=%x\n",
-		    fasreg->fas_cmd, fas->f_stat, fas->f_intr, fasreg->fas_step,
-		    fasreg->fas_fifo_flag);
+	    fasreg->fas_cmd, fas->f_stat, fas->f_intr, fasreg->fas_step,
+	    fasreg->fas_fifo_flag);
 
 	fas_set_pkt_reason(fas, fas->f_current_sp, CMD_TRAN_ERR, 0);
 
@@ -6525,7 +6526,7 @@ fas_set_throttles(struct fas *fas, int slot, int n, int what)
 			if (what == MAX_THROTTLE) {
 				int tshift = 1 << (i/NLUNS_PER_TARGET);
 				fas->f_throttle[i] = (short)
-					((fas->f_notag & tshift)? 1 : what);
+				    ((fas->f_notag & tshift)? 1 : what);
 			} else {
 				fas->f_throttle[i] = what;
 			}
@@ -6558,8 +6559,8 @@ fas_runpoll(struct fas *fas, short slot, struct fas_cmd *sp)
 	int timeout = 0;
 
 	DPRINTF4("runpoll: slot=%x, cmd=%x, current_sp=0x%p, tcmds=%x\n",
-		slot, *((uchar_t *)sp->cmd_pkt->pkt_cdbp),
-		(void *)fas->f_current_sp, fas->f_tcmds[slot]);
+	    slot, *((uchar_t *)sp->cmd_pkt->pkt_cdbp),
+	    (void *)fas->f_current_sp, fas->f_tcmds[slot]);
 
 	TRACE_0(TR_FAC_SCSI_FAS, TR_FAS_RUNPOLL_START, "fas_runpoll_start");
 
@@ -6803,7 +6804,7 @@ fas_dopoll(struct fas *fas, int limit)
 		n = -1;
 	}
 	TRACE_1(TR_FAC_SCSI_FAS, TR_FAS_DOPOLL_END,
-		"fas_dopoll_end: rval %x", n);
+	    "fas_dopoll_end: rval %x", n);
 	return (n);
 }
 
@@ -6879,7 +6880,7 @@ fas_make_sdtr(struct fas *fas, int msgout_offset, int target)
 	fas->f_omsglen = 5 + msgout_offset;
 
 	IPRINTF2("fas_make_sdtr: period = %x, offset = %x\n",
-		period, offset);
+	    period, offset);
 	/*
 	 * increment sdtr flag, odd value indicates that we initiated
 	 * the negotiation
@@ -6989,7 +6990,7 @@ fas_create_arq_pkt(struct fas *fas, struct scsi_address *ap)
 	 */
 #ifndef __lock_lint
 	rqpktp->cmd_pkt->pkt_comp =
-		(void (*)(struct scsi_pkt *))fas_complete_arq_pkt;
+	    (void (*)(struct scsi_pkt *))fas_complete_arq_pkt;
 #endif
 	return (0);
 }
@@ -7033,7 +7034,7 @@ fas_complete_arq_pkt(struct scsi_pkt *pkt)
 	struct fas_cmd *sp = pkt->pkt_ha_private;
 	struct scsi_arq_status *arqstat;
 	struct arq_private_data *arq_data =
-		    (struct arq_private_data *)sp->cmd_pkt->pkt_private;
+	    (struct arq_private_data *)sp->cmd_pkt->pkt_private;
 	struct fas_cmd *ssp = arq_data->arq_save_sp;
 	struct buf *bp = arq_data->arq_save_bp;
 	int	slot = sp->cmd_slot;
@@ -7045,7 +7046,7 @@ fas_complete_arq_pkt(struct scsi_pkt *pkt)
 
 	arqstat = (struct scsi_arq_status *)(ssp->cmd_pkt->pkt_scbp);
 	arqstat->sts_rqpkt_status = *((struct scsi_status *)
-		(sp->cmd_pkt->pkt_scbp));
+	    (sp->cmd_pkt->pkt_scbp));
 	arqstat->sts_rqpkt_reason = sp->cmd_pkt->pkt_reason;
 	arqstat->sts_rqpkt_state  = sp->cmd_pkt->pkt_state;
 	arqstat->sts_rqpkt_statistics = sp->cmd_pkt->pkt_statistics;
@@ -7059,7 +7060,7 @@ fas_complete_arq_pkt(struct scsi_pkt *pkt)
 	 * ASC=0x47 is parity error
 	 */
 	if (arqstat->sts_sensedata.es_key == KEY_ABORTED_COMMAND &&
-		arqstat->sts_sensedata.es_add_code == 0x47) {
+	    arqstat->sts_sensedata.es_add_code == 0x47) {
 		fas_sync_wide_backoff(fas, sp, slot);
 	}
 
@@ -7135,7 +7136,7 @@ fas_handle_qfull(struct fas *fas, struct fas_cmd *sp)
 	int slot = sp->cmd_slot;
 
 	if ((++sp->cmd_qfull_retries > fas->f_qfull_retries[Tgt(sp)]) ||
-		(fas->f_qfull_retries[Tgt(sp)] == 0)) {
+	    (fas->f_qfull_retries[Tgt(sp)] == 0)) {
 		/*
 		 * We have exhausted the retries on QFULL, or,
 		 * the target driver has indicated that it
@@ -7146,7 +7147,7 @@ fas_handle_qfull(struct fas *fas, struct fas_cmd *sp)
 		 * as CMD_CMPLT and pkt_scbp as STATUS_QFULL.
 		 */
 		IPRINTF2("%d.%d: status queue full, retries over\n",
-			Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 		fas_set_all_lun_throttles(fas, slot, DRAIN_THROTTLE);
 		fas_call_pkt_comp(fas, sp);
 	} else {
@@ -7155,7 +7156,7 @@ fas_handle_qfull(struct fas *fas, struct fas_cmd *sp)
 			    max((fas->f_tcmds[slot] - 2), 0);
 		}
 		IPRINTF3("%d.%d: status queue full, new throttle = %d, "
-			"retrying\n", Tgt(sp), Lun(sp), fas->f_throttle[slot]);
+		    "retrying\n", Tgt(sp), Lun(sp), fas->f_throttle[slot]);
 		sp->cmd_pkt->pkt_flags |= FLAG_HEAD;
 		sp->cmd_flags &= ~CFLAG_TRANFLAG;
 		(void) fas_accept_pkt(fas, sp, NO_TRAN_BUSY);
@@ -7202,7 +7203,7 @@ fas_restart_cmd(void *fas_arg)
 		if (fas->f_reset_delay[i/NLUNS_PER_TARGET] == 0) {
 			if (fas->f_throttle[i] == QFULL_THROTTLE) {
 				fas_set_all_lun_throttles(fas,
-					i, MAX_THROTTLE);
+				    i, MAX_THROTTLE);
 			}
 		}
 	}
@@ -7236,14 +7237,14 @@ fas_watch(void *arg)
 
 		fas_log(fas, CE_NOTE,
 	"total=%d, cmds=%d fas-rd=%d, fas-wrt=%d, dma-rd=%d, dma-wrt=%d\n",
-			fas->f_total_cmds,
-			fas->f_reg_cmds/n,
-			fas->f_reg_reads/n, fas->f_reg_writes/n,
-			fas->f_reg_dma_reads/n, fas->f_reg_dma_writes/n);
+		    fas->f_total_cmds,
+		    fas->f_reg_cmds/n,
+		    fas->f_reg_reads/n, fas->f_reg_writes/n,
+		    fas->f_reg_dma_reads/n, fas->f_reg_dma_writes/n);
 
 		fas->f_reg_reads = fas->f_reg_writes =
-			fas->f_reg_dma_reads = fas->f_reg_dma_writes =
-			fas->f_reg_cmds = fas->f_total_cmds = 0;
+		    fas->f_reg_dma_reads = fas->f_reg_dma_writes =
+		    fas->f_reg_cmds = fas->f_total_cmds = 0;
 	}
 #endif
 		if (fas->f_ncmds) {
@@ -7334,7 +7335,7 @@ fas_watchsubr(struct fas *fas)
 		tag_slots = fas->f_active[slot];
 		DPRINTF3(
 		"fas_watchsubr: slot %x: tcmds=%x, timeout=%x\n",
-		slot, fas->f_tcmds[slot], tag_slots->f_timeout);
+		    slot, fas->f_tcmds[slot], tag_slots->f_timeout);
 
 		if ((fas->f_tcmds[slot] > 0) && (tag_slots->f_timebase)) {
 
@@ -7354,10 +7355,10 @@ fas_watchsubr(struct fas *fas)
 			if ((tag_slots->f_timeout) <=
 			    fas_scsi_watchdog_tick) {
 				IPRINTF1("pending timeout on slot=%x\n",
-					slot);
+				    slot);
 				IPRINTF("draining all queues\n");
 				fas_set_throttles(fas, 0, N_SLOTS,
-					DRAIN_THROTTLE);
+				    DRAIN_THROTTLE);
 			}
 		}
 	}
@@ -7420,7 +7421,7 @@ fas_cmd_timeout(struct fas *fas, int slot)
 		ssp = fas->f_active[slot]->f_slot[tag];
 		if (ssp && ssp->cmd_pkt->pkt_time) {
 			fas_set_pkt_reason(fas, ssp, CMD_TIMEOUT,
-				STAT_TIMEOUT | STAT_ABORTED);
+			    STAT_TIMEOUT | STAT_ABORTED);
 			fas_short_dump_cmd(fas, ssp);
 			ncmds++;
 		}
@@ -7535,7 +7536,7 @@ fas_sync_wide_backoff(struct fas *fas, struct fas_cmd *sp,
 				    tgt);
 			}
 			fas->f_target_scsi_options[tgt] &=
-				~(SCSI_OPTIONS_SYNC | SCSI_OPTIONS_FAST);
+			    ~(SCSI_OPTIONS_SYNC | SCSI_OPTIONS_FAST);
 		} else {
 			/* increase period by 100% */
 			fas->f_neg_period[tgt] *= 2;
@@ -7576,7 +7577,7 @@ fas_reset_sync_wide(struct fas *fas)
 		fas->f_nowide |= (1<<tgt);
 		fas->f_fasconf3[tgt] &= ~FAS_CONF3_WIDE;
 		fas_reg_write(fas, &fas->f_reg->fas_conf3,
-		fas->f_fasconf3[tgt]);
+		    fas->f_fasconf3[tgt]);
 		/*
 		 * clear offset just in case it goes to
 		 * data phase
@@ -7585,7 +7586,7 @@ fas_reset_sync_wide(struct fas *fas)
 		    (uchar_t *)&fas->f_reg->fas_sync_offset, 0);
 	} else if (fas->f_sdtr_sent) {
 		volatile struct fasreg *fasreg =
-					fas->f_reg;
+		    fas->f_reg;
 		IPRINTF("sync neg message rejected or bus free\n");
 		fas->f_nosync |= (1<<tgt);
 		fas->f_offset[tgt] = 0;
@@ -7649,7 +7650,7 @@ fas_abort_curcmd(struct fas *fas)
 {
 	if (fas->f_current_sp) {
 		return (fas_abort_cmd(fas, fas->f_current_sp,
-			fas->f_current_sp->cmd_slot));
+		    fas->f_current_sp->cmd_slot));
 	} else {
 		return (fas_reset_bus(fas));
 	}
@@ -7792,7 +7793,7 @@ fas_do_scsi_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 		    (sp->cmd_flags & CFLAG_CMDDISC) &&
 		    ((sp->cmd_flags &  CFLAG_COMPLETED) == 0)) {
 			rval = fas_abort_disconnected_cmd(fas, ap, sp,
-				abort_msg, slot);
+			    abort_msg, slot);
 		}
 
 		if (rval) {
@@ -7812,11 +7813,11 @@ fas_do_scsi_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 		    (cur_sp->cmd_slot == slot) &&
 		    cur_sp->cmd_pkt->pkt_state) {
 			rval = fas_abort_connected_cmd(fas, cur_sp,
-				abort_msg);
+			    abort_msg);
 		}
 		if (rval == 0) {
 			rval = fas_abort_disconnected_cmd(fas, ap,
-				    NULL, abort_msg, slot);
+			    NULL, abort_msg, slot);
 		}
 	}
 
@@ -8182,11 +8183,11 @@ fas_abort_connected_cmd(struct fas *fas, struct fas_cmd *sp, uchar_t msg)
 	 */
 	if (fas->f_abort_msg_sent && (sp->cmd_flags & CFLAG_COMPLETED)) {
 		IPRINTF2("target %d.%d aborted\n",
-			Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 		rval = TRUE;
 	} else {
 		IPRINTF2("target %d.%d did not abort\n",
-			Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 	}
 	sp->cmd_pkt_flags = flags;
 	fas->f_omsglen = 0;
@@ -8219,7 +8220,7 @@ fas_abort_disconnected_cmd(struct fas *fas, struct scsi_address *ap,
 		ASSERT(sp->cmd_slot == slot);
 
 	IPRINTF1("aborting disconnected tagged cmd(s) with %s\n",
-		scsi_mname(msg));
+	    scsi_mname(msg));
 	pkt = kmem_alloc(scsi_pkt_size(), KM_SLEEP);
 	if (sp && (TAGGED(target) && (msg == MSG_ABORT_TAG))) {
 		int tag = sp->cmd_tag[1];
@@ -8248,7 +8249,7 @@ fas_do_scsi_reset(struct scsi_address *ap, int level)
 
 	ASSERT(mutex_owned(FAS_MUTEX(fas)));
 	IPRINTF3("fas_scsi_reset for slot %x, level=%x, tcmds=%x\n",
-		slot, level, fas->f_tcmds[slot]);
+	    slot, level, fas->f_tcmds[slot]);
 
 	fas_move_waitQ_to_readyQ(fas);
 
@@ -8497,8 +8498,8 @@ fas_reset_cleanup(struct fas *fas, int slot)
 	    slot, start, end, fas->f_tcmds[slot]);
 
 	ASSERT(!(fas->f_current_sp &&
-		(fas->f_current_sp->cmd_slot == slot) &&
-		(fas->f_state & STATE_SELECTING)));
+	    (fas->f_current_sp->cmd_slot == slot) &&
+	    (fas->f_state & STATE_SELECTING)));
 
 	/*
 	 * if we are not in panic set up a reset delay for this target,
@@ -8519,7 +8520,8 @@ fas_reset_cleanup(struct fas *fas, int slot)
 		if (fas->f_arq_pkt[i]) {
 			struct fas_cmd *sp = fas->f_arq_pkt[i];
 			struct arq_private_data *arq_data =
-			(struct arq_private_data *)(sp->cmd_pkt->pkt_private);
+			    (struct arq_private_data *)
+			    (sp->cmd_pkt->pkt_private);
 			if (sp->cmd_pkt->pkt_comp) {
 				ASSERT(arq_data->arq_save_sp == NULL);
 			}
@@ -8594,7 +8596,7 @@ fas_reset_connected_cmd(struct fas *fas, struct scsi_address *ap)
 		rval = TRUE;
 	} else {
 		IPRINTF2("target %d.%d did not reset\n",
-			ap->a_target, ap->a_lun);
+		    ap->a_target, ap->a_lun);
 	}
 	sp->cmd_pkt_flags = flags;
 	fas->f_omsglen = 0;
@@ -8715,7 +8717,8 @@ fas_reset_recovery(struct fas *fas)
 		if (fas->f_arq_pkt[slot]) {
 			struct fas_cmd *sp = fas->f_arq_pkt[slot];
 			struct arq_private_data *arq_data =
-			(struct arq_private_data *)(sp->cmd_pkt->pkt_private);
+			    (struct arq_private_data *)
+			    (sp->cmd_pkt->pkt_private);
 			if (sp->cmd_pkt->pkt_comp) {
 				ASSERT(arq_data->arq_save_sp == NULL);
 			}
@@ -8747,7 +8750,7 @@ done:
 	 * perform the reset notification callbacks that are registered.
 	 */
 	(void) scsi_hba_reset_notify_callback(&fas->f_mutex,
-		&fas->f_reset_notify_listf);
+	    &fas->f_reset_notify_listf);
 
 	/*
 	 * if reset delay is still active a search is meaningless
@@ -8849,7 +8852,8 @@ fas_test_abort(struct fas *fas, int slot)
 			 * find the oldest tag
 			 */
 			for (tag = NTAGS-1; tag >= 0; tag--) {
-			    if ((sp = fas->f_active[slot]->f_slot[tag]) != 0)
+				if ((sp = fas->f_active[slot]->f_slot[tag])
+				    != 0)
 				break;
 			}
 			if (sp) {
@@ -8889,7 +8893,7 @@ fas_test_abort(struct fas *fas, int slot)
 		}
 
 		fas_log(fas, CE_NOTE, "aborting pkt=0x%p state=%x\n",
-			(void *)pkt, (pkt != NULL? pkt->pkt_state : 0));
+		    (void *)pkt, (pkt != NULL? pkt->pkt_state : 0));
 		if (fas_do_scsi_abort(&ap, pkt)) {
 			fas_atest = 0;
 		}
@@ -9038,7 +9042,7 @@ fas_commoncap(struct scsi_address *ap, char *cap, int val,
 
 		case SCSI_CAP_QFULL_RETRY_INTERVAL:
 			fas->f_qfull_retry_interval[target] =
-					drv_usectohz(val * 1000);
+			    drv_usectohz(val * 1000);
 			rval = TRUE;
 			break;
 
@@ -9061,7 +9065,7 @@ fas_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_DISCONNECT:
 			if (tgtonly &&
 			    (fas->f_target_scsi_options[target] &
-				SCSI_OPTIONS_DR)) {
+			    SCSI_OPTIONS_DR)) {
 				rval = TRUE;
 			}
 			break;
@@ -9104,8 +9108,8 @@ fas_commoncap(struct scsi_address *ap, char *cap, int val,
 			break;
 		case SCSI_CAP_QFULL_RETRY_INTERVAL:
 			rval = drv_hztousec(
-				fas->f_qfull_retry_interval[target]) /
-				1000;
+			    fas->f_qfull_retry_interval[target]) /
+			    1000;
 			break;
 
 		default:
@@ -9122,7 +9126,7 @@ exit:
 	if (doset) {
 		IPRINTF6(
 	    "fas_commoncap:tgt=%x,cap=%s,tgtonly=%x,doset=%x,val=%x,rval=%x\n",
-		target, cap, tgtonly, doset, val, rval);
+		    target, cap, tgtonly, doset, val, rval);
 	}
 	return (rval);
 }
@@ -9145,7 +9149,7 @@ fas_update_props(struct fas *fas, int tgt)
 	wide_enabled = ((fas->f_nowide & (1<<tgt)) == 0);
 	if (offset && regval) {
 		xfer_speed =
-			FAS_SYNC_KBPS((regval * fas->f_clock_cycle) / 1000);
+		    FAS_SYNC_KBPS((regval * fas->f_clock_cycle) / 1000);
 		xfer_rate = ((wide_enabled)? 2 : 1) * xfer_speed;
 	}
 	(void) sprintf(property, "target%x-sync-speed", tgt);
@@ -9199,8 +9203,8 @@ fas_alloc_active_slots(struct fas *fas, int slot, int flag)
 	size = ((NOTAG(target)) ? FAS_F_SLOT_SIZE : FAS_F_SLOTS_SIZE_TQ);
 	EPRINTF4(
 	"fas_alloc_active_slots: target=%x size=%x, old=0x%p, oldsize=%x\n",
-		target, size, (void *)old_active,
-		((old_active == NULL) ? -1 : old_active->f_size));
+	    target, size, (void *)old_active,
+	    ((old_active == NULL) ? -1 : old_active->f_size));
 
 	new_active = kmem_zalloc(size, flag);
 	if (new_active == NULL) {

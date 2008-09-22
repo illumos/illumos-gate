@@ -18,11 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 
 #include <sys/errno.h>
 #include <sys/modctl.h>
@@ -136,12 +141,13 @@ static struct dev_ops oplmsu_ops = {
 	(nodev),			/* devo_reset */
 	&(cb_oplmsu_ops),		/* devo_cb_ops */
 	(struct bus_ops *)NULL,		/* devo_bus_ops */
-	NULL				/* devo_power */
+	NULL,				/* devo_power */
+	ddi_quiesce_not_needed,			/* dev_quiesce */
 };
 
 struct modldrv modldrv = {
 	&mod_driverops,
-	"OPL serial mux driver %I%",
+	"OPL serial mux driver",
 	&oplmsu_ops
 };
 
@@ -927,22 +933,23 @@ oplmsu_lrsrv(queue_t *lrq)
 				mutex_enter(&oplmsu_uinst->l_lock);
 				lpath = lrq->q_ptr;
 				while (rx_char != mp->b_wptr) {
-				    if (*rx_char == *lpath->abt_char) {
+					if (*rx_char == *lpath->abt_char) {
 					lpath->abt_char++;
 					if (*lpath->abt_char == '\0') {
-					    abort_sequence_enter((char *)NULL);
-					    lpath->abt_char
-						= oplmsu_uinst->abts;
-					    aborted = B_TRUE;
-					    break;
+						abort_sequence_enter((char *)
+						    NULL);
+						lpath->abt_char
+						    = oplmsu_uinst->abts;
+						aborted = B_TRUE;
+						break;
 					}
-				    } else {
+					} else {
 					lpath->abt_char = (*rx_char ==
 					    *oplmsu_uinst->abts) ?
-						oplmsu_uinst->abts + 1 :
-						oplmsu_uinst->abts;
-				    }
-				    rx_char++;
+					    oplmsu_uinst->abts + 1 :
+					    oplmsu_uinst->abts;
+					}
+					rx_char++;
 				}
 				mutex_exit(&oplmsu_uinst->l_lock);
 			}

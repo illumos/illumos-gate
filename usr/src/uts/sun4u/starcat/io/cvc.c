@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MT STREAMS Virtual Console Device Driver
@@ -171,14 +169,15 @@ static void cvc_dbg(uint32_t flag, char *fmt,
  */
 
 DDI_DEFINE_STREAM_OPS(cvcops, nulldev, nulldev, cvc_attach, cvc_detach,
-			nodev, cvc_info, (D_NEW|D_MTPERQ|D_MP), &cvcinfo);
+		    nodev, cvc_info, (D_NEW|D_MTPERQ|D_MP), &cvcinfo,
+		    ddi_quiesce_not_supported);
 
 extern int nodev(), nulldev();
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"CVC driver 'cvc' v%I%",
+	"CVC driver 'cvc'",
 	&cvcops,	/* driver ops */
 };
 
@@ -239,8 +238,8 @@ cvc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	} else {
 #if defined(DEBUG)
 		cmn_err(CE_NOTE,
-			"cvc_attach: called multiple times!! (instance = %d)",
-			ddi_get_instance(devi));
+		    "cvc_attach: called multiple times!! (instance = %d)",
+		    ddi_get_instance(devi));
 #endif /* DEBUG */
 		mutex_exit(&cvcmutex);
 		return (DDI_SUCCESS);
@@ -412,7 +411,7 @@ cvc_wput(queue_t *q, mblk_t *mp)
 	rw_enter(&cvclock, RW_READER);
 
 	CVC_DBG2(CVC_DBG_WPUT, "mp 0x%x db_type 0x%x",
-		    mp, mp->b_datap->db_type);
+	    mp, mp->b_datap->db_type);
 
 	switch (mp->b_datap->db_type) {
 
@@ -764,7 +763,7 @@ cvc_register(queue_t *q)
 			cmn_err(CE_WARN, "cvc_register: duplicate q!");
 		else
 			cmn_err(CE_WARN, "cvc_register: nondup q = 0x%p",
-				q);
+			    q);
 		return (error);
 	}
 	rw_exit(&cvclock);
@@ -1144,7 +1143,8 @@ cvc_getstr(char *cp)
 		 */
 		rval = iosram_get_flag(IOSRAM_KEY_CONI, &dvalid, &intrpending);
 		if ((rval != 0) && (rval != EAGAIN)) {
-		    cmn_err(CE_WARN, "cvc_getstr: get flag for inbuf ret %d",
+			cmn_err(CE_WARN,
+			    "cvc_getstr: get flag for inbuf ret %d",
 			    rval);
 		}
 		if ((rval != 0) || (dvalid != IOSRAM_DATA_VALID)) {

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -103,7 +102,8 @@ static struct dev_ops mc_ops = {
 	nulldev,			/* reset */
 	&mc_cb_ops,			/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 /*
@@ -132,7 +132,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* module type, this one is a driver */
-	"Memory-controller: %I%",	/* module name */
+	"Memory-controller: 1.14",	/* module name */
 	&mc_ops,			/* driver ops */
 };
 

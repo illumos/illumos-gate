@@ -31,7 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains common functions to access and manage the page lists.
@@ -137,7 +136,7 @@ int pg_contig_disable;
 int pg_lpgcreate_nocage = LPGCREATE;
 
 /*
- * page_freelist_split pfn flag to signify no hi pfn requirement.
+ * page_freelist_split pfn flag to signify no lo or hi pfn requirement.
  */
 #define	PFNNULL		0
 
@@ -231,9 +230,9 @@ void page_ctr_sub_internal(int, int, page_t *, int);
 void page_freelist_lock(int);
 void page_freelist_unlock(int);
 page_t *page_promote(int, pfn_t, uchar_t, int, int);
-page_t *page_demote(int, pfn_t, uchar_t, uchar_t, int, int);
+page_t *page_demote(int, pfn_t, pfn_t, uchar_t, uchar_t, int, int);
 page_t *page_freelist_split(uchar_t,
-    uint_t, int, int, pfn_t, page_list_walker_t *);
+    uint_t, int, int, pfn_t, pfn_t, page_list_walker_t *);
 page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 static int page_trylock_cons(page_t *pp, se_t se);
 
@@ -1580,7 +1579,7 @@ page_boot_demote(page_t *pp)
 	ASSERT(PP_ISAGED(pp));
 
 	(void) page_demote(PP_2_MEM_NODE(pp),
-	    PFN_BASE(pp->p_pagenum, pp->p_szc), pp->p_szc, 0, PC_NO_COLOR,
+	    PFN_BASE(pp->p_pagenum, pp->p_szc), 0, pp->p_szc, 0, PC_NO_COLOR,
 	    PC_FREE);
 
 	ASSERT(PP_ISFREE(pp));
@@ -1687,7 +1686,7 @@ try_again:
 		 * Large page is on freelist.
 		 */
 		(void) page_demote(mnode, PFN_BASE(pp->p_pagenum, pp->p_szc),
-		    pp->p_szc, 0, PC_NO_COLOR, PC_FREE);
+		    0, pp->p_szc, 0, PC_NO_COLOR, PC_FREE);
 	}
 	ASSERT(PP_ISFREE(pp));
 	ASSERT(PP_ISAGED(pp));
@@ -1749,7 +1748,7 @@ try_again:
 		if (pp->p_szc > szc) {
 			VM_STAT_ADD(vmm_vmstats.plsubpages_szcbig);
 			(void) page_demote(mnode,
-			    PFN_BASE(pp->p_pagenum, pp->p_szc),
+			    PFN_BASE(pp->p_pagenum, pp->p_szc), 0,
 			    pp->p_szc, szc, PC_NO_COLOR, PC_FREE);
 		}
 		bin = PP_2_BIN(pp);
@@ -2093,10 +2092,11 @@ fail_promote:
  * If flags is not PC_ALLOC, the color argument is ignored, and thus
  * technically, any value may be passed in but PC_NO_COLOR is the standard
  * which should be followed for clarity's sake.
+ * Returns a page whose pfn is < pfnmax
  */
 page_t *
-page_demote(int mnode, pfn_t pfnum, uchar_t cur_szc, uchar_t new_szc,
-    int color, int flags)
+page_demote(int mnode, pfn_t pfnum, pfn_t pfnmax, uchar_t cur_szc,
+    uchar_t new_szc, int color, int flags)
 {
 	page_t	*pp, *pplist, *npplist;
 	pgcnt_t	npgs, n;
@@ -2142,7 +2142,8 @@ page_demote(int mnode, pfn_t pfnum, uchar_t cur_szc, uchar_t new_szc,
 			pp->p_szc = new_szc;
 			bin = PP_2_BIN(pp);
 			if ((bin == color) && (flags == PC_ALLOC) &&
-			    (ret_pp == NULL) &&
+			    (ret_pp == NULL) && (pfnmax == 0 ||
+			    pp->p_pagenum < pfnmax) &&
 			    page_trylock_cons(pp, SE_EXCL)) {
 				ret_pp = pp;
 			} else {
@@ -2152,6 +2153,8 @@ page_demote(int mnode, pfn_t pfnum, uchar_t cur_szc, uchar_t new_szc,
 				page_ctr_add(mnode, mtype, pp, PG_FREE_LIST);
 			}
 		} else {
+			page_t *try_to_return_this_page = NULL;
+			int count = 0;
 
 			/*
 			 * Break down into smaller lists of pages.
@@ -2162,18 +2165,33 @@ page_demote(int mnode, pfn_t pfnum, uchar_t cur_szc, uchar_t new_szc,
 			n = npgs;
 			while (n--) {
 				ASSERT(pp->p_szc == cur_szc);
+				/*
+				 * Check whether all the pages in this list
+				 * fit the request criteria.
+				 */
+				if (pfnmax == 0 || pp->p_pagenum < pfnmax) {
+					count++;
+				}
 				pp->p_szc = new_szc;
 				pp = pp->p_next;
+			}
+
+			if (count == npgs &&
+			    (pfnmax == 0 || pp->p_pagenum < pfnmax)) {
+				try_to_return_this_page = pp;
 			}
 
 			CHK_LPG(pplist, new_szc);
 
 			bin = PP_2_BIN(pplist);
-			ASSERT(mnode == PP_2_MEM_NODE(pp));
+			if (try_to_return_this_page)
+				ASSERT(mnode ==
+				    PP_2_MEM_NODE(try_to_return_this_page));
 			if ((bin == color) && (flags == PC_ALLOC) &&
-			    (ret_pp == NULL) &&
-			    page_trylock_cons(pp, SE_EXCL)) {
-				ret_pp = pp;
+			    (ret_pp == NULL) && try_to_return_this_page &&
+			    page_trylock_cons(try_to_return_this_page,
+			    SE_EXCL)) {
+				ret_pp = try_to_return_this_page;
 			} else {
 				mtype = PP_2_MTYPE(pp);
 				page_vpadd(&PAGE_FREELISTS(mnode, new_szc,
@@ -2516,7 +2534,7 @@ page_freelist_coalesce_all(int mnode)
 
 page_t *
 page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
-    pfn_t pfnhi, page_list_walker_t *plw)
+    pfn_t pfnlo, pfn_t pfnhi, page_list_walker_t *plw)
 {
 	uchar_t nszc = szc + 1;
 	uint_t 	bin, sbin, bin_prev;
@@ -2552,14 +2570,24 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
 			 * If pfnhi is not PFNNULL, look for large page below
 			 * pfnhi. PFNNULL signifies no pfn requirement.
 			 */
-			if (pfnhi != PFNNULL && pp->p_pagenum >= pfnhi) {
+			if ((pfnhi != PFNNULL && pp->p_pagenum >= pfnhi) ||
+			    (pfnlo != PFNNULL && pp->p_pagenum < pfnlo)) {
 				do {
 					pp = pp->p_vpnext;
 					if (pp == firstpp) {
 						pp = NULL;
 						break;
 					}
-				} while (pp->p_pagenum >= pfnhi);
+				} while ((pfnhi != PFNNULL &&
+				    pp->p_pagenum >= pfnhi) ||
+				    (pfnlo != PFNNULL &&
+				    pp->p_pagenum < pfnlo));
+
+				if (pfnhi != PFNNULL && pp != NULL)
+					ASSERT(pp->p_pagenum < pfnhi);
+
+				if (pfnlo != PFNNULL && pp != NULL)
+					ASSERT(pp->p_pagenum >= pfnlo);
 			}
 			if (pp) {
 				uint_t ccolor = page_correct_color(szc, nszc,
@@ -2568,7 +2596,7 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
 				ASSERT(pp->p_szc == nszc);
 				VM_STAT_ADD(vmm_vmstats.pfs_demote[nszc]);
 				ret_pp = page_demote(mnode, pp->p_pagenum,
-				    pp->p_szc, szc, ccolor, PC_ALLOC);
+				    pfnhi, pp->p_szc, szc, ccolor, PC_ALLOC);
 				if (ret_pp) {
 					page_freelist_unlock(mnode);
 #if defined(__sparc)
@@ -2983,7 +3011,7 @@ bin_empty_1:
 		 */
 		if (plw.plw_do_split &&
 		    (pp = page_freelist_split(szc, bin, mnode,
-		    mtype, PFNNULL, &plw)) != NULL)
+		    mtype, PFNNULL, PFNNULL, &plw)) != NULL)
 			return (pp);
 
 		if (szc > 0 && (pp = page_freelist_coalesce(mnode, szc,
@@ -4328,7 +4356,7 @@ page_demote_free_pages(page_t *pp)
 	page_freelist_lock(mnode);
 	if (pp->p_szc != 0) {
 		(void) page_demote(mnode, PFN_BASE(pp->p_pagenum,
-		    pp->p_szc), pp->p_szc, 0, PC_NO_COLOR, PC_FREE);
+		    pp->p_szc), 0, pp->p_szc, 0, PC_NO_COLOR, PC_FREE);
 	}
 	page_freelist_unlock(mnode);
 	ASSERT(pp->p_szc == 0);

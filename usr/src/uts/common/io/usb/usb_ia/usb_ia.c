@@ -166,7 +166,8 @@ static struct dev_ops usb_ia_ops = {
 	nodev,			/* reset */
 	&usb_ia_cb_ops,	/* driver operations */
 	&usb_ia_busops,	/* bus operations */
-	usb_ia_power		/* power */
+	usb_ia_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

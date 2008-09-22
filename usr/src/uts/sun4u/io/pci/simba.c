@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	PCI to PCI bus bridge nexus driver
@@ -191,8 +190,9 @@ struct dev_ops simba_ops = {
 	simba_detach,		/* detach */
 	nulldev,		/* reset */
 	&simba_cb_ops,		/* driver operations */
-	&simba_bus_ops		/* bus operations */
-
+	&simba_bus_ops,		/* bus operations */
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -201,7 +201,7 @@ struct dev_ops simba_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"SIMBA PCI to PCI bridge nexus driver %I%",
+	"SIMBA PCI to PCI bridge nexus driver",
 	&simba_ops,	/* driver ops */
 };
 
@@ -383,7 +383,7 @@ simba_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 * Make sure the "device_type" property exists.
 		 */
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-			"device_type", "pci");
+		    "device_type", "pci");
 
 		/*
 		 * Allocate and get soft state structure.
@@ -420,24 +420,24 @@ simba_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 */
 		simba->simba_cache_line_size =
 		    pci_config_get8(simba->config_handle,
-			PCI_CONF_CACHE_LINESZ);
+		    PCI_CONF_CACHE_LINESZ);
 		simba->simba_latency_timer =
 		    pci_config_get8(simba->config_handle,
-			PCI_CONF_LATENCY_TIMER);
+		    PCI_CONF_LATENCY_TIMER);
 
 		/* simba specific, clears up the pri/sec status registers */
 		pci_config_put16(simba->config_handle, 0x6, 0xffff);
 		pci_config_put16(simba->config_handle, 0x1e, 0xffff);
 
 		DEBUG2(D_ATTACH, "simba_attach(): clsz=%x, lt=%x\n",
-			simba->simba_cache_line_size,
-			simba->simba_latency_timer);
+		    simba->simba_cache_line_size,
+		    simba->simba_latency_timer);
 
 		/*
 		 * Initialize FMA support
 		 */
 		simba->fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-			DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+		    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 		/*
 		 * Call parent to get it's capablity
@@ -461,7 +461,7 @@ simba_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 * Get the soft state structure for the bridge.
 		 */
 		simba = (simba_devstate_t *)
-			ddi_get_soft_state(simba_state, ddi_get_instance(devi));
+		    ddi_get_soft_state(simba_state, ddi_get_instance(devi));
 		simba_restore_config_regs(simba);
 		return (DDI_SUCCESS);
 	}
@@ -474,7 +474,7 @@ simba_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	simba_devstate_t *simba;
 	simba = (simba_devstate_t *)
-		ddi_get_soft_state(simba_state, ddi_get_instance(devi));
+	    ddi_get_soft_state(simba_state, ddi_get_instance(devi));
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -582,9 +582,9 @@ simba_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	pci_regspec_t *drv_regp;
 
 	DEBUG6(D_CTLOPS,
-		"simba_ctlops(): dip=%p rdip=%p ctlop=%x-%s arg=%p result=%p",
-		dip, rdip, ctlop, ctlop < (sizeof (ops) / sizeof (ops[0])) ?
-		ops[ctlop] : "Unknown", arg, result);
+	    "simba_ctlops(): dip=%p rdip=%p ctlop=%x-%s arg=%p result=%p",
+	    dip, rdip, ctlop, ctlop < (sizeof (ops) / sizeof (ops[0])) ?
+	    ops[ctlop] : "Unknown", arg, result);
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -619,8 +619,8 @@ simba_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 	*(int *)result = 0;
 	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
-		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
-		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
+	    (caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	totreg = reglen / sizeof (pci_regspec_t);
@@ -633,7 +633,7 @@ simba_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 			return (DDI_FAILURE);
 		}
 		*(off_t *)result = drv_regp[rn].pci_size_low |
-			((uint64_t)drv_regp[rn].pci_size_hi << 32);
+		    ((uint64_t)drv_regp[rn].pci_size_hi << 32);
 	}
 
 	kmem_free(drv_regp, reglen);
@@ -806,19 +806,19 @@ simba_initchild(dev_info_t *child)
 	}
 
 	simba = (simba_devstate_t *)ddi_get_soft_state(simba_state,
-		ddi_get_instance(ddi_get_parent(child)));
+	    ddi_get_instance(ddi_get_parent(child)));
 	/*
 	 * Initialize cache-line-size configuration register if needed.
 	 */
 	if (simba_set_cache_line_size_register &&
 	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"cache-line-size", 0) == 0) {
+	    "cache-line-size", 0) == 0) {
 		pci_config_put8(config_handle, PCI_CONF_CACHE_LINESZ,
 		    simba->simba_cache_line_size);
 		n = pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
 		if (n != 0)
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-				"cache-line-size", n);
+			    "cache-line-size", n);
 	}
 
 	/*
@@ -826,7 +826,7 @@ simba_initchild(dev_info_t *child)
 	 */
 	if (simba_set_latency_timer_register &&
 	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"latency-timer", 0) == 0) {
+	    "latency-timer", 0) == 0) {
 
 		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
 			latency_timer = simba->simba_latency_timer;
@@ -880,14 +880,14 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 	struct simba_cfg_state *statep;
 
 	for (i = 0, dip = ddi_get_child(simba_p->dip); dip != NULL;
-		dip = ddi_get_next_sibling(dip)) {
+	    dip = ddi_get_next_sibling(dip)) {
 		if (i_ddi_devi_attached(dip))
 			i++;
 	}
 	if (!i)
 		return;
 	simba_p->simba_config_state_p =
-		kmem_zalloc(i * sizeof (struct simba_cfg_state), KM_NOSLEEP);
+	    kmem_zalloc(i * sizeof (struct simba_cfg_state), KM_NOSLEEP);
 	if (!simba_p->simba_config_state_p) {
 		cmn_err(CE_WARN, "not enough memrory to save simba child\n");
 		return;
@@ -895,38 +895,38 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 	simba_p->config_state_index = i;
 
 	for (statep = simba_p->simba_config_state_p,
-		dip = ddi_get_child(simba_p->dip);
-		dip != NULL;
-		dip = ddi_get_next_sibling(dip)) {
+	    dip = ddi_get_child(simba_p->dip);
+	    dip != NULL;
+	    dip = ddi_get_next_sibling(dip)) {
 
 		if (!i_ddi_devi_attached(dip)) {
 			DEBUG4(D_DETACH, "%s%d: skipping unattached %s%d\n",
-				ddi_driver_name(simba_p->dip),
-				ddi_get_instance(simba_p->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    ddi_driver_name(simba_p->dip),
+			    ddi_get_instance(simba_p->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 
 		DEBUG4(D_DETACH, "%s%d: saving regs for %s%d\n",
-			ddi_driver_name(simba_p->dip),
-			ddi_get_instance(simba_p->dip),
-			ddi_driver_name(dip),
-			ddi_get_instance(dip));
+		    ddi_driver_name(simba_p->dip),
+		    ddi_get_instance(simba_p->dip),
+		    ddi_driver_name(dip),
+		    ddi_get_instance(dip));
 
 		if (pci_config_setup(dip, &ch) != DDI_SUCCESS) {
 			DEBUG4(D_DETACH, "%s%d: can't config space for %s%d\n",
-				ddi_driver_name(simba_p->dip),
-				ddi_get_instance(simba_p->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    ddi_driver_name(simba_p->dip),
+			    ddi_get_instance(simba_p->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 
 		DEBUG3(D_DETACH, "%s%d: saving child dip=%p\n",
-			ddi_driver_name(simba_p->dip),
-			ddi_get_instance(simba_p->dip),
-			dip);
+		    ddi_driver_name(simba_p->dip),
+		    ddi_get_instance(simba_p->dip),
+		    dip);
 
 		statep->dip = dip;
 		statep->command = pci_config_get16(ch, PCI_CONF_COMM);
@@ -935,12 +935,12 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 			statep->bridge_control =
 			    pci_config_get16(ch, PCI_BCNF_BCNTRL);
 		statep->cache_line_size =
-			pci_config_get8(ch, PCI_CONF_CACHE_LINESZ);
+		    pci_config_get8(ch, PCI_CONF_CACHE_LINESZ);
 		statep->latency_timer =
-			pci_config_get8(ch, PCI_CONF_LATENCY_TIMER);
+		    pci_config_get8(ch, PCI_CONF_LATENCY_TIMER);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			statep->sec_latency_timer =
-				pci_config_get8(ch, PCI_BCNF_LATENCY_TIMER);
+			    pci_config_get8(ch, PCI_BCNF_LATENCY_TIMER);
 		/*
 		 * Simba specific.
 		 */
@@ -948,13 +948,13 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 		    pci_config_get16(ch, PCI_CONF_DEVID) == PCI_SIMBA_DEVID) {
 
 			statep->bus_number =
-				pci_config_get8(ch, PCI_BCNF_PRIBUS);
+			    pci_config_get8(ch, PCI_BCNF_PRIBUS);
 			statep->sec_bus_number =
-				pci_config_get8(ch, PCI_BCNF_SECBUS);
+			    pci_config_get8(ch, PCI_BCNF_SECBUS);
 			statep->sub_bus_number =
-				pci_config_get8(ch, PCI_BCNF_SUBBUS);
+			    pci_config_get8(ch, PCI_BCNF_SUBBUS);
 			statep->bridge_control =
-				pci_config_get16(ch, PCI_BCNF_BCNTRL);
+			    pci_config_get16(ch, PCI_BCNF_BCNTRL);
 		}
 		pci_config_teardown(&ch);
 		statep++;
@@ -986,59 +986,59 @@ simba_restore_config_regs(simba_devstate_t *simba_p)
 		dip = statep->dip;
 		if (!dip) {
 			cmn_err(CE_WARN,
-				"%s%d: skipping bad dev info (%d)\n",
-				ddi_driver_name(simba_p->dip),
-				ddi_get_instance(simba_p->dip),
-				i);
+			    "%s%d: skipping bad dev info (%d)\n",
+			    ddi_driver_name(simba_p->dip),
+			    ddi_get_instance(simba_p->dip),
+			    i);
 			continue;
 		}
 
 		DEBUG5(D_ATTACH, "%s%d: restoring regs for %p-%s%d\n",
-			ddi_driver_name(simba_p->dip),
-			ddi_get_instance(simba_p->dip),
-			dip,
-			ddi_driver_name(dip),
-			ddi_get_instance(dip));
+		    ddi_driver_name(simba_p->dip),
+		    ddi_get_instance(simba_p->dip),
+		    dip,
+		    ddi_driver_name(dip),
+		    ddi_get_instance(dip));
 
 		if (pci_config_setup(dip, &ch) != DDI_SUCCESS) {
 			DEBUG4(D_ATTACH, "%s%d: can't config space for %s%d\n",
-				ddi_driver_name(simba_p->dip),
-				ddi_get_instance(simba_p->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    ddi_driver_name(simba_p->dip),
+			    ddi_get_instance(simba_p->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 		pci_config_put16(ch, PCI_CONF_COMM, statep->command);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			pci_config_put16(ch, PCI_BCNF_BCNTRL,
-				statep->bridge_control);
+			    statep->bridge_control);
 		/*
 		 * Simba specific.
 		 */
 		if (pci_config_get16(ch, PCI_CONF_VENID) == PCI_SIMBA_VENID &&
 		    pci_config_get16(ch, PCI_CONF_DEVID) == PCI_SIMBA_DEVID) {
 			pci_config_put8(ch, PCI_BCNF_PRIBUS,
-				statep->bus_number);
+			    statep->bus_number);
 			pci_config_put8(ch, PCI_BCNF_SECBUS,
-				statep->sec_bus_number);
+			    statep->sec_bus_number);
 			pci_config_put8(ch, PCI_BCNF_SUBBUS,
-				statep->sub_bus_number);
+			    statep->sub_bus_number);
 			pci_config_put16(ch, PCI_BCNF_BCNTRL,
-				statep->bridge_control);
+			    statep->bridge_control);
 		}
 
 		pci_config_put8(ch, PCI_CONF_CACHE_LINESZ,
-			statep->cache_line_size);
+		    statep->cache_line_size);
 		pci_config_put8(ch, PCI_CONF_LATENCY_TIMER,
-			statep->latency_timer);
+		    statep->latency_timer);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			pci_config_put8(ch, PCI_BCNF_LATENCY_TIMER,
-				statep->sec_latency_timer);
+			    statep->sec_latency_timer);
 		pci_config_teardown(&ch);
 	}
 
 	kmem_free(simba_p->simba_config_state_p,
-		simba_p->config_state_index * sizeof (struct simba_cfg_state));
+	    simba_p->config_state_index * sizeof (struct simba_cfg_state));
 	simba_p->simba_config_state_p = NULL;
 	simba_p->config_state_index = 0;
 }
@@ -1191,7 +1191,7 @@ simba_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 		ddi_iblock_cookie_t *ibc)
 {
 	simba_devstate_t *simba_p = ddi_get_soft_state(simba_state,
-			ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	*ibc = simba_p->fm_ibc;
 	return (simba_p->fm_cap);

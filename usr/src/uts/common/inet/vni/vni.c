@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "vni_impl.h"
 #include <sys/conf.h>
@@ -78,11 +77,11 @@ static struct streamtab vni_info = {
 };
 
 DDI_DEFINE_STREAM_OPS(vni_ops, nulldev, nulldev, vniattach, \
-    vnidetach, nodev, nodev, VNIFLAGS, &vni_info);
+    vnidetach, nodev, nodev, VNIFLAGS, &vni_info, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Virtual network interface %I%",
+	"Virtual network interface",
 	&vni_ops,
 };
 

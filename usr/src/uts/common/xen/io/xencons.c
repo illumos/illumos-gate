@@ -24,11 +24,10 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -1603,12 +1602,15 @@ struct dev_ops xencons_ops = {
 	xenconsattach,		/* devo_attach */
 	xenconsdetach,		/* devo_detach */
 	nodev,			/* devo_reset */
-	&cb_xencons_ops,		/* devo_cb_ops */
+	&cb_xencons_ops,	/* devo_cb_ops */
+	NULL,			/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"virtual console driver %I%",
+	"virtual console driver",
 	&xencons_ops,	/* driver ops */
 };
 

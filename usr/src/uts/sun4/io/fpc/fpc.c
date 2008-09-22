@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -48,14 +47,15 @@ static struct dev_ops fpc_ops = {
 	nodev,
 	NULL,
 	NULL,
-	nodev
+	nodev,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv md = {
 	&mod_driverops,
-	"IO Chip Perf Counter %I%",
+	"IO Chip Perf Counter",
 	&fpc_ops,
 };
 

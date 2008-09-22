@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -120,7 +119,8 @@ static struct dev_ops upa64s_ops = {
 	nodev,
 	(struct cb_ops *)0,
 	&upa64s_bus_ops,
-	upa64s_power
+	upa64s_power,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -131,7 +131,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 		/* type of module */
-	"UPA64S nexus driver %I%",	/* name of module */
+	"UPA64S nexus driver",	/* name of module */
 	&upa64s_ops,			/* driver ops */
 };
 

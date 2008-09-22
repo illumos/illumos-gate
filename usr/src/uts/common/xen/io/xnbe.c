@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Xen network backend - ioemu version.
@@ -133,11 +132,12 @@ static struct dev_ops ops = {
 	nodev,			/* devo_reset */
 	&cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)0,	/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops, "xnbe driver %I%", &ops,
+	&mod_driverops, "xnbe driver", &ops,
 };
 
 static struct modlinkage modlinkage = {

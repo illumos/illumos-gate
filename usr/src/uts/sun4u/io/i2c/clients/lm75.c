@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
@@ -92,14 +90,16 @@ static struct dev_ops lm75_ops = {
 	lm75_detach,
 	nodev,
 	&lm75_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv lm75_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"LM75 i2c device driver: v%I%",
+	"LM75 i2c device driver: v1.8",
 	&lm75_ops
 };
 
@@ -119,7 +119,7 @@ _init(void)
 
 	if (!error)
 		(void) ddi_soft_state_init(&lm75soft_statep,
-			sizeof (struct lm75_unit), 1);
+		    sizeof (struct lm75_unit), 1);
 	return (error);
 }
 
@@ -157,7 +157,7 @@ lm75_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct lm75_unit *)
-		ddi_get_soft_state(lm75soft_statep, instance);
+	    ddi_get_soft_state(lm75soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -203,7 +203,7 @@ lm75_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct lm75_unit *)
-		ddi_get_soft_state(lm75soft_statep, instance);
+	    ddi_get_soft_state(lm75soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -318,13 +318,13 @@ lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	if (arg == NULL) {
 		D2CMN_ERR((CE_WARN, "LM75: ioctl: arg passed in to ioctl "
-				"= NULL\n"));
+		    "= NULL\n"));
 		err = EINVAL;
 		return (err);
 	}
 	instance = getminor(dev);
 	unitp = (struct lm75_unit *)
-		ddi_get_soft_state(lm75soft_statep, instance);
+	    ddi_get_soft_state(lm75soft_statep, instance);
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "LM75: ioctl: unitp = NULL\n");
@@ -357,11 +357,11 @@ lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	case LM75_GET_CONFIG:
 		(void) i2c_transfer_alloc(unitp->lm75_hdl, &i2c_tran_pointer,
-					1, 1, I2C_SLEEP);
+		    1, 1, I2C_SLEEP);
 		if (i2c_tran_pointer == NULL) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in LM75_GET_CONFIG "
-					"i2c_tran_pointer not allocated\n",
-					unitp->lm75_name));
+			    "i2c_tran_pointer not allocated\n",
+			    unitp->lm75_name));
 			err = ENOMEM;
 			break;
 		}
@@ -371,17 +371,17 @@ lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		err = i2c_transfer(unitp->lm75_hdl, i2c_tran_pointer);
 		if (err) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in LM75_GET_CONFIG "
-					"i2c_transfer routine\n",
-					unitp->lm75_name));
+			    "i2c_transfer routine\n",
+			    unitp->lm75_name));
 			i2c_transfer_free(unitp->lm75_hdl, i2c_tran_pointer);
 			break;
 		}
 		if (ddi_copyout((caddr_t)i2c_tran_pointer->i2c_rbuf,
-				(caddr_t)arg,
-				sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    (caddr_t)arg,
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in LM75_GET_CONFIG "
-					"ddi_copyout routine\n",
-					unitp->lm75_name));
+			    "ddi_copyout routine\n",
+			    unitp->lm75_name));
 			err = EFAULT;
 		}
 		i2c_transfer_free(unitp->lm75_hdl, i2c_tran_pointer);
@@ -389,19 +389,19 @@ lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	case LM75_SET_CONFIG:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&passin_byte,
-				sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in LM75_SET_CONFIG "
-					"ddi_copyin routine\n",
-					unitp->lm75_name));
+			    "ddi_copyin routine\n",
+			    unitp->lm75_name));
 			err = EFAULT;
 			break;
 		}
 		(void) i2c_transfer_alloc(unitp->lm75_hdl, &i2c_tran_pointer,
-					2, 0, I2C_SLEEP);
+		    2, 0, I2C_SLEEP);
 		if (i2c_tran_pointer == NULL) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in LM75_SET_CONFIG "
-					"i2c_tran_pointer not allocated\n",
-					unitp->lm75_name));
+			    "i2c_tran_pointer not allocated\n",
+			    unitp->lm75_name));
 			err = ENOMEM;
 			break;
 		}
@@ -415,7 +415,7 @@ lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	default:
 		D2CMN_ERR((CE_WARN, "%s: Invalid IOCTL cmd %x\n",
-				unitp->lm75_name, cmd));
+		    unitp->lm75_name, cmd));
 		err = EINVAL;
 	}
 
@@ -459,7 +459,7 @@ lm75_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(lm75soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d: failed to zalloc softstate\n",
-				ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -471,12 +471,12 @@ lm75_do_attach(dev_info_t *dip)
 	}
 
 	(void) snprintf(unitp->lm75_name, sizeof (unitp->lm75_name),
-			"%s%d", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "lm75", S_IFCHR, instance,
-			"ddi_i2c:temperature_sensor", NULL) == DDI_FAILURE) {
+	    "ddi_i2c:temperature_sensor", NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
-			"%s\n", unitp->lm75_name, "lm75");
+		    "%s\n", unitp->lm75_name, "lm75");
 		ddi_soft_state_free(lm75soft_statep, instance);
 
 		return (DDI_FAILURE);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
@@ -98,14 +96,16 @@ static struct dev_ops pcf8574_ops = {
 	pcf8574_detach,
 	nodev,
 	&pcf8574_cbops,
-	NULL
+	NULL,			/* bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv pcf8574_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"PCF8574 i2c device driver: v%I%",
+	"PCF8574 i2c device driver: v1.9",
 	&pcf8574_ops
 };
 
@@ -131,7 +131,7 @@ _init(void)
 
 	if (!error)
 		(void) ddi_soft_state_init(&pcf8574soft_statep,
-			sizeof (struct pcf8574_unit), 1);
+		    sizeof (struct pcf8574_unit), 1);
 	return (error);
 }
 
@@ -170,7 +170,7 @@ pcf8574_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574soft_statep, instance);
+	    ddi_get_soft_state(pcf8574soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -214,7 +214,7 @@ pcf8574_close(dev_t dev, int flags, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574soft_statep, instance);
+	    ddi_get_soft_state(pcf8574soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -308,14 +308,14 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	if (arg == NULL) {
 		D2CMN_ERR((CE_WARN, "PCF8574: ioctl: arg passed in to ioctl "
-				"= NULL\n"));
+		    "= NULL\n"));
 		err = EINVAL;
 		return (err);
 	}
 
 	instance = getminor(dev);
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574soft_statep, instance);
+	    ddi_get_soft_state(pcf8574soft_statep, instance);
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "PCF8574: ioctl: unitp not filled\n");
 		return (ENOMEM);
@@ -326,10 +326,10 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	switch (cmd) {
 	case I2C_GET_PORT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_port,
-				sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_PORT"
-					" ddi_copyin routine\n",
-					unitp->pcf8574_name));
+			    " ddi_copyin routine\n",
+			    unitp->pcf8574_name));
 			err = EFAULT;
 			break;
 		}
@@ -337,30 +337,30 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = pcf8574_get(unitp, &byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_PORT"
-					" pcf8574_get routine\n",
-					unitp->pcf8574_name));
+			    " pcf8574_get routine\n",
+			    unitp->pcf8574_name));
 			break;
 		}
 
 		ioctl_port.value = byte;
 		if (ddi_copyout((caddr_t)&ioctl_port, (caddr_t)arg,
-				sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_PORT "
-					"ddi_copyout routine\n",
-					unitp->pcf8574_name));
+			    "ddi_copyout routine\n",
+			    unitp->pcf8574_name));
 			err = EFAULT;
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: contains %x\n", unitp->pcf8574_name,
-			byte));
+		    byte));
 		break;
 
 	case I2C_SET_PORT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_port,
-				sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_PORT"
-					"ddi_cpoyin routine\n",
-					unitp->pcf8574_name));
+			    "ddi_cpoyin routine\n",
+			    unitp->pcf8574_name));
 			err = EFAULT;
 			break;
 		}
@@ -368,26 +368,26 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = pcf8574_set(unitp, ioctl_port.value);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_PORT"
-					" pcf8574_set routine\n",
-					unitp->pcf8574_name));
+			    " pcf8574_set routine\n",
+			    unitp->pcf8574_name));
 			break;
 		}
 		break;
 
 	case I2C_GET_BIT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_bit,
-				sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_BIT"
-					" ddi_copyin routine\n",
-					unitp->pcf8574_name));
+			    " ddi_copyin routine\n",
+			    unitp->pcf8574_name));
 			err = EFAULT;
 			break;
 		}
 
 		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: In I2C_GET_BIT bit num"
-					" was not between 0 and 7\n",
-					unitp->pcf8574_name));
+			    " was not between 0 and 7\n",
+			    unitp->pcf8574_name));
 			err = EIO;
 			break;
 		}
@@ -395,41 +395,41 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = pcf8574_get(unitp, &byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_BIT"
-					" pcf8574_get routine\n",
-					unitp->pcf8574_name));
+			    " pcf8574_get routine\n",
+			    unitp->pcf8574_name));
 			break;
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: byte returned from device is %x\n",
-			unitp->pcf8574_name, byte));
+		    unitp->pcf8574_name, byte));
 		ioctl_bit.bit_value = (boolean_t)PCF8574_BIT_READ_MASK(byte,
-							ioctl_bit.bit_num);
+		    ioctl_bit.bit_num);
 		D1CMN_ERR((CE_NOTE, "%s: byte now contains %x\n",
-				unitp->pcf8574_name, byte));
+		    unitp->pcf8574_name, byte));
 
 		if (ddi_copyout((caddr_t)&ioctl_bit, (caddr_t)arg,
-				sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_BIT"
-					" ddi_copyout routine\n",
-					unitp->pcf8574_name));
+			    " ddi_copyout routine\n",
+			    unitp->pcf8574_name));
 			err = EFAULT;
 		}
 		break;
 
 	case I2C_SET_BIT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_bit,
-				sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_SET_BIT"
-					" ddi_copyin routine\n",
-					unitp->pcf8574_name));
+			    " ddi_copyin routine\n",
+			    unitp->pcf8574_name));
 			err = EFAULT;
 			break;
 		}
 
 		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: I2C_SET_BIT: bit_num sent"
-					" in was not between 0 and 7",
-					unitp->pcf8574_name));
+			    " in was not between 0 and 7",
+			    unitp->pcf8574_name));
 			err = EIO;
 			break;
 		}
@@ -437,30 +437,30 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = pcf8574_get(unitp, &byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_BIT"
-					" pcf8574_get routine\n",
-					unitp->pcf8574_name));
+			    " pcf8574_get routine\n",
+			    unitp->pcf8574_name));
 			break;
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: byte returned from device is %x\n",
-			unitp->pcf8574_name, byte));
+		    unitp->pcf8574_name, byte));
 		byte = PCF8574_BIT_WRITE_MASK(byte, ioctl_bit.bit_num,
-						ioctl_bit.bit_value);
+		    ioctl_bit.bit_value);
 		D1CMN_ERR((CE_NOTE, "%s: byte after shifting is %x\n",
-			unitp->pcf8574_name, byte));
+		    unitp->pcf8574_name, byte));
 
 		err = pcf8574_set(unitp, byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_BIT"
-					" pcf8574_set routine\n",
-					unitp->pcf8574_name));
+			    " pcf8574_set routine\n",
+			    unitp->pcf8574_name));
 			break;
 		}
 		break;
 
 	default:
 		D2CMN_ERR((CE_WARN, "%s: Invalid IOCTL cmd: %x\n",
-				unitp->pcf8574_name, cmd));
+		    unitp->pcf8574_name, cmd));
 		err = EINVAL;
 	}
 
@@ -506,7 +506,7 @@ pcf8574_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(pcf8574soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d: failed to zalloc softstate\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -514,18 +514,18 @@ pcf8574_do_attach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 
 	(void) snprintf(unitp->pcf8574_name, sizeof (unitp->pcf8574_name),
-			"%s%d", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 
 	if (ddi_create_minor_node(dip, "pcf8574", S_IFCHR, instance,
-			"ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
+	    "ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
-			"%s\n", unitp->pcf8574_name, "pcf8574");
+		    "%s\n", unitp->pcf8574_name, "pcf8574");
 		ddi_soft_state_free(pcf8574soft_statep, instance);
 
 		return (DDI_FAILURE);
@@ -539,8 +539,8 @@ pcf8574_do_attach(dev_info_t *dip)
 	}
 
 	err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS,
-		"reg", (int **)&regs, &len);
+	    DDI_PROP_DONTPASS,
+	    "reg", (int **)&regs, &len);
 	if (err != DDI_PROP_SUCCESS) {
 		return (DDI_FAILURE);
 	}
@@ -553,7 +553,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	if (regs[0] == 0 && regs[1] == 0x7c) {
 		abort_seq_handler = littleneck_abort_seq_handler;
 		keypoll_timeout_hz =
-			drv_usectohz(LNECK_KEY_POLL_INTVL * MICROSEC);
+		    drv_usectohz(LNECK_KEY_POLL_INTVL * MICROSEC);
 		littleneck_ks_poll(unitp);
 	}
 
@@ -592,7 +592,7 @@ pcf8574_do_detach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 
@@ -620,7 +620,7 @@ littleneck_ks_poll(void *arg)
 
 	if (pcf8574_get(unitp, &byte) != I2C_SUCCESS) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in littleneck_ks_poll"
-				" pcf8574_get routine\n", unitp->pcf8574_name));
+		    " pcf8574_get routine\n", unitp->pcf8574_name));
 		mutex_exit(&unitp->pcf8574_mutex);
 		return;
 	}
@@ -629,10 +629,10 @@ littleneck_ks_poll(void *arg)
 	 * 5th bit in the byte is the key LOCKED position
 	 */
 	key_locked_bit = (boolean_t)PCF8574_BIT_READ_MASK(byte,
-		LNECK_KEY_POLL_BIT);
+	    LNECK_KEY_POLL_BIT);
 
 	keypoll_timeout_id = (timeout(littleneck_ks_poll,
-		(caddr_t)unitp, keypoll_timeout_hz));
+	    (caddr_t)unitp, keypoll_timeout_hz));
 
 	mutex_exit(&unitp->pcf8574_mutex);
 }
@@ -643,7 +643,7 @@ littleneck_abort_seq_handler(char *msg)
 
 	if (key_locked_bit == 0)
 		cmn_err(CE_CONT, "KEY in LOCKED position, "
-			"ignoring debug enter sequence\n");
+		    "ignoring debug enter sequence\n");
 	else  {
 		D1CMN_ERR((CE_CONT, "debug enter sequence \n"));
 		debug_enter(msg);

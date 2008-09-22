@@ -178,7 +178,8 @@ struct dev_ops cmdk_ops = {
 	nodev, 			/* reset */
 	&cmdk_cb_ops, 		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	cmdkpower		/* power */
+	cmdkpower,		/* power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 /*

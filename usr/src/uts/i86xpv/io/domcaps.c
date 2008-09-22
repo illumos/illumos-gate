@@ -143,14 +143,15 @@ static struct dev_ops domcaps_dv_ops = {
 	DEVO_REV,
 	0,
 	domcaps_getinfo,
-	nulldev,	/* identify */
-	nulldev,	/* probe */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
 	domcaps_attach,
 	domcaps_detach,
-	nodev,		/* reset */
+	nodev,			/* reset */
 	&domcaps_cb_ops,
-	NULL,		/* struct bus_ops */
-	NULL		/* power */
+	NULL,			/* struct bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

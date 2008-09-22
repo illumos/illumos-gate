@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the nexus driver for SMBUS devices.  It mostly does not use
@@ -135,12 +134,14 @@ static struct dev_ops smbus_ops = {
 	smbus_detach,
 	nodev,
 	&smbus_cb_ops,
-	&smbus_busops
+	&smbus_busops,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	"SMBUS nexus Driver %I%",	/* Name of the module. */
+	"SMBUS nexus Driver",	/* Name of the module. */
 	&smbus_ops,		/* driver ops */
 };
 
@@ -208,7 +209,7 @@ _init(void)
 	int status;
 
 	status = ddi_soft_state_init(&smbus_state, sizeof (smbus_t),
-		1);
+	    1);
 	if (status != 0) {
 
 		return (status);
@@ -500,8 +501,8 @@ smbus_initchild(dev_info_t *cdip)
 
 	len = sizeof (cell_size);
 	err = ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip,
-		DDI_PROP_CANSLEEP, "#address-cells",
-		(caddr_t)&cell_size, &len);
+	    DDI_PROP_CANSLEEP, "#address-cells",
+	    (caddr_t)&cell_size, &len);
 	if (err != DDI_PROP_SUCCESS || len != sizeof (cell_size)) {
 		cmn_err(CE_WARN, "cannot find address-cells");
 
@@ -1175,7 +1176,7 @@ smbus_intr_cmn(smbus_t *smbus, char *src)
 			smbus->smbus_timeout = timeout(smbus_intr_timeout,
 			    smbus, drv_usectohz(intr_timeout));
 			SMBUS_PRINT((PRT_INTR, "smbus_intr starting timeout %p "
-				"%s", smbus->smbus_timeout, src));
+			    "%s", smbus->smbus_timeout, src));
 		}
 	}
 

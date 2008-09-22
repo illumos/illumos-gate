@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v application watchdog driver
@@ -177,12 +176,13 @@ static struct dev_ops ntwdt_dev_ops = {
 	nodev,			/* devo_reset */
 	&ntwdt_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Application Watchdog Driver 1.1",
+	"Application Watchdog Driver",
 	&ntwdt_dev_ops
 };
 
@@ -399,9 +399,9 @@ ntwdt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_remove_softintr(ntwdt_cyclic_softint_id);
 
 		mutex_destroy(
-			&ntwdt_ptr->ntwdt_run_state->ntwdt_runstate_mutex);
+		    &ntwdt_ptr->ntwdt_run_state->ntwdt_runstate_mutex);
 		kmem_free(ntwdt_ptr->ntwdt_run_state,
-			sizeof (ntwdt_runstate_t));
+		    sizeof (ntwdt_runstate_t));
 		ntwdt_ptr->ntwdt_run_state = NULL;
 
 		mutex_destroy(&ntwdt_ptr->ntwdt_mutex);
@@ -492,30 +492,30 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		mutex_exit(&ntwdt_state->ntwdt_runstate_mutex);
 
 		if (ddi_copyout((caddr_t)&lom_dogstate, (caddr_t)arg,
-			sizeof (lom_dogstate_t), mode) != 0) {
+		    sizeof (lom_dogstate_t), mode) != 0) {
 			retval = EFAULT;
 		}
 		break;
 
 	case LOMIOCDOGCTL:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&lom_dogctl,
-			sizeof (lom_dogctl_t), mode) != 0) {
+		    sizeof (lom_dogctl_t), mode) != 0) {
 			retval = EFAULT;
 			break;
 		}
 
 		NTWDT_DBG(NTWDT_DBG_IOCTL, ("reset_enable: %d, and dog_enable: "
-			"%d, watchdog_timeout %d", lom_dogctl.reset_enable,
-			lom_dogctl.dog_enable,
-			ntwdt_state->ntwdt_watchdog_timeout));
+		    "%d, watchdog_timeout %d", lom_dogctl.reset_enable,
+		    lom_dogctl.dog_enable,
+		    ntwdt_state->ntwdt_watchdog_timeout));
 		/*
 		 * ignore request to enable reset while disabling watchdog.
 		 */
 		if (!lom_dogctl.dog_enable && lom_dogctl.reset_enable) {
 			NTWDT_DBG(NTWDT_DBG_IOCTL, ("invalid combination of "
-				"reset_enable: %d, and dog_enable: %d",
-				lom_dogctl.reset_enable,
-				lom_dogctl.dog_enable));
+			    "reset_enable: %d, and dog_enable: %d",
+			    lom_dogctl.reset_enable,
+			    lom_dogctl.dog_enable));
 			retval = EINVAL;
 			break;
 		}
@@ -528,8 +528,8 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			 * a valid timeout.
 			 */
 			NTWDT_DBG(NTWDT_DBG_IOCTL, ("timeout has not been set"
-				"watchdog_timeout: %d",
-				ntwdt_state->ntwdt_watchdog_timeout));
+			    "watchdog_timeout: %d",
+			    ntwdt_state->ntwdt_watchdog_timeout));
 			retval = EINVAL;
 			goto end;
 		}
@@ -567,22 +567,22 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	case LOMIOCDOGTIME:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&lom_dogtime,
-			sizeof (uint32_t), mode) != 0) {
+		    sizeof (uint32_t), mode) != 0) {
 			retval = EFAULT;
 			break;
 		}
 
 		NTWDT_DBG(NTWDT_DBG_IOCTL, ("user set timeout: %d",
-			lom_dogtime));
+		    lom_dogtime));
 
 		/*
 		 * Ensure specified timeout is valid.
 		 */
 		if ((lom_dogtime == 0) ||
-			(lom_dogtime > (uint32_t)NTWDT_MAX_TIMEOUT)) {
+		    (lom_dogtime > (uint32_t)NTWDT_MAX_TIMEOUT)) {
 			retval = EINVAL;
 			NTWDT_DBG(NTWDT_DBG_IOCTL, ("user set invalid "
-				"timeout: %d", (int)TICK_TO_MSEC(lom_dogtime)));
+			    "timeout: %d", (int)TICK_TO_MSEC(lom_dogtime)));
 			break;
 		}
 
@@ -612,7 +612,7 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * running, exit.
 		 */
 		if (!(ntwdt_state->ntwdt_watchdog_enabled &&
-			ntwdt_state->ntwdt_timer_running)) {
+		    ntwdt_state->ntwdt_timer_running)) {
 			NTWDT_DBG(NTWDT_DBG_IOCTL, ("PAT: AWDT not enabled"));
 			goto end;
 		}
@@ -623,8 +623,8 @@ ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			 */
 			ntwdt_arm_watchdog(ntwdt_state);
 			NTWDT_DBG(NTWDT_DBG_IOCTL, ("AWDT patted, "
-				"remainning seconds: %d",
-				ntwdt_state->ntwdt_time_remaining));
+			    "remainning seconds: %d",
+			    ntwdt_state->ntwdt_time_remaining));
 		}
 
 		mutex_exit(&ntwdt_state->ntwdt_runstate_mutex);
@@ -663,14 +663,14 @@ ntwdt_cyclic_softint(caddr_t arg)
 	}
 
 	if ((ntwdt_state->ntwdt_timer_running == 0) ||
-		(ntwdt_ptr->ntwdt_cycl_id == CYCLIC_NONE) ||
-		(ntwdt_state->ntwdt_watchdog_enabled == 0)) {
+	    (ntwdt_ptr->ntwdt_cycl_id == CYCLIC_NONE) ||
+	    (ntwdt_state->ntwdt_watchdog_enabled == 0)) {
 		goto end;
 	}
 
 	NTWDT_DBG(NTWDT_DBG_IOCTL, ("cyclic_softint: %d"
-		"lbolt64: %d\n", ntwdt_state->ntwdt_watchdog_timeout,
-		(int)TICK_TO_MSEC(lbolt64)));
+	    "lbolt64: %d\n", ntwdt_state->ntwdt_watchdog_timeout,
+	    (int)TICK_TO_MSEC(lbolt64)));
 
 	/*
 	 * Decrement the virtual watchdog timer and check if it has expired.
@@ -701,7 +701,7 @@ ntwdt_cyclic_softint(caddr_t arg)
 	} else {
 		_NOTE(EMPTY)
 		NTWDT_DBG(NTWDT_DBG_NTWDT, ("time remaining in AWDT: %d secs",
-			(int)TICK_TO_MSEC(ntwdt_state->ntwdt_time_remaining)));
+		    (int)TICK_TO_MSEC(ntwdt_state->ntwdt_time_remaining)));
 	}
 
 end:
@@ -784,7 +784,7 @@ ntwdt_enforce_timeout()
 {
 	if (ntwdt_disable_timeout_action != 0) {
 		cmn_err(CE_NOTE, "Appication watchdog timer expired, "
-			"taking no action");
+		    "taking no action");
 		return;
 	}
 

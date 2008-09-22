@@ -1,3 +1,4 @@
+
 /*
  * CDDL HEADER START
  *
@@ -20,11 +21,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(__lint)
 
@@ -74,7 +73,7 @@ mb_header:
 	 * At entry we are in protected mode, 32 bit execution, paging and
 	 * interrupts are disabled.
 	 *
-	 * EAX == 0x2BADB002
+	 * EAX == MB_BOOTLOADER_MAGIC
 	 * EBX points to multiboot information
 	 * segment registers all have segments with base 0, limit == 0xffffffff
 	 */
@@ -109,6 +108,7 @@ newgdt:
 	 * go off and determine memory config, build page tables, etc.
 	 */
 	call	startup_kernel
+
 
 	/*
 	 * On amd64 we'll want the stack pointer to be 16 byte aligned.

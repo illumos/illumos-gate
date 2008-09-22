@@ -29,7 +29,6 @@
 #ifndef _SYS_CONF_H
 #define	_SYS_CONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.21	*/
 
 #include <sys/feature_tests.h>
 
@@ -87,6 +86,7 @@ extern int devi_probe(dev_info_t *);
 extern int devi_attach(dev_info_t *, ddi_attach_cmd_t);
 extern int devi_detach(dev_info_t *, ddi_detach_cmd_t);
 extern int devi_reset(dev_info_t *, ddi_reset_cmd_t);
+extern int devi_quiesce(dev_info_t *);
 
 /*
  * The following [cb]dev_* functions are not part of the DDI, use

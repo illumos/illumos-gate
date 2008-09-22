@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Platform Power Management master pseudo driver -
@@ -141,14 +140,15 @@ static struct dev_ops ppm_ops = {
 	nodev,			/* reset */
 	&ppm_cb_ops,		/* cb_ops */
 	&ppm_bus_ops,		/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"platform pm driver v%I%",
+	"platform pm driver",
 	&ppm_ops
 };
 

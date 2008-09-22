@@ -71,7 +71,8 @@ static struct dev_ops aggr_dev_ops = {
 	nodev,			/* reset */
 	&aggr_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	nodev			/* dev power */
+	nodev,			/* dev power */
+	ddi_quiesce_not_supported,	/* dev quiesce */
 };
 
 static struct modldrv aggr_modldrv = {

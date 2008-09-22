@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DESCRIPTION
@@ -356,7 +355,7 @@ sm_qs_without(sm_uqi_t *uqi, uint_t flag, uint_t ioflag)
 
 	for (lqi = uqi->sm_lqs; lqi; lqi = lqi->sm_nlqi) {
 		if ((lqi->sm_flags & flag) == 0 &&
-			(lqi->sm_ioflag & ioflag) == 0)
+		    (lqi->sm_ioflag & ioflag) == 0)
 			count++;
 	}
 	return (count);
@@ -375,7 +374,7 @@ static int
 sm_cnt_oqs(sm_uqi_t *uqi)
 {
 	return (sm_qs_without(uqi, (WERROR_MODE|HANGUP_MODE),
-		(uint_t)FOROUTPUT));
+	    (uint_t)FOROUTPUT));
 }
 
 /*
@@ -394,7 +393,7 @@ sm_issue_ioctl(void *arg)
 
 	lqi->sm_bid = 0;
 	if ((lqi->sm_flags & (WERROR_MODE|HANGUP_MODE)) == 0 &&
-		(lqi->sm_flags & (WANT_CDSTAT|WANT_TCSET))) {
+	    (lqi->sm_flags & (WANT_CDSTAT|WANT_TCSET))) {
 		mblk_t *pioc;
 
 		if (lqi->sm_flags & WANT_TCSET) {
@@ -432,7 +431,7 @@ sm_issue_ioctl(void *arg)
 					bzero((caddr_t)tc,
 					    sizeof (struct termios));
 					tc->c_cflag = lqi->sm_ttycommon->
-							t_cflag;
+					    t_cflag;
 					pioc->b_cont->b_rptr =
 					    pioc->b_cont->b_wptr;
 					pioc->b_cont->b_wptr +=
@@ -450,7 +449,7 @@ sm_issue_ioctl(void *arg)
 		if (pioc != 0) {
 
 			lqi->sm_piocid = ((struct iocblk *)pioc->b_rptr)->
-						ioc_id;
+			    ioc_id;
 			lqi->sm_flags |= SM_IOCPENDING;
 
 			/* lqi->sm_flags |= cmdflag; */
@@ -459,7 +458,7 @@ sm_issue_ioctl(void *arg)
 		} else {
 			UNLOCK_UNIT(lqi);
 			lqi->sm_bid = qbufcall(WR(q), size, BPRI_MED,
-				sm_issue_ioctl, lqi);
+			    sm_issue_ioctl, lqi);
 		}
 	}
 	else
@@ -476,7 +475,7 @@ sm_associate(int unit, sm_lqi_t *plqi, ulong_t tag, uint_t ioflag, char *dp)
 	int rval = 0;
 
 	sm_dbg('Y', ("sm_associate(%d, %d, %d): ",
-		(plqi) ? plqi->sm_linkid : 0, unit, ioflag));
+	    (plqi) ? plqi->sm_linkid : 0, unit, ioflag));
 	/*
 	 * Check the data is valid.
 	 * Associate a lower queue with a logical unit.
@@ -511,9 +510,9 @@ sm_associate(int unit, sm_lqi_t *plqi, ulong_t tag, uint_t ioflag, char *dp)
 				plqi->sm_ioflag = (ioflag & (uint_t)FORIO);
 
 			plqi->sm_ttycommon->t_cflag = uqi->sm_ttycommon->
-							t_cflag;
+			    t_cflag;
 			plqi->sm_ttycommon->t_flags = uqi->sm_ttycommon->
-							t_flags;
+			    t_flags;
 			plqi->sm_uqi = uqi;
 			plqi->sm_mbits = 0;
 			plqi->sm_tag = tag;
@@ -532,7 +531,7 @@ sm_associate(int unit, sm_lqi_t *plqi, ulong_t tag, uint_t ioflag, char *dp)
 			if (uqi->sm_lqs) {
 				sm_lqi_t *lq;
 				for (lq = uqi->sm_lqs; lq->sm_nlqi;
-						lq = lq->sm_nlqi) {
+				    lq = lq->sm_nlqi) {
 				}
 				lq->sm_nlqi = plqi;
 			} else
@@ -722,7 +721,7 @@ sm_dupmsg(sm_uqi_t *uqi, mblk_t *mp)
 			sm_lqi_t *flqi;
 
 			for (flqi = uqi->sm_lqs; flqi != lqi;
-					flqi = flqi->sm_nlqi) {
+			    flqi = flqi->sm_nlqi) {
 				if (lqi->sm_mp) {
 				/* must have been sm_copymsg */
 					sm_freemsg(lqi->sm_mp);
@@ -773,7 +772,7 @@ sm_putqs(queue_t *q, mblk_t *mp, int (*qfn)())
 	if (uqi->sm_lqs == 0 || (uqi->sm_flags & WERROR_MODE)) {
 
 		sm_dbg('Q', ("sm_putqs: freeing (0x%p 0x%p).\n", uqi->sm_lqs,
-					uqi->sm_flags));
+		    uqi->sm_flags));
 		freemsg(mp);
 	} else if (pri != BPRI_HI && sm_cansenddown(uqi) == 0) {
 		/* a lower q is flow controlled */
@@ -785,7 +784,7 @@ sm_putqs(queue_t *q, mblk_t *mp, int (*qfn)())
 
 	} else {
 		sm_log("sm_putqs: msg 0x%x - can't alloc %d bytes (pri %d).\n",
-				DB_TYPE(mp), memreq, pri);
+		    DB_TYPE(mp), memreq, pri);
 		sm_sched_uqcb(q, memreq, pri, sm_reenable_q);
 
 		(void) qfn(q, mp);
@@ -827,7 +826,7 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 		 * 4.	Remember that this lower queue is linked to the driver.
 		 */
 		if ((linkp == NULL) || (MBLKL(mp) < sizeof (*linkp)) ||
-			linkp->l_qbot == NULL) {
+		    linkp->l_qbot == NULL) {
 			sm_dbg('I', ("sm_link_req: invalid link block.\n"));
 			rval = EINVAL;
 		} else if ((plqi = get_lqi_byq(linkp->l_qbot)) == 0) {
@@ -842,12 +841,12 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 			SM_RQ(plqi)	= OTHERQ(linkp->l_qbot);
 
 			linkp->l_qbot->q_ptr =
-				OTHERQ(linkp->l_qbot)->q_ptr = plqi;
+			    OTHERQ(linkp->l_qbot)->q_ptr = plqi;
 			plqi->sm_linkid = linkp->l_index;
 			UNLOCK_UNIT(plqi); /* was aquired by get_lqi_byq */
 
 			sm_dbg('H', ("sm_link_req: linkid = %d.\n",
-				linkp->l_index));
+			    linkp->l_index));
 
 			sm_setdip(linkp->l_qbot, plqi);
 			plqi->sm_ttycommon->t_flags = 0;
@@ -866,8 +865,8 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 		linkp = (struct linkblk *)mp->b_cont->b_rptr;
 
 		if ((linkp == NULL) ||
-			(MBLKL(mp) < sizeof (*linkp)) ||
-			linkp->l_qbot == NULL) {
+		    (MBLKL(mp) < sizeof (*linkp)) ||
+		    linkp->l_qbot == NULL) {
 			rval = EINVAL;
 		} else if ((plqi = get_lqi_byid(linkp->l_index)) == 0) {
 			rval = EINVAL;
@@ -879,7 +878,7 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 			 * Mark the lower q as invalid.
 			 */
 			sm_dbg('G', ("I_PUNLINK: freeing link %d\n",
-					linkp->l_index));
+			    linkp->l_index));
 
 			if (plqi->sm_bid) {
 				qunbufcall(SM_RQ(plqi), plqi->sm_bid);
@@ -897,7 +896,7 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 
 			if (uqi)
 				(void) sm_disassociate(uqi->sm_lunit,
-					plqi, plqi->sm_tag);
+				    plqi, plqi->sm_tag);
 
 			LOCK_UNIT(plqi);
 
@@ -926,7 +925,7 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 			    sm_uwq_error(uqi) &&
 			    putnextctl(SM_RQ(uqi), M_HANGUP) == 0) {
 				sm_log("sm_link_req: putnextctl(M_HANGUP)"
-					" failed.\n");
+				    " failed.\n");
 			}
 
 			rval = 0;
@@ -962,8 +961,8 @@ sm_getiocinfo(mblk_t *mp, struct sm_iocinfo *info)
 		info->sm_cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
 		/* the se driver has bug so we cannot use ioc_count */
 		info->sm_data = (((struct iocblk *)mp->b_rptr)->
-					ioc_error == 0 && mp->b_cont) ?
-					(void *)mp->b_cont->b_rptr : 0;
+		    ioc_error == 0 && mp->b_cont) ?
+		    (void *)mp->b_cont->b_rptr : 0;
 		break;
 	case M_IOCNAK:
 		info->sm_id = ((struct iocblk *)mp->b_rptr)->ioc_id;
@@ -974,8 +973,8 @@ sm_getiocinfo(mblk_t *mp, struct sm_iocinfo *info)
 		info->sm_id = ((struct copyresp *)mp->b_rptr)->cp_id;
 		info->sm_cmd = ((struct copyresp *)mp->b_rptr)->cp_cmd;
 		info->sm_data = (((struct copyresp *)mp->b_rptr)->
-					cp_rval == 0 && mp->b_cont) ?
-					(void *)mp->b_cont->b_rptr : 0;
+		    cp_rval == 0 && mp->b_cont) ?
+		    (void *)mp->b_cont->b_rptr : 0;
 		break;
 	case M_IOCTL:
 		info->sm_id = ((struct iocblk *)mp->b_rptr)->ioc_id;
@@ -1068,8 +1067,8 @@ sm_update_ttyinfo(mblk_t *mp, sm_uqi_t *uqi)
 	} /* end switch cmd */
 
 	if ((uqi->sm_mbits & TIOCM_CD) ||
-		(uqi->sm_ttycommon->t_flags & TS_SOFTCAR) ||
-		(uqi->sm_ttycommon->t_cflag & CLOCAL))
+	    (uqi->sm_ttycommon->t_flags & TS_SOFTCAR) ||
+	    (uqi->sm_ttycommon->t_cflag & CLOCAL))
 		uqi->sm_flags |= SM_CARON;
 	else
 		uqi->sm_flags &= ~SM_CARON;
@@ -1129,7 +1128,7 @@ sm_hp_uwput(queue_t *wq, mblk_t *mp)
 		 */
 		for (plqi = uqi->sm_lqs; plqi != 0; plqi = plqi->sm_nlqi) {
 			if ((plqi->sm_flags & WERROR_MODE) == 0 &&
-						SM_WQ(plqi)) {
+			    SM_WQ(plqi)) {
 				sm_dbg('I', ("flush lq 0x%p\n", SM_WQ(plqi)));
 				if (*mp->b_rptr & FLUSHW)
 					flushq(SM_WQ(plqi), FLUSHDATA);
@@ -1306,7 +1305,7 @@ sm_uwput(queue_t *wq, mblk_t *mp)
 		case CONSSETABORTENABLE:
 			iobp->ioc_error =
 			    secpolicy_sys_config(iobp->ioc_cr, B_FALSE) != 0 ?
-				EPERM : ttymux_abort_ioctl(mp);
+			    EPERM : ttymux_abort_ioctl(mp);
 			DB_TYPE(mp) = iobp->ioc_error ? M_IOCNAK : M_IOCACK;
 			qreply(wq, mp);
 			break;
@@ -1468,7 +1467,7 @@ sm_uriocack(queue_t *rq, mblk_t *mp)
 	} else {
 		sm_log("Unexpected ioctl response\n");
 		sm_dbg('I', ("Unexpected ioctl response (id %d)\n",
-				info.sm_id));
+		    info.sm_id));
 
 		/*
 		 * If the response is sent up it will result in
@@ -1701,16 +1700,16 @@ sm_lrmsg_check(queue_t *q, mblk_t *mp)
 					lqi->sm_nachar++;
 					if (*lqi->sm_nachar == '\0') {
 						abort_sequence_enter(
-							(char *)NULL);
+						    (char *)NULL);
 						lqi->sm_nachar = sm_ssp->sm_abs;
 						aborted = B_TRUE;
 					}
 				} else
 					lqi->sm_nachar = (*rxc == *sm_ssp->
-								sm_abs) ?
-								sm_ssp->
-								sm_abs + 1 :
-								sm_ssp->sm_abs;
+					    sm_abs) ?
+					    sm_ssp->
+					    sm_abs + 1 :
+					    sm_ssp->sm_abs;
 
 			if (aborted) {
 				freemsg(mp);
@@ -1848,7 +1847,7 @@ sm_sendup(queue_t *q, mblk_t *mp)
 				/* has next driver done qprocsoff */
 				if (rw && OTHERQ(q)->q_next != NULL) {
 					(void) putnextctl1(OTHERQ(q), M_FLUSH,
-						rw);
+					    rw);
 				}
 			}
 		} else if (*mp->b_rptr != 0 && OTHERQ(q)->q_next != NULL) {
@@ -1927,7 +1926,7 @@ sm_ok_to_open(sm_uqi_t *uqi, int protocol, cred_t *credp, int *abort_waiters)
 	switch (protocol) {
 		case ASYNC_DEVICE: /* Standard async protocol */
 		if ((uqi->sm_protocol == NULL_PROTOCOL) ||
-			(uqi->sm_protocol == ASYN_PROTOCOL)) {
+		    (uqi->sm_protocol == ASYN_PROTOCOL)) {
 			/*
 			 * Lock out other incompatible protocol requests.
 			 */
@@ -1939,7 +1938,7 @@ sm_ok_to_open(sm_uqi_t *uqi, int protocol, cred_t *credp, int *abort_waiters)
 
 		case OUTLINE:	/* Outdial protocol */
 		if ((uqi->sm_protocol == NULL_PROTOCOL) ||
-			(uqi->sm_protocol == OUTD_PROTOCOL)) {
+		    (uqi->sm_protocol == OUTD_PROTOCOL)) {
 			proto = OUTD_PROTOCOL;
 			rval = 0;
 		} else if (uqi->sm_protocol == ASYN_PROTOCOL) {
@@ -1962,8 +1961,8 @@ sm_ok_to_open(sm_uqi_t *uqi, int protocol, cred_t *credp, int *abort_waiters)
 	}
 
 	if (rval == 0 &&
-		(uqi->sm_ttycommon->t_flags & TS_XCLUDE) &&
-		secpolicy_excl_open(credp) != 0) {
+	    (uqi->sm_ttycommon->t_flags & TS_XCLUDE) &&
+	    secpolicy_excl_open(credp) != 0) {
 
 		if (uqi->sm_flags & FULLY_OPEN) {
 			rval = EBUSY; /* exclusive device already open */
@@ -1978,7 +1977,7 @@ sm_ok_to_open(sm_uqi_t *uqi, int protocol, cred_t *credp, int *abort_waiters)
 		uqi->sm_protocol = proto;
 
 	sm_dbg('A', ("ok_to_open (0x%p, %d) proto=%d rval %d (wabort=%d)",
-		uqi, protocol, uqi->sm_protocol, rval, *abort_waiters));
+	    uqi, protocol, uqi->sm_protocol, rval, *abort_waiters));
 
 	return (rval);
 }
@@ -2049,7 +2048,7 @@ sm_defer_open(sm_uqi_t *uqi, queue_t *q)
 		mblk_t *pioc;
 
 		sm_dbg('C', ("sm_defer_open: flags 0x%x cmdflags 0x%x\n",
-					uqi->sm_flags, cmdflags));
+		    uqi->sm_flags, cmdflags));
 		if (cmdflags == 0) {
 			if (err = sm_qwait_sig(uqi, q))
 				return (err);
@@ -2068,8 +2067,8 @@ sm_defer_open(sm_uqi_t *uqi, queue_t *q)
 		if (uqi->sm_piocdata.sm_iocid == 0) {
 			while ((pioc = mkiocb(iocmd)) == 0) {
 				bufcall_id_t id =
-					qbufcall(q, sizeof (struct iocblk),
-					BPRI_MED, dummy_callback, 0);
+				    qbufcall(q, sizeof (struct iocblk),
+				    BPRI_MED, dummy_callback, 0);
 				if (err = sm_qwait_sig(uqi, q)) {
 					/* wait for the bufcall */
 					qunbufcall(q, id);
@@ -2086,7 +2085,7 @@ sm_defer_open(sm_uqi_t *uqi, queue_t *q)
 			uqi->sm_piocdata.sm_nacks = nqs;
 			uqi->sm_piocdata.sm_acnt = 0;
 			uqi->sm_piocdata.sm_ackcnt = uqi->
-					sm_piocdata.sm_nakcnt = 0;
+			    sm_piocdata.sm_nakcnt = 0;
 			uqi->sm_piocdata.sm_policy = uqi->sm_policy;
 			uqi->sm_piocdata.sm_flags = SM_INTERNALIOC;
 			if (sm_putqs(WR(q), pioc, sm_dump_msg) != 0) {
@@ -2133,7 +2132,7 @@ sm_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 	uqi = get_uqi(sm_ssp, unit);
 
 	sm_dbg('C', ("open(0x%p, %d, 0x%x) :- unit=%d, proto=%d, uqi=0x%p\n",
-		rq, *devp, flag, unit, protocol, uqi));
+	    rq, *devp, flag, unit, protocol, uqi));
 
 	if (uqi == 0)
 		return (ENXIO);
@@ -2186,7 +2185,7 @@ sm_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		}
 		else
 			bzero((caddr_t)uqi->sm_ttycommon,
-				sizeof (uqi->sm_ttycommon));
+			    sizeof (uqi->sm_ttycommon));
 
 		if (*devp == rconsdev) {
 			uqi->sm_cmask = sm_cmask;
@@ -2205,7 +2204,7 @@ sm_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		uqi->sm_policy = FIRSTACK;
 		if (unit == 0 && sm_ssp->sm_ms == 0)
 			sm_ssp->sm_ms = (sm_mux_state_t *)
-						space_fetch(TTYMUXPTR);
+			    space_fetch(TTYMUXPTR);
 		if (sm_ssp->sm_ms) {
 			if (sm_ssp->sm_ms->sm_cons_stdin.sm_dev == *devp ||
 			    sm_ssp->sm_ms->sm_cons_stdout.sm_dev == *devp)
@@ -2338,7 +2337,7 @@ sm_close(queue_t *rq, int flag, cred_t *credp)
 	}
 
 	sm_dbg('C', ("close: uqi=0x%p unit=%d q=0x%p)\n", uqi, uqi->sm_lunit,
-			rq));
+	    rq));
 
 	if (SM_RQ(uqi) != rq)
 		sm_dbg('C', ("sm_close: rq != current uqi queue\n"));
@@ -2373,7 +2372,7 @@ sm_close(queue_t *rq, int flag, cred_t *credp)
 	LOCK_UNIT(uqi);
 	if (uqi->sm_waitq == 0)
 		uqi->sm_flags = (uqi->sm_flags & SM_OBPCNDEV) ? SM_OBPCNDEV :
-									0U;
+		    0U;
 
 	uqi->sm_dev = NODEV;
 	uqi->sm_protocol = NULL_PROTOCOL;
@@ -2402,7 +2401,7 @@ sm_close(queue_t *rq, int flag, cred_t *credp)
 	 */
 	if (uqi->sm_waitq) {
 		sm_dbg('C', ("close(0x%p): doing putctl on 0x%p\n",
-			rq, uqi->sm_waitq));
+		    rq, uqi->sm_waitq));
 		if (rq == uqi->sm_waitq)
 			sm_log("close: waitq and closeq are same q\n");
 		(void) putctl(uqi->sm_waitq, M_CTL);
@@ -2425,8 +2424,8 @@ sm_set_abort()
 	int len = SM_MAX_ABSLEN;
 
 	if (ddi_prop_op(DDI_DEV_T_ANY, sm_ssp->sm_dip, PROP_LEN_AND_VAL_BUF, 0,
-		"abort-str", as, &len) != DDI_PROP_SUCCESS ||
-		(len = strlen(as)) < SM_MIN_ABSLEN) {
+	    "abort-str", as, &len) != DDI_PROP_SUCCESS ||
+	    (len = strlen(as)) < SM_MIN_ABSLEN) {
 		(void) strcpy(as, ds);
 		len = strlen(as);
 	} else {
@@ -2518,27 +2517,27 @@ sm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Get required debug level.
 	 */
 	sm_ssp->sm_trflag = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sm-trlv", sm_default_trflag);
+	    DDI_PROP_DONTPASS, "sm-trlv", sm_default_trflag);
 
 	sm_max_units = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sm-max-units", sm_max_units);
+	    DDI_PROP_DONTPASS, "sm-max-units", sm_max_units);
 	sm_minor_cnt = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sm-minor-cnt", 0);
+	    DDI_PROP_DONTPASS, "sm-minor-cnt", 0);
 
 	sm_refuse_opens = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sm-refuse-opens", sm_refuse_opens);
+	    DDI_PROP_DONTPASS, "sm-refuse-opens", sm_refuse_opens);
 
 	sm_ssp->sm_ctrla_abort_on = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sm-ctrla-abort-on", 1);
+	    DDI_PROP_DONTPASS, "sm-ctrla-abort-on", 1);
 	sm_ssp->sm_break_abort_on = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "sm-break-abort-on", 0);
+	    DDI_PROP_DONTPASS, "sm-break-abort-on", 0);
 
 	sm_set_abort();
 
 	sm_ssp->sm_lqs = (sm_lqi_t *)kmem_zalloc(sizeof (sm_lqi_t) * MAX_LQS,
-							KM_SLEEP);
+	    KM_SLEEP);
 	sm_ssp->sm_uqs = (sm_uqi_t *)kmem_zalloc(sizeof (sm_uqi_t) * NLUNITS,
-							KM_SLEEP);
+	    KM_SLEEP);
 
 	for (unit = 2; unit < NLUNITS && unit < sm_minor_cnt + 2; unit++) {
 
@@ -2577,7 +2576,7 @@ sm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(uqi->sm_umutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(uqi->sm_ucv, NULL, CV_DRIVER, NULL);
 		mutex_init(&uqi->sm_ttycommon->t_excl, NULL,
-				MUTEX_DRIVER, NULL);
+		    MUTEX_DRIVER, NULL);
 	}
 
 	for (unit = 0; unit < MAX_LQS; unit++) {
@@ -2591,7 +2590,7 @@ sm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(lqip->sm_umutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(lqip->sm_ucv, NULL, CV_DRIVER, NULL);
 		mutex_init(&lqip->sm_ttycommon->t_excl, NULL,
-				MUTEX_DRIVER, NULL);
+		    MUTEX_DRIVER, NULL);
 	}
 
 	return (DDI_SUCCESS);
@@ -2826,7 +2825,7 @@ DDI_DEFINE_STREAM_OPS(sm_ops, \
 	nulldev, nulldev, \
 	sm_attach, sm_detach, nodev, \
 	sm_info, (D_NEW | D_MTQPAIR|D_MTOUTPERIM|D_MTOCEXCL | D_MP),
-	&sm_streamtab);
+	&sm_streamtab, ddi_quiesce_not_supported);
 
 /*
  * Driver module information.
@@ -2835,7 +2834,7 @@ extern struct mod_ops mod_driverops;
 static struct modldrv modldrv =
 {
 	&mod_driverops,
-	"serial mux driver %I%",
+	"serial mux driver",
 	&sm_ops
 };
 

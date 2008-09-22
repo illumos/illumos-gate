@@ -80,6 +80,7 @@ static int mscsi_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 static int mscsi_reset(dev_info_t *devi, ddi_reset_cmd_t cmd);
 static int mscsi_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
 	void *arg, void **result);
+static int mscsi_quiesce(dev_info_t *devi);
 
 struct dev_ops mscsi_ops = {
 	DEVO_REV,		/* devo_rev */
@@ -92,7 +93,8 @@ struct dev_ops mscsi_ops = {
 	mscsi_reset,		/* reset */
 	(struct cb_ops *)0,	/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power operations */
+	NULL,			/* power operations */
+	mscsi_quiesce,		/* quiesce */
 };
 
 /*
@@ -193,7 +195,7 @@ mscsi_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return ((DEVI(pdevi)->devi_ops->devo_attach)(devi, cmd));
 
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-		"mbus_type", MSCSI_NAME);
+	    "mbus_type", MSCSI_NAME);
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);
 }
@@ -218,6 +220,27 @@ mscsi_reset(dev_info_t *devi, ddi_reset_cmd_t cmd)
 
 	if (mscsi_callback(pdevi) == DDI_SUCCESS)
 		return ((DEVI(pdevi)->devi_ops->devo_reset)(devi, cmd));
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+mscsi_quiesce(dev_info_t *devi)
+{
+	dev_info_t *pdevi = ddi_get_parent(devi);
+
+	if (mscsi_callback(pdevi) == DDI_SUCCESS)
+		return ((DEVI(pdevi)->devi_ops->devo_quiesce)(devi));
 
 	return (DDI_SUCCESS);
 }

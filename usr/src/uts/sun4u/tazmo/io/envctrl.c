@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ENVCTRL_ Environment Monitoring driver for i2c
@@ -206,14 +205,15 @@ struct dev_ops  envctrl_ops = {
 	nodev,			/* devo_reset */
 	&envctrl_cb_ops,	/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv envctrlmodldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"I2C ENVCTRL_driver: %I% %E%",
+	"I2C ENVCTRL_driver",
 	&envctrl_ops,
 };
 
@@ -385,7 +385,7 @@ _init(void)
 
 	if ((error = mod_install(&envctrlmodlinkage)) == 0) {
 		(void) ddi_soft_state_init(&envctrlsoft_statep,
-			sizeof (struct envctrlunit), 1);
+		    sizeof (struct envctrlunit), 1);
 	}
 
 	return (error);
@@ -472,8 +472,8 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	unitp = ddi_get_soft_state(envctrlsoft_statep, instance);
 
 	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&unitp->bus_ctl_regs, 0,
-			sizeof (struct envctrl_pcd8584_regs), &attr,
-			&unitp->ctlr_handle) != DDI_SUCCESS) {
+	    sizeof (struct envctrl_pcd8584_regs), &attr,
+	    &unitp->ctlr_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "I2c failed to map in bus_control regs\n");
 		return (DDI_FAILURE);
 	}
@@ -492,27 +492,27 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* add interrupts */
 
 	if (ddi_get_iblock_cookie(dip, 1,
-			&unitp->ic_trap_cookie) != DDI_SUCCESS)  {
+	    &unitp->ic_trap_cookie) != DDI_SUCCESS)  {
 		cmn_err(CE_WARN, "ddi_get_iblock_cookie FAILED \n");
 		goto failed;
 	}
 
 	mutex_init(&unitp->umutex, NULL, MUTEX_DRIVER,
-		(void *)unitp->ic_trap_cookie);
+	    (void *)unitp->ic_trap_cookie);
 
 
 	if (ddi_add_intr(dip, 0, &unitp->ic_trap_cookie, NULL, envctrl_bus_isr,
-			(caddr_t)unitp) != DDI_SUCCESS) {
+	    (caddr_t)unitp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "envctrl_attach failed to add hard intr %d\n",
-			instance);
+		    instance);
 		goto remlock;
 	}
 
 
 	if (ddi_add_intr(dip, 1, &unitp->ic_trap_cookie, NULL, envctrl_dev_isr,
-			(caddr_t)unitp) != DDI_SUCCESS) {
+	    (caddr_t)unitp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "envctrl_attach failed to add hard intr %d\n",
-			instance);
+		    instance);
 		goto remhardintr;
 	}
 
@@ -520,7 +520,7 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	(void) sprintf(name, "envctrl%d", instance);
 
 	if (ddi_create_minor_node(dip, name, S_IFCHR, instance, DDI_PSEUDO,
-			NULL) == DDI_FAILURE) {
+	    NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		goto remhardintr1;
 	}
@@ -545,24 +545,24 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 #ifdef	DEBUG
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, ENVCTRL_PANEL_LEDS_PR,
-			&reg_prop, &len) == DDI_PROP_SUCCESS)
+	    DDI_PROP_DONTPASS, ENVCTRL_PANEL_LEDS_PR,
+	    &reg_prop, &len) == DDI_PROP_SUCCESS)
 		ddi_prop_free((void *)reg_prop);
 	ASSERT(len != 0);
 
 	len = 0;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, ENVCTRL_PANEL_LEDS_STA,
-			&reg_prop, &len) == DDI_PROP_SUCCESS)
+	    DDI_PROP_DONTPASS, ENVCTRL_PANEL_LEDS_STA,
+	    &reg_prop, &len) == DDI_PROP_SUCCESS)
 		ddi_prop_free((void *)reg_prop);
 	ASSERT(len != 0);
 
 	len = 0;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, ENVCTRL_DISK_LEDS_STA,
-			&reg_prop, &len) == DDI_PROP_SUCCESS)
+	    DDI_PROP_DONTPASS, ENVCTRL_DISK_LEDS_STA,
+	    &reg_prop, &len) == DDI_PROP_SUCCESS)
 		ddi_prop_free((void *)reg_prop);
 	ASSERT(len != 0);
 #endif	/* DEBUG */
@@ -573,8 +573,8 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "cpu-fan-speeds",
-			&creg_prop, &len) == DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "cpu-fan-speeds",
+	    &creg_prop, &len) == DDI_PROP_SUCCESS) {
 
 		tblsz = (sizeof (acme_cpu_fanspd) / sizeof (short));
 
@@ -589,8 +589,8 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	len = 0;
 
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "ps-fan-speeds",
-			&creg_prop, &len) == DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "ps-fan-speeds",
+	    &creg_prop, &len) == DDI_PROP_SUCCESS) {
 
 		tblsz = (sizeof (acme_ps_fanspd) / sizeof (short));
 
@@ -636,21 +636,21 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	buf[0] = ALARM_CTR_REG_MINS;
 	buf[1] = 0x0;
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "write to PCF8583 failed\n");
 
 	buf[0] = ALARM_REG_MINS;
 	buf[1] = 0x58;
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "write to PCF8583 failed\n");
 
 	buf[0] = ALARM_TIMER_REG;
 	buf[1] = 0x80;
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "write to PCF8583 failed\n");
 
@@ -791,7 +791,7 @@ envctrl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	case DDI_SUSPEND:
 		if (!(unitp = ddi_get_soft_state(envctrlsoft_statep, instance)))
-		    return (DDI_FAILURE);
+			return (DDI_FAILURE);
 		mutex_enter(&unitp->umutex);
 		if (unitp->suspended) {
 			cmn_err(CE_WARN, "envctrl already suspended\n");
@@ -823,8 +823,8 @@ envctrl_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 	switch (infocmd) {
 		case DDI_INFO_DEVT2DEVINFO:
 			if ((unitp = (struct envctrlunit *)
-				ddi_get_soft_state(envctrlsoft_statep,
-				    instance)) != NULL) {
+			    ddi_get_soft_state(envctrlsoft_statep,
+			    instance)) != NULL) {
 				*result = unitp->dip;
 				ret = DDI_SUCCESS;
 			} else {
@@ -856,7 +856,7 @@ envctrl_open(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *credp)
 	if (instance < 0)
 		return (ENXIO);
 	unitp = (struct envctrlunit *)
-		    ddi_get_soft_state(envctrlsoft_statep, instance);
+	    ddi_get_soft_state(envctrlsoft_statep, instance);
 
 	if (unitp == NULL)
 		return (ENXIO);
@@ -1177,7 +1177,7 @@ envctrl_wput(queue_t *q, mblk_t *mp)
 			    (void *)mp->b_cont->b_rptr;
 			mutex_enter(&unitp->umutex);
 			envctrl_recv(unitp, (caddr_t *)(void *)a_fanspeed,
-				PCF8591);
+			    PCF8591);
 			mutex_exit(&unitp->umutex);
 			mcopyout(mp, (void *)-1,
 			    sizeof (struct envctrl_pcf8591_chip),
@@ -1232,7 +1232,8 @@ envctrl_wput(queue_t *q, mblk_t *mp)
 					(void) untimeout(unitp->timeout_id);
 					unitp->timeout_id =
 					    (timeout(envctrl_tempr_poll,
-					(caddr_t)unitp, overtemp_timeout_hz));
+					    (caddr_t)unitp,
+					    overtemp_timeout_hz));
 
 				}
 				if (*wdval == ENVCTRL_NORMAL_MODE) {
@@ -1342,7 +1343,7 @@ envctrl_dev_isr(caddr_t arg)
 retry:
 
 	status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-		PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV0, &recv_data, 1);
+	    PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV0, &recv_data, 1);
 
 	/*
 	 * This extra read is needed since the first read is discarded
@@ -1350,11 +1351,11 @@ retry:
 	 */
 	if (recv_data == 0xFF) {
 		status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-		PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV0, &recv_data, 1);
+		    PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV0, &recv_data, 1);
 	}
 	if (envctrl_debug_flags)
 		cmn_err(CE_WARN, "envctrl_dev_isr: status= %d, data = %x\n",
-			status, recv_data);
+		    status, recv_data);
 
 	/*
 	 * if the i2c bus is hung it is imperative that this
@@ -1460,9 +1461,9 @@ envctrl_init_bus(struct envctrlunit *unitp)
 	/* SET UP SLAVE ADDR XXX Required..send 0x80 */
 
 	ddi_put8(unitp->ctlr_handle, &unitp->bus_ctl_regs->s1,
-	ENVCTRL_BUS_INIT0);
+	    ENVCTRL_BUS_INIT0);
 	(void) ddi_put8(unitp->ctlr_handle, &unitp->bus_ctl_regs->s0,
-	ENVCTRL_BUS_INIT1);
+	    ENVCTRL_BUS_INIT1);
 
 	/* Set the clock now */
 	ddi_put8(unitp->ctlr_handle,
@@ -1501,10 +1502,10 @@ envctrl_init_bus(struct envctrlunit *unitp)
 		for (i = 0; i < sizeof (fans)/sizeof (int); i++) {
 			fan.fan_num = fans[i];
 			if ((fans[i] == ENVCTRL_AFB_FANS) &&
-				(unitp->AFB_present == B_FALSE))
+			    (unitp->AFB_present == B_FALSE))
 				continue;
 			(void) envctrl_xmit(unitp, (caddr_t *)(void *)&fan,
-				TDA8444T);
+			    TDA8444T);
 		}
 	}
 
@@ -1553,8 +1554,8 @@ retry0:
 		buf[0] = fanspeed->val;
 
 		status = eHc_write_tda8444((struct eHc_envcunit *)unitp,
-			TDA8444T_BASE_ADDR | fanspeed->chip_num, 0xF,
-			fanspeed->fan_num, buf, 1);
+		    TDA8444T_BASE_ADDR | fanspeed->chip_num, 0xF,
+		    fanspeed->fan_num, buf, 1);
 		if (status != DDI_SUCCESS) {
 			drv_usecwait(1000);
 			if (retrys < envctrl_max_retries) {
@@ -1602,12 +1603,12 @@ retry:
 		if (ioport->type == PCF8574A) {
 			slave_addr = (PCF8574A_BASE_ADDR | ioport->chip_num);
 			status =
-				eHc_write_pcf8574a((struct eHc_envcunit *)unitp,
-				PCF8574A_BASE_ADDR | ioport->chip_num, buf, 1);
+			    eHc_write_pcf8574a((struct eHc_envcunit *)unitp,
+			    PCF8574A_BASE_ADDR | ioport->chip_num, buf, 1);
 		} else {
 			slave_addr = (PCF8574_BASE_ADDR | ioport->chip_num);
 			status = eHc_write_pcf8574((struct eHc_envcunit *)unitp,
-				PCF8574_BASE_ADDR | ioport->chip_num, buf, 1);
+			    PCF8574_BASE_ADDR | ioport->chip_num, buf, 1);
 		}
 
 		if (status != DDI_SUCCESS) {
@@ -1625,7 +1626,7 @@ retry:
 				if (envctrl_debug_flags)
 					cmn_err(CE_WARN, "envctrl_xmit: PCF8574\
 						dev = %d, port = %d\n",
-						ioport->chip_num, ioport->type);
+					    ioport->chip_num, ioport->type);
 				return (DDI_FAILURE);
 			}
 		}
@@ -1658,8 +1659,8 @@ envctrl_recv(struct envctrlunit *unitp, caddr_t *data, int chip_type)
 
 retry:
 		status = eHc_read_pcf8591((struct eHc_envcunit *)unitp,
-			PCF8591_BASE_ADDR | temp->chip_num & 0xF,
-			temp->sensor_num, 0, 0, 1, &recv_data, 1);
+		    PCF8591_BASE_ADDR | temp->chip_num & 0xF,
+		    temp->sensor_num, 0, 0, 1, &recv_data, 1);
 
 		/*
 		 * another place to catch the i2c bus hang on an 8591 read
@@ -1692,18 +1693,18 @@ retry:
 retry1:
 		if (ioport->chip_num > ENVCTRL_PCF8574_DEV7)
 			cmn_err(CE_WARN, "envctrl: dev out of range 0x%x\n",
-ioport->chip_num);
+			    ioport->chip_num);
 
 		if (ioport->type == PCF8574A) {
 			slave_addr = (PCF8574_READ_BIT | PCF8574A_BASE_ADDR |
 			    ioport->chip_num);
 			status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-				PCF8574A_BASE_ADDR | ioport->chip_num, buf, 1);
+			    PCF8574A_BASE_ADDR | ioport->chip_num, buf, 1);
 		} else {
 			slave_addr = (PCF8574_READ_BIT | PCF8574_BASE_ADDR |
 			    ioport->chip_num);
 			status = eHc_read_pcf8574((struct eHc_envcunit *)unitp,
-				PCF8574_BASE_ADDR | ioport->chip_num, buf, 1);
+			    PCF8574_BASE_ADDR | ioport->chip_num, buf, 1);
 		}
 
 		if (status != DDI_SUCCESS) {
@@ -1721,7 +1722,7 @@ ioport->chip_num);
 				if (envctrl_debug_flags)
 					cmn_err(CE_WARN, "envctrl_recv: PCF8574\
 						dev = %d, port = %d\n",
-						ioport->chip_num, ioport->type);
+					    ioport->chip_num, ioport->type);
 			}
 		}
 		ioport->val = buf[0];
@@ -1746,7 +1747,7 @@ envctrl_get_ps_temp(struct envctrlunit *unitp, uint8_t psaddr)
 
 retry:
 	status = eHc_read_pcf8591((struct eHc_envcunit *)unitp,
-			PCF8591_BASE_ADDR | psaddr & 0xF, 0, 1, 0, 1, buf, 4);
+	    PCF8591_BASE_ADDR | psaddr & 0xF, 0, 1, 0, 1, buf, 4);
 
 	tempr = 0;
 	for (i = 0; i < PCF8591_MAX_PORTS; i++) {
@@ -1812,8 +1813,8 @@ envctrl_get_cpu_temp(struct envctrlunit *unitp, int cpunum)
 
 retry:
 	status = eHc_read_pcf8591((struct eHc_envcunit *)unitp,
-			PCF8591_BASE_ADDR | PCF8591_DEV7, cpunum, 0, 0, 0,
-			&recv_data, 1);
+	    PCF8591_BASE_ADDR | PCF8591_DEV7, cpunum, 0, 0, 0,
+	    &recv_data, 1);
 
 	/*
 	 * We need to take a sledge hammer to the bus if we get back
@@ -1859,7 +1860,7 @@ envctrl_get_lm75_temp(struct envctrlunit *unitp)
 	ASSERT(MUTEX_HELD(&unitp->umutex));
 
 	status = eHc_read_lm75((struct eHc_envcunit *)unitp,
-		LM75_BASE_ADDR | LM75_CONFIG_ADDRA, buf, 2);
+	    LM75_BASE_ADDR | LM75_CONFIG_ADDRA, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "read of LM75 failed\n");
 
@@ -1950,7 +1951,7 @@ envctrl_led_blink(void *arg)
 		 * and set it.
 		 */
 		fspchip.val = (fspchip.val & ~(ENVCTRL_PCF8574_PORT4) |
-				    0xC0);
+		    0xC0);
 		unitp->present_led_state = B_FALSE;
 	} else {
 		fspchip.val = (fspchip.val | ENVCTRL_PCF8574_PORT4 | 0xC0);
@@ -2018,7 +2019,7 @@ envctrl_get_sys_temperatures(struct envctrlunit *unitp, uint8_t *diag_tempr)
 	 */
 	if (unitp->current_mode == ENVCTRL_DIAG_MODE && diag_tempr != NULL) {
 		if (unitp->timeout_id != 0) {
-		    (void) untimeout(unitp->timeout_id);
+			(void) untimeout(unitp->timeout_id);
 		}
 
 		ambtemp = *diag_tempr;
@@ -2056,7 +2057,7 @@ envctrl_get_sys_temperatures(struct envctrlunit *unitp, uint8_t *diag_tempr)
 			}
 	} else {
 		if (envctrl_isother_fault_led(unitp, fspval,
-			ENVCTRL_FSP_TEMP_ERR)) {
+		    ENVCTRL_FSP_TEMP_ERR)) {
 			fspval &= ~(ENVCTRL_FSP_TEMP_ERR);
 		} else {
 			fspval &= ~(ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_GEN_ERR);
@@ -2122,7 +2123,7 @@ envctrl_get_sys_temperatures(struct envctrlunit *unitp, uint8_t *diag_tempr)
 			fan.val = fan_speed[temperature];
 		}
 		if (envctrl_isother_fault_led(unitp, fspval,
-			ENVCTRL_FSP_TEMP_ERR)) {
+		    ENVCTRL_FSP_TEMP_ERR)) {
 			fspval &= ~(ENVCTRL_FSP_TEMP_ERR);
 		} else {
 			fspval &= ~(ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_GEN_ERR);
@@ -2220,10 +2221,10 @@ envctrl_fan_fail_service(struct envctrlunit *unitp)
 
 retry:
 	status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-		PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV4, &recv_data, 1);
+	    PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV4, &recv_data, 1);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "fan_fail_service: status = %d, data = %x\n",
-			status, recv_data);
+		    status, recv_data);
 
 	/*
 	 * If all fan ports are high (0xff) then we don't have any
@@ -2298,7 +2299,7 @@ retry:
 	}
 
 	if (!(recv_data & ENVCTRL_PCF8574_PORT6) &&
-		(unitp->AFB_present == B_TRUE)) {
+	    (unitp->AFB_present == B_TRUE)) {
 		/*
 		 * If the afb is present and the afb fan fails,
 		 * we need to power off or else it will melt!
@@ -2340,8 +2341,8 @@ retry:
 	}
 
 	if ((cpufanflt > 0 || psfanflt > 0 || afbfanflt > 0 ||
-		(status != DDI_SUCCESS)) && !unitp->initting &&
-		unitp->current_mode == ENVCTRL_NORMAL_MODE) {
+	    (status != DDI_SUCCESS)) && !unitp->initting &&
+	    unitp->current_mode == ENVCTRL_NORMAL_MODE) {
 		if (status != DDI_SUCCESS)
 			max_retry_count = envctrl_max_retries;
 		else
@@ -2394,7 +2395,7 @@ envctrl_PS_intr_service(struct envctrlunit *unitp, uint8_t psaddr)
 
 retry:
 	status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-			PCF8574A_BASE_ADDR | psaddr & 0xF, &recv_data, 1);
+	    PCF8574A_BASE_ADDR | psaddr & 0xF, &recv_data, 1);
 	if (status != DDI_SUCCESS) {
 		drv_usecwait(1000);
 		if (retrys < envctrl_max_retries) {
@@ -2406,8 +2407,8 @@ retry:
 			mutex_enter(&unitp->umutex);
 			if (envctrl_debug_flags)
 				cmn_err(CE_WARN,
-					"PS_intr_service: Read from 8574A " \
-					    "failed\n");
+				    "PS_intr_service: Read from 8574A " \
+				"failed\n");
 		}
 	}
 
@@ -2521,7 +2522,7 @@ envctrl_stop_clock(struct envctrlunit *unitp)
 	buf[1] = CLOCK_DISABLE;
 
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "write to PCF8583 failed\n");
 }
@@ -2546,7 +2547,7 @@ envctrl_reset_watchdog(struct envctrlunit *unitp, uint8_t *wdval)
 	buf[0] = ALARM_CTR_REG_MINS;
 	buf[1] = 0x0;
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "write to PCF8583 failed\n");
 
@@ -2572,7 +2573,7 @@ envctrl_reset_watchdog(struct envctrlunit *unitp, uint8_t *wdval)
 
 	/* STEP 10: End Transmission */
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "Reset envctrl watchdog failed\n");
 
@@ -2608,7 +2609,7 @@ envctrl_reset_watchdog(struct envctrlunit *unitp, uint8_t *wdval)
 	}
 
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "Reset envctrl watchdog failed\n");
 
@@ -2621,7 +2622,7 @@ envctrl_reset_watchdog(struct envctrlunit *unitp, uint8_t *wdval)
 	buf[0] = CLOCK_CSR_REG;
 	buf[1] = CLOCK_ENABLE;
 	status = eHc_write_pcf8583((struct eHc_envcunit *)unitp,
-			PCF8583_BASE_ADDR | 0, buf, 2);
+	    PCF8583_BASE_ADDR | 0, buf, 2);
 	if (status != DDI_SUCCESS)
 		cmn_err(CE_WARN, "Reset envctrl watchdog failed\n");
 
@@ -2666,7 +2667,7 @@ envctrl_ps_probe(struct envctrlunit *unitp)
 		retrys = 0;
 retry:
 		status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-				PCF8574A_BASE_ADDR | devaddr, &recv_data, 1);
+		    PCF8574A_BASE_ADDR | devaddr, &recv_data, 1);
 		if (status != DDI_SUCCESS) {
 			drv_usecwait(1000);
 			if (retrys < envctrl_max_retries) {
@@ -2779,7 +2780,7 @@ retry:
 		fpmstat |= (ENVCTRL_FSP_PS_ERR | ENVCTRL_FSP_GEN_ERR);
 	} else {
 		if (envctrl_isother_fault_led(unitp, fpmstat,
-			ENVCTRL_FSP_PS_ERR)) {
+		    ENVCTRL_FSP_PS_ERR)) {
 			fpmstat &= ~(ENVCTRL_FSP_PS_ERR);
 		} else {
 			fpmstat &= ~(ENVCTRL_FSP_PS_ERR |
@@ -2816,7 +2817,7 @@ envctrl_abort_seq_handler(char *msg)
 	 */
 	for (i = 0; i < MAX_DEVS; i++) {
 		if (unitp = (struct envctrlunit *)
-				ddi_get_soft_state(envctrlsoft_statep, i))
+		    ddi_get_soft_state(envctrlsoft_statep, i))
 			break;
 	}
 
@@ -2824,7 +2825,7 @@ envctrl_abort_seq_handler(char *msg)
 
 	for (i = 0; i < MAX_DEVS; i++) {
 		if ((unitp->encl_kstats[i].type == ENVCTRL_ENCL_FSP) &&
-			(unitp->encl_kstats[i].instance != I2C_NODEV)) {
+		    (unitp->encl_kstats[i].instance != I2C_NODEV)) {
 			secure = unitp->encl_kstats[i].value;
 			break;
 		}
@@ -2860,7 +2861,7 @@ envctrl_get_fpm_status(struct envctrlunit *unitp)
 
 retry:
 	status = eHc_read_pcf8574a((struct eHc_envcunit *)unitp,
-		PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV6, &recv_data, 1);
+	    PCF8574A_BASE_ADDR | ENVCTRL_PCF8574_DEV6, &recv_data, 1);
 
 	/*
 	 * yet another place where a read can cause the
@@ -2917,8 +2918,8 @@ envctrl_get_dskled(struct envctrlunit *unitp, struct envctrl_pcf8574_chip *chip)
 	ASSERT(MUTEX_HELD(&unitp->umutex));
 
 	if (chip->chip_num > ENVCTRL_PCF8574_DEV2 ||
-		chip->type != ENVCTRL_ENCL_BACKPLANE4 &&
-		chip->type != ENVCTRL_ENCL_BACKPLANE8) {
+	    chip->type != ENVCTRL_ENCL_BACKPLANE4 &&
+	    chip->type != ENVCTRL_ENCL_BACKPLANE8) {
 		return (DDI_FAILURE);
 	}
 	oldtype = chip->type;
@@ -2949,8 +2950,8 @@ envctrl_set_dskled(struct envctrlunit *unitp, struct envctrl_pcf8574_chip *chip)
 
 
 	if (chip->chip_num > ENVCTRL_PCF8574_DEV2 ||
-		chip->val > ENVCTRL_DISK8LED_ALLOFF ||
-		chip->val < ENVCTRL_CHAR_ZERO) {
+	    chip->val > ENVCTRL_DISK8LED_ALLOFF ||
+	    chip->val < ENVCTRL_CHAR_ZERO) {
 		return (DDI_FAILURE);
 	}
 
@@ -2986,7 +2987,7 @@ envctrl_set_dskled(struct envctrlunit *unitp, struct envctrl_pcf8574_chip *chip)
 
 	if (diskfault) {
 		if (!(envctrl_isother_fault_led(unitp, fspchip.val & 0xFF,
-			ENVCTRL_FSP_DISK_ERR))) {
+		    ENVCTRL_FSP_DISK_ERR))) {
 			fspchip.val &= ~(ENVCTRL_FSP_DISK_ERR);
 		} else {
 			fspchip.val &= ~(ENVCTRL_FSP_DISK_ERR |
@@ -3043,7 +3044,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->encl_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "envctrl%d: encl raw kstat_create failed",
-			unitp->instance);
+		    unitp->instance);
 		return;
 	}
 
@@ -3057,7 +3058,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->fan_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "envctrl%d: fans kstat_create failed",
-			unitp->instance);
+		    unitp->instance);
 		return;
 	}
 
@@ -3070,7 +3071,7 @@ envctrl_add_kstats(struct envctrlunit *unitp)
 	    sizeof (unitp->ps_kstats),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "envctrl%d: ps name kstat_create failed",
-			unitp->instance);
+		    unitp->instance);
 		return;
 	}
 
@@ -3176,7 +3177,7 @@ envctrl_init_fan_kstats(struct envctrlunit *unitp)
 	unitp->fan_kstats[ENVCTRL_FAN_TYPE_CPU].type = ENVCTRL_FAN_TYPE_CPU;
 	if (unitp->AFB_present == B_TRUE)
 		unitp->fan_kstats[ENVCTRL_FAN_TYPE_AFB].type =
-			ENVCTRL_FAN_TYPE_AFB;
+		    ENVCTRL_FAN_TYPE_AFB;
 }
 
 static void
@@ -3212,16 +3213,16 @@ envctrl_init_encl_kstats(struct envctrlunit *unitp)
 	envctrl_recv(unitp, (caddr_t *)(void *)&chip, PCF8574);
 
 	envctrl_add_encl_kstats(unitp, ENVCTRL_ENCL_FSP, INSTANCE_0,
-		chip.val & 0xFF);
+	    chip.val & 0xFF);
 
 	val = envctrl_get_lm75_temp(unitp) & 0xFF;
 	envctrl_add_encl_kstats(unitp, ENVCTRL_ENCL_AMBTEMPR, INSTANCE_0, val);
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, unitp->dip,
-			DDI_PROP_DONTPASS, ENVCTRL_DISK_LEDS_PR,
-			&reg_prop, &len) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, ENVCTRL_DISK_LEDS_PR,
+	    &reg_prop, &len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "prop lookup of %s failed\n",
-			ENVCTRL_DISK_LEDS_PR);
+		    ENVCTRL_DISK_LEDS_PR);
 		return;
 	}
 
@@ -3305,10 +3306,9 @@ envctrl_match_cpu(dev_info_t *dip, void *arg)
 	(void) sprintf(name1, "%s", ENVCTRL_TAZBLKBRDCPU_STRING);
 
 	if ((strcmp(ddi_node_name(dip), name) == 0) ||
-		(strcmp(ddi_node_name(dip), name1) == 0)) {
+	    (strcmp(ddi_node_name(dip), name1) == 0)) {
 		if ((cpu_slot = (int)ddi_getprop(DDI_DEV_T_ANY, dip,
-			    DDI_PROP_DONTPASS, "upa-portid",
-				    -1)) == -1) {
+		    DDI_PROP_DONTPASS, "upa-portid", -1)) == -1) {
 			cmn_err(CE_WARN, "envctrl no cpu upa-portid");
 		} else {
 			unitp->cpu_pr_location[cpu_slot] = B_TRUE;
@@ -3385,7 +3385,7 @@ eHc_start_pcf8584(struct eHc_envcunit *ehcp, uint8_t byteaddress)
 	do {
 		drv_usecwait(1000);
 		poll_status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+		    ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
 		i++;
 	} while (((poll_status & EHC_S1_NBB) == 0) && i < EHC_MAX_WAIT);
 
@@ -3409,14 +3409,14 @@ eHc_start_pcf8584(struct eHc_envcunit *ehcp, uint8_t byteaddress)
 
 	/* generate the "start condition" and clock out the slave address */
 	ddi_put8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1,
-		EHC_S1_PIN | EHC_S1_ES0 | EHC_S1_STA | EHC_S1_ACK);
+	    EHC_S1_PIN | EHC_S1_ES0 | EHC_S1_STA | EHC_S1_ACK);
 
 	/* wait for completion of transmission */
 	i = 0;
 	do {
 		drv_usecwait(1000);
 		poll_status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+		    ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
 		i++;
 	} while ((poll_status & EHC_S1_PIN) && i < EHC_MAX_WAIT);
 
@@ -3457,8 +3457,8 @@ eHc_start_pcf8584(struct eHc_envcunit *ehcp, uint8_t byteaddress)
 		/* wait for completion of transmission */
 		do {
 			drv_usecwait(1000);
-			poll_status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+			poll_status = ddi_get8(ehcp->ctlr_handle,
+			    &ehcp->bus_ctl_regs->s1);
 			i++;
 		} while ((poll_status & EHC_S1_PIN) && i < EHC_MAX_WAIT);
 
@@ -3469,13 +3469,13 @@ eHc_start_pcf8584(struct eHc_envcunit *ehcp, uint8_t byteaddress)
 
 		if (poll_status & EHC_S1_BER) {
 			DCMN2ERR(CE_WARN,
-				"eHc_start_pcf8584: I2C bus error");
+			    "eHc_start_pcf8584: I2C bus error");
 			return (EHC_FAILURE);
 		}
 
 		if (poll_status & EHC_S1_LAB) {
 			DCMN2ERR(CE_WARN,
-				"eHc_start_pcf8584: Lost arbitration");
+			    "eHc_start_pcf8584: Lost arbitration");
 			return (EHC_FAILURE);
 		}
 	}
@@ -3490,7 +3490,7 @@ static void
 eHc_stop_pcf8584(struct eHc_envcunit *ehcp)
 {
 	ddi_put8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1,
-		EHC_S1_PIN | EHC_S1_ES0 | EHC_S1_STO | EHC_S1_ACK);
+	    EHC_S1_PIN | EHC_S1_ES0 | EHC_S1_STO | EHC_S1_ACK);
 }
 
 static int
@@ -3506,7 +3506,7 @@ eHc_read_pcf8584(struct eHc_envcunit *ehcp, uint8_t *data)
 	do {
 		drv_usecwait(1000);
 		poll_status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+		    ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
 		i++;
 	} while ((poll_status & EHC_S1_PIN) && i < EHC_MAX_WAIT);
 
@@ -3546,7 +3546,7 @@ eHc_write_pcf8584(struct eHc_envcunit *ehcp, uint8_t data)
 	do {
 		drv_usecwait(1000);
 		poll_status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+		    ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
 		i++;
 	} while ((poll_status & EHC_S1_PIN) && i < EHC_MAX_WAIT);
 
@@ -3593,7 +3593,7 @@ eHc_after_read_pcf8584(struct eHc_envcunit *ehcp, uint8_t *data)
 	do {
 		drv_usecwait(1000);
 		poll_status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+		    ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
 		i++;
 	} while ((poll_status & EHC_S1_PIN) && i < EHC_MAX_WAIT);
 
@@ -3604,7 +3604,7 @@ eHc_after_read_pcf8584(struct eHc_envcunit *ehcp, uint8_t *data)
 
 	if (poll_status & EHC_S1_BER) {
 		DCMN2ERR(CE_WARN,
-			"eHc_after_read_pcf8584: I2C bus error");
+		    "eHc_after_read_pcf8584: I2C bus error");
 		return (EHC_FAILURE);
 	}
 
@@ -3669,7 +3669,7 @@ eHc_write_tda8444(struct eHc_envcunit *ehcp, int byteaddress, int instruction,
 
 	for (i = 0; i < size; i++) {
 		if ((status = eHc_write_pcf8584(ehcp, (buf[i] & 0x3f))) !=
-			EHC_SUCCESS) {
+		    EHC_SUCCESS) {
 			if (status == EHC_NO_SLAVE_ACK)
 				eHc_stop_pcf8584(ehcp);
 			return (EHC_FAILURE);
@@ -3700,7 +3700,7 @@ eHc_read_pcf8574a(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
 	 * Put the bus into the start condition
 	 */
 	if ((status = eHc_start_pcf8584(ehcp, EHC_BYTE_READ | byteaddress)) !=
-			EHC_SUCCESS) {
+	    EHC_SUCCESS) {
 		if (status == EHC_NO_SLAVE_ACK) {
 			/*
 			 * Send the "stop" condition.
@@ -3709,8 +3709,8 @@ eHc_read_pcf8574a(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
 			/*
 			 * Read the last byte - discard it.
 			 */
-			discard =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s0);
+			discard = ddi_get8(ehcp->ctlr_handle,
+			    &ehcp->bus_ctl_regs->s0);
 #ifdef lint
 			discard = discard;
 #endif
@@ -3802,7 +3802,7 @@ eHc_read_pcf8574(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
 	 * Put the bus into the start condition
 	 */
 	if ((status = eHc_start_pcf8584(ehcp, EHC_BYTE_READ | byteaddress)) !=
-			EHC_SUCCESS) {
+	    EHC_SUCCESS) {
 		if (status == EHC_NO_SLAVE_ACK) {
 			/*
 			 * Send the "stop" condition.
@@ -3811,8 +3811,8 @@ eHc_read_pcf8574(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
 			/*
 			 * Read the last byte - discard it.
 			 */
-			discard =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s0);
+			discard = ddi_get8(ehcp->ctlr_handle,
+			    &ehcp->bus_ctl_regs->s0);
 #ifdef lint
 			discard = discard;
 #endif
@@ -3903,7 +3903,7 @@ eHc_read_lm75(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
 	 * Put the bus into the start condition
 	 */
 	if ((status = eHc_start_pcf8584(ehcp, EHC_BYTE_READ | byteaddress)) !=
-			EHC_SUCCESS) {
+	    EHC_SUCCESS) {
 		if (status == EHC_NO_SLAVE_ACK) {
 			/*
 			 * Send the stop condition.
@@ -3912,8 +3912,8 @@ eHc_read_lm75(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
 			/*
 			 * Read the last byte - discard it.
 			 */
-			discard =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s0);
+			discard = ddi_get8(ehcp->ctlr_handle,
+			    &ehcp->bus_ctl_regs->s0);
 #ifdef lint
 			discard = discard;
 #endif
@@ -4029,17 +4029,17 @@ eHc_read_pcf8591(struct eHc_envcunit *ehcp, int byteaddress, int channel,
 	 */
 
 	ddi_put8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1,
-		EHC_S1_ES0 | EHC_S1_STA | EHC_S1_ACK);
+	    EHC_S1_ES0 | EHC_S1_STA | EHC_S1_ACK);
 
 	ddi_put8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s0,
-		EHC_BYTE_READ | byteaddress);
+	    EHC_BYTE_READ | byteaddress);
 
 	i = 0;
 
 	do {
 		drv_usecwait(1000);
 		status =
-			ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
+		    ddi_get8(ehcp->ctlr_handle, &ehcp->bus_ctl_regs->s1);
 		i++;
 	} while ((status & EHC_S1_PIN) && i < EHC_MAX_WAIT);
 

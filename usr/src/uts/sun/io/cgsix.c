@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma	weak	setintrenable
 /*
@@ -230,7 +228,8 @@ struct dev_ops cgsix_ops = {
 	nodev,			/* reset */
 	&cg6_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	cg6_power
+	cg6_power,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -494,7 +493,7 @@ static pid_t	getpid(void);
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"cgsix driver v%I%",	/* Name of the module. */
+	"cgsix driver",	/* Name of the module. */
 	&cgsix_ops,		/* driver ops */
 };
 
@@ -516,8 +515,8 @@ _init(void)
 	e = mod_install(&modlinkage);
 
 	if (e) {
-	    ddi_soft_state_fini(&cg6_softc_head);
-	    DEBUGF(1, (CE_CONT, "done\n"));
+		ddi_soft_state_fini(&cg6_softc_head);
+		DEBUGF(1, (CE_CONT, "done\n"));
 	}
 	DEBUGF(1, (CE_CONT, "cgsix: _init done rtn=%d\n", e));
 	return (e);
@@ -531,7 +530,7 @@ _fini(void)
 	DEBUGF(1, (CE_CONT, "cgsix: _fini, mem used=%d\n", total_memory));
 
 	if ((e = mod_remove(&modlinkage)) != 0)
-	    return (e);
+		return (e);
 
 	ddi_soft_state_fini(&cg6_softc_head);
 
@@ -560,46 +559,47 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_ATTACH:
-	    break;
+		break;
 
 	case DDI_RESUME:
-	    if ((softc = ddi_get_driver_private(devi)) == NULL)
-		    return (DDI_FAILURE);
-	    if (!softc->cg6_suspended)
-		    return (DDI_SUCCESS);
-	    mutex_enter(&softc->mutex);
-	    cg6_reset(softc);
-	    if (softc->curctx) {
+		if ((softc = ddi_get_driver_private(devi)) == NULL)
+			return (DDI_FAILURE);
+		if (!softc->cg6_suspended)
+			return (DDI_SUCCESS);
+		mutex_enter(&softc->mutex);
+		cg6_reset(softc);
+		if (softc->curctx) {
 		    /* Restore the video state */
-		    cg6_set_video(softc, softc->vidon);
+			cg6_set_video(softc, softc->vidon);
 
 		    /* Restore non display RAM */
-		    if (ddi_map_regs(devi, 0, (caddr_t *)&fb_ndvram,
-			CG6_ADDR_COLOR + softc->_w * softc->_h,
-			softc->ndvramsz) == -1) {
-			    mutex_exit(&softc->mutex);
-			    return (DDI_FAILURE);
-		    }
-		    bcopy(softc->ndvram, fb_ndvram, softc->ndvramsz);
-		    ddi_unmap_regs(devi, 0, (caddr_t *)&fb_ndvram,
-			CG6_ADDR_COLOR + softc->_w * softc->_h,
-			softc->ndvramsz);
-		    kmem_free(softc->ndvram, softc->ndvramsz);
+			if (ddi_map_regs(devi, 0, (caddr_t *)&fb_ndvram,
+			    CG6_ADDR_COLOR + softc->_w * softc->_h,
+			    softc->ndvramsz) == -1) {
+				mutex_exit(&softc->mutex);
+				return (DDI_FAILURE);
+			}
+			bcopy(softc->ndvram, fb_ndvram, softc->ndvramsz);
+			ddi_unmap_regs(devi, 0, (caddr_t *)&fb_ndvram,
+			    CG6_ADDR_COLOR + softc->_w * softc->_h,
+			    softc->ndvramsz);
+			kmem_free(softc->ndvram, softc->ndvramsz);
 
 		    /* Restore other frame buffer state */
-		    (void) cg6_cntxrestore(S_FBC(softc), S_TEC(softc),
-			softc->curctx);
-		    cg6_setcurpos(softc);
-		    cg6_setcurshape(softc);
-		    cg6_update_cmap(softc, (uint_t)_ZERO_, CG6_CMAP_ENTRIES);
-		    cg6_int_enable(softc);	/* Schedule the update */
-	    }
-	    softc->cg6_suspended = 0;
-	    mutex_exit(&softc->mutex);
-	    return (DDI_SUCCESS);
+			(void) cg6_cntxrestore(S_FBC(softc), S_TEC(softc),
+			    softc->curctx);
+			cg6_setcurpos(softc);
+			cg6_setcurshape(softc);
+			cg6_update_cmap(softc, (uint_t)_ZERO_,
+			    CG6_CMAP_ENTRIES);
+			cg6_int_enable(softc);	/* Schedule the update */
+		}
+		softc->cg6_suspended = 0;
+		mutex_exit(&softc->mutex);
+		return (DDI_SUCCESS);
 
 	default:
-	    return (DDI_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 	DEBUGF(1, (CE_CONT, "cg6_attach unit=%d\n", unit));
@@ -621,19 +621,19 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/* Grab properties from PROM */
 	/* TODO don't really want default w, h */
 	if (ddi_prop_op(DDI_DEV_T_ANY, devi, PROP_LEN_AND_VAL_ALLOC,
-		DDI_PROP_DONTPASS, "emulation", (caddr_t)&tmp, &proplen) ==
-		    DDI_PROP_SUCCESS) {
-	    if (strcmp(tmp, "cgthree+") == 0)
+	    DDI_PROP_DONTPASS, "emulation", (caddr_t)&tmp, &proplen) ==
+	    DDI_PROP_SUCCESS) {
+		if (strcmp(tmp, "cgthree+") == 0)
 		softc->emulation = FBTYPE_SUN3COLOR;
-	    else if (strcmp(tmp, "cgfour+") == 0)
+		else if (strcmp(tmp, "cgfour+") == 0)
 		softc->emulation = FBTYPE_SUN4COLOR;
-	    else if (strcmp(tmp, "bwtwo+") == 0)
+		else if (strcmp(tmp, "bwtwo+") == 0)
 		softc->emulation = FBTYPE_SUN2BW;
-	    else
+		else
 		softc->emulation = FBTYPE_SUNFAST_COLOR;
-	    kmem_free(tmp, proplen);
+		kmem_free(tmp, proplen);
 	} else
-	    softc->emulation = FBTYPE_SUNFAST_COLOR;
+		softc->emulation = FBTYPE_SUNFAST_COLOR;
 
 	softc->_w = w = getprop(devi, "width", 1152);
 	softc->_h = h = getprop(devi, "height", 900);
@@ -647,11 +647,11 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	softc->cg6info.vmsize = getprop(devi, "vmsize", 1);
 	if (softc->cg6info.vmsize > 1) {
-	    softc->size = (size_t)ddi_ptob(devi,
-					ddi_btopr(devi, 8 * 1024 * 1024));
-	    softc->fbmappable = 8 * 1024 * 1024;
+		softc->size = (size_t)ddi_ptob(devi,
+		    ddi_btopr(devi, 8 * 1024 * 1024));
+		softc->fbmappable = 8 * 1024 * 1024;
 	} else
-	    softc->fbmappable = 1024 * 1024;
+		softc->fbmappable = 1024 * 1024;
 
 	/* Compute size of dummy overlay/enable planes */
 	softc->dummysize = btob(mpr_linebytes(w, 1) * h) * 2;
@@ -662,18 +662,19 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * don't need a new mapping
 	 */
 	if (reg = (caddr_t)(uintptr_t)getprop(devi, "address", 0)) {
-	    softc->_fb = (MPR_T *) reg;
-	    softc->mapped_by_prom = 1;
-	    if (ddi_ptob(devi, ddi_btopr(devi, w * h)) <=
-		getprop(devi, "fbmapped", w * h))
-		    bytes = 0;
-	    DEBUGF(2, (CE_CONT, "cg6 mapped by PROM\n"));
+		softc->_fb = (MPR_T *) reg;
+		softc->mapped_by_prom = 1;
+		if (ddi_ptob(devi, ddi_btopr(devi, w * h)) <=
+		    getprop(devi, "fbmapped", w * h))
+			bytes = 0;
+		DEBUGF(2, (CE_CONT, "cg6 mapped by PROM\n"));
 	}
 
 	softc->cg6info.line_bytes = softc->_linebytes;
 	softc->cg6info.accessible_width = getprop(devi, "awidth", 1152);
 	softc->cg6info.accessible_height = (uint_t)
-	(softc->cg6info.vmsize * 1024 * 1024) / softc->cg6info.accessible_width;
+	    (softc->cg6info.vmsize * 1024 * 1024) /
+	    softc->cg6info.accessible_width;
 	softc->cg6info.hdb_capable = getprop(devi, "dblbuf", 0);
 	softc->cg6info.boardrev = getprop(devi, "boardrev", 0);
 	softc->vrtpage = NULL;
@@ -704,19 +705,19 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	softc->addr_rom = CG6_ADDR_ROM_SBUS;
 
 	if (ddi_map_regs(devi, 0, &softc->fbctec, CG6_ADDR_FBC,
-		    (off_t)CG6_FBCTEC_SZ) != 0) {
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
+	    (off_t)CG6_FBCTEC_SZ) != 0) {
+		(void) cg6_detach(devi, DDI_DETACH);
+		return (DDI_FAILURE);
 	}
 	if (ddi_map_regs(devi, 0, &softc->cmap, CG6_ADDR_CMAP,
-		    (off_t)CG6_CMAP_SZ) != 0) {
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
+	    (off_t)CG6_CMAP_SZ) != 0) {
+		(void) cg6_detach(devi, DDI_DETACH);
+		return (DDI_FAILURE);
 	}
 	if (ddi_map_regs(devi, 0, &softc->fhcthc, CG6_ADDR_FHC,
-		    (off_t)CG6_FHCTHC_SZ) != 0) {
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
+	    (off_t)CG6_FHCTHC_SZ) != 0) {
+		(void) cg6_detach(devi, DDI_DETACH);
+		return (DDI_FAILURE);
 	}
 
 	softc->chiprev =
@@ -737,11 +738,11 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	cv_init(&softc->vrtsleep, NULL, CV_DRIVER, NULL);
 
 	if (ddi_add_intr(devi, 0, &softc->iblock_cookie, 0,
-		    cg6_intr, (caddr_t)softc) != DDI_SUCCESS) {
-	    DEBUGF(2, (CE_CONT,
+	    cg6_intr, (caddr_t)softc) != DDI_SUCCESS) {
+		DEBUGF(2, (CE_CONT,
 		"cg6_attach%d add_intr failed\n", unit));
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
+		(void) cg6_detach(devi, DDI_DETACH);
+		return (DDI_FAILURE);
 	}
 
 	/*
@@ -808,17 +809,17 @@ cg6_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-	    break;
+		break;
 
 	case DDI_SUSPEND:
-	    if (softc == NULL)
-		    return (DDI_FAILURE);
-	    if (softc->cg6_suspended)
-		    return (DDI_FAILURE);
+		if (softc == NULL)
+			return (DDI_FAILURE);
+		if (softc->cg6_suspended)
+			return (DDI_FAILURE);
 
-	    mutex_enter(&softc->mutex);
+		mutex_enter(&softc->mutex);
 
-	    if (softc->curctx) {
+		if (softc->curctx) {
 		struct fbc *fbc0 = S_FBC(softc);
 
 		/* Save the video state */
@@ -826,9 +827,9 @@ cg6_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 		/* Save non display RAM */
 		softc->ndvramsz = (softc->cg6info.vmsize * 1024 * 1024)
-			- (softc->_w * softc->_h);
+		    - (softc->_w * softc->_h);
 		if ((softc->ndvram = kmem_alloc(softc->ndvramsz,
-			KM_NOSLEEP)) == NULL) {
+		    KM_NOSLEEP)) == NULL) {
 			mutex_exit(&softc->mutex);
 			return (DDI_FAILURE);
 		}
@@ -837,47 +838,47 @@ cg6_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 * If FBC is busy, wait for maximum of 2 seconds for it
 		 * to be idle
 		 */
-		    CG6DELAY(!(fbc0->l_fbc_status & L_FBC_BUSY),
-			4*CG6_FBC_WAIT);
+		CG6DELAY(!(fbc0->l_fbc_status & L_FBC_BUSY),
+		    4*CG6_FBC_WAIT);
 
-		    if (fbc0->l_fbc_status & L_FBC_BUSY) {
+		if (fbc0->l_fbc_status & L_FBC_BUSY) {
 
 			/*
 			 * if still busy, try another 2 seconds before
 			 * giving up
 			 */
 			CG6DELAY(!(fbc0->l_fbc_status & L_FBC_BUSY),
-				4*CG6_FBC_WAIT);
+			    4*CG6_FBC_WAIT);
 			if (fbc0->l_fbc_status & L_FBC_BUSY)
-			    cmn_err(CE_WARN, "cg6_detach: FBC still busy");
-		    }
+				cmn_err(CE_WARN, "cg6_detach: FBC still busy");
+			}
 
-		    if (ddi_map_regs(devi, 0, &fb_ndvram, CG6_ADDR_COLOR +
-			softc->_w * softc->_h, softc->ndvramsz) == -1) {
-			    kmem_free(softc->ndvram, softc->ndvramsz);
-			    mutex_exit(&softc->mutex);
-			    return (DDI_FAILURE);
-		    }
-		    bcopy(fb_ndvram, softc->ndvram, softc->ndvramsz);
-		    ddi_unmap_regs(devi, 0, &fb_ndvram, CG6_ADDR_COLOR +
-			softc->_w * softc->_h, softc->ndvramsz);
+			if (ddi_map_regs(devi, 0, &fb_ndvram, CG6_ADDR_COLOR +
+			    softc->_w * softc->_h, softc->ndvramsz) == -1) {
+				kmem_free(softc->ndvram, softc->ndvramsz);
+				mutex_exit(&softc->mutex);
+				return (DDI_FAILURE);
+			}
+			bcopy(fb_ndvram, softc->ndvram, softc->ndvramsz);
+			ddi_unmap_regs(devi, 0, &fb_ndvram, CG6_ADDR_COLOR +
+			    softc->_w * softc->_h, softc->ndvramsz);
 
 		    /* Save other frame buffer state */
-		    (void) cg6_cntxsave(S_FBC(softc), S_TEC(softc),
-			softc->curctx);
-	    }
-	    softc->cg6_suspended = 1;
-	    mutex_exit(&softc->mutex);
-	    return (DDI_SUCCESS);
+			(void) cg6_cntxsave(S_FBC(softc), S_TEC(softc),
+			    softc->curctx);
+		}
+		softc->cg6_suspended = 1;
+		mutex_exit(&softc->mutex);
+		return (DDI_SUCCESS);
 
 	default:
-	    return (DDI_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 	/* shut off video if not console */
 
 	if (!softc->mapped_by_prom)
-	    cg6_set_video(softc, 0);
+		cg6_set_video(softc, 0);
 
 	mutex_enter(&softc->mutex);
 	cg6_int_disable(softc);
@@ -886,20 +887,21 @@ cg6_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	ddi_remove_intr(devi, 0, softc->iblock_cookie);
 
 	if (softc->fbctec)
-	    ddi_unmap_regs(devi, 0,
-		&softc->fbctec, CG6_ADDR_FBC, CG6_FBCTEC_SZ);
+		ddi_unmap_regs(devi, 0,
+		    &softc->fbctec, CG6_ADDR_FBC, CG6_FBCTEC_SZ);
 	if (softc->cmap)
-	    ddi_unmap_regs(devi, 0, &softc->cmap, CG6_ADDR_CMAP, CG6_CMAP_SZ);
+		ddi_unmap_regs(devi, 0, &softc->cmap, CG6_ADDR_CMAP,
+		    CG6_CMAP_SZ);
 	if (softc->fhcthc)
-	    ddi_unmap_regs(devi, 0,
-		&softc->fhcthc, CG6_ADDR_FHC, CG6_FHCTHC_SZ);
+		ddi_unmap_regs(devi, 0,
+		    &softc->fhcthc, CG6_ADDR_FHC, CG6_FHCTHC_SZ);
 	if (softc->intrstats) {
 		kstat_delete(softc->intrstats);
 	}
 	softc->intrstats = NULL;
 
 	if (softc->vrtpage != NULL)
-	    ddi_umem_free(softc->vrtcookie);
+		ddi_umem_free(softc->vrtcookie);
 
 	mutex_destroy(&softc->mutex);
 
@@ -937,7 +939,7 @@ cg6_power(dev_info_t *dip, int cmpt, int level)
 		S_THC(softc)->l_thc_hcmisc |= THC_HCMISC_RESET;
 		drv_usecwait(500);
 		S_THC(softc)->l_thc_hcmisc |=
-		(THC_HCMISC_SYNCEN | THC_HCMISC_VIDEO);
+		    (THC_HCMISC_SYNCEN | THC_HCMISC_VIDEO);
 		S_THC(softc)->l_thc_hcmisc &= ~THC_HCMISC_RESET;
 		cg6_update_cmap(softc, (uint_t)_ZERO_, CG6_CMAP_ENTRIES);
 		cg6_int_enable(softc);
@@ -948,7 +950,7 @@ cg6_power(dev_info_t *dip, int cmpt, int level)
 		S_THC(softc)->l_thc_hcmisc |= THC_HCMISC_RESET;
 		drv_usecwait(500);
 		S_THC(softc)->l_thc_hcmisc &=
-		~(THC_HCMISC_VIDEO | THC_HCMISC_SYNCEN);
+		    ~(THC_HCMISC_VIDEO | THC_HCMISC_SYNCEN);
 		S_THC(softc)->l_thc_hcmisc &= ~THC_HCMISC_RESET;
 		mutex_exit(&softc->mutex);
 	}
@@ -967,19 +969,19 @@ cg6_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-	    if ((softc = getsoftc(instance)) == NULL) {
+		if ((softc = getsoftc(instance)) == NULL) {
 		error = DDI_FAILURE;
-	    } else {
+		} else {
 		*result = (void *) softc->devi;
 		error = DDI_SUCCESS;
-	    }
-	    break;
+		}
+		break;
 	case DDI_INFO_DEVT2INSTANCE:
 		*result = (void *) (uintptr_t)instance;
 		error = DDI_SUCCESS;
 		break;
 	default:
-	    error = DDI_FAILURE;
+		error = DDI_FAILURE;
 	}
 	return (error);
 }
@@ -998,10 +1000,10 @@ cg6_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	 * is this gorp necessary?
 	 */
 	if (otyp != OTYP_CHR) {
-	    error = EINVAL;
+		error = EINVAL;
 	} else
 	if (softc == NULL) {
-	    error = ENXIO;
+		error = ENXIO;
 	}
 
 	return (error);
@@ -1020,17 +1022,17 @@ cg6_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	    unit, flag, otyp, total_memory));
 
 	if (otyp != OTYP_CHR) {
-	    error = EINVAL;
+		error = EINVAL;
 	} else if (softc == NULL) {
-	    error = ENXIO;
+		error = ENXIO;
 	} else {
-	    mutex_enter(&softc->mutex);
-	    cg6_reset_cmap(softc->cmap_rgb, CG6_CMAP_ENTRIES);
-	    cg6_restore_prom_cmap(softc, softc->cmap_rgb, CG6_CMAP_ENTRIES);
-	    softc->cur.enable = 0;
-	    softc->curctx = NULL;
-	    cg6_reset(softc);
-	    mutex_exit(&softc->mutex);
+		mutex_enter(&softc->mutex);
+		cg6_reset_cmap(softc->cmap_rgb, CG6_CMAP_ENTRIES);
+		cg6_restore_prom_cmap(softc, softc->cmap_rgb, CG6_CMAP_ENTRIES);
+		softc->cur.enable = 0;
+		softc->curctx = NULL;
+		cg6_reset(softc);
+		mutex_exit(&softc->mutex);
 	}
 
 	return (error);
@@ -1049,25 +1051,25 @@ cg6_mmap(dev_t dev, off_t off, int prot)
 	    getminor(dev), (uint_t)off));
 
 	if ((diff = off - CG6_VADDR_COLOR) >= 0 && diff < softc->fbmappable)
-	    rval = softc->fbpfnum + diff / pagesize;
+		rval = softc->fbpfnum + diff / pagesize;
 	else if ((diff = off - CG6_VADDR_FBC) >= 0 && diff < CG6_FBCTEC_SZ)
-	    page = softc->fbctec + diff;
+		page = softc->fbctec + diff;
 	else if ((diff = off - CG6_VADDR_CMAP) >= 0 && diff < CG6_CMAP_SZ)
-	    page = softc->cmap + diff;
+		page = softc->cmap + diff;
 	else if ((diff = off - CG6_VADDR_FHC) >= 0 && diff < CG6_FHCTHC_SZ)
-	    page = softc->fhcthc + diff;
+		page = softc->fhcthc + diff;
 	else if ((diff = off - CG6_VADDR_ROM) >= 0 && diff < CG6_ROM_SZ)
-	    page = softc->rom + diff;
+		page = softc->rom + diff;
 	else if ((diff = off - CG6_VADDR_DHC) >= 0 && diff < CG6_DHC_SZ)
-	    page = softc->dhc + diff;
+		page = softc->dhc + diff;
 	else if ((diff = off - CG6_VADDR_ALT) >= 0 && diff < CG6_ALT_SZ)
-	    page = softc->alt + diff;
+		page = softc->alt + diff;
 	else if ((diff = off - CG6_VADDR_VRT) >= 0 && diff < CG6_VRT_SZ)
-	    page = softc->vrtpage ?
+		page = softc->vrtpage ?
 		    (caddr_t)softc->vrtpage + diff : (caddr_t)-1;
 	else if ((diff = off - CG3_MMAP_OFFSET) >= 0 &&
-		diff < softc->fbmappable)
-	    rval = softc->fbpfnum + diff / pagesize;
+	    diff < softc->fbmappable)
+		rval = softc->fbpfnum + diff / pagesize;
 	else if (off < CG6_VBASE) {
 
 	/*
@@ -1075,25 +1077,25 @@ cg6_mmap(dev_t dev, off_t off, int prot)
 	 * we're emulating
 	 */
 
-	    if (softc->emulation == FBTYPE_SUN3COLOR) {
+		if (softc->emulation == FBTYPE_SUN3COLOR) {
 		if (off >= 0 && off < softc->fbmappable)
-		    rval = softc->fbpfnum + diff / pagesize;
+			rval = softc->fbpfnum + diff / pagesize;
 		else
-		    page = (caddr_t)-1;
-	    } else {		/* softc->emulation == FBTYPE_SUN4COLOR */
+			page = (caddr_t)-1;
+		} else {	/* softc->emulation == FBTYPE_SUN4COLOR */
 		if (off >= 0 && off < softc->dummysize)
-		    page = softc->rom;
+			page = softc->rom;
 		else if ((diff = off - softc->dummysize) < softc->fbmappable)
-		    rval = softc->fbpfnum + diff / pagesize;
-	    }
+			rval = softc->fbpfnum + diff / pagesize;
+		}
 	    /* TODO: bw2? */
 	} else
-	    page = (caddr_t)-1;
+		page = (caddr_t)-1;
 
 	if (rval == 0)
-	    if (page != (caddr_t)-1)
+		if (page != (caddr_t)-1)
 		rval = hat_getkpfnum(page);
-	    else
+		else
 		rval = -1;
 
 	DEBUGF(5, (CE_CONT, "cg6_mmap returning 0x%x\n", rval));
@@ -1132,12 +1134,12 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 
 	case VIS_GETIDENTIFIER:
 
-	    if (ddi_copyout((caddr_t)&cg6_ident,
-			    (caddr_t)data,
-			    sizeof (struct vis_identifier),
-			    mode))
-		return (EFAULT);
-	    break;
+		if (ddi_copyout((caddr_t)&cg6_ident,
+		    (caddr_t)data,
+		    sizeof (struct vis_identifier),
+		    mode))
+			return (EFAULT);
+		break;
 
 	case FBIOPUTCMAP:
 	case FBIOGETCMAP:
@@ -1162,11 +1164,11 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 
 			case 0:
 			case PIXPG_8BIT_COLOR:
-			    map = softc->cmap_rgb;
-			    entries = CG6_CMAP_ENTRIES;
-			    break;
+				map = softc->cmap_rgb;
+				entries = CG6_CMAP_ENTRIES;
+				break;
 			default:
-			    return (EINVAL);
+				return (EINVAL);
 			}
 		} else {
 			map = softc->omap_rgb;
@@ -1174,7 +1176,7 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		}
 
 		if ((index &= PIX_ALL_PLANES) >= entries ||
-			index + count > entries) {
+		    index + count > entries) {
 			return (EINVAL);
 		}
 		/*
@@ -1214,7 +1216,7 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 			mutex_enter(&softc->mutex);
 			map += index * 3;
 			if (cg6_update_pending(softc))
-			    cg6_int_disable(softc);
+				cg6_int_disable(softc);
 
 			/*
 			 * Copy color map entries from stack to the color map
@@ -1227,7 +1229,7 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 
 			/* cursor colormap update */
 			if (entries < CG6_CMAP_ENTRIES)
-			    count = 0;
+				count = 0;
 			cg6_update_cmap(softc, index, count);
 			cg6_int_enable(softc);
 			mutex_exit(&softc->mutex);
@@ -1276,9 +1278,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		struct fbsattr attr;
 
 		if (ddi_copyin((caddr_t)data,
-				(caddr_t)&attr,
-				sizeof (attr),
-				mode))
+		    (caddr_t)&attr,
+		    sizeof (attr),
+		    mode))
 			return (EFAULT);
 		DEBUGF(3, (CE_CONT, "FBIOSATTR, type=%d\n", attr.emu_type));
 		if (attr.emu_type != -1)
@@ -1288,12 +1290,12 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 			case FBTYPE_SUN4COLOR:
 			case FBTYPE_SUN2BW:
 			case FBTYPE_SUNFAST_COLOR:
-				    mutex_enter(&softc->mutex);
-				    softc->emulation = attr.emu_type;
-				    mutex_exit(&softc->mutex);
-				    break;
+					mutex_enter(&softc->mutex);
+					softc->emulation = attr.emu_type;
+					mutex_exit(&softc->mutex);
+					break;
 			default:
-				    return (EINVAL);
+					return (EINVAL);
 		}
 		/* ignore device-dependent stuff */
 	}
@@ -1303,7 +1305,7 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		struct fbgattr attr;
 
 		DEBUGF(3, (CE_CONT, "FBIOGATTR, emu_type=%d\n",
-			softc->emulation));
+		    softc->emulation));
 		bcopy((caddr_t)&cg6_attr, (caddr_t)&attr, sizeof (attr));
 		mutex_enter(&softc->mutex);
 		attr.fbtype.fb_type = softc->emulation;
@@ -1315,9 +1317,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		mutex_exit(&softc->mutex);
 
 		if (ddi_copyout((caddr_t)&attr,
-				(caddr_t)data,
-				sizeof (struct fbgattr),
-				mode))
+		    (caddr_t)data,
+		    sizeof (struct fbgattr),
+		    mode))
 			return (EFAULT);
 	}
 	break;
@@ -1344,9 +1346,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		mutex_exit(&softc->mutex);
 
 		if (ddi_copyout((caddr_t)&fb,
-				(caddr_t)data,
-				sizeof (struct fbtype),
-				mode))
+		    (caddr_t)data,
+		    sizeof (struct fbtype),
+		    mode))
 			return (EFAULT);
 		}
 		break;
@@ -1354,9 +1356,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 
 		DEBUGF(3, (CE_CONT, "FBIOSVIDEO\n"));
 		if (ddi_copyin((caddr_t)data,
-				(caddr_t)&i,
-				sizeof (int),
-				mode))
+		    (caddr_t)&i,
+		    sizeof (int),
+		    mode))
 			return (EFAULT);
 		mutex_enter(&softc->mutex);
 		cg6_set_video(softc, i & FBVIDEO_ON);
@@ -1371,9 +1373,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		mutex_exit(&softc->mutex);
 
 		if (ddi_copyout((caddr_t)&i,
-				(caddr_t)data,
-				sizeof (int),
-				mode))
+		    (caddr_t)data,
+		    sizeof (int),
+		    mode))
 			return (EFAULT);
 		break;
 
@@ -1381,17 +1383,17 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 
 	case FBIOGXINFO:
 		if (ddi_copyout((caddr_t)&softc->cg6info,
-				(caddr_t)data,
-				sizeof (struct cg6_info),
-				mode))
+		    (caddr_t)data,
+		    sizeof (struct cg6_info),
+		    mode))
 			return (EFAULT);
 		return (0);
 
 	case FBIOMONINFO:
 		if (ddi_copyout((caddr_t)&softc->moninfo,
-				(caddr_t)data,
-				sizeof (struct mon_info),
-				mode))
+		    (caddr_t)data,
+		    sizeof (struct mon_info),
+		    mode))
 			return (EFAULT);
 		return (0);
 
@@ -1411,9 +1413,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		i = CG6_VADDR_VRT;
 
 		if (ddi_copyout((caddr_t)&i,
-				(caddr_t)data,
-				sizeof (int),
-				mode))
+		    (caddr_t)data,
+		    sizeof (int),
+		    mode))
 			return (EFAULT);
 		return (0);
 
@@ -1471,17 +1473,17 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 
 			if (STRUCT_FGETP(fbcursor, image)) {
 				bzero((caddr_t)softc->cur.image,
-					sizeof (softc->cur.image));
+				    sizeof (softc->cur.image));
 				bcopy((caddr_t)&stack_image,
-					(caddr_t)softc->cur.image,
-					cbytes);
+				    (caddr_t)softc->cur.image,
+				    cbytes);
 			}
 			if (STRUCT_FGETP(fbcursor, mask)) {
 				bzero((caddr_t)softc->cur.mask,
-					sizeof (softc->cur.mask));
+				    sizeof (softc->cur.mask));
 				bcopy((caddr_t)&stack_mask,
-					(caddr_t)softc->cur.mask,
-					cbytes);
+				    (caddr_t)softc->cur.mask,
+				    cbytes);
 			}
 			/* load into hardware */
 			softc->cur.size = STRUCT_FGET(fbcursor, size);
@@ -1570,9 +1572,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		struct fbcurpos stack_curpos;	/* cursor position */
 
 		if (ddi_copyin((caddr_t)data,
-				(caddr_t)&stack_curpos,
-				sizeof (struct fbcurpos),
-				mode))
+		    (caddr_t)&stack_curpos,
+		    sizeof (struct fbcurpos),
+		    mode))
 			return (EFAULT);
 
 		mutex_enter(&softc->mutex);
@@ -1592,9 +1594,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		mutex_exit(&softc->mutex);
 
 		if (ddi_copyout((caddr_t)&stack_curpos,
-				(caddr_t)data,
-				sizeof (struct fbcurpos),
-				mode))
+		    (caddr_t)data,
+		    sizeof (struct fbcurpos),
+		    mode))
 			return (EFAULT);
 	}
 	break;
@@ -1603,9 +1605,9 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 		static struct fbcurpos curmax = {32, 32};
 
 		if (ddi_copyout((caddr_t)&curmax,
-				(caddr_t)data,
-				sizeof (struct fbcurpos),
-				mode))
+		    (caddr_t)data,
+		    sizeof (struct fbcurpos),
+		    mode))
 			return (EFAULT);
 	}
 	break;
@@ -1614,7 +1616,7 @@ cg6_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred, int *rval)
 	case 255:
 		cg6_debug = (int)data;
 		if (cg6_debug == -1)
-		    cg6_debug = CG6DEBUG;
+			cg6_debug = CG6DEBUG;
 		cmn_err(CE_CONT, "cg6_debug is now %d\n", cg6_debug);
 		break;
 #endif
@@ -1635,101 +1637,102 @@ cg6_intr(caddr_t arg)
 	volatile uint32_t  tmp;
 
 	DEBUGF(7, (CE_CONT,
-		"cg6_intr: softc=%x, vrtflag=%x\n", softc, softc->vrtflag));
+	    "cg6_intr: softc=%x, vrtflag=%x\n", softc, softc->vrtflag));
 
 	mutex_enter(&softc->mutex);
 	mutex_enter(&softc->interlock);
 
 	if (!cg6_int_pending(softc)) {
-	    if (softc->intr_flag) {
+		if (softc->intr_flag) {
 		softc->intr_flag = 0;
-	    } else {
+		} else {
 		if (softc->intrstats) {
-		    KIOIP->intrs[KSTAT_INTR_SPURIOUS]++;
+			KIOIP->intrs[KSTAT_INTR_SPURIOUS]++;
 		}
 		mutex_exit(&softc->interlock);
 		mutex_exit(&softc->mutex);
 		return (DDI_INTR_UNCLAIMED);	/* nope, not mine */
-	    }
+		}
 	}
 
 	if (!(cg6_update_pending(softc) || (softc)->vrtflag)) {
 	    /* TODO catch stray interrupts? */
-	    cg6_int_disable_intr(softc);
-	    if (softc->intrstats) {
+		cg6_int_disable_intr(softc);
+		if (softc->intrstats) {
 		KIOIP->intrs[KSTAT_INTR_HARD]++;
-	    }
-	    mutex_exit(&softc->interlock);
-	    mutex_exit(&softc->mutex);
-	    return (DDI_INTR_CLAIMED);
+		}
+		mutex_exit(&softc->interlock);
+		mutex_exit(&softc->mutex);
+		return (DDI_INTR_CLAIMED);
 	}
 	if (softc->vrtflag & CG6VRTCTR) {
-	    if (softc->vrtmaps == 0) {
+		if (softc->vrtmaps == 0) {
 		softc->vrtflag &= ~CG6VRTCTR;
-	    } else
+		} else
 		*softc->vrtpage += 1;
 	}
 	if (softc->vrtflag & CG6VRTIOCTL) {
-	    softc->vrtflag &= ~CG6VRTIOCTL;
-	    cv_broadcast(&softc->vrtsleep);
+		softc->vrtflag &= ~CG6VRTIOCTL;
+		cv_broadcast(&softc->vrtsleep);
 	}
 	if (cg6_update_pending(softc)) {
-	    volatile struct cg6_cmap *cmap = S_CMAP(softc);
-	    LOOP_T  count = softc->cmap_count;
+		volatile struct cg6_cmap *cmap = S_CMAP(softc);
+		LOOP_T  count = softc->cmap_count;
 
-	    /* load cursor color map */
-	    if (softc->omap_update) {
-		in = &softc->omap_image.omap_int[0];
-		out = (uint32_t *)& cmap->omap;
+		/* load cursor color map */
+		if (softc->omap_update) {
+			in = &softc->omap_image.omap_int[0];
+			out = (uint32_t *)& cmap->omap;
 
-		/* background color */
-		cmap->addr = 1 << 24;
-		tmp = in[0];
-		*out = tmp;
-		*out = tmp <<= 8;
-		*out = tmp <<= 8;
+			/* background color */
+			cmap->addr = 1 << 24;
+			tmp = in[0];
+			*out = tmp;
+			*out = tmp <<= 8;
+			*out = tmp <<= 8;
 
-		/* foreground color */
-		cmap->addr = 3 << 24;
-		*out = tmp <<= 8;
-		tmp = in[1];
-		*out = tmp;
-		*out = tmp <<= 8;
-	    }
-	    /* load main color map */
-	    if (count) {
-		LOOP_T  index = softc->cmap_index;
+			/* foreground color */
+			cmap->addr = 3 << 24;
+			*out = tmp <<= 8;
+			tmp = in[1];
+			*out = tmp;
+			*out = tmp <<= 8;
+		}
+		/* load main color map */
+		if (count) {
+			LOOP_T  index = softc->cmap_index;
 
-		in = &softc->cmap_image.cmap_int[0];
-		out = (uint32_t *)& cmap->cmap;
+			in = &softc->cmap_image.cmap_int[0];
+			out = (uint32_t *)& cmap->cmap;
 
-		/* count multiples of 4 RGB entries */
-		count = (count + (index & 3) + 3) >> 2;
+			/* count multiples of 4 RGB entries */
+			count = (count + (index & 3) + 3) >> 2;
 
-		/* round index to 4 entry boundary */
-		index &= ~3;
+			/* round index to 4 entry boundary */
+			index &= ~3;
 
-		cmap->addr = index << 24;
-		PTR_INCR(uint32_t *, in, index * 3);
+			cmap->addr = index << 24;
+			PTR_INCR(uint32_t *, in, index * 3);
 
-		/* copy 4 bytes (4/3 RGB entries) per loop iteration */
-		count *= 3;
-		PR_LOOPV(count,
-			tmp = *in++;
-		*out = tmp;
-		*out = tmp <<= 8;
-		*out = tmp <<= 8;
-		*out = tmp <<= 8);
+			/* copy 4 bytes (4/3 RGB entries) per loop iteration */
+			count *= 3;
+			/* CSTYLED */
+			PR_LOOPV(count, tmp = *in++;
+				*out = tmp;
+				*out = tmp <<= 8;
+				*out = tmp <<= 8;
+				/* CSTYLED */
+				*out = tmp <<= 8);
 
-		softc->cmap_count = 0;
-	    }
-	    softc->omap_update = 0;
+			softc->cmap_count = 0;
+		}
+		softc->omap_update = 0;
 	}
 	cg6_int_disable_intr(softc);
 	if (softc->vrtflag)
-	    cg6_int_enable(softc);
+		cg6_int_enable(softc);
 	if (softc->intrstats) {
-	    KIOIP->intrs[KSTAT_INTR_HARD]++;
+		KIOIP->intrs[KSTAT_INTR_HARD]++;
 	}
 	mutex_exit(&softc->interlock);
 	mutex_exit(&softc->mutex);
@@ -1759,25 +1762,25 @@ cg6_update_cmap(struct cg6_softc *softc, uint_t index, uint_t count)
 	uint_t   high, low;
 
 	if (count == 0) {
-	    softc->omap_update = 1;
-	    return;
+		softc->omap_update = 1;
+		return;
 	}
 
 	high = softc->cmap_count;
 
 	if (high != 0) {
-	    high += (low = softc->cmap_index);
+		high += (low = softc->cmap_index);
 
-	    if (index < low)
+		if (index < low)
 		softc->cmap_index = low = index;
 
-	    if (index + count > high)
+		if (index + count > high)
 		high = index + count;
 
-	    softc->cmap_count = high - low;
+		softc->cmap_count = high - low;
 	} else {
-	    softc->cmap_index = index;
-	    softc->cmap_count = count;
+		softc->cmap_index = index;
+		softc->cmap_count = count;
 	}
 }
 
@@ -1794,13 +1797,17 @@ cg6_cmap_bcopy(uchar_t *bufp, uchar_t *rgb, uint_t count)
 	LOOP_T rcount = count;
 
 	if (--rcount >= 0)
-	    PR_LOOPVP(rcount,
+		PR_LOOPVP(rcount,
+			/* CSTYLED */
 			*rgb = *bufp++;
+			/* CSTYLED */
 			rgb += 3);
 	else {
-	    rcount = -rcount - 2;
-	    PR_LOOPVP(rcount,
+		rcount = -rcount - 2;
+		PR_LOOPVP(rcount,
+			/* CSTYLED */
 			*bufp++ = *rgb;
+			/* CSTYLED */
 			rgb += 3);
 	}
 }
@@ -1824,10 +1831,12 @@ cg6_restore_prom_cmap(struct cg6_softc *softc,
 		hwcmap->addr = 0;
 
 		count = ((entries + 3) >> 2) * 3;
+		/* CSTYLED */
 		PR_LOOPV(count, tmp = *in++;
 			*out = tmp;
 			*out = tmp <<= 8;
 			*out = tmp <<= 8;
+			/* CSTYLED */
 			*out = tmp <<= 8);
 	}
 }
@@ -1843,7 +1852,7 @@ cg6_setcurpos(struct cg6_softc *softc)
 	thc->l_thc_cursor = softc->cur.enable ?
 	    (((softc->cur.pos.x - softc->cur.hot.x) << 16) |
 	    ((softc->cur.pos.y - softc->cur.hot.y) & 0xffff)) :
-		CG6_CURSOR_OFFPOS;
+	    CG6_CURSOR_OFFPOS;
 }
 
 /*
@@ -1859,15 +1868,15 @@ cg6_setcurshape(struct cg6_softc *softc)
 
 	/* compute right edge mask */
 	if (softc->cur.size.x)
-	    edge = (uint_t)~ 0 << (32 - softc->cur.size.x);
+		edge = (uint_t)~ 0 << (32 - softc->cur.size.x);
 
 	image = softc->cur.image;
 	mask = softc->cur.mask;
 	hw = (uint_t *)&thc->l_thc_cursora00;
 
 	for (i = 0; i < 32; i++) {
-	    hw[i] = (tmp = mask[i] & edge);
-	    hw[i + 32] = tmp & image[i];
+		hw[i] = (tmp = mask[i] & edge);
+		hw[i + 32] = tmp & image[i];
 	}
 }
 
@@ -1881,20 +1890,20 @@ cg6_reset(struct cg6_softc *softc)
 
 	/* reinitialize TEC */
 	{
-	    volatile struct tec *tec = S_TEC(softc);
+		volatile struct tec *tec = S_TEC(softc);
 
-	    tec->l_tec_mv = 0;
-	    tec->l_tec_clip = 0;
-	    tec->l_tec_vdc = 0;
+		tec->l_tec_mv = 0;
+		tec->l_tec_clip = 0;
+		tec->l_tec_vdc = 0;
 	}
 
 	/* reinitialize FBC config register */
 	{
-	    volatile uint_t  *fhc = S_FHC(softc);
-	    uint_t rev, conf;
+		volatile uint_t  *fhc = S_FHC(softc);
+		uint_t rev, conf;
 
-	    rev = *fhc >> FHC_CONFIG_REV_SHIFT & FHC_CONFIG_REV_MASK;
-	    if (rev <= 4) {
+		rev = *fhc >> FHC_CONFIG_REV_SHIFT & FHC_CONFIG_REV_MASK;
+		if (rev <= 4) {
 
 		/* PROM knows how to deal with LSC and above */
 		/* rev == 0 : FBC 0 (not available to customers) */
@@ -1910,33 +1919,33 @@ cg6_reset(struct cg6_softc *softc)
 #if FBC_REV0
 		/* FBC0: test window = 0, disable fast rops */
 		if (rev == 0)
-		    conf |= FHC_CONFIG_TEST |
-			FHC_CONFIG_FROP_DISABLE;
+			conf |= FHC_CONFIG_TEST |
+			    FHC_CONFIG_FROP_DISABLE;
 		else
 #endif	/* FBC_REV0 */
 
 		    /* test window = 1K x 1K */
-		    conf |= FHC_CONFIG_TEST |
-			(10 + 1) << FHC_CONFIG_TESTX_SHIFT |
-			(10 + 1) << FHC_CONFIG_TESTY_SHIFT;
+			conf |= FHC_CONFIG_TEST |
+			    (10 + 1) << FHC_CONFIG_TESTX_SHIFT |
+			    (10 + 1) << FHC_CONFIG_TESTY_SHIFT;
 
 		/* FBC[01]: disable destination cache */
 		if (rev <= 1)
-		    conf |= FHC_CONFIG_DST_DISABLE;
+			conf |= FHC_CONFIG_DST_DISABLE;
 
 		*fhc = conf;
-	    }
+		}
 	}
 
 	/* reprogram DAC to enable HW cursor use */
 	{
-	    volatile struct cg6_cmap *cmap = S_CMAP(softc);
+		volatile struct cg6_cmap *cmap = S_CMAP(softc);
 
 	    /* command register */
-	    cmap->addr = 6 << 24;
+		cmap->addr = 6 << 24;
 
 	    /* turn on CR1:0, overlay enable */
-	    cmap->ctrl = cmap->ctrl | (0x3 << 24);
+		cmap->ctrl = cmap->ctrl | (0x3 << 24);
 	}
 }
 
@@ -2110,29 +2119,29 @@ cg6_segmap(dev_t	dev,
 	 * check to see if this is a VRT page
 	 */
 	if (off == CG6_VADDR_VRT) {
-	    if (len != pagesize) {
+		if (len != pagesize) {
 			mutex_exit(&softc->mutex);
 			DEBUGF(3, (CE_CONT,
 			    "rejecting because off=vrt and len=%x\n", len))
 			return (EINVAL);
-	    }
-	    if (softc->vrtmaps++ == 0) {
+		}
+		if (softc->vrtmaps++ == 0) {
 			if (softc->vrtpage == NULL) {
 				softc->vrtpage = (int *)ddi_umem_alloc(
-					pagesize, KM_SLEEP,
-					(void **)&softc->vrtcookie);
+				    pagesize, KM_SLEEP,
+				    (void **)&softc->vrtcookie);
 			}
 			*softc->vrtpage = 0;
 			softc->vrtflag |= CG6VRTCTR;
 			cg6_int_enable(softc);
-	    }
+		}
 	}
 
 	/*
 	 * use the devmap framework for setting up the user mapping.
 	 */
 	error = devmap_setup(dev, (offset_t)off, as, addrp, (size_t)len, prot,
-			maxprot, flags, cred);
+	    maxprot, flags, cred);
 
 	mutex_exit(&softc->mutex);
 
@@ -2151,7 +2160,7 @@ cg6map_map(devmap_cookie_t dhp, dev_t dev, uint_t flags, offset_t off,
 	uint_t	maptype = 0;
 
 	DEBUGF(3, (CE_CONT, "cg6map_map: off = %x, len = %x\n",
-		(uint_t)off, (uint_t)len));
+	    (uint_t)off, (uint_t)len));
 
 	/*
 	 * LSC DFB BUG KLUDGE:  DFB must always be mapped private on the buggy
@@ -2186,7 +2195,7 @@ cg6map_map(devmap_cookie_t dhp, dev_t dev, uint_t flags, offset_t off,
 	 * but not both.
 	 */
 	if (softc->chiprev == 5 && (maptype & CG6MAP_FB))
-	    flags = (flags & ~MAP_TYPE) | MAP_PRIVATE;
+		flags = (flags & ~MAP_TYPE) | MAP_PRIVATE;
 
 	if (flags & MAP_SHARED) {	/* shared mapping */
 		ctx = shared_ctx;
@@ -2195,7 +2204,7 @@ cg6map_map(devmap_cookie_t dhp, dev_t dev, uint_t flags, offset_t off,
 		ctx = ctx_map_insert(softc, maptype);
 		ctx->flag |= maptype;
 		DEBUGF(2, (CE_CONT, "cg6map_map: ** MAP_PRIVATE **. ctx = %x\n",
-			ctx));
+		    ctx));
 	}
 
 	pvt = cg6_pvt_alloc(ctx, maptype, off, len, softc);
@@ -2216,7 +2225,7 @@ cg6map_access(devmap_cookie_t dhp, void *pvt, offset_t offset, size_t len,
 	uint_t type, uint_t rw)
 {
 	return (devmap_do_ctxmgt(dhp, pvt, offset, len, type, rw,
-		cg6map_contextmgt));
+	    cg6map_contextmgt));
 }
 
 /*
@@ -2239,7 +2248,7 @@ cg6map_contextmgt(devmap_cookie_t dhp, void *pvt, offset_t offset,
 
 	DEBUGF(6, (CE_CONT, "cg6map_contextmgt: pvt = %x, dhp = %x, \
 curctx = %x, context = %x\n",
-		p, dhp, softc->curctx, p->context));
+	    p, dhp, softc->curctx, p->context));
 	/*
 	 * Do we need to switch contexts?
 	 */
@@ -2257,9 +2266,9 @@ curctx = %x, context = %x\n",
 			 */
 			ASSERT(softc->curctx->pvt);
 			for (pvts = softc->curctx->pvt; pvts != NULL;
-					pvts = pvts->next) {
+			    pvts = pvts->next) {
 				err = devmap_unload(pvts->dhp, pvts->offset,
-						pvts->len);
+				    pvts->len);
 				if (err) {
 					mutex_exit(&softc->mutex);
 					return (err);
@@ -2267,9 +2276,9 @@ curctx = %x, context = %x\n",
 			}
 
 			if (cg6_cntxsave(fbc, S_TEC(softc),
-					softc->curctx) == 0) {
+			    softc->curctx) == 0) {
 				DEBUGF(1, (CE_CONT,
-					"cgsix: context save failed\n"));
+				    "cgsix: context save failed\n"));
 				/*
 				 * At this point we have no current context.
 				 */
@@ -2285,7 +2294,7 @@ curctx = %x, context = %x\n",
 		CG6DELAY(!(fbc->l_fbc_status & L_FBC_BUSY), CG6_FBC_WAIT);
 		if (fbc->l_fbc_status & L_FBC_BUSY) {
 			DEBUGF(1, (CE_CONT, "cgsix: idle_cg6: status = %x\n",
-			fbc->l_fbc_status));
+			    fbc->l_fbc_status));
 			/*
 			 * At this point we have no current context.
 			 */
@@ -2298,9 +2307,9 @@ curctx = %x, context = %x\n",
 
 		if (p->context->flag & CG6MAP_FBCTEC)
 			if (cg6_cntxrestore(fbc, S_TEC(softc),
-				p->context) == 0) {
+			    p->context) == 0) {
 				DEBUGF(1, (CE_CONT,
-					"cgsix: context restore failed\n"));
+				    "cgsix: context restore failed\n"));
 				/*
 				 * At this point we have no current context.
 				 */
@@ -2323,7 +2332,7 @@ curctx = %x, context = %x\n",
 		}
 	} else {
 		if ((err = devmap_load(p->dhp, p->offset, p->len, type,
-			rw)) != 0) {
+		    rw)) != 0) {
 			mutex_exit(&softc->mutex);
 			return (err);
 		}
@@ -2350,7 +2359,7 @@ cg6map_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off, size_t len,
 
 	DEBUGF(3, (CE_CONT, "cg6map_unmap: pvt = %x, dhp = %x, \
 off = %x, len = %x, dhp1 = %x, dhp2 = %x\n",
-			pvtp, dhp, (uint_t)off, len, new_dhp1, new_dhp2));
+	    pvtp, dhp, (uint_t)off, len, new_dhp1, new_dhp2));
 
 	mutex_enter(&softc->mutex);
 
@@ -2359,10 +2368,10 @@ off = %x, len = %x, dhp1 = %x, dhp2 = %x\n",
 	 * new_dhp1 is not NULL.
 	 */
 	if (new_dhp1 != NULL) {
-	    ptmp = cg6_pvt_alloc(ctx,  p->type,
-			p->offset,
-			(off - p->offset),
-			softc);
+		ptmp = cg6_pvt_alloc(ctx,  p->type,
+		    p->offset,
+		    (off - p->offset),
+		    softc);
 		ptmp->dhp = new_dhp1;
 		*pvtp1 = ptmp;
 	}
@@ -2373,7 +2382,7 @@ off = %x, len = %x, dhp1 = %x, dhp2 = %x\n",
 	 */
 	if (new_dhp2 != NULL) {
 		length = p->len - len - (off -  p->offset);
-	    ptmp = cg6_pvt_alloc(ctx, p->type, (off + len), length, softc);
+		ptmp = cg6_pvt_alloc(ctx, p->type, (off + len), length, softc);
 		ptmp->dhp = new_dhp2;
 
 		*pvtp2 = ptmp;
@@ -2419,11 +2428,11 @@ off = %x, len = %x, dhp1 = %x, dhp2 = %x\n",
 				kmem_free(ctx, sizeof (struct cg6_cntxt));
 			} else {
 				for (ctxptr = softc->pvt_ctx; ctxptr != NULL;
-					ctxptr = ctxptr->link) {
+				    ctxptr = ctxptr->link) {
 					if (ctxptr->link == ctx) {
 						ctxptr->link = ctx->link;
 						kmem_free(ctx,
-						sizeof (struct cg6_cntxt));
+						    sizeof (struct cg6_cntxt));
 					}
 				}
 			}
@@ -2435,7 +2444,7 @@ off = %x, len = %x, dhp1 = %x, dhp2 = %x\n",
 		 * NULL to force a context switch on the next device access.
 		 */
 		if ((softc->curctx == shared_ctx) && (softc->curctx->pvt ==
-			NULL)) {
+		    NULL)) {
 			softc->curctx = NULL;
 		}
 	}
@@ -2455,7 +2464,7 @@ cg6map_dup(devmap_cookie_t dhp, void *oldpvt, devmap_cookie_t new_dhp,
 	uint_t maptype;
 
 	DEBUGF(3, (CE_CONT, "cg6map_dup: pvt=%x, dhp=%x, newdhp=%x\n",
-			oldpvt, dhp, new_dhp));
+	    oldpvt, dhp, new_dhp));
 
 	mutex_enter(&softc->mutex);
 	if (p->context != &softc->shared_ctx) {
@@ -2470,10 +2479,10 @@ cg6map_dup(devmap_cookie_t dhp, void *oldpvt, devmap_cookie_t new_dhp,
 	*newpvt = pvt;
 
 	if (p->context && (p->context->flag & CG6MAP_VRT)) {
-	    softc->vrtflag |= CG6VRTCTR;
-	    if (softc->vrtmaps == 0)
+		softc->vrtflag |= CG6VRTCTR;
+		if (softc->vrtmaps == 0)
 			cg6_int_enable(softc);
-	    softc->vrtmaps++;
+		softc->vrtmaps++;
 	}
 
 	mutex_exit(&softc->mutex);
@@ -2675,7 +2684,7 @@ ctx_map_insert(struct cg6_softc *softc, int maptype)
 	pid_t curpid = getpid();
 
 	DEBUGF(4, (CE_CONT, "ctx_map_insert: maptype=0x%x curpid=%d\n",
-		maptype, curpid));
+	    maptype, curpid));
 
 	/*
 	 * If this is the first time we're here, then alloc space
@@ -2683,7 +2692,7 @@ ctx_map_insert(struct cg6_softc *softc, int maptype)
 	 */
 	if (softc->pvt_ctx == NULL) {
 		ctx = (struct cg6_cntxt *)
-			kmem_zalloc(sizeof (struct cg6_cntxt), KM_SLEEP);
+		    kmem_zalloc(sizeof (struct cg6_cntxt), KM_SLEEP);
 		ctx->pid = curpid;
 		ctx->link = NULL;
 		softc->pvt_ctx = ctx;
@@ -2697,7 +2706,7 @@ ctx_map_insert(struct cg6_softc *softc, int maptype)
 	 */
 	for (ctx = softc->pvt_ctx; ctx != NULL; ctx = ctx->link) {
 		if (ctx->pid == curpid &&
-			(maptype & ctx->flag & (CG6MAP_FBCTEC|CG6MAP_FB)) == 0)
+		    (maptype & ctx->flag & (CG6MAP_FBCTEC|CG6MAP_FB)) == 0)
 			break;
 	}
 
@@ -2705,7 +2714,7 @@ ctx_map_insert(struct cg6_softc *softc, int maptype)
 	/* no match, create a new one and add to softc list */
 	if (ctx == NULL) {
 		ctx = (struct cg6_cntxt *)
-			kmem_zalloc(sizeof (struct cg6_cntxt), KM_SLEEP);
+		    kmem_zalloc(sizeof (struct cg6_cntxt), KM_SLEEP);
 		ctx->pid = curpid;
 		ctx->link = softc->pvt_ctx;
 		softc->pvt_ctx = ctx;
@@ -2754,7 +2763,7 @@ cg6_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	struct devmap_callback_ctl *callbackops = &cg6map_ops;
 
 	DEBUGF(2, (CE_CONT, "cg6_devmap(%d), off=0x%x, len=%x, dhp=%x\n",
-		getminor(dev), (uint_t)off, len, dhp));
+	    getminor(dev), (uint_t)off, len, dhp));
 
 	if ((diff = off - CG6_VADDR_COLOR) >= 0 && diff < softc->fbmappable) {
 		if ((len + off) > (CG6_VADDR_COLOR + softc->fbmappable))
@@ -2796,7 +2805,7 @@ cg6_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 			kvaddr = (caddr_t)-1;
 		cookie = softc->vrtcookie;
 	} else if ((diff = off - CG3_MMAP_OFFSET) >= 0 &&
-		diff < softc->fbmappable) {
+	    diff < softc->fbmappable) {
 		if ((len + off) > (CG3_MMAP_OFFSET + softc->fbmappable))
 			length = CG3_MMAP_OFFSET + softc->fbmappable - off;
 		offset = CG6_ADDR_COLOR + diff;
@@ -2814,9 +2823,9 @@ cg6_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 					length = softc->dummysize - off;
 				offset = CG6_ADDR_COLOR + diff;
 			} else if ((diff = off - softc->dummysize) <
-				softc->fbmappable) {
+			    softc->fbmappable) {
 				if ((len + off) >
-					(softc->dummysize + softc->fbmappable))
+				    (softc->dummysize + softc->fbmappable))
 					length = softc->fbmappable - off;
 				offset = CG6_ADDR_COLOR + diff;
 			}
@@ -2826,7 +2835,7 @@ cg6_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 
 	if (kvaddr == (caddr_t)-1) {
 		DEBUGF(1, (CE_CONT, "cg6_devmap: no mapping off=0x%x, len=%x\n",
-			(uint_t)off, len));
+		    (uint_t)off, len));
 		return (-1);
 	}
 
@@ -2850,7 +2859,7 @@ cg6_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	 * no context to switch.
 	 */
 	ctxmap = (softc->chiprev == 5) ?
-		(CG6MAP_FBCTEC|CG6MAP_FB) : CG6MAP_FBCTEC;
+	    (CG6MAP_FBCTEC|CG6MAP_FB) : CG6MAP_FBCTEC;
 
 	/*
 	 * do context switching on the TEC and FBC registers.

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * socal - Serial Optical Channel Arbitrated Loop host adapter driver.
@@ -318,7 +317,7 @@ static struct bus_ops socal_bus_ops = {
 	ddi_dma_win,
 	ddi_dma_mctl,		/* int (*bus_dma_ctl)() */
 	socal_bus_ctl,		/* int (*bus_ctl)() */
-	ddi_bus_prop_op		/* int (*bus_prop_op*)() */
+	ddi_bus_prop_op,	/* int (*bus_prop_op*)() */
 };
 
 static struct cb_ops socal_cb_ops = {
@@ -356,7 +355,9 @@ static struct dev_ops socal_ops = {
 	socal_detach,		/* detach */
 	nodev,			/* reset */
 	&socal_cb_ops,		/* driver operations */
-	&socal_bus_ops		/* bus operations */
+	&socal_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* quiesce */
 };
 
 /*
@@ -399,10 +400,10 @@ extern struct mod_ops mod_driverops;
  * Module linkage information for the kernel.
  */
 #define	SOCAL_NAME "SOC+ FC-AL Host Adapter Driver"
-static	char	socal_version[] = "%I% %E%";
+static	char	socal_version[] = "1.62 08/19/2008";
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	SOCAL_NAME " %I%",
+	SOCAL_NAME,
 	&socal_ops,		/* driver ops */
 };
 
@@ -415,7 +416,7 @@ static struct modlinkage modlinkage = {
  */
 
 #if !defined(lint)
-static char socal_initmsg[] = "socal _init: socal.c\t%I%\t%E%\n";
+static char socal_initmsg[] = "socal _init: socal.c\t1.62\t08/19/2008\n";
 #endif
 
 int
@@ -427,7 +428,7 @@ _init(void)
 
 	/* Allocate soft state.  */
 	stat = ddi_soft_state_init(&socal_soft_state_p,
-		sizeof (socal_state_t), SOCAL_INIT_ITEMS);
+	    sizeof (socal_state_t), SOCAL_INIT_ITEMS);
 	if (stat != 0)
 		return (stat);
 
@@ -507,15 +508,15 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_dev_is_sid(dip) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "socal%d probe: Not self-identifying",
-			instance);
+		    instance);
 		return (DDI_FAILURE);
 	}
 
 	/* If we are in a slave-slot, then we can't be used. */
 	if (ddi_slaveonly(dip) == DDI_SUCCESS) {
 		cmn_err(CE_WARN,
-			"socal%d attach failed: device in slave-only slot",
-				instance);
+		    "socal%d attach failed: device in slave-only slot",
+		    instance);
 		return (DDI_FAILURE);
 	}
 
@@ -529,7 +530,7 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		cmn_err(CE_WARN,
 		"socal%d attach failed: hilevel interrupt unsupported",
-			instance);
+		    instance);
 		return (DDI_FAILURE);
 	}
 
@@ -537,11 +538,11 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_soft_state_zalloc(socal_soft_state_p, instance)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "socal%d attach failed: alloc soft state",
-			instance);
+		    instance);
 		return (DDI_FAILURE);
 	}
 	DEBUGF(4, (CE_CONT, "socal%d attach: allocated soft state\n",
-		instance));
+	    instance));
 
 	/*
 	 * Initialize the state structure.
@@ -549,11 +550,11 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	socalp = ddi_get_soft_state(socal_soft_state_p, instance);
 	if (socalp == (socal_state_t *)NULL) {
 		cmn_err(CE_WARN, "socal%d attach failed: bad soft state",
-			instance);
+		    instance);
 		return (DDI_FAILURE);
 	}
 	DEBUGF(4, (CE_CONT, "socal%d: attach: soc soft state ptr=0x%p\n",
-		instance, socalp));
+	    instance, socalp));
 
 	socalp->dip = dip;
 	socallim = &default_socallim;
@@ -594,8 +595,8 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Get out Node wwn and calculate port wwns */
 	rval = ddi_prop_op(DDI_DEV_T_ANY, dip,
-		PROP_LEN_AND_VAL_ALLOC, DDI_PROP_DONTPASS |
-		DDI_PROP_CANSLEEP, "wwn", (caddr_t)&wwn, &i);
+	    PROP_LEN_AND_VAL_ALLOC, DDI_PROP_DONTPASS |
+	    DDI_PROP_CANSLEEP, "wwn", (caddr_t)&wwn, &i);
 
 	if ((rval != DDI_PROP_SUCCESS) || (i < FC_WWN_SIZE) ||
 	    (bcmp(wwn, "00000000", FC_WWN_SIZE) == 0)) {
@@ -604,8 +605,8 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		bcopy((caddr_t)&ourmacaddr, (caddr_t)&s, sizeof (short));
 		socalp->socal_n_wwn.w.wwn_hi = s;
 		bcopy((caddr_t)&ourmacaddr+2,
-			(caddr_t)&socalp->socal_n_wwn.w.wwn_lo,
-			sizeof (uint_t));
+		    (caddr_t)&socalp->socal_n_wwn.w.wwn_lo,
+		    sizeof (uint_t));
 		socalp->socal_n_wwn.w.naa_id = NAA_ID_IEEE;
 		socalp->socal_n_wwn.w.nport_id = 0;
 	} else {
@@ -617,15 +618,15 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	for (i = 0; i < FC_WWN_SIZE; i++) {
 		(void) sprintf(&socalp->socal_stats.node_wwn[i << 1],
-			"%02x", socalp->socal_n_wwn.raw_wwn[i]);
+		    "%02x", socalp->socal_n_wwn.raw_wwn[i]);
 	}
 	DEBUGF(4, (CE_CONT, "socal%d attach: node wwn: %s\n",
-		instance, socalp->socal_stats.node_wwn));
+	    instance, socalp->socal_stats.node_wwn));
 
 	bcopy((caddr_t)&socalp->socal_n_wwn, (caddr_t)&porta->sp_p_wwn,
-		sizeof (la_wwn_t));
+	    sizeof (la_wwn_t));
 	bcopy((caddr_t)&socalp->socal_n_wwn, (caddr_t)&portb->sp_p_wwn,
-		sizeof (la_wwn_t));
+	    sizeof (la_wwn_t));
 	porta->sp_p_wwn.w.naa_id = NAA_ID_IEEE_EXTENDED;
 	portb->sp_p_wwn.w.naa_id = NAA_ID_IEEE_EXTENDED;
 	porta->sp_p_wwn.w.nport_id = instance*2;
@@ -633,30 +634,30 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	for (i = 0; i < FC_WWN_SIZE; i++) {
 		(void) sprintf(&socalp->socal_stats.port_wwn[0][i << 1],
-			"%02x", porta->sp_p_wwn.raw_wwn[i]);
+		    "%02x", porta->sp_p_wwn.raw_wwn[i]);
 		(void) sprintf(&socalp->socal_stats.port_wwn[1][i << 1],
-			"%02x", portb->sp_p_wwn.raw_wwn[i]);
+		    "%02x", portb->sp_p_wwn.raw_wwn[i]);
 	}
 	DEBUGF(4, (CE_CONT, "socal%d attach: porta wwn: %s\n",
-		instance, socalp->socal_stats.port_wwn[0]));
+	    instance, socalp->socal_stats.port_wwn[0]));
 	DEBUGF(4, (CE_CONT, "socal%d attach: portb wwn: %s\n",
-		instance, socalp->socal_stats.port_wwn[1]));
+	    instance, socalp->socal_stats.port_wwn[1]));
 
 	if ((porta->sp_transport = (fcal_transport_t *)
-		kmem_zalloc(sizeof (fcal_transport_t), KM_SLEEP)) == NULL) {
+	    kmem_zalloc(sizeof (fcal_transport_t), KM_SLEEP)) == NULL) {
 		socal_disp_err(socalp, CE_WARN, "attach.4011",
-			"attach failed: unable to alloc xport struct");
+		    "attach failed: unable to alloc xport struct");
 		goto fail;
 	}
 
 	if ((portb->sp_transport = (fcal_transport_t *)
-		kmem_zalloc(sizeof (fcal_transport_t), KM_SLEEP)) == NULL) {
+	    kmem_zalloc(sizeof (fcal_transport_t), KM_SLEEP)) == NULL) {
 		socal_disp_err(socalp, CE_WARN, "attach.4012",
-			"attach failed: unable to alloc xport struct");
+		    "attach failed: unable to alloc xport struct");
 		goto fail;
 	}
 	DEBUGF(4, (CE_CONT, "socal%d attach: allocated transport structs\n",
-		instance));
+	    instance));
 
 	/*
 	 * Map the external ram and registers for SOC+.
@@ -666,54 +667,54 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((ddi_dev_nregs(dip, &i) == DDI_SUCCESS) && (i == 1)) {
 		/* Map XRAM */
 		if (ddi_map_regs(dip, 0, &socalp->socal_xrp, 0, 0)
-			!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			socalp->socal_xrp = NULL;
 			socal_disp_err(socalp, CE_WARN, "attach.4020",
-				"attach failed: unable to map XRAM");
+			    "attach failed: unable to map XRAM");
 			goto fail;
 		}
 		/* Map registers */
 		socalp->socal_rp = (socal_reg_t *)(socalp->socal_xrp +
-			SOCAL_XRAM_SIZE);
+		    SOCAL_XRAM_SIZE);
 	} else {
 		/* Map EEPROM */
 		if (ddi_map_regs(dip, 0, &socalp->socal_eeprom, 0, 0) !=
 		    DDI_SUCCESS) {
 			socalp->socal_eeprom = NULL;
 			socal_disp_err(socalp, CE_WARN, "attach.4010",
-				"attach failed: unable to map eeprom");
+			    "attach failed: unable to map eeprom");
 			goto fail;
 		}
 	DEBUGF(4, (CE_CONT, "socal%d attach: mapped eeprom 0x%p\n",
-		instance, socalp->socal_eeprom));
+	    instance, socalp->socal_eeprom));
 		/* Map XRAM */
 		if (ddi_map_regs(dip, 1, &socalp->socal_xrp, 0, 0) !=
-			DDI_SUCCESS) {
+		    DDI_SUCCESS) {
 			socalp->socal_xrp = NULL;
 			socal_disp_err(socalp, CE_WARN, "attach.4020",
-				"attach failed: unable to map XRAM");
+			    "attach failed: unable to map XRAM");
 			goto fail;
 		}
 	DEBUGF(4, (CE_CONT, "socal%d attach: mapped xram 0x%p\n",
-		instance, socalp->socal_xrp));
+	    instance, socalp->socal_xrp));
 		/* Map registers */
 		if (ddi_map_regs(dip, 2, (caddr_t *)&socalp->socal_rp, 0, 0) !=
-			DDI_SUCCESS) {
+		    DDI_SUCCESS) {
 			socalp->socal_rp = NULL;
 			socal_disp_err(socalp, CE_WARN, "attach.4030",
-				"attach failed: unable to map registers");
+			    "attach failed: unable to map registers");
 			goto fail;
 		}
 	DEBUGF(4, (CE_CONT, "socal%d attach: mapped regs 0x%p\n",
-		instance, socalp->socal_rp));
+	    instance, socalp->socal_rp));
 	}
 	/*
 	 * Check to see we really have a SOC+ Host Adapter card installed
 	 */
 	if (ddi_peek32(dip, (int32_t *)&socalp->socal_rp->socal_csr.w,
-		(int32_t *)NULL) != DDI_SUCCESS) {
+	    (int32_t *)NULL) != DDI_SUCCESS) {
 		socal_disp_err(socalp, CE_WARN, "attach.4040",
-			"attach failed: unable to access status register");
+		    "attach failed: unable to access status register");
 		goto fail;
 	}
 	/* now that we have our registers mapped make sure soc+ reset */
@@ -721,25 +722,25 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* try defacing a spot in XRAM */
 	if (ddi_poke32(dip, (int32_t *)(socalp->socal_xrp + SOCAL_XRAM_UCODE),
-		0xdefaced) != DDI_SUCCESS) {
+	    0xdefaced) != DDI_SUCCESS) {
 		socal_disp_err(socalp, CE_WARN, "attach.4050",
-			"attach failed: unable to write host adapter XRAM");
+		    "attach failed: unable to write host adapter XRAM");
 		goto fail;
 	}
 
 	/* see if it stayed defaced */
 	if (ddi_peek32(dip, (int32_t *)(socalp->socal_xrp + SOCAL_XRAM_UCODE),
 	    (int32_t *)&y)
-		!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		socal_disp_err(socalp, CE_WARN, "attach.4051",
-			"attach failed: unable to access host adapter XRAM");
+		    "attach failed: unable to access host adapter XRAM");
 		goto fail;
 	}
 
 #ifdef DEBUG
 	for (i = 0; i < 4; i++) {
 		socalp->socal_rp->socal_cr.w &=
-			~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
+		    ~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
 		socalp->socal_rp->socal_cr.w |= i<<24;
 		cptr = (char *)(socal_xrambuf + (i*0x10000));
 		bcopy((caddr_t)socalp->socal_xrp, (caddr_t)cptr, 0x10000);
@@ -751,25 +752,25 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (y != 0xdefaced) {
 		socal_disp_err(socalp, CE_WARN, "attach.4052",
-			"attach failed: read/write mismatch in XRAM");
+		    "attach failed: read/write mismatch in XRAM");
 		goto fail;
 	}
 
 	/* Point to the SOC XRAM CQ Descriptor locations. */
 	socalp->xram_reqp = (soc_cq_t *)(socalp->socal_xrp +
-		SOCAL_XRAM_REQ_DESC);
+	    SOCAL_XRAM_REQ_DESC);
 	socalp->xram_rspp = (soc_cq_t *)(socalp->socal_xrp +
-		SOCAL_XRAM_RSP_DESC);
+	    SOCAL_XRAM_RSP_DESC);
 
 	if ((socalp->socal_ksp = kstat_create("socal", instance, "statistics",
 	    "controller", KSTAT_TYPE_RAW, sizeof (struct socal_stats),
 	    KSTAT_FLAG_VIRTUAL)) == NULL) {
 		socal_disp_err(socalp, CE_WARN, "attach.4053",
-			"unable to create kstats");
+		    "unable to create kstats");
 	} else {
 		socalp->socal_stats.version = 2;
 		(void) sprintf(socalp->socal_stats.drvr_name,
-			"%s: %s", SOCAL_NAME, socal_version);
+		    "%s: %s", SOCAL_NAME, socal_version);
 		socalp->socal_stats.pstats[0].port = 0;
 		socalp->socal_stats.pstats[1].port = 1;
 		socalp->socal_ksp->ks_data = (void *)&socalp->socal_stats;
@@ -780,14 +781,14 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Install a dummy interrupt routine.
 	 */
 	if (ddi_add_intr(dip,
-		(uint_t)0,
-		&socalp->iblkc,
-		&socalp->idevc,
-		socal_dummy_intr,
-		(caddr_t)socalp) != DDI_SUCCESS) {
-		    socal_disp_err(socalp, CE_WARN, "attach.4060",
+	    (uint_t)0,
+	    &socalp->iblkc,
+	    &socalp->idevc,
+	    socal_dummy_intr,
+	    (caddr_t)socalp) != DDI_SUCCESS) {
+			socal_disp_err(socalp, CE_WARN, "attach.4060",
 			"attach failed: unable to install interrupt handler");
-		    goto fail;
+			goto fail;
 	}
 
 	ddi_set_driver_private(dip, socalp);
@@ -807,8 +808,8 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	cv_init(&socalp->board_cv, NULL, CV_DRIVER, NULL);
 	DEBUGF(4, (CE_CONT,
-		"socal%d: attach: inited imr mutex, board mutex, board cv\n",
-		instance));
+	    "socal%d: attach: inited imr mutex, board mutex, board cv\n",
+	    instance));
 
 	/* init the port mutexes */
 	mutex_init(&porta->sp_mtx, NULL, MUTEX_DRIVER, socalp->iblkc);
@@ -816,18 +817,18 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&portb->sp_mtx, NULL, MUTEX_DRIVER, socalp->iblkc);
 	cv_init(&portb->sp_cv, NULL, CV_DRIVER, NULL);
 	DEBUGF(4, (CE_CONT, "socal%d: attach: inited port mutexes and cvs\n",
-		instance));
+	    instance));
 
 	/* get local copy of service params */
 	socal_wcopy((uint_t *)socalp->socal_xrp + SOCAL_XRAM_SERV_PARAMS,
-		(uint_t *)socalp->socal_service_params, SOCAL_SVC_LENGTH);
+	    (uint_t *)socalp->socal_service_params, SOCAL_SVC_LENGTH);
 	DEBUGF(4, (CE_CONT, "socal%d: attach: got service params\n", instance));
 	/*
 	 * Initailize the FCAL transport interface.
 	 */
 	socal_init_transport_interface(socalp);
 	DEBUGF(4, (CE_CONT, "socal%d: attach: initalized transport interface\n",
-		instance));
+	    instance));
 
 	/*
 	 * Allocate request and response queues and init their mutexs.
@@ -844,19 +845,20 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	burstsize = ddi_dma_burstsizes(socalp->request[0].skc_dhandle);
 	DEBUGF(4, (CE_CONT, "socal%d: attach: burstsize = 0x%x\n",
-		instance, burstsize));
+	    instance, burstsize));
 	j = burstsize & BURSTSIZE_MASK;
 	for (i = 0; socal_burst32_table[i] != SOCAL_CR_BURST_64; i++)
 		if (!(j >>= 1)) break;
 
 	socalp->socal_cfg = (socalp->socal_cfg & ~SOCAL_CR_SBUS_BURST_SIZE_MASK)
-		| socal_burst32_table[i];
+	    | socal_burst32_table[i];
 
 	if (socal_64bitsbus) {
-	    if (ddi_dma_set_sbus64(socalp->request[0].skc_dhandle,
-		socal_dma_attr.dma_attr_burstsizes | BURST128) == DDI_SUCCESS) {
+		if (ddi_dma_set_sbus64(socalp->request[0].skc_dhandle,
+		    socal_dma_attr.dma_attr_burstsizes | BURST128) ==
+		    DDI_SUCCESS) {
 			DEBUGF(4, (CE_CONT, "socal%d: enabled 64 bit sbus\n",
-				instance));
+			    instance));
 			socalp->socal_cfg |= SOCAL_CR_SBUS_ENHANCED;
 			burstsize = ddi_dma_burstsizes(socalp->request[0].
 			    skc_dhandle);
@@ -871,7 +873,7 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			socalp->socal_cfg = (socalp->socal_cfg &
 			    ~SOCAL_CR_SBUS_BURST_SIZE_64BIT_MASK) |
 			    socal_burst64_table[i];
-	    }
+		}
 	}
 
 	ddi_remove_intr(dip, 0, socalp->iblkc);
@@ -880,24 +882,24 @@ socal_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Install the interrupt routine.
 	 */
 	if (ddi_add_intr(dip,
-		(uint_t)0,
-		&socalp->iblkc,
-		&socalp->idevc,
-		socal_intr,
-		(caddr_t)socalp) != DDI_SUCCESS) {
-		    socal_disp_err(socalp, CE_WARN, "attach.4060",
+	    (uint_t)0,
+	    &socalp->iblkc,
+	    &socalp->idevc,
+	    socal_intr,
+	    (caddr_t)socalp) != DDI_SUCCESS) {
+			socal_disp_err(socalp, CE_WARN, "attach.4060",
 			"attach failed: unable to install interrupt handler");
-		    goto fail;
+			goto fail;
 	}
 
 	DEBUGF(4, (CE_CONT, "socal%d: attach: set config reg %x\n",
-		instance, socalp->socal_cfg));
+	    instance, socalp->socal_cfg));
 
 	if (ddi_create_minor_node(dip, SOCAL_PORTA_NAME, S_IFCHR,
-		instance*N_SOCAL_NPORTS, SOCAL_NT_PORT, 0) != DDI_SUCCESS)
+	    instance*N_SOCAL_NPORTS, SOCAL_NT_PORT, 0) != DDI_SUCCESS)
 		goto fail;
 	if (ddi_create_minor_node(dip, SOCAL_PORTB_NAME, S_IFCHR,
-		instance*N_SOCAL_NPORTS+1, SOCAL_NT_PORT, 0) != DDI_SUCCESS)
+	    instance*N_SOCAL_NPORTS+1, SOCAL_NT_PORT, 0) != DDI_SUCCESS)
 		goto fail;
 
 	if (socal_start(socalp) != FCAL_SUCCESS)
@@ -1000,8 +1002,8 @@ socal_dodetach(dev_info_t *dip)
 	if (socalp->iblkc != (void *)NULL) {
 		ddi_remove_intr(dip, (uint_t)0, socalp->iblkc);
 		DEBUGF(2, (CE_CONT,
-		"socal%d: detach: Removed SOC+ interrupt from ddi\n",
-		instance));
+		    "socal%d: detach: Removed SOC+ interrupt from ddi\n",
+		    instance));
 	}
 
 	for (i = 0; i < N_SOCAL_NPORTS; i++) {
@@ -1011,9 +1013,9 @@ socal_dodetach(dev_info_t *dip)
 		mutex_destroy(&portp->sp_transport->fcal_mtx);
 		cv_destroy(&portp->sp_transport->fcal_cv);
 		kmem_free((void *)portp->sp_transport,
-			sizeof (fcal_transport_t));
+		    sizeof (fcal_transport_t));
 		for (cb = portp->sp_unsol_cb; cb != (socal_unsol_cb_t *)NULL;
-			cb = cbn) {
+		    cb = cbn) {
 			cbn = cb->next;
 			kmem_free((void *)cb, sizeof (socal_unsol_cb_t));
 		}
@@ -1052,11 +1054,11 @@ socal_dodetach(dev_info_t *dip)
 		}
 		if (socalp->request[i].deferred_intr_timeoutid) {
 			(void) untimeout(socalp->
-				request[i].deferred_intr_timeoutid);
+			    request[i].deferred_intr_timeoutid);
 		}
 		if (socalp->response[i].deferred_intr_timeoutid) {
 			(void) untimeout(socalp->
-				response[i].deferred_intr_timeoutid);
+			    response[i].deferred_intr_timeoutid);
 		}
 	}
 
@@ -1136,7 +1138,7 @@ socal_bus_ctl(dev_info_t *dip, dev_info_t *rip, ddi_ctl_enum_t op,
 			return (DDI_FAILURE);
 
 		port = ddi_getprop(DDI_DEV_T_ANY, child_dip,
-			DDI_PROP_DONTPASS, SOCAL_PORT_NO_PROP, -1);
+		    DDI_PROP_DONTPASS, SOCAL_PORT_NO_PROP, -1);
 
 		if ((port < 0) || (port > 1)) {
 			port = ddi_getprop(DDI_DEV_T_ANY, child_dip,
@@ -1170,7 +1172,7 @@ socal_bus_ctl(dev_info_t *dip, dev_info_t *rip, ddi_ctl_enum_t op,
 
 		socalp = ddi_get_driver_private(dip);
 		port = ddi_getprop(DDI_DEV_T_ANY, child_dip,
-			DDI_PROP_DONTPASS, SOCAL_PORT_NO_PROP, -1);
+		    DDI_PROP_DONTPASS, SOCAL_PORT_NO_PROP, -1);
 
 		if ((port < 0) || (port > 1)) {
 			port = ddi_getprop(DDI_DEV_T_ANY, child_dip,
@@ -1235,8 +1237,8 @@ socal_bus_ctl(dev_info_t *dip, dev_info_t *rip, ddi_ctl_enum_t op,
 		 * Remaining requests get passed up to our parent
 		 */
 		DEBUGF(2, (CE_CONT, "%s%d: op (%d) from %s%d\n",
-			ddi_get_name(dip), ddi_get_instance(dip),
-			op, ddi_get_name(rip), ddi_get_instance(rip)));
+		    ddi_get_name(dip), ddi_get_instance(dip),
+		    op, ddi_get_name(rip), ddi_get_instance(rip)));
 		return (ddi_ctlops(dip, rip, op, a, v));
 	}
 
@@ -1286,7 +1288,7 @@ socal_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 {
 	int 	instance = getminor(*devp)/2;
 	socal_state_t	*socalp =
-			ddi_get_soft_state(socal_soft_state_p, instance);
+	    ddi_get_soft_state(socal_soft_state_p, instance);
 	socal_port_t	*port_statep;
 	int		port;
 
@@ -1310,7 +1312,7 @@ socal_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 {
 	int 	instance = getminor(dev)/2;
 	socal_state_t	*socalp =
-			ddi_get_soft_state(socal_soft_state_p, instance);
+	    ddi_get_soft_state(socal_soft_state_p, instance);
 	socal_port_t	*port_statep;
 	int		port;
 
@@ -1332,7 +1334,7 @@ socal_ioctl(dev_t dev,
 {
 	int 	instance = getminor(dev)/2;
 	socal_state_t	*socalp =
-			ddi_get_soft_state(socal_soft_state_p, instance);
+	    ddi_get_soft_state(socal_soft_state_p, instance);
 	int		port;
 	socal_port_t	*port_statep;
 	int 		i;
@@ -1367,413 +1369,417 @@ socal_ioctl(dev_t dev,
 	port = getminor(dev)%2;
 
 	switch (cmd) {
-		case FCIO_FCODE_MCODE_VERSION:
+	case FCIO_FCODE_MCODE_VERSION:
 #ifdef _MULTI_DATAMODEL
-			switch (ddi_model_convert_from(mode & FMODELS)) {
-				case DDI_MODEL_ILP32:
-					dm32 = 1;
-					if (ddi_copyin((caddr_t)arg,
-					    (caddr_t)&ver32, sizeof (ver32),
-					    mode) == -1)
-						return (EFAULT);
-					ver.fcode_ver_len =
-					    ver32.fcode_ver_len;
-					ver.mcode_ver_len =
-					    ver32.mcode_ver_len;
-					ver.prom_ver_len =
-					    ver32.prom_ver_len;
-					ver.fcode_ver =
-					    (caddr_t)(uintptr_t)ver32.fcode_ver;
-					ver.mcode_ver =
-					    (caddr_t)(uintptr_t)ver32.mcode_ver;
-					ver.prom_ver =
-					    (caddr_t)(uintptr_t)ver32.prom_ver;
-					break;
-				case DDI_MODEL_NONE:
-					if (ddi_copyin((caddr_t)arg,
-					    (caddr_t)&ver, sizeof (ver),
-					    mode) == -1)
-						return (EFAULT);
-			}
-#else /* _MULTI_DATAMODEL */
-			if (ddi_copyin((caddr_t)arg, (caddr_t)&ver,
-				sizeof (ver), mode) == -1)
-				return (EFAULT);
-#endif /* _MULTI_DATAMODEL */
-			dip = socalp->dip;
-			if (ddi_prop_op(DDI_DEV_T_ANY, dip,
-			    PROP_LEN_AND_VAL_ALLOC, DDI_PROP_DONTPASS |
-			    DDI_PROP_CANSLEEP, "version", (caddr_t)&buffer,
-			    &i) != DDI_PROP_SUCCESS)
-				return (EIO);
-			if (i < ver.fcode_ver_len)
-				ver.fcode_ver_len = i;
-			if (ddi_copyout((caddr_t)buffer,
-			    (caddr_t)ver.fcode_ver, ver.fcode_ver_len,
-			    mode) == -1) {
-				kmem_free((caddr_t)buffer, i);
-				return (EFAULT);
-			}
-			kmem_free((caddr_t)buffer, i);
-			if (socalp->socal_eeprom) {
-				for (i = 0; i < SOCAL_N_CQS; i++) {
-					mutex_enter(
-						&socalp->request[i].skc_mtx);
-					mutex_enter(
-						&socalp->response[i].skc_mtx);
-				}
-				i = socalp->socal_rp->socal_cr.w;
-				socalp->socal_rp->socal_cr.w &=
-						~SOCAL_CR_EEPROM_BANK_MASK;
-				socalp->socal_rp->socal_cr.w |= 3 << 16;
-				if (ver.prom_ver_len > 10)
-					ver.prom_ver_len = 10;
-				bcopy((caddr_t)socalp->socal_eeprom + (unsigned)
-				    0xfff6, tmp, 10);
-				socalp->socal_rp->socal_cr.w  = i;
-				for (i = SOCAL_N_CQS-1; i >= 0; i--) {
-					mutex_exit(&socalp->request[i].skc_mtx);
-					mutex_exit(
-						&socalp->response[i].skc_mtx);
-				}
-				if (ddi_copyout((caddr_t)tmp,
-				    (caddr_t)ver.prom_ver,
-				    ver.prom_ver_len, mode) == -1)
-					return (EFAULT);
-			} else {
-				ver.prom_ver_len = 0;
-			}
-			ver.mcode_ver_len = 0;
-#ifdef _MULTI_DATAMODEL
-			if (dm32) {
-				ver32.fcode_ver_len = ver.fcode_ver_len;
-				ver32.mcode_ver_len = ver.mcode_ver_len;
-				ver32.prom_ver_len = ver.prom_ver_len;
-				ver32.fcode_ver = (caddr32_t)(uintptr_t)
-				    ver.fcode_ver;
-				ver32.mcode_ver = (caddr32_t)(uintptr_t)
-				    ver.mcode_ver;
-				ver32.prom_ver = (caddr32_t)(uintptr_t)
-				    ver.prom_ver;
-				if (ddi_copyout((caddr_t)&ver32,
-				    (caddr_t)arg, sizeof (ver32),
+		switch (ddi_model_convert_from(mode & FMODELS)) {
+			case DDI_MODEL_ILP32:
+				dm32 = 1;
+				if (ddi_copyin((caddr_t)arg,
+				    (caddr_t)&ver32, sizeof (ver32),
 				    mode) == -1)
 					return (EFAULT);
-			} else
+				ver.fcode_ver_len =
+				    ver32.fcode_ver_len;
+				ver.mcode_ver_len =
+				    ver32.mcode_ver_len;
+				ver.prom_ver_len =
+				    ver32.prom_ver_len;
+				ver.fcode_ver =
+				    (caddr_t)(uintptr_t)ver32.fcode_ver;
+				ver.mcode_ver =
+				    (caddr_t)(uintptr_t)ver32.mcode_ver;
+				ver.prom_ver =
+				    (caddr_t)(uintptr_t)ver32.prom_ver;
+				break;
+			case DDI_MODEL_NONE:
+				if (ddi_copyin((caddr_t)arg,
+				    (caddr_t)&ver, sizeof (ver),
+				    mode) == -1)
+					return (EFAULT);
+		}
+#else /* _MULTI_DATAMODEL */
+		if (ddi_copyin((caddr_t)arg, (caddr_t)&ver,
+		    sizeof (ver), mode) == -1)
+			return (EFAULT);
 #endif /* _MULTI_DATAMODEL */
-			if (ddi_copyout((caddr_t)&ver, (caddr_t)arg,
-			    sizeof (struct socal_fm_version), mode) == -1)
-				return (EFAULT);
-			break;
-		case FCIO_LOADUCODE:
-			mutex_enter(&socalp->k_imr_mtx);
-			socal_disable(socalp);
-			mutex_exit(&socalp->k_imr_mtx);
-			if (copyin((caddr_t)arg, (caddr_t)socal_ucode, 0x10000)
-			    == -1)
-				return (EFAULT);
-			/* restart socal after resetting */
-			(void) socal_force_reset((void *)socalp, 0,
-			    RESET_PORT);
-			break;
-		case FCIO_DUMPXRAM:
+		dip = socalp->dip;
+		if (ddi_prop_op(DDI_DEV_T_ANY, dip,
+		    PROP_LEN_AND_VAL_ALLOC, DDI_PROP_DONTPASS |
+		    DDI_PROP_CANSLEEP, "version", (caddr_t)&buffer,
+		    &i) != DDI_PROP_SUCCESS)
+			return (EIO);
+		if (i < ver.fcode_ver_len)
+			ver.fcode_ver_len = i;
+		if (ddi_copyout((caddr_t)buffer,
+		    (caddr_t)ver.fcode_ver, ver.fcode_ver_len,
+		    mode) == -1) {
+			kmem_free((caddr_t)buffer, i);
+			return (EFAULT);
+		}
+		kmem_free((caddr_t)buffer, i);
+		if (socalp->socal_eeprom) {
 			for (i = 0; i < SOCAL_N_CQS; i++) {
-				mutex_enter(&socalp->request[i].skc_mtx);
-				mutex_enter(&socalp->response[i].skc_mtx);
+				mutex_enter(
+				    &socalp->request[i].skc_mtx);
+				mutex_enter(
+				    &socalp->response[i].skc_mtx);
 			}
-			for (i = 0; i < 4; i++) {
-				offset = arg+(0x10000 * i);
-				socalp->socal_rp->socal_cr.w &=
-					~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
-				socalp->socal_rp->socal_cr.w |= i<<24;
-				(void) copyout((caddr_t)socalp->socal_xrp,
-					(caddr_t)(uintptr_t)offset, 0x10000);
-			}
+			i = socalp->socal_rp->socal_cr.w;
 			socalp->socal_rp->socal_cr.w &=
-				~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
+			    ~SOCAL_CR_EEPROM_BANK_MASK;
+			socalp->socal_rp->socal_cr.w |= 3 << 16;
+			if (ver.prom_ver_len > 10)
+				ver.prom_ver_len = 10;
+			bcopy((caddr_t)socalp->socal_eeprom + (unsigned)
+			    0xfff6, tmp, 10);
+			socalp->socal_rp->socal_cr.w  = i;
 			for (i = SOCAL_N_CQS-1; i >= 0; i--) {
 				mutex_exit(&socalp->request[i].skc_mtx);
-				mutex_exit(&socalp->response[i].skc_mtx);
+				mutex_exit(
+				    &socalp->response[i].skc_mtx);
 			}
-			break;
+			if (ddi_copyout((caddr_t)tmp,
+			    (caddr_t)ver.prom_ver,
+			    ver.prom_ver_len, mode) == -1)
+				return (EFAULT);
+		} else {
+			ver.prom_ver_len = 0;
+		}
+		ver.mcode_ver_len = 0;
+#ifdef _MULTI_DATAMODEL
+		if (dm32) {
+			ver32.fcode_ver_len = ver.fcode_ver_len;
+			ver32.mcode_ver_len = ver.mcode_ver_len;
+			ver32.prom_ver_len = ver.prom_ver_len;
+			ver32.fcode_ver = (caddr32_t)(uintptr_t)
+			    ver.fcode_ver;
+			ver32.mcode_ver = (caddr32_t)(uintptr_t)
+			    ver.mcode_ver;
+			ver32.prom_ver = (caddr32_t)(uintptr_t)
+			    ver.prom_ver;
+			if (ddi_copyout((caddr_t)&ver32,
+			    (caddr_t)arg, sizeof (ver32),
+			    mode) == -1)
+				return (EFAULT);
+		} else
+#endif /* _MULTI_DATAMODEL */
+		if (ddi_copyout((caddr_t)&ver, (caddr_t)arg,
+		    sizeof (struct socal_fm_version), mode) == -1)
+			return (EFAULT);
+		break;
+	case FCIO_LOADUCODE:
+		mutex_enter(&socalp->k_imr_mtx);
+		socal_disable(socalp);
+		mutex_exit(&socalp->k_imr_mtx);
+		if (copyin((caddr_t)arg, (caddr_t)socal_ucode, 0x10000)
+		    == -1)
+			return (EFAULT);
+		/* restart socal after resetting */
+		(void) socal_force_reset((void *)socalp, 0,
+		    RESET_PORT);
+		break;
+	case FCIO_DUMPXRAM:
+		for (i = 0; i < SOCAL_N_CQS; i++) {
+			mutex_enter(&socalp->request[i].skc_mtx);
+			mutex_enter(&socalp->response[i].skc_mtx);
+		}
+		for (i = 0; i < 4; i++) {
+			offset = arg+(0x10000 * i);
+			socalp->socal_rp->socal_cr.w &=
+			    ~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
+			socalp->socal_rp->socal_cr.w |= i<<24;
+			(void) copyout((caddr_t)socalp->socal_xrp,
+			    (caddr_t)(uintptr_t)offset, 0x10000);
+		}
+		socalp->socal_rp->socal_cr.w &=
+		    ~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
+		for (i = SOCAL_N_CQS-1; i >= 0; i--) {
+			mutex_exit(&socalp->request[i].skc_mtx);
+			mutex_exit(&socalp->response[i].skc_mtx);
+		}
+		break;
 #ifdef DEBUG
-		case FCIO_DUMPXRAMBUF:
-			(void) copyout((caddr_t)socal_xrambuf, (caddr_t)arg,
-			    0x40000);
-			break;
+	case FCIO_DUMPXRAMBUF:
+		(void) copyout((caddr_t)socal_xrambuf, (caddr_t)arg,
+		    0x40000);
+		break;
 #endif
-		case FCIO_GETMAP:
-			mutex_enter(&socalp->ioctl_mtx);
-			if (socal_getmap(socalp, port, (caddr_t)arg, 0, 0) ==
-			    -1)
-				retval = FCAL_ALLOC_FAILED;
-			mutex_exit(&socalp->ioctl_mtx);
-			break;
-		case FCIO_BYPASS_DEV:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_bypass_dev((void *)socalp, port, arg);
-			mutex_exit(&socalp->ioctl_mtx);
-			break;
-		case FCIO_FORCE_LIP:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_force_lip((void *)socalp, port, 0,
-					FCAL_FORCE_LIP);
-			mutex_exit(&socalp->ioctl_mtx);
-			break;
-		case FCIO_FORCE_OFFLINE:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_force_offline((void *)socalp, port, 0);
-			mutex_exit(&socalp->ioctl_mtx);
-			break;
-		case FCIO_ADISC_ELS:
-		{
-		    if ((adisc_pl =
-			(la_els_adisc_t *)kmem_zalloc(sizeof (la_els_adisc_t),
-			KM_NOSLEEP)) == NULL)
-			    return (ENOMEM);
+	case FCIO_GETMAP:
+		mutex_enter(&socalp->ioctl_mtx);
+		if (socal_getmap(socalp, port, (caddr_t)arg, 0, 0) ==
+		    -1)
+			retval = FCAL_ALLOC_FAILED;
+		mutex_exit(&socalp->ioctl_mtx);
+		break;
+	case FCIO_BYPASS_DEV:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_bypass_dev((void *)socalp, port, arg);
+		mutex_exit(&socalp->ioctl_mtx);
+		break;
+	case FCIO_FORCE_LIP:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_force_lip((void *)socalp, port, 0,
+		    FCAL_FORCE_LIP);
+		mutex_exit(&socalp->ioctl_mtx);
+		break;
+	case FCIO_FORCE_OFFLINE:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_force_offline((void *)socalp, port, 0);
+		mutex_exit(&socalp->ioctl_mtx);
+		break;
+	case FCIO_ADISC_ELS:
+	{
+		if ((adisc_pl =
+		    (la_els_adisc_t *)kmem_zalloc(
+		    sizeof (la_els_adisc_t),
+		    KM_NOSLEEP)) == NULL)
+			return (ENOMEM);
 
-		    if (copyin((caddr_t)arg, (caddr_t)adisc_pl,
-			sizeof (la_els_adisc_t)) == -1) {
-			kmem_free((void *)adisc_pl, sizeof (la_els_adisc_t));
+		if (copyin((caddr_t)arg, (caddr_t)adisc_pl,
+		    sizeof (la_els_adisc_t)) == -1) {
+			kmem_free((void *)adisc_pl,
+			    sizeof (la_els_adisc_t));
 			return (EFAULT);
-		    }
-			mutex_enter(&socalp->ioctl_mtx);
-		    retval = socal_issue_adisc(socalp, port, adisc_pl->nport_id,
-			adisc_pl, 0);
-			mutex_exit(&socalp->ioctl_mtx);
-
-		    if (retval == FCAL_SUCCESS) {
-			if (copyout((caddr_t)adisc_pl, (caddr_t)arg,
-				sizeof (la_els_adisc_t)) == -1) {
-				kmem_free((void *)adisc_pl,
-				    sizeof (la_els_adisc_t));
-				return (EFAULT);
-			}
-		    }
-
-		    kmem_free((void *)adisc_pl, sizeof (la_els_adisc_t));
-		    break;
 		}
-		case FCIO_LINKSTATUS:
-		{
-		    int dest;
-		    if ((rls_pl =
-			(la_els_rls_reply_t *)
-			    kmem_zalloc(sizeof (la_els_rls_reply_t),
-			    KM_NOSLEEP)) == NULL)
-			    return (ENOMEM);
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_issue_adisc(socalp, port,
+		    adisc_pl->nport_id,
+		    adisc_pl, 0);
+		mutex_exit(&socalp->ioctl_mtx);
 
-		    if (copyin((caddr_t)arg, (caddr_t)rls_pl,
-			sizeof (la_els_rls_reply_t)) == -1) {
-			kmem_free((void *)rls_pl, sizeof (la_els_rls_reply_t));
+		if (retval == FCAL_SUCCESS) {
+		if (copyout((caddr_t)adisc_pl, (caddr_t)arg,
+		    sizeof (la_els_adisc_t)) == -1) {
+			kmem_free((void *)adisc_pl,
+			    sizeof (la_els_adisc_t));
 			return (EFAULT);
-		    }
-		    dest = (rls_pl->mbz[0] << 16) + (rls_pl->mbz[1] << 8) +
-			rls_pl->mbz[2];
-			mutex_enter(&socalp->ioctl_mtx);
-		    retval = socal_issue_rls(socalp, port, dest,
-			rls_pl, 0);
-			mutex_exit(&socalp->ioctl_mtx);
-
-		    if (retval == FCAL_SUCCESS) {
-			if (copyout((caddr_t)rls_pl, (caddr_t)arg,
-				sizeof (la_els_rls_reply_t)) == -1) {
-				kmem_free((void *)rls_pl,
-				    sizeof (la_els_rls_reply_t));
-				return (EFAULT);
-			}
-		    }
-		    kmem_free((void *)rls_pl, sizeof (la_els_rls_reply_t));
-		    break;
 		}
-		case FCIO_LOOPBACK_INTERNAL:
-			/*
-			 * If userland doesn't provide a location for a return
-			 * value the driver will permanently offline the port,
-			 * ignoring any checks for devices on the loop.
-			 */
-			mutex_enter(&socalp->ioctl_mtx);
-			if (arg == 0) {
-				port_statep = &socalp->port_state[port];
-				mutex_enter(&port_statep->sp_mtx);
-				if (port_statep->sp_status & PORT_DISABLED) {
-					/* Already disabled */
-					mutex_exit(&port_statep->sp_mtx);
-					mutex_exit(&socalp->ioctl_mtx);
-					return (EALREADY);
-				}
-				port_statep->sp_status |= PORT_DISABLED;
-				mutex_exit(&port_statep->sp_mtx);
-			}
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_INT_LOOP);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (arg == 0) break;
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_LOOPBACK_MANUAL:
-			mutex_enter(&socalp->ioctl_mtx);
+		}
+
+		kmem_free((void *)adisc_pl, sizeof (la_els_adisc_t));
+		break;
+	}
+	case FCIO_LINKSTATUS:
+	{
+		int dest;
+		if ((rls_pl =
+		    (la_els_rls_reply_t *)
+		    kmem_zalloc(sizeof (la_els_rls_reply_t),
+		    KM_NOSLEEP)) == NULL)
+			return (ENOMEM);
+
+		if (copyin((caddr_t)arg, (caddr_t)rls_pl,
+		    sizeof (la_els_rls_reply_t)) == -1) {
+			kmem_free((void *)rls_pl,
+			    sizeof (la_els_rls_reply_t));
+		return (EFAULT);
+		}
+		dest = (rls_pl->mbz[0] << 16) + (rls_pl->mbz[1] << 8) +
+		    rls_pl->mbz[2];
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_issue_rls(socalp, port, dest,
+		    rls_pl, 0);
+		mutex_exit(&socalp->ioctl_mtx);
+
+		if (retval == FCAL_SUCCESS) {
+		if (copyout((caddr_t)rls_pl, (caddr_t)arg,
+		    sizeof (la_els_rls_reply_t)) == -1) {
+			kmem_free((void *)rls_pl,
+			    sizeof (la_els_rls_reply_t));
+			return (EFAULT);
+		}
+		}
+		kmem_free((void *)rls_pl, sizeof (la_els_rls_reply_t));
+		break;
+	}
+	case FCIO_LOOPBACK_INTERNAL:
+		/*
+		 * If userland doesn't provide a location for a return
+		 * value the driver will permanently offline the port,
+		 * ignoring any checks for devices on the loop.
+		 */
+		mutex_enter(&socalp->ioctl_mtx);
+		if (arg == 0) {
 			port_statep = &socalp->port_state[port];
 			mutex_enter(&port_statep->sp_mtx);
 			if (port_statep->sp_status & PORT_DISABLED) {
+				/* Already disabled */
 				mutex_exit(&port_statep->sp_mtx);
 				mutex_exit(&socalp->ioctl_mtx);
+				return (EALREADY);
+			}
+			port_statep->sp_status |= PORT_DISABLED;
+			mutex_exit(&port_statep->sp_mtx);
+		}
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_INT_LOOP);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (arg == 0) break;
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_LOOPBACK_MANUAL:
+		mutex_enter(&socalp->ioctl_mtx);
+		port_statep = &socalp->port_state[port];
+		mutex_enter(&port_statep->sp_mtx);
+		if (port_statep->sp_status & PORT_DISABLED) {
+			mutex_exit(&port_statep->sp_mtx);
+			mutex_exit(&socalp->ioctl_mtx);
+			return (EBUSY);
+		}
+		mutex_exit(&port_statep->sp_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_EXT_LOOP);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_NO_LOOPBACK:
+		mutex_enter(&socalp->ioctl_mtx);
+		port_statep = &socalp->port_state[port];
+		mutex_enter(&port_statep->sp_mtx);
+		/* Do not allow online if we're disabled */
+		if (port_statep->sp_status & PORT_DISABLED) {
+			if (arg != 0) {
+				mutex_exit(&port_statep->sp_mtx);
+				mutex_exit(&socalp->ioctl_mtx);
+				/*
+				 * It's permanently disabled -- Need to
+				 * enable it first
+				 */
 				return (EBUSY);
 			}
-			mutex_exit(&port_statep->sp_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_EXT_LOOP);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_NO_LOOPBACK:
-			mutex_enter(&socalp->ioctl_mtx);
-			port_statep = &socalp->port_state[port];
-			mutex_enter(&port_statep->sp_mtx);
-			/* Do not allow online if we're disabled */
-			if (port_statep->sp_status & PORT_DISABLED) {
-				if (arg != 0) {
-					mutex_exit(&port_statep->sp_mtx);
-					mutex_exit(&socalp->ioctl_mtx);
-					/*
-					 * It's permanently disabled -- Need to
-					 * enable it first
-					 */
-					return (EBUSY);
-				}
-				/* This was a request to online. */
-				port_statep->sp_status &= ~PORT_DISABLED;
-			}
-			mutex_exit(&port_statep->sp_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_REM_LOOP);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (arg == 0) break;
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_NOP:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_NOP);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_XRAM:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_XRAM_TEST);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_SOC:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_SOC_TEST);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_HCB:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_HCB_TEST);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_SOCLB:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_SOCLB_TEST);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_SRDSLB:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_SRDSLB_TEST);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_EXTLB:
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				SOC_DIAG_EXTOE_TEST);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_DIAG_RAW:
-			if (copyin((caddr_t)arg, (caddr_t)&i, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			mutex_enter(&socalp->ioctl_mtx);
-			retval = socal_diag_request((void *)socalp, port, &r,
-				(uint_t)i);
-			mutex_exit(&socalp->ioctl_mtx);
-			if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
-			    == -1)
-				return (EFAULT);
-			break;
-		case FCIO_LOOPBACK_FRAME:
-		    if ((flb_hdr = (flb_hdr_t *)kmem_zalloc(sizeof (flb_hdr_t),
-					KM_NOSLEEP)) == NULL)
-			    return (ENOMEM);
+			/* This was a request to online. */
+			port_statep->sp_status &= ~PORT_DISABLED;
+		}
+		mutex_exit(&port_statep->sp_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_REM_LOOP);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (arg == 0) break;
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_NOP:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_NOP);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_XRAM:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_XRAM_TEST);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_SOC:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_SOC_TEST);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_HCB:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_HCB_TEST);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_SOCLB:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_SOCLB_TEST);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_SRDSLB:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_SRDSLB_TEST);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_EXTLB:
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    SOC_DIAG_EXTOE_TEST);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_DIAG_RAW:
+		if (copyin((caddr_t)arg, (caddr_t)&i, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_diag_request((void *)socalp, port, &r,
+		    (uint_t)i);
+		mutex_exit(&socalp->ioctl_mtx);
+		if (copyout((caddr_t)&r, (caddr_t)arg, sizeof (uint_t))
+		    == -1)
+			return (EFAULT);
+		break;
+	case FCIO_LOOPBACK_FRAME:
+		if ((flb_hdr = (flb_hdr_t *)kmem_zalloc(sizeof (flb_hdr_t),
+		    KM_NOSLEEP)) == NULL)
+			return (ENOMEM);
 
-		    if (copyin((caddr_t)arg,
-				(caddr_t)flb_hdr, sizeof (flb_hdr_t)) == -1) {
+		if (copyin((caddr_t)arg,
+		    (caddr_t)flb_hdr, sizeof (flb_hdr_t)) == -1) {
+		kmem_free((void *)flb_hdr, sizeof (flb_hdr_t));
+		return (EFAULT);
+		}
+
+		flb_size = flb_hdr->length;
+
+		if ((flb_pl =
+		    (uchar_t *)kmem_zalloc(flb_size, KM_NOSLEEP)) == NULL)
+			return (ENOMEM);
+
+		if (copyin((caddr_t)(arg + sizeof (flb_hdr_t)),
+		    (caddr_t)flb_pl, flb_size) == -1) {
+			kmem_free((void *)flb_pl, flb_size);
+			return (EFAULT);
+		}
+		mutex_enter(&socalp->ioctl_mtx);
+		retval = socal_issue_lbf(socalp, port, flb_pl,
+		    flb_size, 1);
+		mutex_exit(&socalp->ioctl_mtx);
+
+		if (retval == FCAL_SUCCESS) {
+		if (copyout((caddr_t)flb_pl,
+		    (caddr_t)(arg + sizeof (flb_hdr_t) +
+		    flb_hdr->max_length), flb_size) == -1) {
+			kmem_free((void *)flb_pl, flb_size);
 			kmem_free((void *)flb_hdr, sizeof (flb_hdr_t));
 			return (EFAULT);
-		    }
+		}
+		}
 
-		    flb_size = flb_hdr->length;
-
-		    if ((flb_pl =
-			(uchar_t *)kmem_zalloc(flb_size, KM_NOSLEEP)) == NULL)
-			    return (ENOMEM);
-
-		    if (copyin((caddr_t)(arg + sizeof (flb_hdr_t)),
-				(caddr_t)flb_pl, flb_size) == -1) {
-				kmem_free((void *)flb_pl, flb_size);
-				return (EFAULT);
-		    }
-			mutex_enter(&socalp->ioctl_mtx);
-		    retval = socal_issue_lbf(socalp, port, flb_pl,
-						flb_size, 1);
-			mutex_exit(&socalp->ioctl_mtx);
-
-		    if (retval == FCAL_SUCCESS) {
-			if (copyout((caddr_t)flb_pl,
-				    (caddr_t)(arg + sizeof (flb_hdr_t) +
-					flb_hdr->max_length), flb_size) == -1) {
-				kmem_free((void *)flb_pl, flb_size);
-				kmem_free((void *)flb_hdr, sizeof (flb_hdr_t));
-				return (EFAULT);
-			}
-		    }
-
-		    kmem_free((void *)flb_pl, flb_size);
-		    kmem_free((void *)flb_hdr, sizeof (flb_hdr_t));
-		    break;
-		default:
-			return (ENOTTY);
+		kmem_free((void *)flb_pl, flb_size);
+		kmem_free((void *)flb_hdr, sizeof (flb_hdr_t));
+		break;
+	default:
+		return (ENOTTY);
 
 	}
 	switch (retval) {
@@ -1842,7 +1848,7 @@ socal_init_transport_interface(socal_state_t *socalp)
 	for (i = 0; i < N_SOCAL_NPORTS; i++) {
 		xport = socalp->port_state[i].sp_transport;
 		mutex_init(&xport->fcal_mtx, NULL, MUTEX_DRIVER,
-			(void *)(socalp->iblkc));
+		    (void *)(socalp->iblkc));
 
 		cv_init(&xport->fcal_cv, NULL, CV_DRIVER, NULL);
 
@@ -1853,9 +1859,9 @@ socal_init_transport_interface(socal_state_t *socalp)
 		xport->fcal_accattr = &socal_acc_attr;
 		xport->fcal_loginparms = socalp->socal_service_params;
 		bcopy((caddr_t)&socalp->socal_n_wwn,
-			(caddr_t)&xport->fcal_n_wwn, sizeof (la_wwn_t));
+		    (caddr_t)&xport->fcal_n_wwn, sizeof (la_wwn_t));
 		bcopy((caddr_t)&socalp->port_state[i].sp_p_wwn,
-			(caddr_t)&xport->fcal_p_wwn, sizeof (la_wwn_t));
+		    (caddr_t)&xport->fcal_p_wwn, sizeof (la_wwn_t));
 		xport->fcal_portno = i;
 		xport->fcal_cmdmax = SOCAL_MAX_XCHG;
 		xport->fcal_ops = &socal_transport_ops;
@@ -1911,7 +1917,7 @@ socal_cqalloc_init(socal_state_t *socalp, uint32_t index)
 		    &cqp->skc_acchandle) != DDI_SUCCESS) {
 			socal_disp_err(socalp, CE_WARN, "driver.4030",
 			    "!alloc of dma space failed");
-			    goto fail;
+				goto fail;
 		}
 
 		if (real_len < (cq_size + SOCAL_CQ_ALIGN)) {
@@ -1920,8 +1926,8 @@ socal_cqalloc_init(socal_state_t *socalp, uint32_t index)
 			goto fail;
 		}
 		cqp->skc_cq = (cqe_t *)(((uintptr_t)cqp->skc_cq_raw +
-			(uintptr_t)SOCAL_CQ_ALIGN - 1) &
-			((uintptr_t)(~(SOCAL_CQ_ALIGN-1))));
+		    (uintptr_t)SOCAL_CQ_ALIGN - 1) &
+		    ((uintptr_t)(~(SOCAL_CQ_ALIGN-1))));
 
 		if (ddi_dma_addr_bind_handle(cqp->skc_dhandle,
 		    (struct as *)NULL, (caddr_t)cqp->skc_cq, cq_size,
@@ -1965,7 +1971,7 @@ socal_cqalloc_init(socal_state_t *socalp, uint32_t index)
 		    &cqp->skc_acchandle) != DDI_SUCCESS) {
 			socal_disp_err(socalp, CE_WARN, "driver.4060",
 			    "!alloc of dma space failed");
-			    goto fail;
+				goto fail;
 		}
 
 		if (real_len < (cq_size + SOCAL_CQ_ALIGN)) {
@@ -1975,8 +1981,8 @@ socal_cqalloc_init(socal_state_t *socalp, uint32_t index)
 		}
 
 		cqp->skc_cq = (cqe_t *)(((uintptr_t)cqp->skc_cq_raw +
-			(uintptr_t)SOCAL_CQ_ALIGN - 1) &
-			((uintptr_t)(~(SOCAL_CQ_ALIGN-1))));
+		    (uintptr_t)SOCAL_CQ_ALIGN - 1) &
+		    ((uintptr_t)(~(SOCAL_CQ_ALIGN-1))));
 
 		if (ddi_dma_addr_bind_handle(cqp->skc_dhandle,
 		    (struct as *)NULL, (caddr_t)cqp->skc_cq, cq_size,
@@ -2066,9 +2072,9 @@ socal_cqinit(socal_state_t *socalp, uint32_t index)
 	kcq_rsp->skc_socalp = socalp;
 
 	kcq_req->skc_xram_cqdesc =
-		(socalp->xram_reqp + (index * sizeof (struct cq))/8);
+	    (socalp->xram_reqp + (index * sizeof (struct cq))/8);
 	kcq_rsp->skc_xram_cqdesc =
-		(socalp->xram_rspp + (index * sizeof (struct cq))/8);
+	    (socalp->xram_rspp + (index * sizeof (struct cq))/8);
 
 	/*  Clear out memory we have allocated */
 	if (kcq_req->skc_cq != NULL)
@@ -2094,13 +2100,13 @@ socal_start(socal_state_t *socalp)
 
 	mutex_enter(&socalp->port_state[0].sp_mtx);
 	socalp->port_state[0].sp_status
-		&= (PORT_OPEN|PORT_CHILD_INIT|PORT_DISABLED|PORT_TARGET_MODE);
+	    &= (PORT_OPEN|PORT_CHILD_INIT|PORT_DISABLED|PORT_TARGET_MODE);
 	socalp->port_state[0].sp_status |= PORT_OFFLINE;
 	mutex_exit(&socalp->port_state[0].sp_mtx);
 
 	mutex_enter(&socalp->port_state[1].sp_mtx);
 	socalp->port_state[1].sp_status
-		&= (PORT_OPEN|PORT_CHILD_INIT|PORT_DISABLED|PORT_TARGET_MODE);
+	    &= (PORT_OPEN|PORT_CHILD_INIT|PORT_DISABLED|PORT_TARGET_MODE);
 	socalp->port_state[1].sp_status |= PORT_OFFLINE;
 	mutex_exit(&socalp->port_state[1].sp_mtx);
 
@@ -2108,10 +2114,10 @@ socal_start(socal_state_t *socalp)
 	/* Make sure disabled ports stay disabled. */
 	if (socalp->port_state[0].sp_status & PORT_DISABLED)
 		(void) socal_diag_request((void *)socalp, 0, &r,
-			SOC_DIAG_INT_LOOP);
+		    SOC_DIAG_INT_LOOP);
 	if (socalp->port_state[1].sp_status & PORT_DISABLED)
 		(void) socal_diag_request((void *)socalp, 1, &r,
-			SOC_DIAG_INT_LOOP);
+		    SOC_DIAG_INT_LOOP);
 
 	mutex_enter(&socalp->k_imr_mtx);
 	socalp->socal_shutdown = 0;
@@ -2165,9 +2171,9 @@ socal_doreset(socal_state_t *socalp)
 
 		mutex_enter(&port_statep->sp_mtx);
 		port_statep->sp_status &= ~ (PORT_STATUS_MASK |
-			PORT_LILP_PENDING | PORT_LIP_PENDING |
-			PORT_ABORT_PENDING | PORT_BYPASS_PENDING |
-			PORT_ELS_PENDING);
+		    PORT_LILP_PENDING | PORT_LIP_PENDING |
+		    PORT_ABORT_PENDING | PORT_BYPASS_PENDING |
+		    PORT_ELS_PENDING);
 		mutex_exit(&port_statep->sp_mtx);
 	}
 
@@ -2180,7 +2186,7 @@ socal_doreset(socal_state_t *socalp)
 
 	for (i = 0; i < N_SOCAL_NPORTS; i++) {
 		for (scbp = socalp->port_state[i].sp_unsol_cb; scbp;
-			scbp = scbp->next)
+		    scbp = scbp->next)
 			(scbp->statec_cb)(scbp->arg, FCAL_STATE_RESET);
 	}
 
@@ -2225,7 +2231,7 @@ socal_download_ucode(socal_state_t *socalp)
 
 	/* Copy the firmware image */
 	socal_wcopy((uint_t *)&socal_ucode,
-		(uint_t *)socalp->socal_xrp, fw_len);
+	    (uint_t *)socalp->socal_xrp, fw_len);
 
 	socal_fix_harda(socalp, 0);
 	socal_fix_harda(socalp, 1);
@@ -2236,16 +2242,19 @@ socal_download_ucode(socal_state_t *socalp)
 	date_str[sizeof (date_str) / sizeof (uint_t) - 1] = 0;
 
 	if (*(caddr_t)date_str != '\0') {
-	    (void) sprintf(buf, "!Downloading host adapter, fw date code: %s\n",
-		(caddr_t)date_str);
-	    socal_disp_err(socalp, CE_CONT, "driver.1010", buf);
-	    (void) strcpy(socalp->socal_stats.fw_revision, (char *)date_str);
+		(void) sprintf(buf,
+		    "!Downloading host adapter, fw date code: %s\n",
+		    (caddr_t)date_str);
+		socal_disp_err(socalp, CE_CONT, "driver.1010", buf);
+		(void) strcpy(socalp->socal_stats.fw_revision,
+		    (char *)date_str);
 	} else {
-	    (void) sprintf(buf,
-		"!Downloading host adapter fw, date code: <not available>\n");
-	    socal_disp_err(socalp, CE_CONT, "driver.3010", buf);
-	    (void) strcpy(socalp->socal_stats.fw_revision,
-		"<Not Available>");
+		(void) sprintf(buf,
+		    "!Downloading host adapter fw, "
+		    "date code: <not available>\n");
+		socal_disp_err(socalp, CE_CONT, "driver.3010", buf);
+		(void) strcpy(socalp->socal_stats.fw_revision,
+		    "<Not Available>");
 	}
 }
 
@@ -2272,17 +2281,17 @@ socal_disp_err(
 	c = *msg;
 
 	if (c == '!')		/* log only */
-	    cmn_err(level,
+		cmn_err(level,
 		"!ID[SUNWssa.socal.%s] socal%d: %s", mid, instance, msg+1);
 	else if (c == '?')	/* boot message - log && maybe console */
-	    cmn_err(level,
+		cmn_err(level,
 		"?ID[SUNWssa.socal.%s] socal%d: %s", mid, instance, msg+1);
 	else if (c == '^')	/* console only */
-	    cmn_err(level, "^socal%d: %s", instance, msg+1);
+		cmn_err(level, "^socal%d: %s", instance, msg+1);
 	else	{		/* log and console */
-	    cmn_err(level, "^socal%d: %s", instance, msg);
-	    cmn_err(level, "!ID[SUNWssa.socal.%s] socal%d: %s", mid,
-		instance, msg);
+		cmn_err(level, "^socal%d: %s", instance, msg);
+		cmn_err(level, "!ID[SUNWssa.socal.%s] socal%d: %s", mid,
+		    instance, msg);
 	}
 }
 
@@ -2315,12 +2324,13 @@ socal_init_cq_desc(socal_state_t *socalp)
 	 */
 	for (i = 0; i < SOCAL_N_CQS; i++) {
 		if (socal_req_entries[i]) {
-		    que_desc[i].cq_address =
-			(uint32_t)socalp->request[i].skc_dcookie.dmac_address;
-		    que_desc[i].cq_last_index = socal_req_entries[i] - 1;
+			que_desc[i].cq_address =
+			    (uint32_t)socalp->request[i].
+			    skc_dcookie.dmac_address;
+			que_desc[i].cq_last_index = socal_req_entries[i] - 1;
 		} else {
-		    que_desc[i].cq_address = (uint32_t)0;
-		    que_desc[i].cq_last_index = 0;
+			que_desc[i].cq_address = (uint32_t)0;
+			que_desc[i].cq_last_index = 0;
 		}
 		que_desc[i].cq_in = 0;
 		que_desc[i].cq_out = 0;
@@ -2329,28 +2339,29 @@ socal_init_cq_desc(socal_state_t *socalp)
 
 	/* copy to XRAM */
 	socal_wcopy((uint_t *)que_desc,		/* pointer to kernel copy */
-		(uint_t *)socalp->xram_reqp,	/* pointer to xram location */
-		SOCAL_N_CQS * sizeof (soc_cq_t));
+	    (uint_t *)socalp->xram_reqp,	/* pointer to xram location */
+	    SOCAL_N_CQS * sizeof (soc_cq_t));
 
 	/*
 	 * Do response queues
 	 */
 	for (i = 0; i < SOCAL_N_CQS; i++) {
 		if (socal_rsp_entries[i]) {
-		    que_desc[i].cq_last_index = socal_rsp_entries[i] - 1;
-		    que_desc[i].cq_address =
-			(uint32_t)socalp->response[i].skc_dcookie.dmac_address;
+			que_desc[i].cq_last_index = socal_rsp_entries[i] - 1;
+			que_desc[i].cq_address =
+			    (uint32_t)socalp->response[i].
+			    skc_dcookie.dmac_address;
 
 		} else {
-		    que_desc[i].cq_address = 0;
-		    que_desc[i].cq_last_index = 0;
+			que_desc[i].cq_address = 0;
+			que_desc[i].cq_last_index = 0;
 		}
 	}
 
 	/* copy to XRAM */
 	socal_wcopy((uint_t *)que_desc,		/* pointer to kernel copy */
-		(uint_t *)socalp->xram_rspp,	/* pointer to xram location */
-		SOCAL_N_CQS * sizeof (soc_cq_t));
+	    (uint_t *)socalp->xram_rspp,	/* pointer to xram location */
+	    SOCAL_N_CQS * sizeof (soc_cq_t));
 }
 
 static void
@@ -2358,18 +2369,18 @@ socal_init_wwn(socal_state_t *socalp)
 {
 	/* copy the node wwn to xram */
 	socal_wcopy((uint_t *)&socalp->socal_n_wwn,
-		(uint_t *)(socalp->socal_xrp +
-		SOCAL_XRAM_NODE_WWN), sizeof (la_wwn_t));
+	    (uint_t *)(socalp->socal_xrp +
+	    SOCAL_XRAM_NODE_WWN), sizeof (la_wwn_t));
 
 	/* copy port a's wwn to xram */
 	socal_wcopy((uint_t *)&socalp->port_state[0].sp_p_wwn,
-		(uint_t *)(socalp->socal_xrp + SOCAL_XRAM_PORTA_WWN),
-		sizeof (la_wwn_t));
+	    (uint_t *)(socalp->socal_xrp + SOCAL_XRAM_PORTA_WWN),
+	    sizeof (la_wwn_t));
 
 	/* copy port b's wwn to xram */
 	socal_wcopy((uint_t *)&socalp->port_state[1].sp_p_wwn,
-		(uint_t *)(socalp->socal_xrp + SOCAL_XRAM_PORTB_WWN),
-		sizeof (la_wwn_t));
+	    (uint_t *)(socalp->socal_xrp + SOCAL_XRAM_PORTB_WWN),
+	    sizeof (la_wwn_t));
 
 	/*
 	 * need to avoid deadlock by assuring no other thread grabs both of
@@ -2379,7 +2390,7 @@ socal_init_wwn(socal_state_t *socalp)
 	mutex_enter(&socalp->port_state[1].sp_transport->fcal_mtx);
 
 	socal_wcopy((uint_t *)(socalp->socal_xrp + SOCAL_XRAM_SERV_PARAMS),
-		(uint_t *)&socalp->socal_service_params, SOCAL_SVC_LENGTH);
+	    (uint_t *)&socalp->socal_service_params, SOCAL_SVC_LENGTH);
 	mutex_exit(&socalp->port_state[1].sp_transport->fcal_mtx);
 	mutex_exit(&socalp->port_state[0].sp_transport->fcal_mtx);
 }
@@ -2388,7 +2399,7 @@ static void
 socal_enable(socal_state_t *socalp)
 {
 	DEBUGF(2, (CE_CONT, "socal%d: enable:\n",
-		ddi_get_instance(socalp->dip)));
+	    ddi_get_instance(socalp->dip)));
 
 	socalp->socal_rp->socal_cr.w = socalp->socal_cfg;
 	socalp->socal_rp->socal_csr.w = SOCAL_CSR_SOCAL_TO_HOST;
@@ -2415,15 +2426,15 @@ socal_establish_pool(socal_state_t *socalp, uint32_t poolid)
 	int			result;
 
 	if ((prq =
-		(soc_pool_request_t *)kmem_zalloc(sizeof (soc_pool_request_t),
-		KM_NOSLEEP)) == NULL)
+	    (soc_pool_request_t *)kmem_zalloc(sizeof (soc_pool_request_t),
+	    KM_NOSLEEP)) == NULL)
 			return (FCAL_FAILURE);
 	/*
 	 * Fill in the request structure.
 	 */
 	prq->spr_soc_hdr.sh_request_token = 1;
 	prq->spr_soc_hdr.sh_flags = SOC_FC_HEADER | SOC_UNSOLICITED |
-		SOC_NO_RESPONSE;
+	    SOC_NO_RESPONSE;
 	prq->spr_soc_hdr.sh_class = 0;
 	prq->spr_soc_hdr.sh_seg_cnt = 1;
 	prq->spr_soc_hdr.sh_byte_cnt = 0;
@@ -2452,7 +2463,7 @@ socal_establish_pool(socal_state_t *socalp, uint32_t poolid)
 
 	/* Enque the request. */
 	result = socal_cq_enque(socalp, NULL, (cqe_t *)prq, CQ_REQUEST_1,
-		FCAL_NOSLEEP, NULL, 0);
+	    FCAL_NOSLEEP, NULL, 0);
 	kmem_free((void *)prq, sizeof (soc_pool_request_t));
 	return (result);
 
@@ -2479,8 +2490,8 @@ socal_add_pool_buffer(socal_state_t *socalp, uint32_t poolid)
 	uint_t			ccount;
 
 	if ((drq =
-		(soc_data_request_t *)kmem_zalloc(sizeof (soc_data_request_t),
-		KM_NOSLEEP)) == NULL)
+	    (soc_data_request_t *)kmem_zalloc(sizeof (soc_data_request_t),
+	    KM_NOSLEEP)) == NULL)
 			return (FCAL_FAILURE);
 
 	/* Allocate DVMA resources for the buffer pool */
@@ -2517,7 +2528,7 @@ socal_add_pool_buffer(socal_state_t *socalp, uint32_t poolid)
 	drq->sdr_soc_hdr.sh_byte_cnt = 0;
 
 	drq->sdr_dataseg[0].fc_base =
-		(uint32_t)socalp->pool_dcookie.dmac_address;
+	    (uint32_t)socalp->pool_dcookie.dmac_address;
 	drq->sdr_dataseg[0].fc_count = SOCAL_POOL_SIZE;
 	drq->sdr_dataseg[1].fc_base = 0;
 	drq->sdr_dataseg[1].fc_count = 0;
@@ -2537,13 +2548,13 @@ socal_add_pool_buffer(socal_state_t *socalp, uint32_t poolid)
 
 	/* Transport the request. */
 	result = socal_cq_enque(socalp, NULL, (cqe_t *)drq, CQ_REQUEST_1,
-		FCAL_NOSLEEP, NULL, 0);
+	    FCAL_NOSLEEP, NULL, 0);
 	kmem_free((void *)drq, sizeof (soc_data_request_t));
 	return (result);
 
 fail:
 	socal_disp_err(socalp, CE_WARN, "driver.4110",
-		"!Buffer pool DVMA alloc failed");
+	    "!Buffer pool DVMA alloc failed");
 	if (socalp->pool_dhandle) {
 		if (bound)
 			(void) ddi_dma_unbind_handle(socalp->pool_dhandle);
@@ -2573,7 +2584,7 @@ socal_transport(fcal_packet_t *fcalpkt, fcal_sleep_t sleep, int req_q_no)
 	port_statep = &socalp->port_state[port];
 
 	DEBUGF(4, (CE_CONT, "socal%d: transport: packet, sleep = %p, %d\n",
-		instance, fcalpkt, sleep));
+	    instance, fcalpkt, sleep));
 
 	fcalpkt->fcal_cmd_state = 0;
 	fcalpkt->fcal_pkt_flags &= ~(FCFLAG_COMPLETE | FCFLAG_ABORTING);
@@ -2630,8 +2641,8 @@ socal_cq_enque(socal_state_t *socalp, socal_port_t *port_statep, cqe_t *cqe,
 	 */
 	if (to_queue) {
 		if ((to_queue->fcal_socal_request.sr_soc_hdr.sh_request_token =
-			SOCAL_ID_GET(to_queue, mtxheld ? FCAL_NOSLEEP :
-				sleep)) == NULL) {
+		    SOCAL_ID_GET(to_queue, mtxheld ? FCAL_NOSLEEP :
+		    sleep)) == NULL) {
 			return (FCAL_TRANSPORT_QFULL);
 		}
 	}
@@ -2648,22 +2659,23 @@ socal_cq_enque(socal_state_t *socalp, socal_port_t *port_statep, cqe_t *cqe,
 
 	do {
 
-	    if (kcq->skc_full) {
+		if (kcq->skc_full) {
 		/*
 		 * If soc's queue full, then we wait for an interrupt
 		 * telling us we are not full.
 		 */
 
-		    if (to_queue) {
+			if (to_queue) {
 			to_queue->fcal_pkt_next = NULL;
 			if (!kcq->skc_overflowh) {
-			    DEBUGF(2, (CE_CONT,
-				"socal%d: cq_enque: request que %d is full\n",
-				instance, rqix));
-			    kcq->skc_overflowh = to_queue;
-			    socalp->socal_stats.qfulls++;
+				DEBUGF(2, (CE_CONT,
+				    "socal%d: cq_enque: request "
+				    "que %d is full\n",
+				    instance, rqix));
+				kcq->skc_overflowh = to_queue;
+				socalp->socal_stats.qfulls++;
 			} else
-			    kcq->skc_overflowt->fcal_pkt_next = to_queue;
+				kcq->skc_overflowt->fcal_pkt_next = to_queue;
 			kcq->skc_overflowt = to_queue;
 
 			mutex_enter(&socalp->k_imr_mtx);
@@ -2674,29 +2686,29 @@ socal_cq_enque(socal_state_t *socalp, socal_port_t *port_statep, cqe_t *cqe,
 			if (!mtxheld)
 				mutex_exit(&kcq->skc_mtx);
 			return (FCAL_TRANSPORT_SUCCESS);
-		    }
+			}
 
-		    if (!mtxheld)
+			if (!mtxheld)
 			mutex_exit(&kcq->skc_mtx);
-		    return (FCAL_TRANSPORT_QFULL);
-	    }
+			return (FCAL_TRANSPORT_QFULL);
+		}
 
-	    if (((kcq->skc_in + 1) & kcq->skc_last_index)
-			== (out = kcq->skc_out)) {
+		if (((kcq->skc_in + 1) & kcq->skc_last_index)
+		    == (out = kcq->skc_out)) {
 		/*
 		 * get SOC+'s copy of out to update our copy of out
 		 */
 		s_out =
 		    SOCAL_REQUESTQ_INDEX(rqix, socalp->socal_rp->socal_reqp.w);
 		DEBUGF(2, (CE_CONT,
-			"socal%d: cq_enque: &XRAM cq_in: 0x%p s_out.out 0x%x\n",
-			instance, &kcq->skc_xram_cqdesc->cq_in, s_out));
+		    "socal%d: cq_enque: &XRAM cq_in: 0x%p s_out.out 0x%x\n",
+		    instance, &kcq->skc_xram_cqdesc->cq_in, s_out));
 
 		kcq->skc_out = out = s_out;
 		/* if soc+'s que still full set flag */
 		kcq->skc_full = ((((kcq->skc_in + 1) &
-			kcq->skc_last_index) == out)) ? SOCAL_SKC_FULL : 0;
-	    }
+		    kcq->skc_last_index) == out)) ? SOCAL_SKC_FULL : 0;
+		}
 
 	} while (kcq->skc_full);
 
@@ -2797,15 +2809,15 @@ socal_doit(fcal_packet_t *fcalpkt, socal_port_t *port_statep, int polled,
 		port_statep->sp_status |= flag;
 		if ((status = socal_transport(fcalpkt, FCAL_NOSLEEP,
 		    CQ_REQUEST_0)) == FCAL_TRANSPORT_SUCCESS) {
-		    lb = ddi_get_lbolt();
+			lb = ddi_get_lbolt();
 			while (!(fcalpkt->fcal_cmd_state & FCAL_CMD_COMPLETE)) {
 			if ((retval = cv_timedwait(&port_statep->sp_cv,
 			    &port_statep->sp_mtx,
 			    lb+drv_usectohz(timo))) == -1) {
-			    status = FCAL_TRANSPORT_TIMEOUT;
-			    break;
+				status = FCAL_TRANSPORT_TIMEOUT;
+				break;
 			}
-		    }
+			}
 		}
 		port_statep->sp_status &= ~flag;
 		mutex_exit(&port_statep->sp_mtx);
@@ -2857,7 +2869,7 @@ socal_doit(fcal_packet_t *fcalpkt, socal_port_t *port_statep, int polled,
 			if (flag == PORT_LIP_PENDING ||
 			    flag == PORT_LILP_PENDING) {
 				if (socal_core &&
-					(socal_core & SOCAL_FAILED_LIP)) {
+				    (socal_core & SOCAL_FAILED_LIP)) {
 					socal_core = 0;
 					socal_take_core(socalp);
 				}
@@ -2869,7 +2881,8 @@ socal_doit(fcal_packet_t *fcalpkt, socal_port_t *port_statep, int polled,
 			}
 			else
 				(void) socal_force_lip(port_statep->sp_board,
-			    port_statep->sp_port, polled, FCAL_FORCE_LIP);
+				    port_statep->sp_port, polled,
+				    FCAL_FORCE_LIP);
 			retval = FCAL_TIMEOUT;
 			break;
 		case FCAL_TRANSPORT_FAILURE:
@@ -2900,7 +2913,7 @@ socal_lilp_map(void *ssp, uint_t port, uint32_t bufid, uint_t polled)
 
 	sdr = (soc_data_request_t *)&fcalpkt->fcal_socal_request;
 	if (port)
-	    sdr->sdr_soc_hdr.sh_flags = SOC_PORT_B;
+		sdr->sdr_soc_hdr.sh_flags = SOC_PORT_B;
 	sdr->sdr_soc_hdr.sh_seg_cnt = 1;
 	sdr->sdr_soc_hdr.sh_byte_cnt = 132;
 	sdr->sdr_dataseg[0].fc_base = bufid;
@@ -2925,11 +2938,11 @@ socal_force_lip(void *ssp, uint_t port, uint_t polled, uint_t lip_req)
 	if (lip_req == FCAL_NO_LIP) {
 		mutex_enter(&port_statep->sp_mtx);
 		if ((port_statep->sp_status & PORT_ONLINE_LOOP) &&
-			(port_statep->sp_unsol_cb->statec_cb != NULL)) {
+		    (port_statep->sp_unsol_cb->statec_cb != NULL)) {
 				mutex_exit(&port_statep->sp_mtx);
 				(*port_statep->sp_unsol_cb->statec_cb)
-				(port_statep->sp_unsol_cb->arg,
-						FCAL_STATUS_LOOP_ONLINE);
+				    (port_statep->sp_unsol_cb->arg,
+				    FCAL_STATUS_LOOP_ONLINE);
 			return (FCAL_SUCCESS);
 
 		} else
@@ -2943,7 +2956,7 @@ socal_force_lip(void *ssp, uint_t port, uint_t polled, uint_t lip_req)
 
 	scr = (soc_cmdonly_request_t *)&fcalpkt->fcal_socal_request;
 	if (port)
-	    scr->scr_soc_hdr.sh_flags = SOC_PORT_B;
+		scr->scr_soc_hdr.sh_flags = SOC_PORT_B;
 	scr->scr_cqhdr.cq_hdr_count = 1;
 	scr->scr_cqhdr.cq_hdr_type = CQ_TYPE_REQUEST_LIP;
 
@@ -2978,7 +2991,7 @@ socal_abort_cmd(void *ssp, uint_t port, fcal_packet_t *fcalpkt, uint_t polled)
 			mutex_exit(&kcq->skc_mtx);
 			socalp->socal_stats.pstats[port].abts_ok++;
 			SOCAL_ID_FREE(fcalpkt->fcal_socal_request.
-				sr_soc_hdr.sh_request_token);
+			    sr_soc_hdr.sh_request_token);
 			return (FCAL_ABORTED);
 		} else {
 			fpkt = fcalpkt2;
@@ -3040,7 +3053,7 @@ socal_bypass_dev(void *ssp, uint_t port, uint_t dest)
 
 	scr = (soc_cmdonly_request_t *)&fcalpkt->fcal_socal_request;
 	if (port)
-	    scr->scr_soc_hdr.sh_flags = SOC_PORT_B;
+		scr->scr_soc_hdr.sh_flags = SOC_PORT_B;
 	scr->scr_soc_hdr.sh_byte_cnt = dest;
 	scr->scr_cqhdr.cq_hdr_count = 1;
 	scr->scr_cqhdr.cq_hdr_type = CQ_TYPE_BYPASS_DEV;
@@ -3179,8 +3192,8 @@ socal_intr(caddr_t arg)
 	cause = (int)SOCAL_INTR_CAUSE(socalp, csr);
 
 	DEBUGF(2, (CE_CONT,
-		"socal%d: intr: csr: 0x%x cause: 0x%x\n",
-		instance, csr, cause));
+	    "socal%d: intr: csr: 0x%x cause: 0x%x\n",
+	    instance, csr, cause));
 
 	if (!cause) {
 		socalp->socal_on_intr = 0;
@@ -3197,15 +3210,15 @@ socal_intr(caddr_t arg)
 	 *
 	 */
 
-	    if (cause & SOCAL_CSR_RSP_QUE_1) {
-		    socal_intr_unsolicited(socalp, 1);
+		if (cause & SOCAL_CSR_RSP_QUE_1) {
+			socal_intr_unsolicited(socalp, 1);
 	DEBUGF(4, (CE_CONT, "socal%d intr: did unsolicited\n", instance));
-	    }
+		}
 
-	    if (cause & SOCAL_CSR_RSP_QUE_0) {
-		    socal_intr_solicited(socalp, 0);
+		if (cause & SOCAL_CSR_RSP_QUE_0) {
+			socal_intr_solicited(socalp, 0);
 	DEBUGF(4, (CE_CONT, "socal%d intr: did solicited\n", instance));
-	    }
+		}
 
 	/*
 	 * for use with token-only response queues in the future
@@ -3221,18 +3234,18 @@ socal_intr(caddr_t arg)
 	 * queue is full and we are waiting so we can enque
 	 * another command.
 	 */
-	    if ((request = (cause & SOCAL_CSR_HOST_TO_SOCAL)) != 0) {
+		if ((request = (cause & SOCAL_CSR_HOST_TO_SOCAL)) != 0) {
 		socalp->socal_stats.reqq_intrs++;
 		for (i = SOCAL_CSR_1ST_H_TO_S, j = 0; j < SOCAL_N_CQS;
-			j++, i <<= 1) {
-		    if (request & i) {
+		    j++, i <<= 1) {
+			if (request & i) {
 			socal_kcq_t *kcq = &socalp->request[j];
 
 			if (kcq->skc_full) {
-			    mutex_enter(&kcq->skc_mtx);
-			    full = kcq->skc_full;
-			    kcq->skc_full = 0;
-			    while ((fpkt = kcq->skc_overflowh) != NULL) {
+				mutex_enter(&kcq->skc_mtx);
+				full = kcq->skc_full;
+				kcq->skc_full = 0;
+				while ((fpkt = kcq->skc_overflowh) != NULL) {
 				nfpkt = fpkt->fcal_pkt_next;
 				fpkt->fcal_pkt_next = NULL;
 				kcq->skc_overflowh = nfpkt;
@@ -3241,12 +3254,12 @@ socal_intr(caddr_t arg)
 				    (cqe_t *)&fpkt->fcal_socal_request,
 				    j, FCAL_NOSLEEP, NULL, 1) !=
 				    FCAL_TRANSPORT_SUCCESS) {
-				    break;
+					break;
 				}
-			    }
-			    if (!kcq->skc_overflowh) {
+				}
+				if (!kcq->skc_overflowh) {
 				if (full & SOCAL_SKC_SLEEP)
-				    cv_broadcast(&kcq->skc_cv);
+					cv_broadcast(&kcq->skc_cv);
 
 			    /* Disable this queue's intrs */
 				DEBUGF(2, (CE_CONT,
@@ -3256,14 +3269,14 @@ socal_intr(caddr_t arg)
 				socalp->socal_rp->socal_imr =
 				    (socalp->socal_k_imr &= ~i);
 				mutex_exit(&socalp->k_imr_mtx);
-			    }
-			    mutex_exit(&kcq->skc_mtx);
+				}
+				mutex_exit(&kcq->skc_mtx);
 			}
-		    }
+			}
 		}
-	    }
-	    csr = socalreg->socal_csr.w;
-	    cause = (int)SOCAL_INTR_CAUSE(socalp, csr);
+		}
+		csr = socalreg->socal_csr.w;
+		cause = (int)SOCAL_INTR_CAUSE(socalp, csr);
 	DEBUGF(4, (CE_CONT, "socal%d intr: did request queues\n", instance));
 
 	}
@@ -3325,7 +3338,7 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 	while (kcqv->skc_out != index_in) {
 		/* Find out where the newest entry lives in the queue */
 		(void) ddi_dma_sync(kcq->skc_dhandle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 
 		srp = (soc_response_t *)cqe;
 		port = srp->sr_soc_hdr.sh_flags & SOC_PORT_B;
@@ -3350,15 +3363,15 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 				kcq->skc_saved_out = kcqv->skc_out;
 				kcq->skc_saved_seqno = kcqv->skc_seqno;
 				kcq->deferred_intr_timeoutid = timeout(
-					socal_deferred_intr, (caddr_t)kcq,
-					drv_usectohz(10000));
+				    socal_deferred_intr, (caddr_t)kcq,
+				    drv_usectohz(10000));
 				mutex_exit(&kcq->skc_mtx);
 				return;
 			}
 		}
 
 		fcalpkt = (fcal_packet_t *)
-				SOCAL_ID_LOOKUP(shp->sh_request_token);
+		    SOCAL_ID_LOOKUP(shp->sh_request_token);
 
 		if ((socal_core & SOCAL_TAKE_CORE) && ddi_peek8(socalp->dip,
 		    (char *)fcalpkt, &val) != DDI_SUCCESS) {
@@ -3368,13 +3381,13 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 		}
 
 		if ((fcalpkt == (fcal_packet_t *)NULL) ||
-			(fcalpkt->fcal_magic != FCALP_MAGIC)) {
-		    (void) sprintf(buf, "!invalid FC packet; \n\
-			in, out, seqno = 0x%x, 0x%x, 0x%x\n",
-			kcqv->skc_in, kcqv->skc_out, kcqv->skc_seqno);
-		    socal_disp_err(socalp, CE_WARN, "link.4060", buf);
-		    DEBUGF(4, (CE_CONT,
-		    "\tsoc CR: 0x%x SAE: 0x%x CSR: 0x%x IMR: 0x%x\n",
+		    (fcalpkt->fcal_magic != FCALP_MAGIC)) {
+			(void) sprintf(buf, "!invalid FC packet; \n\
+			    in, out, seqno = 0x%x, 0x%x, 0x%x\n",
+			    kcqv->skc_in, kcqv->skc_out, kcqv->skc_seqno);
+			socal_disp_err(socalp, CE_WARN, "link.4060", buf);
+			DEBUGF(4, (CE_CONT,
+			    "\tsoc CR: 0x%x SAE: 0x%x CSR: 0x%x IMR: 0x%x\n",
 			    socalreg->socal_cr.w,
 			    socalreg->socal_sae.w,
 			    socalreg->socal_csr.w,
@@ -3382,16 +3395,16 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 		/*
 		 * Update response queue ptrs and soc registers.
 		 */
-		    kcqv->skc_out++;
-		    if ((kcqv->skc_out & kcq->skc_last_index) == 0) {
-			    kcqv->skc_out = 0;
-			    kcqv->skc_seqno++;
-		    }
+			kcqv->skc_out++;
+			if ((kcqv->skc_out & kcq->skc_last_index) == 0) {
+				kcqv->skc_out = 0;
+				kcqv->skc_seqno++;
+			}
 
 		} else {
 
 			DEBUGF(2, (CE_CONT, "packet 0x%p complete\n",
-				fcalpkt));
+			    fcalpkt));
 			status = srp->sr_soc_status;
 			fcalpkt->fcal_pkt_status = status;
 			DEBUGF(2, (CE_CONT, "SOC status: 0x%x\n", status));
@@ -3401,7 +3414,7 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 			 */
 
 			ASSERT((fcalpkt->fcal_cmd_state & FCAL_CMD_COMPLETE)
-				== 0);
+			    == 0);
 			mutex_enter(&socalp->abort_mtx);
 			fcalpkt->fcal_pkt_flags |= FCFLAG_COMPLETE;
 			mutex_exit(&socalp->abort_mtx);
@@ -3425,16 +3438,17 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 				i = srp->sr_soc_hdr.sh_flags & SOC_PORT_B ?
 				    1 : 0;
 				if ((status != FCAL_STATUS_OK) &&
-					(status <= FCAL_STATUS_MAX_STATUS)) {
+				    (status <= FCAL_STATUS_MAX_STATUS)) {
 					socalp->socal_stats.pstats[i].
-					resp_status[status]++;
+					    resp_status[status]++;
 				} else {
 					socalp->socal_stats.pstats[i].
-					resp_status[FCAL_STATUS_ERROR]++;
+					    resp_status[FCAL_STATUS_ERROR]++;
 				}
 			} else if (status == FCAL_STATUS_OK) {
-			fcalpkt->fcal_socal_request.sr_soc_hdr.sh_byte_cnt =
-						shp->sh_byte_cnt;
+				fcalpkt->fcal_socal_request.
+				    sr_soc_hdr.sh_byte_cnt =
+				    shp->sh_byte_cnt;
 			}
 			fcalpkt->fcal_diag_status =
 			    (uint32_t)srp->sr_dataseg.fc_base;
@@ -3451,7 +3465,7 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 
 			/* For incmplt DMA offline loop by loopback */
 			if (fcalpkt->fcal_pkt_status ==
-				FCAL_STATUS_INCOMPLETE_DMA_ERR) {
+			    FCAL_STATUS_INCOMPLETE_DMA_ERR) {
 				socal_port_t	*port_statep;
 				uint_t		r;
 
@@ -3547,21 +3561,19 @@ socal_intr_solicited(socal_state_t *socalp, uint32_t srq)
 		 * all entries that are available.
 		 */
 
-		    socalreg->socal_csr.w =
-			((kcqv->skc_out << 24) |
-			(SOCAL_CSR_SOCAL_TO_HOST & ~SOCAL_CSR_RSP_QUE_0));
+		socalreg->socal_csr.w = ((kcqv->skc_out << 24) |
+		    (SOCAL_CSR_SOCAL_TO_HOST & ~SOCAL_CSR_RSP_QUE_0));
 
 		/* Make sure the csr write has completed */
-		    i = socalreg->socal_csr.w;
-		    DEBUGF(9, (CE_CONT, "csr.w = %x\n", i));
+		i = socalreg->socal_csr.w;
+		DEBUGF(9, (CE_CONT, "csr.w = %x\n", i));
 
 		/*
 		 * Update our idea of where the host adapter has placed
 		 * the most recent entry in the response queue and resync
 		 * the response queue
 		 */
-			index_in =
-			    SOCAL_RESPONSEQ_INDEX(srq, socalreg->socal_rspp.w);
+		index_in = SOCAL_RESPONSEQ_INDEX(srq, socalreg->socal_rspp.w);
 
 		kcqv->skc_in = index_in;
 	}
@@ -3627,23 +3639,23 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 
 	while (kcqv->skc_out != index_in) {
 		(void) ddi_dma_sync(kcq->skc_dhandle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 
 		/* Check for continuation entries */
 		if ((hdr_count = cqe->cqe_hdr.cq_hdr_count) != 1) {
 
-		    t_seqno = kcqv->skc_seqno;
-		    t_index = kcqv->skc_out + hdr_count;
+			t_seqno = kcqv->skc_seqno;
+			t_index = kcqv->skc_out + hdr_count;
 
-		    i = index_in;
-		    if (kcqv->skc_out > index_in)
+			i = index_in;
+			if (kcqv->skc_out > index_in)
 			i += kcq->skc_last_index + 1;
 
 		/*
 		 * If we think the continuation entries haven't yet
 		 * arrived, try once more before giving up
 		 */
-		    if (i < t_index) {
+			if (i < t_index) {
 
 			socalreg->socal_csr.w =
 			    ((kcqv->skc_out << 24) |
@@ -3657,25 +3669,26 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 			 * the most recent entry in the response queue
 			 */
 			i = index_in = SOCAL_RESPONSEQ_INDEX(urq,
-				socalreg->socal_rspp.w);
+			    socalreg->socal_rspp.w);
 			if (kcqv->skc_out > index_in)
-			    i += kcq->skc_last_index + 1;
+				i += kcq->skc_last_index + 1;
 
 			/*
 			 * Exit if the continuation entries haven't yet
 			 * arrived
 			 */
 			if (i < t_index)
-			    break;
-		    }
+				break;
+			}
 
-		    if (t_index > kcq->skc_last_index) {
+			if (t_index > kcq->skc_last_index) {
 			t_seqno++;
 			t_index &= kcq->skc_last_index;
-		    }
+			}
 
-		    cqe_cont = (volatile cqe_t *)
-		    &(kcq->skc_cq[t_index ? t_index - 1 : kcq->skc_last_index]);
+			cqe_cont = (volatile cqe_t *)
+			    &(kcq->skc_cq[t_index ? t_index - 1 :
+			    kcq->skc_last_index]);
 
 
 		    /* A cq_hdr_count > 2 is illegal; throw away the response */
@@ -3684,16 +3697,16 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 		 * XXX - should probably throw out as many entries as the
 		 * hdr_cout tells us there are
 		 */
-		    if (hdr_count != 2) {
+			if (hdr_count != 2) {
 			socal_disp_err(socalp, CE_WARN, "driver.4030",
 			    "!too many continuation entries");
 			DEBUGF(4, (CE_CONT,
-				"socal%d: soc+ unsolicited entry count = %d\n",
-				instance, cqe->cqe_hdr.cq_hdr_count));
+			    "socal%d: soc+ unsolicited entry count = %d\n",
+			    instance, cqe->cqe_hdr.cq_hdr_count));
 
 			if ((++t_index & kcq->skc_last_index) == 0) {
-			    t_index = 0;
-			    t_seqno++;
+				t_index = 0;
+				t_seqno++;
 			}
 			kcqv->skc_out = t_index;
 			kcqv->skc_seqno = t_seqno;
@@ -3701,7 +3714,7 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 			cqe = &(kcq->skc_cq[kcqv->skc_out]);
 			cqe_cont = NULL;
 			continue;
-		    }
+			}
 		}
 
 		/*
@@ -3714,19 +3727,19 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 		}
 
 		if (cqe_cont != NULL) {
-		    kcqv->skc_out++;
-		    if ((kcqv->skc_out & kcq->skc_last_index) == 0) {
-			    kcqv->skc_out = 0;
-			    kcqv->skc_seqno++;
-		    }
+			kcqv->skc_out++;
+			if ((kcqv->skc_out & kcq->skc_last_index) == 0) {
+				kcqv->skc_out = 0;
+				kcqv->skc_seqno++;
+			}
 		}
 
 		if (index_in == kcqv->skc_out) {
-		    socalreg->socal_csr.w = ((kcqv->skc_out << 24) |
-			(SOCAL_CSR_SOCAL_TO_HOST & ~SOCAL_CSR_RSP_QUE_1));
+			socalreg->socal_csr.w = ((kcqv->skc_out << 24) |
+			    (SOCAL_CSR_SOCAL_TO_HOST & ~SOCAL_CSR_RSP_QUE_1));
 
 		/* Make sure the csr write has completed */
-		    i = socalreg->socal_csr.w;
+			i = socalreg->socal_csr.w;
 		}
 
 		srp = (soc_response_t *)cqe;
@@ -3740,10 +3753,10 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 		switch (flags & ~SOC_PORT_B) {
 		case SOC_UNSOLICITED | SOC_FC_HEADER:
 
-		    srp = (soc_response_t *)cqe;
+			srp = (soc_response_t *)cqe;
 
-		    switch (srp->sr_fc_frame_hdr.r_ctl & R_CTL_ROUTING) {
-		    case R_CTL_EXTENDED_SVC:
+			switch (srp->sr_fc_frame_hdr.r_ctl & R_CTL_ROUTING) {
+			case R_CTL_EXTENDED_SVC:
 			/*
 			 * Extended Link Services frame received
 			 */
@@ -3753,31 +3766,32 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 			/* do callbacks to any interested ULPs */
 			mutex_enter(&port_statep->sp_mtx);
 			for (cblist = port_statep->sp_unsol_cb; cblist;
-				cblist = cblist->next) {
+			    cblist = cblist->next) {
 				if (cblist->els_cb) {
-				    mutex_exit(&port_statep->sp_mtx);
-				    mutex_exit(&kcq->skc_mtx);
-				    cblist->els_cb(cblist->arg, (cqe_t *)cqe,
-					(caddr_t)cqe_cont);
-				    mutex_enter(&kcq->skc_mtx);
-				    mutex_enter(&port_statep->sp_mtx);
+					mutex_exit(&port_statep->sp_mtx);
+					mutex_exit(&kcq->skc_mtx);
+					cblist->els_cb(cblist->arg,
+					    (cqe_t *)cqe,
+					    (caddr_t)cqe_cont);
+					mutex_enter(&kcq->skc_mtx);
+					mutex_enter(&port_statep->sp_mtx);
 				}
 			}
 			mutex_exit(&port_statep->sp_mtx);
 			break;
-		    case R_CTL_BASIC_SVC:
+			case R_CTL_BASIC_SVC:
 			(void) sprintf(buf,
 			    "!unsupported Link Service command: 0x%x",
-				srp->sr_fc_frame_hdr.type);
+			    srp->sr_fc_frame_hdr.type);
 			socal_disp_err(socalp, CE_WARN, "link.4020", buf);
 			break;
-		    case R_CTL_DEVICE_DATA:
+			case R_CTL_DEVICE_DATA:
 			switch (srp->sr_fc_frame_hdr.type) {
 			default:
-			    mutex_enter(&port_statep->sp_mtx);
-			    status = 1;
-			    for (cblist = port_statep->sp_unsol_cb; cblist;
-				cblist = cblist->next) {
+				mutex_enter(&port_statep->sp_mtx);
+				status = 1;
+				for (cblist = port_statep->sp_unsol_cb; cblist;
+				    cblist = cblist->next) {
 				if (cblist->data_cb &&
 				    (cblist->type ==
 				    srp->sr_fc_frame_hdr.type)) {
@@ -3789,25 +3803,27 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 					mutex_enter(&port_statep->sp_mtx);
 					status = 0;
 				}
-			    }
-			    mutex_exit(&port_statep->sp_mtx);
+				}
+				mutex_exit(&port_statep->sp_mtx);
 
-			    if (status == 0)
+				if (status == 0)
 				break;
 
-			    (void) sprintf(buf, "!unknown FC-4 command: 0x%x",
-				srp->sr_fc_frame_hdr.type);
-			    socal_disp_err(socalp, CE_WARN, "link.4030", buf);
-			    break;
+				(void) sprintf(buf,
+				    "!unknown FC-4 command: 0x%x",
+				    srp->sr_fc_frame_hdr.type);
+				socal_disp_err(socalp, CE_WARN,
+				    "link.4030", buf);
+				break;
 			}
 			break;
-		    default:
+			default:
 			(void) sprintf(buf, "!unsupported FC frame R_CTL: 0x%x",
 			    srp->sr_fc_frame_hdr.r_ctl);
 			socal_disp_err(socalp, CE_WARN, "link.4040", buf);
 			break;
-		    }
-		    break;
+			}
+			break;
 
 		case SOC_STATUS: {
 
@@ -3823,23 +3839,23 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 				(void) sprintf(buf,
 				"!port %d: Fibre Channel is ONLINE\n", port);
 				socal_disp_err(socalp, CE_CONT, "link.6010",
-					buf);
+				    buf);
 				mutex_enter(&port_statep->sp_mtx);
 				port_statep->sp_status &= ~PORT_STATUS_MASK;
 				port_statep->sp_status |= PORT_ONLINE;
 				mutex_exit(&port_statep->sp_mtx);
 				socalp->socal_stats.pstats[port].onlines++;
 				DEBUGF(4, (CE_CONT,
-					"socal%d intr_unsol: ONLINE intr\n",
-					instance));
+				    "socal%d intr_unsol: ONLINE intr\n",
+				    instance));
 				break;
 
 			case FCAL_STATUS_LOOP_ONLINE:
 				(void) sprintf(buf,
 				"!port %d: Fibre Channel Loop is ONLINE\n",
-					port);
+				    port);
 				socal_disp_err(socalp, CE_CONT, "link.6010",
-					buf);
+				    buf);
 				mutex_enter(&port_statep->sp_mtx);
 				port_statep->sp_status &= ~PORT_STATUS_MASK;
 				port_statep->sp_status |= PORT_ONLINE_LOOP;
@@ -3860,7 +3876,7 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 				(void) sprintf(buf,
 				"!port %d: Fibre Channel is OFFLINE\n", port);
 				socal_disp_err(socalp, CE_CONT, "link.5010",
-					buf);
+				    buf);
 
 				mutex_enter(&port_statep->sp_mtx);
 				port_statep->sp_status &= ~PORT_STATUS_MASK;
@@ -3875,18 +3891,19 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 				break;
 			default:
 				(void) sprintf(buf, "!unknown status: 0x%x\n",
-				status);
+				    status);
 				socal_disp_err(socalp, CE_WARN, "link.3020",
-					buf);
+				    buf);
 			}
 			mutex_exit(&kcq->skc_mtx);
 			mutex_enter(&port_statep->sp_mtx);
 			for (cblist = port_statep->sp_unsol_cb; cblist;
-				cblist = cblist->next) {
+			    cblist = cblist->next) {
 				if (cblist->statec_cb) {
-				    mutex_exit(&port_statep->sp_mtx);
-				    (*cblist->statec_cb)(cblist->arg, status);
-				    mutex_enter(&port_statep->sp_mtx);
+					mutex_exit(&port_statep->sp_mtx);
+					(*cblist->statec_cb)(cblist->arg,
+					    status);
+					mutex_enter(&port_statep->sp_mtx);
 				}
 			}
 			mutex_exit(&port_statep->sp_mtx);
@@ -3901,14 +3918,14 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 		}
 		default:
 			(void) sprintf(buf, "!unexpected state: flags: 0x%x\n",
-			flags);
+			    flags);
 			socal_disp_err(socalp, CE_WARN, "link.4050", buf);
 			DEBUGF(4, (CE_CONT,
-			"\tsoc CR: 0x%x SAE: 0x%x CSR: 0x%x IMR: 0x%x\n",
-				socalp->socal_rp->socal_cr.w,
-				socalp->socal_rp->socal_sae.w,
-				socalp->socal_rp->socal_csr.w,
-				socalp->socal_rp->socal_imr));
+			    "\tsoc CR: 0x%x SAE: 0x%x CSR: 0x%x IMR: 0x%x\n",
+			    socalp->socal_rp->socal_cr.w,
+			    socalp->socal_rp->socal_sae.w,
+			    socalp->socal_rp->socal_csr.w,
+			    socalp->socal_rp->socal_imr));
 		}
 
 
@@ -3944,19 +3961,19 @@ socal_intr_unsolicited(socal_state_t *socalp, uint32_t urq)
 		 */
 		if (index_in == kcqv->skc_out) {
 
-		    socalreg->socal_csr.w =
-			((kcqv->skc_out << 24) |
-			(SOCAL_CSR_SOCAL_TO_HOST & ~SOCAL_CSR_RSP_QUE_1));
+			socalreg->socal_csr.w =
+			    ((kcqv->skc_out << 24) |
+			    (SOCAL_CSR_SOCAL_TO_HOST & ~SOCAL_CSR_RSP_QUE_1));
 
 		/* Make sure the csr write has completed */
-		    i = socalreg->socal_csr.w;
+			i = socalreg->socal_csr.w;
 
 		/*
 		 * Update our idea of where the host adapter has placed
 		 * the most recent entry in the response queue
 		 */
-		    index_in =
-			SOCAL_RESPONSEQ_INDEX(urq, socalreg->socal_rspp.w);
+			index_in =
+			    SOCAL_RESPONSEQ_INDEX(urq, socalreg->socal_rspp.w);
 		}
 
 		socalp->socal_stats.pstats[port].unsol_resps++;
@@ -3987,9 +4004,9 @@ socal_us_els(socal_state_t *socalp, cqe_t *cqe, caddr_t payload)
 	 * extended link services
 	 */
 	if ((els == NULL) || ((i = srp->sr_soc_hdr.sh_byte_cnt) == 0)) {
-	    socal_disp_err(socalp, CE_WARN, "link.4010",
+		socal_disp_err(socalp, CE_WARN, "link.4010",
 		"!incomplete continuation entry");
-	    return;
+		return;
 	}
 
 	/* Quietly impose a maximum byte count */
@@ -4001,7 +4018,7 @@ socal_us_els(socal_state_t *socalp, cqe_t *cqe, caddr_t payload)
 	 * Decode the LS_Command code
 	 */
 	switch (els->els_cmd.c.ls_command) {
-	    case LA_ELS_DISPLAY:
+		case LA_ELS_DISPLAY:
 		els->els_data[i] = '\0';	/* terminate the string */
 		for (bp = (char *)&(els->els_data[0]); *bp; bp++) {
 			/* squash newlines */
@@ -4011,9 +4028,9 @@ socal_us_els(socal_state_t *socalp, cqe_t *cqe, caddr_t payload)
 		socal_disp_err(socalp, CE_CONT, "link.1010", buf);
 		break;
 
-	    default:
+		default:
 		DEBUGF(3, (CE_CONT, "!unknown LS_Command, %x\n",
-						els->els_cmd.i));
+		    els->els_cmd.i));
 		break;
 	}
 
@@ -4147,9 +4164,9 @@ socal_abort_done(fcal_packet_t *fcalpkt)
 	uint32_t	port;
 	socal_state_t	*socalp = (socal_state_t *)fcalpkt->fcal_pkt_cookie;
 	soc_header_t	*shp =
-		(soc_header_t *)&fcalpkt->fcal_socal_request.sr_soc_hdr;
+	    (soc_header_t *)&fcalpkt->fcal_socal_request.sr_soc_hdr;
 	fcal_packet_t	*target = (fcal_packet_t *)
-		SOCAL_ID_LOOKUP(shp->sh_request_token);
+	    SOCAL_ID_LOOKUP(shp->sh_request_token);
 
 	mutex_enter(&socalp->abort_mtx);
 	ASSERT(target->fcal_pkt_flags & FCFLAG_ABORTING);
@@ -4201,9 +4218,9 @@ socal_diag_request(socal_state_t *socalp, uint32_t port, uint_t *diagcode,
 	/* Grabbing the state mutex is totally unnecessary.... */
 	if (!(port_statep->sp_status & PORT_DISABLED)) {
 		if (socal_getmap(socalp, port, (caddr_t)&map, 0, FKIOCTL)
-			!= -1) {
+		    != -1) {
 			if (map.lilp_length != 1 && ((port_statep->sp_status &
-				PORT_ONLINE_LOOP) && cmd != SOC_DIAG_REM_LOOP))
+			    PORT_ONLINE_LOOP) && cmd != SOC_DIAG_REM_LOOP))
 				return (FCAL_TRANSPORT_UNAVAIL);
 		}
 	}
@@ -4212,7 +4229,7 @@ socal_diag_request(socal_state_t *socalp, uint32_t port, uint_t *diagcode,
 		return (FCAL_ALLOC_FAILED);
 	sdr = (soc_diag_request_t *)&fcalpkt->fcal_socal_request;
 	if (port)
-	    sdr->sdr_soc_hdr.sh_flags = SOC_PORT_B;
+		sdr->sdr_soc_hdr.sh_flags = SOC_PORT_B;
 	sdr->sdr_diag_cmd = cmd;
 	sdr->sdr_cqhdr.cq_hdr_count = 1;
 	sdr->sdr_cqhdr.cq_hdr_type = CQ_TYPE_DIAGNOSTIC;
@@ -4236,7 +4253,7 @@ socal_force_offline(void *ssp, uint_t port, uint_t polled)
 
 	scr = (soc_cmdonly_request_t *)&fcalpkt->fcal_socal_request;
 	if (port)
-	    scr->scr_soc_hdr.sh_flags = SOC_PORT_B;
+		scr->scr_soc_hdr.sh_flags = SOC_PORT_B;
 	scr->scr_cqhdr.cq_hdr_count = 1;
 	scr->scr_cqhdr.cq_hdr_type = CQ_TYPE_OFFLINE;
 	fcalpkt->fcal_pkt_cookie = (void *)socalp;
@@ -4280,7 +4297,7 @@ socal_issue_adisc(socal_state_t *socalp, uint32_t port, uint32_t dest,
 	    SOCAL_ADISC_TIMEOUT, PORT_ADISC_PENDING, NULL);
 	if (retval == FCAL_SUCCESS) {
 		(void) ddi_dma_sync(privp->rsp_handle, 0, 0,
-				DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		bcopy(privp->rsp, (caddr_t)payload, sizeof (la_els_adisc_t));
 	}
 	privp->fapktp = NULL;
@@ -4300,7 +4317,7 @@ socal_issue_lbf(socal_state_t *socalp, uint32_t port,
 	port_statep = &socalp->port_state[port];
 
 	if ((fcalpkt = socal_lbf_alloc(socalp, port, length, length,
-		    (caddr_t *)&privp, polled)) == (fcal_packet_t *)NULL)
+	    (caddr_t *)&privp, polled)) == (fcal_packet_t *)NULL)
 		return (FCAL_ALLOC_FAILED);
 
 	privp = (socal_priv_cmd_t *)fcalpkt->fcal_pkt_private;
@@ -4312,7 +4329,7 @@ socal_issue_lbf(socal_state_t *socalp, uint32_t port,
 
 	if (retval == FCAL_SUCCESS) {
 		(void) ddi_dma_sync(privp->rsp_handle, 0, 0,
-				DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		bcopy(privp->rsp, (caddr_t)payload, length);
 	}
 	privp->fapktp = NULL;
@@ -4376,7 +4393,7 @@ socal_issue_rls(socal_state_t *socalp, uint32_t port, uint32_t dest,
 	    SOCAL_RLS_TIMEOUT, PORT_RLS_PENDING, NULL);
 	if (retval == FCAL_SUCCESS) {
 		(void) ddi_dma_sync(privp->rsp_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		bcopy(privp->rsp, (caddr_t)payload,
 		    sizeof (la_els_rls_reply_t));
 	}
@@ -4425,13 +4442,13 @@ socal_els_alloc(socal_state_t *socalp, uint32_t port, uint32_t dest,
 		goto fail;
 
 	if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &chandle) != DDI_SUCCESS)
+	    DDI_DMA_DONTWAIT, NULL, &chandle) != DDI_SUCCESS)
 		goto fail;
 	privp->cmd_handle = chandle;
 
 	if (ddi_dma_mem_alloc(chandle, cmd_size, &socal_acc_attr,
-		DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
-		(caddr_t *)&cmd, &real_len, &cacchandle) != DDI_SUCCESS)
+	    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    (caddr_t *)&cmd, &real_len, &cacchandle) != DDI_SUCCESS)
 		goto fail;
 	privp->cmd = cmd;
 	privp->cmd_acchandle = cacchandle;
@@ -4440,56 +4457,56 @@ socal_els_alloc(socal_state_t *socalp, uint32_t port, uint32_t dest,
 		goto fail;
 
 	if (ddi_dma_addr_bind_handle(chandle, (struct as *)NULL,
-		(caddr_t)cmd, cmd_size,
-		DDI_DMA_WRITE | DDI_DMA_CONSISTENT,
-		DDI_DMA_DONTWAIT, NULL, &ccookie, &ccount)
-		!= DDI_DMA_MAPPED)
+	    (caddr_t)cmd, cmd_size,
+	    DDI_DMA_WRITE | DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, NULL, &ccookie, &ccount)
+	    != DDI_DMA_MAPPED)
 		goto fail;
 	cmd_bound = 1;
 	if (ccount != 1)
 		goto fail;
 
 	if (rsp_size) {
-	    if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &rhandle) != DDI_SUCCESS)
+		if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
+		    DDI_DMA_DONTWAIT, NULL, &rhandle) != DDI_SUCCESS)
 		goto fail;
 
-	    privp->rsp_handle = rhandle;
-	    if (ddi_dma_mem_alloc(rhandle, rsp_size, &socal_acc_attr,
-		DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
-		&rsp, &real_len, &racchandle) != DDI_SUCCESS)
-		goto fail;
-	    privp->rsp = rsp;
-	    privp->rsp_acchandle = racchandle;
-	    if (real_len < rsp_size)
-		goto fail;
-
-	    if (ddi_dma_addr_bind_handle(rhandle, (struct as *)NULL,
-		rsp, rsp_size,
-		DDI_DMA_READ | DDI_DMA_CONSISTENT,
-		DDI_DMA_DONTWAIT, NULL, &rcookie, &ccount)
-		!= DDI_DMA_MAPPED)
+		privp->rsp_handle = rhandle;
+		if (ddi_dma_mem_alloc(rhandle, rsp_size, &socal_acc_attr,
+		    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+		    &rsp, &real_len, &racchandle) != DDI_SUCCESS)
+			goto fail;
+		privp->rsp = rsp;
+		privp->rsp_acchandle = racchandle;
+		if (real_len < rsp_size)
 		goto fail;
 
-	    rsp_bound = 1;
-	    if (ccount != 1)
+		if (ddi_dma_addr_bind_handle(rhandle, (struct as *)NULL,
+		    rsp, rsp_size,
+		    DDI_DMA_READ | DDI_DMA_CONSISTENT,
+		    DDI_DMA_DONTWAIT, NULL, &rcookie, &ccount)
+		    != DDI_DMA_MAPPED)
+		goto fail;
+
+		rsp_bound = 1;
+		if (ccount != 1)
 		goto fail;
 	}
 
 	srp = (soc_request_t *)&fcalpkt->fcal_socal_request;
 	srp->sr_soc_hdr.sh_flags = SOC_FC_HEADER;
 	if (port)
-	    srp->sr_soc_hdr.sh_flags |= SOC_PORT_B;
+		srp->sr_soc_hdr.sh_flags |= SOC_PORT_B;
 	srp->sr_soc_hdr.sh_class = 3;
 	srp->sr_soc_hdr.sh_byte_cnt = cmd_size;
 	srp->sr_dataseg[0].fc_base = (uint32_t)ccookie.dmac_address;
 	srp->sr_dataseg[0].fc_count = cmd_size;
 	if (rsp_size == 0) {
-	    srp->sr_soc_hdr.sh_seg_cnt = 1;
+		srp->sr_soc_hdr.sh_seg_cnt = 1;
 	} else {
-	    srp->sr_soc_hdr.sh_seg_cnt = 2;
-	    srp->sr_dataseg[1].fc_base = (uint32_t)rcookie.dmac_address;
-	    srp->sr_dataseg[1].fc_count = rsp_size;
+		srp->sr_soc_hdr.sh_seg_cnt = 2;
+		srp->sr_dataseg[1].fc_base = (uint32_t)rcookie.dmac_address;
+		srp->sr_dataseg[1].fc_count = rsp_size;
 	}
 	srp->sr_cqhdr.cq_hdr_count = 1;
 	/* this will potentially be overwritten by the calling function */
@@ -4571,13 +4588,13 @@ socal_lbf_alloc(socal_state_t *socalp, uint32_t port,
 	privp->fapktp = (void *)fcalpkt;
 
 	if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &chandle) != DDI_SUCCESS)
+	    DDI_DMA_DONTWAIT, NULL, &chandle) != DDI_SUCCESS)
 		goto fail;
 	privp->cmd_handle = chandle;
 
 	if (ddi_dma_mem_alloc(chandle, cmd_size, &socal_acc_attr,
-		DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
-		(caddr_t *)&cmd, &real_len, &cacchandle) != DDI_SUCCESS)
+	    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    (caddr_t *)&cmd, &real_len, &cacchandle) != DDI_SUCCESS)
 		goto fail;
 	privp->cmd = cmd;
 	privp->cmd_acchandle = cacchandle;
@@ -4586,57 +4603,57 @@ socal_lbf_alloc(socal_state_t *socalp, uint32_t port,
 		goto fail;
 
 	if (ddi_dma_addr_bind_handle(chandle, (struct as *)NULL,
-		(caddr_t)cmd, cmd_size,
-		DDI_DMA_WRITE | DDI_DMA_CONSISTENT,
-		DDI_DMA_DONTWAIT, NULL, &ccookie, &ccount)
-		!= DDI_DMA_MAPPED)
+	    (caddr_t)cmd, cmd_size,
+	    DDI_DMA_WRITE | DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, NULL, &ccookie, &ccount)
+	    != DDI_DMA_MAPPED)
 		goto fail;
 	cmd_bound = 1;
 	if (ccount != 1)
 		goto fail;
 
 	if (rsp_size) {
-	    if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &rhandle) != DDI_SUCCESS)
+		if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
+		    DDI_DMA_DONTWAIT, NULL, &rhandle) != DDI_SUCCESS)
 		goto fail;
 
-	    privp->rsp_handle = rhandle;
-	    if (ddi_dma_mem_alloc(rhandle, rsp_size, &socal_acc_attr,
-		DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
-		&rsp, &real_len, &racchandle) != DDI_SUCCESS)
+		privp->rsp_handle = rhandle;
+		if (ddi_dma_mem_alloc(rhandle, rsp_size, &socal_acc_attr,
+		    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+		    &rsp, &real_len, &racchandle) != DDI_SUCCESS)
 			goto fail;
 
-	    privp->rsp = rsp;
-	    privp->rsp_acchandle = racchandle;
-	    if (real_len < rsp_size)
+		privp->rsp = rsp;
+		privp->rsp_acchandle = racchandle;
+		if (real_len < rsp_size)
 		goto fail;
 
-	    if (ddi_dma_addr_bind_handle(rhandle, (struct as *)NULL,
-		rsp, rsp_size,
-		DDI_DMA_READ | DDI_DMA_CONSISTENT,
-		DDI_DMA_DONTWAIT, NULL, &rcookie, &ccount)
-		!= DDI_DMA_MAPPED)
+		if (ddi_dma_addr_bind_handle(rhandle, (struct as *)NULL,
+		    rsp, rsp_size,
+		    DDI_DMA_READ | DDI_DMA_CONSISTENT,
+		    DDI_DMA_DONTWAIT, NULL, &rcookie, &ccount)
+		    != DDI_DMA_MAPPED)
 			goto fail;
 
-	    rsp_bound = 1;
-	    if (ccount != 1)
+		rsp_bound = 1;
+		if (ccount != 1)
 		goto fail;
 	}
 
 	srp = (soc_request_t *)&fcalpkt->fcal_socal_request;
 	srp->sr_soc_hdr.sh_flags = SOC_FC_HEADER;
 	if (port)
-	    srp->sr_soc_hdr.sh_flags |= SOC_PORT_B;
+		srp->sr_soc_hdr.sh_flags |= SOC_PORT_B;
 	srp->sr_soc_hdr.sh_class = 3;
 	srp->sr_soc_hdr.sh_byte_cnt = cmd_size;
 	srp->sr_dataseg[0].fc_base = (uint32_t)ccookie.dmac_address;
 	srp->sr_dataseg[0].fc_count = cmd_size;
 	if (rsp_size == 0) {
-	    srp->sr_soc_hdr.sh_seg_cnt = 1;
+		srp->sr_soc_hdr.sh_seg_cnt = 1;
 	} else {
-	    srp->sr_soc_hdr.sh_seg_cnt = 2;
-	    srp->sr_dataseg[1].fc_base = (uint32_t)rcookie.dmac_address;
-	    srp->sr_dataseg[1].fc_count = rsp_size;
+		srp->sr_soc_hdr.sh_seg_cnt = 2;
+		srp->sr_dataseg[1].fc_base = (uint32_t)rcookie.dmac_address;
+		srp->sr_dataseg[1].fc_count = rsp_size;
 	}
 	srp->sr_cqhdr.cq_hdr_count = 1;
 	/* this will potentially be overwritten by the calling function */
@@ -4751,19 +4768,19 @@ socal_getmap(socal_state_t *socalp, uint32_t port, caddr_t arg,
 
 	if (port_statep->sp_lilpmap_valid) {
 
-	    buf = &port_statep->sp_lilpmap; /* give from cache */
+		buf = &port_statep->sp_lilpmap; /* give from cache */
 
-	    if (arg) {
+		if (arg) {
 		if (ddi_copyout(buf, (caddr_t)arg,
 		    sizeof (struct lilpmap), flags) == -1)
 			return (-1);
-	    }
+		}
 
-	    return (buf->lilp_myalpa);
+		return (buf->lilp_myalpa);
 	}
 
 	if (ddi_dma_alloc_handle(socalp->dip, &socal_dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &dhandle) != DDI_SUCCESS)
+	    DDI_DMA_DONTWAIT, NULL, &dhandle) != DDI_SUCCESS)
 		goto getmap_fail;
 
 	i = sizeof (struct fcal_lilp_map);
@@ -4791,20 +4808,20 @@ socal_getmap(socal_state_t *socalp, uint32_t port, caddr_t arg,
 	(void) ddi_dma_sync(dhandle, 0, 0, DDI_DMA_SYNC_FORKERNEL);
 
 	if (retval == FCAL_SUCCESS) {
-	    bcopy(buf, &port_statep->sp_lilpmap, sizeof (fcal_lilp_map_t));
+		bcopy(buf, &port_statep->sp_lilpmap, sizeof (fcal_lilp_map_t));
 
-	    mutex_enter(&port_statep->sp_mtx);
-	    port_statep->sp_src_id = buf->lilp_myalpa;
-	    port_statep->sp_lilpmap_valid = 1; /* cached */
-	    mutex_exit(&port_statep->sp_mtx);
+		mutex_enter(&port_statep->sp_mtx);
+		port_statep->sp_src_id = buf->lilp_myalpa;
+		port_statep->sp_lilpmap_valid = 1; /* cached */
+		mutex_exit(&port_statep->sp_mtx);
 
-	    if (arg) {
+		if (arg) {
 		if (ddi_copyout(buf, (caddr_t)arg,
 		    sizeof (struct lilpmap), flags) == -1)
 			goto getmap_fail;
-	    }
+		}
 
-	    retval = buf->lilp_myalpa;
+		retval = buf->lilp_myalpa;
 	}
 	else
 		retval = -1;
@@ -4859,7 +4876,7 @@ socal_flush_overflowq(socal_state_t *socalp, int port, int q_no)
 			head = fpkt2;
 			fpkt2 = tmp;
 			SOCAL_ID_FREE(head->fcal_socal_request.
-				sr_soc_hdr.sh_request_token);
+			    sr_soc_hdr.sh_request_token);
 		} else {
 			fpkt1 = fpkt2;
 			fpkt2 = fpkt2->fcal_pkt_next;
@@ -4898,7 +4915,7 @@ socal_deferred_intr(void *arg)
 	if (socalp->socal_on_intr) {
 		mutex_exit(&kcq->skc_mtx);
 		kcq->deferred_intr_timeoutid = timeout(socal_deferred_intr,
-					(caddr_t)kcq, drv_usectohz(10000));
+		    (caddr_t)kcq, drv_usectohz(10000));
 		return;
 	}
 
@@ -4920,10 +4937,10 @@ socal_take_core(void *arg)
 	}
 	for (i = 0; i < 4; i++) {
 		socalp->socal_rp->socal_cr.w &=
-				~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
+		    ~SOCAL_CR_EXTERNAL_RAM_BANK_MASK;
 		socalp->socal_rp->socal_cr.w |= i<<24;
 		(void) bcopy((caddr_t)socalp->socal_xrp,
-			(caddr_t)&socal_xrambuf[i*0x10000], 0x10000);
+		    (caddr_t)&socal_xrambuf[i*0x10000], 0x10000);
 	}
 	for (i = 3; i >= 0; i--) {
 		mutex_exit(&socalp->request[i].skc_mtx);
@@ -4931,7 +4948,7 @@ socal_take_core(void *arg)
 	}
 	instance = ddi_get_instance(socalp->dip);
 	cmn_err(CE_PANIC,
-		"socal take core (socal instance %d)", instance);
+	    "socal take core (socal instance %d)", instance);
 }
 
 /*

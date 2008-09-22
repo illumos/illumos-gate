@@ -135,7 +135,8 @@ struct dev_ops usbser_pl2303_ops = {
 	nodev,			/* devo_reset */
 	&usbser_pl2303_cb_ops,	/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	usbser_power		/* devo_power */
+	usbser_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -144,7 +145,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"USB Prolific PL2303 driver 1.1",
+	"USB Prolific PL2303 driver",
 	&usbser_pl2303_ops,
 };
 

@@ -137,7 +137,9 @@ static struct dev_ops megasas_ops = {
 	megasas_detach,		/* detach */
 	megasas_reset,		/* reset */
 	&megasas_cb_ops,	/* char/block ops */
-	NULL			/* bus ops */
+	NULL,			/* bus ops */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 char _depends_on[] = "misc/scsi";

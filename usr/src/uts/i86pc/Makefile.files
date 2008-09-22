@@ -49,6 +49,8 @@ CORE_OBJS +=			\
 	dvma.o			\
 	fpu_subr.o		\
 	fakebop.o		\
+	fastboot.o		\
+	fb_swtch.o		\
 	graphics.o		\
 	hardclk.o		\
 	hat_i86.o		\

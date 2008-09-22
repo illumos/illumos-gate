@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -92,7 +91,8 @@ static struct dev_ops sram_ops = {
 	nulldev,			/* reset */
 	&sram_cb_ops,			/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 
@@ -107,7 +107,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Sram Leaf v%I%",	/* name of module */
+	"Sram Leaf",		/* name of module */
 	&sram_ops,		/* driver ops */
 };
 
@@ -185,24 +185,24 @@ sram_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if ((softsp->board = (int)ddi_getprop(DDI_DEV_T_ANY, softsp->pdip,
 	    DDI_PROP_DONTPASS, OBP_BOARDNUM, -1)) == -1) {
 		cmn_err(CE_WARN, "sram%d: unable to retrieve %s property",
-			instance, OBP_BOARDNUM);
+		    instance, OBP_BOARDNUM);
 		goto bad;
 	}
 
 	DPRINTF(SRAM_ATTACH_DEBUG, ("sram%d: devi= 0x%p\n, "
-		" softsp=0x%p\n", instance, devi, softsp));
+	    " softsp=0x%p\n", instance, devi, softsp));
 
 	/* map in the registers for this device. */
 	if (ddi_map_regs(softsp->dip, 0,
 	    (caddr_t *)&softsp->sram_base, 0, 0)) {
 		cmn_err(CE_WARN, "sram%d: unable to map registers",
-			instance);
+		    instance);
 		goto bad;
 	}
 
 	/* nothing to suspend/resume here */
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-		"pm-hardware-state", "no-suspend-resume");
+	    "pm-hardware-state", "no-suspend-resume");
 
 	/* create the kstats for this device. */
 	sram_add_kstats(softsp);
@@ -256,7 +256,7 @@ sram_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	/* unmap the registers */
 	ddi_unmap_regs(softsp->dip, 0,
-		(caddr_t *)&softsp->sram_base, 0, 0);
+	    (caddr_t *)&softsp->sram_base, 0, 0);
 
 	/* free the soft state structure */
 	ddi_soft_state_free(sramp, instance);
@@ -328,20 +328,20 @@ sram_add_kstats(struct sram_soft_state *softsp)
 	/* Check for illegal size values. */
 	if ((uint_t)reset_size > MX_RSTINFO_SZ) {
 		cmn_err(CE_NOTE, "sram%d: illegal "
-			"reset_size: 0x%x",
-			ddi_get_instance(softsp->dip),
-			reset_size);
+		    "reset_size: 0x%x",
+		    ddi_get_instance(softsp->dip),
+		    reset_size);
 		return;
 	}
 
 	/* create the reset-info kstat */
 	resetinfo_ksp = kstat_create("unix", 0,
-		RESETINFO_KSTAT_NAME, "misc", KSTAT_TYPE_RAW,
-		reset_size, KSTAT_FLAG_PERSISTENT);
+	    RESETINFO_KSTAT_NAME, "misc", KSTAT_TYPE_RAW,
+	    reset_size, KSTAT_FLAG_PERSISTENT);
 
 	if (resetinfo_ksp == NULL) {
 		cmn_err(CE_WARN, "sram%d: kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 		return;
 	}
 

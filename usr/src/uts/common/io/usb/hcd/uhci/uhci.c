@@ -49,6 +49,7 @@ static	int uhci_close(dev_t dev, int flag, int otyp, cred_t *credp);
 static	int uhci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		cred_t *credp, int *rvalp);
 static	int uhci_reset(dev_info_t *dip, ddi_reset_cmd_t cmd);
+static	int uhci_quiesce(dev_info_t *dip);
 static	int uhci_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
 
@@ -84,7 +85,8 @@ static struct dev_ops uhci_ops = {
 	uhci_reset,			/* Reset */
 	&uhci_cb_ops,			/* Driver operations */
 	&usba_hubdi_busops,		/* Bus operations */
-	usba_hubdi_root_hub_power	/* Power */
+	usba_hubdi_root_hub_power,	/* Power */
+	uhci_quiesce			/* quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -706,6 +708,45 @@ uhci_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 	/* Disable all HC ED list processing */
 	Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
 	Set_OpReg16(USBCMD, 0);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+uhci_quiesce(dev_info_t *dip)
+{
+	uhci_state_t	*uhcip = uhci_obtain_state(dip);
+
+	if (uhcip == NULL)
+		return (DDI_FAILURE);
+
+	/* Disable interrupts */
+	Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
+
+	/* Wait for SOF time to handle the scheduled interrupt */
+	drv_usecwait(UHCI_TIMEWAIT);
+
+	/* Stop the Host Controller */
+	Set_OpReg16(USBCMD, 0);
+
+	/* Wait for SOF time to handle the scheduled interrupt */
+	drv_usecwait(UHCI_TIMEWAIT);
+
+	/* Set Global Suspend bit */
+	Set_OpReg16(USBCMD, USBCMD_REG_ENER_GBL_SUSPEND);
+
+	/* Wait for SOF time to handle the scheduled interrupt */
+	drv_usecwait(UHCI_TIMEWAIT);
 
 	return (DDI_SUCCESS);
 }

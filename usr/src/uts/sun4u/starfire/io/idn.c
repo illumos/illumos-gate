@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -565,14 +564,15 @@ static struct dev_ops idnops = {
 	nodev,			/* devo_reset */
 	&cb_idnops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern cpuset_t	cpu_ready_set;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* This module is a pseudo driver */
-	IDNDESC " %I%",
+	IDNDESC " 1.58",
 	&idnops
 };
 
@@ -640,8 +640,8 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		IDN_GLOCK_SHARED();
 		if (idn.state != IDNGS_OFFLINE) {
 			cmn_err(CE_WARN,
-				"IDN: 101: not in expected OFFLINE state "
-				"for DDI_RESUME");
+			    "IDN: 101: not in expected OFFLINE state "
+			    "for DDI_RESUME");
 			ASSERT(0);
 		}
 		IDN_GUNLOCK();
@@ -680,7 +680,7 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(&idn.siplock);
 
 	if (ddi_create_minor_node(dip, IDNNAME, S_IFCHR, instance,
-				DDI_NT_NET, CLONE_DEV) == DDI_FAILURE) {
+	    DDI_NT_NET, CLONE_DEV) == DDI_FAILURE) {
 		mutex_exit(&idn.siplock);
 		return (DDI_FAILURE);
 	}
@@ -693,9 +693,9 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #endif /* DEBUG */
 		} else {
 			cmn_err(CE_NOTE,
-				"!IDN: 102: driver disabled "
-				"- check OBP environment "
-				"(idn-smr-size)");
+			    "!IDN: 102: driver disabled "
+			    "- check OBP environment "
+			    "(idn-smr-size)");
 			mutex_exit(&idn.siplock);
 			return (DDI_SUCCESS);
 		}
@@ -801,7 +801,7 @@ idnattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			ddi_remove_minor_node(dip, NULL);
 
 			cmn_err(CE_WARN,
-				"IDN: 103: unable to reference sigblock area");
+			    "IDN: 103: unable to reference sigblock area");
 
 			return (DDI_FAILURE);
 		}
@@ -846,9 +846,9 @@ idndetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			int	d;
 
 			cmn_err(CE_WARN,
-				"IDN: 104: cannot suspend while active "
-				"(state = %s)",
-				idngs_str[idn.state]);
+			    "IDN: 104: cannot suspend while active "
+			    "(state = %s)",
+			    idngs_str[idn.state]);
 
 			for (d = 0; d < MAX_DOMAINS; d++) {
 				idn_domain_t	*dp;
@@ -858,10 +858,10 @@ idndetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 					continue;
 
 				cmn_err(CE_CONT,
-					"IDN: 121: domain %d (CPU %d, name "
-					"\"%s\", state %s)\n",
-					d, dp->dcpu, dp->dname,
-					idnds_str[dp->dstate]);
+				    "IDN: 121: domain %d (CPU %d, name "
+				    "\"%s\", state %s)\n",
+				    d, dp->dcpu, dp->dname,
+				    idnds_str[dp->dstate]);
 			}
 			err = 1;
 		}
@@ -943,7 +943,7 @@ idndetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		idn.sip = sip->si_nextp;
 	} else {
 		for (; hsip && (sip != hsip); tsip = hsip,
-						hsip = hsip->si_nextp)
+		    hsip = hsip->si_nextp)
 			;
 		if (hsip)
 			tsip->si_nextp = hsip->si_nextp;
@@ -985,16 +985,16 @@ idn_check_conf(dev_info_t *dip, processorid_t *cpuid)
 			ASSERT(str && var);
 
 			val = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-						DDI_PROP_DONTPASS |
-						DDI_PROP_NOTPROM,
-						str, v_def);
+			    DDI_PROP_DONTPASS |
+			    DDI_PROP_NOTPROM,
+			    str, v_def);
 			if ((v_min != v_max) &&
-				((val < v_min) || (val > v_max))) {
+			    ((val < v_min) || (val > v_max))) {
 				cmn_err(CE_WARN,
-					"IDN: 105: driver parameter "
-					"(%s) specified (%d) out of "
-					"range [%d - %d]",
-					str, val, v_min, v_max);
+				    "IDN: 105: driver parameter "
+				    "(%s) specified (%d) out of "
+				    "range [%d - %d]",
+				    str, val, v_min, v_max);
 				global_props = IDN_GPROPS_ERROR;
 			} else {
 				*var = val;
@@ -1003,8 +1003,8 @@ idn_check_conf(dev_info_t *dip, processorid_t *cpuid)
 	}
 
 	*cpuid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-				"bind_cpu", -1);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "bind_cpu", -1);
 
 	return (global_props);
 }
@@ -1023,23 +1023,23 @@ idn_size_check()
 
 	if (IDN_NWR_SIZE > IDN_SMR_SIZE) {
 		cmn_err(CE_WARN,
-			"IDN: 106: idn_nwr_size(%d) > idn_smr_size(%d)"
-			" - Limiting to %d MB",
-			IDN_NWR_SIZE, IDN_SMR_SIZE, IDN_SMR_SIZE);
+		    "IDN: 106: idn_nwr_size(%d) > idn_smr_size(%d)"
+		    " - Limiting to %d MB",
+		    IDN_NWR_SIZE, IDN_SMR_SIZE, IDN_SMR_SIZE);
 		IDN_NWR_SIZE = IDN_SMR_SIZE;
 	}
 
 	if (MB2B(IDN_NWR_SIZE) < IDN_SLAB_SIZE) {
 		cmn_err(CE_WARN,
-			"IDN: 107: memory region(%lu) < slab size(%u)",
-			MB2B(IDN_NWR_SIZE), IDN_SLAB_SIZE);
+		    "IDN: 107: memory region(%lu) < slab size(%u)",
+		    MB2B(IDN_NWR_SIZE), IDN_SLAB_SIZE);
 		rv = -1;
 	}
 
 	if (IDN_LOWAT >= IDN_HIWAT) {
 		cmn_err(CE_WARN,
-			"IDN: 108: idn_lowat(%d) >= idn_hiwat(%d)",
-			IDN_LOWAT, IDN_HIWAT);
+		    "IDN: 108: idn_lowat(%d) >= idn_hiwat(%d)",
+		    IDN_LOWAT, IDN_HIWAT);
 		rv = -1;
 	}
 
@@ -1048,27 +1048,27 @@ idn_size_check()
 #ifdef DEBUG
 	if ((ulong_t)IDN_SLAB_SIZE < mboxareasize) {
 		PR_DRV("%s: slab size(%d) < mailbox area(%ld)",
-			proc, IDN_SLAB_SIZE, mboxareasize);
+		    proc, IDN_SLAB_SIZE, mboxareasize);
 		/* not fatal */
 	}
 #endif /* DEBUG */
 
 	if ((mboxareasize + (ulong_t)IDN_SLAB_SIZE) > MB2B(IDN_NWR_SIZE)) {
 		cmn_err(CE_WARN,
-			"IDN: 109: mailbox area(%lu) + slab size(%u) "
-			"> nwr region(%lu)",
-			mboxareasize, IDN_SLAB_SIZE,
-			MB2B(IDN_NWR_SIZE));
+		    "IDN: 109: mailbox area(%lu) + slab size(%u) "
+		    "> nwr region(%lu)",
+		    mboxareasize, IDN_SLAB_SIZE,
+		    MB2B(IDN_NWR_SIZE));
 		rv = -1;
 	}
 
 	max_num_slabs = (int)((MB2B(IDN_NWR_SIZE) - mboxareasize) /
-				(ulong_t)IDN_SLAB_SIZE);
+	    (ulong_t)IDN_SLAB_SIZE);
 	if (max_num_slabs < IDN_SLAB_MINTOTAL) {
 		cmn_err(CE_WARN,
-			"IDN: 110: maximum number of slabs(%d) < "
-			"minimum required(%d)",
-			max_num_slabs, IDN_SLAB_MINTOTAL);
+		    "IDN: 110: maximum number of slabs(%d) < "
+		    "minimum required(%d)",
+		    max_num_slabs, IDN_SLAB_MINTOTAL);
 		rv = -1;
 	} else {
 		IDN_SLAB_MAXPERDOMAIN = max_num_slabs / IDN_SLAB_MINTOTAL;
@@ -1077,50 +1077,50 @@ idn_size_check()
 #if 0
 	if ((IDN_MTU + sizeof (struct ether_header)) > IDN_DATA_SIZE) {
 		cmn_err(CE_WARN,
-			"IDN: (IDN_MTU(%d) + ether_header(%d)) "
-			"> IDN_DATA_SIZE(%lu)",
-			IDN_MTU, sizeof (struct ether_header),
-			IDN_DATA_SIZE);
+		    "IDN: (IDN_MTU(%d) + ether_header(%d)) "
+		    "> IDN_DATA_SIZE(%lu)",
+		    IDN_MTU, sizeof (struct ether_header),
+		    IDN_DATA_SIZE);
 		rv = -1;
 	}
 #endif /* 0 */
 
 	if (IDN_SMR_BUFSIZE & (IDN_ALIGNSIZE - 1)) {
 		cmn_err(CE_WARN,
-			"IDN: 111: idn_smr_bufsize(%d) not on a "
-			"64 byte boundary", IDN_SMR_BUFSIZE);
+		    "IDN: 111: idn_smr_bufsize(%d) not on a "
+		    "64 byte boundary", IDN_SMR_BUFSIZE);
 		rv = -1;
 	}
 
 	for (i = cnt = 0;
-		(cnt <= 1) && (((ulong_t)1 << i) < MB2B(IDN_NWR_SIZE));
-		i++)
+	    (cnt <= 1) && (((ulong_t)1 << i) < MB2B(IDN_NWR_SIZE));
+	    i++)
 		if ((1 << i) & IDN_SMR_BUFSIZE)
 			cnt++;
 	if ((i > 0) && (!cnt || (cnt > 1))) {
 		cmn_err(CE_WARN,
-			"IDN: 112: idn_smr_bufsize(%d) not a power of 2",
-			IDN_SMR_BUFSIZE);
+		    "IDN: 112: idn_smr_bufsize(%d) not a power of 2",
+		    IDN_SMR_BUFSIZE);
 		rv = -1;
 	}
 
 	if ((IDN_MBOX_PER_NET & 1) == 0) {
 		cmn_err(CE_WARN,
-			"IDN: 113: idn_mbox_per_net(%d) must be an "
-			"odd number", IDN_MBOX_PER_NET);
+		    "IDN: 113: idn_mbox_per_net(%d) must be an "
+		    "odd number", IDN_MBOX_PER_NET);
 		rv = -1;
 	}
 
 	if (idn.nchannels > 0)
 		IDN_WINDOW_EMAX = IDN_WINDOW_MAX +
-				((idn.nchannels - 1) * IDN_WINDOW_INCR);
+		    ((idn.nchannels - 1) * IDN_WINDOW_INCR);
 
 	if (IDN_NETSVR_WAIT_MIN > IDN_NETSVR_WAIT_MAX) {
 		cmn_err(CE_WARN,
-			"IDN: 115: idn_netsvr_wait_min(%d) cannot be "
-			"greater than idn_netsvr_wait_max(%d)",
-			IDN_NETSVR_WAIT_MIN,
-			IDN_NETSVR_WAIT_MAX);
+		    "IDN: 115: idn_netsvr_wait_min(%d) cannot be "
+		    "greater than idn_netsvr_wait_max(%d)",
+		    IDN_NETSVR_WAIT_MIN,
+		    IDN_NETSVR_WAIT_MAX);
 		rv = -1;
 	}
 
@@ -1143,7 +1143,7 @@ idn_init_smr()
 		return (-1);
 
 	PR_PROTO("%s: smr_size = %d, obp_paddr = 0x%lx, obp_size = 0x%lx\n",
-		proc, smr_size, obp_paddr, obp_size);
+	    proc, smr_size, obp_paddr, obp_size);
 
 	if (IDN_SMR_SIZE)
 		smr_size = MIN(smr_size, IDN_SMR_SIZE);
@@ -1221,13 +1221,13 @@ idn_init(dev_info_t *dip)
 
 	if (!idn.enabled) {
 		cmn_err(CE_WARN,
-			"IDN: 117: IDN not enabled");
+		    "IDN: 117: IDN not enabled");
 		return (-1);
 	}
 
 	if (idn.dip != NULL) {
 		PR_DRV("%s: already initialized (dip = 0x%p)\n",
-			proc, idn.dip);
+		    proc, idn.dip);
 		return (0);
 	}
 
@@ -1236,7 +1236,7 @@ idn_init(dev_info_t *dip)
 	 */
 	if (get_hw_config(&local_hw)) {
 		cmn_err(CE_WARN,
-			"IDN: 118: hardware config not appropriate");
+		    "IDN: 118: hardware config not appropriate");
 		return (-1);
 	}
 
@@ -1261,10 +1261,10 @@ idn_init(dev_info_t *dip)
 			;
 		idn.bframe_shift = s;
 		PR_DRV("%s: idn.bframe_shift = %d, minbuf = %d\n",
-			proc, idn.bframe_shift, IDN_SMR_BUFSIZE_MIN);
+		    proc, idn.bframe_shift, IDN_SMR_BUFSIZE_MIN);
 
 		ASSERT((uint_t)IDN_OFFSET2BFRAME(MB2B(idn_smr_size)) <
-			(1 << 24));
+		    (1 << 24));
 	}
 
 	idn_xmit_monitor_init();
@@ -1304,8 +1304,8 @@ idn_init(dev_info_t *dip)
 	 */
 	if (idn_protocol_init(idn_protocol_nservers) <= 0) {
 		cmn_err(CE_WARN,
-			"IDN: 119: failed to initialize %d protocol servers",
-			idn_protocol_nservers);
+		    "IDN: 119: failed to initialize %d protocol servers",
+		    idn_protocol_nservers);
 		idn_domains_deinit();
 		idn_retrytask_deinit();
 		smr_slabwaiter_deinit();
@@ -1355,8 +1355,8 @@ idn_deinit()
 		int	d;
 
 		cmn_err(CE_WARN,
-			"IDN: 120: cannot deinit while active "
-			"(state = %s)", idngs_str[idn.state]);
+		    "IDN: 120: cannot deinit while active "
+		    "(state = %s)", idngs_str[idn.state]);
 
 		for (d = 0; d < MAX_DOMAINS; d++) {
 			idn_domain_t	*dp;
@@ -1366,10 +1366,10 @@ idn_deinit()
 				continue;
 
 			cmn_err(CE_CONT,
-				"IDN: 121: domain %d (CPU %d, "
-				"name \"%s\", state %s)\n",
-				d, dp->dcpu, dp->dname,
-				idnds_str[dp->dstate]);
+			    "IDN: 121: domain %d (CPU %d, "
+			    "name \"%s\", state %s)\n",
+			    d, dp->dcpu, dp->dname,
+			    idnds_str[dp->dstate]);
 		}
 		IDN_GUNLOCK();
 		return (-1);
@@ -1494,7 +1494,7 @@ idnopen(register queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *crp)
 
 	if (idn.enabled == 0) {
 		PR_DRV("%s: Driver disabled (check OBP:idn-smr-size)\n",
-			proc);
+		    proc);
 		mutex_exit(&idn.sipwenlock);
 		rw_exit(&idn.struprwlock);
 		IDN_GUNLOCK();
@@ -1638,10 +1638,10 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 
 	case M_DATA:
 		if (((stp->ss_flags & (IDNSFAST|IDNSRAW)) == 0) ||
-				(stp->ss_state != DL_IDLE) ||
-				(sip == NULL)) {
+		    (stp->ss_state != DL_IDLE) ||
+		    (sip == NULL)) {
 			PR_DLPI("%s: fl=0x%x, st=0x%x, ret(EPROTO)\n",
-				proc, stp->ss_flags, stp->ss_state);
+			    proc, stp->ss_flags, stp->ss_state);
 			merror(wq, mp, EPROTO);
 
 		} else if (wq->q_first) {
@@ -1666,7 +1666,7 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 
 		} else {
 			PR_DLPI("%s: idndl_start(sip=0x%p)\n",
-				proc, sip);
+			    proc, sip);
 			rw_enter(&stp->ss_rwlock, RW_READER);
 			(void) idndl_start(wq, mp, sip);
 			rw_exit(&stp->ss_rwlock);
@@ -1689,7 +1689,7 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 
 	case M_FLUSH:
 		PR_STR("%s: M_FLUSH request (flush = %d)\n",
-			proc, (int)*mp->b_rptr);
+		    proc, (int)*mp->b_rptr);
 		if (*mp->b_rptr & FLUSHW) {
 			flushq(wq, FLUSHALL);
 			*mp->b_rptr &= ~FLUSHW;
@@ -1702,7 +1702,7 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 
 	default:
 		PR_STR("%s: unexpected DB_TYPE 0x%x\n",
-			proc, DB_TYPE(mp));
+		    proc, DB_TYPE(mp));
 		freemsg(mp);
 		break;
 	}
@@ -1730,7 +1730,7 @@ idnwsrv(queue_t *wq)
 		case M_DATA:
 			if (sip) {
 				PR_DLPI("%s: idndl_start(sip=0x%p)\n",
-					proc, sip);
+				    proc, sip);
 				rw_enter(&stp->ss_rwlock, RW_READER);
 				err = idndl_start(wq, mp, sip);
 				rw_exit(&stp->ss_rwlock);
@@ -1750,7 +1750,7 @@ idnwsrv(queue_t *wq)
 		default:
 			ASSERT(0);
 			PR_STR("%s: unexpected db_type (%d)\n",
-				proc, DB_TYPE(mp));
+			    proc, DB_TYPE(mp));
 			freemsg(mp);
 			break;
 		}
@@ -1775,15 +1775,15 @@ idnrput(register queue_t *rq, register mblk_t *mp)
 		 * if running DLPI.
 		 */
 		cmn_err(CE_WARN,
-			"IDN: 123: unexpected M_DATA packets for "
-			"q_stream 0x%p", rq->q_stream);
+		    "IDN: 123: unexpected M_DATA packets for "
+		    "q_stream 0x%p", rq->q_stream);
 		freemsg(mp);
 		err = ENXIO;
 		break;
 
 	case M_FLUSH:
 		PR_STR("%s: M_FLUSH request (flush = %d)\n",
-			proc, (int)*mp->b_rptr);
+		    proc, (int)*mp->b_rptr);
 		if (*mp->b_rptr & FLUSHR)
 			flushq(rq, FLUSHALL);
 		(void) putnext(rq, mp);
@@ -1791,12 +1791,12 @@ idnrput(register queue_t *rq, register mblk_t *mp)
 
 	case M_ERROR:
 		PR_STR("%s: M_ERROR (error = %d) coming through\n",
-			proc, (int)*mp->b_rptr);
+		    proc, (int)*mp->b_rptr);
 		(void) putnext(rq, mp);
 		break;
 	default:
 		PR_STR("%s: unexpected DB_TYPE 0x%x\n",
-			proc, DB_TYPE(mp));
+		    proc, DB_TYPE(mp));
 		freemsg(mp);
 		err = ENXIO;
 		break;
@@ -1929,7 +1929,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 	sbp = *sbpp;
 
 	PR_PROTO("%s: KICKED OFF (sigbintr pointer = 0x%p)\n",
-		proc, sbp);
+	    proc, sbp);
 
 	ASSERT(sbp == &idn.sigbintr);
 
@@ -1939,10 +1939,10 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 		cpu_sgnblk_t	*sigbp;
 
 		while ((sbp->sb_busy != IDNSIGB_ACTIVE) &&
-				(sbp->sb_busy != IDNSIGB_DIE)) {
+		    (sbp->sb_busy != IDNSIGB_DIE)) {
 			cv_wait(&sbp->sb_cv, &idn.sigbintr.sb_mutex);
 			PR_PROTO("%s: AWAKENED (busy = %d)\n",
-				proc, (int)sbp->sb_busy);
+			    proc, (int)sbp->sb_busy);
 		}
 		if (sbp->sb_busy == IDNSIGB_DIE) {
 			PR_PROTO("%s: DIE REQUESTED\n", proc);
@@ -1951,8 +1951,8 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 
 		if ((sigbp = cpu_sgnblkp[sbp->sb_cpuid]) == NULL) {
 			cmn_err(CE_WARN,
-				"IDN: 124: sigblk for CPU ID %d "
-				"is NULL", sbp->sb_cpuid);
+			    "IDN: 124: sigblk for CPU ID %d "
+			    "is NULL", sbp->sb_cpuid);
 			sbp->sb_busy = IDNSIGB_INACTIVE;
 			continue;
 		}
@@ -1961,7 +1961,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 
 		if (mbp->flag != SIGB_MBOX_BUSY) {
 			PR_PROTO("%s: sigblk mbox flag (%d) != BUSY (%d)\n",
-				proc, mbp->flag, SIGB_MBOX_BUSY);
+			    proc, mbp->flag, SIGB_MBOX_BUSY);
 			sbp->sb_busy = IDNSIGB_INACTIVE;
 			continue;
 		}
@@ -1980,8 +1980,8 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 
 		if (mbp->len != sizeof (idnsb_data_t)) {
 			PR_PROTO("%s: sigblk mbox length (%d) != "
-				"expected (%lu)\n", proc, mbp->len,
-				sizeof (idnsb_data_t));
+			    "expected (%lu)\n", proc, mbp->len,
+			    sizeof (idnsb_data_t));
 			SET_IDNKERR_ERRNO(sep, EINVAL);
 			SET_IDNKERR_IDNERR(sep, IDNKERR_DATA_LEN);
 			SET_IDNKERR_PARAM0(sep, sizeof (idnsb_data_t));
@@ -1992,14 +1992,14 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 		if (idn.enabled == 0) {
 #ifdef DEBUG
 			cmn_err(CE_NOTE,
-				"IDN: 102: driver disabled "
-				"- check OBP environment "
-				"(idn-smr-size)");
+			    "IDN: 102: driver disabled "
+			    "- check OBP environment "
+			    "(idn-smr-size)");
 #else /* DEBUG */
 			cmn_err(CE_NOTE,
-				"!IDN: 102: driver disabled "
-				"- check OBP environment "
-				"(idn-smr-size)");
+			    "!IDN: 102: driver disabled "
+			    "- check OBP environment "
+			    "(idn-smr-size)");
 #endif /* DEBUG */
 			SET_IDNKERR_ERRNO(sep, EACCES);
 			SET_IDNKERR_IDNERR(sep, IDNKERR_DRV_DISABLED);
@@ -2034,12 +2034,12 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 			}
 
 			PR_PROTO("%s: SSI_LINK(cpuid = %d, domid = %d, "
-				"pri = %d (req = %d), t/o = %d)\n",
-				proc, slp.cpuid, slp.domid, pri,
-				slp.master_pri, slp.timeout);
+			    "pri = %d (req = %d), t/o = %d)\n",
+			    proc, slp.cpuid, slp.domid, pri,
+			    slp.master_pri, slp.timeout);
 
 			rv = idn_link(slp.domid, slp.cpuid, pri,
-					slp.timeout, sep);
+			    slp.timeout, sep);
 			SET_IDNKERR_ERRNO(sep, rv);
 			(void) idn_info(&sdp->ssb_info);
 			break;
@@ -2054,15 +2054,15 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 			bcopy(&sdp->ssb_unlink, &sup, sizeof (sup));
 
 			PR_PROTO("%s: SSI_UNLINK(c = %d, d = %d, bs = 0x%x, "
-				"f = %d, is = 0x%x, t/o = %d)\n",
-				proc, sup.cpuid, sup.domid, sup.boardset,
-				sup.force, sup.idnset, sup.timeout);
+			    "f = %d, is = 0x%x, t/o = %d)\n",
+			    proc, sup.cpuid, sup.domid, sup.boardset,
+			    sup.force, sup.idnset, sup.timeout);
 
 			domset = idn.domset.ds_trans_on |
-					idn.domset.ds_connected |
-					idn.domset.ds_trans_off |
-					idn.domset.ds_awol |
-					idn.domset.ds_relink;
+			    idn.domset.ds_connected |
+			    idn.domset.ds_trans_off |
+			    idn.domset.ds_awol |
+			    idn.domset.ds_relink;
 
 			if (VALID_DOMAINID(sup.domid)) {
 				dp = &idn_domain[sup.domid];
@@ -2075,7 +2075,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 						continue;
 
 					if (CPU_IN_SET(xdp->dcpuset,
-							sup.cpuid))
+					    sup.cpuid))
 						break;
 				}
 				dp = (d == MAX_DOMAINS) ? NULL : xdp;
@@ -2089,7 +2089,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 						continue;
 
 					if (xdp->dhw.dh_boardset &
-							sup.boardset)
+					    sup.boardset)
 						break;
 				}
 				dp = (d == MAX_DOMAINS) ? NULL : xdp;
@@ -2126,7 +2126,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 			}
 
 			rv = idn_unlink(sup.domid, sup.idnset, fintype,
-					IDNFIN_OPT_UNLINK, sup.timeout, sep);
+			    IDNFIN_OPT_UNLINK, sup.timeout, sep);
 			SET_IDNKERR_ERRNO(sep, rv);
 			(void) idn_info(&sdp->ssb_info);
 			break;
@@ -2157,32 +2157,32 @@ sberr:
 		if (GET_IDNKERR_ERRNO(sep) != 0) {
 			cmn_err(CE_WARN,
 #ifdef DEBUG
-				"IDN: 125: op (%s) failed, returning "
-				"(%d/0x%x [%d, %d, %d])",
+			    "IDN: 125: op (%s) failed, returning "
+			    "(%d/0x%x [%d, %d, %d])",
 #else /* DEBUG */
-				"!IDN: 125: op (%s) failed, returning "
-				"(%d/0x%x [%d, %d, %d])",
+			    "!IDN: 125: op (%s) failed, returning "
+			    "(%d/0x%x [%d, %d, %d])",
 #endif /* DEBUG */
-				(mbp->cmd == SSI_LINK) ? "LINK" :
-				(mbp->cmd == SSI_UNLINK) ? "UNLINK" :
-				(mbp->cmd == SSI_INFO) ?
-					"INFO" : "UNKNOWN",
-				GET_IDNKERR_ERRNO(sep),
-				GET_IDNKERR_IDNERR(sep),
-				GET_IDNKERR_PARAM0(sep),
-				GET_IDNKERR_PARAM1(sep),
-				GET_IDNKERR_PARAM2(sep));
+			    (mbp->cmd == SSI_LINK) ? "LINK" :
+			    (mbp->cmd == SSI_UNLINK) ? "UNLINK" :
+			    (mbp->cmd == SSI_INFO) ?
+			    "INFO" : "UNKNOWN",
+			    GET_IDNKERR_ERRNO(sep),
+			    GET_IDNKERR_IDNERR(sep),
+			    GET_IDNKERR_PARAM0(sep),
+			    GET_IDNKERR_PARAM1(sep),
+			    GET_IDNKERR_PARAM2(sep));
 		}
 
 		PR_PROTO("%s: returning errno = %d, idnerr = %d, "
-			"params = [%d, %d, %d]\n",
-			proc, GET_IDNKERR_ERRNO(sep), GET_IDNKERR_IDNERR(sep),
-			GET_IDNKERR_PARAM0(sep), GET_IDNKERR_PARAM1(sep),
-			GET_IDNKERR_PARAM2(sep));
+		    "params = [%d, %d, %d]\n",
+		    proc, GET_IDNKERR_ERRNO(sep), GET_IDNKERR_IDNERR(sep),
+		    GET_IDNKERR_PARAM0(sep), GET_IDNKERR_PARAM1(sep),
+		    GET_IDNKERR_PARAM2(sep));
 
 		mutex_enter(&idn.sigbintr.sb_mutex);
 		ASSERT((sbp->sb_busy == IDNSIGB_ACTIVE) ||
-			(sbp->sb_busy == IDNSIGB_DIE));
+		    (sbp->sb_busy == IDNSIGB_DIE));
 		mbp->cmd |= SSI_ACK;
 		if (sbp->sb_busy == IDNSIGB_ACTIVE)
 			sbp->sb_busy = IDNSIGB_INACTIVE;
@@ -2212,8 +2212,8 @@ idn_sigbhandler_create()
 
 	if (idn.sigb_threadp) {
 		cmn_err(CE_WARN,
-			"IDN: 126: sigbhandler thread already "
-			"exists (0x%p)", idn.sigb_threadp);
+		    "IDN: 126: sigbhandler thread already "
+		    "exists (0x%p)", idn.sigb_threadp);
 		return;
 	}
 	cv_init(&idn.sigbintr.sb_cv, NULL, CV_DEFAULT, NULL);
@@ -2310,7 +2310,7 @@ idn_sigbhandler(processorid_t cpuid, cpu_sgnblk_t *sgnblkp)
 	sigb_lock = 1;
 
 	if ((idn.sigb_threadp == NULL) ||
-			(sbp->sb_busy == IDNSIGB_NOTREADY)) {
+	    (sbp->sb_busy == IDNSIGB_NOTREADY)) {
 		cmd |= SSI_ACK;
 		SET_IDNKERR_ERRNO(sep, EAGAIN);
 		SET_IDNKERR_IDNERR(sep, IDNKERR_SIGBINTR_NOTRDY);
@@ -2376,7 +2376,7 @@ idn_info(idnsb_info_t *sfp)
 	case IDNGS_OFFLINE:
 		sinfo.idn_active = SSISTATE_INACTIVE;
 		PR_PROTO("%s: idn_state (%s) = INACTIVE\n",
-			proc, idngs_str[idn.state]);
+		    proc, idngs_str[idn.state]);
 		break;
 
 	case IDNGS_IGNORE:
@@ -2387,7 +2387,7 @@ idn_info(idnsb_info_t *sfp)
 	default:
 		sinfo.idn_active = SSISTATE_ACTIVE;
 		PR_PROTO("%s: idn_state (%s) = ACTIVE\n",
-			proc, idngs_str[idn.state]);
+		    proc, idngs_str[idn.state]);
 		break;
 	}
 	master_id = IDN_GET_MASTERID();
@@ -2402,7 +2402,7 @@ idn_info(idnsb_info_t *sfp)
 
 	sinfo.awol_domset = (ushort_t)idn.domset.ds_awol;
 	sinfo.conn_domset = (ushort_t)(idn.domset.ds_connected &
-					~idn.domset.ds_trans_on);
+	    ~idn.domset.ds_trans_on);
 	DOMAINSET_ADD(sinfo.conn_domset, idn.localid);
 
 	count = 0;
@@ -2414,7 +2414,7 @@ idn_info(idnsb_info_t *sfp)
 
 		IDN_DLOCK_SHARED(d);
 		if ((dp->dcpu == IDN_NIL_DCPU) ||
-				(dp->dstate == IDNDS_CLOSED)) {
+		    (dp->dstate == IDNDS_CLOSED)) {
 			IDN_DUNLOCK(d);
 			continue;
 		}
@@ -2424,13 +2424,13 @@ idn_info(idnsb_info_t *sfp)
 			sinfo.local_index = (uchar_t)d;
 			sinfo.local_cpuid = (uchar_t)dp->dcpu;
 			PR_PROTO("%s: domid %d is LOCAL (cpuid = %d)\n",
-				proc, d, dp->dcpu);
+			    proc, d, dp->dcpu);
 		}
 		if (d == master_id) {
 			sinfo.master_index = (uchar_t)d;
 			sinfo.master_cpuid = (uchar_t)dp->dcpu;
 			PR_PROTO("%s: domid %d is MASTER (cpuid = %d)\n",
-				proc, d, dp->dcpu);
+			    proc, d, dp->dcpu);
 		}
 
 		sinfo.domain_boardset[d] = (ushort_t)dp->dhw.dh_boardset;
@@ -2494,21 +2494,21 @@ idn_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 	new_value = (ulong_t)mi_strtol(value, &end, 10);
 
 	if ((end == value) ||
-		(new_value < idnpa->sp_min) ||
-		(new_value > idnpa->sp_max))
+	    (new_value < idnpa->sp_min) ||
+	    (new_value > idnpa->sp_max))
 		return (EINVAL);
 
 	if (idn.enabled == 0) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE,
-			"IDN: 102: driver disabled "
-			"- check OBP environment "
-			"(idn-smr-size)");
+		    "IDN: 102: driver disabled "
+		    "- check OBP environment "
+		    "(idn-smr-size)");
 #else /* DEBUG */
 		cmn_err(CE_NOTE,
-			"!IDN: 102: driver disabled "
-			"- check OBP environment "
-			"(idn-smr-size)");
+		    "!IDN: 102: driver disabled "
+		    "- check OBP environment "
+		    "(idn-smr-size)");
 #endif /* DEBUG */
 		return (EACCES);
 	}
@@ -2554,55 +2554,55 @@ idn_param_register(register idnparam_t *idnpa, int count)
 				set_func = idn_param_set;
 
 			if (!nd_load(&idn_ndlist, idnpa->sp_name,
-					idn_param_get, set_func,
-					(caddr_t)idnpa)) {
+			    idn_param_get, set_func,
+			    (caddr_t)idnpa)) {
 				nd_free(&idn_ndlist);
 				return (-1);
 			}
 		}
 	}
 	if (!nd_load(&idn_ndlist, "idn_slabpool", idn_slabpool_report,
-			NULL, NULL)) {
+	    NULL, NULL)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_buffers", idn_buffer_report,
-			NULL, NULL)) {
+	    NULL, NULL)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_mboxtbl", idn_mboxtbl_report,
-			NULL, MBXTBL_PART_REPORT)) {
+	    NULL, MBXTBL_PART_REPORT)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_mboxtbl_all", idn_mboxtbl_report,
-			NULL, MBXTBL_FULL_REPORT)) {
+	    NULL, MBXTBL_FULL_REPORT)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_mainmbox", idn_mainmbox_report,
-			NULL, NULL)) {
+	    NULL, NULL)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_global", idn_global_report,
-			NULL, NULL)) {
+	    NULL, NULL)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_domain", idn_domain_report,
-			NULL, (caddr_t)0)) {
+	    NULL, (caddr_t)0)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_domain_all", idn_domain_report,
-			NULL, (caddr_t)1)) {
+	    NULL, (caddr_t)1)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
 	if (!nd_load(&idn_ndlist, "idn_bind_net", idn_get_net_binding,
-			idn_set_net_binding, NULL)) {
+	    idn_set_net_binding, NULL)) {
 		nd_free(&idn_ndlist);
 		return (-1);
 	}
@@ -2630,13 +2630,13 @@ idn_set_net_binding(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 
 	net = mi_strtol(value, &end, 10);
 	if ((end == value) || (net < 0) || (net >= IDN_MAX_NETS) ||
-				!CHAN_IN_SET(idn.chanset, net))
+	    !CHAN_IN_SET(idn.chanset, net))
 		return (EINVAL);
 
 	cpuid = (processorid_t)mi_strtol(cpup, &end, 10);
 	if ((end == cpup) || ((cpuid != -1) &&
-				(!VALID_CPUID(cpuid) ||
-				!CPU_IN_SET(cpu_ready_set, cpuid))))
+	    (!VALID_CPUID(cpuid) ||
+	    !CPU_IN_SET(cpu_ready_set, cpuid))))
 		return (EINVAL);
 
 	idn_chanserver_bind(net, cpuid);
@@ -2656,8 +2656,8 @@ idn_get_net_binding(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 	ASSERT(IDN_GLOCK_IS_HELD());
 
 	(void) mi_mpprintf(mp,
-			"IDN network interfaces/channels active = %d",
-			idn.nchannels);
+	    "IDN network interfaces/channels active = %d",
+	    idn.nchannels);
 
 	if (idn.nchannels == 0)
 		return (0);
@@ -2701,10 +2701,10 @@ idnioc_link(idnop_t *idnop)
 		pri = IDNVOTE_DEFPRI;
 
 	PR_DRV("%s: domid = %d, cpuid = %d, pri = %d\n",
-		proc, idnop->link.domid, idnop->link.cpuid, pri);
+	    proc, idnop->link.domid, idnop->link.cpuid, pri);
 
 	rv = idn_link(idnop->link.domid, idnop->link.cpuid,
-			pri, idnop->link.wait, &err);
+	    pri, idnop->link.wait, &err);
 
 	return (rv);
 }
@@ -2720,8 +2720,8 @@ idnioc_unlink(idnop_t *idnop)
 	procname_t	proc = "idnioc_unlink";
 
 	PR_DRV("%s: domid = %d, cpuid = %d, force = %d\n",
-		proc, idnop->unlink.domid, idnop->unlink.cpuid,
-		idnop->unlink.force);
+	    proc, idnop->unlink.domid, idnop->unlink.cpuid,
+	    idnop->unlink.force);
 
 	idnset = BOARDSET_ALL;
 	domid = idnop->unlink.domid;
@@ -2734,13 +2734,13 @@ idnioc_unlink(idnop_t *idnop)
 	if (VALID_DOMAINID(domid)) {
 		dp = &idn_domain[domid];
 		if (VALID_CPUID(cpuid) && (dp->dcpu != IDN_NIL_DCPU) &&
-					!CPU_IN_SET(dp->dcpuset, cpuid)) {
+		    !CPU_IN_SET(dp->dcpuset, cpuid)) {
 			dp = NULL;
 			PR_PROTO("%s: ERROR: invalid cpuid "
-				"(%d) for domain (%d) [cset = 0x%x.x%x]\n",
-				proc, cpuid, domid,
-				UPPER32_CPUMASK(dp->dcpuset),
-				LOWER32_CPUMASK(dp->dcpuset));
+			    "(%d) for domain (%d) [cset = 0x%x.x%x]\n",
+			    proc, cpuid, domid,
+			    UPPER32_CPUMASK(dp->dcpuset),
+			    LOWER32_CPUMASK(dp->dcpuset));
 		}
 	} else if (VALID_CPUID(cpuid)) {
 		for (d = 0; d < MAX_DOMAINS; d++) {
@@ -2774,12 +2774,12 @@ idnioc_unlink(idnop_t *idnop)
 		break;
 	default:
 		PR_PROTO("%s: invalid force parameter \"%d\"",
-			proc, idnop->unlink.force);
+		    proc, idnop->unlink.force);
 		return (EINVAL);
 	}
 
 	rv = idn_unlink(domid, idnset, fintype, IDNFIN_OPT_UNLINK,
-			idnop->unlink.wait, &err);
+	    idnop->unlink.wait, &err);
 
 	return (rv);
 }
@@ -2796,8 +2796,8 @@ idn_send_ping(idnop_t *idnop)
 
 	if ((domid == IDN_NIL_DOMID) && (cpuid == IDN_NIL_DCPU)) {
 		cmn_err(CE_WARN,
-			"IDN: %s: no valid domain ID or CPU ID given",
-			proc);
+		    "IDN: %s: no valid domain ID or CPU ID given",
+		    proc);
 		return (EINVAL);
 	}
 	if (domid == IDN_NIL_DOMID)
@@ -2807,8 +2807,8 @@ idn_send_ping(idnop_t *idnop)
 	IDN_DLOCK_EXCL(domid);
 	if ((dp->dcpu == IDN_NIL_DCPU) && (cpuid == IDN_NIL_DCPU)) {
 		cmn_err(CE_WARN,
-			"IDN: %s: no valid target CPU specified",
-			proc);
+		    "IDN: %s: no valid target CPU specified",
+		    proc);
 		IDN_DUNLOCK(domid);
 		return (EINVAL);
 	}
@@ -2932,7 +2932,7 @@ idn_add_op(idn_opflag_t opflag, domainset_t domset)
 
 	mutex_enter(&idn.dopers->dop_mutex);
 	if ((idn.dopers->dop_waitcount == 0) ||
-		((idn.dopers->dop_domset & domset) == 0)) {
+	    ((idn.dopers->dop_domset & domset) == 0)) {
 		mutex_exit(&idn.dopers->dop_mutex);
 		return;
 	}
@@ -2961,10 +2961,10 @@ idn_update_op(idn_opflag_t opflag, domainset_t domset, idnsb_error_t *sep)
 	 * just bail.
 	 */
 	if ((idn.dopers->dop_waitcount == 0) ||
-		((idn.dopers->dop_domset & domset) == 0)) {
+	    ((idn.dopers->dop_domset & domset) == 0)) {
 		mutex_exit(&idn.dopers->dop_mutex);
 		PR_PROTO("%s: NO waiters exist (domset=0x%x)\n",
-			proc, domset);
+		    proc, domset);
 		return;
 	}
 
@@ -2983,7 +2983,7 @@ idn_update_op(idn_opflag_t opflag, domainset_t domset, idnsb_error_t *sep)
 						continue;
 
 					dw->dw_errors[d] =
-						(short)GET_IDNKERR_ERRNO(sep);
+					    (short)GET_IDNKERR_ERRNO(sep);
 				}
 				bcopy(sep, dw->dw_idnerr, sizeof (*sep));
 			}
@@ -3030,8 +3030,8 @@ idn_deinit_op(void *cookie)
 		}
 	} else {
 		for (tw = idn.dopers->dop_waitlist, hw = tw->dw_next;
-				hw;
-				tw = hw, hw = hw->dw_next) {
+		    hw;
+		    tw = hw, hw = hw->dw_next) {
 			if (dwl == hw)
 				break;
 		}
@@ -3077,14 +3077,14 @@ idn_wait_op(void *cookie, domainset_t *domsetp, int wait_timeout)
 
 	ASSERT(wait_timeout > 0);
 	ASSERT((dwl->dw_op == IDNOP_CONNECTED) ||
-		(dwl->dw_op == IDNOP_DISCONNECTED));
+	    (dwl->dw_op == IDNOP_DISCONNECTED));
 
 	mutex_enter(&idn.dopers->dop_mutex);
 
 	while (((dwl->dw_domset | dwl->dw_errset) != dwl->dw_reqset) && !err) {
 		rv = cv_timedwait_sig(&idn.dopers->dop_cv,
-					&idn.dopers->dop_mutex,
-					lbolt + (wait_timeout * hz));
+		    &idn.dopers->dop_mutex,
+		    lbolt + (wait_timeout * hz));
 
 		if ((dwl->dw_domset | dwl->dw_errset) == dwl->dw_reqset)
 			break;
@@ -3095,10 +3095,10 @@ idn_wait_op(void *cookie, domainset_t *domsetp, int wait_timeout)
 			 * timed out
 			 */
 			cmn_err(CE_WARN,
-				"!IDN: 129: %s operation timed out",
-				(dwl->dw_op == IDNOP_CONNECTED) ? "LINK" :
-				(dwl->dw_op == IDNOP_DISCONNECTED) ? "UNLINK" :
-				"UNKNOWN");
+			    "!IDN: 129: %s operation timed out",
+			    (dwl->dw_op == IDNOP_CONNECTED) ? "LINK" :
+			    (dwl->dw_op == IDNOP_DISCONNECTED) ? "UNLINK" :
+			    "UNKNOWN");
 			/*FALLTHROUGH*/
 		case 0:
 			/*
@@ -3144,8 +3144,8 @@ board_to_ready_cpu(int board, cpuset_t cpuset)
 
 	board *= ncpu_board;
 	for (base_cpuid = board;
-			base_cpuid < (board + ncpu_board);
-			base_cpuid++)
+	    base_cpuid < (board + ncpu_board);
+	    base_cpuid++)
 		if (CPU_IN_SET(cpuset, base_cpuid))
 			return (base_cpuid);
 
@@ -3195,7 +3195,7 @@ idn_domain_resetentry(idn_domain_t *dp)
 
 	if (dp->dtimerq.tq_queue != NULL) {
 		PR_PROTO("%s: WARNING: MSG timerq not empty (count = %d)\n",
-			proc, dp->dtimerq.tq_count);
+		    proc, dp->dtimerq.tq_count);
 		IDN_MSGTIMER_STOP(dp->domid, 0, 0);
 	}
 
@@ -3215,8 +3215,8 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 
 	if (!VALID_DOMAINID(domid)) {
 		PR_PROTO("%s: INVALID domainid (%d) "
-			"[cpuid = %d, ticket = 0x%x]\n",
-			proc, domid, cpuid, ticket);
+		    "[cpuid = %d, ticket = 0x%x]\n",
+		    proc, domid, cpuid, ticket);
 		return (-1);
 	}
 
@@ -3225,7 +3225,7 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 
 	if (dp->dcpu >= 0) {
 		PR_PROTO("%s:%d: domain already OPEN (state = %s)\n",
-			proc, domid, idnds_str[dp->dstate]);
+		    proc, domid, idnds_str[dp->dstate]);
 		return (1);
 	}
 
@@ -3240,7 +3240,7 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 
 	if (new_cpuid == IDN_NIL_DCPU) {
 		PR_PROTO("%s:%d: WARNING: invalid cpuid (%d) specified\n",
-			proc, domid, new_cpuid);
+		    proc, domid, new_cpuid);
 		return (-1);
 	}
 
@@ -3249,7 +3249,7 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 	idn_domain_resetentry(dp);
 
 	PR_STATE("%s:%d: requested cpuid %d, assigning cpuid %d\n",
-		proc, domid, cpuid, new_cpuid);
+	    proc, domid, cpuid, new_cpuid);
 
 	idn_assign_cookie(domid);
 
@@ -3280,7 +3280,7 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 		if (get_hw_config(&local_hw)) {
 			dp->dcpu = IDN_NIL_DCPU;
 			cmn_err(CE_WARN,
-				"IDN: 118: hardware config not appropriate");
+			    "IDN: 118: hardware config not appropriate");
 			if (domid != idn.localid)
 				IDN_DUNLOCK(idn.localid);
 			IDN_GUNLOCK();
@@ -3300,9 +3300,9 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 
 	if (domid != idn.localid) {
 		dp->dmbox.m_send = idn_mainmbox_init(domid,
-							IDNMMBOX_TYPE_SEND);
+		    IDNMMBOX_TYPE_SEND);
 		dp->dmbox.m_recv = idn_mainmbox_init(domid,
-							IDNMMBOX_TYPE_RECV);
+		    IDNMMBOX_TYPE_RECV);
 	} else {
 		/*
 		 * The local domain does not need send/recv
@@ -3314,7 +3314,7 @@ idn_open_domain(int domid, int cpuid, uint_t ticket)
 	IDN_MBOX_UNLOCK(domid);
 
 	PR_PROTO("%s:%d: new domain (cpu = %d, vote = 0x%x)\n",
-		proc, domid, dp->dcpu, dp->dvote.ticket);
+	    proc, domid, dp->dcpu, dp->dvote.ticket);
 
 	return (0);
 }
@@ -3340,7 +3340,7 @@ idn_close_domain(int domid)
 
 	if (dp->dcpu == IDN_NIL_DCPU) {
 		PR_PROTO("%s:%d: DOMAIN ALREADY CLOSED!\n",
-			proc, domid);
+		    proc, domid);
 		return;
 	}
 
@@ -3384,8 +3384,8 @@ idn_close_domain(int domid)
 	IDN_MBOX_UNLOCK(domid);
 
 	cmn_err(CE_NOTE,
-		"!IDN: 142: link (domain %d, CPU %d) disconnected",
-		dp->domid, dp->dcpu);
+	    "!IDN: 142: link (domain %d, CPU %d) disconnected",
+	    dp->domid, dp->dcpu);
 
 	dp->dcpu = IDN_NIL_DCPU;	/* ultimate demise */
 
@@ -3471,7 +3471,7 @@ idn_domains_init(struct hwconfig *local_hw)
 	bcopy(local_hw, &ldp->dhw, sizeof (ldp->dhw));
 	ASSERT(idn.ndomains == 1);
 	ASSERT((ldp->dhw.dh_nboards > 0) &&
-		(ldp->dhw.dh_nboards <= MAX_BOARDS));
+	    (ldp->dhw.dh_nboards <= MAX_BOARDS));
 	ldp->dnetid	= IDN_DOMID2NETID(ldp->domid);
 	ldp->dmtu	= IDN_MTU;
 	ldp->dbufsize	= IDN_SMR_BUFSIZE;
@@ -3545,9 +3545,9 @@ idn_retrytask_init()
 
 	mutex_init(&idn.retryqueue.rq_mutex, NULL, MUTEX_DEFAULT, NULL);
 	idn.retryqueue.rq_cache = kmem_cache_create("idn_retryjob_cache",
-						sizeof (idn_retry_job_t),
-						0, NULL, NULL, NULL,
-						NULL, NULL, 0);
+	    sizeof (idn_retry_job_t),
+	    0, NULL, NULL, NULL,
+	    NULL, NULL, 0);
 }
 
 static void
@@ -3571,9 +3571,9 @@ idn_timercache_init()
 	ASSERT(idn.timer_cache == NULL);
 
 	idn.timer_cache = kmem_cache_create("idn_timer_cache",
-					sizeof (idn_timer_t),
-					0, NULL, NULL, NULL,
-					NULL, NULL, 0);
+	    sizeof (idn_timer_t),
+	    0, NULL, NULL, NULL,
+	    NULL, NULL, 0);
 }
 
 static void
@@ -3649,7 +3649,7 @@ idn_timer_get(idn_timerq_t *tq, int type, ushort_t tcookie)
 		do {
 			tpnext = tp->t_forw;
 			if ((tp->t_type == type) &&
-				(!tcookie || (tp->t_cookie == tcookie))) {
+			    (!tcookie || (tp->t_cookie == tcookie))) {
 				tp->t_forw->t_back = tp->t_back;
 				tp->t_back->t_forw = tp->t_forw;
 				if (tphead == NULL) {
@@ -3699,7 +3699,7 @@ idn_timer_start(idn_timerq_t *tq, idn_timer_t *tp, clock_t tval)
 	 */
 	while ((tcookie = tp->t_cookie) == 0) {
 		tp->t_cookie = (tp->t_type & 0xf) |
-					((++tq->tq_cookie & 0xf) << 4);
+		    ((++tq->tq_cookie & 0xf) << 4);
 		/*
 		 * Calculated cookie must never conflict
 		 * with the public timer cookie.
@@ -3735,7 +3735,7 @@ idn_timer_start(idn_timerq_t *tq, idn_timer_t *tp, clock_t tval)
 
 	INUM2STR(tp->t_type, str);
 	PR_TIMER("%s: started %s timer (domain = %d, cookie = 0x%x)\n",
-		proc, str, tp->t_domid, tcookie);
+	    proc, str, tp->t_domid, tcookie);
 
 	IDN_TIMERQ_UNLOCK(tq);
 
@@ -3772,8 +3772,8 @@ idn_timer_stop(idn_timerq_t *tq, int type, ushort_t tcookie)
 #ifdef DEBUG
 	if (tphead == NULL)
 		PR_TIMER("%s: found no %s (cookie = 0x%x) "
-			"timers (count=%d)!!\n",
-			proc, str, tcookie, tq->tq_count);
+		    "timers (count=%d)!!\n",
+		    proc, str, tcookie, tq->tq_count);
 #endif /* DEBUG */
 	IDN_TIMERQ_UNLOCK(tq);
 
@@ -3809,10 +3809,10 @@ idn_timer_stopall(idn_timer_t *tp)
 		if (untimeout(tp->t_id) < 0) {
 			nonactive++;
 			PR_TIMER("%s: bad %s untimeout (domain=%d)\n",
-				proc, str, tp->t_domid);
+			    proc, str, tp->t_domid);
 		} else {
 			PR_TIMER("%s: good %s untimeout (domain=%d)\n",
-				proc, str, tp->t_domid);
+			    proc, str, tp->t_domid);
 		}
 		/*
 		 * There are two possible outcomes from
@@ -3827,7 +3827,7 @@ idn_timer_stopall(idn_timer_t *tp)
 		idn_timer_free(tp);
 	}
 	PR_TIMER("%s: stopped %d of %d %s timers\n",
-		proc, count - nonactive, count, str);
+	    proc, count - nonactive, count, str);
 
 	return (count);
 }
@@ -3877,8 +3877,8 @@ idn_slabpool_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	if (idn.slabpool == NULL) {
 		(void) mi_mpprintf(mp,
-				"IDN slabpool not initialized (masterid = %d)",
-				IDN_GET_MASTERID());
+		    "IDN slabpool not initialized (masterid = %d)",
+		    IDN_GET_MASTERID());
 		return (0);
 	}
 
@@ -3886,11 +3886,11 @@ idn_slabpool_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		nfree += idn.slabpool->pool[p].nfree;
 
 	(void) mi_mpprintf(mp,
-			"IDN slabpool (ntotal_slabs = %d, nalloc = %d, "
-			"npools = %d)",
-			idn.slabpool->ntotslabs,
-			idn.slabpool->ntotslabs - nfree,
-			idn.slabpool->npools);
+	    "IDN slabpool (ntotal_slabs = %d, nalloc = %d, "
+	    "npools = %d)",
+	    idn.slabpool->ntotslabs,
+	    idn.slabpool->ntotslabs - nfree,
+	    idn.slabpool->npools);
 
 	(void) mi_mpprintf(mp, "pool  nslabs  nfree domains");
 
@@ -3916,20 +3916,20 @@ idn_slabpool_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 					(void) sprintf(dsetstr, "%d", d);
 				else
 					(void) sprintf(dsetstr, "%s %d",
-							dsetstr, d);
+					    dsetstr, d);
 			}
 		}
 
 		if (p < 10)
 			(void) mi_mpprintf(mp, "  %d     %d       %d    %s",
-					p, idn.slabpool->pool[p].nslabs,
-					idn.slabpool->pool[p].nfree,
-					dsetstr);
+			    p, idn.slabpool->pool[p].nslabs,
+			    idn.slabpool->pool[p].nfree,
+			    dsetstr);
 		else
 			(void) mi_mpprintf(mp, " %d     %d       %d    %s",
-					p, idn.slabpool->pool[p].nslabs,
-					idn.slabpool->pool[p].nfree,
-					dsetstr);
+			    p, idn.slabpool->pool[p].nslabs,
+			    idn.slabpool->pool[p].nfree,
+			    dsetstr);
 	}
 	return (0);
 }
@@ -3947,12 +3947,12 @@ idn_buffer_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	if (idn.localid == IDN_NIL_DOMID) {
 		(void) mi_mpprintf(mp, "IDN not initialized (localid = %d)",
-				idn.localid);
+		    idn.localid);
 		return (0);
 	}
 
 	(void) mi_mpprintf(mp, "Local domain has %d slabs allocated.",
-				idn_domain[idn.localid].dnslabs);
+	    idn_domain[idn.localid].dnslabs);
 
 	DSLAB_LOCK_SHARED(idn.localid);
 	if ((sp = idn_domain[idn.localid].dslab) == NULL) {
@@ -3988,10 +3988,10 @@ idn_buffer_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		if (bufcount[d]) {
 			if (d < 10)
 				(void) mi_mpprintf(mp, "   %d      %d",
-							d, bufcount[d]);
+				    d, bufcount[d]);
 			else
 				(void) mi_mpprintf(mp, "  %d      %d",
-							d, bufcount[d]);
+				    d, bufcount[d]);
 		}
 
 	return (0);
@@ -4111,14 +4111,14 @@ idn_mboxtbl_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	if ((map = idn.mboxarea) == NULL) {
 		(void) mi_mpprintf(mp,
-				"WARNING: Local domain is not master, "
-				"ASSUMING idn.smr.vaddr.");
+		    "WARNING: Local domain is not master, "
+		    "ASSUMING idn.smr.vaddr.");
 		map = (idn_mboxtbl_t *)idn.smr.vaddr;
 	}
 
 	if (map) {
 		(void) mi_mpprintf(mp, "Mailbox Area starts @ 0x%p",
-					map);
+		    map);
 	} else {
 		(void) mi_mpprintf(mp, "Mailbox Area not found.");
 		goto repdone;
@@ -4138,44 +4138,44 @@ idn_mboxtbl_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 
 		(void) mi_mpprintf(mp,
-				"Channel %d ---------------------------"
-				"--------------------------"
-				"-----------------------------", c);
+		    "Channel %d ---------------------------"
+		    "--------------------------"
+		    "-----------------------------", c);
 		(void) mi_mpprintf(mp,
-				"  Domain   Header            "
-				"Ready/Active Ptrs    "
-				"rdy/actv  cookie    Queue             "
-				"busy");
+		    "  Domain   Header	    "
+		    "Ready/Active Ptrs    "
+		    "rdy/actv  cookie    Queue	     "
+		    "busy");
 
 		for (domid = 0; domid < MAX_DOMAINS; domid++) {
 			register int	busy_count;
 
 			if ((cp == MBXTBL_PART_REPORT) &&
-				(idn_domain[domid].dcpu == IDN_NIL_DCPU))
+			    (idn_domain[domid].dcpu == IDN_NIL_DCPU))
 				continue;
 
 			mtbasep = IDN_MBOXAREA_BASE(map, domid);
 
 			for (subdomid = 0; subdomid < MAX_DOMAINS;
-								subdomid++) {
+			    subdomid++) {
 				mtp = IDN_MBOXTBL_PTR(mtbasep, subdomid);
 				mtp = IDN_MBOXTBL_PTR_CHAN(mtp, c);
 
 				if (subdomid == domid) {
 					if (subdomid == 0)
 						(void) mi_mpprintf(mp,
-							"   %x.%x-%d%s%s",
-							domid, subdomid, c,
+						    "   %x.%x-%d%s%s",
+						    domid, subdomid, c,
 							/*CONSTCOND*/
-							DECSPACE(c, 2, 2),
-							"-- unused --");
+						    DECSPACE(c, 2, 2),
+						    "-- unused --");
 					else
 						(void) mi_mpprintf(mp,
-							"    .%x-%d%s%s",
-							subdomid, c,
+						    "    .%x-%d%s%s",
+						    subdomid, c,
 							/*CONSTCOND*/
-							DECSPACE(c, 2, 2),
-							"-- unused --");
+						    DECSPACE(c, 2, 2),
+						    "-- unused --");
 					continue;
 				}
 				busy_count = 0;
@@ -4186,22 +4186,22 @@ idn_mboxtbl_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 				}
 				if (subdomid == 0) {
 					(void) mi_mpprintf(mp,
-						"   %x.%x-%d%s%p%s%x%s/ %x%s"
-						"%d%s/ %d%s%x%s%p%s%d%s",
-						domid, subdomid, c,
+					    "   %x.%x-%d%s%p%s%x%s/ %x%s"
+					    "%d%s/ %d%s%x%s%p%s%d%s",
+					    domid, subdomid, c,
 						/*CONSTCOND*/
-						DECSPACE(c, 2, 2),
-						MBXINFO(mtp), busy_count,
-						busy_count ? " <<<<<":"");
+					    DECSPACE(c, 2, 2),
+					    MBXINFO(mtp), busy_count,
+					    busy_count ? " <<<<<":"");
 				} else {
 					(void) mi_mpprintf(mp,
-						"    .%x-%d%s%p%s%x%s/ %x%s"
-						"%d%s/ %d%s%x%s%p%s%d%s",
-						subdomid, c,
+					    "    .%x-%d%s%p%s%x%s/ %x%s"
+					    "%d%s/ %d%s%x%s%p%s%d%s",
+					    subdomid, c,
 						/*CONSTCOND*/
-						DECSPACE(c, 2, 2),
-						MBXINFO(mtp), busy_count,
-						busy_count ? " <<<<<":"");
+					    DECSPACE(c, 2, 2),
+					    MBXINFO(mtp), busy_count,
+					    busy_count ? " <<<<<":"");
 				}
 			}
 		}
@@ -4232,7 +4232,7 @@ idn_mainmbox_domain_report(queue_t *wq, mblk_t *mp, int domid,
 		IDN_CHAN_LOCK_GLOBAL(&idn.chan_servers[c]);
 		if (IDN_CHANNEL_IS_DETACHED(&idn.chan_servers[c])) {
 			(void) mi_mpprintf(mp, " %x.%s  %u  -- not open --",
-					domid, mbxtype, (int)mmp->mm_channel);
+			    domid, mbxtype, (int)mmp->mm_channel);
 			IDN_CHAN_UNLOCK_GLOBAL(&idn.chan_servers[c]);
 			continue;
 		}
@@ -4240,23 +4240,23 @@ idn_mainmbox_domain_report(queue_t *wq, mblk_t *mp, int domid,
 		mm_count = ((mmp->mm_count < 0) ? 0 : mmp->mm_count) / 1000;
 
 		(void) mi_mpprintf(mp, " %x.%s  %d%s%d%s%d%s%p%s%p%s%p%s%d/%d",
-					domid, mbxtype,
-					(int)mmp->mm_channel,
+		    domid, mbxtype,
+		    (int)mmp->mm_channel,
 					/*CONSTCOND*/
-					DECSPACE((int)mmp->mm_channel, 5, 2),
-					mm_count, DECSPACE(mm_count, 8, 2),
-					mmp->mm_dropped,
-					DECSPACE(mmp->mm_dropped, 8, 2),
-					mmp->mm_smr_mboxp,
-					HEXSPACE(mmp->mm_smr_mboxp,
-						mmp->mm_smr_mboxp, 16, 2),
-					mmp->mm_smr_readyp,
-					HEXSPACE(mmp->mm_smr_readyp,
-						mmp->mm_smr_readyp, 16, 2),
-					mmp->mm_smr_activep,
-					HEXSPACE(mmp->mm_smr_activep,
-						mmp->mm_smr_activep, 16, 2),
-					mmp->mm_qiget, mmp->mm_qiput);
+		    DECSPACE((int)mmp->mm_channel, 5, 2),
+		    mm_count, DECSPACE(mm_count, 8, 2),
+		    mmp->mm_dropped,
+		    DECSPACE(mmp->mm_dropped, 8, 2),
+		    mmp->mm_smr_mboxp,
+		    HEXSPACE(mmp->mm_smr_mboxp,
+		    mmp->mm_smr_mboxp, 16, 2),
+		    mmp->mm_smr_readyp,
+		    HEXSPACE(mmp->mm_smr_readyp,
+		    mmp->mm_smr_readyp, 16, 2),
+		    mmp->mm_smr_activep,
+		    HEXSPACE(mmp->mm_smr_activep,
+		    mmp->mm_smr_activep, 16, 2),
+		    mmp->mm_qiget, mmp->mm_qiput);
 		IDN_CHAN_UNLOCK_GLOBAL(&idn.chan_servers[c]);
 	}
 }
@@ -4286,28 +4286,28 @@ idn_mainmbox_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 		if (!header) {
 			(void) mi_mpprintf(mp,
-					"Domain  Chan   PktCntK   "
-					"PktDrop   SMRMbox           "
-					"ReadyPtr          "
-					"ActvPtr          Miget/Miput");
+			    "Domain  Chan   PktCntK   "
+			    "PktDrop   SMRMbox	   "
+			    "ReadyPtr	  "
+			    "ActvPtr	  Miget/Miput");
 			header = 1;
 		}
 
 		mutex_enter(&dp->dmbox.m_mutex);
 		idn_mainmbox_domain_report(wq, mp, domid,
-					idn_domain[domid].dmbox.m_send,
-					"snd");
+		    idn_domain[domid].dmbox.m_send,
+		    "snd");
 		idn_mainmbox_domain_report(wq, mp, domid,
-					idn_domain[domid].dmbox.m_recv,
-					"rcv");
+		    idn_domain[domid].dmbox.m_recv,
+		    "rcv");
 		mutex_exit(&dp->dmbox.m_mutex);
 
 		IDN_DUNLOCK(domid);
 
 		(void) mi_mpprintf(mp,
-				"  ---------------------------------------"
-				"------------------------"
-				"----------------------------");
+		    "  ---------------------------------------"
+		    "------------------------"
+		    "----------------------------");
 	}
 
 	if (!header)
@@ -4322,9 +4322,9 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 {
 	int		i, nactive, masterid, nretry;
 	uint_t		locpfn_upper, locpfn_lower,
-			rempfn_upper, rempfn_lower;
+	    rempfn_upper, rempfn_lower;
 	uint_t		marea_upper, marea_lower,
-			iarea_upper, iarea_lower;
+	    iarea_upper, iarea_lower;
 	char		alt_dbuffer[64];
 	idn_retry_job_t	*rp;
 	domainset_t	retryset;
@@ -4348,7 +4348,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		dbp = alt_dbuffer;
 
 	(void) mi_mpprintf(mp, "IDN\n    Global State = %s (%d)",
-			idngs_str[idn.state], idn.state);
+	    idngs_str[idn.state], idn.state);
 
 	(void) mi_mpprintf(mp, "SMR");
 	(void) mi_mpprintf(mp, "    vaddr                ");
@@ -4365,10 +4365,10 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		rempfn_lower = (uint_t)(idn.smr.rempfn << PAGESHIFT);
 	}
 	(void) mi_mpprintf(mp, "    0x%x.%x%s0x%x.%x",
-			locpfn_upper, locpfn_lower,
-			HEXSPACE(locpfn_lower, locpfn_lower, 8,
-				(locpfn_upper < 0x10) ? 4 : 3),
-			rempfn_upper, rempfn_lower);
+	    locpfn_upper, locpfn_lower,
+	    HEXSPACE(locpfn_lower, locpfn_lower, 8,
+	    (locpfn_upper < 0x10) ? 4 : 3),
+	    rempfn_upper, rempfn_lower);
 
 	(void) mi_mpprintf(mp, "    SMR length  = %d MBytes", IDN_SMR_SIZE);
 	(void) mi_mpprintf(mp, "    SMR bufsize = %d Bytes", IDN_SMR_BUFSIZE);
@@ -4376,21 +4376,21 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 	marea_upper = (uint_t)((uint64_t)IDN_MBOXAREA_SIZE >> 32);
 	marea_lower = (uint_t)((uint64_t)IDN_MBOXAREA_SIZE & 0xffffffff);
 	iarea_upper = (uint_t)((uint64_t)(MB2B(IDN_NWR_SIZE) -
-				(size_t)IDN_MBOXAREA_SIZE) >> 32);
+	    (size_t)IDN_MBOXAREA_SIZE) >> 32);
 	iarea_lower = (uint_t)((MB2B(IDN_NWR_SIZE) -
-				(size_t)IDN_MBOXAREA_SIZE) & 0xffffffff);
+	    (size_t)IDN_MBOXAREA_SIZE) & 0xffffffff);
 	(void) mi_mpprintf(mp,
-			"    [ mbox area = 0x%x.%x Bytes, "
-			"iobuf area = 0x%x.%x Bytes ]",
-			marea_upper, marea_lower, iarea_upper, iarea_lower);
+	    "    [ mbox area = 0x%x.%x Bytes, "
+	    "iobuf area = 0x%x.%x Bytes ]",
+	    marea_upper, marea_lower, iarea_upper, iarea_lower);
 
 	(void) mi_mpprintf(mp,
-			"\nIDNnet (local domain [id:%d] [name:%s] is %s)",
-			idn.localid,
-			idn_domain[idn.localid].dname,
-			(masterid == IDN_NIL_DOMID) ? "IDLE" :
-			(idn.localid == masterid) ? "MASTER" :
-			"SLAVE");
+	    "\nIDNnet (local domain [id:%d] [name:%s] is %s)",
+	    idn.localid,
+	    idn_domain[idn.localid].dname,
+	    (masterid == IDN_NIL_DOMID) ? "IDLE" :
+	    (idn.localid == masterid) ? "MASTER" :
+	    "SLAVE");
 	nactive = 0;
 	for (i = 0; i < IDN_MAX_NETS; i++) {
 		IDN_CHAN_LOCK_GLOBAL(&idn.chan_servers[i]);
@@ -4399,8 +4399,8 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		IDN_CHAN_UNLOCK_GLOBAL(&idn.chan_servers[i]);
 	}
 	(void) mi_mpprintf(mp, "    I/O Networks: (Open = %d, "
-			"Active = %d, Max = %d)",
-			idn.nchannels, nactive, IDN_MAX_NETS);
+	    "Active = %d, Max = %d)",
+	    idn.nchannels, nactive, IDN_MAX_NETS);
 	(void) mi_mpprintf(mp, "    Number of Domains  = %d", idn.ndomains);
 	(void) mi_mpprintf(mp, "    Number of AWOLs    = %d", idn.nawols);
 	/*
@@ -4414,15 +4414,15 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 	(void) mi_mpprintf(mp, "    Connected Domains      = %s", dbp);
 	domainset2str(idn.domset.ds_trans_on, dbp);
 	(void) mi_mpprintf(mp, "    Pending Domain Links   = %s",
-			idn.domset.ds_trans_on ? dbp : "<>");
+	    idn.domset.ds_trans_on ? dbp : "<>");
 	domainset2str(idn.domset.ds_trans_off, dbp);
 	(void) mi_mpprintf(mp, "    Pending Domain Unlinks = %s",
-			idn.domset.ds_trans_off ? dbp : "<>");
+	    idn.domset.ds_trans_off ? dbp : "<>");
 	mutex_enter(&idn.retryqueue.rq_mutex);
 	nretry = idn.retryqueue.rq_count;
 	retryset = 0;
 	for (i = 0, rp = idn.retryqueue.rq_jobs; i < nretry; i++,
-							rp = rp->rj_next) {
+	    rp = rp->rj_next) {
 		int	domid;
 
 		domid = IDN_RETRY_TOKEN2DOMID(rp->rj_token);
@@ -4433,16 +4433,16 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 	mutex_exit(&idn.retryqueue.rq_mutex);
 	domainset2str(retryset, dbp);
 	(void) mi_mpprintf(mp, "    Retry Jobs:Domains     = %d:%s",
-			nretry, retryset ? dbp : "<>");
+	    nretry, retryset ? dbp : "<>");
 	domainset2str(idn.domset.ds_hitlist, dbp);
 	(void) mi_mpprintf(mp, "    Hitlist Domains        = %s",
-			idn.domset.ds_hitlist ? dbp : "<>");
+	    idn.domset.ds_hitlist ? dbp : "<>");
 	domainset2str(idn.domset.ds_relink, dbp);
 	(void) mi_mpprintf(mp, "    Reconfig Domains       = %s",
-			idn.domset.ds_relink ? dbp : "<>");
+	    idn.domset.ds_relink ? dbp : "<>");
 	if (idn.domset.ds_relink)
 		(void) mi_mpprintf(mp, "         new master id = %d",
-				IDN_GET_NEW_MASTERID());
+		    IDN_GET_NEW_MASTERID());
 	if (masterid == IDN_NIL_DOMID) {
 		(void) mi_mpprintf(mp, "    Master Domain: no master");
 	} else {
@@ -4451,7 +4451,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		mdp = &idn_domain[masterid];
 
 		(void) mi_mpprintf(mp,
-				"    Master Domain (id:name/brds - state):");
+		    "    Master Domain (id:name/brds - state):");
 
 		if (strlen(mdp->dname) > 0)
 			strcpy(dbp, mdp->dname);
@@ -4459,12 +4459,12 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 			boardset2str(mdp->dhw.dh_boardset, dbp);
 		if (masterid < 10)
 			(void) mi_mpprintf(mp, "         %d: %s - %s",
-					masterid, dbp,
-					idnds_str[mdp->dstate]);
+			    masterid, dbp,
+			    idnds_str[mdp->dstate]);
 		else
 			(void) mi_mpprintf(mp, "        %d: %s - %s",
-					masterid, dbp,
-					idnds_str[mdp->dstate]);
+			    masterid, dbp,
+			    idnds_str[mdp->dstate]);
 	}
 	if (idn.ndomains <= 1) {
 		(void) mi_mpprintf(mp, "    Slave Domains: none");
@@ -4472,7 +4472,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		int	d;
 
 		(void) mi_mpprintf(mp,
-				"    Slave Domains (id:name/brds - state):");
+		    "    Slave Domains (id:name/brds - state):");
 		for (d = 0; d < MAX_DOMAINS; d++) {
 			dp = &idn_domain[d];
 
@@ -4485,12 +4485,12 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 				boardset2str(dp->dhw.dh_boardset, dbp);
 			if (d < 10)
 				(void) mi_mpprintf(mp, "         %d: %s - %s",
-						d, dbp,
-						idnds_str[dp->dstate]);
+				    d, dbp,
+				    idnds_str[dp->dstate]);
 			else
 				(void) mi_mpprintf(mp, "        %d: %s - %s",
-						d, dbp,
-						idnds_str[dp->dstate]);
+				    d, dbp,
+				    idnds_str[dp->dstate]);
 		}
 	}
 
@@ -4504,7 +4504,7 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 			dp = &idn_domain[d];
 
 			if (!DOMAIN_IN_SET(idn.domset.ds_awol, d) ||
-						(dp->dcpu == IDN_NIL_DCPU))
+			    (dp->dcpu == IDN_NIL_DCPU))
 				continue;
 
 			if (strlen(dp->dname) > 0)
@@ -4513,10 +4513,10 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 				boardset2str(dp->dhw.dh_boardset, dbp);
 			if (d < 10)
 				(void) mi_mpprintf(mp, "         %d: %s",
-						d, dbp);
+				    d, dbp);
 			else
 				(void) mi_mpprintf(mp, "        %d: %s",
-						d, dbp);
+				    d, dbp);
 		}
 	}
 
@@ -4527,19 +4527,19 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		(void) mi_mpprintf(mp, "    Sync Zone (con): [empty]");
 	} else {
 		(void) mi_mpprintf(mp, "    Sync Zone (con): [%d domains]",
-				zp->sc_cnt);
+		    zp->sc_cnt);
 		sp = zp->sc_op;
 		for (i = 0; (i < zp->sc_cnt) && sp; i++) {
 			(void) mi_mpprintf(mp,
-					"                     "
-					"%x: x_set =%s0x%x, r_set =%s0x%x",
-					sp->s_domid,
-					HEXSPACE(sp->s_set_exp,
-						sp->s_set_exp, 4, 1),
-					sp->s_set_exp,
-					HEXSPACE(sp->s_set_rdy,
-						sp->s_set_rdy, 4, 1),
-					sp->s_set_rdy);
+			    "	             "
+			    "%x: x_set =%s0x%x, r_set =%s0x%x",
+			    sp->s_domid,
+			    HEXSPACE(sp->s_set_exp,
+			    sp->s_set_exp, 4, 1),
+			    sp->s_set_exp,
+			    HEXSPACE(sp->s_set_rdy,
+			    sp->s_set_rdy, 4, 1),
+			    sp->s_set_rdy);
 			sp = sp->s_next;
 		}
 	}
@@ -4550,19 +4550,19 @@ idn_global_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		(void) mi_mpprintf(mp, "    Sync Zone (dis): [empty]");
 	} else {
 		(void) mi_mpprintf(mp, "    Sync Zone (dis): [%d domains]",
-				zp->sc_cnt);
+		    zp->sc_cnt);
 		sp = zp->sc_op;
 		for (i = 0; (i < zp->sc_cnt) && sp; i++) {
 			(void) mi_mpprintf(mp,
-					"                     "
-					"%x: x_set =%s0x%x, r_set =%s0x%x",
-					sp->s_domid,
-					HEXSPACE(sp->s_set_exp,
-						sp->s_set_exp, 4, 1),
-					sp->s_set_exp,
-					HEXSPACE(sp->s_set_rdy,
-						sp->s_set_rdy, 4, 1),
-					sp->s_set_rdy);
+			    "	             "
+			    "%x: x_set =%s0x%x, r_set =%s0x%x",
+			    sp->s_domid,
+			    HEXSPACE(sp->s_set_exp,
+			    sp->s_set_exp, 4, 1),
+			    sp->s_set_exp,
+			    HEXSPACE(sp->s_set_rdy,
+			    sp->s_set_rdy, 4, 1),
+			    sp->s_set_rdy);
 			sp = sp->s_next;
 		}
 	}
@@ -4622,12 +4622,12 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		if (IDN_DLOCK_TRY_SHARED(d) == 0) {
 			if (d < 10)
 				(void) mi_mpprintf(mp,
-					"Domain %d   (0x%p) busy...",
-					d, dp);
+				    "Domain %d   (0x%p) busy...",
+				    d, dp);
 			else
 				(void) mi_mpprintf(mp,
-					"Domain %d  (0x%p) busy...",
-					d, dp);
+				    "Domain %d  (0x%p) busy...",
+				    d, dp);
 			continue;
 		}
 		if (dp->dcpu == IDN_NIL_DCPU) {
@@ -4636,22 +4636,22 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		}
 		if (d < 10)
 			(void) mi_mpprintf(mp, "%sDomain %d   (0x%p)",
-					(d && (idn.ndomains > 1)) ? "\n" : "",
-					d, dp);
+			    (d && (idn.ndomains > 1)) ? "\n" : "",
+			    d, dp);
 		else
 			(void) mi_mpprintf(mp, "%sDomain %d  (0x%p)",
-					(d && (idn.ndomains > 1)) ? "\n" : "",
-					d, dp);
+			    (d && (idn.ndomains > 1)) ? "\n" : "",
+			    d, dp);
 
 		if (d == idn.localid)
 			(void) mi_mpprintf(mp, "  (local)  State = %s (%d)",
-					idnds_str[dp->dstate], dp->dstate);
+			    idnds_str[dp->dstate], dp->dstate);
 		else
 			(void) mi_mpprintf(mp, "           State = %s (%d)",
-					idnds_str[dp->dstate], dp->dstate);
+			    idnds_str[dp->dstate], dp->dstate);
 		(void) mi_mpprintf(mp, "           Name = %s, Netid = %d",
-				(strlen(dp->dname) > 0) ? dp->dname : "<>",
-				(int)dp->dnetid);
+		    (strlen(dp->dname) > 0) ? dp->dname : "<>",
+		    (int)dp->dnetid);
 
 		CHANSET_ZERO(chanset);
 		nchan = idn_domain_is_registered(d, -1, &chanset);
@@ -4660,7 +4660,7 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		else
 			(void) sprintf(dbp, "0x%x", chanset);
 		(void) mi_mpprintf(mp, "           Nchans = %d, Chanset = %s",
-				nchan, nchan ? dbp : "<>");
+		    nchan, nchan ? dbp : "<>");
 		pset_upper = UPPER32_CPUMASK(dp->dcpuset);
 		pset_lower = LOWER32_CPUMASK(dp->dcpuset);
 		if (dbuffer)
@@ -4669,46 +4669,46 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 			(void) sprintf(dbp, "0x%x", dp->dhw.dh_boardset);
 
 		(void) mi_mpprintf(mp, "           Nboards = %d, Brdset = %s",
-				dp->dhw.dh_nboards,
-				dp->dhw.dh_nboards ? dbp : "<>");
+		    dp->dhw.dh_nboards,
+		    dp->dhw.dh_nboards ? dbp : "<>");
 		(void) sprintf(dbp, "0x%x.%x", pset_upper, pset_lower);
 		(void) mi_mpprintf(mp, "           Ncpus = %d, Cpuset = %s",
-				dp->dncpus, dp->dncpus ? dbp : "<>");
+		    dp->dncpus, dp->dncpus ? dbp : "<>");
 		(void) mi_mpprintf(mp, "           Nmcadr = %d",
-				dp->dhw.dh_nmcadr);
+		    dp->dhw.dh_nmcadr);
 		(void) mi_mpprintf(mp,
-				"           MsgTimer = %s  (cnt = %d)",
-				(dp->dtimerq.tq_count > 0)
-				? "active" : "idle",
-				dp->dtimerq.tq_count);
+		    "	   MsgTimer = %s  (cnt = %d)",
+		    (dp->dtimerq.tq_count > 0)
+		    ? "active" : "idle",
+		    dp->dtimerq.tq_count);
 		(void) mi_mpprintf(mp, "           Dcpu = %d  "
-				"(lastcpu = %d, cpuindex = %d)",
-				dp->dcpu, dp->dcpu_last, dp->dcpuindex);
+		    "(lastcpu = %d, cpuindex = %d)",
+		    dp->dcpu, dp->dcpu_last, dp->dcpuindex);
 		(void) mi_mpprintf(mp, "           Dio = %d  "
-				"(ioerr = %d, iochk = %d, iowanted = %d)",
-				dp->dio, dp->dioerr, dp->diocheck ? 1 : 0,
-				dp->diowanted ? 1 : 0);
+		    "(ioerr = %d, iochk = %d, iowanted = %d)",
+		    dp->dio, dp->dioerr, dp->diocheck ? 1 : 0,
+		    dp->diowanted ? 1 : 0);
 		if (dp->dsync.s_cmd == IDNSYNC_NIL) {
 			(void) mi_mpprintf(mp, "           Dsync = %s",
-				idnsync_str[IDNSYNC_NIL]);
+			    idnsync_str[IDNSYNC_NIL]);
 		} else {
 			(void) mi_mpprintf(mp,
-				"           Dsync = %s "
-				"(x_set = 0x%x, r_set = 0x%x)",
-				idnsync_str[dp->dsync.s_cmd],
-				(uint_t)dp->dsync.s_set_exp,
-				(uint_t)dp->dsync.s_set_rdy);
+			    "	   Dsync = %s "
+			    "(x_set = 0x%x, r_set = 0x%x)",
+			    idnsync_str[dp->dsync.s_cmd],
+			    (uint_t)dp->dsync.s_set_exp,
+			    (uint_t)dp->dsync.s_set_rdy);
 		}
 		(void) mi_mpprintf(mp, "           Dvote = 0x%x",
-				dp->dvote.ticket);
+		    dp->dvote.ticket);
 		(void) mi_mpprintf(mp, "           Dfin = %s (Sync = %s)",
-				idnfin_str[dp->dfin],
-				(dp->dfin_sync == IDNFIN_SYNC_OFF) ? "OFF" :
-				(dp->dfin_sync == IDNFIN_SYNC_YES) ? "YES" :
-				"NO");
+		    idnfin_str[dp->dfin],
+		    (dp->dfin_sync == IDNFIN_SYNC_OFF) ? "OFF" :
+		    (dp->dfin_sync == IDNFIN_SYNC_YES) ? "YES" :
+		    "NO");
 		(void) mi_mpprintf(mp, "           Dcookie_err = %s (cnt = %d)",
-				dp->dcookie_err ? "YES" : "NO",
-				dp->dcookie_errcnt);
+		    dp->dcookie_err ? "YES" : "NO",
+		    dp->dcookie_errcnt);
 		IDN_DUNLOCK(d);
 	}
 
@@ -4778,7 +4778,7 @@ idn_init_handler()
 
 	if (idn.intr.dmv_data != NULL) {
 		cmn_err(CE_WARN,
-			"IDN: 130: IDN DMV handler already initialized");
+		    "IDN: 130: IDN DMV handler already initialized");
 		return (-1);
 	}
 
@@ -4792,7 +4792,7 @@ idn_init_handler()
 	len = roundup(len, PAGESIZE);
 
 	PR_PROTO("%s: sizeof (idn_dmv_data_t) = %lu\n",
-		proc, sizeof (idn_dmv_data_t));
+	    proc, sizeof (idn_dmv_data_t));
 	PR_PROTO("%s: allocating %lu bytes for dmv data area\n", proc, len);
 
 	idn.intr.dmv_data_len = len;
@@ -4802,8 +4802,8 @@ idn_init_handler()
 
 	idn_dmv_data = (idn_dmv_data_t *)idn.intr.dmv_data;
 	basep = (idn_dmv_msg_t *)roundup((size_t)idn.intr.dmv_data +
-					sizeof (idn_dmv_data_t),
-					sizeof (uint64_t));
+	    sizeof (idn_dmv_data_t),
+	    sizeof (uint64_t));
 	idn_dmv_data->idn_dmv_qbase = (uint64_t)basep;
 
 	ivp = basep;
@@ -4837,7 +4837,7 @@ idn_init_handler()
 	membar_stld_stst();
 
 	if (dmv_add_intr(idn.intr.dmv_inum, idn_dmv_handler,
-			(caddr_t)idn_dmv_data)) {
+	    (caddr_t)idn_dmv_data)) {
 		idn_deinit_handler();
 		cmn_err(CE_WARN, "IDN: 132: failed to add IDN DMV handler");
 		return (-1);
@@ -4922,14 +4922,14 @@ idn_handler(caddr_t unused, caddr_t unused2)
 			count++;
 
 			PR_XDC("%s:%d:%d RECV: scpu = %d, msg = 0x%x(%s)\n",
-				proc, (int)xp->iv_domid, count,
-				(int)xp->iv_cpuid, mtype, mstr);
+			    proc, (int)xp->iv_domid, count,
+			    (int)xp->iv_cpuid, mtype, mstr);
 			PR_XDC("%s:%d:%d R-DATA: a0 = 0x%x, a1 = 0x%x\n",
-				proc, (int)xp->iv_domid, count,
-				xp->iv_xargs0, xp->iv_xargs1);
+			    proc, (int)xp->iv_domid, count,
+			    xp->iv_xargs0, xp->iv_xargs1);
 			PR_XDC("%s:%d:%d R-DATA: a2 = 0x%x, a3 = 0x%x\n",
-				proc, (int)xp->iv_domid, count,
-				xp->iv_xargs2, xp->iv_xargs3);
+			    proc, (int)xp->iv_domid, count,
+			    xp->iv_xargs2, xp->iv_xargs3);
 #endif /* DEBUG */
 
 			if (mtype == IDNP_DATA) {
@@ -4944,7 +4944,7 @@ idn_handler(caddr_t unused, caddr_t unused2)
 				 * server to do it.
 				 */
 				idn_signal_data_server((int)xp->iv_domid,
-						(ushort_t)xp->iv_xargs0);
+				    (ushort_t)xp->iv_xargs0);
 			} else {
 				jp = idn_protojob_alloc(KM_NOSLEEP);
 				/*
@@ -4961,8 +4961,8 @@ idn_handler(caddr_t unused, caddr_t unused2)
 					jp->j_msg.m_acktype = atype;
 					jp->j_msg.m_cookie = xp->iv_cookie;
 					SET_XARGS(jp->j_msg.m_xargs,
-						xp->iv_xargs0, xp->iv_xargs1,
-						xp->iv_xargs2, xp->iv_xargs3);
+					    xp->iv_xargs0, xp->iv_xargs1,
+					    xp->iv_xargs2, xp->iv_xargs3);
 				}
 
 			}
@@ -5000,15 +5000,15 @@ idn_awol_event_set(boardset_t boardset)
 	if (sbp == NULL) {
 		cmn_err(CE_WARN, "IDN: 133: sigblock event area missing");
 		cmn_err(CE_CONT,
-			"IDN: 134: unable to mark boardset (0x%x) AWOL\n",
-			boardset);
+		    "IDN: 134: unable to mark boardset (0x%x) AWOL\n",
+		    boardset);
 		mutex_exit(&idn.idnsb_mutex);
 		return;
 	}
 
 	if (boardset == 0) {
 		PR_PROTO("%s: AWOL BOARDSET is 0, NO EVENT <<<<<<<<<<<<<<<\n",
-			proc);
+		    proc);
 		mutex_exit(&idn.idnsb_mutex);
 		return;
 	} else {
@@ -5031,15 +5031,15 @@ idn_awol_event_clear(boardset_t boardset)
 	if (sbp == NULL) {
 		cmn_err(CE_WARN, "IDN: 133: sigblock event area missing");
 		cmn_err(CE_CONT,
-			"IDN: 134: unable to mark boardset (0x%x) AWOL\n",
-			boardset);
+		    "IDN: 134: unable to mark boardset (0x%x) AWOL\n",
+		    boardset);
 		mutex_exit(&idn.idnsb_mutex);
 		return;
 	}
 
 	if (boardset == 0) {
 		PR_PROTO("%s: AWOL BOARDSET is 0, NO EVENT <<<<<<<<<<<<<<<\n",
-			proc);
+		    proc);
 		mutex_exit(&idn.idnsb_mutex);
 		return;
 	} else {
@@ -5057,54 +5057,54 @@ idn_gkstat_init()
 
 #ifdef	kstat
 	if ((ksp = kstat_create(IDNNAME, ddi_get_instance(idn.dip),
-		IDNNAME, "net", KSTAT_TYPE_NAMED,
-		sizeof (struct idn_gkstat_named) / sizeof (kstat_named_t),
-		KSTAT_FLAG_PERSISTENT)) == NULL) {
+	    IDNNAME, "net", KSTAT_TYPE_NAMED,
+	    sizeof (struct idn_gkstat_named) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 #else
 	if ((ksp = kstat_create(IDNNAME, ddi_get_instance(idn.dip),
-			IDNNAME, "net", KSTAT_TYPE_NAMED,
-			sizeof (struct idn_gkstat_named) /
-			sizeof (kstat_named_t), 0)) == NULL) {
+	    IDNNAME, "net", KSTAT_TYPE_NAMED,
+	    sizeof (struct idn_gkstat_named) /
+	    sizeof (kstat_named_t), 0)) == NULL) {
 #endif /* kstat */
 		cmn_err(CE_CONT, "IDN: 135: %s: %s\n",
-			IDNNAME, "kstat_create failed");
+		    IDNNAME, "kstat_create failed");
 		return;
 	}
 
 	idn.ksp = ksp;
 	sgkp = (struct idn_gkstat_named *)(ksp->ks_data);
 	kstat_named_init(&sgkp->sk_curtime,		"curtime",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_reconfigs,		"reconfigs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_reconfig_last,	"reconfig_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_reaps,		"reaps",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_reap_last,		"reap_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_links,		"links",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_link_last,		"link_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_unlinks,		"unlinks",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_unlink_last,		"unlink_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_buffail,		"buf_fail",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_buffail_last,	"buf_fail_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_slabfail,		"slab_fail",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_slabfail_last,	"slab_fail_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_slabfail_last,	"slab_fail_last",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_reap_count,		"reap_count",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&sgkp->sk_dropped_intrs,	"dropped_intrs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	ksp->ks_update = idn_gkstat_update;
 	ksp->ks_private = (void *)NULL;
 	kstat_install(ksp);
@@ -5212,8 +5212,8 @@ idn_rw_mem(idnop_t *idnop)
 	} else if (!idnop->rwmem.goawol && (orig_gstate != IDNGS_IGNORE)) {
 		IDN_GLOCK_EXCL();
 		cmn_err(CE_WARN,
-			"IDN: Local domain restoring original state %s(%d)",
-			idngs_str[orig_gstate], (int)orig_gstate);
+		    "IDN: Local domain restoring original state %s(%d)",
+		    idngs_str[orig_gstate], (int)orig_gstate);
 		IDN_GSTATE_TRANSITION(orig_gstate);
 		orig_gstate = IDNGS_IGNORE;
 		IDN_GUNLOCK();
@@ -5244,7 +5244,7 @@ idn_rw_mem(idnop_t *idnop)
 		}
 		if (segp == NULL) {
 			cmn_err(CE_WARN,
-				"IDN: blksize (%d) too large", blksize);
+			    "IDN: blksize (%d) too large", blksize);
 			return (EINVAL);
 		}
 		bcopy(segp->s_base, obuf, blksize);
@@ -5254,9 +5254,9 @@ idn_rw_mem(idnop_t *idnop)
 	cv_init(&scv, NULL, CV_DEFAULT, NULL);
 
 	cmn_err(CE_NOTE,
-		"IDN: starting %s of %d blocks of %d bytes each...",
-		(rw == 1) ? "W-ONLY" : (rw == 2) ? "RW" : "R-ONLY",
-		num, blksize);
+	    "IDN: starting %s of %d blocks of %d bytes each...",
+	    (rw == 1) ? "W-ONLY" : (rw == 2) ? "RW" : "R-ONLY",
+	    num, blksize);
 
 	for (n = 0; n < num; n++) {
 		uint_t	rpos;
@@ -5373,7 +5373,7 @@ cpuset2str(cpuset_t cset, char buffer[])
 		if (strlen(buffer) >= _DSTRLEN) {
 			PR_PROTO("************* WARNING WARNING WARNING\n");
 			PR_PROTO("cpuset2str(cpu = %d) buffer "
-				"OVERFLOW <<<<<<\n", c);
+			    "OVERFLOW <<<<<<\n", c);
 			PR_PROTO("*******************************\n");
 			(void) sprintf(&buffer[_DSTRLEN-6], "*OVER");
 			return;
@@ -5475,14 +5475,14 @@ idnxdc(int domid, idn_msgtype_t *mtp,
 	dmv_word2 = ((uint64_t)arg3 << 32) | (uint64_t)arg4;
 
 	ASSERT((dp->dcpu != IDN_NIL_DCPU) ||
-		(dp->dcpu_last != IDN_NIL_DCPU));
+	    (dp->dcpu_last != IDN_NIL_DCPU));
 
 	tcpuid = (dp->dcpu == IDN_NIL_DCPU) ?
-			dp->dcpu_last : dp->dcpu;
+	    dp->dcpu_last : dp->dcpu;
 
 	if (tcpuid == IDN_NIL_DCPU) {
 		PR_PROTO("%s:%d: cpu/cpu_last == NIL_DCPU\n",
-			proc, domid);
+		    proc, domid);
 		return (-1);
 	}
 
@@ -5555,13 +5555,13 @@ idn_prom_getsmr(uint_t *smrsz, uint64_t *paddrp, uint64_t *sizep)
 		len = prom_getproplen(nodeid, IDN_PROP_SMRSIZE);
 		if (len == sizeof (smrsize)) {
 			(void) prom_getprop(nodeid, IDN_PROP_SMRSIZE,
-				    (caddr_t)&smrsize);
+			    (caddr_t)&smrsize);
 			found |= PROM_SMRSIZE;
 		}
 		len = prom_getproplen(nodeid, IDN_PROP_SMRADDR);
 		if (len  == sizeof (smraddr)) {
 			(void) prom_getprop(nodeid, IDN_PROP_SMRADDR,
-					(caddr_t)&smraddr);
+			    (caddr_t)&smraddr);
 			found |= PROM_SMRADDR;
 		}
 	}
@@ -5569,14 +5569,14 @@ idn_prom_getsmr(uint_t *smrsz, uint64_t *paddrp, uint64_t *sizep)
 	if (found != PROM_SMRPROPS) {
 		if ((found & PROM_SMRSIZE) == 0)
 			cmn_err(CE_WARN,
-				"IDN: 136: \"%s\" property not found, "
-				"disabling IDN",
-				IDN_PROP_SMRSIZE);
+			    "IDN: 136: \"%s\" property not found, "
+			    "disabling IDN",
+			    IDN_PROP_SMRSIZE);
 		if (smrsize && ((found & PROM_SMRADDR) == 0))
 			cmn_err(CE_WARN,
-				"IDN: 136: \"%s\" property not found, "
-				"disabling IDN",
-				IDN_PROP_SMRADDR);
+			    "IDN: 136: \"%s\" property not found, "
+			    "disabling IDN",
+			    IDN_PROP_SMRADDR);
 		return (-1);
 	}
 
@@ -5586,11 +5586,11 @@ idn_prom_getsmr(uint_t *smrsz, uint64_t *paddrp, uint64_t *sizep)
 
 	} else if (smrsize > IDN_SMR_MAXSIZE) {
 		PR_SMR("%s: IDN DISABLED (idn_smr_size too big %d > %d MB)\n",
-			proc, smrsize, IDN_SMR_MAXSIZE);
+		    proc, smrsize, IDN_SMR_MAXSIZE);
 		cmn_err(CE_WARN,
-			"!IDN: 138: SMR size (%dMB) is too big (max = %dMB), "
-			"disabling IDN",
-			smrsize, IDN_SMR_MAXSIZE);
+		    "!IDN: 138: SMR size (%dMB) is too big (max = %dMB), "
+		    "disabling IDN",
+		    smrsize, IDN_SMR_MAXSIZE);
 		smrsize = 0;
 	} else {
 		*smrsz = smrsize;
@@ -5598,24 +5598,24 @@ idn_prom_getsmr(uint_t *smrsz, uint64_t *paddrp, uint64_t *sizep)
 	}
 
 	obpaddr = ((uint64_t)smraddr.hi_addr << 32) |
-			(uint64_t)smraddr.lo_addr;
+	    (uint64_t)smraddr.lo_addr;
 	obpsize = ((uint64_t)smraddr.hi_size << 32) |
-			(uint64_t)smraddr.lo_size;
+	    (uint64_t)smraddr.lo_size;
 
 	if (obpsize == 0) {
 		if (smrsize > 0) {
 			cmn_err(CE_WARN, "!IDN: 139: OBP region for "
-				"SMR is 0 length");
+			    "SMR is 0 length");
 		}
 	} else if (obpsize < (uint64_t)MB2B(smrsize)) {
 		cmn_err(CE_WARN,
-			"!IDN: 140: OBP region (%ld B) smaller "
-			"than requested size (%ld B)",
-			obpsize, MB2B(smrsize));
+		    "!IDN: 140: OBP region (%ld B) smaller "
+		    "than requested size (%ld B)",
+		    obpsize, MB2B(smrsize));
 	} else if ((obpaddr & ((uint64_t)IDN_SMR_ALIGN - 1)) != 0) {
 		cmn_err(CE_WARN,
-			"!IDN: 141: OBP region (0x%lx) not on (0x%x) "
-			"boundary", obpaddr, IDN_SMR_ALIGN);
+		    "!IDN: 141: OBP region (0x%lx) not on (0x%x) "
+		    "boundary", obpaddr, IDN_SMR_ALIGN);
 	} else {
 		*sizep = obpsize;
 		*paddrp = obpaddr;
@@ -5645,7 +5645,7 @@ idn_init_autolink()
 	sbp->idn_version = (uchar_t)idn.version;
 	SSIEVENT_SET(sbp, SSIEVENT_BOOT, 0);
 	(void) strncpy(sbp->idn_cookie_str, SSIEVENT_COOKIE,
-						SSIEVENT_COOKIE_LEN);
+	    SSIEVENT_COOKIE_LEN);
 	mutex_exit(&idn.idnsb_mutex);
 }
 
@@ -5667,7 +5667,7 @@ idn_deinit_autolink()
 	sbp->idn_version = (uchar_t)idn.version;
 	SSIEVENT_CLEAR(sbp, SSIEVENT_BOOT, 0);
 	(void) strncpy(sbp->idn_cookie_str, SSIEVENT_COOKIE,
-						SSIEVENT_COOKIE_LEN);
+	    SSIEVENT_COOKIE_LEN);
 	mutex_exit(&idn.idnsb_mutex);
 }
 
@@ -5743,16 +5743,16 @@ debug_idnxdc(char *f, int domid, idn_msgtype_t *mtp,
 	SNOOP_IDN(0, str, bd, a1, a2, a3, a4);
 
 	PR_XDC("%s:%d:%d SENT: scpu = %d, msg = 0x%x(%s)\n",
-		f, domid, xx, cpuid, mtp->mt_mtype, str);
+	    f, domid, xx, cpuid, mtp->mt_mtype, str);
 	PR_XDC("%s:%d:%d S-DATA: a1 = 0x%x, a2 = 0x%x\n",
-		f, domid, xx, a1, a2);
+	    f, domid, xx, a1, a2);
 	PR_XDC("%s:%d:%d S-DATA: a3 = 0x%x, a4 = 0x%x\n",
-		f, domid, xx, a3, a4);
+	    f, domid, xx, a3, a4);
 
 	rv = idnxdc(domid, mtp, a1, a2, a3, a4);
 	if (rv != 0) {
 		PR_XDC("%s:%d:%d: WARNING: idnxdc(cpu %d) FAILED\n",
-			f, domid, xx, cpuid);
+		    f, domid, xx, cpuid);
 	}
 
 	return (rv);
@@ -5767,7 +5767,7 @@ _idn_getstruct(char *structname, int size)
 	ptr = kmem_zalloc(size, KM_SLEEP);
 
 	PR_ALLOC("%s: ptr 0x%p, struct(%s), size = %d\n",
-		proc, ptr, structname, size);
+	    proc, ptr, structname, size);
 
 	return (ptr);
 }
@@ -5778,7 +5778,7 @@ _idn_freestruct(caddr_t ptr, char *structname, int size)
 	procname_t	proc = "FREESTRUCT";
 
 	PR_ALLOC("%s: ptr 0x%p, struct(%s), size = %d\n",
-		proc, ptr, structname, size);
+	    proc, ptr, structname, size);
 
 	ASSERT(ptr != NULL);
 	kmem_free(ptr, size);

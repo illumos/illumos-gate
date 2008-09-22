@@ -1,11 +1,10 @@
 /*
  * sppptun_mod.c - modload support for PPP multiplexing tunnel driver.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -66,7 +65,7 @@ DDI_DEFINE_STREAM_OPS(sppptun_ops,			\
 	nulldev, nulldev,				\
 	tun_attach, tun_detach, nodev, tun_info,	\
 	D_NEW | D_MP | D_MTQPAIR | D_MTOUTPERIM | D_MTOCEXCL | D_MTPUTSHARED, \
-	&sppptun_tab);
+	&sppptun_tab, ddi_quiesce_not_supported);
 
 /*
  * This is the loadable module wrapper.

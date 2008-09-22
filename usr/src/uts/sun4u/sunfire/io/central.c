@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -108,14 +107,15 @@ static struct dev_ops central_ops = {
 	nulldev,		/* reset */
 	(struct cb_ops *)0,	/* cb_ops */
 	&central_bus_ops,	/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Central Nexus %I%",	/* Name of module. */
+	"Central Nexus",	/* Name of module. */
 	&central_ops,		/* driver ops */
 };
 
@@ -168,7 +168,7 @@ central_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	/* nothing to suspend/resume here */
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-		"pm-hardware-state", "no-suspend-resume");
+	    "pm-hardware-state", "no-suspend-resume");
 
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);

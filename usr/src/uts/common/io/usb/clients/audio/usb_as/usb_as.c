@@ -245,7 +245,8 @@ static struct dev_ops usb_as_dev_ops = {
 	nodev,			/* devo_reset */
 	&usb_as_cb_ops,		/* devi_cb_ops */
 	NULL,			/* devo_busb_as_ops */
-	usb_as_power		/* devo_power */
+	usb_as_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */

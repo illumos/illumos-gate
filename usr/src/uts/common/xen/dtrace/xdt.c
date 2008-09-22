@@ -1034,7 +1034,8 @@ static struct dev_ops xdt_ops = {
 	nulldev,		/* devo_reset */
 	&xdt_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* power(9E) */
+	NULL,			/* power(9E) */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 

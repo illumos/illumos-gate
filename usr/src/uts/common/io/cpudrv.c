@@ -91,7 +91,8 @@ struct dev_ops cpudrv_ops = {
 	nodev,			/* reset */
 	(struct cb_ops *)NULL,	/* cb_ops */
 	(struct bus_ops *)NULL,	/* bus_ops */
-	cpudrv_power		/* power */
+	cpudrv_power,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

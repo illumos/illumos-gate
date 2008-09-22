@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Logical domain channel devices are devices implemented entirely
@@ -243,7 +242,8 @@ static struct dev_ops cnex_ops = {
 	nodev,			/* reset */
 	&cnex_cb_ops,		/* driver operations */
 	&cnex_bus_ops,		/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -251,7 +251,7 @@ static struct dev_ops cnex_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"sun4v channel-devices nexus 1.11",
+	"sun4v channel-devices nexus",
 	&cnex_ops,
 };
 

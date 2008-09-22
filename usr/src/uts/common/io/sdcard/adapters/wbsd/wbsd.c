@@ -111,7 +111,8 @@ static struct dev_ops wbsd_dev_ops = {
 	nodev,				/* devo_reset */
 	NULL,				/* devo_cb_ops */
 	NULL,				/* devo_bus_ops */
-	NULL				/* devo_power */
+	NULL,				/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv wbsd_modldrv = {

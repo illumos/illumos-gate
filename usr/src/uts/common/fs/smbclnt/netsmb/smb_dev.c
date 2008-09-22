@@ -155,7 +155,8 @@ static struct dev_ops nsmb_ops = {
 	nodev,		/* reset */
 	&nsmb_cbops,	/* driver ops - devctl interfaces */
 	NULL,		/* bus operations */
-	NULL		/* power */
+	NULL,		/* power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 /*
@@ -164,7 +165,7 @@ static struct dev_ops nsmb_ops = {
 
 static struct modldrv nsmb_modldrv = {
 	&mod_driverops,				/* Driver module */
-	"SMBFS network driver v" NSMB_VER_STR,
+	"SMBFS network driver",
 	&nsmb_ops				/* Driver ops */
 };
 

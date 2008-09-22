@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the Beep driver for SMBUS based beep mechanism.
@@ -107,13 +106,14 @@ static struct dev_ops grbeep_ops = {
 	nodev,			/* Reset */
 	&grbeep_cb_ops,		/* Driver operations */
 	0,			/* Bus operations */
-	NULL			/* Power */
+	NULL,			/* Power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
 static struct modldrv modldrv = {
 	&mod_driverops, 		/* This one is a driver */
-	"SMBUS Beep Driver %I%", 	/* Name of the module. */
+	"SMBUS Beep Driver", 		/* Name of the module. */
 	&grbeep_ops,			/* Driver ops */
 };
 

@@ -18,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SunOS MT QFE Device Driver (layered above FEPS/Cheerio)
@@ -48,7 +48,7 @@ extern int hmeattach(dev_info_t *, ddi_attach_cmd_t);
 extern int hmedetach(dev_info_t *, ddi_detach_cmd_t);
 
 DDI_DEFINE_STREAM_OPS(qfe_dev_ops, nulldev, nulldev, hmeattach, hmedetach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.

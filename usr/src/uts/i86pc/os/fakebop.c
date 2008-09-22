@@ -51,6 +51,7 @@
 #include <sys/privregs.h>
 #include <sys/sysmacros.h>
 #include <sys/ctype.h>
+#include <sys/fastboot.h>
 #ifdef __xpv
 #include <sys/hypervisor.h>
 #include <net/if.h>
@@ -119,6 +120,27 @@ static ulong_t total_bop_alloc_kernel = 0;
 static void build_firmware_properties(void);
 
 static int early_allocation = 1;
+
+#ifdef	__xpv
+int fastreboot_capable = 0;
+int force_fastreboot = 0;
+int post_fastreboot = 0;
+#else
+int fastreboot_capable = 1;
+int force_fastreboot = 0;
+int post_fastreboot = 0;
+#endif
+
+/*
+ * Information saved from current boot for fast reboot.
+ * If the information size exceeds what we have allocated, fast reboot
+ * will not be supported.
+ */
+multiboot_info_t saved_mbi;
+mb_memory_map_t saved_mmap[FASTBOOT_SAVED_MMAP_COUNT];
+struct sol_netinfo saved_drives[FASTBOOT_SAVED_DRIVES_COUNT];
+char saved_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
+int saved_cmdline_len = 0;
 
 /*
  * Pointers to where System Resource Affinity Table (SRAT) and
@@ -780,6 +802,9 @@ do_bsys_doint(bootops_t *bop, int intnum, struct bop_regs *rp)
 	br.es = rp->es;
 
 	DBG_MSG("Doing BIOS call...");
+	DBG(br.ax);
+	DBG(br.bx);
+	DBG(br.dx);
 	rp->eflags = bios_func(intnum, &br);
 	DBG_MSG("done\n");
 
@@ -1047,6 +1072,20 @@ build_boot_properties(void)
 	boot_args[0] = 0;
 	boot_arg_len = 0;
 
+#ifndef	__xpv
+	saved_cmdline_len =  strlen(xbootp->bi_cmdline) + 1;
+	if (saved_cmdline_len > FASTBOOT_SAVED_CMDLINE_LEN) {
+		DBG(saved_cmdline_len);
+		DBG_MSG("Command line too long: clearing fastreboot_capable\n");
+		fastreboot_capable = 0;
+	} else {
+		bcopy((void *)(xbootp->bi_cmdline), (void *)saved_cmdline,
+		    saved_cmdline_len);
+		saved_cmdline[saved_cmdline_len - 1] = '\0';
+	}
+#endif
+
+
 #ifdef __xpv
 	/*
 	 * Xen puts a lot of device information in front of the kernel name
@@ -1235,6 +1274,26 @@ build_boot_properties(void)
 	 */
 	netboot = 0;
 	mbi = xbootp->bi_mb_info;
+	bcopy(mbi, &saved_mbi, sizeof (multiboot_info_t));
+	if (mbi->mmap_length > sizeof (saved_mmap)) {
+		DBG_MSG("mbi->mmap_length too big: clearing "
+		    "fastreboot_capable\n");
+		fastreboot_capable = 0;
+	} else {
+		bcopy((void *)(uintptr_t)mbi->mmap_addr, (void *)saved_mmap,
+		    mbi->mmap_length);
+	}
+
+	if (mbi->drives_length > sizeof (saved_drives)) {
+		DBG(mbi->drives_length);
+		DBG_MSG("mbi->drives_length too big: clearing "
+		    "fastreboot_capable\n");
+		fastreboot_capable = 0;
+	} else {
+		bcopy((void *)(uintptr_t)mbi->drives_addr, (void *)saved_drives,
+		    mbi->drives_length);
+	}
+
 	if (mbi != NULL && mbi->flags & 0x2) {
 		boot_device = mbi->boot_device >> 24;
 		if (boot_device == 0x20)
@@ -1541,6 +1600,12 @@ _start(struct xboot_info *xbp)
 #endif
 	bcons_init((void *)xbootp->bi_cmdline);
 	have_console = 1;
+
+	if (*((uint32_t *)(FASTBOOT_SWTCH_PA + FASTBOOT_STACK_OFFSET)) ==
+	    FASTBOOT_MAGIC) {
+		post_fastreboot = 1;
+		*((uint32_t *)(FASTBOOT_SWTCH_PA + FASTBOOT_STACK_OFFSET)) = 0;
+	}
 
 	/*
 	 * enable debugging

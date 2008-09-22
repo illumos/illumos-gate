@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Niagara 2 Random Number Generator (RNG) driver
@@ -76,7 +75,8 @@ static struct dev_ops devops = {
 	nodev,			/* devo_reset */
 	NULL,			/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	ddi_power		/* devo_power */
+	ddi_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*

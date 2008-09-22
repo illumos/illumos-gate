@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "nge.h"
 
@@ -1055,7 +1054,7 @@ nge_get_props(nge_t *ngep)
 
 
 static int
-nge_reset(nge_t *ngep)
+nge_reset_dev(nge_t *ngep)
 {
 	int err;
 	nge_mul_addr1 maddr1;
@@ -2140,7 +2139,7 @@ int
 nge_restart(nge_t *ngep)
 {
 	int err = 0;
-	err = nge_reset(ngep);
+	err = nge_reset_dev(ngep);
 	/* write back the promisc setting */
 	ngep->promisc = ngep->record_promisc;
 	nge_chip_sync(ngep);
@@ -2611,13 +2610,46 @@ nge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+nge_quiesce(dev_info_t *devinfo)
+{
+	nge_t *ngep;
+
+	ngep = ddi_get_driver_private(devinfo);
+
+	if (ngep == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * Turn off debug tracing
+	 */
+	nge_debug = 0;
+	ngep->debug = 0;
+
+	nge_restore_mac_addr(ngep);
+	(void) nge_chip_stop(ngep, B_FALSE);
+
+	return (DDI_SUCCESS);
+}
+
+
 
 /*
  * ========== Module Loading Data & Entry Points ==========
  */
 
 DDI_DEFINE_STREAM_OPS(nge_dev_ops, nulldev, nulldev, nge_attach, nge_detach,
-    nodev, NULL, D_MP, NULL);
+    NULL, NULL, D_MP, NULL, nge_quiesce);
 
 
 static struct modldrv nge_modldrv = {

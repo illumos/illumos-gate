@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * audiots Audio Driver
@@ -320,13 +318,14 @@ static struct dev_ops audiots_dev_ops = {
 	nodev,			/* devo_reset */
 	&audiots_cb_ops,	/* devi_cb_ops */
 	NULL,			/* devo_bus_ops */
-	audiots_power		/* devo_power */
+	audiots_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
 static struct modldrv audiots_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	TS_MOD_NAME " %I%",	/* drv_linkinfo */
+	TS_MOD_NAME,		/* drv_linkinfo */
 	&audiots_dev_ops	/* drv_dev_ops */
 };
 
@@ -1964,14 +1963,14 @@ audiots_chip_init(audiots_state_t *state, int restore)
 
 		/* set outputs muted */
 		state->ts_shadow[TS_CODEC_REG(AC97_MASTER_VOLUME_REGISTER)] =
-			MVR_MUTE;
+		    MVR_MUTE;
 		state->ts_shadow[TS_CODEC_REG(AC97_HEADPHONE_VOLUME_REGISTER)] =
-			HPVR_MUTE;
+		    HPVR_MUTE;
 		state->ts_shadow
-			[TS_CODEC_REG(AC97_MONO_MASTER_VOLUME_REGSITER)] =
-			MMVR_MUTE;
+		    [TS_CODEC_REG(AC97_MONO_MASTER_VOLUME_REGSITER)] =
+		    MMVR_MUTE;
 		state->ts_shadow[TS_CODEC_REG(AC97_PCM_OUT_VOLUME_REGISTER)] =
-			PCMOVR_MUTE;
+		    PCMOVR_MUTE;
 	}
 
 	/* preload shadow registers if not restoring */
@@ -2535,57 +2534,61 @@ rec_intr:
 			/* 1st half just filled */
 			if (state->ts_flags & TS_DMA_RECORD_START) {
 			    /* skip the first interrupt, it is NULL */
-			    state->ts_flags &= ~TS_DMA_RECORD_START;
+				state->ts_flags &= ~TS_DMA_RECORD_START;
 			} else {
-			    if (ddi_dma_sync(state->ts_ch,
-				(off_t)((state->ts_ccnt<<1) - TS_FIFO_SIZE),
-				TS_FIFO_SIZE, DDI_DMA_SYNC_FORCPU) ==
-				DDI_FAILURE) {
-				    audio_sup_log(state->ts_ahandle, CE_NOTE,
-					"!dma_sync(1) failed audio lost");
-				    mutex_exit(&state->ts_lock);
-				    goto done;
-			    }
-			    samples = TS_FIFO_SIZE /
-				(state->ts_cprecision >> AUDIO_PRECISION_SHIFT);
+				if (ddi_dma_sync(state->ts_ch,
+				    (off_t)((state->ts_ccnt<<1) - TS_FIFO_SIZE),
+				    TS_FIFO_SIZE, DDI_DMA_SYNC_FORCPU) ==
+				    DDI_FAILURE) {
+					audio_sup_log(state->ts_ahandle,
+					    CE_NOTE,
+					    "!dma_sync(1) failed audio lost");
+					mutex_exit(&state->ts_lock);
+					goto done;
+				}
+				samples = TS_FIFO_SIZE /
+				    (state->ts_cprecision >>
+				    AUDIO_PRECISION_SHIFT);
 
-			    sptr =  (uint16_t *)
-				&state->ts_cb[(state->ts_ccnt<<1) -
-				TS_FIFO_SIZE];
-			    for (i = 0; i < (TS_FIFO_SIZE/2); i++) {
-				state->ts_tcbuf[i] = sptr[i];
-			    }
-			    ATRACE_32("ts_intr(c1) "
+				sptr =  (uint16_t *)
+				    &state->ts_cb[(state->ts_ccnt<<1) -
+				    TS_FIFO_SIZE];
+				for (i = 0; i < (TS_FIFO_SIZE/2); i++) {
+					state->ts_tcbuf[i] = sptr[i];
+				}
+				ATRACE_32("ts_intr(c1) "
 				"calling am_send_audio() samples", samples);
-			    tcbuf = state->ts_tcbuf;
-			    mutex_exit(&state->ts_lock);
-			    am_send_audio(state->ts_ahandle, tcbuf,
-				AUDIO_NO_CHANNEL, samples);
-			    mutex_enter(&state->ts_lock);
+				tcbuf = state->ts_tcbuf;
+				mutex_exit(&state->ts_lock);
+				am_send_audio(state->ts_ahandle, tcbuf,
+				    AUDIO_NO_CHANNEL, samples);
+				mutex_enter(&state->ts_lock);
 
-			    if (ddi_dma_sync(state->ts_ch, (off_t)0,
-				state->ts_ccnt - TS_FIFO_SIZE,
-				DDI_DMA_SYNC_FORCPU) == DDI_FAILURE) {
-				    audio_sup_log(state->ts_ahandle, CE_NOTE,
-					"!dma_sync(2) failed audio lost");
-				    mutex_exit(&state->ts_lock);
-				    goto done;
-			    }
-			    samples = (state->ts_ccnt - TS_FIFO_SIZE) /
-				(state->ts_cprecision >> AUDIO_PRECISION_SHIFT);
+				if (ddi_dma_sync(state->ts_ch, (off_t)0,
+				    state->ts_ccnt - TS_FIFO_SIZE,
+				    DDI_DMA_SYNC_FORCPU) == DDI_FAILURE) {
+					audio_sup_log(state->ts_ahandle,
+					    CE_NOTE,
+					    "!dma_sync(2) failed audio lost");
+					mutex_exit(&state->ts_lock);
+					goto done;
+				}
+				samples = (state->ts_ccnt - TS_FIFO_SIZE) /
+				    (state->ts_cprecision >>
+				    AUDIO_PRECISION_SHIFT);
 
-			    sptr =  (uint16_t *)state->ts_cb;
-			    count = (state->ts_ccnt - TS_FIFO_SIZE) >> 1;
-			    for (i = 0; i < count; i++) {
+				sptr =  (uint16_t *)state->ts_cb;
+				count = (state->ts_ccnt - TS_FIFO_SIZE) >> 1;
+				for (i = 0; i < count; i++) {
 				state->ts_tcbuf[i] = sptr[i];
-			    }
-			    ATRACE_32("ts_intr(c2) "
+				}
+				ATRACE_32("ts_intr(c2) "
 				"calling am_send_audio() samples", samples);
-			    tcbuf = state->ts_tcbuf;
-			    mutex_exit(&state->ts_lock);
-			    am_send_audio(state->ts_ahandle, tcbuf,
-				AUDIO_NO_CHANNEL, samples);
-			    mutex_enter(&state->ts_lock);
+				tcbuf = state->ts_tcbuf;
+				mutex_exit(&state->ts_lock);
+				am_send_audio(state->ts_ahandle, tcbuf,
+				    AUDIO_NO_CHANNEL, samples);
+				mutex_enter(&state->ts_lock);
 			}
 		} else {
 			/* 2nd half just filled */

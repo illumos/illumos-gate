@@ -277,7 +277,8 @@ static struct dev_ops usbvc_ops = {
 	nodev,			/* reset */
 	&usbvc_cb_ops,	/* driver operations */
 	NULL,			/* bus operations */
-	usbvc_power		/* power */
+	usbvc_power,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv usbvc_modldrv =	{

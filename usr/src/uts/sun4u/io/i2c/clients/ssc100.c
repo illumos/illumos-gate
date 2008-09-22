@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
@@ -97,14 +95,16 @@ static struct dev_ops ssc100_ops = {
 	ssc100_detach,
 	nodev,
 	&ssc100_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv ssc100_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"SSC100 i2c device driver: v%I%",
+	"SSC100 i2c device driver: v1.10",
 	&ssc100_ops
 };
 
@@ -124,7 +124,7 @@ _init(void)
 
 	if (!error)
 		(void) ddi_soft_state_init(&ssc100soft_statep,
-			sizeof (struct ssc100_unit), 1);
+		    sizeof (struct ssc100_unit), 1);
 	return (error);
 }
 
@@ -162,7 +162,7 @@ ssc100_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct ssc100_unit *)
-		ddi_get_soft_state(ssc100soft_statep, instance);
+	    ddi_get_soft_state(ssc100soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -207,7 +207,7 @@ ssc100_close(dev_t dev, int flags, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 	unitp = (struct ssc100_unit *)
-		ddi_get_soft_state(ssc100soft_statep, instance);
+	    ddi_get_soft_state(ssc100soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -232,8 +232,8 @@ ssc100_common(struct ssc100_unit *unitp, uchar_t *byte, uchar_t input,
 	    1, 1, I2C_SLEEP);
 	if (i2c_tran_pointer == NULL) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in SSC100_COMMON "
-			"i2c_tran_pointer not allocated",
-			    unitp->ssc100_name));
+		    "i2c_tran_pointer not allocated",
+		    unitp->ssc100_name));
 		return (ENOMEM);
 	}
 
@@ -245,7 +245,7 @@ ssc100_common(struct ssc100_unit *unitp, uchar_t *byte, uchar_t input,
 	err = i2c_transfer(unitp->ssc100_hdl, i2c_tran_pointer);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in SSC100_COMMON "
-			"i2c_transfer routine", unitp->ssc100_name));
+		    "i2c_transfer routine", unitp->ssc100_name));
 	} else if (flag != I2C_WR) {
 		*byte = i2c_tran_pointer->i2c_rbuf[0];
 	}
@@ -262,7 +262,7 @@ ssc100_get_reg(struct ssc100_unit *unitp, uchar_t *byte, uchar_t reg)
 	err = ssc100_common(unitp, byte, reg, I2C_WR_RD);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in SSC100_GET_REG "
-			"i2c_common routine", unitp->ssc100_name));
+		    "i2c_common routine", unitp->ssc100_name));
 	}
 	return (err);
 }
@@ -275,7 +275,7 @@ ssc100_get(struct ssc100_unit *unitp, uchar_t *byte)
 	err = ssc100_common(unitp, byte, 0, I2C_RD);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in SSC100_GET "
-			"i2c_common routine", unitp->ssc100_name));
+		    "i2c_common routine", unitp->ssc100_name));
 	}
 	return (err);
 }
@@ -288,7 +288,7 @@ ssc100_set(struct ssc100_unit *unitp, uchar_t byte)
 	err = ssc100_common(unitp, NULL, byte, I2C_WR);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in SSC100_SET "
-			"i2c_common routine", unitp->ssc100_name));
+		    "i2c_common routine", unitp->ssc100_name));
 	}
 	return (err);
 }
@@ -309,14 +309,14 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	if (arg == NULL) {
 		D2CMN_ERR((CE_WARN, "SSC100: ioctl: arg passed in to ioctl "
-				"= NULL"));
+		    "= NULL"));
 		err = EINVAL;
 		return (err);
 	}
 
 	instance = getminor(dev);
 	unitp = (struct ssc100_unit *)
-		ddi_get_soft_state(ssc100soft_statep, instance);
+	    ddi_get_soft_state(ssc100soft_statep, instance);
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "SSC100: ioctl: unitp not filled");
 		return (ENOMEM);
@@ -327,9 +327,9 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	switch (cmd) {
 	case I2C_GET_PORT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_port,
-			sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_PORT"
-				" ddi_copyin routine", unitp->ssc100_name));
+			    " ddi_copyin routine", unitp->ssc100_name));
 			err = EFAULT;
 			break;
 		}
@@ -337,27 +337,27 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = ssc100_get(unitp, &byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_PORT"
-				" ssc100_get routine", unitp->ssc100_name));
+			    " ssc100_get routine", unitp->ssc100_name));
 			break;
 		}
 
 		ioctl_port.value = byte;
 		if (ddi_copyout((caddr_t)&ioctl_port, (caddr_t)arg,
-			sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_PORT "
-				"ddi_copyout routine", unitp->ssc100_name));
+			    "ddi_copyout routine", unitp->ssc100_name));
 			err = EFAULT;
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: contains %x", unitp->ssc100_name,
-			byte));
+		    byte));
 		break;
 
 	case I2C_SET_PORT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_port,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_PORT"
-				"ddi_cpoyin routine", unitp->ssc100_name));
+			    "ddi_cpoyin routine", unitp->ssc100_name));
 			err = EFAULT;
 			break;
 		}
@@ -365,24 +365,24 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = ssc100_set(unitp, ioctl_port.value);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_PORT"
-				" ssc100_set routine", unitp->ssc100_name));
+			    " ssc100_set routine", unitp->ssc100_name));
 			break;
 		}
 		break;
 
 	case I2C_GET_BIT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_bit,
-			sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_BIT"
-				" ddi_copyin routine", unitp->ssc100_name));
+			    " ddi_copyin routine", unitp->ssc100_name));
 			err = EFAULT;
 			break;
 		}
 
 		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: In I2C_GET_BIT bit num"
-				" was not between 0 and 7",
-				    unitp->ssc100_name));
+			    " was not between 0 and 7",
+			    unitp->ssc100_name));
 			err = EIO;
 			break;
 		}
@@ -390,38 +390,38 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = ssc100_get(unitp, &byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_GET_BIT"
-				" ssc100_get routine", unitp->ssc100_name));
+			    " ssc100_get routine", unitp->ssc100_name));
 			break;
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: byte returned from device is %x",
-			unitp->ssc100_name, byte));
+		    unitp->ssc100_name, byte));
 		ioctl_bit.bit_value = (boolean_t)SSC100_BIT_READ_MASK(byte,
 		    ioctl_bit.bit_num);
 		D1CMN_ERR((CE_NOTE, "%s: byte now contains %x",
-			unitp->ssc100_name, byte));
+		    unitp->ssc100_name, byte));
 
 		if (ddi_copyout((caddr_t)&ioctl_bit, (caddr_t)arg,
-			sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_BIT"
-				" ddi_copyout routine", unitp->ssc100_name));
+			    " ddi_copyout routine", unitp->ssc100_name));
 			err = EFAULT;
 		}
 		break;
 
 	case I2C_SET_BIT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_bit,
-			sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_SET_BIT"
-				" ddi_copyin routine", unitp->ssc100_name));
+			    " ddi_copyin routine", unitp->ssc100_name));
 			err = EFAULT;
 			break;
 		}
 
 		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: I2C_SET_BIT: bit_num sent"
-				" in was not between 0 and 7",
-				    unitp->ssc100_name));
+			    " in was not between 0 and 7",
+			    unitp->ssc100_name));
 			err = EIO;
 			break;
 		}
@@ -429,28 +429,28 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = ssc100_get(unitp, &byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_BIT"
-				" ssc100_get routine", unitp->ssc100_name));
+			    " ssc100_get routine", unitp->ssc100_name));
 			break;
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: byte returned from device is %x",
-			unitp->ssc100_name, byte));
+		    unitp->ssc100_name, byte));
 		byte = SSC100_BIT_WRITE_MASK(byte, ioctl_bit.bit_num,
 		    ioctl_bit.bit_value);
 		D1CMN_ERR((CE_NOTE, "%s: byte after shifting is %x",
-			unitp->ssc100_name, byte));
+		    unitp->ssc100_name, byte));
 
 		err = ssc100_set(unitp, byte);
 		if (err != I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in the I2C_SET_BIT"
-				" ssc100_set routine", unitp->ssc100_name));
+			    " ssc100_set routine", unitp->ssc100_name));
 			break;
 		}
 		break;
 
 	case I2C_GET_REG:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_reg,
-			sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_REG "
 			    "ddi_copyin routine", unitp->ssc100_name));
 			err = EFAULT;
@@ -461,7 +461,7 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 		ioctl_reg.reg_value = byte;
 		if (ddi_copyout((caddr_t)&ioctl_reg, (caddr_t)arg,
-			sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_REG "
 			    "ddi_copyout routine", unitp->ssc100_name));
 			err = EFAULT;
@@ -470,7 +470,7 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	default:
 		D2CMN_ERR((CE_WARN, "%s: Invalid IOCTL cmd: %x",
-			unitp->ssc100_name, cmd));
+		    unitp->ssc100_name, cmd));
 		err = EINVAL;
 	}
 
@@ -514,7 +514,7 @@ ssc100_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(ssc100soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d: failed to zalloc softstate",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -522,17 +522,17 @@ ssc100_do_attach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 
 	(void) snprintf(unitp->ssc100_name, sizeof (unitp->ssc100_name),
-			"%s%d", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "ssc100", S_IFCHR, instance,
-			"ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
+	    "ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
-			"%s", unitp->ssc100_name, "ssc100");
+		    "%s", unitp->ssc100_name, "ssc100");
 		ddi_soft_state_free(ssc100soft_statep, instance);
 
 		return (DDI_FAILURE);
@@ -545,8 +545,8 @@ ssc100_do_attach(dev_info_t *dip)
 	unitp->ssc100_size = SSC100_SIZE;
 
 	(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
-		DDI_PROP_CANSLEEP, "size",
-		(caddr_t)&unitp->ssc100_size, sizeof (unitp->ssc100_size));
+	    DDI_PROP_CANSLEEP, "size",
+	    (caddr_t)&unitp->ssc100_size, sizeof (unitp->ssc100_size));
 
 	if (i2c_client_register(dip, &unitp->ssc100_hdl) != I2C_SUCCESS) {
 		ddi_remove_minor_node(dip, NULL);
@@ -630,7 +630,7 @@ ssc100_io(dev_t dev, struct uio *uiop, int rw)
 	}
 
 	unitp = (struct ssc100_unit *)
-		ddi_get_soft_state(ssc100soft_statep, instance);
+	    ddi_get_soft_state(ssc100soft_statep, instance);
 
 
 	if (unitp == NULL) {
@@ -655,32 +655,32 @@ ssc100_io(dev_t dev, struct uio *uiop, int rw)
 	}
 
 	bytes_to_rw = min(uiop->uio_resid,
-		unitp->ssc100_size - uiop->uio_offset);
+	    unitp->ssc100_size - uiop->uio_offset);
 	current_xfer_len = bytes_to_rw;
 
 	if (rw == B_WRITE) {
 		(void) i2c_transfer_alloc(unitp->ssc100_hdl, &i2ctp,
-			current_xfer_len+1, 0, I2C_SLEEP);
+		    current_xfer_len+1, 0, I2C_SLEEP);
 		if (i2ctp == NULL) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in ssc100_io WRITE "
-				"i2c_tran_pointer not allocated",
-				    unitp->ssc100_name));
+			    "i2c_tran_pointer not allocated",
+			    unitp->ssc100_name));
 			return (ENOMEM);
 		}
 		i2ctp->i2c_version = I2C_XFER_REV;
 		i2ctp->i2c_flags = I2C_WR;
 		i2ctp->i2c_wbuf[0] = (uchar_t)ssc100_addr;
 		if ((err = uiomove(&i2ctp->i2c_wbuf[1], current_xfer_len,
-			UIO_WRITE, uiop)) != 0) {
+		    UIO_WRITE, uiop)) != 0) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in ssc100_io WRITE "
-				"uiomove failed", unitp->ssc100_name));
+			    "uiomove failed", unitp->ssc100_name));
 			goto end;
 		}
 
 		if ((err = i2c_transfer(unitp->ssc100_hdl, i2ctp)) !=
 		    I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in ssc100_io WRITE "
-				"i2c_transfer failed", unitp->ssc100_name));
+			    "i2c_transfer failed", unitp->ssc100_name));
 			goto end;
 		}
 	} else {
@@ -692,8 +692,8 @@ ssc100_io(dev_t dev, struct uio *uiop, int rw)
 		    current_xfer_len, I2C_SLEEP);
 		if (i2ctp == NULL) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in ssc100_io READ "
-				"i2c_tran_pointer not allocated",
-				    unitp->ssc100_name));
+			    "i2c_tran_pointer not allocated",
+			    unitp->ssc100_name));
 			return (ENOMEM);
 		}
 		i2ctp->i2c_version = I2C_XFER_REV;
@@ -703,14 +703,14 @@ ssc100_io(dev_t dev, struct uio *uiop, int rw)
 		if ((err = i2c_transfer(unitp->ssc100_hdl, i2ctp)) !=
 		    I2C_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in ssc100_io READ "
-				"i2c_transfer failed", unitp->ssc100_name));
+			    "i2c_transfer failed", unitp->ssc100_name));
 			goto end;
 		}
 
 		if ((err = uiomove(i2ctp->i2c_rbuf, current_xfer_len,
-			UIO_READ, uiop)) != 0) {
+		    UIO_READ, uiop)) != 0) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in ssc100_io READ "
-				"uiomove failed", unitp->ssc100_name));
+			    "uiomove failed", unitp->ssc100_name));
 			goto end;
 		}
 	}

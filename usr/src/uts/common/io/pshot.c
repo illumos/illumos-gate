@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,6 @@
  * pseudo bus nexus driver
  * hotplug framework test facility
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The pshot driver can be used to exercise the i/o framework together
@@ -363,7 +362,8 @@ static struct dev_ops pshot_ops = {
 	nodev,			/* reset */
 	&pshot_cb_ops,		/* driver operations */
 	&pshot_bus_ops,		/* bus operations */
-	pshot_power		/* power */
+	pshot_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 
 };
 
@@ -373,7 +373,7 @@ static struct dev_ops pshot_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"pshotnex %I%",
+	"pshotnex",
 	&pshot_ops,
 };
 
@@ -521,9 +521,9 @@ pshot_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		if (pshot_debug)
 			cmn_err(CE_CONT, "attach: %s%d/pshot%d\n",
-				ddi_get_name(ddi_get_parent(devi)),
-				ddi_get_instance(ddi_get_parent(devi)),
-				instance);
+			    ddi_get_name(ddi_get_parent(devi)),
+			    ddi_get_instance(ddi_get_parent(devi)),
+			    instance);
 
 		/*
 		 * Hook for tests to force attach fail
@@ -640,7 +640,7 @@ pshot_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (ndi_event_bind_set(pshot->ndi_event_hdl, &pshot->ndi_events,
 		    NDI_SLEEP) != NDI_SUCCESS) {
 			cmn_err(CE_CONT, "pshot%d bind set failed\n",
-				instance);
+			    instance);
 		}
 
 		/*
@@ -938,8 +938,8 @@ pshot_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (pshot->state & FAIL_SUSPEND_FLAG) {
 			if (pshot_debug) {
 				cmn_err(CE_CONT, "pshot%d:"
-				" FAIL_SUSPEND_FLAG set, fail suspend\n",
-				ddi_get_instance(devi));
+				    " FAIL_SUSPEND_FLAG set, fail suspend\n",
+				    ddi_get_instance(devi));
 			}
 			pshot->state &= ~FAIL_SUSPEND_FLAG;
 			rval = DDI_FAILURE;
@@ -1111,8 +1111,8 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 		 * by a pseudo driver.  So we whine when we're called.
 		 */
 		cmn_err(CE_CONT, "%s%d: invalid op (%d) from %s%d\n",
-			ddi_get_name(dip), ddi_get_instance(dip),
-			ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
+		    ddi_get_name(dip), ddi_get_instance(dip),
+		    ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
 		return (DDI_FAILURE);
 
 	case DDI_CTLOPS_ATTACH:
@@ -1729,15 +1729,15 @@ pshot_initchild(dev_info_t *dip, dev_info_t *child)
 		if (pshot_debug)
 			cmn_err(CE_CONT,
 			    "pshot%d: %s forced INITCHILD failure\n",
-				ddi_get_instance(dip), bus_addr);
+			    ddi_get_instance(dip), bus_addr);
 		ddi_prop_free(bus_addr);
 		return (DDI_FAILURE);
 	}
 
 	if (pshot_log) {
 		cmn_err(CE_CONT, "initchild %s%d/%s@%s\n",
-			ddi_get_name(dip), ddi_get_instance(dip),
-			ddi_node_name(child), bus_addr);
+		    ddi_get_name(dip), ddi_get_instance(dip),
+		    ddi_node_name(child), bus_addr);
 	}
 
 	ddi_set_name_addr(child, bus_addr);
@@ -1967,7 +1967,7 @@ pshot_devctl(pshot_t *pshot, minor_t nodenum, int cmd, intptr_t arg, int mode,
 		 * but if there were....
 		 */
 		rv = pshot_event(pshot, PSHOT_EVENT_TAG_BUS_RESET,
-			child, (void *)self);
+		    child, (void *)self);
 		ASSERT(rv == NDI_SUCCESS);
 		break;
 
@@ -2324,7 +2324,7 @@ pshot_testctl(pshot_t *pshot, minor_t nodenum, int cmd, intptr_t arg, int mode,
 		 * but if there were....
 		 */
 		rv = pshot_event(pshot, PSHOT_EVENT_TAG_BUS_RESET,
-			child, (void *)self);
+		    child, (void *)self);
 		ASSERT(rv == NDI_SUCCESS);
 		break;
 
@@ -2346,16 +2346,16 @@ pshot_get_eventcookie(dev_info_t *dip, dev_info_t *rdip,
 	pshot_t *pshot = ddi_get_soft_state(pshot_softstatep, instance);
 
 	if (pshot_debug)
-	    cmn_err(CE_CONT, "pshot%d: "
-		"pshot_get_eventcookie:\n\t"
-		"dip = 0x%p rdip = 0x%p (%s/%d) eventname = %s\n",
-		instance, (void *)dip, (void *)rdip,
-		ddi_node_name(rdip), ddi_get_instance(rdip),
-		eventname);
+		cmn_err(CE_CONT, "pshot%d: "
+		    "pshot_get_eventcookie:\n\t"
+		    "dip = 0x%p rdip = 0x%p (%s/%d) eventname = %s\n",
+		    instance, (void *)dip, (void *)rdip,
+		    ddi_node_name(rdip), ddi_get_instance(rdip),
+		    eventname);
 
 
 	return (ndi_event_retrieve_cookie(pshot->ndi_event_hdl,
-		rdip, eventname, event_cookiep, NDI_EVENT_NOPASS));
+	    rdip, eventname, event_cookiep, NDI_EVENT_NOPASS));
 }
 
 static int
@@ -2367,17 +2367,17 @@ pshot_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 	pshot_t *pshot = ddi_get_soft_state(pshot_softstatep, instance);
 
 	if (pshot_debug)
-	    cmn_err(CE_CONT, "pshot%d: "
-	    "pshot_add_eventcall:\n\t"
-	    "dip = 0x%p rdip = 0x%p (%s%d)\n\tcookie = 0x%p (%s)\n\t"
-	    "cb = 0x%p, arg = 0x%p\n",
-	    instance, (void *)dip, (void *)rdip,
-	    ddi_node_name(rdip), ddi_get_instance(rdip), (void *)cookie,
-	    NDI_EVENT_NAME(cookie), (void *)callback, arg);
+		cmn_err(CE_CONT, "pshot%d: "
+		    "pshot_add_eventcall:\n\t"
+		    "dip = 0x%p rdip = 0x%p (%s%d)\n\tcookie = 0x%p (%s)\n\t"
+		    "cb = 0x%p, arg = 0x%p\n",
+		    instance, (void *)dip, (void *)rdip,
+		    ddi_node_name(rdip), ddi_get_instance(rdip), (void *)cookie,
+		    NDI_EVENT_NAME(cookie), (void *)callback, arg);
 
 	/* add callback to our event handle */
 	return (ndi_event_add_callback(pshot->ndi_event_hdl, rdip,
-		cookie, callback, arg, NDI_SLEEP, cb_id));
+	    cookie, callback, arg, NDI_SLEEP, cb_id));
 }
 
 static int
@@ -2392,13 +2392,14 @@ pshot_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 	ASSERT(cb);
 
 	if (pshot_debug)
-	    cmn_err(CE_CONT, "pshot%d: "
-	    "pshot_remove_eventcall:\n\t"
-	    "dip = 0x%p rdip = 0x%p (%s%d)\n\tcookie = 0x%p (%s)\n",
-	    instance, (void *)dip, (void *)cb->ndi_evtcb_dip,
-	    ddi_node_name(cb->ndi_evtcb_dip),
-	    ddi_get_instance(cb->ndi_evtcb_dip), (void *)cb->ndi_evtcb_cookie,
-	    NDI_EVENT_NAME(cb->ndi_evtcb_cookie));
+		cmn_err(CE_CONT, "pshot%d: "
+		    "pshot_remove_eventcall:\n\t"
+		    "dip = 0x%p rdip = 0x%p (%s%d)\n\tcookie = 0x%p (%s)\n",
+		    instance, (void *)dip, (void *)cb->ndi_evtcb_dip,
+		    ddi_node_name(cb->ndi_evtcb_dip),
+		    ddi_get_instance(cb->ndi_evtcb_dip),
+		    (void *)cb->ndi_evtcb_cookie,
+		    NDI_EVENT_NAME(cb->ndi_evtcb_cookie));
 
 	return (ndi_event_remove_callback(pshot->ndi_event_hdl, cb_id));
 }
@@ -2411,21 +2412,22 @@ pshot_post_event(dev_info_t *dip, dev_info_t *rdip,
 	pshot_t *pshot = ddi_get_soft_state(pshot_softstatep, instance);
 
 	if (pshot_debug) {
-	    if (rdip) {
-		cmn_err(CE_CONT, "pshot%d: "
-		    "pshot_post_event:\n\t"
-		    "dip = 0x%p rdip = 0x%p (%s%d\n\t"
-		    "cookie = 0x%p (%s)\n\tbus_impl = 0x%p\n",
-		    instance, (void *)dip, (void *)rdip,
-		    ddi_node_name(rdip), ddi_get_instance(rdip), (void *)cookie,
-		    NDI_EVENT_NAME(cookie), impl_data);
-	    } else {
-		cmn_err(CE_CONT, "pshot%d: "
-		    "pshot_post_event:\n\t"
-		    "dip = 0x%p cookie = 0x%p (%s) bus_impl = 0x%p\n",
-		    instance, (void *)dip, (void *)cookie,
-		    NDI_EVENT_NAME(cookie), impl_data);
-	    }
+		if (rdip) {
+			cmn_err(CE_CONT, "pshot%d: "
+			    "pshot_post_event:\n\t"
+			    "dip = 0x%p rdip = 0x%p (%s%d\n\t"
+			    "cookie = 0x%p (%s)\n\tbus_impl = 0x%p\n",
+			    instance, (void *)dip, (void *)rdip,
+			    ddi_node_name(rdip), ddi_get_instance(rdip),
+			    (void *)cookie,
+			    NDI_EVENT_NAME(cookie), impl_data);
+		} else {
+			cmn_err(CE_CONT, "pshot%d: "
+			    "pshot_post_event:\n\t"
+			    "dip = 0x%p cookie = 0x%p (%s) bus_impl = 0x%p\n",
+			    instance, (void *)dip, (void *)cookie,
+			    NDI_EVENT_NAME(cookie), impl_data);
+		}
 	}
 
 	/*  run callbacks for this event */
@@ -2442,33 +2444,35 @@ pshot_event(pshot_t *pshot, int event_tag, dev_info_t *child,
 	void *bus_impldata)
 {
 	ddi_eventcookie_t cookie = ndi_event_tag_to_cookie(
-		pshot->ndi_event_hdl, event_tag);
+	    pshot->ndi_event_hdl, event_tag);
 
 	if (pshot_debug) {
 		if (child) {
-		    cmn_err(CE_CONT, "pshot%d: "
-			"pshot_event: event_tag = 0x%x (%s)\n\t"
-			"child = 0x%p (%s%d) bus_impl = 0x%p (%s%d)\n",
-			pshot->instance, event_tag,
-			ndi_event_tag_to_name(pshot->ndi_event_hdl, event_tag),
-			(void *)child, ddi_node_name(child),
-			ddi_get_instance(child), bus_impldata,
-			ddi_node_name((dev_info_t *)bus_impldata),
-			ddi_get_instance((dev_info_t *)bus_impldata));
+			cmn_err(CE_CONT, "pshot%d: "
+			    "pshot_event: event_tag = 0x%x (%s)\n\t"
+			    "child = 0x%p (%s%d) bus_impl = 0x%p (%s%d)\n",
+			    pshot->instance, event_tag,
+			    ndi_event_tag_to_name(pshot->ndi_event_hdl,
+			    event_tag),
+			    (void *)child, ddi_node_name(child),
+			    ddi_get_instance(child), bus_impldata,
+			    ddi_node_name((dev_info_t *)bus_impldata),
+			    ddi_get_instance((dev_info_t *)bus_impldata));
 		} else {
-		    cmn_err(CE_CONT, "pshot%d: "
-			"pshot_event: event_tag = 0x%x (%s)\n\t"
-			"child = NULL,  bus_impl = 0x%p (%s%d)\n",
-			pshot->instance, event_tag,
-			ndi_event_tag_to_name(pshot->ndi_event_hdl, event_tag),
-			bus_impldata,
-			ddi_node_name((dev_info_t *)bus_impldata),
-			ddi_get_instance((dev_info_t *)bus_impldata));
+			cmn_err(CE_CONT, "pshot%d: "
+			    "pshot_event: event_tag = 0x%x (%s)\n\t"
+			    "child = NULL,  bus_impl = 0x%p (%s%d)\n",
+			    pshot->instance, event_tag,
+			    ndi_event_tag_to_name(pshot->ndi_event_hdl,
+			    event_tag),
+			    bus_impldata,
+			    ddi_node_name((dev_info_t *)bus_impldata),
+			    ddi_get_instance((dev_info_t *)bus_impldata));
 		}
 	}
 
 	return (ndi_event_run_callbacks(pshot->ndi_event_hdl,
-		child, cookie, bus_impldata));
+	    child, cookie, bus_impldata));
 }
 
 
@@ -2503,11 +2507,11 @@ pshot_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
 	case PSHOT_EVENT_TAG_BUS_UNQUIESCE:
 		/* notify all subscribers of the this event */
 		(void) ndi_event_run_callbacks(pshot->ndi_event_hdl,
-			NULL, cookie, bus_impldata);
+		    NULL, cookie, bus_impldata);
 		if (pshot_debug) {
 			cmn_err(CE_CONT, "pshot%d: event=%s\n\t"
-			"pshot_event_cb\n", pshot->instance,
-			NDI_EVENT_NAME(cookie));
+			    "pshot_event_cb\n", pshot->instance,
+			    NDI_EVENT_NAME(cookie));
 		}
 		/*FALLTHRU*/
 	case PSHOT_EVENT_TAG_TEST_POST:
@@ -2580,7 +2584,7 @@ pshot_bus_config(dev_info_t *parent, uint_t flags,
 		 * Handle a few special cases for testing purposes
 		 */
 		rval = pshot_bus_config_test_specials(parent,
-			devname, cname, caddr);
+		    devname, cname, caddr);
 
 		if (rval == NDI_SUCCESS) {
 			/*
@@ -2791,7 +2795,7 @@ pshot_nexus_properties(dev_info_t *parent, dev_info_t *child, char *cname,
 				    " nexus_properties:\n\tunable to create"
 				    " the \"no-pm-components\""
 				    " property for %s@%s",
-				ddi_get_instance(parent), cname, caddr);
+				    ddi_get_instance(parent), cname, caddr);
 			}
 		}
 	}
@@ -3049,7 +3053,7 @@ pshot_bus_config_test_specials(dev_info_t *parent, char *devname,
 		if (pshot_debug)
 			cmn_err(CE_CONT,
 			    "pshot%d: %s forced failure\n",
-				ddi_get_instance(parent), devname);
+			    ddi_get_instance(parent), devname);
 		return (NDI_FAILURE);
 	}
 
@@ -3069,13 +3073,13 @@ pshot_bus_config_test_specials(dev_info_t *parent, char *devname,
 		if (pshot_debug)
 			cmn_err(CE_CONT,
 			    "pshot%d: %s delay %d second\n",
-				ddi_get_instance(parent), devname, n);
+			    ddi_get_instance(parent), devname, n);
 		delay(n * drv_usectohz(1000000));
 	} else if (strncmp(caddr, "delay", 5) == 0) {
 		if (pshot_debug)
 			cmn_err(CE_CONT,
 			    "pshot%d: %s delay 1 second\n",
-				ddi_get_instance(parent), devname);
+			    ddi_get_instance(parent), devname);
 		delay(drv_usectohz(1000000));
 	} else if (strncmp(caddr, "wait,", 5) == 0) {
 		p = caddr+5;
@@ -3085,7 +3089,7 @@ pshot_bus_config_test_specials(dev_info_t *parent, char *devname,
 		if (pshot_debug)
 			cmn_err(CE_CONT,
 			    "pshot%d: %s wait %d second\n",
-				ddi_get_instance(parent), devname, n);
+			    ddi_get_instance(parent), devname, n);
 		delay(n * drv_usectohz(1000000));
 	} else if (strncmp(caddr, "wait", 4) == 0) {
 		if (pshot_debug)
@@ -3511,11 +3515,12 @@ pshot_devnode(dev_info_t *dip, void *arg)
 		    DEVI(dip)->devi_node_name, DEVI(dip)->devi_addr);
 		if (f_dip != dip) {
 			cmn_err(CE_NOTE, "!pshot_devnode: failed lookup"
-			"node (%s/%s@%s)\n",
-			DEVI(DEVI(dip)->devi_parent)->devi_node_name,
-			(DEVI(dip)->devi_node_name ?
-				DEVI(dip)->devi_node_name : "NULL"),
-			(DEVI(dip)->devi_addr ? DEVI(dip)->devi_addr : "NULL"));
+			    "node (%s/%s@%s)\n",
+			    DEVI(DEVI(dip)->devi_parent)->devi_node_name,
+			    (DEVI(dip)->devi_node_name ?
+			    DEVI(dip)->devi_node_name : "NULL"),
+			    (DEVI(dip)->devi_addr ? DEVI(dip)->devi_addr :
+			    "NULL"));
 		}
 	}
 	return (DDI_WALK_CONTINUE);
@@ -3694,11 +3699,11 @@ pshot_event_test(void *arg)
 	delay(drv_usectohz(1000000));
 	for (i = 0; i < 8; i++) {
 		rval = ndi_event_add_callback(hdl, pshot->dip,
-			ndi_event_tag_to_cookie(hdl,
-				pshot_test_events[i].ndi_event_tag),
-			pshot_event_cb_test,
-			(void *)(uintptr_t)pshot_test_events[i].ndi_event_tag,
-			NDI_SLEEP, &pshot->test_callback_cache[i]);
+		    ndi_event_tag_to_cookie(hdl,
+		    pshot_test_events[i].ndi_event_tag),
+		    pshot_event_cb_test,
+		    (void *)(uintptr_t)pshot_test_events[i].ndi_event_tag,
+		    NDI_SLEEP, &pshot->test_callback_cache[i]);
 		ASSERT(rval == NDI_SUCCESS);
 	}
 
@@ -3711,7 +3716,7 @@ pshot_event_test(void *arg)
 		    (void *)hdl);
 
 		cmn_err(CE_CONT, "pshot: callback, tag=%d rval=%d\n",
-			i, rval);
+		    i, rval);
 		delay(drv_usectohz(1000000));
 	}
 
@@ -3721,10 +3726,10 @@ pshot_event_test(void *arg)
 		ddi_eventcookie_t cookie = ndi_event_tag_to_cookie(hdl, i);
 
 		rval = ndi_event_run_callbacks(hdl,
-			pshot->dip, cookie, (void *)hdl);
+		    pshot->dip, cookie, (void *)hdl);
 
 		cmn_err(CE_CONT, "pshot: callback, tag=%d rval=%d\n",
-			i, rval);
+		    i, rval);
 		delay(drv_usectohz(1000000));
 	}
 
@@ -3755,7 +3760,7 @@ pshot_event_test_post_one(void *arg)
 	ddi_eventcookie_t cookie;
 
 	cmn_err(CE_CONT, "pshot%d: pshot_event_post_one event\n",
-		pshot->instance);
+	    pshot->instance);
 
 	if (ddi_get_eventcookie(pshot->dip, PSHOT_EVENT_NAME_BUS_TEST_POST,
 	    &cookie) != DDI_SUCCESS) {
@@ -3766,10 +3771,10 @@ pshot_event_test_post_one(void *arg)
 	rval = ndi_post_event(pshot->dip, pshot->dip, cookie, NULL);
 
 	cmn_err(CE_CONT, "pshot%d: pshot_event_post_one rval=%d\n",
-		pshot->instance, rval);
+	    pshot->instance, rval);
 
 	(void) timeout(pshot_event_test_post_one, (void *)pshot,
-		pshot->instance * drv_usectohz(60000000));
+	    pshot->instance * drv_usectohz(60000000));
 
 }
 #endif /* DEBUG */

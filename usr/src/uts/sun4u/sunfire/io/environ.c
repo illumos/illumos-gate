@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -100,7 +99,8 @@ static struct dev_ops environ_ops = {
 	nulldev,			/* reset */
 	&environ_cb_ops,		/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 void *environp;			/* environ soft state hook */
@@ -128,9 +128,9 @@ static int environ_overtemp_thread_started = 0;
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
-	&mod_driverops,			/* module type, this one is a driver */
-	"Environment Leaf v%I%",	/* name of module */
-	&environ_ops,			/* driver ops */
+	&mod_driverops,		/* module type, this one is a driver */
+	"Environment Leaf",	/* name of module */
+	&environ_ops,		/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
@@ -216,12 +216,12 @@ environ_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if ((softsp->board = (int)ddi_getprop(DDI_DEV_T_ANY, softsp->pdip,
 	    DDI_PROP_DONTPASS, OBP_BOARDNUM, -1)) == -1) {
 		cmn_err(CE_WARN, "environ%d: unable to retrieve %s property",
-			instance, OBP_BOARDNUM);
+		    instance, OBP_BOARDNUM);
 		goto bad;
 	}
 
 	DPRINTF(ENVIRON_ATTACH_DEBUG, ("environ: devi= 0x%p\n, softsp=0x%p,",
-		devi, softsp));
+	    devi, softsp));
 
 	/*
 	 * Init the temperature device here. We start the overtemp
@@ -232,7 +232,7 @@ environ_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	/* nothing to suspend/resume here */
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-		"pm-hardware-state", "no-suspend-resume");
+	    "pm-hardware-state", "no-suspend-resume");
 
 	ddi_report_dev(devi);
 
@@ -361,7 +361,7 @@ environ_init(struct environ_soft_state *softsp)
 	if (ddi_map_regs(softsp->dip, 0,
 	    (caddr_t *)&softsp->temp_reg, 0, 0)) {
 		cmn_err(CE_WARN, "environ%d: unable to map temperature "
-			"register", ddi_get_instance(softsp->dip));
+		    "register", ddi_get_instance(softsp->dip));
 		return (DDI_FAILURE);
 	}
 
@@ -441,7 +441,7 @@ environ_overtemp_poll(void)
 			}
 
 			update_temp(list->pdip, &list->tempstat,
-				*(list->temp_reg));
+			    *(list->temp_reg));
 		}
 
 		CALLB_CPR_SAFE_BEGIN(&cprinfo);
@@ -488,9 +488,9 @@ environ_add_temp_kstats(struct environ_soft_state *softsp)
 	 */
 	if ((ttsp = kstat_create("unix", softsp->board,
 	    TEMP_OVERRIDE_KSTAT_NAME, "misc", KSTAT_TYPE_RAW, sizeof (short),
-		KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
+	    KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
 		cmn_err(CE_WARN, "environ%d: temp override kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 	} else {
 		ttsp->ks_update = temp_override_kstat_update;
 		ttsp->ks_private = (void *) &softsp->tempstat.override;

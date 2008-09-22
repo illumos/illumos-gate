@@ -280,13 +280,15 @@ static struct dev_ops ucode_dv_ops = {
 	DEVO_REV,
 	0,
 	ucode_getinfo,
-	nulldev,	/* identify */
-	nulldev,	/* probe */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
 	ucode_attach,
 	ucode_detach,
-	nodev,		/* reset */
+	nodev,			/* reset */
 	&ucode_cb_ops,
-	(struct bus_ops *)0
+	(struct bus_ops *)0,
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

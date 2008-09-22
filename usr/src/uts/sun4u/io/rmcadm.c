@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/conf.h>
@@ -84,7 +83,8 @@ static struct dev_ops rmcadm_ops = {
 	nodev,			/* reset */
 	&rmcadm_cb_ops,		/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -94,7 +94,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"rmcadm control driver v%I%",	/* Name of the module */
+	"rmcadm control driver",	/* Name of the module */
 	&rmcadm_ops			/* pointer to the dev_ops structure */
 };
 
@@ -233,7 +233,7 @@ rmcadm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		err = ddi_create_minor_node(dip, "rmcadm", S_IFCHR,
-			instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, NULL);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
@@ -432,7 +432,7 @@ rmcadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 			}
 
 			rr.status = rmc_comm_request_response(
-				    rmc_reqp, rmc_respp, rr.wait_time);
+			    rmc_reqp, rmc_respp, rr.wait_time);
 
 		} else { /* RMCADM_REQUEST_RESPONSE_BP */
 
@@ -453,7 +453,7 @@ rmcadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 			}
 
 			rr.status = rmc_comm_request_response_bp(
-				    rmc_reqp, rmc_respp, rr.wait_time);
+			    rmc_reqp, rmc_respp, rr.wait_time);
 		}
 
 		/*

@@ -21,6 +21,11 @@
  * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #include "xgehal-device.h"
 #include "xgehal-channel.h"
 #include "xgehal-fifo.h"
@@ -7258,4 +7263,25 @@ xge_hal_fix_rldram_ecc_error(xge_hal_device_t *hldev)
 	    &bar0->mc_rldram_test_ctrl);
 
 	return XGE_HAL_OK;
+}
+
+/*
+ * xge_hal_device_quiesce
+ * @hldev: HAL device object
+ * @devh : HAL device handle
+ *
+ * This is called by xge_quiesce to quiesce the device.
+ */
+void
+xge_hal_device_quiesce(xge_hal_device_t *hldev, xge_hal_device_h devh)
+{
+	/* Turn off debugging */
+	g_xge_hal_driver->debug_level = XGE_NONE;
+	g_level = &(g_xge_hal_driver->debug_level);
+
+	/* Disable device */
+	(void) xge_hal_device_disable(devh);
+
+	/* Disable Xframe interrupts */
+	xge_hal_device_intr_disable(devh);
 }

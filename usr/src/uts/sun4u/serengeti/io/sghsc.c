@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -124,12 +123,14 @@ static struct dev_ops sghsc_dev_ops = {
 	sghsc_detach,		/* detach */
 	nodev,			/* reset */
 	&sghsc_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* no bus operations */
+	(struct bus_ops *)0,	/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Serengeti CompactPCI HSC v%I%",
+	"Serengeti CompactPCI HSC",
 	&sghsc_dev_ops,
 };
 
@@ -328,7 +329,7 @@ sghsc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			break;
 		default:
 			cmn_err(CE_WARN, "sghsc%d: unsupported cmd %d",
-				instance, cmd);
+			    instance, cmd);
 			return (DDI_FAILURE);
 	}
 
@@ -497,7 +498,7 @@ sghsc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	switch (cmd) {
-	    case DDI_DETACH:
+		case DDI_DETACH:
 		/*
 		 * We don't allow to detach in case the pci nexus
 		 * didn't run pcihp_uninit(). The buses should be
@@ -531,10 +532,10 @@ sghsc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&sghsc_event_thread_mutex);
 		return (DDI_SUCCESS);
 
-	    case DDI_SUSPEND:
+		case DDI_SUSPEND:
 		return (DDI_SUCCESS);
 
-	    default:
+		default:
 		return (DDI_FAILURE);
 	}
 }
@@ -653,7 +654,7 @@ sghsc_register_slots(sghsc_t *sghsc, int board_type)
 		slot_info->pci_dev_num = slot2bus[i].pcidev;
 
 		sprintf(slot_info->pci_slot_name,
-			"sg%dslot%d", sghsc->sghsc_board, i);
+		    "sg%dslot%d", sghsc->sghsc_board, i);
 		DEBUGF(1, (CE_NOTE, "pci_slot_name is %s at pci_dev_num %d"
 		    " on node %d / board %d", slot_info->pci_slot_name,
 		    slot_info->pci_dev_num, sghsc->sghsc_node_id,
@@ -738,7 +739,7 @@ sghsc_connect(caddr_t op_arg, hpc_slot_t sloth, void *data,
 
 	switch (flag) {
 
-	    case SGHSC_ALL_SLOTS_ENABLE:
+		case SGHSC_ALL_SLOTS_ENABLE:
 		for (i = 0; i < sghsc->sghsc_num_slots; i++) {
 			/*
 			 * All slots will be marked 'empty' as HP Framework
@@ -827,7 +828,7 @@ sghsc_disconnect(caddr_t op_arg, hpc_slot_t sloth, void *data,
 	int slot_num = sghsc_get_slotnum(sghsc, sloth);
 
 	switch (flag) {
-	    case SGHSC_ALL_SLOTS_DISABLE:
+		case SGHSC_ALL_SLOTS_DISABLE:
 		return (HPC_SUCCESS);
 
 	}
@@ -995,9 +996,9 @@ sghsc_control(caddr_t op_arg, hpc_slot_t sloth, int request,
 			sghsc->sghsc_slot_table[slot].slot_status =
 			    HPC_SLOT_CONNECTED;
 		} else if (sghsc->sghsc_slot_table[slot].slot_status ==
-			HPC_SLOT_EMPTY ||
-			sghsc->sghsc_slot_table[slot].slot_status ==
-			HPC_SLOT_UNKNOWN) {
+		    HPC_SLOT_EMPTY ||
+		    sghsc->sghsc_slot_table[slot].slot_status ==
+		    HPC_SLOT_UNKNOWN) {
 			sghsc->sghsc_slot_table[slot].slot_status =
 			    HPC_SLOT_DISCONNECTED;
 		}
@@ -1005,7 +1006,7 @@ sghsc_control(caddr_t op_arg, hpc_slot_t sloth, int request,
 		 * No change
 		 */
 		*(hpc_slot_state_t *)arg =
-			sghsc->sghsc_slot_table[slot].slot_status;
+		    sghsc->sghsc_slot_table[slot].slot_status;
 
 		break;
 	}
@@ -1345,7 +1346,8 @@ sghsc_scctl(int cmd, int node_id, int board, int slot, int *resultp)
 #ifdef DEBUG_EXTENDED
 	if (cmd == SGHSC_GET_NUM_SLOTS) {
 		DEBUGF(1, (CE_NOTE, "sghsc:  node %d / board %d has %d slots",
-		    cmd_infop->node_id, cmd_infop->board, cmd_info_r_p->result);
+		    cmd_infop->node_id, cmd_infop->board,
+		    cmd_info_r_p->result));
 		*resultp = cmd_info_r_p->result;
 		return (0);
 	}
@@ -1419,9 +1421,9 @@ sghsc_freemem(sghsc_t *sghsc)
 	 */
 	for (i = 0; i < sghsc->sghsc_num_slots; i++) {
 		if (sghsc->sghsc_slot_table[i].slot_ops)
-		    hpc_free_slot_ops(sghsc->sghsc_slot_table[i].slot_ops);
+			hpc_free_slot_ops(sghsc->sghsc_slot_table[i].slot_ops);
 		if (sghsc->sghsc_slot_table[i].handle)
-		    hpc_slot_unregister(&sghsc->sghsc_slot_table[i].handle);
+			hpc_slot_unregister(&sghsc->sghsc_slot_table[i].handle);
 	}
 
 	/* finally free up slot_table */
@@ -1575,7 +1577,7 @@ sghsc_event_handler(char *arg)
 	 */
 
 	if (sghsc_rb_put(&sghsc_rb_header, rsp_data) != DDI_SUCCESS) {
-	    cmn_err(CE_WARN, "sghsc: no space to store #ENUM info");
+		cmn_err(CE_WARN, "sghsc: no space to store #ENUM info");
 		return (DDI_INTR_UNCLAIMED);
 	}
 

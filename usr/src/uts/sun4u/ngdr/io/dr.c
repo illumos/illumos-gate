@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PIM-DR layer of DR driver.  Provides interface between user
@@ -416,14 +415,15 @@ struct dev_ops dr_dev_ops = {
 	nodev,		/* reset */
 	&dr_cb_ops,	/* cb_ops */
 	(struct bus_ops *)NULL, /* bus ops */
-	NULL		/* power */
+	NULL,		/* power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Dynamic Reconfiguration %I%",
+	"Dynamic Reconfiguration",
 	&dr_dev_ops
 };
 
@@ -449,7 +449,7 @@ _init(void)
 	 * soft state structure each time a node is attached.
 	 */
 	err = ddi_soft_state_init((void **)&dr_g.softsp,
-		sizeof (dr_softstate_t), 1);
+	    sizeof (dr_softstate_t), 1);
 	if (err)
 		return (err);
 
@@ -608,12 +608,12 @@ dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	/* translate canonical name to component type */
 	if (hp->h_sbdcmd.cmd_cm.c_id.c_name[0] != '\0') {
 		hp->h_sbdcmd.cmd_cm.c_id.c_type =
-			dr_dev_type_to_nt(hp->h_sbdcmd.cmd_cm.c_id.c_name);
+		    dr_dev_type_to_nt(hp->h_sbdcmd.cmd_cm.c_id.c_name);
 
 		PR_ALL("%s: c_name = %s, c_type = %d\n",
-			f,
-			hp->h_sbdcmd.cmd_cm.c_id.c_name,
-			hp->h_sbdcmd.cmd_cm.c_id.c_type);
+		    f,
+		    hp->h_sbdcmd.cmd_cm.c_id.c_name,
+		    hp->h_sbdcmd.cmd_cm.c_id.c_type);
 	} else {
 		/*EMPTY*/
 		PR_ALL("%s: c_name is NULL\n", f);
@@ -678,7 +678,7 @@ dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		/* Board changed state. Log a sysevent. */
 		if (rv == 0)
 			(void) drmach_log_sysevent(hp->h_bd->b_num, "",
-				SE_SLEEP, 1);
+			    SE_SLEEP, 1);
 		/* Fall through */
 
 	default:
@@ -721,7 +721,7 @@ dr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		rv = ddi_soft_state_zalloc(dr_g.softsp, instance);
 		if (rv != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "dr%d: failed to alloc soft-state",
-				instance);
+			    instance);
 			return (DDI_FAILURE);
 		}
 
@@ -768,7 +768,7 @@ dr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			minor_num = DR_MAKE_MINOR(instance, bd);
 			rv = ddi_create_minor_node(dip, name, S_IFCHR,
-				minor_num, DDI_NT_SBD_ATTACHMENT_POINT, NULL);
+			    minor_num, DDI_NT_SBD_ATTACHMENT_POINT, NULL);
 			if (rv != DDI_SUCCESS)
 				rv = DDI_FAILURE;
 		}
@@ -786,9 +786,9 @@ dr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		dr_unsafe_devs.devnames = NULL;
 		rv2 = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-			"unsupported-io-drivers", &dr_unsafe_devs.devnames,
-			&dr_unsafe_devs.ndevs);
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+		    "unsupported-io-drivers", &dr_unsafe_devs.devnames,
+		    &dr_unsafe_devs.ndevs);
 
 		if (rv2 != DDI_PROP_SUCCESS)
 			dr_unsafe_devs.ndevs = 0;
@@ -900,16 +900,16 @@ dr_copyin_iocmd(dr_handle_t *hp)
 		bzero((caddr_t)&scmd32, sizeof (sbd_cmd32_t));
 
 		if (ddi_copyin((void *)hp->h_iap, (void *)&scmd32,
-			sizeof (sbd_cmd32_t), hp->h_mode)) {
+		    sizeof (sbd_cmd32_t), hp->h_mode)) {
 			cmn_err(CE_WARN,
-				"%s: (32bit) failed to copyin "
-					"sbdcmd-struct", f);
+			    "%s: (32bit) failed to copyin "
+			    "sbdcmd-struct", f);
 			return (EFAULT);
 		}
 		scp->cmd_cm.c_id.c_type = scmd32.cmd_cm.c_id.c_type;
 		scp->cmd_cm.c_id.c_unit = scmd32.cmd_cm.c_id.c_unit;
 		bcopy(&scmd32.cmd_cm.c_id.c_name[0],
-			&scp->cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
+		    &scp->cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
 		scp->cmd_cm.c_flags = scmd32.cmd_cm.c_flags;
 		scp->cmd_cm.c_len = scmd32.cmd_cm.c_len;
 		scp->cmd_cm.c_opts = (caddr_t)(uintptr_t)scmd32.cmd_cm.c_opts;
@@ -918,7 +918,7 @@ dr_copyin_iocmd(dr_handle_t *hp)
 		case SBD_CMD_STATUS:
 			scp->cmd_stat.s_nbytes = scmd32.cmd_stat.s_nbytes;
 			scp->cmd_stat.s_statp =
-				(caddr_t)(uintptr_t)scmd32.cmd_stat.s_statp;
+			    (caddr_t)(uintptr_t)scmd32.cmd_stat.s_statp;
 			break;
 		default:
 			break;
@@ -927,9 +927,9 @@ dr_copyin_iocmd(dr_handle_t *hp)
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyin((void *)hp->h_iap, (void *)scp,
-		sizeof (sbd_cmd_t), hp->h_mode) != 0) {
+	    sizeof (sbd_cmd_t), hp->h_mode) != 0) {
 		cmn_err(CE_WARN,
-			"%s: failed to copyin sbdcmd-struct", f);
+		    "%s: failed to copyin sbdcmd-struct", f);
 		return (EFAULT);
 	}
 
@@ -937,8 +937,8 @@ dr_copyin_iocmd(dr_handle_t *hp)
 		hp->h_opts.copts = GETSTRUCT(char, scp->cmd_cm.c_len + 1);
 		++hp->h_opts.size;
 		if (ddi_copyin((void *)scp->cmd_cm.c_opts,
-			(void *)hp->h_opts.copts,
-			scp->cmd_cm.c_len, hp->h_mode) != 0) {
+		    (void *)hp->h_opts.copts,
+		    scp->cmd_cm.c_len, hp->h_mode) != 0) {
 			cmn_err(CE_WARN, "%s: failed to copyin options", f);
 			return (EFAULT);
 		}
@@ -962,7 +962,7 @@ dr_copyout_iocmd(dr_handle_t *hp)
 		scmd32.cmd_cm.c_id.c_type = scp->cmd_cm.c_id.c_type;
 		scmd32.cmd_cm.c_id.c_unit = scp->cmd_cm.c_id.c_unit;
 		bcopy(&scp->cmd_cm.c_id.c_name[0],
-			&scmd32.cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
+		    &scmd32.cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
 
 		scmd32.cmd_cm.c_flags = scp->cmd_cm.c_flags;
 		scmd32.cmd_cm.c_len = scp->cmd_cm.c_len;
@@ -977,18 +977,18 @@ dr_copyout_iocmd(dr_handle_t *hp)
 		}
 
 		if (ddi_copyout((void *)&scmd32, (void *)hp->h_iap,
-			sizeof (sbd_cmd32_t), hp->h_mode)) {
+		    sizeof (sbd_cmd32_t), hp->h_mode)) {
 			cmn_err(CE_WARN,
-				"%s: (32bit) failed to copyout "
-					"sbdcmd-struct", f);
+			    "%s: (32bit) failed to copyout "
+			    "sbdcmd-struct", f);
 			return (EFAULT);
 		}
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyout((void *)scp, (void *)hp->h_iap,
-		sizeof (sbd_cmd_t), hp->h_mode) != 0) {
+	    sizeof (sbd_cmd_t), hp->h_mode) != 0) {
 		cmn_err(CE_WARN,
-			"%s: failed to copyout sbdcmd-struct", f);
+		    "%s: failed to copyout sbdcmd-struct", f);
 		return (EFAULT);
 	}
 
@@ -1005,7 +1005,7 @@ dr_copyout_errs(dr_handle_t *hp)
 
 	if (hp->h_err->e_code) {
 		PR_ALL("%s: error %d %s",
-			f, hp->h_err->e_code, hp->h_err->e_rsc);
+		    f, hp->h_err->e_code, hp->h_err->e_rsc);
 	}
 
 #ifdef _MULTI_DATAMODEL
@@ -1016,22 +1016,22 @@ dr_copyout_errs(dr_handle_t *hp)
 
 		serr32p->e_code = hp->h_err->e_code;
 		bcopy(&hp->h_err->e_rsc[0], &serr32p->e_rsc[0],
-			MAXPATHLEN);
+		    MAXPATHLEN);
 		if (ddi_copyout((void *)serr32p,
-			(void *)&((sbd_ioctl_arg32_t *)hp->h_iap)->i_err,
-			sizeof (sbd_error32_t), hp->h_mode)) {
+		    (void *)&((sbd_ioctl_arg32_t *)hp->h_iap)->i_err,
+		    sizeof (sbd_error32_t), hp->h_mode)) {
 			cmn_err(CE_WARN,
-				"%s: (32bit) failed to copyout", f);
+			    "%s: (32bit) failed to copyout", f);
 			return (EFAULT);
 		}
 		FREESTRUCT(serr32p, sbd_error32_t, 1);
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyout((void *)hp->h_err,
-		(void *)&hp->h_iap->i_err,
-		sizeof (sbd_error_t), hp->h_mode)) {
+	    (void *)&hp->h_iap->i_err,
+	    sizeof (sbd_error_t), hp->h_mode)) {
 		cmn_err(CE_WARN,
-			"%s: failed to copyout", f);
+		    "%s: failed to copyout", f);
 		return (EFAULT);
 	}
 
@@ -1063,7 +1063,7 @@ dr_pre_op(dr_handle_t *hp)
 	hp->h_err = drmach_pre_op(cmd, bp->b_id, &hp->h_opts);
 	if (hp->h_err != NULL) {
 		PR_ALL("drmach_pre_op failed for cmd %s(%d)\n",
-			SBD_CMD_STR(cmd), cmd);
+		    SBD_CMD_STR(cmd), cmd);
 		return (-1);
 	}
 
@@ -1086,19 +1086,19 @@ dr_pre_op(dr_handle_t *hp)
 			dr_op_err(CE_IGNORE, hp, ESBD_INVAL, NULL);
 			serr = -1;
 			PR_ALL("%s: invalid devset (0x%x)\n",
-				f, (uint_t)devset);
+			    f, (uint_t)devset);
 		} else if (state_err != 0) {
 			/*
 			 * State transition is not a valid one.
 			 */
 			dr_op_err(CE_IGNORE, hp,
-				transp->x_op[state_err].x_err, NULL);
+			    transp->x_op[state_err].x_err, NULL);
 
 			serr = transp->x_op[state_err].x_rv;
 
 			PR_ALL("%s: invalid state %s(%d) for cmd %s(%d)\n",
-				f, state_str[state_err], state_err,
-				SBD_CMD_STR(cmd), cmd);
+			    f, state_str[state_err], state_err,
+			    SBD_CMD_STR(cmd), cmd);
 		} else {
 			shp->h_devset = devset;
 		}
@@ -1129,7 +1129,7 @@ dr_post_op(dr_handle_t *hp)
 	hp->h_err = drmach_post_op(cmd, bp->b_id, &hp->h_opts);
 	if (hp->h_err != NULL) {
 		PR_ALL("drmach_post_op failed for cmd %s(%d)\n",
-			SBD_CMD_STR(cmd), cmd);
+		    SBD_CMD_STR(cmd), cmd);
 		return (-1);
 	}
 
@@ -1214,8 +1214,8 @@ dr_exec_op(dr_handle_t *hp)
 
 	default:
 		cmn_err(CE_WARN,
-			"%s: unknown command (%d)",
-			f, hp->h_cmd);
+		    "%s: unknown command (%d)",
+		    f, hp->h_cmd);
 		break;
 	}
 
@@ -1355,7 +1355,7 @@ dr_connect(dr_handle_t *hp)
 		 * Board already has devices present.
 		 */
 		PR_ALL("%s: devices already present (0x%lx)\n",
-			f, DR_DEVS_PRESENT(bp));
+		    f, DR_DEVS_PRESENT(bp));
 		return;
 	}
 
@@ -1391,7 +1391,7 @@ dr_disconnect(dr_handle_t *hp)
 	 * unattached can be disconnected.
 	 */
 	devset = hp->h_devset & DR_DEVS_PRESENT(bp) &
-		DR_DEVS_UNATTACHED(bp);
+	    DR_DEVS_UNATTACHED(bp);
 
 	if ((devset == 0) && DR_DEVS_PRESENT(bp)) {
 		dr_op_err(CE_IGNORE, hp, ESBD_EMPTY_BD, bp->b_path);
@@ -1475,11 +1475,11 @@ dr_disconnect(dr_handle_t *hp)
 		 * changed to avoid the e_code testing.
 		 */
 		if ((hp->h_err->e_code == ESTC_MBXRPLY) ||
-			(hp->h_err->e_code == ESTC_MBXRQST) ||
-			(hp->h_err->e_code == ESTC_SMS_ERR_UNRECOVERABLE) ||
-			(hp->h_err->e_code == ESTC_SMS_ERR_RECOVERABLE) ||
-			(hp->h_err->e_code == ESTC_DEPROBE) ||
-			(hp->h_err->e_code == EOPL_DEPROBE)) {
+		    (hp->h_err->e_code == ESTC_MBXRQST) ||
+		    (hp->h_err->e_code == ESTC_SMS_ERR_UNRECOVERABLE) ||
+		    (hp->h_err->e_code == ESTC_SMS_ERR_RECOVERABLE) ||
+		    (hp->h_err->e_code == ESTC_DEPROBE) ||
+		    (hp->h_err->e_code == EOPL_DEPROBE)) {
 			bp->b_ostate = SBD_STAT_UNCONFIGURED;
 			bp->b_busy = 0;
 			(void) drv_getparm(TIME, (void *)&bp->b_time);
@@ -1752,7 +1752,7 @@ dr_attach_update_state(dr_handle_t *hp,
 
 		if (dr_check_unit_attached(cp) == -1) {
 			PR_ALL("%s: ERROR %s not attached\n",
-				f, cp->sbdev_path);
+			    f, cp->sbdev_path);
 			continue;
 		}
 
@@ -1817,25 +1817,25 @@ dr_dev_configure(dr_handle_t *hp)
 	int rv;
 
 	rv = dr_dev_walk(hp, SBD_COMP_CPU, 1,
-		dr_pre_attach_cpu,
-		dr_attach_cpu,
-		dr_post_attach_cpu,
-		dr_attach_update_state);
+	    dr_pre_attach_cpu,
+	    dr_attach_cpu,
+	    dr_post_attach_cpu,
+	    dr_attach_update_state);
 
 	if (rv >= 0) {
 		rv = dr_dev_walk(hp, SBD_COMP_MEM, 1,
-			dr_pre_attach_mem,
-			dr_attach_mem,
-			dr_post_attach_mem,
-			dr_attach_update_state);
+		    dr_pre_attach_mem,
+		    dr_attach_mem,
+		    dr_post_attach_mem,
+		    dr_attach_update_state);
 	}
 
 	if (rv >= 0) {
 		(void) dr_dev_walk(hp, SBD_COMP_IO, 1,
-			dr_pre_attach_io,
-			dr_attach_io,
-			dr_post_attach_io,
-			dr_attach_update_state);
+		    dr_pre_attach_io,
+		    dr_attach_io,
+		    dr_post_attach_io,
+		    dr_attach_update_state);
 	}
 }
 
@@ -1853,7 +1853,7 @@ dr_release_update_state(dr_handle_t *hp,
 	 * unreferenced then transfer it to the UNREFERENCED state.
 	 */
 	if ((bp->b_state != DR_STATE_RELEASE) &&
-		(DR_DEVS_RELEASED(bp) == DR_DEVS_ATTACHED(bp))) {
+	    (DR_DEVS_RELEASED(bp) == DR_DEVS_ATTACHED(bp))) {
 		dr_board_transition(bp, DR_STATE_RELEASE);
 		hp->h_bd->b_busy = 1;
 	}
@@ -1914,7 +1914,7 @@ dr_release_done(dr_handle_t *hp, dr_common_unit_t *cp)
 	 * attached, then transfer the board to the RELEASE state.
 	 */
 	if ((bp->b_state == DR_STATE_RELEASE) &&
-		(DR_DEVS_RELEASED(bp) == DR_DEVS_UNREFERENCED(bp))) {
+	    (DR_DEVS_RELEASED(bp) == DR_DEVS_UNREFERENCED(bp))) {
 		dr_board_transition(bp, DR_STATE_UNREFERENCED);
 		bp->b_busy = 1;
 		(void) drv_getparm(TIME, (void *)&bp->b_time);
@@ -1936,25 +1936,25 @@ dr_dev_release(dr_handle_t *hp)
 	hp->h_bd->b_busy = 1;
 
 	rv = dr_dev_walk(hp, SBD_COMP_CPU, 0,
-		dr_pre_release_cpu,
-		dr_release_done,
-		dr_dev_noop,
-		dr_release_update_state);
+	    dr_pre_release_cpu,
+	    dr_release_done,
+	    dr_dev_noop,
+	    dr_release_update_state);
 
 	if (rv >= 0) {
 		rv = dr_dev_walk(hp, SBD_COMP_MEM, 0,
-			dr_pre_release_mem,
-			dr_dev_release_mem,
-			dr_dev_noop,
-			dr_release_update_state);
+		    dr_pre_release_mem,
+		    dr_dev_release_mem,
+		    dr_dev_noop,
+		    dr_release_update_state);
 	}
 
 	if (rv >= 0) {
 		rv = dr_dev_walk(hp, SBD_COMP_IO, 0,
-			dr_pre_release_io,
-			dr_release_done,
-			dr_dev_noop,
-			dr_release_update_state);
+		    dr_pre_release_io,
+		    dr_release_done,
+		    dr_dev_noop,
+		    dr_release_update_state);
 
 	}
 
@@ -1981,7 +1981,7 @@ dr_detach_update_state(dr_handle_t *hp,
 			 * to an error.  Need to keep track of it.
 			 */
 			PR_ALL("%s: ERROR %s not detached\n",
-				f, cp->sbdev_path);
+			    f, cp->sbdev_path);
 
 			continue;
 		}
@@ -2002,8 +2002,8 @@ dr_detach_update_state(dr_handle_t *hp,
 			hp->h_bd->b_ostate = SBD_STAT_UNCONFIGURED;
 			(void) drv_getparm(TIME, (void *)&hp->h_bd->b_time);
 		} else if ((bp->b_state != DR_STATE_PARTIAL) &&
-			(DR_DEVS_ATTACHED(bp) !=
-			DR_DEVS_PRESENT(bp))) {
+		    (DR_DEVS_ATTACHED(bp) !=
+		    DR_DEVS_PRESENT(bp))) {
 			/*
 			 * Some devices remain attached.
 			 */
@@ -2035,24 +2035,24 @@ dr_dev_unconfigure(dr_handle_t *hp)
 	mutex_exit(&bp->b_slock);
 
 	(void) dr_dev_walk(hp, SBD_COMP_IO, 0,
-		dr_pre_detach_io,
-		dr_detach_io,
-		dr_post_detach_io,
-		dr_detach_update_state);
+	    dr_pre_detach_io,
+	    dr_detach_io,
+	    dr_post_detach_io,
+	    dr_detach_update_state);
 
 	dr_unlock_status(bp);
 
 	(void) dr_dev_walk(hp, SBD_COMP_CPU, 0,
-		dr_pre_detach_cpu,
-		dr_detach_cpu,
-		dr_post_detach_cpu,
-		dr_detach_update_state);
+	    dr_pre_detach_cpu,
+	    dr_detach_cpu,
+	    dr_post_detach_cpu,
+	    dr_detach_update_state);
 
 	(void) dr_dev_walk(hp, SBD_COMP_MEM, 0,
-		dr_pre_detach_mem,
-		dr_detach_mem,
-		dr_post_detach_mem,
-		dr_detach_update_state);
+	    dr_pre_detach_mem,
+	    dr_detach_mem,
+	    dr_post_detach_mem,
+	    dr_detach_update_state);
 
 	return (0);
 }
@@ -2194,8 +2194,8 @@ dr_dev_status(dr_handle_t *hp)
 		 * receptacle buffer at copyout time.
 		 */
 			ncm = MAX_CPU_UNITS_PER_BOARD +
-				MAX_MEM_UNITS_PER_BOARD +
-				MAX_IO_UNITS_PER_BOARD;
+			    MAX_MEM_UNITS_PER_BOARD +
+			    MAX_IO_UNITS_PER_BOARD;
 
 		} else {
 			/*
@@ -2233,7 +2233,7 @@ dr_dev_status(dr_handle_t *hp)
 		if (ncm > 1)
 			sz32  += sizeof (sbd_dev_stat32_t) * (ncm - 1);
 		pnstat = (pbsz - sizeof (sbd_stat32_t))/
-			sizeof (sbd_dev_stat32_t);
+		    sizeof (sbd_dev_stat32_t);
 	}
 
 	sz += sz32;
@@ -2328,7 +2328,7 @@ dr_dev_status(dr_handle_t *hp)
 		/* Alignment Paranoia */
 		if ((ulong_t)dstat32p & 0x1) {
 			PR_ALL("%s: alignment: sz=0x%lx dstat32p=0x%p\n",
-				f, sizeof (sbd_stat32_t), dstat32p);
+			    f, sizeof (sbd_stat32_t), dstat32p);
 			DR_OP_INTERNAL_ERROR(hp);
 			rv = EINVAL;
 			goto status_done;
@@ -2336,7 +2336,7 @@ dr_dev_status(dr_handle_t *hp)
 
 		/* paranoia: detect buffer overrun */
 		if ((caddr_t)&dstat32p->s_stat[dstatp->s_nstat] >
-				((caddr_t)dstatp) + sz) {
+		    ((caddr_t)dstatp) + sz) {
 			DR_OP_INTERNAL_ERROR(hp);
 			rv = EINVAL;
 			goto status_done;
@@ -2354,9 +2354,9 @@ dr_dev_status(dr_handle_t *hp)
 		_SBD_STAT(uint32_t, s_assigned);
 		_SBD_STAT(int32_t, s_nstat);
 		bcopy(&dstatp->s_type[0], &dstat32p->s_type[0],
-			SBD_TYPE_LEN);
+		    SBD_TYPE_LEN);
 		bcopy(&dstatp->s_info[0], &dstat32p->s_info[0],
-			SBD_MAX_INFO);
+		    SBD_MAX_INFO);
 #undef _SBD_STAT
 
 		for (i = 0; i < dstatp->s_nstat; i++) {
@@ -2398,8 +2398,8 @@ dr_dev_status(dr_handle_t *hp)
 				_SBD_DEV_STAT(int32_t, d_mem.ms_cage_enabled);
 				_SBD_DEV_STAT(int32_t, d_mem.ms_peer_is_target);
 				bcopy(&dsp->d_mem.ms_peer_ap_id[0],
-					&ds32p->d_mem.ms_peer_ap_id[0],
-					sizeof (ds32p->d_mem.ms_peer_ap_id));
+				    &ds32p->d_mem.ms_peer_ap_id[0],
+				    sizeof (ds32p->d_mem.ms_peer_ap_id));
 				break;
 
 			case SBD_COMP_IO:
@@ -2409,7 +2409,7 @@ dr_dev_status(dr_handle_t *hp)
 
 				for (j = 0; j < SBD_MAX_UNSAFE; j++)
 					_SBD_DEV_STAT(int32_t,
-						d_io.is_unsafe_list[j]);
+					    d_io.is_unsafe_list[j]);
 
 				bcopy(&dsp->d_io.is_pathname[0],
 				    &ds32p->d_io.is_pathname[0], MAXPATHLEN);
@@ -2418,8 +2418,8 @@ dr_dev_status(dr_handle_t *hp)
 			case SBD_COMP_CMP:
 				/* copy sbd_cmp_stat_t structure members */
 				bcopy(&dsp->d_cmp.ps_cpuid[0],
-					&ds32p->d_cmp.ps_cpuid[0],
-					sizeof (ds32p->d_cmp.ps_cpuid));
+				    &ds32p->d_cmp.ps_cpuid[0],
+				    sizeof (ds32p->d_cmp.ps_cpuid));
 				_SBD_DEV_STAT(int32_t, d_cmp.ps_ncores);
 				_SBD_DEV_STAT(int32_t, d_cmp.ps_speed);
 				_SBD_DEV_STAT(int32_t, d_cmp.ps_ecache);
@@ -2436,10 +2436,10 @@ dr_dev_status(dr_handle_t *hp)
 
 
 		if (ddi_copyout((void *)dstat32p,
-			hp->h_sbdcmd.cmd_stat.s_statp, pbsz, mode) != 0) {
+		    hp->h_sbdcmd.cmd_stat.s_statp, pbsz, mode) != 0) {
 			cmn_err(CE_WARN,
-				"%s: failed to copyout status "
-				"for board %d", f, bp->b_num);
+			    "%s: failed to copyout status "
+			    "for board %d", f, bp->b_num);
 			rv = EFAULT;
 			goto status_done;
 		}
@@ -2447,10 +2447,10 @@ dr_dev_status(dr_handle_t *hp)
 #endif /* _MULTI_DATAMODEL */
 
 	if (ddi_copyout((void *)dstatp, hp->h_sbdcmd.cmd_stat.s_statp,
-		pbsz, mode) != 0) {
+	    pbsz, mode) != 0) {
 		cmn_err(CE_WARN,
-			"%s: failed to copyout status for board %d",
-			f, bp->b_num);
+		    "%s: failed to copyout status for board %d",
+		    f, bp->b_num);
 		rv = EFAULT;
 		goto status_done;
 	}
@@ -2474,7 +2474,7 @@ dr_get_ncm(dr_handle_t *hp)
 	devset = DR_DEVS_PRESENT(hp->h_bd);
 	if (hp->h_sbdcmd.cmd_cm.c_id.c_type != SBD_COMP_NONE)
 		devset &= DEVSET(hp->h_sbdcmd.cmd_cm.c_id.c_type,
-			DEVSET_ANYUNIT);
+		    DEVSET_ANYUNIT);
 
 	/*
 	 * Handle CPUs first to deal with possible CMP
@@ -2588,8 +2588,8 @@ dr_dev2devset(sbd_comp_id_t *cid)
 		case SBD_COMP_CPU:
 			if ((unit > MAX_CPU_UNITS_PER_BOARD) || (unit < 0)) {
 				cmn_err(CE_WARN,
-					"%s: invalid cpu unit# = %d",
-					f, unit);
+				    "%s: invalid cpu unit# = %d",
+				    f, unit);
 				devset = 0;
 			} else {
 				/*
@@ -2614,8 +2614,8 @@ dr_dev2devset(sbd_comp_id_t *cid)
 
 			if ((unit > MAX_MEM_UNITS_PER_BOARD) || (unit < 0)) {
 				cmn_err(CE_WARN,
-					"%s: invalid mem unit# = %d",
-					f, unit);
+				    "%s: invalid mem unit# = %d",
+				    f, unit);
 				devset = 0;
 			} else
 				devset = DEVSET(cid->c_type, unit);
@@ -2626,8 +2626,8 @@ dr_dev2devset(sbd_comp_id_t *cid)
 		case SBD_COMP_IO:
 			if ((unit > MAX_IO_UNITS_PER_BOARD) || (unit < 0)) {
 				cmn_err(CE_WARN,
-					"%s: invalid io unit# = %d",
-					f, unit);
+				    "%s: invalid io unit# = %d",
+				    f, unit);
 				devset = 0;
 			} else
 				devset = DEVSET(cid->c_type, unit);
@@ -2752,7 +2752,7 @@ dr_check_transition(dr_board_t *bp, dr_devset_t *devsetp,
 	}
 
 	PR_ALL("%s: requested devset = 0x%x, final devset = 0x%x\n",
-		f, (uint_t)*devsetp, (uint_t)devset);
+	    f, (uint_t)*devsetp, (uint_t)devset);
 
 	*devsetp = devset;
 	/*
@@ -2772,9 +2772,9 @@ void
 dr_device_transition(dr_common_unit_t *cp, dr_state_t st)
 {
 	PR_STATE("%s STATE %s(%d) -> %s(%d)\n",
-		cp->sbdev_path,
-		state_str[cp->sbdev_state], cp->sbdev_state,
-		state_str[st], st);
+	    cp->sbdev_path,
+	    state_str[cp->sbdev_state], cp->sbdev_state,
+	    state_str[st], st);
 
 	cp->sbdev_state = st;
 	if (st == DR_STATE_CONFIGURED) {
@@ -2782,7 +2782,7 @@ dr_device_transition(dr_common_unit_t *cp, dr_state_t st)
 		if (cp->sbdev_bp->b_ostate != SBD_STAT_CONFIGURED) {
 			cp->sbdev_bp->b_ostate = SBD_STAT_CONFIGURED;
 			(void) drv_getparm(TIME,
-				(void *) &cp->sbdev_bp->b_time);
+			    (void *) &cp->sbdev_bp->b_time);
 		}
 	} else
 		cp->sbdev_ostate = SBD_STAT_UNCONFIGURED;
@@ -2794,9 +2794,9 @@ static void
 dr_board_transition(dr_board_t *bp, dr_state_t st)
 {
 	PR_STATE("BOARD %d STATE: %s(%d) -> %s(%d)\n",
-		bp->b_num,
-		state_str[bp->b_state], bp->b_state,
-		state_str[st], st);
+	    bp->b_num,
+	    state_str[bp->b_state], bp->b_state,
+	    state_str[st], st);
 
 	bp->b_state = st;
 }
@@ -2843,7 +2843,7 @@ dr_dev_found(void *data, const char *name, int unum, drmachid_t id)
 	static fn_t	f = "dr_dev_found";
 
 	PR_ALL("%s (board = %d, name = %s, unum = %d, id = %p)...\n",
-		f, bp->b_num, name, unum, id);
+	    f, bp->b_num, name, unum, id);
 
 	nt = dr_dev_type_to_nt((char *)name);
 	if (nt == SBD_COMP_UNKNOWN) {
@@ -2864,9 +2864,9 @@ dr_dev_found(void *data, const char *name, int unum, drmachid_t id)
 
 	/* render dynamic attachment point path of this unit */
 	(void) snprintf(dp->du_common.sbdev_path,
-		sizeof (dp->du_common.sbdev_path),
-		(nt == SBD_COMP_MEM ? "%s::%s" : "%s::%s%d"),
-		bp->b_path, name, DR_UNUM2SBD_UNUM(unum, nt));
+	    sizeof (dp->du_common.sbdev_path),
+	    (nt == SBD_COMP_MEM ? "%s::%s" : "%s::%s%d"),
+	    bp->b_path, name, DR_UNUM2SBD_UNUM(unum, nt));
 
 	dp->du_common.sbdev_id = id;
 	DR_DEV_SET_PRESENT(&dp->du_common);
@@ -2933,7 +2933,7 @@ dr_init_devlists(dr_board_t *bp)
 	if (bp->b_id) {
 		/* find devices on this board */
 		err = drmach_board_find_devices(
-			bp->b_id, bp, dr_dev_found);
+		    bp->b_id, bp, dr_dev_found);
 	}
 
 	return (err);
@@ -2996,7 +2996,7 @@ dr_check_unit_attached(dr_common_unit_t *cp)
 		memlist_read_lock();
 		for (ml = phys_install; ml; ml = ml->next)
 			if ((endpa <= ml->address) ||
-				(basepa >= (ml->address + ml->size)))
+			    (basepa >= (ml->address + ml->size)))
 				continue;
 			else
 				break;
@@ -3017,7 +3017,7 @@ dr_check_unit_attached(dr_common_unit_t *cp)
 
 	default:
 		PR_ALL("%s: unexpected nodetype(%d) for id 0x%p\n",
-			f, cp->sbdev_type, cp->sbdev_id);
+		    f, cp->sbdev_type, cp->sbdev_id);
 		rv = -1;
 		break;
 	}
@@ -3114,7 +3114,7 @@ dr_board_discovery(dr_board_t *bp)
 
 	if (DR_DEVS_PRESENT(bp) == 0) {
 		PR_ALL("%s: board %d has no devices present\n",
-			f, bp->b_num);
+		    f, bp->b_num);
 		return;
 	}
 
@@ -3131,7 +3131,7 @@ dr_board_discovery(dr_board_t *bp)
 			DR_DEV_SET_ATTACHED(&cp->sbc_cm);
 			DEVSET_ADD(devs_attached, SBD_COMP_CPU, i);
 			PR_ALL("%s: board %d, cpu-unit %d - attached\n",
-				f, bp->b_num, i);
+			    f, bp->b_num, i);
 		}
 		dr_init_cpu_unit(cp);
 	}
@@ -3149,7 +3149,7 @@ dr_board_discovery(dr_board_t *bp)
 			DR_DEV_SET_ATTACHED(&mp->sbm_cm);
 			DEVSET_ADD(devs_attached, SBD_COMP_MEM, i);
 			PR_ALL("%s: board %d, mem-unit %d - attached\n",
-				f, bp->b_num, i);
+			    f, bp->b_num, i);
 		}
 		dr_init_mem_unit(mp);
 	}
@@ -3170,7 +3170,7 @@ dr_board_discovery(dr_board_t *bp)
 			DR_DEV_SET_ATTACHED(&ip->sbi_cm);
 			DEVSET_ADD(devs_attached, SBD_COMP_IO, i);
 			PR_ALL("%s: board %d, io-unit %d - attached\n",
-				f, bp->b_num, i);
+			    f, bp->b_num, i);
 		}
 		dr_init_io_unit(ip);
 	}
@@ -3241,13 +3241,13 @@ dr_board_init(dr_board_t *bp, dev_info_t *dip, int bd)
 	bp->b_dip = dip;
 
 	bp->b_dev[NIX(SBD_COMP_CPU)] = GETSTRUCT(dr_dev_unit_t,
-		MAX_CPU_UNITS_PER_BOARD);
+	    MAX_CPU_UNITS_PER_BOARD);
 
 	bp->b_dev[NIX(SBD_COMP_MEM)] = GETSTRUCT(dr_dev_unit_t,
-		MAX_MEM_UNITS_PER_BOARD);
+	    MAX_MEM_UNITS_PER_BOARD);
 
 	bp->b_dev[NIX(SBD_COMP_IO)] = GETSTRUCT(dr_dev_unit_t,
-		MAX_IO_UNITS_PER_BOARD);
+	    MAX_IO_UNITS_PER_BOARD);
 
 	/*
 	 * Initialize the devlists
@@ -3303,7 +3303,7 @@ static void
 dr_board_destroy(dr_board_t *bp)
 {
 	PR_ALL("dr_board_destroy: num %d, path %s\n",
-		bp->b_num, bp->b_path);
+	    bp->b_num, bp->b_path);
 
 	dr_board_transition(bp, DR_STATE_EMPTY);
 	bp->b_rstate = SBD_STAT_EMPTY;
@@ -3313,19 +3313,19 @@ dr_board_destroy(dr_board_t *bp)
 	 * Free up MEM unit structs.
 	 */
 	FREESTRUCT(bp->b_dev[NIX(SBD_COMP_MEM)],
-		dr_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
+	    dr_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
 	bp->b_dev[NIX(SBD_COMP_MEM)] = NULL;
 	/*
 	 * Free up CPU unit structs.
 	 */
 	FREESTRUCT(bp->b_dev[NIX(SBD_COMP_CPU)],
-		dr_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
+	    dr_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
 	bp->b_dev[NIX(SBD_COMP_CPU)] = NULL;
 	/*
 	 * Free up IO unit structs.
 	 */
 	FREESTRUCT(bp->b_dev[NIX(SBD_COMP_IO)],
-		dr_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
+	    dr_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
 	bp->b_dev[NIX(SBD_COMP_IO)] = NULL;
 
 	mutex_destroy(&bp->b_lock);

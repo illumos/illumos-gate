@@ -18,9 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 					/* from S5R4 1.22 */
 
 /*
@@ -98,8 +97,9 @@ struct dev_ops	sy_ops = {
 	nodev,			/* detach */
 	nodev,			/* reset */
 	&sy_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
-
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 
@@ -115,7 +115,7 @@ extern struct dev_ops sy_ops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Indirect driver for tty 'sy' %I%",
+	"Indirect driver for tty 'sy'",
 	&sy_ops,	/* driver ops */
 };
 

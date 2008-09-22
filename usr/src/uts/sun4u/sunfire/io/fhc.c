@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -421,7 +420,8 @@ static struct dev_ops fhc_ops = {
 	nulldev,		/* reset */
 	&fhc_cb_ops,		/* cb_ops */
 	&fhc_bus_ops,		/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -434,7 +434,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"FHC Nexus v%I%",	/* Name of module. */
+	"FHC Nexus",		/* Name of module. */
 	&fhc_ops,		/* driver ops */
 };
 
@@ -547,7 +547,7 @@ fhc_handle_imr(struct fhc_soft_state *softsp)
 				}
 			}
 			cmn_err(CE_NOTE, "central IGN corruption fixed: "
-				"got %x wanted %x", act_igr, want_igr);
+			    "got %x wanted %x", act_igr, want_igr);
 		}
 		return;
 	}
@@ -768,7 +768,7 @@ fhc_board_type(struct fhc_soft_state *softsp, int board)
 		if (cpu_on_board(board))
 			type = CPU_BOARD;
 		else if ((*(softsp->bsr) & FHC_UPADATA64A) ||
-			(*(softsp->bsr) & FHC_UPADATA64B))
+		    (*(softsp->bsr) & FHC_UPADATA64B))
 			type = IO_2SBUS_BOARD;
 		else
 			type = MEM_BOARD;
@@ -792,26 +792,26 @@ fhc_unmap_regs(struct fhc_soft_state *softsp)
 	}
 	if (softsp->intr_regs[FHC_FANFAIL_INO].mapping_reg) {
 		ddi_unmap_regs(dip, 2,
-		(caddr_t *)&softsp->intr_regs[FHC_FANFAIL_INO].mapping_reg,
-		0, 0);
+		    (caddr_t *)&softsp->intr_regs[FHC_FANFAIL_INO].mapping_reg,
+		    0, 0);
 		softsp->intr_regs[FHC_FANFAIL_INO].mapping_reg = NULL;
 	}
 	if (softsp->intr_regs[FHC_SYS_INO].mapping_reg) {
 		ddi_unmap_regs(dip, 3,
-		(caddr_t *)&softsp->intr_regs[FHC_SYS_INO].mapping_reg,
-		0, 0);
+		    (caddr_t *)&softsp->intr_regs[FHC_SYS_INO].mapping_reg,
+		    0, 0);
 		softsp->intr_regs[FHC_SYS_INO].mapping_reg = NULL;
 	}
 	if (softsp->intr_regs[FHC_UART_INO].mapping_reg) {
 		ddi_unmap_regs(dip, 4,
-		(caddr_t *)&softsp->intr_regs[FHC_UART_INO].mapping_reg,
-		0, 0);
+		    (caddr_t *)&softsp->intr_regs[FHC_UART_INO].mapping_reg,
+		    0, 0);
 		softsp->intr_regs[FHC_UART_INO].mapping_reg = NULL;
 	}
 	if (softsp->intr_regs[FHC_TOD_INO].mapping_reg) {
 		ddi_unmap_regs(dip, 5,
-		(caddr_t *)&softsp->intr_regs[FHC_TOD_INO].mapping_reg,
-		0, 0);
+		    (caddr_t *)&softsp->intr_regs[FHC_TOD_INO].mapping_reg,
+		    0, 0);
 		softsp->intr_regs[FHC_TOD_INO].mapping_reg = NULL;
 	}
 }
@@ -832,7 +832,7 @@ fhc_init(struct fhc_soft_state *softsp)
 	if (ddi_map_regs(softsp->dip, 0,
 	    (caddr_t *)&softsp->id, 0, 0)) {
 		cmn_err(CE_WARN, "fhc%d: unable to map internal "
-			"registers", ddi_get_instance(softsp->dip));
+		    "registers", ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -841,21 +841,21 @@ fhc_init(struct fhc_soft_state *softsp)
 	 * fhc_soft_state structure.
 	 */
 	softsp->rctrl = (uint_t *)((char *)(softsp->id) +
-		FHC_OFF_RCTRL);
+	    FHC_OFF_RCTRL);
 	softsp->ctrl = (uint_t *)((char *)(softsp->id) +
-		FHC_OFF_CTRL);
+	    FHC_OFF_CTRL);
 	softsp->bsr = (uint_t *)((char *)(softsp->id) +
-		FHC_OFF_BSR);
+	    FHC_OFF_BSR);
 	softsp->jtag_ctrl = (uint_t *)((char *)(softsp->id) +
-		FHC_OFF_JTAG_CTRL);
+	    FHC_OFF_JTAG_CTRL);
 	softsp->jt_master.jtag_cmd = (uint_t *)((char *)(softsp->id) +
-		FHC_OFF_JTAG_CMD);
+	    FHC_OFF_JTAG_CMD);
 
 	/* map in register set 1 */
 	if (ddi_map_regs(softsp->dip, 1,
 	    (caddr_t *)&softsp->igr, 0, 0)) {
 		cmn_err(CE_WARN, "fhc%d: unable to map IGR "
-			"register", ddi_get_instance(softsp->dip));
+		    "register", ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -868,7 +868,7 @@ fhc_init(struct fhc_soft_state *softsp)
 	    (caddr_t *)&softsp->intr_regs[FHC_FANFAIL_INO].mapping_reg,
 	    0, 0)) {
 		cmn_err(CE_WARN, "fhc%d: unable to map Fan Fail "
-			"IMR register", ddi_get_instance(softsp->dip));
+		    "IMR register", ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -877,7 +877,7 @@ fhc_init(struct fhc_soft_state *softsp)
 	    (caddr_t *)&softsp->intr_regs[FHC_SYS_INO].mapping_reg,
 	    0, 0)) {
 		cmn_err(CE_WARN, "fhc%d: unable to map System "
-			"IMR register\n", ddi_get_instance(softsp->dip));
+		    "IMR register\n", ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -886,7 +886,7 @@ fhc_init(struct fhc_soft_state *softsp)
 	    (caddr_t *)&softsp->intr_regs[FHC_UART_INO].mapping_reg,
 	    0, 0)) {
 		cmn_err(CE_WARN, "fhc%d: unable to map UART "
-			"IMR register\n", ddi_get_instance(softsp->dip));
+		    "IMR register\n", ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -895,7 +895,7 @@ fhc_init(struct fhc_soft_state *softsp)
 	    (caddr_t *)&softsp->intr_regs[FHC_TOD_INO].mapping_reg,
 	    0, 0)) {
 		cmn_err(CE_WARN, "fhc%d: unable to map FHC TOD "
-			"IMR register", ddi_get_instance(softsp->dip));
+		    "IMR register", ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -903,8 +903,8 @@ fhc_init(struct fhc_soft_state *softsp)
 	/* TODO - Make sure we are calculating the ISMR correctly. */
 	for (i = 0; i < FHC_MAX_INO; i++) {
 		softsp->intr_regs[i].clear_reg =
-			(uint_t *)((char *)(softsp->intr_regs[i].mapping_reg) +
-			FHC_OFF_ISMR);
+		    (uint_t *)((char *)(softsp->intr_regs[i].mapping_reg) +
+		    FHC_OFF_ISMR);
 
 		/* Now clear the state machines to idle */
 		*(softsp->intr_regs[i].clear_reg) = ISM_IDLE;
@@ -1324,7 +1324,7 @@ fhc_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	volatile uint_t tmpreg;
 	int i;
 	struct fhc_soft_state *softsp = (struct fhc_soft_state *)
-		ddi_get_soft_state(fhcp, ddi_get_instance(dip));
+	    ddi_get_soft_state(fhcp, ddi_get_instance(dip));
 	int ino;
 
 	/* Xlate the interrupt */
@@ -1355,7 +1355,7 @@ fhc_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		/* If we did not find an entry, then we have a problem */
 		if (!intr_found) {
 			cmn_err(CE_WARN, "fhc%d: Intrspec not found in"
-				" poll list", ddi_get_instance(dip));
+			    " poll list", ddi_get_instance(dip));
 			mutex_exit(&softsp->poll_list_lock);
 			goto done;
 		}
@@ -1760,14 +1760,14 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 	} else {
 		/* Run the calibration function using this board type */
 		real_temp = calibrate_temp(softsp->list->sc.type, value,
-			softsp->list->sc.ac_compid);
+		    softsp->list->sc.ac_compid);
 	}
 
 	envstat->l1[index % L1_SZ] = real_temp;
 
 	/* check if the temperature state for this device needs to change */
 	temp_state = get_temp_state(softsp->list->sc.type, real_temp,
-					softsp->list->sc.board);
+	    softsp->list->sc.board);
 
 	/* has the state changed? Then get the board string ready */
 	if (temp_state != envstat->state) {
@@ -1782,7 +1782,7 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 					reg_fault(0, FT_OVERTEMP, FT_SYSTEM);
 				} else {
 					reg_fault(board, FT_OVERTEMP,
-						FT_BOARD);
+					    FT_BOARD);
 				}
 			}
 
@@ -1793,22 +1793,22 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 			if (temp_state == TEMP_WARN) {
 				/* now warn the user of the problem */
 				cmn_err(CE_WARN,
-					"%s is warm (temperature: %dC). "
-					"Please check system cooling", buffer,
-					real_temp);
+				    "%s is warm (temperature: %dC). "
+				    "Please check system cooling", buffer,
+				    real_temp);
 				fhc_bd_update(board, SYSC_EVT_BD_OVERTEMP);
 				if (temperature_chamber == -1)
 					temperature_chamber =
 					    check_for_chamber();
 			} else if (temp_state == TEMP_DANGER) {
 				cmn_err(CE_WARN,
-					"%s is very hot (temperature: %dC)",
-					buffer, real_temp);
+				    "%s is very hot (temperature: %dC)",
+				    buffer, real_temp);
 
 				envstat->shutdown_cnt = 1;
 				if (temperature_chamber == -1)
 					temperature_chamber =
-						check_for_chamber();
+					    check_for_chamber();
 				if ((temperature_chamber == 0) &&
 				    enable_overtemp_powerdown) {
 					/*
@@ -1820,12 +1820,12 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 					 */
 					if (shutdown_msg == 0) {
 						cmn_err(CE_WARN, "System "
-							"shutdown scheduled "
-							"in %d seconds due to "
-							"over-temperature "
-							"condition on %s",
-							SHUTDOWN_TIMEOUT_SEC,
-							buffer);
+						    "shutdown scheduled "
+						    "in %d seconds due to "
+						    "over-temperature "
+						    "condition on %s",
+						    SHUTDOWN_TIMEOUT_SEC,
+						    buffer);
 					}
 					shutdown_msg++;
 				}
@@ -1853,22 +1853,22 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 			} else if (--envstat->temp_cnt == 0) {
 				if (temp_state == TEMP_WARN) {
 					cmn_err(CE_NOTE,
-						"%s is cooling "
-						"(temperature: %dC)", buffer,
-						real_temp);
+					    "%s is cooling "
+					    "(temperature: %dC)", buffer,
+					    real_temp);
 
 				} else if (temp_state == TEMP_OK) {
 					cmn_err(CE_NOTE,
-						"%s has cooled down "
-						"(temperature: %dC), system OK",
-						buffer, real_temp);
+					    "%s has cooled down "
+					    "(temperature: %dC), system OK",
+					    buffer, real_temp);
 
 					if (type == CLOCK_BOARD) {
 						clear_fault(0, FT_OVERTEMP,
-							FT_SYSTEM);
+						    FT_SYSTEM);
 					} else {
 						clear_fault(board, FT_OVERTEMP,
-							FT_BOARD);
+						    FT_BOARD);
 					}
 				}
 
@@ -1883,9 +1883,9 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 				    (powerdown_started == 0) &&
 				    (--shutdown_msg == 0)) {
 					cmn_err(CE_NOTE, "System "
-						"shutdown due to over-"
-						"temperature "
-						"condition cancelled");
+					    "shutdown due to over-"
+					    "temperature "
+					    "condition cancelled");
 				}
 				envstat->state = temp_state;
 
@@ -1908,13 +1908,13 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 
 				/* the system is still too hot */
 				build_bd_display_str(buffer,
-					softsp->list->sc.type,
-					softsp->list->sc.board);
+				    softsp->list->sc.type,
+				    softsp->list->sc.board);
 
 				cmn_err(CE_WARN, "%s still too hot "
-					"(temperature: %dC)."
-					" Overtemp shutdown started", buffer,
-					real_temp);
+				    "(temperature: %dC)."
+				    " Overtemp shutdown started", buffer,
+				    real_temp);
 
 				fhc_reboot();
 			}
@@ -1949,8 +1949,8 @@ update_temp(dev_info_t *pdip, struct temp_stats *envstat, uchar_t value)
 
 			build_bd_display_str(buffer, type, board);
 			cmn_err(CE_WARN, "%s temperature is rising rapidly!  "
-				"Current temperature is %dC", buffer,
-				real_temp);
+			    "Current temperature is %dC", buffer,
+			    real_temp);
 		}
 	}
 }
@@ -2331,7 +2331,7 @@ fhc_add_kstats(struct fhc_soft_state *softsp)
 	    sizeof (struct fhc_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "fhc%d kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 		return;
 	}
 
@@ -2339,12 +2339,12 @@ fhc_add_kstats(struct fhc_soft_state *softsp)
 
 	/* initialize the named kstats */
 	kstat_named_init(&fhc_named_ksp->csr,
-		CSR_KSTAT_NAMED,
-		KSTAT_DATA_UINT32);
+	    CSR_KSTAT_NAMED,
+	    KSTAT_DATA_UINT32);
 
 	kstat_named_init(&fhc_named_ksp->bsr,
-		BSR_KSTAT_NAMED,
-		KSTAT_DATA_UINT32);
+	    BSR_KSTAT_NAMED,
+	    KSTAT_DATA_UINT32);
 
 	fhc_ksp->ks_update = fhc_kstat_update;
 	fhc_ksp->ks_private = (void *)softsp;
@@ -2479,8 +2479,8 @@ check_for_chamber(void)
 			if (strcmp(mfgmode, CHAMBER_VALUE) == 0) {
 				chamber = 1;
 				cmn_err(CE_WARN, "System in Temperature"
-					" Chamber Mode. Overtemperature"
-					" Shutdown disabled");
+				    " Chamber Mode. Overtemperature"
+				    " Shutdown disabled");
 			}
 		}
 		kmem_free(mfgmode, mfgmode_len+1);
@@ -2499,7 +2499,7 @@ build_bd_display_str(char *buffer, enum board_type type, int board)
 	switch (type) {
 	case UNINIT_BOARD:
 		(void) sprintf(buffer, "Uninitialized Board type board %d",
-									board);
+		    board);
 		break;
 
 	case UNKNOWN_BOARD:
@@ -2537,7 +2537,7 @@ build_bd_display_str(char *buffer, enum board_type type, int board)
 
 	default:
 		(void) sprintf(buffer, "Unrecognized board type board %d",
-									board);
+		    board);
 		break;
 	}
 }
@@ -2743,7 +2743,7 @@ process_fault_list(void)
 				bdlist->fault = 1;
 			} else {
 				cmn_err(CE_WARN, "No board %d list entry found",
-					ftlist->f.unit);
+				    ftlist->f.unit);
 			}
 		}
 	}
@@ -2784,7 +2784,7 @@ fhc_add_memloc(int board, uint64_t pa, uint_t size)
 	p->size = size;
 #ifdef DEBUG_MEMDEC
 	cmn_err(CE_NOTE, "fhc_add_memloc: adding %d 0x%x 0x%x",
-		p->board, p->pa, p->size);
+	    p->board, p->pa, p->size);
 #endif /* DEBUG_MEMDEC */
 	*pp = p;
 }
@@ -2977,7 +2977,7 @@ create_ft_kstats(int instance)
 	struct kstat *ksp;
 
 	ksp = kstat_create("unix", instance, FT_LIST_KSTAT_NAME, "misc",
-		KSTAT_TYPE_RAW, 1, KSTAT_FLAG_VIRTUAL|KSTAT_FLAG_VAR_SIZE);
+	    KSTAT_TYPE_RAW, 1, KSTAT_FLAG_VIRTUAL|KSTAT_FLAG_VAR_SIZE);
 
 	if (ksp != NULL) {
 		ksp->ks_data = NULL;
@@ -3025,7 +3025,7 @@ ft_ks_update(struct kstat *ksp, int rw)
 	} else {
 		if (ft_nfaults) {
 			ksp->ks_data_size = ft_nfaults *
-				sizeof (struct ft_list);
+			    sizeof (struct ft_list);
 		} else {
 			ksp->ks_data_size = 1;
 		}
@@ -3197,7 +3197,7 @@ fhc_cpu_poweroff(struct cpu *cp)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT((cp->cpu_flags & (CPU_EXISTS | CPU_OFFLINE | CPU_QUIESCED)) ==
-		(CPU_EXISTS | CPU_OFFLINE | CPU_QUIESCED));
+	    (CPU_EXISTS | CPU_OFFLINE | CPU_QUIESCED));
 
 	/*
 	 * Lock the board so that we can safely access the
@@ -3227,7 +3227,7 @@ fhc_cpu_poweroff(struct cpu *cp)
 	mp_cpu_quiesce(cp);
 
 	xt_one_unchecked(cp->cpu_id, (xcfunc_t *)idle_stop_xcall,
-		(uint64_t)fhc_cpu_shutdown_self, (uint64_t)NULL);
+	    (uint64_t)fhc_cpu_shutdown_self, (uint64_t)NULL);
 
 	/*
 	 * Wait for slave cpu to shutdown.
@@ -3347,7 +3347,7 @@ fhc_cpu_poweron(struct cpu *cp)
 	ASSERT(bd_list->dev_softsp != NULL);
 
 	state = ((struct environ_soft_state *)
-		bd_list->dev_softsp)->tempstat.state;
+	    bd_list->dev_softsp)->tempstat.state;
 
 	fhc_bdlist_unlock();
 	if ((state == TEMP_WARN) || (state == TEMP_DANGER))
@@ -3399,9 +3399,9 @@ os_completes_shutdown(void)
 
 	/* force load i and d translations */
 	tte.tte_inthi = TTE_VALID_INT | TTE_SZ_INT(TTE8K) |
-		TTE_PFN_INTHI(pfn);
+	    TTE_PFN_INTHI(pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(pfn) |
-		TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT; /* un$ */
+	    TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT; /* un$ */
 	sfmmu_dtlb_ld_kva(shutdown_va, &tte);	/* load dtlb */
 	sfmmu_itlb_ld_kva(shutdown_va, &tte);	/* load itlb */
 
@@ -3431,8 +3431,8 @@ os_completes_shutdown(void)
 	 * NOTE: the base flush address must be unique for each MID.
 	 */
 	((void (*)(u_longlong_t, int))copy_addr)(
-		FHC_BASE_NOMEM + CPU->cpu_id * FHC_MAX_ECACHE_SIZE,
-		cpunodes[CPU->cpu_id].ecache_size);
+	    FHC_BASE_NOMEM + CPU->cpu_id * FHC_MAX_ECACHE_SIZE,
+	    cpunodes[CPU->cpu_id].ecache_size);
 }
 
 enum temp_state
@@ -3473,7 +3473,7 @@ fhc_tod_fault(enum tod_fault_type tod_bad)
 		/* if tod is not on clock board, */
 		/* it'd be on one of io boards */
 		board_num = (addr >> IO_BOARD_NUMBER_SHIFT)
-				& IO_BOARD_NUMBER_MASK;
+		    & IO_BOARD_NUMBER_MASK;
 		class = FT_BOARD;
 	}
 

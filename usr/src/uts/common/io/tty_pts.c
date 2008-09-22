@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,7 +14,6 @@
  * This is the "slave" side.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -125,7 +124,8 @@ static int ptsl_attach(dev_info_t *, ddi_attach_cmd_t);
 static dev_info_t *ptsl_dip;	/* for dev-to-dip conversions */
 
 DDI_DEFINE_STREAM_OPS(ptsl_ops, nulldev, nulldev,
-    ptsl_attach, nodev, nodev, ptsl_info, D_MP, &ptysinfo);
+    ptsl_attach, nodev, nodev, ptsl_info, D_MP, &ptysinfo,
+    ddi_quiesce_not_supported);
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -142,7 +142,7 @@ char _depends_on[] = "drv/ptc";
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"tty pseudo driver slave 'ptsl' %I%",
+	"tty pseudo driver slave 'ptsl'",
 	&ptsl_ops,	/* driver ops */
 };
 
@@ -185,7 +185,7 @@ ptsl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	for (tty_num = 0; tty_num < npty; tty_num++) {
 		(void) sprintf(name, "tty%c%c", *tty_bank, *tty_digit);
 		if (ddi_create_minor_node(devi, name, S_IFCHR,
-			tty_num, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    tty_num, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(devi, NULL);
 			return (-1);
 		}
@@ -488,7 +488,7 @@ ptslwput(queue_t *q, mblk_t *mp)
 			 */
 			(void) putctl1(RD(q), M_CTL,
 			    (pty->pt_flags & PF_REMOTE) ?
-				MC_NOCANON : MC_DOCANON);
+			    MC_NOCANON : MC_DOCANON);
 		}
 		freemsg(mp);
 		break;

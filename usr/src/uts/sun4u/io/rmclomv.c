@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -152,7 +151,8 @@ static struct dev_ops rmclomv_ops = {
 	nodev,			/* reset */
 	&rmclomv_cb_ops,		/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -162,7 +162,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"rmclomv control driver v%I%",	/* Name of the module */
+	"rmclomv control driver",	/* Name of the module */
 	&rmclomv_ops			/* pointer to the dev_ops structure */
 };
 

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI nexus driver interface
@@ -114,7 +113,8 @@ static struct dev_ops pci_ops = {
 	nodev,
 	&pci_cb_ops,
 	&pci_bus_ops,
-	0
+	0,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -125,7 +125,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module - driver */
-	"PCI Bus nexus driver %I%",	/* Name of module. */
+	"PCI Bus nexus driver",	/* Name of module. */
 	&pci_ops,		/* driver ops */
 };
 
@@ -162,7 +162,7 @@ _init(void)
 	 * Initialize per-psycho soft state pointer.
 	 */
 	e = ddi_soft_state_init(&per_pci_common_state,
-		sizeof (pci_common_t), 1);
+	    sizeof (pci_common_t), 1);
 	if (e != 0) {
 		ddi_soft_state_fini(&per_pci_state);
 		return (e);
@@ -289,7 +289,7 @@ pci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		if (alloc_pci_soft_state(instance) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s%d: can't allocate pci state",
-				ddi_driver_name(dip), instance);
+			    ddi_driver_name(dip), instance);
 			goto err_bad_pci_softstate;
 		}
 		pci_p = get_pci_soft_state(instance);
@@ -448,7 +448,8 @@ pci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_destroy(&pci_p->pci_mutex);
 		free_pci_soft_state(instance);
 
-		/* Free the interrupt-priorities prop if we created it. */ {
+		/* Free the interrupt-priorities prop if we created it. */
+		{
 			int len;
 
 			if (ddi_getproplen(DDI_DEV_T_ANY, dip,
@@ -497,7 +498,7 @@ pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	pci_regspec_t reloc_reg, *rp = &reloc_reg;
 
 	DEBUG2(DBG_MAP, dip, "rdip=%s%d:",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	if (mp->map_flags & DDI_MF_USER_MAPPING)
 		return (DDI_ME_UNIMPLEMENTED);
@@ -512,7 +513,7 @@ pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		DEBUG1(DBG_MAP | DBG_CONT, dip, " r#=%x", r_no);
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-			"reg", (caddr_t)&rp, &reglen) != DDI_SUCCESS)
+		    "reg", (caddr_t)&rp, &reglen) != DDI_SUCCESS)
 				return (DDI_ME_RNUMBER_RANGE);
 
 		if (r_no < 0 || r_no >= reglen / sizeof (pci_regspec_t)) {
@@ -584,8 +585,8 @@ pci_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 	int ret;
 
 	DEBUG3(DBG_DMA_MAP, dip, "mapping - rdip=%s%d type=%s\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip),
-		handlep ? "alloc" : "advisory");
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    handlep ? "alloc" : "advisory");
 
 	if (!(mp = pci_dma_lmts2hdl(dip, rdip, iommu_p, dmareq)))
 		return (DDI_DMA_NORESOURCES);
@@ -649,7 +650,7 @@ pci_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	int rval;
 
 	DEBUG2(DBG_DMA_ALLOCH, dip, "rdip=%s%d\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	if (attrp->dma_attr_version != DMA_ATTR_V0)
 		return (DDI_DMA_BADATTR);
@@ -683,7 +684,7 @@ int
 pci_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 {
 	DEBUG3(DBG_DMA_FREEH, dip, "rdip=%s%d mp=%p\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
 	pci_dma_freemp((ddi_dma_impl_t *)handle);
 
 	if (pci_kmem_clid) {
@@ -708,7 +709,7 @@ pci_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	int ret;
 
 	DEBUG4(DBG_DMA_BINDH, dip, "rdip=%s%d mp=%p dmareq=%p\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip), mp, dmareq);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), mp, dmareq);
 
 	if (mp->dmai_flags & DMAI_FLAGS_INUSE)
 		return (DDI_DMA_INUSE);
@@ -782,7 +783,7 @@ pci_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	iommu_t *iommu_p = pci_p->pci_iommu_p;
 
 	DEBUG3(DBG_DMA_UNBINDH, dip, "rdip=%s%d, mp=%p\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
 	if ((mp->dmai_flags & DMAI_FLAGS_INUSE) == 0) {
 		DEBUG0(DBG_DMA_UNBINDH, dip, "handle not in use\n");
 		return (DDI_FAILURE);
@@ -849,14 +850,14 @@ pci_dma_win(dev_info_t *dip, dev_info_t *rdip,
 	case DMAI_FLAGS_DVMA:
 		if (win != PCI_DMA_CURWIN(mp)) {
 			pci_t *pci_p =
-				get_pci_soft_state(ddi_get_instance(dip));
+			    get_pci_soft_state(ddi_get_instance(dip));
 			pci_dma_sync_unmap(dip, rdip, mp);
 			/* map_window sets dmai_mapping/size/offset */
 			iommu_map_window(pci_p->pci_iommu_p, mp, win);
 		}
 		if (cookiep)
 			MAKE_DMA_COOKIE(cookiep, mp->dmai_mapping,
-				mp->dmai_size);
+			    mp->dmai_size);
 		if (ccountp)
 			*ccountp = 1;
 		break;
@@ -866,7 +867,8 @@ pci_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		ddi_dma_cookie_t *ck_p;
 		pci_dma_win_t *win_p = mp->dmai_winlst;
 
-		for (i = 0; i < win; win_p = win_p->win_next, i++);
+		for (i = 0; i < win; win_p = win_p->win_next, i++)
+			;
 		ck_p = (ddi_dma_cookie_t *)(win_p + 1);
 		*cookiep = *ck_p;
 		mp->dmai_offset = win_p->win_offset;
@@ -886,8 +888,8 @@ pci_dma_win(dev_info_t *dip, dev_info_t *rdip,
 	}
 	if (cookiep)
 		DEBUG2(DBG_DMA_WIN, dip,
-			"cookie - dmac_address=%x dmac_size=%x\n",
-			cookiep->dmac_address, cookiep->dmac_size);
+		    "cookie - dmac_address=%x dmac_size=%x\n",
+		    cookiep->dmac_address, cookiep->dmac_size);
 	if (offp)
 		*offp = (off_t)mp->dmai_offset;
 	if (lenp)
@@ -941,7 +943,7 @@ pci_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	case DDI_DMA_RESERVE: {
 		pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 		return (pci_fdvma_reserve(dip, rdip, pci_p,
-			(ddi_dma_req_t *)offp, (ddi_dma_handle_t *)objp));
+		    (ddi_dma_req_t *)offp, (ddi_dma_handle_t *)objp));
 		}
 	case DDI_DMA_RELEASE: {
 		pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
@@ -954,11 +956,11 @@ pci_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	switch (PCI_DMA_TYPE(mp)) {
 	case DMAI_FLAGS_DVMA:
 		return (pci_dvma_ctl(dip, rdip, mp, cmd, offp, lenp, objp,
-			cache_flags));
+		    cache_flags));
 	case DMAI_FLAGS_PEER_TO_PEER:
 	case DMAI_FLAGS_BYPASS:
 		return (pci_dma_ctl(dip, rdip, mp, cmd, offp, lenp, objp,
-			cache_flags));
+		    cache_flags));
 	default:
 		panic("%s%d: pci_dma_ctlops(%x):bad dma type %x",
 		    ddi_driver_name(rdip), ddi_get_instance(rdip), cmd,
@@ -1194,7 +1196,7 @@ get_reg_set_size(dev_info_t *child, int rnumber)
 	}
 
 	size = pci_rp[rnumber].pci_size_low |
-		((uint64_t)pci_rp[rnumber].pci_size_hi << 32);
+	    ((uint64_t)pci_rp[rnumber].pci_size_hi << 32);
 	kmem_free(pci_rp, i);
 	return (size);
 }
@@ -1286,7 +1288,7 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	 * Now pass the request up to our parent.
 	 */
 	DEBUG2(DBG_CTLOPS, dip, "passing request to parent: rdip=%s%d\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 	return (ddi_ctlops(dip, rdip, op, arg, result));
 }
 
@@ -1297,7 +1299,7 @@ pci_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
 	pci_t		*pci_p = get_pci_soft_state(
-			ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 	int		ret = DDI_SUCCESS;
 
 	switch (intr_op) {
@@ -1384,11 +1386,11 @@ pci_init_hotplug(struct pci *pci_p)
 	 * slots.
 	 */
 	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"hotplug-capable")) {
+	    "hotplug-capable")) {
 		if (ndi_prop_update_int_array(DDI_DEV_T_NONE,
-			dip, "bus-range",
-			(int *)&bus_range,
-			2) != DDI_PROP_SUCCESS) {
+		    dip, "bus-range",
+		    (int *)&bus_range,
+		    2) != DDI_PROP_SUCCESS) {
 			return;
 		}
 

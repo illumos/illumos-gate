@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/types.h>
@@ -103,7 +102,8 @@ static struct dev_ops axq_ops = {
 	nulldev,			/* reset */
 	&axq_cb_ops,			/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -127,7 +127,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"AXQ driver v%I%",	/* name of module */
+	"AXQ driver",	/* name of module */
 	&axq_ops,		/* driver ops */
 };
 
@@ -238,7 +238,7 @@ _init(void)
 	int error;
 
 	if ((error = ddi_soft_state_init(&axq_softp,
-		sizeof (struct axq_soft_state), 1)) != 0)
+	    sizeof (struct axq_soft_state), 1)) != 0)
 		return (error);
 
 	rw_init(&axq_array_lock, NULL, RW_DEFAULT, NULL);
@@ -328,9 +328,9 @@ axq_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	/* Get the "portid" property */
 	if ((softsp->portid = (int)ddi_getprop(DDI_DEV_T_ANY, softsp->dip,
-		DDI_PROP_DONTPASS, "portid", -1)) == -1) {
+	    DDI_PROP_DONTPASS, "portid", -1)) == -1) {
 		cmn_err(CE_WARN, "Unable to retrieve safari portid"
-			"property.");
+		    "property.");
 		goto bad;
 	}
 
@@ -350,10 +350,10 @@ axq_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 	if (ddi_regs_map_setup(softsp->dip, 0, &softsp->address, 0, 0,
-		&attr, &softsp->ac0) != DDI_SUCCESS) {
+	    &attr, &softsp->ac0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: unable to map reg set 0\n",
-			ddi_get_name(softsp->dip),
-			ddi_get_instance(softsp->dip));
+		    ddi_get_name(softsp->dip),
+		    ddi_get_instance(softsp->dip));
 		goto bad;
 	}
 
@@ -377,11 +377,11 @@ axq_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (!axq_local.initflag) {
 		/* initialize and map in the local space */
 		if (ddi_regs_map_setup(softsp->dip, 1,
-			&axq_local.laddress, 0, 0,
-			&attr, &axq_local.ac) != DDI_SUCCESS) {
+		    &axq_local.laddress, 0, 0,
+		    &attr, &axq_local.ac) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s%d: unable to map reg set 1\n",
-				ddi_get_name(softsp->dip),
-				ddi_get_instance(softsp->dip));
+			    ddi_get_name(softsp->dip),
+			    ddi_get_instance(softsp->dip));
 			ddi_regs_map_free(&softsp->ac0);
 			mutex_exit(&axq_local.axq_local_lock);
 			goto bad;
@@ -423,64 +423,64 @@ axq_init(struct axq_soft_state *softsp)
 	if (softsp->slotnum == 0) {
 		/* This is a slot type 0 AXQ */
 		softsp->axq_domain_ctrl = REG_ADDR(softsp->address,
-					AXQ_SLOT0_DOMCTRL);
+		    AXQ_SLOT0_DOMCTRL);
 		softsp->axq_cdc_addrtest = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_ADR_TEST);
+		    AXQ_SLOT0_CDC_ADR_TEST);
 		softsp->axq_cdc_ctrltest = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_CTL_TEST);
+		    AXQ_SLOT0_CDC_CTL_TEST);
 		softsp->axq_cdc_datawrite0 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_DATA_WR0);
+		    AXQ_SLOT0_CDC_DATA_WR0);
 		softsp->axq_cdc_datawrite1 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_DATA_WR1);
+		    AXQ_SLOT0_CDC_DATA_WR1);
 		softsp->axq_cdc_datawrite2 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_DATA_WR2);
+		    AXQ_SLOT0_CDC_DATA_WR2);
 		softsp->axq_cdc_datawrite3 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_DATA_WR3);
+		    AXQ_SLOT0_CDC_DATA_WR3);
 		softsp->axq_cdc_counter = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_CNT_TEST);
+		    AXQ_SLOT0_CDC_CNT_TEST);
 		softsp->axq_cdc_readdata0 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_RD_DATA0);
+		    AXQ_SLOT0_CDC_RD_DATA0);
 		softsp->axq_cdc_readdata1 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_RD_DATA1);
+		    AXQ_SLOT0_CDC_RD_DATA1);
 		softsp->axq_cdc_readdata2 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_RD_DATA2);
+		    AXQ_SLOT0_CDC_RD_DATA2);
 		softsp->axq_cdc_readdata3 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_CDC_RD_DATA3);
+		    AXQ_SLOT0_CDC_RD_DATA3);
 		softsp->axq_pcr = REG_ADDR(softsp->address,
-					AXQ_SLOT0_PERFCNT_SEL);
+		    AXQ_SLOT0_PERFCNT_SEL);
 		softsp->axq_pic0 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_PERFCNT0);
+		    AXQ_SLOT0_PERFCNT0);
 		softsp->axq_pic1 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_PERFCNT1);
+		    AXQ_SLOT0_PERFCNT1);
 		softsp->axq_pic2 = REG_ADDR(softsp->address,
-					AXQ_SLOT0_PERFCNT2);
+		    AXQ_SLOT0_PERFCNT2);
 		softsp->axq_nasm = REG_ADDR(softsp->address, AXQ_SLOT0_NASM);
 	} else {
 		/* slot type 1 AXQ */
 		softsp->axq_domain_ctrl = REG_ADDR(softsp->address,
-					AXQ_SLOT1_DOMCTRL);
+		    AXQ_SLOT1_DOMCTRL);
 		softsp->axq_pcr = REG_ADDR(softsp->address,
-					AXQ_SLOT1_PERFCNT_SEL);
+		    AXQ_SLOT1_PERFCNT_SEL);
 		softsp->axq_pic0 = REG_ADDR(softsp->address,
-					AXQ_SLOT1_PERFCNT0);
+		    AXQ_SLOT1_PERFCNT0);
 		softsp->axq_pic1 = REG_ADDR(softsp->address,
-					AXQ_SLOT1_PERFCNT1);
+		    AXQ_SLOT1_PERFCNT1);
 		softsp->axq_pic2 = REG_ADDR(softsp->address,
-					AXQ_SLOT1_PERFCNT2);
+		    AXQ_SLOT1_PERFCNT2);
 		softsp->axq_nasm = REG_ADDR(softsp->address, AXQ_SLOT1_NASM);
 	}
 
 	/* setup CASM slots */
 	for (i = 0; i < AXQ_MAX_EXP; i++) {
 		softsp->axq_casm_slot[i] = REG_ADDR(softsp->address,
-				(AXQ_CASM_SLOT_START + AXQ_REGOFF(i)));
+		    (AXQ_CASM_SLOT_START + AXQ_REGOFF(i)));
 	}
 
 	/* setup SDI timeout register accesses */
 	softsp->axq_sdi_timeout_rd = REG_ADDR(softsp->address,
-				AXQ_SLOT_SDI_TIMEOUT_RD);
+	    AXQ_SLOT_SDI_TIMEOUT_RD);
 	softsp->axq_sdi_timeout_rdclr = REG_ADDR(softsp->address,
-				AXQ_SLOT_SDI_TIMEOUT_RDCLR);
+	    AXQ_SLOT_SDI_TIMEOUT_RDCLR);
 
 	/*
 	 * Save the CDC state (enabled or disabled)
@@ -488,7 +488,7 @@ axq_init(struct axq_soft_state *softsp)
 	 */
 	if (softsp->slotnum == 0) {
 		softsp->axq_cdc_state = *softsp->axq_cdc_ctrltest &
-			AXQ_CDC_DIS;
+		    AXQ_CDC_DIS;
 	}
 
 #ifndef _AXQ_LOCAL_ACCESS_SUPPORTED
@@ -498,7 +498,7 @@ axq_init(struct axq_soft_state *softsp)
 	 * we'll use explicit addressing for now.
 	 */
 	softsp->axq_cpu2ssc_intr = REG_ADDR(softsp->address,
-					AXQ_SLOT_CPU2SSC_INTR);
+	    AXQ_SLOT_CPU2SSC_INTR);
 #endif /* _AXQ_LOCAL_ACCESS_SUPPORTED */
 }
 
@@ -513,7 +513,7 @@ axq_init_local(struct axq_local_regs *localregs)
 	 * Set it up here for now.
 	 */
 	localregs->axq_cpu2ssc_intr = REG_ADDR(localregs->laddress,
-					AXQ_SLOT_CPU2SSC_INTR);
+	    AXQ_SLOT_CPU2SSC_INTR);
 }
 
 /* ARGSUSED */
@@ -551,7 +551,7 @@ axq_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			mutex_enter(&cpu_lock);
 			for (i = 0; i < STARCAT_SLOT1_CPU_MAX; i++) {
 				cpuid = MAKE_CPUID(softsp->expid,
-					softsp->slotnum, i);
+				    softsp->slotnum, i);
 				if (cpu[cpuid]) {
 					mutex_exit(&cpu_lock);
 					return (DDI_SUCCESS);
@@ -579,7 +579,7 @@ axq_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		rw_enter(&axq_array_lock, RW_WRITER);
 		ASSERT(axq_array[softsp->expid][softsp->slotnum]
-			!= NULL);
+		    != NULL);
 		axq_array[softsp->expid][softsp->slotnum] = NULL;
 		rw_exit(&axq_array_lock);
 
@@ -675,14 +675,14 @@ axq_cdc_flush(uint32_t expid, int held, int disabled)
 
 	/* disable sram and setup the ctrl test reg for flushing */
 	tmpval = axq_ctrl_test_save0 & (AXQ_CDC_DATA_ECC_CHK_EN |
-					AXQ_CDC_ADR_PAR_CHK_EN |
-					AXQ_CDC_DATA_ECC_GEN_EN |
-					AXQ_CDC_ADR_PAR_GEN_EN);
+	    AXQ_CDC_ADR_PAR_CHK_EN |
+	    AXQ_CDC_DATA_ECC_GEN_EN |
+	    AXQ_CDC_ADR_PAR_GEN_EN);
 	*softsp->axq_cdc_ctrltest = tmpval | AXQ_CDC_TMODE_WR
-					| AXQ_CDC_DATA2PAR_MUX_SEL_DATA
-					| AXQ_CDC_ADR2SRAM_MUX_SEL_TEST
-					| AXQ_CDC_ADR_INCR_XOR_CTRL
-					| AXQ_CDC_DIS;
+	    | AXQ_CDC_DATA2PAR_MUX_SEL_DATA
+	    | AXQ_CDC_ADR2SRAM_MUX_SEL_TEST
+	    | AXQ_CDC_ADR_INCR_XOR_CTRL
+	    | AXQ_CDC_DIS;
 
 	/* Enable CDC test in the CDC Address test reg */
 	*softsp->axq_cdc_addrtest = AXQ_CDC_ADR_TEST_EN;
@@ -701,14 +701,14 @@ axq_cdc_flush(uint32_t expid, int held, int disabled)
 	for (i = 0; i < AXQ_CDC_FLUSH_WAIT; i++) {
 		DELAY(3000); /* should take only 1750 usecs */
 		if (((*softsp->axq_cdc_counter) &
-			AXQ_CDC_CNT_TEST_DONE) != 0) {
+		    AXQ_CDC_CNT_TEST_DONE) != 0) {
 			break;
 		}
 	}
 	if (i >= AXQ_CDC_FLUSH_WAIT) {
 		retval = DDI_FAILURE;
 		cmn_err(CE_WARN, "axq_cdc_flush failed on expander %d",
-				expid);
+		    expid);
 	}
 
 	/*
@@ -1147,13 +1147,13 @@ axq_casm_write_all(int casmslot, uint32_t value)
 	for (i = 0; i < AXQ_MAX_EXP; i++) {
 		if ((softsp = axq_array[i][SLOT0_AXQ]) != NULL) {
 			if (*(softsp->axq_casm_slot[casmslot])
-				== 0) {
+			    == 0) {
 				break;
 			}
 		}
 		if ((softsp = axq_array[i][SLOT1_AXQ]) != NULL) {
 			if (*(softsp->axq_casm_slot[casmslot])
-				== 0) {
+			    == 0) {
 				break;
 			}
 		}
@@ -1219,17 +1219,17 @@ axq_do_casm_rename_script(uint64_t **script_elm, int casmslot0,
 	 * they should be non-zero.
 	 */
 	for (slot = SLOT0_AXQ; slot <= SLOT1_AXQ; slot++) {
-	    for (i = 0; i < AXQ_MAX_EXP; i++) {
+		for (i = 0; i < AXQ_MAX_EXP; i++) {
 		if ((softsp = axq_array[i][slot]) != NULL) {
 			paddr = softsp->axq_phyaddr;
 			val0 = *(softsp->axq_casm_slot[casmslot0]);
 			val1 = *(softsp->axq_casm_slot[casmslot1]);
 			if (val0 != 0 && val1 != 0) {
 				*s_elm++ = paddr + AXQ_CASM_SLOT_START +
-						AXQ_REGOFF(casmslot0);
+				    AXQ_REGOFF(casmslot0);
 				*s_elm++ = val1;
 				*s_elm++ = paddr + AXQ_CASM_SLOT_START +
-						AXQ_REGOFF(casmslot1);
+				    AXQ_REGOFF(casmslot1);
 				*s_elm++ = val0;
 			} else {
 				/*
@@ -1239,8 +1239,8 @@ axq_do_casm_rename_script(uint64_t **script_elm, int casmslot0,
 				break;
 			}
 		}
-	    }
-	    if (i < AXQ_MAX_EXP) break;
+		}
+		if (i < AXQ_MAX_EXP) break;
 	}
 
 	rw_exit(&axq_array_lock);
@@ -1373,13 +1373,13 @@ axq_add_picN_kstats(dev_info_t *dip)
 		(void) sprintf(pic_name, "pic%d", pic);
 
 		num_events = (pic <= 1) ? AXQ_PIC0_1_NUM_EVENTS :
-			AXQ_PIC2_NUM_EVENTS;
+		    AXQ_PIC2_NUM_EVENTS;
 
 		if ((axq_picN_ksp[pic] = kstat_create("axq",
-			instance, pic_name, "bus", KSTAT_TYPE_NAMED,
-			num_events + 1, NULL)) == NULL) {
+		    instance, pic_name, "bus", KSTAT_TYPE_NAMED,
+		    num_events + 1, NULL)) == NULL) {
 			cmn_err(CE_WARN, "axq %s: kstat_create failed",
-				pic_name);
+			    pic_name);
 
 			/* remove pic kstats that was created earlier */
 			for (i = 0; i < pic; i++) {
@@ -1390,7 +1390,7 @@ axq_add_picN_kstats(dev_info_t *dip)
 		}
 
 		axq_pic_named_data =
-			(struct kstat_named *)(axq_picN_ksp[pic]->ks_data);
+		    (struct kstat_named *)(axq_picN_ksp[pic]->ks_data);
 
 		pic_shift = pic * AXQ_PIC_SHIFT;
 
@@ -1401,12 +1401,12 @@ axq_add_picN_kstats(dev_info_t *dip)
 		for (event = 0; event < num_events; event++) {
 			/* pcr_mask */
 			axq_pic_named_data[event].value.ui64 =
-				axq_events[event].pcr_mask << pic_shift;
+			    axq_events[event].pcr_mask << pic_shift;
 
 			/* event name */
 			kstat_named_init(&axq_pic_named_data[event],
-				axq_events[event].event_name,
-				KSTAT_DATA_UINT64);
+			    axq_events[event].event_name,
+			    KSTAT_DATA_UINT64);
 		}
 
 		/*
@@ -1414,10 +1414,10 @@ axq_add_picN_kstats(dev_info_t *dip)
 		 * record in the kstat.
 		 */
 		axq_pic_named_data[num_events].value.ui64 =
-			(uint32_t)~(AXQ_PIC_CLEAR_MASK << pic_shift);
+		    (uint32_t)~(AXQ_PIC_CLEAR_MASK << pic_shift);
 
 		kstat_named_init(&axq_pic_named_data[num_events],
-			"clear_pic", KSTAT_DATA_UINT64);
+		    "clear_pic", KSTAT_DATA_UINT64);
 
 		kstat_install(axq_picN_ksp[pic]);
 	}
@@ -1450,29 +1450,29 @@ axq_add_kstats(struct axq_soft_state *softsp)
 	 * The size of this kstat is AXQ_NUM_PICS + 1 for %pcr
 	 */
 	if ((axq_counters_ksp = kstat_create("axq",
-		ddi_get_instance(softsp->dip), "counters",
-		"bus", KSTAT_TYPE_NAMED, AXQ_NUM_PICS + 1,
-		KSTAT_FLAG_WRITABLE)) == NULL) {
+	    ddi_get_instance(softsp->dip), "counters",
+	    "bus", KSTAT_TYPE_NAMED, AXQ_NUM_PICS + 1,
+	    KSTAT_FLAG_WRITABLE)) == NULL) {
 			cmn_err(CE_WARN, "axq%d counters: kstat_create"
 			" failed", ddi_get_instance(softsp->dip));
 		return;
 	}
 
 	axq_counters_named_data =
-		(struct kstat_named *)(axq_counters_ksp->ks_data);
+	    (struct kstat_named *)(axq_counters_ksp->ks_data);
 
 	/* initialize the named kstats */
 	kstat_named_init(&axq_counters_named_data[0],
-		"pcr", KSTAT_DATA_UINT32);
+	    "pcr", KSTAT_DATA_UINT32);
 
 	kstat_named_init(&axq_counters_named_data[1],
-		"pic0", KSTAT_DATA_UINT32);
+	    "pic0", KSTAT_DATA_UINT32);
 
 	kstat_named_init(&axq_counters_named_data[2],
-		"pic1", KSTAT_DATA_UINT32);
+	    "pic1", KSTAT_DATA_UINT32);
 
 	kstat_named_init(&axq_counters_named_data[3],
-		"pic2", KSTAT_DATA_UINT32);
+	    "pic2", KSTAT_DATA_UINT32);
 
 	axq_counters_ksp->ks_update = axq_counters_kstat_update;
 	axq_counters_ksp->ks_private = (void *)softsp;
@@ -1509,19 +1509,19 @@ axq_counters_kstat_update(kstat_t *ksp, int rw)
 
 		/* pcr */
 		axq_counters_data[0].value.ui64 = (uint64_t)
-						(*softsp->axq_pcr);
+		    (*softsp->axq_pcr);
 
 		/* pic0 */
 		axq_counters_data[1].value.ui64 = (uint64_t)
-						(*softsp->axq_pic0);
+		    (*softsp->axq_pic0);
 
 		/* pic1 */
 		axq_counters_data[2].value.ui64 = (uint64_t)
-						*softsp->axq_pic1;
+		    *softsp->axq_pic1;
 
 		/* pic2 */
 		axq_counters_data[3].value.ui64 = (uint64_t)
-						*softsp->axq_pic2;
+		    *softsp->axq_pic2;
 	}
 	return (0);
 }
@@ -1580,7 +1580,7 @@ starcat_axq_pio_workaround(dev_info_t *dip)
 	pdip = ddi_root_node();
 	ndi_devi_enter(pdip, &circ);
 	for (cdip = ddi_get_child(pdip); cdip != NULL;
-		cdip = ddi_get_next_sibling(cdip)) {
+	    cdip = ddi_get_next_sibling(cdip)) {
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, cdip,
 		    DDI_PROP_DONTPASS, "name", (caddr_t)&name, &size)
@@ -1730,7 +1730,7 @@ axq_unmap_phys(ddi_acc_handle_t *handlep)
 	mr.map_vers = DDI_MAP_VERSION;
 
 	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
-		hp->ah_len, &hp->ah_addr);
+	    hp->ah_len, &hp->ah_addr);
 
 	impl_acc_hdl_free(*handlep);
 	kmem_free(ph, sizeof (struct regspec));	/* Free the cached copy */

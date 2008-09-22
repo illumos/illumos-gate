@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Starcat IPSec Key Management Driver.
@@ -131,12 +130,14 @@ static struct dev_ops sckm_ops = {
 	sckm_detach,		/* detach */
 	nodev,			/* reset */
 	&sckm_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* no bus operations */
+	(struct bus_ops *)0,	/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Key Management Driver v%I%",
+	"Key Management Driver",
 	&sckm_ops,
 };
 
@@ -572,7 +573,7 @@ sckm_ioctl(dev_t dev, int cmd, intptr_t data, int flag,
 			}
 		}
 		SCKM_DEBUG1(D_IOCTL, "sckm_ioctl: msg available "
-			"transid = 0x%lx", sckm_udata.transid);
+		    "transid = 0x%lx", sckm_udata.transid);
 
 		arg.transid = sckm_udata.transid;
 		arg.type = sckm_udata.type;

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/audio.h>
 #include <sys/conf.h>
@@ -1985,7 +1984,8 @@ static struct dev_ops lxa_ops = {
 	nodev,
 	&lxa_cb_ops,
 	NULL,
-	NULL
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

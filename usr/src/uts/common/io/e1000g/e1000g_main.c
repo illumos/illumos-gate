@@ -44,7 +44,7 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.13";
+static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
 static char e1000g_version[] = "Driver Ver. 5.2.13";
 
@@ -53,6 +53,7 @@ static char e1000g_version[] = "Driver Ver. 5.2.13";
  */
 static int e1000g_attach(dev_info_t *, ddi_attach_cmd_t);
 static int e1000g_detach(dev_info_t *, ddi_detach_cmd_t);
+static int e1000g_quiesce(dev_info_t *);
 
 /*
  * init and intr routines prototype
@@ -102,6 +103,7 @@ static int e1000g_unicst_set(struct e1000g *, const uint8_t *, mac_addr_slot_t);
 /*
  * Local routines
  */
+static boolean_t e1000g_reset_adapter(struct e1000g *);
 static void e1000g_tx_clean(struct e1000g *);
 static void e1000g_rx_clean(struct e1000g *);
 static void e1000g_link_timer(void *);
@@ -210,7 +212,8 @@ static struct dev_ops ws_ops = {
 	nodev,			/* devo_reset */
 	&cb_ws_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	ddi_power		/* devo_power */
+	ddi_power,		/* devo_power */
+	e1000g_quiesce		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -1479,7 +1482,7 @@ e1000g_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 		break;
 	case E1000G_IOC_CHIP_RESET:
 		e1000gp->reset_count++;
-		if (e1000g_reset(e1000gp))
+		if (e1000g_reset_adapter(e1000gp))
 			status = IOC_ACK;
 		else
 			status = IOC_INVAL;
@@ -1775,8 +1778,8 @@ e1000g_rx_drain(struct e1000g *Adapter)
 	return (done);
 }
 
-boolean_t
-e1000g_reset(struct e1000g *Adapter)
+static boolean_t
+e1000g_reset_adapter(struct e1000g *Adapter)
 {
 	e1000g_stop(Adapter, B_FALSE);
 
@@ -3660,7 +3663,7 @@ e1000g_local_timer(void *ws)
 		    "Tx stall detected. Activate automatic recovery.\n");
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_STALL);
 		Adapter->reset_count++;
-		if (e1000g_reset(Adapter))
+		if (e1000g_reset_adapter(Adapter))
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_RESTORED);
 		else
@@ -3684,7 +3687,7 @@ e1000g_local_timer(void *ws)
 	 */
 	if (Adapter->esb2_workaround) {
 		Adapter->esb2_workaround = B_FALSE;
-		(void) e1000g_reset(Adapter);
+		(void) e1000g_reset_adapter(Adapter);
 	}
 
 	/*
@@ -4025,6 +4028,9 @@ e1000g_mask_interrupt(struct e1000g *Adapter)
 		e1000g_mask_tx_interrupt(Adapter);
 }
 
+/*
+ * This routine is called by e1000g_quiesce(), therefore must not block.
+ */
 void
 e1000g_clear_all_interrupts(struct e1000g *Adapter)
 {
@@ -4584,7 +4590,7 @@ e1000g_set_loopback_mode(struct e1000g *Adapter, uint32_t mode)
 	if (mode == E1000G_LB_NONE) {
 		/* Reset the chip */
 		hw->phy.autoneg_wait_to_complete = B_TRUE;
-		(void) e1000g_reset(Adapter);
+		(void) e1000g_reset_adapter(Adapter);
 		hw->phy.autoneg_wait_to_complete = B_FALSE;
 		return (B_TRUE);
 	}
@@ -4636,7 +4642,7 @@ again:
 			/* Reset the link */
 			E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
 			    "Reset the link ...");
-			(void) e1000g_reset(Adapter);
+			(void) e1000g_reset_adapter(Adapter);
 			goto again;
 		}
 	}
@@ -5518,6 +5524,41 @@ e1000g_fm_ereport(struct e1000g *Adapter, char *detail)
 		ddi_fm_ereport_post(Adapter->dip, buf, ena, DDI_NOSLEEP,
 		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
 	}
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+e1000g_quiesce(dev_info_t *devinfo)
+{
+	struct e1000g *Adapter;
+
+	Adapter = (struct e1000g *)ddi_get_driver_private(devinfo);
+
+	if (Adapter == NULL)
+		return (DDI_FAILURE);
+
+	e1000g_clear_all_interrupts(Adapter);
+
+	(void) e1000_reset_hw(&Adapter->shared);
+
+	/* Setup our HW Tx Head & Tail descriptor pointers */
+	E1000_WRITE_REG(&Adapter->shared, E1000_TDH(0), 0);
+	E1000_WRITE_REG(&Adapter->shared, E1000_TDT(0), 0);
+
+	/* Setup our HW Rx Head & Tail descriptor pointers */
+	E1000_WRITE_REG(&Adapter->shared, E1000_RDH(0), 0);
+	E1000_WRITE_REG(&Adapter->shared, E1000_RDT(0), 0);
+
+	return (DDI_SUCCESS);
 }
 
 static int

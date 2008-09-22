@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * llc1 - an LLC Class 1 MUX compatible with SunConnect LLC2 uses DLPI
@@ -182,14 +180,15 @@ struct streamtab llc1_info = {
 
 /* define the "ops" structure for a STREAMS driver */
 DDI_DEFINE_STREAM_OPS(llc1_ops, nulldev, nulldev, llc1_attach,
-    llc1_detach, nodev, llc1_getinfo, D_MP | D_MTPERMOD, &llc1_info);
+    llc1_detach, nodev, llc1_getinfo, D_MP | D_MTPERMOD, &llc1_info,
+    ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.
  */
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"LLC Class 1 Driver %I%",
+	"LLC Class 1 Driver",
 	&llc1_ops,		/* driver ops */
 };
 
@@ -253,13 +252,13 @@ llc1_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 		/* make sure minor device lists are initialized */
 		llc1_device_list.llc1_str_next =
-			llc1_device_list.llc1_str_prev =
-			(llc1_t *)&llc1_device_list.llc1_str_next;
+		    llc1_device_list.llc1_str_prev =
+		    (llc1_t *)&llc1_device_list.llc1_str_next;
 
 		/* make sure device list is initialized */
 		llc1_device_list.llc1_mac_next =
-			llc1_device_list.llc1_mac_prev =
-			(llc_mac_info_t *)&llc1_device_list.llc1_mac_next;
+		    llc1_device_list.llc1_mac_prev =
+		    (llc_mac_info_t *)&llc1_device_list.llc1_mac_next;
 	}
 
 	/*
@@ -278,7 +277,7 @@ llc1_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 	llc1_device_list.llc1_multisize = ddi_getprop(DDI_DEV_T_NONE,
-						devinfo, 0, "multisize", 0);
+	    devinfo, 0, "multisize", 0);
 	if (llc1_device_list.llc1_multisize == 0)
 		llc1_device_list.llc1_multisize = LLC1_MAX_MULTICAST;
 
@@ -440,10 +439,10 @@ llc1_close(queue_t *q, int flag, cred_t *cred)
 				 */
 				if (llc1->llc_mac_info &&
 				    llc1->llc_mac_info->llcp_flags &
-							LLC1_AVAILABLE)
+				    LLC1_AVAILABLE)
 					llc1_send_disable_multi(
-						llc1->llc_mac_info,
-						mcast);
+					    llc1->llc_mac_info,
+					    mcast);
 				llc1->llc_mcast[i] = NULL;
 			}
 		}
@@ -518,7 +517,7 @@ llc1_uwput(queue_t *q, mblk_t *mp)
 #ifdef LLC1_DEBUG
 		if (llc1_debug & LLCERRS)
 			printf("llc1: Unexpected packet type from queue: %d\n",
-				mp->b_datap->db_type);
+			    mp->b_datap->db_type);
 #endif
 		freemsg(mp);
 	}
@@ -574,11 +573,11 @@ llc1_lrsrv(queue_t *q)
 					macinfo->llcp_flags &= ~LLC1_LINKED;
 					macinfo->llcp_flags |= LLC1_AVAILABLE;
 					macinfo->llcp_maxpkt =
-						prim->info_ack.dl_max_sdu;
+					    prim->info_ack.dl_max_sdu;
 					macinfo->llcp_minpkt =
-						prim->info_ack.dl_min_sdu;
+					    prim->info_ack.dl_min_sdu;
 					macinfo->llcp_type =
-						prim->info_ack.dl_mac_type;
+					    prim->info_ack.dl_mac_type;
 					if (macinfo->llcp_type == DL_ETHER) {
 						macinfo->llcp_type = DL_CSMACD;
 						/*
@@ -596,12 +595,14 @@ llc1_lrsrv(queue_t *q)
 					    macinfo->llcp_macaddr,
 					    macinfo->llcp_addrlen);
 					bcopy(mp->b_rptr +
-			prim->info_ack.dl_brdcst_addr_offset,
-			macinfo->llcp_broadcast,
-			prim->info_ack.dl_brdcst_addr_length);
+					    prim->info_ack.
+					    dl_brdcst_addr_offset,
+					    macinfo->llcp_broadcast,
+					    prim->info_ack.
+					    dl_brdcst_addr_length);
 
 					if (prim->info_ack.dl_current_state ==
-								DL_UNBOUND)
+					    DL_UNBOUND)
 						llc1_send_bindreq(macinfo);
 					freemsg(mp);
 					/*
@@ -627,8 +628,8 @@ llc1_lrsrv(queue_t *q)
 						break;
 					}
 				} else {
-				    if (prim->info_ack.dl_current_state ==
-									DL_IDLE)
+					if (prim->info_ack.dl_current_state ==
+					    DL_IDLE)
 					/* address was wrong before */
 					bcopy(mp->b_rptr +
 					    prim->info_ack.dl_addr_offset,
@@ -652,7 +653,7 @@ llc1_lrsrv(queue_t *q)
 			case DL_ERROR_ACK:
 				/* binding is a special case */
 				if (prim->error_ack.dl_error_primitive ==
-								DL_BIND_REQ) {
+				    DL_BIND_REQ) {
 					freemsg(mp);
 					if (macinfo->llcp_flags & LLC1_BINDING)
 						llc1_send_bindreq(macinfo);
@@ -662,11 +663,11 @@ llc1_lrsrv(queue_t *q)
 				break;
 			case DL_PHYS_ADDR_ACK:
 				llc1_find_waiting(macinfo, mp,
-							DL_PHYS_ADDR_REQ);
+				    DL_PHYS_ADDR_REQ);
 				break;
 			case DL_OK_ACK:
 				if (prim->ok_ack.dl_correct_primitive ==
-								DL_BIND_REQ)
+				    DL_BIND_REQ)
 					macinfo->llcp_flags &= ~LLC1_BINDING;
 				/* FALLTHROUGH */
 			default:
@@ -739,15 +740,15 @@ llc1_uwsrv(queue_t *q)
 					if (llc1_debug & LLCERRS)
 						printf(
 "llc1_cmds: nonfatal err=%d\n",
-							err);
+						    err);
 #endif
 					(void) putbq(q, mp);
 					return (0);
 
 				} else {
 					dlerrorack(q, mp,
-							prim->dl_primitive,
-							err, 0);
+					    prim->dl_primitive,
+					    err, 0);
 				}
 			}
 			break;
@@ -769,7 +770,7 @@ llc1_uwsrv(queue_t *q)
 #ifdef LLC1_DEBUG
 			if (llc1_debug & LLCERRS)
 				printf("llc1_wsrv: type(%x) not supported\n",
-					mp->b_datap->db_type);
+				    mp->b_datap->db_type);
 #endif
 			freemsg(mp);	/* unknown types are discarded */
 			break;
@@ -849,7 +850,7 @@ llc1_ioctl(queue_t *q, mblk_t *mp)
 		rw_enter(&llc1_device_list.llc1_rwlock, RW_WRITER);
 		llc1insque(macinfo, llc1_device_list.llc1_mac_prev);
 		macinfo->llcp_queue->q_ptr = RD(macinfo->llcp_queue)->q_ptr =
-			(caddr_t)macinfo;
+		    (caddr_t)macinfo;
 		llc1_init_kstat(macinfo);
 		rw_exit(&llc1_device_list.llc1_rwlock);
 
@@ -866,42 +867,42 @@ llc1_ioctl(queue_t *q, mblk_t *mp)
 		for (macinfo = llc1_device_list.llc1_mac_next;
 		    macinfo != NULL &&
 		    macinfo !=
-			(llc_mac_info_t *)&llc1_device_list.llc1_mac_next;
+		    (llc_mac_info_t *)&llc1_device_list.llc1_mac_next;
 		    macinfo = macinfo->llcp_next) {
 			if (macinfo->llcp_lindex == link->l_index &&
 			    macinfo->llcp_queue == link->l_qbot) {
 				/* found it */
 
-			    ASSERT(macinfo->llcp_next);
+				ASSERT(macinfo->llcp_next);
 
 			    /* remove from device list */
-			    llc1_device_list.llc1_ndevice--;
-			    llc1remque(macinfo);
+				llc1_device_list.llc1_ndevice--;
+				llc1remque(macinfo);
 
 			    /* remove any mcast structs */
-			    if (macinfo->llcp_mcast != NULL) {
+				if (macinfo->llcp_mcast != NULL) {
 				kmem_free(macinfo->llcp_mcast,
 				    sizeof (llc_mcast_t) *
-				llc1_device_list.llc1_multisize);
+				    llc1_device_list.llc1_multisize);
 				macinfo->llcp_mcast = NULL;
-			    }
+				}
 
 			    /* remove any kstat counters */
-			    if (macinfo->llcp_kstatp != NULL)
+				if (macinfo->llcp_kstatp != NULL)
 				llc1_uninit_kstat(macinfo);
-			    if (macinfo->llcp_mb != NULL)
+				if (macinfo->llcp_mb != NULL)
 				freeb(macinfo->llcp_mb);
 
-			    lld->llc_mac_info = NULL;
+				lld->llc_mac_info = NULL;
 
-			    miocack(q, mp, 0, 0);
+				miocack(q, mp, 0, 0);
 
 			    /* finish any necessary setup */
-			    if (llc1_device_list.llc1_ndevice == 0)
+				if (llc1_device_list.llc1_ndevice == 0)
 				llc1_device_list.llc1_nextppa = 0;
 
-			    rw_exit(&llc1_device_list.llc1_rwlock);
-			    return;
+				rw_exit(&llc1_device_list.llc1_rwlock);
+				return;
 			}
 		}
 		rw_exit(&llc1_device_list.llc1_rwlock);
@@ -934,7 +935,7 @@ llc1_ioctl(queue_t *q, mblk_t *mp)
 				return;
 			}
 			mp->b_cont->b_wptr =
-				mp->b_cont->b_rptr + sizeof (struct ll_snioc);
+			    mp->b_cont->b_rptr + sizeof (struct ll_snioc);
 		} else {
 			error = miocpullup(mp, sizeof (struct ll_snioc));
 			if (error != 0) {
@@ -967,8 +968,8 @@ llc1_setppa(struct ll_snioc *snioc)
 	llc_mac_info_t *macinfo;
 
 	for (macinfo = llc1_device_list.llc1_mac_next;
-		macinfo != (llc_mac_info_t *)&llc1_device_list.llc1_mac_next;
-		macinfo = macinfo->llcp_next)
+	    macinfo != (llc_mac_info_t *)&llc1_device_list.llc1_mac_next;
+	    macinfo = macinfo->llcp_next)
 		if (macinfo->llcp_lindex == snioc->lli_index &&
 		    (macinfo->llcp_flags & LLC1_DEF_PPA)) {
 			macinfo->llcp_flags &= ~LLC1_DEF_PPA;
@@ -1006,7 +1007,7 @@ llc1_cmds(queue_t *q, mblk_t *mp)
 #ifdef LLC1_DEBUG
 	if (llc1_debug & LLCTRACE)
 		printf("llc1_cmds(%x, %x):dlp=%x, dlp->dl_primitive=%d\n",
-			q, mp, dlp, dlp->dl_primitive);
+		    q, mp, dlp, dlp->dl_primitive);
 #endif
 	mutex_enter(&llc->llc_lock);
 	rw_enter(&llc1_device_list.llc1_rwlock, RW_READER);
@@ -1091,7 +1092,7 @@ llc1_cmds(queue_t *q, mblk_t *mp)
 #ifdef LLC1_DEBUG
 		if (llc1_debug & LLCERRS)
 			printf("llc1_cmds: Received unknown primitive: %d\n",
-				dlp->dl_primitive);
+			    dlp->dl_primitive);
 #endif
 		result = DL_BADPRIM;
 		break;
@@ -1134,7 +1135,7 @@ llc1_bind(queue_t *q, mblk_t *mp)
 #ifdef LLC1_DEBUG
 		if (llc1_debug & LLCERRS)
 			printf("llc1_bind: stream bound/not attached (%d)\n",
-				lld->llc_state);
+			    lld->llc_state);
 #endif
 		return (DL_OUTSTATE);
 	}
@@ -1215,7 +1216,7 @@ llc1_unbind(queue_t *q, mblk_t *mp)
 #ifdef LLC1_DEBUG
 		if (llc1_debug & LLCERRS)
 			printf("llc1_unbind: wrong state (%d)\n",
-				lld->llc_state);
+			    lld->llc_state);
 #endif
 		return (DL_OUTSTATE);
 	}
@@ -1247,7 +1248,7 @@ llc1_inforeq(queue_t *q, mblk_t *mp)
 		bufsize = sizeof (dl_info_ack_t) + ETHERADDRL;
 	else
 		bufsize = sizeof (dl_info_ack_t) +
-				2 * lld->llc_mac_info->llcp_addrlen + 2;
+		    2 * lld->llc_mac_info->llcp_addrlen + 2;
 
 	nmp = mexchange(q, mp, bufsize, M_PCPROTO, DL_INFO_ACK);
 
@@ -1263,7 +1264,7 @@ llc1_inforeq(queue_t *q, mblk_t *mp)
 		dlp->dl_service_mode = DL_CLDLS;
 		dlp->dl_current_state = lld->llc_state;
 		dlp->dl_provider_style =
-			(lld->llc_style == 0) ? lld->llc_style : DL_STYLE2;
+		    (lld->llc_style == 0) ? lld->llc_style : DL_STYLE2;
 
 		/* now append physical address */
 		if (lld->llc_mac_info) {
@@ -1271,19 +1272,19 @@ llc1_inforeq(queue_t *q, mblk_t *mp)
 			dlp->dl_addr_offset = DL_INFO_ACK_SIZE;
 			nmp->b_wptr += dlp->dl_addr_length + 1;
 			bcopy(lld->llc_mac_info->llcp_macaddr,
-				((caddr_t)dlp) + dlp->dl_addr_offset,
-				lld->llc_mac_info->llcp_addrlen);
+			    ((caddr_t)dlp) + dlp->dl_addr_offset,
+			    lld->llc_mac_info->llcp_addrlen);
 			if (lld->llc_state == DL_IDLE) {
 				dlp->dl_sap_length = -1; /* 1 byte on end */
 				*(((caddr_t)dlp) + dlp->dl_addr_offset +
-					dlp->dl_addr_length) = lld->llc_sap;
+				    dlp->dl_addr_length) = lld->llc_sap;
 				dlp->dl_addr_length += 1;
 			}
 			/* and the broadcast address */
 			dlp->dl_brdcst_addr_length =
-				lld->llc_mac_info->llcp_addrlen;
+			    lld->llc_mac_info->llcp_addrlen;
 			dlp->dl_brdcst_addr_offset =
-				dlp->dl_addr_offset + dlp->dl_addr_length;
+			    dlp->dl_addr_offset + dlp->dl_addr_length;
 			nmp->b_wptr += dlp->dl_brdcst_addr_length;
 			bcopy(lld->llc_mac_info->llcp_broadcast,
 			    ((caddr_t)dlp) + dlp->dl_brdcst_addr_offset,
@@ -1334,7 +1335,7 @@ llc1_unitdata(queue_t *q, mblk_t *mp)
 #ifdef LLC1_DEBUG
 		if (llc1_debug & LLCERRS)
 			printf("llc1_unitdata: wrong state (%d)\n",
-				lld->llc_state);
+			    lld->llc_state);
 #endif
 		return (DL_OUTSTATE);
 	}
@@ -1348,13 +1349,13 @@ llc1_unitdata(queue_t *q, mblk_t *mp)
 		 */
 
 	    /* need a buffer big enough for the headers */
-	    nmp = allocb(macinfo->llcp_addrlen * 2 + 2 + 8, BPRI_MED);
-	    hdr = (struct ether_header *)nmp->b_rptr;
-	    msglen = msgdsize(mp);
+		nmp = allocb(macinfo->llcp_addrlen * 2 + 2 + 8, BPRI_MED);
+		hdr = (struct ether_header *)nmp->b_rptr;
+		msglen = msgdsize(mp);
 
 	    /* fill in type dependent fields */
-	    switch (lld->llc_type) {
-	    case DL_CSMACD: /* 802.3 CSMA/CD */
+		switch (lld->llc_type) {
+		case DL_CSMACD: /* 802.3 CSMA/CD */
 		nmp->b_wptr = nmp->b_rptr + LLC1_CSMACD_HDR_SIZE;
 		llchdr = (struct llchdr *)nmp->b_wptr;
 		bcopy(llcp->llca_addr,
@@ -1367,7 +1368,7 @@ llc1_unitdata(queue_t *q, mblk_t *mp)
 		if (lld->llc_sap != LLC_NOVELL_SAP) {
 			/* set length with llc header size */
 			hdr->ether_type = ntohs(msglen +
-							sizeof (struct llchdr));
+			    sizeof (struct llchdr));
 
 			/* need an LLC header, otherwise is Novell */
 			/* bound sap is always source */
@@ -1403,42 +1404,42 @@ llc1_unitdata(queue_t *q, mblk_t *mp)
 
 		break;
 
-	    default:		/* either RAW or unknown, send as is */
+		default:		/* either RAW or unknown, send as is */
 		break;
-	    }
-	    DB_TYPE(nmp) = M_DATA; /* ether/llc header is data */
-	    nmp->b_cont = mp->b_cont;	/* use the data given */
-	    freeb(mp);
-	    mp = nmp;
+		}
+		DB_TYPE(nmp) = M_DATA; /* ether/llc header is data */
+		nmp->b_cont = mp->b_cont;	/* use the data given */
+		freeb(mp);
+		mp = nmp;
 	} else {
 	    /* need to format a DL_UNITDATA_REQ with LLC1 header inserted */
-	    nmp = allocb(sizeof (struct llchdr)+sizeof (struct snaphdr),
-				BPRI_MED);
-	    if (nmp == NULL)
+		nmp = allocb(sizeof (struct llchdr)+sizeof (struct snaphdr),
+		    BPRI_MED);
+		if (nmp == NULL)
 		return (DL_UNDELIVERABLE);
-	    llchdr = (struct llchdr *)(nmp->b_rptr);
-	    nmp->b_wptr += sizeof (struct llchdr);
-	    llchdr->llc_dsap = llcp->llca_sap;
-	    llchdr->llc_ssap = lld->llc_sap;
-	    llchdr->llc_ctl = LLC_UI;
+		llchdr = (struct llchdr *)(nmp->b_rptr);
+		nmp->b_wptr += sizeof (struct llchdr);
+		llchdr->llc_dsap = llcp->llca_sap;
+		llchdr->llc_ssap = lld->llc_sap;
+		llchdr->llc_ctl = LLC_UI;
 
 		/*
 		 * if we are using SNAP, insert the header here
 		 */
-	    if (lld->llc_flags & LLC_SNAP) {
-		    bcopy(lld->llc_snap, nmp->b_wptr, 5);
-		    nmp->b_wptr += 5;
-	    }
-	    nmp->b_cont = mp->b_cont;
-	    mp->b_cont = nmp;
-	    nmp = mp;
-	    if (ismulticast(llcp->llca_addr)) {
-		    if (bcmp(llcp->llca_addr,
-			macinfo->llcp_broadcast, ETHERADDRL) == 0)
-			    xmt_type = 2;
-		    else
-			    xmt_type = 1;
-	    }
+		if (lld->llc_flags & LLC_SNAP) {
+			bcopy(lld->llc_snap, nmp->b_wptr, 5);
+			nmp->b_wptr += 5;
+		}
+		nmp->b_cont = mp->b_cont;
+		mp->b_cont = nmp;
+		nmp = mp;
+		if (ismulticast(llcp->llca_addr)) {
+			if (bcmp(llcp->llca_addr,
+			    macinfo->llcp_broadcast, ETHERADDRL) == 0)
+				xmt_type = 2;
+			else
+				xmt_type = 1;
+		}
 	}
 	if (canput(macinfo->llcp_queue)) {
 		lld->llc_stats->llcs_bytexmt += msgdsize(mp);
@@ -1491,7 +1492,7 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 		nmp = mp;
 		udata = (dl_unitdata_ind_t *)(nmp->b_rptr);
 		addr = (struct ether_addr *)(nmp->b_rptr +
-						udata->dl_dest_addr_offset);
+		    udata->dl_dest_addr_offset);
 		llchdr = (struct llchdr *)(nmp->b_cont->b_rptr);
 		if (macinfo->llcp_type == DL_CSMACD) {
 			i = ((struct llcsaddr *)addr)->llca_ssap;
@@ -1507,11 +1508,11 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 		hdr = (struct ether_header *)mp->b_rptr;
 		addr = &hdr->ether_dhost;
 		llchdr = (struct llchdr *)(mp->b_rptr +
-						sizeof (struct ether_header));
+		    sizeof (struct ether_header));
 		i = (ushort_t)ntohs(hdr->ether_type);
 		if (i < 60) {
 			(void) adjmsg(mp, i + sizeof (struct ether_header) -
-					msgdsize(mp));
+			    msgdsize(mp));
 		}
 	}
 	udmp = NULL;
@@ -1545,28 +1546,28 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 			mp = llc1_test_reply(macinfo, mp, 0);
 	} else
 		for (lld = llc1_device_list.llc1_str_next;
-			lld != (llc1_t *)&llc1_device_list.llc1_str_next;
-			lld = lld->llc_next) {
+		    lld != (llc1_t *)&llc1_device_list.llc1_str_next;
+		    lld = lld->llc_next) {
 
 			/*
 			 * is this a potentially usable SAP on the
 			 * right MAC layer?
 			 */
 			if (lld->llc_qptr == NULL ||
-						lld->llc_state != DL_IDLE ||
-						lld->llc_mac_info != macinfo) {
+			    lld->llc_state != DL_IDLE ||
+			    lld->llc_mac_info != macinfo) {
 				continue;
 			}
 #ifdef LLC1_DEBUG
 			if (llc1_debug & LLCRECV)
 				printf(
 "llc1_recv: type=%d, sap=%x, pkt-dsap=%x\n",
-					lld->llc_type, lld->llc_sap,
-					msgsap);
+				    lld->llc_type, lld->llc_sap,
+				    msgsap);
 #endif
 			if (!valid && ismulticast(addr->ether_addr_octet) &&
-						lld->llc_multicnt > 0 &&
-						llc1_multicast(addr, lld)) {
+			    lld->llc_multicnt > 0 &&
+			    llc1_multicast(addr, lld)) {
 				valid |= 4;
 			} else if (lld->llc_flags & LLC_PROM)
 				/* promiscuous mode */
@@ -1574,15 +1575,15 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 
 			if ((lld->llc_flags & LLC_PROM) ||
 				/* promiscuous streams */
-						(valid &&
-						(lld->llc_sap == msgsap ||
-						msgsap == LLC_GLOBAL_SAP))) {
+			    (valid &&
+			    (lld->llc_sap == msgsap ||
+			    msgsap == LLC_GLOBAL_SAP))) {
 				/* sap matches */
 				if (msgsap == LLC_SNAP_SAP &&
 				    (lld->llc_flags & (LLC_SNAP|LLC_PROM)) ==
-								LLC_SNAP) {
+				    LLC_SNAP) {
 					if (!llc1_snap_match(lld,
-						(struct snaphdr *)(llchdr+1)))
+					    (struct snaphdr *)(llchdr+1)))
 						continue;
 				}
 				if (!canputnext(RD(lld->llc_qptr))) {
@@ -1626,7 +1627,7 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 					 */
 					if (lld->llc_flags & LLC1_AUTO_XID) {
 						nmp = llc1_xid_reply(macinfo,
-							mp, lld->llc_sap);
+						    mp, lld->llc_sap);
 					} else {
 						/*
 						 * hand to the user for
@@ -1638,7 +1639,7 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 						 * DL_XID_CON.
 						 */
 						nmp = llc1_xid_ind_con(lld,
-								macinfo, mp);
+						    macinfo, mp);
 					}
 					macinfo->llcp_stats.llcs_xidrcv++;
 					break;
@@ -1657,7 +1658,7 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 					 */
 					if (lld->llc_flags & LLC1_AUTO_TEST) {
 						nmp = llc1_test_reply(macinfo,
-							mp, lld->llc_sap);
+						    mp, lld->llc_sap);
 					} else {
 						/*
 						 * hand to the user for
@@ -1671,7 +1672,7 @@ llc1_recv(llc_mac_info_t *macinfo, mblk_t *mp)
 						 * DL_TEST_CON.
 						 */
 						nmp = llc1_test_ind_con(lld,
-								macinfo, mp);
+						    macinfo, mp);
 					}
 					macinfo->llcp_stats.llcs_testrcv++;
 					break;
@@ -1747,8 +1748,8 @@ llc1attach(queue_t *q, mblk_t *mp)
 	}
 
 	for (mac = llc1_device_list.llc1_mac_next;
-		mac != (llc_mac_info_t *)(&llc1_device_list.llc1_mac_next);
-		mac = mac->llcp_next) {
+	    mac != (llc_mac_info_t *)(&llc1_device_list.llc1_mac_next);
+	    mac = mac->llcp_next) {
 		ASSERT(mac);
 		if (mac->llcp_ppa == at->dl_ppa && mac->llcp_lqtop == q) {
 			/*
@@ -1815,7 +1816,7 @@ llc1unattach(queue_t *q, mblk_t *mp)
 			if ((mcast = llc->llc_mcast[i]) != NULL) {
 				/* disable from stream and possibly lower */
 				llc1_send_disable_multi(llc->llc_mac_info,
-							mcast);
+				    mcast);
 				llc->llc_mcast[i] = NULL;
 			}
 		}
@@ -1880,15 +1881,15 @@ llc1_enable_multi(queue_t *q, mblk_t *mp)
 		if (llc->llc_mcast == NULL) {
 			/* no mcast addresses -- allocate table */
 			llc->llc_mcast =
-				GETSTRUCT(llc_mcast_t *,
-					llc1_device_list.llc1_multisize);
+			    GETSTRUCT(llc_mcast_t *,
+			    llc1_device_list.llc1_multisize);
 			if (llc->llc_mcast == NULL)
 				return (DL_SYSERR);
 			llc->llc_multicnt = llc1_device_list.llc1_multisize;
 		} else {
 			for (i = 0; i < llc1_device_list.llc1_multisize; i++) {
 				if (llc->llc_mcast[i] &&
-				bcmp(llc->llc_mcast[i]->llcm_addr,
+				    bcmp(llc->llc_mcast[i]->llcm_addr,
 				    maddr->ether_addr_octet, ETHERADDRL)) {
 					/* this is a match -- just succeed */
 					dlokack(q, mp, DL_ENABMULTI_REQ);
@@ -1901,16 +1902,16 @@ llc1_enable_multi(queue_t *q, mblk_t *mp)
 		 */
 		if (macinfo->llcp_mcast == NULL) {
 			macinfo->llcp_mcast =
-				GETSTRUCT(llc_mcast_t,
-					llc1_device_list.llc1_multisize);
+			    GETSTRUCT(llc_mcast_t,
+			    llc1_device_list.llc1_multisize);
 			if (macinfo->llcp_mcast == NULL)
 				return (DL_SYSERR);
 		}
 		for (mcast = NULL, i = 0;
-			i < llc1_device_list.llc1_multisize; i++) {
+		    i < llc1_device_list.llc1_multisize; i++) {
 			if (macinfo->llcp_mcast[i].llcm_refcnt &&
 			    bcmp(macinfo->llcp_mcast[i].llcm_addr,
-				maddr->ether_addr_octet, ETHERADDRL) == 0) {
+			    maddr->ether_addr_octet, ETHERADDRL) == 0) {
 				mcast = &macinfo->llcp_mcast[i];
 				break;
 			}
@@ -1926,7 +1927,7 @@ llc1_enable_multi(queue_t *q, mblk_t *mp)
 			}
 			/* find an empty slot to fill in */
 			for (mcast = macinfo->llcp_mcast, i = 0;
-			i < llc1_device_list.llc1_multisize; i++, mcast++) {
+			    i < llc1_device_list.llc1_multisize; i++, mcast++) {
 				if (mcast->llcm_refcnt == 0) {
 					bcopy(maddr->ether_addr_octet,
 					    mcast->llcm_addr, ETHERADDRL);
@@ -1989,7 +1990,7 @@ llc1_disable_multi(queue_t *q, mblk_t *mp)
 				    bcmp(mcast->llcm_addr,
 				    maddr->ether_addr_octet, ETHERADDRL) == 0) {
 					llc1_send_disable_multi(macinfo,
-								mcast);
+					    mcast);
 					llc->llc_mcast[i] = NULL;
 					dlokack(q, mp, DL_DISABMULTI_REQ);
 					return (LLCE_OK);
@@ -2024,7 +2025,7 @@ llc1_send_disable_multi(llc_mac_info_t *macinfo, llc_mcast_t *mcast)
 	if (mp) {
 		dis = (dl_disabmulti_req_t *)mp->b_rptr;
 		mp->b_wptr =
-			mp->b_rptr + sizeof (dl_disabmulti_req_t) + ETHERADDRL;
+		    mp->b_rptr + sizeof (dl_disabmulti_req_t) + ETHERADDRL;
 		dis->dl_primitive = DL_DISABMULTI_REQ;
 		dis->dl_addr_offset = sizeof (dl_disabmulti_req_t);
 		dis->dl_addr_length = ETHERADDRL;
@@ -2150,108 +2151,108 @@ llc1_form_udata(llc1_t *lld, llc_mac_info_t *macinfo, mblk_t *mp)
 	struct snaphdr *snap;
 
 	if (macinfo->llcp_flags & LLC1_USING_RAW) {
-	    hdr = (struct ether_header *)mp->b_rptr;
-	    llchdr = (struct llchdr *)(hdr + 1);
+		hdr = (struct ether_header *)mp->b_rptr;
+		llchdr = (struct llchdr *)(hdr + 1);
 
 	    /* allocate the DL_UNITDATA_IND M_PROTO header */
-	    udmp = allocb(sizeof (dl_unitdata_ind_t) +
-				2 * (macinfo->llcp_addrlen + 5), BPRI_MED);
-	    if (udmp == NULL) {
+		udmp = allocb(sizeof (dl_unitdata_ind_t) +
+		    2 * (macinfo->llcp_addrlen + 5), BPRI_MED);
+		if (udmp == NULL) {
 		/* might as well discard since we can't go further */
 		freemsg(mp);
 		return (NULL);
-	    }
-	    udata = (dl_unitdata_ind_t *)udmp->b_rptr;
-	    udmp->b_wptr += sizeof (dl_unitdata_ind_t);
+		}
+		udata = (dl_unitdata_ind_t *)udmp->b_rptr;
+		udmp->b_wptr += sizeof (dl_unitdata_ind_t);
 
-	    nmp = dupmsg(mp);	/* make a copy for future streams */
-	    if (lld->llc_sap != LLC_NOVELL_SAP)
-		    mp->b_rptr += sizeof (struct ether_header) +
+		nmp = dupmsg(mp);	/* make a copy for future streams */
+		if (lld->llc_sap != LLC_NOVELL_SAP)
+			mp->b_rptr += sizeof (struct ether_header) +
 			    sizeof (struct llchdr);
-	    else
-		    mp->b_rptr += sizeof (struct ether_header);
+		else
+			mp->b_rptr += sizeof (struct ether_header);
 
-	    if (lld->llc_flags & LLC_SNAP) {
-		    mp->b_rptr += sizeof (struct snaphdr);
-		    snap = (struct snaphdr *)(llchdr + 1);
-	    }
+		if (lld->llc_flags & LLC_SNAP) {
+			mp->b_rptr += sizeof (struct snaphdr);
+			snap = (struct snaphdr *)(llchdr + 1);
+		}
 
 		/*
 		 * now setup the DL_UNITDATA_IND header
 		 */
-	    DB_TYPE(udmp) = M_PROTO;
-	    udata->dl_primitive = DL_UNITDATA_IND;
-	    udata->dl_dest_addr_offset = sizeof (dl_unitdata_ind_t);
-	    bcopy(hdr->ether_dhost.ether_addr_octet,
-		LLCADDR(udata, udata->dl_dest_addr_offset)->llca_addr,
-		macinfo->llcp_addrlen);
+		DB_TYPE(udmp) = M_PROTO;
+		udata->dl_primitive = DL_UNITDATA_IND;
+		udata->dl_dest_addr_offset = sizeof (dl_unitdata_ind_t);
+		bcopy(hdr->ether_dhost.ether_addr_octet,
+		    LLCADDR(udata, udata->dl_dest_addr_offset)->llca_addr,
+		    macinfo->llcp_addrlen);
 
-	    if (lld->llc_flags & LLC_SNAP) {
-		    udata->dl_dest_addr_length = macinfo->llcp_addrlen + 2;
-		    LLCSADDR(udata, udata->dl_dest_addr_offset)->llca_ssap =
+		if (lld->llc_flags & LLC_SNAP) {
+			udata->dl_dest_addr_length = macinfo->llcp_addrlen + 2;
+			LLCSADDR(udata, udata->dl_dest_addr_offset)->llca_ssap =
 			    ntohs(*(ushort_t *)snap->snap_type);
-	    } else {
-		    udata->dl_dest_addr_length = macinfo->llcp_addrlen + 1;
-		    LLCADDR(udata, udata->dl_dest_addr_offset)->llca_sap =
+		} else {
+			udata->dl_dest_addr_length = macinfo->llcp_addrlen + 1;
+			LLCADDR(udata, udata->dl_dest_addr_offset)->llca_sap =
 			    llchdr->llc_dsap;
-	    }
-	    udmp->b_wptr += udata->dl_dest_addr_length;
-	    udata->dl_src_addr_offset = udata->dl_dest_addr_length +
-		udata->dl_dest_addr_offset;
-	    bcopy(hdr->ether_shost.ether_addr_octet,
-		LLCADDR(udata, udata->dl_src_addr_offset)->llca_addr,
-		macinfo->llcp_addrlen);
-	    if (lld->llc_flags & LLC_SNAP) {
-		    udata->dl_src_addr_length = macinfo->llcp_addrlen + 2;
-		    LLCSADDR(udata, udata->dl_src_addr_offset)->llca_ssap =
+		}
+		udmp->b_wptr += udata->dl_dest_addr_length;
+		udata->dl_src_addr_offset = udata->dl_dest_addr_length +
+		    udata->dl_dest_addr_offset;
+		bcopy(hdr->ether_shost.ether_addr_octet,
+		    LLCADDR(udata, udata->dl_src_addr_offset)->llca_addr,
+		    macinfo->llcp_addrlen);
+		if (lld->llc_flags & LLC_SNAP) {
+			udata->dl_src_addr_length = macinfo->llcp_addrlen + 2;
+			LLCSADDR(udata, udata->dl_src_addr_offset)->llca_ssap =
 			    ntohs(*(ushort_t *)snap->snap_type);
-	    } else {
-		    udata->dl_src_addr_length = macinfo->llcp_addrlen + 1;
-		    LLCADDR(udata, udata->dl_src_addr_offset)->llca_sap =
-					llchdr->llc_ssap;
-	    }
-	    udata->dl_group_address = hdr->ether_dhost.ether_addr_octet[0] &
-									0x1;
-	    udmp->b_wptr += udata->dl_src_addr_length;
-	    udmp->b_cont = mp;
+		} else {
+			udata->dl_src_addr_length = macinfo->llcp_addrlen + 1;
+			LLCADDR(udata, udata->dl_src_addr_offset)->llca_sap =
+			    llchdr->llc_ssap;
+		}
+		udata->dl_group_address = hdr->ether_dhost.ether_addr_octet[0] &
+		    0x1;
+		udmp->b_wptr += udata->dl_src_addr_length;
+		udmp->b_cont = mp;
 	} else {
-	    dl_unitdata_ind_t *ud2;
-	    if (mp->b_cont == NULL) {
+		dl_unitdata_ind_t *ud2;
+		if (mp->b_cont == NULL) {
 		return (mp);	/* we can't do anything */
-	    }
+		}
 	    /* if we end up here, we only want to patch the existing M_PROTO */
-	    nmp = dupmsg(mp);	/* make a copy for future streams */
-	    udata = (dl_unitdata_ind_t *)(mp->b_rptr);
-	    udmp = allocb(MBLKL(mp) + 4, BPRI_MED);
-	    bcopy(mp->b_rptr, udmp->b_rptr, sizeof (dl_unitdata_ind_t));
-	    ud2 = (dl_unitdata_ind_t *)(udmp->b_rptr);
-	    udmp->b_wptr += sizeof (dl_unitdata_ind_t);
-	    bcopy((caddr_t)mp->b_rptr + udata->dl_dest_addr_offset,
-		udmp->b_wptr, macinfo->llcp_addrlen);
-	    ud2->dl_dest_addr_offset = sizeof (dl_unitdata_ind_t);
-	    ud2->dl_dest_addr_length = macinfo->llcp_addrlen + 1;
-	    udmp->b_wptr += ud2->dl_dest_addr_length;
-	    bcopy((caddr_t)udmp->b_rptr + udata->dl_src_addr_offset,
-		udmp->b_wptr, macinfo->llcp_addrlen);
-	    ud2->dl_src_addr_length = ud2->dl_dest_addr_length;
-	    udmp->b_wptr += ud2->dl_src_addr_length;
-	    udmp->b_cont = mp->b_cont;
-	    if (lld->llc_sap != LLC_NOVELL_SAP)
-		    mp->b_cont->b_rptr += sizeof (struct llchdr);
-	    freeb(mp);
+		nmp = dupmsg(mp);	/* make a copy for future streams */
+		udata = (dl_unitdata_ind_t *)(mp->b_rptr);
+		udmp = allocb(MBLKL(mp) + 4, BPRI_MED);
+		bcopy(mp->b_rptr, udmp->b_rptr, sizeof (dl_unitdata_ind_t));
+		ud2 = (dl_unitdata_ind_t *)(udmp->b_rptr);
+		udmp->b_wptr += sizeof (dl_unitdata_ind_t);
+		bcopy((caddr_t)mp->b_rptr + udata->dl_dest_addr_offset,
+		    udmp->b_wptr, macinfo->llcp_addrlen);
+		ud2->dl_dest_addr_offset = sizeof (dl_unitdata_ind_t);
+		ud2->dl_dest_addr_length = macinfo->llcp_addrlen + 1;
+		udmp->b_wptr += ud2->dl_dest_addr_length;
+		bcopy((caddr_t)udmp->b_rptr + udata->dl_src_addr_offset,
+		    udmp->b_wptr, macinfo->llcp_addrlen);
+		ud2->dl_src_addr_length = ud2->dl_dest_addr_length;
+		udmp->b_wptr += ud2->dl_src_addr_length;
+		udmp->b_cont = mp->b_cont;
+		if (lld->llc_sap != LLC_NOVELL_SAP)
+			mp->b_cont->b_rptr += sizeof (struct llchdr);
+		freeb(mp);
 
-	    DB_TYPE(udmp) = M_PROTO;
-	    udata = (dl_unitdata_ind_t *)(mp->b_rptr);
-	    llchdr = (struct llchdr *)(mp->b_cont->b_rptr);
-	    LLCADDR(udata, udata->dl_dest_addr_offset)->llca_sap =
-		llchdr->llc_dsap;
-	    LLCADDR(udata, udata->dl_src_addr_offset)->llca_sap =
-		llchdr->llc_ssap;
+		DB_TYPE(udmp) = M_PROTO;
+		udata = (dl_unitdata_ind_t *)(mp->b_rptr);
+		llchdr = (struct llchdr *)(mp->b_cont->b_rptr);
+		LLCADDR(udata, udata->dl_dest_addr_offset)->llca_sap =
+		    llchdr->llc_dsap;
+		LLCADDR(udata, udata->dl_src_addr_offset)->llca_sap =
+		    llchdr->llc_ssap;
 	}
 #ifdef LLC1_DEBUG
-	    if (llc1_debug & LLCRECV)
+		if (llc1_debug & LLCRECV)
 		printf("llc1_recv: queued message to %x (%d)\n",
-			lld->llc_qptr, lld->llc_minor);
+		    lld->llc_qptr, lld->llc_minor);
 #endif
 	/* enqueue for the service routine to process */
 	putnext(RD(lld->llc_qptr), udmp);
@@ -2302,7 +2303,7 @@ llc1_xid_reply(llc_mac_info_t *macinfo, mblk_t *mp, int sap)
 		    msgether->ether_shost.ether_addr_octet,
 		    macinfo->llcp_addrlen);
 		msgether->ether_type = htons(sizeof (struct llchdr_xid) +
-						sizeof (struct llchdr));
+		    sizeof (struct llchdr));
 		rmp = nmp;
 	} else {
 		dl_unitdata_req_t *ud;
@@ -2310,7 +2311,7 @@ llc1_xid_reply(llc_mac_info_t *macinfo, mblk_t *mp, int sap)
 		rud = (dl_unitdata_ind_t *)mp->b_rptr;
 
 		rmp = allocb(sizeof (dl_unitdata_req_t) +
-				macinfo->llcp_addrlen + 5, BPRI_MED);
+		    macinfo->llcp_addrlen + 5, BPRI_MED);
 		if (rmp == NULL)
 			return (mp);
 
@@ -2326,7 +2327,7 @@ llc1_xid_reply(llc_mac_info_t *macinfo, mblk_t *mp, int sap)
 		    LLCADDR(rmp->b_rptr, ud->dl_dest_addr_offset),
 		    macinfo->llcp_addrlen);
 		LLCADDR(rmp->b_rptr, ud->dl_dest_addr_offset)->llca_sap =
-			LLCADDR(mp->b_rptr, rud->dl_src_addr_offset)->llca_sap;
+		    LLCADDR(mp->b_rptr, rud->dl_src_addr_offset)->llca_sap;
 		rmp->b_wptr += sizeof (struct llcaddr);
 		rmp->b_cont = nmp;
 	}
@@ -2366,7 +2367,7 @@ llc1_xid_ind_con(llc1_t *lld, llc_mac_info_t *macinfo, mblk_t *mp)
 	int raw;
 
 	nmp = allocb(sizeof (dl_xid_ind_t) + 2 * (macinfo->llcp_addrlen + 1),
-			BPRI_MED);
+	    BPRI_MED);
 	if (nmp == NULL)
 		return (mp);
 
@@ -2397,10 +2398,10 @@ llc1_xid_ind_con(llc1_t *lld, llc_mac_info_t *macinfo, mblk_t *mp)
 	}
 
 	LLCADDR(xid, xid->dl_dest_addr_offset)->llca_sap =
-		llchdr->llc_dsap;
+	    llchdr->llc_dsap;
 
 	xid->dl_src_addr_offset =
-		xid->dl_dest_addr_offset + xid->dl_dest_addr_length;
+	    xid->dl_dest_addr_offset + xid->dl_dest_addr_length;
 	xid->dl_src_addr_length = xid->dl_dest_addr_length;
 
 	if (raw) {
@@ -2415,10 +2416,10 @@ llc1_xid_ind_con(llc1_t *lld, llc_mac_info_t *macinfo, mblk_t *mp)
 		    ind->dl_src_addr_length);
 	}
 	LLCADDR(nmp->b_rptr, xid->dl_src_addr_offset)->llca_sap =
-		llchdr->llc_ssap & ~LLC_RESPONSE;
+	    llchdr->llc_ssap & ~LLC_RESPONSE;
 
 	nmp->b_wptr = nmp->b_rptr + sizeof (dl_xid_ind_t) +
-				2 * xid->dl_dest_addr_length;
+	    2 * xid->dl_dest_addr_length;
 
 	if (!(llchdr->llc_ssap & LLC_RESPONSE)) {
 		xid->dl_primitive = DL_XID_IND;
@@ -2476,7 +2477,7 @@ llc1_xid_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 	}
 
 	nmp = allocb(sizeof (struct ether_header) + sizeof (struct llchdr) +
-			sizeof (struct llchdr_xid), BPRI_MED);
+	    sizeof (struct llchdr_xid), BPRI_MED);
 
 	if (nmp == NULL)
 		return (LLCE_NOBUFFER);
@@ -2489,13 +2490,13 @@ llc1_xid_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 		    hdr->ether_shost.ether_addr_octet, ETHERADDRL);
 		hdr->ether_type = htons(sizeof (struct llchdr) + msgdsize(mp));
 		nmp->b_wptr = nmp->b_rptr +
-			sizeof (struct ether_header) + sizeof (struct llchdr);
+		    sizeof (struct ether_header) + sizeof (struct llchdr);
 		llchdr = (struct llchdr *)(hdr + 1);
 		rmp = nmp;
 	} else {
 		dl_unitdata_req_t *ud;
 		rmp = allocb(sizeof (dl_unitdata_req_t) +
-				(macinfo->llcp_addrlen + 2), BPRI_MED);
+		    (macinfo->llcp_addrlen + 2), BPRI_MED);
 		if (rmp == NULL) {
 			freemsg(nmp);
 			return (LLCE_NOBUFFER);
@@ -2510,7 +2511,7 @@ llc1_xid_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 		    LLCADDR(ud, ud->dl_dest_addr_offset),
 		    xid->dl_dest_addr_length);
 		LLCSADDR(ud, ud->dl_dest_addr_offset)->llca_ssap =
-			msgdsize(mp);
+		    msgdsize(mp);
 		rmp->b_wptr += xid->dl_dest_addr_length;
 		rmp->b_cont = nmp;
 		llchdr = (struct llchdr *)nmp->b_rptr;
@@ -2520,7 +2521,7 @@ llc1_xid_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 	llchdr->llc_dsap = LLCADDR(xid, xid->dl_dest_addr_offset)->llca_sap;
 	llchdr->llc_ssap = llc->llc_sap | (req_or_res ? LLC_RESPONSE : 0);
 	llchdr->llc_ctl =
-		LLC_XID | ((xid->dl_flag & DL_POLL_FINAL) ? LLC_P : 0);
+	    LLC_XID | ((xid->dl_flag & DL_POLL_FINAL) ? LLC_P : 0);
 
 	nmp->b_cont = mp->b_cont;
 	mp->b_cont = NULL;
@@ -2646,10 +2647,10 @@ llc1_test_ind_con(llc1_t *lld, llc_mac_info_t *macinfo, mblk_t *mp)
 	}
 
 	LLCADDR(test, test->dl_dest_addr_offset)->llca_sap =
-		llchdr->llc_dsap;
+	    llchdr->llc_dsap;
 
 	test->dl_src_addr_offset = test->dl_dest_addr_offset +
-		test->dl_dest_addr_length;
+	    test->dl_dest_addr_length;
 	test->dl_src_addr_length = test->dl_dest_addr_length;
 
 	if (raw) {
@@ -2664,10 +2665,10 @@ llc1_test_ind_con(llc1_t *lld, llc_mac_info_t *macinfo, mblk_t *mp)
 		    ind->dl_src_addr_length);
 	}
 	LLCADDR(nmp->b_rptr, test->dl_src_addr_offset)->llca_sap =
-		llchdr->llc_ssap & ~LLC_RESPONSE;
+	    llchdr->llc_ssap & ~LLC_RESPONSE;
 
 	nmp->b_wptr = nmp->b_rptr + sizeof (dl_test_ind_t) +
-			2 * test->dl_dest_addr_length;
+	    2 * test->dl_dest_addr_length;
 
 	if (!(llchdr->llc_ssap & LLC_RESPONSE)) {
 		test->dl_primitive = DL_TEST_IND;
@@ -2721,12 +2722,12 @@ llc1_test_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 	macinfo = llc->llc_mac_info;
 	if (MBLKL(mp) < sizeof (dl_test_req_t) ||
 	    !MBLKIN(mp, test->dl_dest_addr_offset,
-			test->dl_dest_addr_length)) {
+	    test->dl_dest_addr_length)) {
 		return (DL_BADPRIM);
 	}
 
 	nmp = allocb(sizeof (struct ether_header) + sizeof (struct llchdr),
-			BPRI_MED);
+	    BPRI_MED);
 
 	if (nmp == NULL)
 		return (LLCE_NOBUFFER);
@@ -2739,14 +2740,14 @@ llc1_test_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 		    hdr->ether_shost.ether_addr_octet, ETHERADDRL);
 		hdr->ether_type = htons(sizeof (struct llchdr) + msgdsize(mp));
 		nmp->b_wptr = nmp->b_rptr +
-			sizeof (struct ether_header) + sizeof (struct llchdr);
+		    sizeof (struct ether_header) + sizeof (struct llchdr);
 		llchdr = (struct llchdr *)(hdr + 1);
 		rmp = nmp;
 	} else {
 		dl_unitdata_req_t *ud;
 
 		rmp = allocb(sizeof (dl_unitdata_req_t) +
-				(macinfo->llcp_addrlen + 2), BPRI_MED);
+		    (macinfo->llcp_addrlen + 2), BPRI_MED);
 		if (rmp == NULL) {
 			freemsg(nmp);
 			return (LLCE_NOBUFFER);
@@ -2762,7 +2763,7 @@ llc1_test_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 		    LLCADDR(ud, ud->dl_dest_addr_offset),
 		    test->dl_dest_addr_length);
 		LLCSADDR(ud, ud->dl_dest_addr_offset)->llca_ssap =
-			msgdsize(mp);
+		    msgdsize(mp);
 		rmp->b_wptr += test->dl_dest_addr_length;
 		rmp->b_cont = nmp;
 		llchdr = (struct llchdr *)nmp->b_rptr;
@@ -2772,7 +2773,7 @@ llc1_test_req_res(queue_t *q, mblk_t *mp, int req_or_res)
 	llchdr->llc_dsap = LLCADDR(test, test->dl_dest_addr_offset)->llca_sap;
 	llchdr->llc_ssap = llc->llc_sap | (req_or_res ? LLC_RESPONSE : 0);
 	llchdr->llc_ctl =
-		LLC_TEST | ((test->dl_flag & DL_POLL_FINAL) ? LLC_P : 0);
+	    LLC_TEST | ((test->dl_flag & DL_POLL_FINAL) ? LLC_P : 0);
 
 	nmp->b_cont = mp->b_cont;
 	mp->b_cont = NULL;
@@ -2792,8 +2793,8 @@ llc1_find_waiting(llc_mac_info_t *macinfo, mblk_t *mp, long prim)
 	llc1_t *llc;
 
 	for (llc = llc1_device_list.llc1_str_next;
-		llc != (llc1_t *)&llc1_device_list.llc1_str_next;
-		llc = llc->llc_next)
+	    llc != (llc1_t *)&llc1_device_list.llc1_str_next;
+	    llc = llc->llc_next)
 		if (llc->llc_mac_info == macinfo &&
 		    prim == llc->llc_waiting_for) {
 			putnext(RD(llc->llc_qptr), mp);
@@ -2896,8 +2897,8 @@ llc1_init_kstat(llc_mac_info_t *macinfo)
 	 * Note that the temporary macinfo->llcp_ppa number is negative.
 	 */
 	macinfo->llcp_kstatp = kstat_create("llc", (-macinfo->llcp_ppa - 1),
-				NULL, "net", KSTAT_TYPE_NAMED,
-				sizeof (struct llc_stats) / sizeof (long), 0);
+	    NULL, "net", KSTAT_TYPE_NAMED,
+	    sizeof (struct llc_stats) / sizeof (long), 0);
 	if (macinfo->llcp_kstatp == NULL)
 		return;
 
@@ -2965,7 +2966,7 @@ llc1_subs_bind(queue_t *q, mblk_t *mp)
 	if (lld == NULL || lld->llc_state != DL_IDLE) {
 		result = DL_OUTSTATE;
 	} else if (lld->llc_sap != LLC_SNAP_SAP ||
-			subs->dl_subs_bind_class != DL_HIERARCHICAL_BIND) {
+	    subs->dl_subs_bind_class != DL_HIERARCHICAL_BIND) {
 		/* we only want to support this for SNAP at present */
 		result = DL_UNSUPPORTED;
 	} else {
@@ -3017,11 +3018,11 @@ llc1_subs_bind(queue_t *q, mblk_t *mp)
 			    MBLKL(mp) < (sizeof (dl_subs_bind_ack_t) + 5)) {
 				freemsg(mp);
 				nmp = allocb(sizeof (dl_subs_bind_ack_t) + 5,
-						BPRI_MED);
+				    BPRI_MED);
 			}
 			ack = (dl_subs_bind_ack_t *)nmp->b_rptr;
 			nmp->b_wptr = nmp->b_rptr +
-				sizeof (dl_subs_bind_ack_t) + 5;
+			    sizeof (dl_subs_bind_ack_t) + 5;
 			ack->dl_primitive = DL_SUBS_BIND_ACK;
 			ack->dl_subs_sap_offset = sizeof (dl_subs_bind_ack_t);
 			ack->dl_subs_sap_length = 5;
@@ -3052,11 +3053,11 @@ snapdmp(uchar_t *bstr)
 	static char buff[32];
 
 	(void) sprintf(buff, "%x.%x.%x.%x.%x",
-		bstr[0],
-		bstr[1],
-		bstr[2],
-		bstr[3],
-		bstr[4]);
+	    bstr[0],
+	    bstr[1],
+	    bstr[2],
+	    bstr[3],
+	    bstr[4]);
 	return (buff);
 }
 

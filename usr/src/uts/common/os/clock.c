@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -1594,8 +1593,9 @@ delay(clock_t ticks)
 	clock_t deadline = lbolt + ticks;
 	clock_t timeleft;
 	timeout_id_t id;
+	extern hrtime_t volatile devinfo_freeze;
 
-	if (panicstr && ticks > 0) {
+	if ((panicstr || devinfo_freeze) && ticks > 0) {
 		/*
 		 * Timeouts aren't running, so all we can do is spin.
 		 */

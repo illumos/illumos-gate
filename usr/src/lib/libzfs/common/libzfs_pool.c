@@ -1416,6 +1416,96 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 	    l2cache, log));
 }
 
+static int
+vdev_online(nvlist_t *nv)
+{
+	uint64_t ival;
+
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE, &ival) == 0 ||
+	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_FAULTED, &ival) == 0 ||
+	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVED, &ival) == 0)
+		return (0);
+
+	return (1);
+}
+
+/*
+ * Get phys_path for a root pool
+ * Return 0 on success; non-zeron on failure.
+ */
+int
+zpool_get_physpath(zpool_handle_t *zhp, char *physpath)
+{
+	char bootfs[ZPOOL_MAXNAMELEN];
+	nvlist_t *vdev_root;
+	nvlist_t **child;
+	uint_t count;
+	int i;
+
+	/*
+	 * Make sure this is a root pool, as phys_path doesn't mean
+	 * anything to a non-root pool.
+	 */
+	if (zpool_get_prop(zhp, ZPOOL_PROP_BOOTFS, bootfs,
+	    sizeof (bootfs), NULL) != 0)
+		return (-1);
+
+	verify(nvlist_lookup_nvlist(zhp->zpool_config,
+	    ZPOOL_CONFIG_VDEV_TREE, &vdev_root) == 0);
+
+	if (nvlist_lookup_nvlist_array(vdev_root, ZPOOL_CONFIG_CHILDREN,
+	    &child, &count) != 0)
+		return (-2);
+
+	for (i = 0; i < count; i++) {
+		nvlist_t **child2;
+		uint_t count2;
+		char *type;
+		char *tmppath;
+		int j;
+
+		if (nvlist_lookup_string(child[i], ZPOOL_CONFIG_TYPE, &type)
+		    != 0)
+			return (-3);
+
+		if (strcmp(type, VDEV_TYPE_DISK) == 0) {
+			if (!vdev_online(child[i]))
+				return (-8);
+			verify(nvlist_lookup_string(child[i],
+			    ZPOOL_CONFIG_PHYS_PATH, &tmppath) == 0);
+			(void) strncpy(physpath, tmppath, strlen(tmppath));
+		} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
+			if (nvlist_lookup_nvlist_array(child[i],
+			    ZPOOL_CONFIG_CHILDREN, &child2, &count2) != 0)
+				return (-4);
+
+			for (j = 0; j < count2; j++) {
+				if (!vdev_online(child2[j]))
+					return (-8);
+				if (nvlist_lookup_string(child2[j],
+				    ZPOOL_CONFIG_PHYS_PATH, &tmppath) != 0)
+					return (-5);
+
+				if ((strlen(physpath) + strlen(tmppath)) >
+				    MAXNAMELEN)
+					return (-6);
+
+				if (strlen(physpath) == 0) {
+					(void) strncpy(physpath, tmppath,
+					    strlen(tmppath));
+				} else {
+					(void) strcat(physpath, " ");
+					(void) strcat(physpath, tmppath);
+				}
+			}
+		} else {
+			return (-7);
+		}
+	}
+
+	return (0);
+}
+
 /*
  * Returns TRUE if the given guid corresponds to the given type.
  * This is used to check for hot spares (INUSE or not), and level 2 cache

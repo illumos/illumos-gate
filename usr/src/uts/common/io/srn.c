@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * srn	Provide apm-like interfaces to Xorg
@@ -128,12 +127,13 @@ static struct dev_ops srn_ops = {
 	nodev,			/* reset */
 	&srn_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"srn driver v1.4",
+	"srn driver",
 	&srn_ops
 };
 

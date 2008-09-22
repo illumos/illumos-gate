@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -529,14 +527,15 @@ struct dev_ops  ecpp_ops = {
 	nodev,			/* devo_reset */
 	&ecpp_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv ecppmodldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"parallel port driver %I%",
+	"parallel port driver",
 	&ecpp_ops,
 };
 
@@ -672,7 +671,7 @@ ecpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&pp->umutex, NULL, MUTEX_DRIVER,
-						(void *)pp->ecpp_trap_cookie);
+	    (void *)pp->ecpp_trap_cookie);
 
 	cv_init(&pp->pport_cv, NULL, CV_DRIVER, NULL);
 
@@ -783,7 +782,7 @@ ecpp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 				pp->suspended = FALSE;
 				mutex_exit(&pp->umutex);
 				ecpp_error(pp->dip,
-					"ecpp_detach: suspend timeout\n");
+				    "ecpp_detach: suspend timeout\n");
 				return (DDI_FAILURE);
 			}
 		}
@@ -856,9 +855,9 @@ ecpp_get_props(struct ecppunit *pp)
 	 * will be conducted by PIO for Centronics devices.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pp->dip, 0,
-		"fast-centronics", &prop) == DDI_PROP_SUCCESS) {
+	    "fast-centronics", &prop) == DDI_PROP_SUCCESS) {
 		pp->fast_centronics =
-				(strcmp(prop, "true") == 0) ? TRUE : FALSE;
+		    (strcmp(prop, "true") == 0) ? TRUE : FALSE;
 		ddi_prop_free(prop);
 	} else {
 		pp->fast_centronics = FALSE;
@@ -875,7 +874,7 @@ ecpp_get_props(struct ecppunit *pp)
 	 */
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pp->dip, 0,
-		"fast-1284-compatible", &prop) == DDI_PROP_SUCCESS) {
+	    "fast-1284-compatible", &prop) == DDI_PROP_SUCCESS) {
 		pp->fast_compat = (strcmp(prop, "true") == 0) ? TRUE : FALSE;
 		ddi_prop_free(prop);
 	} else {
@@ -890,7 +889,7 @@ ecpp_get_props(struct ecppunit *pp)
 	 * with ioctl(2) calls as well.  The default is to set it to FALSE.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pp->dip, 0,
-		"centronics-init-seq", &prop) == DDI_PROP_SUCCESS) {
+	    "centronics-init-seq", &prop) == DDI_PROP_SUCCESS) {
 		pp->init_seq = (strcmp(prop, "true") == 0) ? TRUE : FALSE;
 		ddi_prop_free(prop);
 	} else {
@@ -904,7 +903,7 @@ ecpp_get_props(struct ecppunit *pp)
 	 * found, wsrv_retry will be set to CENTRONICS_RETRY ms.
 	 */
 	pp->wsrv_retry = ddi_prop_get_int(DDI_DEV_T_ANY, pp->dip, 0,
-			"centronics-retry", CENTRONICS_RETRY);
+	    "centronics-retry", CENTRONICS_RETRY);
 
 	/*
 	 * In PIO mode, ecpp_isr() will loop for wait for the busy signal
@@ -913,28 +912,28 @@ ecpp_get_props(struct ecppunit *pp)
 	 * ecpp_isr() will wait for a maximum of WAIT_FOR_BUSY us.
 	 */
 	pp->wait_for_busy = ddi_prop_get_int(DDI_DEV_T_ANY, pp->dip, 0,
-			"centronics-wait-for-busy", WAIT_FOR_BUSY);
+	    "centronics-wait-for-busy", WAIT_FOR_BUSY);
 
 	/*
 	 * In PIO mode, centronics transfers must hold the data signals
 	 * for a data_setup_time milliseconds before the strobe is asserted.
 	 */
 	pp->data_setup_time = ddi_prop_get_int(DDI_DEV_T_ANY, pp->dip, 0,
-			"centronics-data-setup-time", DATA_SETUP_TIME);
+	    "centronics-data-setup-time", DATA_SETUP_TIME);
 
 	/*
 	 * In PIO mode, centronics transfers asserts the strobe signal
 	 * for a period of strobe_pulse_width milliseconds.
 	 */
 	pp->strobe_pulse_width = ddi_prop_get_int(DDI_DEV_T_ANY, pp->dip, 0,
-			"centronics-strobe-pulse-width", STROBE_PULSE_WIDTH);
+	    "centronics-strobe-pulse-width", STROBE_PULSE_WIDTH);
 
 	/*
 	 * Upon a transfer the peripheral, ecpp waits write_timeout seconds
 	 * for the transmission to complete.
 	 */
 	default_xfer_parms.write_timeout = ddi_prop_get_int(DDI_DEV_T_ANY,
-		pp->dip, 0, "ecpp-transfer-timeout", ecpp_def_timeout);
+	    pp->dip, 0, "ecpp-transfer-timeout", ecpp_def_timeout);
 
 	pp->xfer_parms = default_xfer_parms;
 
@@ -943,7 +942,7 @@ ecpp_get_props(struct ecppunit *pp)
 	 */
 	if (pp->hw == &m1553) {
 		pp->uh.m1553.chn = ddi_prop_get_int(DDI_DEV_T_ANY,
-			pp->dip, 0, "dma-channel", 0x1);
+		    pp->dip, 0, "dma-channel", 0x1);
 		ecpp_error(pp->dip, "ecpp_get_prop:chn=%x\n", pp->uh.m1553.chn);
 	}
 #if defined(__x86)
@@ -965,20 +964,20 @@ ecpp_get_props(struct ecppunit *pp)
 	 * these properties are not yet public
 	 */
 	pp->ecp_rev_speed = ddi_prop_get_int(DDI_DEV_T_ANY, pp->dip, 0,
-			"ecp-rev-speed", ECP_REV_SPEED);
+	    "ecp-rev-speed", ECP_REV_SPEED);
 
 	pp->rev_watchdog = ddi_prop_get_int(DDI_DEV_T_ANY, pp->dip, 0,
-			"rev-watchdog", REV_WATCHDOG);
+	    "rev-watchdog", REV_WATCHDOG);
 
 	ecpp_error(pp->dip,
-		"ecpp_get_prop: fast_centronics=%x, fast-1284=%x\n"
-		"ecpp_get_prop: wsrv_retry=%d, wait_for_busy=%d\n"
-		"ecpp_get_prop: data_setup=%d, strobe_pulse=%d\n"
-		"ecpp_get_prop: transfer-timeout=%d\n",
-		pp->fast_centronics, pp->fast_compat,
-		pp->wsrv_retry, pp->wait_for_busy,
-		pp->data_setup_time, pp->strobe_pulse_width,
-		pp->xfer_parms.write_timeout);
+	    "ecpp_get_prop: fast_centronics=%x, fast-1284=%x\n"
+	    "ecpp_get_prop: wsrv_retry=%d, wait_for_busy=%d\n"
+	    "ecpp_get_prop: data_setup=%d, strobe_pulse=%d\n"
+	    "ecpp_get_prop: transfer-timeout=%d\n",
+	    pp->fast_centronics, pp->fast_compat,
+	    pp->wsrv_retry, pp->wait_for_busy,
+	    pp->data_setup_time, pp->strobe_pulse_width,
+	    pp->xfer_parms.write_timeout);
 }
 
 /*ARGSUSED*/
@@ -1119,9 +1118,9 @@ ecpp_open(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *credp)
 	(void) ecpp_idle_phase(pp);
 
 	ecpp_error(pp->dip,
-		"ecpp_open: mode=%x, phase=%x ecr=%x, dsr=%x, dcr=%x\n",
-		pp->current_mode, pp->current_phase,
-		ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
+	    "ecpp_open: mode=%x, phase=%x ecr=%x, dsr=%x, dcr=%x\n",
+	    pp->current_mode, pp->current_phase,
+	    ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
 
 	mutex_exit(&pp->umutex);
 
@@ -1168,8 +1167,8 @@ ecpp_close(queue_t *q, int flag, cred_t *cred_p)
 	}
 
 	ecpp_error(pp->dip, "ecpp_close: joblen=%d, ctx_cf=%d, "
-			"qsize(WR(q))=%d, qsize(RD(q))=%d\n",
-			pp->joblen, pp->ctx_cf, qsize(pp->writeq), qsize(q));
+	    "qsize(WR(q))=%d, qsize(RD(q))=%d\n",
+	    pp->joblen, pp->ctx_cf, qsize(pp->writeq), qsize(q));
 
 	/*
 	 * Cancel all timeouts, disable interrupts
@@ -1219,7 +1218,7 @@ ecpp_close(queue_t *q, int flag, cred_t *cred_p)
 	pp->msg = NULL;
 
 	ecpp_error(pp->dip, "ecpp_close: ecr=%x, dsr=%x, dcr=%x\n",
-		ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
+	    ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
 
 	mutex_exit(&pp->umutex);
 
@@ -1243,7 +1242,7 @@ ecpp_wput(queue_t *q, mblk_t *mp)
 
 	if ((mp->b_wptr - mp->b_rptr) <= 0) {
 		ecpp_error(pp->dip,
-			"ecpp_wput:bogus packet recieved mp=%x\n", mp);
+		    "ecpp_wput:bogus packet recieved mp=%x\n", mp);
 		freemsg(mp);
 		return (0);
 	}
@@ -1346,17 +1345,17 @@ ecpp_wput(queue_t *q, mblk_t *mp)
 
 		case ECPPIOC_GETDEVID:
 			ecpp_wput_iocdata_devid(q, mp,
-				offsetof(struct ecpp_device_id, rlen));
+			    offsetof(struct ecpp_device_id, rlen));
 			break;
 
 		case PRNIOC_GET_1284_DEVID:
 			ecpp_wput_iocdata_devid(q, mp,
-				offsetof(struct prn_1284_device_id, id_rlen));
+			    offsetof(struct prn_1284_device_id, id_rlen));
 			break;
 
 		case PRNIOC_GET_IFINFO:
 			ecpp_wput_iocdata_devid(q, mp,
-				offsetof(struct prn_interface_info, if_rlen));
+			    offsetof(struct prn_interface_info, if_rlen));
 			break;
 
 		default:
@@ -1448,11 +1447,11 @@ ecpp_wput_iocdata_devid(queue_t *q, mblk_t *mp, uintptr_t rlen_offset)
 		}
 
 		*(int *)datamp->b_rptr =
-				*(int *)((char *)&stp->un + rlen_offset);
+		    *(int *)((char *)&stp->un + rlen_offset);
 		stp->state = ECPP_STRUCTOUT;
 
 		mcopyout(mp, csp->cp_private, sizeof (int),
-			(char *)stp->uaddr + rlen_offset, datamp);
+		    (char *)stp->uaddr + rlen_offset, datamp);
 		qreply(q, mp);
 		break;
 
@@ -1563,7 +1562,7 @@ ecpp_putioc(queue_t *q, mblk_t *mp)
 		mutex_exit(&pp->umutex);
 
 		ecpp_error(pp->dip, "ECPPIOC_GETREGS: dsr=%x,dcr=%x\n",
-							rg.dsr, rg.dcr);
+		    rg.dsr, rg.dcr);
 
 		/* these bits must be 1 */
 		rg.dsr |= ECPP_SETREGS_DSR_MASK;
@@ -1653,7 +1652,7 @@ ecpp_putioc(queue_t *q, mblk_t *mp)
 		mutex_enter(&pp->umutex);
 
 		if (!((pp->current_mode == ECPP_CENTRONICS) ||
-				(pp->current_mode == ECPP_COMPAT_MODE))) {
+		    (pp->current_mode == ECPP_COMPAT_MODE))) {
 			ecpp_nack_ioctl(q, mp, EINVAL);
 		} else {
 			pp->saved_dsr = DSR_READ(pp);
@@ -1727,7 +1726,7 @@ ecpp_putioc(queue_t *q, mblk_t *mp)
 
 	case PRNIOC_SET_TIMEOUTS:
 		mcopyin(mp, NULL, sizeof (struct prn_timeouts),
-				*(caddr_t *)(void *)mp->b_cont->b_rptr);
+		    *(caddr_t *)(void *)mp->b_cont->b_rptr);
 		qreply(q, mp);
 		break;
 
@@ -1778,7 +1777,7 @@ ecpp_putioc(queue_t *q, mblk_t *mp)
 		ecpp_error(pp->dip, "PRNIOC_GET_STATUS: %x\n", dsr);
 
 		status = (dsr & (ECPP_SLCT | ECPP_PE | ECPP_nERR)) |
-			(~dsr & ECPP_nBUSY);
+		    (~dsr & ECPP_nBUSY);
 
 		ecpp_putioc_copyout(q, mp, &status, sizeof (status));
 		break;
@@ -1786,22 +1785,22 @@ ecpp_putioc(queue_t *q, mblk_t *mp)
 
 	case ECPPIOC_GETDEVID:
 		ecpp_putioc_stateful_copyin(q, mp,
-					sizeof (struct ecpp_device_id));
+		    sizeof (struct ecpp_device_id));
 		break;
 
 	case PRNIOC_GET_1284_DEVID:
 		ecpp_putioc_stateful_copyin(q, mp,
-					sizeof (struct prn_1284_device_id));
+		    sizeof (struct prn_1284_device_id));
 		break;
 
 	case PRNIOC_GET_IFINFO:
 		ecpp_putioc_stateful_copyin(q, mp,
-					sizeof (struct prn_interface_info));
+		    sizeof (struct prn_interface_info));
 		break;
 
 	default:
 		ecpp_error(pp->dip, "putioc: unknown IOCTL: %x\n",
-			iocbp->ioc_cmd);
+		    iocbp->ioc_cmd);
 		ecpp_nack_ioctl(q, mp, EINVAL);
 		break;
 	}
@@ -1920,11 +1919,11 @@ ecpp_wsrv(queue_t *q)
 			if (pp->wsrv_timer_id == 0) {
 				ecpp_error(pp->dip, "wsrv: start wrsv_timer\n");
 				pp->wsrv_timer_id = timeout(ecpp_wsrv_timer,
-					(caddr_t)pp,
-					drv_usectohz(pp->wsrv_retry * 1000));
+				    (caddr_t)pp,
+				    drv_usectohz(pp->wsrv_retry * 1000));
 			} else {
 				ecpp_error(pp->dip,
-					"ecpp_wsrv: wrsv_timer is active\n");
+				    "ecpp_wsrv: wrsv_timer is active\n");
 			}
 
 			mutex_exit(&pp->umutex);
@@ -2128,16 +2127,16 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 		xferp = (struct ecpp_transfer_parms *)mp->b_cont->b_rptr;
 
 		if (xferp->write_timeout <= 0 ||
-				xferp->write_timeout >= ECPP_MAX_TIMEOUT) {
+		    xferp->write_timeout >= ECPP_MAX_TIMEOUT) {
 			ecpp_nack_ioctl(q, mp, EINVAL);
 			break;
 		}
 
 		if (!((xferp->mode == ECPP_CENTRONICS) ||
-			(xferp->mode == ECPP_COMPAT_MODE) ||
-			(xferp->mode == ECPP_NIBBLE_MODE) ||
-			(xferp->mode == ECPP_ECP_MODE) ||
-			(xferp->mode == ECPP_DIAG_MODE))) {
+		    (xferp->mode == ECPP_COMPAT_MODE) ||
+		    (xferp->mode == ECPP_NIBBLE_MODE) ||
+		    (xferp->mode == ECPP_ECP_MODE) ||
+		    (xferp->mode == ECPP_DIAG_MODE))) {
 			ecpp_nack_ioctl(q, mp, EINVAL);
 			break;
 		}
@@ -2146,7 +2145,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 		pp->prn_timeouts.tmo_forward = pp->xfer_parms.write_timeout;
 
 		ecpp_error(pp->dip, "srvioc: current_mode =%x new mode=%x\n",
-			pp->current_mode, pp->xfer_parms.mode);
+		    pp->current_mode, pp->xfer_parms.mode);
 
 		if (ecpp_mode_negotiation(pp, pp->xfer_parms.mode) == FAILURE) {
 			ecpp_nack_ioctl(q, mp, EPROTONOSUPPORT);
@@ -2193,7 +2192,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 
 		/* bits 4-7 must be 1 or return EINVAL */
 		if ((rg->dcr & ECPP_SETREGS_DCR_MASK) !=
-					ECPP_SETREGS_DCR_MASK) {
+		    ECPP_SETREGS_DCR_MASK) {
 			ecpp_nack_ioctl(q, mp, EINVAL);
 			break;
 		}
@@ -2202,7 +2201,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 		dcr = DCR_READ(pp) & ~ECPP_REV_DIR;
 		/* get the new dcr */
 		dcr = (dcr & ECPP_SETREGS_DCR_MASK) |
-			(rg->dcr & ~ECPP_SETREGS_DCR_MASK);
+		    (rg->dcr & ~ECPP_SETREGS_DCR_MASK);
 		DCR_WRITE(pp, dcr);
 		ecpp_error(pp->dip, "ECPPIOC_SETREGS:dcr=%x\n", dcr);
 		ecpp_ack_ioctl(q, mp);
@@ -2224,7 +2223,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 		case ECPP_PORT_PIO:
 			/* put superio into PIO mode */
 			ECR_WRITE(pp,
-				ECR_mode_001 | ECPP_INTR_MASK | ECPP_INTR_SRV);
+			    ECR_mode_001 | ECPP_INTR_MASK | ECPP_INTR_SRV);
 			pp->port = *port;
 			ecpp_ack_ioctl(q, mp);
 			break;
@@ -2234,7 +2233,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 			pp->tfifo_intr = 1;
 			/* change to mode 110 */
 			ECR_WRITE(pp,
-				ECR_mode_110 | ECPP_INTR_MASK | ECPP_INTR_SRV);
+			    ECR_mode_110 | ECPP_INTR_MASK | ECPP_INTR_SRV);
 			pp->port = *port;
 			ecpp_ack_ioctl(q, mp);
 			break;
@@ -2333,7 +2332,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 #endif /* _MULTI_DATAMODEL */
 
 		ecpp_srvioc_devid(q, mp, &id,
-				(int *)&stp->un.prn_devid.id_rlen);
+		    (int *)&stp->un.prn_devid.id_rlen);
 		break;
 	}
 
@@ -2410,7 +2409,7 @@ ecpp_srvioc_devid(queue_t *q, mblk_t *mp, struct ecpp_device_id *id, int *rlen)
 	/* check arguments */
 	if ((mode < ECPP_CENTRONICS) || (mode > ECPP_ECP_MODE)) {
 		ecpp_error(pp->dip, "ecpp_srvioc_devid: mode=%x, len=%x\n",
-			mode, id->len);
+		    mode, id->len);
 		ecpp_nack_ioctl(q, mp, EINVAL);
 		return;
 	}
@@ -2445,7 +2444,7 @@ ecpp_srvioc_devid(queue_t *q, mblk_t *mp, struct ecpp_device_id *id, int *rlen)
 		/* just return rlen */
 		stp->state = ECPP_ADDROUT;
 		ecpp_wput_iocdata_devid(q, mp,
-				(uintptr_t)rlen - (uintptr_t)&stp->un);
+		    (uintptr_t)rlen - (uintptr_t)&stp->un);
 		goto breakout;
 	}
 
@@ -2521,7 +2520,7 @@ ecpp_srvioc_prnif(queue_t *q, mblk_t *mp)
 	if (info.if_len == 0) {
 		/* just copyout rlen */
 		ecpp_wput_iocdata_devid(q, mp,
-			offsetof(struct prn_interface_info, if_rlen));
+		    offsetof(struct prn_interface_info, if_rlen));
 		return;
 	}
 
@@ -2594,7 +2593,7 @@ ecpp_flush(struct ecppunit *pp, int cmd)
 			 */
 			if (ECPP_DMA_STOP(pp, NULL) == FAILURE) {
 				ecpp_error(pp->dip,
-					"ecpp_flush: dma_stop failed.\n");
+				    "ecpp_flush: dma_stop failed.\n");
 			}
 
 			/*
@@ -2604,9 +2603,9 @@ ecpp_flush(struct ecppunit *pp, int cmd)
 			 * case, we need to unbind the dma mappings.
 			 */
 			if (ddi_dma_unbind_handle(
-						pp->dma_handle) != DDI_SUCCESS)
+			    pp->dma_handle) != DDI_SUCCESS)
 				ecpp_error(pp->dip,
-						"ecpp_flush: unbind failed.\n");
+				    "ecpp_flush: unbind failed.\n");
 
 			if (pp->msg != NULL) {
 				freemsg(pp->msg);
@@ -2662,7 +2661,7 @@ ecpp_flush(struct ecppunit *pp, int cmd)
 
 	default:
 		ecpp_error(pp->dip,
-			"ecpp_flush: illegal state %x\n", pp->e_busy);
+		    "ecpp_flush: illegal state %x\n", pp->e_busy);
 	}
 
 	/* in DIAG mode clear TFIFO if needed */
@@ -2670,7 +2669,7 @@ ecpp_flush(struct ecppunit *pp, int cmd)
 		ecr = ECR_READ(pp);
 		if (!(ecr & ECPP_FIFO_EMPTY)) {
 			ECR_WRITE(pp,
-				ECPP_INTR_SRV | ECPP_INTR_MASK | ECR_mode_001);
+			    ECPP_INTR_SRV | ECPP_INTR_MASK | ECR_mode_001);
 			ECR_WRITE(pp, ecr);
 		}
 	}
@@ -2715,8 +2714,8 @@ ecpp_start(struct ecppunit *pp, caddr_t addr, size_t len)
 	ASSERT(pp->e_busy == ECPP_BUSY);
 
 	ecpp_error(pp->dip,
-		"ecpp_start:current_mode=%x,current_phase=%x,ecr=%x,len=%d\n",
-		pp->current_mode, pp->current_phase, ECR_READ(pp), len);
+	    "ecpp_start:current_mode=%x,current_phase=%x,ecr=%x,len=%d\n",
+	    pp->current_mode, pp->current_phase, ECR_READ(pp), len);
 
 	pp->dma_dir = DDI_DMA_WRITE;	/* this is a forward transfer */
 
@@ -2755,11 +2754,11 @@ ecpp_start(struct ecppunit *pp, caddr_t addr, size_t len)
 		drv_usecwait(1);
 		if (!(ECR_READ(pp) & ECPP_FIFO_EMPTY)) {
 			ecpp_error(pp->dip,
-				"ecpp_start: TFIFO not empty, clearing\n");
+			    "ecpp_start: TFIFO not empty, clearing\n");
 			ECR_WRITE(pp,
-				ECPP_INTR_SRV | ECPP_INTR_MASK | ECR_mode_001);
+			    ECPP_INTR_SRV | ECPP_INTR_MASK | ECR_mode_001);
 			ECR_WRITE(pp,
-				ECPP_INTR_SRV | ECPP_INTR_MASK | ECR_mode_110);
+			    ECPP_INTR_SRV | ECPP_INTR_MASK | ECR_mode_110);
 		}
 
 		/* we can DMA at most 16 bytes into TFIFO */
@@ -2782,7 +2781,7 @@ ecpp_start(struct ecppunit *pp, caddr_t addr, size_t len)
 
 	case ECPP_ECP_MODE:
 		ASSERT(pp->current_phase == ECPP_PHASE_ECP_FWD_IDLE ||
-			pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
+		    pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
 
 		/* if in Reverse Phase negotiate to Forward */
 		if (pp->current_phase == ECPP_PHASE_ECP_REV_IDLE) {
@@ -2791,7 +2790,7 @@ ecpp_start(struct ecppunit *pp, caddr_t addr, size_t len)
 					(void) putbq(pp->writeq, pp->msg);
 				} else {
 					ecpp_putback_untransfered(pp,
-								addr, len);
+					    addr, len);
 				}
 			}
 		}
@@ -2805,7 +2804,7 @@ ecpp_start(struct ecppunit *pp, caddr_t addr, size_t len)
 
 	/* schedule transfer timeout */
 	pp->timeout_id = timeout(ecpp_xfer_timeout, (caddr_t)pp,
-		pp->xfer_parms.write_timeout * drv_usectohz(1000000));
+	    pp->xfer_parms.write_timeout * drv_usectohz(1000000));
 }
 
 /*
@@ -2824,7 +2823,7 @@ ecpp_prep_pio_xfer(struct ecppunit *pp, caddr_t addr, size_t len)
 		 * put everything back on the queue.
 		 */
 		ecpp_error(pp->dip,
-			"ecpp_prep_pio_xfer:suspend PIO len=%d\n", len);
+		    "ecpp_prep_pio_xfer:suspend PIO len=%d\n", len);
 
 		if (pp->msg != NULL) {
 			/*
@@ -2833,16 +2832,16 @@ ecpp_prep_pio_xfer(struct ecppunit *pp, caddr_t addr, size_t len)
 			 * then free the orignal one.
 			 */
 			ecpp_putback_untransfered(pp,
-				(void *)pp->msg->b_rptr, len);
+			    (void *)pp->msg->b_rptr, len);
 			ecpp_error(pp->dip,
-				"ecpp_prep_pio_xfer: len1=%d\n", len);
+			    "ecpp_prep_pio_xfer: len1=%d\n", len);
 
 			freemsg(pp->msg);
 			pp->msg = NULL;
 		} else {
 			ecpp_putback_untransfered(pp, pp->ioblock, len);
 			ecpp_error(pp->dip,
-				"ecpp_prep_pio_xfer: len2=%d\n", len);
+			    "ecpp_prep_pio_xfer: len2=%d\n", len);
 		}
 		qenable(pp->writeq);
 
@@ -2853,12 +2852,12 @@ ecpp_prep_pio_xfer(struct ecppunit *pp, caddr_t addr, size_t len)
 
 	/* pport must be in PIO mode */
 	if (ecr_write(pp, ECR_mode_001 |
-				ECPP_INTR_MASK | ECPP_INTR_SRV) != SUCCESS) {
+	    ECPP_INTR_MASK | ECPP_INTR_SRV) != SUCCESS) {
 		ecpp_error(pp->dip, "ecpp_prep_pio_xfer: failed w/ECR.\n");
 	}
 
 	ecpp_error(pp->dip, "ecpp_prep_pio_xfer: dcr=%x ecr=%x\n",
-			DCR_READ(pp), ECR_READ(pp));
+	    DCR_READ(pp), ECR_READ(pp));
 
 	return (SUCCESS);
 }
@@ -2879,7 +2878,7 @@ ecpp_init_dma_xfer(struct ecppunit *pp, caddr_t addr, size_t len)
 	uint8_t	ecr;
 
 	ASSERT((pp->current_mode <= ECPP_DIAG_MODE) &&
-		(ecr_mode[pp->current_mode] != 0));
+	    (ecr_mode[pp->current_mode] != 0));
 
 	if (ecpp_setup_dma_resources(pp, addr, len) == FAILURE) {
 		qenable(pp->writeq);
@@ -2892,8 +2891,8 @@ ecpp_init_dma_xfer(struct ecppunit *pp, caddr_t addr, size_t len)
 		 * rather put everything back on the queue.
 		 */
 		ecpp_error(pp->dip,
-			"ecpp_init_dma_xfer: suspending DMA len=%d\n",
-			pp->dma_cookie.dmac_size);
+		    "ecpp_init_dma_xfer: suspending DMA len=%d\n",
+		    pp->dma_cookie.dmac_size);
 
 		if (pp->msg != NULL) {
 			/*
@@ -2902,21 +2901,21 @@ ecpp_init_dma_xfer(struct ecppunit *pp, caddr_t addr, size_t len)
 			 * then free the orignal one.
 			 */
 			ecpp_putback_untransfered(pp,
-				(void *)pp->msg->b_rptr, len);
+			    (void *)pp->msg->b_rptr, len);
 			ecpp_error(pp->dip,
-				"ecpp_init_dma_xfer:a:len=%d\n", len);
+			    "ecpp_init_dma_xfer:a:len=%d\n", len);
 
 			freemsg(pp->msg);
 			pp->msg = NULL;
 		} else {
 			ecpp_putback_untransfered(pp, pp->ioblock, len);
 			ecpp_error(pp->dip,
-				"ecpp_init_dma_xfer:b:len=%d\n", len);
+			    "ecpp_init_dma_xfer:b:len=%d\n", len);
 		}
 
 		if (ddi_dma_unbind_handle(pp->dma_handle) != DDI_SUCCESS) {
 			ecpp_error(pp->dip,
-				"ecpp_init_dma_xfer: unbind FAILURE.\n");
+			    "ecpp_init_dma_xfer: unbind FAILURE.\n");
 		}
 		qenable(pp->writeq);
 		return (FAILURE);
@@ -2952,9 +2951,9 @@ ecpp_setup_dma_resources(struct ecppunit *pp, caddr_t addr, size_t len)
 	ASSERT(pp->dma_dir == DDI_DMA_READ || pp->dma_dir == DDI_DMA_WRITE);
 
 	err = ddi_dma_addr_bind_handle(pp->dma_handle, NULL,
-		addr, len, pp->dma_dir | DDI_DMA_PARTIAL,
-		DDI_DMA_DONTWAIT, NULL,
-		&pp->dma_cookie, &pp->dma_cookie_count);
+	    addr, len, pp->dma_dir | DDI_DMA_PARTIAL,
+	    DDI_DMA_DONTWAIT, NULL,
+	    &pp->dma_cookie, &pp->dma_cookie_count);
 
 	switch (err) {
 	case DDI_DMA_MAPPED:
@@ -2968,7 +2967,7 @@ ecpp_setup_dma_resources(struct ecppunit *pp, caddr_t addr, size_t len)
 		ecpp_error(pp->dip, "ecpp_setup_dma: DMA_PARTIAL_MAP\n");
 
 		if (ddi_dma_numwin(pp->dma_handle,
-				&pp->dma_nwin) != DDI_SUCCESS) {
+		    &pp->dma_nwin) != DDI_SUCCESS) {
 			(void) ddi_dma_unbind_handle(pp->dma_handle);
 			return (FAILURE);
 		}
@@ -2982,16 +2981,16 @@ ecpp_setup_dma_resources(struct ecppunit *pp, caddr_t addr, size_t len)
 		if (ddi_dma_getwin(pp->dma_handle, 0, &woff, &wlen,
 		    &pp->dma_cookie, &pp->dma_cookie_count) != DDI_SUCCESS) {
 			ecpp_error(pp->dip,
-				"ecpp_setup_dma: ddi_dma_getwin failed!");
+			    "ecpp_setup_dma: ddi_dma_getwin failed!");
 			(void) ddi_dma_unbind_handle(pp->dma_handle);
 			return (FAILURE);
 		}
 
 		ecpp_error(pp->dip,
-			"ecpp_setup_dma: cookies=%d, windows=%d"
-			" addr=%lx len=%d\n",
-			pp->dma_cookie_count, pp->dma_nwin,
-			pp->dma_cookie.dmac_address, pp->dma_cookie.dmac_size);
+		    "ecpp_setup_dma: cookies=%d, windows=%d"
+		    " addr=%lx len=%d\n",
+		    pp->dma_cookie_count, pp->dma_nwin,
+		    pp->dma_cookie.dmac_address, pp->dma_cookie.dmac_size);
 
 		break;
 	}
@@ -3219,15 +3218,15 @@ unexpected:
 		ECR_WRITE(pp, ECR_READ(pp) | ECPP_INTR_MASK | ECPP_INTR_SRV);
 		pp->nspur = 0;
 		cmn_err(CE_NOTE, "%s%d: too many interrupt requests",
-			ddi_get_name(pp->dip), ddi_get_instance(pp->dip));
+		    ddi_get_name(pp->dip), ddi_get_instance(pp->dip));
 	} else {
 		ECR_WRITE(pp, ECR_READ(pp) | ECPP_INTR_SRV | ECPP_INTR_MASK);
 	}
 
 	ecpp_error(pp->dip,
-		"isr:unknown: dcsr=%x ecr=%x dsr=%x dcr=%x\nmode=%x phase=%x\n",
-		dcsr, ECR_READ(pp), dsr, DCR_READ(pp),
-		pp->current_mode, pp->current_phase);
+	    "isr:unknown: dcsr=%x ecr=%x dsr=%x dcr=%x\nmode=%x phase=%x\n",
+	    dcsr, ECR_READ(pp), dsr, DCR_READ(pp),
+	    pp->current_mode, pp->current_phase);
 
 	mutex_exit(&pp->umutex);
 	return (DDI_INTR_CLAIMED);
@@ -3237,9 +3236,9 @@ unclaimed:
 	pp->intr_spurious++;
 
 	ecpp_error(pp->dip,
-		"isr:UNCL: dcsr=%x ecr=%x dsr=%x dcr=%x\nmode=%x phase=%x\n",
-		dcsr, ECR_READ(pp), DSR_READ(pp), DCR_READ(pp),
-		pp->current_mode, pp->current_phase);
+	    "isr:UNCL: dcsr=%x ecr=%x dsr=%x dcr=%x\nmode=%x phase=%x\n",
+	    dcsr, ECR_READ(pp), DSR_READ(pp), DCR_READ(pp),
+	    pp->current_mode, pp->current_phase);
 
 	mutex_exit(&pp->umutex);
 	return (DDI_INTR_UNCLAIMED);
@@ -3286,7 +3285,7 @@ ecpp_dma_ihdlr(struct ecppunit *pp)
 	clock_t	tm;
 
 	ecpp_error(pp->dip, "ecpp_dma_ihdlr(%x): ecr=%x, dsr=%x, dcr=%x\n",
-		pp->current_mode, ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
+	    pp->current_mode, ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
 
 	/* we are expecting a data transfer interrupt */
 	ASSERT(pp->e_busy == ECPP_BUSY);
@@ -3353,12 +3352,12 @@ ecpp_pio_ihdlr(struct ecppunit *pp)
 	if (pp->next_byte >= pp->last_byte) {
 		ecpp_xfer_cleanup(pp);
 		ecpp_error(pp->dip,
-			"ecpp_pio_ihdlr: pp->joblen=%d,pp->ctx_cf=%d,\n",
-			pp->joblen, pp->ctx_cf);
+		    "ecpp_pio_ihdlr: pp->joblen=%d,pp->ctx_cf=%d,\n",
+		    pp->joblen, pp->ctx_cf);
 	} else {
 		if (pp->softintr_pending) {
 			ecpp_error(pp->dip,
-				"ecpp_pio_ihdlr:E: next byte in progress\n");
+			    "ecpp_pio_ihdlr:E: next byte in progress\n");
 		} else {
 			pp->softintr_flags = ECPP_SOFTINTR_PIONEXT;
 			pp->softintr_pending = 1;
@@ -3408,7 +3407,7 @@ static uint_t
 ecpp_nErr_ihdlr(struct ecppunit *pp)
 {
 	ecpp_error(pp->dip, "ecpp_nErr_ihdlr: mode=%x, phase=%x\n",
-				pp->current_mode, pp->current_phase);
+	    pp->current_mode, pp->current_phase);
 
 	if (pp->oflag != TRUE) {
 		ecpp_error(pp->dip, "ecpp_nErr_ihdlr: not open!\n");
@@ -3496,8 +3495,8 @@ ecpp_softintr(caddr_t arg)
 		if (pp->e_busy == ECPP_ERR) {
 			++pp->ctx_cf; /* check status fail */
 			ecpp_error(pp->dip, "ecpp_softintr:check_status:F: "
-				"dsr=%x jl=%d cf_isr=%d\n",
-				DSR_READ(pp), pp->joblen, pp->ctx_cf);
+			    "dsr=%x jl=%d cf_isr=%d\n",
+			    DSR_READ(pp), pp->joblen, pp->ctx_cf);
 
 			/*
 			 * if status signals are bad,
@@ -3506,7 +3505,7 @@ ecpp_softintr(caddr_t arg)
 			unx_len = pp->last_byte - pp->next_byte;
 			if (pp->msg != NULL) {
 				ecpp_putback_untransfered(pp,
-					(void *)pp->msg->b_rptr, unx_len);
+				    (void *)pp->msg->b_rptr, unx_len);
 				ecpp_error(pp->dip,
 				    "ecpp_softintr:e1:unx_len=%d\n", unx_len);
 
@@ -3514,7 +3513,7 @@ ecpp_softintr(caddr_t arg)
 				pp->msg = NULL;
 			} else {
 				ecpp_putback_untransfered(pp,
-					pp->next_byte, unx_len);
+				    pp->next_byte, unx_len);
 				ecpp_error(pp->dip,
 				    "ecpp_softintr:e2:unx_len=%d\n", unx_len);
 			}
@@ -3602,7 +3601,7 @@ ecpp_error(dev_info_t *dip, char *fmt, ...)
 	va_start(ap, fmt);
 	(void) vsprintf(msg_buffer, fmt, ap);
 	cmn_err(CE_CONT, "%s%d: %s", ddi_get_name(dip),
-			ddi_get_instance(dip), msg_buffer);
+	    ddi_get_instance(dip), msg_buffer);
 	va_end(ap);
 }
 
@@ -3662,14 +3661,14 @@ ecpp_xfer_timeout(void *arg)
 		 */
 		if (ECPP_DMA_STOP(pp, &unx_len) == FAILURE) {
 			ecpp_error(pp->dip,
-				"ecpp_xfer_timeout: failed dma_stop\n");
+			    "ecpp_xfer_timeout: failed dma_stop\n");
 		}
 
 		ecpp_error(pp->dip, "xfer_timeout: unx_len=%d\n", unx_len);
 
 		if (ddi_dma_unbind_handle(pp->dma_handle) == DDI_FAILURE) {
 			ecpp_error(pp->dip,
-				"ecpp_xfer_timeout: failed unbind\n");
+			    "ecpp_xfer_timeout: failed unbind\n");
 		}
 
 		/*
@@ -3694,7 +3693,7 @@ ecpp_xfer_timeout(void *arg)
 				unx_addr = (caddr_t)pp->msg->b_wptr - unx_len;
 			} else {
 				unx_addr = pp->ioblock +
-							(pp->xfercnt - unx_len);
+				    (pp->xfercnt - unx_len);
 			}
 		}
 	}
@@ -3737,7 +3736,7 @@ ecpp_putback_untransfered(struct ecppunit *pp, void *startp, uint_t len)
 	new_mp = allocb(len, BPRI_MED);
 	if (new_mp == NULL) {
 		ecpp_error(pp->dip,
-			"ecpp_putback_untransfered: allocb FAILURE.\n");
+		    "ecpp_putback_untransfered: allocb FAILURE.\n");
 		return;
 	}
 
@@ -3782,8 +3781,8 @@ dcr_write(struct ecppunit *pp, uint8_t dcr_byte)
 			return (SUCCESS);
 	}
 	ecpp_error(pp->dip,
-		"(%d)dcr_write: dcr written =%x, dcr readback =%x\n",
-		i, dcr_byte, current_dcr);
+	    "(%d)dcr_write: dcr written =%x, dcr readback =%x\n",
+	    i, dcr_byte, current_dcr);
 
 	return (FAILURE);
 }
@@ -3834,11 +3833,11 @@ ecpp_fifo_timer(void *arg)
 	    (pp->ecpp_drain_counter < 10))) {
 
 		ecpp_error(pp->dip,
-			"ecpp_fifo_timer(%d):FIFO not empty:ecr=%x\n",
-			pp->ecpp_drain_counter, ecr);
+		    "ecpp_fifo_timer(%d):FIFO not empty:ecr=%x\n",
+		    pp->ecpp_drain_counter, ecr);
 
 		pp->fifo_timer_id = timeout(ecpp_fifo_timer,
-				(caddr_t)pp, drv_usectohz(FIFO_DRAIN_PERIOD));
+		    (caddr_t)pp, drv_usectohz(FIFO_DRAIN_PERIOD));
 		++pp->ecpp_drain_counter;
 
 		mutex_exit(&pp->umutex);
@@ -3852,12 +3851,12 @@ ecpp_fifo_timer(void *arg)
 		 */
 		if (pp->ecpp_drain_counter >= 10) {
 			ecpp_error(pp->dip, "ecpp_fifo_timer(%d):"
-				" clearing FIFO,can't wait:ecr=%x\n",
-				pp->ecpp_drain_counter, ecr);
+			    " clearing FIFO,can't wait:ecr=%x\n",
+			    pp->ecpp_drain_counter, ecr);
 		} else {
 			ecpp_error(pp->dip,
-				"ecpp_fifo_timer(%d):FIFO empty:ecr=%x\n",
-				pp->ecpp_drain_counter, ecr);
+			    "ecpp_fifo_timer(%d):FIFO empty:ecr=%x\n",
+			    pp->ecpp_drain_counter, ecr);
 		}
 
 		pp->ecpp_drain_counter = 0;
@@ -3889,10 +3888,10 @@ ecpp_fifo_timer(void *arg)
 		pp->joblen += pp->dma_cookie.dmac_size;
 		if (pp->dma_dir == DDI_DMA_WRITE) {
 			pp->obytes[pp->current_mode] +=
-						pp->dma_cookie.dmac_size;
+			    pp->dma_cookie.dmac_size;
 		} else {
 			pp->ibytes[pp->current_mode] +=
-						pp->dma_cookie.dmac_size;
+			    pp->dma_cookie.dmac_size;
 		}
 
 		/*
@@ -3901,7 +3900,7 @@ ecpp_fifo_timer(void *arg)
 		if (--pp->dma_cookie_count > 0) {
 			/* process the next cookie */
 			ddi_dma_nextcookie(pp->dma_handle,
-						&pp->dma_cookie);
+			    &pp->dma_cookie);
 		} else if (pp->dma_curwin < pp->dma_nwin) {
 			/* process the next window */
 			if (ddi_dma_getwin(pp->dma_handle,
@@ -3919,18 +3918,18 @@ ecpp_fifo_timer(void *arg)
 		}
 
 		ecpp_error(pp->dip, "ecpp_fifo_timer: next addr=%llx len=%d\n",
-			pp->dma_cookie.dmac_address,
-			pp->dma_cookie.dmac_size);
+		    pp->dma_cookie.dmac_address,
+		    pp->dma_cookie.dmac_size);
 
 		/* kick off new transfer */
 		if (ECPP_DMA_START(pp) != SUCCESS) {
 			ecpp_error(pp->dip,
-					"ecpp_fifo_timer: dma_start failed\n");
+			    "ecpp_fifo_timer: dma_start failed\n");
 			goto dma_done;
 		}
 
 		(void) ecr_write(pp, (ecr & 0xe0) |
-					ECPP_DMA_ENABLE | ECPP_INTR_MASK);
+		    ECPP_DMA_ENABLE | ECPP_INTR_MASK);
 
 		mutex_exit(&pp->umutex);
 
@@ -4080,7 +4079,7 @@ ecpp_get_prn_ifcap(struct ecppunit *pp)
 	    pp->current_mode == ECPP_COMPAT_MODE) {
 		ifcap |= PRN_1284_STATUS;
 	} else if (pp->current_mode == ECPP_NIBBLE_MODE ||
-		    pp->current_mode == ECPP_ECP_MODE) {
+	    pp->current_mode == ECPP_ECP_MODE) {
 		ifcap |= PRN_BIDI;
 	}
 
@@ -4163,9 +4162,9 @@ ecp_negotiation(struct ecppunit *pp)
 
 	/* Event 5: peripheral deasserts PError and Busy, asserts Select */
 	if ((dsr & (ECPP_PE | ECPP_nBUSY | ECPP_SLCT)) !=
-		(ECPP_nBUSY | ECPP_SLCT)) {
+	    (ECPP_nBUSY | ECPP_SLCT)) {
 		ecpp_error(pp->dip,
-			"ecp_negotiation: failed event 5 %x\n", DSR_READ(pp));
+		    "ecp_negotiation: failed event 5 %x\n", DSR_READ(pp));
 		(void) ecpp_1284_termination(pp);
 		return (FAILURE);
 	}
@@ -4179,7 +4178,7 @@ ecp_negotiation(struct ecppunit *pp)
 	/* Event 31: peripheral asserts PError */
 	if (wait_dsr(pp, ECPP_PE, ECPP_PE, 35000) < 0) {
 		ecpp_error(pp->dip,
-			"ecp_negotiation: failed event 31 %x\n", DSR_READ(pp));
+		    "ecp_negotiation: failed event 31 %x\n", DSR_READ(pp));
 		(void) ecpp_1284_termination(pp);
 		return (FAILURE);
 	}
@@ -4223,7 +4222,7 @@ nibble_negotiation(struct ecppunit *pp)
 	pp->backchannel = ECPP_NIBBLE_MODE;
 
 	ecpp_error(pp->dip, "nibble_negotiation: ok (phase=%x)\n",
-			pp->current_phase);
+	    pp->current_phase);
 
 	return (SUCCESS);
 
@@ -4285,10 +4284,10 @@ ecpp_1284_negotiation(struct ecppunit *pp, uint8_t xreq, uint8_t *rdsr)
 	 * 			asserts Select, asserts PError
 	 */
 	if (wait_dsr(pp, ECPP_nERR | ECPP_SLCT | ECPP_PE | ECPP_nACK,
-			ECPP_nERR | ECPP_SLCT | ECPP_PE, 35000) < 0) {
+	    ECPP_nERR | ECPP_SLCT | ECPP_PE, 35000) < 0) {
 		/* peripheral is not 1284-compliant */
 		ecpp_error(pp->dip,
-			"nego(%x): failed event 2 %x\n", xreq, DSR_READ(pp));
+		    "nego(%x): failed event 2 %x\n", xreq, DSR_READ(pp));
 		(void) ecpp_1284_termination(pp);
 		return (FAILURE);
 	}
@@ -4320,7 +4319,7 @@ ecpp_1284_negotiation(struct ecppunit *pp, uint8_t xreq, uint8_t *rdsr)
 	if (wait_dsr(pp, ECPP_nACK, ECPP_nACK, 35000) < 0) {
 		/* Something wrong with peripheral */
 		ecpp_error(pp->dip,
-			"nego(%x): failed event 6 %x\n", xreq, DSR_READ(pp));
+		    "nego(%x): failed event 6 %x\n", xreq, DSR_READ(pp));
 		(void) ecpp_1284_termination(pp);
 		return (FAILURE);
 	}
@@ -4328,7 +4327,7 @@ ecpp_1284_negotiation(struct ecppunit *pp, uint8_t xreq, uint8_t *rdsr)
 	if ((DSR_READ(pp) & ECPP_SLCT) != xflag) {
 		/* Extensibility value is not supported */
 		ecpp_error(pp->dip,
-			"nego(%x): failed event 5 %x\n", xreq, DSR_READ(pp));
+		    "nego(%x): failed event 5 %x\n", xreq, DSR_READ(pp));
 		(void) ecpp_1284_termination(pp);
 		return (FAILURE);
 	}
@@ -4398,9 +4397,9 @@ ecpp_1284_termination(struct ecppunit *pp)
 	/* Event 23: peripheral deasserts nFault and nBusy */
 	/* Event 24: peripheral asserts nAck */
 	if (wait_dsr(pp, ECPP_nERR | ECPP_nBUSY | ECPP_nACK,
-			ECPP_nERR, 35000) < 0) {
+	    ECPP_nERR, 35000) < 0) {
 		ecpp_error(pp->dip,
-			"termination: failed events 23,24 %x\n", DSR_READ(pp));
+		    "termination: failed events 23,24 %x\n", DSR_READ(pp));
 		ecpp_1284_init_interface(pp);
 		return (FAILURE);
 	}
@@ -4415,7 +4414,7 @@ ecpp_1284_termination(struct ecppunit *pp)
 	/* Event 27: peripheral deasserts nAck */
 	if (wait_dsr(pp, ECPP_nACK, ECPP_nACK, 35000) < 0) {
 		ecpp_error(pp->dip,
-			"termination: failed event 27 %x\n", DSR_READ(pp));
+		    "termination: failed event 27 %x\n", DSR_READ(pp));
 		ecpp_1284_init_interface(pp);
 		return (FAILURE);
 	}
@@ -4432,7 +4431,7 @@ endterm:
 	pp->current_phase = ECPP_PHASE_C_IDLE;
 
 	ecpp_error(pp->dip, "termination: completed %x %x\n",
-			DSR_READ(pp), DCR_READ(pp));
+	    DSR_READ(pp), DCR_READ(pp));
 
 	return (SUCCESS);
 }
@@ -4448,7 +4447,7 @@ ecp_peripheral2host(struct ecppunit *pp)
 	uint32_t	xfer_time;
 
 	ASSERT(pp->current_mode == ECPP_ECP_MODE &&
-		pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
+	    pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
 
 	/*
 	 * hardware generates cycles to receive data from the peripheral
@@ -4474,7 +4473,7 @@ ecp_peripheral2host(struct ecppunit *pp)
 	 */
 	while ((mp = allocb(len, BPRI_MED)) == NULL) {
 		ecpp_error(pp->dip,
-				"ecp_periph2host: failed allocb(%d)\n", len);
+		    "ecp_periph2host: failed allocb(%d)\n", len);
 		if (len > ECP_REV_BLKSZ) {
 			len = ECP_REV_BLKSZ;
 		} else {
@@ -4532,19 +4531,20 @@ ecp_peripheral2host(struct ecppunit *pp)
 	xfer_time = max((1000 * len) / pp->ecp_rev_speed, ECP_REV_MINTOUT);
 #if defined(__x86)
 	pp->rev_timeout_cnt = (pp->hw == &x86) ? 1 :
+	    max(xfer_time / pp->rev_watchdog, 1);
 #else
 	pp->rev_timeout_cnt = (pp->hw == &m1553) ? 1 :
+	    max(xfer_time / pp->rev_watchdog, 1);
 #endif
-		max(xfer_time / pp->rev_watchdog, 1);
 
 	pp->last_dmacnt = len;	/* nothing xferred yet */
 
 	pp->timeout_id = timeout(ecpp_ecp_read_timeout, (caddr_t)pp,
-			drv_usectohz(pp->rev_watchdog * 1000));
+	    drv_usectohz(pp->rev_watchdog * 1000));
 
 	ecpp_error(pp->dip, "ecp_periph2host: DMA started len=%d\n"
-			"xfer_time=%d wdog=%d cnt=%d\n",
-			len, xfer_time, pp->rev_watchdog, pp->rev_timeout_cnt);
+	    "xfer_time=%d wdog=%d cnt=%d\n",
+	    len, xfer_time, pp->rev_watchdog, pp->rev_timeout_cnt);
 
 	return (SUCCESS);
 
@@ -4607,8 +4607,8 @@ ecpp_ecp_read_timeout(void *arg)
 			ecpp_error(pp->dip, "ecp_read_timeout: restarting\n");
 			pp->last_dmacnt = dmacnt;
 			pp->timeout_id = timeout(ecpp_ecp_read_timeout,
-					(caddr_t)pp,
-					drv_usectohz(pp->rev_watchdog * 1000));
+			    (caddr_t)pp,
+			    drv_usectohz(pp->rev_watchdog * 1000));
 		}
 	}
 
@@ -4627,7 +4627,7 @@ ecpp_ecp_read_completion(struct ecppunit *pp)
 
 	ASSERT(mutex_owned(&pp->umutex));
 	ASSERT(pp->current_mode == ECPP_ECP_MODE &&
-		pp->current_phase == ECPP_PHASE_ECP_REV_XFER);
+	    pp->current_phase == ECPP_PHASE_ECP_REV_XFER);
 	ASSERT(pp->msg != NULL);
 
 	/*
@@ -4646,7 +4646,7 @@ ecpp_ecp_read_completion(struct ecppunit *pp)
 	}
 
 	ecpp_error(pp->dip, "ecp_read_completion: xfered %d bytes of %d\n",
-			xfer_len, pp->resid);
+	    xfer_len, pp->resid);
 
 	/* clean up and update statistics */
 	pp->msg = NULL;
@@ -4699,8 +4699,8 @@ nibble_peripheral2host(struct ecppunit *pp, uint8_t *byte)
 		/* Event 9: peripheral asserts nAck, data available */
 		if (wait_dsr(pp, ECPP_nACK, 0, 35000) < 0) {
 			ecpp_error(pp->dip,
-				"nibble_periph2host(%d): failed event 9 %x\n",
-				i + 1, DSR_READ(pp));
+			    "nibble_periph2host(%d): failed event 9 %x\n",
+			    i + 1, DSR_READ(pp));
 			(void) ecpp_1284_termination(pp);
 			return (FAILURE);
 		}
@@ -4715,8 +4715,8 @@ nibble_peripheral2host(struct ecppunit *pp, uint8_t *byte)
 		/* Event 11: peripheral deasserts nAck to finish handshake */
 		if (wait_dsr(pp, ECPP_nACK, ECPP_nACK, 35000) < 0) {
 			ecpp_error(pp->dip,
-				"nibble_periph2host(%d): failed event 11 %x\n",
-				i + 1, DSR_READ(pp));
+			    "nibble_periph2host(%d): failed event 11 %x\n",
+			    i + 1, DSR_READ(pp));
 			(void) ecpp_1284_termination(pp);
 			return (FAILURE);
 		}
@@ -4757,8 +4757,8 @@ ecpp_peripheral2host(struct ecppunit *pp)
 		/* Event 21: Periph sets PError low to ack host */
 		if (wait_dsr(pp, ECPP_PE, 0, 35000) < 0) {
 			ecpp_error(pp->dip,
-				"ecpp_periph2host: failed event 21 %x\n",
-				DSR_READ(pp));
+			    "ecpp_periph2host: failed event 21 %x\n",
+			    DSR_READ(pp));
 			(void) ecpp_1284_termination(pp);
 			return (FAILURE);
 		}
@@ -4788,7 +4788,7 @@ ecpp_peripheral2host(struct ecppunit *pp)
 		/* allocate the FIFO size */
 		if ((mp = allocb(ECPP_FIFO_SZ, BPRI_MED)) == NULL) {
 			ecpp_error(pp->dip,
-				"ecpp_periph2host: allocb FAILURE.\n");
+			    "ecpp_periph2host: allocb FAILURE.\n");
 			return (FAILURE);
 		}
 
@@ -4805,14 +4805,14 @@ ecpp_peripheral2host(struct ecppunit *pp)
 			mutex_exit(&pp->umutex);
 			mp->b_datap->db_type = M_DATA;
 			ecpp_error(pp->dip,
-				"ecpp_periph2host: sending %d bytes\n",
-				mp->b_wptr - mp->b_rptr);
+			    "ecpp_periph2host: sending %d bytes\n",
+			    mp->b_wptr - mp->b_rptr);
 			putnext(pp->readq, mp);
 			mutex_enter(&pp->umutex);
 			return (SUCCESS);
 		} else {
 			ecpp_error(pp->dip,
-				"ecpp_periph2host: !canputnext data lost\n");
+			    "ecpp_periph2host: !canputnext data lost\n");
 			freemsg(mp);
 			return (FAILURE);
 		}
@@ -4833,7 +4833,7 @@ static int
 ecp_forward2reverse(struct ecppunit *pp)
 {
 	ASSERT(pp->current_mode == ECPP_ECP_MODE &&
-		pp->current_phase == ECPP_PHASE_ECP_FWD_IDLE);
+	    pp->current_phase == ECPP_PHASE_ECP_FWD_IDLE);
 
 	/* place port into PS2 mode */
 	ECR_WRITE(pp, ECR_mode_001 | ECPP_INTR_SRV | ECPP_INTR_MASK);
@@ -4867,7 +4867,7 @@ static int
 ecp_reverse2forward(struct ecppunit *pp)
 {
 	ASSERT(pp->current_mode == ECPP_ECP_MODE &&
-		pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
+	    pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
 
 	/* Event 47: host deasserts nInit */
 	DCR_WRITE(pp, ECPP_REV_DIR | ECPP_nINIT);
@@ -4916,7 +4916,7 @@ ecpp_default_negotiation(struct ecppunit *pp)
 	} else {
 		/* Centronics device */
 		pp->io_mode =
-			(pp->fast_centronics == TRUE) ? ECPP_DMA : ECPP_PIO;
+		    (pp->fast_centronics == TRUE) ? ECPP_DMA : ECPP_PIO;
 	}
 	ECPP_CONFIG_MODE(pp);
 }
@@ -4929,10 +4929,10 @@ ecpp_mode_negotiation(struct ecppunit *pp, uchar_t newmode)
 {
 	/* any other mode is impossible */
 	ASSERT(pp->current_mode == ECPP_CENTRONICS ||
-		pp->current_mode == ECPP_COMPAT_MODE ||
-		pp->current_mode == ECPP_NIBBLE_MODE ||
-		pp->current_mode == ECPP_ECP_MODE ||
-		pp->current_mode == ECPP_DIAG_MODE);
+	    pp->current_mode == ECPP_COMPAT_MODE ||
+	    pp->current_mode == ECPP_NIBBLE_MODE ||
+	    pp->current_mode == ECPP_ECP_MODE ||
+	    pp->current_mode == ECPP_DIAG_MODE);
 
 	if (pp->current_mode == newmode) {
 		return (SUCCESS);
@@ -5008,7 +5008,7 @@ ecpp_mode_negotiation(struct ecppunit *pp, uchar_t newmode)
 		DCR_WRITE(pp, ECPP_nINIT);
 
 		if (ecr_write(pp, ECR_mode_011 |
-			ECPP_INTR_MASK | ECPP_INTR_SRV) == FAILURE) {
+		    ECPP_INTR_MASK | ECPP_INTR_SRV) == FAILURE) {
 			ecpp_error(pp->dip, "mode_nego:ECP: failed w/ecr\n");
 			return (FAILURE);
 		}
@@ -5110,7 +5110,7 @@ ecpp_idle_phase(struct ecppunit *pp)
 		ecpp_error(pp->dip, "ecpp_idle_phase: ECP forward\n");
 
 		ASSERT(pp->current_phase == ECPP_PHASE_ECP_FWD_IDLE ||
-			pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
+		    pp->current_phase == ECPP_PHASE_ECP_REV_IDLE);
 
 		/* put interface into Forward Idle phase */
 		if ((pp->current_phase == ECPP_PHASE_ECP_REV_IDLE) &&
@@ -5126,7 +5126,7 @@ ecpp_idle_phase(struct ecppunit *pp)
 			(void) ecpp_backchan_req(pp);
 		} else {
 			ECR_WRITE(pp,
-				ECR_READ(pp) & ~ECPP_INTR_MASK | ECPP_INTR_SRV);
+			    ECR_READ(pp) & ~ECPP_INTR_MASK | ECPP_INTR_SRV);
 
 			ECPP_UNMASK_INTR(pp);
 		}
@@ -5159,8 +5159,7 @@ read_nibble_backchan(struct ecppunit *pp)
 	ASSERT(pp->current_mode == ECPP_NIBBLE_MODE);
 
 	pp->current_phase = (DSR_READ(pp) & (ECPP_nERR | ECPP_PE))
-					? ECPP_PHASE_NIBT_NAVAIL
-					: ECPP_PHASE_NIBT_AVAIL;
+	    ? ECPP_PHASE_NIBT_NAVAIL : ECPP_PHASE_NIBT_AVAIL;
 
 	ecpp_error(pp->dip, "read_nibble_backchan: %x\n", DSR_READ(pp));
 
@@ -5172,13 +5171,13 @@ read_nibble_backchan(struct ecppunit *pp)
 		/* see if there's space on the queue */
 		if (!canputnext(pp->readq)) {
 			ecpp_error(pp->dip,
-				"read_nibble_backchan: canputnext failed\n");
+			    "read_nibble_backchan: canputnext failed\n");
 			return (SUCCESS);
 		}
 
 		if ((mp = allocb(NIBBLE_REV_BLKSZ, BPRI_MED)) == NULL) {
 			ecpp_error(pp->dip,
-				"read_nibble_backchan: allocb failed\n");
+			    "read_nibble_backchan: allocb failed\n");
 			return (SUCCESS);
 		}
 
@@ -5193,13 +5192,13 @@ read_nibble_backchan(struct ecppunit *pp)
 		}
 
 		pp->current_phase = (DSR_READ(pp) & (ECPP_nERR | ECPP_PE))
-						? ECPP_PHASE_NIBT_NAVAIL
-						: ECPP_PHASE_NIBT_AVAIL;
+		    ? ECPP_PHASE_NIBT_NAVAIL
+		    : ECPP_PHASE_NIBT_AVAIL;
 
 		if (mp->b_wptr - mp->b_rptr > 0) {
 			ecpp_error(pp->dip,
-				"read_nibble_backchan: sending %d bytes\n",
-				mp->b_wptr - mp->b_rptr);
+			    "read_nibble_backchan: sending %d bytes\n",
+			    mp->b_wptr - mp->b_rptr);
 			pp->nread = 0;
 			mutex_exit(&pp->umutex);
 			putnext(pp->readq, mp);
@@ -5221,7 +5220,7 @@ devidnib_negotiation(struct ecppunit *pp)
 	uint8_t dsr;
 
 	if (ecpp_1284_negotiation(pp,
-			ECPP_XREQ_NIBBLE | ECPP_XREQ_ID, &dsr) == FAILURE) {
+	    ECPP_XREQ_NIBBLE | ECPP_XREQ_ID, &dsr) == FAILURE) {
 		return (FAILURE);
 	}
 
@@ -5236,7 +5235,7 @@ devidnib_negotiation(struct ecppunit *pp)
 	}
 
 	ecpp_error(pp->dip, "ecpp_devidnib_nego: current_phase=%x\n",
-			pp->current_phase);
+	    pp->current_phase);
 
 	/* successful negotiation into Nibble mode */
 	pp->current_mode = ECPP_NIBBLE_MODE;
@@ -5304,7 +5303,7 @@ ecpp_getdevid(struct ecppunit *pp, uint8_t *id, int *lenp, int mode)
 			*lenp = (lenhi << 8) | (lenlo);
 
 			ecpp_error(pp->dip,
-				"ecpp_getdevid: id length = %d\n", *lenp);
+			    "ecpp_getdevid: id length = %d\n", *lenp);
 
 			if (*lenp < 2) {
 				return (EIO);
@@ -5322,7 +5321,7 @@ ecpp_getdevid(struct ecppunit *pp, uint8_t *id, int *lenp, int mode)
 				dsr = DSR_READ(pp);
 			}
 			ecpp_error(pp->dip,
-				"ecpp_getdevid: read %d bytes\n", *lenp - i);
+			    "ecpp_getdevid: read %d bytes\n", *lenp - i);
 
 			/*
 			 * 1284: After receiving the sequence, the host is
@@ -5470,7 +5469,7 @@ pc87332_config_chip(struct ecppunit *pp)
 	pmc = pc87332_read_config_reg(pp, PMC);
 	if (!(pmc & PC87332_PMC_ECP_DMA_CONFIG)) {
 		pc87332_write_config_reg(pp, PMC,
-					pmc | PC87332_PMC_ECP_DMA_CONFIG);
+		    pmc | PC87332_PMC_ECP_DMA_CONFIG);
 	}
 
 	/*
@@ -5480,7 +5479,7 @@ pc87332_config_chip(struct ecppunit *pp)
 	fcr = pc87332_read_config_reg(pp, FCR);
 	if (fcr & PC87332_FCR_PPM_FLOAT_CTL) {
 		pc87332_write_config_reg(pp, FCR,
-					fcr & ~PC87332_FCR_PPM_FLOAT_CTL);
+		    fcr & ~PC87332_FCR_PPM_FLOAT_CTL);
 	}
 
 	/*
@@ -5495,11 +5494,11 @@ pc87332_config_chip(struct ecppunit *pp)
 
 	/* enable ECP mode, level intr (note that DCR bits 3-0 == 0x0) */
 	pc87332_write_config_reg(pp, PCR,
-				PC87332_PCR_INTR_LEVL | PC87332_PCR_ECP_EN);
+	    PC87332_PCR_INTR_LEVL | PC87332_PCR_ECP_EN);
 
 	/* put SuperIO in initial state */
 	if (ecr_write(pp, ECR_mode_001 |
-			ECPP_INTR_MASK | ECPP_INTR_SRV) == FAILURE) {
+	    ECPP_INTR_MASK | ECPP_INTR_SRV) == FAILURE) {
 		ecpp_error(pp->dip, "ecpp_config_87332: ECR\n");
 	}
 
@@ -5539,8 +5538,8 @@ pc97317_map_regs(struct ecppunit *pp)
 	}
 
 	if (ddi_regs_map_setup(pp->dip, 0, (caddr_t *)&pp->uh.ebus.c2_reg,
-			0x403, sizeof (struct config2_reg), &acc_attr,
-			&pp->uh.ebus.c2_handle) != DDI_SUCCESS) {
+	    0x403, sizeof (struct config2_reg), &acc_attr,
+	    &pp->uh.ebus.c2_handle) != DDI_SUCCESS) {
 		ecpp_error(pp->dip, "pc97317_map_regs: failed c2_reg\n");
 		pc87332_unmap_regs(pp);
 		return (FAILURE);
@@ -5575,7 +5574,7 @@ pc97317_config_chip(struct ecppunit *pp)
 
 	/* SPP Compatibility */
 	PP_PUTB(pp->uh.ebus.c2_handle,
-		&pp->uh.ebus.c2_reg->eir, PC97317_CONFIG2_CONTROL2);
+	    &pp->uh.ebus.c2_reg->eir, PC97317_CONFIG2_CONTROL2);
 	PP_PUTB(pp->uh.ebus.c2_handle, &pp->uh.ebus.c2_reg->edr, 0x80);
 
 	/* low interrupt polarity */
@@ -5589,7 +5588,7 @@ pc97317_config_chip(struct ecppunit *pp)
 	}
 
 	if (ecr_write(pp, ECR_mode_001 |
-			ECPP_INTR_MASK | ECPP_INTR_SRV) == FAILURE) {
+	    ECPP_INTR_MASK | ECPP_INTR_SRV) == FAILURE) {
 		ecpp_error(pp->dip, "pc97317_config_chip: failed w/ECR\n");
 	}
 
@@ -5652,7 +5651,7 @@ cheerio_mask_intr(struct ecppunit *pp)
 {
 	/* mask Cheerio interrupts */
 	AND_SET_LONG_R(pp->uh.ebus.d_handle,
-			&pp->uh.ebus.dmac->csr, ~DCSR_INT_EN);
+	    &pp->uh.ebus.dmac->csr, ~DCSR_INT_EN);
 }
 
 static void
@@ -5660,7 +5659,7 @@ cheerio_unmask_intr(struct ecppunit *pp)
 {
 	/* unmask Cheerio interrupts */
 	OR_SET_LONG_R(pp->uh.ebus.d_handle,
-			&pp->uh.ebus.dmac->csr, DCSR_INT_EN | DCSR_TCI_DIS);
+	    &pp->uh.ebus.dmac->csr, DCSR_INT_EN | DCSR_TCI_DIS);
 }
 
 static int
@@ -5675,7 +5674,7 @@ cheerio_dma_start(struct ecppunit *pp)
 		    DCSR_CSR_DRAIN | DCSR_BURST_1 | DCSR_BURST_0 | DCSR_WRITE);
 	} else {
 		SET_DMAC_CSR(pp, DCSR_INT_EN | DCSR_EN_CNT | DCSR_EN_DMA |
-				DCSR_CSR_DRAIN | DCSR_BURST_1 | DCSR_BURST_0);
+		    DCSR_CSR_DRAIN | DCSR_BURST_1 | DCSR_BURST_0);
 	}
 
 	return (SUCCESS);
@@ -5691,11 +5690,11 @@ cheerio_dma_stop(struct ecppunit *pp, size_t *countp)
 
 	/* disable DMA and byte counter */
 	AND_SET_LONG_R(pp->uh.ebus.d_handle, &pp->uh.ebus.dmac->csr,
-		~(DCSR_EN_DMA | DCSR_EN_CNT| DCSR_INT_EN));
+	    ~(DCSR_EN_DMA | DCSR_EN_CNT| DCSR_INT_EN));
 
 	/* ACK and disable the TC interrupt */
 	OR_SET_LONG_R(pp->uh.ebus.d_handle, &pp->uh.ebus.dmac->csr,
-		DCSR_TC | DCSR_TCI_DIS);
+	    DCSR_TC | DCSR_TCI_DIS);
 
 	/* read DMA count if requested */
 	if (countp) {
@@ -5761,22 +5760,22 @@ static int
 m1553_map_regs(struct ecppunit *pp)
 {
 	if (ddi_regs_map_setup(pp->dip, 1, (caddr_t *)&pp->uh.m1553.isa_space,
-			0, sizeof (struct isaspace), &acc_attr,
-			&pp->uh.m1553.d_handle) != DDI_SUCCESS) {
+	    0, sizeof (struct isaspace), &acc_attr,
+	    &pp->uh.m1553.d_handle) != DDI_SUCCESS) {
 		ecpp_error(pp->dip, "m1553_map_regs: failed isa space\n");
 		goto fail;
 	}
 
 	if (ddi_regs_map_setup(pp->dip, 0, (caddr_t *)&pp->i_reg, 0,
-			sizeof (struct info_reg), &acc_attr, &pp->i_handle)
-			!= DDI_SUCCESS) {
+	    sizeof (struct info_reg), &acc_attr, &pp->i_handle)
+	    != DDI_SUCCESS) {
 		ecpp_error(pp->dip, "m1553_map_regs: failed i_reg\n");
 		goto fail;
 	}
 
 	if (ddi_regs_map_setup(pp->dip, 0, (caddr_t *)&pp->f_reg, 0x400,
-			sizeof (struct fifo_reg), &acc_attr, &pp->f_handle)
-			!= DDI_SUCCESS) {
+	    sizeof (struct fifo_reg), &acc_attr, &pp->f_handle)
+	    != DDI_SUCCESS) {
 		ecpp_error(pp->dip, "m1553_map_regs: failed f_reg\n");
 		goto fail;
 	}
@@ -5907,7 +5906,7 @@ m1553_config_chip(struct ecppunit *pp)
 	DCR_WRITE(pp, ECPP_SLCTIN | ECPP_nINIT);
 
 	ecpp_error(pp->dip, "m1553_config_chip: ecr=%x, dsr=%x, dcr=%x\n",
-		ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
+	    ECR_READ(pp), DSR_READ(pp), DCR_READ(pp));
 
 	return (SUCCESS);
 }
@@ -5943,8 +5942,8 @@ dma8237_dma_start(struct ecppunit *pp)
 	chn = pp->uh.m1553.chn;
 
 	ASSERT(chn <= DMAE_CH3 &&
-		pp->dma_cookie.dmac_size != 0 &&
-		pp->dma_cookie.dmac_address != NULL);
+	    pp->dma_cookie.dmac_size != 0 &&
+	    pp->dma_cookie.dmac_address != NULL);
 
 	/* At this point Southbridge has not yet asserted DREQ */
 
@@ -5952,10 +5951,10 @@ dma8237_dma_start(struct ecppunit *pp)
 	dma8237_write(pp, DMAC2_MODE, DMAMODE_CASC);
 	if (pp->dma_dir == DDI_DMA_READ) {
 		dma8237_write(pp, DMAC1_MODE, DMAMODE_SINGLE |
-							DMAMODE_READ | chn);
+		    DMAMODE_READ | chn);
 	} else {
 		dma8237_write(pp, DMAC1_MODE, DMAMODE_SINGLE |
-							DMAMODE_WRITE | chn);
+		    DMAMODE_WRITE | chn);
 	}
 
 	dma8237_write_addr(pp, pp->dma_cookie.dmac_address);
@@ -6216,7 +6215,7 @@ static void
 dma8237_write(struct ecppunit *pp, int reg_num, uint8_t val)
 {
 	ddi_put8(pp->uh.m1553.d_handle,
-		&pp->uh.m1553.isa_space->isa_reg[reg_num], val);
+	    &pp->uh.m1553.isa_space->isa_reg[reg_num], val);
 }
 
 static uint8_t
@@ -6255,7 +6254,7 @@ ecpp_kstat_init(struct ecppunit *pp)
 	 */
 	(void) sprintf(buf, "ecppc%d", pp->instance);
 	pp->intrstats = kstat_create("ecpp", pp->instance, buf, "controller",
-		KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (pp->intrstats == NULL) {
 		ecpp_error(pp->dip, "ecpp_kstat_init:1: kstat_create failed");
 	} else {
@@ -6268,9 +6267,9 @@ ecpp_kstat_init(struct ecppunit *pp)
 	 * Allocate, initialize and install misc stats kstat
 	 */
 	pp->ksp = kstat_create("ecpp", pp->instance, NULL, "misc",
-		KSTAT_TYPE_NAMED,
-		sizeof (struct ecppkstat) / sizeof (kstat_named_t),
-		KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_NAMED,
+	    sizeof (struct ecppkstat) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_PERSISTENT);
 	if (pp->ksp == NULL) {
 		ecpp_error(pp->dip, "ecpp_kstat_init:2: kstat_create failed");
 		return;
@@ -6329,7 +6328,7 @@ ecpp_kstat_update(kstat_t *ksp, int rw)
 	mutex_enter(&pp->umutex);
 
 	ekp->ek_ctx_obytes.value.ui32	= pp->obytes[ECPP_CENTRONICS] +
-						pp->obytes[ECPP_COMPAT_MODE];
+	    pp->obytes[ECPP_COMPAT_MODE];
 	ekp->ek_ctxpio_obytes.value.ui32 = pp->ctxpio_obytes;
 	ekp->ek_nib_ibytes.value.ui32	= pp->ibytes[ECPP_NIBBLE_MODE];
 	ekp->ek_ecp_obytes.value.ui32	= pp->obytes[ECPP_ECP_MODE];
@@ -6338,7 +6337,7 @@ ecpp_kstat_update(kstat_t *ksp, int rw)
 	ekp->ek_epp_ibytes.value.ui32	= pp->ibytes[ECPP_EPP_MODE];
 	ekp->ek_diag_obytes.value.ui32	= pp->obytes[ECPP_DIAG_MODE];
 	ekp->ek_to_ctx.value.ui32	= pp->to_mode[ECPP_CENTRONICS] +
-						pp->to_mode[ECPP_COMPAT_MODE];
+	    pp->to_mode[ECPP_COMPAT_MODE];
 	ekp->ek_to_nib.value.ui32	= pp->to_mode[ECPP_NIBBLE_MODE];
 	ekp->ek_to_ecp.value.ui32	= pp->to_mode[ECPP_ECP_MODE];
 	ekp->ek_to_epp.value.ui32	= pp->to_mode[ECPP_EPP_MODE];

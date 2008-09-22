@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4 1.13    */
 
 /*
  * Pseudo Terminal Slave Driver.
@@ -183,7 +182,7 @@ static int pts_detach(dev_info_t *, ddi_detach_cmd_t);
  */
 DDI_DEFINE_STREAM_OPS(pts_ops, nulldev, nulldev,	\
 	pts_attach, pts_detach, nodev,			\
-	pts_devinfo, PTS_CONF_FLAG, &ptsinfo);
+	pts_devinfo, PTS_CONF_FLAG, &ptsinfo, ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.
@@ -535,14 +534,14 @@ ptswput(queue_t *qp, mblk_t *mp)
 	}
 
 	if (type >= QPCTL) {
-	    switch (type) {
+		switch (type) {
 
 		/*
 		 * if write queue request, flush slave's write
 		 * queue and send FLUSHR to ptm. If read queue
 		 * request, send FLUSHR to ptm.
 		 */
-	    case M_FLUSH:
+		case M_FLUSH:
 		DBG(("pts got flush request\n"));
 		if (*mp->b_rptr & FLUSHW) {
 
@@ -596,18 +595,18 @@ ptswput(queue_t *qp, mblk_t *mp)
 		}
 		break;
 
-	    case M_READ:
+		case M_READ:
 		/* Caused by ldterm - can not pass to master */
 		freemsg(mp);
 		break;
 
-	    default:
+		default:
 		if (ptsp->ptm_rdq)
 			putnext(ptsp->ptm_rdq, mp);
 		break;
-	    }
-	    PT_EXIT_READ(ptsp);
-	    return;
+		}
+		PT_EXIT_READ(ptsp);
+		return;
 	}
 
 	switch (type) {

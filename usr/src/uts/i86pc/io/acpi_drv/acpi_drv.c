@@ -413,7 +413,8 @@ static struct dev_ops acpi_drv_dev_ops = {
 	nodev,			/* reset */
 	&acpi_drv_cb_ops,
 	NULL,			/* no bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv1 = {

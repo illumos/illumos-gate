@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the lock device driver.
@@ -244,7 +242,8 @@ static struct dev_ops	winlock_ops = {
 	nodev,			/* reset */
 	&winlock_cb_ops,	/* driver ops */
 	NULL,			/* bus ops */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static int winlockmap_map(devmap_cookie_t, dev_t, uint_t, offset_t, size_t,
@@ -433,7 +432,7 @@ static	int
 winlock_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	DEBUGF(1, (CE_CONT, "winlock_attach, devi=%p, cmd=%d\n",
-		(void *)devi, (int)cmd));
+	    (void *)devi, (int)cmd));
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 	if (ddi_create_minor_node(devi, "winlock", S_IFCHR, 0, DDI_PSEUDO, 0)
@@ -450,7 +449,7 @@ static	int
 winlock_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	DEBUGF(1, (CE_CONT, "winlock_detach, devi=%p, cmd=%d\n",
-		(void *)devi, (int)cmd));
+	    (void *)devi, (int)cmd));
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
@@ -516,7 +515,7 @@ winlock_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	cred_t *cred, int *rval)
 {
 	DEBUGF(1, (CE_CONT, "winlockioctl: cmd=%d, arg=0x%p\n",
-		cmd, (void *)arg));
+	    cmd, (void *)arg));
 
 	switch (cmd) {
 	/*
@@ -577,7 +576,7 @@ winlocksegmap(
 
 	/* Use devmap_setup to setup the mapping */
 	return (devmap_setup(dev, (offset_t)off, as, addr, (size_t)len, prot,
-		maxprot, flags, cred));
+	    maxprot, flags, cred));
 }
 
 /*ARGSUSED*/
@@ -589,7 +588,7 @@ winlock_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	int err;
 
 	DEBUGF(1, (CE_CONT, "winlock devmap: off=%llx, len=%lx, dhp=%p\n",
-		off, len, (void *)dhp));
+	    off, len, (void *)dhp));
 
 	*maplen = 0;
 
@@ -606,8 +605,8 @@ winlock_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 	if (((off & PAGEOFFSET) != 0) &&
 	    ((off ^ (uintptr_t)(lp->lockptr)) & (offset_t)PAGEOFFSET) != 0) {
 		DEBUGF(2, (CE_CONT,
-			"mmap offset %llx mismatch with lockptr %p\n",
-			off, (void *)lp->lockptr));
+		    "mmap offset %llx mismatch with lockptr %p\n",
+		    off, (void *)lp->lockptr));
 		mutex_exit(&lp->mutex);	/* mutex held by seglock_findlock */
 		return (EINVAL);
 	}
@@ -722,7 +721,7 @@ winlockmap_dup(devmap_cookie_t dhp, void *oldpvt, devmap_cookie_t new_dhp,
 	 * getting at either the as or, better, a way to get the child's new pid
 	 */
 	ndp = seglock_alloc_specific(lp,
-		(void *)((devmap_handle_t *)new_dhp)->dh_seg->s_as);
+	    (void *)((devmap_handle_t *)new_dhp)->dh_seg->s_as);
 	ASSERT(ndp != sdp);
 
 	if (sdp->lockseg == dhp) {
@@ -879,7 +878,7 @@ seglock_createlock(enum winlock_style style)
 	SegLock	*lp;
 
 	DEBUGF(3, (CE_CONT, "seglock_createlock: free_list=%p, next_lock %d\n",
-		(void *)lock_free_list, next_lock));
+	    (void *)lock_free_list, next_lock));
 
 	ASSERT(MUTEX_HELD(&winlock_mutex));
 	if (lock_free_list != NULL) {
@@ -900,7 +899,7 @@ seglock_createlock(enum winlock_style style)
 
 	if (style == OLDSTYLE_LOCK) {
 		lp->lockptr = (int *)ddi_umem_alloc(PAGESIZE,
-			DDI_UMEM_SLEEP, &(lp->umem_cookie));
+		    DDI_UMEM_SLEEP, &(lp->umem_cookie));
 	} else {
 		lp->lockptr = ((int *)lockpage) + ((lp->cookie/PAGESIZE) - 1);
 		lp->umem_cookie = lockpage_cookie;
@@ -932,7 +931,7 @@ seglock_destroylock(SegLock *lp)
 	ASSERT(!MUTEX_HELD(&winlock_mutex));
 
 	DEBUGF(3, (CE_CONT, "destroying lock cookie %d key %d\n",
-		lp->cookie, lp->key));
+	    lp->cookie, lp->key));
 
 	ASSERT(lp->alloccount == 0);
 	ASSERT(lp->clients == NULL);
@@ -1025,7 +1024,7 @@ seglock_alloc_specific(SegLock *lp, void *tag)
 		return (sdp);
 
 	DEBUGF(3, (CE_CONT, "Allocating segproc structure for tag %p lock %d\n",
-		    tag, lp->cookie));
+	    tag, lp->cookie));
 
 	/* Allocate a new SegProc */
 	sdp = kmem_zalloc(sizeof (SegProc), KM_SLEEP);
@@ -1049,7 +1048,7 @@ seglock_deleteclient(SegLock *lp, SegProc *sdp)
 	ASSERT(sdp->unlockseg == NULL);
 
 	DEBUGF(3, (CE_CONT, "Deleting segproc structure for pid %d lock %d\n",
-		ddi_get_pid(), lp->cookie));
+	    ddi_get_pid(), lp->cookie));
 	if (lp->clients == sdp) {
 		lp->clients = sdp->next;
 	} else {
@@ -1120,28 +1119,28 @@ seglock_graballoc(intptr_t arg, enum winlock_style style, int mode) /* IOCTL */
 	}
 
 	DEBUGF(3, (CE_CONT,
-		"seglock_graballoc: key=%u, style=%d\n", key, style));
+	    "seglock_graballoc: key=%u, style=%d\n", key, style));
 
 	mutex_enter(&winlock_mutex);
 	/* Allocate lockpage on first new style alloc */
 	if ((lockpage == NULL) && (style == NEWSTYLE_LOCK)) {
 		lockpage = ddi_umem_alloc(PAGESIZE, DDI_UMEM_SLEEP,
-				&lockpage_cookie);
+		    &lockpage_cookie);
 	}
 
 	/* Allocate trashpage on first alloc (any style) */
 	if (trashpage_cookie == NULL) {
 		(void) ddi_umem_alloc(PAGESIZE, DDI_UMEM_TRASH | DDI_UMEM_SLEEP,
-					&trashpage_cookie);
+		    &trashpage_cookie);
 	}
 
 	if ((lp = seglock_findkey(key)) != NULL) {
 		DEBUGF(2, (CE_CONT, "alloc: found lock key %d cookie %d\n",
-			key, lp->cookie));
+		    key, lp->cookie));
 		++lp->alloccount;
 	} else if ((lp = seglock_createlock(style)) != NULL) {
 		DEBUGF(2, (CE_CONT, "alloc: created lock key %d cookie %d\n",
-			key, lp->cookie));
+		    key, lp->cookie));
 		lp->key = key;
 	} else {
 		DEBUGF(2, (CE_CONT, "alloc: cannot create lock key %d\n", key));
@@ -1154,7 +1153,7 @@ seglock_graballoc(intptr_t arg, enum winlock_style style, int mode) /* IOCTL */
 
 	if (style == OLDSTYLE_LOCK) {
 		err = ddi_copyout((caddr_t)&lp->cookie, (caddr_t)arg,
-			sizeof (lp->cookie), mode);
+		    sizeof (lp->cookie), mode);
 	} else {
 		wla.sy_ident = lp->cookie +
 		    (uint_t)((uintptr_t)(lp->lockptr) & PAGEOFFSET);
@@ -1192,7 +1191,7 @@ seglock_grabfree(intptr_t arg, int mode)	/* IOCTL */
 		return (EINVAL);
 	}
 	DEBUGF(3, (CE_CONT, " lock key %d, cookie %d, alloccount %d\n",
-		lp->key, lp->cookie, lp->alloccount));
+	    lp->key, lp->cookie, lp->alloccount));
 
 	if (lp->alloccount > 0)
 		lp->alloccount--;
@@ -1298,8 +1297,8 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 
 	ASSERT(MUTEX_HELD(&lp->mutex));
 	DEBUGF(3, (CE_CONT,
-		"seglock_lockfault: hdl=%p, sdp=%p, lp=%p owner=%p\n",
-		(void *)dhp, (void *)sdp, (void *)lp, (void *)owner));
+	    "seglock_lockfault: hdl=%p, sdp=%p, lp=%p owner=%p\n",
+	    (void *)dhp, (void *)sdp, (void *)lp, (void *)owner));
 
 	/* lockfault is always called with sdp in current process context */
 	ASSERT(ID(sdp) == CURPROC_ID);
@@ -1316,10 +1315,10 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 		 * Current owner is faulting on unlock page and has no waiters
 		 * Then can give the mapping to current owner
 		 */
-	    if ((sdp->lockseg == dhp) || (lp->sleepers == 0)) {
+		if ((sdp->lockseg == dhp) || (lp->sleepers == 0)) {
 		DEBUGF(4, (CE_CONT, "lock owner faulting\n"));
 		return (give_mapping(lp, sdp, rw));
-	    } else {
+		} else {
 		/*
 		 * Owner must be writing to unlock page and there are waiters.
 		 * other cases have been checked earlier.
@@ -1330,7 +1329,7 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 		ASSERT((dhp == sdp->unlockseg) && (lp->sleepers != 0));
 		DEBUGF(4, (CE_CONT, " owner fault on unlock seg w/ sleeper\n"));
 		return (lock_giveup(lp, 1));
-	    }
+		}
 	}
 
 	ASSERT(owner != sdp);
@@ -1345,7 +1344,7 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 	if ((sdp->unlockseg == dhp) && (sdp->flag & TRASHPAGE)) {
 		DEBUGF(4, (CE_CONT, " old owner reloads trash mapping\n"));
 		return (devmap_load(sdp->unlockseg, lp->cookie, PAGESIZE,
-			DEVMAP_ACCESS, rw));
+		    DEVMAP_ACCESS, rw));
 	}
 
 	/*
@@ -1369,8 +1368,8 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 	 */
 	if (LOCK(lp) == 0) {
 		DEBUGF(4, (CE_CONT,
-			"Free lock (%p): Giving mapping to new owner %d\n",
-			(void *)lp, ddi_get_pid()));
+		    "Free lock (%p): Giving mapping to new owner %d\n",
+		    (void *)lp, ddi_get_pid()));
 		return (give_mapping(lp, sdp, rw));
 	}
 
@@ -1417,7 +1416,7 @@ seglock_lockfault(devmap_cookie_t dhp, SegProc *sdp, SegLock *lp, uint_t rw)
 			 * If successful, will break out of loop
 			 */
 			cmn_err(CE_NOTE, "Process %d timed out on lock %d\n",
-				ddi_get_pid(), lp->cookie);
+			    ddi_get_pid(), lp->cookie);
 			(void) lock_giveup(lp, 1);
 		} else if (rval == 0) { /* signal pending */
 			cmn_err(CE_NOTE,
@@ -1493,7 +1492,7 @@ give_mapping(SegLock *lp, SegProc *sdp, uint_t rw)
 		 */
 		DEBUGF(4, (CE_CONT, " and unlock mapping\n"));
 		err = devmap_load(sdp->unlockseg, lp->cookie, PAGESIZE,
-			DEVMAP_ACCESS, PROT_WRITE);
+		    DEVMAP_ACCESS, PROT_WRITE);
 	}
 	return (err);
 }
@@ -1555,8 +1554,8 @@ lock_giveup(SegLock *lp, int trash)
 		 * and be given a trash mapping at that time.
 		 */
 		if (ID(owner) == CURPROC_ID) {
-		    (void) devmap_load(owner->unlockseg, lp->cookie, PAGESIZE,
-			DEVMAP_ACCESS, PROT_WRITE);
+			(void) devmap_load(owner->unlockseg, lp->cookie,
+			    PAGESIZE, DEVMAP_ACCESS, PROT_WRITE);
 		}
 	}
 
@@ -1670,7 +1669,7 @@ seglock_dump_all(void)
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Winlock Driver v%I%",	/* Name of the module */
+	"Winlock Driver",	/* Name of the module */
 	&winlock_ops,		/* driver ops */
 };
 

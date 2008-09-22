@@ -1604,9 +1604,15 @@ apic_shutdown(int cmd, int fcn)
 	 * Switch system back into Legacy-Mode if using ACPI and
 	 * not powering-off.  Some BIOSes need to remain in ACPI-mode
 	 * for power-off to succeed (Dell Dimension 4600)
+	 * Do not disable ACPI while doing fastreboot
 	 */
-	if (apic_enable_acpi && (fcn != AD_POWEROFF))
+	if (apic_enable_acpi && fcn != AD_POWEROFF && fcn != AD_FASTREBOOT)
 		(void) AcpiDisable();
+
+	if (fcn == AD_FASTREBOOT) {
+		apicadr[APIC_INT_CMD1] = AV_ASSERT | AV_RESET |
+		    AV_SH_ALL_EXCSELF;
+	}
 
 	/* remainder of function is for shutdown+poweroff case only */
 	if (fcn != AD_POWEROFF)

@@ -131,6 +131,7 @@ f none usr/platform/i86pc/include/sys/clock.h 644 root bin
 f none usr/platform/i86pc/include/sys/cram.h 644 root bin
 f none usr/platform/i86pc/include/sys/debug_info.h 644 root bin
 f none usr/platform/i86pc/include/sys/ddi_subrdefs.h 644 root bin
+f none usr/platform/i86pc/include/sys/fastboot.h 644 root bin
 f none usr/platform/i86pc/include/sys/mach_mmu.h 644 root bin
 f none usr/platform/i86pc/include/sys/machclock.h 644 root bin
 f none usr/platform/i86pc/include/sys/machcpuvar.h 644 root bin

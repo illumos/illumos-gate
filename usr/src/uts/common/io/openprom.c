@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Ported from 4.1.1_PSRA: "@(#)openprom.c 1.19 91/02/19 SMI";
  *
@@ -122,7 +123,9 @@ static struct dev_ops openeepr_ops = {
 	opdetach,		/* detach */
 	nodev,			/* reset */
 	&openeepr_cb_ops,	/* driver operations */
-	NULL			/* bus operations */
+	NULL,			/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

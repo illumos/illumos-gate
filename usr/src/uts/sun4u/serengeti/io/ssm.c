@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -219,7 +218,8 @@ static struct dev_ops ssm_ops = {
 	nulldev,		/* reset */
 	&ssm_cb_ops,		/* driver operations */
 	&ssm_bus_ops,		/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -231,7 +231,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"SSM Nexus v1.8",		/* name of module */
+	"SSM Nexus",		/* name of module */
 	&ssm_ops,		/* driver ops */
 };
 

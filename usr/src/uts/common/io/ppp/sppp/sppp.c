@@ -78,7 +78,7 @@
 /* MODINFO is limited to 32 characters. */
 const char sppp_module_description[] = "PPP 4.0 mux";
 #else /* INTERNAL_BUILD */
-const char sppp_module_description[] = "ANU PPP mux $Revision: 1.0$";
+const char sppp_module_description[] = "ANU PPP mux";
 
 /* LINTED */
 static const char buildtime[] = "Built " __DATE__ " at " __TIME__

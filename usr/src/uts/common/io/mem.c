@@ -918,7 +918,9 @@ static struct dev_ops mm_ops = {
 	nodev,			/* detach */
 	nodev,			/* reset */
 	&mm_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

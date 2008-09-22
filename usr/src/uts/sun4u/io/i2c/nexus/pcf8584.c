@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * pcf8584.c is the nexus driver for all pcf8584 controller
@@ -153,12 +152,14 @@ static struct dev_ops pcf8584_ops = {
 	pcf8584_detach,
 	nodev,
 	&pcf8584_cb_ops,
-	&pcf8584_busops
+	&pcf8584_busops,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	"I2C Nexus Driver %I%",	/* Name of the module. */
+	"I2C Nexus Driver",	/* Name of the module. */
 	&pcf8584_ops,		/* driver ops */
 };
 
@@ -238,7 +239,7 @@ _init(void)
 	int status;
 
 	status = ddi_soft_state_init(&pcf8584_state, sizeof (pcf8584_t),
-		PCF8584_INITIAL_SOFT_SPACE);
+	    PCF8584_INITIAL_SOFT_SPACE);
 	if (status != 0) {
 
 		return (status);
@@ -288,7 +289,7 @@ pcf8584_dodetach(dev_info_t *dip)
 
 	if ((i2c->pcf8584_attachflags & IMUTEX) != 0) {
 		mutex_destroy(&i2c->pcf8584_imutex);
-		    cv_destroy(&i2c->pcf8584_icv);
+			cv_destroy(&i2c->pcf8584_icv);
 	}
 	if ((i2c->pcf8584_attachflags & SETUP_REGS) != 0) {
 		pcf8584_free_regs(i2c);
@@ -298,7 +299,7 @@ pcf8584_dodetach(dev_info_t *dip)
 	}
 	if ((i2c->pcf8584_attachflags & PROP_CREATE) != 0) {
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
-			"interrupt-priorities");
+		    "interrupt-priorities");
 	}
 	if ((i2c->pcf8584_attachflags & MINOR_NODE) != 0) {
 		ddi_remove_minor_node(dip, NULL);
@@ -326,7 +327,7 @@ pcf8584_doattach(dev_info_t *dip)
 	i2c->pcf8584_dip = dip;
 
 	(void) snprintf(i2c->pcf8584_name, sizeof (i2c->pcf8584_name),
-		"%s_%d", ddi_node_name(dip), instance);
+	    "%s_%d", ddi_node_name(dip), instance);
 
 	/*
 	 * Identify which pcf8584 implementation is being attached to.
@@ -347,9 +348,9 @@ pcf8584_doattach(dev_info_t *dip)
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
 	    "interrupt-priorities") != 1) {
 		(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
-			DDI_PROP_CANSLEEP, "interrupt-priorities",
-			(caddr_t)&pcf8584_pil,
-			sizeof (pcf8584_pil));
+		    DDI_PROP_CANSLEEP, "interrupt-priorities",
+		    (caddr_t)&pcf8584_pil,
+		    sizeof (pcf8584_pil));
 		i2c->pcf8584_attachflags |= PROP_CREATE;
 	}
 
@@ -924,14 +925,14 @@ pcf8584_initchild(dev_info_t *cdip)
 	char name[30];
 
 	PCF8584_DDB(pcf8584_print(PRT_INIT, "pcf8584_initchild enter: %s\n",
-		ddi_node_name(cdip)));
+	    ddi_node_name(cdip)));
 
 	ppvt = kmem_alloc(sizeof (pcf8584_ppvt_t), KM_SLEEP);
 
 	len = sizeof (cell_size);
 	err = ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip,
-		DDI_PROP_CANSLEEP, "#address-cells",
-		(caddr_t)&cell_size, &len);
+	    DDI_PROP_CANSLEEP, "#address-cells",
+	    (caddr_t)&cell_size, &len);
 	if (err != DDI_PROP_SUCCESS || len != sizeof (cell_size)) {
 
 		return (DDI_FAILURE);
@@ -939,10 +940,10 @@ pcf8584_initchild(dev_info_t *cdip)
 
 	len = sizeof (regs);
 	err = ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip,
-		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
-		"reg", (caddr_t)regs, &len);
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
+	    "reg", (caddr_t)regs, &len);
 	if (err != DDI_PROP_SUCCESS ||
-		len != (cell_size * sizeof (int32_t))) {
+	    len != (cell_size * sizeof (int32_t))) {
 
 		return (DDI_FAILURE);
 	}
@@ -1079,9 +1080,9 @@ pcf8584_setup_regs(dev_info_t *dip, pcf8584_t *i2c)
 
 	if (nregs > 1) {
 		if (ddi_regs_map_setup(dip,
-			1, (caddr_t *)&i2c->pcf8584_b_reg,
-			0, 0, &attr, &i2c->pcf8584_b_rhandle) !=
-			DDI_SUCCESS) {
+		    1, (caddr_t *)&i2c->pcf8584_b_reg,
+		    0, 0, &attr, &i2c->pcf8584_b_rhandle) !=
+		    DDI_SUCCESS) {
 
 			return (DDI_FAILURE);
 		}
@@ -1217,7 +1218,7 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 			return (I2C_COMPLETE);
 		}
 		i2c->pcf8584_tran_state =
-			pcf8584_type_to_state(tp->i2c_flags);
+		    pcf8584_type_to_state(tp->i2c_flags);
 
 		/* Set read bit if this is a read transaction */
 		if (tp->i2c_flags == I2C_RD) {
@@ -1322,7 +1323,7 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 		}
 
 		tp->i2c_rbuf[tp->i2c_rlen - tp->i2c_r_resid] =
-			pcf8584_get_s0(i2c);
+		    pcf8584_get_s0(i2c);
 
 		PCF8584_DDB(pcf8584_print(PRT_TRAN,
 		    "TRAN_STATE_RD: returning. i2c_rlen = %d "
@@ -1352,7 +1353,7 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 		}
 		if (tp->i2c_w_resid != 0) {
 			pcf8584_put_s0(i2c, tp->i2c_wbuf[tp->i2c_wlen -
-				tp->i2c_w_resid--]);
+			    tp->i2c_w_resid--]);
 			PCF8584_DDB(pcf8584_print(PRT_TRAN,
 			    "TRAN_STATE_WR_RD: write data %x\n",
 			    tp->i2c_wbuf[tp->i2c_wlen -
@@ -1364,7 +1365,7 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 				pcf8584_put_s1(i2c, S1_START2 | S1_ENI);
 			pcf8584_put_s0(i2c, addr | I2C_READ);
 			i2c->pcf8584_tran_state =
-				TRAN_STATE_DUMMY_RD;
+			    TRAN_STATE_DUMMY_RD;
 			PCF8584_DDB(pcf8584_print(PRT_TRAN,
 			    "TRAN_STATE_WR_RD: write addr "
 			    "%x\n", addr | I2C_READ));
@@ -1394,7 +1395,7 @@ pcf8584_transfer(dev_info_t *dip, i2c_transfer_t *tp)
 	extern int do_polled_io;
 
 	i2c = (pcf8584_t *)ddi_get_soft_state(pcf8584_state,
-		ddi_get_instance(ddi_get_parent(dip)));
+	    ddi_get_instance(ddi_get_parent(dip)));
 
 	tp->i2c_r_resid = tp->i2c_rlen;
 	tp->i2c_w_resid = tp->i2c_wlen;

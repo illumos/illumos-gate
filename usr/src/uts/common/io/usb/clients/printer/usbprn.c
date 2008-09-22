@@ -170,7 +170,8 @@ static struct dev_ops usbprn_ops = {
 	nodev,			/* reset */
 	&usbprn_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	usbprn_power		/* power */
+	usbprn_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv usbprnmodldrv =	{

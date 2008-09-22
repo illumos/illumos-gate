@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	The "todds1287" module has implementation for both tod
@@ -148,7 +147,8 @@ static struct dev_ops ds1287_ops = {
 	nodev,				/* reset */
 	&ds1287_cbops,			/* cb_ops */
 	(struct bus_ops *)NULL,		/* bus_ops */
-	NULL				/* power */
+	NULL,				/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The max1617 I2C is a temp acquisition device.  As implemented on some
@@ -96,12 +94,14 @@ static struct dev_ops max1617_ops = {
 	max1617_detach,
 	nodev,
 	&max1617_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv max1617_modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"max1617 device driver v%I%",
+	"max1617 device driver",
 	&max1617_ops,
 };
 
@@ -123,7 +123,7 @@ _init(void)
 	error = mod_install(&max1617_modlinkage);
 	if (error == 0) {
 		(void) ddi_soft_state_init(&max1617_soft_statep,
-			sizeof (struct max1617_unit), 1);
+		    sizeof (struct max1617_unit), 1);
 	}
 
 	return (error);
@@ -194,7 +194,7 @@ max1617_do_attach(dev_info_t *dip)
 	    minor_number, MAX1617_NODE_TYPE, NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for minor "
 		    " name '%s'", unitp->max1617_name, minor_name);
-		    ddi_soft_state_free(max1617_soft_statep, instance);
+			ddi_soft_state_free(max1617_soft_statep, instance);
 
 		return (DDI_FAILURE);
 	}
@@ -460,7 +460,7 @@ max1617_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct max1617_unit *)
-		ddi_get_soft_state(max1617_soft_statep, instance);
+	    ddi_get_soft_state(max1617_soft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -508,7 +508,7 @@ max1617_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct max1617_unit *)
-		ddi_get_soft_state(max1617_soft_statep, instance);
+	    ddi_get_soft_state(max1617_soft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -602,7 +602,7 @@ max1617_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	uchar_t reg;
 
 	unitp = (struct max1617_unit *)
-		ddi_get_soft_state(max1617_soft_statep, instance);
+	    ddi_get_soft_state(max1617_soft_statep, instance);
 
 	if (max1617_debug) {
 		printf("max1617_ioctl: fcn=%d instance=%d\n", fcn, instance);

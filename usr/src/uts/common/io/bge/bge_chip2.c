@@ -2862,6 +2862,42 @@ static bge_regno_t shutdown_engine_regs[] = {
 	BGE_REGNO_NONE		/* terminator		*/
 };
 
+#ifndef __sparc
+static bge_regno_t quiesce_regs[] = {
+	READ_DMA_MODE_REG,
+	DMA_COMPLETION_MODE_REG,
+	WRITE_DMA_MODE_REG,
+	BGE_REGNO_NONE
+};
+
+void bge_chip_stop_nonblocking(bge_t *bgep);
+#pragma no_inline(bge_chip_stop_nonblocking)
+
+/*
+ * This function is called by bge_quiesce(). We
+ * turn off all the DMA engines here.
+ */
+void
+bge_chip_stop_nonblocking(bge_t *bgep)
+{
+	bge_regno_t *rbp;
+
+	/*
+	 * Flag that no more activity may be initiated
+	 */
+	bgep->progress &= ~PROGRESS_READY;
+
+	rbp = quiesce_regs;
+	while (*rbp != BGE_REGNO_NONE) {
+		(void) bge_chip_disable_engine(bgep, *rbp, 0);
+		++rbp;
+	}
+
+	bgep->bge_chip_state = BGE_CHIP_STOPPED;
+}
+
+#endif
+
 /*
  * bge_chip_stop() -- stop all chip processing
  *

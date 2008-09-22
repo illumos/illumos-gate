@@ -199,6 +199,7 @@ static int nxge_hsvc_register(p_nxge_t);
 static int nxge_attach(dev_info_t *, ddi_attach_cmd_t);
 static int nxge_detach(dev_info_t *, ddi_detach_cmd_t);
 static void nxge_unattach(p_nxge_t);
+static int nxge_quiesce(dev_info_t *);
 
 #if NXGE_PROPERTY
 static void nxge_remove_hard_properties(p_nxge_t);
@@ -5581,7 +5582,7 @@ done:
  */
 
 DDI_DEFINE_STREAM_OPS(nxge_dev_ops, nulldev, nulldev, nxge_attach, nxge_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, nxge_quiesce);
 
 #define	NXGE_DESC_VER		"Sun NIU 10Gb Ethernet"
 
@@ -6929,4 +6930,60 @@ nxge_set_pci_replay_timeout(p_nxge_t nxgep)
 	    PCI_REPLAY_TIMEOUT_CFG_OFFSET)));
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_set_pci_replay_timeout"));
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+nxge_quiesce(dev_info_t *dip)
+{
+	int instance = ddi_get_instance(dip);
+	p_nxge_t nxgep = (p_nxge_t)ddi_get_soft_state(nxge_list, instance);
+
+	if (nxgep == NULL)
+		return (DDI_FAILURE);
+
+	/* Turn off debugging */
+	nxge_debug_level = NO_DEBUG;
+	nxgep->nxge_debug_level = NO_DEBUG;
+	npi_debug_level = NO_DEBUG;
+
+	/*
+	 * Stop link monitor only when linkchkmod is interrupt based
+	 */
+	if (nxgep->mac.linkchkmode == LINKCHK_INTR) {
+		(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
+	}
+
+	(void) nxge_intr_hw_disable(nxgep);
+
+	/*
+	 * Reset the receive MAC side.
+	 */
+	(void) nxge_rx_mac_disable(nxgep);
+
+	/* Disable and soft reset the IPP */
+	if (!isLDOMguest(nxgep))
+		(void) nxge_ipp_disable(nxgep);
+
+	/*
+	 * Reset the transmit/receive DMA side.
+	 */
+	(void) nxge_txdma_hw_mode(nxgep, NXGE_DMA_STOP);
+	(void) nxge_rxdma_hw_mode(nxgep, NXGE_DMA_STOP);
+
+	/*
+	 * Reset the transmit MAC side.
+	 */
+	(void) nxge_tx_mac_disable(nxgep);
+
+	return (DDI_SUCCESS);
 }

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Netra ct800 and Netra ct400 (MonteCarlo/Tonga)
@@ -178,8 +177,9 @@ static struct dev_ops scsb_ops = {
 	scsb_detach,		/* detach */
 	nodev,			/* reset */
 	&scsb_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
-
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -191,7 +191,7 @@ static struct modldrv modldrv = {
 #ifdef DEBUG
 	"SCB/SSB driver DBG" SCSB_BUILD_VERSION,
 #else
-	"v%I% Netra ct System Control/Status Board driver",
+	"v1.33 Netra ct System Control/Status Board driver",
 #endif
 	&scsb_ops,	/* driver ops */
 };
@@ -315,7 +315,7 @@ _init(void)
 	if (scsb_debug & 0x0005)
 		cmn_err(CE_NOTE, "scsb: _init()");
 	ddi_soft_state_init(&scsb_state, sizeof (scsb_state_t),
-			SCSB_NO_OF_BOARDS);
+	    SCSB_NO_OF_BOARDS);
 	hsc_init();
 	if ((status = mod_install(&modlinkage)) != 0) {
 		if (scsb_debug & 0x0006)
@@ -384,14 +384,14 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (cmd != DDI_ATTACH) {
 		if (scsb_debug & 0x0006)
 			cmn_err(CE_NOTE,
-				"scsb_attach[%d]: cmd 0x%x != DDI_ATTACH",
-				instance, cmd);
+			    "scsb_attach[%d]: cmd 0x%x != DDI_ATTACH",
+			    instance, cmd);
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_soft_state_zalloc(scsb_state, instance) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "scsb%d: cannot allocate soft state",
-					instance);
+		    instance);
 		return (DDI_FAILURE);
 	}
 
@@ -408,16 +408,16 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * make sure this is the SCB's known address
 	 */
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"reg", &regs, &len) != DDI_PROP_SUCCESS) {
+	    "reg", &regs, &len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
-			"scsb%d: Failed to get \"reg\" property", instance);
+		    "scsb%d: Failed to get \"reg\" property", instance);
 		ddi_soft_state_free(scsb_state, instance);
 		return (DDI_FAILURE);
 	}
 	scsb->scsb_i2c_addr = regs[1] & SCSB_I2C_ADDR_MASK;
 	if (scsb->scsb_i2c_addr != SCSB_I2C_ADDR) {
 		cmn_err(CE_WARN, "scsb%d: I2C Addr reg %x %x must be %x",
-				instance, regs[0], regs[1], SCSB_I2C_ADDR);
+		    instance, regs[0], regs[1], SCSB_I2C_ADDR);
 		ddi_soft_state_free(scsb_state, instance);
 		ddi_prop_free(regs);
 		return (DDI_FAILURE);
@@ -440,17 +440,17 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	/* 1 */
 	if (ddi_prop_exists(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
-		    "interrupt-priorities") != 1) {
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    "interrupt-priorities") != 1) {
 		int tmp[2];
 		tmp[0] = scsb_pil;
 		tmp[1] = hsc_pil;
 		(void) ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-					"interrupt-priorities", tmp, 2);
+		"interrupt-priorities", tmp, 2);
 		scsb->scsb_state |= SCSB_PROP_CREATE;
 	}
 	if ((i = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "interrupts", -1)) >= 0)
+	    DDI_PROP_DONTPASS, "interrupts", -1)) >= 0)
 		scsb->scsb_state |= SCSB_P06_INTR_ON;
 	else
 		scsb->scsb_state |= SCSB_P06_NOINT_KLUGE;
@@ -461,11 +461,11 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * health. The scsb_err_threshold is 10 by default.
 	 */
 	if ((i = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "device-err-threshold", -1)) >= 0) {
+	    DDI_PROP_DONTPASS, "device-err-threshold", -1)) >= 0) {
 		scsb_err_threshold = i;
 #ifdef	DEBUG
 		cmn_err(CE_NOTE, "?scsb_attach: Found device-err-threshold"
-				" property, value %d", scsb_err_threshold);
+		    " property, value %d", scsb_err_threshold);
 #endif
 	}
 	scsb->scsb_i2c_errcnt = 0;
@@ -476,7 +476,7 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * If all went well, create the minor node for user level access.
 	 */
 	if (ddi_create_minor_node(dip, scsb_name, S_IFCHR, instance,
-			"ddi_ctl:pcihpc", NULL) == DDI_FAILURE) {
+	    "ddi_ctl:pcihpc", NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "scsb_attach: Failed to create minor node");
 		free_resources(dip, scsb, instance);
 		return (DDI_FAILURE);
@@ -484,8 +484,8 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	scsb->scsb_state |= SCSB_MINOR_NODE;
 	scsb->scsb_dev = dip;
 	if (ddi_create_minor_node(dip, scsb_clone_name, S_IFCHR,
-			instance|SCSB_CLONE, "ddi_ctl:pcihpc", NULL)
-			== DDI_FAILURE) {
+	    instance|SCSB_CLONE, "ddi_ctl:pcihpc", NULL)
+	    == DDI_FAILURE) {
 		cmn_err(CE_WARN, "scsb_attach: Failed to create clone node");
 		free_resources(dip, scsb, instance);
 		return (DDI_FAILURE);
@@ -495,16 +495,16 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* 2 */
 	if (i2c_client_register(dip, &scsb->scsb_phandle) != I2C_SUCCESS) {
 		cmn_err(CE_WARN,
-			"scsb_attach: Failed I2C Services registration");
+		    "scsb_attach: Failed I2C Services registration");
 		free_resources(dip, scsb, instance);
 		return (DDI_FAILURE);
 	}
 	scsb->scsb_state |= SCSB_I2C_PHANDLE;
 	/* 3 */
 	if ((scsb->scsb_i2ctp = scsb_alloc_i2ctx(scsb->scsb_phandle,
-		I2C_SLEEP)) == NULL) {
+	    I2C_SLEEP)) == NULL) {
 		cmn_err(CE_WARN,
-			"scsb%d: i2c_transfer allocation failed", instance);
+		    "scsb%d: i2c_transfer allocation failed", instance);
 		free_resources(dip, scsb, instance);
 		return (DDI_FAILURE);
 	}
@@ -560,16 +560,16 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (scsb->scsb_state & SCSB_P06_INTR_ON) {
 		if (ddi_get_iblock_cookie(dip, instance,
-				&scsb->scsb_iblock) == DDI_SUCCESS) {
+		    &scsb->scsb_iblock) == DDI_SUCCESS) {
 			mutex_init(&scsb->scsb_imutex, NULL, MUTEX_DRIVER,
-				(void *)scsb->scsb_iblock);
+			    (void *)scsb->scsb_iblock);
 			scsb->scsb_state |= SCSB_IMUTEX;
 			if (ddi_add_intr(dip, instance, &scsb->scsb_iblock,
-				NULL, scsb_intr_preprocess,
-				(caddr_t)scsb) != DDI_SUCCESS) {
+			    NULL, scsb_intr_preprocess,
+			    (caddr_t)scsb) != DDI_SUCCESS) {
 				cmn_err(CE_WARN,
-					"scsb_attach: failed interrupt "
-					"handler registration");
+				    "scsb_attach: failed interrupt "
+				    "handler registration");
 				free_resources(dip, scsb, instance);
 				return (DDI_FAILURE);
 			}
@@ -577,7 +577,7 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			nct_mutex_init |= MUTEX_INIT;
 		} else {
 			cmn_err(CE_WARN, "scsb_attach: failed interrupt "
-					"mutex initialization");
+			    "mutex initialization");
 			if (scsb_debug) {
 				scsb->scsb_state |= SCSB_P06_NOINT_KLUGE;
 				scsb->scsb_state &= ~SCSB_P06_INTR_ON;
@@ -590,7 +590,7 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* 9. */
 	if (i = scsb_clear_intmasks(scsb)) {
 		cmn_err(CE_WARN,
-			"scsb%d: I2C TRANSFER Failed", instance);
+		    "scsb%d: I2C TRANSFER Failed", instance);
 		if (!scsb_debug) {
 			free_resources(dip, scsb, instance);
 			return (DDI_FAILURE);
@@ -605,11 +605,11 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		rmask = 0x00;
 		wdata = 1 << SYS_OFFSET(SCTRL_SYS_PSM_INT_ENABLE);
 		i = SYS_REG_INDEX(SCTRL_SYS_PSM_INT_ENABLE,
-				SCTRL_SYS_CMD_BASE);
+		    SCTRL_SYS_CMD_BASE);
 		reg = SCSB_REG_ADDR(i);
 		if (i = scsb_write_mask(scsb, reg, rmask, wdata, (uchar_t)0)) {
 			cmn_err(CE_WARN,
-				"scsb%d: I2C TRANSFER Failed", instance);
+			    "scsb%d: I2C TRANSFER Failed", instance);
 			if (!scsb_debug) {
 				free_resources(dip, scsb, instance);
 				return (DDI_FAILURE);
@@ -629,24 +629,24 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_enter(&scsb->scsb_mutex);
 		if (scsb_readall_regs(scsb))
 			cmn_err(CE_WARN,
-				"scsb_attach: scsb_readall FAILED");
+			    "scsb_attach: scsb_readall FAILED");
 		mutex_exit(&scsb->scsb_mutex);
 	}
 	/* 11. */
 	/* Check if Alarm Card present at boot and set flags */
 	if (scsb_fru_op(scsb, ALARM, 1, SCTRL_SYSCFG_BASE,
-					SCSB_FRU_OP_GET_BITVAL))
+	    SCSB_FRU_OP_GET_BITVAL))
 		scsb->scsb_hsc_state |= SCSB_ALARM_CARD_PRES;
 
 	/* 12. */
 	if (scsb_debug & 0x0004)
 		cmn_err(CE_NOTE,
-			"scsb_attach: registering cPCI slots");
+		    "scsb_attach: registering cPCI slots");
 	if (scsb_hsc_attach(dip, scsb, instance) != DDI_SUCCESS) {
 		if (scsb_debug & 0x00008000) {
 			cmn_err(CE_WARN,
 			"scsb: Hotswap controller initialisation"
-				" failed\n");
+			    " failed\n");
 		}
 	} else
 		scsb->scsb_hsc_state |= SCSB_HSC_INIT;
@@ -664,13 +664,13 @@ scsb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_report_dev(scsb->scsb_dev);
 	cmn_err(CE_CONT, "?%s%d: "
 	"Prom Version %s, Midplane Id %x\n",
-		ddi_driver_name(scsb->scsb_dev),
-		scsb->scsb_instance,
-		(scsb->scsb_state & SCSB_P06_PROM) ? "0.6" :
-		(scsb->scsb_state & SCSB_P10_PROM) ? "1.0" :
-		(scsb->scsb_state & SCSB_P15_PROM) ? "1.5" :
-		(scsb->scsb_state & SCSB_P20_PROM) ? "2.0" : "Unknown",
-		mct_system_info.mid_plane.fru_id);
+	    ddi_driver_name(scsb->scsb_dev),
+	    scsb->scsb_instance,
+	    (scsb->scsb_state & SCSB_P06_PROM) ? "0.6" :
+	    (scsb->scsb_state & SCSB_P10_PROM) ? "1.0" :
+	    (scsb->scsb_state & SCSB_P15_PROM) ? "1.5" :
+	    (scsb->scsb_state & SCSB_P20_PROM) ? "2.0" : "Unknown",
+	    mct_system_info.mid_plane.fru_id);
 	return (DDI_SUCCESS);
 }
 
@@ -693,14 +693,14 @@ scb_check_version(scsb_state_t *scsb)
 	}
 	/* Read the SCB PROM ID */
 	if (scsb_rdwr_register(scsb, I2C_WR_RD, (uchar_t)SCTRL_PROM_VERSION, 1,
-				&data, 1)) {
+	    &data, 1)) {
 		if (!(hotswap && scsb->scsb_state & SCSB_FROZEN))
 			cmn_err(CE_WARN, "scsb%d: I2C TRANSFER Failed",
-					scsb->scsb_instance);
+			    scsb->scsb_instance);
 		if (scsb_debug & 0x0006) {
 				cmn_err(CE_WARN,
 				    "scsb_attach(%d): failed read of PROM ID",
-					scsb->scsb_instance);
+				    scsb->scsb_instance);
 		}
 		return (DDI_FAILURE);
 	}
@@ -710,15 +710,15 @@ scb_check_version(scsb_state_t *scsb)
 	 */
 	if (hotswap) {
 		if (((mct_system_info.fru_info_list[SCB])[0].fru_version & 0xf)
-				== (data & 0xf)) {
+		    == (data & 0xf)) {
 			return (DDI_SUCCESS);
 		}
 		if (scsb_debug & 0x00020000) {
 			cmn_err(CE_NOTE,
-				"scb_check_version: SCB version %d "
-				"replacing version %d", data,
-				(mct_system_info.fru_info_list[SCB])[0].
-						fru_version & 0xf);
+			    "scb_check_version: SCB version %d "
+			    "replacing version %d", data,
+			    (mct_system_info.fru_info_list[SCB])[0].
+			    fru_version & 0xf);
 		}
 	}
 	if ((data & 0xf) == SCTRL_PROM_P06) {
@@ -745,7 +745,7 @@ scb_check_version(scsb_state_t *scsb)
 	}
 	if (!(IS_SCB_P15) && !(IS_SCB_P10)) {
 		cmn_err(CE_WARN, "scsb%d: SCB Version %d not recognized",
-				scsb->scsb_instance, data);
+		    scsb->scsb_instance, data);
 		if (hotswap)
 			scsb->scsb_state |= SCSB_FROZEN;
 		if (!(scsb_debug)) {
@@ -783,10 +783,10 @@ initialize_scb(scsb_state_t *scsb)
 	reg = SCSB_REG_ADDR(i);
 	if (i = scsb_write_mask(scsb, reg, rmask, wdata, 0)) {
 		cmn_err(CE_WARN,
-			"scsb%d: I2C TRANSFER Failed", scsb->scsb_instance);
+		    "scsb%d: I2C TRANSFER Failed", scsb->scsb_instance);
 		if (scsb_debug & 0x0006) {
 			cmn_err(CE_NOTE,
-				    "scsb_attach: failed to set SCB_INIT");
+			"scsb_attach: failed to set SCB_INIT");
 		}
 		return (DDI_FAILURE);
 	}
@@ -794,25 +794,25 @@ initialize_scb(scsb_state_t *scsb)
 	if (IS_SCB_P10) {
 		if (scsb_debug & 0x0004) {
 			cmn_err(CE_NOTE, "scsb_attach(%d): turning LEDs off",
-					scsb->scsb_instance);
+			    scsb->scsb_instance);
 		}
 		if (i = scsb_leds_switch(scsb, OFF)) {
 			cmn_err(CE_WARN, "scsb%d: I2C TRANSFER Failed",
-					scsb->scsb_instance);
+			    scsb->scsb_instance);
 			return (DDI_FAILURE);
 		}
 	}
 	/* 4. Read the SYSCFG registers, update FRU info and SSB LEDs */
 	if (scsb_debug & 0x0004)
 		cmn_err(CE_NOTE, "scsb_attach(%d): reading config registers",
-				scsb->scsb_instance);
+		    scsb->scsb_instance);
 	if ((i = scsb_check_config_status(scsb)) == 0) {
 		if (!(scsb->scsb_state & SCSB_TOPOLOGY)) {
 			scsb_set_topology(scsb);
 			if (scsb_debug & 0x0004)
 				cmn_err(CE_NOTE, "scsb_attach(%d): mpid = 0x%x",
-					scsb->scsb_instance,
-					mct_system_info.mid_plane.fru_id);
+				    scsb->scsb_instance,
+				    mct_system_info.mid_plane.fru_id);
 		} else {
 			fru_info_t	*fru_ptr;
 			/*
@@ -830,17 +830,17 @@ initialize_scb(scsb_state_t *scsb)
 	}
 	if (i) {
 		cmn_err(CE_WARN, "scsb%d: I2C TRANSFER Failed",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 		return (DDI_FAILURE);
 	}
 	/* 5. read the Board Healthy registers */
 	if (scsb_debug & 0x0004)
 		cmn_err(CE_NOTE, "scsb_attach(%d): reading Brd_Hlthy registers",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 	i = scsb_read_bhealthy(scsb);
 	if (i) {
 		cmn_err(CE_WARN, "scsb%d: I2C TRANSFER Failed",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 		return (DDI_FAILURE);
 	}
 	/* 6. Clear Interrupt Source registers */
@@ -858,19 +858,19 @@ initialize_scb(scsb_state_t *scsb)
 	reg = SCSB_REG_ADDR(i);
 	if (i = scsb_write_mask(scsb, reg, rmask, (uchar_t)0, wdata)) {
 		cmn_err(CE_WARN, "scsb%d: Cannot turn off PSM_INT",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 		return (DDI_FAILURE);
 	}
 	/* Mask all interrupt sources */
 	if (i = scsb_setall_intmasks(scsb)) {
 		cmn_err(CE_WARN, "scsb%d: I2C TRANSFER Failed",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 		return (DDI_FAILURE);
 	}
 	/* Clear any latched interrupts */
 	if (i = scsb_clear_intptrs(scsb)) {
 		cmn_err(CE_WARN, "scsb%d: I2C TRANSFER Failed",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 		return (DDI_FAILURE);
 	}
 	/* 7. set SCB EEPROM address: NOT USED */
@@ -899,8 +899,8 @@ scsb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (cmd != DDI_DETACH) {
 		if (scsb_debug & 0x0006)
 			cmn_err(CE_NOTE,
-			"scsb_detach(%d): command %x is not DDI_DETACH\n",
-			instance, cmd);
+			    "scsb_detach(%d): command %x is not DDI_DETACH\n",
+			    instance, cmd);
 		return (DDI_FAILURE);
 	}
 	scsb = (scsb_state_t *)ddi_get_soft_state(scsb_state, instance);
@@ -916,10 +916,10 @@ scsb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 		wdata = 1 << SYS_OFFSET(SCTRL_SYS_PSM_INT_ENABLE);
 		reg = SYS_REG_INDEX(SCTRL_SYS_PSM_INT_ENABLE,
-				SCTRL_SYS_CMD_BASE);
+		    SCTRL_SYS_CMD_BASE);
 		if (scsb_write_mask(scsb, reg, (uchar_t)0, (uchar_t)0, wdata)) {
 			cmn_err(CE_WARN,
-				"scsb%d: Cannot turn off PSM_INT", instance);
+			    "scsb%d: Cannot turn off PSM_INT", instance);
 			if (!scsb_debug) {
 				(void) free_resources(dip, scsb, instance);
 				return (DDI_FAILURE);
@@ -928,7 +928,7 @@ scsb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* Mask all interrupts */
 		if (scsb_setall_intmasks(scsb)) {
 			cmn_err(CE_WARN,
-				"scsb%d: I2C TRANSFER Failed", instance);
+			    "scsb%d: I2C TRANSFER Failed", instance);
 			if (!scsb_debug) {
 				(void) free_resources(dip, scsb, instance);
 				return (DDI_FAILURE);
@@ -937,7 +937,7 @@ scsb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* Clear all latched interrupts */
 		if (scsb_clear_intptrs(scsb)) {
 			cmn_err(CE_WARN,
-				"scsb%d: I2C TRANSFER Failed", instance);
+			    "scsb%d: I2C TRANSFER Failed", instance);
 			if (!scsb_debug) {
 				(void) free_resources(dip, scsb, instance);
 				return (DDI_FAILURE);
@@ -960,11 +960,11 @@ free_resources(dev_info_t *dip, scsb_state_t *scsb, int instance)
 {
 	if (scsb_debug & 0x0005) {
 		cmn_err(CE_NOTE, "free_resources[%d], scsb_state=0x%x",
-				instance, scsb->scsb_state);
+		    instance, scsb->scsb_state);
 		drv_usecwait(500000);
 	}
 	if (scsb->scsb_state & SCSB_P06_INTR_ON &&
-			scsb->scsb_state & SCSB_IMUTEX) {
+	    scsb->scsb_state & SCSB_IMUTEX) {
 		scsb->scsb_state &= ~SCSB_P06_INTR_ON;
 		ddi_remove_intr(dip, 0, scsb->scsb_iblock);
 	}
@@ -997,7 +997,7 @@ free_resources(dev_info_t *dip, scsb_state_t *scsb, int instance)
 	if (scsb->scsb_state & SCSB_PROP_CREATE) {
 		scsb->scsb_state &= ~SCSB_PROP_CREATE;
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
-						"interrupt-priorities");
+		    "interrupt-priorities");
 	}
 	/* ddi_prop_remove_all(dip); */
 	if (scsb->scsb_state & SCSB_CONDVAR) {
@@ -1023,7 +1023,7 @@ scsb_fake_intr(scsb_state_t *scsb, uint32_t evcode)
 		scsb_event_code = evcode;
 	if (scsb_debug & 0x4001) {
 		cmn_err(CE_NOTE, "scsb_fake_intr: event = 0x%x, scsb_rq=0x%p",
-				scsb_event_code, scsb->scsb_rq);
+		    scsb_event_code, scsb->scsb_rq);
 	}
 	/*
 	 * Allow access to shadow registers even though SCB is removed
@@ -1038,7 +1038,7 @@ scsb_fake_intr(scsb_state_t *scsb, uint32_t evcode)
 	}
 	/* just inform user-level via poll about this event */
 	if (scsb_queue_ops(scsb, QPUT_INT32, 1, &evcode, "scsb_fake_intr")
-			== QOP_FAILED)
+	    == QOP_FAILED)
 		return (ENOMEM);
 	return (0);
 }
@@ -1138,10 +1138,10 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 */
 		if (scsb_debug & 0x0008)
 			cmn_err(CE_NOTE,
-				"sm_open(%d): SCSB_CLONE OPEN", instance);
+			    "sm_open(%d): SCSB_CLONE OPEN", instance);
 		mutex_enter(&scsb->scsb_mutex);
 		if ((clone = scsb_queue_ops(scsb, QFIRST_AVAILABLE, 0, NULL,
-					"scsb_open")) == QOP_FAILED) {
+		"scsb_open")) == QOP_FAILED) {
 			mutex_exit(&scsb->scsb_mutex);
 			return (ENXIO);
 		}
@@ -1153,9 +1153,9 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		scsb->scsb_clopens++;
 		if (scsb_debug & 0x0008)
 			cmn_err(CE_NOTE,
-				"sm_open(%d): new clone device minor: 0x%x"
-				" stream queue is 0x%p",
-				instance, clptr->cl_minor, q);
+			    "sm_open(%d): new clone device minor: 0x%x"
+			    " stream queue is 0x%p",
+			    instance, clptr->cl_minor, q);
 	} else {
 		/* scsb is being opened as a regular driver */
 		if (scsb_debug & 0x0008)
@@ -1172,23 +1172,23 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		if (flag & FEXCL) {
 			if (scsb_debug & 0x0008)
 				cmn_err(CE_NOTE, "sm_open(%d): is EXCL",
-					instance);
+				    instance);
 			if (scsb->scsb_state & SCSB_OPEN) {
 				if (scsb_debug & 0x0008)
 					cmn_err(CE_NOTE,
-						"sm_open(%d): cannot open EXCL",
-						instance);
+					    "sm_open(%d): cannot open EXCL",
+					    instance);
 				mutex_exit(&scsb->scsb_mutex);
 				return (EBUSY);
 			}
 			scsb->scsb_state |= SCSB_EXCL;
 		}
 		if (scsb->scsb_opens && scsb->scsb_rq != NULL &&
-				scsb->scsb_rq != RD(q)) {
+		    scsb->scsb_rq != RD(q)) {
 			if (scsb_debug & 0x000a)
 				cmn_err(CE_WARN, "sm_open[%d]: q (0x%p) != "
-					"scsb_rq (0x%p)",
-					instance, RD(q), scsb->scsb_rq);
+				    "scsb_rq (0x%p)",
+				    instance, RD(q), scsb->scsb_rq);
 		}
 		scsb->scsb_rq = RD(q);
 		scsb->scsb_opens++;
@@ -1214,7 +1214,7 @@ sm_close(queue_t *q, int flag, int otyp, cred_t *credp)
 	if (scsb->scsb_clopens) {
 		mutex_enter(&scsb->scsb_mutex);
 		if ((clone = scsb_queue_ops(scsb, QFIND_QUEUE, 0,
-				(void *) RD(q), "scsb_close")) != QOP_FAILED) {
+		    (void *) RD(q), "scsb_close")) != QOP_FAILED) {
 			clptr = &scsb->clone_devs[clone];
 			clptr->cl_flags = 0;
 			clptr->cl_rq = NULL;
@@ -1222,19 +1222,19 @@ sm_close(queue_t *q, int flag, int otyp, cred_t *credp)
 		}
 		mutex_exit(&scsb->scsb_mutex);
 		if (scsb_debug & 0x0008 && clone < SCSB_CLONES_MAX &&
-				clone >= SCSB_CLONES_FIRST)
+		    clone >= SCSB_CLONES_FIRST)
 			cmn_err(CE_NOTE, "sm_close(%d): SCSB_CLONE 0x%x",
-				scsb->scsb_instance, clptr->cl_minor);
+			    scsb->scsb_instance, clptr->cl_minor);
 	}
 	if (clptr == NULL && scsb->scsb_opens) {
 		if (scsb_debug & 0x0008)
 			cmn_err(CE_NOTE, "sm_close(%d): DEVOPEN, opens=%d",
-				scsb->scsb_instance, scsb->scsb_opens);
+			    scsb->scsb_instance, scsb->scsb_opens);
 		if (RD(q) != scsb->scsb_rq) {
 			if (scsb_debug & 0x0008)
 				cmn_err(CE_WARN,
-					"sm_close(%d): DEVOPEN, q != scsb_rq",
-					scsb->scsb_instance);
+				    "sm_close(%d): DEVOPEN, q != scsb_rq",
+				    scsb->scsb_instance);
 		}
 		mutex_enter(&scsb->scsb_mutex);
 		scsb->scsb_opens = 0;
@@ -1291,7 +1291,7 @@ sm_wput(queue_t *q, mblk_t *mp)
 	case M_IOCTL:
 		if (scsb_debug & 0x0010)
 			cmn_err(CE_NOTE, "sm_wput(%d): M_IOCTL",
-				scsb->scsb_instance);
+			    scsb->scsb_instance);
 		/* do ioctl */
 		smf_ioctl(q, mp);
 		break;
@@ -1299,7 +1299,7 @@ sm_wput(queue_t *q, mblk_t *mp)
 	case M_DATA:
 		if (scsb_debug & 0x0010)
 			cmn_err(CE_NOTE, "sm_wput(%d): M_DATA",
-				scsb->scsb_instance);
+			    scsb->scsb_instance);
 		if (!(scsb->scsb_state & SCSB_UP)) {
 			freemsg(mp);
 			return (0);
@@ -1310,7 +1310,7 @@ sm_wput(queue_t *q, mblk_t *mp)
 	case M_CTL:
 		if (scsb_debug & 0x0010)
 			cmn_err(CE_NOTE, "sm_wput(%d): M_CTL",
-				scsb->scsb_instance);
+			    scsb->scsb_instance);
 		freemsg(mp);
 		break;
 	}
@@ -1355,7 +1355,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 		/* if we don't understand the ioctl */
 		if (scsb_debug & 0x0022)
 			cmn_err(CE_NOTE, "smf_ioctl(%d):unkown ioctl %x",
-				scsb->scsb_instance, iocp->ioc_cmd);
+			    scsb->scsb_instance, iocp->ioc_cmd);
 		iocp->ioc_error = EINVAL;
 		break;
 
@@ -1377,7 +1377,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 
 		if (scsb_debug & 0x20) {
 			cmn_err(CE_NOTE, "IOC_GETMODE: returning mode 0x%x",
-				*curr_mode);
+			    *curr_mode);
 		}
 		break;
 	}
@@ -1394,7 +1394,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 		switch (*curr_mode) {
 		case ENVCTRL_NORMAL_MODE:
 			scsb->scsb_state &=
-				~(SCSB_DEBUG_MODE | SCSB_DIAGS_MODE);
+			    ~(SCSB_DEBUG_MODE | SCSB_DIAGS_MODE);
 			break;
 		case ENVCTRL_DIAG_MODE:
 			scsb->scsb_state |=  SCSB_DIAGS_MODE;
@@ -1402,7 +1402,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 			break;
 		case ENVC_DEBUG_MODE:
 			if (scsb->scsb_state &
-					(SCSB_DIAGS_MODE | SCSB_DEBUG_MODE)) {
+			    (SCSB_DIAGS_MODE | SCSB_DEBUG_MODE)) {
 				scsb->scsb_state &= ~SCSB_DIAGS_MODE;
 				scsb->scsb_state |=  SCSB_DEBUG_MODE;
 			} else {
@@ -1450,7 +1450,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 
 			ppromid = (uint8_t *)mp->b_cont->b_rptr;
 			*ppromid = (uint8_t)(mct_system_info.
-					fru_info_list[SCB])->fru_version;
+			    fru_info_list[SCB])->fru_version;
 			promid = *ppromid;
 		} else {
 			iocp->ioc_error = miocpullup(mp, sizeof (scsb_ids_t));
@@ -1581,7 +1581,7 @@ smf_ioctl(queue_t *q, mblk_t *mp)
 		/* for now we don't understand these ioctls */
 		if (scsb_debug & 0x0022)
 			cmn_err(CE_NOTE, "smf_ioctl(%d):unknown ioctl %x",
-				scsb->scsb_instance, iocp->ioc_cmd);
+			    scsb->scsb_instance, iocp->ioc_cmd);
 		iocp->ioc_error = EINVAL;
 		break;
 #endif	/* DEBUG */
@@ -1857,7 +1857,7 @@ scsb_fru_register(void (*cb_func)(void *, scsb_fru_event_t, scsb_fru_status_t),
 
 	if (scsb_debug & 0x00800001) {
 		cmn_err(CE_NOTE,
-			"scsb_fru_register: FRU_ID 0x%x", (int)fru_id);
+		    "scsb_fru_register: FRU_ID 0x%x", (int)fru_id);
 	}
 	if (!(scsb_global_state & SCSB_UP)) {
 		return (FRU_NOT_AVAILABLE);
@@ -1866,13 +1866,13 @@ scsb_fru_register(void (*cb_func)(void *, scsb_fru_event_t, scsb_fru_status_t),
 		return (FRU_NOT_AVAILABLE);
 	if (scsb_cb_table == NULL)
 		scsb_cb_table = (struct scsb_cb_entry *)
-			kmem_zalloc(sizeof (struct scsb_cb_entry), KM_SLEEP);
+		    kmem_zalloc(sizeof (struct scsb_cb_entry), KM_SLEEP);
 	cbe_ptr = scsb_cb_table;
 	while (cbe_ptr->cb_softstate_ptr != NULL) {
 		if (cbe_ptr->cb_next == (struct scsb_cb_entry *)NULL) {
 			cbe_ptr->cb_next = (struct scsb_cb_entry *)
-				kmem_zalloc(sizeof (struct scsb_cb_entry),
-						KM_SLEEP);
+			    kmem_zalloc(sizeof (struct scsb_cb_entry),
+			    KM_SLEEP);
 			cbe_ptr = cbe_ptr->cb_next;
 			break;
 		}
@@ -1888,10 +1888,10 @@ scsb_fru_register(void (*cb_func)(void *, scsb_fru_event_t, scsb_fru_status_t),
 #endif
 	if (scsb_debug & 0x00800000) {
 		cmn_err(CE_NOTE,
-			"scsb_fru_register: FRU_ID 0x%x, status=%d",
-				(int)fru_id,
-				(cbe_ptr->cb_fru_ptr == (fru_info_t *)NULL) ?
-					0xff : cbe_ptr->cb_fru_ptr->fru_status);
+		    "scsb_fru_register: FRU_ID 0x%x, status=%d",
+		    (int)fru_id,
+		    (cbe_ptr->cb_fru_ptr == (fru_info_t *)NULL) ?
+		    0xff : cbe_ptr->cb_fru_ptr->fru_status);
 	}
 	if (cbe_ptr->cb_fru_ptr == (fru_info_t *)NULL)
 		return (FRU_NOT_AVAILABLE);
@@ -1907,14 +1907,14 @@ scsb_fru_unregister(void *soft_ptr, fru_id_t fru_id)
 
 	if (scsb_debug & 0x00800001) {
 		cmn_err(CE_NOTE, "scsb_fru_unregister(0x%p, 0x%x)",
-				soft_ptr, (int)fru_id);
+		    soft_ptr, (int)fru_id);
 	}
 	if ((cbe_ptr = scsb_cb_table) == NULL || fru_id == (fru_id_t)0)
 		return;
 	prev_ptr = cbe_ptr;
 	do {
 		if (cbe_ptr->cb_softstate_ptr == soft_ptr &&
-				cbe_ptr->cb_fru_id == fru_id) {
+		    cbe_ptr->cb_fru_id == fru_id) {
 			if (cbe_ptr == scsb_cb_table)
 				scsb_cb_table = cbe_ptr->cb_next;
 			else
@@ -1941,8 +1941,8 @@ scsb_fru_status(uchar_t fru_id)
 	fru_ptr = find_fru_info(fru_id);
 	if (scsb_debug & 0x00800001) {
 		cmn_err(CE_NOTE, "scsb_fru_status(0x%x): status=0x%x",
-			fru_id, (fru_ptr == (fru_info_t *)NULL) ? 0xff :
-				(int)fru_ptr->fru_status);
+		    fru_id, (fru_ptr == (fru_info_t *)NULL) ? 0xff :
+		    (int)fru_ptr->fru_status);
 	}
 	if (fru_ptr == (fru_info_t *)NULL)
 		return (FRU_NOT_AVAILABLE);
@@ -1975,7 +1975,7 @@ scsb_intr_register(int (*intr_handler)(void *), void * soft_ptr,
 {
 	struct fru_intr_entry *intr_table_entry;
 	intr_table_entry = (struct fru_intr_entry *)
-		kmem_zalloc(sizeof (struct fru_intr_entry), KM_SLEEP);
+	    kmem_zalloc(sizeof (struct fru_intr_entry), KM_SLEEP);
 
 	if (intr_table_entry == NULL) {
 		return (DDI_FAILURE);
@@ -2002,7 +2002,7 @@ void
 scsb_intr_unregister(fru_id_t fru_id)
 {
 	struct fru_intr_entry *intr_entry = fru_intr_table,
-			*prev_entry = intr_entry;
+	    *prev_entry = intr_entry;
 
 	if (fru_id == 0) {
 		return;
@@ -2015,10 +2015,10 @@ scsb_intr_unregister(fru_id_t fru_id)
 				fru_intr_table = intr_entry->fru_intr_next;
 			else
 				prev_entry->fru_intr_next =
-					intr_entry->fru_intr_next;
+				    intr_entry->fru_intr_next;
 
 			kmem_free(intr_entry,
-				sizeof (struct fru_intr_entry));
+			    sizeof (struct fru_intr_entry));
 			return;
 		}
 		prev_entry = intr_entry;
@@ -2040,7 +2040,7 @@ scsb_invoke_intr_chain()
 
 	while (intr_entry != NULL) {
 		retval = (*intr_entry->
-			fru_intr_handler)(intr_entry->softstate_ptr);
+		    fru_intr_handler)(intr_entry->softstate_ptr);
 		if (retval == DDI_INTR_CLAIMED) {
 			return (retval);
 		}
@@ -2080,7 +2080,7 @@ sm_ioc_rdwr(queue_t *q, mblk_t *mp, int op)
 	 */
 	reg = iocrdwrp->ioc_regindex;
 	if (reg < SCSB_REG_ADDR_START || (reg + len) >
-			(SCSB_REG_ADDR_START + SCTRL_TOTAL_NUMREGS))
+	    (SCSB_REG_ADDR_START + SCTRL_TOTAL_NUMREGS))
 		error = EINVAL;
 	else
 		error = scsb_rdwr_register(scsb, op, reg, len, uc, 1);
@@ -2125,8 +2125,8 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 	error = 0;
 	if (scsb_debug & 0x0100) {
 		cmn_err(CE_NOTE, "get_led_regnum: suip <%x, %x, %x, %x>\n",
-			suip->unit_type, suip->unit_number,
-			led_type, suip->unit_state);
+		    suip->unit_type, suip->unit_number,
+		    led_type, suip->unit_state);
 	}
 	/*
 	 * It was requested that the scsb driver allow accesses to SCB device
@@ -2138,8 +2138,8 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 	switch (suip->unit_type) {
 	case SLOT:
 		if (suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_SLOTS : MC_MAX_SLOTS)) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_SLOTS : MC_MAX_SLOTS)) {
 			error = EINVAL;
 			break;
 		}
@@ -2148,12 +2148,12 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 
 	case PDU:
 		if (suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_PDU : MC_MAX_PDU)) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_PDU : MC_MAX_PDU)) {
 			if (scsb_debug & 0x0002) {
 				cmn_err(CE_WARN,
-					"get_led_regnum: unit number %d "
-					"is out of range", suip->unit_number);
+				    "get_led_regnum: unit number %d "
+				    "is out of range", suip->unit_number);
 			}
 			error = EINVAL;
 			break;
@@ -2163,12 +2163,12 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 
 	case PS:
 		if ((suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_PS : MC_MAX_PS))) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_PS : MC_MAX_PS))) {
 			if (scsb_debug & 0x0002) {
 				cmn_err(CE_WARN,
-					"get_led_regnum: unit number %d "
-					"is out of range", suip->unit_number);
+				    "get_led_regnum: unit number %d "
+				    "is out of range", suip->unit_number);
 			}
 			error = EINVAL;
 			break;
@@ -2178,12 +2178,12 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 
 	case DISK:
 		if ((suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_DISK : MC_MAX_DISK))) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_DISK : MC_MAX_DISK))) {
 			if (scsb_debug & 0x0002) {
 				cmn_err(CE_WARN,
-					"get_led_regnum: unit number %d "
-					"is out of range", suip->unit_number);
+				    "get_led_regnum: unit number %d "
+				    "is out of range", suip->unit_number);
 			}
 			if (!(scsb_debug & 0x20000000)) {
 				error = EINVAL;
@@ -2195,12 +2195,12 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 
 	case FAN:
 		if (suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_FAN : MC_MAX_FAN)) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_FAN : MC_MAX_FAN)) {
 			if (scsb_debug & 0x0002) {
 				cmn_err(CE_WARN,
-					"get_led_regnum: unit number %d "
-					"is out of range", suip->unit_number);
+				    "get_led_regnum: unit number %d "
+				    "is out of range", suip->unit_number);
 			}
 			error = EINVAL;
 			break;
@@ -2210,12 +2210,12 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 
 	case CFTM:
 		if (suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_CFTM : MC_MAX_CFTM)) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_CFTM : MC_MAX_CFTM)) {
 			if (scsb_debug & 0x0002) {
 				cmn_err(CE_WARN,
-					"get_led_regnum: unit number %d "
-					"is out of range", suip->unit_number);
+				    "get_led_regnum: unit number %d "
+				    "is out of range", suip->unit_number);
 			}
 			error = EINVAL;
 			break;
@@ -2225,12 +2225,12 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 
 	case SCB:
 		if (suip->unit_number < 1 || suip->unit_number >
-					((scsb->scsb_state & SCSB_IS_TONGA) ?
-					TG_MAX_SCB : MC_MAX_SCB)) {
+		    ((scsb->scsb_state & SCSB_IS_TONGA) ?
+		    TG_MAX_SCB : MC_MAX_SCB)) {
 			if (scsb_debug & 0x0002) {
 				cmn_err(CE_WARN,
-					"get_led_regnum: unit number %d "
-					"is out of range", suip->unit_number);
+				    "get_led_regnum: unit number %d "
+				    "is out of range", suip->unit_number);
 			}
 			error = EINVAL;
 			break;
@@ -2245,8 +2245,8 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 	default:
 		if (scsb_debug & 0x0102) {
 			cmn_err(CE_WARN,
-				"scsb_get_led_regnum(): unknown unit type %d",
-					suip->unit_type);
+			    "scsb_get_led_regnum(): unknown unit type %d",
+			    suip->unit_type);
 		}
 		error = EINVAL;
 		break;
@@ -2256,8 +2256,8 @@ scsb_get_led_regnum(scsb_state_t	*scsb,
 		*regptr = FRU_REG_ADDR(code, base);
 		if (scsb_debug & 0x0100) {
 			cmn_err(CE_NOTE, "get_led_regnum: unitptr=%x, "
-					"regptr=%x, code = %x\n",
-					*unitptr, *regptr, code);
+			    "regptr=%x, code = %x\n",
+			    *unitptr, *regptr, code);
 		}
 	}
 	return (error);
@@ -2301,7 +2301,7 @@ tonga_pslotnum_to_cfgbit(scsb_state_t *scsb, int sln)
 #ifdef DEBUG
 	if (scsb_debug & 0x10000000) {
 		cmn_err(CE_NOTE, "tonga_pslotnum_to_cfgbit: old/new: %d/%d",
-			sln, psl2sco[sln]);
+		    sln, psl2sco[sln]);
 	}
 #endif
 	return (psl2sco[sln]);
@@ -2330,7 +2330,7 @@ static void
 tonga_slotnum_check(scsb_state_t *scsb, scsb_uinfo_t *suip)
 {
 	if (!(scsb->scsb_state & SCSB_IS_TONGA && scsb->scsb_state &
-			(SCSB_P10_PROM | SCSB_P15_PROM | SCSB_P20_PROM))) {
+	    (SCSB_P10_PROM | SCSB_P15_PROM | SCSB_P20_PROM))) {
 		return;
 	}
 	if (suip->unit_number < 1 || suip->unit_number > TG_MAX_SLOTS) {
@@ -2339,7 +2339,7 @@ tonga_slotnum_check(scsb_state_t *scsb, scsb_uinfo_t *suip)
 #ifdef DEBUG
 	if (scsb_debug & 0x10000000) {
 		cmn_err(CE_NOTE, "tonga_slotnum_check: old/new: %d/%d",
-			suip->unit_number, psl2ssl[suip->unit_number]);
+		    suip->unit_number, psl2ssl[suip->unit_number]);
 	}
 #endif
 	suip->unit_number = psl2ssl[suip->unit_number];
@@ -2352,7 +2352,7 @@ static int
 tonga_psl_to_ssl(scsb_state_t *scsb, int slotnum)
 {
 	if (!(scsb->scsb_state & SCSB_IS_TONGA && scsb->scsb_state &
-			(SCSB_P10_PROM | SCSB_P15_PROM | SCSB_P20_PROM))) {
+	    (SCSB_P10_PROM | SCSB_P15_PROM | SCSB_P20_PROM))) {
 		return (slotnum);
 	}
 	if (slotnum < 1 || slotnum > TG_MAX_SLOTS) {
@@ -2361,7 +2361,7 @@ tonga_psl_to_ssl(scsb_state_t *scsb, int slotnum)
 #ifdef DEBUG
 	if (scsb_debug & 0x10000000) {
 		cmn_err(CE_NOTE, "tonga_psl_to_ssl: old/new: %d/%d",
-			slotnum, psl2ssl[slotnum]);
+		    slotnum, psl2ssl[slotnum]);
 	}
 #endif
 	return (psl2ssl[slotnum]);
@@ -2374,7 +2374,7 @@ static int
 tonga_ssl_to_psl(scsb_state_t *scsb, int slotnum)
 {
 	if (!(scsb->scsb_state & SCSB_IS_TONGA && scsb->scsb_state &
-			(SCSB_P10_PROM | SCSB_P15_PROM | SCSB_P20_PROM))) {
+	    (SCSB_P10_PROM | SCSB_P15_PROM | SCSB_P20_PROM))) {
 		return (slotnum);
 	}
 	if (slotnum < 1 || slotnum > TG_MAX_SLOTS) {
@@ -2383,7 +2383,7 @@ tonga_ssl_to_psl(scsb_state_t *scsb, int slotnum)
 #ifdef DEBUG
 	if (scsb_debug & 0x10000000) {
 		cmn_err(CE_NOTE, "tonga_ssl_to_psl: old/new: %d/%d",
-			slotnum, ssl2psl[slotnum]);
+		    slotnum, ssl2psl[slotnum]);
 	}
 #endif
 	return (ssl2psl[slotnum]);
@@ -2437,7 +2437,7 @@ tonga_slotnum_led_shift(scsb_state_t *scsb, uchar_t data)
 #ifdef DEBUG
 	if (scsb_debug & 0x10000000) {
 		cmn_err(CE_NOTE, "tonga_slotnum_led_shift: old/new: 0x%x/0x%x",
-				old_data, new_data);
+		    old_data, new_data);
 	}
 #endif
 	return (new_data);
@@ -2469,14 +2469,14 @@ scsb_led_get(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 	}
 	if (led_type != OK && led_type != NOK) {
 		cmn_err(CE_NOTE, "scsb_led_get(%d): unknown led type %x",
-			scsb->scsb_instance, led_type);
+		    scsb->scsb_instance, led_type);
 		return (EINVAL);
 	}
 	error = 0;
 	if (scsb_debug & 0x0100) {
 		cmn_err(CE_NOTE, "scsb_led_get: %s %s %d",
-			led_name[led_type], unit_type_name[suip->unit_type],
-			suip->unit_number);
+		    led_name[led_type], unit_type_name[suip->unit_type],
+		    suip->unit_number);
 	}
 	/*
 	 * Map to Tonga Slot Number, if NOT P1.0 SCB
@@ -2487,18 +2487,18 @@ scsb_led_get(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 	}
 	/* discover the register and index we need to operate on */
 	if ((error = scsb_get_led_regnum(scsb, suip, &reg, &unit_number,
-					led_type)) == 0) {
+	    led_type)) == 0) {
 		index = SCSB_REG_INDEX(reg);
 		mutex_enter(&scsb->scsb_mutex);
 		if (scsb->scsb_data_reg[index] & (1 << unit_number)) {
 			suip->unit_state = ON;
 			if (led_type == OK) {
 				int code = FRU_UNIT_TO_EVCODE(suip->unit_type,
-						suip->unit_number);
+				    suip->unit_number);
 				reg = FRU_REG_ADDR(code, SCTRL_BLINK_OK_BASE);
 				index = SCSB_REG_INDEX(reg);
 				if (scsb->scsb_data_reg[index] &
-						(1 << unit_number))
+				    (1 << unit_number))
 					suip->unit_state = BLINK;
 			}
 		} else {
@@ -2533,9 +2533,9 @@ scsb_led_set(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 	if (led_type == NOUSE) {
 		led_type = suip->led_type;
 	} else if (suip->unit_type == SLOT &&
-			scsb->scsb_state & SCSB_APP_SLOTLED_CTRL &&
-			!(scsb->scsb_state &
-				(SCSB_DIAGS_MODE | SCSB_DEBUG_MODE))) {
+	    scsb->scsb_state & SCSB_APP_SLOTLED_CTRL &&
+	    !(scsb->scsb_state &
+	    (SCSB_DIAGS_MODE | SCSB_DEBUG_MODE))) {
 		/*
 		 * kernel modules using this interface need to think they are
 		 * succeeding, so we won't return an error for this
@@ -2547,23 +2547,23 @@ scsb_led_set(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 		return (EINVAL);
 	}
 	if (suip->unit_state != OFF && suip->unit_state != ON &&
-					suip->unit_state != BLINK) {
+	    suip->unit_state != BLINK) {
 		return (EINVAL);
 	}
 	if (suip->unit_state == BLINK) {
 		if (led_type != OK)
 			return (EINVAL);
 		if (suip->unit_type != SLOT && scsb->scsb_state &
-				(SCSB_P06_PROM | SCSB_P10_PROM))
+		    (SCSB_P06_PROM | SCSB_P10_PROM))
 			return (EINVAL);
 	}
 	if (scsb_debug & 0x0100) {
 		cmn_err(CE_NOTE,
-			"scsb_led_set: led %s, type %s, unit %d, state %s",
-			led_name[led_type],
-			unit_type_name[suip->unit_type], suip->unit_number,
-			suip->unit_state == ON ? "ON":
-			suip->unit_state == OFF ? "OFF": "BLINK");
+		    "scsb_led_set: led %s, type %s, unit %d, state %s",
+		    led_name[led_type],
+		    unit_type_name[suip->unit_type], suip->unit_number,
+		    suip->unit_state == ON ? "ON":
+		    suip->unit_state == OFF ? "OFF": "BLINK");
 	}
 	/*
 	 * Map to Tonga Slot Number, if NOT P1.0 SCB
@@ -2576,7 +2576,7 @@ scsb_led_set(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 	 * discover the register and index we need to access
 	 */
 	if ((error = scsb_get_led_regnum(scsb, suip, &reg, &unit_number,
-					led_type)) == 0) {
+	    led_type)) == 0) {
 		index = SCSB_REG_INDEX(reg);
 		mutex_enter(&scsb->scsb_mutex);
 		if (suip->unit_state == ON || suip->unit_state == BLINK)
@@ -2586,23 +2586,23 @@ scsb_led_set(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 
 		if (scsb_debug & 0x0100) {
 			cmn_err(CE_NOTE, "Writing %x to Reg %x",
-				scsb->scsb_data_reg[index], reg);
+			    scsb->scsb_data_reg[index], reg);
 		}
 		error = scsb_rdwr_register(scsb, I2C_WR, reg, 1,
-					&scsb->scsb_data_reg[index], 1);
+		    &scsb->scsb_data_reg[index], 1);
 		if (error) {
 			cmn_err(CE_WARN, "%s#%d: Could not Update %s LEDs.",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev),
-				led_name[led_type]);
+			    ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev),
+			    led_name[led_type]);
 			goto ledset_done;
 		}
 		if (led_type != OK ||
-				(IS_SCB_P10 && suip->unit_type != SLOT) ||
-				suip->unit_type == ALARM ||
-				suip->unit_type == SSB ||
-				suip->unit_type == CRTM ||
-				suip->unit_type == PRTM) {
+		    (IS_SCB_P10 && suip->unit_type != SLOT) ||
+		    suip->unit_type == ALARM ||
+		    suip->unit_type == SSB ||
+		    suip->unit_type == CRTM ||
+		    suip->unit_type == PRTM) {
 			goto ledset_done;
 		}
 		code = FRU_UNIT_TO_EVCODE(suip->unit_type, suip->unit_number);
@@ -2614,15 +2614,15 @@ scsb_led_set(scsb_state_t *scsb, scsb_uinfo_t *suip, scsb_led_t led_type)
 			scsb->scsb_data_reg[index] &= ~(1 << unit_number);
 		if (scsb_debug & 0x0100) {
 			cmn_err(CE_NOTE, "Writing %x to Reg %x",
-				scsb->scsb_data_reg[index], reg);
+			    scsb->scsb_data_reg[index], reg);
 		}
 		error = scsb_rdwr_register(scsb, I2C_WR, reg, 1,
-					&scsb->scsb_data_reg[index], 1);
+		    &scsb->scsb_data_reg[index], 1);
 		if (error) {
 			cmn_err(CE_WARN, "%s#%d: Could not Blink %s LEDs.",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev),
-				led_name[led_type]);
+			    ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev),
+			    led_name[led_type]);
 		}
 ledset_done:
 		mutex_exit(&scsb->scsb_mutex);
@@ -2655,7 +2655,7 @@ scsb_ps_auto_on(void *arg)
 	sysreg = SCSB_REG_ADDR(tmp);
 	if (scsb_write_mask(ppao->scsb, sysreg, rmask, ondata, (uchar_t)0)) {
 		cmn_err(CE_WARN, "scsb%d: " "I2C TRANSFER Failed",
-				ppao->scsb->scsb_instance);
+		    ppao->scsb->scsb_instance);
 	}
 	ppao->scsb->scsb_btid = 0;
 }
@@ -2678,7 +2678,7 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 	fru_info_t	*fru_ptr;
 
 	if (scsb->scsb_state & SCSB_FROZEN &&
-			!(scsb->scsb_state & SCSB_IN_INTR)) {
+	    !(scsb->scsb_state & SCSB_IN_INTR)) {
 		return (EAGAIN);
 	}
 	for (i = 0; i < SCTRL_LED_OK_NUMREGS; ++i) {
@@ -2699,7 +2699,7 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 		for (; fru_ptr != NULL; fru_ptr = fru_ptr->next) {
 			is_present = 0;
 			if (fru_type == SLOT && (scsb->scsb_state &
-						SCSB_APP_SLOTLED_CTRL))
+			    SCSB_APP_SLOTLED_CTRL))
 				break;
 			if (fru_ptr->i2c_info == NULL)
 				continue;
@@ -2731,7 +2731,7 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 				cfg_idx = SCSB_REG_INDEX(reg);
 				cfg_bit = fru_ptr->i2c_info->syscfg_bit;
 				if (scsb->scsb_data_reg[cfg_idx] &
-							(1 << cfg_bit)) {
+				    (1 << cfg_bit)) {
 					is_present = 1;
 				}
 			}
@@ -2743,7 +2743,7 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 				 * turn it on.
 				 */
 				if (fru_type == PS && (int_fru_ptr == NULL ||
-						(int_fru_ptr == fru_ptr))) {
+				    (int_fru_ptr == fru_ptr))) {
 					pao.scsb = scsb;
 					pao.utype = fru_type;
 					pao.unit = fru_ptr->fru_unit;
@@ -2764,9 +2764,11 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 						 */
 						if (!scsb->scsb_btid)
 							scsb->scsb_btid =
-							timeout(scsb_ps_auto_on,
-							&pao, (4 *
-							drv_usectohz(1000000)));
+							    timeout(
+							    scsb_ps_auto_on,
+							    &pao, (4 *
+							    drv_usectohz(
+							    1000000)));
 					} else
 #endif	/* PS_ON_DELAY */
 						scsb_ps_auto_on((void *)&pao);
@@ -2778,10 +2780,10 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 				 * Both will report as FRU_PRESENT.
 				 */
 				if (fru_type != SLOT || (fru_type == SLOT &&
-						(fru_ptr->fru_type ==
-						(scsb_utype_t)OC_CPU ||
-						fru_ptr->fru_type ==
-						(scsb_utype_t)OC_CTC))) {
+				    (fru_ptr->fru_type ==
+				    (scsb_utype_t)OC_CPU ||
+				    fru_ptr->fru_type ==
+				    (scsb_utype_t)OC_CTC))) {
 					/*
 					 * Set OK (green) LED register bit
 					 */
@@ -2817,12 +2819,12 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 	}
 	if (scsb_debug & 0x0100) {
 		cmn_err(CE_NOTE, "scsb_set_scfg_pres(): writing %d bytes "
-				"to 0x%x", i, reg);
+		    "to 0x%x", i, reg);
 	}
 	if ((error = scsb_rdwr_register(scsb, I2C_WR, reg, i, puc, 1)) != 0) {
 		if (scsb_debug & 0x0102)
 			cmn_err(CE_NOTE, "scsb_set_scfg_pres(): "
-					"I2C write to 0x%x failed", reg);
+			    "I2C write to 0x%x failed", reg);
 		error = EIO;
 	} else {
 		/*
@@ -2838,14 +2840,14 @@ scsb_set_scfg_pres_leds(scsb_state_t *scsb, fru_info_t *int_fru_ptr)
 			}
 			if (scsb_debug & 0x0100) {
 				cmn_err(CE_NOTE, "scsb_set_scfg_pres(): turn "
-						"OFF Blink bits 0x%x in 0x%x",
-							blink[i], reg);
+				    "OFF Blink bits 0x%x in 0x%x",
+				    blink[i], reg);
 			}
 			if (scsb_write_mask(scsb, reg, 0, 0, blink[i])) {
 				if (scsb_debug & 0x0102)
 					cmn_err(CE_NOTE,
-						"scsb_set_scfg_pres(): "
-						"Write to 0x%x failed", reg);
+					    "scsb_set_scfg_pres(): "
+					    "Write to 0x%x failed", reg);
 				error = EIO;
 				break;
 			}
@@ -2876,7 +2878,7 @@ scsb_check_config_status(scsb_state_t *scsb)
 	p06 = 2;
 	do {
 		if (error = scsb_rdwr_register(scsb, I2C_WR_RD, reg,
-			SCTRL_CFG_NUMREGS, &scsb->scsb_data_reg[index], 1)) {
+		    SCTRL_CFG_NUMREGS, &scsb->scsb_data_reg[index], 1)) {
 			break;
 		}
 		if (p06 == 1) {
@@ -2896,7 +2898,7 @@ scsb_check_config_status(scsb_state_t *scsb)
 		if (!(scsb->scsb_state & SCSB_SCB_PRESENT))
 			scsb->scsb_state |= SCSB_SCB_PRESENT;
 		if (scsb_fru_op(scsb, SSB, 1, SCTRL_SYSCFG_BASE,
-						SCSB_FRU_OP_GET_BITVAL))
+		    SCSB_FRU_OP_GET_BITVAL))
 			scsb->scsb_state |= SCSB_SSB_PRESENT;
 		else
 			scsb->scsb_state &= ~SCSB_SSB_PRESENT;
@@ -2926,7 +2928,7 @@ scsb_set_topology(scsb_state_t *scsb)
 	mct_system_info.mid_plane.fru_version = (fru_version_t)0;
 	t = SYS_OFFSET(SCTRL_CFG_MPID0);
 	mct_system_info.mid_plane.fru_id = (int)((scsb->scsb_data_reg[index] &
-						(SCTRL_MPID_MASK << t)) >> t);
+	    (SCTRL_MPID_MASK << t)) >> t);
 	switch (mct_system_info.mid_plane.fru_id) {
 	case SCTRL_MPID_HALF:		/* Monte Carlo		*/
 		if (scsb_debug & 0x00100005)
@@ -2954,9 +2956,9 @@ scsb_set_topology(scsb_state_t *scsb)
 		ctcslot_ptr = NULL;
 		if (scsb_debug & 0x00100005)
 			cmn_err(CE_NOTE, "scsb_set_topology: Tonga%s",
-				mct_system_info.mid_plane.fru_id ==
-					SCTRL_MPID_QUARTER_NODSK ?
-				", no disk" : " with disk");
+			    mct_system_info.mid_plane.fru_id ==
+			    SCTRL_MPID_QUARTER_NODSK ?
+			    ", no disk" : " with disk");
 		cpu_slot_num = SC_TG_CPU_SLOT;
 		alarm_slot_num = scsb->ac_slotnum = SC_TG_AC_SLOT;
 		mct_system_info.max_units[SLOT] = TG_MAX_SLOTS;
@@ -2973,12 +2975,12 @@ scsb_set_topology(scsb_state_t *scsb)
 		break;
 	default:
 		cmn_err(CE_WARN, "%s#%d: Unknown MidPlane Id %x",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev),
-				mct_system_info.mid_plane.fru_id);
+		    ddi_driver_name(scsb->scsb_dev),
+		    ddi_get_instance(scsb->scsb_dev),
+		    mct_system_info.mid_plane.fru_id);
 		if (scsb_debug & 0x00100005)
 			cmn_err(CE_NOTE, "scsb_set_topology: 0x%x: unknown!",
-			mct_system_info.mid_plane.fru_id);
+			    mct_system_info.mid_plane.fru_id);
 		return;
 	}
 	/*
@@ -2990,9 +2992,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * release.
 	 */
 	mct_system_info.fru_info_list[SLOT] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[SLOT] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[SLOT] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[SLOT];
 	for (unit = 1; unit <= mct_system_info.max_units[SLOT]; ++unit) {
 		int	iunit;
@@ -3049,11 +3050,11 @@ scsb_set_topology(scsb_state_t *scsb)
 		}
 		fru_ptr->fru_unit = (scsb_unum_t)unit;
 		fru_ptr->fru_id = fru_id_table[event_to_index(
-					FRU_UNIT_TO_EVCODE(SLOT, unit))];
+		    FRU_UNIT_TO_EVCODE(SLOT, unit))];
 		fru_ptr->fru_version = (fru_version_t)0;
 		fru_ptr->type_list = (fru_options_t *)NULL;
 		fru_ptr->i2c_info = (fru_i2c_info_t *)
-				kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 		fru_ptr->i2c_info->syscfg_reg = syscfg;
 		fru_ptr->i2c_info->syscfg_bit = bit_num;
 		fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3069,9 +3070,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * PDU
 	 */
 	mct_system_info.fru_info_list[PDU] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[PDU] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[PDU] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[PDU];
 	for (unit = 1; unit <= mct_system_info.max_units[PDU]; ++unit) {
 		fru_ptr->fru_type = PDU;
@@ -3114,7 +3114,7 @@ scsb_set_topology(scsb_state_t *scsb)
 		fru_ptr->fru_id = fru_id_table[event_to_index(t)];
 		fru_ptr->type_list = (fru_options_t *)NULL;
 		fru_ptr->i2c_info = (fru_i2c_info_t *)
-				kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 		fru_ptr->i2c_info->syscfg_reg = syscfg;
 		fru_ptr->i2c_info->syscfg_bit = bit_num;
 		fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3130,9 +3130,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * Power Supplies
 	 */
 	mct_system_info.fru_info_list[PS] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[PS] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[PS] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[PS];
 	for (unit = 1; unit <= mct_system_info.max_units[PS]; ++unit) {
 		/*
@@ -3173,7 +3172,7 @@ scsb_set_topology(scsb_state_t *scsb)
 		fru_ptr->fru_version = (fru_version_t)0;
 		fru_ptr->type_list = (fru_options_t *)NULL;
 		fru_ptr->i2c_info = (fru_i2c_info_t *)
-				kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 		fru_ptr->i2c_info->syscfg_reg = syscfg;
 		fru_ptr->i2c_info->syscfg_bit = bit_num;
 		fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3189,9 +3188,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * SCSI Disks and removable media
 	 */
 	mct_system_info.fru_info_list[DISK] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[DISK] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[DISK] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[DISK];
 	for (unit = 1; unit <= mct_system_info.max_units[DISK]; ++unit) {
 		/* SCB15 */
@@ -3232,7 +3230,7 @@ scsb_set_topology(scsb_state_t *scsb)
 		fru_ptr->fru_id = fru_id_table[event_to_index(t)];
 		fru_ptr->type_list = (fru_options_t *)NULL;
 		fru_ptr->i2c_info = (fru_i2c_info_t *)
-				kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 		fru_ptr->i2c_info->syscfg_reg = syscfg;
 		fru_ptr->i2c_info->syscfg_bit = bit_num;
 		fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3248,9 +3246,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * Fan Trays
 	 */
 	mct_system_info.fru_info_list[FAN] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[FAN] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[FAN] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[FAN];
 	for (unit = 1; unit <= mct_system_info.max_units[FAN]; ++unit) {
 		int		bit_num;
@@ -3293,7 +3290,7 @@ scsb_set_topology(scsb_state_t *scsb)
 		fru_ptr->fru_version = (fru_version_t)0;
 		fru_ptr->type_list = (fru_options_t *)NULL;
 		fru_ptr->i2c_info = (fru_i2c_info_t *)
-				kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 		fru_ptr->i2c_info->syscfg_reg = syscfg;
 		fru_ptr->i2c_info->syscfg_bit = bit_num;
 		fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3309,9 +3306,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * Alarm Cards
 	 */
 	mct_system_info.fru_info_list[ALARM] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[ALARM] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[ALARM] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[ALARM];
 	for (unit = 1; unit <= mct_system_info.max_units[ALARM]; ++unit) {
 		int		bit_num;
@@ -3335,11 +3331,11 @@ scsb_set_topology(scsb_state_t *scsb)
 		if (scsb->scsb_data_reg[index] & (1 << bit_num)) {
 			fru_ptr->fru_status = FRU_PRESENT;
 			if (acslot_ptr != NULL && acslot_ptr->fru_status ==
-								FRU_PRESENT) {
+			    FRU_PRESENT) {
 				acslot_ptr->fru_type = (scsb_utype_t)OC_AC;
 				/*
 				 * acslot_ptr->fru_id =
-				 *		fru_id_table[event_to_index(t)];
+				 *	fru_id_table[event_to_index(t)];
 				 */
 			}
 		} else {
@@ -3352,7 +3348,7 @@ scsb_set_topology(scsb_state_t *scsb)
 		fru_ptr->fru_version = (fru_version_t)0;
 		fru_ptr->type_list = (fru_options_t *)NULL;
 		fru_ptr->i2c_info = (fru_i2c_info_t *)
-				kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 		fru_ptr->i2c_info->syscfg_reg = syscfg;
 		fru_ptr->i2c_info->syscfg_bit = bit_num;
 		fru_ptr->i2c_info->ledata_reg = 0;
@@ -3368,9 +3364,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * SCB
 	 */
 	mct_system_info.fru_info_list[SCB] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[SCB] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[SCB] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[SCB];
 	unit = 1;
 	/* SCB15 */
@@ -3410,7 +3405,7 @@ scsb_set_topology(scsb_state_t *scsb)
 		fru_ptr->fru_version = (fru_version_t)t_uchar;
 	fru_ptr->type_list = (fru_options_t *)NULL;
 	fru_ptr->i2c_info = (fru_i2c_info_t *)
-			kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 	fru_ptr->i2c_info->syscfg_reg = 0;
 	fru_ptr->i2c_info->syscfg_bit = 0;
 	fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3422,9 +3417,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * SSB
 	 */
 	mct_system_info.fru_info_list[SSB] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[SSB] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[SSB] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[SSB];
 	unit = 1;
 	/* SCB15 */
@@ -3455,7 +3449,7 @@ scsb_set_topology(scsb_state_t *scsb)
 	fru_ptr->fru_version = (fru_version_t)0;
 	fru_ptr->type_list = (fru_options_t *)NULL;
 	fru_ptr->i2c_info = (fru_i2c_info_t *)
-			kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 	fru_ptr->i2c_info->syscfg_reg = syscfg;
 	fru_ptr->i2c_info->syscfg_bit = bit_num;
 	fru_ptr->i2c_info->ledata_reg = 0;
@@ -3467,9 +3461,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * CFTM
 	 */
 	mct_system_info.fru_info_list[CFTM] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[CFTM] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[CFTM] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[CFTM];
 	unit = 1;
 	/* SCB15 */
@@ -3503,7 +3496,7 @@ scsb_set_topology(scsb_state_t *scsb)
 	if (scsb->scsb_data_reg[index] & (1 << bit_num)) {
 		fru_ptr->fru_status = FRU_PRESENT;
 		if (ctcslot_ptr != NULL && ctcslot_ptr->fru_status ==
-								FRU_PRESENT) {
+		    FRU_PRESENT) {
 			ctcslot_ptr->fru_type = (scsb_utype_t)OC_CTC;
 			scsb->scsb_hsc_state |= SCSB_HSC_CTC_PRES;
 		}
@@ -3516,7 +3509,7 @@ scsb_set_topology(scsb_state_t *scsb)
 	fru_ptr->fru_version = (fru_version_t)0;
 	fru_ptr->type_list = (fru_options_t *)NULL;
 	fru_ptr->i2c_info = (fru_i2c_info_t *)
-			kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 	fru_ptr->i2c_info->syscfg_reg = syscfg;
 	fru_ptr->i2c_info->syscfg_bit = bit_num;
 	fru_ptr->i2c_info->ledata_reg = led_reg;
@@ -3528,9 +3521,9 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * CRTM
 	 */
 	mct_system_info.fru_info_list[CRTM] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[CRTM] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[CRTM] + pad),
+	    KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[CRTM];
 	unit = 1;
 	/* SCB15 */
@@ -3561,7 +3554,7 @@ scsb_set_topology(scsb_state_t *scsb)
 	fru_ptr->fru_version = (fru_version_t)0;
 	fru_ptr->type_list = (fru_options_t *)NULL;
 	fru_ptr->i2c_info = (fru_i2c_info_t *)
-			kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 	fru_ptr->i2c_info->syscfg_reg = syscfg;
 	fru_ptr->i2c_info->syscfg_bit = bit_num;
 	fru_ptr->i2c_info->ledata_reg = 0;
@@ -3573,9 +3566,8 @@ scsb_set_topology(scsb_state_t *scsb)
 	 * PRTM
 	 */
 	mct_system_info.fru_info_list[PRTM] = (fru_info_t *)
-			kmem_zalloc(sizeof (fru_info_t) *
-				(mct_system_info.max_units[PRTM] + pad),
-				KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_info_t) *
+	    (mct_system_info.max_units[PRTM] + pad), KM_SLEEP);
 	fru_ptr = mct_system_info.fru_info_list[PRTM];
 	unit = 1;
 	/*
@@ -3606,7 +3598,7 @@ scsb_set_topology(scsb_state_t *scsb)
 	fru_ptr->fru_version = (fru_version_t)0;
 	fru_ptr->type_list = (fru_options_t *)NULL;
 	fru_ptr->i2c_info = (fru_i2c_info_t *)
-			kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
+	    kmem_zalloc(sizeof (fru_i2c_info_t), KM_SLEEP);
 	fru_ptr->i2c_info->syscfg_reg = syscfg;
 	fru_ptr->i2c_info->syscfg_bit = bit_num;
 	fru_ptr->i2c_info->ledata_reg = 0;
@@ -3635,13 +3627,13 @@ scsb_free_topology(scsb_state_t *scsb)
 		while (fru_ptr != NULL) {
 			if (fru_ptr->i2c_info != (fru_i2c_info_t *)NULL)
 				kmem_free(fru_ptr->i2c_info,
-						sizeof (fru_i2c_info_t));
+				    sizeof (fru_i2c_info_t));
 			fru_ptr = fru_ptr->next;
 		}
 		if ((fru_ptr = mct_system_info.fru_info_list[i]) !=
-				(fru_info_t *)NULL) {
+		    (fru_info_t *)NULL) {
 			kmem_free(fru_ptr, sizeof (fru_info_t) *
-					mct_system_info.max_units[i]);
+			    mct_system_info.max_units[i]);
 			mct_system_info.fru_info_list[i] = (fru_info_t *)NULL;
 		}
 	}
@@ -3667,47 +3659,47 @@ mct_topology_dump(scsb_state_t *scsb, int force)
 		switch ((scsb_utype_t)i) {
 		case SLOT:
 			cmn_err(CE_NOTE, "MCT: Number of Slots: %d",
-					mct_system_info.max_units[SLOT]);
+			    mct_system_info.max_units[SLOT]);
 			break;
 		case ALARM:
 			cmn_err(CE_NOTE, "MCT: MAX Number of Alarm Cards: %d",
-					mct_system_info.max_units[ALARM]);
+			    mct_system_info.max_units[ALARM]);
 			break;
 		case DISK:
 			cmn_err(CE_NOTE, "MCT: MAX Number of SCSI Devices: %d",
-					mct_system_info.max_units[DISK]);
+			    mct_system_info.max_units[DISK]);
 			break;
 		case FAN:
 			cmn_err(CE_NOTE, "MCT: MAX Number of Fan Trays: %d",
-					mct_system_info.max_units[FAN]);
+			    mct_system_info.max_units[FAN]);
 			break;
 		case PDU:
 			cmn_err(CE_NOTE, "MCT: MAX Number of PDUs: %d",
-					mct_system_info.max_units[PDU]);
+			    mct_system_info.max_units[PDU]);
 			break;
 		case PS:
 			cmn_err(CE_NOTE,
-					"MCT: MAX Number of Power Supplies: %d",
-					mct_system_info.max_units[PS]);
+			    "MCT: MAX Number of Power Supplies: %d",
+			    mct_system_info.max_units[PS]);
 			break;
 		case SCB:
 			cmn_err(CE_NOTE, "MCT: MAX Number of SCBs: %d",
-					mct_system_info.max_units[SCB]);
+			    mct_system_info.max_units[SCB]);
 			break;
 		case SSB:
 			cmn_err(CE_NOTE, "MCT: MAX Number of SSBs: %d",
-					mct_system_info.max_units[SSB]);
+			    mct_system_info.max_units[SSB]);
 			break;
 		}
 		while (fru_ptr != NULL) {
 			if (fru_ptr->fru_status & FRU_PRESENT) {
 				cmn_err(CE_NOTE,
-					"MCT:   type=%d, unit=%d, id=0x%x, "
-					"version=0x%x",
-					fru_ptr->fru_type,
-					fru_ptr->fru_unit,
-					fru_ptr->fru_id,
-					fru_ptr->fru_version);
+				    "MCT:   type=%d, unit=%d, id=0x%x, "
+				    "version=0x%x",
+				    fru_ptr->fru_type,
+				    fru_ptr->fru_unit,
+				    fru_ptr->fru_id,
+				    fru_ptr->fru_version);
 			}
 			fru_ptr = fru_ptr->next;
 		}
@@ -3725,7 +3717,7 @@ scsb_failing_event(scsb_state_t *scsb)
 
 	add_event_code(scsb, scsb_event_code);
 	(void) scsb_queue_ops(scsb, QPUT_INT32, 1, &scsb_event_code,
-				"scsb_intr");
+	"scsb_intr");
 }
 #endif
 
@@ -3742,7 +3734,7 @@ scsb_read_bhealthy(scsb_state_t *scsb)
 	reg = SCSB_REG_ADDR(SCTRL_BHLTHY_BASE);
 	index = SCSB_REG_INDEX(reg);
 	error = scsb_rdwr_register(scsb, I2C_WR_RD, reg,
-			SCTRL_BHLTHY_NUMREGS, &scsb->scsb_data_reg[index], 1);
+	    SCTRL_BHLTHY_NUMREGS, &scsb->scsb_data_reg[index], 1);
 	return (error);
 }
 
@@ -3754,7 +3746,7 @@ scsb_read_slot_health(scsb_state_t *scsb, int pslotnum)
 {
 	int slotnum = tonga_psl_to_ssl(scsb, pslotnum);
 	return (scsb_fru_op(scsb, SLOT, slotnum,
-			SCTRL_BHLTHY_BASE, SCSB_FRU_OP_GET_BITVAL));
+	    SCTRL_BHLTHY_BASE, SCSB_FRU_OP_GET_BITVAL));
 }
 
 /*
@@ -3779,7 +3771,7 @@ scsb_bhealthy_slot(scsb_state_t *scsb, scsb_uinfo_t *suip)
 
 	if (scsb_debug & 0x8001)
 		cmn_err(CE_NOTE, "scsb_bhealthy_slot: slot %d",
-			suip->unit_number);
+		    suip->unit_number);
 	if (suip->unit_number > mct_system_info.max_units[SLOT]) {
 		return (EINVAL);
 	}
@@ -3823,11 +3815,11 @@ scsb_reset_unit(scsb_state_t *scsb, scsb_uinfo_t *suip)
 		return (EAGAIN);
 	if (scsb_debug & 0x8001) {
 		cmn_err(CE_NOTE, "scsb_reset_slot(%d): slot %d, state %d\n",
-			scsb->scsb_instance, suip->unit_number,
-			suip->unit_state);
+		    scsb->scsb_instance, suip->unit_number,
+		    suip->unit_state);
 	}
 	if (suip->unit_type != ALARM && !(scsb->scsb_state &
-				(SCSB_DIAGS_MODE | SCSB_DEBUG_MODE))) {
+	    (SCSB_DIAGS_MODE | SCSB_DEBUG_MODE))) {
 		return (EINVAL);
 	}
 	if (suip->unit_state != ON && suip->unit_state != OFF) {
@@ -3849,17 +3841,17 @@ scsb_reset_unit(scsb_state_t *scsb, scsb_uinfo_t *suip)
 	case SLOT:
 		slotnum = suip->unit_number;
 		reset_state = (suip->unit_state == ON) ? SCSB_RESET_SLOT :
-			SCSB_UNRESET_SLOT;
+		    SCSB_UNRESET_SLOT;
 		if (scsb->scsb_state & SCSB_IS_TONGA) {
 			if (slotnum > TG_MAX_SLOTS ||
-				slotnum == SC_TG_CPU_SLOT) {
+			    slotnum == SC_TG_CPU_SLOT) {
 				return (EINVAL);
 			}
 		} else {
 			if (slotnum > MC_MAX_SLOTS ||
-				slotnum == SC_MC_CPU_SLOT ||
-				(scsb->scsb_hsc_state & SCSB_HSC_CTC_PRES &&
-				slotnum == SC_MC_CTC_SLOT)) {
+			    slotnum == SC_MC_CPU_SLOT ||
+			    (scsb->scsb_hsc_state & SCSB_HSC_CTC_PRES &&
+			    slotnum == SC_MC_CTC_SLOT)) {
 				return (EINVAL);
 			}
 		}
@@ -3874,10 +3866,10 @@ scsb_reset_unit(scsb_state_t *scsb, scsb_uinfo_t *suip)
 	else /* OFF */
 		scsb->scsb_data_reg[index] &= ~(1 << unit_number);
 	if ((error = scsb_rdwr_register(scsb, I2C_WR, reg, 1,
-					&scsb->scsb_data_reg[index], 0)) != 0) {
+	    &scsb->scsb_data_reg[index], 0)) != 0) {
 		if (scsb_debug & 0x8002)
 			cmn_err(CE_WARN,
-				"scsb_leds: write failure to 0x%x", reg);
+			    "scsb_leds: write failure to 0x%x", reg);
 		return (error);
 	}
 	mutex_exit(&scsb->scsb_mutex);
@@ -3904,7 +3896,7 @@ scsb_slot_occupancy(scsb_state_t *scsb, scsb_uinfo_t *suip)
 	switch (suip->unit_type) {
 	case ALARM:
 		if (suip->unit_number !=
-			(mct_system_info.fru_info_list[ALARM])->fru_unit) {
+		    (mct_system_info.fru_info_list[ALARM])->fru_unit) {
 			return (EINVAL);
 		}
 		break;
@@ -3914,7 +3906,7 @@ scsb_slot_occupancy(scsb_state_t *scsb, scsb_uinfo_t *suip)
 		 * All slots are acceptable, except slots 11 & 12.
 		 */
 		if (suip->unit_number < 1 || suip->unit_number >
-				mct_system_info.max_units[ALARM]) {
+		    mct_system_info.max_units[ALARM]) {
 			error = EINVAL;
 			break;
 		}
@@ -3932,11 +3924,11 @@ scsb_slot_occupancy(scsb_state_t *scsb, scsb_uinfo_t *suip)
 		return (error);
 	if (suip->unit_state == ON) {
 		if (hsc_slot_occupancy(saved_unit_number, B_TRUE, 0, B_TRUE)
-									!= 0)
+		    != 0)
 			error = EFAULT;
 	} else {
 		if (hsc_slot_occupancy(saved_unit_number, B_FALSE, 0, B_FALSE)
-									!= 0)
+		    != 0)
 			error = EFAULT;
 	}
 
@@ -3953,12 +3945,12 @@ scsb_clear_intptrs(scsb_state_t *scsb)
 		wbuf[i] = 0xff;
 	}
 	if (error = scsb_rdwr_register(scsb, I2C_WR,
-				SCSB_REG_ADDR(SCTRL_INTSRC_BASE),
-				SCTRL_INTR_NUMREGS, wbuf, 1)) {
+	    SCSB_REG_ADDR(SCTRL_INTSRC_BASE),
+	    SCTRL_INTR_NUMREGS, wbuf, 1)) {
 		if (scsb_debug & 0x0402)
 			cmn_err(CE_NOTE, "scsb_clear_intptrs(): "
-					"write to 0x%x failed",
-					SCSB_REG_ADDR(SCTRL_INTSRC_BASE));
+			    "write to 0x%x failed",
+			    SCSB_REG_ADDR(SCTRL_INTSRC_BASE));
 	}
 	return (error);
 }
@@ -3983,7 +3975,7 @@ scsb_setall_intmasks(scsb_state_t *scsb)
 		if (error = scsb_write_mask(scsb, reg, rmask, wdata, 0)) {
 			if (scsb_debug & 0x0402)
 				cmn_err(CE_NOTE, "scsb_setall_intmasks: "
-					"write to 0x%x failed: %d", reg, error);
+				    "write to 0x%x failed: %d", reg, error);
 			error = EIO;
 			break;
 		}
@@ -4014,7 +4006,7 @@ scsb_clear_intmasks(scsb_state_t *scsb)
 	fru_info_t	*fru_ptr;
 
 	if (scsb->scsb_state & SCSB_FROZEN &&
-			!(scsb->scsb_state & SCSB_IN_INTR)) {
+	    !(scsb->scsb_state & SCSB_IN_INTR)) {
 		return (EAGAIN);
 	}
 	error = 0;
@@ -4024,7 +4016,7 @@ scsb_clear_intmasks(scsb_state_t *scsb)
 	mbid    = SCSB_REG_INDEX(msk_reg); /* the Mask Base Index Delta */
 	if (scsb_debug & 0x0400) {
 		cmn_err(CE_NOTE, "clear_intmasks: msk_reg=0x%x; mbid=%d",
-				msk_reg, mbid);
+		    msk_reg, mbid);
 	}
 	for (fru_type = 0; fru_type < SCSB_UNIT_TYPES; ++fru_type) {
 		if (fru_type == SCB)
@@ -4041,7 +4033,7 @@ scsb_clear_intmasks(scsb_state_t *scsb)
 			if (scsb_debug & 0x0400)
 				cmn_err(CE_NOTE,
 				"clear_intmasks:%d:%d: PRES mask[%d]:0x%x",
-					fru_type, unit, tmp, mask_data[tmp]);
+				    fru_type, unit, tmp, mask_data[tmp]);
 			if ((fru_type == SLOT) && (IS_SCB_P15)) {
 				/*
 				 * Unmask the corresponding Slot HLTHY mask
@@ -4049,7 +4041,7 @@ scsb_clear_intmasks(scsb_state_t *scsb)
 				 *  but with SCTRL_INTMASK_HLTHY_BASE
 				 */
 				reg = FRU_REG_ADDR(code,
-						SCTRL_INTMASK_HLTHY_BASE);
+				    SCTRL_INTMASK_HLTHY_BASE);
 				idx = SCSB_REG_INDEX(reg);
 				tmp = idx - mbid;
 				mask_data[tmp] |= (1 << offset);
@@ -4057,8 +4049,8 @@ scsb_clear_intmasks(scsb_state_t *scsb)
 					cmn_err(CE_NOTE,
 				"clear_intmasks:Slot:%d: HLTHY mask[%d]:0x%x"
 				"; reg=0x%x, idx=%d, mbid=%d",
-						unit, tmp, mask_data[tmp],
-						reg, idx, mbid);
+					    unit, tmp, mask_data[tmp],
+					    reg, idx, mbid);
 				}
 			}
 		}
@@ -4095,15 +4087,15 @@ scsb_clear_intmasks(scsb_state_t *scsb)
 		wdata = mask_data[tmp];
 		if (scsb_debug & 0x0400)
 			cmn_err(CE_NOTE, "clear_intmasks:0x%x: ~(0x%x),0x%x",
-					msk_reg, (~wdata) & 0xff, wdata);
+			    msk_reg, (~wdata) & 0xff, wdata);
 		mutex_enter(&scsb->scsb_mutex);
 		if (error = scsb_write_mask(scsb, msk_reg, rmask,
-						(~wdata) & 0xff, wdata)) {
+		    (~wdata) & 0xff, wdata)) {
 			mutex_exit(&scsb->scsb_mutex);
 			if (scsb_debug & 0x0402)
 				cmn_err(CE_NOTE, "scsb_clear_intmasks: "
-						"write to 0x%x failed: %d",
-						msk_reg, error);
+				    "write to 0x%x failed: %d",
+				    msk_reg, error);
 			error = EIO;
 			break;
 		}
@@ -4122,17 +4114,17 @@ scsb_get_status(scsb_state_t *scsb, scsb_status_t *smp)
 		return (EFAULT);
 	}
 	if (scsb_debug & 0x40000000 &&
-			(scsb->scsb_state & SCSB_DEBUG_MODE ||
-			scsb->scsb_state & SCSB_DIAGS_MODE)) {
+	    (scsb->scsb_state & SCSB_DEBUG_MODE ||
+	    scsb->scsb_state & SCSB_DIAGS_MODE)) {
 		if (scsb->scsb_state & SCSB_FROZEN) {
 			return (EAGAIN);
 		}
 		mutex_enter(&scsb->scsb_mutex);
 		if (scsb_debug & 0x80000000) {
 			if ((i = scsb_readall_regs(scsb)) != 0 &&
-					scsb->scsb_state & SCSB_DEBUG_MODE)
+			    scsb->scsb_state & SCSB_DEBUG_MODE)
 				cmn_err(CE_WARN, "scsb_get_status: "
-						"scsb_readall_regs() FAILED");
+				    "scsb_readall_regs() FAILED");
 		} else {
 			if ((i = scsb_check_config_status(scsb)) == 0) {
 				i = scsb_set_scfg_pres_leds(scsb, NULL);
@@ -4141,7 +4133,7 @@ scsb_get_status(scsb_state_t *scsb, scsb_status_t *smp)
 		mutex_exit(&scsb->scsb_mutex);
 		if (i) {
 			cmn_err(CE_WARN,
-				"scsb_get_status: FAILED Presence LEDs update");
+			    "scsb_get_status: FAILED Presence LEDs update");
 			return (EIO);
 		}
 	}
@@ -4205,7 +4197,7 @@ scsb_freeze_check(scsb_state_t *scsb)
 			if (fru_ptr[unit - 1].fru_status == FRU_PRESENT) {
 				slots_in_reset[unit - 1] = unit;
 				cmn_err(CE_NOTE, BAD_BOARD_MSG,
-						scsb->scsb_instance, unit);
+				    scsb->scsb_instance, unit);
 			}
 		}
 	}
@@ -4218,7 +4210,7 @@ scsb_freeze(scsb_state_t *scsb)
 	uint32_t	code;
 	if (scsb_debug & 0x00020002) {
 		cmn_err(CE_WARN, "scsb_freeze: SCB%d possibly removed",
-					scsb->scsb_instance);
+		    scsb->scsb_instance);
 	}
 	if (scsb->scsb_state & SCSB_FROZEN)
 		return;
@@ -4257,7 +4249,7 @@ scsb_restore(scsb_state_t *scsb)
 	/* 9. Clear all Interrupts */
 	if (scsb_clear_intmasks(scsb)) {
 		cmn_err(CE_WARN,
-			"scsb%d: I2C TRANSFER Failed", scsb->scsb_instance);
+		    "scsb%d: I2C TRANSFER Failed", scsb->scsb_instance);
 		if (scsb_debug & 0x00020002) {
 			cmn_err(CE_WARN, "scsb_restore: clear_intmasks Failed");
 		}
@@ -4267,7 +4259,7 @@ scsb_restore(scsb_state_t *scsb)
 	/* 10. */
 	/* Check if Alarm Card present at boot and set flags */
 	if (scsb_fru_op(scsb, ALARM, 1, SCTRL_SYSCFG_BASE,
-					SCSB_FRU_OP_GET_BITVAL))
+	    SCSB_FRU_OP_GET_BITVAL))
 		scsb->scsb_hsc_state |= SCSB_ALARM_CARD_PRES;
 	else
 		scsb->scsb_hsc_state &= ~SCSB_ALARM_CARD_PRES;
@@ -4363,7 +4355,7 @@ scsb_intr_preprocess(caddr_t arg)
 	 * interrupt.
 	 */
 	scsb_intr_tid = timeout((void (*)(void *))scsb_intr, arg,
-					drv_usectohz(1000));
+	    drv_usectohz(1000));
 
 intr_end:
 
@@ -4415,7 +4407,7 @@ scsb_intr(caddr_t arg)
 		if (scb_check_version(scsb) != DDI_SUCCESS) {
 #ifdef DEBUG
 			if (scsb->scsb_state & SCSB_SSB_PRESENT &&
-				scsb->scsb_i2c_errcnt > scsb_err_threshold)
+			    scsb->scsb_i2c_errcnt > scsb_err_threshold)
 				scsb_failing_event(scsb);
 #endif
 			goto intr_error;
@@ -4440,12 +4432,12 @@ scsb_intr(caddr_t arg)
 		intr_addr = SCSB_REG_ADDR(SCTRL_INTSRC_BASE);
 		/* read the interrupt register from scsb */
 		if (scsb_rdwr_register(scsb, I2C_WR_RD, intr_addr,
-				SCTRL_INTR_NUMREGS - 1, scb_intr_regs, 1)) {
+		    SCTRL_INTR_NUMREGS - 1, scb_intr_regs, 1)) {
 			cmn_err(CE_WARN, "scsb_intr: "
-				" Failed read of interrupt registers.");
+			    " Failed read of interrupt registers.");
 #ifdef DEBUG
 			if (scsb->scsb_state & SCSB_SSB_PRESENT &&
-				scsb->scsb_i2c_errcnt > scsb_err_threshold)
+			    scsb->scsb_i2c_errcnt > scsb_err_threshold)
 				scsb_failing_event(scsb);
 #endif
 			goto intr_error;
@@ -4464,7 +4456,7 @@ scsb_intr(caddr_t arg)
 		if (scsb_debug & 0x08000000) {
 			if (tmp_reg || scb_intr_regs[i]) {
 				cmn_err(CE_NOTE, "scsb_intr: INTSRC%d=0x%x",
-					i + 1, scb_intr_regs[i]);
+				    i + 1, scb_intr_regs[i]);
 				++tmp_reg;
 			}
 		}
@@ -4504,8 +4496,8 @@ scsb_intr(caddr_t arg)
 			 */
 			if (scsb_debug & 0x00023000) {
 				cmn_err(CE_NOTE,
-					"scsb_intr(%d): INIT_SCB INT",
-					scsb->scsb_instance);
+				    "scsb_intr(%d): INIT_SCB INT",
+				    scsb->scsb_instance);
 			}
 			scsb_restore(scsb);
 			retval |= (SCSB_INTR_CLAIMED | SCSB_INTR_EVENT);
@@ -4525,7 +4517,7 @@ scsb_intr(caddr_t arg)
 		 * of the request to make sure it's not an I2C noise
 		 */
 		offset = FRU_OFFSET(SCTRL_EVENT_PWRDWN,
-				SCTRL_INTPTR_BASE);
+		    SCTRL_INTPTR_BASE);
 		clr_bits = 1 << offset;
 		intr_reg = scb_intr_regs[intr_idx];
 		if (intr_reg & clr_bits) {
@@ -4537,15 +4529,15 @@ scsb_intr(caddr_t arg)
 			for (i = 0; i < scsb_shutdown_count; i++) {
 				drv_usecwait(1000);
 				if (scsb_rdwr_register(scsb, I2C_WR_RD, tmp_reg,
-						1, &intr_reg, 1)) {
+				    1, &intr_reg, 1)) {
 					cmn_err(CE_WARN, "Failed to read "
-						" interrupt register");
+					    " interrupt register");
 					goto intr_error;
 				}
 				if (scsb_debug & 0x08000000) {
 					cmn_err(CE_NOTE, "scsb_intr: "
-						" INTSRC6[%d]=0x%x", i,
-						intr_reg);
+					    " INTSRC6[%d]=0x%x", i,
+					    intr_reg);
 				}
 				if (!(intr_reg & clr_bits)) {
 					scb_intr_regs[intr_idx] &= ~clr_bits;
@@ -4562,7 +4554,7 @@ scsb_intr(caddr_t arg)
 	 */
 	if (retval == 0 && scsb_check_config_status(scsb)) {
 		cmn_err(CE_WARN,
-			"scsb_intr: Failed read of config/status registers");
+		    "scsb_intr: Failed read of config/status registers");
 		if (scsb->scsb_state & SCSB_P06_NOINT_KLUGE) {
 			if (!scsb_debug) {
 				goto intr_error;
@@ -4570,7 +4562,7 @@ scsb_intr(caddr_t arg)
 		}
 #ifdef DEBUG
 		if (scsb->scsb_state & SCSB_SSB_PRESENT &&
-			scsb->scsb_i2c_errcnt > scsb_err_threshold) {
+		    scsb->scsb_i2c_errcnt > scsb_err_threshold) {
 			scsb_failing_event(scsb);
 		}
 #endif
@@ -4589,17 +4581,17 @@ scsb_intr(caddr_t arg)
 		index = SCSB_REG_INDEX(intr_addr);
 		for (i = 0; i < SCTRL_BHLTHY_NUMREGS; ++i, ++intr_idx) {
 			scsb->scsb_data_reg[index++] =
-				scb_intr_regs[intr_idx] & int_masks[intr_idx];
+			    scb_intr_regs[intr_idx] & int_masks[intr_idx];
 			intr_reg |= scb_intr_regs[i];
 		}
 
 		if (intr_reg &&	scsb_read_bhealthy(scsb) != 0) {
 			cmn_err(CE_WARN, "%s#%d: Error Reading Healthy# "
-				" Registers", ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev));
+			    " Registers", ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev));
 #ifdef DEBUG
 			if (scsb->scsb_state & SCSB_SSB_PRESENT &&
-				scsb->scsb_i2c_errcnt > scsb_err_threshold) {
+			    scsb->scsb_i2c_errcnt > scsb_err_threshold) {
 				scsb_failing_event(scsb);
 			}
 #endif
@@ -4615,12 +4607,12 @@ scsb_intr(caddr_t arg)
 	 */
 	if (IS_SCB_P15) {
 		if (scsb_rdwr_register(scsb, I2C_WR, intr_addr,
-			SCTRL_INTR_NUMREGS, scb_intr_regs, 1)) {
+		    SCTRL_INTR_NUMREGS, scb_intr_regs, 1)) {
 			cmn_err(CE_WARN, "scsb_intr: Failed write to interrupt"
-					" registers.");
+			    " registers.");
 #ifdef DEBUG
 			if (scsb->scsb_state & SCSB_SSB_PRESENT &&
-				scsb->scsb_i2c_errcnt > scsb_err_threshold) {
+			    scsb->scsb_i2c_errcnt > scsb_err_threshold) {
 				scsb_failing_event(scsb);
 			}
 #endif
@@ -4693,7 +4685,7 @@ scsb_intr(caddr_t arg)
 	 */
 	offset_base = FRU_OFFSET_BASE(SCTRL_INTPTR_BASE);
 	for (offset = 0; intr_idx < numregs;
-				++offset, ++intr_idx, ++intr_addr, ++index) {
+	    ++offset, ++intr_idx, ++intr_addr, ++index) {
 		scsb->scsb_data_reg[index] = scb_intr_regs[intr_idx];
 		intr_reg = scb_intr_regs[intr_idx];
 		while (intr_reg) {	/* for each INTSRC bit that's set */
@@ -4718,7 +4710,7 @@ scsb_intr(caddr_t arg)
 					if (j != FRU_INDEX(SCTRL_EVENT_SCB))
 						continue;
 					if (offset != ((uc >> 4) & 0xf)
-							+ SCB_INT_OFFSET)
+					    + SCB_INT_OFFSET)
 						continue;
 				}
 				if (idx == (uc & 0xf))
@@ -4744,12 +4736,12 @@ scsb_intr(caddr_t arg)
 			if (code ==  SCTRL_EVENT_PWRDWN) {
 				if (scsb_debug & 0x1002) {
 					cmn_err(CE_NOTE,
-						"scsb_intr(%d): power down req."
-						" INT.", scsb->scsb_instance);
+					    "scsb_intr(%d): power down req."
+					    " INT.", scsb->scsb_instance);
 				}
 				scsb_event_code |= code;
 				if (scsb->scsb_state & SCSB_OPEN &&
-					scsb->scsb_rq != (queue_t *)NULL) {
+				    scsb->scsb_rq != (queue_t *)NULL) {
 					/*
 					 * inform applications using poll(2)
 					 * about this event, and provide the
@@ -4757,16 +4749,16 @@ scsb_intr(caddr_t arg)
 					 */
 					if (!(scsb_debug & 0x00040000))
 					(void) scsb_queue_put(scsb->scsb_rq, 1,
-						&scsb_event_code, "scsb_intr");
+					    &scsb_event_code, "scsb_intr");
 					goto intr_error;
 				}
 				continue;
 			} else if (code == SCTRL_EVENT_REPLACE) {
 				if (scsb_debug & 0x1002) {
 					cmn_err(CE_NOTE,
-						"scsb_intr(%d): replacement "
-						"req. INT.",
-						scsb->scsb_instance);
+					    "scsb_intr(%d): replacement "
+					    "req. INT.",
+					    scsb->scsb_instance);
 				}
 				scsb_freeze_check(scsb);
 				scsb_freeze(scsb);
@@ -4781,8 +4773,8 @@ scsb_intr(caddr_t arg)
 				 */
 				if (scsb_debug & 0x1002) {
 					cmn_err(CE_NOTE,
-						"scsb_intr(%d): INIT SCB INTR",
-						scsb->scsb_instance);
+					    "scsb_intr(%d): INIT SCB INTR",
+					    scsb->scsb_instance);
 				}
 				/*
 				 * SCB initialization already handled, but we
@@ -4794,7 +4786,7 @@ scsb_intr(caddr_t arg)
 				 * so we won't do it again.
 				 */
 				tmp = FRU_OFFSET(SCTRL_EVENT_SCB,
-							SCTRL_INTPTR_BASE);
+				    SCTRL_INTPTR_BASE);
 				clr_bits &= ~(1 << tmp);
 				scsb_event_code |= code;
 				retval |= (SCSB_INTR_CLAIMED | SCSB_INTR_EVENT);
@@ -4809,8 +4801,8 @@ scsb_intr(caddr_t arg)
 				}
 				if (scsb_debug & 0x1002) {
 					cmn_err(CE_NOTE,
-						"scsb_intr(%d): Alarm INT.",
-						scsb->scsb_instance);
+					    "scsb_intr(%d): Alarm INT.",
+					    scsb->scsb_instance);
 				}
 				scsb_event_code |= code;
 				retval |= (SCSB_INTR_CLAIMED | SCSB_INTR_EVENT);
@@ -4836,8 +4828,8 @@ scsb_intr(caddr_t arg)
 			unit = (ui >> 8) & 0xff;
 			if (scsb_debug & 0x00002000) {
 				cmn_err(CE_NOTE, "scsb_intr: "
-						"FRU type/unit/code %d/%d/0x%x",
-						fru_type, unit, code);
+				    "FRU type/unit/code %d/%d/0x%x",
+				    fru_type, unit, code);
 			}
 			switch (fru_type) {
 			case PDU:
@@ -4866,8 +4858,8 @@ scsb_intr(caddr_t arg)
 				slotnum = tonga_ssl_to_psl(scsb, unit);
 				if (scsb_debug & 0x00002000) {
 					cmn_err(CE_NOTE, "scsb_intr: "
-							"unit/slot %d/%d",
-							unit, slotnum);
+					    "unit/slot %d/%d",
+					    unit, slotnum);
 				}
 
 				/*
@@ -4875,7 +4867,7 @@ scsb_intr(caddr_t arg)
 				 */
 				if (scsb->scsb_state & SCSB_IS_TONGA) {
 					if (slotnum > TG_MAX_SLOTS ||
-						slotnum == SC_TG_CPU_SLOT) {
+					    slotnum == SC_TG_CPU_SLOT) {
 						continue;
 					}
 					/*
@@ -4884,13 +4876,13 @@ scsb_intr(caddr_t arg)
 					 * actual physical slot
 					 */
 					code = FRU_UNIT_TO_EVCODE(SLOT,
-						slotnum);
+					    slotnum);
 				} else {
 					if (slotnum > MC_MAX_SLOTS ||
-						slotnum == SC_MC_CPU_SLOT ||
-						(scsb->scsb_hsc_state &
-						SCSB_HSC_CTC_PRES &&
-						slotnum == SC_MC_CTC_SLOT)) {
+					    slotnum == SC_MC_CPU_SLOT ||
+					    (scsb->scsb_hsc_state &
+					    SCSB_HSC_CTC_PRES &&
+					    slotnum == SC_MC_CTC_SLOT)) {
 						continue;
 					}
 				}
@@ -4909,11 +4901,11 @@ scsb_intr(caddr_t arg)
 		if (fru_type == ALARM) {
 			DEBUG2("AC Intr %d(%d)\n", scsb->ac_slotnum, idx+1);
 			val = scsb_fru_op(scsb, SLOT,
-				tonga_ssl_to_psl(scsb, scsb->ac_slotnum),
-				SCTRL_SYSCFG_BASE, SCSB_FRU_OP_GET_BITVAL);
+			    tonga_ssl_to_psl(scsb, scsb->ac_slotnum),
+			    SCTRL_SYSCFG_BASE, SCSB_FRU_OP_GET_BITVAL);
 			ac_present = scsb_fru_op(scsb, ALARM, 1,
-					SCTRL_SYSCFG_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+			    SCTRL_SYSCFG_BASE,
+			    SCSB_FRU_OP_GET_BITVAL);
 			/*
 			 * It is observed that slot presence and Alarm
 			 * presence bits do not go ON at the same time.
@@ -4921,13 +4913,13 @@ scsb_intr(caddr_t arg)
 			 */
 #ifdef DEBUG
 			if ((((val) && (!ac_present)) ||
-					((!val) && (ac_present))) &&
-					(scsb->scsb_hsc_state &
-						SCSB_AC_SLOT_INTR_DONE))
+			    ((!val) && (ac_present))) &&
+			    (scsb->scsb_hsc_state &
+			    SCSB_AC_SLOT_INTR_DONE))
 
 				cmn_err(CE_WARN, "?Alarm and Slot presence "
-					"state bits do not match! (%x,%x)",
-					val, ac_present);
+				    "state bits do not match! (%x,%x)",
+				    val, ac_present);
 #endif
 			if (scsb->scsb_hsc_state & SCSB_AC_SLOT_INTR_DONE)
 				scsb->scsb_hsc_state &= ~SCSB_AC_SLOT_INTR_DONE;
@@ -4941,14 +4933,14 @@ scsb_intr(caddr_t arg)
 		 */
 		if (scsb->scsb_state & SCSB_IS_TONGA) {
 			if (slotnum > TG_MAX_SLOTS ||
-				slotnum == SC_TG_CPU_SLOT) {
+			    slotnum == SC_TG_CPU_SLOT) {
 				continue;
 			}
 		} else {
 			if (slotnum > MC_MAX_SLOTS ||
-				slotnum == SC_MC_CPU_SLOT ||
-				(scsb->scsb_hsc_state & SCSB_HSC_CTC_PRES &&
-				slotnum == SC_MC_CTC_SLOT)) {
+			    slotnum == SC_MC_CPU_SLOT ||
+			    (scsb->scsb_hsc_state & SCSB_HSC_CTC_PRES &&
+			    slotnum == SC_MC_CTC_SLOT)) {
 				continue;
 			}
 		}
@@ -4957,20 +4949,20 @@ scsb_intr(caddr_t arg)
 			ac_slot = B_TRUE;
 		}
 		val = scsb_fru_op(scsb, SLOT, unit, SCTRL_SYSCFG_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+		    SCSB_FRU_OP_GET_BITVAL);
 		if (ac_slot == B_TRUE) {
 			ac_present = scsb_fru_op(scsb, ALARM, 1,
-					SCTRL_SYSCFG_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+			    SCTRL_SYSCFG_BASE,
+			    SCSB_FRU_OP_GET_BITVAL);
 #ifdef DEBUG
 			if ((((val) && (!ac_present)) ||
-					((!val) && (ac_present))) &&
-					(scsb->scsb_hsc_state &
-						SCSB_AC_SLOT_INTR_DONE)) {
+			    ((!val) && (ac_present))) &&
+			    (scsb->scsb_hsc_state &
+			    SCSB_AC_SLOT_INTR_DONE)) {
 
 				cmn_err(CE_WARN, "?Alarm and Slot presence "
-					"state bits do not match! (%x,%x)",
-					val, ac_present);
+				    "state bits do not match! (%x,%x)",
+				    val, ac_present);
 			}
 #endif
 			if (scsb->scsb_hsc_state & SCSB_AC_SLOT_INTR_DONE)
@@ -4983,7 +4975,7 @@ scsb_intr(caddr_t arg)
 				DEBUG1("AC insertion on slot %d!\n", slotnum);
 				if (scsb_debug & 0x00010000) {
 					cmn_err(CE_NOTE, "scsb_intr: "
-						    "AC_PRES slot %d", slotnum);
+					"AC_PRES slot %d", slotnum);
 				}
 				scsb->scsb_hsc_state |= SCSB_ALARM_CARD_PRES;
 			}
@@ -5000,14 +4992,14 @@ scsb_intr(caddr_t arg)
 			(void) scsb_connect_slot(scsb, slotnum, B_FALSE);
 		} else {
 			if ((ac_slot == B_TRUE) &&
-				(scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES)) {
+			    (scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES)) {
 
 				DEBUG1("AC Removal on slot %d!\n", slotnum);
 #ifdef DEBUG
 				if (scsb_debug & 0x00010000) {
 					cmn_err(CE_NOTE, "scsb_intr: "
-							"!AC_PRES slot %d",
-							slotnum);
+					    "!AC_PRES slot %d",
+					    slotnum);
 				}
 #endif /* DEBUG */
 				scsb->scsb_hsc_state &= ~SCSB_ALARM_CARD_PRES;
@@ -5029,8 +5021,8 @@ scsb_intr(caddr_t arg)
 				 */
 				if (scsb_debug & 0x00000002) {
 					cmn_err(CE_WARN,
-						"scsb_intr: FRU type %d"
-						" not recognized", fru_type);
+					    "scsb_intr: FRU type %d"
+					    " not recognized", fru_type);
 				}
 				continue;
 			}
@@ -5044,16 +5036,16 @@ scsb_intr(caddr_t arg)
 				if (unit != fru_ptr->fru_unit)
 					continue;
 				if (fru_ptr->i2c_info == NULL ||
-						(tmp_reg = fru_ptr->i2c_info->
-							ledata_reg) == 0)
+				    (tmp_reg = fru_ptr->i2c_info->
+				    ledata_reg) == 0)
 					continue;
 				error = scsb_set_scfg_pres_leds(scsb, fru_ptr);
 				if (error) {
 					cmn_err(CE_WARN, "scsb_intr(): "
-						"I2C write error to 0x%x",
-						tmp_reg);
+					    "I2C write error to 0x%x",
+					    tmp_reg);
 					if (!(scsb->scsb_state &
-							SCSB_DEBUG_MODE)) {
+					    SCSB_DEBUG_MODE)) {
 						goto intr_error;
 					}
 				}
@@ -5074,7 +5066,7 @@ scsb_intr(caddr_t arg)
 	index = SCSB_REG_INDEX(intr_addr);
 	if (IS_SCB_P15) {
 		for (i = 0; i < SCTRL_BHLTHY_NUMREGS;
-				++i, ++intr_idx, ++intr_addr) {
+		    ++i, ++intr_idx, ++intr_addr) {
 			scsb->scsb_data_reg[index++] = scb_intr_regs[intr_idx];
 			intr_reg = scb_intr_regs[i];
 			while (intr_reg) {
@@ -5086,15 +5078,15 @@ scsb_intr(caddr_t arg)
 				slotnum = tonga_ssl_to_psl(scsb, idx + 1);
 				if (scsb->scsb_state & SCSB_IS_TONGA) {
 					if (slotnum > TG_MAX_SLOTS ||
-						slotnum == SC_TG_CPU_SLOT) {
+					    slotnum == SC_TG_CPU_SLOT) {
 						continue;
 					}
 				} else {
 					if (slotnum > MC_MAX_SLOTS ||
-						slotnum == SC_MC_CPU_SLOT ||
-						(scsb->scsb_hsc_state &
-						SCSB_HSC_CTC_PRES &&
-						slotnum == SC_MC_CTC_SLOT)) {
+					    slotnum == SC_MC_CPU_SLOT ||
+					    (scsb->scsb_hsc_state &
+					    SCSB_HSC_CTC_PRES &&
+					    slotnum == SC_MC_CTC_SLOT)) {
 						continue;
 					}
 				}
@@ -5107,11 +5099,11 @@ scsb_intr(caddr_t arg)
 	}
 	code = scsb_event_code;
 	if (retval & SCSB_INTR_EVENT &&
-			!(scsb->scsb_state & SCSB_P06_NOINT_KLUGE)) {
+	    !(scsb->scsb_state & SCSB_P06_NOINT_KLUGE)) {
 		check_fru_info(scsb, code);
 		add_event_code(scsb, code);
 		(void) scsb_queue_ops(scsb, QPUT_INT32, 1, &scsb_event_code,
-					"scsb_intr");
+		"scsb_intr");
 	}
 intr_error:
 	scb_post_e = gethrtime();
@@ -5119,7 +5111,7 @@ intr_error:
 	if (scsb_debug & 0x8000000)
 		cmn_err(CE_NOTE, "Summary of times in nsec: pre_time %llu, \
 			post_time %llu", scb_pre_e - scb_pre_s,
-			scb_post_e - scb_post_s);
+		    scb_post_e - scb_post_s);
 
 
 	mutex_enter(&scsb->scsb_mutex);
@@ -5175,18 +5167,18 @@ scsb_leds_switch(scsb_state_t *scsb, scsb_ustate_t op)
 	uchar_t		reg, idata, rwbuf[SCTRL_MAX_GROUP_NUMREGS];
 
 	if (scsb->scsb_state & SCSB_FROZEN &&
-			!(scsb->scsb_state & SCSB_IN_INTR)) {
+	    !(scsb->scsb_state & SCSB_IN_INTR)) {
 		return (EAGAIN);
 	}
 	if (scsb_debug & 0x0101) {
 		cmn_err(CE_NOTE, "scsb_leds_switch(%s):",
-				op == ON ? "ON" : "OFF");
+		    op == ON ? "ON" : "OFF");
 	}
 	/* Step 1: turn ON/OFF all NOK LEDs. */
 	if (scsb_debug & 0x0100) {
 		cmn_err(CE_NOTE, "scsb%d: turning all NOK LEDs %s",
-			scsb->scsb_instance,
-			op == ON ? "ON" : "OFF");
+		    scsb->scsb_instance,
+		    op == ON ? "ON" : "OFF");
 	}
 	if (op == ON)
 		idata = 0xff;
@@ -5200,19 +5192,19 @@ scsb_leds_switch(scsb_state_t *scsb, scsb_ustate_t op)
 	}
 	mutex_enter(&scsb->scsb_mutex);
 	i = scsb_rdwr_register(scsb, I2C_WR, reg, SCTRL_LED_NOK_NUMREGS,
-			rwbuf, 1);
+	    rwbuf, 1);
 	mutex_exit(&scsb->scsb_mutex);
 	if (i) {
 		if (scsb_debug & 0x0102)
 			cmn_err(CE_WARN, "scsb_leds_switch(): "
-				"Failed to turn %s NOK LEDs",
-				op == ON ? "ON" : "OFF");
+			    "Failed to turn %s NOK LEDs",
+			    op == ON ? "ON" : "OFF");
 	}
 	/* Step 2: turn ON/OFF all OK LEDs. */
 	if (scsb_debug & 0x0100) {
 		cmn_err(CE_NOTE, "scsb%d: turning all OK LEDs %s",
-			scsb->scsb_instance,
-			op == ON ? "ON" : "OFF");
+		    scsb->scsb_instance,
+		    op == ON ? "ON" : "OFF");
 	}
 	reg = SCSB_REG_ADDR(SCTRL_LED_OK_BASE);
 	index = SCSB_REG_INDEX(reg);
@@ -5222,13 +5214,13 @@ scsb_leds_switch(scsb_state_t *scsb, scsb_ustate_t op)
 	}
 	mutex_enter(&scsb->scsb_mutex);
 	i = scsb_rdwr_register(scsb, I2C_WR, reg, SCTRL_LED_OK_NUMREGS,
-			rwbuf, 1);
+	    rwbuf, 1);
 	mutex_exit(&scsb->scsb_mutex);
 	if (i) {
 		if (scsb_debug & 0x0102)
 			cmn_err(CE_WARN, "scsb_leds_switch(): "
-				"Failed to turn %s NOK LEDs",
-				op == ON ? "ON" : "OFF");
+			    "Failed to turn %s NOK LEDs",
+			    op == ON ? "ON" : "OFF");
 	}
 	/* Step 3: turn OFF all BLINK LEDs. */
 	if (op == OFF) {
@@ -5240,13 +5232,13 @@ scsb_leds_switch(scsb_state_t *scsb, scsb_ustate_t op)
 		}
 		mutex_enter(&scsb->scsb_mutex);
 		i = scsb_rdwr_register(scsb, I2C_WR, reg, SCTRL_BLINK_NUMREGS,
-				rwbuf, 1);
+		    rwbuf, 1);
 		mutex_exit(&scsb->scsb_mutex);
 		if (i) {
 			if (scsb_debug & 0x0102)
 				cmn_err(CE_WARN, "scsb_leds_switch(): "
-					"Failed to turn %s BLINK BITs",
-					op == ON ? "ON" : "OFF");
+				    "Failed to turn %s BLINK BITs",
+				    op == ON ? "ON" : "OFF");
 		}
 	}
 	return (0);
@@ -5270,7 +5262,7 @@ scsb_readall_regs(scsb_state_t *scsb)
 	reg = SCSB_REG_ADDR_START;	/* 1st register in set */
 	index = SCSB_REG_INDEX(reg);
 	error = scsb_rdwr_register(scsb, I2C_WR_RD, reg, SCSB_DATA_REGISTERS,
-					&scsb->scsb_data_reg[index], 1);
+	    &scsb->scsb_data_reg[index], 1);
 	return (error);
 }
 
@@ -5294,10 +5286,10 @@ scsb_write_mask(scsb_state_t *scsb,
 
 	if (scsb_debug & 0x0800) {
 		cmn_err(CE_NOTE, "scsb_write_mask(,%x,,%x,%x):",
-				reg, on_mask, off_mask);
+		    reg, on_mask, off_mask);
 	}
 	if (scsb->scsb_state & SCSB_FROZEN &&
-			!(scsb->scsb_state & SCSB_IN_INTR)) {
+	    !(scsb->scsb_state & SCSB_IN_INTR)) {
 		return (EAGAIN);
 	}
 	/* select the register address and read the register */
@@ -5315,7 +5307,7 @@ scsb_write_mask(scsb_state_t *scsb,
 	scsb->scsb_i2c_errcnt = 0;
 	if (scsb_debug & 0x0800)
 		cmn_err(CE_NOTE, "scsb_write_mask() read 0x%x",
-			i2cxferp->i2c_rbuf[0]);
+		    i2cxferp->i2c_rbuf[0]);
 	reg_data = i2cxferp->i2c_rbuf[0];
 	if (rmask)
 		reg_data &= rmask;
@@ -5345,11 +5337,11 @@ wm_error:
 	if (scsb->scsb_state & SCSB_SSB_PRESENT) {
 		if (scsb_debug & 0x0802)
 			cmn_err(CE_WARN,
-				"scsb_write_mask(): reg %x %s error, data=%x",
-				reg,
-				i2cxferp->i2c_flags & I2C_WR ? "write" : "read",
-				i2cxferp->i2c_flags & I2C_WR ?
-				i2cxferp->i2c_wbuf[1] : i2cxferp->i2c_rbuf[0]);
+			    "scsb_write_mask(): reg %x %s error, data=%x",
+			    reg,
+			    i2cxferp->i2c_flags & I2C_WR ? "write" : "read",
+			    i2cxferp->i2c_flags & I2C_WR ?
+			    i2cxferp->i2c_wbuf[1] : i2cxferp->i2c_rbuf[0]);
 	} else {
 		if (scsb->scsb_i2c_errcnt >= scsb_freeze_count)
 			scsb_freeze(scsb);
@@ -5371,10 +5363,10 @@ scsb_rdwr_register(scsb_state_t *scsb, int op, uchar_t reg, int len,
 
 	if (scsb_debug & 0x0800) {
 		cmn_err(CE_NOTE, "scsb_rdwr_register(scsb,%s,%x,%x,buf):",
-				(op == I2C_WR) ? "write" : "read",  reg, len);
+		    (op == I2C_WR) ? "write" : "read",  reg, len);
 	}
 	if (scsb->scsb_state & SCSB_FROZEN &&
-			!(scsb->scsb_state & SCSB_IN_INTR)) {
+	    !(scsb->scsb_state & SCSB_IN_INTR)) {
 		return (EAGAIN);
 	}
 	if (i2c_alloc) {
@@ -5382,7 +5374,7 @@ scsb_rdwr_register(scsb_state_t *scsb, int op, uchar_t reg, int len,
 		if (i2cxferp == NULL) {
 			if (scsb_debug & 0x0042)
 				cmn_err(CE_WARN, "scsb_rdwr_register: "
-						"i2ctx allocation failure");
+				    "i2ctx allocation failure");
 			return (ENOMEM);
 		}
 	} else {
@@ -5396,11 +5388,11 @@ scsb_rdwr_register(scsb_state_t *scsb, int op, uchar_t reg, int len,
 		i2cxferp->i2c_wbuf[0] = reg;
 		for (i = 0; i < len; ++i) {
 			scsb->scsb_data_reg[index + i] =
-					i2cxferp->i2c_wbuf[1 + i] = rwbuf[i];
+			    i2cxferp->i2c_wbuf[1 + i] = rwbuf[i];
 			if (scsb_debug & 0x0080)
 				cmn_err(CE_NOTE,
 				"scsb_rdwr_register: writing rwbuf[%d]=0x%x",
-						i, rwbuf[i]);
+				    i, rwbuf[i]);
 		}
 		break;
 	case I2C_WR_RD:
@@ -5425,11 +5417,11 @@ scsb_rdwr_register(scsb_state_t *scsb, int op, uchar_t reg, int len,
 		/* copy to rwbuf[] and keep shadow registers updated */
 		for (i = 0; i < len; ++i) {
 			scsb->scsb_data_reg[index + i] = rwbuf[i] =
-							i2cxferp->i2c_rbuf[i];
+			    i2cxferp->i2c_rbuf[i];
 			if (scsb_debug & 0x0080)
 				cmn_err(CE_NOTE,
 				"scsb_rdwr_register: read rwbuf[%d]=0x%x",
-						i, rwbuf[i]);
+				    i, rwbuf[i]);
 		}
 	}
 	if (i2c_alloc)
@@ -5444,8 +5436,8 @@ scsb_rdwr_register(scsb_state_t *scsb, int op, uchar_t reg, int len,
 			return (EAGAIN);
 		} else {
 			cmn_err(CE_WARN,
-				"scsb_rdwr_register(): I2C read error from %x",
-					reg);
+			    "scsb_rdwr_register(): I2C read error from %x",
+			    reg);
 		}
 	} else {
 		scsb->scsb_i2c_errcnt = 0;
@@ -5479,7 +5471,7 @@ check_fru_info(scsb_state_t *scsb, int evcode)
 	if (i > MCT_MAX_FRUS) {
 		if (scsb_debug & 0x00100000)
 			cmn_err(CE_NOTE,
-				"check_fru_info: index %d out of range", i);
+			    "check_fru_info: index %d out of range", i);
 		check_fru_info(scsb, new_evcode);
 		return;
 	}
@@ -5506,20 +5498,20 @@ check_fru_info(scsb_state_t *scsb, int evcode)
 	 * check for an entry in the CallBack table
 	 */
 	for (cbe_ptr = scsb_cb_table; cbe_ptr != NULL;
-			cbe_ptr = cbe_ptr->cb_next) {
+	    cbe_ptr = cbe_ptr->cb_next) {
 		if (cbe_ptr->cb_fru_id == fru_id &&
-				cbe_ptr->cb_fru_ptr == fru_ptr) {
+		    cbe_ptr->cb_fru_ptr == fru_ptr) {
 			if (scsb_debug & 0x00800000)
 				cmn_err(CE_NOTE,
-					"check_fru_info: callback for FRU_ID "
-					"0x%x; device is %spresent",
-					    (int)fru_id,
-					    fru_status == FRU_PRESENT ?
-						"" : "not ");
+				    "check_fru_info: callback for FRU_ID "
+				    "0x%x; device is %spresent",
+				    (int)fru_id,
+				    fru_status == FRU_PRESENT ?
+				    "" : "not ");
 			(*cbe_ptr->cb_func)(
-					cbe_ptr->cb_softstate_ptr,
-					cbe_ptr->cb_event,
-					fru_status);
+			    cbe_ptr->cb_softstate_ptr,
+			    cbe_ptr->cb_event,
+			    fru_status);
 			break;
 		}
 	}
@@ -5543,12 +5535,12 @@ scsb_alloc_kstats(scsb_state_t *scsb)
 	 */
 	if (scsb_debug & 0x00080001)
 		cmn_err(CE_NOTE,
-			"scsb_alloc_kstats: create scsb_leddata: %lu bytes",
-				sizeof (scsb_ks_leddata_t));
+		    "scsb_alloc_kstats: create scsb_leddata: %lu bytes",
+		    sizeof (scsb_ks_leddata_t));
 	if ((scsb->ks_leddata = kstat_create(scsb_name, scsb->scsb_instance,
-			SCSB_KS_LEDDATA, "misc", KSTAT_TYPE_RAW,
-			sizeof (scsb_ks_leddata_t), KSTAT_FLAG_PERSISTENT))
-			== NULL) {
+	    SCSB_KS_LEDDATA, "misc", KSTAT_TYPE_RAW,
+	    sizeof (scsb_ks_leddata_t), KSTAT_FLAG_PERSISTENT))
+	    == NULL) {
 		scsb->scsb_state |= SCSB_KSTATS;
 		scsb_free_kstats(scsb);
 		return (DDI_FAILURE);
@@ -5566,12 +5558,12 @@ scsb_alloc_kstats(scsb_state_t *scsb)
 	 */
 	if (scsb_debug & 0x00080000)
 		cmn_err(CE_NOTE,
-			"scsb_alloc_kstats: create scsb_state: %lu bytes",
-				sizeof (scsb_ks_state_t));
+		    "scsb_alloc_kstats: create scsb_state: %lu bytes",
+		    sizeof (scsb_ks_state_t));
 	if ((scsb->ks_state = kstat_create(scsb_name, scsb->scsb_instance,
-			SCSB_KS_STATE, "misc", KSTAT_TYPE_RAW,
-			sizeof (scsb_ks_state_t), KSTAT_FLAG_PERSISTENT))
-			== NULL) {
+	    SCSB_KS_STATE, "misc", KSTAT_TYPE_RAW,
+	    sizeof (scsb_ks_state_t), KSTAT_FLAG_PERSISTENT))
+	    == NULL) {
 		scsb->scsb_state |= SCSB_KSTATS;
 		scsb_free_kstats(scsb);
 		return (DDI_FAILURE);
@@ -5589,12 +5581,12 @@ scsb_alloc_kstats(scsb_state_t *scsb)
 	 */
 	if (scsb_debug & 0x00080000)
 		cmn_err(CE_NOTE,
-			"scsb_alloc_kstats: create env_toploogy: %lu bytes",
-				sizeof (mct_topology_t));
+		    "scsb_alloc_kstats: create env_toploogy: %lu bytes",
+		    sizeof (mct_topology_t));
 	if ((scsb->ks_topology = kstat_create(scsb_name, scsb->scsb_instance,
-			SCSB_KS_TOPOLOGY, "misc", KSTAT_TYPE_RAW,
-			sizeof (mct_topology_t), KSTAT_FLAG_PERSISTENT))
-			== NULL) {
+	    SCSB_KS_TOPOLOGY, "misc", KSTAT_TYPE_RAW,
+	    sizeof (mct_topology_t), KSTAT_FLAG_PERSISTENT))
+	    == NULL) {
 		scsb->scsb_state |= SCSB_KSTATS;
 		scsb_free_kstats(scsb);
 		return (DDI_FAILURE);
@@ -5613,10 +5605,10 @@ scsb_alloc_kstats(scsb_state_t *scsb)
 	if (scsb_debug & 0x00080001)
 		cmn_err(CE_NOTE,
 		    "scsb_alloc_kstats: create scsb_evc_register: %lu bytes",
-			sizeof (kstat_named_t) * 2);
+		    sizeof (kstat_named_t) * 2);
 	if ((scsb->ks_evcreg = kstat_create(scsb_name, scsb->scsb_instance,
-			SCSB_KS_EVC_REGISTER, "misc", KSTAT_TYPE_NAMED, 2,
-			KSTAT_FLAG_PERSISTENT|KSTAT_FLAG_WRITABLE)) == NULL) {
+	    SCSB_KS_EVC_REGISTER, "misc", KSTAT_TYPE_NAMED, 2,
+	    KSTAT_FLAG_PERSISTENT|KSTAT_FLAG_WRITABLE)) == NULL) {
 		scsb->scsb_state |= SCSB_KSTATS;
 		scsb_free_kstats(scsb);
 		return (DDI_FAILURE);
@@ -5645,7 +5637,7 @@ update_ks_leddata(kstat_t *ksp, int rw)
 	scsb = (scsb_state_t *)ksp->ks_private;
 	if (scsb_debug & 0x00080001)
 		cmn_err(CE_NOTE, "update_ks_leddata: KS_UPDATE%sset",
-			scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
+		    scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
 	/*
 	 * Since this is satisfied from the shadow registers, let it succeed
 	 * even if the SCB is not present.  It would be nice to return the
@@ -5730,8 +5722,8 @@ update_ks_evcreg(kstat_t *ksp, int rw)
 	scsb = (scsb_state_t *)ksp->ks_private;
 	if (scsb_debug & 0x00080001)
 		cmn_err(CE_NOTE, "update_ks_evcreg: %s(%d), KS_UPDATE%sset",
-				rw == KSTAT_READ ? "read" : "write", rw,
-			scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
+		    rw == KSTAT_READ ? "read" : "write", rw,
+		    scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
 	/*
 	 * Let this registration succeed
 	 *
@@ -5760,9 +5752,9 @@ update_ks_evcreg(kstat_t *ksp, int rw)
 			if (add_event_proc(scsb, pid)) {
 				if (scsb_debug & 0x02000002) {
 					cmn_err(CE_WARN,
-						"update_ks_evcreg: "
-						"process add failed for %d",
-							pid);
+					    "update_ks_evcreg: "
+					    "process add failed for %d",
+					    pid);
 				}
 				error = EOVERFLOW;
 			}
@@ -5771,9 +5763,9 @@ update_ks_evcreg(kstat_t *ksp, int rw)
 			if (del_event_proc(scsb, pid)) {
 				if (scsb_debug & 0x02000000) {
 					cmn_err(CE_NOTE,
-						"update_ks_evcreg: "
-						"process delete failed for %d",
-							pid);
+					    "update_ks_evcreg: "
+					    "process delete failed for %d",
+					    pid);
 				}
 				error = EOVERFLOW;
 			}
@@ -5806,7 +5798,7 @@ update_ks_state(kstat_t *ksp, int rw)
 	scsb = (scsb_state_t *)ksp->ks_private;
 	if (scsb_debug & 0x00080001)
 		cmn_err(CE_NOTE, "update_ks_state: KS_UPDATE%sset",
-			scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
+		    scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
 	/*
 	 * Let this succeed based on last known data
 	 *
@@ -5831,14 +5823,14 @@ update_ks_state(kstat_t *ksp, int rw)
 	 * scsb_freeze() will be called to update SCB info and scsb state.
 	 */
 	if (!(scsb->scsb_state & SCSB_SSB_PRESENT) &&
-			!(scsb->scsb_state & SCSB_FROZEN)) {
+	    !(scsb->scsb_state & SCSB_FROZEN)) {
 		uchar_t		data;
 		/* Read the SCB PROM ID */
 		if (data = scsb_rdwr_register(scsb, I2C_WR_RD,
-				(uchar_t)SCTRL_PROM_VERSION, 1, &data, 1))
+		    (uchar_t)SCTRL_PROM_VERSION, 1, &data, 1))
 			if (scsb_debug & 0x00080002)
 				cmn_err(CE_NOTE, "update_ks_state: SCB/I2C "
-						"failure %d", data);
+				    "failure %d", data);
 	}
 	mutex_exit(&scsb->scsb_mutex);
 	pks_state = (scsb_ks_state_t *)ksp->ks_data;
@@ -5894,7 +5886,7 @@ update_ks_topology(kstat_t *ksp, int rw)
 	scsb = (scsb_state_t *)ksp->ks_private;
 	if (scsb_debug & 0x00080001)
 		cmn_err(CE_NOTE, "update_ks_topology: KS_UPDATE%sset",
-			scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
+		    scsb->scsb_state & SCSB_KS_UPDATE ? " " : " not ");
 	/*
 	 * Let this succeed based on last known data
 	 *
@@ -5919,14 +5911,14 @@ update_ks_topology(kstat_t *ksp, int rw)
 	 * scsb_freeze() will be called to update SCB info and scsb state.
 	 */
 	if (!(scsb->scsb_state & SCSB_SSB_PRESENT) &&
-			!(scsb->scsb_state & SCSB_FROZEN)) {
+	    !(scsb->scsb_state & SCSB_FROZEN)) {
 		uchar_t		data;
 		/* Read the SCB PROM ID */
 		if (data = scsb_rdwr_register(scsb, I2C_WR_RD,
-				(uchar_t)SCTRL_PROM_VERSION, 1, &data, 1))
+		    (uchar_t)SCTRL_PROM_VERSION, 1, &data, 1))
 			if (scsb_debug & 0x00080002)
 				cmn_err(CE_NOTE, "update_ks_topology: SCB/I2C "
-						"failure %d", data);
+				    "failure %d", data);
 	}
 	mutex_exit(&scsb->scsb_mutex);
 	pks_topo = (mct_topology_t *)ksp->ks_data;
@@ -5952,9 +5944,9 @@ update_ks_topology(kstat_t *ksp, int rw)
 		 */
 		slotnum = tonga_psl_to_ssl(scsb, i+1);
 		val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_BHLTHY_BASE,
-						SCSB_FRU_OP_GET_BITVAL);
+		    SCSB_FRU_OP_GET_BITVAL);
 		pks_topo->mct_slots[i].fru_health = (val) ?
-			MCT_HEALTH_OK : MCT_HEALTH_NOK;
+		    MCT_HEALTH_OK : MCT_HEALTH_NOK;
 	}
 	fru_ptr = mct_system_info.fru_info_list[PDU];
 	for (i = 0; i < pks_topo->max_units[PDU]; ++i, ++fru_ptr) {
@@ -6006,15 +5998,15 @@ update_ks_topology(kstat_t *ksp, int rw)
 		if (scsb->scsb_kstat_flag == B_FALSE) {
 			uchar_t		data;
 			scsb_blind_read(scsb, I2C_WR_RD,
-			(uchar_t)SCTRL_PROM_VERSION, 1, &data, 1);
+			    (uchar_t)SCTRL_PROM_VERSION, 1, &data, 1);
 		}
 		pks_topo->mct_scb[i].fru_health = ((scsb->scsb_err_flag ==
-			B_TRUE || scsb->scsb_i2c_errcnt > scsb_err_threshold)
-			?  MCT_HEALTH_NOK : MCT_HEALTH_OK);
+		    B_TRUE || scsb->scsb_i2c_errcnt > scsb_err_threshold)
+		    ?  MCT_HEALTH_NOK : MCT_HEALTH_OK);
 #ifdef DEBUG
 		if (pks_topo->mct_scb[i].fru_health == MCT_HEALTH_NOK)
 			cmn_err(CE_WARN, "SCSB kstat health:%d", pks_topo->
-				mct_scb[i].fru_health);
+			    mct_scb[i].fru_health);
 #endif
 		scsb->scsb_err_flag = B_FALSE; /* clear error flag once read */
 		scsb->scsb_kstat_flag = B_FALSE; /* false? read from i2c */
@@ -6112,7 +6104,7 @@ scsb_alloc_i2ctx(i2c_client_hdl_t phandle, uint_t sleep)
 	i2c_transfer_t	*tp;
 
 	if (i2c_transfer_alloc(phandle, &tp, SCSB_DATA_REGISTERS + 2,
-			SCSB_DATA_REGISTERS + 2, sleep) == I2C_FAILURE) {
+	    SCSB_DATA_REGISTERS + 2, sleep) == I2C_FAILURE) {
 		return (NULL);
 	}
 	return (tp);
@@ -6137,7 +6129,7 @@ update_fru_info(scsb_state_t *scsb, fru_info_t *fru_ptr)
 	if (scsb_debug & 0x00100001)
 		cmn_err(CE_NOTE, "update_fru_info(scsb,0x%p)", fru_ptr);
 	if (fru_ptr == (fru_info_t *)NULL ||
-			fru_ptr->i2c_info == (fru_i2c_info_t *)NULL)
+	    fru_ptr->i2c_info == (fru_i2c_info_t *)NULL)
 		return;
 	/*
 	 * If this is an Alarm Card update, then we also need to get
@@ -6188,19 +6180,19 @@ update_fru_info(scsb_state_t *scsb, fru_info_t *fru_ptr)
 				if (acslot_ptr->fru_status == FRU_PRESENT)
 					/* for now it's unknown */
 					acslot_ptr->fru_type =
-							(scsb_utype_t)OC_UNKN;
+					    (scsb_utype_t)OC_UNKN;
 				else
 					acslot_ptr->fru_type =
-							(scsb_utype_t)OC_UNKN;
+					    (scsb_utype_t)OC_UNKN;
 			}
 		}
 	}
 	if (scsb_debug & 0x00100000)
 		cmn_err(CE_NOTE,
-			"update_fru_info: type %d unit %d is %spresent",
-				fru_ptr->fru_type, fru_ptr->fru_unit,
-				fru_ptr->fru_status == FRU_PRESENT
-					? "" : "not ");
+		    "update_fru_info: type %d unit %d is %spresent",
+		    fru_ptr->fru_type, fru_ptr->fru_unit,
+		    fru_ptr->fru_status == FRU_PRESENT
+		    ? "" : "not ");
 }
 
 /*
@@ -6224,7 +6216,7 @@ scsb_debug_prnt(char *fmt, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 	uintptr_t a4, uintptr_t a5)
 {
 	if (scsb_debug & 0x8000 ||
-			(*fmt == 'X' && scsb_debug & 0x00010000)) {
+	    (*fmt == 'X' && scsb_debug & 0x00010000)) {
 		if (*fmt == 'X')
 			++fmt;
 		prom_printf("scsb: ");
@@ -6255,18 +6247,19 @@ signal_evc_procs(scsb_state_t *scsb)
 			if (proc_signal(evc_procs[i], SIGPOLL)) {
 				if (scsb_debug & 0x02000002)
 					cmn_err(CE_WARN,
-						"scsb:signal_evc_procs: "
-						"signal to %d failed",
-					((struct pid *)evc_procs[i])->pid_id);
+					    "scsb:signal_evc_procs: "
+					    "signal to %d failed",
+					    ((struct pid *)
+					    evc_procs[i])->pid_id);
 				(void) del_event_proc(scsb,
-					((struct pid *)evc_procs[i])->pid_id);
+				    ((struct pid *)evc_procs[i])->pid_id);
 			}
 			if (++c >= evc_proc_count) {
 				if (scsb_debug & 0x02000000) {
 					cmn_err(CE_NOTE,
-						"signal_evc_procs: signaled "
-						"%d/%d processes", c,
-						evc_proc_count);
+					    "signal_evc_procs: signaled "
+					    "%d/%d processes", c,
+					    evc_proc_count);
 				}
 				break;
 			}
@@ -6313,7 +6306,7 @@ add_event_code(scsb_state_t *scsb, uint32_t event_code)
 	}
 	if (scsb_debug & 0x01000000) {
 		cmn_err(CE_NOTE, "add_event_code: 0x%x, FIFO size = %d",
-				event_code, evc_fifo_count);
+		    event_code, evc_fifo_count);
 	}
 	signal_evc_procs(scsb);
 }
@@ -6333,7 +6326,7 @@ del_event_code()
 	--evc_fifo_count;
 	if (scsb_debug & 0x01000000) {
 		cmn_err(CE_NOTE, "del_event_code: 0x%x, FIFO size = %d",
-				evc, evc_fifo_count);
+		    evc, evc_fifo_count);
 	}
 	return (evc);
 }
@@ -6372,8 +6365,8 @@ add_event_proc(scsb_state_t *scsb, pid_t pid)
 	if (curr_pid != pid) {
 		if (scsb_debug & 0x02000000) {
 			cmn_err(CE_WARN,
-				"add_event_proc: current %d != requestor %d",
-					curr_pid, pid);
+			    "add_event_proc: current %d != requestor %d",
+			    curr_pid, pid);
 		} else {
 			proc_unref(curr_proc);
 			return (1);
@@ -6385,8 +6378,8 @@ add_event_proc(scsb_state_t *scsb, pid_t pid)
 			evc_proc_count++;
 			if (scsb_debug & 0x02000000) {
 				cmn_err(CE_NOTE,
-					"add_event_proc: %d; evc_proc_count=%d",
-						pid, evc_proc_count);
+				    "add_event_proc: %d; evc_proc_count=%d",
+				    pid, evc_proc_count);
 			}
 			return (0);
 		}
@@ -6425,8 +6418,8 @@ del_event_proc(scsb_state_t *scsb, pid_t pid)
 			}
 			if (scsb_debug & 0x02000000) {
 				cmn_err(CE_NOTE,
-					"del_event_proc: %d; evc_proc_count=%d",
-						pid, evc_proc_count);
+				    "del_event_proc: %d; evc_proc_count=%d",
+				    pid, evc_proc_count);
 			}
 			proc_unref(this_proc);
 			return (0);
@@ -6449,7 +6442,7 @@ rew_event_proc(scsb_state_t *scsb)
 	int	i = 0;
 	if (scsb_debug & 0x02000001) {
 		cmn_err(CE_NOTE, "rew_event_proc: evc_proc_count=%d",
-				evc_proc_count);
+		    evc_proc_count);
 	}
 	for (; i < EVC_PROCS_MAX; ++i) {
 		if (evc_procs[i] != NULL) {
@@ -6536,8 +6529,8 @@ check_event_procs(uint32_t *return_evc)
 	}
 	if (scsb_debug & 0x02000000) {
 		cmn_err(CE_NOTE, "check_event_procs: pid=%d, evc=0x%x, "
-				"requests=%d, returning 0x%x", curr_pid,
-				*return_evc, evc_requests, return_val);
+		    "requests=%d, returning 0x%x", curr_pid,
+		    *return_evc, evc_requests, return_val);
 	}
 	return (return_val);
 }
@@ -6548,12 +6541,12 @@ scsb_queue_put(queue_t *rq, int count, uint32_t *data, char *caller)
 	mblk_t		*mp;
 	if (scsb_debug & 0x4001) {
 		cmn_err(CE_NOTE, "scsb_queue_put(0x%p, %d, 0x%x, %s)",
-				rq, count, *data, caller);
+		    rq, count, *data, caller);
 	}
 	mp = allocb(sizeof (uint32_t) * count, BPRI_HI);
 	if (mp == NULL) {
 		cmn_err(CE_WARN, "%s: allocb failed",
-				caller);
+		    caller);
 		return (B_FALSE);
 	}
 	while (count--) {
@@ -6579,8 +6572,8 @@ scsb_queue_ops(scsb_state_t	*scsb,
 	switch (op) {
 	case QPUT_INT32:
 		if (scsb->scsb_opens && scsb->scsb_rq != NULL &&
-				scsb_queue_put(scsb->scsb_rq, oparg,
-				(uint32_t *)opdata, caller) == B_FALSE) {
+		    scsb_queue_put(scsb->scsb_rq, oparg,
+		    (uint32_t *)opdata, caller) == B_FALSE) {
 			return (QOP_FAILED);
 		}
 	/*FALLTHROUGH*/	/* to look for opened clones */
@@ -6602,7 +6595,7 @@ scsb_queue_ops(scsb_state_t	*scsb,
 		if (find_open && clptr->cl_flags & SCSB_OPEN) {
 			if (clptr->cl_rq == NULL) {
 				cmn_err(CE_WARN, "%s: Clone %d has no queue",
-						caller, clptr->cl_minor);
+				    caller, clptr->cl_minor);
 				return (QOP_FAILED);
 			}
 			switch (op) {
@@ -6611,8 +6604,8 @@ scsb_queue_ops(scsb_state_t	*scsb,
 				break;
 			case QPUT_INT32:
 				if (scsb_queue_put(clptr->cl_rq, oparg,
-						(uint32_t *)opdata, caller)
-						== B_FALSE) {
+				    (uint32_t *)opdata, caller)
+				    == B_FALSE) {
 					retval = QOP_FAILED;
 				}
 				break;
@@ -6666,14 +6659,14 @@ scsb_fru_op(scsb_state_t *scsb, scsb_utype_t fru_type, int unit, int base,
 	/* get the global index of the register in this SCSB's address space */
 	idx    = SCSB_REG_INDEX(reg);
 	DEBUG4("scsb_fru_op(start): code=%x, offset=%x, tmp=%x, reg=%x\n",
-			code, offset, tmp, reg);
+	    code, offset, tmp, reg);
 	switch (op) {
 		case SCSB_FRU_OP_GET_REG:
 			rc = reg;
 			break;
 		case SCSB_FRU_OP_GET_BITVAL:
 			rc = (scsb->scsb_data_reg[idx] & (1 << offset))
-							>> offset;
+			    >> offset;
 			break;
 		case SCSB_FRU_OP_GET_REGDATA:
 			rc = scsb->scsb_data_reg[idx];
@@ -6685,7 +6678,7 @@ scsb_fru_op(scsb_state_t *scsb, scsb_utype_t fru_type, int unit, int base,
 			break;
 	}
 	DEBUG4("scsb_fru_op: unit=%x, base=%x, op=%d, rc=%x\n", unit, base,
-					op, rc);
+	    op, rc);
 	return (rc);
 }
 
@@ -6712,7 +6705,7 @@ scsb_get_slot_state(scsb_state_t *scsb, int pslotnum, int *rstate)
 		return (DDI_FAILURE);
 	slotnum = tonga_psl_to_ssl(scsb, pslotnum);
 	val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_SYSCFG_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+	    SCSB_FRU_OP_GET_BITVAL);
 	if (! val) {
 		*rstate = HPC_SLOT_EMPTY;
 		return (0);
@@ -6726,18 +6719,18 @@ scsb_get_slot_state(scsb_state_t *scsb, int pslotnum, int *rstate)
 	if ((rc != EAGAIN) && (rc != DDI_SUCCESS))
 		return (DDI_FAILURE);
 	val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+	    SCSB_FRU_OP_GET_BITVAL);
 	if (val)
 		*rstate = HPC_SLOT_DISCONNECTED;
 	else {
 		if (scsb_fru_op(scsb, SLOT, slotnum, SCTRL_BHLTHY_BASE,
-					SCSB_FRU_OP_GET_BITVAL)) {
+		    SCSB_FRU_OP_GET_BITVAL)) {
 			*rstate = HPC_SLOT_CONNECTED;
 		} else {
 			cmn_err(CE_WARN, "%s#%d: Reset Not Asserted on "
-				"Healthy# Failed slot %d!",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev), slotnum);
+			    "Healthy# Failed slot %d!",
+			    ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev), slotnum);
 			*rstate = HPC_SLOT_DISCONNECTED;
 		}
 	}
@@ -6754,11 +6747,11 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 
 	if (scsb_debug & 0x8001)
 		cmn_err(CE_NOTE, "scsb_reset_slot(%d), flag %x", pslotnum,
-						reset_flag);
+		    reset_flag);
 	if (scsb->scsb_state & SCSB_FROZEN)
 		return (EAGAIN);
 	if ((i2cxferp = scsb_alloc_i2ctx(scsb->scsb_phandle,
-		I2C_NOSLEEP)) == NULL) {
+	    I2C_NOSLEEP)) == NULL) {
 		return (ENOMEM);
 	}
 	slotnum = tonga_psl_to_ssl(scsb, pslotnum);
@@ -6795,14 +6788,14 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 				mutex_enter(&scsb->scsb_mutex);
 		}
 		cmn_err(CE_WARN, "%s#%d: scsb_reset_slot: error"
-			" reading Reset regs\n",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev));
+		    " reading Reset regs\n",
+		    ddi_driver_name(scsb->scsb_dev),
+		    ddi_get_instance(scsb->scsb_dev));
 		error = DDI_FAILURE;
 	}
 
 	DEBUG2("pre-reset regs = %x,%x\n", scsb->scsb_data_reg[index],
-					scsb->scsb_data_reg[index+1]);
+	    scsb->scsb_data_reg[index+1]);
 	if ((reset_flag == SCSB_GET_SLOT_RESET_STATUS) || (error)) {
 		mutex_exit(&scsb->scsb_mutex);
 		scsb_free_i2ctx(scsb->scsb_phandle, i2cxferp);
@@ -6810,10 +6803,10 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 	}
 
 	val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+	    SCSB_FRU_OP_GET_BITVAL);
 	if (alarm_card) {
 		ac_val = scsb_fru_op(scsb, ALARM, 1, SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+		    SCSB_FRU_OP_GET_BITVAL);
 	}
 	if (val && (reset_flag == SCSB_RESET_SLOT)) {
 		if (alarm_card) {
@@ -6824,7 +6817,7 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 #ifndef	lint
 			else
 				DEBUG1("Alarm_RST# not active! "
-					"Slot%d_RST# active!\n", pslotnum);
+				    "Slot%d_RST# active!\n", pslotnum);
 #endif
 		} else {
 			condition_exists = 1;
@@ -6841,13 +6834,13 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 #ifndef	lint
 				else
 					DEBUG1("Alarm_RST# active"
-						" Slot%d_RST# not active!\n",
-								pslotnum);
+					    " Slot%d_RST# not active!\n",
+					    pslotnum);
 #endif
 			} else {
 				condition_exists = 1;
 				DEBUG1("Slot%d_RST# already not active!\n",
-						pslotnum);
+				    pslotnum);
 			}
 		}
 
@@ -6855,36 +6848,36 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 		i2cxferp->i2c_flags = I2C_WR;
 		i2cxferp->i2c_wlen = 2;
 		i2cxferp->i2c_wbuf[0] = scsb_fru_op(scsb, SLOT, slotnum,
-				SCTRL_RESET_BASE, SCSB_FRU_OP_GET_REG);
+		    SCTRL_RESET_BASE, SCSB_FRU_OP_GET_REG);
 		if (reset_flag == SCSB_RESET_SLOT) {
 			i2cxferp->i2c_wbuf[1] =
-				scsb_fru_op(scsb, SLOT, slotnum,
-					SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_REGDATA) |
-					scsb_fru_op(scsb, SLOT, slotnum,
-					SCTRL_RESET_BASE,
-					SCSB_FRU_OP_SET_REGBIT);
+			    scsb_fru_op(scsb, SLOT, slotnum,
+			    SCTRL_RESET_BASE,
+			    SCSB_FRU_OP_GET_REGDATA) |
+			    scsb_fru_op(scsb, SLOT, slotnum,
+			    SCTRL_RESET_BASE,
+			    SCSB_FRU_OP_SET_REGBIT);
 #ifdef	DEBUG		/* dont reset Alarm Card line unless in debug mode */
 			if (alarm_card)
 				i2cxferp->i2c_wbuf[1] |=
-					scsb_fru_op(scsb, ALARM, 1,
-						SCTRL_RESET_BASE,
-						SCSB_FRU_OP_SET_REGBIT);
+				    scsb_fru_op(scsb, ALARM, 1,
+				    SCTRL_RESET_BASE,
+				    SCSB_FRU_OP_SET_REGBIT);
 #endif
 		} else {
 			i2cxferp->i2c_wbuf[1] =
-				scsb_fru_op(scsb, SLOT, slotnum,
-					SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_REGDATA) &
-					~(scsb_fru_op(scsb, SLOT, slotnum,
-					SCTRL_RESET_BASE,
-					SCSB_FRU_OP_SET_REGBIT));
+			    scsb_fru_op(scsb, SLOT, slotnum,
+			    SCTRL_RESET_BASE,
+			    SCSB_FRU_OP_GET_REGDATA) &
+			    ~(scsb_fru_op(scsb, SLOT, slotnum,
+			    SCTRL_RESET_BASE,
+			    SCSB_FRU_OP_SET_REGBIT));
 #ifdef	DEBUG		/* dont Unreset Alarm Card line unless in debug mode */
 			if (alarm_card)
 				i2cxferp->i2c_wbuf[1] &=
-					scsb_fru_op(scsb, ALARM, 1,
-						SCTRL_RESET_BASE,
-						SCSB_FRU_OP_SET_REGBIT);
+				    scsb_fru_op(scsb, ALARM, 1,
+				    SCTRL_RESET_BASE,
+				    SCSB_FRU_OP_SET_REGBIT);
 #endif
 		}
 
@@ -6898,10 +6891,10 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 					scsb_freeze(scsb);
 			}
 			cmn_err(CE_WARN, "%s#%d: reset_slot: error writing to"
-				" Reset regs (op=%d, data=%x)\n",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev),
-				reset_flag, i2cxferp->i2c_wbuf[1]);
+			    " Reset regs (op=%d, data=%x)\n",
+			    ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev),
+			    reset_flag, i2cxferp->i2c_wbuf[1]);
 			scsb_free_i2ctx(scsb->scsb_phandle, i2cxferp);
 			return (DDI_FAILURE);
 		}
@@ -6913,7 +6906,7 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 		i2cxferp->i2c_wbuf[0] = reg;
 		i2cxferp->i2c_wlen = 1;
 		if ((error = nct_i2c_transfer(scsb->scsb_phandle,
-				i2cxferp)) == 0) {
+		    i2cxferp)) == 0) {
 			scsb->scsb_i2c_errcnt = 0;
 			scsb->scsb_data_reg[index]   = i2cxferp->i2c_rbuf[0];
 			scsb->scsb_data_reg[index+1] = i2cxferp->i2c_rbuf[1];
@@ -6927,48 +6920,48 @@ scsb_reset_slot(scsb_state_t *scsb, int pslotnum, int reset_flag)
 					scsb_freeze(scsb);
 			}
 			cmn_err(CE_WARN, "%s#%d: scsb_reset_slot: error"
-				" reading Reset regs (post reset)\n",
-				ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev));
+			    " reading Reset regs (post reset)\n",
+			    ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev));
 			scsb_free_i2ctx(scsb->scsb_phandle, i2cxferp);
 			return (DDI_FAILURE);
 		}
 		/* XXX: P1.5 */
 		DEBUG2("post-reset regs = %x,%x\n", scsb->scsb_data_reg[index],
-					scsb->scsb_data_reg[index+1]);
+		    scsb->scsb_data_reg[index+1]);
 		val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+		    SCSB_FRU_OP_GET_BITVAL);
 #ifdef	DEBUG
 		if (alarm_card)
 			ac_val = scsb_fru_op(scsb, ALARM, 1, SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+			    SCSB_FRU_OP_GET_BITVAL);
 #endif
 		if (val && (reset_flag == SCSB_UNRESET_SLOT)) {
 			cmn_err(CE_WARN, "Cannot UnReset Slot %d (reg=%x)\n",
-				pslotnum,
-				scsb_fru_op(scsb, SLOT, slotnum,
-					SCTRL_RESET_BASE,
-					SCSB_FRU_OP_GET_REGDATA));
+			    pslotnum,
+			    scsb_fru_op(scsb, SLOT, slotnum,
+			    SCTRL_RESET_BASE,
+			    SCSB_FRU_OP_GET_REGDATA));
 #ifdef	DEBUG
 			if (alarm_card) {
 				if (ac_val)
 					cmn_err(CE_WARN, "Cannot Unreset "
-							"Alarm_RST#.\n");
+					    "Alarm_RST#.\n");
 			}
 #endif
 		}
 		else
 			if ((val == 0) && (reset_flag == SCSB_RESET_SLOT)) {
 				cmn_err(CE_WARN, "Cannot Reset Slot %d, "
-					"reg=%x\n", pslotnum,
-					scsb_fru_op(scsb, SLOT, slotnum,
-						SCTRL_RESET_BASE,
-						SCSB_FRU_OP_GET_REGDATA));
+				    "reg=%x\n", pslotnum,
+				    scsb_fru_op(scsb, SLOT, slotnum,
+				    SCTRL_RESET_BASE,
+				    SCSB_FRU_OP_GET_REGDATA));
 #ifdef	DEBUG
 				if (alarm_card) {
 					if (!ac_val)
 						cmn_err(CE_WARN, "Cannot reset "
-							"Alarm_RST#.\n");
+						    "Alarm_RST#.\n");
 				}
 #endif
 			}
@@ -7009,7 +7002,7 @@ scsb_connect_slot(scsb_state_t *scsb, int pslotnum, int healthy)
 		if (scsb_read_bhealthy(scsb) != 0)
 			return (DDI_FAILURE);
 		val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_BHLTHY_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+		    SCSB_FRU_OP_GET_BITVAL);
 		if (val) {
 			healthy = B_TRUE;
 			break;
@@ -7021,12 +7014,12 @@ scsb_connect_slot(scsb_state_t *scsb, int pslotnum, int healthy)
 	if (healthy == B_FALSE && count == scsb_healthy_poll_count) {
 		if (scsb_debug & 0x00004000)
 			cmn_err(CE_WARN, "%s#%d: no HEALTHY# signal on"
-				" slot %d", ddi_driver_name(scsb->scsb_dev),
-				ddi_get_instance(scsb->scsb_dev), pslotnum);
+			    " slot %d", ddi_driver_name(scsb->scsb_dev),
+			    ddi_get_instance(scsb->scsb_dev), pslotnum);
 	}
 
 	if ((scsb_is_alarm_card_slot(scsb, pslotnum) == B_TRUE) &&
-			(scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES))
+	    (scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES))
 		slot_flag = ALARM_CARD_ON_SLOT;
 	return (hsc_slot_occupancy(pslotnum, 1, slot_flag, healthy));
 }
@@ -7054,7 +7047,7 @@ scsb_disconnect_slot(scsb_state_t *scsb, int occupied, int slotnum)
 	 * However, hsc module doesn't depend on slot_flag during removal.
 	 */
 	if ((scsb_is_alarm_card_slot(scsb, slotnum) == B_TRUE) &&
-			(scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES))
+	    (scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES))
 		slot_flag = ALARM_CARD_ON_SLOT;
 	return (hsc_slot_occupancy(slotnum, occupied, slot_flag, B_FALSE));
 }
@@ -7080,9 +7073,9 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 	uint32_t	event_code;
 
 	if (!(scsb->scsb_hsc_state & SCSB_HSC_INIT &&
-		scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES)) {
+	    scsb->scsb_hsc_state & SCSB_ALARM_CARD_PRES)) {
 		cmn_err(CE_WARN,
-			"scsb: HSC not initialized or AC not present!");
+		    "scsb: HSC not initialized or AC not present!");
 		return (rc);
 	}
 	switch (op) {
@@ -7102,7 +7095,7 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 			DEBUG0("AC SET BUSY\n");
 			if (scsb_debug & 0x00010000) {
 				cmn_err(CE_NOTE,
-					"scsb_hsc_ac_op(SCSB_HSC_AC_SET_BUSY)");
+				    "scsb_hsc_ac_op(SCSB_HSC_AC_SET_BUSY)");
 			}
 			scsb->scsb_hsc_state |= SCSB_ALARM_CARD_IN_USE;
 			rc = B_TRUE;
@@ -7122,7 +7115,7 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 			 */
 			event_code = SCTRL_EVENT_ALARM_INSERTION;
 			(void) scsb_queue_ops(scsb, QPUT_INT32, 1,
-						&event_code, "scsb_hsc_ac_op");
+			    &event_code, "scsb_hsc_ac_op");
 			rc = B_TRUE;
 			break;
 
@@ -7140,7 +7133,7 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 			 */
 			event_code = SCTRL_EVENT_ALARM_REMOVAL;
 			(void) scsb_queue_ops(scsb, QPUT_INT32, 1,
-						&event_code, "scsb_hsc_ac_op");
+			    &event_code, "scsb_hsc_ac_op");
 			rc = B_TRUE;
 			break;
 
@@ -7149,8 +7142,8 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 			DEBUG0("AC unconfigure\n");
 			if (scsb_debug & 0x00010000) {
 				cmn_err(CE_NOTE,
-					"scsb_hsc_ac_op(SCSB_HSC_AC_UNCONFIG"
-					"URE), AC NOT BUSY");
+				    "scsb_hsc_ac_op(SCSB_HSC_AC_UNCONFIG"
+				    "URE), AC NOT BUSY");
 			}
 			/*
 			 * send notification back to HSC to
@@ -7159,7 +7152,7 @@ scsb_hsc_ac_op(scsb_state_t *scsb, int pslotnum, int op)
 			 */
 			scsb->scsb_hsc_state &= ~SCSB_ALARM_CARD_IN_USE;
 			hsc_ac_op(scsb->scsb_instance, pslotnum,
-					SCSB_HSC_AC_UNCONFIGURE, NULL);
+			    SCSB_HSC_AC_UNCONFIGURE, NULL);
 			rc = B_TRUE;
 			break;
 		default:
@@ -7186,16 +7179,16 @@ scsb_healthy_intr(scsb_state_t *scsb, int pslotnum)
 		if (pslotnum > TG_MAX_SLOTS || pslotnum == SC_TG_CPU_SLOT) {
 			if (scsb_debug & 0x08000000)
 				cmn_err(CE_NOTE, "Healthy interrupt bit set for"
-					" slot %d", pslotnum);
+				    " slot %d", pslotnum);
 		return;
 		}
 	} else {
 		if (pslotnum > MC_MAX_SLOTS || pslotnum == SC_MC_CPU_SLOT ||
-			(scsb->scsb_hsc_state & SCSB_HSC_CTC_PRES &&
-			pslotnum == SC_MC_CTC_SLOT)) {
+		    (scsb->scsb_hsc_state & SCSB_HSC_CTC_PRES &&
+		    pslotnum == SC_MC_CTC_SLOT)) {
 			if (scsb_debug & 0x08000000)
 				cmn_err(CE_NOTE, "Healthy interrupt bit set for"
-					" slot %d", pslotnum);
+				    " slot %d", pslotnum);
 		return;
 		}
 	}
@@ -7210,7 +7203,7 @@ scsb_healthy_intr(scsb_state_t *scsb, int pslotnum)
 	 * P1.5. Following works since slots 1 through 8 are in the same reg
 	 */
 	val = scsb_fru_op(scsb, SLOT, slotnum, SCTRL_BHLTHY_BASE,
-					SCSB_FRU_OP_GET_BITVAL);
+	    SCSB_FRU_OP_GET_BITVAL);
 	if (val)
 		healthy = B_TRUE;
 	scsb_hsc_board_healthy(pslotnum, healthy);
@@ -7229,7 +7222,7 @@ scsb_blind_read(scsb_state_t *scsb, int op, uchar_t reg, int len,
 
 	if (scsb_debug & 0x0800) {
 		cmn_err(CE_NOTE, "scsb_rdwr_register(scsb,%s,%x,%x,buf):",
-				(op == I2C_WR) ? "write" : "read",  reg, len);
+		    (op == I2C_WR) ? "write" : "read",  reg, len);
 	}
 
 	if (i2c_alloc) {
@@ -7237,7 +7230,7 @@ scsb_blind_read(scsb_state_t *scsb, int op, uchar_t reg, int len,
 		if (i2cxferp == NULL) {
 			if (scsb_debug & 0x0042)
 				cmn_err(CE_WARN, "scsb_rdwr_register: "
-						"i2ctx allocation failure");
+				    "i2ctx allocation failure");
 			return (ENOMEM);
 		}
 	} else {
@@ -7253,7 +7246,7 @@ scsb_blind_read(scsb_state_t *scsb, int op, uchar_t reg, int len,
 			if (scsb_debug & 0x0080)
 				cmn_err(CE_NOTE,
 				"scsb_rdwr_register: writing rwbuf[%d]=0x%x",
-						i, rwbuf[i]);
+				    i, rwbuf[i]);
 		}
 		break;
 	case I2C_WR_RD:
@@ -7281,7 +7274,7 @@ scsb_blind_read(scsb_state_t *scsb, int op, uchar_t reg, int len,
 			if (scsb_debug & 0x0080)
 				cmn_err(CE_NOTE,
 				"scsb_rdwr_register: read rwbuf[%d]=0x%x",
-						i, rwbuf[i]);
+				    i, rwbuf[i]);
 		}
 	}
 	if (i2c_alloc)
@@ -7328,7 +7321,7 @@ scsb_quiesce_psmint(scsb_state_t *scsb)
 		clr_bits = 1 << offset;
 
 		error = scsb_rdwr_register(scsb, I2C_WR_RD, tmp_reg,
-					1, &scb_intr_regs[intr_idx], 0);
+		    1, &scb_intr_regs[intr_idx], 0);
 		/*
 		 * Now mask the global PSM_INT and write INIT_SCB in case
 		 * this is an INIT_SCB interrupt
@@ -7337,7 +7330,7 @@ scsb_quiesce_psmint(scsb_state_t *scsb)
 		i = SYS_REG_INDEX(SCTRL_SYS_SCB_INIT, SCTRL_SYS_CMD_BASE);
 		reg = SCSB_REG_ADDR(i);
 		error = scsb_rdwr_register(scsb, I2C_WR, reg, 1,
-					&wdata, 0);
+		    &wdata, 0);
 
 		if (scb_intr_regs[intr_idx] & clr_bits) {
 			/*
@@ -7345,15 +7338,15 @@ scsb_quiesce_psmint(scsb_state_t *scsb)
 			 * first to keep SCB_INIT from keeping PSM_INT asserted.
 			 */
 			error = scsb_rdwr_register(scsb, I2C_WR, tmp_reg,
-						1, &clr_bits, 0);
+			    1, &clr_bits, 0);
 		}
 
 		if (error) {
 			cmn_err(CE_WARN, "scsb%d:scsb_quiesce_psmint: "
-				" I2C TRANSFER Failed", scsb->scsb_instance);
+			    " I2C TRANSFER Failed", scsb->scsb_instance);
 			if (scsb_debug & 0x0006) {
 				cmn_err(CE_NOTE, "scsb_attach: "
-					" failed to set SCB_INIT");
+				    " failed to set SCB_INIT");
 			}
 		}
 		scsb->scsb_state &= ~SCSB_PSM_INT_ENABLED;
@@ -7364,9 +7357,9 @@ scsb_quiesce_psmint(scsb_state_t *scsb)
 		 */
 		/* read the interrupt register from scsb */
 		if (error = scsb_rdwr_register(scsb, I2C_WR_RD, intr_addr,
-					SCTRL_INTR_NUMREGS, scb_intr_regs, 0)) {
+		    SCTRL_INTR_NUMREGS, scb_intr_regs, 0)) {
 			cmn_err(CE_WARN, "scsb_intr: "
-				" Failed read of interrupt registers.");
+			    " Failed read of interrupt registers.");
 			scsb->scsb_state &= ~SCSB_IN_INTR;
 		}
 
@@ -7375,9 +7368,9 @@ scsb_quiesce_psmint(scsb_state_t *scsb)
 		 * from interrupting.
 		 */
 		if (error = scsb_rdwr_register(scsb, I2C_WR, intr_addr,
-					SCTRL_INTR_NUMREGS, scb_intr_regs, 0)) {
+		    SCTRL_INTR_NUMREGS, scb_intr_regs, 0)) {
 			cmn_err(CE_WARN, "scsb_intr: Failed write to interrupt"
-					" registers.");
+			    " registers.");
 			scsb->scsb_state &= ~SCSB_IN_INTR;
 		}
 
@@ -7409,7 +7402,7 @@ scsb_toggle_psmint(scsb_state_t *scsb, int enable)
 	reg = SCSB_REG_ADDR(i);
 	if (scsb_write_mask(scsb, reg, rmask, on, off)) {
 		cmn_err(CE_WARN, "scsb_toggle_psmint: Cannot turn %s PSM_INT",
-			enable == 1 ? "on" : "off");
+		    enable == 1 ? "on" : "off");
 		return (DDI_FAILURE);
 	}
 	if (enable == 0) {

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * audio810 Audio Driver
@@ -277,13 +276,14 @@ static struct dev_ops audio810_dev_ops = {
 	nodev,			/* devo_reset */
 	&audio810_cb_ops,	/* devi_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
 static struct modldrv audio810_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	I810_MOD_NAME" %I%",	/* drv_linkinfo */
+	I810_MOD_NAME,		/* drv_linkinfo */
 	&audio810_dev_ops,	/* drv_dev_ops */
 };
 

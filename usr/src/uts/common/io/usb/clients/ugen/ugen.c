@@ -106,7 +106,8 @@ static struct dev_ops ugen_skel_ops = {
 	nodev,				/* reset */
 	&ugen_skel_cb_ops,		/* driver operations */
 	NULL,				/* bus operations */
-	ugen_skel_power			/* power */
+	ugen_skel_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

@@ -26,7 +26,6 @@
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2008
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -151,7 +150,8 @@ static struct dev_ops mc_ops = {
 	nulldev,			/* reset */
 	&mc_cb_ops,			/* cb_ops */
 	(struct bus_ops *)0,		/* bus_ops */
-	nulldev				/* power */
+	nulldev,			/* power */
+	ddi_quiesce_not_needed,			/* quiesce */
 };
 
 /*
@@ -312,7 +312,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* module type, this one is a driver */
-	"OPL Memory-controller %I%",	/* module name */
+	"OPL Memory-controller",	/* module name */
 	&mc_ops,			/* driver ops */
 };
 

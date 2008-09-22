@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Starcat PCI SBBC Nexus Driver.
@@ -234,7 +233,8 @@ struct dev_ops  sbbc_ops = {
 	nodev,			/* devo_reset */
 	&sbbc_cb_ops,		/* devo_cb_ops */
 	&sbbc_bus_ops,		/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -244,7 +244,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv sbbcmodldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"PCI Sbbc Nexus Driver v%I%",
+	"PCI Sbbc Nexus Driver",
 	&sbbc_ops,
 };
 
@@ -260,7 +260,7 @@ _init(void)
 	int    error;
 
 	if ((error = ddi_soft_state_init(&sbbcsoft_statep,
-		    sizeof (struct sbbcsoft), 1)) != 0)
+	    sizeof (struct sbbcsoft), 1)) != 0)
 		return (error);
 	if ((error = mod_install(&sbbcmodlinkage)) != 0)
 		ddi_soft_state_fini(&sbbcsoft_statep);
@@ -473,8 +473,8 @@ sbbc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 		mutex_enter(&sbbcsoftp->umutex);
 		if (sbbcsoftp->suspended) {
-		    mutex_exit(&sbbcsoftp->umutex);
-		    return (DDI_FAILURE);
+			mutex_exit(&sbbcsoftp->umutex);
+			return (DDI_FAILURE);
 		}
 		sbbcsoftp->suspended = 1;
 		mutex_exit(&sbbcsoftp->umutex);
@@ -487,7 +487,7 @@ sbbc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (!(sbbcsoftp = ddi_get_soft_state(sbbcsoft_statep, instance))) {
 		cmn_err(CE_WARN, "sbbc_detach: unable to get softstate %p",
 		    (void *)sbbcsoftp);
-	    return (DDI_FAILURE);
+		return (DDI_FAILURE);
 	}
 
 	ddi_remove_minor_node(dip, NULL);
@@ -531,7 +531,7 @@ sbbc_busmap(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	 */
 	instance = ddi_get_instance(dip);
 	if (!(sbbcsoftp = ddi_get_soft_state(sbbcsoft_statep, instance)))
-	    return (DDI_FAILURE);
+		return (DDI_FAILURE);
 
 	switch (mp->map_type) {
 	case DDI_MT_REGSPEC:
@@ -906,8 +906,8 @@ sbbc_apply_range(struct sbbcsoft *sbbc_p, dev_info_t *rdip,
 			if ((child_rp->addr_low >=
 			    rangep->sbbc_phys_low) &&
 			    ((child_rp->addr_low + child_rp->size - 1)
-				<= (rangep->sbbc_phys_low +
-				    rangep->rng_size - 1))) {
+			    <= (rangep->sbbc_phys_low +
+			    rangep->rng_size - 1))) {
 				uint_t addr_offset = child_rp->addr_low -
 				    rangep->sbbc_phys_low;
 				/*
@@ -923,7 +923,7 @@ sbbc_apply_range(struct sbbcsoft *sbbc_p, dev_info_t *rdip,
 				rp->pci_size_hi = 0;
 				rp->pci_size_low =
 				    min(child_rp->size, (rangep->rng_size -
-					addr_offset));
+				    addr_offset));
 
 				break;
 			}
@@ -1004,7 +1004,7 @@ sbbc_config4pci(struct sbbcsoft *sbbcsoftp)
 	}
 #endif
 	comm = (PCI_COMM_ME | PCI_COMM_MAE | PCI_COMM_SERR_ENABLE |
-		    PCI_COMM_PARITY_DETECT);
+	    PCI_COMM_PARITY_DETECT);
 
 	pci_config_put16(conf_handle, PCI_CONF_COMM, comm);
 
@@ -1073,7 +1073,7 @@ sbbc_open(dev_t *dev, int flag, int otype, cred_t *credp)
 	if (instance < 0)
 		return (ENXIO);
 	sbbcsoftp = (struct sbbcsoft *)ddi_get_soft_state(sbbcsoft_statep,
-							    instance);
+	    instance);
 	SBBCTRACE(sbbc_open, 'OPEN', sbbcsoftp);
 
 	if (sbbcsoftp == NULL)
@@ -1104,7 +1104,7 @@ sbbc_close(dev_t dev, int flag, int otype, cred_t *credp)
 	if (instance < 0)
 		return (ENXIO);
 	sbbcsoftp = (struct sbbcsoft *)ddi_get_soft_state(sbbcsoft_statep,
-							    instance);
+	    instance);
 	/* wait till all output activity has ceased */
 
 	mutex_enter(&sbbcsoftp->umutex);
@@ -1171,7 +1171,7 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		offset = (uint64_t)sbbcsoftp->pci_sbbc_map;
 		offset += sbbcregs.offset;
 		ddi_put32(sbbcsoftp->pci_sbbc_map_handle, (uint32_t *)offset,
-			    sbbcregs.value);
+		    sbbcregs.value);
 		}
 		break;
 	case SBBC_SBBCREG_RD:
@@ -1212,10 +1212,11 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		offset += sbbcregs.offset;
 
 		sbbcregs.value = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
-						    (uint32_t *)offset);
+		    (uint32_t *)offset);
 
 		if (ddi_copyout((caddr_t)&sbbcregs.value,
-	    &((struct ssc_sbbc_regio *)arg)->value, sbbcregs.len, mode)) {
+		    &((struct ssc_sbbc_regio *)arg)->value,
+		    sbbcregs.len, mode)) {
 			cmn_err(CE_WARN, "sbbc_ioctl:copyout failed arg %p",
 			    (void *)arg);
 			return (EFAULT);
@@ -1468,7 +1469,7 @@ sbbc_dbg(uint32_t flag, dev_info_t *dip, char *fmt,
 		}
 
 		cmn_err(CE_CONT, "%s_%s(%d): ", ddi_driver_name(dip), s,
-			ddi_get_instance(dip));
+		    ddi_get_instance(dip));
 		cmn_err(CE_CONT, fmt, a1, a2, a3, a4, a5);
 	}
 }

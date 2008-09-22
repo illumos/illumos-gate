@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -69,6 +68,7 @@ kcondvar_t uacond;
 kthread_t *ua_shutdown_thread = NULL;
 
 int sys_shutdown = 0;
+volatile int fastreboot_dryrun = 0;
 
 /*
  * Kill all user processes in said zone.  A special argument of ALL_ZONES is
@@ -379,6 +379,16 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	size_t nbytes = 0;
 	cred_t *credp = CRED();
 	char *bootargs = NULL;
+	int reset_status = 0;
+
+	if (cmd == A_SHUTDOWN && fcn == AD_FASTREBOOT_DRYRUN) {
+		ddi_walk_devs(ddi_root_node(), check_driver_quiesce,
+		    &reset_status);
+		if (reset_status != 0)
+			return (EIO);
+		else
+			return (0);
+	}
 
 	/*
 	 * The swapctl system call doesn't have its own entry point: it uses

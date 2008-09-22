@@ -31,7 +31,6 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation		*/
 /*	  All Rights Reserved					*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -1487,6 +1486,7 @@ _sys_rtt(void)
 	ENTRY_NP(lwp_rtt_initial)
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp	/* switch to the thread stack */
+	movq	%rsp, %rbp
 	call	__dtrace_probe___proc_start
 	jmp	_lwp_rtt
 
@@ -1500,6 +1500,7 @@ _sys_rtt(void)
 
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp	/* switch to the thread stack */
+	movq	%rsp, %rbp
 _lwp_rtt:
 	call	__dtrace_probe___proc_lwp__start
 	movq	%gs:CPU_LWP, %r14
@@ -1624,12 +1625,14 @@ _sys_rtt_end:
 	ENTRY_NP(lwp_rtt_initial)
 	movl	%gs:CPU_THREAD, %eax
 	movl	T_STACK(%eax), %esp	/* switch to the thread stack */
+	movl	%esp, %ebp
 	call	__dtrace_probe___proc_start
 	jmp	_lwp_rtt
 
 	ENTRY_NP(lwp_rtt)
 	movl	%gs:CPU_THREAD, %eax
 	movl	T_STACK(%eax), %esp	/* switch to the thread stack */
+	movl	%esp, %ebp
 _lwp_rtt:
 	call	__dtrace_probe___proc_lwp__start
 

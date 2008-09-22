@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI SBBC Device Driver that provides interfaces into
@@ -132,7 +131,8 @@ struct dev_ops  sbbc_ops = {
 	nodev,			/* devo_reset */
 	&sbbc_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -142,7 +142,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"PCI SBBC %I%",
+	"PCI SBBC",
 	&sbbc_ops,
 };
 
@@ -158,7 +158,7 @@ _init(void)
 	int    error;
 
 	if ((error = ddi_soft_state_init(&sbbcp,
-		sizeof (sbbc_softstate_t), 1)) != 0)
+	    sizeof (sbbc_softstate_t), 1)) != 0)
 		return (error);
 
 	if ((error = mod_install(&modlinkage)) != 0) {
@@ -251,10 +251,10 @@ sbbc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 * this device. If not, this instance will be ignored.
 		 */
 		if (ddi_getproplen(DDI_DEV_T_ANY, softsp->dip,
-			DDI_PROP_DONTPASS, "interrupts",
-			&len) != DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, "interrupts",
+		    &len) != DDI_PROP_SUCCESS) {
 			SBBC_ERR1(CE_WARN, "No 'interrupts' property for the "
-					"SBBC instance %d\n", instance);
+			    "SBBC instance %d\n", instance);
 			return (DDI_FAILURE);
 		}
 		/*
@@ -285,7 +285,7 @@ sbbc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		(void) sprintf(name, "sbbc%d", instance);
 
 		if (ddi_create_minor_node(devi, name, S_IFCHR, instance,
-			NULL, NULL) == DDI_FAILURE) {
+		    NULL, NULL) == DDI_FAILURE) {
 			mutex_destroy(&softsp->sbbc_lock);
 			ddi_remove_minor_node(devi, NULL);
 			ddi_soft_state_free(sbbcp, instance);
@@ -308,20 +308,20 @@ sbbc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			 * Enable Interrupts now, turn on both INT#A lines
 			 */
 			pci_intr_enable_reg =  (uint32_t *)
-					((char *)softsp->sbbc_regs +
-						SBBC_PCI_INT_ENABLE);
+			    ((char *)softsp->sbbc_regs +
+			    SBBC_PCI_INT_ENABLE);
 
 			ddi_put32(softsp->sbbc_reg_handle1,
-				pci_intr_enable_reg,
-				(uint32_t)SBBC_PCI_ENABLE_INT_A);
+			    pci_intr_enable_reg,
+			    (uint32_t)SBBC_PCI_ENABLE_INT_A);
 
 			/*
 			 * Reset intr_in_enabled to the original value
 			 * so the SC can send us interrupt.
 			 */
 			if (iosram_write(SBBC_SC_INTR_ENABLED_KEY,
-				0, (caddr_t)&intr_in_enabled,
-				sizeof (intr_in_enabled))) {
+			    0, (caddr_t)&intr_in_enabled,
+			    sizeof (intr_in_enabled))) {
 
 				mutex_exit(&softsp->sbbc_lock);
 				return (DDI_FAILURE);
@@ -388,19 +388,19 @@ sbbc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			 * Disable Interrupts now, turn OFF both INT#A lines
 			 */
 			pci_intr_enable_reg =  (uint32_t *)
-						((char *)softsp->sbbc_regs +
-							SBBC_PCI_INT_ENABLE);
+			    ((char *)softsp->sbbc_regs +
+			    SBBC_PCI_INT_ENABLE);
 
 			ddi_put32(softsp->sbbc_reg_handle1,
-				pci_intr_enable_reg, 0);
+			    pci_intr_enable_reg, 0);
 
 			/*
 			 * Set intr_in_enabled to 0 so the SC won't send
 			 * us interrupt.
 			 */
 			rc = iosram_read(SBBC_SC_INTR_ENABLED_KEY,
-				0, (caddr_t)&intr_in_enabled,
-				sizeof (intr_in_enabled));
+			    0, (caddr_t)&intr_in_enabled,
+			    sizeof (intr_in_enabled));
 
 			if (rc) {
 				mutex_exit(&softsp->sbbc_lock);
@@ -408,8 +408,8 @@ sbbc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			}
 
 			rc = iosram_write(SBBC_SC_INTR_ENABLED_KEY,
-				0, (caddr_t)&tmp_intr_enabled,
-				sizeof (tmp_intr_enabled));
+			    0, (caddr_t)&tmp_intr_enabled,
+			    sizeof (tmp_intr_enabled));
 
 			if (rc) {
 				mutex_exit(&softsp->sbbc_lock);
@@ -444,7 +444,7 @@ softsp_init(sbbc_softstate_t *softsp, dev_info_t *devi)
 	(void) ddi_get_iblock_cookie(devi, 0, &softsp->iblock);
 
 	mutex_init(&softsp->sbbc_lock, NULL, MUTEX_DRIVER,
-		(void *)softsp->iblock);
+	    (void *)softsp->iblock);
 
 	softsp->suspended = FALSE;
 	softsp->chosen = FALSE;
@@ -465,10 +465,10 @@ sbbc_find_dip(dev_info_t *dip, void *arg)
 	 */
 	node_name = ddi_node_name(dip);
 	if (strcmp(node_name, "bootbus-controller") == 0 && DDI_CF2(dip) &&
-		(prom_getprop(ddi_get_nodeid(dip),
-		"status", (caddr_t)status) == -1) &&
-		(prom_getprop(ddi_get_nodeid(ddi_get_parent(dip)),
-		"status", (caddr_t)status) == -1)) {
+	    (prom_getprop(ddi_get_nodeid(dip),
+	    "status", (caddr_t)status) == -1) &&
+	    (prom_getprop(ddi_get_nodeid(ddi_get_parent(dip)),
+	    "status", (caddr_t)status) == -1)) {
 
 		if (dip != dip_struct->cur_dip) {
 			dip_struct->new_dip = (void *)dip;
@@ -534,7 +534,7 @@ sbbc_intr_handler(caddr_t arg)
 	 */
 
 	if (iosram_read(SBBC_SC_INTR_ENABLED_KEY, 0,
-		(caddr_t)&intr_enabled, sizeof (intr_enabled))) {
+	    (caddr_t)&intr_enabled, sizeof (intr_enabled))) {
 
 		goto intr_handler_exit;
 	}
@@ -554,7 +554,7 @@ sbbc_intr_handler(caddr_t arg)
 		if (intr_reason & intr_mask) {
 			intr = &softsp->intr_hdlrs[i];
 			if ((intr != NULL) &&
-				(intr->sbbc_intr_id != 0)) {
+			    (intr->sbbc_intr_id != 0)) {
 				/*
 				 * XXXX
 				 * The model we agree with a handler
@@ -580,10 +580,10 @@ sbbc_intr_handler(caddr_t arg)
 				 */
 				mutex_enter(intr->sbbc_intr_lock);
 				if (*(intr->sbbc_intr_state) ==
-					SBBC_INTR_IDLE) {
+				    SBBC_INTR_IDLE) {
 					mutex_exit(intr->sbbc_intr_lock);
 					ddi_trigger_softintr(
-						intr->sbbc_intr_id);
+					    intr->sbbc_intr_id);
 				} else {
 					/*
 					 * The handler is running
@@ -605,8 +605,8 @@ sbbc_intr_handler(caddr_t arg)
 				 * in SRAM must be as close as possible.
 				 */
 				ddi_put32(intr_in_handle, intr_in_reason,
-					ddi_get32(intr_in_handle,
-					intr_in_reason) & ~intr_mask);
+				    ddi_get32(intr_in_handle,
+				    intr_in_reason) & ~intr_mask);
 			}
 		}
 		if (intr_reason == 0)	/* No more interrupts to be processed */
@@ -679,7 +679,7 @@ sbbc_chosen_init(sbbc_softstate_t *softsp)
 	 * get the full OBP pathname of this node
 	 */
 	if (prom_phandle_to_path((phandle_t)nodeid, master_sbbc,
-		sizeof (master_sbbc)) < 0) {
+	    sizeof (master_sbbc)) < 0) {
 
 		SBBC_ERR1(CE_PANIC, "prom_phandle_to_path(%d) failed\n",
 		    nodeid);
@@ -702,7 +702,7 @@ sbbc_chosen_init(sbbc_softstate_t *softsp)
 		 */
 		if (iosram_tunnel_init(softsp) == DDI_FAILURE) {
 			SBBC_ERR(CE_PANIC, "Can't create the SRAM <-> SC "
-				"comm. tunnel \n");
+			    "comm. tunnel \n");
 		}
 
 		master_chosen = TRUE;
@@ -713,11 +713,11 @@ sbbc_chosen_init(sbbc_softstate_t *softsp)
 		 */
 
 		if (ddi_getproplen(DDI_DEV_T_ANY, softsp->dip,
-			DDI_PROP_DONTPASS, "interrupts",
-			&len) != DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, "interrupts",
+		    &len) != DDI_PROP_SUCCESS) {
 
 			SBBC_ERR(CE_PANIC, "No 'interrupts' property for the "
-					"'chosen' SBBC \n");
+			    "'chosen' SBBC \n");
 		}
 
 		/*
@@ -728,7 +728,7 @@ sbbc_chosen_init(sbbc_softstate_t *softsp)
 		 */
 		if (sbbc_add_intr(softsp) == DDI_FAILURE) {
 			SBBC_ERR(CE_PANIC, "Can't add interrupt handler for "
-					"'chosen' SBBC \n");
+			    "'chosen' SBBC \n");
 		}
 
 		sbbc_enable_intr(softsp);
@@ -813,7 +813,7 @@ sbbc_send_intr(sbbc_softstate_t *softsp, int send_intr)
 	ASSERT(MUTEX_HELD(&master_iosram->iosram_lock));
 
 	if ((softsp == (sbbc_softstate_t *)NULL) ||
-		(softsp->epld_regs == (struct sbbc_epld_regs *)NULL))
+	    (softsp->epld_regs == (struct sbbc_epld_regs *)NULL))
 		return (ENXIO);
 
 	/*
@@ -831,7 +831,7 @@ sbbc_send_intr(sbbc_softstate_t *softsp, int send_intr)
 
 	if (send_intr == TRUE)
 		ddi_put8(softsp->sbbc_reg_handle2, epld_int,
-			(epld_status | INTERRUPT_ON));
+		    (epld_status | INTERRUPT_ON));
 
 	return (0);
 }
@@ -858,12 +858,12 @@ sbbc_map_regs(sbbc_softstate_t *softsp)
 	 * SBCC offset 0x0
 	 */
 	if (ddi_regs_map_setup(softsp->dip, RNUM_SBBC_REGS,
-		(caddr_t *)&softsp->sbbc_regs,
-		SBBC_REGS_OFFSET, SBBC_REGS_SIZE,
-		&attr, &softsp->sbbc_reg_handle1) != DDI_SUCCESS) {
+	    (caddr_t *)&softsp->sbbc_regs,
+	    SBBC_REGS_OFFSET, SBBC_REGS_SIZE,
+	    &attr, &softsp->sbbc_reg_handle1) != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN, "sbbc%d: unable to map interrupt "
-			"registers", ddi_get_instance(softsp->dip));
+		    "registers", ddi_get_instance(softsp->dip));
 		return (DDI_FAILURE);
 	}
 	/*
@@ -871,12 +871,12 @@ sbbc_map_regs(sbbc_softstate_t *softsp)
 	 * SBCC offset 0xe000
 	 */
 	if (ddi_regs_map_setup(softsp->dip, RNUM_SBBC_REGS,
-		(caddr_t *)&softsp->epld_regs,
-		SBBC_EPLD_OFFSET, SBBC_EPLD_SIZE,
-		&attr, &softsp->sbbc_reg_handle2) != DDI_SUCCESS) {
+	    (caddr_t *)&softsp->epld_regs,
+	    SBBC_EPLD_OFFSET, SBBC_EPLD_SIZE,
+	    &attr, &softsp->sbbc_reg_handle2) != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN, "sbbc%d: unable to map EPLD "
-			"registers", ddi_get_instance(softsp->dip));
+		    "registers", ddi_get_instance(softsp->dip));
 		return (DDI_FAILURE);
 	}
 
@@ -884,7 +884,7 @@ sbbc_map_regs(sbbc_softstate_t *softsp)
 	 * Set up pointers for registers
 	 */
 	softsp->port_int_regs =  (uint32_t *)((char *)softsp->sbbc_regs +
-		SBBC_PCI_INT_STATUS);
+	    SBBC_PCI_INT_STATUS);
 
 map_regs_exit:
 	return (DDI_SUCCESS);
@@ -944,11 +944,11 @@ sbbc_add_intr(sbbc_softstate_t *softsp)
 	 */
 
 	if (ddi_add_intr(softsp->dip, 0, &softsp->iblock,
-		&softsp->idevice, sbbc_intr_handler,
-		(caddr_t)softsp) != DDI_SUCCESS) {
+	    &softsp->idevice, sbbc_intr_handler,
+	    (caddr_t)softsp) != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN, "Can't register SBBC "
-			" interrupt handler\n");
+		    " interrupt handler\n");
 		rc = DDI_FAILURE;
 	}
 
@@ -964,9 +964,9 @@ sbbc_enable_intr(sbbc_softstate_t *softsp)
 	 * Enable Interrupts now, turn on both INT#A lines
 	 */
 	pci_intr_enable_reg =  (uint32_t *)((char *)softsp->sbbc_regs +
-		SBBC_PCI_INT_ENABLE);
+	    SBBC_PCI_INT_ENABLE);
 	ddi_put32(softsp->sbbc_reg_handle1, pci_intr_enable_reg,
-		(uint32_t)SBBC_PCI_ENABLE_INT_A);
+	    (uint32_t)SBBC_PCI_ENABLE_INT_A);
 }
 
 void
@@ -978,6 +978,6 @@ sbbc_disable_intr(sbbc_softstate_t *softsp)
 	 * Disable Interrupts now, turn off both INT#A lines
 	 */
 	pci_intr_enable_reg =  (uint32_t *)((char *)softsp->sbbc_regs +
-		SBBC_PCI_INT_ENABLE);
+	    SBBC_PCI_INT_ENABLE);
 	ddi_put32(softsp->sbbc_reg_handle1, pci_intr_enable_reg, 0);
 }

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * OPL CMU-CH PCI nexus driver.
@@ -218,7 +217,9 @@ static struct dev_ops pcmu_ops = {
 	nodev,
 	&pcmu_cb_ops,
 	&pcmu_bus_ops,
-	0
+	0,
+	ddi_quiesce_not_needed,		/* quiesce */
+
 };
 
 /*
@@ -228,7 +229,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,				/* Type of module - driver */
-	"OPL CMU-CH PCI Nexus driver %I%",	/* Name of module. */
+	"OPL CMU-CH PCI Nexus driver",	/* Name of module. */
 	&pcmu_ops,				/* driver ops */
 };
 

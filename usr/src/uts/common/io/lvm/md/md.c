@@ -246,7 +246,8 @@ static struct dev_ops md_devops = {
 	nodev,			/* reset - not defined */
 	&md_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	nodev			/* power management */
+	nodev,			/* power management */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

@@ -300,7 +300,7 @@ extern pri_t minclsyspri;
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(wpi_devops, nulldev, nulldev, wpi_attach,
-    wpi_detach, nodev, NULL, D_MP, NULL);
+    wpi_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv wpi_modldrv = {
 	&mod_driverops,

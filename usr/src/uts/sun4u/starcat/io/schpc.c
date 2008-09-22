@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Starcat IOSRAM/Tunnel PCI Hot Plug Controller Driver
@@ -238,16 +237,18 @@ static int schpc_detach(dev_info_t *, ddi_detach_cmd_t);
 static int schpc_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 
 static struct dev_ops schpc_dev_ops = {
-	DEVO_REV,		/* devo_rev, */
-	0,			/* refcnt  */
-	schpc_info,		/* get_dev_info */
-	nulldev,		/* identify */
-	nulldev,		/* probe */
-	schpc_attach,		/* attach */
-	schpc_detach,		/* detach */
-	nodev,			/* reset */
-	&schpc_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* no bus operations */
+	DEVO_REV,			/* devo_rev, */
+	0,				/* refcnt  */
+	schpc_info,			/* get_dev_info */
+	nulldev,			/* identify */
+	nulldev,			/* probe */
+	schpc_attach,			/* attach */
+	schpc_detach,			/* detach */
+	nodev,				/* reset */
+	&schpc_cb_ops,			/* driver operations */
+	(struct bus_ops *)0,		/* no bus operations */
+	NULL,				/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -255,7 +256,7 @@ static struct dev_ops schpc_dev_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"PCI Hot Plug Controller Driver (schpc) %I%",
+	"PCI Hot Plug Controller Driver (schpc)",
 	&schpc_dev_ops,
 };
 
@@ -299,13 +300,13 @@ _init(void)
 	if (schpc_timeout_putmsg < schpc_putmsg_timeout_range.min_timeout) {
 		schpc_timeout_putmsg = schpc_putmsg_timeout_range.min_timeout;
 		cmn_err(CE_WARN, " schpc: resetting putmsg timeout to %ld\n",
-			schpc_timeout_putmsg);
+		    schpc_timeout_putmsg);
 	}
 
 	if (schpc_timeout_putmsg > schpc_putmsg_timeout_range.max_timeout) {
 		schpc_timeout_putmsg = schpc_putmsg_timeout_range.max_timeout;
 		cmn_err(CE_WARN, " schpc: resetting putmsg timeout to %ld\n",
-			schpc_timeout_putmsg);
+		    schpc_timeout_putmsg);
 	}
 
 	/*
@@ -340,36 +341,36 @@ _init(void)
 	if (schpc_timeout_getmsg < schpc_getmsg_timeout_range.min_timeout) {
 		schpc_timeout_getmsg = schpc_getmsg_timeout_range.min_timeout;
 		cmn_err(CE_WARN, " schpc: resetting getmsg timeout to %ld\n",
-			schpc_timeout_getmsg);
+		    schpc_timeout_getmsg);
 	}
 
 	if (schpc_timeout_getmsg > schpc_getmsg_timeout_range.max_timeout) {
 		schpc_timeout_getmsg = schpc_getmsg_timeout_range.max_timeout;
 		cmn_err(CE_WARN, " schpc: resetting putmsg timeout to %ld\n",
-			schpc_timeout_putmsg);
+		    schpc_timeout_putmsg);
 	}
 
 	if (schpc_timeout_event < schpc_getmsg_timeout_range.min_timeout) {
 		schpc_timeout_event = schpc_getmsg_timeout_range.min_timeout;
 		cmn_err(CE_WARN, " schpc: resetting event timeout to %ld\n",
-			schpc_timeout_event);
+		    schpc_timeout_event);
 	}
 
 	if (schpc_timeout_event > schpc_getmsg_timeout_range.max_timeout) {
 		schpc_timeout_event = schpc_getmsg_timeout_range.max_timeout;
 		cmn_err(CE_WARN, " schpc: resetting event timeout to %ld\n",
-			schpc_timeout_event);
+		    schpc_timeout_event);
 	}
 
 	ret = mod_install(&modlinkage);
 	if (ret != 0) {
 		if ((rv = mboxsc_fini(KEY_PCSC)) != 0) {
 			cmn_err(CE_WARN, "schpc: _init() - "
-				"mboxsc_fini(KEY_PCSC) failed: 0x%x", rv);
+			    "mboxsc_fini(KEY_PCSC) failed: 0x%x", rv);
 		}
 		if ((rv = mboxsc_fini(KEY_SCPC)) != 0) {
 			cmn_err(CE_WARN, "schpc: _init() - "
-				"mboxsc_fini(KEY_SCPC) failed: 0x%x", rv);
+			    "mboxsc_fini(KEY_SCPC) failed: 0x%x", rv);
 		}
 		taskq_destroy(schpc_event_taskq);
 		ddi_soft_state_fini(&per_schpc_state);
@@ -385,7 +386,7 @@ _init(void)
 	 */
 	mutex_init(&schpc_replylist_mutex, NULL, MUTEX_DRIVER, NULL);
 	(void) thread_create(NULL, 0, schpc_msg_thread,
-		    NULL, 0, &p0, TS_RUN, minclsyspri);
+	    NULL, 0, &p0, TS_RUN, minclsyspri);
 
 	SCHPC_DEBUG0(D_ATTACH, "_init() started schpc_msg_thread");
 
@@ -862,7 +863,7 @@ schpc_connect(caddr_t ops_arg, hpc_slot_t slot_hdl, void *data, uint_t flags)
 
 			find_dev.cname = schpc_p->schpc_slot[slot].nexus_path;
 			find_dev.caddr = (char *)kmem_alloc(MAXPATHLEN,
-						KM_SLEEP);
+			    KM_SLEEP);
 			find_dev.dip = NULL;
 
 			/* root node doesn't have to be held */
@@ -2449,7 +2450,7 @@ schpc_event_handler(void *arg)
 			    SCHPC_SLOTSTATE_OCC_GOOD;
 
 			schpc_p->schpc_slot[slot].state &=
-				~SCHPC_SLOTSTATE_PRESENT;
+			    ~SCHPC_SLOTSTATE_PRESENT;
 
 			hpc_slot_event_notify(
 			    schpc_p->schpc_slot[slot].slot_handle,
@@ -2762,8 +2763,8 @@ schpc_msg_thread(void)
 		bzero(&msg, sizeof (pcimsg_t));
 
 		err = mboxsc_getmsg(KEY_SCPC, &type, &cmd,
-			&transid, &length, (void *)&msg,
-			schpc_timeout_getmsg);
+		    &transid, &length, (void *)&msg,
+		    schpc_timeout_getmsg);
 
 		if (err) {
 			switch (err) {
@@ -2890,7 +2891,7 @@ schpc_putrequest(uint32_t key, uint32_t type, uint32_t cmd, uint64_t *transidp,
 
 	/* wait synchronously for request to be sent */
 	rval = mboxsc_putmsg(key, type, cmd, transidp, length,
-				(void *)datap, timeout);
+	    (void *)datap, timeout);
 
 	SCHPC_DEBUG2(D_GETSLOTSTATUS|D_SETSLOTSTATUS, "schpc_putrequest() - "
 	    "0x%lx transid mboxsc_putmsg returned 0x%x", *transidp, rval);
@@ -2932,7 +2933,7 @@ schpc_getreply(uint32_t key, uint32_t *typep, uint32_t *cmdp,
 		 * wait for reply or timeout
 		 */
 		rc = cv_timedwait(&listp->reply_cv, &listp->reply_lock,
-			ddi_get_lbolt() + drv_usectohz(timeout * 1000));
+		    ddi_get_lbolt() + drv_usectohz(timeout * 1000));
 		switch (rc) {
 		case -1: /* most likely a timeout, but check anyway */
 
@@ -3131,7 +3132,7 @@ schpc_getslotstatus(uint32_t expander, uint32_t board, uint32_t slot,
 	    "0x%lx transid schpc_getreply called", transid);
 
 	rval = schpc_getreply(KEY_SCPC, &type, &cmd, &transid, &length,
-				(void *)&reply, schpc_timeout_getmsg, entry);
+	    (void *)&reply, schpc_timeout_getmsg, entry);
 
 	SCHPC_DEBUG2(D_GETSLOTSTATUS, "schpc_getslotstatus() - "
 	    "0x%lx transid schpc_getreply returned 0x%x", transid, rval);
@@ -3231,7 +3232,7 @@ schpc_setslotstatus(uint32_t expander, uint32_t board, uint32_t slot,
 	    "0x%lx transid schpc_getreply called", transid);
 
 	rval = schpc_getreply(KEY_SCPC, &type, &cmd, &transid, &length,
-				(void *)&reply, schpc_timeout_getmsg, entry);
+	    (void *)&reply, schpc_timeout_getmsg, entry);
 
 	SCHPC_DEBUG2(D_SETSLOTSTATUS, "schpc_setslotstatus() - "
 	    "0x%lx transid schpc_getreply returned 0x%x", transid, rval);
@@ -3550,7 +3551,7 @@ schpc_add_pci(dev_info_t *bdip)
 			leaf = 1;
 			name = ddi_binding_name(sdip);
 			if ((strcmp(name, "pci108e,8002") == 0) &&
-				(schizo == 0)) {
+			    (schizo == 0)) {
 				int circ;
 				dev_info_t *cdip;
 				/*
@@ -3562,9 +3563,9 @@ schpc_add_pci(dev_info_t *bdip)
 				cdip = ddi_get_child(sdip);
 				if (cdip == NULL) {
 					cmn_err(CE_WARN,
-						"schpc_add_pci(dip=0x%p) - "
-						"Invalid pci name addr %s\n",
-						sdip, naddr);
+					    "schpc_add_pci(dip=0x%p) - "
+					    "Invalid pci name addr %s\n",
+					    sdip, naddr);
 					ndi_devi_exit(sdip, circ);
 					return (DDI_FAILURE);
 				}

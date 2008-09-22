@@ -247,12 +247,12 @@ static void ibd_perf(ibd_state_t *);
 #endif
 
 DDI_DEFINE_STREAM_OPS(ibd_dev_ops, nulldev, nulldev, ibd_attach, ibd_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 /* Module Driver Info */
 static struct modldrv ibd_modldrv = {
 	&mod_driverops,			/* This one is a driver */
-	"InfiniBand GLDv3 Driver 1.3",	/* short description */
+	"InfiniBand GLDv3 Driver",	/* short description */
 	&ibd_dev_ops			/* driver specific ops */
 };
 

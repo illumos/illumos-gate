@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Zone Console Driver.
@@ -142,7 +141,7 @@ static struct streamtab zc_tab_info = {
  * this will define (struct cb_ops cb_zc_ops) and (struct dev_ops zc_ops)
  */
 DDI_DEFINE_STREAM_OPS(zc_ops, nulldev, nulldev,	zc_attach, zc_detach, nodev, \
-	zc_getinfo, ZC_CONF_FLAG, &zc_tab_info);
+	zc_getinfo, ZC_CONF_FLAG, &zc_tab_info, ddi_quiesce_not_needed);
 
 /*
  * Module linkage information for the kernel.

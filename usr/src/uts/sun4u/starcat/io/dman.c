@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Starcat Management Network Driver
@@ -719,13 +718,14 @@ static struct streamtab man_maninfo = {
 #define	MAN_MDEV_FLAGS	(D_MP|D_MTPERMOD|D_MTPUTSHARED)
 
 DDI_DEFINE_STREAM_OPS(man_ops, nulldev, nulldev, man_attach,
-    man_detach, nodev, man_info, MAN_MDEV_FLAGS, &man_maninfo);
+    man_detach, nodev, man_info, MAN_MDEV_FLAGS, &man_maninfo,
+    ddi_quiesce_not_supported);
 
 extern int nodev(), nulldev();
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Module type.  This one is a pseudo driver */
-	"MAN MetaDriver v%I%",
+	"MAN MetaDriver",
 	&man_ops,		/* driver ops */
 };
 
@@ -748,14 +748,14 @@ _init(void)
 	status = mod_install(&modlinkage);
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_init: mod_install failed"
-			" error = %d", status);
+		    " error = %d", status);
 		return (status);
 	}
 
 	status = ddi_soft_state_init(&man_softstate, sizeof (man_t), 4);
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_init: ddi_soft_state_init failed"
-			" error = %d", status);
+		    " error = %d", status);
 		mod_remove(&modlinkage);
 		return (status);
 	}
@@ -971,7 +971,7 @@ man_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	manp->man_eaddr_v = 1;
 
 	MAN_DBG(MAN_INIT, ("man_attach: set ether to %s",
-		ether_sprintf(&manp->man_eaddr)));
+	    ether_sprintf(&manp->man_eaddr)));
 
 	/*
 	 * Initialize failover-related fields (timers and such),
@@ -1002,7 +1002,7 @@ man_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    "man_dlpireset_time", MAN_DLPIRESET_TIME);
 
 	if (ddi_create_internal_pathname(dip, MAN_IDNAME, S_IFCHR,
-		ddi_get_instance(dip)) == DDI_SUCCESS) {
+	    ddi_get_instance(dip)) == DDI_SUCCESS) {
 		minor_node_created = 1;
 	} else {
 		cmn_err(CE_WARN, "man_attach: failed for instance %d",
@@ -1011,7 +1011,7 @@ man_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(dip, MAN_IDNAME, S_IFCHR,
-		ddi_get_instance(dip), DDI_NT_NET, CLONE_DEV) == DDI_SUCCESS) {
+	    ddi_get_instance(dip), DDI_NT_NET, CLONE_DEV) == DDI_SUCCESS) {
 		minor_node_created = 1;
 	} else {
 		cmn_err(CE_WARN, "man_attach: failed for instance %d",
@@ -1028,12 +1028,12 @@ man_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	flag |= KSTAT_FLAG_PERSISTENT;
 #endif
 	ksp = kstat_create(MAN_IDNAME, ddi_get_instance(dip), NULL, "net",
-		KSTAT_TYPE_NAMED, MAN_NUMSTATS, flag);
+	    KSTAT_TYPE_NAMED, MAN_NUMSTATS, flag);
 
 	if (ksp == NULL) {
 		cmn_err(CE_WARN, "man_attach(%d): kstat_create failed"
-			" - manp(0x%p)", manp->man_meta_ppa,
-			(void *)manp);
+		    " - manp(0x%p)", manp->man_meta_ppa,
+		    (void *)manp);
 		goto exit;
 	}
 
@@ -1046,7 +1046,7 @@ man_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_report_dev(dip);
 
 	MAN_DBG(MAN_INIT, ("man_attach(%d) returns DDI_SUCCESS",
-		ddi_get_instance(dip)));
+	    ddi_get_instance(dip)));
 
 	return (DDI_SUCCESS);
 
@@ -1057,7 +1057,7 @@ exit:
 	ddi_soft_state_free(man_softstate, instance);
 
 	MAN_DBG(MAN_INIT, ("man_attach(%d) eaddr returns DDI_FAILIRE",
-		ddi_get_instance(dip)));
+	    ddi_get_instance(dip)));
 
 	return (DDI_FAILURE);
 
@@ -1116,8 +1116,8 @@ man_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&man_lock);
 
 		cmn_err(CE_WARN, "man_detach: unable to get softstate"
-			" for instance = %d, dip = 0x%p!\n", instance,
-			(void *)dip);
+		    " for instance = %d, dip = 0x%p!\n", instance,
+		    (void *)dip);
 		return (DDI_FAILURE);
 	}
 
@@ -1125,7 +1125,7 @@ man_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&man_lock);
 
 		cmn_err(CE_WARN, "man_detach: %s%d refcnt %d", MAN_IDNAME,
-			instance, manp->man_refcnt);
+		    instance, manp->man_refcnt);
 		MAN_DBGCALL(MAN_INIT, man_print_man(manp));
 
 		return (DDI_FAILURE);
@@ -1321,7 +1321,7 @@ man_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 exit:
 	MAN_DBG(MAN_OCLOSE, ("man_open: exit rq(0x%p) minor %d errno %d\n",
-		(void *)rq, minordev, status));
+	    (void *)rq, minordev, status));
 
 	/*
 	 * Clean up on error.
@@ -1570,8 +1570,8 @@ man_uwput(register queue_t *wq, register mblk_t *mp)
 	msp = (manstr_t *)wq->q_ptr;
 
 	MAN_DBG(MAN_UWPUT, ("man_uwput: wq(0x%p) mp(0x%p) db_type(0x%x)"
-		" msp(0x%p)\n",
-		(void *)wq, (void *)mp, DB_TYPE(mp), (void *)msp));
+	    " msp(0x%p)\n",
+	    (void *)wq, (void *)mp, DB_TYPE(mp), (void *)msp));
 #if DEBUG
 	if (man_debug & MAN_UWPUT) {
 		if (DB_TYPE(mp) == M_IOCTL) {
@@ -1594,8 +1594,8 @@ man_uwput(register queue_t *wq, register mblk_t *mp)
 		manp = msp->ms_manp;
 
 		if (((msp->ms_flags & (MAN_SFLAG_FAST | MAN_SFLAG_RAW)) == 0) ||
-			(msp->ms_dlpistate != DL_IDLE) ||
-			(manp == NULL)) {
+		    (msp->ms_dlpistate != DL_IDLE) ||
+		    (manp == NULL)) {
 
 			merror(wq, mp, EPROTO);
 			break;
@@ -1697,7 +1697,7 @@ man_start(register queue_t *wq, register mblk_t *mp, eaddr_t *eap)
 	msp = (manstr_t *)wq->q_ptr;
 
 	MAN_DBG(MAN_DATA, ("man_start: msp(0x%p) ether_addr(%s)\n",
-		(void *)msp, ether_sprintf(eap)));
+	    (void *)msp, ether_sprintf(eap)));
 
 	if (msp->ms_dests == NULL) {
 		cmn_err(CE_WARN, "man_start: no destinations");
@@ -1742,7 +1742,7 @@ man_start(register queue_t *wq, register mblk_t *mp, eaddr_t *eap)
 
 		} else {
 			MAN_DBG(MAN_DATA, ("man_start: no destination"
-				" for eaddr %s\n", ether_sprintf(eap)));
+			    " for eaddr %s\n", ether_sprintf(eap)));
 			freemsg(mp);
 		}
 	} else {
@@ -1758,17 +1758,17 @@ man_start(register queue_t *wq, register mblk_t *mp, eaddr_t *eap)
 
 				if ((tmp = copymsg(mp)) != NULL) {
 					(void) man_start_lower(mdp, tmp,
-						NULL, MAN_UPPER);
+					    NULL, MAN_UPPER);
 				} else {
 					MAN_DBG(MAN_DATA, ("man_start: copymsg"
-						" failed!"));
+					    " failed!"));
 				}
 			}
 			freemsg(mp);
 		} else {
 			if (mdp->md_state == MAN_DSTATE_READY)
 				status =  man_start_lower(mdp, mp, wq,
-								MAN_UPPER);
+				    MAN_UPPER);
 			else
 				freemsg(mp);
 		}
@@ -1804,7 +1804,7 @@ man_start_lower(man_dest_t *mdp, mblk_t *mp, queue_t *flow_wq, int caller)
 			 * stream.
 			 */
 			if (mdp->md_dmp_head == NULL &&
-				wq->q_first == NULL && canputnext(wq)) {
+			    wq->q_first == NULL && canputnext(wq)) {
 
 				(void) putnext(wq, mp);
 
@@ -1824,7 +1824,7 @@ man_start_lower(man_dest_t *mdp, mblk_t *mp, queue_t *flow_wq, int caller)
 						mdp->md_dmp_tail->b_next = mp;
 						mdp->md_dmp_tail = mp;
 						mdp->md_dmp_count +=
-								msgsize(mp);
+						    msgsize(mp);
 					}
 					mutex_exit(&mdp->md_lock);
 					/*
@@ -1861,8 +1861,8 @@ man_start_lower(man_dest_t *mdp, mblk_t *mp, queue_t *flow_wq, int caller)
 					qenable(wq);
 				} else {
 					MAN_DBG(MAN_DATA, ("man_start_lower:"
-						" lower q flow controlled -"
-						" discarding packet"));
+					    " lower q flow controlled -"
+					    " discarding packet"));
 					freemsg(mp);
 					goto exit;
 				}
@@ -1888,8 +1888,8 @@ man_start_lower(man_dest_t *mdp, mblk_t *mp, queue_t *flow_wq, int caller)
 	if (mdp->md_state == MAN_DSTATE_NOTPRESENT) {
 nodest:
 		cmn_err(CE_WARN,
-			"man_start_lower: no dest for mdp(0x%p), caller(%d)!",
-			(void *)mdp, caller);
+		    "man_start_lower: no dest for mdp(0x%p), caller(%d)!",
+		    (void *)mdp, caller);
 		if (caller == MAN_UPPER)
 			freemsg(mp);
 		goto exit;
@@ -1897,7 +1897,7 @@ nodest:
 
 	if (mdp->md_state & MAN_DSTATE_CLOSING) {
 		MAN_DBG(MAN_DATA, ("man_start_lower: mdp(0x%p) closing",
-			(void *)mdp));
+		    (void *)mdp));
 		if (caller == MAN_UPPER)
 			freemsg(mp);
 		goto exit;
@@ -1962,13 +1962,13 @@ man_ioctl(register queue_t *wq, register mblk_t *mp)
 
 		sprintf(ioc_cmd, "not handled IOCTL 0x%x", iocp->ioc_cmd);
 		MAN_DBG((MAN_SWITCH | MAN_PATH | MAN_DLPI),
-			("man_ioctl: wq(0x%p) mp(0x%p) cmd(%s)\n",
-			(void *)wq, (void *)mp,
-			(iocp->ioc_cmd == I_PLINK) ? "I_PLINK" :
-			(iocp->ioc_cmd == I_PUNLINK) ? "I_PUNLINK" :
-			(iocp->ioc_cmd == MAN_SETPATH) ? "MAN_SETPATH" :
-			(iocp->ioc_cmd == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
-			(iocp->ioc_cmd == DLIOCRAW) ? "DLIOCRAW" : ioc_cmd));
+		    ("man_ioctl: wq(0x%p) mp(0x%p) cmd(%s)\n",
+		    (void *)wq, (void *)mp,
+		    (iocp->ioc_cmd == I_PLINK) ? "I_PLINK" :
+		    (iocp->ioc_cmd == I_PUNLINK) ? "I_PUNLINK" :
+		    (iocp->ioc_cmd == MAN_SETPATH) ? "MAN_SETPATH" :
+		    (iocp->ioc_cmd == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
+		    (iocp->ioc_cmd == DLIOCRAW) ? "DLIOCRAW" : ioc_cmd));
 	}
 #endif /* DEBUG */
 
@@ -2026,7 +2026,7 @@ man_ioctl(register queue_t *wq, register mblk_t *mp)
 
 	default:
 		MAN_DBG(MAN_DDI, ("man_ioctl: unknown ioc_cmd %d\n",
-			(unsigned int)iocp->ioc_cmd));
+		    (unsigned int)iocp->ioc_cmd));
 		miocnak(wq, mp, 0, EINVAL);
 		break;
 	}
@@ -2235,12 +2235,12 @@ man_set_sc_ipaddrs(queue_t *wq, mblk_t *mp)
 		char	buf[INET_ADDRSTRLEN];
 
 		(void) inet_ntop(AF_INET,
-				(void *) &man_sc_ipaddrs.ip_other_sc_ipaddr,
-				buf, INET_ADDRSTRLEN);
+		    (void *) &man_sc_ipaddrs.ip_other_sc_ipaddr,
+		    buf, INET_ADDRSTRLEN);
 		MAN_DBG(MAN_CONFIG, ("ip_other_sc_ipaddr = %s", buf));
 		(void) inet_ntop(AF_INET,
-				(void *) &man_sc_ipaddrs.ip_my_sc_ipaddr,
-				buf, INET_ADDRSTRLEN);
+		    (void *) &man_sc_ipaddrs.ip_my_sc_ipaddr,
+		    buf, INET_ADDRSTRLEN);
 		MAN_DBG(MAN_CONFIG, ("ip_my_sc_ipaddr = %s", buf));
 	}
 #endif /* DEBUG */
@@ -2270,12 +2270,12 @@ man_set_sc_ip6addrs(queue_t *wq, mblk_t *mp)
 		char	buf[INET6_ADDRSTRLEN];
 
 		(void) inet_ntop(AF_INET6,
-				(void *) &man_sc_ip6addrs.ip6_other_sc_ipaddr,
-				buf, INET6_ADDRSTRLEN);
+		    (void *) &man_sc_ip6addrs.ip6_other_sc_ipaddr,
+		    buf, INET6_ADDRSTRLEN);
 		MAN_DBG(MAN_CONFIG, ("ip6_other_sc_ipaddr = %s", buf));
 		(void) inet_ntop(AF_INET6,
-				(void *) &man_sc_ip6addrs.ip6_my_sc_ipaddr,
-				buf, INET6_ADDRSTRLEN);
+		    (void *) &man_sc_ip6addrs.ip6_my_sc_ipaddr,
+		    buf, INET6_ADDRSTRLEN);
 		MAN_DBG(MAN_CONFIG, ("ip6_my_sc_ipaddr = %s", buf));
 	}
 #endif /* DEBUG */
@@ -2364,7 +2364,7 @@ man_dl_ioc_hdr_info(queue_t *wq, mblk_t *mp)
 
 exit:
 	MAN_DBG(MAN_DLPI, ("man_dl_ioc_hdr_info: returns, status = %d",
-		status));
+	    status));
 
 	if (status) {
 		miocnak(wq, mp, 0, status);
@@ -2440,7 +2440,7 @@ man_uwsrv(queue_t *wq)
 
 		default:
 			MAN_DBG(MAN_UWSRV, ("man_uwsrv: discarding mp(0x%p)",
-				(void *)mp));
+			    (void *)mp));
 			freemsg(mp);
 			break;
 		}
@@ -2452,7 +2452,7 @@ break_loop:
 	 * perimeter.
 	 */
 	if ((msp->ms_flags & MAN_SFLAG_CONTROL) &&
-		man_iwork_q->q_work != NULL) {
+	    man_iwork_q->q_work != NULL) {
 
 		man_iwork();
 	}
@@ -2485,8 +2485,8 @@ man_proto(queue_t *wq, mblk_t *mp)
 	dlp = (union DL_primitives *)mp->b_rptr;
 
 	MAN_DBG((MAN_UWSRV | MAN_DLPI),
-		("man_proto: mp(0x%p) prim(%s)\n", (void *)mp,
-		dps[dlp->dl_primitive]));
+	    ("man_proto: mp(0x%p) prim(%s)\n", (void *)mp,
+	    dps[dlp->dl_primitive]));
 
 	switch (dlp->dl_primitive) {
 	case DL_UNITDATA_REQ:
@@ -2539,7 +2539,7 @@ man_proto(queue_t *wq, mblk_t *mp)
 
 	default:
 		MAN_DBG((MAN_UWSRV | MAN_DLPI), ("man_proto: prim(%d)\n",
-			dlp->dl_primitive));
+		    dlp->dl_primitive));
 		dlerrorack(wq, mp, dlp->dl_primitive, DL_UNSUPPORTED, 0);
 		break;
 
@@ -2701,7 +2701,7 @@ man_areq(queue_t *wq, mblk_t *mp)
 	}
 
 	MAN_DBG(MAN_DLPI, ("man_areq: ppa 0x%x man_refcnt: %d\n",
-		ppa, manp->man_refcnt));
+	    ppa, manp->man_refcnt));
 
 	SETSTATE(msp, DL_UNBOUND);
 
@@ -2785,7 +2785,7 @@ man_start_dest(man_dest_t *mdp, manstr_t *msp, man_pg_t *mpg)
 	mdp->md_linkstate = MAN_LINKFAIL;
 	mdp->md_state = MAN_DSTATE_INITIALIZING;
 	mdp->md_lc_timer_id = qtimeout(man_ctl_wq, man_linkcheck_timer,
-		(void *)mdp, man_gettimer(MAN_TIMER_INIT, mdp));
+	    (void *)mdp, man_gettimer(MAN_TIMER_INIT, mdp));
 
 	/*
 	 * As an optimization, if there is only one destination,
@@ -2884,11 +2884,11 @@ man_dl_catch(mblk_t **mplist, mblk_t *mp)
 
 	prim = DL_PRIM(mp);
 	MAN_DBG(MAN_DLPI,
-		("man_dl_catch: adding %s\n",
-		(prim == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
-		(prim == DLIOCRAW) ? "DLIOCRAW" :
-		(prim == DL_PROMISCON_REQ) ? promisc[DL_PROMISCON_TYPE(mp)] :
-		dps[prim]));
+	    ("man_dl_catch: adding %s\n",
+	    (prim == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
+	    (prim == DLIOCRAW) ? "DLIOCRAW" :
+	    (prim == DL_PROMISCON_REQ) ? promisc[DL_PROMISCON_TYPE(mp)] :
+	    dps[prim]));
 
 exit:
 
@@ -2987,11 +2987,11 @@ man_dlpi_replay(man_dest_t *mdp, mblk_t *rmp)
 
 		dlp = (union DL_primitives *)mp->b_rptr;
 		MAN_DBG(MAN_DLPI,
-			("man_dlpi_replay: mdp(0x%p) sending %s\n",
-			(void *)mdp,
-			(dlp->dl_primitive == DL_IOC_HDR_INFO) ?
-			"DL_IOC_HDR_INFO" : (dlp->dl_primitive == DLIOCRAW) ?
-			"DLIOCRAW" : dps[(unsigned)(dlp->dl_primitive)]));
+		    ("man_dlpi_replay: mdp(0x%p) sending %s\n",
+		    (void *)mdp,
+		    (dlp->dl_primitive == DL_IOC_HDR_INFO) ?
+		    "DL_IOC_HDR_INFO" : (dlp->dl_primitive == DLIOCRAW) ?
+		    "DLIOCRAW" : dps[(unsigned)(dlp->dl_primitive)]));
 
 		if (dlp->dl_primitive == DL_ATTACH_REQ) {
 			/*
@@ -3111,9 +3111,9 @@ exit:
 	if (matched) {
 
 		MAN_DBG(MAN_DLPI, ("man_dl_release: release %s",
-			(DL_PRIM(mp) == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
-			(DL_PRIM(mp) == DLIOCRAW) ? "DLIOCRAW" :
-			dps[(int)DL_PRIM(mp)]));
+		    (DL_PRIM(mp) == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
+		    (DL_PRIM(mp) == DLIOCRAW) ? "DLIOCRAW" :
+		    dps[(int)DL_PRIM(mp)]));
 
 		freemsg(tmp);
 	}
@@ -3449,8 +3449,8 @@ man_emreq(queue_t *wq, mblk_t *mp)
 	addrp = (struct ether_addr *)(mp->b_rptr + off);
 
 	if ((len != ETHERADDRL) ||
-		!MBLKIN(mp, off, len) ||
-		((addrp->ether_addr_octet[0] & 01) == 0)) {
+	    !MBLKIN(mp, off, len) ||
+	    ((addrp->ether_addr_octet[0] & 01) == 0)) {
 		dlerrorack(wq, mp, DL_ENABMULTI_REQ, DL_BADADDR, 0);
 		return;
 	}
@@ -3495,8 +3495,8 @@ man_dmreq(queue_t *wq, mblk_t *mp)
 	addrp = (struct ether_addr *)(mp->b_rptr + off);
 
 	if ((len != ETHERADDRL) ||
-		!MBLKIN(mp, off, len) ||
-		((addrp->ether_addr_octet[0] & 01) == 0)) {
+	    !MBLKIN(mp, off, len) ||
+	    ((addrp->ether_addr_octet[0] & 01) == 0)) {
 		dlerrorack(wq, mp, DL_ENABMULTI_REQ, DL_BADADDR, 0);
 		return;
 	}
@@ -3587,8 +3587,8 @@ man_spareq(queue_t *wq, mblk_t *mp)
 	 * specified is a multicast or broadcast address.
 	 */
 	if ((len != ETHERADDRL) ||
-		((addrp->ether_addr_octet[0] & 01) == 1) ||
-		(ether_cmp(addrp, &etherbroadcast) == 0)) {
+	    ((addrp->ether_addr_octet[0] & 01) == 1) ||
+	    (ether_cmp(addrp, &etherbroadcast) == 0)) {
 		dlerrorack(wq, mp, DL_SET_PHYS_ADDR_REQ, DL_BADADDR, 0);
 		return;
 	}
@@ -3612,7 +3612,7 @@ man_spareq(queue_t *wq, mblk_t *mp)
 	ether_copy(addrp, msp->ms_manp->man_eaddr.ether_addr_octet);
 
 	MAN_DBG(MAN_DLPI, ("man_sareq: snagged %s\n",
-		ether_sprintf(&msp->ms_manp->man_eaddr)));
+	    ether_sprintf(&msp->ms_manp->man_eaddr)));
 
 	dlokack(wq, mp, DL_SET_PHYS_ADDR_REQ);
 
@@ -3639,8 +3639,8 @@ man_lwsrv(queue_t *wq)
 	mdp = (man_dest_t *)wq->q_ptr;
 
 	MAN_DBG(MAN_LWSRV, ("man_lwsrv: wq(0x%p) mdp(0x%p)"
-		" md_rq(0x%p)\n", (void *)wq, (void *)mdp,
-		mdp ? (void *)mdp->md_rq : NULL));
+	    " md_rq(0x%p)\n", (void *)wq, (void *)mdp,
+	    mdp ? (void *)mdp->md_rq : NULL));
 
 	if (mdp == NULL)
 		goto exit;
@@ -3729,12 +3729,12 @@ man_lrput(queue_t *rq, mblk_t *mp)
 	}
 
 	prim_str = (prim > MAN_DLPI_MAX_PRIM) ? "NON DLPI" :
-		    (prim == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
-		    (prim == DLIOCRAW) ? "DLIOCRAW" :
-		    dps[(unsigned int)prim];
+	    (prim == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
+	    (prim == DLIOCRAW) ? "DLIOCRAW" :
+	    dps[(unsigned int)prim];
 	MAN_DBG(MAN_LRPUT, ("man_lrput: rq(0x%p) mp(0x%p) mdp(0x%p)"
-		" db_type(0x%x) dl_prim %s", (void *)rq,
-		(void *)mp, (void *)mdp, DB_TYPE(mp), prim_str));
+	    " db_type(0x%x) dl_prim %s", (void *)rq,
+	    (void *)mp, (void *)mdp, DB_TYPE(mp), prim_str));
 	MAN_DBGCALL(MAN_LRPUT2, man_print_mdp(mdp));
 #endif  /* DEBUG */
 
@@ -3751,7 +3751,7 @@ man_lrput(queue_t *rq, mblk_t *mp)
 	if (mdp == NULL || mdp->md_state != MAN_DSTATE_READY) {
 
 		MAN_DBG(MAN_LRPUT, ("man_lrput: not ready mdp(0x%p),"
-			" state(%d)", (void *)mdp, mdp ? mdp->md_state : -1));
+		    " state(%d)", (void *)mdp, mdp ? mdp->md_state : -1));
 		freemsg(mp);
 		return (0);
 	}
@@ -3769,7 +3769,7 @@ man_lrput(queue_t *rq, mblk_t *mp)
 			 * go put mblk_t directly up to next queue.
 			 */
 			MAN_DBG(MAN_LRPUT, ("man_lrput: putnext to rq(0x%p)",
-				(void *)mdp->md_rq));
+			    (void *)mdp->md_rq));
 			(void) putnext(mdp->md_rq, mp);
 		} else {
 			freemsg(mp);
@@ -3823,7 +3823,7 @@ man_lrsrv(queue_t *rq)
 	if (MAN_IS_DATA(mp) || mdp->md_state != MAN_DSTATE_READY) {
 
 		MAN_DBG(MAN_LRSRV, ("man_lrsrv: dropping mblk mdp(0x%p)"
-			" is_data(%d)", (void *)mdp, MAN_IS_DATA(mp)));
+		    " is_data(%d)", (void *)mdp, MAN_IS_DATA(mp)));
 		freemsg(mp);
 		continue;
 	}
@@ -3850,9 +3850,9 @@ man_lrsrv(queue_t *rq)
 
 		sprintf(ioc_cmd, "0x%x", iocp->ioc_cmd);
 		MAN_DBG(MAN_LRSRV, ("man_lrsrv: M_IOCNAK err %d for cmd(%s)\n",
-			iocp->ioc_error,
-			(iocp->ioc_cmd == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
-			(iocp->ioc_cmd == DLIOCRAW) ? "DLIOCRAW" : ioc_cmd));
+		    iocp->ioc_error,
+		    (iocp->ioc_cmd == DL_IOC_HDR_INFO) ? "DL_IOC_HDR_INFO" :
+		    (iocp->ioc_cmd == DLIOCRAW) ? "DLIOCRAW" : ioc_cmd));
 #endif  /* DEBUG */
 
 		/* FALLTHRU */
@@ -3917,12 +3917,12 @@ man_lrsrv(queue_t *rq)
 			ASSERT(mdp->md_bc_id == 0);
 			if (mdp->md_lc_timer_id != 0) {
 				(void) quntimeout(man_ctl_wq,
-					mdp->md_lc_timer_id);
+				    mdp->md_lc_timer_id);
 				mdp->md_lc_timer_id = 0;
 			}
 		}
 		MAN_DBG(MAN_DLPI,
-			("		cprim %s", dps[(int)cprim]));
+		    ("		cprim %s", dps[(int)cprim]));
 		break;
 
 	case DL_BIND_ACK:
@@ -3935,8 +3935,8 @@ man_lrsrv(queue_t *rq)
 		mdp->md_linkstate = MAN_LINKGOOD;
 		if (man_needs_linkcheck(mdp)) {
 			mdp->md_lc_timer_id = qtimeout(man_ctl_wq,
-				man_linkcheck_timer, (void *)mdp,
-				man_gettimer(MAN_TIMER_LINKCHECK, mdp));
+			    man_linkcheck_timer, (void *)mdp,
+			    man_gettimer(MAN_TIMER_LINKCHECK, mdp));
 		}
 
 		break;
@@ -3963,16 +3963,16 @@ man_lrsrv(queue_t *rq)
 		}
 
 		MAN_DBG(MAN_DLPI,
-			("\tdl_errno %d dl_unix_errno %d cprim %s",
-			dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno,
-			dps[(int)cprim]));
+		    ("\tdl_errno %d dl_unix_errno %d cprim %s",
+		    dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno,
+		    dps[(int)cprim]));
 		break;
 
 	case DL_UDERROR_IND:
 		MAN_DBG(MAN_DLPI,
-			("\tdl_errno %d unix_errno %d",
-			dlp->uderror_ind.dl_errno,
-			dlp->uderror_ind.dl_unix_errno));
+		    ("\tdl_errno %d unix_errno %d",
+		    dlp->uderror_ind.dl_errno,
+		    dlp->uderror_ind.dl_unix_errno));
 		break;
 
 	case DL_INFO_ACK:
@@ -3983,7 +3983,7 @@ man_lrsrv(queue_t *rq)
 		 * We should not get here.
 		 */
 		cmn_err(CE_WARN, "man_lrsrv: unexpected DL prim 0x%lx!",
-			prim);
+		    prim);
 		need_dl_reset = TRUE;
 		break;
 	}
@@ -4011,15 +4011,15 @@ dl_reset:
 		ASSERT(mdp->md_msp != NULL);
 		ASSERT(mdp->md_msp->ms_manp != NULL);
 		mpg = man_find_pg_by_id(mdp->md_msp->ms_manp->man_pg,
-							mdp->md_pg_id);
+		    mdp->md_pg_id);
 		ASSERT(mpg != NULL);
 		mp = man_find_path_by_ppa(mpg->mpg_pathp,
-					mdp->md_device.mdev_ppa);
+		    mdp->md_device.mdev_ppa);
 		ASSERT(mp != NULL);
 		mp->mp_device.mdev_state |= MDEV_FAILED;
 		if ((mdp->md_dlpierrors >= MAN_MAX_DLPIERRORS) &&
-			(man_is_on_domain ||
-			mdp->md_msp->ms_manp->man_meta_ppa == 1)) {
+		    (man_is_on_domain ||
+		    mdp->md_msp->ms_manp->man_meta_ppa == 1)) {
 			/*
 			 * Autoswitching is disabled for instance 0
 			 * on the SC as we expect the domain to
@@ -4027,12 +4027,12 @@ dl_reset:
 			 */
 			(void) man_do_autoswitch((man_dest_t *)mdp);
 			MAN_DBG(MAN_WARN, ("man_lrsrv: dlpi failure(%d,%d),"
-				" switching path", mdp->md_device.mdev_major,
-				mdp->md_device.mdev_ppa));
+			    " switching path", mdp->md_device.mdev_major,
+			    mdp->md_device.mdev_ppa));
 		} else {
 			mdp->md_lc_timer_id = qtimeout(man_ctl_wq,
-					man_reset_dlpi, (void *)mdp,
-					man_gettimer(MAN_TIMER_DLPIRESET, mdp));
+			    man_reset_dlpi, (void *)mdp,
+			    man_gettimer(MAN_TIMER_DLPIRESET, mdp));
 		}
 		mutex_exit(&man_lock);
 	}
@@ -4094,7 +4094,7 @@ man_iwork()
 	int		wp_finished;
 
 	MAN_DBG(MAN_SWITCH, ("man_iwork: q_work(0x%p)",
-		(void *)man_iwork_q->q_work));
+	    (void *)man_iwork_q->q_work));
 
 	mutex_enter(&man_lock);
 
@@ -4107,7 +4107,7 @@ man_iwork()
 		mutex_exit(&man_lock);
 
 		MAN_DBG(MAN_SWITCH, ("man_iwork: type %s",
-			_mw_type[wp->mw_type]));
+		    _mw_type[wp->mw_type]));
 
 		wp_finished = TRUE;
 
@@ -4526,7 +4526,7 @@ man_iswitch(man_work_t *wp)
 		 * Never got switch-to destinations open, free them.
 		 */
 		man_kfree(adp->a_mdp,
-			sizeof (man_dest_t) * adp->a_ndests);
+		    sizeof (man_dest_t) * adp->a_ndests);
 	}
 
 	/*
@@ -4567,7 +4567,7 @@ man_iswitch(man_work_t *wp)
 		ASSERT(adp->a_st_dev.mdev_major != 0);
 
 		mp = man_find_path_by_ppa(mpg->mpg_pathp,
-			adp->a_st_dev.mdev_ppa);
+		    adp->a_st_dev.mdev_ppa);
 
 		ASSERT(mp != NULL);
 
@@ -4646,12 +4646,12 @@ man_ifail_dest(man_dest_t *mdp)
 	 * DL_IDLE, restart the linktimer.
 	 */
 	if ((mdp->md_state & MAN_DSTATE_INITIALIZING) ||
-		((mdp->md_msp->ms_sap == ETHERTYPE_IPV6 ||
-		mdp->md_msp->ms_sap == ETHERTYPE_IP) &&
-		mdp->md_msp->ms_dlpistate == DL_IDLE)) {
+	    ((mdp->md_msp->ms_sap == ETHERTYPE_IPV6 ||
+	    mdp->md_msp->ms_sap == ETHERTYPE_IP) &&
+	    mdp->md_msp->ms_dlpistate == DL_IDLE)) {
 
 		mdp->md_lc_timer_id = qtimeout(man_ctl_wq, man_linkcheck_timer,
-		(void *)mdp, man_gettimer(MAN_TIMER_LINKCHECK, mdp));
+		    (void *)mdp, man_gettimer(MAN_TIMER_LINKCHECK, mdp));
 	}
 
 }
@@ -4721,7 +4721,7 @@ fail:
 	 * qtimeout anyway.
 	 */
 	mdp->md_lc_timer_id = qtimeout(man_ctl_wq, man_reset_dlpi,
-		(void *)mdp, man_gettimer(MAN_TIMER_LINKCHECK, mdp));
+	    (void *)mdp, man_gettimer(MAN_TIMER_LINKCHECK, mdp));
 }
 
 /*
@@ -4857,7 +4857,7 @@ man_alloc_physreq_mp(eaddr_t *man_eap)
 
 exit:
 	MAN_DBG(MAN_DLPI, ("man_alloc_physreq: physaddr %s\n",
-		    ether_sprintf(eap)));
+	    ether_sprintf(eap)));
 
 	return (mp);
 }
@@ -4994,9 +4994,9 @@ man_str_uses_pg(manstr_t *msp, man_pg_t *mpg)
 	int	status;
 
 	status = ((msp->ms_flags & MAN_SFLAG_CONTROL)	||
-		    (msp->ms_dests == NULL)		||
-		    (msp->ms_manp == NULL)		||
-		    (msp->ms_manp->man_meta_ppa != mpg->mpg_man_ppa));
+	    (msp->ms_dests == NULL)	||
+	    (msp->ms_manp == NULL)	||
+	    (msp->ms_manp->man_meta_ppa != mpg->mpg_man_ppa));
 
 	return (!status);
 }
@@ -5099,8 +5099,8 @@ man_linkcheck_timer(void *argp)
 
 	if (!man_needs_linkcheck(mdp)) {
 		cmn_err(CE_NOTE,
-			"man_linkcheck_timer: unneeded linkcheck on mdp(0x%p)",
-			(void *)mdp);
+		    "man_linkcheck_timer: unneeded linkcheck on mdp(0x%p)",
+		    (void *)mdp);
 		mutex_exit(&man_lock);
 		return;
 	}
@@ -5151,7 +5151,7 @@ man_linkcheck_timer(void *argp)
 		newstate = MAN_LINKSTALE;
 		mdp->md_linkstales++;
 		mdp->md_linkstale_retries =
-			mdp->md_msp->ms_manp->man_linkstale_retries;
+		    mdp->md_msp->ms_manp->man_linkstale_retries;
 		break;
 
 	case MAN_LINKSTALE:
@@ -5162,7 +5162,7 @@ man_linkcheck_timer(void *argp)
 			newstate = MAN_LINKFAIL;
 			mdp->md_linkfails++;
 			mdp->md_linkstale_retries =
-				mdp->md_msp->ms_manp->man_linkstale_retries;
+			    mdp->md_msp->ms_manp->man_linkstale_retries;
 			/*
 			 * Mark the destination as FAILED and
 			 * update lru.
@@ -5176,7 +5176,7 @@ man_linkcheck_timer(void *argp)
 
 	default:
 		cmn_err(CE_WARN, "man_linkcheck_timer: illegal link"
-			" state %d", oldstate);
+		    " state %d", oldstate);
 		break;
 	}
 done:
@@ -5184,8 +5184,8 @@ done:
 	if (oldstate != newstate) {
 
 		MAN_DBG(MAN_LINK, ("man_linkcheck_timer"
-			" link state %s -> %s", lss[oldstate],
-			lss[newstate]));
+		    " link state %s -> %s", lss[oldstate],
+		    lss[newstate]));
 
 		mdp->md_linkstate = newstate;
 	}
@@ -5210,7 +5210,7 @@ do_switch:
 
 	if (restart_timer)
 		mdp->md_lc_timer_id = qtimeout(man_ctl_wq, man_linkcheck_timer,
-			(void *)mdp, man_gettimer(MAN_TIMER_LINKCHECK, mdp));
+		    (void *)mdp, man_gettimer(MAN_TIMER_LINKCHECK, mdp));
 
 exit:
 	MAN_DBG(MAN_LINK, ("man_linkcheck_timer: returns"));
@@ -5262,8 +5262,8 @@ man_do_autoswitch(man_dest_t *mdp)
 		mdp->md_link_updown_msg = MAN_LINK_DOWN_MSG;
 
 		MAN_DBG(MAN_LINK, ("man_linkcheck_timer: link failure on %s%d",
-			ddi_major_to_name(mdp->md_device.mdev_major),
-			mdp->md_device.mdev_ppa));
+		    ddi_major_to_name(mdp->md_device.mdev_major),
+		    mdp->md_device.mdev_ppa));
 
 		ap = man_find_alternate_path(mpg->mpg_pathp);
 
@@ -5372,7 +5372,7 @@ man_prep_dests_for_switch(man_pg_t *mpg, man_dest_t **mdpp, int *cntp)
 	int		status = 0;
 
 	MAN_DBG(MAN_SWITCH, ("man_prep_dests_for_switch: pg_id %d",
-		mpg->mpg_pg_id));
+	    mpg->mpg_pg_id));
 
 	/*
 	 * Count up number of streams, there is one destination that needs
@@ -5418,7 +5418,7 @@ man_prep_dests_for_switch(man_pg_t *mpg, man_dest_t **mdpp, int *cntp)
 			 */
 			if (mdp->md_lc_timer_id) {
 				(void) quntimeout(man_ctl_wq,
-					mdp->md_lc_timer_id);
+				    mdp->md_lc_timer_id);
 				mdp->md_lc_timer_id = 0;
 			}
 			if (mdp->md_bc_id) {
@@ -5434,7 +5434,7 @@ man_prep_dests_for_switch(man_pg_t *mpg, man_dest_t **mdpp, int *cntp)
 exit:
 
 	MAN_DBG(MAN_SWITCH, ("man_prep_dests_for_switch: returns %d"
-		" sdp(0x%p) sdp_cnt(%d)", status, (void *)sdp, sdp_cnt));
+	    " sdp(0x%p) sdp_cnt(%d)", status, (void *)sdp, sdp_cnt));
 
 	return (status);
 
@@ -5473,7 +5473,7 @@ man_do_icmp_bcast(man_dest_t *mdp, t_uscalar_t sap)
 	mp = man_pinger(sap);
 
 	MAN_DBG(MAN_LINK, ("man_do_icmp_bcast: sap=0x%x mp=0x%p",
-							sap, (void *)mp));
+	    sap, (void *)mp));
 	if (mp == NULL)
 		return;
 
@@ -5530,7 +5530,7 @@ man_pinger(t_uscalar_t sap)
 	if (ipver == IPV4_VERSION) {
 		ipha = (ipha_t *)mp->b_cont->b_rptr;
 		ipha->ipha_version_and_hdr_length = (IP_VERSION << 4)
-			| IP_SIMPLE_HDR_LENGTH_IN_WORDS;
+		    | IP_SIMPLE_HDR_LENGTH_IN_WORDS;
 		ipha->ipha_type_of_service = 0;
 		ipha->ipha_length = size;
 		ipha->ipha_fragment_offset_and_flags = IPH_DF;
@@ -5572,7 +5572,7 @@ man_pinger(t_uscalar_t sap)
 		 */
 		ip6h->ip6_flow = (IPV6_VERSION << 28);
 		ip6h->ip6_plen =
-			htons((short)(size - iph_hdr_len));
+		    htons((short)(size - iph_hdr_len));
 		ip6h->ip6_nxt = IPPROTO_ICMPV6;
 		ip6h->ip6_hlim = 1;	/* stay on link */
 
@@ -5628,7 +5628,7 @@ man_pinger(t_uscalar_t sap)
 
 		sum = htons(IPPROTO_ICMPV6) + ip6h->ip6_plen;
 		icmph->icmph_checksum = IP_CSUM(mp->b_cont, iph_hdr_len - 32,
-			(sum & 0xffff) + (sum >> 16));
+		    (sum & 0xffff) + (sum >> 16));
 	}
 
 /*
@@ -5754,7 +5754,7 @@ man_bwork()
 		wp_finished = TRUE;
 
 		MAN_DBG(MAN_SWITCH, ("man_bwork: type %s",
-			_mw_type[wp->mw_type]));
+		    _mw_type[wp->mw_type]));
 
 		switch (wp->mw_type) {
 		case MAN_WORK_OPEN_CTL:
@@ -5845,7 +5845,7 @@ man_open_ctl()
 	status = ldi_ident_from_mod(&modlinkage, &li);
 	if (status) {
 		cmn_err(CE_WARN,
-			"man_open_ctl: ident alloc failed, error %d", status);
+		    "man_open_ctl: ident alloc failed, error %d", status);
 		goto exit;
 	}
 
@@ -5853,7 +5853,7 @@ man_open_ctl()
 	    kcred, &ctl_lh, li);
 	if (status) {
 		cmn_err(CE_WARN,
-			"man_open_ctl: eri open failed, error %d", status);
+		    "man_open_ctl: eri open failed, error %d", status);
 		ctl_lh = NULL;
 		goto exit;
 	}
@@ -5874,8 +5874,8 @@ man_open_ctl()
 	    kcred, &ctl_lh, li);
 	if (status) {
 		cmn_err(CE_WARN,
-			"man_open_ctl: man control dev open failed, "
-			"error %d", status);
+		    "man_open_ctl: man control dev open failed, "
+		    "error %d", status);
 		goto exit;
 	}
 
@@ -5897,7 +5897,7 @@ exit:
 		ldi_ident_release(li);
 
 	MAN_DBG(MAN_CONFIG, ("man_open_ctl: man_ctl_lh(0x%p) errno = %d\n",
-		(void *)man_ctl_lh, status));
+	    (void *)man_ctl_lh, status));
 
 	return (status);
 }
@@ -5975,7 +5975,7 @@ man_cancel_timers(man_adest_t *adp)
 	cnt = adp->a_ndests;
 
 	MAN_DBG(MAN_SWITCH, ("man_cancel_timers: mdp(0x%p) cnt %d",
-		(void *)mdp, cnt));
+	    (void *)mdp, cnt));
 
 	for (i = 0; i < cnt; i++) {
 
@@ -6023,7 +6023,7 @@ man_bswitch(man_adest_t *adp, man_work_t *wp)
 	 */
 
 	tdp = man_kzalloc(sizeof (man_dest_t) * adp->a_ndests,
-		KM_SLEEP);
+	    KM_SLEEP);
 	bcopy(adp->a_mdp, tdp, sizeof (man_dest_t) * adp->a_ndests);
 
 	/*
@@ -6115,8 +6115,8 @@ man_plumb(man_dest_t *mdp)
 	ldi_ident_t	li = NULL;
 
 	MAN_DBG(MAN_SWITCH, ("man_plumb: mdp(0x%p) %s%d exp(%d)",
-		(void *)mdp, ddi_major_to_name(mdp->md_device.mdev_major),
-		mdp->md_device.mdev_ppa, mdp->md_device.mdev_exp_id));
+	    (void *)mdp, ddi_major_to_name(mdp->md_device.mdev_major),
+	    mdp->md_device.mdev_ppa, mdp->md_device.mdev_exp_id));
 
 	/*
 	 * Control stream should already be open.
@@ -6141,7 +6141,7 @@ man_plumb(man_dest_t *mdp)
 	 * mdev_major) which should always map to /devices/pseudo/clone@0:eri
 	 */
 	ASSERT(strcmp(ERI_IDNAME,
-		    ddi_major_to_name(mdp->md_device.mdev_major)) == 0);
+	    ddi_major_to_name(mdp->md_device.mdev_major)) == 0);
 
 	status = ldi_open_by_name(ERI_PATH, FREAD | FWRITE | FNOCTTY,
 	    kcred, &lh, li);
@@ -6157,7 +6157,7 @@ man_plumb(man_dest_t *mdp)
 	ASSERT(mdp->md_muxid == -1);
 
 	status = ldi_ioctl(man_ctl_lh, I_PLINK, (intptr_t)lh,
-				FREAD+FWRITE+FNOCTTY+FKIOCTL, kcred, &muxid);
+	    FREAD+FWRITE+FNOCTTY+FKIOCTL, kcred, &muxid);
 	if (status) {
 		cmn_err(CE_WARN,
 		    "man_plumb: ldi_ioctl(I_PLINK) failed, error %d", status);
@@ -6209,10 +6209,10 @@ man_unplumb(man_dest_t *mdp)
 	 * I_PUNLINK causes the multiplexor resources to be freed.
 	 */
 	status = ldi_ioctl(man_ctl_lh, I_PUNLINK, (intptr_t)mdp->md_muxid,
-				FREAD+FWRITE+FNOCTTY+FKIOCTL, kcred, &rval);
+	    FREAD+FWRITE+FNOCTTY+FKIOCTL, kcred, &rval);
 	if (status) {
 		cmn_err(CE_WARN, "man_unplumb: ldi_ioctl(I_PUNLINK) failed"
-			" errno %d\n", status);
+		    " errno %d\n", status);
 	}
 	/*
 	 * Delete linkrec if it exists.
@@ -6261,7 +6261,7 @@ man_pg_cmd(mi_path_t *mip, man_work_t *waiter_wp)
 	if (mip->mip_ndevs < 0) {
 		status = EINVAL;
 		cmn_err(CE_WARN, "man_pg_cmd: EINVAL: mip_ndevs %d",
-			mip->mip_ndevs);
+		    mip->mip_ndevs);
 		goto exit;
 	}
 
@@ -6378,9 +6378,9 @@ man_pg_assign(man_pg_t **mplpp, mi_path_t *mip, int add_only)
 
 		cmn_err(CE_WARN, "man_pg_assign: ethernet address mismatch");
 		cmn_err(CE_CONT, "existing %s",
-			ether_sprintf(&mpg->mpg_dst_eaddr));
+		    ether_sprintf(&mpg->mpg_dst_eaddr));
 		cmn_err(CE_CONT, "new %s",
-			ether_sprintf(&mip->mip_eaddr));
+		    ether_sprintf(&mip->mip_eaddr));
 
 		status = EINVAL;
 		goto exit;
@@ -6680,7 +6680,7 @@ man_pg_read(man_pg_t *plp, mi_path_t *mip)
 	}
 
 	MAN_DBG(MAN_PATH, ("man_pg_read: pg(0x%p) id(%d) found %d paths",
-		(void *)mpg, mpg->mpg_pg_id, cnt));
+	    (void *)mpg, mpg->mpg_pg_id, cnt));
 
 	mip->mip_ndevs = cnt;
 
@@ -6716,7 +6716,7 @@ man_pg_create(man_pg_t **mplpp, man_pg_t **mpgp, mi_path_t *mip)
 
 	if (ether_cmp(&mip->mip_eaddr, &zero_ether_addr) == 0) {
 		cmn_err(CE_NOTE, "man_ioctl: man_pg_create: ether"
-			" addresss not set!");
+		    " addresss not set!");
 		status = EINVAL;
 		goto exit;
 	}
@@ -6970,7 +6970,7 @@ man_path_kstat_init(man_path_t *mpp)
 	 * Create named kstats for accounting purposes.
 	 */
 	dev_knp = man_kzalloc(MAN_NUMSTATS * sizeof (kstat_named_t),
-		KM_NOSLEEP);
+	    KM_NOSLEEP);
 	if (dev_knp == NULL) {
 		status = ENOMEM;
 		goto exit;
@@ -7082,7 +7082,7 @@ man_param_register(param_t *manpa, int cnt)
 	int	status = B_TRUE;
 
 	MAN_DBG(MAN_CONFIG, ("man_param_register: manpa(0x%p) cnt %d\n",
-		(void *)manpa, cnt));
+	    (void *)manpa, cnt));
 
 	getp = man_param_get;
 
@@ -7101,7 +7101,7 @@ man_param_register(param_t *manpa, int cnt)
 		}
 
 		if (!nd_load(&man_ndlist, manpa->param_name, getp,
-			setp, (caddr_t)manpa)) {
+		    setp, (caddr_t)manpa)) {
 
 			(void) man_nd_free(&man_ndlist);
 			status = B_FALSE;
@@ -7110,7 +7110,7 @@ man_param_register(param_t *manpa, int cnt)
 	}
 
 	if (!nd_load(&man_ndlist, "man_pathgroups_report",
-		man_pathgroups_report, NULL, NULL)) {
+	    man_pathgroups_report, NULL, NULL)) {
 
 		(void) man_nd_free(&man_ndlist);
 		status = B_FALSE;
@@ -7118,7 +7118,7 @@ man_param_register(param_t *manpa, int cnt)
 	}
 
 	if (!nd_load(&man_ndlist, "man_set_active_path",
-		NULL, man_set_active_path, NULL)) {
+	    NULL, man_set_active_path, NULL)) {
 
 		(void) man_nd_free(&man_ndlist);
 		status = B_FALSE;
@@ -7126,7 +7126,7 @@ man_param_register(param_t *manpa, int cnt)
 	}
 
 	if (!nd_load(&man_ndlist, "man_get_hostinfo",
-		man_get_hostinfo, NULL, NULL)) {
+	    man_get_hostinfo, NULL, NULL)) {
 
 		(void) man_nd_free(&man_ndlist);
 		status = B_FALSE;
@@ -7163,11 +7163,11 @@ man_pathgroups_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 
 	MAN_DBG(MAN_PATH, ("man_pathgroups_report: wq(0x%p) mp(0x%p)"
-		" caddr 0x%p", (void *)wq, (void *)mp, (void *)cp));
+	    " caddr 0x%p", (void *)wq, (void *)mp, (void *)cp));
 
 	(void) mi_mpprintf(mp, "MAN Pathgroup report: (* == failed)");
 	(void) mi_mpprintf(mp, "====================================="
-		"==========================================");
+	    "==========================================");
 
 	mutex_enter(&man_lock);
 
@@ -7177,35 +7177,36 @@ man_pathgroups_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 			continue;
 
 	(void) mi_mpprintf(mp,
-		"Interface\tDestination\t\tActive Path\tAlternate Paths");
+	    "Interface\tDestination\t\tActive Path\tAlternate Paths");
 	(void) mi_mpprintf(mp, "---------------------------------------"
-		"----------------------------------------");
+	    "----------------------------------------");
 
 		for (mpg = manp->man_pg; mpg != NULL; mpg = mpg->mpg_next) {
 
 			(void) mi_mpprintf(mp, "%s%d\t\t",
-				ddi_major_to_name(manp->man_meta_major),
-				manp->man_meta_ppa);
+			    ddi_major_to_name(manp->man_meta_major),
+			    manp->man_meta_ppa);
 
 			if (man_is_on_domain) {
 				(void) mi_mpprintf_nr(mp, "Master SSC\t");
 				man_preport(mpg->mpg_pathp, mp);
 			} else {
 				if (i == 0) {
-				    pad_end = 17 - strlen(ether_sprintf(
-					&mpg->mpg_dst_eaddr));
-				    if (pad_end < 0 || pad_end > 16)
+					pad_end = 17 - strlen(ether_sprintf(
+					    &mpg->mpg_dst_eaddr));
+					if (pad_end < 0 || pad_end > 16)
 					pad_end = 0;
-				    pad[pad_end] = '\0';
+					pad[pad_end] = '\0';
 
-				    (void) mi_mpprintf_nr(mp, "%c %s%s",
-					mpg->mpg_pg_id + 'A',
-					ether_sprintf(&mpg->mpg_dst_eaddr),
-					pad);
+					(void) mi_mpprintf_nr(mp, "%c %s%s",
+					    mpg->mpg_pg_id + 'A',
+					    ether_sprintf(&mpg->mpg_dst_eaddr),
+					    pad);
 
-				    pad[pad_end] = ' ';
+					pad[pad_end] = ' ';
 				} else {
-				    (void) mi_mpprintf_nr(mp, "Other SSC\t");
+					(void) mi_mpprintf_nr(mp,
+					    "Other SSC\t");
 				}
 				man_preport(mpg->mpg_pathp, mp);
 			}
@@ -7230,8 +7231,8 @@ man_preport(man_path_t *plist, mblk_t *mp)
 	 */
 	if (ap != NULL) {
 		(void) mi_mpprintf_nr(mp, "\t%s%d\t\t",
-			ddi_major_to_name(ap->mp_device.mdev_major),
-			ap->mp_device.mdev_ppa);
+		    ddi_major_to_name(ap->mp_device.mdev_major),
+		    ap->mp_device.mdev_ppa);
 	} else {
 		(void) mi_mpprintf_nr(mp, "None \t");
 	}
@@ -7241,9 +7242,9 @@ man_preport(man_path_t *plist, mblk_t *mp)
 	 */
 	while (plist != NULL) {
 		(void) mi_mpprintf_nr(mp, "%s%d exp %d",
-			ddi_major_to_name(plist->mp_device.mdev_major),
-			plist->mp_device.mdev_ppa,
-			plist->mp_device.mdev_exp_id);
+		    ddi_major_to_name(plist->mp_device.mdev_major),
+		    plist->mp_device.mdev_ppa,
+		    plist->mp_device.mdev_exp_id);
 		if (plist->mp_device.mdev_state & MDEV_FAILED)
 			(void) mi_mpprintf_nr(mp, "*");
 		plist = plist->mp_next;
@@ -7274,7 +7275,7 @@ man_set_active_path(queue_t *wq, mblk_t *mp, char *value, caddr_t cp,
 	int		status = 0;
 
 	MAN_DBG(MAN_PATH, ("man_set_active_path: wq(0x%p) mp(0x%p)"
-		" args %s", (void *)wq, (void *)mp, value));
+	    " args %s", (void *)wq, (void *)mp, value));
 
 	meta_ppap = value;
 
@@ -7384,14 +7385,14 @@ man_get_hostinfo(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 		mi_mpprintf(mp, "manc_ip_type = AF_INET6");
 
 		(void) inet_ntop(AF_INET6, (void *)&manc.manc_dom_ipv6addr,
-			ipv6addr, INET6_ADDRSTRLEN);
+		    ipv6addr, INET6_ADDRSTRLEN);
 		mi_mpprintf(mp, "manc_dom_ipv6addr = %s", ipv6addr);
 
 		mi_mpprintf(mp, "manc_dom_ipv6_netmask = %d",
-				manc.manc_dom_ipv6_netmask.s6_addr[0]);
+		    manc.manc_dom_ipv6_netmask.s6_addr[0]);
 
 		(void) inet_ntop(AF_INET6, (void *)&manc.manc_sc_ipv6addr,
-			ipv6addr, INET6_ADDRSTRLEN);
+		    ipv6addr, INET6_ADDRSTRLEN);
 		mi_mpprintf(mp, "manc_sc_ipv6addr = %s", ipv6addr);
 
 	} else {
@@ -7400,12 +7401,12 @@ man_get_hostinfo(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 	}
 
 	mi_mpprintf(mp, "manc_dom_eaddr = %s",
-		ether_sprintf(&manc.manc_dom_eaddr));
+	    ether_sprintf(&manc.manc_dom_eaddr));
 	mi_mpprintf(mp, "manc_sc_eaddr = %s",
-		ether_sprintf(&manc.manc_sc_eaddr));
+	    ether_sprintf(&manc.manc_sc_eaddr));
 
 	mi_mpprintf(mp, "manc_iob_bitmap = 0x%x\tio boards = ",
-		manc.manc_iob_bitmap);
+	    manc.manc_iob_bitmap);
 	for (i = 0; i < MAN_MAX_EXPANDERS; i++) {
 		if ((manc.manc_iob_bitmap >> i) & 0x1) {
 			mi_mpprintf_nr(mp, "%d.1, ", i);
@@ -7517,7 +7518,7 @@ man_kstat_update(kstat_t *ksp, int rw)
 	int			i;
 
 	MAN_DBG(MAN_KSTAT, ("man_kstat_update: %s\n", rw ? "KSTAT_WRITE" :
-		"KSTAT_READ"));
+	    "KSTAT_READ"));
 
 	mutex_enter(&man_lock);
 	manp = (man_t *)ksp->ks_private;
@@ -7549,7 +7550,7 @@ man_kstat_update(kstat_t *ksp, int rw)
 				status = EINTR;
 			else {
 				MAN_DBG(MAN_KSTAT, ("man_kstat_update: "
-					"timedout, returning stale stats."));
+				    "timedout, returning stale stats."));
 				status = 0;
 			}
 		}
@@ -7597,7 +7598,7 @@ man_do_kstats(man_work_t *wp)
 	 * Sync mp_last_knp for each path associated with the MAN instance.
 	 */
 	manp = (man_t *)ddi_get_soft_state(man_softstate,
-		wp->mw_arg.a_man_ppa);
+	    wp->mw_arg.a_man_ppa);
 	for (mpg = manp->man_pg; mpg != NULL; mpg = mpg->mpg_next) {
 
 		ASSERT(mpg->mpg_man_ppa == manp->man_meta_ppa);
@@ -7676,8 +7677,8 @@ man_update_dev_kstats(kstat_named_t *man_knp, man_path_t *mp)
 
 	} else {
 		MAN_DBG(MAN_KSTAT,
-		("man_update_dev_kstats: no kstat data found for %s(%d,%d)",
-				buf, major, instance));
+		    ("man_update_dev_kstats: no kstat data found for %s(%d,%d)",
+		    buf, major, instance));
 	}
 }
 
@@ -7744,11 +7745,11 @@ man_kstat_named_init(kstat_named_t *knp, int num_stats)
 	int	i;
 
 	MAN_DBG(MAN_KSTAT, ("man_kstat_named_init: knp(0x%p) num_stats = %d",
-		(void *)knp, num_stats));
+	    (void *)knp, num_stats));
 
 	for (i = 0; i < num_stats; i++) {
 		kstat_named_init(&knp[i], man_kstat_info[i].mk_name,
-			man_kstat_info[i].mk_type);
+		    man_kstat_info[i].mk_type);
 	}
 
 	MAN_DBG(MAN_KSTAT, ("man_kstat_named_init: returns"));
@@ -7786,7 +7787,7 @@ man_kstat_byname(kstat_t *ksp, char *s, kstat_named_t *res)
 				found++;
 
 				MAN_DBG(MAN_KSTAT2, ("\t%s: %d\n", knp->name,
-					(int)knp->value.ul));
+				    (int)knp->value.ul));
 			}
 		}
 	} else {
@@ -7846,8 +7847,8 @@ man_sum_kstats(kstat_named_t *sum_knp, kstat_t *phys_ksp,
 	int		i;
 
 	MAN_DBG(MAN_KSTAT, ("man_sum_kstats: sum_knp(0x%p) phys_ksp(0x%p)"
-		" phys_last_knp(0x%p)\n", (void *)sum_knp, (void *)phys_ksp,
-		(void *)phys_last_knp));
+	    " phys_last_knp(0x%p)\n", (void *)sum_knp, (void *)phys_ksp,
+	    (void *)phys_last_knp));
 
 	/*
 	 * Now for each entry in man_kstat_info, sum the named kstat.
@@ -7894,12 +7895,12 @@ man_sum_kstats(kstat_named_t *sum_knp, kstat_t *phys_ksp,
 		 */
 		if (phys_ksp) {
 			if (man_kstat_byname(phys_ksp, physname,
-				&phys_kn_entry)) {
+			    &phys_kn_entry)) {
 
 				found = 1;
 
 			} else if ((physalias) && (man_kstat_byname(phys_ksp,
-				physalias, &phys_kn_entry))) {
+			    physalias, &phys_kn_entry))) {
 
 				found = 1;
 			}
@@ -7933,18 +7934,18 @@ man_sum_kstats(kstat_named_t *sum_knp, kstat_t *phys_ksp,
 			 * this handles 32-bit wrapping
 			 */
 			if (phys_kn_entry.value.ui32 <
-				phys_last_knp[i].value.ui32) {
+			    phys_last_knp[i].value.ui32) {
 
 				/*
 				 * we've wrapped!
 				 */
 				delta64 += (UINT_MAX -
-					phys_last_knp[i].value.ui32);
+				    phys_last_knp[i].value.ui32);
 				phys_last_knp[i].value.ui32 = 0;
 			}
 
 			delta64 += phys_kn_entry.value.ui32 -
-				phys_last_knp[i].value.ui32;
+			    phys_last_knp[i].value.ui32;
 			phys_last_knp[i].value.ui32 = phys_kn_entry.value.ui32;
 			break;
 
@@ -7957,7 +7958,7 @@ man_sum_kstats(kstat_named_t *sum_knp, kstat_t *phys_ksp,
 			 * hundred years without a reboot...)
 			 */
 			delta64 = phys_kn_entry.value.ui64 -
-				phys_last_knp[i].value.ui64;
+			    phys_last_knp[i].value.ui64;
 			phys_last_knp[i].value.ui64 = phys_kn_entry.value.ui64;
 		}
 
@@ -8015,8 +8016,8 @@ man_print_msp(manstr_t *msp)
 		return;
 
 	cmn_err(CE_CONT, "\t%s%d SAP(0x%x):\n",
-		ddi_major_to_name(msp->ms_meta_maj), msp->ms_meta_ppa,
-		msp->ms_sap);
+	    ddi_major_to_name(msp->ms_meta_maj), msp->ms_meta_ppa,
+	    msp->ms_sap);
 
 	buf[0] = '\0';
 	prbuf[0] = '\0';
@@ -8066,13 +8067,13 @@ man_print_mdp(man_dest_t *mdp)
 
 	cmn_err(CE_CONT, "\tmd_pg_id: %d\n", mdp->md_pg_id);
 	cmn_err(CE_CONT, "\tmd_dst_eaddr: %s\n",
-		ether_sprintf(&mdp->md_dst_eaddr));
+	    ether_sprintf(&mdp->md_dst_eaddr));
 	cmn_err(CE_CONT, "\tmd_src_eaddr: %s\n",
-		ether_sprintf(&mdp->md_src_eaddr));
+	    ether_sprintf(&mdp->md_src_eaddr));
 	cmn_err(CE_CONT, "\tmd_dlpistate: %s", dss[mdp->md_dlpistate]);
 	cmn_err(CE_CONT, "\tmd_muxid: 0x%u", mdp->md_muxid);
 	cmn_err(CE_CONT, "\tmd_rcvcnt %lu md_lastrcvcnt %lu", mdp->md_rcvcnt,
-		mdp->md_lastrcvcnt);
+	    mdp->md_lastrcvcnt);
 
 	/*
 	 * Print out state as text.
@@ -8112,8 +8113,8 @@ man_print_man(man_t *manp)
 
 	if (ddi_major_to_name(manp->man_meta_major)) {
 		sprintf(buf, "\t man_device: %s%d\n",
-			ddi_major_to_name(manp->man_meta_major),
-			manp->man_meta_ppa);
+		    ddi_major_to_name(manp->man_meta_major),
+		    manp->man_meta_ppa);
 	} else {
 		sprintf(buf, "\t major: %d", manp->man_meta_major);
 		sprintf(buf, "\t ppa: %d", manp->man_meta_ppa);
@@ -8149,8 +8150,8 @@ number:
 		sprintf(buf, "\t mdev_major: %d\n", mdevp->mdev_major);
 	} else if (ddi_major_to_name(mdevp->mdev_major)) {
 		sprintf(buf, "\t mdev_device: %s%d\n",
-			ddi_major_to_name(mdevp->mdev_major),
-			mdevp->mdev_ppa);
+		    ddi_major_to_name(mdevp->mdev_major),
+		    mdevp->mdev_ppa);
 	} else
 		goto number;
 
@@ -8236,7 +8237,7 @@ man_print_mpg(man_pg_t *mpg)
 	cmn_err(CE_CONT, "\tmpg_man_ppa: %d\n", mpg->mpg_man_ppa);
 
 	cmn_err(CE_CONT, "\tmpg_dst_eaddr: %s\n",
-		ether_sprintf(&mpg->mpg_dst_eaddr));
+	    ether_sprintf(&mpg->mpg_dst_eaddr));
 
 	cmn_err(CE_CONT, "\tmpg_pathp: 0x%p\n", (void *)mpg->mpg_pathp);
 
@@ -8304,7 +8305,7 @@ man_dbg_kzalloc(int line, size_t size, int kmflags)
 
 	tmp = kmem_zalloc(size, kmflags);
 	MAN_DBG(MAN_KMEM, ("0x%p %lu\tzalloc'd @ %d\n", (void *)tmp,
-		size, line));
+	    size, line));
 
 	return (tmp);
 

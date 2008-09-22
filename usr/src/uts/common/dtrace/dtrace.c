@@ -15480,7 +15480,8 @@ static struct dev_ops dtrace_ops = {
 	nodev,			/* reset */
 	&dtrace_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	nodev			/* dev power */
+	nodev,			/* dev power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

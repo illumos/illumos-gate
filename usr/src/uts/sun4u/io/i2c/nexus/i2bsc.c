@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * i2bsc.c is the nexus driver i2c traffic against devices hidden behind the
@@ -152,13 +151,15 @@ static struct dev_ops i2bsc_ops = {
 	i2bsc_detach,
 	nodev,
 	&i2bsc_cb_ops,
-	&i2bsc_busops
+	&i2bsc_busops,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 #ifdef DEBUG
-#define	I2BSC_VERSION_STRING "i2bsc driver - Debug v%I%"
+#define	I2BSC_VERSION_STRING "i2bsc driver - Debug"
 #else
-#define	I2BSC_VERSION_STRING "i2bsc driver v%I%"
+#define	I2BSC_VERSION_STRING "i2bsc driver"
 #endif
 
 static struct modldrv modldrv = {
@@ -189,7 +190,7 @@ _init(void)
 	int status;
 
 	status = ddi_soft_state_init(&i2bsc_state, sizeof (i2bsc_t),
-		I2BSC_INITIAL_SOFT_SPACE);
+	    I2BSC_INITIAL_SOFT_SPACE);
 	if (status != 0) {
 		return (status);
 	}
@@ -266,10 +267,10 @@ i2bsc_doattach(dev_info_t *dip)
 	i2c->minornum = instance;
 	i2c->i2bsc_dip = dip;
 	i2c->debug = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "debug", 0);
+	    DDI_PROP_DONTPASS, "debug", 0);
 
 	(void) snprintf(i2c->i2bsc_name, sizeof (i2c->i2bsc_name),
-		"%s_%d", ddi_node_name(dip), instance);
+	    "%s_%d", ddi_node_name(dip), instance);
 
 	if (i2bsc_setup_regs(i2c) != DDI_SUCCESS) {
 		goto bad;
@@ -329,14 +330,14 @@ static int
 i2bsc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	switch (cmd) {
-	    case DDI_ATTACH:
+		case DDI_ATTACH:
 		return (i2bsc_doattach(dip));
 
-	    case DDI_RESUME:
+		case DDI_RESUME:
 		i2bsc_resume(dip);
 		return (DDI_SUCCESS);
 
-	    default:
+		default:
 		return (DDI_FAILURE);
 	}
 }
@@ -442,13 +443,13 @@ i2bsc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	}
 
 	switch (cmd) {
-	    case DEVCTL_BUS_DEV_CREATE:
+		case DEVCTL_BUS_DEV_CREATE:
 		rv = ndi_dc_devi_create(dcp, self, 0, NULL);
 		break;
 
-	    case DEVCTL_DEVICE_REMOVE:
+		case DEVCTL_DEVICE_REMOVE:
 		if (ndi_dc_getname(dcp) == NULL ||
-			ndi_dc_getaddr(dcp) == NULL) {
+		    ndi_dc_getaddr(dcp) == NULL) {
 			rv = EINVAL;
 			break;
 		}
@@ -457,20 +458,20 @@ i2bsc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * lookup and hold child device
 		 */
 		child = ndi_devi_find(self,
-			ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
+		    ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
 		if (child == NULL) {
 			rv = ENXIO;
 			break;
 		}
 
 		if ((rv = ndi_devi_offline(child, NDI_DEVI_REMOVE)) !=
-			NDI_SUCCESS) {
+		    NDI_SUCCESS) {
 			rv = (rv == NDI_BUSY) ? EBUSY : EIO;
 		}
 
 		break;
 
-	    default:
+		default:
 		rv = ENOTSUP;
 	}
 
@@ -492,30 +493,30 @@ i2bsc_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 	    " %p/%p,%d/%p", dip, rdip, (int)op, arg);
 
 	switch (op) {
-	    case DDI_CTLOPS_INITCHILD:
+		case DDI_CTLOPS_INITCHILD:
 		return (i2bsc_initchild(dip, (dev_info_t *)arg));
 
-	    case DDI_CTLOPS_UNINITCHILD:
+		case DDI_CTLOPS_UNINITCHILD:
 		return (i2bsc_uninitchild(dip, (dev_info_t *)arg));
 
-	    case DDI_CTLOPS_REPORTDEV:
+		case DDI_CTLOPS_REPORTDEV:
 		return (i2bsc_reportdev(dip, rdip));
 
-	    case DDI_CTLOPS_DMAPMAPC:
-	    case DDI_CTLOPS_POKE:
-	    case DDI_CTLOPS_PEEK:
-	    case DDI_CTLOPS_IOMIN:
-	    case DDI_CTLOPS_REPORTINT:
-	    case DDI_CTLOPS_SIDDEV:
-	    case DDI_CTLOPS_SLAVEONLY:
-	    case DDI_CTLOPS_AFFINITY:
-	    case DDI_CTLOPS_PTOB:
-	    case DDI_CTLOPS_BTOP:
-	    case DDI_CTLOPS_BTOPR:
-	    case DDI_CTLOPS_DVMAPAGESIZE:
+		case DDI_CTLOPS_DMAPMAPC:
+		case DDI_CTLOPS_POKE:
+		case DDI_CTLOPS_PEEK:
+		case DDI_CTLOPS_IOMIN:
+		case DDI_CTLOPS_REPORTINT:
+		case DDI_CTLOPS_SIDDEV:
+		case DDI_CTLOPS_SLAVEONLY:
+		case DDI_CTLOPS_AFFINITY:
+		case DDI_CTLOPS_PTOB:
+		case DDI_CTLOPS_BTOP:
+		case DDI_CTLOPS_BTOPR:
+		case DDI_CTLOPS_DVMAPAGESIZE:
 		return (DDI_FAILURE);
 
-	    default:
+		default:
 		return (ddi_ctlops(dip, rdip, op, arg, result));
 	}
 }
@@ -604,16 +605,16 @@ i2bsc_initchild(dev_info_t *dip, dev_info_t *cdip)
 	len = sizeof (address_cells);
 
 	err = ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip,
-		DDI_PROP_CANSLEEP, "#address-cells",
-		(caddr_t)&address_cells, &len);
+	    DDI_PROP_CANSLEEP, "#address-cells",
+	    (caddr_t)&address_cells, &len);
 	if (err != DDI_PROP_SUCCESS || len != sizeof (address_cells)) {
 		return (DDI_FAILURE);
 	}
 
 	len = sizeof (regs);
 	err = ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip,
-		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
-		"reg", (caddr_t)regs, &len);
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
+	    "reg", (caddr_t)regs, &len);
 	if (err != DDI_PROP_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -750,8 +751,8 @@ static int i2bsc_bscbus_state(i2bsc_t *i2c)
 	uint32_t retval;
 
 	retval = ddi_get32(i2c->bscbus_handle,
-		    (uint32_t *)I2BSC_NEXUS_ADDR(i2c, EBUS_CMD_SPACE_GENERIC,
-		    LOMBUS_FAULT_REG));
+	    (uint32_t *)I2BSC_NEXUS_ADDR(i2c, EBUS_CMD_SPACE_GENERIC,
+	    LOMBUS_FAULT_REG));
 	i2c->bscbus_fault = retval;
 
 	return ((retval == 0) ? DDI_SUCCESS : DDI_FAILURE);
@@ -1104,10 +1105,10 @@ i2bsc_upload(i2bsc_t *i2c, i2c_transfer_t *tp)
 		return (tp->i2c_result = I2C_INCOMPLETE);
 
 	switch (res) {
-	    case EBUS_I2C_SUCCESS:
+		case EBUS_I2C_SUCCESS:
 		tp->i2c_result = I2C_SUCCESS;
 		break;
-	    case EBUS_I2C_FAILURE:
+		case EBUS_I2C_FAILURE:
 		/*
 		 * This is rare but possible.  A retry may still fix this
 		 * so lets allow that by returning I2C_INCOMPLETE.
@@ -1118,10 +1119,10 @@ i2bsc_upload(i2bsc_t *i2c, i2c_transfer_t *tp)
 		    " but returning I2C_INCOMPLETE for possible re-try");
 		tp->i2c_result = I2C_INCOMPLETE;
 		break;
-	    case EBUS_I2C_INCOMPLETE:
+		case EBUS_I2C_INCOMPLETE:
 		tp->i2c_result = I2C_INCOMPLETE;
 		break;
-	    default:
+		default:
 		tp->i2c_result = I2C_FAILURE;
 	}
 
@@ -1185,7 +1186,7 @@ i2bsc_transfer(dev_info_t *dip, i2c_transfer_t *tp)
 	i2bsc_t *i2c;
 
 	i2c = (i2bsc_t *)ddi_get_soft_state(i2bsc_state,
-		ddi_get_instance(ddi_get_parent(dip)));
+	    ddi_get_instance(ddi_get_parent(dip)));
 
 	i2bsc_acquire(i2c, dip, tp);
 
@@ -1232,7 +1233,7 @@ i2bsc_trace(i2bsc_t *ssp, char code, const char *caller,
 	if (ssp->debug & (1 << (code-'@'))) {
 		p = buf;
 		(void) snprintf(p, sizeof (buf) - (p - buf),
-			"%s/%s: ", ssp->i2bsc_name, caller);
+		    "%s/%s: ", ssp->i2bsc_name, caller);
 		p += strlen(p);
 
 		va_start(va, fmt);

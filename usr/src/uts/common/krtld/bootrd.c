@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/sunddi.h>
@@ -44,7 +43,7 @@ static uint64_t rd_start, rd_end;
 struct boot_fs_ops *bfs_ops;
 struct boot_fs_ops *bfs_tab[] = {&bufs_ops, &bhsfs_ops, NULL};
 
-static uintptr_t scratch_max;
+static uintptr_t scratch_max = 0;
 
 #define	_kmem_ready	get_weakish_int(&kmem_ready)
 

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -317,7 +316,9 @@ static struct dev_ops i8042_ops = {
 	i8042_detach,
 	nodev,
 	(struct cb_ops *)0,
-	&i8042_bus_ops
+	&i8042_bus_ops,
+	NULL,
+	ddi_quiesce_not_needed,
 };
 
 
@@ -329,7 +330,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module.  This one is a driver */
-	"i8042 nexus driver %I%",	/* Name of module. */
+	"i8042 nexus driver",	/* Name of module. */
 	&i8042_ops,		/* driver ops */
 };
 

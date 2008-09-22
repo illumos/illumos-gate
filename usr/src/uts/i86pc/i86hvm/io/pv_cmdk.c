@@ -1463,7 +1463,9 @@ struct dev_ops pv_cmdk_ops = {
 	pv_cmdkdetach,		/* detach */
 	nodev,			/* reset */
 	&pv_cmdk_cb_ops,	/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*

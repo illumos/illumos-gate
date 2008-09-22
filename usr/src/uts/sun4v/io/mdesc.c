@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v machine description driver
@@ -119,12 +118,13 @@ static struct dev_ops mdesc_dev_ops = {
 	nodev,			/* devo_reset */
 	&mdesc_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Machine Description Driver 1.0",
+	"Machine Description Driver",
 	&mdesc_dev_ops};
 
 static struct modlinkage modlinkage = {
@@ -462,7 +462,7 @@ mdesc_rw(dev_t dev, struct uio *uiop, enum uio_rw rw)
 		return (ENXIO);
 
 	retval = uiomove((void *)(buf + uiop->uio_offset),
-		len, rw, uiop);
+	    len, rw, uiop);
 
 	mutex_enter(&mdsp->lock);
 	mdsp->flags &= ~MDESC_BUSY;

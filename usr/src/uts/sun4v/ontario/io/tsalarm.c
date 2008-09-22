@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -285,7 +284,8 @@ static struct dev_ops tsalarm_ops = {
 	nodev,			/* reset */
 	&tsalarm_cb_ops,	/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_needed,		/* quiesce() */
 };
 
 /*
@@ -296,7 +296,7 @@ static void    *statep;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"tsalarm control driver v1.0",	/* Name of the module */
+	"tsalarm control driver",	/* Name of the module */
 	&tsalarm_ops			/* pointer to the dev_ops structure */
 };
 
@@ -410,7 +410,7 @@ tsalarm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * the device's softc, is used to direct peculiar behavior.
 		 */
 		if (ddi_create_minor_node(dip, "lom", S_IFCHR, 0,
-				DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    DDI_PSEUDO, NULL) == DDI_FAILURE) {
 			goto attach_failed;
 		}
 
@@ -490,7 +490,7 @@ tsalarm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	softc->flags |= TSAL_IDENTED;
 
 	rv = ldi_open_by_name(ALARM_CHANNEL, FREAD | FWRITE, kcred, &softc->lh,
-					softc->li);
+	    softc->li);
 	if (rv != 0) {
 		cmn_err(CE_WARN, "ldi_open_by_name failed\n");
 		goto FAIL;
@@ -503,38 +503,38 @@ tsalarm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	channel_op.opt_val = 0;
 
 	if ((rv = ldi_ioctl(softc->lh, GLVC_XPORT_IOCTL_OPT_OP,
-		(intptr_t)&channel_op, FKIOCTL, kcred, &rval)) < 0) {
+	    (intptr_t)&channel_op, FKIOCTL, kcred, &rval)) < 0) {
 		cmn_err(CE_WARN, "ldi_ioctl failed\n");
 		goto FAIL;
 	}
 	softc->mtu_size = channel_op.opt_val;
 
 	if ((softc->req_ptr = (tsal_pcp_alarm_req_t *)kmem_zalloc(
-					sizeof (tsal_pcp_alarm_req_t),
-					KM_NOSLEEP)) == NULL) {
+	    sizeof (tsal_pcp_alarm_req_t),
+	    KM_NOSLEEP)) == NULL) {
 		goto FAIL;
 	}
 	if ((softc->resp_ptr = (tsal_pcp_alarm_resp_t *)kmem_zalloc(
-					sizeof (tsal_pcp_alarm_resp_t),
-					KM_NOSLEEP)) == NULL) {
+	    sizeof (tsal_pcp_alarm_resp_t),
+	    KM_NOSLEEP)) == NULL) {
 		goto FAIL;
 	}
 	if ((softc->req_msg_hdr = (tsal_pcp_req_msg_hdr_t *)kmem_zalloc(
-					sizeof (tsal_pcp_req_msg_hdr_t),
-					KM_NOSLEEP)) == NULL) {
+	    sizeof (tsal_pcp_req_msg_hdr_t),
+	    KM_NOSLEEP)) == NULL) {
 		goto FAIL;
 	}
 	if ((softc->resp_msg_hdr = (tsal_pcp_resp_msg_hdr_t *)kmem_zalloc(
-					sizeof (tsal_pcp_resp_msg_hdr_t),
-					KM_NOSLEEP)) == NULL) {
+	    sizeof (tsal_pcp_resp_msg_hdr_t),
+	    KM_NOSLEEP)) == NULL) {
 		goto FAIL;
 	}
 	if ((softc->peek_area = (uint8_t *)kmem_zalloc(softc->mtu_size,
-					KM_NOSLEEP)) == NULL) {
+	    KM_NOSLEEP)) == NULL) {
 		goto FAIL;
 	}
 	if ((softc->peek_read_area = (uint8_t *)kmem_zalloc(2*softc->mtu_size,
-					KM_NOSLEEP)) == NULL) {
+	    KM_NOSLEEP)) == NULL) {
 		goto FAIL;
 	}
 
@@ -549,16 +549,16 @@ FAIL:
 		softc->flags &= ~(TSAL_OPENED | TSAL_IDENTED);
 		if (softc->req_ptr != NULL)
 			kmem_free(softc->req_ptr,
-					sizeof (tsal_pcp_alarm_req_t));
+			    sizeof (tsal_pcp_alarm_req_t));
 		if (softc->resp_ptr != NULL)
 			kmem_free(softc->resp_ptr,
-					sizeof (tsal_pcp_alarm_resp_t));
+			    sizeof (tsal_pcp_alarm_resp_t));
 		if (softc->req_msg_hdr != NULL)
 			kmem_free(softc->req_msg_hdr,
-					sizeof (tsal_pcp_req_msg_hdr_t));
+			    sizeof (tsal_pcp_req_msg_hdr_t));
 		if (softc->resp_msg_hdr != NULL)
 			kmem_free(softc->resp_msg_hdr,
-					sizeof (tsal_pcp_resp_msg_hdr_t));
+			    sizeof (tsal_pcp_resp_msg_hdr_t));
 		if (softc->peek_area != NULL)
 			kmem_free(softc->peek_area, softc->mtu_size);
 		if (softc->peek_read_area != NULL)
@@ -604,22 +604,22 @@ tsalarm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	}
 	if (softc->req_ptr != NULL) {
 		kmem_free(softc->req_ptr,
-				sizeof (tsal_pcp_alarm_req_t));
+		    sizeof (tsal_pcp_alarm_req_t));
 		softc->req_ptr = NULL;
 	}
 	if (softc->resp_ptr != NULL) {
 		kmem_free(softc->resp_ptr,
-				sizeof (tsal_pcp_alarm_resp_t));
+		    sizeof (tsal_pcp_alarm_resp_t));
 		softc->resp_ptr = NULL;
 	}
 	if (softc->req_msg_hdr != NULL) {
 		kmem_free(softc->req_msg_hdr,
-				sizeof (tsal_pcp_req_msg_hdr_t));
+		    sizeof (tsal_pcp_req_msg_hdr_t));
 		softc->req_msg_hdr = NULL;
 	}
 	if (softc->resp_msg_hdr != NULL) {
 		kmem_free(softc->resp_msg_hdr,
-				sizeof (tsal_pcp_resp_msg_hdr_t));
+		    sizeof (tsal_pcp_resp_msg_hdr_t));
 		softc->resp_msg_hdr = NULL;
 	}
 	if (softc->peek_area != NULL) {
@@ -657,20 +657,20 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	case LOMIOCALSTATE_OLD:
 		{
 			if (ddi_copyin((caddr_t)arg, (caddr_t)&ts_alinfo,
-				sizeof (ts_aldata_t), mode) != 0) {
+			    sizeof (ts_aldata_t), mode) != 0) {
 				retval = EFAULT;
 				goto end;
 			}
 
 			alarm_type = ts_alinfo.alarm_no;
 			if ((alarm_type < ALARM_CRITICAL) ||
-					(alarm_type > ALARM_USER)) {
+			    (alarm_type > ALARM_USER)) {
 				retval = EINVAL;
 				goto end;
 			}
 
 			retval = glvc_alarm_get(alarm_type, &alarm_state,
-								softc);
+			    softc);
 
 			if (retval != 0)
 				goto end;
@@ -682,7 +682,7 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 			ts_alinfo.alarm_state = alarm_state;
 			if (ddi_copyout((caddr_t)&ts_alinfo, (caddr_t)arg,
-				sizeof (ts_aldata_t), mode) != 0) {
+			    sizeof (ts_aldata_t), mode) != 0) {
 				retval = EFAULT;
 				goto end;
 			}
@@ -693,7 +693,7 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	case LOMIOCALCTL_OLD:
 		{
 			if (ddi_copyin((caddr_t)arg, (caddr_t)&ts_alinfo,
-				sizeof (ts_aldata_t), mode) != 0) {
+			    sizeof (ts_aldata_t), mode) != 0) {
 				retval = EFAULT;
 				goto end;
 			}
@@ -702,12 +702,12 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			alarm_state = ts_alinfo.alarm_state;
 
 			if ((alarm_type < ALARM_CRITICAL) ||
-					(alarm_type > ALARM_USER)) {
+			    (alarm_type > ALARM_USER)) {
 				retval = EINVAL;
 				goto end;
 			}
 			if ((alarm_state < ALARM_OFF) ||
-					(alarm_state > ALARM_ON)) {
+			    (alarm_state > ALARM_ON)) {
 				retval = EINVAL;
 				goto end;
 			}
@@ -757,12 +757,12 @@ glvc_alarm_get(int alarm_type, int *alarm_state, tsalarm_softc_t *sc)
 	 * send the request, receive the response
 	 */
 	if (tsal_pcp_send_recv(sc, &send_msg, &recv_msg,
-					PCP_COMM_TIMEOUT) < 0) {
+	    PCP_COMM_TIMEOUT) < 0) {
 		/* we either timed out or erred; either way try again */
 		(void) delay(PCP_COMM_TIMEOUT * drv_usectohz(1000000));
 
 		if (tsal_pcp_send_recv(sc, &send_msg, &recv_msg,
-					PCP_COMM_TIMEOUT) < 0) {
+		    PCP_COMM_TIMEOUT) < 0) {
 			cmn_err(CE_WARN, "tsalarm: communication failure");
 			goto alarm_return;
 		}
@@ -809,8 +809,8 @@ glvc_alarm_set(int alarm_type, int new_state, tsalarm_softc_t *sc)
 	 */
 	if (sc->req_ptr == NULL) {
 		if ((sc->req_ptr = (tsal_pcp_alarm_req_t *)kmem_zalloc(
-				sizeof (tsal_pcp_alarm_req_t),
-				KM_NOSLEEP)) == NULL)
+		    sizeof (tsal_pcp_alarm_req_t),
+		    KM_NOSLEEP)) == NULL)
 			goto alarm_return;
 	}
 
@@ -832,12 +832,12 @@ glvc_alarm_set(int alarm_type, int new_state, tsalarm_softc_t *sc)
 	 * send the request, receive the response
 	 */
 	if (tsal_pcp_send_recv(sc, &send_msg, &recv_msg,
-					PCP_COMM_TIMEOUT) < 0) {
+	    PCP_COMM_TIMEOUT) < 0) {
 		/* we either timed out or erred; either way try again */
 		(void) delay(PCP_COMM_TIMEOUT * drv_usectohz(1000000));
 
 		if (tsal_pcp_send_recv(sc, &send_msg, &recv_msg,
-					PCP_COMM_TIMEOUT) < 0) {
+		    PCP_COMM_TIMEOUT) < 0) {
 			goto alarm_return;
 		}
 	}
@@ -863,11 +863,11 @@ glvc_alarm_set(int alarm_type, int new_state, tsalarm_softc_t *sc)
 	 * ensure the Alarm action taken is the one requested
 	 */
 	if ((req_ptr->alarm_action == PCP_ALARM_DISABLE) &&
-			(resp_ptr->alarm_state != ALARM_STATE_OFF)) {
+	    (resp_ptr->alarm_state != ALARM_STATE_OFF)) {
 		cmn_err(CE_WARN, "tsalarm: failed to set alarm");
 		goto alarm_return;
 	} else if ((req_ptr->alarm_action == PCP_ALARM_ENABLE) &&
-			(resp_ptr->alarm_state != ALARM_STATE_ON)) {
+	    (resp_ptr->alarm_state != ALARM_STATE_ON)) {
 		cmn_err(CE_WARN, "tsalarm: failed to set alarm");
 		goto alarm_return;
 	} else if (resp_ptr->alarm_state == ALARM_STATE_UNKNOWN) {
@@ -941,7 +941,7 @@ tsal_pcp_send_recv(tsalarm_softc_t *sc, tsal_pcp_msg_t *req_msg,
 
 	/* fill request header checksum */
 	req_msg_hdr->hdr_cksum = checksum((uint16_t *)req_msg_hdr,
-					sizeof (tsal_pcp_req_msg_hdr_t));
+	    sizeof (tsal_pcp_req_msg_hdr_t));
 
 	/*
 	 * send request message header
@@ -955,7 +955,7 @@ tsal_pcp_send_recv(tsalarm_softc_t *sc, tsal_pcp_msg_t *req_msg,
 	 */
 	if (req_msg->msg_len != 0) {
 		if ((ret = tsal_pcp_io_op(sc, datap, req_msg->msg_len,
-							PCP_IO_OP_WRITE))) {
+		    PCP_IO_OP_WRITE))) {
 			return (ret);
 		}
 	}
@@ -988,7 +988,7 @@ tsal_pcp_send_recv(tsalarm_softc_t *sc, tsal_pcp_msg_t *req_msg,
 		bkup_resp_hdr_cksum = resp_msg_hdr->hdr_cksum;
 		resp_msg_hdr->hdr_cksum = 0;
 		cksum = checksum((uint16_t *)resp_msg_hdr,
-					sizeof (tsal_pcp_resp_msg_hdr_t));
+		    sizeof (tsal_pcp_resp_msg_hdr_t));
 
 		if (cksum != bkup_resp_hdr_cksum) {
 			return (TSAL_PCP_ERROR);
@@ -1022,15 +1022,15 @@ tsal_pcp_send_recv(tsalarm_softc_t *sc, tsal_pcp_msg_t *req_msg,
 		 * Receive response message.
 		 */
 		if ((ret = tsal_pcp_io_op(sc, resp_msg_data,
-						resp_msg_hdr->msg_len,
-						PCP_IO_OP_READ))) {
+		    resp_msg_hdr->msg_len,
+		    PCP_IO_OP_READ))) {
 			return (ret);
 		}
 
 #ifdef PCP_CKSUM_ENABLE
 		/* verify response message data checksum */
 		cksum = checksum((uint16_t *)resp_msg_data,
-					resp_msg_hdr->msg_len);
+		    resp_msg_hdr->msg_len);
 		if (cksum != resp_msg_hdr->msg_cksum) {
 			return (TSAL_PCP_ERROR);
 		}
@@ -1141,7 +1141,7 @@ tsal_pcp_peek(tsalarm_softc_t *sc, uint8_t *buf, int bytes_cnt)
 	peek_ctrl.flags = 0;
 
 	if ((ret = ldi_ioctl(sc->lh, GLVC_XPORT_IOCTL_DATA_PEEK,
-			(intptr_t)&peek_ctrl, FKIOCTL, kcred, &rval)) < 0) {
+	    (intptr_t)&peek_ctrl, FKIOCTL, kcred, &rval)) < 0) {
 		return (ret);
 	}
 
@@ -1217,7 +1217,7 @@ tsal_pcp_read(tsalarm_softc_t *sc, uint8_t *buf, int byte_cnt)
 	 */
 	if (sc->read_area == NULL) {
 		sc->read_area = (uint8_t *)kmem_zalloc(read_area_size,
-							KM_NOSLEEP);
+		    KM_NOSLEEP);
 		if (sc->read_area == NULL) {
 			return (TSAL_PCP_ERROR);
 		}
@@ -1354,7 +1354,7 @@ tsal_pcp_send_req_msg_hdr(tsalarm_softc_t *sc, tsal_pcp_req_msg_hdr_t *req_hdr)
 
 	hdr_sz = sizeof (tsal_pcp_req_msg_hdr_t);
 	if ((hdrp = (tsal_pcp_req_msg_hdr_t *)kmem_zalloc(hdr_sz,
-						KM_NOSLEEP)) == NULL) {
+	    KM_NOSLEEP)) == NULL) {
 		return (TSAL_PCP_ERROR);
 	}
 
@@ -1370,7 +1370,7 @@ tsal_pcp_send_req_msg_hdr(tsalarm_softc_t *sc, tsal_pcp_req_msg_hdr_t *req_hdr)
 	hdrp->hdr_cksum = htons(req_hdr->hdr_cksum);
 
 	if ((ret = tsal_pcp_io_op(sc, (char *)hdrp, hdr_sz,
-						PCP_IO_OP_WRITE)) != 0) {
+	    PCP_IO_OP_WRITE)) != 0) {
 		kmem_free(hdrp, hdr_sz);
 		return (ret);
 	}
@@ -1413,7 +1413,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* read magic number first */
 	if ((ret = tsal_pcp_io_op(sc, &magic_num, sizeof (magic_num),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1425,7 +1425,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* read version field */
 	if ((ret = tsal_pcp_io_op(sc, &proto_ver, sizeof (proto_ver),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1436,25 +1436,25 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* Read message type */
 	if ((ret = tsal_pcp_io_op(sc, &msg_type, sizeof (msg_type),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
 	/* Read message sub type */
 	if ((ret = tsal_pcp_io_op(sc, &sub_type, sizeof (sub_type),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
 	/* Read rcvd_pad bits */
 	if ((ret = tsal_pcp_io_op(sc, &rsvd_pad, sizeof (rsvd_pad),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
 	/* receive transaction id */
 	if ((ret = tsal_pcp_io_op(sc, &xid, sizeof (xid),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1462,7 +1462,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* receive timeout value */
 	if ((ret = tsal_pcp_io_op(sc, &timeout, sizeof (timeout),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1470,7 +1470,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* receive message length */
 	if ((ret = tsal_pcp_io_op(sc, &msg_len, sizeof (msg_len),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1478,7 +1478,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* receive status field */
 	if ((ret = tsal_pcp_io_op(sc, &status, sizeof (status),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1486,7 +1486,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* receive message checksum */
 	if ((ret = tsal_pcp_io_op(sc, &msg_cksum, sizeof (msg_cksum),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1494,7 +1494,7 @@ tsal_pcp_recv_resp_msg_hdr(tsalarm_softc_t *sc,
 
 	/* receive header checksum */
 	if ((ret = tsal_pcp_io_op(sc, &hdr_cksum, sizeof (hdr_cksum),
-					PCP_IO_OP_READ)) != 0) {
+	    PCP_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1576,11 +1576,11 @@ tsal_pcp_frame_error_handle(tsalarm_softc_t *sc)
 		 * if mathing not found, discard 1 byte and continue checking.
 		 */
 		if (!check_magic_byte_presence(sc, 4, &magic_num_buf[0],
-						&ispresent)) {
+		    &ispresent)) {
 			if (!ispresent) {
 				/* remove 1 byte */
 				(void) tsal_pcp_io_op(sc, buf, 1,
-							PCP_IO_OP_READ);
+				    PCP_IO_OP_READ);
 			}
 		} else {
 			return (-1);

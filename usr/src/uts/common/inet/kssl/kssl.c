@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The system call and DDI interface for the kernel SSL module
@@ -104,11 +103,12 @@ static struct dev_ops devops = {
 	&cbops,			/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops,			/* drv_modops */
-	"Kernel SSL Interface v1.4",	/* drv_linkinfo */
+	&mod_driverops,		/* drv_modops */
+	"Kernel SSL Interface",	/* drv_linkinfo */
 	&devops,
 };
 

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -204,7 +203,8 @@ static struct dev_ops sysctrl_ops = {
 	nulldev,		/* reset */
 	&sysctrl_cb_ops,	/* cb_ops */
 	(struct bus_ops *)0,	/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 void *sysctrlp;				/* sysctrl soft state hook */
@@ -316,7 +316,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Clock Board %I%",	/* name of module */
+	"Clock Board",		/* name of module */
 	&sysctrl_ops,		/* driver ops */
 };
 
@@ -433,7 +433,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	softsp->pdip = ddi_get_parent(softsp->dip);
 
 	DPRINTF(SYSCTRL_ATTACH_DEBUG, ("sysctrl: devi= 0x%p\n, softsp=0x%p\n",
-		devi, softsp));
+	    devi, softsp));
 
 	/* First set all of the timeout values */
 	spur_timeout_hz = drv_usectohz(SPUR_TIMEOUT_USEC);
@@ -461,14 +461,14 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (ddi_map_regs(softsp->dip, 0,
 	    (caddr_t *)&softsp->clk_freq1, 0, 0)) {
 		cmn_err(CE_WARN, "sysctrl%d: unable to map clock frequency "
-			"registers", instance);
+		    "registers", instance);
 		goto bad0;
 	}
 
 	if (ddi_map_regs(softsp->dip, 1,
 	    (caddr_t *)&softsp->csr, 0, 0)) {
 		cmn_err(CE_WARN, "sysctrl%d: unable to map internal"
-			"registers", instance);
+		    "registers", instance);
 		goto bad1;
 	}
 
@@ -486,25 +486,25 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * avoid bugs down the road.
 	 */
 	softsp->clk_freq2 = (uchar_t *)((caddr_t)softsp->clk_freq1 +
-		SYS_OFF_CLK_FREQ2);
+	    SYS_OFF_CLK_FREQ2);
 
 	softsp->status1 = (uchar_t *)((caddr_t)softsp->csr +
-		SYS_OFF_STAT1);
+	    SYS_OFF_STAT1);
 
 	softsp->status2 = (uchar_t *)((caddr_t)softsp->csr +
-		SYS_OFF_STAT2);
+	    SYS_OFF_STAT2);
 
 	softsp->ps_stat = (uchar_t *)((caddr_t)softsp->csr +
-		SYS_OFF_PSSTAT);
+	    SYS_OFF_PSSTAT);
 
 	softsp->ps_pres = (uchar_t *)((caddr_t)softsp->csr +
-		SYS_OFF_PSPRES);
+	    SYS_OFF_PSPRES);
 
 	softsp->pppsr = (uchar_t *)((caddr_t)softsp->csr +
-		SYS_OFF_PPPSR);
+	    SYS_OFF_PPPSR);
 
 	softsp->temp_reg = (uchar_t *)((caddr_t)softsp->csr +
-		SYS_OFF_TEMP);
+	    SYS_OFF_TEMP);
 
 	set_clockbrd_info();
 
@@ -567,7 +567,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	/* shut off all interrupt sources */
 	*(softsp->csr) &= ~(SYS_PPS_FAN_FAIL_EN | SYS_PS_FAIL_EN |
-				SYS_AC_PWR_FAIL_EN | SYS_SBRD_PRES_EN);
+	    SYS_AC_PWR_FAIL_EN | SYS_SBRD_PRES_EN);
 	tmp_reg = *(softsp->csr);
 #ifdef lint
 	tmp_reg = tmp_reg;
@@ -597,7 +597,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto bad4;
 
 	mutex_init(&softsp->spur_int_lock, NULL, MUTEX_DRIVER,
-		(void *)softsp->spur_int_c);
+	    (void *)softsp->spur_int_c);
 
 
 	if (ddi_add_softintr(devi, DDI_SOFTINT_LOW, &softsp->spur_high_id,
@@ -629,7 +629,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto bad9;
 
 	mutex_init(&softsp->ps_fail_lock, NULL, MUTEX_DRIVER,
-		(void *)softsp->ps_fail_c);
+	    (void *)softsp->ps_fail_c);
 
 	if (ddi_add_softintr(devi, DDI_SOFTINT_LOW, &softsp->ps_fail_poll_id,
 	    NULL, NULL, ps_fail_poll_handler, (caddr_t)softsp) !=
@@ -691,7 +691,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	(void) fhc_bdlist_lock(-1);
 
 	DPRINTF(SYSCTRL_ATTACH_DEBUG,
-		("attach: start bd_remove_poll()..."));
+	    ("attach: start bd_remove_poll()..."));
 
 	bd_remove_poll(softsp);
 	fhc_bdlist_unlock();
@@ -715,11 +715,11 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    DDI_SUCCESS)
 		goto bad15;
 	mutex_init(&softsp->sys_led_lock, NULL, MUTEX_DRIVER,
-		(void *)softsp->sys_led_c);
+	    (void *)softsp->sys_led_c);
 
 	/* initialize the bit field for all pps fans to assumed good */
 	softsp->pps_fan_saved = softsp->pps_fan_external_state =
-		SYS_AC_FAN_OK | SYS_KEYSW_FAN_OK;
+	    SYS_AC_FAN_OK | SYS_KEYSW_FAN_OK;
 
 	/* prime the power supply state machines */
 	if (enable_sys_interrupt & SYS_PS_FAIL_EN)
@@ -733,8 +733,8 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/* Now enable selected interrupt sources */
 	mutex_enter(&softsp->csr_mutex);
 	*(softsp->csr) |= enable_sys_interrupt &
-		(SYS_AC_PWR_FAIL_EN | SYS_PS_FAIL_EN |
-		SYS_PPS_FAN_FAIL_EN | SYS_SBRD_PRES_EN);
+	    (SYS_AC_PWR_FAIL_EN | SYS_PS_FAIL_EN |
+	    SYS_PPS_FAN_FAIL_EN | SYS_SBRD_PRES_EN);
 	tmp_reg = *(softsp->csr);
 #ifdef lint
 	tmp_reg = tmp_reg;
@@ -814,8 +814,8 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		softsp->options_nodeid = (pnode_t)ddi_get_nodeid(dip);
 
 	DPRINTF(SYSCTRL_ATTACH_DEBUG,
-		("sysctrl: Creating devices start:%d, limit:%d, incr:%d\n",
-		start, limit, incr));
+	    ("sysctrl: Creating devices start:%d, limit:%d, incr:%d\n",
+	    start, limit, incr));
 
 	/*
 	 * Create minor node for each system attachment points
@@ -827,8 +827,8 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		    (PUTINSTANCE(instance) | slot_num),
 		    DDI_NT_ATTACHMENT_POINT, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "sysctrl%d: \"%s\" "
-				"ddi_create_minor_node failed",
-				instance, name);
+			    "ddi_create_minor_node failed",
+			    instance, name);
 			goto bad16;
 		}
 	}
@@ -1168,7 +1168,7 @@ sysc_pkt_init(sysc_cfga_pkt_t *pkt, intptr_t arg, int flag)
 		sysc_cfga_cmd32_t sysc_cmd32;
 
 		if (ddi_copyin((void *)arg, &sysc_cmd32,
-			sizeof (sysc_cfga_cmd32_t), flag) != 0) {
+		    sizeof (sysc_cfga_cmd32_t), flag) != 0) {
 			return (EFAULT);
 		}
 		pkt->cmd_cfga.force = sysc_cmd32.force;
@@ -1176,11 +1176,11 @@ sysc_pkt_init(sysc_cfga_pkt_t *pkt, intptr_t arg, int flag)
 		pkt->cmd_cfga.arg = sysc_cmd32.arg;
 		pkt->cmd_cfga.errtype = sysc_cmd32.errtype;
 		pkt->cmd_cfga.outputstr =
-			(char *)(uintptr_t)sysc_cmd32.outputstr;
+		    (char *)(uintptr_t)sysc_cmd32.outputstr;
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyin((void *)arg, &(pkt->cmd_cfga),
-		sizeof (sysc_cfga_cmd_t), flag) != 0) {
+	    sizeof (sysc_cfga_cmd_t), flag) != 0) {
 		return (EFAULT);
 	}
 	pkt->errbuf = kmem_zalloc(SYSC_OUTPUT_LEN, KM_SLEEP);
@@ -1196,21 +1196,21 @@ sysc_pkt_fini(sysc_cfga_pkt_t *pkt, intptr_t arg, int flag)
 	if (ddi_model_convert_from(flag & FMODELS) == DDI_MODEL_ILP32) {
 
 		if (ddi_copyout(&(pkt->cmd_cfga.errtype),
-			(void *)&(((sysc_cfga_cmd32_t *)arg)->errtype),
-			sizeof (sysc_err_t), flag) != 0) {
+		    (void *)&(((sysc_cfga_cmd32_t *)arg)->errtype),
+		    sizeof (sysc_err_t), flag) != 0) {
 			ret = FALSE;
 		}
 	} else
 #endif
 	if (ddi_copyout(&(pkt->cmd_cfga.errtype),
-		(void *)&(((sysc_cfga_cmd_t *)arg)->errtype),
-		sizeof (sysc_err_t), flag) != 0) {
+	    (void *)&(((sysc_cfga_cmd_t *)arg)->errtype),
+	    sizeof (sysc_err_t), flag) != 0) {
 		ret = FALSE;
 	}
 
 	if ((ret != FALSE) && ((pkt->cmd_cfga.outputstr != NULL) &&
-		(ddi_copyout(pkt->errbuf, pkt->cmd_cfga.outputstr,
-			SYSC_OUTPUT_LEN, flag) != 0))) {
+	    (ddi_copyout(pkt->errbuf, pkt->cmd_cfga.outputstr,
+	    SYSC_OUTPUT_LEN, flag) != 0))) {
 			ret = FALSE;
 	}
 
@@ -1238,8 +1238,8 @@ sysctrl_ioctl(dev_t devt, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	softsp = GETSOFTC(instance);
 	if (softsp == NULL) {
 		cmn_err(CE_CONT,
-			"sysctrl_ioctl(%d): NULL softstate ptr!\n",
-			(int)GETSLOT(devt));
+		    "sysctrl_ioctl(%d): NULL softstate ptr!\n",
+		    (int)GETSLOT(devt));
 		return (ENXIO);
 	}
 
@@ -1290,7 +1290,7 @@ sysctrl_ioctl(dev_t devt, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 
 		/* grasp lock and set in_transition bit */
 		if (sysc_enter_transition(cmd == SYSC_CFGA_CMD_QUIESCE_TEST
-				? -1 : slot) != TRUE) {
+		    ? -1 : slot) != TRUE) {
 			retval = EBUSY;
 			SYSC_ERR_SET(&sysc_pkt, SYSC_ERR_INTRANS);
 			goto cleanup_copyout;
@@ -1320,7 +1320,7 @@ sysctrl_ioctl(dev_t devt, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 				else
 					bdp->sc.no_detach = 0;
 				bcopy((caddr_t)&bdp->sc,
-					&sc_list[i], sizeof (sysc_cfga_stat_t));
+				    &sc_list[i], sizeof (sysc_cfga_stat_t));
 			} else {
 				sc_list[i].board = -1;
 				sc_list[i].rstate = SYSC_CFGA_RSTATE_EMPTY;
@@ -1392,8 +1392,8 @@ cleanup_copyout:
 	switch (cmd) {
 	case SYSC_CFGA_CMD_GETSTATUS:
 		if (ddi_copyout(sc_list, (void *)arg,
-			sizeof (sysc_cfga_stat_t) * fhc_max_boards(),
-			    flag) != 0) {
+		    sizeof (sysc_cfga_stat_t) * fhc_max_boards(),
+		    flag) != 0) {
 			retval = EFAULT;
 		}
 
@@ -1473,7 +1473,7 @@ system_high_handler(caddr_t arg)
 	if (csr & SYS_PS_FAIL_EN) {
 		if ((*(softsp->ps_stat) != 0xff) ||
 		    ((~status2) & (SYS_PPS0_OK | SYS_CLK_33_OK |
-			SYS_CLK_50_OK)) ||
+		    SYS_CLK_50_OK)) ||
 		    (~(*(softsp->pppsr)) & SYS_PPPSR_BITS)) {
 
 			/* disable this interrupt source */
@@ -1533,7 +1533,7 @@ system_high_handler(caddr_t arg)
 
 		/* and then turn them off */
 		csr &= ~(SYS_AC_PWR_FAIL_EN | SYS_PS_FAIL_EN |
-			SYS_PPS_FAN_FAIL_EN | SYS_SBRD_PRES_EN);
+		    SYS_PPS_FAN_FAIL_EN | SYS_SBRD_PRES_EN);
 
 		/* and then bump the counter */
 		softsp->spur_count++;
@@ -1582,7 +1582,7 @@ spur_delay(caddr_t arg)
 			(void) strcat(buf, buf[0] ? "|PS FAIL" : "PS FAIL");
 		if (softsp->saved_en_state & SYS_SBRD_PRES_EN)
 			(void) strcat(buf,
-				buf[0] ? "|BOARD INSERT" : "BOARD INSERT");
+			    buf[0] ? "|BOARD INSERT" : "BOARD INSERT");
 
 		/*
 		 * This is a high level mutex, therefore it needs to be
@@ -1591,8 +1591,8 @@ spur_delay(caddr_t arg)
 		mutex_exit(&softsp->csr_mutex);
 
 		cmn_err(CE_WARN, "sysctrl%d: unserviced interrupt."
-				" possible sources [%s].",
-				ddi_get_instance(softsp->dip), buf);
+		    " possible sources [%s].",
+		    ddi_get_instance(softsp->dip), buf);
 	} else
 		mutex_exit(&softsp->csr_mutex);
 
@@ -1653,8 +1653,8 @@ spur_reenable(caddr_t arg)
 
 	/* reenable those who were spurious candidates */
 	*(softsp->csr) |= softsp->saved_en_state &
-		(SYS_AC_PWR_FAIL_EN | SYS_PS_FAIL_EN |
-		SYS_PPS_FAN_FAIL_EN | SYS_SBRD_PRES_EN);
+	    (SYS_AC_PWR_FAIL_EN | SYS_PS_FAIL_EN |
+	    SYS_PPS_FAN_FAIL_EN | SYS_SBRD_PRES_EN);
 	tmp_reg = *(softsp->csr);
 #ifdef lint
 	tmp_reg = tmp_reg;
@@ -1748,7 +1748,7 @@ ac_fail_retry(void *arg)
 		(void) timeout(ac_fail_retry, softsp, ac_timeout_hz);
 	} else {
 		cmn_err(CE_NOTE, "%s failure no longer detected",
-			ft_str_table[FT_AC_PWR]);
+		    ft_str_table[FT_AC_PWR]);
 		clear_fault(0, FT_AC_PWR, FT_SYSTEM);
 		ddi_trigger_softintr(softsp->ac_fail_high_id);
 	}
@@ -1879,18 +1879,18 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 		/* peripheral 5v */
 		case SYS_V5_P_INDEX:
 			temp_pres = !(status1 & SYS_NOT_PPS0_PRES) ||
-				((IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) &&
-				!(ps_pres & SYS_NOT_PPS1_PRES));
+			    ((IS4SLOT(softsp->nslots) ||
+			    IS5SLOT(softsp->nslots)) &&
+			    !(ps_pres & SYS_NOT_PPS1_PRES));
 			temp_psok = pppsr & SYS_V5_P_OK;
 			break;
 
 		/* peripheral 12v */
 		case SYS_V12_P_INDEX:
 			temp_pres = !(status1 & SYS_NOT_PPS0_PRES) ||
-				((IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) &&
-				!(ps_pres & SYS_NOT_PPS1_PRES));
+			    ((IS4SLOT(softsp->nslots) ||
+			    IS5SLOT(softsp->nslots)) &&
+			    !(ps_pres & SYS_NOT_PPS1_PRES));
 			temp_psok = pppsr & SYS_V12_P_OK;
 			break;
 
@@ -1931,10 +1931,10 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 		/* peripheral fan assy */
 		case SYS_P_FAN_INDEX:
 			temp_pres = (IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) &&
-				!(status1 & SYS_NOT_P_FAN_PRES);
+			    IS5SLOT(softsp->nslots)) &&
+			    !(status1 & SYS_NOT_P_FAN_PRES);
 			temp_psok = softsp->pps_fan_saved &
-				SYS_AC_FAN_OK;
+			    SYS_AC_FAN_OK;
 			is_fan_assy = TRUE;
 			break;
 		}
@@ -1955,16 +1955,16 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 					pstatp->pctr = PS_PRES_CHANGE_TICKS;
 				} else if (--pstatp->pctr == 0) {
 					pstatp->pshadow = temp_pres ?
-						PRES_IN : PRES_OUT;
+					    PRES_IN : PRES_OUT;
 					pstatp->dcshadow = temp_pres ?
-						PS_UNKNOWN : PS_OUT;
+					    PS_UNKNOWN : PS_OUT;
 
 					/*
 					 * Now we know the state has
 					 * changed, so we should log it.
 					 */
 					ps_log_pres_change(softsp,
-						i, temp_pres);
+					    i, temp_pres);
 				}
 			}
 		}
@@ -1987,14 +1987,14 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 
 				case PS_UNKNOWN:
 					pstatp->dcctr = is_fan_assy ?
-						PS_P_FAN_FROM_UNKNOWN_TICKS :
-						PS_FROM_UNKNOWN_TICKS;
+					    PS_P_FAN_FROM_UNKNOWN_TICKS :
+					    PS_FROM_UNKNOWN_TICKS;
 					break;
 
 				case PS_OK:
 					pstatp->dcctr = is_precharge ?
-						PS_PCH_FROM_OK_TICKS :
-						PS_FROM_OK_TICKS;
+					    PS_PCH_FROM_OK_TICKS :
+					    PS_FROM_OK_TICKS;
 					break;
 
 				case PS_FAIL:
@@ -2015,7 +2015,7 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 				if (!((pstatp->dcshadow == PS_BOOT) &&
 				    temp_psok)) {
 					ps_log_state_change(softsp,
-						i, temp_psok);
+					    i, temp_psok);
 				}
 
 				/*
@@ -2046,7 +2046,7 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 
 				/* always update board condition */
 				sysc_policy_update(softsp, NULL,
-					SYSC_EVT_BD_PS_CHANGE);
+				    SYSC_EVT_BD_PS_CHANGE);
 
 			}
 		}
@@ -2079,10 +2079,10 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 		switch (current_power_state) {
 		case BELOW_MINIMUM:
 			cmn_err(CE_WARN,
-				"Insufficient power available to system");
+			    "Insufficient power available to system");
 			if (!disable_insufficient_power_reboot) {
 				cmn_err(CE_WARN, "System reboot in %d seconds",
-					PS_INSUFFICIENT_COUNTDOWN_SEC);
+				    PS_INSUFFICIENT_COUNTDOWN_SEC);
 			}
 			reg_fault(1, FT_INSUFFICIENT_POWER, FT_SYSTEM);
 			softsp->power_countdown = PS_POWER_COUNTDOWN_TICKS;
@@ -2096,7 +2096,7 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 			} else if (softsp->power_state == BELOW_MINIMUM) {
 				cmn_err(CE_NOTE, "Minimum power available");
 				clear_fault(1, FT_INSUFFICIENT_POWER,
-					FT_SYSTEM);
+				    FT_SYSTEM);
 			}
 			break;
 
@@ -2105,7 +2105,7 @@ ps_fail_handler(struct sysctrl_soft_state *softsp, int fromint)
 			if (softsp->power_state != BOOT) {
 				cmn_err(CE_NOTE, "Redundant power available");
 				clear_fault(1, FT_INSUFFICIENT_POWER,
-					FT_SYSTEM);
+				    FT_SYSTEM);
 			}
 			break;
 
@@ -2254,25 +2254,26 @@ ps_log_pres_change(struct sysctrl_soft_state *softsp, int index, int present)
 		cmn_err(CE_NOTE, "%s %d %s", ft_str_table[FT_CORE_PS], index,
 		    trans);
 		if (!present) {
-		    clear_fault(index, FT_CORE_PS, FT_SYSTEM);
-		    sysc_policy_update(softsp, NULL, SYSC_EVT_BD_PS_CHANGE);
+			clear_fault(index, FT_CORE_PS, FT_SYSTEM);
+			sysc_policy_update(softsp, NULL, SYSC_EVT_BD_PS_CHANGE);
 		}
 		break;
 
 	/* power supply 7 / pps 1 */
 	case 7:
 		if (IS4SLOT(softsp->nslots) || IS5SLOT(softsp->nslots)) {
-		    cmn_err(CE_NOTE, "%s 1 %s", ft_str_table[FT_PPS], trans);
-		    if (!present) {
+			cmn_err(CE_NOTE, "%s 1 %s", ft_str_table[FT_PPS],
+			    trans);
+			if (!present) {
 			clear_fault(1, FT_PPS, FT_SYSTEM);
-		    }
+			}
 		} else {
-		    cmn_err(CE_NOTE, "%s %d %s", ft_str_table[FT_CORE_PS],
-			index, trans);
-		    if (!present) {
+			cmn_err(CE_NOTE, "%s %d %s", ft_str_table[FT_CORE_PS],
+			    index, trans);
+			if (!present) {
 			clear_fault(7, FT_CORE_PS, FT_SYSTEM);
 			sysc_policy_update(softsp, NULL, SYSC_EVT_BD_PS_CHANGE);
-		    }
+			}
 		}
 		break;
 
@@ -2329,7 +2330,7 @@ ps_log_state_change(struct sysctrl_soft_state *softsp, int index, int ps_ok)
 			}
 		} else {
 			cmn_err(level, "%s %d %s", ft_str_table[FT_CORE_PS],
-				index, s);
+			    index, s);
 			if (ps_ok) {
 				clear_fault(index, FT_CORE_PS, FT_SYSTEM);
 			} else {
@@ -2565,8 +2566,8 @@ pps_fan_poll(void *arg)
 			 * Rather, it is handled by the power supply loop.
 			 */
 			fanfail = !(IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) &&
-				!(softsp->pps_fan_saved & SYS_AC_FAN_OK);
+			    IS5SLOT(softsp->nslots)) &&
+			    !(softsp->pps_fan_saved & SYS_AC_FAN_OK);
 			break;
 
 		case KEYSW:
@@ -2577,9 +2578,9 @@ pps_fan_poll(void *arg)
 			 * The 4 and 5 slot systems behave the same.
 			 */
 			fanfail = (!(IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) &&
+			    IS5SLOT(softsp->nslots)) &&
 			    (softsp->ps_stats[SYS_V5_AUX_INDEX].dcshadow !=
-				PS_OK)) ||
+			    PS_OK)) ||
 			    !(softsp->pps_fan_saved & SYS_KEYSW_FAN_OK);
 			break;
 
@@ -2631,18 +2632,18 @@ pps_fan_state_change(struct sysctrl_soft_state *softsp, int index, int fan_ok)
 	case RACK:
 		/* 4 and 5 slot systems behave the same */
 		fan_type = (IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) ?
-				"Disk Drive" : "Rack Exhaust";
+		    IS5SLOT(softsp->nslots)) ?
+		    "Disk Drive" : "Rack Exhaust";
 		if (fan_ok) {
 			softsp->pps_fan_external_state &= ~SYS_RACK_FANFAIL;
 			clear_fault(0, (IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) ? FT_DSK_FAN :
-				FT_RACK_EXH, FT_SYSTEM);
+			    IS5SLOT(softsp->nslots)) ? FT_DSK_FAN :
+			    FT_RACK_EXH, FT_SYSTEM);
 		} else {
 			softsp->pps_fan_external_state |= SYS_RACK_FANFAIL;
 			reg_fault(0, (IS4SLOT(softsp->nslots) ||
-				IS5SLOT(softsp->nslots)) ? FT_DSK_FAN :
-				FT_RACK_EXH, FT_SYSTEM);
+			    IS5SLOT(softsp->nslots)) ? FT_DSK_FAN :
+			    FT_RACK_EXH, FT_SYSTEM);
 		}
 		break;
 
@@ -2697,10 +2698,10 @@ bd_remove_poll(struct sysctrl_soft_state *softsp)
 
 	if (!bd_remove_to_id) {
 		bd_remove_to_id = timeout(bd_remove_timeout, softsp,
-						bd_remove_timeout_hz);
+		    bd_remove_timeout_hz);
 	} else {
 		DPRINTF(SYSCTRL_ATTACH_DEBUG,
-			("bd_remove_poll ignoring start request"));
+		    ("bd_remove_poll ignoring start request"));
 	}
 }
 
@@ -2936,12 +2937,12 @@ nvram_update_powerfail(struct sysctrl_soft_state *softsp)
 
 	if (softsp->options_nodeid) {
 		len = prom_setprop(softsp->options_nodeid, "powerfail-time",
-			buf, strlen(buf)+1);
+		    buf, strlen(buf)+1);
 	}
 
 	if (len <= 0) {
 		cmn_err(CE_WARN, "sysctrl%d: failed to set powerfail-time "
-			"to %s\n", ddi_get_instance(softsp->dip), buf);
+		    "to %s\n", ddi_get_instance(softsp->dip), buf);
 	}
 }
 
@@ -2958,7 +2959,7 @@ sysctrl_add_kstats(struct sysctrl_soft_state *softsp)
 	    sizeof (struct sysctrl_kstat) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "sysctrl%d: kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 	} else {
 		struct sysctrl_kstat *sysksp;
 
@@ -2966,28 +2967,28 @@ sysctrl_add_kstats(struct sysctrl_soft_state *softsp)
 
 		/* now init the named kstats */
 		kstat_named_init(&sysksp->csr, CSR_KSTAT_NAMED,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		kstat_named_init(&sysksp->status1, STAT1_KSTAT_NAMED,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		kstat_named_init(&sysksp->status2, STAT2_KSTAT_NAMED,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		kstat_named_init(&sysksp->clk_freq2, CLK_FREQ2_KSTAT_NAMED,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		kstat_named_init(&sysksp->fan_status, FAN_KSTAT_NAMED,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		kstat_named_init(&sysksp->key_status, KEY_KSTAT_NAMED,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		kstat_named_init(&sysksp->power_state, POWER_KSTAT_NAMED,
-			KSTAT_DATA_INT32);
+		    KSTAT_DATA_INT32);
 
 		kstat_named_init(&sysksp->clk_ver, CLK_VER_KSTAT_NAME,
-			KSTAT_DATA_CHAR);
+		    KSTAT_DATA_CHAR);
 
 		ksp->ks_update = sysctrl_kstat_update;
 		ksp->ks_private = (void *)softsp;
@@ -3007,9 +3008,9 @@ sysctrl_add_kstats(struct sysctrl_soft_state *softsp)
 
 	if ((ttsp = kstat_create("unix", CLOCK_BOARD_INDEX,
 	    TEMP_OVERRIDE_KSTAT_NAME, "misc", KSTAT_TYPE_RAW, sizeof (short),
-		KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
+	    KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) == NULL) {
 		cmn_err(CE_WARN, "sysctrl%d: kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 	} else {
 		ttsp->ks_update = temp_override_kstat_update;
 		ttsp->ks_private = (void *)&softsp->tempstat.override;
@@ -3020,7 +3021,7 @@ sysctrl_add_kstats(struct sysctrl_soft_state *softsp)
 	    PSSHAD_KSTAT_NAME, "misc", KSTAT_TYPE_RAW,
 	    SYS_PS_COUNT, KSTAT_FLAG_PERSISTENT)) == NULL) {
 		cmn_err(CE_WARN, "sysctrl%d: kstat_create failed",
-			ddi_get_instance(softsp->dip));
+		    ddi_get_instance(softsp->dip));
 	} else {
 		pksp->ks_update = psstat_kstat_update;
 		pksp->ks_private = (void *)softsp;
@@ -3126,7 +3127,7 @@ sysctrl_overtemp_poll(void)
 		for (list = sys_list; list != NULL; list = list->next) {
 			if (list->temp_reg != NULL) {
 				update_temp(list->pdip, &list->tempstat,
-					*(list->temp_reg));
+				    *(list->temp_reg));
 			}
 		}
 
@@ -3134,7 +3135,7 @@ sysctrl_overtemp_poll(void)
 
 		/* now have this thread sleep for a while */
 		(void) timeout(sysctrl_thread_wakeup, (void *)OVERTEMP_POLL,
-			overtemp_timeout_hz);
+		    overtemp_timeout_hz);
 
 		cv_wait(&overtemp_cv, &sslist_mutex);
 
@@ -3167,7 +3168,7 @@ sysctrl_keyswitch_poll(void)
 
 		/* now have this thread sleep for a while */
 		(void) timeout(sysctrl_thread_wakeup, (void *)KEYSWITCH_POLL,
-			keyswitch_timeout_hz);
+		    keyswitch_timeout_hz);
 
 		cv_wait(&keyswitch_cv, &sslist_mutex);
 
@@ -3261,7 +3262,7 @@ sysctrl_abort_seq_handler(char *msg)
 
 	if (secure) {
 		cmn_err(CE_CONT,
-			"!sysctrl(%s): ignoring debug enter sequence\n", buf);
+		    "!sysctrl(%s): ignoring debug enter sequence\n", buf);
 	} else {
 		cmn_err(CE_CONT, "!sysctrl: allowing debug enter\n");
 		debug_enter(msg);
@@ -3375,7 +3376,7 @@ rcons_reinit(struct sysctrl_soft_state *softsp)
 		if (ddi_map_regs(softsp->dip, 1, (caddr_t *)&softsp->rcons_ctl,
 		    RMT_CONS_OFFSET, RMT_CONS_LEN)) {
 			cmn_err(CE_WARN, "Unable to reinitialize "
-				"remote console.");
+			    "remote console.");
 			return;
 		}
 

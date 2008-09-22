@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
@@ -125,14 +124,16 @@ static struct dev_ops ssc050_ops = {
 	ssc050_detach,
 	nodev,
 	&ssc050_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv ssc050_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"SSC050 i2c device driver: v%I%",
+	"SSC050 i2c device driver: v1.10",
 	&ssc050_ops
 };
 
@@ -152,7 +153,7 @@ _init(void)
 
 	if (!error)
 		(void) ddi_soft_state_init(&ssc050soft_statep,
-			sizeof (struct ssc050_unit), 1);
+		    sizeof (struct ssc050_unit), 1);
 	return (error);
 }
 
@@ -190,7 +191,7 @@ ssc050_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct ssc050_unit *)
-		ddi_get_soft_state(ssc050soft_statep, instance);
+	    ddi_get_soft_state(ssc050soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -236,7 +237,7 @@ ssc050_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct ssc050_unit *)
-		ddi_get_soft_state(ssc050soft_statep, instance);
+	    ddi_get_soft_state(ssc050soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -257,7 +258,7 @@ ssc050_get(struct ssc050_unit *unitp, int reg, uchar_t *byte, int flags)
 	int			err;
 
 	(void) i2c_transfer_alloc(unitp->hdl, &i2c_tran_pointer,
-		1, 1, flags);
+	    1, 1, flags);
 	if (i2c_tran_pointer == NULL) {
 		return (ENOMEM);
 	}
@@ -267,7 +268,7 @@ ssc050_get(struct ssc050_unit *unitp, int reg, uchar_t *byte, int flags)
 	err = i2c_transfer(unitp->hdl, i2c_tran_pointer);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: ssc050_get failed reg=%x",
-			unitp->name, reg));
+		    unitp->name, reg));
 	} else {
 		*byte = i2c_tran_pointer->i2c_rbuf[0];
 	}
@@ -283,10 +284,10 @@ ssc050_set(struct ssc050_unit *unitp, int reg, uchar_t byte)
 	int			err;
 
 	(void) i2c_transfer_alloc(unitp->hdl, &i2c_tran_pointer,
-		2, 0, I2C_SLEEP);
+	    2, 0, I2C_SLEEP);
 	if (i2c_tran_pointer == NULL) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in ssc050_set "
-			"i2c_tran_pointer not allocated", unitp->name));
+		    "i2c_tran_pointer not allocated", unitp->name));
 		return (ENOMEM);
 	}
 
@@ -298,7 +299,7 @@ ssc050_set(struct ssc050_unit *unitp, int reg, uchar_t byte)
 	err = i2c_transfer(unitp->hdl, i2c_tran_pointer);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in the ssc050_set"
-			" i2c_transfer routine", unitp->name));
+		    " i2c_transfer routine", unitp->name));
 	}
 	i2c_transfer_free(unitp->hdl, i2c_tran_pointer);
 	return (err);
@@ -326,11 +327,11 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	if (arg == NULL) {
 		D2CMN_ERR((CE_WARN, "SSC050: ioctl: arg passed in to ioctl "
-				"= NULL"));
+		    "= NULL"));
 		return (EINVAL);
 	}
 	unitp = (struct ssc050_unit *)
-		ddi_get_soft_state(ssc050soft_statep, instance);
+	    ddi_get_soft_state(ssc050soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -343,7 +344,7 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	switch (cmd) {
 	case I2C_GET_PORT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_port,
-			sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
@@ -358,8 +359,8 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 			if (val8 != ioctl_port.dir_mask) {
 				D2CMN_ERR((CE_NOTE, "GET_PORT sleeping! "
-					"wanted %x, had %x",
-					ioctl_port.dir_mask, val8));
+				    "wanted %x, had %x",
+				    ioctl_port.dir_mask, val8));
 				err = ssc050_set(unitp, reg,
 				    ioctl_port.dir_mask);
 				if (err != I2C_SUCCESS) {
@@ -375,14 +376,14 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		ioctl_port.value = val8;
 		if (ddi_copyout((caddr_t)&ioctl_port, (caddr_t)arg,
-			sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
 
 	case I2C_SET_PORT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_port,
-			sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_port_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
@@ -395,13 +396,13 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: ioctl: Data Direction Register "
-			"contains %x", unitp->name, val8));
+		    "contains %x", unitp->name, val8));
 
 		inverted_mask = ioctl_port.dir_mask ^ 0xff;
 		val8 = val8 & inverted_mask;
 
 		D1CMN_ERR((CE_NOTE, "%s: ioctl: Data Direction Register "
-			"NOW contains %x", unitp->name, val8));
+		    "NOW contains %x", unitp->name, val8));
 
 		err = ssc050_set(unitp, reg, val8);
 		if (err != I2C_SUCCESS) {
@@ -414,13 +415,13 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: ioctl: GP Register "
-			"contains %x", unitp->name, val8));
+		    "contains %x", unitp->name, val8));
 
 		val8 = val8 & inverted_mask;
 		val8 = val8 | ioctl_port.value;
 
 		D1CMN_ERR((CE_NOTE, "%s: ioctl: GP Register "
-			"NOW contains %x", unitp->name, val8));
+		    "NOW contains %x", unitp->name, val8));
 
 		err = ssc050_set(unitp, SSC050_GP_REG(port), val8);
 		break;
@@ -433,7 +434,7 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		D1CMN_ERR((CE_NOTE, "%s: port %d: control = %x", unitp->name,
-			port, control));
+		    port, control));
 
 		if (!(control & SSC050_FAN_CONTROL_ENABLE)) {
 			err = EIO;
@@ -448,14 +449,14 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 		if (fan_count == 0) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_FAN_SPEED "
-					"i2c_rbuf = 0", unitp->name));
+			    "i2c_rbuf = 0", unitp->name));
 			err = EIO;
 			break;
 		}
 		if (fan_count == 0xff) {
 			fan_speed = 0;
 			if (ddi_copyout((caddr_t)&fan_speed, (caddr_t)arg,
-				sizeof (int32_t), mode) != DDI_SUCCESS) {
+			    sizeof (int32_t), mode) != DDI_SUCCESS) {
 				err = EFAULT;
 				break;
 			}
@@ -465,14 +466,14 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		divisor = control & SSC050_FAN_CONTROL_DIVISOR;
 		fan_speed = SSC050_FAN_SPEED(divisor, fan_count);
 		if (ddi_copyout((caddr_t)&fan_speed, (caddr_t)arg,
-			sizeof (int32_t), mode) != DDI_SUCCESS) {
+		    sizeof (int32_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
 
 	case I2C_GET_BIT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_bit,
-			sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
@@ -493,15 +494,15 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 			if (!(val8 & SSC050_DATADIRECTION_BIT)) {
 				D2CMN_ERR((CE_NOTE, "GET_PORT sleeping! "
-					"wanted %x, had %x",
-					val8 | SSC050_DATADIRECTION_BIT,
-					val8));
+				    "wanted %x, had %x",
+				    val8 | SSC050_DATADIRECTION_BIT,
+				    val8));
 				err = ssc050_set(unitp, reg,
 				    val8 | SSC050_DATADIRECTION_BIT);
-				    if (err != I2C_SUCCESS) {
-					    break;
-				    }
-				    delay(10);
+					if (err != I2C_SUCCESS) {
+						break;
+					}
+					delay(10);
 			}
 		}
 
@@ -513,14 +514,14 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		val8 = val8 & 0x01;
 		ioctl_bit.bit_value = (boolean_t)val8;
 		if (ddi_copyout((caddr_t)&ioctl_bit, (caddr_t)arg,
-			sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
 
 	case I2C_SET_BIT:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_bit,
-			sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_bit_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
@@ -539,36 +540,36 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	case I2C_GET_REG:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_reg,
-			sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
 		err = ssc050_get(unitp, ioctl_reg.reg_num, &val8,
-			I2C_SLEEP);
+		    I2C_SLEEP);
 		if (err != I2C_SUCCESS) {
 			break;
 		}
 
 		ioctl_reg.reg_value = val8;
 		if (ddi_copyout((caddr_t)&ioctl_reg, (caddr_t)arg,
-			sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
 
 	case I2C_SET_REG:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&ioctl_reg,
-			sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_reg_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
 		err = ssc050_set(unitp, ioctl_reg.reg_num,
-			ioctl_reg.reg_value);
+		    ioctl_reg.reg_value);
 		break;
 
 	default:
 		D2CMN_ERR((CE_WARN, "%s: Invalid IOCTL cmd: %x",
-			unitp->name, cmd));
+		    unitp->name, cmd));
 		err = EINVAL;
 	}
 
@@ -638,16 +639,16 @@ ssc050_do_attach(dev_info_t *dip)
 	unitp = ddi_get_soft_state(ssc050soft_statep, instance);
 
 	(void) snprintf(unitp->name, sizeof (unitp->name),
-			"%s%d", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 	for (i = 0; i < SSC050_NUM_PORTS; i++) {
 		(void) sprintf(name, "port_%d", i);
 
 		minor_number = INST_TO_MINOR(instance) |
-			PORT_TO_MINOR(I2C_PORT(i));
+		    PORT_TO_MINOR(I2C_PORT(i));
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor_number,
-					"ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
+		"ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s: failed to create node for %s",
 			    unitp->name, name);
 			ddi_soft_state_free(ssc050soft_statep, instance);

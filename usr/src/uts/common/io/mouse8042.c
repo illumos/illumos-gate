@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,10 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PS/2 type Mouse Module - Streams
@@ -188,7 +186,9 @@ static struct dev_ops	mouse8042_ops = {
 	mouse8042_detach,	/* detach */
 	nodev,			/* reset */
 	&mouse8042_cb_ops,	/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -204,7 +204,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"PS/2 Mouse %I%, %E%",
+	"PS/2 Mouse",
 	&mouse8042_ops,	/* driver ops */
 };
 
@@ -318,12 +318,12 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_internal_pathname(dip, "internal_mouse", S_IFCHR,
-		    instance * 2 + 1) != DDI_SUCCESS) {
+	    instance * 2 + 1) != DDI_SUCCESS) {
 		goto fail_2;
 	}
 
 	rc = ddi_regs_map_setup(dip, 0, (caddr_t *)&state->ms_addr,
-		(offset_t)0, (offset_t)0, &attr, &state->ms_handle);
+	    (offset_t)0, (offset_t)0, &attr, &state->ms_handle);
 	if (rc != DDI_SUCCESS) {
 #if	defined(MOUSE8042_DEBUG)
 		cmn_err(CE_WARN, MODULE_NAME "_attach:  can't map registers");
@@ -344,8 +344,8 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    state->ms_iblock_cookie);
 
 	rc = ddi_add_intr(dip, 0,
-		(ddi_iblock_cookie_t *)NULL, (ddi_idevice_cookie_t *)NULL,
-		mouse8042_intr, (caddr_t)state);
+	    (ddi_iblock_cookie_t *)NULL, (ddi_idevice_cookie_t *)NULL,
+	    mouse8042_intr, (caddr_t)state);
 	if (rc != DDI_SUCCESS) {
 #if	defined(MOUSE8042_DEBUG)
 		cmn_err(CE_WARN, MODULE_NAME "_attach: cannot add interrupt");
@@ -358,8 +358,7 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Now that we're attached, announce our presence to the world. */
 	ddi_report_dev(dip);
 #if	defined(MOUSE8042_DEBUG)
-	cmn_err(CE_CONT, "?%s #%d: version %s\n",
-	    DRIVER_NAME(dip), ddi_get_instance(dip), "%I% (%E%)");
+	cmn_err(CE_CONT, "?%s #%d\n", DRIVER_NAME(dip), ddi_get_instance(dip));
 #endif
 	return (DDI_SUCCESS);
 
@@ -657,8 +656,8 @@ mouse8042_wput(queue_t *q, mblk_t *mp)
 				}
 #endif
 				ddi_put8(state->ms_handle,
-					state->ms_addr + I8042_INT_OUTPUT_DATA,
-					*bp->b_rptr++);
+				    state->ms_addr + I8042_INT_OUTPUT_DATA,
+				    *bp->b_rptr++);
 			}
 			next = bp->b_cont;
 			freeb(bp);
@@ -694,12 +693,12 @@ mouse8042_intr(caddr_t arg)
 	for (;;) {
 
 		if (ddi_get8(state->ms_handle,
-			    state->ms_addr + I8042_INT_INPUT_AVAIL) == 0) {
+		    state->ms_addr + I8042_INT_INPUT_AVAIL) == 0) {
 			break;
 		}
 
 		mdata = ddi_get8(state->ms_handle,
-				state->ms_addr + I8042_INT_INPUT_DATA);
+		    state->ms_addr + I8042_INT_INPUT_DATA);
 
 #if	defined(MOUSE8042_DEBUG)
 		if (mouse8042_debug)

@@ -2344,11 +2344,11 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 }
 
 DDI_DEFINE_STREAM_OPS(ath_dev_ops, nulldev, nulldev, ath_attach, ath_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv ath_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ath driver 1.3.1/HAL 0.9.17.2",	/* short description */
+	"ath driver",		/* short description */
 	&ath_dev_ops		/* driver specific ops */
 };
 

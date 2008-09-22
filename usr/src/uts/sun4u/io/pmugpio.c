@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -122,12 +120,13 @@ static struct dev_ops pmugpio_ops = {
 	nodev,			/* Reset */
 	&pmugpio_cb_ops,		/* Driver operations */
 	0,			/* Bus operations */
-	NULL			/* Power */
+	NULL,			/* Power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops, 		/* This one is a driver */
-	"Pmugpio Driver %I%", 		/* Name of the module. */
+	"Pmugpio Driver", 		/* Name of the module. */
 	&pmugpio_ops,			/* Driver ops */
 };
 
@@ -280,7 +279,7 @@ pmugpio_watchdog_pat(void)
 		case PMUGPIO_CPLD:
 			value = (CPLD_WATCHDOG ^
 			    ddi_get8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
-				pmugpio_ptr->pmugpio_watchdog_reg));
+			    pmugpio_ptr->pmugpio_watchdog_reg));
 
 			ddi_put8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
 			    pmugpio_ptr->pmugpio_watchdog_reg, value);
@@ -351,10 +350,10 @@ pmugpio_reset(void)
 		    pmugpio_ptr->pmugpio_reset_reg);
 		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
 		    pmugpio_ptr->pmugpio_reset_reg,
-			(value | MBC_PPC_RESET));
+		    (value | MBC_PPC_RESET));
 		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
 		    pmugpio_ptr->pmugpio_reset_reg,
-			(value & ~MBC_PPC_RESET));
+		    (value & ~MBC_PPC_RESET));
 		break;
 
 	case PMUGPIO_OTHER:
@@ -416,9 +415,9 @@ pmugpio_map_regs(dev_info_t *dip, pmugpio_state_t *pmugpio_ptr)
 			return (DDI_FAILURE);
 		/* MBC and CPLD have reset and watchdog bits in same reg. */
 		pmugpio_ptr->pmugpio_watchdog_reg_handle =
-			pmugpio_ptr->pmugpio_reset_reg_handle;
+		    pmugpio_ptr->pmugpio_reset_reg_handle;
 		pmugpio_ptr->pmugpio_watchdog_reg =
-			pmugpio_ptr->pmugpio_reset_reg;
+		    pmugpio_ptr->pmugpio_reset_reg;
 		break;
 
 	case PMUGPIO_OTHER:
@@ -431,7 +430,7 @@ pmugpio_map_regs(dev_info_t *dip, pmugpio_state_t *pmugpio_ptr)
 		    (caddr_t *)&pmugpio_ptr->pmugpio_reset_reg, 0, 1, &attr,
 		    &pmugpio_ptr->pmugpio_reset_reg_handle) != DDI_SUCCESS) {
 			ddi_regs_map_free(
-				&pmugpio_ptr->pmugpio_watchdog_reg_handle);
+			    &pmugpio_ptr->pmugpio_watchdog_reg_handle);
 			return (DDI_FAILURE);
 		}
 		break;

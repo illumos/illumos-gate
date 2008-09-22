@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tnf driver - provides probe control and kernel trace buffer access
@@ -165,14 +163,16 @@ struct dev_ops	tnf_ops = {
 	tnf_detach,		/* detach */
 	nodev,			/* reset */
 	&tnf_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* no bus operations */
+	(struct bus_ops *)0,	/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"kernel probes driver %I%",
+	"kernel probes driver",
 	&tnf_ops,
 };
 
@@ -246,7 +246,7 @@ tnf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if ((ddi_create_minor_node(devi, "tnfctl", S_IFCHR, TNFCTL_MINOR,
 	    DDI_PSEUDO, NULL) == DDI_FAILURE) ||
 	    (ddi_create_minor_node(devi, "tnfmap", S_IFCHR, TNFMAP_MINOR,
-		DDI_PSEUDO, NULL) == DDI_FAILURE)) {
+	    DDI_PSEUDO, NULL) == DDI_FAILURE)) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
@@ -384,7 +384,7 @@ tnf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	int filterval = 1;
 
 	if ((mode & FMODELS) != FNATIVE)
-	    return (ENOTSUP);
+		return (ENOTSUP);
 
 	if (getminor(dev) != TNFCTL_MINOR &&
 	    cmd != TIFIOCGSTATE &&
@@ -474,8 +474,8 @@ tnf_getprobevals(caddr_t arg, int mode)
 
 	mutex_enter(&mod_lock);
 	for (i = 1, p = (tnf_probe_control_t *)__tnf_probe_list_head;
-		p != NULL && i != probebuf.probenum;
-		++i, p = p->next)
+	    p != NULL && i != probebuf.probenum;
+	    ++i, p = p->next)
 		;
 	if (p == NULL)
 		retval = ENOENT;
@@ -504,8 +504,8 @@ tnf_getprobestring(caddr_t arg, int mode)
 
 	mutex_enter(&mod_lock);
 	for (i = 1, p = (tnf_probe_control_t *)__tnf_probe_list_head;
-		p != NULL && i != probebuf.probenum;
-		++i, p = p->next)
+	    p != NULL && i != probebuf.probenum;
+	    ++i, p = p->next)
 		;
 	if (p == NULL)
 		retval = ENOENT;
@@ -528,8 +528,8 @@ tnf_setprobevals(caddr_t arg, int mode)
 
 	mutex_enter(&mod_lock);
 	for (i = 1, p = (tnf_probe_control_t *)__tnf_probe_list_head;
-		p != NULL && i != probebuf.probenum;
-		++i, p = p->next)
+	    p != NULL && i != probebuf.probenum;
+	    ++i, p = p->next)
 		;
 	if (p == NULL)
 		retval = ENOENT;
@@ -619,7 +619,7 @@ tnf_allocbuf(intptr_t arg)
 #else
 	/* LINTED cast from 64-bit integer to 32-bit intege */
 	tnf_buf = segkp_get(segkp, (int)bufsz,
-				KPD_ZERO | KPD_LOCKED | KPD_NO_ANON);
+	    KPD_ZERO | KPD_LOCKED | KPD_NO_ANON);
 #endif
 	if (tnf_buf == NULL)
 		return (ENOMEM);

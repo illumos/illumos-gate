@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,7 +14,6 @@
  * it connects to a "slave" side.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -95,7 +94,9 @@ struct dev_ops	ptc_ops = {
 	nodev,			/* detach */
 	nodev,			/* reset */
 	&ptc_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 #include <sys/types.h>
@@ -115,7 +116,7 @@ extern struct dev_ops ptc_ops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"tty pseudo driver control 'ptc' %I%",
+	"tty pseudo driver control 'ptc'",
 	&ptc_ops,	/* driver ops */
 };
 
@@ -167,7 +168,7 @@ ptc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	for (pty_num = 0; pty_num < npty; pty_num++) {
 		(void) sprintf(name, "pty%c%c", *pty_bank, *pty_digit);
 		if (ddi_create_minor_node(devi, name, S_IFCHR,
-			pty_num, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    pty_num, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(devi, NULL);
 			return (-1);
 		}
@@ -652,7 +653,7 @@ again:
 					goto out;
 				cmn_err(CE_PANIC,
 				    "ptcwrite: non null return from"
-					" makemsg");
+				    " makemsg");
 			}
 
 			/*

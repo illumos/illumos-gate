@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * hci1394.c
@@ -79,13 +77,14 @@ static struct dev_ops hci1394_ops = {
 	nodev,			/* reset */
 	&hci1394_cb_ops,	/* cb_ops */
 	NULL,			/* bus_ops */
-	NULL			/* power */
+	NULL,			/* power */
+	hci1394_quiesce,	/* devo_quiesce */
 };
 
 /* Module Driver Info */
 static struct modldrv hci1394_modldrv = {
 	&mod_driverops,
-	"1394 OpenHCI HBA driver v1.0",
+	"1394 OpenHCI HBA driver",
 	&hci1394_ops
 };
 

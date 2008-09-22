@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -116,7 +114,9 @@ static struct dev_ops adm1031_dev_ops = {
 	adm1031_s_detach,
 	nodev,
 	&adm1031_cb_ops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static uint8_t adm1031_control_regs[] = {
@@ -162,7 +162,7 @@ static	minor_info	fans[ADM1031_FAN_SPEED_CHANS] = {
 
 static struct modldrv adm1031_modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"adm1031 device driver v1.4",
+	"adm1031 device driver",
 	&adm1031_dev_ops,
 };
 
@@ -472,7 +472,7 @@ adm1031_suspend(dev_info_t *dip)
 	mutex_enter(&admp->adm1031_mutex);
 	while (admp->adm1031_flags & ADM1031_BUSYFLAG) {
 		if (cv_wait_sig(&admp->adm1031_cv,
-			&admp->adm1031_mutex) <= 0) {
+		    &admp->adm1031_mutex) <= 0) {
 			mutex_exit(&admp->adm1031_mutex);
 			return (DDI_FAILURE);
 		}
@@ -753,7 +753,7 @@ adm1031_s_ioctl(dev_t dev, int cmd, intptr_t arg, int mode)
 				admp->adm1031_flags |= ADM1031_AUTOFLAG;
 			} else if (write_value == ADM1031_MANUAL_MODE) {
 				temp = admp->adm1031_transfer->i2c_rbuf[0] &
-				(~ADM1031_AUTOFLAG);
+				    (~ADM1031_AUTOFLAG);
 				admp->adm1031_flags &= ~ADM1031_AUTOFLAG;
 			} else {
 				err = EINVAL;

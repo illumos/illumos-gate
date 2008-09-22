@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -89,12 +87,14 @@ static struct dev_ops tda8444_ops = {
 	tda8444_detach,
 	nodev,
 	&tda8444_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv tda8444_modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"tda8444 device driver v%I%",
+	"tda8444 device driver",
 	&tda8444_ops,
 };
 
@@ -115,7 +115,7 @@ _init(void)
 	error = mod_install(&tda8444_modlinkage);
 	if (error == 0) {
 		(void) ddi_soft_state_init(&tda8444_soft_statep,
-			sizeof (struct tda8444_unit), TDA8444_MAX_DACS);
+		    sizeof (struct tda8444_unit), TDA8444_MAX_DACS);
 	}
 
 	return (error);
@@ -165,7 +165,7 @@ tda8444_do_resume(dev_info_t *dip)
 	int ret = DDI_SUCCESS;
 
 	unitp = (struct tda8444_unit *)
-		ddi_get_soft_state(tda8444_soft_statep, instance);
+	    ddi_get_soft_state(tda8444_soft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -180,7 +180,7 @@ tda8444_do_resume(dev_info_t *dip)
 		DPRINTF(RESUME, ("tda8444_resume: setting channel %d to %d",
 		    channel, unitp->tda8444_output[channel]));
 		if (i2c_transfer(unitp->tda8444_hdl,
-			unitp->tda8444_transfer) != I2C_SUCCESS) {
+		    unitp->tda8444_transfer) != I2C_SUCCESS) {
 			ret = DDI_FAILURE;
 		}
 	}
@@ -206,7 +206,7 @@ tda8444_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(tda8444_soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d failed to zalloc softstate",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 
 		return (DDI_FAILURE);
 	}
@@ -218,16 +218,16 @@ tda8444_do_attach(dev_info_t *dip)
 	}
 
 	(void) snprintf(unitp->tda8444_name, sizeof (unitp->tda8444_name),
-		"%s%d", ddi_driver_name(dip), instance);
+	    "%s%d", ddi_driver_name(dip), instance);
 
 	for (i = 0; i < TDA8444_CHANS; i++) {
 		(void) sprintf(name, "%d", i);
 		minor = TDA8444_CHANNEL_TO_MINOR(i) |
-			TDA8444_DEVINST_TO_MINOR(instance);
+		    TDA8444_DEVINST_TO_MINOR(instance);
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-			TDA8444_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    TDA8444_NODE_TYPE, NULL) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s ddi_create_minor_node failed",
-				unitp->tda8444_name);
+			    unitp->tda8444_name);
 			ddi_soft_state_free(tda8444_soft_statep, instance);
 			ddi_remove_minor_node(dip, NULL);
 
@@ -240,7 +240,7 @@ tda8444_do_attach(dev_info_t *dip)
 	 * preallocate a single buffer for all writes
 	 */
 	if (i2c_transfer_alloc(unitp->tda8444_hdl, &unitp->tda8444_transfer,
-		2, 0, I2C_SLEEP) != I2C_SUCCESS) {
+	    2, 0, I2C_SLEEP) != I2C_SUCCESS) {
 		cmn_err(CE_WARN, "i2c_transfer_alloc failed");
 		ddi_remove_minor_node(dip, NULL);
 		ddi_soft_state_free(tda8444_soft_statep, instance);
@@ -316,7 +316,7 @@ tda8444_do_suspend(dev_info_t *dip)
 	mutex_enter(&unitp->tda8444_mutex);
 	while (unitp->tda8444_flags == TDA8444_BUSY) {
 		if (cv_wait_sig(&unitp->tda8444_cv,
-			&unitp->tda8444_mutex) <= 0) {
+		    &unitp->tda8444_mutex) <= 0) {
 			mutex_exit(&unitp->tda8444_mutex);
 
 			return (DDI_FAILURE);
@@ -358,7 +358,7 @@ tda8444_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct tda8444_unit *)
-		ddi_get_soft_state(tda8444_soft_statep, instance);
+	    ddi_get_soft_state(tda8444_soft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -405,7 +405,7 @@ tda8444_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct tda8444_unit *)
-		ddi_get_soft_state(tda8444_soft_statep, instance);
+	    ddi_get_soft_state(tda8444_soft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -486,7 +486,7 @@ tda8444_io(dev_t dev, struct uio *uiop, int rw)
 
 	while (unitp->tda8444_flags == TDA8444_BUSY) {
 		if (cv_wait_sig(&unitp->tda8444_cv,
-			&unitp->tda8444_mutex) <= 0) {
+		    &unitp->tda8444_mutex) <= 0) {
 			mutex_exit(&unitp->tda8444_mutex);
 
 			return (EINTR);
@@ -509,7 +509,7 @@ tda8444_io(dev_t dev, struct uio *uiop, int rw)
 			unitp->tda8444_transfer->i2c_wbuf[1] =
 			    (uchar_t)out_value;
 			DPRINTF(IO, ("setting channel %d to %d", channel,
-				    unitp->tda8444_transfer->i2c_wbuf[1]));
+			    unitp->tda8444_transfer->i2c_wbuf[1]));
 
 			if (i2c_transfer(unitp->tda8444_hdl,
 			    unitp->tda8444_transfer) != I2C_SUCCESS) {

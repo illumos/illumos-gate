@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * A simple wrapper around the balloon kernel thread to allow userland
@@ -154,19 +153,20 @@ static struct dev_ops balloon_dv_ops = {
 	DEVO_REV,
 	0,
 	balloon_getinfo,
-	nulldev,	/* identify */
-	nulldev,	/* probe */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
 	balloon_attach,
 	balloon_detach,
-	nodev,		/* reset */
+	nodev,			/* reset */
 	&balloon_cb_ops,
-	NULL,		/* struct bus_ops */
-	NULL		/* power */
+	NULL,			/* struct bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"balloon driver 1.1",
+	"balloon driver",
 	&balloon_dv_ops
 };
 

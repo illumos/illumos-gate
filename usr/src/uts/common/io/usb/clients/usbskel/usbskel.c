@@ -167,7 +167,8 @@ static struct dev_ops usbskel_ops = {
 	nodev,			/* reset */
 	&usbskel_cb_ops,	/* driver operations */
 	NULL,			/* bus operations */
-	usbskel_power		/* power */
+	usbskel_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv usbskel_modldrv =	{

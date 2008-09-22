@@ -1685,7 +1685,8 @@ static struct dev_ops sd_ops = {
 	nodev,			/* reset */
 	&sd_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	sdpower			/* power */
+	sdpower,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 

@@ -132,6 +132,7 @@ SUNWprivate_1.1 {
 	zpool_get_handle;
 	zpool_get_history;
 	zpool_get_name;
+	zpool_get_physpath;
 	zpool_get_prop;
 	zpool_get_prop_int;
 	zpool_get_state;

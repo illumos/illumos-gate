@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  PCMCIA Memory Nexus Driver
@@ -117,7 +115,9 @@ static struct dev_ops pcmem_ops = {
 	pcmem_detach,		/* detach	*/
 	nulldev,		/* reset (currently not supported) */
 	(struct cb_ops *)NULL,	/* cb_ops pointer for leaf driver */
-	&pcmem__bus_ops		/* bus_ops pointer for nexus driver */
+	&pcmem__bus_ops,	/* bus_ops pointer for nexus driver */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 
@@ -129,7 +129,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv md = {
 	&mod_driverops,			/* Type of module */
-	"PCMCIA Memory Nexus V2.0 %I%",	/* Name of the module */
+	"PCMCIA Memory Nexus",		/* Name of the module */
 	&pcmem_ops,			/* Device Operation Structure */
 };
 
@@ -230,7 +230,7 @@ pcmem_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		    ddi_get_name(rdip), ddi_get_instance(rdip),
 		    ddi_get_name(dip),
 		    ddi_getprop(DDI_DEV_T_NONE, rdip,
-			DDI_PROP_DONTPASS, "socket", -1)));
+		    DDI_PROP_DONTPASS, "socket", -1)));
 
 		return (DDI_SUCCESS);
 

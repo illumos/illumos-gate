@@ -6,8 +6,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/* #pragma ident   "@(#)solaris.c	1.12 6/5/96 (C) 1995 Darren Reed"*/
-#pragma ident "@(#)$Id: solaris.c,v 2.73.2.6 2005/07/13 21:40:47 darrenr Exp $"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -35,7 +33,7 @@
 #include <sys/hook.h>
 #include <net/if.h>
 #if SOLARIS2 >= 6
-# include <net/if_types.h>
+#include <net/if_types.h>
 #endif
 #include <net/af.h>
 #include <net/route.h>
@@ -62,7 +60,7 @@
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
-				 void *, void **));
+		    void *, void **));
 #if SOLARIS2 < 10
 static	int	ipf_identify __P((dev_info_t *));
 #endif
@@ -113,7 +111,9 @@ static struct dev_ops ipf_ops = {
 	ipf_detach,
 	nodev,		/* reset */
 	&ipf_cb_ops,
-	(struct bus_ops *)0
+	(struct bus_ops *)0,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 
@@ -246,7 +246,7 @@ ipf_kstat_init(ipf_stack_t *ifs)
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_kstat_init(%p) installed %p, %p",
-		ifs, ifs->ifs_kstatp[0], ifs->ifs_kstatp[1]);
+	    ifs, ifs->ifs_kstatp[0], ifs->ifs_kstatp[1]);
 #endif
 }
 
@@ -310,7 +310,8 @@ ipf_kstat_update(kstat_t *ksp, int rwflag)
 	return (0);
 }
 
-int _init()
+int
+_init()
 {
 	int ipfinst;
 
@@ -319,11 +320,12 @@ int _init()
 	cmn_err(CE_NOTE, "IP Filter: _init() = %d", ipfinst);
 #endif
 	mutex_init(&ipf_stack_lock, NULL, MUTEX_DRIVER, NULL);
-	return ipfinst;
+	return (ipfinst);
 }
 
 
-int _fini(void)
+int
+_fini(void)
 {
 	int ipfinst;
 
@@ -331,11 +333,12 @@ int _fini(void)
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", ipfinst);
 #endif
-	return ipfinst;
+	return (ipfinst);
 }
 
 
-int _info(modinfop)
+int
+_info(modinfop)
 struct modinfo *modinfop;
 {
 	int ipfinst;
@@ -344,7 +347,7 @@ struct modinfo *modinfop;
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _info(%p) = %d", modinfop, ipfinst);
 #endif
-	return ipfinst;
+	return (ipfinst);
 }
 
 
@@ -352,9 +355,9 @@ struct modinfo *modinfop;
 static int ipf_identify(dip)
 dev_info_t *dip;
 {
-# ifdef	IPFDEBUG
+#ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_identify(%p)", dip);
-# endif
+#endif
 	if (strcmp(ddi_get_name(dip), "ipf") == 0)
 		return (DDI_IDENTIFIED);
 	return (DDI_NOT_IDENTIFIED);
@@ -433,7 +436,8 @@ ipf_stack_create(const netid_t id)
  * as it will only be nuked when the instance is destroyed as part
  * of the final shutdown of a zone.
  */
-ipf_stack_t *ipf_find_stack(const zoneid_t zone)
+ipf_stack_t *
+ipf_find_stack(const zoneid_t zone)
 {
 	ipf_stack_t *ifs;
 
@@ -443,7 +447,7 @@ ipf_stack_t *ipf_find_stack(const zoneid_t zone)
 			break;
 	}
 	mutex_exit(&ipf_stack_lock);
-	return ifs;
+	return (ifs);
 }
 
 
@@ -458,7 +462,7 @@ static int ipf_detach_check_zone(ipf_stack_t *ifs)
 		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return (-1);
 	}
-	
+
 	/*
 	 * Make sure there is no active filter rule.
 	 */
@@ -561,7 +565,7 @@ ddi_attach_cmd_t cmd;
 		instance = ddi_get_instance(dip);
 		/* Only one instance of ipf (instance 0) can be attached. */
 		if (instance > 0)
-			return DDI_FAILURE;
+			return (DDI_FAILURE);
 
 #ifdef	IPFDEBUG
 		cmn_err(CE_CONT, "IP Filter: attach ipf instance %d", instance);
@@ -575,7 +579,7 @@ ddi_attach_cmd_t cmd;
 				continue;
 			s++;
 			if (ddi_create_minor_node(dip, s, S_IFCHR, i,
-						  DDI_PSEUDO, 0) ==
+			    DDI_PSEUDO, 0) ==
 			    DDI_FAILURE) {
 				ddi_remove_minor_node(dip, NULL);
 				goto attach_failed;
@@ -595,7 +599,7 @@ ddi_attach_cmd_t cmd;
 		cmn_err(CE_CONT, "IP Filter:stack_create callback_reg=%d", i);
 #endif
 
-		return DDI_SUCCESS;
+		return (DDI_SUCCESS);
 		/* NOTREACHED */
 	default:
 		break;
@@ -603,7 +607,7 @@ ddi_attach_cmd_t cmd;
 
 attach_failed:
 	ddi_prop_remove_all(dip);
-	return DDI_FAILURE;
+	return (DDI_FAILURE);
 }
 
 
@@ -619,9 +623,10 @@ ddi_detach_cmd_t cmd;
 	switch (cmd) {
 	case DDI_DETACH:
 		if (ipf_detach_check_all() != 0)
-			return DDI_FAILURE;
+			return (DDI_FAILURE);
 
-		/* Undo what we did in ipf_attach, freeing resources
+		/*
+		 * Undo what we did in ipf_attach, freeing resources
 		 * and removing things we installed.  The system
 		 * framework guarantees we are not active with this devinfo
 		 * node in any other entry points at this time.
@@ -631,19 +636,19 @@ ddi_detach_cmd_t cmd;
 		ddi_remove_minor_node(dip, NULL);
 		if (i > 0) {
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
-			return DDI_FAILURE;
+			return (DDI_FAILURE);
 		}
 
 		(void) net_instance_unregister(ipfncb);
 		net_instance_free(ipfncb);
 
-		return DDI_SUCCESS;
+		return (DDI_SUCCESS);
 		/* NOTREACHED */
 	default:
 		break;
 	}
 	cmn_err(CE_NOTE, "IP Filter: failed to detach\n");
-	return DDI_FAILURE;
+	return (DDI_FAILURE);
 }
 
 
@@ -686,31 +691,33 @@ dev_info_t *dip;
 	if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 				DDI_NO_AUTODETACH, 1) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "!updating DDI_NO_AUTODETACH failed");
-		return DDI_FAILURE;
+		return (DDI_FAILURE);
 	}
 #else
 	if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 				"ddi-no-autodetach", 1) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "!updating ddi-no-autodetach failed");
-		return DDI_FAILURE;
+		return (DDI_FAILURE);
 	}
 #endif
 
-	return DDI_SUCCESS;
+	return (DDI_SUCCESS);
 }
 
-int ipf_property_update(dip, ifs)
+int
+ipf_property_update(dip, ifs)
 dev_info_t *dip;
 ipf_stack_t *ifs;
 {
 	ipftuneable_t *ipft;
 	int64_t *i64p;
 	char *name;
-	u_int one;
+	uint_t one;
 	int *i32p;
 	int err;
 
-	for (ipft = ifs->ifs_ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
+	for (ipft = ifs->ifs_ipf_tuneables; (name = ipft->ipft_name) != NULL;
+	ipft++) {
 		one = 1;
 		switch (ipft->ipft_sz)
 		{
@@ -725,7 +732,7 @@ ipf_stack_t *ifs;
 				name, err);
 #endif
 			if (err != DDI_PROP_SUCCESS)
-				return err;
+				return (err);
 			if (*i32p >= ipft->ipft_min && *i32p <= ipft->ipft_max)
 				*ipft->ipft_pint = *i32p;
 			else
@@ -737,15 +744,15 @@ ipf_stack_t *ifs;
 		case 8 :
 			i64p = NULL;
 			err = ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, dip,
-							  0, name, &i64p, &one);
+			    0, name, &i64p, &one);
 			if (err == DDI_PROP_NOT_FOUND)
 				continue;
-# ifdef	IPFDEBUG
+#ifdef	IPFDEBUG
 			cmn_err(CE_CONT, "IP Filter: lookup_int64(%s) = %d\n",
-				name, err);
-# endif
+			    name, err);
+#endif
 			if (err != DDI_PROP_SUCCESS)
-				return err;
+				return (err);
 			if (*i64p >= ipft->ipft_min && *i64p <= ipft->ipft_max)
 				*ipft->ipft_pint = *i64p;
 			else
@@ -759,5 +766,5 @@ ipf_stack_t *ifs;
 		if (err != DDI_SUCCESS)
 			break;
 	}
-	return err;
+	return (err);
 }

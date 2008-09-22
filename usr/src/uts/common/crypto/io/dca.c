@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Deimos - cryptographic acceleration based upon Broadcom 582x.
@@ -119,10 +118,11 @@ static struct dev_ops devops = {
 	nodev,			/* devo_reset */
 	NULL,			/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	ddi_power		/* devo_power */
+	ddi_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
-#define	IDENT		"PCI Crypto Accelerator 2.0"
+#define	IDENT		"PCI Crypto Accelerator"
 #define	IDENT_SYM	"Crypto Accel Sym 2.0"
 #define	IDENT_ASYM	"Crypto Accel Asym 2.0"
 

@@ -623,6 +623,7 @@ typedef struct prde {
 #define	NV_INTR_DISABLE		0x1
 #define	NV_INTR_ENABLE		0x2
 #define	NV_INTR_CLEAR_ALL	0x4
+#define	NV_INTR_DISABLE_NON_BLOCKING		0x8
 
 /*
  * sizes of strings to allocate

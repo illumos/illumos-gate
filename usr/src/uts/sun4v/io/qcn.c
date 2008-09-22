@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v console driver
@@ -176,12 +175,13 @@ static struct dev_ops qcn_ops = {
 	nodev,			/* reset()		*/
 	&qcn_cb_ops,		/* cb_ops		*/
 	(struct bus_ops *)NULL,	/* bus_ops		*/
-	NULL			/* power()		*/
+	NULL,			/* power()		*/
+	ddi_quiesce_not_needed,		/* quiesce()		*/
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"sun4v console driver v%I%",
+	"sun4v console driver",
 	&qcn_ops
 };
 
@@ -215,16 +215,16 @@ _init(void)
 	 */
 
 	if (((hsvc_version(HSVC_GROUP_CORE, &major, &minor) == 0) &&
-		(major == QCN_API_MAJOR) && (minor >= QCN_API_MINOR))) {
+	    (major == QCN_API_MAJOR) && (minor >= QCN_API_MINOR))) {
 		qcn_state->cons_write_buffer =
-					contig_mem_alloc(CONS_WR_BUF_SIZE);
+		    contig_mem_alloc(CONS_WR_BUF_SIZE);
 		if (qcn_state->cons_write_buffer != NULL) {
 			qcn_state->cons_write_buf_ra =
-					va_to_pa(qcn_state->cons_write_buffer);
+			    va_to_pa(qcn_state->cons_write_buffer);
 			qcn_state->cons_transmit = qcn_transmit_write;
 			qcn_state->cons_receive = qcn_receive_read;
 			qcn_state->cons_read_buf_ra =
-					va_to_pa((char *)RING_ADDR(qcn_state));
+			    va_to_pa((char *)RING_ADDR(qcn_state));
 		}
 	}
 	if (qcn_state->cons_transmit == NULL) {
@@ -596,7 +596,7 @@ qcn_wput(queue_t *q, mblk_t *mp)
 
 #ifdef QCN_DEBUG
 	prom_printf("qcn_wput(): QCN wput q=%X mp=%X rd=%X wr=%X type=%X\n",
-		q, mp, mp->b_rptr, mp->b_wptr, mp->b_datap->db_type);
+	    q, mp, mp->b_rptr, mp->b_wptr, mp->b_datap->db_type);
 #endif
 
 	mutex_enter(&qcn_state->qcn_lock);
@@ -665,7 +665,7 @@ qcn_wput(queue_t *q, mblk_t *mp)
 #ifdef QCN_DEBUG
 		if (mp->b_rptr < mp->b_wptr) {
 		prom_printf("qcn_wput(): DATA q=%X mp=%X rd=%X wr=%X\n",
-			q, mp, mp->b_rptr, mp->b_wptr);
+		    q, mp, mp->b_rptr, mp->b_wptr);
 		prom_printf("qcn_wput(): [");
 		for (i = 0; i < mp->b_wptr-mp->b_rptr; i++) {
 			prom_printf("%c", *(mp->b_rptr+i));
@@ -985,9 +985,9 @@ qcn_trigger_softint(void)
 	 * (qcn_soft_pend == 0), trigger the service routine to run.
 	 */
 	if (atomic_swap_uint(&qcn_state->qcn_soft_pend, QCN_SP_DO) ==
-				QCN_SP_IDL) {
+	    QCN_SP_IDL) {
 		(void) ddi_intr_trigger_softint(
-			    qcn_state->qcn_softint_hdl, NULL);
+		    qcn_state->qcn_softint_hdl, NULL);
 	}
 }
 
@@ -1057,7 +1057,7 @@ out:
 		 * called) while we were processing the loop
 		 */
 	} while (atomic_swap_uint(&qcn_state->qcn_soft_pend, QCN_SP_IDL) ==
-								QCN_SP_DO);
+	    QCN_SP_DO);
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -1091,9 +1091,9 @@ qcn_receive_read(void)
 			RING_INIT(qcn_state);
 		}
 		rv = hv_cnread(qcn_state->cons_read_buf_ra +
-				RING_POFF(qcn_state),
-				RING_LEFT(qcn_state),
-				&retcount);
+		    RING_POFF(qcn_state),
+		    RING_LEFT(qcn_state),
+		    &retcount);
 		bufp = RING_ADDR(qcn_state);
 		if (rv == H_EOK) {
 			/*
@@ -1105,7 +1105,7 @@ qcn_receive_read(void)
 				for (i = 0; i < retcount; i++) {
 					if (abort_charseq_recognize(*bufp++)) {
 						abort_sequence_enter(
-								(char *)NULL);
+						    (char *)NULL);
 					}
 				}
 			}

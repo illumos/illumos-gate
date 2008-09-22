@@ -158,8 +158,9 @@ struct dev_ops isa_ops = {
 	nodev,			/* detach */
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
-	&isa_bus_ops	/* bus operations */
-
+	&isa_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * evtchn.c
@@ -683,12 +682,13 @@ static struct dev_ops evtchndrv_dev_ops = {
 	nodev,			/* devo_reset */
 	&evtchndrv_cb_ops,	/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Evtchn driver v1.0",	/* Name of the module. */
+	"Evtchn driver",	/* Name of the module. */
 	&evtchndrv_dev_ops	/* driver ops */
 };
 

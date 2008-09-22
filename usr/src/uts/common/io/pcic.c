@@ -182,7 +182,8 @@ static struct dev_ops pcic_devops = {
 	nulldev,
 	&pcic_cbops,
 	&pcmciabus_ops,
-	NULL
+	NULL,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 void *pcic_soft_state_p = NULL;
@@ -471,7 +472,7 @@ pcic_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	minor_t minor;
 
 	switch (cmd) {
-	    case DDI_INFO_DEVT2DEVINFO:
+		case DDI_INFO_DEVT2DEVINFO:
 		minor = getminor((dev_t)arg);
 		minor &= 0x7f;
 		if (!(anp = ddi_get_soft_state(pcic_soft_state_p, minor)))
@@ -479,12 +480,12 @@ pcic_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		else
 			*result = anp->an_dip;
 		break;
-	    case DDI_INFO_DEVT2INSTANCE:
+		case DDI_INFO_DEVT2INSTANCE:
 		minor = getminor((dev_t)arg);
 		minor &= 0x7f;
 		*result = (void *)((long)minor);
 		break;
-	    default:
+		default:
 		error = DDI_FAILURE;
 		break;
 	}
@@ -500,7 +501,7 @@ pcic_probe(dev_info_t *dip)
 	uchar_t *index, *data;
 
 	if (ddi_dev_is_sid(dip) == DDI_SUCCESS)
-	    return (DDI_PROBE_DONTCARE);
+		return (DDI_PROBE_DONTCARE);
 
 	/*
 	 * find a PCIC device (any vendor)
@@ -514,11 +515,11 @@ pcic_probe(dev_info_t *dip)
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 	if (ddi_regs_map_setup(dip, PCIC_ISA_CONTROL_REG_NUM,
-				(caddr_t *)&index,
-				PCIC_ISA_CONTROL_REG_OFFSET,
-				PCIC_ISA_CONTROL_REG_LENGTH,
-				&attr, &handle) != DDI_SUCCESS)
-	    return (DDI_PROBE_FAILURE);
+	    (caddr_t *)&index,
+	    PCIC_ISA_CONTROL_REG_OFFSET,
+	    PCIC_ISA_CONTROL_REG_LENGTH,
+	    &attr, &handle) != DDI_SUCCESS)
+		return (DDI_PROBE_FAILURE);
 
 	data = index + 1;
 
@@ -592,18 +593,18 @@ cardbus_enable_cd_intr(dev_info_t *dip)
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	(void) ddi_regs_map_setup(dip, 1,
-				(caddr_t *)&ioaddr,
-				0,
-				4096,
-				&attr, &iohandle);
+	    (caddr_t *)&ioaddr,
+	    0,
+	    4096,
+	    &attr, &iohandle);
 
 	/* CSC Interrupt: Card detect interrupt on */
 	ddi_put32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_MASK),
-		ddi_get32(iohandle,
-		(uint32_t *)(ioaddr+CB_STATUS_MASK)) | CB_SE_CCDMASK);
+	    ddi_get32(iohandle,
+	    (uint32_t *)(ioaddr+CB_STATUS_MASK)) | CB_SE_CCDMASK);
 
 	ddi_put32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_EVENT),
-		ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_EVENT)));
+	    ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_EVENT)));
 
 	ddi_regs_map_free(&iohandle);
 	return (1);
@@ -675,9 +676,9 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Allocate soft state associated with this instance.
 	 */
 	if (ddi_soft_state_zalloc(pcic_soft_state_p,
-				ddi_get_instance(dip)) != DDI_SUCCESS) {
+	    ddi_get_instance(dip)) != DDI_SUCCESS) {
 		cmn_err(CE_CONT, "pcic%d: Unable to alloc state\n",
-			ddi_get_instance(dip));
+		    ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 
@@ -705,7 +706,7 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * set the default values here and override from intr spec
 	 */
 	pcic->pc_irq = ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_CANSLEEP,
-					"interrupt-priorities", -1);
+	    "interrupt-priorities", -1);
 
 	if (pcic->pc_irq == -1) {
 		int			actual;
@@ -729,41 +730,41 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * bus we're on.
 	 */
 	if (ddi_prop_op(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				PROP_LEN_AND_VAL_BUF, DDI_PROP_CANSLEEP,
-				"device_type", (caddr_t)&bus_type[0], &len) !=
-							DDI_PROP_SUCCESS) {
+	    PROP_LEN_AND_VAL_BUF, DDI_PROP_CANSLEEP,
+	    "device_type", (caddr_t)&bus_type[0], &len) !=
+	    DDI_PROP_SUCCESS) {
 		if (ddi_prop_op(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				PROP_LEN_AND_VAL_BUF, DDI_PROP_CANSLEEP,
-				"bus-type", (caddr_t)&bus_type[0], &len) !=
-							DDI_PROP_SUCCESS) {
+		    PROP_LEN_AND_VAL_BUF, DDI_PROP_CANSLEEP,
+		    "bus-type", (caddr_t)&bus_type[0], &len) !=
+		    DDI_PROP_SUCCESS) {
 
 			cmn_err(CE_CONT,
-				"pcic%d: can't find parent bus type\n",
-				ddi_get_instance(dip));
+			    "pcic%d: can't find parent bus type\n",
+			    ddi_get_instance(dip));
 
 			kmem_free(pcic, sizeof (pcicdev_t));
 			ddi_soft_state_free(pcic_soft_state_p,
-				ddi_get_instance(dip));
+			    ddi_get_instance(dip));
 			return (DDI_FAILURE);
 		}
 	} /* ddi_prop_op("device_type") */
 
 	if (strcmp(bus_type, DEVI_PCI_NEXNAME) == 0 ||
-		strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0) {
+	    strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0) {
 		pcic->pc_flags = PCF_PCIBUS;
 	} else {
 		cmn_err(CE_WARN, "!pcic%d: non-pci mode (%s) not supported, "
-			"set BIOS to yenta mode if applicable\n",
-			ddi_get_instance(dip), bus_type);
+		    "set BIOS to yenta mode if applicable\n",
+		    ddi_get_instance(dip), bus_type);
 		kmem_free(pcic, sizeof (pcicdev_t));
 		ddi_soft_state_free(pcic_soft_state_p,
-			ddi_get_instance(dip));
+		    ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 
 	if ((pcic->bus_speed = ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
-						DDI_PROP_CANSLEEP,
-						"clock-frequency", 0)) == 0) {
+	    DDI_PROP_CANSLEEP,
+	    "clock-frequency", 0)) == 0) {
 		if (pcic->pc_flags & PCF_PCIBUS)
 			pcic->bus_speed = PCIC_PCI_DEF_SYSCLK;
 		else
@@ -781,9 +782,9 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef	PCIC_DEBUG
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-			"pcic%d: parent bus type = [%s], speed = %d MHz\n",
-			ddi_get_instance(dip),
-			bus_type, pcic->bus_speed);
+		    "pcic%d: parent bus type = [%s], speed = %d MHz\n",
+		    ddi_get_instance(dip),
+		    bus_type, pcic->bus_speed);
 	}
 #endif
 
@@ -813,24 +814,24 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 		if (ddi_regs_map_setup(dip, pci_cfrn,
-					(caddr_t *)&pcic->cfgaddr,
-					PCIC_PCI_CONFIG_REG_OFFSET,
-					PCIC_PCI_CONFIG_REG_LENGTH,
-					&attr,
-					&pcic->cfg_handle) !=
+		    (caddr_t *)&pcic->cfgaddr,
+		    PCIC_PCI_CONFIG_REG_OFFSET,
+		    PCIC_PCI_CONFIG_REG_LENGTH,
+		    &attr,
+		    &pcic->cfg_handle) !=
 		    DDI_SUCCESS) {
 			cmn_err(CE_CONT,
-				"pcic%d: unable to map config space"
-				"regs\n",
-				ddi_get_instance(dip));
+			    "pcic%d: unable to map config space"
+			    "regs\n",
+			    ddi_get_instance(dip));
 
 			kmem_free(pcic, sizeof (pcicdev_t));
 			return (DDI_FAILURE);
 		} /* ddi_regs_map_setup */
 
 		class_code = ddi_getprop(DDI_DEV_T_ANY, dip,
-					DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
-					"class-code", -1);
+		    DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+		    "class-code", -1);
 #ifdef  PCIC_DEBUG
 		if (pcic_debug) {
 			cmn_err(CE_CONT, "pcic_attach class_code=%x\n",
@@ -869,14 +870,14 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 			if (ddi_regs_map_setup(dip, pci_ctrn,
-						(caddr_t *)&pcic->ioaddr,
-						PCIC_PCI_CONTROL_REG_OFFSET,
-						PCIC_CB_CONTROL_REG_LENGTH,
-						&attr, &pcic->handle) !=
+			    (caddr_t *)&pcic->ioaddr,
+			    PCIC_PCI_CONTROL_REG_OFFSET,
+			    PCIC_CB_CONTROL_REG_LENGTH,
+			    &attr, &pcic->handle) !=
 			    DDI_SUCCESS) {
 				cmn_err(CE_CONT,
-					"pcic%d: unable to map PCI regs\n",
-					ddi_get_instance(dip));
+				    "pcic%d: unable to map PCI regs\n",
+				    ddi_get_instance(dip));
 				ddi_regs_map_free(&pcic->cfg_handle);
 				kmem_free(pcic, sizeof (pcicdev_t));
 				return (DDI_FAILURE);
@@ -896,8 +897,7 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				ddi_regs_map_free(&pcic->cfg_handle);
 				kmem_free(pcic, sizeof (pcicdev_t));
 				cmn_err(CE_WARN, "pcic: %s: unsupported "
-								"bridge\n",
-							ddi_get_name_addr(dip));
+				    "bridge\n", ddi_get_name_addr(dip));
 				return (DDI_FAILURE);
 			}
 			break;
@@ -921,14 +921,14 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 *	format.
 			 */
 			if (ddi_regs_map_setup(dip, pci_ctrn,
-						(caddr_t *)&pcic->ioaddr,
-						PCIC_PCI_CONTROL_REG_OFFSET,
-						PCIC_PCI_CONTROL_REG_LENGTH,
-						&attr,
-						&pcic->handle) != DDI_SUCCESS) {
+			    (caddr_t *)&pcic->ioaddr,
+			    PCIC_PCI_CONTROL_REG_OFFSET,
+			    PCIC_PCI_CONTROL_REG_LENGTH,
+			    &attr,
+			    &pcic->handle) != DDI_SUCCESS) {
 				cmn_err(CE_CONT,
-					"pcic%d: unable to map PCI regs\n",
-					ddi_get_instance(dip));
+				    "pcic%d: unable to map PCI regs\n",
+				    ddi_get_instance(dip));
 				ddi_regs_map_free(&pcic->cfg_handle);
 				kmem_free(pcic, sizeof (pcicdev_t));
 				return (DDI_FAILURE);
@@ -948,8 +948,8 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				ddi_regs_map_free(&pcic->cfg_handle);
 				kmem_free(pcic, sizeof (pcicdev_t));
 				cmn_err(CE_WARN, "pcic: %s: unsupported "
-								"bridge\n",
-							ddi_get_name_addr(dip));
+				    "bridge\n",
+				    ddi_get_name_addr(dip));
 				return (DDI_FAILURE);
 			}
 
@@ -961,26 +961,26 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 *	encompass the Yenta registers.
 			 */
 			switch (pcic->pc_type) {
-			    case PCIC_TI_PCI1031:
+				case PCIC_TI_PCI1031:
 				ddi_regs_map_free(&pcic->handle);
 
 				if (ddi_regs_map_setup(dip,
-						PCIC_PCI_CONTROL_REG_NUM,
-						(caddr_t *)&pcic->ioaddr,
-						PCIC_PCI_CONTROL_REG_OFFSET,
-						PCIC_CB_CONTROL_REG_LENGTH,
-						&attr,
-						&pcic->handle) != DDI_SUCCESS) {
+				    PCIC_PCI_CONTROL_REG_NUM,
+				    (caddr_t *)&pcic->ioaddr,
+				    PCIC_PCI_CONTROL_REG_OFFSET,
+				    PCIC_CB_CONTROL_REG_LENGTH,
+				    &attr,
+				    &pcic->handle) != DDI_SUCCESS) {
 					cmn_err(CE_CONT,
-						"pcic%d: unable to map "
-								"PCI regs\n",
-						ddi_get_instance(dip));
+					    "pcic%d: unable to map "
+					"PCI regs\n",
+					    ddi_get_instance(dip));
 					ddi_regs_map_free(&pcic->cfg_handle);
 					kmem_free(pcic, sizeof (pcicdev_t));
 					return (DDI_FAILURE);
 				} /* ddi_regs_map_setup */
 				break;
-			    default:
+				default:
 				break;
 			} /* switch (pcic->pc_type) */
 			break;
@@ -998,14 +998,14 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pcic->io_reg_num = PCIC_ISA_IO_REG_NUM;
 
 		if (ddi_regs_map_setup(dip, PCIC_ISA_CONTROL_REG_NUM,
-					(caddr_t *)&pcic->ioaddr,
-					PCIC_ISA_CONTROL_REG_OFFSET,
-					PCIC_ISA_CONTROL_REG_LENGTH,
-					&attr,
-					&pcic->handle) != DDI_SUCCESS) {
+		    (caddr_t *)&pcic->ioaddr,
+		    PCIC_ISA_CONTROL_REG_OFFSET,
+		    PCIC_ISA_CONTROL_REG_LENGTH,
+		    &attr,
+		    &pcic->handle) != DDI_SUCCESS) {
 			cmn_err(CE_CONT,
-				"pcic%d: unable to map ISA registers\n",
-				ddi_get_instance(dip));
+			    "pcic%d: unable to map ISA registers\n",
+			    ddi_get_instance(dip));
 
 			kmem_free(pcic, sizeof (pcicdev_t));
 			return (DDI_FAILURE);
@@ -1042,29 +1042,30 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			uint32_t cfg;
 		case PCIC_INTEL_i82092:
 			cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_82092_PCICON);
+			    pcic->cfgaddr + PCIC_82092_PCICON);
 			/* we can only support 4 Socket version */
 			if (cfg & PCIC_82092_4_SOCKETS) {
-			    pcic->pc_numsockets = 4;
-			    pcic->pc_type = PCIC_INTEL_i82092;
-			    if (iline != 0xFF)
-				    pcic->pc_intr_mode = PCIC_INTR_MODE_PCI_1;
-			    else
-				    pcic->pc_intr_mode = PCIC_INTR_MODE_ISA;
+				pcic->pc_numsockets = 4;
+				pcic->pc_type = PCIC_INTEL_i82092;
+				if (iline != 0xFF)
+					pcic->pc_intr_mode =
+					    PCIC_INTR_MODE_PCI_1;
+				else
+					pcic->pc_intr_mode = PCIC_INTR_MODE_ISA;
 			} else {
-			    cmn_err(CE_CONT,
+				cmn_err(CE_CONT,
 				    "pcic%d: Intel 82092 adapter "
 				    "in unsupported configuration: 0x%x",
 				    ddi_get_instance(pcic->dip), cfg);
-			    pcic->pc_numsockets = 0;
+				pcic->pc_numsockets = 0;
 			} /* PCIC_82092_4_SOCKETS */
 			break;
 		case PCIC_CL_PD6730:
 		case PCIC_CL_PD6729:
 			pcic->pc_intr_mode = PCIC_INTR_MODE_PCI_1;
 			cfg = ddi_getprop(DDI_DEV_T_ANY, dip,
-						DDI_PROP_CANSLEEP,
-						"interrupts", 0);
+			    DDI_PROP_CANSLEEP,
+			    "interrupts", 0);
 			/* if not interrupt pin then must use ISA style IRQs */
 			if (cfg == 0 || iline == 0xFF)
 				pcic->pc_intr_mode = PCIC_INTR_MODE_ISA;
@@ -1099,10 +1100,10 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				pcic->pc_intr_mode = PCIC_INTR_MODE_PCI_1;
 
 				cfg = ddi_get8(pcic->cfg_handle,
-					(pcic->cfgaddr + PCIC_BRIDGE_CTL_REG));
+				    (pcic->cfgaddr + PCIC_BRIDGE_CTL_REG));
 				cfg &= (~PCIC_FUN_INT_MOD_ISA);
 				ddi_put8(pcic->cfg_handle, (pcic->cfgaddr +
-					PCIC_BRIDGE_CTL_REG), cfg);
+				    PCIC_BRIDGE_CTL_REG), cfg);
 			}
 			else
 				pcic->pc_intr_mode = PCIC_INTR_MODE_ISA;
@@ -1165,9 +1166,9 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			/* further tests */
 			value = pcic_getb(pcic, i, PCIC_CHIP_REVISION) &
-				PCIC_REV_MASK;
+			    PCIC_REV_MASK;
 			if (!(value >= PCIC_REV_LEVEL_LOW &&
-				value <= PCIC_REV_LEVEL_HI))
+			    value <= PCIC_REV_LEVEL_HI))
 				break;
 
 			pcic_putb(pcic, i, PCIC_SYSMEM_0_STARTLOW, 0xaa);
@@ -1194,13 +1195,13 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			/* put PC Card into RESET, just in case */
 			value = pcic_getb(pcic, i, PCIC_INTERRUPT);
 			pcic_putb(pcic, i, PCIC_INTERRUPT,
-					value & ~PCIC_RESET);
+			    value & ~PCIC_RESET);
 		}
 
 #if defined(PCIC_DEBUG)
 		if (pcic_debug)
 			cmn_err(CE_CONT, "num sockets = %d\n",
-				pcic->pc_numsockets);
+			    pcic->pc_numsockets);
 #endif
 		if (pcic->pc_numsockets == 0) {
 			ddi_regs_map_free(&pcic->handle);
@@ -1221,19 +1222,19 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			for (i = 0; i < count; i++) {
 				/* put pattern into socket 0 */
 				pcic_putb(pcic, i,
-						PCIC_SYSMEM_0_STARTLOW, 0x11);
+				    PCIC_SYSMEM_0_STARTLOW, 0x11);
 
 				/* put pattern into socket 2 */
 				pcic_putb(pcic, i + 2,
-						PCIC_SYSMEM_0_STARTLOW, 0x33);
+				    PCIC_SYSMEM_0_STARTLOW, 0x33);
 
 				/* read back socket 0 */
 				value = pcic_getb(pcic, i,
-						    PCIC_SYSMEM_0_STARTLOW);
+				    PCIC_SYSMEM_0_STARTLOW);
 
 				/* read back chip 1 socket 0 */
 				j = pcic_getb(pcic, i + 2,
-						PCIC_SYSMEM_0_STARTLOW);
+				    PCIC_SYSMEM_0_STARTLOW);
 				if (j == value) {
 					pcic->pc_numsockets -= 2;
 				}
@@ -1243,8 +1244,8 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		smi = 0xff;	/* no more override */
 
 		if (ddi_getprop(DDI_DEV_T_NONE, dip,
-				DDI_PROP_DONTPASS, "need-mult-irq",
-				0xffff) != 0xffff)
+		    DDI_PROP_DONTPASS, "need-mult-irq",
+		    0xffff) != 0xffff)
 			pcic->pc_flags |= PCF_MULT_IRQ;
 
 	} /* !PCF_PCIBUS */
@@ -1270,8 +1271,8 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			nintrs = 0;
 
 		cmn_err(CE_CONT,
-			"pcic%d: %d register sets, %d interrupts\n",
-			ddi_get_instance(dip), nregs, nintrs);
+		    "pcic%d: %d register sets, %d interrupts\n",
+		    ddi_get_instance(dip), nregs, nintrs);
 
 		nintrs = 0;
 		while (nregs--) {
@@ -1280,23 +1281,23 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			if (ddi_dev_regsize(dip, nintrs, &size) ==
 			    DDI_SUCCESS) {
 				cmn_err(CE_CONT,
-					"\tregnum %d size %ld (0x%lx)"
-					"bytes",
-					nintrs, size, size);
+				    "\tregnum %d size %ld (0x%lx)"
+				    "bytes",
+				    nintrs, size, size);
 				if (nintrs ==
 				    (pcic->pc_io_type == PCIC_IO_TYPE_82365SL ?
 				    PCIC_ISA_CONTROL_REG_NUM :
 				    PCIC_PCI_CONTROL_REG_NUM))
 					cmn_err(CE_CONT,
-						" mapped at: 0x%p\n",
-						(void *)pcic->ioaddr);
+					    " mapped at: 0x%p\n",
+					    (void *)pcic->ioaddr);
 				else
 					cmn_err(CE_CONT, "\n");
 			} else {
 				cmn_err(CE_CONT,
-					"\tddi_dev_regsize(rnumber"
-					"= %d) returns DDI_FAILURE\n",
-					nintrs);
+				    "\tddi_dev_regsize(rnumber"
+				    "= %d) returns DDI_FAILURE\n",
+				    nintrs);
 			}
 			nintrs++;
 		} /* while */
@@ -1306,7 +1307,7 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cv_init(&pcic->pm_cv, NULL, CV_DRIVER, NULL);
 
 	if (!ddi_getprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
-						"disable-audio", 0))
+	    "disable-audio", 0))
 		pcic->pc_flags |= PCF_AUDIO;
 
 	if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_CANSLEEP,
@@ -1320,9 +1321,9 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Init all socket SMI levels to 0 (no SMI)
 	 */
 	for (i = 0; i < PCIC_MAX_SOCKETS; i++) {
-	    pcic->pc_sockets[i].pcs_smi = 0;
-	    pcic->pc_sockets[i].pcs_debounce_id = 0;
-	    pcic->pc_sockets[i].pcs_pcic = pcic;
+		pcic->pc_sockets[i].pcs_smi = 0;
+		pcic->pc_sockets[i].pcs_debounce_id = 0;
+		pcic->pc_sockets[i].pcs_pcic = pcic;
 	}
 	pcic->pc_lastreg = -1; /* just to make sure we are in sync */
 
@@ -1362,7 +1363,7 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 						    PCIC_AVAIL_IRQS) {
 							smi =
 							    pcmcia_get_intr(dip,
-									    xx);
+							    xx);
 							if (smi >= 0)
 								break;
 						}
@@ -1517,7 +1518,7 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug)
 		cmn_err(CE_CONT, "type = %s sockets = %d\n", typename,
-						pcic->pc_numsockets);
+		    pcic->pc_numsockets);
 #endif
 
 	pcic_nexus->an_iblock = &pcic->pc_pri;
@@ -1569,7 +1570,7 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (j = 0; j < pcic->pc_numsockets; j++) {
 		pcic->pc_sockets[j].pcs_debounce_id =
 		    pcic_add_debqueue(&pcic->pc_sockets[j],
-			drv_usectohz(pcic_debounce_time));
+		    drv_usectohz(pcic_debounce_time));
 	}
 
 	return (i);
@@ -1645,9 +1646,9 @@ pcic_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_destroy(&pcic->intr_lock);
 		cv_destroy(&pcic->pm_cv);
 		if (pcic->pc_flags & PCF_PCIBUS)
-		    ddi_regs_map_free(&pcic->cfg_handle);
+			ddi_regs_map_free(&pcic->cfg_handle);
 		if (pcic->handle)
-		    ddi_regs_map_free(&pcic->handle);
+			ddi_regs_map_free(&pcic->handle);
 		kmem_free(pcic, sizeof (pcicdev_t));
 		ddi_soft_state_free(pcic_soft_state_p, ddi_get_instance(dip));
 		return (DDI_SUCCESS);
@@ -1668,7 +1669,7 @@ pcic_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 				    (PCS_CARD_PRESENT|PCS_CARD_ISCARDBUS)) {
 
 					pcmcia_cb_suspended(
-						pcic->pc_sockets[i].pcs_socket);
+					    pcic->pc_sockets[i].pcs_socket);
 				}
 			}
 
@@ -1752,7 +1753,7 @@ pcic_setup_adapter(pcicdev_t *pcic)
 		pcic->pc_sockets[i].pcs_flags = 0;
 		/* find out the socket capabilities (I/O vs memory) */
 		value = pcic_getb(pcic, i,
-					PCIC_CHIP_REVISION) & PCIC_REV_ID_MASK;
+		    PCIC_CHIP_REVISION) & PCIC_REV_ID_MASK;
 		if (value == PCIC_REV_ID_IO || value == PCIC_REV_ID_BOTH)
 			pcic->pc_sockets[i].pcs_flags |= PCS_SOCKET_IO;
 
@@ -1765,16 +1766,16 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			uint8_t cfg;
 
 		    /* enable extended registers for Vadem */
-		    case PCIC_VADEM_VG469:
-		    case PCIC_VADEM:
+			case PCIC_VADEM_VG469:
+			case PCIC_VADEM:
 
 			/* enable card status change interrupt for socket */
 			break;
 
-		    case PCIC_I82365SL:
+			case PCIC_I82365SL:
 			break;
 
-		    case PCIC_CL_PD6710:
+			case PCIC_CL_PD6710:
 			pcic_putb(pcic, 0, PCIC_MISC_CTL_2, PCIC_LED_ENABLE);
 			break;
 
@@ -1783,17 +1784,17 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			 * signalling mode (PCI mode) and set the SMI and
 			 * IRQ interrupt lines to PCI/level-mode.
 			 */
-		    case PCIC_CL_PD6730:
+			case PCIC_CL_PD6730:
 			switch (pcic->pc_intr_mode) {
 			case PCIC_INTR_MODE_PCI_1:
 				clext_reg_write(pcic, i, PCIC_CLEXT_MISC_CTL_3,
-						((clext_reg_read(pcic, i,
-						PCIC_CLEXT_MISC_CTL_3) &
-						~PCIC_CLEXT_INT_PCI) |
-						PCIC_CLEXT_INT_PCI));
+				    ((clext_reg_read(pcic, i,
+				    PCIC_CLEXT_MISC_CTL_3) &
+				    ~PCIC_CLEXT_INT_PCI) |
+				    PCIC_CLEXT_INT_PCI));
 				clext_reg_write(pcic, i, PCIC_CLEXT_EXT_CTL_1,
-						(PCIC_CLEXT_IRQ_LVL_MODE |
-						PCIC_CLEXT_SMI_LVL_MODE));
+				    (PCIC_CLEXT_IRQ_LVL_MODE |
+				    PCIC_CLEXT_SMI_LVL_MODE));
 				cfg = PCIC_CL_LP_DYN_MODE;
 				pcic_putb(pcic, i, PCIC_MISC_CTL_2, cfg);
 				break;
@@ -1806,12 +1807,12 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			 *	lines to PCI/level-mode. as well as program the
 			 *	correct clock speed divider bit.
 			 */
-		    case PCIC_CL_PD6729:
+			case PCIC_CL_PD6729:
 			switch (pcic->pc_intr_mode) {
 			case PCIC_INTR_MODE_PCI_1:
 				clext_reg_write(pcic, i, PCIC_CLEXT_EXT_CTL_1,
-						(PCIC_CLEXT_IRQ_LVL_MODE |
-						PCIC_CLEXT_SMI_LVL_MODE));
+				    (PCIC_CLEXT_IRQ_LVL_MODE |
+				    PCIC_CLEXT_SMI_LVL_MODE));
 
 				break;
 			case PCIC_INTR_MODE_ISA:
@@ -1823,19 +1824,19 @@ pcic_setup_adapter(pcicdev_t *pcic)
 				pcic_putb(pcic, i, PCIC_MISC_CTL_2, cfg);
 			}
 			break;
-		    case PCIC_INTEL_i82092:
+			case PCIC_INTEL_i82092:
 			cfg = PCIC_82092_EN_TIMING;
 			if (pcic->bus_speed < PCIC_SYSCLK_33MHZ)
-			    cfg |= PCIC_82092_PCICLK_25MHZ;
+				cfg |= PCIC_82092_PCICLK_25MHZ;
 			ddi_put8(pcic->cfg_handle, pcic->cfgaddr +
-						PCIC_82092_PCICON, cfg);
+			    PCIC_82092_PCICON, cfg);
 			break;
-		    case PCIC_TI_PCI1130:
-		    case PCIC_TI_PCI1131:
-		    case PCIC_TI_PCI1250:
-		    case PCIC_TI_PCI1031:
+			case PCIC_TI_PCI1130:
+			case PCIC_TI_PCI1131:
+			case PCIC_TI_PCI1250:
+			case PCIC_TI_PCI1031:
 			cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_DEVCTL_REG);
+			    pcic->cfgaddr + PCIC_DEVCTL_REG);
 			cfg &= ~PCIC_DEVCTL_INTR_MASK;
 			switch (pcic->pc_intr_mode) {
 			case PCIC_INTR_MODE_ISA:
@@ -1850,18 +1851,18 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			}
 #endif
 			ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_DEVCTL_REG,
-					cfg);
+			    pcic->cfgaddr + PCIC_DEVCTL_REG,
+			    cfg);
 
 			cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_CRDCTL_REG);
+			    pcic->cfgaddr + PCIC_CRDCTL_REG);
 			cfg &= ~(PCIC_CRDCTL_PCIINTR|PCIC_CRDCTL_PCICSC|
-					PCIC_CRDCTL_PCIFUNC);
+			    PCIC_CRDCTL_PCIFUNC);
 			switch (pcic->pc_intr_mode) {
 			case PCIC_INTR_MODE_PCI_1:
 				cfg |= PCIC_CRDCTL_PCIINTR |
-					PCIC_CRDCTL_PCICSC |
-					PCIC_CRDCTL_PCIFUNC;
+				    PCIC_CRDCTL_PCICSC |
+				    PCIC_CRDCTL_PCIFUNC;
 				pcic->pc_flags |= PCF_USE_SMI;
 				break;
 			}
@@ -1873,11 +1874,11 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			}
 #endif
 			ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_CRDCTL_REG,
-					cfg);
+			    pcic->cfgaddr + PCIC_CRDCTL_REG,
+			    cfg);
 			break;
-		    case PCIC_TI_PCI1221:
-		    case PCIC_TI_PCI1225:
+			case PCIC_TI_PCI1221:
+			case PCIC_TI_PCI1225:
 			cfg = ddi_get8(pcic->cfg_handle,
 			    pcic->cfgaddr + PCIC_DEVCTL_REG);
 			cfg |= (PCIC_DEVCTL_INTR_DFLT | PCIC_DEVCTL_3VCAPABLE);
@@ -1909,26 +1910,26 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			ddi_put8(pcic->cfg_handle,
 			    pcic->cfgaddr + PCIC_DIAG_REG, cfg);
 			break;
-		    case PCIC_TI_PCI1520:
-		    case PCIC_TI_PCI1510:
-		    case PCIC_TI_VENDOR:
+			case PCIC_TI_PCI1520:
+			case PCIC_TI_PCI1510:
+			case PCIC_TI_VENDOR:
 			if (pcic->pc_intr_mode == PCIC_INTR_MODE_ISA) {
 				/* functional intr routed by ExCA register */
 				cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 				cfg |= PCIC_FUN_INT_MOD_ISA;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
-					cfg);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
+				    cfg);
 
 				/* IRQ serialized interrupts */
 				cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_DEVCTL_REG);
+				    pcic->cfgaddr + PCIC_DEVCTL_REG);
 				cfg &= ~PCIC_DEVCTL_INTR_MASK;
 				cfg |= PCIC_DEVCTL_INTR_ISA;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_DEVCTL_REG,
-					cfg);
+				    pcic->cfgaddr + PCIC_DEVCTL_REG,
+				    cfg);
 				break;
 			}
 
@@ -1952,8 +1953,9 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			if (ddi_getlongprop(DDI_DEV_T_ANY, pcic->dip,
 			    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
 			    &length) != DDI_PROP_SUCCESS) {
-			    cmn_err(CE_WARN, "pcic_setup_adapter(), failed to"
-				" read reg property\n");
+				cmn_err(CE_WARN,
+				    "pcic_setup_adapter(), failed to"
+				    " read reg property\n");
 				break;
 			}
 
@@ -1967,7 +1969,7 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			}
 
 			classcode = (*pci_getl_func)(bus, dev, 1,
-					PCI_CONF_REVID);
+			    PCI_CONF_REVID);
 			classcode >>= 8;
 			if (classcode != 0x060700 &&
 			    classcode != 0x060500) {
@@ -1976,124 +1978,124 @@ pcic_setup_adapter(pcicdev_t *pcic)
 
 			/* Parallel PCI interrupts only */
 			cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_DEVCTL_REG);
+			    pcic->cfgaddr + PCIC_DEVCTL_REG);
 			cfg &= ~PCIC_DEVCTL_INTR_MASK;
 			ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_DEVCTL_REG,
-					cfg);
+			    pcic->cfgaddr + PCIC_DEVCTL_REG,
+			    cfg);
 
 			/* tie INTA and INTB together */
 			cfg = ddi_get8(pcic->cfg_handle,
-				(pcic->cfgaddr + PCIC_SYSCTL_REG + 3));
+			    (pcic->cfgaddr + PCIC_SYSCTL_REG + 3));
 			cfg |= PCIC_SYSCTL_INTRTIE;
 			ddi_put8(pcic->cfg_handle, (pcic->cfgaddr +
-				PCIC_SYSCTL_REG + 3), cfg);
+			    PCIC_SYSCTL_REG + 3), cfg);
 #endif
 
 			break;
-		    case PCIC_TI_PCI1410:
+			case PCIC_TI_PCI1410:
 			cfg = ddi_get8(pcic->cfg_handle,
 			    pcic->cfgaddr + PCIC_DIAG_REG);
 			cfg |= (PCIC_DIAG_CSC | PCIC_DIAG_ASYNC);
 			ddi_put8(pcic->cfg_handle,
 			    pcic->cfgaddr + PCIC_DIAG_REG, cfg);
 			break;
-		    case PCIC_TOSHIBA_TOPIC100:
-		    case PCIC_TOSHIBA_TOPIC95:
-		    case PCIC_TOSHIBA_VENDOR:
+			case PCIC_TOSHIBA_TOPIC100:
+			case PCIC_TOSHIBA_TOPIC95:
+			case PCIC_TOSHIBA_VENDOR:
 			cfg = ddi_get8(pcic->cfg_handle, pcic->cfgaddr +
-				PCIC_TOSHIBA_SLOT_CTL_REG);
+			    PCIC_TOSHIBA_SLOT_CTL_REG);
 			cfg |= (PCIC_TOSHIBA_SCR_SLOTON |
-				PCIC_TOSHIBA_SCR_SLOTEN);
+			    PCIC_TOSHIBA_SCR_SLOTEN);
 			cfg &= (~PCIC_TOSHIBA_SCR_PRT_MASK);
 			cfg |= PCIC_TOSHIBA_SCR_PRT_3E2;
 			ddi_put8(pcic->cfg_handle, pcic->cfgaddr +
-				PCIC_TOSHIBA_SLOT_CTL_REG, cfg);
+			    PCIC_TOSHIBA_SLOT_CTL_REG, cfg);
 			cfg = ddi_get8(pcic->cfg_handle, pcic->cfgaddr +
-				PCIC_TOSHIBA_INTR_CTL_REG);
+			    PCIC_TOSHIBA_INTR_CTL_REG);
 			switch (pcic->pc_intr_mode) {
 			case PCIC_INTR_MODE_ISA:
 				cfg &= ~PCIC_TOSHIBA_ICR_SRC;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr +
-					PCIC_TOSHIBA_INTR_CTL_REG, cfg);
+				    pcic->cfgaddr +
+				    PCIC_TOSHIBA_INTR_CTL_REG, cfg);
 
 				cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 				cfg |= PCIC_FUN_INT_MOD_ISA;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
-					cfg);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
+				    cfg);
 				break;
 			case PCIC_INTR_MODE_PCI_1:
 				cfg |= PCIC_TOSHIBA_ICR_SRC;
 				cfg &= (~PCIC_TOSHIBA_ICR_PIN_MASK);
 				cfg |= PCIC_TOSHIBA_ICR_PIN_INTA;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr +
-					PCIC_TOSHIBA_INTR_CTL_REG, cfg);
+				    pcic->cfgaddr +
+				    PCIC_TOSHIBA_INTR_CTL_REG, cfg);
 				break;
 			}
 			break;
-		    case PCIC_O2MICRO_VENDOR:
+			case PCIC_O2MICRO_VENDOR:
 			cfg32 = ddi_get32(pcic->cfg_handle,
-				(uint32_t *)(pcic->cfgaddr +
-				PCIC_O2MICRO_MISC_CTL));
+			    (uint32_t *)(pcic->cfgaddr +
+			    PCIC_O2MICRO_MISC_CTL));
 			switch (pcic->pc_intr_mode) {
 			case PCIC_INTR_MODE_ISA:
 				cfg32 |= (PCIC_O2MICRO_ISA_LEGACY |
-					PCIC_O2MICRO_INT_MOD_PCI);
+				    PCIC_O2MICRO_INT_MOD_PCI);
 				ddi_put32(pcic->cfg_handle,
-					(uint32_t *)(pcic->cfgaddr +
-					PCIC_O2MICRO_MISC_CTL),
-					cfg32);
+				    (uint32_t *)(pcic->cfgaddr +
+				    PCIC_O2MICRO_MISC_CTL),
+				    cfg32);
 				cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 				cfg |= PCIC_FUN_INT_MOD_ISA;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
-					cfg);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
+				    cfg);
 				break;
 			case PCIC_INTR_MODE_PCI_1:
 				cfg32 &= ~PCIC_O2MICRO_ISA_LEGACY;
 				cfg32 |= PCIC_O2MICRO_INT_MOD_PCI;
 				ddi_put32(pcic->cfg_handle,
-					(uint32_t *)(pcic->cfgaddr +
-					PCIC_O2MICRO_MISC_CTL),
-					cfg32);
+				    (uint32_t *)(pcic->cfgaddr +
+				    PCIC_O2MICRO_MISC_CTL),
+				    cfg32);
 				break;
 			}
 			break;
-		    case PCIC_RICOH_VENDOR:
+			case PCIC_RICOH_VENDOR:
 			if (pcic->pc_intr_mode == PCIC_INTR_MODE_ISA) {
 				cfg16 = ddi_get16(pcic->cfg_handle,
-					(uint16_t *)(pcic->cfgaddr +
-					PCIC_RICOH_MISC_CTL_2));
+				    (uint16_t *)(pcic->cfgaddr +
+				    PCIC_RICOH_MISC_CTL_2));
 				cfg16 |= (PCIC_RICOH_CSC_INT_MOD |
-					PCIC_RICOH_FUN_INT_MOD);
+				    PCIC_RICOH_FUN_INT_MOD);
 				ddi_put16(pcic->cfg_handle,
-					(uint16_t *)(pcic->cfgaddr +
-					PCIC_RICOH_MISC_CTL_2),
-					cfg16);
+				    (uint16_t *)(pcic->cfgaddr +
+				    PCIC_RICOH_MISC_CTL_2),
+				    cfg16);
 
 				cfg16 = ddi_get16(pcic->cfg_handle,
-					(uint16_t *)(pcic->cfgaddr +
-					PCIC_RICOH_MISC_CTL));
+				    (uint16_t *)(pcic->cfgaddr +
+				    PCIC_RICOH_MISC_CTL));
 				cfg16 |= PCIC_RICOH_SIRQ_EN;
 				ddi_put16(pcic->cfg_handle,
-					(uint16_t *)(pcic->cfgaddr +
-					PCIC_RICOH_MISC_CTL),
-					cfg16);
+				    (uint16_t *)(pcic->cfgaddr +
+				    PCIC_RICOH_MISC_CTL),
+				    cfg16);
 
 				cfg = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 				cfg |= PCIC_FUN_INT_MOD_ISA;
 				ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
-					cfg);
+				    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
+				    cfg);
 			}
 			break;
-		    default:
+			default:
 			break;
 		} /* switch */
 
@@ -2104,7 +2106,7 @@ pcic_setup_adapter(pcicdev_t *pcic)
 		 * INTB. This applies to all TI CardBus controllers.
 		 */
 		if ((pcic->pc_type >> 16) == PCIC_TI_VENDORID &&
-			pcic->pc_intr_mode == PCIC_INTR_MODE_PCI_1) {
+		    pcic->pc_intr_mode == PCIC_INTR_MODE_PCI_1) {
 			value = ddi_get32(pcic->cfg_handle,
 			    (uint32_t *)(pcic->cfgaddr + PCIC_MFROUTE_REG));
 			value &= ~0xff;
@@ -2124,14 +2126,14 @@ pcic_setup_adapter(pcicdev_t *pcic)
 				break;
 			default:
 				if (pcic->pc_intr_mode ==
-					PCIC_INTR_MODE_PCI_1) {
+				    PCIC_INTR_MODE_PCI_1) {
 					pcic_putb(pcic, i, PCIC_MANAGEMENT_INT,
-						PCIC_CHANGE_DEFAULT);
+					    PCIC_CHANGE_DEFAULT);
 					break;
 				} else {
 					pcic_putb(pcic, i, PCIC_MANAGEMENT_INT,
-						PCIC_CHANGE_DEFAULT |
-					(pcic->pc_sockets[i].pcs_smi << 4));
+					    PCIC_CHANGE_DEFAULT |
+					    (pcic->pc_sockets[i].pcs_smi << 4));
 					break;
 				}
 		}
@@ -2145,28 +2147,28 @@ pcic_setup_adapter(pcicdev_t *pcic)
 
 		/* final chip specific initialization */
 		switch (pcic->pc_type) {
-		    case PCIC_VADEM:
+			case PCIC_VADEM:
 			pcic_putb(pcic, i, PCIC_VG_CONTROL,
-					PCIC_VC_DELAYENABLE);
+			    PCIC_VC_DELAYENABLE);
 			pcic->pc_flags |= PCF_DEBOUNCE;
 			/* FALLTHROUGH */
-		    case PCIC_I82365SL:
+			case PCIC_I82365SL:
 			pcic_putb(pcic, i, PCIC_GLOBAL_CONTROL,
-					PCIC_GC_CSC_WRITE);
+			    PCIC_GC_CSC_WRITE);
 			/* clear any pending interrupts */
 			value = pcic_getb(pcic, i, PCIC_CARD_STATUS_CHANGE);
 			pcic_putb(pcic, i, PCIC_CARD_STATUS_CHANGE, value);
 			break;
 		    /* The 82092 uses PCI config space to enable interrupts */
-		    case PCIC_INTEL_i82092:
+			case PCIC_INTEL_i82092:
 			pcic_82092_smiirq_ctl(pcic, i, PCIC_82092_CTL_SMI,
-							PCIC_82092_INT_ENABLE);
+			    PCIC_82092_INT_ENABLE);
 			break;
-		    case PCIC_CL_PD6729:
+			case PCIC_CL_PD6729:
 			if (pcic->bus_speed >= PCIC_PCI_DEF_SYSCLK && i == 0) {
 				value = pcic_getb(pcic, i, PCIC_MISC_CTL_2);
 				pcic_putb(pcic, i, PCIC_MISC_CTL_2,
-						value | PCIC_CL_TIMER_CLK_DIV);
+				    value | PCIC_CL_TIMER_CLK_DIV);
 			}
 			break;
 		} /* switch */
@@ -2174,11 +2176,11 @@ pcic_setup_adapter(pcicdev_t *pcic)
 #if defined(PCIC_DEBUG)
 		if (pcic_debug)
 			cmn_err(CE_CONT,
-				"socket %d value=%x, flags = %x (%s)\n",
-				i, value, pcic->pc_sockets[i].pcs_flags,
-				(pcic->pc_sockets[i].pcs_flags &
-					PCS_CARD_PRESENT) ?
-						"card present" : "no card");
+			    "socket %d value=%x, flags = %x (%s)\n",
+			    i, value, pcic->pc_sockets[i].pcs_flags,
+			    (pcic->pc_sockets[i].pcs_flags &
+			    PCS_CARD_PRESENT) ?
+			"card present" : "no card");
 #endif
 	}
 }
@@ -2204,13 +2206,13 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 
 #if defined(PCIC_DEBUG)
 	pcic_err(pcic->dip, 0xf,
-		"pcic_intr: enter pc_flags=0x%x PCF_ATTACHED=0x%x"
-		" pc_numsockets=%d \n",
-		pcic->pc_flags, PCF_ATTACHED, pcic->pc_numsockets);
+	    "pcic_intr: enter pc_flags=0x%x PCF_ATTACHED=0x%x"
+	    " pc_numsockets=%d \n",
+	    pcic->pc_flags, PCF_ATTACHED, pcic->pc_numsockets);
 #endif
 
 	if (!(pcic->pc_flags & PCF_ATTACHED))
-	    return (DDI_INTR_UNCLAIMED);
+		return (DDI_INTR_UNCLAIMED);
 
 	mutex_enter(&pcic->intr_lock);
 
@@ -2267,11 +2269,11 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 			    "card_type = %d, value_cb = 0x%x\n",
 			    card_type,
 			    value_cb ? value_cb :
-				pcic_getcb(pcic, CB_STATUS_EVENT));
+			    pcic_getcb(pcic, CB_STATUS_EVENT));
 			if (pcic_debug)
 				cmn_err(CE_CONT,
-					"\tchange on socket %d (%x)\n", i,
-					value);
+				    "\tchange on socket %d (%x)\n", i,
+				    value);
 #endif
 			/* find out what happened */
 			status = pcic_getb(pcic, i, PCIC_INTERFACE_STATUS);
@@ -2296,13 +2298,13 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 #if defined(PCIC_DEBUG)
 				if (pcic_debug)
 					cmn_err(CE_CONT,
-						"\tcd_detect: status=%x,"
-						" flags=%x\n",
-						status, sockp->pcs_flags);
+					    "\tcd_detect: status=%x,"
+					    " flags=%x\n",
+					    status, sockp->pcs_flags);
 #else
 #ifdef lint
 				if (status == 0)
-				    status++;
+					status++;
 #endif
 #endif
 				/*
@@ -2345,7 +2347,7 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 			    !(sockp->pcs_state & SBM_BVD2)) {
 				sockp->pcs_state |= SBM_BVD2;
 				PC_CALLBACK(pcic->dip, x,
-						PCE_CARD_BATTERY_WARN, i);
+				    PCE_CARD_BATTERY_WARN, i);
 			}
 
 			/* Battery Dead Detect */
@@ -2355,19 +2357,19 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 				 * and card_type == IF_IO
 				 */
 				if (card_type == IF_MEMORY &&
-					!(sockp->pcs_state & SBM_BVD1)) {
+				    !(sockp->pcs_state & SBM_BVD1)) {
 					sockp->pcs_state |= SBM_BVD1;
 					PC_CALLBACK(pcic->dip, x,
-							PCE_CARD_BATTERY_DEAD,
-							i);
+					    PCE_CARD_BATTERY_DEAD,
+					    i);
 				} else {
 					/*
 					 * information in pin replacement
 					 * register if one is available
 					 */
 					PC_CALLBACK(pcic->dip, x,
-							PCE_CARD_STATUS_CHANGE,
-							i);
+					    PCE_CARD_STATUS_CHANGE,
+					    i);
 				} /* IF_MEMORY */
 			} /* PCIC_BD_DETECT */
 		} /* if pcic_change */
@@ -2429,17 +2431,17 @@ pcic_do_io_intr(pcicdev_t *pcic, uint32_t sockets)
 
 #if defined(PCIC_DEBUG)
 	pcic_err(pcic->dip, 0xf,
-		"pcic_do_io_intr: pcic=%p sockets=%d irq_top=%p\n",
-		(void *)pcic, (int)sockets, (void *)pcic->irq_top);
+	    "pcic_do_io_intr: pcic=%p sockets=%d irq_top=%p\n",
+	    (void *)pcic, (int)sockets, (void *)pcic->irq_top);
 #endif
 
 	if (pcic->irq_top != NULL) {
-	    tmp = pcic->irq_current;
+		tmp = pcic->irq_current;
 
-	    do {
+		do {
 		int cur = pcic->irq_current->socket;
 		pcic_socket_t *sockp =
-				&pcic->pc_sockets[cur];
+		    &pcic->pc_sockets[cur];
 
 #if defined(PCIC_DEBUG)
 		pcic_err(pcic->dip, 0xf,
@@ -2471,9 +2473,9 @@ pcic_do_io_intr(pcicdev_t *pcic, uint32_t sockets)
 		if ((pcic->irq_current = pcic->irq_current->next) == NULL)
 					pcic->irq_current = pcic->irq_top;
 
-	    } while (pcic->irq_current != tmp);
+		} while (pcic->irq_current != tmp);
 
-	    if ((pcic->irq_current = pcic->irq_current->next) == NULL)
+		if ((pcic->irq_current = pcic->irq_current->next) == NULL)
 					pcic->irq_current = pcic->irq_top;
 
 	} else {
@@ -2482,8 +2484,8 @@ pcic_do_io_intr(pcicdev_t *pcic, uint32_t sockets)
 
 #if defined(PCIC_DEBUG)
 	pcic_err(pcic->dip, 0xf,
-		"pcic_do_io_intr: exit ret=%d DDI_INTR_CLAIMED=%d\n",
-		ret, DDI_INTR_CLAIMED);
+	    "pcic_do_io_intr: exit ret=%d DDI_INTR_CLAIMED=%d\n",
+	    ret, DDI_INTR_CLAIMED);
 #endif
 
 	return (ret);
@@ -2521,7 +2523,7 @@ pcic_inquire_adapter(dev_info_t *dip, inquire_adapter_t *config)
 	switch (pcic->pc_intr_mode) {
 	case PCIC_INTR_MODE_PCI_1:
 		config->ResourceFlags |= RES_OWN_IRQ | RES_IRQ_NEXUS |
-			RES_IRQ_SHAREABLE;
+		    RES_IRQ_SHAREABLE;
 		break;
 	}
 	return (SUCCESS);
@@ -2570,10 +2572,10 @@ pcic_calc_speed(pcicdev_t *pcic, uint32_t speed)
 	uint32_t bspeed = PCIC_ISA_DEF_SYSCLK;
 
 	switch (pcic->pc_type) {
-	    case PCIC_I82365SL:
-	    case PCIC_VADEM:
-	    case PCIC_VADEM_VG469:
-	    default:
+		case PCIC_I82365SL:
+		case PCIC_VADEM:
+		case PCIC_VADEM_VG469:
+		default:
 		/* Intel chip wants it in waitstates */
 		wspeed = mhztons(PCIC_ISA_DEF_SYSCLK) * 3;
 		if (speed <= wspeed)
@@ -2587,18 +2589,18 @@ pcic_calc_speed(pcicdev_t *pcic, uint32_t speed)
 		wspeed <<= 6; /* put in right bit positions */
 		break;
 
-	    case PCIC_INTEL_i82092:
+		case PCIC_INTEL_i82092:
 		wspeed = SYSMEM_82092_80NS;
 		if (speed > 80)
-		    wspeed = SYSMEM_82092_100NS;
+			wspeed = SYSMEM_82092_100NS;
 		if (speed > 100)
-		    wspeed = SYSMEM_82092_150NS;
+			wspeed = SYSMEM_82092_150NS;
 		if (speed > 150)
-		    wspeed = SYSMEM_82092_200NS;
+			wspeed = SYSMEM_82092_200NS;
 		if (speed > 200)
-		    wspeed = SYSMEM_82092_250NS;
+			wspeed = SYSMEM_82092_250NS;
 		if (speed > 250)
-		    wspeed = SYSMEM_82092_600NS;
+			wspeed = SYSMEM_82092_600NS;
 		wspeed <<= 5;	/* put in right bit positions */
 		break;
 
@@ -2654,7 +2656,8 @@ pcic_set_cdtimers(pcicdev_t *pcic, int socket, uint32_t speed, int tset)
 		offset = 0;
 
 	clk_pulse = mhztons(pcic->bus_speed);
-	for (ctp = pcic_card_times; speed < ctp->cycle; ctp++);
+	for (ctp = pcic_card_times; speed < ctp->cycle; ctp++)
+		;
 
 	/*
 	 * Add (clk_pulse/2) and an extra 1 to account for rounding errors.
@@ -2708,12 +2711,12 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 	if (pcic_debug) {
 		cmn_err(CE_CONT, "pcic_set_window: entered\n");
 		cmn_err(CE_CONT,
-			"\twindow=%d, socket=%d, WindowSize=%d, speed=%d\n",
-			window->window, window->socket, window->WindowSize,
-			window->speed);
+		    "\twindow=%d, socket=%d, WindowSize=%d, speed=%d\n",
+		    window->window, window->socket, window->WindowSize,
+		    window->speed);
 		cmn_err(CE_CONT,
-			"\tbase=%x, state=%x\n", (unsigned)window->base,
-			(unsigned)window->state);
+		    "\tbase=%x, state=%x\n", (unsigned)window->base,
+		    (unsigned)window->state);
 	}
 #endif
 
@@ -2748,7 +2751,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 		/* only windows 2-6 can do memory mapping */
 		if (tmp != window->socket || win < PCIC_IOWINDOWS) {
 			cmn_err(CE_CONT,
-				"\tattempt to map to non-mem window\n");
+			    "\tattempt to map to non-mem window\n");
 			return (BAD_WINDOW);
 		}
 
@@ -2776,11 +2779,11 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(PCIC_DEBUG)
 			if (pcic_debug) {
 				cmn_err(CE_CONT,
-					"\tbase=%x, win=%d\n", (unsigned)base,
-					win);
+				    "\tbase=%x, win=%d\n", (unsigned)base,
+				    win);
 				if (which)
 					cmn_err(CE_CONT,
-						"\tneed to remap window\n");
+					    "\tneed to remap window\n");
 			}
 #endif
 
@@ -2807,12 +2810,12 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				req.ra_boundbase = pcic->pc_base;
 				req.ra_boundlen  = pcic->pc_bound;
 				req.ra_flags = (memp->pcw_base ?
-					NDI_RA_ALLOC_SPECIFIED : 0) |
-					NDI_RA_ALLOC_BOUNDED;
+				    NDI_RA_ALLOC_SPECIFIED : 0) |
+				    NDI_RA_ALLOC_BOUNDED;
 				req.ra_align_mask =
-					(PAGESIZE - 1) | (PCIC_PAGE - 1);
+				    (PAGESIZE - 1) | (PCIC_PAGE - 1);
 #if defined(PCIC_DEBUG)
-				    pcic_err(dip, 8,
+					pcic_err(dip, 8,
 					    "\tlen 0x%"PRIx64
 					    "addr 0x%"PRIx64"bbase 0x%"PRIx64
 					    " blen 0x%"PRIx64" flags 0x%x"
@@ -2824,7 +2827,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 #endif
 
 				ret = pcmcia_alloc_mem(dip, &req, &res,
-					&memp->res_dip);
+				    &memp->res_dip);
 				if (ret == DDI_FAILURE) {
 					mutex_exit(&pcic->pc_lock);
 					cmn_err(CE_WARN,
@@ -2837,41 +2840,42 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(PCIC_DEBUG)
 				if (pcic_debug)
 					cmn_err(CE_CONT,
-						"\tsetwindow: new base=%x\n",
-						(unsigned)memp->pcw_base);
+					    "\tsetwindow: new base=%x\n",
+					    (unsigned)memp->pcw_base);
 #endif
 				memp->pcw_len = window->WindowSize;
 
 				which = pcmcia_map_reg(pcic->dip,
-						window->child,
-						&res,
-						(uint32_t)(window->state &
-						    0xffff) |
-						    (window->socket << 16),
-						(caddr_t *)&memp->pcw_hostmem,
-						&memp->pcw_handle,
-						&window->attr, NULL);
+				    window->child,
+				    &res,
+				    (uint32_t)(window->state &
+				    0xffff) |
+				    (window->socket << 16),
+				    (caddr_t *)&memp->pcw_hostmem,
+				    &memp->pcw_handle,
+				    &window->attr, NULL);
 
 				if (which != DDI_SUCCESS) {
 
 					cmn_err(CE_WARN, "\tpcmcia_map_reg() "
-						"failed\n");
+					    "failed\n");
 
-				    res.ra_addr_lo = memp->pcw_base;
-				    res.ra_len = memp->pcw_len;
-				    (void) pcmcia_free_mem(memp->res_dip, &res);
+					res.ra_addr_lo = memp->pcw_base;
+					res.ra_len = memp->pcw_len;
+					(void) pcmcia_free_mem(memp->res_dip,
+					    &res);
 
-				    mutex_exit(&pcic->pc_lock);
+					mutex_exit(&pcic->pc_lock);
 
-				    return (BAD_WINDOW);
+					return (BAD_WINDOW);
 				}
 				memp->pcw_status |= PCW_MAPPED;
 #if defined(PCIC_DEBUG)
 				if (pcic_debug)
 					cmn_err(CE_CONT,
-						"\tmap=%x, hostmem=%p\n",
-						which,
-						(void *)memp->pcw_hostmem);
+					    "\tmap=%x, hostmem=%p\n",
+					    which,
+					    (void *)memp->pcw_hostmem);
 #endif
 			} else {
 				base = memp->pcw_base;
@@ -2883,10 +2887,10 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(PCIC_DEBUG)
 			if (pcic_debug) {
 				cmn_err(CE_CONT,
-					"\twindow mapped to %x@%x len=%d\n",
-					(unsigned)window->base,
-					(unsigned)memp->pcw_base,
-					memp->pcw_len);
+				    "\twindow mapped to %x@%x len=%d\n",
+				    (unsigned)window->base,
+				    (unsigned)memp->pcw_base,
+				    memp->pcw_len);
 			}
 #endif
 
@@ -2910,17 +2914,17 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			/* map the physical page base address */
 			which = (window->state & WS_16BIT) ? SYSMEM_DATA_16 : 0;
 			which |= (window->speed <= MEM_SPEED_MIN) ?
-				SYSMEM_ZERO_WAIT : 0;
+			    SYSMEM_ZERO_WAIT : 0;
 
 			/* need to select register set */
 			select = PCIC_MEM_1_OFFSET * win;
 
 			pcic_putb(pcic, socket,
-					PCIC_SYSMEM_0_STARTLOW + select,
-					SYSMEM_LOW(base));
+			    PCIC_SYSMEM_0_STARTLOW + select,
+			    SYSMEM_LOW(base));
 			pcic_putb(pcic, socket,
-					PCIC_SYSMEM_0_STARTHI + select,
-					SYSMEM_HIGH(base) | which);
+			    PCIC_SYSMEM_0_STARTHI + select,
+			    SYSMEM_HIGH(base) | which);
 
 			/*
 			 * Some adapters can decode window addresses greater
@@ -2929,14 +2933,14 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			switch (pcic->pc_type) {
 			case PCIC_INTEL_i82092:
 				pcic_putb(pcic, socket,
-						PCIC_82092_CPAGE,
-						SYSMEM_EXT(base));
+				    PCIC_82092_CPAGE,
+				    SYSMEM_EXT(base));
 				break;
 			case PCIC_CL_PD6729:
 			case PCIC_CL_PD6730:
 				clext_reg_write(pcic, socket,
-						PCIC_CLEXT_MMAP0_UA + win,
-						SYSMEM_EXT(base));
+				    PCIC_CLEXT_MMAP0_UA + win,
+				    SYSMEM_EXT(base));
 				break;
 			case PCIC_TI_PCI1130:
 				/*
@@ -2951,8 +2955,8 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				 */
 				if (pcic->pc_bound == 0xffffffff) {
 					pcic_putb(pcic, socket,
-						    PCIC_TI_WINDOW_PAGE_PCI,
-						    SYSMEM_EXT(base));
+					    PCIC_TI_WINDOW_PAGE_PCI,
+					    SYSMEM_EXT(base));
 					pcic->pc_base = SYSMEM_EXT(base) << 24;
 					pcic->pc_bound = 0x1000000;
 				}
@@ -2979,16 +2983,16 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			case PCIC_RICOH_VENDOR:
 			case PCIC_O2MICRO_VENDOR:
 				pcic_putb(pcic, socket,
-						PCIC_YENTA_MEM_PAGE + win,
-						SYSMEM_EXT(base));
+				    PCIC_YENTA_MEM_PAGE + win,
+				    SYSMEM_EXT(base));
 				break;
 			default:
 				cmn_err(CE_NOTE, "pcic_set_window: unknown "
-						"cardbus vendor:0x%X\n",
-						pcic->pc_type);
+				    "cardbus vendor:0x%X\n",
+				    pcic->pc_type);
 				pcic_putb(pcic, socket,
-						PCIC_YENTA_MEM_PAGE + win,
-						SYSMEM_EXT(base));
+				    PCIC_YENTA_MEM_PAGE + win,
+				    SYSMEM_EXT(base));
 
 				break;
 			} /* switch */
@@ -3010,8 +3014,8 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			case PCIC_CL_PD6722:
 				wspeed = SYSMEM_CLTIMER_SET_0;
 				pcic_set_cdtimers(pcic, socket,
-							window->speed,
-							wspeed);
+				    window->speed,
+				    wspeed);
 				break;
 
 			case PCIC_INTEL_i82092:
@@ -3023,18 +3027,18 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(PCIC_DEBUG)
 			if (pcic_debug)
 				cmn_err(CE_CONT,
-					"\twindow %d speed bits = %x for "
-					"%dns\n",
-					win, (unsigned)wspeed, window->speed);
+				    "\twindow %d speed bits = %x for "
+				    "%dns\n",
+				    win, (unsigned)wspeed, window->speed);
 #endif
 
 			pcic_putb(pcic, socket, PCIC_SYSMEM_0_STOPLOW + select,
-					SYSMEM_LOW(base +
-						    (pages * PCIC_PAGE)-1));
+			    SYSMEM_LOW(base +
+			    (pages * PCIC_PAGE)-1));
 
 			wspeed |= SYSMEM_HIGH(base + (pages * PCIC_PAGE)-1);
 			pcic_putb(pcic, socket, PCIC_SYSMEM_0_STOPHI + select,
-					wspeed);
+			    wspeed);
 
 			/*
 			 * now map the card's memory pages - we start with page
@@ -3043,20 +3047,20 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			 */
 			base = memp->pcw_base;
 			pcic_putb(pcic, socket,
-					PCIC_CARDMEM_0_LOW + select,
-					CARDMEM_LOW(0 - (uint32_t)base));
+			    PCIC_CARDMEM_0_LOW + select,
+			    CARDMEM_LOW(0 - (uint32_t)base));
 
 			pcic_putb(pcic, socket,
-					PCIC_CARDMEM_0_HI + select,
-					CARDMEM_HIGH(0 - (uint32_t)base) |
-					CARDMEM_REG_ACTIVE);
+			    PCIC_CARDMEM_0_HI + select,
+			    CARDMEM_HIGH(0 - (uint32_t)base) |
+			    CARDMEM_REG_ACTIVE);
 
 			/*
 			 * enable the window even though redundant
 			 * and SetPage may do it again.
 			 */
 			select = pcic_getb(pcic, socket,
-					PCIC_MAPPING_ENABLE);
+			    PCIC_MAPPING_ENABLE);
 			select |= SYSMEM_WINDOW(win);
 			pcic_putb(pcic, socket, PCIC_MAPPING_ENABLE, select);
 			memp->pcw_offset = 0;
@@ -3105,8 +3109,8 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 
 		if (win >= PCIC_IOWINDOWS || tmp != window->socket) {
 			cmn_err(CE_WARN,
-				"\twindow is out of range (%d)\n",
-				window->window);
+			    "\twindow is out of range (%d)\n",
+			    window->window);
 			return (BAD_WINDOW);
 		}
 
@@ -3163,9 +3167,9 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			req.ra_len = window->WindowSize;
 
 			req.ra_addr = (uint64_t)
-				((pcic->pc_flags & PCF_IO_REMAP) ? 0 : base);
+			    ((pcic->pc_flags & PCF_IO_REMAP) ? 0 : base);
 			req.ra_flags = (req.ra_addr) ?
-						NDI_RA_ALLOC_SPECIFIED : 0;
+			    NDI_RA_ALLOC_SPECIFIED : 0;
 
 			req.ra_flags |= NDI_RA_ALIGN_SIZE;
 			/* need to rethink this */
@@ -3174,15 +3178,15 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			req.ra_flags |= NDI_RA_ALLOC_BOUNDED;
 
 #if defined(PCIC_DEBUG)
-			    pcic_err(dip, 8,
-					"\tlen 0x%"PRIx64" addr 0x%"PRIx64
-					"bbase 0x%"PRIx64
-					"blen 0x%"PRIx64" flags 0x%x algn 0x%"
-					PRIx64"\n",
-					req.ra_len, (uint64_t)req.ra_addr,
-					req.ra_boundbase,
-					req.ra_boundlen, req.ra_flags,
-					req.ra_align_mask);
+				pcic_err(dip, 8,
+				    "\tlen 0x%"PRIx64" addr 0x%"PRIx64
+				    "bbase 0x%"PRIx64
+				    "blen 0x%"PRIx64" flags 0x%x algn 0x%"
+				    PRIx64"\n",
+				    req.ra_len, (uint64_t)req.ra_addr,
+				    req.ra_boundbase,
+				    req.ra_boundlen, req.ra_flags,
+				    req.ra_align_mask);
 #endif
 
 			/*
@@ -3192,18 +3196,18 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			 *	specific base address or not.
 			 */
 			if (pcmcia_alloc_io(dip, &req, &res,
-					&winp->res_dip) == DDI_FAILURE) {
+			    &winp->res_dip) == DDI_FAILURE) {
 				winp->pcw_status &= ~PCW_ENABLED;
 				mutex_exit(&pcic->pc_lock);
 				cmn_err(CE_WARN, "Failed to alloc I/O:\n"
-					"\tlen 0x%" PRIx64 " addr 0x%" PRIx64
-					"bbase 0x%" PRIx64
-					"blen 0x%" PRIx64 "flags 0x%x"
-					"algn 0x%" PRIx64 "\n",
-					req.ra_len, req.ra_addr,
-					req.ra_boundbase,
-					req.ra_boundlen, req.ra_flags,
-					req.ra_align_mask);
+				    "\tlen 0x%" PRIx64 " addr 0x%" PRIx64
+				    "bbase 0x%" PRIx64
+				    "blen 0x%" PRIx64 "flags 0x%x"
+				    "algn 0x%" PRIx64 "\n",
+				    req.ra_len, req.ra_addr,
+				    req.ra_boundbase,
+				    req.ra_boundlen, req.ra_flags,
+				    req.ra_align_mask);
 
 				return (base?BAD_BASE:BAD_SIZE);
 			} /* pcmcia_alloc_io */
@@ -3216,31 +3220,32 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			winp->pcw_base = res.ra_addr_lo;
 
 #if defined(PCIC_DEBUG)
-			    pcic_err(dip, 8,
+				pcic_err(dip, 8,
 				    "\tsetwindow: new base=%x orig base 0x%x\n",
 				    (unsigned)winp->pcw_base, base);
 #endif
 
 			if ((which = pcmcia_map_reg(pcic->dip,
-						window->child,
-						&res,
-						(uint32_t)(window->state &
-						    0xffff) |
-						    (window->socket << 16),
-						(caddr_t *)&winp->pcw_hostmem,
-						&winp->pcw_handle,
-						&window->attr,
-						base)) != DDI_SUCCESS) {
+			    window->child,
+			    &res,
+			    (uint32_t)(window->state &
+			    0xffff) |
+			    (window->socket << 16),
+			    (caddr_t *)&winp->pcw_hostmem,
+			    &winp->pcw_handle,
+			    &window->attr,
+			    base)) != DDI_SUCCESS) {
 
-					cmn_err(CE_WARN, "pcmcia_map_reg()"
-						"failed\n");
+				cmn_err(CE_WARN, "pcmcia_map_reg()"
+				    "failed\n");
 
-				    res.ra_addr_lo = winp->pcw_base;
-				    res.ra_len = winp->pcw_len;
-				    (void) pcmcia_free_io(winp->res_dip, &res);
+					res.ra_addr_lo = winp->pcw_base;
+					res.ra_len = winp->pcw_len;
+					(void) pcmcia_free_io(winp->res_dip,
+					    &res);
 
-				    mutex_exit(&pcic->pc_lock);
-				    return (BAD_WINDOW);
+					mutex_exit(&pcic->pc_lock);
+					return (BAD_WINDOW);
 			}
 
 			window->handle = winp->pcw_handle;
@@ -3252,11 +3257,11 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 #if defined(PCIC_DEBUG)
 			if (pcic_debug) {
 				cmn_err(CE_CONT,
-					"\tenable: window=%d, select=%x, "
-					"base=%x, handle=%p\n",
-					win, select,
-					(unsigned)window->base,
-					(void *)window->handle);
+				    "\tenable: window=%d, select=%x, "
+				    "base=%x, handle=%p\n",
+				    win, select,
+				    (unsigned)window->base,
+				    (void *)window->handle);
 			}
 #endif
 			/*
@@ -3271,20 +3276,20 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 
 			/* map the I/O base in */
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STARTLOW + select,
-					LOW_BYTE((uint32_t)winp->pcw_base));
+			    PCIC_IO_ADDR_0_STARTLOW + select,
+			    LOW_BYTE((uint32_t)winp->pcw_base));
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STARTHI + select,
-					HIGH_BYTE((uint32_t)winp->pcw_base));
+			    PCIC_IO_ADDR_0_STARTHI + select,
+			    HIGH_BYTE((uint32_t)winp->pcw_base));
 
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STOPLOW + select,
-					LOW_BYTE((uint32_t)winp->pcw_base +
-						window->WindowSize - 1));
+			    PCIC_IO_ADDR_0_STOPLOW + select,
+			    LOW_BYTE((uint32_t)winp->pcw_base +
+			    window->WindowSize - 1));
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STOPHI + select,
-					HIGH_BYTE((uint32_t)winp->pcw_base +
-						window->WindowSize - 1));
+			    PCIC_IO_ADDR_0_STOPHI + select,
+			    HIGH_BYTE((uint32_t)winp->pcw_base +
+			    window->WindowSize - 1));
 
 			/*
 			 * We've got the requested IO space, now see if we
@@ -3306,13 +3311,13 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				winp->pcw_offset = (base - winp->pcw_base);
 
 				pcic_putb(pcic, socket,
-					PCIC_IO_OFFSET_LOW +
-					(win * PCIC_IO_OFFSET_OFFSET),
-					winp->pcw_offset & 0x0ff);
+				    PCIC_IO_OFFSET_LOW +
+				    (win * PCIC_IO_OFFSET_OFFSET),
+				    winp->pcw_offset & 0x0ff);
 				pcic_putb(pcic, socket,
-					PCIC_IO_OFFSET_HI +
-					(win * PCIC_IO_OFFSET_OFFSET),
-					(winp->pcw_offset >> 8) & 0x0ff);
+				    PCIC_IO_OFFSET_HI +
+				    (win * PCIC_IO_OFFSET_OFFSET),
+				    (winp->pcw_offset >> 8) & 0x0ff);
 
 			} /* PCF_IO_REMAP */
 
@@ -3329,7 +3334,7 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			 *	of I/O windows.
 			 */
 			which = (window->state & WS_16BIT) ?
-					(IOMEM_16BIT | IOMEM_IOCS16) : 0;
+			    (IOMEM_16BIT | IOMEM_IOCS16) : 0;
 
 			switch (pcic->pc_type) {
 			case PCIC_CL_PD6729:
@@ -3346,32 +3351,32 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 				 */
 				which |= IOMEM_CLTIMER_SET_1;
 				pcic_set_cdtimers(pcic, socket,
-							window->speed,
-							IOMEM_CLTIMER_SET_1);
+				    window->speed,
+				    IOMEM_CLTIMER_SET_1);
 				which |= IOMEM_IOCS16;
 				break;
 			case PCIC_TI_PCI1031:
 
 				if (window->state & WS_16BIT)
-				    which |= IOMEM_WAIT16;
+					which |= IOMEM_WAIT16;
 
 				break;
 			case PCIC_TI_PCI1130:
 
 				if (window->state & WS_16BIT)
-				    which |= IOMEM_WAIT16;
+					which |= IOMEM_WAIT16;
 
 				break;
 			case PCIC_INTEL_i82092:
 				break;
 			default:
 				if (window->speed >
-						mhztons(pcic->bus_speed) * 3)
-				    which |= IOMEM_WAIT16;
+				    mhztons(pcic->bus_speed) * 3)
+					which |= IOMEM_WAIT16;
 #ifdef notdef
 				if (window->speed <
-						mhztons(pcic->bus_speed) * 6)
-				    which |= IOMEM_ZERO_WAIT;
+				    mhztons(pcic->bus_speed) * 6)
+					which |= IOMEM_ZERO_WAIT;
 #endif
 				break;
 			} /* switch (pc_type) */
@@ -3389,16 +3394,16 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			 */
 			select = pcic_getb(pcic, socket, PCIC_MAPPING_ENABLE);
 			pcic_putb(pcic, socket, PCIC_MAPPING_ENABLE,
-						select | IOMEM_WINDOW(win));
+			    select | IOMEM_WINDOW(win));
 
 			winp->pcw_status |= PCW_ENABLED;
 
 #if defined(PCIC_DEBUG)
 			if (pcic_debug) {
 				cmn_err(CE_CONT,
-					"\twhich = %x, select = %x (%x)\n",
-					which, select,
-					IOMEM_SETWIN(win, which));
+				    "\twhich = %x, select = %x (%x)\n",
+				    which, select,
+				    IOMEM_SETWIN(win, which));
 				xxdmp_all_regs(pcic, window->socket * 0x40, 24);
 			}
 #endif
@@ -3417,9 +3422,9 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 
 			/* disable current mapping */
 			select = pcic_getb(pcic, socket,
-						PCIC_MAPPING_ENABLE);
+			    PCIC_MAPPING_ENABLE);
 			pcic_putb(pcic, socket, PCIC_MAPPING_ENABLE,
-					select &= ~IOMEM_WINDOW(win));
+			    select &= ~IOMEM_WINDOW(win));
 			winp->pcw_status &= ~PCW_ENABLED;
 
 			winp->pcw_base = 0;
@@ -3430,13 +3435,13 @@ pcic_set_window(dev_info_t *dip, set_window_t *window)
 			/* find the register set offset */
 			select = win * PCIC_IO_OFFSET;
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STARTLOW + select, 0);
+			    PCIC_IO_ADDR_0_STARTLOW + select, 0);
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STARTHI + select, 0);
+			    PCIC_IO_ADDR_0_STARTHI + select, 0);
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STOPLOW + select, 0);
+			    PCIC_IO_ADDR_0_STOPLOW + select, 0);
 			pcic_putb(pcic, socket,
-					PCIC_IO_ADDR_0_STOPHI + select, 0);
+			    PCIC_IO_ADDR_0_STOPHI + select, 0);
 		}
 	}
 	mutex_exit(&pcic->pc_lock);
@@ -3464,10 +3469,10 @@ pcic_card_state(pcicdev_t *pcic, pcic_socket_t *sockp)
 	orig_value = value;
 	if (pcic_debug >= 8)
 		cmn_err(CE_CONT, "pcic_card_state(%p) if status = %b for %d\n",
-			(void *)sockp,
-			value,
-			"\020\1BVD1\2BVD2\3CD1\4CD2\5WP\6RDY\7PWR\10~GPI",
-			sockp->pcs_socket);
+		    (void *)sockp,
+		    value,
+		    "\020\1BVD1\2BVD2\3CD1\4CD2\5WP\6RDY\7PWR\10~GPI",
+		    sockp->pcs_socket);
 #endif
 	/*
 	 * Lie to socket services if we are not ready.
@@ -3530,8 +3535,8 @@ pcic_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-			"pcic_set_page: window=%d, socket=%d, page=%d\n",
-			window, socket, page->page);
+		    "pcic_set_page: window=%d, socket=%d, page=%d\n",
+		    window, socket, page->page);
 	}
 #endif
 	/* only windows 2-6 work on memory */
@@ -3550,8 +3555,8 @@ pcic_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug)
 		cmn_err(CE_CONT, "\tpcw_base=%x, pcw_hostmem=%p, pcw_len=%x\n",
-			(uint32_t)memp->pcw_base,
-			(void *)memp->pcw_hostmem, memp->pcw_len);
+		    (uint32_t)memp->pcw_base,
+		    (void *)memp->pcw_hostmem, memp->pcw_len);
 #endif
 
 	/* window must be enabled */
@@ -3589,13 +3594,13 @@ pcic_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT, "\tmemory type = %s\n",
-			(which & CARDMEM_REG_ACTIVE) ? "attribute" : "common");
+		    (which & CARDMEM_REG_ACTIVE) ? "attribute" : "common");
 		if (which & CARDMEM_WRITE_PROTECT)
 			cmn_err(CE_CONT, "\twrite protect\n");
 		cmn_err(CE_CONT, "\tpage offset=%x pcw_base=%x (%x)\n",
-			(unsigned)page->offset,
-			(unsigned)memp->pcw_base,
-			(int)page->offset - (int)memp->pcw_base & 0xffffff);
+		    (unsigned)page->offset,
+		    (unsigned)memp->pcw_base,
+		    (int)page->offset - (int)memp->pcw_base & 0xffffff);
 	}
 #endif
 	/* address computation based on 64MB range and not larger */
@@ -3621,14 +3626,14 @@ pcic_set_page(dev_info_t *dip, set_page_t *page)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT, "\tbase=%p, *base=%x\n",
-			(void *)memp->pcw_hostmem,
-			(uint32_t)*memp->pcw_hostmem);
+		    (void *)memp->pcw_hostmem,
+		    (uint32_t)*memp->pcw_hostmem);
 
 		xxdmp_all_regs(pcic, socket, -1);
 
 		cmn_err(CE_CONT, "\tbase=%p, *base=%x\n",
-			(void *)memp->pcw_hostmem,
-			(uint32_t)*memp->pcw_hostmem);
+		    (void *)memp->pcw_hostmem,
+		    (uint32_t)*memp->pcw_hostmem);
 	}
 #endif
 
@@ -3658,8 +3663,8 @@ pcic_set_vcc_level(pcicdev_t *pcic, set_socket_t *socket)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-			"pcic_set_vcc_level(pcic=%p, VccLevel=%d)\n",
-			(void *)pcic, socket->VccLevel);
+		    "pcic_set_vcc_level(pcic=%p, VccLevel=%d)\n",
+		    (void *)pcic, socket->VccLevel);
 	}
 #endif
 
@@ -3692,13 +3697,13 @@ pcic_set_vcc_level(pcicdev_t *pcic, set_socket_t *socket)
 		 * card type from the adapter socket present state register
 		 */
 		socket_present_state =
-			ddi_get32(pcic->handle, (uint32_t *)(pcic->ioaddr +
-				PCIC_PRESENT_STATE_REG));
+		    ddi_get32(pcic->handle, (uint32_t *)(pcic->ioaddr +
+		    PCIC_PRESENT_STATE_REG));
 #if defined(PCIC_DEBUG)
 		if (pcic_debug) {
 			cmn_err(CE_CONT,
-				"socket present state = 0x%x\n",
-				socket_present_state);
+			    "socket present state = 0x%x\n",
+			    socket_present_state);
 		}
 #endif
 		switch (socket_present_state & PCIC_VCC_MASK) {
@@ -3721,7 +3726,7 @@ pcic_set_vcc_level(pcicdev_t *pcic, set_socket_t *socket)
 				 */
 				return ((unsigned)ddi_get8(pcic->handle,
 				    pcic->ioaddr + CB_R2_OFFSET +
-					PCIC_POWER_CONTROL));
+				    PCIC_POWER_CONTROL));
 		}
 
 	default:
@@ -3891,11 +3896,11 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 	pcic_putb(pcic, socket->socket, PCIC_INTERRUPT, interrupt);
 
 	switch (pcic->pc_type) {
-	    case PCIC_INTEL_i82092:
+		case PCIC_INTEL_i82092:
 		pcic_82092_smiirq_ctl(pcic, socket->socket, PCIC_82092_CTL_IRQ,
-						PCIC_82092_INT_DISABLE);
+		    PCIC_82092_INT_DISABLE);
 		break;
-	    default:
+		default:
 		break;
 	} /* switch */
 
@@ -3905,8 +3910,8 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug)
 		cmn_err(CE_CONT,
-			"\tSCIntMask=%x, interrupt=%x, mirq=%x\n",
-			socket->SCIntMask, interrupt, mirq);
+		    "\tSCIntMask=%x, interrupt=%x, mirq=%x\n",
+		    socket->SCIntMask, interrupt, mirq);
 #endif
 	mirq &= ~(PCIC_BD_DETECT|PCIC_BW_DETECT|PCIC_RD_DETECT);
 	pcic_putb(pcic, socket->socket, PCIC_MANAGEMENT_INT,
@@ -3954,9 +3959,9 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 #endif
 
 	switch (pcic->pc_type) {
-	    case PCIC_I82365SL:
-	    case PCIC_VADEM:
-	    case PCIC_VADEM_VG469:
+		case PCIC_I82365SL:
+		case PCIC_VADEM:
+		case PCIC_VADEM_VG469:
 		/*
 		 * The Intel version has different options. This is a
 		 * special case of GPI which might be used for eject
@@ -3971,32 +3976,32 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 		}
 		pcic_putb(pcic, socket->socket, PCIC_CARD_DETECT, irq);
 		break;
-	    case PCIC_CL_PD6710:
-	    case PCIC_CL_PD6722:
+		case PCIC_CL_PD6710:
+		case PCIC_CL_PD6722:
 		if (socket->IFType == IF_IO) {
 			pcic_putb(pcic, socket->socket, PCIC_MISC_CTL_2, 0x0);
 			value = pcic_getb(pcic, socket->socket,
-						PCIC_MISC_CTL_1);
+			    PCIC_MISC_CTL_1);
 			if (pcic->pc_flags & PCF_AUDIO)
 				value |= PCIC_MC_SPEAKER_ENB;
 			pcic_putb(pcic, socket->socket, PCIC_MISC_CTL_1,
-					value);
+			    value);
 		} else {
 			value = pcic_getb(pcic, socket->socket,
-						PCIC_MISC_CTL_1);
+			    PCIC_MISC_CTL_1);
 			value &= ~PCIC_MC_SPEAKER_ENB;
 			pcic_putb(pcic, socket->socket, PCIC_MISC_CTL_1,
-					value);
+			    value);
 		}
 		break;
-	    case PCIC_CL_PD6729:
-	    case PCIC_CL_PD6730:
-	    case PCIC_CL_PD6832:
+		case PCIC_CL_PD6729:
+		case PCIC_CL_PD6730:
+		case PCIC_CL_PD6832:
 		value = pcic_getb(pcic, socket->socket, PCIC_MISC_CTL_1);
 		if ((socket->IFType == IF_IO) && (pcic->pc_flags & PCF_AUDIO)) {
-		    value |= PCIC_MC_SPEAKER_ENB;
+			value |= PCIC_MC_SPEAKER_ENB;
 		} else {
-		    value &= ~PCIC_MC_SPEAKER_ENB;
+			value &= ~PCIC_MC_SPEAKER_ENB;
 		}
 
 		if (pcic_power[sockp->pcs_vcc].PowerLevel == 33)
@@ -4007,7 +4012,7 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 		pcic_putb(pcic, socket->socket, PCIC_MISC_CTL_1, value);
 		break;
 
-	    case PCIC_O2_OZ6912:
+		case PCIC_O2_OZ6912:
 		value = pcic_getcb(pcic, CB_MISCCTRL);
 		if ((socket->IFType == IF_IO) && (pcic->pc_flags & PCF_AUDIO))
 			value |= (1<<25);
@@ -4018,15 +4023,15 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 			powerlevel |= 0x08;
 		break;
 
-	    case PCIC_TI_PCI1250:
-	    case PCIC_TI_PCI1221:
-	    case PCIC_TI_PCI1225:
-	    case PCIC_TI_PCI1410:
-	    case PCIC_ENE_1410:
-	    case PCIC_TI_PCI1510:
-	    case PCIC_TI_PCI1520:
-	    case PCIC_TI_PCI1420:
-	    case PCIC_ENE_1420:
+		case PCIC_TI_PCI1250:
+		case PCIC_TI_PCI1221:
+		case PCIC_TI_PCI1225:
+		case PCIC_TI_PCI1410:
+		case PCIC_ENE_1410:
+		case PCIC_TI_PCI1510:
+		case PCIC_TI_PCI1520:
+		case PCIC_TI_PCI1420:
+		case PCIC_ENE_1420:
 		value = ddi_get8(pcic->cfg_handle,
 		    pcic->cfgaddr + PCIC_CRDCTL_REG);
 		if ((socket->IFType == IF_IO) && (pcic->pc_flags & PCF_AUDIO)) {
@@ -4111,8 +4116,8 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 		if (irq != sockp->pcs_irq) {
 			if (sockp->pcs_irq != 0)
 				cmn_err(CE_CONT,
-					"SetSocket: IRQ mismatch %x != %x!\n",
-					irq, sockp->pcs_irq);
+				    "SetSocket: IRQ mismatch %x != %x!\n",
+				    irq, sockp->pcs_irq);
 			else
 				sockp->pcs_irq = irq;
 		}
@@ -4129,9 +4134,9 @@ pcic_set_socket(dev_info_t *dip, set_socket_t *socket)
 #if defined(PCIC_DEBUG)
 		if (pcic_debug) {
 			cmn_err(CE_CONT,
-				"\tsocket type is I/O and irq %x is %s\n", irq,
-				(socket->IREQRouting & IRQ_ENABLE) ?
-				"enabled" : "not enabled");
+			    "\tsocket type is I/O and irq %x is %s\n", irq,
+			    (socket->IREQRouting & IRQ_ENABLE) ?
+			    "enabled" : "not enabled");
 			xxdmp_all_regs(pcic, socket->socket, 20);
 		}
 #endif
@@ -4195,8 +4200,8 @@ pcic_inquire_window(dev_info_t *dip, inquire_window_t *window)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug >= 8)
 		cmn_err(CE_CONT,
-			"pcic_inquire_window: window = %d/%d socket=%d\n",
-			window->window, type, socket);
+		    "pcic_inquire_window: window = %d/%d socket=%d\n",
+		    window->window, type, socket);
 #endif
 	if (type < PCIC_IOWINDOWS) {
 		window->WndCaps = WC_IO|WC_WAIT;
@@ -4214,7 +4219,7 @@ pcic_inquire_window(dev_info_t *dip, inquire_window_t *window)
 		iowin_char_t *io;
 		io = &window->iowin_char;
 		io->IOWndCaps = WC_BASE|WC_SIZE|WC_WENABLE|WC_8BIT|
-			WC_16BIT;
+		    WC_16BIT;
 		io->FirstByte = (baseaddr_t)IOMEM_FIRST;
 		io->LastByte = (baseaddr_t)IOMEM_LAST;
 		io->MinSize = IOMEM_MIN;
@@ -4226,7 +4231,7 @@ pcic_inquire_window(dev_info_t *dip, inquire_window_t *window)
 		mem_win_char_t *mem;
 		mem = &window->mem_win_char;
 		mem->MemWndCaps = WC_BASE|WC_SIZE|WC_WENABLE|WC_8BIT|
-			WC_16BIT|WC_WP;
+		    WC_16BIT|WC_WP;
 
 		mem->FirstByte = (baseaddr_t)MEM_FIRST;
 		mem->LastByte = (baseaddr_t)MEM_LAST;
@@ -4380,8 +4385,8 @@ pcic_get_status(dev_info_t *dip, get_ss_status_t *status)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug >= 8)
 		cmn_err(CE_CONT, "pcic_get_status: socket=%d, CardState=%x,"
-			"SocketState=%x\n",
-			socknum, status->CardState, status->SocketState);
+		    "SocketState=%x\n",
+		    socknum, status->CardState, status->SocketState);
 #endif
 	switch (pcic->pc_type) {
 	uint32_t present_state;
@@ -4400,8 +4405,9 @@ pcic_get_status(dev_info_t *dip, get_ss_status_t *status)
 			status->IFType = IF_CARDBUS;
 #if defined(PCIC_DEBUG)
 		if (pcic_debug >= 8)
-		    cmn_err(CE_CONT, "pcic_get_status: present_state=0x%x\n",
-			present_state);
+			cmn_err(CE_CONT,
+			    "pcic_get_status: present_state=0x%x\n",
+			    present_state);
 #endif
 		break;
 	default:
@@ -4431,7 +4437,7 @@ pcic_get_window(dev_info_t *dip, get_window_t *window)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT, "pcic_get_window(socket=%d, window=%d)\n",
-			socket, win);
+		    socket, win);
 	}
 #endif
 
@@ -4460,8 +4466,8 @@ pcic_get_window(dev_info_t *dip, get_window_t *window)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug)
 		cmn_err(CE_CONT, "\tsize=%d, speed=%d, base=%p, state=%x\n",
-			window->size, (unsigned)window->speed,
-			(void *)window->handle, window->state);
+		    window->size, (unsigned)window->speed,
+		    (void *)window->handle, window->state);
 #endif
 
 	return (SUCCESS);
@@ -4491,16 +4497,16 @@ pcic_ll_reset(pcicdev_t *pcic, int socket)
 	/* save windows that were on */
 	windowbits = pcic_getb(pcic, socket, PCIC_MAPPING_ENABLE);
 	if (pcic_reset_time == 0)
-	    return (windowbits);
+		return (windowbits);
 	/* turn all windows off */
 	pcic_putb(pcic, socket, PCIC_MAPPING_ENABLE, 0);
 
 #if defined(PCIC_DEBUG)
 	pcic_err(pcic->dip, 6,
-		"pcic_ll_reset(socket %d) powerlevel=%x cbctl 0x%x cbps 0x%x\n",
-		socket, pcic_getb(pcic, socket, PCIC_POWER_CONTROL),
-		pcic_getcb(pcic, CB_CONTROL),
-		pcic_getcb(pcic, CB_PRESENT_STATE));
+	    "pcic_ll_reset(socket %d) powerlevel=%x cbctl 0x%x cbps 0x%x\n",
+	    socket, pcic_getb(pcic, socket, PCIC_POWER_CONTROL),
+	    pcic_getcb(pcic, CB_CONTROL),
+	    pcic_getcb(pcic, CB_PRESENT_STATE));
 #endif
 
 	if (pcic_vpp_is_vcc_during_reset) {
@@ -4509,16 +4515,16 @@ pcic_ll_reset(pcicdev_t *pcic, int socket)
 	 * Set VPP to VCC for the duration of the reset - for aironet
 	 * card.
 	 */
-	    if (pcic->pc_flags & PCF_CBPWRCTL) {
+		if (pcic->pc_flags & PCF_CBPWRCTL) {
 		pwr = pcic_getcb(pcic, CB_CONTROL);
 		pcic_putcb(pcic, CB_CONTROL, (pwr&~CB_C_VPPMASK)|CB_C_VPPVCC);
 		(void) pcic_getcb(pcic, CB_CONTROL);
-	    } else {
+		} else {
 		pwr = pcic_getb(pcic, socket, PCIC_POWER_CONTROL);
 		pcic_putb(pcic, socket, PCIC_POWER_CONTROL,
 		    pwr | 1);
 		(void) pcic_getb(pcic, socket, PCIC_POWER_CONTROL);
-	    }
+		}
 	}
 
 	if (pcic_prereset_time > 0) {
@@ -4529,18 +4535,18 @@ pcic_ll_reset(pcicdev_t *pcic, int socket)
 
 	/* turn interrupts off and start a reset */
 	pcic_err(pcic->dip, 8,
-		"pcic_ll_reset turn interrupts off and start a reset\n");
+	    "pcic_ll_reset turn interrupts off and start a reset\n");
 	iobits = pcic_getb(pcic, socket, PCIC_INTERRUPT);
 	iobits &= ~(PCIC_INTR_MASK | PCIC_RESET);
 	pcic_putb(pcic, socket, PCIC_INTERRUPT, iobits);
 	(void) pcic_getb(pcic, socket, PCIC_INTERRUPT);
 
 	switch (pcic->pc_type) {
-	    case PCIC_INTEL_i82092:
+		case PCIC_INTEL_i82092:
 		pcic_82092_smiirq_ctl(pcic, socket, PCIC_82092_CTL_IRQ,
-						PCIC_82092_INT_DISABLE);
+		    PCIC_82092_INT_DISABLE);
 		break;
-	    default:
+		default:
 		break;
 	} /* switch */
 
@@ -4574,13 +4580,13 @@ pcic_ll_reset(pcicdev_t *pcic, int socket)
 	/*
 	 * Return VPP power to whatever it was before.
 	 */
-	    if (pcic->pc_flags & PCF_CBPWRCTL) {
+		if (pcic->pc_flags & PCF_CBPWRCTL) {
 		pcic_putcb(pcic, CB_CONTROL, pwr);
 		(void) pcic_getcb(pcic, CB_CONTROL);
-	    } else {
+		} else {
 		pcic_putb(pcic, socket, PCIC_POWER_CONTROL, pwr);
 		(void) pcic_getb(pcic, socket, PCIC_POWER_CONTROL);
-	    }
+		}
 	}
 
 	pcic_err(pcic->dip, 7, "pcic_ll_reset returning 0x%x\n", windowbits);
@@ -4608,7 +4614,7 @@ pcic_reset_socket(dev_info_t *dip, int socket, int mode)
 	if (pcic_debug >= 8)
 		cmn_err(CE_CONT, "pcic_reset_socket(%p, %d, %d/%s)\n",
 		    (void *)dip, socket, mode,
-			mode == RESET_MODE_FULL ? "full" : "partial");
+		    mode == RESET_MODE_FULL ? "full" : "partial");
 #endif
 
 	mutex_enter(&pcic->pc_lock); /* protect the registers */
@@ -4665,12 +4671,12 @@ pcic_set_interrupt(dev_info_t *dip, set_irq_handler_t *handler)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-			"pcic_set_interrupt: entered pc_intr_mode=0x%x\n",
-			pcic->pc_intr_mode);
+		    "pcic_set_interrupt: entered pc_intr_mode=0x%x\n",
+		    pcic->pc_intr_mode);
 		cmn_err(CE_CONT,
-			"\t irq_top=%p handler=%p handler_id=%x\n",
-			(void *)pcic->irq_top, (void *)handler->handler,
-			handler->handler_id);
+		    "\t irq_top=%p handler=%p handler_id=%x\n",
+		    (void *)pcic->irq_top, (void *)handler->handler,
+		    handler->handler_id);
 	}
 #endif
 
@@ -4695,13 +4701,13 @@ pcic_set_interrupt(dev_info_t *dip, set_irq_handler_t *handler)
 		mutex_enter(&pcic->intr_lock);
 
 		if (pcic->irq_top == NULL) {
-		    pcic->irq_top = intr;
-		    pcic->irq_current = pcic->irq_top;
+			pcic->irq_top = intr;
+			pcic->irq_current = pcic->irq_top;
 		} else {
-		    while (pcic->irq_current->next != NULL)
+			while (pcic->irq_current->next != NULL)
 			pcic->irq_current = pcic->irq_current->next;
-		    pcic->irq_current->next = intr;
-		    pcic->irq_current = pcic->irq_current->next;
+			pcic->irq_current->next = intr;
+			pcic->irq_current = pcic->irq_current->next;
 		}
 
 		pcic->irq_current->intr =
@@ -4750,8 +4756,8 @@ pcic_set_interrupt(dev_info_t *dip, set_irq_handler_t *handler)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-			"pcic_set_interrupt: exit irq_top=%p value=%d\n",
-			(void *)pcic->irq_top, value);
+		    "pcic_set_interrupt: exit irq_top=%p value=%d\n",
+		    (void *)pcic->irq_top, value);
 	}
 #endif
 
@@ -4797,12 +4803,12 @@ pcic_clear_interrupt(dev_info_t *dip, clear_irq_handler_t *handler)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-			"pcic_clear_interrupt: entered pc_intr_mode=0x%x\n",
-			pcic->pc_intr_mode);
+		    "pcic_clear_interrupt: entered pc_intr_mode=0x%x\n",
+		    pcic->pc_intr_mode);
 		cmn_err(CE_CONT,
-			"\t irq_top=%p handler=%p handler_id=%x\n",
-			(void *)pcic->irq_top, (void *)handler->handler,
-			handler->handler_id);
+		    "\t irq_top=%p handler=%p handler_id=%x\n",
+		    (void *)pcic->irq_top, (void *)handler->handler,
+		    handler->handler_id);
 	}
 #endif
 
@@ -4819,8 +4825,8 @@ pcic_clear_interrupt(dev_info_t *dip, clear_irq_handler_t *handler)
 		pcic->irq_current = pcic->irq_top;
 
 		while ((pcic->irq_current != NULL) &&
-				(pcic->irq_current->handler_id !=
-						handler->handler_id)) {
+		    (pcic->irq_current->handler_id !=
+		    handler->handler_id)) {
 			intr = pcic->irq_current;
 			pcic->irq_current = pcic->irq_current->next;
 		}
@@ -4850,7 +4856,7 @@ pcic_clear_interrupt(dev_info_t *dip, clear_irq_handler_t *handler)
 		prev = (inthandler_t *)&pcic_handlers;
 
 		while (intr != NULL) {
-		    if (intr->handler_id == handler->handler_id) {
+			if (intr->handler_id == handler->handler_id) {
 			i = intr->irq & PCIC_INTR_MASK;
 			if (--pcic_irq_map[i].count == 0) {
 				/* multi-handler form */
@@ -4862,23 +4868,23 @@ pcic_clear_interrupt(dev_info_t *dip, clear_irq_handler_t *handler)
 #if defined(PCIC_DEBUG)
 				if (pcic_debug) {
 					cmn_err(CE_CONT,
-						"removing interrupt %d at %s "
-						"priority\n", i, "high");
+					    "removing interrupt %d at %s "
+					    "priority\n", i, "high");
 					cmn_err(CE_CONT,
-						"ddi_remove_intr(%p, %x, %p)\n",
-						(void *)dip,
-						0,
-						(void *)intr->iblk_cookie);
+					    "ddi_remove_intr(%p, %x, %p)\n",
+					    (void *)dip,
+					    0,
+					    (void *)intr->iblk_cookie);
 				}
 #endif
 			}
 			prev->next = intr->next;
 			kmem_free(intr, sizeof (inthandler_t));
 			intr = prev->next;
-		    } else {
+			} else {
 			prev = intr;
 			intr = intr->next;
-		    } /* if (handler_id) */
+			} /* if (handler_id) */
 		} /* while */
 
 		mutex_exit(&pcic->pc_lock);
@@ -4887,8 +4893,8 @@ pcic_clear_interrupt(dev_info_t *dip, clear_irq_handler_t *handler)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
 		cmn_err(CE_CONT,
-		"pcic_clear_interrupt: exit irq_top=%p\n",
-		(void *)pcic->irq_top);
+		    "pcic_clear_interrupt: exit irq_top=%p\n",
+		    (void *)pcic->irq_top);
 	}
 #endif
 
@@ -5007,7 +5013,7 @@ xxdmp_cl_regs(pcicdev_t *pcic, int socket, uint32_t len)
 			else
 				fmt = "%s\t%s\t%x\n";
 			cmn_err(CE_CONT, fmt, buff,
-				cregs[i].name, value, cregs[i].fmt);
+			    cregs[i].name, value, cregs[i].fmt);
 			buff[0] = '\0';
 		} else {
 			if (cregs[i].fmt)
@@ -5015,7 +5021,7 @@ xxdmp_cl_regs(pcicdev_t *pcic, int socket, uint32_t len)
 			else
 				fmt = "\t%s\t%x";
 			(void) sprintf(buff, fmt,
-				cregs[i].name, value, cregs[i].fmt);
+			    cregs[i].name, value, cregs[i].fmt);
 			for (j = strlen(buff); j < 40; j++)
 				buff[j] = ' ';
 			buff[40] = '\0';
@@ -5045,7 +5051,7 @@ xxdmp_cl_regs(pcicdev_t *pcic, int socket, uint32_t len)
 			else
 				fmt = "%s\t%s\t%x\n";
 			cmn_err(CE_CONT, fmt, buff,
-				cxregs[i].name, value, cxregs[i].fmt);
+			    cxregs[i].name, value, cxregs[i].fmt);
 			buff[0] = '\0';
 		} else {
 			if (cxregs[i].fmt)
@@ -5053,7 +5059,7 @@ xxdmp_cl_regs(pcicdev_t *pcic, int socket, uint32_t len)
 			else
 				fmt = "\t%s\t%x";
 			(void) sprintf(buff, fmt,
-				cxregs[i].name, value, cxregs[i].fmt);
+			    cxregs[i].name, value, cxregs[i].fmt);
 			for (j = strlen(buff); j < 40; j++)
 				buff[j] = ' ';
 			buff[40] = '\0';
@@ -5074,10 +5080,10 @@ xxdmp_all_regs(pcicdev_t *pcic, int socket, uint32_t len)
 		return;
 #endif
 	cmn_err(CE_CONT,
-		"----------- PCIC Registers for socket %d---------\n",
-		socket);
+	    "----------- PCIC Registers for socket %d---------\n",
+	    socket);
 	cmn_err(CE_CONT,
-		"\tname       value                        name       value\n");
+	    "\tname       value	                name       value\n");
 
 	for (buff[0] = '\0', i = 0; iregs[i].name != NULL && len-- != 0; i++) {
 		value = pcic_getb(pcic, socket, iregs[i].off);
@@ -5087,7 +5093,7 @@ xxdmp_all_regs(pcicdev_t *pcic, int socket, uint32_t len)
 			else
 				fmt = "%s\t%s\t%x\n";
 			cmn_err(CE_CONT, fmt, buff,
-				iregs[i].name, value, iregs[i].fmt);
+			    iregs[i].name, value, iregs[i].fmt);
 			buff[0] = '\0';
 		} else {
 			if (iregs[i].fmt)
@@ -5095,7 +5101,7 @@ xxdmp_all_regs(pcicdev_t *pcic, int socket, uint32_t len)
 			else
 				fmt = "\t%s\t%x";
 			(void) sprintf(buff, fmt,
-				iregs[i].name, value, iregs[i].fmt);
+			    iregs[i].name, value, iregs[i].fmt);
 			for (j = strlen(buff); j < 40; j++)
 				buff[j] = ' ';
 			buff[40] = '\0';
@@ -5213,10 +5219,10 @@ pcic_iomem_pci_ctl(ddi_acc_handle_t handle, uchar_t *cfgaddr, unsigned flags)
 			return;
 
 		if (flags & PCIC_ENABLE_IO)
-		    cmd |= PCI_COMM_IO;
+			cmd |= PCI_COMM_IO;
 
 		if (flags & PCIC_ENABLE_MEM)
-		    cmd |= PCI_COMM_MAE;
+			cmd |= PCI_COMM_MAE;
 
 		ddi_put16(handle, (ushort_t *)(cfgaddr + 4), cmd);
 	} /* if (PCIC_ENABLE_IO | PCIC_ENABLE_MEM) */
@@ -5231,11 +5237,11 @@ pcic_find_pci_type(pcicdev_t *pcic)
 	uint32_t vend, device;
 
 	vend = ddi_getprop(DDI_DEV_T_ANY, pcic->dip,
-				DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
-				"vendor-id", -1);
+	    DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+	    "vendor-id", -1);
 	device = ddi_getprop(DDI_DEV_T_ANY, pcic->dip,
-				DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
-				"device-id", -1);
+	    DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+	    "device-id", -1);
 
 	device = PCI_ID(vend, device);
 	pcic->pc_type = device;
@@ -5254,8 +5260,8 @@ pcic_find_pci_type(pcicdev_t *pcic)
 		 *	to be a 6729 is really a 6730.
 		 */
 		if ((clext_reg_read(pcic, 0, PCIC_CLEXT_MISC_CTL_3) &
-			PCIC_CLEXT_MISC_CTL_3_REV_MASK) ==
-				0) {
+		    PCIC_CLEXT_MISC_CTL_3_REV_MASK) ==
+		    0) {
 			pcic->pc_chipname = PCIC_TYPE_PD6730;
 			pcic->pc_type = PCIC_CL_PD6730;
 		}
@@ -5352,24 +5358,24 @@ static void
 pcic_82092_smiirq_ctl(pcicdev_t *pcic, int socket, int intr, int state)
 {
 	uchar_t ppirr = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_82092_PPIRR);
+	    pcic->cfgaddr + PCIC_82092_PPIRR);
 	uchar_t val;
 
 	if (intr == PCIC_82092_CTL_SMI) {
 		val = PCIC_82092_SMI_CTL(socket,
-						PCIC_82092_INT_DISABLE);
+		    PCIC_82092_INT_DISABLE);
 		ppirr &= ~val;
 		val = PCIC_82092_SMI_CTL(socket, state);
 		ppirr |= val;
 	} else {
 		val = PCIC_82092_IRQ_CTL(socket,
-						PCIC_82092_INT_DISABLE);
+		    PCIC_82092_INT_DISABLE);
 		ppirr &= ~val;
 		val = PCIC_82092_IRQ_CTL(socket, state);
 		ppirr |= val;
 	}
 	ddi_put8(pcic->cfg_handle, pcic->cfgaddr + PCIC_82092_PPIRR,
-			ppirr);
+	    ppirr);
 }
 
 static uint_t
@@ -5386,7 +5392,7 @@ pcic_cd_softint(caddr_t arg1, caddr_t arg2)
 		sockp->pcs_cd_softint_flg = 0;
 		rc = DDI_INTR_CLAIMED;
 		status = pcic_getb(sockp->pcs_pcic, sockp->pcs_socket,
-			PCIC_INTERFACE_STATUS);
+		    PCIC_INTERFACE_STATUS);
 		pcic_handle_cd_change(sockp->pcs_pcic, sockp, status);
 	}
 	mutex_exit(&sockp->pcs_pcic->pc_lock);
@@ -5434,15 +5440,15 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 	 */
 
 #ifdef PCIC_DEBUG
-	    pcic_err(pcic->dip, 6,
+		pcic_err(pcic->dip, 6,
 		    "pcic%d handle_cd_change: socket %d card status 0x%x"
 		    " deb 0x%p\n", ddi_get_instance(pcic->dip),
 		    sockp->pcs_socket, status, debounce);
 #endif
 	switch (status & PCIC_ISTAT_CD_MASK) {
 	case PCIC_CD_PRESENT_OK:
-	    sockp->pcs_flags &= ~(PCS_CARD_REMOVED|PCS_CARD_CBREM);
-	    if (!(sockp->pcs_flags & PCS_CARD_PRESENT)) {
+		sockp->pcs_flags &= ~(PCS_CARD_REMOVED|PCS_CARD_CBREM);
+		if (!(sockp->pcs_flags & PCS_CARD_PRESENT)) {
 		uint32_t cbps;
 #ifdef PCIC_DEBUG
 		pcic_err(pcic->dip, 8, "New card (0x%x)\n", sockp->pcs_flags);
@@ -5456,66 +5462,76 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 		 */
 		if ((cbps & pcic_cbps_on) != pcic_cbps_on ||
 		    cbps & pcic_cbps_off) {
-		    cmn_err(CE_WARN,
+			cmn_err(CE_WARN,
 			    "%s%d: Odd Cardbus Present State 0x%x\n",
 			    ddi_get_name(pcic->dip),
 			    ddi_get_instance(pcic->dip),
 			    cbps);
-		    pcic_putcb(pcic, CB_EVENT_FORCE, CB_EF_CVTEST);
-		    debounce = 0;
-		    debounce_time = drv_usectohz(1000000);
+			pcic_putcb(pcic, CB_EVENT_FORCE, CB_EF_CVTEST);
+			debounce = 0;
+			debounce_time = drv_usectohz(1000000);
 		}
 		if (debounce) {
-		    sockp->pcs_flags |= PCS_CARD_PRESENT;
-		    if (pcic_do_insertion) {
+			sockp->pcs_flags |= PCS_CARD_PRESENT;
+			if (pcic_do_insertion) {
 
-			cbps = pcic_getcb(pcic, CB_PRESENT_STATE);
+				cbps = pcic_getcb(pcic, CB_PRESENT_STATE);
 
-			if (cbps & CB_PS_16BITCARD) {
-			    pcic_err(pcic->dip, 8, "16 bit card inserted\n");
-			    sockp->pcs_flags |= PCS_CARD_IS16BIT;
-			    /* calls pcm_adapter_callback() */
-			    if (pcic->pc_callback) {
+				if (cbps & CB_PS_16BITCARD) {
+					pcic_err(pcic->dip,
+					    8, "16 bit card inserted\n");
+					sockp->pcs_flags |= PCS_CARD_IS16BIT;
+					/* calls pcm_adapter_callback() */
+					if (pcic->pc_callback) {
 
-				(void) ddi_prop_update_string(DDI_DEV_T_NONE,
-					pcic->dip, PCM_DEVICETYPE,
-					"pccard");
-				PC_CALLBACK(pcic->dip, pcic->pc_cb_arg,
-					    PCE_CARD_INSERT,
-					    sockp->pcs_socket);
-			    }
-			} else if (cbps & CB_PS_CBCARD) {
-			    pcic_err(pcic->dip, 8, "32 bit card inserted\n");
+						(void) ddi_prop_update_string(
+						    DDI_DEV_T_NONE,
+						    pcic->dip, PCM_DEVICETYPE,
+						    "pccard");
+						PC_CALLBACK(pcic->dip,
+						    pcic->pc_cb_arg,
+						    PCE_CARD_INSERT,
+						    sockp->pcs_socket);
+					}
+				} else if (cbps & CB_PS_CBCARD) {
+					pcic_err(pcic->dip,
+					    8, "32 bit card inserted\n");
 
-			    if (pcic->pc_flags & PCF_CARDBUS) {
-				sockp->pcs_flags |= PCS_CARD_ISCARDBUS;
+					if (pcic->pc_flags & PCF_CARDBUS) {
+						sockp->pcs_flags |=
+						    PCS_CARD_ISCARDBUS;
 #ifdef CARDBUS
-				if (!pcic_load_cardbus(pcic, sockp)) {
-				    pcic_unload_cardbus(pcic, sockp);
-				}
+						if (!pcic_load_cardbus(pcic,
+						    sockp)) {
+							pcic_unload_cardbus(
+							    pcic, sockp);
+						}
 
 #else
-				cmn_err(CE_NOTE,
-					"32 bit Cardbus not supported in"
-					" this device driver\n");
+						cmn_err(CE_NOTE,
+						    "32 bit Cardbus not"
+						    " supported in"
+						    " this device driver\n");
 #endif
-			    } else {
-				/*
-				 * Ignore the card
-				 */
-				cmn_err(CE_NOTE,
-					"32 bit Cardbus not supported on this"
-					" device\n");
-			    }
-			} else {
-			    cmn_err(CE_NOTE,
-				"Unsupported PCMCIA card inserted\n");
+					} else {
+						/*
+						 * Ignore the card
+						 */
+						cmn_err(CE_NOTE,
+						    "32 bit Cardbus not"
+						    " supported on this"
+						    " device\n");
+					}
+				} else {
+					cmn_err(CE_NOTE,
+					    "Unsupported PCMCIA card"
+					    " inserted\n");
+				}
 			}
-		    }
 		} else {
-		    do_debounce = B_TRUE;
+			do_debounce = B_TRUE;
 		}
-	    } else {
+		} else {
 		/*
 		 * It is possible to come through here if the system
 		 * starts up with cards already inserted. Do nothing
@@ -5523,21 +5539,21 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 		 */
 #ifdef PCIC_DEBUG
 		pcic_err(pcic->dip, 5,
-			"pcic%d: Odd card insertion indication on socket %d\n",
-			ddi_get_instance(pcic->dip),
-			sockp->pcs_socket);
+		    "pcic%d: Odd card insertion indication on socket %d\n",
+		    ddi_get_instance(pcic->dip),
+		    sockp->pcs_socket);
 #endif
-	    }
-	    break;
+		}
+		break;
 
 	default:
-	    if (!(sockp->pcs_flags & PCS_CARD_PRESENT)) {
+		if (!(sockp->pcs_flags & PCS_CARD_PRESENT)) {
 		/*
 		 * Someone has started to insert a card so delay a while.
 		 */
 		do_debounce = B_TRUE;
 		break;
-	    }
+		}
 		/*
 		 * Otherwise this is basically the same as not present
 		 * so fall through.
@@ -5545,13 +5561,14 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 
 		/* FALLTHRU */
 	case 0:
-	    if (sockp->pcs_flags & PCS_CARD_PRESENT) {
-		if (pcic->pc_flags & PCF_CBPWRCTL) {
-		    pcic_putcb(pcic, CB_CONTROL, 0);
-		} else {
-		    pcic_putb(pcic, sockp->pcs_socket, PCIC_POWER_CONTROL, 0);
-		    (void) pcic_getb(pcic, sockp->pcs_socket,
-			PCIC_POWER_CONTROL);
+		if (sockp->pcs_flags & PCS_CARD_PRESENT) {
+			if (pcic->pc_flags & PCF_CBPWRCTL) {
+				pcic_putcb(pcic, CB_CONTROL, 0);
+			} else {
+				pcic_putb(pcic, sockp->pcs_socket,
+				    PCIC_POWER_CONTROL, 0);
+			(void) pcic_getb(pcic, sockp->pcs_socket,
+			    PCIC_POWER_CONTROL);
 		}
 #ifdef PCIC_DEBUG
 		pcic_err(pcic->dip, 8, "Card removed\n");
@@ -5559,22 +5576,22 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 		sockp->pcs_flags &= ~PCS_CARD_PRESENT;
 
 		if (sockp->pcs_flags & PCS_CARD_IS16BIT) {
-		    sockp->pcs_flags &= ~PCS_CARD_IS16BIT;
-		    if (pcic_do_removal && pcic->pc_callback) {
-			PC_CALLBACK(pcic->dip, pcic->pc_cb_arg,
+			sockp->pcs_flags &= ~PCS_CARD_IS16BIT;
+			if (pcic_do_removal && pcic->pc_callback) {
+				PC_CALLBACK(pcic->dip, pcic->pc_cb_arg,
 				    PCE_CARD_REMOVAL, sockp->pcs_socket);
-		    }
+			}
 		}
 		if (sockp->pcs_flags & PCS_CARD_ISCARDBUS) {
-		    sockp->pcs_flags &= ~PCS_CARD_ISCARDBUS;
-		    sockp->pcs_flags |= PCS_CARD_CBREM;
+			sockp->pcs_flags &= ~PCS_CARD_ISCARDBUS;
+			sockp->pcs_flags |= PCS_CARD_CBREM;
 		}
 		sockp->pcs_flags |= PCS_CARD_REMOVED;
 
 		do_debounce = B_TRUE;
-	    }
-	    if (debounce && (sockp->pcs_flags & PCS_CARD_REMOVED)) {
-		if (sockp->pcs_flags & PCS_CARD_CBREM) {
+		}
+		if (debounce && (sockp->pcs_flags & PCS_CARD_REMOVED)) {
+			if (sockp->pcs_flags & PCS_CARD_CBREM) {
 		/*
 		 * Ensure that we do the unloading in the
 		 * debounce handler, that way we're not doing
@@ -5586,14 +5603,14 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 		 * come in...
 		 */
 #ifdef CARDBUS
-		    pcic_unload_cardbus(pcic, sockp);
-		    /* pcic_dump_all(pcic); */
+			pcic_unload_cardbus(pcic, sockp);
+			/* pcic_dump_all(pcic); */
 #endif
-		    sockp->pcs_flags &= ~PCS_CARD_CBREM;
+			sockp->pcs_flags &= ~PCS_CARD_CBREM;
+			}
+			sockp->pcs_flags &= ~PCS_CARD_REMOVED;
 		}
-		sockp->pcs_flags &= ~PCS_CARD_REMOVED;
-	    }
-	    break;
+		break;
 	} /* switch */
 
 	if (do_debounce) {
@@ -5606,18 +5623,19 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 	 */
 #ifdef PCIC_DEBUG
 		pcic_err(pcic->dip, 8, "Queueing up debounce timeout for "
-			"socket %d.%d\n",
-			ddi_get_instance(pcic->dip),
-			sockp->pcs_socket);
+		    "socket %d.%d\n",
+		    ddi_get_instance(pcic->dip),
+		    sockp->pcs_socket);
 #endif
-	    sockp->pcs_debounce_id = pcic_add_debqueue(sockp, debounce_time);
+		sockp->pcs_debounce_id =
+		    pcic_add_debqueue(sockp, debounce_time);
 
 	/*
 	 * We bug out here without re-enabling interrupts. They will
 	 * be re-enabled when the debounce timeout swings through
 	 * here.
 	 */
-	    return;
+		return;
 	}
 
 	/*
@@ -5650,10 +5668,10 @@ pcic_getb(pcicdev_t *pcic, int socket, int reg)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug == 0x7fff) {
 		cmn_err(CE_CONT, "pcic_getb0: pcic=%p socket=%d reg=%d\n",
-			(void *)pcic, socket, reg);
+		    (void *)pcic, socket, reg);
 		cmn_err(CE_CONT, "pcic_getb1: type=%d handle=%p ioaddr=%p \n",
-			pcic->pc_io_type, (void *)pcic->handle,
-			(void *)pcic->ioaddr);
+		    pcic->pc_io_type, (void *)pcic->handle,
+		    (void *)pcic->ioaddr);
 	}
 #endif
 
@@ -5676,12 +5694,12 @@ pcic_putb(pcicdev_t *pcic, int socket, int reg, int8_t value)
 #if defined(PCIC_DEBUG)
 	if (pcic_debug == 0x7fff) {
 		cmn_err(CE_CONT,
-			"pcic_putb0: pcic=%p socket=%d reg=%d value=%x \n",
-			(void *)pcic, socket, reg, value);
+		    "pcic_putb0: pcic=%p socket=%d reg=%d value=%x \n",
+		    (void *)pcic, socket, reg, value);
 		cmn_err(CE_CONT,
-			"pcic_putb1: type=%d handle=%p ioaddr=%p \n",
-			pcic->pc_io_type, (void *)pcic->handle,
-			(void *)pcic->ioaddr);
+		    "pcic_putb1: type=%d handle=%p ioaddr=%p \n",
+		    pcic->pc_io_type, (void *)pcic->handle,
+		    (void *)pcic->ioaddr);
 	}
 #endif
 
@@ -5689,7 +5707,7 @@ pcic_putb(pcicdev_t *pcic, int socket, int reg, int8_t value)
 	switch (pcic->pc_io_type) {
 	case PCIC_IO_TYPE_YENTA:
 		ddi_put8(pcic->handle, pcic->ioaddr + CB_R2_OFFSET + reg,
-				value);
+		    value);
 		break;
 	default:
 		work = (socket * PCIC_SOCKET_1) | reg;
@@ -5768,7 +5786,7 @@ pcic_ci_vadem(pcicdev_t *pcic)
 		int vadem, new;
 		pcic_vadem_enable(pcic);
 		vadem = pcic_getb(pcic, 0, PCIC_VG_DMA) &
-			~(PCIC_V_UNLOCK | PCIC_V_VADEMREV);
+		    ~(PCIC_V_UNLOCK | PCIC_V_VADEMREV);
 		new = vadem | (PCIC_V_VADEMREV|PCIC_V_UNLOCK);
 		pcic_putb(pcic, 0, PCIC_VG_DMA, new);
 		value = pcic_getb(pcic, 0, PCIC_CHIP_REVISION);
@@ -5842,11 +5860,11 @@ pcic_init_assigned(dev_info_t *dip)
 		 */
 		entries = len / sizeof (pcm_regs_t);
 		pci_avail_p = kmem_alloc(sizeof (pci_regspec_t) * entries,
-			KM_SLEEP);
+		    KM_SLEEP);
 		if (pcic_apply_avail_ranges(dip, pcic_avail_p, pci_avail_p,
 		    entries) == DDI_SUCCESS)
 			(void) pci_resource_setup_avail(dip, pci_avail_p,
-				entries);
+			    entries);
 		kmem_free(pcic_avail_p, len);
 		kmem_free(pci_avail_p, entries * sizeof (pci_regspec_t));
 		return;
@@ -5890,7 +5908,7 @@ pcic_init_assigned(dev_info_t *dip)
 			    "device_type",
 			    (caddr_t)&bus_type, &len) == DDI_SUCCESS) &&
 			    (strcmp(bus_type, DEVI_PCI_NEXNAME) == 0 ||
-				strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0))
+			    strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0))
 				break;
 		}
 		if (par != NULL &&
@@ -5972,9 +5990,9 @@ pcic_apply_avail_ranges(dev_info_t *dip, pcm_regs_t *pcic_p,
 	pcic_ranges_t *pcic_range_p;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "ranges",
-		    (caddr_t)&pcic_range_p, &range_len) != DDI_PROP_SUCCESS) {
+	    (caddr_t)&pcic_range_p, &range_len) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_CONT, "?pcic_apply_avail_ranges: "
-			"no ranges property for pcmcia\n");
+		    "no ranges property for pcmcia\n");
 		return (DDI_FAILURE);
 	}
 
@@ -5989,7 +6007,7 @@ pcic_apply_avail_ranges(dev_info_t *dip, pcm_regs_t *pcic_p,
 		/* for each "ranges" entry to be searched */
 		for (j = 0; j < range_entries; j++, range_p++) {
 			uint64_t range_end = range_p->pcic_range_caddrlo +
-				range_p->pcic_range_size;
+			    range_p->pcic_range_size;
 			uint64_t avail_end = pcic_p->phys_lo + pcic_p->phys_len;
 
 			if ((range_p->pcic_range_caddrhi != pcic_p->phys_hi) ||
@@ -6391,16 +6409,17 @@ pcic_do_resume(pcicdev_t *pcic)
 	 * controllers. Need to clear the RESET bit explicitly.
 	 */
 	cfg = ddi_get8(pcic->cfg_handle,
-		pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+	    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 	if (cfg & (1<<6)) {
 		cfg &= ~(1<<6);
 		ddi_put8(pcic->cfg_handle,
-			pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
-			cfg);
+		    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
+		    cfg);
 		cfg = ddi_get8(pcic->cfg_handle,
-			pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+		    pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 		if (cfg & (1<<6)) {
-		    pcic_err(pcic->dip, 1, "Failed to take pcic out of reset");
+			pcic_err(pcic->dip, 1,
+			    "Failed to take pcic out of reset");
 		}
 	}
 
@@ -6667,18 +6686,19 @@ pcic_cbus_powerctl(pcicdev_t *pcic, int socket)
 	    socket, sockp->pcs_vcc, sockp->pcs_vpp1, orig_cbctl, cbctl);
 #endif
 	if (cbctl != orig_cbctl) {
-	    if (pcic_cbdoreset_during_poweron &&
-		(orig_cbctl & (CB_C_VCCMASK|CB_C_VPPMASK)) == 0) {
-		iobits = pcic_getb(pcic, socket, PCIC_INTERRUPT);
-		pcic_putb(pcic, socket, PCIC_INTERRUPT, iobits & ~PCIC_RESET);
-	    }
-	    pcic_putcb(pcic, CB_CONTROL, cbctl);
+		if (pcic_cbdoreset_during_poweron &&
+		    (orig_cbctl & (CB_C_VCCMASK|CB_C_VPPMASK)) == 0) {
+			iobits = pcic_getb(pcic, socket, PCIC_INTERRUPT);
+			pcic_putb(pcic, socket, PCIC_INTERRUPT,
+			    iobits & ~PCIC_RESET);
+		}
+		pcic_putcb(pcic, CB_CONTROL, cbctl);
 
-	    if ((cbctl & CB_C_VCCMASK) == (orig_cbctl & CB_C_VCCMASK)) {
+		if ((cbctl & CB_C_VCCMASK) == (orig_cbctl & CB_C_VCCMASK)) {
 		pcic_mswait(pcic, socket, pcic_powerdelay);
 		return (SUCCESS);
-	    }
-	    for (ind = 0; ind < 20; ind++) {
+		}
+		for (ind = 0; ind < 20; ind++) {
 		cbstev = pcic_getcb(pcic, CB_STATUS_EVENT);
 
 		if (cbstev & CB_SE_POWER_CYCLE) {
@@ -6690,43 +6710,43 @@ pcic_cbus_powerctl(pcicdev_t *pcic, int socket)
 		 * Note: We should check the status AFTER the delay to give time
 		 * for things to stabilize.
 		 */
-		    pcic_mswait(pcic, socket, 400);
+			pcic_mswait(pcic, socket, 400);
 
-		    cbps = pcic_getcb(pcic, CB_PRESENT_STATE);
-		    if (cbctl && !(cbps & CB_PS_POWER_CYCLE)) {
+			cbps = pcic_getcb(pcic, CB_PRESENT_STATE);
+			if (cbctl && !(cbps & CB_PS_POWER_CYCLE)) {
 			/* break; */
 			cmn_err(CE_WARN, "cbus_powerctl: power off??\n");
-		    }
-		    if (cbctl & CB_PS_BADVCC) {
+			}
+			if (cbctl & CB_PS_BADVCC) {
 			cmn_err(CE_WARN, "cbus_powerctl: bad power request\n");
 			break;
-		    }
+			}
 
 #if defined(PCIC_DEBUG)
-		    pcic_err(pcic->dip, 8,
-			"cbstev = 0x%x cbps = 0x%x cbctl 0x%x(0x%x)",
-			cbstev, pcic_getcb(pcic, CB_PRESENT_STATE),
-			cbctl, orig_cbctl);
+			pcic_err(pcic->dip, 8,
+			    "cbstev = 0x%x cbps = 0x%x cbctl 0x%x(0x%x)",
+			    cbstev, pcic_getcb(pcic, CB_PRESENT_STATE),
+			    cbctl, orig_cbctl);
 #endif
-		    if (pcic_cbdoreset_during_poweron &&
-			(orig_cbctl & (CB_C_VCCMASK|CB_C_VPPMASK)) == 0) {
-			pcic_putb(pcic, socket, PCIC_INTERRUPT, iobits);
-		    }
-		    return (SUCCESS);
+			if (pcic_cbdoreset_during_poweron &&
+			    (orig_cbctl & (CB_C_VCCMASK|CB_C_VPPMASK)) == 0) {
+				pcic_putb(pcic, socket, PCIC_INTERRUPT, iobits);
+			}
+			return (SUCCESS);
 		}
 		pcic_mswait(pcic, socket, 40);
-	    }
-	    if (pcic_cbdoreset_during_poweron &&
-		(orig_cbctl & (CB_C_VCCMASK|CB_C_VPPMASK)) == 0) {
-		pcic_putb(pcic, socket, PCIC_INTERRUPT, iobits);
-	    }
-	    cmn_err(CE_WARN,
+		}
+		if (pcic_cbdoreset_during_poweron &&
+		    (orig_cbctl & (CB_C_VCCMASK|CB_C_VPPMASK)) == 0) {
+			pcic_putb(pcic, socket, PCIC_INTERRUPT, iobits);
+		}
+		cmn_err(CE_WARN,
 		    "pcic socket %d: Power didn't get turned on/off!\n"
 		    "cbstev = 0x%x cbps = 0x%x cbctl 0x%x(0x%x) "
 		    "vcc %d vpp1 %d", socket, cbstev,
 		    pcic_getcb(pcic, CB_PRESENT_STATE),
 		    cbctl, orig_cbctl, sockp->pcs_vcc, sockp->pcs_vpp1);
-	    return (BAD_VCC);
+		return (BAD_VCC);
 	}
 	return (SUCCESS);
 }

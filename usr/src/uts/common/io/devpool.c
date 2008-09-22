@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -410,9 +408,9 @@ pool_ioctl(dev_t dev, int cmd, intptr_t arg, int  mode, cred_t *credp,
 			xtransfer.px_o_src_id = xtransfer32.px_o_src_id;
 			xtransfer.px_o_tgt_id = xtransfer32.px_o_tgt_id;
 			xtransfer.px_o_complist_size =
-				xtransfer32.px_o_complist_size;
+			    xtransfer32.px_o_complist_size;
 			xtransfer.px_o_comp_list =
-				(id_t *)(uintptr_t)xtransfer32.px_o_comp_list;
+			    (id_t *)(uintptr_t)xtransfer32.px_o_comp_list;
 			break;
 #endif /* _MULTI_DATAMODEL */
 		default:
@@ -579,7 +577,7 @@ pool_ioctl(dev_t dev, int cmd, intptr_t arg, int  mode, cred_t *credp,
 			return (EFAULT);
 		}
 		if (nvlist_unpack(listbuf, propput.pp_o_bufsize,
-			&list, KM_SLEEP) != 0) {
+		    &list, KM_SLEEP) != 0) {
 			kmem_free(listbuf, propput.pp_o_bufsize);
 			return (EFAULT);
 		}
@@ -684,7 +682,8 @@ static struct dev_ops pool_ops = {
 	nodev,			/* reset */
 	&pool_cb_ops,		/* cb_ops */
 	(struct bus_ops *)NULL,	/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -692,7 +691,7 @@ static struct dev_ops pool_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,		/* this one is a pseudo driver */
-	"pool driver %I%",
+	"pool driver",
 	&pool_ops
 };
 

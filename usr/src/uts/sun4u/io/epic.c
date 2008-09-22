@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver to control Alert and Power LEDs  for the Seattle platform.
@@ -97,7 +95,8 @@ static struct dev_ops epic_dev_ops = {
 	nulldev,		/* reset */
 	&epic_cb_ops,
 	(struct bus_ops *)NULL,
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -120,7 +119,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"epic_client driver v%I%",
+	"epic_client driver",
 	&epic_dev_ops
 };
 
@@ -238,8 +237,8 @@ epic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 		res = ddi_regs_map_setup(dip, 0, (caddr_t *)&softc->cmd_reg,
-			EPIC_REGS_OFFSET, EPIC_REGS_LEN, &dev_attr,
-			&softc->cmd_handle);
+		    EPIC_REGS_OFFSET, EPIC_REGS_LEN, &dev_attr,
+		    &softc->cmd_handle);
 
 		if (res != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "ddi_regs_map_setup() failed\n");
@@ -342,44 +341,44 @@ int *rvalp)
 
 	switch (cmd) {
 	case EPIC_SET_POWER_LED:
-	    EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
-			EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
-			EPIC_POWER_LED_ON);
-	    break;
+		EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
+		    EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
+		    EPIC_POWER_LED_ON);
+		break;
 	case EPIC_RESET_POWER_LED:
-	    EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
-			EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
-			EPIC_POWER_LED_OFF);
-	    break;
+		EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
+		    EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
+		    EPIC_POWER_LED_OFF);
+		break;
 	case EPIC_SB_BL_POWER_LED:
-	    EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
-			EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
-			EPIC_POWER_LED_SB_BLINK);
-	    break;
+		EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
+		    EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
+		    EPIC_POWER_LED_SB_BLINK);
+		break;
 	case EPIC_FAST_BL_POWER_LED:
-	    EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
-			EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
-			EPIC_POWER_LED_FAST_BLINK);
-	    break;
+		EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
+		    EPIC_IND_LED_STATE0, EPIC_POWER_LED_MASK,
+		    EPIC_POWER_LED_FAST_BLINK);
+		break;
 	case EPIC_SET_ALERT_LED:
-	    EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
-			EPIC_IND_LED_STATE0, EPIC_ALERT_LED_MASK,
-			EPIC_ALERT_LED_ON);
-	    break;
+		EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
+		    EPIC_IND_LED_STATE0, EPIC_ALERT_LED_MASK,
+		    EPIC_ALERT_LED_ON);
+		break;
 	case EPIC_RESET_ALERT_LED:
-	    EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
-			EPIC_IND_LED_STATE0, EPIC_ALERT_LED_MASK,
-			EPIC_ALERT_LED_OFF);
-	    break;
+		EPIC_WRITE(softc->cmd_handle, softc->cmd_reg,
+		    EPIC_IND_LED_STATE0, EPIC_ALERT_LED_MASK,
+		    EPIC_ALERT_LED_OFF);
+		break;
 	case EPIC_GET_FW:
-	    EPIC_READ(softc->cmd_handle, softc->cmd_reg,
-			in_command, EPIC_IND_FW_VERSION);
-	    if (ddi_copyout((void *)(&in_command), (void *)arg,
-			sizeof (in_command), mode) != DDI_SUCCESS) {
-		    mutex_exit(&softc->mutex);
-		    return (EFAULT);
-	    }
-	    break;
+		EPIC_READ(softc->cmd_handle, softc->cmd_reg,
+		    in_command, EPIC_IND_FW_VERSION);
+		if (ddi_copyout((void *)(&in_command), (void *)arg,
+		    sizeof (in_command), mode) != DDI_SUCCESS) {
+			mutex_exit(&softc->mutex);
+			return (EFAULT);
+		}
+		break;
 	default:
 		mutex_exit(&softc->mutex);
 		cmn_err(CE_WARN, "epic: cmd %d is not valid", cmd);

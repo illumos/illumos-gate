@@ -151,7 +151,9 @@ struct dev_ops npe_ops = {
 	npe_detach,		/* detach */
 	nulldev,		/* reset */
 	&npe_cb_ops,		/* driver operations */
-	&npe_bus_ops		/* bus operations */
+	&npe_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -328,7 +330,6 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 }
-
 
 static int
 npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,

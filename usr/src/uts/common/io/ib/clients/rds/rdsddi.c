@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -55,7 +54,7 @@
 
 #define	RDS_NAME	"rds"
 #define	RDS_STRTAB	rdsinfo
-#define	RDS_DEVDESC	"RDS STREAMS driver %I%"
+#define	RDS_DEVDESC	"RDS STREAMS driver"
 #define	RDS_DEVMINOR	0
 #define	RDS_DEVMTFLAGS D_MP | D_SYNCSTR
 #define	RDS_DEFAULT_PRIV_MODE	0666
@@ -944,7 +943,7 @@ struct streamtab rdsinfo = {
 };
 
 DDI_DEFINE_STREAM_OPS(rds_devops, nulldev, nulldev, rds_attach, rds_detach,
-    nulldev, rds_info, RDS_DEVMTFLAGS, &RDS_STRTAB);
+    nulldev, rds_info, RDS_DEVMTFLAGS, &RDS_STRTAB, ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.

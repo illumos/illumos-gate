@@ -114,6 +114,7 @@
 #include <sys/debug_info.h>
 #include <sys/bootinfo.h>
 #include <sys/ddi_timer.h>
+#include <sys/multiboot.h>
 
 #ifdef __xpv
 
@@ -206,7 +207,7 @@ char *kobj_file_buf;
 int kobj_file_bufsize;	/* set in /etc/system */
 
 /* Global variables for MP support. Used in mp_startup */
-caddr_t	rm_platter_va;
+caddr_t	rm_platter_va = 0;
 uint32_t rm_platter_pa;
 
 int	auto_lpg_disable = 1;
@@ -239,6 +240,7 @@ struct boot_syscalls	*sysp;		/* passed in from boot */
 char bootblock_fstype[16];
 
 char kern_bootargs[OBP_MAXPATHLEN];
+char kern_bootfile[OBP_MAXPATHLEN];
 
 /*
  * ZFS zio segment.  This allows us to exclude large portions of ZFS data that
@@ -518,6 +520,12 @@ static page_t *bootpages;
  */
 static page_t *rd_pages;
 
+/*
+ * Lower 64K
+ */
+static page_t *lower_pages = NULL;
+static int lower_pages_count = 0;
+
 struct system_hardware system_hardware;
 
 /*
@@ -650,6 +658,7 @@ startup(void)
 #if !defined(__xpv)
 	extern void startup_bios_disk(void);
 	extern void startup_pci_bios(void);
+	extern int post_fastreboot;
 #endif
 	extern cpuset_t cpu_ready_set;
 
@@ -678,14 +687,16 @@ startup(void)
 	startup_kmem();
 	startup_vm();
 #if !defined(__xpv)
-	startup_pci_bios();
+	if (!post_fastreboot)
+		startup_pci_bios();
 #endif
 #if defined(__xpv)
 	startup_xen_mca();
 #endif
 	startup_modules();
 #if !defined(__xpv)
-	startup_bios_disk();
+	if (!post_fastreboot)
+		startup_bios_disk();
 #endif
 	startup_end();
 	progressbar_start();
@@ -2145,12 +2156,10 @@ post_startup(void)
 }
 
 static int
-pp_in_ramdisk(page_t *pp)
+pp_in_range(page_t *pp, uint64_t low_addr, uint64_t high_addr)
 {
-	extern uint64_t ramdisk_start, ramdisk_end;
-
-	return ((pp->p_pagenum >= btop(ramdisk_start)) &&
-	    (pp->p_pagenum < btopr(ramdisk_end)));
+	return ((pp->p_pagenum >= btop(low_addr)) &&
+	    (pp->p_pagenum < btopr(high_addr)));
 }
 
 void
@@ -2171,7 +2180,9 @@ release_bootstrap(void)
 	 * We're finished using the boot loader so free its pages.
 	 */
 	PRM_POINT("Unmapping lower boot pages");
+
 	clear_boot_mappings(0, _userlimit);
+
 	postbootkernelbase = kernelbase;
 
 	/*
@@ -2189,9 +2200,22 @@ release_bootstrap(void)
 
 	PRM_POINT("Releasing boot pages");
 	while (bootpages) {
+		extern uint64_t ramdisk_start, ramdisk_end;
 		pp = bootpages;
 		bootpages = pp->p_next;
-		if (root_is_ramdisk && pp_in_ramdisk(pp)) {
+
+
+		/* Keep pages for the lower 64K */
+		if (pp_in_range(pp, 0, 0x40000)) {
+			pp->p_next = lower_pages;
+			lower_pages = pp;
+			lower_pages_count++;
+			continue;
+		}
+
+
+		if (root_is_ramdisk && pp_in_range(pp, ramdisk_start,
+		    ramdisk_end)) {
 			pp->p_next = rd_pages;
 			rd_pages = pp;
 			continue;
@@ -2211,7 +2235,12 @@ release_bootstrap(void)
 	 * Make sure it has a kernel VA as well as a 1:1 mapping.
 	 * We should have just free'd one up.
 	 */
-	for (pfn = 1; pfn < btop(1*1024*1024); pfn++) {
+
+	/*
+	 * 0x10 pages is 64K.  Leave the bottom 64K alone
+	 * for BIOS.
+	 */
+	for (pfn = 0x10; pfn < btop(1*1024*1024); pfn++) {
 		if (page_numtopp_alloc(pfn) == NULL)
 			continue;
 		rm_platter_va = i86devmap(pfn, 1,

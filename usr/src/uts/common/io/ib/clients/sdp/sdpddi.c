@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -76,7 +75,7 @@
  */
 
 #define	SDP_NAME	"sdp"
-#define	SDP_DEVDESC	"SDP STREAMS driver %I%"
+#define	SDP_DEVDESC	"SDP STREAMS driver"
 #define	SDP_DEVMINOR	0
 
 static dev_info_t *sdp_dev_info;
@@ -289,7 +288,7 @@ struct streamtab sdpinfo = {
 };
 
 DDI_DEFINE_STREAM_OPS(sdp_devops, nulldev, nulldev, sdp_gen_attach,
-    sdp_gen_detach, nodev, NULL, D_MP, &sdpinfo);
+    sdp_gen_detach, nodev, NULL, D_MP, &sdpinfo, ddi_quiesce_not_needed);
 
 /*
  * Module linkage information for the kernel.

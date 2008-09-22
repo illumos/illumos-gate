@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * bscv.c - multi-threaded lom driver for the Stiletto platform.
@@ -84,6 +83,7 @@ static int bscv_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int bscv_attach(dev_info_t *, ddi_attach_cmd_t);
 static int bscv_detach(dev_info_t *, ddi_detach_cmd_t);
 static int bscv_reset(dev_info_t *, ddi_reset_cmd_t);
+static int bscv_quiesce(dev_info_t *);
 static int bscv_map_regs(bscv_soft_state_t *);
 static void bscv_unmap_regs(bscv_soft_state_t *);
 static void bscv_map_chan_logical_physical(bscv_soft_state_t *);
@@ -372,7 +372,9 @@ static struct dev_ops bscv_dev_ops = {
 	bscv_detach,		/* devo_detach */
 	bscv_reset,		/* devo_reset */
 	&bscv_cb_ops,		/* devo_cb_ops */
-	(struct bus_ops *)0	/* devo_bus_ops */
+	(struct bus_ops *)0,	/* devo_bus_ops */
+	NULL,			/* devo_power */
+	bscv_quiesce,		/* devo_quiesce */
 };
 
 /*
@@ -380,9 +382,9 @@ static struct dev_ops bscv_dev_ops = {
  */
 
 #ifdef DEBUG
-#define	BSCV_VERSION_STRING "bscv driver - Debug v%I%"
+#define	BSCV_VERSION_STRING "bscv driver - Debug"
 #else /* DEBUG */
-#define	BSCV_VERSION_STRING "bscv driver v%I%"
+#define	BSCV_VERSION_STRING "bscv driver"
 #endif /* DEBUG */
 
 static struct modldrv modldrv = {
@@ -769,6 +771,32 @@ bscv_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 	default:
 		return (DDI_FAILURE);
 	}
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+bscv_quiesce(dev_info_t *dip)
+{
+	bscv_soft_state_t *ssp;
+	int	instance;
+
+
+	instance = ddi_get_instance(dip);
+	ssp = ddi_get_soft_state(bscv_statep, instance);
+	if (ssp == NULL) {
+		return (DDI_FAILURE);
+	}
+	bscv_full_stop(ssp);
+	return (DDI_SUCCESS);
 }
 
 /*

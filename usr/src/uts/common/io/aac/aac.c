@@ -239,6 +239,7 @@ static void aac_rkt_set_mailbox(struct aac_softstate *, uint32_t, uint32_t,
 static int aac_attach(dev_info_t *, ddi_attach_cmd_t);
 static int aac_detach(dev_info_t *, ddi_detach_cmd_t);
 static int aac_reset(dev_info_t *, ddi_reset_cmd_t);
+static int aac_quiesce(dev_info_t *);
 
 /*
  * Interrupt handler functions
@@ -438,7 +439,8 @@ static struct dev_ops aac_dev_ops = {
 	aac_reset,
 	&aac_cb_ops,
 	NULL,
-	NULL
+	NULL,
+	aac_quiesce,
 };
 
 static struct modldrv aac_modldrv = {
@@ -1044,6 +1046,29 @@ aac_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 	mutex_enter(&softs->io_lock);
 	(void) aac_shutdown(softs);
 	mutex_exit(&softs->io_lock);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+aac_quiesce(dev_info_t *dip)
+{
+	struct aac_softstate *softs = AAC_DIP2SOFTS(dip);
+
+	if (softs == NULL)
+		return (DDI_FAILURE);
+
+	AAC_DISABLE_INTR(softs);
 
 	return (DDI_SUCCESS);
 }

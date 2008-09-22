@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
  * Solaris x86 ACPI ThermalZone Monitor
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/conf.h>
@@ -122,6 +121,7 @@ static struct dev_ops tzmon_ops = {
 	&tzmon_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)0,	/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 extern	struct	mod_ops mod_driverops;

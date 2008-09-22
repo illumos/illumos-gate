@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -88,7 +87,9 @@ static struct dev_ops grfans_ops = {
 	grfans_detach,
 	nodev,
 	&grfans_cbops,
-	NULL
+	NULL,			/* bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv grfans_modldrv = {

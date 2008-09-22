@@ -108,6 +108,11 @@ CLEANFILES	+=		\
 	$(OBJS_DIR)/bios_call.s \
 	$(DBOOT_BIN)
 
+CLEANFILES	+=		\
+	$(OBJS_DIR)/fb_swtch_src.o \
+	$(OBJS_DIR)/fb_swtch_src \
+	$(OBJS_DIR)/fb_swtch.s
+
 CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN) $(MULTIBOOT)
 CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
 

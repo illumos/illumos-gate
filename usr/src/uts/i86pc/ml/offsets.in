@@ -1,5 +1,5 @@
 \
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -22,7 +22,6 @@
 \ CDDL HEADER END
 \
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 \
 \ offsets.in: input file to produce assym.h using the ctfstabs program
@@ -60,6 +59,7 @@
 #include <sys/lgrp.h>
 #include <sys/dtrace.h>
 #include <sys/brand.h>
+#include <sys/fastboot.h>
 #include <sys/cpr_wakecode.h>
 
 proc		PROCSIZE
@@ -385,6 +385,31 @@ copyops
 
 brand
 	b_machops
+
+fastboot_file_t
+	fb_va
+	fb_pte_list_va
+	fb_pte_list_pa
+	fb_dest_pa
+	fb_size
+	fb_next_pa
+	fb_sections
+	fb_sectcnt
+
+fastboot_section_t
+	fb_sec_offset
+	fb_sec_paddr
+	fb_sec_size
+	fb_sec_bss_size
+
+fastboot_info_t
+	fi_files
+	fi_has_pae
+	fi_pagetable_va
+	fi_pagetable_pa
+	fi_last_table_pa
+	fi_new_mbi_pa
+	fi_valid
 
 zone
 	zone_brand_data

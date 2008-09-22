@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -256,6 +255,19 @@ devi_reset(dev_info_t *devi, ddi_reset_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	return ((*fn)(devi, cmd));
+}
+
+int
+devi_quiesce(dev_info_t *devi)
+{
+	struct dev_ops *ops;
+	int (*fn)(dev_info_t *);
+
+	if (((ops = ddi_get_driver(devi)) == NULL) ||
+	    (ops->devo_rev < 4) || ((fn = ops->devo_quiesce) == NULL))
+		return (DDI_FAILURE);
+
+	return ((*fn)(devi));
 }
 
 /*

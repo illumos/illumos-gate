@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/param.h>
@@ -162,14 +160,16 @@ static struct dev_ops pcf8574_ops = {
 	pcf8574_detach,
 	nodev,
 	&pcf8574_cbops,
-	NULL
+	NULL,				/* bus_ops */
+	NULL,				/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv pcf8574_modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"Netract pcf8574 (gpio) %I% ",
+	"Netract pcf8574 (gpio)",
 	&pcf8574_ops,
 };
 
@@ -189,7 +189,7 @@ _init(void)
 	error = mod_install(&pcf8574_modlinkage);
 	if (!error) {
 		(void) ddi_soft_state_init(&pcf8574_soft_statep,
-			sizeof (struct pcf8574_unit), PCF8574_MAX_DEVS);
+		    sizeof (struct pcf8574_unit), PCF8574_MAX_DEVS);
 	}
 
 	return (error);
@@ -227,7 +227,7 @@ pcf8574_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574_soft_statep, instance);
+	    ddi_get_soft_state(pcf8574_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -277,7 +277,7 @@ pcf8574_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574_soft_statep, instance);
+	    ddi_get_soft_state(pcf8574_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -316,7 +316,7 @@ pcf8574_io(dev_t dev, struct uio *uiop, int rw)
 	}
 
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574_soft_statep, instance);
+	    ddi_get_soft_state(pcf8574_soft_statep, instance);
 	if (unitp == NULL) {
 		return (ENXIO);
 	}
@@ -328,18 +328,18 @@ pcf8574_io(dev_t dev, struct uio *uiop, int rw)
 
 	if (rw == B_WRITE) {
 		err = uiomove(unitp->i2c_tran->i2c_wbuf,
-			bytes_to_rw, UIO_WRITE, uiop);
+		    bytes_to_rw, UIO_WRITE, uiop);
 
 		if (!err) {
 			err = pcf8574_write_chip(unitp, bytes_to_rw,
-				unitp->writemask);
+			    unitp->writemask);
 		}
 
 	} else {
 			err = pcf8574_read_chip(unitp, bytes_to_rw);
 			if (!err) {
 				err = uiomove(unitp->i2c_tran->i2c_rbuf,
-					bytes_to_rw, UIO_READ, uiop);
+				    bytes_to_rw, UIO_READ, uiop);
 			}
 	}
 
@@ -355,7 +355,7 @@ pcf8574_do_resume(dev_info_t *dip)
 {
 	int instance = ddi_get_instance(dip);
 	struct pcf8574_unit *unitp =
-		ddi_get_soft_state(pcf8574_soft_statep, instance);
+	    ddi_get_soft_state(pcf8574_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -392,7 +392,7 @@ pcf8574_do_detach(dev_info_t *dip)
 	}
 
 	scsb_fru_unregister((void *)unitp,
-		(fru_id_t)unitp->props.slave_address);
+	    (fru_id_t)unitp->props.slave_address);
 
 	if (attach_flag & PCF8574_ALLOC_TRANSFER) {
 		/*
@@ -414,11 +414,11 @@ pcf8574_do_detach(dev_info_t *dip)
 
 	if (attach_flag & PCF8574_PROPS_READ) {
 		if (unitp->pcf8574_type == PCF8574_ADR_CPUVOLTAGE &&
-			unitp->props.num_chans_used != 0) {
+		    unitp->props.num_chans_used != 0) {
 			ddi_prop_free(unitp->props.channels_in_use);
 		} else {
 			ddi_prop_remove(DDI_DEV_T_NONE, dip,
-							"interrupt-priorities");
+			    "interrupt-priorities");
 		}
 	}
 
@@ -458,11 +458,11 @@ pcf8574_do_attach(dev_info_t *dip)
 #ifdef DEBUG
 	if (pcf8574_debug & 0x04)
 		cmn_err(CE_NOTE, "pcf8574_attach: instance=%d\n",
-		instance);
+		    instance);
 #endif /* DEBUG */
 
 	if (ddi_soft_state_zalloc(pcf8574_soft_statep, instance) !=
-		DDI_SUCCESS) {
+	    DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 	unitp = ddi_get_soft_state(pcf8574_soft_statep, instance);
@@ -489,12 +489,12 @@ pcf8574_do_attach(dev_info_t *dip)
 	unitp->current_mode = ENVCTRL_NORMAL_MODE;
 
 	snprintf(unitp->pcf8574_name, PCF8574_NAMELEN,
-		"%s%d", ddi_driver_name(dip), instance);
+	    "%s%d", ddi_driver_name(dip), instance);
 
 	if (unitp->pcf8574_type == PCF8574_TYPE_PWRSUPP) {
 		(void) sprintf(name, "pwrsuppply");
 		if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
-			PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
 			pcf8574_do_detach(dip);
 
@@ -505,7 +505,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	if (unitp->pcf8574_type == PCF8574_TYPE_FANTRAY) {
 		(void) sprintf(name, "fantray");
 		if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
-			PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
 			pcf8574_do_detach(dip);
 
@@ -516,7 +516,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	if (unitp->pcf8574_type == PCF8574_TYPE_CPUVOLTAGE) {
 		(void) sprintf(name, "cpuvoltage");
 		if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
-			PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    PCF8574_NODE_TYPE, NULL) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
 			pcf8574_do_detach(dip);
 
@@ -543,13 +543,13 @@ pcf8574_do_attach(dev_info_t *dip)
 	}
 
 	for (i = unitp->props.num_chans_used,
-		chp = unitp->props.channels_in_use; i; --i, ++chp) {
+	    chp = unitp->props.channels_in_use; i; --i, ++chp) {
 		unitp->readmask |= (uint8_t)(
-			(chp->io_dir == I2C_PROP_IODIR_IN ||
-			chp->io_dir == I2C_PROP_IODIR_INOUT) << chp->port);
+		    (chp->io_dir == I2C_PROP_IODIR_IN ||
+		    chp->io_dir == I2C_PROP_IODIR_INOUT) << chp->port);
 		unitp->writemask |= (uint8_t)(
-			(chp->io_dir == I2C_PROP_IODIR_OUT ||
-			chp->io_dir == I2C_PROP_IODIR_INOUT) << chp->port);
+		    (chp->io_dir == I2C_PROP_IODIR_OUT ||
+		    chp->io_dir == I2C_PROP_IODIR_INOUT) << chp->port);
 	}
 
 #ifdef DEBUG
@@ -558,7 +558,7 @@ pcf8574_do_attach(dev_info_t *dip)
 #endif /* DEBUG */
 
 	if (i2c_client_register(dip, &unitp->pcf8574_hdl)
-		!= I2C_SUCCESS) {
+	    != I2C_SUCCESS) {
 		pcf8574_do_detach(dip);
 
 		return (DDI_FAILURE);
@@ -570,8 +570,8 @@ pcf8574_do_attach(dev_info_t *dip)
 	 * is used throughout the driver.
 	 */
 	if (i2c_transfer_alloc(unitp->pcf8574_hdl, &unitp->i2c_tran,
-		MAX_WLEN, MAX_RLEN, KM_SLEEP)
-		!= I2C_SUCCESS) {
+	    MAX_WLEN, MAX_RLEN, KM_SLEEP)
+	    != I2C_SUCCESS) {
 		pcf8574_do_detach(dip);
 		return (DDI_FAILURE);
 	}
@@ -599,10 +599,10 @@ pcf8574_do_attach(dev_info_t *dip)
 	 * the returned value to check that the device instance exists.
 	 */
 	dev_presence = scsb_fru_register(pcf8574_callback, (void *)unitp,
-			(fru_id_t)unitp->props.slave_address);
+	    (fru_id_t)unitp->props.slave_address);
 	if (dev_presence == FRU_NOT_AVAILABLE) {
 		scsb_fru_unregister((void *)unitp,
-			(fru_id_t)unitp->props.slave_address);
+		    (fru_id_t)unitp->props.slave_address);
 	}
 
 	/*
@@ -637,10 +637,10 @@ pcf8574_do_attach(dev_info_t *dip)
 #ifdef DEBUG
 		if (pcf8574_debug & 0x0004)
 			cmn_err(CE_NOTE, "registering pcf9574 interrupt "
-					"handler");
+			    "handler");
 #endif /* DEBUG */
 		if (scsb_intr_register(pcf8574_intr, (void *)unitp,
-			(fru_id_t)unitp->props.slave_address) == DDI_SUCCESS) {
+		    (fru_id_t)unitp->props.slave_address) == DDI_SUCCESS) {
 			unitp->pcf8574_canintr |= PCF8574_INTR_ENABLED;
 			unitp->attach_flag |= PCF8574_INTR_ADDED;
 		} else {
@@ -673,7 +673,7 @@ pcf8574_do_suspend(dev_info_t *dip)
 {
 	int instance = ddi_get_instance(dip);
 	struct pcf8574_unit *unitp =
-		ddi_get_soft_state(pcf8574_soft_statep, instance);
+	    ddi_get_soft_state(pcf8574_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -710,7 +710,7 @@ pcf8574_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 
 	instance = getminor(dev);
 	if ((unitp = (struct pcf8574_unit *)ddi_get_soft_state(
-		pcf8574_soft_statep, instance)) == NULL) {
+	    pcf8574_soft_statep, instance)) == NULL) {
 		return (ENXIO);
 	}
 	*reventsp = 0;
@@ -743,7 +743,7 @@ pcf8574_intr(caddr_t arg)
 	ic = DDI_INTR_CLAIMED;
 #ifdef DEBUG
 	cmn_err(CE_NOTE, " In the interrupt service routine, %x",
-		unitp->props.slave_address);
+	    unitp->props.slave_address);
 #endif
 
 	/*
@@ -768,13 +768,13 @@ pcf8574_intr(caddr_t arg)
 		}
 		case PCF8574_TYPE_PWRSUPP: {
 			envctrl_pwrsupp_t *envp =
-				(envctrl_pwrsupp_t *)unitp->envctrl_kstat;
+			    (envctrl_pwrsupp_t *)unitp->envctrl_kstat;
 			dev_presence = envp->ps_present;
 			break;
 		}
 		case PCF8574_TYPE_FANTRAY: {
 			envctrl_fantray_t *envp =
-				(envctrl_fantray_t *)unitp->envctrl_kstat;
+			    (envctrl_fantray_t *)unitp->envctrl_kstat;
 			dev_presence = envp->fan_present;
 			break;
 		}
@@ -803,12 +803,12 @@ pcf8574_intr(caddr_t arg)
 	case PCF8574_TYPE_PWRSUPP:
 	{
 		envctrl_pwrsupp_t *envp =
-			(envctrl_pwrsupp_t *)unitp->envctrl_kstat;
+		    (envctrl_pwrsupp_t *)unitp->envctrl_kstat;
 
 		if (PCF8574_PS_FAULT(value) ||
-			PCF8574_PS_TEMPOK(value) ||
-			PCF8574_PS_ONOFF(value) ||
-			PCF8574_PS_FANOK(value)) {
+		    PCF8574_PS_TEMPOK(value) ||
+		    PCF8574_PS_ONOFF(value) ||
+		    PCF8574_PS_FANOK(value)) {
 
 			envp->ps_ok =		PCF8574_PS_FAULT(value);
 			envp->temp_ok =		PCF8574_PS_TEMPOK(value);
@@ -817,13 +817,13 @@ pcf8574_intr(caddr_t arg)
 			envp->ps_ver =		PCF8574_PS_TYPE(value);
 
 			tp->i2c_wbuf[0] =
-				PCF8574_PS_DEFAULT | PCF8574_PS_MASKINTR;
+			    PCF8574_PS_DEFAULT | PCF8574_PS_MASKINTR;
 			tp->i2c_wlen = 1;
 			tp->i2c_rlen = 0;
 			tp->i2c_flags = I2C_WR;
 
 			unitp->i2c_status =
-				nct_i2c_transfer(unitp->pcf8574_hdl, tp);
+			    nct_i2c_transfer(unitp->pcf8574_hdl, tp);
 
 			unitp->poll_event = POLLIN;
 			pollwakeup(&unitp->poll, POLLIN);
@@ -836,7 +836,7 @@ pcf8574_intr(caddr_t arg)
 	case PCF8574_TYPE_FANTRAY:
 	{
 		envctrl_fantray_t *envp =
-			(envctrl_fantray_t *)unitp->envctrl_kstat;
+		    (envctrl_fantray_t *)unitp->envctrl_kstat;
 
 		if (!PCF8574_FAN_FAULT(value)) {
 
@@ -845,13 +845,13 @@ pcf8574_intr(caddr_t arg)
 			envp->fanspeed =  	PCF8574_FAN_FANSPD(value);
 
 			tp->i2c_wbuf[0] =
-				PCF8574_FAN_DEFAULT | PCF8574_FAN_MASKINTR;
+			    PCF8574_FAN_DEFAULT | PCF8574_FAN_MASKINTR;
 			tp->i2c_wlen = 1;
 			tp->i2c_rlen = 0;
 			tp->i2c_flags = I2C_WR;
 
 			unitp->i2c_status =
-				nct_i2c_transfer(unitp->pcf8574_hdl, tp);
+			    nct_i2c_transfer(unitp->pcf8574_hdl, tp);
 
 			unitp->poll_event = POLLIN;
 			pollwakeup(&unitp->poll, POLLIN);
@@ -885,7 +885,7 @@ call_copyin(caddr_t arg, struct pcf8574_unit *unitp, int mode)
 
 
 	if (ddi_copyin((void *)arg, (caddr_t)&i2ct,
-		sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
+	    sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
 		return (I2C_FAILURE);
 	}
 
@@ -909,7 +909,7 @@ call_copyin(caddr_t arg, struct pcf8574_unit *unitp, int mode)
 
 	if (i2ct.i2c_wlen != 0) {
 		if (ddi_copyin(i2ct.i2c_wbuf, (caddr_t)i2ctp->i2c_wbuf,
-			i2ct.i2c_wlen, mode) != DDI_SUCCESS) {
+		    i2ct.i2c_wlen, mode) != DDI_SUCCESS) {
 				return (I2C_FAILURE);
 		}
 	}
@@ -930,7 +930,7 @@ call_copyout(caddr_t arg, struct pcf8574_unit *unitp, int mode)
 	 */
 
 	int uskip = sizeof (i2c_transfer_t) - 3*sizeof (int16_t),
-		kskip = sizeof (i2c_transfer_t) - 3*sizeof (int16_t);
+	    kskip = sizeof (i2c_transfer_t) - 3*sizeof (int16_t);
 
 	/*
 	 * First copyin the user structure to the temporary i2ct,
@@ -944,8 +944,8 @@ call_copyout(caddr_t arg, struct pcf8574_unit *unitp, int mode)
 	 */
 
 	if (ddi_copyout((void *)((intptr_t)i2ctp+kskip), (void *)
-		((intptr_t)arg + uskip), 3*sizeof (uint16_t), mode)
-		!= DDI_SUCCESS) {
+	    ((intptr_t)arg + uskip), 3*sizeof (uint16_t), mode)
+	    != DDI_SUCCESS) {
 		return (I2C_FAILURE);
 		}
 
@@ -957,7 +957,7 @@ call_copyout(caddr_t arg, struct pcf8574_unit *unitp, int mode)
 	if (i2ctp->i2c_rlen > i2ctp->i2c_r_resid) {
 
 		if (ddi_copyin((void *)arg, &i2ct,
-			sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
+		    sizeof (i2c_transfer_t), mode) != DDI_SUCCESS) {
 			return (I2C_FAILURE);
 		}
 
@@ -966,8 +966,8 @@ call_copyout(caddr_t arg, struct pcf8574_unit *unitp, int mode)
 		 */
 
 		if (ddi_copyout(i2ctp->i2c_rbuf, i2ct.i2c_rbuf,
-			i2ctp->i2c_rlen - i2ctp->i2c_r_resid, mode)
-			!= DDI_SUCCESS) {
+		    i2ctp->i2c_rlen - i2ctp->i2c_r_resid, mode)
+		    != DDI_SUCCESS) {
 			return (I2C_FAILURE);
 		}
 	}
@@ -992,14 +992,14 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 		return (ENXIO);
 	}
 	unitp = (struct pcf8574_unit *)
-		ddi_get_soft_state(pcf8574_soft_statep, instance);
+	    ddi_get_soft_state(pcf8574_soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
 	}
 
 	dev_presence =
-		scsb_fru_status((uchar_t)unitp->props.slave_address);
+	    scsb_fru_status((uchar_t)unitp->props.slave_address);
 
 	CV_LOCK(EINTR)
 
@@ -1010,7 +1010,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 	}
 
 	if (ddi_copyin((caddr_t)arg, (caddr_t)&inval,
-		sizeof (uint8_t), mode) != DDI_SUCCESS) {
+	    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 		err = EFAULT;
 		break;
 	}
@@ -1019,9 +1019,9 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 		err = EINVAL;
 	} else {
 		unitp->i2c_tran->i2c_wbuf[0] =
-			PCF8574_INT_MASK(inval);
+		    PCF8574_INT_MASK(inval);
 		if (pcf8574_write_chip(unitp, 1, PCF8574_INTRMASK_BIT)
-			!= I2C_SUCCESS) {
+		    != I2C_SUCCESS) {
 			err = EFAULT;
 		}
 	}
@@ -1037,12 +1037,12 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 		break;
 	}
 	if (ddi_copyin((caddr_t)arg, (caddr_t)&inval, sizeof (uint8_t),
-		mode) != DDI_SUCCESS) {
+	    mode) != DDI_SUCCESS) {
 			err = EFAULT;
 			break;
 	}
 	if (inval != PCF8574_FAN_SPEED_LOW &&
-		inval != PCF8574_FAN_SPEED_HIGH) {
+	    inval != PCF8574_FAN_SPEED_HIGH) {
 		err = EINVAL;
 		break;
 	}
@@ -1050,7 +1050,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 	unitp->i2c_tran->i2c_wbuf[0] = PCF8574_FAN_SPEED(inval);
 
 	if (pcf8574_write_chip(unitp, 1, PCF8574_FANSPEED_BIT)
-		!= I2C_SUCCESS) {
+	    != I2C_SUCCESS) {
 		err = EFAULT;
 	}
 	break;
@@ -1067,12 +1067,12 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 			break;
 		}
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&inval,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		} else {
 			unitp->i2c_tran->i2c_wbuf[0] = inval & 0xff;
 			if (pcf8574_write_chip(unitp, 1, 0xff)
-				!= I2C_SUCCESS) {
+			    != I2C_SUCCESS) {
 				err = EFAULT;
 			}
 		}
@@ -1091,7 +1091,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 			break;
 		}
 		if (pcf8574_read_chip(unitp, 1)
-			!= I2C_SUCCESS) {
+		    != I2C_SUCCESS) {
 			err = EFAULT;
 			break;
 		}
@@ -1138,7 +1138,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 		}
 
 		if (ddi_copyout((caddr_t)&outval, (caddr_t)arg,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 	}
@@ -1148,7 +1148,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 		uint8_t curr_mode = unitp->current_mode;
 
 		if (ddi_copyout((caddr_t)&curr_mode, (caddr_t)arg,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 			err = EFAULT;
 		}
 		break;
@@ -1157,12 +1157,12 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 	case ENVC_IOC_SETMODE: {
 		uint8_t curr_mode;
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&curr_mode,
-			sizeof (uint8_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint8_t), mode) != DDI_SUCCESS) {
 				err = EFAULT;
 				break;
 		}
 		if (curr_mode == ENVCTRL_DIAG_MODE ||
-			curr_mode == ENVCTRL_NORMAL_MODE) {
+		    curr_mode == ENVCTRL_NORMAL_MODE) {
 			unitp->current_mode = curr_mode; /* Don't do anything */
 		}
 		break;
@@ -1175,13 +1175,13 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg,
 			break;
 		}
 		unitp->i2c_status = err =
-			nct_i2c_transfer(unitp->pcf8574_hdl, unitp->i2c_tran);
+		    nct_i2c_transfer(unitp->pcf8574_hdl, unitp->i2c_tran);
 
 		if (err != I2C_SUCCESS) {
 			err = EIO;
 		} else {
 			if (call_copyout((caddr_t)arg, unitp, mode)
-				!= DDI_SUCCESS) {
+			    != DDI_SUCCESS) {
 				err = EFAULT;
 				break;
 			}
@@ -1214,13 +1214,13 @@ pcf8574_add_kstat(struct pcf8574_unit *unitp, scsb_fru_status_t dev_presence)
 	case PCF8574_TYPE_CPUVOLTAGE:
 	{
 		if ((unitp->kstatp = kstat_create(I2C_PCF8574_NAME,
-			unitp->instance, I2C_KSTAT_CPUVOLTAGE, "misc",
-			KSTAT_TYPE_RAW, sizeof (envctrl_cpuvoltage_t),
-			KSTAT_FLAG_PERSISTENT)) != NULL) {
+		    unitp->instance, I2C_KSTAT_CPUVOLTAGE, "misc",
+		    KSTAT_TYPE_RAW, sizeof (envctrl_cpuvoltage_t),
+		    KSTAT_FLAG_PERSISTENT)) != NULL) {
 
 			if ((unitp->envctrl_kstat = kmem_zalloc(
-				sizeof (envctrl_cpuvoltage_t), KM_NOSLEEP)) ==
-				NULL) {
+			    sizeof (envctrl_cpuvoltage_t), KM_NOSLEEP)) ==
+			    NULL) {
 				kstat_delete(unitp->kstatp);
 				return (DDI_FAILURE);
 			}
@@ -1242,13 +1242,13 @@ pcf8574_add_kstat(struct pcf8574_unit *unitp, scsb_fru_status_t dev_presence)
 		}
 		sprintf(ksname, "%s%d", I2C_KSTAT_PWRSUPPLY, id);
 		if ((unitp->kstatp = kstat_create(I2C_PCF8574_NAME,
-			unitp->instance, ksname, "misc",
-			KSTAT_TYPE_RAW, sizeof (envctrl_pwrsupp_t),
-			KSTAT_FLAG_PERSISTENT)) != NULL) {
+		    unitp->instance, ksname, "misc",
+		    KSTAT_TYPE_RAW, sizeof (envctrl_pwrsupp_t),
+		    KSTAT_FLAG_PERSISTENT)) != NULL) {
 
 			if ((unitp->envctrl_kstat = kmem_zalloc(
-				sizeof (envctrl_pwrsupp_t), KM_NOSLEEP)) ==
-				NULL) {
+			    sizeof (envctrl_pwrsupp_t), KM_NOSLEEP)) ==
+			    NULL) {
 				kstat_delete(unitp->kstatp);
 				return (DDI_FAILURE);
 			}
@@ -1282,13 +1282,13 @@ pcf8574_add_kstat(struct pcf8574_unit *unitp, scsb_fru_status_t dev_presence)
 		}
 		sprintf(ksname, "%s%d", I2C_KSTAT_FANTRAY, id);
 		if ((unitp->kstatp = kstat_create(I2C_PCF8574_NAME,
-			unitp->instance, ksname, "misc",
-			KSTAT_TYPE_RAW, sizeof (envctrl_fantray_t),
-			KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) != NULL) {
+		    unitp->instance, ksname, "misc",
+		    KSTAT_TYPE_RAW, sizeof (envctrl_fantray_t),
+		    KSTAT_FLAG_PERSISTENT | KSTAT_FLAG_WRITABLE)) != NULL) {
 
 			if ((unitp->envctrl_kstat = kmem_zalloc(
-				sizeof (envctrl_fantray_t), KM_NOSLEEP)) ==
-				NULL) {
+			    sizeof (envctrl_fantray_t), KM_NOSLEEP)) ==
+			    NULL) {
 				kstat_delete(unitp->kstatp);
 				return (DDI_FAILURE);
 			}
@@ -1343,7 +1343,7 @@ pcf8574_read_chip(struct pcf8574_unit *unitp, uint16_t size)
 	 * the driverwide lock.
 	 */
 	unitp->i2c_status = retval =
-		nct_i2c_transfer(unitp->pcf8574_hdl, unitp->i2c_tran);
+	    nct_i2c_transfer(unitp->pcf8574_hdl, unitp->i2c_tran);
 
 	if (retval != I2C_SUCCESS) {
 		return (retval);
@@ -1412,7 +1412,7 @@ pcf8574_write_chip(struct pcf8574_unit *unitp,
 			tp->i2c_rbuf[i] |= ~(unitp->writemask);
 
 			tp->i2c_wbuf[i] = tp->i2c_rbuf[i] |
-					(tp->i2c_wbuf[i] & bitpattern);
+			    (tp->i2c_wbuf[i] & bitpattern);
 		}
 
 		tp->i2c_rlen = 0;
@@ -1448,7 +1448,7 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 		dev_presence = FRU_PRESENT;
 	} else {
 		dev_presence =
-			scsb_fru_status((uchar_t)unitp->props.slave_address);
+		    scsb_fru_status((uchar_t)unitp->props.slave_address);
 	}
 
 	kstatp = (char *)ksp->ks_data;
@@ -1468,7 +1468,7 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 		}
 		value = ((envctrl_fantray_t *)kstatp)->fanspeed;
 		if (value != PCF8574_FAN_SPEED_LOW &&
-			value != PCF8574_FAN_SPEED_HIGH) {
+		    value != PCF8574_FAN_SPEED_HIGH) {
 			err = EINVAL;
 			goto kstat_exit;
 		}
@@ -1476,8 +1476,8 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 		unitp->i2c_tran->i2c_wbuf[0] = PCF8574_FAN_SPEED(value);
 
 		if (dev_presence == FRU_PRESENT &&
-			pcf8574_write_chip(unitp, 1, PCF8574_FANSPEED_BIT)
-			!= I2C_SUCCESS) {
+		    pcf8574_write_chip(unitp, 1, PCF8574_FANSPEED_BIT)
+		    != I2C_SUCCESS) {
 			err = EFAULT;
 			goto kstat_exit;
 		}
@@ -1490,7 +1490,7 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 		 * field is set to dev_presence from the SCSB driver.
 		 */
 		if (dev_presence == FRU_PRESENT &&
-				pcf8574_read_chip(unitp, 1) != I2C_SUCCESS) {
+		    pcf8574_read_chip(unitp, 1) != I2C_SUCCESS) {
 			/*
 			 * Looks like a real IO error.
 			 */
@@ -1507,16 +1507,16 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 		switch (unitp->pcf8574_type) {
 		case PCF8574_TYPE_CPUVOLTAGE: {
 			envctrl_cpuvoltage_t *envp =
-				(envctrl_cpuvoltage_t *)unitp->envctrl_kstat;
+			    (envctrl_cpuvoltage_t *)unitp->envctrl_kstat;
 			envp->value = value;
 			bcopy((caddr_t)envp, kstatp,
-				sizeof (envctrl_cpuvoltage_t));
+			    sizeof (envctrl_cpuvoltage_t));
 
 			break;
 		}
 		case PCF8574_TYPE_PWRSUPP: {
 			envctrl_pwrsupp_t *envp =
-				(envctrl_pwrsupp_t *)unitp->envctrl_kstat;
+			    (envctrl_pwrsupp_t *)unitp->envctrl_kstat;
 
 			envp->ps_present = 	dev_presence;
 			envp->ps_ok =		PCF8574_PS_FAULT(value);
@@ -1526,13 +1526,13 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 			envp->ps_ver =		PCF8574_PS_TYPE(value);
 
 			bcopy((caddr_t)envp, kstatp,
-				sizeof (envctrl_pwrsupp_t));
+			    sizeof (envctrl_pwrsupp_t));
 
 			break;
 		}
 		case PCF8574_TYPE_FANTRAY: {
 			envctrl_fantray_t *envp =
-				(envctrl_fantray_t *)unitp->envctrl_kstat;
+			    (envctrl_fantray_t *)unitp->envctrl_kstat;
 
 			envp->fan_present = dev_presence;
 			envp->fan_ver = 	PCF8574_FAN_TYPE(value);
@@ -1540,7 +1540,7 @@ pcf8574_kstat_update(kstat_t *ksp, int rw)
 			envp->fanspeed =  	PCF8574_FAN_FANSPD(value);
 
 			bcopy((caddr_t)unitp->envctrl_kstat, kstatp,
-				sizeof (envctrl_fantray_t));
+			    sizeof (envctrl_fantray_t));
 
 			break;
 		}
@@ -1572,14 +1572,14 @@ pcf8574_delete_kstat(struct pcf8574_unit *unitp)
 	case PCF8574_TYPE_CPUVOLTAGE: {
 		if (unitp->envctrl_kstat != NULL) {
 			kmem_free(unitp->envctrl_kstat,
-				sizeof (envctrl_cpuvoltage_t));
+			    sizeof (envctrl_cpuvoltage_t));
 		}
 		break;
 	}
 	case PCF8574_TYPE_PWRSUPP: {
 		if (unitp->envctrl_kstat != NULL) {
 			kmem_free(unitp->envctrl_kstat,
-				sizeof (envctrl_pwrsupp_t));
+			    sizeof (envctrl_pwrsupp_t));
 		}
 
 		break;
@@ -1587,7 +1587,7 @@ pcf8574_delete_kstat(struct pcf8574_unit *unitp)
 	case PCF8574_TYPE_FANTRAY: {
 		if (unitp->envctrl_kstat != NULL) {
 			kmem_free(unitp->envctrl_kstat,
-				sizeof (envctrl_fantray_t));
+			    sizeof (envctrl_fantray_t));
 		}
 		break;
 	}
@@ -1614,7 +1614,7 @@ pcf8574_read_props(struct pcf8574_unit *unitp)
 	 */
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"pcf8574_function", &function) != DDI_SUCCESS) {
+	    "pcf8574_function", &function) != DDI_SUCCESS) {
 		dbg_print(CE_WARN, "Couldn't find pcf8574_function property");
 
 		return (DDI_FAILURE);
@@ -1628,8 +1628,8 @@ pcf8574_read_props(struct pcf8574_unit *unitp)
 		if (nct_p10fan_patch) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "nct_p10fan_patch set: will not load "
-				"fantary:address %x,%x", unitp->props.i2c_bus,
-				unitp->props.slave_address);
+		    "fantary:address %x,%x", unitp->props.i2c_bus,
+		    unitp->props.slave_address);
 #endif
 			ddi_prop_free(function);
 			return (DDI_FAILURE);
@@ -1647,12 +1647,12 @@ pcf8574_read_props(struct pcf8574_unit *unitp)
 	ddi_prop_free(function);
 
 	retval = ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
-		    "reg", (caddr_t)&prop_value, &prop_len);
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP,
+	    "reg", (caddr_t)&prop_value, &prop_len);
 	if (retval == DDI_PROP_SUCCESS) {
 		unitp->props.i2c_bus		= (uint16_t)prop_value[0];
 		unitp->props.slave_address	= i2c_address =
-			(uint8_t)prop_value[1];
+		    (uint8_t)prop_value[1];
 		kmem_free(prop_value, prop_len);
 
 		if (i2c_address>>4 == 7)
@@ -1676,16 +1676,16 @@ pcf8574_read_props(struct pcf8574_unit *unitp)
 
 	unitp->pcf8574_canintr = 0;
 	retval = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			    "interrupts", -1);
+	    "interrupts", -1);
 	if (retval >= 0) {
 		int prop_len, intr_pri = 4;
 		unitp->pcf8574_canintr |= PCF8574_INTR_ON;
 		if (ddi_getproplen(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "interrupt-priorities",
-			&prop_len) == DDI_PROP_NOT_FOUND) {
+		    DDI_PROP_DONTPASS, "interrupt-priorities",
+		    &prop_len) == DDI_PROP_NOT_FOUND) {
 			retval = ddi_prop_create(DDI_DEV_T_NONE, dip,
-				DDI_PROP_CANSLEEP, "interrupt-priorities",
-				(caddr_t)&intr_pri, sizeof (int));
+			    DDI_PROP_CANSLEEP, "interrupt-priorities",
+			    (caddr_t)&intr_pri, sizeof (int));
 #ifdef DEBUG
 			if (retval != DDI_PROP_SUCCESS) {
 				cmn_err(CE_WARN, "Failed to create interrupt- \
@@ -1701,17 +1701,17 @@ pcf8574_read_props(struct pcf8574_unit *unitp)
 	unitp->props.num_chans_used = 0;
 	if (i2c_address == PCF8574_ADR_CPUVOLTAGE) {
 		if (ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"channels-in-use", &prop_len) == DDI_PROP_SUCCESS) {
+		    "channels-in-use", &prop_len) == DDI_PROP_SUCCESS) {
 			retval = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY,
-				dip, DDI_PROP_DONTPASS,
-				"channels-in-use",
-				(uchar_t **)&unitp->props.channels_in_use,
-				&unitp->props.num_chans_used);
+			    dip, DDI_PROP_DONTPASS,
+			    "channels-in-use",
+			    (uchar_t **)&unitp->props.channels_in_use,
+			    &unitp->props.num_chans_used);
 			if (retval != DDI_PROP_SUCCESS) {
 				unitp->props.num_chans_used = 0;
 			} else {
 				unitp->props.num_chans_used /=
-					sizeof (pcf8574_channel_t);
+				    sizeof (pcf8574_channel_t);
 			}
 		}
 	}
@@ -1732,7 +1732,7 @@ pcf8574_callback(void *softstate, scsb_fru_event_t cb_event,
 #ifdef DEBUG
 		if (pcf8574_debug & 0x00800001)
 			cmn_err(CE_NOTE, "pcf8574_callback(unitp,%d,%d)",
-					(int)cb_event, (int)dev_presence);
+			    (int)cb_event, (int)dev_presence);
 #endif /* DEBUG */
 
 	switch (unitp->pcf8574_type) {
@@ -1755,7 +1755,7 @@ pcf8574_callback(void *softstate, scsb_fru_event_t cb_event,
 				envp->ps_ver = 0;
 			} else
 			if (dev_presence == FRU_PRESENT &&
-					envp->ps_present == FRU_NOT_PRESENT) {
+			    envp->ps_present == FRU_NOT_PRESENT) {
 				pcf8574_init_chip(unitp, 0);
 			}
 			envp->ps_present = dev_presence;
@@ -1774,7 +1774,7 @@ pcf8574_callback(void *softstate, scsb_fru_event_t cb_event,
 				envp->fan_ver = 0;
 			} else
 			if (dev_presence == FRU_PRESENT &&
-					envp->fan_present == FRU_NOT_PRESENT) {
+			    envp->fan_present == FRU_NOT_PRESENT) {
 				pcf8574_init_chip(unitp, 0);
 			}
 			envp->fan_present = dev_presence;
@@ -1800,7 +1800,7 @@ pcf8574_init_chip(struct pcf8574_unit *unitp, int intron)
 	boolean_t device_faulty = B_FALSE; /* true is faulty */
 
 	if (unitp->pcf8574_type != PCF8574_TYPE_PWRSUPP &&
-		unitp->pcf8574_type != PCF8574_TYPE_FANTRAY) {
+	    unitp->pcf8574_type != PCF8574_TYPE_FANTRAY) {
 		return (ret);
 	}
 	switch (unitp->pcf8574_type) {
@@ -1838,7 +1838,7 @@ pcf8574_init_chip(struct pcf8574_unit *unitp, int intron)
 	case PCF8574_TYPE_PWRSUPP:
 	{
 		envctrl_pwrsupp_t *envp =
-			(envctrl_pwrsupp_t *)unitp->envctrl_kstat;
+		    (envctrl_pwrsupp_t *)unitp->envctrl_kstat;
 
 		envp->ps_ok    = PCF8574_PS_FAULT(value);
 		envp->temp_ok  = PCF8574_PS_TEMPOK(value);
@@ -1847,7 +1847,7 @@ pcf8574_init_chip(struct pcf8574_unit *unitp, int intron)
 		envp->ps_ver   = PCF8574_PS_TYPE(value);
 
 		if (envp->ps_ok || envp->temp_ok ||
-			envp->psfan_ok || envp->on_state)
+		    envp->psfan_ok || envp->on_state)
 			device_faulty = B_TRUE;
 
 		break;
@@ -1855,7 +1855,7 @@ pcf8574_init_chip(struct pcf8574_unit *unitp, int intron)
 	case PCF8574_TYPE_FANTRAY:
 	{
 		envctrl_fantray_t *envp =
-			(envctrl_fantray_t *)unitp->envctrl_kstat;
+		    (envctrl_fantray_t *)unitp->envctrl_kstat;
 
 		envp->fan_ver  = PCF8574_FAN_TYPE(value);
 		envp->fan_ok   = PCF8574_FAN_FAULT(value);

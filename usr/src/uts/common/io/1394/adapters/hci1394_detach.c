@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * hci1394_detach.c
@@ -166,6 +165,50 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_FAILURE);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+int
+hci1394_quiesce(dev_info_t *dip)
+{
+	hci1394_state_t *soft_state;
+
+	soft_state = ddi_get_soft_state(hci1394_statep, ddi_get_instance(dip));
+
+	if (soft_state == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	/* Don't allow the HW to generate any more interrupts */
+	hci1394_ohci_intr_master_disable(soft_state->ohci);
+	hci1394_ohci_it_intr_disable(soft_state->ohci, 0xFFFFFFFF);
+	hci1394_ohci_ir_intr_disable(soft_state->ohci, 0xFFFFFFFF);
+
+	/* Clear any pending interrupts - no longer valid */
+	hci1394_ohci_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+	hci1394_ohci_it_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+	hci1394_ohci_ir_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+
+	/* Make sure we tell others on the bus we are dropping out */
+	(void) hci1394_ohci_phy_clr(soft_state->ohci, 4, 0xc0);
+	ddi_put32(soft_state->ohci->ohci_reg_handle,
+	    &soft_state->ohci->ohci_regs->link_ctrl_clr, 0xFFFFFFFF);
+
+	/* Do a long reset on the bus so every one knows we are gone */
+	(void) hci1394_ohci_bus_reset_nroot(soft_state->ohci);
+
+	/* Reset the OHCI HW */
+	(void) hci1394_ohci_soft_reset(soft_state->ohci);
+
+	return (DDI_SUCCESS);
+}
 
 void
 hci1394_detach_hardware(hci1394_state_t *soft_state)

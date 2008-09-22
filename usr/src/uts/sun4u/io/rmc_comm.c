@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "rmc_comm" driver provides access to the RMC so that its clients need
@@ -29,7 +29,6 @@
  * 16550 compatible serial port.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Header files
@@ -954,13 +953,14 @@ static struct dev_ops rmc_comm_dev_ops =
 	rmc_comm_reset,			/* reset		*/
 	(struct cb_ops *)NULL,		/* driver operations	*/
 	(struct bus_ops *)NULL,		/* bus operations	*/
-	nulldev 			/* power()		*/
+	nulldev,			/* power()		*/
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv =
 {
 	&mod_driverops,
-	"rmc_comm driver, v%I%",
+	"rmc_comm driver",
 	&rmc_comm_dev_ops
 };
 

@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Serial I/O driver for 82510/8250/16450/16550AF/16C554D chips.
@@ -274,6 +273,9 @@ struct dev_ops asy_ops = {
 	asydetach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_asy_ops,		/* devo_cb_ops */
+	NULL,			/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -282,7 +284,7 @@ struct dev_ops asy_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"su driver %I%",
+	"su driver",
 	&asy_ops,	/* driver ops */
 };
 

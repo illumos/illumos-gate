@@ -111,8 +111,7 @@ mac_callbacks_t pcan_m_callbacks = {
 static char *pcan_name_str = "pcan";
 
 DDI_DEFINE_STREAM_OPS(pcan_dev_ops, nulldev, pcan_probe, pcan_attach,
-
-    pcan_detach, nodev, NULL, D_MP, NULL);
+    pcan_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {

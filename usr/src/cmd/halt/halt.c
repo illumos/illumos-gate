@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,22 +36,29 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Common code for halt(1M), poweroff(1M), and reboot(1M).  We use
  * argv[0] to determine which behavior to exhibit.
  */
 
+#include <stdio.h>
 #include <procfs.h>
 #include <sys/types.h>
+#include <sys/elf.h>
+#include <sys/systeminfo.h>
+#include <sys/stat.h>
 #include <sys/uadmin.h>
+#include <sys/mntent.h>
+#include <sys/mnttab.h>
+#include <sys/mount.h>
 #include <alloca.h>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <libscf.h>
+#include <limits.h>
 #include <locale.h>
 #include <libintl.h>
 #include <syslog.h>
@@ -65,9 +72,20 @@
 #include <utmpx.h>
 #include <pwd.h>
 #include <zone.h>
+
+#include <libzfs.h>
+
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
+
+#if defined(__sparc)
+#define	CUR_ELFDATA	ELFDATA2MSB
+#elif defined(__i386)
+#define	CUR_ELFDATA	ELFDATA2LSB
+#endif
+
+static libzfs_handle_t *g_zfs;
 
 extern int audit_halt_setup(int, char **);
 extern int audit_halt_success(void);
@@ -91,6 +109,16 @@ static ctid_t startdct = -1;
 	"svc:/system/svc/restarter:default/:properties/restarter/contract"
 
 #define	ZONEADM_PROG "/usr/sbin/zoneadm"
+
+/*
+ * The length of FASTBOOT_MOUNTPOINT must be less than MAXPATHLEN.
+ */
+#define	FASTBOOT_MOUNTPOINT	"/tmp/.fastboot.root"
+
+static char	fastboot_mounted[MAXPATHLEN];
+
+static int validate_ufs_disk(char *, char *);
+static int validate_zfs_pool(char *, char *);
 
 static pid_t
 get_initpid()
@@ -494,19 +522,566 @@ check_zones_haltedness()
 	} while ((t < 30) && (t_prog < 5));
 }
 
+
+/*
+ * Validate that this is a root disk or dataset
+ * Returns 0 if it is a root disk or dataset;
+ * returns 1 if it is a disk argument or dataset, but not valid or not root;
+ * returns -1 if it is not a valid argument or a disk argument.
+ */
+static int
+validate_disk(char *arg, char *mountpoint)
+{
+	static char root_dev_path[] = "/dev/dsk";
+	char kernpath[MAXPATHLEN];
+	struct stat buf;
+	struct stat64 statbuf;
+	int rc = 0;
+
+	if (strlen(arg) > MAXPATHLEN) {
+		(void) fprintf(stderr,
+		    gettext("%s: argument is too long\n"), cmdname);
+		return (-1);
+	}
+
+	bcopy(FASTBOOT_MOUNTPOINT, mountpoint, sizeof (FASTBOOT_MOUNTPOINT));
+
+	/*
+	 * Do a force umount just in case some other filesystem has
+	 * been mounted there.
+	 */
+	(void) umount2(mountpoint, MS_FORCE);
+
+	/* Create the directory if it doesn't already exist */
+	if (lstat(mountpoint, &buf) != 0) {
+		if (mkdirp(mountpoint, 0755) != 0) {
+			(void) fprintf(stderr,
+			    gettext("failed to create mountpoint %s\n"),
+			    mountpoint);
+			return (-1);
+		}
+	}
+
+	if (strncmp(arg, root_dev_path, strlen(root_dev_path)) == 0) {
+		/* ufs root disk argument */
+		rc = validate_ufs_disk(arg, mountpoint);
+	} else {
+		/* zfs root pool argument */
+		rc = validate_zfs_pool(arg, mountpoint);
+	}
+
+	if (rc != 0)
+		return (rc);
+
+	(void) snprintf(kernpath, MAXPATHLEN, "%s/platform/i86pc/kernel/unix",
+	    mountpoint);
+
+	if (stat64(kernpath, &statbuf) != 0) {
+		(void) fprintf(stderr,
+		    gettext("%s: %s is not a root disk or dataset\n"),
+		    cmdname, arg);
+		return (1);
+	}
+
+	return (0);
+}
+
+
+static int
+validate_ufs_disk(char *arg, char *mountpoint)
+{
+	char mntopts[MNT_LINE_MAX] = { '\0' };
+
+	/* perform the mount */
+	if (mount(arg, mountpoint, MS_DATA|MS_OPTIONSTR,
+	    MNTTYPE_UFS, NULL, 0, mntopts, sizeof (mntopts)) != 0) {
+		perror(cmdname);
+		(void) fprintf(stderr,
+		    gettext("%s: failed to mount %s\n"), cmdname, arg);
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+validate_zfs_pool(char *arg, char *mountpoint)
+{
+	zfs_handle_t *zhp = NULL;
+	char mntopts[MNT_LINE_MAX] = { '\0' };
+	int rc = 0;
+
+	if ((g_zfs = libzfs_init()) == NULL) {
+		(void) fprintf(stderr, gettext("internal error: failed to "
+		    "initialize ZFS library\n"));
+		return (-1);
+	}
+
+	/* Try to open the dataset */
+	if ((zhp = zfs_open(g_zfs, arg,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_DATASET)) == NULL)
+		return (-1);
+
+	/* perform the mount */
+	if (mount(zfs_get_name(zhp), mountpoint, MS_DATA|MS_OPTIONSTR,
+	    MNTTYPE_ZFS, NULL, 0, mntopts, sizeof (mntopts)) != 0) {
+		perror(cmdname);
+		(void) fprintf(stderr,
+		    gettext("%s: failed to mount %s\n"), cmdname, arg);
+		rc = -1;
+	}
+
+validate_zfs_err_out:
+	if (zhp != NULL)
+		zfs_close(zhp);
+
+	libzfs_fini(g_zfs);
+	return (rc);
+}
+
+/*
+ * Return 0 if not zfs, or is zfs and have successfully constructed the
+ * boot argument; returns non-zero otherwise.
+ * At successful completion fpth contains pointer where mount point ends.
+ * NOTE: arg is supposed to be the resolved path
+ */
+static int
+get_zfs_bootfs_arg(const char *arg, const char ** fpth, int *is_zfs,
+		char *bootfs_arg)
+{
+	zfs_handle_t *zhp = NULL;
+	zpool_handle_t *zpoolp = NULL;
+	FILE *mtabp = NULL;
+	struct mnttab mnt;
+	char *poolname = NULL;
+	char physpath[MAXNAMELEN];
+	char mntsp[ZPOOL_MAXNAMELEN];
+	char bootfs[ZPOOL_MAXNAMELEN];
+	int rc = 0;
+	size_t mntlen = 0;
+	size_t msz;
+
+	*fpth = arg;
+	*is_zfs = 0;
+
+	bzero(physpath, sizeof (physpath));
+	bzero(bootfs, sizeof (bootfs));
+
+	if ((mtabp = fopen(MNTTAB, "r")) == NULL) {
+		return (-1);
+	}
+
+	while (getmntent(mtabp, &mnt) == 0) {
+		if (strstr(arg, mnt.mnt_mountp) == arg &&
+		    (msz = strlen(mnt.mnt_mountp)) > mntlen) {
+			mntlen = msz;
+			*is_zfs = strcmp(MNTTYPE_ZFS, mnt.mnt_fstype) == 0;
+			(void) strlcpy(mntsp, mnt.mnt_special, sizeof (mntsp));
+		}
+	}
+
+	(void) fclose(mtabp);
+
+	if (mntlen > 1)
+		*fpth += mntlen;
+
+	if (!*is_zfs)
+		return (0);
+
+	if ((g_zfs = libzfs_init()) == NULL)
+		return (-1);
+
+	/* Try to open the dataset */
+	if ((zhp = zfs_open(g_zfs, mntsp,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_DATASET)) == NULL) {
+		(void) fprintf(stderr, gettext("cannot open %s\n"), mntsp);
+		rc = -1;
+		goto validate_zfs_err_out;
+	}
+
+	(void) strlcpy(bootfs, mntsp, sizeof (bootfs));
+
+	if ((poolname = strtok(mntsp, "/")) == NULL) {
+		rc = -1;
+		goto validate_zfs_err_out;
+	}
+
+	if ((zpoolp = zpool_open(g_zfs, poolname)) == NULL) {
+		(void) fprintf(stderr, gettext("cannot open %s\n"), poolname);
+		rc = -1;
+		goto validate_zfs_err_out;
+	}
+
+	if (zpool_get_physpath(zpoolp, physpath) != 0) {
+		(void) fprintf(stderr, gettext("cannot find phys_path\n"));
+		rc = -1;
+		goto validate_zfs_err_out;
+	}
+
+	if (zpool_set_prop(zpoolp, "bootfs", bootfs) != 0) {
+		(void) fprintf(stderr, gettext("cannot set bootfs to %s\n"),
+		    bootfs);
+		rc = -1;
+		goto validate_zfs_err_out;
+	}
+
+	(void) snprintf(bootfs_arg, BOOTARGS_MAX,
+	    "-B zfs-bootfs=%s,bootpath=\"%s\"", bootfs, physpath);
+
+validate_zfs_err_out:
+	if (zhp != NULL)
+		zfs_close(zhp);
+
+	if (zpoolp != NULL)
+		zpool_close(zpoolp);
+
+	libzfs_fini(g_zfs);
+	return (rc);
+}
+
+/*
+ * Validate that the file exists, and is an ELF file.
+ * Returns 0 on success, -1 on failure.
+ */
+static int
+validate_unix(char *arg, int *mplen, int *is_zfs, char *bootfs_arg,
+    int *failsafe)
+{
+	const char *location;
+	int class, format;
+	unsigned char ident[EI_NIDENT];
+	char physpath[MAXPATHLEN];
+	int elffd = -1;
+	size_t	sz;
+
+	if ((sz = resolvepath(arg, physpath, sizeof (physpath) - 1)) ==
+	    (size_t)-1) {
+		(void) fprintf(stderr,
+		    gettext("cannot resolve path for %s: %s\n"),
+		    arg, strerror(errno));
+		return (-1);
+	}
+	(void) strlcpy(arg, physpath, sz + 1);
+
+	if (strlen(arg) > MAXPATHLEN) {
+		(void) fprintf(stderr,
+		    gettext("%s: new kernel name is too long\n"), cmdname);
+		return (-1);
+	}
+
+	if (strncmp(basename(arg), "unix", 4) != 0) {
+		(void) fprintf(stderr,
+		    gettext("%s: %s: kernel name must be unix\n"),
+		    cmdname, arg);
+		return (-1);
+	}
+
+	if (get_zfs_bootfs_arg(arg, &location, is_zfs, bootfs_arg) != 0)
+		goto err_out;
+
+	*mplen = location - arg;
+
+	if ((strstr(location, "/boot/platform")) == location)
+		*failsafe = 1;
+	else if ((strstr(location, "/platform")) == location)
+		*failsafe = 0;
+	else	{
+		(void) fprintf(stderr,
+		    gettext("%s: %s: no /boot/platform or /platform in"
+		    " file name\n"), cmdname, arg);
+			goto err_out;
+	}
+
+	if ((elffd = open64(arg, O_RDONLY)) < 0 ||
+	    (pread64(elffd, ident, EI_NIDENT, 0) != EI_NIDENT)) {
+		(void) fprintf(stderr, "%s: %s: %s\n",
+		    cmdname, arg, strerror(errno));
+		goto err_out;
+	}
+
+	class = ident[EI_CLASS];
+
+	if ((class != ELFCLASS32 && class != ELFCLASS64) ||
+	    ident[EI_MAG0] != ELFMAG0 || ident[EI_MAG1] != ELFMAG1 ||
+	    ident[EI_MAG2] != ELFMAG2 || ident[EI_MAG3] != ELFMAG3) {
+		(void) fprintf(stderr,
+		    gettext("%s: %s: not a valid ELF file\n"),
+		    cmdname, arg);
+		goto err_out;
+	}
+
+	format = ident[EI_DATA];
+
+	if (format != CUR_ELFDATA) {
+		(void) fprintf(stderr, gettext("%s: %s: invalid data format\n"),
+		    cmdname, arg);
+		goto err_out;
+	}
+
+	return (0);
+
+err_out:
+	if (elffd >= 0) {
+		(void) close(elffd);
+		elffd = -1;
+	}
+	return (-1);
+}
+
+#ifndef	__i386
+/* ARGSUSED */
+#endif	/* __i386 */
+static int
+is_fastboot_default(uid_t uid)
+{
+#if defined(__i386)
+	int		ret;
+	struct stat	st;
+	static const char	fastboot_default[] = "/etc/fastreboot";
+
+	ret = (lstat(fastboot_default, &st) == 0 &&
+	    S_ISREG(st.st_mode) &&
+	    (st.st_mode & S_IRUSR) != 0 &&
+	    uid == st.st_uid);
+
+	return (ret);
+#else
+	return (0);
+#endif	/* __i386 */
+}
+
+static int
+fastboot_bename(const char *bename, char *mountpoint, size_t mpsz)
+{
+	int rc;
+	char cmdbuf[MAXPATHLEN];
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf),
+	    "/usr/sbin/luumount %s > /dev/null 2>&1", bename);
+	(void) system(cmdbuf);
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf),
+	    "/usr/sbin/lumount %s %s > /dev/null 2>&1",
+	    bename, FASTBOOT_MOUNTPOINT);
+	if ((rc = system(cmdbuf)) != 0)
+		(void) fprintf(stderr, gettext("%s: cannot mount BE %s\n"),
+		    cmdname, bename);
+	else
+		(void) strlcpy(mountpoint, FASTBOOT_MOUNTPOINT, mpsz);
+
+	return (rc);
+}
+
+/*
+ * Returns 0 on successful parsing of the arguments;
+ * retuens non-zero on failure.
+ */
+static int
+parse_fastboot_args(char *bootargs_buf, int *is_dryrun, const char *bename,
+    int *failsafe)
+{
+	char mountpoint[MAXPATHLEN];
+	char bootargs_saved[BOOTARGS_MAX];
+	char bootargs_scratch[BOOTARGS_MAX];
+	char bootfs_arg[BOOTARGS_MAX];
+	char unixfile[BOOTARGS_MAX];
+	char *head, *newarg;
+	int buflen;		/* length of the bootargs_buf */
+	int mplen;		/* length of the mount point */
+	int rootlen = 0;	/* length of the root argument */
+	int unixlen = 0;	/* length of the unix argument */
+	int off = 0;		/* offset into the new boot argument */
+	int is_zfs = 0;
+	int rc = 0;
+
+	bzero(mountpoint, sizeof (mountpoint));
+
+	/*
+	 * If argc is not 0, buflen is length of the argument being passed in;
+	 * else it is 0 as bootargs_buf has been initialized to all 0's.
+	 */
+	buflen = strlen(bootargs_buf);
+
+	/* Save a copy of the original argument */
+	bcopy(bootargs_buf, bootargs_saved, buflen);
+	bzero(&bootargs_saved[buflen], sizeof (bootargs_saved) - buflen);
+
+	/* Save another copy to be used by strtok */
+	bcopy(bootargs_buf, bootargs_scratch, buflen);
+	bzero(&bootargs_scratch[buflen], sizeof (bootargs_scratch) - buflen);
+	head = &bootargs_scratch[0];
+
+	/* Zero out the boot argument buffer as we will reconstruct it */
+	bzero(bootargs_buf, BOOTARGS_MAX);
+	bzero(bootfs_arg, BOOTARGS_MAX);
+	bzero(unixfile, sizeof (unixfile));
+
+	/* Get the first argument */
+	newarg = strtok(bootargs_scratch, " ");
+
+	/*
+	 * If this is a dry run request, verify that the drivers can handle
+	 * fast reboot.
+	 */
+	if (newarg && strncasecmp(newarg, "dryrun", strlen("dryrun")) == 0) {
+		*is_dryrun = 1;
+		(void) system("/usr/sbin/devfsadm");
+	}
+
+	/*
+	 * Always perform a dry run to identify all the drivers that
+	 * need to implement devo_reset().
+	 */
+	if (uadmin(A_SHUTDOWN, AD_FASTREBOOT_DRYRUN,
+	    (uintptr_t)bootargs_saved) != 0) {
+		(void) fprintf(stderr, gettext("%s: not all drivers "
+		    "have implemented quiesce(9E)\n"), cmdname);
+	} else if (*is_dryrun) {
+		(void) fprintf(stderr, gettext("%s: all drivers have "
+		    "implemented quiesce(9E)\n"), cmdname);
+	}
+
+	/*
+	 * Return if it is a true dry run.
+	 */
+	if (*is_dryrun)
+		return (rc);
+
+	if (bename && (rc = fastboot_bename(bename, mountpoint,
+	    sizeof (mountpoint))) != 0)
+		return (rc);
+
+	/*
+	 * If BE is not specified, look for disk argument to construct
+	 * mountpoint; if BE has been specified, mountpoint has already been
+	 * constructed.
+	 */
+	if (newarg && newarg[0] != '-' && !bename) {
+		int tmprc;
+
+		if ((tmprc = validate_disk(newarg, mountpoint)) == 0) {
+			/*
+			 * The first argument is a valid root argument.
+			 * Get the next argument.
+			 */
+			newarg = strtok(NULL, " ");
+			rootlen = (newarg) ? (newarg - head) : buflen;
+			(void) strlcpy(fastboot_mounted, mountpoint,
+			    sizeof (fastboot_mounted));
+
+		} else if (tmprc == -1) {
+			/*
+			 * Not a disk argument.  Use / as default root.
+			 */
+			bcopy("/", mountpoint, 1);
+			bzero(&mountpoint[1], sizeof (mountpoint) - 1);
+		} else {
+			/*
+			 * Disk argument, but not valid or not root.
+			 * Return failure.
+			 */
+			return (EINVAL);
+		}
+	}
+
+	/*
+	 * Make mountpoint the first part of unixfile.
+	 * If there is not disk argument, and BE has not been specified,
+	 * mountpoint could be empty.
+	 */
+	mplen = strlen(mountpoint);
+	bcopy(mountpoint, unixfile, mplen);
+
+	/*
+	 * Look for unix argument
+	 */
+	if (newarg && newarg[0] != '-') {
+		bcopy(newarg, &unixfile[mplen], strlen(newarg));
+		newarg = strtok(NULL, " ");
+		rootlen = (newarg) ? (newarg - head) : buflen;
+	} else if (mplen != 0) {
+		/*
+		 * No unix argument, but mountpoint is not empty, use
+		 * /platform/i86pc/$ISADIR/kernel/unix as default.
+		 */
+		char isa[20];
+
+		if (sysinfo(SI_ARCHITECTURE_64, isa, sizeof (isa)) != -1)
+			(void) snprintf(&unixfile[mplen],
+			    sizeof (unixfile) - mplen,
+			    "/platform/i86pc/kernel/%s/unix", isa);
+		else if (sysinfo(SI_ARCHITECTURE_32, isa, sizeof (isa)) != -1) {
+			(void) snprintf(&unixfile[mplen],
+			    sizeof (unixfile) - mplen,
+			    "/platform/i86pc/kernel/unix");
+		} else {
+			(void) fprintf(stderr,
+			    gettext("%s: unknown architecture"), cmdname);
+			return (EINVAL);
+		}
+	}
+
+	/*
+	 * We now have the complete unix argument.  Verify that it exists and
+	 * is an ELF file.  Split the argument up into mountpoint and unix
+	 * portions again.  This is necessary to handle cases where mountpoint
+	 * is specified on the command line as part of the unix argument,
+	 * such as this:
+	 *	# reboot -f /.alt/platform/i86pc/kernel/amd64/unix
+	 */
+	unixlen = strlen(unixfile);
+	if (unixlen > 0) {
+		if (validate_unix(unixfile, &mplen, &is_zfs,
+		    bootfs_arg, failsafe) != 0) {
+			/* Not a valid unix file */
+			return (EINVAL);
+		} else {
+			/*
+			 * Construct boot argument.
+			 */
+			unixlen = strlen(unixfile);
+			bcopy(unixfile, bootargs_buf, mplen);
+			(void) strcat(bootargs_buf, " ");
+			bcopy(&unixfile[mplen], &bootargs_buf[mplen + 1],
+			    unixlen - mplen);
+			(void) strcat(bootargs_buf, " ");
+			off += unixlen + 2;
+		}
+	} else {
+		/* Check to see if root is zfs */
+		const char	*dp;
+		(void) get_zfs_bootfs_arg("/", &dp, &is_zfs, bootfs_arg);
+	}
+
+	if (is_zfs && (buflen != 0 || bename != NULL))	{
+		/* LINTED E_SEC_SPRINTF_UNBOUNDED_COPY */
+		off += sprintf(bootargs_buf + off, "%s ", bootfs_arg);
+	}
+
+	/*
+	 * Copy the rest of the arguments
+	 */
+	bcopy(&bootargs_saved[rootlen], &bootargs_buf[off], buflen - rootlen);
+
+	return (rc);
+}
+
 int
 main(int argc, char *argv[])
 {
 	char *ttyn = ttyname(STDERR_FILENO);
 
+	uid_t	euid;
 	int qflag = 0, needlog = 1, nosync = 0;
+	int fast_reboot = 0;
 	uintptr_t mdep = NULL;
 	int cmd, fcn, c, aval, r;
 	const char *usage;
 	zoneid_t zoneid = getzoneid();
 	int need_check_zones = 0;
-
 	char bootargs_buf[BOOTARGS_MAX];
+	int failsafe = 0;
+	char *bename = NULL;
 
 	const char * const resetting = "/etc/svc/volatile/resetting";
 
@@ -527,7 +1102,11 @@ main(int argc, char *argv[])
 		fcn = AD_POWEROFF;
 	} else if (strcmp(cmdname, "reboot") == 0) {
 		(void) audit_reboot_setup();
+#if defined(__i386)
+		usage = gettext("usage: %s [ -dlnqfe: ] [ boot args ]\n");
+#else
 		usage = gettext("usage: %s [ -dlnq ] [ boot args ]\n");
+#endif
 		cmd = A_SHUTDOWN;
 		fcn = AD_BOOT;
 	} else {
@@ -536,7 +1115,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	while ((c = getopt(argc, argv, "dlnqy")) != EOF) {
+	while ((c = getopt(argc, argv, "dlnqyfe:")) != EOF) {
 		switch (c) {
 		case 'd':
 			if (zoneid == GLOBAL_ZONEID)
@@ -560,6 +1139,14 @@ main(int argc, char *argv[])
 		case 'y':
 			ttyn = NULL;
 			break;
+#if defined(__i386)
+		case 'f':
+			fast_reboot = 1;
+			break;
+		case 'e':
+			bename = optarg;
+			break;
+#endif
 		default:
 			/*
 			 * TRANSLATION_NOTE
@@ -586,14 +1173,72 @@ main(int argc, char *argv[])
 			    gettext("%s: Boot arguments too long.\n"), cmdname);
 			return (1);
 		}
+
 		mdep = (uintptr_t)bootargs_buf;
+	} else {
+		/*
+		 * Initialize it to 0 in case of fastboot, the buffer
+		 * will be used.
+		 */
+		bzero(bootargs_buf, sizeof (bootargs_buf));
 	}
 
-	if (geteuid() != 0) {
+	if ((euid = geteuid()) != 0) {
 		(void) fprintf(stderr,
 		    gettext("%s: permission denied\n"), cmdname);
 		goto fail;
 	}
+
+	/*
+	 * Check whether fast  reboot is the default operating mode
+	 */
+	if (!fast_reboot)
+		fast_reboot = is_fastboot_default(euid);
+
+	if (bename && !fast_reboot)	{
+		(void) fprintf(stderr, gettext("%s: -e only valid with -f\n"),
+		    cmdname);
+		return (EINVAL);
+	}
+
+
+	/*
+	 * If fast reboot, do some sanity check on the argument
+	 */
+	if (fast_reboot) {
+		int rc;
+		int is_dryrun = 0;
+
+		if (zoneid != GLOBAL_ZONEID)	{
+			(void) fprintf(stderr,
+			    gettext("%s: fast reboot only valid from global"
+			    " zone\n"), cmdname);
+			return (EINVAL);
+		}
+
+		rc = parse_fastboot_args(bootargs_buf, &is_dryrun,
+		    bename, &failsafe);
+
+		/*
+		 * If dry run, or if arguments are invalid, return.
+		 */
+		if (is_dryrun)
+			return (rc);
+		else if (rc != 0)
+			goto fail;
+
+		/*
+		 * For all the other errors, we continue on in case user
+		 * user want to force fast reboot.
+		 */
+		if (strlen(bootargs_buf) != 0)
+			mdep = (uintptr_t)bootargs_buf;
+	}
+
+#if 0	/* For debugging */
+	if (mdep != NULL)
+		(void) fprintf(stderr, "mdep = %s\n", (char *)mdep);
+#endif
 
 	if (fcn != AD_BOOT && ttyn != NULL &&
 	    strncmp(ttyn, "/dev/term/", strlen("/dev/term/")) == 0) {
@@ -656,7 +1301,10 @@ main(int argc, char *argv[])
 
 	/* sync boot archive in the global zone */
 	if (zoneid == GLOBAL_ZONEID && !nosync) {
-		(void) system("/sbin/bootadm -a update_all");
+		if (fast_reboot)
+			(void) system("/sbin/bootadm -a update_all fastboot");
+		else
+			(void) system("/sbin/bootadm -a update_all");
 	}
 
 	/*
@@ -734,6 +1382,15 @@ main(int argc, char *argv[])
 	if (cmd == A_DUMP && nosync != 0)
 		(void) uadmin(A_DUMP, AD_NOSYNC, NULL);
 
+	if (fast_reboot) {
+		if (failsafe)
+			(void) fprintf(stderr, "Fast reboot - failsafe.\n");
+		else
+			(void) fprintf(stderr, "Fast reboot.\n");
+
+		fcn = AD_FASTREBOOT;
+	}
+
 	if (uadmin(cmd, fcn, mdep) == -1)
 		(void) fprintf(stderr, "%s: uadmin failed: %s\n",
 		    cmdname, strerror(errno));
@@ -769,6 +1426,19 @@ fail:
 		(void) audit_reboot_fail();
 	else
 		(void) audit_halt_fail();
+
+	if (fast_reboot) {
+		if (bename) {
+			char cmdbuf[MAXPATHLEN];
+
+			(void) snprintf(cmdbuf, sizeof (cmdbuf),
+			    "/usr/sbin/luumount %s > /dev/null 2>&1", bename);
+			(void) system(cmdbuf);
+
+		} else if (strlen(fastboot_mounted) != 0) {
+			(void) umount(fastboot_mounted);
+		}
+	}
 
 	return (1);
 }

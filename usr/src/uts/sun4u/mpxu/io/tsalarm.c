@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -92,7 +90,8 @@ static struct dev_ops tsalarm_ops = {
 	nodev,			/* reset */
 	&tsalarm_cb_ops,		/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_needed,		/* quiesce() */
 };
 
 /*
@@ -103,7 +102,7 @@ static void    *statep;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"tsalarm control driver v%I%",	/* Name of the module */
+	"tsalarm control driver",	/* Name of the module */
 	&tsalarm_ops			/* pointer to the dev_ops structure */
 };
 
@@ -212,7 +211,7 @@ tsalarm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * the device's softc, is used to direct peculiar behavior.
 		 */
 		if (ddi_create_minor_node(dip, "lom", S_IFCHR, 0,
-				DDI_PSEUDO, NULL) == DDI_FAILURE)
+		    DDI_PSEUDO, NULL) == DDI_FAILURE)
 			goto attach_failed;
 
 		ddi_report_dev(dip);
@@ -308,14 +307,14 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	case LOMIOCALSTATE_OLD:
 		{
 			if (ddi_copyin((caddr_t)arg, (caddr_t)&ts_alinfo,
-				sizeof (ts_aldata_t), mode) != 0) {
+			    sizeof (ts_aldata_t), mode) != 0) {
 				retval = EFAULT;
 				goto end;
 			}
 
 			alarm_type = ts_alinfo.alarm_no;
 			if ((alarm_type < ALARM_CRITICAL) ||
-					(alarm_type > ALARM_USER)) {
+			    (alarm_type > ALARM_USER)) {
 				retval = EINVAL;
 				goto end;
 			}
@@ -332,7 +331,7 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 			ts_alinfo.alarm_state = alarm_state;
 			if (ddi_copyout((caddr_t)&ts_alinfo, (caddr_t)arg,
-				sizeof (ts_aldata_t), mode) != 0) {
+			    sizeof (ts_aldata_t), mode) != 0) {
 				retval = EFAULT;
 				goto end;
 			}
@@ -344,7 +343,7 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	case LOMIOCALCTL_OLD:
 		{
 			if (ddi_copyin((caddr_t)arg, (caddr_t)&ts_alinfo,
-				sizeof (ts_aldata_t), mode) != 0) {
+			    sizeof (ts_aldata_t), mode) != 0) {
 				retval = EFAULT;
 				goto end;
 			}
@@ -353,12 +352,12 @@ tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			alarm_state = ts_alinfo.alarm_state;
 
 			if ((alarm_type < ALARM_CRITICAL) ||
-					(alarm_type > ALARM_USER)) {
+			    (alarm_type > ALARM_USER)) {
 				retval = EINVAL;
 				goto end;
 			}
 			if ((alarm_state < ALARM_OFF) ||
-					(alarm_state > ALARM_ON)) {
+			    (alarm_state > ALARM_ON)) {
 				retval = EINVAL;
 				goto end;
 			}

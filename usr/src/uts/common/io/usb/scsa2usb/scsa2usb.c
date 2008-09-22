@@ -473,7 +473,8 @@ static struct dev_ops scsa2usb_ops = {
 	nodev,			/* reset */
 	&scsa2usb_cbops,	/* driver operations */
 	NULL,			/* bus operations */
-	scsa2usb_power		/* power */
+	scsa2usb_power,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -1020,7 +1021,6 @@ scsa2usb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 }
-
 
 /*
  * ugen support

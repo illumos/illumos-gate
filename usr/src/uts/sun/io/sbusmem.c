@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -97,12 +95,13 @@ static struct dev_ops sbmem_ops = {
 	nodev,			/* reset */
 	&sbmem_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */
-	"SBus memory driver v%I%", /* Name of module. */
+	"SBus memory driver", /* Name of module. */
 	&sbmem_ops,	/* driver ops */
 };
 
@@ -113,7 +112,7 @@ static struct modlinkage modlinkage = {
 static int sbmem_rw(dev_t, struct uio *, enum uio_rw, cred_t *);
 
 #if !defined(lint)
-static char sbusmem_initmsg[] = "sbusmem _init: sbusmem.c\t%I%\t%E%\n";
+static char sbusmem_initmsg[] = "sbusmem _init: sbusmem.c\t1.28\t08/19/2008\n";
 #endif
 
 int
@@ -401,7 +400,7 @@ sbmem_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 		return (ENXIO);
 	}
 	if ((error = devmap_devmem_setup(dhp, un->dip, NULL, 0,
-			off, len, PROT_ALL, DEVMAP_DEFAULTS, NULL)) < 0) {
+	    off, len, PROT_ALL, DEVMAP_DEFAULTS, NULL)) < 0) {
 		return (error);
 	}
 	*maplen = ptob(btopr(len));

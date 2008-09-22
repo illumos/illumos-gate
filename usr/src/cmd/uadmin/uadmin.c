@@ -27,7 +27,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -144,6 +143,19 @@ main(int argc, char *argv[])
 		break;
 	case AD_NOSYNC:
 		fcn_id = ADT_UADMIN_FCN_AD_NOSYNC;
+		break;
+	case AD_FASTREBOOT:
+#ifdef __i386
+		fcn_id = ADT_UADMIN_FCN_AD_FASTREBOOT;
+		mdep = NULL;	/* Ignore all arguments */
+#else
+		fcn = AD_BOOT;
+		fcn_id = ADT_UADMIN_FCN_AD_BOOT;
+#endif /* __i386 */
+		break;
+	case AD_FASTREBOOT_DRYRUN:
+		fcn_id = ADT_UADMIN_FCN_AD_FASTREBOOT_DRYRUN;
+		mdep = NULL;	/* Ignore all arguments */
 		break;
 	default:
 		fcn_id = 0;
@@ -275,6 +287,14 @@ closeout_audit(int cmd, int fcn)
 	}
 	switch (cmd) {
 	case A_SHUTDOWN:
+		switch (fcn) {
+		case AD_FASTREBOOT_DRYRUN:
+			/* No system discontinuity, don't turn off auditd */
+			return (0);
+		default:
+			break;	/* For all the other shutdown functions */
+		}
+		/* FALLTHROUGH */
 	case A_REBOOT:
 	case A_DUMP:
 		/* system shutting down, turn off auditd */

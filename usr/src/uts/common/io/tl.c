@@ -732,7 +732,7 @@ static	struct streamtab	tlinfo = {
 };
 
 DDI_DEFINE_STREAM_OPS(tl_devops, nulldev, nulldev, tl_attach, tl_detach,
-    nulldev, tl_info, D_MP, &tlinfo);
+    nulldev, tl_info, D_MP, &tlinfo, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module -- pseudo driver here */
@@ -4428,8 +4428,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 			}
 			return;
 		} else if (prim->type == T_OPTDATA_REQ &&
-			(msz < sizeof (struct T_optdata_req) ||
-			    !IS_SOCKET(tep))) {
+		    (msz < sizeof (struct T_optdata_req) || !IS_SOCKET(tep))) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
 			    SL_TRACE|SL_ERROR,
 			    "tl_data:T_OPTDATA_REQ:invalid message"));

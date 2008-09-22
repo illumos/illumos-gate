@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * workstation console redirecting driver
@@ -673,7 +672,9 @@ struct dev_ops	iwscn_ops = {
 	nodev,			/* detach */
 	nodev,			/* reset */
 	&iwscn_cb_ops,		/* driver operations */
-	NULL			/* bus operations */
+	NULL,			/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -681,7 +682,7 @@ struct dev_ops	iwscn_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Workstation Redirection driver %I%",
+	"Workstation Redirection driver",
 	&iwscn_ops,	/* driver ops */
 };
 

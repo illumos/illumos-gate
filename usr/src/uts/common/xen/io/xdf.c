@@ -164,7 +164,9 @@ struct dev_ops xdf_devops = {
 	xdf_detach,		/* devo_detach */
 	xdf_reset,		/* devo_reset */
 	&xdf_cbops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL	/* devo_bus_ops */
+	(struct bus_ops *)NULL,	/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

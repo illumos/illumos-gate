@@ -177,7 +177,7 @@ static mac_callbacks_t rtw_m_callbacks = {
 };
 
 DDI_DEFINE_STREAM_OPS(rtw_dev_ops, nulldev, nulldev, rtw_attach, rtw_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv rtw_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */

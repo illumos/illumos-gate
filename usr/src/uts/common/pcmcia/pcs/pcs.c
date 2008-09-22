@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/byteorder.h>
@@ -46,7 +45,9 @@ static struct dev_ops pcs_devops = {
 	pcs_detach,
 	nulldev,
 	NULL,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 /*
  * This is the loadable module wrapper.
@@ -57,7 +58,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"PCMCIA Socket Driver %I%",	/* Name of the module. */
+	"PCMCIA Socket Driver",	/* Name of the module. */
 	&pcs_devops,		/* driver ops */
 };
 
@@ -74,7 +75,7 @@ _init()
 {
 	int ret;
 	if ((ret = ddi_soft_state_init((void **)&pcs_instances,
-					sizeof (struct pcs_inst), 1)) != 0)
+	    sizeof (struct pcs_inst), 1)) != 0)
 		return (ret);
 	if ((ret = mod_install(&modlinkage)) != 0) {
 		ddi_soft_state_fini((void **)&pcs_instances);
@@ -113,7 +114,7 @@ pcs_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	case DDI_INFO_DEVT2DEVINFO:
 		inum = getminor((dev_t)arg);
 		inst = (struct pcs_inst *)ddi_get_soft_state(pcs_instances,
-								inum);
+		    inum);
 		if (inst == NULL)
 			error = DDI_FAILURE;
 		else
@@ -122,7 +123,7 @@ pcs_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	case DDI_INFO_DEVT2INSTANCE:
 		inum = getminor((dev_t)arg);
 		inst = (struct pcs_inst *)ddi_get_soft_state(pcs_instances,
-								inum);
+		    inum);
 		if (inst == NULL)
 			error = DDI_FAILURE;
 		else
@@ -154,7 +155,7 @@ pcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_soft_state_zalloc(pcs_instances, inum) == DDI_SUCCESS) {
 		inst = (struct pcs_inst *)ddi_get_soft_state(pcs_instances,
-								inum);
+		    inum);
 		if (inst == NULL)
 			ret = DDI_FAILURE;
 		else

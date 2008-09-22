@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
@@ -128,14 +126,16 @@ static struct dev_ops adm1026_ops = {
 	adm1026_detach,
 	nodev,
 	&adm1026_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv adm1026_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"ADM1026 i2c device driver: %I%",
+	"ADM1026 i2c device driver: 1.3",
 	&adm1026_ops
 };
 
@@ -313,7 +313,7 @@ adm1026_do_attach(dev_info_t *dip)
 
 	D2CMN_ERR((CE_WARN, "adm1026_do_attach: ddi_create_minor_node"));
 	if (ddi_create_minor_node(dip, "adm1026", S_IFCHR, instance,
-		    "ddi_i2c:led_control", NULL) == DDI_FAILURE) {
+	"ddi_i2c:led_control", NULL) == DDI_FAILURE) {
 		cmn_err(CE_WARN,
 		    "adm1026_do_attach: ddi_create_minor_node failed");
 		ddi_soft_state_free(adm1026soft_statep, instance);
@@ -609,7 +609,7 @@ adm1026_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	    instance, cmd));
 
 	unitp = (struct adm1026_unit *)
-		ddi_get_soft_state(adm1026soft_statep, instance);
+	    ddi_get_soft_state(adm1026soft_statep, instance);
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "adm1026_ioctl: ddi_get_soft_state failed");

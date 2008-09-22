@@ -55,7 +55,6 @@
  * IN THE SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -178,12 +177,13 @@ static struct dev_ops xenbusdrv_dev_ops = {
 	nodev,			/* devo_reset */
 	&xenbusdrv_cb_ops,	/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"virtual bus driver v%I%",	/* Name of the module. */
+	"virtual bus driver",	/* Name of the module. */
 	&xenbusdrv_dev_ops	/* driver ops */
 };
 

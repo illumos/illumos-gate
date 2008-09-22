@@ -147,7 +147,9 @@ struct dev_ops pepb_ops = {
 	pepb_detach,		/* detach */
 	nulldev,		/* reset */
 	&pepb_cb_ops,		/* driver operations */
-	&pepb_bus_ops		/* bus operations */
+	&pepb_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

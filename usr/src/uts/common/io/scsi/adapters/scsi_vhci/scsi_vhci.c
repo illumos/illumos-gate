@@ -68,7 +68,7 @@ int vhci_prout_not_ready_retry = 180;
 /*
  * Version Macros
  */
-#define	VHCI_NAME_VERSION	"SCSI VHCI Driver 1.79"
+#define	VHCI_NAME_VERSION	"SCSI VHCI Driver"
 char		vhci_version_name[] = VHCI_NAME_VERSION;
 
 int		vhci_first_time = 0;
@@ -276,6 +276,7 @@ static struct dev_ops vhci_ops = {
 	&vhci_cb_ops,		/* cb_ops */
 	NULL,			/* bus_ops */
 	NULL,			/* power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;

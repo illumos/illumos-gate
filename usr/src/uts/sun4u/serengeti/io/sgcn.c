@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Serengeti console driver, see sys/sgcn.h for more information
@@ -173,12 +172,13 @@ static struct dev_ops sgcn_ops = {
 	nodev,			/* reset()		*/
 	&sgcn_cb_ops,		/* cb_ops		*/
 	(struct bus_ops *)NULL,	/* bus_ops		*/
-	NULL			/* power()		*/
+	NULL,			/* power()		*/
+	ddi_quiesce_not_supported,	/* quiesce	*/
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"Serengeti console driver v%I%",
+	"Serengeti console driver",
 	&sgcn_ops
 };
 
@@ -253,7 +253,7 @@ sgcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * All we can do is stopping.
 	 */
 	rv = iosram_read(SBBC_CONSOLE_KEY, 0, (caddr_t)&header,
-		sizeof (cnsram_header));
+	    sizeof (cnsram_header));
 	if (rv != 0)
 		cmn_err(CE_PANIC, "sgcn_attach(): Reading from IOSRAM failed");
 	if (header.cnsram_magic != CNSRAM_MAGIC)
@@ -268,12 +268,12 @@ sgcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Allocate console input buffer */
 	sgcn_state->sgcn_inbuf_size =
-		header.cnsram_in_end - header.cnsram_in_begin;
+	    header.cnsram_in_end - header.cnsram_in_begin;
 	sgcn_state->sgcn_inbuf =
-		kmem_alloc(sgcn_state->sgcn_inbuf_size, KM_SLEEP);
+	    kmem_alloc(sgcn_state->sgcn_inbuf_size, KM_SLEEP);
 #ifdef SGCN_DEBUG
 	prom_printf("Allocated %d(0x%X) bytes for console\n",
-		sgcn_state->sgcn_inbuf_size);
+	    sgcn_state->sgcn_inbuf_size);
 #endif
 
 	(void) prom_serengeti_set_console_input(SGCN_CLNT_STR);
@@ -433,7 +433,7 @@ sgcn_wput(queue_t *q, mblk_t *mp)
 
 #ifdef SGCN_DEBUG
 	prom_printf("sgcn_wput(): SGCN wput q=%X mp=%X rd=%X wr=%X type=%X\n",
-		q, mp, mp->b_rptr, mp->b_wptr, mp->b_datap->db_type);
+	    q, mp, mp->b_rptr, mp->b_wptr, mp->b_datap->db_type);
 #endif
 
 	switch (mp->b_datap->db_type) {
@@ -442,7 +442,7 @@ sgcn_wput(queue_t *q, mblk_t *mp)
 #ifdef SGCN_DEBUG
 		iocp = (struct iocblk *)mp->b_rptr;
 		prom_printf("sgcn_wput(): M_IOCTL cmd=%X TIOC=%X\n",
-			iocp->ioc_cmd, TIOC);
+		    iocp->ioc_cmd, TIOC);
 #endif
 		switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
 		case TCSETSW:
@@ -498,7 +498,7 @@ sgcn_wput(queue_t *q, mblk_t *mp)
 #ifdef SGCN_DEBUG
 		if (mp->b_rptr < mp->b_wptr) {
 		prom_printf("sgcn_wput(): DATA q=%X mp=%X rd=%X wr=%X\n",
-			q, mp, mp->b_rptr, mp->b_wptr);
+		    q, mp, mp->b_rptr, mp->b_wptr);
 		prom_printf("sgcn_wput(): [[[[[");
 		for (i = 0; i < mp->b_wptr-mp->b_rptr; i++) {
 			prom_printf("%c", *(mp->b_rptr+i));
@@ -545,7 +545,7 @@ sgcn_ioctl(queue_t *q, mblk_t *mp)
 			unbufcall(sgcn_state->sgcn_wbufcid);
 		/* call sgcn_reioctl() */
 		sgcn_state->sgcn_wbufcid =
-			bufcall(data_size, BPRI_HI, sgcn_reioctl, sgcn_state);
+		    bufcall(data_size, BPRI_HI, sgcn_reioctl, sgcn_state);
 		return;
 	}
 
@@ -725,7 +725,7 @@ sgcn_flush()
 	q = sgcn_state->sgcn_writeq;
 
 	prom_printf("sgcn_flush(): WARNING console output is dropped "
-		"time=%lX\n", gethrestime_sec());
+	    "time=%lX\n", gethrestime_sec());
 	while (mp = getq(q)) {
 		freemsg(mp);
 	}
@@ -783,7 +783,7 @@ sgcn_data_in_handler(caddr_t arg)
 
 				/* leave our perimeter */
 				leavesq(sgcn_state->sgcn_readq->q_syncq,
-					SQ_CALLBACK);
+				    SQ_CALLBACK);
 				return;
 			} else {
 				mutex_exit(&sgcn_state->sgcn_sbbc_in_lock);
@@ -914,7 +914,7 @@ sgcn_read_header(int rw, cnsram_header *header)
 
 	/* check IOSRAM contents and read pointers */
 	rv = iosram_read(SBBC_CONSOLE_KEY, 0, (caddr_t)header,
-		sizeof (cnsram_header));
+	    sizeof (cnsram_header));
 	if (rv != 0) {
 		return (-1);
 	}
@@ -927,14 +927,14 @@ sgcn_read_header(int rw, cnsram_header *header)
 	 */
 	if (rw == RW_CONSOLE_READ) {
 		rv = iosram_read(SBBC_CONSOLE_KEY,
-			OFFSETOF((*header), cnsram_in_wrptr),
-			POINTER((*header), cnsram_in_wrptr),
-			sizeof (header->cnsram_in_wrptr));
+		    OFFSETOF((*header), cnsram_in_wrptr),
+		    POINTER((*header), cnsram_in_wrptr),
+		    sizeof (header->cnsram_in_wrptr));
 	} else if (rw == RW_CONSOLE_WRITE) {
 		rv = iosram_read(SBBC_CONSOLE_KEY,
-			OFFSETOF((*header), cnsram_out_rdptr),
-			POINTER((*header), cnsram_out_rdptr),
-			sizeof (header->cnsram_out_rdptr));
+		    OFFSETOF((*header), cnsram_out_rdptr),
+		    POINTER((*header), cnsram_out_rdptr),
+		    sizeof (header->cnsram_out_rdptr));
 	} else
 		rv = -1;
 
@@ -949,7 +949,7 @@ sgcn_rw(int rw, caddr_t buf, int len)
 
 #ifdef SGCN_DEBUG
 	prom_printf("sgcn_rw() rw = %X buf = %p len = %d\n",
-		rw, buf, len);
+	    rw, buf, len);
 #endif /* SGCN_DEBUG */
 	if (len == 0)
 		return (0);
@@ -982,16 +982,16 @@ sgcn_rw(int rw, caddr_t buf, int len)
 
 	if (rw == RW_CONSOLE_READ)
 		nbytes = circular_buffer_read(
-			header.cnsram_in_begin,
-				header.cnsram_in_end,
-				header.cnsram_in_rdptr,
-				header.cnsram_in_wrptr, buf, len);
+		    header.cnsram_in_begin,
+		    header.cnsram_in_end,
+		    header.cnsram_in_rdptr,
+		    header.cnsram_in_wrptr, buf, len);
 	else if (rw == RW_CONSOLE_WRITE)
 		nbytes = circular_buffer_write(
-			header.cnsram_out_begin,
-				header.cnsram_out_end,
-				header.cnsram_out_rdptr,
-				header.cnsram_out_wrptr, buf, len);
+		    header.cnsram_out_begin,
+		    header.cnsram_out_end,
+		    header.cnsram_out_rdptr,
+		    header.cnsram_out_wrptr, buf, len);
 
 	/*
 	 * error log was done in circular buffer routines,
@@ -1006,21 +1006,21 @@ sgcn_rw(int rw, caddr_t buf, int len)
 	if (rw == RW_CONSOLE_READ) {
 		header.cnsram_in_rdptr =
 		    (header.cnsram_in_rdptr - header.cnsram_in_begin
-			+ nbytes)
+		    + nbytes)
 		    % size + header.cnsram_in_begin;
 		rv = iosram_write(SBBC_CONSOLE_KEY,
-			OFFSETOF(header, cnsram_in_rdptr),
-			POINTER(header, cnsram_in_rdptr),
-			sizeof (header.cnsram_in_rdptr));
+		    OFFSETOF(header, cnsram_in_rdptr),
+		    POINTER(header, cnsram_in_rdptr),
+		    sizeof (header.cnsram_in_rdptr));
 	} else if (rw == RW_CONSOLE_WRITE) {
 		header.cnsram_out_wrptr =
 		    (header.cnsram_out_wrptr - header.cnsram_out_begin
-			+ nbytes)
+		    + nbytes)
 		    % size + header.cnsram_out_begin;
 		rv = iosram_write(SBBC_CONSOLE_KEY,
-			OFFSETOF(header, cnsram_out_wrptr),
-			POINTER(header, cnsram_out_wrptr),
-			sizeof (header.cnsram_out_wrptr));
+		    OFFSETOF(header, cnsram_out_wrptr),
+		    POINTER(header, cnsram_out_wrptr),
+		    sizeof (header.cnsram_out_wrptr));
 	}
 	if (rv != 0) {
 		sgcn_log_error(rw, EIO);

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Indirect console driver for Sun.
@@ -113,7 +112,9 @@ static struct dev_ops cn_ops = {
 	cn_detach,		/* detach */
 	nodev,			/* reset */
 	&cn_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 
 };
 
@@ -169,7 +170,7 @@ extern struct dev_ops cn_ops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Console redirection driver %I%",
+	"Console redirection driver",
 	&cn_ops,	/* driver ops */
 };
 

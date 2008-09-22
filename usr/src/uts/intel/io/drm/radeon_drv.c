@@ -82,9 +82,10 @@ static struct dev_ops radeon_dev_ops = {
 	radeon_attach,			/* devo_attach */
 	radeon_detach,			/* devo_detach */
 	nodev,				/* devo_reset */
-	&drm_cb_ops,		/* devo_cb_ops */
+	&drm_cb_ops,			/* devo_cb_ops */
 	NULL,				/* devo_bus_ops */
-	NULL				/* power */
+	NULL,				/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -124,7 +123,9 @@ static struct dev_ops vcc_ops = {
 	vcc_detach,		/* detach */
 	nodev,			/* reset */
 	&vcc_cb_ops,		/* cb_ops */
-	(struct bus_ops *)NULL	/* bus_ops */
+	(struct bus_ops *)NULL,	/* bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
@@ -135,7 +136,7 @@ extern struct mod_ops mod_driverops;
 /*
  * This is the string displayed by modinfo(1m).
  */
-static char vcc_ident[] = "sun4v Virtual Console Concentrator Driver v%I%";
+static char vcc_ident[] = "sun4v Virtual Console Concentrator Driver";
 
 static struct modldrv md = {
 	&mod_driverops, 	/* Type - it is a driver */
@@ -426,9 +427,9 @@ i_vcc_ldc_init(vcc_t *vccp, vcc_port_t *vport)
 
 	/* register it */
 	if ((rv = ldc_reg_callback(vport->ldc_handle, vcc_ldc_cb,
-		(caddr_t)vport)) != 0) {
+	    (caddr_t)vport)) != 0) {
 		cmn_err(CE_CONT, "i_vcc_ldc_init: port@%d ldc_register_cb"
-			"failed\n", vport->number);
+		    "failed\n", vport->number);
 		(void) ldc_fini(vport->ldc_handle);
 		vport->ldc_id = VCC_INVALID_CHANNEL;
 		return (rv);
@@ -638,7 +639,7 @@ vcc_ldc_cb(uint64_t event, caddr_t arg)
 		/* channel has space for write */
 
 		i_vcc_set_port_status(vport, &vport->write_cv,
-			VCC_PORT_LDC_WRITE_READY);
+		    VCC_PORT_LDC_WRITE_READY);
 		return (LDC_SUCCESS);
 	}
 
@@ -652,14 +653,14 @@ vcc_ldc_cb(uint64_t event, caddr_t arg)
 		}
 
 		i_vcc_set_port_status(vport, &vport->read_cv,
-			VCC_PORT_LDC_DATA_READY);
+		    VCC_PORT_LDC_DATA_READY);
 		return (LDC_SUCCESS);
 	}
 
 	if (event & LDC_EVT_DOWN) {
 		/* channel is down */
 		i_vcc_set_port_status(vport, &vport->write_cv,
-					VCC_PORT_LDC_LINK_DOWN);
+		    VCC_PORT_LDC_LINK_DOWN);
 		cv_broadcast(&vport->read_cv);
 
 	}
@@ -743,7 +744,7 @@ i_vcc_add_port(vcc_t *vccp, char *group_name, uint64_t tcp_port,
 	if (vport->status & VCC_PORT_AVAIL) {
 		/* this port already exists */
 		cmn_err(CE_CONT, "i_vcc_add_port: invalid port - port@%d "
-			"exists\n", portno);
+		    "exists\n", portno);
 		return (MDEG_FAILURE);
 	}
 
@@ -763,7 +764,7 @@ i_vcc_add_port(vcc_t *vccp, char *group_name, uint64_t tcp_port,
 	/* look up minor number */
 	for (minor_idx = 0; minor_idx < vccp->minors_assigned; minor_idx++) {
 		if (strcmp(vccp->minor_tbl[minor_idx].domain_name,
-			    domain_name) == 0) {
+		    domain_name) == 0) {
 			/* found previous assigned minor number */
 			break;
 		}
@@ -1000,7 +1001,7 @@ vcc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "reg", -1);
 		if (inst == -1) {
 			cmn_err(CE_CONT, "vcc_attach: vcc%d has no "
-				"'reg' property\n",
+			    "'reg' property\n",
 			    ddi_get_instance(dip));
 
 			i_vcc_cleanup_port_table(vccp);
@@ -1172,7 +1173,7 @@ vcc_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 
 	/* check minor no and pid */
 	if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-			    vport)) != 0) {
+	    vport)) != 0) {
 		mutex_exit(&vport->lock);
 		return (rv);
 	}
@@ -1299,7 +1300,7 @@ vcc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	/* check minor no and pid */
 	if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-			    vport)) != 0) {
+	    vport)) != 0) {
 		mutex_exit(&vport->lock);
 		return (rv);
 	}
@@ -1370,7 +1371,7 @@ i_vcc_cons_tbl(vcc_t *vccp, uint_t num_ports, caddr_t buf, int mode)
 
 		/* copy out data */
 		if (ddi_copyout(&cons, (void *)buf,
-			    sizeof (vcc_console_t), mode)) {
+		    sizeof (vcc_console_t), mode)) {
 			mutex_exit(&vport->lock);
 			return (EFAULT);
 		}
@@ -1401,7 +1402,7 @@ i_vcc_cons_tbl(vcc_t *vccp, uint_t num_ports, caddr_t buf, int mode)
 	while (num_ports > 0) {
 		/* fill vntsd buffer with no console */
 		if (ddi_copyout(&cons, (void *)buf,
-			    sizeof (vcc_console_t), mode) != 0) {
+		    sizeof (vcc_console_t), mode) != 0) {
 			mutex_exit(&vport->lock);
 			return (EFAULT);
 		}
@@ -1490,12 +1491,12 @@ i_vcc_cons_info(vcc_t *vccp, caddr_t buf, int mode)
 
 	(void) ddi_pathname(vccp->dip, pathname),
 
-	/* copy device name */
-	(void) snprintf(cons.dev_name, MAXPATHLEN-1, "%s:%s%s",
+	    /* copy device name */
+	    (void) snprintf(cons.dev_name, MAXPATHLEN-1, "%s:%s%s",
 	    pathname, VCC_MINOR_NAME_PREFIX, cons.domain_name);
 	/* copy data */
 	if (ddi_copyout(&cons, (void *)buf,
-		    sizeof (vcc_console_t), mode) != 0) {
+	    sizeof (vcc_console_t), mode) != 0) {
 		mutex_exit(&vport->lock);
 		return (EFAULT);
 	}
@@ -1539,9 +1540,9 @@ i_vcc_inquiry(vcc_t *vccp, caddr_t buf, int mode)
 			msg.cons_no = i;
 
 			if (ddi_copyout((void *)&msg, (void *)buf,
-				    sizeof (msg), mode) == -1) {
+			    sizeof (msg), mode) == -1) {
 				cmn_err(CE_CONT, "i_vcc_find_changed_port:"
-					"ddi_copyout"
+				    "ddi_copyout"
 				    " failed\n");
 				return (EFAULT);
 			}
@@ -1553,7 +1554,7 @@ i_vcc_inquiry(vcc_t *vccp, caddr_t buf, int mode)
 	msg.reason = VCC_CONS_MISS_ADDED;
 
 	if (ddi_copyout((void *)&msg, (void *)buf,
-		    sizeof (msg), mode) == -1) {
+	    sizeof (msg), mode) == -1) {
 		cmn_err(CE_CONT, "i_vcc_find_changed_port: ddi_copyout"
 		    " failed\n");
 		return (EFAULT);
@@ -1655,7 +1656,7 @@ i_vcc_cons_status(vcc_t *vccp, caddr_t buf, int mode)
 	D1("i_vcc_cons_status@%d:\n", console.cons_no);
 
 	if ((console.cons_no >= VCC_MAX_PORTS) ||
-		(console.cons_no == VCC_CONTROL_PORT)) {
+	    (console.cons_no == VCC_CONTROL_PORT)) {
 		return (EINVAL);
 	}
 
@@ -1664,10 +1665,10 @@ i_vcc_cons_status(vcc_t *vccp, caddr_t buf, int mode)
 	if ((vport->status & VCC_PORT_AVAIL) == 0) {
 		console.cons_no = -1;
 	} else  if (strncmp(console.domain_name, vport->minorp->domain_name,
-		    MAXPATHLEN)) {
+	    MAXPATHLEN)) {
 		console.cons_no = -1;
 	} else if (strncmp(console.group_name, vport->group_name,
-		    MAXPATHLEN)) {
+	    MAXPATHLEN)) {
 		console.cons_no = -1;
 	} else if (console.tcp_port != vport->tcp_port) {
 		console.cons_no = -1;
@@ -1703,7 +1704,7 @@ i_vcc_ctrl_ioctl(vcc_t *vccp, int cmd, void* arg, int mode)
 		/* number of consoles */
 
 		return (ddi_copyout((void *)&num_ports, arg,
-			    sizeof (int), mode));
+		    sizeof (int), mode));
 	case VCC_CONS_TBL:
 
 		/* console config table */
@@ -1812,7 +1813,7 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 
 		/* check minor no and pid */
 		if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-				    vport)) != 0) {
+		    vport)) != 0) {
 			mutex_exit(&vport->lock);
 			return (rv);
 		}
@@ -1835,7 +1836,7 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 
 		/* check minor no and pid */
 		if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-				    vport)) != 0) {
+		    vport)) != 0) {
 			mutex_exit(&vport->lock);
 			return (rv);
 		}
@@ -1852,7 +1853,7 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 
 		/* check minor no and pid */
 		if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-				    vport)) != 0) {
+		    vport)) != 0) {
 			mutex_exit(&vport->lock);
 			return (rv);
 		}
@@ -1876,7 +1877,7 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 		mutex_exit(&vport->lock);
 
 		i_vcc_set_port_status(vport, &vport->write_cv,
-			VCC_PORT_USE_WRITE_LDC);
+		    VCC_PORT_USE_WRITE_LDC);
 		return (0);
 
 	case TCXONC:
@@ -1889,7 +1890,7 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 
 		/* check minor no and pid */
 		if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-				    vport)) != 0) {
+		    vport)) != 0) {
 			mutex_exit(&vport->lock);
 			return (rv);
 		}
@@ -1963,7 +1964,7 @@ vcc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	if (portno >= VCC_MAX_PORTS) {
 		cmn_err(CE_CONT, "vcc_ioctl:virtual-console-concentrator@%d"
-			" invalid portno\n", portno);
+		    " invalid portno\n", portno);
 		return (EINVAL);
 	}
 
@@ -2024,14 +2025,14 @@ vcc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	/* check minor no and pid */
 	if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-			    vport)) != 0) {
+	    vport)) != 0) {
 		mutex_exit(&vport->lock);
 		return (rv);
 	}
 
 	rv = i_vcc_wait_port_status(vport, &vport->read_cv,
-		    VCC_PORT_TERM_RD|VCC_PORT_LDC_CHANNEL_READY|
-		    VCC_PORT_USE_READ_LDC);
+	    VCC_PORT_TERM_RD|VCC_PORT_LDC_CHANNEL_READY|
+	    VCC_PORT_USE_READ_LDC);
 	if (rv) {
 		mutex_exit(&vport->lock);
 		return (rv);
@@ -2138,14 +2139,14 @@ vcc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	/* check minor no and pid */
 	if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-			    vport)) != 0) {
+	    vport)) != 0) {
 		mutex_exit(&vport->lock);
 		return (rv);
 	}
 
 	rv = i_vcc_wait_port_status(vport, &vport->write_cv,
-		VCC_PORT_TERM_WR|VCC_PORT_LDC_CHANNEL_READY|
-		VCC_PORT_USE_WRITE_LDC);
+	    VCC_PORT_TERM_WR|VCC_PORT_LDC_CHANNEL_READY|
+	    VCC_PORT_USE_WRITE_LDC);
 	if (rv) {
 		mutex_exit(&vport->lock);
 		return (rv);
@@ -2179,7 +2180,7 @@ vcc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 		/* check minor no and pid */
 		if ((rv = i_vcc_can_use_port(VCCMINORP(vccp, minor),
-			    vport)) != 0) {
+		    vport)) != 0) {
 			mutex_exit(&vport->lock);
 			return (rv);
 		}
@@ -2215,13 +2216,13 @@ i_vcc_md_remove_port(md_t *mdp, mde_cookie_t mdep, vcc_t *vccp)
 
 	if ((portno >= VCC_MAX_PORTS) || (portno < 0)) {
 		cmn_err(CE_CONT, "i_vcc_md_remove_port@%ld invalid port no\n",
-			portno);
+		    portno);
 		return (MDEG_FAILURE);
 	}
 
 	if (portno == VCC_CONTROL_PORT) {
 		cmn_err(CE_CONT, "i_vcc_md_remove_port@%ld can not remove"
-			"control port\n",
+		    "control port\n",
 		    portno);
 		return (MDEG_FAILURE);
 	}
@@ -2261,8 +2262,8 @@ i_vcc_get_ldc_id(md_t *md, mde_cookie_t mdep, uint64_t *ldc_id)
 
 	/* Look for channel endpoint child(ren) of the vdisk MD node */
 	if ((num_channels = md_scan_dag(md, mdep,
-		    md_find_name(md, "channel-endpoint"),
-		    md_find_name(md, "fwd"), channel)) <= 0) {
+	    md_find_name(md, "channel-endpoint"),
+	    md_find_name(md, "fwd"), channel)) <= 0) {
 		cmn_err(CE_CONT, "i_vcc_get_ldc_id:  No 'channel-endpoint'"
 		    " found for vcc");
 		kmem_free(channel, size);
@@ -2299,14 +2300,14 @@ i_vcc_md_add_port(md_t *mdp, mde_cookie_t mdep, vcc_t *vccp)
 	/* read in the port's reg property */
 	if (md_get_prop_val(mdp, mdep, "id", &portno)) {
 		cmn_err(CE_CONT, "i_vcc_md_add_port_: port has no 'id' "
-			"property\n");
+		    "property\n");
 		return (MDEG_FAILURE);
 	}
 
 	/* read in the port's "vcc-doman-name" property */
 	if (md_get_prop_str(mdp, mdep, "vcc-domain-name", &domain_name)) {
 		cmn_err(CE_CONT, "i_vcc_md_add_port: port%ld has "
-			"no 'vcc-domain-name' property\n", portno);
+		    "no 'vcc-domain-name' property\n", portno);
 		return (MDEG_FAILURE);
 	}
 
@@ -2314,7 +2315,7 @@ i_vcc_md_add_port(md_t *mdp, mde_cookie_t mdep, vcc_t *vccp)
 	/* read in the port's "vcc-group-name" property */
 	if (md_get_prop_str(mdp, mdep, "vcc-group-name", &group_name)) {
 		cmn_err(CE_CONT, "i_vcc_md_add_port: port%ld has no "
-			"'vcc-group-name'property\n", portno);
+		    "'vcc-group-name'property\n", portno);
 		return (MDEG_FAILURE);
 	}
 
@@ -2322,7 +2323,7 @@ i_vcc_md_add_port(md_t *mdp, mde_cookie_t mdep, vcc_t *vccp)
 	/* read in the port's "vcc-tcp-port" property */
 	if (md_get_prop_val(mdp, mdep, "vcc-tcp-port", &tcp_port)) {
 		cmn_err(CE_CONT, "i_vcc_md_add_port: port%ld has no"
-			"'vcc-tcp-port' property\n", portno);
+		    "'vcc-tcp-port' property\n", portno);
 		return (MDEG_FAILURE);
 	}
 

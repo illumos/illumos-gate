@@ -30,7 +30,6 @@
 #ifndef _SYS_UADMIN_H
 #define	_SYS_UADMIN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(_ASM)
 #include <sys/types.h>
@@ -59,6 +58,8 @@ extern "C" {
 #define	AD_SIBOOT	4	/* single-user reboot, ask for name of file */
 #define	AD_POWEROFF	6	/* software poweroff */
 #define	AD_NOSYNC	7	/* do not sync filesystems on next A_DUMP */
+#define	AD_FASTREBOOT	8	/* bypass firmware and boot loader */
+#define	AD_FASTREBOOT_DRYRUN	9	/* Fast reboot Dry run */
 
 
 /*

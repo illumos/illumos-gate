@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Floppy Disk Controller Driver
@@ -230,6 +229,7 @@ static int fdc_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int fdc_probe(dev_info_t *);
 static int fdc_attach(dev_info_t *, ddi_attach_cmd_t);
 static int fdc_detach(dev_info_t *, ddi_detach_cmd_t);
+static int fdc_quiesce(dev_info_t *);
 static int fdc_enhance_probe(struct fdcntlr *fcp);
 
 struct dev_ops	fdc_ops = {
@@ -242,7 +242,9 @@ struct dev_ops	fdc_ops = {
 	fdc_detach,		/* detach */
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
-	&fdc_bus_ops		/* bus operations */
+	&fdc_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	fdc_quiesce,		/* quiesce */
 };
 
 /*
@@ -254,7 +256,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"Floppy Controller %I%",	/* Name of the module. */
+	"Floppy Controller",	/* Name of the module. */
 	&fdc_ops,		/* Driver ops vector */
 };
 
@@ -1604,6 +1606,71 @@ decode(xlate_tbl_t *tablep, int kode, int *rvalue)
 	return (-1);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+int
+fdc_quiesce(dev_info_t *dip)
+{
+	struct fdcntlr *fcp;
+	int ctlr = ddi_get_instance(dip);
+	int unit;
+
+	fcp = ddi_get_soft_state(fdc_state_head, ctlr);
+
+	if (fcp == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * If no FD units are attached, there is no need to quiesce.
+	 */
+	for (unit = 0; unit < NFDUN; unit++) {
+		struct fcu_obj *fjp = fcp->c_unit[unit];
+		if (fjp->fj_flags & FUNIT_DRVATCH) {
+			break;
+		}
+	}
+
+	if (unit == NFDUN)
+		return (DDI_SUCCESS);
+
+	(void) ddi_dmae_disable(fcp->c_dip, fcp->c_dmachan);
+
+	fcp->c_digout = (fcp->c_digout & (FD_DMTREN | FD_DRSEL)) | FD_ENABLE;
+	outb(fcp->c_regbase + FCR_DOR, fcp->c_digout);
+	drv_usecwait(20);
+	fcp->c_digout |= FD_RSETZ;
+	outb(fcp->c_regbase + FCR_DOR, fcp->c_digout);
+
+	if (fcp->c_chip >= i82077) {
+		int count = 4;
+		uchar_t *oplistp = configurecmd;
+		do {
+			int ntries = FDC_RQM_RETRY;
+			do {
+				if ((inb(fcp->c_regbase + FCR_MSR) &
+				    (MS_RQM|MS_DIO)) == MS_RQM)
+					break;
+				else
+					drv_usecwait(1);
+			} while (--ntries);
+			if (ntries == 0) {
+				break;
+			}
+			outb(fcp->c_regbase + FCR_DATA, *oplistp++);
+			drv_usecwait(16); /* See comment in fdc_result() */
+		} while (--count);
+	}
+
+	return (DDI_SUCCESS);
+}
 
 void
 fdcquiesce(struct fdcntlr *fcp)
@@ -1612,8 +1679,8 @@ fdcquiesce(struct fdcntlr *fcp)
 
 	FCERRPRINT(FDEP_L2, FDEM_RESE, (CE_NOTE, "fdcquiesce fcp %p",
 	    (void*)fcp));
-	ASSERT(MUTEX_HELD(&fcp->c_lock));
 
+	ASSERT(MUTEX_HELD(&fcp->c_lock));
 	mutex_enter(&fcp->c_dorlock);
 
 	if (ddi_dmae_stop(fcp->c_dip, fcp->c_dmachan) != DDI_SUCCESS)

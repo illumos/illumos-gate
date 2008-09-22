@@ -2148,6 +2148,19 @@ int ddi_parse(const char *, char *, uint_t *);
  */
 ddi_periodic_t ddi_periodic_add(void (*)(void *), void *, hrtime_t, int);
 void ddi_periodic_delete(ddi_periodic_t);
+
+/*
+ * Default quiesce(9E) implementation for drivers that don't need to do
+ * anything.
+ */
+int ddi_quiesce_not_needed(dev_info_t *);
+
+/*
+ * Default quiesce(9E) initialization function for drivers that should
+ * implement quiesce but haven't yet.
+ */
+int ddi_quiesce_not_supported(dev_info_t *);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

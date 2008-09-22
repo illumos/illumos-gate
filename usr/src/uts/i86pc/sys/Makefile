@@ -19,9 +19,8 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/i86pc/sys/Makefile
@@ -46,6 +45,7 @@ HDRS=  \
 	cram.h		\
 	ddi_subrdefs.h	\
 	debug_info.h 	\
+	fastboot.h	\
 	mach_mmu.h	\
 	machclock.h	\
 	machcpuvar.h	\

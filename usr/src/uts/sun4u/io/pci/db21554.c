@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Intel 21554 PCI to PCI bus bridge nexus driver for sun4u platforms.
@@ -72,7 +71,7 @@
  * DEFINES.
  */
 #define	DB_DEBUG
-#define	DB_MODINFO_DESCRIPTION	"Intel/21554 pci-pci nexus:v%I%"
+#define	DB_MODINFO_DESCRIPTION	"Intel/21554 pci-pci nexus"
 #define	DB_DVMA_START		0xc0000000
 #define	DB_DVMA_LEN		0x20000000
 
@@ -386,7 +385,8 @@ static struct dev_ops db_dev_ops = {
 	nulldev,		/* reset */
 	&db_cb_ops,		/* driver operations */
 	&db_bus_ops,		/* bus operations */
-	ddi_power
+	ddi_power,
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -440,8 +440,8 @@ _init(void)
 
 	DB_DEBUG0(DB_INIT|DB_DONT_DISPLAY_DIP, NULL, "enter\n");
 	if (((rc = ddi_soft_state_init(&db_state,
-			sizeof (db_ctrl_t), 1)) == 0) &&
-			((rc = mod_install(&modlinkage)) != 0))
+	    sizeof (db_ctrl_t), 1)) == 0) &&
+	    ((rc = mod_install(&modlinkage)) != 0))
 		ddi_soft_state_fini(&db_state);
 	DB_DEBUG1(DB_INIT|DB_DONT_DISPLAY_DIP, NULL, "exit rc=%d\n", rc);
 	return (rc);
@@ -479,7 +479,7 @@ db_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
 
 	DB_DEBUG1(DB_GETINFO|DB_DONT_DISPLAY_DIP, dip, "enter:cmd=%d\n",
-		infocmd);
+	    infocmd);
 
 	switch (infocmd) {
 		case DDI_INFO_DEVT2DEVINFO:
@@ -501,7 +501,7 @@ db_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 			break;
 	}
 	DB_DEBUG2(DB_GETINFO|DB_DONT_DISPLAY_DIP, dip,
-		"exit: result=%x, rc=%d\n", *result, rc);
+	    "exit: result=%x, rc=%d\n", *result, rc);
 
 	return (rc);
 }
@@ -543,13 +543,13 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * operation.
 		 */
 		if ((rc = ddi_regs_map_setup(dip, DB_PCI_CONF_RNUMBER,
-			(caddr_t *)&dbp->conf_io, DB_PCI_CONF_OFFSET,
-			PCI_CONF_HDR_SIZE, &db_csr_attr, &dbp->conf_handle))
-							!= DDI_SUCCESS) {
+		    (caddr_t *)&dbp->conf_io, DB_PCI_CONF_OFFSET,
+		    PCI_CONF_HDR_SIZE, &db_csr_attr, &dbp->conf_handle))
+		    != DDI_SUCCESS) {
 
 			cmn_err(CE_WARN,
-				"%s#%d: cannot map configuration space",
-				ddi_driver_name(dip), ddi_get_instance(dip));
+			    "%s#%d: cannot map configuration space",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 			mutex_destroy(&dbp->db_mutex);
 			ddi_soft_state_free(db_state, instance);
 			rc = DDI_FAILURE;
@@ -559,10 +559,10 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		db_get_perf_parameters(dbp);
 
 		if (ddi_dev_regsize(dip, DB_CSR_MEMBAR_RNUMBER, &bar_size)
-				!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s#%d: cannot get memory CSR size",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip));
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip));
 			ddi_regs_map_free(&dbp->conf_handle);
 			mutex_destroy(&dbp->db_mutex);
 			ddi_soft_state_free(db_state, instance);
@@ -572,12 +572,12 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* map memory CSR space */
 		if (ddi_regs_map_setup(dip, DB_CSR_MEMBAR_RNUMBER,
-			(caddr_t *)&dbp->csr_mem, DB_CSR_MEM_OFFSET, bar_size,
-			&db_csr_attr, &dbp->csr_mem_handle) != DDI_SUCCESS) {
+		    (caddr_t *)&dbp->csr_mem, DB_CSR_MEM_OFFSET, bar_size,
+		    &db_csr_attr, &dbp->csr_mem_handle) != DDI_SUCCESS) {
 
 			cmn_err(CE_WARN, "%s#%d: cannot map memory CSR space",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip));
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip));
 			ddi_regs_map_free(&dbp->conf_handle);
 			mutex_destroy(&dbp->db_mutex);
 			ddi_soft_state_free(db_state, instance);
@@ -586,10 +586,10 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		if (ddi_dev_regsize(dip, DB_CSR_IOBAR_RNUMBER, &bar_size)
-				!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s#%d: cannot get IO CSR size",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip));
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip));
 			ddi_regs_map_free(&dbp->csr_mem_handle);
 			ddi_regs_map_free(&dbp->conf_handle);
 			mutex_destroy(&dbp->db_mutex);
@@ -604,12 +604,12 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * option than doing through configuration space map.
 		 */
 		if (ddi_regs_map_setup(dip, DB_CSR_IOBAR_RNUMBER,
-			(caddr_t *)&dbp->csr_io, DB_CSR_IO_OFFSET, bar_size,
-			&db_csr_attr, &dbp->csr_io_handle) != DDI_SUCCESS) {
+		    (caddr_t *)&dbp->csr_io, DB_CSR_IO_OFFSET, bar_size,
+		    &db_csr_attr, &dbp->csr_io_handle) != DDI_SUCCESS) {
 
 			cmn_err(CE_WARN, "%s#%d: cannot map IO CSR space",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip));
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip));
 			ddi_regs_map_free(&dbp->csr_mem_handle);
 			ddi_regs_map_free(&dbp->conf_handle);
 			mutex_destroy(&dbp->db_mutex);
@@ -647,12 +647,12 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		range_size = sizeof (dbp->range);
 		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "bus-range", (caddr_t)&dbp->range,
-				&range_size) != DDI_SUCCESS) {
+		    DDI_PROP_DONTPASS, "bus-range", (caddr_t)&dbp->range,
+		    &range_size) != DDI_SUCCESS) {
 
 			cmn_err(CE_WARN,
-				"%s#%d: cannot get bus-range property",
-				ddi_driver_name(dip), ddi_get_instance(dip));
+			    "%s#%d: cannot get bus-range property",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 
 			if (dbp->dev_state & DB_SECONDARY_NEXUS)
 				(void) pcihp_uninit(dip);
@@ -674,7 +674,7 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEBUG_MINOR),
 		    NULL, NULL) == DDI_FAILURE) {
 			cmn_err(CE_NOTE, "%s#%d: node creation failure",
-					ddi_driver_name(dbp->dip), instance);
+			    ddi_driver_name(dbp->dip), instance);
 		}
 
 		mutex_init(&dbp->db_busown, NULL, MUTEX_DRIVER, NULL);
@@ -742,9 +742,9 @@ db_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND :
 		if (db_save_config_regs(dbp) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
-				"%s#%d: Ignoring Child state Suspend Error",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip));
+			    "%s#%d: Ignoring Child state Suspend Error",
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip));
 		}
 		dbp->dev_state |= DB_SUSPENDED;
 		break;
@@ -762,23 +762,23 @@ static void
 db_get_perf_parameters(db_ctrl_t *dbp)
 {
 	dbp->p_latency_timer = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "p-latency-timer", p_latency_timer);
+	    dbp->dip, 0, "p-latency-timer", p_latency_timer);
 	dbp->s_latency_timer = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "s-latency-timer", s_latency_timer);
+	    dbp->dip, 0, "s-latency-timer", s_latency_timer);
 	dbp->p_cache_line_size = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "p-cache-line-size", p_cache_line_size);
+	    dbp->dip, 0, "p-cache-line-size", p_cache_line_size);
 	dbp->s_cache_line_size = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "s-cache-line-size", s_cache_line_size);
+	    dbp->dip, 0, "s-cache-line-size", s_cache_line_size);
 	dbp->p_pwrite_threshold = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "p-pwrite-threshold", p_pwrite_threshold);
+	    dbp->dip, 0, "p-pwrite-threshold", p_pwrite_threshold);
 	dbp->s_pwrite_threshold = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "s-pwrite-threshold", s_pwrite_threshold);
+	    dbp->dip, 0, "s-pwrite-threshold", s_pwrite_threshold);
 	dbp->p_dread_threshold = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "p-dread-threshold", p_dread_threshold);
+	    dbp->dip, 0, "p-dread-threshold", p_dread_threshold);
 	dbp->s_dread_threshold = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "s-dread-threshold", s_dread_threshold);
+	    dbp->dip, 0, "s-dread-threshold", s_dread_threshold);
 	dbp->delayed_trans_order = (int8_t)ddi_prop_get_int(DDI_DEV_T_ANY,
-		dbp->dip, 0, "delayed-trans-order", delayed_trans_order);
+	    dbp->dip, 0, "delayed-trans-order", delayed_trans_order);
 }
 
 static void
@@ -792,69 +792,69 @@ db_set_perf_parameters(db_ctrl_t *dbp)
 		soffset = DB_PCONF_SEC_HDR_OFF;
 
 	if ((dbp->p_latency_timer != (int8_t)DEF_INVALID_REG_VAL) &&
-						(dbp->p_latency_timer != -1))
+	    (dbp->p_latency_timer != -1))
 		ddi_put8(dbp->conf_handle,
-			(uint8_t *)dbp->conf_io+poffset+PCI_CONF_LATENCY_TIMER,
-			dbp->p_latency_timer);
+		    (uint8_t *)dbp->conf_io+poffset+PCI_CONF_LATENCY_TIMER,
+		    dbp->p_latency_timer);
 	if ((dbp->s_latency_timer != (int8_t)DEF_INVALID_REG_VAL) &&
-						(dbp->s_latency_timer != -1))
+	    (dbp->s_latency_timer != -1))
 		ddi_put8(dbp->conf_handle,
-			(uint8_t *)dbp->conf_io+soffset+PCI_CONF_LATENCY_TIMER,
-			dbp->s_latency_timer);
+		    (uint8_t *)dbp->conf_io+soffset+PCI_CONF_LATENCY_TIMER,
+		    dbp->s_latency_timer);
 	if ((dbp->p_cache_line_size != (int8_t)DEF_INVALID_REG_VAL) &&
-						(dbp->p_cache_line_size != -1))
+	    (dbp->p_cache_line_size != -1))
 		ddi_put8(dbp->conf_handle,
-			(uint8_t *)dbp->conf_io+poffset+PCI_CONF_CACHE_LINESZ,
-			dbp->p_cache_line_size);
+		    (uint8_t *)dbp->conf_io+poffset+PCI_CONF_CACHE_LINESZ,
+		    dbp->p_cache_line_size);
 	if ((dbp->s_cache_line_size != (int8_t)DEF_INVALID_REG_VAL) &&
-						(dbp->s_cache_line_size != -1))
+	    (dbp->s_cache_line_size != -1))
 		ddi_put8(dbp->conf_handle,
-			(uint8_t *)dbp->conf_io+soffset+PCI_CONF_CACHE_LINESZ,
-			dbp->s_cache_line_size);
+		    (uint8_t *)dbp->conf_io+soffset+PCI_CONF_CACHE_LINESZ,
+		    dbp->s_cache_line_size);
 	if ((dbp->p_pwrite_threshold != (int8_t)DEF_INVALID_REG_VAL) &&
-					(dbp->p_pwrite_threshold != -1))
+	    (dbp->p_pwrite_threshold != -1))
 		ddi_put16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
-			(ddi_get16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
-				~P_PW_THRESHOLD) |
-				(dbp->p_pwrite_threshold?P_PW_THRESHOLD:0));
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
+		    (ddi_get16(dbp->conf_handle, (uint16_t *)
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
+		    ~P_PW_THRESHOLD) |
+		    (dbp->p_pwrite_threshold?P_PW_THRESHOLD:0));
 	if ((dbp->s_pwrite_threshold != (int8_t)DEF_INVALID_REG_VAL) &&
-					(dbp->s_pwrite_threshold != -1))
+	    (dbp->s_pwrite_threshold != -1))
 		ddi_put16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
-			(ddi_get16(dbp->conf_handle, (uint16_t *)
-				((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
-				~S_PW_THRESHOLD) |
-				(dbp->s_pwrite_threshold?S_PW_THRESHOLD:0));
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
+		    (ddi_get16(dbp->conf_handle, (uint16_t *)
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
+		    ~S_PW_THRESHOLD) |
+		    (dbp->s_pwrite_threshold?S_PW_THRESHOLD:0));
 	/* primary delayed read threshold. 0x01 is reserved ?. */
 	if ((dbp->p_dread_threshold != (int8_t)DEF_INVALID_REG_VAL) &&
-					(dbp->p_dread_threshold != -1))
+	    (dbp->p_dread_threshold != -1))
 		ddi_put16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
-			((ddi_get16(dbp->conf_handle, (uint16_t *)
-				((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
-				~P_DREAD_THRESHOLD_MASK) |
-				((dbp->p_dread_threshold &
-				DREAD_THRESHOLD_VALBITS)<<2)));
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
+		    ((ddi_get16(dbp->conf_handle, (uint16_t *)
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
+		    ~P_DREAD_THRESHOLD_MASK) |
+		    ((dbp->p_dread_threshold &
+		    DREAD_THRESHOLD_VALBITS)<<2)));
 	/* secondary delayed read threshold. 0x01 is reserved ?. */
 	if ((dbp->s_dread_threshold != (int8_t)DEF_INVALID_REG_VAL) &&
-					(dbp->s_dread_threshold != -1))
+	    (dbp->s_dread_threshold != -1))
 		ddi_put16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
-			((ddi_get16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
-				~S_DREAD_THRESHOLD_MASK) |
-				((dbp->s_dread_threshold &
-				DREAD_THRESHOLD_VALBITS)<<4)));
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1),
+		    ((ddi_get16(dbp->conf_handle, (uint16_t *)
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL1)) &
+		    ~S_DREAD_THRESHOLD_MASK) |
+		    ((dbp->s_dread_threshold &
+		    DREAD_THRESHOLD_VALBITS)<<4)));
 	if ((dbp->delayed_trans_order != (int8_t)DEF_INVALID_REG_VAL) &&
-					(dbp->delayed_trans_order != -1))
+	    (dbp->delayed_trans_order != -1))
 		ddi_put16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL0),
-			(ddi_get16(dbp->conf_handle, (uint16_t *)
-			((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL0)) &
-			~DELAYED_TRANS_ORDER) |
-			(dbp->delayed_trans_order?DELAYED_TRANS_ORDER:0));
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL0),
+		    (ddi_get16(dbp->conf_handle, (uint16_t *)
+		    ((uchar_t *)dbp->conf_io+DB_CONF_CHIP_CTRL0)) &
+		    ~DELAYED_TRANS_ORDER) |
+		    (dbp->delayed_trans_order?DELAYED_TRANS_ORDER:0));
 }
 
 static void
@@ -874,18 +874,18 @@ db_orientation(db_ctrl_t *dbp)
 	 * if PIF is set correctly, use it to determine orientation
 	 */
 	pif = ddi_get8(dbp->conf_handle, (uchar_t *)dbp->conf_io +
-				PCI_CONF_PROGCLASS);
+	    PCI_CONF_PROGCLASS);
 	if (pif & 0xff) {
 		if (pif & DB_PIF_SECONDARY_TO_HOST) {
 			dbp->dev_state = DB_SECONDARY_NEXUS;
 			DB_DEBUG0(DB_ATTACH, dip,
-				"db_orientation: pif secondary\n");
+			    "db_orientation: pif secondary\n");
 			return;
 		}
 		if (pif & DB_PIF_PRIMARY_TO_HOST) {
 			dbp->dev_state = DB_PRIMARY_NEXUS;
 			DB_DEBUG0(DB_ATTACH, dip,
-				"db_orientation: pif primary\n");
+			    "db_orientation: pif primary\n");
 			return;
 		}
 		/* otherwise, fall through */
@@ -897,16 +897,16 @@ db_orientation(db_ctrl_t *dbp)
 	 * secondary.
 	 */
 	mem1 = ddi_get32(dbp->conf_handle,
-			(uint32_t *)((uchar_t *)dbp->conf_io +
-			DB_CONF_DS_IO_MEM1_SETUP));
+	    (uint32_t *)((uchar_t *)dbp->conf_io +
+	    DB_CONF_DS_IO_MEM1_SETUP));
 
 	ddi_put32(dbp->conf_handle,
-			(uint32_t *)((uchar_t *)(dbp->conf_io +
-			DB_CONF_DS_IO_MEM1_SETUP)), ~mem1);
+	    (uint32_t *)((uchar_t *)(dbp->conf_io +
+	    DB_CONF_DS_IO_MEM1_SETUP)), ~mem1);
 
 	newval = ddi_get32(dbp->conf_handle,
-			(uint32_t *)((uchar_t *)dbp->conf_io +
-			DB_CONF_DS_IO_MEM1_SETUP));
+	    (uint32_t *)((uchar_t *)dbp->conf_io +
+	    DB_CONF_DS_IO_MEM1_SETUP));
 
 	if (newval == mem1)
 		/* we couldn't write it, orientation is primary */
@@ -918,8 +918,8 @@ db_orientation(db_ctrl_t *dbp)
 		 */
 		dbp->dev_state =  DB_SECONDARY_NEXUS;
 		ddi_put32(dbp->conf_handle,
-			(uint32_t *)((uchar_t *)(dbp->conf_io +
-			DB_CONF_DS_IO_MEM1_SETUP)), mem1);
+		    (uint32_t *)((uchar_t *)(dbp->conf_io +
+		    DB_CONF_DS_IO_MEM1_SETUP)), mem1);
 	}
 
 
@@ -967,24 +967,24 @@ db_enable_io(db_ctrl_t *dbp)
 	 *	which are used for child initialization.
 	 */
 	dbp->latency_timer = ddi_get8(dbp->conf_handle, (uint8_t *)
-			((caddr_t)dbp->conf_io+PCI_CONF_LATENCY_TIMER));
+	    ((caddr_t)dbp->conf_io+PCI_CONF_LATENCY_TIMER));
 
 	dbp->cache_line_size = ddi_get8(dbp->conf_handle, (uint8_t *)
-			((caddr_t)dbp->conf_io+PCI_CONF_CACHE_LINESZ));
+	    ((caddr_t)dbp->conf_io+PCI_CONF_CACHE_LINESZ));
 
 	DB_DEBUG2(DB_ATTACH, dip,
-		"db_enable_io: latency %d, cache line size %d\n",
-		dbp->latency_timer, dbp->cache_line_size);
+	    "db_enable_io: latency %d, cache line size %d\n",
+	    dbp->latency_timer, dbp->cache_line_size);
 
 	/*
 	 * Step 2: program command reg on both primary and secondary
 	 *	   interfaces.
 	 */
 	ddi_put16(dbp->conf_handle, (uint16_t *)((caddr_t)dbp->conf_io +
-			(off_t)(p_offset + PCI_CONF_COMM)), db_command_default);
+	    (off_t)(p_offset + PCI_CONF_COMM)), db_command_default);
 
 	ddi_put16(dbp->conf_handle, (uint16_t *)((caddr_t)dbp->conf_io +
-			(off_t)(s_offset + PCI_CONF_COMM)), db_command_default);
+	    (off_t)(s_offset + PCI_CONF_COMM)), db_command_default);
 
 	/*
 	 * Step 3:
@@ -1004,10 +1004,10 @@ db_enable_io(db_ctrl_t *dbp)
 		 *	  no look up table.
 		 */
 		if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
-				&length) != DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
+		    &length) != DDI_PROP_SUCCESS) {
 			DB_DEBUG0(DB_ATTACH, dip,
-				"Failed to read reg property\n");
+			    "Failed to read reg property\n");
 			return;
 		}
 
@@ -1016,7 +1016,7 @@ db_enable_io(db_ctrl_t *dbp)
 		for (i = 0; i < rcount; i++) {
 			offset = PCI_REG_REG_G(reg[i].pci_phys_hi);
 			if ((offset == PCI_CONF_BASE0) &&
-				(reg[i].pci_size_low > DB_CSR_SIZE))
+			    (reg[i].pci_size_low > DB_CSR_SIZE))
 					break;
 		}
 
@@ -1026,43 +1026,43 @@ db_enable_io(db_ctrl_t *dbp)
 		 */
 		if (i != rcount) {
 			DB_DEBUG0(DB_ATTACH, dip,
-				"db_enable_io: setting up MEM0_TR_BASE\n");
+			    "db_enable_io: setting up MEM0_TR_BASE\n");
 			DB_DEBUG1(DB_ATTACH, dip, "BASE0 register = %x\n",
-				pci_config_get32(dbp->conf_handle,
-					(off_t)(p_offset + PCI_CONF_BASE0)));
+			    pci_config_get32(dbp->conf_handle,
+			    (off_t)(p_offset + PCI_CONF_BASE0)));
 
 			pci_config_put32(dbp->conf_handle,
-				(off_t)DB_CONF_DS_MEM0_TR_BASE,
-				pci_config_get32(dbp->conf_handle,
-					(off_t)(p_offset + PCI_CONF_BASE0)));
+			    (off_t)DB_CONF_DS_MEM0_TR_BASE,
+			    pci_config_get32(dbp->conf_handle,
+			    (off_t)(p_offset + PCI_CONF_BASE0)));
 
 			DB_DEBUG1(DB_ATTACH, dip,
-				"db_enable_io: MEM0_TR_BASE set value = %x\n",
-				pci_config_get32(dbp->conf_handle,
-					(off_t)DB_CONF_DS_MEM0_TR_BASE));
+			    "db_enable_io: MEM0_TR_BASE set value = %x\n",
+			    pci_config_get32(dbp->conf_handle,
+			    (off_t)DB_CONF_DS_MEM0_TR_BASE));
 		}
 		kmem_free(reg, length);
 	}
 
 	pci_config_put32(dbp->conf_handle, (off_t)DB_CONF_DS_IO_MEM1_TR_BASE,
-			((pci_config_get32(dbp->conf_handle,
-			(off_t)(p_offset + PCI_CONF_BASE2))) & ~DB_IO_BIT));
+	    ((pci_config_get32(dbp->conf_handle,
+	    (off_t)(p_offset + PCI_CONF_BASE2))) & ~DB_IO_BIT));
 
 	pci_config_put32(dbp->conf_handle, (off_t)DB_CONF_DS_MEM2_TR_BASE,
-			((pci_config_get32(dbp->conf_handle,
-			(off_t)(p_offset + PCI_CONF_BASE3))) & ~DB_IO_BIT));
+	    ((pci_config_get32(dbp->conf_handle,
+	    (off_t)(p_offset + PCI_CONF_BASE3))) & ~DB_IO_BIT));
 
 	pci_config_put32(dbp->conf_handle, (off_t)DB_CONF_DS_MEM3_TR_BASE,
-			((pci_config_get32(dbp->conf_handle,
-			(off_t)(p_offset + PCI_CONF_BASE4))) & ~DB_IO_BIT));
+	    ((pci_config_get32(dbp->conf_handle,
+	    (off_t)(p_offset + PCI_CONF_BASE4))) & ~DB_IO_BIT));
 
 	pci_config_put32(dbp->conf_handle, (off_t)DB_CONF_US_IO_MEM0_TR_BASE,
-			((pci_config_get32(dbp->conf_handle,
-			(off_t)(s_offset + PCI_CONF_BASE2))) & ~DB_IO_BIT));
+	    ((pci_config_get32(dbp->conf_handle,
+	    (off_t)(s_offset + PCI_CONF_BASE2))) & ~DB_IO_BIT));
 
 	pci_config_put32(dbp->conf_handle, (off_t)DB_CONF_US_MEM1_TR_BASE,
-			((pci_config_get32(dbp->conf_handle,
-			(off_t)(s_offset + PCI_CONF_BASE3))) & ~DB_IO_BIT));
+	    ((pci_config_get32(dbp->conf_handle,
+	    (off_t)(s_offset + PCI_CONF_BASE3))) & ~DB_IO_BIT));
 
 	/*
 	 * Step 4: enable downstream (for primary orientation) or upstream
@@ -1072,38 +1072,38 @@ db_enable_io(db_ctrl_t *dbp)
 	regval = pci_config_get16(dbp->conf_handle, (off_t)DB_CONF_CONF_CSR);
 
 	DB_DEBUG1(DB_ATTACH, dip, "db_enable_io: CSR value before: %x\n",
-		regval);
+	    regval);
 
 	if (!(regval & enable)) {
 		/* enable down/upstream configuration transactions */
 		regval |= enable;
 		pci_config_put16(dbp->conf_handle, (off_t)DB_CONF_CONF_CSR,
-				regval);
+		    regval);
 		regval = pci_config_get16(dbp->conf_handle,
-				(off_t)DB_CONF_CONF_CSR);
+		    (off_t)DB_CONF_CONF_CSR);
 	}
 	DB_DEBUG1(DB_ATTACH, dip, "db_enable_io: CSR value after: %x\n",
-		regval);
+	    regval);
 
 	/*
 	 * Step 5: enable downstream/upstream I/O (through CSR space)
 	 */
 	regval = ddi_get16(dbp->csr_mem_handle,
-			(uint16_t *)((uchar_t *)dbp->csr_mem + DB_CSR_IO_CSR));
+	    (uint16_t *)((uchar_t *)dbp->csr_mem + DB_CSR_IO_CSR));
 
 	DB_DEBUG1(DB_ATTACH, dip, "db_enable_io: IO_CSR value before: %x\n",
-		regval);
+	    regval);
 	if (!(regval & enable)) {
 		regval |= enable;
 		ddi_put16(dbp->csr_mem_handle,
-			(uint16_t *)((uchar_t *)dbp->csr_mem +
-			DB_CSR_IO_CSR), regval);
+		    (uint16_t *)((uchar_t *)dbp->csr_mem +
+		    DB_CSR_IO_CSR), regval);
 
 		regval = ddi_get16(dbp->csr_mem_handle,
-			(uint16_t *)((uchar_t *)dbp->csr_mem + DB_CSR_IO_CSR));
+		    (uint16_t *)((uchar_t *)dbp->csr_mem + DB_CSR_IO_CSR));
 	}
 	DB_DEBUG1(DB_ATTACH, dip, "db_enable_io: IO_CSR value after: %x\n",
-		regval);
+	    regval);
 
 	/*
 	 * Step 6: if 21554 orientation is primary to host,
@@ -1111,27 +1111,27 @@ db_enable_io(db_ctrl_t *dbp)
 	 */
 	if (dbp->dev_state & DB_PRIMARY_NEXUS) {
 		dbp->serr_fwd_enable = ddi_prop_get_int(DDI_DEV_T_ANY,
-			dbp->dip, 0, "serr-fwd-enable", db_serr_fwd_enable);
+		    dbp->dip, 0, "serr-fwd-enable", db_serr_fwd_enable);
 
 		regval = ddi_get16(dbp->conf_handle,
-					(uint16_t *)((uchar_t *)dbp->conf_io +
-					DB_CONF_CHIP_CTRL0));
+		    (uint16_t *)((uchar_t *)dbp->conf_io +
+		    DB_CONF_CHIP_CTRL0));
 
 		DB_DEBUG1(DB_ATTACH, dip,
-			"db_enable_io: CHIP_CTRL0 value before: %x\n", regval);
+		    "db_enable_io: CHIP_CTRL0 value before: %x\n", regval);
 
 		ddi_put16(dbp->conf_handle,
-			(uint16_t *)((uchar_t *)dbp->conf_io +
-			DB_CONF_CHIP_CTRL0),
-			(regval & ~SERR_FWD) |
-			(dbp->serr_fwd_enable?SERR_FWD:0));
+		    (uint16_t *)((uchar_t *)dbp->conf_io +
+		    DB_CONF_CHIP_CTRL0),
+		    (regval & ~SERR_FWD) |
+		    (dbp->serr_fwd_enable?SERR_FWD:0));
 
 		regval = ddi_get16(dbp->conf_handle,
-					(uint16_t *)((uchar_t *)dbp->conf_io +
-					DB_CONF_CHIP_CTRL0));
+		    (uint16_t *)((uchar_t *)dbp->conf_io +
+		    DB_CONF_CHIP_CTRL0));
 
 		DB_DEBUG1(DB_ATTACH, dip,
-			"db_enable_io: CHIP_CTRL0 value after: %x\n", regval);
+		    "db_enable_io: CHIP_CTRL0 value after: %x\n", regval);
 	}
 
 	/*
@@ -1141,17 +1141,17 @@ db_enable_io(db_ctrl_t *dbp)
 
 	if (dbp->dev_state & DB_SECONDARY_NEXUS) {
 		regval = pci_config_get16(dbp->conf_handle,
-					(off_t)DB_CONF_CHIP_CTRL0);
+		    (off_t)DB_CONF_CHIP_CTRL0);
 		DB_DEBUG1(DB_ATTACH, dip,
-			"db_enable_io: chip ctrl (0x%x) before\n", regval);
+		    "db_enable_io: chip ctrl (0x%x) before\n", regval);
 		if (regval & PLOCKOUT)
 			pci_config_put16(dbp->conf_handle,
-					(off_t)DB_CONF_CHIP_CTRL0,
-					(regval & ~PLOCKOUT));
+			    (off_t)DB_CONF_CHIP_CTRL0,
+			    (regval & ~PLOCKOUT));
 		regval = pci_config_get16(dbp->conf_handle,
-					(off_t)DB_CONF_CHIP_CTRL0);
+		    (off_t)DB_CONF_CHIP_CTRL0);
 		DB_DEBUG1(DB_ATTACH, dip,
-			"db_enable_io: chip ctrl (0x%x) after\n", regval);
+		    "db_enable_io: chip ctrl (0x%x) after\n", regval);
 	}
 }
 
@@ -1177,8 +1177,8 @@ db_set_dvma_range(db_ctrl_t *dbp)
 	 * HPB DVMA range.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, ddi_get_parent(dbp->dip), 0,
-		"virtual-dma", (caddr_t)&dvma_prop, &dvma_prop_len)
-						== DDI_SUCCESS) {
+	    "virtual-dma", (caddr_t)&dvma_prop, &dvma_prop_len)
+	    == DDI_SUCCESS) {
 		dvma_start = dvma_prop[0];
 		dvma_len = dvma_prop[1];
 		kmem_free((caddr_t)dvma_prop, dvma_prop_len);
@@ -1189,21 +1189,21 @@ db_set_dvma_range(db_ctrl_t *dbp)
 		 * driver.
 		 */
 		cmn_err(CE_WARN,
-			"%s#%d: Could not get \"virtual-dma\" property",
-			ddi_driver_name(dbp->dip),
-			ddi_get_instance(dbp->dip));
+		    "%s#%d: Could not get \"virtual-dma\" property",
+		    ddi_driver_name(dbp->dip),
+		    ddi_get_instance(dbp->dip));
 		dvma_start = db_dvma_start;
 		dvma_len = db_dvma_len;
 	}
 
 	DB_DEBUG2(DB_DVMA, dbp->dip,
-		"DVMA Range is %lx,%lx\n", dvma_start, dvma_len);
+	    "DVMA Range is %lx,%lx\n", dvma_start, dvma_len);
 
 	dvma_size[0] = dvma_size[1] = 0;
 	/* Validate DVMA size programming and system requirements. */
 	if (dbp->dev_state & DB_SECONDARY_NEXUS) {
 		dvma_size[0] = pci_config_get32(dbp->conf_handle,
-				DB_CONF_DS_IO_MEM1_SETUP);
+		    DB_CONF_DS_IO_MEM1_SETUP);
 		if (!(dvma_size[0] & 1)) /* make sure it is not a IO BAR */
 			dvma_size[0] = ((~dvma_size[0]) + 1) & 0xfffff000;
 		else
@@ -1211,23 +1211,23 @@ db_set_dvma_range(db_ctrl_t *dbp)
 		dvma_size[1] = db_dvma_len;
 	} else {
 		dvma_size[0] = pci_config_get32(dbp->conf_handle,
-				DB_CONF_US_IO_MEM0_SETUP);
+		    DB_CONF_US_IO_MEM0_SETUP);
 		if (!(dvma_size[0] & 1)) /* make sure it is not a IO BAR */
 			dvma_size[0] = ((~dvma_size[0]) + 1) & 0xfffff000;
 		else
 			dvma_size[0] = 0;
 		dvma_size[1] = ((~(pci_config_get32(dbp->conf_handle,
-				DB_CONF_US_MEM1_SETUP))) + 1) & 0xfffff000;
+		    DB_CONF_US_MEM1_SETUP))) + 1) & 0xfffff000;
 	}
 	DB_DEBUG2(DB_DVMA, dbp->dip, "DVMA size register pair %lx, %lx\n",
-		dvma_size[0], dvma_size[1]);
+	    dvma_size[0], dvma_size[1]);
 
 #ifdef	DEBUG
 	if ((dvma_size[0] + dvma_size[1]) < dvma_len)
 		cmn_err(CE_WARN, "%s#%d: DVMA window (%u) does not coincide"
 		    " with system requirements",
-		ddi_driver_name(dbp->dip), ddi_get_instance(dbp->dip),
-		(dvma_size[0] + dvma_size[1]));
+		    ddi_driver_name(dbp->dip), ddi_get_instance(dbp->dip),
+		    (dvma_size[0] + dvma_size[1]));
 #endif
 	dvma_bar[0] = dvma_bar[1] = 0xFFFFFFFF;
 	db_allocd = 0;
@@ -1238,7 +1238,7 @@ db_set_dvma_range(db_ctrl_t *dbp)
 	if (dvma_size[0]) {
 		dvma_bar[0] = (uint32_t)(dvma_start & (~(dvma_size[0] - 1)));
 		new_dvma_end =  (uint64_t)((uint64_t)dvma_bar[0] +
-						(uint64_t)dvma_size[0]);
+		    (uint64_t)dvma_size[0]);
 		if (new_dvma_end > (new_dvma_start + new_dvma_len))
 			new_dvma_end = new_dvma_start + new_dvma_len;
 		db_allocd += (new_dvma_end - new_dvma_start);
@@ -1252,9 +1252,9 @@ db_set_dvma_range(db_ctrl_t *dbp)
 	 */
 	if ((db_allocd != dvma_len) && dvma_size[1]) {
 		dvma_bar[1] = (uint32_t)((dvma_start + db_allocd) &
-							(~(dvma_size[1] - 1)));
+		    (~(dvma_size[1] - 1)));
 		new_dvma_end =  (uint64_t)((uint64_t)dvma_bar[1] +
-						(uint64_t)dvma_size[1]);
+		    (uint64_t)dvma_size[1]);
 		if (new_dvma_end > (new_dvma_start + new_dvma_len))
 			new_dvma_end = new_dvma_start + new_dvma_len;
 		db_allocd += (new_dvma_end - new_dvma_start);
@@ -1266,11 +1266,11 @@ db_set_dvma_range(db_ctrl_t *dbp)
 
 	if (db_allocd != dvma_len) {
 		cmn_err(CE_WARN, "%s#%d: dvma range error!",
-			ddi_driver_name(dbp->dip), ddi_get_instance(dbp->dip));
+		    ddi_driver_name(dbp->dip), ddi_get_instance(dbp->dip));
 	}
 
 	DB_DEBUG2(DB_DVMA, dbp->dip, "DVMA BARs set as %x, %x\n",
-		dvma_bar[0], dvma_bar[1]);
+	    dvma_bar[0], dvma_bar[1]);
 
 	/* configure the setup register and DVMA BARs. */
 	if (dbp->dev_state & DB_SECONDARY_NEXUS) {
@@ -1281,20 +1281,20 @@ db_set_dvma_range(db_ctrl_t *dbp)
 			 * as the PROM would have done it.
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_DS_MEM1_SETUP,
-				(uint32_t)(((~(dvma_size[0] - 1)) |
-				(pci_config_get32(dbp->conf_handle,
-				DB_CONF_DS_MEM1_SETUP) & 0xF)) | 0x80000000));
+			    DB_CONF_DS_MEM1_SETUP,
+			    (uint32_t)(((~(dvma_size[0] - 1)) |
+			    (pci_config_get32(dbp->conf_handle,
+			    DB_CONF_DS_MEM1_SETUP) & 0xF)) | 0x80000000));
 #endif
 			/*
 			 * when translations are to be provided, this will
 			 * change.
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_DS_IO_MEM1_TR_BASE,
-				(uint32_t)dvma_bar[0]);
+			    DB_CONF_DS_IO_MEM1_TR_BASE,
+			    (uint32_t)dvma_bar[0]);
 			pci_config_put32(dbp->conf_handle,
-				DB_SCONF_DS_IO_MEM1, dvma_bar[0]);
+			    DB_SCONF_DS_IO_MEM1, dvma_bar[0]);
 		}
 		if (dvma_bar[1] != 0xFFFFFFFF) {
 #ifdef	DB_SEC_SETUP_WRITE
@@ -1303,19 +1303,19 @@ db_set_dvma_range(db_ctrl_t *dbp)
 			 * as the PROM would have done it.
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_DS_MEM2_SETUP,
-				(uint32_t)(((~(dvma_size[1] - 1)) |
-				(pci_config_get32(dbp->conf_handle,
-				DB_CONF_DS_MEM2_SETUP) & 0xF)) | 0x80000000));
+			    DB_CONF_DS_MEM2_SETUP,
+			    (uint32_t)(((~(dvma_size[1] - 1)) |
+			    (pci_config_get32(dbp->conf_handle,
+			    DB_CONF_DS_MEM2_SETUP) & 0xF)) | 0x80000000));
 #endif
 			/*
 			 * when translations are to be provided, this will
 			 * change.
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_DS_MEM2_TR_BASE, (uint32_t)dvma_bar[1]);
+			    DB_CONF_DS_MEM2_TR_BASE, (uint32_t)dvma_bar[1]);
 			pci_config_put32(dbp->conf_handle,
-				DB_SCONF_DS_MEM2, dvma_bar[1]);
+			    DB_SCONF_DS_MEM2, dvma_bar[1]);
 		}
 
 	} else {
@@ -1328,21 +1328,21 @@ db_set_dvma_range(db_ctrl_t *dbp)
 			 * we cannot dynamically program the DVMA range!
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_US_IO_MEM0_SETUP,
-				(uint32_t)(((~(dvma_size[0] - 1)) |
-				(pci_config_get32(dbp->conf_handle,
-				DB_CONF_US_IO_MEM0_SETUP) & 0xF)) |
-								0x80000000));
+			    DB_CONF_US_IO_MEM0_SETUP,
+			    (uint32_t)(((~(dvma_size[0] - 1)) |
+			    (pci_config_get32(dbp->conf_handle,
+			    DB_CONF_US_IO_MEM0_SETUP) & 0xF)) |
+			    0x80000000));
 #endif
 			/*
 			 * when translations are to be provided, this will
 			 * change.
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_US_IO_MEM0_TR_BASE,
-				(uint32_t)dvma_bar[0]);
+			    DB_CONF_US_IO_MEM0_TR_BASE,
+			    (uint32_t)dvma_bar[0]);
 			pci_config_put32(dbp->conf_handle,
-				DB_PCONF_US_IO_MEM0, dvma_bar[0]);
+			    DB_PCONF_US_IO_MEM0, dvma_bar[0]);
 		}
 		if (dvma_bar[1] != 0xFFFFFFFF) {
 #ifdef DB_CONF_P2S_WRITE_ENABLED	/* primary to secondary write enabled */
@@ -1353,19 +1353,19 @@ db_set_dvma_range(db_ctrl_t *dbp)
 			 * we cannot dynamically program the DVMA range!
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_US_MEM1_SETUP,
-				(uint32_t)(((~(dvma_size[1] - 1)) |
-				(pci_config_get32(dbp->conf_handle,
-				DB_CONF_US_MEM1_SETUP) & 0xF)) | 0x80000000));
+			    DB_CONF_US_MEM1_SETUP,
+			    (uint32_t)(((~(dvma_size[1] - 1)) |
+			    (pci_config_get32(dbp->conf_handle,
+			    DB_CONF_US_MEM1_SETUP) & 0xF)) | 0x80000000));
 #endif
 			/*
 			 * when translations are to be provided, this will
 			 * change.
 			 */
 			pci_config_put32(dbp->conf_handle,
-				DB_CONF_US_MEM1_TR_BASE, (uint32_t)dvma_bar[1]);
+			    DB_CONF_US_MEM1_TR_BASE, (uint32_t)dvma_bar[1]);
 			pci_config_put32(dbp->conf_handle,
-				DB_PCONF_US_MEM1, dvma_bar[1]);
+			    DB_PCONF_US_MEM1, dvma_bar[1]);
 		}
 	}
 }
@@ -1461,7 +1461,7 @@ db_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	 */
 	if (cmd == DB_PCI_READ_CONF_HEADER) {
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&pci_data,
-				sizeof (db_pci_data_t), mode)) {
+		    sizeof (db_pci_data_t), mode)) {
 			rc = EFAULT;
 			return (rc);
 		}
@@ -1469,19 +1469,19 @@ db_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		if (strcmp(pci_data.name, "") == 0) {
 			child_dip = dbp->dip;
 			(void) strcpy(pci_data.name,
-					ddi_get_name(dbp->dip));
+			    ddi_get_name(dbp->dip));
 		} else {
 
 			if ((child_dip = db_lookup_child_name(dbp,
-				pci_data.name, pci_data.instance))
-					== (dev_info_t *)NULL) {
+			    pci_data.name, pci_data.instance))
+			    == (dev_info_t *)NULL) {
 				rc = ENXIO;
 				return (rc);
 			} else {
 				if (ddi_getprop(DDI_DEV_T_ANY,
-					child_dip, DDI_PROP_DONTPASS,
-					"vendor-id", DB_INVAL_VEND)
-						== DB_INVAL_VEND) {
+				    child_dip, DDI_PROP_DONTPASS,
+				    "vendor-id", DB_INVAL_VEND)
+				    == DB_INVAL_VEND) {
 					/* non PCI device */
 					rc = EINVAL;
 					return (rc);
@@ -1502,7 +1502,7 @@ db_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		pci_config_teardown(&config_handle);
 
 		if (ddi_copyout((caddr_t)&pci_data, (caddr_t)arg,
-				sizeof (db_pci_data_t), mode)) {
+		    sizeof (db_pci_data_t), mode)) {
 			rc = EFAULT;
 			return (rc);
 		}
@@ -1584,7 +1584,7 @@ db_lookup_child_name(db_ctrl_t *dbp, char *name, int instance)
 	dev_info_t *cdip, *pdip = dbp->dip;
 
 	for (cdip = ddi_get_child(pdip); cdip;
-				cdip = ddi_get_next_sibling(pdip)) {
+	    cdip = ddi_get_next_sibling(pdip)) {
 
 		do {
 			if (strcmp(ddi_node_name(cdip), name) == 0) {
@@ -1735,10 +1735,10 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			rnumber = mp->map_obj.rnumber;
 
 			if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
-				DDI_PROP_DONTPASS, "reg",
-				(caddr_t)&pci_regsetp, &reg_proplen)
-					!= DDI_SUCCESS)
-				    return (DDI_FAILURE);
+			    DDI_PROP_DONTPASS, "reg",
+			    (caddr_t)&pci_regsetp, &reg_proplen)
+			    != DDI_SUCCESS)
+					return (DDI_FAILURE);
 
 			num_regs = reg_proplen / (int)sizeof (pci_regspec_t);
 			if (rnumber >= num_regs) {
@@ -1761,15 +1761,15 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			addr_space_type = pci_reg.pci_phys_hi & PCI_ADDR_MASK;
 
 			DB_DEBUG3(DB_PCI_MAP, dip, "rdip=%lx, rnum=%d(%d)\n",
-					rdip, rnumber, num_regs);
+			    rdip, rnumber, num_regs);
 
 			/* if we do direct map IO, then lets break here */
 			if ((db_io_map_mode & DB_IO_MAP_DIRECT) &&
-				(addr_space_type == PCI_ADDR_IO))
+			    (addr_space_type == PCI_ADDR_IO))
 					break;
 
 			if ((addr_space_type != PCI_ADDR_CONFIG) &&
-					(addr_space_type != PCI_ADDR_IO))
+			    (addr_space_type != PCI_ADDR_IO))
 				break;
 
 			/*
@@ -1780,7 +1780,7 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				return (DDI_FAILURE);
 
 			dbp = (db_ctrl_t *)ddi_get_soft_state(db_state,
-								instance);
+			    instance);
 			/* get our common access handle */
 			hp = (ddi_acc_hdl_t *)mp->map_handlep;
 
@@ -1792,11 +1792,11 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 					 * private access handle.
 					 */
 					db_pvt = (db_acc_pvt_t *)
-							hp->ah_bus_private;
+					    hp->ah_bus_private;
 					DB_DEBUG1(DB_PCI_MAP, dip,
-						"unmap rdip=%lx\n", rdip);
+					    "unmap rdip=%lx\n", rdip);
 					kmem_free((void *)db_pvt,
-							sizeof (db_acc_pvt_t));
+					    sizeof (db_acc_pvt_t));
 
 					/*
 					 * unmap operation of PCI IO/config
@@ -1850,11 +1850,11 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			/* record the device address for future use */
 			pci_addr = &db_pvt->dev_addr;
 			pci_addr->c_busnum =
-					PCI_REG_BUS_G(pci_reg.pci_phys_hi);
+			    PCI_REG_BUS_G(pci_reg.pci_phys_hi);
 			pci_addr->c_devnum =
-					PCI_REG_DEV_G(pci_reg.pci_phys_hi);
+			    PCI_REG_DEV_G(pci_reg.pci_phys_hi);
 			pci_addr->c_funcnum =
-					PCI_REG_FUNC_G(pci_reg.pci_phys_hi);
+			    PCI_REG_FUNC_G(pci_reg.pci_phys_hi);
 			/*
 			 * We should keep the upstream or
 			 * downstream info in our own ah_bus_private
@@ -1872,99 +1872,99 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 					DB_DEBUG0(DB_PCI_MAP, dip, "primary\n");
 					db_pvt->mask = DS8_CONF_OWN;
 					if (db_conf_map_mode &
-						DB_CONF_MAP_INDIRECT_IO) {
+					    DB_CONF_MAP_INDIRECT_IO) {
 						DB_DEBUG0(DB_PCI_MAP, dip,
-							"INDIRECT_CONF\n");
+						    "INDIRECT_CONF\n");
 
 						db_pvt->handle =
-							dbp->csr_io_handle;
+						    dbp->csr_io_handle;
 						db_pvt->addr =
-							(uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_DS_CONF_ADDR);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR_DS_CONF_ADDR);
 						db_pvt->data =
-							(uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_DS_CONF_DATA);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR_DS_CONF_DATA);
 						db_pvt->bus_own =
-							(uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_DS_CONF_OWN);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR8_DS_CONF_OWN);
 						db_pvt->bus_release =
-							(uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_DS_CONF_CSR);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR8_DS_CONF_CSR);
 					} else {
 						DB_DEBUG0(DB_PCI_MAP, dip,
-							"DIRECT_CONF\n");
+						    "DIRECT_CONF\n");
 
 						db_pvt->handle =
-							dbp->conf_handle;
+						    dbp->conf_handle;
 						db_pvt->addr =
-							(uint32_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF_DS_CONF_ADDR);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF_DS_CONF_ADDR);
 						db_pvt->data = (uint32_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF_DS_CONF_DATA);
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF_DS_CONF_DATA);
 						db_pvt->bus_own =
-							(uint8_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF8_DS_CONF_OWN);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF8_DS_CONF_OWN);
 						db_pvt->bus_release =
-							(uint8_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF8_DS_CONF_CSR);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF8_DS_CONF_CSR);
 					}
 				} else {
 					DB_DEBUG0(DB_PCI_MAP, dip,
-						"secondary\n");
+					    "secondary\n");
 					db_pvt->mask = US8_CONF_OWN;
 					if (db_conf_map_mode &
-						DB_CONF_MAP_INDIRECT_IO) {
+					    DB_CONF_MAP_INDIRECT_IO) {
 						DB_DEBUG0(DB_PCI_MAP, dip,
-							"INDIRECT_CONF\n");
+						    "INDIRECT_CONF\n");
 
 						db_pvt->handle =
-							dbp->csr_io_handle;
+						    dbp->csr_io_handle;
 						db_pvt->addr =
-							(uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_US_CONF_ADDR);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR_US_CONF_ADDR);
 						db_pvt->data =
-							(uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_US_CONF_DATA);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR_US_CONF_DATA);
 						db_pvt->bus_own =
-							(uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_US_CONF_OWN);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR8_US_CONF_OWN);
 						db_pvt->bus_release =
-							(uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_US_CONF_CSR);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->csr_io
+						    + DB_CSR8_US_CONF_CSR);
 					} else {
 						DB_DEBUG0(DB_PCI_MAP, dip,
-							"DIRECT_CONF\n");
+						    "DIRECT_CONF\n");
 
 						db_pvt->handle =
-							dbp->conf_handle;
+						    dbp->conf_handle;
 						db_pvt->addr =
-							(uint32_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF_US_CONF_ADDR);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF_US_CONF_ADDR);
 						db_pvt->data =
-							(uint32_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF_US_CONF_DATA);
+						    (uint32_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF_US_CONF_DATA);
 						db_pvt->bus_own =
-							(uint8_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF8_US_CONF_OWN);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF8_US_CONF_OWN);
 						db_pvt->bus_release =
-							(uint8_t *)
-							((uchar_t *)dbp->conf_io
-							+ DB_CONF8_US_CONF_CSR);
+						    (uint8_t *)
+						    ((uchar_t *)dbp->conf_io
+						    + DB_CONF8_US_CONF_CSR);
 					}
 				}
 				break;
@@ -1977,79 +1977,79 @@ db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				if (dbp->dev_state & DB_PRIMARY_NEXUS) {
 					DB_DEBUG0(DB_PCI_MAP, dip, "primary\n");
 					db_pvt->addr = (uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_DS_IO_ADDR);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR_DS_IO_ADDR);
 					db_pvt->data = (uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_DS_IO_DATA);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR_DS_IO_DATA);
 					db_pvt->bus_own = (uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_DS_IO_OWN);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR8_DS_IO_OWN);
 					db_pvt->bus_release = (uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_DS_IO_CSR);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR8_DS_IO_CSR);
 					db_pvt->mask = DS8_IO_OWN;
 				} else {
 					DB_DEBUG0(DB_PCI_MAP, dip,
-						"secondary\n");
+					    "secondary\n");
 					db_pvt->addr = (uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_US_IO_ADDR);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR_US_IO_ADDR);
 					db_pvt->data = (uint32_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR_US_IO_DATA);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR_US_IO_DATA);
 					db_pvt->bus_own = (uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_US_IO_OWN);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR8_US_IO_OWN);
 					db_pvt->bus_release = (uint8_t *)
-							((uchar_t *)dbp->csr_io
-							+ DB_CSR8_US_IO_CSR);
+					    ((uchar_t *)dbp->csr_io
+					    + DB_CSR8_US_IO_CSR);
 					db_pvt->mask = US8_IO_OWN;
 				}
 				break;
 
 			default :
 				DB_DEBUG0(DB_PCI_MAP, dip,
-					"PCI_ADDR unknown\n");
+				    "PCI_ADDR unknown\n");
 				break;
 			}
 
 			/* make and store a type 0/1 address in the *addrp */
 			if (pci_addr->c_busnum == dbp->range.lo) {
 				*addrp = (caddr_t)DB_PCI_REG_ADDR_TYPE0(
-						pci_addr->c_busnum,
-						pci_addr->c_devnum,
-						pci_addr->c_funcnum,
-						offset);
+				    pci_addr->c_busnum,
+				    pci_addr->c_devnum,
+				    pci_addr->c_funcnum,
+				    offset);
 				db_pvt->access_mode |= DB_PCI_CONF_CYCLE_TYPE0;
 				DB_DEBUG0(DB_PCI_MAP, dip,
-					"access mode type 0\n");
+				    "access mode type 0\n");
 			} else {
 				*addrp = (caddr_t)DB_PCI_REG_ADDR_TYPE1(
-						pci_addr->c_busnum,
-						pci_addr->c_devnum,
-						pci_addr->c_funcnum,
-						offset);
+				    pci_addr->c_busnum,
+				    pci_addr->c_devnum,
+				    pci_addr->c_funcnum,
+				    offset);
 				db_pvt->access_mode |= DB_PCI_CONF_CYCLE_TYPE1;
 				DB_DEBUG0(DB_PCI_MAP, dip,
-					"access mode type 1\n");
+				    "access mode type 1\n");
 			}
 			DB_DEBUG4(DB_PCI_MAP, dip, "addrp<%x,%x,%x> = %lx\n",
-					pci_addr->c_busnum, pci_addr->c_devnum,
-					pci_addr->c_funcnum, *addrp);
+			    pci_addr->c_busnum, pci_addr->c_devnum,
+			    pci_addr->c_funcnum, *addrp);
 
 			return (DDI_SUCCESS);
 
 		default :
 				DB_DEBUG1(DB_PCI_MAP, dip, "DDI other %x\n",
-					mp->map_type);
+				    mp->map_type);
 				break;
 	}
 	DB_DEBUG0(DB_PCI_MAP, dip, "exit\n");
 
 	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
 	return ((DEVI(pdip)->devi_ops->devo_bus_ops->bus_map)
-		(pdip, rdip, mp, offset, len, addrp));
+	    (pdip, rdip, mp, offset, len, addrp));
 }
 
 #ifdef DB_DEBUG
@@ -2089,7 +2089,7 @@ db_ctlops(dev_info_t *dip, dev_info_t *rdip,
 {
 
 	if ((ctlop >= DDI_CTLOPS_DMAPMAPC) &&
-			(ctlop <= DDI_CTLOPS_DETACH)) {
+	    (ctlop <= DDI_CTLOPS_DETACH)) {
 		DB_DEBUG1(DB_CTLOPS, dip, "ctlop=%s\n", db_ctlop_name[ctlop]);
 	} else {
 		DB_DEBUG1(DB_CTLOPS, dip, "ctlop=%d\n", ctlop);
@@ -2312,16 +2312,16 @@ db_initchild(dev_info_t *child)
 	 * Support for the "command-preserve" property.
 	 */
 	command_preserve = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-		DDI_PROP_DONTPASS, "command-preserve", 0);
+	    DDI_PROP_DONTPASS, "command-preserve", 0);
 	command = pci_config_get16(config_handle, PCI_CONF_COMM);
 	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
 	command |= (db_command_default & ~command_preserve);
 	pci_config_put16(config_handle, PCI_CONF_COMM, command);
 
 	DB_DEBUG2(DB_INITCHILD, ddi_get_parent(child),
-		"initializing device vend=%x, devid=%x\n",
-			pci_config_get16(config_handle, PCI_CONF_VENID),
-			pci_config_get16(config_handle, PCI_CONF_DEVID));
+	    "initializing device vend=%x, devid=%x\n",
+	    pci_config_get16(config_handle, PCI_CONF_VENID),
+	    pci_config_get16(config_handle, PCI_CONF_DEVID));
 	/*
 	 * If the device has a bus control register then program it
 	 * based on the settings in the command register.
@@ -2344,16 +2344,16 @@ db_initchild(dev_info_t *child)
 	 */
 	if (db_set_cache_line_size_register &&
 	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"cache-line-size", 0) == 0) {
+	    "cache-line-size", 0) == 0) {
 		pci_config_put8(config_handle, PCI_CONF_CACHE_LINESZ,
-			dbp->cache_line_size);
+		    dbp->cache_line_size);
 		n = pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
 		if (n != 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-					"cache-line-size", n);
+			    "cache-line-size", n);
 		}
 		DB_DEBUG1(DB_INITCHILD, ddi_get_parent(child),
-			"\nChild Device Cache Size %x\n", dbp->cache_line_size);
+		    "\nChild Device Cache Size %x\n", dbp->cache_line_size);
 	}
 
 	/*
@@ -2361,26 +2361,26 @@ db_initchild(dev_info_t *child)
 	 */
 	if (db_set_latency_timer_register &&
 	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"latency-timer", 0) == 0) {
+	    "latency-timer", 0) == 0) {
 
 		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
 			latency_timer = dbp->p_latency_timer;
 			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-				dbp->latency_timer);
+			    dbp->latency_timer);
 		} else {
 			min_gnt = pci_config_get8(config_handle,
-				PCI_CONF_MIN_G);
+			    PCI_CONF_MIN_G);
 			latency_timer = min_gnt * 8;
 		}
 		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-			latency_timer);
+		    latency_timer);
 		n = pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
 		if (n != 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-					"latency-timer", n);
+			    "latency-timer", n);
 		}
 		DB_DEBUG1(DB_INITCHILD, ddi_get_parent(child),
-			"\nChild Device latency %x\n", latency_timer);
+		    "\nChild Device latency %x\n", latency_timer);
 	}
 
 	pci_config_teardown(&config_handle);
@@ -2407,12 +2407,12 @@ db_create_pci_prop(dev_info_t *child)
 
 	/* get child "reg" property */
 	value = ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-		"reg", (caddr_t)&pci_rp, &length);
+	    "reg", (caddr_t)&pci_rp, &length);
 	if (value != DDI_SUCCESS)
 		return (value);
 
 	(void) ndi_prop_update_byte_array(DDI_DEV_T_NONE, child, "reg",
-		(uchar_t *)pci_rp, length);
+	    (uchar_t *)pci_rp, length);
 
 	/*
 	 * free the memory allocated by ddi_getlongprop ().
@@ -2447,7 +2447,7 @@ db_save_config_regs(db_ctrl_t *dbp)
 	db_cfg_state_t *statep;
 
 	for (i = 0, dip = ddi_get_child(dbp->dip); dip != NULL;
-		dip = ddi_get_next_sibling(dip)) {
+	    dip = ddi_get_next_sibling(dip)) {
 		if (i_ddi_devi_attached(dip))
 			i++;
 	}
@@ -2461,50 +2461,50 @@ db_save_config_regs(db_ctrl_t *dbp)
 
 	/* i now equals the total number of child devices */
 	dbp->db_config_state_p =
-		kmem_zalloc(i * sizeof (db_cfg_state_t), KM_NOSLEEP);
+	    kmem_zalloc(i * sizeof (db_cfg_state_t), KM_NOSLEEP);
 	if (!dbp->db_config_state_p) {
 		cmn_err(CE_WARN,
-			"%s#%d: No memory to save state for child %s#%d\n",
-			ddi_driver_name(dbp->dip),
-			ddi_get_instance(dbp->dip),
-			ddi_get_name(dip), ddi_get_instance(dip));
+		    "%s#%d: No memory to save state for child %s#%d\n",
+		    ddi_driver_name(dbp->dip),
+		    ddi_get_instance(dbp->dip),
+		    ddi_get_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 
 	for (statep = dbp->db_config_state_p,
-		dip = ddi_get_child(dbp->dip);
-		dip != NULL;
-		dip = ddi_get_next_sibling(dip)) {
+	    dip = ddi_get_child(dbp->dip);
+	    dip != NULL;
+	    dip = ddi_get_next_sibling(dip)) {
 
 		if (!i_ddi_devi_attached(dip))
 			continue;
 
 		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
-				"%s#%d: can't config space for %s#%d",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    "%s#%d: can't config space for %s#%d",
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 
 		statep->dip = dip;
 		statep->command =
-			pci_config_get16(config_handle, PCI_CONF_COMM);
+		    pci_config_get16(config_handle, PCI_CONF_COMM);
 		statep->header_type =
-			pci_config_get8(config_handle, PCI_CONF_HEADER);
+		    pci_config_get8(config_handle, PCI_CONF_HEADER);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			statep->bridge_control =
 			    pci_config_get16(config_handle, PCI_BCNF_BCNTRL);
 		statep->cache_line_size =
-			pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
+		    pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
 		statep->latency_timer =
-			pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
+		    pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			statep->sec_latency_timer =
 			    pci_config_get8(config_handle,
-				PCI_BCNF_LATENCY_TIMER);
+			    PCI_BCNF_LATENCY_TIMER);
 		pci_config_teardown(&config_handle);
 		statep++;
 	}
@@ -2534,36 +2534,36 @@ db_restore_config_regs(db_ctrl_t *dbp)
 		dip = statep->dip;
 		if (!dip) {
 			cmn_err(CE_WARN,
-				"%s#%d: skipping bad dev info (index %d)",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip), i);
+			    "%s#%d: skipping bad dev info (index %d)",
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip), i);
 			continue;
 		}
 		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
-				"%s#%d: can't config space for %s#%d",
-				ddi_driver_name(dbp->dip),
-				ddi_get_instance(dbp->dip),
-				ddi_driver_name(dip),
-				ddi_get_instance(dip));
+			    "%s#%d: can't config space for %s#%d",
+			    ddi_driver_name(dbp->dip),
+			    ddi_get_instance(dbp->dip),
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			continue;
 		}
 		pci_config_put16(config_handle, PCI_CONF_COMM, statep->command);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			pci_config_put16(config_handle, PCI_BCNF_BCNTRL,
-						statep->bridge_control);
+			    statep->bridge_control);
 		pci_config_put8(config_handle, PCI_CONF_CACHE_LINESZ,
-						statep->cache_line_size);
+		    statep->cache_line_size);
 		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-						statep->latency_timer);
+		    statep->latency_timer);
 		if ((statep->header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-						statep->sec_latency_timer);
+			    statep->sec_latency_timer);
 		pci_config_teardown(&config_handle);
 	}
 
 	kmem_free(dbp->db_config_state_p,
-		dbp->config_state_index * sizeof (db_cfg_state_t));
+	    dbp->config_state_index * sizeof (db_cfg_state_t));
 	dbp->db_config_state_p = NULL;
 	dbp->config_state_index = 0;
 
@@ -2576,10 +2576,10 @@ db_put_reg_conf_addr(db_acc_pvt_t *db_pvt, uint32_t conf_addr)
 {
 	if (db_pvt->access_mode & DB_PCI_CONF_CYCLE_TYPE0)\
 		ddi_put32(db_pvt->handle, db_pvt->addr, (uint32_t)\
-			DB_PCI_CONF_CYCLE_TYPE0_ADDR((conf_addr)));\
+		    DB_PCI_CONF_CYCLE_TYPE0_ADDR((conf_addr)));\
 	else	/* type 1 cycle */\
 		ddi_put32(db_pvt->handle, db_pvt->addr, (uint32_t)\
-				DB_PCI_CONF_CYCLE_TYPE1_ADDR((conf_addr)));
+		    DB_PCI_CONF_CYCLE_TYPE1_ADDR((conf_addr)));
 }
 
 /* Get 8bits data off the 32bit data */
@@ -2601,7 +2601,7 @@ static uint32_t
 db_put_data8(uint32_t addr, uint32_t rdata, uint8_t wdata)
 {
 	return ((rdata & (~((0xff << ((((addr) & 3) * 8))) & 0xffffffff))) |
-			(((wdata) & 0xff)<<((((addr) & 3))*8)));
+	    (((wdata) & 0xff)<<((((addr) & 3))*8)));
 }
 
 /* merge 16bit data into the 32bit data */
@@ -2609,7 +2609,7 @@ static uint32_t
 db_put_data16(uint32_t addr, uint32_t rdata, uint16_t wdata)
 {
 	return ((rdata & (~((0xffff << ((((addr) & 3) * 8))) & 0xffffffff))) |
-			(((wdata) & 0xffff) << ((((addr) & 3))*8)));
+	    (((wdata) & 0xffff) << ((((addr) & 3))*8)));
 }
 
 
@@ -2652,10 +2652,10 @@ db_ddi_get16(ddi_acc_impl_t *handle, uint16_t *addr)
 static uint32_t
 db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr)
 {
-	db_acc_pvt_t 	*db_pvt = (db_acc_pvt_t *)
-					handle->ahi_common.ah_bus_private;
-	uint32_t 	wait_count = 0;
-	uint32_t 	data;
+	db_acc_pvt_t	*db_pvt = (db_acc_pvt_t *)
+	    handle->ahi_common.ah_bus_private;
+	uint32_t	wait_count = 0;
+	uint32_t	data;
 	db_ctrl_t	*dbp;
 
 	dbp = db_pvt->dbp;
@@ -2668,7 +2668,7 @@ db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr)
 		 * bit set. With this set, we cannot proceed.
 		 */
 		while (((ddi_get8(db_pvt->handle, db_pvt->bus_own)) &
-				db_pvt->mask) == db_pvt->mask) {
+		    db_pvt->mask) == db_pvt->mask) {
 #ifdef DEBUG
 			if (dbp->db_pci_max_wait_count < wait_count)
 				dbp->db_pci_max_wait_count = wait_count;
@@ -2680,9 +2680,9 @@ db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr)
 				 * Not specify any error condition values.
 				 */
 				cmn_err(CE_WARN,
-					"%s#%d: pci config bus own error",
-					ddi_driver_name(dbp->dip),
-					ddi_get_instance(dbp->dip));
+				    "%s#%d: pci config bus own error",
+				    ddi_driver_name(dbp->dip),
+				    ddi_get_instance(dbp->dip));
 				dbp->db_pci_err_count++;
 				mutex_exit(&dbp->db_busown);
 				return ((uint32_t)DB_CONF_FAILURE);
@@ -2696,7 +2696,7 @@ db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr)
 
 	if (db_use_config_own_bit) {
 		while (((ddi_get8(db_pvt->handle, db_pvt->bus_release)) &
-				db_pvt->mask) == db_pvt->mask) {
+		    db_pvt->mask) == db_pvt->mask) {
 #ifdef DEBUG
 			if (dbp->db_pci_max_wait_count < wait_count)
 				dbp->db_pci_max_wait_count = wait_count;
@@ -2708,15 +2708,15 @@ db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr)
 				 * not specify any error condition values.
 				 */
 				cmn_err(CE_WARN,
-					"%s#%d: pci config bus release error",
-					ddi_driver_name(dbp->dip),
-					ddi_get_instance(dbp->dip));
+				    "%s#%d: pci config bus release error",
+				    ddi_driver_name(dbp->dip),
+				    ddi_get_instance(dbp->dip));
 				dbp->db_pci_err_count++;
 				mutex_exit(&dbp->db_busown);
 				return ((uint32_t)DB_CONF_FAILURE);
 			}
 			data = ddi_get32(db_pvt->handle,
-					(uint32_t *)db_pvt->data);
+			    (uint32_t *)db_pvt->data);
 		}
 	}
 
@@ -2750,7 +2750,7 @@ db_ddi_put8(ddi_acc_impl_t *handle, uint8_t *addr, uint8_t data)
 
 	rdata = db_ddi_get32(handle, (uint32_t *)addr);
 	db_ddi_put32(handle, (uint32_t *)addr,
-		db_put_data8((uint32_t)(uintptr_t)addr, rdata, data));
+	    db_put_data8((uint32_t)(uintptr_t)addr, rdata, data));
 }
 
 /*
@@ -2764,7 +2764,7 @@ db_ddi_put16(ddi_acc_impl_t *handle, uint16_t *addr, uint16_t data)
 
 	rdata = db_ddi_get32(handle, (uint32_t *)addr);
 	db_ddi_put32(handle, (uint32_t *)addr,
-			db_put_data16((uint32_t)(uintptr_t)addr, rdata, data));
+	    db_put_data16((uint32_t)(uintptr_t)addr, rdata, data));
 }
 
 /*
@@ -2774,10 +2774,10 @@ db_ddi_put16(ddi_acc_impl_t *handle, uint16_t *addr, uint16_t data)
 static void
 db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr, uint32_t data)
 {
-	db_acc_pvt_t 	*db_pvt = (db_acc_pvt_t *)
-					handle->ahi_common.ah_bus_private;
+	db_acc_pvt_t	*db_pvt = (db_acc_pvt_t *)
+	    handle->ahi_common.ah_bus_private;
 	db_ctrl_t	*dbp;
-	uint32_t 	wait_count = 0;
+	uint32_t	wait_count = 0;
 
 	dbp = db_pvt->dbp;
 
@@ -2789,7 +2789,7 @@ db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr, uint32_t data)
 		 * bit set. with this set, we cannot proceed.
 		 */
 		while (((ddi_get8(db_pvt->handle, db_pvt->bus_own)) &
-				db_pvt->mask) == db_pvt->mask) {
+		    db_pvt->mask) == db_pvt->mask) {
 #ifdef DEBUG
 			if (dbp->db_pci_max_wait_count < wait_count)
 				dbp->db_pci_max_wait_count = wait_count;
@@ -2802,9 +2802,9 @@ db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr, uint32_t data)
 				 * could be a serious situation.
 				 */
 				cmn_err(CE_WARN,
-					"%s#%d: pci config bus own error",
-					ddi_driver_name(dbp->dip),
-					ddi_get_instance(dbp->dip));
+				    "%s#%d: pci config bus own error",
+				    ddi_driver_name(dbp->dip),
+				    ddi_get_instance(dbp->dip));
 				dbp->db_pci_err_count++;
 				mutex_exit(&dbp->db_busown);
 				return;
@@ -2818,7 +2818,7 @@ db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr, uint32_t data)
 
 	if (db_use_config_own_bit) {
 		while (((ddi_get8(db_pvt->handle, db_pvt->bus_release)) &
-				db_pvt->mask) == db_pvt->mask) {
+		    db_pvt->mask) == db_pvt->mask) {
 #ifdef DEBUG
 			if (dbp->db_pci_max_wait_count < wait_count)
 				dbp->db_pci_max_wait_count = wait_count;
@@ -2830,15 +2830,15 @@ db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr, uint32_t data)
 				 * Not specify any error condition values.
 				 */
 				cmn_err(CE_WARN,
-					"%s#%d: pci config bus release error",
-					ddi_driver_name(dbp->dip),
-					ddi_get_instance(dbp->dip));
+				    "%s#%d: pci config bus release error",
+				    ddi_driver_name(dbp->dip),
+				    ddi_get_instance(dbp->dip));
 				dbp->db_pci_err_count++;
 				mutex_exit(&dbp->db_busown);
 				return;
 			}
 			ddi_put32(db_pvt->handle, (uint32_t *)db_pvt->data,
-					data);
+			    data);
 		}
 	}
 
@@ -3055,7 +3055,7 @@ static void
 db_fm_init(db_ctrl_t *db_p)
 {
 	db_p->fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
 	 * Request our capability level and get our parents capability
@@ -3097,7 +3097,7 @@ db_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 		ddi_iblock_cookie_t *ibc)
 {
 	db_ctrl_t *db_p = (db_ctrl_t *)ddi_get_soft_state(db_state,
-			ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 	*ibc = db_p->fm_ibc;
 	return (db_p->fm_cap);
 }

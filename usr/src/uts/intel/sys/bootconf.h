@@ -27,7 +27,6 @@
 #ifndef	_SYS_BOOTCONF_H
 #define	_SYS_BOOTCONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Boot time configuration information objects
@@ -225,6 +224,7 @@ extern int netboot;
 extern int swaploaded;
 extern int modrootloaded;
 extern char kern_bootargs[];
+extern char kern_bootfile[];
 extern char *kobj_module_path;
 extern char *default_path;
 extern char *dhcack;

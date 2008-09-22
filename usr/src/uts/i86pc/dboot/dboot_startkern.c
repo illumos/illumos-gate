@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/machparam.h>
@@ -365,9 +364,92 @@ map_pte(paddr_t table, uint_t index)
 	return ((x86pte_t *)(uintptr_t)(table + index * pte_size));
 }
 
+/*
+ * dump out the contents of page tables...
+ */
+static void
+dump_tables(void)
+{
+	uint_t save_index[4];	/* for recursion */
+	char *save_table[4];	/* for recursion */
+	uint_t	l;
+	uint64_t va;
+	uint64_t pgsize;
+	int index;
+	int i;
+	x86pte_t pteval;
+	char *table;
+	static char *tablist = "\t\t\t";
+	char *tabs = tablist + 3 - top_level;
+	uint_t pa, pa1;
 #if !defined(__xpv)
 #define	maddr_t paddr_t
 #endif /* !__xpv */
+
+	dboot_printf("Finished pagetables:\n");
+	table = (char *)(uintptr_t)top_page_table;
+	l = top_level;
+	va = 0;
+	for (index = 0; index < ptes_per_table; ++index) {
+		pgsize = 1ull << shift_amt[l];
+		if (pae_support)
+			pteval = ((x86pte_t *)table)[index];
+		else
+			pteval = ((x86pte32_t *)table)[index];
+		if (pteval == 0)
+			goto next_entry;
+
+		dboot_printf("%s %p[0x%x] = %" PRIx64 ", va=%" PRIx64,
+		    tabs + l, table, index, (uint64_t)pteval, va);
+		pa = ma_to_pa(pteval & MMU_PAGEMASK);
+		dboot_printf(" physaddr=%x\n", pa);
+
+		/*
+		 * Don't try to walk hypervisor private pagetables
+		 */
+		if ((l > 1 || (l == 1 && (pteval & PT_PAGESIZE) == 0))) {
+			save_table[l] = table;
+			save_index[l] = index;
+			--l;
+			index = -1;
+			table = (char *)(uintptr_t)
+			    ma_to_pa(pteval & MMU_PAGEMASK);
+			goto recursion;
+		}
+
+		/*
+		 * shorten dump for consecutive mappings
+		 */
+		for (i = 1; index + i < ptes_per_table; ++i) {
+			if (pae_support)
+				pteval = ((x86pte_t *)table)[index + i];
+			else
+				pteval = ((x86pte32_t *)table)[index + i];
+			if (pteval == 0)
+				break;
+			pa1 = ma_to_pa(pteval & MMU_PAGEMASK);
+			if (pa1 != pa + i * pgsize)
+				break;
+		}
+		if (i > 2) {
+			dboot_printf("%s...\n", tabs + l);
+			va += pgsize * (i - 2);
+			index += i - 2;
+		}
+next_entry:
+		va += pgsize;
+		if (l == 3 && index == 256)	/* VA hole */
+			va = 0xffff800000000000ull;
+recursion:
+		;
+	}
+	if (l < top_level) {
+		++l;
+		index = save_index[l];
+		table = save_table[l];
+		goto recursion;
+	}
+}
 
 /*
  * Add a mapping for the machine page at the given virtual address.
@@ -884,7 +966,6 @@ build_page_tables(void)
 #if !defined(__xpv)
 	uint32_t i;
 	uint64_t end;
-	uint64_t next_mapping;
 #endif	/* __xpv */
 
 	/*
@@ -959,15 +1040,8 @@ build_page_tables(void)
 	}
 
 #if !defined(__xpv)
-	/*
-	 * Skip memory between 1M and _start, this acts as a reserve
-	 * of memory usable for DMA.
-	 */
-	next_mapping = (uintptr_t)_start & MMU_PAGEMASK;
 	for (i = 0; i < memlists_used; ++i) {
 		start = memlists[i].addr;
-		if (start < next_mapping)
-			start = next_mapping;
 
 		end = start + memlists[i].size;
 
@@ -1317,6 +1391,9 @@ startup_kernel(void)
 
 	bi->bi_kseg_size = FOUR_MEG;
 	DBG(bi->bi_kseg_size);
+
+	if (prom_debug)
+		dump_tables();
 
 	DBG_MSG("\n\n*** DBOOT DONE -- back to asm to jump to kernel\n\n");
 }

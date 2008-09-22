@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3086,12 +3085,15 @@ static struct dev_ops zfs_dev_ops = {
 	zfs_detach,	/* detach */
 	nodev,		/* reset */
 	&zfs_cb_ops,	/* driver operations */
-	NULL		/* no bus operations */
+	NULL,		/* no bus operations */
+	NULL,		/* power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 static struct modldrv zfs_modldrv = {
-	&mod_driverops, "ZFS storage pool version " SPA_VERSION_STRING,
-	    &zfs_dev_ops
+	&mod_driverops,
+	"ZFS storage pool",
+	&zfs_dev_ops
 };
 
 static struct modlinkage modlinkage = {

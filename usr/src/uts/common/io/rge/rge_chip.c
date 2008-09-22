@@ -1064,6 +1064,10 @@ rge_chip_start(rge_t *rgep)
 
 /*
  * rge_chip_stop() -- stop board receiving
+ *
+ * Since this function is also invoked by rge_quiesce(), it
+ * must not block; also, no tracing or logging takes place
+ * when invoked by rge_quiesce().
  */
 void rge_chip_stop(rge_t *rgep, boolean_t fault);
 #pragma	no_inline(rge_chip_stop)

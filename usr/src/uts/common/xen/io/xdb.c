@@ -1520,7 +1520,8 @@ static struct dev_ops xdb_dev_ops = {
 	nodev,		/* devo_reset */
 	NULL,		/* devo_cb_ops */
 	NULL,		/* devo_bus_ops */
-	NULL		/* power */
+	NULL,		/* power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 /*
@@ -1528,7 +1529,7 @@ static struct dev_ops xdb_dev_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. */
-	"vbd backend driver 1.5",	/* Name of the module */
+	"vbd backend driver",	/* Name of the module */
 	&xdb_dev_ops			/* driver ops */
 };
 

@@ -594,7 +594,7 @@ static  param_t	param_arr[] = {
 };
 
 DDI_DEFINE_STREAM_OPS(eri_dev_ops, nulldev, nulldev, eri_attach, eri_detach,
-	nodev, NULL, D_MP, NULL);
+	nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 /*
  * This is the loadable module wrapper.

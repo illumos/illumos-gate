@@ -322,6 +322,8 @@ struct safefile {
 static struct safefile *safefiles = NULL;
 #define	NEED_UPDATE_FILE "/etc/svc/volatile/boot_archive_needs_update"
 
+static int sync_menu = 1;	/* whether we need to sync the BE menus */
+
 static void
 usage(void)
 {
@@ -616,6 +618,19 @@ check_subcmd_and_options(
 			usage();
 			return (BAM_ERROR);
 		}
+	} else if (strcmp(subcmd, "update_all") == 0) {
+		/*
+		 * The only option we accept for the "update_all"
+		 * subcmd is "fastboot".
+		 */
+		if (bam_argc > 1 || (bam_argc == 1 &&
+		    strcmp(bam_argv[0], "fastboot") != 0)) {
+			bam_error(TRAILING_ARGS);
+			usage();
+			return (BAM_ERROR);
+		}
+		if (bam_argc == 1)
+			sync_menu = 0;
 	} else if (bam_argc || bam_argv) {
 		bam_error(TRAILING_ARGS);
 		usage();
@@ -2456,7 +2471,7 @@ out:
 	 * If user has updated menu in current BE, propagate the
 	 * updates to all BEs.
 	 */
-	if (synchronize_BE_menu() != BAM_SUCCESS)
+	if (sync_menu && synchronize_BE_menu() != BAM_SUCCESS)
 		ret = BAM_ERROR;
 
 	return (ret);

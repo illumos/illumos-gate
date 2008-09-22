@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <sys/errno.h>
@@ -127,7 +126,8 @@ static struct dev_ops glvc_ops = {
 	nodev,			/* reset */
 	&glvc_cb_ops,		/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -137,7 +137,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"Sun4v virtual channel driver 2.0",	/* Name of the module */
+	"Sun4v virtual channel driver",	/* Name of the module */
 	&glvc_ops			/* pointer to the dev_ops structure */
 };
 
@@ -338,7 +338,7 @@ glvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    va_to_pa((caddr_t)softsp->mb_send_buf);
 
 		err = ddi_create_minor_node(dip, "glvc", S_IFCHR,
-			instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, NULL);
 		if (err != DDI_SUCCESS) {
 			kmem_free(softsp->mb_recv_buf, softsp->mtu);
 			kmem_free(softsp->mb_send_buf, softsp->mtu);

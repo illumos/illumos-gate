@@ -29,7 +29,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sgen - SCSI generic device driver
@@ -191,13 +190,14 @@ static struct dev_ops sgen_dev_ops = {
 	nodev,			/* reset */
 	&sgen_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static void *sgen_soft_state = NULL;
 
 static struct modldrv modldrv = {
-	&mod_driverops, "SCSI generic driver %I%", &sgen_dev_ops
+	&mod_driverops, "SCSI generic driver", &sgen_dev_ops
 };
 
 static struct modlinkage modlinkage = {

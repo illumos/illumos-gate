@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * audiocs Audio Driver
@@ -333,13 +331,14 @@ static struct dev_ops cs4231_dev_ops = {
 	nodev,			/* devo_reset */
 	&cs4231_cb_ops,		/* devi_cb_ops */
 	NULL,			/* devo_bus_ops */
-	cs4231_power		/* devo_power */
+	cs4231_power,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
 static struct modldrv cs4231_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	CS4231_MOD_NAME " %I%",	/* drv_linkinfo */
+	CS4231_MOD_NAME,	/* drv_linkinfo */
 	&cs4231_dev_ops		/* drv_dev_ops */
 };
 
@@ -475,7 +474,7 @@ cs4231_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
 		*result = (void *)(uintptr_t)
-			audio_sup_devt_to_instance((dev_t)arg);
+		    audio_sup_devt_to_instance((dev_t)arg);
 		error = DDI_SUCCESS;
 		break;
 	default:
@@ -2279,7 +2278,7 @@ cs4231_get_ports(CS_state_t *state, dev_info_t *dip)
 			default:
 				ATRACE("cs_attach() OLD - unknown", state);
 				(void) strcpy(&state->cs_dev_info.version[0],
-					"?");
+				    "?");
 				audio_sup_log(ahandle, CE_NOTE,
 				    "!attach() unknown audio module: %s, some "
 				    "parts of audio may not work correctly",
@@ -2291,15 +2290,15 @@ cs4231_get_ports(CS_state_t *state, dev_info_t *dip)
 			if (ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 			    DDI_PROP_DONTPASS, "internal-loopback", B_FALSE)) {
 				if (state->cs_dma_engine == EB2_DMA) {
-				    ATRACE("cs_attach() OLD - C", state);
-				    (void) strcpy(
-					&state->cs_dev_info.version[0],
-					CS_DEV_VERSION_C);
+					ATRACE("cs_attach() OLD - C", state);
+					(void) strcpy(
+					    &state->cs_dev_info.version[0],
+					    CS_DEV_VERSION_C);
 				} else {
-				    ATRACE("cs_attach() OLD - B", state);
-				    (void) strcpy(
-					&state->cs_dev_info.version[0],
-					CS_DEV_VERSION_B);
+					ATRACE("cs_attach() OLD - B", state);
+					(void) strcpy(
+					    &state->cs_dev_info.version[0],
+					    CS_DEV_VERSION_B);
 				}
 				state->cs_defaults.record.avail_ports |=
 				    AUDIO_SUNVTS;

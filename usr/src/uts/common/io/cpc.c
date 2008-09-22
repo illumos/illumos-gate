@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CPU Performance Counter system calls and device driver.
@@ -895,7 +894,9 @@ static struct dev_ops dev_ops = {
 	nodev,			/* detach */
 	nodev,			/* reset */
 	&cb_ops,
-	(struct bus_ops *)0
+	(struct bus_ops *)0,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {

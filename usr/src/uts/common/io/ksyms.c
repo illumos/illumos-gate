@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ksyms driver - exports a single symbol/string table for the kernel
@@ -438,11 +437,13 @@ static struct dev_ops ksyms_ops = {
 	ksyms_detach,		/* detach */
 	nodev,			/* reset */
 	&ksyms_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* no bus operations */
+	(struct bus_ops *)0,	/* no bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops, "kernel symbols driver %I%", &ksyms_ops,
+	&mod_driverops, "kernel symbols driver", &ksyms_ops,
 };
 
 static struct modlinkage modlinkage = {

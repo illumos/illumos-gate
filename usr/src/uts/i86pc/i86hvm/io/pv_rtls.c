@@ -42,7 +42,9 @@ struct dev_ops pv_rtls_ops = {
 	NULL,
 	nodev,
 	NULL,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

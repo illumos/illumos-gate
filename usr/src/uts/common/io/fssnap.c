@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/debug.h>
 #include <sys/types.h>
@@ -228,14 +227,15 @@ static struct dev_ops snap_ops = {
 	nodev,			/* no snap_reset */
 	&snap_cb_ops,
 	(struct bus_ops *)NULL,
-	nulldev			/* no snap_power() */
+	nulldev,		/* no snap_power() */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv md = {
 	&mod_driverops, /* Type of module. This is a driver */
-	"snapshot driver %I%", 	/* Name of the module */
+	"snapshot driver", 	/* Name of the module */
 	&snap_ops,
 };
 

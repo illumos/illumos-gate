@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 #ifndef _E1000G_SW_H
@@ -973,7 +973,6 @@ void e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet);
 void e1000g_tx_setup(struct e1000g *Adapter);
 void e1000g_rx_setup(struct e1000g *Adapter);
 void e1000g_setup_multicast(struct e1000g *Adapter);
-boolean_t e1000g_reset(struct e1000g *Adapter);
 
 int e1000g_recycle(e1000g_tx_ring_t *tx_ring);
 void e1000g_free_tx_swpkt(p_tx_sw_packet_t packet);

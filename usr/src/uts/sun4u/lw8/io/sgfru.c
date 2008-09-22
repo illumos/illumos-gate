@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -103,18 +102,19 @@ static struct dev_ops sgfru_ops = {
 	nodev,			/* reset */
 	&sgfru_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
  * Loadable module support. This is located in sgfru.c so as to
- * pick up the %I% version of sgfru.c.
+ * pick up the 1.8 version of sgfru.c.
  */
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a pseudo driver */
-	"FRU Driver %I%",
+	"FRU Driver",
 	&sgfru_ops,	/* driver ops */
 };
 
@@ -694,10 +694,10 @@ sgfru_addsegment(const sgfru_init_arg_t *iargp)
 		return (EFAULT);
 	}
 	PR_SEGMENT("sgfru:%s: handle %lx, max cnt %d\n",
-		f, seg.fru_hdl, seg.fru_cnt);
+	    f, seg.fru_hdl, seg.fru_cnt);
 	PR_SEGMENT("sgfru:%s: handle %lx, name %s, descriptor 0x%x, "
-		"offset 0x%x, length 0x%x\n", f, segment.handle, segment.name,
-			segment.descriptor, segment.offset, segment.length);
+	    "offset 0x%x, length 0x%x\n", f, segment.handle, segment.name,
+	    segment.descriptor, segment.offset, segment.length);
 
 	/* allocate buffer for unpadded section_hdl_t + segment_t */
 	size = (size_t)(SECTION_HDL_SIZE + SEGMENT_SIZE);
@@ -753,7 +753,7 @@ sgfru_readsegment(const sgfru_init_arg_t *iargp)
 		return (EINVAL);
 	}
 	PR_SEGMENT("sgfru:%s: handle %lx, max cnt %d\n",
-		f, segs.fru_hdl, segs.fru_cnt);
+	    f, segs.fru_hdl, segs.fru_cnt);
 
 	/* allocate unpadded buffer for raw data */
 	size = (size_t)(FRU_INFO_SIZE + max_cnt);
@@ -768,7 +768,7 @@ sgfru_readsegment(const sgfru_init_arg_t *iargp)
 	/* translate unpadded to padded fru_info_t */
 	tdatap = sgfru_fru_pad(datap, &sinfo);
 	PR_SEGMENT("sgfru:%s: handle %lx, actual cnt %d\n",
-		f, sinfo.hdl, sinfo.cnt);
+	    f, sinfo.hdl, sinfo.cnt);
 
 	/* copyout actual fru_cnt */
 	if (sgfru_copyout_fru(iargp, &sinfo) != 0) {
@@ -809,7 +809,7 @@ sgfru_writesegment(const sgfru_init_arg_t *iargp)
 		return (EINVAL);
 	}
 	PR_SEGMENT("sgfru:%s: handle %lx, max cnt %d\n",
-		f, segs.fru_hdl, segs.fru_cnt);
+	    f, segs.fru_hdl, segs.fru_cnt);
 
 	/* allocate unpadded buffer for fru_info_t + raw data */
 	size = (size_t)(FRU_INFO_SIZE + max_cnt);
@@ -833,7 +833,7 @@ sgfru_writesegment(const sgfru_init_arg_t *iargp)
 	kmem_free(datap, size);
 
 	PR_SEGMENT("sgfru:%s: handle %lx, actual cnt %d\n",
-		f, segs.fru_hdl, segs.fru_cnt);
+	    f, segs.fru_hdl, segs.fru_cnt);
 	/* copyout updated segment handle and actual fru_cnt */
 	if (sgfru_copyout_fru(iargp, &segs.fru_info) != 0) {
 		return (EFAULT);
@@ -989,7 +989,7 @@ sgfru_getpayload(const sgfru_init_arg_t *iargp)
 		return (EFAULT);
 	}
 	PR_PAYLOAD("sgfru:%s: handle %lx, max cnt %d\n",
-		f, payld.fru_hdl, payld.fru_cnt);
+	    f, payld.fru_hdl, payld.fru_cnt);
 
 	/* check on kmem_alloc space requirements */
 	max_cnt = payld.fru_cnt;
@@ -1011,7 +1011,7 @@ sgfru_getpayload(const sgfru_init_arg_t *iargp)
 	/* translate unpadded to padded fru_info_t */
 	tdatap = sgfru_fru_pad(datap, &pinfo);
 	PR_PAYLOAD("sgfru:%s: handle %lx, max cnt %d\n",
-		f, pinfo.hdl, pinfo.cnt);
+	    f, pinfo.hdl, pinfo.cnt);
 
 	/* copyout actual fru_cnt */
 	if (sgfru_copyout_fru(iargp, &pinfo) != 0) {
@@ -1066,7 +1066,7 @@ sgfru_updatepayload(const sgfru_init_arg_t *iargp)
 		return (EFAULT);
 	}
 	PR_PAYLOAD("sgfru_updatepayload: handle %lx, actual cnt %d\n",
-		payld.fru_hdl, payld.fru_cnt);
+	    payld.fru_hdl, payld.fru_cnt);
 
 	/* call mailbox */
 	if ((ret = sgfru_mbox(iargp->cmd, datap, size, &payld.fru_info))
@@ -1083,7 +1083,7 @@ sgfru_updatepayload(const sgfru_init_arg_t *iargp)
 		return (EFAULT);
 	}
 	PR_PAYLOAD("sgfru:%s: new handle %lx, cnt %d\n",
-		f, payld.fru_hdl, payld.fru_cnt);
+	    f, payld.fru_hdl, payld.fru_cnt);
 
 	return (ret);
 }
@@ -1515,8 +1515,8 @@ sgfru_copyin_append(const sgfru_init_arg_t *argp, append_info_t *app)
 		return (EFAULT);
 	}
 	PR_PAYLOAD("sgfru:%s: hdl %lx, cnt %d pkt hdl %lx "
-		"tag %lx\n", f, app->payload_hdl, app->payload_cnt,
-			app->packet.handle, app->packet.tag);
+	    "tag %lx\n", f, app->payload_hdl, app->payload_cnt,
+	    app->packet.handle, app->packet.tag);
 	return (0);
 }
 

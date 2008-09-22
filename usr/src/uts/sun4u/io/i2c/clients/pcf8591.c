@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
@@ -98,14 +96,16 @@ static struct dev_ops pcf8591_ops = {
 	pcf8591_detach,
 	nodev,
 	&pcf8591_cbops,
-	NULL
+	NULL,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv pcf8591_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"PCF8591 i2c device driver: v%I%",
+	"PCF8591 i2c device driver: v1.8",
 	&pcf8591_ops
 };
 
@@ -124,7 +124,7 @@ _init(void)
 	error = mod_install(&pcf8591_modlinkage);
 	if (!error)
 		(void) ddi_soft_state_init(&pcf8591soft_statep,
-			sizeof (struct pcf8591_unit), 1);
+		    sizeof (struct pcf8591_unit), 1);
 	return (error);
 }
 
@@ -162,7 +162,7 @@ pcf8591_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591soft_statep, instance);
+	    ddi_get_soft_state(pcf8591soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -208,7 +208,7 @@ pcf8591_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	}
 
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591soft_statep, instance);
+	    ddi_get_soft_state(pcf8591soft_statep, instance);
 
 	if (unitp == NULL) {
 		return (ENXIO);
@@ -240,12 +240,12 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	if (arg == NULL) {
 		D2CMN_ERR((CE_WARN, "PCF8591: ioctl: arg passed in to ioctl "
-				"= NULL\n"));
+		    "= NULL\n"));
 		err = EINVAL;
 		return (err);
 	}
 	unitp = (struct pcf8591_unit *)
-		ddi_get_soft_state(pcf8591soft_statep, instance);
+	    ddi_get_soft_state(pcf8591soft_statep, instance);
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "PCF8591: ioctl: unitp not filled\n");
@@ -255,24 +255,24 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	mutex_enter(&unitp->pcf8591_mutex);
 
 	D1CMN_ERR((CE_NOTE, "%s: ioctl: port = %d  instance = %d\n",
-		unitp->pcf8591_name, port, instance));
+	    unitp->pcf8591_name, port, instance));
 
 	switch (cmd) {
 	case I2C_GET_INPUT:
 		(void) i2c_transfer_alloc(unitp->pcf8591_hdl, &i2c_tran_pointer,
-					1, 2, I2C_SLEEP);
+		    1, 2, I2C_SLEEP);
 		if (i2c_tran_pointer == NULL) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_INPUT "
-					"i2c_tran_pointer not allocated\n",
-					unitp->pcf8591_name));
+			    "i2c_tran_pointer not allocated\n",
+			    unitp->pcf8591_name));
 			err = ENOMEM;
 			break;
 		}
 		reg = (uchar_t)port;
 		if ((reg == 0x02) && (ipmode == PCF8591_2DIFF)) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_INPUT "
-					"cannot use port 2 when ipmode is "
-					"0x03\n", unitp->pcf8591_name));
+			    "cannot use port 2 when ipmode is "
+			    "0x03\n", unitp->pcf8591_name));
 			err = EIO;
 			i2c_transfer_free(unitp->pcf8591_hdl, i2c_tran_pointer);
 			break;
@@ -280,15 +280,15 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 		if ((reg == 0x03) && (ipmode != PCF8591_4SINGLE)) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_INPUT "
-					"cannot use port 3 when ipmode is not "
-					"0x00\n", unitp->pcf8591_name));
+			    "cannot use port 3 when ipmode is not "
+			    "0x00\n", unitp->pcf8591_name));
 			err = EIO;
 			i2c_transfer_free(unitp->pcf8591_hdl, i2c_tran_pointer);
 			break;
 		}
 		control = ((0 << PCF8591_ANALOG_OUTPUT_SHIFT) |
-			(ipmode << PCF8591_ANALOG_INPUT_SHIFT) |
-			(autoincr << PCF8591_AUTOINCR_SHIFT) | reg);
+		    (ipmode << PCF8591_ANALOG_INPUT_SHIFT) |
+		    (autoincr << PCF8591_AUTOINCR_SHIFT) | reg);
 
 		i2c_tran_pointer->i2c_flags = I2C_WR_RD;
 		i2c_tran_pointer->i2c_wbuf[0] = control;
@@ -296,21 +296,21 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		err = i2c_transfer(unitp->pcf8591_hdl, i2c_tran_pointer);
 		if (err) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_INPUT"
-					" i2c_transfer routine\n",
-					unitp->pcf8591_name));
+			    " i2c_transfer routine\n",
+			    unitp->pcf8591_name));
 			i2c_transfer_free(unitp->pcf8591_hdl, i2c_tran_pointer);
 			break;
 		}
 		i2c_tran_pointer->i2c_rbuf[0] = i2c_tran_pointer->i2c_rbuf[1];
 		value = i2c_tran_pointer->i2c_rbuf[0];
 		D1CMN_ERR((CE_NOTE, "%s: Back from transfer result is %x\n",
-			unitp->pcf8591_name, value));
+		    unitp->pcf8591_name, value));
 		if (ddi_copyout((caddr_t)&value,
-				(caddr_t)arg,
-				sizeof (int32_t), mode) != DDI_SUCCESS) {
+		    (caddr_t)arg,
+		    sizeof (int32_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed I2C_GET_INPUT"
-					" ddi_copyout routine\n",
-					unitp->pcf8591_name));
+			    " ddi_copyout routine\n",
+			    unitp->pcf8591_name));
 			err = EFAULT;
 		}
 		i2c_transfer_free(unitp->pcf8591_hdl, i2c_tran_pointer);
@@ -320,34 +320,34 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		reg = (uchar_t)port;
 		if (ipmode != PCF8591_4SINGLE) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_SET_OUTPUT "
-					"cannot set output when ipmode is not "
-					"0x00\n", unitp->pcf8591_name));
+			    "cannot set output when ipmode is not "
+			    "0x00\n", unitp->pcf8591_name));
 			err = EIO;
 			break;
 		}
 
 		(void) i2c_transfer_alloc(unitp->pcf8591_hdl, &i2c_tran_pointer,
-					2, 0, I2C_SLEEP);
+		    2, 0, I2C_SLEEP);
 		if (i2c_tran_pointer == NULL) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in "
-					"I2C_SET_OUTPUT "
-					"i2c_tran_pointer not allocated\n",
-					unitp->pcf8591_name));
+			    "I2C_SET_OUTPUT "
+			    "i2c_tran_pointer not allocated\n",
+			    unitp->pcf8591_name));
 			err = ENOMEM;
 			break;
 		}
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&value,
-				sizeof (int32_t), mode) != DDI_SUCCESS) {
+		    sizeof (int32_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in I2C_SET_OUTPUT"
-					" ddi_copyout routine\n",
-					unitp->pcf8591_name));
+			    " ddi_copyout routine\n",
+			    unitp->pcf8591_name));
 			err = EFAULT;
 			i2c_transfer_free(unitp->pcf8591_hdl, i2c_tran_pointer);
 			break;
 		}
 		control = ((1 << PCF8591_ANALOG_OUTPUT_SHIFT) |
-			(0 << PCF8591_ANALOG_INPUT_SHIFT) |
-			(autoincr << PCF8591_AUTOINCR_SHIFT) | reg);
+		    (0 << PCF8591_ANALOG_INPUT_SHIFT) |
+		    (autoincr << PCF8591_AUTOINCR_SHIFT) | reg);
 
 		i2c_tran_pointer->i2c_flags = I2C_WR;
 		i2c_tran_pointer->i2c_wbuf[0] = control;
@@ -370,8 +370,8 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			    (caddr_t)arg, sizeof (int32_t), mode)
 			    != DDI_SUCCESS) {
 				D2CMN_ERR((CE_WARN, "%s: Failed in "
-					"I2C_GET_OUTPUT ddi_copyout routine\n",
-					unitp->pcf8591_name));
+				    "I2C_GET_OUTPUT ddi_copyout routine\n",
+				    unitp->pcf8591_name));
 				err = EFAULT;
 				break;
 			}
@@ -380,18 +380,18 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	case PCF8591_SET_IPMODE:
 		if (ddi_copyin((caddr_t)arg, (caddr_t)&uvalue,
-				sizeof (uint_t), mode) != DDI_SUCCESS) {
+		    sizeof (uint_t), mode) != DDI_SUCCESS) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in PCF8591_SET_IPMODE"
-					" ddi_copyout routine\n",
-					unitp->pcf8591_name));
+			    " ddi_copyout routine\n",
+			    unitp->pcf8591_name));
 			err = EFAULT;
 			break;
 		}
 
 		if (uvalue > 0x03) {
 			D2CMN_ERR((CE_WARN, "%s: Failed in PCF8591_SET_IPMODE"
-					" value is not a valid mode\n",
-					unitp->pcf8591_name));
+			    " value is not a valid mode\n",
+			    unitp->pcf8591_name));
 			err = EIO;
 			break;
 		}
@@ -401,7 +401,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	default:
 		D2CMN_ERR((CE_WARN, "%s: Invalid IOCTL cmd: %x\n",
-				unitp->pcf8591_name, cmd));
+		    unitp->pcf8591_name, cmd));
 		err = EINVAL;
 	}
 
@@ -465,7 +465,7 @@ pcf8591_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(pcf8591soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d: failed to zalloc softstate\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (DDI_FAILURE);
 	}
 
@@ -473,23 +473,23 @@ pcf8591_do_attach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 
 	(void) snprintf(unitp->pcf8591_name, sizeof (unitp->pcf8591_name),
-			"%s%d", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 	for (i = 0; i < 4; i++) {
 		(void) sprintf(name, "port_%d", i);
 
 		minor_number = INST_TO_MINOR(instance) |
-						PORT_TO_MINOR(I2C_PORT(i));
+		    PORT_TO_MINOR(I2C_PORT(i));
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor_number,
-					"ddi_i2c:adio", NULL) == DDI_FAILURE) {
+		    "ddi_i2c:adio", NULL) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
-				"%s\n", unitp->pcf8591_name, name);
+			    "%s\n", unitp->pcf8591_name, name);
 			ddi_soft_state_free(pcf8591soft_statep, instance);
 
 			return (DDI_FAILURE);
@@ -536,7 +536,7 @@ pcf8591_do_detach(dev_info_t *dip)
 
 	if (unitp == NULL) {
 		cmn_err(CE_WARN, "%s%d: unitp not filled\n",
-			ddi_get_name(dip), instance);
+		    ddi_get_name(dip), instance);
 		return (ENOMEM);
 	}
 

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DM2S - Domain side Mailbox to synchronous serial device driver.
@@ -180,12 +179,12 @@ struct streamtab dm2s_streamtab = {
 
 DDI_DEFINE_STREAM_OPS(dm2s_ops, nulldev, nulldev, dm2s_attach,		\
 	dm2s_detach, nodev, dm2s_info, D_NEW | D_MP | D_MTPERMOD,	\
-	&dm2s_streamtab);
+	&dm2s_streamtab, ddi_quiesce_not_supported);
 
 
 struct modldrv modldrv = {
 	&mod_driverops,
-	"OPL Mbox to Serial Driver %I%",
+	"OPL Mbox to Serial Driver",
 	&dm2s_ops
 };
 
@@ -1268,7 +1267,7 @@ dm2s_dump_bytes(char *str, uint32_t total_len,
 		tlen += len;
 	}
 	sprintf(bytestr, "%s Packet: Size=%d  Digest=%d\n",
-		str, total_len, digest);
+	    str, total_len, digest);
 	DTRACE_PROBE1(dm2s_dump_digest, unsigned char *, bytestr);
 
 	tlen = 0;

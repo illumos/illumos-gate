@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 2001-2006 Advanced Micro Devices, Inc.  All rights reserved.
  *
@@ -52,11 +50,6 @@
  * nationals of countries subject to national security controls.
  */
 
-
-#pragma ident "@(#)$RCSfile: solaris_odl.c,v $ $Revision: 1.3 $ " \
-" $Date: 2004/04/22 15:22:54 $ AMD"
-
-
 /* include files */
 #include <sys/disp.h>
 #include <sys/atomic.h>
@@ -69,7 +62,7 @@
 #define	AMD8111S_SPLIT	128
 #define	AMD8111S_SEND_MAX	64
 
-static char ident[] = "AMD8111 10/100M Ethernet 1.0";
+static char ident[] = "AMD8111 10/100M Ethernet";
 
 /*
  * Driver Entry Points
@@ -137,7 +130,8 @@ static struct dev_ops amd8111s_dev_ops = {
 	nodev,			/* devo_reset */
 	&amd8111s_cb_ops,	/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	nodev
+	nodev,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 struct modldrv amd8111s_modldrv = {

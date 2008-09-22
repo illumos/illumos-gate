@@ -119,7 +119,8 @@ static struct dev_ops px_ops = {
 	nodev,
 	&px_cb_ops,
 	&px_bus_ops,
-	nulldev
+	nulldev,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

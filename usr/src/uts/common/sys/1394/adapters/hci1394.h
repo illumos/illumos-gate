@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_1394_ADAPTERS_HCI1394_H
 #define	_SYS_1394_ADAPTERS_HCI1394_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * hci1394.h
@@ -88,6 +86,7 @@ int hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 void hci1394_detach_hardware(hci1394_state_t *soft_state);
 void hci1394_pci_fini(hci1394_state_t *soft_state);
 void hci1394_soft_state_fini(hci1394_state_t *soft_state);
+int hci1394_quiesce(dev_info_t *dip);
 
 /* These functions can be found in hci1394_misc.c */
 hci1394_statevar_t hci1394_state(hci1394_drvinfo_t *drvinfo);

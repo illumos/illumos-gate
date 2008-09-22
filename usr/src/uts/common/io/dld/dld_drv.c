@@ -105,7 +105,8 @@ static struct dev_ops drv_ops = {
 	nodev,			/* reset */
 	&drv_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	nodev			/* dev power */
+	nodev,			/* dev power */
+	ddi_quiesce_not_supported,	/* dev quiesce */
 };
 
 /*

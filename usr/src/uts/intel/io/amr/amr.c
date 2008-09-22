@@ -223,7 +223,8 @@ static struct dev_ops   amr_ops = {
 	nodev,		/* reset */
 	NULL,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	0		/* power */
+	0,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -256,7 +257,7 @@ _init(void)
 	int		error;
 
 	error = ddi_soft_state_init((void *)&amr_softstatep,
-			sizeof (struct amr_softs), 0);
+	    sizeof (struct amr_softs), 0);
 
 	if (error != 0)
 		goto error_out;
@@ -335,16 +336,16 @@ amr_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 	softs->dev_info_p = dev;
 
 	AMRDB_PRINT((CE_NOTE, "softs: %p; busy_slot addr: %p",
-		(void *)softs, (void *)&(softs->amr_busyslots)));
+	    (void *)softs, (void *)&(softs->amr_busyslots)));
 
 	if (pci_config_setup(dev, &(softs->pciconfig_handle))
-		!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		goto error_out;
 	}
 	softs->state |= AMR_STATE_PCI_CONFIG_SETUP;
 
 	error = ddi_regs_map_setup(dev, 1, &cfgaddr, 0, 0,
-		&accattr, &(softs->regsmap_handle));
+	    &accattr, &(softs->regsmap_handle));
 	if (error != DDI_SUCCESS) {
 		goto error_out;
 	}
@@ -367,9 +368,9 @@ amr_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 	if (!(command & PCI_COMM_ME)) {
 		command |= PCI_COMM_ME;
 		pci_config_put16(softs->pciconfig_handle,
-				PCI_CONF_COMM, command);
+		    PCI_CONF_COMM, command);
 		command = pci_config_get16(softs->pciconfig_handle,
-				PCI_CONF_COMM);
+		    PCI_CONF_COMM);
 		if (!(command & PCI_COMM_ME))
 			goto error_out;
 	}
@@ -378,17 +379,18 @@ amr_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 	 * Allocate and connect our interrupt.
 	 */
 	if (ddi_intr_hilevel(dev, 0) != 0) {
-	    AMRDB_PRINT((CE_NOTE,  "High level interrupt is not supported!"));
-	    goto error_out;
+		AMRDB_PRINT((CE_NOTE,
+		    "High level interrupt is not supported!"));
+		goto error_out;
 	}
 
 	if (ddi_get_iblock_cookie(dev, 0,  &softs->iblock_cookiep)
-		!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		goto error_out;
 	}
 
 	mutex_init(&softs->cmd_mutex, NULL, MUTEX_DRIVER,
-		softs->iblock_cookiep); /* should be used in interrupt */
+	    softs->iblock_cookiep); /* should be used in interrupt */
 	mutex_init(&softs->queue_mutex, NULL, MUTEX_DRIVER,
 	    softs->iblock_cookiep); /* should be used in interrupt */
 	mutex_init(&softs->periodic_mutex, NULL, MUTEX_DRIVER,
@@ -419,13 +421,13 @@ amr_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 	 * configured for this instance.
 	 */
 	if ((softs->amr_taskq = ddi_taskq_create(dev, "amr_taskq",
-		MAX(softs->amr_nlogdrives, 1), TASKQ_DEFAULTPRI, 0)) == NULL) {
+	    MAX(softs->amr_nlogdrives, 1), TASKQ_DEFAULTPRI, 0)) == NULL) {
 		goto error_out;
 	}
 	softs->state |= AMR_STATE_TASKQ_SETUP;
 
 	if (ddi_add_intr(dev, 0, &softs->iblock_cookiep, NULL,
-		amr_intr, (caddr_t)softs) != DDI_SUCCESS) {
+	    amr_intr, (caddr_t)softs) != DDI_SUCCESS) {
 		goto error_out;
 	}
 	softs->state |= AMR_STATE_INTR_SETUP;
@@ -440,14 +442,14 @@ amr_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 	/* schedule a thread for periodic check */
 	mutex_enter(&softs->periodic_mutex);
 	softs->timeout_t = timeout(amr_periodic, (void *)softs,
-				drv_usectohz(500000*AMR_PERIODIC_TIMEOUT));
+	    drv_usectohz(500000*AMR_PERIODIC_TIMEOUT));
 	softs->state |= AMR_STATE_TIMEOUT_ENABLED;
 	mutex_exit(&softs->periodic_mutex);
 
 	/* print firmware information in verbose mode */
 	cmn_err(CE_CONT, "?MegaRaid %s %s attached.",
-		softs->amr_product_info.pi_product_name,
-		softs->amr_product_info.pi_firmware_ver);
+	    softs->amr_product_info.pi_product_name,
+	    softs->amr_product_info.pi_firmware_ver);
 
 	/* clear any interrupts */
 	AMR_QCLEAR_INTR(softs);
@@ -463,11 +465,11 @@ error_out:
 	if (softs->state & AMR_STATE_SG_TABLES_SETUP) {
 		for (i = 0; i < softs->sg_max_count; i++) {
 			(void) ddi_dma_unbind_handle(
-				softs->sg_items[i].sg_handle);
+			    softs->sg_items[i].sg_handle);
 			(void) ddi_dma_mem_free(
-				&((softs->sg_items[i]).sg_acc_handle));
+			    &((softs->sg_items[i]).sg_acc_handle));
 			(void) ddi_dma_free_handle(
-				&(softs->sg_items[i].sg_handle));
+			    &(softs->sg_items[i].sg_handle));
 		}
 	}
 	if (softs->state & AMR_STATE_MAILBOX_SETUP) {
@@ -524,11 +526,11 @@ static int amr_detach(dev_info_t *dev, ddi_detach_cmd_t cmd)
 
 	for (i = 0; i < softs->sg_max_count; i++) {
 		(void) ddi_dma_unbind_handle(
-			softs->sg_items[i].sg_handle);
+		    softs->sg_items[i].sg_handle);
 		(void) ddi_dma_mem_free(
-			&((softs->sg_items[i]).sg_acc_handle));
+		    &((softs->sg_items[i]).sg_acc_handle));
 		(void) ddi_dma_free_handle(
-			&(softs->sg_items[i].sg_handle));
+		    &(softs->sg_items[i].sg_handle));
 	}
 
 	(void) ddi_dma_unbind_handle(softs->mbox_dma_handle);
@@ -558,8 +560,8 @@ static int amr_detach(dev_info_t *dev, ddi_detach_cmd_t cmd)
 
 	/* print firmware information in verbose mode */
 	cmn_err(CE_NOTE, "?MegaRaid %s %s detached.",
-		softs->amr_product_info.pi_product_name,
-		softs->amr_product_info.pi_firmware_ver);
+	    softs->amr_product_info.pi_product_name,
+	    softs->amr_product_info.pi_firmware_ver);
 
 	ddi_soft_state_free(amr_softstatep, instance);
 
@@ -630,41 +632,41 @@ amr_setup_mbox(struct amr_softs *softs)
 	size_t		mbox_len;
 
 	if (ddi_dma_alloc_handle(
-		softs->dev_info_p,
-		&addr_dma_attr,
-		DDI_DMA_SLEEP,
-		NULL,
-		&softs->mbox_dma_handle) != DDI_SUCCESS) {
+	    softs->dev_info_p,
+	    &addr_dma_attr,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &softs->mbox_dma_handle) != DDI_SUCCESS) {
 		AMRDB_PRINT((CE_NOTE, "Cannot alloc dma handle for mailbox"));
 		goto error_out;
 	}
 
 	if (ddi_dma_mem_alloc(
-		softs->mbox_dma_handle,
-		sizeof (struct amr_mailbox) + 16,
-		&accattr,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP,
-		NULL,
-		(caddr_t *)(&softs->mbox),
-		&mbox_len,
-		&softs->mbox_acc_handle) !=
-		DDI_SUCCESS) {
+	    softs->mbox_dma_handle,
+	    sizeof (struct amr_mailbox) + 16,
+	    &accattr,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    (caddr_t *)(&softs->mbox),
+	    &mbox_len,
+	    &softs->mbox_acc_handle) !=
+	    DDI_SUCCESS) {
 
 		AMRDB_PRINT((CE_WARN, "Cannot alloc dma memory for mailbox"));
 		goto error_out;
 	}
 
 	if (ddi_dma_addr_bind_handle(
-		softs->mbox_dma_handle,
-		NULL,
-		(caddr_t)softs->mbox,
-		mbox_len,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP,
-		NULL,
-		&softs->mbox_dma_cookie,
-		&softs->mbox_dma_cookien) != DDI_DMA_MAPPED) {
+	    softs->mbox_dma_handle,
+	    NULL,
+	    (caddr_t)softs->mbox,
+	    mbox_len,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &softs->mbox_dma_cookie,
+	    &softs->mbox_dma_cookien) != DDI_DMA_MAPPED) {
 
 		AMRDB_PRINT((CE_NOTE, "Cannot bind dma memory for mailbox"));
 		goto error_out;
@@ -676,14 +678,14 @@ amr_setup_mbox(struct amr_softs *softs)
 	/* The phy address of mailbox must be aligned on a 16-byte boundary */
 	move = 16 - (((uint32_t)softs->mbox_dma_cookie.dmac_address)&0xf);
 	softs->mbox_phyaddr =
-		(softs->mbox_dma_cookie.dmac_address + move);
+	    (softs->mbox_dma_cookie.dmac_address + move);
 
 	softs->mailbox =
-		(struct amr_mailbox *)(((uintptr_t)softs->mbox) + move);
+	    (struct amr_mailbox *)(((uintptr_t)softs->mbox) + move);
 
 	AMRDB_PRINT((CE_NOTE, "phraddy=%x, mailbox=%p, softs->mbox=%p, move=%x",
-		softs->mbox_phyaddr, (void *)softs->mailbox,
-		softs->mbox, move));
+	    softs->mbox_phyaddr, (void *)softs->mailbox,
+	    softs->mbox, move));
 
 	return (DDI_SUCCESS);
 
@@ -727,17 +729,17 @@ amr_periodic(void *data)
 		pkt = softs->busycmd[i]->pkt;
 
 		if ((pkt->pkt_time != 0) &&
-			(ddi_get_time() -
-			softs->busycmd[i]->ac_timestamp >
-			pkt->pkt_time)) {
+		    (ddi_get_time() -
+		    softs->busycmd[i]->ac_timestamp >
+		    pkt->pkt_time)) {
 
 			cmn_err(CE_WARN,
-				"!timed out packet detected,\
+			    "!timed out packet detected,\
 				sc = %p, pkt = %p, index = %d, ac = %p",
-				(void *)softs,
-				(void *)pkt,
-				i,
-				(void *)softs->busycmd[i]);
+			    (void *)softs,
+			    (void *)pkt,
+			    i,
+			    (void *)softs->busycmd[i]);
 
 			ac = softs->busycmd[i];
 			ac->ac_next = NULL;
@@ -756,7 +758,7 @@ amr_periodic(void *data)
 			pkt->pkt_statistics |= STAT_TIMEOUT;
 			pkt->pkt_reason = CMD_TIMEOUT;
 			if (!(pkt->pkt_flags &
-			FLAG_NOINTR) && pkt->pkt_comp) {
+			    FLAG_NOINTR) && pkt->pkt_comp) {
 				/* call pkt callback */
 				(*pkt->pkt_comp)(pkt);
 			}
@@ -770,7 +772,7 @@ amr_periodic(void *data)
 	mutex_enter(&softs->periodic_mutex);
 	if (softs->state & AMR_STATE_TIMEOUT_ENABLED)
 		softs->timeout_t = timeout(amr_periodic, (void *)softs,
-				drv_usectohz(500000*AMR_PERIODIC_TIMEOUT));
+		    drv_usectohz(500000*AMR_PERIODIC_TIMEOUT));
 	mutex_exit(&softs->periodic_mutex);
 }
 
@@ -799,36 +801,38 @@ amr_query_controller(struct amr_softs *softs)
 	 * Try to issue an ENQUIRY3 command
 	 */
 	if ((aex = amr_enquiry(softs, AMR_ENQ_BUFFER_SIZE, AMR_CMD_CONFIG,
-		AMR_CONFIG_ENQ3, AMR_CONFIG_ENQ3_SOLICITED_FULL)) != NULL) {
+	    AMR_CONFIG_ENQ3, AMR_CONFIG_ENQ3_SOLICITED_FULL)) != NULL) {
 
 		AMRDB_PRINT((CE_NOTE, "First enquiry"));
 
 		for (ldrv = 0; ldrv < aex->ae_numldrives; ldrv++) {
-		    softs->logic_drive[ldrv].al_size =
-						aex->ae_drivesize[ldrv];
-		    softs->logic_drive[ldrv].al_state =
-						aex->ae_drivestate[ldrv];
-		    softs->logic_drive[ldrv].al_properties =
-						aex->ae_driveprop[ldrv];
-		    AMRDB_PRINT((CE_NOTE,
-			"  drive %d: size: %d state %x properties %x\n",
-			ldrv,
-			softs->logic_drive[ldrv].al_size,
-			softs->logic_drive[ldrv].al_state,
-			softs->logic_drive[ldrv].al_properties));
+			softs->logic_drive[ldrv].al_size =
+			    aex->ae_drivesize[ldrv];
+			softs->logic_drive[ldrv].al_state =
+			    aex->ae_drivestate[ldrv];
+			softs->logic_drive[ldrv].al_properties =
+			    aex->ae_driveprop[ldrv];
+			AMRDB_PRINT((CE_NOTE,
+			    "  drive %d: size: %d state %x properties %x\n",
+			    ldrv,
+			    softs->logic_drive[ldrv].al_size,
+			    softs->logic_drive[ldrv].al_state,
+			    softs->logic_drive[ldrv].al_properties));
 
-		    if (softs->logic_drive[ldrv].al_state == AMR_LDRV_OFFLINE)
-			cmn_err(CE_NOTE, "!instance %d log-drive %d is offline",
-				instance, ldrv);
-		    else
-			softs->amr_nlogdrives++;
+			if (softs->logic_drive[ldrv].al_state ==
+			    AMR_LDRV_OFFLINE)
+				cmn_err(CE_NOTE,
+				    "!instance %d log-drive %d is offline",
+				    instance, ldrv);
+			else
+				softs->amr_nlogdrives++;
 		}
 		kmem_free(aex, AMR_ENQ_BUFFER_SIZE);
 
 		if ((ap = amr_enquiry(softs, AMR_ENQ_BUFFER_SIZE,
-			AMR_CMD_CONFIG, AMR_CONFIG_PRODUCT_INFO, 0)) == NULL) {
+		    AMR_CMD_CONFIG, AMR_CONFIG_PRODUCT_INFO, 0)) == NULL) {
 			AMRDB_PRINT((CE_NOTE,
-				"Cannot obtain product data from controller"));
+			    "Cannot obtain product data from controller"));
 			return (EIO);
 		}
 
@@ -837,14 +841,14 @@ amr_query_controller(struct amr_softs *softs)
 		softs->maxio = ap->ap_maxio;
 
 		bcopy(ap->ap_firmware, softs->amr_product_info.pi_firmware_ver,
-			AMR_FIRMWARE_VER_SIZE);
+		    AMR_FIRMWARE_VER_SIZE);
 		softs->amr_product_info.
-			pi_firmware_ver[AMR_FIRMWARE_VER_SIZE] = 0;
+		    pi_firmware_ver[AMR_FIRMWARE_VER_SIZE] = 0;
 
 		bcopy(ap->ap_product, softs->amr_product_info.pi_product_name,
-			AMR_PRODUCT_INFO_SIZE);
+		    AMR_PRODUCT_INFO_SIZE);
 		softs->amr_product_info.
-			pi_product_name[AMR_PRODUCT_INFO_SIZE] = 0;
+		    pi_product_name[AMR_PRODUCT_INFO_SIZE] = 0;
 
 		kmem_free(ap, AMR_ENQ_BUFFER_SIZE);
 		AMRDB_PRINT((CE_NOTE, "maxio=%d", softs->maxio));
@@ -855,14 +859,14 @@ amr_query_controller(struct amr_softs *softs)
 
 		/* failed, try the 8LD ENQUIRY commands */
 		if ((ae = (struct amr_enquiry *)amr_enquiry(softs,
-			AMR_ENQ_BUFFER_SIZE, AMR_CMD_EXT_ENQUIRY2, 0, 0))
-			== NULL) {
+		    AMR_ENQ_BUFFER_SIZE, AMR_CMD_EXT_ENQUIRY2, 0, 0))
+		    == NULL) {
 
 			if ((ae = (struct amr_enquiry *)amr_enquiry(softs,
-				AMR_ENQ_BUFFER_SIZE, AMR_CMD_ENQUIRY, 0, 0))
-				== NULL) {
+			    AMR_ENQ_BUFFER_SIZE, AMR_CMD_ENQUIRY, 0, 0))
+			    == NULL) {
 				AMRDB_PRINT((CE_NOTE,
-					"Cannot obtain configuration data"));
+				    "Cannot obtain configuration data"));
 				return (EIO);
 			}
 			ae->ae_signature = 0;
@@ -872,24 +876,26 @@ amr_query_controller(struct amr_softs *softs)
 		 * Fetch current state of logical drives.
 		 */
 		for (ldrv = 0; ldrv < ae->ae_ldrv.al_numdrives; ldrv++) {
-		    softs->logic_drive[ldrv].al_size =
-						ae->ae_ldrv.al_size[ldrv];
-		    softs->logic_drive[ldrv].al_state =
-						ae->ae_ldrv.al_state[ldrv];
-		    softs->logic_drive[ldrv].al_properties =
-						ae->ae_ldrv.al_properties[ldrv];
-		    AMRDB_PRINT((CE_NOTE,
-			" ********* drive %d: %d state %x properties %x",
-			ldrv,
-			softs->logic_drive[ldrv].al_size,
-			softs->logic_drive[ldrv].al_state,
-			softs->logic_drive[ldrv].al_properties));
+			softs->logic_drive[ldrv].al_size =
+			    ae->ae_ldrv.al_size[ldrv];
+			softs->logic_drive[ldrv].al_state =
+			    ae->ae_ldrv.al_state[ldrv];
+			softs->logic_drive[ldrv].al_properties =
+			    ae->ae_ldrv.al_properties[ldrv];
+			AMRDB_PRINT((CE_NOTE,
+			    " ********* drive %d: %d state %x properties %x",
+			    ldrv,
+			    softs->logic_drive[ldrv].al_size,
+			    softs->logic_drive[ldrv].al_state,
+			    softs->logic_drive[ldrv].al_properties));
 
-		    if (softs->logic_drive[ldrv].al_state == AMR_LDRV_OFFLINE)
-			cmn_err(CE_NOTE, "!instance %d log-drive %d is offline",
-				instance, ldrv);
-		    else
-			softs->amr_nlogdrives++;
+			if (softs->logic_drive[ldrv].al_state ==
+			    AMR_LDRV_OFFLINE)
+				cmn_err(CE_NOTE,
+				    "!instance %d log-drive %d is offline",
+				    instance, ldrv);
+			else
+				softs->amr_nlogdrives++;
 		}
 
 		softs->maxdrives = AMR_8LD_MAXDRIVES;
@@ -992,9 +998,9 @@ amr_poll_command(struct amr_command *ac)
 	volatile uint32_t	done_flag;
 
 	AMRDB_PRINT((CE_NOTE, "Amr_Poll bcopy(%p, %p, %d)",
-			(void *)&ac->mailbox,
-			(void *)softs->mailbox,
-			(uint32_t)AMR_MBOX_CMDSIZE));
+	    (void *)&ac->mailbox,
+	    (void *)softs->mailbox,
+	    (uint32_t)AMR_MBOX_CMDSIZE));
 
 	mutex_enter(&softs->cmd_mutex);
 
@@ -1008,15 +1014,15 @@ amr_poll_command(struct amr_command *ac)
 	if ((ac->mailbox.mb_command == AMR_CMD_LREAD) ||
 	    (ac->mailbox.mb_command == AMR_CMD_LWRITE)) {
 		bcopy(ac->sgtable,
-			softs->sg_items[softs->sg_max_count - 1].sg_table,
-			sizeof (struct amr_sgentry) * AMR_NSEG);
+		    softs->sg_items[softs->sg_max_count - 1].sg_table,
+		    sizeof (struct amr_sgentry) * AMR_NSEG);
 
 		(void) ddi_dma_sync(
-			softs->sg_items[softs->sg_max_count - 1].sg_handle,
-			0, 0, DDI_DMA_SYNC_FORDEV);
+		    softs->sg_items[softs->sg_max_count - 1].sg_handle,
+		    0, 0, DDI_DMA_SYNC_FORDEV);
 
 		ac->mailbox.mb_physaddr =
-			softs->sg_items[softs->sg_max_count - 1].sg_phyaddr;
+		    softs->sg_items[softs->sg_max_count - 1].sg_phyaddr;
 	}
 
 	bcopy(&ac->mailbox, (void *)softs->mailbox, AMR_MBOX_CMDSIZE);
@@ -1038,7 +1044,7 @@ amr_poll_command(struct amr_command *ac)
 	(void) ddi_dma_sync(softs->mbox_dma_handle, 0, 0, DDI_DMA_SYNC_FORCPU);
 
 	AMR_DELAY((softs->mailbox->mb_nstatus != AMR_POLL_DEFAULT_NSTATUS),
-			1000, done_flag);
+	    1000, done_flag);
 	if (!done_flag) {
 		mutex_exit(&softs->cmd_mutex);
 		return (1);
@@ -1088,11 +1094,11 @@ amr_setup_sg(struct amr_softs *softs)
 
 		(softs->sg_items[i]).sg_handle = NULL;
 		if (ddi_dma_alloc_handle(
-			softs->dev_info_p,
-			&addr_dma_attr,
-			DDI_DMA_SLEEP,
-			NULL,
-			&((softs->sg_items[i]).sg_handle)) != DDI_SUCCESS) {
+		    softs->dev_info_p,
+		    &addr_dma_attr,
+		    DDI_DMA_SLEEP,
+		    NULL,
+		    &((softs->sg_items[i]).sg_handle)) != DDI_SUCCESS) {
 
 			AMRDB_PRINT((CE_WARN,
 			"Cannot alloc dma handle for s/g table"));
@@ -1100,14 +1106,14 @@ amr_setup_sg(struct amr_softs *softs)
 		}
 
 		if (ddi_dma_mem_alloc((softs->sg_items[i]).sg_handle,
-			sizeof (struct amr_sgentry) * AMR_NSEG,
-			&accattr,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP, NULL,
-			(caddr_t *)(&(softs->sg_items[i]).sg_table),
-			&len,
-			&(softs->sg_items[i]).sg_acc_handle)
-			!= DDI_SUCCESS) {
+		    sizeof (struct amr_sgentry) * AMR_NSEG,
+		    &accattr,
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+		    DDI_DMA_SLEEP, NULL,
+		    (caddr_t *)(&(softs->sg_items[i]).sg_table),
+		    &len,
+		    &(softs->sg_items[i]).sg_acc_handle)
+		    != DDI_SUCCESS) {
 
 			AMRDB_PRINT((CE_WARN,
 			"Cannot allocate DMA memory"));
@@ -1115,15 +1121,15 @@ amr_setup_sg(struct amr_softs *softs)
 		}
 
 		if (ddi_dma_addr_bind_handle(
-			(softs->sg_items[i]).sg_handle,
-			NULL,
-			(caddr_t)((softs->sg_items[i]).sg_table),
-			len,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			NULL,
-			&cookie,
-			&cookien) != DDI_DMA_MAPPED) {
+		    (softs->sg_items[i]).sg_handle,
+		    NULL,
+		    (caddr_t)((softs->sg_items[i]).sg_table),
+		    len,
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+		    DDI_DMA_SLEEP,
+		    NULL,
+		    &cookie,
+		    &cookien) != DDI_DMA_MAPPED) {
 
 			AMRDB_PRINT((CE_WARN,
 			"Cannot bind communication area for s/g table"));
@@ -1192,7 +1198,7 @@ amr_setup_dmamap(struct amr_command *ac, ddi_dma_cookie_t *buffer_dma_cookiep,
 		 */
 		if ((ac->current_cookie + i + 1) != ac->num_of_cookie)
 			ddi_dma_nextcookie(ac->buffer_dma_handle,
-				buffer_dma_cookiep);
+			    buffer_dma_cookiep);
 	}
 
 	ac->transfer_size = size;
@@ -1211,7 +1217,7 @@ amr_enquiry_mapcmd(struct amr_command *ac, uint32_t data_size)
 	uint_t			dma_flags;
 
 	AMRDB_PRINT((CE_NOTE, "Amr_enquiry_mapcmd called, ac=%p, flags=%x",
-			(void *)ac, ac->ac_flags));
+	    (void *)ac, ac->ac_flags));
 
 	if (ac->ac_flags & AMR_CMD_DATAOUT) {
 		dma_flags = DDI_DMA_READ;
@@ -1223,9 +1229,9 @@ amr_enquiry_mapcmd(struct amr_command *ac, uint32_t data_size)
 
 	/* process the DMA by address bind mode */
 	if (ddi_dma_alloc_handle(softs->dev_info_p,
-		&addr_dma_attr, DDI_DMA_SLEEP, NULL,
-		&ac->buffer_dma_handle) !=
-		DDI_SUCCESS) {
+	    &addr_dma_attr, DDI_DMA_SLEEP, NULL,
+	    &ac->buffer_dma_handle) !=
+	    DDI_SUCCESS) {
 
 		AMRDB_PRINT((CE_WARN,
 		"Cannot allocate addr DMA tag"));
@@ -1233,15 +1239,15 @@ amr_enquiry_mapcmd(struct amr_command *ac, uint32_t data_size)
 	}
 
 	if (ddi_dma_mem_alloc(ac->buffer_dma_handle,
-		data_size,
-		&accattr,
-		dma_flags,
-		DDI_DMA_SLEEP,
-		NULL,
-		(caddr_t *)&ac->ac_data,
-		&len,
-		&ac->buffer_acc_handle) !=
-		DDI_SUCCESS) {
+	    data_size,
+	    &accattr,
+	    dma_flags,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    (caddr_t *)&ac->ac_data,
+	    &len,
+	    &ac->buffer_acc_handle) !=
+	    DDI_SUCCESS) {
 
 		AMRDB_PRINT((CE_WARN,
 		"Cannot allocate DMA memory"));
@@ -1249,13 +1255,13 @@ amr_enquiry_mapcmd(struct amr_command *ac, uint32_t data_size)
 	}
 
 	if ((ddi_dma_addr_bind_handle(
-		ac->buffer_dma_handle,
-		NULL, ac->ac_data, len, dma_flags,
-		DDI_DMA_SLEEP, NULL, &ac->buffer_dma_cookie,
-		&ac->num_of_cookie)) != DDI_DMA_MAPPED) {
+	    ac->buffer_dma_handle,
+	    NULL, ac->ac_data, len, dma_flags,
+	    DDI_DMA_SLEEP, NULL, &ac->buffer_dma_cookie,
+	    &ac->num_of_cookie)) != DDI_DMA_MAPPED) {
 
 		AMRDB_PRINT((CE_WARN,
-			"Cannot bind addr for dma"));
+		    "Cannot bind addr for dma"));
 		goto error_out;
 	}
 
@@ -1291,20 +1297,20 @@ static void
 amr_enquiry_unmapcmd(struct amr_command *ac)
 {
 	AMRDB_PRINT((CE_NOTE, "Amr_enquiry_unmapcmd called, ac=%p",
-			(void *)ac));
+	    (void *)ac));
 
 	/* if the command involved data at all and was mapped */
 	if ((ac->ac_flags & AMR_CMD_MAPPED) && ac->ac_data) {
 		if (ac->buffer_dma_handle)
 			(void) ddi_dma_unbind_handle(
-				ac->buffer_dma_handle);
+			    ac->buffer_dma_handle);
 		if (ac->buffer_acc_handle) {
 			ddi_dma_mem_free(&ac->buffer_acc_handle);
 			ac->buffer_acc_handle = NULL;
 		}
 		if (ac->buffer_dma_handle) {
 			(void) ddi_dma_free_handle(
-				&ac->buffer_dma_handle);
+			    &ac->buffer_dma_handle);
 			ac->buffer_dma_handle = NULL;
 		}
 	}
@@ -1325,7 +1331,7 @@ amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg)
 	int	(*cb)(caddr_t);
 
 	AMRDB_PRINT((CE_NOTE, "Amr_mapcmd called, ac=%p, flags=%x",
-			(void *)ac, ac->ac_flags));
+	    (void *)ac, ac->ac_flags));
 
 	if (ac->ac_flags & AMR_CMD_DATAOUT) {
 		dma_flags = DDI_DMA_READ;
@@ -1351,23 +1357,23 @@ amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg)
 	if (!(ac->ac_flags & AMR_CMD_MAPPED)) {
 		/* process the DMA by buffer bind mode */
 		error = ddi_dma_buf_bind_handle(ac->buffer_dma_handle,
-			ac->ac_buf,
-			dma_flags,
-			cb,
-			arg,
-			&ac->buffer_dma_cookie,
-			&ac->num_of_cookie);
+		    ac->ac_buf,
+		    dma_flags,
+		    cb,
+		    arg,
+		    &ac->buffer_dma_cookie,
+		    &ac->num_of_cookie);
 		switch (error) {
 		case DDI_DMA_PARTIAL_MAP:
 			if (ddi_dma_numwin(ac->buffer_dma_handle,
-				&ac->num_of_win) == DDI_FAILURE) {
+			    &ac->num_of_win) == DDI_FAILURE) {
 
 				AMRDB_PRINT((CE_WARN,
-					"Cannot get dma num win"));
+				    "Cannot get dma num win"));
 				(void) ddi_dma_unbind_handle(
-					ac->buffer_dma_handle);
+				    ac->buffer_dma_handle);
 				(void) ddi_dma_free_handle(
-					&ac->buffer_dma_handle);
+				    &ac->buffer_dma_handle);
 				ac->buffer_dma_handle = NULL;
 				return (DDI_FAILURE);
 			}
@@ -1381,10 +1387,10 @@ amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg)
 
 		default:
 			AMRDB_PRINT((CE_WARN,
-				"Cannot bind buf for dma"));
+			    "Cannot bind buf for dma"));
 
 			(void) ddi_dma_free_handle(
-				&ac->buffer_dma_handle);
+			    &ac->buffer_dma_handle);
 			ac->buffer_dma_handle = NULL;
 			return (DDI_FAILURE);
 		}
@@ -1396,9 +1402,9 @@ amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg)
 		/* get the next window */
 		ac->current_win++;
 		(void) ddi_dma_getwin(ac->buffer_dma_handle,
-			ac->current_win, &off, &len,
-			&ac->buffer_dma_cookie,
-			&ac->num_of_cookie);
+		    ac->current_win, &off, &len,
+		    &ac->buffer_dma_cookie,
+		    &ac->num_of_cookie);
 		ac->current_cookie = 0;
 	}
 
@@ -1407,7 +1413,7 @@ amr_mapcmd(struct amr_command *ac, int (*callback)(), caddr_t arg)
 		ac->current_cookie += AMR_NSEG;
 	} else {
 		amr_setup_dmamap(ac, &ac->buffer_dma_cookie,
-		ac->num_of_cookie - ac->current_cookie);
+		    ac->num_of_cookie - ac->current_cookie);
 		ac->current_cookie = AMR_LAST_COOKIE_TAG;
 	}
 
@@ -1421,11 +1427,11 @@ static void
 amr_unmapcmd(struct amr_command *ac)
 {
 	AMRDB_PRINT((CE_NOTE, "Amr_unmapcmd called, ac=%p",
-			(void *)ac));
+	    (void *)ac));
 
 	/* if the command involved data at all and was mapped */
 	if ((ac->ac_flags & AMR_CMD_MAPPED) &&
-		ac->ac_buf && ac->buffer_dma_handle)
+	    ac->ac_buf && ac->buffer_dma_handle)
 		(void) ddi_dma_unbind_handle(ac->buffer_dma_handle);
 
 	ac->ac_flags &= ~AMR_CMD_MAPPED;
@@ -1457,7 +1463,7 @@ amr_setup_tran(dev_info_t  *dip, struct amr_softs *softp)
 	softp->hba_tran->tran_sd		= NULL;
 
 	if (scsi_hba_attach_setup(dip, &buffer_dma_attr, softp->hba_tran,
-		SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
+	    SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
 		scsi_hba_tran_free(softp->hba_tran);
 		softp->hba_tran = NULL;
 		return (DDI_FAILURE);
@@ -1476,7 +1482,7 @@ amr_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	uchar_t			lun = sd->sd_address.a_lun;
 
 	softs = (struct amr_softs *)
-		(sd->sd_address.a_hba_tran->tran_hba_private);
+	    (sd->sd_address.a_hba_tran->tran_hba_private);
 
 	if ((lun == 0) && (target < AMR_MAXLD))
 		if (softs->logic_drive[target].al_state != AMR_LDRV_OFFLINE)
@@ -1496,12 +1502,12 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	struct amr_command	*ac;
 
 	AMRDB_PRINT((CE_NOTE, "amr_tran_start, cmd=%X,target=%d,lun=%d",
-		cdbp->scc_cmd, ap->a_target, ap->a_lun));
+	    cdbp->scc_cmd, ap->a_target, ap->a_lun));
 
 	softs = (struct amr_softs *)(ap->a_hba_tran->tran_hba_private);
 	if ((ap->a_lun != 0) || (ap->a_target >= AMR_MAXLD) ||
-		(softs->logic_drive[ap->a_target].al_state ==
-			AMR_LDRV_OFFLINE)) {
+	    (softs->logic_drive[ap->a_target].al_state ==
+	    AMR_LDRV_OFFLINE)) {
 		cmn_err(CE_WARN, "target or lun is not correct!");
 		ret = TRAN_BADPKT;
 		return (ret);
@@ -1524,9 +1530,9 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		if (pkt->pkt_flags & FLAG_NOINTR) {
 			(void) amr_poll_command(ac);
 			pkt->pkt_state |= (STATE_GOT_BUS
-					| STATE_GOT_TARGET
-					| STATE_SENT_CMD
-					| STATE_XFERRED_DATA);
+			    | STATE_GOT_TARGET
+			    | STATE_SENT_CMD
+			    | STATE_XFERRED_DATA);
 			*pkt->pkt_scbp = 0;
 			pkt->pkt_statistics |= STAT_SYNC;
 			pkt->pkt_reason = CMD_CMPLT;
@@ -1570,13 +1576,13 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 				/* Enable Tag Queue */
 				inqp.inq_cmdque = 1;
 				bcopy("MegaRaid", inqp.inq_vid,
-					sizeof (inqp.inq_vid));
+				    sizeof (inqp.inq_vid));
 				bcopy(softs->amr_product_info.pi_product_name,
-					inqp.inq_pid,
-					AMR_PRODUCT_INFO_SIZE);
+				    inqp.inq_pid,
+				    AMR_PRODUCT_INFO_SIZE);
 				bcopy(softs->amr_product_info.pi_firmware_ver,
-					inqp.inq_revision,
-					AMR_FIRMWARE_VER_SIZE);
+				    inqp.inq_revision,
+				    AMR_FIRMWARE_VER_SIZE);
 			}
 
 			amr_unmapcmd(ac);
@@ -1584,14 +1590,14 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			if (bp->b_flags & (B_PHYS | B_PAGEIO))
 				bp_mapin(bp);
 			bcopy(&inqp, bp->b_un.b_addr,
-				sizeof (struct scsi_inquiry));
+			    sizeof (struct scsi_inquiry));
 
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
 		pkt->pkt_reason = CMD_CMPLT;
 		pkt->pkt_state |= (STATE_GOT_BUS
-				| STATE_GOT_TARGET
-				| STATE_SENT_CMD);
+		    | STATE_GOT_TARGET
+		    | STATE_SENT_CMD);
 		*pkt->pkt_scbp = 0;
 		ret = TRAN_ACCEPT;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
@@ -1614,9 +1620,9 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		}
 		pkt->pkt_reason = CMD_CMPLT;
 		pkt->pkt_state |= (STATE_GOT_BUS
-				| STATE_GOT_TARGET
-				| STATE_SENT_CMD
-				| STATE_XFERRED_DATA);
+		    | STATE_GOT_TARGET
+		    | STATE_SENT_CMD
+		    | STATE_XFERRED_DATA);
 		*pkt->pkt_scbp = 0;
 		ret = TRAN_ACCEPT;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
@@ -1632,9 +1638,9 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 		pkt->pkt_reason = CMD_CMPLT;
 		pkt->pkt_state |= (STATE_GOT_BUS
-				| STATE_GOT_TARGET
-				| STATE_SENT_CMD
-				| STATE_XFERRED_DATA);
+		    | STATE_GOT_TARGET
+		    | STATE_SENT_CMD
+		    | STATE_XFERRED_DATA);
 		*pkt->pkt_scbp = 0;
 		ret = TRAN_ACCEPT;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
@@ -1657,8 +1663,8 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		}
 		pkt->pkt_reason = CMD_CMPLT;
 		pkt->pkt_state |= (STATE_GOT_BUS
-				| STATE_GOT_TARGET
-				| STATE_SENT_CMD);
+		    | STATE_GOT_TARGET
+		    | STATE_SENT_CMD);
 		ret = TRAN_ACCEPT;
 		*pkt->pkt_scbp = 0;
 		if (!(pkt->pkt_flags & FLAG_NOINTR))
@@ -1669,10 +1675,10 @@ amr_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		amr_unmapcmd(ac);
 		pkt->pkt_reason = CMD_INCOMPLETE;
 		pkt->pkt_state = (STATE_GOT_BUS
-				| STATE_GOT_TARGET
-				| STATE_SENT_CMD
-				| STATE_GOT_STATUS
-				| STATE_ARQ_DONE);
+		    | STATE_GOT_TARGET
+		    | STATE_SENT_CMD
+		    | STATE_GOT_STATUS
+		    | STATE_ARQ_DONE);
 		ret = TRAN_ACCEPT;
 		*pkt->pkt_scbp = 0;
 		amr_set_arq_data(pkt, KEY_ILLEGAL_REQUEST);
@@ -1714,14 +1720,14 @@ amr_tran_reset(struct scsi_address *ap, int level)
 		/* Acknowledge the card if there are any significant commands */
 		while (softs->amr_busyslots > 0) {
 			AMR_DELAY((softs->mailbox->mb_busy == 0),
-					AMR_RETRYCOUNT, done_flag);
+			    AMR_RETRYCOUNT, done_flag);
 			if (!done_flag) {
 				/*
 				 * command not completed, indicate the
 				 * problem and continue get ac
 				 */
 				cmn_err(CE_WARN,
-					"AMR command is not completed");
+				    "AMR command is not completed");
 				return (0);
 			}
 
@@ -1729,7 +1735,7 @@ amr_tran_reset(struct scsi_address *ap, int level)
 
 			/* wait for the acknowledge from hardware */
 			AMR_BUSYWAIT(!(AMR_QGET_IDB(softs) & AMR_QIDB_ACK),
-					AMR_RETRYCOUNT, done_flag);
+			    AMR_RETRYCOUNT, done_flag);
 			if (!done_flag) {
 				/*
 				 * command is not completed, return from the
@@ -1760,10 +1766,10 @@ amr_tran_reset(struct scsi_address *ap, int level)
 		 *	 cases, the core file will be fine.
 		 */
 		cmn_err(CE_WARN, "This system contains a SCSI HBA card/driver "
-				"that doesn't support software reset. This "
-				"means that memory being used by the HBA for "
-				"DMA based reads could have been updated after "
-				"we panic'd.");
+		    "that doesn't support software reset. This "
+		    "means that memory being used by the HBA for "
+		    "DMA based reads could have been updated after "
+		    "we panic'd.");
 		return (1);
 	} else {
 		/* return failure to sd */
@@ -1813,8 +1819,8 @@ amr_tran_setcap(struct scsi_address *ap, char *cap, int value,
 	 */
 	if (cap == NULL || whom == 0) {
 		AMRDB_PRINT((CE_NOTE,
-			"Set Cap not supported, string = %s, whom=%d",
-			cap, whom));
+		    "Set Cap not supported, string = %s, whom=%d",
+		    cap, whom));
 		return (-1);
 	}
 
@@ -1845,8 +1851,8 @@ amr_tran_init_pkt(struct scsi_address *ap,
 	softs = (struct amr_softs *)(ap->a_hba_tran->tran_hba_private);
 
 	if ((ap->a_lun != 0)||(ap->a_target >= AMR_MAXLD)||
-		(softs->logic_drive[ap->a_target].al_state ==
-			AMR_LDRV_OFFLINE)) {
+	    (softs->logic_drive[ap->a_target].al_state ==
+	    AMR_LDRV_OFFLINE)) {
 		return (NULL);
 	}
 
@@ -1855,8 +1861,8 @@ amr_tran_init_pkt(struct scsi_address *ap,
 		slen = MAX(statuslen, sizeof (struct scsi_arq_status));
 
 		pkt = scsi_hba_pkt_alloc(softs->dev_info_p, ap, cmdlen,
-			slen, tgtlen, sizeof (struct amr_command),
-			callback, arg);
+		    slen, tgtlen, sizeof (struct amr_command),
+		    callback, arg);
 		if (pkt == NULL) {
 			AMRDB_PRINT((CE_WARN, "scsi_hba_pkt_alloc failed"));
 			return (NULL);
@@ -1881,11 +1887,11 @@ amr_tran_init_pkt(struct scsi_address *ap,
 		}
 
 		if (ddi_dma_alloc_handle(softs->dev_info_p, &buffer_dma_attr,
-			DDI_DMA_SLEEP, NULL,
-			&ac->buffer_dma_handle) != DDI_SUCCESS) {
+		    DDI_DMA_SLEEP, NULL,
+		    &ac->buffer_dma_handle) != DDI_SUCCESS) {
 
 			AMRDB_PRINT((CE_WARN,
-				"Cannot allocate buffer DMA tag"));
+			    "Cannot allocate buffer DMA tag"));
 			scsi_hba_pkt_free(ap, pkt);
 			return (NULL);
 
@@ -1922,9 +1928,9 @@ amr_tran_init_pkt(struct scsi_address *ap,
 	pkt->pkt_resid = bp->b_bcount - ac->data_transfered;
 
 	AMRDB_PRINT((CE_NOTE,
-		"init pkt, pkt_resid=%d, b_bcount=%d, data_transfered=%d",
-		(uint32_t)pkt->pkt_resid, (uint32_t)bp->b_bcount,
-		ac->data_transfered));
+	    "init pkt, pkt_resid=%d, b_bcount=%d, data_transfered=%d",
+	    (uint32_t)pkt->pkt_resid, (uint32_t)bp->b_bcount,
+	    ac->data_transfered));
 
 	ASSERT(pkt->pkt_resid >= 0);
 
@@ -1955,8 +1961,8 @@ amr_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	if (ac->buffer_dma_handle) {
 		(void) ddi_dma_sync(ac->buffer_dma_handle, 0, 0,
-			(ac->ac_flags & AMR_CMD_DATAIN) ?
-			DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
+		    (ac->ac_flags & AMR_CMD_DATAIN) ?
+		    DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
 	}
 }
 
@@ -1991,9 +1997,9 @@ amr_rw_command(struct amr_softs *softs, struct scsi_pkt *pkt, int target)
 
 	ac->mailbox.mb_command = cmd;
 	ac->mailbox.mb_blkcount =
-		(ac->transfer_size + AMR_BLKSIZE - 1)/AMR_BLKSIZE;
+	    (ac->transfer_size + AMR_BLKSIZE - 1)/AMR_BLKSIZE;
 	ac->mailbox.mb_lba = (ac->cmdlen == 10) ?
-				GETG1ADDR(cdbp) : GETG0ADDR(cdbp);
+	    GETG1ADDR(cdbp) : GETG0ADDR(cdbp);
 	ac->mailbox.mb_drive = (uint8_t)target;
 }
 
@@ -2019,7 +2025,7 @@ amr_mode_sense(union scsi_cdb *cdbp, struct buf *bp, unsigned int capacity)
 		headerp->bdesc_length = MODE_BLK_DESC_LENGTH;
 
 		page3p = (struct mode_format *)((caddr_t)headerp +
-			MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+		    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
 		page3p->mode_page.code = BE_8(SD_MODE_SENSE_PAGE3_CODE);
 		page3p->mode_page.length = BE_8(sizeof (struct mode_format));
 		page3p->data_bytes_sect = BE_16(AMR_DEFAULT_SECTORS);
@@ -2032,7 +2038,7 @@ amr_mode_sense(union scsi_cdb *cdbp, struct buf *bp, unsigned int capacity)
 		headerp->bdesc_length = MODE_BLK_DESC_LENGTH;
 
 		page4p = (struct mode_geometry *)((caddr_t)headerp +
-			MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+		    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
 		page4p->mode_page.code = BE_8(SD_MODE_SENSE_PAGE4_CODE);
 		page4p->mode_page.length = BE_8(sizeof (struct mode_geometry));
 		page4p->heads = BE_8(AMR_DEFAULT_HEADS);
@@ -2060,7 +2066,7 @@ amr_set_arq_data(struct scsi_pkt *pkt, uchar_t key)
 	arqstat->sts_rqpkt_reason = CMD_CMPLT;
 	arqstat->sts_rqpkt_resid = 0;
 	arqstat->sts_rqpkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
-				STATE_SENT_CMD | STATE_XFERRED_DATA;
+	    STATE_SENT_CMD | STATE_XFERRED_DATA;
 	arqstat->sts_rqpkt_statistics = 0;
 	arqstat->sts_sensedata.es_valid = 1;
 	arqstat->sts_sensedata.es_class = CLASS_EXTENDED_SENSE;
@@ -2105,15 +2111,16 @@ amr_start_waiting_queue(void *softp)
 					softs->amr_busyslots++;
 
 					bcopy(ac->sgtable,
-					softs->sg_items[slot].sg_table,
-					sizeof (struct amr_sgentry) * AMR_NSEG);
+					    softs->sg_items[slot].sg_table,
+					    sizeof (struct amr_sgentry) *
+					    AMR_NSEG);
 
 					(void) ddi_dma_sync(
-					softs->sg_items[slot].sg_handle,
-					0, 0, DDI_DMA_SYNC_FORDEV);
+					    softs->sg_items[slot].sg_handle,
+					    0, 0, DDI_DMA_SYNC_FORDEV);
 
 					ac->mailbox.mb_physaddr =
-					softs->sg_items[slot].sg_phyaddr;
+					    softs->sg_items[slot].sg_phyaddr;
 				}
 
 				/* take the cmd from the queue */
@@ -2130,26 +2137,26 @@ amr_start_waiting_queue(void *softp)
 				softs->mailbox->mb_ack = 0;
 
 				AMR_DELAY((softs->mailbox->mb_busy == 0),
-					AMR_RETRYCOUNT, done_flag);
+				    AMR_RETRYCOUNT, done_flag);
 				if (!done_flag) {
 					/*
 					 * command not completed, indicate the
 					 * problem and continue get ac
 					 */
 					cmn_err(CE_WARN,
-						"AMR command is not completed");
+					    "AMR command is not completed");
 					break;
 				}
 
 				bcopy(&ac->mailbox, (void *)softs->mailbox,
-					AMR_MBOX_CMDSIZE);
+				    AMR_MBOX_CMDSIZE);
 				ac->ac_flags |= AMR_CMD_BUSY;
 
 				(void) ddi_dma_sync(softs->mbox_dma_handle,
-					0, 0, DDI_DMA_SYNC_FORDEV);
+				    0, 0, DDI_DMA_SYNC_FORDEV);
 
 				AMR_QPUT_IDB(softs,
-					softs->mbox_phyaddr | AMR_QIDB_SUBMIT);
+				    softs->mbox_phyaddr | AMR_QIDB_SUBMIT);
 
 				/*
 				 * current ac is submitted
@@ -2189,11 +2196,11 @@ amr_done(struct amr_softs *softs)
 
 	if (softs->mailbox->mb_nstatus != 0) {
 		(void) ddi_dma_sync(softs->mbox_dma_handle,
-			0, 0, DDI_DMA_SYNC_FORCPU);
+		    0, 0, DDI_DMA_SYNC_FORCPU);
 
 		/* save mailbox, which contains a list of completed commands */
 		bcopy((void *)(uintptr_t)(volatile void *)softs->mailbox,
-				&mbsave, sizeof (mbsave));
+		    &mbsave, sizeof (mbsave));
 
 		mbox = &mbsave;
 
@@ -2201,7 +2208,7 @@ amr_done(struct amr_softs *softs)
 
 		/* wait for the acknowledge from hardware */
 		AMR_BUSYWAIT(!(AMR_QGET_IDB(softs) & AMR_QIDB_ACK),
-				AMR_RETRYCOUNT, done_flag);
+		    AMR_RETRYCOUNT, done_flag);
 		if (!done_flag) {
 			/*
 			 * command is not completed, return from the current
@@ -2240,7 +2247,7 @@ amr_done(struct amr_softs *softs)
 				}
 			} else {
 				AMRDB_PRINT((CE_WARN,
-					"ac in mailbox is NULL!"));
+				    "ac in mailbox is NULL!"));
 			}
 		}
 	} else {
@@ -2255,7 +2262,7 @@ amr_done(struct amr_softs *softs)
 
 	/* dispatch a thread to process the pending I/O if there is any */
 	if ((ddi_taskq_dispatch(softs->amr_taskq, amr_start_waiting_queue,
-		(void *)softs, DDI_NOSLEEP)) != DDI_SUCCESS) {
+	    (void *)softs, DDI_NOSLEEP)) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "No memory available to dispatch taskq");
 	}
 }
@@ -2278,19 +2285,19 @@ amr_call_pkt_comp(register struct amr_command *head)
 
 		if (ac->ac_status == AMR_STATUS_SUCCESS) {
 			pkt->pkt_state |= (STATE_GOT_BUS
-					| STATE_GOT_TARGET
-					| STATE_SENT_CMD
-					| STATE_XFERRED_DATA);
+			    | STATE_GOT_TARGET
+			    | STATE_SENT_CMD
+			    | STATE_XFERRED_DATA);
 			pkt->pkt_reason = CMD_CMPLT;
 		} else {
 			pkt->pkt_state |= STATE_GOT_BUS
-					| STATE_ARQ_DONE;
+			    | STATE_ARQ_DONE;
 			pkt->pkt_reason = CMD_INCOMPLETE;
 			amr_set_arq_data(pkt, KEY_HARDWARE_ERROR);
 		}
 
 		if (!(pkt->pkt_flags & FLAG_NOINTR) &&
-			pkt->pkt_comp) {
+		    pkt->pkt_comp) {
 			(*pkt->pkt_comp)(pkt);
 		}
 	}

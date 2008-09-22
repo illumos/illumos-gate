@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * esp - Emulex SCSI Processor host adapter driver with FAS101/236,
@@ -389,14 +388,15 @@ static struct dev_ops esp_ops = {
 	nodev,			/* reset */
 	NULL,			/* cb ops */
 	NULL,			/* bus operations */
-	ddi_power		/* power */
+	ddi_power,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	"ESP SCSI HBA Driver v%I%", /* Name of the module. */
+	"ESP SCSI HBA Driver", /* Name of the module. */
 	&esp_ops,	/* driver ops */
 };
 
@@ -501,8 +501,8 @@ esp_scsi_tgt_probe(struct scsi_device *sd,
 		if (options != -1) {
 			esp->e_target_scsi_options[tgt] = options;
 			esplog(esp, CE_NOTE,
-				"?target%x-scsi-options = 0x%x\n", tgt,
-				esp->e_target_scsi_options[tgt]);
+			    "?target%x-scsi-options = 0x%x\n", tgt,
+			    esp->e_target_scsi_options[tgt]);
 
 			if (options & SCSI_OPTIONS_FAST) {
 				esp->e_default_period[tgt] = (uchar_t)
@@ -518,7 +518,7 @@ esp_scsi_tgt_probe(struct scsi_device *sd,
 	mutex_exit(ESP_MUTEX);
 
 	IPRINTF2("target%x-scsi-options = 0x%x\n",
-		tgt, esp->e_target_scsi_options[tgt]);
+	    tgt, esp->e_target_scsi_options[tgt]);
 
 	return (rval);
 }
@@ -530,8 +530,8 @@ esp_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
 	return (((sd->sd_address.a_target < NTARGETS) &&
-		(sd->sd_address.a_lun < NLUNS_PER_TARGET)) ?
-		DDI_SUCCESS : DDI_FAILURE);
+	    (sd->sd_address.a_lun < NLUNS_PER_TARGET)) ?
+	    DDI_SUCCESS : DDI_FAILURE);
 }
 
 static char *prop_cfreq = "clock-frequency";
@@ -815,7 +815,7 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (i = 0; i < NTARGETS; i++) {
 		esp->e_qfull_retries[i] = QFULL_RETRIES;
 		esp->e_qfull_retry_interval[i] =
-			drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
+		    drv_usectohz(QFULL_RETRY_INTERVAL * 1000);
 	}
 
 	esp->e_reg = ep;
@@ -874,11 +874,11 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (i = 0; i < NTARGETS; i++) {
 		(void) sprintf(prop_str, prop_template, i);
 		esp->e_target_scsi_options[i] = ddi_prop_get_int(
-			DDI_DEV_T_ANY, dip, 0, prop_str, -1);
+		    DDI_DEV_T_ANY, dip, 0, prop_str, -1);
 		if (esp->e_target_scsi_options[i] != -1) {
 			esplog(esp, CE_NOTE,
-				"?target%d_scsi_options=0x%x\n",
-				i, esp->e_target_scsi_options[i]);
+			    "?target%d_scsi_options=0x%x\n",
+			    i, esp->e_target_scsi_options[i]);
 			esp->e_target_scsi_options_defined |= 1 << i;
 		} else {
 			esp->e_target_scsi_options[i] = esp->e_scsi_options;
@@ -908,8 +908,8 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    esp->e_scsi_reset_delay, scsi_reset_delay);
 	if (esp->e_scsi_reset_delay == 0) {
 		esplog(esp, CE_NOTE,
-			"scsi_reset_delay of 0 is not recommended,"
-			" resetting to SCSI_DEFAULT_RESET_DELAY\n");
+		    "scsi_reset_delay of 0 is not recommended,"
+		    " resetting to SCSI_DEFAULT_RESET_DELAY\n");
 		esp->e_scsi_reset_delay = SCSI_DEFAULT_RESET_DELAY;
 	}
 	if (esp->e_scsi_reset_delay != scsi_reset_delay) {
@@ -958,12 +958,12 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	(void) sprintf(buf, "esp%d", instance);
 	esp->e_intr_kstat = kstat_create("esp", instance, buf, "controller", \
-			KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (esp->e_intr_kstat)
 		kstat_install(esp->e_intr_kstat);
 
 	if (ddi_add_intr(dip, (uint_t)0, &esp->e_iblock, NULL, esp_intr,
-								(caddr_t)esp)) {
+	    (caddr_t)esp)) {
 		cmn_err(CE_WARN, "esp: cannot add intr");
 		goto fail;
 	}
@@ -981,7 +981,7 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (esp_softc == esp) {
 		esp_scsi_watchdog_tick =
 		    ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-			"scsi-watchdog-tick", scsi_watchdog_tick);
+		    "scsi-watchdog-tick", scsi_watchdog_tick);
 		if (esp_scsi_watchdog_tick != scsi_watchdog_tick) {
 			esplog(esp, CE_NOTE, "scsi-watchdog-tick=%d\n",
 			    esp_scsi_watchdog_tick);
@@ -1044,9 +1044,9 @@ esp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	(void) sprintf(buf, "esp%d_cache", instance);
 	esp->e_kmem_cache = kmem_cache_create(buf,
-		ESP_CMD_SIZE, 8,
-		esp_kmem_cache_constructor, esp_kmem_cache_destructor,
-		NULL, (void *)esp, NULL, 0);
+	    ESP_CMD_SIZE, 8,
+	    esp_kmem_cache_constructor, esp_kmem_cache_destructor,
+	    NULL, (void *)esp, NULL, 0);
 	if (esp->e_kmem_cache == NULL) {
 		cmn_err(CE_WARN, "esp: cannot create kmem_cache");
 		goto fail;
@@ -1266,7 +1266,7 @@ esp_dr_detach(dev_info_t *dev)
 			 * unusable.
 			 */
 			cmn_err(CE_WARN, "esp_dr_detach: esp instance not"
-				" in softc list!");
+			    " in softc list!");
 			rw_exit(&esp_global_rwlock);
 			return (DDI_FAILURE);
 		}
@@ -1461,8 +1461,8 @@ esp_determine_chip_type(struct esp *esp)
 	esp->e_stval = ESP_CLOCK_TIMEOUT(ticks, esp_selection_timeout);
 
 	IPRINTF5("%d mhz, clock_conv %d, clock_cycle %d, ticks %ld, stval %d\n",
-		i, esp->e_clock_conv, esp->e_clock_cycle,
-		ticks, esp->e_stval);
+	    i, esp->e_clock_conv, esp->e_clock_cycle,
+	    ticks, esp->e_stval);
 
 	ep->esp_conf2 = 0;
 	ep->esp_conf2 = 0xa;
@@ -1518,7 +1518,7 @@ esp_determine_chip_type(struct esp *esp)
 	 */
 	if ((esp->e_type == FAST) && (esp->e_weak == 0)) {
 		esp_internal_reset(esp,
-			ESP_RESET_SOFTC|ESP_RESET_ESP|ESP_RESET_DMA);
+		    ESP_RESET_SOFTC|ESP_RESET_ESP|ESP_RESET_DMA);
 	} else {
 		esp_internal_reset(esp, ESP_RESET_ALL);
 	}
@@ -1604,7 +1604,7 @@ esp_hw_reset(struct esp *esp, int action)
 	if (action & ESP_RESET_DMA) {
 		int burstsizes = esp->e_dma_attr->dma_attr_burstsizes;
 		burstsizes &= (ddi_dma_burstsizes(esp->e_dmahandle) &
-			esp_burst_sizes_limit);
+		    esp_burst_sizes_limit);
 
 		ESP_FLUSH_DMA(esp);
 		dmar->dmaga_csr = DMAGA_RESET;
@@ -1742,7 +1742,7 @@ esp_hw_reset(struct esp *esp, int action)
 			ep->esp_conf2 = esp->e_espconf2;
 			esp->e_req_ack_delay = DEFAULT_REQ_ACK_DELAY_101;
 			esp->e_options |= ESP_OPT_DMA_OUT_TAG | ESP_OPT_FAS |
-				ESP_OPT_ACCEPT_STEP567;
+			    ESP_OPT_ACCEPT_STEP567;
 			break;
 
 		case ESP236:
@@ -1753,7 +1753,7 @@ esp_hw_reset(struct esp *esp, int action)
 			ep->esp_conf2 = esp->e_espconf2;
 			ep->esp_conf3 = esp->e_espconf3[0];
 			esp->e_options |= ESP_OPT_DMA_OUT_TAG |
-						ESP_OPT_SLOW_FIFO_FLUSH;
+			    ESP_OPT_SLOW_FIFO_FLUSH;
 			break;
 
 		case ESP100A:
@@ -1786,7 +1786,7 @@ esp_hw_reset(struct esp *esp, int action)
 		 * look up esp-options property
 		 */
 		esp->e_options = ddi_prop_get_int(DDI_DEV_T_ANY,
-			esp->e_dev, 0, "esp-options", esp->e_options);
+		    esp->e_dev, 0, "esp-options", esp->e_options);
 
 		esplog(esp, CE_NOTE, "?esp-options=0x%x\n", esp->e_options);
 
@@ -1911,8 +1911,8 @@ esp_destroy_callback_thread(struct esp *esp)
 		struct callback_info	*tci, **pci;
 
 	IPRINTF2("esp_destroy_callback_thread: "
-		    "killing callback 0x%p thread %d\n",
-		    (void *)esp->e_callback_info, ci->c_id);
+	    "killing callback 0x%p thread %d\n",
+	    (void *)esp->e_callback_info, ci->c_id);
 		mutex_enter(&ci->c_mutex);
 		ci->c_exit = 1;			/* die */
 
@@ -1939,8 +1939,8 @@ esp_destroy_callback_thread(struct esp *esp)
 				cv_destroy(&ci->c_cvd);
 				mutex_destroy(&ci->c_mutex);
 				kmem_free(ci, sizeof (struct callback_info));
-			IPRINTF1("esp_destroy_callback_thread:%p freed\n",
-				    (void *)ci);
+				IPRINTF1("esp_destroy_callback_thread:%p"
+				    " freed\n", (void *)ci);
 				esp->e_callback_info = NULL;
 				break;
 			}
@@ -2034,7 +2034,7 @@ esp_callback(struct esp *esp)
 	_NOTE(NO_COMPETING_THREADS_NOW);
 	mutex_init(&cpr_mutex, NULL, MUTEX_DRIVER, esp->e_iblock);
 	CALLB_CPR_INIT(&cpr_info,
-		&cpr_mutex, callb_generic_cpr, "esp_callback");
+	    &cpr_mutex, callb_generic_cpr, "esp_callback");
 #ifndef lint
 	_NOTE(COMPETING_THREADS_NOW);
 #endif
@@ -2049,7 +2049,7 @@ esp_callback(struct esp *esp)
 
 	for (;;) {
 		TRACE_0(TR_FAC_SCSI, TR_ESP_CALLBACK_START,
-			"esp_callback_start");
+		    "esp_callback_start");
 		while (cb_info->c_qf) {
 			sp = cb_info->c_qf;
 			cb_info->c_qf = sp->cmd_forw;
@@ -2147,7 +2147,7 @@ esp_callback(struct esp *esp)
 		}
 
 		TRACE_1(TR_FAC_SCSI, TR_ESP_CALLBACK_END,
-			"esp_callback_end: (%d)", serviced);
+		    "esp_callback_end: (%d)", serviced);
 
 		/*
 		 * reset serviced and wakeups; if these numbers get too high
@@ -2185,7 +2185,7 @@ esp_callback(struct esp *esp)
 	cmn_err(CE_CONT, "esp cb%d.%d exits\n", cb_info->c_id, id);
 #endif
 	TRACE_1(TR_FAC_SCSI, TR_ESP_CALLBACK_END,
-		"esp_callback_end:  (%d)", n);
+	    "esp_callback_end:  (%d)", n);
 #ifndef __lock_lint
 	mutex_enter(&cpr_mutex);
 	CALLB_CPR_EXIT(&cpr_info);
@@ -2232,8 +2232,8 @@ esp_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	if (sp->cmd_flags & CFLAG_DMAVALID) {
 		i = ddi_dma_sync(sp->cmd_dmahandle, 0, 0,
-			(sp->cmd_flags & CFLAG_DMASEND) ?
-			DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
+		    (sp->cmd_flags & CFLAG_DMASEND) ?
+		    DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
 		if (i != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "esp: sync pkt failed");
 		}
@@ -2281,7 +2281,7 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 
 			cmd->cmd_pkt.pkt_scbp = (opaque_t)cmd->cmd_scb;
 			cmd->cmd_cdblen_alloc = cmd->cmd_cdblen =
-				(uchar_t)cmdlen;
+			    (uchar_t)cmdlen;
 			cmd->cmd_scblen		= statuslen;
 			cmd->cmd_privlen	= tgtlen;
 			cmd->cmd_pkt.pkt_address = *ap;
@@ -2302,8 +2302,8 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			}
 			if (failure) {
 				TRACE_0(TR_FAC_SCSI,
-					TR_ESP_SCSI_IMPL_PKTALLOC_END,
-					"esp_scsi_pktalloc_end");
+				    TR_ESP_SCSI_IMPL_PKTALLOC_END,
+				    "esp_scsi_pktalloc_end");
 				return (NULL);
 			}
 		}
@@ -2311,7 +2311,7 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		new_cmd = cmd;
 
 		TRACE_0(TR_FAC_SCSI, TR_ESP_SCSI_IMPL_PKTALLOC_END,
-			"esp_scsi_pktalloc_end");
+		    "esp_scsi_pktalloc_end");
 	} else {
 		cmd = (struct esp_cmd *)pkt->pkt_ha_private;
 		new_cmd = NULL;
@@ -2346,8 +2346,8 @@ esp_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		ASSERT(cmd->cmd_dmahandle != NULL);
 
 		rval = ddi_dma_buf_bind_handle(cmd->cmd_dmahandle, bp,
-			dma_flags, callback, arg, &cmd->cmd_dmacookie,
-			&dmacookie_count);
+		    dma_flags, callback, arg, &cmd->cmd_dmacookie,
+		    &dmacookie_count);
 dma_failure:
 		if (rval && rval != DDI_DMA_PARTIAL_MAP) {
 			switch (rval) {
@@ -2368,7 +2368,7 @@ dma_failure:
 				esp_scsi_destroy_pkt(ap, &new_cmd->cmd_pkt);
 			}
 			TRACE_0(TR_FAC_SCSI, TR_SCSI_IMPL_DMAGET_END,
-				"esp_scsi_dmaget_end");
+			    "esp_scsi_dmaget_end");
 			return ((struct scsi_pkt *)NULL);
 		}
 		ASSERT(dmacookie_count == 1);
@@ -2504,7 +2504,7 @@ esp_kmem_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	struct esp_cmd *cmd = buf;
 	struct esp *esp = cdrarg;
 	int  (*callback)(caddr_t) = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP:
-					DDI_DMA_DONTWAIT;
+	    DDI_DMA_DONTWAIT;
 
 	bzero(cmd, ESP_CMD_SIZE);
 
@@ -2609,7 +2609,7 @@ esp_prepare_pkt(struct esp *esp, struct esp_cmd *sp)
 		sp->cmd_data_count = sp->cmd_saved_data_count = 0;
 
 		if ((sp->cmd_flags & (CFLAG_CMDIOPB | CFLAG_DMASEND)) ==
-			(CFLAG_CMDIOPB | CFLAG_DMASEND)) {
+		    (CFLAG_CMDIOPB | CFLAG_DMASEND)) {
 			(void) ddi_dma_sync(sp->cmd_dmahandle, 0, (uint_t)-1,
 			    DDI_DMA_SYNC_FORDEV);
 		}
@@ -2643,10 +2643,10 @@ esp_prepare_pkt(struct esp *esp, struct esp_cmd *sp)
 			sp->cmd_pkt.pkt_flags &= ~FLAG_NODISCON;
 			sp->cmd_pkt.pkt_flags |= 0x80000000;
 			esplog(esp, CE_NOTE,
-				"starting untagged cmd, target=%d,"
-				" tcmds=%d, sp=0x%p, throttle=%d\n",
-				Tgt(sp), esp->e_tcmds[slot], (void *)sp,
-				esp->e_throttle[slot]);
+			    "starting untagged cmd, target=%d,"
+			    " tcmds=%d, sp=0x%p, throttle=%d\n",
+			    Tgt(sp), esp->e_tcmds[slot], (void *)sp,
+			    esp->e_throttle[slot]);
 			esp_test_untagged = -10;
 		}
 	}
@@ -2965,21 +2965,21 @@ _esp_start(struct esp *esp, struct esp_cmd *sp, int flag)
 				}
 			}
 		} else if ((esp->e_tcmds[slot] >= esp->e_throttle[slot]) &&
-			    (esp->e_throttle[slot] > HOLD_THROTTLE) &&
-			    (flag == TRAN_BUSY_OK)) {
-				IPRINTF2(
-				    "transport busy, slot=%x, ncmds=%x\n",
-				    slot, esp->e_ncmds);
-				rval = TRAN_BUSY;
-				esp->e_ncmds--;
-				sp->cmd_flags &= ~CFLAG_PREPARED;
+		    (esp->e_throttle[slot] > HOLD_THROTTLE) &&
+		    (flag == TRAN_BUSY_OK)) {
+			IPRINTF2(
+			    "transport busy, slot=%x, ncmds=%x\n",
+			    slot, esp->e_ncmds);
+			rval = TRAN_BUSY;
+			esp->e_ncmds--;
+			sp->cmd_flags &= ~CFLAG_PREPARED;
 #ifdef ESPDEBUG
-				sp->cmd_flags &= ~CFLAG_IN_TRANSPORT;
+			sp->cmd_flags &= ~CFLAG_IN_TRANSPORT;
 #endif
 #ifdef ESP_PERF
-				esp_request_count--;
+			esp_request_count--;
 #endif
-				goto done;
+			goto done;
 		} else {
 			struct esp_cmd *dp = esp->e_readyb[slot];
 
@@ -3011,7 +3011,7 @@ _esp_start(struct esp *esp, struct esp_cmd *sp, int flag)
 		 * throttle now (t_cmds is always zero for non-tagged)
 		 */
 		if ((esp->e_tcmds[slot] == 0) && (esp->e_throttle[slot] ==
-			DRAIN_THROTTLE)) {
+		    DRAIN_THROTTLE)) {
 			IPRINTF("reset throttle\n");
 			esp->e_throttle[slot] = CLEAR_THROTTLE;
 		}
@@ -3270,7 +3270,7 @@ esp_startcmd(struct esp *esp, struct esp_cmd *sp)
 #ifdef ESPDEBUG
 	if (esp->e_cur_slot != ((target * NLUNS_PER_TARGET) | lun)) {
 		eprintf(esp, "cur_slot=%x, target=%x, lun=%x, sp=0x%p\n",
-		esp->e_cur_slot, target, lun, (void *)sp);
+		    esp->e_cur_slot, target, lun, (void *)sp);
 		debug_enter("esp_startcmd");
 	}
 	ASSERT((sp->cmd_flags & CFLAG_FREE) == 0);
@@ -3318,7 +3318,7 @@ esp_startcmd(struct esp *esp, struct esp_cmd *sp)
 		ESP_PREEMPT(esp);
 		LOG_STATE(esp, ACTS_PREEMPTED, esp->e_stat, Tgt(sp), lun);
 		TRACE_0(TR_FAC_SCSI, TR_ESP_STARTCMD_PREEMPT_CALL,
-			"esp_startcmd_preempt_call");
+		    "esp_startcmd_preempt_call");
 		/*
 		 * put request back in the ready queue
 		 * runpoll will retry NOINTR cmds so no need to put
@@ -3447,10 +3447,10 @@ esp_startcmd(struct esp *esp, struct esp_cmd *sp)
 		cmd = CMD_SEL_STOP | CMD_DMA;
 		cmd_len = 0;
 		LOG_STATE(esp, ACTS_PROXY, esp->e_stat,
-			esp->e_cur_msgout[0], nstate);
+		    esp->e_cur_msgout[0], nstate);
 
 	} else if (((esp->e_sync_known & tshift) == 0) &&
-		(esp->e_target_scsi_options[target] & SCSI_OPTIONS_SYNC)) {
+	    (esp->e_target_scsi_options[target] & SCSI_OPTIONS_SYNC)) {
 
 		if (sp->cmd_pkt.pkt_flags & FLAG_NODISCON) {
 			LOAD_CMDP = esp->e_last_msgout = MSG_IDENTIFY | lun;
@@ -3656,7 +3656,7 @@ esp_intr(caddr_t arg)
 			esp->e_polled_intr = 0;
 		}
 		if (!kstat_updated && esp->e_intr_kstat &&
-					rval == DDI_INTR_CLAIMED) {
+		    rval == DDI_INTR_CLAIMED) {
 			ESP_KSTAT_INTR(esp);
 			kstat_updated++;
 		}
@@ -3781,8 +3781,8 @@ espsvc(struct esp *esp)
 		    esp->e_dma->dmaga_csr, dmaga_bits, esp->e_dma->dmaga_addr);
 		esp_stat_int_print(esp);
 		eprintf(esp, "\tState %s Laststate %s\n",
-			esp_state_name(esp->e_state),
-			esp_state_name(esp->e_laststate));
+		    esp_state_name(esp->e_state),
+		    esp_state_name(esp->e_laststate));
 	}
 #endif	/* ESPDEBUG */
 
@@ -3883,8 +3883,8 @@ start_action:
 	while (action != ACTION_RETURN) {
 		ASSERT((action >= 0) && (action <= ACTION_SELECT));
 		TRACE_3(TR_FAC_SCSI, TR_ESPSVC_ACTION_CALL,
-			"espsvc call: esp 0x%p, action %d (%d)",
-			(void *)esp, action, i);
+		    "espsvc call: esp 0x%p, action %d (%d)",
+		    (void *)esp, action, i);
 		i++;
 		action = (*evec[action])(esp);
 	}
@@ -3924,7 +3924,7 @@ esp_phasemanage(struct esp *esp)
 		    esp_state_name(esp->e_state & STATE_ITPHASES));
 
 		TRACE_2(TR_FAC_SCSI, TR_ESP_PHASEMANAGE_CALL,
-			"esp_phasemanage_call: esp 0x%p (%d)", (void *)esp, i);
+		    "esp_phasemanage_call: esp 0x%p (%d)", (void *)esp, i);
 
 		i++;
 		state = esp->e_state;
@@ -3999,7 +3999,7 @@ esp_remove_tagged_cmd(struct esp *esp, struct esp_cmd *sp, int slot,
 		 * going to take a while...
 		 */
 		if (sp->cmd_pkt.pkt_time == tag_slots->e_timebase) {
-		    if (--(tag_slots->e_dups) <= 0) {
+			if (--(tag_slots->e_dups) <= 0) {
 			if (esp->e_tcmds[slot]) {
 				struct esp_cmd *ssp;
 				uint_t n = 0;
@@ -4019,16 +4019,16 @@ esp_remove_tagged_cmd(struct esp *esp, struct esp_cmd *sp, int slot,
 						n = ssp->cmd_pkt.pkt_time;
 						tag_slots->e_dups = 1;
 					} else if (
-						ssp->cmd_pkt.pkt_time == n) {
+					    ssp->cmd_pkt.pkt_time == n) {
 						tag_slots->e_dups++;
 					}
 				}
 				tag_slots->e_timebase = n;
 			} else {
 				tag_slots->e_dups =
-					tag_slots->e_timebase = 0;
+				    tag_slots->e_timebase = 0;
 			}
-		    }
+			}
 		}
 		tag_slots->e_timeout = tag_slots->e_timebase;
 	}
@@ -4078,11 +4078,11 @@ esp_finish(struct esp *esp)
 
 	if (DEBUGGING) {
 		eprintf(esp, "%d.%d; cmds=%d disc=%d lastmsg 0x%x\n",
-			Tgt(sp), Lun(sp), esp->e_ncmds, esp->e_ndisc,
-			esp->e_last_msgin);
+		    Tgt(sp), Lun(sp), esp->e_ncmds, esp->e_ndisc,
+		    esp->e_last_msgin);
 		eprintf(esp, "\treason '%s'; cmd state 0x%b\n",
-			scsi_rname(sp->cmd_pkt.pkt_reason),
-			sp->cmd_pkt.pkt_state, scsi_state_bits);
+		    scsi_rname(sp->cmd_pkt.pkt_reason),
+		    sp->cmd_pkt.pkt_state, scsi_state_bits);
 	}
 #endif	/* ESPDEBUG */
 
@@ -4227,7 +4227,7 @@ static void
 esp_handle_qfull(struct esp *esp, struct esp_cmd *sp, int slot)
 {
 	if ((++sp->cmd_qfull_retries > esp->e_qfull_retries[Tgt(sp)]) ||
-		(esp->e_qfull_retries[Tgt(sp)] == 0)) {
+	    (esp->e_qfull_retries[Tgt(sp)] == 0)) {
 		/*
 		 * We have exhausted the retries on QFULL, or,
 		 * the target driver has indicated that it
@@ -4238,16 +4238,16 @@ esp_handle_qfull(struct esp *esp, struct esp_cmd *sp, int slot)
 		 * as CMD_CMPLT and pkt_scbp as STATUS_QFULL.
 		 */
 		IPRINTF2("%d.%d: status queue full, retries over\n",
-			Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 		esp_set_all_lun_throttles(esp, slot, DRAIN_THROTTLE);
 		esp_call_pkt_comp(esp, sp);
 	} else {
 		if (esp->e_reset_delay[Tgt(sp)] == 0) {
 			esp->e_throttle[slot] =
-				max((esp->e_tcmds[slot] - 2), 0);
+			    max((esp->e_tcmds[slot] - 2), 0);
 		}
 		IPRINTF3("%d.%d: status queue full, new throttle = %d, "
-			"retrying\n", Tgt(sp), Lun(sp), esp->e_throttle[slot]);
+		    "retrying\n", Tgt(sp), Lun(sp), esp->e_throttle[slot]);
 		sp->cmd_pkt.pkt_flags |= FLAG_HEAD;
 		sp->cmd_flags &= ~CFLAG_TRANFLAG;
 		(void) _esp_start(esp, sp, NO_TRAN_BUSY);
@@ -4371,21 +4371,21 @@ esp_check_in_transport(struct esp *esp, struct esp_cmd *sp)
 
 		if (esp->e_tagQ[slot] != NULL) {
 			for (i = 0; i < NTAGS; i++) {
-			    if ((esp->e_tagQ[slot]->t_slot[i] != NULL) &&
-				(esp->e_tagQ[slot]->t_slot[i] !=
-				esp->e_slots[slot])) {
-				    ncmds++;
-				    qsp = esp->e_tagQ[slot]->t_slot[i];
-				    if (qsp->cmd_flags & CFLAG_CMDDISC) {
-					ndiscs++;
-				    }
-				    ASSERT((qsp->cmd_flags &
-						CFLAG_COMPLETED) == 0);
-				    ASSERT((qsp->cmd_flags & CFLAG_FREE)
-								== 0);
-				    ASSERT((qsp->cmd_flags &
-							CFLAG_FINISHED) == 0);
-			    }
+				if ((esp->e_tagQ[slot]->t_slot[i] != NULL) &&
+				    (esp->e_tagQ[slot]->t_slot[i] !=
+				    esp->e_slots[slot])) {
+					ncmds++;
+					qsp = esp->e_tagQ[slot]->t_slot[i];
+					if (qsp->cmd_flags & CFLAG_CMDDISC) {
+						ndiscs++;
+					}
+					ASSERT((qsp->cmd_flags &
+					    CFLAG_COMPLETED) == 0);
+					ASSERT((qsp->cmd_flags & CFLAG_FREE)
+					    == 0);
+					ASSERT((qsp->cmd_flags &
+					    CFLAG_FINISHED) == 0);
+				}
 			}
 		}
 	}
@@ -4394,7 +4394,7 @@ esp_check_in_transport(struct esp *esp, struct esp_cmd *sp)
 		if (esp_do_check)
 			debug_enter("ncmds problem");
 		eprintf(esp, "ncmds = %d, %d, ndisc = %d, %d\n",
-			ncmds, esp->e_ncmds, ndiscs, esp->e_ndisc);
+		    ncmds, esp->e_ncmds, ndiscs, esp->e_ndisc);
 	}
 }
 #endif
@@ -4437,13 +4437,13 @@ esp_call_pkt_comp(struct esp *esp, struct esp_cmd *sp)
 		if (sp->cmd_pkt.pkt_reason != CMD_CMPLT) {
 			IPRINTF6("completion for %d.%d, sp=0x%p, "
 			    "reason=%s, stats=%x, state=%x\n",
-				Tgt(sp), Lun(sp), (void *)sp,
-				scsi_rname(sp->cmd_pkt.pkt_reason),
-				sp->cmd_pkt.pkt_statistics,
-				sp->cmd_pkt.pkt_state);
+			    Tgt(sp), Lun(sp), (void *)sp,
+			    scsi_rname(sp->cmd_pkt.pkt_reason),
+			    sp->cmd_pkt.pkt_statistics,
+			    sp->cmd_pkt.pkt_state);
 		} else {
 			EPRINTF2("completion queued for %d.%d\n",
-				Tgt(sp), Lun(sp));
+			    Tgt(sp), Lun(sp));
 		}
 
 		/*
@@ -4764,8 +4764,8 @@ step_done:
 					 */
 					if (esp_do_kstats &&
 					    esp->e_slot_stats[slot]) {
-					    kstat_runq_back_to_waitq(
-						IOSP(slot));
+						kstat_runq_back_to_waitq(
+						    IOSP(slot));
 					}
 #endif /* ESP_KSTATS */
 					(void) esp_ustart(esp, slot, SAME_CMD);
@@ -4797,7 +4797,7 @@ step_done:
 				 */
 				if (esp_do_kstats &&
 				    esp->e_slot_stats[slot]) {
-				    kstat_runq_back_to_waitq(IOSP(slot));
+					kstat_runq_back_to_waitq(IOSP(slot));
 				}
 #endif /* ESP_KSTATS */
 				New_state(esp, STATE_FREE);
@@ -4861,8 +4861,8 @@ step_done:
 			esp->e_readyb[slot] = sp;
 		}
 		if ((esp->e_target_scsi_options[target] &
-			SCSI_OPTIONS_PARITY) &&
-			(sp->cmd_pkt.pkt_flags & FLAG_NOPARITY)) {
+		    SCSI_OPTIONS_PARITY) &&
+		    (sp->cmd_pkt.pkt_flags & FLAG_NOPARITY)) {
 			ep->esp_conf = esp->e_espconf;
 		}
 		TRACE_0(TR_FAC_SCSI, TR_ESP_FINISH_SELECT_ACTION2_END,
@@ -5078,7 +5078,7 @@ esp_reconnect(struct esp *esp)
 		 */
 		if (TAGGED(target) && esp->e_tcmds[slot]) {
 			volatile uchar_t *c =
-				(uchar_t *)esp->e_cmdarea;
+			    (uchar_t *)esp->e_cmdarea;
 
 			/*
 			 * accept the identify msg
@@ -5140,7 +5140,7 @@ esp_reconnect(struct esp *esp)
 	case ACTS_RESEL:
 		{
 			volatile uchar_t *c =
-				(uchar_t *)esp->e_cmdarea;
+			    (uchar_t *)esp->e_cmdarea;
 			struct t_slots *tag_slots;
 			int id, tag;
 			uint_t i;
@@ -5432,7 +5432,7 @@ esp_handle_unknown(struct esp *esp)
 				 * reliable on FAS236
 				 */
 				volatile uchar_t *c =
-					(uchar_t *)esp->e_cmdarea;
+				    (uchar_t *)esp->e_cmdarea;
 
 				*c++ = INVALID_MSG;
 				*c   = INVALID_MSG;
@@ -5493,8 +5493,8 @@ esp_handle_unknown(struct esp *esp)
 			msgout = esp->e_cur_msgout[2];
 		}
 		EPRINTF4("msgout: %x %x %x, last_msgout=%x\n",
-			esp->e_cur_msgout[0], esp->e_cur_msgout[1],
-			esp->e_cur_msgout[2], esp->e_last_msgout);
+		    esp->e_cur_msgout[0], esp->e_cur_msgout[1],
+		    esp->e_cur_msgout[2], esp->e_last_msgout);
 
 		if (msgout == MSG_ABORT || msgout == MSG_ABORT_TAG ||
 		    msgout == MSG_DEVICE_RESET) {
@@ -5634,8 +5634,8 @@ esp_handle_clearing(struct esp *esp)
 			sp->cmd_pkt.pkt_reason = CMD_TRAN_ERR;
 #ifdef ESPDEBUG
 		IPRINTF4("msgout: %x %x %x, last_msgout=%x\n",
-			esp->e_cur_msgout[0], esp->e_cur_msgout[1],
-			esp->e_cur_msgout[2], esp->e_last_msgout);
+		    esp->e_cur_msgout[0], esp->e_cur_msgout[1],
+		    esp->e_cur_msgout[2], esp->e_last_msgout);
 		IPRINTF1("last msgin=%x\n", esp->e_last_msgin);
 		esp_dump_state(esp);
 #endif
@@ -5696,7 +5696,7 @@ bad:
 	 */
 	ASSERT(sp->cmd_cur_addr >= sp->cmd_dmacookie.dmac_address);
 	end = (uint64_t)sp->cmd_dmacookie.dmac_address +
-		(uint64_t)sp->cmd_dmacookie.dmac_size;
+	    (uint64_t)sp->cmd_dmacookie.dmac_size;
 
 	EPRINTF5("cmd_data_count=%x, dmacount=%x, cur_addr=%x, end=%"
 	    PRIx64 ", nwin=%x\n",
@@ -5711,7 +5711,7 @@ bad:
 			goto bad;
 		}
 		end = (uint64_t)sp->cmd_dmacookie.dmac_address +
-			(uint64_t)sp->cmd_dmacookie.dmac_size;
+		    (uint64_t)sp->cmd_dmacookie.dmac_size;
 		IPRINTF2("dmac_address=%x, dmac_size=%lx\n",
 		    sp->cmd_dmacookie.dmac_address,
 		    sp->cmd_dmacookie.dmac_size);
@@ -5735,7 +5735,7 @@ bad:
 		    " cntr_max %" PRIx64 "\n",
 		    sp->cmd_cur_addr, end, esp->e_dma_attr->dma_attr_seg);
 		amt = (end & ~esp->e_dma_attr->dma_attr_seg) -
-			sp->cmd_cur_addr;
+		    sp->cmd_cur_addr;
 		if (amt == 0 || amt > ESP_MAX_DMACOUNT) {
 			esplog(esp, CE_WARN, "illegal DMA boundary? %x", amt);
 			goto bad;
@@ -5743,8 +5743,8 @@ bad:
 	}
 #endif
 	end = (uint64_t)sp->cmd_dmacookie.dmac_address +
-		(uint64_t)sp->cmd_dmacookie.dmac_size -
-		(uint64_t)sp->cmd_cur_addr;
+	    (uint64_t)sp->cmd_dmacookie.dmac_size -
+	    (uint64_t)sp->cmd_cur_addr;
 	EPRINTF3("amt=%x, end=%lx, cur_addr=%x\n", amt, end, sp->cmd_cur_addr);
 
 	if (amt > end) {
@@ -7057,8 +7057,8 @@ esp_handle_msg_out_done(struct esp *esp)
 		msgout = esp->e_cur_msgout[2];
 	}
 	EPRINTF4("msgout: %x %x %x, last_msgout=%x\n",
-		esp->e_cur_msgout[0], esp->e_cur_msgout[1],
-		esp->e_cur_msgout[2], esp->e_last_msgout);
+	    esp->e_cur_msgout[0], esp->e_cur_msgout[1],
+	    esp->e_cur_msgout[2], esp->e_last_msgout);
 
 	EPRINTF1("esp_handle_msgout_done: msgout=%x\n", msgout);
 
@@ -7096,12 +7096,12 @@ esp_handle_msg_out_done(struct esp *esp)
 			if (msgout == MSG_ABORT || msgout == MSG_ABORT_TAG) {
 				esp->e_abort++;
 				if ((sp->cmd_flags & CFLAG_CMDPROXY) == 0) {
-				    MARK_PKT(sp, CMD_ABORTED, STAT_ABORTED);
+					MARK_PKT(sp, CMD_ABORTED, STAT_ABORTED);
 				}
 			} else if (msgout == MSG_DEVICE_RESET) {
 				esp->e_reset++;
 				if ((sp->cmd_flags & CFLAG_CMDPROXY) == 0) {
-				    MARK_PKT(sp, CMD_RESET, STAT_DEV_RESET);
+					MARK_PKT(sp, CMD_RESET, STAT_DEV_RESET);
 				}
 				esp->e_offset[target] = 0;
 				esp->e_sync_known &= ~(1<<target);
@@ -7260,7 +7260,7 @@ esp_update_props(struct esp *esp, int tgt)
 		 */
 
 		tickval = ESP_SYNC_KBPS((regval *
-				esp->e_clock_cycle) / 1000);
+		    esp->e_clock_cycle) / 1000);
 	} else {
 		tickval = 0;
 	}
@@ -7349,7 +7349,7 @@ esp_multibyte_msg(struct esp *esp)
 
 			if ((esp->e_weak & (1<<tgt)) ||
 			    (esp->e_target_scsi_options[tgt] &
-				SCSI_OPTIONS_SYNC) == 0) {
+			    SCSI_OPTIONS_SYNC) == 0) {
 				/*
 				 * Only zero out the offset. Don't change
 				 * the period.
@@ -7462,9 +7462,9 @@ esp_multibyte_msg(struct esp *esp)
 			}
 
 			EPRINTF4(
-				"sending period %d (%d), offset %d to tgt %d\n",
-				period, esp->e_period[tgt] & SYNC_PERIOD_MASK,
-				esp->e_offset[tgt] & 0xf, tgt);
+			    "sending period %d (%d), offset %d to tgt %d\n",
+			    period, esp->e_period[tgt] & SYNC_PERIOD_MASK,
+			    esp->e_offset[tgt] & 0xf, tgt);
 			EPRINTF1("req/ack delay = %x\n", esp->e_req_ack_delay);
 			EPRINTF1("conf3 = %x\n", esp->e_espconf3[tgt]);
 
@@ -7478,7 +7478,7 @@ esp_multibyte_msg(struct esp *esp)
 			 * k-bytes/second.
 			 */
 			xfer_freq = ESP_SYNC_KBPS((regval *
-				esp->e_clock_cycle) / 1000);
+			    esp->e_clock_cycle) / 1000);
 			xfer_div = xfer_freq / 1000;
 			xfer_mod = xfer_freq % 1000;
 
@@ -7662,8 +7662,8 @@ esp_runpoll(struct esp *esp, short slot, struct esp_cmd *sp)
 	int timeout = 0;
 
 	IPRINTF4("runpoll: slot=%x, cmd=%x, e_slots=0x%p, tcmds=%x\n",
-		slot, *((uchar_t *)sp->cmd_pkt.pkt_cdbp),
-		(void *)esp->e_slots[slot], esp->e_tcmds[slot]);
+	    slot, *((uchar_t *)sp->cmd_pkt.pkt_cdbp),
+	    (void *)esp->e_slots[slot], esp->e_tcmds[slot]);
 
 	TRACE_0(TR_FAC_SCSI, TR_ESP_RUNPOLL_START, "esp_runpoll_start");
 
@@ -8026,10 +8026,10 @@ esp_watch(void *arg)
 	if (esp_request_count >= 20000) {
 		cmn_err(CE_CONT,
 	    "%d reqs/sec (ticks=%d, intrs=%d, reqs=%d, n_cmds=%d, n_disc=%d)\n",
-			esp_request_count/esp_sample_time, esp_sample_time,
-			esp_intr_count, esp_request_count,
-			(esp_ncmds * esp_scsi_watchdog_tick)/esp_sample_time,
-			(esp_ndisc * esp_scsi_watchdog_tick)/esp_sample_time);
+		    esp_request_count/esp_sample_time, esp_sample_time,
+		    esp_intr_count, esp_request_count,
+		    (esp_ncmds * esp_scsi_watchdog_tick)/esp_sample_time,
+		    (esp_ndisc * esp_scsi_watchdog_tick)/esp_sample_time);
 
 		for (i = 0; i < MAX_ESPS; i++) {
 			if (esp_ncmds_per_esp[i] == 0) {
@@ -8041,7 +8041,7 @@ esp_watch(void *arg)
 		}
 
 		esp_request_count = esp_sample_time = esp_intr_count =
-			esp_ncmds = esp_ndisc = 0;
+		    esp_ncmds = esp_ndisc = 0;
 	}
 #endif
 
@@ -8109,7 +8109,7 @@ esp_watch(void *arg)
 again:
 	mutex_enter(&esp_global_mutex);
 	if (esp_timeout_initted && esp_timeout_id) {
-	    esp_timeout_id = timeout(esp_watch, NULL, esp_tick);
+		esp_timeout_id = timeout(esp_watch, NULL, esp_tick);
 	}
 	mutex_exit(&esp_global_mutex);
 	TRACE_0(TR_FAC_SCSI, TR_ESP_WATCH_END, "esp_watch_end");
@@ -8154,12 +8154,12 @@ esp_watchsubr(struct esp *esp)
 		tag_slots = esp->e_tagQ[slot];
 		if (tag_slots && tag_slots->e_timebase) {
 			EPRINTF3(
-			"esp_watchsubr: slot %x: tcmds=%x, timeout=%x\n",
-			slot, esp->e_tcmds[slot], tag_slots->e_timeout);
+			    "esp_watchsubr: slot %x: tcmds=%x, timeout=%x\n",
+			    slot, esp->e_tcmds[slot], tag_slots->e_timeout);
 
 			if (esp->e_tcmds[slot] > 0) {
 				tag_slots->e_timeout -=
-					esp_scsi_watchdog_tick;
+				    esp_scsi_watchdog_tick;
 
 				if (tag_slots->e_timeout < 0) {
 					if (INTPENDING(esp)) {
@@ -8180,14 +8180,14 @@ esp_watchsubr(struct esp *esp)
 				    esp_scsi_watchdog_tick) {
 					int i;
 					IPRINTF1("pending timeout on slot=%x\n",
-						slot);
+					    slot);
 					IPRINTF("draining all tag queues\n");
 					for (i = 0; i < N_SLOTS; i += d) {
 						if (esp->e_tcmds[i] &&
 						    (esp->e_reset_delay[slot/
 						    NLUNS_PER_TARGET] == 0)) {
 							esp->e_throttle[i] =
-								DRAIN_THROTTLE;
+							    DRAIN_THROTTLE;
 						}
 					}
 				}
@@ -8281,7 +8281,7 @@ esp_cmd_timeout(struct esp *esp, struct esp_cmd *sp,
 		if ((INTPENDING(esp) == 0) &&
 		    (esp->e_slots[esp->e_cur_slot])) {
 			IPRINTF2("timeout is not slot %x but %x\n",
-			slot, esp->e_cur_slot);
+			    slot, esp->e_cur_slot);
 			slot = esp->e_cur_slot;
 			sp = esp->e_slots[slot];
 			ASSERT(sp);
@@ -8323,7 +8323,7 @@ esp_cmd_timeout(struct esp *esp, struct esp_cmd *sp,
 
 		cp = (uchar_t *)sp->cmd_pkt.pkt_cdbp;
 		esplog(0, CE_WARN, "Cmd dump for Target %d Lun %d:",
-				Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 		buf[0] = '\0';
 		for (i = 0; i < (int)sp->cmd_cdblen; i++) {
 			(void) sprintf(&buf[strlen(buf)], " 0x%x", *cp++);
@@ -8433,17 +8433,17 @@ esp_sync_backoff(struct esp *esp, struct esp_cmd *sp,
 	if (sp && ((sp->cmd_pkt.pkt_statistics & STAT_PERR) == 0)) {
 		if (state != ACTS_DATA && state != ACTS_DATA_DONE) {
 			IPRINTF2("Target %d.%d hang state not in data phase\n",
-				tgt, lun);
+			    tgt, lun);
 			return;
 		} else if (
 		    phase != ESP_PHASE_DATA_IN && phase != ESP_PHASE_DATA_OUT) {
 			IPRINTF2("Target %d.%d hang bus not in data phase\n",
-				tgt, lun);
+			    tgt, lun);
 			return;
 		} else if (
 		    (uchar_t)*(sp->cmd_pkt.pkt_cdbp) == SCMD_REQUEST_SENSE) {
 			IPRINTF2("Target %d.%d ignoring request sense hang\n",
-				tgt, lun);
+			    tgt, lun);
 			return;
 		}
 	}
@@ -8463,7 +8463,7 @@ esp_sync_backoff(struct esp *esp, struct esp_cmd *sp,
 		 * Compute sync transfer limits for later compensation.
 		 */
 		IPRINTF3("Target %d.%d back off using %s params\n", tgt,
-			lun, ((esp->e_options & ESP_OPT_FAS)? "FAS" : "ESP"));
+		    lun, ((esp->e_options & ESP_OPT_FAS)? "FAS" : "ESP"));
 #endif
 		if (esp->e_backoff[tgt]) {
 			esp->e_period[tgt] = 0;
@@ -8632,7 +8632,7 @@ esp_create_arq_pkt(struct esp *esp, struct scsi_address *ap, int create)
 		 */
 #ifndef __lock_lint
 		rqpkt->pkt_comp =
-			(void (*)(struct scsi_pkt *))esp_complete_arq_pkt;
+		    (void (*)(struct scsi_pkt *))esp_complete_arq_pkt;
 #endif
 	}
 	return (rval);
@@ -8657,7 +8657,7 @@ esp_complete_arq_pkt(struct esp *esp, struct esp_cmd *sp, int slot)
 	if (sp && ssp) {
 		arqstat = (struct scsi_arq_status *)(ssp->cmd_pkt.pkt_scbp);
 		arqstat->sts_rqpkt_status = *((struct scsi_status *)
-			(sp->cmd_pkt.pkt_scbp));
+		    (sp->cmd_pkt.pkt_scbp));
 		arqstat->sts_rqpkt_reason = sp->cmd_pkt.pkt_reason;
 		arqstat->sts_rqpkt_state  = sp->cmd_pkt.pkt_state;
 		arqstat->sts_rqpkt_statistics = sp->cmd_pkt.pkt_statistics;
@@ -8697,7 +8697,7 @@ esp_start_arq_pkt(struct esp *esp, struct esp_cmd *sp)
 	EPRINTF1("starting arq for slot 0x%p\n", (void *)sp);
 	bzero(esp->e_rq_sense_data[slot], sizeof (struct scsi_extended_sense));
 	EPRINTF3("slot=%x, arqsp=0x%p, save_pkt=0x%p\n", slot, (void *)arqsp,
-		(void *)esp->e_arq_pkt[slot]);
+	    (void *)esp->e_arq_pkt[slot]);
 
 	if (esp->e_save_pkt[slot] != NULL) {
 		if (sp->cmd_pkt.pkt_reason == CMD_CMPLT) {
@@ -8852,7 +8852,7 @@ _esp_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 		    ((sp->cmd_flags & CFLAG_COMPLETED) == 0) &&
 		    (sp->cmd_flags & CFLAG_CMDDISC)) {
 			rval = esp_abort_disconnected_cmd(esp, ap, sp,
-				abort_msg, slot);
+			    abort_msg, slot);
 			abort_disconnected++;
 		}
 		esp_check_in_transport(esp, NULL);
@@ -8878,7 +8878,7 @@ _esp_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 		esp_check_in_transport(esp, NULL);
 		if (rval == 0) {
 			rval = esp_abort_disconnected_cmd(esp, ap,
-				    NULL, abort_msg, slot);
+			    NULL, abort_msg, slot);
 			abort_disconnected++;
 		}
 	}
@@ -8923,7 +8923,7 @@ _esp_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 			if (!cur_tagged_flag ||
 			    (cur_tagged_flag && esp->e_tagQ[slot] &&
 			    (cur_sp != esp->e_tagQ[slot]->
-					t_slot[cur_sp->cmd_tag[1]]))) {
+			    t_slot[cur_sp->cmd_tag[1]]))) {
 				cur_sp->cmd_flags |= CFLAG_COMPLETED;
 				MARK_PKT(cur_sp, CMD_ABORTED, STAT_ABORTED);
 			}
@@ -9019,7 +9019,7 @@ esp_remove_readyQ(struct esp *esp, struct esp_cmd *sp, int slot)
 
 	ASSERT(esp->e_ncmds > 0);
 	IPRINTF3("aborting sp=0x%p %d.%d (not yet started)\n",
-		(void *)sp, Tgt(sp), Lun(sp));
+	    (void *)sp, Tgt(sp), Lun(sp));
 
 	/*
 	 * find packet on the ready queue and remove it
@@ -9179,7 +9179,7 @@ esp_decrement_ncmds(struct esp *esp, struct esp_cmd *sp)
 			esp->e_ndisc--;
 		}
 		sp->cmd_flags = (sp->cmd_flags | CFLAG_FINISHED) &
-					~CFLAG_CMDDISC;
+		    ~CFLAG_CMDDISC;
 	}
 	ASSERT((esp->e_ncmds >= 0) && (esp->e_ndisc >= 0));
 	ASSERT(esp->e_ncmds >= esp->e_ndisc);
@@ -9240,11 +9240,11 @@ esp_abort_connected_cmd(struct esp *esp, struct esp_cmd *sp, uchar_t msg)
 	 */
 	if (esp->e_abort && (sp->cmd_flags & CFLAG_COMPLETED)) {
 		IPRINTF2("target %d.%d aborted\n",
-			Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 		rval = TRUE;
 	} else {
 		IPRINTF2("target %d.%d did not abort\n",
-			Tgt(sp), Lun(sp));
+		    Tgt(sp), Lun(sp));
 	}
 	sp->cmd_pkt.pkt_flags = flags;
 	esp->e_omsglen = 0;
@@ -9273,7 +9273,7 @@ esp_abort_disconnected_cmd(struct esp *esp, struct scsi_address *ap,
 	}
 
 	IPRINTF1("aborting disconnected tagged cmd(s) with %s\n",
-		scsi_mname(msg));
+	    scsi_mname(msg));
 	proxy_cmdp = kmem_alloc(ESP_CMD_SIZE, KM_SLEEP);
 	if (TAGGED(target) && (msg == MSG_ABORT)) {
 		esp_makeproxy_cmd(proxy_cmdp, ap, 1, msg);
@@ -9381,7 +9381,7 @@ esp_reset(struct scsi_address *ap, int level)
 	int rval;
 
 	IPRINTF3("esp_reset: target %d.%d, level %d\n",
-		ap->a_target, ap->a_lun, level);
+	    ap->a_target, ap->a_lun, level);
 
 	mutex_enter(ESP_MUTEX);
 	rval = _esp_reset(ap, level);
@@ -9403,7 +9403,7 @@ _esp_reset(struct scsi_address *ap, int level)
 
 	ASSERT(mutex_owned(ESP_MUTEX));
 	IPRINTF3("esp_reset for slot %x, level=%x, tcmds=%x\n",
-		slot, level, esp->e_tcmds[slot]);
+	    slot, level, esp->e_tcmds[slot]);
 
 	if (level == RESET_ALL) {
 		/*
@@ -9534,7 +9534,7 @@ _esp_reset(struct scsi_address *ap, int level)
 				 */
 				(void) esp_remove_readyQ(esp, cur_sp, slot);
 				esp_remove_tagged_cmd(esp, cur_sp, slot,
-					NEW_TIMEOUT);
+				    NEW_TIMEOUT);
 				cur_sp->cmd_flags &= ~CFLAG_COMPLETED;
 
 				esp_decrement_ncmds(esp, cur_sp);
@@ -9771,7 +9771,7 @@ esp_reset_connected_cmd(struct esp *esp, struct scsi_address *ap, int slot)
 		rval = TRUE;
 	} else {
 		IPRINTF2("target %d.%d did not reset\n",
-			ap->a_target, ap->a_lun);
+		    ap->a_target, ap->a_lun);
 	}
 	sp->cmd_pkt.pkt_flags = flags;
 	esp->e_omsglen = 0;
@@ -9916,7 +9916,7 @@ esp_reset_recovery(struct esp *esp)
 	 * perform the reset notification callbacks that are registered.
 	 */
 	(void) scsi_hba_reset_notify_callback(&esp->e_mutex,
-		&esp->e_reset_notify_listf);
+	    &esp->e_reset_notify_listf);
 
 	return (ACTION_RETURN);
 }
@@ -9931,7 +9931,7 @@ void (*callback)(caddr_t), caddr_t arg)
 	struct esp	*esp = ADDR2ESP(ap);
 
 	return (scsi_hba_reset_notify_setup(ap, flag, callback, arg,
-		&esp->e_mutex, &esp->e_reset_notify_listf));
+	    &esp->e_mutex, &esp->e_reset_notify_listf));
 }
 
 /*
@@ -9995,7 +9995,7 @@ esp_test_abort(struct esp *esp, int slot)
 			 */
 			for (tag = NTAGS-1; tag >= 0; tag--) {
 				if ((sp = esp->e_tagQ[slot]->t_slot[tag]) != 0)
-				    break;
+					break;
 			}
 			if (sp) {
 				pkt = &sp->cmd_pkt;
@@ -10019,12 +10019,12 @@ esp_test_abort(struct esp *esp, int slot)
 			if ((esp->e_tcmds[slot] == 0) &&
 			    (esp->e_slots[slot] == NULL)) {
 				if (_esp_abort(&ap, NULL) &&
-					_esp_reset(&ap, RESET_TARGET)) {
+				    _esp_reset(&ap, RESET_TARGET)) {
 						esp_atest = 0;
 						return;
 				} else {
 					esplog(esp, CE_NOTE,
-						"abort/reset failed\n");
+					    "abort/reset failed\n");
 				}
 				return;
 			}
@@ -10075,7 +10075,7 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_DISCONNECT:
 
 			if ((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_DR) == 0) {
+			    SCSI_OPTIONS_DR) == 0) {
 				break;
 			} else if (tgtonly) {
 				if (val)
@@ -10090,22 +10090,23 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_SYNCHRONOUS:
 
 			if ((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_SYNC) == 0) {
+			    SCSI_OPTIONS_SYNC) == 0) {
 				break;
 			} else if (tgtonly) {
 				if ((esp->e_weak & tshift) && val) {
 					IPRINTF2(
-					"target %d.%d: can't set sync cap!\n",
-					ap->a_target, ap->a_lun);
+					    "target %d.%d: "
+					    "can't set sync cap!\n",
+					    ap->a_target, ap->a_lun);
 					rval = FALSE;
 					break;
 				}
 				if (val) {
 					esp->e_force_async &=
-						~(1<<ap->a_target);
+					    ~(1<<ap->a_target);
 				} else {
 					esp->e_force_async |=
-						(1<<ap->a_target);
+					    (1<<ap->a_target);
 				}
 				esp->e_sync_known &= ntshift;
 			} else {
@@ -10123,9 +10124,9 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_TAGGED_QING:
 			/* Must have disco/reco enabled for tagged queuing. */
 			if (((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_DR) == 0) ||
+			    SCSI_OPTIONS_DR) == 0) ||
 			    ((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_TAG) == 0) ||
+			    SCSI_OPTIONS_TAG) == 0) ||
 			    ((esp->e_options & ESP_OPT_FAS) == 0)) {
 				break;
 			} else if (tgtonly) {
@@ -10151,13 +10152,14 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 					start =	 target * NLUNS_PER_TARGET;
 					end   =	 start + NLUNS_PER_TARGET;
 					for (slot = start; slot < end; slot++) {
-					    if ((esp->e_tagQ[slot]) &&
-						(esp->e_tcmds[slot] == 0)) {
-						    kmem_free((caddr_t)
+						if ((esp->e_tagQ[slot]) &&
+						    (esp->e_tcmds[slot] == 0)) {
+							kmem_free((caddr_t)
 							    esp->e_tagQ[slot],
 							    size);
-						    esp->e_tagQ[slot] = NULL;
-					    }
+							esp->e_tagQ[slot] =
+							    NULL;
+						}
 					}
 				}
 			} else {
@@ -10186,7 +10188,7 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_QFULL_RETRIES:
 			if (tgtonly) {
 				esp->e_qfull_retries[ap->a_target] =
-					(uchar_t)val;
+				    (uchar_t)val;
 			} else {
 				int i;
 				for (i = 0; i < NTARGETS; i++) {
@@ -10199,12 +10201,12 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_QFULL_RETRY_INTERVAL:
 			if (tgtonly) {
 				esp->e_qfull_retry_interval[ap->a_target] =
-					drv_usectohz(val * 1000);
+				    drv_usectohz(val * 1000);
 			} else {
 				int i;
 				for (i = 0; i < NTARGETS; i++) {
 					esp->e_qfull_retry_interval[i] =
-						drv_usectohz(val * 1000);
+					    drv_usectohz(val * 1000);
 				}
 			}
 			rval = TRUE;
@@ -10229,21 +10231,21 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 			break;
 		case SCSI_CAP_DISCONNECT:
 			if ((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_DR) &&
+			    SCSI_OPTIONS_DR) &&
 			    (tgtonly == 0 || (esp->e_nodisc & tshift) == 0)) {
 				rval = TRUE;
 			}
 			break;
 		case SCSI_CAP_SYNCHRONOUS:
 			if ((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_SYNC) &&
+			    SCSI_OPTIONS_SYNC) &&
 			    (tgtonly == 0 || esp->e_offset[ap->a_target])) {
 				rval = TRUE;
 			}
 			break;
 		case SCSI_CAP_PARITY:
 			if (esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_PARITY)
+			    SCSI_OPTIONS_PARITY)
 				rval = TRUE;
 			break;
 		case SCSI_CAP_INITIATOR_ID:
@@ -10252,9 +10254,9 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 		case SCSI_CAP_TAGGED_QING:
 			/* Must have disco/reco enabled for tagged queuing. */
 			if (((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_DR) == 0) ||
+			    SCSI_OPTIONS_DR) == 0) ||
 			    ((esp->e_target_scsi_options[ap->a_target] &
-				SCSI_OPTIONS_TAG) == 0) ||
+			    SCSI_OPTIONS_TAG) == 0) ||
 			    ((esp->e_options & ESP_OPT_FAS) == 0)) {
 				break;
 
@@ -10286,8 +10288,8 @@ esp_commoncap(struct scsi_address *ap, char *cap, int val,
 
 		case SCSI_CAP_QFULL_RETRY_INTERVAL:
 			rval = drv_hztousec(
-				esp->e_qfull_retry_interval[ap->a_target]) /
-				1000;
+			    esp->e_qfull_retry_interval[ap->a_target]) /
+			    1000;
 			break;
 		default:
 			rval = UNDEFINED;
@@ -10300,8 +10302,9 @@ exit:
 
 	if (doset) {
 		IPRINTF6(
-	    "esp_commoncap:tgt=%x,cap=%s,tgtonly=%x,doset=%x,val=%x,rval=%x\n",
-		ap->a_target, cap, tgtonly, doset, val, rval);
+		    "esp_commoncap:tgt=%x,cap=%s,tgtonly=%x,doset=%x,"
+		    "val=%x,rval=%x\n",
+		    ap->a_target, cap, tgtonly, doset, val, rval);
 	}
 
 	return (rval);
@@ -10490,19 +10493,19 @@ esp_dump_state(struct esp *esp)
 			break;
 
 		(void) sprintf(&buf[0], "\tcurrent phase 0x%x=%s",
-			y, esp_state_name((ushort_t)y));
+		    y, esp_state_name((ushort_t)y));
 
 		(void) sprintf(&buf[strlen(buf)], "\tstat=0x%x",
-			esp->e_phase[z].e_save_stat);
+		    esp->e_phase[z].e_save_stat);
 
 		if (esp->e_phase[z].e_val1 != -1) {
 			(void) sprintf(&buf[strlen(buf)], "\t0x%x",
-				esp->e_phase[z].e_val1);
+			    esp->e_phase[z].e_val1);
 		}
 
 		if (esp->e_phase[z].e_val2 != -1) {
 			(void) sprintf(&buf[strlen(buf)], "\t0x%x",
-				esp->e_phase[z].e_val2);
+			    esp->e_phase[z].e_val2);
 		}
 		eprintf((struct esp *)0, "%s\n", buf);
 	}
@@ -10546,7 +10549,7 @@ esp_state_name(ushort_t state)
 	if (state == STATE_FREE) {
 		return ("FREE");
 	} else if ((state & STATE_SELECTING) &&
-		    (!(state & ACTS_LOG))) {
+	    (!(state & ACTS_LOG))) {
 		if (state == STATE_SELECT_NORMAL)
 			return ("SELECT");
 		else if (state == STATE_SELECT_N_STOP)

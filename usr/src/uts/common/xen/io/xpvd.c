@@ -158,7 +158,9 @@ struct dev_ops xpvd_ops = {
 	xpvd_detach,		/* detach */
 	nulldev,		/* reset */
 	(struct cb_ops *)0,	/* driver operations */
-	&xpvd_bus_ops		/* bus operations */
+	&xpvd_bus_ops,		/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Copyright (c) 2002-2005 Neterion, Inc.
  *  All right Reserved.
@@ -40,9 +38,10 @@
 
 static int xge_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd);
 static int xge_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd);
+static int xge_quiesce(dev_info_t *dev_info);
 
 DDI_DEFINE_STREAM_OPS(xge_ops, nulldev, nulldev, xge_attach, xge_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, xge_quiesce);
 
 /* Standard Module linkage initialization for a Streams driver */
 extern struct mod_ops mod_driverops;
@@ -1266,6 +1265,29 @@ _exit0a:
 	kmem_free(device_config, sizeof (xge_hal_device_config_t));
 _exit0:
 	return (ret);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+xge_quiesce(dev_info_t *dev_info)
+{
+	xge_hal_device_t *hldev =
+	    (xge_hal_device_t *)ddi_get_driver_private(dev_info);
+
+	xgelldev_t *lldev = xge_hal_device_private(hldev);
+
+	xge_hal_device_quiesce(hldev, lldev->devh);
+
+	return (DDI_SUCCESS);
 }
 
 /*

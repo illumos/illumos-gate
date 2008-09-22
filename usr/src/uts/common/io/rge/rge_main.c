@@ -29,7 +29,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char rge_ident[] = "Realtek 1Gb Ethernet v1.11";
+static char rge_ident[] = "Realtek 1Gb Ethernet";
 
 /*
  * Used for buffers allocated by ddi_dma_mem_alloc()
@@ -1902,6 +1902,36 @@ rge_suspend(rge_t *rgep)
 }
 
 /*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+rge_quiesce(dev_info_t *devinfo)
+{
+	rge_t *rgep = ddi_get_driver_private(devinfo);
+
+	if (rgep == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * Turn off debugging
+	 */
+	rge_debug = 0;
+	rgep->debug = 0;
+
+	/* Stop the chip */
+	rge_chip_stop(rgep, B_FALSE);
+
+	return (DDI_SUCCESS);
+}
+
+/*
  * detach(9E) -- Detach a device from the system
  */
 static int
@@ -1956,7 +1986,7 @@ rge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 #undef	RGE_DBG
 #define	RGE_DBG		RGE_DBG_INIT	/* debug flag for this code	*/
 DDI_DEFINE_STREAM_OPS(rge_dev_ops, nulldev, nulldev, rge_attach, rge_detach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, rge_quiesce);
 
 static struct modldrv rge_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */

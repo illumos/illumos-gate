@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Power Button Driver
@@ -222,7 +221,8 @@ static struct dev_ops power_ops = {
 	nodev,			/* reset */
 	&power_cb_ops,		/* cb_ops */
 	(struct bus_ops *)NULL,	/* bus_ops */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

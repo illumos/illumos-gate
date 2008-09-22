@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver to retire/unretire L2/L3 cachelines on panther
@@ -128,7 +127,8 @@ static struct dev_ops mem_cache_dev_ops = {
 	nulldev,		/* reset */
 	&mem_cache_cb_ops,
 	(struct bus_ops *)NULL,
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

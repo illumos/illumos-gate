@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	PCI-IDE bus nexus driver
@@ -158,8 +157,9 @@ struct dev_ops pciide_ops = {
 	pciide_detach,		/* detach */
 	nodev,			/* reset */
 	(struct cb_ops *)0,	/* driver operations */
-	&pciide_bus_ops	/* bus operations */
-
+	&pciide_bus_ops,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -168,7 +168,7 @@ struct dev_ops pciide_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This is PCI-IDE bus driver */
-	"pciide nexus driver for 'PCI-IDE' %I%",
+	"pciide nexus driver for 'PCI-IDE' 1.26",
 	&pciide_ops,	/* driver ops */
 };
 

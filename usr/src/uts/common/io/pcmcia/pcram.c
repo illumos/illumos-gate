@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(DEBUG)
 #define	PCRAM_DEBUG
@@ -207,7 +205,9 @@ static struct dev_ops pcram_ops = {
 	pcram_detach,		/* detach	*/
 	nodev,			/* reset (currently not supported)  */
 	&pcram_cb_ops,		/* cb_ops pointer for leaf driver   */
-	(struct bus_ops *)NULL  /* bus_ops pointer for nexus driver */
+	(struct bus_ops *)NULL, /* bus_ops pointer for nexus driver */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -216,7 +216,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv md = {
 	&mod_driverops,		/* Type of module. This is a driver */
-	PCRAM_DRIVERID " %I%",	/* Driver Identifier string */
+	PCRAM_DRIVERID,		/* Driver Identifier string */
 	&pcram_ops,		/* Device Operation Structure */
 };
 
@@ -275,8 +275,8 @@ _init(void)
 #endif
 
 	error = ddi_soft_state_init(&pcram_soft_state_p,
-					sizeof (pcram_state_t),
-					1	/* n_items */);
+	    sizeof (pcram_state_t),
+	    1	/* n_items */);
 	if (error) {
 		return (error);
 	}
@@ -378,8 +378,8 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE)
 		cmn_err(CE_CONT,
-			"pcram_attach: instance %d cmd 0x%x\n",
-		instance, cmd);
+		    "pcram_attach: instance %d cmd 0x%x\n",
+		    instance, cmd);
 #endif
 
 	/* resume from a checkpoint */
@@ -394,15 +394,15 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (cmd != DDI_ATTACH) {
 		cmn_err(CE_NOTE, "pcram_attach[%d]: "
-				"cmd != DDI_ATTACH\n", instance);
+		    "cmd != DDI_ATTACH\n", instance);
 		return (DDI_FAILURE);
 		/* NOTREACHED */
 	}
 
 	if (ddi_soft_state_zalloc(pcram_soft_state_p,
-					instance) != DDI_SUCCESS) {
+	    instance) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "pcram_attach: could not allocate "
-			"state structure for instance %d.", instance);
+		    "state structure for instance %d.", instance);
 		return (DDI_FAILURE);
 		/* NOTREACHED */
 	}
@@ -410,8 +410,8 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_attach: could not get "
-			"state structure for instance %d.",
-			instance);
+		    "state structure for instance %d.",
+		    instance);
 		goto out;
 	}
 
@@ -477,8 +477,8 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rs->blist = getrbuf(KM_SLEEP);
 	if (rs->blist == NULL) {
 		cmn_err(CE_NOTE, "pcram%d: attach card: "
-			"could not allocate transfer list header",
-			instance);
+		    "could not allocate transfer list header",
+		    instance);
 		goto out;
 	}
 
@@ -487,11 +487,11 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Add Medium priority soft interrupt to the system */
 	if (ddi_add_softintr(dip, DDI_SOFTINT_MED, &rs->softint_id,
-		&rs->soft_blk_cookie, (ddi_idevice_cookie_t *)NULL,
-		pcram_softintr, (caddr_t)rs) != DDI_SUCCESS) {
+	    &rs->soft_blk_cookie, (ddi_idevice_cookie_t *)NULL,
+	    pcram_softintr, (caddr_t)rs) != DDI_SUCCESS) {
 			cmn_err(CE_NOTE, "pcram%d attach: "
-				"could not add soft interrupt",
-				instance);
+			    "could not add soft interrupt",
+			    instance);
 			goto out;
 	}
 
@@ -500,8 +500,8 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
 		cmn_err(CE_CONT, "pcram_attach: "
-			"calling RegisterClient for instance %d\n",
-			instance);
+		    "calling RegisterClient for instance %d\n",
+		    instance);
 	}
 #endif
 
@@ -511,28 +511,28 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 *	low priority CS_EVENT_CARD_REMOVAL events as well.
 	 */
 	client_reg.Attributes = (INFO_MEM_CLIENT |
-					INFO_CARD_SHARE |
-					INFO_CARD_EXCL);
+	    INFO_CARD_SHARE |
+	    INFO_CARD_EXCL);
 	client_reg.EventMask = (CS_EVENT_CARD_INSERTION |
-				CS_EVENT_CARD_REMOVAL |
-				CS_EVENT_CARD_REMOVAL_LOWP |
-				CS_EVENT_CLIENT_INFO |
-				CS_EVENT_REGISTRATION_COMPLETE);
+	    CS_EVENT_CARD_REMOVAL |
+	    CS_EVENT_CARD_REMOVAL_LOWP |
+	    CS_EVENT_CLIENT_INFO |
+	    CS_EVENT_REGISTRATION_COMPLETE);
 	client_reg.event_handler = (csfunction_t *)pcram_event;
 	client_reg.event_callback_args.client_data = rs;
 	client_reg.Version = _VERSION(2, 1);
 	client_reg.dip = dip;
 	(void) strcpy(client_reg.driver_name, pcram_name);
 	if ((ret = csx_RegisterClient(&rs->client_handle,
-					&client_reg)) != CS_SUCCESS) {
-			error2text_t cft;
+	    &client_reg)) != CS_SUCCESS) {
+		error2text_t cft;
 
-			cft.item = ret;
-			(void) csx_Error2Text(&cft);
-			cmn_err(CE_CONT, "pcram_attach: "
-				"RegisterClient failed %s (0x%x)\n",
-				cft.text, ret);
-			goto out;
+		cft.item = ret;
+		(void) csx_Error2Text(&cft);
+		cmn_err(CE_CONT, "pcram_attach: "
+		    "RegisterClient failed %s (0x%x)\n",
+		    cft.text, ret);
+		goto out;
 	}
 
 	rs->flags |= PCRAM_REGCLIENT;
@@ -540,22 +540,22 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
 		cmn_err(CE_CONT, "pcram_attach: "
-			"RegisterClient client_handle 0x%x\n",
-			rs->client_handle);
+		    "RegisterClient client_handle 0x%x\n",
+		    rs->client_handle);
 	}
 #endif
 
 	/* Get logical socket number and store in pcram_state_t */
 	if ((ret = csx_MapLogSocket(rs->client_handle,
-				&map_log_socket)) != CS_SUCCESS) {
+	    &map_log_socket)) != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_attach: "
-			"MapLogSocket failed %s (0x%x)\n",
-			cft.text, ret);
+		    "MapLogSocket failed %s (0x%x)\n",
+		    cft.text, ret);
 	}
 
 	rs->sn = map_log_socket.PhySocket;
@@ -563,7 +563,7 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
 		cmn_err(CE_CONT, "pcram_attach: "
-			"MapLogSocket for socket %d\n", rs->sn);
+		    "MapLogSocket for socket %d\n", rs->sn);
 	}
 #endif
 
@@ -597,17 +597,17 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * we can start receiving events
 	 */
 	sockmask.EventMask = (CS_EVENT_CARD_INSERTION |
-				CS_EVENT_CARD_REMOVAL);
+	    CS_EVENT_CARD_REMOVAL);
 
 	if ((ret = csx_RequestSocketMask(rs->client_handle,
-					&sockmask)) != CS_SUCCESS) {
+	    &sockmask)) != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_attach: RequestSocketMask "
-			"failed %s (0x%x)\n", cft.text, ret);
+		    "failed %s (0x%x)\n", cft.text, ret);
 		goto out;
 	}
 
@@ -616,7 +616,7 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE)
 		cmn_err(CE_CONT,
-			"pcram_attach: RequestSocketMask OK\n");
+		    "pcram_attach: RequestSocketMask OK\n");
 #endif
 
 	/*
@@ -633,7 +633,7 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* XXX function return value ignored */
 	(void) csx_GetStatus(rs->client_handle, &get_status);
 	if (get_status.CardState & CS_EVENT_CARD_INSERTION) {
-	    if (!PCRAM_CARD_PRESENT(rs)) {
+		if (!PCRAM_CARD_PRESENT(rs)) {
 		mutex_enter(&rs->event_hilock);
 		cv_wait(&rs->firstopenwait_cv, &rs->event_hilock);
 		mutex_exit(&rs->event_hilock);
@@ -645,7 +645,7 @@ pcram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 #endif
 
-	    }
+		}
 	}
 
 	ddi_report_dev(dip);
@@ -678,8 +678,8 @@ pcram_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE)
 		cmn_err(CE_CONT,
-			"pcram_detach: instance %d cmd 0x%x\n",
-		instance, cmd);
+		    "pcram_detach: instance %d cmd 0x%x\n",
+		    instance, cmd);
 #endif
 
 	/* suspend */
@@ -696,8 +696,8 @@ pcram_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_detach: "
-			"could not get state structure "
-			"for instance %d.", instance);
+		    "could not get state structure "
+		    "for instance %d.", instance);
 		return (DDI_FAILURE);
 		/* NOTREACHED */
 	}
@@ -721,18 +721,18 @@ pcram_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 *	CS calls fail?
 	 */
 	if (rs->flags & PCRAM_REQSOCKMASK) {
-	    release_socket_mask_t rsm;
-	    if ((ret = csx_ReleaseSocketMask(rs->client_handle, &rsm))
-							!= CS_SUCCESS) {
-		error2text_t cft;
+		release_socket_mask_t rsm;
+		if ((ret = csx_ReleaseSocketMask(rs->client_handle, &rsm))
+		    != CS_SUCCESS) {
+			error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_detach: Socket %d "
-			"ReleaseSocketMask failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
-	    }
+		    "ReleaseSocketMask failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
+		}
 	}
 
 	/*
@@ -740,17 +740,17 @@ pcram_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 *	events at this point.
 	 */
 	if (rs->flags & PCRAM_REGCLIENT) {
-	    if ((ret = csx_DeregisterClient(rs->client_handle))
-						!= CS_SUCCESS) {
-		error2text_t cft;
+		if ((ret = csx_DeregisterClient(rs->client_handle))
+		    != CS_SUCCESS) {
+			error2text_t cft;
 
-		cft.item = ret;
-		(void) csx_Error2Text(&cft);
+			cft.item = ret;
+			(void) csx_Error2Text(&cft);
 
-		cmn_err(CE_CONT, "pcram_detach: Socket %d "
-				"DeregisterClient failed %s (0x%x)\n",
-				rs->sn, cft.text, ret);
-	    }
+			cmn_err(CE_CONT, "pcram_detach: Socket %d "
+			    "DeregisterClient failed %s (0x%x)\n",
+			    rs->sn, cft.text, ret);
+		}
 	}
 
 	if (rs->host_sp) {
@@ -813,14 +813,14 @@ pcram_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
 
 	switch (cmd) {
 
-	    case DDI_INFO_DEVT2DEVINFO:
-	    case DDI_INFO_DEVT2INSTANCE:
+		case DDI_INFO_DEVT2DEVINFO:
+		case DDI_INFO_DEVT2INSTANCE:
 		cs_ddi_info.Socket = PCRAM_SOCKET((dev_t)arg);
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE)
 		cmn_err(CE_CONT, "pcram_getinfo: socket %d\n",
-			cs_ddi_info.Socket);
+		    cs_ddi_info.Socket);
 #endif
 
 		cs_ddi_info.driver_name = pcram_name;
@@ -830,22 +830,22 @@ pcram_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
 		}
 
 		switch (cmd) {
-		    case DDI_INFO_DEVT2DEVINFO:
+			case DDI_INFO_DEVT2DEVINFO:
 			if (!(rs = ddi_get_soft_state(
-					pcram_soft_state_p,
-					cs_ddi_info.instance))) {
+			    pcram_soft_state_p,
+			    cs_ddi_info.instance))) {
 				*result = NULL;
 			} else {
 				*result = rs->dip;
 			}
 			break;
 
-		    case DDI_INFO_DEVT2INSTANCE:
+			case DDI_INFO_DEVT2INSTANCE:
 			*result = (void *)(uintptr_t)cs_ddi_info.instance;
 			break;
 		} /* switch */
 		break;
-	    default:
+		default:
 		error = DDI_FAILURE;
 		break;
 	} /* switch */
@@ -868,8 +868,8 @@ pcram_getinstance(dev_t devp)
 		cft.item = rval;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_NOTE,
-			"pcram[%d]: csx_CS_DDI_Info failed - %s\n",
-			PCRAM_SOCKET(devp), cft.text);
+		    "pcram[%d]: csx_CS_DDI_Info failed - %s\n",
+		    PCRAM_SOCKET(devp), cft.text);
 		return (-1);
 	}
 
@@ -907,22 +907,22 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	/* get instance number */
 	if ((instance = pcram_getinstance(*devp)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_open: pcram_getinfo failed\n");
+		    "pcram_open: pcram_getinfo failed\n");
 		return (ENXIO);
 	}
 
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_open: "
-			"could not get state for instance %d\n",
-			instance);
+		    "could not get state for instance %d\n",
+		    instance);
 		return (ENXIO);
 	}
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE)
 		cmn_err(CE_CONT, "pcram_open: socket %d "
-			"flag 0x%x otyp 0x%x\n", rs->sn, flag, otyp);
+		    "flag 0x%x otyp 0x%x\n", rs->sn, flag, otyp);
 #endif
 
 	mutex_enter(&rs->mutex);
@@ -937,7 +937,7 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	 * Do a CS call to see if the card is present
 	 */
 	if ((err = csx_GetStatus(rs->client_handle, &get_status))
-			!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		mutex_exit(&rs->mutex);
@@ -946,8 +946,8 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_open: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, err);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, err);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -955,8 +955,8 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT,
-			"pcram_open: socket %d GetStatus returns:\n",
-			rs->sn);
+		    "pcram_open: socket %d GetStatus returns:\n",
+		    rs->sn);
 		pcram_display_card_status(&get_status);
 	}
 #endif
@@ -971,7 +971,7 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "pcram_open: socket %d "
-			"ERROR: Found no memory card\n", rs->sn);
+		    "ERROR: Found no memory card\n", rs->sn);
 	}
 #endif
 
@@ -983,8 +983,8 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	if (get_status.CardState & CS_EVENT_BATTERY_DEAD) {
 		if (!rs->batter_dead_posted) {
 			cmn_err(CE_WARN, "pcram_open: socket %d "
-				"Battery & Data integrity "
-				"is not guaranteed\n", rs->sn);
+			    "Battery & Data integrity "
+			    "is not guaranteed\n", rs->sn);
 			/* Display once on the system console */
 			rs->batter_dead_posted++;
 		}
@@ -998,8 +998,8 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	if (get_status.CardState & CS_EVENT_BATTERY_LOW) {
 		if (!rs->batter_low_posted) {
 			cmn_err(CE_WARN, "pcram_open: socket %d "
-				"Battery should be replaced; "
-				"Data is OK\n", rs->sn);
+			    "Battery should be replaced; "
+			    "Data is OK\n", rs->sn);
 			/* Display once on the system console */
 			rs->batter_low_posted++;
 		}
@@ -1007,10 +1007,10 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 
 	/* Next check for read only file system */
 	if ((flag & FWRITE) &&
-		(get_status.CardState & CS_EVENT_WRITE_PROTECT)) {
-			mutex_exit(&rs->mutex);
-			return (EROFS);
-			/* NOTREACHED */
+	    (get_status.CardState & CS_EVENT_WRITE_PROTECT)) {
+		mutex_exit(&rs->mutex);
+		return (EROFS);
+		/* NOTREACHED */
 	}
 
 
@@ -1020,7 +1020,7 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	 * must fail.
 	 */
 	if ((flag & FEXCL) && (rs->blk_open || rs->chr_open ||
-						rs->nlayered)) {
+	    rs->nlayered)) {
 		mutex_exit(&rs->mutex);
 		return (EAGAIN);
 		/* NOTREACHED */
@@ -1071,9 +1071,9 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 		    != UNRECOGNIZED_MEDIA) {
 			rs->hdrv_chars->drv_ncyl =
 			    GET_NCYL(rs->card_size,
-				rs->hdrv_chars->drv_nhead,
-				rs->hdrv_chars->drv_sec_size,
-				rs->hdrv_chars->drv_secptrack);
+			    rs->hdrv_chars->drv_nhead,
+			    rs->hdrv_chars->drv_sec_size,
+			    rs->hdrv_chars->drv_secptrack);
 			/*
 			 * Actual card size is determined
 			 * so disable default_size_flag
@@ -1089,7 +1089,7 @@ pcram_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 			cmn_err(CE_NOTE, "pcram: socket %d - "
 			    "Unregconized PCMCIA Static RAM media",
 			    rs->sn);
-			    err = ENXIO;
+				err = ENXIO;
 		}
 	}
 	mutex_exit(&rs->mutex);
@@ -1107,15 +1107,15 @@ pcram_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	if ((instance = pcram_getinstance(dev)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_close: pcram_getinfo failed\n");
+		    "pcram_close: pcram_getinfo failed\n");
 		return (ENXIO);
 	}
 
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_close: "
-			"could not get state for instance %d\n",
-			instance);
+		    "could not get state for instance %d\n",
+		    instance);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -1123,7 +1123,7 @@ pcram_close(dev_t dev, int flag, int otyp, cred_t *cred)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE)
 		cmn_err(CE_CONT, "pcram_close: socket %d "
-			"flag 0x%x otyp 0x%x\n", rs->sn, flag, otyp);
+		    "flag 0x%x otyp 0x%x\n", rs->sn, flag, otyp);
 #endif
 
 	mutex_enter(&rs->mutex);
@@ -1164,7 +1164,7 @@ pcram_close(dev_t dev, int flag, int otyp, cred_t *cred)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
 		cmn_err(CE_CONT, "pcram_close: "
-			"Reset ejected_while_mounting flag\n");
+		    "Reset ejected_while_mounting flag\n");
 	}
 #endif
 		rs->ejected_while_mounting = 0;
@@ -1185,7 +1185,7 @@ pcram_print(dev_t dev, char *str)
 
 	if ((instance = pcram_getinstance(dev)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_print: pcram_getinfo failed\n");
+		    "pcram_print: pcram_getinfo failed\n");
 		return (ENXIO);
 	}
 
@@ -1224,15 +1224,15 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	if ((instance = pcram_getinstance(dev)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_read: pcram_getinfo failed\n");
+		    "pcram_read: pcram_getinfo failed\n");
 		return (ENXIO);
 	}
 
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_read: "
-			"could not get state for instance %d.",
-			instance);
+		    "could not get state for instance %d.",
+		    instance);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -1248,7 +1248,7 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * Do a CS call to see if the card is present
 	 */
 	if ((err = csx_GetStatus(rs->client_handle,
-					&get_status)) != CS_SUCCESS) {
+	    &get_status)) != CS_SUCCESS) {
 		error2text_t cft;
 
 		mutex_exit(&rs->mutex);
@@ -1257,8 +1257,8 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_read: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, err);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, err);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -1266,7 +1266,7 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "pcram_read: socket %d "
-			"GetStatus returns:\n", rs->sn);
+		    "GetStatus returns:\n", rs->sn);
 		pcram_display_card_status(&get_status);
 	}
 #endif
@@ -1282,15 +1282,15 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * is called
 	 */
 	if (!(get_status.CardState & CS_EVENT_CARD_INSERTION) ||
-					rs->ejected_while_mounting) {
+	    rs->ejected_while_mounting) {
 		if (!rs->card_eject_posted) {
 			/* XXX WARNING - card is ejected */
 			rs->card_eject_posted++;
 			rs->ejected_while_mounting = 1;
 			cmn_err(CE_WARN, "pcram: socket%d "
-				"Card is ejected & "
-				"Data integrity is not guaranteed",
-				rs->sn);
+			    "Card is ejected & "
+			    "Data integrity is not guaranteed",
+			    rs->sn);
 		}
 		mutex_exit(&rs->mutex);
 		return (EIO);
@@ -1337,11 +1337,11 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	if (pcram_debug & PCRAM_DEBUG_SIZE) {
 		if (nbytes > (rs->win_size-remainder_wsize))
 			cmn_err(CE_CONT, "pcram_read: socket %d - "
-				"READ: size not on window boundary\n"
-				"\toffset 0x%x, rs->win_size 0x%x\n"
-				"\tnbytes 0x%x, remainder_wsize 0x%x\n",
-				rs->sn, offset, (int)rs->win_size,
-				nbytes, remainder_wsize);
+			    "READ: size not on window boundary\n"
+			    "\toffset 0x%x, rs->win_size 0x%x\n"
+			    "\tnbytes 0x%x, remainder_wsize 0x%x\n",
+			    rs->sn, offset, (int)rs->win_size,
+			    nbytes, remainder_wsize);
 	}
 #endif
 
@@ -1368,17 +1368,17 @@ pcram_read(dev_t dev, struct uio *uiop, cred_t *credp)
 			pbuf = kmem_zalloc(copybytes, KM_SLEEP);
 			csx_RepGet8(
 				/* Card access handle */
-				rs->access_handle,
+			    rs->access_handle,
 				/* base dest addr */
-				(uchar_t *)pbuf,
+			    (uchar_t *)pbuf,
 				/* card window offset */
-				(uint32_t)remainder_wsize,
+			    (uint32_t)remainder_wsize,
 				/* num_bytes xfer */
-				copybytes,
+			    copybytes,
 				/* flag */
-				DDI_DEV_AUTOINCR);
+			    DDI_DEV_AUTOINCR);
 			error = uiomove((caddr_t)pbuf,
-				copybytes, UIO_READ, uiop);
+			    copybytes, UIO_READ, uiop);
 
 			/* now free csbuf */
 			kmem_free(pbuf, copybytes);
@@ -1432,15 +1432,15 @@ pcram_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	if ((instance = pcram_getinstance(dev)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_write: pcram_getinfo failed\n");
+		    "pcram_write: pcram_getinfo failed\n");
 		return (ENXIO);
 	}
 
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_write: "
-			"could not get state for instance %d.",
-			instance);
+		    "could not get state for instance %d.",
+		    instance);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -1456,7 +1456,7 @@ pcram_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * Do a CS call to see if the card is present
 	 */
 	if ((err = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		mutex_exit(&rs->mutex);
@@ -1465,8 +1465,8 @@ pcram_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_write: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, err);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, err);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -1483,15 +1483,15 @@ pcram_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * is called
 	 */
 	if (!(get_status.CardState & CS_EVENT_CARD_INSERTION) ||
-					rs->ejected_while_mounting) {
+	    rs->ejected_while_mounting) {
 		if (!rs->card_eject_posted) {
 			/* XXX WARNING - card is ejected */
 			rs->card_eject_posted++;
 			rs->ejected_while_mounting = 1;
 			cmn_err(CE_WARN, "pcram: socket%d "
-				"Card is ejected & "
-				"Data integrity is not guaranteed",
-				rs->sn);
+			    "Card is ejected & "
+			    "Data integrity is not guaranteed",
+			    rs->sn);
 		}
 		mutex_exit(&rs->mutex);
 		return (EIO);
@@ -1548,11 +1548,11 @@ pcram_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	if (pcram_debug & PCRAM_DEBUG_SIZE) {
 		if (nbytes > (rs->win_size-remainder_wsize))
 			cmn_err(CE_CONT, "pcram_write: socket %d - "
-				"WRITE: size not on window boundary\n"
-				"\toffset 0x%x, rs->win_size 0x%x\n"
-				"\tnbytes 0x%x, remainder_wsize 0x%x\n",
-				rs->sn, offset, (int)rs->win_size,
-				nbytes, remainder_wsize);
+			    "WRITE: size not on window boundary\n"
+			    "\toffset 0x%x, rs->win_size 0x%x\n"
+			    "\tnbytes 0x%x, remainder_wsize 0x%x\n",
+			    rs->sn, offset, (int)rs->win_size,
+			    nbytes, remainder_wsize);
 	}
 #endif
 
@@ -1562,7 +1562,7 @@ pcram_write(dev_t dev, struct uio *uiop, cred_t *credp)
 			 *  the two windows
 			 */
 			error = uiomove(rs->host_sp, copybytes,
-						UIO_WRITE, uiop);
+			    UIO_WRITE, uiop);
 			if (error != 0) {
 				rval = EFAULT;
 				goto out;
@@ -1625,15 +1625,15 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	if ((instance = pcram_getinstance(dev)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_ioctl: pcram_getinfo failed\n");
+		    "pcram_ioctl: pcram_getinfo failed\n");
 		return (ENXIO);
 	}
 
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_ioctl: "
-			"could not get state for instance %d.",
-			instance);
+		    "could not get state for instance %d.",
+		    instance);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -1641,8 +1641,8 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
 		cmn_err(CE_CONT, "pcram_ioctl: socket %d "
-			"cmd 0x%x arg 0x%lx mode 0x%x\n",
-			rs->sn, cmd, arg, mode);
+		    "cmd 0x%x arg 0x%lx mode 0x%x\n",
+		    rs->sn, cmd, arg, mode);
 	}
 #endif
 
@@ -1777,7 +1777,7 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	case DKIOCGAPART:
 		nblks = rs->hdrv_chars->drv_nhead *
-				rs->hdrv_chars->drv_secptrack;
+		    rs->hdrv_chars->drv_secptrack;
 #ifdef _MULTI_DATAMODEL
 		switch (ddi_model_convert_from(mode & FMODELS)) {
 		case DDI_MODEL_ILP32: {
@@ -1927,7 +1927,7 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (!rs->default_size_flag) {
 #ifdef	PCRAM_DEBUG
 			if (pcram_debug & PCRAM_DEBUG_CIS) {
-			    cmn_err(CE_CONT, "pcram_ioctl: socket %d\n"
+				cmn_err(CE_CONT, "pcram_ioctl: socket %d\n"
 				"\tPCRAM_PROBESIZE: card size "
 				"is already\n\t\tdetermined from "
 				"DOS_BPB, VTOC, or CIS\n", rs->sn);
@@ -1957,15 +1957,15 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * Do a CS call to see if the card is present
 		 */
 		if ((err = csx_GetStatus(rs->client_handle, &get_status))
-							!= CS_SUCCESS) {
+		    != CS_SUCCESS) {
 			error2text_t cft;
 
 			mutex_exit(&rs->mutex);
 			cft.item = err;
 			(void) csx_Error2Text(&cft);
 			cmn_err(CE_CONT, "pcram_ioctl: socket %d "
-				"GetStatus failed %s (0x%x)\n",
-				rs->sn, cft.text, err);
+			    "GetStatus failed %s (0x%x)\n",
+			    rs->sn, cft.text, err);
 			return (ENXIO);
 			/* NOTREACHED */
 		}
@@ -1973,12 +1973,12 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (get_status.CardState & CS_EVENT_WRITE_PROTECT) {
 			err = EROFS;
 		} else if ((rs->card_size = pcram_card_sizing(rs))
-						!= UNRECOGNIZED_MEDIA) {
+		    != UNRECOGNIZED_MEDIA) {
 			rs->hdrv_chars->drv_ncyl =
 			    GET_NCYL(rs->card_size,
-				rs->hdrv_chars->drv_nhead,
-				rs->hdrv_chars->drv_sec_size,
-				rs->hdrv_chars->drv_secptrack);
+			    rs->hdrv_chars->drv_nhead,
+			    rs->hdrv_chars->drv_sec_size,
+			    rs->hdrv_chars->drv_secptrack);
 			/*
 			 * Actual card size is determined
 			 * so disable default_size_flag
@@ -1993,8 +1993,8 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			 * specification)
 			 */
 			cmn_err(CE_NOTE, "pcram: socket %d - "
-				"Unregconized PCMCIA Static RAM media",
-				rs->sn);
+			    "Unregconized PCMCIA Static RAM media",
+			    rs->sn);
 			err = ENXIO;
 		}
 
@@ -2048,7 +2048,7 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 		/* GetStatus */
 		if ((err = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+		    != CS_SUCCESS) {
 			error2text_t cft;
 
 			mutex_exit(&rs->mutex);
@@ -2068,7 +2068,7 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			/* Simulating - floppy is present */
 			fdchange &= ~FDGC_CURRENT;
 			if (get_status.CardState &
-					CS_EVENT_WRITE_PROTECT) {
+			    CS_EVENT_WRITE_PROTECT) {
 				/*
 				 * Simulating
 				 *	floppy is write protected
@@ -2139,7 +2139,7 @@ pass:		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 		if (rs == NULL) {
 			cmn_err(CE_NOTE, "pcram_prop_op: "
-				"no state for instance %d", instance);
+			    "no state for instance %d", instance);
 			goto pass;
 		}
 
@@ -2168,7 +2168,7 @@ pcram_strategy(struct buf *bp)
 
 	if ((instance = pcram_getinstance(bp->b_edev)) == -1) {
 		cmn_err(CE_NOTE,
-			"pcram_strategy: pcram_getinfo failed\n");
+		    "pcram_strategy: pcram_getinfo failed\n");
 		err = ENXIO;
 		goto out;
 	}
@@ -2176,8 +2176,8 @@ pcram_strategy(struct buf *bp)
 	rs = ddi_get_soft_state(pcram_soft_state_p, instance);
 	if (rs == NULL) {
 		cmn_err(CE_NOTE, "pcram_strategy: "
-			"could not get state for instance %d.",
-			instance);
+		    "could not get state for instance %d.",
+		    instance);
 		err = ENXIO;
 		goto out;
 	}
@@ -2191,15 +2191,15 @@ pcram_strategy(struct buf *bp)
 
 	/* Do a CS call to see if the card is present */
 	if ((err = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		mutex_exit(&rs->mutex);
 		cft.item = err;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_strategy: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, err);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, err);
 		err = ENXIO;
 		goto out;
 	}
@@ -2207,7 +2207,7 @@ pcram_strategy(struct buf *bp)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "pcram_strategy: socket %d "
-			"GetStatus returns:\n", rs->sn);
+		    "GetStatus returns:\n", rs->sn);
 		pcram_display_card_status(&get_status);
 	}
 #endif
@@ -2223,21 +2223,21 @@ pcram_strategy(struct buf *bp)
 	 * is called
 	 */
 	if (!(get_status.CardState & CS_EVENT_CARD_INSERTION) ||
-					rs->ejected_while_mounting) {
+	    rs->ejected_while_mounting) {
 		if (!rs->card_eject_posted) {
 			/* XXX WARNING - card is ejected */
 			rs->card_eject_posted++;
 			rs->ejected_while_mounting = 1;
 			cmn_err(CE_WARN, "pcram: socket%d "
 		"Card is ejected & Data integrity is not guaranteed",
-				rs->sn);
+			    rs->sn);
 		}
 		mutex_exit(&rs->mutex);
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "pcram_strategy: socket %d - ERROR: "
-			"Found no memory card\n", rs->sn);
+		    "Found no memory card\n", rs->sn);
 	}
 #endif
 
@@ -2347,14 +2347,14 @@ pcram_start(pcram_state_t *rs)
 	if (pcram_debug & PCRAM_DEBUG_SIZE) {
 		if (nbytes > (rs->win_size-remainder_wsize)) {
 			cmn_err(CE_CONT, "pcram_start: socket %d - "
-				"%s: size not on window boundary\n"
-				"\toffset 0x%x, rs->win_size 0x%x\n"
-				"\tnbytes 0x%x, remainder_wsize 0x%x\n",
-				rs->sn,
-				(bp->b_flags & B_READ) ?
-					"READ" : "WRITE",
-				offset, (int)rs->win_size,
-				nbytes, remainder_wsize);
+			    "%s: size not on window boundary\n"
+			    "\toffset 0x%x, rs->win_size 0x%x\n"
+			    "\tnbytes 0x%x, remainder_wsize 0x%x\n",
+			    rs->sn,
+			    (bp->b_flags & B_READ) ?
+			    "READ" : "WRITE",
+			    offset, (int)rs->win_size,
+			    nbytes, remainder_wsize);
 		}
 	}
 #endif
@@ -2362,15 +2362,15 @@ pcram_start(pcram_state_t *rs)
 		if (bp->b_flags & B_READ) {
 			/* Read direct from PC Card memory  */
 			csx_RepGet8(/* Card access handle */
-				rs->access_handle,
+			    rs->access_handle,
 				/* base dest addr */
-				(uchar_t *)buf_addr,
+			    (uchar_t *)buf_addr,
 				/* card window offset */
-				(uint32_t)remainder_wsize,
+			    (uint32_t)remainder_wsize,
 				/* num_bytes xfer */
-				copybytes,
+			    copybytes,
 				/* flag */
-				DDI_DEV_AUTOINCR);
+			    DDI_DEV_AUTOINCR);
 
 		} else {	/*  WRITE operation  */
 			/*
@@ -2488,10 +2488,10 @@ card_byte_wr(pcram_state_t *rs, int xfer_size, int offset)
 		if (PCRAM_CARD_PRESENT(rs)) {
 			if (rs->card_event & PCRAM_WRITE_PROTECT) {
 				if (!rs->wp_posted) {
-				    rs->wp_posted++;
-				    cmn_err(CE_WARN, "pcram: socket%d "
-					"Write-Protect is enabled",
-					rs->sn);
+					rs->wp_posted++;
+					cmn_err(CE_WARN, "pcram: socket%d "
+					    "Write-Protect is enabled",
+					    rs->sn);
 				}
 				/*
 				 * stop writing when
@@ -2500,7 +2500,7 @@ card_byte_wr(pcram_state_t *rs, int xfer_size, int offset)
 				break;
 			} else {
 				csx_Put8(rs->access_handle,
-					cardoffset, *hostmempt);
+				    cardoffset, *hostmempt);
 				hostmempt++;
 				cardoffset++;
 			}
@@ -2534,15 +2534,15 @@ update_mapmempage(pcram_state_t *rs, int offset)
 	 * Do a CS call to see if the card is present
 	 */
 	if ((err = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = err;
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "update_mapmempage: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, err);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, err);
 		/* Let caller knows that there is some thing wrong */
 		return (-1);
 		/* NOTREACHED */
@@ -2551,7 +2551,7 @@ update_mapmempage(pcram_state_t *rs, int offset)
 	if (!(get_status.CardState & CS_EVENT_CARD_INSERTION)) {
 #ifdef	PCRAM_DEBUG
 	cmn_err(CE_CONT, "update_mapmempage: "
-		"\tFound no memory card in socket %d\n", rs->sn);
+	    "\tFound no memory card in socket %d\n", rs->sn);
 #endif
 		/* Let caller knows that there is no card */
 		return (-1);
@@ -2569,8 +2569,8 @@ update_mapmempage(pcram_state_t *rs, int offset)
 
 	if (rs->win_size == 0) {
 		cmn_err(CE_CONT, "update_mapmempage: "
-			"Found zero rs->win_size %d\n",
-			(int)rs->win_size);
+		    "Found zero rs->win_size %d\n",
+		    (int)rs->win_size);
 		/* To avoid zero divide problem */
 		return (-1);
 		/* NOTREACHED */
@@ -2588,23 +2588,23 @@ update_mapmempage(pcram_state_t *rs, int offset)
 
 
 	if ((ret = csx_MapMemPage(rs->window_handle, &map_mem_page))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "update_mapmempage: "
-			"MapMemPage failed %s (0x%x)\n", cft.text, ret);
+		    "MapMemPage failed %s (0x%x)\n", cft.text, ret);
 
 		if ((ret = csx_ReleaseWindow(rs->window_handle))
-						!= CS_SUCCESS) {
+		    != CS_SUCCESS) {
 			error2text_t cft;
 
 			cft.item = ret;
 			(void) csx_Error2Text(&cft);
 			cmn_err(CE_CONT, "update_mapmempage: "
-				"ReleaseWindow failed %s (0x%x)\n",
-				cft.text, ret);
+			    "ReleaseWindow failed %s (0x%x)\n",
+			    cft.text, ret);
 		}
 
 		/* Let caller knows that there is some thing wrong */
@@ -2674,8 +2674,8 @@ static int pcram_card_sizing(pcram_state_t *rs)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_SIZE) {
 		cmn_err(CE_CONT, "pcram_card_sizing: socket %d \n"
-			"\tBlock size sample [%d bytes]\n",
-			rs->sn, blocksize);
+		    "\tBlock size sample [%d bytes]\n",
+		    rs->sn, blocksize);
 	}
 #endif
 
@@ -2737,8 +2737,8 @@ static int pcram_card_sizing(pcram_state_t *rs)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_SIZE) {
 		cmn_err(CE_CONT, "pcram_card_sizing: socket %d \n"
-			"\tFound card_size [%d bytes]\n",
-			rs->sn, offset);
+		    "\tFound card_size [%d bytes]\n",
+		    rs->sn, offset);
 	}
 #endif
 
@@ -2786,7 +2786,7 @@ pcram_check_media(pcram_state_t *rs, enum dkio_state state)
 	 * Do a CS call to see if the card is present
 	 */
 	if ((err = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		mutex_exit(&rs->mutex);
@@ -2794,8 +2794,8 @@ pcram_check_media(pcram_state_t *rs, enum dkio_state state)
 		cft.item = err;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_check_media: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, err);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, err);
 		return (ENXIO);
 		/* NOTREACHED */
 	}
@@ -2827,7 +2827,7 @@ pcram_check_media(pcram_state_t *rs, enum dkio_state state)
 	 */
 	if (state != DKIO_NONE) {
 		if (rs->ejected_media_flag &&
-				(rs->media_state == DKIO_EJECTED)) {
+		    (rs->media_state == DKIO_EJECTED)) {
 			rs->media_state = DKIO_NONE;
 			rs->ejected_media_flag = 0;
 			mutex_exit(&rs->mutex);
@@ -2838,11 +2838,11 @@ pcram_check_media(pcram_state_t *rs, enum dkio_state state)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_VOLD) {
-	    cmn_err(CE_CONT, "pcram_check_media: socket %d \n"
-		"\tWaiting state change: rs->media_state %d state %d\n"
-		"\tDKIO_NONE %d DKIO_EJECTED %d DKIO_INSERTED %d\n",
-		rs->sn, rs->media_state, state,
-		DKIO_NONE, DKIO_EJECTED, DKIO_INSERTED);
+		cmn_err(CE_CONT, "pcram_check_media: socket %d \n"
+		    "\tWaiting state change: rs->media_state %d state %d\n"
+		    "\tDKIO_NONE %d DKIO_EJECTED %d DKIO_INSERTED %d\n",
+		    rs->sn, rs->media_state, state,
+		    DKIO_NONE, DKIO_EJECTED, DKIO_INSERTED);
 	}
 #endif
 
@@ -2854,7 +2854,7 @@ pcram_check_media(pcram_state_t *rs, enum dkio_state state)
 	while (rs->media_state == state) {
 		rs->checkmedia_flag++;
 		if (cv_wait_sig(&rs->condvar_mediastate,
-						&rs->mutex) == 0) {
+		    &rs->mutex) == 0) {
 			mutex_exit(&rs->mutex);
 			return (EINTR);
 			/* NOTREACHED */
@@ -2863,17 +2863,17 @@ pcram_check_media(pcram_state_t *rs, enum dkio_state state)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_VOLD) {
-	    cmn_err(CE_CONT, "pcram_check_media: socket %d \n"
-		"\tAfter state change: rs->media_state %d state %d\n"
-		"\tDKIO_NONE %d DKIO_EJECTED %d DKIO_INSERTED %d\n",
-		rs->sn, rs->media_state, state,
-		DKIO_NONE, DKIO_EJECTED, DKIO_INSERTED);
+		cmn_err(CE_CONT, "pcram_check_media: socket %d \n"
+		    "\tAfter state change: rs->media_state %d state %d\n"
+		    "\tDKIO_NONE %d DKIO_EJECTED %d DKIO_INSERTED %d\n",
+		    rs->sn, rs->media_state, state,
+		    DKIO_NONE, DKIO_EJECTED, DKIO_INSERTED);
 	}
 #endif
 
 	if (state != DKIO_NONE) {
 		if (!rs->ejected_media_flag &&
-				(rs->media_state == DKIO_EJECTED)) {
+		    (rs->media_state == DKIO_EJECTED)) {
 			rs->ejected_media_flag++;
 		}
 	}
@@ -2963,7 +2963,7 @@ pcram_build_label_vtoc(pcram_state_t *rs, struct vtoc *vtoc)
 	bcopy(vtoc->v_asciilabel, rs->un_label.dkl_asciilabel, LEN_DKL_ASCII);
 
 	nblks = rs->hdrv_chars->drv_nhead *
-			rs->hdrv_chars->drv_secptrack;
+	    rs->hdrv_chars->drv_secptrack;
 
 	lmap = rs->un_label.dkl_map;
 	vpart = vtoc->v_part;
@@ -2999,11 +2999,11 @@ pcram_build_label_vtoc(pcram_state_t *rs, struct vtoc *vtoc)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug > 1) {
-	    cmn_err(CE_CONT, "pcram_build_label_vtoc: socket %d\n"
-		"\tncyl %d, nhd %d, nsec %d, pcyl %d\n",
-		rs->sn,
-		rs->un_label.dkl_ncyl, rs->un_label.dkl_nhead,
-		rs->un_label.dkl_nsect, rs->un_label.dkl_pcyl);
+		cmn_err(CE_CONT, "pcram_build_label_vtoc: socket %d\n"
+		    "\tncyl %d, nhd %d, nsec %d, pcyl %d\n",
+		    rs->sn,
+		    rs->un_label.dkl_ncyl, rs->un_label.dkl_nhead,
+		    rs->un_label.dkl_nsect, rs->un_label.dkl_pcyl);
 	}
 #endif
 
@@ -3062,34 +3062,34 @@ pcram_event(event_t event, int priority, event_callback_args_t *eca)
 		(void) csx_Event2Text(&event2text);
 
 		cmn_err(CE_CONT, "pcram_event: socket %d \n"
-			"\tevent %s (0x%x) priority 0x%x\n",
-			rs->sn, event2text.text, event, priority);
+		    "\tevent %s (0x%x) priority 0x%x\n",
+		    rs->sn, event2text.text, event, priority);
 	}
 #endif
 	/*
 	 * Find out which event we got and do the appropriate thing
 	 */
 	switch (event) {
-	    case CS_EVENT_REGISTRATION_COMPLETE:
+		case CS_EVENT_REGISTRATION_COMPLETE:
 		break;
-	    case CS_EVENT_CARD_INSERTION:
+		case CS_EVENT_CARD_INSERTION:
 		if (priority & CS_EVENT_PRI_LOW) {
-		    retcode = pcram_card_insertion(rs);
+			retcode = pcram_card_insertion(rs);
 		}
 		break;
-	    case CS_EVENT_BATTERY_LOW:
+		case CS_EVENT_BATTERY_LOW:
 		break;
-	    case CS_EVENT_BATTERY_DEAD:
+		case CS_EVENT_BATTERY_DEAD:
 		break;
-	    case CS_EVENT_WRITE_PROTECT:
+		case CS_EVENT_WRITE_PROTECT:
 		if (priority & CS_EVENT_PRI_LOW) {
 			mutex_enter(&rs->mutex);
 		}
 		if (eca->info) {
-		    rs->card_event |= PCRAM_WRITE_PROTECT;
+			rs->card_event |= PCRAM_WRITE_PROTECT;
 		} else {
-		    rs->card_event &= ~PCRAM_WRITE_PROTECT;
-		    rs->wp_posted = 0;
+			rs->card_event &= ~PCRAM_WRITE_PROTECT;
+			rs->wp_posted = 0;
 		}
 		if (priority & CS_EVENT_PRI_LOW) {
 			mutex_exit(&rs->mutex);
@@ -3103,7 +3103,7 @@ pcram_event(event_t event, int priority, event_callback_args_t *eca)
 		 *  event masks.
 		 *  (See the call to RegisterClient).
 		 */
-	    case CS_EVENT_CARD_REMOVAL:
+		case CS_EVENT_CARD_REMOVAL:
 		if (priority & CS_EVENT_PRI_HIGH) {
 			retcode = CS_SUCCESS;
 			rs->card_event &= ~PCRAM_CARD_INSERTED;
@@ -3114,16 +3114,16 @@ pcram_event(event_t event, int priority, event_callback_args_t *eca)
 			mutex_exit(&rs->event_hilock);
 		}
 		break;
-	    case CS_EVENT_CLIENT_INFO:
+		case CS_EVENT_CLIENT_INFO:
 		if (GET_CLIENT_INFO_SUBSVC(ci->Attributes) ==
-					CS_CLIENT_INFO_SUBSVC_CS) {
+		    CS_CLIENT_INFO_SUBSVC_CS) {
 			ci->Revision = PCRAM_REV_LEVEL;
 			ci->CSLevel = CS_VERSION;
 			ci->RevDate = PCRAM_REV_DATE;
 			(void) strcpy(ci->ClientName,
-					PCRAM_CLIENT_DESCRIPTION);
+			    PCRAM_CLIENT_DESCRIPTION);
 			(void) strcpy(ci->VendorName,
-					PCRAM_VENDOR_DESCRIPTION);
+			    PCRAM_VENDOR_DESCRIPTION);
 			ci->Attributes |= CS_CLIENT_INFO_VALID;
 			retcode = CS_SUCCESS;
 		} /* CS_CLIENT_INFO_SUBSVC_CS */
@@ -3171,7 +3171,7 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_VOLD) {
-	    cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
+		cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
 		"\tdoing cv_broadcast - "
 		"rs->media_state of DKIO_INSERTED\n", rs->sn);
 	}
@@ -3197,14 +3197,14 @@ pcram_card_insertion(pcram_state_t *rs)
 	 * Do a CS call to check the card state
 	 */
 	if ((ret = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		mutex_enter(&rs->event_hilock);
 		cv_broadcast(&rs->firstopenwait_cv);
 		mutex_exit(&rs->event_hilock);
@@ -3217,7 +3217,7 @@ pcram_card_insertion(pcram_state_t *rs)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d "
-			"ERROR: Found no memory card\n", rs->sn);
+		    "ERROR: Found no memory card\n", rs->sn);
 	}
 #endif
 		mutex_enter(&rs->event_hilock);
@@ -3237,14 +3237,14 @@ pcram_card_insertion(pcram_state_t *rs)
 	 */
 	se.Attributes = CONF_EVENT_MASK_CLIENT;
 	if ((ret = csx_GetEventMask(rs->client_handle, &se))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d "
-			"GetEventMask failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "GetEventMask failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		mutex_enter(&rs->event_hilock);
 		cv_broadcast(&rs->firstopenwait_cv);
 		mutex_exit(&rs->event_hilock);
@@ -3253,17 +3253,17 @@ pcram_card_insertion(pcram_state_t *rs)
 	}
 
 	se.EventMask |= (CS_EVENT_BATTERY_LOW | CS_EVENT_BATTERY_DEAD |
-						CS_EVENT_WRITE_PROTECT);
+	    CS_EVENT_WRITE_PROTECT);
 
 	if ((ret = csx_SetEventMask(rs->client_handle, &se))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d "
-			"SetEventMask failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "SetEventMask failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		mutex_enter(&rs->event_hilock);
 		cv_broadcast(&rs->firstopenwait_cv);
 		mutex_exit(&rs->event_hilock);
@@ -3282,15 +3282,15 @@ pcram_card_insertion(pcram_state_t *rs)
 		mutex_exit(&rs->mutex);
 
 		if ((ret = csx_ReleaseWindow(rs->window_handle))
-						!= CS_SUCCESS) {
+		    != CS_SUCCESS) {
 			error2text_t cft;
 
 			cft.item = ret;
 			(void) csx_Error2Text(&cft);
 			cmn_err(CE_CONT,
-				"pcram_card_insertion: socket %d "
-				"ReleaseWindow failed %s (0x%x)\n",
-				rs->sn, cft.text, ret);
+			    "pcram_card_insertion: socket %d "
+			    "ReleaseWindow failed %s (0x%x)\n",
+			    rs->sn, cft.text, ret);
 		}
 	}
 
@@ -3298,7 +3298,7 @@ pcram_card_insertion(pcram_state_t *rs)
 	 * Try to get a memory window to CM space
 	 */
 	win_req.Attributes = (WIN_MEMORY_TYPE_CM | WIN_DATA_WIDTH_16 |
-							WIN_ENABLE);
+	    WIN_ENABLE);
 	win_req.Base.base = 0;	/* let CS find us a base address */
 	win_req.Size = 0;	/* let CS return the smallest size */
 				/* window it finds */
@@ -3313,14 +3313,14 @@ pcram_card_insertion(pcram_state_t *rs)
 	win_req.win_params.AccessSpeed = convert_speed.devspeed;
 
 	if ((ret = csx_RequestWindow(rs->client_handle,
-			&rs->window_handle, &win_req)) != CS_SUCCESS) {
+	    &rs->window_handle, &win_req)) != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d "
-			"RequestWindow failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "RequestWindow failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		mutex_enter(&rs->event_hilock);
 		cv_broadcast(&rs->firstopenwait_cv);
 		mutex_exit(&rs->event_hilock);
@@ -3334,15 +3334,15 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
-	    cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
-		"\tRequestWindow successful handle 0x%x\n"
-		"\tAttributes 0x%x Base 0x%x \n"
-		"\tSize 0x%x AccessSpeed 0x%x\n",
-		rs->sn, rs->window_handle,
-		win_req.Attributes,
-		win_req.Base.base,
-		win_req.Size,
-		win_req.win_params.AccessSpeed);
+		cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
+		    "\tRequestWindow successful handle 0x%x\n"
+		    "\tAttributes 0x%x Base 0x%x \n"
+		    "\tSize 0x%x AccessSpeed 0x%x\n",
+		    rs->sn, rs->window_handle,
+		    win_req.Attributes,
+		    win_req.Base.base,
+		    win_req.Size,
+		    win_req.win_params.AccessSpeed);
 	}
 #endif
 
@@ -3353,7 +3353,7 @@ pcram_card_insertion(pcram_state_t *rs)
 	map_mem_page.Page = 0;
 
 	if ((ret = csx_MapMemPage(rs->window_handle,
-				&map_mem_page)) != CS_SUCCESS) {
+	    &map_mem_page)) != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
@@ -3364,19 +3364,19 @@ pcram_card_insertion(pcram_state_t *rs)
 		mutex_exit(&rs->mutex);
 
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d "
-			"MapMemPage failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "MapMemPage failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 
 		if ((ret = csx_ReleaseWindow(rs->window_handle))
-						!= CS_SUCCESS) {
+		    != CS_SUCCESS) {
 			error2text_t cft;
 
 			cft.item = ret;
 			(void) csx_Error2Text(&cft);
 			cmn_err(CE_CONT,
-				"pcram_card_insertion: socket %d "
-				"ReleaseWindow failed %s (0x%x)\n",
-				rs->sn, cft.text, ret);
+			    "pcram_card_insertion: socket %d "
+			    "ReleaseWindow failed %s (0x%x)\n",
+			    rs->sn, cft.text, ret);
 		}
 		mutex_enter(&rs->event_hilock);
 		cv_broadcast(&rs->firstopenwait_cv);
@@ -3393,12 +3393,12 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
-	    cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
-		"\tBase 0x%x rs->access_handle 0x%p\n"
-		"\tSize 0x%x rs->win_size 0x%x\n",
-		rs->sn,
-		win_req.Base.base, (void *)rs->access_handle,
-		win_req.Size, (int)rs->win_size);
+		cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
+		    "\tBase 0x%x rs->access_handle 0x%p\n"
+		    "\tSize 0x%x rs->win_size 0x%x\n",
+		    rs->sn,
+		    win_req.Base.base, (void *)rs->access_handle,
+		    win_req.Size, (int)rs->win_size);
 	}
 #endif
 
@@ -3412,11 +3412,11 @@ pcram_card_insertion(pcram_state_t *rs)
 		rval = CS_GENERAL_FAILURE;
 		if (ret == 0) {
 			cmn_err(CE_CONT,
-				"pcram_card_insertion: socket %d \n"
-				"\tERROR - pcram_build_region_lists - "
-				"AM[%d], CM[%d]\n",
-				rs->sn, rs->num_am_regions,
-				rs->num_cm_regions);
+			    "pcram_card_insertion: socket %d \n"
+			    "\tERROR - pcram_build_region_lists - "
+			    "AM[%d], CM[%d]\n",
+			    rs->sn, rs->num_am_regions,
+			    rs->num_cm_regions);
 		} else if (ret == -2) {
 			/*
 			 * Found unsupported Device error
@@ -3429,9 +3429,9 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
-		"\tRegion number - AM[%d], CM[%d]\n",
-		rs->sn, rs->num_am_regions, rs->num_cm_regions);
+		cmn_err(CE_CONT, "pcram_card_insertion: socket %d \n"
+		    "\tRegion number - AM[%d], CM[%d]\n",
+		    rs->sn, rs->num_am_regions, rs->num_cm_regions);
 	}
 #endif
 
@@ -3453,9 +3453,9 @@ pcram_card_insertion(pcram_state_t *rs)
 		/* Get  BUILD_DOS_BPBFAT_LIST list */
 		first = 1;
 		while (mrp = pcram_get_firstnext_region(mrp,
-					REGION_DOS_BPBFAT,
-					CISTPL_DEVICE_DTYPE_SRAM,
-					&first)) {
+		    REGION_DOS_BPBFAT,
+		    CISTPL_DEVICE_DTYPE_SRAM,
+		    &first)) {
 			/* XXX - For now assuming there is ONLY */
 			/*	one DOS region 			*/
 
@@ -3464,17 +3464,17 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT,
-		"pcram_card_insertion: socket %d - "
-		"BUILD_DOS_BPBFAT_LIST\n\tdevice speed [%d]\n",
-		rs->sn, (int)mrp->nS_speed);
+		cmn_err(CE_CONT,
+		    "pcram_card_insertion: socket %d - "
+		    "BUILD_DOS_BPBFAT_LIST\n\tdevice speed [%d]\n",
+		    rs->sn, (int)mrp->nS_speed);
 	}
 #endif
 
 			/* for VERBOSE mode */
 			cmn_err(CE_CONT, "?pcram: "
-				"(MSDOS) socket %d card size %d\n",
-				rs->sn, rs->card_size);
+			    "(MSDOS) socket %d card size %d\n",
+			    rs->sn, rs->card_size);
 
 		} /* while */
 
@@ -3483,9 +3483,9 @@ pcram_card_insertion(pcram_state_t *rs)
 		mrp = rs->cm_regions;
 		first = 1;
 		while (mrp = pcram_get_firstnext_region(mrp,
-					REGION_SOLARIS,
-					CISTPL_DEVICE_DTYPE_SRAM,
-					&first)) {
+		    REGION_SOLARIS,
+		    CISTPL_DEVICE_DTYPE_SRAM,
+		    &first)) {
 			/* XXX - For now assuming there is ONLY */
 			/*	one Solaris region 		*/
 
@@ -3494,16 +3494,16 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT,
-		"pcram_card_insertion: socket %d - BUILD_SOLARIS_LIST\n"
-		"\tdevice speed [%d]\n", rs->sn, (int)mrp->nS_speed);
+		cmn_err(CE_CONT,
+		    "pcram_card_insertion: socket %d - BUILD_SOLARIS_LIST\n"
+		    "\tdevice speed [%d]\n", rs->sn, (int)mrp->nS_speed);
 	}
 #endif
 
 			/* for VERBOSE mode */
 			cmn_err(CE_CONT, "?pcram: "
-				"(SOLARIS) socket %d card size %d\n",
-				rs->sn, rs->card_size);
+			    "(SOLARIS) socket %d card size %d\n",
+			    rs->sn, rs->card_size);
 
 		} /* while */
 
@@ -3512,9 +3512,9 @@ pcram_card_insertion(pcram_state_t *rs)
 		mrp = rs->cm_regions;
 		first = 1;
 		while (mrp = pcram_get_firstnext_region(mrp,
-					REGION_DEFAULT,
-					CISTPL_DEVICE_DTYPE_SRAM,
-					&first)) {
+		    REGION_DEFAULT,
+		    CISTPL_DEVICE_DTYPE_SRAM,
+		    &first)) {
 			/* XXX - For now assuming there is ONLY */
 			/*	one DEFAULT region 		*/
 
@@ -3526,17 +3526,17 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT,
-		"pcram_card_insertion: socket %d - BUILD_DEFAULT_LIST\n"
-		"\tdevice speed [%d]\n", rs->sn, (int)mrp->nS_speed);
+		cmn_err(CE_CONT,
+		    "pcram_card_insertion: socket %d - BUILD_DEFAULT_LIST\n"
+		    "\tdevice speed [%d]\n", rs->sn, (int)mrp->nS_speed);
 	}
 #endif
 			update_hdrv_chars(rs, mrp);
 
 			/* for VERBOSE mode */
 			cmn_err(CE_CONT, "?pcram: "
-				"(DEFAULT) socket %d card size %d\n",
-				rs->sn, rs->card_size);
+			    "(DEFAULT) socket %d card size %d\n",
+			    rs->sn, rs->card_size);
 
 		} /* while */
 
@@ -3545,9 +3545,9 @@ pcram_card_insertion(pcram_state_t *rs)
 		mrp = rs->cm_regions;
 		first = 1;
 		while (mrp = pcram_get_firstnext_region(mrp,
-					REGION_VALID,
-					CISTPL_DEVICE_DTYPE_SRAM,
-					&first)) {
+		    REGION_VALID,
+		    CISTPL_DEVICE_DTYPE_SRAM,
+		    &first)) {
 			/* XXX - For now assuming there is ONLY */
 			/*	one CM CIS region 		*/
 
@@ -3560,8 +3560,8 @@ pcram_card_insertion(pcram_state_t *rs)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
 		cmn_err(CE_CONT, "pcram_card_insertion: socket %d - "
-		"BUILD_CM_LIST\n\tdevice speed [%d]\n",
-		rs->sn, (int)mrp->nS_speed);
+		    "BUILD_CM_LIST\n\tdevice speed [%d]\n",
+		    rs->sn, (int)mrp->nS_speed);
 	}
 #endif
 
@@ -3604,22 +3604,22 @@ pcram_card_insertion(pcram_state_t *rs)
 			 */
 
 			for (n = 0; n < (make_device_node.NumDevNodes);
-								n++) {
+			    n++) {
 
 				dnd = &make_device_node.devnode_desc[n];
 
 				dnd->name = dname;
 				dnd->minor_num =
-					PCRAM_SETMINOR(rs->sn, (n+4)/2);
+				    PCRAM_SETMINOR(rs->sn, (n+4)/2);
 
 				if (n&1) {
 					dnd->spec_type = S_IFCHR;
 					(void) sprintf(dname, "%c,raw",
-						(((n+4)/2)+'a'));
+					    (((n+4)/2)+'a'));
 				} else {
 					dnd->spec_type = S_IFBLK;
 					(void) sprintf(dname, "%c",
-						(((n+4)/2)+'a'));
+					    (((n+4)/2)+'a'));
 				}
 
 				dnd->node_type = DDI_NT_BLOCK_CHAN;
@@ -3628,7 +3628,7 @@ pcram_card_insertion(pcram_state_t *rs)
 			} /* for */
 
 			if ((ret = csx_MakeDeviceNode(rs->client_handle,
-				&make_device_node)) != CS_SUCCESS) {
+			    &make_device_node)) != CS_SUCCESS) {
 
 				error2text_t cft;
 
@@ -3652,8 +3652,8 @@ pcram_card_insertion(pcram_state_t *rs)
 			 *	in a global data area.
 			 */
 			kmem_free(make_device_node.devnode_desc,
-					sizeof (struct devnode_desc) *
-					make_device_node.NumDevNodes);
+			    sizeof (struct devnode_desc) *
+			    make_device_node.NumDevNodes);
 
 			make_device_node.devnode_desc = NULL;
 
@@ -3661,18 +3661,18 @@ pcram_card_insertion(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
-	    cmn_err(CE_CONT, "pcram_card_insertion: socket %d\n"
-		"\tRegion list - hard drive structure\n"
-		"\tcsize [%d] ncyl [%d] hd [%d] "
-		"spt [%d] ssize [%d]\n", rs->sn,
-		rs->card_size,
-		rs->hdrv_chars->drv_ncyl,
-		rs->hdrv_chars->drv_nhead,
-		rs->hdrv_chars->drv_secptrack,
-		rs->hdrv_chars->drv_sec_size);
+		cmn_err(CE_CONT, "pcram_card_insertion: socket %d\n"
+		    "\tRegion list - hard drive structure\n"
+		    "\tcsize [%d] ncyl [%d] hd [%d] "
+		    "spt [%d] ssize [%d]\n", rs->sn,
+		    rs->card_size,
+		    rs->hdrv_chars->drv_ncyl,
+		    rs->hdrv_chars->drv_nhead,
+		    rs->hdrv_chars->drv_secptrack,
+		    rs->hdrv_chars->drv_sec_size);
 
-	    cmn_err(CE_CONT, "pcram: socket%d card size [%d bytes]\n",
-		rs->sn, rs->card_size);
+		cmn_err(CE_CONT, "pcram: socket%d card size [%d bytes]\n",
+		    rs->sn, rs->card_size);
 	}
 #endif
 
@@ -3733,10 +3733,10 @@ pcram_card_removal(pcram_state_t *rs)
 #ifdef	PCRAM_DEBUG
 		if (pcram_debug & PCRAM_DEBUG_VOLD) {
 			cmn_err(CE_CONT,
-				"pcram_card_removal: socket %d \n"
-				"\tdoing cv_broadcast - "
-				"rs->media_state of DKIO_EJECTED\n",
-				rs->sn);
+			    "pcram_card_removal: socket %d \n"
+			    "\tdoing cv_broadcast - "
+			    "rs->media_state of DKIO_EJECTED\n",
+			    rs->sn);
 		}
 #endif
 	}
@@ -3759,7 +3759,7 @@ pcram_card_removal(pcram_state_t *rs)
 		make_device_node.NumDevNodes = 0;
 
 		if ((ret = csx_MakeDeviceNode(rs->client_handle,
-			&make_device_node)) != CS_SUCCESS) {
+		    &make_device_node)) != CS_SUCCESS) {
 
 			error2text_t cft;
 
@@ -3767,9 +3767,9 @@ pcram_card_removal(pcram_state_t *rs)
 			(void) csx_Error2Text(&cft);
 
 			cmn_err(CE_CONT,
-				"pcram_card_removal: socket %d "
-				"MakeDeviceNode failed %s (0x%x)\n",
-				rs->sn, cft.text, ret);
+			    "pcram_card_removal: socket %d "
+			    "MakeDeviceNode failed %s (0x%x)\n",
+			    rs->sn, cft.text, ret);
 		}
 	} /* remove device nodes */
 
@@ -3779,14 +3779,14 @@ pcram_card_removal(pcram_state_t *rs)
 	 * Do a CS call to check the card state
 	 */
 	if ((ret = csx_GetStatus(rs->client_handle, &get_status))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 		cmn_err(CE_CONT, "pcram_card_removal: socket %d "
-			"GetStatus failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "GetStatus failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		return (ret);
 		/* NOTREACHED */
 	}
@@ -3794,7 +3794,7 @@ pcram_card_removal(pcram_state_t *rs)
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "pcram_card_removal: socket %d "
-			"GetStatus returns:\n", rs->sn);
+		    "GetStatus returns:\n", rs->sn);
 		pcram_display_card_status(&get_status);
 	}
 #endif
@@ -3813,10 +3813,10 @@ pcram_card_removal(pcram_state_t *rs)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_TRACE) {
-	    cmn_err(CE_CONT, "pcram_card_removal: socket %d "
-		"PCRAM_HAS_WINDOW [0x%x]\n"
-		"\trs->flags [0x%x]:\n", rs->sn,
-		PCRAM_HAS_WINDOW, (int)rs->flags);
+		cmn_err(CE_CONT, "pcram_card_removal: socket %d "
+		    "PCRAM_HAS_WINDOW [0x%x]\n"
+		    "\trs->flags [0x%x]:\n", rs->sn,
+		    PCRAM_HAS_WINDOW, (int)rs->flags);
 	}
 #endif
 
@@ -3825,16 +3825,16 @@ pcram_card_removal(pcram_state_t *rs)
 		mutex_exit(&rs->mutex);
 
 		if ((ret = csx_ReleaseWindow(rs->window_handle))
-						!= CS_SUCCESS) {
+		    != CS_SUCCESS) {
 			error2text_t cft;
 
 			cft.item = ret;
 			(void) csx_Error2Text(&cft);
 
 			cmn_err(CE_CONT,
-				"pcram_card_removal: socket %d "
-				"ReleaseWindow failed %s (0x%x)\n",
-				rs->sn, cft.text, ret);
+			    "pcram_card_removal: socket %d "
+			    "ReleaseWindow failed %s (0x%x)\n",
+			    rs->sn, cft.text, ret);
 			return (ret);
 			/* NOTREACHED */
 		}
@@ -3850,33 +3850,33 @@ pcram_card_removal(pcram_state_t *rs)
 	 */
 	se.Attributes = CONF_EVENT_MASK_CLIENT;
 	if ((ret = csx_GetEventMask(rs->client_handle, &se))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_card_removal: socket %d"
-			"GetEventMask failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "GetEventMask failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		return (ret);
 		/* NOTREACHED */
 	}
 
 	se.EventMask &= ~(CS_EVENT_BATTERY_LOW |
-				CS_EVENT_BATTERY_DEAD |
-				CS_EVENT_WRITE_PROTECT);
+	    CS_EVENT_BATTERY_DEAD |
+	    CS_EVENT_WRITE_PROTECT);
 
 	if ((ret = csx_SetEventMask(rs->client_handle, &se))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
 		(void) csx_Error2Text(&cft);
 
 		cmn_err(CE_CONT, "pcram_card_removal: socket %d"
-			"SetEventMask failed %s (0x%x)\n",
-			rs->sn, cft.text, ret);
+		    "SetEventMask failed %s (0x%x)\n",
+		    rs->sn, cft.text, ret);
 		return (ret);
 		/* NOTREACHED */
 	}
@@ -3914,7 +3914,7 @@ pcram_display_card_status(get_status_t *gs)
 
 	if (pcram_debug & PCRAM_DEBUG_CARD_STATUS) {
 		cmn_err(CE_CONT, "\tSocketState [%s]\n",
-					event2text.text);
+		    event2text.text);
 	}
 }
 
@@ -3964,7 +3964,7 @@ pcram_build_region_lists(pcram_state_t *rs)
 	 *	is very easy.
 	 */
 	if ((ret = csx_ValidateCIS(rs->client_handle, &cisinfo))
-						!= CS_SUCCESS) {
+	    != CS_SUCCESS) {
 		error2text_t cft;
 
 		cft.item = ret;
@@ -3972,9 +3972,9 @@ pcram_build_region_lists(pcram_state_t *rs)
 
 		if (ret != CS_NO_CIS) {
 			cmn_err(CE_CONT, "pcram_build_region_lists: "
-				"socket %d"
-				"ValidateCIS failed %s (0x%x)\n",
-				rs->sn, cft.text, ret);
+			    "socket %d"
+			    "ValidateCIS failed %s (0x%x)\n",
+			    rs->sn, cft.text, ret);
 			return (0);
 			/* NOTREACHED */
 		/*
@@ -3983,42 +3983,42 @@ pcram_build_region_lists(pcram_state_t *rs)
 		 */
 		} else {
 
-		    if ((rs->num_cm_regions =
-			pcram_build_region_list(rs,
-				&rs->cm_regions,
-				BUILD_DOS_BPBFAT_LIST)) <= 0) {
-
-			/*
-			 * Couldn't find a BPB-FAT filesystem, so first
-			 * destroy the CM list that was just built and
-			 * build the default CM region list.
-			 */
-			pcram_destroy_region_lists(rs);
-
 			if ((rs->num_cm_regions =
-				pcram_build_region_list(
-					rs, &rs->cm_regions,
-					BUILD_SOLARIS_LIST)) <= 0) {
+			    pcram_build_region_list(rs,
+			    &rs->cm_regions,
+			    BUILD_DOS_BPBFAT_LIST)) <= 0) {
 
+				/*
+				 * Couldn't find a BPB-FAT filesystem, so first
+				 * destroy the CM list that was just built and
+				 * build the default CM region list.
+				 */
 				pcram_destroy_region_lists(rs);
 
 				if ((rs->num_cm_regions =
-					pcram_build_region_list(
+				    pcram_build_region_list(
+				    rs, &rs->cm_regions,
+				    BUILD_SOLARIS_LIST)) <= 0) {
+
+					pcram_destroy_region_lists(rs);
+
+					if ((rs->num_cm_regions =
+					    pcram_build_region_list(
 					    rs, &rs->cm_regions,
 					    BUILD_DEFAULT_LIST)) <= 0) {
-				    cmn_err(CE_CONT,
-					"pcram_build_region_lists: "
-					"socket %d \n"
-					"\terror building "
-					"default list\n",
-					rs->sn);
-					return (0);
-					/* NOTREACHED */
-				} /* (BUILD_DEFAULT_LIST) */
+						cmn_err(CE_CONT,
+						    "pcram_build_region_lists: "
+						    "socket %d \n"
+						    "\terror building "
+						    "default list\n",
+						    rs->sn);
+						return (0);
+						/* NOTREACHED */
+					} /* (BUILD_DEFAULT_LIST) */
 
-			} /* (BUILD_SOLARIS_LIST) */
+				} /* (BUILD_SOLARIS_LIST) */
 
-		    } /* (BUILD_DOS_BPBFAT_LIST) */
+			} /* (BUILD_DOS_BPBFAT_LIST) */
 
 		} /* CS_NO_CIS */
 	/*
@@ -4030,11 +4030,11 @@ pcram_build_region_lists(pcram_state_t *rs)
 		 * an empty AM space list.
 		 */
 		if ((rs->num_am_regions = pcram_build_region_list(rs,
-				&rs->am_regions, BUILD_AM_LIST)) < 0) {
+		    &rs->am_regions, BUILD_AM_LIST)) < 0) {
 			cmn_err(CE_CONT, "pcram_build_region_lists: "
-				"socket %d \n"
-				"\terror building AM region list\n",
-				rs->sn);
+			    "socket %d \n"
+			    "\terror building AM region list\n",
+			    rs->sn);
 			return (0);
 			/* NOTREACHED */
 		}
@@ -4044,7 +4044,7 @@ pcram_build_region_lists(pcram_state_t *rs)
 		 * for the driver to work at all.
 		 */
 		if ((rs->num_cm_regions = pcram_build_region_list(rs,
-				&rs->cm_regions, BUILD_CM_LIST)) < 0) {
+		    &rs->cm_regions, BUILD_CM_LIST)) < 0) {
 			if (rs->num_cm_regions == -2) {
 				/*
 				 * Found unsupported Device
@@ -4054,10 +4054,10 @@ pcram_build_region_lists(pcram_state_t *rs)
 				/* NOTREACHED */
 			} else {
 				cmn_err(CE_CONT,
-					"pcram_build_region_lists: "
-					"socket %d \n"
-					"\terror building CM "
-					"region list\n", rs->sn);
+				    "pcram_build_region_lists: "
+				    "socket %d \n"
+				    "\terror building CM "
+				    "region list\n", rs->sn);
 				return (0);
 				/* NOTREACHED */
 			}
@@ -4071,16 +4071,16 @@ pcram_build_region_lists(pcram_state_t *rs)
 			 *	we just return an error instead?
 			 */
 			rs->num_cm_regions = pcram_build_region_list(rs,
-						&rs->cm_regions,
-						(BUILD_CM_LIST |
-						BUILD_DEFAULT_LIST));
+			    &rs->cm_regions,
+			    (BUILD_CM_LIST |
+			    BUILD_DEFAULT_LIST));
 		}
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
 		cmn_err(CE_CONT,
-			"pcram_build_region_lists: socket %d \n"
-			"\t(BUILD_AM_LIST | BUILD_CM_LIST)\n", rs->sn);
+		    "pcram_build_region_lists: socket %d \n"
+		    "\t(BUILD_AM_LIST | BUILD_CM_LIST)\n", rs->sn);
 	}
 #endif
 
@@ -4133,8 +4133,8 @@ pcram_build_region_list(pcram_state_t *rs,
 	if (*rlist) {
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
-		"ERROR *rlist = 0x%p\n", rs->sn, (void *)*rlist);
+		cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
+		    "ERROR *rlist = 0x%p\n", rs->sn, (void *)*rlist);
 	}
 #endif
 		return (-1);
@@ -4145,20 +4145,20 @@ pcram_build_region_list(pcram_state_t *rs,
 	 * Do the common setup for a default or DOS partition.
 	 */
 	if (flags & (BUILD_DEFAULT_LIST |
-		BUILD_DOS_BPBFAT_LIST | BUILD_SOLARIS_LIST)) {
-	    *rlist = kmem_zalloc(sizeof (mem_region_t), KM_SLEEP);
-	    mr = *rlist;
-	    mr->region_num = 0;
-	    mr->flags = 0;
+	    BUILD_DOS_BPBFAT_LIST | BUILD_SOLARIS_LIST)) {
+		*rlist = kmem_zalloc(sizeof (mem_region_t), KM_SLEEP);
+		mr = *rlist;
+		mr->region_num = 0;
+		mr->flags = 0;
 
-	    mr->next = NULL;
-	    mr->prev = NULL;
+		mr->next = NULL;
+		mr->prev = NULL;
 
-	    mr->nS_speed = DEFAULT_CM_SPEED;
-	    convert_speed.Attributes = CONVERT_NS_TO_DEVSPEED;
-	    convert_speed.nS = mr->nS_speed;
-	    (void) csx_ConvertSpeed(&convert_speed);
-	    mr->speed = convert_speed.devspeed;
+		mr->nS_speed = DEFAULT_CM_SPEED;
+		convert_speed.Attributes = CONVERT_NS_TO_DEVSPEED;
+		convert_speed.nS = mr->nS_speed;
+		(void) csx_ConvertSpeed(&convert_speed);
+		mr->speed = convert_speed.devspeed;
 
 	} /* if (BUILD_DEFAULT_LIST | BUILD_DOS_BPBFAT_LIST) */
 
@@ -4182,10 +4182,10 @@ pcram_build_region_list(pcram_state_t *rs,
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
-		"BUILD_DEFAULT_LIST\n"
-		"\tsize_in_bytes - [%d] size [0x%x]\n",
-		rs->sn, (int)mr->size_in_bytes, (int)mr->size);
+		cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
+		    "BUILD_DEFAULT_LIST\n"
+		    "\tsize_in_bytes - [%d] size [0x%x]\n",
+		    rs->sn, (int)mr->size_in_bytes, (int)mr->size);
 	}
 #endif
 
@@ -4228,10 +4228,10 @@ pcram_build_region_list(pcram_state_t *rs,
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
-		"BUILD_DOS_BPBFAT_LIST\n"
-		"\tsize_in_bytes - [%d] size [0x%x]\n",
-		rs->sn, (int)mr->size_in_bytes, (int)mr->size);
+		cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
+		    "BUILD_DOS_BPBFAT_LIST\n"
+		    "\tsize_in_bytes - [%d] size [0x%x]\n",
+		    rs->sn, (int)mr->size_in_bytes, (int)mr->size);
 	}
 #endif
 
@@ -4261,10 +4261,10 @@ pcram_build_region_list(pcram_state_t *rs,
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
-		"BUILD_SOLARIS_LIST\n"
-		"\tsize_in_bytes - [%d] size [0x%x]\n",
-		rs->sn, (int)mr->size_in_bytes, (int)mr->size);
+		cmn_err(CE_CONT, "pcram_build_region_list: socket %d "
+		    "BUILD_SOLARIS_LIST\n"
+		    "\tsize_in_bytes - [%d] size [0x%x]\n",
+		    rs->sn, (int)mr->size_in_bytes, (int)mr->size);
 	}
 #endif
 
@@ -4277,17 +4277,17 @@ pcram_build_region_list(pcram_state_t *rs,
 	 * We've got a CIS so sort out the correct tuples to look for.
 	 */
 	switch (flags & (BUILD_AM_LIST | BUILD_CM_LIST)) {
-	    case BUILD_AM_LIST:
+	case BUILD_AM_LIST:
 		device_tuple = CISTPL_DEVICE_A;
 		JEDEC_tuple = CISTPL_JEDEC_A;
 		break;
-	    case BUILD_CM_LIST:
+	case BUILD_CM_LIST:
 		device_tuple = CISTPL_DEVICE;
 		JEDEC_tuple = CISTPL_JEDEC_C;
 		break;
-	    default:
+	default:
 		return (-1);
-		/* NOTREACHED */
+	/* NOTREACHED */
 	} /* switch (flags) */
 
 	/*
@@ -4297,16 +4297,16 @@ pcram_build_region_list(pcram_state_t *rs,
 	tuple.Attributes = 0;
 	tuple.DesiredTuple = device_tuple;
 	if ((ret = csx_GetFirstTuple(rs->client_handle, &tuple))
-						!= CS_SUCCESS) {
-	    if (ret != CS_NO_MORE_ITEMS) {
-		/* this is a real error */
-		return (-1);
-		/* NOTREACHED */
-	    } else {
-		/* XXX - is 0 the right thing to return here? */
-		return (0);
-		/* NOTREACHED */
-	    }
+	    != CS_SUCCESS) {
+		if (ret != CS_NO_MORE_ITEMS) {
+			/* this is a real error */
+			return (-1);
+			/* NOTREACHED */
+		} else {
+			/* XXX - is 0 the right thing to return here? */
+			return (0);
+			/* NOTREACHED */
+		}
 	}
 
 	/*
@@ -4326,7 +4326,7 @@ pcram_build_region_list(pcram_state_t *rs,
 		 */
 		bzero(&cistpl_device, sizeof (struct cistpl_device_t));
 		if (csx_Parse_CISTPL_DEVICE(rs->client_handle,
-				&tuple, &cistpl_device) != CS_SUCCESS) {
+		    &tuple, &cistpl_device) != CS_SUCCESS) {
 			return (-1);
 			/* NOTREACHED */
 		}
@@ -4375,13 +4375,13 @@ pcram_build_region_list(pcram_state_t *rs,
 			mrr->nS_speed = cistpl_device_node->nS_speed;
 
 			if ((mrr->type = cistpl_device_node->type) ==
-					CISTPL_DEVICE_DTYPE_NULL) {
+			    CISTPL_DEVICE_DTYPE_NULL) {
 				mrr->rflags |= REGION_HOLE;
 			}
 
 			mrr->size = cistpl_device_node->size;
 			mrr->size_in_bytes =
-				cistpl_device_node->size_in_bytes;
+			    cistpl_device_node->size_in_bytes;
 
 
 			/*
@@ -4390,68 +4390,68 @@ pcram_build_region_list(pcram_state_t *rs,
 			 */
 			if (device_tuple == CISTPL_DEVICE) {
 
-			    char *unsupported_fmt_string =
-				"pcram: WARNING - Found unsupported "
-				"%s device at socket %d\n";
-			    char *supported_fmt_string =
-				"?pcram: Found %s device at socket %d "
-				"card size %d\n";
+				char *unsupported_fmt_string =
+				    "pcram: WARNING - Found unsupported "
+				    "%s device at socket %d\n";
+				char *supported_fmt_string =
+				    "?pcram: Found %s device at socket %d "
+				    "card size %d\n";
 
-			    switch (cistpl_device_node->type) {
+				switch (cistpl_device_node->type) {
 
-			    case CISTPL_DEVICE_DTYPE_SRAM:
+				case CISTPL_DEVICE_DTYPE_SRAM:
 				/* Support this main device */
 				break;
 
-			    case CISTPL_DEVICE_DTYPE_ROM:
+				case CISTPL_DEVICE_DTYPE_ROM:
 				/* for VERBOSE mode */
 				cmn_err(CE_CONT, supported_fmt_string,
-					"Masked ROM", rs->sn,
-			(int)cistpl_device_node->size_in_bytes);
+				    "Masked ROM", rs->sn,
+				    (int)cistpl_device_node->size_in_bytes);
 				/* Now consider as SRAM type */
 				mrr->type = CISTPL_DEVICE_DTYPE_SRAM;
 				break;
 
-			    case CISTPL_DEVICE_DTYPE_DRAM:
+				case CISTPL_DEVICE_DTYPE_DRAM:
 				/* for VERBOSE mode */
 				cmn_err(CE_CONT, supported_fmt_string,
-					"Dynamic RAM", rs->sn,
-			(int)cistpl_device_node->size_in_bytes);
+				    "Dynamic RAM", rs->sn,
+				    (int)cistpl_device_node->size_in_bytes);
 				/* Now consider as SRAM type */
 				mrr->type = CISTPL_DEVICE_DTYPE_SRAM;
 				break;
 
-			    case CISTPL_DEVICE_DTYPE_OTPROM:
+				case CISTPL_DEVICE_DTYPE_OTPROM:
 				cmn_err(CE_CONT, unsupported_fmt_string,
-					"OTPROM", rs->sn);
+				    "OTPROM", rs->sn);
 				return (-2);
 				/* NOTREACHED */
 
-			    case CISTPL_DEVICE_DTYPE_EPROM:
+				case CISTPL_DEVICE_DTYPE_EPROM:
 				cmn_err(CE_CONT, unsupported_fmt_string,
-					"UV EPROM", rs->sn);
+				    "UV EPROM", rs->sn);
 				return (-2);
 				/* NOTREACHED */
 
-			    case CISTPL_DEVICE_DTYPE_EEPROM:
+				case CISTPL_DEVICE_DTYPE_EEPROM:
 				cmn_err(CE_CONT, unsupported_fmt_string,
-					"EEPROM", rs->sn);
+				    "EEPROM", rs->sn);
 				return (-2);
 				/* NOTREACHED */
 
-			    case CISTPL_DEVICE_DTYPE_FLASH:
+				case CISTPL_DEVICE_DTYPE_FLASH:
 				cmn_err(CE_CONT, unsupported_fmt_string,
-					"FLASH", rs->sn);
+				    "FLASH", rs->sn);
 				return (-2);
 				/* NOTREACHED */
 
-			    default:
+				default:
 				cmn_err(CE_CONT, unsupported_fmt_string,
-					"UNKNOWN", rs->sn);
+				    "UNKNOWN", rs->sn);
 				return (-2);
 				/* NOTREACHED */
 
-			    } /* switch (cistpl_device_node->type) */
+				} /* switch (cistpl_device_node->type) */
 
 			}   /* if (device_tuple) */
 
@@ -4465,10 +4465,10 @@ pcram_build_region_list(pcram_state_t *rs,
 
 			mrr->next = NULL;
 
-	    } /* for (cistpl_device_node->num_devices) */
+		} /* for (cistpl_device_node->num_devices) */
 
 	} while ((ret = csx_GetNextTuple(rs->client_handle, &tuple))
-							== CS_SUCCESS);
+	    == CS_SUCCESS);
 
 	/*
 	 * If GetNextTuple gave us any error code other than
@@ -4476,7 +4476,7 @@ pcram_build_region_list(pcram_state_t *rs,
 	 *	an internal error in the CIS parser.
 	 */
 	if (ret != CS_NO_MORE_ITEMS) {
-	    return (-1);	/* this is a real error */
+		return (-1);	/* this is a real error */
 	    /* NOTREACHED */
 	}
 
@@ -4488,15 +4488,15 @@ pcram_build_region_list(pcram_state_t *rs,
 	tuple.Attributes = 0;
 	tuple.DesiredTuple = JEDEC_tuple;
 	if ((ret = csx_GetFirstTuple(rs->client_handle, &tuple))
-						!= CS_SUCCESS) {
-	    if (ret != CS_NO_MORE_ITEMS) {
-		/* this is a real error */
-		return (-1);
-		/* NOTREACHED */
-	    } else {
-		return (region_num);
-		/* NOTREACHED */
-	    }
+	    != CS_SUCCESS) {
+		if (ret != CS_NO_MORE_ITEMS) {
+			/* this is a real error */
+			return (-1);
+			/* NOTREACHED */
+		} else {
+			return (region_num);
+			/* NOTREACHED */
+		}
 	}
 
 	/*
@@ -4517,7 +4517,7 @@ pcram_build_region_list(pcram_state_t *rs,
 		 */
 		bzero(&cistpl_jedec, sizeof (struct cistpl_jedec_t));
 		if (csx_Parse_CISTPL_JEDEC_C(rs->client_handle,
-				&tuple, &cistpl_jedec) != CS_SUCCESS) {
+		    &tuple, &cistpl_jedec) != CS_SUCCESS) {
 			return (-1);
 			/* NOTREACHED */
 		}
@@ -4545,14 +4545,14 @@ pcram_build_region_list(pcram_state_t *rs,
 			 *	be a serious error.
 			 */
 			if (!mr) {
-			    cmn_err(CE_CONT,
-				"pcram_build_region_list: socket %d"
-				"too many JEDEC device entries"
-				"in %s memory list\n",
-				rs->sn, (flags & BUILD_AM_LIST)?
-				"ATTRIBUTE":"COMMON");
-			    return (region_num);
-			    /* NOTREACHED */
+				cmn_err(CE_CONT,
+				    "pcram_build_region_list: socket %d"
+				    "too many JEDEC device entries"
+				    "in %s memory list\n",
+				    rs->sn, (flags & BUILD_AM_LIST)?
+				    "ATTRIBUTE":"COMMON");
+				return (region_num);
+				/* NOTREACHED */
 			}
 
 			mr->id = cistpl_jedec.jid[i].id;
@@ -4566,7 +4566,7 @@ pcram_build_region_list(pcram_state_t *rs,
 		} /* for (cistpl_jedec.nid) */
 
 	} while ((ret = csx_GetNextTuple(rs->client_handle,
-					&tuple)) == CS_SUCCESS);
+	    &tuple)) == CS_SUCCESS);
 
 	/*
 	 * If GetNextTuple gave us any error code other than
@@ -4574,8 +4574,8 @@ pcram_build_region_list(pcram_state_t *rs,
 	 * an internal error in the CIS parser.
 	 */
 	if (ret != CS_NO_MORE_ITEMS) {
-	    return (-1);	/* this is a real error */
-	    /* NOTREACHED */
+		return (-1);	/* this is a real error */
+		/* NOTREACHED */
 	}
 
 	/*
@@ -4649,54 +4649,53 @@ pcram_get_bpbfat_info(pcram_state_t *rs, mem_region_t *mr)
 	mr->type = CISTPL_DEVICE_DTYPE_SRAM;
 
 	csx_RepGet8(rs->access_handle, (uchar_t *)&bootblk, (uint32_t)0,
-			sizeof (struct bootblock), DDI_DEV_AUTOINCR);
+	    sizeof (struct bootblock), DDI_DEV_AUTOINCR);
 
 	if (bootblk.sig[0] == DOS_ID1 ||
-				(bootblk.sig[0] == DOS_ID2a &&
-				bootblk.sig[2] == DOS_ID2b)) {
+	    (bootblk.sig[0] == DOS_ID2a &&
+	    bootblk.sig[2] == DOS_ID2b)) {
 
 		rs->hdrv_chars->drv_sec_size =
-			GET_INFO(bootblk.bps[0], bootblk.bps[1]);
+		    GET_INFO(bootblk.bps[0], bootblk.bps[1]);
 		rs->hdrv_chars->drv_secptrack =
-			GET_INFO(bootblk.sectrack[0],
-			bootblk.sectrack[1]);
+		    GET_INFO(bootblk.sectrack[0],
+		    bootblk.sectrack[1]);
 		rs->hdrv_chars->drv_nhead =
-			GET_INFO(bootblk.heads[0], bootblk.heads[1]);
+		    GET_INFO(bootblk.heads[0], bootblk.heads[1]);
 
 		tsecvol = GET_INFO(bootblk.tsec[0], bootblk.tsec[1]);
 
 		rs->card_size = GET_CSIZ_DOS(tsecvol,
-			rs->hdrv_chars->drv_sec_size);
+		    rs->hdrv_chars->drv_sec_size);
 
 		/* Return error if found invalid DOS label */
 		/* Avoiding zero divide panic when compute drv_ncyl */
 		if ((rs->card_size == 0) ||
-				(rs->hdrv_chars->drv_sec_size == 0) ||
-				(rs->hdrv_chars->drv_secptrack == 0) ||
-				(rs->hdrv_chars->drv_nhead == 0)) {
+		    (rs->hdrv_chars->drv_sec_size == 0) ||
+		    (rs->hdrv_chars->drv_secptrack == 0) ||
+		    (rs->hdrv_chars->drv_nhead == 0)) {
 
 			/* set to default default size of 64MB */
 			*rs->hdrv_chars = hdtypes;
 			rs->card_size = MAX_CARD_SIZE;
 			cmn_err(CE_WARN, "pcram: socket%d "
-				"Found invalid DOS label", rs->sn);
+			    "Found invalid DOS label", rs->sn);
 			return (0);
 			/* NOTREACHED */
 		}
 
-		rs->hdrv_chars->drv_ncyl =
-			GET_NCYL(rs->card_size,
-					rs->hdrv_chars->drv_nhead,
-					rs->hdrv_chars->drv_sec_size,
-					rs->hdrv_chars->drv_secptrack);
+		rs->hdrv_chars->drv_ncyl = GET_NCYL(rs->card_size,
+		    rs->hdrv_chars->drv_nhead,
+		    rs->hdrv_chars->drv_sec_size,
+		    rs->hdrv_chars->drv_secptrack);
 
 		mr->size_in_bytes = rs->card_size;
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_get_bpbfat_info: socket %d \n"
-		"\trs->card_size [%d] mr->size_in_bytes [%d]\n",
-		rs->sn, rs->card_size, (int)mr->size_in_bytes);
+		cmn_err(CE_CONT, "pcram_get_bpbfat_info: socket %d \n"
+		    "\trs->card_size [%d] mr->size_in_bytes [%d]\n",
+		    rs->sn, rs->card_size, (int)mr->size_in_bytes);
 	}
 #endif
 		return (1);
@@ -4736,7 +4735,7 @@ pcram_get_solaris_info(pcram_state_t *rs, mem_region_t *mr)
 	mr->type = CISTPL_DEVICE_DTYPE_SRAM;
 
 	csx_RepGet8(rs->access_handle, (uchar_t *)&label, (uint32_t)0,
-			sizeof (struct dk_label), DDI_DEV_AUTOINCR);
+	    sizeof (struct dk_label), DDI_DEV_AUTOINCR);
 
 	if ((label.dkl_magic == DKL_MAGIC) && (cksum(&label) == 0)) {
 		/*
@@ -4749,9 +4748,9 @@ pcram_get_solaris_info(pcram_state_t *rs, mem_region_t *mr)
 		rs->hdrv_chars->drv_ncyl = label.dkl_pcyl;
 
 		rs->card_size = GET_CSIZ(rs->hdrv_chars->drv_ncyl,
-					rs->hdrv_chars->drv_nhead,
-					rs->hdrv_chars->drv_sec_size,
-					rs->hdrv_chars->drv_secptrack);
+		    rs->hdrv_chars->drv_nhead,
+		    rs->hdrv_chars->drv_sec_size,
+		    rs->hdrv_chars->drv_secptrack);
 
 		/* Return error if found invalid SunOS label */
 		if (rs->card_size == 0) {
@@ -4759,7 +4758,7 @@ pcram_get_solaris_info(pcram_state_t *rs, mem_region_t *mr)
 			*rs->hdrv_chars = hdtypes;
 			rs->card_size = MAX_CARD_SIZE;
 			cmn_err(CE_WARN, "pcram: socket%d "
-				"Found invalid SunOS label", rs->sn);
+			    "Found invalid SunOS label", rs->sn);
 			return (0);
 			/* NOTREACHED */
 		}
@@ -4768,9 +4767,9 @@ pcram_get_solaris_info(pcram_state_t *rs, mem_region_t *mr)
 
 #ifdef	PCRAM_DEBUG
 	if (pcram_debug & PCRAM_DEBUG_CIS) {
-	    cmn_err(CE_CONT, "pcram_get_solaris_info: socket %d \n"
-		"\trs->card_size [%d] mr->size_in_bytes [%d]\n",
-		rs->sn, rs->card_size, (int)mr->size_in_bytes);
+		cmn_err(CE_CONT, "pcram_get_solaris_info: socket %d \n"
+		    "\trs->card_size [%d] mr->size_in_bytes [%d]\n",
+		    rs->sn, rs->card_size, (int)mr->size_in_bytes);
 	}
 #endif
 
@@ -4797,10 +4796,10 @@ pcram_destroy_region_lists(pcram_state_t *rs)
 
 
 	pcram_destroy_region_list(&rs->am_regions,
-					&rs->num_am_regions);
+	    &rs->num_am_regions);
 
 	pcram_destroy_region_list(&rs->cm_regions,
-					&rs->num_cm_regions);
+	    &rs->num_cm_regions);
 }
 
 
@@ -4852,7 +4851,7 @@ pcram_get_firstnext_region(mem_region_t *mrp, uint32_t flags,
 
 		do {
 			if (((mrp->rflags & flags) == flags) &&
-						(mrp->type == type)) {
+			    (mrp->type == type)) {
 				return (mrp);
 				/* NOTREACHED */
 			}
@@ -4865,7 +4864,7 @@ pcram_get_firstnext_region(mem_region_t *mrp, uint32_t flags,
 		/* LINTED */
 		while (mrp = mrp->next) {
 			if (((mrp->rflags & flags) == flags) &&
-						(mrp->type == type)) {
+			    (mrp->type == type)) {
 				return (mrp);
 				/* NOTREACHED */
 			}
@@ -4891,9 +4890,9 @@ update_hdrv_chars(pcram_state_t *rs, mem_region_t *mrp)
 	 *		drv_sec_size to avoid zero divide panic
 	 */
 	rs->hdrv_chars->drv_ncyl = GET_NCYL(rs->card_size,
-					rs->hdrv_chars->drv_nhead,
-					rs->hdrv_chars->drv_sec_size,
-					rs->hdrv_chars->drv_secptrack);
+	    rs->hdrv_chars->drv_nhead,
+	    rs->hdrv_chars->drv_sec_size,
+	    rs->hdrv_chars->drv_secptrack);
 	mutex_exit(&rs->mutex);
 }
 

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the Beep driver for bbc based beep mechanism.
@@ -104,13 +103,14 @@ static struct dev_ops bbc_beep_ops = {
 	nodev,			/* Reset */
 	&bbc_beep_cb_ops,	/* Driver operations */
 	0,			/* Bus operations */
-	ddi_power		/* Power */
+	ddi_power,		/* Power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
 static struct modldrv modldrv = {
 	&mod_driverops, 		/* This one is a driver */
-	"BBC Beep Driver %I%", 		/* Name of the module. */
+	"BBC Beep Driver", 		/* Name of the module. */
 	&bbc_beep_ops,			/* Driver ops */
 };
 

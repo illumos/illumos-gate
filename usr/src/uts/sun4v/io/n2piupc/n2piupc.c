@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Driver interconnect for the N2 PIU performance counter driver.
@@ -80,14 +79,15 @@ static struct dev_ops n2piupc_ops = {
 	nodev,
 	NULL,
 	NULL,
-	nodev
+	nodev,
+	ddi_quiesce_not_needed,
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv md = {
 	&mod_driverops,
-	"N2 PIU Perf Counter %I%",
+	"N2 PIU Perf Counter",
 	&n2piupc_ops,
 };
 

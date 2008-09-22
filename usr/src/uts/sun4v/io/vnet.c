@@ -218,7 +218,9 @@ static struct dev_ops vnetops = {
 	vnetdetach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_vnetops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL	/* devo_bus_ops */
+	(struct bus_ops *)NULL,	/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

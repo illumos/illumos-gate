@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/inttypes.h>
@@ -75,10 +74,12 @@ dboot_elfload64(uintptr_t file_image)
 {
 	Elf64_Ehdr *eh;
 	Elf64_Phdr *phdr;
-	caddr_t allphdrs;
+	Elf64_Shdr *shdr;
+	caddr_t allphdrs, sechdrs;
 	int i;
 	paddr_t src;
 	paddr_t dst;
+	paddr_t next_addr;
 
 	elf_file = (caddr_t)file_image;
 
@@ -101,6 +102,14 @@ dboot_elfload64(uintptr_t file_image)
 	if (allphdrs == NULL)
 		dboot_panic("Failed to get program headers e_phnum = %d",
 		    eh->e_phnum);
+
+	/*
+	 * Get the section headers.
+	 */
+	sechdrs = PGETBYTES(eh->e_shoff);
+	if (sechdrs == NULL)
+		dboot_panic("Failed to get section headers e_shnum = %d",
+		    eh->e_shnum);
 
 	/*
 	 * Next look for interesting program headers.
@@ -159,6 +168,23 @@ dboot_elfload64(uintptr_t file_image)
 			    (ulong_t)dst, (ulong_t)phdr->p_vaddr);
 		(void) memcpy((void *)(uintptr_t)dst,
 		    (void *)(uintptr_t)src, (size_t)phdr->p_filesz);
+
+		next_addr = dst + phdr->p_filesz;
+	}
+
+
+	/*
+	 * Next look for bss
+	 */
+	for (i = 0; i < eh->e_shnum; i++) {
+		shdr = (Elf64_Shdr *)(sechdrs + eh->e_shentsize * i);
+
+		/* zero out bss */
+		if (shdr->sh_type == SHT_NOBITS) {
+			(void) memset((void *)(uintptr_t)next_addr, 0,
+			    shdr->sh_size);
+			break;
+		}
 	}
 
 	/*

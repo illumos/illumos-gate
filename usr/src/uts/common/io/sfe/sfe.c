@@ -31,7 +31,10 @@
  * DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  * System Header files.
@@ -52,7 +55,7 @@
 #include "sfe_util.h"
 #include "sfereg.h"
 
-char	ident[] = "sis900/dp83815 driver v" "2.6.1t27os";
+char	ident[] = "sis900/dp83815 driver";
 
 /* Debugging support */
 #ifdef DEBUG_LEVEL
@@ -2292,7 +2295,7 @@ sfedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  */
 /* ======================================================== */
 DDI_DEFINE_STREAM_OPS(sfe_ops, nulldev, nulldev, sfeattach, sfedetach,
-    nodev, NULL, D_MP, NULL);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */

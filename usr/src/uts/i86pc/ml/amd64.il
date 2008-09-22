@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /
 / Inline functions specific to the i86pc kernel running on bare metal.
@@ -42,6 +41,13 @@
 /
 	.inline	reload_cr3,0
 	movq	%cr3, %rdi
+	movq	%rdi, %cr3
+	.end
+
+/
+/ set cr3 register with new value
+/
+	.inline	setcr3,0
 	movq	%rdi, %cr3
 	.end
 
@@ -171,4 +177,3 @@
 	xorl	%eax, %eax
 	bsrw	%di, %ax
 	.end
-

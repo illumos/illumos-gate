@@ -49,7 +49,6 @@
  * I915 driver is a device dependent driver only, it depends on a misc module
  * named drm for generic DRM operations.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 #include "i915_drm.h"
@@ -116,9 +115,10 @@ static struct dev_ops i915_dev_ops = {
 	i915_attach,			/* devo_attach */
 	i915_detach,			/* devo_detach */
 	nodev,				/* devo_reset */
-	&drm_cb_ops,		/* devo_cb_ops */
+	&drm_cb_ops,			/* devo_cb_ops */
 	NULL,				/* devo_bus_ops */
-	NULL				/* power */
+	NULL,				/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

@@ -28,7 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Serial I/O driver for 8250/16450/16550A/16650/16750 chips.
@@ -325,6 +324,7 @@ static int asyinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 static int asyprobe(dev_info_t *);
 static int asyattach(dev_info_t *, ddi_attach_cmd_t);
 static int asydetach(dev_info_t *, ddi_detach_cmd_t);
+static int asyquiesce(dev_info_t *);
 
 static 	struct cb_ops cb_asy_ops = {
 	nodev,			/* cb_open */
@@ -354,11 +354,14 @@ struct dev_ops asy_ops = {
 	asydetach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_asy_ops,		/* devo_cb_ops */
+	NULL,			/* devo_bus_ops */
+	NULL,			/* power */
+	asyquiesce,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"ASY driver %I%",
+	"ASY driver",
 	&asy_ops,	/* driver ops */
 };
 
@@ -4774,4 +4777,36 @@ async_flowcontrol_hw_output(struct asycom *asy, async_flowc_action onoff)
 	default:
 		break;
 	}
+}
+
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+asyquiesce(dev_info_t *devi)
+{
+	int instance;
+	struct asycom *asy;
+
+	instance = ddi_get_instance(devi);	/* find out which unit */
+
+	asy = ddi_get_soft_state(asy_soft_state, instance);
+	if (asy == NULL)
+		return (DDI_FAILURE);
+
+	/* disable all interrupts */
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
+
+	/* reset the FIFO */
+	asy_reset_fifo(asy, FIFOTXFLSH | FIFORXFLSH);
+
+	return (DDI_SUCCESS);
 }

@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sf - Solaris Fibre Channel driver
@@ -209,18 +208,19 @@ static struct dev_ops sf_ops = {
 	nodev,			/* reset */
 	&sf_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	NULL			/* power management */
+	NULL,			/* power management */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* to ensure this module gets loaded in memory when we do */
 char _depends_on[] = "misc/scsi";
 
 #define	SF_NAME	"FC-AL FCP Nexus Driver"	/* Name of the module. */
-static	char	sf_version[] = "%I% %E%";	/* version of the module */
+static	char	sf_version[] = "1.72 08/19/2008"; /* version of the module */
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	SF_NAME "%I%",
+	SF_NAME,
 	&sf_ops,	/* driver ops */
 };
 
@@ -647,7 +647,7 @@ sf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    SF_INST2DEVCTL_MINOR(instance),
 		    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "sf%d: ddi_create_minor_node failed"
-					" for devctl", instance);
+			    " for devctl", instance);
 			goto fail;
 		}
 
@@ -656,7 +656,7 @@ sf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    SF_INST2FC_MINOR(instance), DDI_NT_FC_ATTACHMENT_POINT,
 		    0) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "sf%d: ddi_create_minor_node failed"
-					" for fc", instance);
+			    " for fc", instance);
 			goto fail;
 		}
 		/* allocate a SCSI transport structure */
@@ -710,20 +710,20 @@ sf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * allocate an ndi event handle
 		 */
 		sf->sf_event_defs = (ndi_event_definition_t *)
-			kmem_zalloc(sizeof (sf_event_defs), KM_SLEEP);
+		    kmem_zalloc(sizeof (sf_event_defs), KM_SLEEP);
 
 		bcopy(sf_event_defs, sf->sf_event_defs,
 		    sizeof (sf_event_defs));
 
 		(void) ndi_event_alloc_hdl(dip, NULL,
-			&sf->sf_event_hdl, NDI_SLEEP);
+		    &sf->sf_event_hdl, NDI_SLEEP);
 
 		sf->sf_events.ndi_events_version = NDI_EVENTS_REV1;
 		sf->sf_events.ndi_n_events = SF_N_NDI_EVENTS;
 		sf->sf_events.ndi_event_defs = sf->sf_event_defs;
 
 		if (ndi_event_bind_set(sf->sf_event_hdl,
-			&sf->sf_events, NDI_SLEEP) != NDI_SUCCESS) {
+		    &sf->sf_events, NDI_SLEEP) != NDI_SUCCESS) {
 			goto fail;
 		}
 
@@ -973,18 +973,18 @@ sf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 				mutex_enter(&target->sft_mutex);
 				if (!(target->sft_state & SF_TARGET_OFFLINE)) {
 					target->sft_state |=
-					(SF_TARGET_BUSY | SF_TARGET_MARK);
+					    (SF_TARGET_BUSY | SF_TARGET_MARK);
 				}
 				/* do this for all LUNs as well */
 				for (ntarget = target->sft_next_lun;
-					ntarget;
-					ntarget = ntarget->sft_next_lun) {
+				    ntarget;
+				    ntarget = ntarget->sft_next_lun) {
 					mutex_enter(&ntarget->sft_mutex);
 					if (!(ntarget->sft_state &
-						SF_TARGET_OFFLINE)) {
+					    SF_TARGET_OFFLINE)) {
 						ntarget->sft_state |=
-							(SF_TARGET_BUSY |
-								SF_TARGET_MARK);
+						    (SF_TARGET_BUSY |
+						    SF_TARGET_MARK);
 					}
 					mutex_exit(&ntarget->sft_mutex);
 				}
@@ -1038,14 +1038,14 @@ sf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 					    (SF_TARGET_BUSY | SF_TARGET_MARK);
 				}
 				for (ntarget = target->sft_next_lun;
-					ntarget;
-					ntarget = ntarget->sft_next_lun) {
+				    ntarget;
+				    ntarget = ntarget->sft_next_lun) {
 					mutex_enter(&ntarget->sft_mutex);
 					if (!(ntarget->sft_state &
-						SF_TARGET_OFFLINE)) {
+					    SF_TARGET_OFFLINE)) {
 						ntarget->sft_state |=
-							(SF_TARGET_BUSY |
-								SF_TARGET_MARK);
+						    (SF_TARGET_BUSY |
+						    SF_TARGET_MARK);
 					}
 					mutex_exit(&ntarget->sft_mutex);
 				}
@@ -1152,8 +1152,8 @@ sf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		SF_DEBUG(2, (sf, CE_CONT,
-			"sf_detach: ddi_soft_state_free() for instance 0x%x\n",
-			instance));
+		    "sf_detach: ddi_soft_state_free() for instance 0x%x\n",
+		    instance));
 		ddi_soft_state_free(sf_state, instance);
 		return (DDI_SUCCESS);
 
@@ -1225,7 +1225,7 @@ sf_scsi_bus_config(dev_info_t *parent, uint_t flag,
 	ASSERT(sf);
 
 	reset_delay = (int64_t)(USEC_TO_TICK(SF_INIT_WAIT_TIMEOUT)) -
-		(lbolt64 - sf->sf_reset_time);
+	    (lbolt64 - sf->sf_reset_time);
 	if (reset_delay < 0)
 		reset_delay = 0;
 
@@ -1233,7 +1233,7 @@ sf_scsi_bus_config(dev_info_t *parent, uint_t flag,
 		flag |= NDI_DEVI_DEBUG;
 
 	return (ndi_busop_bus_config(parent, flag, op,
-		arg, childp, (clock_t)reset_delay));
+	    arg, childp, (clock_t)reset_delay));
 }
 
 static int
@@ -1461,7 +1461,7 @@ sf_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			    sizeof (struct sf_pkt) + sizeof (struct
 			    fcal_packet));
 			cmd->cmd_fp_pkt = (struct fcal_packet *)((char *)cmd +
-				sizeof (struct sf_pkt));
+			    sizeof (struct sf_pkt));
 			cmd->cmd_fp_pkt->fcal_pkt_private = (opaque_t)cmd;
 			cmd->cmd_state = SF_STATE_IDLE;
 			cmd->cmd_pkt->pkt_ha_private = (opaque_t)cmd;
@@ -1543,8 +1543,8 @@ sf_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 
 			/* Establish the LUN */
 			bcopy((caddr_t)&target->sft_lun.b,
-				(caddr_t)&cmd->cmd_block->fcp_ent_addr,
-				FCP_LUN_SIZE);
+			    (caddr_t)&cmd->cmd_block->fcp_ent_addr,
+			    FCP_LUN_SIZE);
 			*((int32_t *)&cmd->cmd_block->fcp_cntl) = 0;
 		}
 		cmd->cmd_pkt->pkt_cdbp = cmd->cmd_block->fcp_cdb;
@@ -1751,8 +1751,8 @@ sf_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	if (cmd->cmd_flags & CFLAG_DMAVALID) {
 		if (ddi_dma_sync(cmd->cmd_dmahandle, (off_t)0, (size_t)0,
-			(cmd->cmd_flags & CFLAG_DMASEND) ?
-			DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU) !=
+		    (cmd->cmd_flags & CFLAG_DMASEND) ?
+		    DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU) !=
 		    DDI_SUCCESS) {
 			cmn_err(CE_WARN, "sf: sync pkt failed");
 		}
@@ -1771,7 +1771,7 @@ sf_scsi_reset_notify(struct scsi_address *ap, int flag,
 	struct sf	*sf = ADDR2SF(ap);
 
 	return (scsi_hba_reset_notify_setup(ap, flag, callback, arg,
-		&sf->sf_mutex, &sf->sf_reset_notify_listf));
+	    &sf->sf_mutex, &sf->sf_reset_notify_listf));
 }
 
 
@@ -1922,7 +1922,7 @@ sf_add_cr_pool(struct sf *sf)
 
 	/* set actual total number of entries */
 	ptr->ntot = min((real_cmd_buf_size / sizeof (struct fcp_cmd)),
-			(real_rsp_buf_size / FCP_MAX_RSP_IU_SIZE));
+	    (real_rsp_buf_size / FCP_MAX_RSP_IU_SIZE));
 	ptr->nfree = ptr->ntot;
 	ptr->free = (struct sf_cr_free_elem *)ptr->cmd_base;
 	ptr->sf = sf;
@@ -2246,7 +2246,7 @@ sf_statec_callback(void *arg, int msg)
 				sf_core = 0;
 			}
 			sf_log(sf, CE_WARN,
-				"!soc lilp map failed status=0x%x\n", ret);
+			    "!soc lilp map failed status=0x%x\n", ret);
 			mutex_enter(&sf->sf_mutex);
 			sf->sf_timer = sf_watchdog_time + SF_OFFLINE_TIMEOUT;
 			sf->sf_lip_cnt++;
@@ -2286,7 +2286,7 @@ sf_statec_callback(void *arg, int msg)
 		if (sf->sf_lilp_map->lilp_magic == FCAL_BADLILP_MAGIC) {
 			for (i = 0; i < sizeof (sf_switch_to_alpa); i++)
 				sf->sf_lilp_map->lilp_alpalist[i] =
-					sf_switch_to_alpa[i];
+				    sf_switch_to_alpa[i];
 			cnt = i;
 			sf->sf_device_count = cnt - 1;
 		}
@@ -2298,8 +2298,8 @@ sf_statec_callback(void *arg, int msg)
 		mutex_exit(&sf->sf_mutex);
 
 		SF_DEBUG(2, (sf, CE_WARN,
-			"!statec_callback: starting with %d targets\n",
-			sf->sf_device_count));
+		    "!statec_callback: starting with %d targets\n",
+		    sf->sf_device_count));
 
 		/* scan loop map, logging into all ports (except mine) */
 		for (i = 0; i < cnt; i++) {
@@ -2307,7 +2307,7 @@ sf_statec_callback(void *arg, int msg)
 			    "!lilp map entry %d = %x,%x\n", i,
 			    sf->sf_lilp_map->lilp_alpalist[i],
 			    sf_alpa_to_switch[
-				    sf->sf_lilp_map->lilp_alpalist[i]]));
+			    sf->sf_lilp_map->lilp_alpalist[i]]));
 			/* is this entry for somebody else ? */
 			if (sf->sf_lilp_map->lilp_alpalist[i] != al_pa) {
 				/* do a PLOGI to this port */
@@ -2371,7 +2371,7 @@ sf_statec_callback(void *arg, int msg)
 				mutex_enter(&target->sft_mutex);
 				if (!(target->sft_state & SF_TARGET_OFFLINE))
 					target->sft_state |= (SF_TARGET_BUSY
-						| SF_TARGET_MARK);
+					    | SF_TARGET_MARK);
 				mutex_exit(&target->sft_mutex);
 				target = target->sft_next_lun;
 			}
@@ -2419,7 +2419,7 @@ sf_statec_callback(void *arg, int msg)
 			while (target != NULL) {
 				if (!(target->sft_state & SF_TARGET_OFFLINE)) {
 					target->sft_state |= (SF_TARGET_BUSY
-						| SF_TARGET_MARK);
+					    | SF_TARGET_MARK);
 					mutex_exit(&sf->sf_mutex);
 					/*
 					 * run remove event callbacks for lun
@@ -2434,9 +2434,9 @@ sf_statec_callback(void *arg, int msg)
 					    FCAL_REMOVE_EVENT, &sf_remove_eid,
 					    NDI_EVENT_NOPASS);
 					(void) ndi_event_run_callbacks(
-						sf->sf_event_hdl,
-						target->sft_dip,
-						sf_remove_eid, NULL);
+					    sf->sf_event_hdl,
+					    target->sft_dip,
+					    sf_remove_eid, NULL);
 					mutex_enter(&sf->sf_mutex);
 				}
 				target = target->sft_next_lun;
@@ -2523,34 +2523,34 @@ sf_statec_callback(void *arg, int msg)
 				mutex_enter(&target->sft_pkt_mutex);
 				cmd = target->sft_pkt_head;
 				while (cmd != (struct sf_pkt *)&target->
-					sft_pkt_head) {
+				    sft_pkt_head) {
 					fpkt = cmd->cmd_fp_pkt;
 					mutex_enter(&cmd->cmd_abort_mutex);
 					if ((cmd->cmd_state ==
-						SF_STATE_ISSUED) &&
-						(fpkt->fcal_cmd_state &
-						FCAL_CMD_IN_TRANSPORT) &&
-						(!(fpkt->fcal_cmd_state &
-							FCAL_CMD_COMPLETE))) {
+					    SF_STATE_ISSUED) &&
+					    (fpkt->fcal_cmd_state &
+					    FCAL_CMD_IN_TRANSPORT) &&
+					    (!(fpkt->fcal_cmd_state &
+					    FCAL_CMD_COMPLETE))) {
 						/* a command to be reset */
 						pkt = cmd->cmd_pkt;
 						pkt->pkt_reason = CMD_RESET;
 						pkt->pkt_statistics |=
-							STAT_BUS_RESET;
+						    STAT_BUS_RESET;
 						cmd->cmd_state = SF_STATE_IDLE;
 						mutex_exit(&cmd->
-							cmd_abort_mutex);
+						    cmd_abort_mutex);
 						mutex_exit(&target->
-							sft_pkt_mutex);
+						    sft_pkt_mutex);
 						if (pkt->pkt_comp != NULL) {
 							(*pkt->pkt_comp)(pkt);
 						}
 						mutex_enter(&target->
-							sft_pkt_mutex);
+						    sft_pkt_mutex);
 						cmd = target->sft_pkt_head;
 					} else {
 						mutex_exit(&cmd->
-							cmd_abort_mutex);
+						    cmd_abort_mutex);
 						/* get next command */
 						cmd = cmd->cmd_forw;
 					}
@@ -2603,7 +2603,7 @@ sf_login(struct sf *sf, uchar_t els_code, uchar_t dest_id, uint_t arg1,
 	    sizeof (union sf_els_cmd), sizeof (union sf_els_rsp),
 	    (caddr_t *)&privp, (caddr_t *)&logi) == NULL) {
 		sf_log(sf, CE_WARN, "Cannot allocate PLOGI for target %x "
-			"due to DVMA shortage.\n", sf_alpa_to_switch[dest_id]);
+		    "due to DVMA shortage.\n", sf_alpa_to_switch[dest_id]);
 		return (FALSE);
 	}
 
@@ -2777,9 +2777,9 @@ sf_els_callback(struct fcal_packet *fpkt)
 
 			/* create the target info */
 			if ((target = sf_create_target(sf, privp,
-				sf_alpa_to_switch[(uchar_t)adisc->hard_address],
-				(int64_t)0))
-				== NULL) {
+			    sf_alpa_to_switch[(uchar_t)adisc->hard_address],
+			    (int64_t)0))
+			    == NULL) {
 				goto fail;	/* can't create target */
 			}
 
@@ -2793,7 +2793,7 @@ sf_els_callback(struct fcal_packet *fpkt)
 				    "target 0x%x, AL-PA 0x%x and "
 				    "hard address 0x%x don't match\n",
 				    sf_alpa_to_switch[
-					    (uchar_t)privp->dest_nport_id],
+				    (uchar_t)privp->dest_nport_id],
 				    privp->dest_nport_id,
 				    (uchar_t)adisc->hard_address);
 				mutex_enter(&sf->sf_mutex);
@@ -2832,9 +2832,9 @@ sf_els_callback(struct fcal_packet *fpkt)
 		/* keep track of failures */
 		sf->sf_stats.tstats[tgt_id].els_failures++;
 		if (++(privp->retries) < sf_els_retries &&
-			fpkt->fcal_pkt_status != FCAL_STATUS_OPEN_FAIL) {
+		    fpkt->fcal_pkt_status != FCAL_STATUS_OPEN_FAIL) {
 			if (fpkt->fcal_pkt_status ==
-					FCAL_STATUS_MAX_XCHG_EXCEEDED)  {
+			    FCAL_STATUS_MAX_XCHG_EXCEEDED)  {
 				tsf = sf->sf_sibling;
 				if (tsf != NULL) {
 					mutex_enter(&tsf->sf_cmd_mutex);
@@ -2862,7 +2862,7 @@ sf_els_callback(struct fcal_packet *fpkt)
 				mutex_exit(&sf->sf_mutex);
 				/* device busy?  wait a bit ... */
 				if (fpkt->fcal_pkt_status ==
-					FCAL_STATUS_MAX_XCHG_EXCEEDED)  {
+				    FCAL_STATUS_MAX_XCHG_EXCEEDED)  {
 					privp->delayed_retry = 1;
 					return;
 				}
@@ -2873,11 +2873,11 @@ sf_els_callback(struct fcal_packet *fpkt)
 					mutex_enter(&sf->sf_mutex);
 					if (privp->prev != NULL) {
 						privp->prev->next =
-							privp->next;
+						    privp->next;
 					}
 					if (privp->next != NULL) {
 						privp->next->prev =
-							privp->prev;
+						    privp->prev;
 					}
 					if (sf->sf_els_list == privp) {
 						sf->sf_els_list = privp->next;
@@ -2963,9 +2963,9 @@ sf_do_prli(struct sf *sf, struct sf_els_hdr *privp, struct la_els_logi *ptr)
 	fprli->write_xfer_rdy_disabled = 0;
 
 	bcopy((caddr_t)&ptr->nport_ww_name, (caddr_t)&privp->port_wwn,
-		sizeof (privp->port_wwn));
+	    sizeof (privp->port_wwn));
 	bcopy((caddr_t)&ptr->node_ww_name, (caddr_t)&privp->node_wwn,
-		sizeof (privp->node_wwn));
+	    sizeof (privp->node_wwn));
 
 	privp->timeout = sf_watchdog_time + SF_ELS_TIMEOUT;
 	return (sf_els_transport(sf, privp));
@@ -3030,7 +3030,7 @@ sf_els_alloc(struct sf *sf, uchar_t dest_id, int priv_size, int cmd_size,
 	if ((privp = (struct sf_els_hdr *)kmem_zalloc(priv_size,
 	    KM_NOSLEEP)) == NULL) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not allocate sf_els_hdr for ELS\n"));
+		    "Could not allocate sf_els_hdr for ELS\n"));
 		goto fail;
 	}
 
@@ -3040,7 +3040,7 @@ sf_els_alloc(struct sf *sf, uchar_t dest_id, int priv_size, int cmd_size,
 	if (ddi_dma_alloc_handle(sf->sf_dip, sf->sf_sochandle->fcal_dmaattr,
 	    DDI_DMA_DONTWAIT, NULL, &cmd_dma_handle) != DDI_SUCCESS) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not allocate DMA handle for ELS\n"));
+		    "Could not allocate DMA handle for ELS\n"));
 		goto fail;
 	}
 
@@ -3049,13 +3049,13 @@ sf_els_alloc(struct sf *sf, uchar_t dest_id, int priv_size, int cmd_size,
 	    DDI_DMA_DONTWAIT, NULL, &cmd,
 	    &real_size, &cmd_acc_handle) != DDI_SUCCESS) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not allocate DMA memory for ELS\n"));
+		    "Could not allocate DMA memory for ELS\n"));
 		goto fail;
 	}
 
 	if (real_size < cmd_size) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"DMA memory too small for ELS\n"));
+		    "DMA memory too small for ELS\n"));
 		goto fail;
 	}
 
@@ -3063,21 +3063,21 @@ sf_els_alloc(struct sf *sf, uchar_t dest_id, int priv_size, int cmd_size,
 	    cmd, real_size, DDI_DMA_WRITE | DDI_DMA_CONSISTENT,
 	    DDI_DMA_DONTWAIT, NULL, &pcookie, &ccount) != DDI_DMA_MAPPED) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not bind DMA memory for ELS\n"));
+		    "Could not bind DMA memory for ELS\n"));
 		goto fail;
 	}
 	cmd_bound = TRUE;
 
 	if (ccount != 1) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Wrong cookie count for ELS\n"));
+		    "Wrong cookie count for ELS\n"));
 		goto fail;
 	}
 
 	if (ddi_dma_alloc_handle(sf->sf_dip, sf->sf_sochandle->fcal_dmaattr,
 	    DDI_DMA_DONTWAIT, NULL, &rsp_dma_handle) != DDI_SUCCESS) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not allocate DMA handle for ELS rsp\n"));
+		    "Could not allocate DMA handle for ELS rsp\n"));
 		goto fail;
 	}
 	if (ddi_dma_mem_alloc(rsp_dma_handle, rsp_size,
@@ -3085,13 +3085,13 @@ sf_els_alloc(struct sf *sf, uchar_t dest_id, int priv_size, int cmd_size,
 	    DDI_DMA_DONTWAIT, NULL, &rsp,
 	    &real_size, &rsp_acc_handle) != DDI_SUCCESS) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not allocate DMA memory for ELS rsp\n"));
+		    "Could not allocate DMA memory for ELS rsp\n"));
 		goto fail;
 	}
 
 	if (real_size < rsp_size) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"DMA memory too small for ELS rsp\n"));
+		    "DMA memory too small for ELS rsp\n"));
 		goto fail;
 	}
 
@@ -3099,14 +3099,14 @@ sf_els_alloc(struct sf *sf, uchar_t dest_id, int priv_size, int cmd_size,
 	    rsp, real_size, DDI_DMA_READ | DDI_DMA_CONSISTENT,
 	    DDI_DMA_DONTWAIT, NULL, &rcookie, &ccount) != DDI_DMA_MAPPED) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Could not bind DMA memory for ELS rsp\n"));
+		    "Could not bind DMA memory for ELS rsp\n"));
 		goto fail;
 	}
 	rsp_bound = TRUE;
 
 	if (ccount != 1) {
 		SF_DEBUG(1, (sf, CE_WARN,
-			"Wrong cookie count for ELS rsp\n"));
+		    "Wrong cookie count for ELS rsp\n"));
 		goto fail;
 	}
 
@@ -3241,20 +3241,20 @@ sf_create_target(struct sf *sf, struct sf_els_hdr *privp, int tnum, int64_t lun)
 		 * and enqueue the new LUN.
 		 */
 		if ((ptarget = sf_lookup_target(sf, privp->port_wwn,
-			(int64_t)0)) ==	NULL) {
+		    (int64_t)0)) ==	NULL) {
 			/*
 			 * Yeep -- no LUN 0?
 			 */
 			mutex_exit(&sf->sf_mutex);
 			sf_log(sf, CE_WARN, "target 0x%x "
-				"lun %" PRIx64 ": No LUN 0\n", tnum, lun);
+			    "lun %" PRIx64 ": No LUN 0\n", tnum, lun);
 			if (ntarget != NULL)
 				kmem_free(ntarget, sizeof (struct sf_target));
 			return (NULL);
 		}
 		mutex_enter(&ptarget->sft_mutex);
 		if (target != NULL && ptarget->sft_lip_cnt == sf->sf_lip_cnt &&
-			ptarget->sft_state&SF_TARGET_OFFLINE) {
+		    ptarget->sft_state&SF_TARGET_OFFLINE) {
 			/* LUN 0 already finished, duplicate its state */
 			mutex_exit(&ptarget->sft_mutex);
 			sf_offline_target(sf, target);
@@ -3272,7 +3272,7 @@ sf_create_target(struct sf *sf, struct sf_els_hdr *privp, int tnum, int64_t lun)
 			target->sft_lip_cnt = privp->lip_cnt;
 			target->sft_state |= SF_TARGET_BUSY;
 			target->sft_state &= ~(SF_TARGET_OFFLINE|
-				SF_TARGET_MARK);
+			    SF_TARGET_MARK);
 			target->sft_al_pa = (uchar_t)privp->dest_nport_id;
 			target->sft_hard_address = sf_switch_to_alpa[tnum];
 			mutex_exit(&target->sft_mutex);
@@ -3319,7 +3319,7 @@ sf_create_target(struct sf *sf, struct sf_els_hdr *privp, int tnum, int64_t lun)
 		mutex_enter(&ptarget->sft_mutex);
 		/* Traverse the list looking for this target */
 		for (target = ptarget; target->sft_next_lun;
-			target = target->sft_next_lun) {
+		    target = target->sft_next_lun) {
 			otarget = target->sft_next_lun;
 		}
 		ntarget->sft_next_lun = target->sft_next_lun;
@@ -3364,7 +3364,7 @@ sf_create_target(struct sf *sf, struct sf_els_hdr *privp, int tnum, int64_t lun)
 			sf_offline_target(sf, otarget);
 			mutex_exit(&sf->sf_mutex);
 			sf_log(sf, CE_WARN, "wwn changed on target 0x%x\n",
-					tnum);
+			    tnum);
 			bzero((caddr_t)&sf->sf_stats.tstats[tnum],
 			    sizeof (struct sf_target_stats));
 			mutex_enter(&sf->sf_mutex);
@@ -3534,13 +3534,13 @@ sf_do_reportlun(struct sf *sf, struct sf_els_hdr *privp,
 	((union scsi_cdb *)reportlun->fcp_cdb)->scc_cmd = SCMD_REPORT_LUNS;
 	/* Now set the buffer size.  If DDI gave us extra, that's O.K. */
 	((union scsi_cdb *)reportlun->fcp_cdb)->scc5_count0 =
-		(real_size&0x0ff);
+	    (real_size&0x0ff);
 	((union scsi_cdb *)reportlun->fcp_cdb)->scc5_count1 =
-		(real_size>>8)&0x0ff;
+	    (real_size>>8)&0x0ff;
 	((union scsi_cdb *)reportlun->fcp_cdb)->scc5_count2 =
-		(real_size>>16)&0x0ff;
+	    (real_size>>16)&0x0ff;
 	((union scsi_cdb *)reportlun->fcp_cdb)->scc5_count3 =
-		(real_size>>24)&0x0ff;
+	    (real_size>>24)&0x0ff;
 	reportlun->fcp_cntl.cntl_read_data = 1;
 	reportlun->fcp_cntl.cntl_write_data = 0;
 	reportlun->fcp_data_len = pcookie.dmac_size;
@@ -3554,8 +3554,8 @@ sf_do_reportlun(struct sf *sf, struct sf_els_hdr *privp,
 
 fail:
 	sf_log(sf, CE_WARN,
-		"%s failure for REPORTLUN to target 0x%x\n",
-		msg, sf_alpa_to_switch[privp->dest_nport_id]);
+	    "%s failure for REPORTLUN to target 0x%x\n",
+	    msg, sf_alpa_to_switch[privp->dest_nport_id]);
 	sf_els_free(fpkt);
 	if (lun_dma_handle != NULL) {
 		if (handle_bound)
@@ -3579,7 +3579,7 @@ sf_reportlun_callback(struct fcal_packet *fpkt)
 	struct sf_els_hdr *privp = (struct sf_els_hdr *)fpkt->
 	    fcal_pkt_private;
 	struct scsi_report_luns *ptr =
-		(struct scsi_report_luns *)privp->data_buf;
+	    (struct scsi_report_luns *)privp->data_buf;
 	struct sf *sf = privp->sf;
 	struct sf_target *target = privp->target;
 	struct fcp_rsp *rsp = NULL;
@@ -3610,20 +3610,20 @@ sf_reportlun_callback(struct fcal_packet *fpkt)
 
 	if (fpkt->fcal_pkt_status == FCAL_STATUS_OK) {
 		(void) ddi_dma_sync(privp->rsp_dma_handle, 0,
-			0, DDI_DMA_SYNC_FORKERNEL);
+		    0, DDI_DMA_SYNC_FORKERNEL);
 
 		rsp = (struct fcp_rsp *)privp->rsp;
 	}
 	SF_DEBUG(1, (sf, CE_CONT,
-		"!REPORTLUN to al_pa %x pkt status %x scsi status %x\n",
-		privp->dest_nport_id,
-		fpkt->fcal_pkt_status,
-		rsp?rsp->fcp_u.fcp_status.scsi_status:0));
+	    "!REPORTLUN to al_pa %x pkt status %x scsi status %x\n",
+	    privp->dest_nport_id,
+	    fpkt->fcal_pkt_status,
+	    rsp?rsp->fcp_u.fcp_status.scsi_status:0));
 
 		/* See if target simply does not support REPORT_LUNS. */
 	if (rsp && rsp->fcp_u.fcp_status.scsi_status == STATUS_CHECK &&
-		rsp->fcp_u.fcp_status.sense_len_set &&
-		rsp->fcp_sense_len >=
+	    rsp->fcp_u.fcp_status.sense_len_set &&
+	    rsp->fcp_sense_len >=
 		offsetof(struct scsi_extended_sense, es_qual_code)) {
 			struct scsi_extended_sense *sense;
 			sense = (struct scsi_extended_sense *)
@@ -3674,24 +3674,24 @@ sf_reportlun_callback(struct fcal_packet *fpkt)
 		struct fcp_rsp_info *bep;
 
 		bep = (struct fcp_rsp_info *)(&rsp->
-			fcp_response_len + 1);
+		    fcp_response_len + 1);
 		if (!rsp->fcp_u.fcp_status.rsp_len_set ||
-			bep->rsp_code == FCP_NO_FAILURE) {
+		    bep->rsp_code == FCP_NO_FAILURE) {
 			(void) ddi_dma_sync(privp->data_dma_handle,
-				0, 0, DDI_DMA_SYNC_FORKERNEL);
+			    0, 0, DDI_DMA_SYNC_FORKERNEL);
 
 			/* Convert from #bytes to #ints */
 			ptr->lun_list_len = ptr->lun_list_len >> 3;
 			SF_DEBUG(2, (sf, CE_CONT,
-				"!REPORTLUN to al_pa %x succeeded: %d LUNs\n",
-				privp->dest_nport_id, ptr->lun_list_len));
+			    "!REPORTLUN to al_pa %x succeeded: %d LUNs\n",
+			    privp->dest_nport_id, ptr->lun_list_len));
 			if (!ptr->lun_list_len) {
 				/* No LUNs? Ya gotta be kidding... */
 				sf_log(sf, CE_WARN,
-					"SCSI violation -- "
-					"target 0x%x reports no LUNs\n",
-					sf_alpa_to_switch[
-					privp->dest_nport_id]);
+				    "SCSI violation -- "
+				    "target 0x%x reports no LUNs\n",
+				    sf_alpa_to_switch[
+				    privp->dest_nport_id]);
 				ptr->lun_list_len = 1;
 				ptr->lun[0] = 0;
 			}
@@ -3703,35 +3703,35 @@ sf_reportlun_callback(struct fcal_packet *fpkt)
 
 			mutex_exit(&sf->sf_mutex);
 			for (i = 0; i < ptr->lun_list_len && privp->lip_cnt ==
-				sf->sf_lip_cnt; i++) {
+			    sf->sf_lip_cnt; i++) {
 				struct sf_els_hdr *nprivp;
 				struct fcal_packet *nfpkt;
 
 				/* LUN 0 is already in `target' */
 				if (ptr->lun[i] != 0) {
 					target = sf_create_target(sf,
-						privp, tid, ptr->lun[i]);
+					    privp, tid, ptr->lun[i]);
 				}
 				nprivp = NULL;
 				nfpkt = NULL;
 				if (target) {
 					nfpkt = sf_els_alloc(sf,
-						target->sft_al_pa,
-						sizeof (struct sf_els_hdr),
-						sizeof (union sf_els_cmd),
-						sizeof (union sf_els_rsp),
-						(caddr_t *)&nprivp,
-						(caddr_t *)&rsp);
+					    target->sft_al_pa,
+					    sizeof (struct sf_els_hdr),
+					    sizeof (union sf_els_cmd),
+					    sizeof (union sf_els_rsp),
+					    (caddr_t *)&nprivp,
+					    (caddr_t *)&rsp);
 					if (nprivp)
 						nprivp->lip_cnt =
-							privp->lip_cnt;
+						    privp->lip_cnt;
 				}
 				if (nfpkt && nprivp &&
-					(sf_do_inquiry(sf, nprivp, target) ==
-						0)) {
+				    (sf_do_inquiry(sf, nprivp, target) ==
+				    0)) {
 					mutex_enter(&sf->sf_mutex);
 					if (sf->sf_lip_cnt == privp->
-						lip_cnt) {
+					    lip_cnt) {
 						sf->sf_device_count --;
 					}
 					sf_offline_target(sf, target);
@@ -3742,15 +3742,15 @@ sf_reportlun_callback(struct fcal_packet *fpkt)
 			return;
 		} else {
 			SF_DEBUG(1, (sf, CE_CONT,
-				"!REPORTLUN al_pa %x fcp failure, "
-				"fcp_rsp_code %x scsi status %x\n",
-				privp->dest_nport_id, bep->rsp_code,
-				rsp ? rsp->fcp_u.fcp_status.scsi_status:0));
+			    "!REPORTLUN al_pa %x fcp failure, "
+			    "fcp_rsp_code %x scsi status %x\n",
+			    privp->dest_nport_id, bep->rsp_code,
+			    rsp ? rsp->fcp_u.fcp_status.scsi_status:0));
 			goto fail;
 		}
 	}
 	if (rsp && ((rsp->fcp_u.fcp_status.scsi_status == STATUS_BUSY) ||
-		(rsp->fcp_u.fcp_status.scsi_status == STATUS_QFULL))) {
+	    (rsp->fcp_u.fcp_status.scsi_status == STATUS_QFULL))) {
 		delayed_retry = 1;
 	}
 
@@ -3807,12 +3807,13 @@ fail:
 		}
 		mutex_enter(&sf->sf_mutex);
 		if (sf->sf_lip_cnt == privp->lip_cnt) {
-		    sf_log(sf, CE_WARN, "!REPORTLUN to target 0x%x failed\n",
-				sf_alpa_to_switch[privp->dest_nport_id]);
-		    sf_offline_target(sf, target);
-		    sf->sf_device_count--;
-		    ASSERT(sf->sf_device_count >= 0);
-		    if (sf->sf_device_count == 0)
+			sf_log(sf, CE_WARN,
+			    "!REPORTLUN to target 0x%x failed\n",
+			    sf_alpa_to_switch[privp->dest_nport_id]);
+			sf_offline_target(sf, target);
+			sf->sf_device_count--;
+			ASSERT(sf->sf_device_count >= 0);
+			if (sf->sf_device_count == 0)
 			sf_finish_init(sf, privp->lip_cnt);
 		}
 		mutex_exit(&sf->sf_mutex);
@@ -3890,7 +3891,7 @@ sf_do_inquiry(struct sf *sf, struct sf_els_hdr *privp,
 	((union scsi_cdb *)inq->fcp_cdb)->scc_cmd = SCMD_INQUIRY;
 	((union scsi_cdb *)inq->fcp_cdb)->g0_count0 = SUN_INQSIZE;
 	bcopy((caddr_t)&target->sft_lun.b, (caddr_t)&inq->fcp_ent_addr,
-		FCP_LUN_SIZE);
+	    FCP_LUN_SIZE);
 	inq->fcp_cntl.cntl_read_data = 1;
 	inq->fcp_cntl.cntl_write_data = 0;
 	inq->fcp_data_len = pcookie.dmac_size;
@@ -3900,15 +3901,15 @@ sf_do_inquiry(struct sf *sf, struct sf_els_hdr *privp,
 	    DDI_DMA_SYNC_FORDEV);
 	privp->timeout = sf_watchdog_time + SF_FCP_TIMEOUT;
 	SF_DEBUG(5, (sf, CE_WARN,
-		"!Sending INQUIRY to al_pa %x lun %" PRIx64 "\n",
-		privp->dest_nport_id,
-		SCSA_LUN(target)));
+	    "!Sending INQUIRY to al_pa %x lun %" PRIx64 "\n",
+	    privp->dest_nport_id,
+	    SCSA_LUN(target)));
 	return (sf_els_transport(sf, privp));
 
 fail:
 	sf_log(sf, CE_WARN,
-		"%s failure for INQUIRY to target 0x%x\n",
-		msg, sf_alpa_to_switch[privp->dest_nport_id]);
+	    "%s failure for INQUIRY to target 0x%x\n",
+	    msg, sf_alpa_to_switch[privp->dest_nport_id]);
 	sf_els_free(fpkt);
 	if (inq_dma_handle != NULL) {
 		if (handle_bound) {
@@ -3976,7 +3977,7 @@ sf_inq_callback(struct fcal_packet *fpkt)
 		if ((rsp->fcp_u.fcp_status.scsi_status == STATUS_GOOD) &&
 		    !rsp->fcp_u.fcp_status.resid_over &&
 		    (!rsp->fcp_u.fcp_status.resid_under ||
-			((SUN_INQSIZE - rsp->fcp_resid) >= SUN_MIN_INQLEN))) {
+		    ((SUN_INQSIZE - rsp->fcp_resid) >= SUN_MIN_INQLEN))) {
 			struct fcp_rsp_info *bep;
 
 			bep = (struct fcp_rsp_info *)(&rsp->
@@ -4022,7 +4023,7 @@ sf_inq_callback(struct fcal_packet *fpkt)
 		}
 	} else {
 		SF_DEBUG(2, (sf, CE_CONT, "!INQUIRY to al_pa %x fc status %x",
-			privp->dest_nport_id, fpkt->fcal_pkt_status));
+		    privp->dest_nport_id, fpkt->fcal_pkt_status));
 	}
 
 	if (++(privp->retries) < sf_els_retries ||
@@ -4062,8 +4063,8 @@ sf_inq_callback(struct fcal_packet *fpkt)
 			/* if not delayed call transport to send a pkt */
 			if (!delayed_retry &&
 			    (soc_transport(sf->sf_sochandle, fpkt,
-				FCAL_NOSLEEP, CQ_REQUEST_1) !=
-				FCAL_TRANSPORT_SUCCESS)) {
+			    FCAL_NOSLEEP, CQ_REQUEST_1) !=
+			    FCAL_TRANSPORT_SUCCESS)) {
 				mutex_enter(&sf->sf_mutex);
 				if (privp->prev != NULL) {
 					privp->prev->next = privp->next;
@@ -4193,7 +4194,7 @@ sf_finish_init(struct sf *sf, int lip_cnt)
 					/* this is the first element in list */
 					sf->sf_hp_elem_head =
 					    sf->sf_hp_elem_tail =
-						elem;
+					    elem;
 				}
 				cv_signal(&sf->sf_hp_daemon_cv);
 				mutex_exit(&sf->sf_hp_daemon_mutex);
@@ -4393,9 +4394,9 @@ sf_offline_target(struct sf *sf, struct sf_target *target)
 
 	while (target != NULL) {
 		sf_log(sf, CE_NOTE,
-			"!target 0x%x al_pa 0x%x lun %" PRIx64 " offlined\n",
-			sf_alpa_to_switch[target->sft_al_pa],
-			target->sft_al_pa, SCSA_LUN(target));
+		    "!target 0x%x al_pa 0x%x lun %" PRIx64 " offlined\n",
+		    sf_alpa_to_switch[target->sft_al_pa],
+		    target->sft_al_pa, SCSA_LUN(target));
 		mutex_enter(&target->sft_mutex);
 		target->sft_state &= ~(SF_TARGET_BUSY|SF_TARGET_MARK);
 		target->sft_state |= SF_TARGET_OFFLINE;
@@ -4416,15 +4417,15 @@ sf_offline_target(struct sf *sf, struct sf_target *target)
 			mutex_exit(&target->sft_mutex);
 			mutex_exit(&sf->sf_mutex);
 			(void) ndi_prop_remove(DDI_DEV_T_NONE, dip,
-				TARGET_PROP);
+			    TARGET_PROP);
 			(void) ndi_event_retrieve_cookie(sf->sf_event_hdl,
 			    dip, FCAL_REMOVE_EVENT, &sf_remove_eid,
 			    NDI_EVENT_NOPASS);
 			(void) ndi_event_run_callbacks(sf->sf_event_hdl,
-				target->sft_dip, sf_remove_eid, NULL);
+			    target->sft_dip, sf_remove_eid, NULL);
 
 			elem = kmem_zalloc(sizeof (struct sf_hp_elem),
-				KM_NOSLEEP);
+			    KM_NOSLEEP);
 			if (elem != NULL) {
 				elem->dip = dip;
 				elem->target = target;
@@ -4435,8 +4436,8 @@ sf_offline_target(struct sf *sf, struct sf_target *target)
 					sf->sf_hp_elem_tail = elem;
 				} else {
 					sf->sf_hp_elem_head =
-						sf->sf_hp_elem_tail =
-						elem;
+					    sf->sf_hp_elem_tail =
+					    elem;
 				}
 				cv_signal(&sf->sf_hp_daemon_cv);
 				mutex_exit(&sf->sf_hp_daemon_mutex);
@@ -4444,18 +4445,18 @@ sf_offline_target(struct sf *sf, struct sf_target *target)
 				/* don't do NDI_DEVI_REMOVE for now */
 				if (ndi_devi_offline(dip, 0) != NDI_SUCCESS) {
 					SF_DEBUG(1, (sf, CE_WARN,
-						"target %x lun %" PRIx64 ", "
-						"device offline failed",
-						sf_alpa_to_switch[target->
-							sft_al_pa],
-						SCSA_LUN(target)));
+					    "target %x lun %" PRIx64 ", "
+					    "device offline failed",
+					    sf_alpa_to_switch[target->
+					    sft_al_pa],
+					    SCSA_LUN(target)));
 				} else {
 					SF_DEBUG(1, (sf, CE_NOTE,
-						"target %x, lun %" PRIx64 ", "
-						"device offline succeeded\n",
-						sf_alpa_to_switch[target->
-							sft_al_pa],
-						SCSA_LUN(target)));
+					    "target %x, lun %" PRIx64 ", "
+					    "device offline succeeded\n",
+					    sf_alpa_to_switch[target->
+					    sft_al_pa],
+					    SCSA_LUN(target)));
 				}
 			}
 			mutex_enter(&sf->sf_mutex);
@@ -4691,8 +4692,8 @@ sf_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 					(void) ddi_dma_sync(
 					    cmd->cmd_cr_pool->rsp_dma_handle,
 					    (off_t)
-						((caddr_t)cmd->cmd_rsp_block -
-						cmd->cmd_cr_pool->rsp_base),
+					    ((caddr_t)cmd->cmd_rsp_block -
+					    cmd->cmd_cr_pool->rsp_base),
 					    FCP_MAX_RSP_IU_SIZE,
 					    DDI_DMA_SYNC_FORKERNEL);
 					if (((struct fcp_rsp_info *)
@@ -4707,7 +4708,7 @@ sf_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 						    fcal_socal_request.
 						    sr_fc_frame_hdr;
 						tgt_id = sf_alpa_to_switch[
-							(uchar_t)hp->d_id];
+						    (uchar_t)hp->d_id];
 						sf->sf_stats.tstats[tgt_id].
 						    task_mgmt_failures++;
 						SF_DEBUG(1, (sf, CE_NOTE,
@@ -4715,11 +4716,11 @@ sf_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 						    "Set failed\n", hp->d_id));
 					}
 				} else {
-				    mutex_enter(&cmd->cmd_abort_mutex);
-				    if (cmd->cmd_state == SF_STATE_ISSUED) {
+					mutex_enter(&cmd->cmd_abort_mutex);
+					if (cmd->cmd_state == SF_STATE_ISSUED) {
 					cmd->cmd_state = SF_STATE_ABORTING;
 					cmd->cmd_timeout = sf_watchdog_time
-							+ 20;
+					    + 20;
 					mutex_exit(&cmd->cmd_abort_mutex);
 					if ((t = soc_abort(sf->sf_sochandle,
 					    sf->sf_socp, sf->sf_sochandle->
@@ -4732,9 +4733,9 @@ sf_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 						sf_force_lip(sf);
 						deferred_destroy = 1;
 					}
-				    } else {
+					} else {
 					mutex_exit(&cmd->cmd_abort_mutex);
-				    }
+					}
 				}
 			}
 			if (!deferred_destroy) {
@@ -4799,8 +4800,8 @@ sf_reset(struct scsi_address *ap, int level)
 		lip_cnt = sf->sf_lip_cnt;
 		target->sft_state |= SF_TARGET_BUSY;
 		for (ntarget = target->sft_next_lun;
-			ntarget;
-			ntarget = ntarget->sft_next_lun) {
+		    ntarget;
+		    ntarget = ntarget->sft_next_lun) {
 			mutex_enter(&ntarget->sft_mutex);
 			/*
 			 * XXXX If we supported RESET_LUN we should check here
@@ -4835,7 +4836,7 @@ sf_reset(struct scsi_address *ap, int level)
 					    DDI_DMA_SYNC_FORKERNEL);
 					fpkt = cmd->cmd_fp_pkt;
 					if ((fpkt->fcal_pkt_status ==
-							FCAL_STATUS_OK) &&
+					    FCAL_STATUS_OK) &&
 					    (((struct fcp_rsp_info *)
 					    (&cmd->cmd_rsp_block->
 					    fcp_response_len + 1))->
@@ -4844,25 +4845,25 @@ sf_reset(struct scsi_address *ap, int level)
 						    "!sf%d: Target 0x%x Reset "
 						    "successful\n",
 						    ddi_get_instance(\
-							sf->sf_dip),
+						    sf->sf_dip),
 						    sf_alpa_to_switch[
-							target->sft_al_pa]);
+						    target->sft_al_pa]);
 						rval = TRUE;
 					} else {
 						hp = &cmd->cmd_fp_pkt->
 						    fcal_socal_request.
 						    sr_fc_frame_hdr;
 						tgt_id = sf_alpa_to_switch[
-							(uchar_t)hp->d_id];
+						    (uchar_t)hp->d_id];
 						sf->sf_stats.tstats[tgt_id].
 						    task_mgmt_failures++;
-							sf_log(sf, CE_NOTE,
-							"!sf%d: Target 0x%x "
-							"Reset failed."
-							"Status code 0x%x "
-							"Resp code 0x%x\n",
-							ddi_get_instance(\
-								sf->sf_dip),
+						sf_log(sf, CE_NOTE,
+						    "!sf%d: Target 0x%x "
+						    "Reset failed."
+						    "Status code 0x%x "
+						    "Resp code 0x%x\n",
+						    ddi_get_instance(\
+						    sf->sf_dip),
 						    tgt_id,
 						    fpkt->fcal_pkt_status,
 						    ((struct fcp_rsp_info *)
@@ -4871,16 +4872,16 @@ sf_reset(struct scsi_address *ap, int level)
 						    rsp_code);
 					}
 				} else {
-				    sf_log(sf, CE_NOTE, "!sf%d: Target "
-						"0x%x Reset Failed. Ret=%x\n",
-						ddi_get_instance(sf->sf_dip),
-						sf_alpa_to_switch[
-						target->sft_al_pa], ret);
-				    mutex_enter(&cmd->cmd_abort_mutex);
-				    if (cmd->cmd_state == SF_STATE_ISSUED) {
+					sf_log(sf, CE_NOTE, "!sf%d: Target "
+					    "0x%x Reset Failed. Ret=%x\n",
+					    ddi_get_instance(sf->sf_dip),
+					    sf_alpa_to_switch[
+					    target->sft_al_pa], ret);
+					mutex_enter(&cmd->cmd_abort_mutex);
+					if (cmd->cmd_state == SF_STATE_ISSUED) {
 					/* call the transport to abort a cmd */
 					cmd->cmd_timeout = sf_watchdog_time
-									+ 20;
+					    + 20;
 					cmd->cmd_state = SF_STATE_ABORTING;
 					mutex_exit(&cmd->cmd_abort_mutex);
 					if (((t = soc_abort(sf->sf_sochandle,
@@ -4894,16 +4895,17 @@ sf_reset(struct scsi_address *ap, int level)
 						    "failed. Abort Failed, "
 						    "forcing LIP\n",
 						    ddi_get_instance(
-							sf->sf_dip),
+						    sf->sf_dip),
 						    sf_alpa_to_switch[
-							target->sft_al_pa]);
+						    target->sft_al_pa]);
 						sf_force_lip(sf);
 						rval = TRUE;
 						deferred_destroy = 1;
 					}
-				    } else {
-					mutex_exit(&cmd->cmd_abort_mutex);
-				    }
+					} else {
+						mutex_exit
+						    (&cmd->cmd_abort_mutex);
+					}
 				}
 			}
 			/*
@@ -4923,9 +4925,9 @@ sf_reset(struct scsi_address *ap, int level)
 			}
 		} else {
 			cmn_err(CE_WARN, "!sf%d: Target 0x%x Reset Failed. "
-					"Resource allocation error.\n",
-					ddi_get_instance(sf->sf_dip),
-					sf_alpa_to_switch[target->sft_al_pa]);
+			    "Resource allocation error.\n",
+			    ddi_get_instance(sf->sf_dip),
+			    sf_alpa_to_switch[target->sft_al_pa]);
 		}
 		mutex_enter(&sf->sf_mutex);
 		if ((rval == TRUE) && (lip_cnt == sf->sf_lip_cnt)) {
@@ -4948,8 +4950,8 @@ sf_reset(struct scsi_address *ap, int level)
 				mutex_enter(&target->sft_mutex);
 				target->sft_state &= ~SF_TARGET_BUSY;
 				for (ntarget = target->sft_next_lun;
-					ntarget;
-					ntarget = ntarget->sft_next_lun) {
+				    ntarget;
+				    ntarget = ntarget->sft_next_lun) {
 					mutex_enter(&ntarget->sft_mutex);
 					ntarget->sft_state &= ~SF_TARGET_BUSY;
 					mutex_exit(&ntarget->sft_mutex);
@@ -5006,7 +5008,7 @@ sf_abort_all(struct sf *sf, struct sf_target *target, int abort, int
 		cmd = sf->sf_pkt_head;
 		while (cmd != NULL) {
 			ntarget = ADDR2TARGET(&cmd->cmd_pkt->
-				pkt_address);
+			    pkt_address);
 			if (ntarget == target) {
 				if (pcmd != NULL)
 					pcmd->cmd_next = cmd->cmd_next;
@@ -5083,10 +5085,10 @@ sf_abort_all(struct sf *sf, struct sf_target *target, int abort, int
 			pkt = cmd->cmd_pkt;
 			mutex_enter(&cmd->cmd_abort_mutex);
 			if ((cmd->cmd_state == SF_STATE_ISSUED) &&
-				(fpkt->fcal_cmd_state &
-					FCAL_CMD_IN_TRANSPORT) &&
-				((fpkt->fcal_cmd_state & FCAL_CMD_COMPLETE) ==
-					0) && !(pkt->pkt_flags & FLAG_NOINTR)) {
+			    (fpkt->fcal_cmd_state &
+			    FCAL_CMD_IN_TRANSPORT) &&
+			    ((fpkt->fcal_cmd_state & FCAL_CMD_COMPLETE) ==
+			    0) && !(pkt->pkt_flags & FLAG_NOINTR)) {
 				cmd->cmd_state = SF_STATE_ABORTING;
 				cmd->cmd_timeout = sf_watchdog_time +
 				    cmd->cmd_pkt->pkt_time + 20;
@@ -5095,20 +5097,20 @@ sf_abort_all(struct sf *sf, struct sf_target *target, int abort, int
 				if (try_abort) {
 					/* call the transport to abort a pkt */
 					rval = soc_abort(sf->sf_sochandle,
-						sf->sf_socp,
-						sf->sf_sochandle->fcal_portno,
-						fpkt, 1);
+					    sf->sf_socp,
+					    sf->sf_sochandle->fcal_portno,
+					    fpkt, 1);
 				}
 				if ((rval == FCAL_ABORTED) ||
-					(rval == FCAL_ABORT_FAILED)) {
+				    (rval == FCAL_ABORT_FAILED)) {
 					if (abort) {
 						pkt->pkt_reason = CMD_ABORTED;
 						pkt->pkt_statistics |=
-							STAT_ABORTED;
+						    STAT_ABORTED;
 					} else {
 						pkt->pkt_reason = CMD_RESET;
 						pkt->pkt_statistics |=
-							STAT_DEV_RESET;
+						    STAT_DEV_RESET;
 					}
 					cmd->cmd_state = SF_STATE_IDLE;
 					if (pkt->pkt_comp)
@@ -5148,7 +5150,7 @@ sf_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	if (cmd->cmd_state == SF_STATE_ISSUED) {
 		cmn_err(CE_PANIC, "sf: issuing packet twice 0x%p\n",
-			(void *)cmd);
+		    (void *)cmd);
 	}
 
 	/* prepare the packet for transport */
@@ -5181,7 +5183,7 @@ sf_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		/* locking no needed */
 
 		cmd->cmd_timeout = cmd->cmd_pkt->pkt_time ?
-			sf_watchdog_time + cmd->cmd_pkt->pkt_time : 0;
+		    sf_watchdog_time + cmd->cmd_pkt->pkt_time : 0;
 		cmd->cmd_state = SF_STATE_ISSUED;
 
 		/* call the transport to send a pkt */
@@ -5269,8 +5271,8 @@ sf_prepare_pkt(struct sf *sf, struct sf_pkt *cmd, struct sf_target *target)
 
 /* XXXX Need to set the LUN ? */
 	bcopy((caddr_t)&target->sft_lun.b,
-		(caddr_t)&fcmd->fcp_ent_addr,
-		FCP_LUN_SIZE);
+	    (caddr_t)&fcmd->fcp_ent_addr,
+	    FCP_LUN_SIZE);
 	cmd->cmd_pkt->pkt_reason = CMD_CMPLT;
 	cmd->cmd_pkt->pkt_state = 0;
 	cmd->cmd_pkt->pkt_statistics = 0;
@@ -5306,8 +5308,8 @@ sf_prepare_pkt(struct sf *sf, struct sf_pkt *cmd, struct sf_target *target)
 	 * Sync the cmd segment
 	 */
 	(void) ddi_dma_sync(cmd->cmd_cr_pool->cmd_dma_handle,
-		(caddr_t)fcmd - cmd->cmd_cr_pool->cmd_base,
-		sizeof (struct fcp_cmd), DDI_DMA_SYNC_FORDEV);
+	    (caddr_t)fcmd - cmd->cmd_cr_pool->cmd_base,
+	    sizeof (struct fcp_cmd), DDI_DMA_SYNC_FORDEV);
 
 	sf_fill_ids(sf, cmd, target);
 	return (TRAN_ACCEPT);
@@ -5328,7 +5330,7 @@ sf_fill_ids(struct sf *sf, struct sf_pkt *cmd, struct sf_target *target)
 	hp->d_id = target->sft_al_pa;
 	hp->s_id = sf->sf_al_pa;
 	fpkt->fcal_socal_request.sr_soc_hdr.sh_byte_cnt =
-		    cmd->cmd_dmacookie.dmac_size;
+	    cmd->cmd_dmacookie.dmac_size;
 }
 
 
@@ -5354,7 +5356,7 @@ sf_dopoll(struct sf *sf, struct sf_pkt *cmd)
 
 	/* call transport to send a pkt polled */
 	rval = soc_transport_poll(sf->sf_sochandle, cmd->cmd_fp_pkt,
-		timeout*1000000, CQ_REQUEST_1);
+	    timeout*1000000, CQ_REQUEST_1);
 	mutex_enter(&cmd->cmd_abort_mutex);
 	cmd->cmd_fp_pkt->fcal_pkt_comp = sf_cmd_callback;
 	if (rval != FCAL_TRANSPORT_SUCCESS) {
@@ -5408,7 +5410,7 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 
 	if (cmd->cmd_state == SF_STATE_IDLE) {
 		cmn_err(CE_PANIC, "sf: completing idle packet 0x%p\n",
-			(void *)cmd);
+		    (void *)cmd);
 	}
 
 	mutex_enter(&cmd->cmd_abort_mutex);
@@ -5436,7 +5438,7 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 				    fpkt->fcal_socal_request.\
 				    sr_soc_hdr.sh_request_token;
 				(void) soc_take_core(sf->sf_sochandle,
-							sf->sf_socp);
+				    sf->sf_socp);
 			}
 
 			pkt->pkt_reason = CMD_INCOMPLETE;
@@ -5446,7 +5448,7 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 		} else {
 
 			pkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
-					STATE_SENT_CMD | STATE_GOT_STATUS;
+			    STATE_SENT_CMD | STATE_GOT_STATUS;
 			pkt->pkt_resid = 0;
 			if (cmd->cmd_flags & CFLAG_DMAVALID) {
 				pkt->pkt_state |= STATE_XFERRED_DATA;
@@ -5454,8 +5456,8 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 
 			if ((pkt->pkt_scbp != NULL) &&
 			    ((*(pkt->pkt_scbp) =
-				rsp->fcp_u.fcp_status.scsi_status)
-							!= STATUS_GOOD)) {
+			    rsp->fcp_u.fcp_status.scsi_status)
+			    != STATUS_GOOD)) {
 				good_scsi_status = FALSE;
 			/*
 			 * The next two checks make sure that if there
@@ -5473,7 +5475,7 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 			if ((cmd->cmd_flags & CFLAG_CMDIOPB) &&
 			    (pkt->pkt_state & STATE_XFERRED_DATA)) {
 				(void) ddi_dma_sync(cmd->cmd_dmahandle, 0,
-					(uint_t)0, DDI_DMA_SYNC_FORCPU);
+				    (uint_t)0, DDI_DMA_SYNC_FORCPU);
 			}
 			/*
 			 * Update the transfer resid, if appropriate
@@ -5491,83 +5493,86 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 			 * First see if we got a FCP protocol error.
 			 */
 			if (rsp->fcp_u.fcp_status.rsp_len_set) {
-			    struct fcp_rsp_info *bep;
+				struct fcp_rsp_info *bep;
 
-			    bep =
-			    (struct fcp_rsp_info *)(&rsp->fcp_response_len + 1);
-			    if (bep->rsp_code != FCP_NO_FAILURE) {
-				pkt->pkt_reason = CMD_TRAN_ERR;
-				tgt_id = pkt->pkt_address.a_target;
-				switch (bep->rsp_code) {
-				case FCP_CMND_INVALID:
-					SF_DMSG1("FCP_RSP FCP_CMND "
-						"fields invalid");
-					break;
-				case FCP_TASK_MGMT_NOT_SUPPTD:
-					SF_DMSG1("FCP_RSP Task"
-						"Management Function"
-						"Not Supported");
-					break;
-				case FCP_TASK_MGMT_FAILED:
-					SF_DMSG1("FCP_RSP Task "
-						"Management Function"
-						"Failed");
-					sf->sf_stats.tstats[tgt_id].
-						task_mgmt_failures++;
-					break;
-				case FCP_DATA_RO_MISMATCH:
-					SF_DMSG1("FCP_RSP FCP_DATA RO "
-						"mismatch with "
-						"FCP_XFER_RDY DATA_RO");
-					sf->sf_stats.tstats[tgt_id].
-						data_ro_mismatches++;
-					break;
-				case FCP_DL_LEN_MISMATCH:
-					SF_DMSG1("FCP_RSP FCP_DATA length "
-						"different than BURST_LEN");
-					sf->sf_stats.tstats[tgt_id].
-						dl_len_mismatches++;
-					break;
-				default:
-					SF_DMSG1("FCP_RSP invalid RSP_CODE");
-					break;
+				bep = (struct fcp_rsp_info *)
+				    (&rsp->fcp_response_len + 1);
+				if (bep->rsp_code != FCP_NO_FAILURE) {
+						pkt->pkt_reason = CMD_TRAN_ERR;
+					tgt_id = pkt->pkt_address.a_target;
+					switch (bep->rsp_code) {
+					case FCP_CMND_INVALID:
+						SF_DMSG1("FCP_RSP FCP_CMND "
+						    "fields invalid");
+						break;
+					case FCP_TASK_MGMT_NOT_SUPPTD:
+						SF_DMSG1("FCP_RSP Task"
+						    "Management Function"
+						    "Not Supported");
+						break;
+					case FCP_TASK_MGMT_FAILED:
+						SF_DMSG1("FCP_RSP Task "
+						    "Management Function"
+						    "Failed");
+						sf->sf_stats.tstats[tgt_id].
+						    task_mgmt_failures++;
+						break;
+					case FCP_DATA_RO_MISMATCH:
+						SF_DMSG1("FCP_RSP FCP_DATA RO "
+						    "mismatch with "
+						    "FCP_XFER_RDY DATA_RO");
+						sf->sf_stats.tstats[tgt_id].
+						    data_ro_mismatches++;
+						break;
+					case FCP_DL_LEN_MISMATCH:
+						SF_DMSG1("FCP_RSP FCP_DATA "
+						    "length "
+						    "different than BURST_LEN");
+						sf->sf_stats.tstats[tgt_id].
+						    dl_len_mismatches++;
+						break;
+					default:
+						SF_DMSG1("FCP_RSP invalid "
+						    "RSP_CODE");
+						break;
+					}
 				}
-			    }
 			}
 
 			/*
 			 * See if we got a SCSI error with sense data
 			 */
 			if (rsp->fcp_u.fcp_status.sense_len_set) {
-			    uchar_t rqlen = min(rsp->fcp_sense_len,
-					sizeof (struct scsi_extended_sense));
-			    caddr_t sense = (caddr_t)rsp +
-				sizeof (struct fcp_rsp) + rsp->fcp_response_len;
-			    struct scsi_arq_status *arq;
-			    struct scsi_extended_sense *sensep =
-				(struct scsi_extended_sense *)sense;
+				uchar_t rqlen = min(rsp->fcp_sense_len,
+				    sizeof (struct scsi_extended_sense));
+				caddr_t sense = (caddr_t)rsp +
+				    sizeof (struct fcp_rsp) +
+				    rsp->fcp_response_len;
+				struct scsi_arq_status *arq;
+				struct scsi_extended_sense *sensep =
+				    (struct scsi_extended_sense *)sense;
 
-			    if (rsp->fcp_u.fcp_status.scsi_status !=
-							STATUS_GOOD) {
+				if (rsp->fcp_u.fcp_status.scsi_status !=
+				    STATUS_GOOD) {
 				if (rsp->fcp_u.fcp_status.scsi_status
-					== STATUS_CHECK) {
+				    == STATUS_CHECK) {
 					if (sensep->es_key ==
-						KEY_RECOVERABLE_ERROR)
+					    KEY_RECOVERABLE_ERROR)
 						good_scsi_status = 1;
 					if (sensep->es_key ==
-						KEY_UNIT_ATTENTION &&
-						sensep->es_add_code == 0x3f &&
-						sensep->es_qual_code == 0x0e) {
+					    KEY_UNIT_ATTENTION &&
+					    sensep->es_add_code == 0x3f &&
+					    sensep->es_qual_code == 0x0e) {
 						/* REPORT_LUNS_HAS_CHANGED */
 						sf_log(sf, CE_NOTE,
 						"!REPORT_LUNS_HAS_CHANGED\n");
 						sf_force_lip(sf);
 					}
 				}
-			    }
+				}
 
-			    if ((pkt->pkt_scbp != NULL) &&
-				(cmd->cmd_scblen >=
+				if ((pkt->pkt_scbp != NULL) &&
+				    (cmd->cmd_scblen >=
 					sizeof (struct scsi_arq_status))) {
 
 				pkt->pkt_state |= STATE_ARQ_DONE;
@@ -5590,7 +5595,7 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 				    STATE_GOT_STATUS | STATE_ARQ_DONE |
 				    STATE_XFERRED_DATA;
 			    }
-			    target->sft_alive = TRUE;
+				target->sft_alive = TRUE;
 			}
 
 			/*
@@ -5604,26 +5609,29 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 			    (!(cmd->cmd_flags & CFLAG_CMDIOPB)) &&
 			    (target->sft_device_type != DTYPE_ESI)) {
 				int byte_cnt =
-				fpkt->fcal_socal_request.sr_soc_hdr.sh_byte_cnt;
+				    fpkt->fcal_socal_request.
+				    sr_soc_hdr.sh_byte_cnt;
 				if (cmd->cmd_flags & CFLAG_DMASEND) {
-				    if (byte_cnt != 0) {
+					if (byte_cnt != 0) {
 					sf_log(sf, CE_NOTE,
-						"!sf_cmd_callback: Lost Frame: "
-						"(write) received 0x%x expected"
-						" 0x%x target 0x%x\n",
-						byte_cnt, cmd->cmd_dmacount,
-						sf_alpa_to_switch[
-							target->sft_al_pa]);
+					    "!sf_cmd_callback: Lost Frame: "
+					    "(write) received 0x%x expected"
+					    " 0x%x target 0x%x\n",
+					    byte_cnt, cmd->cmd_dmacount,
+					    sf_alpa_to_switch[
+					    target->sft_al_pa]);
 					pkt->pkt_reason = CMD_INCOMPLETE;
 					pkt->pkt_statistics |= STAT_ABORTED;
-				    }
+					}
 				} else if (byte_cnt < cmd->cmd_dmacount) {
-				    sf_log(sf, CE_NOTE,
-					"!sf_cmd_callback: Lost Frame: (read) "
-					"received 0x%x expected 0x%x "
-					"target 0x%x\n", byte_cnt,
-					cmd->cmd_dmacount, sf_alpa_to_switch[
-							target->sft_al_pa]);
+					sf_log(sf, CE_NOTE,
+					    "!sf_cmd_callback: "
+					    "Lost Frame: (read) "
+					    "received 0x%x expected 0x%x "
+					    "target 0x%x\n", byte_cnt,
+					    cmd->cmd_dmacount,
+					    sf_alpa_to_switch[
+					    target->sft_al_pa]);
 					pkt->pkt_reason = CMD_INCOMPLETE;
 					pkt->pkt_statistics |= STAT_ABORTED;
 				}
@@ -5641,14 +5649,14 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 			mutex_enter(&target->sft_mutex);
 			if (!(target->sft_state & SF_TARGET_OFFLINE)) {
 				target->sft_state |= (SF_TARGET_BUSY
-					    | SF_TARGET_MARK);
+				    | SF_TARGET_MARK);
 			}
 			mutex_exit(&target->sft_mutex);
 			(void) ndi_event_retrieve_cookie(sf->sf_event_hdl,
-				target->sft_dip, FCAL_REMOVE_EVENT,
-				&sf_remove_eid, NDI_EVENT_NOPASS);
+			    target->sft_dip, FCAL_REMOVE_EVENT,
+			    &sf_remove_eid, NDI_EVENT_NOPASS);
 			(void) ndi_event_run_callbacks(sf->sf_event_hdl,
-				target->sft_dip, sf_remove_eid, NULL);
+			    target->sft_dip, sf_remove_eid, NULL);
 			pkt->pkt_reason = CMD_TRAN_ERR;
 			pkt->pkt_statistics |= STAT_BUS_RESET;
 			break;
@@ -5739,10 +5747,11 @@ sf_cmd_callback(struct fcal_packet *fpkt)
 			SF_DMSG1("Fibre Channel Open Failure");
 			if ((target->sft_state & (SF_TARGET_BUSY |
 			    SF_TARGET_MARK | SF_TARGET_OFFLINE)) == 0) {
-			    sf_log(sf, CE_NOTE, "!Open failure to target 0x%x "
-			    "forcing LIP\n",
-			    sf_alpa_to_switch[target->sft_al_pa]);
-			    sf_force_lip(sf);
+				sf_log(sf, CE_NOTE,
+				    "!Open failure to target 0x%x "
+				    "forcing LIP\n",
+				    sf_alpa_to_switch[target->sft_al_pa]);
+				sf_force_lip(sf);
 			}
 			break;
 
@@ -6057,19 +6066,19 @@ sf_watch(void *arg)
 				sf_check_targets(sf);
 			}
 		} else if ((sf->sf_state == SF_STATE_OFFLINE) &&
-			(sf->sf_timer < sf_watchdog_time)) {
+		    (sf->sf_timer < sf_watchdog_time)) {
 			for (i = 0; i < sf_max_targets; i++) {
 				target = sf->sf_targets[i];
 				if ((target != NULL) &&
-					(target->sft_state &
-						SF_TARGET_BUSY)) {
+				    (target->sft_state &
+				    SF_TARGET_BUSY)) {
 					sf_log(sf, CE_WARN,
-						"!Offline Timeout\n");
+					    "!Offline Timeout\n");
 					if (sf_core && (sf_core &
-						SF_CORE_OFFLINE_TIMEOUT)) {
+					    SF_CORE_OFFLINE_TIMEOUT)) {
 						(void) soc_take_core(
-							sf->sf_sochandle,
-							sf->sf_socp);
+						    sf->sf_sochandle,
+						    sf->sf_socp);
 						sf_core = 0;
 					}
 					break;
@@ -6141,7 +6150,7 @@ sf_check_targets(struct sf *sf)
 				    cmd->cmd_timeout) || sf_abort_flag)) {
 					sf_abort_flag = 0;
 #else
-				    cmd->cmd_timeout))) {
+					cmd->cmd_timeout))) {
 #endif
 					cmd->cmd_timeout = 0;
 	/* prevent reset from getting at this packet */
@@ -6173,8 +6182,10 @@ sf_check_targets(struct sf *sf)
 					cmd->cmd_state = SF_STATE_IDLE;
 					mutex_exit(&cmd->cmd_abort_mutex);
 					mutex_exit(&target->sft_pkt_mutex);
-	SF_DEBUG(1, (sf, CE_NOTE, "Command 0x%p to sft 0x%p delayed release\n",
-						(void *)cmd, (void *)target));
+					SF_DEBUG(1, (sf, CE_NOTE,
+					    "Command 0x%p to sft 0x%p"
+					    " delayed release\n",
+					    (void *)cmd, (void *)target));
 					pkt = cmd->cmd_pkt;
 					pkt->pkt_statistics |=
 					    (STAT_TIMEOUT|STAT_ABORTED);
@@ -6183,20 +6194,25 @@ sf_check_targets(struct sf *sf)
 						(*pkt->pkt_comp)(pkt);
 					/* handle deferred_destroy case */
 					} else {
-					    if ((cmd->cmd_block->fcp_cntl.
-						cntl_reset == 1) ||
-						(cmd->cmd_block->
-						fcp_cntl.cntl_abort_tsk == 1)) {
-						cmd->cmd_block->fcp_cntl.
-							cntl_reset = 0;
-						cmd->cmd_block->fcp_cntl.
-							cntl_abort_tsk = 0;
-						cmd->cmd_fp_pkt->fcal_pkt_comp =
-							sf_cmd_callback;
-					    /* for cache */
-						sf_scsi_destroy_pkt
-						    (&pkt->pkt_address, pkt);
-					    }
+						if ((cmd->cmd_block->fcp_cntl.
+						    cntl_reset == 1) ||
+						    (cmd->cmd_block->
+						    fcp_cntl.cntl_abort_tsk ==
+						    1)) {
+							cmd->cmd_block->
+							    fcp_cntl.
+							    cntl_reset = 0;
+							cmd->cmd_block->
+							    fcp_cntl.
+							    cntl_abort_tsk = 0;
+							cmd->cmd_fp_pkt->
+							    fcal_pkt_comp =
+							    sf_cmd_callback;
+							/* for cache */
+							sf_scsi_destroy_pkt
+							    (&pkt->pkt_address,
+							    pkt);
+						}
 					}
 					mutex_enter(&target->sft_pkt_mutex);
 					cmd = target->sft_pkt_head;
@@ -6331,10 +6347,12 @@ sf_els_timeout(struct sf *sf, struct sf_els_hdr *privp)
 		 * if the timeout is *not* for a IB or host.
 		 */
 		if (sf_core && (sf_core & SF_CORE_ELS_TIMEOUT) &&
-		((sf_alpa_to_switch[privp->dest_nport_id] & 0x0d) != 0x0d) &&
-		((privp->dest_nport_id != 1) || (privp->dest_nport_id != 2) ||
-		(privp->dest_nport_id != 4) || (privp->dest_nport_id != 8) ||
-		(privp->dest_nport_id != 0xf))) {
+		    ((sf_alpa_to_switch[privp->dest_nport_id] &
+		    0x0d) != 0x0d) && ((privp->dest_nport_id != 1) ||
+		    (privp->dest_nport_id != 2) ||
+		    (privp->dest_nport_id != 4) ||
+		    (privp->dest_nport_id != 8) ||
+		    (privp->dest_nport_id != 0xf))) {
 			sf_token = (int *)(uintptr_t)fpkt->fcal_socal_request.\
 			    sr_soc_hdr.sh_request_token;
 			(void) soc_take_core(sf->sf_sochandle, sf->sf_socp);
@@ -6360,7 +6378,7 @@ sf_els_timeout(struct sf *sf, struct sf_els_hdr *privp)
 		}
 		timeout = SF_FCP_TIMEOUT;
 		(void) sprintf(what, "INQUIRY to LUN 0x%lx",
-			(long)SCSA_LUN(target));
+		    (long)SCSA_LUN(target));
 	} else {
 		(void) sprintf(what, "UNKNOWN OPERATION");
 	}
@@ -6368,16 +6386,16 @@ sf_els_timeout(struct sf *sf, struct sf_els_hdr *privp)
 	if (dflag) {
 		/* delayed retry */
 		SF_DEBUG(2, (sf, CE_CONT,
-				"!sf%d: %s to target %x delayed retry\n",
-				ddi_get_instance(sf->sf_dip), what,
-				sf_alpa_to_switch[privp->dest_nport_id]));
+		    "!sf%d: %s to target %x delayed retry\n",
+		    ddi_get_instance(sf->sf_dip), what,
+		    sf_alpa_to_switch[privp->dest_nport_id]));
 		privp->delayed_retry = FALSE;
 		goto try_again;
 	}
 
 	sf_log(sf, CE_NOTE, "!%s to target 0x%x alpa 0x%x timed out\n",
-		what, sf_alpa_to_switch[privp->dest_nport_id],
-		privp->dest_nport_id);
+	    what, sf_alpa_to_switch[privp->dest_nport_id],
+	    privp->dest_nport_id);
 
 	rval = soc_abort(sf->sf_sochandle, sf->sf_socp, sf->sf_sochandle
 	    ->fcal_portno, fpkt, 1);
@@ -6403,9 +6421,9 @@ try_again:
 			    (dflag && (privp->retries < SF_BSY_RETRIES))) {
 				mutex_exit(&sf->sf_mutex);
 				sf_log(sf, CE_NOTE,
-					"!%s to target 0x%x retrying\n",
-					what,
-				sf_alpa_to_switch[privp->dest_nport_id]);
+				    "!%s to target 0x%x retrying\n",
+				    what,
+				    sf_alpa_to_switch[privp->dest_nport_id]);
 				if (sf_els_transport(sf, privp) == 1) {
 					mutex_enter(&sf->sf_mutex);
 					return (sf->sf_els_list); /* success */
@@ -6446,8 +6464,8 @@ try_again:
 			sf_core = 0;
 		}
 		sf_log(sf, CE_NOTE, "%s abort to target 0x%x failed. "
-			"status=0x%x, forcing LIP\n", what,
-			sf_alpa_to_switch[privp->dest_nport_id], rval);
+		    "status=0x%x, forcing LIP\n", what,
+		    sf_alpa_to_switch[privp->dest_nport_id], rval);
 		privp = NULL;
 		if (sf->sf_lip_cnt == lip_cnt) {
 			sf_force_lip(sf);
@@ -6499,11 +6517,11 @@ sf_check_reset_delay(void *arg)
 				/* abort all cmds for this target */
 				while (target) {
 					sf_abort_all(sf, target, FALSE,
-						lip_cnt, TRUE);
+					    lip_cnt, TRUE);
 					mutex_enter(&target->sft_mutex);
 					if (lip_cnt == sf->sf_lip_cnt) {
 						target->sft_state &=
-							~SF_TARGET_BUSY;
+						    ~SF_TARGET_BUSY;
 					}
 					mutex_exit(&target->sft_mutex);
 					target = target->sft_next_lun;
@@ -6597,12 +6615,12 @@ sf_force_lip(struct sf *sf)
 			if (sf_reset_flag != 0) {
 #endif
 				/* restart socal after resetting it */
-			    sf_log(sf, CE_NOTE,
-			    "!Force lip failed Status code 0x%x. Reseting\n",
-									i);
+				sf_log(sf, CE_NOTE,
+				    "!Force lip failed Status code 0x%x."
+				    " Reseting\n", i);
 				/* call transport to force a reset */
-			    soc_force_reset(sf->sf_sochandle, sf->sf_socp,
-				sf->sf_sochandle->fcal_portno, 1);
+				soc_force_reset(sf->sf_sochandle, sf->sf_socp,
+				    sf->sf_sochandle->fcal_portno, 1);
 #ifdef	DEBUG
 			}
 #endif
@@ -6630,7 +6648,7 @@ sf_unsol_els_callback(void *arg, soc_response_t *srp, caddr_t payload)
 
 
 	if ((els == NULL) || ((i = srp->sr_soc_hdr.sh_byte_cnt) == 0)) {
-	    return;
+		return;
 	}
 
 	if (i > SOC_CQE_PAYLOAD) {
@@ -6648,8 +6666,8 @@ sf_unsol_els_callback(void *arg, soc_response_t *srp, caddr_t payload)
 		 */
 		sf->sf_stats.tstats[tgt_id].logouts_recvd++;
 		sf_log(sf, CE_NOTE, "!LOGO recvd from target %x, %s\n",
-			tgt_id,
-			sf_lip_on_plogo ? "Forcing LIP...." : "");
+		    tgt_id,
+		    sf_lip_on_plogo ? "Forcing LIP...." : "");
 		if (sf_lip_on_plogo) {
 			sf_force_lip(sf);
 		}
@@ -6662,7 +6680,7 @@ sf_unsol_els_callback(void *arg, soc_response_t *srp, caddr_t payload)
 		 */
 
 		sf_log(sf, CE_NOTE, "!ELS 0x%x recvd from target 0x%x\n",
-					els->els_cmd.c.ls_command, tgt_id);
+		    els->els_cmd.c.ls_command, tgt_id);
 
 
 		/* allocate room for a response */
@@ -6792,7 +6810,7 @@ sf_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	if (!sf->sf_check_n_close) { /* if this flag is zero */
 		cmn_err(CE_WARN, "sf%d: trying to close unopened instance",
-				SF_MINOR2INST(getminor(dev)));
+		    SF_MINOR2INST(getminor(dev)));
 		return (ENODEV);
 	} else {
 		--(sf->sf_check_n_close);
@@ -6856,8 +6874,8 @@ sf_ioctl(dev_t dev,
 			for (i = 0; i < sf_max_targets; i++) {
 				if (sf->sf_targets[i])
 					sf->sf_lilp_map->lilp_alpalist[j++] =
-						sf->sf_targets[i]->
-						sft_hard_address;
+					    sf->sf_targets[i]->
+					    sft_hard_address;
 			}
 			sf->sf_lilp_map->lilp_length = (uchar_t)j;
 		}
@@ -6885,18 +6903,18 @@ sf_ioctl(dev_t dev,
 				    sf_addr_pair[i].sf_port_wwn,
 				    sizeof (la_wwn_t));
 				map.sf_addr_pair[i].sf_hard_address =
-					al_pa;
+				    al_pa;
 				map.sf_addr_pair[i].sf_inq_dtype =
-					DTYPE_PROCESSOR;
+				    DTYPE_PROCESSOR;
 				continue;
 			}
 			target = sf->sf_targets[sf_alpa_to_switch[
-				al_pa]];
+			    al_pa]];
 			if (target != NULL) {
 				mutex_enter(&target->sft_mutex);
 				if (!(target->sft_state &
 				    (SF_TARGET_OFFLINE |
-					SF_TARGET_BUSY))) {
+				    SF_TARGET_BUSY))) {
 					bcopy((caddr_t)&target->
 					    sft_node_wwn,
 					    (caddr_t)&map.sf_addr_pair
@@ -6908,11 +6926,11 @@ sf_ioctl(dev_t dev,
 					    [i].sf_port_wwn,
 					    sizeof (la_wwn_t));
 					map.sf_addr_pair[i].
-						sf_hard_address
-						= target->sft_hard_address;
+					    sf_hard_address
+					    = target->sft_hard_address;
 					map.sf_addr_pair[i].
-						sf_inq_dtype
-						= target->sft_device_type;
+					    sf_inq_dtype
+					    = target->sft_device_type;
 					mutex_exit(&target->sft_mutex);
 					continue;
 				}
@@ -6923,7 +6941,7 @@ sf_ioctl(dev_t dev,
 			bzero((caddr_t)&map.sf_addr_pair[i].
 			    sf_port_wwn, sizeof (la_wwn_t));
 			map.sf_addr_pair[i].sf_inq_dtype =
-				DTYPE_UNKNOWN;
+			    DTYPE_UNKNOWN;
 		}
 		mutex_exit(&sf->sf_mutex);
 		if (ddi_copyout((caddr_t)&map, (caddr_t)arg,
@@ -7043,7 +7061,7 @@ sf_bus_get_eventcookie(dev_info_t *dip, dev_info_t *rdip, char *name,
 	}
 
 	return (ndi_event_retrieve_cookie(sf->sf_event_hdl, rdip, name,
-		    event_cookiep, NDI_EVENT_NOPASS));
+	    event_cookiep, NDI_EVENT_NOPASS));
 
 }
 
@@ -7066,7 +7084,7 @@ sf_bus_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	return (ndi_event_add_callback(sf->sf_event_hdl, rdip,
-		eventid, callback, arg, NDI_SLEEP, cb_id));
+	    eventid, callback, arg, NDI_SLEEP, cb_id));
 
 }
 
@@ -7153,7 +7171,7 @@ sf_hp_daemon(void *arg)
 	callb_cpr_t cprinfo;
 
 	CALLB_CPR_INIT(&cprinfo, &sf->sf_hp_daemon_mutex,
-		callb_generic_cpr, "sf_hp_daemon");
+	    callb_generic_cpr, "sf_hp_daemon");
 
 	mutex_enter(&sf->sf_hp_daemon_mutex);
 

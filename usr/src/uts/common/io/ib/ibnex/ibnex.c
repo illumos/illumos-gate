@@ -40,7 +40,6 @@
  * device tree nodes.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/conf.h>
@@ -300,13 +299,14 @@ static struct dev_ops ibnex_ops = {
 	nodev,			/* reset */
 	&ibnex_cbops,		/* driver ops - devctl interfaces */
 	&ibnex_bus_ops,		/* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /* Module linkage information for the kernel.  */
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Driver module */
-	"IB nexus %I%",		/* Driver name and version */
+	"IB nexus",		/* Driver name and version */
 	&ibnex_ops,		/* driver ops */
 };
 

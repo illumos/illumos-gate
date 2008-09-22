@@ -23,11 +23,10 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -236,7 +235,9 @@ struct dev_ops kb8042_ops = {
 	kb8042_detach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_kb8042_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL	/* devo_bus_ops */
+	(struct bus_ops *)NULL,	/* devo_bus_ops */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 
@@ -250,7 +251,7 @@ struct dev_ops kb8042_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"PS/2 Keyboard %I%, %E%",
+	"PS/2 Keyboard",
 	&kb8042_ops,	/* driver ops */
 };
 
@@ -543,8 +544,8 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ddi_report_dev(devi);
 
 #ifdef	KD_DEBUG
-	cmn_err(CE_CONT, "?%s #%d: version %s\n",
-	    DRIVER_NAME(devi), ddi_get_instance(devi), "%I% (%E%)");
+	cmn_err(CE_CONT, "?%s #%d\n",
+	    DRIVER_NAME(devi), ddi_get_instance(devi));
 #endif
 
 	return (DDI_SUCCESS);
@@ -584,7 +585,6 @@ kb8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 }
-
 
 /*ARGSUSED*/
 static int

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * IOSRAM leaf driver to SBBC nexus driver.  This driver is used
@@ -189,7 +188,8 @@ struct dev_ops  iosram_ops = {
 	nodev,			/* devo_reset */
 	&iosram_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /*
@@ -199,7 +199,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv iosrammodldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"IOSRAM Leaf driver v%I%",
+	"IOSRAM Leaf driver",
 	&iosram_ops,
 };
 
@@ -354,7 +354,7 @@ iosram_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if ((softp = ddi_get_soft_state(iosramsoft_statep, instance)) == NULL) {
-		    return (DDI_FAILURE);
+			return (DDI_FAILURE);
 	}
 	softp->dip = dip;
 	softp->instance = instance;
@@ -776,7 +776,8 @@ iosram_rd(uint32_t key, uint32_t off, uint32_t len, caddr_t dptr)
 		}
 
 		if (len != 0) {
-		    ddi_rep_get8(handle, buf, iosramp, len, DDI_DEV_AUTOINCR);
+			ddi_rep_get8(handle, buf, iosramp, len,
+			    DDI_DEV_AUTOINCR);
 		}
 	} else if ((len >= UINT32SZ) &&
 	    ((((uintptr_t)iosramp | (uintptr_t)buf) & (UINT32SZ - 1)) == 0)) {
@@ -798,7 +799,8 @@ iosram_rd(uint32_t key, uint32_t off, uint32_t len, caddr_t dptr)
 		 * copy the remainder using byte access
 		 */
 		if (len != 0) {
-		    ddi_rep_get8(handle, buf, iosramp, len, DDI_DEV_AUTOINCR);
+			ddi_rep_get8(handle, buf, iosramp, len,
+			    DDI_DEV_AUTOINCR);
 		}
 	} else if (len != 0) {
 		/*
@@ -1702,7 +1704,7 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	switch (cmd) {
 #if defined(DEBUG)
 	case IOSRAM_GET_FLAG:
-	    {
+		{
 		iosram_io_t	req;
 		uint8_t		data_valid, int_pending;
 
@@ -1725,10 +1727,10 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		return (error);
-	    }
+		}
 
 	case IOSRAM_SET_FLAG:
-	    {
+		{
 		iosram_io_t	req;
 
 		if (ddi_copyin((void *)arg, &req, sizeof (req), mode)) {
@@ -1749,10 +1751,10 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		return (error);
-	    }
+		}
 
 	case IOSRAM_RD:
-	    {
+		{
 		caddr_t		bufp;
 		int		len;
 		iosram_io_t	req;
@@ -1781,10 +1783,10 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 		kmem_free(bufp, len);
 		return (error);
-	    }
+		}
 
 	case IOSRAM_WR:
-	    {
+		{
 		caddr_t		bufp;
 		iosram_io_t	req;
 		int		len;
@@ -1810,10 +1812,10 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		kmem_free(bufp, len);
 		return (error);
-	    }
+		}
 
 	case IOSRAM_TOC:
-	    {
+		{
 		caddr_t		bufp;
 		int		len;
 		iosram_io_t	req;
@@ -1844,10 +1846,10 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		kmem_free(bufp, len);
 		return (error);
-	    }
+		}
 
 	case IOSRAM_SEND_INTR:
-	    {
+		{
 		DPRINTF(2, ("IOSRAM_SEND_INTR\n"));
 
 		switch ((int)arg) {
@@ -1870,7 +1872,7 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		return (error);
-	    }
+		}
 
 	case IOSRAM_PRINT_CBACK:
 		iosram_print_cback();
@@ -1901,7 +1903,7 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		break;
 
 	case IOSRAM_REG_CBACK:
-	    {
+		{
 		iosram_io_t	req;
 
 		if (ddi_copyin((void *)arg, &req, sizeof (req), mode)) {
@@ -1917,10 +1919,10 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		return (error);
-	    }
+		}
 
 	case IOSRAM_UNREG_CBACK:
-	    {
+		{
 		iosram_io_t	req;
 
 		if (ddi_copyin((void *)arg, &req, sizeof (req), mode)) {
@@ -1935,7 +1937,7 @@ iosram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		return (error);
-	    }
+		}
 
 	case IOSRAM_SEMA_ACQUIRE:
 	{
@@ -2283,7 +2285,7 @@ iosram_abort_tswitch()
 	}
 
 	IOSRAMLOG(1, "ABORT: Instance %d selected as master\n",
-		    iosram_master->instance, NULL, NULL, NULL);
+	    iosram_master->instance, NULL, NULL, NULL);
 }
 
 

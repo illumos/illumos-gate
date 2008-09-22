@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SMP - Serial Management Protocol Device Driver
@@ -97,13 +96,14 @@ static struct dev_ops smp_dev_ops = {
 	nodev,			/* reset */
 	&smp_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static void *smp_soft_state = NULL;
 
 static struct modldrv modldrv = {
-	&mod_driverops, "smp device driver %I%", &smp_dev_ops
+	&mod_driverops, "smp device driver", &smp_dev_ops
 };
 
 static struct modlinkage modlinkage = {

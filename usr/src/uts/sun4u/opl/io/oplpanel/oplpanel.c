@@ -18,11 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -106,7 +111,8 @@ static struct dev_ops panel_dev_ops = {
 	nulldev,		/* reset */
 	&panel_cb_ops,		/* cb_ops */
 	NULL,			/* bus_ops */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 /* module configuration stuff */
@@ -115,7 +121,7 @@ extern struct mod_ops	mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"OPL panel driver %I%",
+	"OPL panel driver",
 	&panel_dev_ops
 };
 

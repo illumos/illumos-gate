@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The driver portion of kmdb, which manages /dev/kmdb and passes requests along
@@ -227,11 +226,12 @@ static struct dev_ops kdrv_ops = {
 	&kdrv_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)0,	/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"kmdb driver %I%",
+	"kmdb driver",
 	&kdrv_ops
 };
 

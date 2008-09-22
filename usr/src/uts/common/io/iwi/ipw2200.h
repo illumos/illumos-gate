@@ -33,8 +33,6 @@
 #ifndef _SYS_IPW2200_H
 #define	_SYS_IPW2200_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,7 +47,6 @@ extern "C" {
 
 #define	IPW2200_DRV_NAME  "iwi"
 #define	IPW2200_DRV_DESC  "Intel Wireless 2200/2915"
-#define	IPW2200_DRV_REV   "V1.02"
 
 /*
  * Debug functionalities

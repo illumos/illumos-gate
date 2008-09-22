@@ -26,7 +26,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Pseudo Terminal Master Driver.
@@ -202,7 +201,7 @@ static dev_info_t	*ptm_dip;		/* private devinfo pointer */
  * this will define (struct cb_ops cb_ptm_ops) and (struct dev_ops ptm_ops)
  */
 DDI_DEFINE_STREAM_OPS(ptm_ops, nulldev, nulldev, ptm_attach, ptm_detach,
-    nodev, ptm_devinfo, D_MP, &ptminfo);
+    nodev, ptm_devinfo, D_MP, &ptminfo, ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.
@@ -210,7 +209,7 @@ DDI_DEFINE_STREAM_OPS(ptm_ops, nulldev, nulldev, ptm_attach, ptm_detach,
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Master streams driver 'ptm' %I%",
+	"Master streams driver 'ptm'",
 	&ptm_ops,	/* driver ops */
 };
 

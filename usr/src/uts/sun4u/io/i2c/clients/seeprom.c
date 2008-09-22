@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/modctl.h>
@@ -87,12 +85,13 @@ static struct dev_ops seeprom_ops = {
 	nodev,
 	&seeprom_cbops,
 	NULL,
-	nulldev
+	nulldev,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv seeprom_modldrv = {
 	&mod_driverops,	 /* type of module - driver */
-	"I2C serial EEPROM device driver v%I%",
+	"I2C serial EEPROM device driver",
 	&seeprom_ops,
 };
 
@@ -155,7 +154,7 @@ seeprom_do_attach(dev_info_t *dip)
 
 	if (ddi_soft_state_zalloc(seepromsoft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s_%d: failed to zalloc softstate",
-			ddi_node_name(dip), instance);
+		    ddi_node_name(dip), instance);
 
 		return (DDI_FAILURE);
 	}
@@ -165,7 +164,7 @@ seeprom_do_attach(dev_info_t *dip)
 	unitp->seeprom_dip = dip;
 
 	(void) snprintf(unitp->seeprom_name, sizeof (unitp->seeprom_name),
-			"%s%d", ddi_driver_name(dip), instance);
+	    "%s%d", ddi_driver_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, ddi_node_name(dip), S_IFCHR,
 	    instance, SEEPROM_NODE_TYPE, NULL) == DDI_FAILURE) {
@@ -306,7 +305,7 @@ seeprom_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	instance = getminor(*devp);
 
 	unitp = (struct seepromunit *)
-		ddi_get_soft_state(seepromsoft_statep, instance);
+	    ddi_get_soft_state(seepromsoft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -344,7 +343,7 @@ seeprom_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	instance = getminor(dev);
 
 	unitp = (struct seepromunit *)
-		ddi_get_soft_state(seepromsoft_statep, instance);
+	    ddi_get_soft_state(seepromsoft_statep, instance);
 
 	if (unitp == NULL) {
 
@@ -387,7 +386,7 @@ seeprom_io(dev_t dev, struct uio *uiop, int rw)
 	i2c_transfer_t *i2ctp = NULL;
 
 	unitp = (struct seepromunit *)
-		ddi_get_soft_state(seepromsoft_statep, instance);
+	    ddi_get_soft_state(seepromsoft_statep, instance);
 
 
 	if (unitp == NULL) {
@@ -409,7 +408,7 @@ seeprom_io(dev_t dev, struct uio *uiop, int rw)
 	}
 
 	bytes_to_rw = min(uiop->uio_resid,
-		unitp->seeprom_memsize - uiop->uio_offset);
+	    unitp->seeprom_memsize - uiop->uio_offset);
 	/*
 	 * Serialize access here to prevent a transaction starting
 	 * until after 20 ms delay if last operation was a write.
@@ -417,7 +416,7 @@ seeprom_io(dev_t dev, struct uio *uiop, int rw)
 	mutex_enter(&unitp->seeprom_mutex);
 	while ((unitp->seeprom_flags & SEEPROM_BUSY) == SEEPROM_BUSY) {
 		if (cv_wait_sig(&unitp->seeprom_cv,
-			&unitp->seeprom_mutex) <= 0) {
+		    &unitp->seeprom_mutex) <= 0) {
 			mutex_exit(&unitp->seeprom_mutex);
 
 			return (EINTR);

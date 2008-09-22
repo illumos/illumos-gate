@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Floppy Disk driver
@@ -118,7 +116,9 @@ static struct dev_ops fd_ops = {
 	fd_detach,		/* detach */
 	nodev,			/* reset */
 	&fd_cb_ops,		/* driver operations */
-	(struct bus_ops *)0	/* bus operations */
+	(struct bus_ops *)0,	/* bus operations */
+	NULL,			/* power */
+	ddi_quiesce_not_supported,	/* devo_quiesce */
 };
 
 
@@ -158,7 +158,7 @@ static struct driver_minor_data {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"Floppy Disk driver %I%",	/* Name of the module. */
+	"Floppy Disk driver",	/* Name of the module. */
 	&fd_ops,		/* driver ops */
 };
 
@@ -566,7 +566,7 @@ fd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	int rval = DDI_SUCCESS;
 
 	FDERRPRINT(FDEP_L3, FDEM_ATTA, (CE_WARN, "fd_detach dip %p",
-		(void *)dip));
+	    (void *)dip));
 
 	drive_num = ddi_get_instance(dip);
 	if (!(fdp = ddi_get_soft_state(fd_state_head, drive_num)))
@@ -1600,8 +1600,8 @@ get_geom:
 		default:
 			FDERRPRINT(FDEP_L4, FDEM_IOCT,
 			    (CE_WARN, "fd_ioctl fd unit %d: FDIOSCHAR odd "
-				"xfer rate %dkbs",
-				unit, cpy.fdchar.fdc_transfer_rate));
+			    "xfer rate %dkbs",
+			    unit, cpy.fdchar.fdc_transfer_rate));
 			rval = EINVAL;
 			break;
 		}
@@ -1893,7 +1893,7 @@ fd_build_label_vtoc(struct fcu_obj *fjp, struct fdisk *fdp, struct vtoc *vtocp,
 	 */
 
 	nblks = (fjp->fj_chars->fdc_nhead * fjp->fj_chars->fdc_secptrack *
-		fjp->fj_chars->fdc_sec_size) / DEV_BSIZE;
+	    fjp->fj_chars->fdc_sec_size) / DEV_BSIZE;
 	if (nblks == 0 || fjp->fj_chars->fdc_ncyl == 0)
 		return (EFAULT);
 	vpart = vtocp->v_part;
@@ -2270,7 +2270,7 @@ fd_check_media(dev_t dev, enum dkio_state state)
 
 		/* turn on timer */
 		fdp->d_media_timeout_id = timeout(fd_media_watch,
-			(void *)dev, fdp->d_media_timeout);
+		    (void *)dev, fdp->d_media_timeout);
 
 		if (cv_wait_sig(&fdp->d_statecv, &fjp->fj_lock) == 0) {
 			fdp->d_media_timeout = 0;
@@ -2309,7 +2309,7 @@ fd_get_media_info(struct fcu_obj *fjp, caddr_t buf, int flag)
 	media_info.dki_media_type = DK_FLOPPY;
 	media_info.dki_lbsize = fjp->fj_chars->fdc_sec_size;
 	media_info.dki_capacity = fjp->fj_chars->fdc_ncyl *
-		fjp->fj_chars->fdc_secptrack * fjp->fj_chars->fdc_nhead;
+	    fjp->fj_chars->fdc_secptrack * fjp->fj_chars->fdc_nhead;
 
 	if (ddi_copyout(&media_info, buf, sizeof (struct dk_minfo), flag))
 		err = EFAULT;

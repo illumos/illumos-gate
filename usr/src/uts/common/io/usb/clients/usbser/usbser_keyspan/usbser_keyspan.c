@@ -222,7 +222,8 @@ struct dev_ops usbser_keyspan_ops = {
 	nodev,			/* devo_reset */
 	&usbser_keyspan_cb_ops,	/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	usbser_power		/* devo_power */
+	usbser_power,		/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;

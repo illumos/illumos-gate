@@ -65,7 +65,7 @@
 #include <sys/crypto/api.h>
 
 static void   *ipw2100_ssp	= NULL;
-static char   ipw2100_ident[]	= IPW2100_DRV_DESC " " IPW2100_DRV_REV;
+static char   ipw2100_ident[]	= IPW2100_DRV_DESC;
 
 /*
  * PIO access attribute for register
@@ -2634,7 +2634,7 @@ enable_interrupt:
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ipw2100_devops, nulldev, nulldev, ipw2100_attach,
-    ipw2100_detach, ipw2100_reset, NULL, D_MP, NULL);
+    ipw2100_detach, ipw2100_reset, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv ipw2100_modldrv = {
 	&mod_driverops,

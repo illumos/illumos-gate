@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_init.c	1.4	08/07/08 SMI"
-
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/modctl.h>
@@ -106,11 +104,12 @@ static struct dev_ops devops = {
 	&cbops,			/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,		/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,					/* drv_modops */
-	"CIFS Server Protocol 1.4",			/* drv_linkinfo */
+	"CIFS Server Protocol",				/* drv_linkinfo */
 	&devops,
 };
 

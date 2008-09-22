@@ -8911,3 +8911,24 @@ ddi_parse(
 	*nump = num;
 	return (DDI_SUCCESS);
 }
+
+/*
+ * Default initialization function for drivers that don't need to quiesce.
+ */
+/* ARGSUSED */
+int
+ddi_quiesce_not_needed(dev_info_t *dip)
+{
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Initialization function for drivers that should implement quiesce()
+ * but haven't yet.
+ */
+/* ARGSUSED */
+int
+ddi_quiesce_not_supported(dev_info_t *dip)
+{
+	return (DDI_FAILURE);
+}

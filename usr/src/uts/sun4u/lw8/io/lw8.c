@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <sys/errno.h>
@@ -121,7 +120,8 @@ static struct dev_ops lw8_ops = {
 	nodev,			/* reset */
 	&lw8_cb_ops,		/* pointer to cb_ops structure */
 	(struct bus_ops *)NULL,
-	nulldev			/* power() */
+	nulldev,		/* power() */
+	ddi_quiesce_not_needed,		/* quiesce() */
 };
 
 /*
@@ -131,7 +131,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"Netra-T12 control driver v%I%",	/* Name of the module */
+	"Netra-T12 control driver",	/* Name of the module */
 	&lw8_ops			/* pointer to the dev_ops structure */
 };
 
@@ -367,7 +367,7 @@ lw8_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		err = ddi_create_minor_node(dip, "lw8", S_IFCHR,
-			instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, NULL);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
@@ -462,17 +462,17 @@ lw8_add_intr_handlers()
 	    &lw8_shutdown_payload_msg, NULL, &lw8_shutdown_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_LW8 "
-			" handler. Err=%d", err);
+		    " handler. Err=%d", err);
 		return (DDI_FAILURE);
 	}
 
 	lw8_dr_payload_msg.msg_buf = (caddr_t)&lw8_dr_payload;
 	lw8_dr_payload_msg.msg_len = sizeof (lw8_dr_payload);
 	err = sbbc_mbox_reg_intr(MBOX_EVENT_GENERIC, lw8_dr_data_handler,
-		&lw8_dr_payload_msg, NULL, &lw8_dr_hdlr_lock);
+	    &lw8_dr_payload_msg, NULL, &lw8_dr_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_GENERIC "
-			" handler. Err=%d", err);
+		    " handler. Err=%d", err);
 		sbbc_mbox_unreg_intr(MBOX_EVENT_LW8, lw8_event_data_handler);
 		return (DDI_FAILURE);
 	}
@@ -480,10 +480,10 @@ lw8_add_intr_handlers()
 	lw8_env_payload_msg.msg_buf = (caddr_t)&lw8_env_payload;
 	lw8_env_payload_msg.msg_len = sizeof (lw8_env_payload);
 	err = sbbc_mbox_reg_intr(MBOX_EVENT_ENV, lw8_env_data_handler,
-		&lw8_env_payload_msg, NULL, &lw8_env_hdlr_lock);
+	    &lw8_env_payload_msg, NULL, &lw8_env_hdlr_lock);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to register MBOX_EVENT_ENV "
-			" handler. Err=%d", err);
+		    " handler. Err=%d", err);
 		sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, lw8_dr_data_handler);
 		sbbc_mbox_unreg_intr(MBOX_EVENT_LW8, lw8_event_data_handler);
 		return (DDI_FAILURE);
@@ -514,19 +514,19 @@ lw8_remove_intr_handlers(void)
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_LW8, lw8_event_data_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_LW8 "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_GENERIC, lw8_dr_data_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_GENERIC "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 	err = sbbc_mbox_unreg_intr(MBOX_EVENT_ENV, lw8_env_data_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister MBOX_EVENT_ENV "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		rv = DDI_FAILURE;
 	}
 	err = sbbc_mbox_unreg_intr(INFO_MBOX, lw8_cap_ecc_msg_handler);
@@ -1394,7 +1394,7 @@ lw8_logger(caddr_t arg)
 
 				/* Ensure NUL termination */
 				lw8_logmsgp->msg[
-					sizeof (lw8_logmsgp->msg) - 1] = '\0';
+				    sizeof (lw8_logmsgp->msg) - 1] = '\0';
 				strlog(0, 0, 0, SL_CONSOLE | level,
 				    lw8_logmsgp->msg);
 			}

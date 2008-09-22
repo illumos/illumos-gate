@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -87,7 +86,8 @@ struct streamtab sadinfo = {
 
 DDI_DEFINE_STREAM_OPS(sad_ops, nulldev, nulldev, sad_attach,
     nodev, nodev, sad_info,
-    D_MP | D_MTPERQ | D_MTOUTPERIM | D_MTOCEXCL, &sadinfo);
+    D_MP | D_MTPERQ | D_MTOUTPERIM | D_MTOCEXCL, &sadinfo,
+    ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.

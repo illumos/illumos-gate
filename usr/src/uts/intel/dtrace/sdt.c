@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/sunddi.h>
@@ -520,7 +519,8 @@ static struct dev_ops sdt_ops = {
 	nodev,			/* reset */
 	&sdt_cb_ops,		/* driver operations */
 	NULL,			/* bus operations */
-	nodev			/* dev power */
+	nodev,			/* dev power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * Copyright (c) 2007, The Ohio State University. All rights reserved.
  *
@@ -165,7 +164,8 @@ static struct dev_ops rpcib_ops = {
 	nodev,			/* reset */
 	&rpcib_cbops,		    /* driver ops - devctl interfaces */
 	NULL,			/* bus operations */
-	NULL			/* power */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*
@@ -173,9 +173,9 @@ static struct dev_ops rpcib_ops = {
  */
 
 static struct modldrv rib_modldrv = {
-	&mod_driverops,			    /* Driver module */
-	"RPCIB plugin driver, ver 1.30", /* Driver name and version */
-	&rpcib_ops,		    /* Driver ops */
+	&mod_driverops,		/* Driver module */
+	"RPCIB plugin driver",	/* Driver name and version */
+	&rpcib_ops,		/* Driver ops */
 };
 
 static struct modlinkage rib_modlinkage = {

@@ -27,7 +27,6 @@
 #ifndef _BGE_IMPL_H
 #define	_BGE_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -1135,6 +1134,9 @@ void bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma);
 int bge_chip_id_init(bge_t *bgep);
 int bge_chip_start(bge_t *bgep, boolean_t reset_phy);
 void bge_chip_stop(bge_t *bgep, boolean_t fault);
+#ifndef __sparc
+void bge_chip_stop_nonblocking(bge_t *bgep);
+#endif
 #ifdef BGE_IPMI_ASF
 void bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data);
 #pragma	inline(bge_nic_put32)

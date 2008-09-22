@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -131,7 +130,9 @@ static struct dev_ops pmubus_ops = {
 	pmubus_detach,
 	nodev,
 	(struct cb_ops *)0,
-	&pmubus_bus_ops
+	&pmubus_bus_ops,
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 /*

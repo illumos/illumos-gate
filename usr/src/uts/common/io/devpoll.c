@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/devops.h>
@@ -101,7 +100,8 @@ static struct dev_ops dp_ops = {
 	nodev,			/* reset */
 	&dp_cb_ops,		/* driver operations */
 	(struct bus_ops *)NULL, /* bus operations */
-	nulldev			/* power */
+	nulldev,		/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 

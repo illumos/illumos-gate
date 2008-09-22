@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -139,14 +138,16 @@ static struct dev_ops vldc_ops = {
 	vldc_detach,		/* detach */
 	nodev,			/* reset */
 	&vldc_cb_ops,		/* cb_ops */
-	(struct bus_ops *)NULL	/* bus_ops */
+	(struct bus_ops *)NULL,	/* bus_ops */
+	NULL,			/* power */
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv md = {
 	&mod_driverops, 			/* Type - it is a driver */
-	"sun4v Virtual LDC Driver %I%",	/* Name of the module */
+	"sun4v Virtual LDC Driver",		/* Name of the module */
 	&vldc_ops,				/* driver specific ops */
 };
 

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CPU nexus driver
@@ -74,12 +73,13 @@ static struct dev_ops cpunex_ops = {
 	nodev,
 	NULL,
 	&cpunex_bus_ops,
-	NULL
+	NULL,
+	ddi_quiesce_not_needed,		/* quiesce */
 };
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"cpu nexus driver v1.0",
+	"cpu nexus driver",
 	&cpunex_ops
 };
 
