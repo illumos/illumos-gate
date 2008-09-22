@@ -1823,9 +1823,13 @@ vhci_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 
 	if (pkt == NULL) {
 		if (cmdlen > VHCI_SCSI_CDB_SIZE) {
-			VHCI_DEBUG(1, (CE_NOTE, NULL,
-			    "!init pkt: cdb size not supported\n"));
-			return (NULL);
+			if ((cmdlen != VHCI_SCSI_OSD_CDB_SIZE) ||
+			    ((flags & VHCI_SCSI_OSD_PKT_FLAGS) !=
+			    VHCI_SCSI_OSD_PKT_FLAGS)) {
+				VHCI_DEBUG(1, (CE_NOTE, NULL,
+				    "!init pkt: cdb size not supported\n"));
+				return (NULL);
+			}
 		}
 
 		pktp = scsi_hba_pkt_alloc(vhci->vhci_dip,

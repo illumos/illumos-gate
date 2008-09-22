@@ -201,6 +201,12 @@ extern int vhci_debug;
 #define	VHCI_SCSI_SCB_SIZE		(sizeof (struct scsi_arq_status))
 
 /*
+ * OSD specific definitions
+ */
+#define	VHCI_SCSI_OSD_CDB_SIZE		224
+#define	VHCI_SCSI_OSD_PKT_FLAGS		0x100000
+
+/*
  * flag to determine failover support
  */
 #define	SCSI_NO_FAILOVER	0x0
