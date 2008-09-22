@@ -559,8 +559,6 @@ is_remote_fstype(const char *fstype, char *const *remote_fstypes)
 static void
 root_to_lu(zlog_t *zlogp, char *zroot, size_t zrootlen, boolean_t isresolved)
 {
-	assert(zone_isnative || zone_iscluster);
-
 	if (!isresolved && zonecfg_in_alt_root())
 		resolve_lofs(zlogp, zroot, zrootlen);
 	(void) strcpy(strrchr(zroot, '/') + 1, "lu");
@@ -1069,7 +1067,7 @@ get_iptype(zlog_t *zlogp, zone_iptype_t *iptypep)
  * use these as a profile/filter to determine what exists in /dev.
  */
 static int
-mount_one_dev(zlog_t *zlogp, char *devpath)
+mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 {
 	char			brand[MAXNAMELEN];
 	zone_dochandle_t	handle = NULL;
@@ -1086,9 +1084,22 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 		goto cleanup;
 	}
 
-	/* Get a handle to the brand info for this zone */
-	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
-	    (bh = brand_open(brand)) == NULL) {
+	/*
+	 * Get a handle to the brand info for this zone.
+	 * If we are mounting the zone, then we must always use the native
+	 * brand device mounts.
+	 */
+	if (ALT_MOUNT(mount_cmd)) {
+		(void) strlcpy(brand, NATIVE_BRAND_NAME, sizeof (brand));
+	} else {
+		if (zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) {
+			zerror(zlogp, B_FALSE,
+			    "unable to determine zone brand");
+			goto cleanup;
+		}
+	}
+
+	if ((bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		goto cleanup;
 	}
@@ -1161,7 +1172,8 @@ cleanup:
 }
 
 static int
-mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
+mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath,
+    zone_mnt_t mount_cmd)
 {
 	char path[MAXPATHLEN];
 	char specpath[MAXPATHLEN];
@@ -1316,7 +1328,7 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 	 * We just mounted an instance of a /dev filesystem, so now we
 	 * need to configure it.
 	 */
-	return (mount_one_dev(zlogp, path));
+	return (mount_one_dev(zlogp, path, mount_cmd));
 }
 
 static void
@@ -1361,8 +1373,6 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 	char *altstr;
 	FILE *fp;
 	uuid_t uuid;
-
-	assert(zone_isnative || zone_iscluster);
 
 	resolve_lofs(zlogp, rootpath, rootlen);
 	(void) snprintf(luroot, lurootlen, "%s/lu", zonepath);
@@ -1753,9 +1763,23 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		goto bad;
 	}
 
+	/*
+	 * If we are mounting the zone, then we must always use the native
+	 * brand global mounts.
+	 */
+	if (ALT_MOUNT(mount_cmd)) {
+		(void) strlcpy(brand, NATIVE_BRAND_NAME, sizeof (brand));
+	} else {
+		if (zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) {
+			zerror(zlogp, B_FALSE,
+			    "unable to determine zone brand");
+			zonecfg_fini_handle(handle);
+			return (-1);
+		}
+	}
+
 	/* Get a handle to the brand info for this zone */
-	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
-	    (bh = brand_open(brand)) == NULL) {
+	if ((bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		zonecfg_fini_handle(handle);
 		return (-1);
@@ -1841,15 +1865,15 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 			 * but /dev is special and always goes at the top
 			 * so strip the trailing '/a' from the rootpath.
 			 */
-			assert(zone_isnative || zone_iscluster);
 			assert(strcmp(&rootpath[slen], "/a") == 0);
 			rootpath[slen] = '\0';
-			if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
+			if (mount_one(zlogp, &fs_ptr[i], rootpath, mount_cmd)
+			    != 0)
 				goto bad;
 			rootpath[slen] = '/';
 			continue;
 		}
-		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
+		if (mount_one(zlogp, &fs_ptr[i], rootpath, mount_cmd) != 0)
 			goto bad;
 	}
 	if (ALT_MOUNT(mount_cmd) &&
@@ -3530,7 +3554,8 @@ again:
 				 * Mount can fail because the lower-level
 				 * zone may have already done a mount up.
 				 */
-				(void) mount_one(zlogp, &lower_fstab, "");
+				(void) mount_one(zlogp, &lower_fstab, "",
+				    Z_MNT_BOOT);
 			}
 		} else if ((bldominates(zid_label, zlabel)) &&
 		    (priv_ismember(zid_privs, PRIV_NET_MAC_AWARE))) {
@@ -3557,7 +3582,8 @@ again:
 				 * Mount can fail because the higher-level
 				 * zone may have already done a mount down.
 				 */
-				(void) mount_one(zlogp, &lower_fstab, "");
+				(void) mount_one(zlogp, &lower_fstab, "",
+				    Z_MNT_BOOT);
 			}
 		}
 	}
@@ -4057,9 +4083,6 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	zoneid_t rval = -1;
 	priv_set_t *privs;
 	char rootpath[MAXPATHLEN];
-	char modname[MAXPATHLEN];
-	struct brand_attr attr;
-	brand_handle_t bh;
 	char *rctlbuf = NULL;
 	size_t rctlbufsz = 0;
 	char *zfsbuf = NULL;
@@ -4138,7 +4161,6 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		goto error;
 
 	if (ALT_MOUNT(mount_cmd)) {
-		assert(zone_isnative || zone_iscluster);
 		root_to_lu(zlogp, rootpath, sizeof (rootpath), B_TRUE);
 
 		/*
@@ -4232,40 +4254,45 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		goto error;
 	}
 
-	if ((zone_get_brand(zone_name, attr.ba_brandname,
-	    MAXNAMELEN) != Z_OK) ||
-	    (bh = brand_open(attr.ba_brandname)) == NULL) {
-		zerror(zlogp, B_FALSE, "unable to determine brand name");
-		return (-1);
-	}
-
-	/*
-	 * If this brand requires any kernel support, now is the time to
-	 * get it loaded and initialized.
-	 */
-	if (brand_get_modname(bh, modname, MAXPATHLEN) < 0) {
-		brand_close(bh);
-		zerror(zlogp, B_FALSE, "unable to determine brand kernel "
-		    "module");
-		return (-1);
-	}
-	brand_close(bh);
-
-	if (strlen(modname) > 0) {
-		(void) strlcpy(attr.ba_modname, modname, MAXPATHLEN);
-		if (zone_setattr(zoneid, ZONE_ATTR_BRAND, &attr,
-		    sizeof (attr) != 0)) {
-			zerror(zlogp, B_TRUE, "could not set zone brand "
-			    "attribute.");
-			goto error;
-		}
-	}
-
 	/*
 	 * The following actions are not performed when merely mounting a zone
 	 * for administrative use.
 	 */
 	if (mount_cmd == Z_MNT_BOOT) {
+		brand_handle_t bh;
+		struct brand_attr attr;
+		char modname[MAXPATHLEN];
+
+		if ((zone_get_brand(zone_name, attr.ba_brandname,
+		    MAXNAMELEN) != Z_OK) ||
+		    (bh = brand_open(attr.ba_brandname)) == NULL) {
+			zerror(zlogp, B_FALSE,
+			    "unable to determine brand name");
+			return (-1);
+		}
+
+		/*
+		 * If this brand requires any kernel support, now is the time to
+		 * get it loaded and initialized.
+		 */
+		if (brand_get_modname(bh, modname, MAXPATHLEN) < 0) {
+			brand_close(bh);
+			zerror(zlogp, B_FALSE,
+			    "unable to determine brand kernel module");
+			return (-1);
+		}
+		brand_close(bh);
+
+		if (strlen(modname) > 0) {
+			(void) strlcpy(attr.ba_modname, modname, MAXPATHLEN);
+			if (zone_setattr(zoneid, ZONE_ATTR_BRAND, &attr,
+			    sizeof (attr) != 0)) {
+				zerror(zlogp, B_TRUE,
+				    "could not set zone brand attribute.");
+				goto error;
+			}
+		}
+
 		if (setup_zone_rm(zlogp, zone_name, zoneid) != Z_OK) {
 			(void) zone_shutdown(zoneid);
 			goto error;
@@ -4436,8 +4463,6 @@ static int
 lu_root_teardown(zlog_t *zlogp)
 {
 	char zroot[MAXPATHLEN];
-
-	assert(zone_isnative || zone_iscluster);
 
 	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");

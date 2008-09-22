@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * zoneadm is a command interpreter for zone administration.  It is all in
  * C (i.e., no lex/yacc), and all the argument passing is argc/argv based.
@@ -105,7 +103,6 @@ typedef struct zone_entry {
 static zone_entry_t *zents;
 static size_t nzents;
 static boolean_t is_native_zone = B_TRUE;
-static boolean_t is_cluster_zone = B_FALSE;
 
 #define	LOOPBACK_IF	"lo0"
 #define	SOCKET_AF(af)	(((af) == AF_UNSPEC) ? AF_INET : (af))
@@ -1621,12 +1618,6 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		zerror(gettext("%s operation is invalid for zones starting "
 		    "with SUNW."), cmd_to_str(cmd_num));
 		return (Z_ERR);
-	}
-
-	if (!is_native_zone && !is_cluster_zone && cmd_num == CMD_MOUNT) {
-		zerror(gettext("%s operation is invalid for branded zones."),
-		    cmd_to_str(cmd_num));
-			return (Z_ERR);
 	}
 
 	if (!zonecfg_in_alt_root()) {
@@ -5560,8 +5551,6 @@ main(int argc, char **argv)
 			exit(Z_ERR);
 		}
 		is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
-		is_cluster_zone =
-		    (strcmp(target_brand, CLUSTER_BRAND_NAME) == 0);
 	}
 
 	err = parse_and_run(argc - optind, &argv[optind]);

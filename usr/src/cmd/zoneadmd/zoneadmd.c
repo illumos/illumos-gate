@@ -92,6 +92,7 @@
 #include <limits.h>
 #include <zone.h>
 #include <libbrand.h>
+#include <sys/brand.h>
 #include <libcontract.h>
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
@@ -574,8 +575,6 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 	if (mount_cmd) {
 		char zonepath[MAXPATHLEN];
 		char luroot[MAXPATHLEN];
-
-		assert(zone_isnative || zone_iscluster);
 
 		if (zone_get_zonepath(zone_name,
 		    zonepath, sizeof (zonepath)) != Z_OK) {
@@ -1180,11 +1179,14 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
 			if (!zone_isnative && !zone_iscluster) {
-				zerror(zlogp, B_FALSE,
-				    "%s operation is invalid for branded "
-				    "zones", z_cmd_name(cmd));
-				rval = -1;
-				break;
+				/*
+				 * -U mounts the zone without lofs mounting
+				 * zone file systems back into the scratch
+				 * zone.  This is required when mounting
+				 * non-native branded zones.
+				 */
+				(void) strlcpy(zargp->bootbuf, "-U",
+				    BOOTARGS_MAX);
 			}
 
 			rval = zone_ready(zlogp,
@@ -1195,8 +1197,12 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 
 			eventstream_write(Z_EVT_ZONE_READIED);
 
-			/* Get a handle to the brand info for this zone */
-			if ((bh = brand_open(brand_name)) == NULL) {
+			/*
+			 * Get a handle to the native brand info.
+			 * We must always use the native brand file system
+			 * list when mounting the zone.
+			 */
+			if ((bh = brand_open(NATIVE_BRAND_NAME)) == NULL) {
 				rval = -1;
 				break;
 			}
