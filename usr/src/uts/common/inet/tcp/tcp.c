@@ -265,9 +265,9 @@ squeue_func_t tcp_squeue_wput_proc;
  * SOD_PTR_ENTER(tcp, sodp) - for the tcp_t pointer "tcp" set the
  * sodirect_t pointer "sodp" to the socket/tcp shared sodirect_t
  * if it exists and is enabled, else to NULL. Note, in the current
- * sodirect implementation the sod_lock must not be held across any
+ * sodirect implementation the sod_lockp must not be held across any
  * STREAMS call (e.g. putnext) else a "recursive mutex_enter" PANIC
- * will result as sod_lock is the streamhead stdata.sd_lock.
+ * will result as sod_lockp is the streamhead stdata.sd_lock.
  *
  * SOD_NOT_ENABLED(tcp) - return true if not a sodirect tcp_t or the
  * sodirect_t isn't enabled, usefull for ASSERT()ing that a recieve
@@ -279,9 +279,9 @@ squeue_func_t tcp_squeue_wput_proc;
 	(sodp) = (tcp)->tcp_sodirect;					\
 									\
 	if ((sodp) != NULL) {						\
-		mutex_enter((sodp)->sod_lock);				\
+		mutex_enter((sodp)->sod_lockp);				\
 		if (!((sodp)->sod_state & SOD_ENABLED)) {		\
-			mutex_exit((sodp)->sod_lock);			\
+			mutex_exit((sodp)->sod_lockp);			\
 			(sodp) = NULL;					\
 		}							\
 	}
@@ -3881,7 +3881,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 	SOD_PTR_ENTER(tcp, sodp);
 	if (sodp != NULL) {
 		tcp->tcp_sodirect = NULL;
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 	}
 
 	q = tcp->tcp_rq;
@@ -11782,7 +11782,7 @@ tcp_rcv_enqueue(tcp_t *tcp, mblk_t *mp, uint_t seg_len)
  * non sodirect connection but as there are no tcp_tcv_list mblk_t's we deal
  * with the rcv_wnd and push timer and call the sodirect wakeup function.
  *
- * Must be called with sodp->sod_lock held and will return with the lock
+ * Must be called with sodp->sod_lockp held and will return with the lock
  * released.
  */
 static uint_t
@@ -11797,7 +11797,7 @@ tcp_rcv_sod_wakeup(tcp_t *tcp, sodirect_t *sodp)
 	ASSERT(tcp->tcp_listener == NULL);
 
 	/* Caller must have lock held */
-	ASSERT(MUTEX_HELD(sodp->sod_lock));
+	ASSERT(MUTEX_HELD(sodp->sod_lockp));
 
 	/* Sodirect mode so must not be a tcp_rcv_list */
 	ASSERT(tcp->tcp_rcv_list == NULL);
@@ -11838,7 +11838,7 @@ tcp_rcv_sod_wakeup(tcp_t *tcp, sodirect_t *sodp)
 		/* Q is empty, no need to wake */
 		sodp->sod_state &= SOD_WAKE_CLR;
 		sodp->sod_state |= SOD_WAKE_NOT;
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 	}
 
 	/* No need for the push timer now. */
@@ -11868,7 +11868,7 @@ tcp_rcv_sod_enqueue(tcp_t *tcp, sodirect_t *sodp, mblk_t *mp, uint_t seg_len)
 	ASSERT(tcp->tcp_listener == NULL);
 
 	/* Caller must have lock held */
-	ASSERT(MUTEX_HELD(sodp->sod_lock));
+	ASSERT(MUTEX_HELD(sodp->sod_lockp));
 
 	/* Sodirect mode so must not be a tcp_rcv_list */
 	ASSERT(tcp->tcp_rcv_list == NULL);
@@ -11883,6 +11883,7 @@ tcp_rcv_sod_enqueue(tcp_t *tcp, sodirect_t *sodp, mblk_t *mp, uint_t seg_len)
 	if (uioap->uioa_state & UIOA_ENABLED) {
 		/* Uioa is enabled */
 		mblk_t		*mp1 = mp;
+		mblk_t		*lmp = NULL;
 
 		if (seg_len > uioap->uio_resid) {
 			/*
@@ -11911,6 +11912,7 @@ tcp_rcv_sod_enqueue(tcp_t *tcp, sodirect_t *sodp, mblk_t *mp, uint_t seg_len)
 				uioap->uioa_state |= UIOA_FINI;
 				break;
 			}
+			lmp = mp1;
 		} while ((mp1 = mp1->b_cont) != NULL);
 
 		if (mp1 != NULL || uioap->uio_resid == 0) {
@@ -11921,6 +11923,12 @@ tcp_rcv_sod_enqueue(tcp_t *tcp, sodirect_t *sodp, mblk_t *mp, uint_t seg_len)
 			 */
 			sodp->sod_state &= SOD_WAKE_CLR;
 			sodp->sod_state |= SOD_WAKE_NEED;
+
+			/* Break the mblk chain if neccessary. */
+			if (mp1 != NULL && lmp != NULL) {
+				mp->b_next = mp1;
+				lmp->b_cont = NULL;
+			}
 		}
 	} else if (uioap->uioa_state & UIOA_FINI) {
 		/*
@@ -15182,24 +15190,27 @@ est:
 		 * sodirect_t and the sodirect_t's lock will be held.
 		 */
 		if (sodp != NULL) {
-			mutex_enter(sodp->sod_lock);
-			if (!(sodp->sod_state & SOD_ENABLED)) {
-				mutex_exit(sodp->sod_lock);
-				sodp = NULL;
-			} else if (tcp->tcp_kssl_ctx != NULL &&
-			    DB_TYPE(mp) == M_DATA) {
-				mutex_exit(sodp->sod_lock);
+			mutex_enter(sodp->sod_lockp);
+			if (!(sodp->sod_state & SOD_ENABLED) ||
+			    (tcp->tcp_kssl_ctx != NULL &&
+			    DB_TYPE(mp) == M_DATA)) {
+				mutex_exit(sodp->sod_lockp);
 				sodp = NULL;
 			}
 		}
 		if (mp->b_datap->db_type != M_DATA ||
 		    (flags & TH_MARKNEXT_NEEDED)) {
 			if (sodp != NULL) {
+				if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
+					sodp->sod_uioa.uioa_state &= UIOA_CLR;
+					sodp->sod_uioa.uioa_state |= UIOA_FINI;
+				}
 				if (!SOD_QEMPTY(sodp) &&
 				    (sodp->sod_state & SOD_WAKE_NOT)) {
 					flags |= tcp_rcv_sod_wakeup(tcp, sodp);
 					/* sod_wakeup() did the mutex_exit() */
-					mutex_enter(sodp->sod_lock);
+				} else {
+					mutex_exit(sodp->sod_lockp);
 				}
 			} else if (tcp->tcp_rcv_list != NULL) {
 				flags |= tcp_rcv_drain(tcp->tcp_rq, tcp);
@@ -15225,14 +15236,6 @@ est:
 				    mblk_t *, mp);
 				tcp_kssl_input(tcp, mp);
 			} else {
-				if (sodp) {
-					/*
-					 * Done with sodirect, use putnext
-					 * to push this non M_DATA headed
-					 * mblk_t chain.
-					 */
-					mutex_exit(sodp->sod_lock);
-				}
 				putnext(tcp->tcp_rq, mp);
 				if (!canputnext(tcp->tcp_rq))
 					tcp->tcp_rwnd -= seg_len;
@@ -15259,7 +15262,7 @@ est:
 					/* Q is full, need backenable */
 					SOD_QSETBE(sodp);
 				}
-				mutex_exit(sodp->sod_lock);
+				mutex_exit(sodp->sod_lockp);
 			}
 		} else if ((flags & (TH_PUSH|TH_FIN)) ||
 		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_rq->q_hiwat >> 3) {
@@ -15298,7 +15301,7 @@ est:
 		 *
 		 * Note, for sodirect if Q isn't empty and there's not a
 		 * pending wakeup then we need a timer. Also note that sodp
-		 * is assumed to be still valid after exit()ing the sod_lock
+		 * is assumed to be still valid after exit()ing the sod_lockp
 		 * above and while the SOD state can change it can only change
 		 * such that the Q is empty now even though data was added
 		 * above.
@@ -15399,7 +15402,10 @@ ack_check:
 		mp1 = tcp->tcp_urp_mark_mp;
 		tcp->tcp_urp_mark_mp = NULL;
 		if (sodp != NULL) {
-
+			if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
+				sodp->sod_uioa.uioa_state &= UIOA_CLR;
+				sodp->sod_uioa.uioa_state |= UIOA_FINI;
+			}
 			ASSERT(tcp->tcp_rcv_list == NULL);
 
 			flags |= tcp_rcv_sod_wakeup(tcp, sodp);
@@ -15461,6 +15467,10 @@ ack_check:
 
 		SOD_PTR_ENTER(tcp, sodp);
 		if (sodp != NULL) {
+			if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
+				sodp->sod_uioa.uioa_state &= UIOA_CLR;
+				sodp->sod_uioa.uioa_state |= UIOA_FINI;
+			}
 			/* No more sodirect */
 			tcp->tcp_sodirect = NULL;
 			if (!SOD_QEMPTY(sodp)) {
@@ -15469,7 +15479,7 @@ ack_check:
 				/* sod_wakeup() does the mutex_exit() */
 			} else {
 				/* Nothing to process */
-				mutex_exit(sodp->sod_lock);
+				mutex_exit(sodp->sod_lockp);
 			}
 		} else if (tcp->tcp_rcv_list != NULL) {
 			/*
@@ -16310,7 +16320,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 			/* Not flow-controlled */
 			fc = B_FALSE;
 		}
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 	} else if (canputnext(q)) {
 		/* STREAMS, not flow-controlled */
 		fc = B_FALSE;
@@ -16345,6 +16355,10 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 
 		SOD_PTR_ENTER(tcp, sodp);
 		if (sodp != NULL) {
+			if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
+				sodp->sod_uioa.uioa_state &= UIOA_CLR;
+				sodp->sod_uioa.uioa_state |= UIOA_FINI;
+			}
 			/* No more sodirect */
 			tcp->tcp_sodirect = NULL;
 			if (!SOD_QEMPTY(sodp)) {
@@ -16353,7 +16367,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 				/* sod_wakeup() does the mutex_exit() */
 			} else {
 				/* Nothing to process */
-				mutex_exit(sodp->sod_lock);
+				mutex_exit(sodp->sod_lockp);
 			}
 		} else if (tcp->tcp_rcv_list != NULL) {
 			/*
@@ -18646,9 +18660,9 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 		eager->tcp_sodirect = SOD_QTOSODP(eager->tcp_rq);
 		if (eager->tcp_fused && eager->tcp_sodirect != NULL) {
 			/* Fused, disable sodirect */
-			mutex_enter(eager->tcp_sodirect->sod_lock);
+			mutex_enter(eager->tcp_sodirect->sod_lockp);
 			SOD_DISABLE(eager->tcp_sodirect);
-			mutex_exit(eager->tcp_sodirect->sod_lock);
+			mutex_exit(eager->tcp_sodirect->sod_lockp);
 			eager->tcp_sodirect = NULL;
 		}
 

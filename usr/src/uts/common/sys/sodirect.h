@@ -40,8 +40,6 @@
 #ifndef _SYS_SODIRECT_H
 #define	_SYS_SODIRECT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Sodirect ...
  *
@@ -62,7 +60,8 @@ typedef struct sodirect_s {
 	void		(*sod_wakeup)(); /* Call to awkake a read()er, if any */
 	mblk_t		*sod_uioafh;	/* To be freed list head, or NULL */
 	mblk_t		*sod_uioaft;	/* To be freed list tail */
-	kmutex_t	*sod_lock;	/* Lock needed to protect all members */
+	kmutex_t	*sod_lockp;	/* Pointer to the lock needed */
+					/* to protect all members */
 	uioa_t		sod_uioa;	/* Pending uio_t for uioa_t use */
 } sodirect_t;
 
@@ -83,8 +82,27 @@ typedef struct sodirect_s {
  * Usefull macros:
  */
 
-#define	SOD_QSETBE(p) ((p)->sod_q->q_flag |= QWANTW)
-#define	SOD_QCLRBE(p) ((p)->sod_q->q_flag &= ~QWANTW)
+#define	SOD_QSETBE(p) {				\
+	queue_t *q = (p)->sod_q;		\
+						\
+	ASSERT(MUTEX_HELD((p)->sod_lockp));	\
+						\
+	mutex_enter(QLOCK(q));			\
+	if (q->q_flag & QFULL)			\
+		q->q_flag |= QWANTW;		\
+	mutex_exit(QLOCK(q));			\
+}
+
+#define	SOD_QCLRBE(p) {				\
+	queue_t *q = (p)->sod_q;		\
+						\
+	ASSERT(MUTEX_HELD((p)->sod_lockp));	\
+						\
+	mutex_enter(QLOCK(q));			\
+	q->q_flag &= ~QWANTW;			\
+	mutex_exit(QLOCK(q));			\
+}
+
 #define	SOD_QEMPTY(p) ((p)->sod_q->q_first == NULL)
 #define	SOD_QFULL(p) ((p)->sod_q->q_flag & QFULL)
 #define	SOD_QCNT(p) ((p)->sod_q->q_count)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/inttypes.h>
 #include <sys/t_lock.h>
@@ -507,7 +505,7 @@ so_strinit(struct sonode *so, struct sonode *tso)
 		sodp->sod_wakeup = sodwakeup;
 		sodp->sod_uioafh = NULL;
 		sodp->sod_uioaft = NULL;
-		sodp->sod_lock = &stp->sd_lock;
+		sodp->sod_lockp = &stp->sd_lock;
 		/*
 		 * Remainder of the sod_uioa members are left uninitialized
 		 * but will be initialized later by uioainit() before uioa
@@ -2939,19 +2937,24 @@ sodput(sodirect_t *sodp, mblk_t *bp)
 	queue_t		*q = sodp->sod_q;
 	struct stdata	*stp = (struct stdata *)q->q_ptr;
 	mblk_t		*nbp;
-	int		ret;
 	mblk_t		*last = q->q_last;
 	int		bytecnt = 0;
 	int		mblkcnt = 0;
 
 
-	ASSERT(MUTEX_HELD(sodp->sod_lock));
+	ASSERT(MUTEX_HELD(sodp->sod_lockp));
 
 	if (stp->sd_flag == STREOF) {
-		ret = 0;
-		goto error;
+		do {
+			if ((nbp = bp->b_next) != NULL)
+				bp->b_next = NULL;
+			freemsg(bp);
+		} while ((bp = nbp) != NULL);
+
+		return (0);
 	}
 
+	mutex_enter(QLOCK(q));
 	if (q->q_first == NULL) {
 		/* Q empty, really fast fast-path */
 		bp->b_prev = NULL;
@@ -2975,6 +2978,8 @@ sodput(sodirect_t *sodp, mblk_t *bp)
 			last->b_cont = bp;
 		} else {
 			/* New last */
+			ASSERT((bp->b_datap->db_flags & DBLK_UIOA) == 0 ||
+			    msgdsize(bp) == sodp->sod_uioa.uioa_mbytes);
 			last->b_next = bp;
 			bp->b_next = NULL;
 			bp->b_prev = last;
@@ -2984,6 +2989,10 @@ sodput(sodirect_t *sodp, mblk_t *bp)
 		/*
 		 * Can't use q_last so just call putq().
 		 */
+		mutex_exit(QLOCK(q));
+
+		ASSERT((bp->b_datap->db_flags & DBLK_UIOA) == 0 ||
+		    msgdsize(bp) == sodp->sod_uioa.uioa_mbytes);
 		(void) putq(q, bp);
 		return (0);
 	}
@@ -3002,16 +3011,8 @@ sodput(sodirect_t *sodp, mblk_t *bp)
 		q->q_flag |= QFULL;
 	}
 
+	mutex_exit(QLOCK(q));
 	return (0);
-
-error:
-	do {
-		if ((nbp = bp->b_next) != NULL)
-			bp->b_next = NULL;
-		freemsg(bp);
-	} while ((bp = nbp) != NULL);
-
-	return (ret);
 }
 
 /*
@@ -3027,7 +3028,7 @@ sodwakeup(sodirect_t *sodp)
 	queue_t		*q = sodp->sod_q;
 	struct stdata	*stp = (struct stdata *)q->q_ptr;
 
-	ASSERT(MUTEX_HELD(sodp->sod_lock));
+	ASSERT(MUTEX_HELD(sodp->sod_lockp));
 
 	if (stp->sd_flag & RSLEEP) {
 		stp->sd_flag &= ~RSLEEP;
@@ -3036,8 +3037,8 @@ sodwakeup(sodirect_t *sodp)
 
 	if (stp->sd_rput_opt & SR_POLLIN) {
 		stp->sd_rput_opt &= ~SR_POLLIN;
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 		pollwakeup(&stp->sd_pollist, POLLIN | POLLRDNORM);
 	} else
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 }

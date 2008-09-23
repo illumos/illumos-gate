@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -426,6 +424,7 @@ uioamove(void *p, size_t n, enum uio_rw rw, uioa_t *uioa)
 			iov->iov_base += cnt;
 			iov->iov_len -= cnt;
 			uioa->uio_resid -= cnt;
+			uioa->uioa_mbytes += cnt;
 			uioa->uio_loffset += cnt;
 			p = (caddr_t)p + cnt;
 			n -= cnt;
@@ -489,6 +488,10 @@ uioainit(uio_t *uiop, uioa_t *uioap)
 
 	/* Indicate uioa_t (will be) initialized */
 	uioap->uioa_state = UIOA_INIT;
+
+	uioap->uioa_mbytes = 0;
+
+	uioap->uioa_mbytes = 0;
 
 	/* uio_t/uioa_t uio_t common struct copy */
 	*((uio_t *)uioap) = *uiop;
@@ -575,6 +578,7 @@ cleanup:
 
 	/* Last indicate uioa_t still in alloc state */
 	uioap->uioa_state = UIOA_ALLOC;
+	uioap->uioa_mbytes = 0;
 
 	return (error);
 }
@@ -663,6 +667,7 @@ uioafini(uio_t *uiop, uioa_t *uioap)
 	 * will be initialized in a subsequent uioainit().
 	 */
 	uioap->uioa_state = UIOA_ALLOC;
+	uioap->uioa_mbytes = 0;
 
 	uioap->uioa_hwst[UIO_DCOPY_CMD] = NULL;
 	uioap->uioa_hwst[UIO_DCOPY_CHANNEL] = NULL;

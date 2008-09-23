@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -1075,17 +1073,24 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 	*errorp = 0;
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
 
-	if (sodp != NULL && (sodp->sod_state & SOD_ENABLED) &&
-	    (sodp->sod_uioa.uioa_state & UIOA_INIT)) {
-		/*
-		 * First kstrgetmsg() call for an uioa_t so if any
-		 * queued mblk_t's need to consume them before uioa
-		 * from below can occur.
-		 */
-		sodp->sod_uioa.uioa_state &= UIOA_CLR;
-		sodp->sod_uioa.uioa_state |= UIOA_ENABLED;
-		if (q->q_first != NULL) {
-			struioainit(q, sodp, uiop);
+	if (sodp != NULL && sodp->sod_state & SOD_ENABLED) {
+		if (sodp->sod_uioa.uioa_state & UIOA_INIT) {
+			/*
+			 * First kstrgetmsg() call for an uioa_t so if any
+			 * queued mblk_t's need to consume them before uioa
+			 * from below can occur.
+			 */
+			sodp->sod_uioa.uioa_state &= UIOA_CLR;
+			sodp->sod_uioa.uioa_state |= UIOA_ENABLED;
+			if (q->q_first != NULL) {
+				struioainit(q, sodp, uiop);
+			}
+		} else if (sodp->sod_uioa.uioa_state &
+		    (UIOA_ENABLED|UIOA_FINI)) {
+			ASSERT(uiop == (uio_t *)&sodp->sod_uioa);
+			rbytes = 0;
+		} else {
+			rbytes = uiop->uio_resid;
 		}
 	} else {
 		/*
@@ -1116,6 +1121,7 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 		mblk_t	*bpt = sodp->sod_uioaft;
 
 		ASSERT(sodp != NULL);
+		ASSERT(msgdsize(bp) == sodp->sod_uioa.uioa_mbytes);
 
 		/*
 		 * Add first mblk_t of "bp" chain to current sodirect uioa
@@ -8759,52 +8765,53 @@ void
 struioainit(queue_t *q, sodirect_t *sodp, uio_t *uiop)
 {
 	uioa_t	*uioap = (uioa_t *)uiop;
-	mblk_t	*bp = q->q_first;
+	mblk_t	*bp;
 	mblk_t	*lbp = NULL;
-	mblk_t	*nbp, *wbp;
+	mblk_t	*wbp;
 	int	len;
 	int	error;
 
-	ASSERT(MUTEX_HELD(sodp->sod_lock));
+	ASSERT(MUTEX_HELD(sodp->sod_lockp));
 	ASSERT(&sodp->sod_uioa == uioap);
 
 	/*
-	 * Walk the b_next/b_prev doubly linked list of b_cont chain(s)
+	 * Walk first b_cont chain in sod_q
 	 * and schedule any M_DATA mblk_t's for uio asynchronous move.
 	 */
+	mutex_enter(QLOCK(q));
+	if ((bp = q->q_first) == NULL) {
+		mutex_exit(QLOCK(q));
+		return;
+	}
+	/* Walk the chain */
+	wbp = bp;
 	do {
-		/* Next mblk_t chain */
-		nbp = bp->b_next;
-		/* Walk the chain */
-		wbp = bp;
-		do {
-			if (wbp->b_datap->db_type != M_DATA) {
-				/* Not M_DATA, no more uioa */
+		if (wbp->b_datap->db_type != M_DATA) {
+			/* Not M_DATA, no more uioa */
+			goto nouioa;
+		}
+		if ((len = wbp->b_wptr - wbp->b_rptr) > 0) {
+			/* Have a M_DATA mblk_t with data */
+			if (len > uioap->uio_resid) {
+				/* Not enough uio sapce */
 				goto nouioa;
 			}
-			if ((len = wbp->b_wptr - wbp->b_rptr) > 0) {
-				/* Have a M_DATA mblk_t with data */
-				if (len > uioap->uio_resid) {
-					/* Not enough uio sapce */
-					goto nouioa;
-				}
-				error = uioamove(wbp->b_rptr, len,
-				    UIO_READ, uioap);
-				if (!error) {
-					/* Scheduled, mark dblk_t as such */
-					wbp->b_datap->db_flags |= DBLK_UIOA;
-				} else {
-					/* Error of some sort, no more uioa */
-					uioap->uioa_state &= UIOA_CLR;
-					uioap->uioa_state |= UIOA_FINI;
-					return;
-				}
+			ASSERT(!(wbp->b_datap->db_flags & DBLK_UIOA));
+			error = uioamove(wbp->b_rptr, len,
+			    UIO_READ, uioap);
+			if (!error) {
+				/* Scheduled, mark dblk_t as such */
+				wbp->b_datap->db_flags |= DBLK_UIOA;
+			} else {
+				/* Break the mblk chain */
+				goto nouioa;
 			}
-			/* Save last wbp processed */
-			lbp = wbp;
-		} while ((wbp = wbp->b_cont) != NULL);
-	} while ((bp = nbp) != NULL);
+		}
+		/* Save last wbp processed */
+		lbp = wbp;
+	} while ((wbp = wbp->b_cont) != NULL);
 
+	mutex_exit(QLOCK(q));
 	return;
 
 nouioa:
@@ -8823,11 +8830,12 @@ nouioa:
 		lbp->b_cont = NULL;
 
 		/* Insert new chain wbp after bp */
-		if ((wbp->b_next = nbp) != NULL)
-			nbp->b_prev = wbp;
+		if ((wbp->b_next = bp->b_next) != NULL)
+			bp->b_next->b_prev = wbp;
 		else
 			q->q_last = wbp;
 		wbp->b_prev = bp;
 		bp->b_next = wbp;
 	}
+	mutex_exit(QLOCK(q));
 }

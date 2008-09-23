@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -289,15 +287,15 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 
 		/* If either tcp or peer_tcp sodirect enabled then disable */
 		if (tcp->tcp_sodirect != NULL) {
-			mutex_enter(tcp->tcp_sodirect->sod_lock);
+			mutex_enter(tcp->tcp_sodirect->sod_lockp);
 			SOD_DISABLE(tcp->tcp_sodirect);
-			mutex_exit(tcp->tcp_sodirect->sod_lock);
+			mutex_exit(tcp->tcp_sodirect->sod_lockp);
 			tcp->tcp_sodirect = NULL;
 		}
 		if (peer_tcp->tcp_sodirect != NULL) {
-			mutex_enter(peer_tcp->tcp_sodirect->sod_lock);
+			mutex_enter(peer_tcp->tcp_sodirect->sod_lockp);
 			SOD_DISABLE(peer_tcp->tcp_sodirect);
-			mutex_exit(peer_tcp->tcp_sodirect->sod_lock);
+			mutex_exit(peer_tcp->tcp_sodirect->sod_lockp);
 			peer_tcp->tcp_sodirect = NULL;
 		}
 

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -1561,6 +1559,14 @@ again:
 		mp->b_cont = NULL;
 		strsetrwputdatahooks(nvp, strsock_kssl_input,
 		    strsock_kssl_output);
+
+		/* Disable sodirect if any */
+		if (nso->so_direct != NULL) {
+			mutex_enter(nso->so_direct->sod_lockp);
+			SOD_DISABLE(nso->so_direct);
+			mutex_exit(nso->so_direct->sod_lockp);
+			nso->so_direct = NULL;
+		}
 	}
 #ifdef DEBUG
 	/*
@@ -3079,7 +3085,7 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		 * and sodirect enabled and uioa enabled and I/O will be done
 		 * and not EOF so initialize the sodirect_t uioa_t with "uiop".
 		 */
-		mutex_enter(sodp->sod_lock);
+		mutex_enter(sodp->sod_lockp);
 		if (!uioainit(uiop, &sodp->sod_uioa)) {
 			/*
 			 * Successful uioainit() so the uio_t part of the
@@ -3105,14 +3111,14 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		 * transport (e.g. TCP) strategy.
 		 */
 		sodp->sod_want = uiop->uio_resid;
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 	} else if (sodp != NULL && (sodp->sod_state & SOD_ENABLED)) {
 		/*
 		 * No uioa but still using sodirect so note the number of
 		 * uio bytes the caller wants for sodirect framework and/or
 		 * transport (e.g. TCP) strategy.
 		 *
-		 * Note, sod_lock not held, only writer is in this function
+		 * Note, sod_lockp not held, only writer is in this function
 		 * and only one thread at a time so not needed just to init.
 		 */
 		sodp->sod_want = uiop->uio_resid;
@@ -3538,7 +3544,7 @@ out:
 out_locked:
 	if (sodp != NULL) {
 		/* Finish any sodirect and uioa processing */
-		mutex_enter(sodp->sod_lock);
+		mutex_enter(sodp->sod_lockp);
 		if (suiop != NULL) {
 			/* Finish any uioa_t processing */
 			int ret;
@@ -3555,6 +3561,7 @@ out_locked:
 				freemsg(mp);
 			}
 		}
+		ASSERT(sodp->sod_uioafh == NULL);
 		if (!(sodp->sod_state & SOD_WAKE_NOT)) {
 			/* Awoke */
 			sodp->sod_state &= SOD_WAKE_CLR;
@@ -3562,7 +3569,7 @@ out_locked:
 		}
 		/* Last, clear sod_want value */
 		sodp->sod_want = 0;
-		mutex_exit(sodp->sod_lock);
+		mutex_exit(sodp->sod_lockp);
 	}
 	so_unlock_read(so);	/* Clear SOREADLOCKED */
 	mutex_exit(&so->so_lock);

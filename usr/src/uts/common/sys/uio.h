@@ -39,8 +39,6 @@
 #ifndef _SYS_UIO_H
 #define	_SYS_UIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus
@@ -128,6 +126,7 @@ typedef struct uioa_s {
 	 * uioa extended members.
 	 */
 	uint32_t	uioa_state;	/* state of asynch i/o */
+	ssize_t		uioa_mbytes;	/* bytes that have been uioamove()ed */
 	uioa_page_t	*uioa_lcur;	/* pointer into uioa_locked[] */
 	void		**uioa_lppp;	/* pointer into lcur->uioa_ppp[] */
 	void		*uioa_hwst[4];	/* opaque hardware state */
