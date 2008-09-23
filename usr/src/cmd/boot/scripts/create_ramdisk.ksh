@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 format=ufs
 ALT_ROOT=
 EXTRACT_ARGS=
@@ -496,11 +494,14 @@ if [ $format = ufs ] ; then
 	# check to see if there is sufficient space in tmpfs 
 	#
 	tmp_free=`df -b /tmp | tail -1 | awk '{ printf ($2) }'`
-	(( tmp_free = tmp_free / 2 ))
+	(( tmp_free = tmp_free / 3 ))
+	if [ $SPLIT = yes ]; then
+		(( tmp_free = tmp_free / 2 ))
+	fi
 
 	if [ $total_size -gt $tmp_free  ] ; then
 		# assumes we have enough scratch space on $ALT_ROOT
-		new_rddir="/$ALT_ROOT/create_ramdisk.$$.tmp"
+		new_rddir="/$ALT_ROOT/var/tmp/create_ramdisk.$$.tmp"
 		rm -rf "$new_rddir"
 		mkdir "$new_rddir" || fatal_error \
 		    "Could not create temporary directory $new_rddir"
