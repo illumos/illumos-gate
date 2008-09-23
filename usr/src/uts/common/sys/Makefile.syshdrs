@@ -71,6 +71,9 @@ ib/mgt/ibmf/%.check:	ib/mgt/ibmf/%.h
 ib/adapters/tavor/%.check:	ib/adapters/tavor/%.h
 	$(DOT_H_CHECK)
 
+ib/adapters/hermon/%.check:	ib/adapters/hermon/%.h
+	$(DOT_H_CHECK)
+
 lvm/%.check:	lvm/%.h
 	$(DOT_H_CHECK)
 
@@ -166,6 +169,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/fs		\
 	$(ROOTDIR)/ib		\
 	$(ROOTDIR)/ib/adapters/tavor	\
+	$(ROOTDIR)/ib/adapters/hermon	\
 	$(ROOTDIR)/ib/ibtl	\
 	$(ROOTDIR)/ib/ibtl/impl	\
 	$(ROOTDIR)/ib/mgt	\
@@ -218,6 +222,7 @@ ROOTIBNEXHDRS= $(IBNEXHDRS:%=$(ROOTDIR)/ib/ibnex/%)
 ROOTIBMGTHDRS= $(IBMGTHDRS:%=$(ROOTDIR)/ib/mgt/%)
 ROOTIBMFHDRS= $(IBMFHDRS:%=$(ROOTDIR)/ib/mgt/ibmf/%)
 ROOTTAVORHDRS= $(TAVORHDRS:%=$(ROOTDIR)/ib/adapters/tavor/%)
+ROOTHERMONHDRS= $(HERMONHDRS:%=$(ROOTDIR)/ib/adapters/hermon/%)
 
 ROOTISOHDRS= $(ISOHDRS:%=$(ROOTDIR)/iso/%)
 
@@ -325,6 +330,9 @@ $(ROOTDIR)/ib/mgt/ibmf/%:	ib/mgt/ibmf/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/adapters/tavor/%:	ib/adapters/tavor/%
+	$(INS.file)
+
+$(ROOTDIR)/ib/adapters/hermon/%:	ib/adapters/hermon/%
 	$(INS.file)
 
 $(ROOTDIR)/lvm/%: lvm/%

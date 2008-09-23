@@ -1051,6 +1051,7 @@ CHECKHDRS=						\
 	$(IBMGTHDRS:%.h=ib/mgt/%.check)			\
 	$(IBMFHDRS:%.h=ib/mgt/ibmf/%.check)		\
 	$(TAVORHDRS:%.h=ib/adapters/tavor/%.check)	\
+	$(HERMONHDRS:%.h=ib/adapters/hermon/%.check)	\
 	$(ISOHDRS:%.h=iso/%.check)			\
 	$(FMHDRS:%.h=fm/%.check)			\
 	$(FMFSHDRS:%.h=fm/fs/%.check)			\

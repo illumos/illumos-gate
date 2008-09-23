@@ -123,6 +123,7 @@ warlock.ib:
 	@cd ../ibcm; $(MAKE) clean; $(MAKE) warlock
 	@cd ../ibd; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/tavor; $(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/hermon; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/daplt; $(MAKE) clean; $(MAKE) warlock
 
 warlock.sata:

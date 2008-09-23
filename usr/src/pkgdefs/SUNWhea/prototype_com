@@ -908,6 +908,8 @@ d none usr/include/sys/ib 755 root bin
 d none usr/include/sys/ib/adapters 755 root bin
 d none usr/include/sys/ib/adapters/tavor 755 root bin
 f none usr/include/sys/ib/adapters/tavor/tavor_ioctl.h 644 root bin
+d none usr/include/sys/ib/adapters/hermon 755 root bin
+f none usr/include/sys/ib/adapters/hermon/hermon_ioctl.h 644 root bin
 f none usr/include/sys/ib/ib_pkt_hdrs.h 644 root bin
 f none usr/include/sys/ib/ib_types.h 644 root bin
 d none usr/include/sys/ib/ibtl 755 root bin

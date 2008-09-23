@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -22,26 +23,24 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
-#
-# List files which are i386 specific here
-#
-# source locations relative to the prototype file
-#
-# SUNWhermon
-#
-f none kernel/drv/hermon 0755 root sys
-d none kernel/drv/amd64 0755 root sys
-f none kernel/drv/amd64/hermon 0755 root sys
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+# 
+# Driver info 
+# 
+ADD_DRV="add_drv -b ${BASEDIR}"
+
+DRV=hermon
+grep "^${DRV} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+	${ADD_DRV} -m '* 0666 root sys' -i \
+	    '"pci15b3,6340" "pci15b3,634a" "pci15b3,6354"' ${DRV}
+        if [ $? -ne 0 ]; then
+                echo "\nFailed add_drv of ${DRV}!\n" >&2
+                exit 1
+        fi
+fi
+
+exit 0

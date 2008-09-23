@@ -443,6 +443,7 @@ SVVS		+= svvs
 XMODS		+=
 $(CLOSED_BUILD)CLOSED_XMODS =		\
 	daplt		\
+	hermon		\
 	sdpib		\
 	tavor		\
 	wsdrv

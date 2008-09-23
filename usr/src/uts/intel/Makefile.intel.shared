@@ -633,6 +633,7 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 	adpu320		\
 	bnx		\
 	daplt		\
+	hermon		\
 	lsimega		\
 	sdpib		\
 	spwr		\
