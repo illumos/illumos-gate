@@ -1641,7 +1641,7 @@ cmdk_devid_modser(struct cmdk *dkp)
 
 	/* Initialize the device ID, trailing NULL not included */
 	rc = ddi_devid_init(dkp->dk_dip, DEVID_ATA_SERIAL, modlen + serlen,
-	    hwid, (ddi_devid_t *)&dkp->dk_devid);
+	    hwid, &dkp->dk_devid);
 	if (rc != DDI_SUCCESS) {
 		rc = DDI_FAILURE;
 		goto err;
@@ -1768,15 +1768,15 @@ cmdk_devid_fabricate(struct cmdk *dkp)
 	tgdk_iob_handle	handle = NULL;
 	uint_t		*ip, chksum;
 	int		i;
-	int		rc;
+	int		rc = DDI_FAILURE;
 
-	rc = ddi_devid_init(dkp->dk_dip, DEVID_FAB, 0, NULL, &devid);
-	if (rc != DDI_SUCCESS)
+	if (ddi_devid_init(dkp->dk_dip, DEVID_FAB, 0, NULL, &devid) !=
+	    DDI_SUCCESS)
 		goto err;
 
 	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk, 0)) {
 		/* no device id block address */
-		return (DDI_FAILURE);
+		goto err;
 	}
 
 	handle = dadk_iob_alloc(DKTP_DATA, blk, NBPSCTR, KM_SLEEP);
