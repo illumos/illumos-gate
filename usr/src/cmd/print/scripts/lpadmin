@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 set -o noclobber
 
@@ -353,23 +352,26 @@ if [[ -n "${delete}" ]] ; then
    		${LPSET} -n system -x ${delete}
    		exit_code=$?
    	fi
-elif [[ -z "${local}" ]] ; then
-	# if we need a uri, find the "best" one.
-	if [[ -z "${uri}" ]] ; then
-		uri="ipp://${server}/printers/${rem_printer}"
-		${LPSTAT} -p ${uri} >/dev/null 2>&1
-		if [[ $? -ne 0 ]] ; then
-			uri="lpd://${server}/printers/${rem_printer}#Solaris"
+else
+	if [[ -z "${local}" ]] ; then
+		# if we need a uri, find the "best" one.
+		if [[ -z "${uri}" ]] ; then
+			uri="ipp://${server}/printers/${rem_printer}"
+			${LPSTAT} -p ${uri} >/dev/null 2>&1
+			if [[ $? -ne 0 ]] ; then
+				uri="lpd://${server}/printers/${rem_printer}#Solaris"
+			fi
 		fi
-	fi
-	# set the bsdaddr
-	bsdaddr="${server},${rem_printer},Solaris"
+		# set the bsdaddr
+		bsdaddr="${server},${rem_printer},Solaris"
 
-	if [[ -n "${printer}" ]] ; then
-		${LPSET} -n system \
-			-a "printer-uri-supported=${uri}" \
-			-a "bsdaddr=${bsdaddr}" ${printer}
-		exit_code=$?
+		if [[ -n "${printer}" ]] ; then
+			${LPSET} -n system \
+				-a "printer-uri-supported=${uri}" \
+				-a "bsdaddr=${bsdaddr}" ${printer}
+			exit_code=$?
+		fi
+
 	fi
 
 	if [[ -n "${printer}" && -n "${description}" ]] ; then
