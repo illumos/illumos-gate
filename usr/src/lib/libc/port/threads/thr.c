@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <pthread.h>
@@ -562,7 +560,7 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	ucontext_t uc;
 	uint_t lwp_flags;
 	thread_t tid;
-	int error = 0;
+	int error;
 	ulwp_t *ulwp;
 
 	/*
@@ -652,9 +650,10 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	 */
 	ulwp->ul_sigdefer = 1;
 
-	if (setup_context(&uc, _thrp_setup, ulwp,
-	    (caddr_t)ulwp->ul_stk + ulwp->ul_guardsize, stksize) != 0)
-		error = EAGAIN;
+	error = setup_context(&uc, _thrp_setup, ulwp,
+	    (caddr_t)ulwp->ul_stk + ulwp->ul_guardsize, stksize);
+	if (error != 0 && stk != NULL)	/* inaccessible stack */
+		error = EFAULT;
 
 	/*
 	 * Call enter_critical() to avoid being suspended until we

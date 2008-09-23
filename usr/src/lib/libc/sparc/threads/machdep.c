@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <procfs.h>
@@ -36,20 +34,47 @@
 extern int getlwpstatus(thread_t, lwpstatus_t *);
 extern int putlwpregs(thread_t, prgregset_t);
 
-int
-setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
-	ulwp_t *ulwp, caddr_t stk, size_t stksize)
+/* ARGSUSED2 */
+void *
+setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
 {
+	uintptr_t stack;
+	char frame[SA(MINFRAME)];
+
 	/*
 	 * Top-of-stack must be rounded down to STACK_ALIGN and
 	 * there must be a minimum frame for the register window.
 	 */
-	uintptr_t stack = (((uintptr_t)stk + stksize) & ~(STACK_ALIGN - 1)) -
+	stack = (((uintptr_t)stk + stksize) & ~(STACK_ALIGN - 1)) -
 	    SA(MINFRAME);
 
-	/* clear the context and the top stack frame */
+	/*
+	 * This will return NULL if the kernel cannot allocate
+	 * a page for the top page of the stack.  This will cause
+	 * thr_create(), pthread_create() or pthread_attr_setstack()
+	 * to fail, passing the problem up to the application.
+	 */
+	(void) memset(frame, 0, sizeof (frame));
+	if (uucopy(frame, (void *)stack, sizeof (frame)) == 0)
+		return ((void *)stack);
+	return (NULL);
+}
+
+int
+setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
+	ulwp_t *ulwp, caddr_t stk, size_t stksize)
+{
+	uintptr_t stack;
+
+	/* clear the context */
 	(void) memset(ucp, 0, sizeof (*ucp));
-	(void) memset((void *)stack, 0, SA(MINFRAME));
+
+	/*
+	 * Clear the top stack frame.
+	 * If this fails, pass the problem up to the application.
+	 */
+	if ((stack = (uintptr_t)setup_top_frame(stk, stksize, ulwp)) == NULL)
+		return (ENOMEM);
 
 	/* fill in registers of interest */
 	ucp->uc_flags |= UC_CPU;

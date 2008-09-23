@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <procfs.h>
@@ -34,6 +32,38 @@
 
 extern int getlwpstatus(thread_t, lwpstatus_t *);
 extern int putlwpregs(thread_t, prgregset_t);
+
+/* ARGSUSED2 */
+void *
+setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
+{
+	uint64_t *stack;
+	struct {
+		uint64_t	rpc;
+		uint64_t	fp;
+		uint64_t	pc;
+	} frame;
+
+	/*
+	 * Top-of-stack must be rounded down to STACK_ALIGN and
+	 * there must be a minimum frame.
+	 */
+	stack = (uint64_t *)(((uintptr_t)stk + stksize) & ~(STACK_ALIGN-1));
+
+	/*
+	 * This will return NULL if the kernel cannot allocate
+	 * a page for the top page of the stack.  This will cause
+	 * thr_create(), pthread_create() or pthread_attr_setstack()
+	 * to fail, passing the problem up to the application.
+	 */
+	stack -= 3;
+	frame.pc = 0;
+	frame.fp = 0;
+	frame.rpc = (uint64_t)_lwp_start;
+	if (uucopy(&frame, stack, sizeof (frame)) == 0)
+		return (stack);
+	return (NULL);
+}
 
 int
 setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
@@ -51,20 +81,19 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 	/* all contexts should have a valid data segment descriptor for %ss */
 	ucp->uc_mcontext.gregs[REG_SS] = UDS_SEL;
 
-	/* top-of-stack must be rounded down to STACK_ALIGN */
-	stack = (uint64_t *)(((uintptr_t)stk + stksize) & ~(STACK_ALIGN-1));
-
-	/* set up top stack frame */
-	*--stack = 0;
-	*--stack = 0;
-	*--stack = (uint64_t)_lwp_start;
+	/*
+	 * Setup the top stack frame.
+	 * If this fails, pass the problem up to the application.
+	 */
+	if ((stack = setup_top_frame(stk, stksize, ulwp)) == NULL)
+		return (ENOMEM);
 
 	/* fill in registers of interest */
 	ucp->uc_flags |= UC_CPU;
 	ucp->uc_mcontext.gregs[REG_RDI] = (greg_t)ulwp;
 	ucp->uc_mcontext.gregs[REG_RIP] = (greg_t)func;
 	ucp->uc_mcontext.gregs[REG_RSP] = (greg_t)stack;
-	ucp->uc_mcontext.gregs[REG_RBP] = (greg_t)(stack+1);
+	ucp->uc_mcontext.gregs[REG_RBP] = (greg_t)(stack + 1);
 
 	return (0);
 }

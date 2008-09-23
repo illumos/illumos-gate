@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sched.h>
@@ -447,6 +445,9 @@ pthread_attr_setstack(pthread_attr_t *attr,
 	    stacksize >= MINSTACK) {
 		ap->stkaddr = stackaddr;
 		ap->stksize = stacksize;
+		if (stackaddr != NULL &&
+		    setup_top_frame(stackaddr, stacksize, NULL) == NULL)
+			return (EACCES);
 		return (0);
 	}
 	return (EINVAL);

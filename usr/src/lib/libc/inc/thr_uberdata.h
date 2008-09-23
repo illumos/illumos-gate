@@ -27,8 +27,6 @@
 #ifndef _THR_UBERDATA_H
 #define	_THR_UBERDATA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -1188,6 +1186,7 @@ extern	void	signal_init(void);
 extern	int	sigequalset(const sigset_t *, const sigset_t *);
 extern	void	mutex_setup(void);
 extern	void	take_deferred_signal(int);
+extern	void	*setup_top_frame(void *, size_t, ulwp_t *);
 extern	int	setup_context(ucontext_t *, void *(*func)(ulwp_t *),
 			ulwp_t *ulwp, caddr_t stk, size_t stksize);
 extern	volatile sc_shared_t *setup_schedctl(void);
