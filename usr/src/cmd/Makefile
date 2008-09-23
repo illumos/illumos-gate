@@ -293,6 +293,7 @@ COMMON_SUBDIRS=		\
 	policykit	\
 	pools		\
 	power		\
+	powertop	\
 	ppgsz		\
 	pg		\
 	plockstat	\

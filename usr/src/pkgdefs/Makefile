@@ -340,6 +340,7 @@ COMMON_SUBDIRS= \
 	SUNWpool \
 	SUNWpoold \
 	SUNWpoolr \
+	SUNWpowertop \
 	SUNWppm \
 	SUNWpppd \
 	SUNWpppdu \
