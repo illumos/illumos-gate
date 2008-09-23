@@ -27,8 +27,6 @@
 #ifndef _SYS_AGPDEFS_H
 #define	_SYS_AGPDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -100,6 +98,9 @@ extern "C" {
 #define	INTEL_BR_G33			0x29c08086
 #define	INTEL_BR_Q33			0x29d08086
 #define	INTEL_BR_GM45			0x2a408086
+#define	INTEL_BR_EL			0x2e008086
+#define	INTEL_BR_Q45			0x2e108086
+#define	INTEL_BR_G45			0x2e208086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -164,6 +165,9 @@ extern "C" {
 #define	INTEL_IGD_G33			0x29c28086
 #define	INTEL_IGD_Q33			0x29d28086
 #define	INTEL_IGD_GM45			0x2a428086
+#define	INTEL_IGD_EL			0x2e028086
+#define	INTEL_IGD_Q45			0x2e128086
+#define	INTEL_IGD_G45			0x2e228086
 
 /* register offsets in PCI config space */
 #define	I8XX_CONF_GMADR			0x10 /* GMADR of i8xx series */

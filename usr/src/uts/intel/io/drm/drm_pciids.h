@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_DRM_PCIIDS_H_
 #define	_DRM_PCIIDS_H_
 
@@ -203,6 +201,10 @@ extern "C" {
 	{0x8086, 0x29C2, CHIP_I9XX|CHIP_I915, "Intel G33"}, \
 	{0x8086, 0x29B2, CHIP_I9XX|CHIP_I915, "Intel Q35"}, \
 	{0x8086, 0x29D2, CHIP_I9XX|CHIP_I915, "Intel Q33"}, \
+	{0x8086, 0x2A42, CHIP_I9XX|CHIP_I965, "Intel GM45"}, \
+	{0x8086, 0x2E02, CHIP_I9XX|CHIP_I965, "Intel EL"}, \
+	{0x8086, 0x2E12, CHIP_I9XX|CHIP_I965, "Intel Q45"}, \
+	{0x8086, 0x2E22, CHIP_I9XX|CHIP_I965, "Intel G45"}, \
 	{0, 0, 0, NULL}
 
 #ifdef	__cplusplus

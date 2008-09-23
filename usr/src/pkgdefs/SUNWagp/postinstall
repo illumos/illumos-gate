@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # SUNWagp postinstall script
 
 PATH=/usr/bin:/usr/sbin:${PATH}
@@ -53,6 +51,9 @@ BRALIAS="\
 	\"pci8086,2a00\" \
 	\"pci8086,2a10\" \
 	\"pci8086,2a40\" \
+	\"pci8086,2e00\" \
+	\"pci8086,2e10\" \
+	\"pci8086,2e20\" \
 	\"pci8086,1130\" \
 	"
 CPUGART='"pci1022,1103"'

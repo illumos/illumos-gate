@@ -327,7 +327,7 @@ i915_save_vga(struct drm_device *dev)
 	/* CRT controller regs */
 	i915_write_indexed(&regmap, cr_index, cr_data, 0x11,
 	    i915_read_indexed(&regmap, cr_index, cr_data, 0x11) & (~0x80));
-	for (i = 0; i < 0x24; i++)
+	for (i = 0; i <= 0x24; i++)
 		s3_priv->saveCR[i] =
 		    i915_read_indexed(&regmap, cr_index, cr_data, i);
 	/* Make sure we don't turn off CR group 0 writes */
@@ -336,7 +336,7 @@ i915_save_vga(struct drm_device *dev)
 	/* Attribute controller registers */
 	(void) vga_reg_get8(&regmap, st01);
 	s3_priv->saveAR_INDEX = vga_reg_get8(&regmap, VGA_AR_INDEX);
-	for (i = 0; i < 20; i++)
+	for (i = 0; i <= 0x14; i++)
 		s3_priv->saveAR[i] = i915_read_ar(&regmap, st01, i, 0);
 	(void) vga_reg_get8(&regmap, st01);
 	vga_reg_put8(&regmap, VGA_AR_INDEX, s3_priv->saveAR_INDEX);
@@ -403,7 +403,7 @@ i915_restore_vga(struct drm_device *dev)
 	/* Enable CR group 0 writes */
 	i915_write_indexed(&regmap, cr_index, cr_data,
 	    0x11, s3_priv->saveCR[0x11]);
-	for (i = 0; i < 0x24; i++)
+	for (i = 0; i <= 0x24; i++)
 		i915_write_indexed(&regmap, cr_index,
 		    cr_data, i, s3_priv->saveCR[i]);
 
@@ -421,7 +421,7 @@ i915_restore_vga(struct drm_device *dev)
 
 	/* Attribute controller registers */
 	(void) vga_reg_get8(&regmap, st01); /* switch back to index mode */
-	for (i = 0; i < 20; i++)
+	for (i = 0; i <= 0x14; i++)
 	    i915_write_ar(&regmap, st01, i, s3_priv->saveAR[i], 0);
 	(void) vga_reg_get8(&regmap, st01); /* switch back to index mode */
 	vga_reg_put8(&regmap, VGA_AR_INDEX, s3_priv->saveAR_INDEX | 0x20);
@@ -453,6 +453,9 @@ i915_resume(struct drm_device *dev)
 	 * see pci_pre_resume for detail.
 	 */
 	pci_config_put8(conf_hdl, LBB, s3_priv->saveLBB);
+
+	S3_WRITE(DSPARB, s3_priv->saveDSPARB);
+
 	/* 
 	 * Pipe & plane A info
 	 * Prime the clock
@@ -570,7 +573,8 @@ i915_resume(struct drm_device *dev)
 	drv_usecwait(150);
 
 	 /* Clock gating state */
-	S3_WRITE (DSPCLK_GATE_D, s3_priv->saveDSPCLK_GATE_D);
+	S3_WRITE (D_STATE, s3_priv->saveD_STATE);
+	S3_WRITE (CG_2D_DIS, s3_priv->saveCG_2D_DIS);
 
 	/* Cache mode state */
 	S3_WRITE (CACHE_MODE_0, s3_priv->saveCACHE_MODE_0 | 0xffff0000);
@@ -611,6 +615,9 @@ i915_suspend(struct drm_device *dev)
 	 * So pci config registers are not saved here.
 	 */
 	s3_priv->saveLBB = pci_config_get8(conf_hdl, LBB);
+
+	/* Display arbitration control */
+	s3_priv->saveDSPARB = S3_READ(DSPARB);
 
 	/*
 	 * Pipe & plane A info.
@@ -665,7 +672,7 @@ i915_suspend(struct drm_device *dev)
 	s3_priv->saveDSPBSIZE = S3_READ(DSPBSIZE);
 	s3_priv->saveDSPBPOS = S3_READ(DSPBPOS);
 	s3_priv->saveDSPBBASE = S3_READ(DSPBBASE);
-	if (IS_I965GM(dev) || IS_IGD_GM(dev)) {
+	if (IS_I965GM(dev) || IS_GM45(dev)) {
 		s3_priv->saveDSPBSURF = S3_READ(DSPBSURF);
 		s3_priv->saveDSPBTILEOFF = S3_READ(DSPBTILEOFF);
 	}
@@ -713,7 +720,8 @@ i915_suspend(struct drm_device *dev)
 	s3_priv->saveVGACNTRL = S3_READ(VGACNTRL);
 
 	/* Clock gating state */
-	s3_priv->saveDSPCLK_GATE_D = S3_READ(DSPCLK_GATE_D);
+	s3_priv->saveD_STATE = S3_READ(D_STATE);
+	s3_priv->saveCG_2D_DIS = S3_READ(CG_2D_DIS);
 
 	/* Cache mode state */
 	s3_priv->saveCACHE_MODE_0 = S3_READ(CACHE_MODE_0);
@@ -763,7 +771,8 @@ i915_map_regs(dev_info_t *dip, caddr_t *save_addr, ddi_acc_handle_t *handlep)
 	for (rnumber = 1; rnumber < nregs; rnumber++) {
 		(void) ddi_dev_regsize(dip, rnumber, &size);
 		if ((size == 0x80000) ||
-		    (size == 0x100000))
+		    (size == 0x100000) ||
+		    (size == 0x400000))
 			break;
 	}
 

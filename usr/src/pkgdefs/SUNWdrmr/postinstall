@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # SUNWdrmr postinstall script
 
 PATH=/usr/bin:/usr/sbin:${PATH}
@@ -48,6 +46,10 @@ IGFX_ALIAS="\
 	\"pci8086,29d2\" \
 	\"pci8086,2a02\" \
 	\"pci8086,2a12\" \
+	\"pci8086,2a42\" \
+	\"pci8086,2e02.8086.2e02\" \
+	\"pci8086,2e12\" \
+	\"pci8086,2e22\" \
 	"
 DRVPERM='* 0644 root sys'
 

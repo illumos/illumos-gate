@@ -33,8 +33,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "drmP.h"
 #include "drm.h"
 #include "i915_drm.h"
@@ -194,7 +192,7 @@ static int i915_initialize(drm_device_t * dev,
 	dev_priv->allow_batchbuffer = 1;
 
 	
-	if (!IS_G33(dev)) {
+	if (!I915_NEED_GFX_HWS(dev)) {
 		/* Program Hardware Status Page */
 		dev_priv->status_page_dmah =
 		    drm_pci_alloc(dev, PAGE_SIZE, PAGE_SIZE,
@@ -253,7 +251,10 @@ static int i915_dma_resume(drm_device_t * dev)
 	}
 	DRM_DEBUG("hw status page @ %p\n", dev_priv->hw_status_page);
 
-	I915_WRITE(0x02080, dev_priv->dma_status_page);
+	if (!I915_NEED_GFX_HWS(dev))
+		I915_WRITE(0x02080, dev_priv->dma_status_page);
+	else
+		I915_WRITE(0x02080, dev_priv->status_gfx_addr);
 	DRM_DEBUG("Enabled hardware status page\n");
 
 	return 0;
@@ -458,7 +459,7 @@ static void i915_emit_breadcrumb(drm_device_t *dev)
 
 	BEGIN_LP_RING(4);
 	OUT_RING(CMD_STORE_DWORD_IDX);
-	OUT_RING(20);
+	OUT_RING(BREADCRUMB_OFFSET << 2);
 	OUT_RING(dev_priv->counter);
 	OUT_RING(0);
 	ADVANCE_LP_RING();
@@ -605,7 +606,7 @@ static int i915_dispatch_flip(drm_device_t * dev)
 
 	BEGIN_LP_RING(4);
 	OUT_RING(CMD_STORE_DWORD_IDX);
-	OUT_RING(20);
+	OUT_RING(BREADCRUMB_OFFSET << 2);
 	OUT_RING(dev_priv->counter);
 	OUT_RING(0);
 	ADVANCE_LP_RING();
@@ -849,6 +850,9 @@ static int i915_set_status_page(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	drm_i915_hws_addr_t hws;
+
+	if (!I915_NEED_GFX_HWS(dev))
+		return (EINVAL);
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);

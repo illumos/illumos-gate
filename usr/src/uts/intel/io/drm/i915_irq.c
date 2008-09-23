@@ -33,8 +33,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "drmP.h"
 #include "drm.h"
 #include "i915_drm.h"
@@ -297,7 +295,7 @@ int i915_emit_irq(drm_device_t * dev)
 
 	BEGIN_LP_RING(6);
 	OUT_RING(CMD_STORE_DWORD_IDX);
-	OUT_RING(20);
+	OUT_RING(BREADCRUMB_OFFSET << 2);
 	OUT_RING(dev_priv->counter);
 
 	OUT_RING(0);

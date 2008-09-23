@@ -37,8 +37,6 @@
 #ifndef _I915_DRV_H
 #define _I915_DRV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* General customization:
  */
 
@@ -102,6 +100,7 @@ typedef struct s3_i915_private {
 	uint8_t saveLBB;
 	uint32_t saveDSPACNTR;
 	uint32_t saveDSPBCNTR;
+	uint32_t saveDSPARB;
 	uint32_t savePIPEACONF;
 	uint32_t savePIPEBCONF;
 	uint32_t savePIPEASRC;
@@ -168,7 +167,8 @@ typedef struct s3_i915_private {
 	uint32_t saveIER;
 	uint32_t saveIIR;
 	uint32_t saveIMR;
-	uint32_t saveDSPCLK_GATE_D;
+	uint32_t saveD_STATE;
+	uint32_t saveCG_2D_DIS;
 	uint32_t saveMI_ARB_STATE;
 	uint32_t savePIPEASTAT;
 	uint32_t savePIPEBSTAT;
@@ -178,12 +178,12 @@ typedef struct s3_i915_private {
 	uint32_t saveSWF2[3];
 	uint8_t saveMSR;
 	uint8_t saveSR[8];
-	uint8_t saveGR[24];
+	uint8_t saveGR[25];
 	uint8_t saveAR_INDEX;
-	uint8_t saveAR[20];
+	uint8_t saveAR[21];
 	uint8_t saveDACMASK;
 	uint8_t saveDACDATA[256*3]; /* 256 3-byte colors */
-	uint8_t saveCR[36];
+	uint8_t saveCR[37];
 } s3_i915_private_t;
 
 typedef struct drm_i915_private {
@@ -514,7 +514,8 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
 #define CMD_OP_DESTBUFFER_INFO	 ((0x3<<29)|(0x1d<<24)|(0x8e<<16)|1)
 
-#define READ_BREADCRUMB(dev_priv)  (((volatile u32*)(dev_priv->hw_status_page))[5])
+#define BREADCRUMB_OFFSET          32  /* dword offset 20h */
+#define READ_BREADCRUMB(dev_priv)  (((volatile u32*)(dev_priv->hw_status_page))[BREADCRUMB_OFFSET])
 #define READ_HWSP(dev_priv, reg)  (((volatile u32*)(dev_priv->hw_status_page))[reg])
 
 /*
@@ -640,7 +641,10 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define FPB0            0x06048
 #define FPB1            0x0604c
 
-#define DSPCLK_GATE_D   0x6200
+#define D_STATE         0x6104
+#define CG_2D_DIS       0x6200
+#define CG_3D_DIS       0x6204
+
 #define MI_ARB_STATE    0x20e4
 
 /*
@@ -814,6 +818,8 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define FBC_LL_SIZE             (1536)
 #define FBC_LL_PAD              (32)
 
+#define	DSPARB                  0x70030
+
 /*
  * Some BIOS scratch area registers.  The 845 (and 830?) store the amount
  * of video memory available to the BIOS in SWF1.
@@ -846,6 +852,9 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define	PCI_DEVICE_ID_INTEL_82Q35_IG	0x29b2
 #define	PCI_DEVICE_ID_INTEL_82Q33_IG	0x29d2
 #define	PCI_DEVICE_ID_INTEL_CANTIGA_IG	0x2a42
+#define	PCI_DEVICE_ID_INTEL_EL_IG	0x2e02
+#define	PCI_DEVICE_ID_INTEL_82Q45_IG	0x2e12
+#define	PCI_DEVICE_ID_INTEL_82G45_IG	0x2e22
 
 
 #define IS_I830(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82830_CGC)
@@ -864,20 +873,30 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q963_IG || \
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G965_IG || \
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_GM965_IG || \
-                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_GME965_IG)
+                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_GME965_IG || \
+                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_CANTIGA_IG || \
+                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_EL_IG || \
+                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q45_IG || \
+                       (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G45_IG)
 
 #define IS_I965GM(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_GM965_IG)
+
+#define IS_GM45(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_CANTIGA_IG)
+
+#define IS_G4X(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_EL_IG || \
+                     (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q45_IG || \
+                     (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G45_IG)
 
 #define IS_G33(dev)    ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82G33_IG ||  \
                         (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q35_IG || \
                         (dev)->pci_device == PCI_DEVICE_ID_INTEL_82Q33_IG)
 
 #define IS_I9XX(dev) (IS_I915G(dev) || IS_I915GM(dev) || IS_I945G(dev) || \
-                      IS_I945GM(dev) || IS_I965G(dev))
+                      IS_I945GM(dev) || IS_I965G(dev) || IS_G33(dev))
 
 #define IS_MOBILE(dev) (IS_I830(dev) || IS_I85X(dev) || IS_I915GM(dev) || \
-                        IS_I945GM(dev) || IS_I965GM(dev))
+                        IS_I945GM(dev) || IS_I965GM(dev) || IS_GM45(dev))
 
-#define IS_IGD_GM(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_CANTIGA_IG)
+#define I915_NEED_GFX_HWS(dev) (IS_G33(dev) || IS_GM45(dev) || IS_G4X(dev))
 
 #endif /* _I915_DRV_H */

@@ -101,13 +101,18 @@ int agpm_debug = 0;
 	(agpmaster->agpm_id == INTEL_IGD_965G2) || \
 	(agpmaster->agpm_id == INTEL_IGD_965GM) || \
 	(agpmaster->agpm_id == INTEL_IGD_965GME) || \
-	(agpmaster->agpm_id == INTEL_IGD_GM45))
+	(agpmaster->agpm_id == INTEL_IGD_GM45) || \
+	IS_INTEL_G4X(agpmaster))
 
 /* Intel G33 series */
 #define	IS_INTEL_X33(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_Q35) || \
 	(agpmaster->agpm_id == INTEL_IGD_G33) || \
 	(agpmaster->agpm_id == INTEL_IGD_Q33))
 
+/* Intel G4X series */
+#define	IS_INTEL_G4X(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_EL) || \
+	(agpmaster->agpm_id == INTEL_IGD_Q45) || \
+	(agpmaster->agpm_id == INTEL_IGD_G45))
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces"
@@ -301,7 +306,8 @@ set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster,
 		    &MMIO_BASE(agpmaster), 0, 0, &i8xx_dev_access,
 		    &MMIO_HANDLE(agpmaster));
 		CHECK_STATUS(status);
-		if (agpmaster->agpm_id == INTEL_IGD_GM45)
+		if ((agpmaster->agpm_id == INTEL_IGD_GM45) ||
+		    IS_INTEL_G4X(agpmaster))
 			GTT_ADDR(agpmaster) =
 			    MMIO_BASE(agpmaster) + GM45_GTT_OFFSET;
 		else
@@ -637,6 +643,9 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_G33:
 	case INTEL_IGD_Q33:
 	case INTEL_IGD_GM45:
+	case INTEL_IGD_EL:
+	case INTEL_IGD_Q45:
+	case INTEL_IGD_G45:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */
