@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/inline.h>
@@ -148,6 +147,16 @@ struct i8042_port {
 	int			rptr;
 	int			overruns;
 	unsigned char		buf[BUFSIZ];
+
+	/*
+	 * Used during i8042_rep_put8 to intercept the 8042 response in
+	 * i8042_intr()
+	 */
+	boolean_t		intercept_complete;
+	boolean_t		intr_intercept_enabled;
+	uint8_t			intercept;
+	kcondvar_t		intercept_cv;
+	kmutex_t		intercept_mutex;
 };
 
 /*
@@ -173,6 +182,14 @@ struct i8042 {
 #ifdef __sparc
 	timeout_id_t		timeout_id;
 #endif
+#ifdef DEBUG
+	/*
+	 * intr_thread is set to curthread in i8042_intr and is
+	 * tested against curthread in i8402_rep_put8().
+	 */
+	kthread_t		*intr_thread;
+#endif
+	ddi_softint_handle_t	intercept_sih;
 };
 
 /*
@@ -378,8 +395,13 @@ static unsigned int i8042_intr(caddr_t arg);
 static void i8042_write_command_byte(struct i8042 *, unsigned char);
 static uint8_t i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr);
 static void i8042_put8(ddi_acc_impl_t *handlep, uint8_t *addr,
-	uint8_t value);
+    uint8_t value);
+static void i8042_put8_nolock(ddi_acc_impl_t *handlep, uint8_t *addr,
+    uint8_t value);
+static void i8042_rep_put8(ddi_acc_impl_t *handlep, uint8_t *haddr,
+    uint8_t *daddr, size_t repcount, uint_t flags);
 static void i8042_send(struct i8042 *global, int reg, unsigned char cmd);
+static uint_t i8042_intercept_softint(caddr_t arg1, caddr_t arg2);
 
 unsigned int i8042_unclaimed_interrupts = 0;
 
@@ -465,13 +487,18 @@ i8042_cleanup(struct i8042 *global)
 		}
 	}
 
+	(void) ddi_intr_remove_softint(global->intercept_sih);
+
+
 	if (global->init_state & I8042_INIT_MUTEXES) {
-#ifndef USE_SOFT_INTRS
 		for (which_port = 0; which_port < NUM_PORTS; which_port++) {
+#ifndef USE_SOFT_INTRS
 			port = &global->i8042_ports[which_port];
 			mutex_destroy(&port->intr_mutex);
-		}
 #endif
+			mutex_destroy(&port->intercept_mutex);
+			cv_destroy(&port->intercept_cv);
+		}
 		mutex_destroy(&global->i8042_out_mutex);
 		mutex_destroy(&global->i8042_mutex);
 	}
@@ -543,6 +570,9 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	struct i8042_port	*port;
 	enum i8042_ports	which_port;
 	int			i;
+#if !defined(USE_SOFT_INTRS)
+	ddi_iblock_cookie_t	cookie;
+#endif
 	static ddi_device_acc_attr_t attr = {
 		DDI_DEVICE_ATTR_V0,
 		DDI_NEVERSWAP_ACC,
@@ -654,21 +684,33 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		port->initialized = B_FALSE;
 		port->i8042_global = global;
 		port->which = which_port;
+		port->intr_intercept_enabled = B_FALSE;
+		cv_init(&port->intercept_cv, NULL, CV_DRIVER, NULL);
 #if defined(USE_SOFT_INTRS)
 		port->soft_hdl = 0;
 #else
+
+		mutex_init(&port->intercept_mutex, NULL, MUTEX_DRIVER,
+		    (void *)DDI_INTR_SOFTPRI_DEFAULT);
+
 		/*
 		 * Assume that the interrupt block cookie for port <n>
 		 * is iblock_cookies[<n>] (a 1:1 mapping).  If there are not
 		 * enough interrupts to cover the number of ports, use
 		 * the cookie from interrupt 0.
 		 */
-		if (global->nintrs > 0)
+		if (global->nintrs > 0) {
+			cookie = global->iblock_cookies[
+			    (which_port < global->nintrs) ? which_port : 0];
+
 			mutex_init(&port->intr_mutex, NULL, MUTEX_DRIVER,
-			    global->iblock_cookies[(which_port < global->nintrs)
-			    ? which_port : 0]);
-		else
+			    cookie);
+
+		} else {
 			mutex_init(&port->intr_mutex, NULL, MUTEX_DRIVER, NULL);
+			mutex_init(&port->intercept_mutex, NULL, MUTEX_DRIVER,
+			    NULL);
+		}
 
 #endif
 	}
@@ -695,6 +737,12 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Discard any junk data that may have been left around */
 	if (i8042_purge_outbuf(global) != 0)
+		goto fail;
+
+
+	if (ddi_intr_add_softint(dip, &global->intercept_sih,
+	    DDI_INTR_SOFTPRI_DEFAULT, i8042_intercept_softint, global)
+	    != DDI_SUCCESS)
 		goto fail;
 
 	/*
@@ -891,7 +939,7 @@ i8042_map(
 		handle->ah_addr = 0;
 		ap = (ddi_acc_impl_t *)handle->ah_platform_private;
 		/*
-		 * Only single get/put 8 is supported on this "bus".
+		 * Support get8, put8 and _rep_put8
 		 */
 		ap->ahi_put8 = i8042_put8;
 		ap->ahi_get8 = i8042_get8;
@@ -901,7 +949,7 @@ i8042_map(
 		ap->ahi_get32 = NULL;
 		ap->ahi_put64 = NULL;
 		ap->ahi_get64 = NULL;
-		ap->ahi_rep_put8 = NULL;
+		ap->ahi_rep_put8 = i8042_rep_put8;
 		ap->ahi_rep_get8 = NULL;
 		ap->ahi_rep_put16 = NULL;
 		ap->ahi_rep_get16 = NULL;
@@ -976,6 +1024,9 @@ i8042_intr(caddr_t arg)
 	int			new_wptr;
 	struct i8042_port	*port;
 
+#ifdef DEBUG
+	global->intr_thread = curthread;
+#endif
 	mutex_enter(&global->i8042_mutex);
 
 	stat = ddi_get8(global->io_handle, global->io_addr + I8042_STAT);
@@ -983,6 +1034,9 @@ i8042_intr(caddr_t arg)
 	if (! (stat & I8042_STAT_OUTBF)) {
 		++i8042_unclaimed_interrupts;
 		mutex_exit(&global->i8042_mutex);
+#ifdef DEBUG
+		global->intr_thread = NULL;
+#endif
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -994,6 +1048,25 @@ i8042_intr(caddr_t arg)
 
 	if (! port->initialized) {
 		mutex_exit(&global->i8042_mutex);
+#ifdef DEBUG
+		global->intr_thread = NULL;
+#endif
+		return (DDI_INTR_CLAIMED);
+	}
+
+	/*
+	 * If interception is enabled, and the byte matches what is being
+	 * waited for, clear the interception flag and trigger a softintr
+	 * that will signal the waiter, then exit the interrupt handler
+	 * without passing the byte to the child's interrupt handler.
+	 */
+	if (port->intr_intercept_enabled && port->intercept == byte) {
+		port->intr_intercept_enabled = B_FALSE;
+		(void) ddi_intr_trigger_softint(global->intercept_sih, port);
+		mutex_exit(&global->i8042_mutex);
+#ifdef DEBUG
+		global->intr_thread = NULL;
+#endif
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -1006,7 +1079,12 @@ i8042_intr(caddr_t arg)
 			    which_port, port->overruns);
 		}
 #endif
+
 		mutex_exit(&global->i8042_mutex);
+
+#ifdef DEBUG
+		global->intr_thread = NULL;
+#endif
 		return (DDI_INTR_CLAIMED);
 	}
 
@@ -1028,6 +1106,9 @@ i8042_intr(caddr_t arg)
 	mutex_exit(&port->intr_mutex);
 #endif
 
+#ifdef DEBUG
+	global->intr_thread = NULL;
+#endif
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -1222,8 +1303,140 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 	return (ret);
 }
 
+/*
+ * The _rep_put8() operation is designed to allow child drivers to
+ * execute commands that have responses or that have responses plus an
+ * option byte.  These commands need to be executed atomically with respect
+ * to commands from other children (some 8042 implementations get confused
+ * when other child devices intersperse their commands while a command
+ * to a different 8042-connected device is in flight).
+ *
+ * haddr points to a buffer with either 2 or 3 bytes.  Two bytes if a
+ * command is being sent for which we expect a response code (this function
+ * blocks until we either read that response code or until a timer expires).
+ * Three if the command requires a response and then an option byte.  The
+ * option byte is only sent iff the response code expected is received before
+ * the timeout.
+ *
+ * While this function may technically called in interrupt context, it may
+ * block (depending on the IPL of the i8042 interrupt handler vs. the handler
+ * executing) for as long as the timeout (and fail if i8042_intr cannot run).
+ *
+ * flags are ignored.
+ *
+ */
+/*ARGSUSED*/
 static void
-i8042_put8(ddi_acc_impl_t *handlep, uint8_t *addr, uint8_t value)
+i8042_rep_put8(ddi_acc_impl_t *handlep, uint8_t *haddr, uint8_t *daddr,
+    size_t repcount, uint_t flags)
+{
+	struct i8042_port	*port;
+	struct i8042		*global;
+	uint8_t			*oaddr;
+	uintptr_t		devaddr = (uintptr_t)daddr;
+	int			timedout = 0;
+	boolean_t		polled;
+	ddi_acc_hdl_t		*h;
+	clock_t			tval;
+
+	h = (ddi_acc_hdl_t *)handlep;
+
+	port = (struct i8042_port *)h->ah_bus_private;
+	global = port->i8042_global;
+
+	/*
+	 * If this function is called, somehow, while we're in i8042_intr,
+	 * the logic below will not work.  That situation should never be
+	 * possible.
+	 */
+	ASSERT(global->intr_thread != curthread);
+
+	/*
+	 * Only support the main port for now
+	 */
+	if (port->which != MAIN_PORT || (devaddr != I8042_INT_CMD_PLUS_PARAM &&
+	    devaddr != I8042_POLL_CMD_PLUS_PARAM)) {
+#ifdef DEBUG
+		prom_printf("WARNING: i8042_rep_put8(): port or address "
+		    "invalid\n");
+#endif
+		return;
+	}
+
+	/*
+	 * Only support commands with MAX one parameter.  The format of the
+	 * buffer supplied must be { <CMD>, <CMD_OK_RESPONSE>[, <PARAMETER>] }
+	 */
+	if (repcount != 2 && repcount != 3) {
+#ifdef DEBUG
+		prom_printf("WARNING: i8042_rep_put8(): Invalid repetition "
+		    "count (%d)\n", (int)repcount);
+#endif
+		return;
+	}
+
+	polled = (devaddr == I8042_POLL_CMD_PLUS_PARAM);
+
+	if (polled) {
+		oaddr = (uint8_t *)I8042_POLL_OUTPUT_DATA;
+	} else {
+		oaddr = (uint8_t *)I8042_INT_OUTPUT_DATA;
+		/*
+		 * Mutexes are only required for the non-polled (polled
+		 * via the virtual registers, NOT via the polling mechanism
+		 * used for systems without 8042 interrupts) case, because
+		 * when polling is used, the system is single-threaded
+		 * with interrupts disabled.
+		 */
+		mutex_enter(&global->i8042_out_mutex);
+	}
+
+	mutex_enter(&port->intercept_mutex);
+
+	/*
+	 * Intercept the command response so that the 8042 interrupt handler
+	 * does not call the port's interrupt handler.
+	 */
+	port->intercept = haddr[1];
+	port->intercept_complete = B_FALSE;
+	port->intr_intercept_enabled = B_TRUE;
+
+	i8042_put8_nolock(handlep, oaddr, haddr[0]);
+
+	/*
+	 * Wait for the command response
+	 */
+	tval = ddi_get_lbolt() + drv_usectohz(MAX_WAIT_ITERATIONS *
+	    USECS_PER_WAIT);
+
+	while (!port->intercept_complete) {
+		if (cv_timedwait(&port->intercept_cv, &port->intercept_mutex,
+		    tval) < 0 && !port->intercept_complete) {
+			timedout = 1;
+			break;
+		}
+	}
+
+	port->intr_intercept_enabled = B_FALSE;
+
+	mutex_exit(&port->intercept_mutex);
+
+	if (!timedout && repcount == 3) {
+		i8042_put8_nolock(handlep, oaddr, haddr[2]);
+	}
+
+#ifdef DEBUG
+	if (timedout)
+		prom_printf("WARNING: i8042_rep_put8(): timed out waiting for "
+		    "command response\n");
+#endif
+
+	if (!polled)
+		mutex_exit(&global->i8042_out_mutex);
+}
+
+static void
+i8042_put8_nolock(ddi_acc_impl_t *handlep, uint8_t *addr, uint8_t value)
 {
 	struct i8042_port *port;
 	struct i8042 *global;
@@ -1238,18 +1451,42 @@ i8042_put8(ddi_acc_impl_t *handlep, uint8_t *addr, uint8_t value)
 	case I8042_INT_OUTPUT_DATA:
 	case I8042_POLL_OUTPUT_DATA:
 
-		if ((uintptr_t)addr == I8042_INT_OUTPUT_DATA)
-			mutex_enter(&global->i8042_out_mutex);
-
 		if (port->which == AUX_PORT)
 			i8042_send(global, I8042_CMD, I8042_CMD_WRITE_AUX);
 
 		i8042_send(global, I8042_DATA, value);
 
+		break;
+	}
+}
+
+static void
+i8042_put8(ddi_acc_impl_t *handlep, uint8_t *addr, uint8_t value)
+{
+	struct i8042 *global;
+	ddi_acc_hdl_t	*h;
+
+	h = (ddi_acc_hdl_t *)handlep;
+	global = ((struct i8042_port *)h->ah_bus_private)->i8042_global;
+
+	switch ((uintptr_t)addr) {
+	case I8042_INT_OUTPUT_DATA:
+	case I8042_POLL_OUTPUT_DATA:
+
+		if ((uintptr_t)addr == I8042_INT_OUTPUT_DATA)
+			mutex_enter(&global->i8042_out_mutex);
+
+		i8042_put8_nolock(handlep, addr, value);
+
 		if ((uintptr_t)addr == I8042_INT_OUTPUT_DATA)
 			mutex_exit(&global->i8042_out_mutex);
+
 		break;
 
+	case I8042_INT_CMD_PLUS_PARAM:
+	case I8042_POLL_CMD_PLUS_PARAM:
+
+		break;
 
 #if defined(DEBUG)
 	case I8042_INT_INPUT_AVAIL:
@@ -1606,3 +1843,25 @@ i8042_is_polling_platform(void)
 		return (B_FALSE);
 }
 #endif
+
+/*
+ * arg1 is the global i8042 state pointer (not used)
+ * arg2 is the port pointer for the intercepted port
+ */
+/*ARGSUSED*/
+static uint_t
+i8042_intercept_softint(caddr_t arg1, caddr_t arg2)
+{
+	struct i8042_port *port = (struct i8042_port *)arg2;
+	ASSERT(port != NULL);
+
+	mutex_enter(&port->intercept_mutex);
+	if (!port->intercept_complete) {
+		port->intercept_complete = B_TRUE;
+		cv_signal(&port->intercept_cv);
+		mutex_exit(&port->intercept_mutex);
+		return (DDI_INTR_CLAIMED);
+	}
+	mutex_exit(&port->intercept_mutex);
+	return (DDI_INTR_UNCLAIMED);
+}

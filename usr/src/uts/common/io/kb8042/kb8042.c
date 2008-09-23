@@ -27,7 +27,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/inline.h>
@@ -143,8 +142,6 @@ enum state_return { STATE_NORMAL, STATE_INTERNAL };
 static void kb8042_init(struct kb8042 *kb8042, boolean_t from_resume);
 static uint_t kb8042_intr(caddr_t arg);
 static void kb8042_wait_poweron(struct kb8042 *kb8042);
-static void kb8042_start_state_machine(struct kb8042 *, boolean_t);
-static enum state_return kb8042_state_machine(struct kb8042 *, int, boolean_t);
 static void kb8042_send_to_keyboard(struct kb8042 *, int, boolean_t);
 static int kb8042_xlate_leds(int);
 static void kb8042_setled(struct kb8042 *, int led_state, boolean_t polled);
@@ -251,7 +248,7 @@ struct dev_ops kb8042_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a driver */
-	"PS/2 Keyboard",
+	"PS/2 keyboard driver",
 	&kb8042_ops,	/* driver ops */
 };
 
@@ -373,8 +370,8 @@ kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
 	}
 
 	/*
-	 * Send a 0.  The keyboard should ACK the 0, then it send the scan code
-	 * set in use.
+	 * Send a 0.  The keyboard should ACK the 0, then it should send the
+	 * scan code set in use.
 	 */
 	if (kb8042_send_and_expect(kb8042, 0, KB_ACK, polled,
 	    MAX_WAIT_USECS, &err, &got) != B_TRUE) {
@@ -544,7 +541,7 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ddi_report_dev(devi);
 
 #ifdef	KD_DEBUG
-	cmn_err(CE_CONT, "?%s #%d\n",
+	cmn_err(CE_CONT, "?%s instance #%d READY\n",
 	    DRIVER_NAME(devi), ddi_get_instance(devi));
 #endif
 
@@ -659,7 +656,6 @@ kb8042_init(struct kb8042 *kb8042, boolean_t from_resume)
 	kb8042->kb_old_key_pos = 0;
 
 	/* Set up the command state machine and start it running. */
-	kb8042->command_state = KB_COMMAND_STATE_WAIT;
 	kb8042_send_to_keyboard(kb8042, KB_ENABLE, B_FALSE);
 
 	kb8042->w_init++;
@@ -1186,17 +1182,6 @@ kb8042_intr(caddr_t arg)
 			prom_printf(" <K:%x ", scancode);
 #endif
 
-		mutex_enter(&kb8042->w_hw_mutex);
-
-		if (kb8042_state_machine(kb8042, scancode, B_FALSE) !=
-		    STATE_NORMAL) {
-			mutex_exit(&kb8042->w_hw_mutex);
-			continue;
-		}
-
-
-		mutex_exit(&kb8042->w_hw_mutex);
-
 		kb8042_received_byte(kb8042, scancode);
 	}
 
@@ -1258,11 +1243,6 @@ kb8042_polled_keycheck(
 			prom_printf(" g<%x ", scancode);
 #endif
 
-		if (kb8042_state_machine(kb8042, scancode, B_FALSE) !=
-		    STATE_NORMAL) {
-			continue;
-		}
-
 #ifdef	KD_DEBUG
 		kb8042_debug_hotkey(scancode);
 		if (kb8042_getchar_debug)
@@ -1320,7 +1300,9 @@ kb8042_setled(struct kb8042 *kb8042, int led_state, boolean_t polled)
 	if (!polled)
 		mutex_enter(&kb8042->w_hw_mutex);
 
-	kb8042_start_state_machine(kb8042, polled);
+	if (kb8042->leds.desired != kb8042->leds.commanded) {
+		kb8042_send_to_keyboard(kb8042, KB_SET_LED, polled);
+	}
 
 	if (!polled)
 		mutex_exit(&kb8042->w_hw_mutex);
@@ -1343,12 +1325,59 @@ kb8042_streams_setled(struct kbtrans_hardware *hw, int led_state)
 static void
 kb8042_send_to_keyboard(struct kb8042 *kb8042, int byte, boolean_t polled)
 {
-	if (polled) {
-		ddi_put8(kb8042->handle,
-		    kb8042->addr + I8042_POLL_OUTPUT_DATA, byte);
+	uint8_t led_cmd[3];
+
+	/*
+	 * KB_SET_LED and KB_ENABLE are special commands for which the nexus
+	 * driver is requested to wait for responses before proceeding.
+	 * KB_SET_LED also provides an option byte for the nexus to send to
+	 * the keyboard after the acknowledgement.
+	 *
+	 * Other commands/data are sent using the single put8 I/O access
+	 * function.
+	 */
+	if (byte == KB_SET_LED) {
+		/*
+		 * Initialize the buffer used with _rep_put8.  We
+		 * expect an ACK after the SET_LED command, at which point
+		 * the LED byte should be sent to the keyboard.
+		 */
+		led_cmd[0] = KB_SET_LED;
+		led_cmd[1] = KB_ACK;
+		led_cmd[2] = kb8042_xlate_leds(kb8042->leds.desired);
+		if (polled) {
+			ddi_rep_put8(kb8042->handle, &led_cmd[0],
+			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 3, 0);
+		} else {
+			ddi_rep_put8(kb8042->handle, &led_cmd[0],
+			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 3, 0);
+		}
+		kb8042->leds.commanded = kb8042->leds.desired;
+
+	} else if (byte == KB_ENABLE) {
+
+		/*
+		 * Initialize the buffer used with _rep_put8.  We
+		 * expect an ACK after the KB_ENABLE command.
+		 */
+		led_cmd[0] = KB_ENABLE;
+		led_cmd[1] = KB_ACK;
+		if (polled) {
+			ddi_rep_put8(kb8042->handle, &led_cmd[0],
+			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 2, 0);
+		} else {
+			ddi_rep_put8(kb8042->handle, &led_cmd[0],
+			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 2, 0);
+		}
 	} else {
-		ddi_put8(kb8042->handle,
-		    kb8042->addr + I8042_INT_OUTPUT_DATA, byte);
+		/* All other commands use the "normal" virtual output port */
+		if (polled) {
+			ddi_put8(kb8042->handle,
+			    kb8042->addr + I8042_POLL_OUTPUT_DATA, byte);
+		} else {
+			ddi_put8(kb8042->handle,
+			    kb8042->addr + I8042_INT_OUTPUT_DATA, byte);
+		}
 	}
 
 #if	defined(KD_DEBUG)
@@ -1397,48 +1426,6 @@ kb8042_wait_poweron(struct kb8042 *kb8042)
 	}
 }
 
-static void
-kb8042_start_state_machine(struct kb8042 *kb8042, boolean_t polled)
-{
-	if (kb8042->command_state == KB_COMMAND_STATE_IDLE) {
-		if (kb8042->leds.desired != kb8042->leds.commanded) {
-			kb8042_send_to_keyboard(kb8042, KB_SET_LED, polled);
-			kb8042->command_state = KB_COMMAND_STATE_LED;
-		}
-	}
-}
-
-enum state_return
-kb8042_state_machine(struct kb8042 *kb8042, int scancode, boolean_t polled)
-{
-	switch (kb8042->command_state) {
-	case KB_COMMAND_STATE_IDLE:
-		break;
-
-	case KB_COMMAND_STATE_LED:
-		if (scancode == KB_ACK) {
-			kb8042_send_to_keyboard(kb8042,
-			    kb8042_xlate_leds(kb8042->leds.desired),
-			    polled);
-			kb8042->leds.commanded = kb8042->leds.desired;
-			kb8042->command_state = KB_COMMAND_STATE_WAIT;
-			return (STATE_INTERNAL);
-		}
-		/* Drop normal scan codes through. */
-		break;
-
-	case KB_COMMAND_STATE_WAIT:
-		if (scancode == KB_ACK) {
-			kb8042->command_state = KB_COMMAND_STATE_IDLE;
-			kb8042_start_state_machine(kb8042, polled);
-			return (STATE_INTERNAL);
-		}
-		/* Drop normal scan codes through. */
-		break;
-	}
-	return (STATE_NORMAL);
-}
-
 static int
 kb8042_xlate_leds(int led)
 {
@@ -1463,7 +1450,7 @@ kb8042_get_initial_leds(
     int *initial_leds,
     int *initial_led_mask)
 {
-#if	defined(i86pc)
+#if defined(__i386) || defined(__amd64)
 	extern caddr_t	p0_va;
 	uint8_t		bios_kb_flag;
 

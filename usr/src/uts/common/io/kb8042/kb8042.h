@@ -24,14 +24,12 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_KB8042_H
 #define	_KB8042_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -90,7 +88,6 @@ struct kb8042 {
 	ddi_acc_handle_t	handle;
 	uint8_t			*addr;
 	int	kb_old_key_pos;	/* scancode for autorepeat filtering */
-	int	command_state;
 	struct {
 		int desired;
 		int commanded;
@@ -117,15 +114,11 @@ struct kb8042 {
 	kcondvar_t	ops_cv;
 };
 
-#define	KB_COMMAND_STATE_IDLE	0
-#define	KB_COMMAND_STATE_LED	1
-#define	KB_COMMAND_STATE_WAIT	2
-
 extern boolean_t KeyboardConvertScan(struct kb8042 *, unsigned char scan,
 			int *keynum, enum keystate *, boolean_t *);
 extern int KeyboardConvertScan_init(struct kb8042 *, int scanset);
 
-#if	defined(i86pc)
+#if defined(__i386) || defined(__amd64)
 /*
  * We pick up the initial state of the keyboard from the BIOS state.
  */
