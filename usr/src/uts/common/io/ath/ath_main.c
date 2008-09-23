@@ -36,6 +36,7 @@
  *
  */
 
+
 /*
  * Driver for the Atheros Wireless LAN controller.
  *
@@ -218,8 +219,13 @@ static int	ath_m_multicst(void *, boolean_t, const uint8_t *);
 static int	ath_m_unicst(void *, const uint8_t *);
 static mblk_t	*ath_m_tx(void *, mblk_t *);
 static void	ath_m_ioctl(void *, queue_t *, mblk_t *);
+static int	ath_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+static int	ath_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *);
+
 static mac_callbacks_t ath_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	ath_m_stat,
 	ath_m_start,
 	ath_m_stop,
@@ -229,7 +235,11 @@ static mac_callbacks_t ath_m_callbacks = {
 	ath_m_tx,
 	NULL,		/* mc_resources; */
 	ath_m_ioctl,
-	NULL		/* mc_getcapab */
+	NULL,		/* mc_getcapab */
+	NULL,
+	NULL,
+	ath_m_setprop,
+	ath_m_getprop
 };
 
 /*
@@ -1736,6 +1746,49 @@ ath_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 
 	ATH_UNLOCK(asc);
 	return (0);
+}
+
+/*
+ * callback functions for /get/set properties
+ */
+static int
+ath_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	ath_t	*asc = arg;
+	int	err;
+
+	err = ieee80211_setprop(&asc->asc_isc, pr_name, wldp_pr_num,
+	    wldp_length, wldp_buf);
+
+	ATH_LOCK(asc);
+
+	if (err == ENETRESET) {
+		if (ATH_IS_RUNNING(asc)) {
+			ATH_UNLOCK(asc);
+			(void) ath_m_start(asc);
+			(void) ieee80211_new_state(&asc->asc_isc,
+			    IEEE80211_S_SCAN, -1);
+			ATH_LOCK(asc);
+		}
+		err = 0;
+	}
+
+	ATH_UNLOCK(asc);
+
+	return (err);
+}
+static int
+ath_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+{
+	ath_t	*asc = arg;
+	int	err = 0;
+
+	err = ieee80211_getprop(&asc->asc_isc, pr_name, wldp_pr_num,
+	    pr_flags, wldp_length, wldp_buf);
+
+	return (err);
 }
 
 static void

@@ -4480,6 +4480,19 @@ skip:
 		return ("");
 }
 
+static boolean_t
+linkprop_is_supported(datalink_id_t  linkid, const char *propname,
+    show_linkprop_state_t *statep)
+{
+	dladm_status_t	status;
+	uint_t		valcnt = DLADM_MAX_PROP_VALCNT;
+
+	status = dladm_get_linkprop(linkid, DLADM_PROP_VAL_DEFAULT,
+	    propname, statep->ls_propvals, &valcnt);
+
+	return (status != DLADM_STATUS_NOTSUP);
+}
+
 static int
 show_linkprop(datalink_id_t linkid, const char *propname, void *arg)
 {
@@ -4496,6 +4509,9 @@ show_linkprop(datalink_id_t linkid, const char *propname, void *arg)
 		if (!statep->ls_parseable)
 			print_header(&statep->ls_print);
 	}
+	if (!linkprop_is_supported(linkid, propname, statep))
+		return (DLADM_WALK_CONTINUE);
+
 	dladm_print_output(&statep->ls_print, statep->ls_parseable,
 	    linkprop_callback, (void *)&ls_arg);
 
@@ -5851,7 +5867,6 @@ show_ether_xprop(datalink_id_t linkid, void *arg)
 	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
 	    "%s", "peeradv");
 	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
-
 	(void) dladm_get_single_mac_stat(linkid, "lp_cap_autoneg",
 	    KSTAT_DATA_UINT32, &autoneg);
 	(void) snprintf(ebuf.eth_autoneg, sizeof (ebuf.eth_autoneg),

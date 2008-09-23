@@ -31,6 +31,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -43,6 +44,34 @@
 #include <sys/mac.h>
 #include <inet/wifi_ioctl.h>
 #include "net80211_impl.h"
+
+static int wl_set_essid(struct ieee80211com *, const void *);
+static void wl_get_essid(struct ieee80211com *, void *);
+static int wl_set_bssid(struct ieee80211com *, const void *);
+static void wl_get_bssid(struct ieee80211com *, void *);
+static int wl_set_bsstype(struct ieee80211com *, const void *);
+static void wl_get_bsstype(struct ieee80211com *, void *);
+static void wl_get_linkstatus(struct ieee80211com *, void *);
+static int wl_set_desrates(struct ieee80211com *, const void *);
+static void wl_get_desrates(struct ieee80211com *, void *);
+static int wl_set_authmode(struct ieee80211com *, const void *);
+static void wl_get_authmode(struct ieee80211com *, void *);
+static int wl_set_encrypt(struct ieee80211com *, const void *);
+static void wl_get_encrypt(struct ieee80211com *, void *);
+static void wl_get_rssi(struct ieee80211com *, void *);
+static int wl_set_phy(struct ieee80211com *, const void *);
+static int wl_get_phy(struct ieee80211com *, void *);
+static void wl_get_capability(struct ieee80211com *, void *);
+static int wl_set_wpa(struct ieee80211com *, const void *);
+static void wl_get_wpa(struct ieee80211com *, void *);
+static void wl_get_scanresults(struct ieee80211com *, void *);
+static void wl_get_esslist(struct ieee80211com *, void *);
+static int wl_set_wepkey(struct ieee80211com *, const void *);
+static int wl_set_optie(struct ieee80211com *, const void *);
+static int wl_set_delkey(struct ieee80211com *, const void *);
+static int wl_set_mlme(struct ieee80211com *, const void *);
+static int wl_set_wpakey(struct ieee80211com *, const void *);
+static void wl_get_suprates(struct ieee80211com *, void *);
 
 static size_t
 wifi_strnlen(const char *s, size_t n)
@@ -105,7 +134,6 @@ wifi_cfg_essid(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wl_essid_t *iw_essid = (wl_essid_t *)inp->wldp_buf;
 	wl_essid_t *ow_essid;
-	char *essid;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, sizeof (wl_essid_t))) == NULL)
@@ -115,35 +143,10 @@ wifi_cfg_essid(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		essid = (char *)ic->ic_des_essid;
-		if (essid[0] == '\0')
-			essid = (char *)ic->ic_bss->in_essid;
-		ow_essid->wl_essid_length = wifi_strnlen((const char *)essid,
-		    IEEE80211_NWID_LEN);
-		bcopy(essid, ow_essid->wl_essid_essid,
-		    ow_essid->wl_essid_length);
+		wl_get_essid(ic, ow_essid);
 		break;
 	case WLAN_SET_PARAM:
-		if (iw_essid->wl_essid_length > IEEE80211_NWID_LEN) {
-			ieee80211_err("wifi_cfg_essid: "
-			    "essid too long, %u, max %u\n",
-			    iw_essid->wl_essid_length, IEEE80211_NWID_LEN);
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-		}
-		essid = iw_essid->wl_essid_essid;
-		essid[IEEE80211_NWID_LEN] = 0;
-		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_essid: "
-		    "set essid=%s length=%d\n",
-		    essid, iw_essid->wl_essid_length);
-
-		ic->ic_des_esslen = iw_essid->wl_essid_length;
-		if (ic->ic_des_esslen != 0)
-			bcopy(essid, ic->ic_des_essid, ic->ic_des_esslen);
-		if (ic->ic_des_esslen < IEEE80211_NWID_LEN)
-			ic->ic_des_essid[ic->ic_des_esslen] = 0;
-		err = ENETRESET;
+		err = wl_set_essid(ic, iw_essid);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_essid: unknown command %x\n", cmd);
@@ -163,7 +166,6 @@ wifi_cfg_bssid(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	mblk_t *omp;
 	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
 	wldp_t *outp;
-	uint8_t *bssid;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, sizeof (wl_bssid_t))) == NULL)
@@ -172,19 +174,13 @@ wifi_cfg_bssid(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case  WLAN_GET_PARAM:
-		if (ic->ic_flags & IEEE80211_F_DESBSSID)
-			bssid = ic->ic_des_bssid;
-		else
-			bssid = ic->ic_bss->in_bssid;
-		bcopy(bssid, outp->wldp_buf, sizeof (wl_bssid_t));
+		wl_get_bssid(ic, outp->wldp_buf);
 		break;
 	case WLAN_SET_PARAM:
+		err = wl_set_bssid(ic, inp->wldp_buf);
 		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_bssid: "
 		    "set bssid=%s\n",
 		    ieee80211_macaddr_sprintf(inp->wldp_buf));
-		bcopy(inp->wldp_buf, ic->ic_des_bssid, sizeof (wl_bssid_t));
-		ic->ic_flags |= IEEE80211_F_DESBSSID;
-		err = ENETRESET;
 		break;
 	default:
 		ieee80211_err("wifi_cfg_bssid: unknown command %x\n", cmd);
@@ -263,7 +259,6 @@ wifi_cfg_phy(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wl_phy_conf_t *iw_phy = (wl_phy_conf_t *)inp->wldp_buf;
 	wl_phy_conf_t *ow_phy;
-	struct ieee80211_channel *ch = ic->ic_curchan;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, sizeof (wl_phy_conf_t))) == NULL)
@@ -272,86 +267,13 @@ wifi_cfg_phy(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	ow_phy = (wl_phy_conf_t *)outp->wldp_buf;
 
 	switch (cmd) {
-	case WLAN_GET_PARAM: {
-		/* get current physical (FH, DS, ERP) parameters */
-		if (IEEE80211_IS_CHAN_A(ch) || IEEE80211_IS_CHAN_T(ch)) {
-			wl_ofdm_t *ofdm = (wl_ofdm_t *)ow_phy;
-
-			ofdm->wl_ofdm_subtype = WL_OFDM;
-			ofdm->wl_ofdm_frequency = ch->ich_freq;
-		} else {
-			switch (ic->ic_phytype) {
-			case IEEE80211_T_FH: {
-				wl_fhss_t *fhss = (wl_fhss_t *)ow_phy;
-
-				fhss->wl_fhss_subtype = WL_FHSS;
-				fhss->wl_fhss_channel =
-				    ieee80211_chan2ieee(ic, ch);
-				break;
-			}
-			case IEEE80211_T_DS: {
-				wl_dsss_t *dsss = (wl_dsss_t *)ow_phy;
-
-				dsss->wl_dsss_subtype = WL_DSSS;
-				dsss->wl_dsss_channel =
-				    ieee80211_chan2ieee(ic, ch);
-				break;
-			}
-			case IEEE80211_T_OFDM: {
-				wl_erp_t *erp = (wl_erp_t *)ow_phy;
-
-				erp->wl_erp_subtype = WL_ERP;
-				erp->wl_erp_channel =
-				    ieee80211_chan2ieee(ic, ch);
-				break;
-			}
-			default:
-				ieee80211_err("wifi_cfg_phy: "
-				    "unknown phy type, %x\n", ic->ic_phytype);
-				outp->wldp_result = WL_HW_ERROR;
-				err = EIO;
-				break;
-			} /* switch (ic->ic_phytype) */
-		}
+	case WLAN_GET_PARAM:
+		err = wl_get_phy(ic, ow_phy);
 		break;
-	}
 
-	case WLAN_SET_PARAM: {
-		wl_dsss_t *dsss = (wl_dsss_t *)iw_phy;
-		int16_t ch = dsss->wl_dsss_channel;
-
-		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_phy: "
-		    "set channel=%d\n", ch);
-		if (ch == 0 || ch == (int16_t)IEEE80211_CHAN_ANY) {
-			ic->ic_des_chan = IEEE80211_CHAN_ANYC;
-		} else if ((uint_t)ch > IEEE80211_CHAN_MAX ||
-		    ieee80211_isclr(ic->ic_chan_active, ch)) {
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-		} else {
-			ic->ic_des_chan = ic->ic_ibss_chan =
-			    &ic->ic_sup_channels[ch];
-		}
-		switch (ic->ic_state) {
-		case IEEE80211_S_INIT:
-		case IEEE80211_S_SCAN:
-			err = ENETRESET;
-			break;
-		default:
-			/*
-			 * If the desired channel has changed (to something
-			 * other than any) and we're not already scanning,
-			 * then kick the state machine.
-			 */
-			if (ic->ic_des_chan != IEEE80211_CHAN_ANYC &&
-			    ic->ic_bss->in_chan != ic->ic_des_chan &&
-			    (ic->ic_flags & IEEE80211_F_SCAN) == 0)
-				err = ENETRESET;
-			break;
-		}
+	case WLAN_SET_PARAM:
+		err = wl_set_phy(ic, iw_phy);
 		break;
-	}
 
 	default:
 		ieee80211_err("wifi_cfg_phy: unknown command %x\n", cmd);
@@ -372,9 +294,6 @@ wifi_cfg_wepkey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
 	wldp_t *outp;
 	wl_wep_key_t *iw_wepkey = (wl_wep_key_t *)inp->wldp_buf;
-	struct ieee80211_key *k;
-	uint16_t i;
-	uint32_t klen;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, 0)) == NULL)
@@ -396,50 +315,7 @@ wifi_cfg_wepkey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 			break;
 		}
 
-		/* set all valid keys */
-		for (i = 0; i < MAX_NWEPKEYS; i++) {
-			if (iw_wepkey[i].wl_wep_operation != WL_ADD)
-				continue;
-			klen = iw_wepkey[i].wl_wep_length;
-			if (klen > IEEE80211_KEYBUF_SIZE) {
-				ieee80211_err("wifi_cfg_wepkey: "
-				    "invalid wepkey length, %u\n", klen);
-				outp->wldp_result = WL_NOTSUPPORTED;
-				err = EINVAL;
-				continue;	/* continue to set other keys */
-			}
-			if (klen == 0)
-				continue;
-
-			/*
-			 * Set key contents. Only WEP is supported
-			 */
-			ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_wepkey: "
-			    "set key %u, len=%u\n", i, klen);
-			k = &ic->ic_nw_keys[i];
-			if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP,
-			    IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV, k) == 0) {
-				ieee80211_err("wifi_cfg_wepkey: "
-				    "abort, create key failed. id=%u\n", i);
-				outp->wldp_result = WL_HW_ERROR;
-				err = EIO;
-				continue;
-			}
-			k->wk_keyix = i;
-			k->wk_keylen = (uint8_t)klen;
-			k->wk_flags |= IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
-			bzero(k->wk_key, IEEE80211_KEYBUF_SIZE);
-			bcopy(iw_wepkey[i].wl_wep_key, k->wk_key, klen);
-			if (ieee80211_crypto_setkey(ic, k, ic->ic_macaddr)
-			    == 0) {
-				ieee80211_err("wifi_cfg_wepkey: "
-				    "set key failed len=%u\n", klen);
-				outp->wldp_result = WL_HW_ERROR;
-				err = EIO;
-			}
-		}
-		if (err == 0)
-			err = ENETRESET;
+		err = wl_set_wepkey(ic, iw_wepkey);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_wepkey: unknown command %x\n", cmd);
@@ -515,27 +391,10 @@ wifi_cfg_authmode(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		*ow_auth = ic->ic_bss->in_authmode;
+		wl_get_authmode(ic, ow_auth);
 		break;
 	case WLAN_SET_PARAM:
-		if (*iw_auth == ic->ic_bss->in_authmode)
-			break;
-
-		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_authmode: "
-		    "set authmode=%u\n", *iw_auth);
-		switch (*iw_auth) {
-		case WL_OPENSYSTEM:
-		case WL_SHAREDKEY:
-			ic->ic_bss->in_authmode = *iw_auth;
-			err = ENETRESET;
-			break;
-		default:
-			ieee80211_err("wifi_cfg_authmode: "
-			    "unknown authmode %u\n", *iw_auth);
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-		}
+		err = wl_set_authmode(ic, iw_auth);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_authmode: unknown command %x\n", cmd);
@@ -557,7 +416,6 @@ wifi_cfg_encrypt(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wl_encryption_t *iw_encryp = (wl_encryption_t *)inp->wldp_buf;
 	wl_encryption_t *ow_encryp;
-	uint32_t flags;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, sizeof (wl_encryption_t))) == NULL)
@@ -567,23 +425,10 @@ wifi_cfg_encrypt(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		*ow_encryp = (ic->ic_flags & IEEE80211_F_PRIVACY) ? 1 : 0;
-		if (ic->ic_flags & IEEE80211_F_WPA)
-			*ow_encryp = WL_ENC_WPA;
+		wl_get_encrypt(ic, ow_encryp);
 		break;
 	case WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_encrypt: "
-		    "set encryption=%u\n", *iw_encryp);
-		flags = ic->ic_flags;
-		if (*iw_encryp == WL_NOENCRYPTION)
-			flags &= ~IEEE80211_F_PRIVACY;
-		else
-			flags |= IEEE80211_F_PRIVACY;
-
-		if (ic->ic_flags != flags) {
-			ic->ic_flags = flags;
-			err = ENETRESET;
-		}
+		err = wl_set_encrypt(ic, iw_encryp);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_encrypt: unknown command %x\n", cmd);
@@ -614,47 +459,10 @@ wifi_cfg_bsstype(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		switch (ic->ic_opmode) {
-		case IEEE80211_M_STA:
-			*ow_opmode = WL_BSS_BSS;
-			break;
-		case IEEE80211_M_IBSS:
-			*ow_opmode = WL_BSS_IBSS;
-			break;
-		default:
-			*ow_opmode = WL_BSS_ANY;
-			break;
-		}
+		wl_get_bsstype(ic, ow_opmode);
 		break;
 	case  WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_bsstype: "
-		    "set bsstype=%u\n", *iw_opmode);
-		switch (*iw_opmode) {
-		case WL_BSS_BSS:
-			ic->ic_flags &= ~IEEE80211_F_IBSSON;
-			ic->ic_opmode = IEEE80211_M_STA;
-			err = ENETRESET;
-			break;
-		case WL_BSS_IBSS:
-			if ((ic->ic_caps & IEEE80211_C_IBSS) == 0) {
-				outp->wldp_result = WL_LACK_FEATURE;
-				err = ENOTSUP;
-				break;
-			}
-
-			if ((ic->ic_flags & IEEE80211_F_IBSSON) == 0) {
-				ic->ic_flags |= IEEE80211_F_IBSSON;
-				ic->ic_opmode = IEEE80211_M_IBSS;
-				err = ENETRESET;
-			}
-			break;
-		default:
-			ieee80211_err("wifi_cfg_bsstype: "
-			    "unknown opmode %u\n", *iw_opmode);
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-		}
+		err = wl_set_bsstype(ic, iw_opmode);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_bsstype: unknown command %x\n", cmd);
@@ -683,12 +491,7 @@ wifi_cfg_linkstatus(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		*ow_linkstat = (ic->ic_state == IEEE80211_S_RUN) ?
-		    WL_CONNECTED : WL_NOTCONNECTED;
-		if ((ic->ic_flags & IEEE80211_F_WPA) &&
-		    (ieee80211_crypto_getciphertype(ic) != WIFI_SEC_WPA)) {
-			*ow_linkstat = WL_NOTCONNECTED;
-		}
+		wl_get_linkstatus(ic, ow_linkstat);
 		break;
 	case WLAN_SET_PARAM:
 		outp->wldp_result = WL_READONLY;
@@ -712,9 +515,7 @@ wifi_cfg_suprates(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	mblk_t *omp;
 	wldp_t *outp;
 	wl_rates_t *ow_rates;
-	const struct ieee80211_rateset *srs;
-	uint8_t srates, *drates;
-	int err, buflen, i, j, k, l;
+	int err, buflen;
 
 	err = 0;
 	/* rate value (wl_rates_rates) is of type char */
@@ -727,30 +528,7 @@ wifi_cfg_suprates(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		/* all rates supported by the device */
-		ow_rates->wl_rates_num = 0;
-		drates = (uint8_t *)ow_rates->wl_rates_rates;
-		for (i = 0; i < IEEE80211_MODE_MAX; i++) {
-			srs = &ic->ic_sup_rates[i];
-			if (srs->ir_nrates == 0)
-				continue;
-
-			for (j = 0; j < srs->ir_nrates; j++) {
-				srates = IEEE80211_RV(srs->ir_rates[j]);
-				/* sort and skip duplicated rates */
-				for (k = 0; k < ow_rates->wl_rates_num; k++) {
-					if (srates <= drates[k])
-						break;
-				}
-				if (srates == drates[k])
-					continue;	/* duplicate, skip */
-				/* sort */
-				for (l = ow_rates->wl_rates_num; l > k; l--)
-					drates[l] = drates[l-1];
-				drates[k] = srates;
-				ow_rates->wl_rates_num++;
-			}
-		}
+		(void) wl_get_suprates(ic, ow_rates);
 		break;
 	case WLAN_SET_PARAM:
 		outp->wldp_result = WL_READONLY;
@@ -776,11 +554,7 @@ wifi_cfg_desrates(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	mblk_t *omp;
 	wldp_t *outp;
 	wl_rates_t *ow_rates;
-	struct ieee80211_node *in = ic->ic_bss;
-	struct ieee80211_rateset *rs = &in->in_rates;
-	uint8_t drate, srate;
-	int err, i, j;
-	boolean_t found;
+	int err;
 
 	err = 0;
 	if ((omp = wifi_getoutmsg(*mp, cmd, sizeof (wl_rates_t))) == NULL)
@@ -788,86 +562,12 @@ wifi_cfg_desrates(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	outp = (wldp_t *)omp->b_rptr;
 	ow_rates = (wl_rates_t *)outp->wldp_buf;
 
-	srate = rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL;
 	switch (cmd) {
 	case  WLAN_GET_PARAM:
-		ow_rates->wl_rates_num = 1;
-		ow_rates->wl_rates_rates[0] =
-		    (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
-		    srate : ic->ic_fixed_rate;
+		wl_get_desrates(ic, ow_rates);
 		break;
 	case  WLAN_SET_PARAM:
-		drate = iw_rates->wl_rates_rates[0];
-		if (ic->ic_fixed_rate == drate)
-			break;
-
-		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_desrates: "
-		    "set desired rate=%u\n", drate);
-
-		if (drate == 0) {	/* reset */
-			ic->ic_fixed_rate = IEEE80211_FIXED_RATE_NONE;
-			if (ic->ic_state == IEEE80211_S_RUN) {
-				IEEE80211_UNLOCK(ic);
-				ieee80211_new_state(ic, IEEE80211_S_ASSOC, 0);
-				IEEE80211_LOCK(ic);
-			}
-			break;
-		}
-
-		/*
-		 * Set desired rate. the desired rate is for data transfer
-		 * and usually is checked and used when driver changes to
-		 * RUN state.
-		 * If the driver is in AUTH | ASSOC | RUN state, desired
-		 * rate is checked against rates supported by current ESS.
-		 * If it's supported and current state is AUTH|ASSOC, nothing
-		 * needs to be doen by driver since the desired rate will
-		 * be enabled when the device changes to RUN state. And
-		 * when current state is RUN, Re-associate with the ESS to
-		 * enable the desired rate.
-		 */
-		if (ic->ic_state != IEEE80211_S_INIT &&
-		    ic->ic_state != IEEE80211_S_SCAN) {
-			/* check if the rate is supported by current ESS */
-			for (i = 0; i < rs->ir_nrates; i++) {
-				if (drate == IEEE80211_RV(rs->ir_rates[i]))
-					break;
-			}
-			if (i < rs->ir_nrates) {	/* supported */
-				ic->ic_fixed_rate = drate;
-				if (ic->ic_state == IEEE80211_S_RUN) {
-					IEEE80211_UNLOCK(ic);
-					ieee80211_new_state(ic,
-					    IEEE80211_S_ASSOC, 0);
-					IEEE80211_LOCK(ic);
-				}
-				break;
-			}
-		}
-
-		/* check the rate is supported by device */
-		found = B_FALSE;
-		for (i = 0; i < IEEE80211_MODE_MAX; i++) {
-			rs = &ic->ic_sup_rates[i];
-			for (j = 0; j < rs->ir_nrates; j++) {
-				if (drate == IEEE80211_RV(rs->ir_rates[j])) {
-					found = B_TRUE;
-					break;
-				}
-			}
-			if (found)
-				break;
-		}
-		if (!found) {
-			ieee80211_err("wifi_cfg_desrates: "
-			    "invalid rate %d\n", drate);
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-		}
-		ic->ic_fixed_rate = drate;
-		if (ic->ic_state != IEEE80211_S_SCAN)
-			err = ENETRESET;	/* restart */
+		err = wl_set_desrates(ic, iw_rates);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_desrates: unknown command %x\n", cmd);
@@ -1216,9 +916,7 @@ wifi_cfg_caps(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_caps: "
-		    "ic_caps = %u\n", ic->ic_caps);
-		o_caps->caps = ic->ic_caps;
+		wl_get_capability(ic, o_caps);
 		break;
 	case WLAN_SET_PARAM:
 		outp->wldp_result = WL_READONLY;
@@ -1256,20 +954,10 @@ wifi_cfg_wpa(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 
 	switch (cmd) {
 	case WLAN_GET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_wpa: "
-		    "get wpa=%u\n", wpa->wpa_flag);
-		o_wpa->wpa_flag = ((ic->ic_flags & IEEE80211_F_WPA)? 1 : 0);
+		wl_get_wpa(ic, o_wpa);
 		break;
 	case WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_wpa: "
-		    "set wpa=%u\n", wpa->wpa_flag);
-		if (wpa->wpa_flag > 0) {	/* enable WPA mode */
-			ic->ic_flags |= IEEE80211_F_PRIVACY;
-			ic->ic_flags |= IEEE80211_F_WPA;
-		} else {
-			ic->ic_flags &= ~IEEE80211_F_PRIVACY;
-			ic->ic_flags &= ~IEEE80211_F_WPA;
-		}
+		err = wl_set_wpa(ic, wpa);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_wpa: unknown command %x\n", cmd);
@@ -1294,9 +982,6 @@ wifi_cfg_wpakey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
 	wl_key_t *ik = (wl_key_t *)(inp->wldp_buf);
-	struct ieee80211_node *in;
-	struct ieee80211_key *wk;
-	uint16_t kid;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, 0)) == NULL)
@@ -1309,62 +994,7 @@ wifi_cfg_wpakey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		err = EINVAL;
 		break;
 	case WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_wpakey: "
-		    "idx=%d\n", ik->ik_keyix);
-		/* NB: cipher support is verified by ieee80211_crypt_newkey */
-		/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
-		if (ik->ik_keylen > sizeof (ik->ik_keydata)) {
-			ieee80211_err("wifi_cfg_wpakey: key too long\n");
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-		}
-		kid = ik->ik_keyix;
-		if (kid == IEEE80211_KEYIX_NONE || kid >= IEEE80211_WEP_NKID) {
-			ieee80211_err("wifi_cfg_wpakey: incorrect keyix\n");
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-
-		} else {
-			wk = &ic->ic_nw_keys[kid];
-			/*
-			 * Global slots start off w/o any assigned key index.
-			 * Force one here for consistency with WEPKEY.
-			 */
-			if (wk->wk_keyix == IEEE80211_KEYIX_NONE)
-				wk->wk_keyix = kid;
-			/* in = ic->ic_bss; */
-			in = NULL;
-		}
-
-		KEY_UPDATE_BEGIN(ic);
-		if (ieee80211_crypto_newkey(ic, ik->ik_type,
-		    ik->ik_flags, wk)) {
-			wk->wk_keylen = ik->ik_keylen;
-			/* NB: MIC presence is implied by cipher type */
-			if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
-				wk->wk_keylen = IEEE80211_KEYBUF_SIZE;
-			wk->wk_keyrsc = ik->ik_keyrsc;
-			wk->wk_keytsc = 0;		/* new key, reset */
-			wk->wk_flags |= ik->ik_flags &
-			    (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV);
-			(void) memset(wk->wk_key, 0, sizeof (wk->wk_key));
-			(void) memcpy(wk->wk_key, ik->ik_keydata,
-			    ik->ik_keylen);
-			if (!ieee80211_crypto_setkey(ic, wk,
-			    in != NULL ? in->in_macaddr : ik->ik_macaddr)) {
-				err = EIO;
-				outp->wldp_result = WL_HW_ERROR;
-			} else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT)) {
-				ic->ic_def_txkey = kid;
-				ieee80211_mac_update(ic);
-			}
-		} else {
-			err = EIO;
-			outp->wldp_result = WL_HW_ERROR;
-		}
-		KEY_UPDATE_END(ic);
+		err = wl_set_wpakey(ic, ik);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_wpakey: unknown command %x\n", cmd);
@@ -1389,7 +1019,6 @@ wifi_cfg_delkey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
 	wl_del_key_t *dk = (wl_del_key_t *)inp->wldp_buf;
-	int kid;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, 0)) == NULL)
@@ -1402,20 +1031,7 @@ wifi_cfg_delkey(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		err = EINVAL;
 		break;
 	case WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_delkey: "
-		    "keyix=%d\n", dk->idk_keyix);
-		kid = dk->idk_keyix;
-		if (kid == IEEE80211_KEYIX_NONE || kid >= IEEE80211_WEP_NKID) {
-			ieee80211_err("wifi_cfg_delkey: incorrect keyix\n");
-			outp->wldp_result = WL_NOTSUPPORTED;
-			err = EINVAL;
-			break;
-
-		} else {
-			(void) ieee80211_crypto_delkey(ic,
-			    &ic->ic_nw_keys[kid]);
-			ieee80211_mac_update(ic);
-		}
+		err = wl_set_delkey(ic, dk);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_delkey: unknown command %x\n", cmd);
@@ -1439,7 +1055,6 @@ wifi_cfg_setoptie(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
 	wl_wpa_ie_t *ie_in = (wl_wpa_ie_t *)inp->wldp_buf;
-	char *ie;
 	int err = 0;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, 0)) == NULL)
@@ -1452,32 +1067,8 @@ wifi_cfg_setoptie(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		err = EINVAL;
 		break;
 	case WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_setoptie\n");
-		/*
-		 * NB: Doing this for ap operation could be useful (e.g. for
-		 * WPA and/or WME) except that it typically is worthless
-		 * without being able to intervene when processing
-		 * association response frames--so disallow it for now.
-		 */
-		if (ic->ic_opmode != IEEE80211_M_STA) {
-			ieee80211_err("wifi_cfg_setoptie: opmode err\n");
-			err = EINVAL;
+		if ((err = wl_set_optie(ic, ie_in)) == EINVAL)
 			outp->wldp_result = WL_NOTSUPPORTED;
-			break;
-		}
-		if (ie_in->wpa_ie_len > IEEE80211_MAX_OPT_IE) {
-			ieee80211_err("wifi_cfg_setoptie: optie too long\n");
-			err = EINVAL;
-			outp->wldp_result = WL_NOTSUPPORTED;
-			break;
-		}
-
-		ie = ieee80211_malloc(ie_in->wpa_ie_len);
-		(void) memcpy(ie, ie_in->wpa_ie, ie_in->wpa_ie_len);
-		if (ic->ic_opt_ie != NULL)
-			ieee80211_free(ic->ic_opt_ie);
-		ic->ic_opt_ie = ie;
-		ic->ic_opt_ie_len = ie_in->wpa_ie_len;
 		break;
 	default:
 		ieee80211_err("wifi_cfg_setoptie: unknown command %x\n", cmd);
@@ -1573,9 +1164,7 @@ wifi_cfg_setmlme(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 	wldp_t *outp;
 	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
 	wl_mlme_t *mlme = (wl_mlme_t *)inp->wldp_buf;
-	ieee80211_node_t *in;
 	int err = 0;
-	uint32_t flags;
 
 	if ((omp = wifi_getoutmsg(*mp, cmd, 0)) == NULL)
 		return (ENOMEM);
@@ -1587,60 +1176,7 @@ wifi_cfg_setmlme(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		err = EINVAL;
 		break;
 	case WLAN_SET_PARAM:
-		ieee80211_dbg(IEEE80211_MSG_WPA, "wifi_cfg_setmlme: "
-		    "op=%d\n", mlme->im_op);
-		switch (mlme->im_op) {
-		case IEEE80211_MLME_DISASSOC:
-		case IEEE80211_MLME_DEAUTH:
-			if (ic->ic_opmode == IEEE80211_M_STA) {
-				/*
-				 * Mask ic_flags of IEEE80211_F_WPA to disable
-				 * ieee80211_notify temporarily.
-				 */
-				flags = ic->ic_flags;
-				ic->ic_flags &= ~IEEE80211_F_WPA;
-
-				IEEE80211_UNLOCK(ic);
-				ieee80211_new_state(ic, IEEE80211_S_INIT,
-				    mlme->im_reason);
-				IEEE80211_LOCK(ic);
-
-				ic->ic_flags = flags;
-			}
-			break;
-		case IEEE80211_MLME_ASSOC:
-			if (ic->ic_opmode != IEEE80211_M_STA) {
-				ieee80211_err("wifi_cfg_setmlme: opmode err\n");
-				err = EINVAL;
-				outp->wldp_result = WL_NOTSUPPORTED;
-				break;
-			}
-			if (ic->ic_des_esslen != 0) {
-			/*
-			 * Desired ssid specified; must match both bssid and
-			 * ssid to distinguish ap advertising multiple ssid's.
-			 */
-				in = ieee80211_find_node_with_ssid(&ic->ic_scan,
-				    mlme->im_macaddr,
-				    ic->ic_des_esslen, ic->ic_des_essid);
-			} else {
-			/*
-			 * Normal case; just match bssid.
-			 */
-				in = ieee80211_find_node(&ic->ic_scan,
-				    mlme->im_macaddr);
-			}
-			if (in == NULL) {
-				ieee80211_err("wifi_cfg_setmlme: "
-				    "no matched node\n");
-				err = EINVAL;
-				outp->wldp_result = WL_NOTSUPPORTED;
-				break;
-			}
-			IEEE80211_UNLOCK(ic);
-			ieee80211_sta_join(ic, in);
-			IEEE80211_LOCK(ic);
-		}
+		err = wl_set_mlme(ic, mlme);
 		break;
 	default:
 		ieee80211_err("wifi_cfg_delkey: unknown command %x\n", cmd);
@@ -1839,6 +1375,1058 @@ ieee80211_ioctl(struct ieee80211com *ic, queue_t *wq, mblk_t *mp)
 		miocack(wq, mp, len, 0);
 	else
 		miocack(wq, mp, len, err);
+
+	return (err);
+}
+
+/*
+ * The following routines are for brussels support
+ */
+
+/*
+ * MAC_PROP_WL_ESSID
+ */
+static int
+wl_set_essid(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	char *essid;
+	wl_essid_t *iw_essid = (wl_essid_t *)wldp_buf;
+
+	if (iw_essid->wl_essid_length > IEEE80211_NWID_LEN) {
+		ieee80211_err("wl_set_essid: "
+		    "essid too long, %u, max %u\n",
+		    iw_essid->wl_essid_length, IEEE80211_NWID_LEN);
+
+		err = EINVAL;
+		return (err);
+	}
+
+	essid = iw_essid->wl_essid_essid;
+	essid[IEEE80211_NWID_LEN] = 0;
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_essid: "
+	    "set essid=%s length=%d\n",
+	    essid, iw_essid->wl_essid_length);
+
+	ic->ic_des_esslen = iw_essid->wl_essid_length;
+	if (ic->ic_des_esslen != 0)
+		bcopy(essid, ic->ic_des_essid, ic->ic_des_esslen);
+	if (ic->ic_des_esslen < IEEE80211_NWID_LEN)
+		ic->ic_des_essid[ic->ic_des_esslen] = 0;
+
+	err = ENETRESET;
+
+	return (err);
+}
+
+static void
+wl_get_essid(struct ieee80211com *ic, void *wldp_buf)
+{
+	char *essid;
+	wl_essid_t ow_essid;
+
+	essid = (char *)ic->ic_des_essid;
+	if (essid[0] == '\0')
+		essid = (char *)ic->ic_bss->in_essid;
+
+	bzero(&ow_essid, sizeof (wl_essid_t));
+	ow_essid.wl_essid_length = wifi_strnlen((const char *)essid,
+	    IEEE80211_NWID_LEN);
+	bcopy(essid, ow_essid.wl_essid_essid,
+	    ow_essid.wl_essid_length);
+	bcopy(&ow_essid, wldp_buf, sizeof (wl_essid_t));
+
+}
+
+/*
+ * MAC_PROP_WL_BSSID
+ */
+static int
+wl_set_bssid(struct ieee80211com *ic, const void* wldp_buf)
+{
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_bssid: "
+	    "set bssid=%s\n",
+	    ieee80211_macaddr_sprintf(wldp_buf));
+
+	bcopy(wldp_buf, ic->ic_des_bssid, sizeof (wl_bssid_t));
+	ic->ic_flags |= IEEE80211_F_DESBSSID;
+
+	return (ENETRESET);
+}
+
+static void
+wl_get_bssid(struct ieee80211com *ic, void *wldp_buf)
+{
+	uint8_t *bssid;
+
+	if (ic->ic_flags & IEEE80211_F_DESBSSID)
+		bssid = ic->ic_des_bssid;
+	else
+		bssid = ic->ic_bss->in_bssid;
+	bcopy(bssid, wldp_buf, sizeof (wl_bssid_t));
+
+}
+
+/*
+ * MAC_PROP_WL_BSSTYP
+ */
+static int
+wl_set_bsstype(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	wl_bss_type_t *iw_opmode = (wl_bss_type_t *)wldp_buf;
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_bsstype: "
+	    "set bsstype=%u\n", *iw_opmode);
+
+	switch (*iw_opmode) {
+	case WL_BSS_BSS:
+		ic->ic_flags &= ~IEEE80211_F_IBSSON;
+		ic->ic_opmode = IEEE80211_M_STA;
+		err = ENETRESET;
+		break;
+	case WL_BSS_IBSS:
+		if ((ic->ic_caps & IEEE80211_C_IBSS) == 0) {
+			err = ENOTSUP;
+			break;
+		}
+		if ((ic->ic_flags & IEEE80211_F_IBSSON) == 0) {
+			ic->ic_flags |= IEEE80211_F_IBSSON;
+			ic->ic_opmode = IEEE80211_M_IBSS;
+			err = ENETRESET;
+		}
+		break;
+	default:
+		ieee80211_err("wl_set_bsstype: "
+		    "unknown opmode\n");
+		err = EINVAL;
+		break;
+	}
+	return (err);
+}
+
+static void
+wl_get_bsstype(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_bss_type_t ow_opmode;
+
+	switch (ic->ic_opmode) {
+	case IEEE80211_M_STA:
+		ow_opmode = WL_BSS_BSS;
+		break;
+	case IEEE80211_M_IBSS:
+		ow_opmode = WL_BSS_IBSS;
+		break;
+	default:
+		ow_opmode = WL_BSS_ANY;
+		break;
+	}
+
+	bcopy(&ow_opmode, wldp_buf, sizeof (wl_bss_type_t));
+}
+
+/*
+ * MAC_PROP_WL_LINKSTATUS
+ */
+static void
+wl_get_linkstatus(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_linkstatus_t ow_linkstat;
+
+	ow_linkstat = (ic->ic_state == IEEE80211_S_RUN) ?
+	    WL_CONNECTED : WL_NOTCONNECTED;
+	if ((ic->ic_flags & IEEE80211_F_WPA) &&
+	    (ieee80211_crypto_getciphertype(ic) != WIFI_SEC_WPA)) {
+		ow_linkstat = WL_NOTCONNECTED;
+	}
+
+	bcopy(&ow_linkstat, wldp_buf, sizeof (wl_linkstatus_t));
+}
+
+/*
+ * MAC_PROP_WL_DESIRED_RATESa
+ */
+static int
+wl_set_desrates(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	int i, j;
+	uint8_t drate;
+	boolean_t isfound;
+	wl_rates_t *iw_rates = (wl_rates_t *)wldp_buf;
+	struct ieee80211_node *in = ic->ic_bss;
+	struct ieee80211_rateset *rs = &in->in_rates;
+
+	drate = iw_rates->wl_rates_rates[0];
+	if (ic->ic_fixed_rate == drate)
+		return (err);
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_desrates: "
+	    "set desired rate=%u\n", drate);
+
+	if (drate == 0) {
+		ic->ic_fixed_rate = IEEE80211_FIXED_RATE_NONE;
+		if (ic->ic_state == IEEE80211_S_RUN) {
+			IEEE80211_UNLOCK(ic);
+			ieee80211_new_state(ic, IEEE80211_S_ASSOC, 0);
+			IEEE80211_LOCK(ic);
+		}
+		return (err);
+	}
+
+	/*
+	 * Set desired rate. The desired rate is for data transfer
+	 * and usally is checked and used when driver changes to
+	 * RUN state.
+	 * If the driver is in AUTH | ASSOC | RUN state, desired
+	 * rate is checked anainst rates supported by current ESS.
+	 * If it's supported and current state is AUTH|ASSOC, nothing
+	 * needs to be done by driver since the desired rate will
+	 * be enabled when the device changes to RUN state. And
+	 * when current state is RUN, Re-associate with the ESS to
+	 * enable the desired rate.
+	 */
+
+	if (ic->ic_state != IEEE80211_S_INIT &&
+	    ic->ic_state != IEEE80211_S_SCAN) {
+		for (i = 0; i < rs->ir_nrates; i++) {
+			if (drate == IEEE80211_RV(rs->ir_rates[i]))
+				break;
+		}
+		/* supported */
+		if (i < rs->ir_nrates) {
+			ic->ic_fixed_rate = drate;
+			if (ic->ic_state == IEEE80211_S_RUN) {
+				IEEE80211_UNLOCK(ic);
+				ieee80211_new_state(ic,
+				    IEEE80211_S_ASSOC, 0);
+				IEEE80211_LOCK(ic);
+			}
+			return (err);
+		}
+	}
+
+	/*
+	 * In INIT or SCAN state
+	 * check if the desired rate is supported by device
+	 */
+	isfound = B_FALSE;
+	for (i = 0; i < IEEE80211_MODE_MAX; i++) {
+		rs = &ic->ic_sup_rates[i];
+		for (j = 0; j < rs->ir_nrates; j++) {
+			if (drate ==  IEEE80211_RV(rs->ir_rates[j])) {
+				isfound = B_TRUE;
+				break;
+			}
+		}
+		if (isfound)
+			break;
+	}
+	if (!isfound) {
+		ieee80211_err("wl_set_desrates: "
+		    "invald rate %d\n", drate);
+		err = EINVAL;
+		return (err);
+	}
+	ic->ic_fixed_rate = drate;
+	if (ic->ic_state != IEEE80211_S_SCAN)
+		err = ENETRESET;
+
+	return (err);
+}
+
+static void
+wl_get_desrates(struct ieee80211com *ic, void *wldp_buf)
+{
+	uint8_t srate;
+	wl_rates_t ow_rates;
+	struct ieee80211_node *in = ic->ic_bss;
+	struct ieee80211_rateset *rs = &in->in_rates;
+
+	srate = rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL;
+	ow_rates.wl_rates_num = 1;
+	ow_rates.wl_rates_rates[0] =
+	    (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
+	    srate : ic->ic_fixed_rate;
+	bcopy(&ow_rates, wldp_buf, sizeof (wl_rates_t));
+
+}
+
+/*
+ * MAC_PROP_AUTH_MODE
+ */
+static int
+wl_set_authmode(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	wl_authmode_t *iw_auth = (wl_authmode_t *)wldp_buf;
+
+	if (*iw_auth == ic->ic_bss->in_authmode)
+		return (err);
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_authmode: "
+	    "set authmode=%u\n", *iw_auth);
+
+	switch (*iw_auth) {
+	case WL_OPENSYSTEM:
+	case WL_SHAREDKEY:
+		ic->ic_bss->in_authmode = *iw_auth;
+		err = ENETRESET;
+		break;
+	default:
+		ieee80211_err("wl_set_authmode: "
+		    "unknown authmode %u\n", *iw_auth);
+		err = EINVAL;
+		break;
+	}
+
+	return (err);
+}
+
+static void
+wl_get_authmode(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_authmode_t ow_auth;
+
+	ow_auth = ic->ic_bss->in_authmode;
+	bcopy(&ow_auth, wldp_buf, sizeof (wl_authmode_t));
+
+}
+
+/*
+ * MAC_PROP_WL_ENCRYPTION
+ */
+static int
+wl_set_encrypt(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	uint32_t flags;
+	wl_encryption_t *iw_encryp = (wl_encryption_t *)wldp_buf;
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_encrypt: "
+	    "set encryption=%u\n", *iw_encryp);
+
+	flags = ic->ic_flags;
+	if (*iw_encryp == WL_NOENCRYPTION)
+		flags &= ~IEEE80211_F_PRIVACY;
+	else
+		flags |= IEEE80211_F_PRIVACY;
+
+	if (ic->ic_flags != flags) {
+		ic->ic_flags = flags;
+		err = ENETRESET;
+	}
+
+	return (err);
+}
+
+static void
+wl_get_encrypt(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_encryption_t *ow_encryp;
+
+	ow_encryp = (wl_encryption_t *)wldp_buf;
+	*ow_encryp = (ic->ic_flags & IEEE80211_F_PRIVACY) ? 1 : 0;
+	if (ic->ic_flags & IEEE80211_F_WPA)
+		*ow_encryp = WL_ENC_WPA;
+
+}
+
+/*
+ * MAC_PROP_WL_RSSI
+ */
+static void
+wl_get_rssi(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_rssi_t *ow_rssi;
+
+	ow_rssi = (wl_rssi_t *)wldp_buf;
+	*ow_rssi = wifi_getrssi(ic->ic_bss);
+
+}
+
+/*
+ * MAC_PROP_WL_PHY_CONFIG
+ */
+
+static int
+wl_set_phy(struct ieee80211com *ic, const void* wldp_buf)
+{
+	int err = 0;
+	int16_t ch;
+	wl_dsss_t *dsss;
+	wl_phy_conf_t *iw_phy = (wl_phy_conf_t *)wldp_buf;
+
+	dsss = (wl_dsss_t *)iw_phy;
+	ch = dsss->wl_dsss_channel;
+
+	ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_phy: "
+	    "set channel=%d\n", ch);
+
+	if (ch == 0 || ch == (int16_t)IEEE80211_CHAN_ANY) {
+		ic->ic_des_chan = IEEE80211_CHAN_ANYC;
+	} else if ((uint_t)ch > IEEE80211_CHAN_MAX ||
+	    ieee80211_isclr(ic->ic_chan_active, ch)) {
+		err = EINVAL;
+		return (err);
+	} else {
+		ic->ic_des_chan = ic->ic_ibss_chan =
+		    &ic->ic_sup_channels[ch];
+	}
+
+	switch (ic->ic_state) {
+	case IEEE80211_S_INIT:
+	case IEEE80211_S_SCAN:
+		err = ENETRESET;
+		break;
+	default:
+		/*
+		 * If hte desired channel has changed (to something
+		 * other than any) and we're not already scanning,
+		 * then kick the state machine.
+		 */
+		if (ic->ic_des_chan != IEEE80211_CHAN_ANYC &&
+		    ic->ic_bss->in_chan != ic->ic_des_chan &&
+		    (ic->ic_flags & IEEE80211_F_SCAN) == 0)
+			err = ENETRESET;
+		break;
+	}
+
+	return (err);
+}
+
+static int
+wl_get_phy(struct ieee80211com *ic, void *wldp_buf)
+{
+	int err = 0;
+	wl_phy_conf_t *ow_phy;
+	struct ieee80211_channel *ch = ic->ic_curchan;
+
+	ow_phy = (wl_phy_conf_t *)wldp_buf;
+	bzero(wldp_buf, sizeof (wl_phy_conf_t));
+
+	/* get current phy parameters: FH|DS|ERP */
+	if (IEEE80211_IS_CHAN_A(ch) || IEEE80211_IS_CHAN_T(ch)) {
+		wl_ofdm_t *ofdm = (wl_ofdm_t *)ow_phy;
+		ofdm->wl_ofdm_subtype = WL_OFDM;
+		ofdm->wl_ofdm_frequency = ch->ich_freq;
+	} else {
+		switch (ic->ic_phytype) {
+		case IEEE80211_T_FH: {
+			wl_fhss_t *fhss = (wl_fhss_t *)ow_phy;
+			fhss->wl_fhss_subtype = WL_FHSS;
+			fhss->wl_fhss_channel =
+			    ieee80211_chan2ieee(ic, ch);
+			break;
+		}
+		case IEEE80211_T_DS: {
+			wl_dsss_t *dsss = (wl_dsss_t *)ow_phy;
+			dsss->wl_dsss_subtype = WL_DSSS;
+			dsss->wl_dsss_channel =
+			    ieee80211_chan2ieee(ic, ch);
+			break;
+		}
+		case IEEE80211_T_OFDM: {
+			wl_erp_t *erp = (wl_erp_t *)ow_phy;
+			erp->wl_erp_subtype = WL_ERP;
+			erp->wl_erp_channel =
+			    ieee80211_chan2ieee(ic, ch);
+			break;
+		}
+		default:
+			ieee80211_err("wl_get_phy: "
+			    "unknown phy type, %x\n", ic->ic_phytype);
+			err = EIO;
+			break;
+		}
+	}
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_CAPABILITY
+ */
+static void
+wl_get_capability(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_capability_t ow_caps;
+
+	ow_caps.caps = ic->ic_caps;
+	bcopy(&ow_caps, wldp_buf, sizeof (wl_capability_t));
+
+}
+
+/*
+ * MAC_PROP_WL_WPA
+ */
+static int
+wl_set_wpa(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	wl_wpa_t *wpa = (wl_wpa_t *)wldp_buf;
+
+	ieee80211_dbg(IEEE80211_MSG_BRUSSELS, "wl_set_wpa: "
+	    "set wpa=%u\n", wpa->wpa_flag);
+
+	if (wpa->wpa_flag > 0) {
+		/* enable wpa mode */
+		ic->ic_flags |= IEEE80211_F_PRIVACY;
+		ic->ic_flags |= IEEE80211_F_WPA;
+	} else {
+		ic->ic_flags &= ~IEEE80211_F_PRIVACY;
+		ic->ic_flags &= ~IEEE80211_F_WPA;
+	}
+
+	return (err);
+}
+
+static void
+wl_get_wpa(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_wpa_t *wpa;
+
+	wpa = (wl_wpa_t *)wldp_buf;
+	wpa->wpa_flag = ((ic->ic_flags & IEEE80211_F_WPA) ? 1 : 0);
+
+	ieee80211_dbg(IEEE80211_MSG_BRUSSELS, "wl_get_wpa: "
+	    "get wpa=%u\n", wpa->wpa_flag);
+
+}
+
+/*
+ * MAC_PROP_WL_SCANRESULTS
+ */
+
+static void
+wl_get_scanresults(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_wpa_ess_t *sr;
+	ieee80211_node_t *in;
+	ieee80211_node_table_t *nt;
+	int ap_num;
+	int len;
+
+	sr = (wl_wpa_ess_t *)wldp_buf;
+	sr->count = 0;
+	ap_num = 0;
+
+	ieee80211_dbg(IEEE80211_MSG_WPA, "wl_get_scanrelults\n");
+
+	nt = &ic->ic_scan;
+	IEEE80211_NODE_LOCK(nt);
+	in = list_head(&nt->nt_node);
+
+	while (in != NULL) {
+		/* filter out non-wpa APs */
+		if (in->in_wpa_ie == NULL) {
+			in = list_next(&nt->nt_node, in);
+			continue;
+		}
+		bcopy(in->in_bssid, sr->ess[ap_num].bssid,
+		    IEEE80211_ADDR_LEN);
+		sr->ess[ap_num].ssid_len = in->in_esslen;
+		bcopy(in->in_essid, sr->ess[ap_num].ssid,
+		    in->in_esslen);
+		sr->ess[ap_num].freq = in->in_chan->ich_freq;
+
+		len = in->in_wpa_ie[1] + 2;
+		bcopy(in->in_wpa_ie, sr->ess[ap_num].wpa_ie, len);
+		sr->ess[ap_num].wpa_ie_len = len;
+
+		ap_num++;
+		in = list_next(&nt->nt_node, in);
+	}
+	IEEE80211_NODE_UNLOCK(nt);
+	sr->count = ap_num;
+
+}
+
+/*
+ * MAC_PROP_WL_ESS_LIST
+ */
+static void
+wl_get_esslist(struct ieee80211com *ic, void *wldp_buf)
+{
+	wl_ess_list_t *ess_list;
+
+	ess_list = (wl_ess_list_t *)wldp_buf;
+
+	ess_list->wl_ess_list_num = 0;
+	ieee80211_iterate_nodes(&ic->ic_scan, wifi_read_ap, ess_list);
+
+}
+
+/*
+ * MAC_PROP_WL_WEP_KEY
+ */
+static int
+wl_set_wepkey(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int	 err = 0;
+	uint16_t i;
+	uint32_t klen;
+	struct ieee80211_key *key;
+	wl_wep_key_t *wepkey = (wl_wep_key_t *)wldp_buf;
+
+	/* set all valid keys */
+	for (i = 0; i < MAX_NWEPKEYS; i++) {
+		if (wepkey[i].wl_wep_operation != WL_ADD)
+			continue;
+		klen = wepkey[i].wl_wep_length;
+		if (klen > IEEE80211_KEYBUF_SIZE) {
+			ieee80211_err("wl_set_wepkey: "
+			    "invalid wepkey length, %u\n", klen);
+			err = EINVAL;
+			continue;  /* continue to set other keys */
+		}
+		if (klen == 0)
+			continue;
+
+		/*
+		 *  Set key contents. Only WEP is supported
+		 */
+		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wl_set_wepkey: "
+		    "set key %u, len=%u\n", i, klen);
+		key = &ic->ic_nw_keys[i];
+		if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP,
+		    IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV, key) == 0) {
+			ieee80211_err("wl_set_wepkey: "
+			    "abort, create key failed. id=%u\n", i);
+			err = EIO;
+			continue;
+		}
+
+		key->wk_keyix = i;
+		key->wk_keylen = (uint8_t)klen;
+		key->wk_flags |= IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
+		bzero(key->wk_key, IEEE80211_KEYBUF_SIZE);
+		bcopy(wepkey[i].wl_wep_key, key->wk_key, klen);
+		if (ieee80211_crypto_setkey(ic, key, ic->ic_macaddr)
+		    == 0) {
+			ieee80211_err("wl_set_wepkey: "
+			    "set key failed len=%u\n", klen);
+			err = EIO;
+		}
+	}
+	if (err == 0)
+		err = ENETRESET;
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_SETOPTIE
+ */
+static int
+wl_set_optie(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	char *ie;
+	wl_wpa_ie_t *ie_in = (wl_wpa_ie_t *)wldp_buf;
+
+	if (ic->ic_opmode != IEEE80211_M_STA) {
+		ieee80211_err("wl_set_optie: opmode err\n");
+		err = EINVAL;
+		return (err);
+	}
+	if (ie_in->wpa_ie_len > IEEE80211_MAX_OPT_IE) {
+
+		ieee80211_err("wl_set_optie: optie is too long\n");
+
+		err = EINVAL;
+		return (err);
+	}
+
+	ie = ieee80211_malloc(ie_in->wpa_ie_len);
+	(void) memcpy(ie, ie_in->wpa_ie, ie_in->wpa_ie_len);
+	if (ic->ic_opt_ie != NULL) {
+		ieee80211_dbg(IEEE80211_MSG_BRUSSELS,
+		    "wl_set_optie:ic_opt_ie!=NULL\n");
+		ieee80211_free(ic->ic_opt_ie);
+	}
+	ic->ic_opt_ie = ie;
+	ic->ic_opt_ie_len = ie_in->wpa_ie_len;
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_DELKEY
+ */
+static int
+wl_set_delkey(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	int kid;
+	wl_del_key_t *dk = (wl_del_key_t *)wldp_buf;
+
+	ieee80211_dbg(IEEE80211_MSG_BRUSSELS, "wl_set_delkey(): "
+	    "keyix=%d\n", dk->idk_keyix);
+
+	kid = dk->idk_keyix;
+
+	if (kid == IEEE80211_KEYIX_NONE ||
+	    kid >= IEEE80211_WEP_NKID) {
+		ieee80211_err("wl_set_delkey: incorrect keyix\n");
+		err = EINVAL;
+		return (err);
+	} else {
+		(void) ieee80211_crypto_delkey(ic,
+		    &ic->ic_nw_keys[kid]);
+		ieee80211_mac_update(ic);
+	}
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_MLME
+ */
+
+static int
+wl_set_mlme(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	uint32_t flags;
+	ieee80211_node_t *in;
+	wl_mlme_t *mlme = (wl_mlme_t *)wldp_buf;
+
+	ieee80211_dbg(IEEE80211_MSG_WPA, "wl_set_mlme: "
+	    "op=%d\n", mlme->im_op);
+
+	switch (mlme->im_op) {
+	case IEEE80211_MLME_DISASSOC:
+	case IEEE80211_MLME_DEAUTH:
+		if (ic->ic_opmode == IEEE80211_M_STA) {
+			/*
+			 * Mask ic_flags of IEEE80211_F_WPA to disable
+			 * ieee80211_notify temporarily.
+			 */
+			flags = ic->ic_flags;
+			ic->ic_flags &= ~IEEE80211_F_WPA;
+
+			IEEE80211_UNLOCK(ic);
+			ieee80211_new_state(ic, IEEE80211_S_INIT,
+			    mlme->im_reason);
+			IEEE80211_LOCK(ic);
+
+			ic->ic_flags = flags;
+		}
+		break;
+	case IEEE80211_MLME_ASSOC:
+		if (ic->ic_opmode != IEEE80211_M_STA) {
+			ieee80211_err("wifi_cfg_setmlme: opmode err\n");
+			err = EINVAL;
+			break;
+		}
+		if (ic->ic_des_esslen != 0) {
+		/*
+		 * Desired ssid specified; must match both bssid and
+		 * ssid to distinguish ap advertising multiple ssid's.
+		 */
+			in = ieee80211_find_node_with_ssid(&ic->ic_scan,
+			    mlme->im_macaddr,
+			    ic->ic_des_esslen,
+			    ic->ic_des_essid);
+		} else {
+		/*
+		 * Normal case; just match bssid.
+		 */
+			in = ieee80211_find_node(&ic->ic_scan,
+			    mlme->im_macaddr);
+		}
+		if (in == NULL) {
+			ieee80211_err("wifi_cfg_setmlme: "
+			    "no matched node\n");
+			err = EINVAL;
+			break;
+		}
+		IEEE80211_UNLOCK(ic);
+		ieee80211_sta_join(ic, in);
+		IEEE80211_LOCK(ic);
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_WPA_KEY
+ */
+static int
+wl_set_wpakey(struct ieee80211com *ic, const void *wldp_buf)
+{
+	int err = 0;
+	uint16_t kid;
+	struct ieee80211_node *in;
+	struct ieee80211_key *wk;
+	wl_key_t *ik = (wl_key_t *)wldp_buf;
+
+	ieee80211_dbg(IEEE80211_MSG_BRUSSELS, "wl_set_wpakey: "
+	    "idx=%d\n", ik->ik_keyix);
+
+	/*
+	 * cipher support is verified by ieee80211_crypt_newkey
+	 * this also checks ik->ik_keylen > sizeof(wk->wk_key)
+	 */
+	if (ik->ik_keylen > sizeof (ik->ik_keydata)) {
+		ieee80211_err("wl_set_wpakey: key is too long\n");
+		err = EINVAL;
+		return (err);
+	}
+	kid = ik->ik_keyix;
+	if (kid == IEEE80211_KEYIX_NONE || kid >= IEEE80211_WEP_NKID) {
+		ieee80211_err("wl_set_wpakey: incorrect keyix\n");
+		err = EINVAL;
+		return (err);
+	} else {
+		wk = &ic->ic_nw_keys[kid];
+		/*
+		 * Globle slots start off w/o any assigned key index.
+		 * Force one here for consistency with WEPKEY.
+		 */
+		if (wk->wk_keyix == IEEE80211_KEYIX_NONE)
+			wk->wk_keyix = kid;
+		in = NULL;
+	}
+
+	KEY_UPDATE_BEGIN(ic);
+	if (ieee80211_crypto_newkey(ic, ik->ik_type,
+	    ik->ik_flags, wk)) {
+		wk->wk_keylen = ik->ik_keylen;
+		/* MIC presence is implied by cipher type */
+		if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
+			wk->wk_keylen = IEEE80211_KEYBUF_SIZE;
+		wk->wk_keyrsc = ik->ik_keyrsc;
+		wk->wk_keytsc = 0;
+		wk->wk_flags |= ik->ik_flags &
+		    (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV);
+		(void) memset(wk->wk_key, 0, sizeof (wk->wk_key));
+		(void) memcpy(wk->wk_key, ik->ik_keydata,
+		    ik->ik_keylen);
+		if (!ieee80211_crypto_setkey(ic, wk,
+		    in != NULL ? in->in_macaddr : ik->ik_macaddr)) {
+			err = EIO;
+		} else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT)) {
+			ic->ic_def_txkey = kid;
+			ieee80211_mac_update(ic);
+		}
+	} else {
+		err = EIO;
+	}
+	KEY_UPDATE_END(ic);
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_SUP_RATE
+ */
+static void
+wl_get_suprates(struct ieee80211com *ic, void *wldp_buf)
+{
+	int i, j, k, l;
+	uint8_t srates;
+	uint8_t *drates;
+	wl_rates_t *wl_rates;
+	const struct ieee80211_rateset *srs;
+
+	wl_rates = (wl_rates_t *)wldp_buf;
+
+	wl_rates->wl_rates_num = 0;
+	drates = (uint8_t *)wl_rates->wl_rates_rates;
+	for (i = 0; i < IEEE80211_MODE_MAX; i++) {
+		srs = &ic->ic_sup_rates[i];
+		if (srs->ir_nrates == 0)
+			continue;
+		for (j = 0; j < srs->ir_nrates; j++) {
+			srates = IEEE80211_RV(srs->ir_rates[j]);
+			/* sort & skip duplicated rates */
+			for (k = 0; k < wl_rates->wl_rates_num; k++) {
+				if (srates <= drates[k])
+					break;
+			}
+			if (srates == drates[k])
+				/* skip duplicated rates */
+				continue;
+			/* sort */
+			for (l = wl_rates->wl_rates_num; l > k; l--)
+				drates[l] = drates[l-1];
+			drates[k] = srates;
+			wl_rates->wl_rates_num++;
+		}
+	}
+
+}
+
+/*
+ * Typically invoked by drivers in response to request for
+ * information or to change settings from the userland.
+ *
+ * Return value should be checked by WiFI drivers. Return 0
+ * on success. Otherwise, return non-zero value to indicate
+ * the error. Driver should operate as below when the return
+ * error is:
+ * ENETRESET	Reset wireless network and re-start to join a
+ * 		WLAN, ENETRESET is returned when a configuration
+ * 		parameter has been changed.
+ * 		When acknowledge a M_IOCTL message, this error
+ * 		is ignored
+ */
+/* ARGSUSED */
+int
+ieee80211_setprop(void *ic_arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	int err = 0;
+	struct ieee80211com *ic = ic_arg;
+
+	ASSERT(ic != NULL);
+	IEEE80211_LOCK(ic);
+
+	switch (wldp_pr_num) {
+	/* mac_prop_id */
+	case MAC_PROP_WL_ESSID:
+		err = wl_set_essid(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSID:
+		err = wl_set_bssid(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_PHY_CONFIG:
+		err = wl_set_phy(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_KEY_TAB:
+		err = wl_set_wepkey(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_AUTH_MODE:
+		err = wl_set_authmode(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_ENCRYPTION:
+		err = wl_set_encrypt(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSTYPE:
+		err = wl_set_bsstype(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_DESIRED_RATES:
+		err = wl_set_desrates(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_WPA:
+		err = wl_set_wpa(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_KEY:
+		err = wl_set_wpakey(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_DELKEY:
+		err = wl_set_delkey(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_SETOPTIE:
+		err = wl_set_optie(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_MLME:
+		err = wl_set_mlme(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_LINKSTATUS:
+	case MAC_PROP_WL_ESS_LIST:
+	case MAC_PROP_WL_SUPPORTED_RATES:
+	case MAC_PROP_WL_RSSI:
+	case MAC_PROP_WL_CAPABILITY:
+	case MAC_PROP_WL_SCANRESULTS:
+		ieee80211_err("ieee80211_setprop: opmode err\n");
+		err = EINVAL;
+		break;
+	default:
+		ieee80211_err("ieee80211_setprop: opmode not support\n");
+		err = ENOTSUP;
+		break;
+	}
+
+	IEEE80211_UNLOCK(ic);
+
+	return (err);
+}
+
+/* ARGSUSED */
+int
+ieee80211_getprop(void *ic_arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+{
+	int err = 0;
+	struct ieee80211com *ic = ic_arg;
+
+	if (wldp_length == 0) {
+		err = EINVAL;
+		return (err);
+	}
+	bzero(wldp_buf, wldp_length);
+
+	ASSERT(ic != NULL);
+	IEEE80211_LOCK(ic);
+
+	switch (wldp_pr_num) {
+	/* mac_prop_id */
+	case MAC_PROP_WL_ESSID:
+		wl_get_essid(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSID:
+		wl_get_bssid(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_PHY_CONFIG:
+		err = wl_get_phy(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_AUTH_MODE:
+		wl_get_authmode(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_ENCRYPTION:
+		wl_get_encrypt(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSTYPE:
+		wl_get_bsstype(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_DESIRED_RATES:
+		wl_get_desrates(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_LINKSTATUS:
+		wl_get_linkstatus(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_ESS_LIST:
+		wl_get_esslist(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_SUPPORTED_RATES:
+		wl_get_suprates(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_RSSI:
+		wl_get_rssi(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_CAPABILITY:
+		wl_get_capability(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_WPA:
+		wl_get_wpa(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_SCANRESULTS:
+		wl_get_scanresults(ic, wldp_buf);
+		break;
+	case MAC_PROP_WL_KEY_TAB:
+	case MAC_PROP_WL_KEY:
+	case MAC_PROP_WL_DELKEY:
+	case MAC_PROP_WL_SETOPTIE:
+	case MAC_PROP_WL_MLME:
+		ieee80211_err("ieee80211_setprop: opmode err\n");
+		err = EINVAL;
+		break;
+	default:
+		ieee80211_err("ieee80211_setprop: opmode not support\n");
+		err = ENOTSUP;
+		break;
+	}
+
+	IEEE80211_UNLOCK(ic);
 
 	return (err);
 }

@@ -46,18 +46,18 @@
 static dladm_status_t	wpa_instance_create(datalink_id_t, void *);
 static dladm_status_t	wpa_instance_delete(datalink_id_t);
 
-static dladm_status_t 	do_get_bsstype(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_essid(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_bssid(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_signal(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_encryption(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_authmode(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_linkstatus(datalink_id_t, wldp_t *);
-static dladm_status_t	do_get_esslist(datalink_id_t, wldp_t *);
-static dladm_status_t 	do_get_rate(datalink_id_t, wldp_t *);
-static dladm_status_t	do_get_mode(datalink_id_t, wldp_t *);
-static dladm_status_t	do_get_capability(datalink_id_t, wldp_t *);
-static dladm_status_t	do_get_wpamode(datalink_id_t, wldp_t *);
+static dladm_status_t 	do_get_bsstype(datalink_id_t, void *, int);
+static dladm_status_t 	do_get_essid(datalink_id_t, void *, int);
+static dladm_status_t 	do_get_bssid(datalink_id_t, void *, int);
+static dladm_status_t 	do_get_signal(datalink_id_t, void *, int);
+static dladm_status_t 	do_get_encryption(datalink_id_t, void *, int);
+static dladm_status_t 	do_get_authmode(datalink_id_t, void *, int);
+static dladm_status_t 	do_get_linkstatus(datalink_id_t, void *, int);
+static dladm_status_t	do_get_esslist(datalink_id_t, void  *, int);
+static dladm_status_t 	do_get_rate(datalink_id_t, void *, int);
+static dladm_status_t	do_get_mode(datalink_id_t, void *, int);
+static dladm_status_t	do_get_capability(datalink_id_t, void *, int);
+static dladm_status_t	do_get_wpamode(datalink_id_t, void *, int);
 
 static dladm_status_t	do_set_bsstype(datalink_id_t, dladm_wlan_bsstype_t *);
 static dladm_status_t	do_set_authmode(datalink_id_t, dladm_wlan_auth_t *);
@@ -68,10 +68,11 @@ static dladm_status_t	do_set_createibss(datalink_id_t, boolean_t *);
 static dladm_status_t	do_set_key(datalink_id_t, dladm_wlan_key_t *, uint_t);
 static dladm_status_t	do_set_channel(datalink_id_t, dladm_wlan_channel_t *);
 
-static dladm_status_t	do_scan(datalink_id_t, wldp_t *);
-static dladm_status_t	do_connect(datalink_id_t, wldp_t *, dladm_wlan_attr_t *,
-			    boolean_t, void *, uint_t, int);
-static dladm_status_t	do_disconnect(datalink_id_t, wldp_t *);
+static dladm_status_t	do_scan(datalink_id_t, void *, int);
+static dladm_status_t	do_connect(datalink_id_t, void *, int,
+			    dladm_wlan_attr_t *, boolean_t, void *, uint_t,
+			    int);
+static dladm_status_t	do_disconnect(datalink_id_t, void *, int);
 static boolean_t	find_val_by_name(const char *, val_desc_t *,
 			    uint_t, uint_t *);
 static boolean_t	find_name_by_val(uint_t, val_desc_t *, uint_t, char **);
@@ -116,8 +117,7 @@ static val_desc_t	bsstype_vals[] = {
 	{ "any",	DLADM_WLAN_BSSTYPE_ANY		}
 };
 
-#define	IS_CONNECTED(gbuf) \
-	((*(wl_linkstatus_t *)((gbuf)->wldp_buf) == WL_CONNECTED))
+#define	WLDP_BUFSIZE (MAX_BUF_LEN - WIFI_BUF_OFFSET)
 
 static dladm_status_t
 dladm_wlan_wlresult2status(wldp_t *gbuf)
@@ -237,24 +237,20 @@ dladm_wlan_scan(datalink_id_t linkid, void *arg,
 	int			i;
 	uint32_t		count;
 	wl_ess_conf_t		*wlp;
-	wldp_t 			*gbuf = NULL;
+	wl_ess_list_t		*wls = NULL;
+	char 			buf[WLDP_BUFSIZE];
+	wl_linkstatus_t		wl_status;
 	dladm_wlan_attr_t	wlattr;
 	dladm_status_t		status;
-	boolean_t		connected;
 
 	if ((status = dladm_wlan_validate(linkid)) != DLADM_STATUS_OK)
 		goto done;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL) {
-		status = DLADM_STATUS_NOMEM;
+	status = do_get_linkstatus(linkid, &wl_status, sizeof (wl_status));
+	if (status != DLADM_STATUS_OK)
 		goto done;
-	}
 
-	if ((status = do_get_linkstatus(linkid, gbuf)) != DLADM_STATUS_OK)
-		goto done;
-	connected = IS_CONNECTED(gbuf);
-
-	if ((status = do_scan(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_scan(linkid, buf, sizeof (buf))) != DLADM_STATUS_OK)
 		goto done;
 
 	if (func == NULL) {
@@ -262,11 +258,18 @@ dladm_wlan_scan(datalink_id_t linkid, void *arg,
 		goto done;
 	}
 
-	if ((status = do_get_esslist(linkid, gbuf)) != DLADM_STATUS_OK)
+	wls = malloc(WLDP_BUFSIZE);
+	if (wls == NULL) {
+		status = DLADM_STATUS_NOMEM;
+		goto done;
+	}
+
+	if ((status = do_get_esslist(linkid, wls, WLDP_BUFSIZE))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	wlp = ((wl_ess_list_t *)gbuf->wldp_buf)->wl_ess_list_ess;
-	count = ((wl_ess_list_t *)(gbuf->wldp_buf))->wl_ess_list_num;
+	wlp = wls->wl_ess_list_ess;
+	count = wls->wl_ess_list_num;
 
 	for (i = 0; i < count; i++, wlp++) {
 		fill_wlan_attr(wlp, &wlattr);
@@ -274,17 +277,18 @@ dladm_wlan_scan(datalink_id_t linkid, void *arg,
 			break;
 	}
 
-	if (!connected) {
-		status = do_get_linkstatus(linkid, gbuf);
+	if (wl_status != WL_CONNECTED) {
+		status = do_get_linkstatus(linkid, &wl_status,
+		    sizeof (&wl_status));
 		if (status != DLADM_STATUS_OK)
 			goto done;
-		if (IS_CONNECTED(gbuf))
-			(void) do_disconnect(linkid, gbuf);
+		if (wl_status == WL_CONNECTED)
+			(void) do_disconnect(linkid, buf, sizeof (buf));
 	}
 
 	status = DLADM_STATUS_OK;
 done:
-	free(gbuf);
+	free(wls);
 	return (status);
 }
 
@@ -398,8 +402,9 @@ append:
 #define	IEEE80211_C_WPA		0x01800000
 
 static dladm_status_t
-do_connect(datalink_id_t linkid, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
-    boolean_t create_ibss, void *keys, uint_t key_count, int timeout)
+do_connect(datalink_id_t linkid, void *buf, int bufsize,
+    dladm_wlan_attr_t *attrp, boolean_t create_ibss, void *keys,
+    uint_t key_count, int timeout)
 {
 	dladm_wlan_secmode_t	secmode;
 	dladm_wlan_auth_t	authmode;
@@ -410,6 +415,7 @@ do_connect(datalink_id_t linkid, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
 	dladm_wlan_channel_t	channel;
 	hrtime_t		start;
 	wl_capability_t		*caps;
+	wl_linkstatus_t		wl_status;
 
 	if ((attrp->wa_valid & DLADM_WLAN_ATTR_CHANNEL) != 0) {
 		channel = attrp->wa_channel;
@@ -451,10 +457,10 @@ do_connect(datalink_id_t linkid, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
 			status = DLADM_STATUS_BADARG;
 			goto fail;
 		}
-		status = do_get_capability(linkid, gbuf);
+		status = do_get_capability(linkid, buf, bufsize);
 		if (status != DLADM_STATUS_OK)
 			goto fail;
-		caps = (wl_capability_t *)(gbuf->wldp_buf);
+		caps = (wl_capability_t *)buf;
 		if ((caps->caps & IEEE80211_C_WPA) == 0)
 			return (DLADM_STATUS_NOTSUP);
 	}
@@ -496,11 +502,12 @@ do_connect(datalink_id_t linkid, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
 
 	start = gethrtime();
 	for (;;) {
-		status = do_get_linkstatus(linkid, gbuf);
+		status = do_get_linkstatus(linkid, &wl_status,
+		    sizeof (wl_status));
 		if (status != DLADM_STATUS_OK)
 			goto fail;
 
-		if (IS_CONNECTED(gbuf))
+		if (wl_status == WL_CONNECTED)
 			break;
 
 		(void) poll(NULL, 0, DLADM_WLAN_CONNECT_POLLRATE);
@@ -520,23 +527,22 @@ dladm_wlan_connect(datalink_id_t linkid, dladm_wlan_attr_t *attrp,
     int timeout, void *keys, uint_t key_count, uint_t flags)
 {
 	int			i;
-	wldp_t 			*gbuf = NULL;
+	char 			buf[WLDP_BUFSIZE];
 	connect_state_t		state = {0, NULL, NULL};
 	attr_node_t		*nodep = NULL;
 	boolean_t		create_ibss, set_authmode;
 	dladm_wlan_attr_t	**wl_list = NULL;
 	dladm_status_t		status;
+	wl_linkstatus_t		wl_status;
 
 	if ((status = dladm_wlan_validate(linkid)) != DLADM_STATUS_OK)
 		return (status);
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	if ((status = do_get_linkstatus(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_linkstatus(linkid, &wl_status, sizeof (wl_status)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	if (IS_CONNECTED(gbuf)) {
+	if (wl_status == WL_CONNECTED) {
 		status = DLADM_STATUS_ISCONN;
 		goto done;
 	}
@@ -551,8 +557,8 @@ dladm_wlan_connect(datalink_id_t linkid, dladm_wlan_attr_t *attrp,
 	if ((flags & DLADM_WLAN_CONNECT_NOSCAN) != 0 ||
 	    (create_ibss && attrp != NULL &&
 	    (attrp->wa_valid & DLADM_WLAN_ATTR_ESSID) == 0)) {
-		status = do_connect(linkid, gbuf, attrp, create_ibss, keys,
-		    key_count, timeout);
+		status = do_connect(linkid, buf, sizeof (buf), attrp,
+		    create_ibss, keys, key_count, timeout);
 		goto done;
 	}
 
@@ -569,8 +575,8 @@ dladm_wlan_connect(datalink_id_t linkid, dladm_wlan_attr_t *attrp,
 			status = DLADM_STATUS_NOTFOUND;
 			goto done;
 		}
-		status = do_connect(linkid, gbuf, attrp, create_ibss, keys,
-		    key_count, timeout);
+		status = do_connect(linkid, buf, sizeof (buf),
+		    attrp, create_ibss, keys, key_count, timeout);
 		goto done;
 	}
 
@@ -591,30 +597,29 @@ dladm_wlan_connect(datalink_id_t linkid, dladm_wlan_attr_t *attrp,
 	for (i = 0; i < state.cs_count; i++) {
 		dladm_wlan_attr_t	*ap = wl_list[i];
 
-		status = do_connect(linkid, gbuf, ap, create_ibss, keys,
-		    key_count, timeout);
+		status = do_connect(linkid, buf, sizeof (buf),
+		    ap, create_ibss, keys, key_count, timeout);
 		if (status == DLADM_STATUS_OK)
 			break;
 
 		if (!set_authmode) {
 			ap->wa_auth = DLADM_WLAN_AUTH_SHARED;
 			ap->wa_valid |= DLADM_WLAN_ATTR_AUTH;
-			status = do_connect(linkid, gbuf, ap, create_ibss, keys,
-			    key_count, timeout);
+			status = do_connect(linkid, buf, sizeof (buf),
+			    ap, create_ibss, keys, key_count, timeout);
 			if (status == DLADM_STATUS_OK)
 				break;
 		}
 	}
 done:
 	if ((status != DLADM_STATUS_OK) && (status != DLADM_STATUS_ISCONN))
-		(void) do_disconnect(linkid, gbuf);
+		(void) do_disconnect(linkid, buf, sizeof (buf));
 
 	while (state.cs_list != NULL) {
 		nodep = state.cs_list;
 		state.cs_list = nodep->an_next;
 		free(nodep);
 	}
-	free(gbuf);
 	free(wl_list);
 	return (status);
 }
@@ -622,53 +627,54 @@ done:
 dladm_status_t
 dladm_wlan_disconnect(datalink_id_t linkid)
 {
-	wldp_t		*gbuf;
+	char		buf[WLDP_BUFSIZE];
 	dladm_status_t	status;
+	wl_linkstatus_t	wl_status;
 
 	if ((status = dladm_wlan_validate(linkid)) != DLADM_STATUS_OK)
 		return (status);
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL) {
-		status = DLADM_STATUS_NOMEM;
-		goto done;
-	}
-
-	if ((status = do_get_linkstatus(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_linkstatus(linkid, &wl_status, sizeof (wl_status)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	if (!IS_CONNECTED(gbuf)) {
+	if (wl_status != WL_CONNECTED) {
 		status = DLADM_STATUS_NOTCONN;
 		goto done;
 	}
 
-	if ((status = do_disconnect(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_disconnect(linkid, buf, sizeof (buf)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	if ((status = do_get_linkstatus(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_linkstatus(linkid, &wl_status, sizeof (wl_status)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	if (IS_CONNECTED(gbuf)) {
+	if (wl_status == WL_CONNECTED) {
 		status = DLADM_STATUS_FAILED;
 		goto done;
 	}
 
 	status = DLADM_STATUS_OK;
 done:
-	free(gbuf);
 	return (status);
 }
 
 dladm_status_t
 dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 {
-	wldp_t			*gbuf = NULL;
 	wl_rssi_t		signal;
 	wl_bss_type_t		bsstype;
 	wl_authmode_t		authmode;
 	wl_encryption_t		encryption;
-	wl_rates_t		*ratesp;
+	wl_rates_t		*ratesp = NULL;
 	dladm_wlan_attr_t	*wl_attrp;
 	dladm_status_t		status;
+	char			buf[WLDP_BUFSIZE];
+	wl_essid_t		wls;
+	wl_phy_conf_t		wl_phy_conf;
+	wl_linkstatus_t		wl_status;
 
 	if (attrp == NULL)
 		return (DLADM_STATUS_BADARG);
@@ -676,37 +682,33 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 	if ((status = dladm_wlan_validate(linkid)) != DLADM_STATUS_OK)
 		goto done;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL) {
-		status = DLADM_STATUS_NOMEM;
-		goto done;
-	}
-
 	(void) memset(attrp, 0, sizeof (*attrp));
 	wl_attrp = &attrp->la_wlan_attr;
 
-	if ((status = do_get_linkstatus(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_linkstatus(linkid, &wl_status, sizeof (wl_status)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
 	attrp->la_valid |= DLADM_WLAN_LINKATTR_STATUS;
-	if (!IS_CONNECTED(gbuf))
+	if (wl_status != WL_CONNECTED)
 		attrp->la_status = DLADM_WLAN_LINK_DISCONNECTED;
 	else
 		attrp->la_status = DLADM_WLAN_LINK_CONNECTED;
 
-	if ((status = do_get_essid(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_essid(linkid, &wls, sizeof (wls)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	(void) strlcpy(wl_attrp->wa_essid.we_bytes,
-	    ((wl_essid_t *)(gbuf->wldp_buf))->wl_essid_essid,
+	(void) strlcpy(wl_attrp->wa_essid.we_bytes, wls.wl_essid_essid,
 	    DLADM_WLAN_MAX_ESSID_LEN);
 
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_ESSID;
 
-	if ((status = do_get_bssid(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_bssid(linkid, buf, sizeof (buf)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	(void) memcpy(wl_attrp->wa_bssid.wb_bytes, gbuf->wldp_buf,
-	    DLADM_WLAN_BSSID_LEN);
+	(void) memcpy(wl_attrp->wa_bssid.wb_bytes, buf, DLADM_WLAN_BSSID_LEN);
 
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_BSSID;
 
@@ -716,10 +718,10 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 		goto done;
 	}
 
-	if ((status = do_get_encryption(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_encryption(linkid, &encryption,
+	    sizeof (encryption))) != DLADM_STATUS_OK)
 		goto done;
 
-	encryption = *(wl_encryption_t *)(gbuf->wldp_buf);
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_SECMODE;
 
 	switch (encryption) {
@@ -737,17 +739,23 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 		break;
 	}
 
-	if ((status = do_get_signal(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_signal(linkid, &signal, sizeof (signal)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	signal = *(wl_rssi_t *)(gbuf->wldp_buf);
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_STRENGTH;
 	wl_attrp->wa_strength = DLADM_WLAN_SIGNAL2STRENGTH(signal);
 
-	if ((status = do_get_rate(linkid, gbuf)) != DLADM_STATUS_OK)
+	ratesp = malloc(WLDP_BUFSIZE);
+	if (ratesp == NULL) {
+		status = DLADM_STATUS_NOMEM;
+		goto done;
+	}
+
+	if ((status = do_get_rate(linkid, ratesp, WLDP_BUFSIZE))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	ratesp = (wl_rates_t *)(gbuf->wldp_buf);
 	if (ratesp->wl_rates_num > 0) {
 		uint_t	i, r = 0;
 
@@ -759,10 +767,10 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 		wl_attrp->wa_valid |= DLADM_WLAN_ATTR_SPEED;
 	}
 
-	if ((status = do_get_authmode(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_authmode(linkid, &authmode,
+	    sizeof (authmode))) != DLADM_STATUS_OK)
 		goto done;
 
-	authmode = *(wl_authmode_t *)(gbuf->wldp_buf);
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_AUTH;
 
 	switch (authmode) {
@@ -777,10 +785,10 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 		break;
 	}
 
-	if ((status = do_get_bsstype(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_bsstype(linkid, &bsstype,
+	    sizeof (bsstype))) != DLADM_STATUS_OK)
 		goto done;
 
-	bsstype = *(wl_bss_type_t *)(gbuf->wldp_buf);
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_BSSTYPE;
 
 	switch (bsstype) {
@@ -798,10 +806,11 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 		break;
 	}
 
-	if ((status = do_get_mode(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_mode(linkid, &wl_phy_conf,
+	    sizeof (wl_phy_conf))) != DLADM_STATUS_OK)
 		goto done;
 
-	wl_attrp->wa_mode = do_convert_mode((wl_phy_conf_t *)(gbuf->wldp_buf));
+	wl_attrp->wa_mode = do_convert_mode(&wl_phy_conf);
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_MODE;
 	if (wl_attrp->wa_mode != DLADM_WLAN_MODE_NONE)
 		wl_attrp->wa_valid |= DLADM_WLAN_ATTR_MODE;
@@ -810,7 +819,7 @@ dladm_wlan_get_linkattr(datalink_id_t linkid, dladm_wlan_linkattr_t *attrp)
 	status = DLADM_STATUS_OK;
 
 done:
-	free(gbuf);
+	free(ratesp);
 	return (status);
 }
 
@@ -1047,8 +1056,8 @@ dladm_wlan_str2linkstatus(const char *str, dladm_wlan_linkstatus_t *linkstatus)
 }
 
 dladm_status_t
-i_dladm_wlan_ioctl(datalink_id_t linkid, wldp_t *gbuf, uint_t id, size_t len,
-    uint_t cmd, size_t cmdlen)
+i_dladm_wlan_legacy_ioctl(datalink_id_t linkid, wldp_t *gbuf, uint_t id,
+    size_t len, uint_t cmd, size_t cmdlen)
 {
 	char			linkname[MAXPATHLEN];
 	int			fd, rc;
@@ -1105,17 +1114,8 @@ i_dladm_wlan_ioctl(datalink_id_t linkid, wldp_t *gbuf, uint_t id, size_t len,
 	return (status);
 }
 
-dladm_status_t
-i_dladm_wlan_get_ioctl(datalink_id_t linkid, wldp_t *gbuf, uint_t id)
-{
-	(void) memset(gbuf, 0, MAX_BUF_LEN);
-	return (i_dladm_wlan_ioctl(linkid, gbuf, id, MAX_BUF_LEN,
-	    WLAN_GET_PARAM, MAX_BUF_LEN));
-}
-
-dladm_status_t
-i_dladm_wlan_set_ioctl(datalink_id_t linkid, uint_t id, void *buf,
-    uint_t buflen)
+static dladm_status_t
+do_cmd_ioctl(datalink_id_t linkid, void *buf, int buflen, uint_t cmd)
 {
 	wldp_t *gbuf;
 	dladm_status_t status = DLADM_STATUS_OK;
@@ -1124,99 +1124,97 @@ i_dladm_wlan_set_ioctl(datalink_id_t linkid, uint_t id, void *buf,
 		return (DLADM_STATUS_NOMEM);
 
 	(void) memset(gbuf, 0, MAX_BUF_LEN);
-	(void) memcpy(gbuf->wldp_buf, buf, buflen);
-	buflen += WIFI_BUF_OFFSET;
-	status = i_dladm_wlan_ioctl(linkid, gbuf, id, buflen,
-	    WLAN_SET_PARAM, buflen);
-
+	status = i_dladm_wlan_legacy_ioctl(linkid, gbuf, cmd, WLDP_BUFSIZE,
+	    WLAN_COMMAND, sizeof (wldp_t));
+	(void) memcpy(buf, gbuf->wldp_buf, buflen);
 	free(gbuf);
 	return (status);
 }
 
 static dladm_status_t
-do_cmd_ioctl(datalink_id_t linkid, wldp_t *gbuf, uint_t cmd)
+do_scan(datalink_id_t linkid, void *buf, int buflen)
 {
-	(void) memset(gbuf, 0, MAX_BUF_LEN);
-	return (i_dladm_wlan_ioctl(linkid, gbuf, cmd, sizeof (wldp_t),
-	    WLAN_COMMAND, sizeof (wldp_t)));
+	return (do_cmd_ioctl(linkid, buf, buflen, WL_SCAN));
 }
 
 static dladm_status_t
-do_scan(datalink_id_t linkid, wldp_t *gbuf)
+do_disconnect(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (do_cmd_ioctl(linkid, gbuf, WL_SCAN));
-}
-
-static dladm_status_t
-do_disconnect(datalink_id_t linkid, wldp_t *gbuf)
-{
-	if (do_get_wpamode(linkid, gbuf) == 0 &&
-	    ((wl_wpa_t *)(gbuf->wldp_buf))->wpa_flag > 0)
+	if (do_get_wpamode(linkid, buf, buflen) == 0 &&
+	    ((wl_wpa_t *)(buf))->wpa_flag > 0)
 		(void) wpa_instance_delete(linkid);
 
-	return (do_cmd_ioctl(linkid, gbuf, WL_DISASSOCIATE));
+	return (do_cmd_ioctl(linkid, buf, buflen, WL_DISASSOCIATE));
 }
 
 static dladm_status_t
-do_get_esslist(datalink_id_t linkid, wldp_t *gbuf)
+do_get_esslist(datalink_id_t linkid, void *buf, int buflen)
 {
-	(void) memset(gbuf, 0, MAX_BUF_LEN);
-	return (i_dladm_wlan_ioctl(linkid, gbuf, WL_ESS_LIST, MAX_BUF_LEN,
-	    WLAN_GET_PARAM, sizeof (wldp_t)));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_ESS_LIST, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_bssid(datalink_id_t linkid, wldp_t *gbuf)
+do_get_bssid(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_BSSID));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_BSSID, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_essid(datalink_id_t linkid, wldp_t *gbuf)
+do_get_essid(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_ESSID));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_ESSID, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_bsstype(datalink_id_t linkid, wldp_t *gbuf)
+do_get_bsstype(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_BSS_TYPE));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_BSSTYPE, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_linkstatus(datalink_id_t linkid, wldp_t *gbuf)
+do_get_linkstatus(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_LINKSTATUS));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_LINKSTATUS, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_rate(datalink_id_t linkid, wldp_t *gbuf)
+do_get_rate(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_DESIRED_RATES));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_DESIRED_RATES,
+	    buflen, B_FALSE));
 }
 
 static dladm_status_t
-do_get_authmode(datalink_id_t linkid, wldp_t *gbuf)
+do_get_authmode(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_AUTH_MODE));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_AUTH_MODE, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_encryption(datalink_id_t linkid, wldp_t *gbuf)
+do_get_encryption(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_ENCRYPTION));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_ENCRYPTION, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_signal(datalink_id_t linkid, wldp_t *gbuf)
+do_get_signal(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_RSSI));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_RSSI, buflen,
+	    B_FALSE));
 }
 
 static dladm_status_t
-do_get_mode(datalink_id_t linkid, wldp_t *gbuf)
+do_get_mode(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_PHY_CONFIG));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_PHY_CONFIG,
+	    buflen, B_FALSE));
 }
 
 static dladm_status_t
@@ -1235,8 +1233,8 @@ do_set_bsstype(datalink_id_t linkid, dladm_wlan_bsstype_t *bsstype)
 		ibsstype = WL_BSS_ANY;
 		break;
 	}
-	return (i_dladm_wlan_set_ioctl(linkid, WL_BSS_TYPE, &ibsstype,
-	    sizeof (ibsstype)));
+	return (i_dladm_wlan_param(linkid, &ibsstype, MAC_PROP_WL_BSSTYPE,
+	    sizeof (ibsstype), B_TRUE));
 }
 
 static dladm_status_t
@@ -1254,8 +1252,8 @@ do_set_authmode(datalink_id_t linkid, dladm_wlan_auth_t *auth)
 	default:
 		return (DLADM_STATUS_NOTSUP);
 	}
-	return (i_dladm_wlan_set_ioctl(linkid, WL_AUTH_MODE, &auth_mode,
-	    sizeof (auth_mode)));
+	return (i_dladm_wlan_param(linkid, &auth_mode, MAC_PROP_WL_AUTH_MODE,
+	    sizeof (auth_mode), B_TRUE));
 }
 
 static dladm_status_t
@@ -1275,8 +1273,8 @@ do_set_encryption(datalink_id_t linkid, dladm_wlan_secmode_t *secmode)
 	default:
 		return (DLADM_STATUS_NOTSUP);
 	}
-	return (i_dladm_wlan_set_ioctl(linkid, WL_ENCRYPTION, &encryption,
-	    sizeof (encryption)));
+	return (i_dladm_wlan_param(linkid, &encryption, MAC_PROP_WL_ENCRYPTION,
+	    sizeof (encryption), B_TRUE));
 }
 
 static dladm_status_t
@@ -1309,8 +1307,8 @@ do_set_key(datalink_id_t linkid, dladm_wlan_key_t *keys,
 		(void) memcpy(wkp->wl_wep_key, kp->wk_val, kp->wk_len);
 	}
 
-	return (i_dladm_wlan_set_ioctl(linkid, WL_WEP_KEY_TAB, &wepkey_tab,
-	    sizeof (wepkey_tab)));
+	return (i_dladm_wlan_param(linkid, &wepkey_tab, MAC_PROP_WL_KEY_TAB,
+	    sizeof (wepkey_tab), B_TRUE));
 }
 
 static dladm_status_t
@@ -1327,8 +1325,8 @@ do_set_essid(datalink_id_t linkid, dladm_wlan_essid_t *essid)
 	} else {
 		return (DLADM_STATUS_BADARG);
 	}
-	return (i_dladm_wlan_set_ioctl(linkid, WL_ESSID, &iessid,
-	    sizeof (iessid)));
+	return (i_dladm_wlan_param(linkid, &iessid, MAC_PROP_WL_ESSID,
+	    sizeof (iessid), B_TRUE));
 }
 
 static dladm_status_t
@@ -1342,8 +1340,8 @@ do_set_channel(datalink_id_t linkid, dladm_wlan_channel_t *channel)
 	(void) memset(&phy_conf, 0xff, sizeof (phy_conf));
 	phy_conf.wl_phy_dsss_conf.wl_dsss_channel = *channel;
 
-	return (i_dladm_wlan_set_ioctl(linkid, WL_PHY_CONFIG, &phy_conf,
-	    sizeof (phy_conf)));
+	return (i_dladm_wlan_param(linkid, &phy_conf, MAC_PROP_WL_PHY_CONFIG,
+	    sizeof (phy_conf), B_TRUE));
 }
 
 static dladm_status_t
@@ -1351,8 +1349,8 @@ do_set_createibss(datalink_id_t linkid, boolean_t *create_ibss)
 {
 	wl_create_ibss_t cr = (wl_create_ibss_t)(*create_ibss);
 
-	return (i_dladm_wlan_set_ioctl(linkid, WL_CREATE_IBSS,
-	    &cr, sizeof (cr)));
+	return (i_dladm_wlan_param(linkid, &cr, MAC_PROP_WL_CREATE_IBSS,
+	    sizeof (cr), B_TRUE));
 }
 
 static void
@@ -1364,15 +1362,17 @@ generate_essid(dladm_wlan_essid_t *essid)
 }
 
 static dladm_status_t
-do_get_capability(datalink_id_t linkid, wldp_t *gbuf)
+do_get_capability(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_CAPABILITY));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_CAPABILITY,
+	    buflen, B_FALSE));
 }
 
 static dladm_status_t
-do_get_wpamode(datalink_id_t linkid, wldp_t *gbuf)
+do_get_wpamode(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_WPA));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_WPA, buflen,
+	    B_FALSE));
 }
 
 dladm_status_t
@@ -1380,17 +1380,17 @@ dladm_wlan_wpa_get_sr(datalink_id_t linkid, dladm_wlan_ess_t *sr,
     uint_t escnt, uint_t *estot)
 {
 	int		i, n;
-	wldp_t 		*gbuf;
 	wl_wpa_ess_t	*es;
 	dladm_status_t	status;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+	es = malloc(WLDP_BUFSIZE);
+	if (es == NULL)
 		return (DLADM_STATUS_NOMEM);
 
-	status = i_dladm_wlan_get_ioctl(linkid, gbuf, WL_SCANRESULTS);
+	status = i_dladm_wlan_param(linkid, es, MAC_PROP_WL_SCANRESULTS,
+	    WLDP_BUFSIZE, B_FALSE);
 
 	if (status == DLADM_STATUS_OK) {
-		es = (wl_wpa_ess_t *)(gbuf->wldp_buf);
 		n = (es->count > escnt) ? escnt : es->count;
 		for (i = 0; i < n; i ++) {
 			(void) memcpy(sr[i].we_bssid.wb_bytes, es->ess[i].bssid,
@@ -1406,7 +1406,7 @@ dladm_wlan_wpa_get_sr(datalink_id_t linkid, dladm_wlan_ess_t *sr,
 		*estot = n;
 	}
 
-	free(gbuf);
+	free(es);
 	return (status);
 }
 
@@ -1428,7 +1428,8 @@ dladm_wlan_wpa_set_ie(datalink_id_t linkid, uint8_t *wpa_ie, uint_t wpa_ie_len)
 	ie->wpa_ie_len = wpa_ie_len;
 	(void) memcpy(ie->wpa_ie, wpa_ie, wpa_ie_len);
 
-	status = i_dladm_wlan_set_ioctl(linkid, WL_SETOPTIE, ie, len);
+	status = i_dladm_wlan_param(linkid, ie, MAC_PROP_WL_SETOPTIE, len,
+	    B_TRUE);
 	free(ie);
 
 	return (status);
@@ -1440,8 +1441,8 @@ dladm_wlan_wpa_set_wpa(datalink_id_t linkid, boolean_t flag)
 	wl_wpa_t	wpa;
 
 	wpa.wpa_flag = flag;
-	return (i_dladm_wlan_set_ioctl(linkid, WL_WPA, &wpa,
-	    sizeof (wl_wpa_t)));
+	return (i_dladm_wlan_param(linkid, &wpa, MAC_PROP_WL_WPA,
+	    sizeof (wpa), B_TRUE));
 }
 
 dladm_status_t
@@ -1455,8 +1456,8 @@ dladm_wlan_wpa_del_key(datalink_id_t linkid, uint_t key_idx,
 		(void) memcpy((char *)wk.idk_macaddr, addr->wb_bytes,
 		    DLADM_WLAN_BSSID_LEN);
 
-	return (i_dladm_wlan_set_ioctl(linkid, WL_DELKEY, &wk,
-	    sizeof (wl_del_key_t)));
+	return (i_dladm_wlan_param(linkid, &wk, MAC_PROP_WL_DELKEY,
+	    sizeof (wk), B_TRUE));
 }
 
 dladm_status_t
@@ -1501,7 +1502,8 @@ dladm_wlan_wpa_set_key(datalink_id_t linkid, dladm_wlan_cipher_t cipher,
 	(void) memcpy(&wk.ik_keyrsc, &seq, 6);	/* only use 48-bit of seq */
 	(void) memcpy(wk.ik_keydata, key, key_len);
 
-	return (i_dladm_wlan_set_ioctl(linkid, WL_KEY, &wk, sizeof (wl_key_t)));
+	return (i_dladm_wlan_param(linkid, &wk, MAC_PROP_WL_KEY,
+	    sizeof (wk), B_TRUE));
 }
 
 dladm_status_t
@@ -1526,8 +1528,8 @@ dladm_wlan_wpa_set_mlme(datalink_id_t linkid, dladm_wlan_mlme_op_t op,
 		(void) memcpy(mlme.im_macaddr, bssid->wb_bytes,
 		    DLADM_WLAN_BSSID_LEN);
 
-	return (i_dladm_wlan_set_ioctl(linkid, WL_MLME, &mlme,
-	    sizeof (wl_mlme_t)));
+	return (i_dladm_wlan_param(linkid, &mlme, MAC_PROP_WL_MLME,
+	    sizeof (mlme), B_TRUE));
 }
 
 /*

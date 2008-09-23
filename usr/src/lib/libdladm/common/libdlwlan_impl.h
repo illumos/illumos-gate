@@ -26,10 +26,9 @@
 #ifndef _LIBDLWLAN_IMPL_H
 #define	_LIBDLWLAN_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <inet/wifi_ioctl.h>
+#include <sys/mac.h>
 
 /*
  * Implementation-private data structures, macros, and constants.
@@ -75,12 +74,10 @@ typedef enum {
 	DLADM_WLAN_PM_FAST
 } dladm_wlan_powermode_t;
 
-extern dladm_status_t	i_dladm_wlan_get_ioctl(datalink_id_t, wldp_t *,
-			    uint_t);
-extern dladm_status_t	i_dladm_wlan_set_ioctl(datalink_id_t, uint_t,
-			    void *, uint_t);
-extern dladm_status_t	i_dladm_wlan_ioctl(datalink_id_t, wldp_t *, uint_t,
-			    size_t, uint_t, size_t);
+extern	dladm_status_t i_dladm_wlan_legacy_ioctl(datalink_id_t, wldp_t *,
+			    uint_t, size_t, uint_t, size_t);
+extern dladm_status_t	i_dladm_wlan_param(datalink_id_t, void *,
+			    mac_prop_id_t, size_t, boolean_t);
 extern boolean_t	i_dladm_wlan_convert_chan(wl_phy_conf_t *, uint32_t *);
 
 #ifdef	__cplusplus

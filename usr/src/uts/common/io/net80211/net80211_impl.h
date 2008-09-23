@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _SYS_NET80211_IMPL_H
 #define	_SYS_NET80211_IMPL_H
@@ -186,6 +184,7 @@ extern "C" {
 #define	IEEE80211_MAXRSSI	127
 
 /* Debug Flags */
+#define	IEEE80211_MSG_BRUSSELS  0x80000000	/* BRUSSELS */
 #define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */
 #define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalant */
 #define	IEEE80211_MSG_CRYPTO	0x10000000	/* crypto work */

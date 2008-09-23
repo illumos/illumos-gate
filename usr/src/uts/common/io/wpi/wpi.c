@@ -269,7 +269,11 @@ static int	wpi_m_multicst(void *arg, boolean_t add, const uint8_t *m);
 static int	wpi_m_promisc(void *arg, boolean_t on);
 static mblk_t  *wpi_m_tx(void *arg, mblk_t *mp);
 static void	wpi_m_ioctl(void *arg, queue_t *wq, mblk_t *mp);
-
+static int	wpi_m_setprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
+static int	wpi_m_getprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_lenth,
+    void *wldp_buf);
 static void	wpi_destroy_locks(wpi_sc_t *sc);
 static int	wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type);
 static void	wpi_thread(wpi_sc_t *sc);
@@ -358,7 +362,7 @@ _info(struct modinfo *mip)
  * Mac Call Back entries
  */
 mac_callbacks_t	wpi_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	wpi_m_stat,
 	wpi_m_start,
 	wpi_m_stop,
@@ -367,7 +371,12 @@ mac_callbacks_t	wpi_m_callbacks = {
 	wpi_m_unicst,
 	wpi_m_tx,
 	NULL,
-	wpi_m_ioctl
+	wpi_m_ioctl,
+	NULL,
+	NULL,
+	NULL,
+	wpi_m_setprop,
+	wpi_m_getprop
 };
 
 #ifdef DEBUG
@@ -2219,6 +2228,44 @@ wpi_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 			    IEEE80211_S_SCAN, -1);
 		}
 	}
+}
+
+/*
+ * Callback functions for get/set properties
+ */
+static int
+wpi_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_name,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+{
+	int		err = 0;
+	wpi_sc_t	*sc = (wpi_sc_t *)arg;
+
+	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_name,
+	    pr_flags, wldp_length, wldp_buf);
+
+	return (err);
+}
+static int
+wpi_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_name,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	int		err;
+	wpi_sc_t	*sc = (wpi_sc_t *)arg;
+	ieee80211com_t  *ic = &sc->sc_ic;
+
+	err = ieee80211_setprop(ic, pr_name, wldp_pr_name,
+	    wldp_length, wldp_buf);
+
+	if (err == ENETRESET) {
+		if (ic->ic_des_esslen) {
+			(void) ieee80211_new_state(ic,
+			    IEEE80211_S_SCAN, -1);
+		}
+
+		err = 0;
+	}
+
+	return (err);
 }
 
 /*ARGSUSED*/

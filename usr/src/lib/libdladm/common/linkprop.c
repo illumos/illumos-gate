@@ -48,6 +48,8 @@
 #include <sys/param.h>
 #include <inttypes.h>
 #include <sys/ethernet.h>
+#include <net/wpa.h>
+#include <sys/sysmacros.h>
 
 /*
  * The linkprop get() callback.
@@ -98,20 +100,23 @@ typedef dladm_status_t	pd_checkf_t(struct prop_desc *pd,
 			    uint_t cnt, val_desc_t *propval,
 			    datalink_media_t);
 
-typedef struct dladm_public_prop_s {
+typedef struct link_attr_s {
 	mac_prop_id_t	pp_id;
 	size_t		pp_valsize;
 	char		*pp_name;
-	char		*pp_desc;
-} dladm_public_prop_t;
+} link_attr_t;
 
-static dld_ioc_macprop_t *i_dladm_buf_alloc(size_t, datalink_id_t, const char *,
-					uint_t, dladm_status_t *);
+static dld_ioc_macprop_t *i_dladm_buf_alloc_by_name(size_t, datalink_id_t,
+					const char *, uint_t, dladm_status_t *);
+static dld_ioc_macprop_t *i_dladm_buf_alloc_by_id(size_t, datalink_id_t,
+					mac_prop_id_t, uint_t,
+					dladm_status_t *);
 static dladm_status_t i_dladm_set_prop(datalink_id_t, const char *, char **,
 					uint_t, uint_t);
 static dladm_status_t i_dladm_get_prop(datalink_id_t, const char *, char **,
 					uint_t *, dladm_prop_type_t, uint_t);
-static dladm_public_prop_t *dladm_name2prop(const char *);
+static link_attr_t *dladm_name2prop(const char *);
+static link_attr_t *dladm_id2prop(mac_prop_id_t);
 static dld_ioc_macprop_t *i_dladm_get_public_prop(datalink_id_t, char *, uint_t,
 					dladm_status_t *);
 static pd_getf_t	do_get_zone, do_get_autopush, do_get_rate_mod,
@@ -128,6 +133,11 @@ static pd_checkf_t	do_check_zone, do_check_autopush, do_check_rate,
 
 static dladm_status_t	i_dladm_speed_get(struct prop_desc *, datalink_id_t,
 			char **, uint_t *, uint_t);
+static dladm_status_t	i_dladm_wlan_get_legacy_ioctl(datalink_id_t, void *,
+			    uint_t, uint_t);
+static dladm_status_t	i_dladm_wlan_set_legacy_ioctl(datalink_id_t, void *,
+			    uint_t, uint_t);
+static dladm_status_t	i_dladm_macprop(void *, boolean_t);
 
 typedef struct prop_desc {
 	/*
@@ -193,70 +203,104 @@ typedef struct prop_desc {
 
 #define	MAC_PROP_BUFSIZE(v)	sizeof (dld_ioc_macprop_t) + (v) - 1
 
+/*
+ * Supported link properties enumerated in the prop_table[] array are
+ * computed using the callback functions in that array. To compute the
+ * property value, multiple distinct system calls may be needed (e.g.,
+ * for wifi speed, we need to issue system calls to get desired/supported
+ * rates). The link_attr[] table enumerates the interfaces to the kernel,
+ * and the type/size of the data passed in the user-kernel interface.
+ */
+static link_attr_t link_attr[] = {
+	{ MAC_PROP_DUPLEX,	sizeof (link_duplex_t),	"duplex"},
 
-static dladm_public_prop_t dladm_prop[] = {
-	{ MAC_PROP_DUPLEX,	sizeof (link_duplex_t),
-	    "duplex",		"link duplex mode" },
+	{ MAC_PROP_SPEED,	sizeof (uint64_t),	"speed"},
 
-	{ MAC_PROP_SPEED,	sizeof (uint64_t),
-	    "speed",		"link speed (bps)" },
+	{ MAC_PROP_STATUS,	sizeof (link_state_t),	"state"},
 
-	{ MAC_PROP_STATUS,	sizeof (link_state_t),
-	    "state",		"link up/down" },
+	{ MAC_PROP_AUTONEG,	sizeof (uint8_t),	"adv_autoneg_cap"},
 
-	{ MAC_PROP_AUTONEG,	sizeof (uint8_t),
-	    "adv_autoneg_cap",	"Advertised auto-negotiation" },
+	{ MAC_PROP_MTU,		sizeof (uint32_t),	"mtu"},
 
-	{ MAC_PROP_MTU,		sizeof (uint32_t),
-	    "mtu",		"current link mtu" },
+	{ MAC_PROP_FLOWCTRL,	sizeof (link_flowctrl_t), "flowctrl"},
 
-	{ MAC_PROP_FLOWCTRL,	sizeof (link_flowctrl_t),
-	    "flowctrl",		"flowcontrol" },
+	{ MAC_PROP_ZONE,	sizeof (dld_ioc_zid_t),	"zone"},
 
-	{ MAC_PROP_ZONE,	sizeof (dld_ioc_zid_t),
-	    "zone",		"non-global zones" },
+	{ MAC_PROP_AUTOPUSH,	sizeof (struct dlautopush), "autopush"},
 
-	{ MAC_PROP_AUTOPUSH,	sizeof (struct dlautopush),
-	    "autopush",		"autopush modules" },
+	{ MAC_PROP_ADV_1000FDX_CAP, sizeof (uint8_t),	"adv_1000fdx_cap"},
 
-	{ MAC_PROP_ADV_1000FDX_CAP, sizeof (uint8_t),
-	    "adv_1000fdx_cap",	"Adv 1000 Mbps fdx" },
+	{ MAC_PROP_EN_1000FDX_CAP, sizeof (uint8_t),	"en_1000fdx_cap"},
 
-	{ MAC_PROP_EN_1000FDX_CAP, sizeof (uint8_t),
-	    "en_1000fdx_cap",	"Enable 1000 Mbps fdx" },
+	{ MAC_PROP_ADV_1000HDX_CAP, sizeof (uint8_t),	"adv_1000hdx_cap"},
 
-	{ MAC_PROP_ADV_1000HDX_CAP, sizeof (uint8_t),
-	    "adv_1000hdx_cap", "Adv 1000 Mbps hdx" },
+	{ MAC_PROP_EN_1000HDX_CAP, sizeof (uint8_t),	"en_1000hdx_cap"},
 
-	{ MAC_PROP_EN_1000HDX_CAP, sizeof (uint8_t),
-	    "en_1000hdx_cap",	"Enable 1000 Mbps hdx" },
+	{ MAC_PROP_ADV_100FDX_CAP, sizeof (uint8_t),	"adv_100fdx_cap"},
 
-	{ MAC_PROP_ADV_100FDX_CAP, sizeof (uint8_t),
-	    "adv_100fdx_cap",	"Adv 100 Mbps fdx" },
+	{ MAC_PROP_EN_100FDX_CAP, sizeof (uint8_t),	"en_100fdx_cap"},
 
-	{ MAC_PROP_EN_100FDX_CAP, sizeof (uint8_t),
-	    "en_100fdx_cap",	"Enable 100 Mbps fdx" },
+	{ MAC_PROP_ADV_100HDX_CAP, sizeof (uint8_t),	"adv_100hdx_cap"},
 
-	{ MAC_PROP_ADV_100HDX_CAP, sizeof (uint8_t),
-	    "adv_100hdx_cap",	"Adv 100 Mbps hdx" },
+	{ MAC_PROP_EN_100HDX_CAP, sizeof (uint8_t),	"en_100hdx_cap"},
 
-	{ MAC_PROP_EN_100HDX_CAP, sizeof (uint8_t),
-	    "en_100hdx_cap",	"Enable 100 Mbps hdx" },
+	{ MAC_PROP_ADV_10FDX_CAP, sizeof (uint8_t),	"adv_10fdx_cap"},
 
-	{ MAC_PROP_ADV_10FDX_CAP, sizeof (uint8_t),
-	    "adv_10fdx_cap",	"Adv 10 Mbps fdx" },
+	{ MAC_PROP_EN_10FDX_CAP, sizeof (uint8_t),	"en_10fdx_cap"},
 
-	{ MAC_PROP_EN_10FDX_CAP, sizeof (uint8_t),
-	    "en_10fdx_cap",	"Enable 10 Mbps fdx" },
+	{ MAC_PROP_ADV_10HDX_CAP, sizeof (uint8_t),	"adv_10hdx_cap"},
 
-	{ MAC_PROP_ADV_10HDX_CAP, sizeof (uint8_t),
-	    "adv_10hdx_cap",	"Adv 10 Mbps hdx" },
+	{ MAC_PROP_EN_10HDX_CAP, sizeof (uint8_t),	"en_10hdx_cap"},
 
-	{ MAC_PROP_EN_10HDX_CAP, sizeof (uint8_t),
-	    "en_10hdx_cap",	"Enable 10 Mbps hdx" },
+	{ MAC_PROP_WL_ESSID,	sizeof (wl_linkstatus_t), "essid"},
 
-	{ MAC_PROP_PRIVATE, 0,
-	    "driver-private",	"" }
+	{ MAC_PROP_WL_BSSID,	sizeof (wl_bssid_t),	"bssid"},
+
+	{ MAC_PROP_WL_BSSTYPE,	sizeof (wl_bss_type_t),	"bsstype"},
+
+	{ MAC_PROP_WL_LINKSTATUS, sizeof (wl_linkstatus_t), "wl_linkstatus"},
+
+	/* wl_rates_t has variable length */
+	{ MAC_PROP_WL_DESIRED_RATES, sizeof (wl_rates_t), "desired_rates"},
+
+	/* wl_rates_t has variable length */
+	{ MAC_PROP_WL_SUPPORTED_RATES, sizeof (wl_rates_t), "supported_rates"},
+
+	{ MAC_PROP_WL_AUTH_MODE, sizeof (wl_authmode_t), "authmode"},
+
+	{ MAC_PROP_WL_ENCRYPTION, sizeof (wl_encryption_t), "encryption"},
+
+	{ MAC_PROP_WL_RSSI,	sizeof (wl_rssi_t),	"signal"},
+
+	{ MAC_PROP_WL_PHY_CONFIG, sizeof (wl_phy_conf_t), "phy_conf"},
+
+	{ MAC_PROP_WL_CAPABILITY, sizeof (wl_capability_t), "capability"},
+
+	{ MAC_PROP_WL_WPA,	sizeof (wl_wpa_t),	"wpa"},
+
+	/*  wl_wpa_ess_t has variable length */
+	{ MAC_PROP_WL_SCANRESULTS, sizeof (wl_wpa_ess_t), "scan_results"},
+
+	{ MAC_PROP_WL_POWER_MODE, sizeof (wl_ps_mode_t), "powermode"},
+
+	{ MAC_PROP_WL_RADIO,	sizeof (dladm_wlan_radio_t), "wl_radio"},
+
+	{ MAC_PROP_WL_ESS_LIST, sizeof (wl_ess_list_t),	"wl_ess_list"},
+
+	{ MAC_PROP_WL_KEY_TAB,	sizeof (wl_wep_key_tab_t), "wl_wep_key"},
+
+	{ MAC_PROP_WL_CREATE_IBSS, sizeof (wl_create_ibss_t), "createibss"},
+
+	/* wl_wpa_ie_t has variable length */
+	{ MAC_PROP_WL_SETOPTIE,	sizeof (wl_wpa_ie_t),	"set_ie"},
+
+	{ MAC_PROP_WL_DELKEY,	sizeof (wl_del_key_t),	"wpa_del_key"},
+
+	{ MAC_PROP_WL_KEY,	sizeof (wl_key_t),	"wl_key"},
+
+	{ MAC_PROP_WL_MLME,	sizeof (wl_mlme_t),	"mlme"},
+
+	{ MAC_PROP_PRIVATE,	0,			"driver-private"}
 };
 
 static  val_desc_t	link_duplex_vals[] = {
@@ -413,6 +457,12 @@ static prop_desc_t	prop_table[] = {
 };
 
 #define	DLADM_MAX_PROPS	(sizeof (prop_table) / sizeof (prop_desc_t))
+
+/*
+ * when retrieving  private properties, we pass down a buffer with
+ * DLADM_PROP_BUF_CHUNK of space for the driver to return the property value.
+ */
+#define	DLADM_PROP_BUF_CHUNK	1024
 
 static dladm_status_t	i_dladm_set_linkprop_db(datalink_id_t, const char *,
 			    char **, uint_t);
@@ -1244,6 +1294,8 @@ do_check_autopush(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
 	return (DLADM_STATUS_OK);
 }
 
+#define	WLDP_BUFSIZE (MAX_BUF_LEN - WIFI_BUF_OFFSET)
+
 /* ARGSUSED */
 static dladm_status_t
 do_get_rate_common(struct prop_desc *pd, datalink_id_t linkid,
@@ -1251,19 +1303,16 @@ do_get_rate_common(struct prop_desc *pd, datalink_id_t linkid,
 {
 	wl_rates_t	*wrp;
 	uint_t		i;
-	wldp_t		*gbuf = NULL;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL) {
-		status = DLADM_STATUS_NOMEM;
-		goto done;
-	}
+	wrp = malloc(WLDP_BUFSIZE);
+	if (wrp == NULL)
+		return (DLADM_STATUS_NOMEM);
 
-	status = i_dladm_wlan_get_ioctl(linkid, gbuf, id);
+	status = i_dladm_wlan_param(linkid, wrp, id, WLDP_BUFSIZE, B_FALSE);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
-	wrp = (wl_rates_t *)gbuf->wldp_buf;
 	if (wrp->wl_rates_num > *val_cnt) {
 		status = DLADM_STATUS_TOOSMALL;
 		goto done;
@@ -1283,7 +1332,7 @@ do_get_rate_common(struct prop_desc *pd, datalink_id_t linkid,
 	*val_cnt = wrp->wl_rates_num;
 
 done:
-	free(gbuf);
+	free(wrp);
 	return (status);
 }
 
@@ -1296,7 +1345,7 @@ do_get_rate_prop(struct prop_desc *pd, datalink_id_t linkid,
 		    val_cnt, flags));
 
 	return (do_get_rate_common(pd, linkid, prop_val, val_cnt,
-	    WL_DESIRED_RATES));
+	    MAC_PROP_WL_DESIRED_RATES));
 }
 
 /* ARGSUSED */
@@ -1314,7 +1363,7 @@ do_get_rate_mod(struct prop_desc *pd, datalink_id_t linkid,
 
 	case DL_WIFI:
 		return (do_get_rate_common(pd, linkid, prop_val, val_cnt,
-		    WL_SUPPORTED_RATES));
+		    MAC_PROP_WL_SUPPORTED_RATES));
 	default:
 		return (DLADM_STATUS_BADARG);
 	}
@@ -1325,26 +1374,24 @@ do_set_rate(datalink_id_t linkid, dladm_wlan_rates_t *rates)
 {
 	int		i;
 	uint_t		len;
-	wldp_t		*gbuf;
 	wl_rates_t	*wrp;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+	wrp = malloc(WLDP_BUFSIZE);
+	if (wrp == NULL)
 		return (DLADM_STATUS_NOMEM);
 
-	(void) memset(gbuf, 0, MAX_BUF_LEN);
-
-	wrp = (wl_rates_t *)gbuf->wldp_buf;
+	bzero(wrp, WLDP_BUFSIZE);
 	for (i = 0; i < rates->wr_cnt; i++)
 		wrp->wl_rates_rates[i] = rates->wr_rates[i];
 	wrp->wl_rates_num = rates->wr_cnt;
 
 	len = offsetof(wl_rates_t, wl_rates_rates) +
 	    (rates->wr_cnt * sizeof (char)) + WIFI_BUF_OFFSET;
-	status = i_dladm_wlan_ioctl(linkid, gbuf, WL_DESIRED_RATES, len,
-	    WLAN_SET_PARAM, len);
+	status = i_dladm_wlan_param(linkid, wrp, MAC_PROP_WL_DESIRED_RATES,
+	    len, B_TRUE);
 
-	free(gbuf);
+	free(wrp);
 	return (status);
 }
 
@@ -1420,9 +1467,10 @@ done:
 }
 
 static dladm_status_t
-do_get_phyconf(datalink_id_t linkid, wldp_t *gbuf)
+do_get_phyconf(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_PHY_CONFIG));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_PHY_CONFIG,
+	    buflen, B_FALSE));
 }
 
 /* ARGSUSED */
@@ -1431,17 +1479,16 @@ do_get_channel_prop(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	uint32_t	channel;
-	wldp_t		*gbuf;
+	char		buf[WLDP_BUFSIZE];
 	dladm_status_t	status = DLADM_STATUS_OK;
+	wl_phy_conf_t	wl_phy_conf;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	if ((status = do_get_phyconf(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_phyconf(linkid, buf, sizeof (buf)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	if (!i_dladm_wlan_convert_chan((wl_phy_conf_t *)gbuf->wldp_buf,
-	    &channel)) {
+	(void) memcpy(&wl_phy_conf, buf, sizeof (wl_phy_conf));
+	if (!i_dladm_wlan_convert_chan(&wl_phy_conf, &channel)) {
 		status = DLADM_STATUS_NOTFOUND;
 		goto done;
 	}
@@ -1450,14 +1497,14 @@ do_get_channel_prop(struct prop_desc *pd, datalink_id_t linkid,
 	*val_cnt = 1;
 
 done:
-	free(gbuf);
 	return (status);
 }
 
 static dladm_status_t
-do_get_powermode(datalink_id_t linkid, wldp_t *gbuf)
+do_get_powermode(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_POWER_MODE));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_POWER_MODE,
+	    buflen, B_FALSE));
 }
 
 /* ARGSUSED */
@@ -1465,19 +1512,17 @@ static dladm_status_t
 do_get_powermode_prop(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	wl_ps_mode_t	*mode;
+	wl_ps_mode_t	mode;
 	const char	*s;
-	wldp_t		*gbuf;
+	char		buf[WLDP_BUFSIZE];
 	dladm_status_t	status = DLADM_STATUS_OK;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	if ((status = do_get_powermode(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_powermode(linkid, buf, sizeof (buf)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	mode = (wl_ps_mode_t *)(gbuf->wldp_buf);
-	switch (mode->wl_ps_mode) {
+	(void) memcpy(&mode, buf, sizeof (mode));
+	switch (mode.wl_ps_mode) {
 	case WL_PM_AM:
 		s = "off";
 		break;
@@ -1495,7 +1540,6 @@ do_get_powermode_prop(struct prop_desc *pd, datalink_id_t linkid,
 	*val_cnt = 1;
 
 done:
-	free(gbuf);
 	return (status);
 }
 
@@ -1519,8 +1563,8 @@ do_set_powermode(datalink_id_t linkid, dladm_wlan_powermode_t *pm)
 	default:
 		return (DLADM_STATUS_NOTSUP);
 	}
-	return (i_dladm_wlan_set_ioctl(linkid, WL_POWER_MODE, &ps_mode,
-	    sizeof (ps_mode)));
+	return (i_dladm_wlan_param(linkid, &ps_mode, MAC_PROP_WL_POWER_MODE,
+	    sizeof (ps_mode), B_TRUE));
 }
 
 /* ARGSUSED */
@@ -1540,9 +1584,10 @@ do_set_powermode_prop(prop_desc_t *pd, datalink_id_t linkid,
 }
 
 static dladm_status_t
-do_get_radio(datalink_id_t linkid, wldp_t *gbuf)
+do_get_radio(datalink_id_t linkid, void *buf, int buflen)
 {
-	return (i_dladm_wlan_get_ioctl(linkid, gbuf, WL_RADIO));
+	return (i_dladm_wlan_param(linkid, buf, MAC_PROP_WL_RADIO, buflen,
+	    B_FALSE));
 }
 
 /* ARGSUSED */
@@ -1552,16 +1597,14 @@ do_get_radio_prop(struct prop_desc *pd, datalink_id_t linkid,
 {
 	wl_radio_t	radio;
 	const char	*s;
-	wldp_t		*gbuf;
+	char		buf[WLDP_BUFSIZE];
 	dladm_status_t	status = DLADM_STATUS_OK;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	if ((status = do_get_radio(linkid, gbuf)) != DLADM_STATUS_OK)
+	if ((status = do_get_radio(linkid, buf, sizeof (buf)))
+	    != DLADM_STATUS_OK)
 		goto done;
 
-	radio = *(wl_radio_t *)(gbuf->wldp_buf);
+	(void) memcpy(&radio, buf, sizeof (radio));
 	switch (radio) {
 	case B_TRUE:
 		s = "on";
@@ -1577,7 +1620,6 @@ do_get_radio_prop(struct prop_desc *pd, datalink_id_t linkid,
 	*val_cnt = 1;
 
 done:
-	free(gbuf);
 	return (status);
 }
 
@@ -1596,7 +1638,8 @@ do_set_radio(datalink_id_t linkid, dladm_wlan_radio_t *radio)
 	default:
 		return (DLADM_STATUS_NOTSUP);
 	}
-	return (i_dladm_wlan_set_ioctl(linkid, WL_RADIO, &r, sizeof (r)));
+	return (i_dladm_wlan_param(linkid, &r, MAC_PROP_WL_RADIO,
+	    sizeof (r), B_TRUE));
 }
 
 /* ARGSUSED */
@@ -1688,32 +1731,39 @@ done:
 	return (status);
 }
 
-static dladm_public_prop_t *
+static link_attr_t *
 dladm_name2prop(const char *prop_name)
 {
-	dladm_public_prop_t *p;
+	link_attr_t *p;
 
-	for (p = dladm_prop; p->pp_id != MAC_PROP_PRIVATE; p++) {
+	for (p = link_attr; p->pp_id != MAC_PROP_PRIVATE; p++) {
 		if (strcmp(p->pp_name, prop_name) == 0)
 			break;
 	}
 	return (p);
 }
 
+static link_attr_t *
+dladm_id2prop(mac_prop_id_t propid)
+{
+	link_attr_t *p;
+
+	for (p = link_attr; p->pp_id != MAC_PROP_PRIVATE; p++) {
+		if (p->pp_id == propid)
+			break;
+	}
+	return (p);
+}
 
 static dld_ioc_macprop_t *
-i_dladm_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
-    uint_t flags, dladm_status_t *status)
+i_dladm_buf_alloc_impl(size_t valsize, datalink_id_t linkid,
+    const char *prop_name, mac_prop_id_t propid, uint_t flags,
+    dladm_status_t *status)
 {
 	int dsize;
 	dld_ioc_macprop_t *dip;
-	dladm_public_prop_t *p;
 
 	*status = DLADM_STATUS_OK;
-	p = dladm_name2prop(prop_name);
-	if (p->pp_id != MAC_PROP_PRIVATE)
-		valsize = p->pp_valsize;
-
 	dsize = MAC_PROP_BUFSIZE(valsize);
 	dip = malloc(dsize);
 	if (dip == NULL) {
@@ -1725,9 +1775,33 @@ i_dladm_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
 	(void) strlcpy(dip->pr_name, prop_name, sizeof (dip->pr_name));
 	dip->pr_version = MAC_PROP_VERSION;
 	dip->pr_linkid = linkid;
-	dip->pr_num = p->pp_id;
+	dip->pr_num = propid;
 	dip->pr_flags = flags;
 	return (dip);
+}
+
+static dld_ioc_macprop_t *
+i_dladm_buf_alloc_by_name(size_t valsize, datalink_id_t linkid,
+    const char *prop_name, uint_t flags, dladm_status_t *status)
+{
+	link_attr_t *p;
+
+	p = dladm_name2prop(prop_name);
+	valsize = MAX(p->pp_valsize, valsize);
+	return (i_dladm_buf_alloc_impl(valsize, linkid, prop_name, p->pp_id,
+	    flags, status));
+}
+
+static dld_ioc_macprop_t *
+i_dladm_buf_alloc_by_id(size_t valsize, datalink_id_t linkid,
+    mac_prop_id_t propid, uint_t flags, dladm_status_t *status)
+{
+	link_attr_t *p;
+
+	p = dladm_id2prop(propid);
+	valsize = MAX(p->pp_valsize, valsize);
+	return (i_dladm_buf_alloc_impl(valsize, linkid, p->pp_name, propid,
+	    flags, status));
 }
 
 /* ARGSUSED */
@@ -1736,14 +1810,13 @@ i_dladm_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
     val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
 {
 	dld_ioc_macprop_t	*dip;
-	int		fd;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	uint8_t		u8;
 	uint16_t	u16;
 	uint32_t	u32;
 	void		*val;
 
-	dip = i_dladm_buf_alloc(0, linkid, pd->pd_name, 0, &status);
+	dip = i_dladm_buf_alloc_by_name(0, linkid, pd->pd_name, 0, &status);
 	if (dip == NULL)
 		return (status);
 
@@ -1778,16 +1851,27 @@ i_dladm_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 	else
 		dip->pr_valsize = 0;
 
+	status = i_dladm_macprop(dip, B_TRUE);
+
+done:
+	free(dip);
+	return (status);
+}
+
+dladm_status_t
+i_dladm_macprop(void *dip, boolean_t set)
+{
+	int fd;
+	dladm_status_t status = DLADM_STATUS_OK;
+
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
-		goto done;
+		return (status);
 	}
-	if (ioctl(fd, DLDIOC_SETMACPROP, dip) < 0)
+	if (ioctl(fd, (set ? DLDIOC_SETMACPROP : DLDIOC_GETMACPROP), dip))
 		status = dladm_errno2status(errno);
 
 	(void) close(fd);
-done:
-	free(dip);
 	return (status);
 }
 
@@ -1795,24 +1879,13 @@ static dld_ioc_macprop_t *
 i_dladm_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
     dladm_status_t *status)
 {
-	int fd;
 	dld_ioc_macprop_t *dip = NULL;
 
-	*status = DLADM_STATUS_OK;
-
-	dip = i_dladm_buf_alloc(0, linkid, prop_name, flags, status);
+	dip = i_dladm_buf_alloc_by_name(0, linkid, prop_name, flags, status);
 	if (dip == NULL)
 		return (NULL);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
-		*status = dladm_errno2status(errno);
-		goto done;
-	}
-	if (ioctl(fd, DLDIOC_GETMACPROP, dip) < 0)
-		*status = dladm_errno2status(errno);
-
-	(void) close(fd);
-done:
+	*status = i_dladm_macprop(dip, B_FALSE);
 	if (*status != DLADM_STATUS_OK) {
 		free(dip);
 		return (NULL);
@@ -1999,11 +2072,11 @@ static dladm_status_t
 i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
     char **prop_val, uint_t val_cnt, uint_t flags)
 {
-	int		fd, i, slen;
+	int		i, slen;
 	int 		bufsize = 0;
 	dld_ioc_macprop_t *dip = NULL;
 	uchar_t 	*dp;
-	dladm_public_prop_t *p;
+	link_attr_t *p;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
 	if ((prop_name == NULL && prop_val != NULL) ||
@@ -2025,25 +2098,19 @@ i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
 		/*
 		 * getting default value. so use more buffer space.
 		 */
-		bufsize += 1024;
+		bufsize += DLADM_PROP_BUF_CHUNK;
 	}
 
-	dip = i_dladm_buf_alloc(bufsize + 1, linkid, prop_name,
+	dip = i_dladm_buf_alloc_by_name(bufsize + 1, linkid, prop_name,
 	    (prop_val != NULL ? 0 : MAC_PROP_DEFAULT), &status);
 	if (dip == NULL)
 		return (status);
 
 	dp = (uchar_t *)dip->pr_val;
 	slen = 0;
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
-		status = dladm_errno2status(errno);
-		goto done;
-	}
+
 	if (prop_val == NULL) {
-		if (ioctl(fd, DLDIOC_GETMACPROP, dip) < 0) {
-			status = dladm_errno2status(errno);
-			goto done;
-		}
+		status = i_dladm_macprop(dip, B_FALSE);
 	} else {
 		for (i = 0; i < val_cnt; i++) {
 			int plen = 0;
@@ -2058,13 +2125,9 @@ i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
 				dp[slen++] = ',';
 			dp += (plen + 1);
 		}
+		status = i_dladm_macprop(dip, B_TRUE);
 	}
-	if (ioctl(fd, DLDIOC_SETMACPROP, dip) < 0)
-		status = dladm_errno2status(errno);
 
-done:
-	if (fd > 0)
-		(void) close(fd);
 	free(dip);
 	return (status);
 }
@@ -2073,10 +2136,9 @@ static dladm_status_t
 i_dladm_get_prop(datalink_id_t linkid, const char *prop_name,
     char **prop_val, uint_t *val_cnt, dladm_prop_type_t type, uint_t dld_flags)
 {
-	int		fd;
-	dladm_status_t  status = DLADM_STATUS_OK;
+	dladm_status_t	status = DLADM_STATUS_OK;
 	dld_ioc_macprop_t *dip = NULL;
-	dladm_public_prop_t *p;
+	link_attr_t *p;
 	char tmp = '\0';
 
 	if ((prop_name == NULL && prop_val != NULL) ||
@@ -2096,23 +2158,15 @@ i_dladm_get_prop(datalink_id_t linkid, const char *prop_name,
 	/*
 	 * private properties: all parsing is done in the kernel.
 	 */
-	dip = i_dladm_buf_alloc(1024, linkid, prop_name, dld_flags, &status);
+	dip = i_dladm_buf_alloc_by_name(DLADM_PROP_BUF_CHUNK, linkid, prop_name,
+	    dld_flags, &status);
 	if (dip == NULL)
 		return (status);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
-		free(dip);
-		return (DLADM_STATUS_BADARG);
-	}
-
-	if (ioctl(fd, DLDIOC_GETMACPROP, dip) < 0) {
-		status = dladm_errno2status(errno);
-	} else {
+	if ((status = i_dladm_macprop(dip, B_FALSE)) == DLADM_STATUS_OK) {
 		(void) strncpy(*prop_val, dip->pr_val, DLADM_PROP_VAL_MAX);
 		*val_cnt = 1;
 	}
-
-	(void) close(fd);
 	free(dip);
 	return (status);
 }
@@ -2160,5 +2214,148 @@ i_dladm_getset_defval(prop_desc_t *pdp, datalink_id_t linkid,
 		    media, pdp, prop_vals, cnt, flags);
 	}
 	free(buf);
+	return (status);
+}
+
+int
+macprop_to_wifi(mac_prop_id_t wl_prop)
+{
+	switch (wl_prop) {
+	case MAC_PROP_WL_ESSID:
+		return (WL_ESSID);
+	case MAC_PROP_WL_BSSID:
+		return (WL_BSSID);
+	case MAC_PROP_WL_BSSTYPE:
+		return (WL_BSS_TYPE);
+	case MAC_PROP_WL_LINKSTATUS:
+		return (WL_LINKSTATUS);
+	case MAC_PROP_WL_DESIRED_RATES:
+		return (WL_DESIRED_RATES);
+	case MAC_PROP_WL_SUPPORTED_RATES:
+		return (WL_SUPPORTED_RATES);
+	case MAC_PROP_WL_AUTH_MODE:
+		return (WL_AUTH_MODE);
+	case MAC_PROP_WL_ENCRYPTION:
+		return (WL_ENCRYPTION);
+	case MAC_PROP_WL_RSSI:
+		return (WL_RSSI);
+	case MAC_PROP_WL_PHY_CONFIG:
+		return (WL_PHY_CONFIG);
+	case MAC_PROP_WL_CAPABILITY:
+		return (WL_CAPABILITY);
+	case MAC_PROP_WL_WPA:
+		return (WL_WPA);
+	case MAC_PROP_WL_SCANRESULTS:
+		return (WL_SCANRESULTS);
+	case MAC_PROP_WL_POWER_MODE:
+		return (WL_POWER_MODE);
+	case MAC_PROP_WL_RADIO:
+		return (WL_RADIO);
+	case MAC_PROP_WL_ESS_LIST:
+		return (WL_ESS_LIST);
+	case MAC_PROP_WL_KEY_TAB:
+		return (WL_WEP_KEY_TAB);
+	case MAC_PROP_WL_CREATE_IBSS:
+		return (WL_CREATE_IBSS);
+	case MAC_PROP_WL_SETOPTIE:
+		return (WL_SETOPTIE);
+	case MAC_PROP_WL_DELKEY:
+		return (WL_DELKEY);
+	case MAC_PROP_WL_KEY:
+		return (WL_KEY);
+	case MAC_PROP_WL_MLME:
+		return (WL_MLME);
+	default:
+		return (-1);
+	}
+}
+
+dladm_status_t
+i_dladm_wlan_param(datalink_id_t linkid, void *buf, mac_prop_id_t cmd,
+    size_t len, boolean_t set)
+{
+	uint32_t		flags;
+	dladm_status_t		status;
+	uint32_t		media;
+	dld_ioc_macprop_t	*dip;
+	void			*dp;
+
+	if ((status = dladm_datalink_id2info(linkid, &flags, NULL, &media,
+	    NULL, 0)) != DLADM_STATUS_OK) {
+		return (status);
+	}
+
+	if (media != DL_WIFI)
+		return (DLADM_STATUS_BADARG);
+
+	if (!(flags & DLADM_OPT_ACTIVE))
+		return (DLADM_STATUS_TEMPONLY);
+
+	if (len == (MAX_BUF_LEN - WIFI_BUF_OFFSET))
+		len = MAX_BUF_LEN - sizeof (dld_ioc_macprop_t) - 1;
+
+	dip = i_dladm_buf_alloc_by_id(len, linkid, cmd, 0, &status);
+	if (dip == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	dp = (uchar_t *)dip->pr_val;
+	if (set)
+		(void) memcpy(dp, buf, len);
+
+	status = i_dladm_macprop(dip, set);
+	if (status == DLADM_STATUS_NOTSUP) {
+		if (set) {
+			status = i_dladm_wlan_set_legacy_ioctl(linkid,
+			    buf, len, macprop_to_wifi(cmd));
+		} else {
+			status = i_dladm_wlan_get_legacy_ioctl(linkid,
+			    buf, len, macprop_to_wifi(cmd));
+		}
+	} else if (status == DLADM_STATUS_OK) {
+		if (!set)
+			(void) memcpy(buf, dp, len);
+	}
+
+	free(dip);
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_wlan_get_legacy_ioctl(datalink_id_t linkid, void *buf, uint_t buflen,
+    uint_t id)
+{
+	wldp_t *gbuf;
+	dladm_status_t status;
+
+	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	(void) memset(gbuf, 0, MAX_BUF_LEN);
+	status = i_dladm_wlan_legacy_ioctl(linkid, gbuf, id, MAX_BUF_LEN,
+	    WLAN_GET_PARAM, sizeof (wldp_t));
+	if (status == DLADM_STATUS_OK)
+		(void) memcpy(buf, gbuf->wldp_buf, buflen);
+
+	free(gbuf);
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_wlan_set_legacy_ioctl(datalink_id_t linkid,  void *buf, uint_t buflen,
+    uint_t id)
+{
+	wldp_t *gbuf;
+	dladm_status_t status = DLADM_STATUS_OK;
+
+	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	(void) memset(gbuf, 0, MAX_BUF_LEN);
+	(void) memcpy(gbuf->wldp_buf, buf, buflen);
+	buflen += WIFI_BUF_OFFSET;
+	status = i_dladm_wlan_legacy_ioctl(linkid, gbuf, id, buflen,
+	    WLAN_SET_PARAM, buflen);
+
+	free(gbuf);
 	return (status);
 }

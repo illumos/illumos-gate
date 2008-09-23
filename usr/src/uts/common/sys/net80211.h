@@ -38,8 +38,6 @@
 #ifndef _SYS_NET80211_H
 #define	_SYS_NET80211_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mac.h>
 #include <sys/ethernet.h>
 #include <sys/net80211_proto.h>
@@ -538,6 +536,10 @@ void ieee80211_stop_watchdog(ieee80211com_t *);
 
 void *ieee80211_malloc(size_t);
 void ieee80211_free(void *);
+int ieee80211_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+int ieee80211_getprop(void *, const char *, mac_prop_id_t, uint_t, uint_t,
+    void *);
 
 #ifdef	__cplusplus
 }
