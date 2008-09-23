@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * vnode ops for the /dev filesystem
  *
@@ -425,8 +423,11 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred, ct)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred, ct)) != 0) {
+		if (error == EACCES)
+			error = ENXIO;		/* unix standards compliance */
 		return (error);
+	}
 
 	/* check existing name */
 /* XXXci - We may need to translate the C-I flags on VOP_LOOKUP */
