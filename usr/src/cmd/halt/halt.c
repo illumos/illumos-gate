@@ -69,6 +69,8 @@
 #include <stdio.h>
 #include <strings.h>
 #include <time.h>
+#include <wait.h>
+#include <ctype.h>
 #include <utmpx.h>
 #include <pwd.h>
 #include <zone.h>
@@ -109,6 +111,9 @@ static ctid_t startdct = -1;
 	"svc:/system/svc/restarter:default/:properties/restarter/contract"
 
 #define	ZONEADM_PROG "/usr/sbin/zoneadm"
+
+#define	LUUMOUNT_PROG	"/usr/sbin/luumount"
+#define	LUMOUNT_PROG	"/usr/sbin/lumount"
 
 /*
  * The length of FASTBOOT_MOUNTPOINT must be less than MAXPATHLEN.
@@ -851,19 +856,62 @@ is_fastboot_default(uid_t uid)
 }
 
 static int
+halt_exec(const char *path, ...)
+{
+	pid_t		pid;
+	int		i;
+	int		st;
+	const char	*arg;
+	va_list	vp;
+	const char	*argv[256];
+
+	if ((pid = fork()) == -1) {
+		return (errno);
+	} else if (pid == 0) {
+		(void) fclose(stdout);
+		(void) fclose(stderr);
+
+		argv[0] = path;
+		i = 1;
+
+		va_start(vp, path);
+
+		do {
+			arg = va_arg(vp, const char *);
+			argv[i] = arg;
+		} while (arg != NULL &&
+		    ++i != sizeof (argv) / sizeof (argv[0]));
+
+		va_end(vp);
+
+		(void) execve(path, (char * const *)argv, NULL);
+		(void) fprintf(stderr, gettext("cannot execute %s: %s\n"),
+		    path, strerror(errno));
+		exit(-1);
+	} else {
+		if (waitpid(pid, &st, 0) == pid &&
+		    !WIFSIGNALED(st) && WIFEXITED(st))
+			st = WEXITSTATUS(st);
+		else
+			st = -1;
+	}
+	return (st);
+}
+
+/*
+ * Invokes lumount for bename.
+ * At successfull completion returns zero and copies contents of bename
+ * into mountpoint[]
+ */
+static int
 fastboot_bename(const char *bename, char *mountpoint, size_t mpsz)
 {
 	int rc;
-	char cmdbuf[MAXPATHLEN];
 
-	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "/usr/sbin/luumount %s > /dev/null 2>&1", bename);
-	(void) system(cmdbuf);
+	(void) halt_exec(LUUMOUNT_PROG, "-n", bename, NULL);
 
-	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "/usr/sbin/lumount %s %s > /dev/null 2>&1",
-	    bename, FASTBOOT_MOUNTPOINT);
-	if ((rc = system(cmdbuf)) != 0)
+	if ((rc = halt_exec(LUMOUNT_PROG, "-n", bename, FASTBOOT_MOUNTPOINT,
+	    NULL)) != 0)
 		(void) fprintf(stderr, gettext("%s: cannot mount BE %s\n"),
 		    cmdname, bename);
 	else
@@ -1429,11 +1477,7 @@ fail:
 
 	if (fast_reboot) {
 		if (bename) {
-			char cmdbuf[MAXPATHLEN];
-
-			(void) snprintf(cmdbuf, sizeof (cmdbuf),
-			    "/usr/sbin/luumount %s > /dev/null 2>&1", bename);
-			(void) system(cmdbuf);
+			(void) halt_exec(LUUMOUNT_PROG, "-n", bename, NULL);
 
 		} else if (strlen(fastboot_mounted) != 0) {
 			(void) umount(fastboot_mounted);
