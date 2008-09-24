@@ -319,6 +319,7 @@ ehci_dma_attr_workaround(ehci_state_t	*ehcip)
 	if (PCI_VENDOR_NVIDIA == ehcip->ehci_vendor_id) {
 		switch (ehcip->ehci_device_id) {
 			case PCI_DEVICE_NVIDIA_CK804:
+			case PCI_DEVICE_NVIDIA_MCP04:
 				USB_DPRINTF_L2(PRINT_MASK_ATTA,
 				    ehcip->ehci_log_hdl,
 				    "ehci_dma_attr_workaround: NVIDIA dma "

@@ -1051,6 +1051,7 @@ typedef struct setup_pkt {
 
 #define	PCI_VENDOR_NVIDIA	0x10de		/* PCI Vendor-id NVIDIA */
 #define	PCI_DEVICE_NVIDIA_CK804	0x5b
+#define	PCI_DEVICE_NVIDIA_MCP04	0x3c
 /*
  * workaround for ALI chips
  */
