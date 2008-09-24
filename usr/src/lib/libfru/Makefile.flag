@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libfru/Makefile.flag
 #
 
 LINTFLAGS =	-uxn
-LINTFLAGS64 =	$(LINTFLAGS) -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64 =	$(LINTFLAGS) -m64
 LINTOUT=	lint.out
 LINTSRC =       $(LINTLIB:%.ln=%)
 ROOTLINTDIR =   $(ROOTLIBDIR)
@@ -48,7 +45,7 @@ CLEANFILES +=	pics/lex.fru.cc pics/y.tab.cc pics/y.tab.h
 
 $(LINTLIB) :=	SRCS = ../llib-lfru
 $(LINTLIB) :=	LINTFLAGS = -nvx -I../include
-$(LINTLIB) :=	LINTFLAGS64 = -nvx -Xarch=$(MACH64:sparcv9=v9) -I../include
+$(LINTLIB) :=	LINTFLAGS64 = -nvx -m64 -I../include
 
 CLOBBERFILES +=	$(DYNLIBCCC) libfru.so
 

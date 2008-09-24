@@ -33,7 +33,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"1.25"
+#define	CW_VERSION	"1.26"
 
 /*
  * -#		Verbose mode
@@ -1795,10 +1795,10 @@ main(int argc, char **argv)
 	if ((dir = getenv("SPRO_VROOT")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN, "%s/bin", dir);
 	} else if ((dir = getenv("SPRO_ROOT")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SS11/bin", dir);
+		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SS12/bin", dir);
 	} else if ((dir = getenv("BUILD_TOOLS")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN,
-		    "%s/SUNWspro/SS11/bin", dir);
+		    "%s/SUNWspro/SS12/bin", dir);
 	}
 	if (dir != NULL) {
 		dirs[CIDX(CW_C_CC, 0)] = (const char *)cc_buf;

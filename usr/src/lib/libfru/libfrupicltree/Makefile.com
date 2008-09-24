@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libfrupicltree.a
@@ -40,7 +38,7 @@ LIBS =		$(DYNLIB)
 MAPFILES =
 
 LINTFLAGS =	-mnux
-LINTFLAGS64 =	$(LINTFLAGS) -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64 =	$(LINTFLAGS) -m64
 LINTOUT=	lint.out
 LINTSRC =       $(LINTLIB:%.ln=%)
 ROOTLINTDIR =   $(ROOTLIBDIR)
@@ -58,7 +56,7 @@ CPPFLAGS += 	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 
 $(LINTLIB) :=	LINTFLAGS = -nvx -I..
-$(LINTLIB) :=	LINTFLAGS64 = -nvx -Xarch=$(MACH64:sparcv9=v9) -I..
+$(LINTLIB) :=	LINTFLAGS64 = -nvx -m64 -I..
 
 XGETFLAGS += -a
 POFILE=	picl.po

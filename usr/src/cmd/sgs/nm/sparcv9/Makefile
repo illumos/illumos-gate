@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/sgs/nm/sparcv9/Makefile
 #
 
@@ -46,7 +44,7 @@ INCLIST=	-I../../include -I../../include/sparc \
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTFLAGS64=	-x $(LDLIBS) -Xarch=v9
+LINTFLAGS64=	-x $(LDLIBS) -m64
 LINTSRCS=	$(SRCS)
 CLEANFILES +=	$(LINTOUTS)
 

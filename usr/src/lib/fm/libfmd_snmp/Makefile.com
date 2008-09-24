@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY = libfmd_snmp.a
@@ -62,14 +60,14 @@ LDLIBS += -lc
 DYNFLAGS += -R$(SFWLIBDIR)
 
 LINTFLAGS = -msux
-LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64 = -msux -m64
 
 # Net-SNMP's headers use do {} while (0) a lot
 LINTCHECKFLAGS += -erroff=E_CONSTANT_CONDITION
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9)
+$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 
 .KEEP_STATE:
 

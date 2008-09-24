@@ -110,7 +110,7 @@ include $(UTSBASE)/Makefile.uts
 #	machine specific optimization, override default in Makefile.master
 #
 XARCH_32	= -xarch=v8
-XARCH_64	= -xarch=v9
+XARCH_64	= -m64
 XARCH		= $(XARCH_$(CLASS))
 
 COPTIMIZE_32	= -xO3
@@ -143,7 +143,7 @@ CFLAGS		+= -xstrconst
 ASFLAGS		+= $(XARCH)
 
 LINT_DEFS_32	=
-LINT_DEFS_64	= -Xarch=v9
+LINT_DEFS_64	= -m64
 LINT_DEFS	+= $(LINT_DEFS_$(CLASS))
 
 #

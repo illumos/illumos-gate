@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libfruutils.a
 VERS=		.1
@@ -41,7 +39,7 @@ LIBS =		$(DYNLIB)
 MAPFILES =
 
 LINTFLAGS =	-uxn
-LINTFLAGS64 =	$(LINTFLAGS) -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64 =	$(LINTFLAGS) -m64
 LINTOUT=	lint.out
 LINTSRC =       $(LINTLIB:%.ln=%)
 ROOTLINTDIR =   $(ROOTLIBDIR)
@@ -53,7 +51,7 @@ CPPFLAGS +=	-I.. -D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 
 $(LINTLIB) :=	LINTFLAGS = -nvx
-$(LINTLIB) :=	LINTFLAGS64 = -nvx -Xarch=$(MACH64:sparcv9=v9)
+$(LINTLIB) :=	LINTFLAGS64 = -nvx -m64
 
 .KEEP_STATE:
 

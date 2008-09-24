@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile contains the common definitions for the sun4u unix
 #	and all sun4u implementation architecture dependent modules.
 #
@@ -194,7 +192,7 @@ $(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= ents
 #
 #	machine specific optimization, override default in Makefile.master
 #
-CC_XARCH	= -xarch=v9a
+CC_XARCH	= -m64 -xarch=sparcvis
 AS_XARCH	= -xarch=v9a
 COPTIMIZE	= -xO3
 CCMODE		= -Xa
@@ -223,7 +221,7 @@ AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
 
 LINT_KMODS	+= $(GENUNIX_KMODS)
 
-LINT_DEFS	= -Xarch=v9
+LINT_DEFS = -m64
 
 #
 #	The following must be defined for all implementations:

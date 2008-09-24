@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 COMMONOBJS=	plugin_common.o
@@ -43,7 +41,7 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/sasl
 ROOTLIBDIR64=	$(ROOT)/usr/lib/sasl/$(MACH64)
 
 LINTFLAGS=	$(ENC_FLAGS)
-LINTFLAGS64=	-Xarch=$(MACH64:sparcv9=v9) $(ENC_FLAGS)
+LINTFLAGS64=	-m64 $(ENC_FLAGS)
 
 CFLAGS +=	$(CCVERBOSE) $(XSTRCONST) $(ENC_FLAGS)
 CFLAGS64 +=	$(XSTRCONST) $(ENC_FLAGS)

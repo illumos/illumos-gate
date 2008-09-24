@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 CLASS		= 64
@@ -39,7 +37,7 @@ OBJECTS		= md5.o sha1.o sha1_asm.o
 MAPFILES =	mapfile
 
 ASDEFS +=	-D__sparcv9
-ASFLAGS	+=	-xarch=v9a $(AS_BIGPICFLAGS)
+ASFLAGS +=	-xarch=v9a $(AS_BIGPICFLAGS)
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
 # and .fini sections being added).

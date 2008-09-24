@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libmdesc.a
 VERS = .1
@@ -60,7 +58,7 @@ LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -v
 LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -v
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9)
+$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 
 .KEEP_STATE:
 

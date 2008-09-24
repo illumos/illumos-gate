@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # The link-editor related source files and Makefile files are normally unified
 # across all presently maintained release gates.  However, some of the compiler
@@ -110,7 +108,7 @@
 #
 VAR_CPPFLAGS=
 
-VAR_LINTFLAGS64=	-Xarch=$(MACH64:sparcv9=v9)
+VAR_LINTFLAGS64=	-m64
 VAR_I386_ARCH=		intel
 
 VAR_PLAT_sparc=		sparc

@@ -106,7 +106,7 @@ CFLAGS64	+= -xchip=ultra $(CCABS32)
 # XXX this totally sucks since it effectively turns off -errchk=longptr64,
 # which we really should be using.
 #
-LINTFLAGS64 = $(LINTFLAGS) -Xarch=v9
+LINTFLAGS64 = $(LINTFLAGS) -m64
 
 #
 # Cross-reference customization: include all boot-related source files.

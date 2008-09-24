@@ -23,9 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #
 # Makefile.master, global definitions for system source
 #
@@ -326,10 +323,10 @@ CCUNBOUND	= $($(MACH)_CCUNBOUND)
 #
 # compiler '-xarch' flag. This is here to centralize it and make it
 # overridable for testing.
-sparc_XARCH=		-xarch=v8
-sparcv9_XARCH=		-xarch=v9
+sparc_XARCH=	-m32
+sparcv9_XARCH=	-m64
 i386_XARCH=
-amd64_XARCH=		-xarch=amd64 -Ui386 -U__i386
+amd64_XARCH=	-m64 -Ui386 -U__i386
 
 # assembler '-xarch' flag.  Different from compiler '-xarch' flag.
 sparc_AS_XARCH=		-xarch=v8plus
@@ -347,8 +344,7 @@ amd64_AS_XARCH=		-xarch=amd64 -P -Ui386 -U__i386
 sparc_STAND_FLAGS=	-_gcc=-ffreestanding
 sparcv9_STAND_FLAGS=	-_gcc=-ffreestanding
 i386_STAND_FLAGS=	-_gcc=-ffreestanding
-amd64_STAND_FLAGS=	-Wu,-xmodel=kernel
-$(__SSNEXT)amd64_STAND_FLAGS=	-xmodel=kernel
+amd64_STAND_FLAGS=	-xmodel=kernel
 
 SAVEARGS=		-Wu,-save_args
 amd64_STAND_FLAGS	+= $(SAVEARGS)
@@ -674,7 +670,7 @@ NATIVE_MACH=	$(MACH:amd64=i386)
 # Defined here so it can be overridden by developer.
 #
 SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
-SPRO_VROOT=		$(SPRO_ROOT)/SS11
+SPRO_VROOT=		$(SPRO_ROOT)/SS12
 GNU_ROOT=		$(SFW_ROOT)
 
 # Specify platform compiler versions for languages

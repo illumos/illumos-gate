@@ -141,7 +141,7 @@ LDFLAGS.cmd = \
 LDFLAGS =	$(LDFLAGS.cmd)
 
 LINTFLAGS=	-axsm
-LINTFLAGS64=	-axsm -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64=	-axsm -m64
 LINTOUT=	lint.out
 
 KRB5PROG=	$(PROG:%=$(KRB5BIN)/%)

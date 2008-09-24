@@ -22,9 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #
 # Definitions common to libraries.
 #
@@ -156,7 +153,7 @@ ROOTSFWMAN7=	$(ROOT)/usr/sfw/share/man/man7
 
 LINTLIB=	llib-l$(LIBNAME).ln
 LINTFLAGS=	-uaxm
-LINTFLAGS64=	-uaxm -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64=	-uaxm -m64
 LINTSRC=	$(LINTLIB:%.ln=%)
 LINTOUT=	lint.out
 ARFLAGS=	r

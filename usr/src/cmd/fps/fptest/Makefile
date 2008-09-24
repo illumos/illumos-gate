@@ -20,8 +20,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 include ../../Makefile.cmd
 include ../../Makefile.cmd.64
 
@@ -43,7 +41,7 @@ SUNPERF = $(SPRO_VROOT)/prod/lib
 
 SUNPV9B = $(SUNPERF)/v9b
 SUNPV9  = $(SUNPERF)/v9
-VISARCH = -xarch=v9b
+VISARCH = -m64 -xarch=sparcvis2
 
 CHIP = -xchip=ultra3
 

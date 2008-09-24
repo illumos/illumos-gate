@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		ar
 XPG4PROG=	ar
@@ -45,7 +43,7 @@ C99MODE=	$(C99_ENABLE)
 
 LDLIBS +=	-lelf
 LINTFLAGS=	-mx
-LINTFLAGS64=	-mx -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64=	-mx -m64
 
 SED=		sed
 

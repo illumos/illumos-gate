@@ -1088,7 +1088,7 @@ lint:
 
 $(LINTLIB):= SRCS=../port/llib-lc
 $(LINTLIB):= CPPFLAGS += -D_MSE_INT_H
-$(LINTLIB):= LINTFLAGS64=-nvx -Xarch=amd64
+$(LINTLIB):= LINTFLAGS64=-nvx -m64
 
 # object files that depend on inline template
 $(TIL:%=pics/%): $(LIBCBASE)/threads/amd64.il

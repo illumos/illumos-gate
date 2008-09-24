@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		nm
 
@@ -43,7 +41,7 @@ INCLIST=	-I../../include -I../../include/i386 \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTFLAGS64 +=	-x $(LDLIBS) -Xarch=amd64
+LINTFLAGS64 +=	-x $(LDLIBS) -m64
 LINTSRCS=	$(SRCS)
 CLEANFILES +=	$(LINTOUTS)
 

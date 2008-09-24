@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libtopo.a
 VERS = .1
@@ -81,7 +79,7 @@ CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 LINTFLAGS = -msux
-LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64 = -msux -m64
 
 $(DYNLIB)  := LDLIBS += \
 	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo \
@@ -89,7 +87,7 @@ $(DYNLIB)  := LDLIBS += \
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9)
+$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 $(LINTLIB) := LDLIBS += -lnvpair -lumem -lc
 
 .KEEP_STATE:
