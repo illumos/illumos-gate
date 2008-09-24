@@ -80,6 +80,28 @@ static const int8_t bge_copper_link_duplex[] = {
 	LINK_DUPLEX_FULL		/* MII_AUX_STATUS_MODE_1000_F	*/
 };
 
+static const int16_t bge_copper_link_speed_5906[] = {
+	0,				/* MII_AUX_STATUS_MODE_NONE	*/
+	10,				/* MII_AUX_STATUS_MODE_10_H	*/
+	10,				/* MII_AUX_STATUS_MODE_10_F	*/
+	100,				/* MII_AUX_STATUS_MODE_100_H	*/
+	0,				/* MII_AUX_STATUS_MODE_100_4	*/
+	100,				/* MII_AUX_STATUS_MODE_100_F	*/
+	0,				/* MII_AUX_STATUS_MODE_1000_H	*/
+	0				/* MII_AUX_STATUS_MODE_1000_F	*/
+};
+
+static const int8_t bge_copper_link_duplex_5906[] = {
+	LINK_DUPLEX_UNKNOWN,		/* MII_AUX_STATUS_MODE_NONE	*/
+	LINK_DUPLEX_HALF,		/* MII_AUX_STATUS_MODE_10_H	*/
+	LINK_DUPLEX_FULL,		/* MII_AUX_STATUS_MODE_10_F	*/
+	LINK_DUPLEX_HALF,		/* MII_AUX_STATUS_MODE_100_H	*/
+	LINK_DUPLEX_UNKNOWN,		/* MII_AUX_STATUS_MODE_100_4	*/
+	LINK_DUPLEX_FULL,		/* MII_AUX_STATUS_MODE_100_F	*/
+	LINK_DUPLEX_UNKNOWN,		/* MII_AUX_STATUS_MODE_1000_H	*/
+	LINK_DUPLEX_UNKNOWN		/* MII_AUX_STATUS_MODE_1000_F	*/
+};
+
 #if	BGE_DEBUGGING
 
 static void
@@ -191,6 +213,14 @@ bge_phy_reset(bge_t *bgep)
 
 	ASSERT(mutex_owned(bgep->genlock));
 
+	if (DEVICE_5906_SERIES_CHIPSETS(bgep)) {
+		drv_usecwait(40);
+		/* put PHY into ready state */
+		bge_reg_clr32(bgep, MISC_CONFIG_REG, MISC_CONFIG_EPHY_IDDQ);
+		(void) bge_reg_get32(bgep, MISC_CONFIG_REG); /* flush */
+		drv_usecwait(40);
+	}
+
 	/*
 	 * Set the PHY RESET bit, then wait up to 5 ms for it to self-clear
 	 */
@@ -201,6 +231,10 @@ bge_phy_reset(bge_t *bgep)
 		if (BIC(control, MII_CONTROL_RESET))
 			return (B_TRUE);
 	}
+
+	/* Adjust output voltage (From bsd driver) */
+	if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+		bge_mii_put16(bgep, 0x17, 0x12);
 
 	BGE_DEBUG(("bge_phy_reset: FAILED, control now 0x%x", control));
 
@@ -457,6 +491,10 @@ bge_phy_reset_and_check(bge_t *bgep)
 	extctrl = bge_mii_get16(bgep, 0x10);
 	bge_mii_put16(bgep, 0x10, extctrl & ~0x3000);
 
+	/* Adjust output voltage (From bsd driver) */
+	if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+		bge_mii_put16(bgep, 0x17, 0x12);
+
 	if (!reset_success)
 		bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
 	else if (phy_locked)
@@ -516,6 +554,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 		reset_ok = bge_phy_reset_and_check(bgep);
 		break;
 
+	case MHCR_CHIP_ASIC_REV_5906:
 	case MHCR_CHIP_ASIC_REV_5700:
 	case MHCR_CHIP_ASIC_REV_5701:
 		/*
@@ -856,10 +895,16 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		 */
 		mode = aux & MII_AUX_STATUS_MODE_MASK;
 		mode >>= MII_AUX_STATUS_MODE_SHIFT;
-		linkup = bge_copper_link_speed[mode] > 0;
-		linkup &= bge_copper_link_duplex[mode] != LINK_DUPLEX_UNKNOWN;
-		linkup &= BIS(aux, MII_AUX_STATUS_LINKUP);
-		linkup &= BIS(mii_status, MII_STATUS_LINKUP);
+		if (DEVICE_5906_SERIES_CHIPSETS(bgep)) {
+			linkup = BIS(aux, MII_AUX_STATUS_LINKUP);
+			linkup &= BIS(mii_status, MII_STATUS_LINKUP);
+		} else {
+			linkup = bge_copper_link_speed[mode] > 0;
+			linkup &= bge_copper_link_duplex[mode] !=
+			    LINK_DUPLEX_UNKNOWN;
+			linkup &= BIS(aux, MII_AUX_STATUS_LINKUP);
+			linkup &= BIS(mii_status, MII_STATUS_LINKUP);
+		}
 
 		BGE_DEBUG(("bge_check_copper: MII status 0x%x aux 0x%x "
 		    "=> mode %d (%s)",
@@ -932,9 +977,24 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	if (!linkup)
 		mode = MII_AUX_STATUS_MODE_NONE;
 	bgep->param_link_up = linkup;
-	bgep->param_link_speed = bge_copper_link_speed[mode];
-	bgep->param_link_duplex = bge_copper_link_duplex[mode];
 	bgep->link_state = LINK_STATE_UNKNOWN;
+	if (DEVICE_5906_SERIES_CHIPSETS(bgep)) {
+		if (bgep->phy_aux_status & MII_AUX_STATUS_NEG_ENABLED_5906) {
+			bgep->param_link_speed =
+			    bge_copper_link_speed_5906[mode];
+			bgep->param_link_duplex =
+			    bge_copper_link_duplex_5906[mode];
+		} else {
+			bgep->param_link_speed = (bgep->phy_aux_status &
+			    MII_AUX_STATUS_SPEED_IND_5906) ?  100 : 10;
+			bgep->param_link_duplex = (bgep->phy_aux_status &
+			    MII_AUX_STATUS_DUPLEX_IND_5906) ? LINK_DUPLEX_FULL :
+			    LINK_DUPLEX_HALF;
+		}
+	} else {
+		bgep->param_link_speed = bge_copper_link_speed[mode];
+		bgep->param_link_duplex = bge_copper_link_duplex[mode];
+	}
 
 	BGE_DEBUG(("bge_check_copper: link now %s speed %d duplex %d",
 	    UPORDOWN(bgep->param_link_up),

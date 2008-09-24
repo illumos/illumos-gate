@@ -32,7 +32,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.70";
 
 /*
  * Property names
@@ -910,6 +910,12 @@ bge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		mutex_exit(bgep->genlock);
 		return (ENOTSUP);
 	}
+	if ((DEVICE_5906_SERIES_CHIPSETS(bgep) &&
+	    (pr_num == MAC_PROP_EN_1000FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_1000HDX_CAP))) {
+		mutex_exit(bgep->genlock);
+		return (ENOTSUP);
+	}
 
 	switch (pr_num) {
 		case MAC_PROP_EN_1000FDX_CAP:
@@ -1126,26 +1132,42 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			bcopy(&fl, pr_val, sizeof (fl));
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
-			if (is_default)
-				*(uint8_t *)pr_val = 1;
+			if (is_default) {
+				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+					*(uint8_t *)pr_val = 0;
+				else
+					*(uint8_t *)pr_val = 1;
+			}
 			else
 				*(uint8_t *)pr_val = bgep->param_adv_1000fdx;
 			break;
 		case MAC_PROP_EN_1000FDX_CAP:
-			if (is_default)
-				*(uint8_t *)pr_val = 1;
+			if (is_default) {
+				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+					*(uint8_t *)pr_val = 0;
+				else
+					*(uint8_t *)pr_val = 1;
+			}
 			else
 				*(uint8_t *)pr_val = bgep->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
-			if (is_default)
-				*(uint8_t *)pr_val = 1;
+			if (is_default) {
+				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+					*(uint8_t *)pr_val = 0;
+				else
+					*(uint8_t *)pr_val = 1;
+			}
 			else
 				*(uint8_t *)pr_val = bgep->param_adv_1000hdx;
 			break;
 		case MAC_PROP_EN_1000HDX_CAP:
-			if (is_default)
-				*(uint8_t *)pr_val = 1;
+			if (is_default) {
+				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
+					*(uint8_t *)pr_val = 0;
+				else
+					*(uint8_t *)pr_val = 1;
+			}
 			else
 				*(uint8_t *)pr_val = bgep->param_en_1000hdx;
 			break;

@@ -87,6 +87,8 @@ extern "C" {
 #define	DEVICE_ID_5714S			0x1669
 #define	DEVICE_ID_5715C			0x1678
 #define	DEVICE_ID_5715S			0x1679
+#define	DEVICE_ID_5906			0x1712
+#define	DEVICE_ID_5906M			0x1713
 
 #define	REVISION_ID_5700_B0		0x10
 #define	REVISION_ID_5700_B2		0x12
@@ -179,6 +181,10 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5715C) ||\
 		(bgep->chipid.device == DEVICE_ID_5715S))
 
+#define	DEVICE_5906_SERIES_CHIPSETS(bgep) \
+		((bgep->chipid.device == DEVICE_ID_5906) ||\
+		(bgep->chipid.device == DEVICE_ID_5906M))
+
 /*
  * Second section:
  *	Offsets of important registers & definitions for bits therein
@@ -270,6 +276,10 @@ extern "C" {
 #define	MHCR_CHIP_REV_5755_A0		0xa0000000
 #define	MHCR_CHIP_REV_5755_A1		0xa0010000
 
+#define	MHCR_CHIP_REV_5906_A0		0xc0000000
+#define	MHCR_CHIP_REV_5906_A1		0xc0010000
+#define	MHCR_CHIP_REV_5906_A2		0xc0020000
+
 #define	MHCR_CHIP_ASIC_REV(ChipRevId)	((ChipRevId) & 0xf0000000)
 #define	MHCR_CHIP_ASIC_REV_5700		(0x7 << 28)
 #define	MHCR_CHIP_ASIC_REV_5701		(0x0 << 28)
@@ -283,6 +293,7 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5787		((uint32_t)0xb << 28)
 #define	MHCR_CHIP_ASIC_REV_5755		((uint32_t)0xa << 28)
 #define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
+#define	MHCR_CHIP_ASIC_REV_5906		((uint32_t)0xc << 28)
 
 
 /*
@@ -605,6 +616,7 @@ extern "C" {
 
 
 /*
+ * High priority mailbox registers.
  * Mailbox Registers (8 bytes each, but high half unused)
  */
 #define	INTERRUPT_MBOX_0_REG		0x0200
@@ -612,6 +624,11 @@ extern "C" {
 #define	INTERRUPT_MBOX_2_REG		0x0210
 #define	INTERRUPT_MBOX_3_REG		0x0218
 #define	INTERRUPT_MBOX_REG(n)		(0x0200+8*(n))
+
+/*
+ * Low priority mailbox registers, for BCM5906, BCM5906M.
+ */
+#define	INTERRUPT_LP_MBOX_0_REG		0x5800
 
 /*
  * Ring Producer/Consumer Index (Mailbox) Registers
@@ -1042,16 +1059,19 @@ extern "C" {
 #define	RDMA_MBUF_LOWAT_REG		0x4410
 #define	RDMA_MBUF_LOWAT_DEFAULT		0x00000050
 #define	RDMA_MBUF_LOWAT_5705		0x00000000
+#define	RDMA_MBUF_LOWAT_5906		0x00000000
 #define	RDMA_MBUF_LOWAT_JUMBO		0x00000130
 #define	RDMA_MBUF_LOWAT_5714_JUMBO	0x00000000
 #define	MAC_RX_MBUF_LOWAT_REG		0x4414
 #define	MAC_RX_MBUF_LOWAT_DEFAULT	0x00000020
 #define	MAC_RX_MBUF_LOWAT_5705		0x00000010
+#define	MAC_RX_MBUF_LOWAT_5906		0x00000004
 #define	MAC_RX_MBUF_LOWAT_JUMBO		0x00000098
 #define	MAC_RX_MBUF_LOWAT_5714_JUMBO	0x0000004b
 #define	MBUF_HIWAT_REG			0x4418
 #define	MBUF_HIWAT_DEFAULT		0x00000060
 #define	MBUF_HIWAT_5705			0x00000060
+#define	MBUF_HIWAT_5906			0x00000010
 #define	MBUF_HIWAT_JUMBO		0x0000017c
 #define	MBUF_HIWAT_5714_JUMBO		0x00000096
 
@@ -1089,6 +1109,16 @@ extern "C" {
 #define	TX_RISC_MODE_REG		0x5400
 #define	TX_RISC_STATE_REG		0x5404
 #define	TX_RISC_PC_REG			0x541c
+
+/*
+ * V? RISC Registerss
+ */
+#define	VCPU_STATUS_REG			0x5100
+#define	VCPU_INIT_DONE			0x04000000
+#define	VCPU_DRV_RESET			0x08000000
+
+#define	VCPU_EXT_CTL			0x6890
+#define	VCPU_EXT_CTL_HALF		0x00400000
 
 #define	FTQ_RESET_REG			0x5c00
 
@@ -1152,6 +1182,7 @@ extern "C" {
 #define	MISC_CONFIG_PRESCALE_MASK	0x000000fe
 #define	MISC_CONFIG_RESET_BIT		0x00000001
 #define	MISC_CONFIG_DEFAULT		(((CORE_CLOCK_MHZ)-1) << 1)
+#define	MISC_CONFIG_EPHY_IDDQ		0x00200000
 
 /*
  * Miscellaneous Local Control Register (MLCR)
@@ -1298,6 +1329,7 @@ extern "C" {
  * important values, and how to interpret them ...
  */
 #define	NVMEM_DATA_MAC_ADDRESS		0x007c		/* 8 bytes	*/
+#define	NVMEM_DATA_MAC_ADDRESS_5906	0x0010		/* 8 bytes	*/
 
 /*
  * MII (PHY) registers, beyond those already defined in <sys/miiregs.h>
@@ -1462,6 +1494,10 @@ extern "C" {
 #define	MII_AUX_STATUS_LINKUP		0x0004
 #define	MII_AUX_STATUS_RX_PAUSE		0x0002
 #define	MII_AUX_STATUS_TX_PAUSE		0x0001
+
+#define	MII_AUX_STATUS_SPEED_IND_5906	0x0008
+#define	MII_AUX_STATUS_NEG_ENABLED_5906		0x0002
+#define	MII_AUX_STATUS_DUPLEX_IND_5906		0x0001
 
 /*
  * Bits in the MII_INTR_STATUS and MII_INTR_MASK registers
