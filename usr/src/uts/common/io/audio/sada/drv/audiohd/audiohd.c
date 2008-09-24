@@ -3239,9 +3239,10 @@ audiohd_finish_output_path(hda_codec_t *codec)
 			}
 
 			/* If this pin has external amplifier, enable it */
-			if (pin->cap & 0x00010000)
+			if (pin->cap & AUDIOHD_EXT_AMP_MASK)
 				(void) audioha_codec_verb_get(statep, caddr,
-				    wid, AUDIOHDC_VERB_SET_EAPD, 0x02);
+				    wid, AUDIOHDC_VERB_SET_EAPD,
+				    AUDIOHD_EXT_AMP_ENABLE);
 
 			if (widget->outamp_cap) {
 				(void) audioha_codec_4bit_verb_get(statep,
@@ -3323,10 +3324,13 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 	audiohd_state_t		*statep = codec->soft_statep;
 	uint_t			caddr = codec->index;
 	int			retval = -1;
-	int			num;
+	int			num, i;
 	uint32_t		pinctrl;
 
 	if (depth > AUDIOHD_MAX_DEPTH)
+		return (uint32_t)(AUDIO_FAILURE);
+
+	if (widget == NULL)
 		return (uint32_t)(AUDIO_FAILURE);
 
 	/* we don't share widgets */
@@ -3406,17 +3410,18 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 		} else {
 			/*
 			 * We had already found a real sum before this one since
-			 * allowmixer is 0. For this one, we use only its first
-			 * input and treat it as an one-input widget. In other
-			 * words, the other inputs except the fist one of this
-			 * widget won't be used by our audio driver in any case.
+			 * allowmixer is 0.
 			 */
-			retval = audiohd_find_input_pins(codec,
-			    widget->avail_conn[0], 0, depth + 1, istream);
-			if (retval != AUDIO_FAILURE) {
-				widget->selconn = 0;
-				widget->path_flags |= AUDIOHD_PATH_ADC;
-				widget->in_weight++;
+			for (i = 0; i < widget->nconns; i++) {
+				retval = audiohd_find_input_pins(codec,
+				    widget->avail_conn[i], 0, depth + 1,
+				    istream);
+				if (retval != AUDIO_FAILURE) {
+					widget->selconn = i;
+					widget->path_flags |= AUDIOHD_PATH_ADC;
+					widget->in_weight++;
+					break;
+				}
 			}
 		}
 		break;
@@ -3488,6 +3493,9 @@ audiohd_build_input_path(hda_codec_t *codec)
 			}
 		}
 	}
+
+	if (istream)
+		kmem_free(istream, sizeof (audiohd_istream_t));
 }	/* audiohd_build_input_path */
 
 /*
