@@ -2060,19 +2060,17 @@ xdf_oe_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg, void *impl_data)
 			(void) xdf_start_disconnect(vdp);
 		break;
 	case XenbusStateClosing:
-		if (vdp->xdf_status == XD_READY) {
-			mutex_enter(&vdp->xdf_dev_lk);
-			if (xdf_isopen(vdp, -1)) {
-				cmn_err(CE_NOTE, "xdf@%s: hot-unplug failed, "
-				    "still in use", ddi_get_name_addr(dip));
-				mutex_exit(&vdp->xdf_dev_lk);
-				break;
-			} else {
+		mutex_enter(&vdp->xdf_dev_lk);
+		if (xdf_isopen(vdp, -1)) {
+			cmn_err(CE_NOTE, "xdf@%s: hot-unplug failed, "
+			    "still in use", ddi_get_name_addr(dip));
+		} else {
+			if ((vdp->xdf_status == XD_READY) ||
+			    (vdp->xdf_status == XD_INIT))
 				vdp->xdf_status = XD_CLOSING;
-			}
-			mutex_exit(&vdp->xdf_dev_lk);
+			(void) xdf_start_disconnect(vdp);
 		}
-		(void) xdf_start_disconnect(vdp);
+		mutex_exit(&vdp->xdf_dev_lk);
 		break;
 	case XenbusStateClosed:
 		/* first check if BE closed unexpectedly */
