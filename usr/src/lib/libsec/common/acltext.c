@@ -115,39 +115,35 @@ prgname(gid_t gid, char *gidp, size_t buflen, int noresolve)
 	return (gidp);
 }
 
-static char *
-prsidname(uid_t who, boolean_t user, char **sidp, int noresolve)
+static int
+getsidname(uid_t who, boolean_t user, char **sidp, boolean_t noresolve)
 {
 	idmap_handle_t *idmap_hdl = NULL;
 	idmap_get_handle_t *get_hdl = NULL;
 	idmap_stat status;
 	idmap_rid_t rid;
-	int error = 1;
+	int error = IDMAP_ERR_NORESULT;
 	int len;
 	char *domain;
 	char *name;
 
-	if (noresolve) {
-		len = snprintf(NULL, 0, "%u", who);
-		*sidp = malloc(len + 1);
-		(void) snprintf(*sidp, len + 1, "%u", who);
-		return (*sidp);
-	}
+	*sidp = NULL;
 
 	/*
 	 * First try and get windows name
 	 */
 
-	if (user)
-		error = idmap_getwinnamebyuid(who, IDMAP_REQ_FLG_USE_CACHE,
-		    &name, &domain);
-	else
-		error = idmap_getwinnamebygid(who, IDMAP_REQ_FLG_USE_CACHE,
-		    &name, &domain);
-
-	if (error) {
-		if (idmap_init(&idmap_hdl) == 0 &&
-		    idmap_get_create(idmap_hdl, &get_hdl) == 0) {
+	if (!noresolve) {
+		if (user)
+			error = idmap_getwinnamebyuid(who,
+			    IDMAP_REQ_FLG_USE_CACHE, &name, &domain);
+		else
+			error = idmap_getwinnamebygid(who,
+			    IDMAP_REQ_FLG_USE_CACHE, &name, &domain);
+	}
+	if (error != IDMAP_SUCCESS) {
+		if (idmap_init(&idmap_hdl) == IDMAP_SUCCESS &&
+		    idmap_get_create(idmap_hdl, &get_hdl) == IDMAP_SUCCESS) {
 			if (user)
 				error = idmap_get_sidbyuid(get_hdl, who,
 				    IDMAP_REQ_FLG_USE_CACHE, &domain, &rid,
@@ -156,15 +152,17 @@ prsidname(uid_t who, boolean_t user, char **sidp, int noresolve)
 				error = idmap_get_sidbygid(get_hdl, who,
 				    IDMAP_REQ_FLG_USE_CACHE, &domain, &rid,
 				    &status);
-			if (error == 0)
-				error = idmap_get_mappings(get_hdl);
-		}
-		if (error == 0) {
-			len = snprintf(NULL, 0, "%s-%d", domain, rid);
-			*sidp = malloc(len + 1);
-			(void) snprintf(*sidp, len + 1, "%s-%d", domain, rid);
-		} else {
-			*sidp = NULL;
+			if (error == IDMAP_SUCCESS &&
+			    idmap_get_mappings(get_hdl) == 0) {
+				if (status == IDMAP_SUCCESS) {
+					len = snprintf(NULL, 0,
+					    "%s-%d", domain, rid);
+					if (*sidp = malloc(len + 1)) {
+						(void) snprintf(*sidp, len + 1,
+						    "%s-%d", domain, rid);
+					}
+				}
+			}
 		}
 		if (get_hdl)
 			idmap_get_destroy(get_hdl);
@@ -172,11 +170,12 @@ prsidname(uid_t who, boolean_t user, char **sidp, int noresolve)
 			(void) idmap_fini(idmap_hdl);
 	} else {
 		int len;
+
 		len = snprintf(NULL, 0, "%s@%d", name, domain);
-		*sidp = malloc(len + 1);
-		(void) snprintf(*sidp, len + 1, "%s@%s", name, domain);
+		if (*sidp = malloc(len + 1))
+			(void) snprintf(*sidp, len + 1, "%s@%s", name, domain);
 	}
-	return (*sidp);
+	return (*sidp ? 0 : 1);
 }
 
 static void
@@ -404,8 +403,10 @@ ace_type_txt(dynaclstr_t *dynstr, ace_t *acep, int flags)
 			if (error = str_append(dynstr,
 			    GROUPSID_TXT))
 				break;
-			error = str_append(dynstr, prsidname(acep->a_who,
-			    B_FALSE, &sidp, flags & ACL_NORESOLVE));
+			if (error = getsidname(acep->a_who, B_FALSE,
+			    &sidp, flags & ACL_NORESOLVE))
+				break;
+			error = str_append(dynstr, sidp);
 		} else {
 			if (error = str_append(dynstr, GROUP_TXT))
 				break;
@@ -424,8 +425,10 @@ ace_type_txt(dynaclstr_t *dynstr, ace_t *acep, int flags)
 		if ((flags & ACL_SID_FMT) && acep->a_who > MAXUID) {
 			if (error = str_append(dynstr, USERSID_TXT))
 				break;
-			error = str_append(dynstr, prsidname(acep->a_who,
-			    B_TRUE, &sidp, flags & ACL_NORESOLVE));
+			if (error = getsidname(acep->a_who, B_TRUE,
+			    &sidp, flags & ACL_NORESOLVE))
+				break;
+			error = str_append(dynstr, sidp);
 		} else {
 			if (error = str_append(dynstr, USER_TXT))
 				break;
@@ -733,7 +736,7 @@ char *
 aclent_acltotext(aclent_t  *aclp, int aclcnt, int flags)
 {
 	dynaclstr_t 	*dstr;
-	char		*aclexport;
+	char		*aclexport = NULL;
 	int		i;
 	int 		error = 0;
 
@@ -809,8 +812,9 @@ aclfromtext(char *aclstr, int *aclcnt)
 
 
 /*
- * returns a character position index of the start of the newly
- * appended string.  Returns -1 if operation couldn't be completed.
+ * Append string onto dynaclstr_t.
+ *
+ * Return 0 on success, 1 for failure.
  */
 static int
 str_append(dynaclstr_t *dstr, char *newstr)
@@ -887,7 +891,7 @@ ace_acltotext(acl_t *aceaclp, int flags)
 	int		error = 0;
 	int		isdir = (aceaclp->acl_flags & ACL_IS_DIR);
 	dynaclstr_t 	*dstr;
-	char		*aclexport;
+	char		*aclexport = NULL;
 
 	if (aclp == NULL)
 		return (NULL);

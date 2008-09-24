@@ -744,21 +744,21 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 	char *rid_start = NULL;
 	idmap_stat status;
 	char *end;
-	int error = 0;
+	int error = 1;
 	char *domain_start;
-
 
 	if ((domain_start = strchr(sid, '@')) == NULL) {
 		idmap_rid_t rid;
 
 		if ((rid_start = strrchr(sid, '-')) == NULL)
-			return (-1);
+			return (1);
 		*rid_start++ = '\0';
 		errno = 0;
 		rid = strtoul(rid_start--, &end, 10);
 		if (errno == 0 && *end == '\0') {
-			if (idmap_init(&idmap_hdl) == 0 &&
-			    idmap_get_create(idmap_hdl, &get_hdl) == 0) {
+			if (idmap_init(&idmap_hdl) == IDMAP_SUCCESS &&
+			    idmap_get_create(idmap_hdl, &get_hdl) ==
+			    IDMAP_SUCCESS) {
 				if (user)
 					error = idmap_get_uidbysid(get_hdl,
 					    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
@@ -767,19 +767,24 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 					error = idmap_get_gidbysid(get_hdl,
 					    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
 					    id, &status);
+				if (error == IDMAP_SUCCESS) {
+					error = idmap_get_mappings(get_hdl);
+					if (error == IDMAP_SUCCESS &&
+					    status != IDMAP_SUCCESS)
+						error = 1;
+					else
+						error = 0;
+				}
+			} else {
+				error = 1;
 			}
+			if (get_hdl)
+				idmap_get_destroy(get_hdl);
+			if (idmap_hdl)
+				(void) idmap_fini(idmap_hdl);
 		} else {
-			error = -1;
+			error = 1;
 		}
-		if (error == 0) {
-			error = idmap_get_mappings(get_hdl);
-			if (error == 0 && status != 0)
-				error = -1;
-		}
-		if (get_hdl)
-			idmap_get_destroy(get_hdl);
-		if (idmap_hdl)
-			(void) idmap_fini(idmap_hdl);
 		*rid_start = '-'; /* putback character removed earlier */
 	} else {
 		char *name = sid;
@@ -792,6 +797,7 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 			error = idmap_getgidbywinname(name, domain_start,
 			    IDMAP_REQ_FLG_USE_CACHE, id);
 		*--domain_start = '@';
+		error = (error == IDMAP_SUCCESS) ? 0 : 1;
 	}
 
 	return (error);
