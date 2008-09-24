@@ -319,6 +319,7 @@ f none usr/lib/help/auths/locale/SysPowerMgmtSuspendtoDisk.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtSuspendtoRAM.html 444 root bin
 f none usr/lib/help/auths/locale/SysPowerMgmtBrightness.html 444 root bin
 f none usr/lib/help/auths/locale/SysCpuPowerMgmt.html 444 root bin
+f none usr/lib/help/auths/locale/SmfManageZFSSnap.html 444 root bin
 #
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin

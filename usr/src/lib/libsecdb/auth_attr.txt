@@ -181,3 +181,5 @@ solaris.smf.manage.mms:::Manage MMS Service States::help=SmfManageMMS.html
 solaris.smf.modify.mms:::Add/Remove Values of MMS Service Properties::help=SmfModifyMMS.html
 solaris.smf.value.mms:::Change Values of MMS Service Properties::help=SmfValueMMS.html
 solaris.smf.read.mms:::Read Permission for Protected MMS Service Properties::help=SmfReadMMS.html
+#
+solaris.smf.manage.zfs-auto-snapshot:::Manage the ZFS Automatic Snapshots Service::help=SmfManageZFSSnap.html

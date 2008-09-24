@@ -20,7 +20,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -149,6 +148,17 @@ do
 		else
 			printf '/^gdm:\*LK\*\na\n%s\n.\nw\nq\n' \
 				"$XVM_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'zfssnap' reserved user if it doesn't exist.
+		#
+		ZFSSNAP_LINE="zfssnap:NP:::::::"
+		if grep "^zfssnap:" $dest 2>&1 > /dev/null; then
+			:
+		else
+			printf '/^gdm:\*LK\*\na\n%s\n.\nw\nq\n' \
+				"$ZFSSNAP_LINE" | ed -s $dest > /dev/null
 		fi
 	fi
 done

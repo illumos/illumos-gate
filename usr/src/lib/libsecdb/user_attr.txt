@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -25,9 +25,9 @@
 #
 # user attributes. see user_attr(4)
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 root::::auths=solaris.*,solaris.grant;profiles=All;lock_after_retries=no;min_label=admin_low;clearance=admin_high
 lp::::profiles=Printer Management
 adm::::profiles=Log Management
 dladm::::auths=solaris.smf.manage.wpa,solaris.smf.modify
+zfssnap::::type=role;auths=solaris.smf.manage.zfs-auto-snapshot;profiles=ZFS File System Management

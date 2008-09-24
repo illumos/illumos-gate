@@ -143,7 +143,8 @@ HTMLENTS = \
 	SysPowerMgmtSuspendtoDisk.html \
 	SysPowerMgmtSuspendtoRAM.html \
 	SysPowerMgmtBrightness.html \
-	SysCpuPowerMgmt.html
+	SysCpuPowerMgmt.html \
+	SmfManageZFSSnap.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths
