@@ -2247,6 +2247,20 @@ ata_init_drive_pcidma(
 		return (ATA_DMA_OFF);
 	}
 
+	/*
+	 * Disable DMA for ATAPI devices on controllers known to
+	 * have trouble with ATAPI DMA
+	 */
+
+	if (ATAPIDRV(ata_drvp)) {
+		if (ata_check_pciide_blacklist(ata_ctlp->ac_dip,
+		    ATA_BL_ATAPI_NODMA)) {
+			ata_dev_DMA_sel_msg =
+			    "controller incapable of DMA for ATAPI device";
+
+			return (ATA_DMA_OFF);
+		}
+	}
 	dma = ata_prop_lookup_int(DDI_DEV_T_ANY, tdip,
 	    0, "ata-dma-enabled", TRUE);
 	disk_dma = ata_prop_lookup_int(DDI_DEV_T_ANY, tdip,
@@ -2614,7 +2628,7 @@ ata_start_arq(
 
 	/* finish initializing the ARQ CDB */
 	ata_ctlp->ac_arq_cdb[1] = ata_drvp->ad_lun << 4;
-	ata_ctlp->ac_arq_cdb[4] = senselen;
+	ata_ctlp->ac_arq_cdb[4] = (uchar_t)senselen;
 
 	/* finish initializing the ARQ pkt */
 	arq_pktp->ap_v_addr = (caddr_t)&ata_pktp->ap_scbp->sts_sensedata;

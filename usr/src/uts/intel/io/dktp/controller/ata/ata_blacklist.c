@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,6 +60,12 @@ pcibl_t	ata_pciide_blacklist[] = {
 							ATA_BL_NO_SIMPLEX},
 	{ 0x1166, 0xffff, 0x0213, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN},
 	{ 0x1166, 0xffff, 0x0214, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN},
+
+	/*
+	 * The  chip 0x24b,which is Broadcom HT1000 SATA controller
+	 * working in legacy IDE mode, does not support ATAPI DMA
+	 */
+	{ 0x1166, 0xffff, 0x024b, 0xffff, ATA_BL_ATAPI_NODMA},
 
 	/*
 	 * On Intel ICH5/ICH5R (SATA controller), the simplex bit lies

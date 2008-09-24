@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ghd.h"
 
@@ -188,7 +187,7 @@ ghd_dmaget_next_attr(ccc_t *cccp, gcmd_t *gcmdp, long max_transfer_cnt,
 
 	gcmdp->cmd_totxfer += toxfer;
 
-	return (toxfer);
+	return ((uint_t)toxfer);
 }
 
 

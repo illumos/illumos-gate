@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ATA_BLACKLIST_H
 #define	_ATA_BLACKLIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -83,6 +82,12 @@ extern	atabl_t	ata_drive_blacklist[];
 				 * Ignore simplex bit on this device
 				 * if set
 				 */
+#define	ATA_BL_ATAPI_NODMA	0x40
+				/*
+				 * Disable DMA for ATAPI devices because
+				 * controller has trouble supporting it
+				 */
+
 #ifdef	__cplusplus
 }
 #endif

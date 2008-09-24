@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/dkio.h>
 #include <sys/cdio.h>
@@ -1584,7 +1582,7 @@ ata_disk_iosetup(opaque_t ctl_data, cmpkt_t *pktp)
 	 * value, so max_transfer 0x100 cannot be truncated to 8-bits
 	 * because this would represent a zero sector count.
 	 */
-	ata_pktp->ap_count = sec_count;
+	ata_pktp->ap_count = (ushort_t)sec_count;
 	if (!(ata_drvp->ad_flags & AD_EXT48)) {
 		ata_pktp->ap_count &= 0xff;
 	}
@@ -2428,7 +2426,7 @@ ata_disk_intr_pio_out(
 	/*
 	 * check for final interrupt on write command
 	 */
-	if (ata_pktp->ap_resid <= 0) {
+	if (ata_pktp->ap_resid == 0) {
 		/* tell the upper layer this request is complete */
 		return (ATA_FSM_RC_FINI);
 	}
@@ -3304,7 +3302,7 @@ ata_disk_update_fw(gtgt_t *gtgtp, ata_ctl_t *ata_ctlp,
 		sec_count = min(total_sec_count, MAX_FWFILE_SIZE_ONECMD);
 		ata_pktp->ap_flags = 0;
 
-		ata_pktp->ap_count = sec_count;
+		ata_pktp->ap_count = (ushort_t)sec_count;
 		ata_pktp->ap_startsec = start_sec;
 		ata_pktp->ap_v_addr = tmp_fwfile_memp;
 		ata_pktp->ap_resid = sec_count << SCTRSHFT;

@@ -760,7 +760,7 @@ ghd_timer_init(tmr_t *tmrp, long ticks)
 			continue;
 		state = ghd_time_inits[indx].state;
 		value = ghd_time_inits[indx].value;
-		ghd_timeout_table[state] = value;
+		ghd_timeout_table[state] = (cmdstate_t)value;
 	}
 }
 
