@@ -11418,29 +11418,45 @@ sd_ssc_send(sd_ssc_t *ssc, struct uscsi_cmd *incmd, int flag,
 	enum uio_seg dataspace, int path_flag)
 {
 	struct sd_uscsi_info	*uip;
-	struct uscsi_cmd	*uscmd = ssc->ssc_uscsi_cmd;
+	struct uscsi_cmd	*uscmd;
 	struct sd_lun		*un;
 	dev_t			dev;
 
 	int	format = 0;
 	int	rval;
 
-
 	ASSERT(ssc != NULL);
 	un = ssc->ssc_un;
 	ASSERT(un != NULL);
+	uscmd = ssc->ssc_uscsi_cmd;
+	ASSERT(uscmd != NULL);
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
-	ASSERT(!(ssc->ssc_flags & SSC_FLAGS_NEED_ASSESSMENT));
-	/*
-	 * We need to make sure sd_ssc_send will have sd_ssc_assessment
-	 * followed to avoid missing any point of telemetry.
-	 */
-	ssc->ssc_flags |= SSC_FLAGS_NEED_ASSESSMENT;
-
-	if (uscmd == NULL) {
-		return (ENXIO);
+	if (ssc->ssc_flags & SSC_FLAGS_NEED_ASSESSMENT) {
+		/*
+		 * If enter here, it indicates that the previous uscsi
+		 * command has not been processed by sd_ssc_assessment.
+		 * This is violating our rules of FMA telemetry processing.
+		 * We should print out this message and the last undisposed
+		 * uscsi command.
+		 */
+		if (uscmd->uscsi_cdb != NULL) {
+			SD_INFO(SD_LOG_SDTEST, un,
+			    "sd_ssc_send is missing the alternative "
+			    "sd_ssc_assessment when running command 0x%x.\n",
+			    uscmd->uscsi_cdb[0]);
+		}
+		/*
+		 * Set the ssc_flags to SSC_FLAGS_UNKNOWN, which should be
+		 * the initial status.
+		 */
+		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
 	}
 
+	/*
+	 * We need to make sure sd_ssc_send will have sd_ssc_assessment
+	 * followed to avoid missing FMA telemetries.
+	 */
+	ssc->ssc_flags |= SSC_FLAGS_NEED_ASSESSMENT;
 
 #ifdef SDDEBUG
 	switch (dataspace) {
@@ -11614,45 +11630,76 @@ sd_ssc_assessment(sd_ssc_t *ssc, enum sd_type_assessment tp_assess)
 	struct sd_lun *un;
 
 	ASSERT(ssc != NULL);
-	ASSERT(ssc->ssc_flags & SSC_FLAGS_NEED_ASSESSMENT);
-
-	ssc->ssc_flags &= ~SSC_FLAGS_NEED_ASSESSMENT;
 	un = ssc->ssc_un;
 	ASSERT(un != NULL);
+	ucmdp = ssc->ssc_uscsi_cmd;
+	ASSERT(ucmdp != NULL);
+
+	if (ssc->ssc_flags & SSC_FLAGS_NEED_ASSESSMENT) {
+		ssc->ssc_flags &= ~SSC_FLAGS_NEED_ASSESSMENT;
+	} else {
+		/*
+		 * If enter here, it indicates that we have a wrong
+		 * calling sequence of sd_ssc_send and sd_ssc_assessment,
+		 * both of which should be called in a pair in case of
+		 * loss of FMA telemetries.
+		 */
+		if (ucmdp->uscsi_cdb != NULL) {
+			SD_INFO(SD_LOG_SDTEST, un,
+			    "sd_ssc_assessment is missing the "
+			    "alternative sd_ssc_send when running 0x%x, "
+			    "or there are superfluous sd_ssc_assessment for "
+			    "the same sd_ssc_send.\n",
+			    ucmdp->uscsi_cdb[0]);
+		}
+		/*
+		 * Set the ssc_flags to the initial value to avoid passing
+		 * down dirty flags to the following sd_ssc_send function.
+		 */
+		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
+		return;
+	}
 
 	/*
-	 * We don't handle CD-ROM, and removable media
+	 * We don't handle a non-disk drive(CD-ROM, removable media).
+	 * Clear the ssc_flags before return in case we've set
+	 * SSC_FLAGS_INVALID_DATA which should be skipped for a non-disk
+	 * driver.
 	 */
 	if (ISCD(un) || un->un_f_has_removable_media) {
-		ssc->ssc_flags &= ~SSC_FLAGS_CMD_ISSUED;
-		ssc->ssc_flags &= ~SSC_FLAGS_INVALID_DATA;
+		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
 		return;
 	}
 
 	/*
 	 * Only handle an issued command which is waiting for assessment.
+	 * A command which is not issued will not have
+	 * SSC_FLAGS_INVALID_DATA set, so it'ok we just return here.
 	 */
 	if (!(ssc->ssc_flags & SSC_FLAGS_CMD_ISSUED)) {
 		sd_ssc_print(ssc, SCSI_ERR_INFO);
 		return;
-	} else
+	} else {
+		/*
+		 * For an issued command, we should clear this flag in
+		 * order to make the sd_ssc_t structure be used off
+		 * multiple uscsi commands.
+		 */
 		ssc->ssc_flags &= ~SSC_FLAGS_CMD_ISSUED;
-
-	ucmdp = ssc->ssc_uscsi_cmd;
-	ASSERT(ucmdp != NULL);
+	}
 
 	/*
-	 * We will not deal with non-retryable commands here.
+	 * We will not deal with non-retryable(flag USCSI_DIAGNOSE set)
+	 * commands here. And we should clear the ssc_flags before return.
 	 */
 	if (ucmdp->uscsi_flags & USCSI_DIAGNOSE) {
-		ssc->ssc_flags &= ~SSC_FLAGS_INVALID_DATA;
+		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
 		return;
 	}
 
 	switch (tp_assess) {
 	case SD_FMT_IGNORE:
 	case SD_FMT_IGNORE_COMPROMISE:
-		ssc->ssc_flags &= ~SSC_FLAGS_INVALID_DATA;
 		break;
 	case SD_FMT_STATUS_CHECK:
 		/*
@@ -11680,13 +11727,17 @@ sd_ssc_assessment(sd_ssc_t *ssc, enum sd_type_assessment tp_assess)
 		break;
 	default:
 		/*
-		 * Should be an software error.
+		 * Should not have other type of assessment.
 		 */
 		scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
-		    "sd_ssc_assessment got wrong \
-		    sd_type_assessment %d\n", tp_assess);
+		    "sd_ssc_assessment got wrong "
+		    "sd_type_assessment %d.\n", tp_assess);
 		break;
 	}
+	/*
+	 * Clear up the ssc_flags before return.
+	 */
+	ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
 }
 
 /*
