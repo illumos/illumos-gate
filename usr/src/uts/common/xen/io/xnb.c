@@ -1507,6 +1507,27 @@ finished:
 	start = xnbp->xnb_tx_ring.req_cons;
 	end = xnbp->xnb_tx_ring.sring->req_prod;
 
+	if ((end - start) > NET_TX_RING_SIZE) {
+		/*
+		 * This usually indicates that the frontend driver is
+		 * misbehaving, as it's not possible to have more than
+		 * NET_TX_RING_SIZE ring elements in play at any one
+		 * time.
+		 *
+		 * We reset the ring pointers to the state declared by
+		 * the frontend and try to carry on.
+		 */
+		cmn_err(CE_WARN, "xnb_from_peer: domain %d tried to give us %u "
+		    "items in the ring, resetting and trying to recover.",
+		    xnbp->xnb_peer, (end - start));
+
+		/* LINTED: constant in conditional context */
+		BACK_RING_ATTACH(&xnbp->xnb_tx_ring,
+		    (netif_tx_sring_t *)xnbp->xnb_tx_ring_addr, PAGESIZE);
+
+		goto around;
+	}
+
 	for (loop = start, mop = xnbp->xnb_tx_mop, txpp = xnbp->xnb_tx_bufp;
 	    loop != end;
 	    loop++, mop++, txpp++) {
