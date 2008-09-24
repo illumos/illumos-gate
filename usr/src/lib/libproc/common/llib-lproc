@@ -22,11 +22,9 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libproc.h"
 
 /*
@@ -194,8 +192,14 @@ const rd_loadobj_t *Pname_to_loadobj(struct ps_prochandle *, const char *);
 const rd_loadobj_t *Plmid_to_loadobj(struct ps_prochandle *, Lmid_t,
 		const char *);
 int	Pmapping_iter(struct ps_prochandle *Pr, proc_map_f *func, void *cd);
+int	Pmapping_iter_resolved(struct ps_prochandle *Pr, proc_map_f *func,
+		void *cd);
 int	Pobject_iter(struct ps_prochandle *Pr, proc_map_f *func, void *cd);
+int	Pobject_iter_resolved(struct ps_prochandle *Pr, proc_map_f *func,
+		void *cd);
 char	*Pobjname(struct ps_prochandle *Pr, uintptr_t addr,
+		char *buffer, size_t bufsize);
+char	*Pobjname_resolved(struct ps_prochandle *Pr, uintptr_t addr,
 		char *buffer, size_t bufsize);
 int	Plmid(struct ps_prochandle *Pr, uintptr_t addr, Lmid_t *lmidp);
 int	Psymbol_iter(struct ps_prochandle *Pr, const char *object_name,
@@ -208,6 +212,8 @@ char	*Pgetenv(struct ps_prochandle *Pr, const char *name,
 char	*Pplatform(struct ps_prochandle *Pr, char *s, size_t n);
 int	Puname(struct ps_prochandle *Pr, struct utsname *u);
 char	*Pzonename(struct ps_prochandle *Pr, char *s, size_t n);
+char	*Pfindobj(struct ps_prochandle *Pr, const char *path,
+		char *s, size_t n);
 char	*Pexecname(struct ps_prochandle *Pr, char *buffer, size_t bufsize);
 void	Preset_maps(struct ps_prochandle *Pr);
 

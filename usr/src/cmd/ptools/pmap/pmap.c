@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -44,7 +42,8 @@
 #include <sys/mman.h>
 #include <sys/lgrp_user.h>
 #include <libproc.h>
-#include <libzonecfg.h>
+
+#include "pmap_common.h"
 
 #define	KILOBYTE	1024
 #define	MEGABYTE	(KILOBYTE * KILOBYTE)
@@ -152,11 +151,6 @@ static	struct ps_prochandle *Pr;
 
 static void intr(int);
 
-typedef struct lwpstack {
-	lwpid_t	lwps_lwpid;
-	stack_t	lwps_stack;
-} lwpstack_t;
-
 typedef struct {
 	prxmap_t	md_xmap;
 	prmap_t		md_map;
@@ -192,28 +186,6 @@ getstack(void *data, const lwpstatus_t *lsp)
 
 	return (0);
 }
-
-/*
- * We compare the high memory addresses since stacks are faulted in from
- * high memory addresses to low memory addresses, and our prmap_t
- * structures identify only the range of addresses that have been faulted
- * in so far.
- */
-static int
-cmpstacks(const void *ap, const void *bp)
-{
-	const lwpstack_t *as = ap;
-	const lwpstack_t *bs = bp;
-	uintptr_t a = (uintptr_t)as->lwps_stack.ss_sp + as->lwps_stack.ss_size;
-	uintptr_t b = (uintptr_t)bs->lwps_stack.ss_sp + bs->lwps_stack.ss_size;
-
-	if (a < b)
-		return (1);
-	if (a > b)
-		return (-1);
-	return (0);
-}
-
 
 int
 main(int argc, char **argv)
@@ -483,9 +455,12 @@ again:
 				else if (sflag)
 					rc += xmapping_iter(Pr, gather_xmap,
 					    NULL, 0);
+				else if (lflag)
+					rc += Pmapping_iter(Pr,
+					    gather_map, NULL);
 				else
-					rc += Pmapping_iter(Pr, gather_map,
-					    NULL);
+					rc += Pmapping_iter_resolved(Pr,
+					    gather_map, NULL);
 			}
 
 			/*
@@ -606,144 +581,6 @@ again:
 	return (rc);
 }
 
-static char *
-make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
-	char *buf, size_t bufsz)
-{
-	const pstatus_t		*Psp = Pstatus(Pr);
-	const psinfo_t		*pi = Ppsinfo(Pr);
-	char			fname[100];
-	struct stat		statb;
-	int			len;
-	char			zname[ZONENAME_MAX];
-	char			zpath[PATH_MAX];
-	char			objname[PATH_MAX];
-
-	if (!lflag && strcmp(mapname, "a.out") == 0 &&
-	    Pexecname(Pr, buf, bufsz) != NULL)
-		return (buf);
-
-	if (Pobjname(Pr, addr, objname, sizeof (objname)) != NULL) {
-		(void) strncpy(buf, objname, bufsz);
-
-		if (lflag)
-			return (buf);
-
-		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
-			buf[len] = '\0';
-			return (buf);
-		}
-
-		/*
-		 * If the target is in a non-global zone, attempt to prepend
-		 * the zone path in order to give the global-zone caller the
-		 * real path to the file.
-		 */
-		if (getzonenamebyid(pi->pr_zoneid, zname,
-		    sizeof (zname)) != -1 && strcmp(zname, "global") != 0) {
-			typedef int  (*fptr)(char *, char *, size_t);
-			fptr zone_get_zonepath;
-			void *dlhdl;
-
-			if (((dlhdl =
-			    dlopen(LIBZONECFG_PATH, RTLD_LAZY)) == NULL) ||
-			    ((zone_get_zonepath =
-			    (fptr) dlsym(dlhdl, "zone_get_zonepath")) == NULL))
-				return (NULL);
-
-			if ((*zone_get_zonepath)(zname, zpath, sizeof (zpath))
-			    == Z_OK) {
-				(void) strncat(zpath, "/root",
-				    MAXPATHLEN - strlen(zpath));
-
-				if (bufsz <= strlen(zpath)) {
-					(void) dlclose(dlhdl);
-					return (NULL);
-				}
-
-				(void) strncpy(buf, zpath, bufsz);
-				(void) strncat(buf, objname,
-				    bufsz - strlen(zpath));
-			}
-			(void) dlclose(dlhdl);
-		}
-
-		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
-			buf[len] = '\0';
-			return (buf);
-		}
-	}
-
-	if (Pstate(Pr) != PS_DEAD && *mapname != '\0') {
-		(void) snprintf(fname, sizeof (fname), "/proc/%d/path/%s",
-		    (int)Psp->pr_pid, mapname);
-		len = readlink(fname, buf, bufsz - 1);
-		if (len >= 0) {
-			buf[len] = '\0';
-			return (buf);
-		} else { /* there is no path and readlink() error */
-			(void) snprintf(fname, sizeof (fname),
-			    "/proc/%d/object/%s", (int)Psp->pr_pid, mapname);
-			if (stat(fname, &statb) == 0) {
-				dev_t dev = statb.st_dev;
-				ino_t ino = statb.st_ino;
-				(void) snprintf(buf, bufsz,
-				    "dev:%lu,%lu ino:%lu",
-				    (ulong_t)major(dev),
-				    (ulong_t)minor(dev), ino);
-				return (buf);
-			}
-		}
-	}
-
-	return (NULL);
-}
-
-static char *
-anon_name(char *name, const pstatus_t *Psp,
-    uintptr_t vaddr, size_t size, int mflags, int shmid)
-{
-	if (mflags & MA_ISM) {
-		if (shmid == -1)
-			(void) snprintf(name, PATH_MAX, "  [ %s shmid=null ]",
-			    (mflags & MA_NORESERVE) ? "ism" : "dism");
-		else
-			(void) snprintf(name, PATH_MAX, "  [ %s shmid=0x%x ]",
-			    (mflags & MA_NORESERVE) ? "ism" : "dism", shmid);
-	} else if (mflags & MA_SHM) {
-		if (shmid == -1)
-			(void) sprintf(name, "  [ shmid=null ]");
-		else
-			(void) sprintf(name, "  [ shmid=0x%x ]", shmid);
-	} else if (vaddr + size > Psp->pr_stkbase &&
-	    vaddr < Psp->pr_stkbase + Psp->pr_stksize) {
-		(void) strcpy(name, "  [ stack ]");
-	} else if ((mflags & MA_ANON) &&
-	    vaddr + size > Psp->pr_brkbase &&
-	    vaddr < Psp->pr_brkbase + Psp->pr_brksize) {
-		(void) strcpy(name, "  [ heap ]");
-	} else {
-		lwpstack_t key, *stk;
-
-		key.lwps_stack.ss_sp = (void *)vaddr;
-		key.lwps_stack.ss_size = size;
-		if (nstacks > 0 &&
-		    (stk = bsearch(&key, stacks, nstacks, sizeof (stacks[0]),
-		    cmpstacks)) != NULL) {
-			(void) snprintf(name, PATH_MAX, "  [ %s tid=%d ]",
-			    (stk->lwps_stack.ss_flags & SS_ONSTACK) ?
-			    "altstack" : "stack",
-			    stk->lwps_lwpid);
-		} else if (Pstate(Pr) != PS_DEAD) {
-			(void) strcpy(name, "  [ anon ]");
-		} else {
-			return (NULL);
-		}
-	}
-
-	return (name);
-}
-
 static int
 rmapping_iter(struct ps_prochandle *Pr, proc_map_f *func, void *cd)
 {
@@ -862,14 +699,14 @@ look_map(void *data, const prmap_t *pmp, const char *object_name)
 	if (!(pmp->pr_mflags & MA_ANON) ||
 	    segment_end <= Psp->pr_brkbase ||
 	    pmp->pr_vaddr >= Psp->pr_brkbase + Psp->pr_brksize) {
-		lname = make_name(Pr, pmp->pr_vaddr, pmp->pr_mapname,
+		lname = make_name(Pr, lflag, pmp->pr_vaddr, pmp->pr_mapname,
 		    mname, sizeof (mname));
 	}
 
 	if (lname == NULL &&
 	    ((pmp->pr_mflags & MA_ANON) || Pstate(Pr) == PS_DEAD)) {
-		lname = anon_name(mname, Psp, pmp->pr_vaddr,
-		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid);
+		lname = anon_name(mname, Psp, stacks, nstacks, pmp->pr_vaddr,
+		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid, NULL);
 	}
 
 	/*
@@ -1000,14 +837,14 @@ look_smap(void *data,
 	if (!(pmp->pr_mflags & MA_ANON) ||
 	    pmp->pr_vaddr + pmp->pr_size <= Psp->pr_brkbase ||
 	    pmp->pr_vaddr >= Psp->pr_brkbase + Psp->pr_brksize) {
-		lname = make_name(Pr, pmp->pr_vaddr, pmp->pr_mapname,
+		lname = make_name(Pr, lflag, pmp->pr_vaddr, pmp->pr_mapname,
 		    mname, sizeof (mname));
 	}
 
 	if (lname == NULL &&
 	    ((pmp->pr_mflags & MA_ANON) || Pstate(Pr) == PS_DEAD)) {
-		lname = anon_name(mname, Psp, pmp->pr_vaddr,
-		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid);
+		lname = anon_name(mname, Psp, stacks, nstacks, pmp->pr_vaddr,
+		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid, NULL);
 	}
 
 	/*
@@ -1104,7 +941,7 @@ look_xmap(void *data,
 	if (!(pmp->pr_mflags & MA_ANON) ||
 	    pmp->pr_vaddr + pmp->pr_size <= Psp->pr_brkbase ||
 	    pmp->pr_vaddr >= Psp->pr_brkbase + Psp->pr_brksize) {
-		lname = make_name(Pr, pmp->pr_vaddr, pmp->pr_mapname,
+		lname = make_name(Pr, lflag, pmp->pr_vaddr, pmp->pr_mapname,
 		    mname, sizeof (mname));
 	}
 
@@ -1112,8 +949,8 @@ look_xmap(void *data,
 		if ((ln = strrchr(lname, '/')) != NULL)
 			lname = ln + 1;
 	} else if ((pmp->pr_mflags & MA_ANON) || Pstate(Pr) == PS_DEAD) {
-		lname = anon_name(mname, Psp, pmp->pr_vaddr,
-		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid);
+		lname = anon_name(mname, Psp, stacks, nstacks, pmp->pr_vaddr,
+		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid, NULL);
 	}
 
 	(void) printf("%.*lX", addr_width, (ulong_t)pmp->pr_vaddr);
@@ -1183,7 +1020,7 @@ look_xmap_nopgsz(void *data,
 	if (!(pmp->pr_mflags & MA_ANON) ||
 	    pmp->pr_vaddr + pmp->pr_size <= Psp->pr_brkbase ||
 	    pmp->pr_vaddr >= Psp->pr_brkbase + Psp->pr_brksize) {
-		lname = make_name(Pr, pmp->pr_vaddr, pmp->pr_mapname,
+		lname = make_name(Pr, lflag, pmp->pr_vaddr, pmp->pr_mapname,
 		    mname, sizeof (mname));
 	}
 
@@ -1191,8 +1028,8 @@ look_xmap_nopgsz(void *data,
 		if ((ln = strrchr(lname, '/')) != NULL)
 			lname = ln + 1;
 	} else if ((pmp->pr_mflags & MA_ANON) || Pstate(Pr) == PS_DEAD) {
-		lname = anon_name(mname, Psp, pmp->pr_vaddr,
-		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid);
+		lname = anon_name(mname, Psp, stacks, nstacks, pmp->pr_vaddr,
+		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid, NULL);
 	}
 
 	kperpage = pmp->pr_pagesize / KILOBYTE;

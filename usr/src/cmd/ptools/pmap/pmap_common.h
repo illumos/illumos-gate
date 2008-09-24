@@ -18,25 +18,47 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	_PMAP_COMMON_H
+#define	_PMAP_COMMON_H
 
-#include "libproc.h"
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-char *
-Pbrandname(struct ps_prochandle *P, char *buf, size_t buflen)
-{
-	long	addr;
+typedef struct lwpstack {
+	lwpid_t	lwps_lwpid;
+	stack_t	lwps_stack;
+} lwpstack_t;
 
-	if ((addr = Pgetauxval(P, AT_SUN_BRANDNAME)) == -1)
-		return (NULL);
+/*
+ * Used to set the advice type var (at_map) when parsing the arguments to
+ * pmadvise.  Later, when creating the map list, at_map is used as a mask
+ * to determine if any generic advice applies to each memory mapping.
+ */
+enum	atype_enum {
+	AT_PRIVM,
+	AT_SHARED,
+	AT_HEAP,
+	AT_STACK,
+	AT_SEG,
+	AT_NTYPES
+};
 
-	if (Pread_string(P, buf, buflen, addr) == -1)
-		return (NULL);
+extern int cmpstacks(const void *, const void *);
+extern char *make_name(struct ps_prochandle *, int, uintptr_t,
+    const char *, char *, size_t);
+extern char *anon_name(char *, const pstatus_t *, lwpstack_t *, uint_t,
+    uintptr_t, size_t, int, int, int *);
 
-	return (buf);
+
+#ifdef	__cplusplus
 }
+#endif
+
+#endif	/* _PMAP_COMMON_H */

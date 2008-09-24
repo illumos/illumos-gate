@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * User Process Target
  *
@@ -311,7 +309,7 @@ pt_rtld_event(mdb_tgt_t *t, int vid, void *private)
 	struct ps_prochandle *P = t->t_pshandle;
 	pt_data_t *pt = t->t_data;
 	rd_event_msg_t rdm;
-	int docontinue = 1;
+	int rv, docontinue = 1;
 
 	if (rd_event_getmsg(pt->p_rtld, &rdm) == RD_OK) {
 
@@ -324,8 +322,15 @@ pt_rtld_event(mdb_tgt_t *t, int vid, void *private)
 
 			Pupdate_maps(P);
 
-			if (Pobject_iter(P, (proc_map_f *)thr_check, t) == 0 &&
-			    pt->p_ptl_ops != &proc_lwp_ops) {
+			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+				rv = Pobject_iter_resolved(P,
+				    (proc_map_f *)thr_check, t);
+			} else {
+				rv = Pobject_iter(P,
+				    (proc_map_f *)thr_check, t);
+			}
+
+			if ((rv == 0) && (pt->p_ptl_ops != &proc_lwp_ops)) {
 				mdb_dprintf(MDB_DBG_TGT, "unloading thread_db "
 				    "support after dlclose\n");
 				PTL_DTOR(t);
@@ -780,7 +785,14 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	else {
 		t->t_pshandle = C;
 		pt->p_rtld = Prd_agent(C);
-		(void) Pobject_iter(t->t_pshandle, (proc_map_f *)thr_check, t);
+
+		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+			(void) Pobject_iter_resolved(t->t_pshandle,
+			    (proc_map_f *)thr_check, t);
+		} else {
+			(void) Pobject_iter(t->t_pshandle,
+			    (proc_map_f *)thr_check, t);
+		}
 	}
 
 	(void) mdb_tgt_sespec_activate_all(t);
@@ -1783,8 +1795,13 @@ pt_tmodel(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		pt->p_ptl_hdl = NULL;
 
 		if (ptl_ops == &proc_tdb_ops) {
-			(void) Pobject_iter(t->t_pshandle, (proc_map_f *)
-			    thr_check, t);
+			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+				(void) Pobject_iter(t->t_pshandle,
+				    (proc_map_f *)thr_check, t);
+			} else {
+				(void) Pobject_iter_resolved(t->t_pshandle,
+				    (proc_map_f *)thr_check, t);
+			}
 		}
 	}
 
@@ -2166,8 +2183,15 @@ pt_activate_common(mdb_tgt_t *t)
 	 * and initialize the corresponding libthread_db.  If this fails, fall
 	 * back to our native LWP implementation and issue a warning.
 	 */
-	if (t->t_pshandle != NULL && Pstate(t->t_pshandle) != PS_IDLE)
-		(void) Pobject_iter(t->t_pshandle, (proc_map_f *)thr_check, t);
+	if (t->t_pshandle != NULL && Pstate(t->t_pshandle) != PS_IDLE) {
+		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+			(void) Pobject_iter_resolved(t->t_pshandle,
+			    (proc_map_f *)thr_check, t);
+		} else {
+			(void) Pobject_iter(t->t_pshandle,
+			    (proc_map_f *)thr_check, t);
+		}
+	}
 
 	/*
 	 * If there's a global object named '_mdb_abort_info', assuming we're
@@ -2579,8 +2603,14 @@ pt_lookup_by_name_thr(mdb_tgt_t *t, const char *object,
 		pl.pl_found = FALSE;
 
 		if (object == MDB_TGT_OBJ_EVERY) {
-			if (Pobject_iter(P, pt_lookup_cb, &pl) == -1)
-				return (-1); /* errno is set for us */
+			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+				if (Pobject_iter_resolved(P, pt_lookup_cb,
+				    &pl) == -1)
+					return (-1); /* errno is set for us */
+			} else {
+				if (Pobject_iter(P, pt_lookup_cb, &pl) == -1)
+					return (-1); /* errno is set for us */
+			}
 		} else {
 			const prmap_t *pmp;
 
@@ -2677,10 +2707,10 @@ pt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 {
 	struct ps_prochandle *P = t->t_pshandle;
 	pt_data_t *pt = t->t_data;
-
 	rd_plt_info_t rpi = { 0 };
+
 	const char *pltsym;
-	int match, i;
+	int rv, match, i;
 
 	mdb_gelf_symtab_t *gsts[3];	/* mdb.m_prsym, .symtab, .dynsym */
 	int gstc = 0;			/* number of valid gsts[] entries */
@@ -2782,9 +2812,15 @@ pt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 	 * Once we get the closest symbol, we perform the EXACT match or
 	 * smart-mode or absolute distance check ourself:
 	 */
-	if (Pxlookup_by_addr(P, addr, buf, nbytes, symp, &si) == 0 &&
-	    symp->st_value != 0 && (gst == NULL ||
-	    mdb_gelf_sym_closer(symp, &sym, addr))) {
+	if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+		rv = Pxlookup_by_addr_resolved(P, addr, buf, nbytes,
+		    symp, &si);
+	} else {
+		rv = Pxlookup_by_addr(P, addr, buf, nbytes,
+		    symp, &si);
+	}
+	if ((rv == 0) && (symp->st_value != 0) &&
+	    (gst == NULL || mdb_gelf_sym_closer(symp, &sym, addr))) {
 
 		if (flags & MDB_TGT_SYM_EXACT)
 			match = (addr == symp->st_value);
@@ -2821,8 +2857,14 @@ found:
 		const char *prefix = pmp->pr_mapname;
 		Lmid_t lmid;
 
-		if (Pobjname(P, addr, pt->p_objname, MDB_TGT_MAPSZ))
-			prefix = pt->p_objname;
+		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+			if (Pobjname_resolved(P, addr, pt->p_objname,
+			    MDB_TGT_MAPSZ))
+				prefix = pt->p_objname;
+		} else {
+			if (Pobjname(P, addr, pt->p_objname, MDB_TGT_MAPSZ))
+				prefix = pt->p_objname;
+		}
 
 		if (buf != NULL && nbytes > 1) {
 			(void) strncpy(pt->p_symname, buf, MDB_TGT_SYM_NAMLEN);
@@ -2917,7 +2959,13 @@ pt_symbol_iter(mdb_tgt_t *t, const char *object, uint_t which,
 			    which, type, pt_symbol_iter_cb, &ps);
 			return (0);
 		} else if (Prd_agent(t->t_pshandle) != NULL) {
-			(void) Pobject_iter(t->t_pshandle, pt_objsym_iter, &ps);
+			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+				(void) Pobject_iter_resolved(t->t_pshandle,
+				    pt_objsym_iter, &ps);
+			} else {
+				(void) Pobject_iter(t->t_pshandle,
+				    pt_objsym_iter, &ps);
+			}
 			return (0);
 		}
 	}
@@ -2947,10 +2995,16 @@ static const mdb_map_t *
 pt_prmap_to_mdbmap(mdb_tgt_t *t, const prmap_t *prp, mdb_map_t *mp)
 {
 	struct ps_prochandle *P = t->t_pshandle;
-	char name[MAXPATHLEN];
+	char *rv, name[MAXPATHLEN];
 	Lmid_t lmid;
 
-	if (Pobjname(P, prp->pr_vaddr, name, sizeof (name)) != NULL) {
+	if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+		rv = Pobjname_resolved(P, prp->pr_vaddr, name, sizeof (name));
+	} else {
+		rv = Pobjname(P, prp->pr_vaddr, name, sizeof (name));
+	}
+
+	if (rv != NULL) {
 		if (Plmid(P, prp->pr_vaddr, &lmid) == 0 && (
 		    (lmid != LM_ID_BASE && lmid != LM_ID_LDSO) ||
 		    (mdb.m_flags & MDB_FL_SHOWLMID))) {
@@ -3010,7 +3064,13 @@ pt_mapping_iter(mdb_tgt_t *t, mdb_tgt_map_f *func, void *private)
 		pm.pmap_func = func;
 		pm.pmap_private = private;
 
-		(void) Pmapping_iter(t->t_pshandle, pt_map_apply, &pm);
+		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+			(void) Pmapping_iter_resolved(t->t_pshandle,
+			    pt_map_apply, &pm);
+		} else {
+			(void) Pmapping_iter(t->t_pshandle,
+			    pt_map_apply, &pm);
+		}
 		return (0);
 	}
 
@@ -3033,7 +3093,13 @@ pt_object_iter(mdb_tgt_t *t, mdb_tgt_map_f *func, void *private)
 		pm.pmap_func = func;
 		pm.pmap_private = private;
 
-		(void) Pobject_iter(t->t_pshandle, pt_map_apply, &pm);
+		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
+			(void) Pobject_iter_resolved(t->t_pshandle,
+			    pt_map_apply, &pm);
+		} else {
+			(void) Pobject_iter(t->t_pshandle,
+			    pt_map_apply, &pm);
+		}
 		return (0);
 	}
 

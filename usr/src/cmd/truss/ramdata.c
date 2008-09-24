@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,7 +100,7 @@ lwpid_t	*truss_lwpid;		/* array of truss lwpid's */
 struct counts *Cp;		/* for counting: malloc() or shared memory */
 struct global_psinfo *gps;	/* contains global process information */
 
-struct dynlib *Dyn;		/* for tracing functions in shared libraries */
+struct dynlib *Dynlib;		/* for tracing functions in shared libraries */
 struct dynpat *Dynpat;
 struct dynpat *Lastpat;
 struct bkpt **bpt_hashtable;	/* breakpoint hash table */

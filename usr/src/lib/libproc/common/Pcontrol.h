@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PCONTROL_H
 #define	_PCONTROL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implemention-specific include file for libproc process management.
@@ -98,6 +96,8 @@ typedef struct file_info {	/* symbol information for a mapped file */
 	rd_loadobj_t *file_lo;	/* load object structure from rtld_db */
 	char	*file_lname;	/* load object name from rtld_db */
 	char	*file_lbase;	/* pointer to basename of file_lname */
+	char	*file_rname;	/* resolved on-disk object pathname */
+	char	*file_rbase;	/* pointer to basename of file_rname */
 	Elf	*file_elf;	/* ELF handle so we can close */
 	void	*file_elfmem;	/* data for faked-up ELF handle */
 	sym_tbl_t file_symtab;	/* symbol table */
@@ -222,6 +222,7 @@ struct ps_prochandle {
 	core_info_t *core;	/* information specific to core (if PS_DEAD) */
 	uintptr_t *ucaddrs;	/* ucontext-list addresses */
 	uint_t	ucnelems;	/* number of elements in the ucaddrs list */
+	char	*zoneroot;	/* cached path to zone root */
 };
 
 /* flags */
@@ -264,6 +265,12 @@ extern	char 	*Pfindexec(struct ps_prochandle *, const char *,
 extern	int	getlwpstatus(struct ps_prochandle *, lwpid_t, lwpstatus_t *);
 int	Pstopstatus(struct ps_prochandle *, long, uint32_t);
 extern	file_info_t *file_info_new(struct ps_prochandle *, map_info_t *);
+extern	char	*Plofspath(const char *, char *, size_t);
+extern	char	*Pzoneroot(struct ps_prochandle *, char *, size_t);
+extern	char	*Pzonepath(struct ps_prochandle *, const char *, char *,
+	size_t);
+extern	char	*Pfindmap(struct ps_prochandle *, map_info_t *, char *,
+	size_t);
 
 extern	int	Padd_mapping(struct ps_prochandle *, off64_t, file_info_t *,
     prmap_t *);

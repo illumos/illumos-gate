@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _RAMDATA_H
 #define	_RAMDATA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 
 #ifdef	__cplusplus
 extern "C" {
@@ -258,7 +256,7 @@ struct dynpat {		/* structure specifying patterns for dynlib's */
 	struct dynlib *Dp;	/* set to the dynlib instance when searching */
 };
 
-extern	struct dynlib *Dyn;	/* for tracing functions in shared libraries */
+extern	struct dynlib *Dynlib;	/* for tracing functions in shared libraries */
 extern	struct dynpat *Dynpat;
 extern	struct dynpat *Lastpat;
 extern	struct bkpt **bpt_hashtable;	/* breakpoint hash table */

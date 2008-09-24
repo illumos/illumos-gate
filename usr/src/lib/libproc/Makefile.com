@@ -22,15 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libproc.a
 VERS = .1
 
 CMNOBJS =	\
 	P32ton.o	\
-	Pbrand.o	\
 	Pcontrol.o	\
 	Pcore.o		\
 	Pexecname.o	\
@@ -46,6 +43,7 @@ CMNOBJS =	\
 	Pstack.o	\
 	Psyscall.o	\
 	Putil.o		\
+	Pzone.o		\
 	pr_door.o	\
 	pr_exit.o	\
 	pr_fcntl.o	\

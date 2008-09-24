@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Chad Mynhier
@@ -42,8 +42,6 @@
 
 #ifndef	_LIBPROC_H
 #define	_LIBPROC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -467,11 +465,15 @@ extern int Pxlookup_by_name(struct ps_prochandle *,
 
 extern int Pxlookup_by_addr(struct ps_prochandle *,
     uintptr_t, char *, size_t, GElf_Sym *, prsyminfo_t *);
+extern int Pxlookup_by_addr_resolved(struct ps_prochandle *,
+    uintptr_t, char *, size_t, GElf_Sym *, prsyminfo_t *);
 
 typedef int proc_map_f(void *, const prmap_t *, const char *);
 
 extern int Pmapping_iter(struct ps_prochandle *, proc_map_f *, void *);
+extern int Pmapping_iter_resolved(struct ps_prochandle *, proc_map_f *, void *);
 extern int Pobject_iter(struct ps_prochandle *, proc_map_f *, void *);
+extern int Pobject_iter_resolved(struct ps_prochandle *, proc_map_f *, void *);
 
 extern const prmap_t *Paddr_to_map(struct ps_prochandle *, uintptr_t);
 extern const prmap_t *Paddr_to_text_map(struct ps_prochandle *, uintptr_t);
@@ -491,9 +493,12 @@ extern ctf_file_t *Pname_to_ctf(struct ps_prochandle *, const char *);
 extern char *Pplatform(struct ps_prochandle *, char *, size_t);
 extern int Puname(struct ps_prochandle *, struct utsname *);
 extern char *Pzonename(struct ps_prochandle *, char *, size_t);
+extern char *Pfindobj(struct ps_prochandle *, const char *, char *, size_t);
 
 extern char *Pexecname(struct ps_prochandle *, char *, size_t);
 extern char *Pobjname(struct ps_prochandle *, uintptr_t, char *, size_t);
+extern char *Pobjname_resolved(struct ps_prochandle *, uintptr_t, char *,
+    size_t);
 extern int Plmid(struct ps_prochandle *, uintptr_t, Lmid_t *);
 
 typedef int proc_env_f(void *, struct ps_prochandle *, uintptr_t, const char *);

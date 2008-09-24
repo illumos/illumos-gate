@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Due to mistakes made early in the history of this library, there are no
@@ -126,11 +124,14 @@ SUNWprivate_1.1 {
 	Plwp_setregs;
 	Plwp_stack;
 	Pmapping_iter;
+	Pmapping_iter_resolved;
 	Pname_to_ctf;
 	Pname_to_loadobj;
 	Pname_to_map;
 	Pobject_iter;
+	Pobject_iter_resolved;
 	Pobjname;
+	Pobjname_resolved;
 	Pplatform;
 	Ppltdest;
 	Ppriv;
@@ -276,9 +277,12 @@ SUNWprivate_1.1 {
 	Pxecbkpt;
 	Pxecwapt;
 	Pxlookup_by_addr;
+	Pxlookup_by_addr_resolved;
 	Pxlookup_by_name;
 	Pxsymbol_iter;
 	Pzonename;
+	Pzonepath;
+	Pzoneroot;
     local:
 	*;
 };

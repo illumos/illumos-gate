@@ -189,10 +189,10 @@ establish_breakpoints(void)
 		struct dynlib **Dpp;
 		struct dynlib *Dp;
 
-		for (Dp = Dyn; Dp != NULL; Dp = Dp->next)
+		for (Dp = Dynlib; Dp != NULL; Dp = Dp->next)
 			Dp->present = FALSE;
 		(void) Pobject_iter(Proc, object_present, NULL);
-		Dpp = &Dyn;
+		Dpp = &Dynlib;
 		while ((Dp = *Dpp) != NULL) {
 			if (Dp->present) {
 				Dpp = &Dp->next;
@@ -313,7 +313,7 @@ object_iter(void *cd, const prmap_t *pmp, const char *object_name)
 	if (Thr_agent == NULL && strstr(object_name, "/libc.so.") != NULL)
 		setup_thread_agent();
 
-	for (Dp = Dyn; Dp != NULL; Dp = Dp->next)
+	for (Dp = Dynlib; Dp != NULL; Dp = Dp->next)
 		if (strcmp(object_name, Dp->lib_name) == 0 ||
 		    (strcmp(Dp->lib_name, "a.out") == 0 &&
 		    strcmp(pmp->pr_mapname, "a.out") == 0))
@@ -340,8 +340,8 @@ object_iter(void *cd, const prmap_t *pmp, const char *object_name)
 			(void) strcat(name, ":");
 			Dp->prt_name = strdup(name);
 		}
-		Dp->next = Dyn;
-		Dyn = Dp;
+		Dp->next = Dynlib;
+		Dynlib = Dp;
 	}
 
 	if (Dp->built ||
@@ -397,7 +397,7 @@ object_present(void *cd, const prmap_t *pmp, const char *object_name)
 {
 	struct dynlib *Dp;
 
-	for (Dp = Dyn; Dp != NULL; Dp = Dp->next) {
+	for (Dp = Dynlib; Dp != NULL; Dp = Dp->next) {
 		if (Dp->base == pmp->pr_vaddr)
 			Dp->present = TRUE;
 	}
@@ -1072,8 +1072,8 @@ reset_breakpoints(void)
 		return;
 
 	/* destroy all previous dynamic library information */
-	while ((Dp = Dyn) != NULL) {
-		Dyn = Dp->next;
+	while ((Dp = Dynlib) != NULL) {
+		Dynlib = Dp->next;
 		free(Dp->lib_name);
 		free(Dp->match_name);
 		free(Dp->prt_name);

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 
@@ -66,6 +64,11 @@ clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 lint	:=	TARGET = lint
 _msg	:=	TARGET = _msg
+
+
+# pmadvise depends on pmap components
+PMAP =			$(SRC)/cmd/ptools/pmap
+pmadvise/pmadvise.po :=	CPPFLAGS +=	-I$(PMAP)
 
 #
 # Commands with messages support

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <libelf.h>
@@ -34,6 +31,7 @@
 #include <errno.h>
 #include <sys/sysmacros.h>
 
+#include "libproc.h"
 #include "Pcontrol.h"
 
 static ssize_t
@@ -111,6 +109,7 @@ struct ps_prochandle *
 Pgrab_file(const char *fname, int *perr)
 {
 	struct ps_prochandle *P = NULL;
+	char buf[PATH_MAX];
 	GElf_Ehdr ehdr;
 	Elf *elf = NULL;
 	size_t phnum;
@@ -183,10 +182,16 @@ Pgrab_file(const char *fname, int *perr)
 
 	fp->file_fd = fd;
 	fp->file_lo->rl_lmident = LM_ID_BASE;
-	fp->file_lname = strdup(fp->file_pname);
+	if ((fp->file_lname = strdup(fp->file_pname)) == NULL) {
+		*perr = G_STRANGE;
+		goto err;
+	}
 	fp->file_lbase = basename(fp->file_lname);
 
-	P->execname = strdup(fp->file_pname);
+	if ((P->execname = strdup(fp->file_pname)) == NULL) {
+		*perr = G_STRANGE;
+		goto err;
+	}
 
 	P->num_files++;
 	list_link(fp, &P->file_head);
@@ -236,6 +241,7 @@ Pgrab_file(const char *fname, int *perr)
 	P->status.pr_sid = (pid_t)-1;
 	P->status.pr_taskid = (taskid_t)-1;
 	P->status.pr_projid = (projid_t)-1;
+	P->status.pr_zoneid = (zoneid_t)-1;
 	switch (ehdr.e_ident[EI_CLASS]) {
 	case ELFCLASS32:
 		P->status.pr_dmodel = PR_MODEL_ILP32;
@@ -246,6 +252,18 @@ Pgrab_file(const char *fname, int *perr)
 	default:
 		*perr = G_FORMAT;
 		goto err;
+	}
+
+	/*
+	 * Pfindobj() checks what zone a process is associated with, so
+	 * we call it after initializing pr_zoneid to -1.  This ensures
+	 * we don't get associated with any zone on the system.
+	 */
+	if (Pfindobj(P, fp->file_lname, buf, sizeof (buf)) != NULL) {
+		free(P->execname);
+		P->execname = strdup(buf);
+		if ((fp->file_rname = strdup(buf)) != NULL)
+			fp->file_rbase = basename(fp->file_rname);
 	}
 
 	/*

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/utsname.h>
@@ -40,6 +38,7 @@
 #include <gelf.h>
 #include <stddef.h>
 
+#include "libproc.h"
 #include "Pcontrol.h"
 #include "P32ton.h"
 #include "Putil.h"
@@ -1365,7 +1364,7 @@ core_find_data(struct ps_prochandle *P, Elf *elf, rd_loadobj_t *rlp)
 static int
 core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 {
-	char lname[PATH_MAX];
+	char lname[PATH_MAX], buf[PATH_MAX];
 	file_info_t *fp;
 	map_info_t *mp;
 
@@ -1399,27 +1398,16 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 	fp->file_map = mp;
 
 	/* Create a local copy of the load object representation */
-	if ((fp->file_lo = malloc(sizeof (rd_loadobj_t))) == NULL) {
+	if ((fp->file_lo = calloc(1, sizeof (rd_loadobj_t))) == NULL) {
 		P->core->core_errno = errno;
 		dprintf("failed to malloc mapping data\n");
 		return (0); /* Abort */
 	}
 	*fp->file_lo = *rlp;
 
-	if (fp->file_lname == NULL &&
-	    strcmp(mp->map_pmap.pr_mapname, "a.out") == 0) {
-		/*
-		 * Naming dance part 1: if the file_info_t is unnamed and
-		 * it represents the main executable, name it after the
-		 * execname.
-		 */
-		fp->file_lname = P->execname ?
-		    strdup(P->execname) : strdup("a.out");
-	}
-
 	if (lname[0] != '\0') {
 		/*
-		 * Naming dance part 2: if we got a name from librtld_db, then
+		 * Naming dance part 1: if we got a name from librtld_db, then
 		 * copy this name to the prmap_t if it is unnamed.  If the
 		 * file_info_t is unnamed, name it after the lname.
 		 */
@@ -1434,14 +1422,20 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 	} else if (fp->file_lname == NULL &&
 	    mp->map_pmap.pr_mapname[0] != '\0') {
 		/*
-		 * Naming dance part 3: if the mapping is named and the
+		 * Naming dance part 2: if the mapping is named and the
 		 * file_info_t is not, name the file after the mapping.
 		 */
 		fp->file_lname = strdup(mp->map_pmap.pr_mapname);
 	}
 
+	if ((fp->file_rname == NULL) &&
+	    (Pfindmap(P, mp, buf, sizeof (buf)) != NULL))
+		fp->file_rname = strdup(buf);
+
 	if (fp->file_lname != NULL)
 		fp->file_lbase = basename(fp->file_lname);
+	if (fp->file_rname != NULL)
+		fp->file_rbase = basename(fp->file_rname);
 
 	/* Associate the file and the mapping. */
 	(void) strncpy(fp->file_pname, mp->map_pmap.pr_mapname, PRMAPSZ);
@@ -1507,12 +1501,16 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 
 /*
  * Callback function for Pfindexec().  In order to confirm a given pathname,
- * we verify that we can open it as an ELF file of type ET_EXEC.
+ * we verify that we can open it as an ELF file of type ET_EXEC or ET_DYN.
  */
 static int
 core_exec_open(const char *path, void *efp)
 {
-	return (core_elf_open(efp, path, ET_EXEC, NULL) == 0);
+	if (core_elf_open(efp, path, ET_EXEC, NULL) == 0)
+		return (1);
+	if (core_elf_open(efp, path, ET_DYN, NULL) == 0)
+		return (1);
+	return (0);
 }
 
 /*
@@ -1731,6 +1729,7 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	P->statfd = -1;
 	P->agentctlfd = -1;
 	P->agentstatfd = -1;
+	P->zoneroot = NULL;
 	P->info_valid = 1;
 	P->ops = &P_core_ops;
 
@@ -1751,19 +1750,13 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	 * Allocate and initialize a core_info_t to hang off the ps_prochandle
 	 * structure.  We keep all core-specific information in this structure.
 	 */
-	if ((P->core = malloc(sizeof (core_info_t))) == NULL) {
+	if ((P->core = calloc(1, sizeof (core_info_t))) == NULL) {
 		*perr = G_STRANGE;
 		goto err;
 	}
 
 	list_link(&P->core->core_lwp_head, NULL);
-	P->core->core_errno = 0;
-	P->core->core_lwp = NULL;
-	P->core->core_nlwp = 0;
 	P->core->core_size = stbuf.st_size;
-	P->core->core_platform = NULL;
-	P->core->core_uts = NULL;
-	P->core->core_cred = NULL;
 	/*
 	 * In the days before adjustable core file content, this was the
 	 * default core file content. For new core files, this value will
@@ -1772,16 +1765,6 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 	P->core->core_content = CC_CONTENT_STACK | CC_CONTENT_HEAP |
 	    CC_CONTENT_DATA | CC_CONTENT_RODATA | CC_CONTENT_ANON |
 	    CC_CONTENT_SHANON;
-	P->core->core_priv = NULL;
-	P->core->core_priv_size = 0;
-	P->core->core_privinfo = NULL;
-	P->core->core_zonename = NULL;
-	P->core->core_ppii = NULL;
-
-#if defined(__i386) || defined(__amd64)
-	P->core->core_ldt = NULL;
-	P->core->core_nldt = 0;
-#endif
 
 	switch (core.e_hdr.e_ident[EI_CLASS]) {
 	case ELFCLASS32:
@@ -2098,6 +2081,8 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 				*fp->file_lo = rl;
 			if (fp->file_lname)
 				fp->file_lbase = basename(fp->file_lname);
+			if (fp->file_rname)
+				fp->file_rbase = basename(fp->file_rname);
 
 			(void) strcpy(fp->file_pname,
 			    P->mappings[0].map_pmap.pr_mapname);

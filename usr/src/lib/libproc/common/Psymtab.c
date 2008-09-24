@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +39,6 @@
 #include <signal.h>
 #include <limits.h>
 #include <libgen.h>
-#include <zone.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/systeminfo.h>
@@ -269,6 +266,8 @@ file_info_free(struct ps_prochandle *P, file_info_t *fptr)
 			free(fptr->file_lo);
 		if (fptr->file_lname)
 			free(fptr->file_lname);
+		if (fptr->file_rname)
+			free(fptr->file_rname);
 		if (fptr->file_elf)
 			(void) elf_end(fptr->file_elf);
 		if (fptr->file_elfmem != NULL)
@@ -355,6 +354,12 @@ map_iter(const rd_loadobj_t *lop, void *cd)
 	if (fptr->file_lname) {
 		free(fptr->file_lname);
 		fptr->file_lname = NULL;
+		fptr->file_lbase = NULL;
+	}
+	if (fptr->file_rname) {
+		free(fptr->file_rname);
+		fptr->file_rname = NULL;
+		fptr->file_rbase = NULL;
 	}
 
 	if (Pread_string(P, buf, sizeof (buf), lop->rl_nameaddr) > 0) {
@@ -365,8 +370,12 @@ map_iter(const rd_loadobj_t *lop, void *cd)
 		    (void *)lop->rl_nameaddr);
 	}
 
+	if ((Pfindmap(P, mptr, buf, sizeof (buf)) != NULL) &&
+	    ((fptr->file_rname = strdup(buf)) != NULL))
+		fptr->file_rbase = basename(fptr->file_rname);
+
 	dprintf("loaded rd object %s lmid %lx\n",
-	    fptr->file_lname ? fptr->file_lname : "<NULL>", lop->rl_lmident);
+	    fptr->file_lname ? buf : "<NULL>", lop->rl_lmident);
 	return (1);
 }
 
@@ -395,9 +404,15 @@ map_set(struct ps_prochandle *P, map_info_t *mptr, const char *lname)
 	fptr->file_lo->rl_plt_base = fptr->file_plt_base;
 	fptr->file_lo->rl_plt_size = fptr->file_plt_size;
 
-	if (fptr->file_lname == NULL &&
+	if ((fptr->file_lname == NULL) &&
 	    (fptr->file_lname = strdup(lname)) != NULL)
 		fptr->file_lbase = basename(fptr->file_lname);
+
+	/*
+	 * Don't bother to set file_rname/file_rbase since lname is really
+	 * just a token name (either "a.out" or "ld.so.1") and not a real
+	 * filesystem object path.
+	 */
 }
 
 static void
@@ -1610,6 +1625,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	}
 
 	if (P->state == PS_DEAD || P->state == PS_IDLE) {
+		char *name;
 		/*
 		 * If we're a not live, we can't open files from the /proc
 		 * object directory; we have only the mapping and file names
@@ -1617,9 +1633,18 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		 * the case of it being NULL in order to bootstrap: we first
 		 * come here during rd_new() when the only information we have
 		 * is interpreter name associated with the AT_BASE mapping.
+		 *
+		 * Also, if the zone associated with the core file seems
+		 * to exists on this machine we'll try to open the object
+		 * file within the zone.
 		 */
-		(void) snprintf(objectfile, sizeof (objectfile), "%s",
-		    fptr->file_lname ? fptr->file_lname : fptr->file_pname);
+		if (fptr->file_rname != NULL)
+			name = fptr->file_rname;
+		else if (fptr->file_lname != NULL)
+			name = fptr->file_lname;
+		else
+			name = fptr->file_pname;
+		(void) strlcpy(objectfile, name, sizeof (objectfile));
 	} else {
 		(void) snprintf(objectfile, sizeof (objectfile),
 		    "%s/%d/object/%s",
@@ -2027,7 +2052,8 @@ object_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *objname)
 	for (i = 0, mp = P->mappings; i < P->map_count; i++, mp++) {
 
 		if (mp->map_pmap.pr_mapname[0] == '\0' ||
-		    (fp = mp->map_file) == NULL || fp->file_lname == NULL)
+		    (fp = mp->map_file) == NULL ||
+		    ((fp->file_lname == NULL) && (fp->file_rname == NULL)))
 			continue;
 
 		if (lmid != PR_LMID_EVERY &&
@@ -2038,8 +2064,10 @@ object_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *objname)
 		 * If we match, return the primary text mapping; otherwise
 		 * just return the mapping we matched.
 		 */
-		if (strcmp(fp->file_lname, objname) == 0 ||
-		    strcmp(fp->file_lbase, objname) == 0)
+		if ((fp->file_lbase && strcmp(fp->file_lbase, objname) == 0) ||
+		    (fp->file_rbase && strcmp(fp->file_rbase, objname) == 0) ||
+		    (fp->file_lname && strcmp(fp->file_lname, objname) == 0) ||
+		    (fp->file_rname && strcmp(fp->file_rname, objname) == 0))
 			return (fp->file_map ? fp->file_map : mp);
 	}
 
@@ -2051,7 +2079,8 @@ object_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *objname)
 	for (i = 0, mp = P->mappings; i < P->map_count; i++, mp++) {
 
 		if (mp->map_pmap.pr_mapname[0] == '\0' ||
-		    (fp = mp->map_file) == NULL || fp->file_lname == NULL)
+		    (fp = mp->map_file) == NULL ||
+		    ((fp->file_lname == NULL) && (fp->file_rname == NULL)))
 			continue;
 
 		if (lmid != PR_LMID_EVERY &&
@@ -2062,8 +2091,13 @@ object_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *objname)
 		 * If we match, return the primary text mapping; otherwise
 		 * just return the mapping we matched.
 		 */
-		if (strncmp(fp->file_lbase, objname, objlen) == 0 &&
-		    fp->file_lbase[objlen] == '.')
+		if ((fp->file_lbase != NULL) &&
+		    (strncmp(fp->file_lbase, objname, objlen) == 0) &&
+		    (fp->file_lbase[objlen] == '.'))
+			return (fp->file_map ? fp->file_map : mp);
+		if ((fp->file_rbase != NULL) &&
+		    (strncmp(fp->file_rbase, objname, objlen) == 0) &&
+		    (fp->file_rbase[objlen] == '.'))
 			return (fp->file_map ? fp->file_map : mp);
 	}
 
@@ -2344,9 +2378,10 @@ sym_by_name(sym_tbl_t *symtab, const char *name, GElf_Sym *symp, uint_t *idp)
  *	prsyminfo_t ancillary symbol information
  * Returns 0 on success, -1 on failure.
  */
-int
-Pxlookup_by_addr(
+static int
+i_Pxlookup_by_addr(
 	struct ps_prochandle *P,
+	int lmresolve,			/* use resolve linker object names */
 	uintptr_t addr,			/* process address being sought */
 	char *sym_name_buffer,		/* buffer for the symbol name */
 	size_t bufsize,			/* size of sym_name_buffer */
@@ -2397,7 +2432,10 @@ Pxlookup_by_addr(
 	*symbolp = *symp;
 	if (sip != NULL) {
 		sip->prs_name = bufsize == 0 ? NULL : sym_name_buffer;
-		sip->prs_object = fptr->file_lbase;
+		if (lmresolve && (fptr->file_rname != NULL))
+			sip->prs_object = fptr->file_rbase;
+		else
+			sip->prs_object = fptr->file_lbase;
 		sip->prs_id = (symp == sym1p) ? i1 : i2;
 		sip->prs_table = (symp == sym1p) ? PR_SYMTAB : PR_DYNSYM;
 		sip->prs_lmid = (fptr->file_lo == NULL) ? LM_ID_BASE :
@@ -2411,10 +2449,24 @@ Pxlookup_by_addr(
 }
 
 int
-Plookup_by_addr(struct ps_prochandle *P, uintptr_t addr, char *buf, size_t size,
-    GElf_Sym *symp)
+Pxlookup_by_addr(struct ps_prochandle *P, uintptr_t addr, char *buf,
+    size_t bufsize, GElf_Sym *symp, prsyminfo_t *sip)
 {
-	return (Pxlookup_by_addr(P, addr, buf, size, symp, NULL));
+	return (i_Pxlookup_by_addr(P, B_FALSE, addr, buf, bufsize, symp, sip));
+}
+
+int
+Pxlookup_by_addr_resolved(struct ps_prochandle *P, uintptr_t addr, char *buf,
+    size_t bufsize, GElf_Sym *symp, prsyminfo_t *sip)
+{
+	return (i_Pxlookup_by_addr(P, B_TRUE, addr, buf, bufsize, symp, sip));
+}
+
+int
+Plookup_by_addr(struct ps_prochandle *P, uintptr_t addr, char *buf,
+    size_t size, GElf_Sym *symp)
+{
+	return (i_Pxlookup_by_addr(P, B_FALSE, addr, buf, size, symp, NULL));
 }
 
 /*
@@ -2531,8 +2583,9 @@ Plookup_by_name(struct ps_prochandle *P, const char *object,
 /*
  * Iterate over the process's address space mappings.
  */
-int
-Pmapping_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
+static int
+i_Pmapping_iter(struct ps_prochandle *P, boolean_t lmresolve,
+    proc_map_f *func, void *cd)
 {
 	map_info_t *mptr;
 	file_info_t *fptr;
@@ -2546,6 +2599,8 @@ Pmapping_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
 	for (i = 0, mptr = P->mappings; i < P->map_count; i++, mptr++) {
 		if ((fptr = mptr->map_file) == NULL)
 			object_name = NULL;
+		else if (lmresolve && (fptr->file_rname != NULL))
+			object_name = fptr->file_rname;
 		else
 			object_name = fptr->file_lname;
 		if ((rc = func(cd, &mptr->map_pmap, object_name)) != 0)
@@ -2554,11 +2609,24 @@ Pmapping_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
 	return (0);
 }
 
+int
+Pmapping_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
+{
+	return (i_Pmapping_iter(P, B_FALSE, func, cd));
+}
+
+int
+Pmapping_iter_resolved(struct ps_prochandle *P, proc_map_f *func, void *cd)
+{
+	return (i_Pmapping_iter(P, B_TRUE, func, cd));
+}
+
 /*
  * Iterate over the process's mapped objects.
  */
-int
-Pobject_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
+static int
+i_Pobject_iter(struct ps_prochandle *P, boolean_t lmresolve,
+    proc_map_f *func, void *cd)
 {
 	map_info_t *mptr;
 	file_info_t *fptr;
@@ -2570,8 +2638,14 @@ Pobject_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
 
 	for (cnt = P->num_files, fptr = list_next(&P->file_head);
 	    cnt; cnt--, fptr = list_next(fptr)) {
+		const char *lname;
 
-		const char *lname = fptr->file_lname ? fptr->file_lname : "";
+		if (lmresolve && (fptr->file_rname != NULL))
+			lname = fptr->file_rname;
+		else if (fptr->file_lname != NULL)
+			lname = fptr->file_lname;
+		else
+			lname = "";
 
 		if ((mptr = fptr->file_map) == NULL)
 			continue;
@@ -2582,13 +2656,20 @@ Pobject_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
 	return (0);
 }
 
-/*
- * Given a virtual address, return the name of the underlying
- * mapped object (file), as provided by the dynamic linker.
- * Return NULL on failure (no underlying shared library).
- */
-char *
-Pobjname(struct ps_prochandle *P, uintptr_t addr,
+int
+Pobject_iter(struct ps_prochandle *P, proc_map_f *func, void *cd)
+{
+	return (i_Pobject_iter(P, B_FALSE, func, cd));
+}
+
+int
+Pobject_iter_resolved(struct ps_prochandle *P, proc_map_f *func, void *cd)
+{
+	return (i_Pobject_iter(P, B_TRUE, func, cd));
+}
+
+static char *
+i_Pobjname(struct ps_prochandle *P, boolean_t lmresolve, uintptr_t addr,
 	char *buffer, size_t bufsize)
 {
 	map_info_t *mptr;
@@ -2597,15 +2678,49 @@ Pobjname(struct ps_prochandle *P, uintptr_t addr,
 	/* create all the file_info_t's for all the mappings */
 	(void) Prd_agent(P);
 
-	if ((mptr = Paddr2mptr(P, addr)) != NULL &&
-	    (fptr = mptr->map_file) != NULL &&
-	    fptr->file_lname != NULL) {
-		(void) strncpy(buffer, fptr->file_lname, bufsize);
-		if (strlen(fptr->file_lname) >= bufsize)
-			buffer[bufsize-1] = '\0';
+	if ((mptr = Paddr2mptr(P, addr)) == NULL)
+		return (NULL);
+
+	if (!lmresolve) {
+		if (((fptr = mptr->map_file) == NULL) ||
+		    (fptr->file_lname == NULL))
+			return (NULL);
+		(void) strlcpy(buffer, fptr->file_lname, bufsize);
 		return (buffer);
 	}
+
+	/* Check for a cached copy of the resolved path */
+	if (Pfindmap(P, mptr, buffer, bufsize) != NULL)
+		return (buffer);
+
 	return (NULL);
+}
+
+/*
+ * Given a virtual address, return the name of the underlying
+ * mapped object (file) as provided by the dynamic linker.
+ * Return NULL if we can't find any name information for the object.
+ */
+char *
+Pobjname(struct ps_prochandle *P, uintptr_t addr,
+	char *buffer, size_t bufsize)
+{
+	return (i_Pobjname(P, B_FALSE, addr, buffer, bufsize));
+}
+
+/*
+ * Given a virtual address, try to return a filesystem path to the
+ * underlying mapped object (file).  If we're in the global zone,
+ * this path could resolve to an object in another zone.  If we're
+ * unable return a valid filesystem path, we'll fall back to providing
+ * the mapped object (file) name provided by the dynamic linker in
+ * the target process (ie, the object reported by Pobjname()).
+ */
+char *
+Pobjname_resolved(struct ps_prochandle *P, uintptr_t addr,
+	char *buffer, size_t bufsize)
+{
+	return (i_Pobjname(P, B_TRUE, addr, buffer, bufsize));
 }
 
 /*
@@ -2843,32 +2958,6 @@ Puname(struct ps_prochandle *P, struct utsname *u)
 		return (0);
 	}
 	return (uname(u));
-}
-
-/*
- * Get the zone name from the core file if we have it; look up the
- * name based on the zone id if this is a live process.
- */
-char *
-Pzonename(struct ps_prochandle *P, char *s, size_t n)
-{
-	if (P->state == PS_IDLE) {
-		errno = ENODATA;
-		return (NULL);
-	}
-
-	if (P->state == PS_DEAD) {
-		if (P->core->core_zonename == NULL) {
-			errno = ENODATA;
-			return (NULL);
-		}
-		(void) strlcpy(s, P->core->core_zonename, n);
-	} else {
-		if (getzonenamebyid(P->status.pr_zoneid, s, n) < 0)
-			return (NULL);
-		s[n - 1] = '\0';
-	}
-	return (s);
 }
 
 /*

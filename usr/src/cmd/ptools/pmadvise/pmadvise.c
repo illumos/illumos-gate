@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * pmadvise
  *
@@ -44,6 +42,7 @@
  *      free, access_lwp, access_many, access_default
  *  -v: verbose output
  *  -F: force grabbing of the target process(es)
+ *  -l: show unresolved dynamic linker map names
  *  pid: process id list
  *
  *
@@ -124,6 +123,8 @@
 #include <libgen.h>
 #include <signal.h>
 
+#include "pmap_common.h"
+
 #ifndef	TEXT_DOMAIN			/* should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* use this only if it wasn't */
 #endif
@@ -173,31 +174,14 @@ static	int	pr_madvise(struct ps_prochandle *, caddr_t, size_t, int);
 static	char	*mflags(uint_t);
 static	char	*advtostr(int);
 
+static	int	lflag = 0;
+
 static	int	addr_width, size_width;
 static	char	*progname;
 static	struct ps_prochandle *Pr;
 
-typedef struct lwpstack {
-	lwpid_t	lwps_lwpid;
-	stack_t	lwps_stack;
-} lwpstack_t;
-
 static	lwpstack_t *stacks;
 static	uint_t	nstacks;
-
-/*
- * Used to set the advice type var (at_map) when parsing the arguments to
- * pmadvise.  Later, when creating the map list, at_map is used as a mask
- * to determine if any generic advice applies to each memory mapping.
- */
-enum	atype_enum {
-	AT_PRIVM,
-	AT_SHARED,
-	AT_HEAP,
-	AT_STACK,
-	AT_SEG,
-	AT_NTYPES
-};
 
 static char	*suboptstr[] = {
 	"private",
@@ -306,49 +290,29 @@ getstack(void *data, const lwpstatus_t *lsp)
 }
 
 /*
- * We compare the high memory addresses since stacks are faulted in from
- * high memory addresses to low memory addresses, and our prmap_t
- * structures identify only the range of addresses that have been faulted
- * in so far.
- */
-static int
-cmpstacks(const void *ap, const void *bp)
-{
-	const lwpstack_t *as = ap;
-	const lwpstack_t *bs = bp;
-	uintptr_t a = (uintptr_t)as->lwps_stack.ss_sp + as->lwps_stack.ss_size;
-	uintptr_t b = (uintptr_t)bs->lwps_stack.ss_sp + bs->lwps_stack.ss_size;
-
-	if (a < b)
-		return (1);
-	if (a > b)
-		return (-1);
-	return (0);
-}
-
-/*
  * Prints usage and exits
  */
 static void
 usage()
 {
 	(void) fprintf(stderr,
-	    gettext("usage:\t%s -o option[,option] [-v] [-F] pid ...\n"),
+	    gettext("usage:\t%s [-o option[,option]] [-Flv] pid ...\n"),
 	    progname);
 	(void) fprintf(stderr,
 	    gettext("    (Give \"advice\" about a process's memory)\n"
-		"    -o option[,option]: options are\n"
-		"        private=<advice>\n"
-		"        shared=<advice>\n"
-		"        heap=<advice>\n"
-		"        stack=<advice>\n"
-		"        <segaddr>[:<length>]=<advice>\n"
-		"       valid <advice> is one of:\n"
-		"        normal, random, sequential, willneed, dontneed,\n"
-		"        free, access_lwp, access_many, access_default\n"
-		"    -v: verbose output\n"
-		"    -F: force grabbing of the target process(es)\n"
-		"    pid: process id list\n"));
+	    "    -o option[,option]: options are\n"
+	    "        private=<advice>\n"
+	    "        shared=<advice>\n"
+	    "        heap=<advice>\n"
+	    "        stack=<advice>\n"
+	    "        <segaddr>[:<length>]=<advice>\n"
+	    "       valid <advice> is one of:\n"
+	    "        normal, random, sequential, willneed, dontneed,\n"
+	    "        free, access_lwp, access_many, access_default\n"
+	    "    -v: verbose output\n"
+	    "    -F: force grabbing of the target process(es)\n"
+	    "    -l: show unresolved dynamic linker map names\n"
+	    "    pid: process id list\n"));
 	exit(2);
 }
 
@@ -580,99 +544,6 @@ parse_suboptions(char *value)
 }
 
 /*
- * Create labels for non-anon, non-heap mappings
- */
-static char *
-make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
-	char *buf, size_t bufsz)
-{
-	const pstatus_t *Psp = Pstatus(Pr);
-	char fname[100];
-	struct stat statb;
-	int len;
-
-	if (strcmp(mapname, "a.out") == 0 &&
-	    Pexecname(Pr, buf, bufsz) != NULL)
-		return (buf);
-
-	if (Pobjname(Pr, addr, buf, bufsz) != NULL) {
-		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
-			buf[len] = '\0';
-			return (buf);
-		}
-	}
-
-	if (*mapname != '\0') {
-		(void) snprintf(fname, sizeof (fname), "/proc/%d/object/%s",
-			(int)Psp->pr_pid, mapname);
-		if (stat(fname, &statb) == 0) {
-			dev_t dev = statb.st_dev;
-			ino_t ino = statb.st_ino;
-			(void) snprintf(buf, bufsz, "dev:%lu,%lu ino:%lu",
-				(ulong_t)major(dev), (ulong_t)minor(dev), ino);
-			return (buf);
-		}
-	}
-
-	return (NULL);
-}
-
-/*
- * Create label for anon mappings
- */
-static char *
-anon_name(char *name, const pstatus_t *Psp,
-    uintptr_t vaddr, size_t size, int mflags, int shmid, int *mtypes)
-{
-	if (mflags & MA_ISM) {
-		if (shmid == -1)
-			(void) snprintf(name, PATH_MAX, "  [ %s shmid=null ]",
-			    (mflags & MA_NORESERVE) ? "ism" : "dism");
-		else
-			(void) snprintf(name, PATH_MAX, "  [ %s shmid=0x%x ]",
-			    (mflags & MA_NORESERVE) ? "ism" : "dism", shmid);
-		*mtypes |= (1 << AT_SHARED);
-	} else if (mflags & MA_SHM) {
-		if (shmid == -1)
-			(void) sprintf(name, "  [ shmid=null ]");
-		else
-			(void) sprintf(name, "  [ shmid=0x%x ]", shmid);
-		*mtypes |= (1 << AT_SHARED);
-
-	} else if (vaddr + size > Psp->pr_stkbase &&
-	    vaddr < Psp->pr_stkbase + Psp->pr_stksize) {
-		(void) strcpy(name, "  [ stack ]");
-		*mtypes |= (1 << AT_STACK);
-
-	} else if ((mflags & MA_ANON) &&
-	    vaddr + size > Psp->pr_brkbase &&
-	    vaddr < Psp->pr_brkbase + Psp->pr_brksize) {
-		(void) strcpy(name, "  [ heap ]");
-		*mtypes |= (1 << AT_HEAP);
-
-	} else {
-		lwpstack_t key, *stk;
-
-		key.lwps_stack.ss_sp = (void *)vaddr;
-		key.lwps_stack.ss_size = size;
-		if (nstacks > 0 &&
-		    (stk = bsearch(&key, stacks, nstacks, sizeof (stacks[0]),
-		    cmpstacks)) != NULL) {
-			(void) snprintf(name, PATH_MAX, "  [ %s tid=%d ]",
-			    (stk->lwps_stack.ss_flags & SS_ONSTACK) ?
-			    "altstack" : "stack",
-			    stk->lwps_lwpid);
-			*mtypes |= (1 << AT_STACK);
-		} else {
-			(void) strcpy(name, "  [ anon ]");
-			*mtypes |= (1 << AT_PRIVM);
-		}
-	}
-
-	return (name);
-}
-
-/*
  * Create linked list of mappings for current process
  * In addition, add generic advice and raw advice
  * entries to merged_list.
@@ -704,7 +575,7 @@ create_maplist(void *arg, const prmap_t *pmp, const char *object_name)
 	if (!(pmp->pr_mflags & MA_ANON) ||
 	    (pmp->pr_vaddr + pmp->pr_size <= Psp->pr_brkbase ||
 	    pmp->pr_vaddr >= Psp->pr_brkbase + Psp->pr_brksize)) {
-		lname = make_name(Pr, pmp->pr_vaddr, pmp->pr_mapname,
+		lname = make_name(Pr, lflag, pmp->pr_vaddr, pmp->pr_mapname,
 		    newmap->label, sizeof (newmap->label));
 		if (pmp->pr_mflags & MA_SHARED)
 			newmap->mtypes |= 1 << AT_SHARED;
@@ -713,8 +584,8 @@ create_maplist(void *arg, const prmap_t *pmp, const char *object_name)
 	}
 
 	if (lname == NULL && (pmp->pr_mflags & MA_ANON)) {
-		lname = anon_name(newmap->label, Psp, pmp->pr_vaddr,
-		    pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid,
+		lname = anon_name(newmap->label, Psp, stacks, nstacks,
+		    pmp->pr_vaddr, pmp->pr_size, pmp->pr_mflags, pmp->pr_shmid,
 		    &newmap->mtypes);
 	}
 
@@ -816,8 +687,8 @@ apply_advice(saddr_t **advicelist)
 					 */
 					(void) fprintf(stderr,
 					    gettext("Error applying "
-						"advice (%s) to memory range "
-						"[%lx, %lx):\n"),
+					    "advice (%s) to memory range "
+					    "[%lx, %lx):\n"),
 					    advicestr[i], (ulong_t)psaddr->addr,
 					    (ulong_t)psaddr->addr +
 					    psaddr->length);
@@ -900,14 +771,15 @@ create_choplist(saddr_t **choppedlist, saddr_t *mergedlist)
 	}
 
 	for (clptr = *choppedlist; clptr != NULL; clptr = clptr->next) {
-		if (clptr->next)
+		if (clptr->next) {
 			clptr->length = clptr->next->addr - clptr->addr;
-		else {
+		} else {
 			/*
 			 * must be last element, now that we've calculated
 			 * all segment lengths, we can remove this node
 			 */
 			delete_addr(choppedlist, clptr);
+			break;
 		}
 	}
 
@@ -986,7 +858,7 @@ static int
 pr_madvise(struct ps_prochandle *Pr, caddr_t addr, size_t len, int advice)
 {
 	return (pr_memcntl(Pr, addr, len, MC_ADVISE,
-		    (caddr_t)(uintptr_t)advice, 0, 0));
+	    (caddr_t)(uintptr_t)advice, 0, 0));
 }
 
 static char *
@@ -1097,7 +969,7 @@ main(int argc, char **argv)
 	 * rawadv_list from specific address advice.
 	 */
 
-	while ((opt = getopt(argc, argv, "Fo:v")) != EOF) {
+	while ((opt = getopt(argc, argv, "Flo:v")) != EOF) {
 		switch (opt) {
 		case 'o':
 			options = optarg;
@@ -1132,6 +1004,9 @@ main(int argc, char **argv)
 			break;
 		case 'F':		/* force grabbing (no O_EXCL) */
 			Fflag = PGRAB_FORCE;
+			break;
+		case 'l':		/* show unresolved link map names */
+			lflag = 1;
 			break;
 		default:
 			usage();
@@ -1200,9 +1075,9 @@ main(int argc, char **argv)
 			    Prd_agent(Pr) == NULL) {
 				(void) fprintf(stderr,
 				    gettext("%s: warning: "
-					"librtld_db failed to initialize; "
-					"shared library information will not "
-					"be available\n"),
+				    "librtld_db failed to initialize; "
+				    "shared library information will not "
+				    "be available\n"),
 				    progname);
 			}
 

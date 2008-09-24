@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	__EXTENSIONS__
 #include <string.h>
@@ -36,6 +34,7 @@
 #include <unistd.h>
 #include <zone.h>
 
+#include "libproc.h"
 #include "Pcontrol.h"
 
 /*
@@ -49,7 +48,7 @@
  * caller's function do the final confirmation.
  */
 static int
-try_exec(const char *cwd, const char *path, char *buf,
+try_exec(struct ps_prochandle *P, const char *cwd, const char *path, char *buf,
     int (*isexec)(const char *, void *), void *isdata)
 {
 	int i;
@@ -61,6 +60,7 @@ try_exec(const char *cwd, const char *path, char *buf,
 
 	dprintf("try_exec \"%s\"\n", buf);
 
+	(void) Pfindobj(P, buf, buf, PATH_MAX);
 	if ((i = resolvepath(buf, buf, PATH_MAX)) > 0) {
 		buf[i] = '\0';
 		return (isexec(buf, isdata));
@@ -87,6 +87,8 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	uintptr_t addr;
 	char *p = path, *q;
 
+	dprintf("Pfindexec '%s'\n", aout);
+
 	if (P->execname)
 		return (P->execname); /* Already found */
 
@@ -99,7 +101,7 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	 * our subsequent attempts to locate the executable.
 	 */
 	if (aout != NULL && stat(aout, &st) == 0 && !S_ISDIR(st.st_mode)) {
-		if (try_exec(".", aout, buf, isexec, isdata))
+		if (try_exec(P, ".", aout, buf, isexec, isdata))
 			goto found;
 		else
 			aout = ".";
@@ -127,17 +129,17 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 		char		zpath[PATH_MAX];
 		const psinfo_t	*pi = Ppsinfo(P);
 
-		if (try_exec(cwd, path, buf, isexec, isdata))
+		if (try_exec(P, cwd, path, buf, isexec, isdata))
 			goto found;
 
 		if (strchr(path, '/') != NULL && (p = basename(path)) != NULL &&
-		    try_exec(cwd, p, buf, isexec, isdata))
+		    try_exec(P, cwd, p, buf, isexec, isdata))
 			goto found;
 
 		if (getzoneid() == GLOBAL_ZONEID &&
 		    pi->pr_zoneid != GLOBAL_ZONEID &&
 		    zone_getattr(pi->pr_zoneid, ZONE_ATTR_ROOT, zpath,
-			sizeof (zpath)) != -1) {
+		    sizeof (zpath)) != -1) {
 			/*
 			 * try_exec() only combines its cwd and path arguments
 			 * if path is relative; but in our case even an absolute
@@ -147,7 +149,7 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 			 * calling try_exec().
 			 */
 			p = (path[0] == '/') ? path + 1 : path;
-			if (try_exec(zpath, p, buf, isexec, isdata))
+			if (try_exec(P, zpath, p, buf, isexec, isdata))
 				goto found;
 		}
 	}
@@ -163,11 +165,11 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 		if ((p = strchr(path, ' ')) != NULL)
 			*p = '\0';
 
-		if (try_exec(cwd, path, buf, isexec, isdata))
+		if (try_exec(P, cwd, path, buf, isexec, isdata))
 			goto found;
 
 		if (strchr(path, '/') != NULL && (p = basename(path)) != NULL &&
-		    try_exec(cwd, p, buf, isexec, isdata))
+		    try_exec(P, cwd, p, buf, isexec, isdata))
 			goto found;
 	}
 
@@ -179,11 +181,11 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	    Pread(P, &addr, sizeof (addr), P->psinfo.pr_argv) != -1 &&
 	    Pread_string(P, path, sizeof (path), (off_t)addr) > 0) {
 
-		if (try_exec(cwd, path, buf, isexec, isdata))
+		if (try_exec(P, cwd, path, buf, isexec, isdata))
 			goto found;
 
 		if (strchr(path, '/') != NULL && (p = basename(path)) != NULL &&
-		    try_exec(cwd, p, buf, isexec, isdata))
+		    try_exec(P, cwd, p, buf, isexec, isdata))
 			goto found;
 	}
 
@@ -218,7 +220,7 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 			if (*p != '/')
 				continue; /* Ignore anything relative */
 
-			if (try_exec(p, path, buf, isexec, isdata))
+			if (try_exec(P, p, path, buf, isexec, isdata))
 				goto found;
 		}
 	}
@@ -255,7 +257,12 @@ stat_exec(const char *path, struct stat64 *stp)
 char *
 Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 {
-	if (P->execname == NULL && P->state != PS_DEAD && P->state != PS_IDLE) {
+	if (P->execname != NULL) {
+		(void) strncpy(buf, P->execname, buflen);
+		return (buf);
+	}
+
+	if (P->state != PS_DEAD && P->state != PS_IDLE) {
 		char exec_name[PATH_MAX];
 		char cwd[PATH_MAX];
 		char proc_cwd[64];
@@ -269,6 +276,7 @@ Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 		    "%s/%d/path/a.out", procfs_path, (int)P->pid);
 		if ((ret = readlink(exec_name, buf, buflen - 1)) > 0) {
 			buf[ret] = '\0';
+			(void) Pfindobj(P, buf, buf, buflen);
 			return (buf);
 		}
 
@@ -295,11 +303,6 @@ Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 
 		(void) Pfindexec(P, ret > 0 ? cwd : NULL,
 		    (int (*)(const char *, void *))stat_exec, &st);
-	}
-
-	if (P->execname != NULL) {
-		(void) strncpy(buf, P->execname, buflen);
-		return (buf);
 	}
 
 	return (NULL);

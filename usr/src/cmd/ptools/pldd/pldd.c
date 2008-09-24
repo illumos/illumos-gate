@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -46,6 +44,7 @@ main(int argc, char **argv)
 	int opt;
 	int errflg = 0;
 	int Fflag = 0;
+	int lflag = 0;
 	core_content_t content = CC_CONTENT_DATA | CC_CONTENT_ANON;
 	struct rlimit rlim;
 
@@ -55,10 +54,13 @@ main(int argc, char **argv)
 		command = argv[0];
 
 	/* options */
-	while ((opt = getopt(argc, argv, "F")) != EOF) {
+	while ((opt = getopt(argc, argv, "Fl")) != EOF) {
 		switch (opt) {
 		case 'F':		/* force grabbing (no O_EXCL) */
 			Fflag = PGRAB_FORCE;
+			break;
+		case 'l':		/* show unresolved link map names */
+			lflag = 1;
 			break;
 		default:
 			errflg = 1;
@@ -71,11 +73,12 @@ main(int argc, char **argv)
 
 	if (errflg || argc <= 0) {
 		(void) fprintf(stderr,
-			"usage:\t%s [-F] { pid | core } ...\n", command);
+		    "usage:\t%s [-Fl] { pid | core } ...\n", command);
 		(void) fprintf(stderr,
-			"  (report process dynamic libraries)\n");
+		    "  (report process dynamic libraries)\n");
 		(void) fprintf(stderr,
-			"  -F: force grabbing of the target process\n");
+		    "  -F: force grabbing of the target process\n"
+		    "  -l: show unresolved dynamic linker map names\n");
 		return (2);
 	}
 
@@ -131,7 +134,10 @@ main(int argc, char **argv)
 			    "not be available\n", command);
 		}
 
-		rc += Pobject_iter(Pr, show_map, Pr);
+		if (lflag)
+			rc += Pobject_iter(Pr, show_map, Pr);
+		else
+			rc += Pobject_iter_resolved(Pr, show_map, Pr);
 		Prelease(Pr, 0);
 	}
 	(void) proc_finistdio();

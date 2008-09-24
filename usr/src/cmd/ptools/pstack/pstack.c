@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 
@@ -170,7 +168,7 @@ main(int argc, char **argv)
 		    "usage:\t%s [-F] { pid | core }[/lwps] ...\n", command);
 		(void) fprintf(stderr, "  (show process call stack)\n");
 		(void) fprintf(stderr,
-			"  -F: force grabbing of the target process\n");
+		    "  -F: force grabbing of the target process\n");
 		exit(2);
 	}
 
@@ -380,7 +378,7 @@ thread_call_stack(void *data, const lwpstatus_t *psp,
 		else {
 			(void) memset(&lwpstatus, 0, sizeof (lwpstatus));
 			(void) memcpy(lwpstatus.pr_reg, tip->regs,
-				sizeof (prgregset_t));
+			    sizeof (prgregset_t));
 			call_stack(h, &lwpstatus);
 		}
 	}
@@ -402,7 +400,7 @@ lwp_call_stack(void *data,
 		call_stack(h, psp);
 	else
 		(void) printf("\t** zombie "
-			"(exited, not detached, not yet joined) **\n");
+		    "(exited, not detached, not yet joined) **\n");
 	return (0);
 }
 
@@ -440,7 +438,7 @@ all_call_stacks(pstack_handle_t *h, int dothreads)
 
 			if ((tid = tip->threadid) != 0) {
 				(void) memcpy(lwpstatus.pr_reg, tip->regs,
-					sizeof (prgregset_t));
+				    sizeof (prgregset_t));
 				tlhead(tid, tip->lwpid);
 				if (tip->state == TD_THR_ZOMBIE)
 					print_zombie(Pr, tip);
@@ -464,7 +462,7 @@ tlhead(id_t threadid, id_t lwpid)
 
 	if (threadid && lwpid)
 		(void) printf("  lwp# %d / thread# %d  ",
-			(int)lwpid, (int)threadid);
+		    (int)lwpid, (int)threadid);
 	else if (threadid)
 		(void) printf("---------  thread# %d  ", (int)threadid);
 	else if (lwpid)
@@ -556,12 +554,10 @@ print_frame(void *cd, prgregset_t gregs, uint_t argc, const long *argv)
 
 	(void) printf(" %-17s (", buff);
 	for (i = 0; i < argc && i < MAX_ARGS; i++)
-		(void) printf((i+1 == argc)? "%lx" : "%lx, ",
-			argv[i]);
+		(void) printf((i+1 == argc) ? "%lx" : "%lx, ", argv[i]);
 	if (i != argc)
 		(void) printf("...");
-	(void) printf((start != pc)?
-		") + %lx\n" : ")\n", (long)(pc - start));
+	(void) printf((start != pc) ? ") + %lx\n" : ")\n", (long)(pc - start));
 
 	/*
 	 * If the frame's pc is in the "sigh" (a.k.a. signal handler, signal
@@ -598,7 +594,7 @@ print_zombie(struct ps_prochandle *Pr, struct threadinfo *tip)
 		(void) printf("+%lx", (long)(tip->startfunc - start));
 	(void) printf(", exit value = 0x%.*lx\n", length, (long)tip->exitval);
 	(void) printf("\t** zombie "
-		"(exited, not detached, not yet joined) **\n");
+	    "(exited, not detached, not yet joined) **\n");
 }
 
 static void
@@ -612,7 +608,7 @@ print_syscall(const lwpstatus_t *psp, prgregset_t reg)
 	(void) printf(" %.*lx %-8s (", length, (long)reg[R_PC], sname);
 	for (i = 0; i < psp->pr_nsysarg; i++)
 		(void) printf((i+1 == psp->pr_nsysarg)? "%lx" : "%lx, ",
-			(long)psp->pr_sysarg[i]);
+		    (long)psp->pr_sysarg[i]);
 	(void) printf(")\n");
 }
 
@@ -676,6 +672,23 @@ load_libjvm(struct ps_prochandle *Pr)
 {
 	jvm_agent_t *ret;
 
+	/*
+	 * Iterate through all the loaded objects in the target, looking
+	 * for libjvm.so.  If we find libjvm.so we'll try to load the
+	 * corresponding libjvm_db.so that lives in the same directory.
+	 *
+	 * At first glance it seems like we'd want to use
+	 * Pobject_iter_resolved() here since we'd want to make sure that
+	 * we have the full path to the libjvm.so.  But really, we don't
+	 * want that since we're going to be dlopen()ing a library and
+	 * executing code from that path, and therefore we don't want to
+	 * load any library code that could be from a zone since it could
+	 * have been replaced with a trojan.  Hence, we use Pobject_iter().
+	 * So if we're debugging java processes in a zone from the global
+	 * zone, and we want to get proper java stack stack frames, then
+	 * the same jvm that is running within the zone needs to be
+	 * installed in the global zone.
+	 */
 	(void) Pobject_iter(Pr, jvm_object_iter, Pr);
 
 	if (libjvm) {

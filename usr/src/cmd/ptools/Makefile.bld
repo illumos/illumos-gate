@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG:sh = basename `cd ..; pwd`
 
@@ -56,27 +55,39 @@ LDLIBS_pwdx	= -lproc
 
 LDLIBS += $(LDLIBS_$(PROG))
 
-# pargs requires to link with ../../common/elfcap components
+# pargs depends on ../../common/elfcap components
+# pmadvise depends on pmap components
 
 ELFCAP =	$(SRC)/common/elfcap
+PMAP =		$(SRC)/cmd/ptools/pmap
 
-CPPFLAGS_pargs =-I$(ELFCAP)
-OBJS_pargs =	elfcap.o
-SRCS_pargs =	$(ELFCAP)/elfcap.c
+CPPFLAGS_pargs =	-I$(ELFCAP)
+OBJS_pargs =		elfcap.o
+SRCS_pargs =		$(ELFCAP)/elfcap.c
+
+CPPFLAGS_pmap =		-I$(PMAP)
+OBJS_pmap =		pmap_common.o
+SRCS_pmap =		$(PMAP)/pmap_common.c
+
+CPPFLAGS_pmadvise =	-I$(PMAP)
+OBJS_pmadvise =		pmap_common.o
+SRCS_pmadvise =		$(PMAP)/pmap_common.c
 
 CPPFLAGS +=	$(CPPFLAGS_$(PROG))
 OBJS +=		$(OBJS_$(PROG))
 SRCS +=		$(SRCS_$(PROG))
-
-elfcap.o:	$(ELFCAP)/elfcap.c
-		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
-
 
 INSTALL_NEW=
 INSTALL_LEGACY=$(RM) $(ROOTPROCBINSYMLINK) ; \
 	$(LN) -s ../../bin/$(PROG) $(ROOTPROCBINSYMLINK)
 
 .KEEP_STATE:
+
+elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
+
+pmap_common.o:	$(PMAP)/pmap_common.c
+		$(COMPILE.c) -o $@ $(PMAP)/pmap_common.c
 
 %.o:	../%.c
 	$(COMPILE.c) $<
