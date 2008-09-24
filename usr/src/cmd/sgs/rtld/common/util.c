@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility routines for run-time linker.  some are duplicated here from libc
  * (with different names) to avoid name space collisions.
@@ -47,6 +45,7 @@
 #include	<dlfcn.h>
 #include	<unistd.h>
 #include	<stdlib.h>
+#include	<limits.h>
 #include	<sys/auxv.h>
 #include	<debug.h>
 #include	<conv.h>
@@ -380,6 +379,20 @@ pnavl_compare(const void *n1, const void *n2)
 }
 
 /*
+ * Create an AVL tree.
+ */
+static avl_tree_t *
+pnavl_create(size_t size)
+{
+	avl_tree_t	*avlt;
+
+	if ((avlt = malloc(sizeof (avl_tree_t))) == NULL)
+		return (NULL);
+	avl_create(avlt, pnavl_compare, size, SGSOFFSETOF(PathNode, pn_avl));
+	return (avlt);
+}
+
+/*
  * Determine if a pathname has already been recorded on the full path name
  * AVL tree.  This tree maintains a node for each path name that ld.so.1 has
  * successfully loaded.  If the path name does not exist in this AVL tree, then
@@ -390,18 +403,13 @@ Rt_map *
 fpavl_recorded(Lm_list *lml, const char *name, avl_index_t *where)
 {
 	FullPathNode	fpn, *fpnp;
-	avl_tree_t	*avlt;
 
 	/*
 	 * Create the avl tree if required.
 	 */
-	if ((avlt = lml->lm_fpavl) == NULL) {
-		if ((avlt = calloc(sizeof (avl_tree_t), 1)) == 0)
-			return (0);
-		avl_create(avlt, pnavl_compare, sizeof (FullPathNode),
-		    SGSOFFSETOF(FullPathNode, fpn_node.pn_avl));
-		lml->lm_fpavl = avlt;
-	}
+	if ((lml->lm_fpavl == NULL) &&
+	    ((lml->lm_fpavl = pnavl_create(sizeof (FullPathNode))) == NULL))
+		return (NULL);
 
 	fpn.fpn_node.pn_name = name;
 	fpn.fpn_node.pn_hash = sgs_str_hash(name);
@@ -439,7 +447,7 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 	/*
 	 * Insert new node in tree.
 	 */
-	if ((fpnp = calloc(sizeof (FullPathNode), 1)) == 0)
+	if ((fpnp = calloc(sizeof (FullPathNode), 1)) == NULL)
 		return (0);
 
 	fpnp->fpn_node.pn_name = name;
@@ -487,23 +495,18 @@ int
 nfavl_recorded(const char *name, avl_index_t *where)
 {
 	PathNode	pn;
-	avl_tree_t	*avlt;
 
 	/*
 	 * Create the avl tree if required.
 	 */
-	if ((avlt = nfavl) == NULL) {
-		if ((avlt = calloc(sizeof (avl_tree_t), 1)) == 0)
-			return (0);
-		avl_create(avlt, pnavl_compare, sizeof (PathNode),
-		    SGSOFFSETOF(PathNode, pn_avl));
-		nfavl = avlt;
-	}
+	if ((nfavl == NULL) &&
+	    ((nfavl = pnavl_create(sizeof (PathNode))) == NULL))
+		return (0);
 
 	pn.pn_name = name;
 	pn.pn_hash = sgs_str_hash(name);
 
-	if (avl_find(avlt, &pn, where) == NULL)
+	if (avl_find(nfavl, &pn, where) == NULL)
 		return (0);
 
 	return (1);
@@ -535,6 +538,76 @@ nfavl_insert(const char *name, avl_index_t where)
 		pnp->pn_name = name;
 		pnp->pn_hash = sgs_str_hash(name);
 		avl_insert(nfavl, pnp, where);
+	}
+}
+
+static avl_tree_t	*spavl = NULL;
+
+/*
+ * Search for a path name within the secure path AVL tree.  This tree is used
+ * to maintain a list of directories in which the dependencies of a secure
+ * process have been found.  This list provides a fall-back in the case that a
+ * $ORIGIN expansion is deemed insecure, when the expansion results in a path
+ * name that has already provided dependencies.
+ */
+int
+spavl_recorded(const char *name, avl_index_t *where)
+{
+	PathNode	pn;
+
+	/*
+	 * Create the avl tree if required.
+	 */
+	if ((spavl == NULL) &&
+	    ((spavl = pnavl_create(sizeof (PathNode))) == NULL))
+		return (0);
+
+	pn.pn_name = name;
+	pn.pn_hash = sgs_str_hash(name);
+
+	if (avl_find(spavl, &pn, where) == NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
+ * Insert the directory name, of a full path name,  into the secure path AVL
+ * tree.
+ */
+void
+spavl_insert(const char *name)
+{
+	char		buffer[PATH_MAX], *str;
+	size_t		size;
+	avl_index_t	where;
+	PathNode	*pnp;
+
+	/*
+	 * Separate the directory name from the path name.
+	 */
+	if ((str = strrchr(name, '/')) == name)
+		size = 1;
+	else
+		size = str - name;
+
+	(void) strncpy(buffer, name, size);
+	buffer[size] = '\0';
+
+	/*
+	 * Determine whether this directory name is already recorded, or if
+	 * not, 'where" will provide the insertion point for the new string.
+	 */
+	if (spavl_recorded(buffer, &where))
+		return;
+
+	/*
+	 * Insert new node in tree.
+	 */
+	if ((pnp = calloc(sizeof (PathNode), 1)) != 0) {
+		pnp->pn_name = strdup(buffer);
+		pnp->pn_hash = sgs_str_hash(buffer);
+		avl_insert(spavl, pnp, where);
 	}
 }
 
@@ -1034,8 +1107,8 @@ list_append(List *lst, const void *item)
 {
 	Listnode	*_lnp;
 
-	if ((_lnp = malloc(sizeof (Listnode))) == 0)
-		return (0);
+	if ((_lnp = malloc(sizeof (Listnode))) == NULL)
+		return (NULL);
 
 	_lnp->data = (void *)item;
 	_lnp->next = NULL;
@@ -1109,7 +1182,7 @@ list_delete(List *lst, void *item)
 		plnp = clnp;
 	}
 
-	if (clnp == 0)
+	if (clnp == NULL)
 		return;
 
 	if (lst->head == clnp)
@@ -1335,16 +1408,16 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 	 * Move the new link-map control list, to the callers link-map control
 	 * list.
 	 */
-	if (plmc->lc_head == 0) {
+	if (plmc->lc_head == NULL) {
 		plmc->lc_head = nlmc->lc_head;
-		PREV(nlmc->lc_head) = 0;
+		PREV(nlmc->lc_head) = NULL;
 	} else {
 		NEXT(plmc->lc_tail) = (Link_map *)nlmc->lc_head;
 		PREV(nlmc->lc_head) = (Link_map *)plmc->lc_tail;
 	}
 
 	plmc->lc_tail = nlmc->lc_tail;
-	nlmc->lc_head = nlmc->lc_tail = 0;
+	nlmc->lc_head = nlmc->lc_tail = NULL;
 
 	/*
 	 * For backward compatibility with debuggers, the link-map list contains
@@ -2133,10 +2206,10 @@ static int
 ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
     uint_t env_flags, int aout)
 {
-	char	*nstr, *sstr, *estr = 0;
+	char	*nstr, *sstr, *estr = NULL;
 	size_t	nlen, len;
 
-	if (str == 0)
+	if (str == NULL)
 		return (0);
 
 	/*
@@ -2144,7 +2217,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 	 * uppercase and separate tokens with nulls.
 	 */
 	len = strlen(str);
-	if ((nstr = malloc(len + 1)) == 0)
+	if ((nstr = malloc(len + 1)) == NULL)
 		return (1);
 	(void) strcpy(nstr, str);
 
@@ -2152,7 +2225,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 		int	flags;
 
 		if ((*sstr != '\0') && (*sstr != ',')) {
-			if (estr == 0) {
+			if (estr == NULL) {
 				if (*sstr == '=')
 					estr = sstr;
 				else {
@@ -2183,7 +2256,7 @@ ld_flags_env(const char *str, Word *lmflags, Word *lmtflags,
 		 * the term "(null)" is specifically chosen in case someone
 		 * mistakenly supplies something like LD_FLAGS=library_path.
 		 */
-		if (estr == 0)
+		if (estr == NULL)
 			estr = (char *)MSG_INTL(MSG_STR_NULL);
 
 		/*
@@ -2282,7 +2355,7 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 		 * within a configuration file, these null user settings can be
 		 * used to disable any configuration replaceable definitions.
 		 */
-		if ((s2 = strchr(s1, '=')) == 0) {
+		if ((s2 = strchr(s1, '=')) == NULL) {
 			len = strlen(s1);
 			s2 = 0;
 		} else if (*++s2 == '\0') {
@@ -3179,7 +3252,7 @@ is_path_used(Lm_list *lml, Word unref, int *nl, Pnode *pnp, const char *obj)
 		 * If this pathname originated from an expanded token, use the
 		 * original for any diagnostic output.
 		 */
-		if ((name = pnp->p_oname) == 0)
+		if ((name = pnp->p_oname) == NULL)
 			name = pnp->p_name;
 
 		if (unref == 0) {
@@ -3399,7 +3472,7 @@ leave(Lm_list *lml, int flags)
 	 * case of tearing down a whole link-map list, lml will be null.  In
 	 * this case use the main link-map list to test for a notification.
 	 */
-	if (elml == 0)
+	if (elml == NULL)
 		elml = &lml_main;
 	if (elml->lm_flags & LML_FLG_DBNOTIF)
 		rd_event(elml, RD_DLACTIVITY, RT_CONSISTENT);
@@ -3629,6 +3702,23 @@ security(uid_t uid, uid_t euid, gid_t gid, gid_t egid, int auxflags)
 				rtld_flags |= RT_FL_SECURE;
 		}
 	}
+}
+
+/*
+ * Determine whether ld.so.1 itself is owned by root and has its mode setuid.
+ */
+int
+is_rtld_setuid()
+{
+	struct stat	status;
+
+	if ((rtld_flags2 & RT_FL2_SETUID) ||
+	    ((stat(NAME(lml_rtld.lm_head), &status) == 0) &&
+	    (status.st_uid == 0) && (status.st_mode & S_ISUID))) {
+		rtld_flags2 |= RT_FL2_SETUID;
+		return (1);
+	}
+	return (0);
 }
 
 /*

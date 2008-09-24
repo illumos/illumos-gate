@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<string.h>
 #include	<stdio.h>
 #include	<unistd.h>
@@ -1740,6 +1738,23 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
 		    (fpavl_insert(lml, nlmp, PATHNAME(nlmp), 0) == 0)) {
 			remove_so(lml, nlmp);
 			return (0);
+		}
+
+		/*
+		 * If this is a secure application, record any full path name
+		 * directory in which this dependency has been found.  This
+		 * directory can be deemed safe (as we've already found a
+		 * dependency here).  This recording provides a fall-back
+		 * should another objects $ORIGIN definition expands to this
+		 * directory, an expansion that would ordinarily be deemed
+		 * insecure.
+		 */
+		if (rtld_flags & RT_FL_SECURE) {
+			if (NAME(nlmp)[0] == '/')
+				spavl_insert(NAME(nlmp));
+			if ((NAME(nlmp) != PATHNAME(nlmp)) &&
+			    (PATHNAME(nlmp)[0] == '/'))
+				spavl_insert(PATHNAME(nlmp));
 		}
 	}
 

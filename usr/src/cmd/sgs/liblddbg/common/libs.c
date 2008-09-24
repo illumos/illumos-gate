@@ -23,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
@@ -64,12 +62,15 @@ Dbg_libs_found(Lm_list *lml, const char *path, int alter)
 }
 
 void
-Dbg_libs_ignore(Lm_list *lml, const char *path)
+Dbg_libs_insecure(Lm_list *lml, const char *path, int usable)
 {
 	if (DBG_NOTCLASS(DBG_C_LIBS))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_LIB_IGNORE), path);
+	if (usable)
+		dbg_print(lml, MSG_INTL(MSG_LIB_INUSE), path);
+	else
+		dbg_print(lml, MSG_INTL(MSG_LIB_IGNORE), path);
 }
 
 static void

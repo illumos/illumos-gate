@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 $(VAR_POUND_2)LIBS +=	$(LIBRARY)
 
@@ -137,8 +135,6 @@ pics/xlate.o:	xlate.c
 # to build a version of ld :-).
 
 native:		$(SGSPROTO)/$(DYNLIB)
-
-native :=	CPPFLAGS += -DNATIVE_BUILD
 
 $(SGSPROTO)/$(DYNLIB): \
 		pics .WAIT $$(PICS)

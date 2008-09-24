@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <thread.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -39,7 +37,6 @@
 #define	ELFERRSHIFT	16
 #define	SYSERRMASK	0xffff
 
-
 /*
  * _elf_err has two values encoded in it, both the _elf_err # and
  * the system errno value (if relevant).  These values are encoded
@@ -47,56 +44,14 @@
  */
 static int		_elf_err = 0;
 
-#if !defined(NATIVE_BUILD)
-
 static thread_key_t	errkey = THR_ONCE_KEY;
 static thread_key_t	bufkey = THR_ONCE_KEY;
-
-#else	/* NATIVE_BUILD */
-
-/*
- * This code is here to enable the building of a native version
- * of libelf.so when the build machine has not yet been upgraded
- * to a version of libc that provides thr_keycreate_once().
- * It should be deleted when solaris_nevada ships.
- * The code is not MT-safe in a relaxed memory model.
- */
-
-static thread_key_t	errkey = 0;
-static thread_key_t	bufkey = 0;
-
-int
-thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
-{
-	static mutex_t key_lock = DEFAULTMUTEX;
-	thread_key_t key;
-	int error;
-
-	if (*keyp == 0) {
-		mutex_lock(&key_lock);
-		if (*keyp == 0) {
-			error = thr_keycreate(&key, destructor);
-			if (error) {
-				mutex_unlock(&key_lock);
-				return (error);
-			}
-			*keyp = key;
-		}
-		mutex_unlock(&key_lock);
-	}
-
-	return (0);
-}
-
-#endif	/* NATIVE_BUILD */
-
 
 const char *
 _libelf_msg(Msg mid)
 {
 	return (dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
 }
-
 
 void
 _elf_seterr(Msg lib_err, int sys_err)

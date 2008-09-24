@@ -1376,3 +1376,5 @@ Bugid   Risk Synopsis
 	linking gnu object code
 6744003 ld(1) could provide better argument processing diagnostics
 	PSARC 2008/583 add gld options to ld(1)
+6746674 setuid applications do not find libraries any more because trusted
+	directories behavior changed

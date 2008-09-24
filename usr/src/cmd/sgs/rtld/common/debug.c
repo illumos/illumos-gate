@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/types.h>
 #include	<sys/stat.h>
 #include	<sys/param.h>
@@ -61,16 +59,8 @@ dbg_setup(const char *options, Dbg_desc *dbp)
 	 * If we're running secure, only allow debugging if ld.so.1 itself is
 	 * owned by root and has its mode setuid.  Fail silently.
 	 */
-	if (rtld_flags & RT_FL_SECURE) {
-		struct stat	status;
-
-		if (stat(NAME(lml_rtld.lm_head), &status) == 0) {
-			if ((status.st_uid != 0) ||
-			    (!(status.st_mode & S_ISUID)))
-				return (0);
-		} else
-			return (0);
-	}
+	if ((rtld_flags & RT_FL_SECURE) && (is_rtld_setuid() == 0))
+		return (0);
 
 	/*
 	 * As Dbg_setup() will effectively lazy load the necessary support

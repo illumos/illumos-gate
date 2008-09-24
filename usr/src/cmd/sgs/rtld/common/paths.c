@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PATH setup and search directory functions.
  */
@@ -715,7 +713,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 {
 	Pnode	*sdir = LM_SECURE_DIRS(LIST(clmp)->lm_head);
 	char	buffer[PATH_MAX], *npath;
-	Lm_list	*lml;
+	Lm_list	*lml = LIST(clmp);
 
 	/*
 	 * If a pathname originates from a configuration file, use it.  The use
@@ -736,20 +734,24 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		str = strrchr(opath, '/');
 
 		/*
-		 * A simple filename (one containing no "/") is fine, as this
-		 * will be combined with search paths to determine the complete
-		 * path.  Other paths are checked:
+		 * Carry out some initial security checks.
 		 *
+		 *   .	a simple file name (one containing no "/") is fine, as
+		 *	this file name will be combined with search paths to
+		 *	determine the complete path.
 		 *   .	a full path (one starting with "/") is fine, provided
-		 *	it isn't a preload/audit path.
-		 *   .  any $ORIGIN expansion
-		 *   .	any relative path
+		 *	this path name isn't a preload/audit path.
+		 *   .	provided $ORIGIN expansion has not been employed, the
+		 *	above categories of path are deemed secure.
 		 */
 		if (((str == 0) || ((*opath == '/') && (str != opath) &&
 		    ((info & PN_FLG_EXTLOAD) == 0))) &&
 		    ((flags & PN_TKN_ORIGIN) == 0))
 			return (1);
 
+		/*
+		 * Determine the directory name of the present path.
+		 */
 		if (str == opath)
 			npath = (char *)MSG_ORIG(MSG_STR_SLASH);
 		else {
@@ -762,19 +764,47 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 			buffer[size] = '\0';
 			npath = buffer;
 		}
+
+		/*
+		 * If $ORIGIN processing has been employed, then allow any
+		 * directory that has already been used to satisfy other
+		 * dependencies, to be used.
+		 */
+		if ((flags & PN_TKN_ORIGIN) && spavl_recorded(npath, 0)) {
+			DBG_CALL(Dbg_libs_insecure(lml, npath, 1));
+			return (1);
+		}
+
 	} else {
 		/*
 		 * A search path, i.e., RPATH, configuration file path, etc. is
 		 * used as is.  Exceptions to this are:
 		 *
-		 *   .	LD_LIBRARY_PATH
-		 *   .	any $ORIGIN expansion
-		 *   .	any relative path
+		 *   .	LD_LIBRARY_PATH.
+		 *   .	any $ORIGIN expansion, unless used by a setuid ld.so.1
+		 *	to find its own dependencies, or the path name has
+		 *	already been used to find other dependencies.
+		 *   .	any relative path.
 		 */
 		if (((info & LA_SER_LIBPATH) == 0) && (*opath == '/') &&
 		    ((flags & PN_TKN_ORIGIN) == 0))
 			return (1);
 
+		/*
+		 * If $ORIGIN processing is requested, allow a setuid ld.so.1
+		 * to use this path for its own dependencies.  Allow the
+		 * application to use this path name only if the path name has
+		 * already been used to locate other dependencies.
+		 */
+		if (flags & PN_TKN_ORIGIN) {
+			if ((lml->lm_flags & LML_FLG_RTLDLM) &&
+			    is_rtld_setuid())
+				return (1);
+			else if (spavl_recorded(opath, 0)) {
+				DBG_CALL(Dbg_libs_insecure(lml, opath, 1));
+				return (1);
+			}
+		}
 		npath = (char *)opath;
 	}
 
@@ -783,8 +813,6 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 			return (1);
 		sdir = sdir->p_next;
 	}
-
-	lml = LIST(clmp);
 
 	/*
 	 * The path is insecure, so depending on the caller, provide a
@@ -830,7 +858,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		/*
 		 * Search paths.
 		 */
-		DBG_CALL(Dbg_libs_ignore(lml, opath));
+		DBG_CALL(Dbg_libs_insecure(lml, opath, 0));
 		if ((lml->lm_flags & LML_FLG_TRC_SEARCH) &&
 		    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0))
 			(void) printf(MSG_INTL(MSG_LDD_PTH_IGNORE), opath);

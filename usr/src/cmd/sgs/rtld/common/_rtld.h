@@ -30,8 +30,6 @@
 #ifndef	__RTLD_H
 #define	__RTLD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Common header for run-time linker.
  */
@@ -318,6 +316,7 @@ typedef struct {
 #define	RT_FL2_PLMSETUP	0x00000400	/* primary link-map set up complete */
 #define	RT_FL2_BRANDED	0x00000800	/* process is branded */
 #define	RT_FL2_NOPLM	0x00001000	/* process has no primary link map */
+#define	RT_FL2_SETUID	0x00002000	/* ld.so.1 is setuid root */
 
 /*
  * Information flags for env_info.
@@ -585,6 +584,7 @@ extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,
 extern void		is_dep_ready(Rt_map *, Rt_map *, int);
 extern void		is_dep_init(Rt_map *, Rt_map *);
 extern int		is_move_data(caddr_t);
+extern int		is_rtld_setuid();
 extern int		is_sym_interposer(Rt_map *, Sym *);
 extern void		ldso_plt_init(Rt_map *);
 extern Listnode		*list_append(List *, const void *);
@@ -650,6 +650,8 @@ extern Rt_map		*setup(char **, auxv_t *, Word, char *, int, char *,
 			    Dyn *, ulong_t, ulong_t, int fd, Phdr *, char *,
 			    char **, int, uid_t, uid_t, gid_t, gid_t, void *,
 			    int, uint_t);
+extern void		spavl_insert(const char *);
+extern int		spavl_recorded(const char *, avl_index_t *);
 extern int		tls_assign(Lm_list *, Rt_map *, Phdr *);
 extern void		tls_modaddrem(Rt_map *, uint_t);
 extern int		tls_statmod(Lm_list *, Rt_map *);

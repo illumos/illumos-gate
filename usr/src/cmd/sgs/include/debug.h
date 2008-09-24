@@ -273,7 +273,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_libs_audit		Dbg64_libs_audit
 #define	Dbg_libs_find		Dbg64_libs_find
 #define	Dbg_libs_found		Dbg64_libs_found
-#define	Dbg_libs_ignore		Dbg64_libs_ignore
+#define	Dbg_libs_insecure	Dbg64_libs_insecure
 #define	Dbg_libs_init		Dbg64_libs_init
 #define	Dbg_libs_l		Dbg64_libs_l
 #define	Dbg_libs_path		Dbg64_libs_path
@@ -478,7 +478,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_libs_audit		Dbg32_libs_audit
 #define	Dbg_libs_find		Dbg32_libs_find
 #define	Dbg_libs_found		Dbg32_libs_found
-#define	Dbg_libs_ignore		Dbg32_libs_ignore
+#define	Dbg_libs_insecure	Dbg32_libs_insecure
 #define	Dbg_libs_init		Dbg32_libs_init
 #define	Dbg_libs_l		Dbg32_libs_l
 #define	Dbg_libs_path		Dbg32_libs_path
@@ -713,7 +713,7 @@ extern	void	Dbg_got_display(Ofl_desc *, Off, int, Word, size_t);
 extern	void	Dbg_libs_audit(Lm_list *, const char *, const char *);
 extern	void	Dbg_libs_find(Lm_list *, const char *);
 extern	void	Dbg_libs_found(Lm_list *, const char *, int);
-extern	void	Dbg_libs_ignore(Lm_list *, const char *);
+extern	void	Dbg_libs_insecure(Lm_list *, const char *, int);
 extern	void	Dbg_libs_init(Lm_list *, List *, List *);
 extern	void	Dbg_libs_l(Lm_list *, const char *, const char *);
 extern	void	Dbg_libs_path(Lm_list *, const char *, uint_t, const char *);

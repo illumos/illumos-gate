@@ -492,7 +492,8 @@
 @ MSG_LIB_ALTER		" trying path=%s  (auditing supplied alternative)"
 @ MSG_LIB_SKIP		"   skip path=%s  (auditing directed)"
 @ MSG_LIB_IGNORE	" ignore path=%s  (insecure directory name)"
-
+@ MSG_LIB_INUSE		"    use path=%s  (implicitly secure, as directory \
+			 has already provided dependencies)"
 
 # Mapfile messages
 
