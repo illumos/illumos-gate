@@ -55,7 +55,7 @@ $(ROOTETCDATA) := GROUP = sys
 
 LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid
 
-CFLAGS    += -D_EXTVTOC
+CPPFLAGS    += -D_EXTVTOC
 
 .KEEP_STATE:
 
