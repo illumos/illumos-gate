@@ -1392,8 +1392,10 @@ startup_kernel(void)
 	bi->bi_kseg_size = FOUR_MEG;
 	DBG(bi->bi_kseg_size);
 
+#ifndef __xpv
 	if (prom_debug)
 		dump_tables();
+#endif
 
 	DBG_MSG("\n\n*** DBOOT DONE -- back to asm to jump to kernel\n\n");
 }

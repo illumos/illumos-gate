@@ -1601,11 +1601,13 @@ _start(struct xboot_info *xbp)
 	bcons_init((void *)xbootp->bi_cmdline);
 	have_console = 1;
 
+#ifndef __xpv
 	if (*((uint32_t *)(FASTBOOT_SWTCH_PA + FASTBOOT_STACK_OFFSET)) ==
 	    FASTBOOT_MAGIC) {
 		post_fastreboot = 1;
 		*((uint32_t *)(FASTBOOT_SWTCH_PA + FASTBOOT_STACK_OFFSET)) = 0;
 	}
+#endif
 
 	/*
 	 * enable debugging
