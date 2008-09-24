@@ -3198,7 +3198,6 @@ hid_polled_read(hid_polled_handle_t hid_polled_input, uchar_t **buffer)
 
 	*buffer = hidp->hid_polled_raw_buf;
 
-	/*LINTED*/
 	_NOTE(COMPETING_THREADS_NOW);
 
 	/*
