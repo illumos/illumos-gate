@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		pvs
@@ -34,7 +32,9 @@ include		$(SRC)/cmd/sgs/Makefile.com
 COMOBJ=		pvs.o
 BLTOBJ=		msg.o
 
-OBJS=		$(BLTOBJ) $(COMOBJ)
+TOOLOBJS =	alist.o
+
+OBJS=		$(BLTOBJ) $(COMOBJ) $(TOOLOBJS)
 
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPTS=	$(MAPFILE:%=-M%)
@@ -60,7 +60,8 @@ SGSMSGALL=	$(SGSMSGCOM)
 
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n pvs_msg
 
-SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA)
+SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA) \
+		$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c)
 LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

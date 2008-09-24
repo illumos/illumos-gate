@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,12 +21,11 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Message file for cmd/sgs/libconv/common/versions.c
 
-@ MSG_VER_FLG_WEAK	"[ WEAK ]"
-@ MSG_VER_FLG_BASE	"[ BASE ]"
+@ MSG_VER_FLG_WEAK	"WEAK"
+@ MSG_VER_FLG_BASE	"BASE"
+@ MSG_VER_FLG_INFO	"INFO"
 
 @ MSG_VERSYM_ELIMINATE	"ELIM"
 

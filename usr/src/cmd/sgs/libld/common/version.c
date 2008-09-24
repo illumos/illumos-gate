@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	<stdio.h>
@@ -313,12 +312,17 @@ vers_derefer(Ifl_desc *ifl, Ver_desc *vdp, int weak)
 	Ver_index	*vip = &ifl->ifl_verndx[vdp->vd_ndx];
 
 	/*
-	 * If the head of the list was a weak then we only clear out
+	 * Set the INFO bit on all dependencies that ld.so.1
+	 * can skip verification for. These are the dependencies
+	 * that are inherited by others -- verifying the inheriting
+	 * version implicitily covers this one.
+	 *
+	 * If the head of the list was a weak then we only mark
 	 * weak dependencies, but if the head of the list was 'strong'
-	 * we clear the REFER bit on all dependencies.
+	 * we set INFO on all dependencies.
 	 */
 	if ((weak && (vdp->vd_flags & VER_FLG_WEAK)) || (!weak))
-		vip->vi_flags &= ~FLG_VER_REFER;
+		vip->vi_flags |= VER_FLG_INFO;
 
 	for (LIST_TRAVERSE(&vdp->vd_deps, lnp, _vdp))
 		vers_derefer(ifl, _vdp, weak);
@@ -334,6 +338,15 @@ ld_vers_check_need(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Ifl_desc	*ifl;
+	Half		needndx;
+
+	/*
+	 * Versym indexes for needed versions start with the next
+	 * available version after the final definied version.
+	 * However, it can never be less than 2. 0 is always for local
+	 * scope, and 1 is always the first global definition.
+	 */
+	needndx = (ofl->ofl_vercnt > 0) ? (ofl->ofl_vercnt + 1) : 2;
 
 	/*
 	 * Traverse the shared object list looking for dependencies.
@@ -343,7 +356,7 @@ ld_vers_check_need(Ofl_desc *ofl)
 		Ver_index	*vip;
 		Ver_desc	*vdp;
 		Sdf_desc	*sdf = ifl->ifl_sdfdesc;
-		Byte		cnt, need;
+		Byte		cnt, need = 0;
 
 		if (!(ifl->ifl_flags & FLG_IF_NEEDED))
 			continue;
@@ -353,23 +366,30 @@ ld_vers_check_need(Ofl_desc *ofl)
 
 		/*
 		 * If version needed definitions were specified in
-		 * a mapfile ($SPECVERS=) then record those definitions
+		 * a mapfile ($SPECVERS=) then record those definitions.
 		 */
 		if (sdf && (sdf->sdf_flags & FLG_SDF_SPECVER)) {
 			Sdv_desc	*sdv;
 			for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp2,
 			    sdv)) {
+
+				/*
+				 * If this $SPECVERS item corresponds to
+				 * a real version, then don't issue it
+				 * here, but use the real one instead.
+				 * This preserves the ability to reference it
+				 * from a symbol versym entry.
+				 */
+				if (sdv->sdv_flags & FLG_SDV_MATCHED)
+					continue;
+
+				/* Not found in known versions. Count it */
 				ofl->ofl_verneedsz += sizeof (Vernaux);
 				if (st_insert(ofl->ofl_dynstrtab,
 				    sdv->sdv_name) == -1)
 					return (S_ERROR);
+				need++;
 			}
-			ifl->ifl_flags |= FLG_IF_VERNEED;
-			ofl->ofl_verneedsz += sizeof (Verneed);
-			if (st_insert(ofl->ofl_dynstrtab,
-			    ifl->ifl_soname) == -1)
-				return (S_ERROR);
-			continue;
 		}
 
 		/*
@@ -379,7 +399,7 @@ ld_vers_check_need(Ofl_desc *ofl)
 		 * cause fatal errors from the runtime linker, non-weak
 		 * dependencies do.
 		 */
-		for (need = 0, cnt = 0; cnt <= ifl->ifl_vercnt; cnt++) {
+		for (cnt = 0; cnt <= ifl->ifl_vercnt; cnt++) {
 			vip = &ifl->ifl_verndx[cnt];
 			vdp = vip->vi_desc;
 
@@ -421,7 +441,7 @@ ld_vers_check_need(Ofl_desc *ofl)
 		 * Finally, determine how many of the version dependencies need
 		 * to be recorded.
 		 */
-		for (need = 0, cnt = 0; cnt <= ifl->ifl_vercnt; cnt++) {
+		for (cnt = 0; cnt <= ifl->ifl_vercnt; cnt++) {
 			vip = &ifl->ifl_verndx[cnt];
 
 			/*
@@ -429,6 +449,9 @@ ld_vers_check_need(Ofl_desc *ofl)
 			 * version dependency.
 			 */
 			if (vip->vi_flags & FLG_VER_REFER) {
+				/* Assign a VERSYM index for it */
+				vip->vi_overndx = needndx++;
+
 				ofl->ofl_verneedsz += sizeof (Vernaux);
 				if (st_insert(ofl->ofl_dynstrtab,
 				    vip->vi_name) == -1)
@@ -513,15 +536,20 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 		if (vdp->vd_flags & VER_FLG_WEAK)
 			vip[ndx].vi_flags |= VER_FLG_WEAK;
 		/*
-		 * If this version is mentioned in a mapfile
-		 * $ADDVERS syntax then add a FLG_IF_NEEDED flag now
+		 * If this version is mentioned in a mapfile using
+		 * $ADDVERS or $SPECVERS syntax then check to see if
+		 * it corresponds to an actual version in the file.
 		 */
-		if (sdf && (sdf->sdf_flags & FLG_SDF_ADDVER)) {
+		if (sdf &&
+		    (sdf->sdf_flags & (FLG_SDF_SPECVER|FLG_SDF_ADDVER))) {
 			Listnode *	lnp2;
 			for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp2, sdv)) {
 				if (strcmp(vip[ndx].vi_name,
 				    sdv->sdv_name) == 0) {
 					vip[ndx].vi_flags |= FLG_VER_REFER;
+					if (sdf->sdf_flags & FLG_SDF_SPECVER)
+						vip[ndx].vi_flags |=
+						    FLG_VER_SPECVER;
 					sdv->sdv_flags |= FLG_SDV_MATCHED;
 					break;
 				}

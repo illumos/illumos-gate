@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Analyze the versioning information within a file.
@@ -33,7 +31,7 @@
  *
  *   -d		dump version definitions.
  *
- *   -l		print reduced (local) symbols.
+ *   -l		print reduced (local) symbols. Implies -s.
  *
  *   -n		normalize any version definitions.
  *
@@ -46,8 +44,11 @@
  *
  *   -v		verbose output.  With the -r and -d options any WEAK attribute
  *		is displayed.  With the -d option, any version inheritance,
- *		and the base version are displayed.  With the -s option the
- *		version symbol is displayed.
+ *		and the base version are displayed.  With the -r option,
+ *		WEAK and INFO attributes are displayed. With the -s option
+ *		the version symbol is displayed.
+ *
+ *   -I index	only print the specifed version index, or index range.
  *
  *   -N name	only print the specifed `name'.
  */
@@ -64,9 +65,15 @@
 #include	<conv.h>
 #include	<gelf.h>
 #include	<debug.h>
+#include	<ctype.h>
+#include	<alist.h>
 #include	"msg.h"
 
-#define		FLG_VER_AVAIL	0x10
+/*
+ * Define Alist initialization sizes.
+ */
+#define	AL_CNT_MATCH_LIST	5	/* match_list initial alist count */
+#define	AL_CNT_GVER_DESC	25	/* version tracking descriptors */
 
 typedef struct cache {
 	Elf_Scn		*c_scn;
@@ -79,21 +86,70 @@ typedef struct gver_desc {
 	unsigned long	vd_hash;
 	GElf_Half	vd_ndx;
 	GElf_Half	vd_flags;
-	List		vd_deps;
+	APlist		*vd_deps;
 } GVer_desc;
+
+/* Versym related data used by gvers_syms() */
+typedef struct {
+	GElf_Versym	*vsd_vsp;   	/* ptr to versym data */
+	Elf_Data	*vsd_sym_data;	/* ptr to symtab data */
+	Word		vsd_symn;	/* # of symbols in symtab */
+	const char	*vsd_strs;	/* string table data */
+} Gver_sym_data;
+
+/*
+ * Type used to manage -I and -N options:
+ *
+ * The -I option specifies a VERSYM index, or index range. The
+ * result is to select the VERDEF or VERNEED records with
+ * indexes that match those given.
+ *
+ * -N options come in two forms:
+ *
+ *	1) name
+ *	2) needobj (version)
+ *
+ * The meaning of the first case depends on the type of
+ * version record being matched:
+ *
+ *	VERDEF - name is the name of a version defined
+ *		by the object being processed (i.e. SUNW_1.1).
+ *
+ *	VERNEED - name is the name of the object file
+ *		on which the dependency exists (i.e. libc.so.1).
+ *
+ * -N options of the second form only apply to VERNEED records.
+ * They are used to specify a version from a needed object.
+ */
+/* match_opt_t is  used to note which match option was used */
+typedef enum {
+	MATCH_OPT_NAME,		/* Record contains a name */
+	MATCH_OPT_NEED_VER,	/* Record contains needed object and version */
+	MATCH_OPT_NDX,		/* Record contains a single index */
+	MATCH_OPT_RANGE,	/* Record contains an index range */
+} match_opt_t;
+
+typedef struct {
+	match_opt_t	opt_type;
+	union {
+		struct {
+			const char *version;	/* MATCH_OPT_{NAME|NEED_VER} */
+			const char *needobj;	/* MATCH_OPT_NEED_VER only */
+		} name;
+		struct {
+			int start;		/* MATCH_OPT_{NDX|RANGE} */
+			int end;		/* MATCH_OPT_RANGE only) */
+		} ndx;
+	} value;
+} match_rec_t;
+
+
 
 static const char	*cname;
 static int		Cflag, dflag, lflag, nflag, oflag, rflag, sflag, vflag;
+static Alist		*match_list;
 
-static const char
-	* Format_ofil = "%s -",
-	* Format_tnco =	"\t%s:\n",
-	* Format_tnse =	"\t%s;\n",
-	* Format_bgnl = "\t%s (%s",
-	* Format_next = ", %s",
-	* Format_weak = " [WEAK]",
-	* Format_endl = ");\n";
-
+/* Used to track whether an option defaulted to on, or was explicitly set */
 #define	DEF_DEFINED	1
 #define	USR_DEFINED	2
 
@@ -110,6 +166,305 @@ demangle(const char *name)
 }
 
 /*
+ * Append an item to the specified list, and return a pointer to the list
+ * node created.
+ *
+ * exit:
+ *	On success, a new list node is created and the item is
+ *	added to the list. On failure, a fatal error is issued
+ *	and the process exits.
+ */
+static void
+pvs_aplist_append(APlist **lst, const void *item, const char *file)
+{
+	if (aplist_append(lst, item, AL_CNT_GVER_DESC) == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC), cname, file,
+		    strerror(err));
+		exit(1);
+	}
+}
+
+/*
+ * Add an entry to match_list for use by match(). This routine is for
+ * use during getopt() processing.
+ *
+ * entry:
+ *	opt - One of 'N' or 'I', indicating the option
+ *	str - Value string corresponding to opt
+ *
+ * exit:
+ *	The new match record has been added. On error, a fatal
+ *	error is issued and and the process exits.
+ */
+static void
+add_match_record(int opt, const char *str)
+{
+	/*
+	 * Macros for removing leading and trailing whitespace:
+	 *	WS_SKIP - Advance _str without passing the NULL termination,
+	 *		until the first character is not whitespace.
+	 *	WS_SKIP_LIMIT - Advance _str without passing _limit,
+	 *		until the first character is not whitespace.
+	 *	WS_RSKIP_LIMIT - Move _tail back without passing _str,
+	 *		until the character before it is not whitespace.
+	 *		Write a NULL termination at that point.
+	 */
+#define	WS_SKIP(_str) for (; *(_str) && isspace(*(_str)); (_str)++)
+#define	WS_SKIP_LIMIT(_str, _limit) \
+	while (((_str) < s2) && isspace(*(_str))) \
+		(_str)++
+#define	WS_RSKIP_LIMIT(_str, _tail) \
+	while (((_tail) > (_str)) && isspace(*((_tail) - 1)))	\
+		(_tail)--;					\
+	*(_tail) = '\0'
+
+
+	match_rec_t	*rec;
+	char		*lstr, *s1, *s2;
+
+	rec = alist_append(&match_list, NULL, sizeof (match_rec_t),
+	    AL_CNT_MATCH_LIST);
+	if (rec == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC), cname,
+		    MSG_INTL(MSG_STR_MATCH_RECORD), strerror(err));
+		exit(1);
+	}
+
+	if (opt == 'N') {
+		if ((lstr = strdup(str)) == NULL) {
+			int err = errno;
+			(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC),
+			    cname, MSG_INTL(MSG_STR_MATCH_RECORD),
+			    strerror(err));
+			exit(1);
+		}
+
+		/* Strip leading/trailing whitespace */
+		s2 = lstr + strlen(lstr);
+		WS_SKIP_LIMIT(lstr, s2);
+		WS_RSKIP_LIMIT(lstr, s2);
+
+		/* Assume this is a plain string */
+		rec->opt_type = MATCH_OPT_NAME;
+		rec->value.name.version = lstr;
+
+		/*
+		 * If s2 points at a closing paren, then this might
+		 * be a MATCH_OPT_NEED_VER case. Otherwise we're done.
+		 */
+		if ((s2 == lstr) || (*(s2 - 1) != ')'))
+			return;
+
+		/* We have a closing paren. Locate the opening one. */
+		for (s1 = lstr; *s1 && (*s1 != '('); s1++)
+			;
+		if (*s1 != '(')
+			return;
+
+		rec->opt_type = MATCH_OPT_NEED_VER;
+		rec->value.name.needobj = lstr;
+		rec->value.name.version = s1 + 1;
+		s2--;		/* Points at closing paren */
+
+		/* Remove whitespace from head/tail of version */
+		WS_SKIP_LIMIT(rec->value.name.version, s2);
+		WS_RSKIP_LIMIT(rec->value.name.version, s2);
+
+		/* Terminate needobj, skipping trailing whitespace */
+		WS_RSKIP_LIMIT(rec->value.name.needobj, s1);
+
+		return;
+	}
+
+
+	/* If we get here, we are looking at a -I index option */
+	rec->value.ndx.start = strtol(str, &s2, 10);
+	/* Value must use some of the input, and be positive */
+	if ((str == s2) || (rec->value.ndx.start < 1))
+		goto syntax_error;
+	str = s2;
+
+	WS_SKIP(str);
+	if (*str != ':') {
+		rec->opt_type = MATCH_OPT_NDX;
+	} else {
+		str++;					/* Skip the ':' */
+		rec->opt_type = MATCH_OPT_RANGE;
+		WS_SKIP(str);
+		if (*str == '\0') {
+			rec->value.ndx.end = -1;	/* Indicates "to end" */
+		} else {
+			rec->value.ndx.end = strtol(str, &s2, 10);
+			if ((str == s2) || (rec->value.ndx.end < 0))
+				goto syntax_error;
+			str = s2;
+			WS_SKIP(str);
+		}
+	}
+
+	/* If we are successful, there is nothing left to parse */
+	if (*str == '\0')
+		return;
+
+	/*
+	 * If we get here, there is leftover input. Fall through
+	 * to issue a syntax error.
+	 */
+syntax_error:
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF), cname);
+	exit(1);
+
+#undef	WS_SKIP
+#undef	WS_SKIP_LIMIT
+#undef	WS_RSKIP_LIMIT
+}
+
+/*
+ * Returns True (1) if the version with the given name or index should
+ * be displayed, and False (0) if it should not be.
+ *
+ * entry:
+ *	needobj - NULL for VERDEF records, the name of the
+ *		needed object for VERNEED.
+ *	version - NULL, or needed version
+ *	ndx - Versym index of version under consideration, or a value less
+ *		than 1 to indicate that no valid index is given.
+ *
+ * exit:
+ *	True will be returned if the given name/index matches those given
+ *	by one of the -I or -N command line options, or if no such option
+ *	was used in the command invocation.
+ */
+int
+match(const char *needobj, const char *version, int ndx)
+{
+	Aliste		_idx;
+	match_rec_t	*rec;
+	const char	*str;
+
+	/* If there is no match list, then we approve everything */
+	if (alist_nitems(match_list) == 0)
+		return (1);
+
+	/* Run through the match records and check for a hit */
+	for (ALIST_TRAVERSE(match_list, _idx, rec)) {
+		switch (rec->opt_type) {
+		case MATCH_OPT_NAME:
+			if (needobj)
+				str = needobj;
+			else if (version)
+				str = version;
+			else
+				break;
+			if (strcmp(rec->value.name.version, str) == 0)
+				return (1);
+			break;
+		case MATCH_OPT_NEED_VER:
+			if (needobj && version &&
+			    (strcmp(rec->value.name.needobj, needobj) == 0) &&
+			    (strcmp(rec->value.name.version, version) == 0))
+				return (1);
+			break;
+		case MATCH_OPT_NDX:
+			if ((ndx > 0) && (ndx == rec->value.ndx.start))
+				return (1);
+			break;
+		case MATCH_OPT_RANGE:
+			/*
+			 * A range end value less than 0 means that any value
+			 * above the start is acceptible.
+			 */
+			if ((ndx > 0) &&
+			    (ndx >= rec->value.ndx.start) &&
+			    ((rec->value.ndx.end < 0) ||
+			    (ndx <= rec->value.ndx.end)))
+				return (1);
+			break;
+		}
+	}
+
+	/* Nothing matched */
+	return (0);
+}
+
+/*
+ * List the symbols that belong to a specified version
+ *
+ * entry:
+ *	vsdata - VERSYM related data from the object
+ *	vd_ndx - The VERSYM index for symbols to display
+ *	vd_name - Version name
+ *	needobj - NULL for symbols corresponding to a VERDEF
+ *		record. Name of the needed object in the case
+ *		of a VERNEED record.
+ *	file - Object file
+ */
+static void
+gvers_syms(const Gver_sym_data *vsdata, GElf_Half vd_ndx,
+    const char *vd_name, const char *needobj, const char *file)
+{
+	GElf_Sym	sym;
+	int		_symn;
+
+	for (_symn = 0; _symn < vsdata->vsd_symn; _symn++) {
+		size_t		size =	0;
+		const char	*name;
+
+		if (vsdata->vsd_vsp[_symn] != vd_ndx)
+			continue;
+
+		(void) gelf_getsym(vsdata->vsd_sym_data, _symn, &sym);
+		name = demangle(vsdata->vsd_strs + sym.st_name);
+
+		/*
+		 * Symbols that reference a VERDEF record
+		 * have some extra details to handle.
+		 */
+		if (needobj == NULL) {
+			/*
+			 * For data symbols defined by this object,
+			 * determine the size.
+			 */
+			if ((GELF_ST_TYPE(sym.st_info) == STT_OBJECT) ||
+			    (GELF_ST_TYPE(sym.st_info) == STT_COMMON) ||
+			    (GELF_ST_TYPE(sym.st_info) == STT_TLS))
+				size = (size_t)sym.st_size;
+
+			/*
+			 * Only output the version symbol when the verbose
+			 * flag is used.
+			 */
+			if (!vflag && (sym.st_shndx == SHN_ABS) &&
+			    (strcmp(name, vd_name) == 0))
+				continue;
+		}
+
+		if (oflag) {
+			if (needobj == NULL)
+				(void) printf(MSG_ORIG(MSG_FMT_SYM_OFIL),
+				    file, vd_name);
+			else
+				(void) printf(MSG_ORIG(MSG_FMT_SYM_NEED_OFIL),
+				    file, needobj, vd_name);
+
+			if (size)
+				(void) printf(MSG_ORIG(MSG_FMT_SYM_SZ_OFLG),
+				    name, (ulong_t)size);
+			else
+				(void) printf(MSG_ORIG(MSG_FMT_SYM_OFLG), name);
+		} else {
+			if (size)
+				(void) printf(MSG_ORIG(MSG_FMT_SYM_SZ), name,
+				    (ulong_t)size);
+			else
+				(void) printf(MSG_ORIG(MSG_FMT_SYM), name);
+		}
+	}
+}
+
+/*
  * Print any reduced symbols.  The convention is that reduced symbols exist as
  * LOCL entries in the .symtab, between the FILE symbol for the output file and
  * the first FILE symbol for any input file used to build the output file.
@@ -120,7 +475,7 @@ sym_local(Cache *cache, Cache *csym, const char *file)
 	int		symn, _symn, found = 0;
 	GElf_Shdr	shdr;
 	GElf_Sym	sym;
-	char		*strs, *local = "_LOCAL_";
+	char		*strs;
 
 	(void) gelf_getshdr(csym->c_scn, &shdr);
 	strs = (char *)cache[shdr.sh_link].c_data->d_buf;
@@ -162,29 +517,49 @@ sym_local(Cache *cache, Cache *csym, const char *file)
 		name = demangle(strs + sym.st_name);
 
 		if (oflag) {
-			(void) printf(Format_ofil, file);
-			(void) printf("\t%s: %s\n", local, name);
+			(void) printf(MSG_ORIG(MSG_FMT_LOCSYM_OFLG),
+			    file, name);
 		} else {
 			if (found == 0) {
 				found = 1;
-				(void) printf(Format_tnco, local);
+				(void) printf(MSG_ORIG(MSG_FMT_LOCSYM_HDR));
 			}
-			(void) printf("\t\t%s;\n", name);
+			(void) printf(MSG_ORIG(MSG_FMT_LOCSYM), name);
 		}
 	}
 }
 
 /*
- * Print the files version needed sections.
+ * Print data from the files VERNEED section.
+ *
+ * If we have been asked to display symbols, then the
+ * output format follows that used for verdef sections,
+ * with each version displayed separately. For instance:
+ *
+ *	libc.so.1 (SUNW_1.7):
+ *		sym1;
+ *		sym2;
+ *	libc.so.1 (SUNW_1.9):
+ *		sym3;
+ *
+ * If we are not displaying symbols, then a terse format
+ * is used, which combines all the needed versions from
+ * a given object into a single line. In this case, the
+ * versions are shown whether or not they contribute symbols.
+ *
+ *	libc.so.1 (SUNW_1.7, SUNW_1.9);
  */
 static int
-gvers_need(Cache *cache, Cache *need, const char *file, const char *name)
+gvers_need(Cache *cache, Cache *need, const Gver_sym_data *vsdata,
+    const char *file)
 {
 	unsigned int	num, _num;
 	char		*strs;
 	GElf_Verneed	*vnd = need->c_data->d_buf;
 	GElf_Shdr	shdr;
 	int		error = 0;
+	int		show = vflag || (vsdata == NULL) || !oflag;
+
 
 	(void) gelf_getshdr(need->c_scn, &shdr);
 
@@ -205,107 +580,144 @@ gvers_need(Cache *cache, Cache *need, const char *file, const char *name)
 
 	for (_num = 1; _num <= num; _num++,
 	    vnd = (GElf_Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
-		GElf_Vernaux	*vnap = (GElf_Vernaux *)
-					((uintptr_t)vnd + vnd->vn_aux);
-		GElf_Half	cnt = vnd->vn_cnt;
-		const char	*_name, * dep;
+		GElf_Vernaux	*vnap;
+		Word		ndx;
+		const char	*needobj, *dep, *fmt;
+		int		started = 0;
 
-		/*
-		 * Obtain the version name and determine if we need to process
-		 * it further.
-		 */
-		_name = (char *)(strs + vnd->vn_file);
-		if (name && (strcmp(name, _name) == 0))
-			continue;
+		vnap = (GElf_Vernaux *) ((uintptr_t)vnd + vnd->vn_aux);
+
+		/* Obtain the needed object file name */
+		needobj = (char *)(strs + vnd->vn_file);
 
 		error = 1;
 
-		/*
-		 * If one-line ouput is called for display the filename being
-		 * processed.
-		 */
-		if (oflag)
-			(void) printf(Format_ofil, file);
-
-		/*
-		 * Determine the version name required from this file.
-		 */
-		if (cnt--)
-			dep = (char *)(strs + vnap->vna_name);
-		else
-			dep = MSG_ORIG(MSG_STR_EMPTY);
-
-		(void) printf(Format_bgnl, _name, dep);
-		if (vflag && (vnap->vna_flags == VER_FLG_WEAK))
-			(void) printf(Format_weak);
-
-		/*
-		 * Extract any other version dependencies for this file
-		 */
-		/* CSTYLED */
-		for (vnap = (GElf_Vernaux *)((uintptr_t)vnap + vnap->vna_next);
-		    cnt; cnt--,
+		/* Process the versions needed from this object */
+		for (ndx = 0; ndx < vnd->vn_cnt; ndx++,
 		    vnap = (GElf_Vernaux *)((uintptr_t)vnap + vnap->vna_next)) {
+			Conv_ver_flags_buf_t	ver_flags_buf;
+
 			dep = (char *)(strs + vnap->vna_name);
-			(void) printf(Format_next, dep);
-			if (vflag && (vnap->vna_flags == VER_FLG_WEAK))
-				(void) printf(Format_weak);
+
+			if (!match(needobj, dep, vnap->vna_other))
+				continue;
+
+			if (show) {
+				if ((started == 0) || (vsdata != NULL))  {
+					/*
+					 * If one-line ouput is called for
+					 * display the filename being processed.
+					 */
+					if (oflag && show)
+						(void) printf(
+						    MSG_ORIG(MSG_FMT_OFIL),
+						    file);
+
+					(void) printf(
+					    MSG_ORIG(MSG_FMT_LIST_BEGIN),
+					    needobj);
+
+					fmt = MSG_ORIG(MSG_FMT_LIST_FIRST);
+					started = 1;
+				} else {
+					fmt = MSG_ORIG(MSG_FMT_LIST_NEXT);
+				}
+
+				/*
+				 * If not showing symbols, only show INFO
+				 * versions in verbose mode. They don't
+				 * actually contribute to the version
+				 * interface as seen by rtld, so listing them
+				 * without qualification can be misleading.
+				 */
+				if (vflag || (vsdata != NULL) ||
+				    (alist_nitems(match_list) != 0) ||
+				    !(vnap->vna_flags & VER_FLG_INFO)) {
+					(void) printf(fmt, dep);
+
+					/* Show non-zero flags */
+					if (vflag && (vnap->vna_flags != 0))
+						(void) printf(
+						    MSG_ORIG(MSG_FMT_VER_FLG),
+						    conv_ver_flags(
+						    vnap->vna_flags,
+						    CONV_FMT_NOBKT,
+						    &ver_flags_buf));
+				}
+				if (vsdata != NULL)
+					(void) printf(oflag ?
+					    MSG_ORIG(MSG_FMT_LIST_END_SEM) :
+					    MSG_ORIG(MSG_FMT_LIST_END_COL));
+			}
+
+			/*
+			 * If we are showing symbols, and vna_other is
+			 * non-zero, list them here.
+			 *
+			 * A value of 0 means that this object uses
+			 * traditional Solaris versioning rules, under
+			 * which VERSYM does not contain indexes to VERNEED
+			 * records. In this case, there is nothing to show.
+			 */
+			if (vsdata && (vnap->vna_other > 0))
+				gvers_syms(vsdata, vnap->vna_other,
+				    dep, needobj, file);
 		}
-		(void) printf(Format_endl);
+		if (show && started && (vsdata == NULL))
+			(void) printf(MSG_ORIG(MSG_FMT_LIST_END_SEM));
 	}
 	return (error);
 }
 
 /*
- * Append an item to the specified list, and return a pointer to the list
- * node created.
+ * Return a GVer_desc descriptor for the given version if one
+ * exists.
+ *
+ * entry:
+ *	name - Version name
+ *	hash - ELF hash of name
+ *	lst - APlist of existing descriptors.
+ *	file - Object file containing the version
+ *
+ * exit:
+ *	Return the corresponding GVer_desc struct if it
+ *	exists, and NULL otherwise.
  */
-static Listnode *
-list_append(List *lst, const void *item, const char *file)
-{
-	Listnode	*_lnp;
-
-	if ((_lnp = malloc(sizeof (Listnode))) == 0) {
-		int err = errno;
-		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC), cname, file,
-		    strerror(err));
-		exit(1);
-	}
-
-	_lnp->data = (void *)item;
-	_lnp->next = NULL;
-
-	if (lst->head == NULL)
-		lst->tail = lst->head = _lnp;
-	else {
-		lst->tail->next = _lnp;
-		lst->tail = lst->tail->next;
-	}
-	return (_lnp);
-}
-
 static GVer_desc *
-gvers_find(const char *name, unsigned long hash, List *lst)
+gvers_find(const char *name, unsigned long hash, APlist *lst)
 {
-	Listnode	*lnp;
+	Aliste		idx;
 	GVer_desc	*vdp;
 
-	for (LIST_TRAVERSE(lst, lnp, vdp)) {
-		if (vdp->vd_hash != hash)
-			continue;
-		if (strcmp(vdp->vd_name, name) == 0)
+	for (APLIST_TRAVERSE(lst, idx, vdp))
+		if ((vdp->vd_hash == hash) &&
+		    (strcmp(vdp->vd_name, name) == 0))
 			return (vdp);
-	}
-	return (0);
+
+	return (NULL);
 }
 
+/*
+ * Return a GVer_desc descriptor for the given version.
+ *
+ * entry:
+ *	name - Version name
+ *	hash - ELF hash of name
+ *	lst - List of existing descriptors.
+ *	file - Object file containing the version
+ *
+ * exit:
+ *	Return the corresponding GVer_desc struct. If the
+ * 	descriptor does not already exist, it is created.
+ *	On error, a fatal error is issued and the process exits.
+ */
 static GVer_desc *
-gvers_desc(const char *name, unsigned long hash, List *lst, const char *file)
+gvers_desc(const char *name, unsigned long hash, APlist **lst, const char *file)
 {
 	GVer_desc	*vdp;
 
-	if ((vdp = gvers_find(name, hash, lst)) == 0) {
-		if ((vdp = calloc(sizeof (GVer_desc), 1)) == 0) {
+	if ((vdp = gvers_find(name, hash, *lst)) == NULL) {
+		if ((vdp = calloc(sizeof (GVer_desc), 1)) == NULL) {
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC), cname,
 			    file, strerror(err));
@@ -315,83 +727,44 @@ gvers_desc(const char *name, unsigned long hash, List *lst, const char *file)
 		vdp->vd_name = name;
 		vdp->vd_hash = hash;
 
-		if (list_append(lst, vdp, file) == 0)
-			return (0);
+		pvs_aplist_append(lst, vdp, file);
 	}
 	return (vdp);
 }
 
+/*
+ * Insert a version dependency for the given GVer_desc descriptor.
+ *
+ * entry:
+ *	name - Dependency version name
+ *	hash - ELF hash of name
+ *	lst - List of existing descriptors.
+ *	vdp - Existing version descriptor to which the dependency
+ *		is to be added.
+ *	file - Object file containing the version
+ *
+ * exit:
+ *	A descriptor for the dependency version is looked up
+ *	(created if necessary), and then added to the dependency
+ *	list for vdp. Returns the dependency descriptor. On error,
+ *	a fatal error is issued and the process exits.
+ */
 static GVer_desc *
-gvers_depend(const char *name, unsigned long hash, GVer_desc *vdp, List *lst,
+gvers_depend(const char *name, unsigned long hash, GVer_desc *vdp, APlist **lst,
     const char *file)
 {
 	GVer_desc	*_vdp;
 
-	if ((_vdp = gvers_desc(name, hash, lst, file)) == 0)
-		return (0);
-
-	if (list_append(&vdp->vd_deps, _vdp, file) == 0)
-		return (0);
-
+	_vdp = gvers_desc(name, hash, lst, file);
+	pvs_aplist_append(&vdp->vd_deps, _vdp, file);
 	return (vdp);
 }
 
 static void
-gvers_syms(GElf_Versym *vsp, Elf_Data *sym_data, int symn, char *strs,
-    GVer_desc *vdp, const char *file)
+gvers_derefer(GVer_desc *vdp, int weak)
 {
-	GElf_Sym	sym;
-	int		_symn;
-
-	for (_symn = 0; _symn < symn; _symn++) {
-		size_t		size =	0;
-		const char	*name;
-
-		if (vsp[_symn] != vdp->vd_ndx)
-			continue;
-
-		/*
-		 * For data symbols determine the size.
-		 */
-		(void) gelf_getsym(sym_data, _symn, &sym);
-		if ((GELF_ST_TYPE(sym.st_info) == STT_OBJECT) ||
-		    (GELF_ST_TYPE(sym.st_info) == STT_COMMON) ||
-		    (GELF_ST_TYPE(sym.st_info) == STT_TLS))
-			size = (size_t)sym.st_size;
-
-		name = demangle(strs + sym.st_name);
-
-		/*
-		 * Only output the version symbol when the verbose flag is used.
-		 */
-		if (!vflag && (sym.st_shndx == SHN_ABS)) {
-			if (strcmp(name, vdp->vd_name) == 0)
-				continue;
-		}
-
-		if (oflag) {
-			(void) printf(Format_ofil, file);
-			(void) printf("\t%s: ", vdp->vd_name);
-			if (size)
-				(void) printf("%s (%ld);\n", name,
-				    (ulong_t)size);
-			else
-				(void) printf("%s;\n", name);
-		} else {
-			if (size)
-				(void) printf("\t\t%s (%ld);\n", name,
-				    (ulong_t)size);
-			else
-				(void) printf("\t\t%s;\n", name);
-		}
-	}
-}
-
-static void
-gvers_derefer(GVer_desc * vdp, int weak)
-{
-	Listnode *	_lnp;
-	GVer_desc *	_vdp;
+	Aliste		idx;
+	GVer_desc 	*_vdp;
 
 	/*
 	 * If the head of the list was a weak then we only clear out
@@ -401,24 +774,23 @@ gvers_derefer(GVer_desc * vdp, int weak)
 	if ((weak && (vdp->vd_flags & VER_FLG_WEAK)) || (!weak))
 		vdp->vd_flags &= ~FLG_VER_AVAIL;
 
-	for (LIST_TRAVERSE(&vdp->vd_deps, _lnp, _vdp))
+	for (APLIST_TRAVERSE(vdp->vd_deps, idx, _vdp))
 		gvers_derefer(_vdp, weak);
 }
 
 
 static void
-recurse_syms(GElf_Versym *vsp, Elf_Data *sym_data, int symn, char *strs,
-    GVer_desc *vdp, const char *file)
+recurse_syms(const Gver_sym_data *vsdata, GVer_desc *vdp, const char *file)
 {
-	Listnode	*_lnp;
+	Aliste		idx;
 	GVer_desc	*_vdp;
 
-	for (LIST_TRAVERSE(&vdp->vd_deps, _lnp, _vdp)) {
+	for (APLIST_TRAVERSE(vdp->vd_deps, idx, _vdp)) {
 		if (!oflag)
-			(void) printf(Format_tnco, _vdp->vd_name);
-		gvers_syms(vsp, sym_data, symn, strs, _vdp, file);
-		if (_vdp->vd_deps.head)
-			recurse_syms(vsp, sym_data, symn, strs, _vdp, file);
+			(void) printf(MSG_ORIG(MSG_FMT_TNCO), _vdp->vd_name);
+		gvers_syms(vsdata, _vdp->vd_ndx, _vdp->vd_name, NULL, file);
+		if (aplist_nitems(_vdp->vd_deps) != 0)
+			recurse_syms(vsdata, _vdp, file);
 	}
 }
 
@@ -427,19 +799,16 @@ recurse_syms(GElf_Versym *vsp, Elf_Data *sym_data, int symn, char *strs,
  * Print the files version definition sections.
  */
 static int
-gvers_def(Cache *cache, Cache *def, Cache *csym, const char *file,
-    const char *name)
+gvers_def(Cache *cache, Cache *def, const Gver_sym_data *vsdata,
+    const char *file)
 {
 	unsigned int	num, _num;
 	char		*strs;
-	GElf_Versym	*vsp;
 	GElf_Verdef	*vdf = def->c_data->d_buf;
 	GElf_Shdr	shdr;
-	Elf_Data	*sym_data;
-	int		symn;
-	GVer_desc	*vdp, *bvdp = 0;
-	Listnode	*lnp;
-	List		verdefs = {0, 0};
+	GVer_desc	*vdp, *bvdp = NULL;
+	Aliste		idx1;
+	APlist		*verdefs = NULL;
 	int		error = 0;
 
 	/*
@@ -467,18 +836,17 @@ gvers_def(Cache *cache, Cache *def, Cache *csym, const char *file,
 	    vdf = (GElf_Verdef *)((uintptr_t)vdf + vdf->vd_next)) {
 		GElf_Half	cnt = vdf->vd_cnt;
 		GElf_Half	ndx = vdf->vd_ndx;
-		GElf_Verdaux	*vdap = (GElf_Verdaux *)((uintptr_t)vdf +
-				    vdf->vd_aux);
+		GElf_Verdaux	*vdap;
 		const char	*_name;
+
+		vdap = (GElf_Verdaux *)((uintptr_t)vdf + vdf->vd_aux);
 
 		/*
 		 * Determine the version name and any dependencies.
 		 */
 		_name = (char *)(strs + vdap->vda_name);
 
-		if ((vdp = gvers_desc(_name, elf_hash(_name), &verdefs,
-		    file)) == 0)
-			return (0);
+		vdp = gvers_desc(_name, elf_hash(_name), &verdefs, file);
 		vdp->vd_ndx = ndx;
 		vdp->vd_flags = vdf->vd_flags | FLG_VER_AVAIL;
 
@@ -487,7 +855,7 @@ gvers_def(Cache *cache, Cache *def, Cache *csym, const char *file,
 		    vdap = (GElf_Verdaux *)((uintptr_t)vdap + vdap->vda_next)) {
 			_name = (char *)(strs + vdap->vda_name);
 			if (gvers_depend(_name, elf_hash(_name), vdp,
-			    &verdefs, file) == 0)
+			    &verdefs, file) == NULL)
 				return (0);
 		}
 
@@ -502,12 +870,12 @@ gvers_def(Cache *cache, Cache *def, Cache *csym, const char *file,
 	 * Normalize the dependency list if required.
 	 */
 	if (nflag) {
-		for (LIST_TRAVERSE(&verdefs, lnp, vdp)) {
-			Listnode *	_lnp;
-			GVer_desc *	_vdp;
+		for (APLIST_TRAVERSE(verdefs, idx1, vdp)) {
+			Aliste		idx2;
+			GVer_desc 	*_vdp;
 			int		type = vdp->vd_flags & VER_FLG_WEAK;
 
-			for (LIST_TRAVERSE(&vdp->vd_deps, _lnp, _vdp))
+			for (APLIST_TRAVERSE(vdp->vd_deps, idx2, _vdp))
 				gvers_derefer(_vdp, type);
 		}
 
@@ -523,15 +891,15 @@ gvers_def(Cache *cache, Cache *def, Cache *csym, const char *file,
 	 * Traverse the dependency list and print out the appropriate
 	 * information.
 	 */
-	for (LIST_TRAVERSE(&verdefs, lnp, vdp)) {
-		Listnode *	_lnp;
-		GVer_desc *	_vdp;
+	for (APLIST_TRAVERSE(verdefs, idx1, vdp)) {
+		Aliste		idx2;
+		GVer_desc 	*_vdp;
 		int		count;
 
-		if (name && (strcmp(name, vdp->vd_name) != 0))
+		if (!match(NULL, vdp->vd_name, vdp->vd_ndx))
 			continue;
-
-		if (!name && !(vdp->vd_flags & FLG_VER_AVAIL))
+		if ((alist_nitems(match_list) == 0) &&
+		    !(vdp->vd_flags & FLG_VER_AVAIL))
 			continue;
 
 		error = 1;
@@ -543,77 +911,86 @@ gvers_def(Cache *cache, Cache *def, Cache *csym, const char *file,
 			 * dependencies this version inherits.
 			 */
 			if (oflag)
-				(void) printf(Format_ofil, file);
-			(void) printf("\t%s", vdp->vd_name);
-			if (vdp->vd_flags & VER_FLG_WEAK)
-				(void) printf(Format_weak);
+				(void) printf(MSG_ORIG(MSG_FMT_OFIL), file);
+			(void) printf(MSG_ORIG(MSG_FMT_VER_NAME), vdp->vd_name);
+			if ((vdp->vd_flags & MSK_VER_USER) != 0) {
+				Conv_ver_flags_buf_t	ver_flags_buf;
+
+				(void) printf(MSG_ORIG(MSG_FMT_VER_FLG),
+				    conv_ver_flags(
+				    vdp->vd_flags & MSK_VER_USER,
+				    CONV_FMT_NOBKT, &ver_flags_buf));
+			}
 
 			count = 1;
-			for (LIST_TRAVERSE(&vdp->vd_deps, _lnp, _vdp)) {
+			for (APLIST_TRAVERSE(vdp->vd_deps, idx2, _vdp)) {
 				const char	*_name = _vdp->vd_name;
 
 				if (count++ == 1) {
+
 					if (oflag)
-						(void) printf(": {%s", _name);
+						(void) printf(
+						    MSG_ORIG(MSG_FMT_IN_OFLG),
+						    _name);
 					else if (vdp->vd_flags & VER_FLG_WEAK)
-						(void) printf(":\t{%s", _name);
+						(void) printf(
+						    MSG_ORIG(MSG_FMT_IN_WEAK),
+						    _name);
 					else
-						(void) printf(":       \t{%s",
+						(void) printf(
+						    MSG_ORIG(MSG_FMT_IN),
 						    _name);
 				} else
-					(void) printf(Format_next, _name);
+					(void) printf(
+					    MSG_ORIG(MSG_FMT_LIST_NEXT), _name);
 			}
 
 			if (count != 1)
-				(void) printf("}");
+				(void) printf(MSG_ORIG(MSG_FMT_IN_END));
 
-			if (csym && !oflag)
-				(void) printf(":\n");
+			if (vsdata && !oflag)
+				(void) printf(MSG_ORIG(MSG_FMT_COL_NL));
 			else
-				(void) printf(";\n");
+				(void) printf(MSG_ORIG(MSG_FMT_SEM_NL));
 		} else {
-			if (csym && !oflag)
-				(void) printf(Format_tnco, vdp->vd_name);
-			else if (!csym) {
+			if (vsdata && !oflag)
+				(void) printf(MSG_ORIG(MSG_FMT_TNCO),
+				    vdp->vd_name);
+			else if (!vsdata) {
 				if (oflag)
-					(void) printf(Format_ofil, file);
-				(void) printf(Format_tnse, vdp->vd_name);
+					(void) printf(MSG_ORIG(MSG_FMT_OFIL),
+					    file);
+				(void) printf(MSG_ORIG(MSG_FMT_TNSE),
+				    vdp->vd_name);
 			}
 		}
 
-		/*
-		 * If we need to print symbols get the associated symbol table.
-		 */
-		if (csym) {
-			(void) gelf_getshdr(csym->c_scn, &shdr);
-			vsp = (GElf_Versym *)csym->c_data->d_buf;
-			sym_data = cache[shdr.sh_link].c_data;
-			(void) gelf_getshdr(cache[shdr.sh_link].c_scn, &shdr);
-			/* LINTED */
-			symn = (int)(shdr.sh_size / shdr.sh_entsize);
-		} else
+		/* If we are not printing symbols, we're done */
+		if (vsdata == NULL)
 			continue;
 
 		/*
-		 * If a specific version name has been specified then display
-		 * any of its own symbols plus any inherited from other
-		 * versions.  Otherwise simply print out the symbols for this
-		 * version.
+		 * If a specific version to match has been specified then
+		 * display any of its own symbols plus any inherited from
+		 * other versions. Otherwise simply print out the symbols
+		 * for this version.
 		 */
-		gvers_syms(vsp, sym_data, symn, strs, vdp, file);
-		if (name) {
-			recurse_syms(vsp, sym_data, symn, strs, vdp, file);
+		gvers_syms(vsdata, vdp->vd_ndx, vdp->vd_name, NULL, file);
+		if (alist_nitems(match_list) != 0) {
+			recurse_syms(vsdata, vdp, file);
 
 			/*
-			 * If the verbose flag is set add the base version as a
-			 * dependency (unless it's the list we were asked to
-			 * print in the first place).
+			 * If the verbose flag is set, and this is not
+			 * the base version, then add the base version as a
+			 * dependency.
 			 */
-			if (vflag && bvdp && strcmp(name, bvdp->vd_name)) {
+			if (vflag && bvdp &&
+			    !match(NULL, bvdp->vd_name, bvdp->vd_ndx)) {
 				if (!oflag)
-				    (void) printf(Format_tnco, bvdp->vd_name);
-				gvers_syms(vsp, sym_data, symn, strs, bvdp,
-				    file);
+					(void) printf(MSG_ORIG(MSG_FMT_TNCO),
+					    bvdp->vd_name);
+				gvers_syms(vsdata, bvdp->vd_ndx,
+				    bvdp->vd_name, NULL, file);
 			}
 		}
 	}
@@ -629,11 +1006,12 @@ main(int argc, char **argv, char **envp)
 	Elf_Data	*data;
 	GElf_Ehdr 	ehdr;
 	int		nfile, var;
-	const char	*name;
 	char		*names;
 	Cache		*cache, *_cache;
 	Cache		*_cache_def, *_cache_need, *_cache_sym, *_cache_loc;
 	int		error = 0;
+	Gver_sym_data 	vsdata_s;
+	const Gver_sym_data	*vsdata = NULL;
 
 	/*
 	 * Check for a binary that better fits this architecture.
@@ -647,11 +1025,10 @@ main(int argc, char **argv, char **envp)
 	(void) textdomain(MSG_ORIG(MSG_SUNW_OST_SGS));
 
 	cname = argv[0];
-	name = NULL;
 	Cflag = dflag = lflag = nflag = oflag = rflag = sflag = vflag = 0;
 
 	opterr = 0;
-	while ((var = getopt(argc, argv, "CdlnorsvN:")) != EOF) {
+	while ((var = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != EOF) {
 		switch (var) {
 		case 'C':
 			Cflag = USR_DEFINED;
@@ -660,7 +1037,7 @@ main(int argc, char **argv, char **envp)
 			dflag = USR_DEFINED;
 			break;
 		case 'l':
-			lflag = USR_DEFINED;
+			lflag = sflag = USR_DEFINED;
 			break;
 		case 'n':
 			nflag = USR_DEFINED;
@@ -677,8 +1054,9 @@ main(int argc, char **argv, char **envp)
 		case 'v':
 			vflag = USR_DEFINED;
 			break;
+		case 'I':
 		case 'N':
-			name = optarg;
+			add_match_record(var, optarg);
 			break;
 		case '?':
 			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF),
@@ -701,7 +1079,7 @@ main(int argc, char **argv, char **envp)
 	/*
 	 * By default print both version definitions and needed dependencies.
 	 */
-	if ((dflag == 0) && (rflag == 0))
+	if ((dflag == 0) && (rflag == 0) && (lflag == 0))
 		dflag = rflag = DEF_DEFINED;
 
 	/*
@@ -774,14 +1152,14 @@ main(int argc, char **argv, char **envp)
 		 * as elf_begin has already gone through all the overhead we
 		 * might as well set up the cache for every section.
 		 */
-		if ((cache = calloc(ehdr.e_shnum, sizeof (Cache))) == 0) {
+		if ((cache = calloc(ehdr.e_shnum, sizeof (Cache))) == NULL) {
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_SYS_MALLOC), cname,
 			    file, strerror(err));
 			exit(1);
 		}
 
-		_cache_def = _cache_need = _cache_sym = _cache_loc = 0;
+		_cache_def = _cache_need = _cache_sym = _cache_loc = NULL;
 		_cache = cache;
 		_cache++;
 		for (scn = NULL; scn = elf_nextscn(elf, scn); _cache++) {
@@ -830,7 +1208,7 @@ main(int argc, char **argv, char **envp)
 		 * Before printing anything out determine if any warnings are
 		 * necessary.
 		 */
-		if (lflag && (_cache_loc == 0)) {
+		if (lflag && (_cache_loc == NULL)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_VER_UNREDSYMS),
 			    cname, file);
 			(void) fprintf(stderr, MSG_INTL(MSG_VER_NOSYMTAB));
@@ -841,20 +1219,36 @@ main(int argc, char **argv, char **envp)
 		 * one-line output, display the filename being processed.
 		 */
 		if ((nfile > 1) && !oflag)
-			(void) printf("%s:\n", file);
+			(void) printf(MSG_ORIG(MSG_FMT_FILE), file);
+
+		/*
+		 * If we're printing symbols, then collect the data
+		 * necessary to do that.
+		 */
+		if (_cache_sym != NULL) {
+			vsdata = &vsdata_s;
+			(void) gelf_getshdr(_cache_sym->c_scn, &shdr);
+			vsdata_s.vsd_vsp =
+			    (GElf_Versym *)_cache_sym->c_data->d_buf;
+			vsdata_s.vsd_sym_data = cache[shdr.sh_link].c_data;
+			(void) gelf_getshdr(cache[shdr.sh_link].c_scn, &shdr);
+			vsdata_s.vsd_symn = shdr.sh_size / shdr.sh_entsize;
+			vsdata_s.vsd_strs =
+			    (const char *)cache[shdr.sh_link].c_data->d_buf;
+		}
+
 
 		/*
 		 * Print the files version needed sections.
 		 */
 		if (_cache_need)
-			nerror = gvers_need(cache, _cache_need, file, name);
+			nerror = gvers_need(cache, _cache_need, vsdata, file);
 
 		/*
 		 * Print the files version definition sections.
 		 */
 		if (_cache_def)
-			derror = gvers_def(cache, _cache_def, _cache_sym,
-			    file, name);
+			derror = gvers_def(cache, _cache_def, vsdata, file);
 
 		/*
 		 * Print any local symbol reductions.

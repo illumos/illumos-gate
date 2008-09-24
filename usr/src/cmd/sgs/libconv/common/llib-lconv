@@ -26,8 +26,6 @@
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdlib.h>
 #include	<libelf.h>
 #include	<_machelf.h>
@@ -57,7 +55,7 @@ const char	*conv_lddstub(int);
 const char	*conv_seg_flags(Half, Conv_seg_flags_buf_t *);
 int		conv_sys_eclass(void);
 Uts_desc	*conv_uts(void);
-const char	*conv_ver_flags(Half);
+const char	*conv_ver_flags(Half, Conv_fmt_flags_t, Conv_ver_flags_buf_t *);
 const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
 
 

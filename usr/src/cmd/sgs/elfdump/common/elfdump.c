@@ -47,27 +47,63 @@
  * in the object being analyzed. It is filled in by versions(), and used
  * by init_symtbl_state() when displaying symbol information.
  *
+ * There are three forms of symbol versioning known to us:
+ *
+ * 1) The original form, introduced with Solaris 2.5, in which
+ *	the Versym contains indexes to Verdef records, and the
+ *	Versym values for UNDEF symbols resolved by other objects
+ *	are all set to 0.
+ * 2) The GNU form, which is backward compatible with the original
+ *	Solaris form, but which adds several extensions:
+ *	- The Versym also contains indexes to Verneed records, recording
+ *		which object/version contributed the external symbol at
+ *		link time. These indexes start with the next value following
+ *		the final Verdef index. The index is written to the previously
+ *		reserved vna_other field of the ELF Vernaux structure.
+ *	- The top bit of the Versym value is no longer part of the index,
+ *		but is used as a "hidden bit" to prevent binding to the symbol.
+ *	- Multiple implementations of a given symbol, contained in varying
+ *		versions are allowed, using special assembler pseudo ops,
+ *		and encoded in the symbol name using '@' characters.
+ * 3) Modified Solaris form, in which we adopt the first GNU extension
+ *	(Versym indexes to Verneed records), but not the others.
+ *
+ * elfdump can handle any of these cases. The presence of a DT_VERSYM
+ * dynamic element indicates a full GNU object. An object that lacks
+ * a DT_VERSYM entry, but which has non-zero vna_other fields in the Vernaux
+ * structures is a modified Solaris object. An object that has neither of
+ * these uses the original form.
+ *
  * max_verndx contains the largest version index that can appear
  * in a Versym entry. This can never be less than 1: In the case where
  * there is no verdef/verneed sections, the [0] index is reserved
- * for local symbols, and the [1] index for globals. If Solaris versioning
- * rules are in effect and there is a verdef section, then the number
- * of defined versions provides this number. If GNU versioning is in effect,
- * then:
- *	- If there is no verneed section, it is the same as for
- *		Solaris versioning.
- *	- If there is a verneed section, the vna_other field of the
+ * for local symbols, and the [1] index for globals. If the original
+ * Solaris versioning rules are in effect and there is a verdef section,
+ * then max_verndex is the number of defined versions. If one of the
+ * other versioning forms is in effect, then:
+ *	1) If there is no verneed section, it is the same as for
+ *		original Solaris versioning.
+ *	2) If there is a verneed section, the vna_other field of the
  *		Vernaux structs contain versions, and max_verndx is the
  *		largest such index.
  *
- * The value of the gnu field is based on the presence of
+ * If gnu_full is True, the object uses the full GNU form of versioning.
+ * The value of the gnu_full field is based on the presence of
  * a DT_VERSYM entry in the dynamic section: GNU ld produces these, and
  * Solaris ld does not.
+ *
+ * The gnu_needed field is True if the Versym contains indexes to
+ * Verneed records, as indicated by non-zero vna_other fields in the Verneed
+ * section. If gnu_full is True, then gnu_needed will always be true.
+ * However, gnu_needed can be true without gnu_full. This is the modified
+ * Solaris form.
  */
 typedef struct {
 	Cache	*cache;		/* Pointer to cache entry for VERSYM */
 	Versym	*data;		/* Pointer to versym array */
-	int	gnu;		/* True if object uses GNU versioning rules */
+	int	gnu_full;	/* True if object uses GNU versioning rules */
+	int	gnu_needed;	/* True if object uses VERSYM indexes for */
+				/*	VERNEED (subset of gnu_full) */
 	int	max_verndx;	/* largest versym index value */
 } VERSYM_STATE;
 
@@ -982,10 +1018,11 @@ version_def(Verdef *vdf, Word vdf_num, Cache *vcache, Cache *scache,
 
 	for (cnt = 1; cnt <= vdf_num; cnt++,
 	    vdf = (Verdef *)((uintptr_t)vdf + vdf->vd_next)) {
-		const char	*name, *dep;
-		Half		vcnt = vdf->vd_cnt - 1;
-		Half		ndx = vdf->vd_ndx;
-		Verdaux *vdap = (Verdaux *)((uintptr_t)vdf + vdf->vd_aux);
+		Conv_ver_flags_buf_t	ver_flags_buf;
+		const char		*name, *dep;
+		Half			vcnt = vdf->vd_cnt - 1;
+		Half			ndx = vdf->vd_ndx;
+		Verdaux	*vdap = (Verdaux *)((uintptr_t)vdf + vdf->vd_aux);
 
 		/*
 		 * Obtain the name and first dependency (if any).
@@ -1000,7 +1037,7 @@ version_def(Verdef *vdf, Word vdf_num, Cache *vcache, Cache *scache,
 		(void) snprintf(index, MAXNDXSIZE, MSG_ORIG(MSG_FMT_INDEX),
 		    EC_XWORD(ndx));
 		Elf_ver_line_1(0, index, name, dep,
-		    conv_ver_flags(vdf->vd_flags));
+		    conv_ver_flags(vdf->vd_flags, 0, &ver_flags_buf));
 
 		/*
 		 * Print any additional dependencies.
@@ -1033,6 +1070,26 @@ version_def(Verdef *vdf, Word vdf_num, Cache *vcache, Cache *scache,
  *	The versions have been printed. If GNU style versioning
  *	is in effect, versym->max_verndx has been updated to
  *	contain the largest version index seen.
+ *
+ * note:
+ * 	The versym section of an object that follows the original
+ *	Solaris versioning rules only contains indexes into the verdef
+ *	section. Symbols defined in other objects (UNDEF) are given
+ *	a version of 0, indicating that they are not defined by
+ *	this file, and the Verneed entries do not have associated version
+ *	indexes. For these reasons, we do not display a version index
+ *	for original-style Verneed sections.
+ *
+ *	The GNU versioning extensions alter this: Symbols defined in other
+ *	objects receive a version index in the range above those defined
+ *	by the Verdef section, and the vna_other field of the Vernaux
+ *	structs inside the Verneed section contain the version index for
+ *	that item. We therefore  display the index when showing the
+ *	contents of a GNU style Verneed section. You should not
+ *	necessarily expect these indexes to appear in sorted
+ *	order --- it seems that the GNU ld assigns the versions as
+ *	symbols are encountered during linking, and then the results
+ *	are assembled into the Verneed section afterwards.
  */
 static void
 version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
@@ -1042,38 +1099,13 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
 	char		index[MAXNDXSIZE];
 	const char	*index_str;
 
-	Elf_ver_need_title(0, versym->gnu);
-
-	/*
-	 * The versym section in an object that follows Solaris versioning
-	 * rules contains indexes into the verdef section. Symbols defined
-	 * in other objects (UNDEF) are given a version of 0, indicating that
-	 * they are not defined by this file, and the Verneed entries do not
-	 * have associated version indexes. For these reasons, we do not
-	 * display a version index for Solaris Verneed sections.
-	 *
-	 * The GNU versioning rules are different: Symbols defined in other
-	 * objects receive a version index in the range above those defined
-	 * by the Verdef section, and the vna_other field of the Vernaux
-	 * structs inside the Verneed section contain the version index for
-	 * that item. We therefore  display the index when showing the
-	 * contents of a GNU Verneed section. You should not expect these
-	 * indexes to appear in sorted order --- it seems that the GNU ld
-	 * assigns the versions as symbols are encountered during linking,
-	 * and then the results are assembled into the Verneed section
-	 * afterwards.
-	 */
-	if (versym->gnu) {
-		index_str = index;
-	} else {
-		/* For Solaris versioning, display a NULL string */
-		index_str = MSG_ORIG(MSG_STR_EMPTY);
-	}
+	Elf_ver_need_title(0, versym->gnu_needed);
 
 	for (cnt = 1; cnt <= vnd_num; cnt++,
 	    vnd = (Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
-		const char	*name, *dep;
-		Half		vcnt = vnd->vn_cnt;
+		Conv_ver_flags_buf_t	ver_flags_buf;
+		const char		*name, *dep;
+		Half			vcnt = vnd->vn_cnt;
 		Vernaux *vnap = (Vernaux *)((uintptr_t)vnd + vnd->vn_aux);
 
 		/*
@@ -1088,7 +1120,10 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
 		else
 			dep = MSG_INTL(MSG_STR_NULL);
 
-		if (versym->gnu) {
+		if (vnap->vna_other == 0) {	/* Traditional form */
+			index_str = MSG_ORIG(MSG_STR_EMPTY);
+		} else {			/* GNU form */
+			index_str = index;
 			/* Format the version index value */
 			(void) snprintf(index, MAXNDXSIZE,
 			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(vnap->vna_other));
@@ -1096,7 +1131,7 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
 				versym->max_verndx = vnap->vna_other;
 		}
 		Elf_ver_line_1(0, index_str, name, dep,
-		    conv_ver_flags(vnap->vna_flags));
+		    conv_ver_flags(vnap->vna_flags, 0, &ver_flags_buf));
 
 		/*
 		 * Print any additional version dependencies.
@@ -1108,14 +1143,15 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
 			    vnap->vna_next)) {
 				dep = string(vcache, cnt, scache, file,
 				    vnap->vna_name);
-				if (versym->gnu) {
+				if (vnap->vna_other > 0) {
 					/* Format the next index value */
 					(void) snprintf(index, MAXNDXSIZE,
 					    MSG_ORIG(MSG_FMT_INDEX),
 					    EC_XWORD(vnap->vna_other));
-					Elf_ver_line_1(0, index_str,
+					Elf_ver_line_1(0, index,
 					    MSG_ORIG(MSG_STR_EMPTY), dep,
-					    conv_ver_flags(vnap->vna_flags));
+					    conv_ver_flags(vnap->vna_flags,
+					    0, &ver_flags_buf));
 					if (vnap->vna_other >
 					    versym->max_verndx)
 						versym->max_verndx =
@@ -1123,7 +1159,8 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
 				} else {
 					Elf_ver_line_3(0,
 					    MSG_ORIG(MSG_STR_EMPTY), dep,
-					    conv_ver_flags(vnap->vna_flags));
+					    conv_ver_flags(vnap->vna_flags,
+					    0, &ver_flags_buf));
 				}
 			}
 		}
@@ -1131,9 +1168,12 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
 }
 
 /*
- * Compute the max_verndx value for a GNU style object with
- * a Verneed section. This is only needed if version_need() is not
- * called.
+ * Examine the Verneed section for information related to GNU
+ * style Versym indexing:
+ *	- A non-zero vna_other field indicates that Versym indexes can
+ *		reference Verneed records.
+ *	- If the object uses GNU style Versym indexing, the
+ *	  maximum index value is needed to detect bad Versym entries.
  *
  * entry:
  *	vnd - Address of verneed data
@@ -1141,11 +1181,13 @@ version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
  *	versym - Information about versym section
  *
  * exit:
+ *	If a non-zero vna_other field is seen, versym->gnu_needed is set.
+ *
  *	versym->max_verndx has been updated to contain the largest
  *	version index seen.
  */
 static void
-update_gnu_max_verndx(Verneed *vnd, Word vnd_num, VERSYM_STATE *versym)
+update_gnu_verndx(Verneed *vnd, Word vnd_num, VERSYM_STATE *versym)
 {
 	Word		cnt;
 
@@ -1154,8 +1196,16 @@ update_gnu_max_verndx(Verneed *vnd, Word vnd_num, VERSYM_STATE *versym)
 		Half	vcnt = vnd->vn_cnt;
 		Vernaux	*vnap = (Vernaux *)((uintptr_t)vnd + vnd->vn_aux);
 
-		if (vnap->vna_other > versym->max_verndx)
-			versym->max_verndx = vnap->vna_other;
+		/*
+		 * A non-zero value of vna_other indicates that this
+		 * object references VERNEED items from the VERSYM
+		 * array.
+		 */
+		if (vnap->vna_other != 0) {
+			versym->gnu_needed = 1;
+			if (vnap->vna_other > versym->max_verndx)
+				versym->max_verndx = vnap->vna_other;
+		}
 
 		/*
 		 * Check any additional version dependencies.
@@ -1165,6 +1215,10 @@ update_gnu_max_verndx(Verneed *vnd, Word vnd_num, VERSYM_STATE *versym)
 			for (vcnt--; vcnt; vcnt--,
 			    vnap = (Vernaux *)((uintptr_t)vnap +
 			    vnap->vna_next)) {
+				if (vnap->vna_other == 0)
+					continue;
+
+				versym->gnu_needed = 1;
 				if (vnap->vna_other > versym->max_verndx)
 					versym->max_verndx = vnap->vna_other;
 			}
@@ -1220,7 +1274,8 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 			dyn = (Dyn *)_cache->c_data->d_buf;
 			for (; numdyn-- > 0; dyn++)
 				if (dyn->d_tag == DT_VERSYM) {
-					versym->gnu = 1;
+					versym->gnu_full =
+					    versym->gnu_needed = 1;
 					break;
 				}
 			break;
@@ -1281,23 +1336,20 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 		}
 	}
 
-	if ((flags & FLG_SHOW_VERSIONS) == 0) {
-		/*
-		 * If GNU versioning applies to this object, and there
-		 * is a Verneed section, then examine it to determine
-		 * the maximum Versym version index for this file.
-		 */
-		if ((versym->gnu) && (verneed_cache != NULL))
-			update_gnu_max_verndx(
-			    (Verneed *)verneed_cache->c_data->d_buf,
-			    verneed_cache->c_shdr->sh_info, versym);
-		return;
-	}
+	/*
+	 * If there is a Verneed section, examine it for information
+	 * related to GNU style versioning.
+	 */
+	if (verneed_cache != NULL)
+		update_gnu_verndx((Verneed *)verneed_cache->c_data->d_buf,
+		    verneed_cache->c_shdr->sh_info, versym);
 
 	/*
 	 * Now that all the information is available, display the
-	 * Verdef and Verneed section contents.
+	 * Verdef and Verneed section contents, if requested.
 	 */
+	if ((flags & FLG_SHOW_VERSIONS) == 0)
+		return;
 	if (verdef_cache != NULL) {
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_VERDEF),
@@ -1313,7 +1365,7 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 		/*
 		 * If GNU versioning applies to this object, version_need()
 		 * will update versym->max_verndx, and it is not
-		 * necessary to call update_gnu_max_verndx().
+		 * necessary to call update_gnu_verndx().
 		 */
 		version_need((Verneed *)verneed_cache->c_data->d_buf,
 		    verneed_cache->c_shdr->sh_info, verneed_cache,
@@ -1545,7 +1597,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 		Versym test_verndx;
 
 		verndx = test_verndx = state->versym->data[symndx];
-		gnuver = state->versym->gnu;
+		gnuver = state->versym->gnu_full;
 
 		/*
 		 * Check to see if this is a defined symbol with a

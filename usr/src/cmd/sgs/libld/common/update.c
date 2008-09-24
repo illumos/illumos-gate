@@ -303,7 +303,8 @@ update_osym(Ofl_desc *ofl)
 	 * table.  There is one entry for each symbol which contains the symbols
 	 * version index.
 	 */
-	if ((flags & (FLG_OF_VERDEF | FLG_OF_NOVERSEC)) == FLG_OF_VERDEF) {
+	if (!(flags & FLG_OF_NOVERSEC) &&
+	    (flags & (FLG_OF_VERNEED | FLG_OF_VERDEF))) {
 		versym = (Versym *)ofl->ofl_osversym->os_outdata->d_buf;
 		versym[0] = 0;
 	} else
@@ -1188,9 +1189,9 @@ update_osym(Ofl_desc *ofl)
 		if (sdp->sd_symndx && versym) {
 			Half	vndx = 0;
 
-			if (sdp->sd_flags & FLG_SY_MVTOCOMM)
+			if (sdp->sd_flags & FLG_SY_MVTOCOMM) {
 				vndx = VER_NDX_GLOBAL;
-			else if (sdp->sd_ref == REF_REL_NEED) {
+			} else if (sdp->sd_ref == REF_REL_NEED) {
 				Half	symflags1 = sdp->sd_flags1;
 
 				vndx = sap->sa_overndx;
@@ -1201,6 +1202,13 @@ update_osym(Ofl_desc *ofl)
 					else
 						vndx = VER_NDX_GLOBAL;
 				}
+			} else if ((sdp->sd_ref == REF_DYN_NEED) &&
+			    (sap->sa_dverndx > 0) &&
+			    (sap->sa_dverndx <= sdp->sd_file->ifl_vercnt) &&
+			    (sdp->sd_file->ifl_verndx != NULL)) {
+				/* Use index of verneed record */
+				vndx = sdp->sd_file->ifl_verndx
+				    [sap->sa_dverndx].vi_overndx;
 			}
 			versym[sdp->sd_symndx] = vndx;
 		}
@@ -2467,7 +2475,7 @@ update_overdef(Ofl_desc *ofl)
 	Ver_desc	*vdp, *_vdp;
 	Verdef		*vdf, *_vdf;
 	int		num = 0;
-	Os_desc		*strosp, *symosp;
+	Os_desc		*strosp;
 
 	/*
 	 * Traverse the version descriptors and update the version structures
@@ -2572,21 +2580,44 @@ update_overdef(Ofl_desc *ofl)
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) ||
 	    (ofl->ofl_flags & FLG_OF_STATIC)) {
 		strosp = ofl->ofl_osstrtab;
-		symosp = ofl->ofl_ossymtab;
 	} else {
 		strosp = ofl->ofl_osdynstr;
-		symosp = ofl->ofl_osdynsym;
 	}
 	/* LINTED */
 	ofl->ofl_osverdef->os_shdr->sh_link = (Word)elf_ndxscn(strosp->os_scn);
-	/* LINTED */
-	ofl->ofl_osversym->os_shdr->sh_link = (Word)elf_ndxscn(symosp->os_scn);
 
 	/*
 	 * The version definition sections `info' field is used to indicate the
 	 * number of entries in this section.
 	 */
 	ofl->ofl_osverdef->os_shdr->sh_info = num;
+
+	return (1);
+}
+
+/*
+ * Finish the version symbol index section
+ */
+static int
+update_oversym(Ofl_desc *ofl)
+{
+	Os_desc		*symosp;
+
+	/*
+	 * Record the string table association with the version definition
+	 * section, and the symbol table associated with the version symbol
+	 * table (the actual contents of the version symbol table are filled
+	 * in during symbol update).
+	 */
+	if ((ofl->ofl_flags & FLG_OF_RELOBJ) ||
+	    (ofl->ofl_flags & FLG_OF_STATIC)) {
+		symosp = ofl->ofl_ossymtab;
+	} else {
+		symosp = ofl->ofl_osdynsym;
+	}
+
+	/* LINTED */
+	ofl->ofl_osversym->os_shdr->sh_link = (Word)elf_ndxscn(symosp->os_scn);
 
 	return (1);
 }
@@ -2601,7 +2632,8 @@ update_overneed(Ofl_desc *ofl)
 	Ifl_desc	*ifl;
 	Verneed		*vnd, *_vnd;
 	Str_tbl		*dynstr;
-	Word		num = 0, cnt = 0;
+	Word		num = 0;
+	int		has_specver;
 
 	dynstr = ofl->ofl_dynstrtab;
 	_vnd = vnd = (Verneed *)ofl->ofl_osverneed->os_outdata->d_buf;
@@ -2612,6 +2644,7 @@ update_overneed(Ofl_desc *ofl)
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_sos, lnp, ifl)) {
 		Half		_cnt;
+		Word		cnt = 0;
 		Vernaux		*_vnap, *vnap;
 		Sdf_desc	*sdf = ifl->ifl_sdfdesc;
 		size_t		stoff;
@@ -2626,16 +2659,25 @@ update_overneed(Ofl_desc *ofl)
 
 		_vnap = vnap = (Vernaux *)(vnd + 1);
 
-		if (sdf && (sdf->sdf_flags & FLG_SDF_SPECVER)) {
+		has_specver = sdf && (sdf->sdf_flags & FLG_SDF_SPECVER);
+		if (has_specver) {
 			Sdv_desc	*sdv;
 			Listnode	*lnp2;
 
 			/*
 			 * If version needed definitions were specified in
-			 * a mapfile ($VERSION=*) then record those
+			 * a mapfile ($SPECVERS=*) then record those
 			 * definitions.
 			 */
 			for (LIST_TRAVERSE(&sdf->sdf_verneed, lnp2, sdv)) {
+				/*
+				 * If this $SPECVERS item corresponds
+				 * to a real version, then skip it here
+				 * in favor of the real one below.
+				 */
+				if (sdv->sdv_flags & FLG_SDV_MATCHED)
+					continue;
+
 				(void) st_setstring(dynstr, sdv->sdv_name,
 				    &stoff);
 				vnap->vna_name = stoff;
@@ -2650,41 +2692,62 @@ update_overneed(Ofl_desc *ofl)
 				_vnap->vna_next = (Word)((uintptr_t)vnap -
 				    (uintptr_t)_vnap);
 			}
-		} else {
+		}
 
-			/*
-			 * Traverse the version index list recording
-			 * each version as a needed dependency.
-			 */
-			for (cnt = _cnt = 0; _cnt <= ifl->ifl_vercnt;
-			    _cnt++) {
-				Ver_index	*vip = &ifl->ifl_verndx[_cnt];
+		/*
+		 * Traverse the version index list recording
+		 * each version as a needed dependency.
+		 */
+		for (_cnt = 0; _cnt <= ifl->ifl_vercnt; _cnt++) {
+			Ver_index	*vip = &ifl->ifl_verndx[_cnt];
 
-				if (vip->vi_flags & FLG_VER_REFER) {
-					(void) st_setstring(dynstr,
-					    vip->vi_name, &stoff);
-					vnap->vna_name = stoff;
+			if (vip->vi_flags & FLG_VER_REFER) {
+				(void) st_setstring(dynstr, vip->vi_name,
+				    &stoff);
+				vnap->vna_name = stoff;
 
-					if (vip->vi_desc) {
-						vnap->vna_hash =
-						    vip->vi_desc->vd_hash;
-						vnap->vna_flags =
-						    vip->vi_desc->vd_flags;
-					} else {
-						vnap->vna_hash = 0;
-						vnap->vna_flags = 0;
-					}
-					vnap->vna_other = 0;
-
-					_vnap = vnap;
-					vnap++, cnt++;
-					_vnap->vna_next =
-					    /* LINTED */
-					    (Word)((uintptr_t)vnap -
-					    (uintptr_t)_vnap);
+				if (vip->vi_desc) {
+					vnap->vna_hash = vip->vi_desc->vd_hash;
+					vnap->vna_flags =
+					    vip->vi_desc->vd_flags;
+				} else {
+					vnap->vna_hash = 0;
+					vnap->vna_flags = 0;
 				}
+				vnap->vna_other = vip->vi_overndx;
+
+				/*
+				 * If version A inherits version B, then
+				 * B is implicit in A. It suffices for ld.so.1
+				 * to verify A at runtime and skip B. The
+				 * version normalization process sets the INFO
+				 * flag for the versions we want ld.so.1 to
+				 * skip. By default, we progagate these flags
+				 * to the output object as computed.
+				 *
+				 * The presence of $SPECVERS items alters
+				 * matters. If $SPECVERS are present in the
+				 * mapfile, then any version that corresponds
+				 * to the $SPECVERS must be validated, and
+				 * all others must be skipped. This is true
+				 * even if it causes ld.so.1 to incorrectly
+				 * validate the object ---- it is an override
+				 * mechanism.
+				 */
+				if ((!has_specver &&
+				    (vip->vi_flags & VER_FLG_INFO)) ||
+				    (has_specver &&
+				    !(vip->vi_flags & FLG_VER_SPECVER)))
+					vnap->vna_flags |= VER_FLG_INFO;
+
+				_vnap = vnap;
+				vnap++, cnt++;
+				_vnap->vna_next =
+				    /* LINTED */
+				    (Word)((uintptr_t)vnap - (uintptr_t)_vnap);
 			}
 		}
+
 		_vnap->vna_next = 0;
 
 		/*
@@ -3753,12 +3816,17 @@ ld_update_outfile(Ofl_desc *ofl)
 	 */
 	if (update_oehdr(ofl) == S_ERROR)
 		return (S_ERROR);
-	if ((flags & (FLG_OF_VERDEF | FLG_OF_NOVERSEC)) == FLG_OF_VERDEF)
-		if (update_overdef(ofl) == S_ERROR)
+	if (!(flags & FLG_OF_NOVERSEC)) {
+		if ((flags & FLG_OF_VERDEF) &&
+		    (update_overdef(ofl) == S_ERROR))
 			return (S_ERROR);
-	if ((flags & (FLG_OF_VERNEED | FLG_OF_NOVERSEC)) == FLG_OF_VERNEED)
-		if (update_overneed(ofl) == S_ERROR)
+		if ((flags & FLG_OF_VERNEED) &&
+		    (update_overneed(ofl) == S_ERROR))
 			return (S_ERROR);
+		if ((flags & (FLG_OF_VERNEED | FLG_OF_VERDEF)) &&
+		    (update_oversym(ofl) == S_ERROR))
+			return (S_ERROR);
+	}
 	if (flags & FLG_OF_DYNAMIC) {
 		if (update_odynamic(ofl) == S_ERROR)
 			return (S_ERROR);

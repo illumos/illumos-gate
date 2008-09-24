@@ -2659,16 +2659,17 @@ ld_make_sections(Ofl_desc *ofl)
 	/*
 	 * Add any necessary versioning information.
 	 */
-	if ((flags & (FLG_OF_VERNEED | FLG_OF_NOVERSEC)) == FLG_OF_VERNEED) {
-		if (make_verneed(ofl) == S_ERROR)
+	if (!(flags & FLG_OF_NOVERSEC)) {
+		if ((flags & FLG_OF_VERNEED) &&
+		    (make_verneed(ofl) == S_ERROR))
 			return (S_ERROR);
-	}
-	if ((flags & (FLG_OF_VERDEF | FLG_OF_NOVERSEC)) == FLG_OF_VERDEF) {
-		if (make_verdef(ofl) == S_ERROR)
+		if ((flags & FLG_OF_VERDEF) &&
+		    (make_verdef(ofl) == S_ERROR))
 			return (S_ERROR);
-		if ((ofl->ofl_osversym = make_sym_sec(ofl,
+		if ((flags & (FLG_OF_VERNEED | FLG_OF_VERDEF)) &&
+		    ((ofl->ofl_osversym = make_sym_sec(ofl,
 		    MSG_ORIG(MSG_SCN_SUNWVERSYM), SHT_SUNW_versym,
-		    ld_targ.t_id.id_version)) == (Os_desc*)S_ERROR)
+		    ld_targ.t_id.id_version)) == (Os_desc*)S_ERROR))
 			return (S_ERROR);
 	}
 

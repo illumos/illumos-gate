@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Object file dependent support for ELF objects.
  */
@@ -517,6 +515,19 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 			Verdef		*vdf = VERDEF(nlmp);
 			ulong_t		_num, num = VERDEFNUM(nlmp);
 			int		found = 0;
+
+			/*
+			 * Skip validation of versions that are marked
+			 * INFO. This optimization is used for versions
+			 * that are inherited by another version. Verification
+			 * of the inheriting version is sufficient.
+			 *
+			 * Such versions are recorded in the object for the
+			 * benefit of VERSYM entries that refer to them. This
+			 * provides a purely diagnositic benefit.
+			 */
+			if (vnap->vna_flags & VER_FLG_INFO)
+				continue;
 
 			version = (char *)(cstrs + vnap->vna_name);
 			DBG_CALL(Dbg_ver_need_entry(lml, 0, need, version));

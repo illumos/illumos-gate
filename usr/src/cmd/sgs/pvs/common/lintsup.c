@@ -22,10 +22,9 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Supplimental Pseudo-code to get lint to consider
@@ -39,4 +38,12 @@ void
 foo()
 {
 	dbg_print(0, _pvs_msg((Msg)&__pvs_msg[0]));
+
+	alist_delete_by_offset(NULL, NULL);
+	(void) alist_insert_by_offset(NULL, NULL, 0, 0, 0);
+	alist_reset(NULL);
+
+	(void) aplist_delete_value(NULL, NULL);
+	aplist_reset(NULL);
+	(void) aplist_test(NULL, NULL, 0);
 }

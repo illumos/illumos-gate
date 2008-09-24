@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<debug.h>
@@ -109,10 +108,11 @@ Dbg_ver_nointerface(Lm_list *lml, const char *name)
 void
 Dbg_ver_desc_entry(Lm_list *lml, Ver_desc *vdp)
 {
-	const char	*dep;
-	Ver_desc	*_vdp, *__vdp;
-	Listnode *	lnp;
-	char		index[10];
+	Conv_ver_flags_buf_t	ver_flags_buf;
+	const char		*dep;
+	Ver_desc		*_vdp, *__vdp;
+	Listnode 		*lnp;
+	char			index[10];
 
 	if (DBG_NOTCLASS(DBG_C_VERSIONS))
 		return;
@@ -126,7 +126,7 @@ Dbg_ver_desc_entry(Lm_list *lml, Ver_desc *vdp)
 	}
 	(void) sprintf(index, MSG_ORIG(MSG_FMT_INDEX), vdp->vd_ndx);
 	Elf_ver_line_1(lml, index, vdp->vd_name, dep,
-	    conv_ver_flags(vdp->vd_flags));
+	    conv_ver_flags(vdp->vd_flags, 0, &ver_flags_buf));
 
 	/*
 	 * Loop through the dependency list in case there are more that one

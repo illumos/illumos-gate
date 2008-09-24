@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * String conversion routine for version flag entries.
@@ -32,15 +31,48 @@
 #include	"_conv.h"
 #include	"version_msg.h"
 
+#define	VERFLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+	MSG_VER_FLG_WEAK_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_VER_FLG_BASE_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	MSG_VER_FLG_INFO_SIZE		+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+	CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_ver_flags_buf_t is large enough:
+ *
+ * VERFLAGSZ is the real minimum size of the buffer required by
+ * conv_ver_flags(). However, Conv_ver_flags_buf_t uses CONV_VER_FLAGS_BUFSIZE
+ * to set the buffer size. We do things this way because the definition of
+ * VERFLAGSZ uses information that is not available in the environment of
+ * other programs that include the conv.h header file.
+ */
+#if (CONV_VER_FLAGS_BUFSIZE != VERFLAGSZ) && !defined(__lint)
+#define	REPORT_BUFSIZE VERFLAGSZ
+#include "report_bufsize.h"
+#error "CONV_VER_FLAGS_BUFSIZE does not match VERFLAGSZ"
+#endif
+
 const char *
-conv_ver_flags(Half flags)
+conv_ver_flags(Half flags, Conv_fmt_flags_t fmt_flags,
+    Conv_ver_flags_buf_t *ver_flags_buf)
 {
-	if (flags & VER_FLG_WEAK)
-		return (MSG_ORIG(MSG_VER_FLG_WEAK));
-	else if (flags & VER_FLG_BASE)
-		return (MSG_ORIG(MSG_VER_FLG_BASE));
-	else
+	static Val_desc vda[] = {
+		{ VER_FLG_WEAK,		MSG_ORIG(MSG_VER_FLG_WEAK) },
+		{ VER_FLG_BASE,		MSG_ORIG(MSG_VER_FLG_BASE) },
+		{ VER_FLG_INFO,		MSG_ORIG(MSG_VER_FLG_INFO) },
+		{ 0,			0 }
+	};
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (ver_flags_buf->buf), vda };
+
+	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
+
+	conv_arg.buf = ver_flags_buf->buf;
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg, fmt_flags);
+
+	return ((const char *)ver_flags_buf->buf);
 }
 
 

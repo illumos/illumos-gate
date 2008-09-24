@@ -30,8 +30,6 @@
 #ifndef _SYS_LINK_H
 #define	_SYS_LINK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_ASM
 #include <sys/types.h>
 #include <sys/elftypes.h>
@@ -415,10 +413,16 @@ typedef struct {
 #define	VER_NDX_ELIMINATE	0xff01	/* symbol is to be eliminated */
 
 /*
- * Verdef and Verneed (via Veraux) flags values.
+ * Verdef (vd_flags) and Vernaux (vna_flags) flags values.
  */
 #define	VER_FLG_BASE		0x1	/* version definition of file itself */
+					/*	(Verdef only) */
 #define	VER_FLG_WEAK		0x2	/* weak version identifier */
+#define	VER_FLG_INFO		0x4	/* version is recorded in object for */
+					/*	informational purposes */
+					/*	(Versym reference) only. No */
+					/*	runtime verification is */
+					/*	required. (Vernaux only) */
 
 /*
  * Verdef version values.

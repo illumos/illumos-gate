@@ -30,8 +30,6 @@
 #ifndef	_CONV_H
 #define	_CONV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Global include file for conversion library.
  */
@@ -571,6 +569,18 @@ typedef union {
 } Conv64_cnote_auxv_af_buf_t;
 
 
+/* conv_ver_flags() */
+#define	CONV_VER_FLAGS_BUFSIZE	31
+typedef union {
+	Conv32_inv_buf_t	inv_buf;
+	char			buf[CONV_VER_FLAGS_BUFSIZE];
+} Conv32_ver_flags_buf_t;
+typedef union {
+	Conv64_inv_buf_t	inv_buf;
+	char			buf[CONV_VER_FLAGS_BUFSIZE];
+} Conv64_ver_flags_buf_t;
+
+
 
 /*
  * Generic names for class specific buffer types above
@@ -621,6 +631,7 @@ typedef union {
 #define	Conv_cnote_ss_flags_buf_t	Conv64_cnote_ss_flags_buf_t
 #define	Conv_cnote_cc_content_buf_t	Conv64_cnote_cc_content_buf_t
 #define	Conv_cnote_auxv_af_buf_t	Conv64_cnote_auxv_af_buf_t
+#define	Conv_ver_flags_buf_t		Conv64_ver_flags_buf_t
 #else
 #define	CONV_INV_BUFSIZE		CONV32_INV_BUFSIZE
 #define	CONV_EHDR_FLAGS_BUFSIZE		CONV32_EHDR_FLAGS_BUFSIZE
@@ -667,6 +678,7 @@ typedef union {
 #define	Conv_cnote_ss_flags_buf_t	Conv32_cnote_ss_flags_buf_t
 #define	Conv_cnote_cc_content_buf_t	Conv32_cnote_cc_content_buf_t
 #define	Conv_cnote_auxv_af_buf_t	Conv32_cnote_auxv_af_buf_t
+#define	Conv_ver_flags_buf_t		Conv32_ver_flags_buf_t
 #endif
 
 
@@ -860,7 +872,8 @@ extern	void		conv_str_to_c_literal(const char *buf, size_t n,
 			    Conv_str_to_c_literal_func_t *cb_func,
 			    void *uvalue);
 extern	Uts_desc	*conv_uts(void);
-extern	const char	*conv_ver_flags(Half);
+extern	const char	*conv_ver_flags(Half, Conv_fmt_flags_t,
+			    Conv_ver_flags_buf_t *);
 extern	const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
 
 

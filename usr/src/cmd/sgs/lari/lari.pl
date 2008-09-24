@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Link Analysis of Runtime Interfaces.
 #
@@ -1201,7 +1199,6 @@ sub GetAllSymbols {
 	my ($Type, $FileHandle);
 	my (%AddrToName, %NameToAddr);
 	my ($Exec) = 0;
-	my ($Vers) = 0;
 	my ($Symb) = 0;
 	my ($Copy) = 0;
 	my ($Interpose) = 0;
@@ -1233,12 +1230,13 @@ sub GetAllSymbols {
 	#	-e	ELF header provides the file type
 	#	-d	dynamic information provides filter names 
 	#	-r	relocations provide for copy relocations
+	#	-v	object versioning
 	#	-y	symbol information section provide pre-symbol filters
 	#		and direct binding information
 	#
 	# As this information can be quite large, process the elfdump(1) output
 	# through a pipe.
-	open($FileHandle, "LC_ALL=C elfdump -edry '$Obj' 2> /dev/null |");
+	open($FileHandle, "LC_ALL=C elfdump -edrvy '$Obj' 2> /dev/null |");
 
 	while (defined(my $Line = <$FileHandle>)) {
 		my (@Fields);
@@ -1261,6 +1259,12 @@ sub GetAllSymbols {
 			} elsif ($Line =~ /^Syminfo Section:/) {
 				$Info = 1;
 				$Ehdr = $Dyn = $Rel = 0;
+			} elsif ($Line =~ /^Version Definition Section:/) {
+				# The existance of a VERDEF section is all we
+				# are looking for. There is no need to parse
+				# the specific version definitions.
+				$Versioned{$Obj} = 1;
+			    	$Ehdr = $Dyn = $Rel = $Info = 0;
 			} else {
 				$Ehdr = $Dyn = $Rel = $Info = 0;
 			}
@@ -1509,13 +1513,6 @@ sub GetAllSymbols {
 		$Symbols{$Fields[8]}{$Obj}[$ObjFlag] |= $Flags;
 		$Symbols{$Fields[8]}{$Obj}[$ObjVis] = $Fields[5];
 		$Objects{$Obj}{$Fields[8]} |= $Flags;
-
-		# If the version field is non-null this object has already been
-		# versioned.
-		if (($Vers == 0) && ($Fields[6] ne '0')) {
-			$Versioned{$Obj} = 1;
-			$Vers = 1;
-		}
 	}
 	close($FileHandle);
 

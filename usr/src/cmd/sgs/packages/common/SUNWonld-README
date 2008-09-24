@@ -1378,3 +1378,5 @@ Bugid   Risk Synopsis
 	PSARC 2008/583 add gld options to ld(1)
 6746674 setuid applications do not find libraries any more because trusted
 	directories behavior changed
+6749055 ld should generate GNU style VERSYM indexes for VERNEED records
+	PSARC/2008/603 ELF objects to adopt GNU-style Versym indexes
