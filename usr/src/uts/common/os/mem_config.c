@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/vmem.h>
@@ -270,7 +268,7 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	if (ddi_peek32((dev_info_t *)NULL,
 	    (int32_t *)pp, (int32_t *)0) == DDI_FAILURE) {
 
-		cmn_err(CE_PANIC, "kphysm_add_memory_dynamic:"
+		cmn_err(CE_WARN, "kphysm_add_memory_dynamic:"
 		    " Can't access pp array at 0x%p [phys 0x%lx]",
 		    (void *)pp, pt_base);
 
@@ -399,7 +397,7 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	 * The new memseg is inserted at the beginning of the list.
 	 * Not only does this save searching for the tail, but in the
 	 * case of a re-used memseg, it solves the problem of what
-	 * happens of some process has still got a pointer to the
+	 * happens if some process has still got a pointer to the
 	 * memseg and follows the next pointer to continue traversing
 	 * the memsegs list.
 	 */
