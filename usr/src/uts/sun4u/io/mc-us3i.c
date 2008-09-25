@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -132,7 +131,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* module type, this one is a driver */
-	"Memory-controller: 1.14",	/* module name */
+	"Memory-controller",		/* module name */
 	&mc_ops,			/* driver ops */
 };
 

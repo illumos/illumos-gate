@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/devops.h>
@@ -137,7 +136,7 @@ static struct dev_ops ds1337_ops = {
 
 static struct modldrv todds1337_modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"tod driver for DS1337 1.12",   /* Name of the module. */
+	"tod driver for DS1337",	/* Name of the module. */
 	&ds1337_ops,			/* Pointer to dev_ops */
 };
 

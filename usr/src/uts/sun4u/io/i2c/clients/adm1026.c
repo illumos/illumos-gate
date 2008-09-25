@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
 #include <sys/open.h>		/* for open params.	 */
@@ -135,7 +134,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv adm1026_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"ADM1026 i2c device driver: 1.3",
+	"ADM1026 i2c device driver",
 	&adm1026_ops
 };
 

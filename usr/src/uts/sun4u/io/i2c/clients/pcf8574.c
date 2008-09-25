@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-
-
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
 #include <sys/open.h>		/* for open params.	 */
@@ -100,7 +98,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv pcf8574_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"PCF8574 i2c device driver: v1.9",
+	"PCF8574 i2c device driver",
 	&pcf8574_ops
 };
 

@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tod driver module for Starfire
@@ -59,7 +56,7 @@ static uint64_t		todsf_get_cpufrequency(void);
  * Module linkage information for the kernel.
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "Soft tod module for Starfire %I%"
+	&mod_miscops, "Soft tod module for Starfire"
 };
 
 static struct modlinkage modlinkage = {

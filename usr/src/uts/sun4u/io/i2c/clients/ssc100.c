@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
 #include <sys/open.h>		/* for open params.	 */
@@ -104,7 +103,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv ssc100_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"SSC100 i2c device driver: v1.10",
+	"SSC100 i2c device driver",
 	&ssc100_ops
 };
 

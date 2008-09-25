@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/conf.h>
 #include <sys/kmem.h>
@@ -54,7 +52,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,				/* Type of module */
-	"OPL opl_cfg %I%"
+	"OPL opl_cfg"
 };
 
 static struct modlinkage modlinkage = {

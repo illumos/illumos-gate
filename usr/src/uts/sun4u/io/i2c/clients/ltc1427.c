@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-
-
 #include <sys/stat.h>		/* ddi_create_minor_node S_IFCHR */
 #include <sys/modctl.h>		/* for modldrv */
 #include <sys/open.h>		/* for open params.	 */
@@ -100,7 +98,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv ltc1427_modldrv = {
 	&mod_driverops,			/* type of module - driver */
-	"LTC1427 i2c device driver: v1.8",
+	"LTC1427 i2c device driver",
 	&ltc1427_ops
 };
 

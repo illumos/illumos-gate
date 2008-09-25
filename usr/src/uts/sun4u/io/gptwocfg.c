@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Safari Configurator  (gptwocfg)
@@ -101,7 +99,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, /* Type of module */
-	"gptwo configurator %I%",
+	"gptwo configurator",
 };
 
 static struct modlinkage modlinkage = {
