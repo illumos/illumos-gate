@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/fs.d/autofs/Makefile
 
 FSTYPE=		autofs
@@ -173,13 +171,13 @@ selfcheck.o:	../nfs/lib/selfcheck.c
 
 
 webnfs_xdr.c:	webnfs.x
-	$(RPCGEN) -C -c -o $@ webnfs.x
+	$(RPCGEN) -M -C -c -o $@ webnfs.x
 
 webnfs_client.c:	webnfs.x
-	$(RPCGEN) -C -l -o $@ webnfs.x
+	$(RPCGEN) -M -C -l -o $@ webnfs.x
 
 webnfs.h:	webnfs.x
-	$(RPCGEN) -C -h -o $@ webnfs.x
+	$(RPCGEN) -M -C -h -o $@ webnfs.x
 
 webnfs.x:	../nfs/lib/webnfs.x
 	$(RM) webnfs.x

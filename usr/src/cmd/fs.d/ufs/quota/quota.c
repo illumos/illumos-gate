@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Disk quota reporting program.
@@ -58,6 +56,11 @@
 #include <sys/fs/ufs_quota.h>
 #include <priv_utils.h>
 #include <locale.h>
+#include <rpc/rpc.h>
+#include <netdb.h>
+#include <rpcsvc/rquota.h>
+#include <zone.h>
+#include "../../nfs/lib/replica.h"
 
 int	vflag;
 int	nolocalquota;
@@ -102,11 +105,11 @@ main(int argc, char *argv[])
 	 */
 
 	if (__init_suid_priv(PU_CLEARLIMITSET, PRIV_FILE_DAC_READ,
-				NULL) == -1) {
+	    NULL) == -1) {
 		(void) fprintf(stderr,
-				gettext("Insufficient privileges, "
-				"quota must be set-uid root or have "
-				"file_dac_read privileges\n"));
+		    gettext("Insufficient privileges, "
+		    "quota must be set-uid root or have "
+		    "file_dac_read privileges\n"));
 
 		exit(1);
 	}
@@ -127,7 +130,8 @@ main(int argc, char *argv[])
 			for (opt_count = 1; opt_count < argc; opt_count++) {
 				opt_text = argv[opt_count];
 				if (opt_text)
-				    (void) fprintf(stdout, " %s ", opt_text);
+					(void) fprintf(stdout, " %s ",
+					    opt_text);
 			}
 			(void) fprintf(stdout, "\n");
 			}
@@ -191,8 +195,6 @@ showname(char *name)
 	return (0);
 }
 
-#include "../../nfs/lib/replica.h"
-
 static void
 showquotas(uid_t uid, char *name)
 {
@@ -200,12 +202,24 @@ showquotas(uid_t uid, char *name)
 	FILE *mtab;
 	struct dqblk dqblk;
 	uid_t myuid;
+	struct failed_srv {
+		char *serv_name;
+		struct failed_srv *next;
+	};
+	struct failed_srv *failed_srv_list = NULL;
+	int	rc;
+	char	my_zonename[ZONENAME_MAX];
+	zoneid_t my_zoneid = getzoneid();
 
 	myuid = getuid();
 	if (uid != myuid && myuid != 0) {
 		printf("quota: %s (uid %d): permission denied\n", name, uid);
 		exit(32);
 	}
+
+	memset(my_zonename, '\0', ZONENAME_MAX);
+	getzonenamebyid(my_zoneid, my_zonename, ZONENAME_MAX);
+
 	if (vflag)
 		heading(uid, name);
 	mtab = fopen(MNTTAB, "r");
@@ -213,13 +227,28 @@ showquotas(uid_t uid, char *name)
 		if (strcmp(mnt.mnt_fstype, MNTTYPE_UFS) == 0) {
 			if (nolocalquota ||
 			    (quotactl(Q_GETQUOTA,
-				mnt.mnt_mountp, uid, &dqblk) != 0 &&
-				!(vflag && getdiskquota(&mnt, uid, &dqblk))))
-					continue;
+			    mnt.mnt_mountp, uid, &dqblk) != 0 &&
+			    !(vflag && getdiskquota(&mnt, uid, &dqblk))))
+				continue;
 		} else if (strcmp(mnt.mnt_fstype, MNTTYPE_NFS) == 0) {
 
 			struct replica *rl;
 			int count;
+			char *mntopt = NULL;
+
+			/*
+			 * Skip checking quotas for file systems mounted
+			 * in other zones. Zone names will be passed in
+			 * following format from hasmntopt():
+			 * "zone=<zone-name>,<mnt options...>"
+			 */
+			if ((mntopt = hasmntopt(&mnt, MNTOPT_ZONE)) &&
+			    (my_zonename[0] != '\0')) {
+				mntopt += strcspn(mntopt, "=");
+				if (strncmp(++mntopt, my_zonename,
+				    strcspn(mntopt, ",")) != 0)
+					continue;
+			}
 
 			if (hasopt(MNTOPT_NOQUOTA, mnt.mnt_mntopts))
 				continue;
@@ -282,13 +311,58 @@ showquotas(uid_t uid, char *name)
 				continue;
 			}
 
-			if (!getnfsquota(rl[0].host, rl[0].path, uid, &dqblk)) {
+			/*
+			 * Skip getting quotas from failing servers
+			 */
+			if (failed_srv_list != NULL) {
+				struct failed_srv *tmp_list;
+				int found_failed = 0;
+				size_t len = strlen(rl[0].host);
+
+				tmp_list = failed_srv_list;
+				do {
+					if (strncasecmp(rl[0].host,
+					    tmp_list->serv_name, len) == 0) {
+						found_failed = 1;
+						break;
+					}
+				} while ((tmp_list = tmp_list->next) != NULL);
+				if (found_failed) {
+					free_replica(rl, count);
+					continue;
+				}
+			}
+
+			rc = getnfsquota(rl[0].host, rl[0].path, uid, &dqblk);
+			if (rc != RPC_SUCCESS) {
+				size_t len;
+				struct failed_srv *tmp_srv;
+
+				/*
+				 * Failed to get quota from this server. Add
+				 * this server to failed_srv_list and skip
+				 * getting quotas for other mounted filesystems
+				 * from this server.
+				 */
+				if (rc == RPC_TIMEDOUT || rc == RPC_CANTSEND) {
+					len = strlen(rl[0].host);
+					tmp_srv = (struct failed_srv *)malloc(
+					    sizeof (struct failed_srv));
+					tmp_srv->serv_name = (char *)malloc(
+					    len * sizeof (char) + 1);
+					strncpy(tmp_srv->serv_name, rl[0].host,
+					    len);
+					tmp_srv->serv_name[len] = '\0';
+
+					tmp_srv->next = failed_srv_list;
+					failed_srv_list = tmp_srv;
+				}
+
 				free_replica(rl, count);
 				continue;
 			}
 
 			free_replica(rl, count);
-
 		} else {
 			continue;
 		}
@@ -300,6 +374,18 @@ showquotas(uid_t uid, char *name)
 		else
 			warn(&mnt, &dqblk);
 	}
+
+	/*
+	 * Free list of failed servers
+	 */
+	while (failed_srv_list != NULL) {
+		struct failed_srv *tmp_srv = failed_srv_list;
+
+		failed_srv_list = failed_srv_list->next;
+		free(tmp_srv->serv_name);
+		free(tmp_srv);
+	}
+
 	fclose(mtab);
 }
 
@@ -311,10 +397,10 @@ warn(struct mnttab *mntp, struct dqblk *dqp)
 	time(&(tv.tv_sec));
 	tv.tv_usec = 0;
 	if (dqp->dqb_bhardlimit &&
-		dqp->dqb_curblocks >= dqp->dqb_bhardlimit) {
+	    dqp->dqb_curblocks >= dqp->dqb_bhardlimit) {
 		printf("Block limit reached on %s\n", mntp->mnt_mountp);
 	} else if (dqp->dqb_bsoftlimit &&
-		dqp->dqb_curblocks >= dqp->dqb_bsoftlimit) {
+	    dqp->dqb_curblocks >= dqp->dqb_bsoftlimit) {
 		if (dqp->dqb_btimelimit == 0) {
 			printf("Over disk quota on %s, remove %luK\n",
 			    mntp->mnt_mountp,
@@ -344,7 +430,7 @@ warn(struct mnttab *mntp, struct dqblk *dqp)
 			    mntp->mnt_mountp,
 			    dqp->dqb_curfiles - dqp->dqb_fsoftlimit + 1,
 			    ((dqp->dqb_curfiles - dqp->dqb_fsoftlimit + 1) > 1 ?
-				"s" : ""));
+			    "s" : ""));
 		} else if (dqp->dqb_ftimelimit > tv.tv_sec) {
 			char ftimeleft[80];
 
@@ -354,14 +440,14 @@ warn(struct mnttab *mntp, struct dqblk *dqp)
 			    mntp->mnt_mountp,
 			    dqp->dqb_curfiles - dqp->dqb_fsoftlimit + 1,
 			    ((dqp->dqb_curfiles - dqp->dqb_fsoftlimit + 1) > 1 ?
-				"s" : ""), ftimeleft);
+			    "s" : ""), ftimeleft);
 		} else {
 			printf(
 "Over file quota on %s, time limit has expired, remove %lu file%s\n",
 			    mntp->mnt_mountp,
 			    dqp->dqb_curfiles - dqp->dqb_fsoftlimit + 1,
 			    ((dqp->dqb_curfiles - dqp->dqb_fsoftlimit + 1) > 1 ?
-				"s" : ""));
+			    "s" : ""));
 		}
 	}
 }
@@ -371,15 +457,15 @@ heading(uid_t uid, char *name)
 {
 	printf("Disk quotas for %s (uid %ld):\n", name, (long)uid);
 	printf("%-12s %7s%7s%7s%12s%7s%7s%7s%12s\n",
-		"Filesystem",
-		"usage",
-		"quota",
-		"limit",
-		"timeleft",
-		"files",
-		"quota",
-		"limit",
-		"timeleft");
+	    "Filesystem",
+	    "usage",
+	    "quota",
+	    "limit",
+	    "timeleft",
+	    "files",
+	    "quota",
+	    "limit",
+	    "timeleft");
 }
 
 static void
@@ -484,7 +570,7 @@ getdiskquota(struct mnttab *mntp, uid_t uid, struct dqblk *dqp)
 		return (0);
 	fsdev = statb.st_rdev;
 	(void) snprintf(qfilename, sizeof (qfilename), "%s/%s",
-		mntp->mnt_mountp, QFNAME);
+	    mntp->mnt_mountp, QFNAME);
 	if (stat64(qfilename, &statb) < 0 || statb.st_dev != fsdev)
 		return (0);
 	(void) __priv_bracket(PRIV_ON);
@@ -539,12 +625,12 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 		fd = -1;
 		while ((status = getmntent(fstab, &mnt)) == NULL) {
 			if (strcmp(mnt.mnt_fstype, MNTTYPE_UFS) != 0 ||
-				hasopt(MNTOPT_RO, mnt.mnt_mntopts))
+			    hasopt(MNTOPT_RO, mnt.mnt_mntopts))
 				continue;
 			if ((strlcpy(qfile, mnt.mnt_mountp,
-				sizeof (qfile)) >= sizeof (qfile)) ||
+			    sizeof (qfile)) >= sizeof (qfile)) ||
 			    (strlcat(qfile, "/" QFNAME, sizeof (qfile)) >=
-				sizeof (qfile))) {
+			    sizeof (qfile))) {
 				continue;
 			}
 			(void) __priv_bracket(PRIV_ON);
@@ -564,9 +650,9 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 			return (-1);
 		}
 		if ((strlcpy(qfile, mountp, sizeof (qfile)) >= sizeof
-			(qfile)) ||
+		    (qfile)) ||
 		    (strlcat(qfile, "/" QFNAME, sizeof (qfile)) >= sizeof
-			(qfile))) {
+		    (qfile))) {
 			errno = ENOENT;
 			return (-1);
 		}
@@ -607,10 +693,10 @@ hasopt(char *opt, char *optlist)
 	return (0);
 }
 
-#include <rpc/rpc.h>
-#include <netdb.h>
-#include <rpcsvc/rquota.h>
-
+/*
+ * If there are no quotas available, then getnfsquota() returns
+ * RPC_SYSTEMERROR to caller.
+ */
 static int
 getnfsquota(char *hostp, char *path, uid_t uid, struct dqblk *dqp)
 {
@@ -618,13 +704,15 @@ getnfsquota(char *hostp, char *path, uid_t uid, struct dqblk *dqp)
 	struct getquota_rslt gq_rslt;
 	struct rquota *rquota;
 	extern char *strchr();
+	int	rpc_err;
 
 	gq_args.gqa_pathp = path;
 	gq_args.gqa_uid = uid;
-	if (callaurpc(hostp, RQUOTAPROG, RQUOTAVERS,
+	rpc_err = callaurpc(hostp, RQUOTAPROG, RQUOTAVERS,
 	    (vflag? RQUOTAPROC_GETQUOTA: RQUOTAPROC_GETACTIVEQUOTA),
-	    xdr_getquota_args, &gq_args, xdr_getquota_rslt, &gq_rslt) != 0) {
-		return (0);
+	    xdr_getquota_args, &gq_args, xdr_getquota_rslt, &gq_rslt);
+	if (rpc_err != RPC_SUCCESS) {
+		return (rpc_err);
 	}
 	switch (gq_rslt.status) {
 	case Q_OK:
@@ -634,8 +722,9 @@ getnfsquota(char *hostp, char *path, uid_t uid, struct dqblk *dqp)
 
 		rquota = &gq_rslt.getquota_rslt_u.gqr_rquota;
 
-		if (!vflag && rquota->rq_active == FALSE)
-			return (0);
+		if (!vflag && rquota->rq_active == FALSE) {
+			return (RPC_SYSTEMERROR);
+		}
 		gettimeofday(&tv, NULL);
 		limit = (u_longlong_t)(rquota->rq_bhardlimit) *
 		    rquota->rq_bsize / DEV_BSIZE;
@@ -653,21 +742,22 @@ getnfsquota(char *hostp, char *path, uid_t uid, struct dqblk *dqp)
 		    tv.tv_sec + rquota->rq_btimeleft;
 		dqp->dqb_ftimelimit =
 		    tv.tv_sec + rquota->rq_ftimeleft;
-		return (1);
+		return (RPC_SUCCESS);
 		}
 
 	case Q_NOQUOTA:
-		break;
+		return (RPC_SYSTEMERROR);
 
 	case Q_EPERM:
 		fprintf(stderr, "quota permission error, host: %s\n", hostp);
-		break;
+		return (RPC_AUTHERROR);
 
 	default:
 		fprintf(stderr, "bad rpc result, host: %s\n",  hostp);
-		break;
+		return (RPC_CANTDECODEARGS);
 	}
-	return (0);
+
+	/* NOTREACHED */
 }
 
 int
@@ -675,7 +765,7 @@ callaurpc(char *host, int prognum, int versnum, int procnum,
 		xdrproc_t inproc, char *in, xdrproc_t outproc, char *out)
 {
 	static enum clnt_stat clnt_stat;
-	struct timeval tottimeout;
+	struct timeval tottimeout = {20, 0};
 
 	static CLIENT *cl = NULL;
 	static int oldprognum, oldversnum;
@@ -688,12 +778,13 @@ callaurpc(char *host, int prognum, int versnum, int procnum,
 	 * make further calls.
 	 */
 	if (cl == NULL || oldprognum != prognum || oldversnum != versnum ||
-		strcmp(oldhost, host) != 0) {
+	    strcmp(oldhost, host) != 0) {
 		if (cl) {
 			clnt_destroy(cl);
 			cl = NULL;
 		}
-		cl = clnt_create(host, prognum, versnum, "udp");
+		cl = clnt_create_timed(host, prognum, versnum, "udp",
+		    &tottimeout);
 		if (cl == NULL)
 			return ((int)RPC_TIMEDOUT);
 		if ((cl->cl_auth = authunix_create_default()) == NULL) {
@@ -709,8 +800,6 @@ callaurpc(char *host, int prognum, int versnum, int procnum,
 	if (clnt_stat != RPC_SUCCESS)
 		return ((int)clnt_stat);	/* don't bother retrying */
 
-	tottimeout.tv_sec  = 5;
-	tottimeout.tv_usec = 0;
 	clnt_stat = clnt_call(cl, procnum, inproc, in,
 	    outproc, out, tottimeout);
 

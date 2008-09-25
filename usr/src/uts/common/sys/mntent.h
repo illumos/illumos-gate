@@ -29,8 +29,6 @@
 #ifndef _SYS_MNTENT_H
 #define	_SYS_MNTENT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -134,6 +132,7 @@ extern "C" {
 #define	MNTOPT_RESTRICT	"restrict"	/* restricted autofs mount */
 #define	MNTOPT_BROWSE	"browse"	/* browsable autofs mount */
 #define	MNTOPT_NOBROWSE	"nobrowse"	/* non-browsable autofs mount */
+#define	MNTOPT_ZONE	"zone"	/* zone name - set only for non global zones */
 
 #ifdef	__cplusplus
 }

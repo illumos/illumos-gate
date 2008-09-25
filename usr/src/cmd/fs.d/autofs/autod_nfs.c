@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -3044,13 +3042,13 @@ get_the_stuff(
 		    case NFS_VERSION:
 			    {
 			    wnl_diropargs arg;
-			    wnl_diropres *res;
+			    wnl_diropres res;
 
 			    memset((char *)&arg.dir, 0, sizeof (wnl_fh));
+			    memset((char *)&res, 0, sizeof (wnl_diropres));
 			    arg.name = fspath;
-			    res = wnlproc_lookup_2(&arg, cl);
-
-			    if (res == NULL || res->status != NFS_OK)
+			    if (wnlproc_lookup_2(&arg, &res, cl) !=
+				RPC_SUCCESS || res.status != NFS_OK)
 				    goto done;
 			    *fhp = malloc(sizeof (wnl_fh));
 
@@ -3060,7 +3058,7 @@ get_the_stuff(
 			    }
 
 			    memcpy((char *)*fhp,
-			    (char *)&res->wnl_diropres_u.wnl_diropres.file,
+			    (char *)&res.wnl_diropres_u.wnl_diropres.file,
 				sizeof (wnl_fh));
 			    cs = RPC_SUCCESS;
 			    }
@@ -3068,34 +3066,31 @@ get_the_stuff(
 		    case NFS_V3:
 			    {
 			    WNL_LOOKUP3args arg;
-			    WNL_LOOKUP3res *res;
+			    WNL_LOOKUP3res res;
 			    nfs_fh3 *fh3p;
 
 			    memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
+			    memset((char *)&res, 0, sizeof (WNL_LOOKUP3res));
 			    arg.what.name = fspath;
-			    res = wnlproc3_lookup_3(&arg, cl);
-
-			    if (res == NULL || res->status != NFS3_OK)
+			    if (wnlproc3_lookup_3(&arg, &res, cl) !=
+				RPC_SUCCESS || res.status != NFS3_OK)
 				    goto done;
 
 			    fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
 
 			    if (fh3p == NULL) {
 				    syslog(LOG_ERR, "no memory\n");
-				    CLNT_FREERES(cl, xdr_WNL_LOOKUP3res,
-					(char *)res);
 				    goto done;
 			    }
 
-			    fh3p->fh3_length = res->
+			    fh3p->fh3_length = res.
 				WNL_LOOKUP3res_u.res_ok.object.data.data_len;
-			    memcpy(fh3p->fh3_u.data, res->
+			    memcpy(fh3p->fh3_u.data, &res.
 				WNL_LOOKUP3res_u.res_ok.object.data.data_val,
 				fh3p->fh3_length);
 
 			    *fhp = (caddr_t)fh3p;
 
-			    CLNT_FREERES(cl, xdr_WNL_LOOKUP3res, (char *)res);
 			    cs = RPC_SUCCESS;
 			    }
 			    break;

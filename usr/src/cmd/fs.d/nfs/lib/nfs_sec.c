@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /* LINTLIBRARY */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +33,6 @@
  * used for accessing /etc/nfssec.conf.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* SVr4.0 1.18	*/
 
 #include <stdio.h>
@@ -228,11 +226,11 @@ matchname(char *line, char *name, seconfig_t *secp)
 
 	tok1 = tok2 = NULL;
 	if (((tok1 = gettoken(NULL, FALSE)) == NULL) ||
-		((gss_mech = gettoken(NULL, FALSE)) == NULL) ||
-		((gss_qop = gettoken(NULL, FALSE)) == NULL) ||
-		((tok2 = gettoken(NULL, FALSE)) == NULL) ||
-		((secp->sc_service = getvalue(tok2, sc_service))
-			== SC_FAILURE)) {
+	    ((gss_mech = gettoken(NULL, FALSE)) == NULL) ||
+	    ((gss_qop = gettoken(NULL, FALSE)) == NULL) ||
+	    ((tok2 = gettoken(NULL, FALSE)) == NULL) ||
+	    ((secp->sc_service = getvalue(tok2, sc_service))
+	    == SC_FAILURE)) {
 		return (FALSE);
 	}
 	secp->sc_nfsnum = atoi(tok1);
@@ -240,10 +238,10 @@ matchname(char *line, char *name, seconfig_t *secp)
 	(void) strcpy(secp->sc_gss_mech, gss_mech);
 	secp->sc_gss_mech_type = NULL;
 	if (secp->sc_gss_mech[0] != '-') {
-	    if (!rpc_gss_mech_to_oid(gss_mech, &secp->sc_gss_mech_type) ||
-		!rpc_gss_qop_to_num(gss_qop, gss_mech, &secp->sc_qop)) {
-		return (FALSE);
-	    }
+		if (!rpc_gss_mech_to_oid(gss_mech, &secp->sc_gss_mech_type) ||
+		    !rpc_gss_qop_to_num(gss_qop, gss_mech, &secp->sc_qop)) {
+			return (FALSE);
+		}
 	}
 
 	return (TRUE);
@@ -279,20 +277,20 @@ matchnum(char *line, int num, seconfig_t *secp)
 	}
 
 	if (((gss_mech = gettoken(NULL, FALSE)) == NULL) ||
-		((gss_qop = gettoken(NULL, FALSE)) == NULL) ||
-		((tok2 = gettoken(NULL, FALSE)) == NULL) ||
-		((secp->sc_service = getvalue(tok2, sc_service))
-			== SC_FAILURE)) {
+	    ((gss_qop = gettoken(NULL, FALSE)) == NULL) ||
+	    ((tok2 = gettoken(NULL, FALSE)) == NULL) ||
+	    ((secp->sc_service = getvalue(tok2, sc_service))
+	    == SC_FAILURE)) {
 		return (FALSE);
 	}
 
 	(void) strcpy(secp->sc_name, secname);
 	(void) strcpy(secp->sc_gss_mech, gss_mech);
 	if (secp->sc_gss_mech[0] != '-') {
-	    if (!rpc_gss_mech_to_oid(gss_mech, &secp->sc_gss_mech_type) ||
-		!rpc_gss_qop_to_num(gss_qop, gss_mech, &secp->sc_qop)) {
-		return (FALSE);
-	    }
+		if (!rpc_gss_mech_to_oid(gss_mech, &secp->sc_gss_mech_type) ||
+		    !rpc_gss_qop_to_num(gss_qop, gss_mech, &secp->sc_qop)) {
+			return (FALSE);
+		}
 	}
 
 	return (TRUE);
@@ -361,33 +359,34 @@ nfs_get_qop_name(seconfig_t *entryp)
 	FILE	*fp;		/* file stream for NFSSEC_CONF */
 
 	if ((fp = fopen(NFSSEC_CONF, "r")) == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	(void) mutex_lock(&matching_lock);
 	while (fgets(line, BUFSIZ, fp)) {
-	    if (!(blank(line) || comment(line))) {
-		if ((secname = gettoken(line, FALSE)) == NULL) {
-		    /* bad line */
-		    continue;
-		}
-		if (strcmp(secname, entryp->sc_name) == 0) {
-		    tok = NULL;
-		    if ((tok = gettoken(NULL, FALSE)) == NULL) {
-			/* bad line */
-			goto err;
-		    }
+		if (!(blank(line) || comment(line))) {
+			if ((secname = gettoken(line, FALSE)) == NULL) {
+				/* bad line */
+				continue;
+			}
+			if (strcmp(secname, entryp->sc_name) == 0) {
+				tok = NULL;
+				if ((tok = gettoken(NULL, FALSE)) == NULL) {
+					/* bad line */
+					goto err;
+				}
 
-		    if (atoi(tok) != entryp->sc_nfsnum)
-			goto err;
+				if (atoi(tok) != entryp->sc_nfsnum)
+					goto err;
 
-		    if ((gettoken(NULL, FALSE) == NULL) ||
-			((gss_qop = gettoken(NULL, FALSE)) == NULL)) {
-			goto err;
-		    }
-		    break;
+				if ((gettoken(NULL, FALSE) == NULL) ||
+				    ((gss_qop = gettoken(NULL, FALSE))
+				    == NULL)) {
+					goto err;
+				}
+				break;
+			}
 		}
-	    }
 	}
 err:
 	(void) mutex_unlock(&matching_lock);
@@ -410,42 +409,46 @@ nfs_create_ah(CLIENT *cl, char *hostname, seconfig_t *nfs_sec)
 	static int window = 60;
 
 	if (nfs_sec == NULL)
-	    goto err;
+		goto err;
 
 	switch (nfs_sec->sc_rpcnum) {
-	    case AUTH_UNIX:
-	    case AUTH_NONE:
-		return (NULL);
+		case AUTH_UNIX:
+		case AUTH_NONE:
+			return (NULL);
 
-	    case AUTH_DES:
-		if (!host2netname(netname, hostname, NULL))
-		    goto err;
+		case AUTH_DES:
+			if (!host2netname(netname, hostname, NULL))
+				goto err;
 
-		return (authdes_seccreate(netname, window, hostname, NULL));
+			return (authdes_seccreate(netname, window, hostname,
+			    NULL));
 
-	    case RPCSEC_GSS:
-		if (cl == NULL)
-		    goto err;
+		case RPCSEC_GSS:
+			if (cl == NULL)
+				goto err;
 
-		if (nfs_sec->sc_gss_mech_type == NULL) {
-		    syslog(LOG_ERR,
-			"nfs_create_ah: need mechanism information\n");
-		    goto err;
-		}
+			if (nfs_sec->sc_gss_mech_type == NULL) {
+				syslog(LOG_ERR,
+				"nfs_create_ah: need mechanism information\n");
+				goto err;
+			}
 
-		/* RPCSEC_GSS service names are of the form svc@host.dom */
-		(void) sprintf(svc_name, "nfs@%s", hostname);
+			/*
+			 * RPCSEC_GSS service names are of the form svc@host.dom
+			 */
+			(void) sprintf(svc_name, "nfs@%s", hostname);
 
-		gss_qop = nfs_get_qop_name(nfs_sec);
-		if (gss_qop == NULL)
-		    goto err;
+			gss_qop = nfs_get_qop_name(nfs_sec);
+			if (gss_qop == NULL)
+				goto err;
 
-		return (rpc_gss_seccreate(cl, svc_name, nfs_sec->sc_gss_mech,
-			nfs_sec->sc_service, gss_qop, NULL, NULL));
+			return (rpc_gss_seccreate(cl, svc_name,
+			    nfs_sec->sc_gss_mech, nfs_sec->sc_service, gss_qop,
+			    NULL, NULL));
 
-	    default:
-		syslog(LOG_ERR, "nfs_create_ah: unknown flavor\n");
-		return (NULL);
+		default:
+			syslog(LOG_ERR, "nfs_create_ah: unknown flavor\n");
+			return (NULL);
 	}
 err:
 	syslog(LOG_ERR, "nfs_create_ah: failed to make auth handle\n");
@@ -515,172 +518,172 @@ nfs_sec_nego(rpcprog_t vers, CLIENT *clnt, char *fspath, struct snego_t *snego)
 	int status;
 
 	if (clnt == NULL || fspath == NULL || snego == NULL)
-	    return (SNEGO_FAILURE);
+		return (SNEGO_FAILURE);
 
 	if (vers == WNL_V2) {
-	    wnl_diropargs arg;
-	    wnl_diropres clnt_res;
+		wnl_diropargs arg;
+		wnl_diropres clnt_res;
 
-	    memset((char *)&arg.dir, 0, sizeof (wnl_fh));
-	    arg.name = fspath;
-	    memset((char *)&clnt_res, 0, sizeof (clnt_res));
-	    rpc_stat = clnt_call(clnt, WNLPROC_LOOKUP,
+		memset((char *)&arg.dir, 0, sizeof (wnl_fh));
+		arg.name = fspath;
+		memset((char *)&clnt_res, 0, sizeof (clnt_res));
+		rpc_stat = clnt_call(clnt, WNLPROC_LOOKUP,
 		    (xdrproc_t)xdr_wnl_diropargs, (caddr_t)&arg,
 		    (xdrproc_t)xdr_wnl_diropres, (caddr_t)&clnt_res,
-			TIMEOUT);
-	    if (rpc_stat == RPC_SUCCESS && clnt_res.status == WNL_OK)
-		return (SNEGO_DEF_VALID);
-	    if (rpc_stat != RPC_AUTHERROR)
-		return (SNEGO_FAILURE);
-
-	    {
-		struct rpc_err e;
-		wnl_diropres *res;
-		char *p;
-		int tot = 0;
-
-		CLNT_GETERR(clnt, &e);
-		if (e.re_why != AUTH_TOOWEAK)
-		    return (SNEGO_FAILURE);
-
-		if ((p = malloc(strlen(fspath)+3)) == NULL) {
-		    syslog(LOG_ERR, "no memory\n");
-		    return (SNEGO_FAILURE);
-		}
-		/*
-		 * Do an x81 LOOKUP
-		 */
-		p[0] = (char)WNL_SEC_NEGO;
-		strcpy(&p[2], fspath);
-		do {
-		    p[1] = (char)(1+snego->cnt); /* sec index */
-		    arg.name = p;
-		    res = wnlproc_lookup_2(&arg, clnt);
-		    if (res == NULL || res->status != WNL_OK) {
-			free(p);
+		    TIMEOUT);
+		if (rpc_stat == RPC_SUCCESS && clnt_res.status == WNL_OK)
+			return (SNEGO_DEF_VALID);
+		if (rpc_stat != RPC_AUTHERROR)
 			return (SNEGO_FAILURE);
-		    }
 
+		{
+			struct rpc_err e;
+			wnl_diropres res;
+			char *p;
+			int tot = 0;
+
+			CLNT_GETERR(clnt, &e);
+			if (e.re_why != AUTH_TOOWEAK)
+				return (SNEGO_FAILURE);
+
+			if ((p = malloc(strlen(fspath)+3)) == NULL) {
+				syslog(LOG_ERR, "no memory\n");
+				return (SNEGO_FAILURE);
+			}
 			/*
-			 * retrieve flavors from filehandle:
-			 *	1st byte: length
-			 *	2nd byte: status
-			 *	3rd & 4th: pad
-			 *	5th and after: sec flavors.
+			 * Do an x81 LOOKUP
 			 */
-		    {
-			char *c = (char *)&res->wnl_diropres_u.
-			    wnl_diropres.file;
-			int ii;
-			int cnt = ((int)*c)/sizeof (uint_t);
-			/* LINTED pointer alignment */
-			int *ip = (int *)(c+sizeof (int));
+			p[0] = (char)WNL_SEC_NEGO;
+			strcpy(&p[2], fspath);
+			do {
+				p[1] = (char)(1+snego->cnt); /* sec index */
+				arg.name = p;
+				memset((char *)&res, 0, sizeof (wnl_diropres));
+				if (wnlproc_lookup_2(&arg, &res, clnt) !=
+				    RPC_SUCCESS || res.status != WNL_OK) {
+					free(p);
+					return (SNEGO_FAILURE);
+				}
 
-			tot += cnt;
-			if (tot >= MAX_FLAVORS) {
-			    free(p);
-			    return (SNEGO_ARRAY_TOO_SMALL);
-			}
-			status = (int)*(c+1);
-			if (cnt > MAX_V2_CNT || cnt < 0) {
-			    free(p);
-			    return (SNEGO_FAILURE);
-			}
-			for (ii = 0; ii < cnt; ii++)
-			    snego->array[snego->cnt+ii] =
-				ntohl(*(ip+ii));
-			snego->cnt += cnt;
-		    }
-		} while (status);
-		free(p);
-		return (SNEGO_SUCCESS);
-	    }
+				/*
+				 * retrieve flavors from filehandle:
+				 *	1st byte: length
+				 *	2nd byte: status
+				 *	3rd & 4th: pad
+				 *	5th and after: sec flavors.
+				 */
+				{
+					char *c = (char *)&res.wnl_diropres_u.
+					    wnl_diropres.file;
+					int ii;
+					int cnt = ((int)*c)/sizeof (uint_t);
+					/* LINTED pointer alignment */
+					int *ip = (int *)(c+sizeof (int));
+
+					tot += cnt;
+					if (tot >= MAX_FLAVORS) {
+						free(p);
+						return (SNEGO_ARRAY_TOO_SMALL);
+					}
+					status = (int)*(c+1);
+					if (cnt > MAX_V2_CNT || cnt < 0) {
+						free(p);
+						return (SNEGO_FAILURE);
+					}
+					for (ii = 0; ii < cnt; ii++)
+						snego->array[snego->cnt+ii] =
+						    ntohl(*(ip+ii));
+					snego->cnt += cnt;
+				}
+			} while (status);
+			free(p);
+			return (SNEGO_SUCCESS);
+		}
 	} else if (vers == WNL_V3) {
-	    WNL_LOOKUP3args arg;
-	    WNL_LOOKUP3res clnt_res;
+		WNL_LOOKUP3args arg;
+		WNL_LOOKUP3res clnt_res;
 
-	    memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
-	    arg.what.name = fspath;
-	    arg.what.dir.data.data_len = 0;
-	    arg.what.dir.data.data_val = 0;
-	    memset((char *)&clnt_res, 0, sizeof (clnt_res));
-	    rpc_stat = clnt_call(clnt, WNLPROC3_LOOKUP,
-		(xdrproc_t)xdr_WNL_LOOKUP3args, (caddr_t)&arg,
-		(xdrproc_t)xdr_WNL_LOOKUP3res, (caddr_t)&clnt_res,
-		TIMEOUT);
-	    if (rpc_stat == RPC_SUCCESS && clnt_res.status == WNL3_OK)
-		return (SNEGO_DEF_VALID);
-	    if (rpc_stat != RPC_AUTHERROR)
-		return (SNEGO_FAILURE);
-
-	    {
-		struct rpc_err e;
-		WNL_LOOKUP3res *res;
-		char *p;
-		int tot = 0;
-
-		CLNT_GETERR(clnt, &e);
-		if (e.re_why != AUTH_TOOWEAK)
-		    return (SNEGO_FAILURE);
-
-		if ((p = malloc(strlen(fspath)+3)) == NULL) {
-		    syslog(LOG_ERR, "no memory\n");
-		    return (SNEGO_FAILURE);
-		}
-		/*
-		 * Do an x81 LOOKUP
-		 */
-		p[0] = (char)WNL_SEC_NEGO;
-		strcpy(&p[2], fspath);
-		do {
-		    p[1] = (char)(1+snego->cnt); /* sec index */
-		    arg.what.name = p;
-		    res = wnlproc3_lookup_3(&arg, clnt);
-		    if (res == NULL || res->status != WNL3_OK) {
-			free(p);
+		memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
+		arg.what.name = fspath;
+		arg.what.dir.data.data_len = 0;
+		arg.what.dir.data.data_val = 0;
+		memset((char *)&clnt_res, 0, sizeof (clnt_res));
+		rpc_stat = clnt_call(clnt, WNLPROC3_LOOKUP,
+		    (xdrproc_t)xdr_WNL_LOOKUP3args, (caddr_t)&arg,
+		    (xdrproc_t)xdr_WNL_LOOKUP3res, (caddr_t)&clnt_res,
+		    TIMEOUT);
+		if (rpc_stat == RPC_SUCCESS && clnt_res.status == WNL3_OK)
+			return (SNEGO_DEF_VALID);
+		if (rpc_stat != RPC_AUTHERROR)
 			return (SNEGO_FAILURE);
-		    }
 
+		{
+			struct rpc_err e;
+			WNL_LOOKUP3res res;
+			char *p;
+			int tot = 0;
+
+			CLNT_GETERR(clnt, &e);
+			if (e.re_why != AUTH_TOOWEAK)
+				return (SNEGO_FAILURE);
+
+			if ((p = malloc(strlen(fspath)+3)) == NULL) {
+				syslog(LOG_ERR, "no memory\n");
+				return (SNEGO_FAILURE);
+			}
 			/*
-			 * retrieve flavors from filehandle:
-			 *
-			 * 1st byte: status
-			 * 2nd thru 4th: pad
-			 * 5th and after: sec flavors.
+			 * Do an x81 LOOKUP
 			 */
-		    {
-			char *c = res->WNL_LOOKUP3res_u.res_ok.
-			    object.data.data_val;
-			int ii;
-			int len = res->WNL_LOOKUP3res_u.res_ok.
-			    object.data.data_len;
-			int cnt;
-			/* LINTED pointer alignment */
-			int *ip = (int *)(c+sizeof (int));
+			p[0] = (char)WNL_SEC_NEGO;
+			strcpy(&p[2], fspath);
+			do {
+				p[1] = (char)(1+snego->cnt); /* sec index */
+				arg.what.name = p;
+				memset((char *)&res, 0,
+				    sizeof (WNL_LOOKUP3res));
+				if (wnlproc3_lookup_3(&arg, &res, clnt) !=
+				    RPC_SUCCESS || res.status != WNL3_OK) {
+					free(p);
+					return (SNEGO_FAILURE);
+				}
 
-			cnt = len/sizeof (uint_t) - 1;
-			tot += cnt;
-			if (tot >= MAX_FLAVORS) {
-			    free(p);
-			    return (SNEGO_ARRAY_TOO_SMALL);
-			}
-			status = (int)(*c);
-			if (cnt > MAX_V3_CNT || cnt < 0) {
-			    free(p);
-			    return (SNEGO_FAILURE);
-			}
-			for (ii = 0; ii < cnt; ii++)
-			    snego->array[snego->cnt+ii] =
-				ntohl(*(ip+ii));
-			snego->cnt += cnt;
+				/*
+				 * retrieve flavors from filehandle:
+				 *
+				 * 1st byte: status
+				 * 2nd thru 4th: pad
+				 * 5th and after: sec flavors.
+				 */
+				{
+					char *c = (char *)&res.WNL_LOOKUP3res_u.
+					    res_ok.object.data.data_val;
+					int ii;
+					int len = res.WNL_LOOKUP3res_u.res_ok.
+					    object.data.data_len;
+					int cnt;
+					/* LINTED pointer alignment */
+					int *ip = (int *)(c+sizeof (int));
 
-			CLNT_FREERES(clnt, xdr_WNL_LOOKUP3res,
-			    (char *)res);
-		    }
-		} while (status);
-		free(p);
-		return (SNEGO_SUCCESS);
-	    }
+					cnt = len/sizeof (uint_t) - 1;
+					tot += cnt;
+					if (tot >= MAX_FLAVORS) {
+						free(p);
+						return (SNEGO_ARRAY_TOO_SMALL);
+					}
+					status = (int)(*c);
+					if (cnt > MAX_V3_CNT || cnt < 0) {
+						free(p);
+						return (SNEGO_FAILURE);
+					}
+					for (ii = 0; ii < cnt; ii++)
+						snego->array[snego->cnt+ii] =
+						    ntohl(*(ip+ii));
+					snego->cnt += cnt;
+				}
+			} while (status);
+			free(p);
+			return (SNEGO_SUCCESS);
+		}
 	}
 	return (SNEGO_FAILURE);
 }
@@ -708,24 +711,24 @@ get_seconfig(int whichway, char *name, int num,
 
 	(void) mutex_lock(&matching_lock);
 	while (fgets(line, BUFSIZ, fp)) {
-	    if (!(blank(line) || comment(line))) {
-		switch (whichway) {
-		    case GETBYNAME:
-			if (matchname(line, name, entryp)) {
-				goto found;
-			}
-			break;
+		if (!(blank(line) || comment(line))) {
+			switch (whichway) {
+				case GETBYNAME:
+					if (matchname(line, name, entryp)) {
+						goto found;
+					}
+					break;
 
-		    case GETBYNUM:
-			if (matchnum(line, num, entryp)) {
-				goto found;
-			}
-			break;
+				case GETBYNUM:
+					if (matchnum(line, num, entryp)) {
+						goto found;
+					}
+					break;
 
-		    default:
-			break;
+				default:
+					break;
+			}
 		}
-	    }
 	}
 	(void) mutex_unlock(&matching_lock);
 	(void) fclose(fp);
@@ -751,7 +754,7 @@ nfs_getseconfig_byname(char *secmode_name, seconfig_t *entryp)
 		return (SC_NOMEM);
 
 	return (get_seconfig(GETBYNAME, secmode_name, 0, rpc_gss_svc_none,
-			entryp));
+	    entryp));
 }
 
 /*
@@ -767,7 +770,7 @@ nfs_getseconfig_bynumber(int nfs_secnum, seconfig_t *entryp)
 		return (SC_NOMEM);
 
 	return (get_seconfig(GETBYNUM, NULL, nfs_secnum, rpc_gss_svc_none,
-				entryp));
+	    entryp));
 }
 
 /*
@@ -804,34 +807,34 @@ nfs_free_secdata(sec_data_t *secdata)
 		return;
 
 	switch (secdata->rpcflavor) {
-	    case AUTH_UNIX:
-	    case AUTH_NONE:
-		break;
+		case AUTH_UNIX:
+		case AUTH_NONE:
+			break;
 
-	    case AUTH_DES:
-		/* LINTED pointer alignment */
-		dkdata = (dh_k4_clntdata_t *)secdata->data;
-		if (dkdata) {
-			if (dkdata->netname)
-				free(dkdata->netname);
-			if (dkdata->syncaddr.buf)
-				free(dkdata->syncaddr.buf);
-			free(dkdata);
-		}
-		break;
+		case AUTH_DES:
+			/* LINTED pointer alignment */
+			dkdata = (dh_k4_clntdata_t *)secdata->data;
+			if (dkdata) {
+				if (dkdata->netname)
+					free(dkdata->netname);
+				if (dkdata->syncaddr.buf)
+					free(dkdata->syncaddr.buf);
+				free(dkdata);
+			}
+			break;
 
-	    case RPCSEC_GSS:
-		/* LINTED pointer alignment */
-		gdata = (gss_clntdata_t *)secdata->data;
-		if (gdata) {
-			if (gdata->mechanism.elements)
-				free(gdata->mechanism.elements);
-			free(gdata);
-		}
-		break;
+		case RPCSEC_GSS:
+			/* LINTED pointer alignment */
+			gdata = (gss_clntdata_t *)secdata->data;
+			if (gdata) {
+				if (gdata->mechanism.elements)
+					free(gdata->mechanism.elements);
+				free(gdata);
+			}
+			break;
 
-	    default:
-		break;
+		default:
+			break;
 	}
 
 	free(secdata);
@@ -885,85 +888,92 @@ nfs_clnt_secdata(seconfig_t *secp, char *hostname, struct knetconfig *knconf,
 	 *    nodename.domain@realm
 	 */
 	switch (secp->sc_rpcnum) {
-	    case AUTH_UNIX:
-	    case AUTH_NONE:
-		secdata->data = NULL;
-		break;
+		case AUTH_UNIX:
+		case AUTH_NONE:
+			secdata->data = NULL;
+			break;
 
-	    case AUTH_DES:
-		/*
-		 *  If hostname is in the format of host.nisdomain
-		 *  the netname will be constructed with
-		 *  this nisdomain name rather than the default
-		 *  domain of the machine.
-		 */
-		    if (!host2netname(netname, hostname, NULL)) {
-			syslog(LOG_ERR, "host2netname: %s: unknown\n",
-				hostname);
-			goto err_out;
-		    }
-		dkdata = malloc(sizeof (dh_k4_clntdata_t));
-		if (!dkdata) {
-		    syslog(LOG_ERR, "nfs_clnt_secdata: no memory\n");
-		    goto err_out;
-		}
-		(void) memset((char *)dkdata, 0, sizeof (dh_k4_clntdata_t));
-		if ((dkdata->netname = strdup(netname)) == NULL) {
-		    syslog(LOG_ERR, "nfs_clnt_secdata: no memory\n");
-		    goto err_out;
-		}
-		dkdata->netnamelen = strlen(netname);
-		dkdata->knconf = knconf;
-		dkdata->syncaddr = *syncaddr;
-		dkdata->syncaddr.buf = malloc(syncaddr->len);
-		if (dkdata->syncaddr.buf == NULL) {
-		    syslog(LOG_ERR, "nfs_clnt_secdata: no memory\n");
-		    goto err_out;
-		}
-		(void) memcpy(dkdata->syncaddr.buf, syncaddr->buf,
-						syncaddr->len);
-		secdata->data = (caddr_t)dkdata;
-		break;
+		case AUTH_DES:
+			/*
+			 *  If hostname is in the format of host.nisdomain
+			 *  the netname will be constructed with
+			 *  this nisdomain name rather than the default
+			 *  domain of the machine.
+			 */
+			if (!host2netname(netname, hostname, NULL)) {
+				syslog(LOG_ERR, "host2netname: %s: unknown\n",
+				    hostname);
+				goto err_out;
+			}
+			dkdata = malloc(sizeof (dh_k4_clntdata_t));
+			if (!dkdata) {
+				syslog(LOG_ERR,
+				    "nfs_clnt_secdata: no memory\n");
+				goto err_out;
+			}
+			(void) memset((char *)dkdata, 0,
+			    sizeof (dh_k4_clntdata_t));
+			if ((dkdata->netname = strdup(netname)) == NULL) {
+				syslog(LOG_ERR,
+				    "nfs_clnt_secdata: no memory\n");
+				goto err_out;
+			}
+			dkdata->netnamelen = strlen(netname);
+			dkdata->knconf = knconf;
+			dkdata->syncaddr = *syncaddr;
+			dkdata->syncaddr.buf = malloc(syncaddr->len);
+			if (dkdata->syncaddr.buf == NULL) {
+				syslog(LOG_ERR,
+				    "nfs_clnt_secdata: no memory\n");
+				goto err_out;
+			}
+			(void) memcpy(dkdata->syncaddr.buf, syncaddr->buf,
+			    syncaddr->len);
+			secdata->data = (caddr_t)dkdata;
+			break;
 
-	    case RPCSEC_GSS: {
-
-		if (secp->sc_gss_mech_type == NULL) {
-		    syslog(LOG_ERR,
+		case RPCSEC_GSS:
+			if (secp->sc_gss_mech_type == NULL) {
+				syslog(LOG_ERR,
 			"nfs_clnt_secdata: need mechanism information\n");
-		    goto err_out;
-		}
+				goto err_out;
+			}
 
-		gdata = malloc(sizeof (gss_clntdata_t));
-		if (!gdata) {
-		    syslog(LOG_ERR, "nfs_clnt_secdata: no memory\n");
-		    goto err_out;
-		}
+			gdata = malloc(sizeof (gss_clntdata_t));
+			if (!gdata) {
+				syslog(LOG_ERR,
+				    "nfs_clnt_secdata: no memory\n");
+				goto err_out;
+			}
 
-		(void) strcpy(gdata->uname, "nfs");
-		if (!parsehostname(hostname, gdata->inst, gdata->realm)) {
-		    syslog(LOG_ERR, "nfs_clnt_secdata: bad host name\n");
-		    goto err_out;
-		}
+			(void) strcpy(gdata->uname, "nfs");
+			if (!parsehostname(hostname, gdata->inst,
+			    gdata->realm)) {
+				syslog(LOG_ERR,
+				    "nfs_clnt_secdata: bad host name\n");
+				goto err_out;
+			}
 
-		gdata->mechanism.length = secp->sc_gss_mech_type->length;
-		if (!(gdata->mechanism.elements =
-			malloc(secp->sc_gss_mech_type->length))) {
-			syslog(LOG_ERR, "nfs_clnt_secdata: no memory\n");
+			gdata->mechanism.length =
+			    secp->sc_gss_mech_type->length;
+			if (!(gdata->mechanism.elements =
+			    malloc(secp->sc_gss_mech_type->length))) {
+				syslog(LOG_ERR,
+				    "nfs_clnt_secdata: no memory\n");
+				goto err_out;
+			}
+			(void) memcpy(gdata->mechanism.elements,
+			    secp->sc_gss_mech_type->elements,
+			    secp->sc_gss_mech_type->length);
+
+			gdata->qop = secp->sc_qop;
+			gdata->service = secp->sc_service;
+			secdata->data = (caddr_t)gdata;
+			break;
+
+		default:
+			syslog(LOG_ERR, "nfs_clnt_secdata: unknown flavor\n");
 			goto err_out;
-		}
-		(void) memcpy(gdata->mechanism.elements,
-			secp->sc_gss_mech_type->elements,
-			secp->sc_gss_mech_type->length);
-
-		gdata->qop = secp->sc_qop;
-		gdata->service = secp->sc_service;
-		secdata->data = (caddr_t)gdata;
-	    }
-	    break;
-
-	    default:
-		syslog(LOG_ERR, "nfs_clnt_secdata: unknown flavor\n");
-		goto err_out;
 	}
 
 	return (secdata);
@@ -997,37 +1007,37 @@ nfs_get_root_principal(seconfig_t *seconfig, char *host, caddr_t *rootname_p)
 
 	switch (seconfig->sc_rpcnum) {
 		case AUTH_DES:
-		    if (!host2netname(netname, host, NULL)) {
-			syslog(LOG_ERR,
+			if (!host2netname(netname, host, NULL)) {
+				syslog(LOG_ERR,
 			    "nfs_get_root_principal: unknown host: %s\n", host);
-			return (FALSE);
-		    }
-		    *rootname_p = strdup(netname);
-		    if (!*rootname_p) {
-			syslog(LOG_ERR, "nfs_get_root_principal: no memory\n");
-			return (FALSE);
-		    }
-		    break;
+				return (FALSE);
+			}
+			*rootname_p = strdup(netname);
+			if (!*rootname_p) {
+				syslog(LOG_ERR,
+				    "nfs_get_root_principal: no memory\n");
+				return (FALSE);
+			}
+			break;
 
 		case RPCSEC_GSS:
-		    if (!parsehostname(host, node, secdomain)) {
-			syslog(LOG_ERR,
-			    "nfs_get_root_principal: bad host name\n");
-			return (FALSE);
-		    }
-		    if (!rpc_gss_get_principal_name(&gssname,
-				seconfig->sc_gss_mech, "root",
-				node, secdomain)) {
-			syslog(LOG_ERR,
+			if (!parsehostname(host, node, secdomain)) {
+				syslog(LOG_ERR,
+				    "nfs_get_root_principal: bad host name\n");
+				return (FALSE);
+			}
+			if (!rpc_gss_get_principal_name(&gssname,
+			    seconfig->sc_gss_mech, "root", node, secdomain)) {
+				syslog(LOG_ERR,
 	"nfs_get_root_principal: can not get principal name : %s\n", host);
-			return (FALSE);
-		    }
+				return (FALSE);
+			}
 
-		    *rootname_p = (caddr_t)gssname;
-		    break;
+			*rootname_p = (caddr_t)gssname;
+			break;
 
 		default:
-		    return (FALSE);
+			return (FALSE);
 	}
 	return (TRUE);
 }

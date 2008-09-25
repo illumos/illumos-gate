@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PSARC/2004/154 nfsmapid DNS enhancements implementation.
@@ -245,6 +243,17 @@ resolv_search(void)
 	(void) rw_unlock(&s_dns_impl_lock);
 
 	return (NETDB_SUCCESS);
+}
+
+/*
+ * Free all resolver state information stored in s_res
+ */
+static void
+resolv_destroy(void)
+{
+	(void) mutex_lock(&s_res_lock);
+	res_ndestroy(&s_res);
+	(void) mutex_unlock(&s_res_lock);
 }
 
 /*
@@ -504,7 +513,7 @@ resolv_get_txt_data()
 	if (s_txt_rr[0] != '\0') {
 		(void) rw_wrlock(&s_dns_data_lock);
 		(void) snprintf(dns_txt_domain, strlen(s_txt_rr) + 1, "%s",
-								s_txt_rr);
+		    s_txt_rr);
 		dns_txt_domain_len = strlen(dns_txt_domain);
 		dns_txt_cached = 1;
 		(void) rw_unlock(&s_dns_data_lock);
@@ -646,6 +655,8 @@ resolv_query_thread(void *arg)
 #endif
 			goto thr_reset;
 		}
+
+		resolv_destroy();
 	}
 thr_reset:
 	(void) rw_wrlock(&s_dns_data_lock);
@@ -654,6 +665,7 @@ thr_reset:
 	resolv_txt_reset();
 
 thr_okay:
+	resolv_destroy();
 	/* mark thread as done */
 	(void) rw_wrlock(&s_dns_impl_lock);
 	s_dns_qthr_created = FALSE;
@@ -727,7 +739,11 @@ get_dns_txt_domain(cb_t *argp)
 		 * reason to query DNS or fire a thread since we
 		 * have no nameserver addresses.
 		 */
-		goto txtclear;
+		(void) rw_wrlock(&s_dns_data_lock);
+		dns_txt_cached = 0;
+		(void) rw_unlock(&s_dns_data_lock);
+		resolv_txt_reset();
+		return;
 	}
 
 	(void) rw_rdlock(&s_dns_impl_lock);
@@ -754,7 +770,7 @@ get_dns_txt_domain(cb_t *argp)
 		 */
 		resolv_decode();
 		resolv_get_txt_data();
-		return;
+		break;
 
 	case TRY_AGAIN:
 		if (argp == NULL || argp->fcn == NULL)
@@ -762,7 +778,7 @@ get_dns_txt_domain(cb_t *argp)
 			 * If no valid argument was passed or
 			 * callback defined, don't fire thread
 			 */
-			return;
+			break;
 
 		(void) rw_wrlock(&s_dns_impl_lock);
 		if (s_dns_qthr_created) {
@@ -778,7 +794,7 @@ get_dns_txt_domain(cb_t *argp)
 			    whoami);
 #endif
 			(void) rw_unlock(&s_dns_impl_lock);
-				return;
+			break;
 		}
 
 		/*
@@ -801,7 +817,7 @@ get_dns_txt_domain(cb_t *argp)
 		}
 #endif
 		(void) rw_unlock(&s_dns_impl_lock);
-		return;
+		break;
 
 	case NO_RECOVERY:
 #ifdef	DEBUG
@@ -820,14 +836,14 @@ get_dns_txt_domain(cb_t *argp)
 		 * occuring. At any rate, the TXT domain should not
 		 * be used, so we default to the DNS domain.
 		 */
+		(void) rw_wrlock(&s_dns_data_lock);
+		dns_txt_cached = 0;
+		(void) rw_unlock(&s_dns_data_lock);
+		resolv_txt_reset();
 		break;
 	}
 
-txtclear:
-	(void) rw_wrlock(&s_dns_data_lock);
-	dns_txt_cached = 0;
-	(void) rw_unlock(&s_dns_data_lock);
-	resolv_txt_reset();
+	resolv_destroy();
 }
 
 static int
@@ -962,7 +978,7 @@ get_nfs_domain(void)
 #ifdef	DEBUG
 		if (orig[0] != '\0') {
 			syslog(LOG_ERR, gettext("%s: Invalid domain name \"%s\""
-				" found in configuration file."), whoami, orig);
+			    " found in configuration file."), whoami, orig);
 		}
 #endif
 	}
@@ -1023,11 +1039,15 @@ get_dns_domain(void)
 		dns_domain_len = strlen(sysdns_domain);
 		(void) rw_unlock(&s_dns_data_lock);
 		dns_mtime = ntime;
+		resolv_destroy();
 		return;
 	}
 	(void) rw_unlock(&s_dns_data_lock);
 
 	ZAP_DOMAIN(dns);
+
+	resolv_destroy();
+
 }
 
 /*
@@ -1176,4 +1196,5 @@ _lib_init(void)
 	(void) rwlock_init(&mapid_domain_lock, USYNC_THREAD, NULL);
 	(void) thr_keycreate(&s_thr_key, NULL);
 	lib_init_done++;
+	resolv_destroy();
 }

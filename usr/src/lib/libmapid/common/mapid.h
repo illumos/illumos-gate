@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MAPID_H
 #define	_MAPID_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -131,6 +129,7 @@ static void			 resolv_get_txt_data(void);
 static void			 resolv_txt_reset(void);
 static void			 resolve_process_txt(uchar_t *, int);
 static int			 resolv_search(void);
+static void			 resolv_destroy(void);
 static uchar_t			*resolv_skip_rr(uchar_t *, uchar_t *);
 static void			 domain_sync(cb_t *, char *);
 static int			 get_mtime(const char *, timestruc_t *);

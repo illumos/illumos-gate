@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nfs mount
  */
@@ -1576,14 +1574,15 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 
 		if (vers == NFS_VERSION) {
 			wnl_diropargs arg;
-			wnl_diropres *res;
+			wnl_diropres res;
 
 			memset((char *)&arg.dir, 0, sizeof (wnl_fh));
 			arg.name = fspath;
-			res = wnlproc_lookup_2(&arg, cl);
-
-			if (res == NULL || res->status != NFS_OK)
+			memset((char *)&res, 0, sizeof (wnl_diropres));
+			if (wnlproc_lookup_2(&arg, &res, cl) !=
+			    RPC_SUCCESS || res.status != NFS_OK)
 				goto done;
+
 			*fhp = malloc(sizeof (wnl_fh));
 
 			if (*fhp == NULL) {
@@ -1592,50 +1591,51 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 			}
 
 			memcpy((char *)*fhp,
-			    (char *)&res->wnl_diropres_u.wnl_diropres.file,
+			    (char *)&res.wnl_diropres_u.wnl_diropres.file,
 			    sizeof (wnl_fh));
 		} else {
 			WNL_LOOKUP3args arg;
-			WNL_LOOKUP3res *res;
+			WNL_LOOKUP3res res;
 			nfs_fh3 *fh3p;
 
 			memset((char *)&arg.what.dir, 0, sizeof (wnl_fh3));
 			arg.what.name = fspath;
-			res = wnlproc3_lookup_3(&arg, cl);
-
-			if (res == NULL || res->status != NFS3_OK)
+			memset((char *)&res, 0, sizeof (WNL_LOOKUP3res));
+			if (wnlproc3_lookup_3(&arg, &res, cl) !=
+			    RPC_SUCCESS || res.status != NFS3_OK)
 				goto done;
 
 			fh3p = (nfs_fh3 *)malloc(sizeof (*fh3p));
 
 			if (fh3p == NULL) {
 				pr_err(gettext("no memory\n"));
-				CLNT_FREERES(cl, xdr_WNL_LOOKUP3res,
-				    (char *)res);
 				goto done;
 			}
 
 			fh3p->fh3_length =
-			    res->WNL_LOOKUP3res_u.res_ok.object.data.data_len;
+			    res.WNL_LOOKUP3res_u.res_ok.object.data.data_len;
 			memcpy(fh3p->fh3_u.data,
-			    res->WNL_LOOKUP3res_u.res_ok.object.data.data_val,
+			    &res.WNL_LOOKUP3res_u.res_ok.object.data.data_val,
 			    fh3p->fh3_length);
 
 			*fhp = (caddr_t)fh3p;
-			CLNT_FREERES(cl, xdr_WNL_LOOKUP3res, (char *)res);
 		}
 	} else {
-		void *res;
 		struct rpc_err r_err;
+		enum clnt_stat rc;
 
+		/*
+		 * NULL procedures need not have an argument or
+		 * result param.
+		 */
 		if (vers == NFS_VERSION)
-			res = wnlproc_null_2(NULL, cl);
+			rc = wnlproc_null_2(NULL, NULL, cl);
 		else if (vers == NFS_V3)
-			res = wnlproc3_null_3(NULL, cl);
+			rc = wnlproc3_null_3(NULL, NULL, cl);
 		else
-			res = wnlproc4_null_4(NULL, cl);
+			rc = wnlproc4_null_4(NULL, NULL, cl);
 
-		if (res == NULL) {
+		if (rc != RPC_SUCCESS) {
 			clnt_geterr(cl, &r_err);
 			if (strcmp(nconf->nc_protofmly, NC_LOOPBACK) == 0) {
 				switch (r_err.re_status) {
