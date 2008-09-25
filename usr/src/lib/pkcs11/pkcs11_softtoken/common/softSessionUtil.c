@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <md5.h>
 #include <pthread.h>
 #include <syslog.h>
@@ -43,6 +41,8 @@
 
 CK_ULONG soft_session_cnt = 0;		/* the number of opened sessions */
 CK_ULONG soft_session_rw_cnt = 0;	/* the number of opened R/W sessions */
+
+#define	DIGEST_MECH_OK(_m_)	((_m_) == CKM_MD5 || (_m_) == CKM_SHA_1)
 
 /*
  * Delete all the sessions. First, obtain the global session
@@ -448,27 +448,37 @@ soft_get_operationstate(soft_session_t *session_p, CK_BYTE_PTR pOperationState,
     CK_ULONG_PTR pulOperationStateLen)
 {
 
-	internal_op_state_t op_state;
+	internal_op_state_t *p_op_state;
 	CK_ULONG op_data_len = 0;
+	CK_RV rv = CKR_OK;
+
+	if (pulOperationStateLen == NULL)
+		return (CKR_ARGUMENTS_BAD);
+
+	(void) pthread_mutex_lock(&session_p->session_mutex);
 
 	/* Check to see if encrypt operation is active. */
 	if (session_p->encrypt.flags & CRYPTO_OPERATION_ACTIVE) {
-		return (CKR_STATE_UNSAVEABLE);
+		rv = CKR_STATE_UNSAVEABLE;
+		goto unlock_session;
 	}
 
 	/* Check to see if decrypt operation is active. */
 	if (session_p->decrypt.flags & CRYPTO_OPERATION_ACTIVE) {
-		return (CKR_STATE_UNSAVEABLE);
+		rv = CKR_STATE_UNSAVEABLE;
+		goto unlock_session;
 	}
 
 	/* Check to see if sign operation is active. */
 	if (session_p->sign.flags & CRYPTO_OPERATION_ACTIVE) {
-		return (CKR_STATE_UNSAVEABLE);
+		rv = CKR_STATE_UNSAVEABLE;
+		goto unlock_session;
 	}
 
 	/* Check to see if verify operation is active. */
 	if (session_p->verify.flags & CRYPTO_OPERATION_ACTIVE) {
-		return (CKR_STATE_UNSAVEABLE);
+		rv = CKR_STATE_UNSAVEABLE;
+		goto unlock_session;
 	}
 
 	/* Check to see if digest operation is active. */
@@ -484,26 +494,27 @@ soft_get_operationstate(soft_session_t *session_p, CK_BYTE_PTR pOperationState,
 			op_data_len += sizeof (SHA1_CTX);
 			break;
 		default:
-			return (CKR_STATE_UNSAVEABLE);
+			rv = CKR_STATE_UNSAVEABLE;
+			goto unlock_session;
 		}
 
 		if (pOperationState == NULL_PTR) {
 			*pulOperationStateLen = op_data_len;
-			return (CKR_OK);
+			goto unlock_session;
 		} else {
 			if (*pulOperationStateLen < op_data_len) {
 				*pulOperationStateLen = op_data_len;
-				return (CKR_BUFFER_TOO_SMALL);
+				rv = CKR_BUFFER_TOO_SMALL;
+				goto unlock_session;
 			}
 		}
 
-		op_state.op_len = op_data_len;
-		op_state.op_active = DIGEST_OP;
-		op_state.op_session_state = session_p->state;
-
 		/* Save internal_op_state_t */
-		(void) memcpy(pOperationState, (CK_BYTE_PTR)&op_state,
-		    sizeof (internal_op_state_t));
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		p_op_state = (internal_op_state_t *)pOperationState;
+		p_op_state->op_len = op_data_len;
+		p_op_state->op_active = DIGEST_OP;
+		p_op_state->op_session_state = session_p->state;
 
 		/* Save crypto_active_op_t */
 		(void) memcpy((CK_BYTE *)pOperationState +
@@ -531,13 +542,34 @@ soft_get_operationstate(soft_session_t *session_p, CK_BYTE_PTR pOperationState,
 			break;
 
 		default:
-			return (CKR_STATE_UNSAVEABLE);
+			rv = CKR_STATE_UNSAVEABLE;
 		}
 	}
 
 	*pulOperationStateLen = op_data_len;
-	return (CKR_OK);
 
+unlock_session:
+	(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+	return (rv);
+
+}
+
+static CK_BYTE_PTR alloc_digest(CK_ULONG mech)
+{
+	CK_BYTE_PTR	ret_val;
+
+	switch (mech) {
+		case CKM_MD5:
+			ret_val = (CK_BYTE_PTR) malloc(sizeof (MD5_CTX));
+			break;
+		case CKM_SHA_1:
+			ret_val = (CK_BYTE_PTR) malloc(sizeof (SHA1_CTX));
+			break;
+		default: ret_val = NULL;
+	}
+
+	return (ret_val);
 }
 
 /*
@@ -552,24 +584,17 @@ soft_set_operationstate(soft_session_t *session_p, CK_BYTE_PTR pOperationState,
     CK_OBJECT_HANDLE hAuthenticationKey)
 {
 
-	CK_RV		rv;
-	internal_op_state_t op_state;
-	crypto_active_op_t crypto_tmp;
+	CK_RV		rv = CKR_OK;
+	internal_op_state_t *p_op_state;
+	crypto_active_op_t *p_active_op;
 	CK_ULONG offset = 0;
+	CK_ULONG mech;
+	void *free_it = NULL;
 
-	/* Restore internal_op_state_t */
-	(void) memcpy((CK_BYTE_PTR)&op_state, pOperationState,
-	    sizeof (internal_op_state_t));
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
+	p_op_state = (internal_op_state_t *)pOperationState;
 
-	if (session_p->state != op_state.op_session_state) {
-		/*
-		 * The supplied session state does not match with
-		 * the saved session state.
-		 */
-		return (CKR_SAVED_STATE_INVALID);
-	}
-
-	if (op_state.op_len != ulOperationStateLen) {
+	if (p_op_state->op_len != ulOperationStateLen) {
 		/*
 		 * The supplied data length does not match with
 		 * the saved data length.
@@ -577,115 +602,90 @@ soft_set_operationstate(soft_session_t *session_p, CK_BYTE_PTR pOperationState,
 		return (CKR_SAVED_STATE_INVALID);
 	}
 
+	if (p_op_state->op_active != DIGEST_OP)
+		return (CKR_SAVED_STATE_INVALID);
+
+	if ((hAuthenticationKey != 0) || (hEncryptionKey != 0)) {
+		return (CKR_KEY_NOT_NEEDED);
+	}
+
 	offset = sizeof (internal_op_state_t);
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
+	p_active_op = (crypto_active_op_t *)(pOperationState + offset);
+	offset += sizeof (crypto_active_op_t);
+	mech = p_active_op->mech.mechanism;
 
-	(void) memcpy((CK_BYTE *)&crypto_tmp,
-	    (CK_BYTE *)pOperationState + offset,
-	    sizeof (crypto_active_op_t));
-
-	switch (op_state.op_active) {
-	case DIGEST_OP:
-		if ((hAuthenticationKey != 0) || (hEncryptionKey != 0)) {
-			return (CKR_KEY_NOT_NEEDED);
-		}
-
-		/*
-		 * If the destination session has the same mechanism
-		 * as the source, we can reuse the memory allocated for
-		 * the crypto context. Otherwise, we free the crypto
-		 * context of the destination session now.
-		 */
-		if (session_p->digest.context) {
-			if (session_p->digest.mech.mechanism !=
-			    crypto_tmp.mech.mechanism) {
-				(void) pthread_mutex_lock(&session_p->
-				    session_mutex);
-				free(session_p->digest.context);
-				session_p->digest.context = NULL;
-				(void) pthread_mutex_unlock(&session_p->
-				    session_mutex);
-			}
-		}
-		break;
-
-	default:
+	if (!DIGEST_MECH_OK(mech)) {
 		return (CKR_SAVED_STATE_INVALID);
 	}
 
-	/* Restore crypto_active_op_t */
-	(void) pthread_mutex_lock(&session_p->session_mutex);
-	session_p->digest.mech.mechanism = crypto_tmp.mech.mechanism;
-	session_p->digest.flags = crypto_tmp.flags;
-	(void) pthread_mutex_unlock(&session_p->session_mutex);
-
-	offset += sizeof (crypto_active_op_t);
-
 	/*
-	 * Make sure the supplied crypto operation state is valid
+	 * We may reuse digest.context in case the digest mechanisms (the one,
+	 * which belongs to session and the operation, which we are restoring)
+	 * are the same. If digest mechanisms are different, we have to release
+	 * the digest context, which belongs to session and allocate a new one.
 	 */
-	switch (op_state.op_active) {
-	case DIGEST_OP:
+	(void) pthread_mutex_lock(&session_p->session_mutex);
 
-		switch (session_p->digest.mech.mechanism) {
+	if (session_p->state != p_op_state->op_session_state) {
+		/*
+		 * The supplied session state does not match with
+		 * the saved session state.
+		 */
+		rv = CKR_SAVED_STATE_INVALID;
+		goto unlock_session;
+	}
+
+	if (session_p->digest.context &&
+	    (session_p->digest.mech.mechanism != mech)) {
+		free_it = session_p->digest.context;
+		session_p->digest.context = NULL;
+	}
+
+	if (session_p->digest.context == NULL) {
+		session_p->digest.context = alloc_digest(mech);
+
+		if (session_p->digest.context == NULL) {
+			/*
+			 * put back original context into session in case
+			 * allocation of new context has failed.
+			 */
+			session_p->digest.context = free_it;
+			free_it = NULL;
+			rv = CKR_HOST_MEMORY;
+			goto unlock_session;
+		}
+	}
+
+	/* Restore crypto_active_op_t */
+	session_p->digest.mech.mechanism = mech;
+	session_p->digest.flags = p_active_op->flags;
+
+	switch (mech) {
 		case CKM_MD5:
-			(void) pthread_mutex_lock(&session_p->session_mutex);
-			if (session_p->digest.context == NULL) {
-				session_p->digest.context =
-				    malloc(sizeof (MD5_CTX));
-
-				if (session_p->digest.context == NULL) {
-					(void) pthread_mutex_unlock(
-					    &session_p->session_mutex);
-					return (CKR_HOST_MEMORY);
-				}
-			}
-
 			/* Restore MD5_CTX from the saved digest operation */
 			(void) memcpy((CK_BYTE *)session_p->digest.context,
 			    (CK_BYTE *)pOperationState + offset,
 			    sizeof (MD5_CTX));
-
-			(void) pthread_mutex_unlock(&session_p->session_mutex);
-
-			rv = CKR_OK;
 			break;
-
 		case CKM_SHA_1:
-			(void) pthread_mutex_lock(&session_p->session_mutex);
-			if (session_p->digest.context == NULL) {
-				session_p->digest.context =
-				    malloc(sizeof (SHA1_CTX));
-
-				if (session_p->digest.context == NULL) {
-					(void) pthread_mutex_unlock(
-					    &session_p->session_mutex);
-					return (CKR_HOST_MEMORY);
-				}
-			}
-
 			/* Restore SHA1_CTX from the saved digest operation */
 			(void) memcpy((CK_BYTE *)session_p->digest.context,
 			    (CK_BYTE *)pOperationState + offset,
 			    sizeof (SHA1_CTX));
-
-			(void) pthread_mutex_unlock(&session_p->session_mutex);
-
-			rv = CKR_OK;
 			break;
-
 		default:
+			/* never reached */
 			rv = CKR_SAVED_STATE_INVALID;
-			break;
-		}
-		break;
-
-	default:
-		rv = CKR_SAVED_STATE_INVALID;
-		break;
 	}
 
-	return (rv);
+unlock_session:
+	(void) pthread_mutex_unlock(&session_p->session_mutex);
 
+	if (free_it != NULL)
+		free(free_it);
+
+	return (rv);
 }
 
 
