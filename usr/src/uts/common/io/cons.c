@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * Indirect console driver for Sun.
  *
@@ -221,6 +220,7 @@ cn_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
+
 	cn_dip = devi;
 	return (DDI_SUCCESS);
 }
@@ -357,7 +357,6 @@ cnclose(dev_t dev, int flag, int state, struct cred *cred)
 	while ((rconsopen != 0) && ((vp = rconsvp) != NULL)) {
 		err = VOP_CLOSE(vp, flag, 1, (offset_t)0, cred, NULL);
 		if (!err) {
-			vp->v_stream = NULL;
 			rconsopen--;
 		}
 	}

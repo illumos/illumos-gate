@@ -52,7 +52,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #	lock_lint rules
 #
 all:	warlock warlock.1394 warlock.audio warlock.ecpp warlock.scsi \
-	warlock.usb warlock.ib warlock.sata warlock.sdcard
+	warlock.usb warlock.ib warlock.sata warlock.sdcard warlock.wc
 
 warlock: $(MODULE).ok 
 
@@ -137,3 +137,6 @@ $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/marvell88sx; \
 warlock.sdcard:
 	@cd ../sda; $(MAKE) clean; $(MAKE) warlock
 	@cd ../sdhost; $(MAKE) clean; $(MAKE) warlock
+
+warlock.wc:
+	@cd ../wc; $(MAKE) clean; $(MAKE) warlock

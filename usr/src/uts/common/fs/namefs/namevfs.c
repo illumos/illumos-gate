@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* from S5R4 1.28 */
 
 /*
  * This file supports the vfs operations for the NAMEFS file system.
@@ -356,13 +354,14 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	/*
 	 * Cannot allow users to fattach() in /dev/pts.
 	 * First, there is no need for doing so and secondly
-	 * we cannot allow arbitrary users to park on a
-	 * /dev/pts node.
+	 * we cannot allow arbitrary users to park on a node in
+	 * /dev/pts or /dev/vt.
 	 */
 	rvp = NULLVP;
 	if (vn_matchops(mvp, spec_getvnodeops()) &&
 	    VOP_REALVP(mvp, &rvp, NULL) == 0 && rvp &&
-	    vn_matchops(rvp, devpts_getvnodeops())) {
+	    (vn_matchops(rvp, devpts_getvnodeops()) ||
+	    vn_matchops(rvp, devvt_getvnodeops()))) {
 		releasef(namefdp.fd);
 		return (ENOTSUP);
 	}

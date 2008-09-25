@@ -21,18 +21,15 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 cat >console-login.xml <<EOF
 <?xml version="1.0"?>
 <!--
 	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
-
-	ident   "%Z%%M% %I%     %E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -48,10 +45,6 @@ cat >console-login.xml <<EOF
 	name='system/console-login'
 	type='service'
 	version='1'>
-
-	<create_default_instance enabled='true' />
-
-	<single_instance/>
 
 	<dependency
 		name='fs'
@@ -93,14 +86,23 @@ cat >console-login.xml <<EOF
 	<exec_method
 		type='method'
 		name='start'
-		exec='/lib/svc/method/console-login'
-		timeout_seconds='0' />
+		exec='/lib/svc/method/console-login %i'
+		timeout_seconds='0'>
+                <method_context>
+                        <method_credential user='root' group='root' />
+                </method_context>
+        </exec_method>
 
 	<exec_method
 		type='method'
 		name='stop'
 		exec=':kill -9'
-		timeout_seconds='3' />
+		timeout_seconds='3'>
+                <method_context>
+                        <method_credential user='root' group='root' />
+                </method_context>
+        </exec_method>
+
 
 	<property_group name='startd' type='framework'>
 		<propval name='duration' type='astring' value='child' />
@@ -109,8 +111,20 @@ cat >console-login.xml <<EOF
 		<propval name='utmpx_prefix' type='astring' value='co' />
 	</property_group>
 
-	<!-- these are passed to ttymon in the method script -->
+	<property_group name='general' type='framework'>
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.vt' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.vt' />
+	</property_group>
+
+	<!-- these are passed to ttymon in the method script.
+	     note that value_authorization is not passed to ttymon
+	     and it's for smf_security(5).
+	-->
 	<property_group name='ttymon' type='application'>
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.vt' />
 		<propval name='device' type='astring' value='/dev/console' />
 		<propval name='label' type='astring' value='console' />
 		<propval name='timeout' type='count' value='0' />
@@ -122,6 +136,64 @@ cat >console-login.xml <<EOF
 		<propval name='terminal_type' type='astring'
 		     value='' />
 	</property_group>
+
+
+<instance name='default' enabled='true'>
+</instance>
+
+EOF
+
+# Note that this script file is normally parsed during build by sh(1).
+# When the parser encounters an EOF token (like the one above), it
+# will fork off and pipe all the text after the EOF above to the shell
+# for execution.
+#
+# one system console (/dev/console) plus five virtual consoles
+# (/dev/vt/#, # is from 2 to 6).
+
+for num in 2 3 4 5 6; do
+	cat >>console-login.xml <<EOF
+
+<instance name='vt$num' enabled='false'>
+
+	<dependency
+		name='system-console'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/console-login:default' />
+	</dependency>
+
+	<dependency
+		name='vtdaemon'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/vtdaemon:default' />
+	</dependency>
+
+        <!-- these are passed to ttymon in the method script -->
+        <property_group name='ttymon' type='application'>
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.vt' />
+		<propval name='device' type='astring' value='/dev/vt/$num' />
+		<propval name='label' type='astring' value='console' />
+		<propval name='timeout' type='count' value='0' />
+		<propval name='nohangup' type='boolean' value='true' />
+		<propval name='modules' type='astring'
+			value='ldterm,ttcompat' />
+		<propval name='prompt' type='astring'
+			value='\`uname -n\` vt$num login:' />
+		<propval name='terminal_type' type='astring'
+			value='' />
+	</property_group>
+
+</instance>
+
+EOF
+done
+
+cat >>console-login.xml <<EOF
 
 	<stability value='Evolving' />
 

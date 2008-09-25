@@ -20,14 +20,11 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -109,11 +106,9 @@ ttymon_express(int argc, char **argv)
 
 	read_ttydefs(NULL, FALSE);
 
-	if ((pmtab->p_device != NULL) && (*(pmtab->p_device) != '\0') &&
-	    strcmp(pmtab->p_device, "/dev/console") == 0) {
+	if ((pmtab->p_device != NULL) && (*(pmtab->p_device) != '\0'))
 		while (checkut_line(pmtab->p_device))
 			sleep(15);
-	}
 
 	if ((pmtab->p_device == NULL) || (*(pmtab->p_device) == '\0')) {
 		devname = find_ttyname(0);

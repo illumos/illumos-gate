@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CONSOLE_H
 #define	_SYS_CONSOLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -76,14 +74,6 @@ extern void console_exit(int, int);
 
 extern vnode_t *console_vnode;
 extern taskq_t *console_taskq;
-
-/*
- * PROM interface callback routine
- */
-#ifdef _HAVE_TEM_FIRMWARE
-#include <sys/promif.h>
-extern ssize_t console_prom_write_cb(promif_redir_arg_t, uchar_t *, size_t);
-#endif /* _HAVE_TEM_FIRMWARE */
 
 #endif	/* _KERNEL */
 

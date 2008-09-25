@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * utility routines for the /dev fs
  */
@@ -606,6 +604,9 @@ struct sdev_vop_table {
 static struct sdev_vop_table vtab[] =
 {
 	{ "pts", devpts_vnodeops_tbl, NULL, &devpts_vnodeops, devpts_validate,
+	SDEV_DYNAMIC | SDEV_VTOR },
+
+	{ "vt", devvt_vnodeops_tbl, NULL, &devvt_vnodeops, devvt_validate,
 	SDEV_DYNAMIC | SDEV_VTOR },
 
 	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
@@ -1949,7 +1950,6 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 			return (-1);
 		}
 
-		ASSERT(physpath);
 		rvp = devname_configure_by_path(physpath, NULL);
 		if (rvp == NULL) {
 			sdcmn_err3(("devname_configure_by_path: "
@@ -1990,6 +1990,34 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 				return (0);
 			}
 		}
+	} else if (flags & SDEV_VLINK) {
+		physpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+		rv = callback(ddv, nm, (void *)&physpath, kcred, NULL,
+		    NULL);
+		if (rv) {
+			kmem_free(physpath, MAXPATHLEN);
+			return (-1);
+		}
+
+		vap = sdev_getdefault_attr(VLNK);
+		vap->va_size = strlen(physpath);
+		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+		rv = sdev_mknode(ddv, nm, &dv, vap, NULL,
+		    (void *)physpath, cred, SDEV_READY);
+		rw_downgrade(&ddv->sdev_contents);
+		kmem_free(physpath, MAXPATHLEN);
+		if (rv)
+			return (rv);
+
+		mutex_enter(&dv->sdev_lookup_lock);
+		SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
+		mutex_exit(&dv->sdev_lookup_lock);
+		return (0);
 	} else if (flags & SDEV_VNODE) {
 		/*
 		 * DBNR has its own way to create the device

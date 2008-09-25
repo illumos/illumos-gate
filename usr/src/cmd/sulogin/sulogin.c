@@ -74,6 +74,7 @@
 #include <auth_list.h>
 #include <nss_dbdefs.h>
 #include <user_attr.h>
+#include <sys/vt.h>
 
 /*
  * Intervals to sleep after failed login
@@ -458,6 +459,16 @@ main_loop(char *devname, boolean_t cttyflag)
 	}
 	if ((fd = open(devname, O_RDWR)) < 0)
 		exit(EXIT_FAILURE);
+
+	/*
+	 * In system maintenance mode, all virtual console instances
+	 * of the svc:/system/console-login service are not available
+	 * any more, and only the system console is available. So here
+	 * we always switch to the system console in case at the moment
+	 * the active console isn't it.
+	 */
+	(void) ioctl(fd, VT_ACTIVATE, 1);
+
 	if (fd != 0)
 		(void) dup2(fd, STDIN_FILENO);
 	if (fd != 1)

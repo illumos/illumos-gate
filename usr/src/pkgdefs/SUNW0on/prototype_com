@@ -265,6 +265,7 @@ f none usr/lib/help/auths/locale/SmfVscanStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctProcess.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctTask.html 444 root bin
+f none usr/lib/help/auths/locale/SmfVtStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueInetd.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueIPsec.html 444 root bin
@@ -279,6 +280,7 @@ f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueSMB.html 444 root bin
 f none usr/lib/help/auths/locale/AuthReadSMB.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueVscan.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueVt.html 444 root bin
 f none usr/lib/help/auths/locale/SmfWpaStates.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkAutoconf.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin

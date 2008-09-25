@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -89,7 +88,6 @@ f none usr/include/sys/fp.h 644 root bin
 f none usr/include/sys/hypervisor.h 644 root bin
 f none usr/include/sys/i8272A.h 644 root bin
 f none usr/include/sys/iommulib.h 644 root bin
-f none usr/include/sys/kd.h 644 root bin
 f none usr/include/sys/mc.h 644 root bin
 f none usr/include/sys/mc_amd.h 644 root bin
 f none usr/include/sys/mca_amd.h 644 root bin

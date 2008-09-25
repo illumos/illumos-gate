@@ -126,6 +126,9 @@ CHKHDRS=			\
 	consdev.h		\
 	console.h		\
         consplat.h              \
+	vt.h			\
+	vtdaemon.h		\
+	kd.h			\
 	contract.h		\
 	contract_impl.h		\
 	copyops.h		\

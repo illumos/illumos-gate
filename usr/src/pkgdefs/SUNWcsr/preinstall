@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # When first introduced the /etc/inet/ipnodes file was seperate from
@@ -125,6 +124,16 @@ if [ "$UPDATE" = yes ]; then
 		MANKEYMANIFEST=`echo manual-key.xml$BASEPREFIX" | cut -c 1-256`
 		touch /tmp/${MANKEYMANIFEST}
 	fi
+fi
+
+# Presence of this temp file will tell postinstall script
+# that the vtdaemon service is already installed, in which case
+# the current service state will be preserved, be it enabled
+# or disabled.
+rm -f $PKG_INSTALL_ROOT/var/tmp/vtdaemon_installed.tmp > /dev/null 2>&1
+
+if [ -f $PKG_INSTALL_ROOT/var/svc/manifest/system/vtdaemon.xml ]; then
+        touch $PKG_INSTALL_ROOT/var/tmp/vtdaemon_installed.tmp
 fi
 
 exit 0

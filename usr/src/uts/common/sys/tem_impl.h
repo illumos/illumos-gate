@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,6 @@
 #ifndef	_SYS_TEM_IMPL_H
 #define	_SYS_TEM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,7 +41,9 @@ extern "C" {
 #include <sys/sunldi.h>
 #include <sys/visual_io.h>
 #include <sys/font.h>
+#include <sys/list.h>
 #include <sys/tem.h>
+#include <sys/note.h>
 
 /*
  * definitions for ANSI x3.64 terminal control language parser
@@ -93,6 +93,7 @@ extern "C" {
 /*
  * Default foreground/background color
  */
+
 #ifdef _HAVE_TEM_FIRMWARE
 #define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_BLACK
 #define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_WHITE
@@ -100,6 +101,7 @@ extern "C" {
 #define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_WHITE
 #define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_BLACK
 #endif
+
 
 #define	BUF_LEN		160 /* Two lines of data can be processed at a time */
 
@@ -110,6 +112,8 @@ typedef struct tem_color {
 	text_color_t	bg_color;
 	unsigned short	a_flags;
 } tem_color_t;
+
+enum called_from { CALLED_FROM_NORMAL, CALLED_FROM_STANDALONE };
 
 struct tem_pix_pos {
 	screen_pos_t	x;
@@ -134,130 +138,164 @@ typedef struct {
 
 extern text_cmap_t cmap4_to_24;
 
-struct tem;	/* Forward declare */
+/*
+ * State structure for each virtual terminal emulator
+ */
+struct tem_vt_state {
+	kmutex_t	tvs_lock;
+	uchar_t		tvs_fbmode;	/* framebuffer mode */
+	unsigned short	tvs_flags;	/* flags for this x3.64 terminal */
+	int		tvs_state;	/* state in output esc seq processing */
+	boolean_t	tvs_gotparam;	/* does output esc seq have a param */
 
-enum called_from { CALLED_FROM_NORMAL, CALLED_FROM_STANDALONE };
+	int	tvs_curparam;	/* current param # of output esc seq */
+	int	tvs_paramval;	/* value of current param */
+	int	tvs_params[TEM_MAXPARAMS];  /* parameters of output esc seq */
+	screen_pos_t	tvs_tabs[TEM_MAXTAB];	/* tab stops */
+	int	tvs_ntabs;		/* number of tabs used */
+	int	tvs_nscroll;		/* number of lines to scroll */
 
-struct in_func_ptrs {
-	void (*f_display)(struct tem *, unsigned char *, int,
+	struct tem_char_pos tvs_s_cursor;	/* start cursor position */
+	struct tem_char_pos tvs_c_cursor;	/* current cursor position */
+	struct tem_char_pos tvs_r_cursor;	/* remembered cursor position */
+
+	unsigned char	*tvs_outbuf;	/* place to keep incomplete lines */
+	int		tvs_outbuf_size;
+	int		tvs_outindex;	/* index into a_outbuf */
+	void   		*tvs_pix_data;	/* pointer to tmp bitmap area */
+	int		tvs_pix_data_size;
+	text_color_t	tvs_fg_color;
+	text_color_t	tvs_bg_color;
+	int		tvs_first_line;	/* kernel console output begins */
+
+	unsigned char	*tvs_screen_buf;	/* whole screen buffer */
+	int		tvs_screen_buf_size;
+	text_color_t	*tvs_fg_buf;	/* fg_color attribute cache */
+	text_color_t	*tvs_bg_buf;	/* bg_color attribute cache */
+	int		tvs_color_buf_size;
+
+	boolean_t	tvs_isactive;
+	int		tvs_initialized;	/* initialization flag */
+
+	list_node_t	tvs_list_node;
+};
+_NOTE(MUTEX_PROTECTS_DATA(tem_vt_state::tvs_lock, tem_vt_state))
+
+typedef struct tem_safe_callbacks {
+	void (*tsc_display)(struct tem_vt_state *, unsigned char *, int,
 	    screen_pos_t, screen_pos_t, unsigned char, unsigned char,
 	    cred_t *, enum called_from);
-	void (*f_copy)(struct tem *,
+	void (*tsc_copy)(struct tem_vt_state *,
 	    screen_pos_t, screen_pos_t, screen_pos_t, screen_pos_t,
 	    screen_pos_t, screen_pos_t, cred_t *, enum called_from);
-	void (*f_cursor)(struct tem *, short, cred_t *,
+	void (*tsc_cursor)(struct tem_vt_state *, short, cred_t *,
 	    enum called_from);
-	void (*f_bit2pix)(struct tem *, unsigned char,
+	void (*tsc_bit2pix)(struct tem_vt_state *, unsigned char,
 	    unsigned char, unsigned char);
-	void (*f_cls)(struct tem *, int,
+	void (*tsc_cls)(struct tem_vt_state *, int,
 	    screen_pos_t, screen_pos_t, cred_t *, enum called_from);
-};
+} tem_safe_callbacks_t;
 
 /*
- * State structure for terminal emulator
+ * common term soft state structure shared by all virtual terminal emulators
  */
-typedef struct tem_state {		/* state for tem x3.64 emulator */
-	int	display_mode;		/* What mode we are in */
-	screen_size_t	linebytes;	/* Layered on bytes per scan line */
-	unsigned short	a_flags;	/* flags for this x3.64 terminal */
-	int	a_state;	/* state in output esc seq processing */
-	boolean_t	a_gotparam;	/* does output esc seq have a param */
-	int	a_curparam;	/* current param # of output esc seq */
-	int	a_paramval;	/* value of current param */
-	int	a_params[TEM_MAXPARAMS];  /* parameters of output esc seq */
-	screen_pos_t	a_tabs[TEM_MAXTAB];	/* tab stops */
-	int	a_ntabs;		/* number of tabs used */
-	int	a_nscroll;		/* number of lines to scroll */
-	struct tem_char_pos a_s_cursor;	/* start cursor position */
-	struct tem_char_pos a_c_cursor;	/* current cursor position */
-	struct tem_char_pos a_r_cursor;	/* remembered cursor position */
-	struct tem_size a_c_dimension;	/* window dimensions in characters */
-	struct tem_size a_p_dimension;	/* screen dimensions in pixels */
-	struct tem_pix_pos a_p_offset;	/* pix offset to center the display */
-	unsigned char	*a_outbuf;	/* place to keep incomplete lines */
-	unsigned char	*a_blank_line;	/* a blank line for scrolling */
-	int	a_outindex;	/* index into a_outbuf */
-	struct in_func_ptrs	in_fp;	/* internal output functions */
-	struct font	a_font;	/* font table */
-	int	a_pdepth;	/* pixel depth */
-	int	a_initialized;	/* initialization flag */
-	void   *a_pix_data;	/* pointer to tmp bitmap area */
-	int	a_pix_data_size; /* size of bitmap data areas */
-	text_color_t fg_color;
-	text_color_t bg_color;
-	int	first_line;	/* kernel console output begins */
+typedef struct tem_state {
+	ldi_handle_t	ts_hdl;	/* Framework handle for layered on dev */
+	screen_size_t	ts_linebytes;	/* Layered on bytes per scan line */
+
+	int	ts_display_mode;	/* What mode we are in */
+	struct	vis_polledio	*ts_fb_polledio;
+
+	struct tem_size ts_c_dimension;	/* window dimensions in characters */
+	struct tem_size ts_p_dimension;	/* screen dimensions in pixels */
+	struct tem_pix_pos ts_p_offset;	/* pix offset to center the display */
+
+	int	ts_pix_data_size;	/* size of bitmap data areas */
+	int	ts_pdepth;		/* pixel depth */
+	struct font	ts_font;	/* font table */
+
+	unsigned char	*ts_blank_line;	/* a blank line for scrolling */
+	tem_safe_callbacks_t	*ts_callbacks;	/* internal output functions */
+
+	int	ts_initialized;		/* initialization flag */
+
+	tem_modechg_cb_t	ts_modechg_cb;
+	tem_modechg_cb_arg_t	ts_modechg_arg;
+
+	tem_color_t	ts_init_color; /* initial color and attributes */
+
+	struct tem_vt_state	*ts_active;
+	kmutex_t	ts_lock;
+	list_t		ts_list;	/* chain of all tems */
 } tem_state_t;
 
+extern tem_state_t tems;
+extern tem_safe_callbacks_t tem_safe_text_callbacks;
+extern tem_safe_callbacks_t tem_safe_pix_callbacks;
+
+
 /*
- * State structure for terminal emulator
+ * tems_* fuctions mean that they just operate on the common soft state
+ * (tem_state_t), and tem_* functions mean that they operate on the
+ * per-tem structure (tem_vt_state). All "safe" interfaces are in tem_safe.c.
  */
-typedef struct tem {
-#ifdef	_HAVE_TEM_FIRMWARE
-	void (*cons_wrtvec)	/* PROM output gets redirected thru this vec. */
-	    (struct tem *, uchar_t *, ssize_t, cred_t *);
-#endif /* _HAVE_TEM_FIRMWARE */
-	ldi_handle_t		hdl; /* Framework handle for layered on dev */
-	dev_info_t		*dip; /* Our dip */
-	kmutex_t		lock;
-	struct vis_polledio	*fb_polledio;
-	tem_state_t		*state;
-	tem_modechg_cb_t	modechg_cb;
-	tem_modechg_cb_arg_t	modechg_arg;
-	tem_color_t		init_color; /* initial color and attributes */
-} tem_t;
+void	tems_display_layered(struct vis_consdisplay *, cred_t *);
+void	tems_copy_layered(struct vis_conscopy *, cred_t *);
+void	tems_cursor_layered(struct vis_conscursor *, cred_t *);
+void	tems_safe_copy(struct vis_conscopy *, cred_t *, enum called_from);
 
-void	tem_check_first_time(tem_t *tem, cred_t *, enum called_from);
-void	tem_reset_colormap(tem_t *, cred_t *, enum called_from);
-void	tem_align_cursor(tem_t *);
-void	tem_reset_emulator(tem_t *, cred_t *, enum called_from, tem_color_t *);
-void	tem_reset_display(tem_t *, cred_t *, enum called_from, int,
-			tem_color_t *);
-void	tem_display_layered(tem_t *, struct vis_consdisplay *, cred_t *);
-void	tem_copy_layered(tem_t *, struct vis_conscopy *, cred_t *);
-void	tem_cursor_layered(tem_t *, struct vis_conscursor *, cred_t *);
-void	tem_terminal_emulate(tem_t *, uchar_t *, int, cred_t *,
-			enum called_from);
-void	tem_text_display(tem_t *, uchar_t *,
-			int, screen_pos_t, screen_pos_t,
-			text_color_t, text_color_t,
-			cred_t *, enum called_from);
-void	tem_text_copy(tem_t *,
-			screen_pos_t, screen_pos_t,
-			screen_pos_t, screen_pos_t,
-			screen_pos_t, screen_pos_t,
-			cred_t *, enum called_from);
-void	tem_text_cursor(tem_t *, short, cred_t *, enum called_from);
-void	tem_text_cls(tem_t *,
-			int count, screen_pos_t row, screen_pos_t col,
-			cred_t *credp, enum called_from called_from);
-void	tem_pix_display(tem_t *, uchar_t *,
-			int, screen_pos_t, screen_pos_t,
-			text_color_t, text_color_t,
-			cred_t *, enum called_from);
-void	tem_pix_copy(tem_t *,
-			screen_pos_t, screen_pos_t,
-			screen_pos_t, screen_pos_t,
-			screen_pos_t, screen_pos_t,
-			cred_t *, enum called_from);
-void	tem_copy(tem_t *,
-			struct vis_conscopy *,
-			cred_t *, enum called_from);
-void	tem_pix_cursor(tem_t *, short, cred_t *, enum called_from);
-void	tem_pix_cls(tem_t *, int, screen_pos_t, screen_pos_t,
-			cred_t *, enum called_from);
-void	tem_pix_cls_range(tem_t *,
-			screen_pos_t, int, int,
-			screen_pos_t, int, int,
-			boolean_t, cred_t *, enum called_from);
+void	tem_pix_align(struct tem_vt_state *, cred_t *, enum called_from);
+void	tem_safe_check_first_time(struct tem_vt_state *tem, cred_t *,
+	    enum called_from);
+void	tem_safe_reset_display(struct tem_vt_state *, cred_t *,
+	    enum called_from, boolean_t, boolean_t);
+void	tem_safe_terminal_emulate(struct tem_vt_state *, uchar_t *, int,
+	    cred_t *, enum called_from);
+void	tem_safe_text_display(struct tem_vt_state *, uchar_t *,
+	    int, screen_pos_t, screen_pos_t,
+	    text_color_t, text_color_t,
+	    cred_t *, enum called_from);
+void	tem_safe_text_copy(struct tem_vt_state *,
+	    screen_pos_t, screen_pos_t,
+	    screen_pos_t, screen_pos_t,
+	    screen_pos_t, screen_pos_t,
+	    cred_t *, enum called_from);
+void	tem_safe_text_cursor(struct tem_vt_state *, short, cred_t *,
+	    enum called_from);
+void	tem_safe_text_cls(struct tem_vt_state *,
+	    int count, screen_pos_t row, screen_pos_t col,
+	    cred_t *credp, enum called_from called_from);
+void	tem_safe_pix_display(struct tem_vt_state *, uchar_t *,
+	    int, screen_pos_t, screen_pos_t,
+	    text_color_t, text_color_t,
+	    cred_t *, enum called_from);
+void	tem_safe_pix_copy(struct tem_vt_state *,
+	    screen_pos_t, screen_pos_t,
+	    screen_pos_t, screen_pos_t,
+	    screen_pos_t, screen_pos_t,
+	    cred_t *, enum called_from);
+void	tem_safe_pix_cursor(struct tem_vt_state *, short, cred_t *,
+	    enum called_from);
+void	tem_safe_pix_bit2pix(struct tem_vt_state *, unsigned char,
+	    unsigned char, unsigned char);
+void	tem_safe_pix_cls(struct tem_vt_state *, int, screen_pos_t, screen_pos_t,
+	    cred_t *, enum called_from);
+void	tem_safe_pix_cls_range(struct tem_vt_state *,
+	    screen_pos_t, int, int,
+	    screen_pos_t, int, int,
+	    boolean_t, cred_t *, enum called_from);
 
-void	bit_to_pix24(tem_t *, uchar_t, text_color_t, text_color_t);
-void	bit_to_pix8(tem_t *, uchar_t, text_color_t, text_color_t);
-void	bit_to_pix4(tem_t *, uchar_t, text_color_t, text_color_t);
+void	tem_safe_pix_clear_entire_screen(struct tem_vt_state *,
+	    cred_t *, enum called_from);
 
-text_color_t ansi_bg_to_solaris(tem_t *, int);
-text_color_t ansi_fg_to_solaris(tem_t *, int);
-
+void	tem_safe_get_color(struct tem_vt_state *, text_color_t *,
+	    text_color_t *, uint8_t);
 void	set_font(struct font *, short *, short *, short, short);
+
+void	tem_safe_blank_screen(struct tem_vt_state *, cred_t *,
+	    enum called_from);
+void	tem_safe_unblank_screen(struct tem_vt_state *, cred_t *,
+	    enum called_from);
 
 #ifdef __cplusplus
 }

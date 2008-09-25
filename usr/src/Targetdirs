@@ -71,6 +71,7 @@ ROOT.SYS= \
 	/dev/pts \
 	/dev/sad \
 	/dev/swap \
+	/dev/vt \
 	/dev/zcons \
 	/devices \
 	/devices/pseudo \

@@ -141,6 +141,7 @@ solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStat
 solaris.smf.manage.tnctl:::Manage Refresh of Trusted Network Parameters::help=TNctl.html
 solaris.smf.manage.tnd:::Manage Trusted Network Daemon::help=TNDaemon.html
 solaris.smf.manage.vscan:::Manage VSCAN Service States::help=SmfVscanStates.html
+solaris.smf.manage.vt:::Manage Virtual Console Service States::help=SmfVtStates.html
 solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html
 solaris.smf.manage.ndmp:::Manage NDMP Service States::help=SmfNDMPStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
@@ -158,6 +159,7 @@ solaris.smf.read.smb:::Read permission for protected SMF SMB Service Properties:
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
 solaris.smf.value.tnd:::Change Trusted Network Daemon Service Property Values::help=ValueTND.html
 solaris.smf.value.vscan:::Change Values of VSCAN Properties::help=SmfValueVscan.html
+solaris.smf.value.vt:::Change Values of Virtual Console Service Properties::help=SmfValueVt.html
 solaris.smf.value.ndmp:::Change Values of SMF NDMP Service Properties::help=SmfValueNDMP.html
 solaris.smf.read.ndmp:::Read permission for protected SMF NDMP Service Properties::help=AuthReadNDMP.html
 #

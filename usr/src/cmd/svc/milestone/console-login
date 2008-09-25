@@ -21,10 +21,11 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# This method script manages all vt logins including system
+# console login.
 #
 # For modifying parameters passed to ttymon, do not edit
 # this script. Instead use svccfg(1m) to modify the SMF
@@ -35,6 +36,15 @@
 # svc:/system/console-login> setprop ttymon/terminal_type = "xterm"
 # svc:/system/console-login> exit
 
+. /lib/svc/share/smf_include.sh
+
+if [ "$1" != "default" ]; then
+	if smf_dont_configure_vt; then
+		/usr/sbin/svcadm disable $SMF_FMRI
+		exit $SMF_EXIT_OK
+	fi
+fi
+
 getproparg() {
 	val=`svcprop -p $2 $SMF_FMRI`
 	[ -n "$val" ] && [ "$val" != "\"\"" ] && echo $1 $val
@@ -44,7 +54,13 @@ args="-g"
 
 val=`svcprop -p ttymon/device $SMF_FMRI`
 # if this isn't set, recover a little
-[ -z "$val" ] && val=/dev/console
+[ -z "$val" ] && val="/dev/console"
+
+if [ "$val" = "/dev/vt/1" ]; then
+	echo "ERROR: ttymon/device cannot be configured to /dev/vt/1."
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
 args="$args -d $val"
 
 args="$args `getproparg -l ttymon/label`"

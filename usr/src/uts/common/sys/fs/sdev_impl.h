@@ -26,8 +26,6 @@
 #ifndef _SYS_SDEV_IMPL_H
 #define	_SYS_SDEV_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -333,6 +331,7 @@ extern int devname_lookup_func(struct sdev_node *, char *, struct vnode **,
 #define	SDEV_PATH	0x1	/* callback returning /devices physical path */
 #define	SDEV_VNODE	0x2	/* callback returning backing store vnode */
 #define	SDEV_VATTR	0x4	/* callback returning node vattr */
+#define	SDEV_VLINK	0x8	/* callback returning /dev link */
 
 /*
  * devname_readdir_func()
@@ -429,6 +428,7 @@ extern int devname_profile_update(char *, size_t);
 extern struct sdev_data *sdev_find_mntinfo(char *);
 void sdev_mntinfo_rele(struct sdev_data *);
 extern struct vnodeops *devpts_getvnodeops(void);
+extern struct vnodeops *devvt_getvnodeops(void);
 
 /*
  * Directory Based Device Naming (DBNR) defines
@@ -626,6 +626,7 @@ extern int prof_lookup();
 extern void prof_filldir(struct sdev_node *);
 extern int devpts_validate(struct sdev_node *dv);
 extern int devnet_validate(struct sdev_node *dv);
+extern int devvt_validate(struct sdev_node *dv);
 extern void *sdev_get_vtor(struct sdev_node *dv);
 
 /*
@@ -656,10 +657,12 @@ extern kmem_cache_t *sdev_node_cache;
 extern struct vnodeops		*sdev_vnodeops;
 extern struct vnodeops		*devpts_vnodeops;
 extern struct vnodeops		*devnet_vnodeops;
+extern struct vnodeops		*devvt_vnodeops;
 extern struct sdev_data *sdev_origins; /* mount info for global /dev instance */
 extern const fs_operation_def_t	sdev_vnodeops_tbl[];
 extern const fs_operation_def_t	devpts_vnodeops_tbl[];
 extern const fs_operation_def_t	devnet_vnodeops_tbl[];
+extern const fs_operation_def_t	devvt_vnodeops_tbl[];
 extern const fs_operation_def_t	devsys_vnodeops_tbl[];
 extern const fs_operation_def_t	devpseudo_vnodeops_tbl[];
 

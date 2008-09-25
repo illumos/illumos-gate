@@ -496,6 +496,9 @@ consconfig_tem_supported(cons_state_t *sp)
 	uint_t			nint;
 	int			rv = 0;
 
+	if (sp->cons_fb_path == NULL)
+		return (0);
+
 	if ((dev = ddi_pathname_to_dev_t(sp->cons_fb_path)) == NODEV)
 		return (0); /* warning printed later by common code */
 
@@ -722,6 +725,9 @@ consconfig_state_init(void)
 #endif /* _HAVE_TEM_FIRMWARE */
 	} else {
 		sp->cons_fb_path = plat_fbpath();
+#ifdef _HAVE_TEM_FIRMWARE
+		sp->cons_tem_supported = consconfig_tem_supported(sp);
+#endif /* _HAVE_TEM_FIRMWARE */
 	}
 
 	sp->cons_li = ldi_ident_from_anon();
@@ -2108,4 +2114,18 @@ flush_usb_serial_buf(void)
 	console_printf("%s", usbser_kern_buf);
 
 	kmem_free(usbser_kern_buf, MMU_PAGESIZE);
+}
+
+boolean_t
+consconfig_console_is_tipline(void)
+{
+	cons_state_t	*sp;
+
+	if ((sp = (cons_state_t *)space_fetch("consconfig")) == NULL)
+		return (B_FALSE);
+
+	if (sp->cons_input_type == CONSOLE_TIP)
+		return (B_TRUE);
+
+	return (B_FALSE);
 }

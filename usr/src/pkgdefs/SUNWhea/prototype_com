@@ -957,6 +957,7 @@ f none usr/include/sys/kbd.h 644 root bin
 f none usr/include/sys/kbdreg.h 644 root bin
 f none usr/include/sys/kbio.h 644 root bin
 f none usr/include/sys/kcpc.h 644 root bin
+f none usr/include/sys/kd.h 644 root bin
 f none usr/include/sys/kdi.h 644 root bin
 f none usr/include/sys/kdi_impl.h 644 root bin
 f none usr/include/sys/kdi_machimpl.h 644 root bin
@@ -1354,6 +1355,8 @@ f none usr/include/sys/vmmeter.h 644 root bin
 f none usr/include/sys/vmparam.h 644 root bin
 f none usr/include/sys/vmsystm.h 644 root bin
 f none usr/include/sys/vnode.h 644 root bin
+f none usr/include/sys/vt.h 644 root bin
+f none usr/include/sys/vtdaemon.h 644 root bin
 f none usr/include/sys/vtoc.h 644 root bin
 f none usr/include/sys/vtrace.h 644 root bin
 f none usr/include/sys/vuid_event.h 644 root bin

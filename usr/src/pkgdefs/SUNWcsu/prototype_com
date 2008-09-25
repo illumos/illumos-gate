@@ -505,6 +505,7 @@ f none usr/lib/help/auths/locale/C/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctProcess.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctTask.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfVtStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueInetd.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueIPsec.html 444 root bin
@@ -519,6 +520,7 @@ f none usr/lib/help/auths/locale/C/SmfValueRouting.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueSMB.html 444 root bin
 f none usr/lib/help/auths/locale/C/AuthReadSMB.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfWpaStates.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfValueVt.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysDate.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysMaintenance.html 444 root bin
@@ -697,6 +699,9 @@ f none usr/lib/utmp_update 4555 root bin
 f none usr/lib/utmpd 555 root bin
 f none usr/lib/vna 555 root bin
 f none usr/lib/vplot 555 root bin
+f none usr/lib/vtdaemon 555 root bin
+f none usr/lib/vtinfo 555 root bin
+f none usr/lib/vtxlock 555 root bin
 s none usr/mail=../var/mail
 d none usr/net 755 root sys
 d none usr/net/nls 755 root sys

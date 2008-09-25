@@ -19,10 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -62,9 +59,13 @@ while read src dest; do
 
 		devices=`echo "$devices" | sed 's/\[/\\\[/g' | sed 's/\]/\\\]/g' | sed 's/\+/\\\+/g' | sed 's/\*/\\\*/g'`
 
-		# if dest has an entry for these devices, preserve that
+		# if dest has an entry for these devices and the difference
+		# between dest entry and src entry is not only
+		# "/dev/console" vs. "/dev/vt/active", preserve dest entry
 		dest_entry=`egrep "^[# 	]*/[a-zA-Z0-9\/]+[ 	]+[0-9]+[ 	]+$devices[ 	]*$drivers" $dest | tail -1 2>/dev/null`
-		if [ -n "$dest_entry" ]; then
+		tmp_line=`echo "$line" | sed 's:/dev/vt/active:/dev/console:'`
+
+		if [ -n "$dest_entry" ] && [ "$dest_entry" != "$tmp_line" ]; then
 			echo "$dest_entry"
 		else
 			echo "$line"

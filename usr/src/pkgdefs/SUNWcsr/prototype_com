@@ -375,6 +375,7 @@ f none lib/svc/method/svc-dlmgmtd 0555 root bin
 f none lib/svc/method/svc-nscd 0555 root bin
 f none lib/svc/method/svc-utmpd 0555 root bin
 f none lib/svc/method/system-log 0555 root bin
+f none lib/svc/method/vtdaemon 0555 root bin
 f none lib/svc/method/yp 0555 root bin
 d none lib/svc/monitor 0755 root bin
 d none lib/svc/seed 0755 root bin
@@ -547,6 +548,7 @@ f manifest var/svc/manifest/system/rmtmpfiles.xml 0444 root sys
 f manifest var/svc/manifest/system/sac.xml 0444 root sys
 f manifest var/svc/manifest/system/system-log.xml 0444 root sys
 f manifest var/svc/manifest/system/utmp.xml 0444 root sys
+f manifest var/svc/manifest/system/vtdaemon.xml 0444 root sys
 d none var/svc/manifest/system/svc 755 root sys
 f manifest var/svc/manifest/system/svc/restarter.xml 0444 root sys
 d none var/svc/profile 755 root sys

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_TEM_H
 #define	_SYS_TEM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,19 +40,31 @@ extern "C" {
 typedef struct __tem_modechg_cb_arg *tem_modechg_cb_arg_t;
 typedef void (*tem_modechg_cb_t) (tem_modechg_cb_arg_t arg);
 
-struct tem;
-int	tem_init(struct tem **,
-			char *, cred_t *);
-void	tem_write(struct tem *,
-			uchar_t *, ssize_t, cred_t *);
-void	tem_polled_write(struct tem *,
-			unsigned char *, int);
-void	tem_get_size(struct tem *, ushort_t *, ushort_t *,
-			ushort_t *, ushort_t *);
-int	tem_fini(struct tem *);
+typedef	struct __tem_vt_state *tem_vt_state_t;
 
-void	tem_register_modechg_cb(struct tem *, tem_modechg_cb_t,
-					tem_modechg_cb_arg_t);
+int	tem_initialized(tem_vt_state_t);
+
+tem_vt_state_t tem_init(cred_t *);
+
+void	tem_destroy(tem_vt_state_t, cred_t *);
+
+int	tem_info_init(char *, cred_t *);
+
+void	tem_write(tem_vt_state_t, uchar_t *, ssize_t, cred_t *);
+
+void	tem_safe_polled_write(tem_vt_state_t, unsigned char *, int);
+
+void	tem_get_size(ushort_t *, ushort_t *, ushort_t *, ushort_t *);
+
+void	tem_register_modechg_cb(tem_modechg_cb_t, tem_modechg_cb_arg_t);
+
+void	tem_activate(tem_vt_state_t, boolean_t, cred_t *);
+
+void	tem_switch(tem_vt_state_t, tem_vt_state_t, cred_t *);
+
+uchar_t	tem_get_fbmode(tem_vt_state_t);
+
+void	tem_set_fbmode(tem_vt_state_t, uchar_t, cred_t *);
 
 #endif /* _KERNEL */
 

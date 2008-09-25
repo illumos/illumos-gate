@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Generic keyboard support:  streams and administration.
@@ -56,6 +54,8 @@ int	kbtrans_errmask;
 int	kbtrans_errlevel;
 #endif
 
+#define	KB_NR_FUNCKEYS		12
+
 /*
  * Repeat rates set in static variables so they can be tweeked with
  * debugger.
@@ -78,7 +78,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
-	"kbtrans (key translation) 1.32"
+	"kbtrans (key translation)"
 };
 
 static struct modlinkage modlinkage = {
@@ -242,7 +242,7 @@ kbtrans_streams_init(
 
 	case CLONEOPEN:
 		DPRINTF(PRINT_L1, PRINT_MASK_OPEN, (NULL,
-			"kbtrans_streams_init: Clone open not supported"));
+		    "kbtrans_streams_init: Clone open not supported"));
 
 		return (EINVAL);
 	}
@@ -308,15 +308,15 @@ kbtrans_streams_init(
 	/* Allocate dynamic memory for downs table */
 	upper->kbtrans_streams_num_downs_entries = kbtrans_downs_size;
 	upper->kbtrans_streams_downs_bytes =
-			(uint32_t)(kbtrans_downs_size * sizeof (Key_event));
+	    (uint32_t)(kbtrans_downs_size * sizeof (Key_event));
 	upper->kbtrans_streams_downs =
-		kmem_zalloc(upper->kbtrans_streams_downs_bytes, KM_SLEEP);
+	    kmem_zalloc(upper->kbtrans_streams_downs_bytes, KM_SLEEP);
 	upper->kbtrans_streams_abortable = B_FALSE;
 
 	upper->kbtrans_streams_flags = KBTRANS_STREAMS_OPEN;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_OPEN, (upper, "kbtrans_streams_init "
-					    "exiting"));
+	    "exiting"));
 	return (0);
 }
 
@@ -338,18 +338,18 @@ kbtrans_streams_fini(struct kbtrans *upper)
 	/* clear all timeouts */
 	if (upper->kbtrans_streams_bufcallid) {
 		qunbufcall(upper->kbtrans_streams_readq,
-			upper->kbtrans_streams_bufcallid);
+		    upper->kbtrans_streams_bufcallid);
 	}
 	if (upper->kbtrans_streams_rptid) {
 		(void) quntimeout(upper->kbtrans_streams_readq,
-			upper->kbtrans_streams_rptid);
+		    upper->kbtrans_streams_rptid);
 	}
 	kmem_free(upper->kbtrans_streams_downs,
-		upper->kbtrans_streams_downs_bytes);
+	    upper->kbtrans_streams_downs_bytes);
 	kmem_free(upper, sizeof (struct kbtrans));
 
 	DPRINTF(PRINT_L1, PRINT_MASK_CLOSE, (upper, "kbtrans_streams_fini "
-					    "exiting"));
+	    "exiting"));
 	return (0);
 }
 
@@ -396,7 +396,7 @@ kbtrans_streams_message(struct kbtrans *upper, register mblk_t *mp)
 	enum kbtrans_message_response ret;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL, (upper,
-		"kbtrans_streams_message entering"));
+	    "kbtrans_streams_message entering"));
 	/*
 	 * Process M_FLUSH, and some M_IOCTL, messages here; pass
 	 * everything else down.
@@ -425,7 +425,7 @@ kbtrans_streams_message(struct kbtrans *upper, register mblk_t *mp)
 
 	}
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL, (upper,
-		"kbtrans_streams_message exiting\n"));
+	    "kbtrans_streams_message exiting\n"));
 
 	return (ret);
 }
@@ -459,7 +459,7 @@ kbtrans_streams_key(
 			if (key == (kbtrans_key_t)kp->k_abort1 ||
 			    key == (kbtrans_key_t)kp->k_abort1a) {
 				upper->kbtrans_streams_abort_state =
-					ABORT_ABORT1_RECEIVED;
+				    ABORT_ABORT1_RECEIVED;
 				upper->kbtrans_streams_abort1_key = key;
 				return;
 			}
@@ -467,7 +467,7 @@ kbtrans_streams_key(
 			if (key == (kbtrans_key_t)kp->k_newabort1 ||
 			    key == (kbtrans_key_t)kp->k_newabort1a) {
 				upper->kbtrans_streams_abort_state =
-					NEW_ABORT_ABORT1_RECEIVED;
+				    NEW_ABORT_ABORT1_RECEIVED;
 				upper->kbtrans_streams_new_abort1_key = key;
 			}
 			break;
@@ -479,9 +479,9 @@ kbtrans_streams_key(
 				return;
 			} else {
 				kbtrans_processkey(lower,
-					upper->kbtrans_streams_callback,
-					upper->kbtrans_streams_abort1_key,
-					KEY_PRESSED);
+				    upper->kbtrans_streams_callback,
+				    upper->kbtrans_streams_abort1_key,
+				    KEY_PRESSED);
 			}
 			break;
 		case NEW_ABORT_ABORT1_RECEIVED:
@@ -490,9 +490,9 @@ kbtrans_streams_key(
 			    key == (kbtrans_key_t)kp->k_newabort2) {
 				abort_sequence_enter((char *)NULL);
 				kbtrans_processkey(lower,
-					upper->kbtrans_streams_callback,
-					upper->kbtrans_streams_new_abort1_key,
-					KEY_RELEASED);
+				    upper->kbtrans_streams_callback,
+				    upper->kbtrans_streams_new_abort1_key,
+				    KEY_RELEASED);
 				return;
 			}
 		}
@@ -605,12 +605,12 @@ kbtrans_streams_untimeout(struct kbtrans *upper)
 	/* clear all timeouts */
 	if (upper->kbtrans_streams_bufcallid) {
 		qunbufcall(upper->kbtrans_streams_readq,
-			upper->kbtrans_streams_bufcallid);
+		    upper->kbtrans_streams_bufcallid);
 		upper->kbtrans_streams_bufcallid = 0;
 	}
 	if (upper->kbtrans_streams_rptid) {
 		(void) quntimeout(upper->kbtrans_streams_readq,
-			upper->kbtrans_streams_rptid);
+		    upper->kbtrans_streams_rptid);
 		upper->kbtrans_streams_rptid = 0;
 	}
 }
@@ -659,7 +659,7 @@ kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
 	iocp = (struct iocblk *)mp->b_rptr;
 
 	DPRINTF(PRINT_L0, PRINT_MASK_ALL, (upper,
-		"kbtrans_ioctl: ioc_cmd 0x%x - ", iocp->ioc_cmd));
+	    "kbtrans_ioctl: ioc_cmd 0x%x - ", iocp->ioc_cmd));
 	switch (iocp->ioc_cmd) {
 
 	case VUIDSFORMAT:
@@ -729,7 +729,7 @@ kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
 		*(int *)datap->b_wptr =
 		    (upper->kbtrans_streams_translate_mode == TR_EVENT ||
 		    upper->kbtrans_streams_translate_mode == TR_UNTRANS_EVENT) ?
-			VUID_FIRM_EVENT: VUID_NATIVE;
+		    VUID_FIRM_EVENT: VUID_NATIVE;
 		datap->b_wptr += sizeof (int);
 		if (mp->b_cont)  /* free msg to prevent memory leak */
 			freemsg(mp->b_cont);
@@ -793,17 +793,17 @@ kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
 
 		case ASCII_FIRST:
 			addr_probe->data.current =
-				upper->kbtrans_streams_vuid_addr.ascii;
+			    upper->kbtrans_streams_vuid_addr.ascii;
 			break;
 
 		case TOP_FIRST:
 			addr_probe->data.current =
-				upper->kbtrans_streams_vuid_addr.top;
+			    upper->kbtrans_streams_vuid_addr.top;
 			break;
 
 		case VKEY_FIRST:
 			addr_probe->data.current =
-				upper->kbtrans_streams_vuid_addr.vkey;
+			    upper->kbtrans_streams_vuid_addr.vkey;
 			break;
 
 		default:
@@ -870,7 +870,7 @@ kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
 
 	case KIOCSETKEY:
 		DPRINTF(PRINT_L0, PRINT_MASK_ALL, (upper, "KIOCSETKEY %d\n",
-							kiocsetkey++));
+		    kiocsetkey++));
 		err = miocpullup(mp, sizeof (struct kiockey));
 		if (err != 0)
 			break;
@@ -885,7 +885,7 @@ kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
 
 	case KIOCGETKEY:
 		DPRINTF(PRINT_L0, PRINT_MASK_ALL, (upper, "KIOCGETKEY %d\n",
-							kiocgetkey++));
+		    kiocgetkey++));
 		err = miocpullup(mp, sizeof (struct kiockey));
 		if (err != 0)
 			break;
@@ -1073,11 +1073,11 @@ allocfailure:
 	upper->kbtrans_streams_iocpending = mp;
 	if (upper->kbtrans_streams_bufcallid) {
 		qunbufcall(upper->kbtrans_streams_readq,
-			upper->kbtrans_streams_bufcallid);
+		    upper->kbtrans_streams_bufcallid);
 	}
 	upper->kbtrans_streams_bufcallid =
-		qbufcall(upper->kbtrans_streams_readq, ioctlrespsize, BPRI_HI,
-			kbtrans_reioctl, upper);
+	    qbufcall(upper->kbtrans_streams_readq, ioctlrespsize, BPRI_HI,
+	    kbtrans_reioctl, upper);
 	/*
 	 * This is a white lie... we *will* handle it, eventually.
 	 */
@@ -1111,8 +1111,8 @@ static void
 kbtrans_setled(struct kbtrans *upper)
 {
 	upper->kbtrans_streams_hw_callbacks->kbtrans_streams_setled(
-		upper->kbtrans_streams_hw,
-		upper->kbtrans_lower.kbtrans_led_state);
+	    upper->kbtrans_streams_hw,
+	    upper->kbtrans_lower.kbtrans_led_state);
 }
 
 /*
@@ -1127,8 +1127,8 @@ kbtrans_rpt(void *arg)
 	struct kbtrans_lower	*lower = &upper->kbtrans_lower;
 
 	DPRINTF(PRINT_L0, PRINT_MASK_ALL, (NULL,
-		"kbtrans_rpt: repeat key %X\n",
-		lower->kbtrans_repeatkey));
+	    "kbtrans_rpt: repeat key %X\n",
+	    lower->kbtrans_repeatkey));
 
 	upper->kbtrans_streams_rptid = 0;
 
@@ -1140,13 +1140,13 @@ kbtrans_rpt(void *arg)
 		kbtrans_keyreleased(upper, lower->kbtrans_repeatkey);
 
 		kbtrans_processkey(lower,
-			upper->kbtrans_streams_callback,
-			lower->kbtrans_repeatkey,
-			KEY_PRESSED);
+		    upper->kbtrans_streams_callback,
+		    lower->kbtrans_repeatkey,
+		    KEY_PRESSED);
 
 		upper->kbtrans_streams_rptid =
-			qtimeout(upper->kbtrans_streams_readq, kbtrans_rpt,
-			    (caddr_t)upper, kbtrans_repeat_rate);
+		    qtimeout(upper->kbtrans_streams_readq, kbtrans_rpt,
+		    (caddr_t)upper, kbtrans_repeat_rate);
 	}
 }
 
@@ -1161,7 +1161,7 @@ kbtrans_cancelrpt(struct kbtrans	*upper)
 
 	if (upper->kbtrans_streams_rptid != 0) {
 		(void) quntimeout(upper->kbtrans_streams_readq,
-				    upper->kbtrans_streams_rptid);
+		    upper->kbtrans_streams_rptid);
 		upper->kbtrans_streams_rptid = 0;
 	}
 }
@@ -1236,7 +1236,7 @@ kbtrans_keypressed(struct kbtrans *upper, uchar_t key_station,
 			unsigned int mask;
 
 			mask = lower->kbtrans_shiftmask &
-				~(CTRLMASK | CTLSMASK | UPMASK);
+			    ~(CTRLMASK | CTLSMASK | UPMASK);
 
 			ke = kbtrans_find_entry(lower, mask, key_station);
 			if (ke == NULL)
@@ -1287,7 +1287,7 @@ kbtrans_queuepress(struct kbtrans *upper,
 	register int i;
 
 	DPRINTF(PRINT_L0, PRINT_MASK_ALL, (NULL, "kbtrans_queuepress:"
-		" key=%d", key_station));
+	    " key=%d", key_station));
 
 	ke_free = 0;
 
@@ -1300,9 +1300,9 @@ kbtrans_queuepress(struct kbtrans *upper,
 		if (ke->key_station == key_station) {
 
 			DPRINTF(PRINT_L0, PRINT_MASK_ALL,
-				(NULL, "kbtrans: Double "
-				"entry in downs table (%d,%d)!\n",
-				key_station, i));
+			    (NULL, "kbtrans: Double "
+			    "entry in downs table (%d,%d)!\n",
+			    key_station, i));
 
 			goto add_event;
 		}
@@ -1335,7 +1335,7 @@ kbtrans_keyreleased(register struct kbtrans *upper, uchar_t key_station)
 	register int i;
 
 	DPRINTF(PRINT_L0, PRINT_MASK_ALL, (NULL, "RELEASE key=%d\n",
-		key_station));
+	    key_station));
 
 	if (upper->kbtrans_streams_translate_mode != TR_EVENT &&
 	    upper->kbtrans_streams_translate_mode != TR_UNTRANS_EVENT) {
@@ -1446,7 +1446,7 @@ kbtrans_queueevent(struct kbtrans *upper, Firm_event *fe)
 	if (!canputnext(q)) {
 		if (kbtrans_overflow_msg) {
 			DPRINTF(PRINT_L2, PRINT_MASK_ALL, (NULL,
-				"kbtrans: Buffer flushed when overflowed."));
+			    "kbtrans: Buffer flushed when overflowed."));
 		}
 
 		kbtrans_flush(upper);
@@ -1457,7 +1457,7 @@ kbtrans_queueevent(struct kbtrans *upper, Firm_event *fe)
 					block for event.");
 		} else {
 			uniqtime32(&fe->time);
-			 *(Firm_event *)bp->b_wptr = *fe;
+			*(Firm_event *)bp->b_wptr = *fe;
 			bp->b_wptr += sizeof (Firm_event);
 			(void) putnext(q, bp);
 
@@ -1478,6 +1478,14 @@ kbtrans_set_translation_callback(register struct kbtrans *upper)
 
 	default:
 	case TR_ASCII:
+		upper->vt_switch_keystate = VT_SWITCH_KEY_NONE;
+
+		/* Discard any obsolete CTRL/ALT/SHIFT keys */
+		upper->kbtrans_lower.kbtrans_shiftmask &=
+		    ~(CTRLMASK | ALTMASK | SHIFTMASK);
+		upper->kbtrans_lower.kbtrans_togglemask &=
+		    ~(CTRLMASK | ALTMASK | SHIFTMASK);
+
 		upper->kbtrans_streams_callback = &ascii_callback;
 
 		break;
@@ -1535,6 +1543,75 @@ kbtrans_untrans_keyreleased_raw(struct kbtrans *upper, kbtrans_key_t key)
 }
 
 /*
+ * kbtrans_vt_compose:
+ *   To compose the key sequences for virtual terminal switching.
+ *
+ *   'ALTL + F#'                for 1-12 terminals
+ *   'ALTGR + F#'               for 13-24 terminals
+ *   'ALT + UPARROW'            for last terminal
+ *   'ALT + LEFTARROW'          for previous terminal
+ *   'ALT + RIGHTARROW'         for next terminal
+ *
+ * the vt switching message is encoded as:
+ *
+ *   -------------------------------------------------------------
+ *   |  \033  |  'Q'  |  vtno + 'A'  |  opcode  |  'z'  |  '\0'  |
+ *   -------------------------------------------------------------
+ *
+ * opcode:
+ *   'B'    to switch to previous terminal
+ *   'F'    to switch to next terminal
+ *   'L'    to switch to last terminal
+ *   'H'    to switch to the terminal as specified by vtno,
+ *          which is from 1 to 24.
+ *
+ * Here keyid is the keycode of UPARROW, LEFTARROW, or RIGHTARROW
+ * when it is a kind of arrow key as indicated by is_arrow_key,
+ * otherwise it indicates a function key and keyid is the number
+ * corresponding to that function key.
+ */
+static void
+kbtrans_vt_compose(struct kbtrans *upper, unsigned short keyid,
+    boolean_t is_arrow_key, char *buf)
+{
+	char		*bufp;
+
+	bufp = buf;
+	*bufp++ = '\033'; /* Escape */
+	*bufp++ = 'Q';
+	if (is_arrow_key) {
+		*bufp++ = 'A';
+		switch (keyid) {
+		case UPARROW: /* last vt */
+			*bufp++ = 'L';
+			break;
+		case LEFTARROW: /* previous vt */
+			*bufp++ = 'B';
+			break;
+		case RIGHTARROW: /* next vt */
+			*bufp++ = 'F';
+			break;
+		default:
+			break;
+		}
+	} else {
+		/* this is funckey specifying vtno for switch */
+		*bufp++ = keyid +
+		    (upper->vt_switch_keystate - VT_SWITCH_KEY_ALT) *
+		    KB_NR_FUNCKEYS + 'A';
+		*bufp++ = 'H';
+	}
+	*bufp++ = 'z';
+	*bufp = '\0';
+
+	/*
+	 * Send the result upstream.
+	 */
+	kbtrans_putbuf(buf, upper->kbtrans_streams_readq);
+
+}
+
+/*
  * kbtrans_ascii_keypressed:
  *	This is the code if we are in TR_ASCII mode and a key
  * 	is pressed.  This is where we will do any special processing that
@@ -1551,16 +1628,29 @@ kbtrans_ascii_keypressed(
 	register char	*cp;
 	register char	*bufp;
 	char		buf[14];
+	unsigned short		keyid;
 	struct kbtrans_lower	*lower = &upper->kbtrans_lower;
 
 	/*
 	 * Based on the type of key, we may need to do some ASCII
-	 * specific post processing.
+	 * specific post processing. Note that the translated entry
+	 * is constructed as the actual keycode plus entrytype. see
+	 * sys/kbd.h for details of each entrytype.
 	 */
 	switch (entrytype) {
 
 	case BUCKYBITS:
+		return;
+
 	case SHIFTKEYS:
+		keyid = entry & 0xFF;
+		if (keyid == ALT) {
+			upper->vt_switch_keystate = VT_SWITCH_KEY_ALT;
+		} else if (keyid == ALTGRAPH) {
+			upper->vt_switch_keystate = VT_SWITCH_KEY_ALTGR;
+		}
+		return;
+
 	case FUNNY:
 		/*
 		 * There is no ascii equivalent.  We will ignore these
@@ -1569,14 +1659,29 @@ kbtrans_ascii_keypressed(
 		return;
 
 	case FUNCKEYS:
+		if (upper->vt_switch_keystate > VT_SWITCH_KEY_NONE) {
+			if (entry >= TOPFUNC &&
+			    entry < (TOPFUNC + KB_NR_FUNCKEYS)) {
+
+				/*
+				 * keyid is the number correspoding to F#
+				 * and its value is from 1 to 12.
+				 */
+				keyid = (entry & 0xF) + 1;
+
+				kbtrans_vt_compose(upper, keyid, B_FALSE, buf);
+				return;
+			}
+		}
+
 		/*
 		 * We need to expand this key to get the ascii
 		 * equivalent.  These are the function keys (F1, F2 ...)
 		 */
 		bufp = buf;
 		cp = kbtrans_strsetwithdecimal(bufp + 2,
-			(uint_t)((entry & 0x003F) + 192),
-			sizeof (buf) - 5);
+		    (uint_t)((entry & 0x003F) + 192),
+		    sizeof (buf) - 5);
 		*bufp++ = '\033'; /* Escape */
 		*bufp++ = '[';
 		while (*cp != '\0')
@@ -1592,6 +1697,17 @@ kbtrans_ascii_keypressed(
 		return;
 
 	case STRING:
+		if (upper->vt_switch_keystate > VT_SWITCH_KEY_NONE) {
+			keyid = entry & 0xFF;
+			if (keyid == UPARROW ||
+			    keyid == RIGHTARROW ||
+			    keyid == LEFTARROW) {
+
+				kbtrans_vt_compose(upper, keyid, B_TRUE, buf);
+				return;
+			}
+		}
+
 		/*
 		 * These are the multi byte keys (Home, Up, Down ...)
 		 */
@@ -1616,7 +1732,7 @@ kbtrans_ascii_keypressed(
 		 * answer in the kb_numlock_table and send it upstream.
 		 */
 		kbtrans_putcode(upper,
-			    lower->kbtrans_numlock_table[entry&0x1F]);
+		    lower->kbtrans_numlock_table[entry&0x1F]);
 
 		return;
 
@@ -1632,17 +1748,24 @@ kbtrans_ascii_keypressed(
 
 }
 
+#define	KB_SCANCODE_ALT		0xe2
+#define	KB_SCANCODE_ALTGRAPH	0xe6
+
 /*
  * kbtrans_ascii_keyreleased:
  *	This is the function if we are in TR_ASCII mode and a key
  * 	is released.  ASCII doesn't have the concept of released keys,
- * 	or make/break codes.  So there is nothing for us to do.
+ * 	or make/break codes.  So there is nothing for us to do except
+ *      checking 'Alt/AltGraph' release key in order to reset the state
+ *      of vt switch key sequence.
  */
 /* ARGSUSED */
 static void
 kbtrans_ascii_keyreleased(struct kbtrans *upper, kbtrans_key_t key)
 {
-	/* Nothing to do ... for now */
+	if (key == KB_SCANCODE_ALT || key == KB_SCANCODE_ALTGRAPH) {
+		upper->vt_switch_keystate = VT_SWITCH_KEY_NONE;
+	}
 }
 
 /*
@@ -1675,7 +1798,7 @@ kbtrans_ascii_setup_repeat(
 	 * be called to repeat the key.
 	 */
 	upper->kbtrans_streams_rptid = qtimeout(upper->kbtrans_streams_readq,
-		kbtrans_rpt, (caddr_t)upper, kbtrans_repeat_delay);
+	    kbtrans_rpt, (caddr_t)upper, kbtrans_repeat_delay);
 }
 
 /*
@@ -1890,7 +2013,7 @@ kbtrans_trans_event_setup_repeat(
 	 * be called to repeat the key.
 	 */
 	upper->kbtrans_streams_rptid = qtimeout(upper->kbtrans_streams_readq,
-		kbtrans_rpt, (caddr_t)upper, kbtrans_repeat_delay);
+	    kbtrans_rpt, (caddr_t)upper, kbtrans_repeat_delay);
 }
 
 /*
@@ -1990,7 +2113,7 @@ kbtrans_setkey(struct kbtrans_lower *lower, struct kiockey *key, cred_t *cr)
 	    key->kio_entry <= (uchar_t)(OLD_STRING + 15)) {
 		strtabindex = key->kio_entry - OLD_STRING;
 		bcopy(key->kio_string,
-			lower->kbtrans_keystringtab[strtabindex], KTAB_STRLEN);
+		    lower->kbtrans_keystringtab[strtabindex], KTAB_STRLEN);
 		lower->kbtrans_keystringtab[strtabindex][KTAB_STRLEN-1] = '\0';
 	}
 
@@ -2064,7 +2187,7 @@ kbtrans_getkey(struct kbtrans_lower *lower, struct kiockey *key)
 	}
 
 	ke = kbtrans_find_entry(lower, (uint_t)key->kio_tablemask,
-		key->kio_station);
+	    key->kio_station);
 	if (ke == NULL)
 		return (EINVAL);
 
@@ -2084,7 +2207,7 @@ kbtrans_getkey(struct kbtrans_lower *lower, struct kiockey *key)
 	if (entry >= STRING && entry <= (uchar_t)(STRING + 15)) {
 		strtabindex = entry - STRING;
 		bcopy(lower->kbtrans_keystringtab[strtabindex],
-			key->kio_string, KTAB_STRLEN);
+		    key->kio_string, KTAB_STRLEN);
 	}
 	return (0);
 }
@@ -2134,7 +2257,7 @@ kbtrans_skey(struct kbtrans_lower *lower, struct kiockeymap *key, cred_t *cr)
 	}
 
 	ke = kbtrans_find_entry(lower, (uint_t)key->kio_tablemask,
-		key->kio_station);
+	    key->kio_station);
 	if (ke == NULL)
 		return (EINVAL);
 
@@ -2142,7 +2265,7 @@ kbtrans_skey(struct kbtrans_lower *lower, struct kiockeymap *key, cred_t *cr)
 	    key->kio_entry <= (ushort_t)(STRING + 15)) {
 		strtabindex = key->kio_entry-STRING;
 		bcopy(key->kio_string,
-			lower->kbtrans_keystringtab[strtabindex], KTAB_STRLEN);
+		    lower->kbtrans_keystringtab[strtabindex], KTAB_STRLEN);
 		lower->kbtrans_keystringtab[strtabindex][KTAB_STRLEN-1] = '\0';
 	}
 
@@ -2184,7 +2307,7 @@ kbtrans_gkey(struct kbtrans_lower *lower, struct	kiockeymap *key)
 	}
 
 	ke = kbtrans_find_entry(lower, (uint_t)key->kio_tablemask,
-		key->kio_station);
+	    key->kio_station);
 	if (ke == NULL)
 		return (EINVAL);
 
@@ -2194,7 +2317,7 @@ kbtrans_gkey(struct kbtrans_lower *lower, struct	kiockeymap *key)
 	    key->kio_entry <= (ushort_t)(STRING + 15)) {
 		strtabindex = key->kio_entry-STRING;
 		bcopy(lower->kbtrans_keystringtab[strtabindex],
-			key->kio_string, KTAB_STRLEN);
+		    key->kio_string, KTAB_STRLEN);
 	}
 	return (0);
 }

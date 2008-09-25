@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1177,22 +1178,42 @@ logins_disabled(char *user_name)
 	return (FALSE);
 }
 
+#define	DEFAULT_CONSOLE	"/dev/console"
+
 /*
  * check_for_console -  Checks if we're getting a root login on the
- *			console, or a login from the global zone.  Exits if not.
+ *			console, or a login from the global zone. Exits if not.
  *
+ * If CONSOLE is set to /dev/console in /etc/default/login, then root logins
+ * on /dev/vt/# are permitted as well. /dev/vt/# does not exist in non-global
+ * zones, but checking them does no harm.
  */
 static void
 check_for_console(void)
 {
-	if (pwd != NULL && pwd->pw_uid == 0 && zflag == B_FALSE) {
-		if ((Console != NULL) && (strcmp(ttyn, Console) != 0)) {
-			(void) printf("Not on system console\n");
+	const char *consoles[] = { "/dev/console", "/dev/vt/", NULL };
+	int i;
 
-			audit_error = ADT_FAIL_VALUE_CONSOLE;
-			login_exit(10);
+	if (pwd == NULL || pwd->pw_uid != 0 || zflag != B_FALSE ||
+	    Console == NULL)
+		return;
+
+	if (strcmp(Console, DEFAULT_CONSOLE) == 0) {
+		for (i = 0; consoles[i] != NULL; i ++) {
+			if (strncmp(ttyn, consoles[i],
+			    strlen(consoles[i])) == 0)
+				return;
 		}
+	} else {
+		if (strcmp(ttyn, Console) == 0)
+			return;
 	}
+
+	(void) printf("Not on system console\n");
+
+	audit_error = ADT_FAIL_VALUE_CONSOLE;
+	login_exit(10);
+
 }
 
 /*
@@ -2017,10 +2038,10 @@ update_utmpx_entry(int sublogin)
 	char	*user;
 	static char	*errmsg	= "No utmpx entry. "
 	    "You must exec \"login\" from the lowest level \"shell\".";
-	int	   tmplen;
+	int	tmplen;
 	struct utmpx  *u = (struct utmpx *)0;
 	struct utmpx  utmpx;
-	char	  *ttyntail;
+	char	*ttyntail;
 
 	/*
 	 * If we're not a sublogin then

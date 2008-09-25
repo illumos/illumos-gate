@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _KBTRANS_STREAMS_H
 #define	_KBTRANS_STREAMS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,6 +131,13 @@ struct  kbtrans {
 	/* Buffers to hold characters during the polled mode */
 	char	*kbtrans_polled_pending_chars;
 	char	kbtrans_polled_buf[KBTRANS_POLLED_BUF_SIZE+1];
+
+	/* vt switch key sequence state */
+	enum {
+		VT_SWITCH_KEY_NONE = 0,
+		VT_SWITCH_KEY_ALT,	/* left Alt key is pressed */
+		VT_SWITCH_KEY_ALTGR	/* right Alt key is pressed */
+	}		vt_switch_keystate;
 };
 
 #ifdef __cplusplus

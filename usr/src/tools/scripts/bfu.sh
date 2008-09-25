@@ -247,6 +247,7 @@ superfluous_nonglobal_zone_files="
 	dev/stdout
 	dev/swap
 	dev/term
+	dev/vt
 	devices
 	etc/dacf.conf
 	etc/dat
@@ -321,6 +322,7 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/svc-tnd
 	lib/svc/method/svc-vntsd
 	lib/svc/method/svc-zones
+	lib/svc/method/vtdaemon
 	platform/*/kernel
 	platform/SUNW,Sun-Fire-15000/lib/cvcd
 	platform/SUNW,Ultra-Enterprise-10000/lib/cvcd
@@ -379,6 +381,7 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/system/resource-mgmt.xml
 	var/svc/manifest/system/scheduler.xml
 	var/svc/manifest/system/sysevent.xml
+	var/svc/manifest/system/vtdaemon.xml
 	var/svc/manifest/system/zones.xml
 	var/svc/manifest/system/filesystem/rmvolmgr.xml
 "
@@ -1557,6 +1560,20 @@ smf_cleanup_dlmgmtd() {
 )
 }
 
+smf_cleanup_vt() {
+	(
+		smf_delete_manifest var/src/manifest/system/vtdaemon.xml
+		cd $root
+		rm -f lib/svc/method/vtdaemon
+
+		vt_conslogin_instances=`/usr/bin/svcs -o FMRI | \
+		    grep console-login:vt`
+		for i in $vt_conslogin_instances; do
+			/usr/sbin/svccfg delete -f $i
+		done
+	)
+}
+
 old_mfst_dir="var/svc/manifest.orig"
 new_mfst_dir="var/svc/manifest"
 
@@ -1862,6 +1879,17 @@ smf_apply_conf () {
 
 	if [[ $dlmgmtd_status = cleanup ]]; then
 		smf_cleanup_dlmgmtd
+	fi
+
+	#
+	# When doing backwards BFU, if the target does not contain
+	# vtdaemon manifest, delete it and delete all the additional
+	# console-login service instances which were used to provide
+	# additional console sessions.
+	#
+	if ((! $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
+	    grep vtdaemon.xml > /dev/null 2>&1) && [ $zone = global ]); then
+		smf_cleanup_vt
 	fi
 
 	print "Disabling unneeded inetd.conf entries ..."
@@ -6029,6 +6057,7 @@ mondo_loop() {
 	rm -f	\
 	    $usr/include/table.h			\
 	    $usr/include/libgenIO.h			\
+	    $usr/include/sys/kd.h			\
 	    $usr/lib/llib-lTL				\
 	    $usr/lib/llib-lTL.ln
 

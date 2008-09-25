@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_POSIX_PTHREAD_SEMANTICS	/* for getgrnam_r */
 #ifdef lint
@@ -56,9 +54,12 @@
 #include <strings.h>
 #include <libdevinfo.h>
 #include <zone.h>
+#include <fcntl.h>
+#include <utmpx.h>
 
 extern int is_minor_node(const char *, const char **);
 
+static int is_login_user(uid_t);
 static int logindevperm(const char *, uid_t, gid_t, void (*)());
 static int dir_dev_acc(char *, char *, uid_t, gid_t, mode_t, char *line,
 	void (*)());
@@ -192,8 +193,21 @@ logindevperm(const char *ttyn, uid_t uid, gid_t gid, void (*errmsg)(char *))
 		if (console == NULL)
 			continue;	/* ignore blank lines */
 
-		if (strcmp(console, ttyn) != 0)
-			continue;	/* not our tty, skip */
+		/*
+		 * If "console" read from /dev/logindevperm is
+		 * "/dev/vt/active", then the first user who logged into
+		 * consoles (/dev/vt/# or /dev/console) takes ownership.
+		 * Otherwise the first user who logged into "console"
+		 * takes owership.
+		 */
+		if (strcmp(console, ttyn) != 0) {
+			if (strcmp(console, "/dev/vt/active") != 0)
+				continue;	/* not our tty, skip */
+			if (strncmp(ttyn, "/dev/vt/",
+			    strlen("/dev/vt/")) != 0 && strcmp(ttyn,
+			    "/dev/console") != 0)
+				continue;	/* not our tty, skip */
+		}
 
 		mode_str = strtok_r(last, field_delims, &last);
 		if (mode_str == NULL) {
@@ -372,6 +386,38 @@ check_driver_match(char *path, char *line)
 }
 
 /*
+ * Check whether the user has logged onto "/dev/console" or "/dev/vt/#".
+ */
+static int
+is_login_user(uid_t uid)
+{
+	int changed = 0;
+	struct passwd pwd, *ppwd;
+	char pwd_buf[NSS_BUFLEN_PASSWD];
+	struct utmpx *utx;
+
+	if ((getpwuid_r(uid, &pwd, pwd_buf, NSS_BUFLEN_PASSWD, &ppwd))) {
+		return (0);
+	}
+
+	setutxent();
+	while ((utx = getutxent()) != NULL) {
+		if (utx->ut_type == USER_PROCESS &&
+		    strncmp(utx->ut_user, ppwd->pw_name,
+		    strlen(ppwd->pw_name)) == 0 && (strncmp(utx->ut_line,
+		    "console", strlen("console")) == 0 || strncmp(utx->ut_line,
+		    "vt", strlen("vt")) == 0)) {
+
+			changed = 1;
+			break;
+		}
+	}
+	endutxent();
+
+	return (changed);
+}
+
+/*
  * Apply owner/group/perms to all files (except "." and "..")
  * in a directory.
  * This function is recursive. We start with "/" and the rest of the pathname
@@ -423,6 +469,17 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 			if (strlen(left_to_do) == 0) {
 				/* finally check the driver matches */
 				if (check_driver_match(path, line) == 0) {
+					/*
+					 * if the owner of device has been
+					 * login, the ownership and mode
+					 * should be set already. in
+					 * this case, do not set the
+					 * permissions.
+					 */
+					if (is_login_user(stat_buf.st_uid)) {
+
+						return (0);
+					}
 					/* we are done, set the permissions */
 					if (setdevaccess(path,
 					    uid, gid, mode, errmsg)) {

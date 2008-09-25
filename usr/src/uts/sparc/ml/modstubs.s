@@ -316,6 +316,7 @@ stubs_base:
 	NO_UNLOAD_STUB(dev, devname_profile_update,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, sdev_module_register,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, sdev_devstate_change,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, devvt_getvnodeops,		nomod_minus_one);
 	NO_UNLOAD_STUB(dev, devpts_getvnodeops,		nomod_zero);
 	END_MODULE(dev);
 #endif

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/varargs.h>
@@ -167,32 +165,6 @@ console_rele(void)
 	console_busy = 0;
 	rw_exit(&console_lock);
 }
-
-#ifdef _HAVE_TEM_FIRMWARE
-/*
- *  This routine exists so that prom_write() can redirect writes
- *  to the framebuffer through the kernel terminal emulator, if
- *  that configuration is selected during consconfig.
- *  When the kernel terminal emulator is enabled, consconfig_dacf
- *  sets up the PROM output redirect vector to enter this function.
- *  During panic the console will already be powered up as part of
- *  calling into the prom_*() layer.
- */
-ssize_t
-console_prom_write_cb(promif_redir_arg_t arg, uchar_t *s, size_t n)
-{
-	struct tem *tem = (struct tem *)arg;
-
-	ASSERT(consmode == CONS_KFB);
-
-	if (panicstr)
-		polled_io_cons_write(s, n);
-	else
-		tem->cons_wrtvec(tem, s, n, kcred);
-
-	return (n);
-}
-#endif /* _HAVE_TEM_FIRMWARE */
 
 static void
 console_getprop(dev_t dev, dev_info_t *dip, char *name, ushort_t *sp)

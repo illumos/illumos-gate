@@ -20,14 +20,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 case "$MACH" in
   "i386" )
@@ -35,7 +33,7 @@ case "$MACH" in
 #
 #       major minor   lastminor       modules
 
-	wc	0	0	ldterm ttcompat
+	wc	-1	0	ldterm ttcompat
 	asy	-1	0	ldterm ttcompat
 	xencons	0	0	ldterm ttcompat
 	ptsl	0	47	ldterm ttcompat
@@ -52,7 +50,7 @@ case "$MACH" in
 #
 #      major   minor lastminor	modules
 
-	wc	0	0	ldterm ttcompat
+	wc	-1	0	ldterm ttcompat
 	qcn	0	255	ldterm ttcompat
 	sgcn	0	0	ldterm ttcompat
 	zs	0	63	ldterm ttcompat

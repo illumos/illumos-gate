@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 smf_present () {
 	[ -r /etc/svc/volatile/repository_door ] && \
@@ -93,6 +92,17 @@ smf_dont_configure_ip() {
 	[ "${SMF_ZONENAME:=`/sbin/zonename`}" != "global" -a \
 	 `/sbin/zonename -t` = shared ] && return 0
 	return 1
+}
+
+# smf_dont_configure_vt
+#
+#  Returns zero (success) if vt functionality is not to be configured,
+#  1 otherwise.
+#
+smf_dont_configure_vt() {
+	[ "${SMF_ZONENAME:=`/sbin/zonename`}" != "global" ] && return 0
+	/usr/lib/vtinfo > /dev/null 2>&1
+	return $?
 }
 
 # smf_is_system_labeled

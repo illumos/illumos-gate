@@ -91,6 +91,7 @@ HTMLENTS = \
 	SmfValueExAcctFlow.html \
 	SmfValueExAcctProcess.html \
 	SmfValueExAcctTask.html \
+	SmfVtStates.html \
 	SmfValueHeader.html \
 	SmfValueInetd.html \
 	SmfValueIPsec.html \
@@ -107,6 +108,7 @@ HTMLENTS = \
 	SmfSMBStates.html \
 	SmfValueVscan.html \
 	SmfVscanStates.html \
+	SmfValueVt.html	\
 	SmfWpaStates.html \
 	NetworkAutoconf.html \
 	NetworkHeader.html \

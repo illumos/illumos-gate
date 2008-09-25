@@ -52,7 +52,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	lock_lint rules
 #
 all:	warlock warlock.1394 warlock.audio warlock.ecpp warlock.scsi \
-	warlock.smartcard warlock.usb warlock.ib warlock.sata
+	warlock.smartcard warlock.usb warlock.ib warlock.sata warlock.wc
 
 warlock: $(MODULE).ok 
 
@@ -152,3 +152,6 @@ warlock.sdcard:
 	@cd ../sda; $(MAKE) clean; $(MAKE) warlock
 	@cd ../sdhost; $(MAKE) clean; $(MAKE) warlock
 	@cd ../wbsd; $(MAKE) clean; $(MAKE) warlock
+
+warlock.wc:
+	@cd ../wc; $(MAKE) clean; $(MAKE) warlock

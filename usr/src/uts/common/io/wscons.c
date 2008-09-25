@@ -24,13 +24,60 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * "Workstation console" multiplexor driver for Sun.
  *
  * Sends output to the primary frame buffer using the PROM monitor;
  * gets input from a stream linked below us that is the "keyboard
  * driver", below which is linked the primary keyboard.
+ */
+
+/*
+ * Locking Policy:
+ * This module has a D_MTPERMOD inner perimeter which means STREAMS
+ * only allows one thread to enter this module through STREAMS entry
+ * points each time -- open() close() put() srv() qtimeout().
+ * So for the most time we do not need locking in this module, but with
+ * the following exceptions:
+ *
+ *   - wc shares three global variables (wc_dip, vc_active_consle, vc_avl_root)
+ *     with virtual console devname part (fs/dev/sdev_vtops.c) which get
+ *     compiled into genunix.
+ *
+ *   - wc_modechg_cb() is a callback function which will triggered when
+ *     framebuffer display mode is changed.
+ *
+ *   - vt_send_hotkeys() is triggered by timeout() which is not STREAMS MT
+ *     safe.
+ *
+ * Based on the fact that virtual console devname part and wc_modechg_cb()
+ * only do read access to the above mentioned shared three global variables,
+ * It is safe to do locking this way:
+ * 1) all read access to the three global variables in THIS WC MODULE do not
+ *    need locking;
+ * 2) all write access to the three global variables in THIS WC MODULE must
+ *    hold vc_lock;
+ * 3) any access to the three global variables in either DEVNAME PART or the
+ *    CALLBACK must hold vc_lock;
+ * 4) other global variables which are only shared in this wc module and only
+ *    accessible through STREAMS entry points such as "vc_last_console",
+ *    "vc_inuse_max_minor", "vc_target_console" and "vc_waitactive_list"
+ *    do not need explict locking.
+ *
+ * wc_modechg_cb() does read access to vc_state_t::vc_flags,
+ * vc_state_t::vc_state_lock is used to protect concurrently accesses to
+ * vc_state_t::vc_flags which may happen from both through STREAMS entry
+ * points and wc_modechg_cb().
+ * Since wc_modechg_cb() only does read access to vc_state_t::vc_flags,
+ * The other parts of wc module (except wc_modechg_cb()) only has to hold
+ * vc_state_t::vc_flags when writing to vc_state_t::vc_flags.
+ *
+ * vt_send_hotkeys() could access vt_pending_vtno at the same time with
+ * the rest of wc module, vt_pending_vtno_lock is used to protect
+ * vt_pending_vtno.
+ *
+ * Lock order: vc_lock -> vc_state_t::vc_state_lock.
+ * No overlap between vc_lock and vt_pending_vtno_lock.
  */
 
 #include <sys/types.h>
@@ -48,6 +95,14 @@
 #include <sys/buf.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <sys/errno.h>
+#include <sys/proc.h>
+#include <sys/procset.h>
+#include <sys/fault.h>
+#include <sys/siginfo.h>
+#include <sys/debug.h>
+#include <sys/session.h>
 #include <sys/kmem.h>
 #include <sys/cpuvar.h>
 #include <sys/kbio.h>
@@ -55,15 +110,33 @@
 #include <sys/fs/snode.h>
 #include <sys/consdev.h>
 #include <sys/conf.h>
+#include <sys/cmn_err.h>
+#include <sys/console.h>
+#include <sys/promif.h>
+#include <sys/note.h>
+#include <sys/polled_io.h>
+#include <sys/systm.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
+#include <sys/esunddi.h>
+#include <sys/sunldi.h>
 #include <sys/debug.h>
 #include <sys/console.h>
 #include <sys/ddi_impldefs.h>
-#include <sys/promif.h>
 #include <sys/policy.h>
+#include <sys/modctl.h>
 #include <sys/tem.h>
 #include <sys/wscons.h>
+#include <sys/vt_impl.h>
+
+/* streams stuff */
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", copyreq))
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", copyresp))
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", datab))
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", iocblk))
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", msgb))
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", queue))
 
 #define	MINLINES	10
 #define	MAXLINES	48
@@ -75,30 +148,37 @@
 #define	LOSCREENCOLS	80
 #define	HISCREENCOLS	120
 
-struct wscons {
-	struct tem *wc_tem;		/* Terminal emulator state */
-	int	wc_flags;		/* random flags (protected by */
-					/* write-side exclusion lock  */
+struct wscons_state {
 	dev_t	wc_dev;			/* major/minor for this device */
-	tty_common_t wc_ttycommon;	/* data common to all tty drivers */
 #ifdef _HAVE_TEM_FIRMWARE
-	int	wc_pendc;		/* pending output character */
 	int	wc_defer_output;	/* set if output device is "slow" */
 #endif /* _HAVE_TEM_FIRMWARE */
 	queue_t	*wc_kbdqueue;		/* "console keyboard" device queue */
 					/* below us */
-	bufcall_id_t wc_bufcallid;	/* id returned by qbufcall */
-	timeout_id_t wc_timeoutid;	/* id returned by qtimeout */
 	cons_polledio_t		wc_polledio; /* polled I/O function pointers */
 	cons_polledio_t		*wc_kb_polledio; /* keyboard's polledio */
 	unsigned int	wc_kb_getpolledio_id; /* id for kb CONSOPENPOLLEDIO */
+	queue_t *wc_pending_wq;
 	mblk_t	*wc_pending_link;	/* I_PLINK pending for kb polledio */
 } wscons;
 
-#define	WCS_ISOPEN	0x00000001	/* open is complete */
-#define	WCS_STOPPED	0x00000002	/* output is stopped */
-#define	WCS_DELAY	0x00000004	/* waiting for delay to finish */
-#define	WCS_BUSY	0x00000008	/* waiting for transmission to finish */
+/*
+ * This module has a D_MTPERMOD inner perimeter, so we don't need to protect
+ * the variables only shared within this module
+ */
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", wscons))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", wscons_state))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", vt_stat))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", vc_waitactive_msg))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", tty_common))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", vt_mode))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", vt_dispinfo))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", winsize))
+_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data", vc_last_console))
+
+#ifdef _HAVE_TEM_FIRMWARE
+ssize_t wc_cons_wrtvec(promif_redir_arg_t arg, uchar_t *s, size_t n);
+#endif /* _HAVE_TEM_FIRMWARE */
 
 static int	wcopen(queue_t *, dev_t *, int, int, cred_t *);
 static int	wcclose(queue_t *, int, cred_t *);
@@ -166,7 +246,6 @@ static struct streamtab wcinfo = {
 
 static int wc_info(dev_info_t *, ddi_info_cmd_t, void *, void **result);
 static int wc_attach(dev_info_t *, ddi_attach_cmd_t);
-static dev_info_t *wc_dip;
 
 DDI_DEFINE_STREAM_OPS(wc_ops, nulldev, nulldev, wc_attach, nodev, nodev,
     wc_info, D_MTPERMOD | D_MP, &wcinfo, ddi_quiesce_not_supported);
@@ -178,23 +257,19 @@ static void	wcopoll(void *);
 static void	wconsout(void *);
 #endif /* _HAVE_TEM_FIRMWARE */
 static void	wcrstrt(void *);
-static void	wcstart(void);
-static void	wc_open_kb_polledio(struct wscons *wc, queue_t *q, mblk_t *mp);
-static void	wc_close_kb_polledio(struct wscons *wc, queue_t *q, mblk_t *mp);
-static void	wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c);
+static void	wcstart(void *);
+static void	wc_open_kb_polledio(struct wscons_state *wc, queue_t *q,
+		    mblk_t *mp);
+static void	wc_close_kb_polledio(struct wscons_state *wc, queue_t *q,
+		    mblk_t *mp);
+static void	wc_polled_putchar(cons_polledio_arg_t arg,
+			unsigned char c);
 static boolean_t wc_polled_ischar(cons_polledio_arg_t arg);
 static int	wc_polled_getchar(cons_polledio_arg_t arg);
 static void	wc_polled_enter(cons_polledio_arg_t arg);
 static void	wc_polled_exit(cons_polledio_arg_t arg);
-static void	wc_get_size(struct wscons *wscons);
+void	wc_get_size(vc_state_t *pvc);
 static void	wc_modechg_cb(tem_modechg_cb_arg_t arg);
-
-#include <sys/types.h>
-#include <sys/conf.h>
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/errno.h>
-#include <sys/modctl.h>
 
 static struct dev_ops wc_ops;
 
@@ -209,7 +284,6 @@ static void	wc_dprintf(const char *fmt, ...) __KPRINTFLIKE(1);
 	(((l) >= wc_errlevel) && ((m) & wc_errmask) ?	\
 		wc_dprintf args :			\
 		(void) 0)
-
 /*
  * Severity levels for printing
  */
@@ -232,7 +306,6 @@ uint_t	wc_errlevel = PRINT_L2;
 /*
  * Module linkage information for the kernel.
  */
-
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
 	"Workstation multiplexer Driver 'wc'",
@@ -248,7 +321,10 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+	int rc;
+	if ((rc = mod_install(&modlinkage)) == 0)
+		vt_init();
+	return (rc);
 }
 
 int
@@ -267,14 +343,22 @@ _info(struct modinfo *modinfop)
 static int
 wc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
+	/* create minor node for workstation hard console */
 	if (ddi_create_minor_node(devi, "wscons", S_IFCHR,
 	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
-		return (-1);
+		return (DDI_FAILURE);
 	}
+
+	mutex_enter(&vc_lock);
+
 	wc_dip = devi;
 
 	bzero(&(wscons.wc_polledio), sizeof (wscons.wc_polledio));
+
+	vt_resize(VC_DEFAULT_COUNT);
+
+	mutex_exit(&vc_lock);
 
 	return (DDI_SUCCESS);
 }
@@ -313,104 +397,95 @@ wc_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 static char obuf[MAXHIWAT];
 #endif /* _HAVE_TEM_FIRMWARE */
 
+static void
+wc_init_polledio(void)
+{
+	static boolean_t polledio_inited = B_FALSE;
+	_NOTE(SCHEME_PROTECTS_DATA("D_MTPERMOD protected data",
+	    polledio_inited))
+
+	if (polledio_inited)
+		return;
+
+	polledio_inited = B_TRUE;
+
+	/*
+	 * Initialize the parts of the polled I/O struct that
+	 * are common to both input and output modes, but which
+	 * don't flag to the upper layers, which if any of the
+	 * two modes are available.  We don't know at this point
+	 * if system is configured CONS_KFB, but we will when
+	 * consconfig_dacf asks us with CONSOPENPOLLED I/O.
+	 */
+	bzero(&(wscons.wc_polledio), sizeof (wscons.wc_polledio));
+	wscons.wc_polledio.cons_polledio_version =
+	    CONSPOLLEDIO_V0;
+	wscons.wc_polledio.cons_polledio_argument =
+	    (cons_polledio_arg_t)&wscons;
+	wscons.wc_polledio.cons_polledio_enter =
+	    wc_polled_enter;
+	wscons.wc_polledio.cons_polledio_exit =
+	    wc_polled_exit;
+
+#ifdef _HAVE_TEM_FIRMWARE
+	/*
+	 * If we're talking directly to a framebuffer, we assume
+	 * that it's a "slow" device, so that rendering should
+	 * be deferred to a timeout or softcall so that we write
+	 * a bunch of characters at once.
+	 */
+	wscons.wc_defer_output = prom_stdout_is_framebuffer();
+#endif /* _HAVE_TEM_FIRMWARE */
+}
+
 /*ARGSUSED*/
 static int
 wcopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 {
-	static boolean_t polledio_inited = B_FALSE;
-	struct termios *termiosp;
-	int len;
+	int minor;
 
-	if (getminor(*devp) != 0)
-		return (ENXIO);		/* sorry, only one per customer */
-
-	if (!(wscons.wc_flags & WCS_ISOPEN)) {
-		mutex_init(&wscons.wc_ttycommon.t_excl, NULL, MUTEX_DEFAULT,
-		    NULL);
-		wscons.wc_ttycommon.t_iflag = 0;
-		/*
-		 * Get the default termios settings (cflag).
-		 * These are stored as a property in the
-		 * "options" node.
-		 */
-		if (ddi_getlongprop(DDI_DEV_T_ANY,
-		    ddi_root_node(), 0, "ttymodes",
-		    (caddr_t)&termiosp, &len) == DDI_PROP_SUCCESS &&
-		    len == sizeof (struct termios)) {
-
-			wscons.wc_ttycommon.t_cflag = termiosp->c_cflag;
-			kmem_free(termiosp, len);
-		} else {
-			/*
-			 * Gack!  Whine about it.
-			 */
-			cmn_err(CE_WARN,
-			    "wc: Couldn't get ttymodes property!\n");
-		}
-		wscons.wc_ttycommon.t_iocpending = NULL;
-		wscons.wc_flags = WCS_ISOPEN;
-
-		wscons.wc_dev = *devp;
-		wc_get_size(&wscons);
-
-		if (!polledio_inited) {
-			polledio_inited = B_TRUE;
-
-			/*
-			 * Initialize the parts of the polled I/O struct that
-			 * are common to both input and output modes, but which
-			 * don't flag to the upper layers, which if any of the
-			 * two modes are available.  We don't know at this point
-			 * if system is configured CONS_KFB, but we will when
-			 * consconfig_dacf asks us with CONSOPENPOLLED I/O.
-			 */
-			wscons.wc_polledio.cons_polledio_version =
-			    CONSPOLLEDIO_V0;
-			wscons.wc_polledio.cons_polledio_argument =
-			    (cons_polledio_arg_t)&wscons;
-			wscons.wc_polledio.cons_polledio_enter =
-			    wc_polled_enter;
-			wscons.wc_polledio.cons_polledio_exit =
-			    wc_polled_exit;
-
-#ifdef _HAVE_TEM_FIRMWARE
-			/*
-			 * If we're talking directly to a framebuffer, we assume
-			 * that it's a "slow" device, so that rendering should
-			 * be deferred to a timeout or softcall so that we write
-			 * a bunch of characters at once.
-			 */
-			wscons.wc_defer_output = prom_stdout_is_framebuffer();
-#endif /* _HAVE_TEM_FIRMWARE */
-		}
-	}
-
-	if (wscons.wc_ttycommon.t_flags & TS_XCLUDE) {
-		if (secpolicy_excl_open(crp) != 0) {
-			return (EBUSY);
-		}
-	}
-	wscons.wc_ttycommon.t_readq = q;
-	wscons.wc_ttycommon.t_writeq = WR(q);
-	qprocson(q);
-	return (0);
+	wc_init_polledio();
+	minor = (int)getminor(*devp);
+	return (vt_open(minor, q, crp));
 }
 
 /*ARGSUSED*/
 static int
 wcclose(queue_t *q, int flag, cred_t *crp)
 {
+	vc_state_t *pvc = (vc_state_t *)q->q_ptr;
+
 	qprocsoff(q);
-	if (wscons.wc_bufcallid != 0) {
-		qunbufcall(q, wscons.wc_bufcallid);
-		wscons.wc_bufcallid = 0;
+
+	mutex_enter(&vc_lock);
+
+	if (pvc->vc_minor == 0 || pvc->vc_minor == vc_active_console) {
+
+		/*
+		 * If we lose the system console,
+		 * no any other active consoles.
+		 */
+		if (pvc->vc_minor == 0 && pvc->vc_minor == vc_active_console) {
+			vc_active_console = VT_MINOR_INVALID;
+			vc_last_console = VT_MINOR_INVALID;
+		}
+
+		/*
+		 * just clean for our primary console
+		 * and active console
+		 */
+		mutex_enter(&pvc->vc_state_lock);
+		vt_clean(q, pvc);
+		mutex_exit(&pvc->vc_state_lock);
+
+		mutex_exit(&vc_lock);
+
+		return (0);
 	}
-	if (wscons.wc_timeoutid != 0) {
-		(void) quntimeout(q, wscons.wc_timeoutid);
-		wscons.wc_timeoutid = 0;
-	}
-	ttycommon_close(&wscons.wc_ttycommon);
-	wscons.wc_flags = 0;
+	vt_close(q, pvc, crp);
+
+	mutex_exit(&vc_lock);
+
 	return (0);
 }
 
@@ -424,16 +499,24 @@ wcclose(queue_t *q, int flag, cred_t *crp)
 static int
 wcuwput(queue_t *q, mblk_t *mp)
 {
+	vc_state_t *pvc = (vc_state_t *)q->q_ptr;
+
 	switch (mp->b_datap->db_type) {
 
 	case M_STOP:
-		wscons.wc_flags |= WCS_STOPPED;
+		mutex_enter(&pvc->vc_state_lock);
+		pvc->vc_flags |= WCS_STOPPED;
+		mutex_exit(&pvc->vc_state_lock);
+
 		freemsg(mp);
 		break;
 
 	case M_START:
-		wscons.wc_flags &= ~WCS_STOPPED;
-		wcstart();
+		mutex_enter(&pvc->vc_state_lock);
+		pvc->vc_flags &= ~WCS_STOPPED;
+		mutex_exit(&pvc->vc_state_lock);
+
+		wcstart(pvc);
 		freemsg(mp);
 		break;
 
@@ -441,7 +524,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 		struct iocblk *iocp;
 		struct linkblk *linkp;
 
-		iocp = (void *)mp->b_rptr;
+		iocp = (struct iocblk *)(void *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
 
 		case I_LINK:	/* stupid, but permitted */
@@ -451,7 +534,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 				miocnak(q, mp, 0, EINVAL);
 				return (0);
 			}
-			linkp = (void *)mp->b_cont->b_rptr;
+			linkp = (struct linkblk *)(void *)mp->b_cont->b_rptr;
 			wscons.wc_kbdqueue = WR(linkp->l_qbot);
 			mp->b_datap->db_type = M_IOCACK;
 			iocp->ioc_count = 0;
@@ -460,7 +543,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 
 		case I_UNLINK:	/* stupid, but permitted */
 		case I_PUNLINK:
-			linkp = (void *)mp->b_cont->b_rptr;
+			linkp = (struct linkblk *)(void *)mp->b_cont->b_rptr;
 			if (wscons.wc_kbdqueue != WR(linkp->l_qbot)) {
 				/* not us */
 				miocnak(q, mp, 0, EINVAL);
@@ -486,13 +569,14 @@ wcuwput(queue_t *q, mblk_t *mp)
 			 * start routine, just in case.
 			 */
 			(void) putq(q, mp);
-			wcstart();
+			wcstart(pvc);
 			break;
 
 		case CONSSETABORTENABLE:
 		case CONSGETABORTENABLE:
 		case KIOCSDIRECT:
 			if (wscons.wc_kbdqueue != NULL) {
+				wscons.wc_pending_wq = q;
 				(void) putnext(wscons.wc_kbdqueue, mp);
 				break;
 			}
@@ -537,7 +621,11 @@ wcuwput(queue_t *q, mblk_t *mp)
 		 * and poke the start routine.
 		 */
 		(void) putq(q, mp);
-		wcstart();
+		wcstart(pvc);
+		break;
+
+	case M_IOCDATA:
+		vt_miocdata(q, mp);
 		break;
 
 	default:
@@ -560,14 +648,15 @@ wcuwput(queue_t *q, mblk_t *mp)
 static void
 wcreioctl(void *arg)
 {
+	vc_state_t *pvc = (vc_state_t *)arg;
 	queue_t *q;
 	mblk_t *mp;
 
-	wscons.wc_bufcallid = 0;
-	q = wscons.wc_ttycommon.t_writeq;
-	if ((mp = wscons.wc_ttycommon.t_iocpending) != NULL) {
+	pvc->vc_bufcallid = 0;
+	q = pvc->vc_ttycommon.t_writeq;
+	if ((mp = pvc->vc_ttycommon.t_iocpending) != NULL) {
 		/* not pending any more */
-		wscons.wc_ttycommon.t_iocpending = NULL;
+		pvc->vc_ttycommon.t_iocpending = NULL;
 		wcioctl(q, mp);
 	}
 }
@@ -618,12 +707,19 @@ wc_getterm(mblk_t *mp)
 static void
 wcioctl(queue_t *q, mblk_t *mp)
 {
+	vc_state_t *pvc = (vc_state_t *)q->q_ptr;
 	struct iocblk *iocp;
 	size_t datasize;
 	int error;
 	long len;
 
-	iocp = (void *)mp->b_rptr;
+	iocp = (struct iocblk *)(void *)mp->b_rptr;
+
+	if ((iocp->ioc_cmd & VTIOC) == VTIOC ||
+	    (iocp->ioc_cmd & KDIOC) == KDIOC) {
+		vt_ioctl(q, mp);
+		return;
+	}
 
 	switch (iocp->ioc_cmd) {
 	case TIOCSWINSZ:
@@ -698,21 +794,17 @@ wcioctl(queue_t *q, mblk_t *mp)
 		iocp->ioc_error = EINVAL;
 
 		/*
-		 * If we're already open, fail.
-		 */
-		if (wscons.wc_tem != NULL)
-			goto open_fail;
-
-		/*
 		 * If we don't have exactly one continuation block, fail.
 		 */
-		if (mp->b_cont == NULL || mp->b_cont->b_cont != NULL)
+		if (mp->b_cont == NULL ||
+		    mp->b_cont->b_cont != NULL)
 			goto open_fail;
 
 		/*
 		 * If there's no null terminator in the string, fail.
 		 */
-		len = MBLKL(mp->b_cont);
+		/* LINTED E_PTRDIFF_OVERFLOW */
+		len = mp->b_cont->b_wptr - mp->b_cont->b_rptr;
 		if (memchr(mp->b_cont->b_rptr, 0, len) == NULL)
 			goto open_fail;
 
@@ -720,8 +812,8 @@ wcioctl(queue_t *q, mblk_t *mp)
 		 * NOTE:  should eventually get default
 		 * dimensions from a property, e.g. screen-#rows.
 		 */
-		iocp->ioc_error = tem_init(&wscons.wc_tem,
-		    (char *)mp->b_cont->b_rptr, iocp->ioc_cr);
+		iocp->ioc_error = tem_info_init((char *)mp->b_cont->b_rptr,
+		    iocp->ioc_cr);
 		/*
 		 * Of course, if the terminal emulator initialization
 		 * failed, fail.
@@ -729,13 +821,23 @@ wcioctl(queue_t *q, mblk_t *mp)
 		if (iocp->ioc_error != 0)
 			goto open_fail;
 
-		tem_register_modechg_cb(wscons.wc_tem, wc_modechg_cb,
-		    (tem_modechg_cb_arg_t)&wscons);
+#ifdef	_HAVE_TEM_FIRMWARE
+		if (prom_stdout_is_framebuffer()) {
+			/*
+			 * Drivers in the console stream may emit additional
+			 * messages before we are ready. This causes text
+			 * overwrite on the screen. So we set the redirection
+			 * here. It is safe because the ioctl in consconfig_dacf
+			 * will succeed and consmode will be set to CONS_KFB.
+			 */
+			prom_set_stdout_redirect(wc_cons_wrtvec,
+			    (promif_redir_arg_t)NULL);
 
-		/*
-		 * Refresh terminal size with info from terminal emulator.
-		 */
-		wc_get_size(&wscons);
+		}
+#endif	/* _HAVE_TEM_FIRMWARE */
+
+		tem_register_modechg_cb(wc_modechg_cb,
+		    (tem_modechg_cb_arg_t)&wscons);
 
 		/*
 		 * ... and succeed.
@@ -779,12 +881,12 @@ close_fail:
 		 * request that we be called back when we stand a
 		 * better chance of allocating the data.
 		 */
-		datasize = ttycommon_ioctl(&wscons.wc_ttycommon, q, mp, &error);
+		datasize = ttycommon_ioctl(&pvc->vc_ttycommon, q, mp, &error);
 		if (datasize != 0) {
-			if (wscons.wc_bufcallid != 0)
-				qunbufcall(q, wscons.wc_bufcallid);
-			wscons.wc_bufcallid = qbufcall(q, datasize, BPRI_HI,
-			    wcreioctl, NULL);
+			if (pvc->vc_bufcallid != 0)
+				qunbufcall(q, pvc->vc_bufcallid);
+			pvc->vc_bufcallid = qbufcall(q, datasize, BPRI_HI,
+			    wcreioctl, pvc);
 			return;
 		}
 
@@ -810,7 +912,7 @@ close_fail:
  * the lower driver services this message.
  */
 static void
-wc_open_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
+wc_open_kb_polledio(struct wscons_state *wscons, queue_t *q, mblk_t *mp)
 {
 	mblk_t *mp2;
 	struct iocblk *iocp;
@@ -838,12 +940,13 @@ wc_open_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 		goto nomem;
 	}
 
-	iocp = (void *)mp2->b_rptr;
+	iocp = (struct iocblk *)(void *)mp2->b_rptr;
 
 	iocp->ioc_count = sizeof (struct cons_polledio *);
 	mp2->b_cont->b_wptr = mp2->b_cont->b_rptr +
 	    sizeof (struct cons_polledio *);
 
+	wscons->wc_pending_wq = q;
 	wscons->wc_pending_link = mp;
 	wscons->wc_kb_getpolledio_id = iocp->ioc_id;
 
@@ -852,7 +955,7 @@ wc_open_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 	return;
 
 nomem:
-	iocp = (void *)mp->b_rptr;
+	iocp = (struct iocblk *)(void *)mp->b_rptr;
 	iocp->ioc_error = ENOMEM;
 	mp->b_datap->db_type = M_IOCNAK;
 	qreply(q, mp);
@@ -865,7 +968,7 @@ nomem:
  * driver services this message.
  */
 static void
-wc_close_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
+wc_close_kb_polledio(struct wscons_state *wscons, queue_t *q, mblk_t *mp)
 {
 	mblk_t *mp2;
 	struct iocblk *iocp;
@@ -894,10 +997,11 @@ wc_close_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 		goto nomem;
 	}
 
-	iocp = (void *)mp2->b_rptr;
+	iocp = (struct iocblk *)(void *)mp2->b_rptr;
 
 	iocp->ioc_count = 0;
 
+	wscons->wc_pending_wq = q;
 	wscons->wc_pending_link = mp;
 	wscons->wc_kb_getpolledio_id = iocp->ioc_id;
 
@@ -906,7 +1010,7 @@ wc_close_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 	return;
 
 nomem:
-	iocp = (void *)mp->b_rptr;
+	iocp = (struct iocblk *)(void *)mp->b_rptr;
 	iocp->ioc_error = ENOMEM;
 	mp->b_datap->db_type = M_IOCNAK;
 	qreply(q, mp);
@@ -917,20 +1021,26 @@ nomem:
 static void
 wcopoll(void *arg)
 {
+	vc_state_t *pvc = (vc_state_t *)arg;
 	queue_t *q;
 
-	q = wscons.wc_ttycommon.t_writeq;
-	wscons.wc_timeoutid = 0;
+	q = pvc->vc_ttycommon.t_writeq;
+	pvc->vc_timeoutid = 0;
+
+	mutex_enter(&pvc->vc_state_lock);
+
 	/* See if we can continue output */
-	if ((wscons.wc_flags & WCS_BUSY) && wscons.wc_pendc != -1) {
-		if (prom_mayput((char)wscons.wc_pendc) == 0) {
-			wscons.wc_pendc = -1;
-			wscons.wc_flags &= ~WCS_BUSY;
-			if (!(wscons.wc_flags&(WCS_DELAY|WCS_STOPPED)))
-				wcstart();
+	if ((pvc->vc_flags & WCS_BUSY) && pvc->vc_pendc != -1) {
+		if (prom_mayput((char)pvc->vc_pendc) == 0) {
+			pvc->vc_pendc = -1;
+			pvc->vc_flags &= ~WCS_BUSY;
+			if (!(pvc->vc_flags&(WCS_DELAY|WCS_STOPPED)))
+				wcstart(pvc);
 		} else
-			wscons.wc_timeoutid = qtimeout(q, wcopoll, NULL, 1);
+			pvc->vc_timeoutid = qtimeout(q, wcopoll, pvc, 1);
 	}
+
+	mutex_exit(&pvc->vc_state_lock);
 }
 #endif	/* _HAVE_TEM_FIRMWARE */
 
@@ -941,17 +1051,38 @@ wcopoll(void *arg)
 static void
 wcrstrt(void *arg)
 {
-	ASSERT(wscons.wc_ttycommon.t_writeq != NULL);
-	wscons.wc_flags &= ~WCS_DELAY;
-	wcstart();
+	vc_state_t *pvc = (vc_state_t *)arg;
+
+	ASSERT(pvc->vc_ttycommon.t_writeq != NULL);
+
+	mutex_enter(&pvc->vc_state_lock);
+	pvc->vc_flags &= ~WCS_DELAY;
+	mutex_exit(&pvc->vc_state_lock);
+
+	wcstart(pvc);
+}
+
+/*
+ * get screen terminal for current output
+ */
+static tem_vt_state_t
+wc_get_screen_tem(vc_state_t *pvc)
+{
+	if (!tem_initialized(pvc->vc_tem) ||
+	    tem_get_fbmode(pvc->vc_tem) != KD_TEXT)
+		return (NULL);
+
+	return (pvc->vc_tem);
 }
 
 /*
  * Start console output
  */
 static void
-wcstart(void)
+wcstart(void *arg)
 {
+	vc_state_t *pvc = (vc_state_t *)arg;
+	tem_vt_state_t ptem = NULL;
 #ifdef _HAVE_TEM_FIRMWARE
 	int c;
 	ssize_t cc;
@@ -966,14 +1097,14 @@ wcstart(void)
 	 * restarted, output to finish draining), don't grab anything
 	 * new.
 	 */
-	if (wscons.wc_flags & (WCS_DELAY|WCS_BUSY|WCS_STOPPED))
+	if (pvc->vc_flags & (WCS_DELAY|WCS_BUSY|WCS_STOPPED))
 		return;
 
-	q = wscons.wc_ttycommon.t_writeq;
+	q = pvc->vc_ttycommon.t_writeq;
 	/*
 	 * assumes that we have been called by whoever holds the
 	 * exclusionary lock on the write-side queue (protects
-	 * wc_flags and wc_pendc).
+	 * vc_flags and vc_pendc).
 	 */
 	for (;;) {
 		if ((bp = getq(q)) == NULL)
@@ -993,11 +1124,15 @@ wcstart(void)
 			 * delay expires; it will turn WCS_DELAY off,
 			 * and call "wcstart" to grab the next message.
 			 */
-			if (wscons.wc_timeoutid != 0)
-				(void) quntimeout(q, wscons.wc_timeoutid);
-			wscons.wc_timeoutid = qtimeout(q, wcrstrt, NULL,
+			if (pvc->vc_timeoutid != 0)
+				(void) quntimeout(q, pvc->vc_timeoutid);
+			pvc->vc_timeoutid = qtimeout(q, wcrstrt, pvc,
 			    (clock_t)(*(unsigned char *)bp->b_rptr + 6));
-			wscons.wc_flags |= WCS_DELAY;
+
+			mutex_enter(&pvc->vc_state_lock);
+			pvc->vc_flags |= WCS_DELAY;
+			mutex_exit(&pvc->vc_state_lock);
+
 			freemsg(bp);
 			return;	/* wait for this to finish */
 
@@ -1014,23 +1149,34 @@ wcstart(void)
 #ifdef _HAVE_TEM_FIRMWARE
 		if (consmode == CONS_KFB) {
 #endif /* _HAVE_TEM_FIRMWARE */
-			if (wscons.wc_tem != NULL) {
+			if ((ptem = wc_get_screen_tem(pvc)) != NULL) {
+
 				for (nbp = bp; nbp != NULL; nbp = nbp->b_cont) {
 					if (nbp->b_wptr > nbp->b_rptr) {
-						(void) tem_write(wscons.wc_tem,
+						(void) tem_write(ptem,
 						    nbp->b_rptr,
-						    MBLKL(nbp),
+						    /* LINTED */
+						    nbp->b_wptr - nbp->b_rptr,
 						    kcred);
 					}
 				}
-				freemsg(bp);
+
 			}
+
+			freemsg(bp);
+
 #ifdef _HAVE_TEM_FIRMWARE
 			continue;
 		}
 
 		/* consmode = CONS_FW */
-		if ((cc = MBLKL(bp)) == 0) {
+		if (pvc->vc_minor != 0) {
+			freemsg(bp);
+			continue;
+		}
+
+		/* LINTED E_PTRDIFF_OVERFLOW */
+		if ((cc = bp->b_wptr - bp->b_rptr) == 0) {
 			freemsg(bp);
 			continue;
 		}
@@ -1043,17 +1189,20 @@ wcstart(void)
 			 * Never do output here;
 			 * it takes forever.
 			 */
-			wscons.wc_flags |= WCS_BUSY;
-			wscons.wc_pendc = -1;
+			mutex_enter(&pvc->vc_state_lock);
+			pvc->vc_flags |= WCS_BUSY;
+			mutex_exit(&pvc->vc_state_lock);
+
+			pvc->vc_pendc = -1;
 			(void) putbq(q, bp);
 			if (q->q_count > 128) { /* do it soon */
-				softcall(wconsout, NULL);
+				softcall(wconsout, pvc);
 			} else {	/* wait a bit */
-				if (wscons.wc_timeoutid != 0)
+				if (pvc->vc_timeoutid != 0)
 					(void) quntimeout(q,
-					    wscons.wc_timeoutid);
-				wscons.wc_timeoutid = qtimeout(q, wconsout,
-				    NULL, hz / 30);
+					    pvc->vc_timeoutid);
+				pvc->vc_timeoutid = qtimeout(q, wconsout,
+				    pvc, hz / 30);
 			}
 			return;
 		}
@@ -1061,13 +1210,17 @@ wcstart(void)
 			c = *bp->b_rptr++;
 			cc--;
 			if (prom_mayput((char)c) != 0) {
-				wscons.wc_flags |= WCS_BUSY;
-				wscons.wc_pendc = c;
-				if (wscons.wc_timeoutid != 0)
+
+				mutex_enter(&pvc->vc_state_lock);
+				pvc->vc_flags |= WCS_BUSY;
+				mutex_exit(&pvc->vc_state_lock);
+
+				pvc->vc_pendc = c;
+				if (pvc->vc_timeoutid != 0)
 					(void) quntimeout(q,
-					    wscons.wc_timeoutid);
-				wscons.wc_timeoutid = qtimeout(q, wcopoll,
-				    NULL, 1);
+					    pvc->vc_timeoutid);
+				pvc->vc_timeoutid = qtimeout(q, wcopoll,
+				    pvc, 1);
 				if (bp != NULL)
 					/* not done with this message yet */
 					(void) putbq(q, bp);
@@ -1079,7 +1232,8 @@ wcstart(void)
 				freeb(nbp);
 				if (bp == NULL)
 					return;
-				cc = MBLKL(bp);
+				/* LINTED E_PTRDIFF_OVERFLOW */
+				cc = bp->b_wptr - bp->b_rptr;
 			}
 		}
 #endif /* _HAVE_TEM_FIRMWARE */
@@ -1093,8 +1247,9 @@ wcstart(void)
  */
 /* ARGSUSED */
 static void
-wconsout(void *dummy)
+wconsout(void *arg)
 {
+	vc_state_t *pvc = (vc_state_t *)arg;
 	uchar_t *cp;
 	ssize_t cc;
 	queue_t *q;
@@ -1103,7 +1258,7 @@ wconsout(void *dummy)
 	char *current_position;
 	ssize_t bytes_left;
 
-	if ((q = wscons.wc_ttycommon.t_writeq) == NULL) {
+	if ((q = pvc->vc_ttycommon.t_writeq) == NULL) {
 		return;	/* not attached to a stream */
 	}
 
@@ -1126,7 +1281,8 @@ wconsout(void *dummy)
 
 		do {
 			cp = bp->b_rptr;
-			cc = MBLKL(bp);
+			/* LINTED E_PTRDIFF_OVERFLOW */
+			cc = bp->b_wptr - cp;
 			while (cc != 0) {
 				if (bytes_left == 0) {
 					/*
@@ -1152,8 +1308,11 @@ transmit:
 	if ((cc = MAXHIWAT - bytes_left) != 0)
 		console_puts(obuf, cc);
 
-	wscons.wc_flags &= ~WCS_BUSY;
-	wcstart();
+	mutex_enter(&pvc->vc_state_lock);
+	pvc->vc_flags &= ~WCS_BUSY;
+	mutex_exit(&pvc->vc_state_lock);
+
+	wcstart(pvc);
 }
 #endif /* _HAVE_TEM_FIRMWARE */
 
@@ -1164,8 +1323,11 @@ transmit:
 static int
 wclrput(queue_t *q, mblk_t *mp)
 {
+	vc_state_t *pvc;
 	queue_t *upq;
 	struct iocblk *iocp;
+
+	pvc = vt_minor2vc(VT_ACTIVE);
 
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL,
 	    ("wclrput: wclrput type = 0x%x\n", mp->b_datap->db_type));
@@ -1190,20 +1352,26 @@ wclrput(queue_t *q, mblk_t *mp)
 		break;
 
 	case M_DATA:
-		if ((upq = wscons.wc_ttycommon.t_readq) != NULL) {
+		if (consmode == CONS_KFB && vt_check_hotkeys(mp)) {
+			freemsg(mp);
+			break;
+		}
+
+		if ((upq = pvc->vc_ttycommon.t_readq) != NULL) {
 			if (!canput(upq->q_next)) {
-				ttycommon_qfull(&wscons.wc_ttycommon, upq);
-				wcstart();
+				ttycommon_qfull(&pvc->vc_ttycommon, upq);
+				wcstart(pvc);
 				freemsg(mp);
-			} else
+			} else {
 				putnext(upq, mp);
+			}
 		} else
 			freemsg(mp);
 		break;
 
 	case M_IOCACK:
 	case M_IOCNAK:
-		iocp = (void *)mp->b_rptr;
+		iocp = (struct iocblk *)(void *)mp->b_rptr;
 		if (wscons.wc_pending_link != NULL &&
 		    iocp->ioc_id == wscons.wc_kb_getpolledio_id) {
 			switch (mp->b_datap->db_type) {
@@ -1211,14 +1379,13 @@ wclrput(queue_t *q, mblk_t *mp)
 			case M_IOCACK:
 				switch (iocp->ioc_cmd) {
 
-
 				case CONSOPENPOLLEDIO:
 					DPRINTF(PRINT_L1, PRINT_MASK_ALL,
 					    ("wclrput: "
 					    "ACK CONSOPENPOLLEDIO\n"));
 					wscons.wc_kb_polledio =
-					    *(struct cons_polledio **)(void *)
-					    mp->b_cont->b_rptr;
+					    *(struct cons_polledio **)
+					    (void *)mp->b_cont->b_rptr;
 					wscons.wc_polledio.
 					    cons_polledio_getchar =
 					    wc_polled_getchar;
@@ -1240,7 +1407,8 @@ wclrput(queue_t *q, mblk_t *mp)
 					break;
 				default:
 					DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-					    ("wclrput: ACK UNKNOWN\n"));
+					    ("wclrput: "
+					    "ACK UNKNOWN\n"));
 				}
 
 				break;
@@ -1282,11 +1450,17 @@ wclrput(queue_t *q, mblk_t *mp)
 		/* FALLTHROUGH */
 
 	default:	/* inc M_ERROR, M_HANGUP, M_IOCACK, M_IOCNAK, ... */
-		DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-		    ("wclrput: Message DISCARDED\n"));
-		if ((upq = wscons.wc_ttycommon.t_readq) != NULL) {
+		if (wscons.wc_pending_wq != NULL) {
+			qreply(wscons.wc_pending_wq, mp);
+			wscons.wc_pending_wq = NULL;
+			break;
+		}
+
+		if ((upq = pvc->vc_ttycommon.t_readq) != NULL) {
 			putnext(upq, mp);
 		} else {
+			DPRINTF(PRINT_L1, PRINT_MASK_ALL,
+			    ("wclrput: Message DISCARDED\n"));
 			freemsg(mp);
 		}
 		break;
@@ -1295,6 +1469,38 @@ wclrput(queue_t *q, mblk_t *mp)
 	return (0);
 }
 
+#ifdef _HAVE_TEM_FIRMWARE
+/*
+ *  This routine exists so that prom_write() can redirect writes
+ *  to the framebuffer through the kernel terminal emulator, if
+ *  that configuration is selected during consconfig.
+ *  When the kernel terminal emulator is enabled, consconfig_dacf
+ *  sets up the PROM output redirect vector to enter this function.
+ *  During panic the console will already be powered up as part of
+ *  calling into the prom_*() layer.
+ */
+/* ARGSUSED */
+ssize_t
+wc_cons_wrtvec(promif_redir_arg_t arg, uchar_t *s, size_t n)
+{
+	vc_state_t *pvc;
+
+	pvc = vt_minor2vc(VT_ACTIVE);
+
+	if (pvc->vc_tem == NULL)
+		return (0);
+
+	ASSERT(consmode == CONS_KFB);
+
+	if (panicstr)
+		polled_io_cons_write(s, n);
+	else
+		(void) tem_write(pvc->vc_tem, s, n, kcred);
+
+	return (n);
+}
+#endif /* _HAVE_TEM_FIRMWARE */
+
 /*
  * These are for systems without OBP, and for devices that cannot be
  * shared between Solaris and the OBP.
@@ -1302,10 +1508,14 @@ wclrput(queue_t *q, mblk_t *mp)
 static void
 wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c)
 {
+	vc_state_t *pvc;
+
+	pvc = vt_minor2vc(VT_ACTIVE);
+
 	if (c == '\n')
 		wc_polled_putchar(arg, '\r');
 
-	if (wscons.wc_tem == NULL) {
+	if (pvc->vc_tem == NULL) {
 		/*
 		 * We have no terminal emulator configured.  We have no
 		 * recourse but to drop the output on the floor.
@@ -1313,7 +1523,7 @@ wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c)
 		return;
 	}
 
-	tem_polled_write(wscons.wc_tem, &c, 1);
+	tem_safe_polled_write(pvc->vc_tem, &c, 1);
 }
 
 /*
@@ -1323,7 +1533,7 @@ wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c)
 static int
 wc_polled_getchar(cons_polledio_arg_t arg)
 {
-	struct wscons *wscons = (struct wscons *)arg;
+	struct wscons_state *wscons = (struct wscons_state *)arg;
 
 	if (wscons->wc_kb_polledio == NULL) {
 		prom_printf("wscons:  getchar with no keyboard support");
@@ -1339,7 +1549,7 @@ wc_polled_getchar(cons_polledio_arg_t arg)
 static boolean_t
 wc_polled_ischar(cons_polledio_arg_t arg)
 {
-	struct wscons *wscons = (struct wscons *)arg;
+	struct wscons_state *wscons = (struct wscons_state *)arg;
 
 	if (wscons->wc_kb_polledio == NULL)
 		return (B_FALSE);
@@ -1351,7 +1561,7 @@ wc_polled_ischar(cons_polledio_arg_t arg)
 static void
 wc_polled_enter(cons_polledio_arg_t arg)
 {
-	struct wscons *wscons = (struct wscons *)arg;
+	struct wscons_state *wscons = (struct wscons_state *)arg;
 
 	if (wscons->wc_kb_polledio == NULL)
 		return;
@@ -1365,7 +1575,7 @@ wc_polled_enter(cons_polledio_arg_t arg)
 static void
 wc_polled_exit(cons_polledio_arg_t arg)
 {
-	struct wscons *wscons = (struct wscons *)arg;
+	struct wscons_state *wscons = (struct wscons_state *)arg;
 
 	if (wscons->wc_kb_polledio == NULL)
 		return;
@@ -1392,41 +1602,69 @@ wc_dprintf(const char *fmt, ...)
 }
 #endif
 
+/*ARGSUSED*/
 static void
-update_property(struct wscons *wscons, char *name, ushort_t value)
+update_property(vc_state_t *pvc, char *name, ushort_t value)
 {
 	char data[8];
 
 	(void) snprintf(data, sizeof (data), "%u", value);
-	(void) ddi_prop_update_string(wscons->wc_dev, wc_dip, name, data);
+
+	(void) ddi_prop_update_string(wscons.wc_dev, wc_dip, name, data);
 }
 
 /*
  * Gets the number of text rows and columns and the
  * width and height (in pixels) of the console.
  */
-static void
-wc_get_size(struct wscons *wscons)
+void
+wc_get_size(vc_state_t *pvc)
 {
-	struct winsize *t = &wscons->wc_ttycommon.t_size;
+	struct winsize *t = &pvc->vc_ttycommon.t_size;
 	ushort_t r = LOSCREENLINES, c = LOSCREENCOLS, x = 0, y = 0;
 
-	if (wscons->wc_tem != NULL)
-		tem_get_size(wscons->wc_tem, &r, &c, &x, &y);
+	if (pvc->vc_tem != NULL)
+		tem_get_size(&r, &c, &x, &y);
 #ifdef _HAVE_TEM_FIRMWARE
-	else {
+	else
 		console_get_size(&r, &c, &x, &y);
-	}
 #endif /* _HAVE_TEM_FIRMWARE */
 
-	update_property(wscons, "screen-#cols",  t->ws_col = c);
-	update_property(wscons, "screen-#rows",  t->ws_row = r);
-	update_property(wscons, "screen-width",  t->ws_xpixel = x);
-	update_property(wscons, "screen-height", t->ws_ypixel = y);
+	mutex_enter(&pvc->vc_ttycommon.t_excl);
+	t->ws_col = c;
+	t->ws_row = r;
+	t->ws_xpixel = x;
+	t->ws_ypixel = y;
+	mutex_exit(&pvc->vc_ttycommon.t_excl);
+
+	if (pvc->vc_minor != 0)
+		return;
+
+	/* only for the wscons:0 */
+	update_property(pvc, "screen-#cols",  c);
+	update_property(pvc, "screen-#rows",  r);
+	update_property(pvc, "screen-width",  x);
+	update_property(pvc, "screen-height", y);
 }
 
+/*ARGSUSED*/
 static void
 wc_modechg_cb(tem_modechg_cb_arg_t arg)
 {
-	wc_get_size((struct wscons *)arg);
+	minor_t index;
+	vc_state_t *pvc;
+
+	mutex_enter(&vc_lock);
+	for (index = 0; index < VC_INSTANCES_COUNT; index++) {
+		pvc = vt_minor2vc(index);
+
+		mutex_enter(&pvc->vc_state_lock);
+
+		if ((pvc->vc_flags & WCS_ISOPEN) &&
+		    (pvc->vc_flags & WCS_INIT))
+			wc_get_size(pvc);
+
+		mutex_exit(&pvc->vc_state_lock);
+	}
+	mutex_exit(&vc_lock);
 }

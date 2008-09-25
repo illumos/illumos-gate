@@ -124,6 +124,7 @@ static const entry_t dev_dir =
 
 static const entry_t def_srch_dirs[] = {	/* default search list */
 	{ "/dev/pts", MATCH_ALL },
+	{ "/dev/vt", MATCH_ALL },
 	{ "/dev/term", MATCH_ALL },
 	{ "/dev/zcons", MATCH_ALL },
 	{ NULL, 0 }
@@ -535,6 +536,9 @@ srch_dir(const entry_t path,	/* current path */
 
 		(void) strcpy(last_comp, direntp->d_name);
 		if (stat64(file_name, &tsb) < 0)
+			continue;
+
+		if (strcmp(file_name, "/dev/vt/active") == 0)
 			continue;
 
 		/*
