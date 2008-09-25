@@ -495,7 +495,7 @@ sda_slot_fini(sda_slot_t *slot)
 void
 sda_slot_attach(sda_slot_t *slot)
 {
-	sda_host_t	*h = slot->s_host;
+	sda_host_t	*h = slot->s_hostp;
 	char		name[16];
 	kthread_t	*thr;
 	uint32_t	cap;
@@ -862,7 +862,7 @@ sda_slot_vprintf(sda_slot_t *s, int level, const char *fmt, va_list ap)
 	}
 
 	if (s != NULL) {
-		dev_info_t	*dip = s->s_host->h_dip;
+		dev_info_t	*dip = s->s_hostp->h_dip;
 
 		(void) snprintf(msgbuf, sizeof (msgbuf),
 		    "%s%s%d: slot %d: %s%s", pfx,

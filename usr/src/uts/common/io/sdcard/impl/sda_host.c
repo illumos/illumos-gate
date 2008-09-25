@@ -131,7 +131,7 @@ sda_host_alloc(dev_info_t *dip, int nslot, sda_ops_t *ops, ddi_dma_attr_t *dma)
 	for (i = 0; i < nslot; i++) {
 		sda_slot_t *slot = &h->h_slots[i];
 
-		slot->s_host = h;
+		slot->s_hostp = h;
 		slot->s_slot_num = i;
 		slot->s_ops = *ops;
 

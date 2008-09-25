@@ -175,7 +175,7 @@ sda_mem_b2s_rw(sda_slot_t *slot, b2s_request_t *reqp)
 		return (B_TRUE);
 	}
 
-	if (slot->s_host->h_dma != NULL) {
+	if (slot->s_hostp->h_dma != NULL) {
 		b2s_request_dma(reqp, &cmdp->sc_ndmac, &cmdp->sc_dmacs);
 		cmdp->sc_kvaddr = 0;
 	}
@@ -388,7 +388,7 @@ sda_mem_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		nexinfo.nexus_version = B2S_VERSION_0;
 		nexinfo.nexus_private = slot;
 		nexinfo.nexus_dip = dip;
-		nexinfo.nexus_dma_attr = slot->s_host->h_dma;
+		nexinfo.nexus_dma_attr = slot->s_hostp->h_dma;
 		nexinfo.nexus_request = sda_mem_b2s_request;
 
 		nexus = b2s_alloc_nexus(&nexinfo);

@@ -46,8 +46,9 @@ typedef struct sda_slot sda_slot_t;
  * Per slot state.
  */
 struct sda_slot {
-	sda_host_t	*s_host;
+	sda_host_t	*s_hostp;
 	void		*s_prv;			/* bus private data */
+	dev_info_t	*s_dip;			/* devinfo node for child */
 
 	int		s_slot_num;
 	boolean_t	s_inserted;

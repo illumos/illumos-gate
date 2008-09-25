@@ -48,14 +48,13 @@
 #include <sys/sdcard/sda.h>
 #include <sys/sdcard/sda_ioctl.h>
 #include <sys/sdcard/sda_impl.h>
-
+#include <sys/fs/dv_node.h>
 
 /*
  * Local prototypes.
  */
 
 static sda_host_t *sda_nexus_lookup_dev(dev_t);
-static dev_info_t *sda_nexus_get_child(sda_slot_t *);
 static int sda_nexus_ap_ioctl(sda_host_t *, int, int, intptr_t);
 static int sda_nexus_ap_control(sda_host_t *, int, intptr_t, int);
 static int sda_nexus_ap_disconnect(sda_slot_t *);
@@ -294,7 +293,7 @@ sda_nexus_create(sda_slot_t *slot)
 	dev_info_t	*pdip, *cdip;
 	int		rv;
 
-	pdip = slot->s_host->h_dip;
+	pdip = slot->s_hostp->h_dip;
 
 	/*
 	 * SDIO: This whole function will need to be recrafted to
@@ -309,6 +308,7 @@ sda_nexus_create(sda_slot_t *slot)
 	}
 
 	ddi_set_parent_data(cdip, slot);
+	slot->s_dip = NULL;
 
 	/*
 	 * Make sure the child node gets suspend/resume events.
@@ -327,33 +327,30 @@ sda_nexus_create(sda_slot_t *slot)
 	if (ndi_devi_online(cdip, NDI_ONLINE_ATTACH) != NDI_SUCCESS) {
 		sda_slot_err(slot, "Failed bringing node online");
 		(void) ndi_devi_free(cdip);
+	} else {
+		slot->s_dip = cdip;
 	}
 }
 
 void
 sda_nexus_reinsert(sda_slot_t *slot)
 {
-	dev_info_t	*cdip, *ndip, *pdip;
+	dev_info_t	*cdip, *pdip;
 	int		circ;
 
-	pdip = slot->s_host->h_dip;
+	pdip = slot->s_hostp->h_dip;
 
 	ndi_devi_enter(pdip, &circ);
-	ndip = ddi_get_child(pdip);
-	while ((cdip = ndip) !=  NULL) {
-		ndip = ddi_get_next_sibling(cdip);
-		if (ddi_get_parent_data(cdip) == slot) {
-			mutex_enter(&DEVI(cdip)->devi_lock);
-			DEVI_SET_DEVICE_REINSERTED(cdip);
-			mutex_exit(&DEVI(cdip)->devi_lock);
-		}
-	}
-	ndi_devi_exit(pdip, circ);
-
 	sda_slot_enter(slot);
+	if ((cdip = slot->s_dip) !=  NULL) {
+		mutex_enter(&DEVI(cdip)->devi_lock);
+		DEVI_SET_DEVICE_REINSERTED(cdip);
+		mutex_exit(&DEVI(cdip)->devi_lock);
+	}
+	sda_slot_exit(slot);
 	slot->s_warn = B_FALSE;
 	slot->s_ready = B_TRUE;
-	sda_slot_exit(slot);
+	ndi_devi_exit(pdip, circ);
 }
 
 void
@@ -379,7 +376,7 @@ sda_nexus_insert(sda_slot_t *slot)
 
 	match = ((uuid[0] != 0) && (strcmp(slot->s_uuid, uuid) == 0));
 
-	if (sda_nexus_get_child(slot) != NULL) {
+	if (slot->s_dip != NULL) {
 		if (!match) {
 			sda_slot_err(slot, "Card removed while still in use.");
 			sda_slot_err(slot, "Please reinsert previous card.");
@@ -404,46 +401,25 @@ sda_nexus_insert(sda_slot_t *slot)
 void
 sda_nexus_remove(sda_slot_t *slot)
 {
-	sda_host_t	*h  = slot->s_host;
+	sda_host_t	*h  = slot->s_hostp;
 	dev_info_t	*pdip = h->h_dip;
 	dev_info_t	*cdip;
 	int		circ;
-	char		addr[16];
-	int		addrl;
-	char		*ap;
 	boolean_t	reap = B_FALSE;
 
 	ndi_devi_enter(pdip, &circ);
-	cdip = ddi_get_child(pdip);
-
-	/* calculate the prefix address that slot's children should have */
-	(void) snprintf(addr, sizeof (addr), "%x", slot->s_slot_num);
-	addrl = strlen(addr);
-
-	while (cdip != NULL) {
-		ap = ddi_get_name_addr(cdip);
-		if (ap == NULL)
-			continue;
-
-		if ((strncmp(addr, ap, addrl) != 0) ||
-		    ((ap[addrl] != '\0') && (ap[addrl] != ','))) {
-			/* address isn't for this slot */
-			continue;
-		}
-
+	if ((cdip = slot->s_dip) != NULL) {
 		reap = B_TRUE;
 		mutex_enter(&(DEVI(cdip))->devi_lock);
 		DEVI_SET_DEVICE_REMOVED(cdip);
 		mutex_exit(&(DEVI(cdip))->devi_lock);
-
-		cdip = ddi_get_next_sibling(cdip);
 	}
 	ndi_devi_exit(pdip, circ);
 
 	if (reap) {
-		sda_slot_enter(slot);
+		mutex_enter(&slot->s_evlock);
 		slot->s_reap = B_TRUE;
-		sda_slot_exit(slot);
+		mutex_exit(&slot->s_evlock);
 		sda_slot_wakeup(slot);
 	}
 }
@@ -452,71 +428,54 @@ void
 sda_nexus_reap(void *arg)
 {
 	sda_slot_t	*slot = arg;
-	dev_info_t	*pdip = slot->s_host->h_dip;
-	dev_info_t	*cdip, *ndip;
+	dev_info_t	*pdip = slot->s_hostp->h_dip;
+	dev_info_t	*cdip;
 	int		circ;
+	char		*devnm;
+	int		rv;
+
+	devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
 
 	ndi_devi_enter(pdip, &circ);
-	ndip = ddi_get_child(pdip);
+	sda_slot_enter(slot);
 
-	/*
-	 * NB: The goofy locking order here is required because
-	 * ndi_devi_offline won't clean the devfs cache if the parent
-	 * lock is held.  There really needs to be a better way, such
-	 * as a recurse flag.
-	 */
-	while ((cdip = ndip) != NULL) {
+	if (((cdip = slot->s_dip) != NULL) && DEVI_IS_DEVICE_REMOVED(cdip)) {
 
-		/* get the next node before we delete this one! */
-		ndip = ddi_get_next_sibling(cdip);
+		sda_slot_exit(slot);
+		(void) ddi_deviname(cdip, devnm);
+		(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 
-		if ((ddi_get_parent_data(cdip) == slot) &&
-		    (DEVI_IS_DEVICE_REMOVED(cdip))) {
-
-
-			ndi_devi_exit(pdip, circ);
-			if (ndi_devi_offline(cdip, NDI_DEVI_REMOVE) !=
-			    NDI_SUCCESS) {
-
-				mutex_enter(&slot->s_evlock);
-				slot->s_reap = B_TRUE;
-				mutex_exit(&slot->s_evlock);
-				return;
-			}
-
-			ndi_devi_enter(pdip, &circ);
-			/* we removed it, so restart from the beginning */
-			ndip = ddi_get_child(pdip);
+		if (i_ddi_node_state(cdip) < DS_INITIALIZED) {
+			rv = ddi_remove_child(cdip, 0);
+		} else {
+			rv = ndi_devi_unconfig_one(pdip, devnm + 1, NULL,
+			    NDI_DEVI_REMOVE | NDI_UNCONFIG);
 		}
+
+		if (rv != NDI_SUCCESS) {
+
+			mutex_enter(&slot->s_evlock);
+			slot->s_reap = B_TRUE;
+			mutex_exit(&slot->s_evlock);
+			ndi_devi_exit(pdip, circ);
+			return;
+		}
+		sda_slot_enter(slot);
 	}
+
+	if (slot->s_dip == cdip) {
+		slot->s_dip = NULL;
+	}
+	sda_slot_exit(slot);
+
 	mutex_enter(&slot->s_evlock);
 	/* woohoo, done reaping nodes */
 	slot->s_reap = B_FALSE;
 	mutex_exit(&slot->s_evlock);
 
 	ndi_devi_exit(pdip, circ);
+	kmem_free(devnm, MAXNAMELEN + 1);
 }
-
-dev_info_t *
-sda_nexus_get_child(sda_slot_t *slot)
-{
-	int		circ;
-	dev_info_t	*cdip, *pdip;
-
-	pdip = slot->s_host->h_dip;
-
-	ndi_devi_enter(pdip, &circ);
-	cdip = ddi_get_child(pdip);
-	while (cdip != NULL) {
-		if (ddi_get_parent_data(cdip) == slot) {
-			break;
-		}
-		cdip = ddi_get_next_sibling(cdip);
-	}
-	ndi_devi_exit(pdip, circ);
-	return (cdip);
-}
-
 
 /*ARGSUSED3*/
 int
@@ -574,9 +533,11 @@ void
 sda_nexus_ap_getstate(sda_slot_t *slot, devctl_ap_state_t *ap_state)
 {
 	dev_info_t	*cdip;
+	dev_info_t	*pdip = slot->s_hostp->h_dip;
 	int		circ;
 
-	ndi_devi_enter(slot->s_host->h_dip, &circ);
+	ndi_devi_enter(pdip, &circ);
+	sda_slot_enter(slot);
 
 	/*
 	 * Default state.
@@ -589,7 +550,7 @@ sda_nexus_ap_getstate(sda_slot_t *slot, devctl_ap_state_t *ap_state)
 		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
 	}
 
-	if ((cdip = sda_nexus_get_child(slot)) != NULL) {
+	if ((cdip = slot->s_dip) != NULL) {
 		mutex_enter(&DEVI(cdip)->devi_lock);
 		if (DEVI_IS_DEVICE_REMOVED(cdip)) {
 			ap_state->ap_condition = AP_COND_UNUSABLE;
@@ -610,42 +571,61 @@ sda_nexus_ap_getstate(sda_slot_t *slot, devctl_ap_state_t *ap_state)
 	ap_state->ap_last_change = slot->s_stamp;
 	ap_state->ap_in_transition = slot->s_intransit;
 
-	ndi_devi_exit(slot->s_host->h_dip, circ);
+	sda_slot_exit(slot);
+	ndi_devi_exit(pdip, circ);
 }
 
 int
 sda_nexus_ap_disconnect(sda_slot_t *slot)
 {
 	dev_info_t	*cdip;
+	dev_info_t	*pdip = slot->s_hostp->h_dip;
+	int		rv = 0;
+	int		circ;
 
 	/* if a child node exists, try to delete it */
-	if ((cdip = sda_nexus_get_child(slot)) != NULL) {
+	ndi_devi_enter(pdip, &circ);
+
+	sda_slot_enter(slot);
+	if ((cdip = slot->s_dip) != NULL) {
 		if (ndi_devi_offline(cdip, NDI_DEVI_REMOVE) != NDI_SUCCESS) {
 			/* couldn't disconnect, why not? */
-			return (EBUSY);
+			rv = EBUSY;
+			goto done;
 		}
-		slot->s_stamp = ddi_get_time();
 	}
-	return (0);
+	slot->s_stamp = ddi_get_time();
+	slot->s_dip = NULL;
+done:
+	sda_slot_exit(slot);
+	ndi_devi_exit(pdip, circ);
+	return (rv);
 }
 
 int
 sda_nexus_ap_unconfigure(sda_slot_t *slot)
 {
 	dev_info_t	*cdip;
+	dev_info_t	*pdip = slot->s_hostp->h_dip;
+	int		rv = 0;
+	int		circ;
 
 	/* attempt to unconfigure the node */
-	if ((cdip = sda_nexus_get_child(slot)) == NULL) {
-		/* node not there! */
-		return (ENXIO);
-	}
-
-	if (ndi_devi_offline(cdip, NDI_UNCONFIG) != NDI_SUCCESS) {
-		/* failed to unconfigure the node (EBUSY?) */
-		return (EIO);
+	ndi_devi_enter(pdip, &circ);
+	sda_slot_enter(slot);
+	if ((cdip = slot->s_dip) != NULL) {
+		if (ndi_devi_offline(cdip, NDI_UNCONFIG) != NDI_SUCCESS) {
+			/* failed to unconfigure the node (EBUSY?) */
+			rv = EIO;
+			goto done;
+		}
 	}
 	slot->s_stamp = ddi_get_time();
-	return (0);
+	slot->s_dip = NULL;
+done:
+	sda_slot_exit(slot);
+	ndi_devi_exit(pdip, circ);
+	return (rv);
 }
 
 int
@@ -661,7 +641,7 @@ sda_nexus_ap_configure(sda_slot_t *slot)
 	}
 
 	/* attempt to configure the node */
-	if ((cdip = sda_nexus_get_child(slot)) == NULL) {
+	if ((cdip = slot->s_dip) == NULL) {
 		sda_slot_exit(slot);
 		/* node not there! */
 		return (ENXIO);
@@ -669,6 +649,7 @@ sda_nexus_ap_configure(sda_slot_t *slot)
 	sda_slot_exit(slot);
 
 	slot->s_intransit = 1;
+
 	if (ndi_devi_online(cdip, NDI_CONFIG) != NDI_SUCCESS) {
 		/* failed to configure the node */
 		slot->s_intransit = 0;
@@ -814,12 +795,15 @@ sda_nexus_ap_control(sda_host_t *h, int snum, intptr_t arg, int mode)
 		dev_info_t	*cdip;
 		int		slen;
 
-		if ((cdip = sda_nexus_get_child(slot)) == NULL) {
+		sda_slot_enter(slot);
+		if ((cdip = slot->s_dip) == NULL) {
+			sda_slot_exit(slot);
 			return (ENOENT);
 		}
 		(void) strcpy(path, "/devices");
 		(void) ddi_pathname(cdip, path + strlen(path));
 		slen = strlen(path) + 1;
+		sda_slot_exit(slot);
 		if (apc.size < slen) {
 			apc.size = slen;
 			rv = ENOSPC;
