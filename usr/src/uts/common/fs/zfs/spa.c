@@ -2344,9 +2344,8 @@ spa_get_rootconf(char *devpath, char *devid, nvlist_t **bestconf)
 		if (nvlist_lookup_string(child[c], ZPOOL_CONFIG_DEVID,
 		    &cdevid) != 0)
 			return (EINVAL);
-		if (error = spa_check_rootconf(cpath, cdevid, NULL, &tmptxg))
-			return (error);
-		if (tmptxg > txg) {
+		if ((spa_check_rootconf(cpath, cdevid, NULL,
+		    &tmptxg) == 0) && (tmptxg > txg)) {
 			txg = tmptxg;
 			VERIFY(nvlist_lookup_string(child[c],
 			    ZPOOL_CONFIG_PATH, &bootpath) == 0);

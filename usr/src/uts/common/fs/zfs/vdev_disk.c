@@ -608,15 +608,13 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 	uint64_t s, size;
 	int l;
 	ddi_devid_t tmpdevid;
-	int error;
+	int error = -1;
 	char *minor_name;
 
 	/*
 	 * Read the device label and build the nvlist.
 	 */
-	error = ldi_open_by_name(devpath, FREAD, kcred, &vd_lh, zfs_li);
-
-	if (error && devid != NULL && ddi_devid_str_decode(devid, &tmpdevid,
+	if (devid != NULL && ddi_devid_str_decode(devid, &tmpdevid,
 	    &minor_name) == 0) {
 		error = ldi_open_by_devid(tmpdevid, minor_name,
 		    spa_mode, kcred, &vd_lh, zfs_li);
@@ -624,7 +622,8 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 		ddi_devid_str_free(minor_name);
 	}
 
-	if (error)
+	if (error && (error = ldi_open_by_name(devpath, FREAD, kcred, &vd_lh,
+	    zfs_li)))
 		return (error);
 
 	if (ldi_get_size(vd_lh, &s)) {
