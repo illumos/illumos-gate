@@ -465,8 +465,8 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  * kernel's.  On 64-bit systems, it sits above segkp and segkpm.
  *
  * segmap_start: start of segmap. The length of segmap can be modified
- * by changing segmapsize in /etc/system (preferred) or eeprom (deprecated).
- * The default length is 16MB on 32-bit systems and 64MB on 64-bit systems.
+ * through eeprom. The default length is 16MB on 32-bit systems and 64MB
+ * on 64-bit systems.
  *
  * kernelbase: On a 32-bit kernel the default value of 0xd4000000 will be
  * decreased by 2X the size required for page_t.  This allows the kernel
@@ -1703,11 +1703,9 @@ layout_kernel_va(void)
 	PRM_DEBUG(segmap_start);
 
 	/*
-	 * Users can change segmapsize through eeprom or /etc/system.
-	 * If the variable is tuned through eeprom, there is no upper
-	 * bound on the size of segmap.  If it is tuned through
-	 * /etc/system on 32-bit systems, it must be no larger than we
-	 * planned for in startup_memlist().
+	 * Users can change segmapsize through eeprom. If the variable
+	 * is tuned through eeprom, there is no upper bound on the
+	 * size of segmap. 
 	 */
 	segmapsize = MAX(ROUND_UP_LPAGE(segmapsize), SEGMAPDEFAULT);
 
