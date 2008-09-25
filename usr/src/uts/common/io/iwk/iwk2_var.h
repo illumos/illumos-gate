@@ -159,6 +159,7 @@ typedef struct iwk_softc {
 	struct iwk_rx_sensitivity	sc_rx_sens;
 
 	uint32_t		sc_tx_timer;
+	uint32_t		sc_scan_pending;
 	uint8_t			*sc_fw_bin;
 
 	ddi_softint_handle_t    sc_soft_hdl;

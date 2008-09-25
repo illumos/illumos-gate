@@ -609,7 +609,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (sc->sc_eep_map.calib_version < EEP_TX_POWER_VERSION_NEW) {
-		IWK_DBG((IWK_DEBUG_EEPROM, "older EEPROM detected"));
+		cmn_err(CE_WARN, "older EEPROM detected\n");
 		goto attach_fail4;
 	}
 
@@ -655,13 +655,14 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ic->ic_sup_rates[IEEE80211_MODE_11B] = iwk_rateset_11b;
 	ic->ic_sup_rates[IEEE80211_MODE_11G] = iwk_rateset_11g;
 
-	/* set supported .11b and .11g channels (1 through 14) */
-	for (i = 1; i <= 14; i++) {
+	/* set supported .11b and .11g channels (1 through 11) */
+	for (i = 1; i <= 11; i++) {
 		ic->ic_sup_channels[i].ich_freq =
 		    ieee80211_ieee2mhz(i, IEEE80211_CHAN_2GHZ);
 		ic->ic_sup_channels[i].ich_flags =
 		    IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM |
-		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ;
+		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ |
+		    IEEE80211_CHAN_PASSIVE;
 	}
 
 	ic->ic_xmit = iwk_send;
@@ -1179,8 +1180,7 @@ iwk_alloc_rx_ring(iwk_sc_t *sc)
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_desc);
 	if (err != DDI_SUCCESS) {
-		IWK_DBG((IWK_DEBUG_DMA, "dma alloc rx ring desc "
-		    "failed\n"));
+		cmn_err(CE_WARN, "dma alloc rx ring desc failed\n");
 		goto fail;
 	}
 	ring->desc = (uint32_t *)ring->dma_desc.mem_va;
@@ -1199,8 +1199,8 @@ iwk_alloc_rx_ring(iwk_sc_t *sc)
 		    DDI_DMA_READ | DDI_DMA_STREAMING,
 		    &data->dma_data);
 		if (err != DDI_SUCCESS) {
-			IWK_DBG((IWK_DEBUG_DMA, "dma alloc rx ring "
-			    "buf[%d] failed\n", i));
+			cmn_err(CE_WARN, "dma alloc rx ring buf[%d] "
+			    "failed\n", i);
 			goto fail;
 		}
 		/*
@@ -1287,8 +1287,8 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_desc);
 	if (err != DDI_SUCCESS) {
-		IWK_DBG((IWK_DEBUG_DMA, "dma alloc tx ring desc[%d]"
-		    " failed\n", qid));
+		cmn_err(CE_WARN, "dma alloc tx ring desc[%d] "
+		    "failed\n", qid);
 		goto fail;
 	}
 	dma_p = &ring->dma_desc;
@@ -1305,8 +1305,8 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &ring->dma_cmd);
 	if (err != DDI_SUCCESS) {
-		IWK_DBG((IWK_DEBUG_DMA, "dma alloc tx ring cmd[%d]"
-		    " failed\n", qid));
+		cmn_err(CE_WARN, "dma alloc tx ring cmd[%d] "
+		    "failed\n", qid);
 		goto fail;
 	}
 	dma_p = &ring->dma_cmd;
@@ -1323,8 +1323,7 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 	ring->data = kmem_zalloc(sizeof (iwk_tx_data_t) * TFD_QUEUE_SIZE_MAX,
 	    KM_NOSLEEP);
 	if (ring->data == NULL) {
-		IWK_DBG((IWK_DEBUG_DMA, "could not allocate "
-		    "tx data slots\n"));
+		cmn_err(CE_WARN, "could not allocate tx data slots\n");
 		goto fail;
 	}
 
@@ -1335,8 +1334,8 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 		    DDI_DMA_WRITE | DDI_DMA_STREAMING,
 		    &data->dma_data);
 		if (err != DDI_SUCCESS) {
-			IWK_DBG((IWK_DEBUG_DMA, "dma alloc tx "
-			    "ring buf[%d] failed\n", i));
+			cmn_err(CE_WARN, "dma alloc tx ring "
+			    "buf[%d] failed\n", i);
 			goto fail;
 		}
 
@@ -1379,12 +1378,10 @@ iwk_reset_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring)
 			break;
 		DELAY(10);
 	}
-#ifdef DEBUG
-	if (n == 200 && iwk_dbg_flags > 0) {
+	if (n == 200) {
 		IWK_DBG((IWK_DEBUG_DMA, "timeout reset tx ring %d\n",
 		    ring->qid));
 	}
-#endif
 	iwk_mac_access_exit(sc);
 
 	for (i = 0; i < ring->count; i++) {
@@ -1493,27 +1490,76 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	mutex_enter(&sc->sc_glock);
 	switch (nstate) {
 	case IEEE80211_S_SCAN:
-		ic->ic_state = nstate;
-		if (ostate == IEEE80211_S_INIT) {
-			ic->ic_flags |= IEEE80211_F_SCAN | IEEE80211_F_ASCAN;
-			/* let LED blink when scanning */
+		switch (ostate) {
+		case IEEE80211_S_INIT:
+		{
+			iwk_add_sta_t node;
+
+			sc->sc_flags |= IWK_F_SCANNING;
 			iwk_set_led(sc, 2, 10, 2);
 
-			if ((err = iwk_scan(sc)) != 0) {
-				IWK_DBG((IWK_DEBUG_80211,
-				    "could not initiate scan\n"));
-				ic->ic_flags &= ~(IEEE80211_F_SCAN |
-				    IEEE80211_F_ASCAN);
-				ic->ic_state = ostate;
+			/*
+			 * clear association to receive beacons from
+			 * all BSS'es
+			 */
+			sc->sc_config.assoc_id = 0;
+			sc->sc_config.filter_flags &=
+			    ~LE_32(RXON_FILTER_ASSOC_MSK);
+
+			IWK_DBG((IWK_DEBUG_80211, "config chan %d "
+			    "flags %x filter_flags %x\n", sc->sc_config.chan,
+			    sc->sc_config.flags, sc->sc_config.filter_flags));
+
+			err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
+			    sizeof (iwk_rxon_cmd_t), 1);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN,
+				    "could not clear association\n");
+				sc->sc_flags &= ~IWK_F_SCANNING;
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
+
+			/* add broadcast node to send probe request */
+			(void) memset(&node, 0, sizeof (node));
+			(void) memset(&node.bssid, 0xff, IEEE80211_ADDR_LEN);
+			node.id = IWK_BROADCAST_ID;
+			err = iwk_cmd(sc, REPLY_ADD_STA, &node,
+			    sizeof (node), 1);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN, "could not add "
+				    "broadcast node\n");
+				sc->sc_flags &= ~IWK_F_SCANNING;
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
+			break;
+		}
+		case IEEE80211_S_SCAN:
+			mutex_exit(&sc->sc_glock);
+			/* step to next channel before actual FW scan */
+			err = sc->sc_newstate(ic, nstate, arg);
+			mutex_enter(&sc->sc_glock);
+			if ((err != 0) || ((err = iwk_scan(sc)) != 0)) {
+				cmn_err(CE_WARN,
+				    "could not initiate scan\n");
+				sc->sc_flags &= ~IWK_F_SCANNING;
+				ieee80211_cancel_scan(ic);
+			}
+			mutex_exit(&sc->sc_glock);
+			return (err);
+		default:
+			break;
+
 		}
 		sc->sc_clk = 0;
-		mutex_exit(&sc->sc_glock);
-		return (IWK_SUCCESS);
+		break;
 
 	case IEEE80211_S_AUTH:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWK_F_SCANNING;
+		}
+
 		/* reset state to handle reassociations correctly */
 		sc->sc_config.assoc_id = 0;
 		sc->sc_config.filter_flags &= ~LE_32(RXON_FILTER_ASSOC_MSK);
@@ -1524,14 +1570,18 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		 * channel same to the target AP...
 		 */
 		if ((err = iwk_hw_set_before_auth(sc)) != 0) {
-			IWK_DBG((IWK_DEBUG_80211,
-			    "could not send authentication request\n"));
+			cmn_err(CE_WARN, "could not setup firmware for "
+			    "authentication\n");
 			mutex_exit(&sc->sc_glock);
 			return (err);
 		}
 		break;
 
 	case IEEE80211_S_RUN:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWK_F_SCANNING;
+		}
+
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/* let LED blink when monitoring */
 			iwk_set_led(sc, 2, 10, 10);
@@ -1542,7 +1592,13 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		/* none IBSS mode */
 		if (ic->ic_opmode != IEEE80211_M_IBSS) {
 			/* update adapter's configuration */
-			sc->sc_config.assoc_id = sc->sc_assoc_id & 0x3fff;
+			if (sc->sc_assoc_id != in->in_associd) {
+				cmn_err(CE_WARN,
+				    "associate ID mismatch: expected %d, "
+				    "got %d\n",
+				    in->in_associd, sc->sc_assoc_id);
+			}
+			sc->sc_config.assoc_id = in->in_associd & 0x3fff;
 			/*
 			 * short preamble/slot time are
 			 * negotiated when associating
@@ -1573,8 +1629,8 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
 			    sizeof (iwk_rxon_cmd_t), 1);
 			if (err != IWK_SUCCESS) {
-				IWK_DBG((IWK_DEBUG_80211,
-				    "could not update configuration\n"));
+				cmn_err(CE_WARN, "could not update "
+				    "configuration\n");
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
@@ -1613,10 +1669,18 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_INIT:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWK_F_SCANNING;
+		}
+
 		/* set LED off after init */
 		iwk_set_led(sc, 2, 1, 0);
 		break;
 	case IEEE80211_S_ASSOC:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWK_F_SCANNING;
+		}
+
 		break;
 	}
 
@@ -1636,6 +1700,7 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		if (err) {
 			cmn_err(CE_WARN, "iwk_newstate(): "
 			    "failed to init RX sensitivity\n");
+			mutex_exit(&sc->sc_glock);
 			return (err);
 		}
 
@@ -1644,6 +1709,7 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		if (err) {
 			cmn_err(CE_WARN, "iwk_newstate(): "
 			    "failed to init phy calibration\n");
+			mutex_exit(&sc->sc_glock);
 			return (err);
 		}
 
@@ -1838,8 +1904,7 @@ iwk_load_firmware(iwk_sc_t *sc)
 		DELAY(10);
 	}
 	if (n == 1000) {
-		IWK_DBG((IWK_DEBUG_FW,
-		    "timeout transferring firmware\n"));
+		cmn_err(CE_WARN, "timeout transferring firmware\n");
 		err = ETIMEDOUT;
 		return (err);
 	}
@@ -2199,17 +2264,21 @@ iwk_rx_softintr(caddr_t arg, caddr_t unused)
 			break;
 		}
 		case SCAN_COMPLETE_NOTIFICATION:
-			IWK_DBG((IWK_DEBUG_SCAN, "scan finished\n"));
-			sc->sc_flags &= ~IWK_F_SCANNING;
-			ieee80211_end_scan(ic);
-			break;
-		case STATISTICS_NOTIFICATION:
 		{
+			iwk_stop_scan_t *scan =
+			    (iwk_stop_scan_t *)(desc + 1);
+
+			IWK_DBG((IWK_DEBUG_SCAN,
+			    "completed channel %d (burst of %d) status %02x\n",
+			    scan->chan, scan->nchan, scan->status));
+
+			sc->sc_scan_pending++;
+			break;
+		}
+		case STATISTICS_NOTIFICATION:
 			/* handle statistics notification */
 			iwk_statistics_notify(sc, desc);
 			break;
-		}
-
 		}
 
 		sc->sc_rxq.cur = (sc->sc_rxq.cur + 1) % RX_QUEUE_SIZE;
@@ -2266,7 +2335,7 @@ iwk_intr(caddr_t arg, caddr_t unused)
 		return (DDI_INTR_CLAIMED);
 	}
 	if (r & (BIT_INT_SWERROR | BIT_INT_ERR)) {
-		IWK_DBG((IWK_DEBUG_FW, "fatal firmware error\n"));
+		cmn_err(CE_WARN, "fatal firmware error\n");
 		mutex_exit(&sc->sc_glock);
 #ifdef DEBUG
 		/* dump event and error logs to dmesg */
@@ -2654,8 +2723,12 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		 * essid of the AP we want to connect.
 		 */
 		if (ic->ic_des_esslen) {
-			(void) ieee80211_new_state(ic,
-			    IEEE80211_S_SCAN, -1);
+			if (sc->sc_flags & IWK_F_RUNNING) {
+				iwk_m_stop(sc);
+				(void) iwk_m_start(sc);
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_SCAN, -1);
+			}
 		}
 	}
 }
@@ -2688,10 +2761,13 @@ iwk_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	if (err == ENETRESET) {
 		if (ic->ic_des_esslen) {
-			(void) ieee80211_new_state(ic,
-			    IEEE80211_S_SCAN, -1);
+			if (sc->sc_flags & IWK_F_RUNNING) {
+				iwk_m_stop(sc);
+				(void) iwk_m_start(sc);
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_SCAN, -1);
+			}
 		}
-
 		err = 0;
 	}
 
@@ -2779,6 +2855,8 @@ iwk_m_start(void *arg)
 		 * the 'plumb' succeed. The iwk_thread() tries to re-init
 		 * background.
 		 */
+		cmn_err(CE_WARN, "iwk_m_start(): failed to initialize "
+		    "hardware\n");
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags |= IWK_F_HW_ERR_RECOVER;
 		mutex_exit(&sc->sc_glock);
@@ -2808,6 +2886,7 @@ iwk_m_stop(void *arg)
 	mutex_exit(&sc->sc_mt_lock);
 	mutex_enter(&sc->sc_glock);
 	sc->sc_flags &= ~IWK_F_RUNNING;
+	sc->sc_flags &= ~IWK_F_SCANNING;
 	mutex_exit(&sc->sc_glock);
 }
 
@@ -2888,11 +2967,12 @@ iwk_thread(iwk_sc_t *sc)
 			    "try to recover fatal hw error: %d\n", times++));
 
 			iwk_stop(sc);
-			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
 			mutex_exit(&sc->sc_mt_lock);
+			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 			delay(drv_usectohz(2000000 + n*500000));
 			mutex_enter(&sc->sc_mt_lock);
+
 			err = iwk_init(sc);
 			if (err != IWK_SUCCESS) {
 				n++;
@@ -2907,6 +2987,20 @@ iwk_thread(iwk_sc_t *sc)
 			delay(drv_usectohz(2000000));
 			if (sc->sc_ostate != IEEE80211_S_INIT)
 				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
+			mutex_enter(&sc->sc_mt_lock);
+		}
+
+		if (ic->ic_mach &&
+		    (sc->sc_flags & IWK_F_SCANNING) && sc->sc_scan_pending) {
+
+			IWK_DBG((IWK_DEBUG_SCAN,
+			    "iwk_thread(): "
+			    "wait for probe response\n"));
+
+			sc->sc_scan_pending--;
+			mutex_exit(&sc->sc_mt_lock);
+			delay(drv_usectohz(200000));
+			ieee80211_next_scan(ic);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
@@ -3143,12 +3237,11 @@ iwk_scan(iwk_sc_t *sc)
 	iwk_scan_chan_t *chan;
 	struct ieee80211_frame *wh;
 	ieee80211_node_t *in = ic->ic_bss;
+	uint8_t essid[IEEE80211_NWID_LEN+1];
 	struct ieee80211_rateset *rs;
 	enum ieee80211_phymode mode;
 	uint8_t *frm;
 	int i, pktlen, nrates;
-
-	sc->sc_flags |= IWK_F_SCANNING;
 
 	data = &ring->data[ring->cur];
 	desc = data->desc;
@@ -3161,8 +3254,8 @@ iwk_scan(iwk_sc_t *sc)
 
 	hdr = (iwk_scan_hdr_t *)cmd->data;
 	(void) memset(hdr, 0, sizeof (iwk_scan_hdr_t));
-	hdr->nchan = 11;
-	hdr->quiet_time = LE_16(5);
+	hdr->nchan = 1;
+	hdr->quiet_time = LE_16(50);
 	hdr->quiet_plcp_th = LE_16(1);
 
 	hdr->flags = RXON_FLG_BAND_24G_MSK | RXON_FLG_AUTO_DETECT_MSK;
@@ -3181,12 +3274,17 @@ iwk_scan(iwk_sc_t *sc)
 	hdr->direct_scan[0].len = ic->ic_des_esslen;
 	hdr->direct_scan[0].id  = IEEE80211_ELEMID_SSID;
 
-	if (ic->ic_des_esslen)
+	if (ic->ic_des_esslen) {
+		bcopy(ic->ic_des_essid, essid, ic->ic_des_esslen);
+		essid[ic->ic_des_esslen] = '\0';
+		IWK_DBG((IWK_DEBUG_SCAN, "directed scan %s\n", essid));
+
 		bcopy(ic->ic_des_essid, hdr->direct_scan[0].ssid,
 		    ic->ic_des_esslen);
-	else
+	} else {
 		bzero(hdr->direct_scan[0].ssid,
 		    sizeof (hdr->direct_scan[0].ssid));
+	}
 	/*
 	 * a probe request frame is required after the REPLY_SCAN_CMD
 	 */
@@ -3203,6 +3301,12 @@ iwk_scan(iwk_sc_t *sc)
 	frm = (uint8_t *)(wh + 1);
 
 	/* essid IE */
+	if (in->in_esslen) {
+		bcopy(in->in_essid, essid, in->in_esslen);
+		essid[in->in_esslen] = '\0';
+		IWK_DBG((IWK_DEBUG_SCAN, "probe with ESSID %s\n",
+		    essid));
+	}
 	*frm++ = IEEE80211_ELEMID_SSID;
 	*frm++ = in->in_esslen;
 	(void) memcpy(frm, in->in_essid, in->in_esslen);
@@ -3246,11 +3350,16 @@ iwk_scan(iwk_sc_t *sc)
 	 */
 	chan = (iwk_scan_chan_t *)frm;
 	for (i = 1; i <= hdr->nchan; i++, chan++) {
-		chan->type = 3;
-		chan->chan = (uint8_t)i;
+		if (ic->ic_des_esslen) {
+			chan->type = 3;
+		} else {
+			chan->type = 1;
+		}
+
+		chan->chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 		chan->tpc.tx_gain = 0x3f;
 		chan->tpc.dsp_atten = 110;
-		chan->active_dwell = LE_16(20);
+		chan->active_dwell = LE_16(50);
 		chan->passive_dwell = LE_16(120);
 
 		frm += sizeof (iwk_scan_chan_t);
@@ -3483,6 +3592,8 @@ iwk_preinit(iwk_sc_t *sc)
 		DELAY(10);
 	}
 	if (n == 1000) {
+		cmn_err(CE_WARN,
+		    "iwk_preinit(): timeout waiting for clock ready\n");
 		return (ETIMEDOUT);
 	}
 	iwk_mac_access_enter(sc);
@@ -3583,13 +3694,13 @@ static int iwk_eep_load(iwk_sc_t *sc)
 	eep_gp = IWK_READ(sc, CSR_EEPROM_GP);
 	if ((eep_gp & CSR_EEPROM_GP_VALID_MSK) ==
 	    CSR_EEPROM_GP_BAD_SIGNATURE) {
-		IWK_DBG((IWK_DEBUG_EEPROM, "not find eeprom\n"));
+		cmn_err(CE_WARN, "EEPROM not found\n");
 		return (IWK_FAIL);
 	}
 
 	rr = iwk_eep_sem_down(sc);
 	if (rr != 0) {
-		IWK_DBG((IWK_DEBUG_EEPROM, "driver failed to own EEPROM\n"));
+		cmn_err(CE_WARN, "failed to own EEPROM\n");
 		return (IWK_FAIL);
 	}
 
@@ -3606,8 +3717,7 @@ static int iwk_eep_load(iwk_sc_t *sc)
 		}
 
 		if (!(rv & 1)) {
-			IWK_DBG((IWK_DEBUG_EEPROM,
-			    "time out when read eeprome\n"));
+			cmn_err(CE_WARN, "time out when read EEPROM\n");
 			iwk_eep_sem_up(sc);
 			return (IWK_FAIL);
 		}
