@@ -154,7 +154,8 @@ struct i8042_port {
 	 */
 	boolean_t		intercept_complete;
 	boolean_t		intr_intercept_enabled;
-	uint8_t			intercept;
+	uint8_t			intercept[2];
+	uint8_t			intercepted_byte;
 	kcondvar_t		intercept_cv;
 	kmutex_t		intercept_mutex;
 };
@@ -263,6 +264,10 @@ boolean_t i8042_force_interrupt_mode = B_FALSE;
 #endif /* __sparc */
 
 int max_wait_iterations = MAX_WAIT_ITERATIONS;
+
+#ifdef DEBUG
+int i8042_debug = 0;
+#endif
 
 /*
  * function prototypes for bus ops routines:
@@ -1060,7 +1065,9 @@ i8042_intr(caddr_t arg)
 	 * that will signal the waiter, then exit the interrupt handler
 	 * without passing the byte to the child's interrupt handler.
 	 */
-	if (port->intr_intercept_enabled && port->intercept == byte) {
+	if (port->intr_intercept_enabled && (port->intercept[0] == byte ||
+	    port->intercept[1] == byte)) {
+		port->intercepted_byte = byte;
 		port->intr_intercept_enabled = B_FALSE;
 		(void) ddi_intr_trigger_softint(global->intercept_sih, port);
 		mutex_exit(&global->i8042_mutex);
@@ -1304,6 +1311,60 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
 }
 
 /*
+ * Send the byte specified and wait for a reply -- either the retry response,
+ * or another response (assumed to be an acknowledgement).  If the retry
+ * response is received within the timeout period, the initial byte is resent
+ * to the 8042.
+ */
+static int
+i8042_do_intercept(ddi_acc_impl_t *handlep, struct i8042_port *port,
+    uint8_t *oaddr, uint8_t byte, uint8_t retry_response)
+{
+	int 	timedout = 0;
+	clock_t	tval;
+
+	/*
+	 * Intercept the command response so that the 8042 interrupt handler
+	 * does not call the port's interrupt handler.
+	 */
+	port->intercept_complete = B_FALSE;
+	port->intr_intercept_enabled = B_TRUE;
+
+	/* Maximum time to wait: */
+	tval = ddi_get_lbolt() + drv_usectohz(MAX_WAIT_ITERATIONS *
+	    USECS_PER_WAIT);
+
+	do {
+		i8042_put8_nolock(handlep, oaddr, byte);
+
+		/*
+		 * Wait for the command response
+		 */
+		while (!port->intercept_complete) {
+			if (cv_timedwait(&port->intercept_cv,
+			    &port->intercept_mutex, tval) < 0 &&
+			    !port->intercept_complete) {
+				timedout = 1;
+				break;
+			}
+		}
+
+		/*
+		 * If the intercepted byte is the retry response, keep retrying
+		 * until we time out, or until the success response is received.
+		 */
+		if (port->intercept_complete &&
+		    port->intercepted_byte == retry_response)
+			port->intercept_complete = B_FALSE;
+
+	} while (!timedout && !port->intercept_complete);
+
+	port->intr_intercept_enabled = B_FALSE;
+
+	return (timedout);
+}
+
+/*
  * The _rep_put8() operation is designed to allow child drivers to
  * execute commands that have responses or that have responses plus an
  * option byte.  These commands need to be executed atomically with respect
@@ -1311,12 +1372,14 @@ i8042_get8(ddi_acc_impl_t *handlep, uint8_t *addr)
  * when other child devices intersperse their commands while a command
  * to a different 8042-connected device is in flight).
  *
- * haddr points to a buffer with either 2 or 3 bytes.  Two bytes if a
- * command is being sent for which we expect a response code (this function
- * blocks until we either read that response code or until a timer expires).
- * Three if the command requires a response and then an option byte.  The
- * option byte is only sent iff the response code expected is received before
- * the timeout.
+ * haddr points to a buffer with either 3 or 4 bytes.  Three bytes if a
+ * command (byte 0) is being sent for which we expect a response code (byte 1)
+ * (this function blocks until we either read a response code (or the retry
+ * code (byte 2)) or until a timer expires).
+ * Four if the command (byte 0) requires a response (byte 1) and then an
+ * option byte (byte 3).  The option byte is only sent iff the response code
+ * expected is received before the timeout.  As with the 3-byte request, byte
+ * 2 is the retry response.
  *
  * While this function may technically called in interrupt context, it may
  * block (depending on the IPL of the i8042 interrupt handler vs. the handler
@@ -1337,7 +1400,6 @@ i8042_rep_put8(ddi_acc_impl_t *handlep, uint8_t *haddr, uint8_t *daddr,
 	int			timedout = 0;
 	boolean_t		polled;
 	ddi_acc_hdl_t		*h;
-	clock_t			tval;
 
 	h = (ddi_acc_hdl_t *)handlep;
 
@@ -1367,7 +1429,7 @@ i8042_rep_put8(ddi_acc_impl_t *handlep, uint8_t *haddr, uint8_t *daddr,
 	 * Only support commands with MAX one parameter.  The format of the
 	 * buffer supplied must be { <CMD>, <CMD_OK_RESPONSE>[, <PARAMETER>] }
 	 */
-	if (repcount != 2 && repcount != 3) {
+	if (repcount != 3 && repcount != 4) {
 #ifdef DEBUG
 		prom_printf("WARNING: i8042_rep_put8(): Invalid repetition "
 		    "count (%d)\n", (int)repcount);
@@ -1391,42 +1453,27 @@ i8042_rep_put8(ddi_acc_impl_t *handlep, uint8_t *haddr, uint8_t *daddr,
 		mutex_enter(&global->i8042_out_mutex);
 	}
 
+	/* Initialize the response and retry bytes from the caller */
+	port->intercept[0] = haddr[1];
+	port->intercept[1] = haddr[2];
+
 	mutex_enter(&port->intercept_mutex);
 
-	/*
-	 * Intercept the command response so that the 8042 interrupt handler
-	 * does not call the port's interrupt handler.
-	 */
-	port->intercept = haddr[1];
-	port->intercept_complete = B_FALSE;
-	port->intr_intercept_enabled = B_TRUE;
-
-	i8042_put8_nolock(handlep, oaddr, haddr[0]);
+	timedout = i8042_do_intercept(handlep, port, oaddr, haddr[0], haddr[2]);
 
 	/*
-	 * Wait for the command response
+	 * If the first byte was processed before the timeout period, and
+	 * there's an option byte, send it now.
 	 */
-	tval = ddi_get_lbolt() + drv_usectohz(MAX_WAIT_ITERATIONS *
-	    USECS_PER_WAIT);
-
-	while (!port->intercept_complete) {
-		if (cv_timedwait(&port->intercept_cv, &port->intercept_mutex,
-		    tval) < 0 && !port->intercept_complete) {
-			timedout = 1;
-			break;
-		}
+	if (!timedout && repcount == 4) {
+		timedout = i8042_do_intercept(handlep, port, oaddr, haddr[3],
+		    haddr[2]);
 	}
-
-	port->intr_intercept_enabled = B_FALSE;
 
 	mutex_exit(&port->intercept_mutex);
 
-	if (!timedout && repcount == 3) {
-		i8042_put8_nolock(handlep, oaddr, haddr[2]);
-	}
-
 #ifdef DEBUG
-	if (timedout)
+	if (timedout && i8042_debug)
 		prom_printf("WARNING: i8042_rep_put8(): timed out waiting for "
 		    "command response\n");
 #endif

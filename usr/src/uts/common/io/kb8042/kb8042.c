@@ -234,7 +234,7 @@ struct dev_ops kb8042_ops = {
 	&cb_kb8042_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
 	NULL,			/* devo_power */
-	ddi_quiesce_not_needed,		/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 
@@ -1325,7 +1325,7 @@ kb8042_streams_setled(struct kbtrans_hardware *hw, int led_state)
 static void
 kb8042_send_to_keyboard(struct kb8042 *kb8042, int byte, boolean_t polled)
 {
-	uint8_t led_cmd[3];
+	uint8_t led_cmd[4];
 
 	/*
 	 * KB_SET_LED and KB_ENABLE are special commands for which the nexus
@@ -1344,13 +1344,14 @@ kb8042_send_to_keyboard(struct kb8042 *kb8042, int byte, boolean_t polled)
 		 */
 		led_cmd[0] = KB_SET_LED;
 		led_cmd[1] = KB_ACK;
-		led_cmd[2] = kb8042_xlate_leds(kb8042->leds.desired);
+		led_cmd[2] = KB_RESEND;
+		led_cmd[3] = kb8042_xlate_leds(kb8042->leds.desired);
 		if (polled) {
 			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 3, 0);
+			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 4, 0);
 		} else {
 			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 3, 0);
+			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 4, 0);
 		}
 		kb8042->leds.commanded = kb8042->leds.desired;
 
@@ -1362,12 +1363,13 @@ kb8042_send_to_keyboard(struct kb8042 *kb8042, int byte, boolean_t polled)
 		 */
 		led_cmd[0] = KB_ENABLE;
 		led_cmd[1] = KB_ACK;
+		led_cmd[2] = KB_RESEND;
 		if (polled) {
 			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 2, 0);
+			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 3, 0);
 		} else {
 			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 2, 0);
+			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 3, 0);
 		}
 	} else {
 		/* All other commands use the "normal" virtual output port */
