@@ -448,7 +448,8 @@ nfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 */
 	if ((vp->v_flag & VNOCACHE) ||
 	    (((rp->r_flags & RDIRECTIO) || (mi->mi_flags & MI_DIRECTIO)) &&
-	    rp->r_mapcnt == 0 && !vn_has_cached_data(vp))) {
+	    rp->r_mapcnt == 0 && rp->r_inmap == 0 &&
+	    !vn_has_cached_data(vp))) {
 		size_t bufsize;
 		size_t resid = 0;
 
@@ -634,7 +635,8 @@ nfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 */
 	if ((vp->v_flag & VNOCACHE) ||
 	    (((rp->r_flags & RDIRECTIO) || (mi->mi_flags & MI_DIRECTIO)) &&
-	    rp->r_mapcnt == 0 && !vn_has_cached_data(vp))) {
+	    rp->r_mapcnt == 0 && rp->r_inmap == 0 &&
+	    !vn_has_cached_data(vp))) {
 		size_t bufsize;
 		int count;
 		uint_t org_offset;
@@ -4295,9 +4297,29 @@ nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	 * rp->r_lkserlock to avoid a race with concurrent lock requests.
 	 */
 	rp = VTOR(vp);
-	if (nfs_rw_enter_sig(&rp->r_lkserlock, RW_READER, INTR(vp)))
-		return (EINTR);
 
+	/*
+	 * Atomically increment r_inmap after acquiring r_rwlock. The
+	 * idea here is to acquire r_rwlock to block read/write and
+	 * not to protect r_inmap. r_inmap will inform nfs_read/write()
+	 * that we are in nfs_map(). Now, r_rwlock is acquired in order
+	 * and we can prevent the deadlock that would have occurred
+	 * when nfs_addmap() would have acquired it out of order.
+	 *
+	 * Since we are not protecting r_inmap by any lock, we do not
+	 * hold any lock when we decrement it. We atomically decrement
+	 * r_inmap after we release r_lkserlock.
+	 */
+
+	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR(vp)))
+		return (EINTR);
+	atomic_add_int(&rp->r_inmap, 1);
+	nfs_rw_exit(&rp->r_rwlock);
+
+	if (nfs_rw_enter_sig(&rp->r_lkserlock, RW_READER, INTR(vp))) {
+		atomic_add_int(&rp->r_inmap, -1);
+		return (EINTR);
+	}
 	if (vp->v_flag & VNOCACHE) {
 		error = EAGAIN;
 		goto done;
@@ -4336,6 +4358,7 @@ nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 done:
 	nfs_rw_exit(&rp->r_lkserlock);
+	atomic_add_int(&rp->r_inmap, -1);
 	return (error);
 }
 
@@ -4352,16 +4375,8 @@ nfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
-	/*
-	 * Need to hold rwlock while incrementing the mapcnt so that
-	 * mmap'ing can be serialized with writes so that the caching
-	 * can be handled correctly.
-	 */
 	rp = VTOR(vp);
-	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR(vp)))
-		return (EINTR);
 	atomic_add_long((ulong_t *)&rp->r_mapcnt, btopr(len));
-	nfs_rw_exit(&rp->r_rwlock);
 
 	return (0);
 }

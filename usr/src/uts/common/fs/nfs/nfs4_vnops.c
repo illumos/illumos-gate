@@ -2627,7 +2627,7 @@ nfs4_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 */
 	if ((vp->v_flag & VNOCACHE) ||
 	    (((rp->r_flags & R4DIRECTIO) || (mi->mi_flags & MI4_DIRECTIO)) &&
-	    rp->r_mapcnt == 0 && !nfs4_has_pages(vp))) {
+	    rp->r_mapcnt == 0 && rp->r_inmap == 0 && !nfs4_has_pages(vp))) {
 		size_t resid = 0;
 
 		return (nfs4read(vp, NULL, uiop->uio_loffset,
@@ -2813,7 +2813,7 @@ nfs4_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 */
 	if ((vp->v_flag & VNOCACHE) ||
 	    (((rp->r_flags & R4DIRECTIO) || (mi->mi_flags & MI4_DIRECTIO)) &&
-	    rp->r_mapcnt == 0 && !nfs4_has_pages(vp))) {
+	    rp->r_mapcnt == 0 && rp->r_inmap == 0 && !nfs4_has_pages(vp))) {
 		size_t bufsize;
 		int count;
 		u_offset_t org_offset;
@@ -10376,9 +10376,29 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	 * This means portions of the file are locked (through VOP_FRLOCK).
 	 * In this case the map request must be refused.  We use
 	 * rp->r_lkserlock to avoid a race with concurrent lock requests.
+	 *
+	 * Atomically increment r_inmap after acquiring r_rwlock. The
+	 * idea here is to acquire r_rwlock to block read/write and
+	 * not to protect r_inmap. r_inmap will inform nfs4_read/write()
+	 * that we are in nfs4_map(). Now, r_rwlock is acquired in order
+	 * and we can prevent the deadlock that would have occurred
+	 * when nfs4_addmap() would have acquired it out of order.
+	 *
+	 * Since we are not protecting r_inmap by any lock, we do not
+	 * hold any lock when we decrement it. We atomically decrement
+	 * r_inmap after we release r_lkserlock.
 	 */
-	if (nfs_rw_enter_sig(&rp->r_lkserlock, RW_READER, INTR4(vp)))
+
+	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR(vp)))
 		return (EINTR);
+	atomic_add_int(&rp->r_inmap, 1);
+	nfs_rw_exit(&rp->r_rwlock);
+
+	if (nfs_rw_enter_sig(&rp->r_lkserlock, RW_READER, INTR4(vp))) {
+		atomic_add_int(&rp->r_inmap, -1);
+		return (EINTR);
+	}
+
 
 	if (vp->v_flag & VNOCACHE) {
 		error = EAGAIN;
@@ -10483,6 +10503,7 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 
 done:
 	nfs_rw_exit(&rp->r_lkserlock);
+	atomic_add_int(&rp->r_inmap, -1);
 	return (error);
 }
 
@@ -10622,20 +10643,13 @@ nfs4_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 		return (ENOSYS);
 
 	/*
-	 * Need to hold rwlock while incrementing the mapcnt so that
-	 * mmap'ing can be serialized with writes so that the caching
-	 * can be handled correctly.
-	 *
 	 * Don't need to update the open stream first, since this
 	 * mmap can't add any additional share access that isn't
 	 * already contained in the open stream (for the case where we
 	 * open/mmap/only update rp->r_mapcnt/server reboots/reopen doesn't
 	 * take into account os_mmap_read[write] counts).
 	 */
-	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR(vp)))
-		return (EINTR);
 	atomic_add_long((ulong_t *)&rp->r_mapcnt, btopr(len));
-	nfs_rw_exit(&rp->r_rwlock);
 
 	if (vp->v_type == VREG) {
 		/*

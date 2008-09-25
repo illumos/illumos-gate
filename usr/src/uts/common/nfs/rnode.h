@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
 
 #ifndef	_NFS_RNODE_H
 #define	_NFS_RNODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/avl.h>
 #include <sys/list.h>
@@ -221,6 +219,16 @@ typedef struct rhashq {
  *	set r_modaddr and release r_statelock as long as the r_rwlock
  *	writer lock is held.
  *
+ * r_inmap informs nfsX_read()/write() that there is a call to nfsX_map()
+ * in progress. nfsX_read()/write() check r_inmap to decide whether
+ * to perform directio on the file or not. r_inmap is atomically
+ * incremented in nfsX_map() before the address space routines are
+ * called and atomically decremented just before nfsX_map() exits.
+ * r_inmap is not protected by any lock.
+ *
+ * r_mapcnt tells that the rnode has mapped pages. r_inmap can be 0
+ * while the rnode has mapped pages.
+ *
  * 64-bit offsets: the code formerly assumed that atomic reads of
  * r_size were safe and reliable; on 32-bit architectures, this is
  * not true since an intervening bus cycle from another processor
@@ -283,6 +291,7 @@ typedef struct rnode {
 	acache_t	*r_acache;	/* list of access cache entries */
 	kthread_t	*r_serial;	/* id of purging thread */
 	list_t		r_indelmap;	/* list of delmap callers */
+	uint_t		r_inmap;	/* to serialize read/write and mmap */
 } rnode_t;
 #endif /* _KERNEL */
 
