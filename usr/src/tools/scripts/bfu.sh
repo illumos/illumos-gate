@@ -1566,10 +1566,10 @@ smf_cleanup_vt() {
 		cd $root
 		rm -f lib/svc/method/vtdaemon
 
-		vt_conslogin_instances=`/usr/bin/svcs -o FMRI | \
+		vt_conslogin_instances=`/tmp/bfubin/svcs -o FMRI | \
 		    grep console-login:vt`
 		for i in $vt_conslogin_instances; do
-			/usr/sbin/svccfg delete -f $i
+			/tmp/bfubin/svccfg delete -f $i
 		done
 	)
 }
@@ -2894,6 +2894,7 @@ bfuoptcmd="
 	/usr/sbin/svcadm
 	/usr/sbin/svccfg
 	/usr/bin/svcprop
+	/usr/bin/svcs
 "
 
 set $bfuoptcmd
