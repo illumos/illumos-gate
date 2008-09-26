@@ -37,6 +37,7 @@ from onbld.Checks.DbLookups import BugDB, ARC
 
 arcre = re.compile(r'^([A-Z][A-Z]*ARC[/ \t][12]\d{3}/\d{3}) (.*)$')
 bugre = re.compile(r'^(\d{7}) (.*)$')
+
 def isARC(comment):
 	return arcre.match(comment)
 
@@ -51,6 +52,17 @@ def normalize_arc(caseid):
 	return re.sub(r'^([A-Z][A-Z]*ARC)[/ \t]', '\\1 ', caseid)
 
 def comchk(comments, check_db=True, output=sys.stderr):
+        '''Validate checkin comments against ON standards.
+
+        Comments must be a list of one-line comments, with no trailing
+        newline.
+        
+        If check_db is True (the default), validate CR and ARC
+        synopses against the databases.
+
+        Error messages intended for the user are written to output,
+        which defaults to stderr
+        '''
 	bugnospcre = re.compile(r'^(\d{7})([^ ].*)')
 	ignorere = re.compile(r'^(Portions contributed by |Contributed by |back[ -]?out )')
 
@@ -61,15 +73,20 @@ def comchk(comments, check_db=True, output=sys.stderr):
 		   'nonexistent': [] }
 	bugs = {}
 	arcs = {}
-	ret = blanks = 0
+	ret = 0
+	blanks = False
 
 	for com in comments:
+                # Our input must be newline-free, comments are line-wise.
+                if com.find('\n') != -1:
+                        raise ValueError("newline in comment '%s'" % com)
+                
 		# Ignore valid comments we can't check
 		if ignorere.search(com):
 			continue
 
 		if not com or com.isspace():
-			blanks += 1
+			blanks = True
 			continue
 
 		match = bugre.search(com)
@@ -118,9 +135,14 @@ def comchk(comments, check_db=True, output=sys.stderr):
 			errors['nonexistent'].append(crid)
 			continue
 
+		#
+		# For each synopsis, compare the real synopsis with
+		# that in the comments, allowing for possible '(fix
+		# stuff)'-like trailing text
+		#
 		for entered in insts:
 			synopsis = results[crid]["synopsis"]
-			if not re.search(re.escape(synopsis) +
+			if not re.search(r'^' + re.escape(synopsis) +
 					 r'( \([^)]+\))?$', entered):
 				errors['nomatch'].append([crid, synopsis,
 							  entered])
@@ -152,6 +174,7 @@ def comchk(comments, check_db=True, output=sys.stderr):
 			if entered[0:40] == arc.name():
 				continue
 			else:
+				# Try again with trailing (fix ...) removed.
 				dbcom = re.sub(r' \([^)]+\)$', '', entered)
 				if dbcom[0:40] != arc.name():
 					errors['nomatch'].append([case,

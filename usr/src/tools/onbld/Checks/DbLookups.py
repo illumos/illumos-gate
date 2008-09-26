@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Various database lookup classes/methods, i.e.:
@@ -96,10 +94,10 @@ class Monaco(object):
 		Dictionary, mapping CR=>dictionary, where the nested dictionary
 		is a mapping of field=>value
 		"""
-		monacoFields = [ "cr_number", "synopsis", "category", "sub_category",
+		monacoFields = [ "cr_number", "category", "sub_category",
 			"area", "release", "build", "responsible_manager",
 			"responsible_engineer", "priority", "status", "sub_status",
-			"submitted_by", "date_submitted" ]
+			"submitted_by", "date_submitted", "synopsis" ]
 		cmd = []
 		cmd.append("set What = cr." + ', cr.'.join(monacoFields))
 		cmd.append("")
@@ -111,7 +109,15 @@ class Monaco(object):
 		output = self.expertQuery(cmd, "Pipe-delimited+text")
 		results = {}
 		for line in output:
-			values = line.split('|')
+			line = line.rstrip('\n')
+                        
+			#
+			# We request synopsis last, and split on only
+			# the number of separators that we expect to
+			# see such that a | in the synopsis doesn't
+			# throw us out of whack.
+			#
+			values = line.split('|', len(monacoFields) - 1)
 			v = 0
 			cr = values[0]
 			results[cr] = {}
