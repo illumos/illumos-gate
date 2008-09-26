@@ -334,15 +334,19 @@ soft_delete_session(soft_session_t *session_p,
 
 	session_p->ses_close_sync &= ~SESSION_REFCNT_WAITING;
 
-	/* Mark session as no longer valid. */
-	session_p->magic_marker = 0;
-
-	(void) pthread_cond_destroy(&session_p->ses_free_cond);
-
 	/*
 	 * Remove all the objects created in this session.
 	 */
 	soft_delete_all_objects_in_session(session_p);
+
+	/*
+	 * Mark session as no longer valid. This can only be done after all
+	 * objects created by this session are free'd since the marker is
+	 * still needed in the process of removing objects from the session.
+	 */
+	session_p->magic_marker = 0;
+
+	(void) pthread_cond_destroy(&session_p->ses_free_cond);
 
 	/* In case application did not call Final */
 	if (session_p->digest.context != NULL)
