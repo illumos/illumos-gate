@@ -88,7 +88,6 @@ typedef struct ipstate {
 
 #define	is_die		is_sti.tqe_die
 #define	is_state	is_sti.tqe_state
-#define	is_touched	is_sti.tqe_touched
 #define	is_saddr	is_src.in4.s_addr
 #define	is_daddr	is_dst.in4.s_addr
 #define	is_icmp		is_ps.is_ics

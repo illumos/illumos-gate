@@ -149,7 +149,6 @@ typedef	struct	nat	{
 #define	nat_seq		nat_un.nat_uni.ici_seq
 #define	nat_id		nat_un.nat_uni.ici_id
 #define	nat_tcpstate	nat_tqe.tqe_state
-#define	nat_touched	nat_tqe.tqe_touched
 
 /*
  * Values for nat_dir

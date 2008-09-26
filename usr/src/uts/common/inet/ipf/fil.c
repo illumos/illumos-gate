@@ -2555,17 +2555,6 @@ ipf_stack_t *ifs;
 	if (fin->fin_state != NULL)
 		fr_statederef((ipstate_t **)&fin->fin_state, ifs);
 
-	if (fin->fin_nat != NULL) {
-		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
-			WRITE_ENTER(&ifs->ifs_ipf_nat);
-			nat_delete((nat_t *)fin->fin_nat, NL_DESTROY, ifs);
-			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
-			fin->fin_nat = NULL;
-		} else {
-			fr_natderef((nat_t **)&fin->fin_nat, ifs);
-		}
-	}
-
 	/*
 	 * Only allow FR_DUP to work if a rule matched - it makes no sense to
 	 * set FR_DUP as a "default" as there are no instructions about where
@@ -2586,6 +2575,22 @@ ipf_stack_t *ifs;
 		 * some operating systems.
 		 */
 		if (!out) {
+			nat_t *savenat;
+
+			/*
+			 * In case this packet is associated with a NAT entry,
+			 * we need to save a pointer to it, set it to NULL,
+			 * and restore the pointer after any return packets
+			 * have been sent.
+			 *
+			 * We must do this to keep calls to fr_send_icmp_err()
+			 * and fr_send_reset() from trying to dereference the
+			 * entry; as the dereference happens (for all packets)
+ 			 * later on.
+			 */
+			savenat = fin->fin_nat;
+			fin->fin_nat = NULL;
+
 			if (pass & FR_RETICMP) {
 				int dst;
 
@@ -2601,9 +2606,33 @@ ipf_stack_t *ifs;
 					IPF_BUMP(ifs->ifs_frstats[1].fr_ret);
 				}
 			}
+
+			fin->fin_nat = savenat;
 		} else {
 			if (pass & FR_RETRST)
 				fin->fin_error = ECONNRESET;
+		}
+	}
+
+	/*
+	 * fr_send_icmp_err() and fr_send_reset() are the last functions that
+	 * could require use of a NAT entry.  If this packet is associated with
+	 * one, it's time to clean up our reference to it.
+	 *
+	 * Note:
+	 * If a new NAT entry was created as result of this packet, and the
+	 * packet was blocked, then the entry should be forcibly removed
+	 * from the table.  Otherwise, it's sufficient to simply give up the
+	 * reference to it.
+	 */
+	if (fin->fin_nat != NULL) {
+		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
+			nat_delete((nat_t *)fin->fin_nat, NL_DESTROY, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			fin->fin_nat = NULL;
+		} else {
+			fr_natderef((nat_t **)&fin->fin_nat, ifs);
 		}
 	}
 
