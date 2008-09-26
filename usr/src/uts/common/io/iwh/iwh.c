@@ -270,8 +270,6 @@ static void	iwh_free_tx_ring(iwh_tx_ring_t *);
 static ieee80211_node_t *iwh_node_alloc(ieee80211com_t *);
 static void	iwh_node_free(ieee80211_node_t *);
 static int	iwh_newstate(ieee80211com_t *, enum ieee80211_state, int);
-static int	iwh_key_set(ieee80211com_t *, const struct ieee80211_key *,
-    const uint8_t mac[IEEE80211_ADDR_LEN]);
 static void	iwh_mac_access_enter(iwh_sc_t *);
 static void	iwh_mac_access_exit(iwh_sc_t *);
 static uint32_t	iwh_reg_read(iwh_sc_t *, uint32_t);
@@ -678,11 +676,6 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    IEEE80211_C_PMGT | IEEE80211_C_SHSLOT;
 
 	/*
-	 * use software WEP and TKIP, hardware CCMP;
-	 */
-	ic->ic_caps |= IEEE80211_C_AES_CCM;
-
-	/*
 	 * Support WPA/WPA2
 	 */
 	ic->ic_caps |= IEEE80211_C_WPA;
@@ -694,14 +687,15 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ic->ic_sup_rates[IEEE80211_MODE_11G] = iwh_rateset_11g;
 
 	/*
-	 * set supported .11b and .11g channels (1 through 14)
+	 * set supported .11b and .11g channels (1 through 11)
 	 */
-	for (i = 1; i <= 14; i++) {
+	for (i = 1; i <= 11; i++) {
 		ic->ic_sup_channels[i].ich_freq =
 		    ieee80211_ieee2mhz(i, IEEE80211_CHAN_2GHZ);
 		ic->ic_sup_channels[i].ich_flags =
 		    IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM |
-		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ;
+		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ |
+		    IEEE80211_CHAN_PASSIVE;
 	}
 
 	ic->ic_ibss_chan = &ic->ic_sup_channels[0];
@@ -726,7 +720,6 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ic->ic_newstate = iwh_newstate;
 	ic->ic_node_alloc = iwh_node_alloc;
 	ic->ic_node_free = iwh_node_free;
-	ic->ic_crypto.cs_key_set = iwh_key_set;
 
 	/*
 	 * initialize 802.11 module
@@ -1557,12 +1550,10 @@ iwh_reset_tx_ring(iwh_sc_t *sc, iwh_tx_ring_t *ring)
 		}
 		DELAY(10);
 	}
-#ifdef DEBUG
-	if (200 == n && iwh_dbg_flags > 0) {
+	if (200 == n) {
 		IWH_DBG((IWH_DEBUG_DMA, "timeout reset tx ring %d\n",
 		    ring->qid));
 	}
-#endif
 	iwh_mac_access_exit(sc);
 
 	for (i = 0; i < ring->count; i++) {
@@ -1698,27 +1689,74 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	switch (nstate) {
 	case IEEE80211_S_SCAN:
-		ic->ic_state = nstate;
-		if (IEEE80211_S_INIT == ostate) {
-			ic->ic_flags |= IEEE80211_F_SCAN | IEEE80211_F_ASCAN;
-			/* let LED blink when scanning */
+		switch (ostate) {
+		case IEEE80211_S_INIT:
+		{
+			iwh_add_sta_t node;
+			sc->sc_flags |= IWH_F_SCANNING;
 			iwh_set_led(sc, 2, 10, 2);
 
-			if ((err = iwh_scan(sc)) != 0) {
-				IWH_DBG((IWH_DEBUG_80211,
-				    "could not initiate scan\n"));
-				ic->ic_flags &= ~(IEEE80211_F_SCAN |
-				    IEEE80211_F_ASCAN);
-				ic->ic_state = ostate;
+			/*
+			 * clear association to receive beacons from
+			 * all BSS'es
+			 */
+			sc->sc_config.assoc_id = 0;
+			sc->sc_config.filter_flags &=
+			    ~LE_32(RXON_FILTER_ASSOC_MSK);
+
+			IWH_DBG((IWH_DEBUG_80211, "config chan %d "
+			    "flags %x filter_flags %x\n", sc->sc_config.chan,
+			    sc->sc_config.flags, sc->sc_config.filter_flags));
+
+			err = iwh_cmd(sc, REPLY_RXON, &sc->sc_config,
+			    sizeof (iwh_rxon_cmd_t), 1);
+			if (err != IWH_SUCCESS) {
+				cmn_err(CE_WARN,
+				    "could not clear association\n");
+				sc->sc_flags &= ~IWH_F_SCANNING;
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
+
+			/* add broadcast node to send probe request */
+			(void) memset(&node, 0, sizeof (node));
+			(void) memset(&node.sta.addr, 0xff, IEEE80211_ADDR_LEN);
+			node.sta.sta_id = IWH_BROADCAST_ID;
+			err = iwh_cmd(sc, REPLY_ADD_STA, &node,
+			    sizeof (node), 1);
+			if (err != IWH_SUCCESS) {
+				cmn_err(CE_WARN, "could not add "
+				    "broadcast node\n");
+				sc->sc_flags &= ~IWH_F_SCANNING;
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
+			break;
+		}
+		case IEEE80211_S_SCAN:
+			mutex_exit(&sc->sc_glock);
+			/* step to next channel before actual FW scan */
+			err = sc->sc_newstate(ic, nstate, arg);
+			mutex_enter(&sc->sc_glock);
+			if ((err != 0) || ((err = iwh_scan(sc)) != 0)) {
+				cmn_err(CE_WARN,
+				    "could not initiate scan\n");
+				sc->sc_flags &= ~IWH_F_SCANNING;
+				ieee80211_cancel_scan(ic);
+			}
+			mutex_exit(&sc->sc_glock);
+			return (err);
+		default:
+			break;
 		}
 		sc->sc_clk = 0;
-		mutex_exit(&sc->sc_glock);
-		return (IWH_SUCCESS);
+		break;
 
 	case IEEE80211_S_AUTH:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWH_F_SCANNING;
+		}
+
 		/*
 		 * reset state to handle reassociations correctly
 		 */
@@ -1739,6 +1777,10 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_RUN:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWH_F_SCANNING;
+		}
+
 		if (IEEE80211_M_MONITOR == ic->ic_opmode) {
 			/* let LED blink when monitoring */
 			iwh_set_led(sc, 2, 10, 10);
@@ -1747,11 +1789,16 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 		IWH_DBG((IWH_DEBUG_80211, "iwh: associated."));
 
-
 		/*
 		 * update adapter's configuration
 		 */
-		sc->sc_config.assoc_id = sc->sc_assoc_id & 0x3fff;
+		if (sc->sc_assoc_id != in->in_associd) {
+			cmn_err(CE_WARN,
+			    "associate ID mismatch: expected %d, "
+			    "got %d\n",
+			    in->in_associd, sc->sc_assoc_id);
+		}
+		sc->sc_config.assoc_id = in->in_associd & 0x3fff;
 
 		/*
 		 * short preamble/slot time are
@@ -1830,6 +1877,9 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_INIT:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWH_F_SCANNING;
+		}
 		/*
 		 * set LED off after init
 		 */
@@ -1837,81 +1887,15 @@ iwh_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_ASSOC:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~IWH_F_SCANNING;
+		}
 		break;
 	}
 
 	mutex_exit(&sc->sc_glock);
 
 	return (sc->sc_newstate(ic, nstate, arg));
-}
-
-/*
- * set key for a given node
- */
-static int
-iwh_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
-    const uint8_t mac[IEEE80211_ADDR_LEN])
-{
-	iwh_sc_t *sc = (iwh_sc_t *)ic;
-	iwh_add_sta_t node;
-	int err;
-
-	switch (k->wk_cipher->ic_cipher) {
-	case IEEE80211_CIPHER_WEP:
-	case IEEE80211_CIPHER_TKIP:
-		return (1); /* sofeware do it. */
-
-	case IEEE80211_CIPHER_AES_CCM:
-		break;
-
-	default:
-		return (0);
-	}
-
-	sc->sc_config.filter_flags &= ~(RXON_FILTER_DIS_DECRYPT_MSK |
-	    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
-
-	mutex_enter(&sc->sc_glock);
-
-	/*
-	 * update ap/multicast node
-	 */
-	(void) memset(&node, 0, sizeof (node));
-	if (IEEE80211_IS_MULTICAST(mac)) {
-		(void) memset(node.sta.addr, 0xFF, 6);
-		node.sta.sta_id = IWH_BROADCAST_ID;
-
-	} else {
-		IEEE80211_ADDR_COPY(node.sta.addr, ic->ic_bss->in_bssid);
-		node.sta.sta_id = IWH_AP_ID;
-	}
-
-	if (k->wk_flags & IEEE80211_KEY_XMIT) {
-		node.key.key_flags = 0;
-		node.key.key_offset = k->wk_keyix;
-	} else {
-		node.key.key_flags = (1 << 14);
-		node.key.key_offset = k->wk_keyix + 4;
-	}
-
-	(void) memcpy(node.key.key, k->wk_key, k->wk_keylen);
-	node.key.key_flags |= (STA_KEY_FLG_CCMP |
-	    (1 << 3) | (k->wk_keyix << 8));
-	node.sta.modify_mask = STA_MODIFY_KEY_MASK;
-	node.mode = 1;
-	node.station_flags = 0;
-
-	err = iwh_cmd(sc, REPLY_ADD_STA, &node, sizeof (node), 1);
-	if (err != IWH_SUCCESS) {
-		cmn_err(CE_WARN, "iwh_key_set(): "
-		    "failed to update ap node\n");
-		mutex_exit(&sc->sc_glock);
-		return (0);
-	}
-
-	mutex_exit(&sc->sc_glock);
-
-	return (1);
 }
 
 /*
@@ -2607,10 +2591,17 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 		}
 
 		case SCAN_COMPLETE_NOTIFICATION:
-			IWH_DBG((IWH_DEBUG_SCAN, "scan finished\n"));
-			sc->sc_flags &= ~IWH_F_SCANNING;
-			ieee80211_end_scan(ic);
+		{
+			iwh_stop_scan_t *scan =
+			    (iwh_stop_scan_t *)(desc + 1);
+
+			IWH_DBG((IWH_DEBUG_SCAN,
+			    "completed channel %d (burst of %d) status %02x\n",
+			    scan->chan, scan->nchan, scan->status));
+
+			sc->sc_scan_pending++;
 			break;
+		}
 
 		case STATISTICS_NOTIFICATION:
 		{
@@ -2860,7 +2851,6 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	int rate, hdrlen, len, len0, mblen, off, err = IWH_SUCCESS;
 	uint16_t masks = 0;
 	uint32_t 	s_id = 0;
-	uint8_t		s_ctl = 0;
 
 	ring = &sc->sc_txq[0];
 	data = &ring->data[ring->cur];
@@ -2954,12 +2944,6 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 			sc->sc_tx_err++;
 			err = IWH_SUCCESS;
 			goto exit;
-		}
-
-		if (IEEE80211_CIPHER_AES_CCM == k->wk_cipher->ic_cipher) {
-			tx->sec_ctl = 2; /* for CCMP */
-			tx->tx_flags |= LE_32(TX_CMD_FLG_ACK_MSK);
-			(void) memcpy(&tx->key, k->wk_key, k->wk_keylen);
 		}
 
 		/* packet header may have moved, reset our local pointer */
@@ -3100,11 +3084,6 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	 * kick ring
 	 */
 	s_id = tx->sta_id;
-	s_ctl = tx->sec_ctl;
-
-	if (TX_CMD_SEC_CCM == (s_ctl & TX_CMD_SEC_MSK)) {
-		len += CCMP_MIC_LEN;
-	}
 
 	sc->sc_shared->queues_byte_cnt_tbls[ring->qid].
 	    tfd_offset[ring->cur].val =
@@ -3160,8 +3139,12 @@ iwh_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		 * essid of the AP we want to connect.
 		 */
 		if (ic->ic_des_esslen) {
-			(void) ieee80211_new_state(ic,
-			    IEEE80211_S_SCAN, -1);
+			if (sc->sc_flags & IWH_F_RUNNING) {
+				iwh_m_stop(sc);
+				(void) iwh_m_start(sc);
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_SCAN, -1);
+			}
 		}
 	}
 }
@@ -3305,6 +3288,7 @@ iwh_m_stop(void *arg)
 	mutex_exit(&sc->sc_mt_lock);
 	mutex_enter(&sc->sc_glock);
 	sc->sc_flags &= ~IWH_F_RUNNING;
+	sc->sc_flags &= ~IWH_F_SCANNING;
 
 	mutex_exit(&sc->sc_glock);
 }
@@ -3397,10 +3381,10 @@ iwh_thread(iwh_sc_t *sc)
 			    "try to recover fatal hw error: %d\n", times++));
 
 			iwh_stop(sc);
-			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
 			mutex_exit(&sc->sc_mt_lock);
 
+			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 			delay(drv_usectohz(2000000 + n*500000));
 
 			mutex_enter(&sc->sc_mt_lock);
@@ -3428,6 +3412,19 @@ iwh_thread(iwh_sc_t *sc)
 				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 			}
 
+			mutex_enter(&sc->sc_mt_lock);
+		}
+
+		if (ic->ic_mach &&
+		    (sc->sc_flags & IWH_F_SCANNING) && sc->sc_scan_pending) {
+			IWH_DBG((IWH_DEBUG_SCAN,
+			    "iwh_thread(): "
+			    "wait for probe response\n"));
+
+			sc->sc_scan_pending--;
+			mutex_exit(&sc->sc_mt_lock);
+			delay(drv_usectohz(200000));
+			ieee80211_next_scan(ic);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
@@ -3686,12 +3683,11 @@ iwh_scan(iwh_sc_t *sc)
 	iwh_scan_chan_t *chan;
 	struct ieee80211_frame *wh;
 	ieee80211_node_t *in = ic->ic_bss;
+	uint8_t essid[IEEE80211_NWID_LEN+1];
 	struct ieee80211_rateset *rs;
 	enum ieee80211_phymode mode;
 	uint8_t *frm;
 	int i, pktlen, nrates;
-
-	sc->sc_flags |= IWH_F_SCANNING;
 
 	data = &ring->data[ring->cur];
 	desc = data->desc;
@@ -3704,8 +3700,8 @@ iwh_scan(iwh_sc_t *sc)
 
 	hdr = (iwh_scan_hdr_t *)cmd->data;
 	(void) memset(hdr, 0, sizeof (iwh_scan_hdr_t));
-	hdr->nchan = 11;
-	hdr->quiet_time = LE_16(5);
+	hdr->nchan = 1;
+	hdr->quiet_time = LE_16(50);
 	hdr->quiet_plcp_th = LE_16(1);
 
 	hdr->flags = RXON_FLG_BAND_24G_MSK;
@@ -3727,6 +3723,10 @@ iwh_scan(iwh_sc_t *sc)
 	    RXON_FILTER_BCON_AWARE_MSK;
 
 	if (ic->ic_des_esslen) {
+		bcopy(ic->ic_des_essid, essid, ic->ic_des_esslen);
+		essid[ic->ic_des_esslen] = '\0';
+		IWH_DBG((IWH_DEBUG_SCAN, "directed scan %s\n", essid));
+
 		bcopy(ic->ic_des_essid, hdr->direct_scan[0].ssid,
 		    ic->ic_des_esslen);
 	} else {
@@ -3752,6 +3752,12 @@ iwh_scan(iwh_sc_t *sc)
 	/*
 	 * essid IE
 	 */
+	if (in->in_esslen) {
+		bcopy(in->in_essid, essid, in->in_esslen);
+		essid[in->in_esslen] = '\0';
+		IWH_DBG((IWH_DEBUG_SCAN, "probe with ESSID %s\n",
+		    essid));
+	}
 	*frm++ = IEEE80211_ELEMID_SSID;
 	*frm++ = in->in_esslen;
 	(void) memcpy(frm, in->in_essid, in->in_esslen);
@@ -3803,11 +3809,16 @@ iwh_scan(iwh_sc_t *sc)
 	 */
 	chan = (iwh_scan_chan_t *)frm;
 	for (i = 1; i <= hdr->nchan; i++, chan++) {
-		chan->type = 3;
-		chan->chan = (uint8_t)i;
+		if (ic->ic_des_esslen) {
+			chan->type = 3;
+		} else {
+			chan->type = 1;
+		}
+
+		chan->chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 		chan->tpc.tx_gain = 0x28;
 		chan->tpc.dsp_atten = 110;
-		chan->active_dwell = 20;
+		chan->active_dwell = 50;
 		chan->passive_dwell = 120;
 
 		frm += sizeof (iwh_scan_chan_t);

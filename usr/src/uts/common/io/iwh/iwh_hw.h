@@ -2484,6 +2484,17 @@ typedef struct iwh_start_scan {
 	uint32_t	status;
 } iwh_start_scan_t;
 
+/*
+ * structure for IWK_SCAN_COMPLETE notification
+ */
+typedef struct iwh_stop_scan {
+	uint8_t		nchan;
+	uint8_t		status;
+	uint8_t		reserved;
+	uint8_t		chan;
+	uint8_t		tsf;
+} iwh_stop_scan_t;
+
 
 #define	IWH_READ(sc, reg)						\
 	ddi_get32((sc)->sc_handle, (uint32_t *)((sc)->sc_base + (reg)))

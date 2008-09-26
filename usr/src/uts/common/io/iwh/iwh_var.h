@@ -166,6 +166,7 @@ typedef struct iwh_softc {
 	struct iwh_init_alive_resp	sc_card_alive_init;
 
 	uint32_t		sc_tx_timer;
+	uint32_t		sc_scan_pending;
 	uint8_t			*sc_fw_bin;
 
 	ddi_softint_handle_t    sc_soft_hdl;
