@@ -468,10 +468,10 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			/* Initialize FMA */
 			instance->fm_capabilities = ddi_prop_get_int(
-			    DDI_DEV_T_ANY, instance->dip, DDI_PROP_CANSLEEP
-			    | DDI_PROP_DONTPASS, "fm-capable",
-			    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE
-			    | DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+			    DDI_DEV_T_ANY, instance->dip, DDI_PROP_DONTPASS,
+			    "fm-capable", DDI_FM_EREPORT_CAPABLE |
+			    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE
+			    | DDI_FM_ERRCB_CAPABLE);
 
 			megasas_fm_init(instance);
 
@@ -1780,7 +1780,6 @@ get_mfi_pkt(struct megasas_instance *instance)
 	ASSERT(mutex_owned(&instance->cmd_pool_mtx));
 
 	if (!mlist_empty(head)) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		cmd = mlist_entry(head->next, struct megasas_cmd, list);
 		mlist_del_init(head->next);
 	}
@@ -2737,7 +2736,6 @@ megasas_softintr(struct megasas_instance *instance)
 
 	/* perform all callbacks first, before releasing the SCBs */
 	mlist_for_each_safe(pos, next, &process_list) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		cmd = mlist_entry(pos, struct megasas_cmd, list);
 
 		/* syncronize the Cmd frame for the controller */

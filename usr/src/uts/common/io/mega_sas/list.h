@@ -41,8 +41,6 @@
 #ifndef	_LIST_H_
 #define	_LIST_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -134,19 +132,20 @@ static void __list_del(struct mlist_head *prev,
 }
 
 
+#if 0
 /*
  * mlist_del - deletes entry from list.
  * @entry:	the element to delete from the list.
  * Note:	list_empty on entry does not return true after this, the entry
  * is in an undefined state.
  */
-/* LINTED E_STATIC_UNUSED */
+
 static void mlist_del(struct mlist_head *entry)
 {
 	__list_del(entry->prev, entry->next);
 	entry->next = entry->prev = 0;
 }
-
+#endif
 
 /*
  * mlist_del_init - deletes entry from list and reinitialize it.
@@ -206,7 +205,7 @@ static void mlist_splice(struct mlist_head *list, struct mlist_head *head)
  * @member:	the name of the list_struct within the struct.
  */
 #define	mlist_entry(ptr, type, member) \
-	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
+	((type *)((size_t)(ptr) - offsetof(type, member)))
 
 
 /*

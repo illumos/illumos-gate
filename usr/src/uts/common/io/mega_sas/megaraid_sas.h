@@ -591,7 +591,7 @@ struct megasas_ctrl_info {
 #define	MFI_POLL_TIMEOUT_SECS		60
 
 #define	MFI_ENABLE_INTR(instance)  ddi_put32((instance)->regmap_handle, \
-		(uint32_t *)((uintptr_t)(instance)->regmap + 0x34), 1)
+	(uint32_t *)((uintptr_t)(instance)->regmap + OB_INTR_MASK_OFF), 1)
 #define	MFI_DISABLE_INTR(instance)					\
 {									\
 	uint32_t disable = 1;						\
