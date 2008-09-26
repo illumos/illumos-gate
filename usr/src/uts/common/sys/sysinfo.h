@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,14 +23,12 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SYSINFO_H
 #define	_SYS_SYSINFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.14 */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -59,6 +56,22 @@ extern "C" {
 typedef struct cpu_sysinfo {
 	uint_t	cpu[CPU_STATES]; /* CPU utilization			*/
 	uint_t	wait[W_STATES];	/* CPU wait time breakdown		*/
+	/*
+	 * The two stats lwrite and bwrite are used by sar(1) to
+	 * generate the write cache hit percentage (%wcache value).
+	 *
+	 * The value is calculated as follows (unless lwrite < 0.5 and
+	 * then %wcache is coded to 100%):
+	 *
+	 *	(lwrite - bwrite)/lwrite * 100.0
+	 *
+	 * This calculation assumes that when a physical write occurs
+	 * (bwrite incremented), that a logical write (lwrite
+	 * incremented) has also occured. Note that a logical write
+	 * (lwrite incremented) my occur on its own.
+	 *
+	 * Similar for lread/bread and %rcache.
+	 */
 	uint_t	bread;		/* physical block reads			*/
 	uint_t	bwrite;		/* physical block writes (sync+async)	*/
 	uint_t	lread;		/* logical block reads			*/
