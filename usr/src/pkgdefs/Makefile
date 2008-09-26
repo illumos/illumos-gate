@@ -76,7 +76,6 @@ sparc_SUBDIRS= \
 	SUNWluxd.u \
 	SUNWluxl \
 	SUNWn2cp.v \
-	SUNWn2cpact.v \
 	SUNWniumx.v \
 	SUNWnxge.u \
 	SUNWnxge.v \
@@ -100,7 +99,8 @@ sparc_SUBDIRS= \
 	SUNWust2.v \
 	SUNWwbsd
 
-sparc_XMODS=
+sparc_XMODS= \
+	SUNWn2cpact.v
 
 i386_SUBDIRS= \
 	SUNWad810 \
@@ -544,5 +544,12 @@ EXPORT_SRC:
 		< SUNWcsl/prototype_sparc > SUNWcsl/prototype_sparc+
 	$(MV) -f SUNWcsl/prototype_sparc+ SUNWcsl/prototype_sparc
 	$(CHMOD) 444 SUNWcsl/prototype_sparc
+
+CRYPT_SRC:
+	$(RM) SUNWcryptoint/prototype_com+
+	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
+		< SUNWcryptoint/prototype_com > SUNWcryptoint/prototype_com+
+	$(MV) -f SUNWcryptoint/prototype_com+ SUNWcryptoint/prototype_com
+	$(CHMOD) 444 SUNWcryptoint/prototype_com
 
 # EXPORT DELETE END

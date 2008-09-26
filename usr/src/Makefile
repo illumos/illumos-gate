@@ -303,6 +303,7 @@ EXPORT_SRC:
 	$(CHMOD) 444 Makefile.master
 
 CRYPT_SRC:
+	@cd $(CLOSED)/cmd/cmd-crypto/etc;  pwd; $(MAKE) CRYPT_SRC
 	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) CRYPT_SRC
 	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils;  pwd; \
 	    $(MAKE) CRYPT_SRC
@@ -321,6 +322,7 @@ CRYPT_SRC:
 	@cd uts/common/gssapi/include;    pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/mechs/dummy;        pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/mechs/krb5; pwd; $(MAKE) CRYPT_SRC
+	@cd pkgdefs;	pwd; $(MAKE) CRYPT_SRC
 	$(RM) Makefile+
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 			< Makefile > Makefile+
