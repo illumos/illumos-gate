@@ -6593,6 +6593,14 @@ vdc_check_capacity(vdc_t *vdc)
 	size_t dsk_size, blk_size;
 	int rv;
 
+	/*
+	 * If the vdisk does not support the VD_OP_GET_CAPACITY operation
+	 * then the disk capacity has been retrieved during the handshake
+	 * and there's nothing more to do here.
+	 */
+	if (!VD_OP_SUPPORTED(vdc->operations, VD_OP_GET_CAPACITY))
+		return (0);
+
 	if ((rv = vdc_get_capacity(vdc, &dsk_size, &blk_size)) != 0)
 		return (rv);
 
