@@ -1141,8 +1141,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 			goto out;
 		}
 
-		if (nvlist_lookup_uint64(newconfig, ZPOOL_CONFIG_HOSTID,
-		    &hostid) == 0) {
+		if (!spa_is_root(spa) && nvlist_lookup_uint64(newconfig,
+		    ZPOOL_CONFIG_HOSTID, &hostid) == 0) {
 			char *hostname;
 			unsigned long myhostid = 0;
 
@@ -1154,7 +1154,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 			    (unsigned long)hostid != myhostid) {
 				cmn_err(CE_WARN, "pool '%s' could not be "
 				    "loaded as it was last accessed by "
-				    "another system (host: %s hostid: 0x%lx).  "
+				    "another system (host: %s hostid: 0x%lx). "
 				    "See: http://www.sun.com/msg/ZFS-8000-EY",
 				    spa->spa_name, hostname,
 				    (unsigned long)hostid);
