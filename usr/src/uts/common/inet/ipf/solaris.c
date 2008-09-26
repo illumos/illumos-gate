@@ -710,61 +710,39 @@ dev_info_t *dip;
 ipf_stack_t *ifs;
 {
 	ipftuneable_t *ipft;
-	int64_t *i64p;
 	char *name;
 	uint_t one;
 	int *i32p;
-	int err;
+	int err, rv = 0;
 
-	for (ipft = ifs->ifs_ipf_tuneables; (name = ipft->ipft_name) != NULL;
-	ipft++) {
+	for (ipft = ifs->ifs_ipf_tuneables;
+		(name = ipft->ipft_name) != NULL; ipft++) {
 		one = 1;
-		switch (ipft->ipft_sz)
-		{
-		case 4 :
-			i32p = NULL;
-			err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-							0, name, &i32p, &one);
-			if (err == DDI_PROP_NOT_FOUND)
-				continue;
+		i32p = NULL;
+		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+						0, name, &i32p, &one);
+		if (err == DDI_PROP_NOT_FOUND)
+			continue;
 #ifdef	IPFDEBUG
-			cmn_err(CE_CONT, "IP Filter: lookup_int(%s) = %d\n",
-				name, err);
+		cmn_err(CE_CONT, "IP Filter: lookup_int(%s) = %d\n",
+			name, err);
 #endif
-			if (err != DDI_PROP_SUCCESS)
-				return (err);
-			if (*i32p >= ipft->ipft_min && *i32p <= ipft->ipft_max)
-				*ipft->ipft_pint = *i32p;
-			else
-				err = DDI_PROP_CANNOT_DECODE;
-			ddi_prop_free(i32p);
-			break;
-
-#if SOLARIS2 > 8
-		case 8 :
-			i64p = NULL;
-			err = ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, dip,
-			    0, name, &i64p, &one);
-			if (err == DDI_PROP_NOT_FOUND)
-				continue;
-#ifdef	IPFDEBUG
-			cmn_err(CE_CONT, "IP Filter: lookup_int64(%s) = %d\n",
-			    name, err);
-#endif
-			if (err != DDI_PROP_SUCCESS)
-				return (err);
-			if (*i64p >= ipft->ipft_min && *i64p <= ipft->ipft_max)
-				*ipft->ipft_pint = *i64p;
-			else
-				err = DDI_PROP_CANNOT_DECODE;
-			ddi_prop_free(i64p);
-			break;
-#endif
-		default :
-			break;
+		if (err != DDI_PROP_SUCCESS) {
+			rv = err;
+			continue;
 		}
-		if (err != DDI_SUCCESS)
-			break;
+
+		if (*i32p >= ipft->ipft_min &&
+		    *i32p <= ipft->ipft_max) {
+			if (ipft->ipft_sz == sizeof (uint32_t)) {
+				*ipft->ipft_pint = *i32p;
+			} else if (ipft->ipft_sz == sizeof (uint64_t)) {
+				*ipft->ipft_plong = *i32p;
+			}
+		}
+
+		ddi_prop_free(i32p);
 	}
-	return (err);
+
+	return (rv);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1988, 1989, 1993
@@ -34,7 +34,6 @@
  * imp Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines to build and maintain radix trees for routing lookups.
@@ -87,7 +86,11 @@ static struct radix_node
 	*rn_delete(void *, void *, struct radix_node_head *);
 static	boolean_t rn_refines(void *, void *);
 
-#define	MAX_KEYLEN	16
+/*
+ * IPF also uses PATRICIA tree to manage ippools. IPF stores its own structure
+ * addrfamily_t. sizeof (addrfamily_t) == 24.
+ */
+#define	MAX_KEYLEN	24
 static int	max_keylen = MAX_KEYLEN;
 
 #ifdef	_KERNEL

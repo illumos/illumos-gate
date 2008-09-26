@@ -7,7 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef SOLARIS
 #define SOLARIS (defined(__SVR4) || defined(__svr4__)) && defined(sun)
@@ -1278,8 +1277,13 @@ printipflog:
 			t += 8;
 	}
 	if ((ipf->fl_lflags & FI_OOW) != 0) {
+		if (ipf->fl_lflags & FI_NEG_OOW) {
+			strcpy(t, " NEG_OOW");
+			t += sizeof (" NEG_OOW") - 1;
+		} else {
 			strcpy(t, " OOW");
-			t += 4;
+			t += sizeof (" OOW") - 1;
+		}
 	}
 	if ((ipf->fl_lflags & FI_BAD) != 0) {
 			strcpy(t, " bad");

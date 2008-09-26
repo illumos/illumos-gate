@@ -862,12 +862,12 @@ ipstate_t *is2;
 
 	if (is1->is_saddr == is2->is_saddr && is1->is_daddr == is2->is_daddr)
 		rv = 2;
-	else if (is1->is_saddr == is2->is_daddr && 
+	else if (is1->is_saddr == is2->is_daddr &&
 	    is1->is_daddr == is2->is_saddr)
 		rv = 1;
 	else
 		rv = 0;
-	
+
 	return (rv);
 }
 
@@ -885,8 +885,8 @@ ipstate_t *is2;
 {
 	int	rv;
 
-	if (IP6_EQ(&is1->is_src, &is2->is_src) && 
-	    IP6_EQ(&is1->is_dst, &is2->is_dst))  
+	if (IP6_EQ(&is1->is_src, &is2->is_src) &&
+	    IP6_EQ(&is1->is_dst, &is2->is_dst))
 		rv = 2;
 	else if (IP6_EQ(&is1->is_src, &is2->is_dst) &&
 	    IP6_EQ(&is1->is_dst, &is2->is_src)) {
@@ -900,7 +900,7 @@ ipstate_t *is2;
 /* ------------------------------------------------------------------------ */
 /* Function:	fr_match_addresses					    */
 /* Returns:	int - 	2 strong match (same addresses, same direction)	    */
-/*			1 weak match (same address, opposite directions)    */ 
+/*			1 weak match (same address, opposite directions)    */
 /* 			0 no match					    */
 /* Parameters:	is1, is2 pointers to states we are checking		    */
 /*									    */
@@ -915,11 +915,10 @@ ipstate_t *is2;
 
 	if (is1->is_v == 4) {
 		rv = fr_match_ipv4addrs(is1, is2);
-	}
-	else {
+	} else {
 		rv = fr_match_ipv6addrs(is1, is2);
 	}
-	
+
 	return (rv);
 }
 
@@ -939,10 +938,10 @@ port_pair_t *ppairs2;
 {
 	int	rv;
 
-	if (ppairs1->pp_sport == ppairs2->pp_sport && 
+	if (ppairs1->pp_sport == ppairs2->pp_sport &&
 	    ppairs1->pp_dport == ppairs2->pp_dport)
 		rv = 2;
-	else if (ppairs1->pp_sport == ppairs2->pp_dport && 
+	else if (ppairs1->pp_sport == ppairs2->pp_dport &&
 		    ppairs1->pp_dport == ppairs2->pp_sport)
 		rv = 1;
 	else
@@ -953,7 +952,7 @@ port_pair_t *ppairs2;
 
 /* ------------------------------------------------------------------------ */
 /* Function:	fr_match_l4_hdr						    */
-/* Returns:	int - 	0 no match, 					    */
+/* Returns:	int -	0 no match,					    */
 /*			1 weak match (same ports, different directions)	    */
 /*			2 strong match (same ports, same direction)	    */
 /* Parameters	is1, is2 - states we want to match			    */
@@ -997,7 +996,7 @@ ipstate_t *is2;
 			break;
 		case	IPPROTO_ICMP:
 		case	IPPROTO_ICMPV6:
-			if (bcmp(&is1->is_ps, &is2->is_ps, sizeof(icmpinfo_t)))
+			if (bcmp(&is1->is_ps, &is2->is_ps, sizeof (icmpinfo_t)))
 				rv = 1;
 			else
 				rv = 0;
@@ -1015,14 +1014,14 @@ ipstate_t *is2;
 /* Parameters	is1, is2 - states we want to match			    */
 /*									    */
 /* The state entries are equal (identical match) if they belong to the same */
-/* session. Any time new state entry is being added the fr_addstate() 	    */
+/* session. Any time new state entry is being added the fr_addstate()	    */
 /* function creates temporal state entry from the data it gets from IP and  */
 /* L4 header. The fr_matchstats() must be also aware of packet direction,   */
 /* which is also stored within the state entry. We should keep in mind the  */
 /* information about packet direction is spread accross L3 (addresses) and  */
 /* L4 (ports). There are three possible relationships betwee is1, is2:	    */
 /* 		- no match (match(is1, is2) == 0))			    */
-/*		- weak match same addresses (ports), but different 	    */
+/*		- weak match same addresses (ports), but different	    */
 /*			directions (1)	(fr_match_xxxx(is1, is2) == 1)	    */
 /*		- strong match same addresses (ports) and same directions   */
 /*			 (2) (fr_match_xxxx(is1, is2) == 2)		    */
@@ -1036,7 +1035,7 @@ ipstate_t *is2;
 /*	suppose there are two connections between hosts A, B. Connection 1: */
 /*			a.a.a.a:12345 <=> b.b.b.b:54321			    */
 /*		Connection 2:						    */
-/*			a.a.a.a:54321 <=> b.b.b.b:12345			    */		
+/*			a.a.a.a:54321 <=> b.b.b.b:12345			    */
 /* since we've introduced match levels into our fr_matchstates(), we are    */
 /* able to identify, which packets belong to connection A and which belong  */
 /* to connection B.	Assume there are two entries is1, is2. is1 has been */
@@ -1051,7 +1050,7 @@ ipstate_t *is2;
 /* result.								    */
 /* ------------------------------------------------------------------------ */
 static int fr_matchstates(is1, is2)
-ipstate_t *is1; 
+ipstate_t *is1;
 ipstate_t *is2;
 {
 	int	rv;
@@ -1059,12 +1058,12 @@ ipstate_t *is2;
 	int	pmatch;
 
 	if (bcmp(&is1->is_pass, &is2->is_pass,
-		 offsetof(struct ipstate, is_ps) -
-		 offsetof(struct ipstate, is_pass)) == 0) {
-		
+		offsetof(struct ipstate, is_ps) -
+		offsetof(struct ipstate, is_pass)) == 0) {
+
 		pmatch = fr_match_l4_hdr(is1, is2);
 		amatch = fr_match_addresses(is1, is2);
-		/* 
+		/*
 		 * If addresses match (amatch != 0), then 'match levels'
 		 * must be same for matching entries. If amatch and pmatch
 		 * have different values (different match levels), then
@@ -1147,8 +1146,7 @@ u_int flags;
 	if (fr == NULL) {
 		pass = ifs->ifs_fr_flags;
 		is->is_tag = FR_NOLOGTAG;
-	}
-	else {
+	} else {
 		pass = fr->fr_flags;
 	}
 
@@ -1315,7 +1313,7 @@ u_int flags;
 			    TH_SYN &&
 			    (TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2))) {
 				if (fr_tcpoptions(fin, tcp,
-					      &is->is_tcp.ts_data[0]) == -1) {
+					&is->is_tcp.ts_data[0]) == -1) {
 					fin->fin_flx |= FI_BAD;
 				}
 			}
@@ -1372,7 +1370,7 @@ u_int flags;
 		if (fr_matchstates(&ips, is) == 1)
 			break;
 	}
-	
+
 	/*
 	 * we've found a matching state -> state already exists,
 	 * we are not going to add a duplicate record.
@@ -1567,8 +1565,8 @@ tcpdata_t *td;
 					else if (i < 0)
 						i = 0;
 					td->td_winscale = i;
-					td->td_winflags |= TCP_WSCALE_SEEN|
-							   TCP_WSCALE_FIRST;
+					td->td_winflags |= TCP_WSCALE_SEEN |
+							    TCP_WSCALE_FIRST;
 				} else
 					retval = -1;
 				break;
@@ -1690,7 +1688,7 @@ ipstate_t *is;
 		if (flags == (TH_SYN|TH_ACK)) {
 			is->is_s0[source] = ntohl(tcp->th_ack);
 			is->is_s0[!source] = ntohl(tcp->th_seq) + 1;
-			if (TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2)) {
+			if (TCP_OFF(tcp) > (sizeof (tcphdr_t) >> 2)) {
 				(void) fr_tcpoptions(fin, tcp, fdata);
 			}
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
@@ -1782,7 +1780,7 @@ int flags;
 		win = ntohs(tcp->th_win);
 	else
 		win = ntohs(tcp->th_win) << fdata->td_winscale;
-	
+
 	/*
 	 * win 0 means the receiving endpoint has closed the window, because it
 	 * has not enough memory to receive data from sender. In such case we
@@ -1795,7 +1793,7 @@ int flags;
 		win = 1;
 
 	dsize = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
-	        ((tcpflags & TH_SYN) ? 1 : 0) + ((tcpflags & TH_FIN) ? 1 : 0);
+		((tcpflags & TH_SYN) ? 1 : 0) + ((tcpflags & TH_FIN) ? 1 : 0);
 
 	/*
 	 * if window scaling is present, the scaling is only allowed
@@ -1841,6 +1839,7 @@ int flags;
 	 */
 	if ((flags & IS_STRICT) != 0) {
 		if (seq != fdata->td_end) {
+			DTRACE_PROBE(strict_check);
 			return 0;
 		}
 	}
@@ -1848,9 +1847,24 @@ int flags;
 #define	SEQ_GE(a,b)	((int)((a) - (b)) >= 0)
 #define	SEQ_GT(a,b)	((int)((a) - (b)) > 0)
 	inseq = 0;
+	DTRACE_PROBE4(
+		dyn_params,
+		int, dsize,
+		int, ackskew,
+		int, maxwin,
+		int, win
+	);
 	if (
 #if defined(_KERNEL)
+		/* 
+		 * end <-> s + n
+		 * maxend <-> ack + win
+		 * this is upperbound check
+		 */
 	    (SEQ_GE(fdata->td_maxend, end)) &&
+		/*
+		 * this is lowerbound check
+		 */
 	    (SEQ_GE(seq, fdata->td_end - maxwin)) &&
 #endif
 /* XXX what about big packets */
@@ -1872,7 +1886,7 @@ int flags;
 	 * listeing to on a port, where the SYN packet has came to.
 	 */
 	} else if ((seq == 0) && (tcpflags == (TH_RST|TH_ACK)) &&
-		   (ackskew >= -1) && (ackskew <= 1)) {
+			(ackskew >= -1) && (ackskew <= 1)) {
 		inseq = 1;
 	} else if (!(flags & IS_TCPFSM)) {
 
@@ -1904,19 +1918,48 @@ int flags;
 		 * Thus, when ackskew is negative but still seems to belong
 		 * to this session, we bump up the destinations end value.
 		 */
-		if (ackskew < 0)
+		if (ackskew < 0) {
+			DTRACE_PROBE2(end_update_td,
+				int, tdata->td_end,
+				int, ack
+			);
 			tdata->td_end = ack;
+		}
 
 		/* update max window seen */
-		if (fdata->td_maxwin < win)
+		if (fdata->td_maxwin < win) {
+			DTRACE_PROBE2(win_update_fd,
+				int, fdata->td_maxwin,
+				int, win
+			);
 			fdata->td_maxwin = win;
-		if (SEQ_GT(end, fdata->td_end))
+		}
+
+		if (SEQ_GT(end, fdata->td_end)) {
+			DTRACE_PROBE2(end_update_fd,
+				int, fdata->td_end,
+				int, end
+			);
 			fdata->td_end = end;
-		if (SEQ_GE(ack + win, tdata->td_maxend))
+		}
+
+		if (SEQ_GE(ack + win, tdata->td_maxend)) {
+			DTRACE_PROBE2(max_end_update_td,
+				int, tdata->td_maxend,
+				int, ack + win
+			);
 			tdata->td_maxend = ack + win;
+		}
+
 		return 1;
 	}
 	fin->fin_flx |= FI_OOW;
+
+#if defined(_KERNEL)
+	if (!(SEQ_GE(seq, fdata->td_end - maxwin)))
+		fin->fin_flx |= FI_NEG_OOW;
+#endif
+
 	return 0;
 }
 

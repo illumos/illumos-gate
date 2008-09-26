@@ -1055,12 +1055,10 @@ ips_stat_t *ipsp;
 	if (!(opts & OPT_SHOWLIST)) {
 		PRINTF("IP states added:\n\t%lu TCP\n\t%lu UDP\n\t%lu ICMP\n",
 			ipsp->iss_tcp, ipsp->iss_udp, ipsp->iss_icmp);
-		PRINTF("\t%lu hits\n\t%lu misses\n", ipsp->iss_hits,
-			ipsp->iss_miss);
-		PRINTF("\t%lu maximum\n\t%lu no memory\n\t%lu max bucket\n",
-			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_bucketfull);
-		PRINTF("\t%lu maximum\n\t%lu no memory\n\t%lu bkts in use\n",
-			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_inuse);
+		PRINTF("\t%lu hits\n\t%lu misses\n",
+			ipsp->iss_hits, ipsp->iss_miss);
+		PRINTF("\t%lu maximum\n\t%lu no memory\n", ipsp->iss_max,
+			ipsp->iss_nomem);
 		PRINTF("\t%lu active\n\t%lu expired\n",
 			ipsp->iss_active, ipsp->iss_expire);
 		PRINTF("\t%lu closed\n\t%u orphans\n",
@@ -1070,7 +1068,8 @@ ips_stat_t *ipsp;
 			state_logging ? "en" : "dis");
 
 		PRINTF("\nState table bucket statistics:\n");
-		PRINTF("\t%lu in use\t\n", ipsp->iss_inuse);
+		PRINTF("\t%lu in use\n\t%lu max bucket\n", ipsp->iss_inuse,
+			ipsp->iss_bucketfull);
 
 		minlen = ipsp->iss_max;
 		totallen = 0;

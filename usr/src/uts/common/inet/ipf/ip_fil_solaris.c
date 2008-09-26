@@ -275,9 +275,9 @@ ipf_stack_t *ifs;
 		  "ipfilter_hook4_in", ifs);
 	HOOK_INIT(ifs->ifs_ipfhook4_out, ipf_hook4_out,
 		  "ipfilter_hook4_out", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook4_loop_in, ipf_hook4_in,
+	HOOK_INIT(ifs->ifs_ipfhook4_loop_in, ipf_hook4_loop_in,
 		  "ipfilter_hook4_loop_in", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook4_loop_out, ipf_hook4_out,
+	HOOK_INIT(ifs->ifs_ipfhook4_loop_out, ipf_hook4_loop_out,
 		  "ipfilter_hook4_loop_out", ifs);
 
 	/*
@@ -336,9 +336,9 @@ ipf_stack_t *ifs;
 		  "ipfilter_hook6_in", ifs);
 	HOOK_INIT(ifs->ifs_ipfhook6_out, ipf_hook6_out,
 		  "ipfilter_hook6_out", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook6_loop_in, ipf_hook6_in,
+	HOOK_INIT(ifs->ifs_ipfhook6_loop_in, ipf_hook6_loop_in,
 		  "ipfilter_hook6_loop_in", ifs);
-	HOOK_INIT(ifs->ifs_ipfhook6_loop_out, ipf_hook6_out,
+	HOOK_INIT(ifs->ifs_ipfhook6_loop_out, ipf_hook6_loop_out,
 		  "ipfilter_hook6_loop_out", ifs);
 
 	ifs->ifs_hook6_nic_events = (net_hook_register(ifs->ifs_ipf_ipv6,
@@ -1549,7 +1549,7 @@ int len;
 	else
 		dpoff = 0;
 
-	if (M_LEN(m) < len) {
+	if (M_LEN(m) < len + ipoff) {
 
 		/*
 		 * pfil_precheck ensures the IP header is on a 32bit
@@ -1891,7 +1891,7 @@ int ipf_hook6_loop_out(hook_event_token_t token, hook_data_t info, void *arg)
 }
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_hook_loop_in                                            */
+/* Function:    ipf_hook4_loop_in                                           */
 /* Returns:     int - 0 == packet ok, else problem, free packet if not done */
 /* Parameters:  event(I)     - pointer to event                             */
 /*              info(I)      - pointer to hook information for firewalling  */
@@ -1899,7 +1899,7 @@ int ipf_hook6_loop_out(hook_event_token_t token, hook_data_t info, void *arg)
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info, void *arg)
+int ipf_hook4_loop_in(hook_event_token_t token, hook_data_t info, void *arg)
 {
 	return ipf_hook(info, 0, FI_NOCKSUM, arg);
 }

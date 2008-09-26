@@ -233,6 +233,9 @@ typedef unsigned int	u_32_t;
 # ifdef _KERNEL
 #  define	KRWLOCK_T		krwlock_t
 #  define	KMUTEX_T		kmutex_t
+#  if SOLARIS2 >= 10
+#   include <sys/sdt.h>
+#  endif /* SOLARIS2 >= 10 */
 #  if SOLARIS2 >= 6
 #   if SOLARIS2 == 6
 #    define	ATOMIC_INCL(x)		atomic_add_long((uint32_t*)&(x), 1)
@@ -2453,6 +2456,14 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 
 #ifdef RESCUE
 # undef IPFILTER_BPF
+#endif
+
+#ifndef DTRACE_PROBE
+# define DTRACE_PROBE(_x_)
+# define DTRACE_PROBE1(_x_, _t1_, _a1_)
+# define DTRACE_PROBE2(_x_, _t1_, _a1_, _t2_, _a2_)
+# define DTRACE_PROBE3(_x_, _t1_, _a1_, _t2_, _a2_, _t3_, _a3_)
+# define DTRACE_PROBE4(_x_, _t1_, _a1_, _t2_, _a2_, _t3_, _a3_, _t4_, _a4_)
 #endif
 
 #endif	/* __IP_COMPAT_H__ */

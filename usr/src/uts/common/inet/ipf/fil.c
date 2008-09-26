@@ -881,12 +881,19 @@ int plen;
 {
 #if defined(_KERNEL)
 	if (fin->fin_m != NULL) {
+		int ipoff;
+
+		ipoff = (char *)fin->fin_ip - MTOD(fin->fin_m, char *);
+
 		if (fin->fin_dp != NULL)
 			plen += (char *)fin->fin_dp -
 				((char *)fin->fin_ip + fin->fin_hlen);
-		plen += ((char *)fin->fin_ip - MTOD(fin->fin_m, char *)) +
-		    fin->fin_hlen;
-		if (M_LEN(fin->fin_m) < plen) {
+		plen += fin->fin_hlen;
+		/*
+		 * We don't do 'plen += ipoff;' here. The fr_pullup() will
+		 * do it for us.
+		 */
+		if (M_LEN(fin->fin_m) < plen + ipoff) {
 			if (fr_pullup(fin->fin_m, fin, plen) == NULL)
 				return -1;
 		}
@@ -3619,8 +3626,9 @@ u_32_t *msk;
 /*              v(I)       - IP version being sync'd (v4 or v6)             */
 /*              newifp(I)  - interface identifier being introduced/removed  */
 /*              oldifp(I)  - interface identifier in a filter rule          */
-/*              newname(I) - name associated with oldifp interface          */
-/*              oldname(I) - name associated with newifp interface          */
+/*              newname(I) - name associated with newifp interface          */
+/*              oldname(I) - name associated with oldifp interface          */
+/*		ifs       - pointer to IPF stack instance		    */
 /*                                                                          */
 /* This function returns what the new value for "oldifp" should be for its  */
 /* caller.  In some cases it will not change, in some it will.              */
@@ -3634,6 +3642,30 @@ u_32_t *msk;
 /* action == IPFSYNC_OLDIFP                                                 */
 /*   if oldifp matches newifp then we are are doing a sync to remove any    */
 /*   references to oldifp, so we return "-1".                               */
+/* -----								    */
+/* NOTE:								    */
+/* This function processes NIC event from PF_HOOKS. The action parameter    */
+/* is set in ipf_nic_event_v4()/ipf_nic_event_v6() function. There is	    */
+/* one single switch statement() in ipf_nic_event_vx() function, which	    */
+/* translates the HOOK event type to action parameter passed to fr_ifsync.  */
+/* The translation table looks as follows:				    */
+/*	event		| action					    */
+/*	----------------+-------------					    */
+/*	NE_PLUMB	| IPFSYNC_NEWIFP				    */
+/*	NE_UNPLUMB	| IPFSYNC_OLDIFP				    */
+/*    NE_ADDRESS_CHANGE	| IPFSYNC_RESYNC				    */
+/*									    */
+/* The oldname and oldifp parameters are taken from IPF entry (rule, state  */
+/* table entry, NAT table entry, fragment ...). The newname and newifp	    */
+/* parameters come from hook event data, parameters are taken from event    */
+/* in ipf_nic_event_vx() functions. Any time NIC changes, the IPF is	    */
+/* notified by hook function.						    */
+/*									    */
+/* We get NE_UNPLUMB event from PF_HOOKS even if someone coincidently tries */
+/* to plumb the interface, which is already plumbed. In such case we always */
+/* get the event from PF_HOOKS as follows:				    */
+/*	event:	NE_PLUMB						    */
+/*	NIC:	0x0							    */
 /* ------------------------------------------------------------------------ */
 static void *fr_ifsync(action, v, newname, oldname, newifp, oldifp, ifs)
 int action, v;
@@ -3655,6 +3687,12 @@ ipf_stack_t *ifs;
 			rval = newifp;
 		break;
 	case IPFSYNC_OLDIFP :
+		/* 
+		 * If interface gets unplumbed it must be invalidated, which
+		 * means set all existing references to the interface to -1.
+		 * We don't want to invalidate references for wildcard
+		 * (unbound) rules (entries).
+		 */
 		if (newifp == oldifp)
 			rval = (oldifp) ? (void *)-1 : NULL;
 		break;
@@ -3670,7 +3708,9 @@ ipf_stack_t *ifs;
 /* Parameters:  action(I) - type of synchronisation to do                   */
 /*              v(I)      - IP version being sync'd (v4 or v6)              */
 /*              ifp(I)    - interface identifier associated with action     */
-/*              name(I)   - name associated with ifp parameter              */
+/*              ifname(I) - name associated with ifp parameter              */
+/*              fr(I)     - pointer to filter rule                          */
+/*		ifs       - pointer to IPF stack instance		    */
 /* Write Locks: ipf_mutex                                                   */
 /*                                                                          */
 /* Walk through a list of filter rules and resolve any interface names into */
