@@ -151,6 +151,7 @@ VDC_OBJS	= vdc.o
 VDS_OBJS	= vds.o
 DS_PRI_OBJS	= ds_pri.o
 DS_SNMP_OBJS	= ds_snmp.o
+VLDS_OBJS	= vlds.o
 
 #
 #			Misc modules
@@ -159,7 +160,7 @@ BOOTDEV_OBJS	+= bootdev.o
 DR_CPU_OBJS	+= dr_cpu.o
 DR_IO_OBJS	+= dr_io.o
 DRCTL_OBJS	= drctl.o drctl_impl.o dr_util.o
-DS_OBJS		= ds.o
+DS_OBJS		= ds_common.o ds_drv.o
 FAULT_ISO_OBJS	= fault_iso.o
 OBPSYM_OBJS	+= obpsym.o obpsym_1275.o
 PLATSVC_OBJS	= platsvc.o mdeg.o

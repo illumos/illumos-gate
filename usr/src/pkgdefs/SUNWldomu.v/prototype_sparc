@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -54,8 +53,10 @@ d none usr/lib/ldoms 755 root bin
 f none usr/lib/ldoms/drd 555 root bin
 f none usr/lib/ldoms/vntsd 555 root bin
 f none usr/lib/libpri.so.1 755 root bin
+f none usr/lib/libds.so.1 755 root bin
 d none usr/lib/rcm 755 root bin
 d none usr/lib/rcm/scripts 755 root bin
 f none usr/lib/rcm/scripts/SUNW,vdevices.pl 555 root bin
 d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libpri.so.1 755 root bin
+f none usr/lib/sparcv9/libds.so.1 755 root bin

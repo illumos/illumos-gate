@@ -246,6 +246,7 @@ SUBDIRS += \
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
 	libc_psr	.WAIT	\
+	libds		\
 	libdscp		\
 	libprtdiag	.WAIT	\
 	libprtdiag_psr	\
@@ -448,6 +449,7 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 	$(CLOSED)/lib/smartcard
 
 sparc_HDRSUBDIRS=	\
+	libds		\
 	libdscp		\
 	libpri
 

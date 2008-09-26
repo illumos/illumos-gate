@@ -348,6 +348,7 @@ DRV_KMODS	+= vcc
 DRV_KMODS	+= vdc
 DRV_KMODS	+= vds
 DRV_KMODS	+= vldc
+DRV_KMODS	+= vlds
 DRV_KMODS	+= vnet
 DRV_KMODS	+= vnex
 DRV_KMODS	+= vsw

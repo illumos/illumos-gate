@@ -977,6 +977,20 @@ usr/lib/llib-lpri.ln			sparc
 usr/lib/sparcv9/libpri.so		sparc
 usr/lib/sparcv9/llib-lpri.ln		sparc
 #
+# These files are installed in the proto area by the build of libds for
+# the benefit of the builds of sun4v IO FMA and/or other libds
+# consumers.  However, the libds interfaces are private to Sun
+# (Consolidation Private) and not intended for customer use. So these
+# files (the symlink and the lint library) are excluded from packaging.
+#
+usr/lib/libds.so			sparc
+usr/lib/llib-lds			sparc
+usr/lib/llib-lds.ln			sparc
+usr/lib/sparcv9/libds.so		sparc
+usr/lib/sparcv9/llib-lds.ln		sparc
+usr/platform/sun4v/include/sys/vlds.h	sparc
+usr/platform/sun4v/include/sys/libds.h	sparc
+#
 # Private/Internal u8_textprep header file. Do not ship.
 #
 usr/include/sys/u8_textprep_data.h	sparc

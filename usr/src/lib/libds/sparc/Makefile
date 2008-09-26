@@ -18,42 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
-PATH=/usr/bin:/usr/sbin:${PATH}
-export PATH
+include ../Makefile.com
 
-EXIT=0
-
-not_installed()
-{
-	driver=$1
-
-	grep "^${driver} " ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
-
-	if [ "$?" -eq 0 ]; then
-		return 1
-	else
-		return 0
-	fi
-}
-
-# 
-# Unload and remove drivers
-#
-not_installed cnex  || rem_drv -b "${BASEDIR}" cnex  || EXIT=1
-not_installed drctl || rem_drv -b "${BASEDIR}" drctl || EXIT=1
-not_installed vlds  || rem_drv -b "${BASEDIR}" vlds  || EXIT=1
-not_installed vcc   || rem_drv -b "${BASEDIR}" vcc   || EXIT=1
-not_installed vdc   || rem_drv -b "${BASEDIR}" vdc   || EXIT=1
-not_installed vds   || rem_drv -b "${BASEDIR}" vds   || EXIT=1
-not_installed vldc  || rem_drv -b "${BASEDIR}" vldc  || EXIT=1
-not_installed vnet  || rem_drv -b "${BASEDIR}" vnet  || EXIT=1
-not_installed vsw   || rem_drv -b "${BASEDIR}" vsw   || EXIT=1
-
-exit ${EXIT}
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

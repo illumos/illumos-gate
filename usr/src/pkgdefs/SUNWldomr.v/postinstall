@@ -21,10 +21,9 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Function: check_add_drv()
@@ -127,6 +126,7 @@ check_add_drv()
 
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-channel-devices"' cnex
 check_add_drv -b "${BASEDIR}" drctl
+check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-domain-service"' vlds
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-console-concentrator"' vcc
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-disk"' vdc
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-disk-server"' vds

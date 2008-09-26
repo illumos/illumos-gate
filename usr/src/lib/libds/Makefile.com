@@ -18,42 +18,47 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
-PATH=/usr/bin:/usr/sbin:${PATH}
-export PATH
+LIBRARY = libds.a
+VERS = .1
 
-EXIT=0
+LIBSRCS = libds.c
+OBJECTS = $(LIBSRCS:%.c=%.o)
 
-not_installed()
-{
-	driver=$1
+include ../../Makefile.lib
 
-	grep "^${driver} " ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
+LIBS = $(DYNLIB) $(LINTLIB)
 
-	if [ "$?" -eq 0 ]; then
-		return 1
-	else
-		return 0
-	fi
-}
+SRCDIR = ../common
+SRCS = $(LIBSRCS:%.c=$(SRCDIR)/%.c)
 
-# 
-# Unload and remove drivers
-#
-not_installed cnex  || rem_drv -b "${BASEDIR}" cnex  || EXIT=1
-not_installed drctl || rem_drv -b "${BASEDIR}" drctl || EXIT=1
-not_installed vlds  || rem_drv -b "${BASEDIR}" vlds  || EXIT=1
-not_installed vcc   || rem_drv -b "${BASEDIR}" vcc   || EXIT=1
-not_installed vdc   || rem_drv -b "${BASEDIR}" vdc   || EXIT=1
-not_installed vds   || rem_drv -b "${BASEDIR}" vds   || EXIT=1
-not_installed vldc  || rem_drv -b "${BASEDIR}" vldc  || EXIT=1
-not_installed vnet  || rem_drv -b "${BASEDIR}" vnet  || EXIT=1
-not_installed vsw   || rem_drv -b "${BASEDIR}" vsw   || EXIT=1
+CPPFLAGS += -I. -I$(SRC)/uts/sun4v
+CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
+CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
-exit ${EXIT}
+LDLIBS += -lsysevent -lnvpair -lc
+
+LINTFLAGS = -msux
+LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
+
+$(LINTLIB) := SRCS = $(LINTSRC:%=$(SRCDIR)/%)
+$(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
+$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9) \
+	-I$(ROOT)/usr/platform/sun4v/include
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: $(LINTLIB) lintcheck
+
+pics/%.o: $(SRCDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+include ../../Makefile.targ

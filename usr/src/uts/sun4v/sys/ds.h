@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DS_H
 #define	_DS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Domain Services Client Interface
