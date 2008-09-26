@@ -1121,7 +1121,7 @@ static struct builtin builtin_foreground =
 {
   "foreground",
   foreground_func,
-  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_HELP_LIST,
+  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_HELP_LIST | BUILTIN_SCRIPT,
   "foreground RRGGBB",
   "Sets the foreground color when in graphics mode."
   "RR is red, GG is green, and BB blue. Numbers must be in hexadecimal."
@@ -1150,7 +1150,7 @@ static struct builtin builtin_background =
 {
   "background",
   background_func,
-  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_HELP_LIST,
+  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_HELP_LIST | BUILTIN_SCRIPT, 
   "background RRGGBB",
   "Sets the background color when in graphics mode."
   "RR is red, GG is green, and BB blue. Numbers must be in hexadecimal."

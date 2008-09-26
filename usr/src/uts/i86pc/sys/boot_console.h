@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _BOOT_CONSOLE_H
 #define	_BOOT_CONSOLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,9 +40,10 @@ extern "C" {
 #define	CONS_TTYB		2
 #define	CONS_USBSER		3
 #define	CONS_HYPERVISOR		4
+#define	CONS_SCREEN_GRAPHICS	5
 
 #define	CONS_MIN	CONS_SCREEN_TEXT
-#define	CONS_MAX	CONS_HYPERVISOR
+#define	CONS_MAX	CONS_SCREEN_GRAPHICS
 
 #define	CONS_COLOR	7
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -506,6 +504,7 @@ console_value_t console_devices[] = {
 	{ "ttya", CONS_TTYA },
 	{ "ttyb", CONS_TTYB },
 	{ "text", CONS_SCREEN_TEXT },
+	{ "graphics", CONS_SCREEN_GRAPHICS },
 #if defined(__xpv)
 	{ "hypervisor", CONS_HYPERVISOR },
 #endif
@@ -628,6 +627,9 @@ bcons_init(char *bootstr)
 		 */
 		break;
 #endif
+	case CONS_SCREEN_GRAPHICS:
+		kb_init();
+		break;
 	case CONS_SCREEN_TEXT:
 	default:
 #if defined(_BOOT)
@@ -799,6 +801,8 @@ _doputchar(int c)
 		return;
 	case CONS_SCREEN_TEXT:
 		screen_putchar(c);
+		return;
+	case CONS_SCREEN_GRAPHICS:
 		return;
 #if !defined(_BOOT)
 	case CONS_USBSER:
