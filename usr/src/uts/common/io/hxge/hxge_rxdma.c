@@ -2785,17 +2785,9 @@ hxge_map_rxdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 		rbrp->pkt_buf_size2_bytes = RBR_BUFSZ2_2K_BYTES;
 		rbrp->hpi_pkt_buf_size2 = SIZE_2KB;
 	} else {
-		if (rbrp->block_size >= 0x2000) {
-			HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
-			    "<== hxge_map_rxdma_channel_buf_ring: channel %d "
-			    "no msg blocks", channel));
-			status = HXGE_ERROR;
-			goto hxge_map_rxdma_channel_buf_ring_fail1;
-		} else {
-			rbrp->pkt_buf_size2 = RBR_BUFSZ2_4K;
-			rbrp->pkt_buf_size2_bytes = RBR_BUFSZ2_4K_BYTES;
-			rbrp->hpi_pkt_buf_size2 = SIZE_4KB;
-		}
+		rbrp->hpi_pkt_buf_size2 = SIZE_4KB;
+		rbrp->pkt_buf_size2 = RBR_BUFSZ2_4K;
+		rbrp->pkt_buf_size2_bytes = RBR_BUFSZ2_4K_BYTES;
 	}
 
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
