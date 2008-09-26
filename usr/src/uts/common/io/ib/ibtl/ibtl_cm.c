@@ -365,7 +365,7 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 						}
 					}
 				}
-				goto search_next;
+				continue;
 			}
 got_apm_hca_info:
 			for (j = 0; j < pinfop->p_sgid_tbl_sz; j++) {
