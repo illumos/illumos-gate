@@ -159,6 +159,7 @@ static int e1000g_get_def_val(struct e1000g *, mac_prop_id_t, uint_t, void *);
 static void e1000g_param_sync(struct e1000g *);
 static void e1000g_get_driver_control(struct e1000_hw *);
 static void e1000g_release_driver_control(struct e1000_hw *);
+static void e1000g_restore_promisc(struct e1000g *Adapter);
 
 mac_priv_prop_t e1000g_priv_props[] = {
 	{"_tx_bcopy_threshold", MAC_PROP_PERM_RW},
@@ -1570,6 +1571,9 @@ e1000g_start(struct e1000g *Adapter, boolean_t global)
 	/* Setup and initialize the receive structures */
 	e1000g_rx_setup(Adapter);
 	msec_delay(5);
+
+	/* Restore the e1000g promiscuous mode */
+	e1000g_restore_promisc(Adapter);
 
 	e1000g_mask_interrupt(Adapter);
 
@@ -5703,5 +5707,20 @@ e1000g_release_driver_control(struct e1000_hw *hw)
 	default:
 		/* no manageability firmware: do nothing */
 		break;
+	}
+}
+
+/*
+ * Restore e1000g promiscuous mode.
+ */
+static void
+e1000g_restore_promisc(struct e1000g *Adapter)
+{
+	if (Adapter->e1000g_promisc) {
+		uint32_t rctl;
+
+		rctl = E1000_READ_REG(&Adapter->shared, E1000_RCTL);
+		rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE | E1000_RCTL_BAM);
+		E1000_WRITE_REG(&Adapter->shared, E1000_RCTL, rctl);
 	}
 }
