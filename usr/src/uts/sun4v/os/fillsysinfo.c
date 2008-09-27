@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -43,6 +41,7 @@
 #include <sys/cmp.h>
 #include <sys/async.h>
 #include <vm/page.h>
+#include <vm/vm_dep.h>
 #include <vm/hat_sfmmu.h>
 #include <sys/sysmacros.h>
 #include <sys/mach_descrip.h>
@@ -71,10 +70,13 @@ static char *construct_isalist(md_t *, mde_cookie_t, char **);
 static void init_md_broken(md_t *, mde_cookie_t *);
 static int get_l2_cache_info(md_t *, mde_cookie_t, uint64_t *, uint64_t *,
     uint64_t *);
+static void get_hwcaps(md_t *, mde_cookie_t);
 static void get_q_sizes(md_t *, mde_cookie_t);
 static void get_va_bits(md_t *, mde_cookie_t);
 static size_t get_ra_limit(md_t *);
 static int get_l2_cache_node_count(md_t *);
+static unsigned long names2bits(char *tokens, size_t tokenslen,
+    char *bit_formatter, char *warning);
 
 uint64_t	system_clock_freq;
 uint_t		niommu_tsbs = 0;
@@ -214,7 +216,7 @@ empty_cpu(int cpuid)
 void
 setup_chip_mappings(md_t *mdp)
 {
-	uint64_t ncache, ncpu;
+	int ncache, ncpu;
 	mde_cookie_t *node, *cachelist;
 	int i, j;
 	processorid_t cpuid;
@@ -269,7 +271,7 @@ setup_chip_mappings(md_t *mdp)
 void
 setup_exec_unit_mappings(md_t *mdp)
 {
-	uint64_t num, num_eunits;
+	int num, num_eunits;
 	mde_cookie_t cpus_node;
 	mde_cookie_t *node, *eunit;
 	int idx, i, j;
@@ -352,10 +354,65 @@ found:
 			}
 			md_free_scan_dag(mdp, &node);
 		}
-
-
 		md_free_scan_dag(mdp, &eunit);
 	}
+}
+
+/*
+ * Setup instruction cache coherency.  The "memory-coherent" property
+ * is optional.  Default for Icache_coherency is 1 (I$ is coherent).
+ * If we find an Icache with coherency == 0, then enable non-coherent
+ * Icache support.
+ */
+void
+setup_icache_coherency(md_t *mdp)
+{
+	int ncache;
+	mde_cookie_t *cachelist;
+	int i;
+
+	ncache = md_alloc_scan_dag(mdp, md_root_node(mdp), "cache",
+	    "fwd", &cachelist);
+
+	/*
+	 * The "cache" node is optional in MD, therefore ncaches can be 0.
+	 */
+	if (ncache < 1) {
+		return;
+	}
+
+	for (i = 0; i < ncache; i++) {
+		uint64_t cache_level;
+		uint64_t memory_coherent;
+		uint8_t *type;
+		int typelen;
+
+		if (md_get_prop_val(mdp, cachelist[i], "level",
+		    &cache_level))
+			continue;
+
+		if (cache_level != 1)
+			continue;
+
+		if (md_get_prop_data(mdp, cachelist[i], "type",
+		    &type, &typelen))
+			continue;
+
+		if (strcmp((char *)type, "instn") != 0)
+			continue;
+
+		if (md_get_prop_val(mdp, cachelist[i], "memory-coherent",
+		    &memory_coherent))
+			continue;
+
+		if (memory_coherent != 0)
+			continue;
+
+		mach_setup_icache(memory_coherent);
+		break;
+	}
+
+	md_free_scan_dag(mdp, &cachelist);
 }
 
 /*
@@ -410,6 +467,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 
 	setup_chip_mappings(mdp);
 	setup_exec_unit_mappings(mdp);
+	setup_icache_coherency(mdp);
 
 	/*
 	 * If MD is broken then append the passed ISA set,
@@ -422,8 +480,8 @@ cpu_setup_common(char **cpu_module_isa_set)
 	else
 		isa_list = construct_isalist(mdp, cpulist[0], NULL);
 
+	get_hwcaps(mdp, cpulist[0]);
 	get_q_sizes(mdp, cpulist[0]);
-
 	get_va_bits(mdp, cpulist[0]);
 
 	/*
@@ -643,6 +701,84 @@ construct_isalist(md_t *mdp, mde_cookie_t cpu_node_cookie,
 
 	return (md_isalist);
 }
+
+static void
+get_hwcaps(md_t *mdp, mde_cookie_t cpu_node_cookie)
+{
+	char *hwcapbuf;
+	int hwcaplen;
+
+	if (md_get_prop_data(mdp, cpu_node_cookie,
+	    "hwcap-list", (uint8_t **)&hwcapbuf, &hwcaplen)) {
+		/* Property not found */
+		return;
+	}
+
+	cpu_hwcap_flags |= names2bits(hwcapbuf, hwcaplen, FMT_AV_SPARC,
+	    "unrecognized token: %s");
+}
+
+
+/*
+ * Does the opposite of cmn_err(9f) "%b" conversion specification:
+ * Given a list of strings, converts them to a bit-vector.
+ *
+ *  tokens - is a buffer of [NUL-terminated] strings.
+ *  tokenslen - length of tokenbuf in bytes.
+ *  bit_formatter - is a %b format string, such as FMT_AV_SPARC
+ *    from /usr/include/sys/auxv_SPARC.h, of the form:
+ *    <base-char>[<bit-char><token-string>]...
+ *        <base-char> is ignored.
+ *        <bit-char>  is [1-32], as per cmn_err(9f).
+ *  warning - is a printf-style format string containing "%s",
+ *    which is used to print a warning message when an unrecognized
+ *    token is found.  If warning is NULL, no warning is printed.
+ * Returns a bit-vector corresponding to the specified tokens.
+ */
+
+static unsigned long
+names2bits(char *tokens, size_t tokenslen, char *bit_formatter, char *warning)
+{
+	char *cur;
+	size_t  curlen;
+	unsigned long ul = 0;
+	char *hit;
+	char *bs;
+
+	bit_formatter++;	/* skip base; not needed for input */
+	cur = tokens;
+	while (tokenslen) {
+		curlen = strlen(cur);
+		bs = bit_formatter;
+		/*
+		 * We need a complicated while loop and the >=32 check,
+		 * instead of a simple "if (strstr())" so that when the
+		 * token is "vis", we don't match on "vis2" (for example).
+		 */
+		/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
+		while ((hit = strstr(bs, cur)) &&
+		    *(hit + curlen) >= 32) {
+			/*
+			 * We're still in the middle of a word, i.e., not
+			 * pointing at a <bit-char>.  So advance ptr
+			 * to ensure forward progress.
+			 */
+			bs = hit + curlen + 1;
+		}
+
+		if (hit != NULL) {
+			ul |= (1<<(*(hit-1) - 1));
+		} else {
+			/* The token wasn't found in bit_formatter */
+			if (warning != NULL)
+				cmn_err(CE_WARN, warning, cur);
+		}
+		tokenslen -= curlen + 1;
+		cur += curlen + 1;
+	}
+	return (ul);
+}
+
 
 uint64_t
 get_ra_limit(md_t *mdp)

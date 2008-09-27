@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef	_VM_HAT_H
 #define	_VM_HAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -424,6 +422,25 @@ void	hat_setstat(struct as *, caddr_t, size_t, uint_t);
 #define	HAT_STRUCTURE_BE	0x1000
 #define	HAT_STRUCTURE_LE	0x2000
 #define	HAT_ENDIAN_MASK		0x3000
+
+/*
+ * Attributes for non-coherent I-cache support.
+ *
+ * We detect if an I-cache has been filled by first resetting
+ * execute permission in a tte entry. This forces a trap when
+ * an instruction fetch first occurs in that page. In "soft
+ * execute mode", the hardware execute permission is cleared
+ * and a different software execution bit is set in the tte.
+ *
+ * HAT_ATTR_TEXT: set this flag to avoid the extra trap associated
+ * with soft execute mode. Same meaning as HAT_LOAD_TEXT.
+ *
+ * HAT_ATTR_NOSOFTEXEC: set this flag when installing a permanent
+ * mapping, or installing a mapping that will never be
+ * freed. Overrides soft execute mode.
+ */
+#define	HAT_ATTR_TEXT		0x4000
+#define	HAT_ATTR_NOSOFTEXEC	0x8000
 
 /* flags for hat_softlock */
 #define	HAT_COW			0x0001

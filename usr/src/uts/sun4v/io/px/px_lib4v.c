@@ -41,6 +41,8 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include "px_lib4v.h"
 #include "px_err.h"
+#include <vm/vm_dep.h>
+#include <vm/hat_sfmmu.h>
 
 /* mask for the ranges property in calculating the real PFN range */
 uint_t px_ranges_phi_mask = ((1 << 28) -1);
@@ -534,6 +536,9 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	else
 		sync_dir = HVIO_DMA_SYNC_DIR_TO_DEV;
 
+	if (force_sync_icache_after_dma == 0 && !icache_is_coherent)
+		sync_dir |= HVIO_DMA_SYNC_DIR_NO_ICACHE_FLUSH;
+
 	off += mp->dmai_offset;
 	pg_off = off & MMU_PAGEOFFSET;
 
@@ -544,12 +549,27 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	end = MMU_BTOPR(off + len - 1);
 	for (idx = MMU_BTOP(off); idx < end; idx++,
 	    len -= bytes_synced, pg_off = 0) {
-		size_t bytes_to_sync = bytes_to_sync =
-		    MIN(len, MMU_PAGESIZE - pg_off);
+		size_t bytes_to_sync =  MIN(len, MMU_PAGESIZE - pg_off);
 
-		if (hvio_dma_sync(hdl, MMU_PTOB(PX_GET_MP_PFN(mp, idx)) +
-		    pg_off, bytes_to_sync, sync_dir, &bytes_synced) != H_EOK)
-			break;
+		while (hvio_dma_sync(hdl,
+		    MMU_PTOB(PX_GET_MP_PFN(mp, idx)) + pg_off,
+		    bytes_to_sync, sync_dir, &bytes_synced) != H_EOK) {
+
+			if (!(sync_dir & HVIO_DMA_SYNC_DIR_NO_ICACHE_FLUSH)) {
+				bytes_synced = 0;
+				break;
+			}
+
+			/*
+			 * Some versions of firmware do not support
+			 * this sync_dir flag. If the call fails clear
+			 * the flag and retry the call. Also, set the
+			 * global so that we dont set the sync_dir
+			 * flag again.
+			 */
+			sync_dir &= ~HVIO_DMA_SYNC_DIR_NO_ICACHE_FLUSH;
+			force_sync_icache_after_dma = 1;
+		}
 
 		DBG(DBG_LIB_DMA, dip, "px_lib_dma_sync: Called hvio_dma_sync "
 		    "ra = %p bytes to sync = %x bytes synced %x\n",

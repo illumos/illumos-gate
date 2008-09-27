@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <sys/prom_plat.h>
@@ -396,6 +394,7 @@ setup_cpu_common(int cpuid)
 	 * including scrubber.
 	 */
 	cpu_init_private(cp);
+	populate_idstr(cp);
 
 	/*
 	 * Initialize the CPUs physical ID cache, and processor groups
@@ -696,6 +695,7 @@ start_other_cpus(int flag)
 	 * Initialize CPU 0 cpu module private data area, including scrubber.
 	 */
 	cpu_init_private(CPU);
+	populate_idstr(CPU);
 
 	/*
 	 * perform such initialization as is needed

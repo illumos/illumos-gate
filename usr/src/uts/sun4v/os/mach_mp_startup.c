@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/machsystm.h>
 #include <sys/cpu_module.h>
@@ -51,7 +49,6 @@ init_cpu_info(struct cpu *cp)
 	processor_info_t *pi = &cp->cpu_type_info;
 	int cpuid = cp->cpu_id;
 	struct cpu_node *cpunode = &cpunodes[cpuid];
-	char buf[CPU_IDSTRLEN];
 
 	cp->cpu_fpowner = NULL;		/* not used for V9 */
 
@@ -72,18 +69,6 @@ init_cpu_info(struct cpu *cp)
 
 	(void) strcpy(pi->pi_processor_type, "sparcv9");
 	(void) strcpy(pi->pi_fputypes, "sparcv9");
-
-	(void) snprintf(buf, sizeof (buf),
-	    "%s (cpuid %d clock %d MHz)",
-	    cpunode->name, cpunode->cpuid, pi->pi_clock);
-
-	cp->cpu_idstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
-	(void) strcpy(cp->cpu_idstr, buf);
-
-	cmn_err(CE_CONT, "?cpu%d: %s\n", cpuid, cp->cpu_idstr);
-
-	cp->cpu_brandstr = kmem_alloc(strlen(cpunode->name) + 1, KM_SLEEP);
-	(void) strcpy(cp->cpu_brandstr, cpunode->name);
 
 	/*
 	 * StarFire requires the signature block stuff setup here
@@ -274,4 +259,32 @@ cpu_mp_init(void)
 		return;
 
 	cif_cpu_mp_ready = 1;
+}
+
+void
+populate_idstr(struct cpu *cp)
+{
+	char buf[CPU_IDSTRLEN];
+	struct cpu_node *cpunode;
+	processor_info_t *pi;
+
+	cpunode = &cpunodes[cp->cpu_id];
+	pi = &cp->cpu_type_info;
+	if (cp->cpu_m.cpu_chip == CPU_CHIPID_INVALID) {
+		(void) snprintf(buf, sizeof (buf),
+		    "%s (cpuid %d, clock %d MHz)",
+		    cpunode->name, cpunode->cpuid, pi->pi_clock);
+	} else {
+		(void) snprintf(buf, sizeof (buf),
+		    "%s (chipid %d, clock %d MHz)",
+		    cpunode->name, cp->cpu_m.cpu_chip, pi->pi_clock);
+	}
+
+	cp->cpu_idstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
+	(void) strcpy(cp->cpu_idstr, buf);
+
+	cp->cpu_brandstr = kmem_alloc(strlen(cpunode->name) + 1, KM_SLEEP);
+	(void) strcpy(cp->cpu_brandstr, cpunode->name);
+
+	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
 }

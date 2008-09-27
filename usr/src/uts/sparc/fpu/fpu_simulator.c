@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Main procedures for sparc FPU simulator. */
 
@@ -114,6 +112,14 @@ struct fpuinfo_kstat fpuinfo = {
 	{ "fpu_sim_fnmaddd",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_fnmsubs",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_fnmsubd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fumadds",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fumaddd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fumsubs",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fumsubd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnumadds",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnumaddd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnumsubs",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnumsubd",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_invalid",		KSTAT_DATA_UINT64},
 };
 
@@ -178,12 +184,14 @@ _fp_fpu_simulator(
 	enum fcc_type	cc;
 	uint32_t	nfcc;		/* fcc number field. */
 	uint64_t	lusr;
+	uint_t		fmau_mul_exceptions;
 
 	nrs1 = inst.rs1;
 	nrs2 = inst.rs2;
 	nrd = inst.rd;
 	fsr = *pfsr;
 	pfpsd->fp_current_exceptions = 0;	/* Init current exceptions. */
+	fmau_mul_exceptions = 0;
 	pfpsd->fp_fsrtem    = fsr.tem;		/* Obtain fsr's tem */
 	/*
 	 * Obtain rounding direction and precision
@@ -191,7 +199,7 @@ _fp_fpu_simulator(
 	pfpsd->fp_direction = GSR_IM(gsr) ? GSR_IRND(gsr) : fsr.rnd;
 	pfpsd->fp_precision = fsr.rnp;
 
-	if (inst.op3 == 0x37) { /* IMPDEP2B FMA-fused opcode */
+	if (inst.op3 == 0x37) { /* FMA-fused opcode */
 		fp_fma_inst_type *fma_inst;
 		uint32_t	nrs3;
 		unpacked	us3;
@@ -210,7 +218,7 @@ _fp_fpu_simulator(
 				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fmadds,
-				fpu_sim_fmaddd, fpu_sim_invalid);
+			    fpu_sim_fmaddd, fpu_sim_invalid);
 			break;
 		case fmsub:
 			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
@@ -222,7 +230,7 @@ _fp_fpu_simulator(
 				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fmsubs,
-				fpu_sim_fmsubd, fpu_sim_invalid);
+			    fpu_sim_fmsubd, fpu_sim_invalid);
 			break;
 		case fnmadd:
 			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
@@ -237,7 +245,7 @@ _fp_fpu_simulator(
 				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmadds,
-				fpu_sim_fnmaddd, fpu_sim_invalid);
+			    fpu_sim_fnmaddd, fpu_sim_invalid);
 			break;
 		case fnmsub:
 			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
@@ -252,7 +260,122 @@ _fp_fpu_simulator(
 				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmsubs,
-				fpu_sim_fnmsubd, fpu_sim_invalid);
+			    fpu_sim_fnmsubd, fpu_sim_invalid);
+		}
+	} else if (inst.op3 == fmau) { /* FMA-unfused opcode */
+		fp_fma_inst_type *fmau_inst;
+		uint32_t	nrs3;
+		unpacked	us3;
+		unpacked	ust;
+		/*
+		 * For FMA-unfused, if either the multiply part or the add
+		 * part raises an exception whose trap is enabled, we trap
+		 * with cexc indicating only that exception and aexc un-
+		 * changed.  If neither part raises an exception whose trap
+		 * is enabled, the instruction completes with cexc indicating
+		 * just those exceptions that occurred in the add part and
+		 * aexc accumulating all exceptions that occurred in either
+		 * part.  We use fmau_mul_exceptions to keep track of the
+		 * exceptions that occurred in the multiply part while we
+		 * simulate the add part.
+		 */
+		fmau_inst = (fp_fma_inst_type *) &inst;
+		nrs2 = fmau_inst->rs2;
+		nrs3 = fmau_inst->rs3;
+		switch (fmau_inst->var) {
+		case fmadd:
+			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				fmau_mul_exceptions =
+				    pfpsd->fp_current_exceptions;
+				pfpsd->fp_current_exceptions = 0;
+				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
+				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
+				_fp_add(pfpsd, &ust, &us3, &ud);
+				/* ensure QSNaN1 has precedence over QNaN3 */
+				if ((us3.fpclass == fp_quiet) &&
+				    ((us1.fpclass == fp_signaling) ||
+				    (us2.fpclass == fp_signaling)))
+					ud = ust;
+				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
+			}
+			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fumadds,
+			    fpu_sim_fumaddd, fpu_sim_invalid);
+			break;
+		case fmsub:
+			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				fmau_mul_exceptions =
+				    pfpsd->fp_current_exceptions;
+				pfpsd->fp_current_exceptions = 0;
+				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
+				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
+				_fp_sub(pfpsd, &ust, &us3, &ud);
+				/* ensure QSNaN1 has precedence over QNaN3 */
+				if ((us3.fpclass == fp_quiet) &&
+				    ((us1.fpclass == fp_signaling) ||
+				    (us2.fpclass == fp_signaling)))
+					ud = ust;
+				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
+			}
+			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fumsubs,
+			    fpu_sim_fumsubd, fpu_sim_invalid);
+			break;
+		case fnmadd:
+			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				fmau_mul_exceptions =
+				    pfpsd->fp_current_exceptions;
+				pfpsd->fp_current_exceptions = 0;
+				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
+				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
+				if (ust.fpclass != fp_quiet &&
+				    ust.fpclass != fp_signaling)
+					ust.sign ^= 1;
+				_fp_sub(pfpsd, &ust, &us3, &ud);
+				/* ensure QSNaN1 has precedence over QNaN3 */
+				if ((us3.fpclass == fp_quiet) &&
+				    ((us1.fpclass == fp_signaling) ||
+				    (us2.fpclass == fp_signaling)))
+					ud = ust;
+				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
+			}
+			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fnumadds,
+			    fpu_sim_fnumaddd, fpu_sim_invalid);
+			break;
+		case fnmsub:
+			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				fmau_mul_exceptions =
+				    pfpsd->fp_current_exceptions;
+				pfpsd->fp_current_exceptions = 0;
+				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
+				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
+				if (ust.fpclass != fp_quiet &&
+				    ust.fpclass != fp_signaling)
+					ust.sign ^= 1;
+				_fp_add(pfpsd, &ust, &us3, &ud);
+				/* ensure QSNaN1 has precedence over QNaN3 */
+				if ((us3.fpclass == fp_quiet) &&
+				    ((us1.fpclass == fp_signaling) ||
+				    (us2.fpclass == fp_signaling)))
+					ud = ust;
+				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
+			}
+			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fnumsubs,
+			    fpu_sim_fnumsubd, fpu_sim_invalid);
 		}
 	} else {
 		nfcc = nrd & 0x3;
@@ -294,11 +417,12 @@ _fp_fpu_simulator(
 				_fp_unpack_extword(pfpsd, &lusr, nrs2);
 				_fp_pack_extword(pfpsd, &lusr, nrd);
 				if (inst.prec > 2) {		/* fmovq */
-				    _fp_unpack_extword(pfpsd, &lusr, nrs2+2);
-				    _fp_pack_extword(pfpsd, &lusr, nrd+2);
-				    FPUINFO_KSTAT(fpu_sim_fmovq);
+					_fp_unpack_extword(pfpsd, &lusr,
+					    nrs2+2);
+					_fp_pack_extword(pfpsd, &lusr, nrd+2);
+					FPUINFO_KSTAT(fpu_sim_fmovq);
 				} else {
-				    FPUINFO_KSTAT(fpu_sim_fmovd);
+					FPUINFO_KSTAT(fpu_sim_fmovd);
 				}
 			}
 			break;
@@ -313,11 +437,12 @@ _fp_fpu_simulator(
 				lusr &= 0x7fffffffffffffff;
 				_fp_pack_extword(pfpsd, &lusr, nrd);
 				if (inst.prec > 2) {		/* fabsq */
-				    _fp_unpack_extword(pfpsd, &lusr, nrs2+2);
-				    _fp_pack_extword(pfpsd, &lusr, nrd+2);
-				    FPUINFO_KSTAT(fpu_sim_fabsq);
+					_fp_unpack_extword(pfpsd, &lusr,
+					    nrs2+2);
+					_fp_pack_extword(pfpsd, &lusr, nrd+2);
+					FPUINFO_KSTAT(fpu_sim_fabsq);
 				} else {
-				    FPUINFO_KSTAT(fpu_sim_fabsd);
+					FPUINFO_KSTAT(fpu_sim_fabsd);
 				}
 			}
 			break;
@@ -332,12 +457,13 @@ _fp_fpu_simulator(
 				lusr ^= 0x8000000000000000;
 				_fp_pack_extword(pfpsd, &lusr, nrd);
 				if (inst.prec > 2) {		/* fnegq */
-				    _fp_unpack_extword(pfpsd, &lusr, nrs2+2);
-				    lusr ^= 0x0000000000000000;
-				    _fp_pack_extword(pfpsd, &lusr, nrd+2);
-				    FPUINFO_KSTAT(fpu_sim_fnegq);
+					_fp_unpack_extword(pfpsd, &lusr,
+					    nrs2+2);
+					lusr ^= 0x0000000000000000;
+					_fp_pack_extword(pfpsd, &lusr, nrd+2);
+					FPUINFO_KSTAT(fpu_sim_fnegq);
 				} else {
-				    FPUINFO_KSTAT(fpu_sim_fnegd);
+					FPUINFO_KSTAT(fpu_sim_fnegd);
 				}
 			}
 			break;
@@ -372,7 +498,7 @@ _fp_fpu_simulator(
 			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
 			_fp_mul(pfpsd, &us1, &us2, &ud);
 			_fp_pack(pfpsd, &ud, nrd,
-				(enum fp_op_type) ((int)inst.prec+1));
+			    (enum fp_op_type) ((int)inst.prec+1));
 			FPUINFO_KSTAT(fpu_sim_fsmuld);
 			break;
 		case fdmulx:
@@ -382,7 +508,7 @@ _fp_fpu_simulator(
 			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
 			_fp_mul(pfpsd, &us1, &us2, &ud);
 			_fp_pack(pfpsd, &ud, nrd,
-				(enum fp_op_type) ((int)inst.prec+1));
+			    (enum fp_op_type) ((int)inst.prec+1));
 			FPUINFO_KSTAT(fpu_sim_fdmulx);
 			break;
 		case fdiv:
@@ -435,7 +561,7 @@ _fp_fpu_simulator(
 					break;
 				}
 			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fcmpes,
-				fpu_sim_fcmped, fpu_sim_fcmpeq);
+			    fpu_sim_fcmped, fpu_sim_fcmpeq);
 			break;
 		case fsqrt:
 			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
@@ -495,37 +621,34 @@ _fp_fpu_simulator(
 		}
 	}
 	fsr.cexc = pfpsd->fp_current_exceptions;
-	if (pfpsd->fp_current_exceptions) {	/* Exception(s) occurred. */
-		andexcep = pfpsd->fp_current_exceptions & fsr.tem;
-		if (andexcep != 0) {	/* Signal an IEEE SIGFPE here. */
-			if (andexcep & (1 << fp_invalid)) {
-				pfpsd->fp_trapcode = FPE_FLTINV;
-				fsr.cexc = FSR_CEXC_NV;
-			} else if (andexcep & (1 << fp_overflow)) {
-				pfpsd->fp_trapcode = FPE_FLTOVF;
-				fsr.cexc = FSR_CEXC_OF;
-			} else if (andexcep & (1 << fp_underflow)) {
-				pfpsd->fp_trapcode = FPE_FLTUND;
-				fsr.cexc = FSR_CEXC_UF;
-			} else if (andexcep & (1 << fp_division)) {
-				pfpsd->fp_trapcode = FPE_FLTDIV;
-				fsr.cexc = FSR_CEXC_DZ;
-			} else if (andexcep & (1 << fp_inexact)) {
-				pfpsd->fp_trapcode = FPE_FLTRES;
-				fsr.cexc = FSR_CEXC_NX;
-			} else {
-				pfpsd->fp_trapcode = 0;
-			}
-			*pfsr = fsr;
-			return (ftt_ieee);
-		} else {	/* Just set accrued exception field. */
-			fsr.aexc |= pfpsd->fp_current_exceptions;
+	andexcep = pfpsd->fp_current_exceptions & fsr.tem;
+	if (andexcep != 0) {	/* Signal an IEEE SIGFPE here. */
+		if (andexcep & (1 << fp_invalid)) {
+			pfpsd->fp_trapcode = FPE_FLTINV;
+			fsr.cexc = FSR_CEXC_NV;
+		} else if (andexcep & (1 << fp_overflow)) {
+			pfpsd->fp_trapcode = FPE_FLTOVF;
+			fsr.cexc = FSR_CEXC_OF;
+		} else if (andexcep & (1 << fp_underflow)) {
+			pfpsd->fp_trapcode = FPE_FLTUND;
+			fsr.cexc = FSR_CEXC_UF;
+		} else if (andexcep & (1 << fp_division)) {
+			pfpsd->fp_trapcode = FPE_FLTDIV;
+			fsr.cexc = FSR_CEXC_DZ;
+		} else if (andexcep & (1 << fp_inexact)) {
+			pfpsd->fp_trapcode = FPE_FLTRES;
+			fsr.cexc = FSR_CEXC_NX;
+		} else {
+			pfpsd->fp_trapcode = 0;
 		}
+		*pfsr = fsr;
+		return (ftt_ieee);
+	} else {	/* Just set accrued exception field. */
+		fsr.aexc |= pfpsd->fp_current_exceptions | fmau_mul_exceptions;
 	}
 	*pfsr = fsr;
 	return (ftt_none);
 }
-
 
 /*
  * fpu_vis_sim simulates fpu and vis instructions;
@@ -569,11 +692,11 @@ fpu_vis_sim(
 
 	if ((fp.inst.hibits == 2) && (fp.inst.op3 == 0x36)) {
 			ftt = vis_fpu_simulator(pfpsd, fp.inst,
-					pregs, (ulong_t *)pregs->r_sp, pfp);
+			    pregs, (ulong_t *)pregs->r_sp, pfp);
 			return (ftt);
 	} else if ((fp.inst.hibits == 2) &&
 	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
-	    (fp.inst.op3 == 0x37))) {
+	    (fp.inst.op3 == 0x37) || (fp.inst.op3 == 0x3f))) {
 		ftt =  _fp_fpu_simulator(pfpsd, fp.inst, pfsr, gsr);
 		if (ftt == ftt_none || ftt == ftt_ieee) {
 			pregs->r_pc = pregs->r_npc;
@@ -652,7 +775,7 @@ fp_emulator(
 
 	if ((fp.inst.hibits == 2) &&
 	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
-	    (fp.inst.op3 == 0x37))) {
+	    (fp.inst.op3 == 0x37) || (fp.inst.op3 == 0x3f))) {
 		ftt = _fp_fpu_simulator(pfpsd, fp.inst, (fsr_type *)&tfsr, gsr);
 		/* Do not retry emulated instruction. */
 		pregs->r_pc = pregs->r_npc;
@@ -692,7 +815,7 @@ again:
 		return (ftt);
 	if ((fp.inst.hibits == 2) &&		/* fpops */
 	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
-	    (fp.inst.op3 == 0x37))) {
+	    (fp.inst.op3 == 0x37) || (fp.inst.op3 == 0x3f))) {
 		ftt = _fp_fpu_simulator(pfpsd, fp.inst, (fsr_type *)&tfsr, gsr);
 		/* Do not retry emulated instruction. */
 		pfpu->fpu_fsr = tfsr;
@@ -709,17 +832,17 @@ again:
 		}
 	} else if ((fp.inst.hibits == 2) && (fp.inst.op3 == 0x36)) {
 			ftt = vis_fpu_simulator(pfpsd, fp.inst,
-						pregs, prw, pfp);
+			    pregs, prw, pfp);
 	} else if (
 						/* rd %gsr */
 	    ((fp.inst.hibits == 2) && ((fp.inst.op3 & 0x3f) == 0x28) &&
-			(fp.inst.rs1 == 0x13)) ||
+	    (fp.inst.rs1 == 0x13)) ||
 						/* wr %gsr */
 	    ((fp.inst.hibits == 2) && ((fp.inst.op3 & 0x3f) == 0x30) &&
-			(fp.inst.rd == 0x13)) ||
+	    (fp.inst.rd == 0x13)) ||
 						/* movcc */
 	    ((fp.inst.hibits == 2) && ((fp.inst.op3 & 0x3f) == 0x2c) &&
-			(((fp.i>>18) & 0x1) == 0)) ||
+	    (((fp.i>>18) & 0x1) == 0)) ||
 						/* fbpcc */
 	    ((fp.inst.hibits == 0) && (((fp.i>>22) & 0x7) == 5)) ||
 						/* fldst */

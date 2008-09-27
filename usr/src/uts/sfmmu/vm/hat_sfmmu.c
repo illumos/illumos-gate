@@ -177,6 +177,14 @@ void	hat_pagecachectl(struct page *, int);
 #define	HAT_TMPNC	0x4
 
 /*
+ * This flag is set to 0 via the MD in platforms that do not support
+ * I-cache coherency in hardware. Used to enable "soft exec" mode.
+ * The MD "coherency" property is optional, and defaults to 1 (because
+ * coherent I-cache is the norm.)
+ */
+uint_t	icache_is_coherent = 1;
+
+/*
  * Flag to allow the creation of non-cacheable translations
  * to system memory. It is off by default. At the moment this
  * flag is used by the ecache error injector. The error injector
@@ -2528,7 +2536,7 @@ sfmmu_memload_batchsmall(struct hat *hat, caddr_t vaddr, page_t **pps,
 void
 sfmmu_memtte(tte_t *ttep, pfn_t pfn, uint_t attr, int tte_sz)
 {
-	ASSERT(!(attr & ~SFMMU_LOAD_ALLATTR));
+	ASSERT((attr & ~(SFMMU_LOAD_ALLATTR | HAT_ATTR_NOSOFTEXEC)) == 0);
 
 	ttep->tte_inthi = MAKE_TTE_INTHI(pfn, attr, tte_sz, 0 /* hmenum */);
 	ttep->tte_intlo = MAKE_TTE_INTLO(pfn, attr, tte_sz, 0 /* hmenum */);
@@ -2541,6 +2549,18 @@ sfmmu_memtte(tte_t *ttep, pfn_t pfn, uint_t attr, int tte_sz)
 	}
 	if (TTE_IS_NFO(ttep) && TTE_IS_EXECUTABLE(ttep)) {
 		panic("sfmmu_memtte: can't set both NFO and EXEC bits");
+	}
+
+	/*
+	 * Disable hardware execute permission to force a fault if
+	 * this page is executed, so we can detect the execution.  Set
+	 * the soft exec bit to remember that this TTE has execute
+	 * permission.
+	 */
+	if (TTE_IS_EXECUTABLE(ttep) && (attr & HAT_ATTR_NOSOFTEXEC) == 0 &&
+	    icache_is_coherent == 0) {
+		TTE_CLR_EXEC(ttep);
+		TTE_SET_SOFTEXEC(ttep);
 	}
 }
 
@@ -3046,9 +3066,26 @@ sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
 			    (void *)hmeblkp);
 		}
 		ASSERT(TTE_CSZ(&tteold) == TTE_CSZ(ttep));
+
+		if (TTE_IS_EXECUTABLE(&tteold) && TTE_IS_SOFTEXEC(ttep)) {
+			TTE_SET_EXEC(ttep);
+		}
 	}
 
 	if (pp) {
+		/*
+		 * If we know that this page will be executed, because
+		 * it was in the past (PP_ISEXEC is already true), or
+		 * if the caller says it will likely be executed
+		 * (HAT_LOAD_TEXT is true), then there is no need to
+		 * dynamically detect execution with a soft exec
+		 * fault. Enable hardware execute permission now.
+		 */
+		if ((PP_ISEXEC(pp) || (flags & HAT_LOAD_TEXT)) &&
+		    TTE_IS_SOFTEXEC(ttep)) {
+			TTE_SET_EXEC(ttep);
+		}
+
 		if (size == TTE8K) {
 #ifdef VAC
 			/*
@@ -3072,6 +3109,12 @@ sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
 				sfmmu_page_exit(pmtx);
 			}
 
+			if (TTE_EXECUTED(ttep)) {
+				pmtx = sfmmu_page_enter(pp);
+				PP_SETEXEC(pp);
+				sfmmu_page_exit(pmtx);
+			}
+
 		} else if (sfmmu_pagearray_setup(vaddr, pps, ttep, remap)) {
 			/*
 			 * sfmmu_pagearray_setup failed so return
@@ -3079,6 +3122,9 @@ sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
 			sfmmu_mlist_exit(pml);
 			return (1);
 		}
+
+	} else if (TTE_IS_SOFTEXEC(ttep)) {
+		TTE_SET_EXEC(ttep);
 	}
 
 	/*
@@ -3203,7 +3249,8 @@ sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
 		 * ref bit in tteload.
 		 */
 		ASSERT(TTE_IS_REF(ttep));
-		if (TTE_IS_MOD(&tteold)) {
+		if (TTE_IS_MOD(&tteold) || (TTE_EXECUTED(&tteold) &&
+		    !TTE_IS_EXECUTABLE(ttep))) {
 			sfmmu_ttesync(sfmmup, vaddr, &tteold, pp);
 		}
 		/*
@@ -3331,6 +3378,12 @@ sfmmu_pagearray_setup(caddr_t addr, page_t **pps, tte_t *ttep, int remap)
 			if (!(PP_ISMOD(pp))) {
 				PP_SETRO(pp);
 			}
+			sfmmu_page_exit(pmtx);
+		}
+
+		if (TTE_EXECUTED(ttep)) {
+			pmtx = sfmmu_page_enter(pp);
+			PP_SETEXEC(pp);
 			sfmmu_page_exit(pmtx);
 		}
 
@@ -4977,9 +5030,11 @@ sfmmu_hblk_chgattr(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 				continue;
 			}
 
-			if (tteflags.tte_intlo & TTE_HWWR_INT) {
+			if ((tteflags.tte_intlo & TTE_HWWR_INT) ||
+			    (TTE_EXECUTED(&tte) &&
+			    !TTE_IS_EXECUTABLE(&ttemod))) {
 				/*
-				 * need to sync if we are clearing modify bit.
+				 * need to sync if clearing modify/exec bit.
 				 */
 				sfmmu_ttesync(sfmmup, addr, &tte, pp);
 			}
@@ -5032,6 +5087,14 @@ sfmmu_vtop_attr(uint_t attr, int mode, tte_t *ttemaskp)
 		ttevalue.tte_intlo = MAKE_TTEATTR_INTLO(attr);
 		ttemaskp->tte_inthi = TTEINTHI_ATTR;
 		ttemaskp->tte_intlo = TTEINTLO_ATTR;
+		if (!icache_is_coherent) {
+			if (!(attr & PROT_EXEC)) {
+				TTE_SET_SOFTEXEC(ttemaskp);
+			} else {
+				TTE_CLR_EXEC(ttemaskp);
+				TTE_SET_SOFTEXEC(&ttevalue);
+			}
+		}
 		break;
 	case SFMMU_SETATTR:
 		ASSERT(!(attr & ~HAT_PROT_MASK));
@@ -5084,6 +5147,9 @@ sfmmu_ptov_attr(tte_t *ttep)
 		attr |= PROT_WRITE;
 	}
 	if (TTE_IS_EXECUTABLE(ttep)) {
+		attr |= PROT_EXEC;
+	}
+	if (TTE_IS_SOFTEXEC(ttep)) {
 		attr |= PROT_EXEC;
 	}
 	if (!TTE_IS_PRIVILEGED(ttep)) {
@@ -5302,6 +5368,11 @@ sfmmu_hblk_chgprot(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 
 			ttemod = tte;
 			TTE_SET_LOFLAGS(&ttemod, tteflags, pprot);
+			ASSERT(TTE_IS_SOFTEXEC(&tte) ==
+			    TTE_IS_SOFTEXEC(&ttemod));
+			ASSERT(TTE_IS_EXECUTABLE(&tte) ==
+			    TTE_IS_EXECUTABLE(&ttemod));
+
 #if defined(SF_ERRATA_57)
 			if (check_exec && addr < errata57_limit)
 				ttemod.tte_exec_perm = 0;
@@ -6014,7 +6085,8 @@ again:
 				continue;
 			}
 
-			if (!(flags & HAT_UNLOAD_NOSYNC)) {
+			if (!(flags & HAT_UNLOAD_NOSYNC) ||
+			    (pp != NULL && TTE_EXECUTED(&tte))) {
 				sfmmu_ttesync(sfmmup, addr, &tte, pp);
 			}
 
@@ -6354,35 +6426,47 @@ static void
 sfmmu_ttesync(struct hat *sfmmup, caddr_t addr, tte_t *ttep, page_t *pp)
 {
 	uint_t rm = 0;
-	int   	sz;
+	int sz = TTE_CSZ(ttep);
 	pgcnt_t	npgs;
 
 	ASSERT(TTE_IS_VALID(ttep));
 
-	if (TTE_IS_NOSYNC(ttep)) {
-		return;
-	}
+	if (!TTE_IS_NOSYNC(ttep)) {
 
-	if (TTE_IS_REF(ttep))  {
-		rm = P_REF;
-	}
-	if (TTE_IS_MOD(ttep))  {
-		rm |= P_MOD;
-	}
+		if (TTE_IS_REF(ttep))
+			rm |= P_REF;
 
-	if (rm == 0) {
-		return;
-	}
+		if (TTE_IS_MOD(ttep))
+			rm |= P_MOD;
 
-	sz = TTE_CSZ(ttep);
-	if (sfmmup != NULL && sfmmup->sfmmu_rmstat) {
-		int i;
-		caddr_t	vaddr = addr;
+		if (rm != 0) {
+			if (sfmmup != NULL && sfmmup->sfmmu_rmstat) {
+				int i;
+				caddr_t	vaddr = addr;
 
-		for (i = 0; i < TTEPAGES(sz); i++, vaddr += MMU_PAGESIZE) {
-			hat_setstat(sfmmup->sfmmu_as, vaddr, MMU_PAGESIZE, rm);
+				for (i = 0; i < TTEPAGES(sz); i++) {
+					hat_setstat(sfmmup->sfmmu_as, vaddr,
+					    MMU_PAGESIZE, rm);
+					vaddr += MMU_PAGESIZE;
+				}
+			}
 		}
+	}
 
+	if (!pp)
+		return;
+
+	/*
+	 * If software says this page is executable, and the page was
+	 * in fact executed (indicated by hardware exec permission
+	 * being enabled), then set P_EXEC on the page to remember
+	 * that it was executed. The I$ will be flushed when the page
+	 * is reassigned.
+	 */
+	if (TTE_EXECUTED(ttep)) {
+		rm |= P_EXEC;
+	} else if (rm == 0) {
+		return;
 	}
 
 	/*
@@ -6392,8 +6476,6 @@ sfmmu_ttesync(struct hat *sfmmup, caddr_t addr, tte_t *ttep, page_t *pp)
 	 * The nrm bits are protected by the same mutex as
 	 * the one that protects the page's mapping list.
 	 */
-	if (!pp)
-		return;
 	ASSERT(sfmmu_mlist_held(pp));
 	/*
 	 * If the tte is for a large page, we need to sync all the
@@ -6412,7 +6494,8 @@ sfmmu_ttesync(struct hat *sfmmup, caddr_t addr, tte_t *ttep, page_t *pp)
 		ASSERT(pp);
 		ASSERT(sfmmu_mlist_held(pp));
 		if (((rm & P_REF) != 0 && !PP_ISREF(pp)) ||
-		    ((rm & P_MOD) != 0 && !PP_ISMOD(pp)))
+		    ((rm & P_MOD) != 0 && !PP_ISMOD(pp)) ||
+		    ((rm & P_EXEC) != 0 && !PP_ISEXEC(pp)))
 			hat_page_setattr(pp, rm);
 
 		/*
@@ -6734,6 +6817,7 @@ hat_page_relocate(page_t **target, page_t **replacement, spgcnt_t *nrelocp)
 	kmutex_t	*low, *high;
 	spgcnt_t	npages, i;
 	page_t		*pl = NULL;
+	uint_t		ppattr;
 	int		old_pil;
 	cpuset_t	cpuset;
 	int		cap_cpus;
@@ -6884,8 +6968,9 @@ hat_page_relocate(page_t **target, page_t **replacement, spgcnt_t *nrelocp)
 		 * Copy attributes.  VAC consistency was handled above,
 		 * if required.
 		 */
-		rpp->p_nrm = tpp->p_nrm;
-		tpp->p_nrm = 0;
+		ppattr = hat_page_getattr(tpp, (P_MOD | P_REF | P_RO));
+		page_clr_all_props(rpp, 0);
+		page_set_props(rpp, ppattr);
 		rpp->p_index = tpp->p_index;
 		tpp->p_index = 0;
 #ifdef VAC
@@ -7690,7 +7775,7 @@ hat_page_setattr(page_t *pp, uint_t flag)
 	noshuffle = flag & P_NSH;
 	flag &= ~P_NSH;
 
-	ASSERT(!(flag & ~(P_MOD | P_REF | P_RO)));
+	ASSERT(!(flag & ~(P_MOD | P_REF | P_RO | P_EXEC)));
 
 	/*
 	 * nothing to do if attribute already set

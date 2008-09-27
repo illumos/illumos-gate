@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  * Copyright 2007 Jason King.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libdisasm.h"
 #include "libdisasm_impl.h"
@@ -112,6 +110,7 @@ static const inst_t BPcc_table_def[16] = {
 	INST("bvc",  V9|V9S, FLG_PRED|FLG_RS1(REG_ICC)|FLG_DISP(DISP19))
 };
 
+
 static const table_t BPcc_table = {
 	.tbl_field = 28,
 	.tbl_len   = 4,
@@ -156,12 +155,12 @@ static const table_t Bicc_table = {
 };
 
 static const inst_t BPr_table_def[16] = {
-	INVALID,
+	INST("brnr",  V9, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brz",   V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brlez", V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brlz",  V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 
-	INVALID,
+	INST("brr",  V9, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brnz",  V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brgz",  V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brgez", V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
@@ -406,6 +405,7 @@ static const table_t ls_table = {
 	.tbl_inp   = ls_table_def
 };
 
+
 /* ALU operations */
 static const inst_t Tcc_table_def[16] = {
 	INST("tn",   VALL, 0),
@@ -478,11 +478,15 @@ static const inst_t tr_table_def[32] = {
 	INVALID,
 
 	/* 0x08 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("jpriv", V9, FLG_DISP(DISP19)),
 
 	/* 0x10 */
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("commit", V9, 0),
+	INVALID
+
 };
 
 static const table_t tr_table = {
@@ -633,7 +637,12 @@ static const inst_t FPop1_table_def[512] = {
 	INST("fsqrtq", VALL,
 		FLG_P1(REG_NONE)|FLG_P2(REG_FPQ)|FLG_NOIMM|FLG_P3(REG_FPQ)),
 
-	INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("frsqrt1xs", V9,
+		FLG_P1(REG_NONE)|FLG_P2(REG_FPQ)|FLG_NOIMM|FLG_P3(REG_FPQ)),
+	INST("frsqrt1xd", VALL,
+		FLG_P1(REG_NONE)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID,
 
 	/* 0x30 */
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
@@ -674,11 +683,31 @@ static const inst_t FPop1_table_def[512] = {
 		FLG_P1(REG_FPQ)|FLG_P2(REG_FPQ)|FLG_NOIMM|FLG_P3(REG_FPQ)),
 
 	/* 0x050 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("fnadds", V9S,
+		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
+	INST("fnaddd", V9S,
+		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("fnmuls", V9S,
+		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
+	INST("fnmuld", V9S,
+		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x060 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("fhadds", V9,
+		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
+	INST("fhaddd", V9,
+		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID, INVALID,
+	INST("fhsubs", V9S,
+		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
+	INST("fhsubd", V9S,
+		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID,
 
 	/* 0x068 */
 	INVALID,
@@ -694,8 +723,16 @@ static const inst_t FPop1_table_def[512] = {
 	INVALID,
 
 	/* 0x070 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("fnhadds", V9S,
+		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
+	INST("fnhaddd", V9S,
+		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("fnsmuld", V9S,
+		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FPD)),
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x080 */
 	INVALID,
@@ -1147,52 +1184,68 @@ static const inst_t vis_table_def[512] = {
 
 	/* 0x010 */
 	INST("array8", V9S, FLG_NOIMM),
-	INVALID,
+	INST("addxc", V9, 0),
 	INST("array16", V9S, FLG_NOIMM),
-	INVALID,
+	INST("addxccc", V9, 0),
 
 	INST("array32", V9S, FLG_NOIMM),
-	INVALID,
-	INVALID,
-	INVALID,
+	INST("random", V9, FLG_P1(REG_NONE)|FLG_P2(REG_NONE)|
+		FLG_RD(REG_FPD)|FLG_NOIMM),
+	INST("umulxhi", V9, FLG_P1(REG_INT)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_P3(REG_INT)),
+	INST("lzd", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_RD(REG_INT)),
 
 	/* 0x018 */
 	INST("alignaddr", V9S, FLG_NOIMM),
-	INST("bmask", V9S, FLG_NOIMM),
+	INST("bmask", V9S, FLG_P1(REG_INT)|FLG_P2(REG_INT)|FLG_RD(REG_INT)),
 	INST("alignaddrl", V9S, FLG_NOIMM),
+	INST("cmask8", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_P3(REG_NONE)),
 	INVALID,
-
-	INVALID, INVALID, INVALID, INVALID,
+	INST("cmask16", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_P3(REG_NONE)),
+	INVALID,
+	INST("cmask32", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_P3(REG_NONE)),
 
 	/* 0x020 */
 	INST("fcmple16", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fsll16", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 	INST("fcmpne16", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fsrl16", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 
 	INST("fcmple32", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fsll32", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 	INST("fcmpne32", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fsrl32", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 
 	/* 0x028 */
 	INST("fcmpgt16", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fslas16", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 	INST("fcmpeq16", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fsra16", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 
 	INST("fcmpgt32", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fslas32", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 	INST("fcmpeq32", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
-	INVALID,
+	INST("fsra32", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
 
 	/* 0x030 */
 	INVALID,
@@ -1225,10 +1278,22 @@ static const inst_t vis_table_def[512] = {
 		FLG_P2(REG_FPD)|FLG_P3(REG_FP)),
 	INST("pdist", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
 		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
-	INVALID,
+	INST("pdistn", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_INT)),
 
 	/* 0x040 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("fmean16", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INVALID,
+	INST("fpadd64", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INVALID,
+	INST("fchksm16", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INVALID,
+	INST("fpsub64", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INVALID,
 
 	/* 0x048 */
 	INST("faligndata", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
@@ -1265,7 +1330,22 @@ static const inst_t vis_table_def[512] = {
 		FLG_P2(REG_FP)|FLG_P3(REG_FP)),
 
 	/* 0x058 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("fpadds16", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INST("fpadds16s", V9S, FLG_P1(REG_FP)|FLG_NOIMM|
+		FLG_P2(REG_FP)|FLG_P3(REG_FP)),
+	INST("fpadds32", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INST("fpadds32s", V9S, FLG_P1(REG_FP)|FLG_NOIMM|
+		FLG_P2(REG_FP)|FLG_P3(REG_FP)),
+	INST("fpsubs16", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INST("fpsubs16s", V9S, FLG_P1(REG_FP)|FLG_NOIMM|
+		FLG_P2(REG_FP)|FLG_P3(REG_FP)),
+	INST("fpsubs32", V9S, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_P3(REG_FPD)),
+	INST("fpsubs32s", V9S, FLG_P1(REG_FP)|FLG_NOIMM|
+		FLG_P2(REG_FP)|FLG_P3(REG_FP)),
 
 	/* 0x060 */
 	INST("fzero", V9S, FLG_P1(REG_NONE)|FLG_P2(REG_NONE)|
@@ -1387,12 +1467,38 @@ static const inst_t vis_table_def[512] = {
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x110 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("movdtox", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_RD(REG_INT)),
+	INST("movstouw", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_FP)|FLG_RD(REG_INT)),
+	INVALID,
+	INST("movstosw", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_FP)|FLG_RD(REG_INT)),
+	INVALID,
+	INST("xmulx", V9, FLG_P1(REG_INT)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_P3(REG_INT)),
+	INST("xmulxhi", V9, FLG_P1(REG_INT)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_P3(REG_INT)),
+	INVALID,
+	INST("movxtod", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_RD(REG_FPD)),
+	INST("movwtos", V9, FLG_P1(REG_NONE)|FLG_NOIMM|
+		FLG_P2(REG_INT)|FLG_RD(REG_FP)),
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x120 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("fucmple8", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_RD(REG_INT)),
+	INVALID,
+	INST("fucmpne8", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_RD(REG_INT)),
+	INVALID, INVALID, INVALID, INVALID, INVALID,
+	INST("fucmpgt8", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_RD(REG_INT)),
+	INVALID,
+	INST("fucmpeq8", V9, FLG_P1(REG_FPD)|FLG_NOIMM|
+		FLG_P2(REG_FPD)|FLG_RD(REG_INT)),
+	INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x130 */
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
@@ -1403,7 +1509,12 @@ static const inst_t vis_table_def[512] = {
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x150 */
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID,
+	INST("flcmps", V9, FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_P3(REG_FCC)
+		|FLG_NOIMM),
+	INST("flcmpd", V9, FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_P3(REG_FCC)
+		|FLG_NOIMM),
+	INVALID, INVALID, INVALID, INVALID, INVALID,
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x160 */
@@ -1458,35 +1569,69 @@ static const table_t vis_table = {
 static const inst_t fused_table_def[16] = {
 	/* 0x0 */
 	INVALID,
-	INST("fmadds", V9O, FLG_P1(REG_FP)),
-	INST("fmaddd", V9O, FLG_P1(REG_FPD)),
+	INST("fmadds", V9, FLG_P1(REG_FP)),
+	INST("fmaddd", V9, FLG_P1(REG_FPD)),
 	INVALID,
 
 	/* 0x4 */
 	INVALID,
-	INST("fmsubs", V9O, FLG_P1(REG_FP)),
-	INST("fmsubd", V9O, FLG_P1(REG_FPD)),
+	INST("fmsubs", V9, FLG_P1(REG_FP)),
+	INST("fmsubd", V9, FLG_P1(REG_FPD)),
 	INVALID,
 
 	/* 0x8 */
 	INVALID,
-	INST("fnmsubs", V9O, FLG_P1(REG_FP)),
-	INST("fnmsubd", V9O, FLG_P1(REG_FPD)),
+	INST("fnmsubs", V9, FLG_P1(REG_FP)),
+	INST("fnmsubd", V9, FLG_P1(REG_FPD)),
 	INVALID,
 
 	/* 0xc */
 	INVALID,
-	INST("fnmadds", V9O, FLG_P1(REG_FP)),
-	INST("fnmaddd", V9O, FLG_P1(REG_FPD)),
+	INST("fnmadds", V9, FLG_P1(REG_FP)),
+	INST("fnmaddd", V9, FLG_P1(REG_FPD)),
 	INVALID
 };
 
 static const table_t fused_table = {
-	.tbl_field = 5,
+	.tbl_field = 8,
 	.tbl_len   = 4,
 	.tbl_ovp   = NULL,
 	.tbl_fmt   = fmt_fused,
 	.tbl_inp   = fused_table_def
+};
+
+static const inst_t unfused_table_def[16] = {
+	/* 0x0 */
+	INVALID,
+	INST("fumadds", V9, FLG_P1(REG_FP)),
+	INST("fumaddd", V9, FLG_P1(REG_FPD)),
+	INVALID,
+
+	/* 0x4 */
+	INVALID,
+	INST("fumsubs", V9, FLG_P1(REG_FP)),
+	INST("fumsubd", V9, FLG_P1(REG_FPD)),
+	INVALID,
+
+	/* 0x8 */
+	INVALID,
+	INST("fnumsubs", V9, FLG_P1(REG_FP)),
+	INST("fnumsubd", V9, FLG_P1(REG_FPD)),
+	INVALID,
+
+	/* 0xc */
+	INVALID,
+	INST("fnumadds", V9, FLG_P1(REG_FP)),
+	INST("fnumaddd", V9, FLG_P1(REG_FPD)),
+	INVALID
+};
+
+static const table_t unfused_table = {
+	.tbl_field = 8,
+	.tbl_len   = 4,
+	.tbl_ovp   = NULL,
+	.tbl_fmt   = fmt_fused,
+	.tbl_inp   = unfused_table_def
 };
 
 static const inst_t alu_table_def[64] = {
@@ -1577,8 +1722,9 @@ static const inst_t alu_table_def[64] = {
 	INST("save",		VALL,	0),
 	INST("restore",		VALL,	0),
 	TABLE(tr_table,		V9|V9S),
-	INVALID
+	TABLE(unfused_table,	V9|V9S)
 };
+
 
 static const overlay_t alu_ov_table[] = {
 	OVERLAY(0x08, INST("addc",		V9|V9S, 0)),
@@ -1586,15 +1732,15 @@ static const overlay_t alu_ov_table[] = {
 	OVERLAY(0x18, INST("addccc",		V9|V9S, 0)),
 	OVERLAY(0x1c, INST("subccc",		V9|V9S, 0)),
 
-	OVERLAY(0x29, INVALIDA(V9|V9S)),
+	OVERLAY(0x29, INST("rdhpr",		V9|V9S, 0)),
 	OVERLAY(0x2a, INST("rdpr",		V9|V9S, 0)),
 	OVERLAY(0x2b, INST("flushw",		V9|V9S, 0)),
 	OVERLAY(0x31, TABLE(rwin_table,		V9|V9S)),
 
 	OVERLAY(0x32, INST("wrpr",		V9|V9S, 0)),
-	OVERLAY(0x33, INVALIDA(V9|V9S)),
+	OVERLAY(0x33, INST("wrhpr",		V9|V9S, 0)),
 	OVERLAY(0x36, TABLE(vis_table,		V9S)),
-	OVERLAY(0x37, TABLE(fused_table,	V9O)),
+	OVERLAY(0x37, TABLE(fused_table,	VALL)),
 	OVERLAY(0x39, INST("return",		VALL, 0)),
 
 	OVERLAY_END

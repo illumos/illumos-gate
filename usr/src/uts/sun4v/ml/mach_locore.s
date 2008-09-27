@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(lint)
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -468,9 +466,9 @@ sys_trap(void)
 	!
 	mov	KCONTEXT, %l0
 	mov	MMU_PCONTEXT, %l1
-	sethi	%hi(FLUSH_ADDR), %l2
 	stxa	%l0, [%l1]ASI_MMU_CTX
-	flush	%l2			! flush required by immu
+	! Ensure new ctx takes effect by the time the "done" (below) completes
+	membar	#Sync
 
 	set	utl0, %g6		! bounce to utl0
 have_win:
@@ -795,11 +793,9 @@ have_win:
 	mov	MMU_SCONTEXT, %g1
 	ldxa	[%g1]ASI_MMU_CTX, %g2
 	mov	MMU_PCONTEXT, %g1
-	sethi	%hi(FLUSH_ADDR), %g3
 	stxa	%g2, [%g1]ASI_MMU_CTX
-	flush	%g3				! flush required by immu
 	!
-	! If shared context support is not enabled, then the next five
+	! If shared context support is not enabled, then the next four
 	! instructions will be patched with nop instructions.
 	!
 	.global sfmmu_shctx_user_rtt_patch
@@ -808,7 +804,10 @@ sfmmu_shctx_user_rtt_patch:
 	ldxa	[%g1]ASI_MMU_CTX, %g2
 	mov	MMU_PCONTEXT1, %g1
 	stxa	%g2, [%g1]ASI_MMU_CTX
-	flush	%g3
+	
+	! Ensure new ctxs take effect by the time the "retry" (below) completes
+	membar	#Sync
+	
 	!
 	! setup trap regs
 	!
@@ -1461,10 +1460,9 @@ state_saved:
 	!
 	! Set pcontext to run kernel.
 	!
-	sethi	%hi(FLUSH_ADDR), %g3
 	set	MMU_PCONTEXT, %g1
 	stxa	%g0, [%g1]ASI_MMU_CTX
-	flush	%g3
+	membar	#Sync
 
 	rdpr	%cwp, %g1
 	set	TSTATE_KERN, %g3

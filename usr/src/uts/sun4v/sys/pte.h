@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PTE_H
 #define	_SYS_PTE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/types.h>
@@ -64,7 +61,7 @@ typedef union {
 		unsigned int	w:1;		/* <6> write perm */
 		unsigned int	ref:1;		/* <5> sw - ref */
 		unsigned int	wr_perm:1;	/* <4> sw - write perm */
-		unsigned int	rsvd:1;		/* <3> reserved */
+		unsigned int	xsoft:1;	/* <3> sw - soft execute */
 		unsigned int	sz:3;		/* <2:0> pagesize */
 	} tte_bit;
 	struct {
@@ -86,6 +83,7 @@ typedef union {
 #define	tte_no_sync	tte_bit.no_sync
 #define	tte_suspend	tte_bit.susp
 #define	tte_exec_perm	tte_bit.x
+#define	tte_soft_exec	tte_bit.xsoft
 #define	tte_lock	tte_bit.lock
 #define	tte_cp		tte_bit.cp
 #define	tte_cv		tte_bit.cv
@@ -165,6 +163,7 @@ typedef union {
 #define	TTE_HWWR_INT			0x00000040
 #define	TTE_REF_INT			0x00000020
 #define	TTE_WRPRM_INT			0x00000010
+#define	TTE_SOFTEXEC_INT		0x00000008
 
 #define	TTE_PROT_INT			(TTE_WRPRM_INT | TTE_PRIV_INT)
 
@@ -246,6 +245,7 @@ typedef union {
 #define	TTE_IS_8K(ttep)		(TTE_CSZ(ttep) == TTE8K)
 #define	TTE_IS_WRITABLE(ttep)	((ttep)->tte_wr_perm)
 #define	TTE_IS_EXECUTABLE(ttep)	((ttep)->tte_exec_perm)
+#define	TTE_IS_SOFTEXEC(ttep)	((ttep)->tte_soft_exec)
 #define	TTE_IS_PRIVILEGED(ttep)	((ttep)->tte_priv)
 #define	TTE_IS_NOSYNC(ttep)	((ttep)->tte_no_sync)
 #define	TTE_IS_LOCKED(ttep)	((ttep)->tte_lock)
@@ -275,6 +275,8 @@ typedef union {
 #define	TTE_CLR_WRT(ttep)	((ttep)->tte_wr_perm = 0)
 #define	TTE_SET_EXEC(ttep)	((ttep)->tte_exec_perm = 1)
 #define	TTE_CLR_EXEC(ttep)	((ttep)->tte_exec_perm = 0)
+#define	TTE_SET_SOFTEXEC(ttep)	((ttep)->tte_soft_exec = 1)
+#define	TTE_CLR_SOFTEXEC(ttep)	((ttep)->tte_soft_exec = 0)
 #define	TTE_SET_PRIV(ttep)	((ttep)->tte_priv = 1)
 #define	TTE_CLR_PRIV(ttep)	((ttep)->tte_priv = 0)
 

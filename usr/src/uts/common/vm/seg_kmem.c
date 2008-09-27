@@ -883,6 +883,15 @@ segkmem_xalloc(vmem_t *vmp, void *inaddr, size_t size, int vmflag, uint_t attr,
 	else
 		allocflag = 0;
 
+	/*
+	 * Support for non-coherent I-cache.
+	 * Set HAT_LOAD_TEXT to override soft execute.
+	 */
+	if (attr & HAT_ATTR_TEXT) {
+		attr &= ~HAT_ATTR_TEXT;
+		allocflag |= HAT_LOAD_TEXT;
+	}
+
 	while (ppl != NULL) {
 		page_t *pp = ppl;
 		page_sub(&ppl, pp);

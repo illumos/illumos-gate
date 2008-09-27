@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
 #include "assym.h"
@@ -1172,6 +1170,8 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 
 #endif /* !lint */
 
+#if !defined(CUSTOM_FPZERO)
+
 /*
  * fp_zero() - clear all fp data registers and the fsr
  */
@@ -1191,7 +1191,7 @@ fp_zero_zero:
 
 	ENTRY_NP(fp_zero)
 	sethi	%hi(fp_zero_zero), %o0
-	ldd	[%o0 + %lo(fp_zero_zero)], %fsr
+	ldx	[%o0 + %lo(fp_zero_zero)], %fsr
 	ldd	[%o0 + %lo(fp_zero_zero)], %f0
 	fmovd	%f0, %f2
 	fmovd	%f0, %f4
@@ -1228,3 +1228,4 @@ fp_zero_zero:
 	SET_SIZE(fp_zero)
 
 #endif	/* lint */
+#endif  /* CUSTOM_FPZERO */

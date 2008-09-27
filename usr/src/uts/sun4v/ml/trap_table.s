@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(lint)
 #include "assym.h"
 #endif /* !lint */
@@ -843,15 +841,8 @@ tt_pil/**/level:			;\
 /*
  * synthesize for trap(): SFSR in %g3
  */
-#define	IMMU_EXCEPTION							\
-	MMU_FAULT_STATUS_AREA(%g3)					;\
-	rdpr	%tpc, %g2						;\
-	ldx	[%g3 + MMFSA_I_TYPE], %g1				;\
-	ldx	[%g3 + MMFSA_I_CTX], %g3				;\
-	sllx	%g3, SFSR_CTX_SHIFT, %g3				;\
-	or	%g3, %g1, %g3						;\
-	ba,pt	%xcc, .mmu_exception_end				;\
-	mov	T_INSTR_EXCEPTION, %g1					;\
+#define IMMU_EXCEPTION							\
+	ba,a,pt	%xcc, .immu_exception					;\
 	.align	32
 
 /*
@@ -1393,6 +1384,10 @@ etrap_table:
  * (0=kernel, 1=invalid, or 2=user) rather than context ID)
  */
 	ALTENTRY(exec_fault)
+	set	icache_is_coherent, %g6		/* check soft exec mode */
+	ld	[%g6], %g6
+	brz,pn	%g6, sfmmu_slow_immu_miss
+	  nop
 	TRACE_TSBHIT(TT_MMU_EXEC)
 	MMU_FAULT_STATUS_AREA(%g4)
 	ldx	[%g4 + MMFSA_I_ADDR], %g2	/* g2 = address */
@@ -2763,6 +2758,30 @@ trace_dataprot:
 	ba,pt	%xcc, .mmu_exception_end
 	mov	T_DATA_EXCEPTION, %g1
 	SET_SIZE(.dmmu_exception)
+
+/*
+ * Firmware on some platforms treats missing execute permission
+ * as an exception instead of an IMMU miss. Solaris and OBP both
+ * expect an IMMU miss.  The expectation is that the sun4v spec
+ * will change, and the current handling will be correct.
+ *
+ * We simply fold these 2 paths together. This is done in order to
+ * handle the non-coherent I-cache case.
+ */
+   .type    .immu_exception, #function
+.immu_exception:
+	MMU_FAULT_STATUS_AREA(%g3)
+	rdpr	%tpc, %g2
+	ldx	[%g3 + MMFSA_I_TYPE], %g1
+	ldx	[%g3 + MMFSA_I_CTX], %g3
+	sllx	%g3, SFSR_CTX_SHIFT, %g3
+	or	%g3, %g1, %g3
+	cmp	%g1, MMFSA_F_PROT
+	be,a,pt	%icc, sfmmu_slow_immu_miss
+	  wrpr	%g0, T_INSTR_MMU_MISS, %tt
+	ba,pt	%xcc, .mmu_exception_end
+	  mov	T_INSTR_EXCEPTION, %g1
+	SET_SIZE(.immu_exception)
 
 /*
  * fast_trap_done, fast_trap_done_chk_intr:

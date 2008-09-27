@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/machsystm.h>
@@ -40,6 +38,8 @@
 #include <sys/error.h>
 #include <sys/fm/util.h>
 #include <sys/ivintr.h>
+#include <sys/machasi.h>
+#include <sys/mmu.h>
 #include <sys/archsystm.h>
 
 #define	MAX_CE_FLTS		10
@@ -212,6 +212,7 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 	int expected = DDI_FM_ERR_UNEXPECTED;
 	uint64_t exec_mode;
 	uint8_t u_spill_fill;
+	int u_kill = 1;
 
 	mcpup = &(CPU->cpu_m);
 
@@ -277,8 +278,29 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 				break;
 			}
 			/*
-			 * Fall through, precise fault also need to check
-			 * to see if it was protected.
+			 * Context Register Parity - for reload of secondary
+			 * context register, see nonresumable_error.  Note
+			 * that 'size' for CRP denotes a sense of version,
+			 * so if it's out of range, then just let it fall
+			 * through and be processed later.
+			 */
+			if ((errh_flt.errh_er.attr & ERRH_ATTR_ASI) &&
+			    (errh_flt.errh_er.asi == ASI_MMU_CTX) &&
+			    (errh_flt.errh_er.addr >= MMU_PCONTEXT0) &&
+			    (errh_flt.errh_er.addr + errh_flt.errh_er.sz <=
+			    MMU_SCONTEXT1 + sizeof (uint64_t))) {
+
+				if (aflt->flt_tl)	/* TL>0, so panic */
+					break;
+
+				u_kill = 0;		/* do not terminate */
+				break;
+			}
+			/*
+			 * All other PR_NRE fall through in order to
+			 * check for protection.  The list can include
+			 * ERRH_ATTR_FRF, ERRH_ATTR_IRF, ERRH_ATTR_MEM,
+			 * and ERRH_ATTR_PIO.
 			 */
 			/*FALLTHRU*/
 
@@ -318,7 +340,7 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 			 * for fatal errors.
 			 */
 			if (aflt->flt_class == BUS_FAULT) {
-				aflt->flt_addr = errh_flt.errh_er.ra;
+				aflt->flt_addr = errh_flt.errh_er.addr;
 				errh_cpu_run_bus_error_handlers(aflt,
 				    expected);
 			}
@@ -367,13 +389,13 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 			errh_page_retire(&errh_flt, PR_UE);
 
 		/*
-		 * If we queued an error and the it was in user mode, or
-		 * protected by t_lofault, or user_spill_fill is set, we
-		 * set AST flag so the queue will be drained before
-		 * returning to user mode.
+		 * If we queued an error for a thread that should terminate
+		 * and it was in user mode or protected by t_lofault, set AST
+		 * flag so the queue will be drained before returning to user
+		 * mode.  Note that user threads can be killed via pcb_flags.
 		 */
-		if (!aflt->flt_priv || aflt->flt_prot == AFLT_PROT_COPY ||
-		    u_spill_fill) {
+		if (u_kill && (!aflt->flt_priv ||
+		    aflt->flt_prot == AFLT_PROT_COPY || u_spill_fill)) {
 			int pcb_flag = 0;
 
 			if (aflt->flt_class == CPU_FAULT)
@@ -524,7 +546,7 @@ cpu_async_log_err(void *flt)
 			 * If we are going to panic, scrub the page first
 			 */
 			if (errh_fltp->cmn_asyncflt.flt_panic)
-				mem_scrub(errh_fltp->errh_er.ra,
+				mem_scrub(errh_fltp->errh_er.addr,
 				    errh_fltp->errh_er.sz);
 		}
 		break;
@@ -580,7 +602,7 @@ cpu_ue_log_err(struct async_flt *aflt)
 static void
 errh_page_retire(errh_async_flt_t *errh_fltp, uchar_t flag)
 {
-	uint64_t flt_real_addr_start = errh_fltp->errh_er.ra;
+	uint64_t flt_real_addr_start = errh_fltp->errh_er.addr;
 	uint64_t flt_real_addr_end = flt_real_addr_start +
 	    errh_fltp->errh_er.sz - 1;
 	int64_t current_addr;

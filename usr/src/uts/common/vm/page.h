@@ -779,7 +779,7 @@ int	page_mem_avail(pgcnt_t);
 int	page_reclaim_mem(pgcnt_t, pgcnt_t, int);
 
 void page_set_props(page_t *, uint_t);
-void page_clr_all_props(page_t *);
+void page_clr_all_props(page_t *, int);
 int page_clear_lck_cow(page_t *, int);
 
 kmutex_t	*page_vnode_mutex(struct vnode *);

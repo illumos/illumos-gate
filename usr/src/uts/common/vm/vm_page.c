@@ -620,7 +620,7 @@ add_physmem(
 		 * initialize other fields in the page_t
 		 */
 		PP_SETFREE(pp);
-		page_clr_all_props(pp);
+		page_clr_all_props(pp, 0);
 		PP_SETAGED(pp);
 		pp->p_offset = (u_offset_t)-1;
 		pp->p_next = pp;
@@ -2653,7 +2653,7 @@ page_free(page_t *pp, int dontneed)
 	PP_SETFREE(pp);
 	ASSERT(pp->p_vnode == NULL || !IS_VMODSORT(pp->p_vnode) ||
 	    !hat_ismod(pp));
-	page_clr_all_props(pp);
+	page_clr_all_props(pp, 0);
 	ASSERT(!hat_page_getshare(pp));
 
 	/*
@@ -2794,7 +2794,7 @@ page_free_pages(page_t *pp)
 		ASSERT(tpp->p_szc == szc);
 
 		PP_SETFREE(tpp);
-		page_clr_all_props(tpp);
+		page_clr_all_props(tpp, 0);
 		PP_SETAGED(tpp);
 		tpp->p_offset = (u_offset_t)-1;
 		ASSERT(tpp->p_next == tpp);
@@ -3136,7 +3136,7 @@ page_destroy_pages(page_t *pp)
 		ASSERT(tpp->p_szc == szc);
 
 		PP_SETFREE(tpp);
-		page_clr_all_props(tpp);
+		page_clr_all_props(tpp, 0);
 		PP_SETAGED(tpp);
 		ASSERT(tpp->p_next == tpp);
 		ASSERT(tpp->p_prev == tpp);
@@ -3511,7 +3511,7 @@ page_do_hashout(page_t *pp)
 		page_vpsub(&vp->v_pages, pp);
 
 	pp->p_hash = NULL;
-	page_clr_all_props(pp);
+	page_clr_all_props(pp, 1);
 	PP_CLRSWAP(pp);
 	pp->p_vnode = NULL;
 	pp->p_offset = (u_offset_t)-1;
@@ -4526,7 +4526,7 @@ page_do_relocate_hash(page_t *new, page_t *old)
 	old->p_vnode = NULL;
 	PP_CLRSWAP(old);
 	old->p_offset = (u_offset_t)-1;
-	page_clr_all_props(old);
+	page_clr_all_props(old, 1);
 
 	/*
 	 * Wake up processes waiting for this page.  The page's
@@ -4872,7 +4872,7 @@ do_page_relocate(
 
 	for (i = 0; i < npgs; i++) {
 		ppattr = hat_page_getattr(targ, (P_MOD | P_REF | P_RO));
-		page_clr_all_props(repl);
+		page_clr_all_props(repl, 0);
 		page_set_props(repl, ppattr);
 		page_relocate_hash(repl, targ);
 
@@ -4883,7 +4883,7 @@ do_page_relocate(
 		 * page_relocate_hash(), they no longer
 		 * have any meaning.
 		 */
-		page_clr_all_props(targ);
+		page_clr_all_props(targ, 0);
 		ASSERT(targ->p_next == targ);
 		ASSERT(targ->p_prev == targ);
 		page_list_concat(&pl, &targ);
@@ -4967,7 +4967,7 @@ page_free_replacement_page(page_t *pplist)
 		pp = pplist;
 		if (pp->p_szc == 0) {
 			page_sub(&pplist, pp);
-			page_clr_all_props(pp);
+			page_clr_all_props(pp, 0);
 			PP_SETFREE(pp);
 			PP_SETAGED(pp);
 			page_list_add(pp, PG_FREE_LIST | PG_LIST_TAIL);
@@ -4981,7 +4981,7 @@ page_free_replacement_page(page_t *pplist)
 			do {
 				ASSERT(PAGE_EXCL(tpp));
 				ASSERT(!hat_page_is_mapped(tpp));
-				page_clr_all_props(pp);
+				page_clr_all_props(tpp, 0);
 				PP_SETFREE(tpp);
 				PP_SETAGED(tpp);
 			} while ((tpp = tpp->p_next) != pp);
@@ -6045,9 +6045,25 @@ page_set_props(page_t *pp, uint_t flags)
 	pp->p_nrm |= (uchar_t)flags;
 }
 
+extern void mach_sync_icache_pp(page_t *);
+#pragma weak mach_sync_icache_pp
+
+/*
+ * Flush I-cache if the page is being reassigned.  The hashout flag is
+ * set when a page has been removed from a hash chain (i.e. vnode
+ * pages). If the page stays on the hash chain there is a chance it
+ * will be re-used, therefore there is no need to flush the
+ * I-cache. However, if the page is being removed from a hash chain
+ * then the page can be used for any new purpose, and the I-cache must
+ * be flushed.
+ */
+/* ARGSUSED */
 void
-page_clr_all_props(page_t *pp)
+page_clr_all_props(page_t *pp, int hashout)
 {
+	if (&mach_sync_icache_pp != NULL && hashout) {
+		mach_sync_icache_pp(pp);
+	}
 	pp->p_nrm = 0;
 }
 

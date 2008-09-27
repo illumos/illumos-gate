@@ -34,8 +34,6 @@
 #ifndef _VM_MACH_SFMMU_H
 #define	_VM_MACH_SFMMU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/x_call.h>
 #include <sys/hypervisor_api.h>
 
@@ -72,13 +70,13 @@ struct hv_tsb_block {
  * Input:
  * cnum     = cnum
  * is_shctx = sfmmu private/shared flag (0: private, 1: shared)
+ * tmp2 is only used in the sun4u version of this macro
  */
 #define	SET_SECCTX(cnum, is_shctx, tmp1, tmp2, label)			\
 	mov	MMU_SCONTEXT, tmp1;					\
 	movrnz	is_shctx, MMU_SCONTEXT1, tmp1;				\
-	sethi   %hi(FLUSH_ADDR), tmp2;					\
 	stxa    cnum, [tmp1]ASI_MMU_CTX;  /* set 2nd ctx reg. */	\
-	flush   tmp2;							\
+	membar  #Sync;							\
 
 /*
  * This macro is used in the MMU code to check if TL should be lowered from
@@ -311,6 +309,47 @@ struct hv_tsb_block {
 	or	tte, scr2, tte;						\
 	/* CSTYLED */							\
 label/**/1:
+
+/*
+ * Support for non-coherent I$.
+ *
+ * In sun4v we use tte bit 3 as a software flag indicating whether
+ * execute permission is given. IMMU miss traps cause the real execute
+ * permission to be set. sfmmu_ttesync() will see if execute permission
+ * has been set, and then set P_EXEC in page_t. This causes I-cache
+ * flush when the page is freed.
+ *
+ * However, the hypervisor reserves bit 3 as part of a 4-bit page size.
+ * We allow this flag to be set in hme TTE, but never in TSB or TLB.
+ */
+#define	TTE_CLR_SOFTEXEC_ML(tte)	bclr TTE_SOFTEXEC_INT, tte
+#define	TTE_CHK_SOFTEXEC_ML(tte)	andcc tte, TTE_SOFTEXEC_INT, %g0
+
+/*
+ * TTE_SET_EXEC_ML is a macro that updates the exec bit if it is
+ * not already set. Will also set reference bit at the same time.
+ *
+ * Caller must check EXECPRM. Do not call if it is already set in the tte.
+ *
+ * Parameters:
+ * tte      = reg containing tte
+ * ttepa    = physical pointer to tte
+ * tmp1     = tmp reg
+ * label    = temporary label
+ */
+
+#define	TTE_SET_EXEC_ML(tte, ttepa, tmp1, label)			\
+	/* BEGIN CSTYLED */						\
+	/* update execprm bit */					\
+label/**/1:								\
+	or	tte, (TTE_EXECPRM_INT | TTE_REF_INT), tmp1;		\
+	casxa	[ttepa]ASI_MEM, tte, tmp1; 	/* update bits */	\
+	cmp	tte, tmp1;						\
+	bne,a,pn %xcc, label/**/1;					\
+	  mov	tmp1, tte;						\
+	or	tte, (TTE_EXECPRM_INT | TTE_REF_INT), tte;		\
+	/* END CSTYLED */
+
 
 /*
  * TTE_SET_REF_ML is a macro that updates the reference bit if it is

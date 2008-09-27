@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PRIVREGS_H
 #define	_SYS_PRIVREGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* from SunOS psl.h 1.2 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -489,14 +486,20 @@ struct regs {
  */
 #ifndef _ASM
 #define	TSTATE_ICC	((long long)CCR_ICC << TSTATE_CCR_SHIFT)
+#define	TSTATE_XCC	((long long)CCR_XCC << TSTATE_CCR_SHIFT)
 #define	TSTATE_IC	((long long)CCR_IC << TSTATE_CCR_SHIFT)
 #define	TSTATE_IV	((long long)CCR_IV << TSTATE_CCR_SHIFT)
+#define	TSTATE_IN	((long long)CCR_IN << TSTATE_CCR_SHIFT)
 #define	TSTATE_XV	((long long)CCR_XV << TSTATE_CCR_SHIFT)
+#define	TSTATE_XZ	((long long)CCR_XZ << TSTATE_CCR_SHIFT)
 #else
 #define	TSTATE_ICC	(CCR_ICC << TSTATE_CCR_SHIFT)
+#define	TSTATE_XCC	(CCR_XCC << TSTATE_CCR_SHIFT)
 #define	TSTATE_IC	(CCR_IC << TSTATE_CCR_SHIFT)
 #define	TSTATE_IV	(CCR_IV << TSTATE_CCR_SHIFT)
+#define	TSTATE_IN	(CCR_IN << TSTATE_CCR_SHIFT)
 #define	TSTATE_XV	(CCR_XV << TSTATE_CCR_SHIFT)
+#define	TSTATE_XZ	(CCR_XZ << TSTATE_CCR_SHIFT)
 #endif
 #define	TSTATE_V8_UBITS (TSTATE_ICC | TSTATE_PEF)
 

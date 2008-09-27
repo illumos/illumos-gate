@@ -431,7 +431,9 @@ XMODS		+=
 #
 #	cpu modules
 #
-CPU_KMODS	+= generic niagara niagara2 vfalls
+CPU_KMODS	+= generic niagara niagara2 vfalls rock
+
+LINT_CPU_KMODS	+= generic rock
 
 #
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):
@@ -439,3 +441,4 @@ CPU_KMODS	+= generic niagara niagara2 vfalls
 PCBE_KMODS	+= niagara_pcbe
 PCBE_KMODS	+= niagara2_pcbe
 PCBE_KMODS	+= vfalls_pcbe
+PCBE_KMODS	+= rock_pcbe

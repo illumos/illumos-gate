@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_AUXV_SPARC_H
 #define	_SYS_AUXV_SPARC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,7 +34,7 @@ extern "C" {
  * Flags used to describe various instruction set extensions available
  * on different SPARC processors.
  *
- * [The first three are legacy descriptions.]
+ * [The first four are legacy descriptions.]
  */
 #define	AV_SPARC_MUL32	0x0001	/* 32x32-bit smul/umul is efficient */
 #define	AV_SPARC_DIV32	0x0002	/* 32x32-bit sdiv/udiv is efficient */
@@ -47,12 +45,17 @@ extern "C" {
 #define	AV_SPARC_VIS2	0x0040	/* VIS2 instruction set supported */
 #define	AV_SPARC_ASI_BLK_INIT	0x0080	/* ASI_BLK_INIT_xxx ASI */
 #define	AV_SPARC_FMAF	0x0100	/* Fused Multiply-Add */
+#define	AV_SPARC_FMAU	0x0200  /* Unfused Multiply-Add */
+#define	AV_SPARC_VIS3	0x0400  /* VIS3 instruction set extensions */
+#define	AV_SPARC_HPC	0x0800  /* High Performance Computing insns */
+#define	AV_SPARC_RANDOM	0x1000  /* random instruction */
+#define	AV_SPARC_TRANS	0x2000  /* transactions supported */
 #define	AV_SPARC_FJFMAU	0x4000	/* Fujitsu Unfused Multiply-Add */
 #define	AV_SPARC_IMA	0x8000	/* Integer Multiply-add */
 
 #define	FMT_AV_SPARC	\
 	"\20" \
-	"\20ima\17fjfmau\16-\15-\14-\13-\12-\11fmaf" \
+	"\20ima\17fjfmau\16trans\15random\14hpc\13vis3\12fmau\11fmaf" 	\
 	"\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
 
 /*

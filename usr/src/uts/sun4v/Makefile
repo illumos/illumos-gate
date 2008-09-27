@@ -305,7 +305,7 @@ globallint:
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 lint:	lintlib .WAIT modlintlib .WAIT $(SPARC_LINTS) $(LINT_DEPS) \
-	$(IMPLEMENTATIONS)
+	$(IMPLEMENTATIONS) $(LINT_CPU_KMODS)
 
 # EXPORT DELETE START
 

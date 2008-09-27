@@ -885,7 +885,7 @@ install_kmem64_tte()
 	PRM_DEBUG(kmem64_pabase);
 	PRM_DEBUG(kmem64_szc);
 	sfmmu_memtte(&tte, kmem64_pabase >> MMU_PAGESHIFT,
-	    PROC_DATA | HAT_NOSYNC, kmem64_szc);
+	    PROC_DATA | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC, kmem64_szc);
 	PRM_DEBUG(tte.ll);
 	(void) sprintf(b, kmem64_obp_str,
 	    kmem64_base, kmem64_end, TTE_PAGEMASK(kmem64_szc), tte.ll);
@@ -2786,6 +2786,8 @@ char obp_tte_str[] =
 	"h# %p constant KCONTEXT "
 	"h# %p constant KHATID "
 	"h# %x constant ASI_MEM "
+	"h# %x constant SOFTEXEC "
+	"h# %x constant EXECPRM "
 
 	": PHYS-X@ ( phys -- data ) "
 	"   ASI_MEM spacex@ "
@@ -2888,7 +2890,11 @@ char obp_tte_str[] =
 	"         ?dup  if                    ( addr sfmmup hmeblkp ) "
 	"            nip swap HBLK_TO_TTEP    ( ttep ) "
 	"            dup TTE_IS_VALID  if     ( valid-ttep ) "
-	"               PHYS-X@ true          ( tte-data true ) "
+	"               PHYS-X@               ( tte-data ) "
+	"               dup SOFTEXEC and 0> if  ( tte-data ) "
+	"                 SOFTEXEC - EXECPRM or ( tte-data ) "
+	"               then                    ( tte-data ) "
+	"               true                  ( tte-data true ) "
 	"            else                     ( invalid-tte ) "
 	"               drop false            ( false ) "
 	"            then                     ( false | tte-data true ) "
@@ -2938,7 +2944,9 @@ create_va_to_tte(void)
 	    KHMEHASH_SZ,
 	    KCONTEXT,
 	    KHATID,
-	    ASI_MEM);
+	    ASI_MEM,
+	    icache_is_coherent ? 0 : TTE_SOFTEXEC_INT,
+	    TTE_EXECPRM_INT);
 	prom_interpret(bp, 0, 0, 0, 0, 0);
 
 	kobj_free(bp, MMU_PAGESIZE);

@@ -112,6 +112,7 @@ typedef struct sf_scd sf_scd_t;
 #define	P_TNC	0x10		/* non-caching is temporary bit */
 #define	P_KPMS	0x20		/* kpm mapped small (vac alias prevention) */
 #define	P_KPMC	0x40		/* kpm conflict page (vac alias prevention) */
+#define	P_EXEC	0x80		/* execution reference (I-cache filled) */
 
 #define	PP_GENERIC_ATTR(pp)	((pp)->p_nrm & (P_MOD | P_REF | P_RO))
 #define	PP_ISMOD(pp)		((pp)->p_nrm & P_MOD)
@@ -124,6 +125,7 @@ typedef struct sf_scd sf_scd_t;
 #endif
 #define	PP_ISKPMS(pp)		((pp)->p_nrm & P_KPMS)
 #define	PP_ISKPMC(pp)		((pp)->p_nrm & P_KPMC)
+#define	PP_ISEXEC(pp)		((pp)->p_nrm & P_EXEC)
 
 #define	PP_SETMOD(pp)		((pp)->p_nrm |= P_MOD)
 #define	PP_SETREF(pp)		((pp)->p_nrm |= P_REF)
@@ -136,6 +138,7 @@ typedef struct sf_scd sf_scd_t;
 #endif
 #define	PP_SETKPMS(pp)		((pp)->p_nrm |= P_KPMS)
 #define	PP_SETKPMC(pp)		((pp)->p_nrm |= P_KPMC)
+#define	PP_SETEXEC(pp)		((pp)->p_nrm |= P_EXEC)
 
 #define	PP_CLRMOD(pp)		((pp)->p_nrm &= ~P_MOD)
 #define	PP_CLRREF(pp)		((pp)->p_nrm &= ~P_REF)
@@ -147,6 +150,17 @@ typedef struct sf_scd sf_scd_t;
 #endif
 #define	PP_CLRKPMS(pp)		((pp)->p_nrm &= ~P_KPMS)
 #define	PP_CLRKPMC(pp)		((pp)->p_nrm &= ~P_KPMC)
+#define	PP_CLREXEC(pp)		((pp)->p_nrm &= ~P_EXEC)
+
+/*
+ * Support for non-coherent I-cache. If the MD property "coherency"
+ * is set to 0, it means that the I-cache must be flushed in
+ * software. Use the "soft exec" bit in the TTE to detect when a page
+ * has been executed, so that it can be flushed before it is re-used
+ * for another program.
+ */
+#define	TTE_EXECUTED(ttep)						\
+	(TTE_IS_EXECUTABLE(ttep) && TTE_IS_SOFTEXEC(ttep))
 
 /*
  * All shared memory segments attached with the SHM_SHARE_MMU flag (ISM)

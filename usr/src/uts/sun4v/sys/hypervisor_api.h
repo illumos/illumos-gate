@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_HYPERVISOR_API_H
 #define	_SYS_HYPERVISOR_API_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v Hypervisor API
@@ -48,6 +46,7 @@ extern "C" {
 #define	CPU_STICK_NPT		0x82
 #define	MMU_MAP_ADDR		0x83
 #define	MMU_UNMAP_ADDR		0x84
+#define	MMU_MAP_TTE		0x86
 
 #define	CORE_TRAP		0xff
 
@@ -111,6 +110,8 @@ extern "C" {
 
 #define	HV_MEM_SCRUB		0x31
 #define	HV_MEM_SYNC		0x32
+#define	HV_MEM_IFLUSH		0x33
+#define	HV_MEM_IFLUSH_ALL	0x34
 
 #define	HV_INTR_SEND		0x42
 
@@ -167,6 +168,8 @@ extern "C" {
 #ifdef SET_MMU_STATS
 #define	MMU_STAT_AREA		0xfc
 #endif /* SET_MMU_STATS */
+
+#define	HV_TM_ENABLE		0x180
 
 #define	HV_RA2PA		0x200
 #define	HV_HPRIV		0x201
@@ -314,8 +317,9 @@ struct mmu_stat {
 /*
  * DMA sync parameter definitions
  */
-#define	HVIO_DMA_SYNC_DIR_TO_DEV	0x01
-#define	HVIO_DMA_SYNC_DIR_FROM_DEV	0x02
+#define	HVIO_DMA_SYNC_DIR_TO_DEV		0x01
+#define	HVIO_DMA_SYNC_DIR_FROM_DEV		0x02
+#define	HVIO_DMA_SYNC_DIR_NO_ICACHE_FLUSH	0x04
 
 /*
  * LDC Channel States
@@ -350,6 +354,10 @@ extern uint64_t hv_mem_scrub(uint64_t real_addr, uint64_t length,
     uint64_t *scrubbed_len);
 extern uint64_t hv_mem_sync(uint64_t real_addr, uint64_t length,
     uint64_t *flushed_len);
+extern uint64_t hv_mem_iflush(uint64_t real_addr, uint64_t length,
+    uint64_t *flushed_len);
+extern uint64_t hv_mem_iflush_all(void);
+extern uint64_t hv_tm_enable(uint64_t enable);
 
 extern uint64_t hv_service_recv(uint64_t s_id, uint64_t buf_pa,
     uint64_t size, uint64_t *recv_bytes);

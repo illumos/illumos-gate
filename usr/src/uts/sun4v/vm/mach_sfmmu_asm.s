@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SFMMU primitives.  These primitives should only be used by sfmmu
@@ -241,10 +239,8 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	wrpr	%g1, PSTATE_IE, %pstate		/* disable interrupts */
 1:
 	mov	MMU_SCONTEXT, %o1
-	sethi	%hi(FLUSH_ADDR), %o4
 	stxa	%o0, [%o1]ASI_MMU_CTX		/* set 2nd context reg. */
-	flush	%o4
-
+	membar	#Sync
         /*
          * if the routine is entered with intr enabled, then enable intr now.
          * otherwise, keep intr disabled, return without enabing intr.

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <vm/hat.h>
@@ -61,6 +59,7 @@
 #include <sys/reboot.h>
 #include <sys/kdi.h>
 #include <sys/hypervisor_api.h>
+#include <sys/hsvc.h>
 
 /*
  * External routines and data structures
@@ -169,7 +168,7 @@ sfmmu_remap_kernel(void)
 		prom_panic("can't find kernel text pfn");
 	pfn &= TTE_PFNMASK(TTE4M);
 
-	attr = PROC_TEXT | HAT_NOSYNC;
+	attr = PROC_TEXT | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC;
 	flags = HAT_LOAD_LOCK | SFMMU_NO_TSBLOAD;
 	sfmmu_memtte(&ktext_tte, pfn, attr, TTE4M);
 	/*
@@ -185,7 +184,7 @@ sfmmu_remap_kernel(void)
 		prom_panic("can't find kernel data pfn");
 	pfn &= TTE_PFNMASK(TTE4M);
 
-	attr = PROC_DATA | HAT_NOSYNC;
+	attr = PROC_DATA | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC;
 	sfmmu_memtte(&kdata_tte, pfn, attr, TTE4M);
 	/*
 	 * We set the lock bit in the tte to lock the translation in
@@ -210,7 +209,7 @@ sfmmu_remap_kernel(void)
 		ASSERT(tsbsz >= MMU_PAGESIZE4M);
 		ASSERT(IS_P2ALIGNED(tsbsz, tsbsz));
 		ASSERT(IS_P2ALIGNED(va, tsbsz));
-		attr = PROC_DATA | HAT_NOSYNC;
+		attr = PROC_DATA | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC;
 		while (tsbsz != 0) {
 			ASSERT(i < MAX_BIGKTSB_TTES);
 			pfn = va_to_pfn(va);
@@ -294,7 +293,8 @@ kdi_tlb_page_lock(caddr_t va, int do_dtlb)
 	pfn_t pfn = va_to_pfn(va);
 	uint64_t ret;
 
-	sfmmu_memtte(&tte, pfn, (PROC_TEXT | HAT_NOSYNC), TTE8K);
+	sfmmu_memtte(&tte, pfn, PROC_TEXT | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC,
+	    TTE8K);
 	ret = hv_mmu_map_perm_addr(va, KCONTEXT, *(uint64_t *)&tte,
 	    MAP_ITLB | (do_dtlb ? MAP_DTLB : 0));
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* common code with bug fixes from original version in trap.c */
 
@@ -174,7 +172,7 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 	if ((op3 >> 4) & 1) {
 		if (immflg) {
 			asi = (uint_t)(rp->r_tstate >> TSTATE_ASI_SHIFT) &
-					TSTATE_ASI_MASK;
+			    TSTATE_ASI_MASK;
 		} else {
 			asi = (inst >> 5) & 0xff;
 		}
@@ -212,10 +210,11 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 		    (void *)rp->r_pc, inst);
 		printf("type %s", (((inst >> 21) & 1) ? "st" : "ld"));
 		if (((inst >> 21) & 1) == 0)
-		    printf(" %s", (((inst >> 22) & 1) ? "signed" : "unsigned"));
+			printf(" %s", (((inst >> 22) & 1) ?
+			    "signed" : "unsigned"));
 		printf(" asi 0x%x size %d immflg %d\n", asi, sz, immflg);
 		printf("rd = %d, op3 = 0x%x, rs1 = %d, rs2 = %d, imm13=0x%x\n",
-			rd, op3, rs1, rs2, (inst & 0x1fff));
+		    rd, op3, rs1, rs2, (inst & 0x1fff));
 	}
 
 	(void) flush_user_windows_to_stack(NULL);
@@ -283,10 +282,10 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 					}
 					if (sz >= 8)
 						_fp_read_pdreg(
-							&data.l[0], rd);
+						    &data.l[0], rd);
 					if (sz == 16)
 						_fp_read_pdreg(
-							&data.l[1], rd+1);
+						    &data.l[1], rd+1);
 				}
 			} else {
 				if (fsrflg) {
@@ -298,7 +297,8 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 					if (sz == 4) {
 						data.i[0] = 0;
 						data.i[1] =
-					    (unsigned)fp->fpu_fr.fpu_regs[rd];
+						    (unsigned)fp->
+						    fpu_fr.fpu_regs[rd];
 					}
 					if (sz >= 8)
 						data.l[0] =
@@ -504,10 +504,10 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 						    (unsigned *)&data.i[1], rd);
 					if (sz >= 8)
 						_fp_write_pdreg(
-							&data.l[0], rd);
+						    &data.l[0], rd);
 					if (sz == 16)
 						_fp_write_pdreg(
-							&data.l[1], rd+1);
+						    &data.l[1], rd+1);
 				}
 			} else {
 				if (fsrflg) {
@@ -515,13 +515,13 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 				} else {
 					if (sz == 4)
 						fp->fpu_fr.fpu_regs[rd] =
-							(unsigned)data.i[1];
+						    (unsigned)data.i[1];
 					if (sz >= 8)
 						fp->fpu_fr.fpu_dregs[rd] =
-							data.l[0];
+						    data.l[0];
 					if (sz == 16)
 						fp->fpu_fr.fpu_dregs[rd+1] =
-							data.l[1];
+						    data.l[1];
 				}
 			}
 		} else {
@@ -590,7 +590,7 @@ simulate_lddstd(struct regs *rp, caddr_t *badaddr)
 	if ((op3 >> 4) & 1) {		/* is this LDDA/STDA? */
 		if (immflg) {
 			asi = (uint_t)(rp->r_tstate >> TSTATE_ASI_SHIFT) &
-					TSTATE_ASI_MASK;
+			    TSTATE_ASI_MASK;
 		} else {
 			asi = (inst >> 5) & 0xff;
 		}
@@ -756,6 +756,88 @@ simulate_popc(struct regs *rp, caddr_t *badaddr, uint_t inst)
 }
 
 /*
+ * simulate mulscc
+ */
+static int
+simulate_mulscc(struct regs *rp, caddr_t *badaddr, uint_t inst)
+{
+	uint32_t	s1, s2;
+	uint32_t	c, d, v;
+	uint_t		rd, rs1;
+	int64_t		d64;
+	uint64_t	ud64;
+	uint64_t	drs1;
+
+	(void) flush_user_windows_to_stack(NULL);
+
+	if ((inst >> 13) & 1) {		/* immediate */
+		d64 = inst & 0x1fff;
+		d64 <<= 51;		/* sign extend it */
+		d64 >>= 51;
+	} else {
+		uint_t		rs2;
+		uint64_t	drs2;
+
+		if (inst & 0x1fe0) {
+			return (SIMU_ILLEGAL);
+		}
+		rs2 = inst & 0x1f;
+		if (getreg(rp, rs2, &drs2, badaddr)) {
+			return (SIMU_FAULT);
+		}
+		d64 = (int64_t)drs2;
+	}
+
+	rs1 = (inst >> 14) & 0x1f;
+	if (getreg(rp, rs1, &drs1, badaddr)) {
+		return (SIMU_FAULT);
+	}
+	/* icc.n xor icc.v */
+	s1 = ((rp->r_tstate & TSTATE_IN) >> (TSTATE_CCR_SHIFT + 3)) ^
+	    ((rp->r_tstate & TSTATE_IV) >> (TSTATE_CCR_SHIFT + 1));
+	s1 = (s1 << 31) | (((uint32_t)drs1) >> 1);
+
+	if (rp->r_y & 1) {
+		s2 = (uint32_t)d64;
+	} else {
+		s2 = 0;
+	}
+	d = s1 + s2;
+
+	ud64 = (uint64_t)d;
+
+	/* set the icc flags */
+	v = (s1 & s2 & ~d) | (~s1 & ~s2 & d);
+	c = (s1 & s2) | (~d & (s1 | s2));
+	rp->r_tstate &= ~TSTATE_ICC;
+	rp->r_tstate |= (uint64_t)((c >> 31) & 1) << (TSTATE_CCR_SHIFT + 0);
+	rp->r_tstate |= (uint64_t)((v >> 31) & 1) << (TSTATE_CCR_SHIFT + 1);
+	rp->r_tstate |= (uint64_t)(d ? 0 : 1) << (TSTATE_CCR_SHIFT + 2);
+	rp->r_tstate |= (uint64_t)((d >> 31) & 1) << (TSTATE_CCR_SHIFT + 3);
+
+	if (rp->r_tstate & TSTATE_IC) {
+		ud64 |= (1ULL << 32);
+	}
+
+	/* set the xcc flags */
+	rp->r_tstate &= ~TSTATE_XCC;
+	if (ud64 == 0) {
+		rp->r_tstate |= TSTATE_XZ;
+	}
+
+	rd = (inst >> 25) & 0x1f;
+	if (putreg(&ud64, rp, rd, badaddr)) {
+		return (SIMU_FAULT);
+	}
+
+	d64 = (drs1 << 32) | (uint32_t)rp->r_y;
+	d64 >>= 1;
+	rp->r_y = (uint32_t)d64;
+
+	return (SIMU_SUCCESS);
+}
+
+/*
  * simulate unimplemented instructions (popc, ldqf{a}, stqf{a})
  */
 int
@@ -833,6 +915,8 @@ simulate_unimp(struct regs *rp, caddr_t *badaddr)
 		return (simulate_popc(rp, badaddr, inst));
 	} else if (optype == 3 && op3 == IOP_V8_POPC) {
 		return (SIMU_ILLEGAL);
+	} else if (optype == OP_V8_ARITH && op3 == IOP_V8_MULScc) {
+		return (simulate_mulscc(rp, badaddr, inst));
 	}
 
 	if (optype == OP_V8_LDSTR) {
@@ -1317,7 +1401,7 @@ instr_size(struct regs *rp, caddr_t *addrp, enum seg_rw rdwr)
 
 	if (immflg)
 		asi = (uint_t)((rp->r_tstate >> TSTATE_ASI_SHIFT) &
-				TSTATE_ASI_MASK);
+		    TSTATE_ASI_MASK);
 	else
 		asi = (inst >> 5) & 0xff;
 

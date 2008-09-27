@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PTE_H
 #define	_SYS_PTE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/types.h>
@@ -354,6 +352,23 @@ typedef union {
 
 #define	TTE_GET_LOFLAGS(ttep, flags)	((ttep)->tte_intlo & flags)
 
+#endif /* !_ASM */
+
+/*
+ * There is no support for non-coherent I-cache in sun4u
+ */
+#define	TTE_SOFTEXEC_INT	0x00000000
+#ifndef _ASM
+#ifdef lint
+/* fix lint warnings about constant conditionals and empty if */
+#define	TTE_IS_SOFTEXEC(ttep)	TTE_IS_EXECUTABLE(ttep)
+#define	TTE_SET_SOFTEXEC(ttep)	TTE_SET_EXEC(ttep)
+#define	TTE_CLR_SOFTEXEC(ttep)	TTE_CLR_EXEC(ttep)
+#else
+#define	TTE_IS_SOFTEXEC(ttep)	(0)
+#define	TTE_SET_SOFTEXEC(ttep)
+#define	TTE_CLR_SOFTEXEC(ttep)
+#endif	/* lint */
 #endif /* !_ASM */
 
 #ifdef	__cplusplus

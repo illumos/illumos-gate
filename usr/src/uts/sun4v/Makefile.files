@@ -175,6 +175,7 @@ SN1_BRAND_OBJS		= sn1_brand.o sn1_brand_asm.o
 #
 NI_PCBE_OBJS	= niagara_pcbe.o
 N2_PCBE_OBJS	= niagara2_pcbe.o
+RK_PCBE_OBJS	= rock_pcbe.o
 
 #
 #			cpu modules
@@ -185,6 +186,7 @@ NIAGARACPU_OBJS = niagara.o niagara_copy.o common_asm.o niagara_perfctr.o
 NIAGARACPU_OBJS += niagara_asm.o atomic.o
 NIAGARA2CPU_OBJS = niagara2.o niagara_copy.o common_asm.o niagara_perfctr.o
 NIAGARA2CPU_OBJS += niagara2_asm.o atomic.o
+ROCKCPU_OBJS = rock.o rock_copy.o common_asm.o rock_atomic.o rock_asm.o 
 
 #
 #			platform module

@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * UNIX machine dependent virtual memory support.
  */
@@ -54,6 +52,7 @@
 #include <sys/stack.h>
 #include <sys/atomic.h>
 #include <sys/promif.h>
+#include <sys/hsvc.h>
 
 uint_t page_colors = 0;
 uint_t page_colors_mask = 0;
@@ -788,4 +787,97 @@ exec_get_spslew(void)
 {
 	uint_t spcolor = atomic_inc_32_nv(&sp_current_color);
 	return ((size_t)((spcolor & sp_color_mask) * SA(sp_color_stride)));
+}
+
+/*
+ * This flag may be set via /etc/system to force the synchronization
+ * of I-cache with memory after every bcopy.  The default is 0, meaning
+ * that there is no need for an I-cache flush after each bcopy.  This
+ * flag is relevant only on platforms that have non-coherent I-caches.
+ */
+uint_t	force_sync_icache_after_bcopy = 0;
+
+/*
+ * This flag may be set via /etc/system to force the synchronization
+ * of I-cache to memory after every DMA. The default is 0, meaning
+ * that there is no need for an I-cache flush after each dma write to
+ * memory. This flag is relevant only on platforms that have
+ * non-coherent I-caches.
+ */
+uint_t	force_sync_icache_after_dma = 0;
+
+/*
+ * This internal flag enables mach_sync_icache_pa, which is always
+ * called from common code if it is defined. However, not all
+ * platforms support the hv_mem_iflush firmware call.
+ */
+static uint_t	do_mach_sync_icache_pa = 0;
+
+int	hsvc_kdi_mem_iflush_negotiated = B_FALSE;
+
+#define	MEM_IFLUSH_MAJOR	1
+#define	MEM_IFLUSH_MINOR	0
+static hsvc_info_t kdi_mem_iflush_hsvc = {
+	HSVC_REV_1,		/* HSVC rev num */
+	NULL,			/* Private */
+	HSVC_GROUP_MEM_IFLUSH,	/* Requested API Group */
+	MEM_IFLUSH_MAJOR,	/* Requested Major */
+	MEM_IFLUSH_MINOR,	/* Requested Minor */
+	"kdi"			/* Module name */
+};
+
+/*
+ * Setup soft exec mode.
+ * Since /etc/system is read later on init, it
+ * may be used to override these flags.
+ */
+void
+mach_setup_icache(uint_t coherency)
+{
+	int		status;
+	uint64_t	sup_minor;
+
+	if (coherency == 0 && icache_is_coherent) {
+		extern void kdi_flush_caches(void);
+		status = hsvc_register(&kdi_mem_iflush_hsvc, &sup_minor);
+		if (status != 0)
+			cmn_err(CE_PANIC, "I$ flush not implemented on "
+			    "I$ incoherent system");
+		hsvc_kdi_mem_iflush_negotiated = B_TRUE;
+		kdi_flush_caches();
+		icache_is_coherent = 0;
+		do_mach_sync_icache_pa = 1;
+	}
+}
+
+/*
+ * Flush specified physical address range from I$ via hv_mem_iflush interface
+ */
+/*ARGSUSED*/
+void
+mach_sync_icache_pa(caddr_t paddr, size_t size)
+{
+	if (do_mach_sync_icache_pa) {
+		uint64_t pa = (uint64_t)paddr;
+		uint64_t sz = (uint64_t)size;
+		uint64_t i, flushed;
+
+		for (i = 0; i < sz; i += flushed) {
+			if (hv_mem_iflush(pa + i, sz - i, &flushed) != H_EOK) {
+				cmn_err(CE_PANIC, "Flushing the Icache failed");
+				break;
+			}
+		}
+	}
+}
+
+/*
+ * Flush the page if it has been marked as executed
+ */
+/*ARGSUSED*/
+void
+mach_sync_icache_pp(page_t *pp)
+{
+	if (PP_ISEXEC(pp))
+		mach_sync_icache_pa((caddr_t)ptob(pp->p_pagenum), PAGESIZE);
 }

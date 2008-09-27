@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
 #include <sys/asm_linkage.h>
@@ -329,7 +327,21 @@ kdi_trap_vatotte(void)
 	ldxa	[%g2]ASI_MEM, %g1
 	brgez,a	%g1, 4f
 	clr	%g1
-4:	ba,a	6f
+4:
+	/*
+	 * If soft execute bit is set, make sure HW execute permission
+	 * is also set. But, clear soft execute bit before giving tte to
+	 * the caller.
+	 */
+	TTE_CHK_SOFTEXEC_ML(%g1)
+	bz,pt	%icc, 6f
+	  andcc %g1, TTE_EXECPRM_INT, %g0
+	bnz,pt	%icc, 7f
+	  nop
+	TTE_SET_EXEC_ML(%g1, %g2, %g4, kdi_trap_vatotte)
+7:
+	TTE_CLR_SOFTEXEC_ML(%g1)
+	ba,a	6f
 
 5:	add	%g3, 1, %g3
 	set	mmu_hashcnt, %g4

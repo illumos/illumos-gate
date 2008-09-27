@@ -250,6 +250,7 @@ label:									;\
 	 */								;\
 	sllx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	ldxa	[ttepa]ASI_MEM, tte					;\
+	TTE_CLR_SOFTEXEC_ML(tte)					;\
 	srlx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
 	add	tsbep, TSBE_TAG, tmp1					;\
@@ -372,6 +373,7 @@ label:									;\
 #define	TSB_UPDATE(tsbep, tteva, tagtarget, tmp1, tmp2, label)		\
 	/* can't rd tteva after locking tsb because it can tlb miss */	;\
 	ldx	[tteva], tteva			/* load tte */		;\
+	TTE_CLR_SOFTEXEC_ML(tteva)					;\
 	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
 	add	tsbep, TSBE_TAG, tmp1					;\
@@ -471,8 +473,7 @@ label/**/2:
 	nop				/* for perf reasons */		;\
 	or	tmp, dest, dest		/* contents of patched value */
 
-
-#endif (lint)
+#endif /* lint */
 
 
 #if defined (lint)
@@ -1398,11 +1399,8 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	flush	%o0
 	add     %o0, I_SIZE, %o0
 	st      %o1, [%o0]		! nop 4th instruction
-	flush	%o0
-	add     %o0, I_SIZE, %o0
-	st      %o1, [%o0]		! nop 5th instruction
 	retl
-	  flush	%o0
+	flush	%o0
 #endif /* sun4u */
 	SET_SIZE(sfmmu_patch_shctx)
 
@@ -3582,9 +3580,11 @@ tsb_validtte:
 	ba,pt	%xcc, tsb_update_tl1
 	  nop
 4:
-	/* 
-	 * If ITLB miss check exec bit.
-	 * If not set treat as invalid TTE.
+	/*
+	 * ITLB translation was found but execute permission is
+	 * disabled. If we have software execute permission (soft exec
+	 * bit is set), then enable hardware execute permission.
+	 * Otherwise continue with a protection violation.
 	 */
 	cmp     %g7, T_INSTR_MMU_MISS
 	be,pn	%icc, 5f
@@ -3593,9 +3593,11 @@ tsb_validtte:
 	bne,pt %icc, 3f
 	  andcc   %g3, TTE_EXECPRM_INT, %g0	/* check execute bit is set */
 5:
+	bnz,pn %icc, 3f
+	  TTE_CHK_SOFTEXEC_ML(%g3)		/* check soft execute */
 	bz,pn %icc, tsb_protfault
 	  nop
-
+	TTE_SET_EXEC_ML(%g3, %g4, %g7, tsb_lset_exec)
 3:
 	/*
 	 * Set reference bit if not already set
@@ -3638,6 +3640,7 @@ tsb_validtte:
 #endif /* sun4v */
 
 tsb_update_tl1:
+	TTE_CLR_SOFTEXEC_ML(%g3)
 	srlx	%g2, TTARGET_CTX_SHIFT, %g7
 	brz,pn	%g7, tsb_kernel
 #ifdef sun4v

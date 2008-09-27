@@ -230,6 +230,9 @@ mmpropop(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int flags,
 	    flags, name, valuep, lengthp, 0));
 }
 
+extern void mach_sync_icache_pa(caddr_t, size_t);
+#pragma weak mach_sync_icache_pa
+
 static int
 mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 {
@@ -252,8 +255,17 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 				error = EFAULT;
 		} else
 			error = EIO;
-	} else
+	} else {
 		error = uiomove(&mm_map[pageoff], nbytes, rw, uio);
+
+		/*
+		 * In case this has changed executable code,
+		 * non-coherent I-caches must be flushed.
+		 */
+		if (rw != UIO_READ && &mach_sync_icache_pa != NULL) {
+			mach_sync_icache_pa((caddr_t)ptob(pfn), PAGESIZE);
+		}
+	}
 
 	hat_unload(kas.a_hat, mm_map, PAGESIZE, HAT_UNLOAD_UNLOCK);
 	mutex_exit(&mm_lock);

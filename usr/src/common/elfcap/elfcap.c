@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* LINTLIBRARY */
 
@@ -142,11 +140,26 @@ static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
 		AV_SPARC_FMAF, STRDESC("AV_SPARC_FMAF"),
 		STRDESC("FMAF"), STRDESC("fmaf"),
 	},
-	RESERVED_ELFCAP_DESC,				/* 0x00000200 */
-	RESERVED_ELFCAP_DESC,				/* 0x00000400 */
-	RESERVED_ELFCAP_DESC,				/* 0x00000800 */
-	RESERVED_ELFCAP_DESC,				/* 0x00001000 */
-	RESERVED_ELFCAP_DESC,				/* 0x00002000 */
+	{						/* 0x00000200 */
+		AV_SPARC_FMAU, STRDESC("AV_SPARC_FMAU"),
+		STRDESC("FMAU"), STRDESC("fmau"),
+	},
+	{						/* 0x00000400 */
+		AV_SPARC_VIS3, STRDESC("AV_SPARC_VIS3"),
+		STRDESC("VIS3"), STRDESC("vis3"),
+	},
+	{						/* 0x00000800 */
+		AV_SPARC_HPC, STRDESC("AV_SPARC_HPC"),
+		STRDESC("HPC"), STRDESC("hpc"),
+	},
+	{						/* 0x00001000 */
+		AV_SPARC_RANDOM, STRDESC("AV_SPARC_RANDOM"),
+		STRDESC("RANDOM"), STRDESC("random"),
+	},
+	{						/* 0x00002000 */
+		AV_SPARC_TRANS, STRDESC("AV_SPARC_TRANS"),
+		STRDESC("TRANS"), STRDESC("trans"),
+	},
 	{						/* 0x00004000 */
 		AV_SPARC_FJFMAU, STRDESC("AV_SPARC_FJFMAU"),
 		STRDESC("FJFMAU"), STRDESC("fjfmau"),

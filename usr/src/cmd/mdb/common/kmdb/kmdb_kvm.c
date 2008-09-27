@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <kmdb/kmdb_kvm.h>
 #include <kmdb/kvm.h>
 #include <kmdb/kmdb_kdi.h>
@@ -45,6 +43,7 @@
 
 #include <strings.h>
 #include <dlfcn.h>
+#include <sys/kdi_impl.h>
 #include <sys/isa_defs.h>
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
@@ -219,6 +218,7 @@ ssize_t
 kmt_writer(void *buf, size_t nbytes, uint64_t addr)
 {
 	kmt_bcopy(buf, (void *)(uintptr_t)addr, nbytes);
+	mdb.m_kdi->kdi_flush_caches();
 	return (nbytes);
 }
 

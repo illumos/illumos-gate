@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/byteorder.h>
 #include <stdarg.h>
@@ -391,15 +389,15 @@ typedef struct formatmbr {
 	uint32_t op3:6;
 	uint32_t rs1:5;
 	uint32_t i:1;
-	uint32_t undef:6;
-	uint32_t cmask:3;
+	uint32_t undef:5;
+	uint32_t cmask:4;
 	uint32_t mmask:4;
 } formatmbr_t;
 #elif defined(_BIT_FIELDS_LTOH)
 typedef struct formatmbr {
 	uint32_t mmask:4;
-	uint32_t cmask:3;
-	uint32_t undef:6;
+	uint32_t cmask:4;
+	uint32_t undef:5;
 	uint32_t i:1;
 	uint32_t rs1:5;
 	uint32_t op3:6;
@@ -568,8 +566,8 @@ static const char *membar_mmask[4] = {
 	"#LoadLoad", "#StoreLoad", "#LoadStore", "#StoreStore"
 };
 
-static const char *membar_cmask[3] = {
-	"#Lookaside", "#MemIssue", "#Sync"
+static const char *membar_cmask[4] = {
+	"#Lookaside", "#MemIssue", "#Sync", "#Halt"
 };
 
 /* v8 ancillary state register names */
@@ -591,18 +589,18 @@ static const char *v9_asr_names[32] = {
 	"%tick",	"%pc",		"%fprs",	NULL,
 	NULL,		NULL,		NULL,	NULL,
 	NULL,		NULL,		NULL,	NULL,
-	"%pcr",	"%pic",	NULL,	"%gsr",
+	"%pcr",		"%pic",		"%dcr",	"%gsr",
 	"%softint_set",	"%softint_clr",	"%softint",	"%tick_cmpr",
 	"%stick",	"%stick_cmpr",	NULL,	NULL,
-	NULL,		NULL,		NULL,	NULL
+	"%cps",		NULL,		NULL,	NULL
 };
 /*
  * on v9, only certain registers are valid for read or writing
  * these are bitmasks corresponding to which registers are valid in which
  * case
  */
-static const uint32_t v9_asr_rdmask = 0x03cb007d;
-static const uint32_t v9_asr_wrmask = 0x02fb004d;
+static const uint32_t v9_asr_rdmask = 0x13cb007d;
+static const uint32_t v9_asr_wrmask = 0x13fb004d;
 
 /* privledged register names on v9 */
 /* TODO: compat - NULL to %priv_nn */
@@ -617,8 +615,22 @@ static const char *v9_privreg_names[32] = {
 	NULL,	NULL,	NULL,	"%ver"
 };
 
+/* hyper privledged register names on v9 */
+static const char *v9_hprivreg_names[32] = {
+	"%hpstate",	 "%htstate",	"%hrstba",  "%hintp",
+	NULL,	"%htba",	 "%hver",  NULL,
+	NULL,	NULL,	NULL,	NULL,
+	NULL,	NULL,	NULL,	NULL,
+	NULL,	NULL,	NULL,	NULL,
+	NULL,	NULL,	NULL,	NULL,
+	NULL,	NULL,	NULL,	NULL,
+	NULL,	NULL,	NULL,	"%hstick_cmpr"
+};
+
 static const uint32_t v9_pr_rdmask = 0x80017fff;
-static const uint32_t v9_pr_wrmask = 0x00017fef;
+static const uint32_t v9_pr_wrmask = 0x00017fff;
+static const uint32_t v9_hpr_rdmask = 0x8000006f;
+static const uint32_t v9_hpr_wrmask = 0x8000006f;
 
 static const char *prefetch_str[32] = {
 	"#n_reads", "#one_read",
@@ -771,6 +783,7 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	int32_t disp;
 	uint32_t flags = inp->in_data.in_def.in_flags;
 	int octal = ((dhp->dh_flags & DIS_OCTAL) != 0);
+	int chkpt = 0;
 
 	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f2.op, 2);
@@ -807,6 +820,14 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		name = "iprefetch";
 		flags = FLG_RS1(REG_NONE)|FLG_DISP(DISP19);
 	}
+
+	if (f->f2b.op2 == 0x01 && f->f2b.a == 1 &&
+	    f->f2b.p == 0 && f->f2b.cond == 0x8 && f->f2b.cc == 0x01) {
+		name = "chkpt";
+		flags = FLG_RS1(REG_NONE)|FLG_DISP(DISP19);
+		chkpt = 1;
+	}
+
 
 	switch (FLG_DISP_VAL(flags)) {
 	case DISP22:
@@ -845,7 +866,11 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		}
 	}
 
-	(void) snprintf(buf, sizeof (buf), "%s%s%s", name, annul, pred);
+	if (!chkpt) {
+		(void) snprintf(buf, sizeof (buf), "%s%s%s", name, annul, pred);
+	} else {
+		(void) snprintf(buf, sizeof (buf), "%s", name);
+	}
 	prt_name(dhp, buf, 1);
 
 
@@ -858,11 +883,19 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		break;
 
 	case DISP19:
-		bprintf(dhp,
-		    (octal != 0) ? "%s, %s0%-5lo <" : "%s, %s0x%-04lx <",
-		    r,
-		    (disp < 0) ? "-" : "+",
-		    (disp < 0) ? (-disp) : disp);
+		if (!chkpt) {
+			bprintf(dhp,
+			    (octal != 0) ? "%s, %s0%-5lo <" :
+			    "%s, %s0x%-04lx <",
+			    r,
+			    (disp < 0) ? "-" : "+",
+			    (disp < 0) ? (-disp) : disp);
+		} else {
+			bprintf(dhp,
+			    (octal != 0) ? "%s0%-5lo <" : "%s0x%-04lx <",
+			    (disp < 0) ? "-" : "+",
+			    (disp < 0) ? (-disp) : disp);
+		}
 		break;
 
 	case DISP16:
@@ -1271,7 +1304,7 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 			first = 0;
 
-			for (i = 0; i < 4; ++i) {
+			for (i = 0; i < 5; ++i) {
 				if ((f->fmb.cmask & (1L << i)) != 0) {
 					bprintf(dhp, "%s%s",
 					    (first != 0) ? "|" : "",
@@ -1302,12 +1335,13 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		break;
 
 	case 0x29:
-		/*
-		 * NOTE: due to an overlay entry, this only gets executed when
-		 * disassembling v8 instructions
-		 */
-		regstr = psr_str;
-		use_mask = 0;
+		if (v9 != 0) {
+			regstr = v9_hprivreg_names[ridx];
+			mask = v9_hpr_rdmask;
+		} else {
+			regstr = psr_str;
+			use_mask = 0;
+		}
 		break;
 
 	case 0x2a:
@@ -1345,15 +1379,17 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		    == 0)
 			break;
 
-		if (f->f3.rs1 == 0) {
-			name = "mov";
-			pr_rs1 = 0;
-		}
+		if (v9 == 0) {
+			if (f->f3.rs1 == 0) {
+				name = "mov";
+				pr_rs1 = 0;
+			}
 
-		if ((f->f3.i == 0 && f->f3.rs2 == 0) ||
-		    (f->f3.i == 1 && f->f3a.simm13 == 0)) {
-			name = "mov";
-			pr_rs2 = 0;
+			if ((f->f3.i == 0 && f->f3.rs2 == 0) ||
+			    (f->f3.i == 1 && f->f3a.simm13 == 0)) {
+				name = "mov";
+				pr_rs2 = 0;
+			}
 		}
 
 		if (pr_rs1 == 0)
@@ -1382,9 +1418,13 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		break;
 
 	case 0x33:
-		/* NOTE: due to an overlay entry, this is v8 only */
-		regstr = tbr_str;
-		use_mask = 0;
+		if (v9 != 0) {
+			regstr = v9_hprivreg_names[ridx];
+			mask = v9_hpr_wrmask;
+		} else {
+			regstr = tbr_str;
+			use_mask = 0;
+		}
 		break;
 	}
 
@@ -1426,6 +1466,7 @@ fmt_trap(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 	int v9 = ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0);
 	int p_rs1, p_t;
+	char failstr[8] = "fail";
 
 	if (f->ftcc.undef != 0)
 		return (-1);
@@ -1452,12 +1493,24 @@ fmt_trap(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		    (p_rs1 != 0) ? " + " : "",
 		    (p_t != 0) ? reg_names[f->f3.rs2] : "");
 	} else {
+		if ((p_rs1 == 0) && (f->ftcc.immtrap == 0xF)) {
+		(void) strlcat(failstr,
+		    (const char *)&(inp->in_data.in_def.in_name[1]),
+		    sizeof (failstr));
+
+		prt_name(dhp, failstr, 1);
+		bprintf(dhp, "%s%s%s",
+		    (v9 != 0) ? icc_names[f->ftcc2.cc] : "",
+		    (p_rs1 != 0) ? reg_names[f->ftcc2.rs1] : "",
+		    (p_rs1 != 0) ? " + " : "");
+		} else {
 		bprintf(dhp, "%-9s %s%s%s%s0x%x", inp->in_data.in_def.in_name,
 		    (v9 != 0) ? icc_names[f->ftcc2.cc] : "",
 		    (v9 != 0) ? ", " : "",
 		    (p_rs1 != 0) ? reg_names[f->ftcc2.rs1] : "",
 		    (p_rs1 != 0) ? " + " : "",
 		    f->ftcc.immtrap);
+		}
 	}
 
 	return (0);
@@ -1804,9 +1857,17 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		return (0);
 
 	case 0x3b:
-		/* flush */
-		prt_name(dhp, name, 1);
-		prt_address(dhp, instr, 0);
+		if (f->f3.rd == 1) {
+			/* flusha */
+			prt_name(dhp, "flusha", 1);
+			prt_address(dhp, instr, 0);
+			(void) strlcat(dhp->dh_buf, " ", dhp->dh_buflen);
+			prt_asi(dhp, instr);
+		} else {
+			/* flush */
+			prt_name(dhp, name, 1);
+			prt_address(dhp, instr, 0);
+		}
 		return (0);
 
 	case 0x3c:
@@ -1848,7 +1909,14 @@ fmt_regwin(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 int
 fmt_trap_ret(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
-	prt_name(dhp, inp->in_data.in_def.in_name, 0);
+	ifmt_t *f = (ifmt_t *)&instr;
+	prt_name(dhp, inp->in_data.in_def.in_name, 1);
+
+	if (f->f3.rd == 0xf) {
+		/* jpriv */
+		prt_address(dhp, instr, 1);
+	}
+
 	return (0);
 }
 
@@ -2200,7 +2268,8 @@ get_regname(dis_handle_t *dhp, int regset, uint32_t idx)
 		break;
 
 	case REG_FPD:
-		if ((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0)
+		if (((dhp->dh_debug & DIS_DEBUG_COMPAT) == 0) ||
+		    ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0))
 			regname = fdreg_names[idx];
 		else
 			regname = compat_fdreg_names[idx];
@@ -2360,6 +2429,7 @@ prt_aluargs(dis_handle_t *dhp, uint32_t instr, uint32_t flags)
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char *r1, *r2, *r3;
 	int p1, p2, p3;
+	unsigned int opf = 0;
 
 	r1 = get_regname(dhp, FLG_P1_VAL(flags), f->f3.rs1);
 	r2 = get_regname(dhp, FLG_P2_VAL(flags), f->f3.rs2);
@@ -2377,6 +2447,15 @@ prt_aluargs(dis_handle_t *dhp, uint32_t instr, uint32_t flags)
 
 	if (r3 == NULL || r3[0] == '\0')
 		p3 = 0;
+
+	if ((f->fcmp.op == 2) && (f->fcmp.op3 == 0x36) && (f->fcmp.cc != 0))
+		opf = f->fcmp.opf;
+
+	if ((opf == 0x151) || (opf == 0x152)) {
+		(void) strlcat(dhp->dh_buf, r3, dhp->dh_buflen);
+		(void) strlcat(dhp->dh_buf, ", ", dhp->dh_buflen);
+		p3 = 0;
+	}
 
 	if (p1 != 0) {
 		(void) strlcat(dhp->dh_buf, r1, dhp->dh_buflen);

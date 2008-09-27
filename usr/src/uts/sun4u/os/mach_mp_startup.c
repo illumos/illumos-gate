@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/machsystm.h>
 #include <sys/cpu_module.h>
@@ -45,7 +43,6 @@ init_cpu_info(struct cpu *cp)
 	processor_info_t *pi = &cp->cpu_type_info;
 	int cpuid = cp->cpu_id;
 	struct cpu_node *cpunode = &cpunodes[cpuid];
-	char buf[CPU_IDSTRLEN];
 
 	cp->cpu_fpowner = NULL;		/* not used for V9 */
 
@@ -66,19 +63,6 @@ init_cpu_info(struct cpu *cp)
 
 	(void) strcpy(pi->pi_processor_type, "sparcv9");
 	(void) strcpy(pi->pi_fputypes, "sparcv9");
-
-	(void) snprintf(buf, sizeof (buf),
-	    "%s (portid %d impl 0x%x ver 0x%x clock %d MHz)",
-	    cpunode->name, cpunode->portid,
-	    cpunode->implementation, cpunode->version, pi->pi_clock);
-
-	cp->cpu_idstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
-	(void) strcpy(cp->cpu_idstr, buf);
-
-	cmn_err(CE_CONT, "?cpu%d: %s\n", cpuid, cp->cpu_idstr);
-
-	cp->cpu_brandstr = kmem_alloc(strlen(cpunode->name) + 1, KM_SLEEP);
-	(void) strcpy(cp->cpu_brandstr, cpunode->name);
 
 	/*
 	 * StarFire requires the signature block stuff setup here
@@ -188,4 +172,26 @@ mp_cpu_configure(int cpuid)
 	(void) setup_cpu_common(cpuid);
 
 	return (0);
+}
+
+void
+populate_idstr(struct cpu *cp)
+{
+	char buf[CPU_IDSTRLEN];
+	struct cpu_node *cpunode;
+	processor_info_t *pi;
+
+	cpunode = &cpunodes[cp->cpu_id];
+	pi = &cp->cpu_type_info;
+	(void) snprintf(buf, sizeof (buf),
+	    "%s (portid %d impl 0x%x ver 0x%x clock %d MHz)",
+	    cpunode->name, cpunode->portid, cpunode->implementation,
+	    cpunode->version, pi->pi_clock);
+	cp->cpu_idstr = kmem_alloc(strlen(buf) + 1, KM_SLEEP);
+	(void) strcpy(cp->cpu_idstr, buf);
+
+	cp->cpu_brandstr = kmem_alloc(strlen(cpunode->name) + 1, KM_SLEEP);
+	(void) strcpy(cp->cpu_brandstr, cpunode->name);
+
+	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
 }

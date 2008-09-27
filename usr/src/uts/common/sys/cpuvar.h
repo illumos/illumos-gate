@@ -724,6 +724,7 @@ extern void cpu_state_change_notify(int, cpu_setup_t);
 #define	CPU_IDSTRLEN	100
 
 extern void init_cpu_info(struct cpu *);
+extern void populate_idstr(struct cpu *);
 extern void cpu_vm_data_init(struct cpu *);
 extern void cpu_vm_data_destroy(struct cpu *);
 
