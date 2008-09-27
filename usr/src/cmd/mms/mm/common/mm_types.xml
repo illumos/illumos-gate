@@ -30,6 +30,8 @@
 	<mm_drive_string value="9840"/>
 	<mm_drive_string value="T9840B"/>
 	<mm_drive_string value="T9840C"/>
+	<mm_drive_string value="T9940A"/>
+	<mm_drive_string value="T9940B"/>
 	<mm_drive_string value="LTO1"/>
 	<mm_drive_string value="LTO2"/>
 	<mm_drive_string value="LTO3"/>
@@ -38,6 +40,7 @@
     <mm_cartridge_list>
 	<mm_cartridge_string value="DISK"/>
 	<mm_cartridge_string value="9840"/>
+	<mm_cartridge_string value="9940"/>
 	<mm_cartridge_string value="LTO1"/>
 	<mm_cartridge_string value="LTO2"/>
 	<mm_cartridge_string value="LTO3"/>
@@ -61,8 +64,7 @@
 		</mm_slottype_list>
 		<mm_cartridgeshape_list>
 			<mm_cartridgeshape name="9840"/>
-			<mm_cartridgeshape name="T9840B"/>
-			<mm_cartridgeshape name="T9840C"/>
+			<mm_cartridgeshape name="9940"/>
 			<mm_cartridgeshape name="LTO1"/>
 			<mm_cartridgeshape name="LTO2"/>
 			<mm_cartridgeshape name="LTO3"/>

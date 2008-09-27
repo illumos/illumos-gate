@@ -76,12 +76,23 @@ f none usr/lib/mms/dm/llib-ldm_default.ln 0644 root bin
 f none usr/lib/mms/dm/libSTK_9840.so.1 0755 root bin
 s none usr/lib/mms/dm/libSTK_9840.so=libSTK_9840.so.1
 f none usr/lib/mms/dm/llib-lSTK_9840.ln 0644 root bin
+
 f none usr/lib/mms/dm/libSTK_T9840B.so.1 0755 root bin
 s none usr/lib/mms/dm/libSTK_T9840B.so=libSTK_T9840B.so.1
 f none usr/lib/mms/dm/llib-lSTK_T9840B.ln 0644 root bin
+
 f none usr/lib/mms/dm/libSTK_T9840C.so.1 0755 root bin
 s none usr/lib/mms/dm/libSTK_T9840C.so=libSTK_T9840C.so.1
 f none usr/lib/mms/dm/llib-lSTK_T9840C.ln 0644 root bin
+
+f none usr/lib/mms/dm/libSTK_T9940A.so.1 0755 root bin
+s none usr/lib/mms/dm/libSTK_T9940A.so=libSTK_T9940A.so.1
+f none usr/lib/mms/dm/llib-lSTK_T9940A.ln 0644 root bin
+
+f none usr/lib/mms/dm/libSTK_T9940B.so.1 0755 root bin
+s none usr/lib/mms/dm/libSTK_T9940B.so=libSTK_T9940B.so.1
+f none usr/lib/mms/dm/llib-lSTK_T9940B.ln 0644 root bin
+
 f none usr/lib/mms/dm/libSEAGATE_ULTRIUM06242-XXX.so.1 0755 root bin
 s none usr/lib/mms/dm/libSEAGATE_ULTRIUM06242-XXX.so=libSEAGATE_ULTRIUM06242-XXX.so.1
 f none usr/lib/mms/dm/llib-lSEAGATE_ULTRIUM06242-XXX.ln 0644 root bin

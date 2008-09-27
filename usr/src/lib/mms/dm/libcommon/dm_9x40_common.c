@@ -67,6 +67,7 @@ drv_get_avail_capacity(void)
 	if (dm_get_log_sense_parm(buf, 0x8000, &val) != 0) {
 		return (-1);
 	}
+	TRACE((MMS_DEBUG, "log sense capacity = %lld", val));
 	/* Avail capacity in mega unit */
 	return ((val * 4096) / (1024 * 1024));
 }
@@ -85,7 +86,7 @@ drv_get_capacity(mms_capacity_t *cap)
 		return (-1);
 	}
 	avail = DRV_CALL(drv_get_avail_capacity, ());
-	if (DRV_CALL(drv_locate, (&pos)) != 0 || avail < 0) {
+	if (DRV_CALL(drv_locate, (&pos)) != 0 || avail <= 0) {
 		return (-1);
 	}
 

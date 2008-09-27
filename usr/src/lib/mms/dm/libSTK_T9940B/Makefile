@@ -18,48 +18,40 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
-include ../../Makefile.lib
+include $(SRC)/lib/Makefile.lib
+include	../Makefile.defs
 
-SUBDIRS = \
-	libDISK_ARCHIVING \
-	libHP_Ultrium_3-SCSI \
-	libIBM_ULTRIUM-TD1 \
-	libIBM_ULTRIUM-TD2 \
-	libIBM_ULTRIUM-TD3 \
-	libIBM_ULTRIUM-TD4 \
-	libSEAGATE_ULTRIUM06242-XXX \
-	libSTK_9840 \
-	libSTK_T9840B \
-	libSTK_T9840C \
-	libSTK_T9940A \
-	libSTK_T9940B \
-	libdefault
+HDRS =
+HDRDIR =	common
+SUBDIRS	=	$(MACH)
+#$(BUILD64)SUBDIRS += $(MACH64)
+
+all := 		TARGET = all
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
+install	:=	TARGET = install
+lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-.PARALLEL:
+all clean clobber lint: $(SUBDIRS)
 
-all := TARGET += all
-check := TARGET += check
-clean := TARGET += clean
-clobber := TARGET += clobber
-install := TARGET += install
-install_h := TARGET += install_h
-lint := TARGET += lint
-_msg := TARGET += _msg
+install: $(ROOTMMSDMLIBDIR) $(SUBDIRS)
 
-all check clean clobber install install_h lint: $(SUBDIRS)
+install_h:
+
+check:
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
+include ../Makefile.rootdirs
 include $(SRC)/lib/Makefile.targ

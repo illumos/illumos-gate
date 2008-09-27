@@ -18,48 +18,53 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
-include ../../Makefile.lib
+LIBRARY =	libSTK_T9940B.a
+VERS =		.1
+OBJS_COMMON =	dm_STK_T9940B.o
+OBJS_SHARED =	dm_9x40_common.o
 
-SUBDIRS = \
-	libDISK_ARCHIVING \
-	libHP_Ultrium_3-SCSI \
-	libIBM_ULTRIUM-TD1 \
-	libIBM_ULTRIUM-TD2 \
-	libIBM_ULTRIUM-TD3 \
-	libIBM_ULTRIUM-TD4 \
-	libSEAGATE_ULTRIUM06242-XXX \
-	libSTK_9840 \
-	libSTK_T9840B \
-	libSTK_T9840C \
-	libSTK_T9940A \
-	libSTK_T9940B \
-	libdefault
+OBJECTS = 	$(OBJS_COMMON) $(OBJS_SHARED)
+
+include $(SRC)/lib/Makefile.lib
+include ../../Makefile.defs
+
+LIBS =		$(DYNLIB) $(LINTLIB)
+
+SRCDIR =	../common
+
+DMDIR = $(SRC)/lib/mms/dm/libcommon
+
+SRCS =	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
+	$(OBJS_SHARED:%.o=$(DMDIR)/%.c)
+
+ROOTLIBDIR = 	$(ROOTMMSDMLIBDIR)
+
+LDLIBS +=	-lc
+
+CFLAGS +=	$(CCVERBOSE)
+
+CPPFLAGS +=	-DMMS_OPENSSL
+CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
+CPPFLAGS +=	-I$(SRC)/cmd/mms/dm/common -I../../../mms/common
+CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dda
+CPPFLAGS +=	-I$(SRC)/uts/common/io/mms/dmd
+CPPFLAGS +=	-I$(SRC)/cmd/mms/wcr/common
 
 .KEEP_STATE:
 
-.PARALLEL:
+all: $(LIBS)
 
-all := TARGET += all
-check := TARGET += check
-clean := TARGET += clean
-clobber := TARGET += clobber
-install := TARGET += install
-install_h := TARGET += install_h
-lint := TARGET += lint
-_msg := TARGET += _msg
+lint: $(LINTLIB) lintcheck
 
-all check clean clobber install install_h lint: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+pics/%.o: $(DMDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include $(SRC)/lib/Makefile.targ
+include ../../Makefile.rootdirs

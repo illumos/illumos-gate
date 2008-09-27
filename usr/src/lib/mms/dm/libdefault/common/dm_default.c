@@ -1573,6 +1573,7 @@ drv_log_sense(uchar_t *buf, int len, int page_control, int page_code)
 	struct		uscsi_cmd us;
 	uchar_t		cdb[] =
 	    { 0x4d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	char		dumpbuf[1024];
 
 
 	(void) memset(&us, 0, sizeof (us));
@@ -1593,6 +1594,8 @@ drv_log_sense(uchar_t *buf, int len, int page_control, int page_code)
 	if (serr->se_status != STATUS_GOOD) {
 		return (EIO);
 	}
+	(void) mms_trace_dump((char *)buf, len, dumpbuf, sizeof (dumpbuf));
+	TRACE((MMS_DEBUG, "log sense data:\n%s", dumpbuf));
 
 	return (0);
 }
