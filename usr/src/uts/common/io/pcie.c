@@ -1256,33 +1256,32 @@ pcie_get_max_supported(dev_info_t *dip, void *arg)
 	ddi_acc_handle_t config_handle;
 
 	if (ddi_get_child(current->dip) == NULL) {
-		return (DDI_WALK_CONTINUE);
+		goto fail1;
 	}
 
 	if (pcie_dev(dip) == DDI_FAILURE) {
 		PCIE_DBG("MPS: pcie_get_max_supported: %s:  "
 		    "Not a PCIe dev\n", ddi_driver_name(dip));
-		return (DDI_WALK_CONTINUE);
+		goto fail1;
 	}
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&reg, &rlen) != DDI_PROP_SUCCESS) {
 		PCIE_DBG("MPS: pcie_get_max_supported: %s:  "
 		    "Can not read reg\n", ddi_driver_name(dip));
-		return (DDI_WALK_CONTINUE);
+		goto fail1;
 	}
 
 	if (pcie_map_phys(ddi_get_child(current->dip), reg, &virt,
 	    &config_handle) != DDI_SUCCESS) {
 		PCIE_DBG("MPS: pcie_get_max_supported: %s:  pcie_map_phys "
 		    "failed\n", ddi_driver_name(dip));
-		return (DDI_WALK_CONTINUE);
+		goto fail2;
 	}
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr)) ==
 	    DDI_FAILURE) {
-		pcie_unmap_phys(&config_handle, reg);
-		return (DDI_WALK_CONTINUE);
+		goto fail3;
 	}
 
 	max_supported = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
@@ -1294,8 +1293,11 @@ pcie_get_max_supported(dev_info_t *dip, void *arg)
 	if (max_supported < current->highest_common_mps)
 		current->highest_common_mps = max_supported;
 
+fail3:
 	pcie_unmap_phys(&config_handle, reg);
-
+fail2:
+	kmem_free(reg, rlen);
+fail1:
 	return (DDI_WALK_CONTINUE);
 }
 
