@@ -16,6 +16,7 @@ smmsp::25:
 gdm::50:
 xvm::60:
 mysql::70:
+openldap::75:
 webservd::80:
 postgres::90:
 slocate::95:

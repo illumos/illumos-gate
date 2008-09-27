@@ -19,8 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -198,6 +196,24 @@ do
 		else
 			printf '/^gdm:x\na\n%s\n.\nw\nq\n' \
 			    "$XVM_LIN" | ed -s $dest > /dev/null
+		fi
+		#
+		# Add the 'openldap' user if it doesn't exist.
+		#
+		OPENLDAP_LIN="openldap:x:75:75:OpenLDAP User:/:"
+		cur_name=`awk -F: '$3 == 75 { print $1 }' $dest`
+		cur_id=`awk -F: '$1 == "openldap" { print $3 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "openldap" ]; then
+			echo "ERROR: Reserved UID 75 already assigned" \
+			    "to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "75" ]; then
+			echo "NOTE: openldap username already assigned" \
+			    "to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$OPENLDAP_LIN" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^mysql:x\na\n%s\n.\nw\nq\n' \
+			    "$OPENLDAP_LIN" | ed -s $dest > /dev/null
 		fi
 
 		#
