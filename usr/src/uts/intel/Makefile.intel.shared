@@ -564,7 +564,6 @@ MISC_KMODS	+= scsi
 MISC_KMODS	+= sda
 MISC_KMODS	+= strategy
 MISC_KMODS	+= strplumb
-MISC_KMODS	+= sysinit
 MISC_KMODS	+= tem
 MISC_KMODS	+= tlimod
 MISC_KMODS	+= usba usba10 usbs49_fw

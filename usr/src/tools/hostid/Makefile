@@ -23,40 +23,29 @@
 # Use is subject to license terms.
 #
 
-PROG= hostid
+PROG=	extract_hostid
+OBJS=	$(PROG).o
+SRCS=	$(OBJS:%.o=%.c)
+CLEANFILES += $(OBJS)
 
-include ../Makefile.cmd
+include ../Makefile.tools
 
-# Currently, the only architecture-specific things are
-# the SMF pieces that set up the software-defined hostid on
-# non-sparc platforms.  These need to get installed on x86
-# which is why we do this in a $MACH subdir.
-
-sparc_SUBDIRS = 
-i386_SUBDIRS = smf
-
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-all     :=	TARGET = all
-install :=	TARGET = install
-clean   :=	TARGET = clean
-clobber :=	TARGET = clobber
-lint    :=	TARGET = lint
-
+CFLAGS += $(CCVERBOSE)
+LDLIBS += -lelf
 
 .KEEP_STATE:
 
-all: $(PROG)
+all:	$(PROG)
 
-install: all $(ROOTPROG) $(SUBDIRS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+install: all .WAIT $(ROOTONBLDMACHPROG)
+
+lint:	lint_SRCS
 
 clean:
-
-lint:	lint_PROG
-
-FRC:
+	$(RM) $(CLEANFILES)
 
 include ../Makefile.targ

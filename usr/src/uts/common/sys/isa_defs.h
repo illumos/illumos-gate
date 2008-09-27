@@ -10,6 +10,7 @@
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
+ *
  * When distributing Covered Code, include this CDDL HEADER in each
  * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
@@ -207,6 +208,10 @@
  *
  * _OBP
  *	This indicates the firmware interface is OBP.
+ *
+ * _SOFT_HOSTID
+ *	This indicates that the implementation obtains the hostid
+ *	from the file /etc/hostid, rather than from hardware.
  */
 
 #ifdef	__cplusplus
@@ -273,6 +278,7 @@ extern "C" {
 #define	__i386_COMPAT
 #define	_PSM_MODULES
 #define	_RTC_CONFIG
+#define	_SOFT_HOSTID
 #define	_DONT_USE_1275_GENERIC_NAMES
 #define	_HAVE_CPUID_INSN
 
@@ -330,6 +336,7 @@ extern "C" {
 #define	_FIRMWARE_NEEDS_FDISK
 #define	_PSM_MODULES
 #define	_RTC_CONFIG
+#define	_SOFT_HOSTID
 #define	_DONT_USE_1275_GENERIC_NAMES
 #define	_HAVE_CPUID_INSN
 

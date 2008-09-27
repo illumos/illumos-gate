@@ -772,8 +772,6 @@ VUIDM5P_OBJS += vuidmice.o vuidm5p.o
 
 VUIDPS2_OBJS += vuidmice.o vuidps2.o
 
-SYSINIT_OBJS +=	sysinit.o sysinit_ddi.o
-
 HPCSVC_OBJS += hpcsvc.o
 
 PCIHPNEXUS_OBJS += pcihp.o

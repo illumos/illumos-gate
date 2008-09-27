@@ -19,44 +19,21 @@
 # CDDL HEADER END
 #
 #
+#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-PROG= hostid
+include ../../Makefile.cmd
 
-include ../Makefile.cmd
+MANIFEST = 	hostid.xml
+METHOD = 	svc-hostid
 
-# Currently, the only architecture-specific things are
-# the SMF pieces that set up the software-defined hostid on
-# non-sparc platforms.  These need to get installed on x86
-# which is why we do this in a $MACH subdir.
+ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
+ROOTMETHOD =    $(ROOTLIBSVCMETHOD)/$(METHOD)
 
-sparc_SUBDIRS = 
-i386_SUBDIRS = smf
+all clean clobber lint:
 
-SUBDIRS = $($(MACH)_SUBDIRS)
+install:	all $(ROOTMANIFEST) $(ROOTMETHOD)
 
-all     :=	TARGET = all
-install :=	TARGET = install
-clean   :=	TARGET = clean
-clobber :=	TARGET = clobber
-lint    :=	TARGET = lint
-
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTPROG) $(SUBDIRS)
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-clean:
-
-lint:	lint_PROG
-
-FRC:
-
-include ../Makefile.targ
+include ../../Makefile.targ

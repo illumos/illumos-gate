@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 !include prototype_com
 #
@@ -41,6 +39,7 @@ f none opt/onbld/bin/i386/ctfmerge 555 root bin
 f none opt/onbld/bin/i386/ctfstabs 555 root bin
 f none opt/onbld/bin/i386/cw 555 root bin
 f none opt/onbld/bin/i386/elfextract 555 root bin
+f none opt/onbld/bin/i386/extract_hostid 555 root bin
 f none opt/onbld/bin/i386/fastfs 555 root bin
 f none opt/onbld/bin/i386/findunref 555 root bin
 f none opt/onbld/bin/i386/install 555 root bin

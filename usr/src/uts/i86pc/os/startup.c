@@ -139,6 +139,17 @@ extern void pcf_init(void);
 
 extern int size_pse_array(pgcnt_t, int);
 
+#if defined(_SOFT_HOSTID)
+
+#include <sys/rtc.h>
+
+static int32_t set_soft_hostid(void);
+extern char hw_serial[];
+static char hostid_file[] = "/etc/hostid";
+
+#endif
+
+
 /*
  * XXX make declaration below "static" when drivers no longer use this
  * interface.
@@ -1401,8 +1412,11 @@ update_default_path()
 static void
 startup_modules(void)
 {
-	unsigned int i;
+	int cnt;
 	extern void prom_setup(void);
+	int32_t v, h;
+	char d[11];
+	char *cp;
 	cmi_hdl_t hdl;
 
 	PRM_POINT("startup_modules() starting...");
@@ -1469,10 +1483,19 @@ startup_modules(void)
 	/*
 	 * This is needed here to initialize hw_serial[] for cluster booting.
 	 */
-	if ((i = modload("misc", "sysinit")) != (unsigned int)-1)
-		(void) modunload(i);
-	else
-		cmn_err(CE_CONT, "sysinit load failed");
+	if ((h = set_soft_hostid()) == -1)
+		cmn_err(CE_WARN, "Unable to set hostid");
+	else {
+		for (v = h, cnt = 0; cnt < 10; cnt++) {
+			d[cnt] = v % 10;
+			v /= 10;
+			if (v == 0)
+				break;
+		}
+		for (cp = hw_serial; cnt >= 0; cnt--)
+			*cp++ = d[cnt] + '0';
+		*cp = 0;
+	}
 
 	/* Read cluster configuration data. */
 	clconf_init();
@@ -1705,7 +1728,7 @@ layout_kernel_va(void)
 	/*
 	 * Users can change segmapsize through eeprom. If the variable
 	 * is tuned through eeprom, there is no upper bound on the
-	 * size of segmap. 
+	 * size of segmap.
 	 */
 	segmapsize = MAX(ROUND_UP_LPAGE(segmapsize), SEGMAPDEFAULT);
 
@@ -2491,6 +2514,112 @@ pat_sync(void)
 }
 
 #endif /* !__xpv */
+
+#if defined(_SOFT_HOSTID)
+/*
+ * On platforms that do not have a hardware serial number, attempt
+ * to set one based on the contents of /etc/hostid.  If this file does
+ * not exist, assume that we are to generate a new hostid and set
+ * it in the kernel, for subsequent saving by a userland process
+ * once the system is up and the root filesystem is mounted r/w.
+ *
+ * In an attempt to make the hostid less prone to abuse
+ * (for license circumvention, etc), we store it in /etc/hostid
+ * in rot47 format.
+ */
+extern volatile unsigned long tenmicrodata;
+
+static int32_t
+set_soft_hostid(void)
+{
+	struct _buf *file;
+	char tokbuf[MAXNAMELEN];
+	token_t token;
+	int done = 0;
+	u_longlong_t tmp;
+	int32_t hostid = -1;
+	unsigned char *c;
+	hrtime_t tsc;
+
+	/*
+	 * If /etc/hostid file not found, we'd like to get a pseudo
+	 * random number to use at the hostid.  A nice way to do this
+	 * is to read the real time clock.  To remain xen-compatible,
+	 * we can't poke the real hardware, so we use tsc_read() to
+	 * read the real time clock.  However, there is an ominous
+	 * warning in tsc_read that says it can return zero, so we
+	 * deal with that possibility by falling back to using the
+	 * (hopefully random enough) value in tenmicrodata.
+	 */
+
+	if ((file = kobj_open_file(hostid_file)) == (struct _buf *)-1) {
+		/* hostid file not found */
+		tsc = tsc_read();
+		if (tsc == 0)	/* tsc_read can return zero sometimes */
+			hostid = (int32_t)tenmicrodata & 0x0CFFFFF;
+		else
+			hostid = (int32_t)tsc & 0x0CFFFFF;
+	} else {
+		/* hostid file found */
+		while (!done) {
+			token = kobj_lex(file, tokbuf, sizeof (tokbuf));
+
+			switch (token) {
+			case POUND:
+				/*
+				 * skip comments
+				 */
+				kobj_find_eol(file);
+				break;
+			case STRING:
+				/*
+				 * un-rot47 - obviously this
+				 * nonsense is ascii-specific
+				 */
+				for (c = (unsigned char *)tokbuf;
+				    *c != '\0'; c++) {
+					*c += 47;
+					if (*c > '~')
+						*c -= 94;
+					else if (*c < '!')
+						*c += 94;
+				}
+				/*
+				 * now we should have a real number
+				 */
+
+				if (kobj_getvalue(tokbuf, &tmp) != 0)
+					kobj_file_err(CE_WARN, file,
+					    "Bad value %s for hostid",
+					    tokbuf);
+				else
+					hostid = (int32_t)tmp;
+
+				break;
+			case EOF:
+				done = 1;
+				/* FALLTHROUGH */
+			case NEWLINE:
+				kobj_newline(file);
+				break;
+			default:
+				break;
+
+			}
+		}
+		if (hostid == -1) /* didn't find a hostid string */
+			kobj_file_err(CE_WARN, file,
+			    "hostid missing or corrupt");
+
+		kobj_close_file(file);
+	}
+	/*
+	 * hostid is now the value read from /etc/hostid, or the
+	 * new hostid we generated in this routine or -1 if not set.
+	 */
+	return (hostid);
+}
+#endif /* _SOFT_HOSTID */
 
 void
 get_system_configuration(void)

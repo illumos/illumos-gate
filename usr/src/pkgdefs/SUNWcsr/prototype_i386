@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -46,7 +44,9 @@
 #
 # SUNWcsr
 #
+f none lib/svc/method/svc-hostid 0555 root bin
 f none sbin/biosdev 555 root bin
 f none sbin/installgrub 0555 root sys
 d none var/ld/amd64 755 root bin
 s none var/ld/64=amd64
+f manifest var/svc/manifest/system/hostid.xml 0444 root sys

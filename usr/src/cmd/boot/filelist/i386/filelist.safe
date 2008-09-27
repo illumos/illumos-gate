@@ -4,3 +4,4 @@ etc/devices/mdi_ib_cache
 etc/path_to_inst
 etc/rtc_config
 etc/zfs/zpool.cache
+etc/hostid

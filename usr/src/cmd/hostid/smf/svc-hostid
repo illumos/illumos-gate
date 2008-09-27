@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -23,40 +24,22 @@
 # Use is subject to license terms.
 #
 
-PROG= hostid
+. /lib/svc/share/smf_include.sh
 
-include ../Makefile.cmd
+if [  `uname -p` = "sparc" ]; then
+        exit $SMF_EXIT_OK
+fi
 
-# Currently, the only architecture-specific things are
-# the SMF pieces that set up the software-defined hostid on
-# non-sparc platforms.  These need to get installed on x86
-# which is why we do this in a $MACH subdir.
+if smf_is_globalzone; then
+        if [ -f /etc/hostid ]; then
+        	exit $SMF_EXIT_OK
+        else
+		host=`/usr/bin/hostid`  
+                echo "# DO NOT EDIT" > /etc/hostid
+		r=`echo "0x${host}" | /usr/bin/perl -e \
+		    'while(<STDIN>){chop;tr/!-~/P-~!-O/;print $_,"\n";}exit 0;'`
+		printf "\"%s\"\n"  $r >> /etc/hostid
+        fi
+fi
 
-sparc_SUBDIRS = 
-i386_SUBDIRS = smf
-
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-all     :=	TARGET = all
-install :=	TARGET = install
-clean   :=	TARGET = clean
-clobber :=	TARGET = clobber
-lint    :=	TARGET = lint
-
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTPROG) $(SUBDIRS)
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-clean:
-
-lint:	lint_PROG
-
-FRC:
-
-include ../Makefile.targ
+exit $SMF_EXIT_OK
