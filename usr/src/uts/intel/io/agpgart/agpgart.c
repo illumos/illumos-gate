@@ -2558,11 +2558,16 @@ agpgart_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 	agpgart_softstate_t *softstate;
 	int rc = 0;
 
+	if (secpolicy_gart_access(credp)) {
+		AGPDB_PRINT2((CE_WARN, "agpgart_open: permission denied"));
+		return (EPERM);
+	}
 	softstate = ddi_get_soft_state(agpgart_glob_soft_handle, instance);
 	if (softstate == NULL) {
 		AGPDB_PRINT2((CE_WARN, "agpgart_open: get soft state err"));
 		return (ENXIO);
 	}
+
 	mutex_enter(&softstate->asoft_instmutex);
 
 	if (softstate->asoft_opened) {
@@ -3033,11 +3038,6 @@ agpgart_ioctl(dev_t dev, int cmd, intptr_t intarg, int flags,
 		return (ENXIO);
 	}
 
-	if ((cmd != AGPIOC_INFO) && secpolicy_gart_access(credp)) {
-		AGPDB_PRINT2((CE_WARN, "agpgart_ioctl: permission denied"));
-		return (EPERM);
-	}
-
 	mutex_enter(&softstate->asoft_instmutex);
 
 	switch (cmd) {
@@ -3095,16 +3095,6 @@ agpgart_segmap(dev_t dev, off_t off, struct as *asp,
 		return (EINVAL);
 
 	mutex_enter(&softstate->asoft_instmutex);
-
-	/*
-	 * Process must have gart map privilege or gart access privilege
-	 * to map agp memory.
-	 */
-	if (secpolicy_gart_map(credp)) {
-		mutex_exit(&softstate->asoft_instmutex);
-		AGPDB_PRINT2((CE_WARN, "agpgart_segmap: permission denied"));
-		return (EPERM);
-	}
 
 	rc = devmap_setup(dev, (offset_t)off, asp, addrp,
 	    (size_t)len, prot, maxprot, flags, credp);
