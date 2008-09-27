@@ -705,6 +705,7 @@ i86_monitor(volatile uint32_t *addr, uint32_t extensions, uint32_t hints)
 	movq	%rdi, %rax		/* addr */
 	movq	%rsi, %rcx		/* extensions */
 	/* rdx contains input arg3: hints */
+	clflush	(%rax)
 	.byte	0x0f, 0x01, 0xc8	/* monitor */
 	leave
 	ret
@@ -718,6 +719,7 @@ ENTRY_NP(i86_monitor)
 	movl	0x8(%ebp),%eax		/* addr */
 	movl	0xc(%ebp),%ecx		/* extensions */
 	movl	0x10(%ebp),%edx		/* hints */
+	clflush	(%eax)
 	.byte	0x0f, 0x01, 0xc8	/* monitor */
 	leave
 	ret

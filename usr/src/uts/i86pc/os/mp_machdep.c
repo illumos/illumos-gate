@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	PSMI_1_6
 #include <sys/smp_impldefs.h>
 #include <sys/psm.h>
@@ -177,6 +175,11 @@ int	idle_cpu_use_hlt = 1;
  * If non-zero, idle cpus will use mwait if available to halt instead of hlt.
  */
 int	idle_cpu_prefer_mwait = 1;
+/*
+ * Set to 0 to avoid MONITOR+CLFLUSH assertion.
+ */
+int	idle_cpu_assert_cflush_monitor = 1;
+
 #endif
 
 /*ARGSUSED*/

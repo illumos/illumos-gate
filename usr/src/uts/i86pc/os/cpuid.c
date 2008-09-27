@@ -776,10 +776,30 @@ cpuid_pass1(cpu_t *cpu)
 	}
 	if (cp->cp_edx & CPUID_INTC_EDX_DE)
 		feature |= X86_DE;
+#if !defined(__xpv)
 	if (cp->cp_ecx & CPUID_INTC_ECX_MON) {
-		cpi->cpi_mwait.support |= MWAIT_SUPPORT;
-		feature |= X86_MWAIT;
+
+		/*
+		 * We require the CLFLUSH instruction for erratum workaround
+		 * to use MONITOR/MWAIT.
+		 */
+		if (cp->cp_edx & CPUID_INTC_EDX_CLFSH) {
+			cpi->cpi_mwait.support |= MWAIT_SUPPORT;
+			feature |= X86_MWAIT;
+		} else {
+			extern int idle_cpu_assert_cflush_monitor;
+
+			/*
+			 * All processors we are aware of which have
+			 * MONITOR/MWAIT also have CLFLUSH.
+			 */
+			if (idle_cpu_assert_cflush_monitor) {
+				ASSERT((cp->cp_ecx & CPUID_INTC_ECX_MON) &&
+				    (cp->cp_edx & CPUID_INTC_EDX_CLFSH));
+			}
+		}
 	}
+#endif	/* __xpv */
 
 	/*
 	 * Only need it first time, rest of the cpus would follow suite.
