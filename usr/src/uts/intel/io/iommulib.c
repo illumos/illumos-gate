@@ -616,10 +616,11 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 	if (unitp == NULL) {
 		mutex_exit(&iommulib_lock);
 		if (iommulib_debug) {
-			char buf[MAXPATHLEN];
+			char *buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 			cmn_err(CE_WARN, "%s: %s%d: devinfo node (%p): is not "
 			    "controlled by an IOMMU: path=%s", f, driver,
 			    instance, (void *)rdip, ddi_pathname(rdip, buf));
+			kmem_free(buf, MAXPATHLEN);
 		}
 		*errorp = ENOTSUP;
 		return (DDI_FAILURE);
@@ -640,7 +641,6 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 void
 iommulib_nex_close(dev_info_t *rdip)
 {
-	char buf[MAXPATHLEN];
 	iommulib_unit_t *unitp;
 	const char *driver;
 	int instance;
@@ -664,15 +664,17 @@ iommulib_nex_close(dev_info_t *rdip)
 	unitid = unitp->ilu_unitid;
 	driver = ddi_driver_name(unitp->ilu_dip);
 	instance = ddi_get_instance(unitp->ilu_dip);
-	(void) ddi_pathname(rdip, buf);
 	unitp->ilu_ref--;
 	mutex_exit(&unitp->ilu_lock);
 	mutex_exit(&iommulib_lock);
 
 	if (iommulib_debug) {
+		char *buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(rdip, buf);
 		cmn_err(CE_NOTE, "%s: %s%d: closing IOMMU for dip (%p), "
 		    "unitid=%u rdip path = %s", f, driver, instance,
 		    (void *)rdip, unitid, buf);
+		kmem_free(buf, MAXPATHLEN);
 	}
 }
 
