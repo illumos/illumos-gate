@@ -437,12 +437,10 @@ make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode,
 		 * and we don't need to second guess him.
 		 */
 		if (!S_ISDIR(st.st_mode)) {
-			if (is_system_labeled() &&
-			    S_ISREG(st.st_mode)) {
+			if (S_ISREG(st.st_mode)) {
 				/*
-				 * The need to mount readonly copies of
-				 * global zone /etc/ files is unique to
-				 * Trusted Extensions.
+				 * Allow readonly mounts of /etc/ files; this
+				 * is needed most by Trusted Extensions.
 				 */
 				if (strncmp(subdir, "/etc/",
 				    strlen("/etc/")) != 0) {
