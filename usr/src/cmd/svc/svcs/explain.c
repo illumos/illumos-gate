@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Service state explanation.  For select services, display a description, the
@@ -132,7 +130,7 @@ typedef struct {
 	const char *aux_state;
 	int64_t start_method_waitstatus;
 
-	int enabled;
+	uint8_t enabled;
 	int temporary;
 	const char *restarter;
 	uu_list_t *dependencies;	/* list of dependency_group's */
@@ -408,8 +406,9 @@ add_instance(const char *svcname, const char *instname, scf_instance_t *inst)
 	inst_t *instp;
 	svc_t *svcp;
 	int have_enabled = 0;
-	int i;
+	uint8_t i;
 	uint32_t h;
+	int r;
 
 	h = hash_name(svcname) & SVC_HASH_MASK;
 	for (svcp = services[h]; svcp != NULL; svcp = svcp->next) {
@@ -522,8 +521,8 @@ add_instance(const char *svcname, const char *instname, scf_instance_t *inst)
 		return;
 
 	uu_list_node_init(instp, &instp->node, insts);
-	i = uu_list_append(svcp->instances, instp);
-	assert(i == 0);
+	r = uu_list_append(svcp->instances, instp);
+	assert(r == 0);
 }
 
 static void
@@ -939,7 +938,7 @@ process_optall(inst_t *svcp, struct dependency_group *dg)
 		}
 
 		if (ip != NULL) {
-			if (ip->enabled && !inst_running_or_maint(ip)) {
+			if ((ip->enabled != 0) && !inst_running_or_maint(ip)) {
 				r = add_causes(svcp, ip);
 				if (r != 0) {
 					assert(r == ELOOP);
@@ -953,7 +952,7 @@ process_optall(inst_t *svcp, struct dependency_group *dg)
 		for (ip = uu_list_first(sp->instances);
 		    ip != NULL;
 		    ip = uu_list_next(sp->instances, ip)) {
-			if (ip->enabled && !inst_running_or_maint(ip)) {
+			if ((ip->enabled != 0) && !inst_running_or_maint(ip)) {
 				r = add_causes(svcp, ip);
 				if (r != 0) {
 					assert(r == ELOOP);
@@ -1203,7 +1202,7 @@ determine_causes(inst_t *svcp, void *canfailp)
 
 	if (strcmp(svcp->state, SCF_STATE_STRING_DISABLED) == 0) {
 		add_svcptr(svcp->causes, svcp);
-		if (svcp->enabled)
+		if (svcp->enabled != 0)
 			add_svcptr(g_causes, svcp);
 
 		return (UU_WALK_NEXT);
