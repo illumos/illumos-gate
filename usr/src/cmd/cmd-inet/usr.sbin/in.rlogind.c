@@ -23,8 +23,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * remote login server:
  *	remuser\0
@@ -244,7 +242,7 @@ main(int argc, char *argv[])
 #endif /* DEBUG */
 		default:
 			syslog(LOG_ERR, "Unrecognized command line option "
-			    "(%s), exiting", argv[optind]);
+			    "(-%c), exiting", optopt);
 			exit(EXIT_FAILURE);
 		}
 	}
