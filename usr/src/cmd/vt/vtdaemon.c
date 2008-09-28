@@ -827,7 +827,7 @@ vt_do_auth(int target_vt)
 }
 
 /* main thread (lock and auth) */
-static void
+static void __NORETURN
 vt_serve_events(void)
 {
 	struct pollfd pollfds[1];
