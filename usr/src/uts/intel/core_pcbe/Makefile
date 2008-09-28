@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#program ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This Makefile builds
 # the Intel Core Architecture Performance Counter BackEnd (PCBE).
@@ -37,7 +36,7 @@ MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CORE_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
-ROOTLINK	= $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.23
+ROOTLINK	= $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.23 $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.26 $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.37
 
 #
 #	Include common rules.

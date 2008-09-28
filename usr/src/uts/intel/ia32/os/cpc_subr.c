@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * x86-specific routines used by the CPU Performance counter driver.
@@ -48,6 +46,9 @@
 
 static const uint64_t allstopped = 0;
 static kcpc_ctx_t *(*overflow_intr_handler)(caddr_t);
+
+/* Do threads share performance monitoring hardware? */
+static int strands_perfmon_shared = 0;
 
 int kcpc_hw_overflow_intr_installed;		/* set by APIC code */
 extern kcpc_ctx_t *kcpc_overflow_intr(caddr_t arg, uint64_t bitmap);
@@ -108,12 +109,43 @@ kcpc_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 static kmutex_t cpu_setup_lock;	/* protects setup_registered */
 static int setup_registered;
 
+
 void
 kcpc_hw_init(cpu_t *cp)
 {
 	kthread_t *t = cp->cpu_idle_thread;
+	uint32_t versionid;
+	struct cpuid_regs cpuid;
 
+	strands_perfmon_shared = 0;
 	if (x86_feature & X86_HTT) {
+		if (cpuid_getvendor(cpu[0]) == X86_VENDOR_Intel) {
+			/*
+			 * Intel processors that support Architectural
+			 * Performance Monitoring Version 3 have per strand
+			 * performance monitoring hardware.
+			 * Hence we can allow use of performance counters on
+			 * multiple strands on the same core simultaneously.
+			 */
+			cpuid.cp_eax = 0x0;
+			(void) __cpuid_insn(&cpuid);
+			if (cpuid.cp_eax < 0xa) {
+				strands_perfmon_shared = 1;
+			} else {
+				cpuid.cp_eax = 0xa;
+				(void) __cpuid_insn(&cpuid);
+
+				versionid = cpuid.cp_eax & 0xFF;
+				if (versionid < 3) {
+					strands_perfmon_shared = 1;
+				}
+			}
+		} else {
+			strands_perfmon_shared = 1;
+		}
+	}
+
+	if (strands_perfmon_shared) {
 		mutex_enter(&cpu_setup_lock);
 		if (setup_registered == 0) {
 			mutex_enter(&cpu_lock);
@@ -193,7 +225,7 @@ kcpc_hw_cpu_hook(processorid_t cpuid, ulong_t *kcpc_cpumap)
 	pg_t		*chip_pg;
 	pg_cpu_itr_t	itr;
 
-	if ((x86_feature & X86_HTT) == 0)
+	if (!strands_perfmon_shared)
 		return (0);
 
 	/*
@@ -235,7 +267,7 @@ kcpc_hw_lwp_hook(void)
 	group_t		*chips;
 	group_iter_t	i;
 
-	if ((x86_feature & X86_HTT) == 0)
+	if (!strands_perfmon_shared)
 		return (0);
 
 	/*
