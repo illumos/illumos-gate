@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +30,6 @@
 #ifndef _USERS_H
 #define	_USERS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pwd.h>
 #include <grp.h>
@@ -86,4 +84,6 @@ extern int valid_projname(char *, struct project *, void *buf, size_t, int *);
 extern void warningmsg(int, char *);
 extern void putgrent(struct group *, FILE *);
 
+/* passmgmt */
+#define	PASSMGMT	"/usr/bin/passmgmt";
 #endif	/* _USERS_H */

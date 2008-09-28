@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -542,7 +540,7 @@ char *argv[];
 	/* set up arguments to  passmgmt in nargv array */
 	nargv = malloc((30 + nkeys * 2) * sizeof (char *));
 	argindex = 0;
-	nargv[argindex++] = "passmgmt";
+	nargv[argindex++] = PASSMGMT;
 	nargv[argindex++] = "-a";	/* add */
 
 	if (comment != NULL) {
@@ -694,7 +692,7 @@ char *logname;
 {
 	char *nargv[4];
 
-	nargv[0] = "passmgmt";
+	nargv[0] = PASSMGMT;
 	nargv[1] = "-d";
 	nargv[2] = logname;
 	nargv[3] = NULL;
