@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_hio.h>
 #include <npi_tx_wr64.h>
@@ -1257,7 +1255,7 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 	size_t 			mblk_len;
 	size_t 			iph_len;
 	size_t 			hdrs_size;
-	uint8_t			hdrs_buf[sizeof (struct  ether_header) +
+	uint8_t			hdrs_buf[sizeof (struct  ether_vlan_header) +
 	    IP_MAX_HDR_LENGTH + sizeof (uint32_t)];
 				/*
 				 * allocate space big enough to cover
@@ -1266,6 +1264,8 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 				 */
 
 	boolean_t		qos = B_FALSE;
+	ushort_t		eth_type;
+	size_t 			eth_hdr_size;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_lb_ring"));
 
@@ -1276,17 +1276,22 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 	case NXGE_TX_LB_TCPUDP: /* default IPv4 TCP/UDP */
 	default:
 		tcp_port = mp->b_rptr;
-		if (!nxge_no_tx_lb && !qos &&
-		    (ntohs(((p_ether_header_t)tcp_port)->ether_type)
-		    == ETHERTYPE_IP)) {
+		eth_type = ntohs(((struct ether_header *)tcp_port)->ether_type);
+		if (eth_type == VLAN_ETHERTYPE) {
+			eth_type = ntohs(((struct ether_vlan_header *)
+			    tcp_port)->ether_type);
+			eth_hdr_size = sizeof (struct ether_vlan_header);
+		} else {
+			eth_hdr_size = sizeof (struct ether_header);
+		}
+
+		if (!nxge_no_tx_lb && !qos && eth_type == ETHERTYPE_IP) {
 			nmp = mp;
 			mblk_len = MBLKL(nmp);
 			tcp_port = NULL;
-			if (mblk_len > sizeof (struct ether_header) +
-			    sizeof (uint8_t)) {
-				tcp_port = nmp->b_rptr +
-				    sizeof (struct ether_header);
-				mblk_len -= sizeof (struct ether_header);
+			if (mblk_len > eth_hdr_size + sizeof (uint8_t)) {
+				tcp_port = nmp->b_rptr + eth_hdr_size;
+				mblk_len -= eth_hdr_size;
 				iph_len = ((*tcp_port) & 0x0f) << 2;
 				if (mblk_len > (iph_len + sizeof (uint32_t))) {
 					tcp_port = nmp->b_rptr;
@@ -1296,7 +1301,6 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 			}
 			if (tcp_port == NULL) {
 				hdrs_size = 0;
-				((p_ether_header_t)hdrs_buf)->ether_type = 0;
 				while ((nmp) && (hdrs_size <
 				    sizeof (hdrs_buf))) {
 					mblk_len = MBLKL(nmp);
@@ -1311,7 +1315,7 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 				}
 				tcp_port = hdrs_buf;
 			}
-			tcp_port += sizeof (ether_header_t);
+			tcp_port += eth_hdr_size;
 			if (!(tcp_port[6] & 0x3f) && !(tcp_port[7] & 0xff)) {
 				switch (tcp_port[9]) {
 				case IPPROTO_TCP:

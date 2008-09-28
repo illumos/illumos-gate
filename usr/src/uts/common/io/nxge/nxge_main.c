@@ -846,11 +846,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail;
 	}
 
-	/*
-	 * Enable interrupts.
-	 */
-	nxge_intrs_enable(nxgep);
-
 	/* If a guest, register with vio_net instead. */
 	if ((status = nxge_mac_register(nxgep)) != NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
