@@ -27,8 +27,6 @@
 #ifndef _TARGET_H
 #define	_TARGET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Block comment which describes the contents of this file.
  */
@@ -246,7 +244,7 @@ extern Boolean_t	enforce_strict_guid,
 			disable_tpgs,
 			dbg_timestamps,
 			pgr_persist;
-extern pthread_mutex_t	targ_config_mutex;
+extern pthread_rwlock_t	targ_config_mutex;
 extern umem_cache_t	*iscsi_cmd_cache,
 			*t10_cmd_cache,
 			*queue_cache;

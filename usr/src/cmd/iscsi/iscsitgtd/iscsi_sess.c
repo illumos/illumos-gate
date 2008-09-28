@@ -88,12 +88,12 @@ session_alloc(iscsi_conn_t *c, uint8_t *isid)
 	c->c_sessq	= s->s_sessq;
 	s->s_mgmtq	= c->c_mgmtq;
 	s->s_type	= SessionNormal;
-	s->s_tsid	= s->s_num;
 
 	sess_set_auth(s);
 
 	(void) pthread_mutex_lock(&sess_mutex);
 	s->s_num	= sess_num++;
+	s->s_tsid	= s->s_num;
 	s->s_state	= SS_STARTED;
 
 	if (sess_head == NULL)

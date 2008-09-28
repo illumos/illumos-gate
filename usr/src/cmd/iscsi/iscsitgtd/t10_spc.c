@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * []------------------------------------------------------------------[]
  * | SPC-3 Support Functions						|
@@ -649,6 +647,7 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	select = cdb[2];
 
 	targ = NULL;
+	(void) pthread_rwlock_rdlock(&targ_config_mutex);
 	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
 	    targ)) != NULL) {
 		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &str) ==
@@ -674,6 +673,7 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	len = entries * SCSI_REPORTLUNS_ADDRESS_SIZE;
 	if ((buf = (uint8_t *)calloc(1, MAX(expected_data, len))) == NULL) {
 		trans_send_complete(cmd, STATUS_BUSY);
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return;
 	}
 
@@ -709,9 +709,11 @@ spc_report_luns(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			trans_send_complete(cmd, STATUS_BUSY);
 		}
 	}
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return;
 
 error:
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	if (buf)
 		free(buf);
 	spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);

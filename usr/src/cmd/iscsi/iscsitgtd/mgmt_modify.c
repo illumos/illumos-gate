@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <time.h>
 #include <sys/utsname.h>
@@ -128,9 +126,10 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	struct stat	st;
 	uint32_t	isns_mods	= 0;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
-		return (msg);
+		goto error;
 	}
 
 	while ((t = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
@@ -142,12 +141,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (t == NULL) {
 		free(name);
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
-		return (msg);
+		goto error;
 	}
 
 	if (tgt_find_attr_str(t, XML_ELEMENT_INCORE, &m) == True) {
 		if (strcmp(m, "true") == 0) {
 			free(m);
+			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (modify_zfs(x, cred));
 		}
 		free(m);
@@ -180,17 +180,17 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_value_str(x, XML_ELEMENT_SIZE, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
-			return (msg);
+			goto error;
 		}
 		if (strtoll_multiplier(prop, &new_lu_size) == False) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_INVALID_SIZE);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 		if ((new_lu_size % 512LL) != 0) {
 			xml_rtn_msg(&msg, ERR_SIZE_MOD_BLOCK);
-			return (msg);
+			goto error;
 		}
 		new_lu_size /= 512LL;
 
@@ -204,30 +204,30 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &prop) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_INIT_XML_READER_FAILED);
-			return (msg);
+			goto error;
 		}
 		if (strtoll_multiplier(prop, &cur_lu_size) == False) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_INVALID_SIZE);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 
 		if (new_lu_size < cur_lu_size) {
 			xml_rtn_msg(&msg, ERR_CANT_SHRINK_LU);
-			return (msg);
+			goto error;
 		}
 
 		/* ---- check that this LU is of type 'disk' or 'tape' ---- */
 		if (tgt_find_value_str(node, XML_ELEMENT_DTYPE, &prop) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_INIT_XML_READER_FAILED);
-			return (msg);
+			goto error;
 		}
 		if ((strcmp(prop, TGT_TYPE_DISK) != 0) &&
 		    (strcmp(prop, TGT_TYPE_TAPE) != 0)) {
 			xml_rtn_msg(&msg, ERR_RESIZE_WRONG_DTYPE);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 
@@ -236,19 +236,19 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		    target_basedir, iscsi, LUNBASE, lun);
 		if (stat(path, &st) == -1) {
 			xml_rtn_msg(&msg, ERR_STAT_BACKING_FAILED);
-			return (msg);
+			goto error;
 		}
 		if ((st.st_mode & S_IFMT) != S_IFREG) {
 			xml_rtn_msg(&msg,
 			    ERR_DISK_BACKING_MUST_BE_REGULAR_FILE);
-			return (msg);
+			goto error;
 		}
 
 		/* ---- update the parameter node with new size ---- */
 		if ((c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &new_lu_size))
 		    == False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		tgt_node_replace(node, c, MatchName);
 		tgt_node_free(c);
@@ -261,13 +261,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		    target_basedir, iscsi, LUNBASE, lun);
 		if ((fd = open(path, O_RDWR|O_CREAT|O_LARGEFILE, 0600)) < 0) {
 			xml_rtn_msg(&msg, ERR_LUN_NOT_FOUND);
-			return (msg);
+			goto error;
 		}
 		(void) lseek(fd, (new_lu_size * 512LL) - 512LL, 0);
 		bzero(buf, sizeof (buf));
 		if (write(fd, buf, sizeof (buf)) != sizeof (buf)) {
 			xml_rtn_msg(&msg, ERR_LUN_NOT_GROWN);
-			return (msg);
+			goto error;
 		}
 		(void) close(fd);
 
@@ -282,7 +282,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
-			return (msg);
+			goto error;
 		}
 
 		/*
@@ -293,7 +293,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		    ((m != NULL) && (*m != '\0'))) {
 			xml_rtn_msg(&msg, ERR_INVALID_TPGT);
 			free(prop);
-			return (msg);
+			goto error;
 		}
 
 		/* update isns only if TPGT contains ip_addr */
@@ -308,7 +308,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 				break;
 			} else {
 				xml_rtn_msg(&msg, ERR_TPGT_NO_IPADDR);
-				return (msg);
+				goto error;
 			}
 		}
 
@@ -316,7 +316,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		    NULL) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 
 		if ((list = tgt_node_next(t, XML_ELEMENT_TPGTLIST,
@@ -333,7 +333,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			if (list == NULL) {
 				free(prop);
 				xml_rtn_msg(&msg, ERR_NO_MEM);
-				return (msg);
+				goto error;
 			}
 			tgt_node_add(list, c);
 			tgt_node_add(t, list);
@@ -347,13 +347,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
-			return (msg);
+			goto error;
 		}
 
 		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
 		if (c == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		if ((list = tgt_node_next(t, XML_ELEMENT_ACLLIST,
 		    NULL)) != NULL) {
@@ -364,7 +364,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			list = tgt_node_alloc(XML_ELEMENT_ACLLIST, String, "");
 			if (list == NULL) {
 				xml_rtn_msg(&msg, ERR_NO_MEM);
-				return (msg);
+				goto error;
 			}
 			tgt_node_add(list, c);
 			tgt_node_add(t, list);
@@ -377,13 +377,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_value_str(x, XML_ELEMENT_ALIAS, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ALIAS);
-			return (msg);
+			goto error;
 		}
 
 		if (modify_element(XML_ELEMENT_ALIAS, prop, t, MatchName) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 		prop = NULL;
@@ -394,19 +394,19 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_value_str(x, XML_ELEMENT_MAXRECV, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_MAXRECV);
-			return (msg);
+			goto error;
 		}
 
 		if ((strtoll_multiplier(prop, &val) == False) ||
 		    (val < MAXRCVDATA_MIN) || (val > MAXRCVDATA_MAX)) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_INVALID_MAXRECV);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 		if ((prop = malloc(32)) == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		(void) snprintf(prop, 32, "%d", val);
 
@@ -414,7 +414,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		    False) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 		prop = NULL;
@@ -424,12 +424,12 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (change_made == True) {
 		if (mgmt_config_save2scf() == False) {
 			xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
-			return (msg);
+			goto error;
 		}
 		if (isns_enabled() == True) {
 			if (isns_dev_update(t->x_value, isns_mods) != 0) {
 				xml_rtn_msg(&msg, ERR_ISNS_ERROR);
-				return (msg);
+				goto error;
 			}
 		}
 		xml_rtn_msg(&msg, ERR_SUCCESS);
@@ -437,6 +437,8 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
 
+error:
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -454,9 +456,10 @@ modify_initiator(tgt_node_t *x)
 	tgt_node_t	*inode		= NULL;
 	Boolean_t	changes_made	= False;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
-		return (msg);
+		goto error;
 	}
 
 	while ((inode = tgt_node_next_child(main_config, XML_ELEMENT_INIT,
@@ -474,20 +477,20 @@ modify_initiator(tgt_node_t *x)
 
 	if (inode == NULL) {
 		xml_rtn_msg(&msg, ERR_INIT_NOT_FOUND);
-		return (msg);
+		goto error;
 	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_CHAPSECRET, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_CHAPSECRET);
-			return (msg);
+			goto error;
 		}
 
 		if (modify_element(XML_ELEMENT_CHAPSECRET, prop, inode,
 		    MatchName) == False) {
 			free(prop);
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 		changes_made = True;
@@ -499,14 +502,14 @@ modify_initiator(tgt_node_t *x)
 			if (prop != NULL)
 				free(prop);
 			xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 
 		if (delete_element(XML_ELEMENT_CHAPSECRET, inode,
 		    MatchName) == False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		changes_made = True;
 	}
@@ -514,13 +517,14 @@ modify_initiator(tgt_node_t *x)
 	if (tgt_find_value_str(x, XML_ELEMENT_CHAPNAME, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_CHAPNAME);
-			return (msg);
+			goto error;
 		}
 
 		if (modify_element(XML_ELEMENT_CHAPNAME, prop, inode,
 		    MatchName) == False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			free(prop);
+			goto error;
 		}
 		free(prop);
 		changes_made = True;
@@ -531,7 +535,7 @@ modify_initiator(tgt_node_t *x)
 			if (prop != NULL)
 				free(prop);
 			xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
-			return (msg);
+			goto error;
 		}
 		free(prop);
 
@@ -539,7 +543,7 @@ modify_initiator(tgt_node_t *x)
 		if (delete_element(XML_ELEMENT_CHAPNAME, inode,
 		    MatchName) == False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
-			return (msg);
+			goto error;
 		}
 		changes_made = True;
 	}
@@ -554,6 +558,8 @@ modify_initiator(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
 
+error:
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -589,11 +595,14 @@ modify_admin(tgt_node_t *x)
 				}
 			}
 
+			(void) pthread_rwlock_wrlock(&targ_config_mutex);
 			if (ap->delete_name == NULL) {
 				if (modify_element(ap->name, prop, main_config,
 				    MatchName) == False) {
 					xml_rtn_msg(&msg, ERR_NO_MEM);
 					free(prop);
+					(void) pthread_rwlock_unlock(
+					    &targ_config_mutex);
 					return (msg);
 				}
 			} else {
@@ -601,15 +610,20 @@ modify_admin(tgt_node_t *x)
 					xml_rtn_msg(&msg,
 					    ERR_SYNTAX_MISSING_OPERAND);
 					free(prop);
+					(void) pthread_rwlock_unlock(
+					    &targ_config_mutex);
 					return (msg);
 				}
 				if (delete_element(ap->delete_name,
 				    main_config, MatchName) == False) {
 					xml_rtn_msg(&msg, ERR_NO_MEM);
 					free(prop);
+					(void) pthread_rwlock_unlock(
+					    &targ_config_mutex);
 					return (msg);
 				}
 			}
+			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			if (0 == strcmp(ap->name, XML_ELEMENT_ISNS_ACCESS) ||
 			    0 == strcmp(ap->name, XML_ELEMENT_ISNS_SERV)) {
 				update_isns = True;
@@ -653,6 +667,7 @@ modify_tpgt(tgt_node_t *x)
 	char		*ip_str	= NULL;
 	tgt_node_t	*tnode	= NULL;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
@@ -677,7 +692,7 @@ modify_tpgt(tgt_node_t *x)
 	if (modify_element(XML_ELEMENT_IPADDR, ip_str, tnode, MatchBoth) ==
 	    False) {
 		xml_rtn_msg(&msg, ERR_NO_MEM);
-		return (msg);
+		goto error;
 	}
 
 	if (mgmt_config_save2scf() == True) {
@@ -700,6 +715,7 @@ error:
 		free(name);
 	if (ip_str)
 		free(ip_str);
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -726,15 +742,17 @@ modify_zfs(tgt_node_t *x, ucred_t *cred)
 	int		val;
 	char		*tru = "true";
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
-		return (msg);
+		goto error;
 	}
 
 	/*
 	 * Validate request
 	 */
 	if (tgt_find_value_str(x, XML_ELEMENT_VALIDATE, &tru)) {
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return (validate_zfs_iscsitgt(x));
 	}
 
@@ -900,6 +918,7 @@ error:
 	if (dataset)
 		free(dataset);
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 

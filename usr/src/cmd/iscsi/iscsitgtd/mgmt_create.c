@@ -138,6 +138,7 @@ create_target(tgt_node_t *x)
 	tgt_node_t	*n, *c, *l;
 	err_code_t	code;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	(void) tgt_find_value_str(x, XML_ELEMENT_BACK, &backing);
 	(void) tgt_find_value_str(x, XML_ELEMENT_ALIAS, &alias);
 	if (tgt_find_value_intchk(x, XML_ELEMENT_LUN, &lun) == False) {
@@ -307,6 +308,7 @@ error:
 	if (type != NULL)
 		free(type);
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -319,6 +321,7 @@ create_initiator(tgt_node_t *x)
 	tgt_node_t	*inode		= NULL;
 	tgt_node_t	*n, *c;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
@@ -356,6 +359,7 @@ error:
 	if (iscsi_name)
 		free(iscsi_name);
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -369,6 +373,7 @@ create_tpgt(tgt_node_t *x)
 	tgt_node_t	*n;
 	int		tpgt_val;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &tpgt) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
@@ -402,6 +407,7 @@ error:
 	if (tpgt)
 		free(tpgt);
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -424,6 +430,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	uint64_t	size;
 	int		status;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	/*
 	 * Extract the dataset name from the arguments passed in
 	 */
@@ -603,6 +610,7 @@ error:
 	if (n)
 		tgt_node_free(n);
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 

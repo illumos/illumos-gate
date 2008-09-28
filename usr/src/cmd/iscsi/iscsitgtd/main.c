@@ -94,7 +94,7 @@ int		targets_vers_maj,
 		targets_vers_min,
 		main_vers_maj,
 		main_vers_min;
-pthread_mutex_t	targ_config_mutex;
+pthread_rwlock_t	targ_config_mutex;
 umem_cache_t	*iscsi_cmd_cache,
 		*t10_cmd_cache,
 		*queue_cache;
@@ -828,7 +828,7 @@ main(int argc, char **argv)
 	 * Initialize the various subsystems. In most cases these are
 	 * just initializing mutexs.
 	 */
-	(void) pthread_mutex_init(&targ_config_mutex, NULL);
+	(void) pthread_rwlock_init(&targ_config_mutex, NULL);
 	iscsi_cmd_init();
 	session_init();
 	t10_init(q);

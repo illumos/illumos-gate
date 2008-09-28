@@ -999,17 +999,22 @@ connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 	tgt_node_t	*targ, *alias;
 	Boolean_t	rval	= False;
 
+	(void) pthread_rwlock_rdlock(&targ_config_mutex);
 	if ((targ = find_target_node(targ_name)) != NULL) {
 
-		if (check_access(targ, c->c_sess->s_i_name, False) == False)
+		if (check_access(targ, c->c_sess->s_i_name, False) == False) {
+			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (False);
+		}
 
 		/*
 		 * Have a valid node for our target. Start looking
 		 * for connection oriented parameters.
 		 */
-		if ((c->c_tpgt = convert_to_tpgt(c, targ)) == 0)
+		if ((c->c_tpgt = convert_to_tpgt(c, targ)) == 0) {
+			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (False);
+		}
 		if ((alias = tgt_node_next(targ, XML_ELEMENT_ALIAS, NULL)) ==
 		    NULL) {
 			(void) tgt_find_value_str(targ, XML_ELEMENT_TARG,
@@ -1024,6 +1029,7 @@ connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 		rval = True;
 	}
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (rval);
 }
 
@@ -1607,7 +1613,6 @@ remove_target_common(char *name, int lun_num, char **msg)
 	char		*iname			= NULL;
 	int		chk;
 
-	(void) pthread_mutex_lock(&targ_config_mutex);
 	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
 	    targ)) != NULL) {
 		/* ---- Look for a match on the friendly name ---- */
@@ -1628,7 +1633,6 @@ remove_target_common(char *name, int lun_num, char **msg)
 
 	/* ---- Check to see if it's already been removed ---- */
 	if (targ == NULL) {
-		(void) pthread_mutex_unlock(&targ_config_mutex);
 		return;
 	}
 
@@ -1642,7 +1646,6 @@ remove_target_common(char *name, int lun_num, char **msg)
 		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &iname) ==
 		    False) {
 			xml_rtn_msg(msg, ERR_INTERNAL_ERROR);
-			(void) pthread_mutex_unlock(&targ_config_mutex);
 			return;
 		}
 	}
@@ -1740,7 +1743,6 @@ remove_target_common(char *name, int lun_num, char **msg)
 		syslog(LOG_ERR, "Failed to update target configuration!");
 
 error:
-	(void) pthread_mutex_unlock(&targ_config_mutex);
 	if (iname != NULL)
 		free(iname);
 }

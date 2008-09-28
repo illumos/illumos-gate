@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file deals with XML data for removing various configuration data.
  */
@@ -111,9 +109,10 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 	uint64_t	size;
 	int		status;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
-		return (msg);
+		goto error;
 	}
 
 	/*
@@ -190,7 +189,7 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_value_str(x, XML_ELEMENT_ACL, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
-			return (msg);
+			goto error;
 		}
 		if (status == ERR_ZFS_ISCSISHARE_OFF) {
 			xml_rtn_msg(&msg, status);
@@ -261,6 +260,7 @@ error:
 		free(prop);
 	if (n)
 		tgt_node_free(n);
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -275,6 +275,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 	Boolean_t	change_made		= False;
 	int		lun_num;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
@@ -293,6 +294,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_attr_str(targ, XML_ELEMENT_INCORE, &prop) == True) {
 		if (strcmp(prop, "true") == 0) {
 			free(prop);
+			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (remove_zfs(x, cred));
 		}
 		free(prop);
@@ -345,6 +347,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		}
 
 		free(prop);
+		prop = NULL;
 		change_made = True;
 	}
 	if (tgt_find_value_int(x, XML_ELEMENT_LUN, &lun_num) == True) {
@@ -392,6 +395,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 
 error:
@@ -399,6 +403,7 @@ error:
 		tgt_node_free(c);
 	if (prop != NULL)
 		free(prop);
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -409,8 +414,10 @@ remove_initiator(tgt_node_t *x)
 	char		*name;
 	tgt_node_t	*node	= NULL;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return (msg);
 	}
 	while ((node = tgt_node_next_child(main_config, XML_ELEMENT_INIT, node))
@@ -421,10 +428,12 @@ remove_initiator(tgt_node_t *x)
 	free(name);
 	if (node == NULL) {
 		xml_rtn_msg(&msg, ERR_INIT_NOT_FOUND);
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return (msg);
 	}
 	if (tgt_find_value_str(x, XML_ELEMENT_ALL, &name) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_ALL);
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return (msg);
 	}
 	(void) tgt_node_remove(main_config, node, MatchBoth);
@@ -435,6 +444,7 @@ remove_initiator(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 	}
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
 
@@ -450,8 +460,10 @@ remove_tpgt(tgt_node_t *x)
 	tgt_node_t	*c		= NULL;
 	Boolean_t	change_made	= False;
 
+	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return (msg);
 	}
 	while ((node = tgt_node_next_child(main_config, XML_ELEMENT_TPGT, node))
@@ -462,6 +474,7 @@ remove_tpgt(tgt_node_t *x)
 	if (node == NULL) {
 		xml_rtn_msg(&msg, ERR_TPGT_NOT_FOUND);
 		free(prop);
+		(void) pthread_rwlock_unlock(&targ_config_mutex);
 		return (msg);
 	}
 	while ((targ = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
@@ -474,13 +487,17 @@ remove_tpgt(tgt_node_t *x)
 			if (strcmp(lnp->x_value, prop) == 0) {
 				xml_rtn_msg(&msg, ERR_TPGT_IN_USE);
 				free(prop);
+				(void) pthread_rwlock_unlock(
+				    &targ_config_mutex);
 				return (msg);
 			}
 		}
 	}
+	free(prop);
 	if (tgt_find_value_str(x, XML_ELEMENT_IPADDR, &prop) == True) {
 		if (prop == NULL) {
 			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_IPADDR);
+			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (msg);
 		}
 		c = tgt_node_alloc(XML_ELEMENT_IPADDR, String, prop);
@@ -511,6 +528,7 @@ remove_tpgt(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
 
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 
 error:
@@ -518,5 +536,6 @@ error:
 		tgt_node_free(c);
 	if (prop != NULL)
 		free(prop);
+	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
