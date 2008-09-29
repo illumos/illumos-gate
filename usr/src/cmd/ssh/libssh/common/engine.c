@@ -45,12 +45,14 @@ pkcs11_engine_load(int use_engine)
 	ENGINE_load_pk11();
 	/* get structural reference */
 	if ((e = ENGINE_by_id(PKCS11_ENGINE)) == NULL) {
-		fatal("%s engine does not exist", PKCS11_ENGINE);
+		error("%s engine does not exist", PKCS11_ENGINE);
+		return (NULL);
 	}
 
 	/* get functional reference */
 	if (ENGINE_init(e) == 0) {
-		fatal("can't initialize %s engine", PKCS11_ENGINE);
+		error("can't initialize %s engine", PKCS11_ENGINE);
+		return (NULL);
 	}
 
 	debug("%s engine initialized, now setting it as default for "
@@ -68,13 +70,17 @@ pkcs11_engine_load(int use_engine)
 	 * digests to HW actually makes SSH data transfer faster.
 	 */
 	if (!ENGINE_set_default_RSA(e)) {
-		fatal("can't use %s engine for RSA", PKCS11_ENGINE);
+		error("can't use %s engine for RSA", PKCS11_ENGINE);
+		return (NULL);
 	}
 	if (!ENGINE_set_default_DSA(e)) {
-		fatal("can't use %s engine for DSA", PKCS11_ENGINE);
+		error("can't use %s engine for DSA", PKCS11_ENGINE);
+		return (NULL);
 	}
 	if (!ENGINE_set_default_ciphers(e)) {
-		fatal("can't use %s engine for ciphers", PKCS11_ENGINE);
+		error("can't use %s engine for symmetric ciphers",
+		    PKCS11_ENGINE);
+		return (NULL);
 	}
 
 	debug("%s engine initialization complete", PKCS11_ENGINE);

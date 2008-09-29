@@ -987,8 +987,15 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 	 * See comment at definition of will_daemonize for information why we
 	 * don't support the PKCS#11 engine with protocol 1.
 	 */
-	if (compat20 == 1 && options.use_openssl_engine == 1)
+	if (compat20 == 1 && options.use_openssl_engine == 1) {
+		/*
+		 * If this fails then 'e' will be NULL which means we do not use
+		 * the engine, as if UseOpenSSLEngine was set to "no". This is
+		 * important in case we go to the background after the
+		 * authentication.
+		 */
 		e = pkcs11_engine_load(options.use_openssl_engine);
+	}
 
 	/* Put the connection into non-blocking mode. */
 	packet_set_nonblocking();

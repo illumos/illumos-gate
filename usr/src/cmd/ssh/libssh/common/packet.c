@@ -692,6 +692,7 @@ free_keys(Newkeys *keys)
 void
 process_newkeys(int mode)
 {
+	/* this function is for the client only */
 	if (packet_is_server() != 0)
 		return;
 
