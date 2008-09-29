@@ -27,8 +27,6 @@
 #ifndef _TOPO_METHOD_H
 #define	_TOPO_METHOD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -91,7 +89,7 @@ extern int topo_prop_method_version_register(tnode_t *, const char *,
 #define	TOPO_METH_PROP_SET_DESC		"set properties for FMRI"
 #define	TOPO_METH_FACILITY_DESC		"get facility for FMRI"
 
-#define	TOPO_METH_COMPARE_RET		"contains-return"
+#define	TOPO_METH_COMPARE_RET		"compare-return"
 
 #define	TOPO_METH_FMRI_ARG_NAME		"child-name"
 #define	TOPO_METH_FMRI_ARG_INST		"child-inst"

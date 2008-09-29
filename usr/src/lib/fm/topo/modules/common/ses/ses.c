@@ -242,7 +242,7 @@ ses_contains(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 		return (-1);
 
 	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) == 0) {
-		if (nvlist_add_uint32(*out, TOPO_METH_COMPARE_RET,
+		if (nvlist_add_uint32(*out, TOPO_METH_CONTAINS_RET,
 		    ret) == 0)
 			return (0);
 		else

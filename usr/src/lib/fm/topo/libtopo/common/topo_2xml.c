@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <strings.h>
 #include <time.h>
@@ -191,7 +189,13 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 				return;
 
 			if (nelem > 0) {
-				aval = calloc((nelem*9-1), sizeof (uchar_t));
+				if ((aval = calloc((nelem * 9 - 1),
+				    sizeof (uchar_t))) == NULL) {
+
+					topo_hdl_free(thp, val,
+					    nelem * sizeof (uint32_t));
+					return;
+				}
 
 				(void) sprintf(aval, "0x%x", val[0]);
 				for (i = 1; i < nelem; i++) {
