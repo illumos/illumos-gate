@@ -26,8 +26,6 @@
 #ifndef	_INET_SADB_H
 #define	_INET_SADB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -87,6 +85,10 @@ typedef struct ipsa_s {
 	uint64_t *ipsa_integ;	/* Integrity bitmap */
 	uint64_t *ipsa_sens;	/* Sensitivity bitmap */
 	mblk_t	*ipsa_lpkt;	/* Packet received while larval (CAS me) */
+	mblk_t	*ipsa_bpkt_head;	/* Packets received while idle */
+	mblk_t	*ipsa_bpkt_tail;
+#define	SADB_MAX_IDLEPKTS	100
+	uint8_t	ipsa_mblkcnt;	/* Number of packets received while idle */
 
 	/*
 	 * PF_KEYv2 supports a replay window size of 255.  Hence there is a
@@ -137,9 +139,11 @@ typedef struct ipsa_s {
 	time_t ipsa_addtime;	/* Time I was added. */
 	time_t ipsa_usetime;	/* Time of my first use. */
 	time_t ipsa_lastuse;	/* Time of my last use. */
+	time_t	ipsa_idletime;	/* Seconds of idle time */
 	time_t ipsa_last_nat_t_ka;	/* Time of my last NAT-T keepalive. */
 	time_t ipsa_softexpiretime;	/* Time of my first soft expire. */
 	time_t ipsa_hardexpiretime;	/* Time of my first hard expire. */
+	time_t	ipsa_idleexpiretime;	/* Time of my next idle expire time */
 
 	/*
 	 * The following fields are directly reflected in PF_KEYv2 LIFETIME
@@ -150,6 +154,8 @@ typedef struct ipsa_s {
 	time_t ipsa_softuselt;	/* Seconds of soft lifetime after first use. */
 	time_t ipsa_hardaddlt;	/* Seconds of hard lifetime after add. */
 	time_t ipsa_harduselt;	/* Seconds of hard lifetime after first use. */
+	time_t ipsa_idleaddlt;	/* Seconds of idle time after add */
+	time_t ipsa_idleuselt;	/* Seconds of idle time after first use */
 	uint64_t ipsa_softbyteslt;	/* Bytes of soft lifetime. */
 	uint64_t ipsa_hardbyteslt;	/* Bytes of hard lifetime. */
 	uint64_t ipsa_bytes;	/* Bytes encrypted/authed by this SA. */
@@ -364,10 +370,12 @@ typedef struct ipsa_s {
 
 
 /* SA states are important for handling UPDATE PF_KEY messages. */
-#define	IPSA_STATE_LARVAL	SADB_SASTATE_LARVAL
-#define	IPSA_STATE_MATURE	SADB_SASTATE_MATURE
-#define	IPSA_STATE_DYING	SADB_SASTATE_DYING
-#define	IPSA_STATE_DEAD		SADB_SASTATE_DEAD
+#define	IPSA_STATE_LARVAL		SADB_SASTATE_LARVAL
+#define	IPSA_STATE_MATURE		SADB_SASTATE_MATURE
+#define	IPSA_STATE_DYING		SADB_SASTATE_DYING
+#define	IPSA_STATE_DEAD			SADB_SASTATE_DEAD
+#define	IPSA_STATE_IDLE			SADB_X_SASTATE_IDLE
+#define	IPSA_STATE_ACTIVE_ELSEWHERE	SADB_X_SASTATE_ACTIVE_ELSEWHERE
 
 /*
  * NOTE:  If the document authors do things right in defining algorithms, we'll
@@ -599,7 +607,7 @@ void sadb_unlinkassoc(ipsa_t *);
 
 /* Support routines to interface a keysock consumer to PF_KEY. */
 mblk_t *sadb_keysock_out(minor_t);
-int sadb_hardsoftchk(sadb_lifetime_t *, sadb_lifetime_t *);
+int sadb_hardsoftchk(sadb_lifetime_t *, sadb_lifetime_t *, sadb_lifetime_t *);
 void sadb_pfkey_echo(queue_t *, mblk_t *, sadb_msg_t *, struct keysock_in_s *,
     ipsa_t *);
 void sadb_pfkey_error(queue_t *, mblk_t *, int, int, uint_t);
@@ -617,7 +625,7 @@ int sadb_common_add(queue_t *, queue_t *, mblk_t *, sadb_msg_t *,
     netstack_t *, sadbp_t *);
 void sadb_set_usetime(ipsa_t *);
 boolean_t sadb_age_bytes(queue_t *, ipsa_t *, uint64_t, boolean_t);
-int sadb_update_sa(mblk_t *, keysock_in_t *, sadbp_t *,
+int sadb_update_sa(mblk_t *, keysock_in_t *, mblk_t **, sadbp_t *,
     int *, queue_t *, int (*)(mblk_t *, keysock_in_t *, int *, netstack_t *),
     netstack_t *, uint8_t);
 void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
@@ -625,11 +633,11 @@ void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
 void sadb_destroy_acquire(ipsacq_t *, netstack_t *);
 struct ipsec_stack;
 mblk_t *sadb_setup_acquire(ipsacq_t *, uint8_t, struct ipsec_stack *);
-ipsa_t *sadb_getspi(keysock_in_t *, uint32_t, int *, netstack_t *);
+ipsa_t *sadb_getspi(keysock_in_t *, uint32_t, int *, netstack_t *, uint_t);
 void sadb_in_acquire(sadb_msg_t *, sadbp_t *, queue_t *, netstack_t *);
 boolean_t sadb_replay_check(ipsa_t *, uint32_t);
 boolean_t sadb_replay_peek(ipsa_t *, uint32_t);
-int sadb_dump(queue_t *, mblk_t *, minor_t, sadb_t *);
+int sadb_dump(queue_t *, mblk_t *, keysock_in_t *, sadb_t *);
 void sadb_replay_delete(ipsa_t *);
 void sadb_ager(sadb_t *, queue_t *, queue_t *, int, netstack_t *);
 
@@ -638,6 +646,28 @@ timeout_id_t sadb_retimeout(hrtime_t, queue_t *, void (*)(void *), void *,
 void sadb_sa_refrele(void *target);
 void sadb_set_lpkt(ipsa_t *, mblk_t *, netstack_t *);
 mblk_t *sadb_clear_lpkt(ipsa_t *);
+void sadb_buf_pkt(ipsa_t *, mblk_t *, netstack_t *);
+void sadb_clear_buf_pkt(void *ipkt);
+
+#define	HANDLE_BUF_PKT(taskq, stack, dropper, buf_pkt)			\
+{									\
+	if (buf_pkt != NULL) {						\
+		if (taskq_dispatch(taskq, sadb_clear_buf_pkt,		\
+		    (void *) buf_pkt, TQ_NOSLEEP) == 0) {		\
+		    /* Dispatch was unsuccessful drop the packets. */	\
+			mblk_t		*tmp;				\
+			while (buf_pkt != NULL) {			\
+				tmp = buf_pkt->b_next;			\
+				buf_pkt->b_next = NULL;			\
+				ip_drop_packet(buf_pkt, B_TRUE, NULL,	\
+				    NULL, DROPPER(stack,		\
+				    ipds_sadb_inidle_timeout),		\
+				    &dropper);				\
+				buf_pkt = tmp;				\
+			}						\
+		}							\
+	}								\
+}									\
 
 /*
  * Hw accel-related calls (downloading sadb to driver)
@@ -809,6 +839,7 @@ do {									\
 			((uint64_t)(new));				\
 _NOTE(CONSTCOND)							\
 } while (0)
+
 
 #ifdef	__cplusplus
 }

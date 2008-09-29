@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -83,6 +81,10 @@ ip_drop_init(ipsec_stack_t *ipss)
 	    "sadb_inlarval_timeout", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_sadb_inlarval_replace,
 	    "sadb_inlarval_replace", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_sadb_inidle_overflow,
+	    "sadb_inidle_overflow", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_sadb_inidle_timeout,
+	    "sadb_inidle_timeout", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_sadb_acquire_nomem,
 	    "sadb_acquire_nomem", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_sadb_acquire_toofull,

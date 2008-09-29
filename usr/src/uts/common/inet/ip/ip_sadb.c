@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -239,7 +237,7 @@ ipsec_getassocbyconn(isaf_t *bucket, ipsec_out_t *io, uint32_t *src,
 				    retval->ipsa_auth_alg)
 					continue;
 				if (ap->ipa_apply.ipp_ah_minbits >
-					retval->ipsa_authkeybits)
+				    retval->ipsa_authkeybits)
 					continue;
 			} else {
 				if (!(ap->ipa_apply.ipp_use_esp))
@@ -315,7 +313,7 @@ ipsec_getassocbyconn(isaf_t *bucket, ipsec_out_t *io, uint32_t *src,
 		 */
 		if ((retval->ipsa_flags & IPSA_F_UNIQUE) &&
 		    ((unique_id & retval->ipsa_unique_mask) ==
-			retval->ipsa_unique_id))
+		    retval->ipsa_unique_id))
 			break;
 
 		/*
@@ -708,7 +706,8 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 	assoc = ipsec_getassocbyspi(hptr, ah->ah_spi, src_ptr, dst_ptr, af);
 	mutex_exit(&hptr->isaf_lock);
 
-	if (assoc == NULL || assoc->ipsa_state == IPSA_STATE_DEAD) {
+	if (assoc == NULL || assoc->ipsa_state == IPSA_STATE_DEAD ||
+	    assoc->ipsa_state == IPSA_STATE_ACTIVE_ELSEWHERE) {
 		IP_AH_BUMP_STAT(ipss, lookup_failure);
 		IP_AH_BUMP_STAT(ipss, in_discards);
 		ipsecah_in_assocfailure(ipsec_in, 0,
@@ -735,6 +734,7 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 	 * already there (innermost SA "wins". The reference to
 	 * the SA will also be used later when doing the policy checks.
 	 */
+
 	if (ii->ipsec_in_ah_sa != NULL) {
 		IPSA_REFRELE(ii->ipsec_in_ah_sa);
 	}
@@ -790,7 +790,7 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 	if (data_mp->b_datap->db_ref > 1 ||
 	    (data_mp->b_wptr - data_mp->b_rptr) <
 	    (isv6 ? (ntohs(ip6h->ip6_plen) + sizeof (ip6_t))
-		: ntohs(ipha->ipha_length))) {
+	    : ntohs(ipha->ipha_length))) {
 		placeholder = msgpullup(data_mp, -1);
 		if (placeholder == NULL) {
 			IP_ESP_BUMP_STAT(ipss, in_discards);
@@ -846,7 +846,8 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 	    af);
 	mutex_exit(&bucket->isaf_lock);
 
-	if (ipsa == NULL || ipsa->ipsa_state == IPSA_STATE_DEAD) {
+	if (ipsa == NULL || ipsa->ipsa_state == IPSA_STATE_DEAD ||
+	    ipsa->ipsa_state == IPSA_STATE_ACTIVE_ELSEWHERE) {
 		/*  This is a loggable error!  AUDIT ME! */
 		IP_ESP_BUMP_STAT(ipss, lookup_failure);
 		IP_ESP_BUMP_STAT(ipss, in_discards);

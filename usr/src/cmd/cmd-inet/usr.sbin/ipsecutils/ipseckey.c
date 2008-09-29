@@ -31,8 +31,6 @@
  *	to systems without POSIX threads.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -58,10 +56,12 @@
 #include <fcntl.h>
 #include <strings.h>
 #include <ctype.h>
+#include <sys/cladm.h>
 
 #include <ipsec_util.h>
 
 static int keysock;
+static int cluster_socket;
 static uint32_t seq;
 static pid_t mypid;
 static boolean_t vflag = B_FALSE;	/* Verbose? */
@@ -69,6 +69,8 @@ static boolean_t cflag = B_FALSE;	/* Check Only */
 
 char *my_fmri = NULL;
 FILE *debugfile = stdout;
+static struct sockaddr_in cli_addr;
+static boolean_t in_cluster_mode = B_FALSE;
 
 #define	MAX_GET_SIZE	1024
 /*
@@ -436,6 +438,9 @@ parsesatype(char *type, char *ebuf)
 #define	TOK_PAIR_SPI		48
 #define	TOK_FLAG_INBOUND	49
 #define	TOK_FLAG_OUTBOUND	50
+#define	TOK_REPLAY_VALUE	51
+#define	TOK_IDLE_ADDTIME	52
+#define	TOK_IDLE_USETIME	53
 
 static struct toktable {
 	char *string;
@@ -519,6 +524,10 @@ static struct toktable {
 
 	{"outbound",		TOK_FLAG_OUTBOUND,	NULL},
 	{"inbound",		TOK_FLAG_INBOUND,	NULL},
+
+	{"replay_value",	TOK_REPLAY_VALUE,	NEXTNUM},
+	{"idle_addtime",	TOK_IDLE_ADDTIME,	NEXTNUM},
+	{"idle_usetime",	TOK_IDLE_USETIME,	NEXTNUM},
 	{NULL,			TOK_UNKNOWN,		NEXTEOF}
 };
 
@@ -1191,6 +1200,16 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 			if (rc == -1)
 				Bail("write() to PF_KEY socket "
 				    "(in doaddresses)");
+			/*
+			 * Sends the message to the Solaris Cluster daemon
+			 */
+
+			if (in_cluster_mode) {
+				(void) sendto(cluster_socket, buffer,
+				    SADB_64TO8(msgp->sadb_msg_len), 0,
+				    (struct sockaddr *)&cli_addr,
+				    sizeof (cli_addr));
+			}
 
 			time_critical_enter();
 			do {
@@ -1417,6 +1436,12 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 		if (rc == -1)
 			Bail("write() to PF_KEY socket (in doaddresses)");
 
+		if (in_cluster_mode) {
+			(void) sendto(cluster_socket, buffer,
+			    SADB_64TO8(msgp->sadb_msg_len), 0,
+			    (struct sockaddr *)&cli_addr,
+			    sizeof (cli_addr));
+		}
 		/* Blank the key for paranoia's sake. */
 		bzero(buffer, buffer_size);
 		time_critical_enter();
@@ -1541,6 +1566,8 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	struct sadb_key *encrypt = NULL, *auth = NULL;
 	struct sadb_ident *srcid = NULL, *dstid = NULL;
 	struct sadb_lifetime *hard = NULL, *soft = NULL;  /* Current? */
+	struct sadb_lifetime *idle = NULL;
+	struct sadb_x_replay_ctr *replay_ctr = NULL;
 	struct sockaddr_in6 *sin6;
 	/* MLS TODO:  Need sensitivity eventually. */
 	int next, token, sa_len, alloclen, totallen = sizeof (msg), prefix;
@@ -2419,6 +2446,58 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		case TOK_FLAG_OUTBOUND:
 			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_OUTBOUND;
 			break;
+		case TOK_REPLAY_VALUE:
+			if (replay_ctr != NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single "
+				    "replay value."));
+				break;
+			}
+			replay_ctr = calloc(1, sizeof (*replay_ctr));
+			if (replay_ctr == NULL) {
+				Bail("malloc(replay value)");
+			}
+			/*
+			 * We currently do not support a 64-bit
+			 * replay value.  RFC 4301 will require one,
+			 * however, and we have a field in place when
+			 * 4301 is built.
+			 */
+			replay_ctr->sadb_x_rc_exttype = SADB_X_EXT_REPLAY_VALUE;
+			replay_ctr->sadb_x_rc_len =
+			    SADB_8TO64(sizeof (*replay_ctr));
+			totallen += sizeof (*replay_ctr);
+			replay_ctr->sadb_x_rc_replay32 = (uint32_t)parsenum(
+			    *argv, B_TRUE, ebuf);
+			argv++;
+			break;
+		case TOK_IDLE_ADDTIME:
+		case TOK_IDLE_USETIME:
+			if (idle == NULL) {
+				idle = calloc(1, sizeof (*idle));
+				if (idle == NULL) {
+					Bail("malloc idle lifetime");
+				}
+				idle->sadb_lifetime_exttype =
+				    SADB_X_EXT_LIFETIME_IDLE;
+				idle->sadb_lifetime_len =
+				    SADB_8TO64(sizeof (*idle));
+				totallen += sizeof (*idle);
+			}
+			switch (token) {
+			case TOK_IDLE_ADDTIME:
+				idle->sadb_lifetime_addtime =
+				    (uint32_t)parsenum(*argv,
+				    B_TRUE, ebuf);
+				break;
+			case TOK_IDLE_USETIME:
+				idle->sadb_lifetime_usetime =
+				    (uint32_t)parsenum(*argv,
+				    B_TRUE, ebuf);
+				break;
+			}
+			argv++;
+			break;
 		default:
 			ERROR1(ep, ebuf, gettext(
 			    "Don't use extension %s for add/update.\n"),
@@ -2601,6 +2680,12 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		free(soft);
 	}
 
+	if (idle != NULL) {
+		bcopy(idle, nexthdr, SADB_64TO8(idle->sadb_lifetime_len));
+		nexthdr += idle->sadb_lifetime_len;
+		free(idle);
+	}
+
 	if (encrypt == NULL && auth == NULL && cmd == CMD_ADD) {
 		ERROR(ep, ebuf, gettext(
 		    "Must have at least one key for an add.\n"));
@@ -2704,6 +2789,13 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		((struct sockaddr_in6 *)(idst + 1))->sin6_port =
 		    htons(idstport);
 		nexthdr += idst->sadb_address_len;
+	}
+
+	if (replay_ctr != NULL) {
+		bcopy(replay_ctr, nexthdr,
+		    SADB_64TO8(replay_ctr->sadb_x_rc_len));
+		nexthdr += replay_ctr->sadb_x_rc_len;
+		free(replay_ctr);
 	}
 
 	if (cflag) {
@@ -3289,6 +3381,7 @@ main(int argc, char *argv[])
 	boolean_t dosave = B_FALSE, readfile = B_FALSE;
 	char *configfile = NULL;
 	struct stat sbuf;
+	int bootflags;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -3381,6 +3474,15 @@ main(int argc, char *argv[])
 			/* some other reason */
 			EXIT_FATAL("Opening PF_KEY socket");
 		}
+	}
+
+	if ((_cladm(CL_INITIALIZE, CL_GET_BOOTFLAG, &bootflags) != 0) ||
+	    (bootflags & CLUSTER_BOOTED)) {
+		in_cluster_mode = B_TRUE;
+		cluster_socket = socket(AF_INET, SOCK_DGRAM, 0);
+		cli_addr.sin_family = AF_INET;
+		cli_addr.sin_addr.s_addr = INADDR_LOOPBACK;
+		cli_addr.sin_port = htons(CLUSTER_UDP_PORT);
 	}
 
 	if (dosave) {

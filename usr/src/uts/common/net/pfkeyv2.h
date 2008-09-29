@@ -26,8 +26,6 @@
 #ifndef	_NET_PFKEYV2_H
 #define	_NET_PFKEYV2_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Definitions and structures for PF_KEY version 2.  See RFC 2367 for
  * more details.  SA == Security Association, which is what PF_KEY provides
@@ -498,6 +496,29 @@ typedef struct sadb_x_pair {
 } sadb_x_pair_t;
 
 /*
+ * For the Sequence numbers to be used with SADB_DUMP, SADB_GET, SADB_UPDATE.
+ */
+
+typedef struct sadb_x_replay_ctr {
+	uint16_t sadb_x_rc_len;
+	uint16_t sadb_x_rc_exttype;
+	uint32_t sadb_x_rc_replay32;    /* For 240x SAs. */
+	uint64_t sadb_x_rc_replay64;    /* For 430x SAs. */
+} sadb_x_replay_ctr_t;
+
+/*
+ * For extended DUMP request. Dumps the SAs which were idle for
+ * longer than the timeout specified.
+ */
+
+typedef struct sadb_x_edump {
+	uint16_t sadb_x_edump_len;
+	uint16_t sadb_x_edump_exttype;
+	uint32_t sadb_x_edump_reserved;
+	uint64_t sadb_x_edump_timeout;
+} sadb_x_edump_t;
+
+/*
  * Base message types.
  */
 
@@ -515,8 +536,9 @@ typedef struct sadb_x_pair {
 #define	SADB_X_PROMISC	11
 #define	SADB_X_INVERSE_ACQUIRE	12
 #define	SADB_X_UPDATEPAIR	13
-#define	SADB_X_DELPAIR	14
-#define	SADB_MAX	14
+#define	SADB_X_DELPAIR		14
+#define	SADB_X_DELPAIR_STATE	15
+#define	SADB_MAX		15
 
 /*
  * SA flags
@@ -553,12 +575,15 @@ typedef struct sadb_x_pair {
  * SA state.
  */
 
-#define	SADB_SASTATE_LARVAL	  0
-#define	SADB_SASTATE_MATURE	  1
-#define	SADB_SASTATE_DYING	  2
-#define	SADB_SASTATE_DEAD	  3
+#define	SADB_SASTATE_LARVAL		0
+#define	SADB_SASTATE_MATURE		1
+#define	SADB_SASTATE_DYING		2
+#define	SADB_SASTATE_DEAD		3
+#define	SADB_X_SASTATE_ACTIVE_ELSEWHERE	4
+#define	SADB_X_SASTATE_IDLE		5
+#define	SADB_X_SASTATE_ACTIVE		6
 
-#define	SADB_SASTATE_MAX	  3
+#define	SADB_SASTATE_MAX		6
 
 /*
  * SA type.  Gaps are present in the number space because (for the time being)
@@ -633,8 +658,11 @@ typedef struct sadb_x_pair {
 #define	SADB_X_EXT_ADDRESS_NATT_REM	21
 #define	SADB_X_EXT_ADDRESS_INNER_DST	22
 #define	SADB_X_EXT_PAIR			23
+#define	SADB_X_EXT_REPLAY_VALUE		24
+#define	SADB_X_EXT_EDUMP		25
+#define	SADB_X_EXT_LIFETIME_IDLE	26
 
-#define	SADB_EXT_MAX			23
+#define	SADB_EXT_MAX			26
 
 /*
  * Identity types.

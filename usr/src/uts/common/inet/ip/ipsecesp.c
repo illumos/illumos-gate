@@ -144,6 +144,8 @@ static boolean_t esp_strip_header(mblk_t *, boolean_t, uint32_t,
 static ipsec_status_t esp_submit_req_inbound(mblk_t *, ipsa_t *, uint_t);
 static ipsec_status_t esp_submit_req_outbound(mblk_t *, ipsa_t *, uchar_t *,
     uint_t);
+extern void (*cl_inet_getspi)(uint8_t, uint8_t *, size_t);
+
 /* Setable in /etc/system */
 uint32_t esp_hash_size = IPSEC_DEFAULT_HASH_SIZE;
 
@@ -1484,9 +1486,15 @@ esp_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecesp_stack_t *espstack)
 	/*
 	 * Randomly generate a proposed SPI value
 	 */
-	(void) random_get_pseudo_bytes((uint8_t *)&newspi, sizeof (uint32_t));
+	if (cl_inet_getspi != NULL) {
+		cl_inet_getspi(IPPROTO_ESP, (uint8_t *)&newspi,
+		    sizeof (uint32_t));
+	} else {
+		(void) random_get_pseudo_bytes((uint8_t *)&newspi,
+		    sizeof (uint32_t));
+	}
 	newbie = sadb_getspi(ksi, newspi, &diagnostic,
-	    espstack->ipsecesp_netstack);
+	    espstack->ipsecesp_netstack, IPPROTO_ESP);
 
 	if (newbie == NULL) {
 		sadb_pfkey_error(espstack->esp_pfkey_q, mp, ENOMEM, diagnostic,
@@ -1733,7 +1741,6 @@ esp_port_freshness(uint32_t ports, ipsa_t *assoc)
 	IPSA_REFRELE(outbound_peer);
 	ESP_BUMP_STAT(espstack, sa_port_renumbers);
 }
-
 /*
  * Finish processing of an inbound ESP packet after processing by the
  * crypto framework.
@@ -3417,6 +3424,8 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_SOFT];
 	sadb_lifetime_t *hard =
 	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_HARD];
+	sadb_lifetime_t *idle =
+	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_X_EXT_LIFETIME_IDLE];
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
@@ -3455,7 +3464,9 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 
 	/* Sundry ADD-specific reality checks. */
 	/* XXX STATS :  Logging/stats here? */
-	if (assoc->sadb_sa_state != SADB_SASTATE_MATURE) {
+
+	if ((assoc->sadb_sa_state != SADB_SASTATE_MATURE) &&
+	    (assoc->sadb_sa_state != SADB_X_SASTATE_ACTIVE_ELSEWHERE)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SASTATE;
 		return (EINVAL);
 	}
@@ -3475,7 +3486,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		return (EINVAL);
 	}
 
-	if ((*diagnostic = sadb_hardsoftchk(hard, soft)) != 0) {
+	if ((*diagnostic = sadb_hardsoftchk(hard, soft, idle)) != 0) {
 		return (EINVAL);
 	}
 	ASSERT(src->sin_family == dst->sin_family);
@@ -3608,6 +3619,10 @@ static int
 esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
     ipsecesp_stack_t *espstack, uint8_t sadb_msg_type)
 {
+	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
+	mblk_t    *buf_pkt;
+	int rcode;
+
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
 
@@ -3616,9 +3631,20 @@ esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		return (EINVAL);
 	}
 
-	return (sadb_update_sa(mp, ksi, &espstack->esp_sadb,
-	    diagnostic, espstack->esp_pfkey_q,
-	    esp_add_sa, espstack->ipsecesp_netstack, sadb_msg_type));
+	rcode = sadb_update_sa(mp, ksi, &buf_pkt, &espstack->esp_sadb,
+	    diagnostic, espstack->esp_pfkey_q, esp_add_sa,
+	    espstack->ipsecesp_netstack, sadb_msg_type);
+
+	if ((assoc->sadb_sa_state != SADB_X_SASTATE_ACTIVE) ||
+	    (rcode != 0)) {
+		return (rcode);
+	}
+
+	HANDLE_BUF_PKT(esp_taskq,
+	    espstack->ipsecesp_netstack->netstack_ipsec,
+	    espstack->esp_dropper, buf_pkt);
+
+	return (rcode);
 }
 
 /*
@@ -3669,12 +3695,12 @@ esp_dump(mblk_t *mp, keysock_in_t *ksi, ipsecesp_stack_t *espstack)
 	 * Dump each fanout, bailing if error is non-zero.
 	 */
 
-	error = sadb_dump(espstack->esp_pfkey_q, mp, ksi->ks_in_serial,
+	error = sadb_dump(espstack->esp_pfkey_q, mp, ksi,
 	    &espstack->esp_sadb.s_v4);
 	if (error != 0)
 		goto bail;
 
-	error = sadb_dump(espstack->esp_pfkey_q, mp, ksi->ks_in_serial,
+	error = sadb_dump(espstack->esp_pfkey_q, mp, ksi,
 	    &espstack->esp_sadb.s_v6);
 bail:
 	ASSERT(mp->b_cont != NULL);
@@ -3757,6 +3783,7 @@ esp_parse_pfkey(mblk_t *mp, ipsecesp_stack_t *espstack)
 		break;
 	case SADB_DELETE:
 	case SADB_X_DELPAIR:
+	case SADB_X_DELPAIR_STATE:
 		error = esp_del_sa(mp, ksi, &diagnostic, espstack,
 		    samsg->sadb_msg_type);
 		if (error != 0) {

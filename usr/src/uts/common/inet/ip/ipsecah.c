@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -34,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/mkdev.h>
 #include <sys/kmem.h>
 #include <sys/zone.h>
 #include <sys/sysmacros.h>
@@ -151,6 +150,8 @@ static void ah_send_acquire(ipsacq_t *, mblk_t *, netstack_t *);
 static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *);
 static void	*ipsecah_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecah_stack_fini(netstackid_t stackid, void *arg);
+
+extern void (*cl_inet_getspi)(uint8_t, uint8_t *, size_t);
 
 /* Setable in /etc/system */
 uint32_t ah_hash_size = IPSEC_DEFAULT_HASH_SIZE;
@@ -1102,6 +1103,8 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_SOFT];
 	sadb_lifetime_t *hard =
 	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_HARD];
+	sadb_lifetime_t *idle =
+	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_X_EXT_LIFETIME_IDLE];
 	ipsec_alginfo_t *aalg;
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
@@ -1138,7 +1141,8 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	/* Sundry ADD-specific reality checks. */
 	/* XXX STATS : Logging/stats here? */
 
-	if (assoc->sadb_sa_state != SADB_SASTATE_MATURE) {
+	if ((assoc->sadb_sa_state != SADB_SASTATE_MATURE) &&
+	    (assoc->sadb_sa_state != SADB_X_SASTATE_ACTIVE_ELSEWHERE)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SASTATE;
 		return (EINVAL);
 	}
@@ -1150,8 +1154,7 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}
-
-	if ((*diagnostic = sadb_hardsoftchk(hard, soft)) != 0)
+	if ((*diagnostic = sadb_hardsoftchk(hard, soft, idle)) != 0)
 		return (EINVAL);
 
 	ASSERT(src->sin_family == dst->sin_family);
@@ -1208,16 +1211,31 @@ static int
 ah_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
     ipsecah_stack_t *ahstack, uint8_t sadb_msg_type)
 {
+	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
+	mblk_t	*buf_pkt;
+	int rcode;
 
 	if (dstext == NULL) {
 		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_DST;
 		return (EINVAL);
 	}
-	return (sadb_update_sa(mp, ksi, &ahstack->ah_sadb, diagnostic,
-	    ahstack->ah_pfkey_q, ah_add_sa, ahstack->ipsecah_netstack,
-	    sadb_msg_type));
+
+	rcode = sadb_update_sa(mp, ksi, &buf_pkt, &ahstack->ah_sadb,
+	    diagnostic, ahstack->ah_pfkey_q, ah_add_sa,
+	    ahstack->ipsecah_netstack, sadb_msg_type);
+
+	if ((assoc->sadb_sa_state != SADB_X_SASTATE_ACTIVE) ||
+	    (rcode != 0)) {
+		return (rcode);
+	}
+
+	HANDLE_BUF_PKT(ah_taskq,
+	    ahstack->ipsecah_netstack->netstack_ipsec, ahstack->ah_dropper,
+	    buf_pkt);
+
+	return (rcode);
 }
 
 /*
@@ -1268,13 +1286,11 @@ ah_dump(mblk_t *mp, keysock_in_t *ksi, ipsecah_stack_t *ahstack)
 	 * Dump each fanout, bailing if error is non-zero.
 	 */
 
-	error = sadb_dump(ahstack->ah_pfkey_q, mp, ksi->ks_in_serial,
-	    &ahstack->ah_sadb.s_v4);
+	error = sadb_dump(ahstack->ah_pfkey_q, mp, ksi, &ahstack->ah_sadb.s_v4);
 	if (error != 0)
 		goto bail;
 
-	error = sadb_dump(ahstack->ah_pfkey_q, mp, ksi->ks_in_serial,
-	    &ahstack->ah_sadb.s_v6);
+	error = sadb_dump(ahstack->ah_pfkey_q, mp, ksi, &ahstack->ah_sadb.s_v6);
 bail:
 	ASSERT(mp->b_cont != NULL);
 	samsg = (sadb_msg_t *)mp->b_cont->b_rptr;
@@ -1365,6 +1381,7 @@ ah_parse_pfkey(mblk_t *mp, ipsecah_stack_t *ahstack)
 		break;
 	case SADB_DELETE:
 	case SADB_X_DELPAIR:
+	case SADB_X_DELPAIR_STATE:
 		error = ah_del_sa(mp, ksi, &diagnostic, ahstack,
 		    samsg->sadb_msg_type);
 		if (error != 0) {
@@ -1941,9 +1958,15 @@ ah_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecah_stack_t *ahstack)
 	/*
 	 * Randomly generate a proposed SPI value.
 	 */
-	(void) random_get_pseudo_bytes((uint8_t *)&newspi, sizeof (uint32_t));
+	if (cl_inet_getspi != NULL) {
+		cl_inet_getspi(IPPROTO_AH, (uint8_t *)&newspi,
+		    sizeof (uint32_t));
+	} else {
+		(void) random_get_pseudo_bytes((uint8_t *)&newspi,
+		    sizeof (uint32_t));
+	}
 	newbie = sadb_getspi(ksi, newspi, &diagnostic,
-	    ahstack->ipsecah_netstack);
+	    ahstack->ipsecah_netstack, IPPROTO_AH);
 
 	if (newbie == NULL) {
 		sadb_pfkey_error(ahstack->ah_pfkey_q, mp, ENOMEM, diagnostic,

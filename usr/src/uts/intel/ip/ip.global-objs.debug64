@@ -33,6 +33,10 @@ cl_inet_isclusterwide
 cl_inet_listen
 cl_inet_unbind
 cl_inet_unlisten
+cl_inet_getspi
+cl_inet_checkspi
+cl_inet_deletespi
+cl_inet_idlesa
 cl_sctp_assoc_change
 cl_sctp_check_addrs
 cl_sctp_connect

@@ -26,8 +26,6 @@
 #ifndef	_IKEDOOR_H
 #define	_IKEDOOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -80,6 +78,15 @@ typedef enum {
 
 	IKE_SVC_ERROR
 } ike_svccmd_t;
+
+/* DPD status */
+
+typedef enum dpd_status {
+	DPD_NOT_INITIATED = 0,
+	DPD_IN_PROGRESS,
+	DPD_SUCCESSFUL,
+	DPD_FAILURE
+} dpd_status_t;
 
 #define	IKE_SVC_MAX	IKE_SVC_ERROR
 
@@ -161,8 +168,10 @@ typedef struct {
 	uint32_t	rule_p1_nonce_len;
 	uint32_t	rule_p2_lifetime_secs;
 	uint32_t	rule_p2_softlife_secs;
+	uint32_t	rule_p2_idletime_secs;
 	uint32_t	sys_p2_lifetime_secs;
 	uint32_t	sys_p2_softlife_secs;
+	uint32_t	sys_p2_idletime_secs;
 	uint32_t	rule_p2_lifetime_kb;
 	uint32_t	rule_p2_softlife_kb;
 	uint32_t	sys_p2_lifetime_bytes;
@@ -197,6 +206,9 @@ typedef struct {
 	uint8_t		p1hdr_xchg;
 	uint8_t		p1hdr_isinit;
 	uint32_t	p1hdr_state;
+	boolean_t	p1hdr_support_dpd;
+	dpd_status_t	p1hdr_dpd_state;
+	time_t		p1hdr_dpd_time;
 } ike_p1_hdr_t;
 
 /* values for p1hdr_xchg (aligned with RFC2408, section 3.1) */
@@ -344,6 +356,7 @@ typedef struct {
 	uint32_t	rule_p2_pfs;
 	uint32_t	rule_p2_lifetime_secs;
 	uint32_t	rule_p2_softlife_secs;
+	uint32_t	rule_p2_idletime_secs;
 	uint32_t	rule_p2_lifetime_kb;
 	uint32_t	rule_p2_softlife_kb;
 	uint16_t	rule_xform_cnt;

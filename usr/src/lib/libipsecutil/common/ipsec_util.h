@@ -26,8 +26,6 @@
 #ifndef	_IPSEC_UTIL_H
 #define	_IPSEC_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Headers and definitions for support functions that are shared by
  * the ipsec utilities ipseckey and ikeadm.
@@ -83,6 +81,12 @@ extern "C" {
 #define	INSECURE_PERMS(sbuf)	(((sbuf).st_uid != 0) || \
 	((sbuf).st_mode & S_IRWXG) || ((sbuf).st_mode & S_IRWXO))
 #endif
+
+/*
+ * Solaris UDP port used to communicate with the Solaris Cluster
+ * daemon. It is used only when the node is booted in cluster mode.
+ */
+#define	CLUSTER_UDP_PORT	2005
 
 /* For keyword-lookup tables */
 typedef struct keywdtab {
@@ -327,7 +331,8 @@ extern void print_sa(FILE *, char *, struct sadb_sa *);
 extern void printsatime(FILE *, int64_t, const char *, const char *,
     const char *, boolean_t);
 extern void print_lifetimes(FILE *, time_t, struct sadb_lifetime *,
-    struct sadb_lifetime *, struct sadb_lifetime *, boolean_t vflag);
+    struct sadb_lifetime *, struct sadb_lifetime *, struct sadb_lifetime *,
+    boolean_t vflag);
 extern void print_address(FILE *, char *, struct sadb_address *, boolean_t);
 extern void print_asn1_name(FILE *, const unsigned char *, long);
 extern void print_key(FILE *, char *, struct sadb_key *);

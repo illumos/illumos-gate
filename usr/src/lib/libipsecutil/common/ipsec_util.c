@@ -1494,7 +1494,7 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 	}
 
 	(void) fprintf(file, dgettext(TEXT_DOMAIN,
-	    "%sSADB_ASSOC spi=0x%x, replay=%u, state="),
+	    "%sSADB_ASSOC spi=0x%x, replay window size=%u, state="),
 	    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
 	switch (assoc->sadb_sa_state) {
 	case SADB_SASTATE_LARVAL:
@@ -1508,6 +1508,13 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 		break;
 	case SADB_SASTATE_DEAD:
 		(void) fprintf(file, dgettext(TEXT_DOMAIN, "DEAD"));
+		break;
+	case SADB_X_SASTATE_ACTIVE_ELSEWHERE:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "ACTIVE_ELSEWHERE"));
+		break;
+	case SADB_X_SASTATE_IDLE:
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "IDLE"));
 		break;
 	default:
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
@@ -1595,12 +1602,14 @@ printsatime(FILE *file, int64_t lt, const char *msg, const char *pfx,
  */
 void
 print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
-    struct sadb_lifetime *hard, struct sadb_lifetime *soft, boolean_t vflag)
+    struct sadb_lifetime *hard, struct sadb_lifetime *soft,
+    struct sadb_lifetime *idle, boolean_t vflag)
 {
 	int64_t scratch;
 	char *soft_prefix = dgettext(TEXT_DOMAIN, "SLT: ");
 	char *hard_prefix = dgettext(TEXT_DOMAIN, "HLT: ");
 	char *current_prefix = dgettext(TEXT_DOMAIN, "CLT: ");
+	char *idle_prefix = dgettext(TEXT_DOMAIN, "ILT: ");
 
 	if (current != NULL &&
 	    current->sadb_lifetime_len != SADB_8TO64(sizeof (*current))) {
@@ -1621,6 +1630,13 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
 		    "WARNING: SOFT lifetime extension length (%u) is bad."),
 		    SADB_64TO8(soft->sadb_lifetime_len));
+	}
+
+	if (idle != NULL &&
+	    idle->sadb_lifetime_len != SADB_8TO64(sizeof (*idle))) {
+		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
+		    "WARNING: IDLE lifetime extension length (%u) is bad."),
+		    SADB_64TO8(idle->sadb_lifetime_len));
 	}
 
 	(void) fprintf(file, " LT: Lifetime information\n");
@@ -1773,6 +1789,16 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 				    "%sat %s.\n"), "", hard_prefix, vflag);
 			}
 		}
+	}
+	if (idle != NULL) {
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%sIdle lifetime information:  "), idle_prefix);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%s%llu seconds of post-add lifetime.\n"),
+		    idle_prefix, idle->sadb_lifetime_addtime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%s%llu seconds of post-use lifetime.\n"),
+		    idle_prefix, idle->sadb_lifetime_usetime);
 	}
 }
 
@@ -2157,6 +2183,30 @@ print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 	    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
 	    kmc->sadb_x_kmc_proto, cookie_label, kmc->sadb_x_kmc_cookie);
 }
+
+/*
+ * Print an SADB_X_EXT_REPLAY_CTR extension.
+ */
+
+void
+print_replay(FILE *file, char *prefix, sadb_x_replay_ctr_t *repl)
+{
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
+	    "%sReplay Value "), prefix);
+	if ((repl->sadb_x_rc_replay32 == 0) &&
+	    (repl->sadb_x_rc_replay64 == 0)) {
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "<Value not found.>"));
+	}
+	/*
+	 * We currently do not support a 64-bit replay value.
+	 * RFC 4301 will require one, however, and we have a field
+	 * in place when 4301 is built.
+	 */
+	(void) fprintf(file, "% " PRIu64 "\n",
+	    ((repl->sadb_x_rc_replay32 == 0) ?
+	    repl->sadb_x_rc_replay64 : repl->sadb_x_rc_replay32));
+}
 /*
  * Print an SADB_X_EXT_PAIR extension.
  */
@@ -2179,6 +2229,7 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
 	struct sadb_ext *ext;
 	struct sadb_lifetime *currentlt = NULL, *hardlt = NULL, *softlt = NULL;
+	struct sadb_lifetime *idlelt = NULL;
 	int i;
 	time_t wallclock;
 
@@ -2208,6 +2259,9 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 			break;
 		case SADB_EXT_LIFETIME_SOFT:
 			softlt = (struct sadb_lifetime *)current;
+			break;
+		case SADB_X_EXT_LIFETIME_IDLE:
+			idlelt = (struct sadb_lifetime *)current;
 			break;
 
 		case SADB_EXT_ADDRESS_SRC:
@@ -2282,6 +2336,10 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 			print_pair(file, dgettext(TEXT_DOMAIN, "OTH: "),
 			    (struct sadb_x_pair *)current);
 			break;
+		case SADB_X_EXT_REPLAY_VALUE:
+			(void) print_replay(file, dgettext(TEXT_DOMAIN,
+			    "RPL: "), (sadb_x_replay_ctr_t *)current);
+			break;
 		default:
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    "UNK: Unknown ext. %d, len %d.\n"),
@@ -2298,9 +2356,10 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 	/*
 	 * Print lifetimes NOW.
 	 */
-	if (currentlt != NULL || hardlt != NULL || softlt != NULL)
-		print_lifetimes(file, wallclock, currentlt, hardlt, softlt,
-		    vflag);
+	if (currentlt != NULL || hardlt != NULL || softlt != NULL ||
+	    idlelt != NULL)
+		print_lifetimes(file, wallclock, currentlt, hardlt,
+		    softlt, idlelt, vflag);
 
 	if (current - buffer != samsg->sadb_msg_len) {
 		warnxfp(EFD(file), dgettext(TEXT_DOMAIN,
@@ -2328,8 +2387,17 @@ save_lifetime(struct sadb_lifetime *lifetime, FILE *ofile)
 {
 	char *prefix;
 
-	prefix = (lifetime->sadb_lifetime_exttype == SADB_EXT_LIFETIME_SOFT) ?
-	    "soft" : "hard";
+	switch (lifetime->sadb_lifetime_exttype) {
+	case SADB_EXT_LIFETIME_HARD:
+		prefix = "hard";
+		break;
+	case SADB_EXT_LIFETIME_SOFT:
+		prefix = "soft";
+		break;
+	case SADB_X_EXT_LIFETIME_IDLE:
+		prefix = "idle";
+		break;
+	}
 
 	if (putc('\t', ofile) == EOF)
 		return (B_FALSE);
@@ -2499,6 +2567,7 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 	boolean_t seen_proto = B_FALSE, seen_iproto = B_FALSE;
 	uint64_t *current;
 	struct sadb_address *addr;
+	struct sadb_x_replay_ctr *repl;
 	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
 	struct sadb_ext *ext;
 
@@ -2575,6 +2644,7 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 			break;
 		case SADB_EXT_LIFETIME_HARD:
 		case SADB_EXT_LIFETIME_SOFT:
+		case SADB_X_EXT_LIFETIME_IDLE:
 			if (!save_lifetime((struct sadb_lifetime *)ext,
 			    ofile)) {
 				tidyup();
@@ -2623,6 +2693,23 @@ skip_srcdst:
 			if (!save_ident((struct sadb_ident *)ext, ofile)) {
 				tidyup();
 				bail(dgettext(TEXT_DOMAIN, "save_address"));
+			}
+			savenl();
+			break;
+		case SADB_X_EXT_REPLAY_VALUE:
+			repl = (sadb_x_replay_ctr_t *)ext;
+			if ((repl->sadb_x_rc_replay32 == 0) &&
+			    (repl->sadb_x_rc_replay64 == 0)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "Replay Value"));
+			}
+			if (fprintf(ofile, "replay_value %" PRIu64 "",
+			    (repl->sadb_x_rc_replay32 == 0 ?
+			    repl->sadb_x_rc_replay64 :
+			    repl->sadb_x_rc_replay32)) < 0) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN,
+				    "save_assoc: fprintf replay value"));
 			}
 			savenl();
 			break;

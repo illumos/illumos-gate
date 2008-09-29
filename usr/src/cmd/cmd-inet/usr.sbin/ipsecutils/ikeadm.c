@@ -1377,6 +1377,9 @@ dhstr(int grp)
 static void
 print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 {
+	char sbuf[TBUF_SIZE];
+	char tbuf[TBUF_SIZE];
+
 	(void) printf(
 	    gettext("%s Cookies: Initiator 0x%llx  Responder 0x%llx\n"),
 	    prefix, ntohll(hdrp->p1hdr_cookies.cky_i),
@@ -1385,8 +1388,36 @@ print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 	    hdrp->p1hdr_isinit ? gettext("initiator") : gettext("responder"));
 	(void) printf(gettext("%s ISAKMP version %d.%d; %s exchange\n"), prefix,
 	    hdrp->p1hdr_major, hdrp->p1hdr_minor, xchgstr(hdrp->p1hdr_xchg));
-	(void) printf(gettext("%s Current state is %s"), prefix,
+	(void) printf(gettext("%s Current state is %s\n"), prefix,
 	    statestr(hdrp->p1hdr_state));
+	if (hdrp->p1hdr_support_dpd == B_FALSE) {
+		return;
+	}
+	(void) printf(gettext("%s Dead Peer Detection (RFC 3706)"
+	    " enabled"), prefix);
+	if (hdrp->p1hdr_dpd_state < DPD_IN_PROGRESS) {
+		(void) printf("\n");
+		return;
+	}
+	if (strftime(tbuf, TBUF_SIZE, NULL,
+	    localtime(&hdrp->p1hdr_dpd_time)) == 0) {
+		(void) strlcpy(tbuf, gettext("<time conversion failed>"),
+		    TBUF_SIZE);
+	}
+	(void) printf(gettext("\n%s Dead Peer Detection handshake "), prefix);
+	switch (hdrp->p1hdr_dpd_state) {
+	case DPD_SUCCESSFUL:
+		(void) strlcpy(sbuf, gettext("was successful at "), TBUF_SIZE);
+		(void) printf("%s %s", sbuf, tbuf);
+		break;
+	case DPD_FAILURE:
+		(void) strlcpy(sbuf, gettext("failed at "), TBUF_SIZE);
+		(void) printf("%s %s", sbuf, tbuf);
+		break;
+	case DPD_IN_PROGRESS:
+		(void) strlcpy(sbuf, gettext("is in progress."), TBUF_SIZE);
+		break;
+	}
 	(void) printf("\n");
 }
 
@@ -1863,6 +1894,9 @@ print_rule(ike_rule_t *rp)
 	    gettext("GLOBL: p2_lifetime=%u seconds, p2_softlife=%u seconds\n"),
 	    rp->rule_p2_lifetime_secs, rp->rule_p2_softlife_secs);
 	(void) printf(
+	    gettext("GLOBL: p2_idletime=%u seconds\n"),
+	    rp->rule_p2_idletime_secs);
+	(void) printf(
 	    gettext("GLOBL: p2_lifetime_kb=%u seconds,"
 	    " p2_softlife_kb=%u seconds\n"),
 	    rp->rule_p2_lifetime_kb, rp->rule_p2_softlife_kb);
@@ -2003,6 +2037,10 @@ do_print_defaults(ike_defaults_t *dp)
 	    gettext("seconds"), B_FALSE, ddp->rule_p2_softlife_secs,
 	    dp->rule_p2_softlife_secs);
 
+	print_defaults("p2_idletime_secs", gettext("phase 2 idle time"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p2_idletime_secs,
+	    dp->rule_p2_idletime_secs);
+
 	print_defaults("-", gettext("system phase 2 lifetime"),
 	    gettext("seconds"), B_FALSE, ddp->sys_p2_lifetime_secs,
 	    dp->sys_p2_lifetime_secs);
@@ -2010,6 +2048,10 @@ do_print_defaults(ike_defaults_t *dp)
 	print_defaults("-", gettext("system phase 2 soft lifetime"),
 	    gettext("seconds"), B_FALSE, ddp->sys_p2_softlife_secs,
 	    dp->sys_p2_softlife_secs);
+
+	print_defaults("-", gettext("system phase 2 idle time"),
+	    gettext("seconds"), B_FALSE, ddp->sys_p2_idletime_secs,
+	    dp->sys_p2_idletime_secs);
 
 	print_defaults("p2_lifetime_kb", gettext("phase 2 lifetime"),
 	    gettext("bytes"), B_TRUE, ddp->rule_p2_lifetime_kb,

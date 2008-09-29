@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INET_IPDROP_H
 #define	_INET_IPDROP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,6 +62,8 @@ struct ip_dropstats {
 	/* SADB-specific drop statistics. */
 	kstat_named_t ipds_sadb_inlarval_timeout;
 	kstat_named_t ipds_sadb_inlarval_replace;
+	kstat_named_t ipds_sadb_inidle_timeout;
+	kstat_named_t ipds_sadb_inidle_overflow;
 	kstat_named_t ipds_sadb_acquire_nomem;
 	kstat_named_t ipds_sadb_acquire_toofull;
 	kstat_named_t ipds_sadb_acquire_timeout;
