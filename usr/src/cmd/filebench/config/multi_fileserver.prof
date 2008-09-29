@@ -22,28 +22,31 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Example multi-client fileserver workload. Three clients named "client1",
+# "client2" and "client3" access one file server whose shared directory is
+# mounted on each client under the pathname "/theserver". This will run the
+# fileserver workload on each of the clients, using seperate filesets for
+# each server.
 
-.KEEP_STATE:
+MULTICLIENT {
+	targetpath = /theserver;
+	clients = client1, client2, client3;
+}
 
-include ../../Makefile.cmd
+DEFAULTS {
+	runtime = 60;
+        dir = /tmp;
+        stats = /tmp;
+	filesystem = nfs;
+	description = "fileserver nfs";
+}
 
-CONFIGS = fileio.prof filemacro.prof filemicro.prof generic.func \
-seqread.prof randomread.prof multi_fileserver.prof
-ROOTUSRBENCHDIR = $(ROOT)/usr/benchmarks
-ROOTUSRBENCHFBCONFIGDIR = $(ROOTUSRBENCHDIR)/filebench/config
-FBCONFIGS = $(CONFIGS:%=$(ROOTUSRBENCHFBCONFIGDIR)/%)
-
-FILEMODE= 0444
-
-all clobber clean lint:
-
-$(ROOTUSRBENCHDIR):
-	$(INS.dir)
-
-$(ROOTUSRBENCHFBCONFIGDIR):
-	$(INS.dir)
-
-$(ROOTUSRBENCHFBCONFIGDIR)/%:%
-	$(INS.file)
-
-install: $(ROOTUSRBENCHDIR) .WAIT $(ROOTUSRBENCHFBCONFIGDIR) .WAIT $(FBCONFIGS)
+CONFIG fileserver {
+	function = generic;
+	personality = fileserver;
+	nfiles = 1000;
+	meandirwidth = 20;
+	filesize = 16k;
+	nthreads = 1;
+	meaniosize = 2k;
+}

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FB_STATS_H
 #define	_FB_STATS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "config.h"
 #ifdef HAVE_STDINT_H
@@ -43,6 +41,7 @@ void stats_clear(void);
 void stats_snap(void);
 void stats_dump(char *filename);
 void stats_xmldump(char *filename);
+void stats_multidump(char *filename);
 
 #ifndef HAVE_HRTIME
 /* typedef uint64_t hrtime_t; */

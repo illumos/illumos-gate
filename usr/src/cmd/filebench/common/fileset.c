@@ -429,7 +429,7 @@ fileset_alloc_thread(filesetentry_t *entry)
  */
 int
 fileset_openfile(fileset_t *fileset,
-    filesetentry_t *entry, int flag, int mode, int attrs)
+    filesetentry_t *entry, int flag, int filemode, int attrs)
 {
 	char path[MAXPATHLEN];
 	char dir[MAXPATHLEN];
@@ -462,7 +462,7 @@ fileset_openfile(fileset_t *fileset,
 #endif
 	}
 
-	if ((fd = open64(path, flag | open_attrs, mode)) < 0) {
+	if ((fd = open64(path, flag | open_attrs, filemode)) < 0) {
 		filebench_log(LOG_ERROR,
 		    "Failed to open file %s: %s",
 		    path, strerror(errno));
@@ -747,7 +747,7 @@ fileset_create(fileset_t *fileset)
 	char *fileset_name;
 	int randno;
 	int preallocated = 0;
-	int reusing = 0;
+	int reusing;
 
 	if ((fileset_path = avd_get_str(fileset->fs_path)) == NULL) {
 		filebench_log(LOG_ERROR, "%s path not set",
@@ -769,34 +769,47 @@ fileset_create(fileset_t *fileset)
 
 	/* XXX Add check to see if there is enough space */
 
-	/* Remove existing */
+	/* set up path to fileset */
 	(void) strcpy(path, fileset_path);
 	(void) strcat(path, "/");
 	(void) strcat(path, fileset_name);
-	if ((stat64(path, &sb) == 0) && (strlen(path) > 3) &&
-	    (strlen(avd_get_str(fileset->fs_path)) > 2)) {
-		if (!avd_get_bool(fileset->fs_reuse)) {
-			char cmd[MAXPATHLEN];
 
-			(void) snprintf(cmd, sizeof (cmd), "rm -rf %s", path);
-			(void) system(cmd);
-			filebench_log(LOG_VERBOSE,
-			    "Removed any existing %s %s in %llu seconds",
-			    fileset_entity_name(fileset), fileset_name,
-			    (u_longlong_t)(((gethrtime() - start) /
-			    1000000000) + 1));
-		} else {
-			/* we are re-using */
-			reusing = 1;
-			filebench_log(LOG_VERBOSE, "Re-using %s %s.",
-			    fileset_entity_name(fileset), fileset_name);
-		}
+	/* if exists and resusing, then don't create new */
+	if (((stat64(path, &sb) == 0)&& (strlen(path) > 3) &&
+	    (strlen(avd_get_str(fileset->fs_path)) > 2)) &&
+	    avd_get_bool(fileset->fs_reuse)) {
+		reusing = 1;
+	} else {
+		reusing = 0;
 	}
-	(void) mkdir(path, 0755);
 
-	/* make the filesets directory tree */
-	if (fileset_create_subdirs(fileset, path) == FILEBENCH_ERROR)
-		return (FILEBENCH_ERROR);
+	if (!reusing) {
+		char cmd[MAXPATHLEN];
+
+		/* Remove existing */
+		(void) snprintf(cmd, sizeof (cmd), "rm -rf %s", path);
+		(void) system(cmd);
+		filebench_log(LOG_VERBOSE,
+		    "Removed any existing %s %s in %llu seconds",
+		    fileset_entity_name(fileset), fileset_name,
+		    (u_longlong_t)(((gethrtime() - start) /
+		    1000000000) + 1));
+	} else {
+		/* we are re-using */
+		filebench_log(LOG_VERBOSE, "Re-using %s %s.",
+		    fileset_entity_name(fileset), fileset_name);
+	}
+
+	/* make the filesets directory tree unless in reuse mode */
+	if (!reusing && (avd_get_bool(fileset->fs_prealloc))) {
+		filebench_log(LOG_INFO,
+		    "making tree for filset %s", path);
+
+		(void) mkdir(path, 0755);
+
+		if (fileset_create_subdirs(fileset, path) == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+	}
 
 	start = gethrtime();
 
@@ -811,13 +824,16 @@ fileset_create(fileset_t *fileset)
 
 	while (entry = fileset_pick(fileset, pickflags, 0)) {
 		pthread_t tid;
+		int newrand;
 
 		pickflags = FILESET_PICKUNIQUE;
 
 		/* entry doesn't need to be locked during initialization */
 		fileset_unbusy(entry, FALSE, FALSE);
 
-		if (rand() < randno)
+		newrand = rand();
+
+		if (newrand < randno)
 			continue;
 
 		preallocated++;

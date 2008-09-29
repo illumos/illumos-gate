@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #include <stdio.h>
@@ -547,7 +545,7 @@ stats_snap(void)
 	free(str);
 
 	filebench_log(LOG_INFO,
-	    "\nIO Summary:      %5d ops %5.1lf ops/s, (%0.0lf/%0.0lf r/w) "
+	    "\nIO Summary:      %5d ops, %5.1lf ops/s, (%0.0lf/%0.0lf r/w) "
 	    "%5.1lfmb/s, %6.0fus cpu/op, %5.1fms latency",
 	    iostat->fs_count + aiostat->fs_count,
 	    (iostat->fs_count + aiostat->fs_count) /
@@ -759,6 +757,85 @@ stats_xmldump(char *filename)
 	filebench_log(LOG_DUMP, "</dim_list>");
 	filebench_log(LOG_DUMP, "</stat_group>");
 	filebench_log(LOG_DUMP, "</stat_doc>");
+}
+
+/*
+ * same as stats_dump, but in computer friendly format
+ */
+void
+stats_multidump(char *filename)
+{
+	flowstat_t *iostat = &globalstats[FLOW_TYPE_IO];
+	flowstat_t *aiostat = &globalstats[FLOW_TYPE_AIO];
+	flowop_t *flowop;
+
+	/* don't dump stats if run ended in error */
+	if (filebench_shm->shm_f_abort == FILEBENCH_ABORT_ERROR)
+		return;
+
+	(void) strcpy(filebench_shm->shm_dump_filename, filename);
+
+	filebench_log(LOG_INFO, "in statsmultidump %s", filename);
+
+	if (filebench_shm->shm_dump_fd > 0) {
+		(void) close(filebench_shm->shm_dump_fd);
+		filebench_shm->shm_dump_fd = -1;
+	}
+
+	filebench_log(LOG_DUMP, "Flowop totals:");
+
+	flowop = filebench_shm->shm_flowoplist;
+	while (flowop) {
+
+		if (flowop->fo_instance != FLOW_MASTER) {
+			flowop = flowop->fo_next;
+			continue;
+		}
+
+		filebench_log(LOG_DUMP,
+		    "%s\t%1.0lf\t%1.1lf\t%1.1f\t%1.0f",
+		    flowop->fo_name,
+		    flowop->fo_stats.fs_count /
+		    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS),
+		    (flowop->fo_stats.fs_bytes / (1024 * 1024)) /
+		    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS),
+		    flowop->fo_stats.fs_count ?
+		    flowop->fo_stats.fs_mstate[FLOW_MSTATE_LAT] /
+		    (flowop->fo_stats.fs_count * 1000000.0) : 0,
+		    flowop->fo_stats.fs_count ?
+		    flowop->fo_stats.fs_mstate[FLOW_MSTATE_CPU] /
+		    (flowop->fo_stats.fs_count * 1000.0) : 0);
+
+		flowop = flowop->fo_next;
+	}
+
+	filebench_log(LOG_DUMP, "");
+	filebench_log(LOG_DUMP,
+	    "IO Summary:\n%d\t%1.1lf\t%1.0lf\t%1.0lf\t%1.1lf\t%1.0f\t%1.1f\n",
+
+	    iostat->fs_count + aiostat->fs_count,
+
+	    (iostat->fs_count + aiostat->fs_count) /
+	    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS),
+
+	    (iostat->fs_rcount + aiostat->fs_rcount) /
+	    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS),
+
+	    (iostat->fs_wcount + aiostat->fs_wcount) /
+	    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS),
+
+	    ((iostat->fs_bytes + aiostat->fs_bytes) / (1024 * 1024)) /
+	    ((globalstats->fs_etime - globalstats->fs_stime) / FSECS),
+
+	    (iostat->fs_rcount + iostat->fs_wcount +
+	    aiostat->fs_rcount + aiostat->fs_wcount) ?
+	    (iostat->fs_syscpu / 1000.0) /
+	    (iostat->fs_rcount + iostat->fs_wcount +
+	    aiostat->fs_rcount + aiostat->fs_wcount) : 0,
+
+	    (iostat->fs_rcount + iostat->fs_wcount) ?
+	    iostat->fs_mstate[FLOW_MSTATE_LAT] /
+	    ((iostat->fs_rcount + iostat->fs_wcount) * 1000000.0) : 0);
 }
 
 /*

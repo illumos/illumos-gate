@@ -27,10 +27,6 @@
  */
 
 %{
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-%}
-
-%{
 
 #include <stdlib.h>
 #include <sys/types.h>
@@ -70,7 +66,9 @@ eventgen                { return FSC_EVENTGEN; }
 create                  { return FSC_CREATE; }
 define			{ return FSC_DEFINE; }
 debug                   { return FSC_DEBUG; }
+domultisync		{ return FSC_DOMULTISYNC; }
 echo                    { return FSC_ECHO; }
+enable			{ return FSC_ENABLE; }
 exit		        { return FSC_QUIT; }
 foreach                 { return FSC_FOREACH; }
 flowop		        { return FSC_FLOWOP; }
@@ -100,14 +98,15 @@ clear                   { return FSE_CLEAR; }
 snap                    { return FSE_SNAP; }
 dump                    { return FSE_DUMP; }
 xmldump                 { return FSE_XMLDUMP; }
+multidump               { return FSE_MULTIDUMP; }
 all                     { return FSE_ALL; }
 mode                    { return FSE_MODE; }
+multi			{ return FSE_MULTI; }
 
 cached                  { return FSA_CACHED; }
 dirwidth                { return FSA_DIRWIDTH; }
 dirdepthrv              { return FSA_DIRDEPTHRV; }
 dirgamma                { return FSA_DIRGAMMA; }
-namelength              { return FSA_NAMELENGTH; }
 filesize                { return FSA_SIZE; }
 filesizegamma           { return FSA_FILESIZEGAMMA; }
 directio                { return FSA_DIRECTIO; }
@@ -120,8 +119,11 @@ filesetname             { return FSA_FILE; }
 instances               { return FSA_INSTANCES;}                  
 iosize                  { return FSA_IOSIZE; }
 iters                   { return FSA_ITERS;}
+master			{ return FSA_MASTER; }
+client			{ return FSA_CLIENT; }
 memsize                 { return FSA_MEMSIZE; }
 name                    { return FSA_NAME;}
+namelength              { return FSA_NAMELENGTH; }
 nice                    { return FSA_NICE;}
 entries                 { return FSA_ENTRIES;}
 prealloc                { return FSA_PREALLOC; }

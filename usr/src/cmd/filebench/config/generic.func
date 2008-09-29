@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 sub pre_run {
         # Initialize filebench to appropriate personality, create files
@@ -43,8 +42,7 @@ sub pre_run {
 
 sub post_run {
         my $statsbase = get_STATSBASE();
-        # Shutdown processes and quit filebench
-        op_quit();
+
         # Create a html summary of the run
 	system ("cd $statsbase; " . get_FILEBENCH() . "/scripts/filebench_compare $statsbase")
 }

@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 
@@ -39,6 +38,7 @@ SRCS = \
 	gamma_dist.c \
         ipc.c \
         misc.c \
+	multi_client_sync.c \
         procflow.c \
         stats.c \
         threadflow.c \
@@ -58,7 +58,7 @@ CLEANFILES += parser_gram.c parser_gram.h parser_lex.c y.tab.h y.tab.c
 CPPFLAGS += -I. -I../common
 CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 CFLAGS64 += $(CCVERBOSE) $(CTF_FLAGS)
-LDLIBS += -lkstat -lm -ltecla
+LDLIBS += -lkstat -lm -ltecla -lsocket -lnsl
 
 LFLAGS = -t -v
 YFLAGS = -d

@@ -43,6 +43,7 @@ f none usr/benchmarks/filebench/config/fileio.prof 444 root bin
 f none usr/benchmarks/filebench/config/filemacro.prof 444 root bin
 f none usr/benchmarks/filebench/config/filemicro.prof 444 root bin
 f none usr/benchmarks/filebench/config/generic.func 444 root bin
+f none usr/benchmarks/filebench/config/multi_fileserver.prof 444 root bin
 f none usr/benchmarks/filebench/config/seqread.prof 444 root bin
 f none usr/benchmarks/filebench/config/randomread.prof 444 root bin
 d none usr/benchmarks/filebench/scripts 755 root bin

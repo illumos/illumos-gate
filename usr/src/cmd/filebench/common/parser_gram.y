@@ -26,10 +26,6 @@
  */
 
 %{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-%}
-
-%{
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -57,6 +53,7 @@
 #ifdef HAVE_LIBTECLA
 #include "auto_comp.h"
 #endif
+#include "multi_client_sync.h"
 
 int dofile = FS_FALSE;
 static const char cmdname[] = "filebench";
@@ -135,6 +132,7 @@ static void parser_log(cmd_t *cmd);
 static void parser_statscmd(cmd_t *cmd);
 static void parser_statsdump(cmd_t *cmd);
 static void parser_statsxmldump(cmd_t *cmd);
+static void parser_statsmultidump(cmd_t *cmd);
 static void parser_echo(cmd_t *cmd);
 static void parser_usage(cmd_t *cmd);
 static void parser_vars(cmd_t *cmd);
@@ -143,6 +141,8 @@ static void parser_system(cmd_t *cmd);
 static void parser_statssnap(cmd_t *cmd);
 static void parser_directory(cmd_t *cmd);
 static void parser_eventgen(cmd_t *cmd);
+static void parser_enable_mc(cmd_t *cmd);
+static void parser_domultisync(cmd_t *cmd);
 static void parser_run(cmd_t *cmd);
 static void parser_run_variable(cmd_t *cmd);
 static void parser_help(cmd_t *cmd);
@@ -169,12 +169,13 @@ static void parser_version(cmd_t *cmd);
 %token FSC_LIST FSC_DEFINE FSC_EXEC FSC_QUIT FSC_DEBUG FSC_CREATE
 %token FSC_SLEEP FSC_STATS FSC_FOREACH FSC_SET FSC_SHUTDOWN FSC_LOG
 %token FSC_SYSTEM FSC_FLOWOP FSC_EVENTGEN FSC_ECHO FSC_LOAD FSC_RUN
-%token FSC_USAGE FSC_HELP FSC_VARS FSC_VERSION
+%token FSC_USAGE FSC_HELP FSC_VARS FSC_VERSION FSC_ENABLE FSC_DOMULTISYNC
 %token FSV_STRING FSV_VAL_INT FSV_VAL_BOOLEAN FSV_VARIABLE FSV_WHITESTRING
 %token FSV_RANDUNI FSV_RANDTAB FSV_RANDVAR FSV_URAND FSV_RAND48
 %token FST_INT FST_BOOLEAN
 %token FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSE_ALL FSE_SNAP FSE_DUMP
 %token FSE_DIRECTORY FSE_COMMAND FSE_FILESET FSE_XMLDUMP FSE_RAND FSE_MODE
+%token FSE_MULTI FSE_MULTIDUMP
 %token FSK_SEPLST FSK_OPENLST FSK_CLOSELST FSK_ASSIGN FSK_IN FSK_QUOTE
 %token FSK_DIRSEPLST
 %token FSA_SIZE FSA_PREALLOC FSA_PARALLOC FSA_PATH FSA_REUSE
@@ -184,7 +185,8 @@ static void parser_version(cmd_t *cmd);
 %token FSA_HIGHWATER FSA_DIRECTIO FSA_DIRWIDTH FSA_FD FSA_SRCFD FSA_ROTATEFD
 %token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA FSA_DIRDEPTHRV
 %token FSA_DIRGAMMA FSA_USEISM FSA_TYPE FSA_RANDTABLE FSA_RANDSRC FSA_RANDROUND
-%token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN
+%token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN FSA_MASTER
+%token FSA_CLIENT
 %token FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC FSS_ROUND
 %token FSV_SET_LOCAL_VAR FSA_LVAR_ASSIGN
 %token FSA_ALLDONE FSA_FIRSTDONE FSA_TIMEOUT
@@ -198,7 +200,8 @@ static void parser_version(cmd_t *cmd);
 %type <sval> FSK_ASSIGN
 %type <sval> FSV_SET_LOCAL_VAR
 
-%type <ival> FSC_LIST FSC_DEFINE FSC_SET FSC_LOAD FSC_RUN
+%type <ival> FSC_LIST FSC_DEFINE FSC_SET FSC_LOAD FSC_RUN FSC_ENABLE
+%type <ival> FSC_DOMULTISYNC
 %type <ival> FSE_FILE FSE_PROC FSE_THREAD FSE_CLEAR FSC_HELP FSC_VERSION
 
 %type <sval> name
@@ -212,20 +215,21 @@ static void parser_version(cmd_t *cmd);
 %type <cmd> foreach_command log_command system_command flowop_command
 %type <cmd> eventgen_command quit_command flowop_list thread_list
 %type <cmd> thread echo_command usage_command help_command vars_command
-%type <cmd> version_command
+%type <cmd> version_command enable_command multisync_command
 
 %type <attr> files_attr_op files_attr_ops pt_attr_op pt_attr_ops
 %type <attr> fo_attr_op fo_attr_ops ev_attr_op ev_attr_ops
 %type <attr> randvar_attr_op randvar_attr_ops randvar_attr_typop
 %type <attr> randvar_attr_srcop attr_value attr_list_value
 %type <attr> comp_lvar_def comp_attr_op comp_attr_ops
+%type <attr> enable_multi_ops enable_multi_op multisync_op
 %type <list> integer_seplist string_seplist string_list var_string_list
 %type <list> var_string whitevar_string whitevar_string_list
 %type <ival> attrs_define_file attrs_define_thread attrs_flowop
 %type <ival> attrs_define_fileset attrs_define_proc attrs_eventgen attrs_define_comp
 %type <ival> files_attr_name pt_attr_name fo_attr_name ev_attr_name
 %type <ival> randvar_attr_name FSA_TYPE randtype_name randvar_attr_param
-%type <ival> randsrc_name FSA_RANDSRC randvar_attr_tsp
+%type <ival> randsrc_name FSA_RANDSRC randvar_attr_tsp em_attr_name
 %type <ival> FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC
 
 %type <rndtb>  probtabentry_list probtabentry
@@ -295,6 +299,8 @@ command:
 | stats_command
 | system_command
 | version_command
+| enable_command
+| multisync_command
 | quit_command;
 
 foreach_command: FSC_FOREACH
@@ -453,6 +459,27 @@ vars_command: FSC_VARS
 
 	$$->cmd = parser_printvars;
 };
+
+enable_command: FSC_ENABLE FSE_MULTI
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+
+	$$->cmd = parser_enable_mc;
+}
+| enable_command  enable_multi_ops
+{
+	$1->cmd_attr_list = $2;
+};
+
+multisync_command: FSC_DOMULTISYNC multisync_op
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+
+	$$->cmd = parser_domultisync;
+	$$->cmd_attr_list = $2;
+}
 
 string_list: FSV_VARIABLE
 {
@@ -870,6 +897,13 @@ stats_command: FSC_STATS FSE_SNAP
 
 	$$->cmd_param_list = $3;
 	$$->cmd = parser_statsxmldump;
+}| FSC_STATS FSE_MULTIDUMP whitevar_string_list
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+
+	$$->cmd_param_list = $3;
+	$$->cmd = parser_statsmultidump;
 };
 
 quit_command: FSC_QUIT
@@ -1342,6 +1376,37 @@ ev_attr_op: ev_attr_name FSK_ASSIGN attr_value
 	$$->attr_name = $1;
 };
 
+/* attribute parsing for enable multiple client command */
+enable_multi_ops: enable_multi_op
+{
+	$$ = $1;
+}
+| enable_multi_ops FSK_SEPLST enable_multi_op
+{
+	attr_t *attr = NULL;
+	attr_t *list_end = NULL;
+
+	for (attr = $1; attr != NULL;
+	    attr = attr->attr_next)
+		list_end = attr; /* Find end of list */
+
+	list_end->attr_next = $3;
+
+	$$ = $1;
+};
+
+enable_multi_op: em_attr_name FSK_ASSIGN attr_value
+{
+	$$ = $3;
+	$$->attr_name = $1;
+}
+
+multisync_op: FSA_VALUE FSK_ASSIGN attr_value
+{
+	$$ = $3;
+	$$->attr_name = FSA_VALUE;
+}
+
 files_attr_name: attrs_define_file
 |attrs_define_fileset;
 
@@ -1451,6 +1516,10 @@ attrs_flowop:
 
 attrs_eventgen:
   FSA_RATE { $$ = FSA_RATE;};
+
+em_attr_name:
+  FSA_MASTER { $$ = FSA_MASTER;};
+| FSA_CLIENT { $$ = FSA_CLIENT;};
 
 comp_attr_ops: comp_attr_op
 {
@@ -2555,6 +2624,27 @@ parser_fileset_define_common(cmd_t *cmd)
 
 	fileset->fs_path = pathname;
 
+	/* How much should we preallocate? */
+	if ((attr = get_attr_integer(cmd, FSA_PREALLOC)) &&
+	    attr->attr_avd) {
+		if (AVD_IS_RANDOM(attr->attr_avd)) {
+			filebench_log(LOG_ERROR,
+			    "define fileset: Prealloc attr cannot be random");
+			filebench_shutdown(1);
+		}
+		fileset->fs_preallocpercent = attr->attr_avd;
+	} else if (attr && !attr->attr_avd) {
+		fileset->fs_preallocpercent = avd_int_alloc(100);
+	} else {
+		fileset->fs_preallocpercent = avd_int_alloc(0);
+	}
+
+	/* Should we preallocate? */
+	if (attr = get_attr_bool(cmd, FSA_PREALLOC))
+		fileset->fs_prealloc = attr->attr_avd;
+	else
+		fileset->fs_prealloc = avd_bool_alloc(FALSE);
+
 	/* Should we prealloc in parallel? */
 	if (attr = get_attr_bool(cmd, FSA_PARALLOC))
 		fileset->fs_paralloc = attr->attr_avd;
@@ -2562,21 +2652,21 @@ parser_fileset_define_common(cmd_t *cmd)
 		fileset->fs_paralloc = avd_bool_alloc(FALSE);
 
 	/* Should we reuse the existing file? */
-	if (attr = get_attr_bool(cmd, FSA_REUSE)) {
+	if (attr = get_attr_bool(cmd, FSA_REUSE))
 		fileset->fs_reuse = attr->attr_avd;
-	} else
+	else
 		fileset->fs_reuse = avd_bool_alloc(FALSE);
 
 	/* Should we leave in cache? */
-	if (attr = get_attr_bool(cmd, FSA_CACHED)) {
+	if (attr = get_attr_bool(cmd, FSA_CACHED))
 		fileset->fs_cached = attr->attr_avd;
-	} else
+	else
 		fileset->fs_cached = avd_bool_alloc(FALSE);
 
 	/* Get the mean or absolute size of the file */
-	if (attr = get_attr_integer(cmd, FSA_SIZE)) {
+	if (attr = get_attr_integer(cmd, FSA_SIZE))
 		fileset->fs_size = attr->attr_avd;
-	} else
+	else
 		fileset->fs_size = avd_int_alloc(0);
 
 	return (fileset);
@@ -2584,9 +2674,8 @@ parser_fileset_define_common(cmd_t *cmd)
 
 /*
  * Calls parser_fileset_define_common() to allocate a fileset with
- * one entry and optionally the fileset_prealloc. Sets the
- * fileset_preallocpercent, fileset_entries, fileset_dirwidth,
- * fileset_dirgamma, and fileset_sizegamma attributes
+ * one entry and optionally the fileset_prealloc. sets the fileset_entries,
+ * fileset_dirwidth, fileset_dirgamma, and fileset_sizegamma attributes
  * to appropriate values for emulating the old "fileobj" entity
  */
 static void
@@ -2614,17 +2703,6 @@ parser_file_define(cmd_t *cmd)
 	/* Set the dir and size gammas to 0 */
 	fileset->fs_dirgamma = avd_int_alloc(0);
 	fileset->fs_sizegamma = avd_int_alloc(0);
-
-	/* Does file need to be preallocated? */
-	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
-		/* yes */
-		fileset->fs_prealloc = attr->attr_avd;
-		fileset->fs_preallocpercent = avd_int_alloc(100);
-	} else {
-		/* no */
-		fileset->fs_prealloc = avd_bool_alloc(FALSE);
-		fileset->fs_preallocpercent = avd_int_alloc(0);
-	}
 }
 
 /*
@@ -2645,28 +2723,6 @@ parser_fileset_define(cmd_t *cmd)
 		filebench_shutdown(1);
 		return;
 	}
-
-	/* How much should we preallocate? */
-	if ((attr = get_attr_integer(cmd, FSA_PREALLOC)) &&
-	    attr->attr_avd) {
-		if (AVD_IS_RANDOM(attr->attr_avd)) {
-			filebench_log(LOG_ERROR,
-			    "define fileset: Prealloc attr cannot be random");
-			filebench_shutdown(1);
-		}
-		fileset->fs_preallocpercent = attr->attr_avd;
-	} else if (attr && !attr->attr_avd) {
-		fileset->fs_preallocpercent = avd_int_alloc(100);
-	} else {
-		fileset->fs_preallocpercent = avd_int_alloc(0);
-	}
-
-	/* Should we preallocate? */
-	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
-		fileset->fs_prealloc = attr->attr_avd;
-	} else
-		fileset->fs_prealloc = avd_bool_alloc(FALSE);
-
 	/* Get the number of files in the fileset */
 	if (attr = get_attr_integer(cmd, FSA_ENTRIES)) {
 		fileset->fs_entries = attr->attr_avd;
@@ -2951,6 +3007,52 @@ parser_printvars(cmd_t *cmd)
 		filebench_log(LOG_INFO, "%s", str);
 		free(str);
 	}
+}
+
+/*
+ * Establishes multi-client synchronization socket with synch server.
+ */
+static void
+parser_enable_mc(cmd_t *cmd)
+{
+	attr_t *attr;
+	char *master;
+	char *client;
+
+	if (attr= get_attr(cmd, FSA_MASTER)) {
+		master = avd_get_str(attr->attr_avd);
+	} else {
+		filebench_log(LOG_ERROR,
+		    "enable multi: no master specified");
+		return;
+	}
+
+	if (attr= get_attr(cmd, FSA_CLIENT)) {
+		client = avd_get_str(attr->attr_avd);
+	} else {
+		filebench_log(LOG_ERROR,
+		    "enable multi: no client specified");
+		return;
+	}
+
+	mc_sync_open_sock(master, 8001, client);
+}
+
+/*
+ * Exchanges multi-client synchronization message with synch server.
+ */
+static void
+parser_domultisync(cmd_t *cmd)
+{
+	attr_t *attr;
+	fbint_t value;
+
+	if (attr = get_attr(cmd, FSA_VALUE))
+		value = avd_get_int(attr->attr_avd);
+	else
+		value = 1;
+
+	mc_sync_synchronize((int)value);
 }
 
 /*
@@ -3327,6 +3429,30 @@ parser_statsdump(cmd_t *cmd)
 	    "Stats dump to file '%s'", string);
 
 	stats_dump(string);
+
+	free(string);
+}
+
+/*
+ * Same as statsdump, but outputs in a computer friendly format.
+ */
+static void
+parser_statsmultidump(cmd_t *cmd)
+{
+	char *string;
+
+	if (cmd->cmd_param_list == NULL)
+		return;
+
+	string = parser_list2string(cmd->cmd_param_list);
+
+	if (string == NULL)
+		return;
+
+	filebench_log(LOG_VERBOSE,
+	    "Stats dump to file '%s'", string);
+
+	stats_multidump(string);
 
 	free(string);
 }
