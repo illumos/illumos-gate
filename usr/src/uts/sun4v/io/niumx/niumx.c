@@ -190,12 +190,12 @@ void
 niumx_intr_dist(void *arg)
 {
 	kmutex_t 	*lock_p = (kmutex_t *)arg;
-	int		i = NIUMX_RSVD_INTRS;
-	niumx_ih_t	*ih_p = niumx_ihtable + i;
+	int		i;
+	niumx_ih_t	*ih_p = niumx_ihtable;
 
 	DBG(DBG_A_INTX, NULL, "niumx_intr_dist entered\n");
 	mutex_enter(lock_p);
-	for (; i < NIUMX_MAX_INTRS; i++, ih_p++) {
+	for (i = 0; i < NIUMX_MAX_INTRS; i++, ih_p++) {
 		sysino_t sysino = ih_p->ih_sysino;
 		cpuid_t	cpuid;
 		int	intr_state, state;
@@ -896,18 +896,7 @@ fail:
 /*
  * niumx_add_intr:
  *
- * This is the leaf/nexus/HV mapping, now read from "interrupts":
- *
- * we have a range of 64 to work with:
- *   [0-15]  - reserved
- *   [16]    - mac0
- *   [17]    - MIF
- *   [18]    - SYSERR
- *   [19-26] - func0 Rx (qty. 8)
- *   [27-34] - func0 Tx (qty. 8)
- *   [35]    - mac1
- *   [36-43] - func1 Rx (qty. 8)
- *   [44-51] - func1 Tx (qty. 8)
+ * This function is called to register interrupts.
  */
 int
 niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,

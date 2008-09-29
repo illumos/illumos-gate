@@ -26,8 +26,6 @@
 #ifndef	_SYS_NIUMX_VAR_H
 #define	_SYS_NIUMX_VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -83,7 +81,6 @@ typedef struct niumx_devstate {
 } niumx_devstate_t;
 
 #define	NIUMX_MAX_INTRS	64
-#define	NIUMX_RSVD_INTRS	16
 
 /*
  * flags for overloading dmai_inuse field of the dma request structure:
