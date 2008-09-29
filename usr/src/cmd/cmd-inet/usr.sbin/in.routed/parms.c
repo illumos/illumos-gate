@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1993
@@ -36,8 +36,6 @@
  * $FreeBSD: src/sbin/routed/parms.c,v 1.9 2000/08/11 08:24:38 sheldonh Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "defs.h"
 #include "pathnames.h"
 #include <sys/stat.h>
@@ -69,8 +67,8 @@ get_parms(struct interface *ifp)
 		if (parmp->parm_name[0] == '\0' ||
 		    strcmp(ifp->int_name, parmp->parm_name) == 0 ||
 		    (parmp->parm_name[0] == '\n' &&
-			on_net(ifp->int_addr,
-			    parmp->parm_net, parmp->parm_mask))) {
+		    on_net(ifp->int_addr,
+		    parmp->parm_net, parmp->parm_mask))) {
 
 			/*
 			 * This group of parameters is relevant,
@@ -843,7 +841,7 @@ parse_parms(char *line,
 		} else if (PARSEQ("rdisc_interval")) {
 			if (parm.parm_rdisc_int != 0 ||
 			    (parm.parm_rdisc_int = (int)strtoul(buf, &p, 0),
-				*p != '\0') || (buf == p) ||
+			    *p != '\0') || (buf == p) ||
 			    parm.parm_rdisc_int < MIN_MAXADVERTISEINTERVAL ||
 			    parm.parm_rdisc_int > MAX_MAXADVERTISEINTERVAL)
 				return (bad_str(tgt));
@@ -852,7 +850,7 @@ parse_parms(char *line,
 			if (parm.parm_d_metric != 0 ||
 			    IS_RIP_OUT_OFF(parm.parm_int_state) ||
 			    (parm.parm_d_metric = (int)strtoul(buf, &p, 0),
-				*p != '\0') || (buf == p) ||
+			    *p != '\0') || (buf == p) ||
 			    parm.parm_d_metric > HOPCNT_INFINITY-1)
 				return (bad_str(tgt));
 
@@ -872,9 +870,9 @@ parse_parms(char *line,
 				p++;
 				if (i >= MAX_TGATE_NETS ||
 				    0 > parse_quote(&p, "|", &delim, buf2,
-					sizeof (buf2)) ||
+				    sizeof (buf2)) ||
 				    !getnet(buf2, &tg->tgate_nets[i].net,
-					&tg->tgate_nets[i].mask) ||
+				    &tg->tgate_nets[i].mask) ||
 				    tg->tgate_nets[i].net == RIP_DEFAULT ||
 				    tg->tgate_nets[i].mask == 0) {
 					free(tg);
@@ -933,7 +931,7 @@ insert_parm(struct parm *new)
 		if (!on_net(htonl(parmp->parm_net), new->parm_net,
 		    new->parm_mask) &&
 		    !on_net(htonl(new->parm_net), parmp->parm_net,
-			parmp->parm_mask))
+		    parmp->parm_mask))
 			continue;
 
 		for (i = 0; i < MAX_AUTH_KEYS; i++) {
@@ -946,26 +944,26 @@ insert_parm(struct parm *new)
 		if ((0 != (new->parm_int_state & GROUP_IS_SOL_OUT) &&
 		    0 != (parmp->parm_int_state & GROUP_IS_SOL_OUT) &&
 		    0 != ((new->parm_int_state ^ parmp->parm_int_state) &&
-			GROUP_IS_SOL_OUT)) ||
+		    GROUP_IS_SOL_OUT)) ||
 		    (0 != (new->parm_int_state & GROUP_IS_ADV_OUT) &&
-			0 != (parmp->parm_int_state & GROUP_IS_ADV_OUT) &&
-			0 != ((new->parm_int_state ^ parmp->parm_int_state) &&
-			    GROUP_IS_ADV_OUT)) ||
+		    0 != (parmp->parm_int_state & GROUP_IS_ADV_OUT) &&
+		    0 != ((new->parm_int_state ^ parmp->parm_int_state) &&
+		    GROUP_IS_ADV_OUT)) ||
 		    (new->parm_rdisc_pref != 0 &&
-			parmp->parm_rdisc_pref != 0 &&
-			new->parm_rdisc_pref != parmp->parm_rdisc_pref) ||
+		    parmp->parm_rdisc_pref != 0 &&
+		    new->parm_rdisc_pref != parmp->parm_rdisc_pref) ||
 		    (new->parm_rdisc_int != 0 &&
-			parmp->parm_rdisc_int != 0 &&
-			new->parm_rdisc_int != parmp->parm_rdisc_int)) {
+		    parmp->parm_rdisc_int != 0 &&
+		    new->parm_rdisc_int != parmp->parm_rdisc_int)) {
 			return ("conflicting, duplicate router discovery"
-				" parameters");
+			    " parameters");
 
 		}
 
 		if (new->parm_d_metric != 0 && parmp->parm_d_metric != 0 &&
 		    new->parm_d_metric != parmp->parm_d_metric) {
 			return ("conflicting, duplicate poor man's router"
-				" discovery or fake default metric");
+			    " discovery or fake default metric");
 		}
 	}
 
@@ -1029,8 +1027,6 @@ addroutefordefault(in_addr_t dst, in_addr_t gate, in_addr_t mask,
 		return;
 	}
 
-	/* Get the ifp of the physical interface */
-	ifp = ifwithname(ifp->int_phys->phyi_name);
 	trace_misc("addroutefordefault: found interface %s", ifp->int_name);
 
 	(void) memset(&new, 0, sizeof (new));

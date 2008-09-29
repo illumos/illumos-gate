@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -40,8 +40,6 @@
 
 #ifndef	_DEFS_H
 #define	_DEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definitions for RIPv2 routing process.
@@ -793,6 +791,9 @@ extern void if_link(struct interface *, uint32_t);
 extern struct interface *ifwithaddr(in_addr_t, boolean_t, boolean_t);
 extern struct interface *ifwithindex(ulong_t, boolean_t);
 extern struct interface *ifwithname(const char *);
+extern struct physical_interface *phys_byname(const char *);
+extern boolean_t addr_on_ifp(in_addr_t, struct interface *,
+    struct interface **);
 extern struct interface *findremoteif(in_addr_t);
 extern struct interface *findifaddr(in_addr_t);
 extern struct interface *iflookup(in_addr_t);

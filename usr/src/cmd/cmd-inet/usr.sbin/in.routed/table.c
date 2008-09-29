@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -36,8 +36,6 @@
  * $FreeBSD: src/sbin/routed/table.c,v 1.15 2000/08/11 08:24:38 sheldonh Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "defs.h"
 #include <fcntl.h>
 #include <stropts.h>
@@ -58,6 +56,7 @@ static void rtbad(struct rt_entry *, struct interface *);
 static int rt_xaddrs(struct rt_addrinfo *, struct sockaddr_storage *,
     char *, int);
 static struct interface *gwkludge_iflookup(in_addr_t, in_addr_t, in_addr_t);
+static struct interface *lifp_iflookup(in_addr_t, const char *);
 
 struct radix_node_head *rhead;		/* root of the radix tree */
 
@@ -843,7 +842,7 @@ again:
 	if (ifp == NULL)
 		ifp = iflookup(gate);
 
-	if ((ifp == NULL) || (ifp->int_phys == NULL)) {
+	if (ifp == NULL || (ifp->int_phys == NULL)) {
 		trace_misc("no ifp for" PAT, ARGS);
 	} else {
 		if (ifp->int_phys->phyi_index > UINT16_MAX) {
@@ -903,10 +902,6 @@ kern_find(in_addr_t dst, in_addr_t mask, in_addr_t gate,
 {
 	struct khash *k, **pk;
 
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
-	}
-
 	for (pk = &KHASH(dst, mask); (k = *pk) != NULL; pk = &k->k_next) {
 		if (k->k_dst == dst && k->k_mask == mask &&
 		    (gate == 0 || k->k_gate == gate) &&
@@ -930,9 +925,6 @@ kern_alternate(in_addr_t dst, in_addr_t mask, in_addr_t gate,
 {
 	struct khash *k, **pk;
 
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
-	}
 	for (pk = &KHASH(dst, mask); (k = *pk) != NULL; pk = &k->k_next) {
 		if (k->k_dst == dst && k->k_mask == mask &&
 		    (k->k_gate != gate) &&
@@ -950,9 +942,6 @@ kern_add(in_addr_t dst, uint32_t mask, in_addr_t gate, struct interface *ifp)
 {
 	struct khash *k, **pk;
 
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
-	}
 	k = kern_find(dst, mask, gate, ifp, &pk);
 	if (k != NULL)
 		return (k);
@@ -977,19 +966,6 @@ kern_flush_ifp(struct interface *ifp)
 {
 	struct khash *k, *kprev, *knext;
 	int i;
-
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		/*
-		 * Only calculate phy ifp when the passed ifp is
-		 * a logical IP interface. Otherwise the call
-		 * ifwithname(phy ifname) will return NULL as we
-		 * unlinked ifp from hashtables prior to this call
-		 * in ifdel.
-		 */
-		if (strchr(ifp->int_phys->phyi_name, ':')) {
-			ifp = ifwithname(ifp->int_phys->phyi_name);
-		}
-	}
 
 	for (i = 0; i < KHASH_SIZE; i++) {
 		kprev = NULL;
@@ -1018,12 +994,6 @@ kern_rewire_ifp(struct interface *oldifp, struct interface *newifp)
 	struct khash *k;
 	int i;
 
-	if (oldifp != NULL && oldifp->int_phys != NULL) {
-		oldifp = ifwithname(oldifp->int_phys->phyi_name);
-	}
-	if (newifp != NULL && newifp->int_phys != NULL) {
-		newifp = ifwithname(newifp->int_phys->phyi_name);
-	}
 	for (i = 0; i < KHASH_SIZE; i++) {
 		for (k = khash_bins[i]; k; k = k->k_next) {
 			if (k->k_ifp == oldifp) {
@@ -1035,7 +1005,6 @@ kern_rewire_ifp(struct interface *oldifp, struct interface *newifp)
 		}
 	}
 }
-
 
 /*
  * Check that a static route it is still in the daemon table, and not
@@ -1049,9 +1018,6 @@ kern_check_static(struct khash *k, struct interface *ifp)
 	struct rt_spare new;
 	uint16_t rt_state = RS_STATIC;
 
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
-	}
 	(void) memset(&new, 0, sizeof (new));
 	new.rts_ifp = ifp;
 	new.rts_gate = k->k_gate;
@@ -1164,10 +1130,6 @@ rtm_add(struct rt_msghdr *rtm,
 			    "route %s --> %s nexthop is not directly connected",
 			    addrname(S_ADDR(INFO_DST(info)), mask, 0),
 			    naddr_ntoa(gate));
-		} else {
-			if (ifp->int_phys != NULL) {
-				ifp = ifwithname(ifp->int_phys->phyi_name);
-			}
 		}
 	}
 
@@ -1473,17 +1435,28 @@ sync_kern(void)
 
 			/*
 			 * First try to match up on gwkludge entries
-			 * before trying to match ifp by name.
+			 * before trying to match ifp by name/nexthop.
 			 */
 			if ((ifp = gwkludge_iflookup(rp->ipRouteDest,
 			    rp->ipRouteNextHop,
 			    ntohl(rp->ipRouteMask))) == NULL) {
-				ifp = ifwithname(ifname);
-				if (ifp != NULL && ifp->int_phys != NULL) {
-					ifp = ifwithname(
-					    ifp->int_phys->phyi_name);
-				}
+				ifp = lifp_iflookup(rp->ipRouteNextHop, ifname);
 			}
+
+#ifdef DEBUG_KERNEL_ROUTE_READ
+			if (ifp != NULL) {
+				(void) fprintf(stderr, "   found interface"
+				    " %-4s #%-3d ", ifp->int_name,
+				    (ifp->int_phys != NULL) ?
+				    ifp->int_phys->phyi_index : 0);
+				(void) fprintf(stderr, "%-15s-->%-15s \n",
+				    naddr_ntoa(ifp->int_addr),
+				    addrname(((ifp->int_if_flags &
+				    IFF_POINTOPOINT) ?
+				    ifp->int_dstaddr : htonl(ifp->int_net)),
+				    ifp->int_mask, 1));
+			}
+#endif
 
 			info.rti_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
 			if (rp->ipRouteInfo.re_ire_type & IRE_HOST_REDIRECT)
@@ -1859,10 +1832,6 @@ kern_out(struct ag_info *ag)
 	struct interface *ifp;
 
 	ifp = ag->ag_ifp;
-
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
-	}
 
 	/*
 	 * Do not install bad routes if they are not already present.
@@ -2883,4 +2852,38 @@ gwkludge_iflookup(in_addr_t dstaddr, in_addr_t addr, in_addr_t mask)
 			return (ifp);
 	}
 	return (NULL);
+}
+
+/*
+ * Lookup logical interface structure given the gateway address.
+ * Returns null if no interfaces match the given name.
+ */
+static struct interface *
+lifp_iflookup(in_addr_t addr, const char *name)
+{
+	struct physical_interface *phyi;
+	struct interface *ifp;
+	struct interface *best = NULL;
+
+	if ((phyi = phys_byname(name)) == NULL)
+		return (NULL);
+
+	for (ifp = phyi->phyi_interface; ifp != NULL;
+	    ifp = ifp->int_ilist.hl_next) {
+
+#ifdef DEBUG_KERNEL_ROUTE_READ
+		(void) fprintf(stderr, " checking interface"
+		    " %-4s %-4s %-15s-->%-15s \n",
+		    phyi->phyi_name, ifp->int_name,
+		    naddr_ntoa(ifp->int_addr),
+		    addrname(((ifp->int_if_flags & IFF_POINTOPOINT) ?
+		    ifp->int_dstaddr : htonl(ifp->int_net)),
+		    ifp->int_mask, 1));
+#endif
+		/* Exact match found */
+		if (addr_on_ifp(addr, ifp, &best))
+			return (ifp);
+	}
+	/* No exact match found but return any best match found */
+	return (best);
 }

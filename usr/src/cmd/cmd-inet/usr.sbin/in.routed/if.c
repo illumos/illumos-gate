@@ -36,8 +36,6 @@
  * $FreeBSD: src/sbin/routed/if.c,v 1.8 2000/08/11 08:24:38 sheldonh Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "defs.h"
 #include "pathnames.h"
 #include <sys/sockio.h>
@@ -413,6 +411,26 @@ ifwithname(const char *name)
 	}
 }
 
+/* Return physical interface with the specified name */
+struct physical_interface *
+phys_byname(const char *name)
+{
+	int nlen;
+	size_t i;
+	struct physical_interface *phyi;
+
+	nlen = strcspn(name, ":");
+	for (i = 0; i < ihash_tbl.htbl_size; i++) {
+		for (phyi = ihash_tbl.htbl_ptrs[i]; phyi != NULL;
+		    phyi = phyi->phyi_link.hl_next) {
+			if (strncmp(phyi->phyi_name, name, nlen) == 0 &&
+			    phyi->phyi_name[nlen] == '\0')
+				return (phyi);
+		}
+	}
+	return (NULL);
+}
+
 struct interface *
 findremoteif(in_addr_t addr)
 {
@@ -468,6 +486,47 @@ ifwithindex(ulong_t index,
 	}
 }
 
+/*
+ * Returns true only if given ifp has the exact address else returns
+ * false and sets best if an ifp matches partially and is a better
+ * match than the previous one passed via best.
+ */
+boolean_t
+addr_on_ifp(in_addr_t addr, struct interface *ifp,
+    struct interface **best)
+{
+	struct interface *p_best = *best;
+
+	/*
+	 * Don't use a duplicate interface since it is unusable for output.
+	 */
+	if (ifp->int_state & IS_DUP)
+		return (_B_FALSE);
+
+	if (ifp->int_if_flags & IFF_POINTOPOINT) {
+		if (ifp->int_dstaddr == addr) {
+			*best = NULL;
+			return (_B_TRUE);
+		}
+	} else {
+		if (ifp->int_addr == addr) {
+			if (IS_PASSIVE_IFP(ifp))
+				trace_misc("addr_on_ifp "
+				    "returning passive intf %s",
+				    ifp->int_name);
+			*best = NULL;
+			return (_B_TRUE);
+		}
+
+		/* Look for the longest approximate match. */
+		if (on_net(addr, ifp->int_net, ifp->int_mask) &&
+		    (p_best == NULL ||
+		    ifp->int_mask > p_best->int_mask)) {
+			*best = ifp;
+		}
+	}
+	return (_B_FALSE);
+}
 
 /*
  * Find an interface which should be receiving packets sent from the
@@ -484,34 +543,10 @@ iflookup(in_addr_t addr)
 	maybe = NULL;
 	for (;;) {
 		for (ifp = ifnet; ifp != NULL; ifp = ifp->int_next) {
-			/*
-			 * Don't return a duplicate interface since
-			 * it is unusable for output.
-			 */
-			if (ifp->int_state & IS_DUP)
-				continue;
 
-			if (ifp->int_if_flags & IFF_POINTOPOINT) {
-				/* finished with a match */
-				if (ifp->int_dstaddr == addr)
-					return (ifp);
-			} else {
-				/* finished with an exact match */
-				if (ifp->int_addr == addr) {
-					if (IS_PASSIVE_IFP(ifp))
-						trace_misc("iflookup "
-						    "returning passive intf %s",
-						    ifp->int_name);
-					return (ifp);
-				}
-
-				/* Look for the longest approximate match. */
-				if (on_net(addr, ifp->int_net, ifp->int_mask) &&
-				    (maybe == NULL ||
-				    ifp->int_mask > maybe->int_mask)) {
-					maybe = ifp;
-				}
-			}
+			/* Exact match found */
+			if (addr_on_ifp(addr, ifp, &maybe))
+				return (ifp);
 		}
 
 		/*

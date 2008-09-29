@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -35,8 +35,6 @@
  *
  * $FreeBSD: src/sbin/routed/input.c,v 1.9 2001/06/06 20:52:30 phk Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include <md5.h>
@@ -104,11 +102,7 @@ receiving_interface(struct msghdr *msg, boolean_t findremote)
 	 * IP_RECVIF index we requested), try to deduce the receiving
 	 * interface based on the source address of the packet.
 	 */
-	ifp = iflookup(from->sin_addr.s_addr);
-	if (ifp != NULL && ifp->int_phys != NULL) {
-		ifp = ifwithname(ifp->int_phys->phyi_name);
-	}
-	return (ifp);
+	return (iflookup(from->sin_addr.s_addr));
 }
 
 /*
