@@ -611,9 +611,16 @@ top:
 	 * Are we just changing the case of an existing name?
 	 */
 	if ((dp->pc_scluster == tdp->pc_scluster) &&
-	    (strcasecmp(snm, tnm) == 0)) {
+	    (u8_strcmp(snm, tnm, 0, U8_STRCMP_CI_UPPER, U8_UNICODE_LATEST,
+	    &error) == 0)) {
 		filecasechange = 1;
 	}
+
+	/*
+	 * u8_strcmp detected an illegal character
+	 */
+	if (error)
+		return (EINVAL);
 
 	oldisdir = pcp->pc_entry.pcd_attr & PCA_DIR;
 
@@ -1111,7 +1118,8 @@ pc_match_long_fn(struct pcnode *pcp, char *namep, struct pcdir **epp,
 			return (error);
 	}
 	ep = *epp;
-	if (strcasecmp(lfn, namep) == 0) {
+	if ((u8_strcmp(lfn, namep, 0, U8_STRCMP_CI_UPPER,
+	    U8_UNICODE_LATEST, &error) == 0) && (error == 0)) {
 		/* match */
 		slotp->sl_flags = 0;
 		slotp->sl_blkno = pc_daddrdb(fsp, slotp->sl_bp->b_blkno);
@@ -1122,6 +1130,7 @@ pc_match_long_fn(struct pcnode *pcp, char *namep, struct pcdir **epp,
 	*offset += sizeof (struct pcdir);
 	ep++;
 	*epp = ep;
+	/* If u8_strcmp detected an error it's sufficient to rtn ENOENT */
 	return (ENOENT);
 }
 

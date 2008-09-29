@@ -29,8 +29,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef KERNEL
 #define	KERNEL
 #endif
@@ -46,6 +44,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/byteorder.h>
+#include <sys/types.h>
 #include <sys/fs/pc_fs.h>
 #include <sys/fs/pc_label.h>
 #include <sys/fs/pc_dir.h>
@@ -87,6 +86,10 @@ static int daysinmonth[] =
 	LE_16(127 << YEARSHIFT | 12 << MONSHIFT | 31 << DAYSHIFT)
 #define	leap_year(y) \
 	(((y) % 4) == 0 && (((y) % 100) != 0 || ((y) % 400) == 0))
+
+#define	YEN	"\xc2\xa5"	/* Yen Sign UTF-8 character */
+#define	LRO	"\xe2\x80\xad"	/* Left-To-Right Override UTF-8 character */
+#define	RLO	"\xe2\x80\xae"	/* Right-To-Left Override UTF-8 character */
 
 static int
 days_in_year(int y)
@@ -276,19 +279,37 @@ int
 pc_valid_long_fn(char *namep, int utf8)
 {
 	char *tmp;
+	int len, error;
+	char *prohibited[13] = {
+		"/", "\\", ":", "*", "?", "<", ">", "|", "\"", YEN, LRO, RLO,
+		    NULL
+	};
 
 	if (utf8) {
 		/* UTF-8 */
-		for (tmp = namep; *tmp != '\0'; tmp++)
-			if (!pc_valid_lfn_char(*tmp))
-				return (0);
-		if ((tmp - namep) > PCMAXNAMLEN)
+		if ((len = u8_validate(namep, strlen(namep), prohibited,
+		    (U8_VALIDATE_ENTIRE|U8_VALIDATE_CHECK_ADDITIONAL),
+		    &error)) < 0)
+			return (0);
+		if (len > PCMAXNAMLEN)
 			return (0);
 	} else {
 		/* UTF-16 */
-		for (tmp = namep; (*tmp != '\0') && (*(tmp+1) != '\0');
+		for (tmp = namep; (*tmp != '\0') || (*(tmp+1) != '\0');
 		    tmp += 2) {
 			if ((*(tmp+1) == '\0') && !pc_valid_lfn_char(*tmp))
+				return (0);
+
+			/* Prohibit the Yen character */
+			if ((*(tmp+1) == '\0') && (*tmp == '\xa5'))
+				return (0);
+
+			/* Prohibit the left-to-right override control char */
+			if ((*(tmp+1) == '\x20') && (*tmp == '\x2d'))
+				return (0);
+
+			/* Prohibit the right-to-left override control char */
+			if ((*(tmp+1) == '\x20') && (*tmp == '\x2e'))
 				return (0);
 		}
 		if ((tmp - namep) > (PCMAXNAMLEN * sizeof (uint16_t)))

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/t_lock.h>
 #include <sys/systm.h>
@@ -57,6 +55,8 @@
 #include <sys/policy.h>
 #include <sys/sdt.h>
 #include <sys/sunddi.h>
+#include <sys/types.h>
+#include <sys/errno.h>
 
 #include <vm/seg.h>
 #include <vm/page.h>
@@ -124,7 +124,7 @@ static int pcfs_pathconf(struct vnode *, int, ulong_t *, struct cred *,
 int pcfs_putapage(struct vnode *, page_t *, u_offset_t *, size_t *, int,
 	struct cred *);
 static int rwpcp(struct pcnode *, struct uio *, enum uio_rw, int);
-static int get_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int foldcase);
+static int get_long_fn_chunk(struct pcdir_lfn *ep, char *buf);
 
 extern krwlock_t pcnodes_lock;
 
@@ -2060,7 +2060,7 @@ set_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int len)
  * Return the number of characters extracted.
  */
 static int
-get_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int foldcase)
+get_long_fn_chunk(struct pcdir_lfn *ep, char *buf)
 {
 	char 	*tmp = buf;
 	int	i;
@@ -2073,9 +2073,6 @@ get_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int foldcase)
 
 		if ((*tmp == '\0') && (*(tmp+1) == '\0'))
 			return (tmp - buf);
-		if (*(tmp + 1) == '\0' && foldcase) {
-			*tmp = toupper(*tmp);
-		}
 	}
 	for (i = 0; i < PCLF_SECONDNAMESIZE; i += 2, tmp += 2) {
 		*tmp = ep->pcdl_secondfilename[i];
@@ -2083,9 +2080,6 @@ get_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int foldcase)
 
 		if ((*tmp == '\0') && (*(tmp+1) == '\0'))
 			return (tmp - buf);
-		if (*(tmp + 1) == '\0' && foldcase) {
-			*tmp = toupper(*tmp);
-		}
 	}
 	for (i = 0; i < PCLF_THIRDNAMESIZE; i += 2, tmp += 2) {
 		*tmp = ep->pcdl_thirdfilename[i];
@@ -2093,9 +2087,6 @@ get_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int foldcase)
 
 		if ((*tmp == '\0') && (*(tmp+1) == '\0'))
 			return (tmp - buf);
-		if (*(tmp + 1) == '\0' && foldcase) {
-			*tmp = toupper(*tmp);
-		}
 	}
 	return (tmp - buf);
 }
@@ -2163,6 +2154,8 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 	int	foldcase;
 	int	count = 0;
 	size_t	u16l = 0, u8l = 0;
+	char	*outbuf;
+	size_t	ret, inlen, outlen;
 
 	foldcase = (fsp->pcfs_flags & PCFS_FOLDCASE);
 	lfn_base = kmem_alloc(PCMAXNAM_UTF16, KM_SLEEP);
@@ -2196,7 +2189,7 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 		if (cksum != lep->pcdl_checksum)
 			detached = 1;
 		/* process current entry */
-		cs = get_long_fn_chunk(lep, buf, foldcase);
+		cs = get_long_fn_chunk(lep, buf);
 		count += cs;
 		for (; cs > 0; cs--) {
 			/* see if we underflow */
@@ -2266,6 +2259,22 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 			return (EINVAL);
 		}
 		namep[u8l] = '\0';
+		if (foldcase) {
+			inlen = strlen(namep);
+			outlen = PCMAXNAMLEN;
+			outbuf = kmem_alloc(PCMAXNAMLEN + 1, KM_SLEEP);
+			ret = u8_textprep_str(namep, &inlen, outbuf,
+			    &outlen, U8_TEXTPREP_TOLOWER, U8_UNICODE_LATEST,
+			    &error);
+			if (ret == -1) {
+				kmem_free(outbuf, PCMAXNAMLEN + 1);
+				kmem_free(lfn_base, PCMAXNAM_UTF16);
+				return (EINVAL);
+			}
+			outbuf[PCMAXNAMLEN - outlen] = '\0';
+			(void) strncpy(namep, outbuf, PCMAXNAMLEN + 1);
+			kmem_free(outbuf, PCMAXNAMLEN + 1);
+		}
 	}
 	kmem_free(lfn_base, PCMAXNAM_UTF16);
 	*epp = ep;
