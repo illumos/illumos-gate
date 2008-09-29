@@ -69,7 +69,7 @@ void serd_save(void);
 /* fme under construction is global so we can free it on module abort */
 static struct fme *Nfmep;
 
-static const char *Undiag_reason;
+static int Undiag_reason = UD_VAL_UNKNOWN;
 
 static int Nextid = 0;
 
@@ -143,6 +143,8 @@ static struct node *eventprop_lookup(struct event *ep, const char *propname);
 static struct node *pathstring2epnamenp(char *path);
 static void publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep,
 	fmd_case_t *fmcase);
+static const char *undiag_2reason_str(int ud);
+static const char *undiag_2defect_str(int ud);
 static void restore_suspects(struct fme *fmep);
 static void save_suspects(struct fme *fmep);
 static void destroy_fme(struct fme *f);
@@ -330,11 +332,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 
 	init_size = alloc_total();
 	out(O_ALTFP|O_STAMP, "start config_snapshot using %d bytes", init_size);
-	if ((cfgdata = config_snapshot()) == NULL) {
-		out(O_ALTFP, "newfme: NULL configuration");
-		Undiag_reason = UD_NOCONF;
-		return (NULL);
-	}
+	cfgdata = config_snapshot();
 	platform_save_config(hdl, fmcase);
 	out(O_ALTFP|O_STAMP, "config_snapshot added %d bytes",
 	    alloc_total() - init_size);
@@ -355,7 +353,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 
 	if ((Nfmep->eventtree = itree_create(Nfmep->config)) == NULL) {
 		out(O_ALTFP, "newfme: NULL instance tree");
-		Undiag_reason = UD_INSTFAIL;
+		Undiag_reason = UD_VAL_INSTFAIL;
 		structconfig_free(Nfmep->config);
 		destroy_fme_bufs(Nfmep);
 		FREE(Nfmep);
@@ -368,7 +366,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	if ((Nfmep->e0 =
 	    itree_lookup(Nfmep->eventtree, e0class, e0ipp)) == NULL) {
 		out(O_ALTFP, "newfme: e0 not in instance tree");
-		Undiag_reason = UD_BADEVENTI;
+		Undiag_reason = UD_VAL_BADEVENTI;
 		itree_free(Nfmep->eventtree);
 		structconfig_free(Nfmep->config);
 		destroy_fme_bufs(Nfmep);
@@ -535,7 +533,7 @@ reconstitute_observations(struct fme *fmep)
 			out(O_ALTFP,
 			    "reconstitute_observation: no %s buffer found.",
 			    tmpbuf);
-			Undiag_reason = UD_MISSINGOBS;
+			Undiag_reason = UD_VAL_MISSINGOBS;
 			break;
 		}
 
@@ -547,7 +545,7 @@ reconstitute_observations(struct fme *fmep)
 			    "reconstitute_observation: %s: "
 			    "missing @ separator in %s.",
 			    tmpbuf, estr);
-			Undiag_reason = UD_MISSINGPATH;
+			Undiag_reason = UD_VAL_MISSINGPATH;
 			FREE(estr);
 			break;
 		}
@@ -559,7 +557,7 @@ reconstitute_observations(struct fme *fmep)
 			    "trouble converting path string \"%s\" "
 			    "to internal representation.",
 			    tmpbuf, sepptr + 1);
-			Undiag_reason = UD_MISSINGPATH;
+			Undiag_reason = UD_VAL_MISSINGPATH;
 			FREE(estr);
 			break;
 		}
@@ -572,7 +570,7 @@ reconstitute_observations(struct fme *fmep)
 			    "reconstitute_observation: %s: "
 			    "lookup of  \"%s\" in itree failed.",
 			    tmpbuf, ipath2str(estr, ipath(epnamenp)));
-			Undiag_reason = UD_BADOBS;
+			Undiag_reason = UD_VAL_BADOBS;
 			tree_free(epnamenp);
 			FREE(estr);
 			break;
@@ -649,7 +647,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	if (fmd_buf_size(hdl, inprogress, WOBUF_POSTD) == 0) {
 		out(O_ALTFP, "restart_fme: no saved posted status");
-		Undiag_reason = UD_MISSINGINFO;
+		Undiag_reason = UD_VAL_MISSINGINFO;
 		goto badcase;
 	} else {
 		fmd_buf_read(hdl, inprogress, WOBUF_POSTD,
@@ -659,7 +657,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	if (fmd_buf_size(hdl, inprogress, WOBUF_ID) == 0) {
 		out(O_ALTFP, "restart_fme: no saved id");
-		Undiag_reason = UD_MISSINGINFO;
+		Undiag_reason = UD_VAL_MISSINGINFO;
 		goto badcase;
 	} else {
 		fmd_buf_read(hdl, inprogress, WOBUF_ID, (void *)&fmep->id,
@@ -672,7 +670,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	if (fmd_buf_size(hdl, inprogress, WOBUF_CFGLEN) != sizeof (size_t)) {
 		out(O_ALTFP, "restart_fme: No config data");
-		Undiag_reason = UD_MISSINGINFO;
+		Undiag_reason = UD_VAL_MISSINGINFO;
 		goto badcase;
 	}
 	fmd_buf_read(hdl, inprogress, WOBUF_CFGLEN, (void *)&rawsz,
@@ -680,13 +678,13 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	if ((fmep->e0r = fmd_case_getprincipal(hdl, inprogress)) == NULL) {
 		out(O_ALTFP, "restart_fme: No event zero");
-		Undiag_reason = UD_MISSINGZERO;
+		Undiag_reason = UD_VAL_MISSINGZERO;
 		goto badcase;
 	}
 
 	if (fmd_buf_size(hdl, inprogress, WOBUF_PULL) == 0) {
 		out(O_ALTFP, "restart_fme: no saved wait time");
-		Undiag_reason = UD_MISSINGINFO;
+		Undiag_reason = UD_VAL_MISSINGINFO;
 		goto badcase;
 	} else {
 		fmd_buf_read(hdl, inprogress, WOBUF_PULL, (void *)&fmep->pull,
@@ -695,7 +693,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	if (fmd_buf_size(hdl, inprogress, WOBUF_NOBS) == 0) {
 		out(O_ALTFP, "restart_fme: no count of observations");
-		Undiag_reason = UD_MISSINGINFO;
+		Undiag_reason = UD_VAL_MISSINGINFO;
 		goto badcase;
 	} else {
 		fmd_buf_read(hdl, inprogress, WOBUF_NOBS,
@@ -707,7 +705,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	if (elen == 0) {
 		out(O_ALTFP, "reconstitute_observation: no %s buffer found.",
 		    tmpbuf);
-		Undiag_reason = UD_MISSINGOBS;
+		Undiag_reason = UD_VAL_MISSINGOBS;
 		goto badcase;
 	}
 	estr = MALLOC(elen);
@@ -717,7 +715,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 		out(O_ALTFP, "reconstitute_observation: %s: "
 		    "missing @ separator in %s.",
 		    tmpbuf, estr);
-		Undiag_reason = UD_MISSINGPATH;
+		Undiag_reason = UD_VAL_MISSINGPATH;
 		FREE(estr);
 		goto badcase;
 	}
@@ -726,7 +724,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 		out(O_ALTFP, "reconstitute_observation: %s: "
 		    "trouble converting path string \"%s\" "
 		    "to internal representation.", tmpbuf, sepptr + 1);
-		Undiag_reason = UD_MISSINGPATH;
+		Undiag_reason = UD_VAL_MISSINGPATH;
 		FREE(estr);
 		goto badcase;
 	}
@@ -746,7 +744,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	if (rawsz > 0) {
 		if (fmd_buf_size(hdl, inprogress, WOBUF_CFG) != rawsz) {
 			out(O_ALTFP, "restart_fme: Config data size mismatch");
-			Undiag_reason = UD_CFGMISMATCH;
+			Undiag_reason = UD_VAL_CFGMISMATCH;
 			goto badcase;
 		}
 		cfgdata->begin = MALLOC(rawsz);
@@ -766,7 +764,7 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	if ((fmep->eventtree = itree_create(fmep->config)) == NULL) {
 		/* case not properly saved or irretrievable */
 		out(O_ALTFP, "restart_fme: NULL instance tree");
-		Undiag_reason = UD_INSTFAIL;
+		Undiag_reason = UD_VAL_INSTFAIL;
 		goto badcase;
 	}
 
@@ -815,13 +813,13 @@ badcase:
 		out(O_ALTFP|O_NONL, "already solved, ");
 	} else {
 		out(O_ALTFP|O_NONL, "solving, ");
-		defect = fmd_nvl_create_fault(hdl, UNDIAGNOSABLE_DEFECT, 100,
-		    NULL, NULL, NULL);
-		if (Undiag_reason != NULL)
-			(void) nvlist_add_string(defect,
-			    UNDIAG_REASON, Undiag_reason);
+		defect = fmd_nvl_create_fault(hdl,
+		    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
+		(void) nvlist_add_string(defect, UNDIAG_REASON,
+		    undiag_2reason_str(Undiag_reason));
 		fmd_case_add_suspect(hdl, bad->fmcase, defect);
 		fmd_case_solve(hdl, bad->fmcase);
+		Undiag_reason = UD_VAL_UNKNOWN;
 	}
 
 	if (fmd_case_closed(hdl, bad->fmcase)) {
@@ -1390,7 +1388,7 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 			 * rules.
 			 */
 			out(O_ALTFP, "upsets_eval: e0 not in instance tree");
-			Undiag_reason = UD_BADEVENTI;
+			Undiag_reason = UD_VAL_BADEVENTI;
 			goto retry_lone_ereport;
 		}
 		out(O_ALTFP|O_NONL, "adding event [");
@@ -1415,7 +1413,7 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 		Verbose = prev_verbose;
 		if (state == FME_DISPROVED) {
 			out(O_ALTFP, "upsets_eval: hypothesis disproved");
-			Undiag_reason = UD_UNSOLVD;
+			Undiag_reason = UD_VAL_UNSOLVD;
 retry_lone_ereport:
 			/*
 			 * However the trigger ereport on its own might be
@@ -1481,7 +1479,7 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 			 */
 			out(O_ALTFP, "XFILE: Unable to map \"%s\" ereport "
 			    "to component path.", class);
-			Undiag_reason = UD_NOPATH;
+			Undiag_reason = UD_VAL_NOPATH;
 			fmcase = fmd_case_open(hdl, NULL);
 			publish_undiagnosable(hdl, ffep, fmcase);
 		}
@@ -1725,11 +1723,14 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		if (ffep)
 			fmd_case_add_ereport(hdl, fmep->fmcase, ffep);
 
-		defect = fmd_nvl_create_fault(hdl, UNDIAGNOSABLE_DEFECT, 100,
-		    NULL, NULL, NULL);
-		(void) nvlist_add_string(defect, UNDIAG_REASON, UD_MAXFME);
+		Undiag_reason = UD_VAL_MAXFME;
+		defect = fmd_nvl_create_fault(hdl,
+		    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
+		(void) nvlist_add_string(defect, UNDIAG_REASON,
+		    undiag_2reason_str(Undiag_reason));
 		fmd_case_add_suspect(hdl, fmep->fmcase, defect);
 		fmd_case_solve(hdl, fmep->fmcase);
+		Undiag_reason = UD_VAL_UNKNOWN;
 		return;
 	}
 
@@ -2980,6 +2981,69 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 	}
 }
 
+static const char *
+undiag_2defect_str(int ud)
+{
+	switch (ud) {
+	case UD_VAL_MISSINGINFO:
+	case UD_VAL_MISSINGOBS:
+	case UD_VAL_MISSINGPATH:
+	case UD_VAL_MISSINGZERO:
+	case UD_VAL_BADOBS:
+	case UD_VAL_CFGMISMATCH:
+		return (UNDIAG_DEFECT_CHKPT);
+		break;
+
+	case UD_VAL_BADEVENTI:
+	case UD_VAL_INSTFAIL:
+	case UD_VAL_NOPATH:
+	case UD_VAL_UNSOLVD:
+		return (UNDIAG_DEFECT_FME);
+		break;
+
+	case UD_VAL_MAXFME:
+		return (UNDIAG_DEFECT_LIMIT);
+		break;
+
+	case UD_VAL_UNKNOWN:
+	default:
+		return (UNDIAG_DEFECT_UNKNOWN);
+		break;
+	}
+}
+
+const char *
+undiag_2reason_str(int ud)
+{
+	switch (ud) {
+	case UD_VAL_BADEVENTI:
+		return (UD_STR_BADEVENTI);
+	case UD_VAL_BADOBS:
+		return (UD_STR_BADOBS);
+	case UD_VAL_CFGMISMATCH:
+		return (UD_STR_CFGMISMATCH);
+	case UD_VAL_INSTFAIL:
+		return (UD_STR_INSTFAIL);
+	case UD_VAL_MAXFME:
+		return (UD_STR_MAXFME);
+	case UD_VAL_MISSINGINFO:
+		return (UD_STR_MISSINGINFO);
+	case UD_VAL_MISSINGOBS:
+		return (UD_STR_MISSINGOBS);
+	case UD_VAL_MISSINGPATH:
+		return (UD_STR_MISSINGPATH);
+	case UD_VAL_MISSINGZERO:
+		return (UD_STR_MISSINGZERO);
+	case UD_VAL_NOPATH:
+		return (UD_STR_NOPATH);
+	case UD_VAL_UNSOLVD:
+		return (UD_STR_UNSOLVD);
+	case UD_VAL_UNKNOWN:
+	default:
+		return (UD_STR_UNKNOWN);
+	}
+}
+
 static void
 publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 {
@@ -2989,7 +3053,7 @@ publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 	out(O_ALTFP,
 	    "[undiagnosable ereport received, "
 	    "creating and closing a new case (%s)]",
-	    Undiag_reason ? Undiag_reason : "reason not provided");
+	    undiag_2reason_str(Undiag_reason));
 
 	newcase = MALLOC(sizeof (struct case_list));
 	newcase->next = NULL;
@@ -3001,14 +3065,15 @@ publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 	if (ffep != NULL)
 		fmd_case_add_ereport(hdl, newcase->fmcase, ffep);
 
-	defect = fmd_nvl_create_fault(hdl, UNDIAGNOSABLE_DEFECT, 100,
-	    NULL, NULL, NULL);
-	if (Undiag_reason != NULL)
-		(void) nvlist_add_string(defect, UNDIAG_REASON, Undiag_reason);
+	defect = fmd_nvl_create_fault(hdl,
+	    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
+	(void) nvlist_add_string(defect, UNDIAG_REASON,
+	    undiag_2reason_str(Undiag_reason));
 	fmd_case_add_suspect(hdl, newcase->fmcase, defect);
 
 	fmd_case_solve(hdl, newcase->fmcase);
 	fmd_case_close(hdl, newcase->fmcase);
+	Undiag_reason = UD_VAL_UNKNOWN;
 }
 
 static void
@@ -3018,15 +3083,16 @@ fme_undiagnosable(struct fme *f)
 
 	out(O_ALTFP, "[solving/closing FME%d, case %s (%s)]",
 	    f->id, fmd_case_uuid(f->hdl, f->fmcase),
-	    Undiag_reason ? Undiag_reason : "undiagnosable");
+	    undiag_2reason_str(Undiag_reason));
 
-	defect = fmd_nvl_create_fault(f->hdl, UNDIAGNOSABLE_DEFECT, 100,
-	    NULL, NULL, NULL);
-	if (Undiag_reason != NULL)
-		(void) nvlist_add_string(defect, UNDIAG_REASON, Undiag_reason);
+	defect = fmd_nvl_create_fault(f->hdl,
+	    undiag_2defect_str(Undiag_reason), 100, NULL, NULL, NULL);
+	(void) nvlist_add_string(defect, UNDIAG_REASON,
+	    undiag_2reason_str(Undiag_reason));
 	fmd_case_add_suspect(f->hdl, f->fmcase, defect);
 	fmd_case_solve(f->hdl, f->fmcase);
 	fmd_case_close(f->hdl, f->fmcase);
+	Undiag_reason = UD_VAL_UNKNOWN;
 }
 
 /*
@@ -3375,7 +3441,7 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 
 	case FME_DISPROVED:
 		print_suspects(SLDISPROVED, fmep);
-		Undiag_reason = UD_UNSOLVD;
+		Undiag_reason = UD_VAL_UNSOLVD;
 		fme_undiagnosable(fmep);
 		break;
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.h -- public definitions for fme module
@@ -30,31 +30,46 @@
 #ifndef	_EFT_FME_H
 #define	_EFT_FME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/fmd_api.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	UNDIAGNOSABLE_DEFECT	"defect.sunos.eft.undiagnosable_problem"
+#define	UNDIAG_DEFECT_CHKPT	"defect.sunos.eft.undiag.checkpoint"
+#define	UNDIAG_DEFECT_FME	"defect.sunos.eft.undiag.fme"
+#define	UNDIAG_DEFECT_LIMIT	"defect.sunos.eft.undiag.limit"
+#define	UNDIAG_DEFECT_UNKNOWN	"defect.sunos.eft.undiag.unknown"
+
 #define	UNDIAG_REASON		"reason"
 
+/* Undiagnosable reason values */
+#define	UD_VAL_UNKNOWN		0
+#define	UD_VAL_BADEVENTI	1
+#define	UD_VAL_BADOBS		2
+#define	UD_VAL_CFGMISMATCH	3
+#define	UD_VAL_INSTFAIL		4
+#define	UD_VAL_MAXFME		5
+#define	UD_VAL_MISSINGINFO	6
+#define	UD_VAL_MISSINGOBS	7
+#define	UD_VAL_MISSINGPATH	8
+#define	UD_VAL_MISSINGZERO	9
+#define	UD_VAL_NOPATH		10
+#define	UD_VAL_UNSOLVD		11
+
 /* Undiagnosable reason strings */
-#define	UD_MISSINGPATH	"bad or missing path in persisted observation"
-#define	UD_MISSINGINFO	"buffer persisting case info is AWOL"
-#define	UD_MISSINGZERO	"buffer persisting principal ereport is AWOL"
-#define	UD_CFGMISMATCH	"persisted config buffer size != actual size"
-#define	UD_MISSINGOBS	"buffer persisting an observation is AWOL"
-#define	UD_BADEVENTF	"ereport event not found in fault tree"
-#define	UD_BADEVENTI	"ereport zero not found in instance tree"
-#define	UD_INSTFAIL	"creation of instance tree failed"
-#define	UD_UNSOLVD	"all hypotheses disproved"
-#define	UD_BADOBS	"persisted observation not found in instance tree"
-#define	UD_NOPATH	"no path to component found in ereport"
-#define	UD_NOCONF	"no configuration information to build instance tree"
-#define	UD_MAXFME	"reached the maximum number of open FMEs (maxfme)"
+#define	UD_STR_UNKNOWN		"undiagnosable reason unknown"
+#define	UD_STR_MISSINGPATH	"bad or missing path in persisted observation"
+#define	UD_STR_MISSINGINFO	"buffer persisting case info is AWOL"
+#define	UD_STR_MISSINGZERO	"buffer persisting principal ereport is AWOL"
+#define	UD_STR_CFGMISMATCH	"persisted config buffer size != actual size"
+#define	UD_STR_MISSINGOBS	"buffer persisting an observation is AWOL"
+#define	UD_STR_BADEVENTI	"ereport zero not found in instance tree"
+#define	UD_STR_INSTFAIL	"creation of instance tree failed"
+#define	UD_STR_UNSOLVD	"all hypotheses disproved"
+#define	UD_STR_BADOBS	"persisted observation not found in instance tree"
+#define	UD_STR_NOPATH	"no path to component found in ereport"
+#define	UD_STR_MAXFME	"reached the maximum number of open FMEs (maxfme)"
 
 #define	WOBUF_CFGLEN	"rawcfglen"
 #define	WOBUF_POSTD	"posted"
