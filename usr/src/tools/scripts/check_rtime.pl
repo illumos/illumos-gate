@@ -1016,7 +1016,15 @@ sub ProcSymSort {
 		# Process symbol line
 		my @fields = split /\s+/, $line;
 		my $new_addr = $fields[2]; 
+		my $new_type = $fields[8];
 		my $new_name = $fields[9]; 
+
+		if ($new_type eq 'UNDEF') {
+		    OutMsg($RefTtl++, $RelPath,
+		        "$secname: unexpected UNDEF symbol " .
+			"(link-editor error): $new_name");
+		    next;
+		}
 
 		if ($new_addr eq $last_addr) {
 			push @dups, $new_name;

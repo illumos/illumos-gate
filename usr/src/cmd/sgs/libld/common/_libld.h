@@ -407,7 +407,9 @@ extern const int	dynsymsort_symtype[STT_NUM];
  *		bit set. If this bit isn't set then we look at the other
  *		attributes.
  *
- *	((_sdp->sd_ref != REF_DYN_NEED) || (_sdp->sd_flags & FLG_SY_MVTOCOMM))
+ *	(((_sdp->sd_ref != REF_DYN_NEED) &&
+ *		(_sdp->sd_sym->st_shndx != SHN_UNDEF))
+ *	|| (_sdp->sd_flags & FLG_SY_MVTOCOMM))
  *		We do not want to include symbols that are not defined within
  *		the object we are creating. REF_DYN_NEED corresponds to those
  *		UNDEF items. However, if the symbol is the target of a copy
@@ -431,7 +433,8 @@ extern const int	dynsymsort_symtype[STT_NUM];
  */
 #define	DYNSORT_TEST_ATTR(_sdp, _sym) \
 	((_sdp->sd_flags & FLG_SY_DYNSORT) || \
-	(((_sdp->sd_ref != REF_DYN_NEED) || \
+	((((_sdp->sd_ref != REF_DYN_NEED) && \
+		(_sdp->sd_sym->st_shndx != SHN_UNDEF)) || \
 		(_sdp->sd_flags & FLG_SY_MVTOCOMM)) && \
 	(_sym->st_size != 0) && \
 	!(_sdp->sd_flags & FLG_SY_NODYNSORT)))
