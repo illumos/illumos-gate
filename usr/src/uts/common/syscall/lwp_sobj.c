@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -341,7 +339,8 @@ lwpchan_destroy_cache(int exec)
 		while (ent != NULL) {
 			next = ent->lwpchan_next;
 			if (ent->lwpchan_pool == LWPCHAN_MPPOOL &&
-			    (ent->lwpchan_type & LOCK_ROBUST))
+			    (ent->lwpchan_type & (USYNC_PROCESS | LOCK_ROBUST))
+			    == (USYNC_PROCESS | LOCK_ROBUST))
 				lwp_mutex_cleanup(ent, lockflg);
 			kmem_free(ent, sizeof (*ent));
 			ent = next;
@@ -2857,7 +2856,7 @@ lwp_change_pri(kthread_t *t, pri_t pri, pri_t *t_prip)
 }
 
 /*
- * Clean up a locked robust mutex
+ * Clean up a left-over process-shared robust mutex
  */
 static void
 lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
@@ -2872,7 +2871,9 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 	volatile struct upimutex *upimutex = NULL;
 	volatile int upilocked = 0;
 
-	ASSERT(ent->lwpchan_type & LOCK_ROBUST);
+	if ((ent->lwpchan_type & (USYNC_PROCESS | LOCK_ROBUST))
+	    != (USYNC_PROCESS | LOCK_ROBUST))
+		return;
 
 	lp = (lwp_mutex_t *)ent->lwpchan_addr;
 	watched = watch_disable_addr((caddr_t)lp, sizeof (*lp), S_WRITE);
@@ -2883,16 +2884,15 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 			upimutex_unlock((upimutex_t *)upimutex, 0);
 		goto out;
 	}
-	if (ent->lwpchan_type & USYNC_PROCESS) {
-		fuword32_noerr(&lp->mutex_ownerpid, (uint32_t *)&owner_pid);
-		if ((UPIMUTEX(ent->lwpchan_type) || owner_pid != 0) &&
-		    owner_pid != curproc->p_pid)
-			goto out;
-	}
+
+	fuword32_noerr(&lp->mutex_ownerpid, (uint32_t *)&owner_pid);
+
 	if (UPIMUTEX(ent->lwpchan_type)) {
 		lwpchan_t lwpchan = ent->lwpchan_lwpchan;
 		upib_t *upibp = &UPI_CHAIN(lwpchan);
 
+		if (owner_pid != curproc->p_pid)
+			goto out;
 		mutex_enter(&upibp->upib_lock);
 		upimutex = upi_get(upibp, &lwpchan);
 		if (upimutex == NULL || upimutex->upi_owner != curthread) {
@@ -2907,13 +2907,21 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 	} else {
 		lwpchan_lock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
 		locked = 1;
-		if ((ent->lwpchan_type & USYNC_PROCESS) && owner_pid == 0) {
+		/*
+		 * Clear the spinners count because one of our
+		 * threads could have been spinning for this lock
+		 * at user level when the process was suddenly killed.
+		 * There is no harm in this since user-level libc code
+		 * will adapt to the sudden change in the spinner count.
+		 */
+		suword8_noerr(&lp->mutex_spinners, 0);
+		if (owner_pid != curproc->p_pid) {
 			/*
-			 * There is no owner.  If there are waiters,
-			 * we should wake up one or all of them.
-			 * It doesn't hurt to wake them up in error
-			 * since they will just retry the lock and
-			 * go to sleep again if necessary.
+			 * We are not the owner.  There may or may not be one.
+			 * If there are waiters, we wake up one or all of them.
+			 * It doesn't hurt to wake them up in error since
+			 * they will just retry the lock and go to sleep
+			 * again if necessary.
 			 */
 			fuword8_noerr(&lp->mutex_waiters, &waiters);
 			if (waiters != 0) {	/* there are waiters */
@@ -2928,6 +2936,9 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 				}
 			}
 		} else {
+			/*
+			 * We are the owner.  Release it.
+			 */
 			(void) lwp_clear_mutex(lp, lockflg);
 			ulock_clear(&lp->mutex_lockw);
 			fuword8_noerr(&lp->mutex_waiters, &waiters);
