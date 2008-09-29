@@ -130,8 +130,7 @@ Mail Management:suser:cmd:::/usr/sbin/makemap:euid=0
 Mail Management:suser:cmd:::/usr/sbin/newaliases:euid=0
 Maintenance and Repair:solaris:cmd:::/usr/bin/mdb:privs=all
 Maintenance and Repair:suser:cmd:::/usr/bin/mdb:euid=0
-Maintenance and Repair:solaris:cmd:::/usr/bin/coreadm:euid=0;\
-	privs=sys_config,proc_owner
+Maintenance and Repair:solaris:cmd:::/usr/bin/coreadm:euid=0;privs=proc_owner
 Maintenance and Repair:suser:cmd:::/usr/bin/date:euid=0
 Maintenance and Repair:suser:cmd:::/usr/bin/ldd:euid=0
 Maintenance and Repair:suser:cmd:::/usr/bin/vmstat:euid=0

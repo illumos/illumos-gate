@@ -237,6 +237,7 @@ f none usr/lib/help/auths/locale/DhcpmgrHeader.html 444 root bin
 f none usr/lib/help/auths/locale/DhcpmgrWrite.html 444 root bin
 f none usr/lib/help/auths/locale/BindStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfAutofsStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfCoreadmStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfCronStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfExAcctFlowStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfExAcctProcessStates.html 444 root bin
@@ -262,6 +263,7 @@ f none usr/lib/help/auths/locale/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfVscanStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueCoreadm.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctProcess.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctTask.html 444 root bin

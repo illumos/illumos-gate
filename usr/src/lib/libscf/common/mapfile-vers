@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNW_1.1 {
     global:
@@ -235,6 +233,9 @@ SUNWprivate_1.1 {
 	gen_filenms_from_fmri;
 	_scf_pg_is_read_protected;
 	_scf_repository_switch;
+	scf_read_propvec;
+	scf_write_propvec;
+	scf_clean_propvec;
     local:
 	*;
 };

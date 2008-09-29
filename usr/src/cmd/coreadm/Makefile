@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		coreadm
@@ -35,7 +33,8 @@ ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 .KEEP_STATE:
 
 CFLAGS += $(CCVERBOSE)
-LDLIBS += -lproc
+LDLIBS += -lproc -lscf
+C99MODE=$(C99_ENABLE)
 
 all: $(PROG)
 

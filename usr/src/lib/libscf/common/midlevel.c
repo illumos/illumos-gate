@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libscf_impl.h"
 
 #include <libuutil.h>
@@ -36,6 +34,7 @@
 #include <sys/param.h>
 #include <errno.h>
 #include <libgen.h>
+#include <assert.h>
 #include "midlevel_impl.h"
 #include "lowlevel_impl.h"
 
@@ -2484,4 +2483,398 @@ gen_filenms_from_fmri(const char *fmri, const char *name, char *filename,
 	}
 
 	return (0);
+}
+
+static scf_type_t
+scf_true_base_type(scf_type_t type)
+{
+	scf_type_t base = type;
+
+	do {
+		type = base;
+		(void) scf_type_base_type(type, &base);
+	} while (base != type);
+
+	return (base);
+}
+
+/*
+ * Convenience routine which frees all strings and opaque data
+ * allocated by scf_read_propvec.
+ *
+ * Like free(3C), this function preserves the value of errno.
+ */
+void
+scf_clean_propvec(scf_propvec_t *propvec)
+{
+	int saved_errno = errno;
+	scf_propvec_t *prop;
+
+	for (prop = propvec; prop->pv_prop != NULL; prop++) {
+		assert(prop->pv_type != SCF_TYPE_INVALID);
+		if (prop->pv_type == SCF_TYPE_OPAQUE) {
+			scf_opaque_t *o = prop->pv_ptr;
+
+			if (o->so_addr != NULL)
+				free(o->so_addr);
+		} else if (scf_true_base_type(prop->pv_type) ==
+		    SCF_TYPE_ASTRING) {
+			if (*(char **)prop->pv_ptr != NULL)
+				free(*(char **)prop->pv_ptr);
+		}
+	}
+
+	errno = saved_errno;
+}
+
+static int
+count_props(scf_propvec_t *props)
+{
+	int count = 0;
+
+	for (; props->pv_prop != NULL; props++)
+		count++;
+	return (count);
+}
+
+/*
+ * Reads a vector of properties from the specified fmri/property group.
+ * If 'running' is true, reads from the running snapshot instead of the
+ * editing snapshot.
+ *
+ * For string types, a buffer is allocated using malloc(3C) to hold the
+ * zero-terminated string, a pointer to which is stored in the
+ * caller-provided char **.  It is the caller's responsbility to free
+ * this string.  To simplify error handling, unread strings are
+ * initialized to NULL.
+ *
+ * For opaque types, a buffer is allocated using malloc(3C) to hold the
+ * opaque data.  A pointer to this buffer and its size are stored in
+ * the caller-provided scf_opaque_t.  It is the caller's responsibility
+ * to free this buffer.  To simplify error handling, the address fields
+ * for unread opaque data are initialized to NULL.
+ *
+ * All other data is stored directly in caller-provided variables or
+ * structures.
+ *
+ * If this function fails to read a specific property, *badprop is set
+ * to point at that property's entry in the properties array.
+ *
+ * On all failures, all memory allocated by this function is freed.
+ */
+int
+scf_read_propvec(const char *fmri, const char *pgname, boolean_t running,
+    scf_propvec_t *properties, scf_propvec_t **badprop)
+{
+	scf_handle_t *h = handle_create();
+	scf_service_t *s = scf_service_create(h);
+	scf_instance_t *i = scf_instance_create(h);
+	scf_snapshot_t *snap = running ? scf_snapshot_create(h) : NULL;
+	scf_propertygroup_t *pg = scf_pg_create(h);
+	scf_property_t *p = scf_property_create(h);
+	scf_value_t *v = scf_value_create(h);
+	boolean_t instance = B_TRUE;
+	scf_propvec_t *prop;
+	int error = 0;
+
+	if (h == NULL || s == NULL || i == NULL || (running && snap == NULL) ||
+	    pg == NULL || p == NULL || v == NULL)
+		goto scferror;
+
+	if (scf_handle_decode_fmri(h, fmri, NULL, s, i, NULL, NULL, 0) == -1)
+		goto scferror;
+
+	if (scf_instance_to_fmri(i, NULL, 0) == -1) {
+		if (scf_error() != SCF_ERROR_NOT_SET)
+			goto scferror;
+		instance = B_FALSE;
+	}
+
+	if (running) {
+		if (!instance) {
+			error = SCF_ERROR_TYPE_MISMATCH;
+			goto out;
+		}
+
+		if (scf_instance_get_snapshot(i, "running", snap) !=
+		    SCF_SUCCESS)
+			goto scferror;
+	}
+
+	if ((instance ? scf_instance_get_pg_composed(i, snap, pgname, pg) :
+	    scf_service_get_pg(s, pgname, pg)) == -1)
+		goto scferror;
+
+	for (prop = properties; prop->pv_prop != NULL; prop++) {
+		if (prop->pv_type == SCF_TYPE_OPAQUE)
+			((scf_opaque_t *)prop->pv_ptr)->so_addr = NULL;
+		else if (scf_true_base_type(prop->pv_type) == SCF_TYPE_ASTRING)
+			*((char **)prop->pv_ptr) = NULL;
+	}
+
+	for (prop = properties; prop->pv_prop != NULL; prop++) {
+		int ret = 0;
+
+		if (scf_pg_get_property(pg, prop->pv_prop, p) == -1 ||
+		    scf_property_get_value(p, v) == -1) {
+			*badprop = prop;
+			goto scferror;
+		}
+		switch (prop->pv_type) {
+		case SCF_TYPE_BOOLEAN: {
+			uint8_t b;
+
+			ret = scf_value_get_boolean(v, &b);
+			if (ret == -1)
+				break;
+			if (prop->pv_aux != 0) {
+				uint64_t *bits = prop->pv_ptr;
+				*bits = b ? (*bits | prop->pv_aux) :
+				    (*bits & ~prop->pv_aux);
+			} else {
+				boolean_t *bool = prop->pv_ptr;
+				*bool = b ? B_TRUE : B_FALSE;
+			}
+			break;
+		}
+		case SCF_TYPE_COUNT:
+			ret = scf_value_get_count(v, prop->pv_ptr);
+			break;
+		case SCF_TYPE_INTEGER:
+			ret = scf_value_get_integer(v, prop->pv_ptr);
+			break;
+		case SCF_TYPE_TIME: {
+			scf_time_t *time = prop->pv_ptr;
+
+			ret = scf_value_get_time(v, &time->st_sec,
+			    &time->st_nanosec);
+			break;
+		}
+		case SCF_TYPE_OPAQUE: {
+			scf_opaque_t *opaque = prop->pv_ptr;
+			ssize_t size = scf_value_get_opaque(v, NULL, 0);
+
+			if (size == -1) {
+				*badprop = prop;
+				goto scferror;
+			}
+			if ((opaque->so_addr = malloc(size)) == NULL) {
+				error = SCF_ERROR_NO_MEMORY;
+				goto out;
+			}
+			opaque->so_size = size;
+			ret = scf_value_get_opaque(v, opaque->so_addr, size);
+			break;
+		}
+		default: {
+			char *s;
+			ssize_t size;
+
+			assert(scf_true_base_type(prop->pv_type) ==
+			    SCF_TYPE_ASTRING);
+
+			size = scf_value_get_astring(v, NULL, 0);
+			if (size == -1) {
+				*badprop = prop;
+				goto scferror;
+			}
+			if ((s = malloc(++size)) == NULL) {
+				error = SCF_ERROR_NO_MEMORY;
+				goto out;
+			}
+			ret = scf_value_get_astring(v, s, size);
+			*(char **)prop->pv_ptr = s;
+		}
+
+		if (ret == -1) {
+			*badprop = prop;
+			goto scferror;
+		}
+
+		}
+	}
+
+	goto out;
+
+scferror:
+	error = scf_error();
+	scf_clean_propvec(properties);
+
+out:
+	scf_pg_destroy(pg);
+	scf_snapshot_destroy(snap);
+	scf_instance_destroy(i);
+	scf_service_destroy(s);
+	scf_handle_destroy(h);
+
+	if (error != 0) {
+		(void) scf_set_error(error);
+		return (SCF_FAILED);
+	}
+
+	return (SCF_SUCCESS);
+}
+
+/*
+ * Writes a vector of properties to the specified fmri/property group.
+ *
+ * If this function fails to write a specific property, *badprop is set
+ * to point at that property's entry in the properties array.
+ *
+ * One significant difference between this function and the
+ * scf_read_propvec function is that for string types, pv_ptr is a
+ * char *, not a char **.  This means that you can't write a propvec
+ * you just read, but makes other uses (hopefully the majority) simpler.
+ */
+int
+scf_write_propvec(const char *fmri, const char *pgname,
+    scf_propvec_t *properties, scf_propvec_t **badprop)
+{
+	scf_handle_t *h = handle_create();
+	scf_service_t *s = scf_service_create(h);
+	scf_instance_t *inst = scf_instance_create(h);
+	scf_snapshot_t *snap = scf_snapshot_create(h);
+	scf_propertygroup_t *pg = scf_pg_create(h);
+	scf_property_t *p = scf_property_create(h);
+	scf_transaction_t *tx = scf_transaction_create(h);
+	scf_value_t **v = NULL;
+	scf_transaction_entry_t **e = NULL;
+	boolean_t instance = B_TRUE;
+	int i, n;
+	scf_propvec_t *prop;
+	int error = 0, ret;
+
+	n = count_props(properties);
+	v = calloc(n, sizeof (scf_value_t *));
+	e = calloc(n, sizeof (scf_transaction_entry_t *));
+
+	if (v == NULL || e == NULL) {
+		error = SCF_ERROR_NO_MEMORY;
+		goto out;
+	}
+
+	if (h == NULL || s == NULL || inst == NULL || pg == NULL || p == NULL ||
+	    tx == NULL)
+		goto scferror;
+
+	for (i = 0; i < n; i++) {
+		v[i] = scf_value_create(h);
+		e[i] = scf_entry_create(h);
+		if (v[i] == NULL || e[i] == NULL)
+			goto scferror;
+	}
+
+	if (scf_handle_decode_fmri(h, fmri, NULL, s, inst, NULL, NULL, 0)
+	    != SCF_SUCCESS)
+		goto scferror;
+
+	if (scf_instance_to_fmri(inst, NULL, 0) == -1) {
+		if (scf_error() != SCF_ERROR_NOT_SET)
+			goto scferror;
+		instance = B_FALSE;
+	}
+
+	if ((instance ? scf_instance_get_pg(inst, pgname, pg) :
+	    scf_service_get_pg(s, pgname, pg)) == -1)
+		goto scferror;
+
+top:
+	if (scf_transaction_start(tx, pg) == -1)
+		goto scferror;
+
+	for (prop = properties, i = 0; prop->pv_prop != NULL; prop++, i++) {
+		ret = scf_transaction_property_change(tx, e[i], prop->pv_prop,
+		    prop->pv_type);
+		if (ret == -1 && scf_error() == SCF_ERROR_NOT_FOUND)
+			ret = scf_transaction_property_new(tx, e[i],
+			    prop->pv_prop, prop->pv_type);
+
+		if (ret == -1) {
+			*badprop = prop;
+			goto scferror;
+		}
+
+		switch (prop->pv_type) {
+		case SCF_TYPE_BOOLEAN: {
+			boolean_t b = (prop->pv_aux != 0) ?
+			    (*(uint64_t *)prop->pv_ptr & prop->pv_aux) != 0 :
+			    *(boolean_t *)prop->pv_ptr;
+
+			scf_value_set_boolean(v[i], b ? 1 : 0);
+			break;
+		}
+		case SCF_TYPE_COUNT:
+			scf_value_set_count(v[i], *(uint64_t *)prop->pv_ptr);
+			break;
+		case SCF_TYPE_INTEGER:
+			scf_value_set_integer(v[i], *(int64_t *)prop->pv_ptr);
+			break;
+		case SCF_TYPE_TIME: {
+			scf_time_t *time = prop->pv_ptr;
+
+			ret = scf_value_set_time(v[i], time->st_sec,
+			    time->st_nanosec);
+			break;
+		}
+		case SCF_TYPE_OPAQUE: {
+			scf_opaque_t *opaque = prop->pv_ptr;
+
+			ret = scf_value_set_opaque(v[i], opaque->so_addr,
+			    opaque->so_size);
+			break;
+		}
+		case SCF_TYPE_ASTRING:
+			ret = scf_value_set_astring(v[i],
+			    (const char *)prop->pv_ptr);
+			break;
+		default:
+			ret = scf_value_set_from_string(v[i], prop->pv_type,
+			    (const char *)prop->pv_ptr);
+		}
+
+		if (ret == -1 || scf_entry_add_value(e[i], v[i]) == -1) {
+			*badprop = prop;
+			goto scferror;
+		}
+	}
+
+	ret = scf_transaction_commit(tx);
+	if (ret == 1)
+		goto out;
+
+	if (ret == 0 && scf_pg_update(pg) != -1) {
+		scf_transaction_reset(tx);
+		goto top;
+	}
+
+scferror:
+	error = scf_error();
+
+out:
+	if (v != NULL) {
+		for (i = 0; i < n; i++)
+			scf_value_destroy(v[i]);
+		free(v);
+	}
+
+	if (e != NULL) {
+		for (i = 0; i < n; i++)
+			scf_entry_destroy(e[i]);
+		free(e);
+	}
+
+	scf_transaction_destroy(tx);
+	scf_property_destroy(p);
+	scf_pg_destroy(pg);
+	scf_snapshot_destroy(snap);
+	scf_instance_destroy(inst);
+	scf_service_destroy(s);
+	scf_handle_destroy(h);
+
+	if (error != 0) {
+		(void) scf_set_error(error);
+		return (SCF_FAILED);
+	}
+
+	return (SCF_SUCCESS);
 }

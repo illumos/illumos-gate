@@ -146,6 +146,7 @@ ROOT.SYS= \
 	/var/adm/pool \
 	/var/adm/sm.bin \
 	/var/adm/streams \
+	/var/cores \
 	/var/cron \
 	/var/db \
 	/var/db/ipf \

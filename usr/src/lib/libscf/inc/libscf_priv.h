@@ -369,6 +369,58 @@ int scf_cmp_pattern(char *, scf_pattern_t *);
 
 int gen_filenms_from_fmri(const char *, const char *, char *, char *);
 
+/*
+ * Interfaces for bulk access to SMF-stored configuration.
+ *
+ * Each scf_propvec_t represents a single property to be read (with
+ * scf_read_propvec) or written (with scf_write_propvec).
+ *
+ * The fields of a scf_propvec_t have the following meanings:
+ *
+ *   pv_prop - the name of the property
+ *   pv_desc - a description string (optional; to be consumed by the caller)
+ *   pv_type - the type of the property
+ *   pv_ptr  - where to store the data read, or a pointer to the data to
+ *             be written
+ *   pv_aux  - additional data influencing the interpretation of pv_ptr
+ *
+ * The meaning of pv_ptr and pv_aux depends on the type of property.  For:
+ *
+ *   boolean - if pv_aux is 0, pv_ptr is a pointer to a boolean_t
+ *             if pv_aux is non-0, pv_ptr is a pointer to a uint64_t,
+ *             where pv_aux indicates the bit holding the truth value.
+ *   count   - pv_ptr is a pointer to a uint64_t; pv_aux is unused
+ *   integer - pv_ptr is a pointer to an int64_t; pv_aux is unused
+ *   time    - pv_ptr is a pointer to an scf_time_t; pv_aux is unused
+ *   opaque  - pv_ptr is a pointer to an scf_opaque_t; pv_aux is unused
+ *   strings - (scf_read_propvec) pv_ptr is a pointer to a char *
+ *             (scf_write_propvec) pv_ptr is a pointer to an array of char
+ *             (both) pv_aux is unused
+ */
+typedef struct {
+	int64_t	st_sec;
+	int32_t	st_nanosec;
+} scf_time_t;
+
+typedef struct {
+	void	*so_addr;
+	size_t	so_size;
+} scf_opaque_t;
+
+typedef struct {
+	const char	*pv_prop;
+	const char	*pv_desc;
+	scf_type_t	pv_type;
+	void		*pv_ptr;
+	uint64_t	pv_aux;
+} scf_propvec_t;
+
+void scf_clean_propvec(scf_propvec_t *);
+int scf_read_propvec(const char *, const char *, boolean_t, scf_propvec_t *,
+    scf_propvec_t **);
+int scf_write_propvec(const char *, const char *, scf_propvec_t *,
+    scf_propvec_t **);
+
 #ifdef	__cplusplus
 }
 #endif

@@ -478,6 +478,7 @@ f none usr/lib/help/auths/locale/C/PriAdmin.html 444 root bin
 f none usr/lib/help/auths/locale/C/ProfmgrHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/RoleHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfAutofsStates.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfCoreadmStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfCronStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfExAcctFlowStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfExAcctProcessStates.html 444 root bin
@@ -502,6 +503,7 @@ f none usr/lib/help/auths/locale/C/SmfSMBFSStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSyslogStates.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfValueCoreadm.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctProcess.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueExAcctTask.html 444 root bin

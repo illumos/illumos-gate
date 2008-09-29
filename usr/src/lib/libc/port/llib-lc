@@ -241,6 +241,8 @@ long labs(long int arg);
 
 /* assert.c */
 void _assert(const char *assertion, const char *filename, int line_num);
+void __assert_c99(const char *assertion, const char *filename, int line_num,
+    const char *funcname);
 
 /* atexit.c */
 int atexit(void(*func)());

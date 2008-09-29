@@ -1,15 +1,14 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
- Common Development and Distribution License, Version 1.0 only
- (the "License").  You may not use this file except in compliance
- with the License.
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
 
  You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  or http://www.opensolaris.org/os/licensing.
@@ -23,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -41,8 +38,6 @@
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='false' />
-
 	<single_instance />
 
 	<dependency
@@ -53,22 +48,69 @@
 		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
-	<exec_method
-		type='method'
-		name='start'
-		exec='/usr/bin/coreadm -u'
-		timeout_seconds='60' />
+	<dependency
+		name='coreadm_manifest-import'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/manifest-import:default' />
+	</dependency>
 
-	<exec_method
-		type='method'
-		name='stop'
-		exec=':true'
-		timeout_seconds='60' />
+	<instance name='default' enabled='false'>
+		<exec_method
+			type='method'
+			name='start'
+			exec='/usr/bin/coreadm -U'
+			timeout_seconds='60' />
 
-	<property_group name='startd' type='framework'>
-		<propval name='duration' type='astring'
-			value='transient' />
-	</property_group>
+		<exec_method
+			type='method'
+			name='refresh'
+			exec='/usr/bin/coreadm -U'
+			timeout_seconds='60' />
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec=':true'
+			timeout_seconds='60' />
+
+		<property_group name='startd' type='framework'>
+			<propval name='duration' type='astring'
+				value='transient' />
+		</property_group>
+
+		<property_group name='general' type='framework'>
+			<propval name='action_authorization' type='astring'
+				value='solaris.smf.manage.coreadm' />
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.manage.coreadm' />
+		</property_group>
+
+		<property_group name='config_params' type='application'>
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.value.coreadm' />
+
+			<propval name='global_pattern'
+				type='astring' value='' />
+			<propval name='global_content'
+				type='astring' value='default' />
+			<propval name='init_pattern'
+				type='astring' value='core' />
+			<propval name='init_content'
+				type='astring' value='default' />
+			<propval name='global_enabled'
+				type='boolean' value='false' />
+			<propval name='process_enabled'
+				type='boolean' value='true' />
+			<propval name='global_setid_enabled'
+				type='boolean' value='false' />
+			<propval name='process_setid_enabled'
+				type='boolean' value='false' />
+			<propval name='global_log_enabled'
+				type='boolean' value='false' />
+		</property_group>
+	</instance>
 
 	<stability value='Unstable' />
 
@@ -86,6 +128,7 @@
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>
+
 </service>
 
 </service_bundle>

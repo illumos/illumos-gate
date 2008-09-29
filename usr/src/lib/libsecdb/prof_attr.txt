@@ -51,7 +51,7 @@ Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapp
 Idmap Service Management:::Manage Identity Mapping Service:auths=solaris.smf.manage.idmap,solaris.smf.value.idmap;help=RtIdmapMngmnt.html
 Inetd Management:::Manage inetd configuration parameters:auths=solaris.smf.manage.inetd,solaris.smf.value.inetd;help=RtInetdMngmnt.html
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
-Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range;help=RtMaintAndRepair.html
+Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range,solaris.smf.manage.coreadm,solaris.smf.value.coreadm;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:profiles=NDMP Management;help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:profiles=NDMP Management;help=RtMediaRestore.html
 MMS Administrator:::MMS Media Manager Administrator:auths=solaris.smf.manage.mms,solaris.smf.modify.mms,solaris.smf.value.mms,solaris.mms.*

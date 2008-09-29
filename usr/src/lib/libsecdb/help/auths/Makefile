@@ -65,6 +65,7 @@ HTMLENTS = \
 	DhcpmgrWrite.html \
 	BindStates.html \
 	SmfAutofsStates.html \
+	SmfCoreadmStates.html \
 	SmfCronStates.html \
 	SmfExAcctFlowStates.html \
 	SmfExAcctProcessStates.html \
@@ -88,6 +89,7 @@ HTMLENTS = \
 	SmfSendmailStates.html \
 	SmfSshStates.html \
 	SmfSyslogStates.html \
+	SmfValueCoreadm.html \
 	SmfValueExAcctFlow.html \
 	SmfValueExAcctProcess.html \
 	SmfValueExAcctTask.html \
