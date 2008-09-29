@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -646,6 +644,7 @@ ufs_acl_access(struct inode *ip, int mode, cred_t *cr)
 	uid_t owner;
 
 	ASSERT(ip->i_ufs_acl != NULL);
+	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
 	sp = ip->i_ufs_acl;
 

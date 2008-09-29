@@ -179,6 +179,7 @@ static	int ufs_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 		caller_context_t *);
 static	int ufs_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 		caller_context_t *);
+static	int ufs_priv_access(void *, int, struct cred *);
 extern int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
 
 /*
@@ -2071,6 +2072,19 @@ out:
 	return (err);
 }
 
+/*
+ * Special wrapper to provide a callback for secpolicy_vnode_setattr().
+ * The i_contents lock is already held by the caller and we need to
+ * declare the inode as 'void *' argument.
+ */
+static int
+ufs_priv_access(void *vip, int mode, struct cred *cr)
+{
+	struct inode *ip = vip;
+
+	return (ufs_iaccess(ip, mode, cr, 0));
+}
+
 /*ARGSUSED4*/
 static int
 ufs_setattr(
@@ -2156,7 +2170,7 @@ again:
 			error = EISDIR;
 			goto update_inode;
 		}
-		if (error = ufs_iaccess(ip, IWRITE, cr))
+		if (error = ufs_iaccess(ip, IWRITE, cr, 0))
 			goto update_inode;
 
 		rw_exit(&ip->i_contents);
@@ -2200,12 +2214,9 @@ again:
 	oldva.va_gid = ip->i_gid;
 
 	vap->va_mask &= ~AT_SIZE;
-	/*
-	 * ufs_iaccess is "close enough"; that's because it doesn't
-	 * map the defines.
-	 */
+
 	error = secpolicy_vnode_setattr(cr, vp, vap, &oldva, flags,
-	    ufs_iaccess, ip);
+	    ufs_priv_access, ip);
 	if (error)
 		goto update_inode;
 
@@ -2413,12 +2424,9 @@ ufs_access(struct vnode *vp, int mode, int flags, struct cred *cr,
 	caller_context_t *ct)
 {
 	struct inode *ip = VTOI(vp);
-	int error;
 
 	if (ip->i_ufsvfs == NULL)
 		return (EIO);
-
-	rw_enter(&ip->i_contents, RW_READER);
 
 	/*
 	 * The ufs_iaccess function wants to be called with
@@ -2431,11 +2439,7 @@ ufs_access(struct vnode *vp, int mode, int flags, struct cred *cr,
 #if IWRITE != VWRITE || IREAD != VREAD || IEXEC != VEXEC
 #error "ufs_access needs to map Vmodes to Imodes"
 #endif
-	error = ufs_iaccess(ip, mode, cr);
-
-	rw_exit(&ip->i_contents);
-
-	return (error);
+	return (ufs_iaccess(ip, mode, cr, 1));
 }
 
 /* ARGSUSED */
@@ -2754,7 +2758,7 @@ ufs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 			error = ENOENT;
 			goto out;
 		}
-		if ((error = ufs_iaccess(VTOI(vp), IEXEC, cr)) != 0) {
+		if ((error = ufs_iaccess(VTOI(vp), IEXEC, cr, 1)) != 0) {
 			VN_RELE(vp);
 			goto out;
 		}
@@ -2787,7 +2791,7 @@ ufs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		 * of the directory. We only need the lock if
 		 * we are going to return it.
 		 */
-		if ((error = ufs_iaccess(ip, IEXEC, cr)) == 0) {
+		if ((error = ufs_iaccess(ip, IEXEC, cr, 1)) == 0) {
 			VN_HOLD(dvp);
 			*vpp = dvp;
 		}
@@ -2801,7 +2805,7 @@ ufs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		/*
 		 * Check accessibility of directory.
 		 */
-		if ((error = ufs_iaccess(ip, IEXEC, cr)) != 0) {
+		if ((error = ufs_iaccess(ip, IEXEC, cr, 1)) != 0) {
 			VN_RELE(vp);
 			goto out;
 		}
@@ -2828,6 +2832,12 @@ ufs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		}
 
 retry_lookup:
+	/*
+	 * Check accessibility of directory.
+	 */
+	if (error = ufs_diraccess(ip, IEXEC, cr))
+		goto out;
+
 	ufsvfsp = ip->i_ufsvfs;
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_LOOKUP_MASK);
 	if (error)
@@ -2949,7 +2959,7 @@ again:
 		}
 		if (xvp) {
 			rw_exit(&ip->i_rwlock);
-			if (error = ufs_iaccess(ip, IEXEC, cr)) {
+			if (error = ufs_iaccess(ip, IEXEC, cr, 1)) {
 				VN_RELE(xvp);
 			} else {
 				error = EEXIST;
@@ -2992,7 +3002,7 @@ again:
 			    (mode & IWRITE))
 				error = EISDIR;
 			else if (mode)
-				error = ufs_iaccess(ip, mode, cr);
+				error = ufs_iaccess(ip, mode, cr, 0);
 			else
 				error = 0;
 		}
@@ -3372,7 +3382,6 @@ retry_rename:
 
 	tdp = VTOI(tdvp);
 
-
 	/*
 	 * We only allow renaming of attributes from ATTRDIR to ATTRDIR.
 	 */
@@ -3380,6 +3389,12 @@ retry_rename:
 		error = EINVAL;
 		goto unlock;
 	}
+
+	/*
+	 * Check accessibility of directory.
+	 */
+	if (error = ufs_diraccess(sdp, IEXEC, cr))
+		goto unlock;
 
 	/*
 	 * Look up inode of file we're supposed to rename.
@@ -3495,7 +3510,7 @@ retry_firstlock:
 	 */
 	rw_enter(&sdp->i_contents, RW_READER);
 	rw_enter(&sip->i_contents, RW_READER);
-	if ((error = ufs_iaccess(sdp, IWRITE, cr)) != 0 ||
+	if ((error = ufs_iaccess(sdp, IWRITE, cr, 0)) != 0 ||
 	    (error = ufs_sticky_remove_access(sdp, sip, cr)) != 0) {
 		rw_exit(&sip->i_contents);
 		rw_exit(&sdp->i_contents);
@@ -3515,7 +3530,7 @@ retry_firstlock:
 	    ((sip->i_mode & IFMT) == IFATTRDIR)) && sdp != tdp) {
 		ino_t	inum;
 
-		if ((error = ufs_iaccess(sip, IWRITE, cr))) {
+		if (error = ufs_iaccess(sip, IWRITE, cr, 0)) {
 			rw_exit(&sip->i_contents);
 			rw_exit(&sdp->i_contents);
 			goto errout;

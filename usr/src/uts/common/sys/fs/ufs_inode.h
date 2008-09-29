@@ -39,8 +39,6 @@
 #ifndef	_SYS_FS_UFS_INODE_H
 #define	_SYS_FS_UFS_INODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/fbuf.h>
 #include <sys/fdbuffer.h>
@@ -838,13 +836,14 @@ extern	void	ufs_iinactive(struct inode *);
 extern	void	ufs_iupdat(struct inode *, int);
 extern	int	ufs_rmidle(struct inode *);
 extern	int	ufs_itrunc(struct inode *, u_offset_t, int, cred_t *);
-extern	int	ufs_iaccess(void *, int, cred_t *);
+extern	int	ufs_iaccess(struct inode *, int, cred_t *, int);
 extern  int	rdip(struct inode *, struct uio *, int, struct cred *);
 extern  int	wrip(struct inode *, struct uio *, int, struct cred *);
 
 extern void	ufs_imark(struct inode *);
 extern void	ufs_itimes_nolock(struct inode *);
 
+extern	int	ufs_diraccess(struct inode *, int, struct cred *);
 extern	int	ufs_dirlook(struct inode *, char *, struct inode **,
     cred_t *, int);
 extern	int	ufs_direnter_cm(struct inode *, char *, enum de_op,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Directory manipulation routines.
@@ -153,8 +150,28 @@ static int dirbadname();
 static int dirmangled();
 
 /*
+ * Check accessibility of directory against inquired mode and type.
+ * Execute access is required to search the directory.
+ * Access for write is interpreted as allowing
+ * deletion of files in the directory.
+ * Note, the reader i_contents lock will be acquired in
+ * ufs_iaccess().
+ */
+int
+ufs_diraccess(struct inode *ip, int mode, struct cred *cr)
+{
+	if (((ip->i_mode & IFMT) != IFDIR) &&
+	    ((ip->i_mode & IFMT) != IFATTRDIR))
+		return (ENOTDIR);
+
+	return (ufs_iaccess(ip, mode, cr, 1));
+}
+
+/*
  * Look for a given name in a directory.  On successful return, *ipp
  * will point to the VN_HELD inode.
+ * The caller is responsible for checking accessibility upfront
+ * via ufs_diraccess().
  */
 int
 ufs_dirlook(
@@ -191,15 +208,6 @@ ufs_dirlook(
 
 	if (dp->i_ufsvfs)
 		ulp = &dp->i_ufsvfs->vfs_ulockfs;
-	/*
-	 * Check accessibility of directory.
-	 */
-	if (((dp->i_mode & IFMT) != IFDIR) &&
-	    ((dp->i_mode & IFMT) != IFATTRDIR))
-		return (ENOTDIR);
-
-	if (err = ufs_iaccess(dp, IEXEC, cr))
-		return (err);
 
 	/*
 	 * Check the directory name lookup cache, first for individual files
@@ -665,6 +673,12 @@ ufs_direnter_cm(
 	ASSERT(namlen);
 
 	/*
+	 * Check accessibility of target directory.
+	 */
+	if (err = ufs_diraccess(tdp, IEXEC, cr))
+		return (err);
+
+	/*
 	 * If name is "." or ".." then if this is a create look it up
 	 * and return EEXIST.
 	 */
@@ -708,21 +722,6 @@ ufs_direnter_cm(
 	}
 
 	/*
-	 * Check accessibility of directory.
-	 */
-	if (((tdp->i_mode & IFMT) != IFDIR) &&
-	    ((tdp->i_mode & IFMT) != IFATTRDIR)) {
-		return (ENOTDIR);
-	}
-
-	/*
-	 * Execute access is required to search the directory.
-	 */
-	if (err = ufs_iaccess(tdp, IEXEC, cr)) {
-		return (err);
-	}
-
-	/*
 	 * Search for the entry. Return VN_HELD tip if found.
 	 */
 	tip = NULL;
@@ -742,7 +741,7 @@ ufs_direnter_cm(
 		 * The entry does not exist. Check write permission in
 		 * directory to see if entry can be created.
 		 */
-		if (err = ufs_iaccess(tdp, IWRITE, cr))
+		if (err = ufs_iaccess(tdp, IWRITE, cr, 0))
 			goto out;
 		/*
 		 * Make new inode and directory entry.
@@ -907,20 +906,12 @@ ufs_direnter_lr(
 		err = ENOENT;
 		goto out2;
 	}
+
 	/*
-	 * Check accessibility of directory.
+	 * Check accessibility of target directory.
 	 */
-	if (((tdp->i_mode & IFMT) != IFDIR) &&
-	    (tdp->i_mode & IFMT) != IFATTRDIR) {
-		err = ENOTDIR;
+	if (err = ufs_diraccess(tdp, IEXEC, cr))
 		goto out2;
-	}
-	/*
-	 * Execute access is required to search the directory.
-	 */
-	if (err = ufs_iaccess(tdp, IEXEC, cr)) {
-		goto out2;
-	}
 
 	/*
 	 * Search for the entry. Return VN_HELD tip if found.
@@ -956,7 +947,7 @@ ufs_direnter_lr(
 		 * The entry does not exist. Check write permission in
 		 * directory to see if entry can be created.
 		 */
-		if (err = ufs_iaccess(tdp, IWRITE, cr))
+		if (err = ufs_iaccess(tdp, IWRITE, cr, 0))
 			goto out;
 		err = ufs_diraddentry(tdp, namep, op, namlen, &slot, sip, sdp,
 		    cr);
@@ -1527,7 +1518,7 @@ retry:
 	 * Must have write permission to rewrite target entry.
 	 * Perform additional checks for sticky directories.
 	 */
-	if ((err = ufs_iaccess(tdp, IWRITE, cr)) != 0 ||
+	if ((err = ufs_iaccess(tdp, IWRITE, cr, 0)) != 0 ||
 	    (err = ufs_sticky_remove_access(tdp, tip, cr)) != 0)
 		goto out;
 
@@ -2468,29 +2459,20 @@ ufs_dirremove(
 	}
 
 	ASSERT(RW_WRITE_HELD(&dp->i_rwlock));
+
+retry:
 	/*
 	 * Check accessibility of directory.
 	 */
-retry:
-	if (((dp->i_mode & IFMT) != IFDIR) &&
-	    ((dp->i_mode & IFMT) != IFATTRDIR)) {
-		return (ENOTDIR);
-	}
-
-	/*
-	 * Execute access is required to search the directory.
-	 * Access for write is interpreted as allowing
-	 * deletion of files in the directory.
-	 */
-	if (err = ufs_iaccess(dp, IEXEC|IWRITE, cr)) {
+	if (err = ufs_diraccess(dp, IEXEC|IWRITE, cr))
 		return (err);
-	}
 
 	ip = NULL;
 	slot.fbp = NULL;
 	slot.status = FOUND;	/* don't need to look for empty slot */
 	rw_enter(&dp->i_ufsvfs->vfs_dqrwlock, RW_READER);
 	rw_enter(&dp->i_contents, RW_WRITER);
+
 	err = ufs_dircheckforname(dp, namep, namlen, &slot, &ip, cr, 0);
 	if (err)
 		goto out_novfs;
@@ -3219,7 +3201,7 @@ ufs_xattrmkdir(
 	 * Validate permission to create attribute directory
 	 */
 
-	if ((err = ufs_iaccess(tdp, IWRITE, cr)) != 0) {
+	if ((err = ufs_iaccess(tdp, IWRITE, cr, 1)) != 0) {
 		return (err);
 	}
 

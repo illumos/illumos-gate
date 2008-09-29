@@ -36,9 +36,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -1520,12 +1517,20 @@ done:
  * is checked.  Depending on the calling user, the appropriate
  * mode bits are selected; privileges to override missing permission
  * bits are checked through secpolicy_vnode_access().
+ * The i_contens lock must be held as reader here to prevent racing with
+ * the acl subsystem removing/setting/changing acls on this inode.
+ * The caller is responsible for indicating whether or not the i_contents
+ * lock needs to be acquired here or if already held.
  */
 int
-ufs_iaccess(void *vip, int mode, struct cred *cr)
+ufs_iaccess(struct inode  *ip, int mode, struct cred *cr, int dolock)
 {
-	struct inode *ip = vip;
 	int shift = 0;
+	int ret = 0;
+
+	if (dolock)
+		rw_enter(&ip->i_contents, RW_READER);
+	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
 	if (mode & IWRITE) {
 		/*
@@ -1537,24 +1542,23 @@ ufs_iaccess(void *vip, int mode, struct cred *cr)
 			if ((ip->i_mode & IFMT) != IFCHR &&
 			    (ip->i_mode & IFMT) != IFBLK &&
 			    (ip->i_mode & IFMT) != IFIFO) {
-				return (EROFS);
+				ret = EROFS;
+				goto out;
 			}
 		}
 	}
 	/*
-	 * If there is a shadow inode check for the presence of an acl,
-	 * if the acl is there use the ufs_acl_access routine to check
-	 * the acl
+	 * If there is an acl, check the acl and return.
 	 */
-	if (ip->i_ufs_acl && ip->i_ufs_acl->aowner)
-		return (ufs_acl_access(ip, mode, cr));
+	if (ip->i_ufs_acl && ip->i_ufs_acl->aowner) {
+		ret = ufs_acl_access(ip, mode, cr);
+		goto out;
+	}
 
 	/*
-	 * Access check is based on only
-	 * one of owner, group, public.
+	 * Access check is based on only one of owner, group, public.
 	 * If not owner, then check group.
-	 * If not a member of the group, then
-	 * check public access.
+	 * If not a member of the group, then check public access.
 	 */
 	if (crgetuid(cr) != ip->i_uid) {
 		shift += 3;
@@ -1565,10 +1569,14 @@ ufs_iaccess(void *vip, int mode, struct cred *cr)
 	mode &= ~(ip->i_mode << shift);
 
 	if (mode == 0)
-		return (0);
+		goto out;
 
 	/* test missing privilege bits */
-	return (secpolicy_vnode_access(cr, ITOV(ip), ip->i_uid, mode));
+	ret = secpolicy_vnode_access(cr, ITOV(ip), ip->i_uid, mode);
+out:
+	if (dolock)
+		rw_exit(&ip->i_contents);
+	return (ret);
 }
 
 /*

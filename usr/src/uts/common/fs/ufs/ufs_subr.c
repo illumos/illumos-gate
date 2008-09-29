@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -1444,16 +1441,21 @@ ufs_putsummaryinfo(dev_t dev, struct ufsvfs *ufsvfsp, struct fs *fs)
  * if you are privileged, if you own the entry or if the entry is
  * a plain file and you have write access to that file.
  * Function returns 0 if remove access is granted.
+ * Note, the caller is responsible for holding the i_contents lock
+ * at least as reader on the inquired inode 'ip'.
  */
 int
 ufs_sticky_remove_access(struct inode *dp, struct inode *ip, struct cred *cr)
 {
 	uid_t uid;
+
+	ASSERT(RW_LOCK_HELD(&ip->i_contents));
+
 	if ((dp->i_mode & ISVTX) &&
 	    (uid = crgetuid(cr)) != dp->i_uid &&
 	    uid != ip->i_uid &&
 	    ((ip->i_mode & IFMT) != IFREG ||
-	    ufs_iaccess(ip, IWRITE, cr) != 0))
+	    ufs_iaccess(ip, IWRITE, cr, 0) != 0))
 		return (secpolicy_vnode_remove(cr));
 
 	return (0);
