@@ -899,6 +899,14 @@ dm_open_dm_device(void)
 	int	fd;
 
 	/*
+	 * close the device if it has been opened to unbind it
+	 * from the target (most likely, the ST) driver.
+	 */
+	if (wka->dm_drm_fd != -1) {
+		close(wka->dm_drm_fd);
+		wka->dm_drm_fd = -1;
+	}
+	/*
 	 * Open the drive manager device
 	 */
 	fd = open(wka->dm_drm_path, O_RDWR | O_NDELAY);
@@ -906,6 +914,7 @@ dm_open_dm_device(void)
 		DM_MSG_ADD((MMS_EXIST, MMS_DM_E_INTERNAL,
 		    "open '%s' error: %s",
 		    wka->dm_drm_path, strerror(errno)));
+		wka->dm_drm_fd = -1;
 		return (-1);
 	}
 	wka->dm_drm_fd = fd;

@@ -2432,6 +2432,17 @@ dm_activate_enable(dm_command_t *cmd)
 	}
 
 	/*
+	 * Have to re-open the DM device to unbind the target device
+	 * so that we may probe all the devices to find the one with
+	 * the matching serial number.
+	 */
+	if (dm_open_dm_device() != 0) {
+		DM_MSG_ADD((MMS_STATE, MMS_DM_E_INTERNAL,
+		    "reopen DM device error"));
+		goto error;
+	}
+
+	/*
 	 * default size of sense data
 	 */
 	drv->drv_mtee_stat_len = sizeof (struct scsi_extended_sense);

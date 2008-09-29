@@ -815,6 +815,7 @@ dm_init(int argc, char **argv)
 	/*
 	 * Open the DM device
 	 */
+	wka->dm_drm_fd = -1;				/* not opened yet */
 	while (dm_open_dm_device() < 0) {
 		if (errno == EBUSY && retries <= DM_OPEN_RETRIES) {
 			/* device is still opened */
