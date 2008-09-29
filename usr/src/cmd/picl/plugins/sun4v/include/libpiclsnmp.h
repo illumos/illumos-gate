@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBPICLSNMP_H
 #define	_LIBPICLSNMP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,6 +50,12 @@ extern int snmp_get_str(picl_snmphdl_t, char *, int, char **, int *);
 extern int snmp_get_bitstr(picl_snmphdl_t, char *, int, uchar_t **,
 	    uint_t *, int *);
 extern int snmp_get_nextrow(picl_snmphdl_t, char *, int, int *, int *);
+
+extern int snmp_refresh_init(void);
+extern void snmp_refresh_fini(void);
+extern int snmp_refresh_get_next_expiration(void);
+extern int snmp_refresh_get_cycle_hint(int);
+extern int snmp_refresh_process_job(void);
 
 #ifdef	__cplusplus
 }

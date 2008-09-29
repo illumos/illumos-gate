@@ -40,6 +40,7 @@
 #include <thread.h>
 #include <synch.h>
 #include <errno.h>
+#include <time.h>
 
 #include <picldefs.h>
 #include <picl.h>
@@ -97,6 +98,30 @@ static cond_t		rebuild_tree_cv;
 static boolean_t	rebuild_tree = B_TRUE;
 static boolean_t	tree_builder_thr_exit = B_FALSE;
 static thread_t		tree_builder_thr_id;
+
+/*
+ * The cache_refresh thread periodically queries the snmp cache refresh work
+ * queue and processes jobs from it to keep cache entries from expiring.  It
+ * attempts to run in cycles of CACHE_REFRESH_CYCLE seconds each, first
+ * processing cache refresh jobs and then sleeping for the remainder of the
+ * cycle once the next refresh job expiration is at least
+ * CACHE_REFRESH_MIN_WINDOW seconds in the future.
+ *
+ * NOTE: By using a thread to keep the SNMP cache refreshed in the background,
+ * we are both adding load to the system and reducing the system's ability to
+ * operate in power-saving mode when there is minimal load.  While these
+ * tradeoffs are acceptable at this time in light of customer concerns about
+ * performance, it may be desirable in the future to move this work into the
+ * firmware.  Also, while the current cycle times performed well on the largest
+ * sun4v config currently available (Batoka), they may need to be revisited for
+ * future systems if the number of sensors increases significantly.
+ */
+#define	CACHE_REFRESH_CYCLE		60
+#define	CACHE_REFRESH_MIN_WINDOW	75
+static mutex_t		cache_refresh_lock;
+static cond_t		cache_refresh_cv;
+static boolean_t	cache_refresh_thr_exit = B_FALSE;
+static thread_t		cache_refresh_thr_id;
 
 /*
  * These two should really not be global
@@ -241,6 +266,9 @@ static int add_void_prop(picl_nodehdl_t node, char *propname);
 static void add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
     int row, sp_propid_t pp, int *snmp_syserr_p);
 
+static void *cache_refresher(void *arg);
+static void cache_refresher_fini(void);
+
 static void log_msg(int pri, const char *fmt, ...);
 
 #ifdef SNMPPLUGIN_DEBUG
@@ -311,6 +339,26 @@ snmpplugin_init(void)
 		(void) cond_destroy(&rebuild_tree_cv);
 		(void) mutex_destroy(&rebuild_tree_lock);
 		tree_builder_thr_exit = B_TRUE;
+
+		return;
+	}
+
+	/*
+	 * While the cache refresher thread does improve performance, it is not
+	 * integral to the proper function of the plugin.  If we fail to create
+	 * the thread for some reason, we will simply continue without
+	 * refreshing.
+	 */
+	(void) mutex_init(&cache_refresh_lock, USYNC_THREAD, NULL);
+	(void) cond_init(&cache_refresh_cv, USYNC_THREAD, NULL);
+	cache_refresh_thr_exit = B_FALSE;
+
+	LOGPRINTF("Cache refresher thread being created.\n");
+	if (thr_create(NULL, NULL, cache_refresher, NULL, THR_BOUND,
+	    &cache_refresh_thr_id) < 0) {
+		(void) cond_destroy(&cache_refresh_cv);
+		(void) mutex_destroy(&cache_refresh_lock);
+		cache_refresh_thr_exit = B_TRUE;
 	}
 }
 
@@ -336,6 +384,9 @@ snmpplugin_fini(void)
 	volprop_ndx = 0;
 	n_vol_props = 0;
 	(void) rw_unlock(&stale_tree_rwlp);
+
+	/* clean up the cache_refresher thread and structures */
+	cache_refresher_fini();
 
 	/* wake up the tree_builder thread, tell it to exit */
 	(void) mutex_lock(&rebuild_tree_lock);
@@ -425,6 +476,7 @@ tree_builder(void *arg)
 		if ((ret = build_physplat(&physplat_root)) < 0) {
 			(void) mutex_unlock(&rebuild_tree_lock);
 			log_msg(LOG_ERR, SNMPP_CANT_CREATE_PHYSPLAT, ret);
+			cache_refresher_fini();
 			snmp_fini(hdl);
 			hdl = NULL;
 			return ((void *)-3);
@@ -441,6 +493,7 @@ tree_builder(void *arg)
 			(void) mutex_unlock(&rebuild_tree_lock);
 			free_resources(physplat_root);
 			log_msg(LOG_ERR, SNMPP_CANT_CREATE_PHYSPLAT, ret);
+			cache_refresher_fini();
 			snmp_fini(hdl);
 			hdl = NULL;
 			return ((void *)-4);
@@ -1807,6 +1860,111 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    OID_sunPlatNumericSensorRateUnits, row);
 		break;
 	}
+}
+
+/*
+ * Initialize the SNMP library's cache refresh subsystem, then periodically
+ * process refresh job to prevent cache entries from expiring.
+ */
+/*ARGSUSED*/
+static void *
+cache_refresher(void *arg)
+{
+	int		jobs;
+	int		next_expiration;
+	timestruc_t	to;
+	hrtime_t	cycle_start, cycle_elapsed;
+
+	/*
+	 * Initialize refresh subsystem
+	 */
+	LOGPRINTF("Initializing SNMP refresh subsystem.\n");
+	if (snmp_refresh_init() < 0) {
+		return ((void *)-1);
+	}
+
+	(void) mutex_lock(&cache_refresh_lock);
+
+
+	for (;;) {
+		cycle_start = gethrtime();
+
+		/*
+		 * Process jobs from the snmp cache refresh work queue until one
+		 * of the following conditions is true:
+		 * 1) we are told to exit, or
+		 * 2) we have processed at least as many jobs as recommended by
+		 * the library, and the next job expiration is at least
+		 * CACHE_REFRESH_MIN_WINDOW * seconds away.
+		 */
+		jobs = snmp_refresh_get_cycle_hint(CACHE_REFRESH_CYCLE);
+		while ((cache_refresh_thr_exit == B_FALSE) && (jobs > 0)) {
+			(void) snmp_refresh_process_job();
+			jobs--;
+		}
+
+		next_expiration = snmp_refresh_get_next_expiration();
+		while ((cache_refresh_thr_exit == B_FALSE) &&
+		    ((next_expiration >= 0) &&
+		    (next_expiration < CACHE_REFRESH_MIN_WINDOW))) {
+			(void) snmp_refresh_process_job();
+			next_expiration = snmp_refresh_get_next_expiration();
+		}
+
+		/*
+		 * As long as we haven't been told to exit, sleep for
+		 * CACHE_REFRESH_CYCLE seconds minus the amount of time that has
+		 * elapsed since this cycle started.  If the elapsed time is
+		 * equal to or greater than 60 seconds, skip sleeping entirely.
+		 */
+		cycle_elapsed = (gethrtime() - cycle_start) / NANOSEC;
+		if ((cache_refresh_thr_exit == B_FALSE) &&
+		    (cycle_elapsed < CACHE_REFRESH_CYCLE)) {
+			to.tv_sec = CACHE_REFRESH_CYCLE - cycle_elapsed;
+			to.tv_nsec = 0;
+			(void) cond_reltimedwait(&cache_refresh_cv,
+			    &cache_refresh_lock, &to);
+		}
+
+		/*
+		 * If we have been told to exit, clean up and bail out.
+		 */
+		if (cache_refresh_thr_exit == B_TRUE) {
+			snmp_refresh_fini();
+			(void) mutex_unlock(&cache_refresh_lock);
+			LOGPRINTF("cache_refresher: time to exit\n");
+			return (NULL);
+		}
+
+	}
+
+	/*NOTREACHED*/
+	return (NULL);
+}
+
+/*
+ * Check to see if the cache_refresher thread is running.  If it is, signal it
+ * to terminate and clean up associated data structures.
+ */
+void
+cache_refresher_fini(void)
+{
+	/* if the thread isn't running, there is nothing to do */
+	if (cache_refresh_thr_exit == B_TRUE)
+		return;
+
+	/* wake up the cache_refresher thread, tell it to exit */
+	(void) mutex_lock(&cache_refresh_lock);
+	cache_refresh_thr_exit = B_TRUE;
+	(void) cond_signal(&cache_refresh_cv);
+	(void) mutex_unlock(&cache_refresh_lock);
+
+	/* reap the thread */
+	(void) thr_join(cache_refresh_thr_id, NULL, NULL);
+
+	/* finish cleanup... */
+	(void) cond_destroy(&cache_refresh_cv);
+	(void) mutex_destroy(&cache_refresh_lock);
 }
 
 /*VARARGS2*/

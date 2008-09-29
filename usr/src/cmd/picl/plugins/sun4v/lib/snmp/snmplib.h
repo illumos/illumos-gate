@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SNMPLIB_H
 #define	_SNMPLIB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,7 +62,11 @@ struct picl_snmphdl {
 
 #define	MIBCACHE_BLK_SZ		256
 #define	MIBCACHE_BLK_SHIFT	8
-#define	MAX_INCACHE_TIME	300	/* in secs */
+#define	REFRESHQ_BLK_SZ		256
+#define	REFRESHQ_BLK_SHIFT	8
+
+#define	HRTIME_SCALE		10LL	/* internal time in 10s of seconds */
+#define	MAX_INCACHE_TIME	(300 / HRTIME_SCALE)
 #define	MAX_INT_LEN		16	/* #chars to print */
 
 #define	DS_SNMP_DRIVER   	"/devices/pseudo/ds_snmp@0:ds_snmp"

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The snmp library helps to prepare the PDUs and communicate with
  * the snmp agent on the SP side via the ds_snmp driver.
@@ -84,6 +82,59 @@ uint_t snmp_rcvdbytes = 0;
 #endif
 
 /*
+ * We need a reliably monotonic and stable source of time values to age
+ * entries in the mibcache toward expiration.  The code originally used
+ * gettimeofday(), but since that is subject to time-of-day changes made by
+ * the administrator, the values it returns do not satisfy our needs.
+ * Instead, we use gethrtime(), which is immune to time-of-day changes.
+ * However, since gethrtime() returns a signed 64-bit value in units of
+ * nanoseconds and we are using signed 32-bit timestamps, we always divide
+ * the result by (HRTIME_SCALE * NANOSEC) to scale it down into units of 10
+ * seconds.
+ *
+ * Note that the scaling factor means that the value of MAX_INCACHE_TIME
+ * from snmplib.h should also be in units of 10 seconds.
+ */
+#define	GET_SCALED_HRTIME()	(int)(gethrtime() / (HRTIME_SCALE * NANOSEC))
+
+/*
+ * The mibcache code originally cached values for 300 seconds after fetching
+ * data via SNMP.  Subsequent reads within that 300 second window would come
+ * from the cache - which is quite a bit faster than an SNMP query - but the
+ * first request that came in more than 300 seconds after the previous SNMP
+ * query would trigger a new SNMP query.  This worked well as an
+ * optimization for frequent queries, but when data was only queried less
+ * frequently than every 300 seconds (as proved to be the case at multiple
+ * customer sites), the cache didn't help at all.
+ *
+ * To improve the performance of infrequent queries, code was added to the
+ * library to allow a client (i.e. a thread in the picl plugin) to proactively
+ * refresh cache entries without waiting for them to expire, thereby ensuring
+ * that all volatile entries in the cache at any given time are less than 300
+ * seconds old.  Whenever an SNMP query is generated to retrieve volatile data
+ * that will be cached, an entry is added in a refresh queue that tracks the
+ * parameters of the query and the time that it was made.  A client can query
+ * the age of the oldest item in the refresh queue and - at its discretion - can
+ * then force that query to be repeated in a manner that will update the
+ * mibcache entry even though it hasn't expired.
+ */
+typedef struct {
+	struct picl_snmphdl	*smd;
+	char			*oidstrs;
+	int			n_oids;
+	int			row;
+	int			last_fetch_time;	/* in scaled hrtime */
+} refreshq_job_t;
+
+static mutex_t		refreshq_lock;
+static refreshq_job_t	*refreshq = NULL;
+static uint_t		n_refreshq_slots = 0;	/* # of alloc'ed job slots */
+static uint_t		n_refreshq_jobs = 0;	/* # of unprocessed jobs */
+static uint_t		refreshq_next_job = 0;	/* oldest unprocessed job */
+static uint_t		refreshq_next_slot = 0;	/* next available job slot */
+
+
+/*
  * Static function declarations
  */
 static void	libpiclsnmp_init(void);
@@ -112,6 +163,9 @@ static int	mibcache_realloc(int);
 static void	mibcache_populate(snmp_pdu_t *, int);
 static char	*oid_to_oidstr(oid *, size_t);
 
+static int	refreshq_realloc(int);
+static int	refreshq_add_job(struct picl_snmphdl *, char *, int, int);
+
 
 static void
 libpiclsnmp_init(void)
@@ -120,6 +174,7 @@ libpiclsnmp_init(void)
 	if (mibcache_realloc(0) < 0)
 		(void) mutex_destroy(&mibcache_lock);
 
+	(void) mutex_init(&refreshq_lock, USYNC_THREAD, NULL);
 	(void) mutex_init(&snmp_reqid_lock, USYNC_THREAD, NULL);
 
 	LOGINIT();
@@ -550,7 +605,7 @@ lookup_int(char *prefix, int row, int *valp, int is_vol)
 {
 	int32_t	*val_arr;
 	uint_t	nelem;
-	struct timeval tv;
+	int	now;
 	int	elapsed;
 
 	(void) mutex_lock(&mibcache_lock);
@@ -579,11 +634,8 @@ lookup_int(char *prefix, int row, int *valp, int is_vol)
 			(void) mutex_unlock(&mibcache_lock);
 			return (-1);
 		}
-		if (gettimeofday(&tv, NULL) < 0) {
-			(void) mutex_unlock(&mibcache_lock);
-			return (-1);
-		}
-		elapsed = tv.tv_sec - val_arr[1];
+		now = GET_SCALED_HRTIME();
+		elapsed = now - val_arr[1];
 		if (elapsed < 0 || elapsed > MAX_INCACHE_TIME) {
 			(void) mutex_unlock(&mibcache_lock);
 			return (-1);
@@ -607,7 +659,7 @@ lookup_str(char *prefix, int row, char **valp, int is_vol)
 {
 	char	**val_arr;
 	uint_t	nelem;
-	struct timeval tv;
+	int	now;
 	int	elapsed;
 
 	(void) mutex_lock(&mibcache_lock);
@@ -636,11 +688,8 @@ lookup_str(char *prefix, int row, char **valp, int is_vol)
 			(void) mutex_unlock(&mibcache_lock);
 			return (-1);
 		}
-		if (gettimeofday(&tv, NULL) < 0) {
-			(void) mutex_unlock(&mibcache_lock);
-			return (-1);
-		}
-		elapsed = tv.tv_sec - atoi(val_arr[1]);
+		now = GET_SCALED_HRTIME();
+		elapsed = now - atoi(val_arr[1]);
 		if (elapsed < 0 || elapsed > MAX_INCACHE_TIME) {
 			(void) mutex_unlock(&mibcache_lock);
 			return (-1);
@@ -925,8 +974,15 @@ fetch_bulk(struct picl_snmphdl *smd, char *oidstrs, int n_oids,
 	if (reply_pdu) {
 		LOGPDU(TAG_RESPONSE_PDU, reply_pdu);
 
-		if (reply_pdu->errstat == SNMP_ERR_NOERROR)
+		if (reply_pdu->errstat == SNMP_ERR_NOERROR) {
+			if (is_vol) {
+				/* Add a job to the cache refresh work queue */
+				(void) refreshq_add_job(smd, oidstrs, n_oids,
+				    row);
+			}
+
 			mibcache_populate(reply_pdu, is_vol);
+		}
 
 		snmp_free_pdu(reply_pdu);
 	}
@@ -1138,7 +1194,6 @@ mibcache_populate(snmp_pdu_t *pdu, int is_vol)
 	pdu_varlist_t	*vp;
 	int		row, ret;
 	char		*oidstr;
-	struct timeval	tv;
 	int		tod;	/* in secs */
 	char		tod_str[MAX_INT_LEN];
 	int		ival_arr[2];
@@ -1146,16 +1201,14 @@ mibcache_populate(snmp_pdu_t *pdu, int is_vol)
 
 	/*
 	 * If we're populating volatile properties, we also store a
-	 * timestamp with each property value. When we lookup, we
-	 * check the current time against this timestamp to determine
-	 * if we need to refetch the value or not (refetch if it has
-	 * been in for far too long).
+	 * timestamp with each property value. When we lookup, we check the
+	 * current time against this timestamp to determine if we need to
+	 * refetch the value or not (refetch if it has been in for far too
+	 * long).
 	 */
+
 	if (is_vol) {
-		if (gettimeofday(&tv, NULL) < 0)
-			tod = -1;
-		else
-			tod = (int)tv.tv_sec;
+		tod = GET_SCALED_HRTIME();
 
 		tod_str[0] = 0;
 		(void) snprintf(tod_str, MAX_INT_LEN, "%d", tod);
@@ -1267,4 +1320,317 @@ oid_to_oidstr(oid *objid, size_t n_subids)
 	}
 
 	return (oidstr);
+}
+
+/*
+ * Expand the refreshq to hold more cache refresh jobs.  Caller must already
+ * hold refreshq_lock mutex.  Every expansion of the refreshq will add
+ * REFRESH_BLK_SZ job slots, rather than expanding by one slot every time more
+ * space is needed.
+ */
+static int
+refreshq_realloc(int hint)
+{
+	uint_t		count = (uint_t)hint;
+	refreshq_job_t	*p;
+
+	if (hint < 0)
+		return (-1);
+
+	if (hint < n_refreshq_slots) {
+		return (0);
+	}
+
+	/* Round count up to next multiple of REFRESHQ_BLK_SHIFT */
+	count =  ((count >> REFRESHQ_BLK_SHIFT) + 1) << REFRESHQ_BLK_SHIFT;
+
+	p = (refreshq_job_t *)calloc(count, sizeof (refreshq_job_t));
+	if (p == NULL) {
+		return (-1);
+	}
+
+	if (refreshq) {
+		if (n_refreshq_jobs == 0) {
+			/* Simple case, nothing to copy */
+			refreshq_next_job = 0;
+			refreshq_next_slot = 0;
+		} else if (refreshq_next_slot > refreshq_next_job) {
+			/* Simple case, single copy preserves everything */
+			(void) memcpy((void *) p,
+			    (void *) &(refreshq[refreshq_next_job]),
+			    n_refreshq_jobs * sizeof (refreshq_job_t));
+		} else {
+			/*
+			 * Complex case.  The jobs in the refresh queue wrap
+			 * around the end of the array in which they are stored.
+			 * To preserve chronological order in the new allocated
+			 * array, we need to copy the jobs at the end of the old
+			 * array to the beginning of the new one and place the
+			 * jobs from the beginning of the old array after them.
+			 */
+			uint_t tail_jobs, head_jobs;
+
+			tail_jobs = n_refreshq_slots - refreshq_next_job;
+			head_jobs = n_refreshq_jobs - tail_jobs;
+
+			/* Copy the jobs from the end of the old array */
+			(void) memcpy((void *) p,
+			    (void *) &(refreshq[refreshq_next_job]),
+			    tail_jobs * sizeof (refreshq_job_t));
+
+			/* Copy the jobs from the beginning of the old array */
+			(void) memcpy((void *) &(p[tail_jobs]),
+			    (void *) &(refreshq[refreshq_next_job]),
+			    head_jobs * sizeof (refreshq_job_t));
+
+			/* update the job and slot indices to match */
+			refreshq_next_job = 0;
+			refreshq_next_slot = n_refreshq_jobs;
+		}
+		free((void *) refreshq);
+	} else {
+		/* First initialization */
+		refreshq_next_job = 0;
+		refreshq_next_slot = 0;
+		n_refreshq_jobs = 0;
+	}
+
+	refreshq = p;
+	n_refreshq_slots = count;
+
+	return (0);
+}
+
+/*
+ * Add a new job to the refreshq.  If there aren't any open slots, attempt to
+ * expand the queue first.  Return -1 if unable to add the job to the work
+ * queue, or 0 if the job was added OR if an existing job with the same
+ * parameters is already pending.
+ */
+static int
+refreshq_add_job(struct picl_snmphdl *smd, char *oidstrs, int n_oids, int row)
+{
+	int	i;
+	int	job;
+
+	(void) mutex_lock(&refreshq_lock);
+
+	/*
+	 * Can't do anything without a queue.  Either the client never
+	 * initialized the refresh queue or the initial memory allocation
+	 * failed.
+	 */
+	if (refreshq == NULL) {
+		(void) mutex_unlock(&refreshq_lock);
+		return (-1);
+	}
+
+	/*
+	 * If there is already a job pending with the same parameters as the job
+	 * we have been asked to add, we apparently let an entry expire and it
+	 * is now being reloaded.  Rather than add another job for the same
+	 * entry, we skip adding the new job and let the existing job address
+	 * it.
+	 */
+	for (i = 0, job = refreshq_next_job; i < n_refreshq_jobs; i++,
+	    job = (job + 1) % n_refreshq_slots) {
+		if ((refreshq[job].row == row) &&
+		    (refreshq[job].n_oids == n_oids) &&
+		    (refreshq[job].oidstrs == oidstrs)) {
+			(void) mutex_unlock(&refreshq_lock);
+			return (0);
+		}
+	}
+
+
+	/*
+	 * If the queue is full, we need to expand it
+	 */
+	if (n_refreshq_jobs == n_refreshq_slots) {
+		if (refreshq_realloc(n_refreshq_slots + 1) < 0) {
+			/*
+			 * Can't expand the job queue, so we drop this job on
+			 * the floor.  No data is lost... we just allow some
+			 * data in the mibcache to expire.
+			 */
+			(void) mutex_unlock(&refreshq_lock);
+			return (-1);
+		}
+	}
+
+	/*
+	 * There is room in the queue, so add the new job.  We are actually
+	 * taking a timestamp for this job that is slightly earlier than when
+	 * the mibcache entry will be updated, but since we're trying to update
+	 * the mibcache entry before it expires anyway, the earlier timestamp
+	 * here is acceptable.
+	 */
+	refreshq[refreshq_next_slot].smd = smd;
+	refreshq[refreshq_next_slot].oidstrs = oidstrs;
+	refreshq[refreshq_next_slot].n_oids = n_oids;
+	refreshq[refreshq_next_slot].row = row;
+	refreshq[refreshq_next_slot].last_fetch_time = GET_SCALED_HRTIME();
+
+	/*
+	 * Update queue management variables
+	 */
+	n_refreshq_jobs += 1;
+	refreshq_next_slot = (refreshq_next_slot + 1) % n_refreshq_slots;
+
+	(void) mutex_unlock(&refreshq_lock);
+
+	return (0);
+}
+
+/*
+ * Almost all of the refresh code remains dormant unless specifically
+ * initialized by a client (the exception being that fetch_bulk() will still
+ * call refreshq_add_job(), but the latter will return without doing anything).
+ */
+int
+snmp_refresh_init(void)
+{
+	int ret;
+
+	(void) mutex_lock(&refreshq_lock);
+
+	ret = refreshq_realloc(0);
+
+	(void) mutex_unlock(&refreshq_lock);
+
+	return (ret);
+}
+
+/*
+ * If the client is going away, we don't want to keep doing refresh work, so
+ * clean everything up.
+ */
+void
+snmp_refresh_fini(void)
+{
+	(void) mutex_lock(&refreshq_lock);
+
+	n_refreshq_jobs = 0;
+	n_refreshq_slots = 0;
+	refreshq_next_job = 0;
+	refreshq_next_slot = 0;
+	free(refreshq);
+	refreshq = NULL;
+
+	(void) mutex_unlock(&refreshq_lock);
+}
+
+/*
+ * Return the number of seconds remaining before the mibcache entry associated
+ * with the next job in the queue will expire.  Note that this requires
+ * reversing the scaling normally done on hrtime values.  (The need for scaling
+ * is purely internal, and should be hidden from clients.)  If there are no jobs
+ * in the queue, return -1.  If the next job has already expired, return 0.
+ */
+int
+snmp_refresh_get_next_expiration(void)
+{
+	int ret;
+	int elapsed;
+
+	(void) mutex_lock(&refreshq_lock);
+
+	if (n_refreshq_jobs == 0) {
+		ret = -1;
+	} else {
+		elapsed = GET_SCALED_HRTIME() -
+		    refreshq[refreshq_next_job].last_fetch_time;
+
+		if (elapsed >= MAX_INCACHE_TIME) {
+			ret = 0;
+		} else {
+			ret = (MAX_INCACHE_TIME - elapsed) * HRTIME_SCALE;
+		}
+	}
+
+	(void) mutex_unlock(&refreshq_lock);
+
+	return (ret);
+}
+
+/*
+ * Given the number of seconds the client wants to spend on each cyle of
+ * processing jobs and then sleeping, return a suggestion for the number of jobs
+ * the client should process, calculated by dividing the client's cycle duration
+ * by MAX_INCACHE_TIME and multiplying the result by the total number of jobs in
+ * the queue.  (Note that the actual implementation of that calculation is done
+ * in a different order to avoid losing fractional values during integer
+ * arithmetic.)
+ */
+int
+snmp_refresh_get_cycle_hint(int secs)
+{
+	int	jobs;
+
+	(void) mutex_lock(&refreshq_lock);
+
+	/*
+	 * First, we need to scale the client's cycle time to get it into the
+	 * same units we use internally (i.e. tens of seconds).  We round up, as
+	 * it makes more sense for the client to process extra jobs than
+	 * insufficient jobs.  If the client's desired cycle time is greater
+	 * than MAX_INCACHE_TIME, we just return the current total number of
+	 * jobs.
+	 */
+	secs = (secs + HRTIME_SCALE - 1) / HRTIME_SCALE;
+
+	jobs = (n_refreshq_jobs * secs) / MAX_INCACHE_TIME;
+	if (jobs > n_refreshq_jobs) {
+		jobs = n_refreshq_jobs;
+	}
+
+	(void) mutex_unlock(&refreshq_lock);
+
+	return (jobs);
+}
+
+/*
+ * Process the next job on the refresh queue by invoking fetch_bulk() with the
+ * recorded parameters.  Return -1 if no job was processed (e.g. because there
+ * aren't any available), or 0 if a job was processed.  We don't actually care
+ * if fetch_bulk() fails, since we're just working on cache entry refreshing and
+ * the worst case result of failing here is a longer delay getting that data the
+ * next time it is requested.
+ */
+int
+snmp_refresh_process_job(void)
+{
+	struct picl_snmphdl	*smd;
+	char			*oidstrs;
+	int			n_oids;
+	int			row;
+	int			err;
+
+	(void) mutex_lock(&refreshq_lock);
+
+	if (n_refreshq_jobs == 0) {
+		(void) mutex_unlock(&refreshq_lock);
+
+		return (-1);
+	}
+
+	smd = refreshq[refreshq_next_job].smd;
+	oidstrs = refreshq[refreshq_next_job].oidstrs;
+	n_oids = refreshq[refreshq_next_job].n_oids;
+	row = refreshq[refreshq_next_job].row;
+
+	refreshq_next_job = (refreshq_next_job + 1) % n_refreshq_slots;
+	n_refreshq_jobs--;
+
+	(void) mutex_unlock(&refreshq_lock);
+
+
+	/*
+	 * fetch_bulk() is going to come right back into the refresh code to add
+	 * a new job for the entry we just loaded, which means we have to make
+	 * the call without holding the refreshq_lock mutex.
+	 */
+	fetch_bulk(smd, oidstrs, n_oids, row, 1, &err);
+
+	return (0);
 }
