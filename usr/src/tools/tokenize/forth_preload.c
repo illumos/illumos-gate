@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This preload library must be applied to forth after libthread is
  * folded into libc because forth/tokenize.exe is not ABI compliant; it
@@ -198,6 +196,9 @@ extern	void	*dlsym(void *handle, const char *name);
 
 static	long	global_g7 = -1;
 
+long	get_g5(void);
+void	set_g5(long);
+
 long	get_g7(void);
 void	set_g7(long);
 
@@ -206,9 +207,11 @@ callfunc(struct intpose *ip,
 	long a0, long a1, long a2, long a3, long a4, long a5)
 {
 	realfunc_t realfunc;
+	long my_g5;
 	long my_g7;
 	long rv;
 
+	my_g5 = get_g5();
 	my_g7 = get_g7();
 	if (global_g7 == -1)
 		global_g7 = my_g7;
@@ -217,6 +220,7 @@ callfunc(struct intpose *ip,
 		ip->realfunc = realfunc =
 		    (realfunc_t)dlsym(RTLD_NEXT, ip->fname);
 	rv = realfunc(a0, a1, a2, a3, a4, a5);
+	set_g5(my_g5);
 	set_g7(my_g7);
 	return (rv);
 }

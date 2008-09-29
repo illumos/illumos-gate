@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -40,7 +38,7 @@ RD_FCODE	= rd.fcode
 
 MKBB		= mkbb
 MKBB_SH		= $(BASEDIR)/common/mkbb.sh
-MKBB.fcode	= $(MKBB) $(MKBBFLAGS)
+MKBB.fcode	= ./$(MKBB) $(MKBBFLAGS)
 
 %.fcode:	$(BASEDIR)/common/%.fth
 	$(TOKENIZE) $<
