@@ -77,7 +77,6 @@
  */
 static	int vsw_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int vsw_detach(dev_info_t *, ddi_detach_cmd_t);
-static	int vsw_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static	int vsw_get_md_physname(vsw_t *, md_t *, mde_cookie_t, char *);
 static	int vsw_get_md_smodes(vsw_t *, md_t *, mde_cookie_t, uint8_t *, int *);
 
@@ -315,7 +314,7 @@ static	struct	cb_ops	vsw_cb_ops = {
 static	struct	dev_ops	vsw_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* devo_refcnt */
-	vsw_getinfo,		/* devo_getinfo */
+	NULL,			/* devo_getinfo */
 	nulldev,		/* devo_identify */
 	nulldev,		/* devo_probe */
 	vsw_attach,		/* devo_attach */
@@ -853,36 +852,6 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_soft_state_free(vsw_state, instance);
 
 	return (DDI_SUCCESS);
-}
-
-static int
-vsw_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
-{
-	_NOTE(ARGUNUSED(dip))
-
-	vsw_t	*vswp = NULL;
-	dev_t	dev = (dev_t)arg;
-	int	instance;
-
-	instance = getminor(dev);
-
-	switch (infocmd) {
-	case DDI_INFO_DEVT2DEVINFO:
-		if ((vswp = ddi_get_soft_state(vsw_state, instance)) == NULL) {
-			*result = NULL;
-			return (DDI_FAILURE);
-		}
-		*result = vswp->dip;
-		return (DDI_SUCCESS);
-
-	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(uintptr_t)instance;
-		return (DDI_SUCCESS);
-
-	default:
-		*result = NULL;
-		return (DDI_FAILURE);
-	}
 }
 
 /*
