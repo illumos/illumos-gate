@@ -36,7 +36,7 @@ DRV=hermon
 grep "^${DRV} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
 if [ $? -ne 0 ]; then
 	${ADD_DRV} -m '* 0666 root sys' -i \
-	    '"pci15b3,6340" "pci15b3,634a" "pci15b3,6354"' ${DRV}
+	    '"pciex15b3,6340" "pciex15b3,634a" "pciex15b3,6354"' ${DRV}
         if [ $? -ne 0 ]; then
                 echo "\nFailed add_drv of ${DRV}!\n" >&2
                 exit 1

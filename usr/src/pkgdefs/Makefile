@@ -239,7 +239,6 @@ COMMON_SUBDIRS= \
 	SUNWhal \
 	SUNWhalr \
 	SUNWhea  \
-	SUNWhermon  \
 	SUNWhwdata \
 	SUNWhxge \
 	SUNWib \
@@ -465,6 +464,7 @@ COMMON_SUBDIRS= \
 
 COMMON_XMODS= \
 	SUNWcryptoint \
+	SUNWhermon  \
 	SUNWibsdpib \
 	SUNWkdcr \
 	SUNWkdcu \
