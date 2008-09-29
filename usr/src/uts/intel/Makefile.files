@@ -252,6 +252,17 @@ CORE_PCBE_OBJS = core_pcbe.o
 AMR_OBJS = amr.o
 
 #
+#	AMD_IOMMU module
+#
+AMD_IOMMU_OBJS = 		\
+	amd_iommu.o		\
+	amd_iommu_impl.o	\
+	amd_iommu_acpi.o	\
+	amd_iommu_cmd.o		\
+	amd_iommu_log.o		\
+	amd_iommu_page_tables.o	
+
+#
 #	IOMMULIB module
 #
 IOMMULIB_OBJS = iommulib.o

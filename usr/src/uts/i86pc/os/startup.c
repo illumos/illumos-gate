@@ -2105,6 +2105,15 @@ startup_end(void)
 		    (avfunc)timer_softintr, name, (caddr_t)(uintptr_t)i, NULL);
 	}
 
+#if !defined(__xpv)
+	if (modload("drv", "amd_iommu") < 0) {
+		PRM_POINT("No AMD IOMMU present\n");
+	} else if (ddi_hold_installed_driver(ddi_name_to_major("amd_iommu"))
+	    == NULL) {
+		prom_printf("ERROR: failed to attach AMD IOMMU\n");
+	}
+#endif
+
 	PRM_POINT("startup_end() done");
 }
 

@@ -74,6 +74,7 @@ f none usr/include/ia32/sys/trap.h 644 root bin
 f none usr/include/ia32/sys/traptrace.h 644 root bin
 f none usr/include/sys/kdi_regs.h 644 root bin
 f none usr/include/stack_unwind.h 644 root bin
+f none usr/include/sys/amd_iommu.h 644 root bin
 f none usr/include/sys/bootregs.h 644 root bin
 f none usr/include/sys/bootsvcs.h 644 root bin
 f none usr/include/sys/controlregs.h 644 root bin

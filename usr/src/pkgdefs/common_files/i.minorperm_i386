@@ -348,6 +348,7 @@ evtchn:*
 privcmd:*
 xenbus:*
 fm:*
+amd_iommu:*
 EOF
 }
 

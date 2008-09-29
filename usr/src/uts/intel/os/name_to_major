@@ -150,3 +150,4 @@ vscan 254
 softmac 255
 nsmb 256
 fm 257
+amd_iommu 258
