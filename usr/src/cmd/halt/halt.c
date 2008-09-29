@@ -1084,16 +1084,25 @@ parse_fastboot_args(char *bootargs_buf, int *is_dryrun, const char *bename,
 			/* Not a valid unix file */
 			return (EINVAL);
 		} else {
+			int space = 0;
 			/*
 			 * Construct boot argument.
 			 */
 			unixlen = strlen(unixfile);
-			bcopy(unixfile, bootargs_buf, mplen);
-			(void) strcat(bootargs_buf, " ");
-			bcopy(&unixfile[mplen], &bootargs_buf[mplen + 1],
+
+			/*
+			 * mdep cannot start with space because bootadm
+			 * creates bogus menu entries if it does.
+			 */
+			if (mplen > 0) {
+				bcopy(unixfile, bootargs_buf, mplen);
+				(void) strcat(bootargs_buf, " ");
+				space = 1;
+			}
+			bcopy(&unixfile[mplen], &bootargs_buf[mplen + space],
 			    unixlen - mplen);
 			(void) strcat(bootargs_buf, " ");
-			off += unixlen + 2;
+			off += unixlen + space + 1;
 		}
 	} else {
 		/* Check to see if root is zfs */

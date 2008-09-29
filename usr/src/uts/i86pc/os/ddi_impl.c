@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PC specific DDI implementation
  */
@@ -1349,7 +1347,7 @@ contig_alloc(size_t size, ddi_dma_attr_t *attr, uintptr_t align, int cansleep)
 	return (addr);
 }
 
-static void
+void
 contig_free(void *addr, size_t size)
 {
 	pgcnt_t	pgcnt = btopr(size);

@@ -24,6 +24,29 @@
  * Use is subject to license terms.
  */
 
+/*
+ * This file contains the functions for performing Fast Reboot -- a
+ * reboot which bypasses the firmware and bootloader, considerably
+ * reducing downtime.
+ *
+ * load_kernel(): This function is invoked by mdpreboot() in the reboot
+ * path.  It loads the new kernel and boot archive into memory, builds
+ * the data structure containing sufficient information about the new
+ * kernel and boot archive to be passed to the fast reboot switcher
+ * (see fb_swtch_src.s for details).  When invoked the switcher relocates
+ * the new kernel and boot archive to physically contiguous low memory,
+ * similar to where the boot loader would have loaded them, and jumps to
+ * the new kernel.
+ *
+ * The physical addresses of the memory allocated for the new kernel, boot
+ * archive and their page tables must be above where the boot archive ends
+ * after it has been relocated by the switcher, otherwise the new files
+ * and their page tables could be overridden during relocation.
+ *
+ * fast_reboot(): This function is invoked by mdboot() once it's determined
+ * that the system is capable of fast reboot.  It jumps to the fast reboot
+ * switcher with the data structure built by load_kernel() as the argument.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -66,13 +89,17 @@
 #include <sys/kobj.h>
 #include <sys/multiboot.h>
 
+/*
+ * Data structure containing necessary information for the fast reboot
+ * switcher to jump to the new kernel.
+ */
 fastboot_info_t newkernel = { 0 };
+
 static char fastboot_filename[2][OBP_MAXPATHLEN] = { { 0 }, { 0 }};
 static x86pte_t ptp_bits = PT_VALID | PT_REF | PT_USER | PT_WRITABLE;
 static x86pte_t pte_bits =
     PT_VALID | PT_REF | PT_MOD | PT_NOCONSIST | PT_WRITABLE;
 static uint_t fastboot_shift_amt_pae[] = {12, 21, 30, 39};
-
 
 int fastboot_debug = 0;
 int fastboot_contig = 0;
@@ -128,6 +155,8 @@ extern int saved_cmdline_len;
 
 extern void* contig_alloc(size_t size, ddi_dma_attr_t *attr,
     uintptr_t align, int cansleep);
+extern void contig_free(void *addr, size_t size);
+
 
 /* PRINTLIKE */
 extern void vprintf(const char *, va_list);
@@ -355,7 +384,7 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 
 	bzero(bootargs, OBP_MAXPATHLEN);
 
-	if (mdep != NULL) {
+	if (mdep != NULL && strlen(mdep) != 0) {
 		arglen = strlen(mdep) + 1;
 	} else {
 		arglen = saved_cmdline_len;
@@ -408,7 +437,7 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 
 	((multiboot_info_t *)new_mbi_pa)->cmdline = next_addr;
 
-	if (mdep != NULL) {
+	if (mdep != NULL && strlen(mdep) != 0) {
 		bcopy(mdep, (void *)(uintptr_t)
 		    (((multiboot_info_t *)new_mbi_pa)->cmdline), (arglen - 1));
 	} else {
@@ -420,45 +449,35 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 	return (0);
 }
 
-
-void
-load_kernel(char *mdep)
+/*
+ * Initialize HAT related fields
+ */
+static void
+fastboot_init_fields(fastboot_info_t *nk)
 {
-	struct _buf	*file;
-	void		*buf = NULL;
-	uintptr_t	va;
-	int		i, j;
-	fastboot_file_t	*fb;
-	uint32_t	dboot_start_offset;
-	Ehdr		*ehdr;
-	char		kern_bootpath[OBP_MAXPATHLEN];
-	char		bootargs[OBP_MAXPATHLEN];
-	extern uintptr_t postbootkernelbase;
-	extern char	fb_swtch_image[];
-	int bootpath_len = 0;
-	int is_failsafe = 0;
-	uintptr_t next_pa = 0;	/* next available physical addr */
-
-	ASSERT(fastreboot_capable);
-
-	postbootkernelbase = 0;
-
 	if (x86_feature & X86_PAE) {
-		newkernel.fi_has_pae = 1;
-		newkernel.fi_shift_amt = fastboot_shift_amt_pae;
-		newkernel.fi_ptes_per_table = 512;
-		newkernel.fi_lpagesize = (2 << 20);	/* 2M */
-		newkernel.fi_top_level = 2;
+		nk->fi_has_pae = 1;
+		nk->fi_shift_amt = fastboot_shift_amt_pae;
+		nk->fi_ptes_per_table = 512;
+		nk->fi_lpagesize = (2 << 20);	/* 2M */
+		nk->fi_top_level = 2;
 	}
+}
 
-	bzero(kern_bootpath, OBP_MAXPATHLEN);
-	bzero(bootargs, OBP_MAXPATHLEN);
+/*
+ * Process boot argument
+ */
+static void
+fastboot_parse_mdep(char *mdep, char *kern_bootpath, int *bootpath_len,
+    char *bootargs)
+{
+	int	i;
 
 	/*
 	 * If mdep is not NULL, it comes in the format of
 	 *	mountpoint unix args
 	 */
-	if (mdep != NULL) {
+	if (mdep != NULL && strlen(mdep) != 0) {
 		if (mdep[0] != '-') {
 			/* First get the root argument */
 			i = 0;
@@ -470,7 +489,7 @@ load_kernel(char *mdep)
 				/* mount point */
 				bcopy(mdep, kern_bootpath, i);
 				kern_bootpath[i] = '\0';
-				bootpath_len = i;
+				*bootpath_len = i;
 
 				/*
 				 * Get the next argument. It should be unix as
@@ -488,6 +507,7 @@ load_kernel(char *mdep)
 			}
 			bcopy(mdep, kern_bootfile, i);
 			kern_bootfile[i] = '\0';
+			bcopy(mdep, bootargs, strlen(mdep));
 		} else {
 			int off = strlen(kern_bootfile);
 			bcopy(kern_bootfile, bootargs, off);
@@ -495,9 +515,72 @@ load_kernel(char *mdep)
 			bcopy(mdep, &bootargs[off], strlen(mdep));
 			off += strlen(mdep);
 			bootargs[off] = '\0';
-			mdep = bootargs;
 		}
 	}
+}
+
+/*
+ * Free up the memory we have allocated for this file
+ */
+static void
+fastboot_free_file(fastboot_file_t *fb)
+{
+	size_t	fsize_roundup, pt_size;
+	int	pt_entry_count;
+
+	fsize_roundup = P2ROUNDUP_TYPED(fb->fb_size, PAGESIZE, size_t);
+	contig_free((void *)fb->fb_va, fsize_roundup);
+
+	pt_entry_count = (fsize_roundup >> PAGESHIFT) + 1;
+	pt_size = P2ROUNDUP(pt_entry_count * 8, PAGESIZE);
+	contig_free((void *)fb->fb_pte_list_va, pt_size);
+}
+
+/*
+ * This function performs the following tasks:
+ * - Read the sizes of the new kernel and boot archive.
+ * - Allocate memory for the new kernel and boot archive.
+ * - Allocate memory for page tables necessary for mapping the memory
+ *   allocated for the files.
+ * - Read the new kernel and boot archive into memory.
+ * - Map in the fast reboot switcher.
+ * - Load the fast reboot switcher to FASTBOOT_SWTCH_PA.
+ * - Build the new multiboot_info structure
+ * - Build page tables for the low 1G of physical memory.
+ * - Mark the data structure as valid if all steps have succeeded.
+ */
+void
+load_kernel(char *mdep)
+{
+	void		*buf = NULL;
+	int		i;
+	fastboot_file_t	*fb;
+	uint32_t	dboot_start_offset;
+	char		kern_bootpath[OBP_MAXPATHLEN];
+	char		bootargs[OBP_MAXPATHLEN];
+	extern uintptr_t postbootkernelbase;
+	extern char	fb_swtch_image[];
+	int		bootpath_len = 0;
+	int		is_failsafe = 0;
+	int		is_retry = 0;
+	uint64_t	end_addr;
+
+	ASSERT(fastreboot_capable);
+
+	postbootkernelbase = 0;
+
+	/*
+	 * Initialize various HAT related fields in the data structure
+	 */
+	fastboot_init_fields(&newkernel);
+
+	bzero(kern_bootpath, OBP_MAXPATHLEN);
+
+	/*
+	 * Process the boot argument
+	 */
+	bzero(bootargs, OBP_MAXPATHLEN);
+	fastboot_parse_mdep(mdep, kern_bootpath, &bootpath_len, bootargs);
 
 	/*
 	 * Make sure we get the null character
@@ -516,16 +599,21 @@ load_kernel(char *mdep)
 		is_failsafe = 1;
 	}
 
+load_kernel_retry:
 	/*
 	 * Read in unix and boot_archive
 	 */
+	end_addr = DBOOT_ENTRY_ADDRESS;
 	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
-		uint64_t fsize;
-		size_t fsize_roundup, pt_size;
-		int page_index;
-		uintptr_t offset;
-		int pt_entry_count;
+		struct _buf	*file;
+		uintptr_t	va;
+		uint64_t	fsize;
+		size_t		fsize_roundup, pt_size;
+		int		page_index;
+		uintptr_t	offset;
+		int		pt_entry_count;
 		ddi_dma_attr_t dma_attr = fastboot_dma_attr;
+
 
 		dprintf("fastboot_filename[%d] = %s\n",
 		    i, fastboot_filename[i]);
@@ -544,13 +632,56 @@ load_kernel(char *mdep)
 			goto err_out;
 		}
 
-		if (i == FASTBOOT_BOOTARCHIVE && is_failsafe) {
-			/* Adjust low memory for failsafe mode */
-			fastboot_below_1G_dma_attr.dma_attr_addr_lo =
-			    dma_attr.dma_attr_addr_lo =
-			    P2ROUNDUP_TYPED(fsize, PAGESIZE, uint64_t) +
-			    next_pa;
+		fsize_roundup = P2ROUNDUP_TYPED(fsize, PAGESIZE, size_t);
+
+		/*
+		 * Where the files end in physical memory after being
+		 * relocated by the fast boot switcher.
+		 */
+		end_addr += fsize_roundup;
+		if (end_addr > fastboot_below_1G_dma_attr.dma_attr_addr_hi) {
+			cmn_err(CE_WARN, "Fastboot: boot archive is too big");
+			goto err_out;
 		}
+
+		/*
+		 * Adjust dma_attr_addr_lo so that the new kernel and boot
+		 * archive will not be overridden during relocation.
+		 */
+		if (end_addr > fastboot_dma_attr.dma_attr_addr_lo ||
+		    end_addr > fastboot_below_1G_dma_attr.dma_attr_addr_lo) {
+
+			if (is_retry) {
+				/*
+				 * If we have already tried and didn't succeed,
+				 * just give up.
+				 */
+				cmn_err(CE_WARN,
+				    "Fastboot: boot archive is too big");
+				goto err_out;
+			} else {
+				int j;
+
+				/* Set the flag so we don't keep retrying */
+				is_retry++;
+
+				/* Adjust dma_attr_addr_lo */
+				fastboot_dma_attr.dma_attr_addr_lo = end_addr;
+				fastboot_below_1G_dma_attr.dma_attr_addr_lo =
+				    end_addr;
+
+				/*
+				 * Free the memory we have already allocated
+				 * whose physical addresses might not fit
+				 * the new lo and hi constraints.
+				 */
+				for (j = 0; j < i; j++)
+					fastboot_free_file(
+					    &newkernel.fi_files[j]);
+				goto load_kernel_retry;
+			}
+		}
+
 
 		if (!fastboot_contig)
 			dma_attr.dma_attr_sgllen = (fsize / PAGESIZE) +
@@ -558,8 +689,7 @@ load_kernel(char *mdep)
 
 		if ((buf = contig_alloc(fsize, &dma_attr, PAGESIZE, 0))
 		    == NULL) {
-			cmn_err(CE_WARN, fastboot_enomem_msg, fsize,
-			    "64G");
+			cmn_err(CE_WARN, fastboot_enomem_msg, fsize, "64G");
 			goto err_out;
 		}
 
@@ -575,8 +705,6 @@ load_kernel(char *mdep)
 		fb->fb_va = va;
 		fb->fb_size = fsize;
 		fb->fb_sectcnt = 0;
-
-		fsize_roundup = P2ROUNDUP_TYPED(fb->fb_size, PAGESIZE, size_t);
 
 		/*
 		 * Allocate one extra page table entry for terminating
@@ -618,7 +746,8 @@ load_kernel(char *mdep)
 		fb->fb_pte_list_va[page_index] = FASTBOOT_TERMINATE;
 
 		if (i == FASTBOOT_UNIX) {
-			ehdr = (Ehdr *)va;
+			Ehdr	*ehdr = (Ehdr *)va;
+			int	j;
 
 			/*
 			 * Sanity checks:
@@ -703,16 +832,17 @@ load_kernel(char *mdep)
 			fb->fb_next_pa = fb->fb_dest_pa + fsize_roundup;
 		}
 
-		next_pa = fb->fb_next_pa;
-
 		kobj_close_file(file);
 
-		/*
-		 * Set fb_va to fake_va
-		 */
-		fb->fb_va = fake_va;
 	}
 
+	/*
+	 * Set fb_va to fake_va
+	 */
+	for (i = 0; i < FASTBOOT_MAX_FILES_MAP; i++) {
+		newkernel.fi_files[i].fb_va = fake_va;
+
+	}
 
 	/*
 	 * Add the function that will switch us to 32-bit protected mode
@@ -733,7 +863,7 @@ load_kernel(char *mdep)
 	/*
 	 * Build the new multiboot_info structure
 	 */
-	if (fastboot_build_mbi(mdep, &newkernel) != 0) {
+	if (fastboot_build_mbi(bootargs, &newkernel) != 0) {
 		goto err_out;
 	}
 
@@ -782,12 +912,12 @@ load_kernel(char *mdep)
 	return;
 
 err_out:
-	/* XXX Do we need to free up the memory we allocated? */
-
 	newkernel.fi_valid = 0;
 }
 
-
+/*
+ * Jump to the fast reboot switcher.  This function never returns.
+ */
 void
 fast_reboot()
 {
