@@ -188,8 +188,7 @@ void smb_vop_close(vnode_t *, int, cred_t *);
 int smb_vop_read(vnode_t *, uio_t *, cred_t *);
 int smb_vop_write(vnode_t *, uio_t *, int, uint32_t *, cred_t *);
 int smb_vop_getattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
-int smb_vop_setattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *,
-    boolean_t);
+int smb_vop_setattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
 int smb_vop_access(vnode_t *, int, int, vnode_t *, cred_t *);
 void smb_vop_eaccess(vnode_t *, int *, int, vnode_t *, cred_t *);
 int smb_vop_lookup(vnode_t *, char *, vnode_t **, char *, int, vnode_t *,

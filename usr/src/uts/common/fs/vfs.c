@@ -267,11 +267,11 @@ fsop_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 	 * some extra bytes that only the sysattr layer knows about.
 	 *
 	 * This guarantees that sysattr fids are larger than other fids
-	 * for this vfs. If the vfs supports sysattrs (implied
-	 * by VFSFT_XVATTR support), we cannot have a size collision
-	 * with XATTR_FIDSZ.
+	 * for this vfs. If the vfs supports the sysattr view interface
+	 * (as indicated by VFSFT_SYSATTR_VIEWS), we cannot have a size
+	 * collision with XATTR_FIDSZ.
 	 */
-	if (vfs_has_feature(vfsp, VFSFT_XVATTR) &&
+	if (vfs_has_feature(vfsp, VFSFT_SYSATTR_VIEWS) &&
 	    fidp->fid_len == XATTR_FIDSZ)
 		return (xattr_dir_vget(vfsp, vpp, fidp));
 

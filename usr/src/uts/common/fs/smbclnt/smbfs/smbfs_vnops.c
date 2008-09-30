@@ -222,14 +222,7 @@ const fs_operation_def_t smbfs_vnodeops_template[] = {
  * XXX
  * When new and relevant functionality is enabled, we should be
  * calling vfs_set_feature() to inform callers that pieces of
- * functionality are available, per PSARC 2007/227, e.g.
- *
- * VFSFT_XVATTR            Supports xvattr for attrs
- * VFSFT_CASEINSENSITIVE   Supports case-insensitive
- * VFSFT_NOCASESENSITIVE   NOT case-sensitive
- * VFSFT_DIRENTFLAGS       Supports dirent flags
- * VFSFT_ACLONCREATE       Supports ACL on create
- * VFSFT_ACEMASKONACCESS   Can use ACEMASK for access
+ * functionality are available, per PSARC 2007/227.
  */
 /* ARGSUSED */
 static int

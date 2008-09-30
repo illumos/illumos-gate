@@ -2884,25 +2884,8 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	/*
-	 * Make a couple of checks made by copen()
-	 *
-	 * Check to make sure underlying fs supports xattrs.  This
-	 * is required because solaris filesystem implementations
-	 * (UFS/TMPFS) don't enforce the noxattr mount option
-	 * in VOP_LOOKUP(LOOKUP_XATTR).  If fs doesn't support this
-	 * pathconf cmd or if fs supports cmd but doesn't claim
-	 * support for xattr, return NOTSUPP.  It would be better
-	 * to use VOP_PATHCONF( _PC_XATTR_ENABLED) for this; however,
-	 * that cmd is not available to VOP_PATHCONF interface
-	 * (it's only implemented inside pathconf syscall)...
-	 *
-	 * Verify permission to put attributes on files (access
-	 * checks from copen).
-	 */
-
 	if ((cs->vp->v_vfsp->vfs_flag & VFS_XATTR) == 0 &&
-	    !vfs_has_feature(cs->vp->v_vfsp, VFSFT_XVATTR)) {
+	    !vfs_has_feature(cs->vp->v_vfsp, VFSFT_SYSATTR_VIEWS)) {
 		*cs->statusp = resp->status = puterrno4(ENOTSUP);
 		goto out;
 	}

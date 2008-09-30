@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
@@ -464,6 +462,9 @@ xattr_file_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 	vnode_t *ppvp;
 	xvattr_t xvattr;
 	xoptattr_t *xoap = NULL;	/* Pointer to optional attributes */
+
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) == 0)
+		return (EINVAL);
 
 	/*
 	 * Validate file offset and size.

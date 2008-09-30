@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -372,7 +370,7 @@ tmp_mount(
 
 out:
 	if (error == 0)
-		vfs_set_feature(vfsp, VFSFT_XVATTR);
+		vfs_set_feature(vfsp, VFSFT_SYSATTR_VIEWS);
 
 	return (error);
 }

@@ -37,8 +37,6 @@
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -427,7 +425,7 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	    dpn.pn_path, cr, 0, &args, datalen);
 
 	if (error == 0) {
-		vfs_set_feature(vfsp, VFSFT_XVATTR);
+		vfs_set_feature(vfsp, VFSFT_SYSATTR_VIEWS);
 
 		/*
 		 * If lofi, drop our reference to the original file.

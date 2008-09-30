@@ -403,7 +403,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 
 int
 smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
-    int flags, cred_t *cr, boolean_t no_xvattr)
+    int flags, cred_t *cr)
 {
 	int error = 0;
 	int at_size = 0;
@@ -428,8 +428,7 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 
 	set_attr->sa_vattr.va_mask = 0;
 
-	if ((no_xvattr == B_FALSE) &&
-	    vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
+	if (vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
 		smb_vop_setup_xvattr(set_attr, &xvattr);
 		vap = &xvattr.xva_vattr;
 	} else {

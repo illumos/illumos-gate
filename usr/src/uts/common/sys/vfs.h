@@ -34,8 +34,6 @@
 #ifndef _SYS_VFS_H
 #define	_SYS_VFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/cred.h>
@@ -297,6 +295,7 @@ typedef	uint64_t	vfs_feature_t;
 #define	VFSFT_DIRENTFLAGS	0x100000008	/* Supports dirent flags */
 #define	VFSFT_ACLONCREATE	0x100000010	/* Supports ACL on create */
 #define	VFSFT_ACEMASKONACCESS	0x100000020	/* Can use ACEMASK for access */
+#define	VFSFT_SYSATTR_VIEWS	0x100000040	/* Supports sysattr view i/f */
 
 /*
  * Argument structure for mount(2).

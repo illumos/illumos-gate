@@ -695,6 +695,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	zfsvfs->z_use_fuids = USE_FUIDS(zfsvfs->z_version, zfsvfs->z_os);
 	if (zfsvfs->z_use_fuids) {
 		vfs_set_feature(vfsp, VFSFT_XVATTR);
+		vfs_set_feature(vfsp, VFSFT_SYSATTR_VIEWS);
 		vfs_set_feature(vfsp, VFSFT_ACEMASKONACCESS);
 		vfs_set_feature(vfsp, VFSFT_ACLONCREATE);
 	}

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -2381,7 +2379,7 @@ tmp_pathconf(
 		break;
 	case _PC_SATTR_ENABLED:
 	case _PC_SATTR_EXISTS:
-		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
+		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_SYSATTR_VIEWS) &&
 		    (vp->v_type == VREG || vp->v_type == VDIR);
 		error = 0;
 		break;

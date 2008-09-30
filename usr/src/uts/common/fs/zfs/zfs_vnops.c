@@ -1969,12 +1969,12 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	eodp = (struct edirent *)odp;
 
 	/*
-	 * If this VFS supports system attributes; and we're looking at an
-	 * extended attribute directory; and we care about normalization
-	 * conflicts on this vfs; then we must check for normalization
-	 * conflicts with the sysattr name space.
+	 * If this VFS supports the system attribute view interface; and
+	 * we're looking at an extended attribute directory; and we care
+	 * about normalization conflicts on this vfs; then we must check
+	 * for normalization conflicts with the sysattr name space.
 	 */
-	check_sysattrs = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
+	check_sysattrs = vfs_has_feature(vp->v_vfsp, VFSFT_SYSATTR_VIEWS) &&
 	    (vp->v_flag & V_XATTRDIR) && zfsvfs->z_norm &&
 	    (flags & V_RDDIR_ENTFLAGS);
 
@@ -4387,7 +4387,7 @@ zfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 
 	case _PC_SATTR_ENABLED:
 	case _PC_SATTR_EXISTS:
-		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
+		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_SYSATTR_VIEWS) &&
 		    (vp->v_type == VREG || vp->v_type == VDIR);
 		return (0);
 

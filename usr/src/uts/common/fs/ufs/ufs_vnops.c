@@ -5879,7 +5879,7 @@ ufs_l_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr,
 
 	case _PC_SATTR_ENABLED:
 	case _PC_SATTR_EXISTS:
-		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
+		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_SYSATTR_VIEWS) &&
 		    (vp->v_type == VREG || vp->v_type == VDIR);
 		break;
 

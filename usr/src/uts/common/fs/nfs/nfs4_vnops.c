@@ -4968,7 +4968,7 @@ nfs4lookup_xattr(vnode_t *dvp, char *nm, vnode_t **vpp, int flags, cred_t *cr)
 
 	mi = VTOMI4(dvp);
 	if (!(mi->mi_vfsp->vfs_flag & VFS_XATTR) &&
-	    !vfs_has_feature(mi->mi_vfsp, VFSFT_XVATTR))
+	    !vfs_has_feature(mi->mi_vfsp, VFSFT_SYSATTR_VIEWS))
 		return (EINVAL);
 
 	drp = VTOR4(dvp);

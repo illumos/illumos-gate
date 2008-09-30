@@ -777,16 +777,6 @@ typedef struct smb_user {
 #define	SMB_TREE_ACEMASKONACCESS	0x00000800
 #define	SMB_TREE_NFS_MOUNTED		0x00001000
 
-/*
- * Currently, the VFSFT_XVATTR feature is defined for file systems
- * which understand the xvattr_t interface as well as for file systems
- * which do not, but which understand the system attribute "view" interface.
- * Since we need to be able to differentiate between these two for UFS,
- * for now we use SMB_TREE_UFS so that we do the right thing.
- */
-
-#define	SMB_TREE_UFS			0x00002000
-
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,
 	SMB_TREE_STATE_DISCONNECTING,

@@ -764,9 +764,6 @@ smb_tree_get_flags(vfs_t *vfsp, smb_tree_t *tree)
 	if (strncasecmp(name, NFS, sizeof (NFS)) == 0)
 		flags |= SMB_TREE_NFS_MOUNTED;
 
-	if (strncasecmp(name, "UFS", sizeof ("UFS")) == 0)
-		flags |= SMB_TREE_UFS;
-
 	(void) strlcpy(tree->t_typename, name, SMB_TYPENAMELEN);
 	(void) utf8_strupr((char *)tree->t_typename);
 

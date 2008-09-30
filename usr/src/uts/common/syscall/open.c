@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
@@ -155,7 +153,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		}
 
 		if ((startvp->v_vfsp->vfs_flag & VFS_XATTR) != 0 ||
-		    vfs_has_feature(startvp->v_vfsp, VFSFT_XVATTR)) {
+		    vfs_has_feature(startvp->v_vfsp, VFSFT_SYSATTR_VIEWS)) {
 			error = VOP_LOOKUP(startvp, "", &sdvp, &pn,
 			    (filemode & FXATTRDIROPEN) ? LOOKUP_XATTR :
 			    LOOKUP_XATTR|CREATE_XATTR_DIR, rootvp, CRED(),

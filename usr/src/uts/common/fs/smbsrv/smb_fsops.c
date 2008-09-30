@@ -161,7 +161,6 @@ smb_fsop_create_with_sd(
 	int flags = 0;
 	int rc;
 	boolean_t is_dir;
-	boolean_t no_xvattr = B_FALSE;
 
 	ASSERT(fs_sd);
 
@@ -230,12 +229,8 @@ smb_fsop_create_with_sd(
 			set_attr.sa_mask |= SMB_AT_GID;
 		}
 
-		if (set_attr.sa_mask) {
-			if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
-				no_xvattr = B_TRUE;
-			rc = smb_vop_setattr(vp, NULL, &set_attr, 0, kcred,
-			    no_xvattr);
-		}
+		if (set_attr.sa_mask)
+			rc = smb_vop_setattr(vp, NULL, &set_attr, 0, kcred);
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
@@ -316,7 +311,6 @@ smb_fsop_create(
     smb_attr_t		*ret_attr)
 {
 	struct open_param *op = &sr->arg.open;
-	boolean_t	no_xvattr = B_FALSE;
 	smb_node_t	*fnode;
 	smb_attr_t	file_attr;
 	vnode_t		*xattrdirvp;
@@ -423,9 +417,6 @@ smb_fsop_create(
 			return (rc);
 		}
 
-		if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
-			no_xvattr = B_TRUE;
-
 		attr->sa_vattr.va_uid = file_attr.sa_vattr.va_uid;
 		attr->sa_vattr.va_gid = file_attr.sa_vattr.va_gid;
 		attr->sa_mask = SMB_AT_UID | SMB_AT_GID;
@@ -438,7 +429,7 @@ smb_fsop_create(
 		 * stream) file (see comments for smb_vop_setattr()).
 		 */
 
-		rc = smb_vop_setattr(vp, NULL, attr, 0, kcred, no_xvattr);
+		rc = smb_vop_setattr(vp, NULL, attr, 0, kcred);
 
 		if (rc != 0) {
 			smb_node_release(fnode);
@@ -1270,7 +1261,6 @@ smb_fsop_setattr(
 	int rc = 0;
 	int flags = 0;
 	uint_t sa_mask;
-	boolean_t no_xvattr = B_FALSE;
 
 	ASSERT(cr);
 	ASSERT(snode);
@@ -1327,12 +1317,8 @@ smb_fsop_setattr(
 		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
 		unnamed_vp = unnamed_node->vp;
 	}
-	if (sr && sr->tid_tree)
-		if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
-			no_xvattr = B_TRUE;
 
-	rc = smb_vop_setattr(snode->vp, unnamed_vp, set_attr, flags, cr,
-	    no_xvattr);
+	rc = smb_vop_setattr(snode->vp, unnamed_vp, set_attr, flags, cr);
 
 	if ((rc == 0) && ret_attr) {
 		/*
