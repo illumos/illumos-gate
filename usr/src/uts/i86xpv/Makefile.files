@@ -201,6 +201,7 @@ XPV_UPPC_OBJS += xpv_uppc.o psm_common.o
 XENBUS_OBJS += xenbus_dev.o
 XENCONS_OBJS += xencons.o
 XPVD_OBJS += xpvd.o
+XPVTAP_OBJS += xpvtap.o blk_common.o seg_mf.o
 XNB_OBJS += xnb.o
 XNBE_OBJS += xnbe.o
 XNBO_OBJS += xnbo.o

@@ -419,8 +419,8 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_enter(&vdp->xdf_cb_lk);
 
 	/* Watch backend XenbusState change */
-	if (xvdi_add_event_handler(devi, XS_OE_STATE,
-	    xdf_oe_change) != DDI_SUCCESS) {
+	if (xvdi_add_event_handler(devi, XS_OE_STATE, xdf_oe_change,
+	    NULL) != DDI_SUCCESS) {
 		mutex_exit(&vdp->xdf_cb_lk);
 		goto errout0;
 	}

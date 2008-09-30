@@ -135,6 +135,9 @@ extern boolean_t xen_physcpu_is_cmt(xen_mc_lcpu_cookie_t);
 extern id_t xen_physcpu_logical_id(xen_mc_lcpu_cookie_t);
 extern uint64_t xen_physcpu_mcg_cap(xen_mc_lcpu_cookie_t);
 
+extern int xen_map_gref(uint_t cmd, gnttab_map_grant_ref_t *mapop,
+    uint_t count, boolean_t uvaddr);
+
 /*
  * Wrappered versions of the hypercalls that diagnose/panic on failure
  */

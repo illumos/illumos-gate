@@ -451,15 +451,15 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	 * Receive notification of changes in the state of the
 	 * driver in the guest domain.
 	 */
-	if (xvdi_add_event_handler(dip, XS_OE_STATE,
-	    xnb_oe_state_change) != DDI_SUCCESS)
+	if (xvdi_add_event_handler(dip, XS_OE_STATE, xnb_oe_state_change,
+	    NULL) != DDI_SUCCESS)
 		goto failure_2;
 
 	/*
 	 * Receive notification of hotplug events.
 	 */
-	if (xvdi_add_event_handler(dip, XS_HP_STATE,
-	    xnb_hp_state_change) != DDI_SUCCESS)
+	if (xvdi_add_event_handler(dip, XS_HP_STATE, xnb_hp_state_change,
+	    NULL) != DDI_SUCCESS)
 		goto failure_2;
 
 	xsname = xvdi_get_xsname(dip);
@@ -1250,7 +1250,7 @@ xnb_txbuf_constructor(void *buf, void *arg, int kmflag)
 	 * Have the hat ensure that page table exists for the VA.
 	 */
 	hat_prepare_mapping(kas.a_hat,
-	    (caddr_t)(uintptr_t)txp->xt_mop.host_addr);
+	    (caddr_t)(uintptr_t)txp->xt_mop.host_addr, NULL);
 
 	return (0);
 }
@@ -1553,8 +1553,8 @@ finished:
 
 	end = loop;
 
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-	    xnbp->xnb_tx_mop, end - start) != 0) {
+	if (xen_map_gref(GNTTABOP_map_grant_ref, xnbp->xnb_tx_mop,
+	    end - start, B_FALSE) != 0) {
 
 		cmn_err(CE_WARN, "xnb_from_peer: map grant operation failed");
 
@@ -1761,9 +1761,9 @@ xnb_connect_rings(dev_info_t *dip)
 	map_op.flags = GNTMAP_host_map;
 	map_op.ref = xnbp->xnb_tx_ring_ref;
 	map_op.dom = xnbp->xnb_peer;
-	hat_prepare_mapping(kas.a_hat, xnbp->xnb_tx_ring_addr);
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-	    &map_op, 1) != 0 || map_op.status != 0) {
+	hat_prepare_mapping(kas.a_hat, xnbp->xnb_tx_ring_addr, NULL);
+	if (xen_map_gref(GNTTABOP_map_grant_ref, &map_op, 1, B_FALSE) != 0 ||
+	    map_op.status != 0) {
 		cmn_err(CE_WARN, "xnb_connect_rings: cannot map tx-ring page.");
 		goto fail;
 	}
@@ -1783,9 +1783,9 @@ xnb_connect_rings(dev_info_t *dip)
 	map_op.flags = GNTMAP_host_map;
 	map_op.ref = xnbp->xnb_rx_ring_ref;
 	map_op.dom = xnbp->xnb_peer;
-	hat_prepare_mapping(kas.a_hat, xnbp->xnb_rx_ring_addr);
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-	    &map_op, 1) != 0 || map_op.status != 0) {
+	hat_prepare_mapping(kas.a_hat, xnbp->xnb_rx_ring_addr, NULL);
+	if (xen_map_gref(GNTTABOP_map_grant_ref, &map_op, 1, B_FALSE) != 0 ||
+	    map_op.status != 0) {
 		cmn_err(CE_WARN, "xnb_connect_rings: cannot map rx-ring page.");
 		goto fail;
 	}

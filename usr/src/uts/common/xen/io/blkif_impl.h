@@ -86,4 +86,11 @@ enum blkif_protocol {
 	BLKIF_PROTOCOL_X86_64 = 3,
 };
 
+#define	BLKIF_RING_SIZE	\
+	__RING_SIZE((blkif_sring_t *)NULL, PAGESIZE)
+#define	BLKIF_X86_32_RING_SIZE \
+	__RING_SIZE((blkif_x86_32_sring_t *)NULL, PAGESIZE)
+#define	BLKIF_X86_64_RING_SIZE \
+	__RING_SIZE((blkif_x86_64_sring_t *)NULL, PAGESIZE)
+
 #endif /* __XEN_BLKIF_H__ */

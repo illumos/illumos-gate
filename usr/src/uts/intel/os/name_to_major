@@ -151,3 +151,4 @@ softmac 255
 nsmb 256
 fm 257
 amd_iommu 258
+xpvtap 259

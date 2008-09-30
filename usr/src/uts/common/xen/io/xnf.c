@@ -757,7 +757,7 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/* set driver private pointer now */
 	ddi_set_driver_private(devinfo, xnfp);
 
-	if (xvdi_add_event_handler(devinfo, XS_OE_STATE, oe_state_change)
+	if (xvdi_add_event_handler(devinfo, XS_OE_STATE, oe_state_change, NULL)
 	    != DDI_SUCCESS)
 		goto failure_1;
 

@@ -24,41 +24,47 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_VM_SEG_MF_H
-#define	_VM_SEG_MF_H
+#ifndef _SYS_BLK_COMMON_H
+#define	_SYS_BLK_COMMON_H
 
-
-#include <sys/types.h>
-#include <vm/seg.h>
-#include <sys/hypervisor.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct segmf_crargs {
-	dev_t		dev;
-	uchar_t		prot;
-	uchar_t		maxprot;
-};
+#include <sys/types.h>
+#include <sys/xendev.h>
 
-extern int segmf_create(struct seg *, void *);
 
-extern int segmf_add_mfns(struct seg *, caddr_t, mfn_t, pgcnt_t, domid_t);
+typedef uint_t (*blk_intr_t)(caddr_t arg);
+typedef void (*blk_ring_cb_t)(caddr_t arg);
 
-/* max grefs which can be passed into segmf_add_grefs */
-#define	SEGMF_MAX_GREFS		0x10
+typedef struct blk_ringinit_args_s {
+	dev_info_t	*ar_dip;
 
-/* segmf_add_grefs flags */
-#define	SEGMF_GREF_WR		0x1	/* Map gref writable */
+	/* callbacks */
+	blk_intr_t	ar_intr;
+	caddr_t		ar_intr_arg;
+	blk_ring_cb_t	ar_ringup;
+	caddr_t		ar_ringup_arg;
+	blk_ring_cb_t	ar_ringdown;
+	caddr_t		ar_ringdown_arg;
+} blk_ringinit_args_t;
 
-extern int segmf_add_grefs(struct seg *, caddr_t, uint_t, grant_ref_t *,
-    uint_t, domid_t);
-extern int segmf_release_grefs(struct seg *, caddr_t, uint_t);
-extern void segmf_add_gref_pte(struct seg *, caddr_t, uint64_t);
+typedef struct blk_ring_s *blk_ring_t;
+
+int blk_ring_init(blk_ringinit_args_t *args, blk_ring_t *ring);
+void blk_ring_fini(blk_ring_t *ring);
+
+boolean_t blk_ring_request_get(blk_ring_t ring, blkif_request_t *req);
+void blk_ring_request_requeue(blk_ring_t ring);
+void blk_ring_request_dump(blkif_request_t *req);
+
+void blk_ring_response_put(blk_ring_t ring, blkif_response_t *resp);
+void blk_ring_response_dump(blkif_response_t *req);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _VM_SEG_MF_H */
+#endif /* _SYS_BLK_COMMON_H */

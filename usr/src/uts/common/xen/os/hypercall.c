@@ -209,35 +209,18 @@ HYPERVISOR_console_io(int cmd, int count, char *str)
 
 /* *** __HYPERVISOR_physdev_op_compat *** OBSOLETED */
 
+/*
+ * ****
+ * NOTE: this hypercall should not be called directly for a
+ * GNTTABOP_map_grant_ref. Instead xen_map_gref() should be called.
+ * ****
+ */
 long
 HYPERVISOR_grant_table_op(uint_t cmd, void *uop, uint_t count)
 {
 	int ret_val;
 	ret_val = __hypercall3(__HYPERVISOR_grant_table_op,
 	    (long)cmd, (ulong_t)uop, (ulong_t)count);
-
-#if !defined(_BOOT) && !defined(XPV_HVM_DRIVER)
-	/*
-	 * XXPV --
-	 * The map_grant_ref call suffers a poor design flaw.
-	 * It's the only hypervisor interface that creates page table mappings
-	 * that doesn't take an entire PTE. Hence we can't create the
-	 * mapping with a particular setting of the software PTE bits, NX, etc.
-	 *
-	 * Until the interface is fixed, we need to minimize the possiblity
-	 * of dtrace or kmdb blowing up on a foreign mapping that doesn't
-	 * have a correct setting for the soft bits. We'll force them here.
-	 */
-	if (ret_val == 0 && cmd == GNTTABOP_map_grant_ref) {
-		extern void xen_fix_foreign(uint64_t);
-		gnttab_map_grant_ref_t *mapops = (gnttab_map_grant_ref_t *)uop;
-		uint_t i;
-		for (i = 0; i < count; ++i) {
-			if (mapops[i].status == GNTST_okay)
-				xen_fix_foreign(mapops[i].host_addr);
-		}
-	}
-#endif
 	return (ret_val);
 }
 

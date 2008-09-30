@@ -261,6 +261,7 @@ DRV_KMODS	+= privcmd
 DRV_KMODS	+= domcaps
 DRV_KMODS	+= evtchn
 DRV_KMODS	+= balloon
+DRV_KMODS	+= xpvtap
 
 #
 #	CPU Modules

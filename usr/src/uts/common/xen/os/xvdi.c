@@ -154,6 +154,9 @@ static i_xd_cfg_t xdci[] = {
 	{ XEN_VBLK, "vbd", "device/vbd", "backend/vbd", "xdf", "xdb",
 	    "block", IPL_VBD, XD_DOM_ALL, },
 
+	{ XEN_BLKTAP, "tap", NULL, "backend/tap", NULL, "xpvtap",
+	    "block", IPL_VBD, XD_DOM_ALL, },
+
 	{ XEN_XENBUS, NULL, NULL, NULL, "xenbus", NULL,
 	    NULL, 0, XD_DOM_ALL, },
 
@@ -260,7 +263,8 @@ xvdi_init_dev(dev_info_t *dip)
 	pdp->xd_vdevnum = vdevnum;
 	pdp->xd_devclass = devcls;
 	pdp->xd_evtchn = INVALID_EVTCHN;
-	mutex_init(&pdp->xd_lk, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&pdp->xd_evt_lk, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&pdp->xd_ndi_lk, NULL, MUTEX_DRIVER, NULL);
 	ddi_set_parent_data(dip, pdp);
 
 	/*
@@ -291,7 +295,8 @@ xvdi_init_dev(dev_info_t *dip)
 		    "%s/%d/%d", xdcp->xs_path_be, domid, vdevnum);
 	if ((xenbus_read_driver_state(xsname) >= XenbusStateClosing)) {
 		/* Don't try to init a dev that may be closing */
-		mutex_destroy(&pdp->xd_lk);
+		mutex_destroy(&pdp->xd_ndi_lk);
+		mutex_destroy(&pdp->xd_evt_lk);
 		kmem_free(pdp, sizeof (*pdp));
 		ddi_set_parent_data(dip, NULL);
 		return (DDI_FAILURE);
@@ -377,7 +382,8 @@ xvdi_uninit_dev(dev_info_t *dip)
 
 		ddi_set_parent_data(dip, NULL);
 
-		mutex_destroy(&pdp->xd_lk);
+		mutex_destroy(&pdp->xd_ndi_lk);
+		mutex_destroy(&pdp->xd_evt_lk);
 		kmem_free(pdp, sizeof (*pdp));
 	}
 }
@@ -397,32 +403,32 @@ xvdi_bind_evtchn(dev_info_t *dip, evtchn_port_t evtchn)
 	ASSERT(pdp != NULL);
 	ASSERT(pdp->xd_evtchn == INVALID_EVTCHN);
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_evt_lk);
 	if (pdp->xd_devclass == XEN_CONSOLE) {
 		if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
 			pdp->xd_evtchn = xen_info->console.domU.evtchn;
 		} else {
 			pdp->xd_evtchn = INVALID_EVTCHN;
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_evt_lk);
 			return (DDI_SUCCESS);
 		}
 	} else {
 		oeid = pdp->xd_xsdev.otherend_id;
 		if (oeid == (domid_t)-1) {
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_evt_lk);
 			return (DDI_FAILURE);
 		}
 
 		if ((r = xen_bind_interdomain(oeid, evtchn, &pdp->xd_evtchn))) {
 			xvdi_dev_error(dip, r, "bind event channel");
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_evt_lk);
 			return (DDI_FAILURE);
 		}
 	}
 #ifndef XPV_HVM_DRIVER
 	pdp->xd_ispec.intrspec_vec = ec_bind_evtchn_to_irq(pdp->xd_evtchn);
 #endif
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_evt_lk);
 
 	return (DDI_SUCCESS);
 }
@@ -442,32 +448,32 @@ xvdi_alloc_evtchn(dev_info_t *dip)
 	ASSERT(pdp != NULL);
 	ASSERT(pdp->xd_evtchn == INVALID_EVTCHN);
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_evt_lk);
 	if (pdp->xd_devclass == XEN_CONSOLE) {
 		if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
 			pdp->xd_evtchn = xen_info->console.domU.evtchn;
 		} else {
 			pdp->xd_evtchn = INVALID_EVTCHN;
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_evt_lk);
 			return (DDI_SUCCESS);
 		}
 	} else {
 		oeid = pdp->xd_xsdev.otherend_id;
 		if (oeid == (domid_t)-1) {
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_evt_lk);
 			return (DDI_FAILURE);
 		}
 
 		if ((rv = xen_alloc_unbound_evtchn(oeid, &pdp->xd_evtchn))) {
 			xvdi_dev_error(dip, rv, "bind event channel");
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_evt_lk);
 			return (DDI_FAILURE);
 		}
 	}
 #ifndef XPV_HVM_DRIVER
 	pdp->xd_ispec.intrspec_vec = ec_bind_evtchn_to_irq(pdp->xd_evtchn);
 #endif
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_evt_lk);
 
 	return (DDI_SUCCESS);
 }
@@ -484,7 +490,7 @@ xvdi_free_evtchn(dev_info_t *dip)
 	pdp = ddi_get_parent_data(dip);
 	ASSERT(pdp != NULL);
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_evt_lk);
 	if (pdp->xd_evtchn != INVALID_EVTCHN) {
 #ifndef XPV_HVM_DRIVER
 		ec_unbind_irq(pdp->xd_ispec.intrspec_vec);
@@ -492,7 +498,7 @@ xvdi_free_evtchn(dev_info_t *dip)
 #endif
 		pdp->xd_evtchn = INVALID_EVTCHN;
 	}
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_evt_lk);
 }
 
 #ifndef XPV_HVM_DRIVER
@@ -522,12 +528,12 @@ xvdi_map_ring(dev_info_t *dip, size_t nentry, size_t entrysize,
 	    0, 0, 0, 0, VM_SLEEP);
 
 	/* map in ring page */
-	hat_prepare_mapping(kas.a_hat, ringva);
+	hat_prepare_mapping(kas.a_hat, ringva, NULL);
 	mapop.host_addr = (uint64_t)(uintptr_t)ringva;
 	mapop.flags = GNTMAP_host_map;
 	mapop.ref = gref;
 	mapop.dom = oeid;
-	err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &mapop, 1);
+	err = xen_map_gref(GNTTABOP_map_grant_ref, &mapop, 1, B_FALSE);
 	if (err) {
 		xvdi_fatal_error(dip, err, errstr);
 		goto errout1;
@@ -845,9 +851,12 @@ xendev_enum_class(dev_info_t *parent, xendev_devclass_t devclass)
 		 * Probe this kind of device from the store, both
 		 * frontend and backend.
 		 */
-
-		i_xvdi_enum_fe(parent, xdcp);
-		i_xvdi_enum_be(parent, xdcp);
+		if (xdcp->node_fe != NULL) {
+			i_xvdi_enum_fe(parent, xdcp);
+		}
+		if (xdcp->node_be != NULL) {
+			i_xvdi_enum_be(parent, xdcp);
+		}
 	}
 }
 
@@ -1088,15 +1097,15 @@ i_xvdi_oestate_handler(void *arg)
 	if (curr_oestate != oestate)
 		return;
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_ndi_lk);
 
 	if (pdp->xd_oe_ehid != NULL) {
 		/* send notification to driver */
 		if (ddi_get_eventcookie(dip, XS_OE_STATE,
 		    &evc) == DDI_SUCCESS) {
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_ndi_lk);
 			(void) ndi_post_event(dip, dip, evc, &oestate);
-			mutex_enter(&pdp->xd_lk);
+			mutex_enter(&pdp->xd_ndi_lk);
 		}
 	} else {
 		/*
@@ -1113,7 +1122,7 @@ i_xvdi_oestate_handler(void *arg)
 		}
 	}
 
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_ndi_lk);
 
 	/*
 	 * We'll try to remove the devinfo node of this device if the
@@ -1133,7 +1142,7 @@ i_xvdi_hpstate_handler(void *arg)
 	char *hp_status;
 	unsigned int hpl;
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_ndi_lk);
 	if ((ddi_get_eventcookie(dip, XS_HP_STATE, &evc) == DDI_SUCCESS) &&
 	    (xenbus_read(XBT_NULL, pdp->xd_hp_watch.node, "",
 	    (void *)&hp_status, &hpl) == 0)) {
@@ -1143,13 +1152,13 @@ i_xvdi_hpstate_handler(void *arg)
 		if (strcmp(hp_status, "connected") == 0)
 			new_state = Connected;
 
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 
 		(void) ndi_post_event(dip, dip, evc, &new_state);
 		kmem_free(hp_status, hpl);
 		return;
 	}
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_ndi_lk);
 }
 
 void
@@ -1194,7 +1203,7 @@ i_xvdi_add_watch_oestate(dev_info_t *dip)
 
 	ASSERT(pdp != NULL);
 	ASSERT(pdp->xd_xsdev.nodename != NULL);
-	ASSERT(mutex_owned(&pdp->xd_lk));
+	ASSERT(mutex_owned(&pdp->xd_ndi_lk));
 
 	/*
 	 * Create taskq for delivering other end state change event to
@@ -1236,22 +1245,22 @@ i_xvdi_rem_watch_oestate(dev_info_t *dip)
 
 	pdp = ddi_get_parent_data(dip);
 	ASSERT(pdp != NULL);
-	ASSERT(mutex_owned(&pdp->xd_lk));
+	ASSERT(mutex_owned(&pdp->xd_ndi_lk));
 
 	dev = &pdp->xd_xsdev;
 
 	/* Unwatch for changes to XenbusState of otherend */
 	if (dev->otherend_watch.node != NULL) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		unregister_xenbus_watch(&dev->otherend_watch);
-		mutex_enter(&pdp->xd_lk);
+		mutex_enter(&pdp->xd_ndi_lk);
 	}
 
 	/* make sure no event handler is running */
 	if (pdp->xd_oe_taskq != NULL) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		ddi_taskq_destroy(pdp->xd_oe_taskq);
-		mutex_enter(&pdp->xd_lk);
+		mutex_enter(&pdp->xd_ndi_lk);
 		pdp->xd_oe_taskq = NULL;
 	}
 
@@ -1274,7 +1283,7 @@ i_xvdi_add_watch_hpstate(dev_info_t *dip)
 
 	ASSERT(pdp != NULL);
 	ASSERT(pdp->xd_xsdev.frontend == 0);
-	ASSERT(mutex_owned(&pdp->xd_lk));
+	ASSERT(mutex_owned(&pdp->xd_ndi_lk));
 
 	/*
 	 * Create taskq for delivering hotplug status change event to
@@ -1326,20 +1335,20 @@ i_xvdi_rem_watch_hpstate(dev_info_t *dip)
 
 	ASSERT(pdp != NULL);
 	ASSERT(pdp->xd_xsdev.frontend == 0);
-	ASSERT(mutex_owned(&pdp->xd_lk));
+	ASSERT(mutex_owned(&pdp->xd_ndi_lk));
 
 	/* Unwatch for changes to "hotplug-status" node for backend device. */
 	if (pdp->xd_hp_watch.node != NULL) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		unregister_xenbus_watch(&pdp->xd_hp_watch);
-		mutex_enter(&pdp->xd_lk);
+		mutex_enter(&pdp->xd_ndi_lk);
 	}
 
 	/* Make sure no event handler is running. */
 	if (pdp->xd_hp_taskq != NULL) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		ddi_taskq_destroy(pdp->xd_hp_taskq);
-		mutex_enter(&pdp->xd_lk);
+		mutex_enter(&pdp->xd_ndi_lk);
 		pdp->xd_hp_taskq = NULL;
 	}
 
@@ -1358,10 +1367,10 @@ i_xvdi_add_watches(dev_info_t *dip)
 
 	ASSERT(pdp != NULL);
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_ndi_lk);
 
 	if (i_xvdi_add_watch_oestate(dip) != DDI_SUCCESS) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		return (DDI_FAILURE);
 	}
 
@@ -1380,13 +1389,13 @@ i_xvdi_add_watches(dev_info_t *dip)
 			goto unwatch_and_fail;
 	}
 
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_ndi_lk);
 
 	return (DDI_SUCCESS);
 
 unwatch_and_fail:
 	i_xvdi_rem_watch_oestate(dip);
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_ndi_lk);
 
 	return (DDI_FAILURE);
 }
@@ -1398,7 +1407,7 @@ i_xvdi_rem_watches(dev_info_t *dip)
 
 	ASSERT(pdp != NULL);
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_ndi_lk);
 
 	i_xvdi_rem_watch_oestate(dip);
 
@@ -1407,7 +1416,7 @@ i_xvdi_rem_watches(dev_info_t *dip)
 	else
 		i_xvdi_rem_watch_hpstate(dip);
 
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_ndi_lk);
 }
 
 static int
@@ -1452,12 +1461,12 @@ i_xvdi_rem_watch_bepath(dev_info_t *dip)
 
 	ASSERT(pdp != NULL);
 	ASSERT(pdp->xd_xsdev.frontend == 1);
-	ASSERT(mutex_owned(&pdp->xd_lk));
+	ASSERT(mutex_owned(&pdp->xd_ndi_lk));
 
 	if (pdp->xd_bepath_watch.node != NULL) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		unregister_xenbus_watch(&pdp->xd_bepath_watch);
-		mutex_enter(&pdp->xd_lk);
+		mutex_enter(&pdp->xd_ndi_lk);
 
 		kmem_free((void *)(pdp->xd_bepath_watch.node),
 		    strlen(pdp->xd_bepath_watch.node) + 1);
@@ -1705,15 +1714,19 @@ xvdi_resume(dev_info_t *dip)
  */
 int
 xvdi_add_event_handler(dev_info_t *dip, char *name,
-    void (*evthandler)(dev_info_t *, ddi_eventcookie_t, void *, void *))
+    void (*evthandler)(dev_info_t *, ddi_eventcookie_t, void *, void *),
+    void *arg)
 {
 	ddi_eventcookie_t ecv;
 	struct xendev_ppd *pdp = ddi_get_parent_data(dip);
 	ddi_callback_id_t *cbid;
+	boolean_t call_handler;
+	i_oestate_evt_t *evt = NULL;
+	XenbusState oestate;
 
 	ASSERT(pdp != NULL);
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_ndi_lk);
 
 	if (strcmp(name, XS_OE_STATE) == 0) {
 		ASSERT(pdp->xd_xsdev.otherend != NULL);
@@ -1721,7 +1734,7 @@ xvdi_add_event_handler(dev_info_t *dip, char *name,
 		cbid = &pdp->xd_oe_ehid;
 	} else if (strcmp(name, XS_HP_STATE) == 0) {
 		if (pdp->xd_xsdev.frontend == 1) {
-			mutex_exit(&pdp->xd_lk);
+			mutex_exit(&pdp->xd_ndi_lk);
 			return (DDI_FAILURE);
 		}
 
@@ -1730,7 +1743,7 @@ xvdi_add_event_handler(dev_info_t *dip, char *name,
 		cbid = &pdp->xd_hp_ehid;
 	} else {
 		/* Unsupported watch. */
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		return (DDI_FAILURE);
 	}
 
@@ -1739,7 +1752,7 @@ xvdi_add_event_handler(dev_info_t *dip, char *name,
 	 * event.
 	 */
 	if (evthandler == NULL) {
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		return (DDI_SUCCESS);
 	}
 
@@ -1748,19 +1761,39 @@ xvdi_add_event_handler(dev_info_t *dip, char *name,
 	if (ddi_get_eventcookie(dip, name, &ecv) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "failed to find %s cookie for %s@%s",
 		    name, ddi_get_name(dip), ddi_get_name_addr(dip));
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		return (DDI_FAILURE);
 	}
-	if (ddi_add_event_handler(dip, ecv, evthandler, NULL, cbid)
+	if (ddi_add_event_handler(dip, ecv, evthandler, arg, cbid)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "failed to add %s event handler for %s@%s",
 		    name, ddi_get_name(dip), ddi_get_name_addr(dip));
 		*cbid = NULL;
-		mutex_exit(&pdp->xd_lk);
+		mutex_exit(&pdp->xd_ndi_lk);
 		return (DDI_FAILURE);
 	}
 
-	mutex_exit(&pdp->xd_lk);
+	/*
+	 * if we're adding an oe state callback, and the ring has already
+	 * transitioned out of Unknown, call the handler after we release
+	 * the mutex.
+	 */
+	call_handler = B_FALSE;
+	if ((strcmp(name, XS_OE_STATE) == 0) &&
+	    (pdp->xd_xsdev.otherend_state != XenbusStateUnknown)) {
+		oestate = pdp->xd_xsdev.otherend_state;
+		call_handler = B_TRUE;
+	}
+
+	mutex_exit(&pdp->xd_ndi_lk);
+
+	if (call_handler) {
+		evt = kmem_alloc(sizeof (i_oestate_evt_t), KM_SLEEP);
+		evt->dip = dip;
+		evt->state = oestate;
+		(void) ddi_taskq_dispatch(pdp->xd_oe_taskq,
+		    i_xvdi_oestate_handler, (void *)evt, DDI_SLEEP);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -1791,7 +1824,7 @@ xvdi_remove_event_handler(dev_info_t *dip, char *name)
 		return;
 	}
 
-	mutex_enter(&pdp->xd_lk);
+	mutex_enter(&pdp->xd_ndi_lk);
 
 	if (rem_oe && (pdp->xd_oe_ehid != NULL)) {
 		oeid = pdp->xd_oe_ehid;
@@ -1803,7 +1836,7 @@ xvdi_remove_event_handler(dev_info_t *dip, char *name)
 		pdp->xd_hp_ehid = NULL;
 	}
 
-	mutex_exit(&pdp->xd_lk);
+	mutex_exit(&pdp->xd_ndi_lk);
 
 	if (oeid != NULL)
 		(void) ddi_remove_event_handler(oeid);
@@ -2050,6 +2083,7 @@ i_xvdi_oestate_cb(struct xenbus_device *dev, XenbusState oestate)
 	dev_info_t *dip = (dev_info_t *)dev->data;
 	struct xendev_ppd *pdp = ddi_get_parent_data(dip);
 	i_oestate_evt_t *evt = NULL;
+	boolean_t call_handler;
 
 	XVDI_DPRINTF(XVDI_DBG_STATE,
 	    "i_xvdi_oestate_cb: %s@%s sees oestate change to %d\n",
@@ -2057,24 +2091,25 @@ i_xvdi_oestate_cb(struct xenbus_device *dev, XenbusState oestate)
 	    ddi_get_name_addr(dip) == NULL ? "null" : ddi_get_name_addr(dip),
 	    oestate);
 
-	/*
-	 * Don't trigger two consecutive ndi_devi_offline
-	 * on the same dip.
-	 */
-	if ((oestate == XenbusStateClosed) &&
-	    (dev->otherend_state == XenbusStateClosed))
-		return;
+	/* only call the handler if our state has changed */
+	call_handler = B_FALSE;
+	mutex_enter(&pdp->xd_ndi_lk);
+	if (dev->otherend_state != oestate) {
+		dev->otherend_state = oestate;
+		call_handler = B_TRUE;
+	}
+	mutex_exit(&pdp->xd_ndi_lk);
 
-	dev->otherend_state = oestate;
-
-	/*
-	 * Try to deliver the oestate change event to the dip
-	 */
-	evt = kmem_alloc(sizeof (i_oestate_evt_t), KM_SLEEP);
-	evt->dip = dip;
-	evt->state = oestate;
-	(void) ddi_taskq_dispatch(pdp->xd_oe_taskq,
-	    i_xvdi_oestate_handler, (void *)evt, DDI_SLEEP);
+	if (call_handler) {
+		/*
+		 * Try to deliver the oestate change event to the dip
+		 */
+		evt = kmem_alloc(sizeof (i_oestate_evt_t), KM_SLEEP);
+		evt->dip = dip;
+		evt->state = oestate;
+		(void) ddi_taskq_dispatch(pdp->xd_oe_taskq,
+		    i_xvdi_oestate_handler, (void *)evt, DDI_SLEEP);
+	}
 }
 
 /*ARGSUSED*/

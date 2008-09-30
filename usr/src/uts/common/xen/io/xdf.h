@@ -28,19 +28,10 @@
 #ifndef _SYS_XDF_H
 #define	_SYS_XDF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-#define	BLKIF_RING_SIZE \
-	__RING_SIZE((blkif_sring_t *)NULL, PAGESIZE)
-#define	BLKIF_X86_32_RING_SIZE \
-	__RING_SIZE((blkif_x86_32_sring_t *)NULL, PAGESIZE)
-#define	BLKIF_X86_64_RING_SIZE \
-	__RING_SIZE((blkif_x86_64_sring_t *)NULL, PAGESIZE)
 
 /*
  * VBDs have standard 512 byte blocks

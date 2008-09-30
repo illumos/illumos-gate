@@ -27,7 +27,6 @@
 #ifndef	_SYS_XENDEV_H
 #define	_SYS_XENDEV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/hypervisor.h>
 #include <sys/taskq.h>
@@ -55,6 +54,7 @@ typedef enum {
 	XEN_BALLOON,
 	XEN_EVTCHN,
 	XEN_PRIVCMD,
+	XEN_BLKTAP,
 	XEN_LASTCLASS
 } xendev_devclass_t;
 
@@ -79,15 +79,18 @@ typedef enum {
 } xendev_hotplug_state_t;
 
 struct xendev_ppd {
+	kmutex_t		xd_evt_lk;
 	int			xd_evtchn;
 	struct intrspec		xd_ispec;
+
 	xendev_devclass_t	xd_devclass;
 	domid_t			xd_domain;
 	int			xd_vdevnum;
+
+	kmutex_t		xd_ndi_lk;
 	struct xenbus_device	xd_xsdev;
 	struct xenbus_watch	xd_hp_watch;
 	struct xenbus_watch	xd_bepath_watch;
-	kmutex_t		xd_lk;
 	ddi_callback_id_t	xd_oe_ehid;
 	ddi_callback_id_t	xd_hp_ehid;
 	ddi_taskq_t		*xd_oe_taskq;
@@ -114,7 +117,8 @@ int	xvdi_alloc_evtchn(dev_info_t *);
 int	xvdi_bind_evtchn(dev_info_t *, evtchn_port_t);
 void	xvdi_free_evtchn(dev_info_t *);
 int	xvdi_add_event_handler(dev_info_t *, char *,
-	void (*)(dev_info_t *, ddi_eventcookie_t, void *, void *));
+	void (*)(dev_info_t *, ddi_eventcookie_t, void *, void *),
+	void *arg);
 void	xvdi_remove_event_handler(dev_info_t *, char *);
 int	xvdi_get_evtchn(dev_info_t *);
 int	xvdi_get_vdevnum(dev_info_t *);

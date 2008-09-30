@@ -152,6 +152,7 @@ domcaps:*		0600 root sys 0444 root sys	/dev/xen/domcaps
 evtchn:*		0600 root sys 0666 root sys	/dev/xen/evtchn
 privcmd:*		0600 root sys 0666 root sys	/dev/xen/privcmd
 xenbus:*		0600 root sys 0666 root sys	/dev/xen/xenbus
+xpvtap:*		0600 root sys 0666 root sys	/devices/xpvd/xpvtap*
 EOF
 }
 
@@ -349,6 +350,7 @@ privcmd:*
 xenbus:*
 fm:*
 amd_iommu:*
+xpvtap:*
 EOF
 }
 

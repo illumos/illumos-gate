@@ -299,8 +299,7 @@ xdb_get_buf(xdb_t *vdp, blkif_request_t *req, xdb_request_t *xreq)
 		}
 
 		/* map in io pages */
-		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-		    mapops, i);
+		err = xen_map_gref(GNTTABOP_map_grant_ref, mapops, i, B_FALSE);
 		if (err != 0)
 			return (NULL);
 		for (i = 0; i < segs; i++) {
@@ -473,7 +472,7 @@ xdb_init_ioreqs(xdb_t *vdp)
 	    VM_SLEEP);
 	for (i = 0; i < XDB_MAX_IO_PAGES(vdp); i++)
 		hat_prepare_mapping(kas.a_hat,
-		    vdp->xs_iopage_va + i * PAGESIZE);
+		    vdp->xs_iopage_va + i * PAGESIZE, NULL);
 }
 
 static void
@@ -1367,6 +1366,7 @@ xdb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg,
 	case XenbusStateClosed:
 		/* clean up */
 		xdb_close(dip);
+
 	}
 
 	mutex_exit(&vdp->xs_cbmutex);
@@ -1416,11 +1416,11 @@ xdb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_SLEEP);
 
 	/* Watch frontend and hotplug state change */
-	if (xvdi_add_event_handler(dip, XS_OE_STATE, xdb_oe_state_change) !=
-	    DDI_SUCCESS)
+	if (xvdi_add_event_handler(dip, XS_OE_STATE, xdb_oe_state_change,
+	    NULL) != DDI_SUCCESS)
 		goto errout3;
-	if (xvdi_add_event_handler(dip, XS_HP_STATE, xdb_hp_state_change) !=
-	    DDI_SUCCESS) {
+	if (xvdi_add_event_handler(dip, XS_HP_STATE, xdb_hp_state_change,
+	    NULL) != DDI_SUCCESS) {
 		goto errout4;
 	}
 

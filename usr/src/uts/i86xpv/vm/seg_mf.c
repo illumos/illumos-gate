@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
  * supported by this driver due to the requirements upon some of the ioctl()s.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -53,13 +52,42 @@
 #include <vm/seg.h>
 
 #include <vm/hat_pte.h>
+#include <vm/hat_i86.h>
 #include <vm/seg_mf.h>
 
 #include <sys/fs/snode.h>
 
 #define	VTOCVP(vp)	(VTOS(vp)->s_commonvp)
 
-#define	mfatob(n)	((n) * sizeof (mfn_t))
+typedef struct segmf_mfn_s {
+	mfn_t		m_mfn;
+} segmf_mfn_t;
+
+/* g_flags */
+#define	SEGMF_GFLAGS_WR		0x1
+#define	SEGMF_GFLAGS_MAPPED	0x2
+typedef struct segmf_gref_s {
+	uint64_t	g_ptep;
+	grant_ref_t	g_gref;
+	uint32_t	g_flags;
+	grant_handle_t	g_handle;
+} segmf_gref_t;
+
+typedef union segmf_mu_u {
+	segmf_mfn_t	m;
+	segmf_gref_t	g;
+} segmf_mu_t;
+
+typedef enum {
+	SEGMF_MAP_EMPTY = 0,
+	SEGMF_MAP_MFN,
+	SEGMF_MAP_GREF
+} segmf_map_type_t;
+
+typedef struct segmf_map_s {
+	segmf_map_type_t	t_type;
+	segmf_mu_t		u;
+} segmf_map_t;
 
 struct segmf_data {
 	kmutex_t	lock;
@@ -68,10 +96,12 @@ struct segmf_data {
 	uchar_t		maxprot;
 	size_t		softlockcnt;
 	domid_t		domid;
-	mfn_t		*mfns;
+	segmf_map_t	*map;
 };
 
 static struct seg_ops segmf_ops;
+
+static int segmf_fault_gref_range(struct seg *seg, caddr_t addr, size_t len);
 
 static struct segmf_data *
 segmf_data_zalloc(struct seg *seg)
@@ -100,9 +130,10 @@ segmf_create(struct seg *seg, void *args)
 	data->prot = a->prot;
 	data->maxprot = a->maxprot;
 
-	data->mfns = kmem_alloc(mfatob(npages), KM_SLEEP);
-	for (i = 0; i < npages; i++)
-		data->mfns[i] = MFN_INVALID;
+	data->map = kmem_alloc(npages * sizeof (segmf_map_t), KM_SLEEP);
+	for (i = 0; i < npages; i++) {
+		data->map[i].t_type = SEGMF_MAP_EMPTY;
+	}
 
 	error = VOP_ADDMAP(VTOCVP(data->vp), 0, as, seg->s_base, seg->s_size,
 	    data->prot, data->maxprot, MAP_SHARED, CRED(), NULL);
@@ -122,6 +153,7 @@ segmf_dup(struct seg *seg, struct seg *newseg)
 	struct segmf_data *data = seg->s_data;
 	struct segmf_data *ndata;
 	pgcnt_t npages = seg_pages(newseg);
+	size_t sz;
 
 	ndata = segmf_data_zalloc(newseg);
 
@@ -131,8 +163,9 @@ segmf_dup(struct seg *seg, struct seg *newseg)
 	ndata->maxprot = data->maxprot;
 	ndata->domid = data->domid;
 
-	ndata->mfns = kmem_alloc(mfatob(npages), KM_SLEEP);
-	bcopy(data->mfns, ndata->mfns, mfatob(npages));
+	sz = npages * sizeof (segmf_map_t);
+	ndata->map = kmem_alloc(sz, KM_SLEEP);
+	bcopy(data->map, ndata->map, sz);
 
 	return (VOP_ADDMAP(VTOCVP(ndata->vp), 0, newseg->s_as,
 	    newseg->s_base, newseg->s_size, ndata->prot, ndata->maxprot,
@@ -176,14 +209,13 @@ segmf_free(struct seg *seg)
 	struct segmf_data *data = seg->s_data;
 	pgcnt_t npages = seg_pages(seg);
 
-	kmem_free(data->mfns, mfatob(npages));
+	kmem_free(data->map, npages * sizeof (segmf_map_t));
 	VN_RELE(data->vp);
 	mutex_destroy(&data->lock);
 	kmem_free(data, sizeof (*data));
 }
 
 static int segmf_faultpage_debug = 0;
-
 /*ARGSUSED*/
 static int
 segmf_faultpage(struct hat *hat, struct seg *seg, caddr_t addr,
@@ -193,10 +225,15 @@ segmf_faultpage(struct hat *hat, struct seg *seg, caddr_t addr,
 	uint_t hat_flags = HAT_LOAD_NOCONSIST;
 	mfn_t mfn;
 	x86pte_t pte;
+	segmf_map_t *map;
+	uint_t idx;
 
-	mfn = data->mfns[seg_page(seg, addr)];
 
-	ASSERT(mfn != MFN_INVALID);
+	idx = seg_page(seg, addr);
+	map = &data->map[idx];
+	ASSERT(map->t_type == SEGMF_MAP_MFN);
+
+	mfn = map->u.m.m_mfn;
 
 	if (type == F_SOFTLOCK) {
 		mutex_enter(&freemem_lock);
@@ -488,7 +525,7 @@ segmf_add_mfns(struct seg *seg, caddr_t addr, mfn_t mfn,
     pgcnt_t pgcnt, domid_t domid)
 {
 	struct segmf_data *data = seg->s_data;
-	pgcnt_t base = seg_page(seg, addr);
+	pgcnt_t base;
 	faultcode_t fc;
 	pgcnt_t i;
 	int error = 0;
@@ -519,21 +556,205 @@ segmf_add_mfns(struct seg *seg, caddr_t addr, mfn_t mfn,
 
 	base = seg_page(seg, addr);
 
-	for (i = 0; i < pgcnt; i++)
-		data->mfns[base + i] = mfn++;
+	for (i = 0; i < pgcnt; i++) {
+		data->map[base + i].t_type = SEGMF_MAP_MFN;
+		data->map[base + i].u.m.m_mfn = mfn++;
+	}
 
 	fc = segmf_fault_range(seg->s_as->a_hat, seg, addr,
 	    pgcnt * MMU_PAGESIZE, F_SOFTLOCK, S_OTHER);
 
 	if (fc != 0) {
 		error = fc_decode(fc);
-		for (i = 0; i < pgcnt; i++)
-			data->mfns[base + i] = MFN_INVALID;
+		for (i = 0; i < pgcnt; i++) {
+			data->map[base + i].t_type = SEGMF_MAP_EMPTY;
+		}
 	}
 
 out:
 	mutex_exit(&data->lock);
 	return (error);
+}
+
+int
+segmf_add_grefs(struct seg *seg, caddr_t addr, uint_t flags,
+    grant_ref_t *grefs, uint_t cnt, domid_t domid)
+{
+	struct segmf_data *data;
+	segmf_map_t *map;
+	faultcode_t fc;
+	uint_t idx;
+	uint_t i;
+	int e;
+
+	if (seg->s_ops != &segmf_ops)
+		return (EINVAL);
+
+	/*
+	 * Don't mess with dom0.
+	 *
+	 * Only allow the domid to be set once for the segment.
+	 * After that attempts to add mappings to this segment for
+	 * other domains explicitly fails.
+	 */
+
+	if (domid == 0 || domid == DOMID_SELF)
+		return (EACCES);
+
+	data = seg->s_data;
+	idx = seg_page(seg, addr);
+	map = &data->map[idx];
+	e = 0;
+
+	mutex_enter(&data->lock);
+
+	if (data->domid == 0)
+		data->domid = domid;
+
+	if (data->domid != domid) {
+		e = EINVAL;
+		goto out;
+	}
+
+	/* store away the grefs passed in then fault in the pages */
+	for (i = 0; i < cnt; i++) {
+		map[i].t_type = SEGMF_MAP_GREF;
+		map[i].u.g.g_gref = grefs[i];
+		map[i].u.g.g_handle = 0;
+		map[i].u.g.g_flags = 0;
+		if (flags & SEGMF_GREF_WR) {
+			map[i].u.g.g_flags |= SEGMF_GFLAGS_WR;
+		}
+	}
+	fc = segmf_fault_gref_range(seg, addr, cnt);
+	if (fc != 0) {
+		e = fc_decode(fc);
+		for (i = 0; i < cnt; i++) {
+			data->map[i].t_type = SEGMF_MAP_EMPTY;
+		}
+	}
+
+out:
+	mutex_exit(&data->lock);
+	return (e);
+}
+
+int
+segmf_release_grefs(struct seg *seg, caddr_t addr, uint_t cnt)
+{
+	gnttab_unmap_grant_ref_t mapop[SEGMF_MAX_GREFS];
+	struct segmf_data *data;
+	segmf_map_t *map;
+	uint_t idx;
+	long e;
+	int i;
+	int n;
+
+
+	if (cnt > SEGMF_MAX_GREFS) {
+		return (-1);
+	}
+
+	idx = seg_page(seg, addr);
+	data = seg->s_data;
+	map = &data->map[idx];
+
+	bzero(mapop, sizeof (gnttab_unmap_grant_ref_t) * cnt);
+
+	/*
+	 * for each entry which isn't empty and is currently mapped,
+	 * set it up for an unmap then mark them empty.
+	 */
+	n = 0;
+	for (i = 0; i < cnt; i++) {
+		ASSERT(map[i].t_type != SEGMF_MAP_MFN);
+		if ((map[i].t_type == SEGMF_MAP_GREF) &&
+		    (map[i].u.g.g_flags & SEGMF_GFLAGS_MAPPED)) {
+			mapop[n].handle = map[i].u.g.g_handle;
+			mapop[n].host_addr = map[i].u.g.g_ptep;
+			mapop[n].dev_bus_addr = 0;
+			n++;
+		}
+		map[i].t_type = SEGMF_MAP_EMPTY;
+	}
+
+	/* if there's nothing to unmap, just return */
+	if (n == 0) {
+		return (0);
+	}
+
+	e = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &mapop, n);
+	if (e != 0) {
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+void
+segmf_add_gref_pte(struct seg *seg, caddr_t addr, uint64_t pte_ma)
+{
+	struct segmf_data *data;
+	uint_t idx;
+
+	idx = seg_page(seg, addr);
+	data = seg->s_data;
+
+	data->map[idx].u.g.g_ptep = pte_ma;
+}
+
+
+static int
+segmf_fault_gref_range(struct seg *seg, caddr_t addr, size_t cnt)
+{
+	gnttab_map_grant_ref_t mapop[SEGMF_MAX_GREFS];
+	struct segmf_data *data;
+	segmf_map_t *map;
+	uint_t idx;
+	int e;
+	int i;
+
+
+	if (cnt > SEGMF_MAX_GREFS) {
+		return (-1);
+	}
+
+	data = seg->s_data;
+	idx = seg_page(seg, addr);
+	map = &data->map[idx];
+
+	bzero(mapop, sizeof (gnttab_map_grant_ref_t) * cnt);
+
+	ASSERT(map->t_type == SEGMF_MAP_GREF);
+
+	/*
+	 * map in each page passed in into the user apps AS. We do this by
+	 * passing the MA of the actual pte of the mapping to the hypervisor.
+	 */
+	for (i = 0; i < cnt; i++) {
+		mapop[i].host_addr = map[i].u.g.g_ptep;
+		mapop[i].dom = data->domid;
+		mapop[i].ref = map[i].u.g.g_gref;
+		mapop[i].flags = GNTMAP_host_map | GNTMAP_application_map |
+		    GNTMAP_contains_pte;
+		if (!(map[i].u.g.g_flags & SEGMF_GFLAGS_WR)) {
+			mapop[i].flags |= GNTMAP_readonly;
+		}
+	}
+	e = xen_map_gref(GNTTABOP_map_grant_ref, mapop, cnt, B_TRUE);
+	if ((e != 0) || (mapop[0].status != GNTST_okay)) {
+		return (FC_MAKE_ERR(EFAULT));
+	}
+
+	/* save handle for segmf_release_grefs() and mark it as mapped */
+	for (i = 0; i < cnt; i++) {
+		ASSERT(mapop[i].status == GNTST_okay);
+		map[i].u.g.g_handle = mapop[i].handle;
+		map[i].u.g.g_flags |= SEGMF_GFLAGS_MAPPED;
+	}
+
+	return (0);
 }
 
 static struct seg_ops segmf_ops = {

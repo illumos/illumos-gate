@@ -78,6 +78,7 @@ f none platform/i86xpv/kernel/drv/xnbo 755 root sys
 f none platform/i86xpv/kernel/drv/xnbu 755 root sys
 f none platform/i86xpv/kernel/drv/xnf 755 root sys
 f none platform/i86xpv/kernel/drv/xpvd 755 root sys
+f none platform/i86xpv/kernel/drv/xpvtap 755 root sys
 d none platform/i86xpv/kernel/mach 755 root sys
 f none platform/i86xpv/kernel/mach/xpv_psm 755 root sys
 f none platform/i86xpv/kernel/mach/xpv_uppc 755 root sys
@@ -111,6 +112,7 @@ f none platform/i86xpv/kernel/drv/amd64/xnbo 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xnbu 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xnf 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xpvd 755 root sys
+f none platform/i86xpv/kernel/drv/amd64/xpvtap 755 root sys
 d none platform/i86xpv/kernel/mach/amd64 755 root sys
 f none platform/i86xpv/kernel/mach/amd64/xpv_psm 755 root sys
 f none platform/i86xpv/kernel/mach/amd64/xpv_uppc 755 root sys

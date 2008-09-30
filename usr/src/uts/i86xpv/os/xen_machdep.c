@@ -1311,3 +1311,38 @@ xen_physcpu_mcg_cap(xen_mc_lcpu_cookie_t cookie)
 	 */
 	return (xcp->mc_msrvalues[0].value);
 }
+
+int
+xen_map_gref(uint_t cmd, gnttab_map_grant_ref_t *mapop, uint_t count,
+    boolean_t uvaddr)
+{
+	long rc;
+
+	ASSERT(cmd == GNTTABOP_map_grant_ref);
+	rc = HYPERVISOR_grant_table_op(cmd, mapop, count);
+
+#if !defined(_BOOT)
+	/*
+	 * XXPV --
+	 * The map_grant_ref call suffers a poor design flaw.
+	 * It's the only hypervisor interface that creates page table mappings
+	 * that doesn't take an entire PTE. Hence we can't create the
+	 * mapping with a particular setting of the software PTE bits, NX, etc.
+	 *
+	 * Until the interface is fixed, we need to minimize the possiblity
+	 * of dtrace or kmdb blowing up on a foreign mapping that doesn't
+	 * have a correct setting for the soft bits. We'll force them here.
+	 */
+	if ((rc == 0) && (uvaddr == B_FALSE)) {
+		extern void xen_fix_foreign(struct hat *, uint64_t);
+		uint_t i;
+		for (i = 0; i < count; ++i) {
+			if (mapop[i].status == GNTST_okay) {
+				xen_fix_foreign(kas.a_hat, mapop[i].host_addr);
+			}
+		}
+	}
+#endif
+
+	return (rc);
+}

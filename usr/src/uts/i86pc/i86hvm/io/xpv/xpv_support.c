@@ -314,6 +314,19 @@ hvm_get_param(int param_id)
 	return (xhp.value);
 }
 
+/*ARGSUSED*/
+int
+xen_map_gref(uint_t cmd, gnttab_map_grant_ref_t *mapop, uint_t count,
+    boolean_t uvaddr)
+{
+	long rc;
+
+	ASSERT(cmd == GNTTABOP_map_grant_ref);
+	rc = HYPERVISOR_grant_table_op(cmd, mapop, count);
+
+	return (rc);
+}
+
 static struct xenbus_watch shutdown_watch;
 taskq_t *xen_shutdown_tq;
 

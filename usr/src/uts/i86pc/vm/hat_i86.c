@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - Hardware Address Translation management for i386 and amd64
@@ -4300,11 +4299,26 @@ hat_kpm_mseghash_update(pgcnt_t inx, struct memseg *msp)
  * that a page table actually exists.
  */
 void
-hat_prepare_mapping(hat_t *hat, caddr_t addr)
+hat_prepare_mapping(hat_t *hat, caddr_t addr, uint64_t *pte_ma)
 {
+	maddr_t base_ma;
+	htable_t *ht;
+	uint_t entry;
+
 	ASSERT(IS_P2ALIGNED((uintptr_t)addr, MMU_PAGESIZE));
 	XPV_DISALLOW_MIGRATE();
-	(void) htable_create(hat, (uintptr_t)addr, 0, NULL);
+	ht = htable_create(hat, (uintptr_t)addr, 0, NULL);
+
+	/*
+	 * if an address for pte_ma is passed in, return the MA of the pte
+	 * for this specific address.  This address is only valid as long
+	 * as the htable stays locked.
+	 */
+	if (pte_ma != NULL) {
+		entry = htable_va2entry((uintptr_t)addr, ht);
+		base_ma = pa_to_ma(ptob(ht->ht_pfn));
+		*pte_ma = base_ma + (entry << mmu.pte_size_shift);
+	}
 	XPV_ALLOW_MIGRATE();
 }
 

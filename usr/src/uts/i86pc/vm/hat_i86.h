@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_VM_HAT_I86_H
 #define	_VM_HAT_I86_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -255,7 +254,7 @@ extern void hat_switch(struct hat *hat);
 /*
  * Interfaces to use around code that maps/unmaps grant table references.
  */
-extern void hat_prepare_mapping(hat_t *, caddr_t);
+extern void hat_prepare_mapping(hat_t *, caddr_t, uint64_t *);
 extern void hat_release_mapping(hat_t *, caddr_t);
 
 #define	XPV_DISALLOW_MIGRATE()	xen_block_migrate()
