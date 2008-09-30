@@ -26,8 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_TXDMA_H
 #define	_SYS_NXGE_NXGE_TXDMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -163,8 +161,6 @@ typedef struct _tx_ring_t {
 	uint_t 			rd_index;
 	uint_t 			wr_index;
 	boolean_t		wr_index_wrap;
-	uint_t 			head_index;
-	boolean_t		head_wrap;
 	tx_ring_hdl_t		ring_head;
 	tx_ring_kick_t		ring_kick_tail;
 	txdma_mailbox_t		tx_mbox;
@@ -219,36 +215,10 @@ typedef struct _tx_rings_t {
 } tx_rings_t, *p_tx_rings_t;
 
 
-#if defined(_KERNEL) || (defined(COSIM) && !defined(IODIAG))
-
-typedef struct _tx_buf_rings_t {
-	struct _tx_buf_ring_t 	*txbuf_rings;
-	boolean_t		txbuf_allocated;
-} tx_buf_rings_t, *p_tx_buf_rings_t;
-
-#endif
-
 typedef struct _tx_mbox_areas_t {
 	p_tx_mbox_t 		*txmbox_areas_p;
 	boolean_t		txmbox_allocated;
 } tx_mbox_areas_t, *p_tx_mbox_areas_t;
-
-typedef struct _tx_param_t {
-	nxge_logical_page_t tx_logical_pages[NXGE_MAX_LOGICAL_PAGES];
-} tx_param_t, *p_tx_param_t;
-
-typedef struct _tx_params {
-	struct _tx_param_t 	*tx_param_p;
-} tx_params_t, *p_tx_params_t;
-
-/*
- * Global register definitions per chip and they are initialized
- * using the function zero control registers.
- * .
- */
-typedef struct _txdma_globals {
-	boolean_t		mode32;
-} txdma_globals_t, *p_txdma_globals;
 
 
 #if	defined(SOLARIS) && (defined(_KERNEL) || \

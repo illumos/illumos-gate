@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_txdma.h>
 #include <sys/nxge/nxge_hio.h>
@@ -106,8 +104,7 @@ nxge_init_txdma_channels(p_nxge_t nxgep)
 			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
 				if ((1 << tdc) & group->map) {
 					if ((nxge_grp_dc_add(nxgep,
-					    (vr_handle_t)group,
-					    VP_BOUND_TX, tdc)))
+					    group, VP_BOUND_TX, tdc)))
 						return (NXGE_ERROR);
 				}
 			}

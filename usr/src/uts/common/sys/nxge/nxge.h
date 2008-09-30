@@ -501,8 +501,6 @@ typedef struct _nxge_ldgv_t {
 	uint8_t			maxldgs;
 	uint8_t			maxldvs;
 	uint8_t			ldg_intrs;
-	boolean_t		own_sys_err;
-	boolean_t		own_max_ldv;
 	uint32_t		tmres;
 	p_nxge_ldg_t		ldgp;
 	p_nxge_ldv_t		ldvp;
@@ -618,7 +616,6 @@ struct _nxge_t {
 	int			function_num;	/* device function number */
 	int			nports;		/* # of ports on this device */
 	int			board_ver;	/* Board Version */
-	int			partition_id;	/* partition ID */
 	int			use_partition;	/* partition is enabled */
 	uint32_t		drv_state;	/* driver state bit flags */
 	uint64_t		nxge_debug_level; /* driver state bit flags */
@@ -673,7 +670,6 @@ struct _nxge_t {
 	p_nxge_ldgv_t		ldgvp;
 
 	npi_vpd_info_t		vpd_info;
-	caddr_t			param_list;	/* Parameter list */
 
 	ether_addr_st		factaddr;	/* factory mac address	    */
 	ether_addr_st		ouraddr;	/* individual address	    */
@@ -707,7 +703,6 @@ struct _nxge_t {
 	p_rx_rcr_rings_t 	rx_rcr_rings;
 	p_rx_mbox_areas_t 	rx_mbox_areas_p;
 
-	p_rx_tx_params_t	rx_params;
 	uint32_t		start_rdc;
 	uint32_t		max_rdcs;
 	uint32_t		rdc_mask;
@@ -718,8 +713,6 @@ struct _nxge_t {
 
 	uint32_t		start_tdc;
 	uint32_t		max_tdcs;
-
-	p_rx_tx_params_t	tx_params;
 
 	ddi_dma_handle_t 	dmasparehandle;
 
@@ -754,15 +747,10 @@ struct _nxge_t {
 
 	boolean_t 		hard_props_read;
 
-	boolean_t 		nxge_htraffic;
 	uint32_t 		nxge_ncpus;
-	uint32_t 		nxge_cpumask;
 	uint16_t 		intr_timeout;
 	uint16_t 		intr_threshold;
-	uchar_t 		nxge_rxmode;
-	uint32_t 		active_threads;
 
-	rtrace_t		rtrace;
 	int			fm_capabilities; /* FMA capabilities */
 
 	uint32_t 		nxge_port_rbr_size;

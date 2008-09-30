@@ -26,8 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_IMPL_H
 #define	_SYS_NXGE_NXGE_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -548,7 +546,6 @@ typedef struct _nxge_dma_pool_t nxge_dma_pool_t, *p_nxge_dma_pool_t;
 struct _nxge_dma_common_t {
 	uint16_t		dma_channel;
 	void			*kaddrp;
-	void			*first_kaddrp;
 	void			*last_kaddrp;
 	void			*ioaddr_pp;
 	void			*first_ioaddr_pp;
@@ -556,7 +553,6 @@ struct _nxge_dma_common_t {
 	ddi_dma_cookie_t 	dma_cookie;
 	uint32_t		ncookies;
 
-	nxge_block_mv_t		msg_dma_flags;
 	ddi_dma_handle_t	dma_handle;
 	nxge_os_acc_handle_t	acc_handle;
 	npi_handle_t		npi_handle;
@@ -633,7 +629,6 @@ struct _nxge_ldg_t {
 	uint8_t			nldvs;
 	p_nxge_ldv_t		ldvp;
 	nxge_sys_intr_t		sys_intr_handler;
-	uint_t			(*ih_cb_func)(caddr_t, caddr_t);
 	p_nxge_t		nxgep;
 };
 
@@ -651,11 +646,8 @@ struct _nxge_ldv_t {
 	uint8_t			func;
 	p_nxge_ldg_t		ldgp;
 	uint8_t			ldv_flags;
-	boolean_t		is_leve;
-	boolean_t		is_edge;
 	uint8_t			ldv_ldf_masks;
 	nxge_ldv_intr_t		ldv_intr_handler;
-	uint_t			(*ih_cb_func)(caddr_t, caddr_t);
 	p_nxge_t		nxgep;
 };
 #endif

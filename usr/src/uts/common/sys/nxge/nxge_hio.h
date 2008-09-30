@@ -27,8 +27,6 @@
 #ifndef	_SYS_NXGE_NXGE_HIO_H
 #define	_SYS_NXGE_NXGE_HIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -51,9 +49,6 @@ extern "C" {
 /* ------------------------------------------------------------------ */
 typedef uint8_t nx_rdc_t;
 typedef uint8_t nx_tdc_t;
-
-typedef uintptr_t vr_handle_t;
-typedef uintptr_t dc_handle_t;
 
 typedef uint64_t res_map_t;
 
@@ -264,8 +259,6 @@ typedef struct nxge_hio_vr {
 	nxge_grp_t	rx_group;
 	nxge_grp_t	tx_group;
 
-	boolean_t	polling;
-
 } nxge_hio_vr_t;
 
 typedef nxge_status_t (*dc_init_t)(nxge_t *, int);
@@ -313,26 +306,19 @@ typedef struct nx_dc {
 	dc_init_t	init;	/* nxge_init_xxdma_channel() */
 	dc_uninit_t	uninit;	/* nxge_uninit_xxdma_channel() */
 
-	vr_handle_t	group;	/* The group belonged to. */
+	nxge_grp_t	*group;	/* The group belonged to. */
 	uint32_t	cookie;	/* The HV cookie. */
 
 	hio_ldg_t	ldg;
 	boolean_t	interrupting; /* Interrupt enabled? */
-	boolean_t	polling; /* Or are we polling? */
 
 } nxge_hio_dc_t;
-
-typedef struct {
-	int		vrs;
-	int		rdcs;
-	int		tdcs;
-} hio_count_t;
 
 typedef struct {
 	nxge_hio_type_t		type;
 
 	kmutex_t		lock;
-	hio_count_t		available;
+	int			vrs;
 	unsigned		sequence;
 
 	nxhv_fp_t		hio;
@@ -367,9 +353,9 @@ extern int nxge_dci_map(nxge_t *, vpc_type_t, int);
  * Crossbow groups.
  * ---------------------------------------------------------------------
  */
-extern vr_handle_t nxge_grp_add(nxge_t *, nxge_grp_type_t);
-extern void nxge_grp_remove(nxge_t *, vr_handle_t);
-extern int nxge_grp_dc_add(nxge_t *, vr_handle_t, vpc_type_t, int);
+extern nxge_grp_t *nxge_grp_add(nxge_t *, nxge_grp_type_t);
+extern void nxge_grp_remove(nxge_t *, nxge_grp_t *);
+extern int nxge_grp_dc_add(nxge_t *, nxge_grp_t *, vpc_type_t, int);
 extern void nxge_grp_dc_remove(nxge_t *, vpc_type_t, int);
 extern nxge_hio_dc_t *nxge_grp_dc_find(nxge_t *, vpc_type_t, int);
 

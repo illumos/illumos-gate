@@ -591,9 +591,9 @@ nxge_hio_vr_release(
 	 * Remove both groups. Assumption: only two groups!
 	 */
 	if (nxge->rx_set.group[0] != NULL)
-		nxge_grp_remove(nxge, (vr_handle_t)nxge->rx_set.group[0]);
+		nxge_grp_remove(nxge, nxge->rx_set.group[0]);
 	if (nxge->tx_set.group[0] != NULL)
-		nxge_grp_remove(nxge, (vr_handle_t)nxge->tx_set.group[0]);
+		nxge_grp_remove(nxge, nxge->tx_set.group[0]);
 
 	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "<== nxge_hio_vr_release"));
 

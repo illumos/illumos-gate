@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_rxdma.h>
 #include <sys/nxge/nxge_hio.h>
@@ -163,8 +161,7 @@ nxge_init_rxdma_channels(p_nxge_t nxgep)
 			for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
 				if ((1 << channel) & group->map) {
 					if ((nxge_grp_dc_add(nxgep,
-					    (vr_handle_t)group,
-					    VP_BOUND_RX, channel)))
+					    group, VP_BOUND_RX, channel)))
 						return (NXGE_ERROR);
 				}
 			}

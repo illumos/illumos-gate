@@ -26,8 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_COMMON_H
 #define	_SYS_NXGE_NXGE_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -238,7 +236,6 @@ typedef struct  nxge_rdc_cfg {
 typedef struct  nxge_tdc_cfg {
 	uint32_t	flag;		/* 0: not configured 1: configured */
 	struct nxge_hw_list *nxge_hw_p;
-	uint32_t	partition_id;
 	uint32_t	port; 		/* function number */
 	/* partitioning, DMC function zero (All 0s for non-partitioning) */
 	uint32_t	tx_log_page_vld_page0;	/* TRUE or FALSE */
@@ -314,7 +311,6 @@ typedef struct nxge_mv_cfg {
 	uint8_t		flag;			/* 0:unconfigure 1:configured */
 	uint8_t		rdctbl;			/* RDC channel table group */
 	uint8_t		mpr_npr;		/* MAC and VLAN preference */
-	uint8_t		odd_parity;
 } nxge_mv_cfg_t, *p_nxge_mv_cfg_t;
 
 typedef struct nxge_param_map {
@@ -377,8 +373,6 @@ typedef struct {
  * Use default static configuration for x86.
  */
 typedef struct nxge_hw_pt_cfg {
-	uint32_t	partition_id;	 /* partition Id		*/
-	uint32_t	read_write_mode; /* read write permission mode	*/
 	uint32_t	function_number; /* function number		*/
 	tdc_cfg_t	tdc;
 	uint32_t	start_rdc;	 /* start RDC (0 - 31)		*/
@@ -389,7 +383,6 @@ typedef struct nxge_hw_pt_cfg {
 	uint32_t	ser_ldvid;
 	uint32_t	def_rdc;	 /* default RDC			*/
 	uint32_t	drr_wt;		 /* port DRR weight		*/
-	uint32_t	rx_full_header;	 /* select the header flag	*/
 	uint32_t	start_grpid;	 /* starting group ID		*/
 	uint32_t	max_grpids;	 /* max group ID		*/
 	uint32_t	grpids[NXGE_MAX_RDCS]; /* RDC group IDs		*/
@@ -401,10 +394,7 @@ typedef struct nxge_hw_pt_cfg {
 	uint32_t	max_macs;	 /* the max mac entry allowed	*/
 	uint32_t	mac_pref;	 /* preference over VLAN	*/
 	uint32_t	def_mac_rxdma_grpid; /* default RDC group ID	*/
-	uint32_t	start_vlan;	 /* starting VLAN ID		*/
-	uint32_t	max_vlans;	 /* max VLAN ID			*/
 	uint32_t	vlan_pref;	 /* preference over MAC		*/
-	uint32_t	def_vlan_rxdma_grpid; /* default RDC group Id	*/
 
 	/* Expand if we have more hardware or default configurations    */
 	uint16_t	ldg[NXGE_INT_MAX_LDG];
@@ -512,7 +502,6 @@ typedef struct nxge_hw_list {
 	uint32_t		niu_type;
 	uint32_t		platform_type;
 	uint8_t			xcvr_addr[NXGE_MAX_PORTS];
-	uintptr_t		tcam;
 	uintptr_t		hio;
 } nxge_hw_list_t, *p_nxge_hw_list_t;
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<nxge_impl.h>
 #include	<npi_mac.h>
 #include	<npi_rxdma.h>
@@ -755,15 +753,6 @@ nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	return (status);
 }
 
-nxge_status_t
-nxge_init_fzc_common(p_nxge_t nxgep)
-{
-	nxge_status_t	status = NXGE_OK;
-
-	(void) nxge_init_fzc_rx_common(nxgep);
-
-	return (status);
-}
 
 nxge_status_t
 nxge_init_fzc_rx_common(p_nxge_t nxgep)

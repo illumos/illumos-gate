@@ -229,7 +229,7 @@ nxge_dci_map(
  * Context:
  *	Any domain
  */
-vr_handle_t
+nxge_grp_t *
 nxge_grp_add(
 	nxge_t *nxge,
 	nxge_grp_type_t type)
@@ -273,19 +273,16 @@ nxge_grp_add(
 	    type == NXGE_TRANSMIT_GROUP ? 't' : 'r',
 	    nxge->mac.portnum, group->sequence));
 
-	return ((vr_handle_t)group);
+	return (group);
 }
 
 void
 nxge_grp_remove(
 	nxge_t *nxge,
-	vr_handle_t handle)	/* The group to remove. */
+	nxge_grp_t *group)	/* The group to remove. */
 {
 	nxge_grp_set_t *set;
-	nxge_grp_t *group;
 	vpc_type_t type;
-
-	group = (nxge_grp_t *)handle;
 
 	MUTEX_ENTER(&nxge->group_lock);
 	switch (group->type) {
@@ -351,19 +348,18 @@ nxge_grp_remove(
 int
 nxge_grp_dc_add(
 	nxge_t *nxge,
-	vr_handle_t handle,	/* The group to add <channel> to. */
+	nxge_grp_t *group,	/* The group to add <channel> to. */
 	vpc_type_t type,	/* Rx or Tx */
 	int channel)		/* A physical/logical channel number */
 {
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	nxge_hio_dc_t *dc;
 	nxge_grp_set_t *set;
-	nxge_grp_t *group;
 	nxge_status_t status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_grp_dc_add"));
 
-	if (handle == 0)
+	if (group == NULL)
 		return (0);
 
 	switch (type) {
@@ -385,7 +381,6 @@ nxge_grp_dc_add(
 		break;
 	}
 
-	group = (nxge_grp_t *)handle;
 	NXGE_DEBUG_MSG((nxge, HIO_CTL,
 	    "nxge_grp_dc_add: %cgroup = %d.%d.%d, channel = %d",
 	    type == VP_BOUND_TX ? 't' : 'r',
@@ -428,7 +423,7 @@ nxge_grp_dc_add(
 		dc->uninit = nxge_uninit_txdma_channel;
 	}
 
-	dc->group = handle;
+	dc->group = group;
 
 	if (isLDOMguest(nxge))
 		(void) nxge_hio_ldsv_add(nxge, dc);
@@ -855,13 +850,13 @@ nxge_ddi_perror(
 /*
  * Local prototypes
  */
-static vr_handle_t nxge_hio_vr_share(nxge_t *);
+static nxge_hio_vr_t *nxge_hio_vr_share(nxge_t *);
 
 static int nxge_hio_dc_share(nxge_t *, nxge_hio_vr_t *, mac_ring_type_t);
-static void nxge_hio_unshare(vr_handle_t);
+static void nxge_hio_unshare(nxge_hio_vr_t *);
 
-static int nxge_hio_addres(vr_handle_t, mac_ring_type_t, int);
-static void nxge_hio_remres(vr_handle_t, mac_ring_type_t, res_map_t);
+static int nxge_hio_addres(nxge_hio_vr_t *, mac_ring_type_t, int);
+static void nxge_hio_remres(nxge_hio_vr_t *, mac_ring_type_t, res_map_t);
 
 static void nxge_hio_tdc_unshare(nxge_t *nxge, int channel);
 static void nxge_hio_rdc_unshare(nxge_t *nxge, int channel);
@@ -922,7 +917,7 @@ nxge_hio_init(
 	for (region = 0; region < NXGE_VR_SR_MAX; region++) {
 		nhd->vr[region].region = region;
 	}
-	nhd->available.vrs = NXGE_VR_SR_MAX - 2;
+	nhd->vrs = NXGE_VR_SR_MAX - 2;
 
 	/*
 	 * Initialize share and ring group structures.
@@ -1065,7 +1060,7 @@ nxge_hio_share_assign(
 		NXGE_ERROR_MSG((nxge, HIO_CTL,
 		    "nx_hio_share_assign: "
 		    "vr->assign() returned %d", hv_rv));
-		nxge_hio_unshare((vr_handle_t)vr);
+		nxge_hio_unshare(vr);
 		return (-EIO);
 	}
 
@@ -1187,7 +1182,6 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 	nxge_rx_ring_group_t *rxgroup;
 	nxge_share_handle_t *shp;
 
-	vr_handle_t shared;	/* The VR being shared */
 	nxge_hio_vr_t *vr;	/* The Virtualization Region */
 	uint64_t rmap, tmap;
 	int rv;
@@ -1205,15 +1199,14 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 	/*
 	 * Get a VR.
 	 */
-	if ((shared = nxge_hio_vr_share(nxge)) == 0)
+	if ((vr = nxge_hio_vr_share(nxge)) == 0)
 		return (EAGAIN);
-	vr = (nxge_hio_vr_t *)shared;
 
 	/*
 	 * Get an RDC group for us to use.
 	 */
 	if ((vr->rdc_tbl = nxge_hio_hostinfo_get_rdc_table(nxge)) < 0) {
-		nxge_hio_unshare(shared);
+		nxge_hio_unshare(vr);
 		return (EBUSY);
 	}
 
@@ -1221,26 +1214,26 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 	 * Add resources to the share.
 	 */
 	tmap = 0;
-	rv = nxge_hio_addres(shared, MAC_RING_TYPE_TX,
+	rv = nxge_hio_addres(vr, MAC_RING_TYPE_TX,
 	    NXGE_HIO_SHARE_MAX_CHANNELS);
 	if (rv != 0) {
-		nxge_hio_unshare(shared);
+		nxge_hio_unshare(vr);
 		return (rv);
 	}
 
 	rmap = 0;
-	rv = nxge_hio_addres(shared, MAC_RING_TYPE_RX,
+	rv = nxge_hio_addres(vr, MAC_RING_TYPE_RX,
 	    NXGE_HIO_SHARE_MAX_CHANNELS);
 	if (rv != 0) {
-		nxge_hio_remres(shared, MAC_RING_TYPE_TX, tmap);
-		nxge_hio_unshare(shared);
+		nxge_hio_remres(vr, MAC_RING_TYPE_TX, tmap);
+		nxge_hio_unshare(vr);
 		return (rv);
 	}
 
 	if ((rv = nxge_hio_share_assign(nxge, cookie, &tmap, &rmap, vr))) {
-		nxge_hio_remres(shared, MAC_RING_TYPE_RX, tmap);
-		nxge_hio_remres(shared, MAC_RING_TYPE_TX, tmap);
-		nxge_hio_unshare(shared);
+		nxge_hio_remres(vr, MAC_RING_TYPE_RX, tmap);
+		nxge_hio_remres(vr, MAC_RING_TYPE_TX, tmap);
+		nxge_hio_unshare(vr);
 		return (rv);
 	}
 
@@ -1279,13 +1272,13 @@ nxge_hio_share_free(mac_share_handle_t shandle)
 	/*
 	 * Free Ring Resources for TX and RX
 	 */
-	nxge_hio_remres((vr_handle_t)shp->vrp, MAC_RING_TYPE_TX, shp->tmap);
-	nxge_hio_remres((vr_handle_t)shp->vrp, MAC_RING_TYPE_RX, shp->rmap);
+	nxge_hio_remres(shp->vrp, MAC_RING_TYPE_TX, shp->tmap);
+	nxge_hio_remres(shp->vrp, MAC_RING_TYPE_RX, shp->rmap);
 
 	/*
 	 * Free VR resource.
 	 */
-	nxge_hio_unshare((vr_handle_t)shp->vrp);
+	nxge_hio_unshare(shp->vrp);
 
 	/*
 	 * Clear internal handle state.
@@ -1334,7 +1327,7 @@ nxge_hio_share_query(mac_share_handle_t shandle, mac_ring_type_t type,
  * Context:
  *	Service domain
  */
-vr_handle_t
+nxge_hio_vr_t *
 nxge_hio_vr_share(
 	nxge_t *nxge)
 {
@@ -1347,7 +1340,7 @@ nxge_hio_vr_share(
 
 	MUTEX_ENTER(&nhd->lock);
 
-	if (nhd->available.vrs == 0) {
+	if (nhd->vrs == 0) {
 		MUTEX_EXIT(&nhd->lock);
 		return (0);
 	}
@@ -1381,20 +1374,19 @@ nxge_hio_vr_share(
 	vr->nxge = (uintptr_t)nxge;
 	vr->region = (uintptr_t)region;
 
-	nhd->available.vrs--;
+	nhd->vrs--;
 
 	MUTEX_EXIT(&nhd->lock);
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_vr_share"));
 
-	return ((vr_handle_t)vr);
+	return (vr);
 }
 
 void
 nxge_hio_unshare(
-	vr_handle_t shared)
+	nxge_hio_vr_t *vr)
 {
-	nxge_hio_vr_t *vr = (nxge_hio_vr_t *)shared;
 	nxge_t *nxge = (nxge_t *)vr->nxge;
 	nxge_hio_data_t *nhd;
 
@@ -1424,7 +1416,7 @@ nxge_hio_unshare(
 	(void) memset(vr, 0, sizeof (*vr));
 	vr->region = region;
 
-	nhd->available.vrs++;
+	nhd->vrs++;
 
 	MUTEX_EXIT(&nhd->lock);
 
@@ -1433,11 +1425,10 @@ nxge_hio_unshare(
 
 int
 nxge_hio_addres(
-	vr_handle_t shared,
+	nxge_hio_vr_t *vr,
 	mac_ring_type_t type,
 	int count)
 {
-	nxge_hio_vr_t *vr = (nxge_hio_vr_t *)shared;
 	nxge_t *nxge = (nxge_t *)vr->nxge;
 	int i;
 
@@ -1464,11 +1455,10 @@ nxge_hio_addres(
 /* ARGSUSED */
 void
 nxge_hio_remres(
-	vr_handle_t shared,
+	nxge_hio_vr_t *vr,
 	mac_ring_type_t type,
 	res_map_t res_map)
 {
-	nxge_hio_vr_t *vr = (nxge_hio_vr_t *)shared;
 	nxge_t *nxge = (nxge_t *)vr->nxge;
 	nxge_grp_t *group;
 
@@ -1846,7 +1836,7 @@ nxge_hio_dc_share(
 	MUTEX_ENTER(&nxge->group_lock);
 	group = (type == MAC_RING_TYPE_TX ? &vr->tx_group : &vr->rx_group);
 
-	dc->group = (vr_handle_t)group;
+	dc->group = group;
 
 	/* Initialize <group>, if necessary */
 	if (group->count == 0) {
@@ -1890,14 +1880,14 @@ nxge_hio_tdc_unshare(
 	int channel)
 {
 	nxge_grp_set_t *set = &nxge->tx_set;
-	vr_handle_t handle = (vr_handle_t)set->group[0];
+	nxge_grp_t *group = set->group[0];
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_tdc_unshare"));
 
 	NXGE_DC_RESET(set->shared.map, channel);
 	set->shared.count--;
 
-	if ((nxge_grp_dc_add(nxge, handle, VP_BOUND_TX, channel))) {
+	if ((nxge_grp_dc_add(nxge, group, VP_BOUND_TX, channel))) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_tdc_unshare: "
 		    "Failed to initialize TxDMA channel %d", channel));
 		return;
@@ -1935,7 +1925,7 @@ nxge_hio_rdc_unshare(
 	nxge_hw_pt_cfg_t *hardware = &nxge->pt_config.hw_config;
 
 	nxge_grp_set_t *set = &nxge->rx_set;
-	vr_handle_t handle = (vr_handle_t)set->group[0];
+	nxge_grp_t *group = set->group[0];
 	int current, last;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_rdc_unshare"));
@@ -1966,7 +1956,7 @@ nxge_hio_rdc_unshare(
 	 * Reconfigure RxDMA
 	 * Enable RxDMA		A.9.5.5
 	 */
-	if ((nxge_grp_dc_add(nxge, handle, VP_BOUND_RX, channel))) {
+	if ((nxge_grp_dc_add(nxge, group, VP_BOUND_RX, channel))) {
 		/* Be sure to re-enable the RX MAC. */
 		if (nxge_rx_mac_enable(nxge) != NXGE_OK) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,

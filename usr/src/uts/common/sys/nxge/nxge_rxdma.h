@@ -26,8 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_RXDMA_H
 #define	_SYS_NXGE_NXGE_RXDMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -157,37 +155,6 @@ typedef struct _nxge_rdc_sys_stats {
 	uint32_t	zcp_eop_err;
 } nxge_rdc_sys_stats_t, *p_nxge_rdc_sys_stats_t;
 
-/*
- * Software reserved buffer offset
- */
-typedef struct _nxge_rxbuf_off_hdr_t {
-	uint32_t		index;
-} nxge_rxbuf_off_hdr_t, *p_nxge_rxbuf_off_hdr_t;
-
-/*
- * Definitions for each receive buffer block.
- */
-typedef struct _nxge_rbb_t {
-	nxge_os_dma_common_t	dma_buf_info;
-	uint8_t			rbr_page_num;
-	uint32_t		block_size;
-	uint16_t		dma_channel;
-	uint32_t		bytes_received;
-	uint32_t		ref_cnt;
-	uint_t			pkt_buf_size;
-	uint_t			max_pkt_bufs;
-	uint32_t		cur_usage_cnt;
-} nxge_rbb_t, *p_nxge_rbb_t;
-
-
-typedef struct _rx_tx_param_t {
-	nxge_logical_page_t logical_pages[NXGE_MAX_LOGICAL_PAGES];
-} rx_tx_param_t, *p_rx_tx_param_t;
-
-typedef struct _rx_tx_params {
-	struct _tx_param_t 	*tx_param_p;
-} rx_tx_params_t, *p_rx_tx_params_t;
-
 
 typedef struct _rx_msg_t {
 	nxge_os_dma_common_t	buf_dma;
@@ -225,18 +192,10 @@ typedef struct _rx_dma_handle_t {
 	npi_handle_t		npi_handle;
 } rx_dma_handle_t, *p_rx_dma_handle_t;
 
-#define	RXCOMP_HIST_ELEMENTS 100000
-
-typedef struct _nxge_rxcomphist_t {
-	uint_t 			comp_cnt;
-	uint64_t 		rx_comp_entry;
-} nxge_rxcomphist_t, *p_nxge_rxcomphist_t;
 
 /* Receive Completion Ring */
 typedef struct _rx_rcr_ring_t {
 	nxge_os_dma_common_t	rcr_desc;
-	uint8_t			rcr_page_num;
-	uint8_t			rcr_buf_page_num;
 
 	struct _nxge_t		*nxgep;
 
@@ -246,13 +205,10 @@ typedef struct _rx_rcr_ring_t {
 
 	rcrcfig_a_t		rcr_cfga;
 	rcrcfig_b_t		rcr_cfgb;
-	boolean_t		cfg_set;
 
 	nxge_os_mutex_t 	lock;
 	uint16_t		index;
 	uint16_t		rdc;
-	uint16_t		rdc_grp_id;
-	uint16_t		ldg_group_id;
 	boolean_t		full_hdr_flag;	 /* 1: 18 bytes header */
 	uint16_t		sw_priv_hdr_len; /* 0 - 192 bytes (SW) */
 	uint32_t 		comp_size;	 /* # of RCR entries */
@@ -269,16 +225,12 @@ typedef struct _rx_rcr_ring_t {
 	p_rcr_entry_t		rcr_desc_rd_head_p;	/* software next read */
 	p_rcr_entry_t		rcr_desc_rd_head_pp;
 
-	p_rcr_entry_t		rcr_desc_wt_tail_p;	/* hardware write */
-	p_rcr_entry_t		rcr_desc_wt_tail_pp;
-
 	uint64_t		rcr_tail_pp;
 	uint64_t		rcr_head_pp;
 	struct _rx_rbr_ring_t	*rx_rbr_p;
 	uint32_t		intr_timeout;
 	uint32_t		intr_threshold;
 	uint64_t		max_receive_pkts;
-	p_mblk_t		rx_first_mp;
 	mac_resource_handle_t	rcr_mac_handle;
 	uint32_t		rcvd_pkt_bytes; /* Received bytes of a packet */
 } rx_rcr_ring_t, *p_rx_rcr_ring_t;
@@ -354,31 +306,14 @@ typedef struct _rx_rbr_ring_t {
 	uint_t			pkt_buf_size2_bytes;
 	uint_t			npi_pkt_buf_size2;
 
-	uint64_t		rbr_head_pp;
-	uint64_t		rbr_tail_pp;
 	uint32_t		*rbr_desc_vp;
 
 	p_rx_rcr_ring_t		rx_rcr_p;
 
-	rx_dma_ent_msk_t	rx_dma_ent_mask;
-
-	rbr_hdh_t		rbr_head;
-	rbr_hdl_t		rbr_tail;
 	uint_t 			rbr_wr_index;
 	uint_t 			rbr_rd_index;
-	uint_t 			rbr_hw_head_index;
-	uint64_t 		rbr_hw_head_ptr;
-
-	/* may not be needed */
-	p_nxge_rbb_t		rbb_p;
 
 	rxring_info_t  *ring_info;
-#ifdef RX_USE_RECLAIM_POST
-	uint32_t hw_freed;
-	uint32_t sw_freed;
-	uint32_t msg_rd_index;
-	uint32_t msg_cnt;
-#endif
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	uint64_t		hv_rx_buf_base_ioaddr_pp;
 	uint64_t		hv_rx_buf_ioaddr_size;
@@ -423,19 +358,17 @@ typedef struct _rx_mbox_t {
 
 typedef struct _rx_rbr_rings_t {
 	p_rx_rbr_ring_t 	*rbr_rings;
-	uint32_t			ndmas;
-	boolean_t		rxbuf_allocated;
+	uint32_t		ndmas;
 } rx_rbr_rings_t, *p_rx_rbr_rings_t;
 
 typedef struct _rx_rcr_rings_t {
 	p_rx_rcr_ring_t 	*rcr_rings;
-	uint32_t			ndmas;
-	boolean_t		cntl_buf_allocated;
+	uint32_t		ndmas;
 } rx_rcr_rings_t, *p_rx_rcr_rings_t;
 
 typedef struct _rx_mbox_areas_t {
 	p_rx_mbox_t 		*rxmbox_areas;
-	uint32_t			ndmas;
+	uint32_t		ndmas;
 	boolean_t		mbox_allocated;
 } rx_mbox_areas_t, *p_rx_mbox_areas_t;
 
