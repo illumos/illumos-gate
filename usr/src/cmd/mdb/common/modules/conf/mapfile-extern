@@ -21,8 +21,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # External interface requirements
 {
@@ -39,6 +37,7 @@
 		mdb_alloc =			EXTERN;
 		mdb_call_dcmd =			EXTERN;
 		mdb_callback_add =		EXTERN;
+		mdb_callback_remove =		EXTERN;
 		mdb_cpuset_find =		EXTERN;
 		mdb_ctf_array_info =		EXTERN;
 		mdb_ctf_enum_name =		EXTERN;
@@ -60,13 +59,16 @@
 		mdb_devinfo2driver =		EXTERN;
 		mdb_devinfo2statep =		EXTERN;
 		mdb_dlpi_prim =			EXTERN;
+		mdb_dump64 =			EXTERN;
 		mdb_dumpptr =			EXTERN;
 		mdb_eval =			EXTERN;
 		mdb_fdio_create_path =		EXTERN;
 		mdb_fdio_fileno =		EXTERN;
 		mdb_ffs =			EXTERN;
 		mdb_flush =			EXTERN;
+		mdb_fread =			EXTERN;
 		mdb_free =			EXTERN;
+		mdb_fwrite =			EXTERN;
 		mdb_get_dot =			EXTERN;
 		mdb_get_pipe =			EXTERN;
 		mdb_get_soft_state_byaddr =	EXTERN;
@@ -83,6 +85,7 @@
 		mdb_iob_getflags =		EXTERN;
 		mdb_iob_resize =		EXTERN;
 		mdb_iob_setflags =		EXTERN;
+		mdb_inval_bits =		EXTERN;
 		mdb_layered_walk =		EXTERN;
 		mdb_lookup_by_addr =		EXTERN;
 		mdb_lookup_by_name =		EXTERN;
@@ -93,6 +96,7 @@
 		mdb_memio_create =		EXTERN;
 		mdb_name_to_major =		EXTERN;
 		mdb_nhconvert =			EXTERN;
+		mdb_one_bit =			EXTERN;
 		mdb_pid2proc =			EXTERN;
 		mdb_printf =			EXTERN;
 		mdb_prop_kernel =		EXTERN;
@@ -100,6 +104,7 @@
 		mdb_pread =			EXTERN;
 		mdb_pwalk =			EXTERN;
 		mdb_pwalk_dcmd =		EXTERN;
+		mdb_pwrite =			EXTERN;
 		mdb_qinfo = 			EXTERN;
 		mdb_qname =			EXTERN;
 		mdb_qops_install =		EXTERN;
@@ -121,9 +126,12 @@
 		mdb_vnode2path =		EXTERN;
 		mdb_vread =			EXTERN;
 		mdb_vtype2chr =			EXTERN;
+		mdb_vwrite =			EXTERN;
 		mdb_walk =			EXTERN;
 		mdb_walk_dcmd =			EXTERN;
 		mdb_warn =			EXTERN;
 		mdb_writevar =			EXTERN;
+		mdb_writestr =			EXTERN;
+		mdb_writesym =			EXTERN;
 		mdb_zalloc =			EXTERN;
 };
