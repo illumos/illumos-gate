@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>	/* getenv() */
 #include <assert.h>
 #include <unistd.h>
@@ -435,7 +433,6 @@ try_local2(
 	}
 
 	if (rc != 0) {
-
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "TRYLOCAL: database: shadow, source: nisplus\n");
 	}
@@ -1126,7 +1123,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		st = _nscd_get_smf_state(srci, params.dbi, 1);
 		if (st == NSCD_SVC_STATE_UNSUPPORTED_SRC ||
 		    (st == NSCD_SVC_STATE_FOREIGN_SRC &&
-		    s->be_version_p[i] == NULL) ||
+		    s->be_version_p[i] == NULL && initf == nscd_initf) ||
 		    st == NSCD_SVC_STATE_UNINITED ||
 		    (params.privdb &&
 		    try_local2(params.dbi, srci) == 1)) {
@@ -1253,9 +1250,12 @@ nss_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		/* nss_endent() on an unused context is a no-op */
 		return;
 	}
-	end_iter_u(rootp, (struct nss_getent_context *)contextp);
-	_nscd_put_getent_ctx(contextp);
-	contextpp->ctx = NULL;
+
+	if (_nscd_is_getent_ctx_in_use(contextp) == 0) {
+		end_iter_u(rootp, (struct nss_getent_context *)contextp);
+		_nscd_put_getent_ctx(contextp);
+		contextpp->ctx = NULL;
+	}
 }
 
 /*
@@ -1389,7 +1389,7 @@ nss_psearch(void *buffer, size_t length)
 
 static void
 nscd_map_contextp(void *buffer, nss_getent_t *contextp,
-	nssuint_t **cookie_num_p, nssuint_t **seqnum_p, int setent)
+    nssuint_t **cookie_num_p, nssuint_t **seqnum_p, int setent)
 {
 	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
 	nssuint_t		off;
@@ -1525,8 +1525,17 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "setent resetting sequence number = %lld\n",  *seqnum_p);
 
-		_nscd_put_getent_ctx((nscd_getent_context_t *)contextp->ctx);
-		contextp->ctx = NULL;
+		if (_nscd_is_getent_ctx_in_use((nscd_getent_context_t *)
+		    contextp->ctx) == 0) {
+			/*
+			 * context not in use, release the backend and
+			 * return the context to the pool
+			 */
+			end_iter_u(NULL, contextp->ctx);
+			_nscd_put_getent_ctx(
+			    (nscd_getent_context_t *)contextp->ctx);
+			contextp->ctx = NULL;
+		}
 	}
 
 	p0c->p0_pid = pid;
@@ -1619,6 +1628,7 @@ nss_pgetent(void *buffer, size_t length)
 	nscd_map_contextp(buffer, contextp, &cookie_num_p, &seqnum_p, 0);
 	if (NSCD_STATUS_IS_NOT_OK(pbuf))
 		return;
+
 	/*
 	 * use the generic nscd_initf for all the getent requests
 	 * (the TSD key is the pointer to the packed header)
@@ -1672,7 +1682,7 @@ nss_pgetent(void *buffer, size_t length)
 	} else {
 		/* release the resources used */
 		ctx = (nscd_getent_context_t *)contextp->ctx;
-		if (ctx != NULL) {
+		if (ctx != NULL && _nscd_is_getent_ctx_in_use(ctx) == 0) {
 			_nscd_put_getent_ctx(ctx);
 			contextp->ctx = NULL;
 		}
@@ -1713,6 +1723,7 @@ nss_pendent(void *buffer, size_t length)
 
 	/* Perform local endent and reset context */
 	nss_endent(NULL, NULL, contextp);
+
 	NSCD_RETURN_STATUS(pbuf, NSS_SUCCESS, 0);
 }
 

@@ -26,8 +26,6 @@
 #ifndef	_NSCD_SWITCH_H
 #define	_NSCD_SWITCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -141,9 +139,11 @@ typedef struct nscd_getent_ctx_base {
  */
 typedef struct nscd_getent_context {
 	int				dbi;
+	thread_t			thr_id;
 	mutex_t				getent_mutex;
 	int				aborted;
 	int				in_use;
+	int				num_reclaim_check;
 	nscd_seq_num_t			seq_num;
 	nscd_cookie_num_t		cookie_num;
 	pid_t				pid;	/* door client's pid */
@@ -152,6 +152,7 @@ typedef struct nscd_getent_context {
 	nss_backend_t			*be;
 	nscd_getent_ctx_base_t		*base;
 	struct nscd_getent_context	*next;
+	struct nscd_getent_context	*next_to_reclaim;
 } nscd_getent_context_t;
 
 /*
@@ -324,6 +325,10 @@ _nscd_put_getent_ctx(
 	nscd_getent_context_t	*ctx);
 void
 _nscd_free_ctx_if_aborted(
+	nscd_getent_context_t	*ctx);
+
+int
+_nscd_is_getent_ctx_in_use(
 	nscd_getent_context_t	*ctx);
 
 nscd_rc_t

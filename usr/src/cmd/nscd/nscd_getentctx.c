@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -143,6 +141,7 @@ _nscd_is_getent_ctx(
 	char			ptrstr[32];
 	const nscd_db_entry_t	*db_entry;
 	nscd_getent_context_t	*ret = NULL;
+	char			*me = "_nscd_is_getent_ctx";
 
 	(void) snprintf(ptrstr, sizeof (ptrstr), "%lld", cookie_num);
 
@@ -155,9 +154,12 @@ _nscd_is_getent_ctx(
 		nscd_getent_ctx_t *gnctx;
 
 		gnctx = (nscd_getent_ctx_t *)*(db_entry->data_array);
+		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
+		(me, "getent context %p, cookie# %lld, to_delete %d\n",
+		    gnctx->ptr, gnctx->cookie_num, gnctx->to_delete);
 
 		/*
-		 * If the ctx is not to be deleted and the cookie number
+		 * If the ctx is not to be deleted and the cookie numbers
 		 * match, return the ctx if not aborted and not in use,
 		 * Otherwise return NULL.
 		 */
@@ -177,6 +179,26 @@ _nscd_is_getent_ctx(
 	return (ret);
 }
 
+int
+_nscd_is_getent_ctx_in_use(
+	nscd_getent_context_t	*ctx)
+{
+	int	in_use;
+	char	*me = "_nscd_getent_ctx_in_use";
+
+	(void) mutex_lock(&ctx->getent_mutex);
+
+	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
+	(me, "in_use = %d, ctx->thr_id = %d, thread id = %d\n",
+	    ctx->in_use, ctx->thr_id, thr_self());
+
+	in_use = ctx->in_use;
+	if (in_use == 1 && ctx->thr_id == thr_self())
+		in_use = 0;
+	(void) mutex_unlock(&ctx->getent_mutex);
+	return (in_use);
+}
+
 /*
  * FUNCTION: _nscd_free_ctx_if_aborted
  *
@@ -190,11 +212,17 @@ _nscd_free_ctx_if_aborted(
 	int	aborted;
 	char	*me = "_nscd_free_ctx_if_aborted";
 
-	if (ctx->in_use != 1)
-		return;
-
 	(void) mutex_lock(&ctx->getent_mutex);
+
+	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
+	(me, "in_use = %d, aborted = %d\n", ctx->in_use, ctx->aborted);
+
+	if (ctx->in_use != 1) {
+		(void) mutex_unlock(&ctx->getent_mutex);
+		return;
+	}
 	aborted = ctx->aborted;
+	ctx->in_use = 0;
 	(void) mutex_unlock(&ctx->getent_mutex);
 
 	if (aborted == 1) {
@@ -202,7 +230,6 @@ _nscd_free_ctx_if_aborted(
 		(me, "getent session aborted, return the getent context\n");
 		_nscd_put_getent_ctx(ctx);
 	}
-	ctx->in_use = 0;
 }
 
 /*
@@ -419,7 +446,9 @@ _nscd_get_getent_ctx(
 	base->first = c->next;
 	c->next = NULL;
 	c->seq_num = 1;
+	c->cookie_num = _nscd_get_cookie_num();
 	c->in_use = 1;
+	c->thr_id = thr_self();
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
 	(me, "got a getent ctx %p\n", c);
@@ -457,7 +486,6 @@ _nscd_put_getent_ctx(
 	char			*me = "_nscd_put_getent_ctx";
 
 	base = gnctx->base;
-	gnctx->seq_num = 0;
 
 	/* if context base is gone, so should this context */
 	if ((_nscd_mutex_lock((nscd_acc_data_t *)base)) == NULL) {
@@ -476,13 +504,15 @@ _nscd_put_getent_ctx(
 	(me, "putting back nsw state %p\n", gnctx->nsw_state);
 
 	/* this nsw_state is no longer used for getent processing */
-	if (gnctx->nsw_state != NULL)
+	if (gnctx->nsw_state != NULL) {
 		gnctx->nsw_state->getent = 0;
-	_nscd_put_nsw_state(gnctx->nsw_state);
-	gnctx->nsw_state = NULL;
+		_nscd_put_nsw_state(gnctx->nsw_state);
+		gnctx->nsw_state = NULL;
+	}
 
 	gnctx->aborted = 0;
 	gnctx->in_use = 0;
+	gnctx->thr_id = (thread_t)-1;
 	_nscd_del_getent_ctx(gnctx, gnctx->cookie_num);
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
@@ -495,6 +525,13 @@ _nscd_put_getent_ctx(
 
 		_nscd_cond_signal((nscd_acc_data_t *)base);
 	}
+
+	gnctx->seq_num = 0;
+	gnctx->cookie_num = 0;
+	gnctx->pid = -1;
+	gnctx->thr_id = (thread_t)-1;
+	gnctx->n_src = 0;
+	gnctx->be = NULL;
 
 	_nscd_mutex_unlock((nscd_acc_data_t *)base);
 }
@@ -611,6 +648,7 @@ reclaim_getent_ctx(void *arg)
 	nscd_getent_ctx_t	*ctx;
 	nscd_getent_context_t	*gctx, *c;
 	nscd_getent_context_t	*first = NULL, *last = NULL;
+	nss_getent_t		nssctx = { 0 };
 	char			*me = "reclaim_getent_ctx";
 
 	/*CONSTCOND*/
@@ -643,8 +681,16 @@ reclaim_getent_ctx(void *arg)
 				    gctx->cookie_num, gctx->seq_num);
 
 				if (first != NULL) {
-					last->next = gctx;
-					last = gctx;
+					/* add to list if not in already */
+					for (c = first; c != NULL;
+					    c = c->next_to_reclaim) {
+						if (gctx == c)
+							break;
+					}
+					if (c == NULL) {
+						last->next_to_reclaim = gctx;
+						last = gctx;
+					}
 				} else {
 					first = gctx;
 					last = gctx;
@@ -660,15 +706,27 @@ reclaim_getent_ctx(void *arg)
 		 * in use
 		 */
 		for (gctx = first; gctx; ) {
-			int in_use;
-			c = gctx->next;
+			int in_use, num_reclaim_check;
+
+			c = gctx->next_to_reclaim;
+			gctx->next_to_reclaim = NULL;
 			gctx->aborted = 1;
+
 			(void) mutex_lock(&gctx->getent_mutex);
+			num_reclaim_check = gctx->num_reclaim_check++;
+			if (num_reclaim_check > 1)
+				gctx->in_use = 0;
 			in_use = gctx->in_use;
 			(void) mutex_unlock(&gctx->getent_mutex);
-			if (in_use != 1) {
-				gctx->next = NULL;
-				_nscd_put_getent_ctx(gctx);
+
+			if (in_use == 0) {
+				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
+				    NSCD_LOG_LEVEL_DEBUG)
+				(me, "process  %d exited, "
+				    "freeing getent context = %p\n",
+				    gctx->pid, gctx);
+				nssctx.ctx = (struct nss_getent_context *)gctx;
+				nss_endent(NULL, NULL, &nssctx);
 			}
 			gctx = c;
 		}

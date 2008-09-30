@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <alloca.h>
 #include <signal.h>
@@ -322,8 +320,8 @@ _nscd_get_client_euid()
 }
 
 /*
- * Check to see if the door client has PRIV_FILE_DAC_READ privilege.
- * Return 0 if yes, -1 otherwise.
+ * Check to see if the door client's euid is 0 or if it has PRIV_FILE_DAC_READ
+ * privilege. Return 0 if yes, -1 otherwise.
  */
 int
 _nscd_check_client_read_priv()
@@ -338,6 +336,12 @@ _nscd_check_client_read_priv()
 		(me, "door_ucred: %s\n", strerror(errno));
 		return (-1);
 	}
+
+	if (ucred_geteuid(uc) == 0) {
+		ucred_free(uc);
+		return (0);
+	}
+
 	eset = ucred_getprivset(uc, PRIV_EFFECTIVE);
 	if (!priv_ismember(eset, PRIV_FILE_DAC_READ))
 		rc = -1;
