@@ -309,14 +309,16 @@ vdev_disk_io_intr(buf_t *bp)
 }
 
 static void
+vdev_disk_ioctl_free(zio_t *zio)
+{
+	kmem_free(zio->io_vsd, sizeof (struct dk_callback));
+}
+
+static void
 vdev_disk_ioctl_done(void *zio_arg, int error)
 {
 	zio_t *zio = zio_arg;
-	struct dk_callback *dkc = zio->io_vsd;
 
-	kmem_free(dkc, sizeof (*dkc));
-
-	zio->io_vsd = NULL;
 	zio->io_error = error;
 
 	zio_interrupt(zio);
@@ -352,6 +354,7 @@ vdev_disk_io_start(zio_t *zio)
 			}
 
 			zio->io_vsd = dkc = kmem_alloc(sizeof (*dkc), KM_SLEEP);
+			zio->io_vsd_free = vdev_disk_ioctl_free;
 
 			dkc->dkc_callback = vdev_disk_ioctl_done;
 			dkc->dkc_flag = FLUSH_VOLATILE;

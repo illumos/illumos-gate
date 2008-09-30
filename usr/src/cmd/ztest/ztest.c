@@ -2046,7 +2046,7 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 	int b, error;
 	int bs = ZTEST_DIROBJ_BLOCKSIZE;
 	int do_free = 0;
-	uint64_t off, txg_how;
+	uint64_t off, txg, txg_how;
 	mutex_t *lp;
 	char osname[MAXNAMELEN];
 	char iobuf[SPA_MAXBLOCKSIZE];
@@ -2094,6 +2094,7 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 		dmu_tx_abort(tx);
 		return;
 	}
+	txg = dmu_tx_get_txg(tx);
 
 	lp = &ztest_shared->zs_sync_lock[b];
 	(void) mutex_lock(lp);
@@ -2101,9 +2102,16 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 	wbt->bt_objset = dmu_objset_id(os);
 	wbt->bt_object = ZTEST_DIROBJ;
 	wbt->bt_offset = off;
-	wbt->bt_txg = dmu_tx_get_txg(tx);
+	wbt->bt_txg = txg;
 	wbt->bt_thread = za->za_instance;
 	wbt->bt_seq = ztest_shared->zs_seq[b]++;	/* protected by lp */
+
+	/*
+	 * Occasionally, write an all-zero block to test the behavior
+	 * of blocks that compress into holes.
+	 */
+	if (off != -1ULL && ztest_random(8) == 0)
+		bzero(wbt, btsize);
 
 	if (off == -1ULL) {
 		dmu_object_info_t *doi = &za->za_doi;
@@ -2150,7 +2158,7 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 	dmu_tx_commit(tx);
 
 	if (ztest_random(10000) == 0)
-		txg_wait_synced(dmu_objset_pool(os), wbt->bt_txg);
+		txg_wait_synced(dmu_objset_pool(os), txg);
 
 	if (off == -1ULL || do_free)
 		return;
@@ -2173,7 +2181,7 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 		return;
 	}
 	blkoff = off - blkoff;
-	error = dmu_sync(NULL, db, &blk, wbt->bt_txg, NULL, NULL);
+	error = dmu_sync(NULL, db, &blk, txg, NULL, NULL);
 	dmu_buf_rele(db, FTAG);
 	za->za_dbuf = NULL;
 
@@ -2213,6 +2221,9 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 	bcopy(&iobuf[blkoff], rbt, btsize);
 
 	if (rbt->bt_objset == 0)		/* concurrent free */
+		return;
+
+	if (wbt->bt_objset == 0)		/* all-zero overwrite */
 		return;
 
 	ASSERT3U(rbt->bt_objset, ==, wbt->bt_objset);

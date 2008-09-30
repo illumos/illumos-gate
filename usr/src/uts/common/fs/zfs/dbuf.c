@@ -2010,7 +2010,8 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		mutex_exit(&db->db_mtx);
 
 		ASSERT(!DVA_EQUAL(BP_IDENTITY(zio_fake.io_bp),
-		    BP_IDENTITY(&zio_fake.io_bp_orig)));
+		    BP_IDENTITY(&zio_fake.io_bp_orig)) ||
+		    BP_IS_HOLE(zio_fake.io_bp));
 
 		if (BP_IS_OLDER(&zio_fake.io_bp_orig, txg))
 			(void) dsl_dataset_block_kill(os->os_dsl_dataset,
