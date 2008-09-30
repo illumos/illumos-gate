@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_REENTRANT
 
@@ -57,7 +56,7 @@
 
 static void	convertascii(char *p, char *c, int size);
 static int	convertbinary(char *p, char *c, int size);
-static void	eventmodifier2string(ushort_t emodifier, char *modstring,
+static void	eventmodifier2string(au_emod_t emodifier, char *modstring,
     size_t modlen);
 static int	do_mtime32(pr_context_t *context, int status, int flag,
     uint32_t scale);
@@ -1254,7 +1253,7 @@ bu2string(char basic_unit)
  * -------------------------------------------------------------------
  */
 static void
-eventmodifier2string(ushort_t emodifier, char *modstring, size_t modlen)
+eventmodifier2string(au_emod_t emodifier, char *modstring, size_t modlen)
 {
 	register int	i, j;
 
@@ -2253,7 +2252,7 @@ int
 pa_event_modifier(pr_context_t *context, int status,  int flag)
 {
 	int	returnstat;
-	ushort_t emodifier;
+	au_emod_t emodifier;
 	uval_t	uval;
 	char	modstring[64];
 
@@ -2306,7 +2305,7 @@ pa_event_modifier(pr_context_t *context, int status,  int flag)
 int
 pa_event_type(pr_context_t *context, int status,  int flag)
 {
-	ushort_t etype;
+	au_event_t etype;
 	int	returnstat;
 	au_event_ent_t *p_event = NULL;
 	uval_t	uval;

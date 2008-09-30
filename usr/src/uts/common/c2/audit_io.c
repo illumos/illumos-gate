@@ -25,7 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/door.h>
 #include <sys/param.h>
@@ -102,7 +101,8 @@ au_write(caddr_t *d, token_t *m)
  * Use the second parameter to indicate if it should be written or not.
  */
 void
-au_close(au_kcontext_t *kctx, caddr_t *d, int flag, short e_type, short e_mod)
+au_close(au_kcontext_t *kctx, caddr_t *d, int flag, au_event_t e_type,
+    au_emod_t e_mod)
 {
 	token_t *dchain;	/* au_membuf chain which is the tokens */
 	t_audit_data_t *tad = U2A(u);
@@ -134,7 +134,7 @@ au_close(au_kcontext_t *kctx, caddr_t *d, int flag, short e_type, short e_mod)
  * syscall end time it will be pulled off.
  */
 void
-au_close_defer(token_t *dchain, int flag, short e_type, short e_mod)
+au_close_defer(token_t *dchain, int flag, au_event_t e_type, au_emod_t e_mod)
 {
 	au_defer_info_t	*attr;
 	t_audit_data_t *tad = U2A(u);
@@ -224,8 +224,8 @@ au_save_time(adr_t *hadrp, timestruc_t *time, int size)
  * current time.
  */
 void
-au_close_time(au_kcontext_t *kctx, token_t *dchain, int flag, short e_type,
-    short e_mod, timestruc_t *etime)
+au_close_time(au_kcontext_t *kctx, token_t *dchain, int flag, au_event_t e_type,
+    au_emod_t e_mod, timestruc_t *etime)
 {
 	token_t 	*record;	/* au_membuf chain == the record */
 	int		byte_count;
@@ -776,7 +776,7 @@ audit_async_drop(caddr_t *rpp, int flags)
 }
 
 int
-audit_async_start(label_t *jb, int event, int sorf)
+audit_async_start(label_t *jb, au_event_t event, int sorf)
 {
 	t_audit_data_t *tad = U2A(u);
 	au_state_t estate;
@@ -815,7 +815,7 @@ audit_async_start(label_t *jb, int event, int sorf)
  * work can be done in a safe context.
  */
 void
-audit_async_finish(caddr_t *ad, int aid, int amod)
+audit_async_finish(caddr_t *ad, au_event_t aid, au_emod_t amod)
 {
 	au_kcontext_t	*kctx;
 

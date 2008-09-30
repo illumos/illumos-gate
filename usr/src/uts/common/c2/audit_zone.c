@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <c2/audit.h>
 #include <c2/audit_kernel.h>
@@ -54,7 +53,6 @@ au_zone_init(zoneid_t zone)
 	if (zone == 0) {
 		global_kctx = kctx;
 		global_zone->zone_audit_kctxt = kctx;
-		au_naevent = sizeof (kctx->auk_ets) / sizeof (au_state_t);
 	} else {
 		kctx->auk_policy = global_kctx->auk_policy;
 		curproc->p_zone->zone_audit_kctxt = kctx;
@@ -75,7 +73,7 @@ au_zone_init(zoneid_t zone)
 
 	/* statistics per zone */
 	kctx->auk_statistics.as_version  = TOKEN_VERSION;
-	kctx->auk_statistics.as_numevent = au_naevent;
+	kctx->auk_statistics.as_numevent = MAX_KEVENTS;
 
 	/* door IO buffer: */
 	kctx->auk_dbuffer =

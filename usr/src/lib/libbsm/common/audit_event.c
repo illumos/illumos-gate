@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interfaces to audit_event(5)  (/etc/security/audit_event)
@@ -118,7 +117,7 @@ getauevent_r(au_event_entry)
 	if (!au_event_file)
 		if (!(au_event_file = fopen(au_event_fname, "rF"))) {
 			(void) mutex_unlock(&mutex_eventfile);
-			return ((au_event_ent_t *)0);
+			return (NULL);
 		}
 
 	while (fgets(input, AU_EVENT_LINE_MAX, au_event_file)) {
@@ -133,7 +132,7 @@ getauevent_r(au_event_entry)
 			/* parse number */
 			i = strcspn(s, ":");
 			s[i] = '\0';
-			(void) sscanf(s, "%hd", &au_event_entry->ae_number);
+			(void) sscanf(s, "%hu", &au_event_entry->ae_number);
 			s = &s[i+1];
 
 			/* parse event name */
@@ -171,18 +170,13 @@ getauevent_r(au_event_entry)
 	if (!error && found) {
 		return (au_event_entry);
 	} else {
-		return ((au_event_ent_t *)0);
+		return (NULL);
 	}
 }
 
 
 au_event_ent_t *
-#ifdef __STDC__
 getauevnam(char *name)
-#else
-getauevnam(name)
-	char *name;
-#endif
 {
 	static au_event_ent_t au_event_entry;
 	static char	ename[AU_EVENT_NAME_MAX];
@@ -196,13 +190,7 @@ getauevnam(name)
 }
 
 au_event_ent_t *
-#ifdef __STDC__
 getauevnam_r(au_event_ent_t *e, char *name)
-#else
-getauevnam_r(e, name)
-	au_event_ent_t &e;
-	char *name;
-#endif
 {
 	setauevent();
 	while (getauevent_r(e) != NULL) {
@@ -212,17 +200,11 @@ getauevnam_r(e, name)
 		}
 	}
 	endauevent();
-	return ((au_event_ent_t *)NULL);
+	return (NULL);
 }
 
 au_event_ent_t *
-#ifdef __STDC__
 getauevnum_r(au_event_ent_t *e, au_event_t event_number)
-#else
-getauevnum_r(e, event_number)
-	au_event_ent_t *e;
-	au_event_t event_number;
-#endif
 {
 	setauevent();
 	while (getauevent_r(e) != NULL) {
@@ -232,16 +214,11 @@ getauevnum_r(e, event_number)
 		}
 	}
 	endauevent();
-	return ((au_event_ent_t *)NULL);
+	return (NULL);
 }
 
 au_event_ent_t *
-#ifdef __STDC__
 getauevnum(au_event_t event_number)
-#else
-getauevnum(event_number)
-	au_event_t event_number;
-#endif
 {
 	static au_event_ent_t e;
 	static char	ename[AU_EVENT_NAME_MAX];
@@ -255,12 +232,7 @@ getauevnum(event_number)
 }
 
 au_event_t
-#ifdef __STDC__
 getauevnonam(char *event_name)
-#else
-getauevnonam(event_name)
-	char	*event_name;
-#endif
 {
 	au_event_ent_t e;
 	char ename[AU_EVENT_NAME_MAX];
@@ -270,8 +242,8 @@ getauevnonam(event_name)
 	e.ae_name = ename;
 	e.ae_desc = edesc;
 
-	if (getauevnam_r(&e, event_name) == (au_event_ent_t *)0) {
-		return (-1);
+	if (getauevnam_r(&e, event_name) == NULL) {
+		return (0);
 	}
 	return (e.ae_number);
 }
@@ -289,16 +261,10 @@ getauevnonam(event_name)
  */
 
 int
-#ifdef __STDC__
 cacheauevent(au_event_ent_t **result, au_event_t event_number)
-#else
-cacheauevent(result, event_number)
-	au_event_ent_t **result; /* set this pointer to an entry in the cache */
-	au_event_t event_number; /* request this event number */
-#endif
 {
-	static ushort_t	max; /* the highest event number in the file */
-	static ushort_t	min; /* the lowest event number in the file */
+	static au_event_t max; /* the highest event number in the file */
+	static au_event_t min; /* the lowest event number in the file */
 	static int	invalid; /* 1+index of the highest event number */
 	static au_event_ent_t **index_tbl;
 	static au_event_ent_t **p_tbl;
@@ -359,10 +325,10 @@ cacheauevent(result, event_number)
 #ifdef DEBUG2
 			printevent(p_tbl[lines]);
 #endif
-			if ((ushort_t)p_event->ae_number > max) {
+			if (p_event->ae_number > max) {
 				max = p_event->ae_number;
 			}
-			if ((ushort_t)p_event->ae_number < min) {
+			if (p_event->ae_number < min) {
 				min = p_event->ae_number;
 			}
 			lines++;
@@ -375,7 +341,7 @@ cacheauevent(result, event_number)
 			(void) mutex_unlock(&mutex_eventcache);
 			return (-4);
 		}
-		p_tbl[invalid]->ae_number = -1;
+		p_tbl[invalid]->ae_number = (au_event_t)-1;
 		p_tbl[invalid]->ae_name   = "invalid event number";
 		p_tbl[invalid]->ae_desc   = p_tbl[invalid]->ae_name;
 		p_tbl[invalid]->ae_class  = (au_class_t)-1;
@@ -396,23 +362,23 @@ cacheauevent(result, event_number)
 		}
 
 		/* intialize the index_tbl to the invalid event number */
-		for (i = 0; (ushort_t)i < max; i++) {
+		for (i = 0; (au_event_t)i < max; i++) {
 			index_tbl[i] = p_tbl[invalid];
 		}
 
 		/* point each index_tbl element at the corresponding event */
 		for (i = 0; i < size; i++) {
-			index_tbl[(ushort_t)p_tbl[i]->ae_number] = p_tbl[i];
+			index_tbl[p_tbl[i]->ae_number] = p_tbl[i];
 		}
 
 		called_once = 1;
 
 	}
 
-	if ((ushort_t)event_number > max || (ushort_t)event_number < min) {
+	if (event_number > max || event_number < min) {
 		*result = index_tbl[invalid];
 	} else {
-		*result = index_tbl[(ushort_t)event_number];
+		*result = index_tbl[event_number];
 		hit = 1;
 	}
 	(void) mutex_unlock(&mutex_eventcache);

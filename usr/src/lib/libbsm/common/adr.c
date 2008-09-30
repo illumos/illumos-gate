@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Adr memory based encoding
@@ -63,6 +62,19 @@ adr_char(adr_t *adr, char *cp, int count)
  */
 void
 adr_short(adr_t *adr, short *sp, int count)
+{
+
+	for (; count-- > 0; sp++) {
+		*adr->adr_now++ = (char)((*sp >> 8) & 0x00ff);
+		*adr->adr_now++ = (char)(*sp & 0x00ff);
+	}
+}
+
+/*
+ * adr_ushort - pull out ushorts
+ */
+void
+adr_ushort(adr_t *adr, ushort_t *sp, int count)
 {
 
 	for (; count-- > 0; sp++) {

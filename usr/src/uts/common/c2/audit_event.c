@@ -77,7 +77,6 @@
 #include <sys/port_impl.h>
 
 
-int	au_naevent;
 char	_depends_on[] = "fs/sockfs";
 
 static au_event_t	aui_open(au_event_t);
@@ -1845,7 +1844,7 @@ aus_close(struct t_audit_data *tad)
 		return;
 
 	fad = F2A(fp);
-	tad->tad_evmod = (short)fad->fad_flags;
+	tad->tad_evmod = (au_emod_t)fad->fad_flags;
 	if (fad->fad_aupath != NULL) {
 		au_uwrite(au_to_path(fad->fad_aupath));
 		if ((vp = fp->f_vnode) != NULL) {

@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * convert binary audit records to syslog messages and
  * send them off to syslog
  *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * auditd_plugin_open(), auditd_plugin() and auditd_plugin_close()
@@ -566,7 +565,7 @@ filter(const char *input, uint32_t sequence, char *output,
 
 			if (cacheauevent(&event, ctx.out.sf_eventid) < 0)
 				(void) snprintf(event_name, EVENT_NAME_LEN,
-				    "%d", ctx.out.sf_eventid);
+				    "%hu", ctx.out.sf_eventid);
 			else
 				(void) strlcpy(event_name, event->ae_desc,
 				    EVENT_NAME_LEN);
@@ -599,13 +598,13 @@ filter(const char *input, uint32_t sequence, char *output,
 #if DEBUG
 			if (ctx.out.sf_sequence != -1)
 				fprintf(dbfp,
-				    "syslog tossed (event=%d) record %u "
+				    "syslog tossed (event=%hu) record %u "
 				    "/ buffer %u\n",
 				    ctx.out.sf_eventid, ctx.out.sf_sequence,
 				    sequence);
 			else
 				fprintf(dbfp,
-				    "syslog tossed (event=%d) buffer %u\n",
+				    "syslog tossed (event=%hu) buffer %u\n",
 				    ctx.out.sf_eventid, sequence);
 #endif
 
@@ -652,7 +651,7 @@ filter(const char *input, uint32_t sequence, char *output,
 			au_event_ent_t	*event;
 
 			if (cacheauevent(&event, ctx.out.sf_eventid) < 0)
-				used = snprintf(bp, remaining, "%d",
+				used = snprintf(bp, remaining, "%hu",
 				    ctx.out.sf_eventid);
 			else
 				used = strlcpy(bp, event->ae_desc, remaining);

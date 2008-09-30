@@ -26,7 +26,6 @@
 #ifndef _BSM_AUDIT_KERNEL_H
 #define	_BSM_AUDIT_KERNEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the basic auditing control structure definitions.
@@ -130,8 +129,8 @@ typedef struct au_termid au_termid_t;
 typedef struct au_defer_info {
 	struct au_defer_info	*audi_next;	/* next on linked list */
 	void	 *audi_ad;		/* audit record */
-	int	audi_e_type;		/* audit event id */
-	int	audi_e_mod;		/* audit event modifier */
+	au_event_t	audi_e_type;	/* audit event id */
+	au_emod_t	audi_e_mod;	/* audit event modifier */
 	int	audi_flag;		/* au_close*() flags */
 	timestruc_t	audi_atime;	/* audit event timestamp */
 } au_defer_info_t;
@@ -202,8 +201,8 @@ extern kmem_cache_t *au_pad_cache;
 struct t_audit_data {
 	kthread_id_t  tad_thread;	/* DEBUG pointer to parent thread */
 	unsigned int  tad_scid;		/* system call ID for finish */
-	short	tad_event;	/* event for audit record */
-	short	tad_evmod;	/* event modifier for audit record */
+	au_event_t	tad_event;	/* event for audit record */
+	au_emod_t	tad_evmod;	/* event modifier for audit record */
 	int	tad_ctrl;	/* audit control/status flags */
 	void	*tad_errjmp;	/* error longjmp (audit record aborted) */
 	int	tad_flag;	/* to audit or not to audit */

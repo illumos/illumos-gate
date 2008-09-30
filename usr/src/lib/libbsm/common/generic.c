@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -122,7 +121,7 @@ aug_init()
 	aug_text1 = NULL;
 	aug_text2 = NULL;
 	aug_na = 0;
-	aug_asid = -1;
+	aug_asid = (au_asid_t)(-1);
 	aug_afunc = NULL;
 	aug_path = NULL;
 }

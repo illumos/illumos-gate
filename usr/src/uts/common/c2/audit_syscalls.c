@@ -28,7 +28,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1554,7 +1553,7 @@ getclass(caddr_t data)
 	if (copyin(data, &event, sizeof (au_evclass_map_t)))
 		return (EFAULT);
 
-	if (event.ec_number < 0 || event.ec_number > (au_naevent - 1))
+	if (event.ec_number > MAX_KEVENTS)
 		return (EINVAL);
 
 	event.ec_class = kctx->auk_ets[event.ec_number];
@@ -1579,7 +1578,7 @@ setclass(caddr_t data)
 	if (copyin(data, &event, sizeof (au_evclass_map_t)))
 		return (EFAULT);
 
-	if (event.ec_number < 0 || event.ec_number > (au_naevent - 1))
+	if (event.ec_number > MAX_KEVENTS)
 		return (EINVAL);
 
 	kctx->auk_ets[event.ec_number] = event.ec_class;

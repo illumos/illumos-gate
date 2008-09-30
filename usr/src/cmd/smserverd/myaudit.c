@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -114,7 +113,7 @@ audit_init(door_data_t *door_dp)
 	door_dp->audit_text[0] = NULL;
 	door_dp->audit_text1[0] = NULL;
 	door_dp->audit_na = 0;
-	door_dp->audit_asid = -1;
+	door_dp->audit_asid = (au_asid_t)(-1);
 	door_dp->audit_path = NULL;
 }
 

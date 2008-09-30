@@ -26,7 +26,6 @@
 #ifndef _BSM_AUDIT_RECORD_H
 #define	_BSM_AUDIT_RECORD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef _KERNEL
 #include <sys/priv.h>
@@ -430,7 +429,7 @@ struct au_header32_tok {
 	uint_t length;
 	uchar_t version;
 	au_event_t event;
-	ushort_t emod;
+	au_emod_t emod;
 	/* really timestruct_t (struct timespec) from hrestime */
 	int32_t sec;		/* seconds since epoc */
 	int32_t nsec;		/* nanoseconds */
@@ -441,7 +440,7 @@ struct au_header64_tok {
 	uint_t length;
 	uchar_t version;
 	au_event_t event;
-	ushort_t emod;
+	au_emod_t emod;
 	/* really timestruct_t (struct timespec) from hrestime */
 	int64_t sec;		/* seconds since epoc */
 	int64_t nsec;		/* nanoseconds */

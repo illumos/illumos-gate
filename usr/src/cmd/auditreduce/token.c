@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Token processing for auditreduce.
@@ -1362,7 +1361,7 @@ subject32_token(adr_t *adr)
 			checkflags |= M_GROUPE;
 	}
 	if (flags & M_SID) {
-		if (m_sid == sid)
+		if (m_sid == (au_asid_t)sid)
 			checkflags |= M_SID;
 	}
 	return (-1);
@@ -1424,7 +1423,7 @@ subject32_ex_token(adr_t *adr)
 			checkflags = checkflags | M_GROUPE;
 	}
 	if (flags & M_SID) {
-		if (m_sid == sid)
+		if (m_sid == (au_asid_t)sid)
 			checkflags = checkflags | M_SID;
 	}
 	return (-1);
@@ -1486,7 +1485,7 @@ subject64_token(adr_t *adr)
 			checkflags |= M_GROUPE;
 	}
 	if (flags & M_SID) {
-		if (m_sid == sid)
+		if (m_sid == (au_asid_t)sid)
 			checkflags |= M_SID;
 	}
 	return (-1);
@@ -1549,7 +1548,7 @@ subject64_ex_token(adr_t *adr)
 			checkflags = checkflags | M_GROUPE;
 	}
 	if (flags & M_SID) {
-		if (m_sid == sid)
+		if (m_sid == (au_asid_t)sid)
 			checkflags = checkflags | M_SID;
 	}
 	return (-1);

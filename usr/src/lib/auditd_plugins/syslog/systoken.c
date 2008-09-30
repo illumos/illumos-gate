@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Token processing for sysupd; each token function does one
@@ -128,7 +127,7 @@ common_header(parse_context_t *ctx)
 {
 	adrm_u_int32(&(ctx->adr), &(ctx->out.sf_reclen), 1);
 	ctx->adr.adr_now += sizeof (char);		/* version number */
-	adrm_short(&(ctx->adr), &(ctx->out.sf_eventid), 1);
+	adrm_u_short(&(ctx->adr), &(ctx->out.sf_eventid), 1);
 	ctx->adr.adr_now += sizeof (short);		/* modifier */
 }
 

@@ -138,6 +138,7 @@ SUNWprivate_1.1 {
 	adrm_u_short;
 	adrm_uid;
 	adr_short;
+	adr_ushort;
 	adr_start;
 	adt_alloc_event;
 	adt_audit_enabled;

@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -59,11 +58,7 @@ static int	au_d_required_length = AU_TABLE_LENGTH; /* new table length */
 static mutex_t  mutex_au_d = DEFAULTMUTEX;
 
 int
-#ifdef __STDC__
 au_open(void)
-#else
-au_open()
-#endif
 {
 	int d;			/* descriptor */
 	token_t	**au_d_new;
@@ -115,13 +110,7 @@ au_open()
  */
 
 int
-#ifdef __STDC__
 au_write(int d, token_t *m)
-#else
-au_write(d, m)
-	int d;
-	token_t *m;
-#endif
 {
 	token_t *mp;
 
@@ -150,16 +139,9 @@ au_write(d, m)
  * Use the second parameter to indicate if it should be written or not.
  */
 int
-#ifdef __STDC__
-au_close(int d, int right, short e_type)
-#else
-au_close(d, right, e_type)
-	int d;
-	int right;
-	short e_type;
-#endif
+au_close(int d, int right, au_event_t e_type)
 {
-	short e_mod;
+	au_emod_t e_mod;
 	struct timeval now;	/* current time */
 	adr_t adr;		/* adr header */
 	auditinfo_addr_t	audit_info;
@@ -249,8 +231,8 @@ au_close(d, right, e_type)
 	adr_char(&adr, &data_header, 1);
 	adr_int32(&adr, (int32_t *)&byte_count, 1);
 	adr_char(&adr, &version, 1);
-	adr_short(&adr, &e_type, 1);
-	adr_short(&adr, &e_mod, 1);
+	adr_ushort(&adr, &e_type, 1);
+	adr_ushort(&adr, &e_mod, 1);
 	if (data_header == HEADER_ID_EX) {
 		adr_int32(&adr, (int32_t *)&host_info->at_type, 1);
 		adr_char(&adr, (char *)&host_info->at_addr[0],

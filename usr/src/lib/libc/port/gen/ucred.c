@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _ucred_free = ucred_free
 #pragma weak _ucred_get = ucred_get
@@ -334,7 +333,7 @@ ucred_getasid(const ucred_t *uc)
 	const auditinfo64_addr_t *ainfo = UCAUD(uc);
 
 	if (ainfo == NULL)
-		return (-1);
+		return ((au_asid_t)-1);
 
 	return (ainfo->ai_asid);
 }

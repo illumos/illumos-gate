@@ -63,7 +63,7 @@
  *	pointer to au_membuf chain containing a header token.
  */
 token_t *
-au_to_header(int byte_count, short e_type, short e_mod)
+au_to_header(int byte_count, au_event_t e_type, au_emod_t e_mod)
 {
 	adr_t adr;			/* adr memory stream header */
 	token_t *m;			/* au_membuf pointer */
@@ -83,8 +83,8 @@ au_to_header(int byte_count, short e_type, short e_mod)
 	adr_int32(&adr, (int32_t *)&byte_count, 1);	/* length of */
 							/* audit record */
 	adr_char(&adr, &version, 1);		/* version of audit tokens */
-	adr_short(&adr, &e_type, 1);		/* event ID */
-	adr_short(&adr, &e_mod, 1);		/* event ID modifier */
+	adr_ushort(&adr, &e_type, 1);		/* event ID */
+	adr_ushort(&adr, &e_mod, 1);		/* event ID modifier */
 #ifdef _LP64
 	adr_int64(&adr, zerotime, 2);		/* time & date space */
 #else
@@ -118,8 +118,8 @@ au_to_header_ex(int byte_count, au_event_t e_type, au_emod_t e_mod)
 	adr_int32(&adr, (int32_t *)&byte_count, 1);	/* length of */
 							/* audit record */
 	adr_char(&adr, &version, 1);		/* version of audit tokens */
-	adr_short(&adr, &e_type, 1);		/* event ID */
-	adr_short(&adr, &e_mod, 1);		/* event ID modifier */
+	adr_ushort(&adr, &e_type, 1);		/* event ID */
+	adr_ushort(&adr, &e_mod, 1);		/* event ID modifier */
 	adr_uint32(&adr, &kctx->auk_info.ai_termid.at_type, 1);
 	adr_char(&adr, (char *)&kctx->auk_info.ai_termid.at_addr[0],
 	    (int)kctx->auk_info.ai_termid.at_type);

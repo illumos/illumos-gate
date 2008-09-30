@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -101,8 +100,8 @@ au_to_header(au_event_t e_type, au_emod_t e_mod)
 	adr_char(&adr, &data_header, 1);	/* token ID */
 	adr_int32(&adr, &byte_count, 1);	/* length of audit record */
 	adr_char(&adr, &version, 1);		/* version of audit tokens */
-	adr_short(&adr, &e_type, 1);		/* event ID */
-	adr_short(&adr, &e_mod, 1);		/* event ID modifier */
+	adr_ushort(&adr, &e_type, 1);		/* event ID */
+	adr_ushort(&adr, &e_mod, 1);		/* event ID modifier */
 #ifdef _LP64
 	adr_int64(&adr, (int64_t *)&tv, 2);	/* time & date */
 #else
@@ -160,8 +159,8 @@ au_to_header_ex(au_event_t e_type, au_emod_t e_mod)
 	adr_char(&adr, &data_header, 1);	/* token ID */
 	adr_int32(&adr, &byte_count, 1);	/* length of audit record */
 	adr_char(&adr, &version, 1);		/* version of audit tokens */
-	adr_short(&adr, &e_type, 1);		/* event ID */
-	adr_short(&adr, &e_mod, 1);		/* event ID modifier */
+	adr_ushort(&adr, &e_type, 1);		/* event ID */
+	adr_ushort(&adr, &e_mod, 1);		/* event ID modifier */
 	adr_int32(&adr, (int32_t *)&host_info->at_type, 1);
 	adr_char(&adr, (char *)host_info->at_addr,
 	    (int)host_info->at_type);

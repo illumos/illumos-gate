@@ -26,7 +26,6 @@
 #ifndef _BSM_LIBBSM_H
 #define	_BSM_LIBBSM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <secdb.h>
 #include <stdio.h>
@@ -108,6 +107,7 @@ extern void	adr_int32(adr_t *, int32_t *, int);
 extern void	adr_uid(adr_t *, uid_t *, int);
 extern void	adr_int64(adr_t *, int64_t *, int);
 extern void	adr_short(adr_t *, short *, int);
+extern void	adr_ushort(adr_t *, ushort_t *, int);
 extern void	adr_start(adr_t *, char *);
 
 extern int	adrf_char(adrf_t *, char *, int);
@@ -140,7 +140,7 @@ extern void	adrm_putint32(adr_t *, int32_t *, int);
  * Functions that do I/O for audit files
  */
 
-extern int	au_close(int, int, short);
+extern int	au_close(int, int, au_event_t);
 extern int	au_open(void);
 extern int	au_write(int, token_t *);
 

@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systeminfo.h>
@@ -47,7 +46,7 @@
 #include <locale.h>
 #include "generic.h"
 
-#define	F_AUID	"%d\n"
+#define	F_AUID	"%u\n"
 #define	F_SMASK	"%x\n"
 #define	F_FMASK	"%x\n"
 #define	F_PORT	"%lx\n"
@@ -119,7 +118,7 @@ audit_cron_getinfo(char *fname, char *fname_aux, struct auditinfo_addr *info)
 	    F_TYPE
 	    F_MACH
 	    F_ASID,
-	    (int *)&(info->ai_auid),
+	    &(info->ai_auid),
 	    &(info->ai_mask.am_success),
 	    &(info->ai_mask.am_failure),
 	    &(info->ai_termid.at_port),
@@ -128,7 +127,7 @@ audit_cron_getinfo(char *fname, char *fname_aux, struct auditinfo_addr *info)
 	    &(info->ai_termid.at_addr[1]),
 	    &(info->ai_termid.at_addr[2]),
 	    &(info->ai_termid.at_addr[3]),
-	    (unsigned int *)&(info->ai_asid)) != 10) {
+	    &(info->ai_asid)) != 10) {
 		audit_cron_syslog(msg);
 		goto delete_first;
 	}
@@ -201,7 +200,7 @@ audit_cron_setinfo(char *fname, struct auditinfo_addr *info)
 	    F_TYPE
 	    F_MACH
 	    F_ASID,
-	    (int)info->ai_auid,
+	    info->ai_auid,
 	    info->ai_mask.am_success,
 	    info->ai_mask.am_failure,
 	    info->ai_termid.at_port,
@@ -210,7 +209,7 @@ audit_cron_setinfo(char *fname, struct auditinfo_addr *info)
 	    info->ai_termid.at_addr[1],
 	    info->ai_termid.at_addr[2],
 	    info->ai_termid.at_addr[3],
-	    (unsigned int)info->ai_asid);
+	    info->ai_asid);
 
 	if (write(fd, textbuf, len) != len)
 		goto audit_setinfo_clean;

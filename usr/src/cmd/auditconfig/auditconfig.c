@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * auditconfig - set and display audit parameters
@@ -915,7 +914,7 @@ do_chkconf(void)
 		len = sizeof (struct au_evclass_map);
 		if (evp->ae_number <= as.as_numevent) {
 			if (auditon(A_GETCLASS, (caddr_t)&cmap, len) == -1) {
-				(void) printf("%s(%d):%s",
+				(void) printf("%s(%hu):%s",
 				    evp->ae_name, evp->ae_number,
 				    gettext("UNKNOWN EVENT: Could not get "
 				    "class for event. Configuration may "
@@ -934,7 +933,7 @@ do_chkconf(void)
 						&pmask, 0);
 
 					(void) printf(gettext(
-					    "%s(%d): CLASS MISMATCH: "
+					    "%s(%hu): CLASS MISMATCH: "
 					    "runtime class (%s) != "
 					    "configured class (%s)\n"),
 					    evp->ae_name, evp->ae_number,
@@ -1065,7 +1064,7 @@ do_audit(char *event, char sorf, int retval, char *audit_str)
 	    AU_PRS_USECACHE);
 
 	if (rtn == -1) {
-		exit_error("%s\n%s %d\n",
+		exit_error("%s\n%s %hu\n",
 		    gettext("Check audit event configuration."),
 		    gettext("Could not get audit class for event number"),
 		    evp->ae_number);
@@ -1213,7 +1212,7 @@ do_getclass(char *event_str)
 	ec.ec_number = event_number;
 	eauditon(A_GETCLASS, (caddr_t)&ec, 0);
 
-	(void) printf(gettext("audit class mask for event %s(%d) = 0x%x\n"),
+	(void) printf(gettext("audit class mask for event %s(%hu) = 0x%x\n"),
 	    event_name, event_number, ec.ec_class);
 }
 
@@ -1480,7 +1479,7 @@ do_lsevent(void)
 		pmask.am_success = pmask.am_failure = evp->ae_class;
 		if (getauditflagschar(auflags, &pmask, 0) == -1)
 			(void) strcpy(auflags, "unknown");
-		(void) printf("%-30s %5d %s %s\n",
+		(void) printf("%-30s %5hu %s %s\n",
 		    evp->ae_name, evp->ae_number, auflags, evp->ae_desc);
 	}
 	endauevent();
@@ -1568,7 +1567,7 @@ do_setsmask(char *asid_str, char *audit_flags)
 	struct auditinfo ainfo;
 
 	if (strisnum(asid_str))
-		ainfo.ai_asid = (pid_t)atoi(asid_str);
+		ainfo.ai_asid = (au_asid_t)atoi(asid_str);
 	else
 		exit_usage(1);
 
@@ -1583,7 +1582,7 @@ do_setumask(char *auid_str, char *audit_flags)
 	struct auditinfo ainfo;
 
 	if (strisnum(auid_str))
-		ainfo.ai_auid = (pid_t)atoi(auid_str);
+		ainfo.ai_auid = (au_id_t)atoi(auid_str);
 	else
 		exit_usage(1);
 
@@ -1840,7 +1839,7 @@ egetauevnum(au_event_t event_number)
 	au_event_ent_t *evp;
 
 	if ((evp = getauevnum(event_number)) == NULL) {
-		exit_error(gettext("Could not get audit event %d"),
+		exit_error(gettext("Could not get audit event %hu"),
 		    event_number);
 	}
 
@@ -2287,14 +2286,14 @@ chk_event_num(int etype, au_event_t event)
 		if (event > as.as_numevent) {
 			exit_error(gettext("Invalid kernel audit event "
 			    "number specified.\n"
-			    "\t%d is outside allowable range 0-%d."),
+			    "\t%hu is outside allowable range 0-%d."),
 			    event, as.as_numevent);
 		}
 	} else  {
 		/* user event */
 		if (event <= as.as_numevent) {
 			exit_error(gettext("Invalid user level audit event "
-			    "number specified %d."), event);
+			    "number specified %hu."), event);
 		}
 	}
 }

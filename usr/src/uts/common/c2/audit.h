@@ -31,8 +31,6 @@
 #ifndef	_BSM_AUDIT_H
 #define	_BSM_AUDIT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -85,10 +83,10 @@ extern "C" {
 /*
  * Some typedefs for the fundamentals
  */
-typedef pid_t au_asid_t;
+typedef uint_t au_asid_t;
 typedef uint_t  au_class_t;
-typedef short au_event_t;
-typedef short au_emod_t;
+typedef ushort_t au_event_t;
+typedef ushort_t au_emod_t;
 typedef uid_t au_id_t;
 
 /*
@@ -436,7 +434,6 @@ struct audit_stat {
 	uint32_t as_memused;		/* no longer used */
 };
 typedef struct audit_stat au_stat_t;
-extern int au_naevent;
 
 /*
  * Secondary stat structure for file size stuff.  The stat structure was
@@ -554,8 +551,8 @@ void	audit_sock(int, struct queue *, struct msgb *, int);
 void	audit_free(void);
 int	audit_start(unsigned int, unsigned int, int, klwp_t *);
 void	audit_finish(unsigned int, unsigned int, int, union rval *);
-int	audit_async_start(label_t *, int, int);
-void	audit_async_finish(caddr_t *, int, int);
+int	audit_async_start(label_t *, au_event_t, int);
+void	audit_async_finish(caddr_t *, au_event_t, au_emod_t);
 void	audit_async_discard_backend(void *);
 void	audit_async_done(caddr_t *, int);
 void	audit_async_drop(caddr_t *, int);

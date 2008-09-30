@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Command line option processing for auditreduce.
@@ -304,7 +303,7 @@ proc_sid(char *optarg)
 		return (-1);
 	}
 	flags |= M_SID;
-	m_sid = atol(optarg);
+	m_sid = (au_asid_t)atol(optarg);
 	return (0);
 }
 
@@ -436,7 +435,7 @@ obj_lkup(char *obj_str)
 			return (&obj_tbl[i]);
 
 	/* not in table */
-	return ((obj_ent_t *)0);
+	return (NULL);
 }
 
 
@@ -464,7 +463,7 @@ proc_type(char *optstr)
 	flags |= M_TYPE;
 	m_type = 0;
 	if (a_isnum(optstr, TRUE)) {
-		if ((aep = getauevnam(optstr)) != (struct au_event_ent *)NULL)
+		if ((aep = getauevnam(optstr)) != NULL)
 			m_type = aep->ae_number;
 	} else {
 		if ((aep = getauevnum((au_event_t)atoi(optstr))) !=
