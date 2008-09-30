@@ -44,6 +44,7 @@
 #include "mm_util.h"
 #include "mm_db_version.h"
 #include <mms_cfg.h>
+#include <net_cfg_service.h>
 
 static char *_SrcFile = __FILE__;
 static mm_db_rval_t db_connect(mm_db_t *db, char *database_name);
@@ -530,8 +531,14 @@ mm_db_connect(mm_db_t *db)
 mm_db_rval_t
 mm_db_reconnect(mm_db_t *db)
 {
+	mm_db_cfg_t	*db_cfg = db->mm_db_cfg;
+
+	/* Re-read password for db */
+	db_cfg->mm_db_passwd = mms_net_cfg_read_pass_file(MMS_NET_CFG_DB_FILE);
+
 	if (db->mm_db_conn != NULL) {
 		PQreset(db->mm_db_conn);
+		db->mm_db_conn = NULL;
 	} else if (mm_db_connect(db) != MM_DB_OK) {
 		mms_trace(MMS_DEVP, "reconnect init failed");
 		return (MM_DB_ERROR);
