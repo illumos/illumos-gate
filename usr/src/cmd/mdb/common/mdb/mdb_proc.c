@@ -1567,6 +1567,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		GElf_Sym sym;
 		uintptr_t panicstr;
 		char panicbuf[128];
+		const siginfo_t *sip = &(psp->pr_lwp.pr_info);
 
 		char execname[MAXPATHLEN], buf[BUFSIZ];
 		char signame[SIG2STR_MAX + 4]; /* enough for SIG+name+\0 */
@@ -1685,6 +1686,30 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				mdb_printf("process terminated by %s (%s)",
 				    proc_signame(cursig, signame,
 				    sizeof (signame)), strsignal(cursig));
+
+				if (sip->si_signo != 0 && SI_FROMUSER(sip) &&
+				    sip->si_pid != 0) {
+					mdb_printf(", pid=%d uid=%u",
+					    (int)sip->si_pid, sip->si_uid);
+					if (sip->si_code != 0) {
+						mdb_printf(" code=%d",
+						    sip->si_code);
+					}
+				} else {
+					switch (sip->si_signo) {
+					case SIGILL:
+					case SIGTRAP:
+					case SIGFPE:
+					case SIGSEGV:
+					case SIGBUS:
+					case SIGEMT:
+						mdb_printf(", addr=%p",
+						    sip->si_addr);
+					default:
+						break;
+					}
+				}
+
 				if (coredump)
 					mdb_printf(" - core file dumped");
 				mdb_printf("\n");
