@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
 #include <sys/dbuf.h>
@@ -776,7 +774,7 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 	if (tx->tx_err)
 		return (tx->tx_err);
 
-	if (spa_state(spa) == POOL_STATE_IO_FAILURE) {
+	if (spa_suspended(spa)) {
 		/*
 		 * If the user has indicated a blocking failure mode
 		 * then return ERESTART which will block in dmu_tx_wait().
@@ -960,8 +958,7 @@ dmu_tx_wait(dmu_tx_t *tx)
 	 * has tried to obtain a tx. If that's the case then his
 	 * tx_lasttried_txg would not have been assigned.
 	 */
-	if (spa_state(spa) == POOL_STATE_IO_FAILURE ||
-	    tx->tx_lasttried_txg == 0) {
+	if (spa_suspended(spa) || tx->tx_lasttried_txg == 0) {
 		txg_wait_synced(tx->tx_pool, spa_last_synced_txg(spa) + 1);
 	} else if (tx->tx_needassign_txh) {
 		dnode_t *dn = tx->tx_needassign_txh->txh_dnode;

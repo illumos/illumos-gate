@@ -2609,9 +2609,15 @@ top:
 		if (GHOST_STATE(hdr->b_state))
 			arc_access(hdr, hash_lock);
 
-		if (hdr->b_l2hdr != NULL) {
-			vd = hdr->b_l2hdr->b_dev->l2ad_vdev;
+		if (HDR_L2CACHE(hdr) && hdr->b_l2hdr != NULL &&
+		    (vd = hdr->b_l2hdr->b_dev->l2ad_vdev) != NULL) {
 			addr = hdr->b_l2hdr->b_daddr;
+			/*
+			 * Lock out device removal.
+			 */
+			if (vdev_is_dead(vd) ||
+			    !spa_config_tryenter(spa, SCL_L2ARC, vd, RW_READER))
+				vd = NULL;
 		}
 
 		mutex_exit(hash_lock);
@@ -2624,12 +2630,7 @@ top:
 		    demand, prefetch, hdr->b_type != ARC_BUFC_METADATA,
 		    data, metadata, misses);
 
-		if (l2arc_ndev != 0 && HDR_L2CACHE(hdr)) {
-			/*
-			 * Lock out device removal.
-			 */
-			spa_config_enter(spa, RW_READER, FTAG);
-
+		if (vd != NULL) {
 			/*
 			 * Read from the L2ARC if the following are true:
 			 * 1. The L2ARC vdev was previously cached.
@@ -2638,12 +2639,9 @@ top:
 			 * 4. The L2ARC entry wasn't evicted, which may
 			 *    also have invalidated the vdev.
 			 */
-			if (vd != NULL && hdr->b_l2hdr != NULL &&
+			if (hdr->b_l2hdr != NULL &&
 			    !HDR_L2_WRITING(hdr) && !HDR_L2_EVICTED(hdr)) {
 				l2arc_read_callback_t *cb;
-
-				if (vdev_is_dead(vd))
-					goto l2skip;
 
 				DTRACE_PROBE1(l2arc__hit, arc_buf_hdr_t *, hdr);
 				ARCSTAT_BUMP(arcstat_l2_hits);
@@ -2657,16 +2655,17 @@ top:
 				cb->l2rcb_flags = zio_flags;
 
 				/*
-				 * l2arc read.
+				 * l2arc read.  The SCL_L2ARC lock will be
+				 * released by l2arc_read_done().
 				 */
 				rzio = zio_read_phys(pio, vd, addr, size,
 				    buf->b_data, ZIO_CHECKSUM_OFF,
 				    l2arc_read_done, cb, priority, zio_flags |
 				    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_CANFAIL |
-				    ZIO_FLAG_DONT_PROPAGATE, B_FALSE);
+				    ZIO_FLAG_DONT_PROPAGATE |
+				    ZIO_FLAG_DONT_RETRY, B_FALSE);
 				DTRACE_PROBE2(l2arc__read, vdev_t *, vd,
 				    zio_t *, rzio);
-				spa_config_exit(spa, FTAG);
 
 				if (*arc_flags & ARC_NOWAIT) {
 					zio_nowait(rzio);
@@ -2684,8 +2683,7 @@ top:
 				ARCSTAT_BUMP(arcstat_l2_misses);
 				if (HDR_L2_WRITING(hdr))
 					ARCSTAT_BUMP(arcstat_l2_rw_clash);
-l2skip:
-				spa_config_exit(spa, FTAG);
+				spa_config_exit(spa, SCL_L2ARC, vd);
 			}
 		}
 
@@ -2984,23 +2982,16 @@ arc_write_ready(zio_t *zio)
 	arc_buf_t *buf = callback->awcb_buf;
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 
-	if (zio->io_error == 0 && callback->awcb_ready) {
-		ASSERT(!refcount_is_zero(&buf->b_hdr->b_refcnt));
-		callback->awcb_ready(zio, buf, callback->awcb_private);
-	}
+	ASSERT(!refcount_is_zero(&buf->b_hdr->b_refcnt));
+	callback->awcb_ready(zio, buf, callback->awcb_private);
+
 	/*
 	 * If the IO is already in progress, then this is a re-write
-	 * attempt, so we need to thaw and re-compute the cksum. It is
-	 * the responsibility of the callback to handle the freeing
-	 * and accounting for any re-write attempt. If we don't have a
-	 * callback registered then simply free the block here.
+	 * attempt, so we need to thaw and re-compute the cksum.
+	 * It is the responsibility of the callback to handle the
+	 * accounting for any re-write attempt.
 	 */
 	if (HDR_IO_IN_PROGRESS(hdr)) {
-		if (!BP_IS_HOLE(&zio->io_bp_orig) &&
-		    callback->awcb_ready == NULL) {
-			zio_nowait(zio_free(zio, zio->io_spa, zio->io_txg,
-			    &zio->io_bp_orig, NULL, NULL));
-		}
 		mutex_enter(&hdr->b_freeze_lock);
 		if (hdr->b_freeze_cksum != NULL) {
 			kmem_free(hdr->b_freeze_cksum, sizeof (zio_cksum_t));
@@ -3043,6 +3034,7 @@ arc_write_done(zio_t *zio)
 			 * sync-to-convergence, because we remove
 			 * buffers from the hash table when we arc_free().
 			 */
+			ASSERT(zio->io_flags & ZIO_FLAG_IO_REWRITE);
 			ASSERT(DVA_EQUAL(BP_IDENTITY(&zio->io_bp_orig),
 			    BP_IDENTITY(zio->io_bp)));
 			ASSERT3U(zio->io_bp_orig.blk_birth, ==,
@@ -3086,16 +3078,9 @@ arc_write_done(zio_t *zio)
 }
 
 static void
-write_policy(spa_t *spa, const writeprops_t *wp,
-    int *cksump, int *compp, int *copiesp)
+write_policy(spa_t *spa, const writeprops_t *wp, zio_prop_t *zp)
 {
-	int copies = wp->wp_copies;
 	boolean_t ismd = (wp->wp_level > 0 || dmu_ot[wp->wp_type].ot_metadata);
-
-	/* Determine copies setting */
-	if (ismd)
-		copies++;
-	*copiesp = MIN(copies, spa_max_replication(spa));
 
 	/* Determine checksum setting */
 	if (ismd) {
@@ -3108,11 +3093,11 @@ write_policy(spa_t *spa, const writeprops_t *wp,
 		 */
 		if (zio_checksum_table[wp->wp_oschecksum].ci_correctable &&
 		    !zio_checksum_table[wp->wp_oschecksum].ci_zbt)
-			*cksump = wp->wp_oschecksum;
+			zp->zp_checksum = wp->wp_oschecksum;
 		else
-			*cksump = ZIO_CHECKSUM_FLETCHER_4;
+			zp->zp_checksum = ZIO_CHECKSUM_FLETCHER_4;
 	} else {
-		*cksump = zio_checksum_select(wp->wp_dnchecksum,
+		zp->zp_checksum = zio_checksum_select(wp->wp_dnchecksum,
 		    wp->wp_oschecksum);
 	}
 
@@ -3122,12 +3107,16 @@ write_policy(spa_t *spa, const writeprops_t *wp,
 		 * XXX -- we should design a compression algorithm
 		 * that specializes in arrays of bps.
 		 */
-		*compp = zfs_mdcomp_disable ? ZIO_COMPRESS_EMPTY :
+		zp->zp_compress = zfs_mdcomp_disable ? ZIO_COMPRESS_EMPTY :
 		    ZIO_COMPRESS_LZJB;
 	} else {
-		*compp = zio_compress_select(wp->wp_dncompress,
+		zp->zp_compress = zio_compress_select(wp->wp_dncompress,
 		    wp->wp_oscompress);
 	}
+
+	zp->zp_type = wp->wp_type;
+	zp->zp_level = wp->wp_level;
+	zp->zp_ndvas = MIN(wp->wp_copies + ismd, spa_max_replication(spa));
 }
 
 zio_t *
@@ -3138,9 +3127,10 @@ arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
 {
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 	arc_write_callback_t *callback;
-	zio_t	*zio;
-	int cksum, comp, copies;
+	zio_t *zio;
+	zio_prop_t zp;
 
+	ASSERT(ready != NULL);
 	ASSERT(!HDR_IO_ERROR(hdr));
 	ASSERT((hdr->b_flags & ARC_IO_IN_PROGRESS) == 0);
 	ASSERT(hdr->b_acb == 0);
@@ -3152,10 +3142,9 @@ arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
 	callback->awcb_private = private;
 	callback->awcb_buf = buf;
 
-	write_policy(spa, wp, &cksum, &comp, &copies);
-	zio = zio_write(pio, spa, cksum, comp, copies, txg, bp,
-	    buf->b_data, hdr->b_size, arc_write_ready, arc_write_done,
-	    callback, priority, zio_flags, zb);
+	write_policy(spa, wp, &zp);
+	zio = zio_write(pio, spa, txg, bp, buf->b_data, hdr->b_size, &zp,
+	    arc_write_ready, arc_write_done, callback, priority, zio_flags, zb);
 
 	return (zio);
 }
@@ -3180,7 +3169,9 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		 * nonzero, it should match what we have in the cache.
 		 */
 		ASSERT(bp->blk_cksum.zc_word[0] == 0 ||
-		    ab->b_cksum0 == bp->blk_cksum.zc_word[0]);
+		    bp->blk_cksum.zc_word[0] == ab->b_cksum0 ||
+		    bp->blk_fill == BLK_FILL_ALREADY_FREED);
+
 		if (ab->b_state != arc_anon)
 			arc_change_state(arc_anon, ab, hash_lock);
 		if (HDR_IO_IN_PROGRESS(ab)) {
@@ -3221,7 +3212,7 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		}
 	}
 
-	zio = zio_free(pio, spa, txg, bp, done, private);
+	zio = zio_free(pio, spa, txg, bp, done, private, ZIO_FLAG_MUSTSUCCEED);
 
 	if (arc_flags & ARC_WAIT)
 		return (zio_wait(zio));
@@ -3702,7 +3693,7 @@ out:
 	 * removed while we are writing to it.
 	 */
 	if (next != NULL)
-		spa_config_enter(next->l2ad_spa, RW_READER, next);
+		spa_config_enter(next->l2ad_spa, SCL_L2ARC, next, RW_READER);
 	mutex_exit(&spa_namespace_lock);
 
 	return (next);
@@ -3818,9 +3809,13 @@ l2arc_read_done(zio_t *zio)
 	l2arc_read_callback_t *cb;
 	arc_buf_hdr_t *hdr;
 	arc_buf_t *buf;
-	zio_t *rzio;
 	kmutex_t *hash_lock;
 	int equal;
+
+	ASSERT(zio->io_vd != NULL);
+	ASSERT(zio->io_flags & ZIO_FLAG_DONT_PROPAGATE);
+
+	spa_config_exit(zio->io_spa, SCL_L2ARC, zio->io_vd);
 
 	cb = zio->io_private;
 	ASSERT(cb != NULL);
@@ -3839,6 +3834,8 @@ l2arc_read_done(zio_t *zio)
 	if (equal && zio->io_error == 0 && !HDR_L2_EVICTED(hdr)) {
 		mutex_exit(hash_lock);
 		zio->io_private = buf;
+		zio->io_bp_copy = cb->l2rcb_bp;	/* XXX fix in L2ARC 2.0	*/
+		zio->io_bp = &zio->io_bp_copy;	/* XXX fix in L2ARC 2.0	*/
 		arc_read_done(zio);
 	} else {
 		mutex_exit(hash_lock);
@@ -3854,20 +3851,16 @@ l2arc_read_done(zio_t *zio)
 		if (!equal)
 			ARCSTAT_BUMP(arcstat_l2_cksum_bad);
 
-		if (zio->io_waiter == NULL) {
-			/*
-			 * Let the resent I/O call arc_read_done() instead.
-			 */
-			zio->io_done = NULL;
-			zio->io_flags &= ~ZIO_FLAG_DONT_CACHE;
-
-			rzio = zio_read(zio->io_parent, cb->l2rcb_spa,
-			    &cb->l2rcb_bp, buf->b_data, zio->io_size,
-			    arc_read_done, buf, zio->io_priority,
-			    cb->l2rcb_flags, &cb->l2rcb_zb);
-
-			(void) zio_nowait(rzio);
-		}
+		/*
+		 * If there's no waiter, issue an async i/o to the primary
+		 * storage now.  If there *is* a waiter, the caller must
+		 * issue the i/o in a context where it's OK to block.
+		 */
+		if (zio->io_waiter == NULL)
+			zio_nowait(zio_read(zio->io_parent,
+			    cb->l2rcb_spa, &cb->l2rcb_bp,
+			    buf->b_data, zio->io_size, arc_read_done, buf,
+			    zio->io_priority, cb->l2rcb_flags, &cb->l2rcb_zb));
 	}
 
 	kmem_free(cb, sizeof (l2arc_read_callback_t));
@@ -4193,6 +4186,11 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 			    zio_t *, wzio);
 			(void) zio_nowait(wzio);
 
+			/*
+			 * Keep the clock hand suitably device-aligned.
+			 */
+			buf_sz = vdev_psize_to_asize(dev->l2ad_vdev, buf_sz);
+
 			write_sz += buf_sz;
 			dev->l2ad_hand += buf_sz;
 		}
@@ -4286,7 +4284,7 @@ l2arc_feed_thread(void)
 		 */
 		if (arc_reclaim_needed()) {
 			ARCSTAT_BUMP(arcstat_l2_abort_lowmem);
-			spa_config_exit(spa, dev);
+			spa_config_exit(spa, SCL_L2ARC, dev);
 			continue;
 		}
 
@@ -4305,7 +4303,7 @@ l2arc_feed_thread(void)
 		 * Write ARC buffers.
 		 */
 		l2arc_write_buffers(spa, dev, size);
-		spa_config_exit(spa, dev);
+		spa_config_exit(spa, SCL_L2ARC, dev);
 	}
 
 	l2arc_thread_exit = 0;
@@ -4414,7 +4412,7 @@ l2arc_remove_vdev(vdev_t *vd)
 }
 
 void
-l2arc_init()
+l2arc_init(void)
 {
 	l2arc_thread_exit = 0;
 	l2arc_ndev = 0;
@@ -4433,26 +4431,16 @@ l2arc_init()
 	    offsetof(l2arc_dev_t, l2ad_node));
 	list_create(l2arc_free_on_write, sizeof (l2arc_data_free_t),
 	    offsetof(l2arc_data_free_t, l2df_list_node));
-
-	(void) thread_create(NULL, 0, l2arc_feed_thread, NULL, 0, &p0,
-	    TS_RUN, minclsyspri);
 }
 
 void
-l2arc_fini()
+l2arc_fini(void)
 {
 	/*
 	 * This is called from dmu_fini(), which is called from spa_fini();
 	 * Because of this, we can assume that all l2arc devices have
 	 * already been removed when the pools themselves were removed.
 	 */
-
-	mutex_enter(&l2arc_feed_thr_lock);
-	cv_signal(&l2arc_feed_thr_cv);	/* kick thread out of startup */
-	l2arc_thread_exit = 1;
-	while (l2arc_thread_exit != 0)
-		cv_wait(&l2arc_feed_thr_cv, &l2arc_feed_thr_lock);
-	mutex_exit(&l2arc_feed_thr_lock);
 
 	l2arc_do_free_on_write();
 
@@ -4464,4 +4452,28 @@ l2arc_fini()
 
 	list_destroy(l2arc_dev_list);
 	list_destroy(l2arc_free_on_write);
+}
+
+void
+l2arc_start(void)
+{
+	if (!(spa_mode & FWRITE))
+		return;
+
+	(void) thread_create(NULL, 0, l2arc_feed_thread, NULL, 0, &p0,
+	    TS_RUN, minclsyspri);
+}
+
+void
+l2arc_stop(void)
+{
+	if (!(spa_mode & FWRITE))
+		return;
+
+	mutex_enter(&l2arc_feed_thr_lock);
+	cv_signal(&l2arc_feed_thr_cv);	/* kick thread out of startup */
+	l2arc_thread_exit = 1;
+	while (l2arc_thread_exit != 0)
+		cv_wait(&l2arc_feed_thr_cv, &l2arc_feed_thr_lock);
+	mutex_exit(&l2arc_feed_thr_lock);
 }

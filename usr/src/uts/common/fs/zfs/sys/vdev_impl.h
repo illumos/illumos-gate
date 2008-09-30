@@ -26,8 +26,6 @@
 #ifndef _SYS_VDEV_IMPL_H
 #define	_SYS_VDEV_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/avl.h>
 #include <sys/dmu.h>
 #include <sys/metaslab.h>
@@ -60,16 +58,14 @@ typedef struct vdev_cache_entry vdev_cache_entry_t;
  */
 typedef int	vdev_open_func_t(vdev_t *vd, uint64_t *size, uint64_t *ashift);
 typedef void	vdev_close_func_t(vdev_t *vd);
-typedef int	vdev_probe_func_t(vdev_t *vd);
 typedef uint64_t vdev_asize_func_t(vdev_t *vd, uint64_t psize);
 typedef int	vdev_io_start_func_t(zio_t *zio);
-typedef int	vdev_io_done_func_t(zio_t *zio);
+typedef void	vdev_io_done_func_t(zio_t *zio);
 typedef void	vdev_state_change_func_t(vdev_t *vd, int, int);
 
 typedef struct vdev_ops {
 	vdev_open_func_t		*vdev_op_open;
 	vdev_close_func_t		*vdev_op_close;
-	vdev_probe_func_t		*vdev_op_probe;
 	vdev_asize_func_t		*vdev_op_asize;
 	vdev_io_start_func_t		*vdev_op_io_start;
 	vdev_io_done_func_t		*vdev_op_io_done;
@@ -143,7 +139,9 @@ struct vdev {
 	txg_list_t	vdev_dtl_list;	/* per-txg dirty DTL lists	*/
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
 	boolean_t	vdev_remove_wanted; /* async remove wanted?	*/
-	list_node_t	vdev_dirty_node; /* config dirty list		*/
+	boolean_t	vdev_probe_wanted; /* async probe wanted?	*/
+	list_node_t	vdev_config_dirty_node; /* config dirty list	*/
+	list_node_t	vdev_state_dirty_node; /* state dirty list	*/
 	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/
 	uint64_t	vdev_islog;	/* is an intent log device	*/
 
@@ -162,23 +160,22 @@ struct vdev {
 	char		*vdev_path;	/* vdev path (if any)		*/
 	char		*vdev_devid;	/* vdev devid (if any)		*/
 	char		*vdev_physpath;	/* vdev device path (if any)	*/
-	uint64_t	vdev_fault_arg; /* fault injection paramater	*/
-	int		vdev_fault_mask; /* zio types to fault		*/
-	uint8_t		vdev_fault_mode; /* fault injection mode	*/
+	uint64_t	vdev_not_present; /* not present during import	*/
+	uint64_t	vdev_unspare;	/* unspare when resilvering done */
+	hrtime_t	vdev_last_try;	/* last reopen time		*/
+	boolean_t	vdev_nowritecache; /* true if flushwritecache failed */
+	boolean_t	vdev_checkremove; /* temporary online test	*/
+	boolean_t	vdev_forcefault; /* force online fault		*/
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
+	uint8_t		vdev_cant_read;	/* vdev is failing all reads	*/
+	uint8_t		vdev_cant_write; /* vdev is failing all writes	*/
 	uint64_t	vdev_isspare;	/* was a hot spare		*/
 	uint64_t	vdev_isl2cache;	/* was a l2cache device		*/
 	vdev_queue_t	vdev_queue;	/* I/O deadline schedule queue	*/
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
-	uint64_t	vdev_not_present; /* not present during import	*/
-	hrtime_t	vdev_last_try;	/* last reopen time		*/
-	boolean_t	vdev_nowritecache; /* true if flushwritecache failed */
-	uint64_t	vdev_unspare;	/* unspare when resilvering done */
-	boolean_t	vdev_checkremove; /* temporary online test	*/
-	boolean_t	vdev_forcefault; /* force online fault		*/
-	boolean_t	vdev_is_failing; /* device errors seen		*/
 	spa_aux_vdev_t	*vdev_aux;	/* for l2cache vdevs		*/
+	zio_t		*vdev_probe_zio; /* root of current probe	*/
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
@@ -189,6 +186,7 @@ struct vdev {
 	 */
 	kmutex_t	vdev_dtl_lock;	/* vdev_dtl_{map,resilver}	*/
 	kmutex_t	vdev_stat_lock;	/* vdev_stat			*/
+	kmutex_t	vdev_probe_lock; /* protects vdev_probe_zio	*/
 };
 
 #define	VDEV_SKIP_SIZE		(8 << 10)

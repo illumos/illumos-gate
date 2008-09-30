@@ -45,11 +45,13 @@ typedef struct vdev_disk_buf {
 } vdev_disk_buf_t;
 
 static int
-vdev_disk_open_common(vdev_t *vd)
+vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 {
 	vdev_disk_t *dvd;
-	dev_t dev;
+	struct dk_minfo dkm;
 	int error;
+	dev_t dev;
+	int otyp;
 
 	/*
 	 * We must have a pathname, and it must be absolute.
@@ -169,26 +171,11 @@ vdev_disk_open_common(vdev_t *vd)
 			    &dvd->vd_lh, zfs_li);
 	}
 
-	if (error)
+	if (error) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_OPEN_FAILED;
-
-	return (error);
-}
-
-static int
-vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
-{
-	vdev_disk_t *dvd;
-	struct dk_minfo dkm;
-	int error;
-	dev_t dev;
-	int otyp;
-
-	error = vdev_disk_open_common(vd);
-	if (error)
 		return (error);
+	}
 
-	dvd = vd->vdev_tsd;
 	/*
 	 * Once a device is opened, verify that the physical device path (if
 	 * available) is up to date.
@@ -300,104 +287,6 @@ vdev_disk_physio(ldi_handle_t vd_lh, caddr_t data, size_t size,
 	return (error);
 }
 
-static int
-vdev_disk_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
-    int flags)
-{
-	int error = 0;
-	vdev_disk_t *dvd = vd ? vd->vdev_tsd : NULL;
-
-	if (vd == NULL || dvd == NULL || dvd->vd_lh == NULL)
-		return (EINVAL);
-
-	error = vdev_disk_physio(dvd->vd_lh, data, size, offset, flags);
-
-	if (zio_injection_enabled && error == 0)
-		error = zio_handle_device_injection(vd, EIO);
-
-	return (error);
-}
-
-/*
- * Determine if the underlying device is accessible by reading and writing
- * to a known location. We must be able to do this during syncing context
- * and thus we cannot set the vdev state directly.
- */
-static int
-vdev_disk_probe(vdev_t *vd)
-{
-	uint64_t offset;
-	vdev_t *nvd;
-	int l, error = 0, retries = 0;
-	char *vl_pad;
-
-	if (vd == NULL)
-		return (EINVAL);
-
-	/* Hijack the current vdev */
-	nvd = vd;
-
-	/*
-	 * Pick a random label to rewrite.
-	 */
-	l = spa_get_random(VDEV_LABELS);
-	ASSERT(l < VDEV_LABELS);
-
-	offset = vdev_label_offset(vd->vdev_psize, l,
-	    offsetof(vdev_label_t, vl_pad));
-
-	vl_pad = kmem_alloc(VDEV_SKIP_SIZE, KM_SLEEP);
-
-	/*
-	 * Try to read and write to a special location on the
-	 * label. We use the existing vdev initially and only
-	 * try to create and reopen it if we encounter a failure.
-	 */
-	while ((error = vdev_disk_probe_io(nvd, vl_pad, VDEV_SKIP_SIZE,
-	    offset, B_READ)) != 0 && retries == 0) {
-
-		nvd = kmem_zalloc(sizeof (vdev_t), KM_SLEEP);
-		if (vd->vdev_path)
-			nvd->vdev_path = spa_strdup(vd->vdev_path);
-		if (vd->vdev_physpath)
-			nvd->vdev_physpath = spa_strdup(vd->vdev_physpath);
-		if (vd->vdev_devid)
-			nvd->vdev_devid = spa_strdup(vd->vdev_devid);
-		nvd->vdev_wholedisk = vd->vdev_wholedisk;
-		nvd->vdev_guid = vd->vdev_guid;
-		nvd->vdev_spa = vd->vdev_spa;
-		retries++;
-
-		error = vdev_disk_open_common(nvd);
-		if (error)
-			break;
-	}
-
-	if (!error) {
-		error = vdev_disk_probe_io(nvd, vl_pad, VDEV_SKIP_SIZE,
-		    offset, B_WRITE);
-	}
-
-	/* Clean up if we allocated a new vdev */
-	if (retries) {
-		vdev_disk_close(nvd);
-		if (nvd->vdev_path)
-			spa_strfree(nvd->vdev_path);
-		if (nvd->vdev_physpath)
-			spa_strfree(nvd->vdev_physpath);
-		if (nvd->vdev_devid)
-			spa_strfree(nvd->vdev_devid);
-		kmem_free(nvd, sizeof (vdev_t));
-	}
-	kmem_free(vl_pad, VDEV_SKIP_SIZE);
-
-	/* Reset the failing flag */
-	if (!error)
-		vd->vdev_is_failing = B_FALSE;
-
-	return (error);
-}
-
 static void
 vdev_disk_io_intr(buf_t *bp)
 {
@@ -423,7 +312,11 @@ static void
 vdev_disk_ioctl_done(void *zio_arg, int error)
 {
 	zio_t *zio = zio_arg;
+	struct dk_callback *dkc = zio->io_vsd;
 
+	kmem_free(dkc, sizeof (*dkc));
+
+	zio->io_vsd = NULL;
 	zio->io_error = error;
 
 	zio_interrupt(zio);
@@ -435,12 +328,11 @@ vdev_disk_io_start(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	vdev_disk_t *dvd = vd->vdev_tsd;
 	vdev_disk_buf_t *vdb;
+	struct dk_callback *dkc;
 	buf_t *bp;
-	int flags, error;
+	int error;
 
 	if (zio->io_type == ZIO_TYPE_IOCTL) {
-		zio_vdev_io_bypass(zio);
-
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = ENXIO;
@@ -459,13 +351,14 @@ vdev_disk_io_start(zio_t *zio)
 				break;
 			}
 
-			zio->io_dk_callback.dkc_callback = vdev_disk_ioctl_done;
-			zio->io_dk_callback.dkc_flag = FLUSH_VOLATILE;
-			zio->io_dk_callback.dkc_cookie = zio;
+			zio->io_vsd = dkc = kmem_alloc(sizeof (*dkc), KM_SLEEP);
+
+			dkc->dkc_callback = vdev_disk_ioctl_done;
+			dkc->dkc_flag = FLUSH_VOLATILE;
+			dkc->dkc_cookie = zio;
 
 			error = ldi_ioctl(dvd->vd_lh, zio->io_cmd,
-			    (uintptr_t)&zio->io_dk_callback,
-			    FKIOCTL, kcred, NULL);
+			    (uintptr_t)dkc, FKIOCTL, kcred, NULL);
 
 			if (error == 0) {
 				/*
@@ -497,59 +390,31 @@ vdev_disk_io_start(zio_t *zio)
 		return (ZIO_PIPELINE_CONTINUE);
 	}
 
-	if (zio->io_type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
-		return (ZIO_PIPELINE_STOP);
-
-	if ((zio = vdev_queue_io(zio)) == NULL)
-		return (ZIO_PIPELINE_STOP);
-
-	if (zio->io_type == ZIO_TYPE_WRITE)
-		error = vdev_writeable(vd) ? vdev_error_inject(vd, zio) : ENXIO;
-	else
-		error = vdev_readable(vd) ? vdev_error_inject(vd, zio) : ENXIO;
-	error = (vd->vdev_remove_wanted || vd->vdev_is_failing) ? ENXIO : error;
-
-	if (error) {
-		zio->io_error = error;
-		zio_interrupt(zio);
-		return (ZIO_PIPELINE_STOP);
-	}
-
-	flags = (zio->io_type == ZIO_TYPE_READ ? B_READ : B_WRITE);
-	flags |= B_BUSY | B_NOCACHE;
-	if (zio->io_flags & ZIO_FLAG_FAILFAST)
-		flags |= B_FAILFAST;
-
 	vdb = kmem_alloc(sizeof (vdev_disk_buf_t), KM_SLEEP);
 
 	vdb->vdb_io = zio;
 	bp = &vdb->vdb_buf;
 
 	bioinit(bp);
-	bp->b_flags = flags;
+	bp->b_flags = B_BUSY | B_NOCACHE |
+	    (zio->io_type == ZIO_TYPE_READ ? B_READ : B_WRITE) |
+	    ((zio->io_flags & ZIO_FLAG_IO_RETRY) ? 0 : B_FAILFAST);
 	bp->b_bcount = zio->io_size;
 	bp->b_un.b_addr = zio->io_data;
 	bp->b_lblkno = lbtodb(zio->io_offset);
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
 
-	error = ldi_strategy(dvd->vd_lh, bp);
 	/* ldi_strategy() will return non-zero only on programming errors */
-	ASSERT(error == 0);
+	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);
 
 	return (ZIO_PIPELINE_STOP);
 }
 
-static int
+static void
 vdev_disk_io_done(zio_t *zio)
 {
-	vdev_queue_io_done(zio);
-
-	if (zio->io_type == ZIO_TYPE_WRITE)
-		vdev_cache_write(zio);
-
-	if (zio_injection_enabled && zio->io_error == 0)
-		zio->io_error = zio_handle_device_injection(zio->io_vd, EIO);
+	vdev_t *vd = zio->io_vd;
 
 	/*
 	 * If the device returned EIO, then attempt a DKIOCSTATE ioctl to see if
@@ -558,36 +423,20 @@ vdev_disk_io_done(zio_t *zio)
 	 * make sure it's still accessible.
 	 */
 	if (zio->io_error == EIO) {
-		vdev_t *vd = zio->io_vd;
 		vdev_disk_t *dvd = vd->vdev_tsd;
-		int state;
+		int state = DKIO_NONE;
 
-		state = DKIO_NONE;
-		if (dvd && ldi_ioctl(dvd->vd_lh, DKIOCSTATE, (intptr_t)&state,
-		    FKIOCTL, kcred, NULL) == 0 &&
-		    state != DKIO_INSERTED) {
+		if (ldi_ioctl(dvd->vd_lh, DKIOCSTATE, (intptr_t)&state,
+		    FKIOCTL, kcred, NULL) == 0 && state != DKIO_INSERTED) {
 			vd->vdev_remove_wanted = B_TRUE;
 			spa_async_request(zio->io_spa, SPA_ASYNC_REMOVE);
-		} else if (vdev_probe(vd) != 0) {
-			ASSERT(vd->vdev_ops->vdev_op_leaf);
-			if (!vd->vdev_is_failing) {
-				vd->vdev_is_failing = B_TRUE;
-				zfs_ereport_post(FM_EREPORT_ZFS_PROBE_FAILURE,
-				    vd->vdev_spa, vd, zio, 0, 0);
-			}
 		}
 	}
-
-	if (zio_injection_enabled && zio->io_error == 0)
-		zio->io_error = zio_handle_label_injection(zio, EIO);
-
-	return (ZIO_PIPELINE_CONTINUE);
 }
 
 vdev_ops_t vdev_disk_ops = {
 	vdev_disk_open,
 	vdev_disk_close,
-	vdev_disk_probe,
 	vdev_default_asize,
 	vdev_disk_io_start,
 	vdev_disk_io_done,

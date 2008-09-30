@@ -2001,12 +2001,16 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		zio_fake.io_bp = db->db_blkptr;
 		zio_fake.io_bp_orig = *db->db_blkptr;
 		zio_fake.io_txg = txg;
+		zio_fake.io_flags = 0;
 
 		*db->db_blkptr = dr->dt.dl.dr_overridden_by;
 		dr->dt.dl.dr_override_state = DR_NOT_OVERRIDDEN;
 		db->db_data_pending = dr;
 		dr->dr_zio = &zio_fake;
 		mutex_exit(&db->db_mtx);
+
+		ASSERT(!DVA_EQUAL(BP_IDENTITY(zio_fake.io_bp),
+		    BP_IDENTITY(&zio_fake.io_bp_orig)));
 
 		if (BP_IS_OLDER(&zio_fake.io_bp_orig, txg))
 			(void) dsl_dataset_block_kill(os->os_dsl_dataset,
@@ -2088,7 +2092,6 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 	zbookmark_t zb;
 	writeprops_t wp = { 0 };
 	zio_t *zio;
-	int zio_flags;
 
 	if (!BP_IS_HOLE(db->db_blkptr) &&
 	    (db->db_level > 0 || dn->dn_type == DMU_OT_DNODE)) {
@@ -2126,9 +2129,6 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
 
-	zio_flags = ZIO_FLAG_MUSTSUCCEED;
-	if (dmu_ot[dn->dn_type].ot_metadata || zb.zb_level != 0)
-		zio_flags |= ZIO_FLAG_METADATA;
 	wp.wp_type = dn->dn_type;
 	wp.wp_level = db->db_level;
 	wp.wp_copies = os->os_copies;
@@ -2144,7 +2144,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 	dr->dr_zio = arc_write(zio, os->os_spa, &wp,
 	    DBUF_IS_L2CACHEABLE(db), txg, db->db_blkptr,
 	    data, dbuf_write_ready, dbuf_write_done, db,
-	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
+	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
 }
 
 /* ARGSUSED */
@@ -2154,26 +2154,32 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 	dmu_buf_impl_t *db = vdb;
 	dnode_t *dn = db->db_dnode;
 	objset_impl_t *os = dn->dn_objset;
+	blkptr_t *bp = zio->io_bp;
 	blkptr_t *bp_orig = &zio->io_bp_orig;
 	uint64_t fill = 0;
 	int old_size, new_size, i;
 
+	ASSERT(db->db_blkptr == bp);
+
 	dprintf_dbuf_bp(db, bp_orig, "bp_orig: %s", "");
 
 	old_size = bp_get_dasize(os->os_spa, bp_orig);
-	new_size = bp_get_dasize(os->os_spa, zio->io_bp);
+	new_size = bp_get_dasize(os->os_spa, bp);
 
-	dnode_diduse_space(dn, new_size-old_size);
+	dnode_diduse_space(dn, new_size - old_size);
 
-	if (BP_IS_HOLE(zio->io_bp)) {
+	if (BP_IS_HOLE(bp)) {
 		dsl_dataset_t *ds = os->os_dsl_dataset;
 		dmu_tx_t *tx = os->os_synctx;
 
 		if (bp_orig->blk_birth == tx->tx_txg)
-			(void) dsl_dataset_block_kill(ds, bp_orig, NULL, tx);
-		ASSERT3U(db->db_blkptr->blk_fill, ==, 0);
+			(void) dsl_dataset_block_kill(ds, bp_orig, zio, tx);
+		ASSERT3U(bp->blk_fill, ==, 0);
 		return;
 	}
+
+	ASSERT(BP_GET_TYPE(bp) == dn->dn_type);
+	ASSERT(BP_GET_LEVEL(bp) == db->db_level);
 
 	mutex_enter(&db->db_mtx);
 
@@ -2194,32 +2200,31 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 			fill = 1;
 		}
 	} else {
-		blkptr_t *bp = db->db.db_data;
+		blkptr_t *ibp = db->db.db_data;
 		ASSERT3U(db->db.db_size, ==, 1<<dn->dn_phys->dn_indblkshift);
-		for (i = db->db.db_size >> SPA_BLKPTRSHIFT; i > 0; i--, bp++) {
-			if (BP_IS_HOLE(bp))
+		for (i = db->db.db_size >> SPA_BLKPTRSHIFT; i > 0; i--, ibp++) {
+			if (BP_IS_HOLE(ibp))
 				continue;
-			ASSERT3U(BP_GET_LSIZE(bp), ==,
+			ASSERT3U(BP_GET_LSIZE(ibp), ==,
 			    db->db_level == 1 ? dn->dn_datablksz :
 			    (1<<dn->dn_phys->dn_indblkshift));
-			fill += bp->blk_fill;
+			fill += ibp->blk_fill;
 		}
 	}
 
-	db->db_blkptr->blk_fill = fill;
-	BP_SET_TYPE(db->db_blkptr, dn->dn_type);
-	BP_SET_LEVEL(db->db_blkptr, db->db_level);
+	bp->blk_fill = fill;
 
 	mutex_exit(&db->db_mtx);
 
-	/* We must do this after we've set the bp's type and level */
-	if (!DVA_EQUAL(BP_IDENTITY(zio->io_bp), BP_IDENTITY(bp_orig))) {
+	if (zio->io_flags & ZIO_FLAG_IO_REWRITE) {
+		ASSERT(DVA_EQUAL(BP_IDENTITY(bp), BP_IDENTITY(bp_orig)));
+	} else {
 		dsl_dataset_t *ds = os->os_dsl_dataset;
 		dmu_tx_t *tx = os->os_synctx;
 
 		if (bp_orig->blk_birth == tx->tx_txg)
-			(void) dsl_dataset_block_kill(ds, bp_orig, NULL, tx);
-		dsl_dataset_block_born(ds, zio->io_bp, tx);
+			(void) dsl_dataset_block_kill(ds, bp_orig, zio, tx);
+		dsl_dataset_block_born(ds, bp, tx);
 	}
 }
 

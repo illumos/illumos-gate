@@ -508,8 +508,7 @@ dump_metaslabs(spa_t *spa)
 	for (c = 0; c < rvd->vdev_children; c++) {
 		vd = rvd->vdev_child[c];
 
-		(void) printf("\n    vdev %llu = %s\n\n",
-		    (u_longlong_t)vd->vdev_id, vdev_description(vd));
+		(void) printf("\n    vdev %llu\n\n", (u_longlong_t)vd->vdev_id);
 
 		if (dump_opt['d'] <= 5) {
 			(void) printf("\t%10s   %10s   %5s\n",
@@ -534,7 +533,10 @@ dump_dtl(vdev_t *vd, int indent)
 	if (indent == 0)
 		(void) printf("\nDirty time logs:\n\n");
 
-	(void) printf("\t%*s%s\n", indent, "", vdev_description(vd));
+	(void) printf("\t%*s%s\n", indent, "",
+	    vd->vdev_path ? vd->vdev_path :
+	    vd->vdev_parent ? vd->vdev_ops->vdev_op_type :
+	    spa_name(vd->vdev_spa));
 
 	for (ss = avl_first(t); ss; ss = AVL_NEXT(t, ss)) {
 		/*
@@ -1366,159 +1368,72 @@ dump_one_dir(char *dsname, void *arg)
 }
 
 static void
-zdb_space_map_load(spa_t *spa)
-{
-	vdev_t *rvd = spa->spa_root_vdev;
-	vdev_t *vd;
-	int c, m, error;
-
-	for (c = 0; c < rvd->vdev_children; c++) {
-		vd = rvd->vdev_child[c];
-		for (m = 0; m < vd->vdev_ms_count; m++) {
-			metaslab_t *msp = vd->vdev_ms[m];
-			mutex_enter(&msp->ms_lock);
-			error = space_map_load(&msp->ms_allocmap[0], NULL,
-			    SM_ALLOC, &msp->ms_smo, spa->spa_meta_objset);
-			mutex_exit(&msp->ms_lock);
-			if (error)
-				fatal("%s bad space map #%d, error %d",
-				    spa->spa_name, c, error);
-		}
-	}
-}
-
-static int
-zdb_space_map_claim(spa_t *spa, blkptr_t *bp, zbookmark_t *zb)
-{
-	dva_t *dva = bp->blk_dva;
-	vdev_t *vd;
-	metaslab_t *msp;
-	space_map_t *allocmap, *freemap;
-	int error;
-	int d;
-	blkptr_t blk = *bp;
-
-	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
-		uint64_t vdev = DVA_GET_VDEV(&dva[d]);
-		uint64_t offset = DVA_GET_OFFSET(&dva[d]);
-		uint64_t size = DVA_GET_ASIZE(&dva[d]);
-
-		if ((vd = vdev_lookup_top(spa, vdev)) == NULL)
-			return (ENXIO);
-
-		if ((offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count)
-			return (ENXIO);
-
-		msp = vd->vdev_ms[offset >> vd->vdev_ms_shift];
-		allocmap = &msp->ms_allocmap[0];
-		freemap = &msp->ms_freemap[0];
-
-		/* Prepare our copy of the bp in case we need to read GBHs */
-		if (DVA_GET_GANG(&dva[d])) {
-			size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
-			DVA_SET_ASIZE(&blk.blk_dva[d], size);
-			DVA_SET_GANG(&blk.blk_dva[d], 0);
-		}
-
-		mutex_enter(&msp->ms_lock);
-		if (space_map_contains(freemap, offset, size)) {
-			mutex_exit(&msp->ms_lock);
-			return (EAGAIN);	/* allocated more than once */
-		}
-
-		if (!space_map_contains(allocmap, offset, size)) {
-			mutex_exit(&msp->ms_lock);
-			return (ESTALE);	/* not allocated at all */
-		}
-
-		space_map_remove(allocmap, offset, size);
-		space_map_add(freemap, offset, size);
-
-		mutex_exit(&msp->ms_lock);
-	}
-
-	if (BP_IS_GANG(bp)) {
-		zio_gbh_phys_t gbh;
-		int g;
-
-		/* LINTED - compile time assert */
-		ASSERT(sizeof (zio_gbh_phys_t) == SPA_GANGBLOCKSIZE);
-
-		BP_SET_CHECKSUM(&blk, ZIO_CHECKSUM_GANG_HEADER);
-		BP_SET_PSIZE(&blk, SPA_GANGBLOCKSIZE);
-		BP_SET_LSIZE(&blk, SPA_GANGBLOCKSIZE);
-		BP_SET_COMPRESS(&blk, ZIO_COMPRESS_OFF);
-		error = zio_wait(zio_read(NULL, spa, &blk, &gbh,
-		    SPA_GANGBLOCKSIZE, NULL, NULL, ZIO_PRIORITY_SYNC_READ,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD, zb));
-		if (error)
-			return (error);
-		if (BP_SHOULD_BYTESWAP(&blk))
-			byteswap_uint64_array(&gbh, SPA_GANGBLOCKSIZE);
-		for (g = 0; g < SPA_GBH_NBLKPTRS; g++) {
-			if (BP_IS_HOLE(&gbh.zg_blkptr[g]))
-				break;
-			error = zdb_space_map_claim(spa, &gbh.zg_blkptr[g], zb);
-			if (error)
-				return (error);
-		}
-	}
-
-	return (0);
-}
-
-static void
 zdb_leak(space_map_t *sm, uint64_t start, uint64_t size)
 {
-	metaslab_t *msp;
-
-	/* LINTED */
-	msp = (metaslab_t *)((char *)sm - offsetof(metaslab_t, ms_allocmap[0]));
+	vdev_t *vd = sm->sm_ppd;
 
 	(void) printf("leaked space: vdev %llu, offset 0x%llx, size %llu\n",
-	    (u_longlong_t)msp->ms_group->mg_vd->vdev_id,
-	    (u_longlong_t)start,
-	    (u_longlong_t)size);
+	    (u_longlong_t)vd->vdev_id, (u_longlong_t)start, (u_longlong_t)size);
+}
+
+/* ARGSUSED */
+static void
+zdb_space_map_load(space_map_t *sm)
+{
 }
 
 static void
-zdb_space_map_unload(spa_t *spa)
+zdb_space_map_unload(space_map_t *sm)
+{
+	space_map_vacate(sm, zdb_leak, sm);
+}
+
+/* ARGSUSED */
+static void
+zdb_space_map_claim(space_map_t *sm, uint64_t start, uint64_t size)
+{
+}
+
+static space_map_ops_t zdb_space_map_ops = {
+	zdb_space_map_load,
+	zdb_space_map_unload,
+	NULL,	/* alloc */
+	zdb_space_map_claim,
+	NULL	/* free */
+};
+
+static void
+zdb_leak_init(spa_t *spa)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
-	vdev_t *vd;
-	int c, m;
 
-	for (c = 0; c < rvd->vdev_children; c++) {
-		vd = rvd->vdev_child[c];
-		for (m = 0; m < vd->vdev_ms_count; m++) {
+	for (int c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *vd = rvd->vdev_child[c];
+		for (int m = 0; m < vd->vdev_ms_count; m++) {
 			metaslab_t *msp = vd->vdev_ms[m];
 			mutex_enter(&msp->ms_lock);
-			space_map_vacate(&msp->ms_allocmap[0], zdb_leak,
-			    &msp->ms_allocmap[0]);
-			space_map_unload(&msp->ms_allocmap[0]);
-			space_map_vacate(&msp->ms_freemap[0], NULL, NULL);
+			VERIFY(space_map_load(&msp->ms_map, &zdb_space_map_ops,
+			    SM_ALLOC, &msp->ms_smo, spa->spa_meta_objset) == 0);
+			msp->ms_map.sm_ppd = vd;
 			mutex_exit(&msp->ms_lock);
 		}
 	}
 }
 
 static void
-zdb_refresh_ubsync(spa_t *spa)
+zdb_leak_fini(spa_t *spa)
 {
-	uberblock_t ub = { 0 };
 	vdev_t *rvd = spa->spa_root_vdev;
-	zio_t *zio;
 
-	/*
-	 * Reload the uberblock.
-	 */
-	zio = zio_root(spa, NULL, NULL,
-	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE);
-	vdev_uberblock_load(zio, rvd, &ub);
-	(void) zio_wait(zio);
-
-	if (ub.ub_txg != 0)
-		spa->spa_ubsync = ub;
+	for (int c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *vd = rvd->vdev_child[c];
+		for (int m = 0; m < vd->vdev_ms_count; m++) {
+			metaslab_t *msp = vd->vdev_ms[m];
+			mutex_enter(&msp->ms_lock);
+			space_map_unload(&msp->ms_map);
+			mutex_exit(&msp->ms_lock);
+		}
+	}
 }
 
 /*
@@ -1548,9 +1463,7 @@ typedef struct zdb_cb {
 static void
 zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, int type)
 {
-	int i, error;
-
-	for (i = 0; i < 4; i++) {
+	for (int i = 0; i < 4; i++) {
 		int l = (i < 2) ? BP_GET_LEVEL(bp) : ZB_TOTAL;
 		int t = (i & 1) ? type : DMU_OT_TOTAL;
 		zdb_blkstats_t *zb = &zcb->zcb_type[l][t];
@@ -1586,21 +1499,9 @@ zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, int type)
 		}
 	}
 
-	if (dump_opt['L'])
-		return;
-
-	error = zdb_space_map_claim(spa, bp, &zcb->zcb_cache->bc_bookmark);
-
-	if (error == 0)
-		return;
-
-	if (error == EAGAIN)
-		(void) fatal("double-allocation, bp=%p", bp);
-
-	if (error == ESTALE)
-		(void) fatal("reference to freed block, bp=%p", bp);
-
-	(void) fatal("fatal error %d in bp %p", error, bp);
+	if (!dump_opt['L'])
+		VERIFY(zio_wait(zio_claim(NULL, spa, spa_first_txg(spa), bp,
+		    NULL, NULL, ZIO_FLAG_MUSTSUCCEED)) == 0);
 }
 
 static int
@@ -1613,9 +1514,16 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 	char blkbuf[BP_SPRINTF_LEN];
 	int error = 0;
 
+	ASSERT(!BP_IS_HOLE(bp));
+
+	zdb_count_block(spa, zcb, bp, type);
+
 	if (bc->bc_errno) {
 		if (zcb->zcb_readfails++ < 10 && dump_opt['L']) {
-			zdb_refresh_ubsync(spa);
+			uberblock_t ub;
+			vdev_uberblock_load(NULL, spa->spa_root_vdev, &ub);
+			if (ub.ub_txg != 0)
+				spa->spa_ubsync = ub;
 			error = EAGAIN;
 		} else {
 			zcb->zcb_haderrors = 1;
@@ -1645,8 +1553,6 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 
 	zcb->zcb_readfails = 0;
 
-	ASSERT(!BP_IS_HOLE(bp));
-
 	if (dump_opt['b'] >= 4) {
 		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, bp);
 		(void) printf("objset %llu object %llu offset 0x%llx %s\n",
@@ -1655,8 +1561,6 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 		    (u_longlong_t)blkid2offset(bc->bc_dnode,
 		    zb->zb_level, zb->zb_blkid), blkbuf);
 	}
-
-	zdb_count_block(spa, zcb, bp, type);
 
 	return (0);
 }
@@ -1688,14 +1592,15 @@ dump_block_stats(spa_t *spa)
 	}
 
 	/*
-	 * Load all space maps.  As we traverse the pool, if we find a block
-	 * that's not in its space map, that indicates a double-allocation,
-	 * reference to a freed block, or an unclaimed block.  Otherwise we
-	 * remove the block from the space map.  If the space maps are not
-	 * empty when we're done, that indicates leaked blocks.
+	 * Load all space maps as SM_ALLOC maps, then traverse the pool
+	 * claiming each block we discover.  If the pool is perfectly
+	 * consistent, the space maps will be empty when we're done.
+	 * Anything left over is a leak; any block we can't claim (because
+	 * it's not part of any space map) is a double allocation,
+	 * reference to a freed block, or an unclaimed log block.
 	 */
 	if (!dump_opt['L'])
-		zdb_space_map_load(spa);
+		zdb_leak_init(spa);
 
 	/*
 	 * If there's a deferred-free bplist, process that first.
@@ -1753,7 +1658,7 @@ dump_block_stats(spa_t *spa)
 	 * Report any leaked segments.
 	 */
 	if (!dump_opt['L'])
-		zdb_space_map_unload(spa);
+		zdb_leak_fini(spa);
 
 	/*
 	 * If we're interested in printing out the blkptr signatures,
@@ -1894,8 +1799,6 @@ dump_zpool(spa_t *spa)
 	dsl_pool_t *dp = spa_get_dsl(spa);
 	int rc = 0;
 
-	spa_config_enter(spa, RW_READER, FTAG);
-
 	if (dump_opt['u'])
 		dump_uberblock(&spa->spa_uberblock);
 
@@ -1907,7 +1810,7 @@ dump_zpool(spa_t *spa)
 			dump_dtl(spa->spa_root_vdev, 0);
 			dump_metaslabs(spa);
 		}
-		(void) dmu_objset_find(spa->spa_name, dump_one_dir, NULL,
+		(void) dmu_objset_find(spa_name(spa), dump_one_dir, NULL,
 		    DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 	}
 
@@ -1916,8 +1819,6 @@ dump_zpool(spa_t *spa)
 
 	if (dump_opt['s'])
 		show_pool_stats(spa);
-
-	spa_config_exit(spa, FTAG);
 
 	if (rc != 0)
 		exit(rc);
@@ -2125,12 +2026,12 @@ zdb_read_block(char *thing, spa_t **spap)
 	zio_t *zio;
 	vdev_t *vd;
 	void *buf;
-	char *s, *p, *dup, *spa_name, *vdev, *flagstr;
+	char *s, *p, *dup, *pool, *vdev, *flagstr;
 	int i, error, zio_flags;
 
 	dup = strdup(thing);
 	s = strtok(dup, ":");
-	spa_name = s ? s : "";
+	pool = s ? s : "";
 	s = strtok(NULL, ":");
 	vdev = s ? s : "";
 	s = strtok(NULL, ":");
@@ -2180,14 +2081,13 @@ zdb_read_block(char *thing, spa_t **spap)
 		}
 	}
 
-	if (spa == NULL || spa->spa_name == NULL ||
-	    strcmp(spa->spa_name, spa_name)) {
-		if (spa && spa->spa_name)
+	if (spa == NULL || strcmp(spa_name(spa), pool) != 0) {
+		if (spa)
 			spa_close(spa, (void *)zdb_read_block);
-		error = spa_open(spa_name, spap, (void *)zdb_read_block);
+		error = spa_open(pool, spap, (void *)zdb_read_block);
 		if (error)
 			fatal("Failed to open pool '%s': %s",
-			    spa_name, strerror(error));
+			    pool, strerror(error));
 		spa = *spap;
 	}
 
@@ -2207,16 +2107,15 @@ zdb_read_block(char *thing, spa_t **spap)
 	buf = umem_alloc(size, UMEM_NOFAIL);
 
 	zio_flags = ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE |
-	    ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_DONT_RETRY | ZIO_FLAG_NOBOOKMARK;
+	    ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_DONT_RETRY;
 
-	if (flags & ZDB_FLAG_PHYS)
-		zio_flags |= ZIO_FLAG_PHYSICAL;
-
+	spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
 	zio = zio_root(spa, NULL, NULL, 0);
 	/* XXX todo - cons up a BP so RAID-Z will be happy */
 	zio_nowait(zio_vdev_child_io(zio, NULL, vd, offset, buf, size,
 	    ZIO_TYPE_READ, ZIO_PRIORITY_SYNC_READ, zio_flags, NULL, NULL));
 	error = zio_wait(zio);
+	spa_config_exit(spa, SCL_STATE, FTAG);
 
 	if (error) {
 		(void) printf("Read of %s failed, error: %d\n", thing, error);

@@ -288,7 +288,8 @@ zil_claim_log_block(zilog_t *zilog, blkptr_t *bp, void *tx, uint64_t first_txg)
 	 */
 	if (bp->blk_birth >= first_txg &&
 	    zil_dva_tree_add(&zilog->zl_dva_tree, BP_IDENTITY(bp)) == 0) {
-		err = zio_wait(zio_claim(NULL, spa, first_txg, bp, NULL, NULL));
+		err = zio_wait(zio_claim(NULL, spa, first_txg, bp, NULL, NULL,
+		    ZIO_FLAG_MUSTSUCCEED));
 		ASSERT(err == 0);
 	}
 }
@@ -673,10 +674,9 @@ zil_flush_vdevs(zilog_t *zilog)
 	if (avl_numnodes(t) == 0)
 		return;
 
-	spa_config_enter(spa, RW_READER, FTAG);
+	spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
 
-	zio = zio_root(spa, NULL, NULL,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
+	zio = zio_root(spa, NULL, NULL, ZIO_FLAG_CANFAIL);
 
 	while ((zv = avl_destroy_nodes(t, &cookie)) != NULL) {
 		vdev_t *vd = vdev_lookup_top(spa, zv->zv_vdev);
@@ -691,7 +691,7 @@ zil_flush_vdevs(zilog_t *zilog)
 	 */
 	(void) zio_wait(zio);
 
-	spa_config_exit(spa, FTAG);
+	spa_config_exit(spa, SCL_STATE, FTAG);
 }
 
 /*
@@ -702,6 +702,15 @@ zil_lwb_write_done(zio_t *zio)
 {
 	lwb_t *lwb = zio->io_private;
 	zilog_t *zilog = lwb->lwb_zilog;
+
+	ASSERT(BP_GET_COMPRESS(zio->io_bp) == ZIO_COMPRESS_OFF);
+	ASSERT(BP_GET_CHECKSUM(zio->io_bp) == ZIO_CHECKSUM_ZILOG);
+	ASSERT(BP_GET_TYPE(zio->io_bp) == DMU_OT_INTENT_LOG);
+	ASSERT(BP_GET_LEVEL(zio->io_bp) == 0);
+	ASSERT(BP_GET_BYTEORDER(zio->io_bp) == ZFS_HOST_BYTEORDER);
+	ASSERT(!BP_IS_GANG(zio->io_bp));
+	ASSERT(!BP_IS_HOLE(zio->io_bp));
+	ASSERT(zio->io_bp->blk_fill == 0);
 
 	/*
 	 * Now that we've written this log block, we have a stable pointer
@@ -720,9 +729,6 @@ zil_lwb_write_done(zio_t *zio)
 
 /*
  * Initialize the io for a log block.
- *
- * Note, we should not initialize the IO until we are about
- * to use it, since zio_rewrite() does a spa_config_enter().
  */
 static void
 zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
@@ -740,7 +746,7 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
 	}
 	if (lwb->lwb_zio == NULL) {
 		lwb->lwb_zio = zio_rewrite(zilog->zl_root_zio, zilog->zl_spa,
-		    ZIO_CHECKSUM_ZILOG, 0, &lwb->lwb_blk, lwb->lwb_buf,
+		    0, &lwb->lwb_blk, lwb->lwb_buf,
 		    lwb->lwb_sz, zil_lwb_write_done, lwb,
 		    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_CANFAIL, &zb);
 	}
@@ -1033,7 +1039,7 @@ zil_clean(zilog_t *zilog)
 	mutex_exit(&zilog->zl_lock);
 }
 
-void
+static void
 zil_commit_writer(zilog_t *zilog, uint64_t seq, uint64_t foid)
 {
 	uint64_t txg;
@@ -1043,7 +1049,7 @@ zil_commit_writer(zilog_t *zilog, uint64_t seq, uint64_t foid)
 	spa_t *spa;
 
 	zilog->zl_writer = B_TRUE;
-	zilog->zl_root_zio = NULL;
+	ASSERT(zilog->zl_root_zio == NULL);
 	spa = zilog->zl_spa;
 
 	if (zilog->zl_suspend) {
@@ -1148,6 +1154,7 @@ zil_commit_writer(zilog_t *zilog, uint64_t seq, uint64_t foid)
 	if (zilog->zl_root_zio) {
 		DTRACE_PROBE1(zil__cw3, zilog_t *, zilog);
 		(void) zio_wait(zilog->zl_root_zio);
+		zilog->zl_root_zio = NULL;
 		DTRACE_PROBE1(zil__cw4, zilog_t *, zilog);
 		zil_flush_vdevs(zilog);
 	}

@@ -26,8 +26,6 @@
 #ifndef _SYS_VDEV_H
 #define	_SYS_VDEV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/spa.h>
 #include <sys/zio.h>
 #include <sys/dmu.h>
@@ -40,13 +38,6 @@ extern "C" {
 
 extern boolean_t zfs_nocacheflush;
 
-/*
- * Fault injection modes.
- */
-#define	VDEV_FAULT_NONE		0
-#define	VDEV_FAULT_RANDOM	1
-#define	VDEV_FAULT_COUNT	2
-
 extern int vdev_open(vdev_t *);
 extern int vdev_validate(vdev_t *);
 extern void vdev_close(vdev_t *);
@@ -54,7 +45,7 @@ extern int vdev_create(vdev_t *, uint64_t txg, boolean_t isreplace);
 extern void vdev_init(vdev_t *, uint64_t txg);
 extern void vdev_reopen(vdev_t *);
 extern int vdev_validate_aux(vdev_t *vd);
-extern int vdev_probe(vdev_t *);
+extern zio_t *vdev_probe(vdev_t *vd, zio_t *pio);
 
 extern boolean_t vdev_is_bootable(vdev_t *vd);
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);
@@ -66,14 +57,12 @@ extern void vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg,
 extern boolean_t vdev_resilver_needed(vdev_t *vd,
     uint64_t *minp, uint64_t *maxp);
 
-extern const char *vdev_description(vdev_t *vd);
-
 extern int vdev_metaslab_init(vdev_t *vd, uint64_t txg);
 extern void vdev_metaslab_fini(vdev_t *vd);
 
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_clear_stats(vdev_t *vd);
-extern void vdev_stat_update(zio_t *zio);
+extern void vdev_stat_update(zio_t *zio, uint64_t psize);
 extern void vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type,
     boolean_t complete);
 extern int vdev_getspec(spa_t *spa, uint64_t vdev, char **vdev_spec);
@@ -91,12 +80,12 @@ extern int vdev_degrade(spa_t *spa, uint64_t guid);
 extern int vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
     vdev_state_t *);
 extern int vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags);
-extern void vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted);
+extern void vdev_clear(spa_t *spa, vdev_t *vd);
 
-extern int vdev_error_inject(vdev_t *vd, zio_t *zio);
-extern int vdev_is_dead(vdev_t *vd);
-extern int vdev_readable(vdev_t *vd);
-extern int vdev_writeable(vdev_t *vd);
+extern boolean_t vdev_is_dead(vdev_t *vd);
+extern boolean_t vdev_readable(vdev_t *vd);
+extern boolean_t vdev_writeable(vdev_t *vd);
+extern boolean_t vdev_accessible(vdev_t *vd, zio_t *zio);
 
 extern void vdev_cache_init(vdev_t *vd);
 extern void vdev_cache_fini(vdev_t *vd);
@@ -111,7 +100,10 @@ extern void vdev_queue_io_done(zio_t *zio);
 
 extern void vdev_config_dirty(vdev_t *vd);
 extern void vdev_config_clean(vdev_t *vd);
-extern void vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg);
+extern int vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg);
+
+extern void vdev_state_dirty(vdev_t *vd);
+extern void vdev_state_clean(vdev_t *vd);
 
 extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
     boolean_t getstats, boolean_t isspare, boolean_t isl2cache);

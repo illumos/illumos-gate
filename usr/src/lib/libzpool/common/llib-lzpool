@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* LINTLIBRARY */
 /* PROTOLIB1 */
@@ -49,5 +47,3 @@
 #include <sys/zfs_znode.h>
 
 extern uint64_t metaslab_gang_bang;
-extern uint16_t zio_zil_fail_shift;
-extern uint16_t zio_io_fail_shift;

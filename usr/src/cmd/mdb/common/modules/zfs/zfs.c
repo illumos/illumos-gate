@@ -907,9 +907,8 @@ static int
 spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	spa_t spa;
-	char poolname[MAXNAMELEN];
 	const char *statetab[] = { "ACTIVE", "EXPORTED", "DESTROYED",
-		"SPARE", "UNINIT", "IOFAILURE", "UNAVAIL" };
+		"SPARE", "L2CACHE", "UNINIT", "UNAVAIL", "POTENTIAL" };
 	const char *state;
 	int config = FALSE;
 	int vdevs = FALSE;
@@ -945,18 +944,12 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_readstr(poolname, sizeof (poolname), (uintptr_t)spa.spa_name)
-	    == -1) {
-		mdb_warn("failed to read pool name at %p", spa.spa_name);
-		return (DCMD_ERR);
-	}
-
 	if (spa.spa_state < 0 || spa.spa_state > POOL_STATE_UNAVAIL)
 		state = "UNKNOWN";
 	else
 		state = statetab[spa.spa_state];
 
-	mdb_printf("%0?p %9s %s\n", addr, state, poolname);
+	mdb_printf("%0?p %9s %s\n", addr, state, spa.spa_name);
 
 	if (config) {
 		mdb_printf("\n");
@@ -1935,7 +1928,7 @@ zio_walk_root_step(mdb_walk_state_t *wsp)
 	if (wsp->walk_data != NULL && wsp->walk_data != zio.io_spa)
 		return (WALK_NEXT);
 
-	if ((uintptr_t)zio.io_root != wsp->walk_addr)
+	if ((uintptr_t)zio.io_parent != NULL)
 		return (WALK_NEXT);
 
 	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));

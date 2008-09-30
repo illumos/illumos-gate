@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/vdev_impl.h>
@@ -111,7 +109,6 @@ vdev_root_state_change(vdev_t *vd, int faulted, int degraded)
 vdev_ops_t vdev_root_ops = {
 	vdev_root_open,
 	vdev_root_close,
-	NULL,
 	vdev_default_asize,
 	NULL,			/* io_start - not applicable to the root */
 	NULL,			/* io_done - not applicable to the root */

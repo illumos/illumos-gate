@@ -159,12 +159,6 @@ zio_handle_label_injection(zio_t *zio, int error)
 	int label;
 	int ret = 0;
 
-	/*
-	 * We only care about physical I/Os.
-	 */
-	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL))
-		return (0);
-
 	if (offset + zio->io_size > VDEV_LABEL_START_SIZE &&
 	    offset < vd->vdev_psize - VDEV_LABEL_END_SIZE)
 		return (0);

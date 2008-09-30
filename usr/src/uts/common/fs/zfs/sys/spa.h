@@ -262,7 +262,6 @@ typedef struct blkptr {
 	((zc1).zc_word[2] - (zc2).zc_word[2]) | \
 	((zc1).zc_word[3] - (zc2).zc_word[3])))
 
-
 #define	DVA_IS_VALID(dva)	(DVA_GET_ASIZE(dva) != 0)
 
 #define	ZIO_SET_CHECKSUM(zcp, w0, w1, w2, w3)	\
@@ -278,7 +277,7 @@ typedef struct blkptr {
 #define	BP_IS_HOLE(bp)		((bp)->blk_birth == 0)
 #define	BP_IS_OLDER(bp, txg)	(!BP_IS_HOLE(bp) && (bp)->blk_birth < (txg))
 
-#define	BP_ZERO_DVAS(bp)			\
+#define	BP_ZERO(bp)				\
 {						\
 	(bp)->blk_dva[0].dva_word[0] = 0;	\
 	(bp)->blk_dva[0].dva_word[1] = 0;	\
@@ -286,19 +285,16 @@ typedef struct blkptr {
 	(bp)->blk_dva[1].dva_word[1] = 0;	\
 	(bp)->blk_dva[2].dva_word[0] = 0;	\
 	(bp)->blk_dva[2].dva_word[1] = 0;	\
-	(bp)->blk_birth = 0;			\
-}
-
-#define	BP_ZERO(bp)				\
-{						\
-	BP_ZERO_DVAS(bp)			\
 	(bp)->blk_prop = 0;			\
 	(bp)->blk_pad[0] = 0;			\
 	(bp)->blk_pad[1] = 0;			\
 	(bp)->blk_pad[2] = 0;			\
+	(bp)->blk_birth = 0;			\
 	(bp)->blk_fill = 0;			\
 	ZIO_SET_CHECKSUM(&(bp)->blk_cksum, 0, 0, 0, 0);	\
 }
+
+#define	BLK_FILL_ALREADY_FREED	(-1ULL)
 
 /*
  * Note: the byteorder is either 0 or -1, both of which are palindromes.
@@ -346,10 +342,11 @@ extern void spa_async_resume(spa_t *spa);
 extern spa_t *spa_inject_addref(char *pool);
 extern void spa_inject_delref(spa_t *spa);
 
-#define	SPA_ASYNC_REMOVE	0x01
-#define	SPA_ASYNC_RESILVER_DONE	0x02
-#define	SPA_ASYNC_RESILVER	0x08
-#define	SPA_ASYNC_CONFIG_UPDATE	0x10
+#define	SPA_ASYNC_CONFIG_UPDATE	0x01
+#define	SPA_ASYNC_REMOVE	0x02
+#define	SPA_ASYNC_PROBE		0x04
+#define	SPA_ASYNC_RESILVER_DONE	0x08
+#define	SPA_ASYNC_RESILVER	0x10
 
 /* device manipulation */
 extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);
@@ -414,14 +411,30 @@ extern void spa_open_ref(spa_t *spa, void *tag);
 extern void spa_close(spa_t *spa, void *tag);
 extern boolean_t spa_refcount_zero(spa_t *spa);
 
-/* Pool configuration lock */
-extern void spa_config_enter(spa_t *spa, krw_t rw, void *tag);
-extern void spa_config_exit(spa_t *spa, void *tag);
-extern boolean_t spa_config_held(spa_t *spa, krw_t rw);
+#define	SCL_CONFIG	0x01
+#define	SCL_STATE	0x02
+#define	SCL_L2ARC	0x04		/* hack until L2ARC 2.0 */
+#define	SCL_ALLOC	0x08
+#define	SCL_ZIO		0x10
+#define	SCL_FREE	0x20
+#define	SCL_VDEV	0x40
+#define	SCL_LOCKS	7
+#define	SCL_ALL		((1 << SCL_LOCKS) - 1)
+#define	SCL_STATE_ALL	(SCL_STATE | SCL_L2ARC | SCL_ZIO)
+
+/* Pool configuration locks */
+extern int spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw);
+extern void spa_config_enter(spa_t *spa, int locks, void *tag, krw_t rw);
+extern void spa_config_exit(spa_t *spa, int locks, void *tag);
+extern int spa_config_held(spa_t *spa, int locks, krw_t rw);
 
 /* Pool vdev add/remove lock */
 extern uint64_t spa_vdev_enter(spa_t *spa);
 extern int spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error);
+
+/* Pool vdev state change lock */
+extern void spa_vdev_state_enter(spa_t *spa);
+extern int spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error);
 
 /* Accessor functions */
 extern krwlock_t *spa_traverse_rwlock(spa_t *spa);
@@ -446,6 +459,7 @@ extern uint64_t spa_version(spa_t *spa);
 extern int spa_max_replication(spa_t *spa);
 extern int spa_busy(void);
 extern uint8_t spa_get_failmode(spa_t *spa);
+extern boolean_t spa_suspended(spa_t *spa);
 
 /* Miscellaneous support routines */
 extern int spa_rename(const char *oldname, const char *newname);

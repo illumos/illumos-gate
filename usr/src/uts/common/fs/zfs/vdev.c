@@ -135,7 +135,7 @@ vdev_lookup_top(spa_t *spa, uint64_t vdev)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
 
-	ASSERT(spa_config_held(spa, RW_READER));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_READER) != 0);
 
 	if (vdev < rvd->vdev_children) {
 		ASSERT(rvd->vdev_child[vdev] != NULL);
@@ -169,7 +169,7 @@ vdev_add_child(vdev_t *pvd, vdev_t *cvd)
 	uint64_t id = cvd->vdev_id;
 	vdev_t **newchild;
 
-	ASSERT(spa_config_held(cvd->vdev_spa, RW_WRITER));
+	ASSERT(spa_config_held(cvd->vdev_spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 	ASSERT(cvd->vdev_parent == NULL);
 
 	cvd->vdev_parent = pvd;
@@ -252,7 +252,7 @@ vdev_compact_children(vdev_t *pvd)
 	int oldc = pvd->vdev_children;
 	int newc, c;
 
-	ASSERT(spa_config_held(pvd->vdev_spa, RW_WRITER));
+	ASSERT(spa_config_held(pvd->vdev_spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 
 	for (c = newc = 0; c < oldc; c++)
 		if (pvd->vdev_child[c])
@@ -315,6 +315,7 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_stat_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&vd->vdev_probe_lock, NULL, MUTEX_DEFAULT, NULL);
 	space_map_create(&vd->vdev_dtl_map, 0, -1ULL, 0, &vd->vdev_dtl_lock);
 	space_map_create(&vd->vdev_dtl_scrub, 0, -1ULL, 0, &vd->vdev_dtl_lock);
 	txg_list_create(&vd->vdev_ms_list,
@@ -342,7 +343,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	uint64_t guid = 0, islog, nparity;
 	vdev_t *vd;
 
-	ASSERT(spa_config_held(spa, RW_WRITER));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
 		return (EINVAL);
@@ -517,8 +518,7 @@ vdev_free(vdev_t *vd)
 	 */
 	vdev_close(vd);
 
-
-	ASSERT(!list_link_active(&vd->vdev_dirty_node));
+	ASSERT(!list_link_active(&vd->vdev_config_dirty_node));
 
 	/*
 	 * Free all children.
@@ -574,6 +574,7 @@ vdev_free(vdev_t *vd)
 	mutex_exit(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_stat_lock);
+	mutex_destroy(&vd->vdev_probe_lock);
 
 	if (vd == spa->spa_root_vdev)
 		spa->spa_root_vdev = NULL;
@@ -628,9 +629,14 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 			(void) txg_list_add(&spa->spa_vdev_txg_list, tvd, t);
 	}
 
-	if (list_link_active(&svd->vdev_dirty_node)) {
+	if (list_link_active(&svd->vdev_config_dirty_node)) {
 		vdev_config_clean(svd);
 		vdev_config_dirty(tvd);
+	}
+
+	if (list_link_active(&svd->vdev_state_dirty_node)) {
+		vdev_state_clean(svd);
+		vdev_state_dirty(tvd);
 	}
 
 	tvd->vdev_deflate_ratio = svd->vdev_deflate_ratio;
@@ -664,7 +670,7 @@ vdev_add_parent(vdev_t *cvd, vdev_ops_t *ops)
 	vdev_t *pvd = cvd->vdev_parent;
 	vdev_t *mvd;
 
-	ASSERT(spa_config_held(spa, RW_WRITER));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 
 	mvd = vdev_alloc_common(spa, cvd->vdev_id, 0, ops);
 
@@ -693,7 +699,7 @@ vdev_remove_parent(vdev_t *cvd)
 	vdev_t *mvd = cvd->vdev_parent;
 	vdev_t *pvd = mvd->vdev_parent;
 
-	ASSERT(spa_config_held(cvd->vdev_spa, RW_WRITER));
+	ASSERT(spa_config_held(cvd->vdev_spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 
 	ASSERT(mvd->vdev_children == 1);
 	ASSERT(mvd->vdev_ops == &vdev_mirror_ops ||
@@ -703,22 +709,16 @@ vdev_remove_parent(vdev_t *cvd)
 
 	vdev_remove_child(mvd, cvd);
 	vdev_remove_child(pvd, mvd);
+	/*
+	 * If cvd will replace mvd as a top-level vdev, preserve mvd's guid.
+	 * Otherwise, we could have detached an offline device, and when we
+	 * go to import the pool we'll think we have two top-level vdevs,
+	 * instead of a different version of the same top-level vdev.
+	 */
+	if (mvd->vdev_top == mvd)
+		cvd->vdev_guid = cvd->vdev_guid_sum = mvd->vdev_guid;
 	cvd->vdev_id = mvd->vdev_id;
 	vdev_add_child(pvd, cvd);
-	/*
-	 * If we created a new toplevel vdev, then we need to change the child's
-	 * vdev GUID to match the old toplevel vdev.  Otherwise, we could have
-	 * detached an offline device, and when we go to import the pool we'll
-	 * think we have two toplevel vdevs, instead of a different version of
-	 * the same toplevel vdev.
-	 */
-	if (cvd->vdev_top == cvd) {
-		pvd->vdev_guid_sum -= cvd->vdev_guid;
-		cvd->vdev_guid_sum -= cvd->vdev_guid;
-		cvd->vdev_guid = mvd->vdev_guid;
-		cvd->vdev_guid_sum += mvd->vdev_guid;
-		pvd->vdev_guid_sum += cvd->vdev_guid;
-	}
 	vdev_top_update(cvd->vdev_top, cvd->vdev_top);
 
 	if (cvd == cvd->vdev_top)
@@ -742,8 +742,6 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 
 	if (vd->vdev_ms_shift == 0)	/* not being allocated from yet */
 		return (0);
-
-	dprintf("%s oldc %llu newc %llu\n", vdev_description(vd), oldc, newc);
 
 	ASSERT(oldc <= newc);
 
@@ -806,19 +804,110 @@ vdev_metaslab_fini(vdev_t *vd)
 	}
 }
 
-int
-vdev_probe(vdev_t *vd)
+typedef struct vdev_probe_stats {
+	boolean_t	vps_readable;
+	boolean_t	vps_writeable;
+	int		vps_flags;
+	zio_t		*vps_root;
+	vdev_t		*vps_vd;
+} vdev_probe_stats_t;
+
+static void
+vdev_probe_done(zio_t *zio)
 {
-	if (vd == NULL)
-		return (EINVAL);
+	vdev_probe_stats_t *vps = zio->io_private;
+	vdev_t *vd = vps->vps_vd;
 
-	/*
-	 * Right now we only support status checks on the leaf vdevs.
-	 */
-	if (vd->vdev_ops->vdev_op_leaf)
-		return (vd->vdev_ops->vdev_op_probe(vd));
+	if (zio->io_type == ZIO_TYPE_READ) {
+		ASSERT(zio->io_vd == vd);
+		if (zio->io_error == 0)
+			vps->vps_readable = 1;
+		if (zio->io_error == 0 && (spa_mode & FWRITE)) {
+			zio_nowait(zio_write_phys(vps->vps_root, vd,
+			    zio->io_offset, zio->io_size, zio->io_data,
+			    ZIO_CHECKSUM_OFF, vdev_probe_done, vps,
+			    ZIO_PRIORITY_SYNC_WRITE, vps->vps_flags, B_TRUE));
+		} else {
+			zio_buf_free(zio->io_data, zio->io_size);
+		}
+	} else if (zio->io_type == ZIO_TYPE_WRITE) {
+		ASSERT(zio->io_vd == vd);
+		if (zio->io_error == 0)
+			vps->vps_writeable = 1;
+		zio_buf_free(zio->io_data, zio->io_size);
+	} else if (zio->io_type == ZIO_TYPE_NULL) {
+		ASSERT(zio->io_vd == NULL);
+		ASSERT(zio == vps->vps_root);
 
-	return (0);
+		vd->vdev_cant_read |= !vps->vps_readable;
+		vd->vdev_cant_write |= !vps->vps_writeable;
+
+		if (vdev_readable(vd) &&
+		    (vdev_writeable(vd) || !(spa_mode & FWRITE))) {
+			zio->io_error = 0;
+		} else {
+			ASSERT(zio->io_error != 0);
+			zfs_ereport_post(FM_EREPORT_ZFS_PROBE_FAILURE,
+			    zio->io_spa, vd, NULL, 0, 0);
+			zio->io_error = ENXIO;
+		}
+		kmem_free(vps, sizeof (*vps));
+	}
+}
+
+/*
+ * Determine whether this device is accessible by reading and writing
+ * to several known locations: the pad regions of each vdev label
+ * but the first (which we leave alone in case it contains a VTOC).
+ */
+zio_t *
+vdev_probe(vdev_t *vd, zio_t *pio)
+{
+	spa_t *spa = vd->vdev_spa;
+	vdev_probe_stats_t *vps;
+	zio_t *zio;
+
+	vps = kmem_zalloc(sizeof (*vps), KM_SLEEP);
+
+	vps->vps_flags = ZIO_FLAG_CANFAIL | ZIO_FLAG_PROBE |
+	    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_AGGREGATE | ZIO_FLAG_DONT_RETRY;
+
+	if (spa_config_held(spa, SCL_ZIO, RW_WRITER)) {
+		/*
+		 * vdev_cant_read and vdev_cant_write can only transition
+		 * from TRUE to FALSE when we have the SCL_ZIO lock as writer;
+		 * otherwise they can only transition from FALSE to TRUE.
+		 * This ensures that any zio looking at these values can
+		 * assume that failures persist for the life of the I/O.
+		 * That's important because when a device has intermittent
+		 * connectivity problems, we want to ensure that they're
+		 * ascribed to the device (ENXIO) and not the zio (EIO).
+		 *
+		 * Since we hold SCL_ZIO as writer here, clear both values
+		 * so the probe can reevaluate from first principles.
+		 */
+		vps->vps_flags |= ZIO_FLAG_CONFIG_WRITER;
+		vd->vdev_cant_read = B_FALSE;
+		vd->vdev_cant_write = B_FALSE;
+	}
+
+	ASSERT(vd->vdev_ops->vdev_op_leaf);
+
+	zio = zio_null(pio, spa, vdev_probe_done, vps, vps->vps_flags);
+
+	vps->vps_root = zio;
+	vps->vps_vd = vd;
+
+	for (int l = 1; l < VDEV_LABELS; l++) {
+		zio_nowait(zio_read_phys(zio, vd,
+		    vdev_label_offset(vd->vdev_psize, l,
+		    offsetof(vdev_label_t, vl_pad)),
+		    VDEV_SKIP_SIZE, zio_buf_alloc(VDEV_SKIP_SIZE),
+		    ZIO_CHECKSUM_OFF, vdev_probe_done, vps,
+		    ZIO_PRIORITY_SYNC_READ, vps->vps_flags, B_TRUE));
+	}
+
+	return (zio);
 }
 
 /*
@@ -836,11 +925,6 @@ vdev_open(vdev_t *vd)
 	ASSERT(vd->vdev_state == VDEV_STATE_CLOSED ||
 	    vd->vdev_state == VDEV_STATE_CANT_OPEN ||
 	    vd->vdev_state == VDEV_STATE_OFFLINE);
-
-	if (vd->vdev_fault_mode == VDEV_FAULT_COUNT)
-		vd->vdev_fault_arg >>= 1;
-	else
-		vd->vdev_fault_mode = VDEV_FAULT_NONE;
 
 	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 
@@ -950,10 +1034,10 @@ vdev_open(vdev_t *vd)
 	 * Ensure we can issue some IO before declaring the
 	 * vdev open for business.
 	 */
-	error = vdev_probe(vd);
-	if (error) {
+	if (vd->vdev_ops->vdev_op_leaf &&
+	    (error = zio_wait(vdev_probe(vd, NULL))) != 0) {
 		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
-		    VDEV_AUX_OPEN_FAILED);
+		    VDEV_AUX_IO_FAILURE);
 		return (error);
 	}
 
@@ -1001,7 +1085,7 @@ vdev_validate(vdev_t *vd)
 	spa_t *spa = vd->vdev_spa;
 	int c;
 	nvlist_t *label;
-	uint64_t guid;
+	uint64_t guid, top_guid;
 	uint64_t state;
 
 	for (c = 0; c < vd->vdev_children; c++)
@@ -1013,7 +1097,7 @@ vdev_validate(vdev_t *vd)
 	 * any further validation.  Otherwise, label I/O will fail and we will
 	 * overwrite the previous state.
 	 */
-	if (vd->vdev_ops->vdev_op_leaf && !vdev_is_dead(vd)) {
+	if (vd->vdev_ops->vdev_op_leaf && vdev_readable(vd)) {
 
 		if ((label = vdev_label_read_config(vd)) == NULL) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
@@ -1029,8 +1113,20 @@ vdev_validate(vdev_t *vd)
 			return (0);
 		}
 
+		/*
+		 * If this vdev just became a top-level vdev because its
+		 * sibling was detached, it will have adopted the parent's
+		 * vdev guid -- but the label may or may not be on disk yet.
+		 * Fortunately, either version of the label will have the
+		 * same top guid, so if we're a top-level vdev, we can
+		 * safely compare to that instead.
+		 */
 		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID,
-		    &guid) != 0 || guid != vd->vdev_guid) {
+		    &guid) != 0 ||
+		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_TOP_GUID,
+		    &top_guid) != 0 ||
+		    (vd->vdev_guid != guid &&
+		    (vd->vdev_guid != top_guid || vd != vd->vdev_top))) {
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			nvlist_free(label);
@@ -1092,7 +1188,7 @@ vdev_reopen(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 
-	ASSERT(spa_config_held(spa, RW_WRITER));
+	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 
 	vdev_close(vd);
 	(void) vdev_open(vd);
@@ -1104,7 +1200,7 @@ vdev_reopen(vdev_t *vd)
 	 */
 	if (vd->vdev_aux) {
 		(void) vdev_validate_aux(vd);
-		if (!vdev_is_dead(vd) &&
+		if (vdev_readable(vd) && vdev_writeable(vd) &&
 		    !l2arc_vdev_present(vd)) {
 			uint64_t size = vdev_get_rsize(vd);
 			l2arc_add_vdev(spa, vd,
@@ -1224,7 +1320,7 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 	spa_t *spa = vd->vdev_spa;
 	int c;
 
-	ASSERT(spa_config_held(spa, RW_READER));
+	ASSERT(spa_config_held(spa, SCL_CONFIG, RW_READER));
 
 	if (vd->vdev_children == 0) {
 		mutex_enter(&vd->vdev_dtl_lock);
@@ -1314,9 +1410,6 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 	dmu_buf_t *db;
 	dmu_tx_t *tx;
 
-	dprintf("%s in txg %llu pass %d\n",
-	    vdev_description(vd), (u_longlong_t)txg, spa_sync_pass(spa));
-
 	tx = dmu_tx_create_assigned(spa->spa_dsl_pool, txg);
 
 	if (vd->vdev_detached) {
@@ -1326,8 +1419,6 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 			smo->smo_object = 0;
 		}
 		dmu_tx_commit(tx);
-		dprintf("detach %s committed in txg %llu\n",
-		    vdev_description(vd), txg);
 		return;
 	}
 
@@ -1454,7 +1545,7 @@ vdev_validate_aux(vdev_t *vd)
 	uint64_t guid, version;
 	uint64_t state;
 
-	if (vdev_is_dead(vd))
+	if (!vdev_readable(vd))
 		return (0);
 
 	if ((label = vdev_label_read_config(vd)) == NULL) {
@@ -1487,8 +1578,6 @@ vdev_sync_done(vdev_t *vd, uint64_t txg)
 {
 	metaslab_t *msp;
 
-	dprintf("%s txg %llu\n", vdev_description(vd), txg);
-
 	while (msp = txg_list_remove(&vd->vdev_ms_list, TXG_CLEAN(txg)))
 		metaslab_sync_done(msp, txg);
 }
@@ -1500,9 +1589,6 @@ vdev_sync(vdev_t *vd, uint64_t txg)
 	vdev_t *lvd;
 	metaslab_t *msp;
 	dmu_tx_t *tx;
-
-	dprintf("%s txg %llu pass %d\n",
-	    vdev_description(vd), (u_longlong_t)txg, spa_sync_pass(spa));
 
 	if (vd->vdev_ms_array == 0 && vd->vdev_ms_shift != 0) {
 		ASSERT(vd == vd->vdev_top);
@@ -1531,27 +1617,6 @@ vdev_psize_to_asize(vdev_t *vd, uint64_t psize)
 	return (vd->vdev_ops->vdev_op_asize(vd, psize));
 }
 
-const char *
-vdev_description(vdev_t *vd)
-{
-	if (vd == NULL || vd->vdev_ops == NULL)
-		return ("<unknown>");
-
-	if (vd->vdev_path != NULL)
-		return (vd->vdev_path);
-
-	if (vd->vdev_physpath != NULL)
-		return (vd->vdev_physpath);
-
-	if (vd->vdev_devid != NULL)
-		return (vd->vdev_devid);
-
-	if (vd->vdev_parent == NULL)
-		return (spa_name(vd->vdev_spa));
-
-	return (vd->vdev_ops->vdev_op_type);
-}
-
 /*
  * Mark the given vdev faulted.  A faulted vdev behaves as if the device could
  * not be opened, and no I/O is attempted.
@@ -1560,36 +1625,24 @@ int
 vdev_fault(spa_t *spa, uint64_t guid)
 {
 	vdev_t *vd;
-	uint64_t txg;
 
-	/*
-	 * Disregard a vdev fault request if the pool has
-	 * experienced a complete failure.
-	 *
-	 * XXX - We do this here so that we don't hold the
-	 * spa_namespace_lock in the event that we can't get
-	 * the RW_WRITER spa_config_lock.
-	 */
-	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
-		return (EIO);
-
-	txg = spa_vdev_enter(spa);
+	spa_vdev_state_enter(spa);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+		return (spa_vdev_state_exit(spa, NULL, ENODEV));
+
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	/*
 	 * Faulted state takes precedence over degraded.
 	 */
 	vd->vdev_faulted = 1ULL;
 	vd->vdev_degraded = 0ULL;
-	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED,
-	    VDEV_AUX_ERR_EXCEEDED);
+	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, VDEV_AUX_ERR_EXCEEDED);
 
 	/*
-	 * If marking the vdev as faulted cause the toplevel vdev to become
+	 * If marking the vdev as faulted cause the top-level vdev to become
 	 * unavailable, then back off and simply mark the vdev as degraded
 	 * instead.
 	 */
@@ -1609,11 +1662,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 		}
 	}
 
-	vdev_config_dirty(vd->vdev_top);
-
-	(void) spa_vdev_exit(spa, NULL, txg, 0);
-
-	return (0);
+	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
 /*
@@ -1625,43 +1674,27 @@ int
 vdev_degrade(spa_t *spa, uint64_t guid)
 {
 	vdev_t *vd;
-	uint64_t txg;
 
-	/*
-	 * Disregard a vdev fault request if the pool has
-	 * experienced a complete failure.
-	 *
-	 * XXX - We do this here so that we don't hold the
-	 * spa_namespace_lock in the event that we can't get
-	 * the RW_WRITER spa_config_lock.
-	 */
-	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
-		return (EIO);
-
-	txg = spa_vdev_enter(spa);
+	spa_vdev_state_enter(spa);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+		return (spa_vdev_state_exit(spa, NULL, ENODEV));
+
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	/*
 	 * If the vdev is already faulted, then don't do anything.
 	 */
-	if (vd->vdev_faulted || vd->vdev_degraded) {
-		(void) spa_vdev_exit(spa, NULL, txg, 0);
-		return (0);
-	}
+	if (vd->vdev_faulted || vd->vdev_degraded)
+		return (spa_vdev_state_exit(spa, NULL, 0));
 
 	vd->vdev_degraded = 1ULL;
 	if (!vdev_is_dead(vd))
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED,
 		    VDEV_AUX_ERR_EXCEEDED);
-	vdev_config_dirty(vd->vdev_top);
 
-	(void) spa_vdev_exit(spa, NULL, txg, 0);
-
-	return (0);
+	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
 /*
@@ -1671,37 +1704,22 @@ vdev_degrade(spa_t *spa, uint64_t guid)
  * so no FMA events are generated if the device fails to open.
  */
 int
-vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
-    vdev_state_t *newstate)
+vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 {
 	vdev_t *vd;
-	uint64_t txg;
 
-	/*
-	 * Disregard a vdev fault request if the pool has
-	 * experienced a complete failure.
-	 *
-	 * XXX - We do this here so that we don't hold the
-	 * spa_namespace_lock in the event that we can't get
-	 * the RW_WRITER spa_config_lock.
-	 */
-	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
-		return (EIO);
-
-	txg = spa_vdev_enter(spa);
+	spa_vdev_state_enter(spa);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+		return (spa_vdev_state_exit(spa, NULL, ENODEV));
 
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	vd->vdev_offline = B_FALSE;
 	vd->vdev_tmpoffline = B_FALSE;
-	vd->vdev_checkremove = (flags & ZFS_ONLINE_CHECKREMOVE) ?
-	    B_TRUE : B_FALSE;
-	vd->vdev_forcefault = (flags & ZFS_ONLINE_FORCEFAULT) ?
-	    B_TRUE : B_FALSE;
+	vd->vdev_checkremove = !!(flags & ZFS_ONLINE_CHECKREMOVE);
+	vd->vdev_forcefault = !!(flags & ZFS_ONLINE_FORCEFAULT);
 	vdev_reopen(vd->vdev_top);
 	vd->vdev_checkremove = vd->vdev_forcefault = B_FALSE;
 
@@ -1713,17 +1731,9 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
 	    vd->vdev_parent->vdev_child[0] == vd)
 		vd->vdev_unspare = B_TRUE;
 
-	vdev_config_dirty(vd->vdev_top);
+	(void) spa_vdev_state_exit(spa, vd, 0);
 
-	(void) spa_vdev_exit(spa, NULL, txg, 0);
-
-	/*
-	 * Must hold spa_namespace_lock in order to post resilver sysevent
-	 * w/pool name.
-	 */
-	mutex_enter(&spa_namespace_lock);
 	VERIFY3U(spa_scrub(spa, POOL_SCRUB_RESILVER), ==, 0);
-	mutex_exit(&spa_namespace_lock);
 
 	return (0);
 }
@@ -1732,26 +1742,14 @@ int
 vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 {
 	vdev_t *vd;
-	uint64_t txg;
 
-	/*
-	 * Disregard a vdev fault request if the pool has
-	 * experienced a complete failure.
-	 *
-	 * XXX - We do this here so that we don't hold the
-	 * spa_namespace_lock in the event that we can't get
-	 * the RW_WRITER spa_config_lock.
-	 */
-	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
-		return (EIO);
-
-	txg = spa_vdev_enter(spa);
+	spa_vdev_state_enter(spa);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+		return (spa_vdev_state_exit(spa, NULL, ENODEV));
 
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	/*
 	 * If the device isn't already offline, try to offline it.
@@ -1765,7 +1763,7 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 		 * as long as the remaining devices don't have any DTL holes.
 		 */
 		if (vd->vdev_top->vdev_dtl_map.sm_space != 0)
-			return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+			return (spa_vdev_state_exit(spa, NULL, EBUSY));
 
 		/*
 		 * Offline this device and reopen its top-level vdev.
@@ -1777,40 +1775,36 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 		if (vdev_is_dead(vd->vdev_top) && vd->vdev_aux == NULL) {
 			vd->vdev_offline = B_FALSE;
 			vdev_reopen(vd->vdev_top);
-			return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+			return (spa_vdev_state_exit(spa, NULL, EBUSY));
 		}
 	}
 
-	vd->vdev_tmpoffline = (flags & ZFS_OFFLINE_TEMPORARY) ?
-	    B_TRUE : B_FALSE;
+	vd->vdev_tmpoffline = !!(flags & ZFS_OFFLINE_TEMPORARY);
 
-	vdev_config_dirty(vd->vdev_top);
-
-	return (spa_vdev_exit(spa, NULL, txg, 0));
+	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
 /*
  * Clear the error counts associated with this vdev.  Unlike vdev_online() and
  * vdev_offline(), we assume the spa config is locked.  We also clear all
  * children.  If 'vd' is NULL, then the user wants to clear all vdevs.
- * If reopen is specified then attempt to reopen the vdev if the vdev is
- * faulted or degraded.
  */
 void
-vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted)
+vdev_clear(spa_t *spa, vdev_t *vd)
 {
-	int c;
+	vdev_t *rvd = spa->spa_root_vdev;
+
+	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 
 	if (vd == NULL)
-		vd = spa->spa_root_vdev;
+		vd = rvd;
 
 	vd->vdev_stat.vs_read_errors = 0;
 	vd->vdev_stat.vs_write_errors = 0;
 	vd->vdev_stat.vs_checksum_errors = 0;
-	vd->vdev_is_failing = B_FALSE;
 
-	for (c = 0; c < vd->vdev_children; c++)
-		vdev_clear(spa, vd->vdev_child[c], reopen_wanted);
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_clear(spa, vd->vdev_child[c]);
 
 	/*
 	 * If we're in the FAULTED state or have experienced failed I/O, then
@@ -1818,72 +1812,58 @@ vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted)
 	 * also mark the vdev config dirty, so that the new faulted state is
 	 * written out to disk.
 	 */
-	if (reopen_wanted && (vd->vdev_faulted || vd->vdev_degraded ||
-	    vd->vdev_stat.vs_aux == VDEV_AUX_IO_FAILURE)) {
-		boolean_t resilver = (vd->vdev_faulted || vd->vdev_degraded);
+	if (vd->vdev_faulted || vd->vdev_degraded ||
+	    !vdev_readable(vd) || !vdev_writeable(vd)) {
 
 		vd->vdev_faulted = vd->vdev_degraded = 0;
-		vdev_reopen(vd);
-		vdev_config_dirty(vd->vdev_top);
+		vd->vdev_cant_read = B_FALSE;
+		vd->vdev_cant_write = B_FALSE;
 
-		if (resilver && vd->vdev_aux == NULL && !vdev_is_dead(vd))
+		vdev_reopen(vd);
+
+		if (vd != rvd)
+			vdev_state_dirty(vd->vdev_top);
+
+		if (vd->vdev_aux == NULL && !vdev_is_dead(vd))
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
 
 		spa_event_notify(spa, vd, ESC_ZFS_VDEV_CLEAR);
 	}
 }
 
-int
-vdev_readable(vdev_t *vd)
-{
-	/* XXPOLICY */
-	return (!vdev_is_dead(vd));
-}
-
-int
-vdev_writeable(vdev_t *vd)
-{
-	return (!vdev_is_dead(vd) && !vd->vdev_is_failing);
-}
-
-int
+boolean_t
 vdev_is_dead(vdev_t *vd)
 {
-	/*
-	 * If the vdev experienced I/O failures, then the vdev is marked
-	 * as faulted (VDEV_STATE_FAULTED) for status output and FMA; however,
-	 * we need to allow access to the vdev for resumed I/Os (see
-	 * zio_vdev_resume_io() ).
-	 */
-	return (vd->vdev_state < VDEV_STATE_DEGRADED &&
-	    vd->vdev_stat.vs_aux != VDEV_AUX_IO_FAILURE);
+	return (vd->vdev_state < VDEV_STATE_DEGRADED);
 }
 
-int
-vdev_error_inject(vdev_t *vd, zio_t *zio)
+boolean_t
+vdev_readable(vdev_t *vd)
 {
-	int error = 0;
+	return (!vdev_is_dead(vd) && !vd->vdev_cant_read);
+}
 
-	if (vd->vdev_fault_mode == VDEV_FAULT_NONE)
-		return (0);
+boolean_t
+vdev_writeable(vdev_t *vd)
+{
+	return (!vdev_is_dead(vd) && !vd->vdev_cant_write);
+}
 
-	if (((1ULL << zio->io_type) & vd->vdev_fault_mask) == 0)
-		return (0);
+boolean_t
+vdev_accessible(vdev_t *vd, zio_t *zio)
+{
+	ASSERT(zio->io_vd == vd);
 
-	switch (vd->vdev_fault_mode) {
-	case VDEV_FAULT_RANDOM:
-		if (spa_get_random(vd->vdev_fault_arg) == 0)
-			error = EIO;
-		break;
+	if (vdev_is_dead(vd) || vd->vdev_remove_wanted)
+		return (B_FALSE);
 
-	case VDEV_FAULT_COUNT:
-		if ((int64_t)--vd->vdev_fault_arg <= 0)
-			vd->vdev_fault_mode = VDEV_FAULT_NONE;
-		error = EIO;
-		break;
-	}
+	if (zio->io_type == ZIO_TYPE_READ)
+		return (!vd->vdev_cant_read);
 
-	return (error);
+	if (zio->io_type == ZIO_TYPE_WRITE)
+		return (!vd->vdev_cant_write);
+
+	return (B_TRUE);
 }
 
 /*
@@ -1893,7 +1873,6 @@ void
 vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 {
 	vdev_t *rvd = vd->vdev_spa->spa_root_vdev;
-	int c, t;
 
 	mutex_enter(&vd->vdev_stat_lock);
 	bcopy(&vd->vdev_stat, vs, sizeof (*vs));
@@ -1908,18 +1887,15 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 	 * over all top-level vdevs (i.e. the direct children of the root).
 	 */
 	if (vd == rvd) {
-		for (c = 0; c < rvd->vdev_children; c++) {
+		for (int c = 0; c < rvd->vdev_children; c++) {
 			vdev_t *cvd = rvd->vdev_child[c];
 			vdev_stat_t *cvs = &cvd->vdev_stat;
 
 			mutex_enter(&vd->vdev_stat_lock);
-			for (t = 0; t < ZIO_TYPES; t++) {
+			for (int t = 0; t < ZIO_TYPES; t++) {
 				vs->vs_ops[t] += cvs->vs_ops[t];
 				vs->vs_bytes[t] += cvs->vs_bytes[t];
 			}
-			vs->vs_read_errors += cvs->vs_read_errors;
-			vs->vs_write_errors += cvs->vs_write_errors;
-			vs->vs_checksum_errors += cvs->vs_checksum_errors;
 			vs->vs_scrub_examined += cvs->vs_scrub_examined;
 			mutex_exit(&vd->vdev_stat_lock);
 		}
@@ -1937,29 +1913,54 @@ vdev_clear_stats(vdev_t *vd)
 }
 
 void
-vdev_stat_update(zio_t *zio)
+vdev_stat_update(zio_t *zio, uint64_t psize)
 {
-	vdev_t *vd = zio->io_vd;
+	vdev_t *rvd = zio->io_spa->spa_root_vdev;
+	vdev_t *vd = zio->io_vd ? zio->io_vd : rvd;
 	vdev_t *pvd;
 	uint64_t txg = zio->io_txg;
 	vdev_stat_t *vs = &vd->vdev_stat;
 	zio_type_t type = zio->io_type;
 	int flags = zio->io_flags;
 
+	/*
+	 * If this i/o is a gang leader, it didn't do any actual work.
+	 */
+	if (zio->io_gang_tree)
+		return;
+
 	if (zio->io_error == 0) {
+		/*
+		 * If this is a root i/o, don't count it -- we've already
+		 * counted the top-level vdevs, and vdev_get_stats() will
+		 * aggregate them when asked.  This reduces contention on
+		 * the root vdev_stat_lock and implicitly handles blocks
+		 * that compress away to holes, for which there is no i/o.
+		 * (Holes never create vdev children, so all the counters
+		 * remain zero, which is what we want.)
+		 *
+		 * Note: this only applies to successful i/o (io_error == 0)
+		 * because unlike i/o counts, errors are not additive.
+		 * When reading a ditto block, for example, failure of
+		 * one top-level vdev does not imply a root-level error.
+		 */
+		if (vd == rvd)
+			return;
+
+		ASSERT(vd == zio->io_vd);
 		if (!(flags & ZIO_FLAG_IO_BYPASS)) {
 			mutex_enter(&vd->vdev_stat_lock);
 			vs->vs_ops[type]++;
-			vs->vs_bytes[type] += zio->io_size;
+			vs->vs_bytes[type] += psize;
 			mutex_exit(&vd->vdev_stat_lock);
 		}
-		if ((flags & ZIO_FLAG_IO_REPAIR) &&
-		    zio->io_delegate_list == NULL) {
+		if (flags & ZIO_FLAG_IO_REPAIR) {
+			ASSERT(zio->io_delegate_list == NULL);
 			mutex_enter(&vd->vdev_stat_lock);
 			if (flags & ZIO_FLAG_SCRUB_THREAD)
-				vs->vs_scrub_repaired += zio->io_size;
+				vs->vs_scrub_repaired += psize;
 			else
-				vs->vs_self_healed += zio->io_size;
+				vs->vs_self_healed += psize;
 			mutex_exit(&vd->vdev_stat_lock);
 		}
 		return;
@@ -1968,22 +1969,18 @@ vdev_stat_update(zio_t *zio)
 	if (flags & ZIO_FLAG_SPECULATIVE)
 		return;
 
-	if (vdev_readable(vd)) {
-		mutex_enter(&vd->vdev_stat_lock);
-		if (type == ZIO_TYPE_READ) {
-			if (zio->io_error == ECKSUM)
-				vs->vs_checksum_errors++;
-			else
-				vs->vs_read_errors++;
-		}
-		if (type == ZIO_TYPE_WRITE)
-			vs->vs_write_errors++;
-		mutex_exit(&vd->vdev_stat_lock);
+	mutex_enter(&vd->vdev_stat_lock);
+	if (type == ZIO_TYPE_READ) {
+		if (zio->io_error == ECKSUM)
+			vs->vs_checksum_errors++;
+		else
+			vs->vs_read_errors++;
 	}
+	if (type == ZIO_TYPE_WRITE)
+		vs->vs_write_errors++;
+	mutex_exit(&vd->vdev_stat_lock);
 
-	if (type == ZIO_TYPE_WRITE) {
-		if (txg == 0 || vd->vdev_children != 0)
-			return;
+	if (type == ZIO_TYPE_WRITE && txg != 0 && vd->vdev_children == 0) {
 		if (flags & ZIO_FLAG_SCRUB_THREAD) {
 			ASSERT(flags & ZIO_FLAG_IO_REPAIR);
 			for (pvd = vd; pvd != NULL; pvd = pvd->vdev_parent)
@@ -2103,7 +2100,14 @@ vdev_config_dirty(vdev_t *vd)
 				break;
 		}
 
-		ASSERT(c < sav->sav_count);
+		if (c == sav->sav_count) {
+			/*
+			 * We're being removed.  There's nothing more to do.
+			 */
+			ASSERT(sav->sav_sync == B_TRUE);
+			return;
+		}
+
 		sav->sav_sync = B_TRUE;
 
 		VERIFY(nvlist_lookup_nvlist_array(sav->sav_config,
@@ -2122,13 +2126,14 @@ vdev_config_dirty(vdev_t *vd)
 	}
 
 	/*
-	 * The dirty list is protected by the config lock.  The caller must
-	 * either hold the config lock as writer, or must be the sync thread
-	 * (which holds the lock as reader).  There's only one sync thread,
+	 * The dirty list is protected by the SCL_CONFIG lock.  The caller
+	 * must either hold SCL_CONFIG as writer, or must be the sync thread
+	 * (which holds SCL_CONFIG as reader).  There's only one sync thread,
 	 * so this is sufficient to ensure mutual exclusion.
 	 */
-	ASSERT(spa_config_held(spa, RW_WRITER) ||
-	    dsl_pool_sync_context(spa_get_dsl(spa)));
+	ASSERT(spa_config_held(spa, SCL_CONFIG, RW_WRITER) ||
+	    (dsl_pool_sync_context(spa_get_dsl(spa)) &&
+	    spa_config_held(spa, SCL_CONFIG, RW_READER)));
 
 	if (vd == rvd) {
 		for (c = 0; c < rvd->vdev_children; c++)
@@ -2136,8 +2141,8 @@ vdev_config_dirty(vdev_t *vd)
 	} else {
 		ASSERT(vd == vd->vdev_top);
 
-		if (!list_link_active(&vd->vdev_dirty_node))
-			list_insert_head(&spa->spa_dirty_list, vd);
+		if (!list_link_active(&vd->vdev_config_dirty_node))
+			list_insert_head(&spa->spa_config_dirty_list, vd);
 	}
 }
 
@@ -2146,11 +2151,52 @@ vdev_config_clean(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 
-	ASSERT(spa_config_held(spa, RW_WRITER) ||
-	    dsl_pool_sync_context(spa_get_dsl(spa)));
+	ASSERT(spa_config_held(spa, SCL_CONFIG, RW_WRITER) ||
+	    (dsl_pool_sync_context(spa_get_dsl(spa)) &&
+	    spa_config_held(spa, SCL_CONFIG, RW_READER)));
 
-	ASSERT(list_link_active(&vd->vdev_dirty_node));
-	list_remove(&spa->spa_dirty_list, vd);
+	ASSERT(list_link_active(&vd->vdev_config_dirty_node));
+	list_remove(&spa->spa_config_dirty_list, vd);
+}
+
+/*
+ * Mark a top-level vdev's state as dirty, so that the next pass of
+ * spa_sync() can convert this into vdev_config_dirty().  We distinguish
+ * the state changes from larger config changes because they require
+ * much less locking, and are often needed for administrative actions.
+ */
+void
+vdev_state_dirty(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(vd == vd->vdev_top);
+
+	/*
+	 * The state list is protected by the SCL_STATE lock.  The caller
+	 * must either hold SCL_STATE as writer, or must be the sync thread
+	 * (which holds SCL_STATE as reader).  There's only one sync thread,
+	 * so this is sufficient to ensure mutual exclusion.
+	 */
+	ASSERT(spa_config_held(spa, SCL_STATE, RW_WRITER) ||
+	    (dsl_pool_sync_context(spa_get_dsl(spa)) &&
+	    spa_config_held(spa, SCL_STATE, RW_READER)));
+
+	if (!list_link_active(&vd->vdev_state_dirty_node))
+		list_insert_head(&spa->spa_state_dirty_list, vd);
+}
+
+void
+vdev_state_clean(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(spa_config_held(spa, SCL_STATE, RW_WRITER) ||
+	    (dsl_pool_sync_context(spa_get_dsl(spa)) &&
+	    spa_config_held(spa, SCL_STATE, RW_READER)));
+
+	ASSERT(list_link_active(&vd->vdev_state_dirty_node));
+	list_remove(&spa->spa_state_dirty_list, vd);
 }
 
 /*
@@ -2169,8 +2215,8 @@ vdev_propagate_state(vdev_t *vd)
 		for (c = 0; c < vd->vdev_children; c++) {
 			child = vd->vdev_child[c];
 
-			if ((vdev_is_dead(child) && !vdev_readable(child)) ||
-			    child->vdev_stat.vs_aux == VDEV_AUX_IO_FAILURE) {
+			if (!vdev_readable(child) ||
+			    (!vdev_writeable(child) && (spa_mode & FWRITE))) {
 				/*
 				 * Root special: if there is a top-level log
 				 * device, treat the root vdev as if it were
@@ -2191,7 +2237,7 @@ vdev_propagate_state(vdev_t *vd)
 		vd->vdev_ops->vdev_op_state_change(vd, faulted, degraded);
 
 		/*
-		 * Root special: if there is a toplevel vdev that cannot be
+		 * Root special: if there is a top-level vdev that cannot be
 		 * opened due to corrupted metadata, then propagate the root
 		 * vdev's aux state as 'corrupt' rather than 'insufficient
 		 * replicas'.
@@ -2312,6 +2358,9 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 				break;
 			case VDEV_AUX_BAD_LABEL:
 				class = FM_EREPORT_ZFS_DEVICE_BAD_LABEL;
+				break;
+			case VDEV_AUX_IO_FAILURE:
+				class = FM_EREPORT_ZFS_IO_FAILURE;
 				break;
 			default:
 				class = FM_EREPORT_ZFS_DEVICE_UNKNOWN;

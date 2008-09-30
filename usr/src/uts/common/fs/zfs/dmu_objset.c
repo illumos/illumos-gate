@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cred.h>
 #include <sys/zfs_context.h>
 #include <sys/dmu_objset.h>
@@ -845,29 +843,28 @@ dmu_objset_sync_dnodes(list_t *list, dmu_tx_t *tx)
 static void
 ready(zio_t *zio, arc_buf_t *abuf, void *arg)
 {
+	blkptr_t *bp = zio->io_bp;
+	blkptr_t *bp_orig = &zio->io_bp_orig;
 	objset_impl_t *os = arg;
-	blkptr_t *bp = os->os_rootbp;
 	dnode_phys_t *dnp = &os->os_phys->os_meta_dnode;
-	int i;
 
-	ASSERT(bp == zio->io_bp);
+	ASSERT(bp == os->os_rootbp);
+	ASSERT(BP_GET_TYPE(bp) == DMU_OT_OBJSET);
+	ASSERT(BP_GET_LEVEL(bp) == 0);
 
 	/*
 	 * Update rootbp fill count.
 	 */
 	bp->blk_fill = 1;	/* count the meta-dnode */
-	for (i = 0; i < dnp->dn_nblkptr; i++)
+	for (int i = 0; i < dnp->dn_nblkptr; i++)
 		bp->blk_fill += dnp->dn_blkptr[i].blk_fill;
 
-	BP_SET_TYPE(bp, DMU_OT_OBJSET);
-	BP_SET_LEVEL(bp, 0);
-
-	/* We must do this after we've set the bp's type and level */
-	if (!DVA_EQUAL(BP_IDENTITY(bp),
-	    BP_IDENTITY(&zio->io_bp_orig))) {
+	if (zio->io_flags & ZIO_FLAG_IO_REWRITE) {
+		ASSERT(DVA_EQUAL(BP_IDENTITY(bp), BP_IDENTITY(bp_orig)));
+	} else {
 		if (zio->io_bp_orig.blk_birth == os->os_synctx->tx_txg)
 			(void) dsl_dataset_block_kill(os->os_dsl_dataset,
-			    &zio->io_bp_orig, NULL, os->os_synctx);
+			    &zio->io_bp_orig, zio, os->os_synctx);
 		dsl_dataset_block_born(os->os_dsl_dataset, bp, os->os_synctx);
 	}
 }
@@ -903,22 +900,24 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	 */
 	zb.zb_objset = os->os_dsl_dataset ? os->os_dsl_dataset->ds_object : 0;
 	zb.zb_object = 0;
-	zb.zb_level = -1;
+	zb.zb_level = -1;	/* for block ordering; it's level 0 on disk */
 	zb.zb_blkid = 0;
+
+	wp.wp_type = DMU_OT_OBJSET;
+	wp.wp_level = 0;	/* on-disk BP level; see above */
+	wp.wp_copies = os->os_copies;
+	wp.wp_oschecksum = os->os_checksum;
+	wp.wp_oscompress = os->os_compress;
+
 	if (BP_IS_OLDER(os->os_rootbp, tx->tx_txg)) {
 		(void) dsl_dataset_block_kill(os->os_dsl_dataset,
 		    os->os_rootbp, pio, tx);
 	}
-	wp.wp_type = DMU_OT_OBJSET;
-	wp.wp_copies = os->os_copies;
-	wp.wp_level = (uint8_t)-1;
-	wp.wp_oschecksum = os->os_checksum;
-	wp.wp_oscompress = os->os_compress;
+
 	arc_release(os->os_phys_buf, &os->os_phys_buf);
-	zio = arc_write(pio, os->os_spa, &wp,
-	    DMU_OS_IS_L2CACHEABLE(os), tx->tx_txg, os->os_rootbp,
-	    os->os_phys_buf, ready, NULL, os, ZIO_PRIORITY_ASYNC_WRITE,
-	    ZIO_FLAG_MUSTSUCCEED | ZIO_FLAG_METADATA, &zb);
+	zio = arc_write(pio, os->os_spa, &wp, DMU_OS_IS_L2CACHEABLE(os),
+	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, NULL, os,
+	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
 
 	/*
 	 * Sync meta-dnode - the parent IO for the sync is the root block

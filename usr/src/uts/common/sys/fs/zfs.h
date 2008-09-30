@@ -347,6 +347,7 @@ typedef enum zfs_cache_type {
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_IS_LOG		"is_log"
 #define	ZPOOL_CONFIG_L2CACHE		"l2cache"
+#define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
 /*
@@ -431,7 +432,6 @@ typedef enum pool_state {
 	POOL_STATE_SPARE,		/* Reserved for hot spare use	*/
 	POOL_STATE_L2CACHE,		/* Level 2 ARC device		*/
 	POOL_STATE_UNINITIALIZED,	/* Internal spa_t state		*/
-	POOL_STATE_IO_FAILURE,		/* Internal pool state		*/
 	POOL_STATE_UNAVAIL,		/* Internal libzfs state	*/
 	POOL_STATE_POTENTIALLY_ACTIVE	/* Internal libzfs state	*/
 } pool_state_t;

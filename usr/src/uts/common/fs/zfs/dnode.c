@@ -560,6 +560,12 @@ dnode_hold_impl(objset_impl_t *os, uint64_t object, int flag,
 	dmu_buf_impl_t *db;
 	dnode_t **children_dnodes;
 
+	/*
+	 * If you are holding the spa config lock as writer, you shouldn't
+	 * be asking the DMU to do *anything*.
+	 */
+	ASSERT(spa_config_held(os->os_spa, SCL_ALL, RW_WRITER) == 0);
+
 	if (object == 0 || object >= DN_MAX_OBJECT)
 		return (EINVAL);
 

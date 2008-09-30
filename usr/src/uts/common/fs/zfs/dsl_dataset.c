@@ -126,6 +126,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 	int compressed = BP_GET_PSIZE(bp);
 	int uncompressed = BP_GET_UCSIZE(bp);
 
+	ASSERT(pio != NULL);
 	ASSERT(dmu_tx_is_syncing(tx));
 	/* No block pointer => nothing to free */
 	if (BP_IS_HOLE(bp))
@@ -139,7 +140,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 		 * dataset.
 		 */
 		err = dsl_free(pio, tx->tx_pool,
-		    tx->tx_txg, bp, NULL, NULL, pio ? ARC_NOWAIT: ARC_WAIT);
+		    tx->tx_txg, bp, NULL, NULL, ARC_NOWAIT);
 		ASSERT(err == 0);
 
 		dsl_dir_diduse_space(tx->tx_pool->dp_mos_dir, DD_USED_HEAD,
@@ -158,7 +159,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 
 		dprintf_bp(bp, "freeing: %s", "");
 		err = dsl_free(pio, tx->tx_pool,
-		    tx->tx_txg, bp, NULL, NULL, pio ? ARC_NOWAIT : ARC_WAIT);
+		    tx->tx_txg, bp, NULL, NULL, ARC_NOWAIT);
 		ASSERT(err == 0);
 
 		mutex_enter(&ds->ds_dir->dd_lock);

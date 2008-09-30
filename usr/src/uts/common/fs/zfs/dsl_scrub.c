@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_prop.h>
@@ -323,48 +321,56 @@ scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb)
 	return (B_FALSE);
 }
 
+typedef struct zil_traverse_arg {
+	dsl_pool_t	*zta_dp;
+	zil_header_t	*zta_zh;
+} zil_traverse_arg_t;
+
 /* ARGSUSED */
 static void
 traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 {
-	dsl_pool_t *dp = arg;
+	zil_traverse_arg_t *zta = arg;
+	dsl_pool_t *dp = zta->zta_dp;
+	zil_header_t *zh = zta->zta_zh;
+	zbookmark_t zb;
 
 	if (bp->blk_birth <= dp->dp_scrub_min_txg)
 		return;
 
-	if (claim_txg != 0 || bp->blk_birth < spa_first_txg(dp->dp_spa)) {
-		zbookmark_t zb;
-		zb.zb_objset = dmu_objset_id(zilog->zl_os);
-		zb.zb_object = 0;
-		zb.zb_level = -1;
-		zb.zb_blkid = bp->blk_cksum.zc_word[ZIL_ZC_SEQ];
-		VERIFY(0 ==
-		    scrub_funcs[dp->dp_scrub_func](dp, bp, &zb));
-	}
+	if (claim_txg == 0 && bp->blk_birth >= spa_first_txg(dp->dp_spa))
+		return;
+
+	zb.zb_objset = zh->zh_log.blk_cksum.zc_word[ZIL_ZC_OBJSET];
+	zb.zb_object = 0;
+	zb.zb_level = -1;
+	zb.zb_blkid = bp->blk_cksum.zc_word[ZIL_ZC_SEQ];
+	VERIFY(0 == scrub_funcs[dp->dp_scrub_func](dp, bp, &zb));
 }
 
 /* ARGSUSED */
 static void
 traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 {
-	dsl_pool_t *dp = arg;
-
 	if (lrc->lrc_txtype == TX_WRITE) {
+		zil_traverse_arg_t *zta = arg;
+		dsl_pool_t *dp = zta->zta_dp;
+		zil_header_t *zh = zta->zta_zh;
 		lr_write_t *lr = (lr_write_t *)lrc;
 		blkptr_t *bp = &lr->lr_blkptr;
+		zbookmark_t zb;
 
 		if (bp->blk_birth <= dp->dp_scrub_min_txg)
 			return;
 
-		if (claim_txg != 0 && bp->blk_birth >= claim_txg) {
-			zbookmark_t zb;
-			zb.zb_objset = dmu_objset_id(zilog->zl_os);
-			zb.zb_object = lr->lr_foid;
-			zb.zb_level = 0;
-			zb.zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
-			VERIFY(0 ==
-			    scrub_funcs[dp->dp_scrub_func](dp, bp, &zb));
-		}
+		if (claim_txg == 0 || bp->blk_birth < claim_txg)
+			return;
+
+		zb.zb_objset = zh->zh_log.blk_cksum.zc_word[ZIL_ZC_OBJSET];
+		zb.zb_object = lr->lr_foid;
+		zb.zb_level = BP_GET_LEVEL(bp);
+		zb.zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
+		VERIFY(0 == scrub_funcs[dp->dp_scrub_func](dp, bp, &zb));
 	}
 }
 
@@ -372,6 +378,7 @@ static void
 traverse_zil(dsl_pool_t *dp, zil_header_t *zh)
 {
 	uint64_t claim_txg = zh->zh_claim_txg;
+	zil_traverse_arg_t zta = { dp, zh };
 	zilog_t *zilog;
 
 	/*
@@ -381,16 +388,9 @@ traverse_zil(dsl_pool_t *dp, zil_header_t *zh)
 	if (claim_txg == 0 && (spa_mode & FWRITE))
 		return;
 
-	/*
-	 * XXX We are passing the wrong objset; the bookmark will be
-	 * wrong, so traverse_zil_record (for dmu_sync()-ed blocks) will
-	 * not report the specific fs if there is an i/o error.  (Note,
-	 * we ignore i/o errors on the zil itself due to the zil's
-	 * design, so there is no negative impact there.)
-	 */
 	zilog = zil_alloc(dp->dp_meta_objset, zh);
 
-	(void) zil_parse(zilog, traverse_zil_block, traverse_zil_record, dp,
+	(void) zil_parse(zilog, traverse_zil_block, traverse_zil_record, &zta,
 	    claim_txg);
 
 	zil_free(zilog);
@@ -827,8 +827,8 @@ dsl_pool_scrub_clean_done(zio_t *zio)
 	spa->spa_scrub_inflight--;
 	cv_broadcast(&spa->spa_scrub_io_cv);
 
-	if (zio->io_error &&
-	    (zio->io_error == EIO || !(zio->io_flags & ZIO_FLAG_SPECULATIVE)))
+	if (zio->io_error && (zio->io_error != ECKSUM ||
+	    !(zio->io_flags & ZIO_FLAG_SPECULATIVE)))
 		spa->spa_scrub_errors++;
 	mutex_exit(&spa->spa_scrub_lock);
 }
@@ -919,11 +919,11 @@ dsl_pool_scrub_clean(dsl_pool_t *dp)
 	 * spa_scrub_reopen flag indicates that vdev_open() should not
 	 * attempt to start another scrub.
 	 */
-	spa_config_enter(dp->dp_spa, RW_WRITER, FTAG);
+	spa_config_enter(dp->dp_spa, SCL_ALL, FTAG, RW_WRITER);
 	dp->dp_spa->spa_scrub_reopen = B_TRUE;
 	vdev_reopen(dp->dp_spa->spa_root_vdev);
 	dp->dp_spa->spa_scrub_reopen = B_FALSE;
-	spa_config_exit(dp->dp_spa, FTAG);
+	spa_config_exit(dp->dp_spa, SCL_ALL, FTAG);
 
 	return (dsl_pool_scrub_setup(dp, SCRUB_FUNC_CLEAN));
 }

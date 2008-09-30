@@ -88,8 +88,8 @@ int arc_referenced(arc_buf_t *buf);
 
 typedef struct writeprops {
 	dmu_object_type_t wp_type;
-	uint8_t wp_copies;
 	uint8_t wp_level;
+	uint8_t wp_copies;
 	uint8_t wp_dncompress, wp_oscompress;
 	uint8_t wp_dnchecksum, wp_oschecksum;
 } writeprops_t;
@@ -127,6 +127,8 @@ void l2arc_remove_vdev(vdev_t *vd);
 boolean_t l2arc_vdev_present(vdev_t *vd);
 void l2arc_init(void);
 void l2arc_fini(void);
+void l2arc_start(void);
+void l2arc_stop(void);
 
 #ifdef	__cplusplus
 }

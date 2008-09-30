@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the functions which analyze the status of a pool.  This
  * include both the status of an active pool, as well as the status exported
@@ -164,7 +162,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
  * only picks the most damaging of all the current errors to report.
  */
 static zpool_status_t
-check_status(zpool_handle_t *zhp, nvlist_t *config, boolean_t isimport)
+check_status(nvlist_t *config, boolean_t isimport)
 {
 	nvlist_t *nvroot;
 	vdev_stat_t *vs;
@@ -172,6 +170,7 @@ check_status(zpool_handle_t *zhp, nvlist_t *config, boolean_t isimport)
 	uint64_t nerr;
 	uint64_t version;
 	uint64_t stateval;
+	uint64_t suspended;
 	uint64_t hostid = 0;
 
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
@@ -206,41 +205,13 @@ check_status(zpool_handle_t *zhp, nvlist_t *config, boolean_t isimport)
 		return (ZPOOL_STATUS_BAD_GUID_SUM);
 
 	/*
-	 * Pool has experienced failed I/O.
+	 * Check whether the pool has suspended due to failed I/O.
 	 */
-	if (stateval == POOL_STATE_IO_FAILURE) {
-		zpool_handle_t *tmp_zhp = NULL;
-		libzfs_handle_t *hdl = NULL;
-		char property[ZPOOL_MAXPROPLEN];
-		char *failmode = NULL;
-
-		if (zhp == NULL) {
-			char *poolname;
-
-			verify(nvlist_lookup_string(config,
-			    ZPOOL_CONFIG_POOL_NAME, &poolname) == 0);
-			if ((hdl = libzfs_init()) == NULL)
-				return (ZPOOL_STATUS_IO_FAILURE_WAIT);
-			tmp_zhp = zpool_open_canfail(hdl, poolname);
-			if (tmp_zhp == NULL) {
-				libzfs_fini(hdl);
-				return (ZPOOL_STATUS_IO_FAILURE_WAIT);
-			}
-		}
-		if (zpool_get_prop(zhp ? zhp : tmp_zhp, ZPOOL_PROP_FAILUREMODE,
-		    property, sizeof (property), NULL) == 0)
-			failmode = property;
-		if (tmp_zhp != NULL)
-			zpool_close(tmp_zhp);
-		if (hdl != NULL)
-			libzfs_fini(hdl);
-		if (failmode == NULL)
-			return (ZPOOL_STATUS_IO_FAILURE_WAIT);
-
-		if (strncmp(failmode, "continue", strlen("continue")) == 0)
+	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_SUSPENDED,
+	    &suspended) == 0) {
+		if (suspended == ZIO_FAILURE_MODE_CONTINUE)
 			return (ZPOOL_STATUS_IO_FAILURE_CONTINUE);
-		else
-			return (ZPOOL_STATUS_IO_FAILURE_WAIT);
+		return (ZPOOL_STATUS_IO_FAILURE_WAIT);
 	}
 
 	/*
@@ -322,7 +293,7 @@ check_status(zpool_handle_t *zhp, nvlist_t *config, boolean_t isimport)
 zpool_status_t
 zpool_get_status(zpool_handle_t *zhp, char **msgid)
 {
-	zpool_status_t ret = check_status(zhp, zhp->zpool_config, B_FALSE);
+	zpool_status_t ret = check_status(zhp->zpool_config, B_FALSE);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;
@@ -335,7 +306,7 @@ zpool_get_status(zpool_handle_t *zhp, char **msgid)
 zpool_status_t
 zpool_import_status(nvlist_t *config, char **msgid)
 {
-	zpool_status_t ret = check_status(NULL, config, B_TRUE);
+	zpool_status_t ret = check_status(config, B_TRUE);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;

@@ -1201,14 +1201,14 @@ zvol_physio(zvol_state_t *zv, int bflags, uint64_t off,
 	if (zvol_get_dva(zv, off, &dva) != 0)
 		return (EIO);
 
-	spa_config_enter(spa, RW_READER, FTAG);
+	spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
 	vd = vdev_lookup_top(spa, DVA_GET_VDEV(&dva));
 
 	error = zvol_dumpio(vd, size,
 	    DVA_GET_OFFSET(&dva) + (off % zv->zv_volblocksize),
 	    addr, bflags & (B_READ | B_WRITE | B_PHYS), isdump);
 
-	spa_config_exit(spa, FTAG);
+	spa_config_exit(spa, SCL_STATE, FTAG);
 	return (error);
 }
 

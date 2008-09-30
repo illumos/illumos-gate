@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -2665,7 +2664,6 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	vdev_t *vd;
-	uint64_t txg;
 	int error;
 
 	/*
@@ -2686,33 +2684,27 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	/*
-	 * Try to resume any I/Os which may have been suspended
-	 * as a result of a complete pool failure.
-	 */
-	if (!list_is_empty(&spa->spa_zio_list)) {
-		if (zio_vdev_resume_io(spa) != 0) {
-			spa_close(spa, FTAG);
-			return (EIO);
-		}
-	}
-
-	txg = spa_vdev_enter(spa);
+	spa_vdev_state_enter(spa);
 
 	if (zc->zc_guid == 0) {
 		vd = NULL;
 	} else {
 		vd = spa_lookup_by_guid(spa, zc->zc_guid, B_TRUE);
 		if (vd == NULL) {
-			(void) spa_vdev_exit(spa, NULL, txg, ENODEV);
+			(void) spa_vdev_state_exit(spa, NULL, ENODEV);
 			spa_close(spa, FTAG);
 			return (ENODEV);
 		}
 	}
 
-	vdev_clear(spa, vd, B_TRUE);
+	vdev_clear(spa, vd);
 
-	(void) spa_vdev_exit(spa, NULL, txg, 0);
+	(void) spa_vdev_state_exit(spa, NULL, 0);
+
+	/*
+	 * Resume any suspended I/Os.
+	 */
+	zio_resume(spa);
 
 	spa_close(spa, FTAG);
 

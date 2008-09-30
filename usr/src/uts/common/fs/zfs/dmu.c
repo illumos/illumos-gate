@@ -220,7 +220,7 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
 		dp = dn->dn_objset->os_dsl_dataset->ds_dir->dd_pool;
 	if (dp && dsl_pool_sync_context(dp))
 		start = gethrtime();
-	zio = zio_root(dn->dn_objset->os_spa, NULL, NULL, TRUE);
+	zio = zio_root(dn->dn_objset->os_spa, NULL, NULL, ZIO_FLAG_CANFAIL);
 	blkid = dbuf_whichblock(dn, offset);
 	for (i = 0; i < nblks; i++) {
 		dmu_buf_impl_t *db = dbuf_hold(dn, blkid+i, tag);
@@ -797,18 +797,28 @@ typedef struct {
 
 /* ARGSUSED */
 static void
+dmu_sync_ready(zio_t *zio, arc_buf_t *buf, void *varg)
+{
+	blkptr_t *bp = zio->io_bp;
+
+	if (!BP_IS_HOLE(bp)) {
+		dmu_sync_arg_t *in = varg;
+		dbuf_dirty_record_t *dr = in->dr;
+		dmu_buf_impl_t *db = dr->dr_dbuf;
+		ASSERT(BP_GET_TYPE(bp) == db->db_dnode->dn_type);
+		ASSERT(BP_GET_LEVEL(bp) == 0);
+		bp->blk_fill = 1;
+	}
+}
+
+/* ARGSUSED */
+static void
 dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 {
 	dmu_sync_arg_t *in = varg;
 	dbuf_dirty_record_t *dr = in->dr;
 	dmu_buf_impl_t *db = dr->dr_dbuf;
 	dmu_sync_cb_t *done = in->done;
-
-	if (!BP_IS_HOLE(zio->io_bp)) {
-		zio->io_bp->blk_fill = 1;
-		BP_SET_TYPE(zio->io_bp, db->db_dnode->dn_type);
-		BP_SET_LEVEL(zio->io_bp, 0);
-	}
 
 	mutex_enter(&db->db_mtx);
 	ASSERT(dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC);
@@ -858,12 +868,10 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	zbookmark_t zb;
 	writeprops_t wp = { 0 };
 	zio_t *zio;
-	int zio_flags;
 	int err;
 
 	ASSERT(BP_IS_HOLE(bp));
 	ASSERT(txg != 0);
-
 
 	dprintf("dmu_sync txg=%llu, s,o,q %llu %llu %llu\n",
 	    txg, tx->tx_synced_txg, tx->tx_open_txg, tx->tx_quiesced_txg);
@@ -969,19 +977,20 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	zb.zb_object = db->db.db_object;
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
-	zio_flags = ZIO_FLAG_MUSTSUCCEED;
-	if (dmu_ot[db->db_dnode->dn_type].ot_metadata || zb.zb_level != 0)
-		zio_flags |= ZIO_FLAG_METADATA;
+
 	wp.wp_type = db->db_dnode->dn_type;
-	wp.wp_copies = os->os_copies;
 	wp.wp_level = db->db_level;
+	wp.wp_copies = os->os_copies;
 	wp.wp_dnchecksum = db->db_dnode->dn_checksum;
 	wp.wp_oschecksum = os->os_checksum;
 	wp.wp_dncompress = db->db_dnode->dn_compress;
 	wp.wp_oscompress = os->os_compress;
-	zio = arc_write(pio, os->os_spa, &wp,
-	    DBUF_IS_L2CACHEABLE(db), txg, bp, dr->dt.dl.dr_data, NULL,
-	    dmu_sync_done, in, ZIO_PRIORITY_SYNC_WRITE, zio_flags, &zb);
+
+	ASSERT(BP_IS_HOLE(bp));
+
+	zio = arc_write(pio, os->os_spa, &wp, DBUF_IS_L2CACHEABLE(db),
+	    txg, bp, dr->dt.dl.dr_data, dmu_sync_ready, dmu_sync_done, in,
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
 
 	if (pio) {
 		zio_nowait(zio);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
 #include <sys/vdev.h>
@@ -85,11 +83,10 @@
  * We keep track of the ENA for a ZIO chain through the 'io_logical' member.
  * When a new logical I/O is issued, we set this to point to itself.  Child I/Os
  * then inherit this pointer, so that when it is first set subsequent failures
- * will use the same ENA.  If a physical I/O is issued (by passing the
- * ZIO_FLAG_NOBOOKMARK flag), then this pointer is reset, guaranteeing that a
- * unique ENA will be generated.  For an aggregate I/O, this pointer is set to
- * NULL, and no ereport will be generated (since it doesn't actually correspond
- * to any particular device or piece of data).
+ * will use the same ENA.  For vdev cache fill and queue aggregation I/O,
+ * this pointer is set to NULL, and no ereport will be generated (since it
+ * doesn't actually correspond to any particular device or piece of data,
+ * and the caller will always retry without caching or queueing anyway).
  */
 void
 zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
@@ -118,16 +115,6 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 
 	if (zio != NULL) {
 		/*
-		 * Ignore any errors from I/Os that we are going to retry
-		 * anyway - we only generate errors from the final failure.
-		 * Checksum errors are generated after the pipeline stage
-		 * responsible for retrying the I/O (VDEV_IO_ASSESS), so this
-		 * only applies to standard I/O errors.
-		 */
-		if (zio_should_retry(zio) && zio->io_error != ECKSUM)
-			return;
-
-		/*
 		 * If this is not a read or write zio, ignore the error.  This
 		 * can occur if the DKIOCFLUSHWRITECACHE ioctl fails.
 		 */
@@ -148,7 +135,8 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 		 * DE will automatically fault the vdev on the first such
 		 * failure.
 		 */
-		if (vd != NULL && vd->vdev_is_failing &&
+		if (vd != NULL &&
+		    (!vdev_readable(vd) || !vdev_writeable(vd)) &&
 		    strcmp(subclass, FM_EREPORT_ZFS_PROBE_FAILURE) != 0)
 			return;
 	}
@@ -210,18 +198,9 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 
 	/*
 	 * Generic payload members common to all ereports.
-	 *
-	 * The direct reference to spa_name is used rather than spa_name()
-	 * because of the asynchronous nature of the zio pipeline.  spa_name()
-	 * asserts that the config lock is held in some form.  This is always
-	 * the case in I/O context, but because the check for RW_WRITER compares
-	 * against 'curthread', we may be in an asynchronous context and blow
-	 * this assert.  Rather than loosen this assert, we acknowledge that all
-	 * contexts in which this function is called (pool open, I/O) are safe,
-	 * and dereference the name directly.
 	 */
 	fm_payload_set(ereport, FM_EREPORT_PAYLOAD_ZFS_POOL,
-	    DATA_TYPE_STRING, spa->spa_name, FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
+	    DATA_TYPE_STRING, spa_name(spa), FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
 	    DATA_TYPE_UINT64, spa_guid(spa),
 	    FM_EREPORT_PAYLOAD_ZFS_POOL_CONTEXT, DATA_TYPE_INT32,
 	    state, NULL);
