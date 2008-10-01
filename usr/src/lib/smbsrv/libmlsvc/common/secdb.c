@@ -313,6 +313,7 @@ smb_token_create_id(smb_sid_t *sid)
 static smb_id_t *
 smb_token_create_owner(smb_userinfo_t *user_info)
 {
+#ifdef SMB_SUPPORT_GROUP_OWNER
 	smb_sid_t *owner_sid;
 	smb_wka_t *wka;
 
@@ -325,6 +326,8 @@ smb_token_create_owner(smb_userinfo_t *user_info)
 	}
 
 	return (smb_token_create_id(owner_sid));
+#endif
+	return (smb_token_create_id(user_info->user_sid));
 }
 
 static smb_privset_t *
