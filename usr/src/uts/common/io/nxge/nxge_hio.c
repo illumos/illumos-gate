@@ -216,6 +216,47 @@ nxge_dci_map(
  */
 
 /*
+ * nxge_grp_cleanup(p_nxge_t nxge)
+ *
+ *	Remove all outstanding groups.
+ *
+ * Arguments:
+ *	nxge
+ */
+void
+nxge_grp_cleanup(p_nxge_t nxge)
+{
+	nxge_grp_set_t *set;
+	int i;
+
+	MUTEX_ENTER(&nxge->group_lock);
+
+	/*
+	 * Find RX groups that need to be cleaned up.
+	 */
+	set = &nxge->rx_set;
+	for (i = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
+		if (set->group[i] != NULL) {
+			KMEM_FREE(set->group[i], sizeof (nxge_grp_t));
+			set->group[i] = NULL;
+		}
+	}
+
+	/*
+	 * Find TX groups that need to be cleaned up.
+	 */
+	set = &nxge->tx_set;
+	for (i = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
+		if (set->group[i] != NULL) {
+			KMEM_FREE(set->group[i], sizeof (nxge_grp_t));
+			set->group[i] = NULL;
+		}
+	}
+	MUTEX_EXIT(&nxge->group_lock);
+}
+
+
+/*
  * nxge_grp_add
  *
  *	Add a group to an instance of NXGE.

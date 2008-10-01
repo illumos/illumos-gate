@@ -210,6 +210,7 @@ static void nxge_remove_hard_properties(p_nxge_t);
  */
 extern int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
 extern int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
+extern void nxge_grp_cleanup(p_nxge_t nxge);
 
 static nxge_status_t nxge_setup_system_dma_pages(p_nxge_t);
 
@@ -6581,6 +6582,9 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 				    (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 				(void) nxge_fzc_rdc_tbl_unbind(nxgep,
 				    p_cfgp->def_mac_rxdma_grpid);
+
+				/* Cleanup any outstanding groups.  */
+				nxge_grp_cleanup(nxgep);
 			}
 
 			if (hw_p->ndevs) {
