@@ -126,7 +126,7 @@ def rti(bugids, gatePath=None, consolidation=None,
 		if not gateType in rtiType:
 			message = "Error: for bug " + cr 
 			for each in rtiNumber:
-				message += " the RTI "  each + "  is of " 
+				message += " the RTI " +  each + "  is of " 
 				message += rtiType[rtiNumber.index(each)] + " type "
 			message += "but the parent gate " + gateName + " is a " 
 			message += gateType + " gate.\n" + "A " + gateType
