@@ -123,19 +123,24 @@ def rti(bugids, gatePath=None, consolidation=None,
 		rtiType = crRti.rtiType()
 	
 		# check to make sure the RTI type matches the gate type
-		if rtiType != gateType:
-			output.write(
-			    "Error: for bug %s the RTI %s is of %s type "
-			    "but the parent gate %s is a %s gate.\n"
-			    "A %s RTI must be submitted to putback bug %s "
-			    "to %s.\n" % (cr, rtiNumber, rtiType, gateName,
-					  gateType, gateType, cr, gateName))
+		if not gateType in rtiType:
+			message = "Error: for bug " + cr 
+			for each in rtiNumber:
+				message += " the RTI "  each + "  is of " 
+				message += rtiType[rtiNumber.index(each)] + " type "
+			message += "but the parent gate " + gateName + " is a " 
+			message += gateType + " gate.\n" + "A " + gateType
+			message += " RTI must be submitted to putback bug " + cr + " to " 
+			message += gateName  + ". \n"
+			
+			output.write( message )
 			badRtis.append(cr)
 			continue
 
 		if not crRti.accepted():
-			output.write("Error: RTI %s for CR %s is not in "
-			     "the accepted state.\n" % (rtiNumber, cr))
+			for each in rtiNumber:
+				message = "Error: RTI " + each + " for CR " + cr + " is not in "
+				message += "the accepted state.\n" 
 			badRtis.append(cr)
 			continue
 	

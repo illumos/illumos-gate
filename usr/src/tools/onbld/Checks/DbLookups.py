@@ -283,7 +283,7 @@ class ARC(object):
 # have a fallback
 WEBRTI_HOST = 'webrti.sfbay.sun.com'
 WEBRTI_PORT = 9188
-WEBRTICLI = '/net/webrti.sfbay.sun.com/export/home/bin/webrticli'
+WEBRTICLI = '/net/onnv.sfbay.sun.com/export/onnv-gate/public/bin/webrticli'
 
 
 class RtiException(Exception):
@@ -293,12 +293,6 @@ class RtiException(Exception):
 
 	def __str__(self):
 		return "Unknown error: %s" % self.data
-
-# RtiInvalidOutput & RtiCallFailed are our "own" failures
-# The other exceptions are triggered from WebRTI itself
-class RtiInvalidOutput(RtiException):
-	def __str__(self):
-		return "Invalid output from WebRTI: %s" % self.data
 
 class RtiCallFailed(RtiException):
 	def __str__(self):
@@ -372,6 +366,13 @@ class Rti:
 		self.__queryGate = gate
 		self.__queryConsolidation = consolidation
 
+		self.__webRtiOutput = []
+		self.__mainCR = []
+		self.__rtiNumber = []
+		self.__consolidation = []
+		self.__project = []
+		self.__status = []
+		self.__rtiType = []
 		try:
 			# try to use a direct connection to the
 			# webrti server first
@@ -435,22 +436,18 @@ class Rti:
 				exc = RtiException
 			raise exc(data)
 
-		if data.count('\n') != 1:
-			# there shouldn't be more than one line in
-			# the output.  if we got more than one line,
-			# then let's be paranoid, and abort.
-			raise RtiInvalidOutput(data)
-
+		data = data.splitlines()
 		# At this point, we should have valid data
-		data = data.rstrip('\r\n')
-		self.__webRtiOutput = data
-		self.__fields = data.split(':')
-		self.__mainCR = self.__fields[0]
-		self.__rtiNumber = self.__fields[1]
-		self.__consolidation = self.__fields[2]
-		self.__project = self.__fields[3]
-		self.__status = self.__fields[4]
-		self.__rtiType = self.__fields[5]
+		for line in data:	
+			line = line.rstrip('\r\n')
+			self.__webRtiOutput.append(line) 
+			fields = line.split(':')
+			self.__mainCR.append(fields[0])
+			self.__rtiNumber.append(fields[1])
+			self.__consolidation.append(fields[2])
+			self.__project.append(fields[3])
+			self.__status.append(fields[4])
+			self.__rtiType.append(fields[5])
 
 	# accessors in case callers need the raw data
 	def mainCR(self):
@@ -474,10 +471,12 @@ class Rti:
 
 	# in practice, most callers only care about the following
 	def accepted(self):
-		return (self.__status == "S_ACCEPTED")
+		for status in self.__status:
+			if status != "S_ACCEPTED":
+				return False
+		return True
 
 	# for logging/debugging in case the caller wants the raw webrti output
 	def webRtiOutput(self):
 		return self.__webRtiOutput
-
 
