@@ -605,7 +605,7 @@ make_vdev_raidz(char *path, char *aux, size_t size, uint64_t ashift, int r)
 
 static nvlist_t *
 make_vdev_mirror(char *path, char *aux, size_t size, uint64_t ashift,
-	int log, int r, int m)
+	int r, int m)
 {
 	nvlist_t *mirror, **child;
 	int c;
@@ -623,7 +623,6 @@ make_vdev_mirror(char *path, char *aux, size_t size, uint64_t ashift,
 	    VDEV_TYPE_MIRROR) == 0);
 	VERIFY(nvlist_add_nvlist_array(mirror, ZPOOL_CONFIG_CHILDREN,
 	    child, m) == 0);
-	VERIFY(nvlist_add_uint64(mirror, ZPOOL_CONFIG_IS_LOG, log) == 0);
 
 	for (c = 0; c < m; c++)
 		nvlist_free(child[c]);
@@ -644,8 +643,11 @@ make_vdev_root(char *path, char *aux, size_t size, uint64_t ashift,
 
 	child = umem_alloc(t * sizeof (nvlist_t *), UMEM_NOFAIL);
 
-	for (c = 0; c < t; c++)
-		child[c] = make_vdev_mirror(path, aux, size, ashift, log, r, m);
+	for (c = 0; c < t; c++) {
+		child[c] = make_vdev_mirror(path, aux, size, ashift, r, m);
+		VERIFY(nvlist_add_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+		    log) == 0);
+	}
 
 	VERIFY(nvlist_alloc(&root, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(root, ZPOOL_CONFIG_TYPE, VDEV_TYPE_ROOT) == 0);
@@ -831,6 +833,22 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	(void) rw_unlock(&ztest_shared->zs_name_lock);
 }
 
+static vdev_t *
+vdev_lookup_by_path(vdev_t *vd, const char *path)
+{
+	vdev_t *mvd;
+
+	if (vd->vdev_path != NULL && strcmp(path, vd->vdev_path) == 0)
+		return (vd);
+
+	for (int c = 0; c < vd->vdev_children; c++)
+		if ((mvd = vdev_lookup_by_path(vd->vdev_child[c], path)) !=
+		    NULL)
+			return (mvd);
+
+	return (NULL);
+}
+
 /*
  * Verify that vdev_add() works as expected.
  */
@@ -875,12 +893,13 @@ void
 ztest_vdev_aux_add_remove(ztest_args_t *za)
 {
 	spa_t *spa = za->za_spa;
+	vdev_t *rvd = spa->spa_root_vdev;
 	spa_aux_vdev_t *sav;
 	char *aux;
 	uint64_t guid = 0;
 	int error;
 
-	if (ztest_random(3) == 0) {
+	if (ztest_random(2) == 0) {
 		sav = &spa->spa_spares;
 		aux = ZPOOL_CONFIG_SPARES;
 	} else {
@@ -911,7 +930,8 @@ ztest_vdev_aux_add_remove(ztest_args_t *za)
 				if (strcmp(sav->sav_vdevs[c]->vdev_path,
 				    path) == 0)
 					break;
-			if (c == sav->sav_count)
+			if (c == sav->sav_count &&
+			    vdev_lookup_by_path(rvd, path) == NULL)
 				break;
 			ztest_shared->zs_vdev_aux++;
 		}
@@ -923,8 +943,8 @@ ztest_vdev_aux_add_remove(ztest_args_t *za)
 		/*
 		 * Add a new device.
 		 */
-		nvlist_t *nvroot = make_vdev_root(NULL, aux, zopt_vdev_size, 0,
-		    0, 0, 0, 1);
+		nvlist_t *nvroot = make_vdev_root(NULL, aux,
+		    (zopt_vdev_size * 5) / 4, 0, 0, 0, 0, 1);
 		error = spa_vdev_add(spa, nvroot);
 		if (error != 0)
 			fatal(0, "spa_vdev_add(%p) = %d", nvroot, error);
@@ -946,34 +966,6 @@ ztest_vdev_aux_add_remove(ztest_args_t *za)
 	(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
 }
 
-static vdev_t *
-vdev_lookup_by_path(vdev_t *vd, const char *path)
-{
-	int c;
-	vdev_t *mvd;
-
-	if (vd->vdev_path != NULL) {
-		if (vd->vdev_wholedisk == 1) {
-			/*
-			 * For whole disks, the internal path has 's0', but the
-			 * path passed in by the user doesn't.
-			 */
-			if (strlen(path) == strlen(vd->vdev_path) - 2 &&
-			    strncmp(path, vd->vdev_path, strlen(path)) == 0)
-				return (vd);
-		} else if (strcmp(path, vd->vdev_path) == 0) {
-			return (vd);
-		}
-	}
-
-	for (c = 0; c < vd->vdev_children; c++)
-		if ((mvd = vdev_lookup_by_path(vd->vdev_child[c], path)) !=
-		    NULL)
-			return (mvd);
-
-	return (NULL);
-}
-
 /*
  * Verify that we can attach and detach devices.
  */
@@ -981,15 +973,19 @@ void
 ztest_vdev_attach_detach(ztest_args_t *za)
 {
 	spa_t *spa = za->za_spa;
+	spa_aux_vdev_t *sav = &spa->spa_spares;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *oldvd, *newvd, *pvd;
 	nvlist_t *root;
 	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
 	uint64_t leaf, top;
 	uint64_t ashift = ztest_get_ashift();
+	uint64_t oldguid;
 	size_t oldsize, newsize;
 	char oldpath[MAXPATHLEN], newpath[MAXPATHLEN];
 	int replacing;
+	int newvd_is_spare = B_FALSE;
+	int oldvd_is_log;
 	int error, expected_error;
 
 	(void) mutex_lock(&ztest_shared->zs_vdev_lock);
@@ -1012,39 +1008,56 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	leaf = ztest_random(leaves);
 
 	/*
-	 * Generate the path to this leaf.  The filename will end with 'a'.
-	 * We'll alternate replacements with a filename that ends with 'b'.
+	 * Locate this vdev.
 	 */
-	(void) snprintf(oldpath, sizeof (oldpath),
-	    ztest_dev_template, zopt_dir, zopt_pool, top * leaves + leaf);
-
-	bcopy(oldpath, newpath, MAXPATHLEN);
-
-	/*
-	 * If the 'a' file isn't part of the pool, the 'b' file must be.
-	 */
-	if (vdev_lookup_by_path(rvd, oldpath) == NULL)
-		oldpath[strlen(oldpath) - 1] = 'b';
-	else
-		newpath[strlen(newpath) - 1] = 'b';
+	oldvd = rvd->vdev_child[top];
+	if (zopt_mirrors >= 1)
+		oldvd = oldvd->vdev_child[leaf / zopt_raidz];
+	if (zopt_raidz > 1)
+		oldvd = oldvd->vdev_child[leaf % zopt_raidz];
 
 	/*
-	 * Now oldpath represents something that's already in the pool,
-	 * and newpath is the thing we'll try to attach.
+	 * If we're already doing an attach or replace, oldvd may be a
+	 * mirror vdev -- in which case, pick a random child.
 	 */
-	oldvd = vdev_lookup_by_path(rvd, oldpath);
-	newvd = vdev_lookup_by_path(rvd, newpath);
-	ASSERT(oldvd != NULL);
+	while (oldvd->vdev_children != 0) {
+		ASSERT(oldvd->vdev_children == 2);
+		oldvd = oldvd->vdev_child[ztest_random(2)];
+	}
+
+	oldguid = oldvd->vdev_guid;
+	oldsize = vdev_get_rsize(oldvd);
+	oldvd_is_log = oldvd->vdev_top->vdev_islog;
+	(void) strcpy(oldpath, oldvd->vdev_path);
 	pvd = oldvd->vdev_parent;
 
 	/*
-	 * Make newsize a little bigger or smaller than oldsize.
-	 * If it's smaller, the attach should fail.
-	 * If it's larger, and we're doing a replace,
-	 * we should get dynamic LUN growth when we're done.
+	 * For the new vdev, choose with equal probability between the two
+	 * standard paths (ending in either 'a' or 'b') or a random hot spare.
 	 */
-	oldsize = vdev_get_rsize(oldvd);
-	newsize = 10 * oldsize / (9 + ztest_random(3));
+	if (sav->sav_count != 0 && ztest_random(3) == 0) {
+		newvd = sav->sav_vdevs[ztest_random(sav->sav_count)];
+		newvd_is_spare = B_TRUE;
+		(void) strcpy(newpath, newvd->vdev_path);
+	} else {
+		(void) snprintf(newpath, sizeof (newpath), ztest_dev_template,
+		    zopt_dir, zopt_pool, top * leaves + leaf);
+		if (ztest_random(2) == 0)
+			newpath[strlen(newpath) - 1] = 'b';
+		newvd = vdev_lookup_by_path(rvd, newpath);
+	}
+
+	if (newvd) {
+		newsize = vdev_get_rsize(newvd);
+	} else {
+		/*
+		 * Make newsize a little bigger or smaller than oldsize.
+		 * If it's smaller, the attach should fail.
+		 * If it's larger, and we're doing a replace,
+		 * we should get dynamic LUN growth when we're done.
+		 */
+		newsize = 10 * oldsize / (9 + ztest_random(3));
+	}
 
 	/*
 	 * If pvd is not a mirror or root, the attach should fail with ENOTSUP,
@@ -1054,12 +1067,17 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	 *
 	 * If newvd is too small, it should fail with EOVERFLOW.
 	 */
-	if (newvd != NULL)
-		expected_error = EBUSY;
-	else if (pvd->vdev_ops != &vdev_mirror_ops &&
-	    pvd->vdev_ops != &vdev_root_ops &&
-	    (!replacing || pvd->vdev_ops == &vdev_replacing_ops))
+	if (pvd->vdev_ops != &vdev_mirror_ops &&
+	    pvd->vdev_ops != &vdev_root_ops && (!replacing ||
+	    pvd->vdev_ops == &vdev_replacing_ops ||
+	    pvd->vdev_ops == &vdev_spare_ops))
 		expected_error = ENOTSUP;
+	else if (newvd_is_spare && (!replacing || oldvd_is_log))
+		expected_error = ENOTSUP;
+	else if (newvd == oldvd)
+		expected_error = replacing ? 0 : EBUSY;
+	else if (vdev_lookup_by_path(rvd, newpath) != NULL)
+		expected_error = EBUSY;
 	else if (newsize < oldsize)
 		expected_error = EOVERFLOW;
 	else if (ashift > oldvd->vdev_top->vdev_ashift)
@@ -1075,7 +1093,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	root = make_vdev_root(newpath, NULL, newvd == NULL ? newsize : 0,
 	    ashift, 0, 0, 0, 1);
 
-	error = spa_vdev_attach(spa, oldvd->vdev_guid, root, replacing);
+	error = spa_vdev_attach(spa, oldguid, root, replacing);
 
 	nvlist_free(root);
 

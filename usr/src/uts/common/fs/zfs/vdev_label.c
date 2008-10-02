@@ -531,9 +531,12 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	 */
 	if (reason != VDEV_LABEL_REMOVE && reason != VDEV_LABEL_L2CACHE &&
 	    spare_guid != 0ULL) {
-		ASSERT(vd->vdev_parent == NULL);
+		uint64_t guid_delta = spare_guid - vd->vdev_guid;
 
-		vd->vdev_guid = vd->vdev_guid_sum = spare_guid;
+		vd->vdev_guid += guid_delta;
+
+		for (vdev_t *pvd = vd; pvd != NULL; pvd = pvd->vdev_parent)
+			pvd->vdev_guid_sum += guid_delta;
 
 		/*
 		 * If this is a replacement, then we want to fallthrough to the
@@ -547,9 +550,12 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 
 	if (reason != VDEV_LABEL_REMOVE && reason != VDEV_LABEL_SPARE &&
 	    l2cache_guid != 0ULL) {
-		ASSERT(vd->vdev_parent == NULL);
+		uint64_t guid_delta = l2cache_guid - vd->vdev_guid;
 
-		vd->vdev_guid = vd->vdev_guid_sum = l2cache_guid;
+		vd->vdev_guid += guid_delta;
+
+		for (vdev_t *pvd = vd; pvd != NULL; pvd = pvd->vdev_parent)
+			pvd->vdev_guid_sum += guid_delta;
 
 		/*
 		 * If this is a replacement, then we want to fallthrough to the
