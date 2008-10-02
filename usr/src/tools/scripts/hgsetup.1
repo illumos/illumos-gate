@@ -20,13 +20,12 @@
 .\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms."
 .\"
-.\" ident	"%Z%%M%	%I%	%E% SMI"
-.TH hgsetup 1 "10 July 2008"
+.TH hgsetup 1 "2 October 2008"
 .SH NAME
 .I hgsetup
 \- sets up a user's ~/.hgrc for development of ON with Mercurial
 .SH SYNOPSIS
-\fBhgsetup [-f] [-c \fIcdm_path\fP] [-m \fImerge_path\fP] [-n \fIname\fP] [-e \fIemail\fP] [-p \fIproxy\fP]
+\fBhgsetup [-f] [-c \fIcdm_path\fP] [-m \fImerge_path\fP] [-n \fIname\fP] [-e \fIemail\fP] [-p \fIproxy\fP] [-s \fIstyle_path\fP]
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "hgsetup" "" "\fBhgsetup\fP"
@@ -60,6 +59,9 @@ is mandatory.
 .TP 10
 .B -p
 Specify an http_proxy to use for interacting with HTTP repositories
+.TP 10
+.B -s
+Override the path to the Mercurial style file
 .LP
 .SH OUTPUT
 .LP

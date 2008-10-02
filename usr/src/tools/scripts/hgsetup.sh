@@ -41,13 +41,14 @@ HGRC=$HOME/.hgrc
 usage() {
 	prog=$(basename "$0")
 	echo \
-"usage: $prog [-f] [-c cdm_path] [-m merge_path] [-n name] [-e email] [-p proxy]
+"usage: $prog [-f] [-c cdm_path] [-m merge_path] [-n name] [-e email] [-p proxy] [-s style_path]
 	-f            : force overwriting $HGRC
 	-c cdm_path   : override Cadmium path
 	-m merge_path : override path to merge tool
 	-n name       : override name (for ui.username)
 	-e email      : override email (for email.from)
 	-p proxy      : enable use of web proxy with specified proxy
+	-s style_path : override path to style file
 
 	if -e isn't provided, and you are on SWAN, an LDAP query is done
 	if -n isn't provided, the entry from /etc/passwd is used
@@ -59,7 +60,7 @@ usage() {
 	exit 1
 }
 
-while getopts c:e:fm:n:p: opt; do
+while getopts c:e:fm:n:p:s: opt; do
 	case "$opt" in
 	c) cdm_path=$OPTARG;;
 	e) email=$OPTARG;;
@@ -67,6 +68,7 @@ while getopts c:e:fm:n:p: opt; do
 	m) merge_path=$OPTARG;;
 	n) name=$OPTARG;;
 	p) proxy=$OPTARG;;
+	s) style_path=$OPTARG;;
 	*) usage;;
 	esac
 done
@@ -84,23 +86,31 @@ LDAPCLIENT="/usr/bin/ldapsearch"
 login=$(/usr/bin/id -un)
 
 #
-# Try and determine where Cadmium is installed.  In order of
+# Try and determine where SUNWonbld is installed.  In order of
 # preference, look in:
 #
 #   1. $(whence $0), on the assumption that you want the version
-#      of cadmium that best matches the hgsetup script you invoked
+#      of SUNWonbld that best matches the hgsetup script you invoked
 #
 #   2. /opt/onbld, because local is generally better
 #
 #   3. /ws/onnv-tools/onbld, it's nfs and it might be slow, but it
 #      should resolve from most places on-SWAN
 #
-paths="$(dirname $(whence $0)) /opt/onbld /ws/onnv-tools/onbld"
+paths="$(dirname $(dirname $(whence $0))) /opt/onbld /ws/onnv-tools/onbld"
 cdmbin="lib/python/onbld/hgext/cdm.py"
+stylefile="etc/hgstyle"
 
 for dir in $paths; do
 	if [[ -f "$dir/$cdmbin" && -z "$cdm_path" ]]; then
 		cdm_path="$dir/$cdmbin"
+	fi
+
+	if [[ -f "$dir/$stylefile" && -z "$style_path" ]]; then
+		style_path="$dir/$stylefile"
+	fi
+
+	if [[ -n "$cdm_path" && -n "$style_path" ]]; then
 		break
 	fi
 done
@@ -143,6 +153,7 @@ if [[ -n $proxy ]]; then
 fi
 echo "	email: $email"
 echo "	username: $name"
+echo "	style: $style_path"
 echo "	cadmium: $cdm_path"
 
 if [[ -z "$cdm_path" ]]; then
@@ -193,6 +204,7 @@ gpyfm.priority=0
 
 [ui]
 username=$username
+style=$style_path
 EOF
 
 if [[ -n $merge_path ]]; then
