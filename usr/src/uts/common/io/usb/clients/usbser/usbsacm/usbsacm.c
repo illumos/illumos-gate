@@ -414,7 +414,7 @@ static void	*usbsacm_statep;	/* soft state */
 /*
  * DSD definitions
  */
-ds_ops_t ds_ops = {
+static ds_ops_t usbsacm_ds_ops = {
 	DS_OPS_VERSION,
 	usbsacm_ds_attach,
 	usbsacm_ds_detach,
@@ -526,7 +526,7 @@ _info(struct modinfo *modinfop)
 static int
 usbsacm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	return (usbser_attach(dip, cmd, usbsacm_statep, &ds_ops));
+	return (usbser_attach(dip, cmd, usbsacm_statep, &usbsacm_ds_ops));
 }
 
 

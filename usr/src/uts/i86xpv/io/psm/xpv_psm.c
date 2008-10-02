@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#define	PSMI_1_5
+#define	PSMI_1_6
 
 #include <sys/mutex.h>
 #include <sys/types.h>
@@ -1236,7 +1236,8 @@ static struct psm_ops xen_psm_ops = {
 	xen_psm_timer_disable,			/* psm_timer_disable	*/
 	(void (*)(void *arg))NULL,		/* psm_post_cyclic_setup */
 	(void (*)(int, int))NULL,		/* psm_preshutdown	*/
-	xen_intr_ops			/* Advanced DDI Interrupt framework */
+	xen_intr_ops,			/* Advanced DDI Interrupt framework */
+	(int (*)(psm_state_request_t *))NULL	/* psm_state		*/
 };
 
 static struct psm_info xen_psm_info = {

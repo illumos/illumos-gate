@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Compatibility routines to read and write alternate
  * utmp-like files.  These routines are only used in
@@ -86,8 +84,9 @@ static int fd = -1;	/* File descriptor for the utmp file. */
 /*
  * name of the current utmp-like file - set by utmpname (getutx.c)
  * only if running in backward compatibility mode
+ * We don't modify this, but we can't declare it const or lint will freak.
  */
-extern const char _compat_utmpfile[];
+extern char _compat_utmpfile[];
 
 #ifdef ERRDEBUG
 static long loc_utmp;	/* Where in "utmp" the current "ubuf" was found. */

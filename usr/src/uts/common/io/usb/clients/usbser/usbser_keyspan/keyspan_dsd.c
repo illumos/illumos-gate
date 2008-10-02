@@ -154,7 +154,7 @@ static void	keyspan_save_port_params_usa49(keyspan_port_t	*);
 /*
  * DSD ops structure
  */
-ds_ops_t ds_ops = {
+ds_ops_t keyspan_ds_ops = {
 	DS_OPS_VERSION,
 	keyspan_attach,
 	keyspan_detach,

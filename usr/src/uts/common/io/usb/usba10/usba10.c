@@ -38,14 +38,13 @@
 /*
  * modload support
  */
-extern struct mod_ops mod_miscops;
 
-struct modlmisc modlmisc	= {
+static struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
 	"USBA10: USB V0.8 Drvr Supp"
 };
 
-struct modlinkage modlinkage = {
+static struct modlinkage modlinkage = {
 	MODREV_1, (void	*)&modlmisc, NULL
 };
 

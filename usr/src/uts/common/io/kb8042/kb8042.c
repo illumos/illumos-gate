@@ -27,6 +27,8 @@
  * Use is subject to license terms.
  */
 
+#define	KEYMAP_SIZE_VARIABLE
+
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/inline.h>

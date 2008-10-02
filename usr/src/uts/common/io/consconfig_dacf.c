@@ -257,13 +257,13 @@ struct dacfsw dacfsw = {
 	opsets,
 };
 
-struct modldacf modldacf = {
+static struct modldacf modldacf = {
 	&mod_dacfops,   /* Type of module */
 	"Consconfig DACF",
 	&dacfsw
 };
 
-struct modlinkage modlinkage = {
+static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modldacf, NULL
 };
 

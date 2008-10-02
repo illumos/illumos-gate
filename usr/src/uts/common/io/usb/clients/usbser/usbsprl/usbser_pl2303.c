@@ -59,7 +59,7 @@ static int 	usbser_pl2303_getinfo(dev_info_t *, ddi_info_cmd_t, void *,
 static int	usbser_pl2303_open(queue_t *, dev_t *, int, int, cred_t *);
 static void	*usbser_pl2303_statep;	/* soft state */
 
-extern		ds_ops_t ds_ops;	/* DSD operations */
+extern		ds_ops_t pl2303_ds_ops;	/* DSD operations */
 
 
 /*
@@ -206,7 +206,7 @@ usbser_pl2303_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 static int
 usbser_pl2303_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	return (usbser_attach(dip, cmd, usbser_pl2303_statep, &ds_ops));
+	return (usbser_attach(dip, cmd, usbser_pl2303_statep, &pl2303_ds_ops));
 }
 
 

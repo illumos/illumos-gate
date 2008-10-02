@@ -174,13 +174,13 @@ static void pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph);
 /*
  * modload support
  */
-extern struct mod_ops mod_miscops;
-struct modlmisc modlmisc	= {
+
+static struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
 	"PCIE: PCI framework"
 };
 
-struct modlinkage modlinkage = {
+static struct modlinkage modlinkage = {
 	MODREV_1,
 	(void	*)&modlmisc,
 	NULL

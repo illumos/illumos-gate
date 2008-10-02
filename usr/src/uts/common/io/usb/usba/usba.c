@@ -74,14 +74,13 @@ _NOTE(MUTEX_PROTECTS_DATA(usba_mutex, usba_device_list))
 /*
  * modload support
  */
-extern struct mod_ops mod_miscops;
 
-struct modlmisc modlmisc	= {
+static struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
 	"USBA: USB Architecture 2.0 1.66"
 };
 
-struct modlinkage modlinkage = {
+static struct modlinkage modlinkage = {
 	MODREV_1, (void	*)&modlmisc, NULL
 };
 

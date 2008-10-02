@@ -33,7 +33,7 @@
  * $Id: deflate.c,v 1.9 1999/01/19 23:58:35 paulus Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#define	NO_DUMMY_DECL
 
 #include <sys/param.h>
 #include <sys/types.h>

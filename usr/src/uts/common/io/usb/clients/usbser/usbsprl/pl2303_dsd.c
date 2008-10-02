@@ -143,7 +143,7 @@ static void	pl2303_put_head(mblk_t **, mblk_t *);
 /*
  * DSD ops structure
  */
-ds_ops_t ds_ops = {
+ds_ops_t pl2303_ds_ops = {
 	DS_OPS_VERSION,
 	pl2303_attach,
 	pl2303_detach,

@@ -152,7 +152,7 @@ static int	keyspan_download_firmware(keyspan_pre_state_t *);
 
 static void    *usbser_keyspan_statep;	/* soft state */
 
-extern ds_ops_t ds_ops;		/* DSD operations */
+extern ds_ops_t keyspan_ds_ops;		/* DSD operations */
 
 /*
  * STREAMS structures
@@ -314,7 +314,7 @@ usbser_keyspan_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (rval == DDI_ECONTEXT) {
 
 		return (usbser_attach(dip, cmd, usbser_keyspan_statep,
-		    &ds_ops));
+		    &keyspan_ds_ops));
 	} else {
 
 		return (rval);
