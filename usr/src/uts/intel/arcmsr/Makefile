@@ -25,7 +25,7 @@
 #
 #	Paths to the base of the uts directory trees
 #
-UTSBASE   = $(SRC)/uts
+UTSBASE   = ../..
 
 #
 # Define the module and object file sets.
