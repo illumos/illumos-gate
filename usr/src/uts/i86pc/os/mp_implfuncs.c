@@ -385,7 +385,7 @@ psm_modload(void)
 	for (this = psm_get_impl_module(1); this != (char *)NULL;
 	    this = psm_get_impl_module(0)) {
 		if (modload("mach", this) == -1)
-			cmn_err(CE_WARN, "!Cannot load psm %s", this);
+			cmn_err(CE_CONT, "!Skipping psm: %s\n", this);
 	}
 	close_mach_list();
 }
