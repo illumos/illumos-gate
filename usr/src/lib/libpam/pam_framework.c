@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <syslog.h>
 #include <dlfcn.h>
@@ -2803,9 +2801,15 @@ __pam_display_msg(pam_handle_t *pamh, int msg_style, int num_msg,
     char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE], void *conv_apdp)
 {
 	struct pam_response	*ret_respp = NULL;
+	int ret;
 
-	return (do_conv(pamh, msg_style, num_msg, messages,
-	    conv_apdp, &ret_respp));
+	ret = do_conv(pamh, msg_style, num_msg, messages,
+	    conv_apdp, &ret_respp);
+
+	if (ret_respp != NULL)
+		free_resp(num_msg, ret_respp);
+
+	return (ret);
 }
 
 /*
