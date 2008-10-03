@@ -49,7 +49,6 @@ extern "C" {
 #define	CPU_ACPI_FREQ(pstate)		pstate->ps_freq
 #define	CPU_ACPI_PSTATE_TRANSLAT(pstate) pstate->ps_translat
 #define	CPU_ACPI_PSTATE_CTRL(pstate)	pstate->ps_ctrl
-#define	CPU_ACPI_PSTATE_STAT(pstate)	pstate->ps_state
 
 /*
  * T-state related macros

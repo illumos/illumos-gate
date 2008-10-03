@@ -57,13 +57,6 @@ cpudrv_pstate_ops_t speedstep_ops = {
 #define	ESS_RET_UNSUP_STATE	0x02
 
 /*
- * Intel docs indicate that maximum latency of P-state changes should
- * be on the order of 10mS. When waiting, wait in 100uS increments.
- */
-#define	ESS_MAX_LATENCY_MICROSECS	10000
-#define	ESS_LATENCY_WAIT		100
-
-/*
  * MSR registers for changing and reading processor power state.
  */
 #define	IA32_PERF_STAT_MSR		0x198
@@ -82,43 +75,6 @@ volatile int ess_debug = 0;
 #else
 #define	ESSDEBUG(arglist)
 #endif
-
-/*
- * Read the status register. How it is read, depends upon the _PCT
- * APCI object value.
- */
-static int
-read_status(cpu_acpi_handle_t handle, uint32_t *stat)
-{
-	cpu_acpi_pct_t *pct_stat;
-	uint64_t reg;
-	int ret = 0;
-
-	pct_stat = CPU_ACPI_PCT_STATUS(handle);
-
-	switch (pct_stat->cr_addrspace_id) {
-	case ACPI_ADR_SPACE_FIXED_HARDWARE:
-		reg = rdmsr(IA32_PERF_STAT_MSR);
-		*stat = reg & 0x1E;
-		ret = 0;
-		break;
-
-	case ACPI_ADR_SPACE_SYSTEM_IO:
-		ret = cpu_acpi_read_port(pct_stat->cr_address, stat,
-		    pct_stat->cr_width);
-		break;
-
-	default:
-		DTRACE_PROBE1(ess_status_unsupported_type, uint8_t,
-		    pct_stat->cr_addrspace_id);
-		return (-1);
-	}
-
-	DTRACE_PROBE1(ess_status_read, uint32_t, *stat);
-	DTRACE_PROBE1(ess_status_read_err, int, ret);
-
-	return (ret);
-}
 
 /*
  * Write the ctrl register. How it is written, depends upon the _PCT
@@ -174,8 +130,6 @@ speedstep_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	cpu_acpi_handle_t handle = mach_state->acpi_handle;
 	cpu_acpi_pstate_t *req_pstate;
 	uint32_t ctrl;
-	uint32_t stat;
-	int i;
 
 	req_pstate = (cpu_acpi_pstate_t *)CPU_ACPI_PSTATES(handle);
 	req_pstate += req_state;
@@ -188,18 +142,6 @@ speedstep_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	if (write_ctrl(handle, ctrl) != 0) {
 		*ret = ESS_RET_UNSUP_STATE;
 		return;
-	}
-
-	/* Wait until switch is complete, but bound the loop just in case. */
-	for (i = CPU_ACPI_PSTATE_TRANSLAT(req_pstate) * 2; i >= 0;
-	    i -= ESS_LATENCY_WAIT) {
-		if (read_status(handle, &stat) == 0 &&
-		    CPU_ACPI_PSTATE_STAT(req_pstate) == stat)
-			break;
-		drv_usecwait(ESS_LATENCY_WAIT);
-	}
-	if (i >= ESS_MAX_LATENCY_MICROSECS) {
-		DTRACE_PROBE(ess_transition_incomplete);
 	}
 
 	mach_state->pstate = req_state;
