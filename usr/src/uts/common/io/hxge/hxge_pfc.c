@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 #include <hxge_classify.h>
 #include <hxge_pfc.h>
@@ -902,15 +900,15 @@ hxge_pfc_update_hw(p_hxge_t hxgep)
 	hxge_status_t	status = HXGE_OK;
 	hpi_handle_t	handle;
 	p_hxge_param_t	pa;
-	uint64_t	cfgd_vlans;
-	uint64_t	*val_ptr;
 	int		i;
-	hxge_param_map_t	*p_map;
 	boolean_t	parity = 0;
 	boolean_t	implicit_valid = 0;
 	vlan_id_t	implicit_vlan_id;
+	uint32_t	vlanid_group;
+	uint64_t	offset;
+	int		max_vlan_groups;
+	int		vlan_group_step;
 
-	p_hxge_mv_cfg_t vlan_table;
 	p_hxge_class_pt_cfg_t 	p_class_cfgp;
 
 	HXGE_DEBUG_MSG((hxgep, PFC_CTL, "==> hxge_pfc_update_hw"));
@@ -923,29 +921,17 @@ hxge_pfc_update_hw(p_hxge_t hxgep)
 		return (HXGE_ERROR);
 	}
 
-	vlan_table = p_class_cfgp->vlan_tbl;
-
-	/* configure vlan tables */
-	pa = (p_hxge_param_t)&hxgep->param_arr[param_vlan_ids];
-#if defined(__i386)
-	val_ptr = (uint64_t *)(uint32_t)pa->value;
-#else
-	val_ptr = (uint64_t *)pa->value;
-#endif
-	cfgd_vlans = ((pa->type & HXGE_PARAM_ARRAY_CNT_MASK) >>
-	    HXGE_PARAM_ARRAY_CNT_SHIFT);
-
-	for (i = 0; i < cfgd_vlans; i++) {
-		p_map = (hxge_param_map_t *)&val_ptr[i];
-		if (vlan_table[p_map->param_id].flag) {
-			status = hpi_pfc_cfg_vlan_table_entry_set(handle,
-			    p_map->param_id);
-			if (status != HPI_SUCCESS) {
-				HXGE_DEBUG_MSG((hxgep, PFC_CTL,
-				    "hpi_pfc_cfg_vlan_table_entry_set Failed"));
-				return (HXGE_ERROR);
-			}
-		}
+	/*
+	 * configure vlan table to join all vlans in order for Solaris
+	 * network to receive vlan packets of any acceptible VIDs.
+	 * This may change when Solaris network passes VIDs down.
+	 */
+	vlanid_group = 0xffffffff;
+	max_vlan_groups = 128;
+	vlan_group_step = 8;
+	for (i = 0; i < max_vlan_groups; i++) {
+		offset = PFC_VLAN_TABLE + i * vlan_group_step;
+		REG_PIO_WRITE64(handle, offset, vlanid_group);
 	}
 
 	/* Configure the vlan_ctrl register */
