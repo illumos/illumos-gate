@@ -1188,7 +1188,7 @@ do_get_autopush(struct prop_desc *pd, datalink_id_t linkid,
 	dld_ioc_macprop_t	*dip;
 
 	if (flags & MAC_PROP_DEFAULT)
-		return (DLADM_STATUS_NOTSUP);
+		return (DLADM_STATUS_NOTDEFINED);
 
 	*val_cnt = 1;
 	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
@@ -1912,9 +1912,6 @@ i_dladm_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
 	link_duplex_t   link_duplex;
 	dladm_status_t  status;
 
-	if (flags & MAC_PROP_DEFAULT)
-		return (DLADM_STATUS_NOTSUP);
-
 	if ((status = dladm_get_single_mac_stat(linkid, "link_duplex",
 	    KSTAT_DATA_UINT32, &link_duplex)) != 0)
 		return (status);
@@ -1942,9 +1939,6 @@ i_dladm_speed_get(struct prop_desc *pd, datalink_id_t linkid,
 	uint64_t	ifspeed = 0;
 	dladm_status_t status;
 
-	if (flags & MAC_PROP_DEFAULT)
-		return (DLADM_STATUS_NOTSUP);
-
 	if ((status = dladm_get_single_mac_stat(linkid, "ifspeed",
 	    KSTAT_DATA_UINT64, &ifspeed)) != 0)
 		return (status);
@@ -1970,8 +1964,6 @@ i_dladm_status_get(struct prop_desc *pd, datalink_id_t linkid,
 	uchar_t 	*cp;
 	dld_ioc_macprop_t  *dip;
 
-	if (flags & MAC_PROP_DEFAULT)
-		return (DLADM_STATUS_NOTSUP);
 	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (status != DLADM_STATUS_OK)
 		return (status);

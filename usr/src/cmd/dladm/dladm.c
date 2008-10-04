@@ -4387,6 +4387,8 @@ print_linkprop(datalink_id_t linkid, show_linkprop_state_t *statep,
 				propvals = &unknown;
 			else
 				propvals = &notsup;
+		} else if (status == DLADM_STATUS_NOTDEFINED) {
+			propvals = &notsup; /* STR_UNDEF_VAL */
 		} else {
 			if (statep->ls_proplist &&
 			    statep->ls_status == DLADM_STATUS_OK) {
@@ -4490,7 +4492,17 @@ linkprop_is_supported(datalink_id_t  linkid, const char *propname,
 	status = dladm_get_linkprop(linkid, DLADM_PROP_VAL_DEFAULT,
 	    propname, statep->ls_propvals, &valcnt);
 
-	return (status != DLADM_STATUS_NOTSUP);
+	if (status == DLADM_STATUS_OK)
+		return (B_TRUE);
+
+	/*
+	 * A system wide default value is not available for the
+	 * property. Check if current value can be retrieved.
+	 */
+	status = dladm_get_linkprop(linkid, DLADM_PROP_VAL_CURRENT,
+	    propname, statep->ls_propvals, &valcnt);
+
+	return (status == DLADM_STATUS_OK);
 }
 
 static int
@@ -4509,7 +4521,8 @@ show_linkprop(datalink_id_t linkid, const char *propname, void *arg)
 		if (!statep->ls_parseable)
 			print_header(&statep->ls_print);
 	}
-	if (!linkprop_is_supported(linkid, propname, statep))
+	if (!statep->ls_parseable &&
+	    !linkprop_is_supported(linkid, propname, statep))
 		return (DLADM_WALK_CONTINUE);
 
 	dladm_print_output(&statep->ls_print, statep->ls_parseable,

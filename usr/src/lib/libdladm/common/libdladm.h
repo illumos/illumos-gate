@@ -26,8 +26,6 @@
 #ifndef _LIBDLADM_H
 #define	_LIBDLADM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dls.h>
 #include <sys/dlpi.h>
 
@@ -100,7 +98,8 @@ typedef enum {
 	DLADM_STATUS_LINKBUSY,
 	DLADM_STATUS_VIDINVAL,
 	DLADM_STATUS_NONOTIF,
-	DLADM_STATUS_TRYAGAIN
+	DLADM_STATUS_TRYAGAIN,
+	DLADM_STATUS_NOTDEFINED
 } dladm_status_t;
 
 typedef enum {

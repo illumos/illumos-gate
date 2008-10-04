@@ -28,8 +28,6 @@
  * ndd.c 2.1, last change 11/14/90
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <errno.h>
 #include <ctype.h>
@@ -57,20 +55,25 @@ static char	gbuf[65536];	/* Need 20k for 160 IREs ... */
 static char	usage_str[] =	"usage: ndd -set device_name name value\n"
 				"       ndd [-get] device_name name [name ...]";
 
+/*
+ * gldv3_warning() catches the case of /sbin/ndd abuse to administer
+ * ethernet/MII props. Note that /sbin/ndd has not been abused
+ * for administration of other datalink types, which makes it permissible
+ * to test for support of the flowctrl property.
+ */
 static void
 gldv3_warning(char *module)
 {
 	datalink_id_t	linkid;
 	dladm_status_t	status;
 	char		buf[DLADM_PROP_VAL_MAX], *cp;
-	uint_t		cnt;
+	uint_t		cnt = 1;
 	char		*link;
 
 	link = strrchr(module, '/');
 	if (link == NULL)
 		return;
-	status = dladm_name2info(++link, &linkid,
-	    NULL, NULL, NULL);
+	status = dladm_name2info(++link, &linkid, NULL, NULL, NULL);
 	if (status != DLADM_STATUS_OK)
 		return;
 	cp = buf;
