@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -472,7 +471,7 @@ main(int argc, char **argv)
 			(void) fprintf(stderr,
 			    gettext("ldaplist: invalid publickey lookup\n"));
 			rc = 2;
-		} if (rc != 0 && rc1 != 0) {
+		} else if (rc != 0 && rc1 != 0) {
 			(void) fprintf(stderr,
 			gettext("ldaplist: %s\n"), (err ? err : err1));
 			if (rc == -1)
