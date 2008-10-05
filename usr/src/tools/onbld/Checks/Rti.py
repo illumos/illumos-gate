@@ -140,7 +140,8 @@ def rti(bugids, gatePath=None, consolidation=None,
 		if not crRti.accepted():
 			for each in rtiNumber:
 				message = "Error: RTI " + each + " for CR " + cr + " is not in "
-				message += "the accepted state.\n" 
+				message += "the accepted state.\n"
+				output.write(message)
 			badRtis.append(cr)
 			continue
 	
