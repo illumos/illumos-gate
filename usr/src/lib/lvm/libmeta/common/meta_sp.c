@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Just in case we're not in a build environment, make sure that
  * TEXT_DOMAIN gets set to something.
@@ -6699,9 +6697,9 @@ meta_sp_check_component(
 	side_t	sideno;
 	char	*miscname;
 	md_dev64_t	*mydev = NULL;
-	char	*pname, *t;
-	char	*ctd_name;
-	char	*devname;
+	char	*pname = NULL, *t;
+	char	*ctd_name = NULL;
+	char	*devname = NULL;
 	int	len;
 	int	rval = -1;
 

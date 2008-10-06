@@ -2539,9 +2539,9 @@ meta_stripe_check_component(
 	char	*miscname;
 	md_dev64_t	*mydev = NULL;
 	mdkey_t	key;
-	char	*pname, *t;
-	char	*ctd_name;
-	char	*devname;
+	char	*pname = NULL, *t;
+	char	*ctd_name = NULL;
+	char	*devname = NULL;
 	int	len;
 	int	cnt, i;
 	int	rval = -1;

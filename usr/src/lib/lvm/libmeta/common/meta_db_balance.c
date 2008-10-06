@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Database location balancing code.
  */
@@ -374,9 +372,8 @@ add_replica_to_ctl(
 			}
 			if (add_replica(sp, d->drv_dnp, (d->drv_dbcnt + 1),
 			    d->drv_dbsize, ep) == -1) {
-				md_error_t nep;
+				md_error_t nep = mdnullerror;
 
-				mdclrerror(&nep);
 				if (d->drv_dbcnt) {
 					/*
 					 * We have to to bring the replica
@@ -394,6 +391,7 @@ add_replica_to_ctl(
 					    &nep) == -1) {
 						c->ctl_dbcnt -= d->drv_dbcnt;
 						d->drv_dbcnt = 0;
+						mdclrerror(&nep);
 					}
 				}
 
@@ -729,11 +727,13 @@ count_replica_on_ctl(
 			if (adding) {
 				mdpart_t	*partp;
 				uint_t		rep_slice;
-				md_error_t	mde;
+				md_error_t	mde = mdnullerror;
 
 				if (meta_replicaslice(d->drv_dnp,
-				    &rep_slice, &mde) != 0)
+				    &rep_slice, &mde) != 0) {
+					mdclrerror(&mde);
 					continue;
+				}
 
 				partp = &d->drv_dnp->vtoc.parts[rep_slice];
 				if (! partp)

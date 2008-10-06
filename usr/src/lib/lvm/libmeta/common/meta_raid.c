@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Just in case we're not in a build environment, make sure that
  * TEXT_DOMAIN gets set to something.
@@ -2792,9 +2791,9 @@ meta_raid_check_component(
 	char	*miscname;
 	md_dev64_t	*mydev = NULL;
 	mdkey_t	key;
-	char	*pname, *t;
-	char	*ctd_name;
-	char	*devname;
+	char	*pname = NULL, *t;
+	char	*ctd_name = NULL;
+	char	*devname = NULL;
 	int	len;
 	int	i;
 	int	rval = -1;
