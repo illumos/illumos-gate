@@ -1095,18 +1095,64 @@ validate_zonepath(char *path, int cmd_num)
 			return (Z_ERR);
 		}
 		if ((res = stat(rootpath, &stbuf)) == 0) {
-			if (zonecfg_detached(rpath))
+			struct dirent	*dp;
+			DIR		*dirp;
+			boolean_t	empty = B_TRUE;
+
+			if (zonecfg_detached(rpath)) {
 				(void) fprintf(stderr,
 				    gettext("Cannot %s detached "
 				    "zone.\nUse attach or remove %s "
 				    "directory.\n"), cmd_to_str(cmd_num),
 				    rpath);
-			else
-				(void) fprintf(stderr,
-				    gettext("Rootpath %s exists; "
-				    "remove or move aside prior to %s.\n"),
-				    rootpath, cmd_to_str(cmd_num));
-			return (Z_ERR);
+				return (Z_ERR);
+			}
+
+			/* Not detached, check if it really looks ok. */
+
+			if (!S_ISDIR(stbuf.st_mode)) {
+				(void) fprintf(stderr, gettext("%s is not a "
+				    "directory.\n"), rootpath);
+				return (Z_ERR);
+			}
+
+			if (stbuf.st_uid != 0) {
+				(void) fprintf(stderr, gettext("%s is not "
+				    "owned by root.\n"), rootpath);
+				return (Z_ERR);
+			}
+
+			if ((stbuf.st_mode & 0777) != 0755) {
+				(void) fprintf(stderr, gettext("%s mode is not "
+				    "0755.\n"), rootpath);
+				return (Z_ERR);
+			}
+
+			if ((dirp = opendir(rootpath)) == NULL) {
+				(void) fprintf(stderr, gettext("Could not "
+				    "open rootpath %s\n"), rootpath);
+				return (Z_ERR);
+			}
+
+			/* Verify that the dir is empty. */
+			while ((dp = readdir(dirp)) != NULL) {
+				if (strcmp(dp->d_name, ".") == 0 ||
+				    strcmp(dp->d_name, "..") == 0)
+					continue;
+
+				empty = B_FALSE;
+				break;
+			}
+			(void) closedir(dirp);
+
+			if (!empty) {
+				(void) fprintf(stderr, gettext("Rootpath %s "
+				    "exists and contains data; remove or move "
+				    "aside prior to %s.\n"), rootpath,
+				    cmd_to_str(cmd_num));
+				return (Z_ERR);
+			}
+
 		}
 	}
 
