@@ -34,6 +34,7 @@
  * University Acknowledgment- Portions of this document are derived from
  * software developed by the University of California, Berkeley, and its
  * contributors.
+ * Portions contributed by Juergen Keil, <jk@tools.de>.
  */
 
 
@@ -52,6 +53,7 @@
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
 #include <sys/mount.h>
+#include <sys/fs/ufs_mount.h>
 #include <alloca.h>
 #include <assert.h>
 #include <errno.h>
@@ -595,11 +597,14 @@ validate_disk(char *arg, char *mountpoint)
 static int
 validate_ufs_disk(char *arg, char *mountpoint)
 {
-	char mntopts[MNT_LINE_MAX] = { '\0' };
+	struct ufs_args	ufs_args = { 0 };
+	char mntopts[MNT_LINE_MAX] = MNTOPT_LARGEFILES;
 
 	/* perform the mount */
+	ufs_args.flags = UFSMNT_LARGEFILES;
 	if (mount(arg, mountpoint, MS_DATA|MS_OPTIONSTR,
-	    MNTTYPE_UFS, NULL, 0, mntopts, sizeof (mntopts)) != 0) {
+	    MNTTYPE_UFS, &ufs_args, sizeof (ufs_args),
+	    mntopts, sizeof (mntopts)) != 0) {
 		perror(cmdname);
 		(void) fprintf(stderr,
 		    gettext("%s: failed to mount %s\n"), cmdname, arg);
@@ -1134,6 +1139,7 @@ main(int argc, char *argv[])
 	uintptr_t mdep = NULL;
 	int cmd, fcn, c, aval, r;
 	const char *usage;
+	const char *optstring;
 	zoneid_t zoneid = getzoneid();
 	int need_check_zones = 0;
 	char bootargs_buf[BOOTARGS_MAX];
@@ -1149,19 +1155,23 @@ main(int argc, char *argv[])
 
 	if (strcmp(cmdname, "halt") == 0) {
 		(void) audit_halt_setup(argc, argv);
+		optstring = "dlnqy";
 		usage = gettext("usage: %s [ -dlnqy ]\n");
 		cmd = A_SHUTDOWN;
 		fcn = AD_HALT;
 	} else if (strcmp(cmdname, "poweroff") == 0) {
 		(void) audit_halt_setup(argc, argv);
+		optstring = "dlnqy";
 		usage = gettext("usage: %s [ -dlnqy ]\n");
 		cmd = A_SHUTDOWN;
 		fcn = AD_POWEROFF;
 	} else if (strcmp(cmdname, "reboot") == 0) {
 		(void) audit_reboot_setup();
 #if defined(__i386)
+		optstring = "dlnqfe:";
 		usage = gettext("usage: %s [ -dlnqfe: ] [ boot args ]\n");
 #else
+		optstring = "dlnq";
 		usage = gettext("usage: %s [ -dlnq ] [ boot args ]\n");
 #endif
 		cmd = A_SHUTDOWN;
@@ -1172,7 +1182,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	while ((c = getopt(argc, argv, "dlnqyfe:")) != EOF) {
+	while ((c = getopt(argc, argv, optstring)) != EOF) {
 		switch (c) {
 		case 'd':
 			if (zoneid == GLOBAL_ZONEID)
@@ -1249,7 +1259,7 @@ main(int argc, char *argv[])
 	/*
 	 * Check whether fast  reboot is the default operating mode
 	 */
-	if (!fast_reboot)
+	if (fcn == AD_BOOT && !fast_reboot)
 		fast_reboot = is_fastboot_default(euid);
 
 	if (bename && !fast_reboot)	{
