@@ -18,16 +18,15 @@
  * Constants and structures defined by the internet system,
  * according to following documents
  *
- * Internet ASSIGNED NUMBERS (RFC1700) and its successors
- *	and other assignments at ftp://ftp.isi.edu/in-notes/iana/assignments
+ * Internet ASSIGNED NUMBERS (RFC1700) and its successors:
+ *	http://www.iana.org/assignments/protocol-numbers
+ *	http://www.iana.org/assignments/port-numbers
  * Basic Socket Interface Extensions for IPv6 (RFC2133 and its successors)
  *
  */
 
 #ifndef _NETINET_IN_H
 #define	_NETINET_IN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -223,6 +222,7 @@ typedef	uint16_t	sa_family_t;
 #define	IPPORT_LDAP		389
 #define	IPPORT_SLP		427
 #define	IPPORT_MIP		434
+#define	IPPORT_SMB		445		/* a.k.a. microsoft-ds */
 
 /*
  * Internet Key Exchange (IKE) ports

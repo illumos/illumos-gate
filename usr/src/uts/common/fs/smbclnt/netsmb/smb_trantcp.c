@@ -191,6 +191,13 @@ nb_setopts(struct nbpcb *nbp)
 	error = nb_setsockopt_int(tiptr, IPPROTO_TCP, TCP_NODELAY, 1);
 	if (error)
 		NBDEBUG("can't set TCP_NODELAY");
+
+	/* Set the connect timeout (in milliseconds). */
+	error = nb_setsockopt_int(tiptr, IPPROTO_TCP,
+	    TCP_CONN_ABORT_THRESHOLD,
+	    nbp->nbp_timo.tv_sec * 1000);
+	if (error)
+		NBDEBUG("can't set connect timeout");
 }
 
 /*
@@ -486,12 +493,6 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
 		return (EBADF);
 	if (nbp->nbp_flags & NBF_CONNECTED)
 		return (EISCONN);
-
-	/* Do local bind (any address) */
-	if ((error = t_kbind(tiptr, NULL, NULL)) != 0) {
-		NBDEBUG("nb_connect_in: bind local");
-		return (error);
-	}
 
 	/*
 	 * Setup (snd)call address (connect to).
@@ -871,10 +872,10 @@ smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
 	struct sockaddr_nb *snb;
-	int error;
+	int error = 0;
 
-	NBDEBUG("\n");
-	error = EINVAL;
+	if (nbp->nbp_tiptr == NULL)
+		return (EBADF);
 
 	/*
 	 * Allow repeated bind calls on one endpoint.
@@ -884,26 +885,37 @@ smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 	/*
 	 * Null name is an "anonymous" (NULL) bind request.
 	 * (Let the transport pick a local name.)
-	 * This transport does not support NULL bind.
+	 * This transport does not support NULL bind,
+	 * because we require a local NetBIOS name.
 	 */
 	if (sap == NULL)
-		goto out;
+		return (EINVAL);
 
 	/*LINTED*/
 	snb = (struct sockaddr_nb *)smb_dup_sockaddr(sap);
-	if (snb == NULL) {
-		error = ENOMEM;
-		goto out;
-	}
+	if (snb == NULL)
+		return (ENOMEM);
+
 	mutex_enter(&nbp->nbp_lock);
 	if (nbp->nbp_laddr)
 		smb_free_sockaddr((struct sockaddr *)nbp->nbp_laddr);
 	nbp->nbp_laddr = snb;
-	nbp->nbp_flags |= NBF_LOCADDR;
-	mutex_exit(&nbp->nbp_lock);
-	error = 0;
 
-out:
+	/*
+	 * Do local TCP bind with NULL (any address),
+	 * but just once (for multiple connect attempts)
+	 * or extra bind calls would cause errors.
+	 */
+	if ((nbp->nbp_flags & NBF_LOCADDR) == 0) {
+		error = t_kbind(nbp->nbp_tiptr, NULL, NULL);
+		if (error) {
+			NBDEBUG("t_kbind failed");
+		} else {
+			nbp->nbp_flags |= NBF_LOCADDR;
+		}
+	}
+	mutex_exit(&nbp->nbp_lock);
+
 	return (error);
 }
 
@@ -913,10 +925,8 @@ smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 	struct nbpcb *nbp = vcp->vc_tdata;
 	struct sockaddr_in sin;
 	struct sockaddr_nb *snb;
-	struct timespec ts1, ts2;
 	int error;
 
-	NBDEBUG("\n");
 	if (nbp->nbp_tiptr == NULL)
 		return (EBADF);
 	if (nbp->nbp_laddr == NULL)
@@ -946,34 +956,42 @@ smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 		smb_free_sockaddr((struct sockaddr *)nbp->nbp_paddr);
 	nbp->nbp_paddr = snb;
 
-	/* Setup the remote IP address. */
+	/*
+	 * Setup the remote IP address.
+	 * Try plain TCP first (port 445).
+	 */
 	bzero(&sin, sizeof (sin));
 	sin.sin_family = AF_INET;
-	sin.sin_port = htons(SMB_TCP_PORT);
+	sin.sin_port = htons(IPPORT_SMB); /* port 445 */
 	sin.sin_addr.s_addr = snb->snb_ipaddr;
 
-	/*
-	 * For our general timeout we use the greater of
-	 * the default (15 sec) and 4 times the time it
-	 * took for the first round trip.  We used to use
-	 * just the latter, but sometimes if the first
-	 * round trip is very fast the subsequent 4 sec
-	 * timeouts are simply too short.
-	 */
-	gethrestime(&ts1);
+again:
+	NBDEBUG("trying port %d\n", ntohs(sin.sin_port));
 	error = nb_connect_in(nbp, &sin, p);
-	if (error)
+	switch (error) {
+	case 0:
+		break;
+	case ECONNREFUSED:
+		if (sin.sin_port != htons(IPPORT_NETBIOS_SSN)) {
+			/* Try again w/ NetBIOS (port 139) */
+			sin.sin_port = htons(IPPORT_NETBIOS_SSN);
+			goto again;
+		}
+		/* FALLTHROUGH */
+	default:
 		goto out;
-	gethrestime(&ts2);
-	timespecsub(&ts2, &ts1);
-	timespecadd(&ts2, &ts2);
-	timespecadd(&ts2, &ts2);	/*  * 4 */
-	/*CSTYLED*/
-	if (timespeccmp(&ts2, (&(nbp->nbp_timo)), >))
-		nbp->nbp_timo = ts2;
-	error = nbssn_rq_request(nbp, p);
-	if (error)
-		nb_disconnect(nbp);
+	}
+
+	/*
+	 * If we connected via NetBIOS (port 139),
+	 * need to do a session request.
+	 */
+	if (sin.sin_port == htons(IPPORT_NETBIOS_SSN)) {
+		error = nbssn_rq_request(nbp, p);
+		if (error)
+			nb_disconnect(nbp);
+	}
+
 out:
 	mutex_enter(&nbp->nbp_lock);
 	nbp->nbp_flags &= ~NBF_RECVLOCK;
@@ -1013,10 +1031,8 @@ nb_disconnect(struct nbpcb *nbp)
 	}
 	mutex_exit(&nbp->nbp_lock);
 
-	if (save_flags & NBF_CONNECTED) {
+	if (save_flags & NBF_CONNECTED)
 		nb_snddis(tiptr);
-		(void) t_kunbind(tiptr);
-	}
 
 	if (nbp->nbp_state != NBST_RETARGET) {
 		nbp->nbp_state = NBST_CLOSED; /* really IDLE */
