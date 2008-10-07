@@ -2284,7 +2284,7 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 	 * want here.  This is limited to leaf devices, because otherwise
 	 * closing the device will affect other children.
 	 */
-	if (!vdev_readable(vd) && vd->vdev_ops->vdev_op_leaf)
+	if (vdev_is_dead(vd) && vd->vdev_ops->vdev_op_leaf)
 		vd->vdev_ops->vdev_op_close(vd);
 
 	if (vd->vdev_removed &&
