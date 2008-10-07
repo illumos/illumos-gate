@@ -1381,3 +1381,4 @@ Bugid   Risk Synopsis
 6749055 ld should generate GNU style VERSYM indexes for VERNEED records (D)
 	PSARC/2008/603 ELF objects to adopt GNU-style Versym indexes
 6752728 link-editor can enter UNDEF symbols in symbol sort sections
+6756472 AOUT search path pruning (D)

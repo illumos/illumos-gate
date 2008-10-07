@@ -484,6 +484,8 @@
 @ MSG_LIB_RUNPATH	" search path=%s  (RUNPATH/RPATH from file %s)"
 @ MSG_LIB_DEFAULT	" search path=%s  (default)"
 @ MSG_LIB_DEFAULTC	" search path=%s  (configuration default - %s)"
+@ MSG_LIB_TDEFAULT	" search path=%s  (trusted default)"
+@ MSG_LIB_TDEFAULTC	" search path=%s  (trusted configuration default - %s)"
 @ MSG_LIB_LIBPATH	" search path=%s  (LIBPATH or -YP)"
 @ MSG_LIB_YPATH		" search path=%s  replaces  path=%s  (-Y%c)"
 

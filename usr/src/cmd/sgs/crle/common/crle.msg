@@ -20,11 +20,9 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 
 @ _START_
 
@@ -163,8 +161,9 @@
 @ MSG_DEF_AOUTDLP	"  Default Library Path (AOUT):\t\
 			 /usr/4lib:/usr/lib:/usr/local/lib  \
 			 (system default)\n"
-@ MSG_DEF_AOUTTD	"  Trusted Directories (AOUT):\t\
-			 /usr/4lib:/usr/lib:/usr/ucblib:/usr/local/lib  \
+@ MSG_DEF_AOUTNEWTD	"  Trusted Directories (AOUT):\t\
+			 /lib/secure:/usr/lib/secure  (system default)\n"
+@ MSG_DEF_AOUTOLDTD	"  Trusted Directories (AOUT):\t\/usr/lib/secure  \
 			 (system default)\n"
 
 @ MSG_ENV_TITLE		"\nEnvironment Variables:\n"
@@ -293,7 +292,6 @@
 @ MSG_PTH_UPTD_64	"/lib/secure/64"
 
 @ MSG_PTH_AOUTDLP	"/usr/4lib:/usr/lib:/usr/local/lib"
-@ MSG_PTH_AOUTTD	"/usr/4lib:/usr/lib:/usr/ucblib:/usr/local/lib"
 
 @ MSG_DIR_ROOT		"/"
 @ MSG_DIR_DOT		"."

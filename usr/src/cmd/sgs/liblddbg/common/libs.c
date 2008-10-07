@@ -109,25 +109,46 @@ void
 Dbg_libs_path(Lm_list *lml, const char *path, uint_t orig, const char *obj)
 {
 	const char	*fmt;
+	uint_t		search;
 
-	if (path == (const char *)0)
+	if (path == NULL)
 		return;
 	if (DBG_NOTCLASS(DBG_C_LIBS))
 		return;
 
-	if (orig & LA_SER_LIBPATH) {
+	search = orig &
+	    (LA_SER_LIBPATH | LA_SER_RUNPATH | LA_SER_DEFAULT | LA_SER_SECURE);
+
+	switch (search) {
+	case LA_SER_LIBPATH:
 		if (orig & LA_SER_CONFIG)
 			fmt = MSG_INTL(MSG_LIB_LDLIBPATHC);
 		else
 			fmt = MSG_INTL(MSG_LIB_LDLIBPATH);
-	} else if (orig & LA_SER_RUNPATH) {
+		break;
+
+	case LA_SER_RUNPATH:
 		fmt = MSG_INTL(MSG_LIB_RUNPATH);
-	} else if (orig & LA_SER_DEFAULT) {
+		break;
+
+	case LA_SER_DEFAULT:
 		if (orig & LA_SER_CONFIG)
 			fmt = MSG_INTL(MSG_LIB_DEFAULTC);
 		else
 			fmt = MSG_INTL(MSG_LIB_DEFAULT);
+		break;
+
+	case LA_SER_SECURE:
+		if (orig & LA_SER_CONFIG)
+			fmt = MSG_INTL(MSG_LIB_TDEFAULTC);
+		else
+			fmt = MSG_INTL(MSG_LIB_TDEFAULT);
+		break;
+
+	default:
+		return;
 	}
+
 	dbg_print(lml, fmt, path, obj);
 }
 

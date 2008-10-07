@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Object file dependent support for a.out format objects.
  */
@@ -59,13 +57,11 @@ static Pnode		aout_dflt_dirs[] = {
 };
 
 static Pnode		aout_secure_dirs[] = {
-	{ MSG_ORIG(MSG_PTH_USR4LIB),	0,	MSG_PTH_USR4LIB_SIZE,
+#ifndef	SGS_PRE_UNIFIED_PROCESS
+	{ MSG_ORIG(MSG_PTH_LIBSE),	0,	MSG_PTH_LIBSE_SIZE,
 		LA_SER_SECURE,		0,	&aout_secure_dirs[1] },
-	{ MSG_ORIG(MSG_PTH_USRLIB),	0,	MSG_PTH_USRLIB_SIZE,
-		LA_SER_SECURE,		0,	&aout_secure_dirs[2] },
-	{ MSG_ORIG(MSG_PTH_USRUCBLIB),	0,	MSG_PTH_USRUCBLIB_SIZE,
-		LA_SER_SECURE,		0,	&aout_secure_dirs[3] },
-	{ MSG_ORIG(MSG_PTH_USRLCLIB),	0,	MSG_PTH_USRLCLIB_SIZE,
+#endif
+	{ MSG_ORIG(MSG_PTH_USRLIBSE),	0,	MSG_PTH_USRLIBSE_SIZE,
 		LA_SER_SECURE,		0, 0 }
 };
 

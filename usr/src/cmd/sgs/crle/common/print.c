@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -177,7 +176,11 @@ fablib(Crle_desc * crle, int flag)
 		break;
 
 	case CRLE_ASLIB:
-		path = MSG_ORIG(MSG_PTH_AOUTTD);
+#ifndef	SGS_PRE_UNIFIED_PROCESS
+		path = MSG_ORIG(MSG_PTH_NEWTD);
+#else
+		path = MSG_ORIG(MSG_PTH_OLDTD);
+#endif
 		list = &crle->c_aslibpath;
 		break;
 
@@ -664,7 +667,11 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			/*
 			 * Indicate any system default.
 			 */
-			(void) printf(MSG_INTL(MSG_DEF_AOUTTD));
+#ifndef	SGS_PRE_UNIFIED_PROCESS
+			(void) printf(MSG_INTL(MSG_DEF_AOUTNEWTD));
+#else
+			(void) printf(MSG_INTL(MSG_DEF_AOUTOLDTD));
+#endif
 		}
 	}
 
@@ -1062,7 +1069,11 @@ inspectconfig(Crle_desc * crle, int c_class)
 
 				if (crle->c_flags & CRLE_AOUT) {
 					fmt1 = MSG_INTL(MSG_DEF_AOUTDLP);
-					fmt2 = MSG_INTL(MSG_DEF_AOUTTD);
+#ifndef SGS_PRE_UNIFIED_PROCESS
+					fmt2 = MSG_INTL(MSG_DEF_AOUTNEWTD);
+#else
+					fmt2 = MSG_INTL(MSG_DEF_AOUTOLDTD);
+#endif
 				} else {
 #if M_CLASS == ELFCLASS64
 #ifndef	SGS_PRE_UNIFIED_PROCESS
