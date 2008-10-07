@@ -272,11 +272,13 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 		quiesce_active = 1;
 
 		quiesce_devices(ddi_root_node(), &reset_status);
-		if (fcn == AD_FASTREBOOT && reset_status == -1 &&
-		    !force_fastreboot) {
-			prom_printf("Driver(s) not capable of fast reboot. "
-			    "Fall back to regular reboot.\n");
-			fastreboot_capable = 0;
+		if (reset_status == -1) {
+			if (fcn == AD_FASTREBOOT && !force_fastreboot) {
+				prom_printf("Driver(s) not capable of fast "
+				    "reboot. Fall back to regular reboot.\n");
+				fastreboot_capable = 0;
+			} else if (fcn != AD_FASTREBOOT)
+				fastreboot_capable = 0;
 		}
 
 		quiesce_active = 0;
@@ -286,9 +288,8 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	 * try to reset devices.  reset_leaves() should only be called when
 	 * there are no other threads that could be accessing devices
 	 */
-	if (!panicstr && !fastreboot_capable) {
+	if (!panicstr && !fastreboot_capable)
 		reset_leaves();
-	}
 
 	(void) spl8();
 	(*psm_shutdownf)(cmd, fcn);
