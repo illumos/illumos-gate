@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nge.h"
 static uint32_t	nge_watchdog_count	= 1 << 29;
 extern boolean_t nge_enable_msi;
@@ -354,7 +352,7 @@ nge_seeprom_access(nge_t *ngep, uint32_t cmd, nge_regno_t addr, uint16_t *dp)
 	/*
 	 * Assemble the command ...
 	 */
-	cmd_reg.cmd_bits.addr = addr;
+	cmd_reg.cmd_bits.addr = (uint32_t)addr;
 	cmd_reg.cmd_bits.cmd = cmd;
 	cmd_reg.cmd_bits.sts = 0;
 

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nge.h"
 
 #undef	NGE_DBG
@@ -94,7 +92,7 @@ nge_mii_access(nge_t *ngep, nge_regno_t regno, uint16_t data, uint32_t cmd)
 	/*
 	 * Assemble the operation cmd
 	 */
-	mdio_adr.adr_bits.phy_reg = regno;
+	mdio_adr.adr_bits.phy_reg = (uint16_t)regno;
 	mdio_adr.adr_bits.phy_adr = ngep->phy_xmii_addr;
 	mdio_adr.adr_bits.mdio_rw = (cmd == NGE_MDIO_WRITE) ? 1 : 0;
 

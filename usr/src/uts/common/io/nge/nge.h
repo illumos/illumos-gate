@@ -27,8 +27,6 @@
 #ifndef	_SYS_NGE_H
 #define	_SYS_NGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -539,8 +537,8 @@ typedef struct send_ring {
 	struct nge		*ngep;		/* (const) containing	*/
 						/* driver soft state	*/
 
-	uint64_t		tx_hwmark;
-	uint64_t		tx_lwmark;
+	uint32_t		tx_hwmark;
+	uint32_t		tx_lwmark;
 
 	/*
 	 * The tx_lock must be held when updating
@@ -548,20 +546,20 @@ typedef struct send_ring {
 	 * (tx_next)
 	 */
 	kmutex_t		tx_lock[1];	/* serialize h/w update	*/
-	uint64_t		tx_next;	/* next slot to use	*/
-	uint64_t		tx_flow;
+	uint32_t		tx_next;	/* next slot to use	*/
+	uint32_t		tx_flow;
 
 	/*
 	 * These counters/indexes are manipulated in the transmit
 	 * path using atomics rather than mutexes for speed
 	 */
-	uint64_t		tx_free;	/* # of slots available	*/
+	uint32_t		tx_free;	/* # of slots available	*/
 
 	/*
 	 * index (tc_next).
 	 */
 	kmutex_t		tc_lock[1];
-	uint64_t		tc_next;	/* next slot to recycle	*/
+	uint32_t		tc_next;	/* next slot to recycle	*/
 						/* ("consumer index")	*/
 
 	sw_tx_sbd_t		*sw_sbds; 	/* software descriptors	*/

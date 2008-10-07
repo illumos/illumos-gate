@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "nge.h"
 
@@ -118,14 +116,16 @@ nge_tx_dmah_push(nge_dmah_list_t *src, nge_dmah_list_t *dst)
 }
 
 static void
-nge_tx_desc_sync(nge_t *ngep, uint64_t start, uint64_t num, uint_t type)
+nge_tx_desc_sync(nge_t *ngep, uint32_t start_index, uint32_t bds, uint_t type)
 {
 	send_ring_t *srp = ngep->send;
 	const size_t txd_size = ngep->desc_attr.txd_size;
 	const uint64_t end = srp->desc.nslots * txd_size;
+	uint64_t start;
+	uint64_t num;
 
-	start = start * txd_size;
-	num = num * txd_size;
+	start = start_index * txd_size;
+	num = bds * txd_size;
 
 	if (start + num <= end)
 		(void) ddi_dma_sync(srp->desc.dma_hdl, start, num, type);
@@ -146,11 +146,11 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 	int resched;
 	uint32_t stflg;
 	size_t len;
-	uint64_t free;
-	uint64_t slot;
-	uint64_t used;
-	uint64_t next;
-	uint64_t nslots;
+	uint32_t free;
+	uint32_t slot;
+	uint32_t used;
+	uint32_t next;
+	uint32_t nslots;
 	mblk_t *mp;
 	sw_tx_sbd_t *ssbdp;
 	void *hw_sbd_p;
@@ -261,13 +261,13 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 		(void) ddi_intr_trigger_softint(ngep->resched_hdl, NULL);
 }
 
-static uint64_t
-nge_tx_alloc(nge_t *ngep, uint64_t num)
+static uint32_t
+nge_tx_alloc(nge_t *ngep, uint32_t num)
 {
-	uint64_t start;
+	uint32_t start;
 	send_ring_t *srp;
 
-	start = (uint64_t)-1;
+	start = (uint32_t)-1;
 	srp = ngep->send;
 
 	mutex_enter(srp->tx_lock);
@@ -293,7 +293,7 @@ nge_tx_alloc(nge_t *ngep, uint64_t num)
 }
 
 static void
-nge_tx_start(nge_t *ngep, uint64_t slotnum)
+nge_tx_start(nge_t *ngep, uint32_t slotnum)
 {
 	nge_mode_cntl mode_cntl;
 	send_ring_t *srp;
@@ -339,8 +339,8 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 	size_t totlen;
 	size_t mblen;
 	uint32_t flags;
-	uint64_t bds;
-	uint64_t start_index;
+	uint32_t bds;
+	uint32_t start_index;
 	char *txb;
 	mblk_t *bp;
 	void *hw_sbd_p;
@@ -350,7 +350,7 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 	    NULL, NULL, &flags);
 	bds = 0x1;
 
-	if ((uint64_t)-1 == (start_index = nge_tx_alloc(ngep, bds)))
+	if ((uint32_t)-1 == (start_index = nge_tx_alloc(ngep, bds)))
 		return (SEND_COPY_FAIL);
 
 	ASSERT(start_index < srp->desc.nslots);
@@ -420,8 +420,8 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 	uint32_t nslots;
 	uint32_t mblen;
 	uint32_t flags;
-	uint64_t start_index;
-	uint64_t end_index;
+	uint32_t start_index;
+	uint32_t end_index;
 	mblk_t *bp;
 	void *hw_sbd_p;
 	send_ring_t *srp;
@@ -511,7 +511,7 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 	 */
 
 
-	if ((uint64_t)-1 == (start_index = nge_tx_alloc(ngep, slot)))
+	if ((uint32_t)-1 == (start_index = nge_tx_alloc(ngep, slot)))
 		goto map_fail;
 
 	ASSERT(start_index < nslots);
@@ -539,14 +539,14 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 
 	/* fill sw desc */
 
-	for (j = start_index; end_index - j != 0; j = NEXT(j, nslots))	{
+	for (j = start_index; end_index - j != 0; j = NEXT(j, nslots)) {
 
 		srp->sw_sbds[j].flags = CONTROLER_OWN;
 	}
 
 	srp->sw_sbds[j].mp = mp;
 	srp->sw_sbds[j].mp_hndl = dmah_list;
-	srp->sw_sbds[j].frags = fragno;
+	srp->sw_sbds[j].frags = (uint32_t)fragno;
 	srp->sw_sbds[j].flags = CONTROLER_OWN;
 
 	nge_tx_start(ngep, slot);

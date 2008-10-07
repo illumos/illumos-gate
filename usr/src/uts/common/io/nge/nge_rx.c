@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nge.h"
 
 #undef	NGE_DBG
@@ -444,7 +442,7 @@ nge_hot_rxd_fill(void *hwd, const ddi_dma_cookie_t *cookie, size_t len)
 	hw_bd_p->cntl_status.cntl_val = 0;
 
 	hw_bd_p->host_buf_addr_hi = dmac_addr >> 32;
-	hw_bd_p->host_buf_addr_lo = dmac_addr;
+	hw_bd_p->host_buf_addr_lo = (uint32_t)dmac_addr;
 	hw_bd_p->cntl_status.control_bits.bcnt = len - 1;
 
 	membar_producer();
@@ -454,15 +452,14 @@ nge_hot_rxd_fill(void *hwd, const ddi_dma_cookie_t *cookie, size_t len)
 void
 nge_sum_rxd_fill(void *hwd, const ddi_dma_cookie_t *cookie, size_t len)
 {
-	uint64_t dmac_addr;
 	sum_rx_bd * hw_bd_p;
 
 	hw_bd_p = hwd;
-	dmac_addr = cookie->dmac_address + NGE_HEADROOM;
 
 	hw_bd_p->cntl_status.cntl_val = 0;
 
-	hw_bd_p->host_buf_addr = dmac_addr;
+	hw_bd_p->host_buf_addr =
+	    (uint32_t)(cookie->dmac_address + NGE_HEADROOM);
 	hw_bd_p->cntl_status.control_bits.bcnt = len - 1;
 
 	membar_producer();
