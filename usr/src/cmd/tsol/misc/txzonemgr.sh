@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # This script provides a simple GUI for managing labeled zones.
@@ -67,7 +66,7 @@ labelCheck() {
 }
 
 snapshotCheck() {
-	filesystem=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
+	filesystem=`zfs list -t snapshot |grep $ZDSET/$zonename |cut -d " " -f1`
 	if [[ -n $filesystem ]]; then
 		snapshot="Create Snapshot\n"
 	fi
@@ -176,7 +175,7 @@ resolveXdisplay() {
 }
 
 clone() {
-	image=`zfs list |grep snapshot|cut -d " " -f1| \
+	image=`zfs list -t snapshot |grep snapshot|cut -d " " -f1| \
 	    zenity --list \
 		--title="$title" \
 	        --height=300 \
