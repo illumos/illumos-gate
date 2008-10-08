@@ -3546,6 +3546,7 @@ ata_resume_drive(ata_drv_t *ata_drvp)
 			return;
 	} else {
 		(void) atapi_init_drive(ata_drvp);
+		(void) atapi_reset_dma_mode(ata_drvp);
 	}
 	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
 
@@ -3637,6 +3638,9 @@ ata_power(dev_info_t *dip, int component, int level)
 	if (!ata_ctlp->ac_pm_support)
 		return (DDI_FAILURE);
 
+	if (ata_ctlp->ac_pm_level == level)
+		return (DDI_SUCCESS);
+
 	switch (level) {
 	case PM_LEVEL_D0:
 		if (ata_save_pci_config)
@@ -3669,11 +3673,13 @@ ata_change_power(dev_info_t *dip, uint8_t cmd)
 	struct ata_id 	id;
 	uchar_t		lun;
 	uchar_t		lastlun;
+	struct ata_id	*aidp;
 
 	ADBG_TRACE(("ata_change_power entered, cmd = %d\n", cmd));
 
 	instance = ddi_get_instance(dip);
 	ata_ctlp = ddi_get_soft_state(ata_state, instance);
+
 	/*
 	 * Issue command on each disk device on the bus.
 	 */
@@ -3682,6 +3688,15 @@ ata_change_power(dev_info_t *dip, uint8_t cmd)
 			ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
 			if (ata_drvp == NULL)
 				continue;
+			aidp = &ata_drvp->ad_id;
+			if ((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
+			    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK)) {
+				ata_drvp->ad_dma_cap = ATA_DMA_ULTRAMODE;
+				ata_drvp->ad_dma_mode = aidp->ai_ultradma;
+			} else if (aidp->ai_dworddma & ATAC_MDMA_SEL_MASK) {
+				ata_drvp->ad_dma_cap = ATA_DMA_MWORDMODE;
+				ata_drvp->ad_dma_mode = aidp->ai_dworddma;
+			}
 			if (ata_drive_type(ata_drvp->ad_drive_bits,
 			    ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
 			    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
@@ -3799,6 +3814,12 @@ ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 
 	/* Return directly if DMA is not supported */
 	if (!(aidp->ai_cap & ATAC_DMA_SUPPORT))
+		return (rval);
+
+	/* Return if DMA mode is already selected */
+	if (((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
+	    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK)) ||
+	    (aidp->ai_dworddma & ATAC_MDMA_SEL_MASK))
 		return (rval);
 
 	/* First check Ultra DMA mode if no DMA is selected */

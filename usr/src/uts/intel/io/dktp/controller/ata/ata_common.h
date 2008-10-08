@@ -27,8 +27,6 @@
 #ifndef _ATA_COMMON_H
 #define	_ATA_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -497,7 +495,17 @@ typedef struct ata_drv {
 	 * Support for 48-bit LBA (ATA-6)
 	 */
 	uint64_t		ad_capacity;	/* Total sectors on disk */
+
+	/*
+	 * save/restore the DMA mode for suspend/resume
+	 */
+	ushort_t		ad_dma_cap;
+	ushort_t		ad_dma_mode;
 } ata_drv_t;
+
+/* values for ad_dma_cap */
+#define	ATA_DMA_ULTRAMODE	0x1
+#define	ATA_DMA_MWORDMODE	0x2
 
 typedef	struct	ata_tgt {
 	ata_drv_t	*at_drvp;
@@ -675,6 +683,7 @@ int	ata_wait3(ddi_acc_handle_t io_hdl, caddr_t ioaddr, uchar_t onbits1,
 int	ata_test_lba_support(struct ata_id *aidp);
 void	ata_nsecwait(clock_t count);
 int	ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp);
+void	atapi_reset_dma_mode(ata_drv_t *ata_drvp);
 
 
 /*
