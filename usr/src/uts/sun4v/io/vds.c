@@ -92,14 +92,19 @@
 #define	VD_SEQ_NUM		0x20
 #define	VD_SETUP_ERROR		0x40
 
-/* Flags for writing to a vdisk which is a file */
-#define	VD_FILE_WRITE_FLAGS	SM_ASYNC
-
 /* Number of backup labels */
 #define	VD_DSKIMG_NUM_BACKUP	5
 
 /* Timeout for SCSI I/O */
 #define	VD_SCSI_RDWR_TIMEOUT	30	/* 30 secs */
+
+/*
+ * Default number of threads for the I/O queue. In many cases, we will not
+ * receive more than 8 I/O requests at the same time. However there are
+ * cases (for example during the OS installation) where we can have a lot
+ * more (up to the limit of the DRing size).
+ */
+#define	VD_IOQ_NTHREADS		8
 
 /* Maximum number of logical partitions */
 #define	VD_MAXPART	(NDKMAP + 1)
@@ -113,6 +118,26 @@
 /* Logical block address for EFI */
 #define	VD_EFI_LBA_GPT		1	/* LBA of the GPT */
 #define	VD_EFI_LBA_GPE		2	/* LBA of the GPE */
+
+/*
+ * Flags defining the behavior for flushing asynchronous writes used to
+ * performed some write I/O requests.
+ *
+ * The VD_AWFLUSH_IMMEDIATE enables immediate flushing of asynchronous
+ * writes. This ensures that data are committed to the backend when the I/O
+ * request reply is sent to the guest domain so this prevents any data to
+ * be lost in case a service domain unexpectedly crashes.
+ *
+ * The flag VD_AWFLUSH_DEFER indicates that flushing is deferred to another
+ * thread while the request is immediatly marked as completed. In that case,
+ * a guest domain can a receive a reply that its write request is completed
+ * while data haven't been flushed to disk yet.
+ *
+ * Flags VD_AWFLUSH_IMMEDIATE and VD_AWFLUSH_DEFER are mutually exclusive.
+ */
+#define	VD_AWFLUSH_IMMEDIATE	0x01	/* immediate flushing */
+#define	VD_AWFLUSH_DEFER	0x02	/* defer flushing */
+#define	VD_AWFLUSH_GROUP	0x04	/* group requests before flushing */
 
 /* Driver types */
 typedef enum vd_driver {
@@ -208,6 +233,10 @@ vd_driver_type_t vds_driver_types[] = {
 /* Identify if a backend is a disk image */
 #define	VD_DSKIMG(vd)	((vd)->vdisk_type == VD_DISK_TYPE_DISK &&	\
 	((vd)->file || (vd)->volume))
+
+/* Next index in a write queue */
+#define	VD_WRITE_INDEX_NEXT(vd, id)		\
+	((((id) + 1) >= vd->dring_len)? 0 : (id) + 1)
 
 /* Message for disk access rights reset failure */
 #define	VD_RESET_ACCESS_FAILURE_MSG \
@@ -398,18 +427,23 @@ typedef struct vd_task {
 	ldc_mem_handle_t	mhdl;		/* task memory handle */
 	int			status;		/* status of processing task */
 	int	(*completef)(struct vd_task *task); /* completion func ptr */
+	uint32_t		write_index;	/* index in the write_queue */
 } vd_task_t;
 
 /*
  * Soft state structure for a virtual disk instance
  */
 typedef struct vd {
+	uint64_t		id;		/* vdisk id */
 	uint_t			initialized;	/* vdisk initialization flags */
 	uint64_t		operations;	/* bitmask of VD_OPs exported */
 	vio_ver_t		version;	/* ver negotiated with client */
 	vds_t			*vds;		/* server for this vdisk */
 	ddi_taskq_t		*startq;	/* queue for I/O start tasks */
 	ddi_taskq_t		*completionq;	/* queue for completion tasks */
+	ddi_taskq_t		*ioq;		/* queue for I/O */
+	uint32_t		write_index;	/* next write index */
+	buf_t			**write_queue;	/* queue for async writes */
 	ldi_handle_t		ldi_handle[V_NUMPAR];	/* LDI slice handles */
 	char			device_path[MAXPATHLEN + 1]; /* vdisk device */
 	dev_t			dev[V_NUMPAR];	/* dev numbers for slices */
@@ -521,10 +555,28 @@ static int	vds_dev_retries = VDS_RETRIES;
 static int	vds_dev_delay = VDS_DEV_DELAY;
 static void	*vds_state;
 
-static uint_t	vd_file_write_flags = VD_FILE_WRITE_FLAGS;
-
 static short	vd_scsi_rdwr_timeout = VD_SCSI_RDWR_TIMEOUT;
 static int	vd_scsi_debug = USCSI_SILENT;
+
+/*
+ * Number of threads in the taskq handling vdisk I/O. This can be set up to
+ * the size of the DRing which is the maximum number of I/O we can receive
+ * in parallel. Note that using a high number of threads can improve performance
+ * but this is going to consume a lot of resources if there are many vdisks.
+ */
+static int	vd_ioq_nthreads = VD_IOQ_NTHREADS;
+
+/*
+ * Tunable to define the behavior for flushing asynchronous writes used to
+ * performed some write I/O requests. The default behavior is to group as
+ * much asynchronous writes as possible and to flush them immediatly.
+ *
+ * If the tunable is set to 0 then explicit flushing is disabled. In that
+ * case, data will be flushed by traditional mechanism (like fsflush) but
+ * this might not happen immediatly.
+ *
+ */
+static int	vd_awflush = VD_AWFLUSH_IMMEDIATE | VD_AWFLUSH_GROUP;
 
 /*
  * Tunable to define the behavior of the service domain if the vdisk server
@@ -816,10 +868,6 @@ static ssize_t
 vd_dskimg_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t offset,
     size_t len)
 {
-	caddr_t	maddr;
-	size_t moffset, mlen, n;
-	uint_t smflags;
-	enum seg_rw srw;
 	ssize_t resid;
 	struct buf buf;
 	int status;
@@ -830,16 +878,13 @@ vd_dskimg_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t offset,
 	if ((status = vd_dskimg_io_params(vd, slice, &offset, &len)) != 0)
 		return ((status == ENODATA)? 0: -1);
 
-	offset *= DEV_BSIZE;
-
 	if (vd->volume) {
-		ASSERT(offset % DEV_BSIZE == 0);
 
 		bioinit(&buf);
 		buf.b_flags	= B_BUSY |
 		    ((operation == VD_OP_BREAD)? B_READ : B_WRITE);
 		buf.b_bcount	= len;
-		buf.b_lblkno	= offset / DEV_BSIZE;
+		buf.b_lblkno	= offset;
 		buf.b_edev 	= vd->dev[0];
 		buf.b_un.b_addr = data;
 
@@ -872,47 +917,12 @@ vd_dskimg_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t offset,
 
 	ASSERT(vd->file);
 
-	srw = (operation == VD_OP_BREAD)? S_READ : S_WRITE;
-	smflags = (operation == VD_OP_BREAD)? 0 :
-	    (SM_WRITE | vd_file_write_flags);
-	n = len;
+	status = vn_rdwr((operation == VD_OP_BREAD)? UIO_READ : UIO_WRITE,
+	    vd->file_vnode, data, len, offset * DEV_BSIZE, UIO_SYSSPACE, FSYNC,
+	    RLIM64_INFINITY, kcred, &resid);
 
-	do {
-		/*
-		 * segmap_getmapflt() returns a MAXBSIZE chunk which is
-		 * MAXBSIZE aligned.
-		 */
-		moffset = offset & MAXBOFFSET;
-		mlen = MIN(MAXBSIZE - moffset, n);
-		maddr = segmap_getmapflt(segkmap, vd->file_vnode, offset,
-		    mlen, 1, srw);
-		/*
-		 * Fault in the pages so we can check for error and ensure
-		 * that we can safely used the mapped address.
-		 */
-		if (segmap_fault(kas.a_hat, segkmap, maddr, mlen,
-		    F_SOFTLOCK, srw) != 0) {
-			(void) segmap_release(segkmap, maddr, 0);
-			return (-1);
-		}
-
-		if (operation == VD_OP_BREAD)
-			bcopy(maddr + moffset, data, mlen);
-		else
-			bcopy(data, maddr + moffset, mlen);
-
-		if (segmap_fault(kas.a_hat, segkmap, maddr, mlen,
-		    F_SOFTUNLOCK, srw) != 0) {
-			(void) segmap_release(segkmap, maddr, 0);
-			return (-1);
-		}
-		if (segmap_release(segkmap, maddr, smflags) != 0)
-			return (-1);
-		n -= mlen;
-		offset += mlen;
-		data += mlen;
-
-	} while (n > 0);
+	if (status != 0)
+		return (-1);
 
 	return (len);
 }
@@ -1864,6 +1874,56 @@ done:
 	return (status);
 }
 
+static int
+vd_flush_write(vd_t *vd)
+{
+	int status, rval;
+
+	if (vd->file) {
+		status = VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL);
+	} else {
+		status = ldi_ioctl(vd->ldi_handle[0], DKIOCFLUSHWRITECACHE,
+		    NULL, vd->open_flags | FKIOCTL, kcred, &rval);
+	}
+
+	return (status);
+}
+
+static void
+vd_bio_task(void *arg)
+{
+	struct buf *buf = (struct buf *)arg;
+	vd_task_t *task = (vd_task_t *)buf->b_private;
+	vd_t *vd = task->vd;
+	ssize_t resid;
+	int status;
+
+	if (vd->zvol) {
+
+		status = ldi_strategy(vd->ldi_handle[0], buf);
+
+	} else {
+
+		ASSERT(vd->file);
+
+		status = vn_rdwr((buf->b_flags & B_READ)? UIO_READ : UIO_WRITE,
+		    vd->file_vnode, buf->b_un.b_addr, buf->b_bcount,
+		    buf->b_lblkno * DEV_BSIZE, UIO_SYSSPACE, 0,
+		    RLIM64_INFINITY, kcred, &resid);
+
+		if (status == 0) {
+			buf->b_resid = resid;
+			biodone(buf);
+			return;
+		}
+	}
+
+	if (status != 0) {
+		bioerror(buf, status);
+		biodone(buf);
+	}
+}
+
 /*
  * We define our own biodone function so that buffers used for
  * asynchronous writes are not released when biodone() is called.
@@ -1875,8 +1935,7 @@ vd_biodone(struct buf *bp)
 	ASSERT(SEMA_HELD(&bp->b_sem));
 
 	bp->b_flags |= B_DONE;
-	if (!(bp->b_flags & B_ASYNC))
-		sema_v(&bp->b_io);
+	sema_v(&bp->b_io);
 
 	return (0);
 }
@@ -2002,7 +2061,7 @@ vd_start_bio(vd_task_t *task)
 			slice = 0;
 		}
 
-	} else if (vd->volume) {
+	} else if (vd->volume || vd->file) {
 
 		rv = vd_dskimg_io_params(vd, slice, &offset, &length);
 		if (rv != 0) {
@@ -2011,7 +2070,7 @@ vd_start_bio(vd_task_t *task)
 		}
 		slice = 0;
 
-	} else if ((slice == VD_SLICE_NONE) && !vd->file) {
+	} else if (slice == VD_SLICE_NONE) {
 
 		/*
 		 * This is not a disk image so it is a real disk. We
@@ -2036,64 +2095,90 @@ vd_start_bio(vd_task_t *task)
 	}
 
 	/* Start the block I/O */
-	if (vd->file) {
-		rv = vd_dskimg_rw(vd, slice, request->operation, bufaddr,
-		    offset, length);
-		if (rv < 0) {
-			request->nbytes = 0;
-			request->status = EIO;
-		} else {
-			request->nbytes += rv;
-			request->status = 0;
-		}
-	} else {
-		bioinit(buf);
-		buf->b_flags	= B_BUSY;
-		buf->b_bcount	= length;
-		buf->b_lblkno	= offset;
-		buf->b_bufsize	= buflen;
-		buf->b_edev 	= vd->dev[slice];
-		buf->b_un.b_addr = bufaddr;
-		buf->b_iodone	= vd_biodone;
+	bioinit(buf);
+	buf->b_flags	= B_BUSY;
+	buf->b_bcount	= length;
+	buf->b_lblkno	= offset;
+	buf->b_bufsize	= buflen;
+	buf->b_edev 	= vd->dev[slice];
+	buf->b_un.b_addr = bufaddr;
+	buf->b_iodone	= vd_biodone;
+
+	if (vd->file || vd->zvol) {
+		/*
+		 * I/O to a file are dispatched to an I/O queue, so that several
+		 * I/Os can be processed in parallel. We also do that for ZFS
+		 * volumes because the ZFS volume strategy() function will only
+		 * return after the I/O is completed (instead of just starting
+		 * the I/O).
+		 */
 
 		if (request->operation == VD_OP_BREAD) {
 			buf->b_flags |= B_READ;
 		} else {
 			/*
-			 * If we have a ZFS volume then we do an
-			 * asynchronous write and we will wait for the
-			 * completion of the write in vd_complete_bio()
-			 * using the DKIOCFLUSHWRITECACHE ioctl. We
-			 * do so for performance reason because, for a
-			 * synchronous write, the ZFS volume strategy()
-			 * function would only return after the write is
-			 * commited and this prevents starting multiple
-			 * writes in parallel.
+			 * For ZFS volumes and files, we do an asynchronous
+			 * write and we will wait for the completion of the
+			 * write in vd_complete_bio() by flushing the volume
+			 * or file.
+			 *
+			 * This done for performance reasons, so that we can
+			 * group together several write requests into a single
+			 * flush operation.
 			 */
-			if (vd->zvol)
-				buf->b_flags |= B_WRITE | B_ASYNC;
-			else
-				buf->b_flags |= B_WRITE;
+			buf->b_flags |= B_WRITE | B_ASYNC;
+
+			/*
+			 * We keep track of the write so that we can group
+			 * requests when flushing. The write queue has the
+			 * same number of slots as the dring so this prevents
+			 * the write queue from wrapping and overwriting
+			 * existing entries: if the write queue gets full
+			 * then that means that the dring is full so we stop
+			 * receiving new requests until an existing request
+			 * is processed, removed from the write queue and
+			 * then from the dring.
+			 */
+			task->write_index = vd->write_index;
+			vd->write_queue[task->write_index] = buf;
+			vd->write_index =
+			    VD_WRITE_INDEX_NEXT(vd, vd->write_index);
+		}
+
+		buf->b_private = task;
+
+		ASSERT(vd->ioq != NULL);
+
+		request->status = 0;
+		(void) ddi_taskq_dispatch(task->vd->ioq, vd_bio_task, buf,
+		    DDI_SLEEP);
+
+	} else {
+
+		if (request->operation == VD_OP_BREAD) {
+			buf->b_flags |= B_READ;
+		} else {
+			buf->b_flags |= B_WRITE;
 		}
 
 		request->status = ldi_strategy(vd->ldi_handle[slice], buf);
-
-		/*
-		 * This is to indicate to the caller that the request
-		 * needs to be finished by vd_complete_bio() by calling
-		 * biowait() there and waiting for that to return before
-		 * triggering the notification of the vDisk client.
-		 *
-		 * This is necessary when writing to real disks as
-		 * otherwise calls to ldi_strategy() would be serialized
-		 * behind the calls to biowait() and performance would
-		 * suffer.
-		 */
-		if (request->status == 0)
-			return (EINPROGRESS);
-
-		biofini(buf);
 	}
+
+	/*
+	 * This is to indicate to the caller that the request
+	 * needs to be finished by vd_complete_bio() by calling
+	 * biowait() there and waiting for that to return before
+	 * triggering the notification of the vDisk client.
+	 *
+	 * This is necessary when writing to real disks as
+	 * otherwise calls to ldi_strategy() would be serialized
+	 * behind the calls to biowait() and performance would
+	 * suffer.
+	 */
+	if (request->status == 0)
+		return (EINPROGRESS);
+
+	biofini(buf);
 
 io_done:
 	/* Clean up after error or completion */
@@ -2176,13 +2261,13 @@ vd_reset_if_needed(vd_t *vd)
 	 * out from under it; defer checking vd->reset_ldc, as one of the
 	 * asynchronous tasks might set it
 	 */
+	if (vd->ioq != NULL)
+		ddi_taskq_wait(vd->ioq);
 	ddi_taskq_wait(vd->completionq);
 
-	if (vd->file) {
-		status = VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL);
-		if (status) {
-			PR0("VOP_FSYNC returned errno %d", status);
-		}
+	status = vd_flush_write(vd);
+	if (status) {
+		PR0("flushwrite returned error %d", status);
 	}
 
 	if ((vd->initialized & VD_DRING) &&
@@ -2312,29 +2397,76 @@ vd_complete_bio(vd_task_t *task)
 	vd_t			*vd		= task->vd;
 	vd_dring_payload_t	*request	= task->request;
 	struct buf		*buf		= &task->buf;
-	int			rval;
+	int			wid, nwrites;
 
 
 	ASSERT(vd != NULL);
 	ASSERT(request != NULL);
 	ASSERT(task->msg != NULL);
 	ASSERT(task->msglen >= sizeof (*task->msg));
-	ASSERT(!vd->file);
-	ASSERT(request->slice != VD_SLICE_NONE || (!vd_slice_single_slice &&
-	    vd->vdisk_type == VD_DISK_TYPE_SLICE) || vd->volume);
 
-	if (vd->zvol && request->operation == VD_OP_BWRITE) {
+	if (buf->b_flags & B_DONE) {
 		/*
-		 * For a ZFS volume, we use asynchronous writes so we have to
-		 * ensure that writes have been commited before marking the
-		 * I/O as completed.
+		 * If the I/O is already done then we don't call biowait()
+		 * because biowait() might already have been called when
+		 * flushing a previous asynchronous write. So we just
+		 * retrieve the status of the request.
 		 */
-		request->status = ldi_ioctl(vd->ldi_handle[0],
-		    DKIOCFLUSHWRITECACHE, NULL, vd->open_flags | FKIOCTL,
-		    kcred, &rval);
+		request->status = geterror(buf);
 	} else {
-		/* Wait for the I/O to complete [ call to ldi_strategy(9f) ] */
+		/*
+		 * Wait for the I/O. For synchronous I/O, biowait() will return
+		 * when the I/O has completed. For asynchronous write, it will
+		 * return the write has been submitted to the backend, but it
+		 * may not have been committed.
+		 */
 		request->status = biowait(buf);
+	}
+
+	if (buf->b_flags & B_ASYNC) {
+		/*
+		 * Asynchronous writes are used when writing to a file or a
+		 * ZFS volume. In that case the bio notification indicates
+		 * that the write has started. We have to flush the backend
+		 * to ensure that the write has been committed before marking
+		 * the request as completed.
+		 */
+		ASSERT(task->request->operation == VD_OP_BWRITE);
+
+		wid = task->write_index;
+
+		/* check if write has been already flushed */
+		if (vd->write_queue[wid] != NULL) {
+
+			vd->write_queue[wid] = NULL;
+			wid = VD_WRITE_INDEX_NEXT(vd, wid);
+
+			/*
+			 * Because flushing is time consuming, it is worth
+			 * waiting for any other writes so that they can be
+			 * included in this single flush request.
+			 */
+			if (vd_awflush & VD_AWFLUSH_GROUP) {
+				nwrites = 1;
+				while (vd->write_queue[wid] != NULL) {
+					(void) biowait(vd->write_queue[wid]);
+					vd->write_queue[wid] = NULL;
+					wid = VD_WRITE_INDEX_NEXT(vd, wid);
+					nwrites++;
+				}
+				DTRACE_PROBE2(flushgrp, vd_task_t *, task,
+				    int, nwrites);
+			}
+
+			if (vd_awflush & VD_AWFLUSH_IMMEDIATE) {
+				request->status = vd_flush_write(vd);
+			} else if (vd_awflush & VD_AWFLUSH_DEFER) {
+				(void) taskq_dispatch(system_taskq,
+				    (void (*)(void *))vd_flush_write, vd,
+				    DDI_SLEEP);
+				request->status = 0;
+			}
+		}
 	}
 
 	/* Update the number of bytes read/written */
@@ -2897,19 +3029,11 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	struct extvtoc *vtoc;
 	struct dk_geom *geom;
 	size_t len, lba;
-	int rval;
 
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
 
-	if (cmd == DKIOCFLUSHWRITECACHE) {
-		if (vd->file) {
-			return (VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL));
-		} else {
-			return (ldi_ioctl(vd->ldi_handle[0], cmd,
-			    (intptr_t)ioctl_arg, vd->open_flags | FKIOCTL,
-			    kcred, &rval));
-		}
-	}
+	if (cmd == DKIOCFLUSHWRITECACHE)
+		return (vd_flush_write(vd));
 
 	switch (vd->vdisk_label) {
 
@@ -3147,7 +3271,7 @@ vd_do_dskimg_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	struct dk_geom *geom;
 	struct extvtoc *vtoc;
 	dk_efi_t *efi;
-	int rc, rval;
+	int rc;
 
 	ASSERT(VD_DSKIMG(vd));
 
@@ -3209,12 +3333,7 @@ vd_do_dskimg_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		break;
 
 	case DKIOCFLUSHWRITECACHE:
-		if (vd->file)
-			return (VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL));
-		else
-			return (ldi_ioctl(vd->ldi_handle[0], cmd,
-			    (intptr_t)ioctl_arg, vd->open_flags | FKIOCTL,
-			    kcred, &rval));
+		return (vd_flush_write(vd));
 
 	case DKIOCGETEFI:
 		ASSERT(ioctl_arg != NULL);
@@ -4090,8 +4209,10 @@ vd_process_task(vd_task_t *task)
 		/* Queue a task to complete the operation */
 		(void) ddi_taskq_dispatch(vd->completionq, vd_complete,
 		    task, DDI_SLEEP);
+		return (EINPROGRESS);
+	}
 
-	} else if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE_V1_0)) {
+	if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE_V1_0)) {
 		/* Update the dring element if it's a dring client */
 		status = vd_mark_elem_done(vd, task->index,
 		    task->request->status, task->request->nbytes);
@@ -4536,6 +4657,11 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		vd->dring_task[i].msg = kmem_alloc(vd->max_msglen, KM_SLEEP);
 	}
 
+	if (vd->file || vd->zvol) {
+		vd->write_queue =
+		    kmem_zalloc(sizeof (buf_t *) * vd->dring_len, KM_SLEEP);
+	}
+
 	return (0);
 }
 
@@ -4758,8 +4884,11 @@ vd_process_element_range(vd_t *vd, int start, int end,
 	 * corresponding to the current range of dring elements; howevever, as
 	 * this situation is an error case, performance is less critical.
 	 */
-	if ((nelem > 1) && (status != EINPROGRESS) && inprogress)
+	if ((nelem > 1) && (status != EINPROGRESS) && inprogress) {
+		if (vd->ioq != NULL)
+			ddi_taskq_wait(vd->ioq);
 		ddi_taskq_wait(vd->completionq);
+	}
 
 	return (status);
 }
@@ -6344,6 +6473,7 @@ vd_setup_vd(vd_t *vd)
 	dev_info_t	*dip;
 	vnode_t 	*vnp;
 	char		*path = vd->device_path;
+	char		tq_name[TASKQ_NAMELEN];
 
 	/* make sure the vdisk backend is valid */
 	if ((status = lookupname(path, UIO_SYSSPACE,
@@ -6462,6 +6592,24 @@ done:
 		vd->initialized &= ~VD_SETUP_ERROR;
 	}
 
+	/*
+	 * For file or ZFS volume we also need an I/O queue.
+	 *
+	 * The I/O task queue is initialized here and not in vds_do_init_vd()
+	 * (as the start and completion queues) because vd_setup_vd() will be
+	 * call again if the backend is not available, and we need to know if
+	 * the backend is a ZFS volume or a file.
+	 */
+	if ((vd->file || vd->zvol) && vd->ioq == NULL) {
+		(void) snprintf(tq_name, sizeof (tq_name), "vd_ioq%lu", vd->id);
+
+		if ((vd->ioq = ddi_taskq_create(vd->vds->dip, tq_name,
+		    vd_ioq_nthreads, TASKQ_DEFAULTPRI, 0)) == NULL) {
+			PRN("Could not create io task queue");
+			return (EIO);
+		}
+	}
+
 	return (status);
 }
 
@@ -6486,6 +6634,7 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t options,
 		return (EAGAIN);
 	}
 	*vdp = vd;	/* assign here so vds_destroy_vd() can cleanup later */
+	vd->id = id;
 	vd->vds = vds;
 	(void) strncpy(vd->device_path, device_path, MAXPATHLEN);
 
@@ -6626,6 +6775,11 @@ vd_free_dring_task(vd_t *vdp)
 		    (sizeof (*vdp->dring_task)) * vdp->dring_len);
 		vdp->dring_task = NULL;
 	}
+
+	if (vdp->write_queue != NULL) {
+		kmem_free(vdp->write_queue, sizeof (buf_t *) * vdp->dring_len);
+		vdp->write_queue = NULL;
+	}
 }
 
 /*
@@ -6649,9 +6803,13 @@ vds_destroy_vd(void *arg)
 		mutex_exit(&vd->lock);
 	}
 
-	/* Drain and destroy start queue (*before* destroying completionq) */
+	/* Drain and destroy start queue (*before* destroying ioq) */
 	if (vd->startq != NULL)
 		ddi_taskq_destroy(vd->startq);	/* waits for queued tasks */
+
+	/* Drain and destroy the I/O queue (*before* destroying completionq) */
+	if (vd->ioq != NULL)
+		ddi_taskq_destroy(vd->ioq);
 
 	/* Drain and destroy completion queue (*before* shutting down LDC) */
 	if (vd->completionq != NULL)
