@@ -71,8 +71,8 @@ uint32_t	ldl_maxtransfer	= LDL_MAXTRANSFER;
 uint32_t	ldl_minbufsize	= LDL_MINBUFSIZE;
 
 /* Generation of header ids */
-kmutex_t	genid_mutex;
-uint32_t	last_loghead_ident = UINT32_C(0);
+static kmutex_t	genid_mutex;
+static uint32_t	last_loghead_ident = UINT32_C(0);
 
 /*
  * Logging delta and roll statistics
