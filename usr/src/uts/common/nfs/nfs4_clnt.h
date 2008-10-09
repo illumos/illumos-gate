@@ -1978,10 +1978,10 @@ extern char	*nfs4_recov_action_to_str(nfs4_recov_t);
  * of whether or not the code in _unlock is to be ran.
  */
 extern void	nfs4_ephemeral_umount_activate(mntinfo4_t *,
-    bool_t *, nfs4_ephemeral_tree_t **);
+    bool_t *, bool_t *, nfs4_ephemeral_tree_t **);
 extern int	nfs4_ephemeral_umount(mntinfo4_t *, int, cred_t *,
-    bool_t *, nfs4_ephemeral_tree_t **);
-extern void	nfs4_ephemeral_umount_unlock(bool_t *,
+    bool_t *, bool_t *, nfs4_ephemeral_tree_t **);
+extern void	nfs4_ephemeral_umount_unlock(bool_t *, bool_t *,
     nfs4_ephemeral_tree_t **);
 
 extern int	nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp);

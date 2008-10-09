@@ -289,11 +289,18 @@ const fs_operation_def_t nfs4_trigger_vnodeops_template[] = {
 };
 
 static void
+nfs4_ephemeral_tree_incr(nfs4_ephemeral_tree_t *net)
+{
+	ASSERT(mutex_owned(&net->net_cnt_lock));
+	net->net_refcnt++;
+	ASSERT(net->net_refcnt != 0);
+}
+
+static void
 nfs4_ephemeral_tree_hold(nfs4_ephemeral_tree_t *net)
 {
 	mutex_enter(&net->net_cnt_lock);
-	net->net_refcnt++;
-	ASSERT(net->net_refcnt != 0);
+	nfs4_ephemeral_tree_incr(net);
 	mutex_exit(&net->net_cnt_lock);
 }
 
@@ -726,9 +733,9 @@ nfs4_trigger_mount(vnode_t *vp, vnode_t **newvpp)
 		mutex_exit(&mi->mi_lock);
 	} else {
 		net = mi->mi_ephemeral_tree;
-		mutex_exit(&mi->mi_lock);
-
 		nfs4_ephemeral_tree_hold(net);
+
+		mutex_exit(&mi->mi_lock);
 
 		mutex_enter(&net->net_tree_lock);
 
@@ -1700,14 +1707,15 @@ nfs4_ephemeral_unmount_engine(nfs4_ephemeral_t *eph,
  */
 void
 nfs4_ephemeral_umount_unlock(bool_t *pmust_unlock,
-    nfs4_ephemeral_tree_t **pnet)
+    bool_t *pmust_rele, nfs4_ephemeral_tree_t **pnet)
 {
 	nfs4_ephemeral_tree_t	*net = *pnet;
 
 	if (*pmust_unlock) {
 		mutex_enter(&net->net_cnt_lock);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_UMOUNTING;
-		nfs4_ephemeral_tree_decr(net);
+		if (*pmust_rele)
+			nfs4_ephemeral_tree_decr(net);
 		mutex_exit(&net->net_cnt_lock);
 
 		mutex_exit(&net->net_tree_lock);
@@ -1724,7 +1732,7 @@ nfs4_ephemeral_umount_unlock(bool_t *pmust_unlock,
  */
 void
 nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
-    nfs4_ephemeral_tree_t **pnet)
+    bool_t *pmust_rele, nfs4_ephemeral_tree_t **pnet)
 {
 	/*
 	 * Now we need to get rid of the ephemeral data if it exists.
@@ -1746,7 +1754,7 @@ nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
 	}
 	mutex_exit(&mi->mi_lock);
 
-	nfs4_ephemeral_umount_unlock(pmust_unlock, pnet);
+	nfs4_ephemeral_umount_unlock(pmust_unlock, pmust_rele, pnet);
 }
 
 /*
@@ -1754,7 +1762,7 @@ nfs4_ephemeral_umount_activate(mntinfo4_t *mi, bool_t *pmust_unlock,
  */
 int
 nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
-    bool_t *pmust_unlock, nfs4_ephemeral_tree_t **pnet)
+    bool_t *pmust_unlock, bool_t *pmust_rele, nfs4_ephemeral_tree_t **pnet)
 {
 	int			error = 0;
 	nfs4_ephemeral_t	*eph;
@@ -1767,7 +1775,7 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 	 * Make sure to set the default state for cleaning
 	 * up the tree in the caller (and on the way out).
 	 */
-	*pmust_unlock = FALSE;
+	*pmust_unlock = *pmust_rele = FALSE;
 
 	/*
 	 * The active vnodes on this file system may be ephemeral
@@ -1844,8 +1852,8 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 
 			was_locked = TRUE;
 		} else {
-			net->net_refcnt++;
-			ASSERT(net->net_refcnt != 0);
+			nfs4_ephemeral_tree_incr(net);
+			*pmust_rele = TRUE;
 		}
 
 		mutex_exit(&net->net_cnt_lock);
@@ -1879,6 +1887,7 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 				    | NFS4_EPHEMERAL_TREE_INVALID)) {
 					nfs4_ephemeral_tree_decr(net);
 					mutex_exit(&net->net_cnt_lock);
+					*pmust_rele = FALSE;
 					goto is_busy;
 				}
 				mutex_exit(&net->net_cnt_lock);
@@ -1917,6 +1926,7 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 					nfs4_ephemeral_tree_decr(net);
 					mutex_exit(&net->net_cnt_lock);
 					mutex_exit(&net->net_tree_lock);
+					*pmust_rele = FALSE;
 					goto is_busy;
 				}
 				mutex_exit(&net->net_cnt_lock);
@@ -1987,7 +1997,8 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 		mutex_enter(&net->net_cnt_lock);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_DEROOTING;
 		net->net_status |= NFS4_EPHEMERAL_TREE_INVALID;
-		nfs4_ephemeral_tree_decr(net);
+		if (was_locked == FALSE)
+			nfs4_ephemeral_tree_decr(net);
 		mutex_exit(&net->net_cnt_lock);
 
 		if (was_locked == FALSE)
@@ -2001,10 +2012,9 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 		*pmust_unlock = FALSE;
 
 		/*
-		 * At this point, the tree should no
-		 * longer be associated with the
-		 * mntinfo4. We need to pull it off
-		 * there and let the harvester take
+		 * At this point, the tree should no longer be
+		 * associated with the mntinfo4. We need to pull
+		 * it off there and let the harvester take
 		 * care of it once the refcnt drops.
 		 */
 		mutex_enter(&mi->mi_lock);
@@ -2016,7 +2026,8 @@ nfs4_ephemeral_umount(mntinfo4_t *mi, int flag, cred_t *cr,
 
 is_busy:
 
-	nfs4_ephemeral_umount_unlock(pmust_unlock, pnet);
+	nfs4_ephemeral_umount_unlock(pmust_unlock, pmust_rele,
+	    pnet);
 
 	return (error);
 }
