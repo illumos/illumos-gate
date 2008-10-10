@@ -561,14 +561,6 @@ apic_init_intr()
 	uint_t nlvt;
 	uint32_t svr = AV_UNIT_ENABLE | APIC_SPUR_INTR;
 
-	/*
-	 * On BSP we would have enabled x2apic, if supported by processor,
-	 * in acpi_probe(), but on AP we do it here.
-	 */
-	if (apic_detect_x2apic()) {
-		apic_enable_x2apic();
-	}
-
 	apic_reg_ops->apic_write_task_reg(APIC_MASK_ALL);
 
 	if (apic_mode == LOCAL_APIC) {
@@ -821,19 +813,38 @@ apic_cpu_start(processorid_t cpun, caddr_t arg)
 	outb(CMOS_ADDR, SSB);
 	outb(CMOS_DATA, BIOS_SHUTDOWN);
 
-	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-		apic_ret();
+	/*
+	 * According to x2APIC specification in section '2.3.5.1' of
+	 * Interrupt Command Register Semantics, the semantics of
+	 * programming the Interrupt Command Register to dispatch an interrupt
+	 * is simplified. A single MSR write to the 64-bit ICR is required
+	 * for dispatching an interrupt. Specifically, with the 64-bit MSR
+	 * interface to ICR, system software is not required to check the
+	 * status of the delivery status bit prior to writing to the ICR
+	 * to send an IPI. With the removal of the Delivery Status bit,
+	 * system software no longer has a reason to read the ICR. It remains
+	 * readable only to aid in debugging.
+	 */
+#ifdef	DEBUG
+	APIC_AV_PENDING_SET();
+#else
+	if (apic_mode == LOCAL_APIC) {
+		APIC_AV_PENDING_SET();
+	}
+#endif /* DEBUG */
 
 	/* for integrated - make sure there is one INIT IPI in buffer */
 	/* for external - it will wake up the cpu */
 	apic_reg_ops->apic_write_int_cmd(cpu_id, AV_ASSERT | AV_RESET);
 
 	/* If only 1 CPU is installed, PENDING bit will not go low */
-	for (loop_count = 0x1000; loop_count; loop_count--)
-		if (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
+	for (loop_count = 0x1000; loop_count; loop_count--) {
+		if (apic_mode == LOCAL_APIC &&
+		    apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
 			apic_ret();
 		else
 			break;
+	}
 
 	apic_reg_ops->apic_write_int_cmd(cpu_id, AV_DEASSERT | AV_RESET);
 
@@ -1105,8 +1116,7 @@ apic_send_ipi(int cpun, int ipl)
 
 	flag = intr_clear();
 
-	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-		apic_ret();
+	APIC_AV_PENDING_SET();
 
 	apic_reg_ops->apic_write_int_cmd(apic_cpus[cpun].aci_local_id,
 	    vector);
@@ -1213,8 +1223,12 @@ gethrtime_again:
 	if (cpun == apic_cpus[0].aci_local_id) {
 		countval = apic_reg_ops->apic_read(APIC_CURR_COUNT);
 	} else {
-		while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-			apic_ret();
+#ifdef	DEBUG
+		APIC_AV_PENDING_SET();
+#else
+		if (apic_mode == LOCAL_APIC)
+			APIC_AV_PENDING_SET();
+#endif /* DEBUG */
 
 		apic_reg_ops->apic_write_int_cmd(
 		    apic_cpus[0].aci_local_id, APIC_CURR_ADD | AV_REMOTE);
@@ -1322,6 +1336,15 @@ apic_post_cpu_start()
 {
 	int cpun;
 
+	/*
+	 * On BSP we would have enabled X2APIC, if supported by processor,
+	 * in acpi_probe(), but on AP we do it here.
+	 */
+	if (apic_detect_x2apic()) {
+		apic_enable_x2apic();
+	}
+
+	splx(ipltospl(LOCK_LEVEL));
 	apic_init_intr();
 
 	/*
@@ -1330,8 +1353,12 @@ apic_post_cpu_start()
 	 */
 	setcr0(getcr0() & ~(CR0_CD | CR0_NW));
 
-	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-		apic_ret();
+#ifdef	DEBUG
+	APIC_AV_PENDING_SET();
+#else
+	if (apic_mode == LOCAL_APIC)
+		APIC_AV_PENDING_SET();
+#endif	/* DEBUG */
 
 	/*
 	 * We may be booting, or resuming from suspend; aci_status will
@@ -1572,8 +1599,12 @@ apic_shutdown(int cmd, int fcn)
 
 	/* Send NMI to all CPUs except self to do per processor shutdown */
 	iflag = intr_clear();
-	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-		apic_ret();
+#ifdef	DEBUG
+	APIC_AV_PENDING_SET();
+#else
+	if (apic_mode == LOCAL_APIC)
+		APIC_AV_PENDING_SET();
+#endif /* DEBUG */
 	apic_shutdown_processors = 1;
 	apic_reg_ops->apic_write(APIC_INT_CMD1,
 	    AV_NMI | AV_LEVEL | AV_SH_ALL_EXCSELF);

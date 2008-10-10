@@ -170,7 +170,7 @@ local_x2apic_write(uint32_t msr, uint64_t value)
 static int
 get_local_x2apic_pri(void)
 {
-	return (rdmsr(REG_X2APIC_BASE_MSR + (APIC_TASK_REG) >> 2));
+	return (rdmsr(REG_X2APIC_BASE_MSR + (APIC_TASK_REG >> 2)));
 }
 
 static void
@@ -257,14 +257,42 @@ x2apic_send_ipi(int cpun, int ipl)
 {
 	int vector;
 	ulong_t flag;
+
 	ASSERT(apic_mode == LOCAL_X2APIC);
+
+	/*
+	 * With X2APIC, Intel relaxed the semantics of the
+	 * WRMSR instruction such that references to the X2APIC
+	 * MSR registers are no longer serializing instructions.
+	 * The code that initiates IPIs assumes that some sort
+	 * of memory serialization occurs. The old APIC code
+	 * did a write to uncachable memory mapped registers.
+	 * Any reference to uncached memory is a serializing
+	 * operation. To mimic those semantics here, we do an
+	 * atomic operation, which translates to a LOCK OR instruction,
+	 * which is serializing.
+	 */
+	atomic_or_ulong(&flag, 1);
 
 	vector = apic_resv_vector[ipl];
 
 	flag = intr_clear();
 
-	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING)
-		apic_ret();
+	/*
+	 * According to x2APIC specification in section '2.3.5.1' of
+	 * Interrupt Command Register Semantics, the semantics of
+	 * programming Interrupt Command Register to dispatch an interrupt
+	 * is simplified. A single MSR write to the 64-bit ICR is required
+	 * for dispatching an interrupt. Specifically with the 64-bit MSR
+	 * interface to ICR, system software is not required to check the
+	 * status of the delivery status bit prior to writing to the ICR
+	 * to send an IPI. With the removal of the Delivery Status bit,
+	 * system software no longer has a reason to read the ICR. It remains
+	 * readable only to aid in debugging.
+	 */
+#ifdef	DEBUG
+	APIC_AV_PENDING_SET();
+#endif	/* DEBUG */
 
 	if ((cpun == psm_get_cpu_id()))
 		apic_reg_ops->apic_write(X2APIC_SELF_IPI, vector);

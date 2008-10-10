@@ -1305,8 +1305,7 @@ cpuid_pass2(cpu_t *cpu)
 			    !ISP2(mwait_size)) {
 #if DEBUG
 				cmn_err(CE_NOTE, "Cannot handle cpu %d mwait "
-				    "size %ld",
-				    cpu->cpu_id, (long)mwait_size);
+				    "size %ld", cpu->cpu_id, (long)mwait_size);
 #endif
 				break;
 			}
@@ -1327,8 +1326,11 @@ cpuid_pass2(cpu_t *cpu)
 	}
 
 	if (cpi->cpi_maxeax >= 0xB && cpi->cpi_vendor == X86_VENDOR_Intel) {
+		struct cpuid_regs regs;
+
+		cp = &regs;
 		cp->cp_eax = 0xB;
-		cp->cp_ecx = 0;
+		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
 
 		(void) __cpuid_insn(cp);
 
@@ -1373,6 +1375,9 @@ cpuid_pass2(cpu_t *cpu)
 			cpi->cpi_coreid = x2apic_id >> coreid_shift;
 			cpi->cpi_pkgcoreid = cpi->cpi_clogid >> coreid_shift;
 		}
+
+		/* Make cp NULL so that we don't stumble on others */
+		cp = NULL;
 	}
 
 	if ((cpi->cpi_xmaxeax & 0x80000000) == 0)

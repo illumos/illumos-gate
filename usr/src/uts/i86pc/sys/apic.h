@@ -106,7 +106,7 @@ extern "C" {
 #define	LOCAL_APIC		0x2
 #define	LOCAL_X2APIC		0x3
 
-/* x2APIC SELF IPI Reguster */
+/* x2APIC SELF IPI Register */
 #define	X2APIC_SELF_IPI		0x100
 
 /* General x2APIC constants used at various places */
@@ -638,6 +638,10 @@ extern int	apic_verbose;
 #define	APIC_VERBOSE_IOAPIC(fmt) \
 	if (apic_verbose & APIC_VERBOSE_IOAPIC_FLAG) \
 		cmn_err fmt;
+
+#define	APIC_AV_PENDING_SET() \
+	while (apic_reg_ops->apic_read(APIC_INT_CMD1) & AV_PENDING) \
+		apic_ret();
 
 #define	APIC_VERBOSE_IRQ(fmt) \
 	if (apic_verbose & APIC_VERBOSE_IRQ_FLAG) \
