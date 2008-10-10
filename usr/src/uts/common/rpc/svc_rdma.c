@@ -1066,7 +1066,7 @@ svc_rdma_kfreeres(SVCXPRT *clone_xprt)
 #define	REQTOXID(req)	((req)->rq_xprt->xp_xid)
 
 static int	rdmandupreqs = 0;
-static int	rdmamaxdupreqs = MAXDUPREQS;
+int	rdmamaxdupreqs = MAXDUPREQS;
 static kmutex_t rdmadupreq_lock;
 static struct dupreq *rdmadrhashtbl[DRHASHSZ];
 static int	rdmadrhashstat[DRHASHSZ];

@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * svc_clts.c
  * Server side for RPC in the kernel.
@@ -654,7 +652,7 @@ svc_clts_kfreeres(SVCXPRT *clone_xprt)
 #define	REQTOXID(req)	((req)->rq_xprt->xp_xid)
 
 static int	ndupreqs = 0;
-static int	maxdupreqs = MAXDUPREQS;
+int	maxdupreqs = MAXDUPREQS;
 static kmutex_t dupreq_lock;
 static struct dupreq *drhashtbl[DRHASHSZ];
 static int	drhashstat[DRHASHSZ];

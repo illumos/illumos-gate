@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * svc_cots.c
  * Server side for connection-oriented RPC in the kernel.
@@ -705,7 +703,7 @@ svc_cots_kfreeres(SVCXPRT *clone_xprt)
 #define	REQTOXID(req)	((req)->rq_xprt->xp_xid)
 
 static int	cotsndupreqs = 0;
-static int	cotsmaxdupreqs = MAXDUPREQS;
+int	cotsmaxdupreqs = MAXDUPREQS;
 static kmutex_t cotsdupreq_lock;
 static struct dupreq *cotsdrhashtbl[DRHASHSZ];
 static int	cotsdrhashstat[DRHASHSZ];
