@@ -984,6 +984,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	size_t oldsize, newsize;
 	char oldpath[MAXPATHLEN], newpath[MAXPATHLEN];
 	int replacing;
+	int oldvd_has_siblings = B_FALSE;
 	int newvd_is_spare = B_FALSE;
 	int oldvd_is_log;
 	int error, expected_error;
@@ -1021,6 +1022,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	 * mirror vdev -- in which case, pick a random child.
 	 */
 	while (oldvd->vdev_children != 0) {
+		oldvd_has_siblings = B_TRUE;
 		ASSERT(oldvd->vdev_children == 2);
 		oldvd = oldvd->vdev_child[ztest_random(2)];
 	}
@@ -1030,6 +1032,19 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	oldvd_is_log = oldvd->vdev_top->vdev_islog;
 	(void) strcpy(oldpath, oldvd->vdev_path);
 	pvd = oldvd->vdev_parent;
+
+	/*
+	 * If oldvd has siblings, then half of the time, detach it.
+	 */
+	if (oldvd_has_siblings && ztest_random(2) == 0) {
+		spa_config_exit(spa, SCL_VDEV, FTAG);
+		error = spa_vdev_detach(spa, oldguid, B_FALSE);
+		if (error != 0 && error != ENODEV && error != EBUSY)
+			fatal(0, "detach (%s) returned %d",
+			    oldpath, error);
+		(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
+		return;
+	}
 
 	/*
 	 * For the new vdev, choose with equal probability between the two

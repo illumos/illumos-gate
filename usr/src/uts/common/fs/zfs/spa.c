@@ -3184,8 +3184,11 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 		while ((spa = spa_next(spa)) != NULL) {
 			if (spa->spa_state != POOL_STATE_ACTIVE)
 				continue;
-
+			spa_open_ref(spa, FTAG);
+			mutex_exit(&spa_namespace_lock);
 			(void) spa_vdev_remove(spa, unspare_guid, B_TRUE);
+			mutex_enter(&spa_namespace_lock);
+			spa_close(spa, FTAG);
 		}
 		mutex_exit(&spa_namespace_lock);
 	}
