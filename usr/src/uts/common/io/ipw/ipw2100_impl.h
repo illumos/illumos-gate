@@ -33,8 +33,6 @@
 #ifndef _SYS_IPW2100_IMPL_H
 #define	_SYS_IPW2100_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -123,6 +121,7 @@ struct ipw2100_softc {
 #define	IPW2100_FLAG_CMD_WAIT		(1 << 5)
 #define	IPW2100_FLAG_SCAN_COMPLETE	(1 << 6)
 #define	IPW2100_FLAG_HW_ERR_RECOVER	(1 << 7)
+#define	IPW2100_FLAG_QUIESCED		(1 << 8)
 #define	IPW2100_FLAG_HAS_RADIO_SWITCH	(1 << 16)
 	/* command */
 	struct ipw2100_cmd	*sc_cmd;

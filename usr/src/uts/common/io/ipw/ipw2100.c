@@ -547,16 +547,34 @@ ipw2100_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/* ARGSUSED */
-int
-ipw2100_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
+/*
+ * quiesce(9E) entry point.
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ * Contributed by Juergen Keil, <jk@tools.de>.
+ */
+static int
+ipw2100_quiesce(dev_info_t *dip)
 {
 	struct ipw2100_softc	*sc =
 	    ddi_get_soft_state(ipw2100_ssp, ddi_get_instance(dip));
-	ASSERT(sc != NULL);
 
+	if (sc == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * No more blocking is allowed while we are in the
+	 * quiesce(9E) entry point.
+	 */
+	sc->sc_flags |= IPW2100_FLAG_QUIESCED;
+
+	/*
+	 * Disable and mask all interrupts.
+	 */
 	ipw2100_stop(sc);
-
 	return (DDI_SUCCESS);
 }
 
@@ -576,7 +594,8 @@ ipw2100_stop(struct ipw2100_softc *sc)
 	ipw2100_csr_put32(sc, IPW2100_CSR_RST, IPW2100_RST_SW_RESET);
 	sc->sc_flags &= ~IPW2100_FLAG_FW_INITED;
 
-	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	if (!(sc->sc_flags & IPW2100_FLAG_QUIESCED))
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 }
 
 static int
@@ -1091,7 +1110,7 @@ ipw2100_master_stop(struct ipw2100_softc *sc)
 			break;
 		drv_usecwait(10);
 	}
-	if (ntries == 50)
+	if (ntries == 50 && !(sc->sc_flags & IPW2100_FLAG_QUIESCED))
 		IPW2100_WARN((sc->sc_dip, CE_WARN,
 		    "ipw2100_master_stop(): timeout when stop master\n"));
 
@@ -2634,7 +2653,7 @@ enable_interrupt:
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ipw2100_devops, nulldev, nulldev, ipw2100_attach,
-    ipw2100_detach, ipw2100_reset, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    ipw2100_detach, nodev, NULL, D_MP, NULL, ipw2100_quiesce);
 
 static struct modldrv ipw2100_modldrv = {
 	&mod_driverops,
