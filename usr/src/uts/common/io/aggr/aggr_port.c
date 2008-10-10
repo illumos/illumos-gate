@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.3ad Link Aggregation - Link Aggregation MAC ports.
  *
@@ -288,10 +286,10 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
 	link_duplex_t link_duplex;
 
 	if (dolock) {
-		AGGR_LACP_LOCK(grp);
+		AGGR_LACP_LOCK_WRITER(grp);
 		rw_enter(&grp->lg_lock, RW_WRITER);
 	} else {
-		ASSERT(AGGR_LACP_LOCK_HELD(grp));
+		ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 		ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	}
 
@@ -336,7 +334,7 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
 		link_state_changed = aggr_grp_attach_port(grp, port);
 	} else if (do_detach) {
 		/* detach the port from the aggregation */
-		link_state_changed = aggr_grp_detach_port(grp, port);
+		link_state_changed = aggr_grp_detach_port(grp, port, B_TRUE);
 	}
 
 	rw_exit(&port->lp_lock);
@@ -362,7 +360,7 @@ aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port,
 
 	ASSERT(mac_addr_changedp != NULL);
 	ASSERT(link_state_changedp != NULL);
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	rw_enter(&port->lp_lock, RW_WRITER);

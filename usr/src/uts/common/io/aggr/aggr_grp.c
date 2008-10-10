@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.3ad Link Aggregation -- Link Aggregation Groups.
  *
@@ -116,7 +114,7 @@ aggr_grp_constructor(void *buf, void *arg, int kmflag)
 
 	bzero(grp, sizeof (*grp));
 	rw_init(&grp->lg_lock, NULL, RW_DRIVER, NULL);
-	mutex_init(&grp->aggr.gl_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&grp->aggr.gl_lock, NULL, RW_DRIVER, NULL);
 
 	grp->lg_link_state = LINK_STATE_UNKNOWN;
 
@@ -134,7 +132,7 @@ aggr_grp_destructor(void *buf, void *arg)
 		    grp->lg_tx_ports_size * sizeof (aggr_port_t *));
 	}
 
-	mutex_destroy(&grp->aggr.gl_lock);
+	rw_destroy(&grp->aggr.gl_lock);
 	rw_destroy(&grp->lg_lock);
 }
 
@@ -195,7 +193,7 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 {
 	boolean_t link_state_changed = B_FALSE;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 
@@ -272,28 +270,28 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 }
 
 boolean_t
-aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
+aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port, boolean_t port_detach)
 {
 	boolean_t link_state_changed = B_FALSE;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 
-	/* update state */
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return (B_FALSE);
 
 	mac_rx_remove(port->lp_mh, port->lp_mrh, B_FALSE);
-	port->lp_state = AGGR_PORT_STATE_STANDBY;
 
 	aggr_grp_multicst_port(port, B_FALSE);
 
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF)
 		aggr_send_port_disable(port);
-	else
+	else if (port_detach)
 		aggr_lacp_port_detached(port);
 
+	/* update state */
+	port->lp_state = AGGR_PORT_STATE_STANDBY;
 	grp->lg_nattached_ports--;
 	if (grp->lg_nattached_ports == 0) {
 		/* the last attached MAC port of the group is being detached */
@@ -335,7 +333,7 @@ aggr_grp_update_ports_mac(aggr_grp_t *grp)
 	    cport = cport->lp_next) {
 		rw_enter(&cport->lp_lock, RW_WRITER);
 		if (aggr_port_unicst(cport, grp->lg_addr) != 0) {
-			if (aggr_grp_detach_port(grp, cport))
+			if (aggr_grp_detach_port(grp, cport, B_TRUE))
 				link_state_changed = B_TRUE;
 		} else {
 			/*
@@ -367,7 +365,7 @@ void
 aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
     boolean_t *mac_addr_changedp, boolean_t *link_state_changedp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 	ASSERT(mac_addr_changedp != NULL);
@@ -397,7 +395,8 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
 		 * of the group.
 		 */
 		if (aggr_port_unicst(port, grp->lg_addr) != 0) {
-			*link_state_changedp = aggr_grp_detach_port(grp, port);
+			*link_state_changedp = aggr_grp_detach_port(grp, port,
+			    B_TRUE);
 		} else {
 			/*
 			 * If a port was detached because of a previous
@@ -421,7 +420,7 @@ aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t linkid, boolean_t force,
 	aggr_port_t *port, **cport;
 	int err;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	/* create new port */
@@ -484,7 +483,7 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 	AGGR_GRP_REFHOLD(grp);
 	rw_exit(&aggr_grp_lock);
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	/* add the specified ports to group */
@@ -581,11 +580,11 @@ aggr_grp_modify(datalink_id_t linkid, aggr_grp_t *grp_arg, uint8_t update_mask,
 			rc = ENOENT;
 			goto bail;
 		}
-		AGGR_LACP_LOCK(grp);
+		AGGR_LACP_LOCK_WRITER(grp);
 		rw_enter(&grp->lg_lock, RW_WRITER);
 	} else {
 		grp = grp_arg;
-		ASSERT(AGGR_LACP_LOCK_HELD(grp));
+		ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 		ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	}
 
@@ -696,7 +695,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 
 	grp = kmem_cache_alloc(aggr_grp_cache, KM_SLEEP);
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	grp->lg_refs = 1;
@@ -867,7 +866,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	uint_t i;
 	uint_t stat;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(grp->lg_nports > 1);
 	ASSERT(!grp->lg_closing);
@@ -901,7 +900,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 		mac_addr_changed = B_TRUE;
 	}
 
-	link_state_changed = aggr_grp_detach_port(grp, port);
+	link_state_changed = aggr_grp_detach_port(grp, port, B_FALSE);
 
 	/*
 	 * Add the counter statistics of the ports while it was aggregated
@@ -972,7 +971,7 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 	AGGR_GRP_REFHOLD(grp);
 	rw_exit(&aggr_grp_lock);
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	/* we need to keep at least one port per group */
@@ -999,6 +998,7 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 		/* stop port if group has already been started */
 		if (grp->lg_started) {
 			rw_enter(&port->lp_lock, RW_WRITER);
+			aggr_lacp_port_detached(port);
 			aggr_port_stop(port);
 			rw_exit(&port->lp_lock);
 		}
@@ -1057,7 +1057,7 @@ aggr_grp_delete(datalink_id_t linkid)
 	}
 	ASSERT(linkid == tmpid);
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	/*
@@ -1090,9 +1090,10 @@ aggr_grp_delete(datalink_id_t linkid)
 	while (port != NULL) {
 		cport = port->lp_next;
 		rw_enter(&port->lp_lock, RW_WRITER);
+		aggr_lacp_port_detached(port);
 		if (grp->lg_started)
 			aggr_port_stop(port);
-		(void) aggr_grp_detach_port(grp, port);
+		(void) aggr_grp_detach_port(grp, port, B_FALSE);
 		rw_exit(&port->lp_lock);
 		aggr_port_delete(port);
 		port = cport;
@@ -1262,7 +1263,7 @@ aggr_m_start(void *arg)
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	/*
@@ -1297,10 +1298,12 @@ aggr_m_stop(void *arg)
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
 
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
 		rw_enter(&port->lp_lock, RW_WRITER);
+		aggr_lacp_port_detached(port);
 		aggr_port_stop(port);
 		rw_exit(&port->lp_lock);
 	}
@@ -1308,6 +1311,7 @@ aggr_m_stop(void *arg)
 	grp->lg_started = B_FALSE;
 
 	rw_exit(&grp->lg_lock);
+	AGGR_LACP_UNLOCK(grp);
 }
 
 static int
@@ -1317,7 +1321,7 @@ aggr_m_promisc(void *arg, boolean_t on)
 	aggr_port_t *port;
 	boolean_t link_state_changed = B_FALSE;
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 	AGGR_GRP_REFHOLD(grp);
 
@@ -1331,7 +1335,7 @@ aggr_m_promisc(void *arg, boolean_t on)
 		AGGR_PORT_REFHOLD(port);
 		if (port->lp_started) {
 			if (aggr_port_promisc(port, on) != 0) {
-				if (aggr_grp_detach_port(grp, port))
+				if (aggr_grp_detach_port(grp, port, B_TRUE))
 					link_state_changed = B_TRUE;
 			} else {
 				/*
@@ -1474,7 +1478,7 @@ aggr_m_unicst(void *arg, const uint8_t *macaddr)
 	aggr_grp_t *grp = arg;
 	int rc;
 
-	AGGR_LACP_LOCK(grp);
+	AGGR_LACP_LOCK_WRITER(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 	rc = aggr_grp_modify(0, grp, AGGR_MODIFY_MAC, 0, B_TRUE, macaddr,
 	    0, 0);

@@ -143,9 +143,11 @@ typedef struct aggr_grp_s {
 	lg_mcst_addr_t	*lg_mcst_list; /* A list of multicast addresses */
 } aggr_grp_t;
 
-#define	AGGR_LACP_LOCK(grp)	mutex_enter(&(grp)->aggr.gl_lock);
-#define	AGGR_LACP_UNLOCK(grp)	mutex_exit(&(grp)->aggr.gl_lock);
-#define	AGGR_LACP_LOCK_HELD(grp) MUTEX_HELD(&(grp)->aggr.gl_lock)
+#define	AGGR_LACP_LOCK_WRITER(grp) rw_enter(&(grp)->aggr.gl_lock, RW_WRITER);
+#define	AGGR_LACP_UNLOCK(grp)	rw_exit(&(grp)->aggr.gl_lock);
+#define	AGGR_LACP_LOCK_HELD_WRITER(grp)	RW_WRITE_HELD(&(grp)->aggr.gl_lock)
+#define	AGGR_LACP_LOCK_READER(grp) rw_enter(&(grp)->aggr.gl_lock, RW_READER);
+#define	AGGR_LACP_LOCK_HELD_READER(grp) RW_READ_HELD(&(grp)->aggr.gl_lock)
 
 #define	AGGR_GRP_REFHOLD(grp) {			\
 	atomic_add_32(&(grp)->lg_refs, 1);	\
@@ -193,7 +195,7 @@ extern int aggr_grp_info(datalink_id_t, void *, aggr_grp_info_new_grp_fn_t,
     aggr_grp_info_new_port_fn_t);
 extern void aggr_grp_notify(aggr_grp_t *, uint32_t);
 extern boolean_t aggr_grp_attach_port(aggr_grp_t *, aggr_port_t *);
-extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *);
+extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *, boolean_t);
 extern void aggr_grp_port_mac_changed(aggr_grp_t *, aggr_port_t *,
     boolean_t *, boolean_t *);
 extern int aggr_grp_add_ports(datalink_id_t, uint_t, boolean_t,

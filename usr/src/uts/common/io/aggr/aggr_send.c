@@ -216,7 +216,7 @@ done:
 void
 aggr_send_update_policy(aggr_grp_t *grp, uint32_t policy)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	grp->lg_tx_policy = policy;
@@ -234,13 +234,13 @@ aggr_m_tx(void *arg, mblk_t *mp)
 	const mac_txinfo_t *mtp;
 
 	for (;;) {
-		rw_enter(&grp->lg_lock, RW_READER);
+		AGGR_LACP_LOCK_READER(grp)
 		if (grp->lg_ntx_ports == 0) {
 			/*
 			 * We could have returned from aggr_m_start() before
 			 * the ports were actually attached. Drop the chain.
 			 */
-			rw_exit(&grp->lg_lock);
+			AGGR_LACP_UNLOCK(grp)
 			freemsgchain(mp);
 			return (NULL);
 		}
@@ -250,13 +250,13 @@ aggr_m_tx(void *arg, mblk_t *mp)
 		port = grp->lg_tx_ports[aggr_send_port(grp, mp)];
 		ASSERT(port->lp_state == AGGR_PORT_STATE_ATTACHED);
 
-		rw_exit(&grp->lg_lock);
-
 		/*
 		 * We store the transmit info pointer locally in case it
 		 * changes between loading mt_fn and mt_arg.
 		 */
 		mtp = port->lp_txinfo;
+		AGGR_LACP_UNLOCK(grp)
+
 		if ((mp = mtp->mt_fn(mtp->mt_arg, mp)) != NULL) {
 			mp->b_next = nextp;
 			break;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.3ad Link Aggregation - LACP & Marker Protocol processing.
  */
@@ -140,7 +138,7 @@ aggr_lacp_fini(void)
 static boolean_t
 lacp_port_select(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (!lacp_sel_ports_add(portp))
 		return (B_FALSE);
@@ -154,7 +152,7 @@ lacp_port_select(aggr_port_t *portp)
 static void
 lacp_port_unselect(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	lacp_sel_ports_del(portp);
 	portp->lp_lacp.sm.selected = AGGR_UNSELECTED;
@@ -182,7 +180,7 @@ aggr_lacp_init_port(aggr_port_t *portp)
 	aggr_grp_t *aggrp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(aggrp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(aggrp));
 	ASSERT(RW_LOCK_HELD(&aggrp->lg_lock));
 	ASSERT(RW_LOCK_HELD(&portp->lp_lock));
 
@@ -266,7 +264,7 @@ lacp_reset_port(aggr_port_t *portp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	pl->NTT = B_FALSE;			/* need to transmit */
 
@@ -308,7 +306,7 @@ lacp_reset_port(aggr_port_t *portp)
 static void
 aggr_lacp_mcast_on(aggr_port_t *port)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(port->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(port->lp_grp));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
@@ -321,7 +319,7 @@ aggr_lacp_mcast_on(aggr_port_t *port)
 static void
 aggr_lacp_mcast_off(aggr_port_t *port)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(port->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(port->lp_grp));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
@@ -334,7 +332,7 @@ aggr_lacp_mcast_off(aggr_port_t *port)
 static void
 start_periodic_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (portp->lp_lacp.periodic_timer.id == 0) {
 		portp->lp_lacp.periodic_timer.id =
@@ -346,12 +344,12 @@ start_periodic_timer(aggr_port_t *portp)
 static void
 stop_periodic_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (portp->lp_lacp.periodic_timer.id != 0) {
 		AGGR_LACP_UNLOCK(portp->lp_grp);
 		(void) untimeout(portp->lp_lacp.periodic_timer.id);
-		AGGR_LACP_LOCK(portp->lp_grp);
+		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 		portp->lp_lacp.periodic_timer.id = 0;
 	}
 }
@@ -366,7 +364,7 @@ stop_periodic_timer(aggr_port_t *portp)
 static void
 periodic_timer_pop_locked(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	portp->lp_lacp.periodic_timer.id = NULL;
 	portp->lp_lacp_stats.LACPDUsTx = 0;
@@ -400,7 +398,7 @@ periodic_timer_pop(void *data)
 	if (portp->lp_closing)
 		return;
 
-	AGGR_LACP_LOCK(portp->lp_grp);
+	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 	periodic_timer_pop_locked(portp);
 	AGGR_LACP_UNLOCK(portp->lp_grp);
 }
@@ -419,7 +417,7 @@ lacp_periodic_sm(aggr_port_t *portp)
 	lacp_periodic_state_t oldstate = portp->lp_lacp.sm.periodic_state;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
@@ -487,7 +485,7 @@ lacp_xmit_sm(aggr_port_t *portp)
 	hrtime_t now, elapsed;
 	const mac_txinfo_t *mtp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on || !pl->NTT || !portp->lp_started)
@@ -566,7 +564,7 @@ fill_lacp_pdu(aggr_port_t *portp, lacp_t *lacp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	aggr_grp_t *aggrp = portp->lp_grp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	lacp->subtype = LACP_SUBTYPE;
 	lacp->version = LACP_VERSION;
@@ -635,7 +633,7 @@ lacp_mux_sm(aggr_port_t *portp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	lacp_mux_state_t oldstate = pl->sm.mux_state;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(aggrp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(aggrp));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
@@ -796,7 +794,7 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 	marker_pdu_t		*markerp = (marker_pdu_t *)mp->b_rptr;
 	const mac_txinfo_t	*mtp;
 
-	AGGR_LACP_LOCK(portp->lp_grp);
+	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 
 	AGGR_LACP_DBG(("trunk link: (%d): MARKER PDU received:\n",
 	    portp->lp_linkid));
@@ -863,13 +861,14 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 	ASSERT(MBLKHEAD(mp) >= sizeof (struct ether_header));
 	mp->b_rptr -= sizeof (struct ether_header);
 	fill_lacp_ether(portp, (struct ether_header *)mp->b_rptr);
-	AGGR_LACP_UNLOCK(portp->lp_grp);
 
 	/*
 	 * Store the transmit info pointer locally in case it changes between
 	 * loading mt_fn and mt_arg.
 	 */
 	mtp = portp->lp_txinfo;
+	AGGR_LACP_UNLOCK(portp->lp_grp);
+
 	mtp->mt_fn(mtp->mt_arg, mp);
 	return;
 
@@ -888,7 +887,7 @@ aggr_lacp_update_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode)
 	aggr_lacp_mode_t old_mode = grp->lg_lacp_mode;
 	aggr_port_t *port;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	if (mode == old_mode)
@@ -944,7 +943,7 @@ aggr_lacp_update_timer(aggr_grp_t *grp, aggr_lacp_timer_t timer)
 {
 	aggr_port_t *port;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	if (timer == grp->aggr.PeriodicTimer)
@@ -970,7 +969,7 @@ aggr_lacp_set_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode,
 {
 	aggr_port_t *port;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	grp->lg_lacp_mode = mode;
@@ -1149,7 +1148,7 @@ lacp_selection_logic(aggr_port_t *portp)
 	boolean_t reset_mac = B_FALSE;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(aggrp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(aggrp));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
@@ -1382,7 +1381,7 @@ wait_while_timer_pop(void *data)
 	if (portp->lp_closing)
 		return;
 
-	AGGR_LACP_LOCK(portp->lp_grp);
+	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 
 	AGGR_LACP_DBG(("trunk link:(%d): wait_while_timer pop \n",
 	    portp->lp_linkid));
@@ -1396,7 +1395,7 @@ wait_while_timer_pop(void *data)
 static void
 start_wait_while_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (portp->lp_lacp.wait_while_timer.id == 0) {
 		portp->lp_lacp.wait_while_timer.id =
@@ -1411,12 +1410,12 @@ static void
 stop_wait_while_timer(portp)
 aggr_port_t *portp;
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (portp->lp_lacp.wait_while_timer.id != 0) {
 		AGGR_LACP_UNLOCK(portp->lp_grp);
 		(void) untimeout(portp->lp_lacp.wait_while_timer.id);
-		AGGR_LACP_LOCK(portp->lp_grp);
+		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 		portp->lp_lacp.wait_while_timer.id = 0;
 	}
 }
@@ -1433,7 +1432,7 @@ aggr_lacp_port_attached(aggr_port_t *portp)
 	aggr_grp_t *grp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(portp->lp_state == AGGR_PORT_STATE_ATTACHED);
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
@@ -1490,7 +1489,7 @@ aggr_lacp_port_detached(aggr_port_t *portp)
 {
 	aggr_grp_t *grp = portp->lp_grp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
 	AGGR_LACP_DBG(("aggr_lacp_port_detached: port %d\n",
@@ -1512,7 +1511,7 @@ aggr_lacp_port_detached(aggr_port_t *portp)
 void
 aggr_lacp_policy_changed(aggr_grp_t *grp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	/* suspend transmission for CollectorMaxDelay time */
@@ -1526,7 +1525,7 @@ aggr_lacp_policy_changed(aggr_grp_t *grp)
 static void
 lacp_on(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 	ASSERT(RW_WRITE_HELD(&portp->lp_grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
@@ -1560,7 +1559,7 @@ lacp_off(aggr_port_t *portp)
 {
 	aggr_grp_t *grp = portp->lp_grp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
@@ -1628,7 +1627,7 @@ valid_lacp_pdu(aggr_port_t *portp, lacp_t *lacp)
 static void
 start_current_while_timer(aggr_port_t *portp, uint_t time)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (portp->lp_lacp.current_while_timer.id == 0) {
 		if (time > 0) {
@@ -1652,12 +1651,12 @@ start_current_while_timer(aggr_port_t *portp, uint_t time)
 static void
 stop_current_while_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if (portp->lp_lacp.current_while_timer.id != 0) {
 		AGGR_LACP_UNLOCK(portp->lp_grp);
 		(void) untimeout(portp->lp_lacp.current_while_timer.id);
-		AGGR_LACP_LOCK(portp->lp_grp);
+		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 		portp->lp_lacp.current_while_timer.id = 0;
 	}
 }
@@ -1671,7 +1670,7 @@ current_while_timer_pop(void *data)
 	if (portp->lp_closing)
 		return;
 
-	AGGR_LACP_LOCK(portp->lp_grp);
+	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 
 	AGGR_LACP_DBG(("trunk link:(%d): current_while_timer "
 	    "pop id=%p\n", portp->lp_linkid,
@@ -1693,7 +1692,7 @@ record_Default(aggr_port_t *portp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	pl->PartnerOperPortNum = pl->PartnerAdminPortNum;
 	pl->PartnerOperPortPriority = pl->PartnerAdminPortPriority;
@@ -1714,7 +1713,7 @@ record_PDU(aggr_port_t *portp, lacp_t *lacp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	uint8_t save_sync;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	/*
 	 * Partner Information
@@ -1781,7 +1780,7 @@ update_selected(aggr_port_t *portp, lacp_t *lacp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if ((pl->PartnerOperPortNum != ntohs(lacp->actor_info.port)) ||
 	    (pl->PartnerOperPortPriority !=
@@ -1815,7 +1814,7 @@ update_default_selected(aggr_port_t *portp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if ((pl->PartnerAdminPortNum != pl->PartnerOperPortNum) ||
 	    (pl->PartnerOperPortPriority != pl->PartnerAdminPortPriority) ||
@@ -1845,7 +1844,7 @@ update_NTT(aggr_port_t *portp, lacp_t *lacp)
 	aggr_grp_t *aggrp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	if ((pl->ActorPortNumber != ntohs(lacp->partner_info.port)) ||
 	    (pl->ActorPortPriority !=
@@ -1891,7 +1890,7 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	lacp_receive_state_t oldstate = pl->sm.receive_state;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on)
@@ -2069,6 +2068,7 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 static void
 aggr_set_coll_dist(aggr_port_t *portp, boolean_t enable)
 {
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 	rw_enter(&portp->lp_lock, RW_WRITER);
 	aggr_set_coll_dist_locked(portp, enable);
 	rw_exit(&portp->lp_lock);
@@ -2077,6 +2077,7 @@ aggr_set_coll_dist(aggr_port_t *portp, boolean_t enable)
 static void
 aggr_set_coll_dist_locked(aggr_port_t *portp, boolean_t enable)
 {
+	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
 	AGGR_LACP_DBG(("AGGR_SET_COLL_DIST_TYPE: (%d) %s\n",
@@ -2125,7 +2126,7 @@ aggr_lacp_rx(aggr_port_t *portp, mblk_t *dmp)
 		AGGR_LACP_DBG(("aggr_lacp_rx:(%d): LACPDU received.\n",
 		    portp->lp_linkid));
 
-		AGGR_LACP_LOCK(portp->lp_grp);
+		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 		if (!portp->lp_lacp.sm.lacp_on) {
 			AGGR_LACP_UNLOCK(portp->lp_grp);
 			break;
