@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ntwdt driver
@@ -487,7 +485,7 @@ static struct dev_ops ntwdt_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, 		/* This one is a driver */
-	"ntwdt-Netra-T12 v%I%", 	/* Name of the module. */
+	"ntwdt-Netra-T12",		/* Name of the module. */
 	&ntwdt_ops,			/* Driver ops */
 };
 
@@ -1933,7 +1931,7 @@ ntwdt_pat_hw_watchdog()
 	    i_am_alive));
 
 	if (iosram_write(SBBC_TOD_KEY, OFFSET(tod_buf, tod_i_am_alive),
-			(char *)&i_am_alive, sizeof (uint32_t))) {
+	    (char *)&i_am_alive, sizeof (uint32_t))) {
 		cmn_err(CE_WARN, "ntwdt_pat_hw_watchdog(): "
 		    "write heartbeat failed");
 	}
@@ -2120,7 +2118,7 @@ ntwdt_lomcmd(int cmd, intptr_t arg)
 	}
 
 	rv = sbbc_mbox_request_response(reqp, resp,
-		LW8_DEFAULT_MAX_MBOX_WAIT_TIME);
+	    LW8_DEFAULT_MAX_MBOX_WAIT_TIME);
 
 	if ((rv) || (resp->msg_status != SG_MBOX_STATUS_SUCCESS)) {
 

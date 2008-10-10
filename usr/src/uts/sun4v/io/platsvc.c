@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v Platform Services Module
@@ -121,7 +119,7 @@ static void ps_fini(void);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"sun4v Platform Services %I%"
+	"sun4v Platform Services"
 };
 
 static struct modlinkage modlinkage = {

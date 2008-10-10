@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/debug.h>
@@ -498,7 +496,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"Sun Fire 15000 DR %I%"
+	"Sun Fire 15000 DR"
 };
 
 static struct modlinkage modlinkage = {
@@ -3642,7 +3640,8 @@ drmach_copy_rename(drmachid_t id)
 
 			if (drmach_slow_copy) {	/* for debug */
 				uint64_t i = 13 * 50;
-				while (i--);
+				while (i--)
+					;
 			}
 		}
 	}

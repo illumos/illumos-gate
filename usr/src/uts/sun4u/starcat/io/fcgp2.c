@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fcgp2.c: Framework gp2 (Safari) fcode ops
@@ -74,7 +72,7 @@ int no_advisory_dma;
  * Module linkage information for the kernel.
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "FCode gp2 (safari) bus functions %I%"
+	&mod_miscops, "FCode gp2 (safari) bus functions"
 };
 
 static struct modlinkage modlinkage = {

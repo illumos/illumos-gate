@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Schizo/PCI Functions to the Safari Configurator
@@ -88,7 +86,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, /* Type of module */
-	"gptwo->pci configurator %I%",
+	"gptwo->pci configurator",
 };
 
 static struct modlinkage modlinkage = {
@@ -119,11 +117,11 @@ _init(void)
 
 	/* register devices with the configurator */
 	gptwocfg_register_ops(SAFPTYPE_sPCI, gptwo_configure_pci,
-				gptwo_unconfigure_pci);
+	    gptwo_unconfigure_pci);
 	gptwocfg_register_ops(SAFPTYPE_cPCI, gptwo_configure_pci,
-				gptwo_unconfigure_pci);
+	    gptwo_unconfigure_pci);
 	gptwocfg_register_ops(SAFPTYPE_PCIX, gptwo_configure_pci,
-				gptwo_unconfigure_pci);
+	    gptwo_unconfigure_pci);
 
 	if ((err = mod_install(&modlinkage)) != 0) {
 		GPTWO_DEBUG1(1, CE_WARN, "gptwo_pci (PCI Functions) "
@@ -322,10 +320,10 @@ gptwo_configure_pci(dev_info_t *ap, spcd_t *pcd, uint_t id)
 			ndi_devi_exit(ap, circ);
 
 			if (ndi_devi_bind_driver(new_child, 0) !=
-				DDI_SUCCESS) {
+			    DDI_SUCCESS) {
 				cmn_err(CE_WARN, "gptwo_pci: Unable to bind"
 				    " new pci child at dip=0x%p\n",
-					new_child);
+				    new_child);
 			}
 
 			/*

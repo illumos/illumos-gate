@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fcpci.c: Framework PCI fcode ops
@@ -111,7 +109,7 @@ char _depends_on[] = "misc/fcodem misc/busra";
  * Module linkage information for the kernel.
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "FCode pci bus functions %I%"
+	&mod_miscops, "FCode pci bus functions"
 };
 
 static struct modlinkage modlinkage = {

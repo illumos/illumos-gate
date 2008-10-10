@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sun4v VIO DR Module
  */
@@ -51,7 +49,7 @@
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"sun4v VIO DR %I%"
+	"sun4v VIO DR"
 };
 
 static struct modlinkage modlinkage = {

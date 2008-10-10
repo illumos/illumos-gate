@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *     PCI configurator (pcicfg)
  */
@@ -401,7 +399,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, /* Type of module */
-	"PCIe/PCI Config (EFCode Enabled) v%I%"
+	"PCIe/PCI Config (EFCode Enabled)"
 };
 
 static struct modlinkage modlinkage = {

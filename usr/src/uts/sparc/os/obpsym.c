@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This module supports callbacks from the firmware
@@ -150,7 +148,7 @@ value_to_name(uintptr_t value, char *symbol)
  * loadable module wrapper
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "OBP symbol callbacks %I%"
+	&mod_miscops, "OBP symbol callbacks"
 };
 
 static struct modlinkage modlinkage = {

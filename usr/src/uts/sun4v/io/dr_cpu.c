@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v CPU DR Module
@@ -51,7 +49,7 @@
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"sun4v CPU DR %I%"
+	"sun4v CPU DR"
 };
 
 static struct modlinkage modlinkage = {

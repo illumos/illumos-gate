@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * DR memory support routines.
@@ -62,7 +60,7 @@ extern struct memlist	*phys_install;
 extern int		kcage_on;
 
 /* for the DR*INTERNAL_ERROR macros.  see sys/dr.h. */
-static char *dr_ie_fmt = "%M% %d";
+static char *dr_ie_fmt = "dr_mem.c %d";
 
 static int		dr_post_detach_mem_unit(dr_mem_unit_t *mp);
 static int		dr_reserve_mem_spans(memhandle_t *mhp,

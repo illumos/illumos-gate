@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *     Starcat Specific Glue for Safari Configurator
@@ -95,7 +93,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, /* Type of module */
-	"Sun Fire 15000 gptwocfg %I%"
+	"Sun Fire 15000 gptwocfg"
 };
 
 static struct modlinkage modlinkage = {
@@ -116,7 +114,7 @@ _init()
 	 */
 	if ((err = mod_install(&modlinkage)) != 0) {
 		SC_DEBUG(1, (CE_WARN, "sc_gptwocfg failed to load, error=%d\n",
-			err));
+		    err));
 		mutex_destroy(&sc_gptwo_config_list_lock);
 	} else {
 		SC_DEBUG(1, (CE_WARN, "sc_gptwocfg has been loaded.\n"));
@@ -500,7 +498,7 @@ sc_configure(uint_t board, int create_nodes)
 	uint32_t size;
 
 	SC_DEBUG(1, (CE_WARN, "sc_configure: board=%d, create_nodes=%d\n",
-		board, create_nodes));
+	    board, create_nodes));
 
 	if (board > 35) {
 		SC_DEBUG(1, (CE_WARN, "sc_gptwocfg - probe_board - "
