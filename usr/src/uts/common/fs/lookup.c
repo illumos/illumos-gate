@@ -36,9 +36,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -952,21 +949,26 @@ localpath(char *path, struct vnode *vrootp, cred_t *cr)
 	vp = rootdir;
 	VN_HOLD(vp);
 
+	if (vn_ismntpt(vp) && traverse(&vp) != 0) {
+		VN_RELE(vp);
+		pn_free(&pn);
+		return (NULL);
+	}
+
 	while (pn_pathleft(&pn)) {
 		pn_skipslash(&pn);
 
 		if (pn_getcomponent(&pn, component) != 0)
 			break;
 
-		if (vn_ismntpt(vp) && traverse(&vp) != 0)
-			break;
-
 		if (VOP_LOOKUP(vp, component, &cvp, &pn, 0, rootdir, cr,
 		    NULL, NULL, NULL) != 0)
 			break;
-
 		VN_RELE(vp);
 		vp = cvp;
+
+		if (vn_ismntpt(vp) && traverse(&vp) != 0)
+			break;
 
 		if (vn_compare(vp, vrootp)) {
 			ret = path + (pn.pn_path - pn.pn_buf);
