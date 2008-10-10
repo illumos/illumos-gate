@@ -837,6 +837,8 @@ xpvtap_segmf_unregister(struct as *as, void *arg, uint_t event)
 
 	state = (xpvtap_state_t *)arg;
 	if (!state->bt_map.um_registered) {
+		/* remove the callback (which is this routine) */
+		(void) as_delete_callback(as, arg);
 		return;
 	}
 
@@ -851,13 +853,6 @@ xpvtap_segmf_unregister(struct as *as, void *arg, uint_t event)
 		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
 		hat_prepare_mapping(as->a_hat, uaddr, NULL);
 		hat_unload(as->a_hat, uaddr, PAGESIZE, HAT_UNLOAD_UNLOCK);
-
-		/* XXX Need to verify if we still need this */
-		hat_devload(as->a_hat, uaddr, PAGESIZE, (pfn_t)0,
-		    PROT_READ | PROT_WRITE | PROT_USER | HAT_UNORDERED_OK,
-		    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
-		hat_unload(as->a_hat, uaddr, PAGESIZE, HAT_UNLOAD_UNLOCK);
-
 		hat_release_mapping(as->a_hat, uaddr);
 		AS_LOCK_EXIT(as, &as->a_lock);
 		uaddr += PAGESIZE;
