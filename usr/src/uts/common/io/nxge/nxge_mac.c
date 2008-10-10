@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_mac.h>
 #include <sys/nxge/nxge_hio.h>
@@ -864,7 +862,7 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 	nxgep->mac.linkchkmode = LINKCHK_TIMER;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_setup_xcvr_table: niu_type"
-	    "[0x%x] platform type[0x%x] xcvr_arr[%d]", nxgep->niu_type,
+	    "[0x%x] platform type[0x%x] xcvr_addr[%d]", nxgep->niu_type,
 	    nxgep->platform_type, nxgep->xcvr_addr));
 
 	return (status);
@@ -6490,8 +6488,8 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	j = l = 0;
 	total_port_fd = total_phy_fd = 0;
 	/*
-	 * Clause 45 and Clause 22 port/phy addresses 0 through 7 are reserved
-	 * for on chip serdes usages. "i" in the following for loop starts at 8.
+	 * Clause 45 and Clause 22 port/phy addresses 0 through 5 are reserved
+	 * for on chip serdes usages. "i" in the following for loop starts at 6.
 	 */
 	for (i = NXGE_EXT_PHY_PORT_ST; i < NXGE_MAX_PHY_PORTS; i++) {
 
@@ -6578,7 +6576,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	case 2:
 		switch (total_phy_fd) {
 		case 2:
-			/* 2 10G, 2 1G RGMII Fiber */
+			/* 2 10G, 2 1G RGMII Fiber / copper */
 			if ((((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
 			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
 			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
@@ -6586,17 +6584,38 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			    ((port_phy_id[0] == PHY_BCM5482_FAMILY) &&
 			    (port_phy_id[1] == PHY_BCM5482_FAMILY))) {
 
-				hw_p->platform_type = P_NEPTUNE_GENERIC;
+				switch (hw_p->platform_type) {
+				case P_NEPTUNE_ROCK:
+					hw_p->niu_type = NEPTUNE_2_10GF_2_1GC;
+					/*
+					 * ROCK platform has assigned a lower
+					 * addr to port 1. (port 0 = 0x9 and
+					 * port 1 = 0x8).
+					 */
+					hw_p->xcvr_addr[1] = port_fd_arr[0];
+					hw_p->xcvr_addr[0] = port_fd_arr[1];
 
-				hw_p->niu_type = NEPTUNE_2_10GF_2_1GRF;
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "Rock with 2 10G, 2 1GC"));
+					break;
 
-				hw_p->xcvr_addr[0] = port_fd_arr[0];
-				hw_p->xcvr_addr[1] = port_fd_arr[1];
+				case P_NEPTUNE_NONE:
+				default:
+					hw_p->platform_type =
+					    P_NEPTUNE_GENERIC;
+					hw_p->niu_type = NEPTUNE_2_10GF_2_1GRF;
+
+					hw_p->xcvr_addr[0] = port_fd_arr[0];
+					hw_p->xcvr_addr[1] = port_fd_arr[1];
+
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "ARTM card with 2 10G, 2 1GF"));
+					break;
+				}
+
 				hw_p->xcvr_addr[2] = phy_fd_arr[0];
 				hw_p->xcvr_addr[3] = phy_fd_arr[1];
 
-				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "ARTM card with 2 10G, 2 1G"));
 			} else {
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				    "Unsupported neptune type 1"));

@@ -454,6 +454,7 @@ typedef enum {
 	P_NEPTUNE_MARAMBA_P0,
 	P_NEPTUNE_MARAMBA_P1,
 	P_NEPTUNE_ALONSO,
+	P_NEPTUNE_ROCK,
 	P_NEPTUNE_NIU
 } platform_type_t;
 
@@ -463,7 +464,8 @@ typedef enum {
 	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P0) || \
 	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P1) || \
 	    ((nxgep->platform_type) == P_NEPTUNE_GENERIC) || \
-	    ((nxgep->platform_type) == P_NEPTUNE_ALONSO))
+	    ((nxgep->platform_type) == P_NEPTUNE_ALONSO) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_ROCK))
 
 #define	NXGE_IS_XAUI_PLATFORM(nxgep) \
 	(((nxgep->platform_type) == P_NEPTUNE_NIU) || \
@@ -777,6 +779,8 @@ typedef struct _nxge_mmac_stats_t {
 #define	NXGE_RFEM_MODEL_STR		"SUNW,pcie-rfem"
 #define	NXGE_ARTM_BM_STR		"375-3544-01"
 #define	NXGE_ARTM_MODEL_STR		"SUNW,pcie-artm"
+/* ROCK OBP creates a compatible property for ROCK */
+#define	NXGE_ROCK_COMPATIBLE		"SUNW,rock-pciex108e,abcd"
 #define	NXGE_EROM_LEN			1048576
 
 #endif

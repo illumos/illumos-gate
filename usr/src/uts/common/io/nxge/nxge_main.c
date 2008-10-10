@@ -6491,6 +6491,11 @@ nxge_init_common_dev(p_nxge_t nxgep)
 	}
 
 	if (hw_p == NULL) {
+
+		char **prop_val;
+		uint_t prop_len;
+		int i;
+
 		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
 		    "==> nxge_init_common_device:func # %d "
 		    "parent dip $%p (new)",
@@ -6518,12 +6523,34 @@ nxge_init_common_dev(p_nxge_t nxgep)
 
 		nxge_hw_list = hw_p;
 
+		if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "compatible", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+			for (i = 0; i < prop_len; i++) {
+				if ((strcmp((caddr_t)prop_val[i],
+				    NXGE_ROCK_COMPATIBLE) == 0)) {
+					hw_p->platform_type = P_NEPTUNE_ROCK;
+					NXGE_DEBUG_MSG((nxgep, MOD_CTL,
+					    "ROCK hw_p->platform_type %d",
+					    hw_p->platform_type));
+					break;
+				}
+				NXGE_DEBUG_MSG((nxgep, MOD_CTL,
+				    "nxge_init_common_dev: read compatible"
+				    " property[%d] val[%s]",
+				    i, (caddr_t)prop_val[i]));
+			}
+		}
+
+		ddi_prop_free(prop_val);
+
 		(void) nxge_scan_ports_phy(nxgep, nxge_hw_list);
 	}
 
 	MUTEX_EXIT(&nxge_common_lock);
 
 	nxgep->platform_type = hw_p->platform_type;
+	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "nxgep->platform_type %d",
+	    nxgep->platform_type));
 	if (nxgep->niu_type != N2_NIU) {
 		nxgep->niu_type = hw_p->niu_type;
 	}
@@ -6680,6 +6707,7 @@ nxge_get_nports(p_nxge_t nxgep)
 		case P_NEPTUNE_ATLAS_4PORT:
 		case P_NEPTUNE_MARAMBA_P0:
 		case P_NEPTUNE_MARAMBA_P1:
+		case P_NEPTUNE_ROCK:
 		case P_NEPTUNE_ALONSO:
 			nports = 4;
 			break;

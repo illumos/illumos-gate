@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nxge_impl.h>
 #include <nxge_mac.h>
 #include <npi_espc.h>
@@ -213,10 +211,14 @@ nxge_vpd_info_get(p_nxge_t nxgep)
 
 	if ((nxgep->platform_type == P_NEPTUNE_NIU) ||
 	    (nxgep->platform_type == P_NEPTUNE_MARAMBA_P0) ||
-	    (nxgep->platform_type == P_NEPTUNE_MARAMBA_P1)) {
+	    (nxgep->platform_type == P_NEPTUNE_MARAMBA_P1) ||
+	    (nxgep->platform_type == P_NEPTUNE_ROCK)) {
 		nxgep->vpd_info.present = B_FALSE;
 		return;
 	}
+
+	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "nxge_vpd_info_get: "
+	    "nxgep->platform_type[%d]...reading vpd", nxgep->platform_type));
 
 	nxgep->vpd_info.present = B_TRUE;
 	nxgep->vpd_info.ver_valid = B_FALSE;

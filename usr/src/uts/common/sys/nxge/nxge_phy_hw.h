@@ -26,9 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_PHY_HW_H
 #define	_SYS_NXGE_NXGE_PHY_HW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -36,11 +33,11 @@ extern "C" {
 #include <nxge_defs.h>
 
 /*
- * Clause 45 and Clause 22 port/phy addresses 0 through 7 are reserved
- * for on-chip serdes. So here the starting port is 8.
+ * Clause 45 and Clause 22 port/phy addresses 0 through 5 are reserved
+ * for on-chip serdes. So here the starting port is 6.
  */
 #define	NXGE_MAX_PHY_PORTS		32
-#define	NXGE_EXT_PHY_PORT_ST		8
+#define	NXGE_EXT_PHY_PORT_ST		6
 
 #define	NXGE_PMA_PMD_DEV_ADDR		1
 #define	NXGE_PCS_DEV_ADDR		3

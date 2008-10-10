@@ -20,10 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 set -u
@@ -35,7 +33,7 @@ export PATH
 # Driver info 
 # 
 DRV=nxge
-DRVALIAS=" \"pciex108e,abcd\" \"SUNW,niusl\""
+DRVALIAS=" \"pciex108e,abcd\" \"SUNW,niusl\" \"SUNW,rock-pciex108e,abcd\""
 
 DRVPERM='* 0600 root sys'
 # POLICY='read_priv_set=net_rawaccess write_priv_set=net_rawaccess'
