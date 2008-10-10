@@ -2865,8 +2865,13 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 	ip_stack_t *ipst = as->as_netstack->netstack_ip;
 	arlphy_t *ap = arl->arl_phy;
 
-	/* Cancel any outstanding timer. */
-	mi_timer(arl->arl_wq, ace->ace_mp, -1L);
+	/*
+	 * On error or completion for a query, we need to shut down the timer.
+	 * However, the timer must not be stopped for an interface doing
+	 * Duplicate Address Detection, or it will never finish that phase.
+	 */
+	if (!(ace->ace_flags & (ACE_F_UNVERIFIED | ACE_F_AUTHORITY)))
+		mi_timer(arl->arl_wq, ace->ace_mp, -1L);
 	/* Establish the return value appropriate. */
 	if (ret_val == 0) {
 		if (!ACE_RESOLVED(ace) || ap == NULL)
