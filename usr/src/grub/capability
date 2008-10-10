@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 #
 # This file defines the current capabilities of GRUB over and above that
 # supported by the standard distribution
@@ -35,10 +33,14 @@
 # Note that the first major number in each sequence is a whole integer
 # i.e. 2.0 is truncated to 2 and 3.0 is truncated to 3.
 #
+# NOTE: Live Upgrade is currently unable to handle decimal fractions (i.e.
+# minor version numbers) so the version number is being bumped up in
+# integer increments until Live Upgrade is fixed.
+#
 # This file and the associated version are Solaris specific and are
 # not a part of the open source distribution of GRUB.
 #
-VERSION=3
+VERSION=4
 dboot
 xVM
 zfs
