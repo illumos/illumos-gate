@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <libdevinfo.h>
 #include <stdio.h>
@@ -62,27 +60,6 @@
 #define	VENDOR_ID_USB_PROP	"usb-vendor-name"
 #define	WWN_PROP		"node-wwn"
 
-/* The list of names of possible disk types used by libdevinfo. */
-static char *disktypes[] = {
-	DDI_NT_BLOCK,
-	DDI_NT_BLOCK_CHAN,
-	DDI_NT_BLOCK_WWN,
-	DDI_NT_BLOCK_FABRIC,
-	DDI_NT_CD_CHAN,
-	DDI_NT_CD,
-	DDI_NT_FD,
-	NULL
-};
-
-/*
- * Most of the removable media will be lumped under here; CD, DVD, MO, etc.
- */
-static char *cdromtypes[] = {
-	DDI_NT_CD_CHAN,
-	DDI_NT_CD,
-	NULL
-};
-
 static char *ctrltypes[] = {
 	DDI_NT_SCSI_NEXUS,
 	DDI_NT_SCSI_ATTACHMENT_POINT,
@@ -119,7 +96,7 @@ static void		clean_paths(struct search_args *args);
 static disk_t		*create_disk(char *deviceid, char *kernel_name,
 			    struct search_args *args);
 static char		*ctype(di_node_t node, di_minor_t minor);
-static boolean_t	disk_is_cdrom(char *type);
+static boolean_t	disk_is_cdrom(const char *type);
 static alias_t		*find_alias(disk_t *diskp, char *kernel_name);
 static bus_t		*find_bus(struct search_args *args, char *name);
 static controller_t	*find_controller(struct search_args *args, char *name);
@@ -1069,18 +1046,9 @@ ctype(di_node_t node, di_minor_t minor)
 }
 
 static boolean_t
-disk_is_cdrom(char *type)
+disk_is_cdrom(const char *type)
 {
-
-	int		type_index;
-
-	for (type_index = 0; cdromtypes[type_index] != NULL; type_index++) {
-	    if (libdiskmgt_str_eq(type, cdromtypes[type_index])) {
-		return (B_TRUE);
-	    }
-	}
-
-	return (B_FALSE);
+	return (strncmp(type, DDI_NT_CD, strlen(DDI_NT_CD)) == 0);
 }
 
 static alias_t *
@@ -1561,20 +1529,8 @@ is_ctds(char *name)
 static int
 is_drive(di_minor_t minor)
 {
-	char	*type;
-	int	type_index;
-
-	type = di_minor_nodetype(minor);
-	type_index = 0;
-
-	while (disktypes[type_index] != NULL) {
-	    if (libdiskmgt_str_eq(type, disktypes[type_index])) {
-		return (1);
-	    }
-	    type_index++;
-	}
-
-	return (0);
+	return (strncmp(di_minor_nodetype(minor), DDI_NT_BLOCK,
+	    strlen(DDI_NT_BLOCK)) == 0);
 }
 
 static int
