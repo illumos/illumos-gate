@@ -26,8 +26,6 @@
 #ifndef _CMD_MEM_H
 #define	_CMD_MEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for managing state related to memory modules.
  *
@@ -183,6 +181,8 @@ extern void cmd_mem_case_restore(fmd_hdl_t *, cmd_case_t *, fmd_case_t *,
     const char *, const char *);
 extern char *cmd_mem_serdnm_create(fmd_hdl_t *, const char *, const char *);
 extern char *cmd_page_serdnm_create(fmd_hdl_t *, const char *, uint64_t);
+extern char *cmd_mq_serdnm_create(fmd_hdl_t *, const char *, uint64_t,
+    uint16_t, uint16_t);
 extern void cmd_mem_retirestat_create(fmd_hdl_t *, fmd_stat_t *, const char *,
     uint64_t, const char *);
 extern int cmd_mem_thresh_check(fmd_hdl_t *, uint_t);

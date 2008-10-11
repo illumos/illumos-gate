@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Ereport-handling routines for memory errors
  */
@@ -177,15 +175,53 @@ mq_create(fmd_hdl_t *hdl, fmd_event_t *ep,
     uint64_t afar, uint16_t upos, uint64_t now)
 {
 	cmd_mq_t *cp;
+	uint16_t ckwd = (afar & 0x30) >> 4;
+
 	cp = fmd_hdl_zalloc(hdl, sizeof (cmd_mq_t), FMD_SLEEP);
 	cp->mq_tstamp = now;
-	cp->mq_ckwd = (afar >> 4) & 0x3;
+	cp->mq_ckwd = ckwd;
 	cp->mq_phys_addr = afar;
 	cp->mq_unit_position = upos;
 	cp->mq_dram = cmd_upos2dram(upos);
 	cp->mq_ep = ep;
+	cp->mq_serdnm =
+	    cmd_mq_serdnm_create(hdl, "mq", afar, ckwd, upos);
+
+	/*
+	 * Create SERD to keep this event from being removed
+	 * by fmd which may not know there is an event pointer
+	 * saved here. This SERD is *never* meant to fire.
+	 * NOTE: wouldn't need to do this if there were an fmd
+	 * api to 'hold' an event.
+	 */
+	if (fmd_serd_exists(hdl, cp->mq_serdnm)) {
+		/* clean up dup */
+		fmd_serd_destroy(hdl, cp->mq_serdnm);
+	}
+	fmd_serd_create(hdl, cp->mq_serdnm, CMD_MQ_SERDN, CMD_MQ_SERDT);
+	(void) fmd_serd_record(hdl, cp->mq_serdnm, ep);
 
 	return (cp);
+}
+
+/* Destroy MQSC tracking block as well as event tracking SERD. */
+
+cmd_mq_t *
+mq_destroy(fmd_hdl_t *hdl, cmd_list_t *lp, cmd_mq_t *ip)
+{
+	cmd_mq_t *jp = cmd_list_next(ip);
+
+	if (ip->mq_serdnm != NULL) {
+		if (fmd_serd_exists(hdl, ip->mq_serdnm)) {
+			fmd_serd_destroy(hdl, ip->mq_serdnm);
+		}
+		fmd_hdl_strfree(hdl, ip->mq_serdnm);
+		ip->mq_serdnm = NULL;
+	}
+	cmd_list_delete(lp, &ip->mq_l);
+	fmd_hdl_free(hdl, ip, sizeof (cmd_mq_t));
+
+	return (jp);
 }
 
 /*
@@ -214,10 +250,7 @@ mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
 			 * Delete this node, to be superseded by the new
 			 * node added below.
 			 */
-			jp = cmd_list_next(ip);
-			cmd_list_delete(&dimm->mq_root[cw], &ip->mq_l);
-			fmd_hdl_free(hdl, ip, sizeof (cmd_mq_t));
-			ip = jp;
+			ip = mq_destroy(hdl, &dimm->mq_root[cw], ip);
 		} else ip = cmd_list_next(ip);
 	}
 	jp = mq_create(hdl, ep, afar, unit_position, now);
@@ -235,16 +268,17 @@ mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
 void
 mq_prune(fmd_hdl_t *hdl, cmd_dimm_t *dimm, uint64_t now)
 {
-	cmd_mq_t *ip, *jp;
+	cmd_mq_t *ip;
 	int cw;
 
 	for (cw = 0; cw < CMD_MAX_CKWDS; cw++) {
 		for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL; ) {
 			if (ip->mq_tstamp < now - (72*60*60)) {
-				jp = cmd_list_next(ip);
-				cmd_list_delete(&dimm->mq_root[cw], ip);
-				fmd_hdl_free(hdl, ip, sizeof (cmd_mq_t));
-				ip = jp;
+				/*
+				 * This event has timed out - delete the
+				 * mq block as well as serd for the event.
+				 */
+				ip = mq_destroy(hdl, &dimm->mq_root[cw], ip);
 			} /* tstamp < now - ce_t */
 			else ip = cmd_list_next(ip);
 		} /* per checkword */

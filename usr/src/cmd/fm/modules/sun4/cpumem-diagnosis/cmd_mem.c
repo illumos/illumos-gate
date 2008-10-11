@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for managing state related to memory modules.
  */
@@ -86,6 +84,18 @@ cmd_page_serdnm_create(fmd_hdl_t *hdl, const char *serdbase,
 	size_t sz = snprintf(NULL, 0, fmt, serdbase, phys_addr) + 1;
 	char *nm = fmd_hdl_alloc(hdl, sz, FMD_SLEEP);
 	(void) snprintf(nm, sz, fmt, serdbase, phys_addr);
+
+	return (nm);
+}
+
+char *
+cmd_mq_serdnm_create(fmd_hdl_t *hdl, const char *serdbase,
+    uint64_t phys_addr, uint16_t cw, uint16_t pos)
+{
+	const char *fmt = "%s_%llX_%x_%x_serd";
+	size_t sz = snprintf(NULL, 0, fmt, serdbase, phys_addr, cw, pos) + 1;
+	char *nm = fmd_hdl_alloc(hdl, sz, FMD_SLEEP);
+	(void) snprintf(nm, sz, fmt, serdbase, phys_addr, cw, pos);
 
 	return (nm);
 }

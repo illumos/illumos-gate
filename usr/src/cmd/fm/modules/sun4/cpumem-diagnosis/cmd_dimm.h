@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _CMD_DIMM_H
 #define	_CMD_DIMM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Memory modules are described by the cmd_dimm general-purpose state structure.
@@ -57,6 +55,7 @@
  */
 
 #include <cmd_mem.h>
+#include <values.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -120,6 +119,7 @@ typedef struct cmd_mq {
 	uint16_t mq_unit_position;	/* bit for sun4u, nibble for sun4v */
 	uint16_t mq_dram;		/* by table lookup from unit pos */
 	fmd_event_t *mq_ep;		/* ereport - for potential fault */
+	char *mq_serdnm;		/* serd eng to retain CE events */
 } cmd_mq_t;
 
 struct cmd_dimm {
@@ -131,6 +131,9 @@ struct cmd_dimm {
 	cmd_list_t
 	    mq_root[CMD_MAX_CKWDS];	/* per-checkword CEs to correlate */
 };
+
+#define	CMD_MQ_SERDT	MAXINT		/* Never expected to fire */
+#define	CMD_MQ_SERDN	2		/* Dup CEs not allowed */
 
 #define	CMD_DIMM_MAXSIZE \
 	MAX(sizeof (cmd_dimm_0_t), sizeof (cmd_dimm_pers_t))

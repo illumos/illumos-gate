@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for DIMMs.
  */
@@ -149,6 +147,13 @@ cmd_dimm_destroy(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 
 	for (i = 0; i < CMD_MAX_CKWDS; i++) {
 		while ((q = cmd_list_next(&dimm->mq_root[i])) != NULL) {
+			if (q->mq_serdnm != NULL) {
+				if (fmd_serd_exists(hdl, q->mq_serdnm)) {
+					fmd_serd_destroy(hdl, q->mq_serdnm);
+				}
+				fmd_hdl_strfree(hdl, q->mq_serdnm);
+				q->mq_serdnm = NULL;
+			}
 			cmd_list_delete(&dimm->mq_root[i], q);
 			fmd_hdl_free(hdl, q, sizeof (cmd_mq_t));
 		}
