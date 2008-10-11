@@ -2396,8 +2396,60 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int32_t
+ath_quiesce(dev_info_t *devinfo)
+{
+	ath_t 		*asc;
+	struct ath_hal	*ah;
+	int		i;
+
+	asc = ddi_get_soft_state(ath_soft_state_p, ddi_get_instance(devinfo));
+
+	if (asc == NULL || (ah = asc->asc_ah) == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * Disable interrupts
+	 */
+	ATH_HAL_INTRSET(ah, 0);
+
+	/*
+	 * Disable TX HW
+	 */
+	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
+		if (ATH_TXQ_SETUP(asc, i)) {
+			ATH_HAL_STOPTXDMA(ah, asc->asc_txq[i].axq_qnum);
+		}
+	}
+
+	/*
+	 * Disable RX HW
+	 */
+	ATH_HAL_STOPPCURECV(ah);
+	ATH_HAL_SETRXFILTER(ah, 0);
+	ATH_HAL_STOPDMARECV(ah);
+	drv_usecwait(3000);
+
+	/*
+	 * Power down HW
+	 */
+	ATH_HAL_PHYDISABLE(ah);
+
+	return (DDI_SUCCESS);
+}
+
 DDI_DEFINE_STREAM_OPS(ath_dev_ops, nulldev, nulldev, ath_attach, ath_detach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, ath_quiesce);
 
 static struct modldrv ath_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
