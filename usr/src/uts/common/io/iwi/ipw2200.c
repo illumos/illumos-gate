@@ -712,16 +712,33 @@ ipw2200_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/* ARGSUSED */
-int
-ipw2200_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
+/*
+ * quiesce(9E) entry point.
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+ipw2200_quiesce(dev_info_t *dip)
 {
 	struct ipw2200_softc	*sc =
 	    ddi_get_soft_state(ipw2200_ssp, ddi_get_instance(dip));
-	ASSERT(sc != NULL);
 
+	if (sc == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * No more blocking is allowed while we are in the
+	 * quiesce(9E) entry point.
+	 */
+	sc->sc_flags |= IPW2200_FLAG_QUIESCED;
+
+	/*
+	 * Disable and mask all interrupts.
+	 */
 	ipw2200_stop(sc);
-
 	return (DDI_SUCCESS);
 }
 
@@ -741,12 +758,20 @@ ipw2200_stop(struct ipw2200_softc *sc)
 	 */
 	ipw2200_ring_reset(sc);
 
-	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	/*
+	 * by-pass, if its' quiesced
+	 */
+	if (!(sc->sc_flags & IPW2200_FLAG_QUIESCED))
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 	sc->sc_flags &= ~IPW2200_FLAG_SCANNING;
 	sc->sc_flags &= ~IPW2200_FLAG_ASSOCIATED;
 
-	IPW2200_DBG(IPW2200_DBG_HWCAP, (sc->sc_dip, CE_CONT,
-	    "ipw2200_stop(): exit\n"));
+	/*
+	 * by-pass, if its' quiesced
+	 */
+	if (!(sc->sc_flags & IPW2200_FLAG_QUIESCED))
+		IPW2200_DBG(IPW2200_DBG_HWCAP, (sc->sc_dip, CE_CONT,
+		    "ipw2200_stop(): exit\n"));
 }
 
 static int
@@ -1146,7 +1171,10 @@ ipw2200_master_stop(struct ipw2200_softc *sc)
 		/* wait for a while */
 		drv_usecwait(100);
 	}
-	if (ntries == 500)
+	/*
+	 * by pass warning message, if it's quiesced already
+	 */
+	if (ntries == 500 && !(sc->sc_flags & IPW2200_FLAG_QUIESCED))
 		IPW2200_WARN((sc->sc_dip, CE_WARN,
 		    "ipw2200_master_stop(): timeout\n"));
 
@@ -2945,7 +2973,7 @@ enable_interrupt:
  *  Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ipw2200_devops, nulldev, nulldev, ipw2200_attach,
-    ipw2200_detach, ipw2200_reset, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    ipw2200_detach, nodev, NULL, D_MP, NULL, ipw2200_quiesce);
 
 static struct modldrv ipw2200_modldrv = {
 	&mod_driverops,

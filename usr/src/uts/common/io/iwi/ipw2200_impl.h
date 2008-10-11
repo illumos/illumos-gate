@@ -33,8 +33,6 @@
 #ifndef _SYS_IPW2200_IMPL_H
 #define	_SYS_IPW2200_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -128,6 +126,7 @@ struct ipw2200_softc {
 #define	IPW2200_FLAG_HW_ERR_RECOVER	(1 << 6)
 #define	IPW2200_FLAG_ASSOCIATED		(1 << 7)
 #define	IPW2200_FLAG_SUSPEND		(1 << 8)
+#define	IPW2200_FLAG_QUIESCED		(1 << 9)
 #define	IPW2200_FLAG_HAS_RADIO_SWITCH	(1 << 16)
 	/* firmware download */
 	int			sc_fw_ok;
