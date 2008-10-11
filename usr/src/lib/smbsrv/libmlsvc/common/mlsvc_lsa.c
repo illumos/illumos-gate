@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * Local Security Authority RPC (LSARPC) server-side interface definition.
  */
@@ -626,14 +623,12 @@ lsarpc_s_QueryInfoPolicy(void *arg, struct mlrpc_xaction *mxa)
 /*
  * lsarpc_s_PrimaryDomainInfo
  *
- * This is the service side function for handling primary domain policy
- * queries. This will return the primary domain name and sid. This is
- * currently a pass through interface so all we do is act as a proxy
- * between the client and the DC. If there is no session, fake up the
- * response with default values - useful for share mode.
+ * Service primary domain policy queries.  In domain mode, return the
+ * primary domain name and SID.   In workgroup mode, return the local
+ * hostname and local domain SID.
  *
- * If the server name matches the local hostname, we should return
- * the local domain SID.
+ * Note: info is zeroed on entry to ensure the SID and name do not
+ * contain spurious values if an error is returned.
  */
 static DWORD
 lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
@@ -643,6 +638,8 @@ lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
 	smb_sid_t *sid = NULL;
 	int security_mode;
 	int rc;
+
+	bzero(info, sizeof (struct mslsa_PrimaryDomainInfo));
 
 	security_mode = smb_config_get_secmode();
 
@@ -671,10 +668,12 @@ lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
 /*
  * lsarpc_s_AccountDomainInfo
  *
- * This is the service side function for handling account domain policy
- * queries. This is where we return our local domain information so that
- * NT knows who to query for information on local names and SIDs. The
- * domain name is the local hostname.
+ * Service account domain policy queries.  We return our local domain
+ * information so that the client knows who to query for information
+ * on local names and SIDs.  The domain name is the local hostname.
+ *
+ * Note: info is zeroed on entry to ensure the SID and name do not
+ * contain spurious values if an error is returned.
  */
 static DWORD
 lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
@@ -683,6 +682,8 @@ lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
 	char domain_name[MLSVC_DOMAIN_NAME_MAX];
 	smb_sid_t *domain_sid;
 	int rc;
+
+	bzero(info, sizeof (struct mslsa_AccountDomainInfo));
 
 	if (smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1) != 0)
 		return (NT_STATUS_NO_MEMORY);
