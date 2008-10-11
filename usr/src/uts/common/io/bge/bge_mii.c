@@ -232,9 +232,8 @@ bge_phy_reset(bge_t *bgep)
 			return (B_TRUE);
 	}
 
-	/* Adjust output voltage (From bsd driver) */
 	if (DEVICE_5906_SERIES_CHIPSETS(bgep))
-		bge_mii_put16(bgep, 0x17, 0x12);
+		(void) bge_adj_volt_5906(bgep);
 
 	BGE_DEBUG(("bge_phy_reset: FAILED, control now 0x%x", control));
 
@@ -491,9 +490,8 @@ bge_phy_reset_and_check(bge_t *bgep)
 	extctrl = bge_mii_get16(bgep, 0x10);
 	bge_mii_put16(bgep, 0x10, extctrl & ~0x3000);
 
-	/* Adjust output voltage (From bsd driver) */
 	if (DEVICE_5906_SERIES_CHIPSETS(bgep))
-		bge_mii_put16(bgep, 0x17, 0x12);
+		(void) bge_adj_volt_5906(bgep);
 
 	if (!reset_success)
 		bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);

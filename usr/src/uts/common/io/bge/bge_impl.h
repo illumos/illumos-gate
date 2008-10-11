@@ -1234,6 +1234,9 @@ void bge_atomic_sub64(uint64_t *count_p, uint64_t n);
 uint64_t bge_atomic_clr64(uint64_t *sp, uint64_t bits);
 uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
 
+/* bge_mii_5906.c */
+void bge_adj_volt_5906(bge_t *bgep);
+
 /*
  * Reset type
  */

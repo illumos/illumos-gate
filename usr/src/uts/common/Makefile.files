@@ -1485,7 +1485,7 @@ KMDB_OBJS += kdrv.o
 AFE_OBJS += afe.o
 
 BGE_OBJS += bge_main2.o bge_chip2.o bge_kstats.o bge_log.o bge_ndd.o \
-		bge_atomic.o bge_mii.o bge_send.o bge_recv2.o
+		bge_atomic.o bge_mii.o bge_send.o bge_recv2.o bge_mii_5906.o
 
 DMFE_OBJS += dmfe_log.o dmfe_main.o dmfe_mii.o dmfe_ndd.o
 

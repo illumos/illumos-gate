@@ -32,7 +32,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.70";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.71";
 
 /*
  * Property names
