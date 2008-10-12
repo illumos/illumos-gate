@@ -43,9 +43,13 @@ static char vlds_device[] =
 typedef struct dslibentry {
 	ds_hdl_t dsl_hdl;
 	uint32_t dsl_flags;
+	uint32_t dsl_tflags;
 	char *dsl_service;
 	ds_ops_t dsl_ops;
 } dslibentry_t;
+
+/* dsl_tflags */
+#define	DSL_ENTRY_INUSE		0x0001	/* handle is currently active */
 
 #define	MIN_DSLIB_ENTRIES	64
 static dslibentry_t *dslibtab;
@@ -69,6 +73,8 @@ static evchan_t *ds_evchan;
  * Static functions internal to dslib.
  */
 static dslibentry_t *ds_hdl_to_dslibentry(ds_hdl_t hdl);
+static dslibentry_t *ds_new_dslibentry(void);
+static uint_t ds_service_count(char *service, boolean_t is_client);
 static dslibentry_t *ds_lookup_dslibentry(char *service, boolean_t is_client);
 static dslibentry_t *ds_register_dslibentry(ds_hdl_t hdl, char *service,
     boolean_t is_client);
@@ -110,6 +116,24 @@ ds_new_dslibentry(void)
 	return (dsp);
 }
 
+static uint_t
+ds_service_count(char *service, boolean_t is_client)
+{
+	int i;
+	dslibentry_t *dsp;
+	uint_t is_client_flag = is_client ? VLDS_REG_CLIENT : 0;
+	uint_t count = 0;
+
+	for (i = 0, dsp = dslibtab; i < ndslib; i++, dsp++) {
+		if (dsp->dsl_hdl != NULL &&
+		    strcmp(dsp->dsl_service, service) == 0 &&
+		    (dsp->dsl_flags & VLDS_REG_CLIENT) == is_client_flag) {
+			count++;
+		}
+	}
+	return (count);
+}
+
 static dslibentry_t *
 ds_lookup_dslibentry(char *service, boolean_t is_client)
 {
@@ -131,36 +155,29 @@ static dslibentry_t *
 ds_register_dslibentry(ds_hdl_t hdl, char *service, boolean_t is_client)
 {
 	dslibentry_t *dsp, *orig_dsp;
-	uint_t nhdls;
 
-	if ((dsp = ds_hdl_to_dslibentry(hdl)) != NULL)
+	if ((dsp = ds_hdl_to_dslibentry(hdl)) != NULL) {
+		dsp->dsl_tflags |= DSL_ENTRY_INUSE;
 		return (dsp);
+	}
 
 	if ((orig_dsp = ds_lookup_dslibentry(service, is_client)) == NULL) {
 		return (NULL);
 	}
 
-	/*
-	 * Find out if we have 1 or 2 or more handles.  Having one implies
-	 * that we can reuse the current one handle for this service.
-	 * Having two or more implies we need to allocate a new handle.
-	 */
-	if (ds_hdl_lookup(service, is_client, NULL, 2, &nhdls) != 0)
+	if ((orig_dsp->dsl_tflags & DSL_ENTRY_INUSE) == 0) {
+		/* use the original structure entry */
+		orig_dsp->dsl_tflags |= DSL_ENTRY_INUSE;
+		orig_dsp->dsl_hdl = hdl;
+		return (orig_dsp);
+	}
+
+	/* allocate a new structure entry */
+	if ((dsp = ds_new_dslibentry()) == NULL)
 		return (NULL);
 
-	if (nhdls == 1) {
-		/* reuse the original structure entry */
-		dsp = orig_dsp;
-	} else if (nhdls == 2) {
-		/* allocate a new structure entry */
-		if ((dsp = ds_new_dslibentry()) == NULL)
-			return (NULL);
-		*dsp = *orig_dsp;
-		dsp->dsl_service = strdup(orig_dsp->dsl_service);
-	} else {
-		/* can't happen... */
-		return (NULL);
-	}
+	*dsp = *orig_dsp;
+	dsp->dsl_service = strdup(orig_dsp->dsl_service);
 	dsp->dsl_hdl = hdl;
 	return (dsp);
 }
@@ -175,22 +192,22 @@ ds_free_dslibentry(dslibentry_t *dsp, int force_unreg)
 	uint_t nhdls;
 
 	/*
-	 * Find out if we have 1 or 2 or more handles.  Having one implies
-	 * that we want to leave the entry alone unless this is a ds_unreg_hdl
+	 * Find out if we have 1 or 2 or more handles for the given
+	 * service.  Having one implies that we want to leave the entry
+	 * intact but marked as not in use unless this is a ds_unreg_hdl
 	 * (force_unreg is true).
 	 */
-	if (ds_hdl_lookup(dsp->dsl_service,
-	    (dsp->dsl_flags & VLDS_REG_CLIENT) != 0, NULL, 2, &nhdls) != 0) {
-		/* should never happen */
-		return;
-	}
+	nhdls = ds_service_count(dsp->dsl_service,
+	    (dsp->dsl_flags & VLDS_REG_CLIENT) != 0);
 
-	if ((nhdls == 1 && force_unreg) || nhdls == 2) {
+	if ((nhdls == 1 && force_unreg) || nhdls >= 2) {
 		dsp->dsl_hdl = NULL;
 		if (dsp->dsl_service) {
 			free(dsp->dsl_service);
 		}
 		(void) memset(dsp, 0, sizeof (dslibentry_t));
+	} else if (nhdls == 1) {
+		dsp->dsl_tflags &= ~DSL_ENTRY_INUSE;
 	}
 }
 
@@ -316,7 +333,8 @@ ds_init(void)
 		return (errno);
 
 	if (dslibtab == NULL) {
-		if ((dslibtab = malloc(sizeof (dslibentry_t) * ndslib)) == NULL)
+		dslibtab = malloc(sizeof (dslibentry_t) * MIN_DSLIB_ENTRIES);
+		if (dslibtab == NULL)
 			return (errno = ENOMEM);
 		ndslib = MIN_DSLIB_ENTRIES;
 		(void) memset(dslibtab, 0, sizeof (dslibentry_t) * ndslib);
@@ -415,6 +433,7 @@ ds_register(ds_capability_t *cap, ds_ops_t *ops, uint_t flags)
 	 */
 	dsp->dsl_hdl = hdl;
 	dsp->dsl_flags = flags;
+	dsp->dsl_tflags = 0;
 	dsp->dsl_service = strdup(cap->svc_id);
 	dsp->dsl_ops = *ops;
 	(void) mutex_unlock(&dslib_lock);

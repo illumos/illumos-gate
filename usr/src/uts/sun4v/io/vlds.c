@@ -77,6 +77,7 @@ typedef struct vlds_svc_info {
 	vlds_recv_hdr_t	*recv_headp;	/* ptr to head of recv queue */
 	vlds_recv_hdr_t	*recv_tailp;	/* ptr to tail of recv queue */
 	size_t		recv_size;	/* no. of bytes in recv queue */
+	uint_t		recv_cnt;	/* no of messages in recv queue */
 	kmutex_t	recv_lock;	/* lock for recv queue */
 	kcondvar_t	recv_cv;	/* condition variable for recv queue */
 	int		recv_nreaders;	/* no of currently waiting readers */
@@ -84,6 +85,7 @@ typedef struct vlds_svc_info {
 
 #define	VLDS_RECV_OK		1
 #define	VLDS_RECV_UNREG_PENDING	2
+#define	VLDS_RECV_OVERFLOW	3
 
 static int vlds_ports_inited = 0;
 
@@ -178,6 +180,9 @@ static ds_clnt_ops_t ds_user_ops = {
 	vlds_user_data_cb,		/* data */
 	NULL				/* ds_ucap_init will fill in */
 };
+
+static size_t vlds_recvq_maxsize = DS_STREAM_MTU * 8;
+static uint_t vlds_recvq_maxmsg = 16;
 
 #define	VLDS_MINOR_MAX			SHRT_MAX
 
@@ -1393,6 +1398,7 @@ vlds_recvq_init(vlds_svc_info_t *dpsp)
 	dpsp->recv_headp = NULL;
 	dpsp->recv_tailp = NULL;
 	dpsp->recv_size = 0;
+	dpsp->recv_cnt = 0;
 }
 
 static void
@@ -1400,6 +1406,7 @@ vlds_recvq_destroy(vlds_svc_info_t *dpsp)
 {
 	ASSERT(dpsp->state == VLDS_RECV_UNREG_PENDING);
 	ASSERT(dpsp->recv_size == 0);
+	ASSERT(dpsp->recv_cnt == 0);
 	ASSERT(dpsp->recv_headp == NULL);
 	ASSERT(dpsp->recv_tailp == NULL);
 
@@ -1418,8 +1425,17 @@ vlds_recvq_get_data(vlds_svc_info_t *dpsp, void *buf, size_t buflen,
 
 	mutex_enter(&dpsp->recv_lock);
 	while (dpsp->recv_size == 0) {
+		ASSERT(dpsp->recv_cnt == 0);
 		if (dpsp->state == VLDS_RECV_UNREG_PENDING)
 			break;
+
+		if (dpsp->state == VLDS_RECV_OVERFLOW) {
+			DS_DBG_RCVQ(CE_NOTE, "%s: user data queue overflow",
+			    __func__);
+			dpsp->state = VLDS_RECV_OK;
+			mutex_exit(&dpsp->recv_lock);
+			return (ENOBUFS);
+		}
 		/*
 		 * Passing in a buflen of 0 allows user to poll for msgs.
 		 */
@@ -1462,7 +1478,9 @@ vlds_recvq_get_data(vlds_svc_info_t *dpsp, void *buf, size_t buflen,
 		dpsp->recv_headp = rhp->next;
 		ASSERT(dpsp->recv_headp != NULL);
 	}
+	ASSERT(dpsp->recv_cnt > 0);
 	dpsp->recv_size -= rhp->datasz;
+	dpsp->recv_cnt -= 1;
 	mutex_exit(&dpsp->recv_lock);
 
 	msglen = rhp->datasz;
@@ -1503,6 +1521,7 @@ vlds_recvq_drain(vlds_svc_info_t *dpsp)
 	dpsp->recv_headp = NULL;
 	dpsp->recv_tailp = NULL;
 	dpsp->recv_size = 0;
+	dpsp->recv_cnt = 0;
 
 	/*
 	 * Make sure other readers have exited.
@@ -1524,6 +1543,26 @@ vlds_recvq_put_data(vlds_svc_info_t *dpsp, void *buf, size_t buflen)
 
 	mutex_enter(&dpsp->recv_lock);
 	if (dpsp->state != VLDS_RECV_UNREG_PENDING) {
+		/*
+		 * If we've already encountered an overflow, or there
+		 * are pending messages and either queue size and
+		 * message limits will be exceeded with this message,
+		 * we mark the recvq as overflowed and return an ENOBUFS
+		 * error.  This allows the enqueuing of one big message
+		 * or several little messages.
+		 */
+		if ((dpsp->state == VLDS_RECV_OVERFLOW) ||
+		    ((dpsp->recv_cnt != 0) &&
+		    ((dpsp->recv_size + buflen) > vlds_recvq_maxsize) ||
+		    ((dpsp->recv_cnt + 1) > vlds_recvq_maxmsg))) {
+			DS_DBG_RCVQ(CE_NOTE, "%s: user data queue overflow",
+			    __func__);
+			dpsp->state = VLDS_RECV_OVERFLOW;
+			cv_broadcast(&dpsp->recv_cv);
+			mutex_exit(&dpsp->recv_lock);
+			return (ENOBUFS);
+		}
+
 		DS_DBG_RCVQ(CE_NOTE, "%s: user data enqueued msglen: %ld",
 		    __func__, buflen);
 		DS_DUMP_MSG(DS_DBG_FLAG_RCVQ, buf, buflen);
@@ -1540,6 +1579,7 @@ vlds_recvq_put_data(vlds_svc_info_t *dpsp, void *buf, size_t buflen)
 			dpsp->recv_tailp = rhp;
 		}
 		dpsp->recv_size += rhp->datasz;
+		dpsp->recv_cnt += 1;
 		cv_broadcast(&dpsp->recv_cv);
 	}
 	mutex_exit(&dpsp->recv_lock);

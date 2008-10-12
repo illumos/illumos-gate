@@ -44,11 +44,11 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 LDLIBS += -lsysevent -lnvpair -lc
 
 LINTFLAGS = -msux
-LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
+LINTFLAGS64 = -msux -m64
 
 $(LINTLIB) := SRCS = $(LINTSRC:%=$(SRCDIR)/%)
 $(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
-$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9) \
+$(LINTLIB) := LINTFLAGS64 = -nsvx -m64 \
 	-I$(ROOT)/usr/platform/sun4v/include
 
 .KEEP_STATE:
