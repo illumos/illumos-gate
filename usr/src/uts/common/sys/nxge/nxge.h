@@ -30,11 +30,9 @@
 extern "C" {
 #endif
 
-#if defined(_KERNEL) || defined(COSIM)
 #include <nxge_mac.h>
 #include <nxge_ipp.h>
 #include <nxge_fflp.h>
-#endif
 
 /*
  * NXGE diagnostics IOCTLS.
@@ -67,7 +65,6 @@ extern "C" {
 #define	NXGE_PUT_TCAM		(NXGE_IOC|30)
 #define	NXGE_INJECT_ERR		(NXGE_IOC|40)
 
-#if (defined(SOLARIS) && defined(_KERNEL)) || defined(COSIM)
 #define	NXGE_OK			0
 #define	NXGE_ERROR		0x40000000
 #define	NXGE_DDI_FAILED		0x20000000
@@ -322,9 +319,6 @@ typedef struct _filter_t {
 	uint32_t all_sap_cnt;
 } filter_t, *p_filter_t;
 
-#if defined(_KERNEL) || defined(COSIM)
-
-
 typedef struct _nxge_port_stats_t {
 	/*
 	 *  Overall structure size
@@ -475,8 +469,6 @@ typedef struct _nxge_stats_t {
 	nxge_mmac_stats_t	mmac_stats;	/* Multi mac. stats */
 
 } nxge_stats_t, *p_nxge_stats_t;
-
-
 
 typedef struct _nxge_intr_t {
 	boolean_t		intr_registered; /* interrupts are registered */
@@ -783,6 +775,7 @@ struct _nxge_t {
 
 	nxge_grp_set_t		rx_set;
 	nxge_grp_set_t		tx_set;
+	boolean_t		tdc_is_shared[NXGE_MAX_TDCS];
 
 	nxge_rx_ring_group_t	rx_hio_groups[NXGE_MAX_RDC_GROUPS];
 	nxge_share_handle_t	shares[NXGE_MAX_VRS];
@@ -1145,8 +1138,6 @@ typedef struct _nxge_mmac_kstat {
 	kstat_named_t	mmac_addr16;
 } nxge_mmac_kstat_t, *p_nxge_mmac_kstat_t;
 
-#endif	/* _KERNEL */
-
 /*
  * Prototype definitions.
  */
@@ -1156,12 +1147,9 @@ void nxge_get64(p_nxge_t, p_mblk_t);
 void nxge_put64(p_nxge_t, p_mblk_t);
 void nxge_pio_loop(p_nxge_t, p_mblk_t);
 
-#ifndef COSIM
 typedef	void	(*fptrv_t)();
-timeout_id_t nxge_start_timer(p_nxge_t, fptrv_t, int);
-void nxge_stop_timer(p_nxge_t, timeout_id_t);
-#endif
-#endif
+timeout_id_t	nxge_start_timer(p_nxge_t, fptrv_t, int);
+void		nxge_stop_timer(p_nxge_t, timeout_id_t);
 
 #ifdef	__cplusplus
 }

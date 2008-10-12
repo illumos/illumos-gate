@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NXGE_NXGE_FFLP_HW_H
 #define	_SYS_NXGE_NXGE_FFLP_HW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -34,12 +33,10 @@ extern "C" {
 
 #include <nxge_defs.h>
 
-
 /* FZC_FFLP Offsets */
 #define	    FFLP_ENET_VLAN_TBL_REG	(FZC_FFLP + 0x00000)
 
-	/* defines for FFLP_ENET_VLAN_TBL */
-
+/* defines for FFLP_ENET_VLAN_TBL */
 #define	ENET_VLAN_TBL_VLANRDCTBLN0_MASK 	0x0000000000000003ULL
 #define	ENET_VLAN_TBL_VLANRDCTBLN0_SHIFT 	0
 #define	ENET_VLAN_TBL_VPR0_MASK			0x00000000000000008ULL
@@ -64,8 +61,6 @@ extern "C" {
 #define	ENET_VLAN_TBL_PARITY0_SHIFT		16
 #define	ENET_VLAN_TBL_PARITY1_MASK		0x0000000000020000ULL
 #define	ENET_VLAN_TBL_PARITY1_SHIFT		17
-
-
 
 typedef union _fflp_enet_vlan_tbl_t {
     uint64_t value;
@@ -106,12 +101,9 @@ typedef union _fflp_enet_vlan_tbl_t {
 	} bits;
 } fflp_enet_vlan_tbl_t, *p_fflp_enet_vlan_tbl_t;
 
-
 #define	FFLP_TCAM_CLS_BASE_OFFSET (FZC_FFLP + 0x20000)
 #define	FFLP_L2_CLS_ENET1_REG	  (FZC_FFLP + 0x20000)
 #define	FFLP_L2_CLS_ENET2_REG	  (FZC_FFLP + 0x20008)
-
-
 
 typedef union _tcam_class_prg_ether_t {
 #define	TCAM_ENET_USR_CLASS_ENABLE   0x1
@@ -138,7 +130,6 @@ typedef union _tcam_class_prg_ether_t {
 #endif
 	} bits;
 } tcam_class_prg_ether_t, *p_tcam_class_prg_ether_t;
-
 
 #define		FFLP_L3_CLS_IP_U4_REG	(FZC_FFLP + 0x20010)
 #define		FFLP_L3_CLS_IP_U5_REG	(FZC_FFLP + 0x20018)
@@ -204,15 +195,12 @@ typedef enum fflp_tcam_class {
     TCAM_CLASS_MAX
 } tcam_class_t;
 
-
-
 /*
  * Specify how to build TCAM key for L3
  * IP Classes. Both User configured and
  * hardwired IP services are included.
  * These are the supported 12 classes.
  */
-
 #define		FFLP_TCAM_KEY_BASE_OFFSET	(FZC_FFLP + 0x20030)
 #define		FFLP_TCAM_KEY_IP_USR4_REG		(FZC_FFLP + 0x20030)
 #define		FFLP_TCAM_KEY_IP_USR5_REG		(FZC_FFLP + 0x20038)
@@ -1296,10 +1284,7 @@ typedef struct tcam_entry {
  * before this header file.
  * Need to move these includes to impl files ...
  */
-
-#if defined(SOLARIS) || defined(COSIM)
 #include <netinet/in.h>
-#endif
 
 typedef union flow_template {
 

@@ -18,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include <sys/nxge/nxge_impl.h>
 #include <sys/proc.h>
 
@@ -37,12 +37,7 @@ extern void bzero(void *, size_t);
 
 extern uint32_t nxge_tx_serial_maxsleep;
 
-#ifdef _KERNEL
 static void nxge_onetrack(void *p);
-#else
-static void *nxge_onetrack(void *p);
-#endif
-
 static int nxge_serial_put(nxge_serialize_t *, void *);
 static int nxge_serial_getn(nxge_serialize_t *, mblk_t **, mblk_t **);
 static void nxge_serial_ungetn(nxge_serialize_t *, mblk_t *, mblk_t *, int);
@@ -258,11 +253,7 @@ nxge_serial_ungetn(nxge_serialize_t *p, mblk_t *head, mblk_t *tail, int n)
 	mutex_exit(&p->lock);
 }
 
-#ifdef _KERNEL
 static void
-#else
-static void *
-#endif
 nxge_onetrack(void *s)
 {
 	int		k, i;

@@ -825,6 +825,12 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (isLDOMguest(nxgep)) {
 		/* Find our VR & channel sets. */
 		status = nxge_hio_vr_add(nxgep);
+		if (status != NXGE_OK) {
+			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+			    "nxge_hio_vr_add failed"));
+			(void) hsvc_unregister(&nxgep->niu_hsvc);
+			nxgep->niu_hsvc_available = B_FALSE;
+		}
 		goto nxge_attach_exit;
 	}
 #endif
@@ -840,6 +846,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL, "add_intr failed"));
 		goto nxge_attach_fail;
 	}
+
 	status = nxge_add_soft_intrs(nxgep);
 	if (status != DDI_SUCCESS) {
 		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
@@ -3360,13 +3367,14 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 				    "> 1 cookie"
 				    "(staus 0x%x ncookies %d.)", ddi_status,
 				    dma_p->ncookies));
+				(void) ddi_dma_unbind_handle(dma_p->dma_handle);
 				if (dma_p->acc_handle) {
 					ddi_dma_mem_free(&dma_p->acc_handle);
 					dma_p->acc_handle = NULL;
 				}
-				(void) ddi_dma_unbind_handle(dma_p->dma_handle);
 				ddi_dma_free_handle(&dma_p->dma_handle);
 				dma_p->dma_handle = NULL;
+				dma_p->acc_handle = NULL;
 				return (NXGE_ERROR);
 			}
 			break;
@@ -3406,11 +3414,11 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 				    "(kmem_alloc) > 1 cookie"
 				    "(staus 0x%x ncookies %d.)", ddi_status,
 				    dma_p->ncookies));
-				KMEM_FREE(kaddrp, length);
-				dma_p->acc_handle = NULL;
 				(void) ddi_dma_unbind_handle(dma_p->dma_handle);
+				KMEM_FREE(kaddrp, length);
 				ddi_dma_free_handle(&dma_p->dma_handle);
 				dma_p->dma_handle = NULL;
+				dma_p->acc_handle = NULL;
 				dma_p->kaddrp = NULL;
 				return (NXGE_ERROR);
 			}

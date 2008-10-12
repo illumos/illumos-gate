@@ -208,9 +208,9 @@ static void nxge_check_guest_state(nxge_hio_vr_t *);
  *	Guest domain
  */
 /* ARGSUSED */
+
 int
-nxge_hio_vr_add(
-	nxge_t *nxge)
+nxge_hio_vr_add(nxge_t *nxge)
 {
 	extern mac_callbacks_t nxge_m_callbacks;
 
@@ -223,7 +223,8 @@ nxge_hio_vr_add(
 	uint8_t vr_index;
 
 	nxhv_vr_fp_t *fp;
-	uint64_t cookie, vr_address, vr_size;
+	uint64_t vr_address, vr_size;
+	uint32_t cookie;
 
 	nxhv_dc_fp_t *tx, *rx;
 	uint64_t tx_map, rx_map;
@@ -248,7 +249,7 @@ nxge_hio_vr_add(
 		return (NXGE_ERROR);
 	}
 
-	cookie = (uint64_t)(reg_val[0]);
+	cookie = (uint32_t)reg_val[0];
 	ddi_prop_free(reg_val);
 
 	fp = &nhd->hio.vr;
@@ -283,6 +284,9 @@ nxge_hio_vr_add(
 	if (vr_index == FUNC_VIR_MAX) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_vr_add "
 		    "no VRs available"));
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+		    "nxge_hio_vr_add(%d): cookie(0x%x)\n",
+		    nxge->instance, cookie));
 		return (NXGE_ERROR);
 	}
 
@@ -567,10 +571,16 @@ res_map_parse(
  *	Guest domain
  */
 int
-nxge_hio_vr_release(
-	nxge_t *nxge)
+nxge_hio_vr_release(nxge_t *nxge)
 {
+	nxge_hio_data_t	*nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
+	int		vr_index;
+
 	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "==> nxge_hio_vr_release"));
+
+	if (nxge->hio_vr == NULL) {
+		return (NXGE_OK);
+	}
 
 	/*
 	 * Uninitialize interrupts.
@@ -596,6 +606,18 @@ nxge_hio_vr_release(
 		nxge_grp_remove(nxge, nxge->tx_set.group[0]);
 
 	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "<== nxge_hio_vr_release"));
+
+	/*
+	 * Clean up.
+	 */
+	MUTEX_ENTER(&nhd->lock);
+	for (vr_index = 0; vr_index < FUNC_VIR_MAX; vr_index++) {
+		if (nhd->vr[vr_index].nxge == (uintptr_t)nxge) {
+			nhd->vr[vr_index].nxge = NULL;
+			break;
+		}
+	}
+	MUTEX_EXIT(&nhd->lock);
 
 	return (NXGE_OK);
 }

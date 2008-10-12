@@ -482,6 +482,12 @@ nxge_grp_dc_add(
 
 	nxge_grp_dc_append(nxge, group, dc);
 
+	if (type == VP_BOUND_TX) {
+		MUTEX_ENTER(&nhd->lock);
+		nxge->tdc_is_shared[channel] = B_FALSE;
+		MUTEX_EXIT(&nhd->lock);
+	}
+
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_grp_dc_add"));
 
 	return ((int)status);
@@ -643,14 +649,16 @@ nxge_grp_dc_append(
  *	Any domain
  */
 nxge_hio_dc_t *
-nxge_grp_dc_unlink(
-	nxge_t *nxge,
-	nxge_grp_t *group,
-	int channel)
+nxge_grp_dc_unlink(nxge_t *nxge, nxge_grp_t *group, int channel)
 {
 	nxge_hio_dc_t *current, *previous;
 
 	MUTEX_ENTER(&nxge->group_lock);
+
+	if (group == NULL) {
+		MUTEX_EXIT(&nxge->group_lock);
+		return (0);
+	}
 
 	if ((current = group->dc) == 0) {
 		MUTEX_EXIT(&nxge->group_lock);
@@ -961,8 +969,11 @@ nxge_hio_init(
 	nhd->vrs = NXGE_VR_SR_MAX - 2;
 
 	/*
-	 * Initialize share and ring group structures.
+	 * Initialize tdc share state, shares and ring group structures.
 	 */
+	for (i = 0; i < NXGE_MAX_TDCS; i++)
+		nxge->tdc_is_shared[i] = B_FALSE;
+
 	for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
 		nxge->rx_hio_groups[i].ghandle = NULL;
 		nxge->rx_hio_groups[i].nxgep = nxge;
@@ -1559,6 +1570,7 @@ nxge_hio_tdc_share(
 	nxge_t *nxge,
 	int channel)
 {
+	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	nxge_grp_set_t *set = &nxge->tx_set;
 	tx_ring_t *ring;
 	int count;
@@ -1594,6 +1606,11 @@ nxge_hio_tdc_share(
 		(void) atomic_swap_32(&ring->tx_ring_offline,
 		    NXGE_TX_RING_OFFLINED);
 	}
+
+	MUTEX_ENTER(&nhd->lock);
+	nxge->tdc_is_shared[channel] = B_TRUE;
+	MUTEX_EXIT(&nhd->lock);
+
 
 	if (nxge_intr_remove(nxge, VP_BOUND_TX, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "

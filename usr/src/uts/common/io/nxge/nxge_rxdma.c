@@ -249,7 +249,7 @@ nxge_reset_rxdma_channel(p_nxge_t nxgep, uint16_t channel)
 	npi_status_t		rs = NPI_SUCCESS;
 	nxge_status_t		status = NXGE_OK;
 
-	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_reset_rxdma_channel"));
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "==> nxge_reset_rxdma_channel"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	rs = npi_rxdma_cfg_rdc_reset(handle, channel);
@@ -257,6 +257,8 @@ nxge_reset_rxdma_channel(p_nxge_t nxgep, uint16_t channel)
 	if (rs != NPI_SUCCESS) {
 		status = NXGE_ERROR | rs;
 	}
+
+	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_reset_rxdma_channel"));
 
 	return (status);
 }
@@ -4143,6 +4145,22 @@ nxge_rxdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	    "npi handle addr $%p acc $%p",
 	    nxgep->npi_handle.regp, nxgep->npi_handle.regh));
 
+	if (!isLDOMguest(nxgep)) {
+		/*
+		 * Stop RxMAC = A.9.2.6
+		 */
+		if (nxge_rx_mac_disable(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_rxdma_stop_channel: "
+			    "Failed to disable RxMAC"));
+		}
+
+		/*
+		 * Drain IPP Port = A.9.3.6
+		 */
+		(void) nxge_ipp_drain(nxgep);
+	}
+
 	/* Reset RXDMA channel */
 	rs = npi_rxdma_cfg_rdc_reset(handle, channel);
 	if (rs != NPI_SUCCESS) {
@@ -4171,10 +4189,11 @@ nxge_rxdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 	    "==> nxge_rxdma_stop_channel: event done"));
 
-	/* Initialize the receive DMA control and status register */
+	/*
+	 * Initialize the receive DMA control and status register
+	 */
 	cs.value = 0;
-	status = nxge_init_rxdma_channel_cntl_stat(nxgep, channel,
-	    &cs);
+	status = nxge_init_rxdma_channel_cntl_stat(nxgep, channel, &cs);
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_stop_channel: control "
 	    " to default (all 0s) 0x%08x", cs.value));
 	if (status != NXGE_OK) {
@@ -4188,15 +4207,26 @@ nxge_rxdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 	    "==> nxge_rxdma_stop_channel: control done"));
 
-	/* disable dma channel */
+	/*
+	 * Make sure channel is disabled.
+	 */
 	status = nxge_disable_rxdma_channel(nxgep, channel);
-
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    " nxge_rxdma_stop_channel: "
 		    " init enable rxdma failed (0x%08x channel %d)",
 		    status, channel));
 		return (status);
+	}
+
+	if (!isLDOMguest(nxgep)) {
+		/*
+		 * Enable RxMAC = A.9.2.10
+		 */
+		if (nxge_rx_mac_enable(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_rxdma_stop_channel: Rx MAC still disabled"));
+		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep,

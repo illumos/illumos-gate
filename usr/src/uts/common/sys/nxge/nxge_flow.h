@@ -18,24 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NXGE_NXGE_FLOW_H
 #define	_SYS_NXGE_NXGE_FLOW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#if defined(SOLARIS) && defined(_KERNEL)
 #include <netinet/in.h>
 #define	S6_addr32	_S6_un._S6_u32
-#endif
 
 typedef struct tcpip4_spec_s {
 	in_addr_t  ip4src;
@@ -108,11 +105,8 @@ typedef struct ip_user_spec_s {
 	uint8_t    tos;
 } ip_user_spec_t;
 
-
-
 typedef ether_spec_t arpip_spec_t;
 typedef ether_spec_t ether_user_spec_t;
-
 
 typedef struct flow_spec_s {
 	uint32_t  flow_type;
@@ -151,14 +145,12 @@ typedef struct flow_spec_s {
 #define	FSPEC_IP_USR	0xF	/* IP Programmable  */
 #define	FSPEC_HDATA	0x10	/* Pkt Headers eth-da,sa,etype,ip,tcp(Bitmap) */
 
-
 #define	TCAM_IPV6_ADDR(m32, ip6addr) {		\
 		m32[0] = ip6addr.S6_addr32[0]; \
 		m32[1] = ip6addr.S6_addr32[1]; \
 		m32[2] = ip6addr.S6_addr32[2]; \
 		m32[3] = ip6addr.S6_addr32[3]; \
 	}
-
 
 #define	TCAM_IPV4_ADDR(m32, ip4addr) (m32 = ip4addr)
 #define	TCAM_IP_PORTS(port32, dp, sp)	  (port32 = dp | (sp << 16))

@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NXGE_NXGE_SERIALIZE_H
 #define	_SYS_NXGE_NXGE_SERIALIZE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -36,8 +35,6 @@ extern "C" {
 #define	NXGE_TX_AVG_RES		2000		/* sleep at least a tick */
 #define	MAXHRS			3		/* # of packets to process */
 #define	ONESEC			1000000000	/* one second */
-
-#ifdef _KERNEL
 
 #include <sys/stream.h>
 #include <sys/mutex.h>
@@ -52,44 +49,6 @@ extern "C" {
 #define	NXGE_TX_STHREAD_RUNNING	0x0001	/* thread started */
 #define	NXGE_TX_STHREAD_DESTROY	0x0002	/* thread is being destroyed */
 #define	NXGE_TX_STHREAD_EXIT	0x0003	/* thread exits */
-
-#else
-
-static int p0 = 0;
-#define	TS_RUN	0
-static int maxclsyspri = 99;
-
-#include <atomic.h>
-#include <thread.h>
-#include <synch.h>
-#include <assert.h>
-#include <errno.h>
-typedef void mblk_t;
-typedef mutex_t kmutex_t;
-typedef cond_t kcondvar_t;
-
-#define	MUTEX_DEFAULT USYNC_THREAD
-
-#define	mutex_init(a, b, c, d) mutex_init(a, b, c)
-#define	mutex_enter(a) mutex_lock(a)
-#define	mutex_tryenter(a) mutex_trylock(a)
-#define	mutex_exit(a) mutex_unlock(a)
-
-#define	cv_init(c, n, t, m) cond_init(c, USYNC_THREAD, NULL)
-#define	cv_wait(c, m) cond_wait(c, m)
-#define	cv_signal(c) cond_signal(c)
-#define	cv_timedwait(c, m, t) cond_timedwait(c, m, &t)
-
-#define	kmem_alloc(a, b) malloc(a)
-#define	kmem_free(a, b) free(a)
-
-#define	cas32(a, b, c) atomic_cas_32(a, b, c)
-
-#define	thread_create(a, b, c, d, e, f, g, h)	\
-		thr_create(a, b, c, d, THR_BOUND, NULL)
-
-#endif
-
 
 typedef int (onetrack_t)(mblk_t *, void *);
 

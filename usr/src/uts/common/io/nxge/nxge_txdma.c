@@ -1674,8 +1674,9 @@ nxge_check_tx_hang_exit:
 int
 nxge_txdma_hung(p_nxge_t nxgep)
 {
-	nxge_grp_set_t *set = &nxgep->tx_set;
-	int tdc;
+	nxge_grp_set_t	*set = &nxgep->tx_set;
+	int		tdc;
+	boolean_t	shared;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_hung"));
 
@@ -1686,7 +1687,24 @@ nxge_txdma_hung(p_nxge_t nxgep)
 	}
 
 	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
-		if ((1 << tdc) & set->owned.map) {
+		/*
+		 * Grab the shared state of the TDC.
+		 */
+		if (isLDOMservice(nxgep)) {
+			nxge_hio_data_t *nhd =
+			    (nxge_hio_data_t *)nxgep->nxge_hw_p->hio;
+
+			MUTEX_ENTER(&nhd->lock);
+			shared = nxgep->tdc_is_shared[tdc];
+			MUTEX_EXIT(&nhd->lock);
+		} else {
+			shared = B_FALSE;
+		}
+
+		/*
+		 * Now, process continue to process.
+		 */
+		if (((1 << tdc) & set->owned.map) && !shared) {
 			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
 			if (ring) {
 				if (nxge_txdma_channel_hung(nxgep, ring, tdc)) {

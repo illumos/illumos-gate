@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -220,10 +221,6 @@ typedef struct _tx_mbox_areas_t {
 	boolean_t		txmbox_allocated;
 } tx_mbox_areas_t, *p_tx_mbox_areas_t;
 
-
-#if	defined(SOLARIS) && (defined(_KERNEL) || \
-	(defined(COSIM) && !defined(IODIAG)))
-
 /*
  * Transmit prototypes.
  */
@@ -279,8 +276,6 @@ void nxge_txdma_inject_err(p_nxge_t, uint32_t, uint8_t);
 extern nxge_status_t nxge_alloc_tx_mem_pool(p_nxge_t);
 extern nxge_status_t nxge_alloc_txb(p_nxge_t nxgep, int channel);
 extern void nxge_free_txb(p_nxge_t nxgep, int channel);
-
-#endif
 
 #ifdef	__cplusplus
 }

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,8 +26,6 @@
 
 #ifndef	_SYS_NXGE_NXGE_COMMON_IMPL_H
 #define	_SYS_NXGE_NXGE_COMMON_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -131,8 +130,6 @@ extern "C" {
 #define	NPI_CTL		0x0000000080000000ULL
 #define	NPI_ERR_CTL	0x0000000080000000ULL
 
-#if defined(SOLARIS) && defined(_KERNEL)
-
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -145,13 +142,8 @@ extern "C" {
 #define	NXGE_DEBUG_MSG(params)
 #endif
 
-#if 1
 #define	NXGE_ERROR_MSG(params)	nxge_debug_msg params
 #define	NXGE_WARN_MSG(params)	nxge_debug_msg params
-#else
-#define	NXGE_ERROR_MSG(params)
-#define	NXGE_WARN_MSG(params)
-#endif
 
 typedef kmutex_t			nxge_os_mutex_t;
 typedef	krwlock_t			nxge_os_rwlock_t;
@@ -318,8 +310,6 @@ typedef frtn_t				nxge_os_frtn_t;
 #define	FM_CHECK_DMA_HANDLE(nxgep, handle)\
 		fm_check_dma_handle(handle)
 
-#endif
-
 #if defined(REG_TRACE)
 #define	NXGE_REG_RD64(handle, offset, val_p) {\
 	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
@@ -335,44 +325,11 @@ typedef frtn_t				nxge_os_frtn_t;
 	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
 	rt_show_reg(0xbadbad, B_FALSE, (uint32_t)offset, (uint64_t)(*(val_p)));\
 }
-#elif defined(AXIS_DEBUG) && !defined(LEGION)
-#define	NXGE_REG_RD64(handle, offset, val_p) {\
-	int	n;				\
-	for (n = 0; n < AXIS_WAIT_LOOP; n++) {	\
-		*(val_p) = 0;		\
-		*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
-		if (*(val_p) != (~0)) { \
-			break; \
-		}	\
-		drv_usecwait(AXIS_WAIT_PER_LOOP); \
-		if (n < 20) { \
-			cmn_err(CE_WARN, "NXGE_REG_RD64: loop %d " \
-			"REG 0x%x(0x%llx)", \
-			n, offset, *val_p);\
-		}	\
-	} \
-	if (n >= AXIS_WAIT_LOOP) {	\
-		cmn_err(CE_WARN, "(FATAL)NXGE_REG_RD64 on offset 0x%x " \
-			"with -1!!!", offset); \
-	}	\
-}
 #else
-
 #define	NXGE_REG_RD64(handle, offset, val_p) {\
 	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
 }
 #endif
-
-/*
- *	 In COSIM mode, we could loop for very long time when polling
- *  for the completion of a Clause45 frame MDIO operations. Display
- *  one rtrace line for each poll can result in messy screen.  Add
- *  this MACRO for no rtrace show.
- */
-#define	NXGE_REG_RD64_NO_SHOW(handle, offset, val_p) {\
-	*(val_p) = NXGE_NPI_PIO_READ64(handle, offset);\
-}
-
 
 #if defined(REG_TRACE)
 #define	NXGE_REG_WR64(handle, offset, val) {\

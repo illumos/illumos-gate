@@ -26,8 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_DEFS_H
 #define	_SYS_NXGE_NXGE_DEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -419,11 +417,7 @@ extern "C" {
 #define	_BIT_FIELDS_LITTLE_ENDIAN	_LITTLE_ENDIAN_BITFIELD
 #endif
 
-#ifdef COSIM
-#define	MAX_PIO_RETRIES		3200
-#else
 #define	MAX_PIO_RETRIES		32
-#endif
 
 #define	IS_PORT_NUM_VALID(portn)\
 	(portn < 4)
