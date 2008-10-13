@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -77,6 +75,7 @@
 void vsw_setup_switching_timeout(void *arg);
 void vsw_stop_switching_timeout(vsw_t *vswp);
 int vsw_setup_switching(vsw_t *);
+void vsw_setup_layer2_post_process(vsw_t *vswp);
 void vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller,
     vsw_port_t *port, mac_resource_handle_t mrh);
 static	int vsw_setup_layer2(vsw_t *);
@@ -177,15 +176,7 @@ vsw_setup_switching_timeout(void *arg)
 	rv = vsw_setup_switching(vswp);
 
 	if (rv == 0) {
-		/*
-		 * Successfully setup switching mode.
-		 * Program unicst, mcst addrs of vsw
-		 * interface and ports in the physdev.
-		 */
-		vsw_set_addrs(vswp);
-
-		/* Start HIO for ports that have already connected */
-		vsw_hio_start_ports(vswp);
+		vsw_setup_layer2_post_process(vswp);
 	}
 
 	mutex_enter(&vswp->swtmout_lock);
@@ -645,6 +636,25 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	}
 
 	D1(vswp, "%s: exit", __func__);
+}
+
+/*
+ * Setup mac addrs and hio resources for layer 2 switching only.
+ */
+void
+vsw_setup_layer2_post_process(vsw_t *vswp)
+{
+	if ((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
+	    (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) {
+		/*
+		 * Program unicst, mcst addrs of vsw
+		 * interface and ports in the physdev.
+		 */
+		vsw_set_addrs(vswp);
+
+		/* Start HIO for ports that have already connected */
+		vsw_hio_start_ports(vswp);
+	}
 }
 
 /*

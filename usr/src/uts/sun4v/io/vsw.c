@@ -140,7 +140,7 @@ extern int vsw_set_hw(vsw_t *, vsw_port_t *, int);
 extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
 extern void vsw_reconfig_hw(vsw_t *);
 extern void vsw_unset_addrs(vsw_t *vswp);
-extern void vsw_set_addrs(vsw_t *vswp);
+extern void vsw_setup_layer2_post_process(vsw_t *vswp);
 extern void vsw_create_vlans(void *arg, int type);
 extern void vsw_destroy_vlans(void *arg, int type);
 extern void vsw_vlan_add_ids(void *arg, int type);
@@ -150,7 +150,6 @@ extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
 	mblk_t **npt);
 extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
 extern void vsw_hio_cleanup(vsw_t *vswp);
-extern void vsw_hio_start_ports(vsw_t *vswp);
 extern void vsw_reset_ports(vsw_t *vswp);
 extern void vsw_port_reset(vsw_port_t *portp);
 void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
@@ -2225,15 +2224,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 			goto fail_update;
 		}
 
-		/*
-		 * program unicst, mcst addrs of vsw interface
-		 * and ports in the physdev.
-		 */
-		vsw_set_addrs(vswp);
-
-		/* Start HIO for ports that have already connected */
-		vsw_hio_start_ports(vswp);
-
+		vsw_setup_layer2_post_process(vswp);
 	} else if (updated & MD_macaddr) {
 		/*
 		 * We enter here if only MD_macaddr is exclusively updated.
