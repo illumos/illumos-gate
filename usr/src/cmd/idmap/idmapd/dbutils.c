@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Database related utility routines
  */
@@ -2920,6 +2918,8 @@ sid2pid_second_pass(lookup_state_t *state,
 		 * as users unless the caller specified which of a UID
 		 * or GID they want.
 		 */
+		if (req->id1.idtype == IDMAP_SID)
+			req->id1.idtype = IDMAP_USID;
 		if (res->id.idtype == IDMAP_POSIXID)
 			res->id.idtype = IDMAP_UID;
 		goto do_eph;
