@@ -109,7 +109,7 @@ extern void vdds_mod_fini(void);
 extern int vdds_init(vnet_t *vnetp);
 extern void vdds_cleanup(vnet_t *vnetp);
 extern void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
-extern void vdds_cleanup_hybrid_res(vnet_t *vnetp);
+extern void vdds_cleanup_hybrid_res(void *arg);
 
 #define	VNET_FDBE_REFHOLD(p)						\
 {									\
@@ -1154,6 +1154,7 @@ vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err)
 {
 	vnet_res_t *vresp = (vnet_res_t *)vrh;
 	vnet_t *vnetp = vresp->vnetp;
+	int rv;
 
 	if (vnetp == NULL) {
 		return;
@@ -1162,7 +1163,13 @@ vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err)
 	    (vresp->type != VIO_NET_RES_HYBRID)) {
 		return;
 	}
-	vdds_cleanup_hybrid_res(vnetp);
+	rv = ddi_taskq_dispatch(vnetp->taskqp, vdds_cleanup_hybrid_res,
+	    vnetp, DDI_NOSLEEP);
+	if (rv != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "vnet%d:Failed to dispatch task to cleanup hybrid resource",
+		    vnetp->instance);
+	}
 }
 
 /*

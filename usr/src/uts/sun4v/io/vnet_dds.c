@@ -86,7 +86,7 @@ void vdds_mod_fini(void);
 int vdds_init(vnet_t *vnetp);
 void vdds_cleanup(vnet_t *vnetp);
 void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
-void vdds_cleanup_hybrid_res(vnet_t *vnetp);
+void vdds_cleanup_hybrid_res(void *arg);
 
 /* Support functions to create/destory Hybrid device */
 static dev_info_t *vdds_create_niu_node(uint64_t cookie,
@@ -157,6 +157,11 @@ static hsvc_info_t niu_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_NIU, 1, 1, "vnet_dds"
 };
 
+/*
+ * Lock to serialize the NIU device node related operations.
+ */
+kmutex_t vdds_dev_lock;
+
 boolean_t vdds_hv_hio_capable = B_FALSE;
 
 /*
@@ -175,6 +180,7 @@ vdds_mod_init(void)
 	if ((rv == 0) && (minor == 1)) {
 		vdds_hv_hio_capable = B_TRUE;
 	}
+	mutex_init(&vdds_dev_lock, NULL, MUTEX_DRIVER, NULL);
 	DBG1(NULL, "HV HIO capable");
 }
 
@@ -185,6 +191,7 @@ void
 vdds_mod_fini(void)
 {
 	(void) hsvc_unregister(&niu_hsvc);
+	mutex_destroy(&vdds_dev_lock);
 }
 
 /*
@@ -232,8 +239,9 @@ vdds_cleanup(vnet_t *vnetp)
  * vdds_cleanup_hybrid_res -- Cleanup Hybrid resource.
  */
 void
-vdds_cleanup_hybrid_res(vnet_t *vnetp)
+vdds_cleanup_hybrid_res(void *arg)
 {
+	vnet_t *vnetp = arg;
 	vnet_dds_info_t *vdds = &vnetp->vdds_info;
 
 	DBG1(vdds, "Hybrid device cleanup...");
@@ -503,6 +511,7 @@ vdds_create_niu_node(uint64_t cookie, uint64_t macaddr, uint32_t max_frame_size)
 	if (vdds_hv_hio_capable == B_FALSE) {
 		return (NULL);
 	}
+	mutex_enter(&vdds_dev_lock);
 	/* Check if the nexus node exists already */
 	nexus_dip = vdds_find_node(cookie, ddi_root_node(),
 	    vdds_match_niu_nexus);
@@ -517,6 +526,7 @@ vdds_create_niu_node(uint64_t cookie, uint64_t macaddr, uint32_t max_frame_size)
 		nexus_dip = vdds_create_new_node(&cba, NULL,
 		    vdds_new_nexus_node);
 		if (nexus_dip == NULL) {
+			mutex_exit(&vdds_dev_lock);
 			return (NULL);
 		}
 	}
@@ -532,21 +542,26 @@ vdds_create_niu_node(uint64_t cookie, uint64_t macaddr, uint32_t max_frame_size)
 		cba.max_frame_size = max_frame_size;
 		niu_dip = vdds_create_new_node(&cba, nexus_dip,
 		    vdds_new_niu_node);
-		if (niu_dip == NULL) {
-			DWARN(NULL, "create_niu_hio_node returned NULL");
-		}
 		/*
-		 * Do not release the niu_dip to prevent it from
-		 * auto-detach/unload.
+		 * Hold the niu_dip to prevent it from
+		 * detaching.
 		 */
-		ndi_rele_devi(nexus_dip);
-		return (niu_dip);
-
+		if (niu_dip != NULL) {
+			e_ddi_hold_devi(niu_dip);
+		} else {
+			DWARN(NULL, "niumx/network node creation failed");
+		}
+	} else {
+		DWARN(NULL, "niumx/network node already exists(dip=0x%p)",
+		    niu_dip);
 	}
-	DWARN(NULL, "niumx/network node already exists(dip=0x%p)", niu_dip);
-	ndi_rele_devi(niu_dip);
-	ndi_rele_devi(nexus_dip);
-	DBG1(NULL, "returning success");
+	/* release the hold that was done in find/create */
+	if ((niu_dip != NULL) && (e_ddi_branch_held(niu_dip)))
+		e_ddi_branch_rele(niu_dip);
+	if (e_ddi_branch_held(nexus_dip))
+		e_ddi_branch_rele(nexus_dip);
+	mutex_exit(&vdds_dev_lock);
+	DBG1(NULL, "returning niu_dip=0x%p", niu_dip);
 	return (niu_dip);
 }
 
@@ -562,32 +577,36 @@ vdds_destroy_niu_node(dev_info_t *niu_dip, uint64_t cookie)
 
 
 	DBG1(NULL, "Called");
-	ndi_rele_devi(niu_dip);
-	rv = e_ddi_branch_unconfigure(niu_dip, &fdip, 0);
-	if (rv != 0) {
-		DERR(NULL, "Failed to unconfigure niumx/network node dip=0x%p",
-		    niu_dip);
-		if (fdip != NULL) {
-			ndi_rele_devi(fdip);
-		}
-		return (EBUSY);
-	}
+	ASSERT(nexus_dip != NULL);
+	mutex_enter(&vdds_dev_lock);
+
+	if (!e_ddi_branch_held(niu_dip))
+		e_ddi_branch_hold(niu_dip);
+	/*
+	 * As we are destroying now, release the
+	 * hold that was done in during the creation.
+	 */
+	ddi_release_devi(niu_dip);
 	rv = e_ddi_branch_destroy(niu_dip, &fdip, 0);
 	if (rv != 0) {
 		DERR(NULL, "Failed to destroy niumx/network node dip=0x%p",
 		    niu_dip);
 		if (fdip != NULL) {
-			ndi_rele_devi(fdip);
+			ddi_release_devi(fdip);
 		}
-		return (EBUSY);
+		rv = EBUSY;
+		goto dest_exit;
 	}
 	/*
 	 * Cleanup the parent's ranges property set
 	 * for this Hybrid device.
 	 */
 	vdds_release_range_prop(nexus_dip, cookie);
-	DBG1(NULL, "returning success");
-	return (0);
+
+dest_exit:
+	mutex_exit(&vdds_dev_lock);
+	DBG1(NULL, "returning rv=%d", rv);
+	return (rv);
 }
 
 /*
@@ -625,7 +644,8 @@ vdds_match_niu_nexus(dev_info_t *dip, void *arg)
 	DBG2(NULL, "Handle = 0x%lx dip=0x%p", hdl, dip);
 	if (hdl == NIUCFGHDL(warg->cookie)) {
 		/* Hold before returning */
-		ndi_hold_devi(dip);
+		if (!e_ddi_branch_held(dip))
+			e_ddi_branch_hold(dip);
 		warg->dip = dip;
 		DBG2(NULL, "Found dip = 0x%p", dip);
 		return (DDI_WALK_TERMINATE);
@@ -662,8 +682,9 @@ vdds_match_niu_node(dev_info_t *dip, void *arg)
 	DBG1(NULL, "addr_hi = 0x%x dip=0x%p", addr_hi, dip);
 	ddi_prop_free(reg_p);
 	if (addr_hi == HVCOOKIE(warg->cookie)) {
-		ndi_hold_devi(dip);
 		warg->dip = dip;
+		if (!e_ddi_branch_held(dip))
+			e_ddi_branch_hold(dip);
 		DBG1(NULL, "Found dip = 0x%p", dip);
 		return (DDI_WALK_TERMINATE);
 	}
@@ -766,7 +787,6 @@ vdds_new_nexus_node(dev_info_t *dip, void *arg, uint_t flags)
 
 	kmem_free(rangesp, (sizeof (vdds_ranges_t) * nranges));
 	cba->dip = dip;
-	ndi_hold_devi(dip);
 	DBG1(NULL, "Returning (dip=0x%p)", dip);
 	return (DDI_WALK_TERMINATE);
 }
@@ -946,8 +966,6 @@ vdds_new_niu_node(dev_info_t *dip, void *arg, uint_t flags)
 	}
 
 	cba->dip = dip;
-	/* Hold the dip */
-	ndi_hold_devi(dip);
 	DBG1(NULL, "Returning dip=0x%p", dip);
 	return (DDI_WALK_TERMINATE);
 }
@@ -970,14 +988,12 @@ vdds_find_node(uint64_t cookie, dev_info_t *sdip,
 	arg.cookie = cookie;
 
 	if (pdip = ddi_get_parent(sdip)) {
-		ndi_hold_devi(pdip);
 		ndi_devi_enter(pdip, &circ);
 	}
 
 	ddi_walk_devs(sdip, match_func, (void *)&arg);
 	if (pdip != NULL) {
 		ndi_devi_exit(pdip, circ);
-		ndi_rele_devi(pdip);
 	}
 
 	DBG1(NULL, "Returning dip=0x%p", arg.dip);
@@ -992,7 +1008,7 @@ vdds_create_new_node(vdds_cb_arg_t *cbap, dev_info_t *pdip,
     int (*new_node_func)(dev_info_t *dip, void *arg, uint_t flags))
 {
 	devi_branch_t br;
-	int circ, rv;
+	int rv;
 
 	DBG1(NULL, "Called cookie=0x%lx", cbap->cookie);
 
@@ -1001,17 +1017,15 @@ vdds_create_new_node(vdds_cb_arg_t *cbap, dev_info_t *pdip,
 	br.create.sid_branch_create = new_node_func;
 	br.devi_branch_callback = NULL;
 
-	if (pdip == NULL)
+	if (pdip == NULL) {
 		pdip = ddi_root_node();
-	ndi_devi_enter(pdip, &circ);
+	}
 	DBG1(NULL, "calling e_ddi_branch_create");
 	if ((rv = e_ddi_branch_create(pdip, &br, NULL,
 	    DEVI_BRANCH_CHILD | DEVI_BRANCH_CONFIGURE))) {
-		ndi_devi_exit(pdip, circ);
 		DERR(NULL, "e_ddi_branch_create failed=%d", rv);
 		return (NULL);
 	}
-	ndi_devi_exit(pdip, circ);
 	DBG1(NULL, "Returning(dip=0x%p", cbap->dip);
 	return (cbap->dip);
 }

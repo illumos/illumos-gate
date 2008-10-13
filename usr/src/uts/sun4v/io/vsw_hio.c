@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -507,7 +505,7 @@ vsw_hio_free_all_shares(vsw_t *vswp, boolean_t reboot)
 		 * release the Hybrid resource.
 		 */
 		mutex_exit(&vswp->hw_lock);
-		delay(drv_usectohz(vsw_hio_cleanup_delay));
+		drv_usecwait(vsw_hio_cleanup_delay);
 		mutex_enter(&vswp->hw_lock);
 		max_retries--;
 	} while ((free_shares < hiop->vh_num_shares) && (max_retries > 0));
@@ -917,7 +915,7 @@ vsw_hio_stop_port(vsw_port_t *portp)
 		 * get freed.
 		 */
 		mutex_exit(&vswp->hw_lock);
-		delay(drv_usectohz(vsw_hio_cleanup_delay));
+		drv_usecwait(vsw_hio_cleanup_delay);
 		mutex_enter(&vswp->hw_lock);
 
 		/* Check if the share still assigned to this port */
