@@ -38,7 +38,7 @@ Device Management:::Control Access to Removable Media:auths=solaris.device.*;hel
 Printer Management:::Manage printers, daemons, spooling:auths=solaris.print.*,solaris.label.print,solaris.smf.manage.discovery.printers.*,solaris.smf.value.discovery.printers.*;help=RtPrntAdmin.html
 Cron Management:::Manage at and cron jobs:auths=solaris.jobs.*,solaris.smf.manage.cron;help=RtCronMngmnt.html
 Log Management:::Manage log files:help=RtLogMngmnt.html
-Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
+Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*,solaris.smf.manage.vt;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
 Extended Accounting Flow Management:::Manage the Flow Extended Accounting service:auths=solaris.smf.manage.extended-accounting.flow,solaris.smf.value.extended-accounting.flow;profiles=acctadm;help=RtExActtFlow.html
