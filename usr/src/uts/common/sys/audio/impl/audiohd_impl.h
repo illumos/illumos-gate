@@ -94,21 +94,24 @@ extern "C" {
 #define	AUDIOHD_MEMIO_LEN	0x4000
 
 #define	AUDIOHD_RETRY_TIMES	60
+#define	AUDIOHD_TEST_TIMES	500
 #define	AUDIOHD_OUTSTR_NUM_OFF	12
 #define	AUDIOHD_INSTR_NUM_OFF	8
 
 #define	AUDIOHD_CORB_SIZE_OFF	0x4e
 
-#define	AUDIOHD_URCAP_OFF	8
-#define	AUDIOHD_DTCCAP_OFF	3
+#define	AUDIOHD_URCAP_MASK	0x80
+#define	AUDIOHD_DTCCAP_MASK	0x4
 #define	AUDIOHD_UR_ENABLE_OFF	8
 #define	AUDIOHD_UR_TAG_MASK	0x1f
 
-#define	AUDIOHD_CIS_OFF		31
+#define	AUDIOHD_CIS_MASK	0x40000000
 
-#define	AUDIOHD_RIRB_UR_OFF	5
+#define	AUDIOHD_RIRB_UR_MASK	0x10
 #define	AUDIOHD_RIRB_CODEC_MASK	0xf
 #define	AUDIOHD_RIRB_WID_OFF	27
+#define	AUDIOHD_RIRB_INTRCNT	0x0
+#define	AUDIOHD_RIRB_WPMASK	0xff
 
 #define	AUDIOHD_FORM_MASK	0x0080
 #define	AUDIOHD_LEN_MASK	0x007f
@@ -125,6 +128,7 @@ extern "C" {
 #define	AUDIOHD_PIN_NUMS	6
 #define	AUDIOHD_PIN_NO_CONN	0x40000000
 #define	AUDIOHD_PIN_IN_ENABLE	0x20
+#define	AUDIOHD_PIN_OUT_ENABLE	0x40
 #define	AUDIOHD_PIN_PRES_OFF	0x20
 #define	AUDIOHD_PIN_CONTP_OFF	0x1e
 #define	AUDIOHD_PIN_CON_JACK	0
@@ -349,6 +353,15 @@ extern "C" {
 
 #define	AUDIOHDC_VERB_SET_URCTRL		0x708
 #define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
+
+#define	AUDIOHDC_VERB_GET_GPIO_MASK		0xf16
+#define	AUDIOHDC_VERB_SET_GPIO_MASK		0x716
+
+#define	AUDIOHDC_VERB_GET_GPIO_DIREC		0xf17
+#define	AUDIOHDC_VERB_SET_GPIO_DIREC		0x717
+
+#define	AUDIOHDC_GPIO_ENABLE			0xff
+#define	AUDIOHDC_GPIO_DIRECT			0x2
 
 /*
  * 4-bit verbs
@@ -641,6 +654,7 @@ struct audiohd_istream {
 	 */
 
 	boolean_t	in_use;
+	uint8_t		rtag;
 };
 
 struct audiohd_pin {
@@ -694,6 +708,7 @@ struct hda_codec {
 	wid_t		first_wid;	/* wid of 1st subnode of AFG */
 	wid_t		last_wid;	/* wid of the last subnode of AFG */
 	int		nnodes;		/* # of subnodes of AFG */
+	uint8_t		nistream;
 
 	uint32_t	outamp_cap;
 	uint32_t	inamp_cap;

@@ -125,8 +125,8 @@ static void audiohd_set_busy(audiohd_state_t *);
 static void audiohd_set_idle(audiohd_state_t *);
 static int audiohd_response_from_codec(audiohd_state_t *statep,
     uint32_t *resp, uint32_t *respex);
-
-
+static void audiohd_restore_codec_gpio(audiohd_state_t *statep);
+static void audiohd_change_speaker_state(audiohd_state_t *statep, int on);
 /* anchor for soft state structures */
 static void *audiohd_statep;
 
@@ -513,7 +513,6 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    AUDIOHD_INTCTL_BIT_GIE |
 	    AUDIOHD_INTCTL_BIT_CIE |
 	    AUDIOHD_INTCTL_BIT_SIE);
-
 	return (DDI_SUCCESS);
 
 err_attach_exit8:
@@ -598,7 +597,6 @@ audiohd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 }	/* audiohd_detach() */
 
-
 /*
  * quiesce(9E) entry point.
  *
@@ -626,7 +624,6 @@ audiohd_quiesce(dev_info_t *dip)
 
 	return (DDI_SUCCESS);
 }
-
 /*
  * audiohd_change_widget_power_state(audiohd_state_t *statep, int off)
  * Description:
@@ -790,11 +787,10 @@ audiohd_reset_pins_ur_cap(audiohd_state_t *statep)
 		while (pin) {
 			/* enable the unsolicited response of the pin */
 			widget = codec->widget[pin->wid];
-			if ((widget->widget_cap >>
-			    (AUDIOHD_URCAP_OFF - 1) & 1) &&
-			    (pin->cap >> (AUDIOHD_DTCCAP_OFF - 1) & 1) &&
+			if ((widget->widget_cap &
+			    (AUDIOHD_URCAP_MASK) &&
+			    (pin->cap & AUDIOHD_DTCCAP_MASK)) &&
 			    ((pin->device == DTYPE_LINEOUT) ||
-			    (pin->device == DTYPE_SPEAKER) ||
 			    (pin->device == DTYPE_SPDIF_OUT) ||
 			    (pin->device == DTYPE_HP_OUT) ||
 			    (pin->device == DTYPE_MIC_IN))) {
@@ -808,6 +804,30 @@ audiohd_reset_pins_ur_cap(audiohd_state_t *statep)
 			}
 			pin = pin->next;
 		}
+	}
+}
+static void
+audiohd_restore_codec_gpio(audiohd_state_t *statep)
+{
+	int		i;
+	wid_t		wid;
+	hda_codec_t	*codec;
+
+	for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
+		codec = statep->codec[i];
+		if (codec == NULL)
+			continue;
+		wid = codec->wid_afg;
+
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
+
+		/* power-up audio function group */
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_POWER_STATE, 0);
+
 	}
 }
 /*
@@ -834,10 +854,9 @@ audiohd_resume(audiohd_state_t *statep)
 	AUDIOHD_REG_SET32(AUDIOHD_REG_INTCTL,
 	    AUDIOHD_INTCTL_BIT_GIE |
 	    AUDIOHD_INTCTL_BIT_SIE);
+	/* clear the unsolicited response interrupt */
 	rirbsts = AUDIOHD_REG_GET8(AUDIOHD_REG_RIRBSTS);
-	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS,
-	    rirbsts & AUDIOHDR_RIRBCTL_RSTINT);
-
+	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS, rirbsts);
 	mutex_exit(&statep->hda_mutex);
 
 	/* Resume playing and recording */
@@ -1013,6 +1032,7 @@ uint8_t id, int select)
 					    istream->sum_wid,
 					    AUDIOHDC_VERB_SET_CONN_SEL,
 					    istream->sum_selconn[i]);
+					statep->hda_record_stag = istream->rtag;
 					return;
 				}
 			}
@@ -1032,14 +1052,62 @@ uint8_t id, int select)
 					    istream->sum_wid,
 					    AUDIOHDC_VERB_SET_CONN_SEL,
 					    istream->sum_selconn[i]);
+					statep->hda_record_stag = istream->rtag;
 					return;
-			}
+				}
 			}
 		}
 		istream = istream->next_stream;
 		if (istream == NULL)
 			break;
 		sumwgt = codec->widget[istream->sum_wid];
+	}
+	/*
+	 * If the input istream > 1, we should set the the record stream tag
+	 * repectively. All the input streams sharing one tag may make the
+	 * record sound distorted.
+	 */
+	if (codec->nistream > 1) {
+		istream = codec->istream;
+		while (istream) {
+			if (select) {
+				for (i = 0; i < istream->pin_nums; i++) {
+					wid = istream->pin_wid[i];
+					widget = codec->widget[wid];
+					if (widget == NULL)
+						return;
+					pin = (audiohd_pin_t *)widget->priv;
+					if (pin->device == DTYPE_MIC_IN &&
+					    pin->wid == id &&
+					    (((pin->config >>
+					    AUDIOHD_PIN_CONTP_OFF) &
+					    AUDIOHD_PIN_CONTP_MASK) ==
+					    AUDIOHD_PIN_CON_JACK)) {
+						statep->hda_record_stag =
+						    istream->rtag;
+						return;
+					}
+				}
+			} else {
+				for (i = 0; i < istream->pin_nums; i++) {
+					wid = istream->pin_wid[i];
+					widget = codec->widget[wid];
+					if (widget == NULL)
+						return;
+					pin = (audiohd_pin_t *)widget->priv;
+					if (pin->device == DTYPE_MIC_IN &&
+					    (((pin->config >>
+					    AUDIOHD_PIN_CONTP_OFF) &
+					    AUDIOHD_PIN_CONTP_MASK) ==
+					    AUDIOHD_PIN_CON_FIXED)) {
+						statep->hda_record_stag =
+						    istream->rtag;
+						return;
+					}
+				}
+			}
+			istream = istream->next_stream;
+		}
 	}
 }
 /*
@@ -1059,14 +1127,20 @@ audiohd_pin_sense(audiohd_state_t *statep, uint32_t resp, uint32_t respex)
 	uint32_t		rs;
 	audiohd_widget_t	*widget;
 	audiohd_pin_t		*pin;
+	hda_codec_t		*codec;
 
 	index = respex & AUDIOHD_RIRB_CODEC_MASK;
 	id = resp >> (AUDIOHD_RIRB_WID_OFF - 1);
-	widget = statep->codec[index]->widget[id];
+
+	codec = statep->codec[index];
+	if (codec == NULL)
+		return;
+	widget = codec->widget[id];
+	if (widget == NULL)
+		return;
 
 	rs = audioha_codec_verb_get(statep, index, id,
 	    AUDIOHDC_VERB_GET_PIN_SENSE, 0);
-
 	if (rs >> (AUDIOHD_PIN_PRES_OFF - 1) & 1) {
 		/* A MIC is plugged in, we select the MIC as input */
 		if ((widget->type == WTYPE_PIN) &&
@@ -1115,7 +1189,7 @@ audiohd_intr(caddr_t arg)
 	uint32_t	regbase;
 	uint32_t	resp, respex;
 	uint8_t		sdstatus, rirbsts;
-	int		i;
+	int		i, ret;
 
 	mutex_enter(&statep->hda_mutex);
 	if (statep->suspended) {
@@ -1128,22 +1202,42 @@ audiohd_intr(caddr_t arg)
 		mutex_exit(&statep->hda_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
+	AUDIOHD_REG_SET32(AUDIOHD_REG_INTSTS, status);
 
 	/*
 	 * unsolicited response from pins, maybe something plugged in or out
 	 * of the jack.
 	 */
-	if (status >> (AUDIOHD_CIS_OFF - 1) & 1) {
-		/* clear the rirb unsolicited response intr */
+	if (status & AUDIOHD_CIS_MASK) {
+		/* clear the unsolicited response interrupt */
 		rirbsts = AUDIOHD_REG_GET8(AUDIOHD_REG_RIRBSTS);
 		AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSTS, rirbsts);
-
-		if (audiohd_response_from_codec(statep, &resp, &respex) ==
-		    AUDIO_SUCCESS) {
-			if (respex >> (AUDIOHD_RIRB_UR_OFF -1) & 1)
-				audiohd_pin_sense(statep, resp,
-				    respex);
+		/*
+		 * We have to wait and try several times to make sure the
+		 * unsolicited response is generated by our pins.
+		 * we need to make it work for audiohd spec 0.9, which is
+		 * just a draft version and requires more time to wait.
+		 */
+		for (i = 0; i < AUDIOHD_TEST_TIMES; i++) {
+			ret = audiohd_response_from_codec(statep, &resp,
+			    &respex);
+			if ((ret == AUDIO_SUCCESS) &&
+			    (respex & AUDIOHD_RIRB_UR_MASK)) {
+				/*
+				 * A pin may generate more than one ur rirb,
+				 * we only need handle one of them, and clear
+				 * the other ones
+				 */
+				statep->hda_rirb_rp =
+				    AUDIOHD_REG_GET16(AUDIOHD_REG_RIRBWP) &
+				    AUDIOHD_RIRB_WPMASK;
+				break;
+			}
+			drv_usecwait(30);
 		}
+		if ((ret == AUDIO_SUCCESS) &&
+		    (respex & AUDIOHD_RIRB_UR_MASK))
+			audiohd_pin_sense(statep, resp, respex);
 	}
 
 	/* stream intr */
@@ -2138,6 +2232,7 @@ audiohd_reinit_hda(audiohd_state_t *statep)
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, 0);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBCTL, AUDIOHDR_CORBCTL_DMARUN);
 
+	audiohd_restore_codec_gpio(statep);
 	audiohd_restore_path(statep);
 	return (audiohd_init_ports(statep));
 }	/* audiohd_reinit_hda */
@@ -2383,8 +2478,10 @@ audiohd_get_conns_from_entry(hda_codec_t *codec, audiohd_widget_t *widget,
 				}
 			}
 		} else {
-			widget->avail_conn[widget->nconns++] =
-			    entry & prop->mask_wid;
+			if ((codec->first_wid <= input_wid) && (input_wid <=
+			    codec->last_wid))
+				widget->avail_conn[widget->nconns++] =
+				    input_wid;
 		}
 	}
 }
@@ -2503,10 +2600,9 @@ audiohd_get_pin_config(audiohd_widget_t *widget)
 	pin->device = (config & AUDIOHD_PIN_DEV_MASK) >> AUDIOHD_PIN_DEV_OFF;
 
 	/* enable the unsolicited response of the pin */
-	if ((widget->widget_cap >> (AUDIOHD_URCAP_OFF - 1) & 1) &&
-	    (pin->cap >> (AUDIOHD_DTCCAP_OFF - 1) & 1) &&
+	if ((widget->widget_cap & AUDIOHD_URCAP_MASK) &&
+	    (pin->cap & AUDIOHD_DTCCAP_MASK) &&
 	    ((pin->device == DTYPE_LINEOUT) ||
-	    (pin->device == DTYPE_SPEAKER) ||
 	    (pin->device == DTYPE_SPDIF_OUT) ||
 	    (pin->device == DTYPE_HP_OUT) ||
 	    (pin->device == DTYPE_MIC_IN))) {
@@ -2734,6 +2830,11 @@ audiohd_create_codec(audiohd_state_t *statep)
 		}
 
 		ASSERT(codec->wid_afg == wid);
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
+
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
 
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
@@ -3237,7 +3338,6 @@ audiohd_finish_output_path(hda_codec_t *codec)
 			    AUDIOHDC_PIN_CONTROL_HP_ENABLE) &
 			    ~ AUDIOHDC_PIN_CONTROL_IN_ENABLE);
 			}
-
 			/* If this pin has external amplifier, enable it */
 			if (pin->cap & AUDIOHD_EXT_AMP_MASK)
 				(void) audioha_codec_verb_get(statep, caddr,
@@ -3330,9 +3430,6 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 	if (depth > AUDIOHD_MAX_DEPTH)
 		return (uint32_t)(AUDIO_FAILURE);
 
-	if (widget == NULL)
-		return (uint32_t)(AUDIO_FAILURE);
-
 	/* we don't share widgets */
 	if (widget->path_flags & AUDIOHD_PATH_ADC)
 		return (uint32_t)(AUDIO_FAILURE);
@@ -3348,6 +3445,11 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 		(void) audioha_codec_verb_get(statep, caddr, wid,
 		    AUDIOHDC_VERB_SET_PIN_CTRL,
 		    pinctrl | AUDIOHD_PIN_IN_ENABLE);
+		if (pin->cap & AUDIOHD_EXT_AMP_MASK) {
+			(void) audioha_codec_verb_get(statep, caddr,
+			    wid, AUDIOHDC_VERB_SET_EAPD,
+			    AUDIOHD_EXT_AMP_ENABLE);
+		}
 		switch (pin->device) {
 		case DTYPE_CD:
 		case DTYPE_LINE_IN:
@@ -3406,7 +3508,6 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 			/* return SUCCESS if we found at least one input path */
 			if (istream->pin_nums > 0)
 				retval = AUDIO_SUCCESS;
-
 		} else {
 			/*
 			 * We had already found a real sum before this one since
@@ -3446,6 +3547,7 @@ audiohd_build_input_path(hda_codec_t *codec)
 	wid_t			wid;
 	int			i;
 	int			retval;
+	uint8_t			rtag = 0;
 
 	for (wid = codec->first_wid; wid <= codec->last_wid; wid++) {
 
@@ -3477,6 +3579,8 @@ audiohd_build_input_path(hda_codec_t *codec)
 			retval = audiohd_find_input_pins(codec,
 			    widget->avail_conn[i], 1, 0, istream);
 			if (retval == AUDIO_SUCCESS) {
+				istream->rtag = ++rtag;
+				codec->nistream++;
 				if (codec->istream) {
 					audiohd_istream_t	*p =
 					    codec->istream;
@@ -3493,7 +3597,6 @@ audiohd_build_input_path(hda_codec_t *codec)
 			}
 		}
 	}
-
 	if (istream)
 		kmem_free(istream, sizeof (audiohd_istream_t));
 }	/* audiohd_build_input_path */
@@ -4041,7 +4144,8 @@ audiohd_do_finish_monitor_path(hda_codec_t *codec, audiohd_widget_t *wgt)
 		    AUDIOHDC_AMP_SET_INDEX_OFFSET));
 		}
 	}
-	if ((widget->type == WTYPE_AUDIO_SEL) && (widget->nconns > 1)) {
+	if ((widget->type == WTYPE_AUDIO_SEL) && (widget->nconns > 1) &&
+	    !share) {
 		(void) audioha_codec_verb_get(statep, caddr,
 		    widget->wid_wid,
 		    AUDIOHDC_VERB_SET_CONN_SEL, widget->selmon[0]);
@@ -4307,6 +4411,12 @@ audiohd_init_ports(audiohd_state_t *statep)
 					inputs |= AUDIO_MICROPHONE;
 					pin->sada_porttype = AUDIO_MICROPHONE |
 					    AUDIOHD_SADA_INPUT;
+					if (((pin->config >>
+					    AUDIOHD_PIN_CONTP_OFF) &
+					    AUDIOHD_PIN_CONTP_MASK) ==
+					    AUDIOHD_PIN_CON_FIXED)
+						statep->hda_record_stag =
+						    istream->rtag;
 					break;
 				case DTYPE_LINE_IN:
 					inputs |= AUDIO_LINE_IN;
@@ -4343,7 +4453,7 @@ audiohd_init_ports(audiohd_state_t *statep)
 
 		(void) audioha_codec_verb_get(statep, codec->index,
 		    istream->adc_wid, AUDIOHDC_VERB_SET_STREAM_CHANN,
-		    statep->hda_record_stag << AUDIOHD_REC_TAG_OFF);
+		    istream->rtag << AUDIOHD_REC_TAG_OFF);
 	}
 
 	return (DDI_SUCCESS);
