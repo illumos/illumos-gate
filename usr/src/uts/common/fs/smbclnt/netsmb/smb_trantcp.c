@@ -990,7 +990,8 @@ again:
 		error = nbssn_rq_request(nbp, p);
 		if (error)
 			nb_disconnect(nbp);
-	}
+	} else
+		nbp->nbp_state = NBST_SESSION;
 
 out:
 	mutex_enter(&nbp->nbp_lock);
