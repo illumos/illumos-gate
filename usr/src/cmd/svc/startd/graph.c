@@ -1830,11 +1830,10 @@ rep_retry:
 
 	scf_pg_destroy(pg);
 	scf_instance_destroy(scf_inst);
-
-	(void) stop_instance_fmri(h, v->gv_name,  RSTOP_DEPENDENCY);
-
 	(void) scf_handle_unbind(h);
 	scf_handle_destroy(h);
+
+	vertex_send_event(v, RESTARTER_EVENT_TYPE_STOP);
 }
 
 /*
