@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * clnt_doors.c, Client side for doors IPC based RPC.
@@ -47,6 +44,7 @@
 #include <alloca.h>
 #include <rpc/svc_mt.h>
 #include <sys/mman.h>
+#include <atomic.h>
 
 
 extern bool_t xdr_opaque_auth(XDR *, struct opaque_auth *);
@@ -92,7 +90,7 @@ clnt_door_create(const rpcprog_t program, const rpcvers_t version,
 	uint_t			ssz;
 
 	(void) sprintf(rendezvous, RPC_DOOR_RENDEZVOUS, (int)program,
-								(int)version);
+	    (int)version);
 	if ((did = open(rendezvous, O_RDONLY, 0)) < 0) {
 		rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
 		rpc_createerr.cf_error.re_errno = errno;
@@ -117,7 +115,7 @@ clnt_door_create(const rpcprog_t program, const rpcvers_t version,
 		ssz = RNDUP(sendsz);
 
 	if ((cl = malloc(sizeof (CLIENT))) == NULL ||
-			(cu = malloc(sizeof (*cu))) == NULL) {
+	    (cu = malloc(sizeof (*cu))) == NULL) {
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 		rpc_createerr.cf_error.re_errno = errno;
 		goto err;
@@ -184,6 +182,7 @@ clnt_door_call(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp,
 	char		*outbuf_ref;
 	struct rpc_msg	reply_msg;
 	bool_t		need_to_unmap;
+	uint32_t	xid;
 	int		nrefreshes = 2;	/* number of times to refresh cred */
 
 	rpc_callerr.re_errno = 0;
@@ -204,14 +203,17 @@ clnt_door_call(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp,
 
 call_again:
 	xdrmem_create(&xdrs, params.data_ptr, cu->cu_sendsz, XDR_ENCODE);
-/* LINTED pointer alignment */
-	(*(uint32_t *)cu->cu_header)++;	/* increment XID */
+	/* Increment XID (not really needed for RPC over doors...) */
+	/* LINTED pointer alignment */
+	xid = atomic_inc_uint_nv((uint32_t *)cu->cu_header);
 	(void) memcpy(params.data_ptr, cu->cu_header, cu->cu_xdrpos);
+	/* LINTED pointer alignment */
+	*(uint32_t *)params.data_ptr = xid;
 	XDR_SETPOS(&xdrs, cu->cu_xdrpos);
 
 	if ((!XDR_PUTINT32(&xdrs, (int32_t *)&proc)) ||
-				(!AUTH_MARSHALL(cl->cl_auth, &xdrs)) ||
-					(!(*xargs)(&xdrs, argsp))) {
+	    (!AUTH_MARSHALL(cl->cl_auth, &xdrs)) ||
+	    (!(*xargs)(&xdrs, argsp))) {
 		return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 	}
 	params.data_size = (int)XDR_GETPOS(&xdrs);
@@ -229,7 +231,7 @@ call_again:
 	need_to_unmap = (params.rbuf != outbuf_ref);
 
 /* LINTED pointer alignment */
-	if (*(uint32_t *)params.rbuf != *(uint32_t *)cu->cu_header) {
+	if (*(uint32_t *)params.rbuf != xid) {
 		rpc_callerr.re_status = RPC_CANTDECODERES;
 		goto done;
 	}
@@ -241,21 +243,21 @@ call_again:
 
 	if (xdr_replymsg(&xdrs, &reply_msg)) {
 		if (reply_msg.rm_reply.rp_stat == MSG_ACCEPTED &&
-				reply_msg.acpted_rply.ar_stat == SUCCESS)
+		    reply_msg.acpted_rply.ar_stat == SUCCESS)
 			rpc_callerr.re_status = RPC_SUCCESS;
 		else
 			__seterr_reply(&reply_msg, &rpc_callerr);
 
 		if (rpc_callerr.re_status == RPC_SUCCESS) {
 			if (!AUTH_VALIDATE(cl->cl_auth,
-					    &reply_msg.acpted_rply.ar_verf)) {
+			    &reply_msg.acpted_rply.ar_verf)) {
 				rpc_callerr.re_status = RPC_AUTHERROR;
 				rpc_callerr.re_why = AUTH_INVALIDRESP;
 			}
 			if (reply_msg.acpted_rply.ar_verf.oa_base != NULL) {
 				xdrs.x_op = XDR_FREE;
 				(void) xdr_opaque_auth(&xdrs,
-					&(reply_msg.acpted_rply.ar_verf));
+				    &(reply_msg.acpted_rply.ar_verf));
 			}
 		}
 		/*
@@ -270,7 +272,7 @@ call_again:
 			    AUTH_REFRESH(cl->cl_auth, &reply_msg)) {
 				if (need_to_unmap)
 					(void) munmap(params.rbuf,
-								params.rsize);
+					    params.rsize);
 				goto call_again;
 			} else
 				/*
@@ -381,14 +383,14 @@ clnt_door_control(CLIENT *cl, int request, char *info)
 		 */
 /* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)(cu->cu_header +
-						    4 * BYTES_PER_XDR_UNIT));
+		    4 * BYTES_PER_XDR_UNIT));
 		break;
 
 	case CLSET_VERS:
 /* LINTED pointer alignment */
 		*(uint32_t *)(cu->cu_header + 4 * BYTES_PER_XDR_UNIT) =
 /* LINTED pointer alignment */
-			htonl(*(uint32_t *)info);
+		    htonl(*(uint32_t *)info);
 		break;
 
 	case CLGET_PROG:
@@ -400,14 +402,14 @@ clnt_door_control(CLIENT *cl, int request, char *info)
 		 */
 /* LINTED pointer alignment */
 		*(uint32_t *)info = ntohl(*(uint32_t *)(cu->cu_header +
-						    3 * BYTES_PER_XDR_UNIT));
+		    3 * BYTES_PER_XDR_UNIT));
 		break;
 
 	case CLSET_PROG:
 /* LINTED pointer alignment */
 		*(uint32_t *)(cu->cu_header + 3 * BYTES_PER_XDR_UNIT) =
 /* LINTED pointer alignment */
-			htonl(*(uint32_t *)info);
+		    htonl(*(uint32_t *)info);
 		break;
 
 	default:
