@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file provides some common functionality for SMB Redirector
  * module.
@@ -208,12 +206,15 @@ smbrdr_exchange(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr, long timeout)
 	DWORD status;
 	int rc;
 
+	smbrdr_lock_transport();
+
 	mb = &srh->srh_mbuf;
 	sign_ctx = &srh->srh_session->sign_ctx;
 
 	if (smbrdr_sign(sign_ctx, mb) != SMBAUTH_SUCCESS) {
 		syslog(LOG_DEBUG, "smbrdr_exchange[%d]: signing failed",
 		    srh->srh_cmd);
+		smbrdr_unlock_transport();
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
@@ -234,6 +235,7 @@ smbrdr_exchange(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr, long timeout)
 			srh->srh_session->state = SDB_SSTATE_STALE;
 		}
 		smb_mac_inc_seqnum(sign_ctx);
+		smbrdr_unlock_transport();
 		return (NT_STATUS_UNEXPECTED_NETWORK_ERROR);
 	}
 
@@ -243,6 +245,7 @@ smbrdr_exchange(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr, long timeout)
 	status = smbrdr_hdr_process(srh, smb_hdr);
 	if (status != NT_STATUS_SUCCESS) {
 		smb_mac_inc_seqnum(sign_ctx);
+		smbrdr_unlock_transport();
 		return (status);
 	}
 
@@ -250,9 +253,11 @@ smbrdr_exchange(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr, long timeout)
 	if (!smbrdr_sign_chk(sign_ctx, mb, smb_hdr->extra.extra.security_sig)) {
 		syslog(LOG_DEBUG, "smbrdr_exchange[%d]: bad signature",
 		    srh->srh_cmd);
+		smbrdr_unlock_transport();
 		return (NT_STATUS_INVALID_NETWORK_RESPONSE);
 	}
 
+	smbrdr_unlock_transport();
 	return (NT_STATUS_SUCCESS);
 }
 

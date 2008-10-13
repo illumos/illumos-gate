@@ -26,8 +26,6 @@
 #ifndef _SMBRDR_H_
 #define	_SMBRDR_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -61,8 +59,8 @@
  * server. Chapter 4, p113. Network Programming for Microsoft Windows
  * Anthony Jones and Jim Ohlund, Microsoft Press, ISBN: 0-7356-0560-2
  */
-#define	N_NETUSE_TABLE		48
-#define	N_OFILE_TABLE		48
+#define	N_NETUSE_TABLE		256
+#define	N_OFILE_TABLE		256
 
 /*
  * Logon's states
@@ -216,6 +214,7 @@ struct sdb_netuse *smbrdr_netuse_get(int);
 DWORD smbrdr_tree_connect(char *, char *, char *, unsigned short *);
 int smbrdr_tree_disconnect(unsigned short);
 void smbrdr_netuse_put(struct sdb_netuse *);
+int smbrdr_tdcon(struct sdb_netuse *);
 
 /*
  * smbrdr_rpcpipe.c

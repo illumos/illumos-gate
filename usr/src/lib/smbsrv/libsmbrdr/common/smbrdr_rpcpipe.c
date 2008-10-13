@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Functions to open and close named pipes. These functions are
  * described in the CIFS 1.0 Protocol Specification (December 19, 1997).
@@ -120,6 +118,7 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
 		    hostname, domain, username, pipename,
 		    xlate_nt_status(NT_STATUS_INSUFFICIENT_RESOURCES));
+		(void) smbrdr_tdcon(netuse);
 		smbrdr_netuse_put(netuse);
 		return (-1);
 	}
@@ -161,6 +160,7 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	    hostname, domain, username, pipename,
 	    xlate_nt_status(status));
 	smbrdr_ofile_free(ofile);
+	(void) smbrdr_tdcon(netuse);
 	smbrdr_netuse_put(netuse);
 	return (-1);
 }
@@ -184,9 +184,7 @@ mlsvc_close_pipe(int fid)
 	rc = smbrdr_close(ofile);
 	smbrdr_ofile_put(ofile);
 
-	if (rc == 0)
-		(void) smbrdr_tree_disconnect(tid);
-
+	(void) smbrdr_tree_disconnect(tid);
 	return (rc);
 }
 

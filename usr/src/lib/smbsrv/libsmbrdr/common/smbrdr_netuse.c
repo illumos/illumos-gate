@@ -53,7 +53,6 @@ static DWORD smbrdr_tree_connectx(struct sdb_session *session,
 
 static struct sdb_netuse *smbrdr_netuse_alloc(struct sdb_session *session,
     char *sharename);
-static int smbrdr_tdcon(struct sdb_netuse *netuse);
 
 static void
 smbrdr_netuse_clear(struct sdb_netuse *netuse)
@@ -139,9 +138,9 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename,
 	}
 
 	free(path);
+	*tid = netuse->tid;
 	(void) mutex_unlock(&netuse->mtx);
 	smbrdr_session_unlock(session);
-	*tid = netuse->tid;
 	return (NT_STATUS_SUCCESS);
 }
 
@@ -279,7 +278,7 @@ smbrdr_tree_disconnect(unsigned short tid)
  *
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
-static int
+int
 smbrdr_tdcon(struct sdb_netuse *netuse)
 {
 	struct sdb_session *session;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NetBIOS support functions. NetBIOS is documented in the following
  * RFC documents:
@@ -195,13 +193,10 @@ nb_exchange(int fd, unsigned char *send_buf, unsigned send_cnt,
 {
 	int rc;
 
-	(void) mutex_lock(&nb_mutex);
-
 	rc = nb_send(fd, send_buf, send_cnt);
 	if (rc == send_cnt)
 		rc = nb_rcv(fd, recv_buf, recv_max, timeout);
 
-	(void) mutex_unlock(&nb_mutex);
 	return (rc);
 }
 
