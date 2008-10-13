@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,39 +22,49 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _BADSEC_H
+#define	_BADSEC_H
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #define	BADSECFILE	"/etc/scsi/badsec"
-#define FAILURE	0
-#define SUCCESS	1
+#define	FAILURE	0
+#define	SUCCESS	1
 
 #define	MAXBLENT	4
 struct	badsec_lst {
-	int	bl_cnt;
+	int		bl_cnt;
 	struct	badsec_lst *bl_nxt;
-	int	bl_sec[MAXBLENT];
+	blkaddr_t	bl_sec[MAXBLENT];
 };
 
-#define BADSLSZ		sizeof(struct badsec_lst)
+#define	BADSLSZ		sizeof (struct badsec_lst)
 
-#define ALTS_ADDPART	0x1	/* add alternate partition		*/
+#define	ALTS_ADDPART	0x1	/* add alternate partition		*/
 struct	alts_mempart {			/* incore alts partition info	*/
 	int	ap_flag;		/* flag for alternate partition	*/
 	struct	alts_parttbl *ap_tblp;	/* alts partition table		*/
 	int	ap_tbl_secsiz;		/* alts parttbl sector size	*/
-	unchar	*ap_memmapp;		/* incore alternate sector map	*/
-	unchar	*ap_mapp;		/* alternate sector map		*/
+	uchar_t	*ap_memmapp;		/* incore alternate sector map	*/
+	uchar_t	*ap_mapp;		/* alternate sector map		*/
 	int	ap_map_secsiz;		/* alts partmap sector size	*/
 	int	ap_map_sectot;		/* alts partmap # sector 	*/
 	struct  alts_ent *ap_entp;	/* alternate sector entry table */
 	int	ap_ent_secsiz;		/* alts entry sector size	*/
 	struct	alts_ent *ap_gbadp;	/* growing badsec entry table	*/
 	int	ap_gbadcnt;		/* growing bad sector count	*/
-	struct	partition part;		/* alts partition configuration */
-} ;
+	struct	extpartition part;	/* alts partition configuration */
+};
 
 /*	size of incore alternate partition memory structure		*/
-#define	ALTS_MEMPART_SIZE	sizeof(struct alts_mempart) 
+#define	ALTS_MEMPART_SIZE	sizeof (struct alts_mempart)
 
 struct	altsectbl {			/* working alts info		*/
 	struct  alts_ent *ast_entp;	/* alternate sector entry table */
@@ -66,9 +75,14 @@ struct	altsectbl {			/* working alts info		*/
 	int	ast_gbadcnt;		/* growing bad sector entry cnt */
 };
 /*	size of incore alternate partition memory structure		*/
-#define	ALTSECTBL_SIZE	sizeof(struct altsectbl) 
+#define	ALTSECTBL_SIZE	sizeof (struct altsectbl)
 
 /*	macro definitions						*/
 #define	byte_to_secsiz(APSIZE, BPS)	(daddr_t) \
-					((((APSIZE) + (BPS) - 1) \
-					 / (uint)(BPS)) * (BPS))
+	((((APSIZE) + (BPS) - 1)/(uint_t)(BPS)) * (BPS))
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _BADSEC_H */

@@ -982,7 +982,7 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 		tgdk.g_sec = ata_drvp->ad_drvrsec;
 		tgdk.g_acyl = ata_drvp->ad_acyl;
 		tgdk.g_secsiz = 512;
-		tgdk.g_cap = tgdk.g_cyl * tgdk.g_head * tgdk.g_sec;
+		tgdk.g_cap = (diskaddr_t)tgdk.g_cyl * tgdk.g_head * tgdk.g_sec;
 		if (ddi_copyout(&tgdk, (caddr_t)arg, sizeof (tgdk), flag))
 			return (EFAULT);
 		return (0);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +33,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <fcntl.h>
 #include <memory.h>
@@ -46,6 +43,10 @@
 #include <sys/vtoc.h>
 #include <sys/dkio.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <unistd.h>
+#include <stropts.h>
 #include <sys/scsi/generic/commands.h>
 #include <sys/scsi/impl/commands.h>
 #include <sys/scsi/impl/uscsi.h>
@@ -53,20 +54,25 @@
 
 char    *devname;		/* name of device */
 int	devfd;			/* device file descriptor */
-struct  dk_geom      	dkg;	/* geometry */
-struct  vtoc	vtoc;		/* table of contents */
+struct	dk_geom		dkg;	/* geometry */
+struct  extvtoc	vtoc;		/* table of contents */
 char	*progname;
 
 extern	struct	badsec_lst *badsl_chain;
 extern	int	badsl_chain_cnt;
 extern	struct	badsec_lst *gbadsl_chain;
 extern	int	gbadsl_chain_cnt;
+extern	int	print_altsec(struct extpartition *);
+extern	int	updatebadsec(struct extpartition *, int);
+extern	void	wr_altsctr(void);
 
 int		alts_fd;
 
 static void giveusage(void);
 static void rd_gbad(FILE *badsecfd);
 static void add_gbad(int badsec_entry);
+static int try_hw_remap(void);
+static int hardware_remap(blkaddr_t);
 
 int
 main(int argc, char *argv[])
@@ -74,13 +80,13 @@ main(int argc, char *argv[])
 	extern int	optind;
 	extern char	*optarg;
 
-	static char     options[] = "Ipa:f:";
+	static char	options[] = "Ipa:f:";
 	char		numbuf[100];
 	char		*nxtarg;
 	char		*alts_name;
 	minor_t 	minor_val;
 	struct stat 	statbuf;
-	struct partition	*part = NULL;
+	struct extpartition	*part = NULL;
 	int		alts_slice = -1;
 	int		l;
 	int		p;
@@ -89,10 +95,9 @@ main(int argc, char *argv[])
 	int 		c;
 	int 		i;
 	FILE		*badsecfd = NULL;
-	struct badsec_lst *blc_p;
 
 	progname = argv[0];
-	while ( (c=getopt(argc, argv, options)) != EOF ) {
+	while ((c = getopt(argc, argv, options)) != EOF) {
 		switch (c) {
 		case 'I':
 			init_flag = 1;
@@ -102,12 +107,14 @@ main(int argc, char *argv[])
 			break;
 		case 'a':
 			nxtarg = optarg;
-			for (;*nxtarg != '\0';)
+			for (; *nxtarg != '\0'; )
 				add_gbad(strtol(nxtarg, &nxtarg, 0));
 			break;
 		case 'f':
 			if ((badsecfd = fopen(optarg, "r")) == NULL) {
-				fprintf(stderr, "%s: unable to open %s file\n", progname, optarg);
+				(void) fprintf(stderr,
+				    "%s: unable to open %s file\n",
+				    progname, optarg);
 				exit(1);
 			}
 			break;
@@ -119,19 +126,21 @@ main(int argc, char *argv[])
 
 		/* get the last argument -- device stanza */
 	if (argc != optind+1) {
-		fprintf(stderr, "Missing disk device name\n");
+		(void) fprintf(stderr, "Missing disk device name\n");
 		giveusage();
 		exit(3);
 	}
 	devname = argv[optind];
 
 	if (stat(devname, &statbuf)) {
-		fprintf(stderr, "%s: invalid device %s, stat failed\n", progname, devname);
+		(void) fprintf(stderr, "%s: invalid device %s, stat failed\n",
+		    progname, devname);
 		giveusage();
 		exit(4);
 	}
 	if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
-		fprintf(stderr, "%s: device %s is not character special\n", progname, devname);
+		(void) fprintf(stderr, "%s: device %s is not character"
+		    " special\n", progname, devname);
 		giveusage();
 		exit(5);
 	}
@@ -140,35 +149,38 @@ main(int argc, char *argv[])
 	 * NEED A DEFINE FOR THE PHYSICAL BIT (0x10)
 	 */
 	if ((minor_val & 0x10) == 0) {
-		fprintf(stderr, "%s: device %s is not a physical slice\n", progname, devname);
+		(void) fprintf(stderr, "%s: device %s is not a physical"
+		    " slice\n", progname, devname);
 		giveusage();
 		exit(6);
 	}
 	if ((minor_val % V_NUMPAR) != 0) {
-		fprintf(stderr, "%s: device %s is not a slice 0 device\n", progname, devname);
+		(void) fprintf(stderr, "%s: device %s is not a slice 0"
+		    " device\n", progname, devname);
 		giveusage();
 		exit(7);
 	}
-	if ((devfd=open(devname, O_RDWR)) == -1) {
-		fprintf(stderr, "%s: open of %s failed\n", progname ,devname);
+	if ((devfd = open(devname, O_RDWR)) == -1) {
+		(void) fprintf(stderr, "%s: open of %s failed\n",
+		    progname, devname);
 		perror("");
 		exit(8);
 	}
-	if ((ioctl (devfd, DKIOCGGEOM, &dkg)) == -1) {
-		fprintf(stderr, "%s: unable to get disk geometry.\n", progname);
+	if ((ioctl(devfd, DKIOCGGEOM, &dkg)) == -1) {
+		(void) fprintf(stderr, "%s: unable to get disk geometry.\n",
+		    progname);
 		perror("");
 		exit(9);
 	}
 
-	if (ioctl(devfd, DKIOCGVTOC, &vtoc) == -1)
-	{
-		fprintf(stderr, "%s: could not get VTOC.\n", progname);
+	if (ioctl(devfd, DKIOCGEXTVTOC, &vtoc) == -1) {
+		(void) fprintf(stderr, "%s: could not get VTOC.\n", progname);
 		giveusage();
 		exit(14);
 	}
 
 	if ((vtoc.v_sanity != VTOC_SANE) || (vtoc.v_version != V_VERSION)) {
-		fprintf(stderr, "%s: invalid VTOC found.\n", progname);
+		(void) fprintf(stderr, "%s: invalid VTOC found.\n", progname);
 		giveusage();
 		exit(15);
 	}
@@ -176,12 +188,15 @@ main(int argc, char *argv[])
 		rd_gbad(badsecfd);
 
 #ifdef ADDBAD_DEBUG
+{
+	struct badsec_lst *blc_p;
 	printf("\n main: Total bad sectors found= %d\n", gbadsl_chain_cnt);
-	for (blc_p=gbadsl_chain; blc_p; blc_p=blc_p->bl_nxt) {
-		for (i=0; i<blc_p->bl_cnt; i++)
+	for (blc_p = gbadsl_chain; blc_p; blc_p = blc_p->bl_nxt) {
+		for (i = 0; i < blc_p->bl_cnt; i++)
 			printf(" badsec=%d ", blc_p->bl_sec[i]);
 	}
 	printf("\n");
+}
 #endif
 #ifdef PPP
 	/*
@@ -191,12 +206,12 @@ main(int argc, char *argv[])
 		/*
 		 * No defects and not initializing
 		 */
-		exit (0);
+		exit(0);
 #endif
 	if (gbadsl_chain_cnt != 0)
 	{
-		if (try_hw_remap () == SUCCESS)
-			exit (0);
+		if (try_hw_remap() == SUCCESS)
+			exit(0);
 	}
 	/*
 	 * get ALTS slice
@@ -211,61 +226,66 @@ main(int argc, char *argv[])
 	}
 	if (alts_slice == -1)
 	{
-		fprintf(stderr, "%s: No alternates slice.\n", progname);
+		(void) fprintf(stderr, "%s: No alternates slice.\n", progname);
 		exit(16);
 	}
-	l = strlen (devname);
-	sprintf (numbuf, "%d", alts_slice);
-	p = strlen (numbuf);
-	alts_name = (char *)malloc (l + p);
-	strcpy (alts_name, devname);
+	l = strlen(devname);
+	(void) sprintf(numbuf, "%d", alts_slice);
+	p = strlen(numbuf);
+	alts_name = (char *)malloc(l + p);
+	(void) strcpy(alts_name, devname);
 	alts_name[l - 2] = 's';
-	strcpy (&alts_name[l - 1], numbuf);
+	(void) strcpy(&alts_name[l - 1], numbuf);
 	alts_name[l + p - 1] = '\0';
-	if ((alts_fd=open(alts_name, O_RDWR)) == -1) {
-		fprintf(stderr, "%s: open of %s failed\n", progname ,alts_name);
+	if ((alts_fd = open(alts_name, O_RDWR)) == -1) {
+		(void) fprintf(stderr, "%s: open of %s failed\n",
+		    progname, alts_name);
 		perror("");
 		exit(9);
 	}
 	if (print_flag)
 	{
-		print_altsec (part);
-		exit (0);
+		(void) print_altsec(part);
+		exit(0);
 	}
-	updatebadsec(part, init_flag);
+	(void) updatebadsec(part, init_flag);
 	wr_altsctr();
 
 	if (ioctl(devfd, DKIOCADDBAD, NULL) == -1) {
-		fprintf(stderr,  "Warning: DKIOCADDBAD io control failed. System must be re-booted\n");
-		fprintf(stderr, "for alternate sectors to be usable.\n");
+		(void) fprintf(stderr,  "Warning: DKIOCADDBAD io control"
+		    " failed. System must be re-booted\n");
+		(void) fprintf(stderr, "for alternate sectors to be usable.\n");
 		exit(17);
 	}
 	sync();
 
-	fclose(badsecfd);
-	close (alts_fd);
-	close (devfd);
-	return(0);
+	(void) fclose(badsecfd);
+	(void) close(alts_fd);
+	(void) close(devfd);
+	return (0);
 }
 
 /*
  * Giveusage ()
  * Give a (not so) concise message on how to use this program.
  */
-static
-void giveusage(void)
+static void
+giveusage(void)
 {
-	fprintf(stderr, "%s [-p] [-a sector] [-f filename] raw-device\n", progname);
-	fprintf(stderr, "	p - Print existing bad block map\n");
-	fprintf(stderr, "	a - Add the given sectors to the bad block list\n");
-	fprintf(stderr, "	f - Add the sectors from <filename> to the bad block list\n");
+	(void) fprintf(stderr, "%s [-p] [-a sector] [-f filename]"
+	    " raw-device\n", progname);
+	(void) fprintf(stderr, "	p - Print existing bad block map\n");
+	(void) fprintf(stderr, "	a - Add the given sectors to the"
+	    " bad block list\n");
+	(void) fprintf(stderr, "	f - Add the sectors from <filename>"
+	    " to the bad block list\n");
 	if (devfd)
-		close(devfd);
+		(void) close(devfd);
 }
 
 
 /*
- *	read in the additional growing bad sectors 
+ *	read in the additional growing bad sectors
  */
 static void
 rd_gbad(FILE *badsecfd)
@@ -274,7 +294,7 @@ rd_gbad(FILE *badsecfd)
 	int	status;
 
 	status = fscanf(badsecfd, "%d", &badsec_entry);
-	while (status!=EOF) {
+	while (status != EOF) {
 		add_gbad(badsec_entry);
 		status = fscanf(badsecfd, "%d", &badsec_entry);
 	}
@@ -288,7 +308,8 @@ add_gbad(int badsec_entry)
 	if (!gbadsl_chain) {
 		blc_p = (struct badsec_lst *)malloc(BADSLSZ);
 		if (!blc_p) {
-			fprintf(stderr, "Unable to allocate memory for additional bad sectors\n");
+			(void) fprintf(stderr, "Unable to allocate memory"
+			    " for additional bad sectors\n");
 			exit(18);
 		}
 		gbadsl_chain = blc_p;
@@ -297,11 +318,12 @@ add_gbad(int badsec_entry)
 	}
 	for (blc_p = gbadsl_chain; blc_p->bl_nxt; )
 		blc_p = blc_p->bl_nxt;
-				
+
 	if (blc_p->bl_cnt == MAXBLENT) {
 		blc_p->bl_nxt = (struct badsec_lst *)malloc(BADSLSZ);
 		if (!blc_p->bl_nxt) {
-			fprintf(stderr, "Unable to allocate memory for additional bad sectors\n");
+			(void) fprintf(stderr, "Unable to allocate memory"
+			    " for additional bad sectors\n");
 			exit(19);
 		}
 		blc_p = blc_p->bl_nxt;
@@ -316,12 +338,12 @@ add_gbad(int badsec_entry)
  * Map a block using hardware (SCSI) techniques.
  */
 /*ARGSUSED*/
-int
-hardware_remap (bn)
-int	bn;
+static int
+hardware_remap(bn)
+blkaddr_t	bn;
 {
-	u_int	byte_swap_32 (u_int);
-	u_short	byte_swap_16 (u_short);
+	uint_t		byte_swap_32(uint_t);
+	ushort_t	byte_swap_16(ushort_t);
 
 	struct uscsi_cmd		ucmd;
 	union scsi_cdb			cdb;
@@ -335,16 +357,12 @@ int	bn;
 	(void) memset((char *)&defect_list, 0,
 		sizeof (struct scsi_reassign_blk));
 	cdb.scc_cmd = SCMD_REASSIGN_BLOCK;
-	ucmd.uscsi_cdb = (caddr_t) &cdb;
+	ucmd.uscsi_cdb = (caddr_t)&cdb;
 	ucmd.uscsi_cdblen = CDB_GROUP0;
-	ucmd.uscsi_bufaddr = (caddr_t) &defect_list;
+	ucmd.uscsi_bufaddr = (caddr_t)&defect_list;
 	ucmd.uscsi_buflen = sizeof (struct scsi_reassign_blk);
-	defect_list.length = byte_swap_16 (sizeof (defect_list.defect));
-	defect_list.defect = byte_swap_32 (bn);
-	/*
-	printf ("length - %x %x\n", sizeof (defect_list.defect), defect_list.length);
-	printf ("defect - %x %x\n", bn, defect_list.defect);
-	*/
+	defect_list.length = byte_swap_16(sizeof (defect_list.defect));
+	defect_list.defect = byte_swap_32(bn);
 	/*
 	 * Set function flags for driver.
 	 */
@@ -358,7 +376,7 @@ int	bn;
 	{
 		if (errno != ENOTTY)
 		{
-			perror ("SCSI hardware re-assign failed");
+			perror("SCSI hardware re-assign failed");
 			/*
 			 * It looks like a failure but by returning success
 			 * the upper layer will not try to do
@@ -371,34 +389,32 @@ int	bn;
 	return (SUCCESS);
 }
 
-u_int
-byte_swap_32 (u_int nav)
+uint_t
+byte_swap_32(uint_t nav)
 {
-	u_int	rc;
+	uint_t	rc;
 	rc = ((nav & 0xff000000) >> 24) | ((nav & 0x00ff0000) >> 8) |
-	     ((nav & 0x0000ff00) << 8)  | ((nav & 0x000000ff) << 24);
+	    ((nav & 0x0000ff00) << 8)  | ((nav & 0x000000ff) << 24);
 	return (rc);
 }
 
-u_short
-byte_swap_16 (u_short niv)
+ushort_t
+byte_swap_16(ushort_t niv)
 {
-	u_short	rc;
-	rc = (u_short)((int)(niv & 0xff00) >> 8) | ((niv & 0x00ff) << 8);
+	ushort_t	rc;
+	rc = (ushort_t)((int)(niv & 0xff00) >> 8) | ((niv & 0x00ff) << 8);
 	return (rc);
 }
 
-int
-try_hw_remap ()
+static int
+try_hw_remap()
 {
 	struct badsec_lst *blc_p;
 	int	i;
 
-	for (blc_p = gbadsl_chain; blc_p != 0; blc_p = blc_p->bl_nxt)
-	{
-				
+	for (blc_p = gbadsl_chain; blc_p != 0; blc_p = blc_p->bl_nxt) {
 		for (i = 0; i < blc_p->bl_cnt; i++)
-		if (hardware_remap (blc_p->bl_sec[i]) == FAILURE)
+		if (hardware_remap(blc_p->bl_sec[i]) == FAILURE)
 			return (FAILURE);
 	}
 	return (SUCCESS);
