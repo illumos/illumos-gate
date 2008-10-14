@@ -317,6 +317,7 @@ typedef struct {
 #define	RT_FL2_BRANDED	0x00000800	/* process is branded */
 #define	RT_FL2_NOPLM	0x00001000	/* process has no primary link map */
 #define	RT_FL2_SETUID	0x00002000	/* ld.so.1 is setuid root */
+#define	RT_FL2_ADDR32	0x00004000	/* 32-bit address space requirement */
 
 /*
  * Information flags for env_info.
@@ -529,6 +530,7 @@ extern Rt_map		*_caller(caddr_t, int);
 extern caddr_t		caller(void);
 extern void		*calloc(size_t, size_t);
 extern void		cap_assign(Cap *, Rt_map *);
+extern int		cap_check(Rej_desc *, Ehdr *);
 extern const char	*_conv_reloc_type(uint_t rel);
 extern uintptr_t	dbg_setup(const char *, Dbg_desc *);
 extern const char	*demangle(const char *);
@@ -578,7 +580,6 @@ extern int		hdl_add(Grp_hdl *, Rt_map *, uint_t);
 extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t,
 			    uint_t, uint_t);
 extern int		hdl_initialize(Grp_hdl *, Rt_map *, int, int);
-extern int		hwcap_check(Rej_desc *, Ehdr *);
 extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,
 			    Rt_map *, const char *, int, uint_t, int *);
 extern void		is_dep_ready(Rt_map *, Rt_map *, int);

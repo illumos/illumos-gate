@@ -325,12 +325,26 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 			    EC_XWORD(Line_num), EC_LWORD(badsf1));
 			ofl->ofl_sfcap_1 &= SF1_SUNW_MASK;
 		}
-		if (ofl->ofl_sfcap_1 == SF1_SUNW_FPUSED) {
+		if ((ofl->ofl_sfcap_1 &
+		    (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_BADSF1), mapfile,
 			    EC_XWORD(Line_num), EC_LWORD(SF1_SUNW_FPUSED));
-			ofl->ofl_sfcap_1 = 0;
+			ofl->ofl_sfcap_1 &= ~SF1_SUNW_FPUSED;
 		}
+#if	!defined(_ELF64)
+		/*
+		 * The SF1_SUNW_ADDR32 software capability is only meaningful
+		 * when building a 64-bit object.  Warn the user, and remove the
+		 * setting, if we're building a 32-bit object.
+		 */
+		if (ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_MAP_INADDR32SF1), mapfile,
+			    EC_XWORD(Line_num));
+			ofl->ofl_sfcap_1 &= ~SF1_SUNW_ADDR32;
+		}
+#endif
 	}
 	return (1);
 }

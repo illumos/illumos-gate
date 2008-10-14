@@ -33,8 +33,6 @@
 #ifndef	_MACHDEP_SPARC_H
 #define	_MACHDEP_SPARC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <link.h>
 #include <sys/machelf.h>
 
@@ -220,12 +218,6 @@ extern "C" {
  * Make register symbols transparent to common code
  */
 #define	M_DT_REGISTER	DT_SPARC_REGISTER
-
-/*
- * PLTRESERVE is not relevant on sparc
- */
-#define	M_DT_PLTRESERVE	0xffffffff
-
 
 /*
  * Make plt section information transparent to the common code.

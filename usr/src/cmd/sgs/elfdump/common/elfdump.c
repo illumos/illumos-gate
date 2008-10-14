@@ -751,7 +751,7 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
     Elf *elf)
 {
 	Word		cnt;
-	Shdr		*cshdr = 0;
+	Shdr		*cshdr = NULL;
 	Cache		*ccache;
 	Off		cphdr_off = 0;
 	Xword		cphdr_sz;
@@ -798,7 +798,7 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 		break;
 	}
 
-	if ((cshdr == 0) && (cphdr_off == 0))
+	if ((cshdr == NULL) && (cphdr_off == 0))
 		return;
 
 	/*
@@ -822,8 +822,22 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 		capn = (Word)(cshdr->sh_size / cshdr->sh_entsize);
 
 		for (ndx = 0; ndx < capn; cap++, ndx++) {
-			if (cap->c_tag != CA_SUNW_NULL)
-				Elf_cap_entry(0, cap, ndx, ehdr->e_machine);
+			if (cap->c_tag == CA_SUNW_NULL)
+				continue;
+
+			Elf_cap_entry(0, cap, ndx, ehdr->e_machine);
+
+			/*
+			 * An SF1_SUNW_ADDR32 software capability in a 32-bit
+			 * object is suspicious as it has no effect.
+			 */
+			if ((cap->c_tag == CA_SUNW_SF_1) &&
+			    (ehdr->e_ident[EI_CLASS] == ELFCLASS32) &&
+			    (cap->c_un.c_val & SF1_SUNW_ADDR32)) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_WARN_INADDR32SF1),
+				    file, ccache->c_name);
+			}
 		}
 	} else
 		(void) fprintf(stderr, MSG_INTL(MSG_WARN_INVCAP1), file);

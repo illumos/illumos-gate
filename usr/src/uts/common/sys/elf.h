@@ -30,8 +30,6 @@
 #ifndef _SYS_ELF_H
 #define	_SYS_ELF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/elftypes.h>
 
 #ifdef	__cplusplus
@@ -703,11 +701,10 @@ typedef struct {
  * Define software capabilities (CA_SUNW_SF_1 values).  Note, hardware
  * capabilities (CA_SUNW_HW_1 values) are taken directly from sys/auxv_$MACH.h.
  */
-#define	SF1_SUNW_FPKNWN	0x001		/* use/non-use of frame pointer is */
-#define	SF1_SUNW_FPUSED	0x002		/*	known, and frame pointer is */
-					/*	in use */
-#define	SF1_SUNW_MASK	0x003		/* known software capabilities mask */
-
+#define	SF1_SUNW_FPKNWN	0x001		/* frame pointer usage is known */
+#define	SF1_SUNW_FPUSED	0x002		/* frame pointer is in use */
+#define	SF1_SUNW_ADDR32	0x004		/* 32-bit address space requirement */
+#define	SF1_SUNW_MASK	0x007		/* known software capabilities mask */
 
 /*
  *	Known values for note entry types (e_type == ET_CORE)

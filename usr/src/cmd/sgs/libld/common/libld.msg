@@ -388,6 +388,10 @@
 @ MSG_FIL_UNKCAP	"file %s: section %s: unknown capability tag: %d"
 @ MSG_FIL_BADSF1	"file %s: section %s: unknown software capabilities: \
 			 0x%llx; ignored"
+@ MSG_FIL_INADDR32SF1	"file %s: section %s: software capability ADDR32: is \
+			 ineffective when building 32-bit object; ignored"
+@ MSG_FIL_EXADDR32SF1	"file %s: section %s: software capability ADDR32: \
+			 requires executable be built with ADDR32 capability"
 
 @ MSG_FIL_BADORDREF	"file %s: section %s[%d]: contains illegal reference \
 			 to discarded section: %s[%d]"
@@ -964,9 +968,11 @@
 @ MSG_MAP_NOFILTER	"%s: %lld: filtee definition required"
 @ MSG_MAP_BADSF1	"%s: %lld: unknown software capabilities: 0x%llx; \
 			 ignored"
+@ MSG_MAP_INADDR32SF1	"%s: %lld: software capability ADDR32: is ineffective \
+			 when building 32-bit object: ignored"
 @ MSG_MAP_NOINTPOSE	"%s: %lld: interposition symbols can only be defined \
 			 when building a dynamic executable"
-@ MSG_MAP_NOEXVLSZ	"%s: %lld: value and size attributes are imcompatible \
+@ MSG_MAP_NOEXVLSZ	"%s: %lld: value and size attributes are incompatible \
 			 with extern or parent symbols"
 
 @ MSG_MAP_SEGSAME	"segments `%s' and `%s' have the same assigned \

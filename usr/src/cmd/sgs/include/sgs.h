@@ -210,6 +210,7 @@ typedef struct {
 #define	SGS_REJ_STR		10	/* generic error - info is a string */
 #define	SGS_REJ_UNKFILE		11	/* unknown file type */
 #define	SGS_REJ_HWCAP_1		12	/* hardware capabilities mismatch */
+#define	SGS_REJ_SFCAP_1		13	/* software capabilities mismatch */
 
 /*
  * For those source files used both inside and outside of the

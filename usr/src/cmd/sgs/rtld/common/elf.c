@@ -208,7 +208,7 @@ elf_are_u(Rej_desc *rej)
 	 * Verify machine specific flags, and hardware capability requirements.
 	 */
 	if ((elf_mach_flags_check(rej, ehdr) == 0) ||
-	    ((rtld_flags2 & RT_FL2_HWCAP) && (hwcap_check(rej, ehdr) == 0)))
+	    (cap_check(rej, ehdr) == 0))
 		return (0);
 
 	/*
@@ -2495,10 +2495,6 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			case DT_DEPRECATED_SPARC_REGISTER:
 			case M_DT_REGISTER:
 				FLAGS(lmp) |= FLG_RT_REGSYMS;
-				break;
-			case M_DT_PLTRESERVE:
-				PLTRESERVE(lmp) = (void *)(ld->d_un.d_ptr +
-				    base);
 				break;
 			}
 		}

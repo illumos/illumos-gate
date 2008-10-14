@@ -713,18 +713,23 @@ are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
 			/*
 			 * If this object is an explicitly defined shared
 			 * object under inspection by ldd, and contains a
-			 * incompatible hardware capabilities requirement, then
+			 * incompatible capabilities requirement, then
 			 * inform the user, but continue processing.
 			 *
 			 * XXXX - ldd -v for any rej failure.
 			 */
-			if ((rej->rej_type == SGS_REJ_HWCAP_1) &&
+			if (((rej->rej_type == SGS_REJ_HWCAP_1) ||
+			    (rej->rej_type == SGS_REJ_SFCAP_1)) &&
 			    (lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
 			    ((lmp = lml_main.lm_head) != 0) &&
 			    (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
 			    (NEXT(lmp) == 0)) {
-				(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
-				    name, rej->rej_str);
+				const char	*fmt;
+				if (rej->rej_type == SGS_REJ_HWCAP_1)
+					fmt = MSG_INTL(MSG_LDD_GEN_HWCAP_1);
+				else
+					fmt = MSG_INTL(MSG_LDD_GEN_SFCAP_1);
+				(void) printf(fmt, name, rej->rej_str);
 				return (vector[i]);
 			}
 			return (0);

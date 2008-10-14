@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ELFCAP_DOT_H
 #define	_ELFCAP_DOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -100,7 +99,7 @@ typedef enum {
  * # of each type of capability known to the system. These values
  * must be kept in sync with the arrays found in elfcap.c
  */
-#define	ELFCAP_NUM_SF1			2
+#define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		16
 #define	ELFCAP_NUM_HW1_386		25
 

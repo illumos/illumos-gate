@@ -33,8 +33,6 @@
 #ifndef	_MACHDEP_X86_H
 #define	_MACHDEP_X86_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <link.h>
 #include <sys/machelf.h>
 
@@ -207,13 +205,11 @@ extern "C" {
  * DT_REGISTER is not valid on i386 or amd64
  */
 #define	M_DT_REGISTER	0xffffffff
-#define	M_DT_PLTRESERVE	0xfffffffe
 
 /*
  * Make plt section information transparent to the common code.
  */
 #define	M_PLT_SHF_FLAGS	(SHF_ALLOC | SHF_EXECINSTR)
-
 
 /*
  * Make data segment information transparent to the common code.

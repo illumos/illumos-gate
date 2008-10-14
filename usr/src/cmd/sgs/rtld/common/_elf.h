@@ -30,8 +30,6 @@
 #ifndef	__ELF_DOT_H
 #define	__ELF_DOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <elf.h>
 #include <_rtld.h>
@@ -94,7 +92,6 @@ typedef struct _rt_elf_private {
 	char		*e_strtab;	/* string table */
 	void		*e_reloc;	/* relocation table */
 	uint_t		*e_pltgot;	/* addrs for procedure linkage table */
-	void		*e_pltreserve;	/* ia64: DT_IA_64_PLTRESERVE */
 	void		*e_dynplt;	/* dynamic plt table - used by prof */
 	void		*e_jmprel;	/* plt relocations */
 	ulong_t		e_sunwsortent;	/* size of sunw[sym|tls]sort entry */
@@ -156,7 +153,6 @@ typedef struct _rt_elf_private {
 #define	SYMINENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_syminent)
 #define	PLTPAD(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpad)
 #define	PLTPADEND(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpadend)
-#define	PLTRESERVE(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltreserve)
 #define	SUNWSORTENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsortent)
 #define	SUNWSYMSORT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsort)
 #define	SUNWSYMSORTSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsortsz)

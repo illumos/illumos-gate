@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
@@ -26,7 +27,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	<sys/mman.h>
@@ -218,6 +218,7 @@ ldd_reject[] = {
 		MSG_LDD_REJ_STR,	/* MSG_INTL(MSG_LDD_REJ_STR) */
 		MSG_LDD_REJ_UNKFILE,	/* MSG_INTL(MSG_LDD_REJ_UNKFILE) */
 		MSG_LDD_REJ_HWCAP_1,	/* MSG_INTL(MSG_LDD_REJ_HWCAP_1) */
+		MSG_LDD_REJ_SFCAP_1,	/* MSG_INTL(MSG_LDD_REJ_SFCAP_1) */
 	};
 
 
@@ -236,4 +237,5 @@ err_reject[] = {
 		MSG_ERR_REJ_STR,	/* MSG_INTL(MSG_ERR_REJ_STR) */
 		MSG_ERR_REJ_UNKFILE,	/* MSG_INTL(MSG_ERR_REJ_UNKFILE) */
 		MSG_ERR_REJ_HWCAP_1,	/* MSG_INTL(MSG_ERR_REJ_HWCAP_1) */
+		MSG_ERR_REJ_SFCAP_1,	/* MSG_INTL(MSG_ERR_REJ_SFCAP_1) */
 	};

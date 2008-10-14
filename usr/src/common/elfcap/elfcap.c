@@ -94,6 +94,10 @@ static const elfcap_desc_t sf1[ELFCAP_NUM_SF1] = {
 	{						/* 0x00000002 */
 		SF1_SUNW_FPUSED, STRDESC("SF1_SUNW_FPUSED"),
 		STRDESC("FPUSED"), STRDESC("fpused"),
+	},
+	{						/* 0x00000004 */
+		SF1_SUNW_ADDR32, STRDESC("SF1_SUNW_ADDR32"),
+		STRDESC("ADDR32"), STRDESC("addr32"),
 	}
 };
 

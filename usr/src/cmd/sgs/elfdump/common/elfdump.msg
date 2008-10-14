@@ -157,6 +157,8 @@
 			 header\n"
 @ MSG_WARN_INVCAP3	"%s: capabilities section: %s: and PT_CAP program \
 			 header have conflicting size or offsets\n"
+@ MSG_WARN_INADDR32SF1	"%s: capabilities section %s: software capability \
+			 ADDR32: is ineffective within a 32-bit object\n"
 
 # Elf Output Messages
 

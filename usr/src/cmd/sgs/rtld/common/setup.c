@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Run time linker common setup.
  *
@@ -723,6 +721,17 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			}
 		}
 	}
+
+#if	defined(_ELF64)
+	/*
+	 * If this is a 64-bit process, determine whether this process has
+	 * restricted the process address space to 32-bits.  Any dependencies
+	 * that are restricted to a 32-bit address space can only be loaded if
+	 * the executable has established this requirement.
+	 */
+	if (SFCAP(mlmp) & SF1_SUNW_ADDR32)
+		rtld_flags2 |= RT_FL2_ADDR32;
+#endif
 
 	FLAGS(mlmp) |= (FLG_RT_ISMAIN | FLG_RT_MODESET);
 	FLAGS1(mlmp) |= FL1_RT_USED;

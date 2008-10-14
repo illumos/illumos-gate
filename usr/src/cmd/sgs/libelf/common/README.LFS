@@ -23,9 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
-
 
 
 Why 32-bit libelf is not Large File Aware
@@ -112,7 +109,7 @@ versions of the public functions that use them, also found in
 
 It is important to note that these new versions cannot replace the
 original definitions. Those must continue to be available to support
-non-largefile-aware programs. These new types and functions would be in
+non-large-file-aware programs. These new types and functions would be in
 addition to the pre-existing versions.
 
 When you make code like this large file aware, it is necessary to undertake
@@ -129,7 +126,7 @@ large file support:
 
 These preprocessor definitions would be used to determine whether 
 a given program linked against libelf would see the regular, or
-the large file aware versons of the above types and routines.
+the large file aware versions of the above types and routines.
 This is the same approach used in other large file capable software,
 such as libc.
 

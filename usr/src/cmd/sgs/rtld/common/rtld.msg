@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 @ _START_
 
@@ -199,8 +197,10 @@
 @ MSG_LDD_REJ_STR	"  - %s"
 @ MSG_LDD_REJ_UNKFILE	"  - unknown file type"
 @ MSG_LDD_REJ_HWCAP_1	"  - hardware capability unsupported: %s"
+@ MSG_LDD_REJ_SFCAP_1	"  - software capability unsupported: %s"
 
 @ MSG_LDD_GEN_HWCAP_1	"%s: warning: hardware capability unsupported: %s\n"
+@ MSG_LDD_GEN_SFCAP_1	"%s: warning: hardware capability unsupported: %s\n"
 
 # Error rejection messages.
 
@@ -216,6 +216,7 @@
 @ MSG_ERR_REJ_STR	"%s: %s"
 @ MSG_ERR_REJ_UNKFILE	"%s: unknown file type"
 @ MSG_ERR_REJ_HWCAP_1	"%s: hardware capability unsupported: %s"
+@ MSG_ERR_REJ_SFCAP_1	"%s: software capability unsupported: %s"
 
 # Error TLS failures
 

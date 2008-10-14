@@ -253,6 +253,20 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 		return;
 	}
 
+#if	!defined(_ELF64)
+	if (ifl->ifl_ehdr->e_type == ET_REL) {
+		/*
+		 * The SF1_SUNW_ADDR32 is only meaningful when building a 64-bit
+		 * object.  Warn the user, and remove the setting, if we're
+		 * building a 32-bit object.
+		 */
+		if (val & SF1_SUNW_ADDR32) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_FIL_INADDR32SF1), ifl->ifl_name, name);
+			val &= ~SF1_SUNW_ADDR32;
+		}
+	}
+#endif
 	/*
 	 * If this object doesn't specify any capabilities, ignore it, and
 	 * leave the state as is.
@@ -269,9 +283,33 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 		    ifl->ifl_name, name, EC_XWORD(badval));
 		val &= SF1_SUNW_MASK;
 	}
-	if (val == SF1_SUNW_FPUSED) {
+	if ((val & (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
 		    ifl->ifl_name, name, EC_XWORD(val));
+		return;
+	}
+
+	/*
+	 * If the input file is not a relocatable object, then we're only here
+	 * to warn the user of any questionable capabilities.
+	 */
+	if (ifl->ifl_ehdr->e_type != ET_REL) {
+#if	defined(_ELF64)
+		/*
+		 * If we're building a 64-bit executable, and we come across a
+		 * dependency that requires a restricted address space, then
+		 * that dependencies requirement can only be satisfied if the
+		 * executable triggers the restricted address space.  This is a
+		 * warning rather than a fatal error, as the possibility exists
+		 * that an appropriate dependency will be provided at runtime.
+		 * The runtime linker will refuse to use this dependency.
+		 */
+		if ((val & SF1_SUNW_ADDR32) && (ofl->ofl_flags & FLG_OF_EXEC) &&
+		    ((ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32) == 0)) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_FIL_EXADDR32SF1), ifl->ifl_name, name);
+		}
+#endif
 		return;
 	}
 
@@ -367,9 +405,23 @@ process_cap(Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 	for (ndx = 0; ndx < cnum; cdata++, ndx++) {
 		switch (cdata->c_tag) {
 			case CA_SUNW_HW_1:
-				hw1_cap(ofl, cdata->c_un.c_val);
+				/*
+				 * Only the hardware capabilities that are
+				 * defined in a relocatable object become part
+				 * of the hardware capabilities in the output
+				 * file.
+				 */
+				if (ifl->ifl_ehdr->e_type == ET_REL)
+					hw1_cap(ofl, cdata->c_un.c_val);
 				break;
 			case CA_SUNW_SF_1:
+				/*
+				 * Only the software capabilities that are
+				 * defined in a relocatable object become part
+				 * of the software capabilities in the output
+				 * file.  However, check the validity of the
+				 * software capabilities of any dependencies.
+				 */
 				sf1_cap(ofl, cdata->c_un.c_val, ifl,
 				    cisp->is_name);
 				break;
@@ -1806,12 +1858,12 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	}
 
 	/*
-	 * Process any hardware/software capabilities sections.  Only propagate
-	 * capabilities for input relocatable objects.  If the object doesn't
-	 * contain any capabilities, any capability state that has already been
-	 * gathered will prevail.
+	 * Process any hardware/software capabilities sections.  Only the
+	 * capabilities for input relocatable objects are propagated.  If the
+	 * relocatable objects don't contain any capabilities, any capability
+	 * state that has already been gathered will prevail.
 	 */
-	if (capisp && (ifl->ifl_ehdr->e_type == ET_REL))
+	if (capisp)
 		process_cap(ifl, capisp, ofl);
 
 	/*

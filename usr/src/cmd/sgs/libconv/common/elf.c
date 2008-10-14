@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * String conversion routines for ELF header attributes.
@@ -398,34 +397,36 @@ conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf,
 	ushort_t	type = rej->rej_type;
 	uint_t		info = rej->rej_info;
 
-	if (type == SGS_REJ_MACH)
-		/* LINTED */
+	switch (type) {
+	case SGS_REJ_MACH:
 		return (conv_ehdr_mach((Half)info, 0,
 		    &reject_desc_buf->inv_buf));
-	else if (type == SGS_REJ_CLASS)
-		/* LINTED */
+	case SGS_REJ_CLASS:
 		return (conv_ehdr_class((uchar_t)info, 0,
 		    &reject_desc_buf->inv_buf));
-	else if (type == SGS_REJ_DATA)
-		/* LINTED */
+	case SGS_REJ_DATA:
 		return (conv_ehdr_data((uchar_t)info, 0,
 		    &reject_desc_buf->inv_buf));
-	else if (type == SGS_REJ_TYPE)
-		/* LINTED */
+	case SGS_REJ_TYPE:
 		return (conv_ehdr_type((Half)info, 0,
 		    &reject_desc_buf->inv_buf));
-	else if ((type == SGS_REJ_BADFLAG) || (type == SGS_REJ_MISFLAG) ||
-	    (type == SGS_REJ_HAL) || (type == SGS_REJ_US3))
+	case SGS_REJ_BADFLAG:
+	case SGS_REJ_MISFLAG:
+	case SGS_REJ_HAL:
+	case SGS_REJ_US3:
 		return (conv_ehdr_flags(mach, (Word)info, 0,
 		    &reject_desc_buf->flags_buf));
-	else if (type == SGS_REJ_UNKFILE)
+	case SGS_REJ_UNKFILE:
 		return ((const char *)0);
-	else if ((type == SGS_REJ_STR) || (type == SGS_REJ_HWCAP_1)) {
+	case SGS_REJ_STR:
+	case SGS_REJ_HWCAP_1:
+	case SGS_REJ_SFCAP_1:
 		if (rej->rej_str)
 			return ((const char *)rej->rej_str);
 		else
 			return (MSG_ORIG(MSG_STR_EMPTY));
-	} else
+	default:
 		return (conv_invalid_val(&reject_desc_buf->inv_buf, info,
 		    CONV_FMT_DECIMAL));
+	}
 }

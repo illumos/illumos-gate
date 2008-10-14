@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/types.h>
 #include	<sys/mman.h>
 #include	<dirent.h>
@@ -63,11 +61,10 @@ compare(const void *fdesc1, const void *fdesc2)
 }
 
 /*
- * If this object defines a set of hardware capability requirements, insure the
- * kernal can cope with them.
+ * Process any hardware and software capabilities.
  */
 int
-hwcap_check(Rej_desc *rej, Ehdr *ehdr)
+cap_check(Rej_desc *rej, Ehdr *ehdr)
 {
 	Cap	*cptr;
 	Phdr	*phdr;
@@ -82,29 +79,57 @@ hwcap_check(Rej_desc *rej, Ehdr *ehdr)
 			continue;
 
 		/* LINTED */
-		cptr = (Cap *)((char *)ehdr + phdr->p_offset);
-		while (cptr->c_tag != CA_SUNW_NULL) {
-			if (cptr->c_tag == CA_SUNW_HW_1)
-				break;
-			cptr++;
+		for (cptr = (Cap *)((char *)ehdr + phdr->p_offset);
+		    (cptr->c_tag != CA_SUNW_NULL); cptr++) {
+
+			if ((cptr->c_tag == CA_SUNW_HW_1) &&
+			    (rtld_flags2 & RT_FL2_HWCAP)) {
+				/*
+				 * If this object defines a set of hardware
+				 * capability requirements, ensure the kernel
+				 * can cope with them.
+				 */
+				if ((val = (cptr->c_un.c_val & ~hwcap)) != 0) {
+					static Conv_cap_val_hw1_buf_t cap_buf;
+
+					rej->rej_type = SGS_REJ_HWCAP_1;
+					rej->rej_str =
+					    conv_cap_val_hw1(val, M_MACH, 0,
+					    &cap_buf);
+					return (0);
+				}
+
+				/*
+				 * Retain this hardware capabilities value for
+				 * possible later inspection should this object
+				 * be processed as a filtee.
+				 */
+				fmap->fm_hwptr = cptr->c_un.c_val;
+
+			}
+#if	defined(_ELF64)
+			if (cptr->c_tag == CA_SUNW_SF_1) {
+				/*
+				 * A 64-bit executable that started the process
+				 * can be restricted to a 32-bit address space.
+				 * A 64-bit dependency that is restricted to a
+				 * 32-bit address space can not be loaded unless
+				 * the executable has established this
+				 * requirement.
+				 */
+				if ((cptr->c_un.c_val & SF1_SUNW_ADDR32) &&
+				    ((rtld_flags2 & RT_FL2_ADDR32) == 0)) {
+					static Conv_cap_val_sf1_buf_t cap_buf;
+
+					rej->rej_type = SGS_REJ_SFCAP_1;
+					rej->rej_str =
+					    conv_cap_val_sf1(SF1_SUNW_ADDR32,
+					    M_MACH, 0, &cap_buf);
+					return (0);
+				}
+			}
+#endif
 		}
-		if (cptr->c_tag == CA_SUNW_NULL)
-			break;
-
-		if ((val = (cptr->c_un.c_val & ~hwcap)) != 0) {
-			static Conv_cap_val_hw1_buf_t cap_buf;
-
-			rej->rej_type = SGS_REJ_HWCAP_1;
-			rej->rej_str =
-			    conv_cap_val_hw1(val, M_MACH, 0, &cap_buf);
-			return (0);
-		}
-
-		/*
-		 * Retain this hardware capabilities pointer for possible later
-		 * inspection should this object be processed as a filtee.
-		 */
-		fmap->fm_hwptr = cptr->c_un.c_val;
 	}
 	return (1);
 }

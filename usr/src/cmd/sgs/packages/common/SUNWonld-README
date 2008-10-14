@@ -1212,6 +1212,15 @@ Bugid   Risk Synopsis
 6668050 First trip through PLT does not preserve args in xmm registers
 --------------------------------------------------------------------------------
 
+-------------------------------------
+Solaris 10 409 (7th Q-update - s10u7)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+6629404 ld with -z ignore doesn't scale
+6606203 link editor ought to allow creation of >2gb sized objects (P)
+--------------------------------------------------------------------------------
+
 --------------
 Solaris Nevada
 --------------
@@ -1311,7 +1320,6 @@ Bugid   Risk Synopsis
 	PSARC/2007/620 elfdump -T, and simplified matching
 6627765 soffice failure after integration of 6603313 - dangling GROUP pointer.
 6319025 SUNWbtool packaging issues in Nevada and S10u1.
-6629404 ld with -z ignore doesn't scale
 6626135 elfedit capabilities str->value mapping should come from
 	usr/src/common/elfcap
 6642769 ld(1) -z combreloc should become default behavior (D)
@@ -1332,7 +1340,6 @@ Bugid   Risk Synopsis
 6672394 ldd(1) unused dependency processing is tricked by relocations errors
 6671255 link-editor should support cross linking (D)
 	PSARC/2008/179 cross link-editor
-6606203 link editor ought to allow creation of >2gb sized objects (P)
 6674666 elfedit dyn:posflag1 needs option to locate element via NEEDED item
 6568447 bcp is broken by 6551627 (link-editor components only)
 6675591 elfwrap - wrap data in an ELF file (D,P)
@@ -1382,3 +1389,6 @@ Bugid   Risk Synopsis
 	PSARC/2008/603 ELF objects to adopt GNU-style Versym indexes
 6752728 link-editor can enter UNDEF symbols in symbol sort sections
 6756472 AOUT search path pruning (D)
+6754965 introduce the SF1_SUNW_ADDR32 bit in software capabilities (D)
+	(link-editor components only)
+	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
