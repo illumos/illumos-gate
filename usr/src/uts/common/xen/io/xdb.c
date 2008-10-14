@@ -962,6 +962,13 @@ xdb_open_device(xdb_t *vdp)
 		return (DDI_FAILURE);
 	}
 
+	if (*nodepath == '\0') {
+		/* Allow a CD-ROM device with an empty backend. */
+		vdp->xs_sectors = 0;
+		kmem_free(nodepath, MAXPATHLEN + 1);
+		return (DDI_SUCCESS);
+	}
+
 	if (ldi_open_by_name(nodepath,
 	    FREAD | (XDB_IS_RO(vdp) ? 0 : FWRITE),
 	    kcred, &vdp->xs_ldi_hdl, vdp->xs_ldi_li) != 0) {
