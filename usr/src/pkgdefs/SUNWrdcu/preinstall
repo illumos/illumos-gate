@@ -1,0 +1,103 @@
+#!/bin/sh
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Set path
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+#
+# Set variables
+#
+
+BASEDIR=${BASEDIR:=/}
+DEVLINKTB="${PKG_INSTALL_ROOT}/etc/devlink.tab"
+MODULE="rdc"
+NAMEMAJOR="${PKG_INSTALL_ROOT}/etc/name_to_major"
+PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+TMP=/tmp/${PKGINST}.$$
+
+#
+# Set specific command syntax (if needed)
+#
+
+if [ "${BASEDIR}" = "/" ]
+then
+    REM_DRV="rem_drv"
+else
+    REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
+fi
+
+#
+# Functions
+#
+
+message()
+{
+    echo ""
+    echo "$@"
+    echo ""
+}
+
+rem_devlink()
+{
+    PATTERN="$1"
+
+    grep -vw $PATTERN ${DEVLINKTB} >${TMP}.devlink
+    if [ $? -eq 0 ]
+    then
+	mv ${TMP}.devlink ${DEVLINKTB}
+    else
+	rm ${TMP}.devlink
+    fi
+}
+
+
+#
+# Shut rdc down
+#
+if [ "${PKG_INSTALL_ROOT}" = "/" -a  -f /etc/init.d/rdc ]
+then
+    sh /etc/init.d/rdc stop
+fi
+
+#
+# If module has been previously installed, unload and remove it...
+#
+grep -w ${MODULE} ${NAMEMAJOR} >/dev/null
+if [ $? -eq 0 ]
+then
+    ${REM_DRV} ${MODULE}
+fi
+
+rem_devlink ${MODULE}
+
+#
+# Remove rogue sndrsyncd that wasn't removed during 3.1 upgrade
+#
+
+rm -f /usr/lib/sndrsyncd >/dev/null 2>&1

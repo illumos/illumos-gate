@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+PATH=/usr/bin:/usr/sbin:$PATH; export PATH
+
+# Driver definitions
+DRVR_NAME=fp
+DRVR_PERM="-m '* 0600 root sys'"
+DRVR_CLASS=""
+DRVR_ALIASES=""
+
+
+if [ -z "${BASEDIR}" ]; then
+	echo "\n$0 Failed: BASEDIR is not set.\n" >&2
+	exit 1
+fi
+
+# Remove existing definition, if it exists. 
+/usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME} > /dev/null 2>&1
+
+fp_conf_scsi_binding()
+{
+	# Update fp.conf with scsi-binding-set
+	CONFFILE=${BASEDIR}/kernel/drv/fp.conf
+
+	grep "^scsi-binding-set=" $CONFFILE > /dev/null 2>&1
+	if [ $? -eq 1 ]; then
+		if [ ! -w $CONFFILE ] ; then
+			echo "$CONFFILE not writeable."  >&2
+			echo "Failed to update." >&2
+			exit 1
+		else
+			cat << EOF >> $CONFFILE
+#
+# To generate the binding-set specific 'compatible' forms used to address
+# legacy issues the 'scsi-binding-set' property must be defined. [do not remove]
+#
+scsi-binding-set="fcp";
+EOF
+			if [ $? -ne 0 ] ; then
+				echo "Failed to update $CONFFILE." >&2
+				exit 1
+			fi
+		fi
+	fi
+}
+
+fp_conf_scsi_binding
+
+ADD_DRV="add_drv -n -b ${BASEDIR}"
+
+eval ${ADD_DRV} "${DRVR_PERM}" ${DRVR_CLASS} "${DRVR_ALIASES}" ${DRVR_NAME}
+if [ $? -ne 0 ]; then
+	echo "\nCommand Failed:\n${ADD_DRV} "${DRVR_PERM}" ${DRVR_CLASS} \
+		"${DRVR_ALIASES}" ${DRVR_NAME}\n" >&2
+	exit 1
+fi
+
+exit 0

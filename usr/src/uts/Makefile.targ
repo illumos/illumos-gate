@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -189,6 +188,9 @@ $(ROOT_KGSS_DIR)/%:	$(OBJS_DIR)/% $(ROOT_KGSS_DIR) FRC
 	$(INS.file)
 
 $(ROOT_SCSI_VHCI_DIR)/%: $(OBJS_DIR)/% $(ROOT_SCSI_VHCI_DIR) FRC
+	$(INS.file)
+
+$(ROOT_QLC_FW_DIR)/%:	$(OBJS_DIR)/% $(ROOT_QLC_FW_DIR) FRC
 	$(INS.file)
 
 $(ROOT_MACH_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MACH_DIR) FRC

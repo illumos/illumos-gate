@@ -235,6 +235,9 @@ CHKHDRS=			\
 	fbio.h			\
 	fbuf.h			\
 	fcntl.h			\
+	fct.h			\
+	fct_defines.h		\
+	fctio.h			\
 	fdbuffer.h		\
 	fdio.h			\
 	feature_tests.h		\
@@ -348,6 +351,7 @@ CHKHDRS=			\
 	lwp.h			\
 	lwp_timer_impl.h	\
 	lwp_upimutex_impl.h	\
+	lpif.h			\
 	mac.h			\
 	mac_impl.h		\
 	machelf.h		\
@@ -430,6 +434,7 @@ CHKHDRS=			\
 	port.h			\
 	port_impl.h		\
 	port_kernel.h		\
+	portif.h		\
 	ppmio.h                 \
 	priocntl.h		\
 	priv.h			\
@@ -501,6 +506,10 @@ CHKHDRS=			\
 	statvfs.h		\
 	stdint.h		\
 	stermio.h		\
+	stmf.h			\
+	stmf_defines.h		\
+	stmf_ioctl.h		\
+	stmf_sbd_ioctl.h	\
 	stream.h		\
 	strft.h			\
 	strlog.h		\
@@ -869,6 +878,11 @@ SCSIADHDRS=		\
 
 SCSICADHDRS=
 
+SCSIISCSIHDRS=		\
+	iscsi_door.h	\
+	iscsi_if.h	\
+	iscsi_protocol.h
+
 SCSIVHCIHDRS=		\
 	scsi_vhci.h	\
 	mpapi_impl.h	\
@@ -879,7 +893,7 @@ SDCARDHDRS=		\
 	sda_impl.h	\
 	sda_ioctl.h
 
-FCHDRS=			\
+FC4HDRS=			\
 	fc_transport.h	\
 	linkapp.h	\
 	fc.h		\
@@ -888,6 +902,20 @@ FCHDRS=			\
 	fcal.h		\
 	fcal_linkapp.h	\
 	fcio.h
+
+FCHDRS=			\
+	fc.h		\
+	fcio.h		\
+	fc_types.h	\
+	fc_appif.h
+
+FCIMPLHDRS=		\
+	fc_error.h	\
+	fcph.h
+
+FCULPHDRS=		\
+	fcp_util.h	\
+	fcsm.h
 
 SATAGENHDRS=		\
 	sata_hba.h	\
@@ -1046,6 +1074,10 @@ CHECKHDRS=						\
 	$(CPUDRVHDRS:%.h=%.check)			\
 	$(CRYPTOHDRS:%.h=crypto/%.check)		\
 	$(DCAMHDRS:%.h=dcam/%.check)			\
+	$(FC4HDRS:%.h=fc4/%.check)			\
+	$(FCHDRS:%.h=fibre-channel/%.check)		\
+	$(FCIMPLHDRS:%.h=fibre-channel/impl/%.check)	\
+	$(FCULPHDRS:%.h=fibre-channel/ulp/%.check)	\
 	$(IBHDRS:%.h=ib/%.check)			\
 	$(IBDHDRS:%.h=ib/clients/ibd/%.check)		\
 	$(IBTLHDRS:%.h=ib/ibtl/%.check)			\
@@ -1066,9 +1098,9 @@ CHECKHDRS=						\
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check)		\
 	$(SCSICONFHDRS:%.h=scsi/conf/%.check)		\
 	$(SCSIIMPLHDRS:%.h=scsi/impl/%.check)		\
+	$(SCSIISCSIHDRS:%.h=scsi/adapters/%.check)	\
 	$(SCSITARGETSHDRS:%.h=scsi/targets/%.check)	\
 	$(SCSIVHCIHDRS:%.h=scsi/adapters/%.check)	\
-	$(FCHDRS:%.h=fc4/%.check)			\
 	$(SATAGENHDRS:%.h=sata/%.check)			\
 	$(SDCARDHDRS:%.h=sdcard/%.check)		\
 	$(SYSEVENTHDRS:%.h=sysevent/%.check)            \
@@ -1097,6 +1129,10 @@ CHECKHDRS=						\
 	$(ROOTCRYPTOHDRS)	\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
+	$(ROOTFC4HDRS)		\
+	$(ROOTFCHDRS)		\
+	$(ROOTFCIMPLHDRS)	\
+	$(ROOTFCULPHDRS)	\
 	$(ROOTFMHDRS)		\
 	$(ROOTFMIOHDRS)		\
 	$(ROOTFMFSHDRS)		\
@@ -1114,10 +1150,10 @@ CHECKHDRS=						\
 	$(ROOTSCSIHDRS)		\
 	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSICONFHDRS)	\
+	$(ROOTSCSIISCSIHDRS)	\
 	$(ROOTSCSIGENHDRS)	\
 	$(ROOTSCSIIMPLHDRS)	\
 	$(ROOTSCSIVHCIHDRS)	\
-	$(ROOTFCHDRS)		\
 	$(ROOTSDCARDHDRS)	\
 	$(ROOTSYSEVENTHDRS)     \
 	$(ROOTCONTRACTHDRS)     \
@@ -1147,6 +1183,10 @@ install_h:			\
 	$(ROOTCRYPTOHDRS)	\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
+	$(ROOTFC4HDRS)		\
+	$(ROOTFCHDRS)		\
+	$(ROOTFCIMPLHDRS)	\
+	$(ROOTFCULPHDRS)	\
 	$(ROOTFMHDRS)		\
 	$(ROOTFMFSHDRS)		\
 	$(ROOTFMIOHDRS)		\
@@ -1163,11 +1203,11 @@ install_h:			\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
 	$(ROOTSCSIADHDRS)	\
+	$(ROOTSCSIISCSIHDRS)	\
 	$(ROOTSCSICONFHDRS)	\
 	$(ROOTSCSIGENHDRS)	\
 	$(ROOTSCSIIMPLHDRS)	\
-	$(ROOTSCSIVHCIHDRS)	\
-	$(ROOTFCHDRS)		\
+	$(ROOTSCSIVHCIHDRS)     \
 	$(ROOTSDCARDHDRS)	\
 	$(ROOTSYSEVENTHDRS)     \
 	$(ROOTCONTRACTHDRS)     \

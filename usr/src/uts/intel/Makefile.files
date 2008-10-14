@@ -149,6 +149,7 @@ I915_OBJS += i915_dma.o i915_drv.o i915_irq.o i915_mem.o
 LOGI_OBJS += logi.o
 MSMOUSE_OBJS += msm.o
 MSCSI_OBJS += mscsi.o
+NSKERN_OBJS += nsc_asm.o
 PCICFG_OBJS += pcicfg.o
 PCI_E_PCINEXUS_OBJS += pcie_pci.o
 PCI_PCINEXUS_OBJS += pci_pci.o

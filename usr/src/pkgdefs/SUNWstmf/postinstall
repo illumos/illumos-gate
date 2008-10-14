@@ -1,0 +1,87 @@
+#!/bin/ksh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
+
+driver_not_installed()
+{
+        grep $1 /etc/name_to_major >/dev/null 2>&1
+	if [ $? -eq 0 ]
+	then
+		return 1
+	else
+		return 0
+	fi
+}
+
+driver_add()
+{
+	if [ "${BASEDIR}" = "/" ]; then
+		add_drv -n -m '* 0666 root sys' $1 > /dev/null 2>&1
+	else
+		add_drv -n -b "${BASEDIR}" -m '* 0666 root sys' $1 > /dev/null 2>&1
+	fi
+}
+
+# Remove old sbd driver (if found)
+if [ ${ARCH} = "sparc" ]; then
+	RMSBD="/kernel/drv/sbd.conf /kernel/drv/sparcv9/sbd"
+	CHKSBD="/kernel/drv/sparcv9/sbd"
+else
+	RMSBD="/kernel/drv/sbd.conf /kernel/drv/sbd /kernel/drv/amd64/sbd"
+	CHKSBD="/kernel/drv/amd64/sbd"
+fi
+
+if [ -f $CHKSBD ]; then
+	strings $CHKSBD |grep COMSTAR >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		rem_drv sbd >/dev/null 2>&1
+		/bin/rm -f $RMSBD
+	fi
+fi
+
+# Now add the new drivers
+if driver_not_installed stmf
+then
+	driver_add stmf
+fi
+
+if driver_not_installed stmf_sbd
+then
+	driver_add stmf_sbd
+fi
+
+if driver_not_installed fct
+then
+	driver_add fct
+fi
+
+if driver_not_installed qlt
+then
+	driver_add qlt
+fi
+
+exit 0

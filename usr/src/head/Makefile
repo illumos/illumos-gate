@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI" 
-#
 # head/Makefile
 #
 # include global definitions
@@ -118,6 +116,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	nl_types.h	\
 	nlist.h		\
 	note.h		\
+	nsctl.h		\
 	nsswitch.h	\
 	nss_common.h	\
 	nss_dbdefs.h	\

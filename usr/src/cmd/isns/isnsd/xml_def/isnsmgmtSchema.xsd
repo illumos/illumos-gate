@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+
+        CDDL HEADER START
+
+        The contents of this file are subject to the terms of the
+        Common Development and Distribution License (the "License").
+        You may not use this file except in compliance with the License.
+
+        You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+        or http://www.opensolaris.org/os/licensing.
+        See the License for the specific language governing permissions
+        and limitations under the License.
+
+        When distributing Covered Code, include this CDDL HEADER in each
+        file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+        If applicable, add the following below this CDDL HEADER, with the
+        fields enclosed by brackets "[]" replaced with your own identifying
+        information: Portions Copyright [yyyy] [name of copyright owner]
+
+        CDDL HEADER END
+
+        Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+        Use is subject to license terms.
+
+
+-->
+
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            targetNamespace="http://www.sun.com/schema/isnsmanagement"
+            xmlns:isns="http://www.sun.com/schema/isnsmanagement"
+            elementFormDefault="qualified">
+
+    <!--
+        Object type names that are asspcoated with isns Object,
+        Discovery Domain, Discovery Domain Set, Node.
+    -->
+    <xsd:element name="isnsObjectType">
+        <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+                <xsd:enumeration value="DiscoveryDomainSet"></xsd:enumeration>
+                <xsd:enumeration value="DiscoveryDomain"></xsd:enumeration>
+                <xsd:enumeration value="Node"></xsd:enumeration>
+            </xsd:restriction>
+        </xsd:simpleType>
+    </xsd:element>
+    
+    <!--
+        Association type name for Discovery Domain membership and Discovery
+        Domain Set membership.       
+    -->
+    <xsd:element name="AssociationType">
+        <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+                <xsd:enumeration value="DiscoveryDomainMember"/>
+                <xsd:enumeration value="DiscoveryDomainSetMember"/>
+            </xsd:restriction>
+        </xsd:simpleType>
+    </xsd:element>     
+    
+    <!--
+        Discovery Domain object.
+        Attribute name represent DD Symbolic Name defined in the iSNS spec.
+        Group isnsDDAttrGroup represents other attrtibutes defined in the
+        iSNS spec.
+        Note that the existence of isnsDDAttrGroup is made as optional.
+    -->
+    <xsd:element name="DiscoveryDomain">
+        <xsd:complexType>
+            <xsd:group ref="isns:isnsDDAttrGroup" minOccurs="0"/>
+            <xsd:attribute name="name" type="xsd:string" use="required"/>
+            <xsd:attribute name="id" type="xsd:positiveInteger" use="optional"/>
+            <xsd:attribute name="nodeCount" type="xsd:nonNegativeInteger" use="optional"/>
+        </xsd:complexType>
+    </xsd:element>   
+    <xsd:group name="isnsDDAttrGroup">
+        <xsd:sequence>            
+            <xsd:element name="BootList_Enabled" type="xsd:boolean"/>                
+        </xsd:sequence>
+    </xsd:group>
+   
+    <!--
+        Discovery Domain Set object.
+        Attribute name represent DD Set Symbolic Name defined in the iSNS spec.
+        Group isnsDDsetAttrGroup represents other attrtibutes defined in the
+        iSNS spec.
+        Note that the existence of isnsDDsetAttrGroup is made as optional.
+    -->
+    <xsd:element name="DiscoveryDomainSet">
+        <xsd:complexType>
+            <xsd:group ref="isns:isnsDDsetAttrGroup" minOccurs="0"/>
+            <xsd:attribute name="name" type="xsd:string" use="required"/>
+            <xsd:attribute name="id" type="xsd:positiveInteger" use="optional"/>
+        </xsd:complexType>
+    </xsd:element>
+    <xsd:group name="isnsDDsetAttrGroup">
+        <xsd:sequence>            
+            <xsd:element name="Enabled" type="xsd:boolean"/>               
+        </xsd:sequence>
+    </xsd:group>
+    
+    <!--
+       isnsServer object for administratively configurable setting.
+    -->
+    <xsd:element name="isnsServer">
+        <xsd:complexType>
+            <xsd:group ref="isns:isnsServerAttrGroup" minOccurs="0"/>
+        </xsd:complexType>
+    </xsd:element>
+    
+    <xsd:group name="isnsServerAttrGroup">
+        <xsd:sequence>
+                <xsd:element name="datastoreLocation" type="xsd:string"></xsd:element>
+                <xsd:element name="esiRetryThreshold" type="xsd:nonNegativeInteger"></xsd:element>
+                <xsd:element name="managementSCNEnabled" type="xsd:boolean"></xsd:element>                
+                <xsd:element name="controlNodeName" type="xsd:string" nillable="true"></xsd:element>
+        </xsd:sequence>
+    </xsd:group>        
+    
+    <!--
+        Node object. Attribute name represent iSCSI name for a node
+        defined in the iSNS spec.
+        Group isnsNodeAttrGroup represents other attrtibutes including
+        Network Entity, Portal and Portal Group Tag.
+        Note that the existence of isnsNodeAttrGroup is made as optional.
+    -->
+    <xsd:element name="Node">
+        <xsd:complexType>
+            <xsd:group ref="isns:isnsNodeAttrGroup" minOccurs="0"/>
+            <xsd:attributeGroup ref="isns:nodeAttrs"/>
+        </xsd:complexType>
+    </xsd:element>
+    
+    <!--
+       Attributes for Node object.
+       name and nodeType are specified. 
+       Both attributes are required.
+    -->
+    <xsd:attributeGroup name="nodeAttrs">
+        <xsd:attribute name="name" type="xsd:string" use="required"/>
+        <xsd:attribute name="alias" type="xsd:string"/>
+        <!--
+           Add support for management clients needing XML documents
+           with properties representing whether or not the given node is
+           assigned or not, is registered or not, and a status timestamp stating
+           when the last time this information was determined.
+           
+           @todo Since these properties are client-specific, we want to factor
+           them out into a separate schema that includes and extends this one.
+           Since this task has proven difficult in the short term, we defer this
+           until a future product cycle.
+        -->
+        <xsd:attribute name="assigned" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="registered" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="timestamp" type="xsd:string" use="optional"/>
+        <xsd:attribute name="type">
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="Target"/>
+                    <xsd:enumeration value="Initiator"/>
+                    <xsd:enumeration value="Control"/>
+                    <xsd:enumeration value="Unknown"/>
+                    <xsd:enumeration value="Control/Target"/>
+                    <xsd:enumeration value="Control/Initiator"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:attribute>    
+    </xsd:attributeGroup>
+ 
+    <!--
+       Child elements for Node object.
+    -->  
+    <xsd:group name="isnsNodeAttrGroup">
+        <xsd:sequence>
+            <xsd:element name="SCN_Subscription" minOccurs="0" maxOccurs="8">
+                <xsd:simpleType>
+                    <xsd:restriction base="xsd:string">
+                        <xsd:enumeration value="Initiator and Self information only"/>
+                        <xsd:enumeration value="Target and Self information only"/>
+                        <xsd:enumeration value="Management Registration/SCN"/>
+                        <xsd:enumeration value="Object Removed"/>
+                        <xsd:enumeration value="Object Added"/>
+                        <xsd:enumeration value="Object Updated"/>
+                        <xsd:enumeration value="DD/DD-Set Member Removed"/>
+                        <xsd:enumeration value="DD/DD-Set Member Added"/>
+                    </xsd:restriction>
+                </xsd:simpleType>
+            </xsd:element>
+            <!--
+                Network Entity attributes
+            -->    
+            <xsd:element name="Network_Entity">
+                <xsd:complexType>
+                    <xsd:sequence>
+                    <xsd:element name="Entity_ID">
+                        <xsd:simpleType>
+                            <xsd:restriction base="xsd:string">
+                                <xsd:minLength value="4"/>
+                                <xsd:maxLength value="256"/>
+                            </xsd:restriction>
+                       </xsd:simpleType>    
+                    </xsd:element>
+                    <xsd:element name="Entity_Protocol" type="xsd:integer" minOccurs="0"></xsd:element>
+                    <xsd:element name="Management_IP_Addr" minOccurs="0">
+                        <xsd:simpleType>
+                            <xsd:restriction base="xsd:string">
+                                <xsd:maxLength value="46"/>
+                            </xsd:restriction>
+                        </xsd:simpleType>          
+                    </xsd:element>
+                    <xsd:element name="Entity_Reg_Timestamp" type="xsd:unsignedLong" minOccurs="0"/>
+                    <xsd:element name="Protocol_Version_Range" minOccurs="0">
+                        <xsd:complexType>
+                            <xsd:sequence>
+                                <xsd:element name="minVersion" type="xsd:unsignedShort"/>
+                                <xsd:element name="maxVersion" type="xsd:unsignedShort"/>
+                            </xsd:sequence>
+                        </xsd:complexType>
+                    </xsd:element>
+                    <xsd:element name="Registration_Period" type="xsd:unsignedInt" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            </xsd:element>
+           
+           <!--
+                Portal attributes including Portal Group Tag
+           -->
+           
+            <xsd:element name="Portal" maxOccurs="unbounded" >
+                <xsd:complexType>
+                    <xsd:sequence>               
+                        <xsd:element name="IP_Addr">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="46"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>          
+                        </xsd:element>
+                        <xsd:element name="UDP_TCP_port">
+                            <xsd:complexType>
+                                <xsd:sequence>
+                                    <xsd:element name="Port_Type">
+                                        <xsd:simpleType>
+                                            <xsd:restriction base="xsd:string">
+                                                <xsd:enumeration value="TCP"/>
+                                                <xsd:enumeration value="UDP"/>
+                                            </xsd:restriction>
+                                        </xsd:simpleType>
+                                    </xsd:element>    
+                                    <xsd:element name="Port_Number" type="xsd:unsignedShort"/>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                        </xsd:element>
+                        <xsd:element name="Group_Tag">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:nonNegativeInteger">
+                                    <xsd:maxInclusive value="65535"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>
+                        </xsd:element>
+                        <xsd:element name="Symbolic_Name" minOccurs="0">
+                            <xsd:simpleType>
+                                <xsd:restriction base="xsd:string">
+                                    <xsd:maxLength value="256"/>
+                                </xsd:restriction>
+                            </xsd:simpleType>
+                        </xsd:element>
+                        <xsd:element name="ESI_Interval" type="xsd:positiveInteger" minOccurs="0"/>
+                        <xsd:element name="ESI_Port" minOccurs="0">
+                            <xsd:complexType>
+                                <xsd:sequence>
+                                    <xsd:element name="Port_Type">
+                                        <xsd:simpleType>
+                                            <xsd:restriction base="xsd:string">
+                                                <xsd:enumeration value="TCP"/>
+                                                <xsd:enumeration value="UDP"/>
+                                            </xsd:restriction>
+                                        </xsd:simpleType>
+                                    </xsd:element>     
+                                    <xsd:element name="Port_Number" type="xsd:unsignedShort"/>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                            </xsd:element>
+                        <xsd:element name="SCN_Port" minOccurs="0">
+                            <xsd:complexType>
+                                <xsd:sequence>
+                                    <xsd:element name="Port_Type">
+                                        <xsd:simpleType>
+                                            <xsd:restriction base="xsd:string">
+                                                <xsd:enumeration value="TCP"/>
+                                                <xsd:enumeration value="UDP"/>
+                                            </xsd:restriction>
+                                        </xsd:simpleType>
+                                    </xsd:element>     
+                                    <xsd:element name="Port_Number" type="xsd:unsignedShort"/>
+                                </xsd:sequence>                            
+                            </xsd:complexType>
+                        </xsd:element>
+                   </xsd:sequence>
+                </xsd:complexType>    
+            </xsd:element>
+        </xsd:sequence>
+    </xsd:group>
+    
+    <!--
+        Discovery Domain Membership Association.
+        Attribute DDName represents Discovery Domain name and NodeName
+        a node name to indicate the association pair.
+        Note that the element has only attributes.
+    -->
+    <xsd:element name="DiscoveryDomainMember">
+        <xsd:complexType>
+            <xsd:attribute name="DDName" type="xsd:string" use="required"/>
+            <xsd:attribute name="NodeName" type="xsd:string" use="required"/>
+        </xsd:complexType>
+    </xsd:element>
+    
+    <!--
+        Discovery Domain Set Membership Association.
+        Attribute DDName represents Discovery Domain name and DDsetName
+        Discovery Domain Set name to indicate the association pair.
+        Note that the element has only attributes.
+    -->
+    <xsd:element name="DiscoveryDomainSetMember">
+        <xsd:complexType>
+            <xsd:attribute name="DDName" type="xsd:string" use="required"/>
+            <xsd:attribute name="DDsetName" type="xsd:string" use="required"/>
+        </xsd:complexType>
+    </xsd:element>
+    <xsd:element name="Association">
+        <xsd:complexType>
+            <xsd:choice>
+                <xsd:element ref="isns:DiscoveryDomainMember"/>
+                <xsd:element ref="isns:DiscoveryDomainSetMember"/>
+            </xsd:choice>
+        </xsd:complexType>
+    </xsd:element>
+   
+    <!--
+        Super element for iSNS object, Discovery Domain, Disocvery Domain
+        set and Node.  
+    -->
+    <xsd:element name="isnsObject">
+        <xsd:complexType>
+            <xsd:choice>
+                <xsd:element ref="isns:Node"/>
+                <xsd:element ref="isns:DiscoveryDomain"/>
+                <xsd:element ref="isns:DiscoveryDomainSet"/>
+            </xsd:choice>
+        </xsd:complexType>
+    </xsd:element>    
+   
+    
+    <!--
+        Result element represent the response value for an isns request 
+        operation including status and error information.
+    -->
+    <xsd:element name="result">
+        <xsd:complexType>
+            <xsd:sequence>
+                <xsd:element name="status" type="xsd:integer" minOccurs="1"/>
+                <xsd:element name="message" minOccurs="0" nillable="false">
+                    <xsd:simpleType>
+                        <xsd:restriction base="xsd:string">
+                            <xsd:whiteSpace value="preserve"/>
+                        </xsd:restriction>   
+                    </xsd:simpleType>
+                </xsd:element>
+            </xsd:sequence>
+        </xsd:complexType>
+     </xsd:element>
+  
+     <!--
+        Request operations for iSNS management applicatioin.
+        Any of request can be included multiple times.
+     -->
+     <xsd:element name="isnsRequest">
+         <xsd:complexType>    
+             <xsd:sequence>
+                 <xsd:element name="description" type="xsd:string" minOccurs="0"/>    
+                 <xsd:choice maxOccurs="1">
+                         
+                 <!--
+                    get operation returns details of a given iSNS object instance.
+                    
+                    input: an object instance.  Specifying only the name 
+                        attribute of an isnsObject insance will be sufficient
+                        for the server to serve the request.   
+                        Ex) <get 
+                    output: an object instance with fully populated
+                        isns{Node|Discveroy_Domain|Discovery_Domain_Set]AttrGroup 
+                        or error info when there is failure.
+                 -->
+                    <xsd:element name="get">
+                         <xsd:complexType>
+                             <xsd:choice>
+                                <xsd:element ref="isns:isnsObject" maxOccurs="unbounded"/>
+                                <xsd:element ref="isns:isnsServer" maxOccurs="1"/>
+                             </xsd:choice>
+                         </xsd:complexType>
+                    </xsd:element>
+                         
+                <!--
+                    getAssociated operation returns a list of object
+                    instances that are asscoiated with the given Association
+                    type name and a given object instance.
+                    
+                    input: an Association type name and an object instance.
+                        Specifying the name attribute is sufficient for 
+                        the request. 
+                        Ex) <get 
+                    output: a list of object instances which is assciated with
+                        the given object instance through the given association.  
+                    
+                        When there is failure for the request, error info will
+                        be returned. 
+                -->        
+                     <xsd:element name="getAssociated">
+                         <xsd:complexType>
+                             <xsd:sequence maxOccurs="unbounded">
+                                 <xsd:element ref="isns:AssociationType"/>
+                                 <xsd:element ref="isns:isnsObject"/>
+                             </xsd:sequence>
+                         </xsd:complexType>
+                     </xsd:element>
+                         
+                         <!--
+                    create operation either creates a new object instance
+                    or modify an object instance if the name of the given object
+                    instance already exists.
+                    
+                    input: an object instance with fully populated
+                        isns{Node|Discveroy_Domain|Discovery_Domain_Set]AttrGroup 
+                       
+                    output: status
+                -->           
+                     <xsd:element name="createModify">
+                         <xsd:complexType>
+                             <xsd:choice>
+                                 <xsd:element ref="isns:DiscoveryDomainMember" maxOccurs="unbounded" />
+                                 <xsd:element ref="isns:DiscoveryDomain" maxOccurs="unbounded"/>
+                                 <xsd:element ref="isns:DiscoveryDomainSetMember" maxOccurs="unbounded"/>
+                                 <xsd:element ref="isns:DiscoveryDomainSet" maxOccurs="unbounded"/>
+                             </xsd:choice>
+                         </xsd:complexType>
+                     </xsd:element>
+                         
+                         
+                         <!--
+                    delete operation delete the given object instance.
+                    
+                    input: an object instance.  Specifying only the name 
+                        attribute of an isnsObject insance will be sufficient
+                        for the server to serve the request.   
+                        Ex) <get 
+                    output: status 
+                -->
+                     <xsd:element name="delete">
+                         <xsd:complexType>
+                             <xsd:choice>
+                                 <xsd:element ref="isns:DiscoveryDomain" maxOccurs="unbounded"/>
+                                 <xsd:element ref="isns:DiscoveryDomainSet" maxOccurs="unbounded"/>
+                                 <xsd:element ref="isns:DiscoveryDomainMember" maxOccurs="unbounded"/>
+                                 <xsd:element ref="isns:DiscoveryDomainSetMember" maxOccurs="unbounded"/>
+                             </xsd:choice>
+                         </xsd:complexType>
+                     </xsd:element>
+                         
+               <!--
+                    enumerate operation returns a list of object instances for the 
+                    given object type.
+                    
+                    input: an object type name.    
+                        Ex) <get 
+                    output: a list of object instances for the given obect type
+                    or error info when there is failure.
+                -->
+                     <xsd:element name="enumerate">
+                         <xsd:complexType>
+                             <xsd:sequence>
+                                 <xsd:element ref="isns:isnsObjectType"/>
+                             </xsd:sequence>
+                         </xsd:complexType>
+                     </xsd:element>
+                     </xsd:choice>                                
+             </xsd:sequence>
+         </xsd:complexType>
+    </xsd:element>
+    
+    
+   <!--
+       isnsResponse returns either object instance information or
+       status.
+                    
+       When the request is 'get'
+            the response should be fully populated an obejct instance.
+       When the request is createModify or delete
+            the response should be status.
+       When the request is getAssociated or enumerate
+            the response should be a list of an object instance
+            with name attribute set.               
+    -->
+    
+    <xsd:element name="isnsResponse">
+        <xsd:complexType>
+            <xsd:sequence>
+            <xsd:element name="description" type="xsd:string" minOccurs="0"/>
+            <xsd:element ref="isns:result" maxOccurs="1" minOccurs="1"/>
+            <xsd:choice minOccurs="0">
+                <xsd:element ref="isns:isnsObject" maxOccurs="unbounded" minOccurs="0"/>
+                <xsd:element ref="isns:isnsServer" maxOccurs="1" minOccurs="0"/>
+                <xsd:element ref="isns:Association" maxOccurs="unbounded" minOccurs="0"/>                
+            </xsd:choice>
+            </xsd:sequence>
+        </xsd:complexType>
+    </xsd:element>   
+</xsd:schema>

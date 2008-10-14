@@ -243,7 +243,10 @@ $SkipSymSort = qr{ ^.*(?:
 	lib/sparcv9/libnsl\.so\.1 |			# C++
 	lib/sparcv9/libfru\.so\.1 |			# C++
 	usr/lib/sgml/nsgmls |				# C++
-	ld\.so\.1					# libc_pic.a user
+	ld\.so\.1 |					# libc_pic.a user
+	lib/libsun_fc\.so\.1 |				# C++
+	lib/amd64/libsun_fc\.so\.1 |			# C++
+	lib/sparcv9/libsun_fc\.so\.1 			# C++
 	)$
 }x;
 

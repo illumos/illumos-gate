@@ -732,7 +732,92 @@ SBP2_OBJS += cfgrom.o sbp2.o
 
 PMODEM_OBJS += pmodem.o pmodem_cis.o cis.o cis_callout.o cis_handlers.o cis_params.o
 
+DSW_OBJS +=	dsw.o dsw_dev.o ii_tree.o
+
+NCALL_OBJS +=	ncall.o \
+		ncall_stub.o
+
+RDC_OBJS +=	rdc.o \
+		rdc_dev.o \
+		rdc_io.o \
+		rdc_clnt.o \
+		rdc_prot_xdr.o \
+		rdc_svc.o \
+		rdc_bitmap.o \
+		rdc_health.o \
+		rdc_subr.o \
+		rdc_diskq.o
+
+RDCSRV_OBJS +=	rdcsrv.o
+
+RDCSTUB_OBJS += rdc_stub.o
+
+SDBC_OBJS +=	sd_bcache.o \
+		sd_bio.o \
+		sd_conf.o \
+		sd_ft.o \
+		sd_hash.o \
+		sd_io.o \
+		sd_misc.o \
+		sd_pcu.o \
+		sd_tdaemon.o \
+		sd_trace.o \
+		sd_iob_impl0.o \
+		sd_iob_impl1.o \
+		sd_iob_impl2.o \
+		sd_iob_impl3.o \
+		sd_iob_impl4.o \
+		sd_iob_impl5.o \
+		sd_iob_impl6.o \
+		sd_iob_impl7.o \
+		safestore.o \
+		safestore_ram.o
+
+NSCTL_OBJS +=	nsctl.o \
+		nsc_cache.o \
+		nsc_disk.o \
+		nsc_dev.o \
+		nsc_freeze.o \
+		nsc_gen.o \
+		nsc_mem.o \
+		nsc_ncallio.o \
+		nsc_power.o \
+		nsc_resv.o \
+		nsc_rmspin.o \
+		nsc_solaris.o \
+		nsc_trap.o \
+		nsc_list.o
+UNISTAT_OBJS +=	spuni.o \
+		spcs_s_k.o
+
+NSKERN_OBJS +=	nsc_ddi.o \
+		nsc_proc.o \
+		nsc_raw.o \
+		nsc_thread.o \
+		nskernd.o 
+
+SV_OBJS +=	sv.o
+
+
+#
+#	Build up defines and paths.
+#
+#	Build up defines and paths.
+
 ST_OBJS +=	st.o	st_conf.o
+
+EMLXS_OBJS +=	emlxs_clock.o emlxs_solaris.o emlxs_dfc.o emlxs_dhchap.o \
+		emlxs_diag.o emlxs_download.o emlxs_els.o emlxs_fcp.o \
+		emlxs_fct.o emlxs_hba.o emlxs_ip.o emlxs_mbox.o emlxs_mem.o \
+		emlxs_msg.o emlxs_node.o emlxs_pkt.o emlxs_thread.o
+
+FCT_OBJS += discovery.o fct.o
+
+QLT_OBJS += 2400.o 2500.o qlt.o qlt_dma.o
+
+STMF_OBJS += lun_map.o stmf.o
+
+STMF_SBD_OBJS += filedisk.o memdisk.o sbd.o sbd_scsi.o
 
 SYSMSG_OBJS +=	sysmsg.o
 
@@ -795,6 +880,29 @@ TPHCI_OBJS += tphci.o
 TVHCI_OBJS += tvhci.o
 
 EMUL64_OBJS += emul64.o emul64_bsd.o
+
+FCP_OBJS += fcp.o
+
+FCIP_OBJS += fcip.o
+
+FCSM_OBJS += fcsm.o
+
+FCTL_OBJS += fctl.o
+
+FP_OBJS += fp.o
+
+QLC_OBJS += ql_api.o ql_debug.o ql_hba_fru.o ql_init.o ql_iocb.o ql_ioctl.o \
+	ql_isr.o ql_mbx.o ql_xioctl.o ql_fw_table.o
+
+QLC_FW_2200_OBJS += ql_fw_2200.o
+
+QLC_FW_2300_OBJS += ql_fw_2300.o
+
+QLC_FW_2400_OBJS += ql_fw_2400.o
+
+QLC_FW_2500_OBJS += ql_fw_2500.o
+
+QLC_FW_6322_OBJS += ql_fw_6322.o
 
 ZCONS_OBJS += zcons.o
 
@@ -1659,3 +1767,16 @@ HXGE_OBJS =	hxge_main.o hxge_vmac.o hxge_send.o		\
 #	MEGARAID_SAS module
 #
 MEGA_SAS_OBJS = megaraid_sas.o
+
+#
+#	ISCSI_INITIATOR module
+#
+ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
+			iscsi_ioctl.o iscsid.o iscsi.o		\
+			iscsi_login.o isns_client.o iscsiAuthClient.o	\
+			iscsi_lun.o iscsiAuthClientGlue.o	\
+			iscsi_net.o nvfile.o iscsi_cmd.o	\
+			iscsi_queue.o persistent.o iscsi_conn.o	\
+			iscsi_sess.o radius_auth.o iscsi_crc.o	\
+			iscsi_stats.o radius_packet.o iscsi_doorclt.o	\
+			iscsi_targetparam.o utils.o

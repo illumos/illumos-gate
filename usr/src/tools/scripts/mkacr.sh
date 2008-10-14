@@ -20,11 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This script builds the overhead information used by bfu to do
 # automatic conflict resolution.  This overhead information is stored
 # in a gzip'ed cpio archive called "conflict_resolution.gz" in the
@@ -100,6 +98,30 @@ parse_pkginfo() {
 	' $dir/pkginfo.tmpl 
 }
 
+
+process_non_on_classes () {
+
+    # $1 is one of non_on_classes
+    # $2 is editablefilelist
+    nononclass=$1
+    efilelist=$2
+    pkgdir=$3
+    
+    if [ "$1" = "build" ] ; then
+	# print the target file name and pkg name from editablefilelist
+	nawk -v class=${nononclass} '$3 == class { print $1,$2 }' $efilelist | \
+	    while read tgtfile pkgname; do
+		mkdir -p ${pkgdir}/${pkgname}/`dirname ${tgtfile}`
+		if [ -s ${pkgname}/`basename ${tgtfile}` ] ; then
+		    cp ${pkgname}/`basename ${tgtfile}` \
+			${pkgdir}/${pkgname}/${tgtfile}
+		else
+		    print -u2 "mkacr: Can't find i.build source script."
+		fi
+	    done
+    fi
+}
+
 #
 # the process_pkdefs_directory function generates the conflict
 # resolution information for a single pkgdefs directory (there can
@@ -169,7 +191,13 @@ process_pkgdefs_directory() {
 		     -s common_files/i.${class}_$isa ] ; then
 			print $pkg $pkginst $p_isa $mach $class c
 		else
-			print $pkg $pkginst $p_isa $mach $class s
+			echo ${non_on_classes} |
+				    /usr/bin/grep -w i.${class} > /dev/null
+			if [ $? -eq 0 ] ; then
+				print $pkg $pkginst $p_isa $mach $class n
+			else
+				print $pkg $pkginst $p_isa $mach $class s
+			fi		
 		fi
 	done > $allclasslist
 
@@ -193,8 +221,11 @@ process_pkgdefs_directory() {
 		fi
 		
 		cat $protos | nawk -v pkginst=$pkginst \
-		    '(/^[ev] /) && ($2 != "none") {
-				printf("%s %s %s\n", $3, pkginst, $2);}'
+		    '(/^[ev] /) && ($2 != "none") && ($2 != "build") {
+				printf("%s %s %s\n", $3, pkginst, $2);}
+		    (/^[ev] /) && ($2 == "build") {
+				split($3,buildtgt,"=");
+				printf("%s %s %s\n", buildtgt[1], pkginst,$2);}'
 	done > $editablefilelist
 
 	#
@@ -252,15 +283,27 @@ process_pkgdefs_directory() {
 			cp common_files/i.${class}_$isa \
 			    $tmpdir/conflict_resolution/$un/i.$class
 		else
-			nawk -v class=$class '$3 == class { print $2 }' \
-			    $editablefilelist | sort -u > $classpk
-			if [ $(wc -l < $classpk) -ne 1 ]
-			then
-				cat >&2 <<EOF
+			echo ${non_on_classes} |
+			    /usr/bin/grep -w i.${class} > /dev/null
+			if [ $? -eq 0 ] ; then
+			    #
+			    # process_non_on_classes is called only once
+			    # per non_on_class due to sort -u above. 
+			    #
+			    process_non_on_classes ${class} \
+				 ${editablefilelist} \
+				 $tmpdir/conflict_resolution/$un
+			    continue;
+			else
+			    nawk -v class=$class '$3 == class { print $2 }' \
+				$editablefilelist | sort -u > $classpk
+			    if [ $(wc -l < $classpk) -ne 1 ] ; then
+				    cat >&2 <<EOF
 mkacr: The class script i.$class cannot be found in the pkgdefs common files
 directory, and there is more than one package that uses it.
 EOF
-				exit 1
+				    exit 1
+			    fi
 			fi
 			pkgdir=$(cat $classpk)
 			if [ -s $pkgdir/i.$class ] ; then
@@ -396,6 +439,17 @@ corepkgs="
 "
 bfu_incompatible_classes="
 	i.initd
+"
+non_on_classes="
+        i.CONFIG.prsv
+        i.CompCpio
+        i.awk
+        i.build 
+        i.ipsecalgs
+        i.kcfconf
+        i.kmfconf 
+        i.pkcs11conf
+        i.sed
 "
 
 process_pkgdefs_directory $workspace/pkgdefs std

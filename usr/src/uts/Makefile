@@ -93,6 +93,10 @@ clean clobber: $($(MACH)_ARCHITECTURES)
 		$(RM) $(PMTMO_FILE) ; \
 	fi
 
+EXTRA_CLOBBER_TARGETS= common/avs/ns/rdc
+clobber: $(EXTRA_CLOBBER_TARGETS)
+
+
 clean.lint modlist: $($(MACH)_ARCHITECTURES)
 
 install_dirs:
@@ -138,11 +142,28 @@ $(PMTMO_FILE) pmtmo_file: $(PATCH_MAKEUP_TABLE)
 # the architecture/machine dependent subdirectories are in completely
 # isomorphic locations.
 #
-COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
-	common/netinet common/nfs common/rpc common/sys common/vm \
-	common/c2 common/pcmcia/sys common/rpcsvc common/inet/kssl \
-	common/inet/nca common/inet/ipf/netinet common/ipp common/idmap \
-	common/sharefs common/smbsrv
+COMMON_HDRDIRS= common/avs \
+		common/c2 \
+		common/des \
+		common/fs \
+		common/gssapi \
+		common/idmap \
+		common/inet \
+		common/inet/ipf/netinet \
+		common/inet/kssl \
+		common/inet/nca \
+		common/ipp \
+		common/net \
+		common/netinet \
+		common/nfs \
+		common/pcmcia/sys \
+		common/rpc \
+		common/rpcsvc \
+		common/sharefs \
+		common/smbsrv \
+		common/sys \
+		common/vm
+
 
 # These aren't the only headers in closed.  But the other directories
 # are simple enough that they can be driven from the src tree.

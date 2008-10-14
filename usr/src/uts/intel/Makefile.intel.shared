@@ -219,6 +219,7 @@ DRV_KMODS	+= dmd
 DRV_KMODS_32	+= dnet
 DRV_KMODS	+= dump
 DRV_KMODS	+= ecpp
+DRV_KMODS	+= emlxs
 DRV_KMODS	+= fd
 DRV_KMODS	+= fdc
 DRV_KMODS	+= fm
@@ -323,6 +324,12 @@ DRV_KMODS	+= winlock
 DRV_KMODS	+= wpi
 DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
+DRV_KMODS	+= stmf
+DRV_KMODS	+= stmf_sbd
+DRV_KMODS	+= fct
+DRV_KMODS	+= qlt
+DRV_KMODS	+= ncall nsctl sdbc nskern sv
+DRV_KMODS	+= ii rdc rdcsrv rdcstub 
 
 #
 # Don't build some of these for OpenSolaris, since they will be
@@ -387,6 +394,12 @@ DRV_KMODS	+= emul64
 DRV_KMODS	+= options
 DRV_KMODS	+= scsi_vhci
 DRV_KMODS	+= arcmsr
+DRV_KMODS	+= fcp
+DRV_KMODS	+= fcip
+DRV_KMODS	+= fcsm
+DRV_KMODS	+= fp
+DRV_KMODS	+= qlc
+DRV_KMODS	+= iscsi
 
 #
 #	PCMCIA specific module(s)
@@ -563,6 +576,7 @@ MISC_KMODS	+= rsmops
 MISC_KMODS	+= sata
 MISC_KMODS	+= scsi
 MISC_KMODS	+= sda
+MISC_KMODS	+= spuni
 MISC_KMODS	+= strategy
 MISC_KMODS	+= strplumb
 MISC_KMODS	+= tem
@@ -574,6 +588,8 @@ MISC_KMODS	+= scsi_vhci_f_tpgs
 MISC_KMODS	+= scsi_vhci_f_asym_sun
 MISC_KMODS	+= scsi_vhci_f_tape
 MISC_KMODS	+= scsi_vhci_f_tpgs_tape
+MISC_KMODS	+= fctl
+MISC_KMODS	+= qlc_fw_2200 qlc_fw_2300 qlc_fw_2400 qlc_fw_2500 qlc_fw_6322
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

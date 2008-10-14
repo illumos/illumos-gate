@@ -43,6 +43,7 @@ COMMON_SUBDIRS = \
 	cmd/auths \
 	cmd/autopush \
 	cmd/availdevs \
+	cmd/avs \
 	cmd/awk \
 	cmd/banner \
 	cmd/bart \
@@ -107,6 +108,7 @@ COMMON_SUBDIRS = \
 	cmd/diskscan \
 	cmd/dispadmin \
 	cmd/dladm \
+	cmd/dlmgmtd \
 	cmd/dtrace \
 	cmd/du \
 	cmd/dumpadm \
@@ -116,6 +118,7 @@ COMMON_SUBDIRS = \
 	cmd/emul64ioctl \
 	cmd/env \
 	cmd/expand \
+	cmd/fcinfo \
 	cmd/fdetach \
 	cmd/fdformat \
 	cmd/fgrep \
@@ -161,6 +164,9 @@ COMMON_SUBDIRS = \
 	cmd/isaexec \
 	cmd/isalist \
 	cmd/iscsi \
+	cmd/iscsiadm \
+	cmd/iscsid \
+	cmd/isns \
 	cmd/join \
 	cmd/kbd \
 	cmd/killall \
@@ -169,7 +175,6 @@ COMMON_SUBDIRS = \
 	cmd/ldapcachemgr \
 	cmd/line \
 	cmd/link \
-	cmd/dlmgmtd \
 	cmd/locator \
 	cmd/lockstat \
 	cmd/lofiadm \
@@ -179,6 +184,7 @@ COMMON_SUBDIRS = \
 	cmd/logins \
 	cmd/logname \
 	cmd/ls \
+	cmd/luxadm \
 	cmd/lvm \
 	cmd/machid \
 	cmd/makekey \
@@ -190,6 +196,7 @@ COMMON_SUBDIRS = \
 	cmd/mkmsgs \
 	cmd/mknod \
 	cmd/mms	\
+	cmd/mpathadm \
 	cmd/msgfmt \
 	cmd/msgid \
 	cmd/mt \
@@ -245,6 +252,7 @@ COMMON_SUBDIRS = \
 	cmd/rpcgen \
 	cmd/rpcsvc/rpc.bootparamd \
 	cmd/runat \
+	cmd/sbdadm \
 	cmd/sdpadm \
 	cmd/setpgrp \
 	cmd/smbios \
@@ -255,6 +263,8 @@ COMMON_SUBDIRS = \
 	cmd/split \
 	cmd/ssh \
 	cmd/stat \
+	cmd/stmfadm \
+	cmd/stmfsvc \
 	cmd/stmsboot \
 	cmd/streams/strcmd \
 	cmd/strings \
@@ -336,6 +346,7 @@ COMMON_SUBDIRS = \
 	lib/libdladm \
 	lib/libdlpi \
 	lib/libdoor \
+	lib/libdscfg \
 	lib/libdtrace \
 	lib/libefi \
 	lib/libelfsign \
@@ -361,6 +372,7 @@ COMMON_SUBDIRS = \
 	lib/libmd \
 	lib/libmp \
 	lib/libmtmalloc \
+	lib/libnsctl \
 	lib/libnsl \
 	lib/libnvpair \
 	lib/libnwam \
@@ -374,6 +386,7 @@ COMMON_SUBDIRS = \
 	lib/libpthread \
 	lib/libraidcfg \
 	lib/librcm \
+	lib/librdc \
 	lib/librestart \
 	lib/librt \
 	lib/libscf \
@@ -386,10 +399,13 @@ COMMON_SUBDIRS = \
 	lib/libslp \
 	lib/libsmbios \
 	lib/libsmedia \
+	lib/libstmf \
+	lib/libsun_ima \
 	lib/libthread \
 	lib/libtsnet \
 	lib/libtsol \
 	lib/libumem \
+	lib/libunistat \
 	lib/libuuid \
 	lib/libuutil \
 	lib/libwanboot \
@@ -466,6 +482,7 @@ sparc_SUBDIRS= \
 	lib/libpri \
 	lib/libpcp \
 	lib/libtsalarm \
+	lib/storage \
 	stand
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/mtst

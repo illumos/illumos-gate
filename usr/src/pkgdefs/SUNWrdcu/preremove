@@ -1,0 +1,124 @@
+#!/bin/sh
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# 
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Set path
+#
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+#
+# Set variables
+#
+
+DEVLINKTB="${PKG_INSTALL_ROOT}/etc/devlink.tab"
+MODULES="rdc rdcsrv"
+NAMEMAJOR="${PKG_INSTALL_ROOT}/etc/name_to_major"
+PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+TMP=/tmp/${PKGINST}.$$
+SERVICES="nws_rdcsyncd nws_rdc"
+FS_LOCAL_SVC="svc:/system/filesystem/local"
+
+#
+# Set specific command syntax (if needed)
+#
+
+if [ "${PKG_INSTALL_ROOT}" = "/" ]
+then
+    REM_DRV="rem_drv"
+else
+    REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
+fi
+
+#
+# Functions
+#
+
+rem_devlink()
+{
+    PATTERN="$1"
+
+    grep -vw $PATTERN ${DEVLINKTB} >${TMP}.devlink
+    if [ $? -eq 0 ]
+    then
+	mv ${TMP}.devlink ${DEVLINKTB}
+    else
+	rm ${TMP}.devlink
+    fi
+}
+
+#
+# Disable the services, if they are imported
+#
+for SVC in $SERVICES
+do
+	svcprop -q -p general/entity_stability svc:/system/${SVC}
+	# are we imported?
+	if [ $? = 0 ]
+	then
+		svcadm disable -s svc:/system/${SVC}
+		svccfg -s $FS_LOCAL_SVC setprop \
+		    ${SVC}-local-fs/grouping=optional_all > /dev/null 2>&1
+	fi
+done
+
+#
+# if module has been previously installed, remove it
+#
+
+for MODULE in $MODULES
+do
+  grep -w ${MODULE} ${NAMEMAJOR} >/dev/null
+  if [ $? -eq 0 ]
+  then
+      ${REM_DRV} ${MODULE}
+  fi
+
+  rm -f ${PKG_INSTALL_ROOT}/dev/${MODULE}
+
+  rem_devlink ${MODULE}
+
+  # since rdcsrv is dynamically loaded, only way to guarantee an
+  # unload is to do it manually, and must ensure it can be 
+  # unloaded without a reboot.  Also, module rdc must be unloaded 
+  # first, hence the required order of modules in this loop, per
+  # the variable MODULES
+  MODID=`modinfo | grep -w ${MODULE} | awk '{print $1}'`
+  if [ -n "$MODID" ]
+  then
+    modunload -i ${MODID}
+    if [ $? != 0 ]
+    then
+	echo "Error: Failed to unload $MODULE module."
+	exit 1
+    fi
+
+  fi
+
+done
+
+# ignore return value from the modunload
+# uncomment this for debugging purposes
+exit 0

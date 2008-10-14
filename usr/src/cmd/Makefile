@@ -65,6 +65,7 @@ COMMON_SUBDIRS=		\
 	audio		\
 	auths		\
 	autopush	\
+	avs		\
 	awk		\
 	awk_xpg4	\
 	backup		\
@@ -151,6 +152,7 @@ COMMON_SUBDIRS=		\
 	exstr		\
 	factor		\
 	false		\
+	fcinfo		\
 	fdetach		\
 	fdformat	\
 	fdisk		\
@@ -209,6 +211,9 @@ COMMON_SUBDIRS=		\
 	isalist		\
 	iscsi		\
 	itutools	\
+	iscsiadm	\
+	iscsid		\
+	isns		\
 	java		\
 	join		\
 	kbd		\
@@ -238,6 +243,7 @@ COMMON_SUBDIRS=		\
 	logname		\
 	look		\
 	ls		\
+	luxadm		\
 	lvm		\
 	mach		\
 	machid		\
@@ -256,6 +262,7 @@ COMMON_SUBDIRS=		\
 	mms		\
 	modload		\
 	more		\
+	mpathadm	\
 	msgfmt		\
 	msgid		\
 	mt		\
@@ -341,6 +348,7 @@ COMMON_SUBDIRS=		\
 	sa		\
 	saf		\
 	savecore	\
+	sbdadm		\
 	script		\
 	scsi		\
 	sdiff		\
@@ -365,6 +373,8 @@ COMMON_SUBDIRS=		\
 	srchtxt		\
 	ssh		\
 	stat		\
+	stmfadm		\
+	stmfsvc		\
 	stmsboot	\
 	streams		\
 	strings		\
@@ -507,6 +517,7 @@ MSGSUBDIRS=		\
 	auditd		\
 	auths		\
 	autopush	\
+	avs		\
 	awk		\
 	awk_xpg4	\
 	backup		\
@@ -564,6 +575,7 @@ MSGSUBDIRS=		\
 	eqn		\
 	expand		\
 	expr		\
+	fcinfo		\
 	fgrep		\
 	file		\
 	filesync	\
@@ -589,6 +601,9 @@ MSGSUBDIRS=		\
 	idmap		\
 	isaexec		\
 	iscsi		\
+	iscsiadm	\
+	iscsid		\
+	isns		\
 	join		\
 	kbd		\
 	krb5		\
@@ -605,6 +620,7 @@ MSGSUBDIRS=		\
 	logins		\
 	logname		\
 	ls		\
+	luxadm		\
 	lvm		\
 	mailx		\
 	mesg		\
@@ -612,6 +628,7 @@ MSGSUBDIRS=		\
 	mkpwdict	\
 	mktemp		\
 	more		\
+	mpathadm	\
 	msgfmt		\
 	mv		\
 	newgrp		\
@@ -657,6 +674,7 @@ MSGSUBDIRS=		\
 	rmformat	\
 	rmmount		\
 	rmvolmgr	\
+	sbdadm		\
 	scadm		\
 	script		\
 	scsi		\
@@ -669,6 +687,7 @@ MSGSUBDIRS=		\
 	split		\
 	ssh		\
 	stat		\
+	stmfadm		\
 	stmsboot	\
 	strings		\
 	su		\

@@ -1,0 +1,236 @@
+#!/bin/sh
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# 
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# Set path
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+#
+# Set variables
+#
+OS_MACH=`eval isainfo -k`
+
+BASEDIR=${BASEDIR:=/}
+DRVDIR=$BASEDIR/usr/kernel/drv
+DRVDIR64=$DRVDIR/${OS_MACH}
+EXIT=0
+FAILURE=1
+INS_DATE=`date '+%m/%d/%Y %H:%M:%S'`
+INS_MSG="${INS_DATE} Remote Dual Copy module installed"
+KEEP=/usr/kernel/drv/rdc.conf
+MISCDIR64=$BASEDIR/usr/kernel/misc/${OS_MACH}
+MISCDIR=$BASEDIR/usr/kernel/misc
+MODBUSY=0
+FS_LOCAL_SVC="svc:/system/filesystem/local"
+MODBUSYMSG="
+		#### NOTICE #####\n
+The previous version of this software cannot be unloaded (busy).\n
+To load the new modules you must reboot the system."
+MODULES="rdcsrv rdc"
+OS_VER=`eval uname -r`
+PKGMSG=${PKGINST}.pkg
+PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+DEVLINKTB="${PKG_INSTALL_ROOT}/etc/devlink.tab"
+DSCFG_UPGRADE="${PKG_INSTALL_ROOT}/etc/opt/SUNWesm/dscfg.cf.upgrade"
+
+TMP=/tmp/${PKGINST}.$$
+ERROR_LOG=${TMP}.errorlog
+
+# For least privileges add option -P sys_devices,sys_config
+if [ "${PKG_INSTALL_ROOT}" = "/" ]
+then
+    ADD_DRV="add_drv -P sys_devices,sys_config"
+    REM_DRV="rem_drv"
+else
+    ADD_DRV="add_drv -P sys_devices,sys_config -b ${PKG_INSTALL_ROOT}"
+    REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
+fi
+
+#
+# Functions
+#
+
+message()
+{
+    echo ""
+    echo "$@"
+    echo ""
+}
+
+add_devlink()
+{
+    PATTERN="$1"
+    LINK="$2"
+    echo "$PATTERN\t$LINK" >> ${DEVLINKTB}
+}
+
+#
+# Setup the service to enable.  This is necessary to deal
+# with upgrade situations.  It also sets the proper dependency type for the
+# local filesystems service
+# $1: name of service to enable
+#
+enable_service_on_reboot()
+{
+	# enable the service
+	svcadm enable -s svc:/system/$1
+	if [ $? -ne 0 ]
+	then
+		message "Warning: Unable to enable $1 service"
+	fi
+
+	if [ $1 = nws_rdc ]
+	then
+		# workaround for 6221374--let local-fs know it depends on us
+		svcadm refresh ${FS_LOCAL_SVC}:default
+		if [ $? -ne 0 ]
+		then
+			message "Warning: Unable to refresh $1 service"
+		fi
+
+		# make sure the local filesystems service waits for us 
+		svccfg -s $FS_LOCAL_SVC setprop \
+			${1}-local-fs/grouping=require_all
+		if [ $? -ne 0 ]
+		then
+			message "Warning: Unable to set dependency for ${1}."
+		fi
+
+		svcadm refresh ${FS_LOCAL_SVC}:default
+		if [ $? -ne 0 ]
+		then
+			message "Warning: Unable to refresh $1 service"
+		fi
+	fi
+}
+
+
+# if the main rdc module is still loaded then it has refused to unload
+# and we have to force a reboot.
+#
+if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
+    modinfo | grep -w rdc >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        # still loaded
+	MODBUSY=1
+	NOPT="-b / "
+	EXIT=10
+    fi
+fi
+
+#
+# if module has been previously installed, unload it and remove it...
+#
+for MODULE in $MODULES
+do
+	REMERR="
+ERROR: The installation cannot be completed due to an error removing the
+${MODULE} loadable module.  The file ${ERROR_LOG} contains the errors.
+Exiting...Please fix problem and re-run pkgadd."
+
+	ADDERR="
+ERROR: The installation cannot be completed due to an error adding the
+${MODULE} loadable module.  The file ${ERROR_LOG} contains the errors.
+Exiting...Please fix problem and re-run pkgadd."
+
+	DEVLINKERR="
+devlinks -r ${PKG_INSTALL_ROOT} -t ${DEVLINKTB} > ${ERROR_LOG} 2>&1
+ERROR: The installation cannot be completed due to an error configuring the
+${MODULE} loadable module.  The file ${ERROR_LOG} contains the errors.
+Exiting...Please fix problem and re-run pkgadd."
+
+        #
+        # if module has been previously installed, remove it
+        #
+        grep -w ${MODULE} ${PKG_INSTALL_ROOT}/etc/name_to_major > /dev/null
+        if [ $? -eq 0 ]
+        then
+                ${REM_DRV} ${MODULE} > ${ERROR_LOG} 2>&1
+                [ $? -ne 0 ] && {
+                        message "${REMERR}"
+                        exit ${FAILURE}
+                }
+        fi
+	
+	if [ "$MODULE" = "rdcsrv" ]
+	then
+		IDIR=${MISCDIR}
+		IDIR64=${MISCDIR64}
+	else
+		IDIR=${DRVDIR}
+		IDIR64=${DRVDIR64}
+	fi
+
+	if [ "$MODULE" != "rdcsrv" ]
+ 	then
+		add_devlink "type=ddi_pseudo;name=${MODULE}" '\D'
+
+		${ADD_DRV} $NOPT -m '* 0666 root sys' ${MODULE} \
+			> ${ERROR_LOG} 2>&1
+		[ $? -ne 0 ] && {
+			message "${ADDERR}"
+			exit ${FAILURE}
+		}
+
+	fi
+done
+
+# deal with upgrades from AVS 3.2
+if [ -f $DSCFG_UPGRADE ]
+then
+	grep $PKGINST $DSCFG_UPGRADE > /dev/null
+	if [ $? = 1 ]
+	then
+		enable_service_on_reboot nws_rdc
+		enable_service_on_reboot nws_rdcsyncd
+		echo "$PKGINST" >> $DSCFG_UPGRADE
+	fi
+fi
+
+if [ $MODBUSY = 1 ]; then
+	message $MODBUSYMSG
+fi
+
+#
+# remove keep file from database, and finalize pkg database
+#
+
+removef ${PKGINST} ${KEEP} >/dev/null 2>&1
+removef -R ${PKG_INSTALL_ROOT} -f ${PKGINST} >/dev/null 2>&1
+installf -R ${PKG_INSTALL_ROOT} -f ${PKGINST}
+
+#
+# Add rdc to services file
+#
+
+grep -w "rdc" ${PKG_INSTALL_ROOT}/etc/services > /dev/null
+if [ $? -eq 1 ]
+then
+    echo "rdc             121/tcp                         # SNDR server daemon" >> ${PKG_INSTALL_ROOT}/etc/services 
+fi
+
+exit $EXIT

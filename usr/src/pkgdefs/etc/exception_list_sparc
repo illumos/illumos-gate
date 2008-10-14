@@ -1188,3 +1188,131 @@ usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 # demo & test program for smbfs (private) ACL support
 #
 usr/lib/fs/smbfs/lsacl		sparc
+#
+# FC related files
+#
+lib/llib-la5k			sparc
+lib/llib-la5k.ln		sparc
+lib/sparcv9/llib-la5k.ln	sparc
+lib/llib-lg_fc			sparc
+lib/llib-lg_fc.ln		sparc
+lib/sparcv9/llib-lg_fc.ln	sparc
+kernel/kmdb/sparcv9/fcip	sparc
+kernel/kmdb/sparcv9/fcp		sparc
+kernel/kmdb/sparcv9/fctl	sparc
+kernel/kmdb/sparcv9/qlc		sparc
+usr/include/l_common.h		sparc
+usr/include/l_error.h		sparc
+usr/include/stgcom.h		sparc
+usr/lib/llib-lHBAAPI		sparc
+usr/lib/llib-lHBAAPI.ln		sparc
+usr/lib/sparcv9/llib-lHBAAPI.ln	sparc
+usr/include/a5k.h		sparc
+usr/include/a_state.h		sparc
+usr/include/exec.h		sparc
+usr/include/rom.h		sparc
+usr/include/gfc.h		sparc
+usr/include/g_scsi.h		sparc
+usr/include/g_state.h		sparc
+usr/include/l_common.h		sparc
+usr/include/l_error.h		sparc
+usr/include/stgcom.h		sparc
+usr/include/sys/fibre-channel			sparc
+usr/include/sys/fibre-channel/fc.h		sparc
+usr/include/sys/fibre-channel/fcio.h		sparc
+usr/include/sys/fibre-channel/fc_appif.h	sparc
+usr/include/sys/fibre-channel/fc_types.h	sparc
+usr/include/sys/fibre-channel/impl		sparc
+usr/include/sys/fibre-channel/impl/fc_error.h	sparc
+usr/include/sys/fibre-channel/impl/fcph.h	sparc
+usr/include/sys/fibre-channel/ulp		sparc
+usr/include/sys/fibre-channel/ulp/fcp_util.h	sparc
+usr/include/sys/fibre-channel/ulp/fcsm.h	sparc
+
+# private AVS headers
+#
+usr/bin/sd_stats			sparc
+usr/bin/errgen				sparc
+usr/bin/dscfgcli			sparc
+usr/bin/sd_diag				sparc
+usr/include/nsctl.h			sparc
+usr/include/sys/nsc_ddi.h		sparc
+usr/include/sys/nsc_thread.h		sparc
+usr/include/sys/nskernd.h		sparc
+usr/include/sys/ncall			sparc
+usr/include/sys/ncall/ncall.h		sparc
+usr/include/sys/ncall/ncall_module.h	sparc
+usr/include/sys/nsctl			sparc
+usr/include/sys/nsctl/cfg.h		sparc
+usr/include/sys/nsctl/cfg_cluster.h	sparc
+usr/include/sys/nsctl/cfg_impl.h	sparc
+usr/include/sys/nsctl/cfg_lockd.h	sparc
+usr/include/sys/nsctl/contract.h	sparc
+usr/include/sys/nsctl/dsw.h		sparc
+usr/include/sys/nsctl/dsw_dev.h		sparc
+usr/include/sys/nsctl/librdc.h		sparc
+usr/include/sys/nsctl/model.h		sparc
+usr/include/sys/nsctl/ncall_inter.h	sparc
+usr/include/sys/nsctl/nsc_dev.h		sparc
+usr/include/sys/nsctl/nsc_disk.h	sparc
+usr/include/sys/nsctl/nsc_gen.h		sparc
+usr/include/sys/nsctl/nsc_hash.h	sparc
+usr/include/sys/nsctl/nsc_ioctl.h	sparc
+usr/include/sys/nsctl/nsc_mem.h		sparc
+usr/include/sys/nsctl/nsc_power.h	sparc
+usr/include/sys/nsctl/nsc_rmspin.h	sparc
+usr/include/sys/nsctl/nsctl.h		sparc
+usr/include/sys/nsctl/nsctl_inter.h	sparc
+usr/include/sys/nsctl/nsvers.h		sparc
+usr/include/sys/nsctl/rdc.h		sparc
+usr/include/sys/nsctl/rdc_bitmap.h	sparc
+usr/include/sys/nsctl/rdc_diskq.h	sparc
+usr/include/sys/nsctl/rdc_io.h		sparc
+usr/include/sys/nsctl/rdc_ioctl.h	sparc
+usr/include/sys/nsctl/rdc_prot.h	sparc
+usr/include/sys/nsctl/rdcerr.h		sparc
+usr/include/sys/nsctl/rdcrules.h	sparc
+usr/include/sys/nsctl/safestore.h	sparc
+usr/include/sys/nsctl/sd_bcache.h	sparc
+usr/include/sys/nsctl/sd_cache.h	sparc
+usr/include/sys/nsctl/sd_conf.h		sparc
+usr/include/sys/nsctl/sd_hash.h		sparc
+usr/include/sys/nsctl/sd_pcu.h		sparc
+usr/include/sys/nsctl/sd_trace.h	sparc
+usr/include/sys/nsctl/sdbc_ioctl.h	sparc
+usr/include/sys/nsctl/sv.h		sparc
+usr/include/sys/nsctl/sv_efi.h		sparc
+usr/include/sys/nsctl/sv_impl.h		sparc
+usr/include/sys/unistat			sparc
+usr/include/sys/unistat/spcs_dtrinkets.h    sparc
+usr/include/sys/unistat/spcs_errors.h	sparc
+usr/include/sys/unistat/spcs_etext.h	sparc
+usr/include/sys/unistat/spcs_etrinkets.h    sparc
+usr/include/sys/unistat/spcs_s.h	sparc
+usr/include/sys/unistat/spcs_s_impl.h	sparc
+usr/include/sys/unistat/spcs_s_k.h	sparc
+usr/include/sys/unistat/spcs_s_u.h	sparc
+
+usr/lib/llib-lnsctl.ln			sparc
+usr/lib/llib-ldscfg.ln			sparc
+usr/lib/llib-lrdc.ln			sparc
+usr/lib/llib-lunistat.ln		sparc
+usr/lib/librdc.so			sparc
+usr/lib/libdscfg.so			sparc
+usr/lib/libnsctl.so			sparc
+usr/lib/libunistat.so			sparc
+# These files are used by the iSCSI initiator only.
+# No reason to ship them.
+#
+usr/include/sys/scsi/adapters/iscsi_door.h		sparc
+usr/include/sys/scsi/adapters/iscsi_protocol.h		sparc
+usr/include/sys/scsi/adapters/iscsi_if.h		sparc
+
+# qus driver headers not installed
+usr/include/sys/scsi/adapters/quscmd.h	sparc
+usr/include/sys/scsi/adapters/qusreg.h	sparc
+usr/include/sys/scsi/adapters/qusvar.h	sparc
+usr/include/sys/scsi/adapters/qusmail.h	sparc
+
+# sbd ioctl hdr
+usr/include/sys/stmf_sbd_ioctl.h	sparc

@@ -1,0 +1,206 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"@(#)i.fpconf	1.9	06/06/21 SMI"
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+NEW_FPCONF_ENTRIES=/tmp/fp.conf.new_entries
+PATH=/usr/bin:/usr/sbin:$PATH; export PATH
+PREFIX=/tmp/fp.conf.$$
+
+add_comment()
+{
+	COMMENTFILE=$PREFIX.comment
+	COMMENTFILESPARC=$PREFIX.comment.sparc
+
+	if grep "^# Global mpxio-disable property:" $1 > /dev/null 2>&1; then
+		return
+	fi
+
+	cat > $COMMENTFILE << EOF
+
+#
+# I/O multipathing feature (MPxIO) can be enabled or disabled using
+# mpxio-disable property. Setting mpxio-disable="no" will activate
+# I/O multipathing; setting mpxio-disable="yes" disables the feature.
+#
+# Global mpxio-disable property:
+#
+# To globally enable MPxIO on all fp ports set:
+# mpxio-disable="no";
+#
+# To globally disable MPxIO on all fp ports set:
+# mpxio-disable="yes";
+#
+# Per port mpxio-disable property:
+#
+# You can also enable or disable MPxIO on a per port basis.
+# Per port settings override the global setting for the specified ports.
+# To disable MPxIO on port 0 whose parent is /pci@8,600000/SUNW,qlc@4 set:
+# name="fp" parent="/pci@8,600000/SUNW,qlc@4" port=0 mpxio-disable="yes";
+EOF
+
+	cat > $COMMENTFILESPARC << EOF
+#
+# NOTE: If you just want to enable or disable MPxIO on all fp ports, it is
+# better to use stmsboot(1M) as it also updates /etc/vfstab.
+#
+EOF
+
+	cat $COMMENTFILE >> $1
+
+        if [ "$ARCH" = "sparc" ] ; then
+		cat $COMMENTFILESPARC >> $1
+	fi
+
+	rm -f $COMMENTFILE $COMMENTFILESPARC
+}
+
+add_comment_manual_cfg ()
+{
+	COMMENTFILE=$PREFIX.comment
+
+	if grep "^# The manual_configuration_only property" $1 > /dev/null 2>&1; then
+		return
+	fi
+
+	cat > $COMMENTFILE << EOF
+
+#
+# Automatic configuration of the fabric is turned on by default
+# and thus allows all devices discovered in the SAN zone to be
+# enumerated in the Solaris devinfo tree automatically.
+#
+# The manual_configuration_only property may be used to
+# disable the default behavior and force the manual configuration of
+# the devices in the SAN. Setting manual_configuration_only=1
+# will disable the automatic configuration of devices.
+# NOTE: Use of this property is not recommended. If used, the
+# fabric devices accessed at boot time need to get manually configured
+# before the next reboot. Otherwise, fabric devices that are needed at
+# boot time may not get configured and may cause boot problems.
+# To manually configure fabric devices, refer to cfgadm_fp(1M).
+# manual_configuration_only=1;
+#
+EOF
+
+	cat $COMMENTFILE >> $1
+	rm -f $COMMENTFILE
+}
+
+add_comment_lun_masking ()
+{
+	if grep "pwwn-lun-blacklist" $1 > /dev/null 2>&1; then
+		return
+	fi
+
+	cat >> $1 << EOF
+#
+# You can describe a list of target port WWNs and LUN numbers which will
+# not be configured. LUN numbers will be interpreted as decimal. White
+# spaces and ',' can be used in the list of LUN numbers.
+#
+# pwwn-lun-blacklist=
+# "target-port-wwn,lun-list"
+#
+# To prevent LUNs 1 and 2 from being configured for target
+# port 510000f010fd92a1 and target port 510000e012079df1, set:
+#
+# pwwn-lun-blacklist=
+# "510000f010fd92a1,1,2",
+# "510000e012079df1,1,2";
+EOF
+}
+
+update_fpconf()
+{
+	NEWIDENT1=$PREFIX.ident1
+	NEWIDENT2=$PREFIX.ident2
+	TMPFILE=$PREFIX.tmp
+
+	# replace old ident with new ident
+	IDENT="^#.*ident.*SMI\"$"
+	if grep "$IDENT" $1 > $NEWIDENT1 2>/dev/null; then
+		# replace / by \/
+		sed "s/\\//\\\\\\//g" $NEWIDENT1 > $NEWIDENT2 2>/dev/null
+		if sed "s/$IDENT/`cat $NEWIDENT2`/" $2 > $TMPFILE 2>/dev/null
+		then
+			cp $TMPFILE $2
+		fi
+	fi
+
+        # Remove ddi-forceattach from fp.conf
+        FORCEATTACH1="# Force attach driver to support hotplug activity"
+        FORCEATTACH2="ddi-forceattach"
+        if cat $2 | grep -v "$FORCEATTACH1" | grep -v "$FORCEATTACH2" > $TMPFILE; then
+                cp $TMPFILE $2
+        fi
+	rm -f $NEWIDENT1 $NEWIDENT2 $TMPFILE
+
+	add_comment $2
+	add_comment_manual_cfg $2
+	add_comment_lun_masking $2
+}
+
+if read src dest; then
+	if [ ! -f $dest ]; then
+		#
+		# note that in addition to fresh install, this case can also
+		# be hit if upgrading from solaris 7 or if upgrading with
+		# disk space relocation option and there were no user made
+		# changes to fp.conf.
+		#
+		cp $src $dest
+		if [ "x$UPDATE" != xyes ]; then
+			# fresh install
+			rm -f $NEW_FPCONF_ENTRIES
+			exit 0
+		else
+			#
+			# Solaris upgrade
+			# In this case we need to disable mpxio only if it
+			# was disabled in scsi_vhci.conf.
+			#
+			TMPFILE=$PREFIX.tmp
+			sed -e '/^mpxio-disable="yes";/d' $dest > $TMPFILE
+			cp $TMPFILE $dest
+			rm -f $TMPFILE
+		fi
+	else
+		# upgrading solaris
+		update_fpconf $src $dest
+	fi
+
+	#
+	# Now append any entries generated by the scsi_vhci.conf class
+	# action script.
+	#
+	if [ -f $NEW_FPCONF_ENTRIES ]; then
+		cat $NEW_FPCONF_ENTRIES >> $dest
+		rm -f $NEW_FPCONF_ENTRIES
+	fi
+fi
+
+exit 0

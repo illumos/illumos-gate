@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # MDB modules used for debugging user processes that every ISA's build
 # subdirectory will need to build.
 # 
@@ -57,9 +55,14 @@ COMMON_MODULES_KVM = \
 	cpc \
 	crypto	\
 	dtrace	\
+	emlxs \
+	fcip \
+	fcp \
+	fctl \
 	genunix \
 	hook \
 	neti \
+	ii \
 	ip \
 	ipc \
 	ipp \
@@ -68,17 +71,23 @@ COMMON_MODULES_KVM = \
 	logindmux \
 	md \
 	nca \
+	nsctl \
 	nsmb \
 	ptm \
+	qlc \
 	random \
+	rdc \
 	s1394 \
 	scsi_vhci \
 	sctp \
 	sd \
+	sdbc \
 	smbfs \
 	smbsrv \
 	specfs \
 	sppp \
+	stmf \
+	sv \
 	ufs \
 	usba \
 	zfs

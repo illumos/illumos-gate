@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # rebind basic build macros to 64-bit versions
@@ -80,5 +78,5 @@ CCNEEDED =		-lCrun
 $(__GNUC64)CCNEEDED =	-L$(SFWLIBDIR) -R$(SFWLIBDIR) -lstdc++	\
 			-lgcc_s_$(MACH64)
 
-BUILDCCC.SO=    $(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS) $(CCNEEDED)
+BUILDCCC.SO=    $(CCC) $(CCFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS) $(CCNEEDED)
 MAPFILE.NGB =	$(MAPFILE.NGB_$(MACH64))

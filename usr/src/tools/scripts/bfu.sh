@@ -411,6 +411,18 @@ realmode_files="
 	boot/solaris/devicedb/master
 "
 
+#
+# /usr/sadm/install/scripts/i.build class runs class client provided
+# script. The files below are managed by build class and its build script.
+# They are added /bfu.conflict/NEW and the acr.sh process runs the script
+# as part of conflict resolution. 
+#
+build_class_script_files="
+	etc/mpapi.conf
+	etc/hba.conf
+	etc/ima.conf
+"
+
 fail() {
 	print "$*" >& 2
 	print "bfu aborting" >& 2
@@ -7940,12 +7952,24 @@ mondo_loop() {
 			print "NEW \c"
 			print $file >>$rootprefix/bfu.conflicts/NEW
 		fi
+
 		print "conflict: $file"
 		(cd $root; print $file | cpio -pdmu bfu.conflicts 2>/dev/null)
 
 		# for all conflicts, restore the pre-BFU version and let
 		# the user decide what to do.
 		cp -p $child $actual
+	done
+
+	#
+	# Add build_class_script_files to NEW
+	# Don't add the file to bfu.conflict since the private script from
+	# the pkg takes care of the update.
+	#
+	for bldscript in $build_class_script_files; do
+		print "NEW \c"
+		print $bldscript >>$rootprefix/bfu.conflicts/NEW
+		print "conflict: $bldscript"
 	done
 
 	if [ $zone = global ]; then

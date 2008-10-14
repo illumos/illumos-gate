@@ -1,0 +1,129 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+SUNW_1.0 {
+    global:
+	IMA_GetErrorRecoveryLevelProperties;
+	IMA_GetNetworkPortalProperties;
+	IMA_GetNodeProperties;
+	IMA_SetMaxBurstLength;
+	IMA_SetIsnsDiscovery;
+	IMA_GetLnpProperties;
+	IMA_LuReportLuns;
+	IMA_GetLibraryProperties;
+	IMA_GetPhbaDownloadProperties;
+	IMA_GetMaxRecvDataSegmentLengthProperties;
+	IMA_GetStaticDiscoveryTargetOidList;
+	IMA_SetNodeName;
+	IMA_DeregisterForObjectVisibilityChanges;
+	IMA_SetInitiatorAuthMethods;
+	IMA_GetImmediateDataProperties;
+	IMA_GenerateNodeName;
+	IMA_SetMaxConnections;
+	IMA_SetSlpDiscovery;
+	IMA_GetPnpProperties;
+	IMA_GetPhbaStatus;
+	IMA_FreeMemory;
+	IMA_GetNonSharedNodeOidList;
+	IMA_GetDataSequenceInOrderProperties;
+	IMA_SetStatisticsCollection;
+	IMA_SetInitiatorAuthParms;
+	IMA_GetStaticDiscoveryTargetProperties;
+	IMA_PluginIOCtl;
+	IMA_SetNodeAlias;
+	IMA_SetDefaultTime2Wait;
+	IMA_SetStaticDiscovery;
+	IMA_GetPnpStatistics;
+	IMA_GetIpProperties;
+	IMA_SetMaxOutstandingR2T;
+	IMA_SetNetworkPortalIpAddress;
+	IMA_GetDefaultTime2RetainProperties;
+	IMA_DeregisterForObjectPropertyChanges;
+	IMA_GetNetworkPortalOidList;
+	IMA_GetLuOid;
+	IMA_GetNetworkPortStatus;
+	IMA_AddDiscoveryAddress;
+	IMA_GetLhbaOidList;
+	IMA_SetInitialR2T;
+	IMA_GetIpsecProperties;
+	IMA_GetTargetProperties;
+	IMA_SetIpConfigMethod;
+	IMA_GetDiscoveryProperties;
+	IMA_SetErrorRecoveryLevel;
+	IMA_GetDiscoveryAddressProperties;
+	IMA_LuInquiry;
+	IMA_RegisterForObjectPropertyChanges;
+	IMA_GetTargetErrorStatistics;
+	IMA_GetMaxBurstLengthProperties;
+	IMA_GetPluginOidList;
+	IMA_GetLhbaProperties;
+	IMA_SetImmediateData;
+	IMA_GetPnpOidList;
+	IMA_GetLuOidList;
+	IMA_SetSubnetMask;
+	IMA_GetInUseInitiatorAuthMethods;
+	IMA_SetSendTargetsDiscovery;
+	IMA_GetDefaultTime2WaitProperties;
+	IMA_ExposeLu;
+	IMA_GetDiscoveryAddressOidList;
+	IMA_GetInitialR2TProperties;
+	IMA_GetStatisticsProperties;
+	IMA_UnexposeLu;
+	IMA_GetPluginProperties;
+	IMA_GetPhbaOidList;
+	IMA_SetDataPduInOrder;
+	IMA_IsPhbaDownloadFile;
+	IMA_GetLuProperties;
+	IMA_SetDnsServerAddress;
+	IMA_SetMaxRecvDataSegmentLength;
+	IMA_AddStaticDiscoveryTarget;
+	IMA_RemoveDiscoveryAddress;
+	IMA_GetDataPduInOrderProperties;
+	IMA_GetMaxOutstandingR2TProperties;
+	IMA_GetSharedNodeOid;
+	IMA_GetPhbaProperties;
+	IMA_GetTargetOidList;
+	IMA_PhbaDownload;
+	IMA_GetDeviceStatistics;
+	IMA_SetDefaultGateway;
+	IMA_GetSupportedAuthMethods;
+	IMA_SetDefaultTime2Retain;
+	IMA_RegisterForObjectVisibilityChanges;
+	IMA_RemoveStaticDiscoveryTarget;
+	IMA_GetFirstBurstLengthProperties;
+	IMA_GetAssociatedPluginOid;
+	IMA_GetObjectType;
+	IMA_SetFirstBurstLength;
+	IMA_RemoveStaleData;
+	IMA_GetLnpOidList;
+	IMA_LuReadCapacity;
+	IMA_SetDataSequenceInOrder;
+	IMA_GetInitiatorAuthParms;
+	IMA_GetMaxConnectionsProperties;
+	IMA_GetAddressKeys;
+    local:
+	*;
+};

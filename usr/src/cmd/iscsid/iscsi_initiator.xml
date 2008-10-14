@@ -1,0 +1,147 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+	Service manifests for the iSCSI Initiator
+-->
+
+<!--
+GLXXX: Instance creation guidelines:
+
+Currently inetd doesn't support property composition in the configuration of
+it's instances. It expects to find the "proto" property in the instances
+"inetd_private" property group, and all other properties (including the
+default back ones) in the "inetd_private" property group of the service.
+This means that only the "proto" field can be specialized for an instance, which
+limits the creation of instances of a service to only those with all fields
+common, bar the "proto" field. This would enable the following two services
+to be created as instances of a common service: 
+
+exec    stream  tcp     nowait  root    /usr/sbin/in.rexecd     in.rexecd
+exec    stream  tcp6    nowait  root    /usr/sbin/in.rexecd     in.rexecd 
+
+but dissallow common service create for these (different socket type):
+
+time    stream  tcp6    nowait  root    internal
+time    dgram   udp6    wait    root    internal
+
+To be more specific, for rpc services all the netids associated with the
+service would need a seperate instance creating under a common service, with
+the instance name and the "proto" being the netid. For non-rpc based
+services only services with changes limited to the "proto" field (such as
+udp/upd6 and tcp/tcp6) can have instances created under a common service - as
+in the exec example above.
+
+I neglected to mention that the composition limitation applies for methods
+also, so an instance can't have a different method than its service.
+
+Inetd is soon going to change to use instance composition for its configuration.
+This will mean that any of the properties/methods can be present in either the
+instance or the service (with the instance one overriding in the case both are
+present) and that multiple instances can be created for a service with the 
+potential to specialize all the properties/methods.
+
+-->
+
+<service_bundle type='manifest' name='SUNWiscsiu:iscsi_initiator'>
+
+<service
+    name='network/iscsi_initiator'
+    type='service'
+    version='1'>
+
+    <single_instance/>
+
+    <dependency
+        name='startup'
+        grouping='require_all'
+        restart_on='none'
+        type='service'>
+        <service_fmri value='svc:/network/physical' />
+    </dependency>
+
+    <dependent
+        name='iscsi_initiator'
+        grouping='optional_all'
+        restart_on='none'>
+        <service_fmri value='svc:/system/metainit' />
+    </dependent>
+
+	<!--
+	   Set a timeout of -1 to signify to inetd that we don't want
+	   to timeout this service, since the forked process is the
+	   one that does the services work. This is the case for most/all
+	   legacy inetd services; for services written to take advantage
+	   of Greenlines capabilities, the start method should fork
+	   off a process to handle the request and return a success code.
+	-->
+	<exec_method
+        type='method'
+        name='start'
+        exec='/lib/svc/method/iscsid'
+        timeout_seconds='-1'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+        
+	<exec_method
+        type='method'
+        name='stop'
+        exec=':kill'
+        timeout_seconds='5'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+        
+	<!--
+	    Create a disabled instance.
+	-->
+	<instance
+        name='default'
+        enabled='false' >
+	</instance>
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				iSCSI initiator daemon
+			</loctext>
+		</common_name>
+
+		<documentation>
+			<manpage
+				title='iscsid'
+				section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

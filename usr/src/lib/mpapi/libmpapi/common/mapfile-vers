@@ -1,0 +1,78 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+SUNW_1.0 {
+    global:
+	MP_GetLibraryProperties;
+	MP_GetPluginOidList;
+	MP_GetPluginProperties;
+	MP_GetAssociatedPluginOid;
+	MP_GetObjectType;
+	MP_GetDeviceProductOidList;
+	MP_GetDeviceProductProperties;
+	MP_GetInitiatorPortOidList;
+	MP_GetInitiatorPortProperties;
+	MP_GetMultipathLus;
+	MP_GetMPLogicalUnitProperties;
+	MP_GetAssociatedPathOidList;
+	MP_GetPathLogicalUnitProperties;
+	MP_GetAssociatedTPGOidList;
+	MP_GetTargetPortGroupProperties;
+	MP_GetMPLuOidListFromTPG;
+	MP_GetProprietaryLoadBalanceOidList;
+	MP_GetProprietaryLoadBalanceProperties;
+	MP_GetTargetPortOidList;
+	MP_GetTargetPortProperties;
+	MP_AssignLogicalUnitToTPG;
+	MP_SetOverridePath;
+	MP_CancelOverridePath;
+	MP_EnableAutoFailback;
+	MP_DisableAutoFailback;
+	MP_EnableAutoProbing;
+	MP_DisableAutoProbing;
+	MP_EnablePath;
+	MP_DisablePath;
+	MP_SetLogicalUnitLoadBalanceType;
+	MP_SetPluginLoadBalanceType;
+	MP_SetPathWeight;
+	MP_SetFailbackPollingRate;
+	MP_SetProbingPollingRate;
+	MP_SetProprietaryProperties;
+	MP_SetTPGAccess;
+	MP_RegisterForObjectPropertyChanges;
+	MP_DeregisterForObjectPropertyChanges;
+	MP_RegisterForObjectVisibilityChanges;
+	MP_DeregisterForObjectVisibilityChanges;
+	MP_CompareOIDs;
+	MP_FreeOidList;
+	MP_RegisterPlugin;
+	MP_DeregisterPlugin;
+	MP_FreeOidList;
+	MP_RegisterPlugin;
+	MP_DeregisterPlugin;
+	Sun_MP_SendScsiCmd;
+    local:
+	*;
+};

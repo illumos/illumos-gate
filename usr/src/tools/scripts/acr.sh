@@ -20,11 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 # usage: acr [root [archivedir]]
 #
@@ -240,8 +238,10 @@ acr_a_root() {
 
 		if [ "$unique" = "c" ] ; then
 			scriptloc=$crdir/$pkgdef/$script
-		else
+		elif [ "$unique" = "s" ] ; then
 			scriptloc=$crdir/$pkgdef/$pkginst/$script
+		else
+			scriptloc=$root/usr/sadm/install/scripts/$script
 		fi
 		msg=`printf "$column_fmt" $filename $script`
 
@@ -289,8 +289,13 @@ acr_a_root() {
 		export PKG PKGINST ARCH
 
 		print "PROCESSING $filename with $script" >> $allresults
-		print $root/bfu.conflicts/$filename $root/$filename |
+		if [ "$script" = "i.build" ] ; then
+		    print $crdir/$pkgdef/$pkginst/$filename $root/$filename |
 			$processedscript.$script > $thisresult 2>&1
+		else     
+		    print $root/bfu.conflicts/$filename $root/$filename |
+			$processedscript.$script > $thisresult 2>&1
+		fi
 		error=$?
 		if [ $error != 0 ] ; then
 			printf "$msg FAIL (exit $error)\n" 1>&2

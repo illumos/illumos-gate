@@ -84,6 +84,8 @@ Kerberos Server Management:::Maintain and Administer Kerberos Servers:profiles=K
 DAT Administration:::Manage the DAT configuration:help=RtDatAdmin.html
 SMB Management:::Manage the SMB service:auths=solaris.smf.manage.smb,solaris.smf.value.smb,solaris.smf.read.smb;help=RtSMBMngmnt.html
 SMBFS Management:::Manage the SMB client:auths=solaris.smf.manage.smbfs,solaris.smf.value,solaris.smf.modify.application;help=RtSMBFSMngmnt.html
+STMF Administration:::Configure STMF service:auths=solaris.smf.modify.application
+STMF Management:::Start/Stop STMF service:auths=solaris.smf.manage.stmf
 ZFS File System Management:::Create and Manage ZFS File Systems:help=RtZFSFileSysMngmnt.html
 ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMngmnt.html
 Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html
@@ -108,3 +110,4 @@ Suspend To RAM:::For authorized users to Suspend to RAM:auths=solaris.system.pow
 Brightness:::For authorized users to Control LCD Brightness:auths=solaris.system.power.brightness;help=RtSysPowerMgmtBrightness.html
 CPU Power Management:::For authorized users to manage CPU Power:auths=solaris.system.power.cpu;help=RtCPUPowerManagement.html
 acctadm:::Do not assign to users. Commands required for Extended Accounting Management profiles:help=RtAcctadm.help
+ISNS Server Management:::Manage ISNS server:auths=solaris.smf.manage.isns,solaris.smf.value.isns,solaris.isnsmgr.write:help=RtISNSMngmnt.html

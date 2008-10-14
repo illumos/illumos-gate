@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+add_multipathing(){
+
+cat >> $dest << EOF
+
+#
+# I/O multipathing feature (MPxIO) can be enabled or disabled using
+# mpxio-disable property. Setting mpxio-disable="no" will activate
+# I/O multipathing; setting mpxio-disable="yes" disables the feature.
+#
+# Global mpxio-disable property:
+#
+# To globally enable MPxIO on all iscsi ports set:
+# mpxio-disable="no";
+#
+# To globally disable MPxIO on all iscsi ports set:
+# mpxio-disable="yes";
+#
+mpxio-disable="no";
+
+EOF
+}
+
+while read src dest; do
+	if [ ! -f $dest ]; then
+		cp $src $dest
+	else
+		grep '^[ 	]*mpxio-disable=' $dest >/dev/null
+		
+		if [ $? -ne 0 ]; then
+			add_multipathing
+		fi
+	fi
+done
+
+exit 0

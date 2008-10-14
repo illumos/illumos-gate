@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This Makefile defines all file modules and build rules for the
 # directory uts/sparc and it's children. These are the source files which
 # are specific to the sparc processor.
@@ -68,6 +66,7 @@ CPR_SPARC_OBJS +=	cpr_sparc.o
 PCI_PCI_OBJS +=		pci_pci.o pci_debug.o pci_pwr.o pcix.o
 PX_PCI_OBJS +=		px_pci.o pcie_pwr.o
 FCODE_OBJS +=		fcode.o
+NSKERN_OBJS +=		nsc_asm.o
 
 #
 #			file system modules

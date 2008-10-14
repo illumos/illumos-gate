@@ -1,0 +1,74 @@
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!include <filename>                    # include another 'prototype' file
+#!default <mode> <owner> <group>        # default used if not specified on entry
+#!<param>=<value>                       # puts parameter in pkg environment
+
+# packaging files
+i pkginfo
+i copyright
+i postinstall
+i preinstall
+i preremove
+i depend
+i space
+
+d none usr 0755 root sys
+d none usr/kernel 0755 root sys
+d none usr/kernel/drv 0755 root sys
+f none usr/kernel/drv/nsctl.conf=usr/kernel/drv/nsctl.conf 0644 root sys
+f none usr/kernel/drv/sdbc.conf=usr/kernel/drv/sdbc.conf 0644 root sys
+f none usr/kernel/drv/nskern.conf=usr/kernel/drv/nskern.conf 0644 root sys
+f none usr/kernel/drv/ncall.conf=usr/kernel/drv/ncall.conf 0644 root sys
+d none usr/kernel/misc 0755 root sys
+
+# /usr/lib/mdb directory structure
+d none usr/lib 0755 root bin
+d none usr/lib/mdb 0755 root sys
+d none usr/lib/mdb/kvm 0755 root sys
+f none usr/lib/nskernd=usr/bin/nskernd 0555 root bin
+f none usr/lib/dscfglockd=usr/bin/dscfglockd 0555 root bin
+f none usr/lib/libdscfg.so.1=usr/lib/libdscfg.so.1 0755 root bin
+f none usr/lib/libunistat.so.1=usr/lib/libunistat.so.1 0755 root bin
+f none usr/lib/libnsctl.so.1=usr/lib/libnsctl.so.1 0755 root bin
+f none usr/lib/ncalladm=usr/bin/ncalladm 0555 root bin
+
+d none usr/sbin 0755 root bin
+f none usr/sbin/dscfg=usr/bin/dscfg 0555 root bin
+f none usr/sbin/dsbitmap=usr/bin/dsbitmap 0555 root bin
+f none usr/sbin/scmadm=usr/bin/scmadm 0555 root bin
+f none usr/sbin/dscfgadm=usr/bin/dscfgadm 0555 root bin
+f none usr/sbin/nscadm=usr/bin/nscadm 0555 root bin
+f none usr/sbin/dsstat=usr/bin/dsstat 0555 root bin
+
+d none usr/cluster 0755 root sys
+d none usr/cluster/lib 0755 root bin
+d none usr/cluster/lib/start 0755 root bin
+d none usr/cluster/lib/stop 0755 root bin
+d none usr/cluster/sbin 0755 root other
+f none usr/cluster/sbin/dscfg_reconfigure=usr/bin/dscfg_reconfigure.cluster 0555 root bin

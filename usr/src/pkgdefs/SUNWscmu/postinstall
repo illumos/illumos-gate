@@ -1,0 +1,393 @@
+#!/bin/sh
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Set path
+#
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+#
+# Set variables
+#
+
+BASEDIR=${BASEDIR:=/}
+FAILURE=1       
+# the kernel modules we install and the order of dependencies
+MODULES="nskern ncall nsctl sdbc"
+OS_VER=`eval uname -r`
+PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
+DEVLINKTB=${PKG_INSTALL_ROOT}/etc/devlink.tab
+DRVDIR64=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/drv/sparcv9
+DRVDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/drv
+SCMBINDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/sbin
+ESMBINDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/sbin
+LIBDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/lib
+MISCDIR64=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/misc/sparcv9
+MISCDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/misc
+NAMEMAJOR=${PKG_INSTALL_ROOT}/etc/name_to_major
+TMP_DSCFG=/tmp/dscfg.${PKGINST}.$$
+ARCH=`uname -p`
+HOST=`/usr/bin/hostname`
+DSCFG="/usr/sbin/dscfg -r $PKG_INSTALL_ROOT"
+PCONFIG="${PKG_INSTALL_ROOT}/etc/dscfg_format"
+DSCFG_REF="${PKG_INSTALL_ROOT}/etc/opt/SUNWesm/dscfg.cf"
+DSCFG_LOCAL="${PKG_INSTALL_ROOT}etc/dscfg_local"
+# number of KB required for the dscfg database (1024 * 5.5)
+DSCFG_SIZE=5632
+FS_LOCAL_SVC="svc:/system/filesystem/local"
+
+EXIT=0
+MODBUSY=0
+MODBUSYMSG="
+		#### NOTICE #####\n
+The previous version of this software cannot be unloaded (busy).\n
+To load the new modules you must reboot the system."
+
+#
+# Functions
+#
+
+message()
+{
+	echo ""
+	echo "$@"
+    	echo ""
+}
+
+add_devlink()
+{
+	PATTERN="$1"
+	LINK="$2"
+	echo "$PATTERN\t$LINK" >>${DEVLINKTB}
+}
+
+valid_dscfg_exists()
+{
+	if [ -s $DSCFG_REF ]; then
+		DSCFG_LOC=`head -1 $DSCFG_REF`
+		DSCFG_LOC=${PKG_INSTALL_ROOT}${DSCFG_LOC}
+		DSCFG_LOC=`echo $DSCFG_LOC | tr -s '/'`
+		contains_data $DSCFG_LOC
+		return $?
+	fi
+
+	return 0
+}
+
+# used to test if a valid DS config database exists on machine already
+# MAGIC_STRING is the top line in the config used in v3.1 & v3.2
+#
+contains_data()
+{
+    $xopt
+
+    # dscfg distinct strings, varies on the architecture
+    if [ $ARCH = "sparc" ]
+    then
+	MAGIC_STRING="MAGI"
+    elif [ $ARCH = "i386" ]
+    then
+	MAGIC_STRING="IGAM"
+    fi
+
+    # Create a PID unique temporary file
+    TMP_FILE=/tmp/$$
+
+    # Write the first or 16th block (skipping over VTOC) to
+    # the TMP_FILE, then scan for the presence of the "MAGI"
+    #
+    for offset in 0 16
+    do
+	if [ ! -z "$1" ]; then
+	    dd if=$1 of=$TMP_FILE count=1 iseek=$offset 2>/dev/null
+	    FILECONTENTS=`strings $TMP_FILE | head -1 2>/dev/null`
+	    if [ `echo $FILECONTENTS | grep -c "$MAGIC_STRING"` -gt 0 ]; then
+		rm $TMP_FILE
+		return 1
+	    fi
+	fi
+    done
+
+    rm $TMP_FILE
+    return 0
+}
+
+# returns 1 if the dscfg is a cluster db, 0 otherwise
+is_cluster_db()
+{
+	#
+	# Check to see if we're in a cluster.
+	# It has to be a /dev/did/rdsk device and it must contain ctags.
+	#
+	DID=`echo ${DSCFG_LOC} | awk -F/ '{print $3}'`
+	RDSK=`echo ${DSCFG_LOC} | awk -F/ '{print $4}'`
+	if [ "did" = $DID -a "rdsk" = $RDSK -a -c ${DSCFG_LOC} ]; then
+		# check if there are any cluster tags.  Do this by verifying
+		# that the output with no cluster tags is equivalent to the
+		# complete output without scm tags
+		cat ${TMP_DSCFG}.1 | grep -v "^scm: " | diff - ${TMP_DSCFG}.2 \
+		    > /dev/null 2>&1
+
+		if [ $? != 0 ]
+		then
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+# move the old dscfg to the new standard location
+convert_dscfg()
+{
+	#
+	# First, grab some info from the old db
+	#
+
+	# backup contents of the old dscfg database
+	${DSCFG} -s ${DSCFG_LOC} -l 2> /dev/null | grep -v "^#" > ${TMP_DSCFG}.1
+
+	# grab all entries without a ctag
+	${DSCFG} -s ${DSCFG_LOC} -l -C - 2> /dev/null | grep -v "^#" \
+	    > ${TMP_DSCFG}.2
+
+	# are we in a cluster?
+	is_cluster_db
+	if [ $? = 0 ]
+	then
+		# we're in a non-cluster environment--just reinit the config
+
+		# First, just make sure we don't overwrite an existing dscfg
+		if [ "$DSCFG_LOC" != "$DSCFG_LOCAL" ]
+		then
+			echo y | ${DSCFG} -i > /dev/null 2>&1
+			${DSCFG} -i -p ${PCONFIG} > /dev/null 2>&1
+			${DSCFG} -a ${TMP_DSCFG}.1 > /dev/null 2>&1
+		fi
+	else
+		#
+		# We're in a cluster. 
+		# reinitialize new database with the contents of the old
+		# strip out all dscfg entries that have a cluster tag other than
+		# l.<my_host_name>
+		#
+
+		# grab all entries with a ctag of l.<my_host_name>
+		${DSCFG} -s ${DSCFG_LOC} -l -C l.${HOST} 2> /dev/null | \
+		    grep -v "^#" > ${TMP_DSCFG}.3
+
+		# replace "l.$HOST" with "-" in ${TMP_DSCFG}.3
+		sed "s/l.${HOST}/-/g" ${TMP_DSCFG}.3 > ${TMP_DSCFG}.4
+
+		# merge the two, removing duplicate entries
+		cat ${TMP_DSCFG}.2 ${TMP_DSCFG}.4 | sort -u > ${TMP_DSCFG}.5
+
+		# reinit the local dscfg, with the ctag info stripped out
+		# First, just make sure we don't overwrite an existing dscfg
+		valid_dscfg_exists $DSCFG_LOCAL
+		if [ $? = 0 ]
+		then
+			echo y | ${DSCFG} -i > /dev/null 2>&1
+			${DSCFG} -i -p ${PCONFIG} > /dev/null 2>&1
+			${DSCFG} -a ${TMP_DSCFG}.5 > /dev/null 2>&1
+		fi
+
+		# init the cluster dscfg
+		${DSCFG} -s ${DSCFG_LOC}
+		echo y | ${DSCFG} -i -C - > /dev/null 2>&1
+		${DSCFG} -i -p ${PCONFIG} -C - > /dev/null 2>&1
+		${DSCFG} -a ${TMP_DSCFG}.1 -C - > /dev/null 2>&1
+
+	fi
+
+	# cleanup
+	rm -f ${TMP_DSCFG}.1
+	rm -f ${TMP_DSCFG}.2
+	rm -f ${TMP_DSCFG}.3
+	rm -f ${TMP_DSCFG}.4
+	rm -f ${TMP_DSCFG}.5
+}
+
+#
+# Setup the service to enable.  This is necessary to deal
+# with upgrade situations.  It also sets the proper dependency type for the
+# local filesystems service
+# $1: name of service to enable
+#
+enable_service_on_reboot()
+{
+	# enable the service
+	svcadm enable -s svc:/system/$1
+	if [ $? -ne 0 ]
+	then
+		message "Warning: Unable to enable $1 service"
+	fi
+
+	# workaround for 6221374--let local-fs know that it depends on us
+	svcadm refresh ${FS_LOCAL_SVC}:default
+	if [ $? -ne 0 ]
+	then
+		message "Warning: Unable to refresh $1 service"
+	fi
+
+	# make sure the local filesystems service waits for us 
+	svccfg -s $FS_LOCAL_SVC setprop ${1}-local-fs/grouping=require_all
+	if [ $? -ne 0 ]
+	then
+		message "Warning: Unable to set dependency for $1 service"
+	fi
+
+	svcadm refresh ${FS_LOCAL_SVC}:default
+	if [ $? -ne 0 ]
+	then
+		message "Warning: Unable to refresh $1 service"
+	fi
+}
+
+
+
+#
+# Installing to an alternate root ensure we can still 
+# find the libraries.
+#
+
+if [ "$PKG_INSTALL_ROOT" != "/" ]
+then
+    if [ -n "$LD_LIBRARY_PATH" ]
+    then
+        # append to existing path               
+	LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PKG_INSTALL_ROOT/usr/lib:/usr/lib
+    else
+	LD_LIBRARY_PATH=$PKG_INSTALL_ROOT/usr/lib:/usr/lib
+    fi
+    export LD_LIBRARY_PATH
+fi
+
+#
+# Set specific command syntax (if needed)
+#
+
+# For least privileges add option -P sys_devices,sys_config
+if [ "${PKG_INSTALL_ROOT}" = "/" ]; then
+    REM_DRV="rem_drv"
+    ADD_DRV="add_drv -P sys_devices,sys_config"
+else
+    REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
+    ADD_DRV="add_drv -P sys_devices,sys_config -b ${PKG_INSTALL_ROOT}"
+fi
+
+#
+# the preinstall should have removed the modules therefore,
+# if the lowest level module (nskern or sdsi) is loaded (busy) then we need to
+# notify the user after the install to reboot or remove the clients and
+# re-run pkgadd.
+
+n=`modinfo |grep -w nskern |cut -d" " -f1`
+
+#
+# add and load modules
+#
+for MODULE in ${MODULES}
+do
+  ERRLOG=/tmp/${MODULE}.postlog
+  REMERR="ERROR: The installation cannot be completed due to an error removing \
+the ${MODULE} loadable module.  The file ${ERRLOG} contains the errors. Exiting...\
+Please fix problem and re-run pkgadd."
+  ADDERR="ERROR: The installation cannot be completed due to an error adding the \
+${MODULE} loadable module.  The file ${ERRLOG} contains the errors.  Exiting...\
+Please fix problem and re-run pkgadd."
+  DEVLINKERR="ERROR: The installation cannot be completed due to an error configuring \
+the ${MODULE} loadable module.  The file ${ERRLOG} contains the errors. Exiting...\
+Please fix problem and re-run pkgadd."
+
+  # if the main module is still loaded then it has refused to unload
+  # and we have to force a reboot.
+  #
+  if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
+      modinfo | grep -w ${MODULE} >/dev/null 2>&1
+      if [ $? -eq 0 ]; then
+	  # still loaded
+	  MODBUSY=1
+	  NOPT="-b / "
+      fi
+  fi
+
+  #
+  # if module has been previously installed, remove it
+  #
+  grep -w ${MODULE} ${NAMEMAJOR}
+  if [ $? -eq 0 ]; then
+      ${REM_DRV} ${MODULE} > ${ERRLOG} 2>&1
+      [ $? -ne 0 ] && {
+	  message ${REMERR}
+	  exit ${FAILURE}
+      }
+  fi
+
+  #
+  # install module
+  #
+  add_devlink "type=ddi_pseudo;name=${MODULE}" '\D'
+  
+  case ${MODULE} in
+      *) ${ADD_DRV} $NOPT -m '* 0666 root sys' ${MODULE} > ${ERRLOG} 2>&1 ;;
+  esac
+  [ $? -ne 0 ] && {
+      message ${ADDERR}
+      exit ${FAILURE}
+  }
+done
+
+#
+# Test if we need next boot to start Availability Suite
+#
+
+# check if we have a valid configuration database
+valid_dscfg_exists
+
+# if so, copy the old database to new location, setup the service to be enabled
+if [ $? = 1 ]
+then
+	convert_dscfg
+
+	enable_service_on_reboot nws_scm
+
+	mv -f $DSCFG_REF ${DSCFG_REF}.legacy
+	rm -f ${DSCFG_REF}.upgrade
+	touch ${DSCFG_REF}.upgrade
+	echo "$PKGINST" >> ${DSCFG_REF}.upgrade
+fi
+
+if [ $MODBUSY = 1 ]; then
+	message $MODBUSYMSG
+fi
+
+#
+# remove keep file from database, and finalize changes to pkg database
+#
+removef ${PKGINST} ${KEEP} >/dev/null 2>&1
+installf -R ${PKG_INSTALL_ROOT} -f ${PKGINST}
+removef -R ${PKG_INSTALL_ROOT} -f ${PKGINST} >/dev/null 2>&1

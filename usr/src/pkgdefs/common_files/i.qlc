@@ -1,0 +1,257 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"@(#)i.qlc	1.7	08/01/07 SMI"
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH=/usr/bin:/usr/sbin:$PATH; export PATH
+
+tmpfile=/tmp/qcca_tmp_$$
+sedfile=/tmp/qcca_sed_$$
+
+sun_copyright1='# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.'
+sun_copyright2='# Use is subject to license terms.'
+
+
+update_header ()
+# Update Copyright and Ident information in Destination
+{
+
+  ident_str=`grep '#ident[ 	].*SMI' $src | tr \" \~`
+  qlogic_copyright=`grep '# Copyright (C) QLogic Corporation' $src`
+  
+  sed \
+    -e "s:# Copyright.*Sun Microsystems.*:$sun_copyright1:" \
+    -e "s:# All rights reserved.*:$sun_copyright2:" \
+    -e "s:#ident[ 	].*SMI.:$ident_str:" \
+    -e "/#ident/y/\~/\"/" \
+    -e "s:# Copyright (C) QLogic Corporation.*:$qlogic_copyright:" \
+    $dest > $tmpfile	
+    if [ $? -eq 0 ] ; then
+       mv $tmpfile $dest
+    fi
+}
+
+update_pci_max_read_request ()
+# Reset default value for pci-max-read-request
+{
+  grep "^pci-max-read-request=0;" $dest > /dev/null 2>&1
+  if [ $? -eq 0 ] ; then
+     sed -e "s/^pci-max-read-request=0;/pci-max-read-request=2048;/" \
+	$dest > $tmpfile
+     mv $tmpfile $dest
+  fi
+}
+
+create_sedfile ()
+# Assemble sed script to remove comments
+{
+
+  cat > $sedfile <<SEDCMDS
+# Comment block 1
+/# Sun StorEdge Traffic Manager Software (mpxio)/{
+N
+N
+N
+N
+/# Multipath I\/O feature through this configuration file/d
+}
+
+# Comment block 2
+/# Example 1: To disable mpxio for a port on a single ported HBA/{
+N
+N
+N
+N
+/# name="qlc" parent="\/pci@6,2000" unit-address="2" mpxio-disable="yes"/d
+}
+
+# Comment block 3
+/^# Example 2: To disable mpxio for a port on a dual ported HBA/{
+N
+N
+N
+N
+/# name="qlc" parent="\/pci@13,2000\/pci@2" unit-address="5" mpxio-disable/d
+}
+
+#  Old pci-max-read-request comment
+/^#Name:  PCI max read request override;/{
+N
+N
+N
+N
+N
+N
+N
+/#pci-max-read-request=2048;/d
+}
+
+SEDCMDS
+}
+
+remove_content ()
+# Remove outdated comment information
+{
+  create_sedfile
+  sed -f $sedfile $dest > $tmpfile
+  if [ $? -eq 0 ] ; then
+     mv $tmpfile $dest
+  fi
+  rm -f $sedfile
+}
+
+convert_content ()
+# Update incompatible parameters to new settings
+{
+  grep "^hba0-enable-adapter-hard-loop-ID=1;" $dest > /dev/null 2>&1
+  if [ $? -ne 0 ] ; then
+     return
+  fi
+
+  loopid=`sed -n 's/^hba0-adapter-hard-loop-ID=\(.*\);/\1/p' $dest`
+  if [ -z "$loopid" ] ; then
+     # Entry does not exist use default for adapter-hard-loop-ID
+     loopid=0
+  fi
+
+  sed -e "s/^\(enable-adapter-hard-loop-ID\)=0;/\1=1;/"  \
+      -e "s/^\(adapter-hard-loop-ID\)=0;/\1=${loopid};/" $dest > $tmpfile
+
+  mv $tmpfile $dest
+}
+
+
+add_new_content ()
+# Add new paramaters from Source and their comments to Destination,
+# if not present.  Comments will not be added if parameters exists 
+# in Destination
+{
+
+  param_comment=""
+  parameter=""
+
+
+  while read confline 
+  do
+
+  echo $confline | grep '^#' > /dev/null 2>&1
+  if [ $? -eq 0 ] ; then
+
+     # Comment. 
+     # Start new block or append to existing block.
+
+     if [ -z "${param_comment}" ] ; then
+	param_comment="${confline}"
+     else
+	param_comment="${param_comment}\n${confline}"
+     fi
+     continue
+  fi
+
+  parameter=`echo $confline | sed 's/\(.*\)=.*/\1/'`
+
+  if [ -z "$parameter" ] ; then
+     # Blank line or no parameter; reset values
+     param_comment=""
+     parameter=""
+     continue
+  fi
+
+  # Must be an assigned parameter
+  # Check if parameter exist in file 
+  grep "^$parameter=" $dest > /dev/null 2>&1
+  if [ $? -ne 0 ] ; then
+
+    # Append leading comment and assigned parameter.
+    echo "$param_comment" >> $dest
+    echo "${confline}" >> $dest
+    echo >> $dest
+  fi
+
+  # Reset for next parameter
+  param_comment=""
+  parameter=""
+
+done < $src
+   
+}
+
+create_sedfile_data_rate ()
+# Assemble sed script to change data rate comments
+{
+
+  cat > $sedfile <<SEDCMDS
+# Look for data rate comments
+/#Name:  Fibre Channel Data Rate Option/{
+n
+s/Range: .-./Range: 0-4/
+n
+n
+n
+n
+n
+/^#Usage/i\\
+#       4 = 8 gigabit/second
+}
+
+SEDCMDS
+}
+
+update_data_rate ()
+{
+  create_sedfile_data_rate
+  sed -f $sedfile $dest > $tmpfile
+  if [ $? -eq 0 ] ; then
+     mv $tmpfile $dest
+  fi
+  rm -f $sedfile
+}
+
+#
+# Main --------------------
+#
+
+while read src dest
+do
+  if [ ! -f $dest ] ; then
+     cp $src $dest
+
+  else
+
+     # Upgrade destination file
+     remove_content 
+     add_new_content 
+     convert_content 
+     update_pci_max_read_request
+     update_header
+     update_data_rate
+
+  fi
+done
+
+exit 0
+
+

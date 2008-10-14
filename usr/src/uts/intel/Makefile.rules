@@ -225,6 +225,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vgatext/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/nskern/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -455,6 +458,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/kdi/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/kdi/$(SUBARCH_DIR)/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/nskern/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 #

@@ -1,0 +1,458 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH=/usr/bin:/usr/sbin:$PATH; export PATH
+
+# Use locale C to evaluate extended acsii characters in existing conf file
+LC_ALL=C; export LC_ALL
+
+tmpfile=/tmp/emlxs_tmp_$$
+sedfile=/tmp/emlxs-sed_$$
+
+
+remove_oldheader ()
+# Remove address and confidential notice no longer used
+{
+  sed -e '/^# 3333 Susan Street, Costa Mesa, CA 92626/d' \
+      -e '/^# All rights reserved.  This computer program and related /',\
+'/^# copyright laws and may subject you to criminal prosecution./d'\
+      $dest > $tmpfile
+  if [ $? -eq 0 ] ; then
+     mv $tmpfile $dest
+  fi
+}
+
+
+update_header ()
+# Update Copyright in Destination
+{
+  emlxs_copyright=`grep '# COPYRIGHT.*Emulex.*' $src`
+
+  sed -e "s:#	*EMLXS.CONF:# EMLXS.CONF:" \
+      -e "s:# COPYRIGHT.*Emulex.*:$emlxs_copyright:" $dest > $tmpfile	
+  if [ $? -eq 0 ] ; then
+     mv $tmpfile $dest
+  fi
+}
+
+
+add_pci_max_read ()
+# Add pci-max-read comment block
+{
+   cat >> $dest <<PCIMAXREAD
+# pci-max-read:  Sets the PCI-X max memory read byte count on the adapter.
+#
+# This value controls the adapter's max PCI-X memory read count.
+# On Sunfire x4100/4200 systems this parameter must be changed to 
+# 1024 bytes.  Currently, this parameter should only be modified on 
+# Sunfire x4100/4200 systems due to the unique nature of the PCI-X bus 
+# on these systems, otherwise it should be left as default.
+#
+# Options:  512, 1024, 2048, 4096
+#
+# Range:  Min:512  Max:4096  Default:2048
+#
+# *Uncomment this parameter for Sunfire x4100/4200 systems only
+#pci-max-read=1024;
+
+
+PCIMAXREAD
+}
+
+
+create_update_pci_max_read_sedfile ()
+# Create sed file to replace old pci-max-read comment
+# with new information
+#
+{
+   cat > $sedfile <<SEDCMDS
+/^# pci-max-read: /{
+n
+n
+/# Uncomment this parameter for Sunfire x4100\/4200 systems only/c\\
+\# This value controls the adapter's max PCI-X memory read count.\\
+\# On Sunfire x4100/4200 systems this parameter must be changed to \\
+\# 1024 bytes.  Currently, this parameter should only be modified on \\
+\# Sunfire x4100/4200 systems due to the unique nature of the PCI-X bus \\
+\# on these systems, otherwise it should be left as default.\\
+\#\\
+\# Options:  512, 1024, 2048, 4096\\
+\#\\
+\# Range:  Min:512  Max:4096  Default:2048\\
+\#\\
+\# *Uncomment this parameter for Sunfire x4100/4200 systems only
+}
+SEDCMDS
+}
+
+
+check_pci_max_read ()
+# pci-max-read may be either new or need updating
+{
+  grep "pci-max-read=" $dest > /dev/null
+  if [ $? -eq 0 ]; then
+
+     # Make sure comment is up to date
+
+     create_update_pci_max_read_sedfile
+     sed -f $sedfile $dest > $tmpfile
+     if [ $? -eq 0 ] ; then
+        mv $tmpfile $dest
+     fi
+
+  else
+     # Add comment block
+     add_pci_max_read
+  fi
+}
+
+
+add_vport_comment ()
+# Add vport comment
+{
+   cat >> $dest << VPORT_CMT
+# vport: Virtual port registration table.
+#        The enable-npiv must be set to 1.  
+#  
+# The vport table may have any number of comma delimited entries.
+# Each entry must be of the form:   
+#
+#   "PHYS_WWPN:VPORT_WWNN:VPORT_WWPN:VPORT_ID"
+#
+#   PHYS_WWPN  = World Wide Port Name of adapter's physical port
+#   VPORT_WWNN = Desired World Wide Node Name of virtual port
+#   VPORT_WWPN = Desired World Wide Port Name of virtual port
+#   VPORT_ID   = Desired virtual port id (1 to max vports)
+#                The port ids must start at 1 and increment by 1
+#                with no gaps in the count.
+#       
+# Example:
+#
+# vport="10000000c9123456:28010000c9123456:20010000c9123456:1",
+#       "10000000c9123456:28020000c9123456:20020000c9123456:2",
+#       "10000000c9123457:28010000c9123457:20010000c9123457:1",
+#       "10000000c9123457:28020000c9123457:20020000c9123457:2",
+#       "10000000c9123457:28030000c9123457:20030000c9123457:3";
+#    
+
+
+VPORT_CMT
+}
+
+
+create_default_num_nodes_sedfile ()
+# Create sed script to determine Default comment for num_nodes
+# Used by check_num_nodes routine
+{
+   cat > $sedfile <<SEDCMDS
+/^# num-nodes: /{
+N
+N
+N
+N
+s/.*Default:\([0-9]*\).*/\1/p
+}
+SEDCMDS
+}
+
+
+create_update_num_nodes_sedfile ()
+# Create sed script to replace num_nodes comment block
+# Used by check_num_nodes routine
+{
+   cat > $sedfile <<SEDCMDS
+/^# num-nodes: /{
+a\\
+\# 
+a\\
+\# 0 = Indicates auto detect limit of adapter.
+n
+s/# /#/
+n
+s/Range:  Min:2  Max:512  Default:512/Range:  Min:0  Max:4096  Default:0/
+n
+n
+s/num-nodes=512;/num-nodes=0;/
+}
+SEDCMDS
+}
+
+
+check_num_nodes ()
+# num-nodes values range and default were modified 
+# As the old default (512) is still a valid setting we need
+# to rely on the comment block to decide to make the change.
+#   If num-nodes != 512 then no change
+#   If num-nodes == 512 and no comment block then no change
+#   If num-nodes == 512 and new comment block then no change
+#   If num-nodes == 512 and old comment block then make change
+{
+  grep "^num-nodes=512;" $dest  > /dev/null
+  if [ $? -eq 0 ]; then
+     create_default_num_nodes_sedfile
+     default=`sed -n -f $sedfile $dest`
+     if [ -n "$default" ] && [ $default -eq 512 ] ; then
+        create_update_num_nodes_sedfile
+	sed -f $sedfile $dest > $tmpfile
+	if [ $? -eq 0 ] ; then
+	   mv $tmpfile $dest
+        fi
+     fi
+  fi
+}
+
+
+create_max_link_speed_sedfile ()
+# Create sed script to determine Max in comments for link_speed
+# Used by check_link_speed routine
+{
+   cat > $sedfile <<SEDCMDS
+/^# link-speed: /{
+N
+N
+N
+N
+N
+N
+N
+N
+N
+s/.*Max:\([0-9]*\).*/\1/p
+}
+SEDCMDS
+}
+
+
+create_update_link_speed_sedfile ()
+# Create sed script to update speed-link comment block
+# Used by check_link_speed routine
+{
+   cat > $sedfile <<SEDCMDS
+/^# link-speed: /{
+n
+n
+n
+n
+n
+n
+a\\
+\#  8 = 8 Gigabaud
+n
+n
+s/Max:4/Max:8/
+}
+SEDCMDS
+}
+
+
+check_link_speed ()
+# link-speed value for range was modified
+# Old Max: 4 New Max: 8
+{
+   create_max_link_speed_sedfile
+   max=`sed -n -f $sedfile $dest`
+   if [ -n "$max" ] && [ $max -eq 4 ] ; then
+      create_update_link_speed_sedfile
+      sed -f $sedfile $dest > $tmpfile
+      if [ $? -eq 0 ] ; then
+	 mv $tmpfile $dest
+      fi
+   fi
+}
+
+
+add_log_ct ()
+# add LOG_CT comment to destination 
+{
+   sed -e '/# LOG_FIRMWARE /a\
+\# LOG_CT          0x00010000     /* CT events */' $dest > $tmpfile
+
+   if [ $? -eq 0 ] ; then
+      mv $tmpfile $dest
+   fi
+}
+
+
+add_log_fcsp ()
+# add LOG_CT comment to destination 
+{
+   sed -e '/# LOG_CT /a\
+\# LOG_FCSP        0x00020000     /* FCSP events */' $dest > $tmpfile
+
+   if [ $? -eq 0 ] ; then
+      mv $tmpfile $dest
+   fi
+}
+
+
+add_parameter ()
+# Add new parameters and comment block from src confile 
+{
+   newparam=$1
+
+   # Special cases - parameters not used or which have been updated
+   
+   if [ $newparam = pci-max-read ] ; then
+      # pci-max-read parameter may be new or need to be updated 
+      check_pci_max_read
+   elif [ $newparam = vport ] ; then
+      # vport parameter is not included in the delivered conf file.
+      # Check is done against the first line of the vport comment instead.
+      # to see if comment was already added.
+
+      grep "^# vport: Virtual port registration table." $dest > /dev/null
+      if [ $? -ne 0 ] ;then
+         add_vport_comment
+      fi
+   else 
+
+      # Regular parameters
+      commentblk=""
+
+      # Lookup comment and parameter from src conffile
+
+      while read confline
+      do
+       
+       if [ -z "$confline" ] ; then
+
+	  # Blank line;  reset block and resume
+
+          commentblk=""
+	  continue
+       fi
+
+       echo "$confline" | grep '^#' > /dev/null 2>&1
+       if [ $? -eq 0 ] ; then
+
+          # Comment
+          
+          # Start new comment block or append to existing block.
+
+          if [ -z "${commentblk}" ] ; then
+             commentblk="${confline}"
+          else
+             commentblk="${commentblk}\n${confline}"
+          fi
+          continue
+       fi
+
+       # Must be a parameter
+
+       param=`echo "$confline" | sed 's/\(.*\)=.*/\1/'`
+
+       if [ "${newparam}" = "${param}" ] ; then
+	  echo "$commentblk" >> $dest
+          echo "$confline" >> $dest
+	  echo "\n" >> $dest
+       else
+	  # Wrong parameter; reset block
+	  commentblk=""
+	  continue
+       fi
+      done < $src
+   fi
+}
+
+
+new_content ()
+# look up new parameters and add if needed
+# Add the parameter variable to the new_params list.
+{
+   new_params="\
+	pci-max-read \
+	linkup-delay \
+	enable-npiv \
+	vport-restrict-login \
+	vport \
+	enable-auth \
+        max-xfer-size \
+        target-mode \
+	"
+
+    for param in $new_params ; do
+	grep "^${param}=" $dest > /dev/null
+	if [ $? -ne 0 ] ; then
+	   add_parameter $param
+         fi
+    done
+}
+
+
+update_content ()
+# Update existing information in destination conffile
+{
+  # Correct spelling issue
+  sed -e 's/manamgnet/management/' \
+      -e 's/# LOG_RESERVED    0xfff.0000/# LOG_RESERVED    0xfffc0000/' \
+      $dest > $tmpfile
+  if [ $? -eq 0 ] ; then
+     mv $tmpfile $dest
+  fi
+
+  if grep '^# LOG_CT ' $dest > /dev/null ; then
+	:
+  else
+     add_log_ct
+  fi
+
+  if grep '^# LOG_FCSP ' $dest > /dev/null ; then
+	:
+  else
+     add_log_fcsp
+  fi
+  
+  check_num_nodes
+
+  check_link_speed
+
+}
+
+
+
+#
+# Main --------------------
+#
+
+while read src dest
+do
+  if [ ! -f $dest ] ; then
+     cp $src $dest
+
+  else
+
+     # Upgrade destination file
+     remove_oldheader
+     update_header
+     new_content
+     update_content 
+
+  fi
+done
+
+exit 0
+
+

@@ -1,0 +1,84 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# Generic interface definition for usr/src/lib/storage/liba5k.
+#
+# For information regarding the establishment of versioned definitions see:
+#       The Linker and Libraries Manual (version 2.5 or greater)
+# This is part of the Developers Guide in the Answerbook.  Specifically refer
+# to Chapter 2 under section "Defining Additional Symbols" through section
+# "Reducing Symbol Scope", and Chapter 5 "Versioning".
+#
+# For Sun's specific rules for the modification (evolution) of these version
+# definitions see:
+#    "Policy for Shared Library Version Names and Interface Definitions"
+#    in /shared/ON/general_docs/scoping_rules.ps
+#
+SUNW_2.0 {
+	global:
+		l_chk_null_wwn;
+		l_convert_name;
+		l_bp_bypass_enable;
+		l_dev_bypass_enable;
+		l_dev_pwr_up_down;
+		l_device_present;
+		l_download;
+		l_duplicate_names;
+		l_encl_status_page_funcs;
+		l_format_fc_status_msg;
+		l_format_ifp_status_msg;
+		l_free_box_list;
+		l_free_lstate;
+		l_get_allses;
+		l_get_box_list;
+		l_get_disk_element_index;
+		l_get_disk_port_status;
+		l_get_disk_status;
+		l_get_drive_name;
+		l_get_envsen;
+		l_get_envsen_page;
+		l_get_ib_status;
+		l_get_individual_state;
+		l_get_port;
+		l_get_ses_path;
+		l_get_slot;
+		l_get_status;
+		l_led;
+		l_pho_pwr_up_down;
+		l_make_node;
+		l_new_name;
+		l_offline_photon;
+		l_get_enc_type;
+		d_p_bypass;
+		d_p_enable;
+		l_check_file;
+		l_element_msg_string;
+		l_get_conflict;
+		l_get_mode_pg;
+		l_new_password;
+	local:
+		*;
+};

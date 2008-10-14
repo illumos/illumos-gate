@@ -1,0 +1,128 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:$PATH"; export PATH
+
+# Driver definitions
+DRVR_NAME=qlc
+PERM_OPT="-m '* 0600 root sys'"
+CLASS_OPT="-c fibre-channel"
+
+DRVR_ALIASES_sparc="\
+	pci1077,2200 \
+	pci1077,2300 \
+	pci1077,2312 \
+	pci1077,2422 \
+	pciex1077,2432 \
+	pciex1077,5432 \
+	"
+
+DRVR_ALIASES_i386="\
+	pci1077,2200 \
+	pci1077,2300 \
+	pci1077,2312 \
+	pci1077,132 \
+	pci1077,2422 \
+	pciex1077,2432 \
+	pciex1077,5432 \
+	"
+
+HARDWARE_STRINGS_sparc="\
+	SUNW,qlc \
+	pci1077,2422 \
+	pciex1077,2432 \
+	pci1077,2432 \
+	"
+
+HARDWARE_STRING_i386="\
+	SUNW,qlc \
+	pci1077,132 \
+	pci1077,2422 \
+	pciex1077,2432 \
+	pci1077,2432 \
+	"
+
+if [ ${ARCH} = "sparc" ]; then
+	DRVR_ALIASES_LIST=$DRVR_ALIASES_sparc
+	HARDWARE_STRINGS=$HARDWARE_STRINGS_sparc
+elif [ ${ARCH} = "i386" ]; then
+	DRVR_ALIASES_LIST=$DRVR_ALIASES_i386
+	HARDWARE_STRINGS=$HARDWARE_STRINGS_i386
+else
+	echo "\n$0 Failed: ${ARCH} is not supported.\n" >&2
+	exit 1
+fi
+
+
+
+for ALIAS in $DRVR_ALIASES_LIST ; do
+	if [ -z "$ALIASES_OPT" ] ; then
+		ALIASES_OPT="-i '\"$ALIAS\""
+	else
+		ALIASES_OPT="$ALIASES_OPT \"$ALIAS\""
+	fi
+done
+ALIASES_OPT="$ALIASES_OPT'"
+
+
+for STRING in $HARDWARE_STRINGS ; do
+	if [ -z "$HARDWARE_LIST" ] ; then
+		HARDWARE_LIST="$STRING"
+	else
+		# Seperate items with pipe to represent or with egrep.
+		HARDWARE_LIST="$HARDWARE_LIST|$STRING"
+	fi
+done
+
+
+if [ -z "${BASEDIR}" ]; then
+	echo "\n$0 Failed: BASEDIR is not set.\n" >&2
+	exit 1
+fi
+
+
+# Remove existing definition, if it exists. 
+/usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME} > /dev/null 2>&1
+
+# Check for hardware
+prtconf -pv | egrep "${HARDWARE_LIST}" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	# Hardware is present; use command to attach the drivers
+	ADD_DRV="add_drv -b ${BASEDIR}"
+else
+	# No hardware found on the system, prevent attachment
+	ADD_DRV="add_drv -n -b ${BASEDIR}"
+fi
+
+eval ${ADD_DRV} "${PERM_OPT}" ${CLASS_OPT} "${ALIASES_OPT}" ${DRVR_NAME}
+if [ $? -ne 0 ]; then
+	echo "\nCommand Failed:\n${ADD_DRV} "${PERM_OPT}" \
+		${CLASS_OPT} "${ALIASES_OPT}" ${DRVR_NAME}\n" >&2
+	exit 1
+fi
+
+exit 0

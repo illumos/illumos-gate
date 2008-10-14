@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This Makefile defines all file modules and build rules for the
 # directory uts/sparc and its children. These are the source files which
 # are specific to the sparc processor.
@@ -80,6 +78,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/krtld/%.s
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/ml/%.s
 	$(COMPILE.s) -o $@ $<
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/nskern/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sparc/os/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -120,6 +121,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sparc/krtld/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sparc/ml/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sparc/nskern/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sparc/os/%.c

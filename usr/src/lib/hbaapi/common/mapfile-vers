@@ -1,0 +1,106 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+SUNW_1.1 {
+    global:
+	HBA_GetVersion;
+	HBA_GetWrapperLibraryAttributes;
+	HBA_LoadLibrary;
+	HBA_FreeLibrary;
+	HBA_GetNumberOfAdapters;
+	HBA_GetAdapterName;
+	HBA_OpenAdapter;
+	HBA_CloseAdapter;
+	HBA_GetAdapterAttributes;
+	HBA_GetAdapterPortAttributes;
+	HBA_GetPortStatistics;
+	HBA_GetDiscoveredPortAttributes;
+	HBA_GetPortAttributesByWWN;
+	HBA_SendCTPassThru;
+	HBA_RefreshInformation;
+	HBA_ResetStatistics;
+	HBA_GetFcpTargetMapping;
+	HBA_GetFcpPersistentBinding;
+	HBA_GetEventBuffer;
+	HBA_SetRNIDMgmtInfo;
+	HBA_GetRNIDMgmtInfo;
+	HBA_SendRNID;
+	HBA_SendScsiInquiry;
+	HBA_SendReportLUNs;
+	HBA_SendReadCapacity;
+
+    local:
+	*;
+};
+
+SUNW_2.0 {
+    global:
+	HBA_GetVendorLibraryAttributes;
+	HBA_OpenAdapterByWWN;
+	Sun_HBA_NPIVGetAdapterAttributes;
+	Sun_HBA_GetNPIVPortInfo;
+	Sun_HBA_DeleteNPIVPort;
+	Sun_HBA_GetPortNPIVAttributes;
+	Sun_HBA_CreateNPIVPort;
+	HBA_SendCTPassThruV2;
+	HBA_RefreshAdapterConfiguration;
+	HBA_GetFcpTargetMappingV2;
+	HBA_RemoveCallback;
+	HBA_RegisterForAdapterAddEvents;
+	HBA_RegisterForAdapterEvents;
+	HBA_RegisterForAdapterPortEvents;
+	Sun_HBA_RegisterForAdapterDeviceEvents;
+	HBA_RegisterForAdapterPortStatEvents;
+	HBA_RegisterForTargetEvents;
+	HBA_RegisterForLinkEvents;
+	HBA_SendRNIDV2;
+	HBA_SendRLS;
+	HBA_SendRPL;
+	HBA_SendRPS;
+	HBA_SendSRL;
+	HBA_SendLIRR;
+	HBA_ScsiInquiryV2;
+	HBA_ScsiReportLUNsV2;
+	HBA_ScsiReadCapacityV2;
+	HBA_GetBindingCapability;
+	HBA_SetBindingSupport;
+	HBA_GetBindingSupport;
+	HBA_SetPersistentBindingV2;
+	HBA_GetPersistentBindingV2;
+	HBA_RemovePersistentBinding;
+	HBA_RemoveAllPersistentBindings;
+	HBA_GetFC4Statistics;
+	HBA_GetFCPStatistics;
+	Sun_HBA_GetNumberOfTgtAdapters;
+	Sun_HBA_GetTgtAdapterName;
+	Sun_HBA_OpenTgtAdapter;
+	Sun_HBA_OpenTgtAdapterByWWN;
+	Sun_HBA_AdapterCreateWWN;
+	Sun_HBA_AdapterReturnWWN;
+
+    local:
+	*;
+};
+

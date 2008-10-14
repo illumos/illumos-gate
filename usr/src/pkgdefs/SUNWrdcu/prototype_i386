@@ -1,0 +1,47 @@
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!include <filename>                    # include another 'prototype' file
+#!default <mode> <owner> <group>        # default used if not specified on entry
+#!<param>=<value>                       # puts parameter in pkg environment
+
+!include prototype_com
+
+d none usr/kernel/drv/amd64 0755 root sys
+f none usr/kernel/drv/amd64/rdc 0755 root sys
+f none usr/kernel/drv/rdc 0755 root sys
+
+d none usr/kernel/misc/amd64 0755 root sys
+f none usr/kernel/misc/rdcstub=usr/kernel/drv/rdcstub 0755 root sys
+f none usr/kernel/misc/amd64/rdcstub=usr/kernel/drv/amd64/rdcstub 0755 root sys
+f none usr/kernel/misc/rdcsrv=usr/kernel/drv/rdcsrv 0755 root sys
+f none usr/kernel/misc/amd64/rdcsrv=usr/kernel/drv/amd64/rdcsrv 0755 root sys
+
+d none usr/lib/mdb/kvm/amd64 0755 root sys
+f none usr/lib/mdb/kvm/rdc.so 0555 root sys
+f none usr/lib/mdb/kvm/amd64/rdc.so 0555 root sys

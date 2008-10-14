@@ -1,0 +1,158 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!--
+
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+
+iSNS Server persistent data store document type definition
+
+-->
+
+<!--
+	This file contains the DTD for the XML flat file of iSNS
+	Persistent Data Store. It defines the XML Nodes and format
+	of iSNS Objects and iSNS Attributes of the Objects.
+
+	There are six iSNS Objects: Network Entity, Portal, iSCSI
+	Storage Node, Portal Group, Discovery Domain Set and
+	Discovery Domain. Each object will be defined as a XML Node.
+
+	All of UID attribute and Key attributes of each iSNS Object
+	will be defined as attributes of a XML Node. Other iSNS
+	Attributes of each iSNS Object will be defined as child
+	elements of the XML Node.
+-->
+
+<!--
+	Root Node Of The Persistent Data Store
+-->
+
+<!ELEMENT isns_data (entity*, dd*, dds*)>
+<!ATTLIST isns_data vendor   CDATA #REQUIRED
+		    version  CDATA #REQUIRED>
+
+<!--
+	Network Entity Object
+-->
+
+<!ELEMENT entity (protocol, period?,
+		  (iscsi | portal)+, pg*)>
+<!-- 7: Entity Index -->
+<!-- 1: Entity Identifier (EID) -->
+<!ATTLIST entity uid   CDATA #REQUIRED
+		 eid   CDATA #REQUIRED>
+<!-- 2: Entity Protocol -->
+<!ELEMENT protocol (#PCDATA)>
+<!-- 6: Registration Period -->
+<!ELEMENT period (#PCDATA)>
+
+<!--
+	Portal Object
+-->
+
+<!ELEMENT portal (esi?, scn?)>
+<!-- 22: Portal Index -->
+<!-- 16: Portal IP Address -->
+<!-- 17: Portal TCP/UDP Port -->
+<!ATTLIST portal uid    CDATA #REQUIRED
+		 ip     CDATA #REQUIRED
+		 port   CDATA #REQUIRED>
+<!-- 20: ESI Port -->
+<!ELEMENT esi (#PCDATA)>
+<!-- 23: SCN Port -->
+<!ELEMENT scn (#PCDATA)>
+
+<!--
+	iSCSI Storage Node Object
+-->
+
+<!ELEMENT iscsi (type, alias?, auth?)>
+<!-- 36: iSCSI Node Index -->
+<!-- 32: iSCSI Name -->
+<!ATTLIST iscsi  uid    CDATA #REQUIRED
+		 name   CDATA #REQUIRED>
+<!-- 33: iSCSI Node Type -->
+<!ELEMENT type (#PCDATA)>
+<!-- 34: iSCSI Alias -->
+<!ELEMENT alias (#PCDATA)>
+<!-- 42: iSCSI AuthMethod -->
+<!ELEMENT auth (#PCDATA)>
+
+<!--
+	Portal Group Object
+-->
+
+<!ELEMENT pg (pgt)>
+<!-- 52: PG Index -->
+<!-- 48: PG iSCSI Name -->
+<!-- 49: PG Portal IP Addr -->
+<!-- 50: PG Portal TCP/UDP Port -->
+<!ATTLIST pg     uid        CDATA #REQUIRED
+		 pg_iscsi   CDATA #REQUIRED
+		 pg_ip      CDATA #REQUIRED
+		 pg_port    CDATA #REQUIRED>
+<!-- 51: PG Tag (PGT) -->
+<!ELEMENT pgt (#PCDATA)>
+
+<!--
+	Discovery Domain Set Object
+-->
+
+<!ELEMENT dds (status?, assoc_dd*)>
+<!-- 2049: DD_Set ID -->
+<!-- 2050: DD_Set Sym Name -->
+<!ATTLIST dds    uid    CDATA #REQUIRED
+		 name   CDATA #REQUIRED>
+<!-- 2051: DD_Set Status -->
+<!ELEMENT status (#PCDATA)>
+
+<!--
+	DD_DDS Association object
+-->
+
+<!ELEMENT assoc_dd EMPTY>
+<!-- 2065: DD_ID -->
+<!ATTLIST assoc_dd dd_uid    CDATA #REQUIRED>
+
+<!--
+	Discovery Domain Object
+-->
+
+<!ELEMENT dd (features?, assoc_iscsi*)>
+<!-- 2065: DD_ID -->
+<!-- 2066: DD_Symbolic Name -->
+<!ATTLIST dd     uid     CDATA #REQUIRED
+		 name    CDATA #REQUIRED>
+<!-- 2078: DD_Features -->
+<!ELEMENT features (#PCDATA)>
+
+<!--
+	ISCSI_DD Association object
+-->
+
+<!ELEMENT assoc_iscsi EMPTY>
+<!-- 36: iSCSI Node Index -->
+<!-- 32: iSCSI Name -->
+<!ATTLIST assoc_iscsi iscsi_uid    CDATA #REQUIRED
+		      iscsi_name   CDATA #REQUIRED>

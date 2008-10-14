@@ -1,0 +1,72 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/* LINTLIBRARY */
+/* PROTOLIB1 */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#include <sys/types.h>
+#include <sys/nsctl/cfg.h>
+
+int cfg_get_cstring(CFGFILE *fd, const char *key, void *value, int value_len);
+int cfg_put_cstring(CFGFILE *fd, const char *key, void *value, int value_len);
+int cfg_get_pstring(CFGFILE *fd, const char *key, void *value, int value_len);
+int cfg_put_pstring(CFGFILE *fd, const char *key, void *value, int value_len);
+int cfg_get_options(CFGFILE *fd, int section, const char *basekey,
+    char *tag, int tag_len, char *val, int val_len);
+int cfg_put_options(CFGFILE *fd, int section, const char *basekey,
+    char *tag, char *val);
+int cfg_get_single_option(CFGFILE *fd, int section, const char *basekey,
+    char *tag, char *val, int val_len);
+int cfg_del_option(CFGFILE *fd, int section, const char *basekey, char *tag);
+
+CFGFILE *cfg_open(char *filename);
+void cfg_rewind(CFGFILE *fd, int section);
+int cfg_update_parser_config(CFGFILE *, const char *key, int section);
+char *cfg_error(int *severity);
+char *cfg_location(char *location, int mode, char *altroot);
+void cfg_close(CFGFILE *fd);
+int cfg_lock(CFGFILE *fd, CFGLOCK type);
+void cfg_unlock(CFGFILE *fd);
+int cfg_get_lock(CFGFILE *fd, CFGLOCK *type, pid_t *pid);
+int cfg_commit(CFGFILE *fd);
+void cfg_resource(CFGFILE *fd, const char *resource);
+char *cfg_dgname(const char *path, char *dgname, size_t len);
+char *cfg_l_dgname(const char *path, char *dgname, size_t len);
+int cfg_dgname_islocal(char *dgname, char **node);
+int cfg_iscluster(void);
+int cfg_issuncluster(void);
+int cfg_add_user(CFGFILE *, char *, char *, char *);
+int cfg_rem_user(CFGFILE *, char *, char *, char *);
+int cfg_vol_enable(CFGFILE *, char *, char *, char *);
+int cfg_vol_disable(CFGFILE *, char *, char *, char *);
+int cfg_load_dsvols(CFGFILE *);
+void cfg_unload_dsvols();
+int cfg_load_svols(CFGFILE *);
+void cfg_unload_svols();
+int cfg_load_shadows(CFGFILE *);
+void cfg_unload_shadows();
+int cfg_get_canonical_name(CFGFILE *, const char *, char **);
+int cfg_get_tags(CFGFILE*, char ***);
+char *cfg_get_resource(CFGFILE *);

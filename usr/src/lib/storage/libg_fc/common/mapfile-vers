@@ -1,0 +1,137 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# Generic interface definition for usr/src/lib/storage/libg_fc.
+#
+# For information regarding the establishment of versioned definitions see:
+#       The Linker and Libraries Manual (version 2.5 or greater)
+# This is part of the Developers Guide in the Answerbook.  Specifically refer
+# to Chapter 2 under section "Defining Additional Symbols" through section
+# "Reducing Symbol Scope", and Chapter 5 "Versioning".
+#
+# For Sun's specific rules for the modification (evolution) of these version
+# definitions see:
+#    "Policy for Shared Library Version Names and Interface Definitions"
+#    in /shared/ON/general_docs/scoping_rules.ps
+#
+SUNW_2.0 {
+	global:
+		g_device_in_map;
+		g_free_multipath;
+		g_free_wwn_list;
+		g_get_dev_map;
+		g_get_lilp_map;
+		g_get_host_params;
+		g_get_fca_port_topology;
+		g_get_inquiry;
+		g_get_serial_number;
+		g_get_limited_map;
+		g_get_multipath;
+		g_get_nexus_path;
+		g_get_port_path;
+		g_get_port_state;
+		g_get_wwn;
+		g_get_wwn_list;
+		g_rdls;
+		g_dev_start;
+		g_dev_stop;
+		g_free_portlist;
+		g_force_lip;
+		g_forcelip_all;
+		g_offline_drive;
+		g_online_drive;
+		g_get_errString;
+		g_get_physical_name;
+		g_get_physical_name_from_link;
+		g_scsi_log_sense_cmd;
+		g_scsi_mode_sense_cmd;
+		g_scsi_read_capacity_cmd;
+		g_scsi_read_capacity_1016_cmd;
+		g_scsi_readbuffer_cmd;
+		g_scsi_rec_diag_cmd;
+		g_scsi_reset;
+		g_scsi_send_diag_cmd;
+		g_scsi_tur;
+		g_scsi_writebuffer_cmd;
+		g_switch_to_alpa;
+		g_sf_alpa_to_switch;
+		g_i18n_catopen;
+		g_port_offline;
+		g_port_online;
+		g_loopback_mode;
+		g_stms_path_enable;
+		g_stms_path_disable_all;
+		g_stms_path_enable_all;
+		g_stms_path_disable;
+		g_stms_get_path_state;
+		g_get_dev_list;
+		g_wwn_in_dev_list;
+		g_get_inq_dtype;
+		g_dev_login;
+		g_dev_logout;
+		g_reserve;
+		g_release;
+		g_start;
+		g_stop;
+		g_string_to_wwn;
+		g_ll_to_str;
+		g_get_port_multipath;
+		g_destroy_data;
+		g_dump;
+		g_object_open;
+		g_zalloc;
+		g_alloc_string;
+		g_scsi_mode_select_cmd;
+		g_scsi_inquiry_cmd;
+		g_scsi_persistent_reserve_in_cmd;
+		g_get_path_type;
+		l_catd;
+		g_get_lun_str;
+		g_get_lun_number;
+		g_get_pathlist;
+		g_get_pathcount;
+		g_failover;
+		g_sort_wwn_list;
+		g_devid_get;
+		g_devices_get_all;
+                g_dev_map_init;
+                g_dev_map_fini;
+                g_get_map_topology;
+                g_get_first_dev;
+                g_get_next_dev;
+                g_dev_prop_lookup_bytes;
+                g_dev_prop_lookup_ints;
+                g_dev_prop_lookup_strings;
+                g_get_first_dev_prop;
+                g_get_next_dev_prop;
+                g_get_dev_prop_name;
+                g_get_dev_prop_type;
+                g_get_dev_prop_bytes;
+                g_get_dev_prop_ints;
+                g_get_dev_prop_strings;
+		g_enclDiskChk;
+	local:
+		*;
+};

@@ -1,0 +1,87 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+SUNW_1.1 {
+    global:
+	Initialize;
+	Terminate;
+	MP_GetPluginPropertiesPlugin;
+	MP_GetDeviceProductOidListPlugin;
+	MP_GetDeviceProductProperties;
+	MP_GetInitiatorPortOidListPlugin;
+	MP_GetInitiatorPortProperties;
+	MP_GetMultipathLusPlugin;
+	MP_GetMultipathLusDevProd;
+	MP_GetMPLogicalUnitProperties;
+	MP_GetAssociatedPathOidList;
+	MP_GetPathLogicalUnitProperties;
+	MP_GetAssociatedTPGOidList;
+	MP_GetTargetPortGroupProperties;
+	MP_GetMPLuOidListFromTPG;
+	MP_GetProprietaryLoadBalanceOidListPlugin;
+	MP_GetProprietaryLoadBalanceProperties;
+	MP_GetTargetPortOidList;
+	MP_GetTargetPortProperties;
+	MP_GetTargetPortGroupProperties;
+	MP_AssignLogicalUnitToTPG;
+	MP_SetOverridePath;
+	MP_CancelOverridePath;
+	MP_EnableAutoFailbackPlugin;
+	MP_EnableAutoFailbackLu;
+	MP_DisableAutoFailbackPlugin;
+	MP_DisableAutoFailbackLu;
+	MP_EnableAutoProbingPlugin;
+	MP_EnableAutoProbingLu;
+	MP_DisableAutoProbingPlugin;
+	MP_DisableAutoProbingLu;
+	MP_EnablePath;
+	MP_DisablePath;
+	MP_SetLogicalUnitLoadBalanceType;
+	MP_SetPluginLoadBalanceTypePlugin;
+	MP_SetPathWeight;
+	MP_SetFailbackPollingRatePlugin;
+	MP_SetFailbackPollingRateLu;
+	MP_SetProbingPollingRatePlugin;
+	MP_SetProbingPollingRateLu;
+	MP_SetProprietaryProperties;
+	MP_SetTPGAccess;
+	MP_RegisterForObjectPropertyChangesPlugin;
+	MP_DeregisterForObjectPropertyChangesPlugin;
+	MP_RegisterForObjectVisibilityChangesPlugin;
+	MP_DeregisterForObjectVisibilityChangesPlugin;
+	Sun_MP_SendScsiCmd;
+    local:
+	*;
+};
+
+SUNWprivate_1.1 {
+	global:
+	    init_sysevents;
+	    log;
+	    getStatus4ErrorCode;
+	    createOidList;
+        local:
+            *;
+};

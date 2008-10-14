@@ -1,0 +1,100 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+SUNWprivate {
+    global:
+	HBA_RegisterLibrary;
+	HBA_RegisterLibraryV2;
+	Sun_fcAdapterCreateWWN;
+	Sun_fcAdapterReturnWWN;
+	Sun_fcCloseAdapter;
+	Sun_fcCreateNPIVPort;
+	Sun_fcDeleteNPIVPort;
+	Sun_fcFreeLibrary;
+	Sun_fcGetAdapterAttributes;
+	Sun_fcGetAdapterName;
+	Sun_fcGetAdapterPortAttributes;
+	Sun_fcGetBindingCapability;
+	Sun_fcGetBindingSupport;
+	Sun_fcGetDiscoveredPortAttributes;
+	Sun_fcGetEventBuffer;
+	Sun_fcGetFC4Statistics;
+	Sun_fcGetFCPStatistics;
+	Sun_fcGetFcpPersistentBinding;
+	Sun_fcGetFcpTargetMapping;
+	Sun_fcGetFcpTargetMappingV2;
+	Sun_fcGetNPIVPortInfo;
+	Sun_fcGetNumberOfAdapters;
+	Sun_fcGetNumberOfTgtAdapters;
+	Sun_fcGetPersistentBindingV2;
+	Sun_fcGetPortAttributesByWWN;
+	Sun_fcGetPortNPIVAttributes;
+	Sun_fcGetPortStatistics;
+	Sun_fcGetRNIDMgmtInfo;
+	Sun_fcGetTgtAdapterName;
+	Sun_fcGetVendorLibraryAttributes;
+	Sun_fcGetVersion;
+	Sun_fcLoadLibrary;
+	Sun_fcNPIVGetAdapterAttributes;
+	Sun_fcOpenAdapter;
+	Sun_fcOpenAdapterByWWN;
+	Sun_fcOpenTgtAdapter;
+	Sun_fcOpenTgtAdapterByWWN;
+	Sun_fcRefreshAdapterConfiguration;
+	Sun_fcRefreshInformation;
+	Sun_fcRegisterForAdapterAddEvents;
+	Sun_fcRegisterForAdapterDeviceEvents;
+	Sun_fcRegisterForAdapterEvents;
+	Sun_fcRegisterForAdapterPortEvents;
+	Sun_fcRegisterForAdapterPortStatEvents;
+	Sun_fcRegisterForLinkEvents;
+	Sun_fcRegisterForTargetEvents;
+	Sun_fcRemoveAllPersistentBindings;
+	Sun_fcRemoveCallback;
+	Sun_fcRemovePersistentBinding;
+	Sun_fcResetStatistics;
+	Sun_fcScsiInquiryV2;
+	Sun_fcScsiReadCapacityV2;
+	Sun_fcScsiReportLUNsV2;
+	Sun_fcSendCTPassThru;
+	Sun_fcSendCTPassThruV2;
+	Sun_fcSendLIRR;
+	Sun_fcSendRLS;
+	Sun_fcSendRNID;
+	Sun_fcSendRNIDV2;
+	Sun_fcSendRPL;
+	Sun_fcSendRPS;
+	Sun_fcSendReadCapacity;
+	Sun_fcSendReportLUNs;
+	Sun_fcSendSRL;
+	Sun_fcSendScsiInquiry;
+	Sun_fcSetBindingSupport;
+	Sun_fcSetPersistentBindingV2;
+	Sun_fcSetRNIDMgmtInfo;
+
+    local:
+	*;
+};

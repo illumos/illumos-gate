@@ -1,0 +1,93 @@
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# 
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+#
+# Generic interface definition for usr/src/lib/libcfg.
+#
+# For information regarding the establishment of versioned definitions see:
+#	The Linker and Libraries Manual (version 2.5 or greater)
+# This is part of the Developers Guide in the Answerbook.  Specifically refer
+# to Chapter 2 under section "Defining Additional Symbols" through section
+# "Reducing Symbol Scope", and Chapter 5 "Versioning".
+#
+# For specific OSNET rules for the modification (evolution) of these version
+# definitions see:
+#	Policy for Shared Library Version Names and Interface Definitions
+
+
+SUNWprivate_1.1 {
+	global:
+		cfg_get_cstring;
+		cfg_put_cstring;
+		cfg_find_cstring;
+		cfg_get_options;
+		cfg_put_options;
+		cfg_open;
+		cfg_close;
+		cfg_rewind;
+		cfg_update_parser_config;
+		cfg_lock;
+		cfg_unlock;
+		cfg_get_lock;
+		cfg_resource;
+		cfg_commit;
+		cfg_location;
+		cfg_error;
+		cfg_iscluster;
+		cfg_issuncluster;
+		cfg_dgname;
+		cfg_dgname_islocal;
+		cfg_lfinit;
+		cfg_filelock;
+		cfg_fileunlock;
+		cfg_readpid;
+		cfg_writepid;
+		cfg_lockd_stat;
+		cfg_invalidate_hsizes;
+		cfg_cfg_isempty;
+		cfg_get_section;
+		cfg_get_num_entries;
+		cfg_add_user;
+		cfg_rem_user;
+		cfg_vol_enable;
+		cfg_vol_disable;
+		cfg_load_dsvols;
+		cfg_unload_dsvols;
+		cfg_load_svols;
+		cfg_unload_svols;
+		cfg_load_shadows;
+		cfg_unload_shadows;
+		cfg_get_canonical_name;
+		cfg_get_tags;
+		cfg_is_cfg;
+		cfg_get_srtdsec;
+		cfg_free_section;
+		cfg_shldskip_vtoc;
+		cfg_get_single_option;
+		cfg_del_option;
+		cfg_get_resource;
+		cfg_l_dgname;
+	local:
+		*;
+};

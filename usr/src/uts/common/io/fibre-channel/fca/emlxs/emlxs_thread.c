@@ -1,0 +1,460 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2008 Emulex.  All rights reserved.
+ * Use is subject to License terms.
+ */
+
+
+#include "emlxs.h"
+
+
+/* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
+EMLXS_MSG_DEF(EMLXS_THREAD_C);
+
+static void emlxs_thread(emlxs_thread_t *ethread);
+static void emlxs_taskq_thread(emlxs_taskq_thread_t *tthread);
+
+
+static void
+emlxs_taskq_thread(emlxs_taskq_thread_t *tthread)
+{
+	emlxs_taskq_t *taskq;
+	void (*func) ();
+	void *arg;
+
+	taskq = tthread->taskq;
+
+	mutex_enter(&tthread->lock);
+	tthread->flags |= EMLXS_THREAD_STARTED;
+
+	while (!(tthread->flags & EMLXS_THREAD_KILLED)) {
+		mutex_enter(&taskq->put_lock);
+		tthread->next = taskq->put_head;
+		taskq->put_head = tthread;
+		taskq->put_count++;
+		mutex_exit(&taskq->put_lock);
+
+		tthread->flags |= EMLXS_THREAD_ASLEEP;
+		cv_wait(&tthread->cv_flag, &tthread->lock);
+		tthread->flags &= ~EMLXS_THREAD_ASLEEP;
+
+		if (tthread->func) {
+			func = tthread->func;
+			arg = tthread->arg;
+
+			tthread->flags |= EMLXS_THREAD_BUSY;
+			mutex_exit(&tthread->lock);
+
+			func(taskq->hba, arg);
+
+			mutex_enter(&tthread->lock);
+			tthread->flags &= ~EMLXS_THREAD_BUSY;
+		}
+	}
+
+	tthread->flags |= EMLXS_THREAD_ENDED;
+	mutex_exit(&tthread->lock);
+
+	(void) thread_exit();
+
+	return;
+
+} /* emlxs_taskq_thread() */
+
+
+
+uint32_t
+emlxs_taskq_dispatch(emlxs_taskq_t *taskq, void (*func) (), void *arg) {
+	emlxs_taskq_thread_t *tthread = NULL;
+
+	mutex_enter(&taskq->get_lock);
+
+	/* Make sure taskq is open for business */
+	if (!taskq->open) {
+		mutex_exit(&taskq->get_lock);
+		return (0);
+	}
+	/* Check get_list for a thread */
+	if (taskq->get_head) {
+		/* Get the next thread */
+		tthread = taskq->get_head;
+		taskq->get_count--;
+		taskq->get_head = (taskq->get_count) ? tthread->next : NULL;
+		tthread->next = NULL;
+	}
+	/* Else check put_list for a thread */
+	else if (taskq->put_head) {
+
+		/* Move put_list to get_list */
+		mutex_enter(&taskq->put_lock);
+		taskq->get_head = taskq->put_head;
+		taskq->get_count = taskq->put_count;
+		taskq->put_head = NULL;
+		taskq->put_count = 0;
+		mutex_exit(&taskq->put_lock);
+
+		/* Get the next thread */
+		tthread = taskq->get_head;
+		taskq->get_count--;
+		taskq->get_head = (taskq->get_count) ? tthread->next : NULL;
+		tthread->next = NULL;
+	}
+	mutex_exit(&taskq->get_lock);
+
+	/* Wake up the thread if one exists */
+	if (tthread) {
+		mutex_enter(&tthread->lock);
+		tthread->func = func;
+		tthread->arg = arg;
+		cv_signal(&tthread->cv_flag);
+		mutex_exit(&tthread->lock);
+
+		return (1);
+	}
+	return (0);
+
+} /* emlxs_taskq_dispatch() */
+
+
+
+void
+emlxs_taskq_create(emlxs_hba_t *hba, emlxs_taskq_t *taskq)
+{
+	emlxs_taskq_thread_t *tthread;
+	char buf[64];
+	uint32_t i = 0;
+
+
+	/* If taskq is already open then quit */
+	if (taskq->open) {
+		return;
+	}
+	/* Zero the taskq */
+	bzero(taskq, sizeof (emlxs_taskq_t));
+
+	(void) sprintf(buf, "%s%d_thread_taskq_get mutex", DRIVER_NAME,
+	    hba->ddiinst);
+	mutex_init(&taskq->get_lock, buf, MUTEX_DRIVER, (void *) hba->intr_arg);
+
+	mutex_enter(&taskq->get_lock);
+
+	taskq->hba = hba;
+
+	(void) sprintf(buf, "%s%d_thread_taskq_put mutex", DRIVER_NAME,
+	    hba->ddiinst);
+	mutex_init(&taskq->put_lock, buf, MUTEX_DRIVER, (void *) hba->intr_arg);
+
+	for (i = 0; i < EMLXS_MAX_TASKQ_THREADS; i++) {
+		tthread = &taskq->thread_list[i];
+		tthread->taskq = taskq;
+
+		(void) sprintf(buf, "%s%d_thread%d mutex", DRIVER_NAME,
+		    hba->ddiinst, i);
+		mutex_init(&tthread->lock, buf, MUTEX_DRIVER,
+		    (void *) hba->intr_arg);
+
+		(void) sprintf(buf, "%s%d_thread%d cv", DRIVER_NAME,
+		    hba->ddiinst, i);
+		cv_init(&tthread->cv_flag, buf, CV_DRIVER, NULL);
+
+		tthread->flags |= EMLXS_THREAD_INITD;
+		tthread->thread = thread_create(NULL, 0, emlxs_taskq_thread,
+		    (char *)tthread, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+	}
+
+	/* Open the taskq */
+	taskq->open = 1;
+
+	mutex_exit(&taskq->get_lock);
+
+	return;
+
+} /* emlxs_taskq_create() */
+
+
+void
+emlxs_taskq_destroy(emlxs_taskq_t *taskq)
+{
+	emlxs_taskq_thread_t *tthread;
+	uint32_t i;
+
+	/* hba = taskq->hba; */
+
+	/* If taskq already closed, then quit */
+	if (!taskq->open) {
+		return;
+	}
+	mutex_enter(&taskq->get_lock);
+
+	/* If taskq already closed, then quit */
+	if (!taskq->open) {
+		mutex_exit(&taskq->get_lock);
+		return;
+	}
+	taskq->open = 0;
+	mutex_exit(&taskq->get_lock);
+
+
+	/* No more threads can be dispatched now */
+
+	/* Kill the threads */
+	for (i = 0; i < EMLXS_MAX_TASKQ_THREADS; i++) {
+		tthread = &taskq->thread_list[i];
+
+		/*
+		 * If the thread lock can be acquired, it is in one of these
+		 * states: 1. Thread not started. 2. Thread asleep. 3. Thread
+		 * busy. 4. Thread ended.
+		 */
+		mutex_enter(&tthread->lock);
+		tthread->flags |= EMLXS_THREAD_KILLED;
+		cv_signal(&tthread->cv_flag);
+
+		/* Wait for thread to die */
+		while (!(tthread->flags & EMLXS_THREAD_ENDED)) {
+			mutex_exit(&tthread->lock);
+			delay(drv_usectohz(10000));
+			mutex_enter(&tthread->lock);
+		}
+		mutex_exit(&tthread->lock);
+
+		/* Clean up thread */
+		mutex_destroy(&tthread->lock);
+		cv_destroy(&tthread->cv_flag);
+	}
+
+	/* Clean up taskq */
+	mutex_destroy(&taskq->put_lock);
+	mutex_destroy(&taskq->get_lock);
+
+	return;
+
+} /* emlxs_taskq_destroy() */
+
+
+
+static void
+emlxs_thread(emlxs_thread_t *ethread)
+{
+	void (*func) ();
+	void *arg1;
+	void *arg2;
+
+	/*
+	 * If the thread lock can be acquired, it is in one of these states:
+	 * 1. Thread not started. 2. Thread asleep. 3. Thread busy. 4. Thread
+	 * ended.
+	 */
+	mutex_enter(&ethread->lock);
+	ethread->flags |= EMLXS_THREAD_STARTED;
+
+	while (!(ethread->flags & EMLXS_THREAD_KILLED)) {
+		if (!(ethread->flags & EMLXS_THREAD_TRIGGERED)) {
+			ethread->flags |= EMLXS_THREAD_ASLEEP;
+			cv_wait(&ethread->cv_flag, &ethread->lock);
+		}
+		ethread->flags &=
+		    ~(EMLXS_THREAD_ASLEEP | EMLXS_THREAD_TRIGGERED);
+
+		if (ethread->func) {
+			func = ethread->func;
+			arg1 = ethread->arg1;
+			arg2 = ethread->arg2;
+			ethread->func = NULL;
+			ethread->arg1 = NULL;
+			ethread->arg2 = NULL;
+
+			ethread->flags |= EMLXS_THREAD_BUSY;
+			mutex_exit(&ethread->lock);
+
+			func(ethread->hba, arg1, arg2);
+
+			mutex_enter(&ethread->lock);
+			ethread->flags &= ~EMLXS_THREAD_BUSY;
+		}
+	}
+
+	ethread->flags |= EMLXS_THREAD_ENDED;
+	mutex_exit(&ethread->lock);
+
+	(void) thread_exit();
+
+	return;
+
+} /* emlxs_thread() */
+
+
+void
+emlxs_thread_create(emlxs_hba_t *hba, emlxs_thread_t *ethread)
+{
+	char buf[64];
+
+	if (ethread->flags & EMLXS_THREAD_INITD) {
+		return;
+	}
+	bzero(ethread, sizeof (emlxs_thread_t));
+
+	(void) sprintf(buf, "%s%d_thread_%08x mutex", DRIVER_NAME,
+	    hba->ddiinst, (int)((uintptr_t)ethread & 0xFFFFFFFF));
+	mutex_init(&ethread->lock, buf, MUTEX_DRIVER, (void *) hba->intr_arg);
+
+	/* mutex_enter(&ethread->lock); */
+
+	(void) sprintf(buf, "%s%d_thread_%08x cv", DRIVER_NAME,
+	    hba->ddiinst, (int)((uintptr_t)ethread & 0xFFFFFFFF));
+	cv_init(&ethread->cv_flag, buf, CV_DRIVER, NULL);
+
+	ethread->hba = hba;
+	ethread->flags |= EMLXS_THREAD_INITD;
+
+	/* mutex_exit(&ethread->lock); */
+
+	ethread->thread = thread_create(NULL, 0, emlxs_thread,
+	    (char *)ethread, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+
+	return;
+
+} /* emlxs_thread_create() */
+
+
+void
+emlxs_thread_destroy(emlxs_thread_t *ethread)
+{
+	/*
+	 * If the thread lock can be acquired, it is in one of these states:
+	 * 1. Thread not started. 2. Thread asleep. 3. Thread busy. 4. Thread
+	 * ended.
+	 */
+	if (!(ethread->flags & EMLXS_THREAD_INITD)) {
+		return;
+	}
+	mutex_enter(&ethread->lock);
+
+	if (ethread->flags & EMLXS_THREAD_ENDED) {
+		return;
+	}
+	ethread->flags &= ~EMLXS_THREAD_INITD;
+	ethread->flags |= (EMLXS_THREAD_KILLED | EMLXS_THREAD_TRIGGERED);
+	ethread->func = NULL;
+	ethread->arg1 = NULL;
+	ethread->arg2 = NULL;
+	cv_signal(&ethread->cv_flag);
+
+	/* Wait for thread to end */
+	while (!(ethread->flags & EMLXS_THREAD_ENDED)) {
+		mutex_exit(&ethread->lock);
+		delay(drv_usectohz(10000));
+		mutex_enter(&ethread->lock);
+	}
+
+	mutex_exit(&ethread->lock);
+
+	cv_destroy(&ethread->cv_flag);
+	mutex_destroy(&ethread->lock);
+
+	return;
+
+} /* emlxs_thread_destroy() */
+
+
+void
+emlxs_thread_trigger1(emlxs_thread_t *ethread, void (*func) ())
+{
+
+	/*
+	 * If the thread lock can be acquired, it is in one of these states:
+	 * 1. Thread not started. 2. Thread asleep. 3. Thread busy. 4. Thread
+	 * ended.
+	 */
+	if (!(ethread->flags & EMLXS_THREAD_INITD)) {
+		return;
+	}
+	mutex_enter(&ethread->lock);
+
+	if (ethread->flags & EMLXS_THREAD_ENDED) {
+		return;
+	}
+	while (!(ethread->flags & EMLXS_THREAD_STARTED)) {
+		mutex_exit(&ethread->lock);
+		delay(drv_usectohz(10000));
+		mutex_enter(&ethread->lock);
+
+		if (ethread->flags & EMLXS_THREAD_ENDED) {
+			return;
+		}
+	}
+
+	ethread->flags |= EMLXS_THREAD_TRIGGERED;
+	ethread->func = func;
+	ethread->arg1 = NULL;
+	ethread->arg2 = NULL;
+
+	if (ethread->flags & EMLXS_THREAD_ASLEEP) {
+		cv_signal(&ethread->cv_flag);
+	}
+	mutex_exit(&ethread->lock);
+
+	return;
+
+} /* emlxs_thread_trigger1() */
+
+
+void
+emlxs_thread_trigger2(emlxs_thread_t *ethread, void (*func) (), RING *rp) {
+
+	/*
+	 * If the thread lock can be acquired, it is in one of these states:
+	 * 1. Thread not started. 2. Thread asleep. 3. Thread busy. 4. Thread
+	 * ended.
+	 */
+	if (!(ethread->flags & EMLXS_THREAD_INITD)) {
+		return;
+	}
+	mutex_enter(&ethread->lock);
+
+	if (ethread->flags & EMLXS_THREAD_ENDED) {
+		return;
+	}
+	while (!(ethread->flags & EMLXS_THREAD_STARTED)) {
+		mutex_exit(&ethread->lock);
+		delay(drv_usectohz(10000));
+		mutex_enter(&ethread->lock);
+
+		if (ethread->flags & EMLXS_THREAD_ENDED) {
+			return;
+		}
+	}
+
+	ethread->flags |= EMLXS_THREAD_TRIGGERED;
+	ethread->func = func;
+	ethread->arg1 = (void *) rp;
+	ethread->arg2 = NULL;
+
+	if (ethread->flags & EMLXS_THREAD_ASLEEP) {
+		cv_signal(&ethread->cv_flag);
+	}
+	mutex_exit(&ethread->lock);
+
+	return;
+
+} /* emlxs_thread_trigger2() */

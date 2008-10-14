@@ -1,0 +1,140 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+
+Service manifests for the iSNS Server
+
+-->
+
+<!--
+
+-->
+
+<service_bundle type='manifest' name='SUNWisns:isns_server'>
+
+<service
+	name='network/isns_server'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance/>
+
+	<!-- We need name resolution and full filesystem access -->
+	<dependency
+		name='milestone'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/milestone/multi-user' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/sbin/isns'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic'
+			/>
+		</method_context>
+	</exec_method>
+        
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic'
+			/>
+		</method_context>
+	</exec_method>
+        
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic'
+			/>
+		</method_context>
+	</exec_method>
+
+        <property_group name='general' type='framework'>
+		<!-- to start stop isns -->		
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.isns' />
+		<!-- to manage prop values -->
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.isns' />
+	</property_group>
+
+	<property_group name='config' type='application'>
+		<propval name='data_store_location' type='astring'
+			value='/etc/isns/isnsdata.xml' />
+		<propval name='ESI_retry_threshold_count' type='count'
+			value='3' />
+		<propval name='Management_SCN_Enabled' type='boolean'
+			value='true' />
+		<property name='Authorized_Control_Nodes' type='ustring' >
+			<ustring_list>
+				<value_node value='' />
+			</ustring_list>
+		</property>
+	</property_group>
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				iSNS server
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='isns' section='1M'
+				manpath='/usr/share/man' />
+			<manpage title='isnsadm' section='1M'
+				manpath='/usr/share /man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

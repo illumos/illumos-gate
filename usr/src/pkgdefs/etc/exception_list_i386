@@ -1095,3 +1095,110 @@ usr/lib/amd64/llib-lsmbfs.ln		i386
 # demo & test program for smbfs (private) ACL support
 #
 usr/lib/fs/smbfs/lsacl		i386
+#
+# FC related files
+kernel/kmdb/amd64/fcip		i386
+kernel/kmdb/amd64/fcp		i386
+kernel/kmdb/amd64/fctl		i386
+kernel/kmdb/amd64/qlc		i386
+kernel/kmdb/fcip		i386
+kernel/kmdb/fcp			i386
+kernel/kmdb/fctl		i386
+kernel/kmdb/qlc			i386
+usr/lib/llib-lHBAAPI		i386
+usr/lib/llib-lHBAAPI.ln		i386
+usr/lib/amd64/llib-lHBAAPI.ln	i386
+usr/include/sys/fibre-channel			i386
+usr/include/sys/fibre-channel/fc.h		i386
+usr/include/sys/fibre-channel/fcio.h		i386
+usr/include/sys/fibre-channel/fc_appif.h	i386
+usr/include/sys/fibre-channel/fc_types.h	i386
+usr/include/sys/fibre-channel/impl		i386
+usr/include/sys/fibre-channel/impl/fc_error.h	i386
+usr/include/sys/fibre-channel/impl/fcph.h	i386
+usr/include/sys/fibre-channel/ulp		i386
+usr/include/sys/fibre-channel/ulp/fcp_util.h	i386
+usr/include/sys/fibre-channel/ulp/fcsm.h	i386
+
+# private AVS headers, commands and libraries
+#
+usr/bin/sd_stats			i386
+usr/bin/errgen				i386
+usr/bin/dscfgcli			i386
+usr/bin/sd_diag				i386
+usr/include/nsctl.h			i386
+usr/include/sys/nsc_ddi.h		i386
+usr/include/sys/nsc_thread.h		i386
+usr/include/sys/nskernd.h		i386
+usr/include/sys/ncall			i386
+usr/include/sys/ncall/ncall.h		i386
+usr/include/sys/ncall/ncall_module.h	i386
+usr/include/sys/nsctl			i386
+usr/include/sys/nsctl/cfg.h		i386
+usr/include/sys/nsctl/cfg_cluster.h	i386
+usr/include/sys/nsctl/cfg_impl.h	i386
+usr/include/sys/nsctl/cfg_lockd.h	i386
+usr/include/sys/nsctl/contract.h	i386
+usr/include/sys/nsctl/dsw.h		i386
+usr/include/sys/nsctl/dsw_dev.h		i386
+usr/include/sys/nsctl/librdc.h		i386
+usr/include/sys/nsctl/model.h		i386
+usr/include/sys/nsctl/ncall_inter.h	i386
+usr/include/sys/nsctl/nsc_dev.h		i386
+usr/include/sys/nsctl/nsc_disk.h	i386
+usr/include/sys/nsctl/nsc_gen.h		i386
+usr/include/sys/nsctl/nsc_hash.h	i386
+usr/include/sys/nsctl/nsc_ioctl.h	i386
+usr/include/sys/nsctl/nsc_mem.h		i386
+usr/include/sys/nsctl/nsc_power.h	i386
+usr/include/sys/nsctl/nsc_rmspin.h	i386
+usr/include/sys/nsctl/nsctl.h		i386
+usr/include/sys/nsctl/nsctl_inter.h	i386
+usr/include/sys/nsctl/nsvers.h		i386
+usr/include/sys/nsctl/rdc.h		i386
+usr/include/sys/nsctl/rdc_bitmap.h	i386
+usr/include/sys/nsctl/rdc_diskq.h	i386
+usr/include/sys/nsctl/rdc_io.h		i386
+usr/include/sys/nsctl/rdc_ioctl.h	i386
+usr/include/sys/nsctl/rdc_prot.h	i386
+usr/include/sys/nsctl/rdcerr.h		i386
+usr/include/sys/nsctl/rdcrules.h	i386
+usr/include/sys/nsctl/safestore.h	i386
+usr/include/sys/nsctl/sd_bcache.h	i386
+usr/include/sys/nsctl/sd_cache.h	i386
+usr/include/sys/nsctl/sd_conf.h		i386
+usr/include/sys/nsctl/sd_hash.h		i386
+usr/include/sys/nsctl/sd_pcu.h		i386
+usr/include/sys/nsctl/sd_trace.h	i386
+usr/include/sys/nsctl/sdbc_ioctl.h	i386
+usr/include/sys/nsctl/sv.h		i386
+usr/include/sys/nsctl/sv_efi.h		i386
+usr/include/sys/nsctl/sv_impl.h		i386
+usr/include/sys/unistat			i386
+usr/include/sys/unistat/spcs_dtrinkets.h    i386
+usr/include/sys/unistat/spcs_errors.h	i386
+usr/include/sys/unistat/spcs_etext.h	i386
+usr/include/sys/unistat/spcs_etrinkets.h    i386
+usr/include/sys/unistat/spcs_s.h	i386
+usr/include/sys/unistat/spcs_s_impl.h	i386
+usr/include/sys/unistat/spcs_s_k.h	i386
+usr/include/sys/unistat/spcs_s_u.h	i386
+
+usr/lib/llib-lnsctl.ln			i386
+usr/lib/llib-ldscfg.ln			i386
+usr/lib/llib-lnsctl.ln			i386
+usr/lib/llib-lrdc.ln			i386
+usr/lib/llib-lunistat.ln		i386
+usr/lib/librdc.so			i386
+usr/lib/libdscfg.so			i386
+usr/lib/libnsctl.so			i386
+usr/lib/libunistat.so			i386
+# These files are used by the iSCSI initiator only.
+# No reason to ship them.
+#
+usr/include/sys/scsi/adapters/iscsi_door.h		i386
+usr/include/sys/scsi/adapters/iscsi_protocol.h		i386
+usr/include/sys/scsi/adapters/iscsi_if.h		i386
+
+# sbd ioctl hdr
+usr/include/sys/stmf_sbd_ioctl.h	i386

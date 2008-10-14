@@ -1,0 +1,594 @@
+--------------------------------------------------------------------
+
+Copyright (c) 2003-2008 QLogic Corporation
+QLogic Leadville qlc HBA device driver
+
+This program includes a device driver for the QLogic Leadville qlc HBA
+device driver distributed with QLogic hardware specific firmware binary 
+files. You may modify and redistribute the device driver code (but not 
+the firmware binary files) under License "A", version 1.0 of the Common 
+Development and Distribution License ("CDDL") as published by Sun 
+Microsystems, Inc. and reproduced below. The hardware binary files are 
+licensed under License "B".
+
+	REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE, 
+THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS" AND ANY EXPRESS 
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, 
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+POSSIBILITY OF SUCH DAMAGE.
+
+	USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT 
+CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR 
+OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT, TRADE 
+SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN ANY OTHER 
+QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN COMBINATION WITH THIS 
+PROGRAM.	
+
+
+License A:
+
+            COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL)
+                               Version 1.0
+
+1. Definitions.
+
+1.1. "Contributor" means each individual or entity that creates or 
+     contributes to the creation of Modifications.
+
+1.2. "Contributor Version" means the combination of the Original 
+     Software, prior Modifications used by a Contributor (if any),
+     and the Modifications made by that particular Contributor.
+
+1.3. "Covered Software" means (a) the Original Software, or (b) 
+     Modifications, or (c) the combination of files containing 
+     Original Software with files containing Modifications, in 
+     each case including portions thereof.
+
+1.4. "Executable" means the Covered Software in any form other than 
+     Source Code.
+
+1.5. "Initial Developer" means the individual or entity that first
+      makes Original Software available under this License.
+
+1.6. "Larger Work" means a work which combines Covered Software or 
+      portions thereof with code not governed by the terms of this 
+      License.
+
+1.7. "License" means this document.
+
+1.8. "Licensable" means having the right to grant, to the maximum 
+     extent possible, whether at the time of the initial grant or 
+     subsequently acquired, any and all of the rights conveyed herein.
+
+1.9. "Modifications" means the Source Code and Executable form of any 
+      of the following:
+
+      A. Any file that results from an addition to, deletion from or 
+         modification of the contents of a file containing Original 
+         Software or previous Modifications;
+
+      B. Any new file that contains any part of the Original Software 
+         or previous Modification; or
+
+      C. Any new file that is contributed or otherwise made available 
+         under the terms of this License.
+
+1.10. "Original Software" means the Source Code and Executable form of 
+      computer software code that is originally released under this 
+      license.
+
+1.11. "Patent Claims" means any patent claim(s), now owned or hereafter
+      acquired, including without limitation, method, process, and 
+      apparatus claims, in any patent Licensable by grantor.
+
+1.12. "Source Code" means (a) the common form of computer software code 
+      in which modifications are made and (b) associated documentation 
+      included in or with such code.
+
+1.13. "You" (or "Your") means an individual or a legal entity 
+      exercising rights under, and complying with all of the terms of, 
+      this License. For legal entities, "You" includes any entity which 
+      controls, is controlled by, or is under common control with You. 
+      For purposes of this definition, "control" means (a) the power, 
+      direct or indirect, to cause the direction or management of such 
+      entity, whether by contract or otherwise, or (b) ownership of 
+      more than fifty percent (50%) of the outstanding shares or 
+      beneficial ownership of such entity.
+
+2. License Grants.
+
+2.1. The Initial Developer Grant.
+
+     Conditioned upon Your compliance with Section 3.1 below and 
+     subject to third party intellectual property claims, the Initial 
+     Developer hereby grants You a world-wide, royalty-free, non-
+     exclusive license:
+
+     (a) under intellectual property rights (other than patent or 
+         trademark) Licensable by Initial Developer, to use, reproduce,
+         modify, display, perform, sublicense and distribute the 
+         Original Software (or portions thereof), with or without 
+         Modifications, and/or as part of a Larger Work; and
+
+     (b) under Patent Claims infringed by the making, using or selling 
+         of Original Software, to make, have made, use, practice, sell, 
+         and offer for sale, and/or otherwise dispose of the Original 
+         Software (or portions thereof).
+
+     (c) The licenses granted in Sections 2.1(a) and (b) are effective 
+         on the date Initial Developer first distributes or otherwise 
+         makes the Original Software available to a third party under 
+         the terms of this License.
+
+     (d) Notwithstanding Section 2.1(b) above, no patent license is 
+         granted: (1) for code that You delete from the Original 
+         Software, or (2) for infringements caused by: (i) the 
+         modification of the Original Software, or (ii) the combination 
+         of the Original Software with other software or devices.
+
+2.2. Contributor Grant.
+
+Conditioned upon Your compliance with Section 3.1 below and subject to
+third party intellectual property claims, each Contributor hereby 
+grants You a world-wide, royalty-free, non-exclusive license:
+
+(a) under intellectual property rights (other than patent or trademark) 
+    Licensable by Contributor to use, reproduce, modify, display, 
+    perform, sublicense and distribute the Modifications created by 
+    such Contributor (or portions thereof), either on an unmodified 
+    basis, with other Modifications, as Covered Software and/or as part 
+    of a Larger Work; and
+
+(b) under Patent Claims infringed by the making, using, or selling of 
+    Modifications made by that Contributor either alone and/or in 
+    combination with its Contributor Version (or portions of such 
+    combination), to make, use, sell, offer for sale, have made, and/or 
+    otherwise dispose of: (1) Modifications made by that Contributor 
+    (or portions thereof); and (2) the combination of Modifications 
+    made by that Contributor with its Contributor Version (or portions 
+    of such combination).
+
+(c) The licenses granted in Sections 2.2(a) and 2.2(b) are effective on 
+    the date Contributor first distributes or otherwise makes the 
+    Modifications available to a third party.
+
+(d) Notwithstanding Section 2.2(b) above, no patent license is granted: 
+    (1) for any code that Contributor has deleted from the Contributor
+    Version; (2) for infringements caused by: (i) third party 
+    modifications of Contributor Version, or (ii) the combination of 
+    Modifications made by that Contributor with other software (except 
+    as part of the Contributor Version) or other devices; or (3) under 
+    Patent Claims infringed by Covered Software in the absence of 
+    Modifications made by that Contributor.
+
+3. Distribution Obligations.
+
+3.1. Availability of Source Code.
+
+     Any Covered Software that You distribute or otherwise make 
+     available in Executable form must also be made available in Source 
+     Code form and that Source Code form must be distributed only under 
+     the terms of this License. You must include a copy of this License 
+     with every copy of the Source Code form of the Covered Software
+     You distribute or otherwise make available. You must inform 
+     recipients of any such Covered Software in xecutable form as to 
+     how they can obtain such Covered Software in Source Code form in a 
+     reasonable manner on or through a medium customarily used for 
+     software exchange.
+
+3.2. Modifications.
+
+     The Modifications that You create or to which You contribute are 
+     governed by the terms of this License. You represent that You 
+     believe Your Modifications are Your original creation(s) and/or 
+     You have sufficient rights to grant the rights conveyed by this 
+     License.
+
+3.3. Required Notices.
+
+     You must include a notice in each of Your Modifications that 
+     identifies You as the Contributor of the Modification. You may not 
+     remove or alter any copyright, patent or trademark notices 
+     contained within the Covered Software, or any notices of licensing 
+     or any descriptive text giving attribution to any Contributor or 
+     the Initial Developer.
+
+3.4. Application of Additional Terms.
+
+     You may not offer or impose any terms on any Covered Software in 
+     Source Code form that alters or restricts the applicable version 
+     of this License or the recipients' rights hereunder. You may 
+     choose to offer, and to charge a fee for, warranty, support, 
+     indemnity or liability obligations to one or more recipients of 
+     Covered Software. However, you may do so only on Your own behalf, 
+     and not on behalf of the Initial Developer or any Contributor. You 
+     must make it absolutely clear that any such warranty, support, 
+     indemnity or liability obligation is offered by You alone, and You 
+     hereby agree to indemnify the Initial Developer and every 
+     Contributor for any liability incurred by the Initial Developer or
+     such Contributor as a result of warranty, support, indemnity or 
+     liability terms You offer.
+
+3.5. Distribution of Executable Versions.
+
+     You may distribute the Executable form of the Covered Software 
+     under the terms of this License or under the terms of a license of 
+     Your choice, which may contain terms different from this License, 
+     provided that You are in compliance with the terms of this License 
+     and that the license for the Executable form does not attempt to 
+     limit or alter the recipient's rights in the Source Code form from 
+     the rights set forth in this License. If You distribute the 
+     Covered Software in Executable form under a different license, You 
+     must make it absolutely clear that any terms which differ from 
+     this License are offered by You alone, not by the Initial 
+     Developer or Contributor. You hereby agree to indemnify the 
+     Initial Developer and every Contributor for any liability incurred 
+     by the Initial Developer or such Contributor as a result of any 
+     such terms You offer.
+
+3.6. Larger Works.
+
+     You may create a Larger Work by combining Covered Software with 
+     other code not governed by the terms of this License and 
+     distribute the Larger Work as a single product. In such a case, 
+     You must make sure the requirements of this License are fulfilled 
+     for the Covered Software.
+
+4. Versions of the License.
+
+4.1. New Versions.
+
+     Sun Microsystems, Inc. is the initial license steward and may 
+     publish revised and/or new versions of this License from time to 
+     time. Each version will be given a distinguishing version number. 
+     Except as provided in Section 4.3, no one other than the license 
+     steward has the right to modify this License.
+
+4.2. Effect of New Versions.
+
+     You may always continue to use, distribute or otherwise make the 
+     Covered Software available under the terms of the version of the 
+     License under which You originally received the Covered Software. 
+     If the Initial Developer includes a notice in the Original 
+     Software prohibiting it from being distributed or otherwise made 
+     available under any subsequent version of the License, You must 
+     distribute and make the Covered Software available under the terms 
+     of the version of the License under which You originally received 
+     the Covered Software. Otherwise, You may also choose to use, 
+     distribute or otherwise make the 
+     Covered Software available under the terms of any subsequent 
+     version of the License published by the license steward.
+
+4.3. Modified Versions.
+
+     When You are an Initial Developer and You want to create a new 
+     license for Your Original Software, You may create and use a 
+     modified version of this License if You: (a) rename the license 
+     and remove any references to the name of the license steward
+     (except to note that the license differs from this License); and 
+     (b) otherwise make it clear that the license contains terms which 
+     differ from this License.
+
+5. DISCLAIMER OF WARRANTY.
+
+   COVERED SOFTWARE IS PROVIDED UNDER THIS LICENSE ON AN "AS IS" 
+   BASIS, WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, 
+   INCLUDING, WITHOUT LIMITATION, WARRANTIES THAT THE COVERED 
+   SOFTWARE IS FREE OF DEFECTS, MERCHANTABLE, FIT FOR A PARTICULAR 
+   PURPOSE OR NON-INFRINGING. THE ENTIRE RISK AS TO THE QUALITY AND 
+   PERFORMANCE OF THE COVERED SOFTWARE IS WITH YOU. SHOULD ANY 
+   COVERED SOFTWARE PROVE DEFECTIVE IN ANY RESPECT, YOU (NOT THE 
+   INITIAL DEVELOPER OR ANY OTHER CONTRIBUTOR) ASSUME THE COST OF ANY 
+   NECESSARY SERVICING, REPAIR OR CORRECTION. THIS DISCLAIMER OF 
+   WARRANTY CONSTITUTES AN ESSENTIAL PART OF THIS LICENSE. 
+   NO USE OF ANY COVERED SOFTWARE IS AUTHORIZED HEREUNDER EXCEPT 
+   UNDER THIS DISCLAIMER.
+
+6. TERMINATION.
+
+6.1. This License and the rights granted hereunder will terminate 
+     automatically if You fail to comply with terms herein and fail to 
+     cure such breach within 30 days of becoming aware of the breach. 
+     Provisions which, by their nature, must remain in effect beyond 
+     the termination of this License shall survive.
+
+6.2. If You assert a patent infringement claim (excluding declaratory 
+     judgment actions) against Initial Developer or a Contributor (the 
+     Initial Developer or Contributor against whom You assert such 
+     claim is referred to as "Participant") alleging that the 
+     Participant Software (meaning the Contributor Version where the 
+     Participant is a Contributor or the Original Software where the 
+     Participant is the Initial Developer) directly or indirectly 
+     infringes any patent, then any and all rights granted directly or 
+     indirectly to You by such Participant, the Initial Developer (if 
+     the Initial Developer is not the Participant) and all Contributors 
+     under Sections 2.1 and/or 2.2 of this License 
+     shall, upon 60 days notice from Participant terminate 
+     prospectively and automatically at the expiration of such 60 day 
+     notice period, unless if within such 60 day period You withdraw 
+     Your claim with respect to the Participant Software against such 
+     Participant either unilaterally or pursuant to a written agreement 
+     with Participant.
+
+6.3. If You assert a patent infringement claim against Participant 
+     alleging that the Participant Software directly or indirectly 
+     infringes any patent where such claim is resolved (such as by 
+     license or settlement) prior to the initiation of patent 
+     infringement litigation, then the reasonable value of the licenses 
+     granted by such Participant under Sections 2.1 or 2.2 shall be 
+     taken into account in determining the amount or value of any 
+     payment or license.
+
+6.4. In the event of termination under Sections 6.1 or 6.2 above, all 
+     end user licenses that have been validly granted by You or any 
+     distributor hereunder prior to termination (excluding licenses 
+     granted to You by any distributor) shall survive termination.
+
+7. LIMITATION OF LIABILITY.
+
+   UNDER NO CIRCUMSTANCES AND UNDER NO LEGAL THEORY, WHETHER TORT
+   (INCLUDING NEGLIGENCE), CONTRACT, OR OTHERWISE, SHALL YOU, THE 
+   INITIAL DEVELOPER, ANY OTHER CONTRIBUTOR, OR ANY DISTRIBUTOR OF 
+   COVERED SOFTWARE, OR ANY SUPPLIER OF ANY OF SUCH PARTIES, BE 
+   LIABLE TO ANY PERSON FOR ANY INDIRECT, SPECIAL, INCIDENTAL, OR 
+   CONSEQUENTIAL DAMAGES OF ANY CHARACTER INCLUDING, WITHOUT 
+   LIMITATION, DAMAGES FOR LOSS OF GOODWILL, WORK STOPPAGE, COMPUTER 
+   FAILURE OR MALFUNCTION, OR ANY AND ALL OTHER COMMERCIAL DAMAGES OR 
+   LOSSES, EVEN IF SUCH PARTY SHALL HAVE BEEN INFORMED OF THE 
+   POSSIBILITY OF SUCH DAMAGES. THIS LIMITATION OF LIABILITY SHALL 
+   NOT APPLY TO LIABILITY FOR DEATH OR PERSONAL INJURY RESULTING FROM 
+   SUCH PARTY'S NEGLIGENCE TO THE EXTENT APPLICABLE LAW PROHIBITS 
+   SUCH LIMITATION. SOME JURISDICTIONS DO NOT ALLOW THE EXCLUSION OR 
+   LIMITATION OF INCIDENTAL OR CONSEQUENTIAL DAMAGES, SO THIS 
+   EXCLUSION AND LIMITATION MAY NOT APPLY TO YOU.
+
+8. U.S. GOVERNMENT END USERS.
+
+   The Covered Software is a "commercial item" as that term is defined 
+   in 48 C.F.R. 2.101 (Oct. 1995), consisting of "commercial computer 
+   software" (as that term is defined at 48 C.F.R. " 252.227-7014(a)
+   (1)) and "commercial computer software documentation" as such terms 
+   are used in 48 C.F.R. 12.212 (Sept. 1995). Consistent with 48 C.F.R. 
+   12.212 and 48 C.F.R. 227.7202-1 through 227.7202-4 (June 1995), all 
+   U.S. Government End Users acquire Covered Software with only those 
+   rights set forth herein. This U.S. Government Rights clause is in 
+   lieu of, and supersedes, any other FAR, DFAR, or other clause or 
+   provision that addresses Government rights in computer software 
+   under this License.
+
+9. MISCELLANEOUS.
+
+   This License represents the complete agreement concerning subject 
+   matter hereof. If any provision of this License is held to be 
+   unenforceable, such provision shall be reformed only to the extent 
+   necessary to make it enforceable. This License shall be governed by 
+   the law of the jurisdiction specified in a notice contained within 
+   the Original Software (except to the extent applicable law, if any, 
+   provides otherwise), excluding such jurisdiction's conflict-of-law 
+   provisions. Any litigation relating to this License shall be subject 
+   to the jurisdiction of the courts located in the jurisdiction and 
+   venue specified in a notice contained within the Original Software, 
+   with the losing party responsible for costs, including, without 
+   limitation, court costs and reasonable attorneys' fees and expenses. 
+   The application of the United Nations Convention on Contracts for 
+   the International Sale of Goods is expressly excluded. Any law or 
+   regulation which provides that the language of a contract shall be 
+   construed against the drafter shall not apply to this License. You 
+   agree that You alone are responsible for compliance with the United 
+   States export administration regulations (and the export control 
+   laws and regulation of any other countries) when You use, distribute
+   or otherwise make available any Covered Software.
+
+10. RESPONSIBILITY FOR CLAIMS.
+
+   As between Initial Developer and the Contributors, each party is 
+   responsible for claims and damages arising, directly or indirectly, 
+   out of its utilization of rights under this License and You agree to 
+   work with Initial Developer and Contributors to distribute such 
+   responsibility on an equitable basis. Nothing herein is intended or 
+   shall be deemed to constitute any admission of liability.
+
+
+----------------------------------------------------------------------
+NOTICE PURSUANT TO SECTION 9 OF THE COMMON DEVELOPMENT AND 
+DISTRIBUTION LICENSE (CDDL)
+
+The OpenSolaris code released under the CDDL shall be governed by the 
+laws of the State of California (excluding conflict-of-law provisions). 
+Any litigation relating to this License shall be subject to the 
+jurisdiction of the Federal Courts of the Northern District of 
+California and the state courts of the State of California, with venue 
+lying in Santa Clara County, California.
+
+
+
+License B:
+
+THIS PRODUCT CONTAINS COMPUTER PROGRAMS AND RELATED DOCUMENTATION 
+("SOFTWARE") THAT BELONG TO QLOGIC CORPORATION ("QLOGIC"), THE USE OF WHICH
+IS SUBJECT TO THIS END USER SOFTWARE LICENSE AGREEMENT ("AGREEMENT") UNLESS
+OTHERWISE AGREED TO IN WRITING BY QLOGIC.  CLICKING ON THE "AGREE" BUTTON
+BELOW, INSTALLING/USING THE SOFTWARE OR ENTERING A LICENSE KEY CONSTITUTES
+ACCEPTANCE BY LICENSEE ("LICENSEE" MEANS YOU OR THE BUSINESS ENTITY ON WHOSE
+BEHALF YOU USE OR INSTALL THE SOFTWARE, AS APPLICABLE) OF ALL THE TERMS AND
+CONDITIONS OF THIS AGREEMENT UNLESS OTHERWISE AGREED TO IN WRITING BY QLOGIC.
+IF LICENSEE DOES NOT AGREE TO THE TERMS AND CONDITIONS OF THIS AGREEMENT,
+LICENSEE SHALL NOT INSTALL/USE THE SOFTWARE OR ENTER A LICENSE KEY.  WRITTEN
+APPROVAL IS NOT A PREREQUISITE TO THE VALIDITY OR ENFORCEABILITY OF THIS 
+AGREEMENT. 
+
+1. License Grant.  Subject to the terms and conditions of this 
+   Agreement, QLogic grants Licensee a limited, non-exclusive license 
+   to redistribute, install, download and/or use the Software (in 
+   object code form only) with certain approved products manufactured 
+   by or for QLogic and approved products manufactured by or for an OEM 
+   customer of QLogic ("QLogic Approved Products").  This license is 
+   only available to original end user purchasers of QLogic Approved 
+   Products that have been purchased through QLogic authorized 
+   distribution channels or approved OEM distribution channels.  This 
+   license is not available to any end users of QLogic products who 
+   have purchased QLogic products, which have previously been used and 
+   the license is not available to any purchaser of QLogic application 
+   specific integrated circuits ("ASICs") or any product incorporating 
+   an ASIC, unless the product incorporating the ASIC is a QLogic 
+   Approved Product.  No rights or licenses in the Software are granted 
+   to Licensee other than those rights expressly granted in this 
+   Agreement.  Nothing in this License entitles Licensee to any 
+   upgrades or updates to, or future releases of, the Software. If 
+   Licensee redistributes the Software, then Licensee shall reproduce 
+   all copyright notices and must include this Agreement or an 
+   agreement which is at least as restrictive as this Agreement.
+
+2. Permitted Use.  Licensee may only install and use the Software in 
+   accordance with the documentation provided with the Software and 
+   with QLogic Approved Products.  
+
+3. Intellectual Property Rights.  The Software contains or embodies 
+   intellectual property of QLogic (or any of its licensors). The 
+   structure, organization and code are valuable trade secrets of 
+   QLogic (or its licensors). QLogic and/or its licensors do not grant, 
+   convey or license to Licensee any rights under any patents, 
+   copyrights, trademarks or any other intellectual property except as 
+   specifically granted herein. The Software is protected under U.S. 
+   copyright laws, international treaty provisions and applicable laws 
+   (including patent laws, if applicable) of the country in which it is 
+   being used. Any unauthorized duplication of the Software is 
+   expressly forbidden.
+
+4. Ownership of Software. Notwithstanding anything to the contrary, 
+   QLogic and its licensors retain all title to and, except as 
+   expressly and unambiguously licensed herein, all rights and interest 
+   in (i) the Software, all copies and derivative works thereof (by 
+   whomever produced), and (ii) all copyright rights, patent rights, 
+   trade secret rights, moral rights and all other intellectual 
+   property and proprietary rights anywhere in the world in the 
+   Software.  The Software is only licensed to Licensee and is not 
+   sold. 
+
+5. Restrictions and Cooperation.  Licensee shall not (and shall not 
+   allow any third party to) (i) decompile, disassemble, or otherwise 
+   reverse engineer or attempt to reconstruct or discover any source 
+   code, or underlying ideas or algorithms of the Software (except to 
+   the extent expressly permitted under applicable law); (ii) provide, 
+   lease, lend, use for timesharing or otherwise use or allow others to 
+   use the Software to or for the benefit of third parties; (iii) 
+   except as specified in the applicable user documentation, modify, 
+   incorporate into or with other hardware or software, or create a 
+   derivative work of any part of the Software; (iv) disseminate 
+   performance information or analysis from any source relating to the 
+   Software; (v) make any copies of the Software except as required to 
+   use the Software as licensed hereunder, except for one (1) copy 
+   solely for archival and back-up purposes,  or (vi) remove any 
+   product identification, copyright notice or other proprietary legend 
+   from the Software.  Licensee agrees to cooperate with QLogic and its 
+   licensors in connection with their efforts to protect their 
+   copyright/patent rights and other legal rights in the Software.  
+   QLogic may, from time to time, implement additional security 
+   measures for the Software, and Licensee shall cooperate with 
+   such measures and be responsible for installing upgrades that 
+   include such measures.
+
+6. Further Obligations.  Licensee shall defend, indemnify and hold 
+   QLogic harmless from and against any and all claims, damages, 
+   liabilities, costs and expenses (including, without limitation, 
+   attorneys" fees) arising out of Licensee"s breach of its obligations 
+   under this Agreement.
+
+7. Term and Termination.  This Agreement will become effective on the 
+   date Licensee clicks on the "Agree" button below or otherwise uses 
+   the Software and will remain in force until terminated.  Licensee 
+   may terminate this Agreement at any time, and QLogic may terminate 
+   this Agreement if Licensee breaches any of the terms or conditions 
+   hereunder.  Licensee agrees to destroy or return to QLogic the 
+   original and all copies of the Software immediately upon any 
+   termination of this Agreement.
+
+8. Confidentiality.  Licensee acknowledges that the Software contains 
+   valuable trade secrets of QLogic and other information proprietary 
+   to QLogic and its licensors.  Licensee shall: (i)"keep confidential 
+   such trade secrets and proprietary information, including without 
+   limitation all information concerning ideas and algorithms related 
+   to the Software, (ii)"disclose such information only to its 
+   employees and agents to the extent required to use the Software 
+   under the terms of this Agreement and (iii)"bind its employees, 
+   consultants, agents and other third parties in writing to maintain 
+   the confidentiality of such trade secrets and proprietary 
+   information and not use or disclose such information except as 
+   permitted in this Agreement.
+
+9. Limited Warranty and Disclaimer. THE SOFTWARE IS PROVIDED "AS IS" 
+   WITHOUT ANY WARRANTY OF ANY KIND INCLUDING, WITHOUT LIMITATION, ANY 
+   WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
+   NON-INFRINGEMENT.  QLOGIC DOES NOT WARRANT THAT THE SOFTWARE IS 
+   ERROR-FREE OR THAT IT WILL OPERATE WITHOUT INTERRUPTION.  QLOGIC 
+   DOES NOT WARRANT, GUARANTEE OR MAKE ANY REPRESENTATION REGARDING THE 
+   USE, OR THE RESULTS OF THE USE OF THE SOFTWARE INCLUDING, WITHOUT 
+   LIMITATION, THE CORRECTNESS, ACCURACY OR RELIABILITY OF SUCH USE OR 
+   RESULTS.  
+
+10. Limitation of Liability.  TO THE MAXIMUM EXTENT PERMITTED BY LAW, 
+    IN NO EVENT WILL QLOGIC BE LIABLE TO LICENSEE OR ANY THIRD PARTY 
+    FOR ANY CONSEQUENTIAL, INCIDENTAL OR SPECIAL DAMAGES, INCLUDING, 
+    WITHOUT LIMITATION, LOST PROFITS, LOST DATA OR LOST SAVINGS, OR FOR 
+    THE COST OF PROCUREMENT OF SUBSTITUTE GOODS, SERVICES OR TECHNOLOGY 
+    EVEN IF QLOGIC HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES, 
+    OR FOR ANY CLAIM BY ANY THIRD PARTY.  
+
+11. Export.  Licensee represents, warrants and agrees that it will not, 
+    directly or indirectly, export, re-export or transmit the Software 
+    or any part thereof to any country in which such export, re-export 
+    or transmission is restricted by any applicable U.S. regulation or 
+    statute, without the prior written consent of both QLogic and, if 
+    required, of the Bureau of Export Administration of the U.S. 
+    Department of Commerce, or such other governmental entity as may 
+    have jurisdiction over such export or transmission. In addition to 
+    the above, Software may not, in the absence of authorization by 
+    U.S. and local law and regulations, as required, be used by or 
+    exported or reexported to (i) any U.S. sanctioned or embargoed 
+    country, or to nationals or residents of such countries; or (ii) 
+    any person, entity, organization or other party identified on the 
+    U.S. Department of Commerce's Denied Persons or Entity List, the 
+    U.S. Department of Treasury's Specially Designated Nationals or 
+    Blocked Persons Lists, or the Department of State's Debarred 
+    Parties List, as published and revised from time to time; or 
+    (iii) any party where the end-use involves nuclear, 
+    chemical/biological weapons, rocket systems or unmanned air 
+    vehicles.
+
+12. Miscellaneous.  A party"s failure to exercise or its delay in 
+    exercising any rights hereunder will not be deemed to be a waiver 
+    of such right.  If any provision of this Agreement shall be held by 
+    any court of competent jurisdiction to be unenforceable or invalid, 
+    that provision shall be limited or eliminated to the minimum extent 
+    necessary so that this Agreement shall otherwise remain in full 
+    force and effect and enforceable.  This Agreement shall be 
+    construed pursuant to the laws of the State of California and the 
+    United States without regard to conflicts of laws provisions 
+    thereof and without regard to the United Nations Convention on 
+    Authority for the International Sale of Goods.  Licensee 
+    irrevocably submits to the jurisdiction of any state or federal 
+    court sitting in the State of California, United States of America, 
+    and consents to venue in such forum with respect to any action or 
+    proceeding that relates to this Agreement.  No amendment 
+    to or modification of this Agreement will be binding unless in 
+    writing and signed by a duly authorized officer of QLogic.  The 
+    provisions of Sections 3-11 shall survive termination of this 
+    Agreement.  This Agreement is in the English language only, which 
+    language shall be controlling and any revision of this Agreement in 
+    any other language shall not be binding.  Both parties agree that 
+    this Agreement is the complete and exclusive statement of the 
+    mutual understanding of the parties and supersedes and cancels all 
+    previous written and oral agreements and communications relating to 
+    the subject matter of this Agreement.  NO VENDOR, DISTRIBUTOR, 
+    DEALER, RETAILER, SALES PERSON OR OTHER PERSON IS AUTHORIZED TO 
+    MODIFY THIS AGREEMENT OR TO MAKE ANY WARRANTY, REPRESENTATION OR 
+    PROMISE WHICH IS DIFFERENT THAN, OR IN ADDITION TO, THE 
+    REPRESENTATIONS OR PROMISES IN THIS AGREEMENT.
+

@@ -162,6 +162,10 @@ ROOTDIRS=			\
 	$(ROOTDIR)/crypto	\
 	$(ROOTDIR)/dcam		\
 	$(ROOTDIR)/iso		\
+	$(ROOTDIR)/fc4		\
+	$(ROOTDIR)/fibre-channel    \
+	$(ROOTDIR)/fibre-channel/impl	\
+	$(ROOTDIR)/fibre-channel/ulp	\
 	$(ROOTDIR)/fm		\
 	$(ROOTDIR)/fm/cpu	\
 	$(ROOTDIR)/fm/fs	\
@@ -182,7 +186,6 @@ ROOTDIRS=			\
 	$(ROOTDIR)/scsi/conf	\
 	$(ROOTDIR)/scsi/generic	\
 	$(ROOTDIR)/scsi/impl	\
-	$(ROOTDIR)/fc4		\
 	$(ROOTDIR)/sdcard	\
 	$(ROOTDIR)/sysevent     \
 	$(ROOTDIR)/contract     \
@@ -246,8 +249,12 @@ ROOTSCSITARGETSHDRS= $(SCSITARGETSHDRS:%=$(ROOTDIR)/scsi/targets/%)
 ROOTSCSICADHDRS= $(SCSICADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 ROOTSCSIADHDRS= $(SCSICADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 ROOTSCSIVHCIHDRS= $(SCSIVHCIHDRS:%=$(ROOTDIR)/scsi/adapters/%)
+ROOTSCSIISCSIHDRS= $(SCSIISCSIHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 
-ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fc4/%)
+ROOTFC4HDRS= $(FC4HDRS:%=$(ROOTDIR)/fc4/%)
+ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fibre-channel/%)
+ROOTFCIMPLHDRS= $(FCIMPLHDRS:%=$(ROOTDIR)/fibre-channel/impl/%)
+ROOTFCULPHDRS= $(FCULPHDRS:%=$(ROOTDIR)/fibre-channel/ulp/%)
 
 ROOTSDCARDHDRS= $(SDCARDHDRS:%=$(ROOTDIR)/sdcard/%)
 
@@ -279,14 +286,12 @@ ROOTHOTPLUGPCIHDRS= $(HOTPLUGPCIHDRS:%=$(ROOTDIR)/hotplug/pci/%)
 ROOTTSOLHDRS= $(TSOLHDRS:%=$(ROOTDIR)/tsol/%)
 
 sparc_ROOTHDRS=	$(ROOTSDKTPHDRS) $(ROOTSCSICADHDRS) $(ROOTSCSITARGETSHDRS) \
-		$(ROOTFCHDRS) $(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
-		$(ROOTUSBAUDHDRS) \
-		$(ROOTUSBHIDHDRS) $(ROOTUSBMSHDRS) $(ROOTUSBPRNHDRS) \
-		$(ROOTUGENHDRS) $(ROOTUSBVIDHDRS)
+		$(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
+		$(ROOTUSBAUDHDRS) $(ROOTUSBHIDHDRS) $(ROOTUSBMSHDRS) \
+		$(ROOTUSBPRNHDRS) $(ROOTUGENHDRS) $(ROOTUSBVIDHDRS)
 
 i386_ROOTHDRS=	$(ROOTDKTPHDRS) $(ROOTPCHDRS) $(ROOTSCSITARGETSHDRS)	\
-		$(ROOTSCSIVHCIHDRS) $(ROOTFCHDRS)	\
-		$(ROOTPCMCIAHDRS) $(ROOTHOTPLUGHDRS) \
+		$(ROOTSCSIVHCIHDRS) $(ROOTPCMCIAHDRS) $(ROOTHOTPLUGHDRS) \
 		$(ROOTHOTPLUGPCIHDRS) $(ROOTSATAGENHDRS)
 
 # install rules
@@ -294,6 +299,18 @@ $(ROOTDIR)/%: %
 	$(INS.file)
 
 $(ROOTDIR)/crypto/%: crypto/%
+	$(INS.file)
+
+$(ROOTDIR)/fc4/%:		fc4/%
+	$(INS.file)
+
+$(ROOTDIR)/fibre-channel/%:	fibre-channel/%
+	$(INS.file)
+
+$(ROOTDIR)/fibre-channel/impl/%:	fibre-channel/impl/%
+	$(INS.file)
+
+$(ROOTDIR)/fibre-channel/ulp/:	fibre-channel/ulp/%
 	$(INS.file)
 
 $(ROOTDIR)/fm/%:                fm/%
@@ -356,7 +373,7 @@ $(ROOTDIR)/scsi/impl/%:		scsi/impl/%
 $(ROOTDIR)/scsi/targets/%:	scsi/targets/%
 	$(INS.file)
 
-$(ROOTDIR)/fc4/%:		fc4/%
+$(ROOTDIR)/scsi/adapters/%:	scsi/adapters/%
 	$(INS.file)
 
 $(ROOTDIR)/sdcard/%:		sdcard/%
