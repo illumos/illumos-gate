@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -1654,7 +1652,10 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 		args->to_ptrsize = sizeof (long);
 		args->ncargs = NCARGS;
 		args->stk_align = STACK_ALIGN;
-		usrstack = (char *)USRSTACK;
+		if (args->addr32)
+			usrstack = (char *)USRSTACK64_32;
+		else
+			usrstack = (char *)USRSTACK;
 	} else {
 		args->to_ptrsize = sizeof (int32_t);
 		args->ncargs = NCARGS32;
@@ -1819,7 +1820,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	as = as_alloc();
 	p->p_as = as;
 	as->a_proc = p;
-	if (p->p_model == DATAMODEL_ILP32)
+	if (p->p_model == DATAMODEL_ILP32 || args->addr32)
 		as->a_userlimit = (caddr_t)USERLIMIT32;
 	(void) hat_setup(as->a_hat, HAT_ALLOC);
 	hat_join_srd(as->a_hat, args->ex_vp);

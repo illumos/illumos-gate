@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -26,11 +27,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef _SYS_EXEC_H
 #define	_SYS_EXEC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <vm/seg.h>
@@ -96,6 +94,7 @@ typedef struct uarg {
 	uint_t	stk_prot;
 	uint_t	dat_prot;
 	int	traceinval;
+	int	addr32;
 	model_t	to_model;
 	model_t	from_model;
 	size_t	to_ptrsize;

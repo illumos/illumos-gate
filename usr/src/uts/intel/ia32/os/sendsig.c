@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T   */
 /*	All Rights Reserved   */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -136,6 +134,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	volatile struct regs *rp;
 	volatile greg_t upc;
 	volatile proc_t *p = ttoproc(curthread);
+	struct as *as = p->p_as;
 	klwp_t *lwp = ttolwp(curthread);
 	ucontext_t *volatile tuc = NULL;
 	ucontext_t *uc;
@@ -224,7 +223,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	/*
 	 * Now, make sure the resulting signal frame address is sane
 	 */
-	if (sp >= (caddr_t)USERLIMIT || fp >= (caddr_t)USERLIMIT) {
+	if (sp >= as->a_userlimit || fp >= as->a_userlimit) {
 #ifdef DEBUG
 		printf("sendsig: bad signal stack cmd=%s, pid=%d, sig=%d\n",
 		    PTOU(p)->u_comm, p->p_pid, sig);

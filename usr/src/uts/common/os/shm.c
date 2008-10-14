@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -35,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Inter-Process Communication Shared Memory Facility.
@@ -369,7 +368,8 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 #endif /* __i386 || __amd64 */
 
 #if defined(__sparcv9)
-		if (addr == 0 && curproc->p_model == DATAMODEL_LP64) {
+		if (addr == 0 &&
+		    pp->p_model == DATAMODEL_LP64 && AS_TYPE_64BIT(as)) {
 			/*
 			 * If no address has been passed in, and this is a
 			 * 64-bit process, we'll try to find an address

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/thread.h>
@@ -64,7 +61,6 @@
 #include <sys/fasttrap.h>
 #include <sys/brand.h>
 #include "elf_impl.h"
-
 #include <sys/sdt.h>
 
 extern int at_flags;
@@ -267,6 +263,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	Phdr		*phdrp;
 	Phdr		*dataphdrp = NULL;
 	Phdr		*dtrphdr;
+	Phdr		*capphdr = NULL;
+	Cap		*cap = NULL;
+	ssize_t		capsize;
 	int		hasu = 0;
 	int		hasauxv = 0;
 	int		hasdy = 0;
@@ -379,6 +378,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		case PT_LOAD:
 			dataphdrp = phdrp;
 			break;
+		case PT_SUNWCAP:
+			capphdr = phdrp;
+			break;
 		}
 		phdrp = (Phdr *)((caddr_t)phdrp + hsize);
 	}
@@ -447,8 +449,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		} else {
 			args->auxsize = 8 * sizeof (aux_entry_t);
 		}
-	} else
+	} else {
 		args->auxsize = 0;
+	}
 
 	/*
 	 * If this binary is using an emulator, we need to add an
@@ -464,6 +467,31 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * the the brandname and 3 for the brand specific aux vectors.
 		 */
 		args->auxsize += 4 * sizeof (aux_entry_t);
+	}
+
+	/* Hardware/Software capabilities */
+	if (capphdr != NULL &&
+	    (capsize = capphdr->p_filesz) > 0 &&
+	    capsize <= 16 * sizeof (*cap)) {
+		int ncaps = capsize / sizeof (*cap);
+		Cap *cp;
+
+		cap = kmem_alloc(capsize, KM_SLEEP);
+		if ((error = vn_rdwr(UIO_READ, vp, (caddr_t)cap,
+		    capsize, (offset_t)capphdr->p_offset,
+		    UIO_SYSSPACE, 0, (rlim64_t)0, CRED(), &resid)) != 0) {
+			uprintf("%s: Cannot read capabilities section\n",
+			    exec_file);
+			goto out;
+		}
+		for (cp = cap; cp < cap + ncaps; cp++) {
+			if (cp->c_tag == CA_SUNW_SF_1 &&
+			    (cp->c_un.c_val & SF1_SUNW_ADDR32)) {
+				if (args->to_model == DATAMODEL_LP64)
+					args->addr32 = 1;
+				break;
+			}
+		}
 	}
 
 	aux = bigwad->elfargs;
@@ -831,6 +859,8 @@ bad:
 out:
 	if (phdrbase != NULL)
 		kmem_free(phdrbase, phdrsize);
+	if (cap != NULL)
+		kmem_free(cap, capsize);
 	kmem_free(bigwad, sizeof (struct bigwad));
 	return (error);
 }
@@ -2016,7 +2046,7 @@ static struct execsw esw = {
 };
 
 static struct modlexec modlexec = {
-	&mod_execops, "exec module for elf %I%", &esw
+	&mod_execops, "exec module for elf", &esw
 };
 
 #ifdef	_LP64

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
 
 #ifndef _SYS_VMPARAM_H
 #define	_SYS_VMPARAM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
 #include <sys/vm_machparam.h>
@@ -54,9 +52,11 @@ extern "C" {
 #if defined(__amd64)
 #define	USRSTACK	USERLIMIT
 #define	USRSTACK32	0x8048000
+#define	USRSTACK64_32	USERLIMIT32
 #elif defined(__i386)
 #define	USRSTACK	0x8048000
 #define	USRSTACK32	USRSTACK
+#define	USRSTACK64_32	USRSTACK
 #endif
 
 /*
