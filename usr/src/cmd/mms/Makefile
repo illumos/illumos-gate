@@ -23,7 +23,11 @@
 # Use is subject to license terms.
 #
 
-include ../../Makefile.master
+include $(SRC)/cmd/Makefile.cmd
+
+MANIFEST = mms.xml
+ROOTMANIFESTDIR	= $(ROOTSVCAPPLICATIONMANAGEMENT)
+SVCMETHOD = mmsdb
 
 SUBDIRS = \
 	dm \
@@ -44,31 +48,15 @@ lint := TARGET += lint
 _msg := TARGET += _msg
 check := TARGET += check
 
-MMSDBDIR = $(ROOT)/lib/svc/method
-MMSMGMT = $(ROOT)/var/svc/manifest/application/management
-MMSETC = $(ROOT)/etc/mms
-
-FILES += $(MMSDBDIR)/mmsdb
-FILES += $(MMSMGMT)/mms.xml
-FILES += $(MMSETC)/release-note
-
 all clean clobber install_h lint: $(SUBDIRS)
 
-install: $(FILES) $(SUBDIRS)
+install: $(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET)
 
+check:	$(CHKMANIFEST)
+
 FRC:
 
-$(MMSMGMT)/%: %
-	$(INS.file)
-
-$(MMSDBDIR)/%: %
-	$(RM) $@; $(INS) -s -m 555 -f $(@D) $<
-
-$(MMSETC):
-	$(INS.dir)
-
-$(MMSETC)/%: $(MMSETC) %
-	$(INS.file)
+include ../Makefile.targ

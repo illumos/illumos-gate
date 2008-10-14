@@ -53,7 +53,6 @@ f none etc/mms/db/mms_db 0644 root sys
 d none etc/mms/types 0755 root sys
 f none etc/mms/types/mm_types.xml 0644 root sys
 d none etc/mms/passwd 0755 root sys
-f none etc/mms/release-note 0644 root sys
 d none etc/security 0755 root sys
 
 f none kernel/drv/dmd.conf 0644 root sys
@@ -69,7 +68,7 @@ d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/application 0755 root sys
 d none var/svc/manifest/application/management 0755 root sys
-e manifest var/svc/manifest/application/management/mms.xml 644 root sys
+f manifest var/svc/manifest/application/management/mms.xml 0444 root sys
 
 d none var 0755 root sys
 d none var/mms 0755 root sys
