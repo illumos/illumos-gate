@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * For a more complete description of the main ideas, see:
  *
@@ -918,7 +916,7 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
 			start = MAX(vsp->vs_start, (uintptr_t)minaddr);
 			end = MIN(vsp->vs_end - 1, (uintptr_t)maxaddr - 1) + 1;
 			taddr = P2PHASEUP(start, align, phase);
-			if (P2CROSS(taddr, taddr + size - 1, nocross))
+			if (P2BOUNDARY(taddr, size, nocross))
 				taddr +=
 				    P2ROUNDUP(P2NPHASE(taddr, nocross), align);
 			if ((taddr - start) + size > end - start ||
@@ -985,7 +983,7 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
 		(void) vmem_seg_alloc(vmp, vbest, addr, size);
 		(void) mutex_unlock(&vmp->vm_lock);
 		ASSERT(P2PHASE(addr, align) == phase);
-		ASSERT(!P2CROSS(addr, addr + size - 1, nocross));
+		ASSERT(!P2BOUNDARY(addr, size, nocross));
 		ASSERT(addr >= (uintptr_t)minaddr);
 		ASSERT(addr + size - 1 <= (uintptr_t)maxaddr - 1);
 		return ((void *)addr);

@@ -1461,8 +1461,8 @@ kalloca(size_t size, size_t align, int cansleep, int physcontig,
 	}
 
 kallocdone:
-	ASSERT(!P2CROSS((uintptr_t)raddr, (uintptr_t)raddr + rsize - 1,
-	    PAGESIZE) || rsize > PAGESIZE);
+	ASSERT(!P2BOUNDARY((uintptr_t)raddr, rsize, PAGESIZE) ||
+	    rsize > PAGESIZE);
 
 	addr = (size_t *)P2ROUNDUP((uintptr_t)raddr + hdrsize, align);
 	ASSERT((uintptr_t)addr + size - (uintptr_t)raddr <= rsize);

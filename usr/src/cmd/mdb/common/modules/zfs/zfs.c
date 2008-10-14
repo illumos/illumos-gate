@@ -1934,6 +1934,174 @@ zio_walk_root_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
 }
 
+#define	NICENUM_BUFLEN 6
+
+static int
+snprintfloat(char *buf, int len, float f, int frac_digits)
+{
+	float mul = 1;
+	int whole, frac, i;
+
+	for (i = frac_digits; i; i--)
+		mul *= 10;
+	whole = (int)f;
+	frac = (int)((f - whole) * mul);
+	return (mdb_snprintf(buf, len, "%u.%0*u", whole, frac_digits, frac));
+}
+
+static void
+mdb_nicenum(uint64_t num, char *buf)
+{
+	uint64_t n = num;
+	int index = 0;
+	char *u;
+
+	while (n >= 1024) {
+		n = (n + (1024 / 2)) / 1024; /* Round up or down */
+		index++;
+	}
+
+	u = &" \0K\0M\0G\0T\0P\0E\0"[index*2];
+
+	if (index == 0) {
+		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu",
+		    (u_longlong_t)n);
+	} else if (n < 10 && (num & (num - 1)) != 0) {
+		(void) snprintfloat(buf, NICENUM_BUFLEN,
+		    (float)num / (1ULL << 10 * index), 2);
+		strcat(buf, u);
+	} else if (n < 100 && (num & (num - 1)) != 0) {
+		(void) snprintfloat(buf, NICENUM_BUFLEN,
+		    (float)num / (1ULL << 10 * index), 1);
+		strcat(buf, u);
+	} else {
+		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu%s",
+		    (u_longlong_t)n, u);
+	}
+}
+
+/*
+ * ::zfs_blkstats
+ *
+ * 	-v	print verbose per-level information
+ *
+ */
+static int
+zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	boolean_t verbose = B_FALSE;
+	zfs_all_blkstats_t stats;
+	dmu_object_type_t t;
+	zfs_blkstat_t *tzb;
+	uint64_t ditto;
+	dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES + 10];
+	/* +10 in case it grew */
+
+	if (mdb_readvar(&dmu_ot, "dmu_ot") == -1) {
+		mdb_warn("failed to read 'dmu_ot'");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (GETMEMB(addr, struct spa, spa_dsl_pool, addr) ||
+	    GETMEMB(addr, struct dsl_pool, dp_blkstats, addr) ||
+	    mdb_vread(&stats, sizeof (zfs_all_blkstats_t), addr) == -1) {
+		mdb_warn("failed to read data at %p;", addr);
+		mdb_printf("maybe no stats? run \"zpool scrub\" first.");
+		return (DCMD_ERR);
+	}
+
+	tzb = &stats.zab_type[DN_MAX_LEVELS][DMU_OT_NUMTYPES];
+	if (tzb->zb_gangs != 0) {
+		mdb_printf("Ganged blocks: %llu\n",
+		    (longlong_t)tzb->zb_gangs);
+	}
+
+	ditto = tzb->zb_ditto_2_of_2_samevdev + tzb->zb_ditto_2_of_3_samevdev +
+	    tzb->zb_ditto_3_of_3_samevdev;
+	if (ditto != 0) {
+		mdb_printf("Dittoed blocks on same vdev: %llu\n",
+		    (longlong_t)ditto);
+	}
+
+	mdb_printf("\nBlocks\tLSIZE\tPSIZE\tASIZE"
+	    "\t  avg\t comp\t%%Total\tType\n");
+
+	for (t = 0; t <= DMU_OT_NUMTYPES; t++) {
+		char csize[NICENUM_BUFLEN], lsize[NICENUM_BUFLEN];
+		char psize[NICENUM_BUFLEN], asize[NICENUM_BUFLEN];
+		char avg[NICENUM_BUFLEN];
+		char comp[NICENUM_BUFLEN], pct[NICENUM_BUFLEN];
+		char typename[64];
+		int l;
+
+
+		if (t == DMU_OT_DEFERRED)
+			strcpy(typename, "deferred free");
+		else if (t == DMU_OT_TOTAL)
+			strcpy(typename, "Total");
+		else if (mdb_readstr(typename, sizeof (typename),
+		    (uintptr_t)dmu_ot[t].ot_name) == -1) {
+			mdb_warn("failed to read type name");
+			return (DCMD_ERR);
+		}
+
+		if (stats.zab_type[DN_MAX_LEVELS][t].zb_asize == 0)
+			continue;
+
+		for (l = -1; l < DN_MAX_LEVELS; l++) {
+			int level = (l == -1 ? DN_MAX_LEVELS : l);
+			zfs_blkstat_t *zb = &stats.zab_type[level][t];
+
+			if (zb->zb_asize == 0)
+				continue;
+
+			/*
+			 * Don't print each level unless requested.
+			 */
+			if (!verbose && level != DN_MAX_LEVELS)
+				continue;
+
+			/*
+			 * If all the space is level 0, don't print the
+			 * level 0 separately.
+			 */
+			if (level == 0 && zb->zb_asize ==
+			    stats.zab_type[DN_MAX_LEVELS][t].zb_asize)
+				continue;
+
+			mdb_nicenum(zb->zb_count, csize);
+			mdb_nicenum(zb->zb_lsize, lsize);
+			mdb_nicenum(zb->zb_psize, psize);
+			mdb_nicenum(zb->zb_asize, asize);
+			mdb_nicenum(zb->zb_asize / zb->zb_count, avg);
+			(void) snprintfloat(comp, NICENUM_BUFLEN,
+			    (float)zb->zb_lsize / zb->zb_psize, 2);
+			(void) snprintfloat(pct, NICENUM_BUFLEN,
+			    100.0 * zb->zb_asize / tzb->zb_asize, 2);
+
+			mdb_printf("%6s\t%5s\t%5s\t%5s\t%5s"
+			    "\t%5s\t%6s\t",
+			    csize, lsize, psize, asize, avg, comp, pct);
+
+			if (level == DN_MAX_LEVELS)
+				mdb_printf("%s\n", typename);
+			else
+				mdb_printf("  L%d %s\n",
+				    level, typename);
+		}
+	}
+
+	return (DCMD_OK);
+}
+
 /*
  * MDB module linkage information:
  *
@@ -1967,6 +2135,9 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "zio_state", "?", "print out all zio_t structures on system or "
 	    "for a particular pool", zio_state },
 	{ "zio_pipeline", ":", "decode a zio pipeline", zio_pipeline },
+	{ "zfs_blkstats", ":[-v]",
+	    "given a spa_t, print block type stats from last scrub",
+	    zfs_blkstats },
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
 	{ NULL }
 };

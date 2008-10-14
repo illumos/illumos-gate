@@ -45,5 +45,6 @@
 #include <sys/zil.h>
 #include <sys/bplist.h>
 #include <sys/zfs_znode.h>
+#include <sys/arc.h>
 
 extern uint64_t metaslab_gang_bang;

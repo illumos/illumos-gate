@@ -1156,12 +1156,13 @@ struct killarg {
 
 /* ARGSUSED */
 static int
-kill_blkptr(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
+kill_blkptr(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
+    const dnode_phys_t *dnp, void *arg)
 {
 	struct killarg *ka = arg;
-	blkptr_t *bp = &bc->bc_blkptr;
 
-	ASSERT3U(bc->bc_errno, ==, 0);
+	if (bp == NULL)
+		return (0);
 
 	ASSERT3U(bp->blk_birth, >, ka->ds->ds_phys->ds_prev_snap_txg);
 	(void) dsl_dataset_block_kill(ka->ds, bp, ka->zio, ka->tx);
@@ -1189,7 +1190,7 @@ dsl_dataset_rollback_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		return (EINVAL);
 
 	/*
-	 * If we made changes this txg, traverse_dsl_dataset won't find
+	 * If we made changes this txg, traverse_dataset won't find
 	 * them.  Try again.
 	 */
 	if (ds->ds_phys->ds_bp.blk_birth >= tx->tx_txg)
@@ -1256,8 +1257,8 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		ka.ds = ds;
 		ka.zio = zio;
 		ka.tx = tx;
-		(void) traverse_dsl_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
-		    ADVANCE_POST, kill_blkptr, &ka);
+		(void) traverse_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
+		    TRAVERSE_POST, kill_blkptr, &ka);
 		(void) zio_wait(zio);
 	}
 
@@ -1650,8 +1651,8 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		ka.ds = ds;
 		ka.zio = zio;
 		ka.tx = tx;
-		err = traverse_dsl_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
-		    ADVANCE_POST, kill_blkptr, &ka);
+		err = traverse_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
+		    TRAVERSE_POST, kill_blkptr, &ka);
 		ASSERT3U(err, ==, 0);
 		ASSERT(spa_version(dp->dp_spa) < SPA_VERSION_UNIQUE_ACCURATE ||
 		    ds->ds_phys->ds_unique_bytes == 0);
@@ -2837,6 +2838,8 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    csa->cds->ds_phys->ds_deadlist_obj));
 	VERIFY(0 == bplist_open(&csa->ohds->ds_deadlist, dp->dp_meta_objset,
 	    csa->ohds->ds_phys->ds_deadlist_obj));
+
+	dsl_pool_ds_clone_swapped(csa->ohds, csa->cds, tx);
 }
 
 /*

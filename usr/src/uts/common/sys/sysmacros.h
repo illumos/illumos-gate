@@ -23,14 +23,12 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SYSMACROS_H
 #define	_SYS_SYSMACROS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 
@@ -222,18 +220,69 @@ extern unsigned char bcd_to_byte[256];
 #define	ISP2(x)		(((x) & ((x) - 1)) == 0)
 
 /*
- * Macros for various sorts of alignment and rounding when the alignment
- * is known to be a power of 2.
+ * Macros for various sorts of alignment and rounding.  The "align" must
+ * be a power of 2.  Often times it is a block, sector, or page.
+ */
+
+/*
+ * return x rounded down to an align boundary
+ * eg, P2ALIGN(1200, 1024) == 1024 (1*align)
+ * eg, P2ALIGN(1024, 1024) == 1024 (1*align)
+ * eg, P2ALIGN(0x1234, 0x100) == 0x1200 (0x12*align)
+ * eg, P2ALIGN(0x5600, 0x100) == 0x5600 (0x56*align)
  */
 #define	P2ALIGN(x, align)		((x) & -(align))
-#define	P2PHASE(x, align)		((x) & ((align) - 1))
-#define	P2NPHASE(x, align)		(-(x) & ((align) - 1))
-#define	P2ROUNDUP(x, align)		(-(-(x) & -(align)))
-#define	P2END(x, align)			(-(~(x) & -(align)))
-#define	P2PHASEUP(x, align, phase)	((phase) - (((phase) - (x)) & -(align)))
-#define	P2CROSS(x, y, align)		(((x) ^ (y)) > (align) - 1)
+
 /*
- * Determine whether two numbers have the same high-order bit.
+ * return x % (mod) align
+ * eg, P2PHASE(0x1234, 0x100) == 0x34 (x-0x12*align)
+ * eg, P2PHASE(0x5600, 0x100) == 0x00 (x-0x56*align)
+ */
+#define	P2PHASE(x, align)		((x) & ((align) - 1))
+
+/*
+ * return how much space is left in this block (but if it's perfectly
+ * aligned, return 0).
+ * eg, P2NPHASE(0x1234, 0x100) == 0xcc (0x13*align-x)
+ * eg, P2NPHASE(0x5600, 0x100) == 0x00 (0x56*align-x)
+ */
+#define	P2NPHASE(x, align)		(-(x) & ((align) - 1))
+
+/*
+ * return x rounded up to an align boundary
+ * eg, P2ROUNDUP(0x1234, 0x100) == 0x1300 (0x13*align)
+ * eg, P2ROUNDUP(0x5600, 0x100) == 0x5600 (0x56*align)
+ */
+#define	P2ROUNDUP(x, align)		(-(-(x) & -(align)))
+
+/*
+ * return the ending address of the block that x is in
+ * eg, P2END(0x1234, 0x100) == 0x12ff (0x13*align - 1)
+ * eg, P2END(0x5600, 0x100) == 0x56ff (0x57*align - 1)
+ */
+#define	P2END(x, align)			(-(~(x) & -(align)))
+
+/*
+ * return x rounded up to the next phase (offset) within align.
+ * phase should be < align.
+ * eg, P2PHASEUP(0x1234, 0x100, 0x10) == 0x1310 (0x13*align + phase)
+ * eg, P2PHASEUP(0x5600, 0x100, 0x10) == 0x5610 (0x56*align + phase)
+ */
+#define	P2PHASEUP(x, align, phase)	((phase) - (((phase) - (x)) & -(align)))
+
+/*
+ * return TRUE if adding len to off would cause it to cross an align
+ * boundary.
+ * eg, P2BOUNDARY(0x1234, 0xe0, 0x100) == TRUE (0x1234 + 0xe0 == 0x1314)
+ * eg, P2BOUNDARY(0x1234, 0x50, 0x100) == FALSE (0x1234 + 0x50 == 0x1284)
+ */
+#define	P2BOUNDARY(off, len, align) \
+	(((off) ^ ((off) + (len) - 1)) > (align) - 1)
+
+/*
+ * Return TRUE if they have the same highest bit set.
+ * eg, P2SAMEHIGHBIT(0x1234, 0x1001) == TRUE (the high bit is 0x1000)
+ * eg, P2SAMEHIGHBIT(0x1234, 0x3010) == FALSE (high bit of 0x3010 is 0x2000)
  */
 #define	P2SAMEHIGHBIT(x, y)		(((x) ^ (y)) < ((x) & (y)))
 
