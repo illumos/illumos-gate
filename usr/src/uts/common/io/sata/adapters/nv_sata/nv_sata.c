@@ -954,7 +954,7 @@ nv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 
 	if ((nvc->nvc_sgp_cbp == NULL) || (nvc->nvc_sgp_cmn == NULL)) {
-		return (EBADF);
+		return (EIO);
 	}
 
 	switch (cmd) {
@@ -5746,6 +5746,14 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 */
 	nvc->nvc_sgp_csr = 0;
 	nvc->nvc_sgp_cbp = NULL;
+
+	/*
+	 * Only try to initialize SGPIO LED support if this property
+	 * indicates it should be.
+	 */
+	if (ddi_getprop(DDI_DEV_T_ANY, nvc->nvc_dip, DDI_PROP_DONTPASS,
+	    "enable-sgpio-leds", 0) != 1)
+		return;
 
 	/*
 	 * CK804 can pass the sgpio_detect test even though it does not support
