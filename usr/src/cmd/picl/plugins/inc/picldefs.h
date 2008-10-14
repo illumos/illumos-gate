@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PICLDEFS_H
 #define	_PICLDEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -108,6 +106,7 @@ extern "C" {
 #define	PICL_CLASS_WATCHDOG_CONTROLLER	"watchdog-controller"
 #define	PICL_CLASS_WATCHDOG_TIMER	"watchdog-timer"
 #define	PICL_CLASS_CHASSIS_SERIAL_NUM	"chassis-serial-number"
+#define	PICL_CLASS_MULTIPATH		"multipath"
 
 /*
  * Sun4v platforms do not create /frutree; instead they create

@@ -1011,6 +1011,240 @@ add_bytes_prop(picl_nodehdl_t nodeh, ptree_propinfo_t propinfo, char *di_val,
 	(void) ptree_create_and_add_prop(nodeh, &propinfo, bdata, NULL);
 }
 
+static const char *
+path_state_name(di_path_state_t st)
+{
+	switch (st) {
+		case DI_PATH_STATE_ONLINE:
+			return ("online");
+		case DI_PATH_STATE_STANDBY:
+			return ("standby");
+		case DI_PATH_STATE_OFFLINE:
+			return ("offline");
+		case DI_PATH_STATE_FAULT:
+			return ("faulted");
+	}
+	return ("unknown");
+}
+
+/*
+ * This function is the volatile property handler for the multipath node
+ * "State" property. It must locate the associated devinfo node in order to
+ * determine the current state. Since the devinfo node can have multiple
+ * paths the devfs_path is used to locate the correct path.
+ */
+static int
+get_path_state_name(ptree_rarg_t *rarg, void *vbuf)
+{
+	int		err;
+	picl_nodehdl_t	parh;
+	char		devfs_path[PATH_MAX];
+	di_node_t	di_node;
+	di_node_t	di_root;
+	di_path_t	pi = DI_PATH_NIL;
+	picl_nodehdl_t	mpnode;
+
+	(void) strlcpy(vbuf, "unknown", MAX_STATE_SIZE);
+
+	mpnode = rarg->nodeh;
+
+	/*
+	 * The parent node represents the vHCI.
+	 */
+	err = ptree_get_propval_by_name(mpnode, PICL_PROP_PARENT, &parh,
+	    sizeof (picl_nodehdl_t));
+	if (err != PICL_SUCCESS) {
+		return (PICL_SUCCESS);
+	}
+
+	/*
+	 * The PICL_PROP_DEVFS_PATH property will be used to locate the
+	 * devinfo node for the vHCI driver.
+	 */
+	err = ptree_get_propval_by_name(parh, PICL_PROP_DEVFS_PATH, devfs_path,
+	    sizeof (devfs_path));
+	if (err != PICL_SUCCESS) {
+		return (PICL_SUCCESS);
+	}
+	/*
+	 * Find the di_node for the vHCI driver. It will be used to scan
+	 * the path information nodes.
+	 */
+	di_root = di_init("/", DINFOCACHE);
+	if (di_root == DI_NODE_NIL) {
+		return (PICL_SUCCESS);
+	}
+	di_node = di_lookup_node(di_root, devfs_path);
+	if (di_node == DI_NODE_NIL) {
+		di_fini(di_root);
+		return (PICL_SUCCESS);
+	}
+
+	/*
+	 * The devfs_path will be used below to match the
+	 * proper path information node.
+	 */
+	err = ptree_get_propval_by_name(mpnode, PICL_PROP_DEVFS_PATH,
+	    devfs_path, sizeof (devfs_path));
+	if (err != PICL_SUCCESS) {
+		di_fini(di_root);
+		return (PICL_SUCCESS);
+	}
+
+	/*
+	 * Scan the path information nodes looking for the matching devfs
+	 * path. When found obtain the state information.
+	 */
+	while ((pi = di_path_next_phci(di_node, pi)) != DI_PATH_NIL) {
+		char		*di_path;
+		di_node_t	phci_node = di_path_phci_node(pi);
+
+		if (phci_node == DI_PATH_NIL)
+			continue;
+
+		di_path = di_devfs_path(phci_node);
+		if (di_path) {
+			if (strcmp(di_path, devfs_path) != 0) {
+				di_devfs_path_free(di_path);
+				continue;
+			}
+			(void) strlcpy(vbuf, path_state_name(di_path_state(pi)),
+			    MAX_STATE_SIZE);
+			di_devfs_path_free(di_path);
+			break;
+		}
+	}
+
+	di_fini(di_root);
+	return (PICL_SUCCESS);
+}
+
+static void
+add_di_path_prop(picl_nodehdl_t nodeh, di_path_prop_t di_path_prop)
+{
+	int			di_ptype;
+	char			*di_val;
+	ptree_propinfo_t	propinfo;
+	int			*idata;
+	char			*sdata;
+	unsigned char		*bdata;
+	int			len;
+
+	di_ptype = di_path_prop_type(di_path_prop);
+	di_val = di_path_prop_name(di_path_prop);
+
+	switch (di_ptype) {
+	case DI_PROP_TYPE_BOOLEAN:
+		add_boolean_prop(nodeh, propinfo, di_val);
+		break;
+	case DI_PROP_TYPE_INT:
+	case DI_PROP_TYPE_INT64:
+		len = di_path_prop_ints(di_path_prop, &idata);
+		if (len < 0)
+			/* Received error, so ignore prop */
+			break;
+		add_uints_prop(nodeh, propinfo, di_val, idata, len);
+		break;
+	case DI_PROP_TYPE_STRING:
+		len = di_path_prop_strings(di_path_prop, &sdata);
+		if (len <= 0)
+			break;
+		add_strings_prop(nodeh, propinfo, di_val, sdata, len);
+		break;
+	case DI_PROP_TYPE_BYTE:
+		len = di_path_prop_bytes(di_path_prop, &bdata);
+		if (len < 0)
+			break;
+		add_bytes_prop(nodeh, propinfo, di_val, bdata, len);
+		break;
+	case DI_PROP_TYPE_UNKNOWN:
+		/*
+		 * Unknown type, we'll try and guess what it should be.
+		 */
+		len = di_path_prop_strings(di_path_prop, &sdata);
+		if ((len > 0) && (sdata[0] != 0)) {
+			add_strings_prop(nodeh, propinfo, di_val, sdata,
+			    len);
+			break;
+		}
+		len = di_path_prop_ints(di_path_prop, &idata);
+		if (len > 0) {
+			add_uints_prop(nodeh, propinfo, di_val,
+			    idata, len);
+			break;
+		}
+		len = di_path_prop_bytes(di_path_prop, &bdata);
+		if (len > 0)
+			add_bytes_prop(nodeh, propinfo,
+			    di_val, bdata, len);
+		else if (len == 0)
+			add_boolean_prop(nodeh, propinfo,
+			    di_val);
+		break;
+	case DI_PROP_TYPE_UNDEF_IT:
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * Add nodes for path information (PSARC/1999/647, PSARC/2008/437)
+ */
+static void
+construct_mpath_node(picl_nodehdl_t parh, di_node_t di_node)
+{
+	di_path_t 		pi = DI_PATH_NIL;
+
+	while ((pi = di_path_next_phci(di_node, pi)) != DI_PATH_NIL) {
+		di_node_t 		phci_node = di_path_phci_node(pi);
+		di_path_prop_t 		di_path_prop;
+		picl_nodehdl_t		nodeh;
+		ptree_propinfo_t	propinfo;
+		int			err;
+		int			instance;
+		char			*di_val;
+
+		if (phci_node == DI_PATH_NIL)
+			continue;
+
+		err = ptree_create_and_add_node(parh, PICL_CLASS_MULTIPATH,
+		    PICL_CLASS_MULTIPATH, &nodeh);
+		if (err != PICL_SUCCESS)
+			continue;
+
+		instance = di_instance(phci_node);
+		(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+		    PICL_PTYPE_INT, PICL_READ, sizeof (instance),
+		    PICL_PROP_INSTANCE, NULL, NULL);
+		(void) ptree_create_and_add_prop(nodeh, &propinfo, &instance,
+		    NULL);
+
+		di_val = di_devfs_path(phci_node);
+		if (di_val) {
+			(void) ptree_init_propinfo(&propinfo,
+			    PTREE_PROPINFO_VERSION,
+			    PICL_PTYPE_CHARSTRING, PICL_READ,
+			    strlen(di_val) + 1, PICL_PROP_DEVFS_PATH,
+			    NULL, NULL);
+			(void) ptree_create_and_add_prop(nodeh,
+			    &propinfo, di_val, NULL);
+			di_devfs_path_free(di_val);
+		}
+
+		(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+		    PICL_PTYPE_CHARSTRING, (PICL_READ|PICL_VOLATILE),
+		    MAX_STATE_SIZE, PICL_PROP_STATE, get_path_state_name, NULL);
+		(void) ptree_create_and_add_prop(nodeh, &propinfo, NULL, NULL);
+
+		for (di_path_prop = di_path_prop_next(pi, DI_PROP_NIL);
+		    di_path_prop != DI_PROP_NIL;
+		    di_path_prop = di_path_prop_next(pi, di_path_prop)) {
+			add_di_path_prop(nodeh, di_path_prop);
+		}
+	}
+}
+
 /*
  * Add properties provided by libdevinfo
  */
@@ -1251,6 +1485,7 @@ construct_devtype_node(picl_nodehdl_t parh, char *nodename,
 
 	(void) add_devinfo_props(anodeh, dn);
 	(void) add_openprom_props(anodeh, dn);
+	construct_mpath_node(anodeh, dn);
 
 	*chdh = anodeh;
 	return (err);
