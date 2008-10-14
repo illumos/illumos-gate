@@ -628,7 +628,10 @@ smbd_already_running(void)
 static int
 smbd_kernel_bind(void)
 {
+	pthread_attr_t	tattr;
 	smb_io_t	smb_io;
+	int		rc1;
+	int		rc2;
 	int		rc;
 
 	bzero(&smb_io, sizeof (smb_io));
@@ -663,25 +666,28 @@ smbd_kernel_bind(void)
 		return (errno);
 	}
 
-	rc = pthread_create(&nbt_listener, NULL, smbd_nbt_listener, NULL);
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+
+	rc1 = pthread_create(&nbt_listener, &tattr, smbd_nbt_listener, NULL);
+	if (rc1 != 0)
+		smbd_report("unable to start NBT service");
+
+	rc2 = pthread_create(&tcp_listener, &tattr, smbd_tcp_listener, NULL);
+	if (rc2 != 0)
+		smbd_report("unable to start TCP service");
+
+	(void) pthread_attr_destroy(&tattr);
+
+	rc = rc1;
+	if (rc == 0)
+		rc = rc2;
+
 	if (rc == 0) {
-		rc = pthread_create(&tcp_listener, NULL, smbd_tcp_listener,
-		    NULL);
-		if (rc == 0) {
-			smbd.s_kbound = B_TRUE;
-			return (0);
-		}
+		smbd.s_kbound = B_TRUE;
+		return (0);
 	}
 
-	rc = pthread_create(&nbt_listener, NULL, smbd_nbt_listener, NULL);
-	if (rc == 0) {
-		rc = pthread_create(&tcp_listener, NULL, smbd_tcp_listener,
-		    NULL);
-		if (rc == 0) {
-			smbd.s_kbound = B_TRUE;
-			return (0);
-		}
-	}
 	(void) close(smbd.s_drv_fd);
 	smbd.s_drv_fd = -1;
 	return (rc);

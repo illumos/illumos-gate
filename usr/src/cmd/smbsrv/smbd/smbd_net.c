@@ -27,8 +27,6 @@
  * Structures and type definitions for the SMB module.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ioccom.h>
 #include <strings.h>
 #include <unistd.h>
@@ -58,6 +56,7 @@ smbd_nbt_receiver(void *arg)
 void *
 smbd_nbt_listener(void *arg)
 {
+	pthread_attr_t	tattr;
 	sigset_t	set;
 	sigset_t	oset;
 	smb_io_t	smb_io;
@@ -67,14 +66,18 @@ smbd_nbt_listener(void *arg)
 	(void) sigdelset(&set, SIGTERM);
 	(void) sigdelset(&set, SIGINT);
 	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 
 	bzero(&smb_io, sizeof (smb_io));
 	smb_io.sio_version = SMB_IOC_VERSION;
 
 	while (ioctl(smbd.s_drv_fd, SMB_IOC_NBT_LISTEN, &smb_io) == 0) {
-		smb_io.sio_data.error = pthread_create(&tid, NULL,
+		smb_io.sio_data.error = pthread_create(&tid, &tattr,
 		    smbd_nbt_receiver, NULL);
 	}
+	(void) pthread_attr_destroy(&tattr);
+
 	return (NULL);
 }
 
@@ -95,6 +98,7 @@ smbd_tcp_receiver(void *arg)
 void *
 smbd_tcp_listener(void *arg)
 {
+	pthread_attr_t	tattr;
 	sigset_t	set;
 	sigset_t	oset;
 	smb_io_t	smb_io;
@@ -104,13 +108,17 @@ smbd_tcp_listener(void *arg)
 	(void) sigdelset(&set, SIGTERM);
 	(void) sigdelset(&set, SIGINT);
 	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 
 	bzero(&smb_io, sizeof (smb_io));
 	smb_io.sio_version = SMB_IOC_VERSION;
 
 	while (ioctl(smbd.s_drv_fd, SMB_IOC_TCP_LISTEN, &smb_io) == 0) {
-		smb_io.sio_data.error = pthread_create(&tid, NULL,
+		smb_io.sio_data.error = pthread_create(&tid, &tattr,
 		    smbd_tcp_receiver, NULL);
 	}
+	(void) pthread_attr_destroy(&tattr);
+
 	return (NULL);
 }
