@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -465,11 +463,11 @@ main(int argc, char *argv[])
 					sz = strlen(optarg);
 					if (sz < MAXHOSTNAMELEN) {
 						host_name[addrix] =
-							(char *)xmalloc(sz+1);
+						    (char *)xmalloc(sz+1);
 						if (host_name[addrix] !=
 						    NULL) {
 						(void) sscanf(optarg, "%s",
-							host_name[addrix]);
+						    host_name[addrix]);
 							addrix++;
 						}
 					} else
@@ -542,16 +540,16 @@ main(int argc, char *argv[])
 	}
 	if (debug)
 		(void) printf("debug is on, create entry: %s, %s, %s\n",
-			CURRENT, BACKUP, STATE);
+		    CURRENT, BACKUP, STATE);
 
 	if (getrlimit(RLIMIT_NOFILE, &rl))
 		(void) printf("statd: getrlimit failed. \n");
 
 	/* Set maxfdlimit current soft limit */
-	rl.rlim_cur = MAX_FDS;
+	rl.rlim_cur = rl.rlim_max;
 	if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
 		syslog(LOG_ERR, "statd: unable to set RLIMIT_NOFILE to %d\n",
-			MAX_FDS);
+		    rl.rlim_cur);
 
 	(void) enable_extended_FILE_stdio(-1, -1);
 
@@ -602,7 +600,7 @@ main(int argc, char *argv[])
 	mode = RPC_SVC_MT_AUTO;
 	if (!rpc_control(RPC_SVC_MTMODE_SET, &mode)) {
 		syslog(LOG_ERR,
-			"statd:unable to set automatic MT mode.");
+		    "statd:unable to set automatic MT mode.");
 		exit(1);
 	}
 
@@ -620,13 +618,13 @@ main(int argc, char *argv[])
 	}
 
 	if (!svc_create(sm_prog_1, SM_PROG, SM_VERS, "netpath")) {
-	    syslog(LOG_ERR,
-		"statd: unable to create (SM_PROG, SM_VERS) for netpath.");
-	    exit(1);
+		syslog(LOG_ERR,
+	    "statd: unable to create (SM_PROG, SM_VERS) for netpath.");
+		exit(1);
 	}
 
 	if (!svc_create(sm_prog_1, NSM_ADDR_PROGRAM, NSM_ADDR_V1, "netpath")) {
-	    syslog(LOG_ERR,
+		syslog(LOG_ERR,
 	"statd: unable to create (NSM_ADDR_PROGRAM, NSM_ADDR_V1) for netpath.");
 	}
 
@@ -748,7 +746,7 @@ copy_client_names()
 		if ((mkdir(buf, SM_DIRECTORY_MODE)) == -1) {
 			if (errno != EEXIST) {
 				syslog(LOG_ERR,
-					"can't mkdir %s: %m\n", buf);
+				    "can't mkdir %s: %m\n", buf);
 				continue;
 			}
 			copydir_from_to(buf, CURRENT);
@@ -756,11 +754,11 @@ copy_client_names()
 		}
 
 		(void) snprintf(buf, sizeof (buf), "%s/statmon/sm.bak",
-				path_name[i]);
+		    path_name[i]);
 		if ((mkdir(buf, SM_DIRECTORY_MODE)) == -1) {
 			if (errno != EEXIST) {
 				syslog(LOG_ERR,
-					"can't mkdir %s: %m\n", buf);
+				    "can't mkdir %s: %m\n", buf);
 				continue;
 			}
 			copydir_from_to(buf, BACKUP);
@@ -815,7 +813,7 @@ nftw_owner(const char *path, const struct stat *statp, int info,
 
 	if (info == FTW_D && (statp->st_mode & (S_IWGRP | S_IWOTH)) != 0) {
 		mode_t newmode = (statp->st_mode & ~(S_IWGRP | S_IWOTH)) &
-			S_IAMB;
+		    S_IAMB;
 
 		if (debug)
 			printf("chmod %03o %s\n", newmode, path);
