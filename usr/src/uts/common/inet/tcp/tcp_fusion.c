@@ -41,6 +41,7 @@
 #include <inet/ipsec_impl.h>
 #include <inet/ipclassifier.h>
 #include <inet/ipp_common.h>
+#include <inet/ip_if.h>
 
 /*
  * This file implements TCP fusion - a protocol-less data path for TCP
@@ -140,10 +141,11 @@ tcp_loopback_needs_ip(tcp_t *tcp, netstack_t *ns)
 		/*
 		 * There is no need to hold conn_lock here because when called
 		 * from tcp_fuse() there can be no window where conn_ire_cache
-		 * can change. This is not true whe called from
-		 * tcp_fuse_output(). conn_ire_cache can become null just
-		 * after the check, but it's ok if a few packets are delivered
-		 * in the fused state.
+		 * can change. This is not true when called from
+		 * tcp_fuse_output() as conn_ire_cache can become null just
+		 * after the check. It will be necessary to recheck for a NULL
+		 * conn_ire_cache in tcp_fuse_output() to avoid passing a
+		 * stale ill pointer to FW_HOOKS.
 		 */
 		return (B_TRUE);
 	}
@@ -513,6 +515,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
 	mblk_t *mp1 = mp;
 	ill_t *ilp, *olp;
+	ipif_t *iifp, *oifp;
 	ipha_t *ipha;
 	ip6_t *ip6h;
 	tcph_t *tcph;
@@ -578,8 +581,27 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			/* If tcp_xmit_mp fails, use regular path */
 			goto unfuse;
 
-		ASSERT(peer_tcp->tcp_connp->conn_ire_cache->ire_ipif != NULL);
-		olp = peer_tcp->tcp_connp->conn_ire_cache->ire_ipif->ipif_ill;
+		/*
+		 * The ipif and ill can be safely referenced under the
+		 * protection of conn_lock - see head of function comment for
+		 * conn_get_held_ipif(). It is necessary to check that both
+		 * the ipif and ill can be looked up (i.e. not condemned). If
+		 * not, bail out and unfuse this connection.
+		 */
+		mutex_enter(&peer_tcp->tcp_connp->conn_lock);
+		if ((peer_tcp->tcp_connp->conn_ire_cache == NULL) ||
+		    (peer_tcp->tcp_connp->conn_ire_cache->ire_marks &
+		    IRE_MARK_CONDEMNED) ||
+		    ((oifp = peer_tcp->tcp_connp->conn_ire_cache->ire_ipif)
+		    == NULL) ||
+		    (!IPIF_CAN_LOOKUP(oifp)) ||
+		    ((olp = oifp->ipif_ill) == NULL) ||
+		    (ill_check_and_refhold(olp) != 0)) {
+			mutex_exit(&peer_tcp->tcp_connp->conn_lock);
+			goto unfuse;
+		}
+		mutex_exit(&peer_tcp->tcp_connp->conn_lock);
+
 		/* PFHooks: LOOPBACK_OUT */
 		if (tcp->tcp_ipversion == IPV4_VERSION) {
 			ipha = (ipha_t *)mp1->b_rptr;
@@ -602,14 +624,33 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    NULL, olp, ip6h, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, mp1);
 		}
+		ill_refrele(olp);
+
 		if (mp1 == NULL)
 			goto unfuse;
 
+		/*
+		 * The ipif and ill can be safely referenced under the
+		 * protection of conn_lock - see head of function comment for
+		 * conn_get_held_ipif(). It is necessary to check that both
+		 * the ipif and ill can be looked up (i.e. not condemned). If
+		 * not, bail out and unfuse this connection.
+		 */
+		mutex_enter(&tcp->tcp_connp->conn_lock);
+		if ((tcp->tcp_connp->conn_ire_cache == NULL) ||
+		    (tcp->tcp_connp->conn_ire_cache->ire_marks &
+		    IRE_MARK_CONDEMNED) ||
+		    ((iifp = tcp->tcp_connp->conn_ire_cache->ire_ipif)
+		    == NULL) ||
+		    (!IPIF_CAN_LOOKUP(iifp)) ||
+		    ((ilp = iifp->ipif_ill) == NULL) ||
+		    (ill_check_and_refhold(ilp) != 0)) {
+			mutex_exit(&tcp->tcp_connp->conn_lock);
+			goto unfuse;
+		}
+		mutex_exit(&tcp->tcp_connp->conn_lock);
 
 		/* PFHooks: LOOPBACK_IN */
-		ASSERT(tcp->tcp_connp->conn_ire_cache->ire_ipif != NULL);
-		ilp = tcp->tcp_connp->conn_ire_cache->ire_ipif->ipif_ill;
-
 		if (tcp->tcp_ipversion == IPV4_VERSION) {
 			DTRACE_PROBE4(ip4__loopback__in__start,
 			    ill_t *, ilp, ill_t *, NULL,
@@ -618,6 +659,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ipst->ips_ipv4firewall_loopback_in,
 			    ilp, NULL, ipha, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, mp1);
+			ill_refrele(ilp);
 			if (mp1 == NULL)
 				goto unfuse;
 
@@ -630,6 +672,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ipst->ips_ipv6firewall_loopback_in,
 			    ilp, NULL, ip6h, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, mp1);
+			ill_refrele(ilp);
 			if (mp1 == NULL)
 				goto unfuse;
 
