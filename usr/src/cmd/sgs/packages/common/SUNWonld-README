@@ -1211,6 +1211,9 @@ Bugid   Risk Synopsis
 6672544 elf_rtbndr must support non-ABI aligned stacks on amd64
 6668050 First trip through PLT does not preserve args in xmm registers
 --------------------------------------------------------------------------------
+All the above changes are incorporated in the following patch:
+    Solaris/SunOS 5.10_x86	patch T137138-01
+--------------------------------------------------------------------------------
 
 -------------------------------------
 Solaris 10 409 (7th Q-update - s10u7)
@@ -1219,6 +1222,12 @@ Bugid   Risk Synopsis
 ================================================================================
 6629404 ld with -z ignore doesn't scale
 6606203 link editor ought to allow creation of >2gb sized objects (P)
+6746674 setuid applications do not find libraries any more because trusted
+	directories behavior changed (D)
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch TXXXXXX-YY
+    Solaris/SunOS 5.10_x86	patch TXXXXXX-YY
 --------------------------------------------------------------------------------
 
 --------------
@@ -1383,8 +1392,6 @@ Bugid   Risk Synopsis
 	linking gnu object code
 6744003 ld(1) could provide better argument processing diagnostics (D)
 	PSARC 2008/583 add gld options to ld(1)
-6746674 setuid applications do not find libraries any more because trusted
-	directories behavior changed (D)
 6749055 ld should generate GNU style VERSYM indexes for VERNEED records (D)
 	PSARC/2008/603 ELF objects to adopt GNU-style Versym indexes
 6752728 link-editor can enter UNDEF symbols in symbol sort sections
@@ -1392,3 +1399,4 @@ Bugid   Risk Synopsis
 6754965 introduce the SF1_SUNW_ADDR32 bit in software capabilities (D)
 	(link-editor components only)
 	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
+6756953 customer requests that DT_CONFIG strings be honored for secure apps (D)

@@ -376,6 +376,7 @@ typedef struct {
 #define	PN_FLG_UNIQUE	0x00002000	/* ensure path is unique */
 #define	PN_FLG_USED	0x00004000	/* indicate that path is used */
 #define	PN_FLG_DUPLICAT	0x00008000	/* path is a duplicate */
+#define	PN_FLG_FULLPATH	0x00010000	/* ensure path is a full path */
 
 #define	PN_FLG_MASK	0x000ff000	/* mask for p_orig incorporation */
 
@@ -585,6 +586,7 @@ extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,
 extern void		is_dep_ready(Rt_map *, Rt_map *, int);
 extern void		is_dep_init(Rt_map *, Rt_map *);
 extern int		is_move_data(caddr_t);
+extern int		is_path_secure(char *, Rt_map *, uint_t, uint_t);
 extern int		is_rtld_setuid();
 extern int		is_sym_interposer(Rt_map *, Sym *);
 extern void		ldso_plt_init(Rt_map *);

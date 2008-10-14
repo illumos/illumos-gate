@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/mman.h>
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -40,8 +38,7 @@
 #include	"msg.h"
 
 static Config	_config = { 0 };
-Config *	config = &_config;
-
+Config		*config = &_config;
 
 /*
  * Validate a configuration file.
@@ -118,7 +115,7 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 		 * RTC_OBJ_NOEXIST directories.
 		 */
 		filetbl = (Rtc_file *)(dirtbl->cd_file + addr);
-		if (filetbl->cf_obj == 0)
+		if (filetbl->cf_obj == NULL)
 			continue;
 
 		/*
@@ -178,6 +175,22 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 	}
 }
 
+/*
+ * Process a configuration file.
+ *
+ * A configuration file can be specified using the LD_CONFIG environment
+ * variable, from a DT_CONFIG string recorded in the executable (see ld(1) -c),
+ * or in the case of a crle() dumped image, the file is "fabricated" to a
+ * configuration file that may have been associated with the dumped image.  In
+ * the absence of any of these techniques, a default configuration file is used.
+ *
+ * The LD_CONFIG variable take precedence, unless the application is secure, in
+ * which case the environment variable is ignored (see ld_generic_env()).
+ *
+ * A DT_CONFIG string is honored, even if the application is secure.  However,
+ * the path name follows the same rules as RUNPATH's, which must be a full path
+ * name with no use of $ORIGIN.
+ */
 int
 elf_config(Rt_map *lmp, int aout)
 {
@@ -187,48 +200,61 @@ elf_config(Rt_map *lmp, int aout)
 	struct stat	status;
 	Addr		addr;
 	Pnode		*pnp;
-	const char	*str = config->c_name;
+	const char	*str;
+	char		path[PATH_MAX];
 
 	/*
-	 * If an alternative configuration file has been specified use it
-	 * (expanding any tokens), otherwise try opening up the default.
+	 * If we're dealing with an alternative application, fabricate the need
+	 * for a $ORIGIN/ld.config.app-name configuration file.
 	 */
-	if ((str == 0) && ((rtld_flags & RT_FL_CONFAPP) == 0))
+	if (rtld_flags & RT_FL_CONFAPP) {
+		if ((str = strrchr(PATHNAME(lmp), '/')) != NULL)
+			str++;
+		else
+			str = PATHNAME(lmp);
+
+		(void) snprintf(path, PATH_MAX, MSG_ORIG(MSG_ORG_CONFIG), str);
+		str = path;
+	} else
+		str = config->c_name;
+
+	/*
+	 * If a configuration file name is known, expand and verify the name.
+	 */
+	if (str) {
+		size_t	size = strlen(str);
+		char	*estr = (char *)str;
+		uint_t	tkns;
+
+		/*
+		 * Expand any configuration string.
+		 */
+		if ((tkns = expand(&estr, &size, 0, 0,
+		    (PN_TKN_ISALIST | PN_TKN_HWCAP), lmp)) == 0)
+			return (0);
+
+		/*
+		 * If this is a secure application, validate the configuration
+		 * file path name.  Ignore any untrustworthy path name, and
+		 * fall through to pick up the defaults.
+		 */
+		if ((rtld_flags & RT_FL_SECURE) &&
+		    (is_path_secure(estr, lmp, PN_FLG_FULLPATH, tkns) == 0))
+			str = NULL;
+		else
+			str = (const char *)estr;
+	}
+
+	/*
+	 * If a configuration file has not been specified try opening up the
+	 * default.
+	 */
+	if (str == NULL) {
 #if	defined(_ELF64)
 		str = MSG_ORIG(MSG_PTH_CONFIG_64);
 #else
 		str = MSG_ORIG(MSG_PTH_CONFIG);
 #endif
-	else if (rtld_flags & RT_FL_SECURE)
-		return (0);
-	else {
-		size_t	size;
-		char	*name;
-
-		/*
-		 * If we're dealing with an alternative application, fabricate
-		 * the need for a $ORIGIN/ld.config.app-name configuration file.
-		 */
-		if (rtld_flags & RT_FL_CONFAPP) {
-			char	_name[PATH_MAX];
-
-			if ((str = strrchr(PATHNAME(lmp), '/')) != NULL)
-				str++;
-			else
-				str = PATHNAME(lmp);
-
-			(void) snprintf(_name, PATH_MAX,
-			    MSG_ORIG(MSG_ORG_CONFIG), str);
-			str = _name;
-		}
-
-		size = strlen(str);
-		name = (char *)str;
-
-		if (expand(&name, &size, 0, 0,
-		    (PN_TKN_ISALIST | PN_TKN_HWCAP), lmp) == 0)
-			return (0);
-		str = (const char *)name;
 	}
 	config->c_name = str;
 
@@ -453,8 +479,8 @@ elf_config_ent(const char *name, Word hash, int id, const char **alternate)
 Pnode *
 elf_config_flt(Lm_list *lml, const char *filter, const char *string)
 {
-	Rtc_fltr *	fltrtbl;
-	Pnode *		pnp = 0, *npnp, *opnp = 0;
+	Rtc_fltr	*fltrtbl;
+	Pnode		*pnp = NULL, *npnp, *opnp = NULL;
 
 	for (fltrtbl = (Rtc_fltr *)config->c_fltr; fltrtbl->fr_filter;
 	    fltrtbl++) {
@@ -480,13 +506,13 @@ elf_config_flt(Lm_list *lml, const char *filter, const char *string)
 
 			flte = config->c_strtbl + fltetbl->fe_filtee;
 
-			if (((npnp = calloc(1, sizeof (Pnode))) == 0) ||
-			    ((npnp->p_name = strdup(flte)) == 0))
+			if (((npnp = calloc(1, sizeof (Pnode))) == NULL) ||
+			    ((npnp->p_name = strdup(flte)) == NULL))
 				return (0);
 
 			DBG_CALL(Dbg_file_filter(lml, fltr, flte, 1));
 
-			if (opnp == 0)
+			if (opnp == NULL)
 				pnp = npnp;
 			else
 				opnp->p_next = npnp;

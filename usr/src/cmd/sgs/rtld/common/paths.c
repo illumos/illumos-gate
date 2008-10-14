@@ -88,7 +88,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 
 			/*
 			 * For ldd(1) -s, indicate the search paths that'll
-			 * be used.  If this is a secure program then some
+			 * be used.  If this is a secure application then some
 			 * search paths may be ignored, therefore reset the
 			 * rpl_libdirs pointer each time so that the
 			 * diagnostics related to these unsecure directories
@@ -136,7 +136,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 
 			/*
 			 * For ldd(1) -s, indicate the search paths that'll
-			 * be used.  If this is a secure program then some
+			 * be used.  If this is a secure application then some
 			 * search paths may be ignored, therefore reset the
 			 * prm_libdirs pointer each time so that the
 			 * diagnostics related to these unsecure directories
@@ -173,7 +173,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 
 			/*
 			 * For ldd(1) -s, indicate the search paths that'll
-			 * be used.  If this is a secure program then some
+			 * be used.  If this is a secure application then some
 			 * search paths may be ignored, therefore reset the
 			 * runlist pointer each time so that the diagnostics
 			 * related to these unsecure directories will be
@@ -549,7 +549,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * $HWCAP expansion required.  For compatibility with
 			 * older environments, only expand this token when hard-
 			 * ware capability information is available.   This
-			 * expansion is only allowed for non-simple pathnames
+			 * expansion is only allowed for non-simple path names
 			 * (must contain a '/'), with the token itself being the
 			 * last element of the path.  Therefore, all we need do
 			 * is test the existence of the string "/$HWCAP\0".
@@ -630,9 +630,9 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 	 * handle one ISALIST per node.  For more than one ISALIST to be
 	 * processed we'd need a better algorithm than above to replace the
 	 * newly generated list.  Whether we want to encourage the number of
-	 * pathname permutations this would provide is another question. So, for
-	 * now if more than one ISALIST is encountered we return the original
-	 * node untouched.
+	 * path name permutations this would provide is another question.  So,
+	 * for now if more than one ISALIST is encountered we return the
+	 * original node untouched.
 	 */
 	if (isa && isaflag) {
 		if (isaflag == 1) {
@@ -667,13 +667,13 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 	*nptr = '\0';
 
 	/*
-	 * A path that has been expanded, is typically used to create full
-	 * pathnames for objects that will be opened.  The final pathname is
+	 * A path that has been expanded is typically used to create full
+	 * path names for objects that will be opened.  The final path name is
 	 * resolved to simplify it, and set the stage for possible $ORIGIN
 	 * processing.  Therefore, it's usually unnecessary to resolve the path
 	 * at this point.  However, if a configuration file, containing
 	 * directory information is in use, then we might need to lookup this
-	 * path in the configuration file.  To keep the number of pathname
+	 * path in the configuration file.  To keep the number of path name
 	 * resolutions to a minimum, only resolve paths that contain "./".  The
 	 * use of "$ORIGIN/../lib" will probably only match a configuration file
 	 * entry after resolution.
@@ -699,24 +699,25 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 
 	/*
 	 * Return an indication of any token expansion that may have occurred.
-	 * Under security, any pathname expanded with the $ORIGIN token must be
-	 * validated against any registered secure directories.
+	 * If this is a secure application, any path name expanded with the
+	 * $ORIGIN token must be validated against any registered trusted
+	 * directories.
 	 */
 	return (flags ? flags : TKN_NONE);
 }
 
 /*
- * Determine whether a pathname is secure.
+ * Determine whether a path name is secure.
  */
-static int
+int
 is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 {
 	Pnode	*sdir = LM_SECURE_DIRS(LIST(clmp)->lm_head);
-	char	buffer[PATH_MAX], *npath;
+	char	buffer[PATH_MAX], *npath = NULL;
 	Lm_list	*lml = LIST(clmp);
 
 	/*
-	 * If a pathname originates from a configuration file, use it.  The use
+	 * If a path name originates from a configuration file, use it.  The use
 	 * of a configuration file is already validated for secure applications,
 	 * so if we're using a configuration file, we must be able to use all
 	 * that it defines.
@@ -728,7 +729,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		char	*str;
 
 		/*
-		 * If the pathname specifies a file (rather than a directory),
+		 * If the path name specifies a file (rather than a directory),
 		 * peel off the file before making the comparison.
 		 */
 		str = strrchr(opath, '/');
@@ -738,13 +739,16 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		 *
 		 *   .	a simple file name (one containing no "/") is fine, as
 		 *	this file name will be combined with search paths to
-		 *	determine the complete path.
+		 *	determine the complete path.  Note, a secure application
+		 *	may provide a configuration file, and this can only be
+		 *	a full path name (PN_FLG_FULLPATH).
 		 *   .	a full path (one starting with "/") is fine, provided
 		 *	this path name isn't a preload/audit path.
 		 *   .	provided $ORIGIN expansion has not been employed, the
 		 *	above categories of path are deemed secure.
 		 */
-		if (((str == 0) || ((*opath == '/') && (str != opath) &&
+		if ((((str == 0) && ((info & PN_FLG_FULLPATH) == 0)) ||
+		    ((*opath == '/') && (str != opath) &&
 		    ((info & PN_FLG_EXTLOAD) == 0))) &&
 		    ((flags & PN_TKN_ORIGIN) == 0))
 			return (1);
@@ -752,29 +756,31 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		/*
 		 * Determine the directory name of the present path.
 		 */
-		if (str == opath)
-			npath = (char *)MSG_ORIG(MSG_STR_SLASH);
-		else {
-			size_t	size;
+		if (str) {
+			if (str == opath)
+				npath = (char *)MSG_ORIG(MSG_STR_SLASH);
+			else {
+				size_t	size;
 
-			if ((size = str - opath) >= PATH_MAX)
-				return (0);
+				if ((size = str - opath) >= PATH_MAX)
+					return (0);
 
-			(void) strncpy(buffer, opath, size);
-			buffer[size] = '\0';
-			npath = buffer;
+				(void) strncpy(buffer, opath, size);
+				buffer[size] = '\0';
+				npath = buffer;
+			}
+
+			/*
+			 * If $ORIGIN processing has been employed, then allow
+			 * any directory that has already been used to satisfy
+			 * other dependencies, to be used.
+			 */
+			if ((flags & PN_TKN_ORIGIN) &&
+			    spavl_recorded(npath, 0)) {
+				DBG_CALL(Dbg_libs_insecure(lml, npath, 1));
+				return (1);
+			}
 		}
-
-		/*
-		 * If $ORIGIN processing has been employed, then allow any
-		 * directory that has already been used to satisfy other
-		 * dependencies, to be used.
-		 */
-		if ((flags & PN_TKN_ORIGIN) && spavl_recorded(npath, 0)) {
-			DBG_CALL(Dbg_libs_insecure(lml, npath, 1));
-			return (1);
-		}
-
 	} else {
 		/*
 		 * A search path, i.e., RPATH, configuration file path, etc. is
@@ -808,10 +814,15 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		npath = (char *)opath;
 	}
 
-	while (sdir) {
-		if (strcmp(npath, sdir->p_name) == 0)
-			return (1);
-		sdir = sdir->p_next;
+	/*
+	 * Determine whether the present directory is trusted.
+	 */
+	if (npath) {
+		while (sdir) {
+			if (strcmp(npath, sdir->p_name) == 0)
+				return (1);
+			sdir = sdir->p_next;
+		}
 	}
 
 	/*
@@ -880,17 +891,17 @@ is_path_unique(Pnode *pnp, const char *path)
 }
 
 /*
- * Expand one or more pathnames.  This routine is called for all path strings,
+ * Expand one or more path names.  This routine is called for all path strings,
  * i.e., NEEDED, rpaths, default search paths, configuration file search paths,
- * filtees, etc.  The path may be a single pathname, or a colon separated list
- * of pathnames.  Each individual pathname is processed for possible reserved
+ * filtees, etc.  The path may be a single path name, or a colon separated list
+ * of path names.  Each individual path name is processed for possible reserved
  * token expansion.  All string nodes are maintained in allocated memory
  * (regardless of whether they are constant (":"), or token expanded) to
  * simplify pnode removal.
  *
  * The info argument passes in auxiliary information regarding the callers
- * intended use of the pathnames.  This information may be maintained in the
- * pnode element produced to describe the pathname (i.e., LA_SER_LIBPATH etc.),
+ * intended use of the path names.  This information may be maintained in the
+ * pnode element produced to describe the path name (i.e., LA_SER_LIBPATH etc.),
  * or may be used to determine additional security or diagnostic processing.
  */
 Pnode *
@@ -965,7 +976,7 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 
 		/*
 		 * If this a secure application, validation of the expanded
-		 * pathname may be necessary.
+		 * path name may be necessary.
 		 */
 		if (rtld_flags & RT_FL_SECURE) {
 			if (is_path_secure(str, clmp, orig, tkns) == 0) {
@@ -1019,7 +1030,7 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 			char	*oname;
 
 			/*
-			 * If this is a pathname, and any token expansion
+			 * If this is a path name, and any token expansion
 			 * occurred, maintain the original string for possible
 			 * diagnostic use.
 			 */
