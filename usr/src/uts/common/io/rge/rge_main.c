@@ -1884,9 +1884,10 @@ rge_suspend(rge_t *rgep)
 	 * Stop processing and idle (powerdown) the PHY ...
 	 */
 	mutex_enter(rgep->genlock);
-	rw_enter(rgep->errlock, RW_READER);
+	rw_enter(rgep->errlock, RW_WRITER);
 
 	if (rgep->rge_mac_state != RGE_MAC_STARTED) {
+		rw_exit(rgep->errlock);
 		mutex_exit(rgep->genlock);
 		return (DDI_SUCCESS);
 	}

@@ -1022,6 +1022,11 @@ rge_chip_init(rge_t *rgep)
 	rge_reg_put32(rgep, TIMER_COUNT_REG, 0);
 
 	/*
+	 * disable the Unicast Wakeup Frame capability
+	 */
+	rge_reg_clr8(rgep, RT_CONFIG_5_REG, RT_UNI_WAKE_FRAME);
+
+	/*
 	 * Return to normal network/host communication mode
 	 */
 	rge_reg_clr8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
@@ -1195,17 +1200,18 @@ rge_set_multi_addr(rge_t *rgep)
 	/*
 	 * Change to config register write enable mode
 	 */
-	if (rgep->chipid.mac_ver == MAC_VER_8169SC)
+	if (rgep->chipid.mac_ver == MAC_VER_8169SC) {
 		rge_reg_set8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
-
+	}
 	rge_reg_put32(rgep, MULTICAST_0_REG, RGE_BSWAP_32(hashp[0]));
 	rge_reg_put32(rgep, MULTICAST_4_REG, RGE_BSWAP_32(hashp[1]));
 
 	/*
 	 * Return to normal network/host communication mode
 	 */
-	if (rgep->chipid.mac_ver == MAC_VER_8169SC)
+	if (rgep->chipid.mac_ver == MAC_VER_8169SC) {
 		rge_reg_clr8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
+	}
 }
 
 static void rge_set_promisc(rge_t *rgep);

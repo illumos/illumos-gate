@@ -246,6 +246,13 @@ extern "C" {
 #define	RT_CONFIG_5_REG			0x0056
 
 /*
+ * Config 5 Register Bits
+ */
+#define	RT_UNI_WAKE_FRAME		0x10
+#define	RT_MUL_WAKE_FRAME		0x20
+#define	RT_BRO_WAKE_FRAME		0x40
+
+/*
  * Timer interrupt register
  */
 #define	TIMER_INT_REG			0x0058
