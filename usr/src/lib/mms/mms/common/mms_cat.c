@@ -225,15 +225,17 @@ static char *
 mms_get_locale(char *locale, int len)
 {
 	char	*lang;
-	char	buf[3];
+	int	i;
 
-	if ((lang = setlocale(LC_MESSAGES, NULL)) == NULL) {
+	locale[0] = '\0';
+	lang = setlocale(LC_MESSAGES, NULL);
+	if (lang == NULL || lang[0] == 'C') {
 		(void) snprintf(locale, len, "EN");
 	} else {
-		buf[0] = (char)toupper(lang[0]);
-		buf[1] = (char)toupper(lang[1]);
-		buf[2] = '\0';
-		(void) snprintf(locale, len, "%s", buf);
+		for (i = 0; i < len - 1 && islower(lang[i]); i++) {
+			locale[i] = (char)toupper(lang[i]);
+			locale[i+1] = '\0';
+		}
 	}
 	return (locale);
 }
@@ -247,7 +249,6 @@ mms_get_msgcl(int msgid, ...)
 	va_start(args, msgid);
 	msg = mms_bld_msgcl(msgid, args);
 	va_end(args);
-
 	return (msg);
 }
 
@@ -276,17 +277,12 @@ mms_bld_msgcl(int msgid, va_list args)
 {
 	char		*msgcl = NULL;
 	char		*msgfmt;
+	char		*arg_key;
+	char		*arg_text;
 	char		*loctext = NULL;
 	char		*argcl = NULL;
 	char		*arglist = NULL;
-	int		nargs = 0;
-	va_list		ap;
-	char		*argp;
-	char		*valp;
-	int		i;
-	int		alen;
-	int		addarg;
-	int		cpstart;
+	va_list		argscp;
 	char		lang[20];
 
 	/*
@@ -295,7 +291,7 @@ mms_bld_msgcl(int msgid, va_list args)
 	(void) mms_get_locale(lang, sizeof (lang));
 
 	/*
-	 * Get localized message format string from msg catalog
+	 * Get message format string
 	 */
 	msgfmt = mms_get_cat_msg(msgid);
 	if (msgfmt == NULL || msgfmt[0] == '\0') {
@@ -307,75 +303,32 @@ mms_bld_msgcl(int msgid, va_list args)
 	/*
 	 * Create argument list
 	 */
-	ap = args;
-	for (argp = va_arg(ap, char *);
-	    argp != NULL; argp = va_arg(ap, char *)) {
-		/* Add to arguments list */
-		arglist = mms_strapp(arglist, "'%s' '%s' ",
-		    argp, va_arg(ap, char *));
-	}
-
-	/*
-	 * Substitute arg values into variables in msg to create loctext
-	 */
-	for (i = 0, cpstart = 0; msgfmt[i] != '\0'; ) {
-		valp = NULL;
-		if (msgfmt[i] == '$') {
-			ap = args;
-			for (argp = va_arg(ap, char *);
-			    argp != NULL; argp = va_arg(ap, char *)) {
-				alen = strlen(argp);
-				if (strncmp(msgfmt + i + 1, argp,
-				    alen) == 0 &&
-				    msgfmt[i + 1 + alen] == '$') {
-					valp = va_arg(ap, char *);
-					/* don't add this to arg list */
-					addarg = 0;
-					break;
-				} else {
-					/* Not matched, skip value */
-					(void) va_arg(ap, char *);
-				}
-			}
-			if (valp != NULL) {
-				/* Substitute variable with value */
-				if (addarg) {
-					/* Add to arguments list */
-					arglist = mms_strapp(arglist,
-					    "'%s' '%s' ",
-					    argp, valp);
-					nargs += 2;
-				}
-				/* Copy the uncopied portion of msgfmt */
-				/* to loctext */
-				loctext = mms_strnapp(loctext, i - cpstart,
-				    msgfmt + cpstart);
-				loctext = mms_strapp(loctext, "%s", valp);
-				i += (alen + 2);	/* skip over arg */
-				cpstart = i;
-			} else {
-				i++;
-			}
-		} else {
-			i++;
+	va_copy(argscp, args);
+	while ((arg_key = va_arg(argscp, char *)) != NULL) {
+		if ((arg_text = va_arg(argscp, char *)) == NULL) {
+			break;
 		}
+		arglist = mms_strapp(arglist, "'%s' '%s' ", arg_key, arg_text);
 	}
+	va_end(argscp);
 
-	/* if not at end of msgfmt, copy the last portion of text to loctext */
-	if (cpstart != i) {
-		loctext = mms_strapp(loctext, "%s", msgfmt + cpstart);
-	}
-
-	/*
-	 * Terminate argument clause
-	 */
-	if (nargs == 0) {		/* no arguments */
-		argcl = "";
-	} else {
+	if (arglist) {
 		argcl = mms_strnew("arguments [ %s ] ", arglist);
 		free(arglist);
+	} else {
+		argcl = strdup("");
 	}
 
+	/*
+	 * Localize message
+	 */
+	if ((loctext = mms_get_locstr(msgid, args)) == NULL) {
+		loctext = strdup("\0");
+	}
+
+	/*
+	 * Build message clause
+	 */
 	msgcl = mms_strapp(msgcl, "message [ id [ 'SUNW' 'MMS' '%d' ] %s "
 	    "loctext [ '%s' '%s' ]] ", msgid, argcl, lang, loctext);
 	free(argcl);
@@ -415,6 +368,5 @@ mms_get_locstr(int msgid, va_list args)
 		free(s1);
 		s1 = s2;
 	}
-
 	return (s1);
 }
