@@ -474,17 +474,19 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
 
 	VERIFY(type == ZFS_OWNER || type == ZFS_GROUP);
 
-	if (type == ZFS_OWNER)
-		id = crgetuid(cr);
-	else
-		id = crgetgid(cr);
+	ksid = crgetsid(cr, (type == ZFS_OWNER) ? KSID_OWNER : KSID_GROUP);
+	if (ksid) {
+		id = ksid_getid(ksid);
+	} else {
+		if (type == ZFS_OWNER)
+			id = crgetuid(cr);
+		else
+			id = crgetgid(cr);
+	}
 
-	if (!zfsvfs->z_use_fuids || !IS_EPHEMERAL(id))
+	if (!zfsvfs->z_use_fuids || (!IS_EPHEMERAL(id)))
 		return ((uint64_t)id);
 
-	ksid = crgetsid(cr, (type == ZFS_OWNER) ? KSID_OWNER : KSID_GROUP);
-
-	VERIFY(ksid != NULL);
 	rid = ksid_getrid(ksid);
 	domain = ksid_getdomain(ksid);
 

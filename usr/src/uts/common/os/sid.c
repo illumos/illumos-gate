@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Sid manipulation (stubs).
  */
@@ -184,6 +182,12 @@ uint_t
 ksid_getrid(ksid_t *ks)
 {
 	return (ks->ks_rid);
+}
+
+uid_t
+ksid_getid(ksid_t *ks)
+{
+	return (ks->ks_id);
 }
 
 int

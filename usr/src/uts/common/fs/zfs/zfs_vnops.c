@@ -65,6 +65,7 @@
 #include <sys/policy.h>
 #include <sys/sunddi.h>
 #include <sys/filio.h>
+#include <sys/sid.h>
 #include "fs/fs_subr.h"
 #include <sys/zfs_ctldir.h>
 #include <sys/zfs_fuid.h>
@@ -1172,15 +1173,24 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	int		error;
 	zfs_acl_t	*aclp = NULL;
 	zfs_fuid_info_t *fuidp = NULL;
+	ksid_t		*ksid;
+	uid_t		uid;
+	gid_t		gid = crgetgid(cr);
 
 	/*
 	 * If we have an ephemeral id, ACL, or XVATTR then
 	 * make sure file system is at proper version
 	 */
 
+	ksid = crgetsid(cr, KSID_OWNER);
+	if (ksid)
+		uid = ksid_getid(ksid);
+	else
+		uid = crgetuid(cr);
+
 	if (zfsvfs->z_use_fuids == B_FALSE &&
 	    (vsecp || (vap->va_mask & AT_XVATTR) ||
-	    IS_EPHEMERAL(crgetuid(cr)) || IS_EPHEMERAL(crgetgid(cr))))
+	    IS_EPHEMERAL(uid) || IS_EPHEMERAL(gid)))
 		return (EINVAL);
 
 	ZFS_ENTER(zfsvfs);
@@ -1266,8 +1276,8 @@ top:
 
 		tx = dmu_tx_create(os);
 		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		if ((aclp && aclp->z_has_fuids) || IS_EPHEMERAL(crgetuid(cr)) ||
-		    IS_EPHEMERAL(crgetgid(cr))) {
+		if ((aclp && aclp->z_has_fuids) || IS_EPHEMERAL(uid) ||
+		    IS_EPHEMERAL(gid)) {
 			if (zfsvfs->z_fuid_obj == 0) {
 				dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
 				dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
@@ -1619,6 +1629,9 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 	zfs_acl_t	*aclp = NULL;
 	zfs_fuid_info_t	*fuidp = NULL;
 	int		zf = ZNEW;
+	ksid_t		*ksid;
+	uid_t		uid;
+	gid_t		gid = crgetgid(cr);
 
 	ASSERT(vap->va_type == VDIR);
 
@@ -1627,9 +1640,14 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 	 * make sure file system is at proper version
 	 */
 
+	ksid = crgetsid(cr, KSID_OWNER);
+	if (ksid)
+		uid = ksid_getid(ksid);
+	else
+		uid = crgetuid(cr);
 	if (zfsvfs->z_use_fuids == B_FALSE &&
-	    (vsecp || (vap->va_mask & AT_XVATTR) || IS_EPHEMERAL(crgetuid(cr))||
-	    IS_EPHEMERAL(crgetgid(cr))))
+	    (vsecp || (vap->va_mask & AT_XVATTR) ||
+	    IS_EPHEMERAL(uid)) || IS_EPHEMERAL(gid))
 		return (EINVAL);
 
 	ZFS_ENTER(zfsvfs);
@@ -1688,8 +1706,8 @@ top:
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, dirname);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
-	if ((aclp && aclp->z_has_fuids) || IS_EPHEMERAL(crgetuid(cr)) ||
-	    IS_EPHEMERAL(crgetgid(cr))) {
+	if ((aclp && aclp->z_has_fuids) || IS_EPHEMERAL(uid) ||
+	    IS_EPHEMERAL(gid)) {
 		if (zfsvfs->z_fuid_obj == 0) {
 			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
 			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,

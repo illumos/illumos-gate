@@ -27,8 +27,6 @@
 #ifndef _SYS_SID_H
 #define	_SYS_SID_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/avl.h>
 #ifdef _KERNEL
@@ -99,6 +97,7 @@ typedef struct credsid {
 
 const char *ksid_getdomain(ksid_t *);
 uint_t ksid_getrid(ksid_t *);
+uid_t ksid_getid(ksid_t *);
 
 int ksid_lookupbyuid(zone_t *, uid_t, ksid_t *);
 int ksid_lookupbygid(zone_t *, gid_t, ksid_t *);
