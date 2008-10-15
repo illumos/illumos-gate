@@ -122,6 +122,14 @@ typedef struct usbvc_stream_if {
 	uint32_t	max_isoc_payload;
 
 	uchar_t		start_polling;	/* indicate if isoc polling started */
+
+	/*
+	 * To flag if VIDIOC_STREAMON is executed, only used by STREAM mode
+	 * for suspend/resume. If it's non-zero, we'll have to resume the
+	 * device's isoc polling operation after resume.
+	 */
+	uint8_t		stream_on;
+
 	uchar_t		fid;		/* the MJPEG FID bit */
 	usbvc_buf_grp_t	buf_read;	/* buf used for read I/O */
 	uint8_t			buf_read_num; /* desired buf num for read I/O */

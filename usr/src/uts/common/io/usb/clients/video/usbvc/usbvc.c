@@ -278,7 +278,7 @@ static struct dev_ops usbvc_ops = {
 	&usbvc_cb_ops,	/* driver operations */
 	NULL,			/* bus operations */
 	usbvc_power,		/* power */
-	ddi_quiesce_not_needed,		/* quiesce */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 static struct modldrv usbvc_modldrv =	{
@@ -707,6 +707,8 @@ usbvc_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		mutex_enter(&usbvcp->usbvc_mutex);
 		strm_if->start_polling = 0;
 	}
+	strm_if->stream_on = 0;
+
 	usbvc_close_isoc_pipe(usbvcp, strm_if);
 	if_num = strm_if->if_descr->if_alt->altif_descr.bInterfaceNumber;
 	mutex_exit(&usbvcp->usbvc_mutex);
@@ -1490,6 +1492,91 @@ usbvc_cpr_suspend(dev_info_t *dip)
 
 
 /*
+ * If the polling has been stopped due to some exceptional errors,
+ * we reconfigure the device and start polling again. Only for S/R
+ * resume or hotplug reconnect operations.
+ */
+static int
+usbvc_resume_operation(usbvc_state_t *usbvcp)
+{
+	usbvc_stream_if_t	*strm_if;
+	int rv = USB_SUCCESS;
+
+	USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+	    "usbvc_resume_operation: enter");
+
+	mutex_enter(&usbvcp->usbvc_mutex);
+	strm_if = usbvcp->usbvc_curr_strm;
+	if (!strm_if) {
+		mutex_exit(&usbvcp->usbvc_mutex);
+		rv = USB_FAILURE;
+
+		return (rv);
+	}
+
+	/*
+	 * 1) if application has not started STREAMON ioctl yet,
+	 *    just return
+	 * 2) if application use READ mode, return immediately
+	 */
+	if (strm_if->stream_on == 0) {
+		mutex_exit(&usbvcp->usbvc_mutex);
+
+		return (rv);
+	}
+
+	/* isoc pipe is expected to be opened already if (stream_on==1) */
+	if (!strm_if->datain_ph) {
+		mutex_exit(&usbvcp->usbvc_mutex);
+		rv = USB_FAILURE;
+
+		return (rv);
+	}
+
+	mutex_exit(&usbvcp->usbvc_mutex);
+
+	/* first commit the parameters negotiated and saved during S_FMT */
+	if ((rv = usbvc_vs_set_probe_commit(usbvcp, strm_if,
+	    &strm_if->ctrl_pc, VS_COMMIT_CONTROL)) != USB_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL,
+		    usbvcp->usbvc_log_handle,
+		    "usbvc_resume_operation: set probe failed, rv=%d", rv);
+
+		return (rv);
+	}
+
+	mutex_enter(&usbvcp->usbvc_mutex);
+
+	/* Set alt interfaces, must be after probe_commit according to spec */
+	if ((rv = usbvc_set_alt(usbvcp, strm_if)) != USB_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL,
+		    usbvcp->usbvc_log_handle,
+		    "usbvc_resume_operation: set alt failed");
+		mutex_exit(&usbvcp->usbvc_mutex);
+
+		return (rv);
+	}
+
+	/*
+	 * The isoc polling could be stopped by isoc_exc_cb
+	 * during suspend or hotplug. Restart it.
+	 */
+	if (usbvc_start_isoc_polling(usbvcp, strm_if, V4L2_MEMORY_MMAP)
+	    != USB_SUCCESS) {
+		rv = USB_FAILURE;
+		mutex_exit(&usbvcp->usbvc_mutex);
+
+		return (rv);
+	}
+
+	strm_if->start_polling = 1;
+
+	mutex_exit(&usbvcp->usbvc_mutex);
+
+	return (rv);
+}
+
+/*
  * usbvc_cpr_resume:
  *
  *	usbvc_restore_device_state marks success by putting device back online
@@ -1564,6 +1651,14 @@ usbvc_restore_device_state(dev_info_t *dip, usbvc_state_t *usbvcp)
 			    "Please verify reconnection");
 		}
 	}
+
+	if (usbvc_resume_operation(usbvcp) != USB_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_PM, usbvcp->usbvc_log_handle,
+		    "usbvc_restore_device_state: can't resume operation");
+
+		goto fail;
+	}
+
 	mutex_enter(&usbvcp->usbvc_mutex);
 
 	usbvc_pm_idle_component(usbvcp);
@@ -2931,6 +3026,8 @@ usbvc_open_isoc_pipe(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
 	mutex_enter(&usbvcp->usbvc_mutex);
 	strm_if->start_polling = 0;
 
+	strm_if->stream_on = 0;
+
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
 	    "usbvc_open_isoc_pipe: success, datain_ph=%p",
 	    (void *)strm_if->datain_ph);
@@ -3370,7 +3467,20 @@ usbvc_decode_stream_header(usbvc_state_t *usbvcp, usbvc_buf_grp_t *bufgrp,
 
 	/* if no buf room left, then return with a err status */
 	if (buf_left == 0) {
+		/* buffer full, got an EOF packet(head only, no payload) */
+		if ((head_flag & USBVC_STREAM_EOF) &&
+		    (actual_len == head_len)) {
+			buf_filling->status = USBVC_BUF_DONE;
+			USB_DPRINTF_L3(PRINT_MASK_CB, usbvcp->usbvc_log_handle,
+			    "usbvc_decode_stream_header: got a EOF packet");
+
+			return (USB_SUCCESS);
+		}
+
+		/* Otherwise, mark the buf error and return failure */
 		buf_filling->status = USBVC_BUF_ERR;
+		USB_DPRINTF_L3(PRINT_MASK_CB, usbvcp->usbvc_log_handle,
+		    "usbvc_decode_stream_header: frame buf full");
 
 		return (USB_FAILURE);
 	}

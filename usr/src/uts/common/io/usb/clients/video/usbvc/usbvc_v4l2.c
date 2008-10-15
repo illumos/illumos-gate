@@ -487,6 +487,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 			break;
 		}
 		strm_if->start_polling = 1;
+		strm_if->stream_on = 1; /* the only place to set this value */
 
 		mutex_exit(&usbvcp->usbvc_mutex);
 
@@ -529,6 +530,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 			mutex_enter(&usbvcp->usbvc_mutex);
 			strm_if->start_polling = 0;
 		}
+		strm_if->stream_on = 0;
 		mutex_exit(&usbvcp->usbvc_mutex);
 
 		break;
