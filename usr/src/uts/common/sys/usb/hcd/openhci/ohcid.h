@@ -140,6 +140,7 @@ typedef struct ohci_state {
 	int			ohci_intr_cnt;		/* # of intrs inuse */
 	uint_t			ohci_intr_pri;		/* intr priority */
 	int			ohci_intr_cap;		/* intr capabilities */
+	boolean_t		ohci_msi_enabled;	/* default to true */
 	kmutex_t		ohci_int_mutex;		/* Mutex for struct */
 
 	/* HCCA area */

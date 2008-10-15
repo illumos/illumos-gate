@@ -684,6 +684,14 @@ ohci_attach(dev_info_t		*dip,
 		return (DDI_FAILURE);
 	}
 
+	/* Get the ohci chip vendor and device id */
+	ohcip->ohci_vendor_id = pci_config_get16(
+	    ohcip->ohci_config_handle, PCI_CONF_VENID);
+	ohcip->ohci_device_id = pci_config_get16(
+	    ohcip->ohci_config_handle, PCI_CONF_DEVID);
+	ohcip->ohci_rev_id = pci_config_get8(
+	    ohcip->ohci_config_handle, PCI_CONF_REVID);
+
 	/* Register interrupts */
 	if (ohci_register_intrs_and_init_mutex(ohcip) != DDI_SUCCESS) {
 		(void) ohci_cleanup(ohcip);
@@ -1255,6 +1263,18 @@ ohci_register_intrs_and_init_mutex(ohci_state_t	*ohcip)
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 	    "ohci_register_intrs_and_init_mutex:");
 
+	/*
+	 * Sometimes the OHCI controller of ULI1575 southbridge
+	 * could not receive SOF intrs when enable MSI. Hence
+	 * MSI is disabled for this chip.
+	 */
+	if ((ohcip->ohci_vendor_id == PCI_ULI1575_VENID) &&
+	    (ohcip->ohci_device_id == PCI_ULI1575_DEVID)) {
+		ohcip->ohci_msi_enabled = B_FALSE;
+	} else {
+		ohcip->ohci_msi_enabled = ohci_enable_msi;
+	}
+
 	if (ohci_is_polled(ohcip->ohci_dip)) {
 		extern pri_t maxclsyspri;
 
@@ -1282,7 +1302,7 @@ ohci_register_intrs_and_init_mutex(ohci_state_t	*ohcip)
 	    "ohci_register_intrs_and_init_mutex: "
 	    "supported interrupt types 0x%x", intr_types);
 
-	if ((intr_types & DDI_INTR_TYPE_MSI) && ohci_enable_msi) {
+	if ((intr_types & DDI_INTR_TYPE_MSI) && ohcip->ohci_msi_enabled) {
 		if (ohci_add_intrs(ohcip, DDI_INTR_TYPE_MSI)
 		    != DDI_SUCCESS) {
 			USB_DPRINTF_L4(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
@@ -1554,14 +1574,6 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 
 	/* hcca area need not be initialized on resume */
 	if (ohcip->ohci_hc_soft_state == OHCI_CTLR_INIT_STATE) {
-
-		/* Get the ohci chip vendor and device id */
-		ohcip->ohci_vendor_id = pci_config_get16(
-		    ohcip->ohci_config_handle, PCI_CONF_VENID);
-		ohcip->ohci_device_id = pci_config_get16(
-		    ohcip->ohci_config_handle, PCI_CONF_DEVID);
-		ohcip->ohci_rev_id = pci_config_get8(
-		    ohcip->ohci_config_handle, PCI_CONF_REVID);
 
 		/* Initialize the hcca area */
 		if (ohci_init_hcca(ohcip) != DDI_SUCCESS) {
