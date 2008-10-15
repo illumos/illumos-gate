@@ -1937,15 +1937,16 @@ zio_walk_root_step(mdb_walk_state_t *wsp)
 #define	NICENUM_BUFLEN 6
 
 static int
-snprintfloat(char *buf, int len, float f, int frac_digits)
+snprintfrac(char *buf, int len,
+    uint64_t numerator, uint64_t denom, int frac_digits)
 {
-	float mul = 1;
+	int mul = 1;
 	int whole, frac, i;
 
 	for (i = frac_digits; i; i--)
 		mul *= 10;
-	whole = (int)f;
-	frac = (int)((f - whole) * mul);
+	whole = numerator / denom;
+	frac = mul * numerator / denom - mul * whole;
 	return (mdb_snprintf(buf, len, "%u.%0*u", whole, frac_digits, frac));
 }
 
@@ -1967,12 +1968,12 @@ mdb_nicenum(uint64_t num, char *buf)
 		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu",
 		    (u_longlong_t)n);
 	} else if (n < 10 && (num & (num - 1)) != 0) {
-		(void) snprintfloat(buf, NICENUM_BUFLEN,
-		    (float)num / (1ULL << 10 * index), 2);
+		(void) snprintfrac(buf, NICENUM_BUFLEN,
+		    num, 1ULL << 10 * index, 2);
 		strcat(buf, u);
 	} else if (n < 100 && (num & (num - 1)) != 0) {
-		(void) snprintfloat(buf, NICENUM_BUFLEN,
-		    (float)num / (1ULL << 10 * index), 1);
+		(void) snprintfrac(buf, NICENUM_BUFLEN,
+		    num, 1ULL << 10 * index, 1);
 		strcat(buf, u);
 	} else {
 		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu%s",
@@ -2082,10 +2083,10 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_nicenum(zb->zb_psize, psize);
 			mdb_nicenum(zb->zb_asize, asize);
 			mdb_nicenum(zb->zb_asize / zb->zb_count, avg);
-			(void) snprintfloat(comp, NICENUM_BUFLEN,
-			    (float)zb->zb_lsize / zb->zb_psize, 2);
-			(void) snprintfloat(pct, NICENUM_BUFLEN,
-			    100.0 * zb->zb_asize / tzb->zb_asize, 2);
+			(void) snprintfrac(comp, NICENUM_BUFLEN,
+			    zb->zb_lsize, zb->zb_psize, 2);
+			(void) snprintfrac(pct, NICENUM_BUFLEN,
+			    100 * zb->zb_asize, tzb->zb_asize, 2);
 
 			mdb_printf("%6s\t%5s\t%5s\t%5s\t%5s"
 			    "\t%5s\t%6s\t",
