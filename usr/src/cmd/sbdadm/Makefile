@@ -38,7 +38,7 @@ COMMON_SRCS =	$(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.c)
 OBJS =	$(LOCAL_OBJS) $(COMMON_OBJS)
 SRCS = $(LOCAL_SRCS) $(COMMON_SRCS)
 POFILE = sbdadm_all.po
-POFILES = $(LOCAL_OBJS:%.o=%.po) $(COMMON_OBJS:%.o=$(COMMONBASE)/cmdparse/%.po)
+POFILES = $(LOCAL_OBJS:%.o=%.po)
  
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
 LDLIBS += -lstmf -lnvpair

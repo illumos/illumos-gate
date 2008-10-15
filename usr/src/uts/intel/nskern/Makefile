@@ -53,15 +53,15 @@ CONF_SRCDIR	= $(UTSBASE)/common/avs/ns/solaris
 include ../Makefile.$(ARCHDIR)
 include $(UTSBASE)/common/avs/Makefile.com
 
-CLEANFILES	+= $(OBJS_DIR)/genassym $(OBJS_DIR)/assym.h
-CLOBBERFILES	+= $(OBJS_DIR)/genassym $(OBJS_DIR)/assym.h
-
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+AS_INC_PATH	+= -I$(DSF_DIR)/$(OBJS_DIR)
+
+ASSYM_H		= $(DSF_DIR)/$(OBJS_DIR)/assym.h
 
 #
 # lint pass one enforcement
@@ -70,14 +70,9 @@ CFLAGS += -v
 
 .KEEP_STATE:
 
-$(OBJS_DIR)/genassym: genassym.c
-	$(LINK.c) $< genassym.c -o $@
+$(OBJS_DIR)/nsc_asm.o: nsc_asm.s
 
-$(OBJS_DIR)/nsc_asm.o: nsc_asm.s $(OBJS_DIR)/assym.h
-
-$(OBJS_DIR)/assym.h: $(OBJS_DIR)/genassym
-	$(OBJS_DIR)/genassym > $@
-
+$(BINARY):	$(ASSYM_H)
 
 def:		$(DEF_DEPS)
 
@@ -92,6 +87,7 @@ lint:		$(LINT_DEPS)
 modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
+
 
 install:	$(INSTALL_DEPS)
 
