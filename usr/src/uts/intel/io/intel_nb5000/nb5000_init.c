@@ -633,117 +633,69 @@ nb_dimms_init(find_dimm_label_t *label_function)
 		nb_smbios();
 }
 
+
+/* Setup the ESI port registers to enable SERR for southbridge */
 static void
 nb_pex_init()
 {
-	int i;
+	int i = 0; /* ESI port */
 	uint32_t mask;
+	uint16_t regw;
 
-	for (i = 0; i < NB_PCI_DEV; i++) {
-		switch (nb_chipset) {
-		case INTEL_NB_5000P:
-		case INTEL_NB_5000X:
-			if (i == 1 || i > 8)
-				continue;
-			break;
-		case INTEL_NB_5000V:
-			if (i == 1 || i > 3)
-				continue;
-			break;
-		case INTEL_NB_5000Z:
-			if (i == 1 || i > 5)
-				continue;
-			break;
-		case INTEL_NB_5400:
-			break;
-		case INTEL_NB_7300:
-			if (i > 8)
-				continue;
-			break;
+	emask_uncor_pex[i] = EMASK_UNCOR_PEX_RD(i);
+	emask_cor_pex[i] = EMASK_COR_PEX_RD(i);
+	emask_rp_pex[i] = EMASK_RP_PEX_RD(i);
+	docmd_pex[i] = PEX_ERR_DOCMD_RD(i);
+	uncerrsev[i] = UNCERRSEV_RD(i);
+
+	if (nb5000_reset_uncor_pex)
+		EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
+	if (nb5000_reset_cor_pex)
+		EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
+	if (nb_set_docmd) {
+		if (nb_chipset == INTEL_NB_5400) {
+			/* disable masking of ERR pins used by DOCMD */
+			PEX_ERR_PIN_MASK_WR(i, 0x10);
+
+			mask = (docmd_pex[i] & nb5400_docmd_pex_mask) |
+			    (nb5400_docmd_pex & ~nb5400_docmd_pex_mask);
+		} else {
+			mask = (docmd_pex[i] & nb5000_docmd_pex_mask) |
+			    (nb5000_docmd_pex & ~nb5000_docmd_pex_mask);
 		}
-		emask_uncor_pex[i] = EMASK_UNCOR_PEX_RD(i);
-		emask_cor_pex[i] = EMASK_COR_PEX_RD(i);
-		emask_rp_pex[i] = EMASK_RP_PEX_RD(i);
-		docmd_pex[i] = PEX_ERR_DOCMD_RD(i);
-		uncerrsev[i] = UNCERRSEV_RD(i);
-
-		if (nb5000_reset_uncor_pex)
-			EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
-		if (nb5000_reset_cor_pex)
-			EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
-		if (nb_set_docmd) {
-			if (nb_chipset == INTEL_NB_5400) {
-				/* disable masking of ERR pins used by DOCMD */
-				PEX_ERR_PIN_MASK_WR(i, 0x10);
-
-				mask = (docmd_pex[i] & nb5400_docmd_pex_mask) |
-				    (nb5400_docmd_pex & ~nb5400_docmd_pex_mask);
-			} else {
-				mask = (docmd_pex[i] & nb5000_docmd_pex_mask) |
-				    (nb5000_docmd_pex & ~nb5000_docmd_pex_mask);
-			}
-			PEX_ERR_DOCMD_WR(i, mask);
-		}
-
-		/* RP error message (CE/NFE/FE) detect mask */
-		EMASK_RP_PEX_WR(i, nb5000_rp_pex);
-
-		/* Setup ESI port registers to enable SERR for southbridge */
-		if (i == 0) {
-			uint16_t regw;
-
-			/* Command Register - Enable SERR */
-			regw = nb_pci_getw(0, i, 0, PCI_CONF_COMM, 0);
-			nb_pci_putw(0, i, 0, PCI_CONF_COMM,
-			    regw | PCI_COMM_SERR_ENABLE);
-
-			/* Root Control Register - SERR on NFE/FE */
-			PEXROOTCTL_WR(i, PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
-			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN);
-
-			/* AER UE Mask - Mask UR */
-			UNCERRMSK_WR(i, PCIE_AER_UCE_UR);
-		}
+		PEX_ERR_DOCMD_WR(i, mask);
 	}
+
+	/* RP error message (CE/NFE/FE) detect mask */
+	EMASK_RP_PEX_WR(i, nb5000_rp_pex);
+
+	/* Command Register - Enable SERR */
+	regw = nb_pci_getw(0, i, 0, PCI_CONF_COMM, 0);
+	nb_pci_putw(0, i, 0, PCI_CONF_COMM,
+	    regw | PCI_COMM_SERR_ENABLE);
+
+	/* Root Control Register - SERR on NFE/FE */
+	PEXROOTCTL_WR(i, PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+	    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN);
+
+	/* AER UE Mask - Mask UR */
+	UNCERRMSK_WR(i, PCIE_AER_UCE_UR);
 }
 
 static void
 nb_pex_fini()
 {
-	int i;
+	int i = 0; /* ESI port */
 
-	for (i = 0; i < NB_PCI_DEV; i++) {
-		switch (nb_chipset) {
-		case INTEL_NB_5000P:
-		case INTEL_NB_5000X:
-			if (i == 1 && i > 8)
-				continue;
-			break;
-		case INTEL_NB_5000V:
-			if (i == 1 || i > 3)
-				continue;
-			break;
-		case INTEL_NB_5000Z:
-			if (i == 1 || i > 5)
-				continue;
-			break;
-		case INTEL_NB_5400:
-			break;
-		case INTEL_NB_7300:
-			if (i > 8)
-				continue;
-			break;
-		}
-		EMASK_UNCOR_PEX_WR(i, emask_uncor_pex[i]);
-		EMASK_COR_PEX_WR(i, emask_cor_pex[i]);
-		EMASK_RP_PEX_WR(i, emask_rp_pex[i]);
-		PEX_ERR_DOCMD_WR(i, docmd_pex[i]);
+	EMASK_UNCOR_PEX_WR(i, emask_uncor_pex[i]);
+	EMASK_COR_PEX_WR(i, emask_cor_pex[i]);
+	EMASK_RP_PEX_WR(i, emask_rp_pex[i]);
+	PEX_ERR_DOCMD_WR(i, docmd_pex[i]);
 
-		if (nb5000_reset_uncor_pex)
-			EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
-		if (nb5000_reset_cor_pex)
-			EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
-	}
+	if (nb5000_reset_uncor_pex)
+		EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
+	if (nb5000_reset_cor_pex)
+		EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
 }
 
 void

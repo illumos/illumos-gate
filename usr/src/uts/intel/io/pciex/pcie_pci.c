@@ -110,6 +110,7 @@ static int	pepb_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
 		    caddr_t, int *);
 static int	pepb_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static void	pepb_peekpoke_cb(dev_info_t *, ddi_fm_error_t *);
+static uint_t 	pepb_intr_handler(caddr_t arg1, caddr_t arg2);
 
 struct cb_ops pepb_cb_ops = {
 	pepb_open,			/* open */
@@ -168,7 +169,6 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-
 /*
  * soft state pointer and structure template:
  */
@@ -204,10 +204,12 @@ typedef struct {
 	int			intr_count;	/* Num of Intr */
 	uint_t			intr_priority;	/* Intr Priority */
 	int			intr_type;	/* (MSI | FIXED) */
+	int			isr_tab[4];	/* MSI source offset */
 	uint32_t		soft_state;	/* soft state flags */
 	kmutex_t		pepb_mutex;	/* Mutex for this ctrl */
 	kmutex_t		pepb_err_mutex;	/* Error handling mutex */
 	kmutex_t		pepb_peek_poke_mutex;
+	boolean_t		pepb_no_aer_msi;
 	int			pepb_fmcap;
 	ddi_iblock_cookie_t	pepb_fm_ibc;
 	int			port_type;
@@ -224,11 +226,16 @@ typedef struct {
 /* default interrupt priority for all interrupts (hotplug or non-hotplug */
 #define	PEPB_INTR_PRI	1
 
+#define	PEPB_INTR_SRC_UNKNOWN	0x0	/* must be 0 */
+#define	PEPB_INTR_SRC_HP	0x1
+#define	PEPB_INTR_SRC_PME	0x2
+#define	PEPB_INTR_SRC_AER	0x4
+
 /* flag to turn on MSI support */
-static int pepb_enable_msi = 1;
+int pepb_enable_msi = 1;
 
 /* panic on PF_PANIC flag */
-static int pepb_die = PF_ERR_FATAL_FLAGS;
+int pepb_die = PF_ERR_FATAL_FLAGS;
 
 extern errorq_t *pci_target_queue;
 
@@ -244,21 +251,15 @@ static int	pepb_pcie_port_type(dev_info_t *dip,
 			ddi_acc_handle_t config_handle);
 
 /* interrupt related declarations */
-static uint_t	pepb_intx_intr(caddr_t arg, caddr_t arg2);
-static uint_t	pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
-static uint_t	pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
-static int	pepb_intr_on_root_port(dev_info_t *);
+static int	pepb_msi_intr_supported(dev_info_t *, int intr_type);
 static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
 static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
 
 /* Intel Workarounds */
-static void	pepb_intel_serr_workaround(dev_info_t *dip);
+static void	pepb_intel_serr_workaround(dev_info_t *dip, boolean_t mcheck);
 static void	pepb_intel_rber_workaround(dev_info_t *dip);
 static void	pepb_intel_sw_workaround(dev_info_t *dip);
 int pepb_intel_workaround_disable = 0;
-
-/* state variable used to apply workaround on current system to RBER devices */
-static boolean_t pepb_do_rber_sev = B_FALSE;
 
 int
 _init(void)
@@ -309,6 +310,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	char			device_type[8];
 	pepb_devstate_t		*pepb;
 	ddi_acc_handle_t	config_handle;
+	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(devi);
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -380,8 +382,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	PEPB_DEBUG((CE_NOTE, "%s#%d: intr_types = 0x%x\n",
 	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
 
-	if (pepb_enable_msi && (intr_types & DDI_INTR_TYPE_MSI) &&
-	    pepb_intr_on_root_port(devi) == DDI_SUCCESS) {
+	if (pepb_msi_intr_supported(devi, intr_types) == DDI_SUCCESS) {
 		if (pepb_intr_init(pepb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
 			goto next_step;
 		else
@@ -391,9 +392,17 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * If we are here that means MSIs were not enabled. For errors fall back
+	 * to the SERR+Machinecheck approach on Intel chipsets.
+	 */
+	if (PCIE_IS_RP(bus_p))
+		pepb->pepb_no_aer_msi = B_TRUE;
+
+	/*
 	 * Only register hotplug interrupts for now.
 	 * Check if device supports PCIe hotplug or not?
 	 * If yes, register fixed interrupts if ILINE is valid.
+	 * Fix error handling for INTx.
 	 */
 	if (pepb->inband_hpc == INBAND_HPC_PCIE) {
 		uint8_t iline;
@@ -435,7 +444,7 @@ next_step:
 	}
 
 	/* Must apply workaround only after all initialization is done */
-	pepb_intel_serr_workaround(devi);
+	pepb_intel_serr_workaround(devi, pepb->pepb_no_aer_msi);
 	pepb_intel_rber_workaround(devi);
 	pepb_intel_sw_workaround(devi);
 
@@ -897,32 +906,63 @@ static int
 pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 {
 	dev_info_t	*dip = pepb_p->dip;
-	int		request = 1, count, x;
-	int		ret;
+	int		nintrs, request, count, x;
 	int		intr_cap = 0;
 	int		inum = 0;
-	ddi_intr_handler_t	**isr_tab = NULL;
-	int		isr_tab_size = 0;
+	int		ret, hp_msi_off, aer_msi_off;
+	pcie_bus_t	*bus_p = PCIE_DIP2UPBUS(dip);
+	uint16_t	vendorid = bus_p->bus_dev_ven_id & 0xFFFF;
+	boolean_t	is_hp = B_FALSE;
+	boolean_t	is_pme = B_FALSE;
 
 	PEPB_DEBUG((CE_NOTE, "pepb_intr_init: Attaching %s handler\n",
 	    (intr_type == DDI_INTR_TYPE_MSI) ? "MSI" : "INTx"));
 
+	request = 0;
+	if (pepb_p->inband_hpc == INBAND_HPC_PCIE) {
+		request++;
+		is_hp = B_TRUE;
+	}
+
 	/*
-	 * Get number of requested interrupts.	If none requested or DDI_FAILURE
-	 * just return DDI_SUCCESS.
+	 * Hotplug and PME share the same MSI vector. If hotplug is not
+	 * supported check if MSI is needed for PME.
+	 */
+	if ((intr_type == DDI_INTR_TYPE_MSI) && PCIE_IS_RP(bus_p) &&
+	    (vendorid == NVIDIA_VENDOR_ID)) {
+		is_pme = B_TRUE;
+		if (!is_hp)
+			request++;
+	}
+
+	/* Setup MSI if this device is a Rootport and has AER. */
+	if (intr_type == DDI_INTR_TYPE_MSI) {
+		if (PCIE_IS_RP(bus_p) && PCIE_HAS_AER(bus_p))
+			request++;
+	}
+
+	if (request == 0)
+		return (DDI_FAILURE);
+
+	/*
+	 * Get number of supported interrupts.
 	 *
 	 * Several Bridges/Switches will not have this property set, resulting
 	 * in a FAILURE, if the device is not configured in a way that
 	 * interrupts are needed. (eg. hotplugging)
 	 */
-	ret = ddi_intr_get_nintrs(dip, intr_type, &request);
-	if ((ret != DDI_SUCCESS) || (request == 0)) {
+	ret = ddi_intr_get_nintrs(dip, intr_type, &nintrs);
+	if ((ret != DDI_SUCCESS) || (nintrs == 0)) {
 		PEPB_DEBUG((CE_NOTE, "ddi_intr_get_nintrs ret:%d req:%d\n",
-		    ret, request));
+		    ret, nintrs));
 		return (DDI_FAILURE);
 	}
 
-	PEPB_DEBUG((CE_NOTE, "ddi_intr_get_nintrs: NINTRS = %x\n", request));
+	PEPB_DEBUG((CE_NOTE, "bdf 0x%x: ddi_intr_get_nintrs: nintrs %d, request"
+	    " %d\n", bus_p->bus_bdf, nintrs, request));
+
+	if (request > nintrs)
+		request = nintrs;
 
 	/* Allocate an array of interrupt handlers */
 	pepb_p->htable_size = sizeof (ddi_intr_handle_t) * request;
@@ -932,25 +972,35 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	ret = ddi_intr_alloc(dip, pepb_p->htable, intr_type, inum, request,
 	    &count, DDI_INTR_ALLOC_NORMAL);
 	if ((ret != DDI_SUCCESS) || (count == 0)) {
-		PEPB_DEBUG((CE_NOTE, "ddi_intr_alloc() ret: %d ask: %d"
+		PEPB_DEBUG((CE_WARN, "ddi_intr_alloc() ret: %d ask: %d"
 		    " actual: %d\n", ret, request, count));
-		goto fail;
+		goto FAIL;
 	}
+	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_ALLOC;
 
 	/* Save the actual number of interrupts allocated */
 	pepb_p->intr_count = count;
-#ifdef	DEBUG
-	if (count < request)
-		PEPB_DEBUG((CE_WARN, "Requested Intr: %d Received: %d\n",
-		    request, count));
-#endif	/* DEBUG */
-	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_ALLOC;
+	if (count < request) {
+		PEPB_DEBUG((CE_WARN, "bdf 0%x: Requested Intr: %d Received:"
+		    " %d\n", bus_p->bus_bdf, request, count));
+	}
+
+	/*
+	 * NVidia (MCP55 and other) chipsets have a errata that if the number
+	 * of requested MSI intrs is not allocated we have to fall back to INTx.
+	 */
+	if (intr_type == DDI_INTR_TYPE_MSI) {
+		if (PCIE_IS_RP(bus_p) && (vendorid == NVIDIA_VENDOR_ID)) {
+			if (request != count)
+				goto FAIL;
+		}
+	}
 
 	/* Get interrupt priority */
 	ret = ddi_intr_get_pri(pepb_p->htable[0], &pepb_p->intr_priority);
 	if (ret != DDI_SUCCESS) {
 		PEPB_DEBUG((CE_WARN, "ddi_intr_get_pri() ret: %d\n", ret));
-		goto fail;
+		goto FAIL;
 	}
 
 	/* initialize the interrupt mutex */
@@ -958,19 +1008,9 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	    DDI_INTR_PRI(pepb_p->intr_priority));
 	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_MUTEX;
 
-	isr_tab_size = sizeof (*isr_tab) * pepb_p->intr_count;
-	isr_tab = kmem_alloc(isr_tab_size, KM_SLEEP);
-	if (pepb_enable_msi && pepb_p->intr_count == 2 &&
-	    intr_type == DDI_INTR_TYPE_MSI &&
-	    pepb_intr_on_root_port(dip) == DDI_SUCCESS) {
-		isr_tab[0] = pepb_pwr_msi_intr;
-		isr_tab[1] = pepb_err_msi_intr;
-	} else
-		isr_tab[0] = pepb_intx_intr;
-
 	for (count = 0; count < pepb_p->intr_count; count++) {
 		ret = ddi_intr_add_handler(pepb_p->htable[count],
-		    isr_tab[count], (caddr_t)pepb_p,
+		    pepb_intr_handler, (caddr_t)pepb_p,
 		    (caddr_t)(uintptr_t)(inum + count));
 
 		if (ret != DDI_SUCCESS) {
@@ -980,19 +1020,25 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 		}
 	}
 
-	kmem_free(isr_tab, isr_tab_size);
-
 	/* If unsucessful, remove the added handlers */
 	if (ret != DDI_SUCCESS) {
 		for (x = 0; x < count; x++) {
 			(void) ddi_intr_remove_handler(pepb_p->htable[x]);
 		}
-		goto fail;
+		goto FAIL;
 	}
 
 	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_HANDLER;
 
 	(void) ddi_intr_get_cap(pepb_p->htable[0], &intr_cap);
+
+	/*
+	 * Get this intr lock because we are not quite ready to handle
+	 * interrupts immediately after enabling it. The MSI multi register
+	 * gets programmed in ddi_intr_enable after which we need to get the
+	 * MSI offsets for Hotplug/AER.
+	 */
+	mutex_enter(&pepb_p->pepb_mutex);
 
 	if (intr_cap & DDI_INTR_FLAG_BLOCK) {
 		(void) ddi_intr_block_enable(pepb_p->htable,
@@ -1008,9 +1054,65 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	/* Save the interrupt type */
 	pepb_p->intr_type = intr_type;
 
+	/* Get the MSI offset for hotplug/PME from the PCIe cap reg */
+	if (intr_type == DDI_INTR_TYPE_MSI) {
+		hp_msi_off = PCI_CAP_GET16(bus_p->bus_cfg_hdl, NULL,
+		    bus_p->bus_pcie_off, PCIE_PCIECAP) &
+		    PCIE_PCIECAP_INT_MSG_NUM;
+
+		if (hp_msi_off >= count) {
+			PEPB_DEBUG((CE_NOTE, "%s%d: MSI number %d in PCIe cap >"
+			    " max allocated %d\n", ddi_driver_name(dip),
+			    ddi_get_instance(dip), hp_msi_off, count));
+			mutex_exit(&pepb_p->pepb_mutex);
+			goto FAIL;
+		}
+
+		if (is_hp)
+			pepb_p->isr_tab[hp_msi_off] |= PEPB_INTR_SRC_HP;
+
+		if (is_pme)
+			pepb_p->isr_tab[hp_msi_off] |= PEPB_INTR_SRC_PME;
+	} else {
+		/* INTx handles only Hotplug interrupts */
+		if (is_hp)
+			pepb_p->isr_tab[0] |= PEPB_INTR_SRC_HP;
+	}
+
+	/*
+	 * Get the MSI offset for errors from the AER Root Error status
+	 * register.
+	 */
+	if ((intr_type == DDI_INTR_TYPE_MSI) && PCIE_IS_RP(bus_p)) {
+		if (PCIE_HAS_AER(bus_p)) {
+			aer_msi_off = (PCI_XCAP_GET32(bus_p->bus_cfg_hdl, NULL,
+			    bus_p->bus_aer_off, PCIE_AER_RE_STS) >>
+			    PCIE_AER_RE_STS_MSG_NUM_SHIFT) &
+			    PCIE_AER_RE_STS_MSG_NUM_MASK;
+
+			if (aer_msi_off >= count) {
+				PEPB_DEBUG((CE_NOTE, "%s%d: MSI number %d in"
+				    " AER cap > max allocated %d\n",
+				    ddi_driver_name(dip), ddi_get_instance(dip),
+				    aer_msi_off, count));
+				mutex_exit(&pepb_p->pepb_mutex);
+				goto FAIL;
+			}
+			pepb_p->isr_tab[aer_msi_off] |= PEPB_INTR_SRC_AER;
+		} else {
+			/*
+			 * This RP does not have AER. Fallback to the
+			 * SERR+Machinecheck approach.
+			 */
+			pepb_p->pepb_no_aer_msi = B_TRUE;
+		}
+	}
+
+	mutex_exit(&pepb_p->pepb_mutex);
+
 	return (DDI_SUCCESS);
 
-fail:
+FAIL:
 	pepb_intr_fini(pepb_p);
 
 	return (DDI_FAILURE);
@@ -1059,82 +1161,28 @@ pepb_intr_fini(pepb_devstate_t *pepb_p)
 }
 
 /*
- * pepb_intx_intr()
- *
- * This is the common interrupt handler for both hotplug and non-hotplug
- * interrupts. For handling hot plug interrupts it calls pciehpc_intr().
- *
- * NOTE: Currently only hot plug interrupts are enabled so it simply
- * calls pciehpc_intr(). This is for INTx interrupts *ONLY*.
- */
-/*ARGSUSED*/
-static uint_t
-pepb_intx_intr(caddr_t arg, caddr_t arg2)
-{
-	pepb_devstate_t *pepb_p = (pepb_devstate_t *)arg;
-	int ret = DDI_INTR_UNCLAIMED;
-
-	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
-		return (DDI_INTR_UNCLAIMED);
-
-	mutex_enter(&pepb_p->pepb_mutex);
-
-	/* if HPC is initialized then call the interrupt handler */
-	if (pepb_p->inband_hpc == INBAND_HPC_PCIE)
-		ret =  pciehpc_intr(pepb_p->dip);
-
-	mutex_exit(&pepb_p->pepb_mutex);
-
-	return (ret);
-}
-
-/*
- * pepb_intr_on_root_port()
- *
- * This helper function checks if the device is a Nvidia RC, Intel 5000 or 7300
- * or not
+ * Checks if this device needs MSIs enabled or not.
  */
 static int
-pepb_intr_on_root_port(dev_info_t *dip)
+pepb_msi_intr_supported(dev_info_t *dip, int intr_type)
 {
-	int ret = DDI_FAILURE;
-	ddi_acc_handle_t handle;
 	uint16_t vendor_id, device_id;
+	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
 
-	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
-		return (ret);
+	if (!(intr_type & DDI_INTR_TYPE_MSI) || !pepb_enable_msi)
+		return (DDI_FAILURE);
 
-	vendor_id = pci_config_get16(handle, PCI_CONF_VENID);
-	device_id = pci_config_get16(handle, PCI_CONF_DEVID);
-	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
-		ret = DDI_SUCCESS;
-	else if ((vendor_id == INTEL_VENDOR_ID) &&
-	    INTEL_NB5000_PCIE_DEV_ID(device_id) && !pcie_intel_error_disable)
-		ret = DDI_SUCCESS;
+	vendor_id = bus_p->bus_dev_ven_id & 0xFFFF;
+	device_id = bus_p->bus_dev_ven_id >> 16;
+	/*
+	 * Intel ESB2 switches have a errata which prevents using MSIs
+	 * for hotplug.
+	 */
+	if ((vendor_id == INTEL_VENDOR_ID) &&
+	    INTEL_ESB2_SW_PCIE_DEV_ID(device_id))
+		return (DDI_FAILURE);
 
-	pci_config_teardown(&handle);
-	return (ret);
-}
-
-/*
- * pepb_pwr_msi_intr()
- *
- * This is the MSI interrupt handler for PM related events.
- */
-/*ARGSUSED*/
-static uint_t
-pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2)
-{
-	pepb_devstate_t	*pepb_p = (pepb_devstate_t *)arg;
-
-	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
-		return (DDI_INTR_UNCLAIMED);
-
-	mutex_enter(&pepb_p->pepb_mutex);
-	PEPB_DEBUG((CE_NOTE, "pepb_pwr_msi_intr: received intr number %d\n",
-	    (int)(uintptr_t)arg2));
-	mutex_exit(&pepb_p->pepb_mutex);
-	return (DDI_INTR_CLAIMED);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -1163,39 +1211,6 @@ pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 	*ibc = pepb->pepb_fm_ibc;
 
 	return (pepb->pepb_fmcap);
-}
-
-/*ARGSUSED*/
-static uint_t
-pepb_err_msi_intr(caddr_t arg, caddr_t arg2)
-{
-	pepb_devstate_t *pepb_p = (pepb_devstate_t *)arg;
-	dev_info_t	*dip = pepb_p->dip;
-	ddi_fm_error_t	derr;
-	int		sts;
-
-	bzero(&derr, sizeof (ddi_fm_error_t));
-	derr.fme_version = DDI_FME_VERSION;
-
-	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
-		return (DDI_INTR_UNCLAIMED);
-
-	mutex_enter(&pepb_p->pepb_peek_poke_mutex);
-	mutex_enter(&pepb_p->pepb_err_mutex);
-	PEPB_DEBUG((CE_NOTE, "pepb_err_msi_intr: received intr number %d\n",
-	    (int)(uintptr_t)arg2));
-
-	if (pepb_p->pepb_fmcap & DDI_FM_EREPORT_CAPABLE)
-		sts = pf_scan_fabric(dip, &derr, NULL);
-
-	mutex_exit(&pepb_p->pepb_err_mutex);
-	mutex_exit(&pepb_p->pepb_peek_poke_mutex);
-
-	if (pepb_die & sts)
-		fm_panic("%s-%d: PCI(-X) Express Fatal Error",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
-
-	return (DDI_INTR_CLAIMED);
 }
 
 static int
@@ -1254,7 +1269,7 @@ pepb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		pepb = ddi_get_soft_state(pepb_state, inst);
 		dip = pepb->dip;
 
-		pepb_intel_serr_workaround(dip);
+		pepb_intel_serr_workaround(dip, pepb->pepb_no_aer_msi);
 		pepb_intel_rber_workaround(dip);
 		pepb_intel_sw_workaround(dip);
 	}
@@ -1285,7 +1300,8 @@ typedef struct x86_error_reg {
 	uint32_t	offset;
 	uint_t		size;
 	uint32_t	mask;
-	uint32_t	value;
+	uint32_t	value1;	/* Value for MSI case */
+	uint32_t	value2; /* Value for machinecheck case */
 } x86_error_reg_t;
 
 typedef struct x86_error_tbl {
@@ -1323,66 +1339,98 @@ typedef struct x86_error_tbl {
  */
 static x86_error_reg_t intel_7300_rp_regs[] = {
 	/* Command Register - Enable SERR */
-	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+	{0x4,   16, 0xFFFF,	0x0,	PCI_COMM_SERR_ENABLE},
 
 	/* Root Control Register - SERR on NFE/FE */
-	{0x88,  16, 0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
-				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
+	{0x88,  16, 0x0,	0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+					PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
 
 	/* AER UE Mask - Mask UR */
-	{0x108, 32, 0x0,	PCIE_AER_UCE_UR},
+	{0x108, 32, 0x0, PCIE_AER_UCE_UR, PCIE_AER_UCE_UR},
 
-	/* PEXCTRL[21] check for certain malformed TLP types */
-	{0x48,	32, 0xFFFFFFFF, 0x200000},
+	/* PEXCTRL[21] check for certain malformed TLP types and MSI enable */
+	{0x48,	32, 0xFFFFFFFF, 0xC0200000, 0x200000},
+	/* PEXCTRL3[7]. MSI RAS error enable */
+	{0x4D,	32, 0xFFFFFFFF, 0x1, 0x0},
 
-	/* PEX_ERR_DOCMD[7:0] SERR on FE & NFE triggers MCE */
-	{0x144,	8,  0x0, 	0xF0},
+	/* PEX_ERR_DOCMD[7:0] */
+	{0x144,	8,  0x0,	0x0,	0xF0},
 
 	/* EMASK_UNCOR_PEX[21:0] UE mask */
-	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR},
+	{0x148,	32, 0x0, PCIE_AER_UCE_UR, PCIE_AER_UCE_UR},
 
 	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
-	{0x150,	8,  0x0, 	0x1},
+	{0x150,	8,  0x0,	0x0,	0x1},
 };
 #define	INTEL_7300_RP_REGS_LEN \
 	(sizeof (intel_7300_rp_regs) / sizeof (x86_error_reg_t))
 
-
 /*
  * 5000 Northbridge Root Ports
  */
-#define	intel_5000_rp_regs		intel_7300_rp_regs
-#define	INTEL_5000_RP_REGS_LEN		INTEL_7300_RP_REGS_LEN
-
-
-/*
- * 5400 Northbridge Root Ports
- */
-static x86_error_reg_t intel_5400_rp_regs[] = {
+static x86_error_reg_t intel_5000_rp_regs[] = {
 	/* Command Register - Enable SERR */
-	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE,	PCI_COMM_SERR_ENABLE},
 
-	/* Root Control Register - SERR on NFE/FE */
+	/* Root Control Register - SERR on NFE/FE/CE */
 	{0x88,  16, 0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_CE_EN,
+				PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
 				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
 
 	/* AER UE Mask - Mask UR */
-	{0x108, 32, 0x0,	PCIE_AER_UCE_UR},
+	{0x108, 32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 
-	/* PEXCTRL[21] check for certain malformed TLP types */
-	{0x48,	32, 0xFFFFFFFF, 0x200000},
+	/* PEXCTRL[21] check for certain malformed TLP type */
+	{0x48,	32, 0xFFFFFFFF, 0xC0200000, 0x200000},
+	/* PEXCTRL3[7]. MSI RAS error enable. */
+	{0x4D,	32, 0xFFFFFFFF,	0x1,	0x0},
 
-	/* PEX_ERR_DOCMD[11:0] SERR on FE, NFE from PCIE & Unit triggers MCE */
-	{0x144,	16,  0x0, 	0xFF0},
-
-	/* PEX_ERR_PIN_MASK[4:0] do not mask ERR[2:0] pins used by DOCMD */
-	{0x146,	16,  0x0, 	0x10},
+	/* PEX_ERR_DOCMD[7:0] */
+	{0x144,	8,  0x0,	0x0,	0xF0},
 
 	/* EMASK_UNCOR_PEX[21:0] UE mask */
-	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR},
+	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 
 	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
-	{0x150,	8,  0x0, 	0x1},
+	{0x150,	8,  0x0, 	0x0,	0x1},
+};
+#define	INTEL_5000_RP_REGS_LEN \
+	(sizeof (intel_5000_rp_regs) / sizeof (x86_error_reg_t))
+
+/*
+ * 5400 Northbridge Root Ports.
+ * MSIs are not working currently, so the MSI settings are the same as the
+ * machinecheck settings
+ */
+static x86_error_reg_t intel_5400_rp_regs[] = {
+	/* Command Register - Enable SERR */
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE, PCI_COMM_SERR_ENABLE},
+
+	/* Root Control Register - SERR on NFE/FE */
+	{0x88,  16, 0x0, PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN,
+			    PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
+
+	/* AER UE Mask - Mask UR */
+	{0x108, 32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
+
+	/* PEXCTRL[21] check for certain malformed TLP types */
+	{0x48,	32, 0xFFFFFFFF,	0x200000, 0x200000},
+
+	/* PEX_ERR_DOCMD[11:0] */
+	{0x144,	16,  0x0, 	0xFF0,	0xFF0},
+
+	/* PEX_ERR_PIN_MASK[4:0] do not mask ERR[2:0] pins used by DOCMD */
+	{0x146,	16,  0x0,	0x10,	0x10},
+
+	/* EMASK_UNCOR_PEX[21:0] UE mask */
+	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
+
+	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
+	{0x150,	8,  0x0, 	0x1,	0x1},
 };
 #define	INTEL_5400_RP_REGS_LEN \
 	(sizeof (intel_5400_rp_regs) / sizeof (x86_error_reg_t))
@@ -1393,14 +1441,17 @@ static x86_error_reg_t intel_5400_rp_regs[] = {
  */
 static x86_error_reg_t intel_esb2_rp_regs[] = {
 	/* Command Register - Enable SERR */
-	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE,	PCI_COMM_SERR_ENABLE},
 
 	/* Root Control Register - SERR on NFE/FE */
 	{0x5c,  16, 0x0,	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN |
+				PCIE_ROOTCTL_SYS_ERR_ON_CE_EN,
+				PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
 				PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
 
 	/* UEM[20:0] UE mask (write-once) */
-	{0x148, 32, 0x0,	PCIE_AER_UCE_UR},
+	{0x148, 32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 };
 #define	INTEL_ESB2_RP_REGS_LEN \
 	(sizeof (intel_esb2_rp_regs) / sizeof (x86_error_reg_t))
@@ -1411,10 +1462,10 @@ static x86_error_reg_t intel_esb2_rp_regs[] = {
  */
 static x86_error_reg_t intel_esb2_sw_regs[] = {
 	/* Command Register - Enable SERR */
-	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE},
+	{0x4,   16, 0xFFFF,	PCI_COMM_SERR_ENABLE,	PCI_COMM_SERR_ENABLE},
 
 	/* AER UE Mask - Mask UR */
-	{0x108, 32, 0x0,	PCIE_AER_UCE_UR},
+	{0x108, 32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 };
 #define	INTEL_ESB2_SW_REGS_LEN \
 	(sizeof (intel_esb2_sw_regs) / sizeof (x86_error_reg_t))
@@ -1494,12 +1545,12 @@ pepb_get_bdf(dev_info_t *dip, int *busp, int *devp, int *funcp)
 }
 
 /*
- * Temporary workaround until there is full error handling support on Intel.
- * The main goal of this workaround is to make the system Machine Check/Panic if
- * an UE is detected in the fabric.
+ * The main goal of this workaround is to set chipset specific settings if
+ * MSIs happen to be enabled on this device. Otherwise make the system
+ * Machine Check/Panic if an UE is detected in the fabric.
  */
 static void
-pepb_intel_serr_workaround(dev_info_t *dip)
+pepb_intel_serr_workaround(dev_info_t *dip, boolean_t mcheck)
 {
 	uint16_t		vid, did;
 	uint8_t			rid;
@@ -1507,8 +1558,9 @@ pepb_intel_serr_workaround(dev_info_t *dip)
 	int			i, j;
 	x86_error_tbl_t		*tbl;
 	x86_error_reg_t		*reg;
-	uint32_t		data, value;
 	ddi_acc_handle_t	cfg_hdl;
+	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(dip);
+	uint16_t		bdf = bus_p->bus_bdf;
 
 	if (pepb_intel_workaround_disable)
 		return;
@@ -1536,15 +1588,20 @@ pepb_intel_serr_workaround(dev_info_t *dip)
 		    (rid <= tbl->rev_id_high)))
 			continue;
 
+		if (mcheck && PCIE_IS_RP(bus_p))
+			pcie_set_rber_fatal(dip, B_TRUE);
+
 		reg = tbl->error_regs;
 		for (j = 0; j < tbl->error_regs_len; j++, reg++) {
-			data = 0xDEADBEEF;
-			value = 0xDEADBEEF;
+			uint32_t data = 0xDEADBEEF;
+			uint32_t value = 0xDEADBEEF;
 			switch (reg->size) {
 			case 32:
 				data = (uint32_t)pci_config_get32(cfg_hdl,
 				    reg->offset);
-				value = (data & reg->mask) | reg->value;
+				value = (mcheck ?
+				    ((data & reg->mask) | reg->value2) :
+				    ((data & reg->mask) | reg->value1));
 				pci_config_put32(cfg_hdl, reg->offset, value);
 				value = (uint32_t)pci_config_get32(cfg_hdl,
 				    reg->offset);
@@ -1552,7 +1609,9 @@ pepb_intel_serr_workaround(dev_info_t *dip)
 			case 16:
 				data = (uint32_t)pci_config_get16(cfg_hdl,
 				    reg->offset);
-				value = (data & reg->mask) | reg->value;
+				value = (mcheck ?
+				    ((data & reg->mask) | reg->value2) :
+				    ((data & reg->mask) | reg->value1));
 				pci_config_put16(cfg_hdl, reg->offset,
 				    (uint16_t)value);
 				value = (uint32_t)pci_config_get16(cfg_hdl,
@@ -1561,24 +1620,22 @@ pepb_intel_serr_workaround(dev_info_t *dip)
 			case 8:
 				data = (uint32_t)pci_config_get8(cfg_hdl,
 				    reg->offset);
-				value = (data & reg->mask) | reg->value;
+				value = (mcheck ?
+				    ((data & reg->mask) | reg->value2) :
+				    ((data & reg->mask) | reg->value1));
 				pci_config_put8(cfg_hdl, reg->offset,
 				    (uint8_t)value);
 				value = (uint32_t)pci_config_get8(cfg_hdl,
 				    reg->offset);
 				break;
 			}
-			PEPB_DEBUG((CE_NOTE, "size:%d off:0x%x mask:0x%x "
-			    "value:0x%x + orig:0x%x -> 0x%x",
-			    reg->size, reg->offset, reg->mask, reg->value,
+
+			PEPB_DEBUG((CE_NOTE, "bdf:%x mcheck:%d size:%d off:0x%x"
+			    " mask:0x%x value:0x%x + orig:0x%x -> 0x%x", bdf,
+			    mcheck, reg->size, reg->offset, reg->mask,
+			    (mcheck ?  reg->value2 : reg->value1),
 			    data, value));
 		}
-
-		/*
-		 * Make sure on this platform that devices supporting RBER
-		 * will set their UE severity appropriately
-		 */
-		pepb_do_rber_sev = B_TRUE;
 	}
 
 	pci_config_teardown(&cfg_hdl);
@@ -1596,40 +1653,28 @@ uint32_t pepb_rber_sev = (PCIE_AER_UCE_TRAINING | PCIE_AER_UCE_DLP |
 static void
 pepb_intel_rber_workaround(dev_info_t *dip)
 {
-	uint16_t pcie_off, aer_off;
-	ddi_acc_handle_t cfg_hdl;
 	uint32_t rber;
+	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
 
 	if (pepb_intel_workaround_disable)
 		return;
-	if (!pepb_do_rber_sev)
+
+	/*
+	 * Check Root Port's machinecheck setting to determine if this
+	 * workaround is needed or not.
+	 */
+	if (!pcie_get_rber_fatal(dip))
 		return;
 
-	/* check config setup since it can be called on other dips */
-	if (pci_config_setup(dip, &cfg_hdl) != DDI_SUCCESS) {
-		PEPB_DEBUG((CE_NOTE, "pepb_intel_rber_workaround: config "
-		    "setup failed on dip 0x%p", (void *)dip));
+	if (!PCIE_IS_PCIE(bus_p) || !PCIE_HAS_AER(bus_p))
 		return;
-	}
 
-	if (PCI_CAP_LOCATE(cfg_hdl, PCI_CAP_ID_PCI_E, &pcie_off) ==
-	    DDI_FAILURE)
-		goto done;
-
-	if (PCI_CAP_LOCATE(cfg_hdl, PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_AER),
-	    &aer_off) == DDI_FAILURE)
-		goto done;
-
-	rber = PCI_CAP_GET16(cfg_hdl, NULL, pcie_off, PCIE_DEVCAP) &
+	rber = PCIE_CAP_GET(16, bus_p, PCIE_DEVCAP) &
 	    PCIE_DEVCAP_ROLE_BASED_ERR_REP;
 	if (!rber)
-		goto done;
+		return;
 
-	PCI_XCAP_PUT32(cfg_hdl, NULL, aer_off, PCIE_AER_UCE_SERV,
-	    pepb_rber_sev);
-
-done:
-	pci_config_teardown(&cfg_hdl);
+	PCIE_AER_PUT(32, bus_p, PCIE_AER_UCE_SERV, pepb_rber_sev);
 }
 
 /*
@@ -1667,4 +1712,66 @@ pepb_intel_sw_workaround(dev_info_t *dip)
 	}
 
 	pci_config_teardown(&cfg_hdl);
+}
+
+/*
+ * Common interrupt handler for hotplug, PME and errors.
+ */
+static uint_t
+pepb_intr_handler(caddr_t arg1, caddr_t arg2)
+{
+	pepb_devstate_t *pepb_p = (pepb_devstate_t *)arg1;
+	dev_info_t	*dip = pepb_p->dip;
+	ddi_fm_error_t	derr;
+	int		sts = 0;
+	int		ret = DDI_INTR_UNCLAIMED;
+	int		isrc;
+
+	mutex_enter(&pepb_p->pepb_mutex);
+	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
+		goto FAIL;
+
+	isrc = pepb_p->isr_tab[(int)(uintptr_t)arg2];
+
+	PEPB_DEBUG((CE_NOTE, "pepb_intr_handler: received intr number %d\n",
+	    (int)(uintptr_t)arg2));
+
+	if (isrc == PEPB_INTR_SRC_UNKNOWN)
+		goto FAIL;
+
+	if (isrc & PEPB_INTR_SRC_HP)
+		ret = pciehpc_intr(dip);
+
+	if (isrc & PEPB_INTR_SRC_PME) {
+		PEPB_DEBUG((CE_NOTE, "pepb_pwr_msi_intr: received intr number"
+		"%d\n", (int)(uintptr_t)arg2));
+		ret = DDI_INTR_CLAIMED;
+	}
+
+	/* AER Error */
+	if (isrc & PEPB_INTR_SRC_AER) {
+		/*
+		 *  If MSI is shared with PME/hotplug then check Root Error
+		 *  Status Reg before claiming it. For now it's ok since
+		 *  we know we get 2 MSIs.
+		 */
+		ret = DDI_INTR_CLAIMED;
+		bzero(&derr, sizeof (ddi_fm_error_t));
+		derr.fme_version = DDI_FME_VERSION;
+		mutex_enter(&pepb_p->pepb_peek_poke_mutex);
+		mutex_enter(&pepb_p->pepb_err_mutex);
+
+		if (pepb_p->pepb_fmcap & DDI_FM_EREPORT_CAPABLE)
+			sts = pf_scan_fabric(dip, &derr, NULL);
+
+		mutex_exit(&pepb_p->pepb_err_mutex);
+		mutex_exit(&pepb_p->pepb_peek_poke_mutex);
+
+		if (pepb_die & sts)
+			fm_panic("%s-%d: PCI(-X) Express Fatal Error",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
+	}
+FAIL:
+	mutex_exit(&pepb_p->pepb_mutex);
+	return (ret);
 }

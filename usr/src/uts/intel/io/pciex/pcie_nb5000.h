@@ -27,8 +27,6 @@
 #ifndef	_PCIEX_PCI_INTEL_NB5000_H
 #define	_PCIEX_PCI_INTEL_NB5000_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -42,7 +40,8 @@ extern "C" {
 	(did) == 0x4000 || (did) == 0x4001 || (did) == 0x4003 || \
 	((did) >= 0x4021 && (did) <= 0x402e))
 
-extern int pcie_intel_error_disable;
+#define	INTEL_ESB2_SW_PCIE_DEV_ID(did) (((did) >= 0x3500 && (did) <= 0x3503) ||\
+	((did) >= 0x3510 && (did) <= 0x351B))
 
 #ifdef	__cplusplus
 }

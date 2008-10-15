@@ -284,6 +284,7 @@ struct pf_data {
 	pf_pcix_bdg_err_regs_t *pe_pcix_bdg_regs; /* PCI-X bridge regs */
 	pf_data_t		*pe_prev;	/* Next error in queue */
 	pf_data_t		*pe_next;	/* Next error in queue */
+	boolean_t		pe_rber_fatal;
 };
 
 /* Information used while handling errors in the fabric. */
@@ -364,6 +365,8 @@ extern void pcie_get_fabric_mps(dev_info_t *rc_dip, dev_info_t *dip,
 	int *max_supported);
 extern int pcie_root_port(dev_info_t *dip);
 extern int pcie_initchild_mps(dev_info_t *dip);
+extern void pcie_set_rber_fatal(dev_info_t *dip, boolean_t val);
+extern boolean_t pcie_get_rber_fatal(dev_info_t *dip);
 
 extern uint32_t pcie_get_aer_uce_mask();
 extern uint32_t pcie_get_aer_ce_mask();

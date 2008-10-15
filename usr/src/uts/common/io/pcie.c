@@ -76,8 +76,6 @@ static void pcie_dbg(char *fmt, ...);
 
 #endif	/* DEBUG */
 
-int pcie_intel_error_disable = 1;
-
 /* Variable to control default PCI-Express config settings */
 ushort_t pcie_command_default =
     PCI_COMM_SERR_ENABLE |
@@ -1447,6 +1445,24 @@ pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph)
 
 	impl_acc_hdl_free(*handlep);
 	*handlep = (ddi_acc_handle_t)NULL;
+}
+
+void
+pcie_set_rber_fatal(dev_info_t *dip, boolean_t val)
+{
+	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
+	bus_p->bus_pfd->pe_rber_fatal = val;
+}
+
+/*
+ * Return parent Root Port's pe_rber_fatal value.
+ */
+boolean_t
+pcie_get_rber_fatal(dev_info_t *dip)
+{
+	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
+	pcie_bus_t *rp_bus_p = PCIE_DIP2UPBUS(bus_p->bus_rp_dip);
+	return (rp_bus_p->bus_pfd->pe_rber_fatal);
 }
 
 #ifdef	DEBUG

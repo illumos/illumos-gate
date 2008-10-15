@@ -72,7 +72,7 @@ extern "C" {
 #define	PCIE_PCIECAP_DEV_TYPE_RC_EC	0xA0	/* RootComplex Evt Collector */
 #define	PCIE_PCIECAP_DEV_TYPE_MASK	0xF0	/* Device/Port Type Mask */
 #define	PCIE_PCIECAP_SLOT_IMPL		0x100	/* Slot Impl vs Integrated */
-#define	PCIE_PCIECAP_INT_MSG_NUM	0x3700	/* Interrupt Message Number */
+#define	PCIE_PCIECAP_INT_MSG_NUM	0x3E00	/* Interrupt Message Number */
 
 /*
  * Device Capabilities Register (4 bytes)
