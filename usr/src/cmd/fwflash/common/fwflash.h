@@ -353,11 +353,9 @@ int manufacturing_mode = 0;
 #define	LOWBITS64		0x00000000ffffffffULL
 
 #if defined(_LITTLE_ENDIAN)
-#define	ARMSWAPBITS(bs)	(bs)
-#define	MLXSWAPBITS16(bs)	\
-	(BE_16(((bs) & LOWBITS16)) | BE_16(((bs) & HIGHBITS16)))
-#define	MLXSWAPBITS32(bs)	\
-	(BE_32(((bs) & LOWBITS32)) | BE_32(((bs) & HIGHBITS32)))
+#define	ARMSWAPBITS(bs)		(bs)
+#define	MLXSWAPBITS16(bs)	ntohs(bs)
+#define	MLXSWAPBITS32(bs)	ntohl(bs)
 #define	MLXSWAPBITS64(bs)	\
 	(BE_64(((bs) & LOWBITS64)) | BE_64(((bs) & HIGHBITS64)))
 #else
@@ -365,7 +363,6 @@ int manufacturing_mode = 0;
 #define	MLXSWAPBITS16(bs)	(bs)
 #define	MLXSWAPBITS32(bs)	(bs)
 #define	MLXSWAPBITS64(bs)	(bs)
-
 #endif
 
 /* common functions for fwflash */
