@@ -25,8 +25,6 @@
  *	Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -278,9 +276,9 @@ mapline_to_mapent(struct mapent **mapents, struct mapline *ml, char *key,
 
 	/*
 	 * implied is true if there is no '/' (the usual NFS case)
-	 * or if there are two slashes (the smbfs case)
+	 * or if there are two slashes (for smbfs direct entries)
 	 */
-	implied = ((*w != '/') || (*(w+1) == '/'));
+	implied = ((*w != '/') || (isdirect && *(w+1) == '/'));
 	while (*w == '/' || implied) {
 		mp = me;
 		if ((me = (struct mapent *)malloc(sizeof (*me))) == NULL)
