@@ -260,7 +260,6 @@ process_ivmd(amd_iommu_acpi_t *acpi, ivmd_t *ivmdp)
 int
 amd_iommu_acpi_init(amd_iommu_acpi_t **acpipp)
 {
-	ACPI_STATUS status;
 	ivrs_t *ivrsp;
 	caddr_t ivrsp_end;
 	caddr_t table_end;
@@ -268,9 +267,7 @@ amd_iommu_acpi_init(amd_iommu_acpi_t **acpipp)
 	uint8_t type8;
 	amd_iommu_acpi_t *acpi;
 
-	status = AcpiGetFirmwareTable(IVRS_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&ivrsp);
-	if (status != AE_OK) {
+	if (AcpiGetTable(IVRS_SIG, 1, (ACPI_TABLE_HEADER **)&ivrsp) != AE_OK) {
 		cmn_err(CE_NOTE, "!amd_iommu: No AMD IOMMU ACPI IVRS table");
 		return (DDI_FAILURE);
 	}

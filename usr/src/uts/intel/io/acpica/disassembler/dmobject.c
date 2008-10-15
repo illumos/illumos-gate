@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dmobject - ACPI object decode and display
- *              $Revision: 1.20 $
+ *              $Revision: 1.24 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -116,10 +116,8 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acnamesp.h"
 #include "acdisasm.h"
-#include "acparser.h"
 
 
 #ifdef ACPI_DISASSEMBLER
@@ -210,13 +208,16 @@ AcpiDmDumpMethodInfo (
 
         if (NextWalkState == WalkState)
         {
-            /* Display currently executing ASL statement */
+            if (Op)
+            {
+                /* Display currently executing ASL statement */
 
-            Next = Op->Common.Next;
-            Op->Common.Next = NULL;
+                Next = Op->Common.Next;
+                Op->Common.Next = NULL;
 
-            AcpiDmDisassemble (NextWalkState, Op, ACPI_UINT32_MAX);
-            Op->Common.Next = Next;
+                AcpiDmDisassemble (NextWalkState, Op, ACPI_UINT32_MAX);
+                Op->Common.Next = Next;
+            }
         }
         else
         {
@@ -349,7 +350,22 @@ AcpiDmDecodeNode (
         AcpiOsPrintf (" [Method Local]");
     }
 
-    AcpiDmDecodeInternalObject (AcpiNsGetAttachedObject (Node));
+    switch (Node->Type)
+    {
+    /* These types have no attached object */
+
+    case ACPI_TYPE_DEVICE:
+        AcpiOsPrintf (" Device");
+        break;
+
+    case ACPI_TYPE_THERMAL:
+        AcpiOsPrintf (" Thermal Zone");
+        break;
+
+    default:
+        AcpiDmDecodeInternalObject (AcpiNsGetAttachedObject (Node));
+        break;
+    }
 }
 
 
@@ -413,46 +429,44 @@ AcpiDmDisplayInternalObject (
         {
         case ACPI_TYPE_LOCAL_REFERENCE:
 
-            switch (ObjDesc->Reference.Opcode)
+            AcpiOsPrintf ("[%s] ", AcpiUtGetReferenceName (ObjDesc));
+
+            /* Decode the refererence */
+
+            switch (ObjDesc->Reference.Class)
             {
-            case AML_LOCAL_OP:
+            case ACPI_REFCLASS_LOCAL:
 
-                AcpiOsPrintf ("[Local%d] ", ObjDesc->Reference.Offset);
+                AcpiOsPrintf ("%X ", ObjDesc->Reference.Value);
                 if (WalkState)
                 {
-                    ObjDesc = WalkState->LocalVariables[
-                                ObjDesc->Reference.Offset].Object;
+                    ObjDesc = WalkState->LocalVariables
+                                [ObjDesc->Reference.Value].Object;
                     AcpiOsPrintf ("%p", ObjDesc);
                     AcpiDmDecodeInternalObject (ObjDesc);
                 }
                 break;
 
 
-            case AML_ARG_OP:
+            case ACPI_REFCLASS_ARG:
 
-                AcpiOsPrintf ("[Arg%d]   ", ObjDesc->Reference.Offset);
+                AcpiOsPrintf ("%X ", ObjDesc->Reference.Value);
                 if (WalkState)
                 {
-                    ObjDesc = WalkState->Arguments[
-                                ObjDesc->Reference.Offset].Object;
+                    ObjDesc = WalkState->Arguments
+                                [ObjDesc->Reference.Value].Object;
                     AcpiOsPrintf ("%p", ObjDesc);
                     AcpiDmDecodeInternalObject (ObjDesc);
                 }
                 break;
 
 
-            case AML_DEBUG_OP:
+            case ACPI_REFCLASS_INDEX:
 
-                AcpiOsPrintf ("[Debug]  ");
-                break;
-
-
-            case AML_INDEX_OP:
-
-                AcpiOsPrintf ("[Index]  ");
                 switch (ObjDesc->Reference.TargetType)
                 {
                 case ACPI_TYPE_BUFFER_FIELD:
+
                     AcpiOsPrintf ("%p", ObjDesc->Reference.Object);
                     AcpiDmDecodeInternalObject (ObjDesc->Reference.Object);
                     break;
@@ -462,7 +476,7 @@ AcpiDmDisplayInternalObject (
                     AcpiOsPrintf ("%p", ObjDesc->Reference.Where);
                     if (!ObjDesc->Reference.Where)
                     {
-                        AcpiOsPrintf (" Uninitialized WHERE ptr");
+                        AcpiOsPrintf (" Uninitialized WHERE pointer");
                     }
                     else
                     {
@@ -472,25 +486,18 @@ AcpiDmDisplayInternalObject (
                     break;
 
                 default:
+
                     AcpiOsPrintf ("Unknown index target type");
                     break;
                 }
                 break;
 
 
-            case AML_LOAD_OP:
-
-                AcpiOsPrintf ("[DdbHandle]  ");
-                break;
-
-
-            case AML_REF_OF_OP:
-
-                AcpiOsPrintf ("[RefOf]          ");
+            case ACPI_REFCLASS_REFOF:
 
                 if (!ObjDesc->Reference.Object)
                 {
-                    AcpiOsPrintf ("Uninitialized reference subobject ptr");
+                    AcpiOsPrintf ("Uninitialized reference subobject pointer");
                     break;
                 }
 
@@ -511,19 +518,27 @@ AcpiDmDisplayInternalObject (
                 }
                 break;
 
-            case AML_INT_NAMEPATH_OP:
+
+            case ACPI_REFCLASS_NAME:
 
                 AcpiDmDecodeNode (ObjDesc->Reference.Node);
                 break;
 
-            default:
 
-                AcpiOsPrintf ("Unknown Reference opcode %X (%s)\n",
-                    ObjDesc->Reference.Opcode,
-                    AcpiPsGetOpcodeName (ObjDesc->Reference.Opcode));
+            case ACPI_REFCLASS_DEBUG:
+            case ACPI_REFCLASS_TABLE:
+
+                AcpiOsPrintf ("\n");
+                break;
+
+
+            default:    /* Unknown reference class */
+
+                AcpiOsPrintf ("%2.2X\n", ObjDesc->Reference.Class);
                 break;
             }
             break;
+
 
         default:
 
@@ -537,7 +552,7 @@ AcpiDmDisplayInternalObject (
     default:
 
         AcpiOsPrintf ("<Not a valid ACPI Object Descriptor> [%s]",
-                AcpiUtGetDescriptorName (ObjDesc));
+            AcpiUtGetDescriptorName (ObjDesc));
         break;
     }
 

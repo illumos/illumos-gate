@@ -246,30 +246,27 @@ static int
 pci_bbn_present(int bus)
 {
 	ACPI_HANDLE	hdl;
-	ACPI_BUFFER	rb;
 	int	rv;
 
 	/* no dip means no _BBN */
 	if (pci_bus_res[bus].dip == NULL)
 		return (0);
 
-	rv = acpica_get_handle(pci_bus_res[bus].dip, &hdl);
-	if (rv != AE_OK)
-		return (-1);
+	rv = -1;	/* default return value in case of error below */
+	if (ACPI_SUCCESS(acpica_get_handle(pci_bus_res[bus].dip, &hdl))) {
+		switch (AcpiEvaluateObject(hdl, "_BBN", NULL, NULL)) {
+		case AE_OK:
+			rv = 1;
+			break;
+		case AE_NOT_FOUND:
+			rv = 0;
+			break;
+		default:
+			break;
+		}
+	}
 
-	rb.Length = ACPI_ALLOCATE_BUFFER;
-
-	rv = AcpiEvaluateObject(hdl, "_BBN", NULL, &rb);
-
-	if (rb.Length > 0)
-		AcpiOsFree(rb.Pointer);
-
-	if (rv == AE_OK)
-		return (1);
-	else if (rv == AE_NOT_FOUND)
-		return (0);
-	else
-		return (-1);
+	return (rv);
 }
 
 /*
@@ -309,8 +306,8 @@ pci_bus_renumber()
 		return (1);
 
 	/* get the FADT */
-	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+	if (AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **)&fadt) !=
+	    AE_OK)
 		return (0);
 
 	/* compare OEM Table ID to "SUNm31" */

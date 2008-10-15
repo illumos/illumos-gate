@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acconfig.h - Global configuration constants
- *       $Revision: 1.222 $
+ *       $Revision: 1.243 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -137,7 +137,7 @@
 
 /* Current ACPICA subsystem version in YYYYMMDD format */
 
-#define ACPI_CA_VERSION                 0x20060721
+#define ACPI_CA_VERSION                 0x20080829
 
 /*
  * OS name, used for the _OS object.  The _OS object is essentially obsolete,
@@ -190,6 +190,10 @@
 
 #define ACPI_NUM_OWNERID_MASKS          8
 
+/* Size of the root table array is increased by this increment */
+
+#define ACPI_ROOT_TABLE_SIZE_INCREMENT  4
+
 
 /******************************************************************************
  *
@@ -222,11 +226,27 @@
 #define ACPI_OBJ_NUM_OPERANDS           8
 #define ACPI_OBJ_MAX_OPERAND            7
 
+/* Number of elements in the Result Stack frame, can be an arbitrary value */
+
+#define ACPI_RESULTS_FRAME_OBJ_NUM      8
+
+/*
+ * Maximal number of elements the Result Stack can contain,
+ * it may be an arbitray value not exceeding the types of
+ * ResultSize and ResultCount (now UINT8).
+ */
+#define ACPI_RESULTS_OBJ_NUM_MAX        255
+
 /* Names within the namespace are 4 bytes long */
 
 #define ACPI_NAME_SIZE                  4
 #define ACPI_PATH_SEGMENT_LENGTH        5           /* 4 chars for name + 1 char for separator */
 #define ACPI_PATH_SEPARATOR             '.'
+
+/* Sizes for ACPI table headers */
+
+#define ACPI_OEM_ID_SIZE                6
+#define ACPI_OEM_TABLE_ID_SIZE          8
 
 /* Constants used in searching for the RSDP in low memory */
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -88,7 +86,7 @@ static struct rtc_offset pc_rtc_offset = {0, 0, 0, 0};
  * are useful to TOD.
  */
 void
-pc_tod_set_rtc_offsets(FADT_DESCRIPTOR *fadt) {
+pc_tod_set_rtc_offsets(ACPI_TABLE_FADT *fadt) {
 	int		ok = 0;
 
 	/*
@@ -101,13 +99,13 @@ pc_tod_set_rtc_offsets(FADT_DESCRIPTOR *fadt) {
 		return;
 	}
 
-	if (fadt->DayAlrm) {
-		pc_rtc_offset.day_alrm = fadt->DayAlrm;
+	if (fadt->DayAlarm) {
+		pc_rtc_offset.day_alrm = fadt->DayAlarm;
 		ok = 1;
 	}
 
-	if (fadt->MonAlrm) {
-		pc_rtc_offset.mon_alrm = fadt->MonAlrm;
+	if (fadt->MonthAlarm) {
+		pc_rtc_offset.mon_alrm = fadt->MonthAlarm;
 		ok = 1;
 	}
 

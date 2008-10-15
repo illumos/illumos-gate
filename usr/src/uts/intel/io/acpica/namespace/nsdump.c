@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 1.178 $
+ *              $Revision: 1.185 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -119,7 +119,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "acparser.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE
@@ -160,7 +159,7 @@ AcpiNsPrintPathname (
     UINT32                  NumSegments,
     char                    *Pathname)
 {
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_NAME (NsPrintPathname);
@@ -311,14 +310,6 @@ AcpiNsDumpOneObject (
             ACPI_WARNING ((AE_INFO, "Invalid ACPI Object Type %08X", Type));
         }
 
-        if (!AcpiUtValidAcpiName (ThisNode->Name.Integer))
-        {
-            ThisNode->Name.Integer = AcpiUtRepairName (ThisNode->Name.Integer);
-
-            ACPI_WARNING ((AE_INFO, "Invalid ACPI Name %08X",
-                ThisNode->Name.Integer));
-        }
-
         AcpiOsPrintf ("%4.4s", AcpiUtGetNodeName (ThisNode));
     }
 
@@ -332,6 +323,13 @@ AcpiNsDumpOneObject (
     AcpiDbgLevel = 0;
     ObjDesc = AcpiNsGetAttachedObject (ThisNode);
     AcpiDbgLevel = DbgLevel;
+
+    /* Temp nodes are those nodes created by a control method */
+
+    if (ThisNode->Flags & ANOBJ_TEMPORARY)
+    {
+        AcpiOsPrintf ("(T) ");
+    }
 
     switch (Info->DisplayType & ACPI_DISPLAY_MASK)
     {
@@ -351,7 +349,7 @@ AcpiNsDumpOneObject (
 
             AcpiOsPrintf ("ID %X Len %.4X Addr %p\n",
                 ObjDesc->Processor.ProcId, ObjDesc->Processor.Length,
-                (char *) ObjDesc->Processor.Address);
+                ACPI_CAST_PTR (void, ObjDesc->Processor.Address));
             break;
 
 
@@ -431,7 +429,7 @@ AcpiNsDumpOneObject (
             if (ObjDesc->Region.Flags & AOPOBJ_DATA_VALID)
             {
                 AcpiOsPrintf (" Addr %8.8X%8.8X Len %.4X\n",
-                    ACPI_FORMAT_UINT64 (ObjDesc->Region.Address),
+                    ACPI_FORMAT_NATIVE_UINT (ObjDesc->Region.Address),
                     ObjDesc->Region.Length);
             }
             else
@@ -443,8 +441,7 @@ AcpiNsDumpOneObject (
 
         case ACPI_TYPE_LOCAL_REFERENCE:
 
-            AcpiOsPrintf ("[%s]\n",
-                AcpiPsGetOpcodeName (ObjDesc->Reference.Opcode));
+            AcpiOsPrintf ("[%s]\n", AcpiUtGetReferenceName (ObjDesc));
             break;
 
 
@@ -610,13 +607,13 @@ AcpiNsDumpOneObject (
 
             if (ObjType > ACPI_TYPE_LOCAL_MAX)
             {
-                AcpiOsPrintf ("(Ptr to ACPI Object type %X [UNKNOWN])\n",
+                AcpiOsPrintf ("(Pointer to ACPI Object type %.2X [UNKNOWN])\n",
                     ObjType);
                 BytesToDump = 32;
             }
             else
             {
-                AcpiOsPrintf ("(Ptr to ACPI Object type %X [%s])\n",
+                AcpiOsPrintf ("(Pointer to ACPI Object type %.2X [%s])\n",
                     ObjType, AcpiUtGetTypeName (ObjType));
                 BytesToDump = sizeof (ACPI_OPERAND_OBJECT);
             }
@@ -728,8 +725,8 @@ AcpiNsDumpObjects (
     Info.DisplayType = DisplayType;
 
     (void) AcpiNsWalkNamespace (Type, StartHandle, MaxDepth,
-                ACPI_NS_WALK_NO_UNLOCK, AcpiNsDumpOneObject,
-                (void *) &Info, NULL);
+                ACPI_NS_WALK_NO_UNLOCK | ACPI_NS_WALK_TEMP_NODES,
+                AcpiNsDumpOneObject, (void *) &Info, NULL);
 }
 
 

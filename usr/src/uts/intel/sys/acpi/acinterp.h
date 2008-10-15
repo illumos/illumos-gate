@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 1.167 $
+ *       $Revision: 1.173 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -334,10 +334,6 @@ AcpiExCreateRegion (
     ACPI_WALK_STATE         *WalkState);
 
 ACPI_STATUS
-AcpiExCreateTableRegion (
-    ACPI_WALK_STATE         *WalkState);
-
-ACPI_STATUS
 AcpiExCreateEvent (
     ACPI_WALK_STATE         *WalkState);
 
@@ -381,9 +377,19 @@ AcpiExAcquireMutex (
     ACPI_WALK_STATE         *WalkState);
 
 ACPI_STATUS
+AcpiExAcquireMutexObject (
+    UINT16                  Timeout,
+    ACPI_OPERAND_OBJECT     *ObjDesc,
+    ACPI_THREAD_ID          ThreadId);
+
+ACPI_STATUS
 AcpiExReleaseMutex (
     ACPI_OPERAND_OBJECT     *ObjDesc,
     ACPI_WALK_STATE         *WalkState);
+
+ACPI_STATUS
+AcpiExReleaseMutexObject (
+    ACPI_OPERAND_OBJECT     *ObjDesc);
 
 void
 AcpiExReleaseAllMutexes (
@@ -558,12 +564,8 @@ AcpiExDumpOperand (
 void
 AcpiExDumpOperands (
     ACPI_OPERAND_OBJECT     **Operands,
-    ACPI_INTERPRETER_MODE   InterpreterMode,
-    char                    *Ident,
-    UINT32                  NumLevels,
-    char                    *Note,
-    char                    *ModuleName,
-    UINT32                  LineNumber);
+    const char              *OpcodeName,
+    UINT32                  NumOpcodes);
 
 void
 AcpiExDumpObjectDescriptor (
@@ -665,7 +667,7 @@ AcpiExCopyIntegerToBufferField (
 /*
  * exutils - interpreter/scanner utilities
  */
-ACPI_STATUS
+void
 AcpiExEnterInterpreter (
     void);
 
@@ -674,16 +676,24 @@ AcpiExExitInterpreter (
     void);
 
 void
+AcpiExReacquireInterpreter (
+    void);
+
+void
+AcpiExRelinquishInterpreter (
+    void);
+
+void
 AcpiExTruncateFor32bitTable (
     ACPI_OPERAND_OBJECT     *ObjDesc);
 
-BOOLEAN
+void
 AcpiExAcquireGlobalLock (
     UINT32                  Rule);
 
 void
 AcpiExReleaseGlobalLock (
-    BOOLEAN                 Locked);
+    UINT32                  Rule);
 
 void
 AcpiExEisaIdToString (
@@ -694,10 +704,6 @@ void
 AcpiExUnsignedIntegerToString (
     ACPI_INTEGER            Value,
     char                    *OutString);
-
-ACPI_INTEGER
-AcpiExStringToUnsignedInteger (
-    char                    *String);
 
 
 /*

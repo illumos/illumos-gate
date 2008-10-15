@@ -102,8 +102,8 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 		PMD(PMD_SX, ("Can't EnableEvent(POWER_BUTTON)\n"))
 	}
 	if (acpi_rtc_wake > 0) {
-		(void) AcpiSetRegister(ACPI_BITREG_RT_CLOCK_STATUS, 1,
-		    ACPI_MTX_DO_NOT_LOCK); /* clear the RTC bit first */
+		/* clear the RTC bit first */
+		(void) AcpiSetRegister(ACPI_BITREG_RT_CLOCK_STATUS, 1);
 		PT(PT_RTCW);
 		if (AcpiEnableEvent(ACPI_EVENT_RTC, 0) != AE_OK) {
 			PT(PT_RTCW_FAIL);

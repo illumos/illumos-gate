@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Solaris x86 ACPI CA services
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/file.h>
 #include <sys/errno.h>
@@ -218,7 +215,7 @@ acpica_check_bios_date(int yy, int mm, int dd)
 	 * as valid.
 	 */
 
-	if ((int)AcpiOsMapMemory(0xffff5, 8, (void **) &datep) != AE_OK)
+	if ((datep = (char *)AcpiOsMapMemory(0xffff5, 8)) == NULL)
 		return (FALSE);
 
 	/* year */
@@ -269,8 +266,8 @@ acpica_metro_old_bios()
 	ACPI_TABLE_HEADER *fadt;
 
 	/* get the FADT */
-	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+	if (AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **)&fadt) !=
+	    AE_OK)
 		return (FALSE);
 
 	/* compare OEM Table ID to "SUNmetro" - no match, return false */
@@ -387,18 +384,22 @@ acpica_init()
 	mutex_enter(&acpica_module_lock);
 
 	if (acpica_init_state == ACPICA_NOT_INITIALIZED) {
-		if ((status = AcpiLoadTables()) != AE_OK) {
+		if (ACPI_FAILURE(status = AcpiInitializeTables(NULL, 0, 0)))
 			goto error;
-		}
-		if ((status = acpica_install_handlers()) != AE_OK) {
+
+		if (ACPI_FAILURE(status = AcpiLoadTables()))
 			goto error;
-		}
-		if ((status = AcpiEnableSubsystem(acpi_init_level)) != AE_OK) {
+
+		if (ACPI_FAILURE(status = acpica_install_handlers()))
 			goto error;
-		}
-		if ((status = AcpiInitializeObjects(0)) != AE_OK) {
+
+		if (ACPI_FAILURE(status = AcpiEnableSubsystem(
+		    acpi_init_level)))
 			goto error;
-		}
+
+		if (ACPI_FAILURE(status = AcpiInitializeObjects(0)))
+			goto error;
+
 		/*
 		 * Initialize EC
 		 */
@@ -434,10 +435,10 @@ error:
 ACPI_STATUS
 acpica_get_sci(int *sci_irq, iflag_t *sci_flags)
 {
-	APIC_HEADER		*ap;
-	MULTIPLE_APIC_TABLE	*mat;
-	MADT_INTERRUPT_OVERRIDE	*mio;
-	FADT_DESCRIPTOR		*fadt;
+	ACPI_SUBTABLE_HEADER		*ap;
+	ACPI_TABLE_MADT			*mat;
+	ACPI_MADT_INTERRUPT_OVERRIDE	*mio;
+	ACPI_TABLE_FADT			*fadt;
 	int			madt_seen, madt_size;
 
 
@@ -461,38 +462,39 @@ acpica_get_sci(int *sci_irq, iflag_t *sci_flags)
 	sci_flags->bustype = BUS_PCI;	/*  we *do* conform to PCI */
 
 	/* get the SCI from the FADT */
-	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+	if (AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **)&fadt) !=
+	    AE_OK)
 		return (AE_ERROR);
 
-	*sci_irq = fadt->SciInt;
+	*sci_irq = fadt->SciInterrupt;
 
 	/* search for ISOs that modify it */
 	/* if we don't find a MADT, that's OK; no ISOs then */
-	if (AcpiGetFirmwareTable(APIC_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **) &mat) != AE_OK) {
+	if (AcpiGetTable(ACPI_SIG_MADT, 1, (ACPI_TABLE_HEADER **) &mat) !=
+	    AE_OK)
 		return (AE_OK);
-	}
 
-	ap = (APIC_HEADER *) (mat + 1);
-	madt_size = mat->Length;
+	ap = (ACPI_SUBTABLE_HEADER *) (mat + 1);
+	madt_size = mat->Header.Length;
 	madt_seen = sizeof (*mat);
 
 	while (madt_seen < madt_size) {
 		switch (ap->Type) {
-		case APIC_XRUPT_OVERRIDE:
-			mio = (MADT_INTERRUPT_OVERRIDE *) ap;
-			if (mio->Source == *sci_irq) {
-				*sci_irq = mio->Interrupt;
-				sci_flags->intr_el = mio->TriggerMode;
-				sci_flags->intr_po = mio->Polarity;
+		case ACPI_MADT_TYPE_INTERRUPT_OVERRIDE:
+			mio = (ACPI_MADT_INTERRUPT_OVERRIDE *) ap;
+			if (mio->SourceIrq == *sci_irq) {
+				*sci_irq = mio->GlobalIrq;
+				sci_flags->intr_el = (mio->IntiFlags &
+				    ACPI_MADT_TRIGGER_MASK) >> 2;
+				sci_flags->intr_po = mio->IntiFlags &
+				    ACPI_MADT_POLARITY_MASK;
 			}
 			break;
 		}
 
 		/* advance to next entry */
 		madt_seen += ap->Length;
-		ap = (APIC_HEADER *)(((char *)ap) + ap->Length);
+		ap = (ACPI_SUBTABLE_HEADER *)(((char *)ap) + ap->Length);
 	}
 
 	/*
@@ -552,7 +554,7 @@ acpica_ddi_setwake(dev_info_t *dip, int level)
 	 */
 	status = AcpiEvaluateObject(devobj, "_PRW", NULL, &prw_buf);
 	prw = prw_buf.Pointer;
-	if (ACPI_FAILURE(status) || prw == NULL ||
+	if (ACPI_FAILURE(status) || prw_buf.Length == 0 || prw == NULL ||
 	    prw->Type != ACPI_TYPE_PACKAGE || prw->Package.Count < 2 ||
 	    prw->Package.Elements[1].Type != ACPI_TYPE_INTEGER) {
 		cmn_err(CE_NOTE, "acpica_ddi_setwake: could not "
@@ -610,7 +612,7 @@ acpica_init_kstats()
 {
 	ACPI_HANDLE	s3handle;
 	ACPI_STATUS	status;
-	FADT_DESCRIPTOR	*fadt;
+	ACPI_TABLE_FADT	*fadt;
 	kstat_named_t *knp;
 
 	/*
@@ -634,9 +636,8 @@ acpica_init_kstats()
 	 * initialize kstat 'preferred_pm_profile' to the value
 	 * contained in the (always present) FADT
 	 */
-	status = AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&fadt);
-	knp->value.l = (status == AE_OK) ? fadt->Prefer_PM_Profile : -1;
+	status = AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **)&fadt);
+	knp->value.l = (status == AE_OK) ? fadt->PreferredProfile : -1;
 	kstat_named_init(knp, "preferred_pm_profile", KSTAT_DATA_LONG);
 
 	/*

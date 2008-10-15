@@ -871,19 +871,19 @@ ao_ms_mca_init(cmi_hdl_t hdl, int nbanks)
 static int
 ao_acpi_find_smicmd(int *asd_port)
 {
-	FADT_DESCRIPTOR *fadt = NULL;
+	ACPI_TABLE_FADT *fadt = NULL;
 
 	/*
-	 * AcpiGetFirmwareTable works even if ACPI is disabled, so a failure
+	 * AcpiGetTable works even if ACPI is disabled, so a failure
 	 * here means we weren't able to retreive a pointer to the FADT.
 	 */
-	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+	if (AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **)&fadt) !=
+	    AE_OK)
 		return (-1);
 
 	ASSERT(fadt != NULL);
 
-	*asd_port = fadt->SmiCmd;
+	*asd_port = fadt->SmiCommand;
 	return (0);
 }
 

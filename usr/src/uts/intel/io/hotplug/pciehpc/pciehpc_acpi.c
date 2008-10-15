@@ -20,11 +20,9 @@
  */
 
 /*
- *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ACPI interface related functions used in PCIEHPC driver module.
@@ -214,7 +212,7 @@ pciehpc_acpi_hpc_init(pciehpc_t *ctrl_p)
 
 	/* get the ACPI object handle for the child node */
 	status = AcpiGetNextObject(ACPI_TYPE_DEVICE, pcibus_obj,
-			NULL, &slot_dev_obj);
+	    NULL, &slot_dev_obj);
 	if (status != AE_OK)
 		return (DDI_FAILURE);
 
@@ -252,7 +250,7 @@ pciehpc_acpi_hpc_init(pciehpc_t *ctrl_p)
 
 	/* initialize the slot mutex */
 	mutex_init(&ctrl_p->pciehpc_mutex, NULL, MUTEX_DRIVER,
-		(void *)PCIEHPC_INTR_PRI);
+	    (void *)PCIEHPC_INTR_PRI);
 
 	return (DDI_SUCCESS);
 }
@@ -329,32 +327,32 @@ pciehpc_acpi_slotinfo_init(pciehpc_t *ctrl_p)
 	p->slot_info.version = HPC_SLOT_OPS_VERSION;
 	p->slot_info.slot_type = HPC_SLOT_TYPE_PCIE;
 	p->slot_info.slot_flags =
-		HPC_SLOT_CREATE_DEVLINK | HPC_SLOT_NO_AUTO_ENABLE;
+	    HPC_SLOT_CREATE_DEVLINK | HPC_SLOT_NO_AUTO_ENABLE;
 	p->slot_info.pci_slot_capabilities = HPC_SLOT_64BITS;
 	/* the device number is fixed as 0 as per the spec  */
 	p->slot_info.pci_dev_num = 0;
 
 	/* read Slot Capabilities Register */
 	slot_capabilities = pciehpc_reg_get32(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCAP);
+	    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCAP);
 
 	/* setup slot number/name */
 	pciehpc_set_slot_name(ctrl_p);
 
 	/* check if Attn Button present */
 	ctrl_p->has_attn = (slot_capabilities & PCIE_SLOTCAP_ATTN_BUTTON) ?
-		B_TRUE : B_FALSE;
+	    B_TRUE : B_FALSE;
 
 	/* check if Manual Retention Latch sensor present */
 	ctrl_p->has_mrl = (slot_capabilities & PCIE_SLOTCAP_MRL_SENSOR) ?
-		B_TRUE : B_FALSE;
+	    B_TRUE : B_FALSE;
 
 	/*
 	 * PCI-E (draft) version 1.1 defines EMI Lock Present bit
 	 * in Slot Capabilities register. Check for it.
 	 */
 	ctrl_p->has_emi_lock = (slot_capabilities &
-		PCIE_SLOTCAP_EMI_LOCK_PRESENT) ? B_TRUE : B_FALSE;
+	    PCIE_SLOTCAP_EMI_LOCK_PRESENT) ? B_TRUE : B_FALSE;
 
 	/* initialize synchronization conditional variable */
 	cv_init(&ctrl_p->slot.cmd_comp_cv, NULL, CV_DRIVER, NULL);
@@ -368,7 +366,7 @@ pciehpc_acpi_slotinfo_init(pciehpc_t *ctrl_p)
 		return (DDI_FAILURE);
 
 	PCIEHPC_DEBUG((CE_NOTE, "ACPI hot plug is enabled for slot #%d\n",
-		    ctrl_p->slot.slotNum));
+	    ctrl_p->slot.slotNum));
 
 	return (DDI_SUCCESS);
 }
@@ -421,13 +419,13 @@ pciehpc_acpi_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 	/* read the Slot Status Register */
 	status =  pciehpc_reg_get16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+	    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
 
 	/* make sure the MRL switch is closed if present */
 	if ((ctrl_p->has_mrl) && (status & PCIE_SLOTSTS_MRL_SENSOR_OPEN)) {
 		/* MRL switch is open */
 		cmn_err(CE_WARN, "MRL switch is open on slot %d",
-			ctrl_p->slot.slotNum);
+		    ctrl_p->slot.slotNum);
 		goto cleanup;
 	}
 
@@ -441,7 +439,7 @@ pciehpc_acpi_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 	/* get the current state of Slot Control Register */
 	control =  pciehpc_reg_get16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
 
 	/* check if the slot's power state is ON */
 	if (!(control & PCIE_SLOTCTL_PWR_CONTROL)) {
@@ -499,7 +497,7 @@ pciehpc_acpi_slot_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 	/* read the Slot Status Register */
 	status =  pciehpc_reg_get16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+	    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
 
 	/* make sure the slot has a device present */
 	if (!(status & PCIE_SLOTSTS_PRESENCE_DETECTED)) {
@@ -533,7 +531,7 @@ pciehpc_acpi_install_event_handler(pciehpc_t *ctrl_p)
 	pciehpc_acpi_t *acpi_p;
 
 	PCIEHPC_DEBUG3((CE_CONT, "install event handler for slot %d\n",
-		ctrl_p->slot.slotNum));
+	    ctrl_p->slot.slotNum));
 	acpi_p = ctrl_p->misc_data;
 	if (acpi_p->slot_dev_obj == NULL)
 		return (AE_NOT_FOUND);
@@ -543,8 +541,7 @@ pciehpc_acpi_install_event_handler(pciehpc_t *ctrl_p)
 	 * (Note: Insert event (hot-insert) is delivered on this object)
 	 */
 	status = AcpiInstallNotifyHandler(acpi_p->slot_dev_obj,
-		ACPI_SYSTEM_NOTIFY,
-		pciehpc_acpi_notify_handler, (void *)ctrl_p);
+	    ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler, (void *)ctrl_p);
 	if (status != AE_OK)
 		goto cleanup;
 
@@ -556,14 +553,13 @@ pciehpc_acpi_install_event_handler(pciehpc_t *ctrl_p)
 	 * on all of the 8 possible device functions so, subscribing to
 	 * one of them is sufficient.
 	 */
-	status = AcpiInstallNotifyHandler(acpi_p->bus_obj,
-		ACPI_SYSTEM_NOTIFY,
-		pciehpc_acpi_notify_handler, (void *)ctrl_p);
+	status = AcpiInstallNotifyHandler(acpi_p->bus_obj, ACPI_SYSTEM_NOTIFY,
+	    pciehpc_acpi_notify_handler, (void *)ctrl_p);
 	return (status);
 
 cleanup:
 	(void) AcpiRemoveNotifyHandler(acpi_p->slot_dev_obj,
-		ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler);
+	    ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler);
 	return (status);
 }
 
@@ -585,12 +581,12 @@ pciehpc_acpi_notify_handler(ACPI_HANDLE device, uint32_t val, void *context)
 	 */
 	acpi_p = ctrl_p->misc_data;
 	if (pciehpc_acpi_get_dev_state(acpi_p->slot_dev_obj,
-		&dev_state) != AE_OK) {
+	    &dev_state) != AE_OK) {
 		cmn_err(CE_WARN, "failed to get device status on slot %d",
-			ctrl_p->slot.slotNum);
+		    ctrl_p->slot.slotNum);
 	}
 	PCIEHPC_DEBUG((CE_CONT, "(1)device state on slot #%d: 0x%x\n",
-				ctrl_p->slot.slotNum, dev_state));
+	    ctrl_p->slot.slotNum, dev_state));
 
 	pciehpc_get_slot_state(ctrl_p);
 
@@ -598,17 +594,17 @@ pciehpc_acpi_notify_handler(ACPI_HANDLE device, uint32_t val, void *context)
 	case 0: /* (re)enumerate the device */
 	case 3: /* Request Eject */
 		if (ctrl_p->slot.slot_state != HPC_SLOT_CONNECTED) {
-		    /* unexpected slot state; surprise removal? */
-		    cmn_err(CE_WARN, "Unexpected event on slot #%d"
-			"(state 0x%x)", ctrl_p->slot.slotNum, dev_state);
+			/* unexpected slot state; surprise removal? */
+			cmn_err(CE_WARN, "Unexpected event on slot #%d"
+			    "(state 0x%x)", ctrl_p->slot.slotNum, dev_state);
 		}
 		/* send the ATTN button event to HPS framework */
 		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
-			HPC_EVENT_SLOT_ATTN, HPC_EVENT_NORMAL);
+		    HPC_EVENT_SLOT_ATTN, HPC_EVENT_NORMAL);
 		break;
 	default:
 		cmn_err(CE_NOTE, "Unknown Notify() event %d on slot #%d\n",
-			val, ctrl_p->slot.slotNum);
+		    val, ctrl_p->slot.slotNum);
 		break;
 	}
 	mutex_exit(&ctrl_p->pciehpc_mutex);
@@ -620,11 +616,11 @@ pciehpc_acpi_uninstall_event_handler(pciehpc_t *ctrl_p)
 	pciehpc_acpi_t *acpi_p = ctrl_p->misc_data;
 
 	PCIEHPC_DEBUG((CE_CONT, "Uninstall event handler for slot #%d\n",
-		ctrl_p->slot.slotNum));
+	    ctrl_p->slot.slotNum));
 	(void) AcpiRemoveNotifyHandler(acpi_p->slot_dev_obj,
-		ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler);
+	    ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler);
 	(void) AcpiRemoveNotifyHandler(acpi_p->bus_obj,
-		ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler);
+	    ACPI_SYSTEM_NOTIFY, pciehpc_acpi_notify_handler);
 }
 
 /*
@@ -638,26 +634,26 @@ pciehpc_acpi_power_on_slot(pciehpc_t *ctrl_p)
 	int dev_state = 0;
 
 	PCIEHPC_DEBUG((CE_CONT, "turn ON power to the slot #%d\n",
-		ctrl_p->slot.slotNum));
+	    ctrl_p->slot.slotNum));
 
 	status = AcpiEvaluateObject(acpi_p->slot_dev_obj, "_PS0", NULL, NULL);
 
 	/* get the state of the device (from _STA method) */
 	if (status == AE_OK) {
-	    if (pciehpc_acpi_get_dev_state(acpi_p->slot_dev_obj,
-		&dev_state) != AE_OK)
+		if (pciehpc_acpi_get_dev_state(acpi_p->slot_dev_obj,
+		    &dev_state) != AE_OK)
 		cmn_err(CE_WARN, "failed to get device status on slot #%d",
-			ctrl_p->slot.slotNum);
+		    ctrl_p->slot.slotNum);
 	}
 	PCIEHPC_DEBUG((CE_CONT, "(3)device state on slot #%d: 0x%x\n",
-				ctrl_p->slot.slotNum, dev_state));
+	    ctrl_p->slot.slotNum, dev_state));
 
 	pciehpc_get_slot_state(ctrl_p);
 
 	if (ctrl_p->slot.slot_state != HPC_SLOT_CONNECTED) {
 		cmn_err(CE_WARN, "failed to power on the slot #%d"
-			"(dev_state 0x%x, ACPI_STATUS 0x%x)",
-			ctrl_p->slot.slotNum, dev_state, status);
+		    "(dev_state 0x%x, ACPI_STATUS 0x%x)",
+		    ctrl_p->slot.slotNum, dev_state, status);
 		return (AE_ERROR);
 	}
 
@@ -675,26 +671,26 @@ pciehpc_acpi_power_off_slot(pciehpc_t *ctrl_p)
 	int dev_state = 0;
 
 	PCIEHPC_DEBUG((CE_CONT, "turn OFF power to the slot #%d\n",
-		ctrl_p->slot.slotNum));
+	    ctrl_p->slot.slotNum));
 
 	status = AcpiEvaluateObject(acpi_p->slot_dev_obj, "_EJ0", NULL, NULL);
 
 	/* get the state of the device (from _STA method) */
 	if (status == AE_OK) {
-	    if (pciehpc_acpi_get_dev_state(acpi_p->slot_dev_obj,
-		&dev_state) != AE_OK)
+		if (pciehpc_acpi_get_dev_state(acpi_p->slot_dev_obj,
+		    &dev_state) != AE_OK)
 		cmn_err(CE_WARN, "failed to get device status on slot #%d",
-			ctrl_p->slot.slotNum);
+		    ctrl_p->slot.slotNum);
 	}
 	PCIEHPC_DEBUG((CE_CONT, "(2)device state on slot #%d: 0x%x\n",
-				ctrl_p->slot.slotNum, dev_state));
+	    ctrl_p->slot.slotNum, dev_state));
 
 	pciehpc_get_slot_state(ctrl_p);
 
 	if (ctrl_p->slot.slot_state == HPC_SLOT_CONNECTED) {
 		cmn_err(CE_WARN, "failed to power OFF the slot #%d"
-			"(dev_state 0x%x, ACPI_STATUS 0x%x)",
-			ctrl_p->slot.slotNum, dev_state, status);
+		    "(dev_state 0x%x, ACPI_STATUS 0x%x)",
+		    ctrl_p->slot.slotNum, dev_state, status);
 		return (AE_ERROR);
 	}
 
@@ -713,7 +709,7 @@ pciehpc_acpi_ej0_present(ACPI_HANDLE pcibus_obj)
 	ACPI_HANDLE ej0_hdl;
 
 	if ((status = AcpiGetNextObject(ACPI_TYPE_DEVICE, pcibus_obj,
-		NULL, &d0f0_obj)) == AE_OK) {
+	    NULL, &d0f0_obj)) == AE_OK) {
 		/* child device node(s) are present; check for _EJ0 method */
 		status = AcpiGetHandle(d0f0_obj, "_EJ0", &ej0_hdl);
 	}
@@ -770,7 +766,6 @@ pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
 	ACPI_OBJECT		args[4];
 	UINT32			caps_buffer[3];
 	ACPI_BUFFER		rb;
-	ACPI_OBJECT		*rv;
 	UINT32			*rbuf;
 
 	/* construct argument list */
@@ -807,27 +802,21 @@ pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
 	rb.Length = ACPI_ALLOCATE_BUFFER;
 	rb.Pointer = NULL;
 
-	status = AcpiEvaluateObject(osc_hdl, NULL, &arglist, &rb);
-
+	status = AcpiEvaluateObjectTyped(osc_hdl, NULL, &arglist, &rb,
+	    ACPI_TYPE_BUFFER);
 	if (status != AE_OK) {
 		PCIEHPC_DEBUG((CE_CONT,
 		    "Failed to execute _OSC method (status %d)\n", status));
 		return (status);
 	}
 
-	rv = rb.Pointer;
-	if (rv == NULL || rv->Type != ACPI_TYPE_BUFFER) {
-		PCIEHPC_DEBUG((CE_CONT,
-		    "Failed to execute _OSC method -- bad status\n"));
-		return (AE_ERROR);
-	}
-	rbuf = (UINT32 *)rv->Buffer.Pointer;
+	rbuf = (UINT32 *)((ACPI_OBJECT *)rb.Pointer)->Buffer.Pointer;
 
 	/* check the STATUS word in the capability buffer */
 	if (rbuf[0] & OSC_STATUS_ERRORS) {
 		PCIEHPC_DEBUG((CE_CONT, "_OSC method failed (STATUS %d)\n",
 		    rbuf[0]));
-		AcpiOsFree(rv);
+		AcpiOsFree(rb.Pointer);
 		return (AE_ERROR);
 	}
 
@@ -841,7 +830,7 @@ pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
 	else
 		*hp_mode = ACPI_HP_MODE;
 
-	AcpiOsFree(rv);
+	AcpiOsFree(rb.Pointer);
 
 	return (AE_OK);
 }
@@ -868,10 +857,10 @@ pciehpc_dump_acpi_obj(ACPI_HANDLE pcibus_obj)
 	/* dump all the methods for this bus node */
 	cmn_err(CE_CONT, "  METHODS: \n");
 	status = AcpiWalkNamespace(ACPI_TYPE_METHOD, pcibus_obj, 1,
-			pciehpc_print_acpi_name, "  ", NULL);
+	    pciehpc_print_acpi_name, "  ", NULL);
 	/* dump all the child devices */
 	status = AcpiWalkNamespace(ACPI_TYPE_DEVICE, pcibus_obj, 1,
-			pciehpc_walk_obj_namespace, NULL, NULL);
+	    pciehpc_walk_obj_namespace, NULL, NULL);
 }
 
 /*ARGSUSED*/
@@ -891,14 +880,14 @@ pciehpc_walk_obj_namespace(ACPI_HANDLE hdl, uint32_t nl, void *context,
 		return (status);
 	buf[0] = 0;
 	while (nl--)
-	    (void) strcat(buf, "  ");
+		(void) strcat(buf, "  ");
 	cmn_err(CE_CONT, "%sDEVICE: %s\n", buf, (char *)retbuf.Pointer);
 	AcpiOsFree(retbuf.Pointer);
 
 	/* dump all the methods for this device */
 	cmn_err(CE_CONT, "%s  METHODS: \n", buf);
 	status = AcpiWalkNamespace(ACPI_TYPE_METHOD, hdl, 1,
-			pciehpc_print_acpi_name, (void *)buf, NULL);
+	    pciehpc_print_acpi_name, (void *)buf, NULL);
 	return (status);
 }
 

@@ -12,7 +12,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -171,10 +171,9 @@ AcpiOsTerminate (
 /*
  * ACPI Table interfaces
  */
-ACPI_STATUS
+ACPI_PHYSICAL_ADDRESS
 AcpiOsGetRootPointer (
-    UINT32                  Flags,
-    ACPI_POINTER            *Address);
+    void);
 
 ACPI_STATUS
 AcpiOsPredefinedOverride (
@@ -272,11 +271,10 @@ void
 AcpiOsFree (
     void *                  Memory);
 
-ACPI_STATUS
+void *
 AcpiOsMapMemory (
-    ACPI_PHYSICAL_ADDRESS   PhysicalAddress,
-    ACPI_SIZE               Size,
-    void                    **LogicalAddress);
+    ACPI_PHYSICAL_ADDRESS   Where,
+    ACPI_SIZE               Length);
 
 void
 AcpiOsUnmapMemory (

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmutex - local mutex support
- *              $Revision: 1.11 $
+ *              $Revision: 1.13 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -332,7 +332,7 @@ AcpiUtAcquireMutex (
          * the mutex ordering rule.  This indicates a coding error somewhere in
          * the ACPI subsystem code.
          */
-        for (i = MutexId; i < ACPI_MAX_MUTEX; i++)
+        for (i = MutexId; i < ACPI_NUM_MUTEX; i++)
         {
             if (AcpiGbl_MutexInfo[i].ThreadId == ThisThreadId)
             {
@@ -434,7 +434,7 @@ AcpiUtReleaseMutex (
          * ordering rule.  This indicates a coding error somewhere in
          * the ACPI subsystem code.
          */
-        for (i = MutexId; i < ACPI_MAX_MUTEX; i++)
+        for (i = MutexId; i < ACPI_NUM_MUTEX; i++)
         {
             if (AcpiGbl_MutexInfo[i].ThreadId == ThisThreadId)
             {

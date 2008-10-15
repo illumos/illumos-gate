@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 1.84 $
+ *              $Revision: 1.88 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -314,7 +314,7 @@ AcpiNsInitOneObject (
     void                    **ReturnValue)
 {
     ACPI_OBJECT_TYPE        Type;
-    ACPI_STATUS             Status;
+    ACPI_STATUS             Status = AE_OK;
     ACPI_INIT_WALK_INFO     *Info = (ACPI_INIT_WALK_INFO *) Context;
     ACPI_NAMESPACE_NODE     *Node = (ACPI_NAMESPACE_NODE *) ObjHandle;
     ACPI_OPERAND_OBJECT     *ObjDesc;
@@ -346,6 +346,10 @@ AcpiNsInitOneObject (
         Info->FieldCount++;
         break;
 
+    case ACPI_TYPE_LOCAL_BANK_FIELD:
+        Info->FieldCount++;
+        break;
+
     case ACPI_TYPE_BUFFER:
         Info->BufferCount++;
         break;
@@ -371,11 +375,7 @@ AcpiNsInitOneObject (
     /*
      * Must lock the interpreter before executing AML code
      */
-    Status = AcpiExEnterInterpreter ();
-    if (ACPI_FAILURE (Status))
-    {
-        return (Status);
-    }
+    AcpiExEnterInterpreter ();
 
     /*
      * Each of these types can contain executable AML code within the
@@ -393,6 +393,12 @@ AcpiNsInitOneObject (
 
         Info->FieldInit++;
         Status = AcpiDsGetBufferFieldArguments (ObjDesc);
+        break;
+
+    case ACPI_TYPE_LOCAL_BANK_FIELD:
+
+        Info->FieldInit++;
+        Status = AcpiDsGetBankFieldArguments (ObjDesc);
         break;
 
     case ACPI_TYPE_BUFFER:
@@ -660,7 +666,6 @@ AcpiNsInitOneDevice (
     Info->PrefixNode = DeviceNode;
     Info->Pathname = METHOD_NAME__INI;
     Info->Parameters = NULL;
-    Info->ParameterType = ACPI_PARAM_ARGS;
     Info->Flags = ACPI_IGNORE_RETURN_VALUE;
 
     Status = AcpiNsEvaluate (Info);

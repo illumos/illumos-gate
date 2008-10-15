@@ -517,7 +517,8 @@ cpu_acpi_cache_present_capabilities(cpu_acpi_handle_t handle,
 	abuf.Length = ACPI_ALLOCATE_BUFFER;
 	abuf.Pointer = NULL;
 	if (ACPI_FAILURE(AcpiEvaluateObject(handle->cs_handle,
-	    cpu_acpi_obj_attrs[objtype].name, NULL, &abuf))) {
+	    cpu_acpi_obj_attrs[objtype].name, NULL, &abuf)) ||
+	    abuf.Length == 0) {
 		*pc = 0;
 		return (1);
 	}

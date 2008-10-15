@@ -313,16 +313,16 @@ typedef struct prs_irq_list_ent {
 int apic_enable_acpi = 0;
 
 /* ACPI Multiple APIC Description Table ptr */
-static	MULTIPLE_APIC_TABLE *acpi_mapic_dtp = NULL;
+static	ACPI_TABLE_MADT *acpi_mapic_dtp = NULL;
 
 /* ACPI Interrupt Source Override Structure ptr */
-static	MADT_INTERRUPT_OVERRIDE *acpi_isop = NULL;
+static	ACPI_MADT_INTERRUPT_OVERRIDE *acpi_isop = NULL;
 static	int acpi_iso_cnt = 0;
 
 /* ACPI Non-maskable Interrupt Sources ptr */
-static	MADT_NMI_SOURCE *acpi_nmi_sp = NULL;
+static	ACPI_MADT_NMI_SOURCE *acpi_nmi_sp = NULL;
 static	int acpi_nmi_scnt = 0;
-static	MADT_LOCAL_APIC_NMI *acpi_nmi_cp = NULL;
+static	ACPI_MADT_LOCAL_APIC_NMI *acpi_nmi_cp = NULL;
 static	int acpi_nmi_ccnt = 0;
 
 /*
@@ -595,17 +595,17 @@ acpi_probe(char *modname)
 	uint32_t		id, ver;
 	int			acpi_verboseflags = 0;
 	int			madt_seen, madt_size;
-	APIC_HEADER		*ap;
-	MADT_PROCESSOR_APIC	*mpa;
-	MADT_PROCESSOR_X2APIC	*mpx2a;
-	MADT_IO_APIC		*mia;
-	MADT_IO_SAPIC		*misa;
-	MADT_INTERRUPT_OVERRIDE	*mio;
-	MADT_NMI_SOURCE		*mns;
-	MADT_INTERRUPT_SOURCE	*mis;
-	MADT_LOCAL_APIC_NMI	*mlan;
-	MADT_LOCAL_X2APIC_NMI	*mx2alan;
-	MADT_ADDRESS_OVERRIDE	*mao;
+	ACPI_SUBTABLE_HEADER		*ap;
+	ACPI_MADT_LOCAL_APIC	*mpa;
+	ACPI_MADT_LOCAL_X2APIC	*mpx2a;
+	ACPI_MADT_IO_APIC		*mia;
+	ACPI_MADT_IO_SAPIC		*misa;
+	ACPI_MADT_INTERRUPT_OVERRIDE	*mio;
+	ACPI_MADT_NMI_SOURCE		*mns;
+	ACPI_MADT_INTERRUPT_SOURCE	*mis;
+	ACPI_MADT_LOCAL_APIC_NMI	*mlan;
+	ACPI_MADT_LOCAL_X2APIC_NMI	*mx2alan;
+	ACPI_MADT_LOCAL_APIC_OVERRIDE	*mao;
 	int			sci;
 	iflag_t			sci_flags;
 	volatile uint32_t	*ioapic;
@@ -617,11 +617,11 @@ acpi_probe(char *modname)
 	if (!apic_use_acpi)
 		return (PSM_FAILURE);
 
-	if (AcpiGetFirmwareTable(APIC_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	if (AcpiGetTable(ACPI_SIG_MADT, 1,
 	    (ACPI_TABLE_HEADER **) &acpi_mapic_dtp) != AE_OK)
 		return (PSM_FAILURE);
 
-	apicadr = mapin_apic((uint32_t)acpi_mapic_dtp->LocalApicAddress,
+	apicadr = mapin_apic((uint32_t)acpi_mapic_dtp->Address,
 	    APIC_LOCAL_MEMLEN, PROT_READ | PROT_WRITE);
 	if (!apicadr)
 		return (PSM_FAILURE);
@@ -641,21 +641,21 @@ acpi_probe(char *modname)
 	CPUSET_ONLY(apic_cpumask, 0);
 	apic_io_max = 0;
 
-	ap = (APIC_HEADER *) (acpi_mapic_dtp + 1);
-	madt_size = acpi_mapic_dtp->Length;
+	ap = (ACPI_SUBTABLE_HEADER *) (acpi_mapic_dtp + 1);
+	madt_size = acpi_mapic_dtp->Header.Length;
 	madt_seen = sizeof (*acpi_mapic_dtp);
 
 	while (madt_seen < madt_size) {
 		switch (ap->Type) {
-		case APIC_PROCESSOR:
-			mpa = (MADT_PROCESSOR_APIC *) ap;
-			if (mpa->ProcessorEnabled) {
-				if (mpa->LocalApicId == local_ids[0]) {
+		case ACPI_MADT_TYPE_LOCAL_APIC:
+			mpa = (ACPI_MADT_LOCAL_APIC *) ap;
+			if (mpa->LapicFlags & ACPI_MADT_ENABLED) {
+				if (mpa->Id == local_ids[0]) {
 					proc_ids[0] = mpa->ProcessorId;
 					acpica_map_cpu(0, mpa->ProcessorId);
 				} else if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
-					local_ids[index] = mpa->LocalApicId;
+					local_ids[index] = mpa->Id;
 					proc_ids[index] = mpa->ProcessorId;
 					CPUSET_ADD(apic_cpumask, index);
 					acpica_map_cpu(index, mpa->ProcessorId);
@@ -668,13 +668,13 @@ acpi_probe(char *modname)
 			}
 			break;
 
-		case APIC_IO:
-			mia = (MADT_IO_APIC *) ap;
+		case ACPI_MADT_TYPE_IO_APIC:
+			mia = (ACPI_MADT_IO_APIC *) ap;
 			if (apic_io_max < MAX_IO_APIC) {
 				ioapic_ix = apic_io_max;
-				apic_io_id[apic_io_max] = mia->IoApicId;
+				apic_io_id[apic_io_max] = mia->Id;
 				apic_io_vectbase[apic_io_max] =
-				    mia->Interrupt;
+				    mia->GlobalIrqBase;
 				apic_physaddr[apic_io_max] =
 				    (uint32_t)mia->Address;
 				ioapic = apicioadr[apic_io_max] =
@@ -688,67 +688,65 @@ acpi_probe(char *modname)
 			}
 			break;
 
-		case APIC_XRUPT_OVERRIDE:
-			mio = (MADT_INTERRUPT_OVERRIDE *) ap;
+		case ACPI_MADT_TYPE_INTERRUPT_OVERRIDE:
+			mio = (ACPI_MADT_INTERRUPT_OVERRIDE *) ap;
 			if (acpi_isop == NULL)
 				acpi_isop = mio;
 			acpi_iso_cnt++;
 			break;
 
-		case APIC_NMI:
+		case ACPI_MADT_TYPE_NMI_SOURCE:
 			/* UNIMPLEMENTED */
-			mns = (MADT_NMI_SOURCE *) ap;
+			mns = (ACPI_MADT_NMI_SOURCE *) ap;
 			if (acpi_nmi_sp == NULL)
 				acpi_nmi_sp = mns;
 			acpi_nmi_scnt++;
 
-			cmn_err(CE_NOTE, "!apic: nmi source: %d %d %d\n",
-			    mns->Interrupt, mns->Polarity,
-			    mns->TriggerMode);
+			cmn_err(CE_NOTE, "!apic: nmi source: %d 0x%x\n",
+			    mns->GlobalIrq, mns->IntiFlags);
 			break;
 
-		case APIC_LOCAL_NMI:
+		case ACPI_MADT_TYPE_LOCAL_APIC_NMI:
 			/* UNIMPLEMENTED */
-			mlan = (MADT_LOCAL_APIC_NMI *) ap;
+			mlan = (ACPI_MADT_LOCAL_APIC_NMI *) ap;
 			if (acpi_nmi_cp == NULL)
 				acpi_nmi_cp = mlan;
 			acpi_nmi_ccnt++;
 
-			cmn_err(CE_NOTE, "!apic: local nmi: %d %d %d %d\n",
-			    mlan->ProcessorId, mlan->Polarity,
-			    mlan->TriggerMode, mlan->Lint);
+			cmn_err(CE_NOTE, "!apic: local nmi: %d 0x%x %d\n",
+			    mlan->ProcessorId, mlan->IntiFlags,
+			    mlan->Lint);
 			break;
 
-		case APIC_ADDRESS_OVERRIDE:
+		case ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE:
 			/* UNIMPLEMENTED */
-			mao = (MADT_ADDRESS_OVERRIDE *) ap;
+			mao = (ACPI_MADT_LOCAL_APIC_OVERRIDE *) ap;
 			cmn_err(CE_NOTE, "!apic: address override: %lx\n",
 			    (long)mao->Address);
 			break;
 
-		case APIC_IO_SAPIC:
+		case ACPI_MADT_TYPE_IO_SAPIC:
 			/* UNIMPLEMENTED */
-			misa = (MADT_IO_SAPIC *) ap;
+			misa = (ACPI_MADT_IO_SAPIC *) ap;
 
 			cmn_err(CE_NOTE, "!apic: io sapic: %d %d %lx\n",
-			    misa->IoSapicId, misa->InterruptBase,
+			    misa->Id, misa->GlobalIrqBase,
 			    (long)misa->Address);
 			break;
 
-		case APIC_XRUPT_SOURCE:
+		case ACPI_MADT_TYPE_INTERRUPT_SOURCE:
 			/* UNIMPLEMENTED */
-			mis = (MADT_INTERRUPT_SOURCE *) ap;
+			mis = (ACPI_MADT_INTERRUPT_SOURCE *) ap;
 
 			cmn_err(CE_NOTE,
-			    "!apic: irq source: %d %d %d %d %d %d %d\n",
-			    mis->ProcessorId, mis->ProcessorEid,
-			    mis->Interrupt, mis->Polarity,
-			    mis->TriggerMode, mis->InterruptType,
+			    "!apic: irq source: %d %d %d 0x%x %d %d\n",
+			    mis->Id, mis->Eid, mis->GlobalIrq,
+			    mis->IntiFlags, mis->Type,
 			    mis->IoSapicVector);
 			break;
 
-		case X2APIC_PROCESSOR:
-			mpx2a = (MADT_PROCESSOR_X2APIC *) ap;
+		case ACPI_MADT_TYPE_LOCAL_X2APIC:
+			mpx2a = (ACPI_MADT_LOCAL_X2APIC *) ap;
 
 			/*
 			 * All logical processors with APIC ID values
@@ -758,15 +756,13 @@ acpi_probe(char *modname)
 			 * 255 will have their APIC reported through
 			 * Processor Local APIC.
 			 */
-			if ((mpx2a->ProcessorEnabled) &&
-			    (mpx2a->X2LocalApicId >> 8)) {
+			if ((mpx2a->LapicFlags & ACPI_MADT_ENABLED) &&
+			    (mpx2a->LocalApicId >> 8)) {
 				if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
-					local_ids[index] =
-					    mpx2a->X2LocalApicId;
+					local_ids[index] = mpx2a->LocalApicId;
 					CPUSET_ADD(apic_cpumask, index);
-					acpica_map_cpu(index,
-					    mpx2a->ProcessorUID);
+					acpica_map_cpu(index, mpx2a->Uid);
 					index++;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU) {
@@ -778,27 +774,28 @@ acpi_probe(char *modname)
 
 			break;
 
-		case X2APIC_LOCAL_NMI:
+		case ACPI_MADT_TYPE_LOCAL_X2APIC_NMI:
 			/* UNIMPLEMENTED */
-			mx2alan = (MADT_LOCAL_X2APIC_NMI *) ap;
-			if (mx2alan->ProcessorUID >> 8)
+			mx2alan = (ACPI_MADT_LOCAL_X2APIC_NMI *) ap;
+			if (mx2alan->Uid >> 8)
 				acpi_nmi_ccnt++;
 
 #ifdef	DEBUG
-			cmn_err(CE_NOTE, "!apic: local x2apic nmi: %d %d %d %d"
-			    "\n", mx2alan->ProcessorUID, mx2alan->Polarity,
-			    mx2alan->TriggerMode, mx2alan->Lint);
+			cmn_err(CE_NOTE,
+			    "!apic: local x2apic nmi: %d 0x%x %d\n",
+			    mx2alan->Uid, mx2alan->IntiFlags, mx2alan->Lint);
 #endif
 
 			break;
 
+		case ACPI_MADT_TYPE_RESERVED:
 		default:
 			break;
 		}
 
 		/* advance to next entry */
 		madt_seen += ap->Length;
-		ap = (APIC_HEADER *)(((char *)ap) + ap->Length);
+		ap = (ACPI_SUBTABLE_HEADER *)(((char *)ap) + ap->Length);
 	}
 
 	apic_cpus_size = apic_nproc * sizeof (*apic_cpus);
@@ -1758,8 +1755,8 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 	uchar_t ipin;
 	struct apic_io_intr *intrp;
 	iflag_t intr_flag;
-	APIC_HEADER	*hp;
-	MADT_INTERRUPT_OVERRIDE	*isop;
+	ACPI_SUBTABLE_HEADER	*hp;
+	ACPI_MADT_INTERRUPT_OVERRIDE *isop;
 	apic_irq_t *airqp;
 	int parent_is_pci_or_pciex = 0;
 	int child_is_pciex = 0;
@@ -1862,18 +1859,23 @@ nonpci:
 	if (apic_enable_acpi && !apic_use_acpi_madt_only) {
 		/* search iso entries first */
 		if (acpi_iso_cnt != 0) {
-			hp = (APIC_HEADER *)acpi_isop;
+			hp = (ACPI_SUBTABLE_HEADER *)acpi_isop;
 			i = 0;
 			while (i < acpi_iso_cnt) {
-				if (hp->Type == APIC_XRUPT_OVERRIDE) {
-					isop = (MADT_INTERRUPT_OVERRIDE *)hp;
+				if (hp->Type ==
+				    ACPI_MADT_TYPE_INTERRUPT_OVERRIDE) {
+					isop =
+					    (ACPI_MADT_INTERRUPT_OVERRIDE *) hp;
 					if (isop->Bus == 0 &&
-					    isop->Source == irqno) {
-						newirq = isop->Interrupt;
+					    isop->SourceIrq == irqno) {
+						newirq = isop->GlobalIrq;
 						intr_flag.intr_po =
-						    isop->Polarity;
+						    isop->IntiFlags &
+						    ACPI_MADT_POLARITY_MASK;
 						intr_flag.intr_el =
-						    isop->TriggerMode;
+						    (isop->IntiFlags &
+						    ACPI_MADT_TRIGGER_MASK)
+						    >> 2;
 						intr_flag.bustype = BUS_ISA;
 
 						return (apic_setup_irq_table(
@@ -1883,7 +1885,7 @@ nonpci:
 					}
 					i++;
 				}
-				hp = (APIC_HEADER *)(((char *)hp) +
+				hp = (ACPI_SUBTABLE_HEADER *)(((char *)hp) +
 				    hp->Length);
 			}
 		}

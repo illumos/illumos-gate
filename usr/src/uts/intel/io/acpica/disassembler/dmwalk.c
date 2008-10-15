@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dmwalk - AML disassembly tree walk
- *              $Revision: 1.32 $
+ *              $Revision: 1.35 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -622,7 +622,7 @@ AcpiDmDescendingOp (
                 }
                 else
                 {
-                    AcpiDmDumpName ((char *) &Name);
+                    AcpiDmDumpName (Name);
                 }
 
                 if (Op->Common.AmlOpcode != AML_INT_NAMEDFIELD_OP)

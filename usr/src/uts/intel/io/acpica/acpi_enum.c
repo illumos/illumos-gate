@@ -779,7 +779,8 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	 */
 	rb.Length = ACPI_ALLOCATE_BUFFER;
 	rb.Pointer = NULL;
-	if (AcpiEvaluateObject(ObjHandle, "_CID", NULL, &rb) == AE_OK) {
+	if (AcpiEvaluateObject(ObjHandle, "_CID", NULL, &rb) == AE_OK &&
+	    rb.Length != 0) {
 		ACPI_OBJECT *rv = rb.Pointer;
 
 		switch (rv->Type) {

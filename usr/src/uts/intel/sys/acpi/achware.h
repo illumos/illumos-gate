@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 1.80 $
+ *       $Revision: 1.84 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -138,10 +138,6 @@
  * hwacpi - high level functions
  */
 ACPI_STATUS
-AcpiHwInitialize (
-    void);
-
-ACPI_STATUS
 AcpiHwSetMode (
     UINT32                  Mode);
 
@@ -159,13 +155,11 @@ AcpiHwGetBitRegisterInfo (
 
 ACPI_STATUS
 AcpiHwRegisterRead (
-    BOOLEAN                 UseLock,
     UINT32                  RegisterId,
     UINT32                  *ReturnValue);
 
 ACPI_STATUS
 AcpiHwRegisterWrite (
-    BOOLEAN                 UseLock,
     UINT32                  RegisterId,
     UINT32                  Value);
 
@@ -183,12 +177,16 @@ AcpiHwLowLevelWrite (
 
 ACPI_STATUS
 AcpiHwClearAcpiStatus (
-    UINT32                  Flags);
+    void);
 
 
 /*
  * hwgpe - GPE support
  */
+ACPI_STATUS
+AcpiHwLowDisableGpe (
+    ACPI_GPE_EVENT_INFO     *GpeEventInfo);
+
 ACPI_STATUS
 AcpiHwWriteGpeEnableReg (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmsvc.h - VC specific defines, etc.
- *       $Revision: 1.25 $
+ *       $Revision: 1.28 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -167,9 +167,6 @@
     n_lo >>= 1;    \
 }
 #endif
-
-/* warn C4214: nonstandard extension used : bit field types other than int */
-#pragma warning(disable:4214)
 
 /* warn C4100: unreferenced formal parameter */
 #pragma warning(disable:4100)

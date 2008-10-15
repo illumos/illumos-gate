@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed Event handling and dispatch
- *              $Revision: 1.122 $
+ *              $Revision: 1.127 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -153,14 +153,6 @@ AcpiEvInitializeEvents (
     ACPI_FUNCTION_TRACE (EvInitializeEvents);
 
 
-    /* Make sure we have ACPI tables */
-
-    if (!AcpiGbl_DSDT)
-    {
-        ACPI_WARNING ((AE_INFO, "No ACPI tables present!"));
-        return_ACPI_STATUS (AE_NO_ACPI_TABLES);
-    }
-
     /*
      * Initialize the Fixed and General Purpose Events. This is done prior to
      * enabling SCIs to prevent interrupts from occurring before the handlers are
@@ -297,7 +289,7 @@ static ACPI_STATUS
 AcpiEvFixedEventInitialize (
     void)
 {
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
     ACPI_STATUS             Status;
 
 
@@ -315,8 +307,7 @@ AcpiEvFixedEventInitialize (
         if (AcpiGbl_FixedEventInfo[i].EnableRegisterId != 0xFF)
         {
             Status = AcpiSetRegister (
-                        AcpiGbl_FixedEventInfo[i].EnableRegisterId,
-                        0, ACPI_MTX_LOCK);
+                        AcpiGbl_FixedEventInfo[i].EnableRegisterId, 0);
             if (ACPI_FAILURE (Status))
             {
                 return (Status);
@@ -347,7 +338,7 @@ AcpiEvFixedEventDetect (
     UINT32                  IntStatus = ACPI_INTERRUPT_NOT_HANDLED;
     UINT32                  FixedStatus;
     UINT32                  FixedEnable;
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_NAME (EvFixedEventDetect);
@@ -357,10 +348,8 @@ AcpiEvFixedEventDetect (
      * Read the fixed feature status and enable registers, as all the cases
      * depend on their values.  Ignore errors here.
      */
-    (void) AcpiHwRegisterRead (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_STATUS,
-                &FixedStatus);
-    (void) AcpiHwRegisterRead (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_ENABLE,
-                &FixedEnable);
+    (void) AcpiHwRegisterRead (ACPI_REGISTER_PM1_STATUS, &FixedStatus);
+    (void) AcpiHwRegisterRead (ACPI_REGISTER_PM1_ENABLE, &FixedEnable);
 
     ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
         "Fixed Event Block: Enable %08X Status %08X\n",
@@ -378,7 +367,8 @@ AcpiEvFixedEventDetect (
         {
             /* Found an active (signalled) event */
 
-            IntStatus |= AcpiEvFixedEventDispatch ((UINT32) i);
+            AcpiFixedEventCount[i]++;
+            IntStatus |= AcpiEvFixedEventDispatch (i);
         }
     }
 
@@ -404,14 +394,12 @@ AcpiEvFixedEventDispatch (
     UINT32                  Event)
 {
 
-
     ACPI_FUNCTION_ENTRY ();
 
 
     /* Clear the status bit */
 
-    (void) AcpiSetRegister (AcpiGbl_FixedEventInfo[Event].StatusRegisterId,
-                1, ACPI_MTX_DO_NOT_LOCK);
+    (void) AcpiSetRegister (AcpiGbl_FixedEventInfo[Event].StatusRegisterId, 1);
 
     /*
      * Make sure we've got a handler.  If not, report an error.
@@ -419,8 +407,7 @@ AcpiEvFixedEventDispatch (
      */
     if (NULL == AcpiGbl_FixedEventHandlers[Event].Handler)
     {
-        (void) AcpiSetRegister (AcpiGbl_FixedEventInfo[Event].EnableRegisterId,
-                0, ACPI_MTX_DO_NOT_LOCK);
+        (void) AcpiSetRegister (AcpiGbl_FixedEventInfo[Event].EnableRegisterId, 0);
 
         ACPI_ERROR ((AE_INFO,
             "No installed handler for fixed event [%08X]",

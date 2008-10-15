@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 1.308 $
+ *       $Revision: 1.323 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -121,7 +121,8 @@
 
 /*
  * ACPI_MACHINE_WIDTH must be specified in an OS- or compiler-dependent header
- * and must be either 16, 32, or 64
+ * and must be either 32 or 64. 16-bit ACPICA is no longer supported, as of
+ * 12/2006.
  */
 #ifndef ACPI_MACHINE_WIDTH
 #error ACPI_MACHINE_WIDTH not defined
@@ -183,10 +184,10 @@
  * usually used for memory allocation, efficient loop counters, and array
  * indexes. The types are similar to the size_t type in the C library and are
  * required because there is no C type that consistently represents the native
- * data width.
+ * data width. ACPI_SIZE is needed because there is no guarantee that a
+ * kernel-level C library is present.
  *
  * ACPI_SIZE        16/32/64-bit unsigned value
- * ACPI_NATIVE_UINT 16/32/64-bit unsigned value
  * ACPI_NATIVE_INT  16/32/64-bit signed value
  *
  */
@@ -222,10 +223,9 @@ typedef int                             INT32;
 /*! [End] no source code translation !*/
 
 
-typedef UINT64                          ACPI_NATIVE_UINT;
 typedef INT64                           ACPI_NATIVE_INT;
 
-typedef UINT64                          ACPI_TABLE_PTR;
+typedef UINT64                          ACPI_SIZE;
 typedef UINT64                          ACPI_IO_ADDRESS;
 typedef UINT64                          ACPI_PHYSICAL_ADDRESS;
 
@@ -264,62 +264,21 @@ typedef int                             INT32;
 /*! [End] no source code translation !*/
 
 
-typedef UINT32                          ACPI_NATIVE_UINT;
 typedef INT32                           ACPI_NATIVE_INT;
 
-typedef UINT64                          ACPI_TABLE_PTR;
+typedef UINT32                          ACPI_SIZE;
 typedef UINT32                          ACPI_IO_ADDRESS;
-typedef UINT64                          ACPI_PHYSICAL_ADDRESS;
+typedef UINT32                          ACPI_PHYSICAL_ADDRESS;
 
 #define ACPI_MAX_PTR                    ACPI_UINT32_MAX
 #define ACPI_SIZE_MAX                   ACPI_UINT32_MAX
 
-
-/*******************************************************************************
- *
- * Types specific to 16-bit targets
- *
- ******************************************************************************/
-
-#elif ACPI_MACHINE_WIDTH == 16
-
-/*! [Begin] no source code translation (keep the typedefs as-is) */
-
-typedef unsigned long                   UINT32;
-typedef short                           INT16;
-typedef long                            INT32;
-
-/*! [End] no source code translation !*/
-
-
-typedef UINT16                          ACPI_NATIVE_UINT;
-typedef INT16                           ACPI_NATIVE_INT;
-
-typedef UINT32                          ACPI_TABLE_PTR;
-typedef UINT32                          ACPI_IO_ADDRESS;
-typedef char                            *ACPI_PHYSICAL_ADDRESS;
-
-#define ACPI_MAX_PTR                    ACPI_UINT16_MAX
-#define ACPI_SIZE_MAX                   ACPI_UINT16_MAX
-
-#define ACPI_USE_NATIVE_DIVIDE          /* No 64-bit integers, ok to use native divide */
-
-/* 64-bit integers cannot be supported */
-
-#define ACPI_NO_INTEGER64_SUPPORT
-
-
 #else
 
-/* ACPI_MACHINE_WIDTH must be either 64, 32, or 16 */
+/* ACPI_MACHINE_WIDTH must be either 64 or 32 */
 
 #error unknown ACPI_MACHINE_WIDTH
 #endif
-
-
-/* Variable-width type, used instead of clib size_t */
-
-typedef ACPI_NATIVE_UINT                ACPI_SIZE;
 
 
 /*******************************************************************************
@@ -336,7 +295,7 @@ typedef ACPI_NATIVE_UINT                ACPI_SIZE;
 /* Value returned by AcpiOsGetThreadId */
 
 #ifndef ACPI_THREAD_ID
-#define ACPI_THREAD_ID                  ACPI_NATIVE_UINT
+#define ACPI_THREAD_ID                  ACPI_SIZE
 #endif
 
 /* Object returned from AcpiOsCreateLock */
@@ -348,7 +307,7 @@ typedef ACPI_NATIVE_UINT                ACPI_SIZE;
 /* Flags for AcpiOsAcquireLock/AcpiOsReleaseLock */
 
 #ifndef ACPI_CPU_FLAGS
-#define ACPI_CPU_FLAGS                  ACPI_NATIVE_UINT
+#define ACPI_CPU_FLAGS                  ACPI_SIZE
 #endif
 
 /* Object returned from AcpiOsCreateCache */
@@ -395,41 +354,6 @@ typedef ACPI_NATIVE_UINT                ACPI_SIZE;
  * Independent types
  *
  ******************************************************************************/
-
-/*
- * Pointer overlays to avoid lots of typecasting for
- * code that accepts both physical and logical pointers.
- */
-typedef union acpi_pointers
-{
-    ACPI_PHYSICAL_ADDRESS           Physical;
-    void                            *Logical;
-    ACPI_TABLE_PTR                  Value;
-
-} ACPI_POINTERS;
-
-typedef struct acpi_pointer
-{
-    UINT32                          PointerType;
-    union acpi_pointers             Pointer;
-
-} ACPI_POINTER;
-
-/* PointerTypes for above */
-
-#define ACPI_PHYSICAL_POINTER           0x01
-#define ACPI_LOGICAL_POINTER            0x02
-
-/* Processor mode */
-
-#define ACPI_PHYSICAL_ADDRESSING        0x04
-#define ACPI_LOGICAL_ADDRESSING         0x08
-#define ACPI_MEMORY_MODE                0x0C
-
-#define ACPI_PHYSMODE_PHYSPTR           ACPI_PHYSICAL_ADDRESSING | ACPI_PHYSICAL_POINTER
-#define ACPI_LOGMODE_PHYSPTR            ACPI_LOGICAL_ADDRESSING  | ACPI_PHYSICAL_POINTER
-#define ACPI_LOGMODE_LOGPTR             ACPI_LOGICAL_ADDRESSING  | ACPI_LOGICAL_POINTER
-
 
 /* Logical defines and NULL */
 
@@ -485,28 +409,11 @@ typedef struct uint32_struct
 
 
 /*
- * Acpi integer width. In ACPI version 1, integers are
- * 32 bits.  In ACPI version 2, integers are 64 bits.
- * Note that this pertains to the ACPI integer type only, not
- * other integers used in the implementation of the ACPI CA
+ * Acpi integer width. In ACPI version 1, integers are 32 bits.  In ACPI
+ * version 2, integers are 64 bits. Note that this pertains to the ACPI integer
+ * type only, not other integers used in the implementation of the ACPI CA
  * subsystem.
  */
-#ifdef ACPI_NO_INTEGER64_SUPPORT
-
-/* 32-bit integers only, no 64-bit support */
-
-typedef UINT32                          ACPI_INTEGER;
-#define ACPI_INTEGER_MAX                ACPI_UINT32_MAX
-#define ACPI_INTEGER_BIT_SIZE           32
-#define ACPI_MAX_DECIMAL_DIGITS         10  /* 2^32 = 4,294,967,296 */
-
-#define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 32-bit divide */
-
-
-#else
-
-/* 64-bit integers */
-
 typedef UINT64                          ACPI_INTEGER;
 #define ACPI_INTEGER_MAX                ACPI_UINT64_MAX
 #define ACPI_INTEGER_BIT_SIZE           64
@@ -515,7 +422,6 @@ typedef UINT64                          ACPI_INTEGER;
 
 #if ACPI_MACHINE_WIDTH == 64
 #define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 64-bit divide */
-#endif
 #endif
 
 #define ACPI_MAX64_DECIMAL_DIGITS       20
@@ -544,7 +450,8 @@ typedef UINT64                          ACPI_INTEGER;
 /*
  * Initialization state
  */
-#define ACPI_INITIALIZED_OK             0x01
+#define ACPI_SUBSYSTEM_INITIALIZE       0x01
+#define ACPI_INITIALIZED_OK             0x02
 
 /*
  * Power state values
@@ -583,29 +490,20 @@ typedef UINT64                          ACPI_INTEGER;
 /*
  * Standard notify values
  */
-#define ACPI_NOTIFY_BUS_CHECK           (UINT8) 0
-#define ACPI_NOTIFY_DEVICE_CHECK        (UINT8) 1
-#define ACPI_NOTIFY_DEVICE_WAKE         (UINT8) 2
-#define ACPI_NOTIFY_EJECT_REQUEST       (UINT8) 3
-#define ACPI_NOTIFY_DEVICE_CHECK_LIGHT  (UINT8) 4
-#define ACPI_NOTIFY_FREQUENCY_MISMATCH  (UINT8) 5
-#define ACPI_NOTIFY_BUS_MODE_MISMATCH   (UINT8) 6
-#define ACPI_NOTIFY_POWER_FAULT         (UINT8) 7
+#define ACPI_NOTIFY_BUS_CHECK           (UINT8) 0x00
+#define ACPI_NOTIFY_DEVICE_CHECK        (UINT8) 0x01
+#define ACPI_NOTIFY_DEVICE_WAKE         (UINT8) 0x02
+#define ACPI_NOTIFY_EJECT_REQUEST       (UINT8) 0x03
+#define ACPI_NOTIFY_DEVICE_CHECK_LIGHT  (UINT8) 0x04
+#define ACPI_NOTIFY_FREQUENCY_MISMATCH  (UINT8) 0x05
+#define ACPI_NOTIFY_BUS_MODE_MISMATCH   (UINT8) 0x06
+#define ACPI_NOTIFY_POWER_FAULT         (UINT8) 0x07
+#define ACPI_NOTIFY_CAPABILITIES_CHECK  (UINT8) 0x08
+#define ACPI_NOTIFY_DEVICE_PLD_CHECK    (UINT8) 0x09
+#define ACPI_NOTIFY_RESERVED            (UINT8) 0x0A
+#define ACPI_NOTIFY_LOCALITY_UPDATE     (UINT8) 0x0B
 
-/*
- *  Table types.  These values are passed to the table related APIs
- */
-typedef UINT32                          ACPI_TABLE_TYPE;
-
-#define ACPI_TABLE_ID_RSDP              (ACPI_TABLE_TYPE) 0
-#define ACPI_TABLE_ID_DSDT              (ACPI_TABLE_TYPE) 1
-#define ACPI_TABLE_ID_FADT              (ACPI_TABLE_TYPE) 2
-#define ACPI_TABLE_ID_FACS              (ACPI_TABLE_TYPE) 3
-#define ACPI_TABLE_ID_PSDT              (ACPI_TABLE_TYPE) 4
-#define ACPI_TABLE_ID_SSDT              (ACPI_TABLE_TYPE) 5
-#define ACPI_TABLE_ID_XSDT              (ACPI_TABLE_TYPE) 6
-#define ACPI_TABLE_ID_MAX               6
-#define ACPI_NUM_TABLE_TYPES            (ACPI_TABLE_ID_MAX+1)
+#define ACPI_NOTIFY_MAX                 0x0B
 
 /*
  * Types associated with ACPI names and objects.  The first group of
@@ -672,6 +570,9 @@ typedef UINT32                          ACPI_OBJECT_TYPE;
 
 #define ACPI_TYPE_INVALID               0x1E
 #define ACPI_TYPE_NOT_FOUND             0xFF
+
+#define ACPI_NUM_NS_TYPES               (ACPI_TYPE_INVALID + 1)
+
 
 /*
  * All I/O
@@ -740,7 +641,7 @@ typedef UINT32                          ACPI_EVENT_STATUS;
  *  | | |  +--- Type of dispatch -- to method, handler, or none
  *  | | +--- Enabled for runtime?
  *  | +--- Enabled for wake?
- *  +--- System state when GPE ocurred (running/waking)
+ *  +--- Unused
  */
 #define ACPI_GPE_XRUPT_TYPE_MASK        (UINT8) 0x01
 #define ACPI_GPE_LEVEL_TRIGGERED        (UINT8) 0x01
@@ -766,10 +667,6 @@ typedef UINT32                          ACPI_EVENT_STATUS;
 
 #define ACPI_GPE_ENABLE_MASK            (UINT8) 0x60    /* Both run/wake */
 
-#define ACPI_GPE_SYSTEM_MASK            (UINT8) 0x80
-#define ACPI_GPE_SYSTEM_RUNNING         (UINT8) 0x80
-#define ACPI_GPE_SYSTEM_WAKING          (UINT8) 0x00
-
 /*
  * Flags for GPE and Lock interfaces
  */
@@ -784,7 +681,7 @@ typedef UINT32                          ACPI_EVENT_STATUS;
 
 #define ACPI_SYSTEM_NOTIFY              0x1
 #define ACPI_DEVICE_NOTIFY              0x2
-#define ACPI_ALL_NOTIFY                 0x3
+#define ACPI_ALL_NOTIFY                 (ACPI_SYSTEM_NOTIFY | ACPI_DEVICE_NOTIFY)
 #define ACPI_MAX_NOTIFY_HANDLER_TYPE    0x3
 
 #define ACPI_MAX_SYS_NOTIFY             0x7f
@@ -842,46 +739,51 @@ typedef UINT8                           ACPI_ADR_SPACE_TYPE;
 /*
  * External ACPI object definition
  */
+
+/*
+ * Note: Type == ACPI_TYPE_ANY (0) is used to indicate a NULL package element
+ * or an unresolved named reference.
+ */
 typedef union acpi_object
 {
     ACPI_OBJECT_TYPE                Type;   /* See definition of AcpiNsType for values */
     struct
     {
-        ACPI_OBJECT_TYPE                Type;
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_INTEGER */
         ACPI_INTEGER                    Value;      /* The actual number */
     } Integer;
 
     struct
     {
-        ACPI_OBJECT_TYPE                Type;
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_STRING */
         UINT32                          Length;     /* # of bytes in string, excluding trailing null */
         char                            *Pointer;   /* points to the string value */
     } String;
 
     struct
     {
-        ACPI_OBJECT_TYPE                Type;
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_BUFFER */
         UINT32                          Length;     /* # of bytes in buffer */
         UINT8                           *Pointer;   /* points to the buffer */
     } Buffer;
 
     struct
     {
-        ACPI_OBJECT_TYPE                Type;
-        UINT32                          Fill1;
-        ACPI_HANDLE                     Handle;     /* object reference */
-    } Reference;
-
-    struct
-    {
-        ACPI_OBJECT_TYPE                Type;
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_PACKAGE */
         UINT32                          Count;      /* # of elements in package */
         union acpi_object               *Elements;  /* Pointer to an array of ACPI_OBJECTs */
     } Package;
 
     struct
     {
-        ACPI_OBJECT_TYPE                Type;
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_LOCAL_REFERENCE */
+        ACPI_OBJECT_TYPE                ActualType; /* Type associated with the Handle */
+        ACPI_HANDLE                     Handle;     /* object reference */
+    } Reference;
+
+    struct
+    {
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_PROCESSOR */
         UINT32                          ProcId;
         ACPI_IO_ADDRESS                 PblkAddress;
         UINT32                          PblkLength;
@@ -889,7 +791,7 @@ typedef union acpi_object
 
     struct
     {
-        ACPI_OBJECT_TYPE                Type;
+        ACPI_OBJECT_TYPE                Type;       /* ACPI_TYPE_POWER */
         UINT32                          SystemLevel;
         UINT32                          ResourceOrder;
     } PowerResource;
@@ -941,16 +843,6 @@ typedef struct acpi_buffer
 
 
 /*
- * ACPI Table Info.  One per ACPI table _type_
- */
-typedef struct acpi_table_info
-{
-    UINT32                          Count;
-
-} ACPI_TABLE_INFO;
-
-
-/*
  * System info returned by AcpiGetSystemInfo()
  */
 typedef struct acpi_system_info
@@ -962,10 +854,28 @@ typedef struct acpi_system_info
     UINT32                          Reserved2;
     UINT32                          DebugLevel;
     UINT32                          DebugLayer;
-    UINT32                          NumTableTypes;
-    ACPI_TABLE_INFO                 TableInfo [ACPI_TABLE_ID_MAX+1];
 
 } ACPI_SYSTEM_INFO;
+
+
+/*
+ * System statistecs returned by AcpiGetStatistics()
+ */
+typedef struct acpi_statistics
+{
+    UINT32                          SciCount;
+    UINT32                          GpeCount;
+    UINT32                          FixedEventCount[ACPI_NUM_FIXED_EVENTS];
+    UINT32                          MethodCount;
+
+} ACPI_STATISTICS;
+
+
+/* Table Event Types */
+
+#define ACPI_TABLE_EVENT_LOAD           0x0
+#define ACPI_TABLE_EVENT_UNLOAD         0x1
+#define ACPI_NUM_TABLE_EVENTS           2
 
 
 /*
@@ -1012,6 +922,18 @@ ACPI_STATUS (*ACPI_EXCEPTION_HANDLER) (
     UINT16                          Opcode,
     UINT32                          AmlOffset,
     void                            *Context);
+
+/* Table Event handler (Load, LoadTable etc) and types */
+
+typedef
+ACPI_STATUS (*ACPI_TABLE_HANDLER) (
+    UINT32                          Event,
+    void                            *Table,
+    void                            *Context);
+
+#define ACPI_TABLE_LOAD             0x0
+#define ACPI_TABLE_UNLOAD           0x1
+#define ACPI_NUM_TABLE_EVENTS       2
 
 
 /* Address Spaces (For Operation Regions) */
@@ -1114,6 +1036,7 @@ typedef struct acpi_device_info
 {
     ACPI_COMMON_OBJ_INFO;
 
+    UINT32                          ParamCount;         /* If a method, required parameter count */
     UINT32                          Valid;              /* Indicates which fields below are valid */
     UINT32                          CurrentStatus;      /* _STA value */
     ACPI_INTEGER                    Address;            /* _ADR value if any */
@@ -1261,6 +1184,7 @@ typedef struct acpi_vendor_uuid
  */
 typedef struct acpi_resource_irq
 {
+    UINT8                           DescriptorLength;
     UINT8                           Triggering;
     UINT8                           Polarity;
     UINT8                           Sharable;
@@ -1268,7 +1192,6 @@ typedef struct acpi_resource_irq
     UINT8                           Interrupts[1];
 
 } ACPI_RESOURCE_IRQ;
-
 
 typedef struct ACPI_RESOURCE_DMA
 {
@@ -1280,9 +1203,9 @@ typedef struct ACPI_RESOURCE_DMA
 
 } ACPI_RESOURCE_DMA;
 
-
 typedef struct acpi_resource_start_dependent
 {
+    UINT8                           DescriptorLength;
     UINT8                           CompatibilityPriority;
     UINT8                           PerformanceRobustness;
 
@@ -1551,8 +1474,8 @@ typedef struct acpi_resource
 #pragma pack()
 
 
-#define ACPI_RS_SIZE_MIN                    12
 #define ACPI_RS_SIZE_NO_DATA                8       /* Id + Length fields */
+#define ACPI_RS_SIZE_MIN                    (UINT32) ACPI_ROUND_UP_TO_NATIVE_WORD (12)
 #define ACPI_RS_SIZE(Type)                  (UINT32) (ACPI_RS_SIZE_NO_DATA + sizeof (Type))
 
 #define ACPI_NEXT_RESOURCE(Res)             (ACPI_RESOURCE *)((UINT8 *) Res + Res->Length)

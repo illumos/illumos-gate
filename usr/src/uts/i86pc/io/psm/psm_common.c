@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/cmn_err.h>
@@ -134,8 +132,8 @@ acpi_get_gsiv(dev_info_t *dip, ACPI_HANDLE pciobj, int devno, int ipin,
 
 		/* NULL Source name means index is GSIV */
 		if (*prtp->Source == 0) {
-			intr_flagp->intr_el = TRIGGER_LEVEL;
-			intr_flagp->intr_po = POLARITY_ACTIVE_LOW;
+			intr_flagp->intr_el = INTR_EL_LEVEL;
+			intr_flagp->intr_po = INTR_PO_ACTIVE_LOW;
 			ASSERT(pci_irqp != NULL);
 			*pci_irqp = prtp->SourceIndex;
 			status = ACPI_PSM_SUCCESS;
@@ -407,9 +405,8 @@ acpi_translate_pci_irq(dev_info_t *dip, int ipin, int *pci_irqp,
 		parentdip = ddi_get_parent(curdip);
 		ASSERT(parentdip != NULL);
 
-		if (get_bdf(curdip, &curbus, &curdev, NULL) != 0) {
+		if (get_bdf(curdip, &curbus, &curdev, NULL) != 0)
 			break;
-		}
 
 		status = acpica_get_handle(parentdip, &pciobj);
 		if ((status == AE_OK) && psm_node_has_prt(pciobj)) {

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ACSOLARIS_H_
 #define	_ACSOLARIS_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,8 +37,8 @@ extern "C" {
 
 #define	strtoul simple_strtoul
 
-uint32_t __acpi_acquire_global_lock(uint32_t *);
-uint32_t __acpi_release_global_lock(uint32_t *);
+uint32_t __acpi_acquire_global_lock(void *);
+uint32_t __acpi_release_global_lock(void *);
 void	 __acpi_wbinvd(void);
 
 #ifdef	_ILP32
@@ -79,11 +77,11 @@ void	 __acpi_wbinvd(void);
 #define	BREAKPOINT3
 #define	ACPI_DISABLE_IRQS()	cli()
 #define	ACPI_ENABLE_IRQS()	sti()
-#define	ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq)	\
-	((Acq) = __acpi_acquire_global_lock(GLptr))
+#define	ACPI_ACQUIRE_GLOBAL_LOCK(Facs, Acq)	\
+	((Acq) = __acpi_acquire_global_lock(Facs))
 
-#define	ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq)	\
-	((Acq) = __acpi_release_global_lock(GLptr))
+#define	ACPI_RELEASE_GLOBAL_LOCK(Facs, Acq)	\
+	((Acq) = __acpi_release_global_lock(Facs))
 
 #ifdef __cplusplus
 }

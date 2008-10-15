@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 1.110 $
+ *              $Revision: 1.113 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -168,41 +168,42 @@ AcpiGetHandle (
 
     if (Parent)
     {
-        Status = AcpiUtAcquireMutex (ACPI_MTX_NAMESPACE);
-        if (ACPI_FAILURE (Status))
-        {
-            return (Status);
-        }
-
         PrefixNode = AcpiNsMapHandleToNode (Parent);
         if (!PrefixNode)
         {
-            (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
             return (AE_BAD_PARAMETER);
         }
-
-        Status = AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
-        if (ACPI_FAILURE (Status))
-        {
-            return (Status);
-        }
-    }
-
-    /* Special case for root, since we can't search for it */
-
-    if (ACPI_STRCMP (Pathname, ACPI_NS_ROOT_PATH) == 0)
-    {
-        *RetHandle = AcpiNsConvertEntryToHandle (AcpiGbl_RootNode);
-        return (AE_OK);
     }
 
     /*
-     *  Find the Node and convert to a handle
+     * Valid cases are:
+     * 1) Fully qualified pathname
+     * 2) Parent + Relative pathname
+     *
+     * Error for <null Parent + relative path>
      */
-    Status = AcpiNsGetNode (PrefixNode, Pathname, ACPI_NS_NO_UPSEARCH,
-                &Node);
+    if (AcpiNsValidRootPrefix (Pathname[0]))
+    {
+        /* Pathname is fully qualified (starts with '\') */
 
-    *RetHandle = NULL;
+        /* Special case for root-only, since we can't search for it */
+
+        if (!ACPI_STRCMP (Pathname, ACPI_NS_ROOT_PATH))
+        {
+            *RetHandle = AcpiNsConvertEntryToHandle (AcpiGbl_RootNode);
+            return (AE_OK);
+        }
+    }
+    else if (!PrefixNode)
+    {
+        /* Relative path with null prefix is disallowed */
+
+        return (AE_BAD_PARAMETER);
+    }
+
+    /* Find the Node and convert to a handle */
+
+    Status = AcpiNsGetNode (PrefixNode, Pathname, ACPI_NS_NO_UPSEARCH, &Node);
     if (ACPI_SUCCESS (Status))
     {
         *RetHandle = AcpiNsConvertEntryToHandle (Node);
@@ -360,6 +361,7 @@ AcpiGetObjectInfo (
     if (!Node)
     {
         (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
+        Status = AE_BAD_PARAMETER;
         goto Cleanup;
     }
 
@@ -370,6 +372,11 @@ AcpiGetObjectInfo (
     Info->Type  = Node->Type;
     Info->Name  = Node->Name.Integer;
     Info->Valid = 0;
+
+    if (Node->Type == ACPI_TYPE_METHOD)
+    {
+        Info->ParamCount = Node->Object->Method.ParamCount;
+    }
 
     Status = AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
     if (ACPI_FAILURE (Status))

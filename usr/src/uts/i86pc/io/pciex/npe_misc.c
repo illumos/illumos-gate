@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Library file that has miscellaneous support for npe(7d)
  */
@@ -73,14 +71,14 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 	uint64_t ecfga_base;
 
 	/* Query the MCFG table using ACPI */
-	if (AcpiGetFirmwareTable(MCFG_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **)&mcfgp) == AE_OK) {
+	if (AcpiGetTable(ACPI_SIG_MCFG, 1, (ACPI_TABLE_HEADER **)&mcfgp) ==
+	    AE_OK) {
 
 		cfg_baap = (CFG_BASE_ADDR_ALLOC *)mcfgp->CfgBaseAddrAllocList;
 		cfg_baa_endp = ((char *)mcfgp) + mcfgp->Length;
 
 		while ((char *)cfg_baap < cfg_baa_endp) {
-			ecfga_base = ACPI_GET_ADDRESS(cfg_baap->base_addr);
+			ecfga_base = cfg_baap->base_addr;
 			if (ecfga_base != (uint64_t)0) {
 				/*
 				 * Setup the 'ecfga-base-address' property to

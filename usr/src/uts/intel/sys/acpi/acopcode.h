@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acopcode.h - AML opcode information for the AML parser and interpreter
- *       $Revision: 1.5 $
+ *       $Revision: 1.9 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -308,7 +308,7 @@
 #define ARGI_CREATE_WORD_FIELD_OP       ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_REFERENCE)
 #define ARGI_DATA_REGION_OP             ARGI_LIST3 (ARGI_STRING,     ARGI_STRING,        ARGI_STRING)
 #define ARGI_DEBUG_OP                   ARG_NONE
-#define ARGI_DECREMENT_OP               ARGI_LIST1 (ARGI_INTEGER_REF)
+#define ARGI_DECREMENT_OP               ARGI_LIST1 (ARGI_TARGETREF)
 #define ARGI_DEREF_OF_OP                ARGI_LIST1 (ARGI_REF_OR_STRING)
 #define ARGI_DEVICE_OP                  ARGI_INVALID_OPCODE
 #define ARGI_DIVIDE_OP                  ARGI_LIST4 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF,    ARGI_TARGETREF)
@@ -321,7 +321,7 @@
 #define ARGI_FIND_SET_RIGHT_BIT_OP      ARGI_LIST2 (ARGI_INTEGER,    ARGI_TARGETREF)
 #define ARGI_FROM_BCD_OP                ARGI_LIST2 (ARGI_INTEGER,    ARGI_FIXED_TARGET)
 #define ARGI_IF_OP                      ARGI_INVALID_OPCODE
-#define ARGI_INCREMENT_OP               ARGI_LIST1 (ARGI_INTEGER_REF)
+#define ARGI_INCREMENT_OP               ARGI_LIST1 (ARGI_TARGETREF)
 #define ARGI_INDEX_FIELD_OP             ARGI_INVALID_OPCODE
 #define ARGI_INDEX_OP                   ARGI_LIST3 (ARGI_COMPLEXOBJ, ARGI_INTEGER,       ARGI_TARGETREF)
 #define ARGI_LAND_OP                    ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
@@ -332,7 +332,7 @@
 #define ARGI_LLESSEQUAL_OP              ARGI_INVALID_OPCODE
 #define ARGI_LNOT_OP                    ARGI_LIST1 (ARGI_INTEGER)
 #define ARGI_LNOTEQUAL_OP               ARGI_INVALID_OPCODE
-#define ARGI_LOAD_OP                    ARGI_LIST2 (ARGI_REGION_OR_FIELD,ARGI_TARGETREF)
+#define ARGI_LOAD_OP                    ARGI_LIST2 (ARGI_REGION_OR_BUFFER,ARGI_TARGETREF)
 #define ARGI_LOAD_TABLE_OP              ARGI_LIST6 (ARGI_STRING,     ARGI_STRING,        ARGI_STRING,       ARGI_STRING,    ARGI_STRING, ARGI_ANYTYPE)
 #define ARGI_LOCAL0                     ARG_NONE
 #define ARGI_LOCAL1                     ARG_NONE

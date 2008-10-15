@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 1.153 $
+ *              $Revision: 1.157 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -120,7 +120,6 @@
 #include "acpi.h"
 #include "acnamesp.h"
 #include "amlcode.h"
-#include "actables.h"
 
 #define _COMPONENT          ACPI_NAMESPACE
         ACPI_MODULE_NAME    ("nsutils")
@@ -155,9 +154,9 @@ AcpiNsFindParentName (
 
 void
 AcpiNsReportError (
-    char                    *ModuleName,
+    const char              *ModuleName,
     UINT32                  LineNumber,
-    char                    *InternalName,
+    const char              *InternalName,
     ACPI_STATUS             LookupStatus)
 {
     ACPI_STATUS             Status;
@@ -222,11 +221,11 @@ AcpiNsReportError (
 
 void
 AcpiNsReportMethodError (
-    char                    *ModuleName,
+    const char              *ModuleName,
     UINT32                  LineNumber,
-    char                    *Message,
+    const char              *Message,
     ACPI_NAMESPACE_NODE     *PrefixNode,
-    char                    *Path,
+    const char              *Path,
     ACPI_STATUS             MethodStatus)
 {
     ACPI_STATUS             Status;
@@ -265,7 +264,7 @@ AcpiNsReportMethodError (
 void
 AcpiNsPrintNodePathname (
     ACPI_NAMESPACE_NODE     *Node,
-    char                    *Message)
+    const char              *Message)
 {
     ACPI_BUFFER             Buffer;
     ACPI_STATUS             Status;
@@ -416,7 +415,7 @@ void
 AcpiNsGetInternalNameLength (
     ACPI_NAMESTRING_INFO    *Info)
 {
-    char                    *NextExternalChar;
+    const char              *NextExternalChar;
     UINT32                  i;
 
 
@@ -495,9 +494,9 @@ AcpiNsBuildInternalName (
 {
     UINT32                  NumSegments = Info->NumSegments;
     char                    *InternalName = Info->InternalName;
-    char                    *ExternalName = Info->NextExternalChar;
+    const char              *ExternalName = Info->NextExternalChar;
     char                    *Result = NULL;
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_TRACE (NsBuildInternalName);
@@ -547,13 +546,13 @@ AcpiNsBuildInternalName (
         else if (NumSegments == 2)
         {
             InternalName[i] = AML_DUAL_NAME_PREFIX;
-            Result = &InternalName[(ACPI_NATIVE_UINT) (i+1)];
+            Result = &InternalName[(ACPI_SIZE) i+1];
         }
         else
         {
             InternalName[i] = AML_MULTI_NAME_PREFIX_OP;
-            InternalName[(ACPI_NATIVE_UINT) (i+1)] = (char) NumSegments;
-            Result = &InternalName[(ACPI_NATIVE_UINT) (i+2)];
+            InternalName[(ACPI_SIZE) i+1] = (char) NumSegments;
+            Result = &InternalName[(ACPI_SIZE) i+2];
         }
     }
 
@@ -629,7 +628,7 @@ AcpiNsBuildInternalName (
 
 ACPI_STATUS
 AcpiNsInternalizeName (
-    char                    *ExternalName,
+    const char              *ExternalName,
     char                    **ConvertedName)
 {
     char                    *InternalName;
@@ -695,16 +694,16 @@ AcpiNsInternalizeName (
 ACPI_STATUS
 AcpiNsExternalizeName (
     UINT32                  InternalNameLength,
-    char                    *InternalName,
+    const char              *InternalName,
     UINT32                  *ConvertedNameLength,
     char                    **ConvertedName)
 {
-    ACPI_NATIVE_UINT        NamesIndex = 0;
-    ACPI_NATIVE_UINT        NumSegments = 0;
-    ACPI_NATIVE_UINT        RequiredLength;
-    ACPI_NATIVE_UINT        PrefixLength = 0;
-    ACPI_NATIVE_UINT        i = 0;
-    ACPI_NATIVE_UINT        j = 0;
+    UINT32                  NamesIndex = 0;
+    UINT32                  NumSegments = 0;
+    UINT32                  RequiredLength;
+    UINT32                  PrefixLength = 0;
+    UINT32                  i = 0;
+    UINT32                  j = 0;
 
 
     ACPI_FUNCTION_TRACE (NsExternalizeName);
@@ -763,8 +762,8 @@ AcpiNsExternalizeName (
             /* <count> 4-byte names */
 
             NamesIndex = PrefixLength + 2;
-            NumSegments = (ACPI_NATIVE_UINT) (UINT8)
-                          InternalName[(ACPI_NATIVE_UINT) (PrefixLength + 1)];
+            NumSegments = (UINT8)
+                InternalName[(ACPI_SIZE) PrefixLength + 1];
             break;
 
         case AML_DUAL_NAME_PREFIX:
@@ -975,13 +974,6 @@ AcpiNsTerminate (
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Namespace freed\n"));
-
-    /*
-     * 2) Now we can delete the ACPI tables
-     */
-    AcpiTbDeleteAllTables ();
-    ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "ACPI Tables freed\n"));
-
     return_VOID;
 }
 
@@ -1041,7 +1033,7 @@ AcpiNsOpensScope (
 ACPI_STATUS
 AcpiNsGetNode (
     ACPI_NAMESPACE_NODE     *PrefixNode,
-    char                    *Pathname,
+    const char              *Pathname,
     UINT32                  Flags,
     ACPI_NAMESPACE_NODE     **ReturnNode)
 {

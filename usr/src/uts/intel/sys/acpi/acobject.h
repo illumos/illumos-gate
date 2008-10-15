@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of ACPI_OPERAND_OBJECT  (Internal object only)
- *       $Revision: 1.139 $
+ *       $Revision: 1.144 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -126,7 +126,15 @@
  * to the interpreter, and to keep track of the various handlers such as
  * address space handlers and notify handlers. The object is a constant
  * size in order to allow it to be cached and reused.
+ *
+ * Note: The object is optimized to be aligned and will not work if it is
+ * byte-packed.
  */
+#if ACPI_MACHINE_WIDTH == 64
+#pragma pack(8)
+#else
+#pragma pack(4)
+#endif
 
 /*******************************************************************************
  *
@@ -182,6 +190,7 @@ typedef struct acpi_object_common
 typedef struct acpi_object_integer
 {
     ACPI_OBJECT_COMMON_HEADER
+    UINT8                           Fill[3];            /* Prevent warning on some compilers */
     ACPI_INTEGER                    Value;
 
 } ACPI_OBJECT_INTEGER;
@@ -248,8 +257,9 @@ typedef struct acpi_object_mutex
     ACPI_OBJECT_COMMON_HEADER
     UINT8                           SyncLevel;          /* 0-15, specified in Mutex() call */
     UINT16                          AcquisitionDepth;   /* Allow multiple Acquires, same thread */
-    struct acpi_thread_state        *OwnerThread;       /* Current owner of the mutex */
     ACPI_MUTEX                      OsMutex;            /* Actual OS synchronization object */
+    ACPI_THREAD_ID                  ThreadId;           /* Current owner of the mutex */
+    struct acpi_thread_state        *OwnerThread;       /* Current owner of the mutex */
     union acpi_operand_object       *Prev;              /* Link for list of acquired mutexes */
     union acpi_operand_object       *Next;              /* Link for list of acquired mutexes */
     ACPI_NAMESPACE_NODE             *Node;              /* Containing namespace node */
@@ -332,6 +342,9 @@ typedef struct acpi_object_power_resource
 typedef struct acpi_object_processor
 {
     ACPI_OBJECT_COMMON_HEADER
+
+    /* The next two fields take advantage of the 3-byte space before NOTIFY_INFO */
+
     UINT8                           ProcId;
     UINT8                           Length;
     ACPI_COMMON_NOTIFY_INFO
@@ -467,20 +480,38 @@ typedef struct acpi_object_addr_handler
  *****************************************************************************/
 
 /*
- * The Reference object type is used for these opcodes:
- * Arg[0-6], Local[0-7], IndexOp, NameOp, ZeroOp, OneOp, OnesOp, DebugOp
+ * The Reference object is used for these opcodes:
+ * Arg[0-6], Local[0-7], IndexOp, NameOp, RefOfOp, LoadOp, LoadTableOp, DebugOp
+ * The Reference.Class differentiates these types.
  */
 typedef struct acpi_object_reference
 {
     ACPI_OBJECT_COMMON_HEADER
-    UINT8                           TargetType;         /* Used for IndexOp */
-    UINT16                          Opcode;
-    void                            *Object;            /* NameOp=>HANDLE to obj, IndexOp=>ACPI_OPERAND_OBJECT  */
-    ACPI_NAMESPACE_NODE             *Node;
-    union acpi_operand_object       **Where;
-    UINT32                          Offset;             /* Used for ArgOp, LocalOp, and IndexOp */
+     UINT8                           Class;              /* Reference Class */
+     UINT8                           TargetType;         /* Used for Index Op */
+     UINT8                           Reserved;
+     void                            *Object;            /* NameOp=>HANDLE to obj, IndexOp=>ACPI_OPERAND_OBJECT */
+     ACPI_NAMESPACE_NODE             *Node;              /* RefOf or Namepath */
+     union acpi_operand_object       **Where;            /* Target of Index */
+     UINT32                          Value;              /* Used for Local/Arg/Index/DdbHandle */
 
 } ACPI_OBJECT_REFERENCE;
+
+/* Values for Reference.Class above */
+
+typedef enum
+{
+    ACPI_REFCLASS_LOCAL             = 0,        /* Method local */
+    ACPI_REFCLASS_ARG               = 1,        /* Method argument */
+    ACPI_REFCLASS_REFOF             = 2,        /* Result of RefOf() TBD: Split to Ref/Node and Ref/OperandObj? */
+    ACPI_REFCLASS_INDEX             = 3,        /* Result of Index() */
+    ACPI_REFCLASS_TABLE             = 4,        /* DdbHandle - Load(), LoadTable() */
+    ACPI_REFCLASS_NAME              = 5,        /* Reference to a named object */
+    ACPI_REFCLASS_DEBUG             = 6,        /* Debug object */
+
+    ACPI_REFCLASS_MAX               = 6
+
+} ACPI_REFERENCE_CLASSES;
 
 
 /*
@@ -556,6 +587,13 @@ typedef union acpi_operand_object
     ACPI_OBJECT_DATA                    Data;
     ACPI_OBJECT_CACHE_LIST              Cache;
 
+    /*
+     * Add namespace node to union in order to simplify code that accepts both
+     * ACPI_OPERAND_OBJECTs and ACPI_NAMESPACE_NODEs. The structures share
+     * a common DescriptorType field in order to differentiate them.
+     */
+    ACPI_NAMESPACE_NODE                 Node;
+
 } ACPI_OPERAND_OBJECT;
 
 
@@ -601,5 +639,6 @@ typedef union acpi_descriptor
 
 } ACPI_DESCRIPTOR;
 
+#pragma pack()
 
 #endif /* _ACOBJECT_H */

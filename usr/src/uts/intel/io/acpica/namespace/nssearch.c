@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 1.118 $
+ *              $Revision: 1.123 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -408,25 +408,7 @@ AcpiNsSearchAndEnter (
      * this problem, and we want to be able to enable ACPI support for them,
      * even though there are a few bad names.
      */
-    if (!AcpiUtValidAcpiName (TargetName))
-    {
-        TargetName = AcpiUtRepairName (TargetName);
-
-        /* Report warning only if in strict mode or debug mode */
-
-        if (!AcpiGbl_EnableInterpreterSlack)
-        {
-            ACPI_WARNING ((AE_INFO,
-                "Found bad character(s) in name, repaired: [%4.4s]\n",
-                ACPI_CAST_PTR (char, &TargetName)));
-        }
-        else
-        {
-            ACPI_DEBUG_PRINT ((ACPI_DB_WARN,
-                "Found bad character(s) in name, repaired: [%4.4s]\n",
-                ACPI_CAST_PTR (char, &TargetName)));
-        }
-    }
+    AcpiUtRepairName (ACPI_CAST_PTR (char, &TargetName));
 
     /* Try to find the name in the namespace level specified by the caller */
 
@@ -499,6 +481,11 @@ AcpiNsSearchAndEnter (
         NewNode->Flags |= ANOBJ_IS_EXTERNAL;
     }
 #endif
+
+    if (Flags & ACPI_NS_TEMPORARY)
+    {
+        NewNode->Flags |= ANOBJ_TEMPORARY;
+    }
 
     /* Install the new object into the parent's list of children */
 

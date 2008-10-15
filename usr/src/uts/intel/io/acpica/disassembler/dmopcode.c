@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dmopcode - AML disassembler, specific AML opcodes
- *              $Revision: 1.98 $
+ *              $Revision: 1.106 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -202,8 +202,6 @@ AcpiDmFieldFlags (
     UINT32                  Flags;
 
 
-    /* The next peer Op (not child op) contains the flags */
-
     Op = Op->Common.Next;
     Flags = (UINT8) Op->Common.Value.Integer;
 
@@ -376,6 +374,7 @@ AcpiDmDisassembleOneOp (
     UINT32                  Offset;
     UINT32                  Length;
     ACPI_PARSE_OBJECT       *Child;
+    ACPI_STATUS             Status;
 
 
     if (!Op)
@@ -404,6 +403,9 @@ AcpiDmDisassembleOneOp (
 
         case AML_LLESS_OP:
             AcpiOsPrintf ("LGreaterEqual");
+            break;
+
+        default:
             break;
         }
         Op->Common.DisasmOpcode = 0;
@@ -496,12 +498,19 @@ AcpiDmDisassembleOneOp (
          * types of buffers, we have to closely look at the data in the
          * buffer to determine the type.
          */
-        if (AcpiDmIsResourceTemplate (Op))
+        Status = AcpiDmIsResourceTemplate (Op);
+        if (ACPI_SUCCESS (Status))
         {
             Op->Common.DisasmOpcode = ACPI_DASM_RESOURCE;
             AcpiOsPrintf ("ResourceTemplate");
+            break;
         }
-        else if (AcpiDmIsUnicodeBuffer (Op))
+        else if (Status == AE_AML_NO_RESOURCE_END_TAG)
+        {
+            AcpiOsPrintf ("/**** Is ResourceTemplate, but EndTag not at buffer end ****/ ");
+        }
+
+        if (AcpiDmIsUnicodeBuffer (Op))
         {
             Op->Common.DisasmOpcode = ACPI_DASM_UNICODE;
             AcpiOsPrintf ("Unicode (");
@@ -540,7 +549,7 @@ AcpiDmDisassembleOneOp (
 
     case AML_INT_NAMEDFIELD_OP:
 
-        Length = AcpiDmDumpName ((char *) &Op->Named.Name);
+        Length = AcpiDmDumpName (Op->Named.Name);
         AcpiOsPrintf (",%*.s  %d", (int) (5 - Length), " ",
             (UINT32) Op->Common.Value.Integer);
         AcpiDmCommaIfFieldMember (Op);
@@ -607,13 +616,15 @@ AcpiDmDisassembleOneOp (
         if ((Op->Common.AmlOpcode == AML_INT_RETURN_VALUE_OP) &&
             (WalkState) &&
             (WalkState->Results) &&
-            (WalkState->Results->Results.NumResults))
+            (WalkState->ResultCount))
         {
             AcpiDmDecodeInternalObject (
                 WalkState->Results->Results.ObjDesc [
-                    WalkState->Results->Results.NumResults-1]);
+                    (WalkState->ResultCount - 1) %
+                        ACPI_RESULTS_FRAME_OBJ_NUM]);
         }
 #endif
+
         break;
     }
 }

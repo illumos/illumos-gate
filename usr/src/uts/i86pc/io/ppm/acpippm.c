@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/open.h>
@@ -50,7 +49,7 @@
  *	acpippm driver is loaded because it is listed as a platform driver
  *	It is initially configured as a pseudo driver.
  */
-extern void pc_tod_set_rtc_offsets(FADT_DESCRIPTOR *);
+extern void pc_tod_set_rtc_offsets(ACPI_TABLE_FADT *);
 
 /*
  * Configuration Function prototypes and data structures
@@ -197,7 +196,7 @@ appm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char	*str = "appm_attach";
 	int		instance;
 	appm_unit	*unitp;
-	FADT_DESCRIPTOR *fadt = NULL;
+	ACPI_TABLE_FADT	*fadt = NULL;
 	int		rv = DDI_SUCCESS;
 
 	switch (cmd) {
@@ -255,7 +254,7 @@ appm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto doerrs;
 
 	/* Get the FADT */
-	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	if (AcpiGetTable(ACPI_SIG_FADT, 1,
 	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
 		return (rv);
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dmresrc.c - Resource Descriptor disassembly
- *              $Revision: 1.32 $
+ *              $Revision: 1.36 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -133,7 +133,7 @@ void (*ACPI_RESOURCE_HANDLER) (
     UINT32                  Length,
     UINT32                  Level);
 
-static ACPI_RESOURCE_HANDLER    AcpiGbl_DumpResourceDispatch [] =
+static ACPI_RESOURCE_HANDLER    AcpiGbl_DmResourceDispatch [] =
 {
     /* Small descriptors */
 
@@ -248,8 +248,7 @@ AcpiDmDumpInteger64 (
     UINT64                  Value,
     char                    *Name)
 {
-    AcpiOsPrintf ("0x%8.8X%8.8X, // %s\n",
-        ACPI_FORMAT_UINT64 (ACPI_GET_ADDRESS (Value)), Name);
+    AcpiOsPrintf ("0x%8.8X%8.8X, // %s\n", ACPI_FORMAT_UINT64 (Value), Name);
 }
 
 
@@ -326,7 +325,7 @@ AcpiDmResourceTemplate (
     UINT32                  ByteCount)
 {
     ACPI_STATUS             Status;
-    ACPI_NATIVE_UINT        CurrentByteOffset;
+    UINT32                  CurrentByteOffset;
     UINT8                   ResourceType;
     UINT32                  ResourceLength;
     void                    *Aml;
@@ -344,7 +343,7 @@ AcpiDmResourceTemplate (
         Node = Node->Child;
     }
 
-    for (CurrentByteOffset = 0; CurrentByteOffset < ByteCount; )
+    for (CurrentByteOffset = 0; CurrentByteOffset < ByteCount;)
     {
         Aml = &ByteData[CurrentByteOffset];
 
@@ -424,7 +423,7 @@ AcpiDmResourceTemplate (
             Node = Node->Peer;
         }
 
-        AcpiGbl_DumpResourceDispatch [ResourceIndex] (
+        AcpiGbl_DmResourceDispatch [ResourceIndex] (
             Aml, ResourceLength, Level);
 
         /* Descriptor post-processing */
@@ -444,15 +443,14 @@ AcpiDmResourceTemplate (
  *
  * PARAMETERS:  Op          - Buffer Op to be examined
  *
- * RETURN:      TRUE if this Buffer Op contains a valid resource
- *              descriptor.
+ * RETURN:      Status. AE_OK if valid template
  *
  * DESCRIPTION: Walk a byte list to determine if it consists of a valid set
  *              of resource descriptors.  Nothing is output.
  *
  ******************************************************************************/
 
-BOOLEAN
+ACPI_STATUS
 AcpiDmIsResourceTemplate (
     ACPI_PARSE_OBJECT       *Op)
 {
@@ -467,7 +465,7 @@ AcpiDmIsResourceTemplate (
 
     if (Op->Common.AmlOpcode != AML_BUFFER_OP)
     {
-        return FALSE;
+        return (AE_TYPE);
     }
 
     /* Get the ByteData list and length */
@@ -476,7 +474,7 @@ AcpiDmIsResourceTemplate (
     NextOp = NextOp->Common.Next;
     if (!NextOp)
     {
-        return (FALSE);
+        return (AE_TYPE);
     }
 
     Aml = NextOp->Named.Data;
@@ -487,7 +485,7 @@ AcpiDmIsResourceTemplate (
     Status = AcpiUtWalkAmlResources (Aml, Length, NULL, &EndAml);
     if (ACPI_FAILURE (Status))
     {
-        return (FALSE);
+        return (AE_TYPE);
     }
 
     /*
@@ -498,14 +496,14 @@ AcpiDmIsResourceTemplate (
      */
     if ((Aml + Length - sizeof (AML_RESOURCE_END_TAG)) != EndAml)
     {
-        return (FALSE);
+        return (AE_AML_NO_RESOURCE_END_TAG);
     }
 
     /*
      * All resource descriptors are valid, therefore this list appears
      * to be a valid resource template
      */
-    return (TRUE);
+    return (AE_OK);
 }
 
 #endif

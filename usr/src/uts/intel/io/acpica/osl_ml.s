@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -54,20 +51,25 @@
  * |---------|------------|------------|-----------------------------------| 
  */
 
+/* Offset of GlobalLock element in FACS structure */
+#define	GlobalLock	0x10
 
 #if defined(lint) || defined(__lint)
 
 /* ARGSUSED */
 UINT32
-__acpi_acquire_global_lock(UINT32 *glp)
+__acpi_acquire_global_lock(void *Facs)
 { return (0); }
 
 #else	/* lint */
 
 #if defined(__amd64)
 	ENTRY(__acpi_acquire_global_lock)
-	movq	%rdi, %rcx		/ %ecx - glp
-__acpi_acquire_global_lock_000:
+	movq	$0xff, %rax		/ error return if FACS is null
+	orq	%rdi, %rdi		/ %rdi contains pointer to FACS
+	jz	1f
+	leaq	GlobalLock(%rdi), %rdi	/ make %rdi point at the lock
+0:
 	movl	(%rdi), %eax		/ get current value of Global Lock
 	movl	%eax, %edx
 	andl	$0xFFFFFFFE, %edx	/ Clear pending bit
@@ -75,17 +77,22 @@ __acpi_acquire_global_lock_000:
 	adcl	$0, %edx		/ If owned, set pending bit
 	lock
 	cmpxchgl %edx, (%rdi)		/ Attempt to set new value
-	jnz	__acpi_acquire_global_lock_000 / If not set, try again
+	jnz	0b			/ If not set, try again
 	cmpb	$3, %dl			/ Was it acquired or marked pending?
 	sbbq	%rax, %rax		/ acquired = -1, pending = 0
+1:
 	ret
 	SET_SIZE(__acpi_acquire_global_lock)
 
 #elif defined(__i386)
 
 	ENTRY(__acpi_acquire_global_lock)
-	movl	4(%esp), %ecx		/ %ecx - glp
-__acpi_acquire_global_lock_000:
+	movl	$0xff, %eax		/ error return if FACS is null
+	movl	4(%esp), %ecx		/ %ecx contains pointer to FACS
+	orl	%ecx, %ecx
+	jz	1f
+	leal	GlobalLock(%ecx), %ecx	/ make %ecx point at the lock
+0:
 	movl	(%ecx), %eax
 	movl	%eax, %edx
 	andl	$0xFFFFFFFE, %edx
@@ -93,9 +100,10 @@ __acpi_acquire_global_lock_000:
 	adcl	$0, %edx
 	lock
 	cmpxchgl %edx, (%ecx)
-	jnz	__acpi_acquire_global_lock_000
+	jnz	0b
 	cmpb	$3, %dl
 	sbbl	%eax, %eax
+1:
 	ret
 	SET_SIZE(__acpi_acquire_global_lock)
 
@@ -108,37 +116,46 @@ __acpi_acquire_global_lock_000:
 
 /* ARGSUSED */
 UINT32
-__acpi_release_global_lock(UINT32 *glp)
+__acpi_release_global_lock(void *Facs)
 { return (0); }
 
 #else	/* lint */
 
 #if defined(__amd64)
 	ENTRY(__acpi_release_global_lock)
-	movq	%rdi, %rcx
-__acpi_release_global_lock_000:
+	xorq	%rax, %rax	/ error return if FACS is null
+	orq	%rdi, %rdi	/ %rdi contains pointer to FACS
+	jz	1f
+	leaq	GlobalLock(%rdi), %rdi	/ make %rdi point at the lock
+0:
 	movl	(%rdi), %eax
 	movl	%eax, %edx
 	andl	$0xFFFFFFFC, %edx
 	lock
 	cmpxchgl %edx, (%rdi)
-	jnz	__acpi_release_global_lock_000
-	andq	$1, %Rax
+	jnz	0b
+	andq	$1, %rax
+1:
 	ret
 	SET_SIZE(__acpi_release_global_lock)
 
 #elif defined(__i386)
 
 	ENTRY(__acpi_release_global_lock)
-	movl	4(%esp), %ecx
-__acpi_release_global_lock_000:
+	xorl	%eax, %eax		/ error return if FACS is null
+	movl	4(%esp), %ecx		/ %ecx contains pointer to FACS
+	orl	%ecx, %ecx
+	jz	1f
+	leal	GlobalLock(%ecx), %ecx	/ make %ecx point at the lock
+0:
 	movl	(%ecx), %eax
 	movl	%eax, %edx
 	andl	$0xFFFFFFFC, %edx
 	lock
 	cmpxchgl %edx, (%ecx)
-	jnz	__acpi_release_global_lock_000
+	jnz	0b
 	andl	$1, %eax
+1:
 	ret
 	SET_SIZE(__acpi_release_global_lock)
 

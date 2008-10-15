@@ -109,15 +109,15 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/hardware/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/interpreter/dispatcher/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/dispatcher/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/interpreter/executer/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/executer/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/interpreter/parser/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/parser/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -349,13 +349,13 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/events/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/hardware/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/interpreter/dispatcher/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/dispatcher/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/interpreter/executer/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/executer/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/interpreter/parser/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/parser/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/namespace/%.c

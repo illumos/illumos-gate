@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: cmclib - Local implementation of C library functions
- * $Revision: 1.59 $
+ * $Revision: 1.61 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -218,7 +218,7 @@ AcpiUtMemcpy (
 void *
 AcpiUtMemset (
     void                    *Dest,
-    ACPI_NATIVE_UINT        Value,
+    UINT8                   Value,
     ACPI_SIZE               Count)
 {
     char                    *New = (char *) Dest;

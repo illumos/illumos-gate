@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 1.66 $
+ *              $Revision: 1.69 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -144,7 +144,7 @@ AcpiRsDecodeBitmask (
     UINT16                  Mask,
     UINT8                   *List)
 {
-    ACPI_NATIVE_UINT        i;
+    UINT8                   i;
     UINT8                   BitCount;
 
 
@@ -157,7 +157,7 @@ AcpiRsDecodeBitmask (
     {
         if (Mask & 0x0001)
         {
-            List[BitCount] = (UINT8) i;
+            List[BitCount] = i;
             BitCount++;
         }
 
@@ -186,7 +186,7 @@ AcpiRsEncodeBitmask (
     UINT8                   *List,
     UINT8                   Count)
 {
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
     UINT16                  Mask;
 
 
@@ -197,7 +197,7 @@ AcpiRsEncodeBitmask (
 
     for (i = 0, Mask = 0; i < Count; i++)
     {
-        Mask |= (0x0001 << List[i]);
+        Mask |= (0x1 << List[i]);
     }
 
     return (Mask);
@@ -228,7 +228,7 @@ AcpiRsMoveData (
     UINT16                  ItemCount,
     UINT8                   MoveType)
 {
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_ENTRY ();
@@ -824,7 +824,6 @@ AcpiRsSetSrsMethodData (
     Info->PrefixNode = Node;
     Info->Pathname = METHOD_NAME__SRS;
     Info->Parameters = Args;
-    Info->ParameterType = ACPI_PARAM_ARGS;
     Info->Flags = ACPI_IGNORE_RETURN_VALUE;
 
     /*

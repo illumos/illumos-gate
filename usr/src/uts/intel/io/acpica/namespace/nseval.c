@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nseval - Object evaluation, includes control method execution
- *              $Revision: 1.142 $
+ *              $Revision: 1.145 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -221,6 +221,39 @@ AcpiNsEvaluate (
             return_ACPI_STATUS (AE_NULL_OBJECT);
         }
 
+        /* Calculate the number of arguments being passed to the method */
+
+        Info->ParamCount = 0;
+        if (Info->Parameters)
+        {
+            while (Info->Parameters[Info->ParamCount])
+            {
+                Info->ParamCount++;
+            }
+        }
+
+        /*
+         * Warning if too few or too many arguments have been passed by the
+         * caller. We don't want to abort here with an error because an
+         * incorrect number of arguments may not cause the method to fail.
+         * However, the method will fail if there are too few arguments passed
+         * and the method attempts to use one of the missing ones.
+         */
+        if (Info->ParamCount < Info->ObjDesc->Method.ParamCount)
+        {
+            ACPI_WARNING ((AE_INFO,
+                "Insufficient arguments - method [%4.4s] needs %d, found %d",
+                AcpiUtGetNodeName (Info->ResolvedNode),
+                Info->ObjDesc->Method.ParamCount, Info->ParamCount));
+        }
+        else if (Info->ParamCount > Info->ObjDesc->Method.ParamCount)
+        {
+            ACPI_WARNING ((AE_INFO,
+                "Excess arguments - method [%4.4s] needs %d, found %d",
+                AcpiUtGetNodeName (Info->ResolvedNode),
+                Info->ObjDesc->Method.ParamCount, Info->ParamCount));
+        }
+
         ACPI_DUMP_PATHNAME (Info->ResolvedNode, "Execute Method:",
             ACPI_LV_INFO, _COMPONENT);
 
@@ -237,12 +270,7 @@ AcpiNsEvaluate (
          * Execute the method via the interpreter. The interpreter is locked
          * here before calling into the AML parser
          */
-        Status = AcpiExEnterInterpreter ();
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
-
+        AcpiExEnterInterpreter ();
         Status = AcpiPsExecuteMethod (Info);
         AcpiExExitInterpreter ();
     }
@@ -250,7 +278,28 @@ AcpiNsEvaluate (
     {
         /*
          * 2) Object is not a method, return its current value
+         *
+         * Disallow certain object types. For these, "evaluation" is undefined.
          */
+        switch (Info->ResolvedNode->Type)
+        {
+        case ACPI_TYPE_DEVICE:
+        case ACPI_TYPE_EVENT:
+        case ACPI_TYPE_MUTEX:
+        case ACPI_TYPE_REGION:
+        case ACPI_TYPE_THERMAL:
+        case ACPI_TYPE_LOCAL_SCOPE:
+
+            ACPI_ERROR ((AE_INFO,
+                "[%4.4s] Evaluation of object type [%s] is not supported",
+                Info->ResolvedNode->Name.Ascii,
+                AcpiUtGetTypeName (Info->ResolvedNode->Type)));
+
+            return_ACPI_STATUS (AE_TYPE);
+
+        default:
+            break;
+        }
 
         /*
          * Objects require additional resolution steps (e.g., the Node may be
@@ -268,11 +317,7 @@ AcpiNsEvaluate (
          * resolution, we must lock it because we could access an opregion.
          * The opregion access code assumes that the interpreter is locked.
          */
-        Status = AcpiExEnterInterpreter ();
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
+        AcpiExEnterInterpreter ();
 
         /* Function has a strange interface */
 

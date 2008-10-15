@@ -202,15 +202,15 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   nsutils.o nswalk.o nsxfeval.o nsxfname.o nsxfobj.o \
 		   rsaddr.o rscalc.o rscreate.o rsdump.o \
 		   rsinfo.o rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
-		   rsutils.o rsxface.o tbconvrt.o tbget.o tbgetall.o \
-		   tbinstal.o tbrsdt.o tbutils.o tbxface.o tbxfroot.o \
+		   rsutils.o rsxface.o tbfadt.o tbfind.o tbinstal.o  \
+		   tbutils.o tbxface.o tbxfroot.o \
 		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
 		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
 		   utobject.o utresrc.o utxface.o acpica.o acpi_enum.o \
 		   master_ops.o osl.o osl_ml.o acpica_ec.o utcache.o \
 		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
 		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
-		   dmwalk.o psloop.o uttrack.o
+		   dmwalk.o psloop.o
 
 ACPI_INTP_OBJS += acpi_inf.o acpi_mod.o  acpi_ml.o \
 	acpi_decl.o acpi_exe.o acpi_gram.o acpi_io.o acpi_lex.o \

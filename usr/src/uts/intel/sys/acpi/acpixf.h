@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -126,6 +126,12 @@
  * Global interfaces
  */
 ACPI_STATUS
+AcpiInitializeTables (
+    ACPI_TABLE_DESC         *InitialStorage,
+    UINT32                  InitialTableCount,
+    BOOLEAN                 AllowResize);
+
+ACPI_STATUS
 AcpiInitializeSubsystem (
     void);
 
@@ -156,6 +162,10 @@ AcpiDisable (
 ACPI_STATUS
 AcpiGetSystemInfo (
     ACPI_BUFFER             *RetBuffer);
+
+ACPI_STATUS
+AcpiGetStatistics (
+    ACPI_STATISTICS         *Stats);
 
 const char *
 AcpiFormatException (
@@ -190,40 +200,42 @@ AcpiFree (
  * ACPI table manipulation interfaces
  */
 ACPI_STATUS
+AcpiReallocateRootTable (
+    void);
+
+ACPI_STATUS
 AcpiFindRootPointer (
-    UINT32                  Flags,
-    ACPI_POINTER            *RsdpAddress);
+    ACPI_SIZE               *RsdpAddress);
 
 ACPI_STATUS
 AcpiLoadTables (
     void);
 
 ACPI_STATUS
-AcpiLoadTable (
-    ACPI_TABLE_HEADER       *TablePtr);
-
-ACPI_STATUS
-AcpiUnloadTable (
-    ACPI_TABLE_TYPE         TableType);
-
-ACPI_STATUS
 AcpiGetTableHeader (
-    ACPI_TABLE_TYPE         TableType,
+    ACPI_STRING             Signature,
     UINT32                  Instance,
     ACPI_TABLE_HEADER       *OutTableHeader);
 
 ACPI_STATUS
 AcpiGetTable (
-    ACPI_TABLE_TYPE         TableType,
-    UINT32                  Instance,
-    ACPI_BUFFER             *RetBuffer);
-
-ACPI_STATUS
-AcpiGetFirmwareTable (
     ACPI_STRING             Signature,
     UINT32                  Instance,
-    UINT32                  Flags,
-    ACPI_TABLE_HEADER       **TablePointer);
+    ACPI_TABLE_HEADER       **OutTable);
+
+ACPI_STATUS
+AcpiGetTableByIndex (
+    UINT32                  TableIndex,
+    ACPI_TABLE_HEADER       **OutTable);
+
+ACPI_STATUS
+AcpiInstallTableHandler (
+    ACPI_TABLE_HANDLER      Handler,
+    void                    *Context);
+
+ACPI_STATUS
+AcpiRemoveTableHandler (
+    ACPI_TABLE_HANDLER      Handler);
 
 
 /*
@@ -510,14 +522,17 @@ AcpiResourceToAddress64 (
 ACPI_STATUS
 AcpiGetRegister (
     UINT32                  RegisterId,
-    UINT32                  *ReturnValue,
-    UINT32                  Flags);
+    UINT32                  *ReturnValue);
+
+ACPI_STATUS
+AcpiGetRegisterUnlocked (
+    UINT32                  RegisterId,
+    UINT32                  *ReturnValue);
 
 ACPI_STATUS
 AcpiSetRegister (
     UINT32                  RegisterId,
-    UINT32                  Value,
-    UINT32                  Flags);
+    UINT32                  Value);
 
 ACPI_STATUS
 AcpiSetFirmwareWakingVector (

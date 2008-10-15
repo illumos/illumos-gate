@@ -20,36 +20,52 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
-# Set this to the fully-qualified path to the ACPI CA source directory
+# Set this to the fully-qualified path to the ACPI CA GIT directory
 #
-ACDIR=/export/home/myers/acpica/acpica-unix-20060721
+ACDIR=/export/home/myers/acpica/acpica-unix-20080829
+
+ACSRC=$ACDIR
+ACINC=$ACDIR/include
 
 DIFF="diff -w"
-WSDIR=`workspace name`
+
+#
+# Use which_scm to get the current WS path
+#
+which_scm | read WS_SCM WSDIR
+
 WSSRC=usr/src/uts/intel/io/acpica
 WSHDR=usr/src/uts/intel/sys/acpi
 ACFILES=/tmp/$$.acfiles
-SRCDIRS="debugger disassembler events hardware interpreter namespace \
-	resources tables utilities"
+SRCDIRS="debugger \
+	disassembler \
+	dispatcher \
+	events \
+	executer \
+	hardware \
+	namespace \
+	parser \
+	resources \
+	tables \
+	utilities"
 
 #
 #
 #
-cd $ACDIR ; find  $SRCDIRS -type f  > $ACFILES ; cd -
+cd $ACSRC ; find  $SRCDIRS -type f  > $ACFILES ; cd -
 for i in `<$ACFILES`
 do
     if [[ ! -a $WSDIR/$WSSRC/$i ]]
     then
 	SRCNEW=$SRCNEW\ $i
     else
-	if (! $DIFF $WSDIR/$WSSRC/$i $ACDIR/$i > /dev/null )
+	if (! $DIFF $WSDIR/$WSSRC/$i $ACSRC/$i > /dev/null )
 	then
 	    SRCCHG=$SRCCHG\ $i
 	fi
@@ -59,14 +75,14 @@ done
 #
 #
 #
-cd $ACDIR/include ; find . -type f  > $ACFILES ; cd -
+cd $ACINC ; find . -type f  > $ACFILES ; cd -
 for i in `<$ACFILES`
 do
     if [[ ! -a $WSDIR/$WSHDR/$i ]]
     then
 	HDRNEW=$HDRNEW\ $i
     else
-	if (! $DIFF $WSDIR/$WSHDR/$i $ACDIR/include/$i > /dev/null )
+	if (! $DIFF $WSDIR/$WSHDR/$i $ACINC/$i > /dev/null )
 	then
 		HDRCHG=$HDRCHG\ $i
 	fi
@@ -77,40 +93,37 @@ cd $WSDIR
 for i in $SRCCHG
 do
     targ=$WSSRC/$i
-    wx edit $targ
-    cp $ACDIR/$i $targ
+    cp $ACSRC/$i $targ
 done
 
 for i in $SRCNEW
 do
     targ=$WSSRC/$i
-    cp $ACDIR/$i $targ
+    cp $ACSRC/$i $targ
     chmod +w $targ
-    wx create -f $targ
+    hg add $targ
 done
 
 for i in $HDRCHG
 do
     targ=$WSHDR/$i
-    wx edit $targ
-    cp $ACDIR/include/$i $targ
+    cp $ACINC/$i $targ
 done
 
 for i in $HDRNEW
 do
     targ=$WSHDR/$i
-    cp $ACDIR/include/$i $targ
+    cp $ACINC/$i $targ
     chmod +w $targ
-    wx create -f $targ
+    hg add $targ
 done
-cd -
 
 if (! $DIFF $WSDIR/$WSSRC/changes.txt $ACDIR/changes.txt > /dev/null )
 then
     targ=$WSSRC/changes.txt
-    wx edit $targ
     cp $ACDIR/changes.txt $targ
 fi
+cd -
 
 echo New source files:
 echo $SRCNEW

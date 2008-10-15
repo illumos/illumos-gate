@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 1.121 $
+ *              $Revision: 1.126 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -120,7 +120,7 @@
 #include "acinterp.h"
 #include "acnamesp.h"
 #include "acevents.h"
-#include "amlcode.h"
+
 
 #define _COMPONENT          ACPI_UTILITIES
         ACPI_MODULE_NAME    ("utdelete")
@@ -222,6 +222,10 @@ AcpiUtDeleteInternalObj (
         break;
 
 
+    /*
+     * These objects have a possible list of notify handlers.
+     * Device object also may have a GPE block.
+     */
     case ACPI_TYPE_DEVICE:
 
         if (Object->Device.GpeBlock)
@@ -229,9 +233,14 @@ AcpiUtDeleteInternalObj (
             (void) AcpiEvDeleteGpeBlock (Object->Device.GpeBlock);
         }
 
-        /* Walk the handler list for this device */
+        /*lint -fallthrough */
 
-        HandlerDesc = Object->Device.Handler;
+    case ACPI_TYPE_PROCESSOR:
+    case ACPI_TYPE_THERMAL:
+
+        /* Walk the notify handler list for this object */
+
+        HandlerDesc = Object->CommonNotify.Handler;
         while (HandlerDesc)
         {
             NextDesc = HandlerDesc->AddressSpace.Next;
@@ -247,7 +256,7 @@ AcpiUtDeleteInternalObj (
             "***** Mutex %p, OS Mutex %p\n",
             Object, Object->Mutex.OsMutex));
 
-        if (Object->Mutex.OsMutex == AcpiGbl_GlobalLockMutex)
+        if (Object == AcpiGbl_GlobalLockMutex)
         {
             /* Global Lock has extra semaphore */
 
@@ -336,6 +345,19 @@ AcpiUtDeleteInternalObj (
 
         ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS,
             "***** Buffer Field %p\n", Object));
+
+        SecondDesc = AcpiNsGetSecondaryObject (Object);
+        if (SecondDesc)
+        {
+            AcpiUtDeleteObjectDesc (SecondDesc);
+        }
+        break;
+
+
+    case ACPI_TYPE_LOCAL_BANK_FIELD:
+
+        ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS,
+            "***** Bank Field %p\n", Object));
 
         SecondDesc = AcpiNsGetSecondaryObject (Object);
         if (SecondDesc)
@@ -544,7 +566,7 @@ AcpiUtUpdateObjectReference (
     ACPI_GENERIC_STATE      *StateList = NULL;
     ACPI_OPERAND_OBJECT     *NextObject = NULL;
     ACPI_GENERIC_STATE      *State;
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_TRACE_PTR (UtUpdateObjectReference, Object);
@@ -633,10 +655,12 @@ AcpiUtUpdateObjectReference (
 
         case ACPI_TYPE_LOCAL_REFERENCE:
             /*
-             * The target of an Index (a package, string, or buffer) must track
-             * changes to the ref count of the index.
+             * The target of an Index (a package, string, or buffer) or a named
+             * reference must track changes to the ref count of the index or
+             * target object.
              */
-            if (Object->Reference.Opcode == AML_INDEX_OP)
+            if ((Object->Reference.Class == ACPI_REFCLASS_INDEX) ||
+                (Object->Reference.Class== ACPI_REFCLASS_NAME))
             {
                 NextObject = Object->Reference.Object;
             }

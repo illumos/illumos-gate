@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 1.149 $
+ *       $Revision: 1.154 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -139,9 +139,13 @@
 #define ACPI_NS_ERROR_IF_FOUND      0x08
 #define ACPI_NS_PREFIX_IS_SCOPE     0x10
 #define ACPI_NS_EXTERNAL            0x20
+#define ACPI_NS_TEMPORARY           0x40
 
-#define ACPI_NS_WALK_UNLOCK         TRUE
-#define ACPI_NS_WALK_NO_UNLOCK      FALSE
+/* Flags for AcpiNsWalkNamespace */
+
+#define ACPI_NS_WALK_NO_UNLOCK      0
+#define ACPI_NS_WALK_UNLOCK         0x01
+#define ACPI_NS_WALK_TEMP_NODES     0x02
 
 
 /*
@@ -165,7 +169,7 @@ AcpiNsLoadNamespace (
 
 ACPI_STATUS
 AcpiNsLoadTable (
-    ACPI_TABLE_DESC         *TableDesc,
+    UINT32                  TableIndex,
     ACPI_NAMESPACE_NODE     *Node);
 
 
@@ -177,7 +181,7 @@ AcpiNsWalkNamespace (
     ACPI_OBJECT_TYPE        Type,
     ACPI_HANDLE             StartObject,
     UINT32                  MaxDepth,
-    BOOLEAN                 UnlockBeforeCallback,
+    UINT32                  Flags,
     ACPI_WALK_CALLBACK      UserFunction,
     void                    *Context,
     void                    **ReturnValue);
@@ -194,13 +198,14 @@ AcpiNsGetNextNode (
  */
 ACPI_STATUS
 AcpiNsParseTable (
-    ACPI_TABLE_DESC         *TableDesc,
-    ACPI_NAMESPACE_NODE     *Scope);
+    UINT32                  TableIndex,
+    ACPI_NAMESPACE_NODE     *StartNode);
 
 ACPI_STATUS
 AcpiNsOneCompleteParse (
-    UINT8                   PassNumber,
-    ACPI_TABLE_DESC         *TableDesc);
+    UINT32                  PassNumber,
+    UINT32                  TableIndex,
+    ACPI_NAMESPACE_NODE     *StartNode);
 
 
 /*
@@ -310,7 +315,7 @@ UINT32
 AcpiNsOpensScope (
     ACPI_OBJECT_TYPE        Type);
 
-void
+ACPI_STATUS
 AcpiNsBuildExternalPath (
     ACPI_NAMESPACE_NODE     *Node,
     ACPI_SIZE               Size,
@@ -337,7 +342,7 @@ AcpiNsPatternMatch (
 ACPI_STATUS
 AcpiNsGetNode (
     ACPI_NAMESPACE_NODE     *PrefixNode,
-    char                    *ExternalPathname,
+    const char              *ExternalPathname,
     UINT32                  Flags,
     ACPI_NAMESPACE_NODE     **OutNode);
 
@@ -426,24 +431,24 @@ AcpiNsLocal (
 
 void
 AcpiNsReportError (
-    char                    *ModuleName,
+    const char              *ModuleName,
     UINT32                  LineNumber,
-    char                    *InternalName,
+    const char              *InternalName,
     ACPI_STATUS             LookupStatus);
 
 void
 AcpiNsReportMethodError (
-    char                    *ModuleName,
+    const char              *ModuleName,
     UINT32                  LineNumber,
-    char                    *Message,
+    const char              *Message,
     ACPI_NAMESPACE_NODE     *Node,
-    char                    *Path,
+    const char              *Path,
     ACPI_STATUS             LookupStatus);
 
 void
 AcpiNsPrintNodePathname (
     ACPI_NAMESPACE_NODE     *Node,
-    char                    *Msg);
+    const char              *Msg);
 
 ACPI_STATUS
 AcpiNsBuildInternalName (
@@ -455,13 +460,13 @@ AcpiNsGetInternalNameLength (
 
 ACPI_STATUS
 AcpiNsInternalizeName (
-    char                    *DottedName,
+    const char              *DottedName,
     char                    **ConvertedName);
 
 ACPI_STATUS
 AcpiNsExternalizeName (
     UINT32                  InternalNameLength,
-    char                    *InternalName,
+    const char              *InternalName,
     UINT32                  *ConvertedNameLength,
     char                    **ConvertedName);
 

@@ -27,9 +27,6 @@
  * ACPI CA OSL for Solaris x86
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/psm.h>
@@ -64,9 +61,26 @@ static void acpica_devinfo_handler(ACPI_HANDLE, UINT32, void *);
 /*
  * Event queue vars
  */
-int acpica_eventq_thread_count = 1;
 int acpica_eventq_init = 0;
 ddi_taskq_t *osl_eventq[OSL_EC_BURST_HANDLER+1];
+
+/*
+ * Priorities relative to minclsyspri that each taskq
+ * run at; OSL_NOTIFY_HANDLER needs to run at a higher
+ * priority than OSL_GPE_HANDLER.  There's an implicit
+ * assumption that no priority here results in exceeding
+ * maxclsyspri.
+ * Note: these initializations need to match the order of
+ * ACPI_EXECUTE_TYPE.
+ */
+int osl_eventq_pri_delta[OSL_EC_BURST_HANDLER+1] = {
+	0,	/* OSL_GLOBAL_LOCK_HANDLER */
+	2,	/* OSL_NOTIFY_HANDLER */
+	0,	/* OSL_GPE_HANDLER */
+	0,	/* OSL_DEBUGGER_THREAD */
+	0,	/* OSL_EC_POLL_HANDLER */
+	0	/* OSL_EC_BURST_HANDLER */
+};
 
 /*
  * Note, if you change this path, you need to update
@@ -131,10 +145,11 @@ init_event_queues()
 	 * Initialize event queues
 	 */
 
+	/* Always allocate only 1 thread per queue to force FIFO execution */
 	for (i = OSL_GLOBAL_LOCK_HANDLER; i <= OSL_EC_BURST_HANDLER; i++) {
 		snprintf(namebuf, 32, "ACPI%d", i);
-		osl_eventq[i] = ddi_taskq_create(NULL, namebuf,
-		    acpica_eventq_thread_count, TASKQ_DEFAULTPRI, 0);
+		osl_eventq[i] = ddi_taskq_create(NULL, namebuf, 1,
+		    osl_eventq_pri_delta[i] + minclsyspri, 0);
 		if (osl_eventq[i] == NULL)
 			error++;
 	}
@@ -183,24 +198,23 @@ AcpiOsTerminate(void)
 }
 
 
-ACPI_STATUS
-AcpiOsGetRootPointer(UINT32 Flags, ACPI_POINTER *Address)
+ACPI_PHYSICAL_ADDRESS
+AcpiOsGetRootPointer()
 {
-	uint_t acpi_root_tab;
+	ACPI_PHYSICAL_ADDRESS Address;
 
 	/*
 	 * For EFI firmware, the root pointer is defined in EFI systab.
 	 * The boot code process the table and put the physical address
 	 * in the acpi-root-tab property.
 	 */
-	acpi_root_tab = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(), 0,
-	    "acpi-root-tab", 0);
-	if (acpi_root_tab != 0) {
-		Address->PointerType = ACPI_PHYSICAL_POINTER;
-		Address->Pointer.Physical = acpi_root_tab;
-		return (AE_OK);
-	}
-	return (AcpiFindRootPointer(Flags, Address));
+	Address = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(), 0,
+	    "acpi-root-tab", NULL);
+
+	if ((Address == NULL) && ACPI_FAILURE(AcpiFindRootPointer(&Address)))
+		Address = NULL;
+
+	return (Address);
 }
 
 /*ARGSUSED*/
@@ -456,24 +470,18 @@ AcpiOsDeleteLock(ACPI_HANDLE Handle)
 	kmem_free((void *)Handle, sizeof (kmutex_t));
 }
 
-ACPI_NATIVE_UINT
+ACPI_CPU_FLAGS
 AcpiOsAcquireLock(ACPI_HANDLE Handle)
 {
 
-	if (Handle == NULL)
-		return (AE_BAD_PARAMETER);
-
 	mutex_enter((kmutex_t *)Handle);
-	return (AE_OK);
+	return (0);
 }
 
 void
-AcpiOsReleaseLock(ACPI_HANDLE Handle, ACPI_NATIVE_UINT Flags)
+AcpiOsReleaseLock(ACPI_HANDLE Handle, ACPI_CPU_FLAGS Flags)
 {
 	_NOTE(ARGUNUSED(Flags))
-
-	if (Handle == NULL)
-		return;
 
 	mutex_exit((kmutex_t *)Handle);
 }
@@ -501,15 +509,12 @@ AcpiOsFree(void *Memory)
 	kmem_free(tmp_ptr, size);
 }
 
-ACPI_STATUS
-AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress,
-		    ACPI_SIZE Size, void **LogicalAddress)
+void *
+AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Size)
 {
 	/* FUTUREWORK: test PhysicalAddress for > 32 bits */
-	*LogicalAddress = psm_map_new((paddr_t)PhysicalAddress,
-	    (size_t)Size, PSM_PROT_WRITE | PSM_PROT_READ);
-
-	return (*LogicalAddress == NULL ? AE_NO_MEMORY : AE_OK);
+	return (psm_map_new((paddr_t)PhysicalAddress,
+	    (size_t)Size, PSM_PROT_WRITE | PSM_PROT_READ));
 }
 
 void
@@ -1259,7 +1264,8 @@ acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint)
 
 	rb.Pointer = NULL;
 	rb.Length = ACPI_ALLOCATE_BUFFER;
-	if (AcpiEvaluateObject(dev, method, NULL, &rb) == AE_OK) {
+	if (AcpiEvaluateObject(dev, method, NULL, &rb) == AE_OK &&
+	    rb.Length != 0) {
 		rv = rb.Pointer;
 		if (rv->Type == ACPI_TYPE_INTEGER) {
 			*rint = rv->Integer.Value;
@@ -1406,6 +1412,65 @@ acpica_get_handle_cpu(dev_info_t *dip, ACPI_HANDLE *rh)
 }
 
 /*
+ * Convert CPU device _UID strings into unique integers
+ * ACPI 3.0 spec 6.1.9 permits _UID to be either
+ * an arbitrary string or numeric value.  ACPI CA converts
+ * numeric types to a string, providing a consistent API,
+ * but it can not be assumed that _UID is always numeric.
+ * Keep a private list of CPU _UIDs and convert them to
+ * an integer representation.
+ */
+
+struct acpica_cpu_uid {
+	struct acpica_cpu_uid *next;
+	char *uid;
+};
+
+static struct acpica_cpu_uid *acpica_cpu_uid_list = NULL;
+
+static UINT32
+acpica_cpu_uid_str_to_uint(char *uidstr)
+{
+	UINT32	n;
+	struct acpica_cpu_uid *current, **tail;
+
+	ASSERT(uidstr != NULL);
+
+	n = 0;
+	current = acpica_cpu_uid_list;
+	tail = &acpica_cpu_uid_list;
+	while (current != NULL) {
+		if (strcmp(current->uid, uidstr) == 0)
+			break;
+		n++;
+		tail = &current->next;
+		current = current->next;
+	}
+
+	/*
+	 * failed to find a matching element; create it here
+	 */
+	if (current == NULL) {
+		/* allocate new list element as current one */
+		current = (struct acpica_cpu_uid *)kmem_zalloc(
+		    sizeof (struct acpica_cpu_uid), KM_SLEEP);
+
+		/* allocate storage for the device ID string */
+		current->uid = (char *)kmem_zalloc(strlen(uidstr) + 1,
+		    KM_SLEEP);
+
+		strcpy(current->uid, uidstr);
+		*tail = current;
+	}
+
+	/*
+	 * 'n' correctly contains the index for either
+	 * a new element or an existing element
+	 */
+	return (n);
+}
+
+/*
  * Determine if this object is a processor
  */
 static ACPI_STATUS
@@ -1423,13 +1488,12 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 		/* process a Processor */
 		rb.Pointer = NULL;
 		rb.Length = ACPI_ALLOCATE_BUFFER;
-		status = AcpiEvaluateObject(obj, NULL, NULL, &rb);
+		status = AcpiEvaluateObjectTyped(obj, NULL, NULL, &rb,
+		    ACPI_TYPE_PROCESSOR);
 		if (status != AE_OK) {
 			cmn_err(CE_WARN, "acpica: error probing Processor");
 			return (status);
 		}
-		ASSERT(((ACPI_OBJECT *)rb.Pointer)->Type ==
-		    ACPI_TYPE_PROCESSOR);
 		acpi_id = ((ACPI_OBJECT *)rb.Pointer)->Processor.ProcId;
 		AcpiOsFree(rb.Pointer);
 	} else if (objtype == ACPI_TYPE_DEVICE) {
@@ -1444,7 +1508,7 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 		}
 		ASSERT(((ACPI_OBJECT *)rb.Pointer)->Type ==
 		    ACPI_TYPE_DEVICE);
-		acpi_id = AcpiExStringToUnsignedInteger(
+		acpi_id = acpica_cpu_uid_str_to_uint(
 		    ((ACPI_DEVICE_INFO *)rb.Pointer)->UniqueId.Value);
 		AcpiOsFree(rb.Pointer);
 	}

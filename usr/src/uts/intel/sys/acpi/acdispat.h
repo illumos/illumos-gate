@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 1.72 $
+ *       $Revision: 1.79 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -131,6 +131,10 @@ AcpiDsGetBufferFieldArguments (
     ACPI_OPERAND_OBJECT     *ObjDesc);
 
 ACPI_STATUS
+AcpiDsGetBankFieldArguments (
+    ACPI_OPERAND_OBJECT     *ObjDesc);
+
+ACPI_STATUS
 AcpiDsGetRegionArguments (
     ACPI_OPERAND_OBJECT     *RgnDesc);
 
@@ -153,10 +157,20 @@ AcpiDsEvalRegionOperands (
     ACPI_PARSE_OBJECT       *Op);
 
 ACPI_STATUS
+AcpiDsEvalTableRegionOperands (
+    ACPI_WALK_STATE         *WalkState,
+    ACPI_PARSE_OBJECT       *Op);
+
+ACPI_STATUS
 AcpiDsEvalDataObjectOperands (
     ACPI_WALK_STATE         *WalkState,
     ACPI_PARSE_OBJECT       *Op,
     ACPI_OPERAND_OBJECT     *ObjDesc);
+
+ACPI_STATUS
+AcpiDsEvalBankFieldOperands (
+    ACPI_WALK_STATE         *WalkState,
+    ACPI_PARSE_OBJECT       *Op);
 
 ACPI_STATUS
 AcpiDsInitializeRegion (
@@ -259,7 +273,7 @@ AcpiDsInitCallbacks (
  */
 ACPI_STATUS
 AcpiDsStoreObjectToLocal (
-    UINT16                  Opcode,
+    UINT8                   Type,
     UINT32                  Index,
     ACPI_OPERAND_OBJECT     *SrcDesc,
     ACPI_WALK_STATE         *WalkState);
@@ -281,7 +295,7 @@ AcpiDsIsMethodValue (
 
 ACPI_STATUS
 AcpiDsMethodDataGetValue (
-    UINT16                  Opcode,
+    UINT8                   Type,
     UINT32                  Index,
     ACPI_WALK_STATE         *WalkState,
     ACPI_OPERAND_OBJECT     **DestDesc);
@@ -294,7 +308,7 @@ AcpiDsMethodDataInitArgs (
 
 ACPI_STATUS
 AcpiDsMethodDataGetNode (
-    UINT16                  Opcode,
+    UINT8                   Type,
     UINT32                  Index,
     ACPI_WALK_STATE         *WalkState,
     ACPI_NAMESPACE_NODE     **Node);
@@ -343,7 +357,7 @@ AcpiDsMethodError (
  */
 ACPI_STATUS
 AcpiDsInitializeObjects (
-    ACPI_TABLE_DESC         *TableDesc,
+    UINT32                  TableIndex,
     ACPI_NAMESPACE_NODE     *StartNode);
 
 
@@ -421,6 +435,10 @@ void
 AcpiDsClearOperands (
     ACPI_WALK_STATE         *WalkState);
 
+ACPI_STATUS
+AcpiDsEvaluateNamePath (
+    ACPI_WALK_STATE         *WalkState);
+
 
 /*
  * dswscope - Scope Stack manipulation
@@ -471,7 +489,7 @@ AcpiDsInitAmlWalk (
     ACPI_EVALUATE_INFO      *Info,
     UINT8                   PassNumber);
 
-ACPI_STATUS
+void
 AcpiDsObjStackPopAndDelete (
     UINT32                  PopCount,
     ACPI_WALK_STATE         *WalkState);
@@ -490,26 +508,12 @@ AcpiDsPushWalkState (
     ACPI_THREAD_STATE       *Thread);
 
 ACPI_STATUS
-AcpiDsResultStackPop (
-    ACPI_WALK_STATE         *WalkState);
-
-ACPI_STATUS
-AcpiDsResultStackPush (
-    ACPI_WALK_STATE         *WalkState);
-
-ACPI_STATUS
 AcpiDsResultStackClear (
     ACPI_WALK_STATE         *WalkState);
 
 ACPI_WALK_STATE *
 AcpiDsGetCurrentWalkState (
     ACPI_THREAD_STATE       *Thread);
-
-ACPI_STATUS
-AcpiDsResultRemove (
-    ACPI_OPERAND_OBJECT     **Object,
-    UINT32                  Index,
-    ACPI_WALK_STATE         *WalkState);
 
 ACPI_STATUS
 AcpiDsResultPop (
@@ -519,11 +523,6 @@ AcpiDsResultPop (
 ACPI_STATUS
 AcpiDsResultPush (
     ACPI_OPERAND_OBJECT     *Object,
-    ACPI_WALK_STATE         *WalkState);
-
-ACPI_STATUS
-AcpiDsResultPopFromBottom (
-    ACPI_OPERAND_OBJECT     **Object,
     ACPI_WALK_STATE         *WalkState);
 
 #endif /* _ACDISPAT_H_ */

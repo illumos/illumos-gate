@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 1.237 $
+ *       $Revision: 1.250 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -124,6 +124,7 @@
 #define ACPI_SERIALIZED                 0xFF
 
 typedef UINT32                          ACPI_MUTEX_HANDLE;
+#define ACPI_GLOBAL_LOCK                (ACPI_SEMAPHORE) (-1)
 
 /* Total number of aml opcodes defined */
 
@@ -155,8 +156,8 @@ union acpi_parse_object;
  * table below also!
  */
 #define ACPI_MTX_INTERPRETER            0   /* AML Interpreter, main lock */
-#define ACPI_MTX_TABLES                 1   /* Data for ACPI tables */
-#define ACPI_MTX_NAMESPACE              2   /* ACPI Namespace */
+#define ACPI_MTX_NAMESPACE              1   /* ACPI Namespace */
+#define ACPI_MTX_TABLES                 2   /* Data for ACPI tables */
 #define ACPI_MTX_EVENTS                 3   /* Data for ACPI events */
 #define ACPI_MTX_CACHES                 4   /* Internal caches, general purposes */
 #define ACPI_MTX_MEMORY                 5   /* Debug memory tracking lists */
@@ -174,8 +175,8 @@ union acpi_parse_object;
 static char                 *AcpiGbl_MutexNames[ACPI_NUM_MUTEX] =
 {
     "ACPI_MTX_Interpreter",
-    "ACPI_MTX_Tables",
     "ACPI_MTX_Namespace",
+    "ACPI_MTX_Tables",
     "ACPI_MTX_Events",
     "ACPI_MTX_Caches",
     "ACPI_MTX_Memory",
@@ -247,7 +248,7 @@ typedef enum
 {
     ACPI_IMODE_LOAD_PASS1           = 0x01,
     ACPI_IMODE_LOAD_PASS2           = 0x02,
-    ACPI_IMODE_EXECUTE              = 0x0E
+    ACPI_IMODE_EXECUTE              = 0x03
 
 } ACPI_INTERPRETER_MODE;
 
@@ -296,7 +297,7 @@ typedef struct acpi_namespace_node
 /* Namespace Node flags */
 
 #define ANOBJ_END_OF_PEER_LIST          0x01    /* End-of-list, Peer field points to parent */
-#define ANOBJ_RESERVED                  0x02    /* Available for future use */
+#define ANOBJ_TEMPORARY                 0x02    /* Node is create by a method and is temporary */
 #define ANOBJ_METHOD_ARG                0x04    /* Node is a method argument */
 #define ANOBJ_METHOD_LOCAL              0x08    /* Node is a method local */
 #define ANOBJ_SUBTREE_HAS_INI           0x10    /* Used to optimize device initialization */
@@ -312,27 +313,45 @@ typedef struct acpi_namespace_node
  */
 typedef struct acpi_table_desc
 {
-    struct acpi_table_desc          *Prev;
-    struct acpi_table_desc          *Next;
-    struct acpi_table_desc          *InstalledDesc;
+    ACPI_PHYSICAL_ADDRESS           Address;
     ACPI_TABLE_HEADER               *Pointer;
-    UINT8                           *AmlStart;
-    UINT64                          PhysicalAddress;
-    ACPI_SIZE                       Length;
-    UINT32                          AmlLength;
+    UINT32                          Length;     /* Length fixed at 32 bits */
+    ACPI_NAME_UNION                 Signature;
     ACPI_OWNER_ID                   OwnerId;
-    UINT8                           Type;
-    UINT8                           Allocation;
-    BOOLEAN                         LoadedIntoNamespace;
+    UINT8                           Flags;
 
 } ACPI_TABLE_DESC;
 
-typedef struct acpi_table_list
-{
-    struct acpi_table_desc          *Next;
-    UINT32                          Count;
+/* Flags for above */
 
-} ACPI_TABLE_LIST;
+#define ACPI_TABLE_ORIGIN_UNKNOWN       (0)
+#define ACPI_TABLE_ORIGIN_MAPPED        (1)
+#define ACPI_TABLE_ORIGIN_ALLOCATED     (2)
+#define ACPI_TABLE_ORIGIN_MASK          (3)
+#define ACPI_TABLE_IS_LOADED            (4)
+
+/* One internal RSDT for table management */
+
+typedef struct acpi_internal_rsdt
+{
+    ACPI_TABLE_DESC                 *Tables;
+    UINT32                          Count;
+    UINT32                          Size;
+    UINT8                           Flags;
+
+} ACPI_INTERNAL_RSDT;
+
+/* Flags for above */
+
+#define ACPI_ROOT_ORIGIN_UNKNOWN        (0)     /* ~ORIGIN_ALLOCATED */
+#define ACPI_ROOT_ORIGIN_ALLOCATED      (1)
+#define ACPI_ROOT_ALLOW_RESIZE          (2)
+
+
+/* Predefined (fixed) table indexes */
+
+#define ACPI_TABLE_INDEX_DSDT           (0)
+#define ACPI_TABLE_INDEX_FACS           (1)
 
 
 typedef struct acpi_find_context
@@ -373,8 +392,8 @@ typedef struct acpi_predefined_names
 
 typedef struct acpi_namestring_info
 {
-    char                            *ExternalName;
-    char                            *NextExternalChar;
+    const char                      *ExternalName;
+    const char                      *NextExternalChar;
     char                            *InternalName;
     UINT32                          Length;
     UINT32                          NumSegments;
@@ -471,7 +490,7 @@ typedef struct acpi_gpe_event_info
     union acpi_gpe_dispatch_info    Dispatch;       /* Either Method or Handler */
     struct acpi_gpe_register_info   *RegisterInfo;  /* Backpointer to register info */
     UINT8                           Flags;          /* Misc info about this GPE */
-    UINT8                           RegisterBit;    /* This GPE bit within the register */
+    UINT8                           GpeNumber;      /* This GPE */
 
 } ACPI_GPE_EVENT_INFO;
 
@@ -674,9 +693,7 @@ typedef struct acpi_thread_state
 typedef struct acpi_result_values
 {
     ACPI_STATE_COMMON
-    UINT8                           NumResults;
-    UINT8                           LastInsert;
-    union acpi_operand_object       *ObjDesc [ACPI_OBJ_NUM_OPERANDS];
+    union acpi_operand_object       *ObjDesc [ACPI_RESULTS_FRAME_OBJ_NUM];
 
 } ACPI_RESULT_VALUES;
 
@@ -776,6 +793,7 @@ typedef union acpi_parse_value
     union acpi_parse_object         *Next;          /* Next op */\
     ACPI_NAMESPACE_NODE             *Node;          /* For use by interpreter */\
     ACPI_PARSE_VALUE                Value;          /* Value or args associated with the opcode */\
+    UINT8                           ArgListLength;  /* Number of elements in the arg list */\
     ACPI_DISASM_ONLY_MEMBERS (\
     UINT8                           DisasmFlags;    /* Used during AML disassembly */\
     UINT8                           DisasmOpcode;   /* Subtype used for disassembly */\
@@ -885,6 +903,8 @@ typedef struct acpi_parse_state
 #define ACPI_PARSEOP_NAMED              0x02
 #define ACPI_PARSEOP_DEFERRED           0x04
 #define ACPI_PARSEOP_BYTELIST           0x08
+#define ACPI_PARSEOP_IN_STACK           0x10
+#define ACPI_PARSEOP_TARGET             0x20
 #define ACPI_PARSEOP_IN_CACHE           0x80
 
 /* Parse object DisasmFlags */
@@ -1073,12 +1093,30 @@ typedef struct acpi_bit_register_info
 
 typedef struct acpi_db_method_info
 {
-    ACPI_HANDLE                     ThreadGate;
+    ACPI_HANDLE                     MainThreadGate;
+    ACPI_HANDLE                     ThreadCompleteGate;
+    UINT32                          *Threads;
+    UINT32                          NumThreads;
+    UINT32                          NumCreated;
+    UINT32                          NumCompleted;
+
     char                            *Name;
-    char                            **Args;
     UINT32                          Flags;
     UINT32                          NumLoops;
     char                            Pathname[128];
+    char                            **Args;
+
+    /*
+     * Arguments to be passed to method for the command
+     * Threads -
+     *   the Number of threads, ID of current thread and
+     *   Index of current thread inside all them created.
+     */
+    char                            InitArgs;
+    char                            *Arguments[4];
+    char                            NumThreadsStr[11];
+    char                            IdOfThreadStr[11];
+    char                            IndexOfThreadStr[11];
 
 } ACPI_DB_METHOD_INFO;
 
@@ -1151,6 +1189,8 @@ typedef struct acpi_memory_list
 
     UINT32                          TotalAllocated;
     UINT32                          TotalFreed;
+    UINT32                          MaxOccupied;
+    UINT32                          TotalSize;
     UINT32                          CurrentTotalSize;
     UINT32                          Requests;
     UINT32                          Hits;

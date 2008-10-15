@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 1.79 $
+ *              $Revision: 1.84 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,8 +118,8 @@
 
 #include "acpi.h"
 #include "acresrc.h"
-#include "amlcode.h"
 #include "acnamesp.h"
+
 
 #define _COMPONENT          ACPI_RESOURCES
         ACPI_MODULE_NAME    ("rscalc")
@@ -168,7 +168,7 @@ AcpiRsCountSetBits (
     {
         /* Zero the least significant bit that is set */
 
-        BitField &= (BitField - 1);
+        BitField &= (UINT16) (BitField - 1);
     }
 
     return (BitsSet);
@@ -312,6 +312,28 @@ AcpiRsGetAmlLength (
          */
         switch (Resource->Type)
         {
+        case ACPI_RESOURCE_TYPE_IRQ:
+
+            /* Length can be 3 or 2 */
+
+            if (Resource->Data.Irq.DescriptorLength == 2)
+            {
+                TotalSize--;
+            }
+            break;
+
+
+        case ACPI_RESOURCE_TYPE_START_DEPENDENT:
+
+            /* Length can be 1 or 0 */
+
+            if (Resource->Data.Irq.DescriptorLength == 0)
+            {
+                TotalSize--;
+            }
+            break;
+
+
         case ACPI_RESOURCE_TYPE_VENDOR:
             /*
              * Vendor Defined Resource:
@@ -654,8 +676,8 @@ AcpiRsGetPciRoutingTableLength (
                 ((ACPI_TYPE_LOCAL_REFERENCE ==
                     ACPI_GET_OBJECT_TYPE (*SubObjectList)) &&
 
-                    ((*SubObjectList)->Reference.Opcode ==
-                        AML_INT_NAMEPATH_OP))))
+                    ((*SubObjectList)->Reference.Class ==
+                        ACPI_REFCLASS_NAME))))
             {
                 NameFound = TRUE;
             }
@@ -686,6 +708,10 @@ AcpiRsGetPciRoutingTableLength (
             {
                 TempSizeNeeded += AcpiNsGetPathnameLength (
                                     (*SubObjectList)->Reference.Node);
+                if (!TempSizeNeeded)
+                {
+                    return_ACPI_STATUS (AE_BAD_PARAMETER);
+                }
             }
         }
         else

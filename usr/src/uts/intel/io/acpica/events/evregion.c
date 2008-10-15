@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI AddressSpace (OpRegion) handler dispatch
- *              $Revision: 1.166 $
+ *              $Revision: 1.171 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -169,7 +169,7 @@ AcpiEvInstallRegionHandlers (
     void)
 {
     ACPI_STATUS             Status;
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_TRACE (EvInstallRegionHandlers);
@@ -245,7 +245,7 @@ AcpiEvInitializeOpRegions (
     void)
 {
     ACPI_STATUS             Status;
-    ACPI_NATIVE_UINT        i;
+    UINT32                  i;
 
 
     ACPI_FUNCTION_TRACE (EvInitializeOpRegions);
@@ -323,7 +323,6 @@ AcpiEvExecuteRegMethod (
     Info->PrefixNode = RegionObj2->Extra.Method_REG;
     Info->Pathname = NULL;
     Info->Parameters = Args;
-    Info->ParameterType = ACPI_PARAM_ARGS;
     Info->Flags = ACPI_IGNORE_RETURN_VALUE;
 
     /*
@@ -400,7 +399,6 @@ AcpiEvAddressSpaceDispatch (
     ACPI_INTEGER            *Value)
 {
     ACPI_STATUS             Status;
-    ACPI_STATUS             Status2;
     ACPI_ADR_SPACE_HANDLER  Handler;
     ACPI_ADR_SPACE_SETUP    RegionSetup;
     ACPI_OPERAND_OBJECT     *HandlerDesc;
@@ -462,11 +460,7 @@ AcpiEvAddressSpaceDispatch (
 
         /* Re-enter the interpreter */
 
-        Status2 = AcpiExEnterInterpreter ();
-        if (ACPI_FAILURE (Status2))
-        {
-            return_ACPI_STATUS (Status2);
-        }
+        AcpiExEnterInterpreter ();
 
         /* Check for failure of the Region Setup */
 
@@ -509,7 +503,7 @@ AcpiEvAddressSpaceDispatch (
     ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
         "Handler %p (@%p) Address %8.8X%8.8X [%s]\n",
         &RegionObj->Region.Handler->AddressSpace, Handler,
-        ACPI_FORMAT_UINT64 (Address),
+        ACPI_FORMAT_NATIVE_UINT (Address),
         AcpiUtGetRegionName (RegionObj->Region.SpaceId)));
 
     if (!(HandlerDesc->AddressSpace.HandlerFlags &
@@ -541,11 +535,7 @@ AcpiEvAddressSpaceDispatch (
          * We just returned from a non-default handler, we must re-enter the
          * interpreter
          */
-        Status2 = AcpiExEnterInterpreter ();
-        if (ACPI_FAILURE (Status2))
-        {
-            return_ACPI_STATUS (Status2);
-        }
+       AcpiExEnterInterpreter ();
     }
 
     return_ACPI_STATUS (Status);

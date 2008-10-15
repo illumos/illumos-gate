@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  *	Power Button Driver
  *
@@ -1074,13 +1073,13 @@ power_probe_method_button(struct power_soft_state *softsp)
 static int
 power_probe_fixed_button(struct power_soft_state *softsp)
 {
-	FADT_DESCRIPTOR *fadt;
+	ACPI_TABLE_FADT *fadt;
 
-	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
-	    (ACPI_TABLE_HEADER **) &fadt) != AE_OK)
+	if (AcpiGetTable(ACPI_SIG_FADT, 1, (ACPI_TABLE_HEADER **) &fadt) !=
+	    AE_OK)
 		return (0);
 
-	if (!fadt->PwrButton) {
+	if ((fadt->Flags & ACPI_FADT_POWER_BUTTON) == 0) {
 		if (AcpiInstallFixedEventHandler(ACPI_EVENT_POWER_BUTTON,
 		    power_acpi_fixed_event, (void *)softsp) == AE_OK)
 			return (1);

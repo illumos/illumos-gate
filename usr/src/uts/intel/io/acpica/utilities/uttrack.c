@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uttrack - Memory allocation tracking routines (debug only)
- *              $Revision: 1.3 $
+ *              $Revision: 1.6 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -146,14 +146,14 @@ AcpiUtTrackAllocation (
     ACPI_SIZE               Size,
     UINT8                   AllocType,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line);
 
 static ACPI_STATUS
 AcpiUtRemoveAllocation (
     ACPI_DEBUG_MEM_BLOCK    *Address,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line);
 
 
@@ -215,7 +215,7 @@ void *
 AcpiUtAllocateAndTrack (
     ACPI_SIZE               Size,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line)
 {
     ACPI_DEBUG_MEM_BLOCK    *Allocation;
@@ -238,7 +238,12 @@ AcpiUtAllocateAndTrack (
     }
 
     AcpiGbl_GlobalList->TotalAllocated++;
+    AcpiGbl_GlobalList->TotalSize += (UINT32) Size;
     AcpiGbl_GlobalList->CurrentTotalSize += (UINT32) Size;
+    if (AcpiGbl_GlobalList->CurrentTotalSize > AcpiGbl_GlobalList->MaxOccupied)
+    {
+        AcpiGbl_GlobalList->MaxOccupied = AcpiGbl_GlobalList->CurrentTotalSize;
+    }
 
     return ((void *) &Allocation->UserSpace);
 }
@@ -263,7 +268,7 @@ void *
 AcpiUtAllocateZeroedAndTrack (
     ACPI_SIZE               Size,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line)
 {
     ACPI_DEBUG_MEM_BLOCK    *Allocation;
@@ -290,7 +295,12 @@ AcpiUtAllocateZeroedAndTrack (
     }
 
     AcpiGbl_GlobalList->TotalAllocated++;
+    AcpiGbl_GlobalList->TotalSize += (UINT32) Size;
     AcpiGbl_GlobalList->CurrentTotalSize += (UINT32) Size;
+    if (AcpiGbl_GlobalList->CurrentTotalSize > AcpiGbl_GlobalList->MaxOccupied)
+    {
+        AcpiGbl_GlobalList->MaxOccupied = AcpiGbl_GlobalList->CurrentTotalSize;
+    }
 
     return ((void *) &Allocation->UserSpace);
 }
@@ -315,7 +325,7 @@ void
 AcpiUtFreeAndTrack (
     void                    *Allocation,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line)
 {
     ACPI_DEBUG_MEM_BLOCK    *DebugBlock;
@@ -415,7 +425,7 @@ AcpiUtTrackAllocation (
     ACPI_SIZE               Size,
     UINT8                   AllocType,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line)
 {
     ACPI_MEMORY_LIST        *MemList;
@@ -498,7 +508,7 @@ static ACPI_STATUS
 AcpiUtRemoveAllocation (
     ACPI_DEBUG_MEM_BLOCK    *Allocation,
     UINT32                  Component,
-    char                    *Module,
+    const char              *Module,
     UINT32                  Line)
 {
     ACPI_MEMORY_LIST        *MemList;
@@ -629,7 +639,7 @@ AcpiUtDumpAllocationInfo (
 void
 AcpiUtDumpAllocations (
     UINT32                  Component,
-    char                    *Module)
+    const char              *Module)
 {
     ACPI_DEBUG_MEM_BLOCK    *Element;
     ACPI_DESCRIPTOR         *Descriptor;

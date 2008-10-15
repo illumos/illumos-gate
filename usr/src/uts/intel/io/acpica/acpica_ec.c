@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Solaris x86 ACPI CA Embedded Controller operation region handler
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/file.h>
 #include <sys/errno.h>
@@ -339,9 +337,7 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 	_NOTE(ARGUNUSED(nest, context, rv))
 
 	int status, i;
-	ACPI_STATUS res;
 	ACPI_BUFFER buf, crs;
-	ACPI_OBJECT *gpe_obj, *crs_obj;
 	ACPI_INTEGER gpe;
 	int io_port_cnt;
 
@@ -354,24 +350,19 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 	 * Find ec_base and ec_sc addresses
 	 */
 	crs.Length = ACPI_ALLOCATE_BUFFER;
-	res = AcpiEvaluateObject(obj, "_CRS", NULL, &crs);
-	if (ACPI_FAILURE(res)) {
+	if (ACPI_FAILURE(AcpiEvaluateObjectTyped(obj, "_CRS", NULL, &crs,
+	    ACPI_TYPE_BUFFER))) {
 		cmn_err(CE_WARN, "!acpica_install_ec: _CRS object evaluate"
 		    "failed");
 		return (AE_OK);
 	}
-	crs_obj = crs.Pointer;
-	if (crs_obj->Type != ACPI_TYPE_BUFFER) {
-		cmn_err(CE_WARN, "!acpica_install_ec: not a buffer");
-		AcpiOsFree(crs.Pointer);
-		return (AE_OK);
-	}
 
-	for (i = 0, io_port_cnt = 0; i < crs_obj->Buffer.Length; i++) {
+	for (i = 0, io_port_cnt = 0;
+	    i < ((ACPI_OBJECT *)crs.Pointer)->Buffer.Length; i++) {
 		io_port_des_t *io_port;
 		uint8_t *tmp;
 
-		tmp = crs_obj->Buffer.Pointer + i;
+		tmp = ((ACPI_OBJECT *)crs.Pointer)->Buffer.Pointer + i;
 		if (*tmp != IO_PORT_DES)
 			continue;
 		io_port = (io_port_des_t *)tmp;
@@ -412,18 +403,13 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 	/*
 	 * grab contents of GPE object
 	 */
-	if (ACPI_FAILURE(AcpiEvaluateObject(obj, "_GPE", NULL, &buf))) {
+	if (ACPI_FAILURE(AcpiEvaluateObjectTyped(obj, "_GPE", NULL, &buf,
+	    ACPI_TYPE_INTEGER))) {
 		cmn_err(CE_WARN, "!acpica_install_ec: _GPE object evaluate"
 		    "failed");
 		return (AE_OK);
 	}
-	gpe_obj = buf.Pointer;
-	if (gpe_obj->Type != ACPI_TYPE_INTEGER) {
-		cmn_err(CE_WARN, "!acpica_install_ec: not an int");
-		AcpiOsFree(buf.Pointer);
-		return (AE_OK);
-	}
-	gpe = gpe_obj->Integer.Value;
+	gpe = ((ACPI_OBJECT *)buf.Pointer)->Integer.Value;
 	AcpiOsFree(buf.Pointer);
 
 	/*
@@ -451,8 +437,8 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 		 */
 	}
 
-	status = AcpiSetGpeType(NULL, gpe, ACPI_GPE_TYPE_RUNTIME);
-	status = AcpiEnableGpe(NULL, gpe, ACPI_NOT_ISR);
+	(void) AcpiSetGpeType(NULL, gpe, ACPI_GPE_TYPE_RUNTIME);
+	(void) AcpiEnableGpe(NULL, gpe, ACPI_NOT_ISR);
 
 	return (AE_OK);
 }
@@ -492,8 +478,7 @@ acpica_probe_ecdt()
 	EC_BOOT_RESOURCES *ecdt;
 
 
-	if (AcpiGetFirmwareTable("ECDT", 1, ACPI_LOGICAL_ADDRESSING,
-				(ACPI_TABLE_HEADER **) &ecdt) != AE_OK) {
+	if (AcpiGetTable("ECDT", 1, (ACPI_TABLE_HEADER **) &ecdt) != AE_OK) {
 		cmn_err(CE_NOTE, "!acpica: ECDT not found\n");
 		return;
 	}
