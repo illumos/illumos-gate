@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
@@ -35,6 +36,7 @@
 #include <link.h>
 #include <assert.h>
 
+#include <fm/libtopo.h>
 #include <sys/processor.h>
 #include <sys/stat.h>
 #include <sys/mdesc.h>
@@ -48,10 +50,19 @@
 #include <sys/pri.h>
 
 #include "ldom.h"
+#include "ldom_alloc.h"
 #include "ldmsvcs_utils.h"
+#include "ldom_xmpp_client.h"
 
 #define	MD_STR_PLATFORM		"platform"
 #define	MD_STR_DOM_CAPABLE	"domaining-enabled"
+#define	MD_STR_IODEVICE		"iodevice"
+#define	MD_STR_NAME		"name"
+#define	MD_STR_DEVICE_TYPE	"device-type"
+#define	MD_STR_CFGHDL		"cfg-handle"
+#define	MD_STR_PCIEX		"pciex"
+#define	MD_STR_PCI		"pci"
+#define	MD_STR_NIU		"niu"
 
 static int ldom_ldmd_is_up = 0; /* assume stays up if ever seen up */
 
@@ -222,83 +233,6 @@ get_local_md_prop_value(ldom_hdl_t *lhp, char *node, char *prop, uint64_t *val)
 	return (rc);
 }
 
-static int
-ldom_getinfo(struct ldom_hdl *lhp)
-{
-	static pthread_mutex_t mt = PTHREAD_MUTEX_INITIALIZER;
-	static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
-	static int major_version = -1;
-	static int service_ldom = -1;
-	static int busy_init = 0;
-
-	int ier, rc = 0;
-	uint64_t domain_capable;
-
-	(void) pthread_mutex_lock(&mt);
-
-	while (busy_init == 1)
-		(void) pthread_cond_wait(&cv, &mt);
-
-	if (major_version != -1 && service_ldom != -1) {
-		lhp->major_version = major_version;
-		lhp->service_ldom = service_ldom;
-		(void) pthread_mutex_unlock(&mt);
-		return (0);
-	}
-
-	/*
-	 * get to this point if major_version and service_ldom have not yet
-	 * been determined
-	 */
-	busy_init = 1;
-	(void) pthread_mutex_unlock(&mt);
-
-	/*
-	 * set defaults which correspond to the case of "LDOMS not
-	 * available".	note that these can (and will) also apply to
-	 * non-sun4v machines.
-	 */
-	major_version = 0;
-	service_ldom = 0;
-
-	if (get_local_md_prop_value(lhp, MD_STR_PLATFORM, MD_STR_DOM_CAPABLE,
-	    &domain_capable) == 0) {
-
-		/*
-		 * LDOMS capable FW is installed; it should be ok to
-		 * try to communicate with ldmd and if that fails/timesout
-		 * then use libpri
-		 */
-		major_version = 1;
-
-		if ((ier = ldmsvcs_check_channel()) == 0) {
-			/*
-			 * control ldom
-			 * ldmfma channel between FMA and ldmd only exists
-			 * on the control domain.
-			 */
-			service_ldom = 1;
-		} else if (ier == 1) {
-			/*
-			 * guest ldom
-			 * non-control ldom such as guest and io service ldom
-			 */
-			service_ldom = 0;
-		}
-	}
-
-	(void) pthread_mutex_lock(&mt);
-	lhp->major_version = major_version;
-	lhp->service_ldom = service_ldom;
-	busy_init = 0;
-	(void) pthread_mutex_unlock(&mt);
-
-	(void) pthread_cond_broadcast(&cv);
-
-	return (rc);
-}
-
-
 /*
  * search the machine description for a "pid" entry (physical cpuid) and
  * return the corresponding "id" entry (virtual cpuid).
@@ -363,6 +297,124 @@ cpu_phys2virt(ldom_hdl_t *lhp, uint32_t cpuid)
 	return (vid);
 }
 
+static int
+get_type(ldom_hdl_t *lhp, uint32_t *type)
+{
+	int num_nodes, cnt, i, rc;
+	char *p;
+	mde_cookie_t *listp;
+	md_t *mdp;
+	uint64_t domain_capable;
+	uint64_t *bufp;
+	ssize_t bufsize;
+
+	*type = 0;
+
+	/* legacy system */
+	if (get_local_md_prop_value(lhp, MD_STR_PLATFORM, MD_STR_DOM_CAPABLE,
+	    &domain_capable) != 0) {
+		*type = LDOM_TYPE_LEGACY;
+		return (0);
+	}
+
+	/*
+	 * LDOMS capable FW is installed; it should be ok to
+	 * try to communicate with ldmd
+	 */
+	if ((rc = ldmsvcs_check_channel()) == 0) {
+		/*
+		 * control ldom
+		 * ldmfma channel between FMA and ldmd only exists
+		 * on the control domain.
+		 */
+		*type |= LDOM_TYPE_CONTROL;
+	} else if (rc == -1) {
+		return (rc);
+	}
+
+	/*
+	 * root domain and io domain
+	 */
+	if ((bufsize = get_local_core_md(lhp, &bufp)) < 1)
+		return (-1);
+	if ((mdp = md_init_intern(bufp, lhp->allocp, lhp->freep)) == NULL) {
+		lhp->freep(bufp, bufsize);
+		return (-1);
+	}
+	if ((num_nodes = md_node_count(mdp)) < 1) {
+		lhp->freep(bufp, bufsize);
+		(void) md_fini(mdp);
+		return (-1);
+	}
+
+	/* Search for the root complex and niu nodes */
+	listp = lhp->allocp(sizeof (mde_cookie_t) * num_nodes);
+	cnt = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
+	    md_find_name(mdp, MD_STR_IODEVICE), md_find_name(mdp, "fwd"),
+	    listp);
+	for (i = 0, p = NULL; i < cnt; i++) {
+		if ((md_get_prop_str(mdp, listp[i], MD_STR_DEVICE_TYPE, &p)
+		    == 0) &&
+		    (p != NULL) && (strcmp(p, MD_STR_PCIEX) == 0)) {
+			*type |= LDOM_TYPE_ROOT;
+			break;
+		}
+	}
+	for (i = 0, p = NULL; i < cnt; i++) {
+		if ((md_get_prop_str(mdp, listp[i], MD_STR_NAME, &p) == 0) &&
+		    (p != NULL) && (strcmp(p, MD_STR_NIU) == 0)) {
+			*type |= LDOM_TYPE_IO;
+			break;
+		}
+	}
+	lhp->freep(listp, sizeof (mde_cookie_t) * num_nodes);
+	(void) md_fini(mdp);
+	lhp->freep(bufp, bufsize);
+
+	return (0);
+}
+
+int
+ldom_get_type(ldom_hdl_t *lhp, uint32_t *type)
+{
+	static pthread_mutex_t mt = PTHREAD_MUTEX_INITIALIZER;
+	static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
+	static uint32_t ltype = 0;
+	static int busy_init = 0;
+
+	int rc = 0;
+
+	(void) pthread_mutex_lock(&mt);
+
+	while (busy_init == 1)
+		(void) pthread_cond_wait(&cv, &mt);
+
+	if (VALID_LDOM_TYPE(ltype) != 0) {
+		*type = ltype;
+		(void) pthread_mutex_unlock(&mt);
+		return (0);
+	}
+
+	/*
+	 * get to this point if the ldom_type has not yet been determined
+	 */
+	busy_init = 1;
+	(void) pthread_mutex_unlock(&mt);
+
+	rc = get_type(lhp, &ltype);
+	if (rc == 0) {
+		*type = ltype;
+	}
+
+	(void) pthread_mutex_lock(&mt);
+	busy_init = 0;
+	(void) pthread_mutex_unlock(&mt);
+
+	(void) pthread_cond_broadcast(&cv);
+
+	return (rc);
+}
+
 int
 ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl)
 {
@@ -373,11 +425,8 @@ ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl)
 		return (EINVAL);
 
 	/*
-	 * ldom_ldmd_is_up can only be true if ldom_major_version()
-	 * returned 1 earlier; the major version is constant for the
-	 * life of the client process
+	 * ldom_ldmd_is_up can only be true if a pri can be obtained from ldmd.
 	 */
-
 	if (!ldom_ldmd_is_up) {
 		/* Zeus is unavail; use local routines for status/retire */
 
@@ -438,11 +487,8 @@ ldom_fmri_retire(ldom_hdl_t *lhp, nvlist_t *nvl)
 		return (EINVAL);
 
 	/*
-	 * ldom_ldmd_is_up can only be true if ldom_major_version()
-	 * returned 1 earlier; the major version is constant for the
-	 * life of the client process
+	 * ldom_ldmd_is_up can only be true if a pri can be obtained from ldmd.
 	 */
-
 	if (!ldom_ldmd_is_up) {
 		/* Zeus is unavail; use local routines for status/retire */
 
@@ -502,11 +548,8 @@ ldom_fmri_unretire(ldom_hdl_t *lhp, nvlist_t *nvl)
 		return (EINVAL);
 
 	/*
-	 * ldom_ldmd_is_up can only be true if ldom_major_version()
-	 * returned 1 earlier; the major version is constant for the
-	 * life of the client process
+	 * ldom_ldmd_is_up can only be true if a pri can be obtained from ldmd.
 	 */
-
 	if (!ldom_ldmd_is_up) {
 		/* Zeus is unavail; use local routines for status/retire */
 
@@ -560,8 +603,10 @@ static int
 fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl, int cmd)
 {
 	char *name;
+	uint32_t type = 0;
 
-	if (ldom_major_version(lhp) != 0)
+	if ((ldom_get_type(lhp, &type) != 0) ||
+	    ((type & LDOM_TYPE_LEGACY) == 0))
 		return (0);
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &name) != 0)
@@ -624,76 +669,107 @@ ldom_fmri_unblacklist(ldom_hdl_t *lhp, nvlist_t *nvl)
 
 
 ssize_t
+ldom_get_local_md(ldom_hdl_t *lhp, uint64_t **buf)
+{
+	return (get_local_core_md(lhp, buf));
+}
+
+ssize_t
 ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 {
 	ssize_t		rv;	/* return value */
 	uint64_t	tok;	/* opaque PRI token */
+	uint32_t	type = 0;
 
-	switch (ldom_major_version(lhp)) {
-	case 0:
-		/* pre LDOMS */
-		rv = get_local_core_md(lhp, buf);
-		break;
-	case 1:
-		/* LDOMS 1.0 - Zeus and libpri usable only on service dom */
-		if (ldom_on_service(lhp) == 1) {
-			if ((rv = ldmsvcs_get_core_md(lhp, buf)) < 1) {
-				(void) pthread_mutex_lock(&ldom_pri_lock);
-				rv = ldom_pri_get(PRI_GET, &tok,
-				    buf, lhp->allocp, lhp->freep);
-				(void) pthread_mutex_unlock(&ldom_pri_lock);
-			} else {
-				ldom_ldmd_is_up = 1;
-			}
+	(void) ldom_get_type(lhp, &type);
+	if (VALID_LDOM_TYPE(type) == 0) {
+		return (-1);
+	}
+	if ((type & LDOM_TYPE_CONTROL) != 0) {
+		/* Get the pri from Zeus first. If failed, get it from libpri */
+		if ((rv = ldmsvcs_get_core_md(lhp, buf)) < 1) {
+			(void) pthread_mutex_lock(&ldom_pri_lock);
+			rv = ldom_pri_get(PRI_GET, &tok,
+			    buf, lhp->allocp, lhp->freep);
+			(void) pthread_mutex_unlock(&ldom_pri_lock);
 		} else {
-			rv = get_local_core_md(lhp, buf);
+			ldom_ldmd_is_up = 1;
+			xmpp_start();
 		}
-		break;
-	default:
-		rv = -1;
-		break;
+	} else {
+		/* get the local MD */
+		rv = get_local_core_md(lhp, buf);
 	}
 
 	return (rv);
 }
 
-/*
- * version 0 means no LDOMS
- */
 int
-ldom_major_version(ldom_hdl_t *lhp)
+ldom_find_id(ldom_hdl_t *lhp, uint64_t addr, ldom_rsrc_t rsrc,
+    uint64_t *virt_addr, char *name, int name_size, uint64_t *did)
 {
-	if (lhp == NULL)
-		return (-1);
+	uint32_t type = 0;
 
-	if (ldom_getinfo(lhp) == 0)
-		return (lhp->major_version);
-	else
-		return (0);
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) == 0) {
+		return (ENOTSUP);
+	}
+	if (!ldom_ldmd_is_up) {
+		return (EAGAIN);
+	}
+	return (ldmsvcs_io_req_id(lhp, addr, rsrc, virt_addr,
+	    name, name_size, did));
+}
+
+int
+ldom_register_event(ldom_hdl_t *lhp, ldom_reg_cb_t cb, ldom_cb_arg_t data)
+{
+	uint32_t type = 0;
+
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) == 0) {
+		return (ENOTSUP);
+	}
+
+	return (xmpp_add_client(lhp, cb, data));
+}
+
+int
+ldom_unregister_event(ldom_hdl_t *lhp)
+{
+	uint32_t type = 0;
+
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) == 0) {
+		return (ENOTSUP);
+	}
+
+	return (xmpp_remove_client(lhp));
 }
 
 /*
- * in the absence of ldoms we are on a single OS instance which is the
- * equivalent of the service ldom
+ * ldom_init()
+ * Description:
+ *     Return a libldom handle to the caller for uniquely identify the session
+ *     betweem the caller and the libldom.so. The handle is used in
+ *     subsequent calls into the libldom.so
+ *
+ *     If the caller does not provide a alloc()/free(), the libldom uses its
+ *     own functions.
  */
-int
-ldom_on_service(ldom_hdl_t *lhp)
-{
-	if (lhp == NULL)
-		return (-1);
-
-	if (ldom_getinfo(lhp) == 0)
-		return (lhp->service_ldom);
-	else
-		return (1);
-}
-
-
 ldom_hdl_t *
 ldom_init(void *(*allocp)(size_t size),
 	void (*freep)(void *addr, size_t size))
 {
 	struct ldom_hdl *lhp;
+
+	if (allocp == NULL && freep == NULL) {
+		allocp = ldom_alloc;
+		freep = ldom_free;
+	} else if (allocp == NULL || freep == NULL) {
+		/* missing alloc or free functions */
+		return (NULL);
+	}
 
 	(void) pthread_mutex_lock(&ldom_pri_lock);
 
@@ -710,7 +786,6 @@ ldom_init(void *(*allocp)(size_t size),
 
 	(void) pthread_mutex_unlock(&ldom_pri_lock);
 
-	lhp->major_version = -1;	/* version not yet determined */
 	lhp->allocp = allocp;
 	lhp->freep = freep;
 
@@ -726,6 +801,7 @@ ldom_fini(ldom_hdl_t *lhp)
 	if (lhp == NULL)
 		return;
 
+	(void) xmpp_remove_client(lhp);
 	ldmsvcs_fini(lhp);
 	lhp->freep(lhp, sizeof (struct ldom_hdl));
 

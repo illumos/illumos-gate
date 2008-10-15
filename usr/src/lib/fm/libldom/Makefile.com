@@ -26,7 +26,7 @@
 LIBRARY = libldom.a
 VERS = .1
 
-LIBSRCS = ldom.c ldmsvcs_utils.c
+LIBSRCS = ldom.c ldom_alloc.c ldmsvcs_utils.c ldom_xmpp_client.c
 OBJECTS = $(LIBSRCS:%.c=%.o)
 
 include ../../../Makefile.lib
@@ -37,12 +37,13 @@ SRCDIR = ../sparc
 
 LIBS = $(DYNLIB) $(LINTLIB)
 
-CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
+CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include \
+	-I/usr/include/libxml2 -I/usr/sfw/include
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 LDLIBS += $(MACH_LDLIBS)
-LDLIBS += -lfmd_agent -lnvpair -lscf -lmdesc -lc
+LDLIBS += -lfmd_agent -lnvpair -lscf -lmdesc -lc -lxml2 -lsocket -lumem
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64

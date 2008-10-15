@@ -31,8 +31,6 @@
  * plugin for sending/receiving FMA events to/from service processor
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * --------------------------------- includes --------------------------------
  */
@@ -42,12 +40,16 @@
 #include <sys/fm/ldom.h>
 #include <sys/strlog.h>
 #include <sys/syslog.h>
+#include <sys/libds.h>
 #include <netinet/in.h>
 #include <fm/fmd_api.h>
 
 #include "etm_xport_api.h"
 #include "etm_etm_proto.h"
 #include "etm_impl.h"
+#include "etm_iosvc.h"
+#include "etm_filter.h"
+#include "etm_ckpt.h"
 
 #include <pthread.h>
 #include <signal.h>
@@ -60,6 +62,8 @@
 #include <values.h>
 #include <alloca.h>
 #include <errno.h>
+#include <dlfcn.h>
+#include <link.h>
 #include <fcntl.h>
 #include <time.h>
 
@@ -70,34 +74,44 @@
 static void
 etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class);
 
+static int
+etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *event, nvlist_t *nvl);
+
+static void
+etm_send_to_remote_root(void *arg);
+
+static void
+etm_recv_from_remote_root(void *arg);
+
 /*
  * ------------------------- data structs for FMD ----------------------------
  */
 
-static const fmd_hdl_ops_t fmd_ops = {
+static fmd_hdl_ops_t fmd_ops = {
 	etm_recv,	/* fmdo_recv */
 	NULL,		/* fmdo_timeout */
 	NULL,		/* fmdo_close */
 	NULL,		/* fmdo_stats */
 	NULL,		/* fmdo_gc */
-	NULL,		/* fmdo_send */
+	etm_send,	/* fmdo_send */
 };
 
 static const fmd_prop_t fmd_props[] = {
-	{ ETM_PROP_NM_XPORT_ADDRS,	FMD_TYPE_STRING, "" },
-	{ ETM_PROP_NM_DEBUG_LVL,	FMD_TYPE_INT32, "0" },
-	{ ETM_PROP_NM_DEBUG_MAX_EV_CNT,	FMD_TYPE_INT32, "-1" },
-	{ ETM_PROP_NM_CONSOLE,		FMD_TYPE_BOOL, "false" },
-	{ ETM_PROP_NM_SYSLOGD,		FMD_TYPE_BOOL, "true" },
-	{ ETM_PROP_NM_FACILITY,		FMD_TYPE_STRING, "LOG_DAEMON" },
-	{ ETM_PROP_NM_MAX_RESP_Q_LEN,	FMD_TYPE_UINT32, "512" },
-	{ ETM_PROP_NM_BAD_ACC_TO_SEC,	FMD_TYPE_UINT32, "1" },
+	{ ETM_PROP_NM_XPORT_ADDRS,		FMD_TYPE_STRING, "" },
+	{ ETM_PROP_NM_DEBUG_LVL,		FMD_TYPE_INT32, "0" },
+	{ ETM_PROP_NM_DEBUG_MAX_EV_CNT,		FMD_TYPE_INT32, "-1" },
+	{ ETM_PROP_NM_CONSOLE,			FMD_TYPE_BOOL, "false" },
+	{ ETM_PROP_NM_SYSLOGD,			FMD_TYPE_BOOL, "true" },
+	{ ETM_PROP_NM_FACILITY,			FMD_TYPE_STRING, "LOG_DAEMON" },
+	{ ETM_PROP_NM_MAX_RESP_Q_LEN,		FMD_TYPE_UINT32, "512" },
+	{ ETM_PROP_NM_BAD_ACC_TO_SEC,		FMD_TYPE_UINT32, "1" },
+	{ ETM_PROP_NM_FMA_RESP_WAIT_TIME,	FMD_TYPE_INT32, "240" },
 	{ NULL, 0, NULL }
 };
 
 
 static const fmd_hdl_info_t fmd_info = {
-	"FMA Event Transport Module", "1.1", &fmd_ops, fmd_props
+	"FMA Event Transport Module", "1.2", &fmd_ops, fmd_props
 };
 
 /*
@@ -107,6 +121,9 @@ static const fmd_hdl_info_t fmd_info = {
 /* misc buffer for variable sized protocol header fields */
 
 #define	ETM_MISC_BUF_SZ	(4 * 1024)
+
+static uint32_t
+etm_ldom_type = LDOM_TYPE_LEGACY;
 
 /* try limit for IO operations w/ capped exp backoff sleep on retry */
 
@@ -129,7 +146,7 @@ static const fmd_hdl_info_t fmd_info = {
 
 /* amount to increment protocol transaction id on each new send */
 
-#define	ETM_XID_INC	(2)
+#define	ETM_XID_INC		(2)
 
 typedef struct etm_resp_q_ele {
 
@@ -147,7 +164,7 @@ typedef struct etm_resp_q_ele {
  */
 
 static fmd_hdl_t
-*init_hdl = NULL;	/* used in mem allocator at init time */
+*init_hdl = NULL;	/* used in mem allocator and several other places */
 
 static int
 etm_debug_lvl = 0;	/* debug level: 0 is off, 1 is on, 2 is more, etc */
@@ -198,13 +215,17 @@ static uint32_t
 etm_xid_ver_negot = 0;	/* xid of last CONTROL msg sent requesting ver negot */
 
 static uint32_t
-etm_xid_posted_ev = 0;	/* xid of last FMA_EVENT msg/event posted OK to FMD */
+etm_xid_posted_logged_ev = 0;
+			/* xid of last FMA_EVENT msg/event posted OK to FMD */
 
 static uint32_t
 etm_xid_posted_sa = 0;	/* xid of last ALERT msg/event posted OK to syslog */
 
 static uint8_t
 etm_resp_ver = ETM_PROTO_V1; /* proto ver [negotiated] for msg sends */
+
+static uint32_t
+etm_fma_resp_wait_time = 30;	/*  time (sec) wait for fma event resp */
 
 static pthread_mutex_t
 etm_write_lock = PTHREAD_MUTEX_INITIALIZER;	/* for write operations */
@@ -324,7 +345,6 @@ static struct stats {
 
 	/* FMD entry point bad arguments */
 
-	fmd_stat_t etm_fmd_recv_badargs;
 	fmd_stat_t etm_fmd_init_badargs;
 	fmd_stat_t etm_fmd_fini_badargs;
 
@@ -486,12 +506,10 @@ static struct stats {
 
 	/* FMD entry point bad arguments */
 
-	{ "etm_fmd_recv_badargs", FMD_TYPE_UINT64,
-		"bad arguments from fmd_recv entry point" },
 	{ "etm_fmd_init_badargs", FMD_TYPE_UINT64,
-		"bad arguments from fmd_init entry point" },
+	    "bad arguments from fmd_init entry point" },
 	{ "etm_fmd_fini_badargs", FMD_TYPE_UINT64,
-		"bad arguments from fmd_fini entry point" },
+	    "bad arguments from fmd_fini entry point" },
 
 	/* Alert logging errors */
 
@@ -506,6 +524,132 @@ static struct stats {
 		"xport resets after xport API failure" }
 };
 
+
+/*
+ * -------------------- global data for Root ldom-------------------------
+ */
+
+ldom_hdl_t
+*etm_lhp = NULL;		/* ldom pointer */
+
+static void *etm_dl_hdl = (void *)NULL;
+static const char *etm_dl_path = "libds.so.1";
+static int etm_dl_mode = (RTLD_NOW | RTLD_LOCAL);
+
+static int(*etm_ds_svc_reg)(ds_capability_t *cap, ds_ops_t *ops) =
+	(int (*)(ds_capability_t *cap, ds_ops_t *ops))NULL;
+static int(*etm_ds_clnt_reg)(ds_capability_t *cap, ds_ops_t *ops) =
+	(int (*)(ds_capability_t *cap, ds_ops_t *ops))NULL;
+static int(*etm_ds_send_msg)(ds_hdl_t hdl, void *buf, size_t buflen) =
+	(int (*)(ds_hdl_t hdl, void *buf, size_t buflen))NULL;
+static int(*etm_ds_recv_msg)(ds_hdl_t hdl, void *buf, size_t buflen,
+    size_t *msglen) =
+	(int (*)(ds_hdl_t hdl, void *buf, size_t buflen, size_t *msglen))NULL;
+static int (*etm_ds_fini)(void) = (int (*)(void))NULL;
+
+static pthread_mutex_t
+iosvc_list_lock =  PTHREAD_MUTEX_INITIALIZER;
+
+static pthread_t
+etm_async_e_tid = NULL;	/* thread id of io svc async event handler */
+
+static etm_proto_v1_ev_hdr_t iosvc_hdr = {
+	ETM_PROTO_MAGIC_NUM,	/* magic number */
+	ETM_PROTO_V1,		/* default to V1, not checked */
+	ETM_MSG_TYPE_FMA_EVENT,	/* Root Domain inteoduces only FMA events */
+	0,			/* sub-type */
+	0,			/* pad */
+	0,			/* add the xid at the Q send time */
+	ETM_PROTO_V1_TIMEOUT_NONE,
+	0			/* ev_lens, 0-termed, after 1 FMA event */
+};
+
+/*
+ * static iosvc_list
+ */
+static etm_iosvc_t iosvc_list[NUM_OF_ROOT_DOMAINS] = {
+	{"", 0}, {"", 0}, {"", 0}, {"", 0}, {"", 0}, {"", 0},
+	{"", 0}, {"", 0}
+};
+
+static etm_iosvc_t io_svc = {
+	"\0",				/* ldom_name */
+	PTHREAD_COND_INITIALIZER,	/* nudges */
+	PTHREAD_MUTEX_INITIALIZER,	/* protects the iosvc msg Q */
+	NULL,				/* iosvc msg Q head */
+	NULL,				/* iosvc msg Q tail */
+	0,				/* msg Q current length */
+	100,				/* msg Q max length */
+	0,				/* current transaction id */
+	0,				/* xid of last event posted to FMD */
+	DS_INVALID_HDL,			/* DS handle */
+	NULL,				/* fmd xprt handle */
+	NULL,				/* tid 4 send to remote RootDomain */
+	NULL,				/* tid 4 recv from remote RootDomain */
+	PTHREAD_COND_INITIALIZER,	/* nudges etm_send_to_remote_root */
+	PTHREAD_MUTEX_INITIALIZER,	/* protects msg_ack_cv */
+	0,				/* send/recv threads are not dying */
+	0,				/* flag for start sending msg Q */
+	0				/* indicate if the ACK has come  */
+};
+etm_iosvc_t *io_svc_p = &io_svc;
+
+
+static uint32_t
+flags;					/* flags for fmd_xprt_open */
+
+static etm_async_event_ele_t
+async_event_q[ASYNC_EVENT_Q_SIZE];	/* holds the async events */
+
+static uint32_t
+etm_async_q_head = 0;		/* ptr to cur head of async event queue */
+
+static uint32_t
+etm_async_q_tail = 0;		/* ptr to cur tail of async event queue */
+
+static uint32_t
+etm_async_q_cur_len = 0;	/* cur length (ele cnt) of async event queue */
+
+static uint32_t
+etm_async_q_max_len = ASYNC_EVENT_Q_SIZE;
+				/* max length (ele cnt) of async event queue */
+
+static pthread_cond_t
+etm_async_event_q_cv = PTHREAD_COND_INITIALIZER;
+				/* nudges  async event handler */
+
+static pthread_mutex_t
+etm_async_event_q_lock = PTHREAD_MUTEX_INITIALIZER;
+				/* protects async event q */
+
+static ds_ver_t
+etm_iosvc_vers[] = { { 1, 0} };
+
+#define	ETM_NVERS	(sizeof (etm_iosvc_vers) / sizeof (ds_ver_t))
+
+static ds_capability_t
+iosvc_caps = {
+	"ETM",				/* svc_id */
+	etm_iosvc_vers,			/* vers */
+	ETM_NVERS			/* number of vers */
+};
+
+static void
+etm_iosvc_reg_handler(ds_hdl_t hdl, ds_cb_arg_t arg, ds_ver_t *ver,
+    ds_domain_hdl_t did);
+
+static void
+etm_iosvc_unreg_handler(ds_hdl_t hdl, ds_cb_arg_t arg);
+
+static ds_ops_t
+iosvc_ops = {
+	etm_iosvc_reg_handler,		/* ds_reg_cb */
+	etm_iosvc_unreg_handler,	/* ds_unreg_cb */
+	NULL,				/* ds_data_cb */
+	NULL				/* cb_arg */
+};
+
+
 /*
  * -------------------------- support functions ------------------------------
  */
@@ -518,6 +662,7 @@ static struct stats {
  *		routines; so "%p" under Solaris does not prepend "0x" to
  *		the outputted hex digits, while Linux and VxWorks do.
  */
+
 
 /*
  * etm_show_time - display the current time of day (for debugging) using
@@ -681,18 +826,18 @@ etm_io_op(fmd_hdl_t *hdl, char *err_substr, etm_xport_conn_t conn,
 		return (-EINVAL);
 	}
 	switch (io_op) {
-		case ETM_IO_OP_RD:
-			io_func_ptr = etm_xport_read;
-			io_retry_stat = etm_stats.etm_xport_rd_retry;
-			io_fail_stat = etm_stats.etm_xport_rd_fail;
-			break;
-		case ETM_IO_OP_WR:
-			io_func_ptr = etm_xport_write;
-			io_retry_stat = etm_stats.etm_xport_wr_retry;
-			io_fail_stat = etm_stats.etm_xport_wr_fail;
-			break;
-		default:
-			return (-EINVAL);
+	case ETM_IO_OP_RD:
+		io_func_ptr = etm_xport_read;
+		io_retry_stat = etm_stats.etm_xport_rd_retry;
+		io_fail_stat = etm_stats.etm_xport_rd_fail;
+		break;
+	case ETM_IO_OP_WR:
+		io_func_ptr = etm_xport_write;
+		io_retry_stat = etm_stats.etm_xport_wr_retry;
+		io_fail_stat = etm_stats.etm_xport_wr_fail;
+		break;
+	default:
+		return (-EINVAL);
 	}
 	if (byte_cnt == 0) {
 		return (byte_cnt);	/* nop */
@@ -1166,7 +1311,7 @@ etm_hdr_write(fmd_hdl_t *hdl, etm_xport_conn_t conn, nvlist_t *evp,
  */
 
 static int
-etm_post_to_fmd(fmd_hdl_t *hdl, nvlist_t *evp)
+etm_post_to_fmd(fmd_hdl_t *hdl, fmd_xprt_t *fmd_xprt, nvlist_t *evp)
 {
 	ssize_t			ev_sz;		/* sizeof *evp */
 
@@ -1175,7 +1320,7 @@ etm_post_to_fmd(fmd_hdl_t *hdl, nvlist_t *evp)
 	if (etm_debug_lvl >= 2) {
 		etm_show_time(hdl, "ante ev post");
 	}
-	fmd_xprt_post(hdl, etm_fmd_xprt, evp, 0);
+	fmd_xprt_post(hdl, fmd_xprt, evp, 0);
 	etm_stats.etm_wr_fmd_fmaevent.fmds_value.ui64++;
 	etm_stats.etm_wr_fmd_bytes.fmds_value.ui64 += ev_sz;
 	if (etm_debug_lvl >= 1) {
@@ -1340,6 +1485,483 @@ func_ret:
 	fmd_hdl_free(hdl, ctl_hdrp, hdr_sz + body_sz);
 
 } /* etm_req_ver_negot() */
+
+
+
+/*
+ * etm_iosvc_msg_enq - add element to tail of ETM iosvc msg queue
+ * etm_iosvc_msg_deq - del element from head of ETM iosvc msg  queue
+ * need to grab the mutex lock before calling this routine
+ * return >0 for success, or -errno value
+ */
+static int
+etm_iosvc_msg_enq(fmd_hdl_t *hdl, etm_iosvc_t *iosvc, etm_iosvc_q_ele_t *msgp)
+{
+	etm_iosvc_q_ele_t		*newp;	/* ptr to new msg q ele */
+
+	if (iosvc->msg_q_cur_len >= iosvc->msg_q_max_len) {
+		fmd_hdl_debug(hdl, "warning: enq to full msg queue\n");
+		return (-E2BIG);
+	}
+
+	newp = fmd_hdl_zalloc(hdl, sizeof (*newp), FMD_SLEEP);
+	(void) memcpy(newp, msgp, sizeof (*newp));
+	newp->msg_nextp = NULL;
+
+	if (iosvc->msg_q_cur_len == 0) {
+		iosvc->msg_q_head = newp;
+	} else {
+		iosvc->msg_q_tail->msg_nextp = newp;
+	}
+
+	iosvc->msg_q_tail = newp;
+	iosvc->msg_q_cur_len++;
+	fmd_hdl_debug(hdl, "info: current msg queue length %d\n",
+	    iosvc->msg_q_cur_len);
+
+	return (1);
+
+} /* etm_iosvc_msg_enq() */
+
+static int
+etm_iosvc_msg_deq(fmd_hdl_t *hdl, etm_iosvc_t *iosvc, etm_iosvc_q_ele_t *msgp)
+{
+	etm_iosvc_q_ele_t	*oldp;	/* ptr to old msg q ele */
+
+	if (iosvc->msg_q_cur_len == 0) {
+		fmd_hdl_debug(hdl, "warning: deq from empty responder queue\n");
+		return (-ENOENT);
+	}
+
+	(void) memcpy(msgp, iosvc->msg_q_head, sizeof (*msgp));
+	msgp->msg_nextp = NULL;
+
+	oldp = iosvc->msg_q_head;
+	iosvc->msg_q_head = iosvc->msg_q_head->msg_nextp;
+
+	/*
+	 * free the mem alloc-ed in etm_iosvc_msg_enq()
+	 */
+	fmd_hdl_free(hdl, oldp, sizeof (*oldp));
+
+	iosvc->msg_q_cur_len--;
+	if (iosvc->msg_q_cur_len == 0) {
+		iosvc->msg_q_tail = NULL;
+	}
+
+	return (1);
+
+} /* etm_iosvc_msg_deq() */
+
+
+/*
+ * etm_msg_enq_head():
+ * enq the msg to the head of the Q.
+ * If the Q is full, drop the msg at the tail then enq the msg at head.
+ * need to grab mutex lock iosvc->msg_q_lock before calling this routine.
+ */
+static void
+etm_msg_enq_head(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
+    etm_iosvc_q_ele_t *msg_ele)
+{
+
+	etm_iosvc_q_ele_t	*newp;	/* iosvc msg ele ptr */
+
+	if (iosvc->msg_q_cur_len >= iosvc->msg_q_max_len) {
+		fmd_hdl_debug(fmd_hdl,
+		    "warning: add to head of a full msg queue."
+		    " Drop the msg at the tail\n");
+		/*
+		 * drop the msg at the tail
+		 */
+		newp = iosvc->msg_q_head;
+		while (newp->msg_nextp != iosvc->msg_q_tail) {
+			newp = newp->msg_nextp;
+		}
+
+		/*
+		 * free the msg in iosvc->msg_q_tail->msg
+		 * free the mem pointed to by iosvc->msg_q_tail
+		 */
+		fmd_hdl_free(fmd_hdl, iosvc->msg_q_tail->msg,
+		    iosvc->msg_q_tail->msg_size);
+		fmd_hdl_free(fmd_hdl, iosvc->msg_q_tail, sizeof (*newp));
+		iosvc->msg_q_tail = newp;
+		iosvc->msg_q_tail->msg_nextp = NULL;
+		iosvc->msg_q_cur_len--;
+	}
+
+	/*
+	 * enq the msg to the head
+	 */
+	newp = fmd_hdl_zalloc(fmd_hdl, sizeof (*newp), FMD_SLEEP);
+	(void) memcpy(newp, msg_ele, sizeof (*newp));
+	if (iosvc->msg_q_cur_len == 0) {
+		newp->msg_nextp = NULL;
+		iosvc->msg_q_tail = newp;
+	} else {
+		newp->msg_nextp = iosvc->msg_q_head;
+	}
+	iosvc->msg_q_head = newp;
+	iosvc->msg_q_cur_len++;
+} /* etm_msg_enq_head() */
+
+/*
+ * etm_isovc_cleanup():
+ * clean up what's in the passed-in iosvc struct, including the msg Q.
+ */
+static void
+etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc)
+{
+
+	etm_iosvc_q_ele_t	msg_ele;	/* io svc msg Q ele */
+
+	iosvc->thr_is_dying = 1;
+
+	if (iosvc->send_tid != NULL) {
+		fmd_thr_signal(fmd_hdl, iosvc->send_tid);
+		fmd_thr_destroy(fmd_hdl, iosvc->send_tid);
+		iosvc->send_tid = NULL;
+	} /* if io svc send thread was created ok */
+
+	if (iosvc->recv_tid != NULL) {
+		fmd_thr_signal(fmd_hdl, iosvc->recv_tid);
+		fmd_thr_destroy(fmd_hdl, iosvc->recv_tid);
+		iosvc->recv_tid = NULL;
+	} /* if root domain recv thread was created */
+
+	iosvc->ldom_name[0] = '\0';
+
+	iosvc->ds_hdl = DS_INVALID_HDL;
+
+	if (iosvc->fmd_xprt != NULL) {
+		fmd_xprt_close(fmd_hdl, iosvc->fmd_xprt);
+		iosvc->fmd_xprt = NULL;
+	} /* if fmd-xprt has been opened */
+
+	(void) pthread_mutex_lock(&iosvc->msg_q_lock);
+	while (iosvc->msg_q_cur_len > 0) {
+		(void) etm_iosvc_msg_deq(fmd_hdl, iosvc, &msg_ele);
+		fmd_hdl_free(fmd_hdl, msg_ele.msg, msg_ele.msg_size);
+	}
+	(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
+
+	return;
+
+} /* etm_iosvc_cleanup() */
+
+/*
+ * etm_iosvc_lookup(using ldom_name or ds_hdl when ldom_name is empty)
+ * not found, create one, add to iosvc_list
+ */
+etm_iosvc_t *
+etm_iosvc_lookup(fmd_hdl_t *fmd_hdl, char *ldom_name, ds_hdl_t ds_hdl,
+    boolean_t iosvc_create)
+{
+	uint32_t		i;			/* for loop var */
+	int32_t			first_empty_slot = -1;	/* remember that */
+
+	for (i = 0; i < NUM_OF_ROOT_DOMAINS; i++) {
+		if (ldom_name[0] == '\0') {
+			/*
+			 * search by hdl passed in
+			 * the only time this is used is at ds_unreg_cb time.
+			 * there is no ldom name, only the valid ds_hdl.
+			 * find an iosvc with the matching ds_hdl.
+			 * ignore the iosvc_create flag, should never need to
+			 * create an iosvc for ds_unreg_cb
+			 */
+			if (ds_hdl == iosvc_list[i].ds_hdl) {
+				if (etm_debug_lvl >= 2) {
+				fmd_hdl_debug(fmd_hdl,
+			    "info: found an iosvc at slot %d w/ ds_hdl %d \n",
+				    i, iosvc_list[i].ds_hdl);
+				}
+				if (iosvc_list[i].ldom_name[0] != '\0')
+					if (etm_debug_lvl >= 2) {
+						fmd_hdl_debug(fmd_hdl,
+				    "info: found an iosvc w/ ldom_name %s \n",
+						    iosvc_list[i].ldom_name);
+				}
+				return (&iosvc_list[i]);
+			} else {
+				continue;
+			}
+		} else if (iosvc_list[i].ldom_name[0] != '\0') {
+			/*
+			 * this is  an non-empty iosvc structure slot
+			 */
+			if (strcmp(ldom_name, iosvc_list[i].ldom_name) == 0) {
+				/*
+				 * found an iosvc structure that matches the
+				 * passed in ldom_name, return the ptr
+				 */
+				if (etm_debug_lvl >= 2) {
+					fmd_hdl_debug(fmd_hdl, "info: found an "
+					    "iosvc at slot %d w/ ds_hdl %d \n",
+					    i, iosvc_list[i].ds_hdl);
+					fmd_hdl_debug(fmd_hdl, "info: found an "
+					    "iosvc w/ ldom_name %s \n",
+					    iosvc_list[i].ldom_name);
+				}
+				return (&iosvc_list[i]);
+			} else {
+				/*
+				 * non-empty slot with no-matching name,
+				 * move on to next slot.
+				 */
+				continue;
+			}
+		} else {
+			/*
+			 * found the 1st slot with ldom name being empty
+			 * remember the slot #, will be used for creating one
+			 */
+			if (first_empty_slot == -1) {
+				first_empty_slot = i;
+			}
+		}
+	}
+	if (iosvc_create == B_TRUE && first_empty_slot >= 0) {
+		/*
+		 * this is the case we need to add an iosvc at first_empty_slot
+		 * for the ldom_name at iosvc_list[first_empty_slot]
+		 */
+		fmd_hdl_debug(fmd_hdl,
+		    "info: create an iosvc with ldom name %s\n",
+		    ldom_name);
+		i = first_empty_slot;
+		(void) memcpy(&iosvc_list[i], &io_svc, sizeof (etm_iosvc_t));
+		(void) strcpy(iosvc_list[i].ldom_name, ldom_name);
+		fmd_hdl_debug(fmd_hdl, "info: iosvc #%d has ldom name %s\n",
+		    i, iosvc_list[i].ldom_name);
+		return (&iosvc_list[i]);
+	} else {
+		return (NULL);
+	}
+
+} /* etm_iosvc_lookup() */
+
+
+/*
+ * etm_ckpt_remove:
+ * remove the ckpt for the iosvc element
+ */
+static void
+etm_ckpt_remove(fmd_hdl_t *hdl, etm_iosvc_q_ele_t *ele) {
+	int		err;			/* temp error */
+	nvlist_t	*evp = NULL;		/* event pointer */
+	etm_proto_v1_ev_hdr_t	*hdrp;		/* hdr for FMA_EVENT */
+	char		*buf;			/* packed event pointer */
+
+	if ((ele->ckpt_flag == ETM_CKPT_NOOP) ||
+	    (etm_ldom_type != LDOM_TYPE_CONTROL)) {
+		return;
+	}
+
+	/* the pointer to the packed event in the etm message */
+	hdrp = (etm_proto_v1_ev_hdr_t *)((ptrdiff_t)ele->msg);
+	buf = (char *)((ptrdiff_t)hdrp + sizeof (*hdrp)
+	    + (1 * sizeof (hdrp->ev_lens[0])));
+
+	/* unpack it, then uncheckpoited it */
+	if ((err = nvlist_unpack(buf, hdrp->ev_lens[0], &evp, 0)) != 0) {
+		fmd_hdl_debug(hdl, "failed to unpack event(rc=%d)\n", err);
+		return;
+	}
+	(void) etm_ckpt_delete(hdl, evp);
+	nvlist_free(evp);
+}
+
+/*
+ * etm_send_ds_msg()
+ * call ds_send_msg() to send the msg passed in.
+ * timedcond_wait for the ACK to come back.
+ * if the ACK doesn't come in the specified time, retrun -EAGAIN.
+ * other wise, return 1.
+ */
+int
+etm_send_ds_msg(fmd_hdl_t *fmd_hdl, boolean_t ckpt_remove, etm_iosvc_t *iosvc,
+    etm_iosvc_q_ele_t *msg_ele, etm_proto_v1_ev_hdr_t *evhdrp)
+{
+	uint32_t		rc;		/* for return code  */
+
+	struct timeval		tv;
+	struct timespec		timeout;
+
+
+	/*
+	 * call ds_send_msg(). Return (-EAGAIN) if not successful
+	 */
+	if ((rc = (*etm_ds_send_msg)(iosvc->ds_hdl, msg_ele->msg,
+	    msg_ele->msg_size)) != 0) {
+		fmd_hdl_debug(fmd_hdl, "info: ds_send_msg rc %d xid %d\n",
+		    rc, evhdrp->ev_pp.pp_xid);
+			return (-EAGAIN);
+	}
+
+	/*
+	 * wait on the cv for resp msg for cur_send_xid
+	 */
+	(void *) pthread_mutex_lock(&iosvc->msg_ack_lock);
+
+	(void) gettimeofday(&tv, 0);
+	timeout.tv_sec = tv.tv_sec + etm_fma_resp_wait_time;
+	timeout.tv_nsec = 0;
+
+	fmd_hdl_debug(fmd_hdl, "info: waiting on msg_ack_cv for ldom %s\n",
+	    iosvc->ldom_name);
+	rc = pthread_cond_timedwait(&iosvc->msg_ack_cv, &iosvc->msg_ack_lock,
+	    &timeout);
+	(void *) pthread_mutex_unlock(&iosvc->msg_ack_lock);
+	fmd_hdl_debug(fmd_hdl,  "info: msg_ack_cv returns with rc %d\n", rc);
+
+	/*
+	 * check to see if ack_ok is non-zero
+	 * if non-zero, resp msg has been received
+	 */
+	if (iosvc->ack_ok != 0) {
+		/*
+		 * ACK came ok,  this send is successful,
+		 * tell the caller ready to send next.
+		 * free mem alloc-ed in
+		 * etm_pack_ds_msg
+		 */
+		if (ckpt_remove == B_TRUE &&
+		    etm_ldom_type == LDOM_TYPE_CONTROL) {
+			etm_ckpt_remove(fmd_hdl, msg_ele);
+		}
+		fmd_hdl_free(fmd_hdl, msg_ele->msg, msg_ele->msg_size);
+		iosvc->cur_send_xid++;
+		return (1);
+	} else {
+		/*
+		 * the ACK did not come on time
+		 * tell the caller to resend cur_send_xid
+		 */
+		return (-EAGAIN);
+	} /* iosvc->ack_ok != 0 */
+} /* etm_send_ds_msg() */
+
+/*
+ * both events from fmdo_send entry point and from SP are using the
+ * etm_proto_v1_ev_hdr_t as its header and it will be the same header for all
+ * ds send/recv msgs.
+ * Idealy, we should use the hdr coming with the SP FMA event. Since fmdo_send
+ * entry point can be called before FMA events from SP, we can't rely on
+ * the SP FMA event hdr. Use the static hdr for packing ds msgs for fmdo_send
+ * events.
+ * return >0 for success, or -errno value
+ * Design assumption: there is one FMA event per ds msg
+ */
+int
+etm_pack_ds_msg(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
+	etm_proto_v1_ev_hdr_t *ev_hdrp, size_t hdr_sz, nvlist_t *evp,
+	etm_pack_msg_type_t msg_type, uint_t ckpt_opt)
+{
+	etm_proto_v1_ev_hdr_t	*hdrp;		/* for FMA_EVENT msg */
+	uint32_t		*lenp;		/* ptr to FMA event length */
+	size_t			evsz;		/* packed FMA event size */
+	char 			*buf;
+	uint32_t		rc;		/* for return code  */
+	char 			*msg;		/* body of msg to be Qed */
+
+	etm_iosvc_q_ele_t	msg_ele;	/* io svc msg Q ele */
+	etm_proto_v1_ev_hdr_t	*evhdrp;
+
+
+	if (ev_hdrp == NULL) {
+		hdrp = &iosvc_hdr;
+	} else {
+		hdrp = ev_hdrp;
+	}
+
+	/*
+	 * determine hdr_sz if 0, otherwise use the one passed in hdr_sz
+	 */
+
+	if (hdr_sz == 0) {
+		hdr_sz = sizeof (*hdrp) + (1 * sizeof (hdrp->ev_lens[0]));
+	}
+
+	/*
+	 * determine evp size
+	 */
+	(void) nvlist_size(evp, &evsz, NV_ENCODE_XDR);
+
+	/* indicate 1 FMA event, no network encoding, and 0-terminate */
+	lenp = &hdrp->ev_lens[0];
+	*lenp = evsz;
+
+	/*
+	 * now the total of mem needs to be alloc-ed/ds msg size is
+	 * hdr_sz + evsz
+	 * msg will be freed in etm_send_to_remote_root() after ds_send_msg()
+	 */
+	msg = fmd_hdl_zalloc(fmd_hdl, hdr_sz + evsz, FMD_SLEEP);
+
+
+	/*
+	 * copy hdr, 0 terminate the length vector,  and then evp
+	 */
+	(void) memcpy(msg, hdrp, sizeof (*hdrp));
+	hdrp = (etm_proto_v1_ev_hdr_t *)((ptrdiff_t)msg);
+	lenp = &hdrp->ev_lens[0];
+	lenp++;
+	*lenp = 0;
+
+	buf = fmd_hdl_zalloc(fmd_hdl, evsz, FMD_SLEEP);
+	(void) nvlist_pack(evp, (char **)&buf, &evsz, NV_ENCODE_XDR, 0);
+	(void) memcpy(msg + hdr_sz, buf, evsz);
+	fmd_hdl_free(fmd_hdl, buf, evsz);
+
+	fmd_hdl_debug(fmd_hdl, "info: hdr_sz= %d evsz= %d in etm_pack_ds_msg"
+	    "for ldom %s\n", hdr_sz, evsz, iosvc->ldom_name);
+	msg_ele.msg = msg;
+	msg_ele.msg_size = hdr_sz + evsz;
+	msg_ele.ckpt_flag = ckpt_opt;
+
+	/*
+	 * decide what to do with the msg:
+	 * if SP ereports (msg_type == SP_MSG), always enq the msg
+	 * if not SP ereports, ie, fmd xprt control msgs, enq it _only_ after
+	 * resource.fm.xprt.run has been sent (which sets start_sending_Q to 1)
+	 */
+	if ((msg_type == SP_MSG) ||
+	    (msg_type != SP_MSG) && (iosvc->start_sending_Q == 1)) {
+		/*
+		 * this is the case when the msg needs to be enq-ed
+		 */
+		(void) pthread_mutex_lock(&iosvc->msg_q_lock);
+		rc = etm_iosvc_msg_enq(fmd_hdl, iosvc, &msg_ele);
+		if ((rc > 0) && (ckpt_opt & ETM_CKPT_SAVE) &&
+		    (etm_ldom_type == LDOM_TYPE_CONTROL)) {
+			(void) etm_ckpt_add(fmd_hdl, evp);
+		}
+		if (iosvc->msg_q_cur_len == 1)
+			(void) pthread_cond_signal(&iosvc->msg_q_cv);
+		(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
+	} else {
+		/*
+		 * fmd RDWR xprt procotol startup msgs, send it now!
+		 */
+		iosvc->ack_ok = 0;
+		evhdrp = (etm_proto_v1_ev_hdr_t *)((ptrdiff_t)msg_ele.msg);
+		evhdrp->ev_pp.pp_xid = iosvc->cur_send_xid + 1;
+		while (!iosvc->ack_ok && iosvc->ds_hdl != DS_INVALID_HDL &&
+		    !etm_is_dying) {
+			if (etm_send_ds_msg(fmd_hdl, B_FALSE, iosvc, &msg_ele,
+			    evhdrp) < 0) {
+				continue;
+			}
+		}
+		if (msg_type == FMD_XPRT_RUN_MSG)
+			iosvc->start_sending_Q = 1;
+	}
+
+	return (rc);
+
+} /* etm_pack_ds_msg() */
 
 /*
  * Design_Note:	For all etm_resp_q_*() functions and etm_resp_q_* globals,
@@ -1601,9 +2223,11 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
 	etm_proto_v1_resp_hdr_t *resp_hdrp;	/* for RESPONSE msg */
 	etm_proto_v3_sa_hdr_t	*sa_hdrp;	/* for ALERT msg */
+	etm_iosvc_t		*iosvc;		/* iosvc data structure */
 	int32_t			resp_code;	/* response code */
 	ssize_t			enq_rv;		/* resp_q enqueue status */
 	size_t			hdr_sz;		/* sizeof header */
+	size_t			evsz;		/* FMA event size */
 	uint8_t			*body_buf;	/* msg body buffer */
 	uint32_t		body_sz;	/* sizeof body_buf */
 	uint32_t		ev_cnt;		/* count of FMA events */
@@ -1612,6 +2236,10 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	char			*class;		/* FMA event class */
 	ssize_t			i, n;		/* gen use */
 	int			should_reset_xport; /* bool to reset xport */
+	char			ldom_name[MAX_LDOM_NAME]; /* ldom name */
+	int			rc;		/* return code */
+	uint64_t		did;		/* domain id */
+
 
 	if (etm_debug_lvl >= 2) {
 		etm_show_time(hdl, "ante conn handle");
@@ -1686,11 +2314,11 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 		 * if a dup then resend response but skip repost to FMD
 		 */
 
-		if (ev_hdrp->ev_pp.pp_xid == etm_xid_posted_ev) {
+		if (ev_hdrp->ev_pp.pp_xid == etm_xid_posted_logged_ev) {
 			enq_rv = etm_maybe_enq_response(hdl, conn,
 			    ev_hdrp, hdr_sz, 0);
 			fmd_hdl_debug(hdl, "info: skipping dup FMA event post "
-			    "xid 0x%x\n", etm_xid_posted_ev);
+			    "xid 0x%x\n", etm_xid_posted_logged_ev);
 			etm_stats.etm_rd_dup_fmaevent.fmds_value.ui64++;
 			goto func_ret;
 		}
@@ -1720,6 +2348,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 				bp += ev_hdrp->ev_lens[i];
 				continue;
 			}
+
 			if (etm_debug_lvl >= 1) {
 				(void) nvlist_lookup_string(evp, FM_CLASS,
 				    &class);
@@ -1729,10 +2358,61 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 				fmd_hdl_debug(hdl, "info: FMA event %p "
 				    "class %s\n", evp, class);
 			}
-			resp_code = etm_post_to_fmd(hdl, evp);
-			if (resp_code >= 0) {
-				etm_xid_posted_ev = ev_hdrp->ev_pp.pp_xid;
+
+			rc = nvlist_size(evp, &evsz, NV_ENCODE_XDR);
+			fmd_hdl_debug(hdl,
+			    "info: evp size before pack ds msg %d\n", evsz);
+			ldom_name[0] = '\0';
+			rc = etm_filter_find_ldom_id(hdl, evp, ldom_name,
+			    MAX_LDOM_NAME, &did);
+
+			/*
+			 * if rc is zero and the ldom_name is not "primary",
+			 * the evp belongs to a root domain, put the evp in an
+			 * outgoing etm queue,
+			 * in all other cases, whether ldom_name is primary or
+			 * can't find a ldom name, call etm_post_to_fmd
+			 */
+			if ((rc == 0) && strcmp(ldom_name, "primary") &&
+			    strcmp(ldom_name, "")) {
+				/*
+				 * use the ldom_name, guaranteered at this point
+				 * to be a valid ldom name/non-NULL, to find the
+				 * iosvc data.
+				 * add an iosvc struct if can not find one
+				 */
+				(void) pthread_mutex_unlock(&iosvc_list_lock);
+				iosvc = etm_iosvc_lookup(hdl, ldom_name,
+				    DS_INVALID_HDL, B_TRUE);
+				(void) pthread_mutex_unlock(&iosvc_list_lock);
+				if (iosvc == NULL) {
+					fmd_hdl_debug(hdl,
+					    "error: can't find iosvc for ldom "
+					    "name %s\n", ldom_name);
+				} else {
+					resp_code = 0;
+					(void) etm_pack_ds_msg(hdl, iosvc,
+					    ev_hdrp, hdr_sz, evp,
+					    SP_MSG, ETM_CKPT_SAVE);
+					/*
+					 * call the new fmd_xprt_log()
+					 */
+					fmd_xprt_log(hdl, etm_fmd_xprt, evp, 0);
+					etm_xid_posted_logged_ev =
+					    ev_hdrp->ev_pp.pp_xid;
+				}
+			} else {
+				/*
+				 * post the fma event to the control fmd
+				 */
+				resp_code = etm_post_to_fmd(hdl, etm_fmd_xprt,
+				    evp);
+				if (resp_code >= 0) {
+					etm_xid_posted_logged_ev =
+					    ev_hdrp->ev_pp.pp_xid;
+				}
 			}
+
 			evp = NULL;
 			enq_rv = etm_maybe_enq_response(hdl, conn,
 			    ev_hdrp, hdr_sz, resp_code);
@@ -1943,6 +2623,12 @@ etm_server(void *arg)
 
 	fmd_hdl_debug(hdl, "info: connection server starting\n");
 
+	/*
+	 * Restore the checkpointed events and dispatch them before starting to
+	 * receive more events from the sp.
+	 */
+	etm_ckpt_recover(hdl);
+
 	while (!etm_is_dying) {
 
 		if ((conn = etm_xport_accept(hdl, NULL)) == NULL) {
@@ -2080,6 +2766,945 @@ etm_init_free(void *addr, size_t size)
 }
 
 /*
+ * ---------------------root ldom support functions -----------------------
+ */
+
+/*
+ * use a static array async_event_q instead of dynamicaly allocated mem  queue
+ * for etm_async_q_enq and etm_async_q_deq.
+ * This is not running in an fmd aux thread, can't use the fmd_hdl_* funcs.
+ * caller needs to grab the mutex lock before calling this func.
+ * return >0 for success, or -errno value
+ */
+static int
+etm_async_q_enq(etm_async_event_ele_t *async_e)
+{
+
+	if (etm_async_q_cur_len >= etm_async_q_max_len) {
+		/* etm_stats.etm_enq_drop_async_q.fmds_value.ui64++; */
+		return (-E2BIG);
+	}
+
+	(void) memcpy(&async_event_q[etm_async_q_tail], async_e,
+	    sizeof (*async_e));
+
+	etm_async_q_tail++;
+	if (etm_async_q_tail == etm_async_q_max_len) {
+		etm_async_q_tail = 0;
+	}
+	etm_async_q_cur_len++;
+
+/* etm_stats.etm_async_q_cur_len.fmds_value.ui64 = etm_async_q_cur_len; */
+
+	return (1);
+
+} /* etm_async_q_enq() */
+
+
+static int
+etm_async_q_deq(etm_async_event_ele_t *async_e)
+{
+
+	if (etm_async_q_cur_len == 0) {
+		/* etm_stats.etm_deq_drop_async_q.fmds_value.ui64++; */
+		return (-ENOENT);
+	}
+
+	(void) memcpy(async_e, &async_event_q[etm_async_q_head],
+	    sizeof (*async_e));
+
+	etm_async_q_head++;
+	if (etm_async_q_head == etm_async_q_max_len) {
+		etm_async_q_head = 0;
+	}
+	etm_async_q_cur_len--;
+/* etm_stats.etm_async__q_cur_len.fmds_value.ui64 = etm_async_q_cur_len; */
+
+	return (1);
+} /* etm_async_q_deq */
+
+
+/*
+ * ds userland interface ds_reg_cb  callback func
+ */
+
+/* ARGSUSED */
+static void
+etm_iosvc_reg_handler(ds_hdl_t ds_hdl, ds_cb_arg_t arg, ds_ver_t *ver,
+	ds_domain_hdl_t dhdl)
+{
+	etm_async_event_ele_t	async_ele;
+
+
+	/*
+	 * do version check here.
+	 * checked the ver received here against etm_iosvc_vers here
+	 */
+	if (etm_iosvc_vers[0].major != ver->major ||
+	    etm_iosvc_vers[0].minor != ver->minor) {
+		/*
+		 * can't log an fmd debug msg,
+		 * not running in an fmd aux thread
+		 */
+		return;
+	}
+
+	/*
+	 * the callback should have a valid ldom_name
+	 * can't log fmd debugging msg here since this is not in an fmd aux
+	 * thread. log fmd debug msg in etm_async_event_handle()
+	 */
+	async_ele.ds_hdl = ds_hdl;
+	async_ele.dhdl = dhdl;
+	async_ele.ldom_name[0] = '\0';
+	async_ele.event_type = ETM_ASYNC_EVENT_DS_REG_CB;
+	(void) pthread_mutex_lock(&etm_async_event_q_lock);
+	(void) etm_async_q_enq(&async_ele);
+	if (etm_async_q_cur_len == 1)
+		(void) pthread_cond_signal(&etm_async_event_q_cv);
+	(void) pthread_mutex_unlock(&etm_async_event_q_lock);
+
+} /* etm_iosvc_reg_handler */
+
+
+/*
+ * ds userland interface ds_unreg_cb  callback func
+ */
+
+/*ARGSUSED*/
+static void
+etm_iosvc_unreg_handler(ds_hdl_t hdl, ds_cb_arg_t arg)
+{
+	etm_async_event_ele_t	async_ele;
+
+	/*
+	 * fill in async_ele and enqueue async_ele
+	 */
+	async_ele.ldom_name[0] = '\0';
+	async_ele.ds_hdl = hdl;
+	async_ele.event_type = ETM_ASYNC_EVENT_DS_UNREG_CB;
+	(void) pthread_mutex_lock(&etm_async_event_q_lock);
+	(void) etm_async_q_enq(&async_ele);
+	if (etm_async_q_cur_len == 1)
+		(void) pthread_cond_signal(&etm_async_event_q_cv);
+	(void) pthread_mutex_unlock(&etm_async_event_q_lock);
+} /* etm_iosvc_unreg_handler */
+
+/*
+ * ldom event registration callback func
+ */
+
+/* ARGSUSED */
+static void
+ldom_event_handler(char *ldom_name, ldom_event_t event, ldom_cb_arg_t data)
+{
+	etm_async_event_ele_t	async_ele;
+
+	/*
+	 * the callback will have a valid ldom_name
+	 */
+	async_ele.ldom_name[0] = '\0';
+	if (ldom_name)
+		(void) strcpy(async_ele.ldom_name, ldom_name);
+	async_ele.ds_hdl = DS_INVALID_HDL;
+
+	/*
+	 * fill in async_ele and enq async_ele
+	 */
+	switch (event) {
+	case LDOM_EVENT_BIND:
+		async_ele.event_type = ETM_ASYNC_EVENT_LDOM_BIND;
+		break;
+	case LDOM_EVENT_UNBIND:
+		async_ele.event_type = ETM_ASYNC_EVENT_LDOM_UNBIND;
+		break;
+	case LDOM_EVENT_ADD:
+		async_ele.event_type = ETM_ASYNC_EVENT_LDOM_ADD;
+		break;
+	case LDOM_EVENT_REMOVE:
+		async_ele.event_type = ETM_ASYNC_EVENT_LDOM_REMOVE;
+		break;
+	default:
+		/*
+		 * for all other ldom events, do nothing
+		 */
+		return;
+	} /* switch (event) */
+
+	(void) pthread_mutex_lock(&etm_async_event_q_lock);
+	(void) etm_async_q_enq(&async_ele);
+	if (etm_async_q_cur_len == 1)
+		(void) pthread_cond_signal(&etm_async_event_q_cv);
+	(void) pthread_mutex_unlock(&etm_async_event_q_lock);
+
+} /* ldom_event_handler */
+
+
+/*
+ * This is running as an fmd aux thread.
+ * This is the func that actually handle the events, which include:
+ * 1. ldom events. ldom events are  on Control Domain only
+ * 2. any DS userland callback funcs
+ * these events are already Q-ed in the async_event_ele_q
+ * deQ and process the events accordingly
+ */
+static void
+etm_async_event_handler(void *arg)
+{
+
+	fmd_hdl_t		*fmd_hdl = (fmd_hdl_t *)arg;
+	etm_iosvc_t		*iosvc;		/* ptr 2 iosvc struct */
+	etm_async_event_ele_t	async_e;
+
+	fmd_hdl_debug(fmd_hdl, "info: etm_async_event_handler starting\n");
+	/*
+	 *  handle etm is not dying and Q len > 0
+	 */
+	while (!etm_is_dying) {
+		/*
+		 * grab the lock to check the Q len
+		 */
+		(void) pthread_mutex_lock(&etm_async_event_q_lock);
+		fmd_hdl_debug(fmd_hdl, "info: etm_async_q_cur_len %d\n",
+		    etm_async_q_cur_len);
+
+		while (etm_async_q_cur_len > 0) {
+			(void) etm_async_q_deq(&async_e);
+			(void) pthread_mutex_unlock(&etm_async_event_q_lock);
+			fmd_hdl_debug(fmd_hdl,
+			    "info: processing an async event type %d ds_hdl"
+			    " %d\n", async_e.event_type, async_e.ds_hdl);
+			if (async_e.ldom_name[0] != '\0') {
+				fmd_hdl_debug(fmd_hdl,
+				    "info: procssing async evt ldom_name %s\n",
+				    async_e.ldom_name);
+			}
+
+			/*
+			 * at this point, if async_e.ldom_name is not NULL,
+			 * we have a valid iosvc strcut ptr.
+			 * the only time async_e.ldom_name is NULL is  at
+			 * ds_unreg_cb()
+			 */
+			switch (async_e.event_type)  {
+			case ETM_ASYNC_EVENT_LDOM_UNBIND:
+			case ETM_ASYNC_EVENT_LDOM_REMOVE:
+				/*
+				 * we have a valid ldom_name,
+				 * etm_lookup_struct(ldom_name)
+				 * do nothing if can't find an iosvc
+				 * no iosvc clean up to do
+				 */
+				(void) pthread_mutex_lock(
+				    &iosvc_list_lock);
+				iosvc = etm_iosvc_lookup(fmd_hdl,
+				    async_e.ldom_name,
+				    async_e.ds_hdl, B_FALSE);
+				if (iosvc == NULL) {
+					fmd_hdl_debug(fmd_hdl,
+					    "error: can't find iosvc for ldom "
+					    "name %s\n",
+					    async_e.ldom_name);
+					(void) pthread_mutex_unlock(
+					    &iosvc_list_lock);
+					break;
+				}
+				etm_iosvc_cleanup(fmd_hdl, iosvc);
+				(void) pthread_mutex_unlock(
+				    &iosvc_list_lock);
+				break;
+
+			case ETM_ASYNC_EVENT_LDOM_BIND:
+
+				/*
+				 * create iosvc if it has not been
+				 * created
+				 * async_e.ds_hdl is invalid
+				 * async_e.ldom_name is valid ldom_name
+				 */
+				(void) pthread_mutex_lock(
+				    &iosvc_list_lock);
+				iosvc = etm_iosvc_lookup(fmd_hdl,
+				    async_e.ldom_name,
+				    async_e.ds_hdl, B_TRUE);
+				if (iosvc == NULL) {
+					fmd_hdl_debug(fmd_hdl,
+					    "error: can't create iosvc for "
+					    "async evnt %d\n",
+					    async_e.event_type);
+					(void) pthread_mutex_unlock(
+					    &iosvc_list_lock);
+					break;
+				}
+				(void) strcpy(iosvc->ldom_name,
+				    async_e.ldom_name);
+				iosvc->ds_hdl = async_e.ds_hdl;
+				(void) pthread_mutex_unlock(
+				    &iosvc_list_lock);
+				break;
+
+			case ETM_ASYNC_EVENT_DS_REG_CB:
+				if (etm_ldom_type == LDOM_TYPE_CONTROL) {
+					/*
+					 * find the root ldom name from
+					 * ldom domain hdl/id
+					 */
+					if (etm_filter_find_ldom_name(
+					    fmd_hdl, async_e.dhdl,
+					    async_e.ldom_name,
+					    MAX_LDOM_NAME) != 0) {
+						fmd_hdl_debug(fmd_hdl,
+						    "error: can't find root "
+						    "domain name from did %d\n",
+						    async_e.dhdl);
+						break;
+					} else {
+						fmd_hdl_debug(fmd_hdl,
+						    "info: etm_filter_find_"
+						    "ldom_name returned %s\n",
+						    async_e.ldom_name);
+					}
+					/*
+					 * now we should have a valid
+					 * root domain name.
+					 * lookup the iosvc struct
+					 * associated with the ldom_name
+					 * and init the iosvc struct
+					 */
+					(void) pthread_mutex_lock(
+					    &iosvc_list_lock);
+					iosvc = etm_iosvc_lookup(
+					    fmd_hdl, async_e.ldom_name,
+					    async_e.ds_hdl, B_TRUE);
+					if (iosvc == NULL) {
+						fmd_hdl_debug(fmd_hdl,
+						    "error: can't create iosvc "
+						    "for async evnt %d\n",
+						    async_e.event_type);
+					(void) pthread_mutex_unlock(
+					    &iosvc_list_lock);
+						break;
+					}
+					iosvc->ds_hdl = async_e.ds_hdl;
+					iosvc->cur_send_xid = 0;
+
+					/*
+					 * open the fmd xprt if it
+					 * hasn't been previously opened
+					 */
+					iosvc->start_sending_Q = 0;
+					fmd_hdl_debug(fmd_hdl,
+					    "info: before fmd_xprt_open"
+					    "ldom_name is %s\n",
+					    async_e.ldom_name);
+					if (iosvc->fmd_xprt == NULL) {
+						iosvc->fmd_xprt =
+						    fmd_xprt_open(
+						    fmd_hdl,
+						    flags, NULL,
+						    iosvc);
+					}
+
+					iosvc->thr_is_dying = 0;
+					if (iosvc->recv_tid == NULL) {
+						iosvc->recv_tid =
+						    fmd_thr_create(
+						    fmd_hdl,
+						    etm_recv_from_remote_root,
+						    iosvc);
+					}
+					if (iosvc->send_tid == NULL) {
+						iosvc->send_tid =
+						    fmd_thr_create(
+						    fmd_hdl,
+						    etm_send_to_remote_root,
+						    iosvc);
+					}
+
+					(void) pthread_mutex_unlock(
+					    &iosvc_list_lock);
+				} else {
+					iosvc = &io_svc;
+					(void) strcpy(iosvc->ldom_name,
+					    async_e.ldom_name);
+					iosvc->ds_hdl = async_e.ds_hdl;
+					iosvc->cur_send_xid = 0;
+					iosvc->start_sending_Q = 0;
+
+					/*
+					 * open the fmd xprt if it
+					 * hasn't been previously opened
+					 */
+					if (iosvc->fmd_xprt == NULL) {
+						iosvc->fmd_xprt =
+						    fmd_xprt_open(
+						    fmd_hdl,
+						    flags, NULL,
+						    iosvc);
+					}
+
+					iosvc->thr_is_dying = 0;
+					if (iosvc->recv_tid == NULL) {
+						iosvc->recv_tid =
+						    fmd_thr_create(
+						    fmd_hdl,
+						    etm_recv_from_remote_root,
+						    iosvc);
+					}
+					if (iosvc->send_tid == NULL) {
+						iosvc->send_tid =
+						    fmd_thr_create(
+						    fmd_hdl,
+						    etm_send_to_remote_root,
+						    iosvc);
+					}
+				}
+				break;
+
+			case ETM_ASYNC_EVENT_DS_UNREG_CB:
+				/*
+				 * decide which iosvc struct to perform
+				 * this UNREG callback on.
+				 */
+				if (etm_ldom_type == LDOM_TYPE_CONTROL) {
+					(void) pthread_mutex_lock(
+					    &iosvc_list_lock);
+					/*
+					 * lookup the iosvc struct w/
+					 * ds_hdl
+					 */
+					iosvc = etm_iosvc_lookup(
+					    fmd_hdl, async_e.ldom_name,
+					    async_e.ds_hdl, B_FALSE);
+					if (iosvc == NULL) {
+						fmd_hdl_debug(fmd_hdl,
+						    "error: can't find iosvc "
+						    "for async evnt %d\n",
+						    async_e.event_type);
+					(void) pthread_mutex_unlock(
+					    &iosvc_list_lock);
+						break;
+					}
+
+					/*
+					 * ds_hdl and fmd_xprt_open
+					 * go hand to hand together
+					 * after unreg_cb,
+					 * ds_hdl is INVALID and
+					 * fmd_xprt is closed.
+					 * the ldom name and the msg Q
+					 * remains in iosvc_list
+					 */
+					iosvc->ds_hdl = DS_INVALID_HDL;
+					if (iosvc->fmd_xprt != NULL)
+						fmd_xprt_close(fmd_hdl,
+						    iosvc->fmd_xprt);
+					iosvc->fmd_xprt = NULL;
+
+					if (iosvc->ldom_name != '\0')
+						fmd_hdl_debug(fmd_hdl,
+						    "info: iosvc  w/ ldom_name "
+						    "%s \n", iosvc->ldom_name);
+
+					/*
+					 * destroy send/recv threads
+					 * on Control side.
+					 */
+					iosvc->thr_is_dying = 1;
+					if (iosvc->send_tid != NULL) {
+						fmd_thr_signal(fmd_hdl,
+						    iosvc->send_tid);
+						fmd_thr_destroy(fmd_hdl,
+						    iosvc->send_tid);
+						iosvc->send_tid = NULL;
+					} /* if send tid was created */
+
+					if (iosvc->recv_tid != NULL) {
+						fmd_thr_signal(fmd_hdl,
+						    iosvc->recv_tid);
+						fmd_thr_destroy(fmd_hdl,
+						    iosvc->recv_tid);
+						iosvc->recv_tid = NULL;
+					} /* if recv tid was created */
+
+					(void) pthread_mutex_unlock(
+					    &iosvc_list_lock);
+				} else {
+					iosvc = &io_svc;
+					/*
+					 * destroy send/recv threads
+					 * on Root side.
+					 */
+					iosvc->thr_is_dying = 1;
+					if (iosvc->send_tid != NULL) {
+						fmd_thr_signal(fmd_hdl,
+						    iosvc->send_tid);
+						fmd_thr_destroy(fmd_hdl,
+						    iosvc->send_tid);
+						iosvc->send_tid = NULL;
+					} /* if send tid was created */
+
+					if (iosvc->recv_tid != NULL) {
+						fmd_thr_signal(fmd_hdl,
+						    iosvc->recv_tid);
+						fmd_thr_destroy(fmd_hdl,
+						    iosvc->recv_tid);
+						iosvc->recv_tid = NULL;
+					} /* if recv tid was created */
+
+					iosvc->ds_hdl = DS_INVALID_HDL;
+					if (iosvc->fmd_xprt != NULL)
+						fmd_xprt_close(fmd_hdl,
+						    iosvc->fmd_xprt);
+					iosvc->fmd_xprt = NULL;
+				}
+				break;
+
+			default:
+				/*
+				 * for all other events, etm doesn't care.
+				 * already logged an fmd info msg w/
+				 * the event type. Do nothing here.
+				 */
+				break;
+			} /* switch (async_e.event_type) */
+
+			if (etm_ldom_type == LDOM_TYPE_CONTROL) {
+				etm_filter_handle_ldom_event(fmd_hdl,
+				    async_e.event_type, async_e.ldom_name);
+			}
+
+			/*
+			 * grab the lock to check the q length again
+			 */
+			(void) pthread_mutex_lock(&etm_async_event_q_lock);
+
+			if (etm_is_dying) {
+				break;
+			}
+		}	/* etm_async_q_cur_len */
+
+		/*
+		 * we have the mutex lock at this point, whether
+		 * . etm_is_dying  and/or
+		 * . q_len == 0
+		 */
+		if (!etm_is_dying && etm_async_q_cur_len == 0) {
+			fmd_hdl_debug(fmd_hdl,
+			    "info: cond wait on async_event_q_cv\n");
+			(void) pthread_cond_wait(&etm_async_event_q_cv,
+			    &etm_async_event_q_lock);
+			fmd_hdl_debug(fmd_hdl,
+			    "info: cond wait on async_event_q_cv rtns\n");
+		}
+		(void) pthread_mutex_unlock(&etm_async_event_q_lock);
+	} /* etm_is_dying */
+
+	fmd_hdl_debug(fmd_hdl,
+	    "info: etm async event handler thread exiting\n");
+
+} /* etm_async_event_handler */
+
+/*
+ * deQ what's in iosvc msg Q
+ * send iosvc_msgp to the remote io svc ldom by calling ds_send_msg()
+ * the iosvc_msgp already has the packed msg, which is hdr + 1 fma event
+ */
+static void
+etm_send_to_remote_root(void *arg)
+{
+
+	etm_iosvc_t		*iosvc = (etm_iosvc_t *)arg;	/* iosvc ptr */
+	etm_iosvc_q_ele_t	msg_ele;	/* iosvc msg ele */
+	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* hdr for FMA_EVENT */
+	fmd_hdl_t		*fmd_hdl = init_hdl;	/* fmd handle */
+
+
+	fmd_hdl_debug(fmd_hdl,
+	    "info: send to remote iosvc starting w/ ldom_name %s\n",
+	    iosvc->ldom_name);
+
+	/*
+	 *  loop forever until etm_is_dying or thr_is_dying
+	 */
+	while (!etm_is_dying && !iosvc->thr_is_dying) {
+		if (iosvc->ds_hdl != DS_INVALID_HDL &&
+		    iosvc->start_sending_Q > 0) {
+			(void) pthread_mutex_lock(&iosvc->msg_q_lock);
+			while (iosvc->msg_q_cur_len > 0 &&
+			    iosvc->ds_hdl != DS_INVALID_HDL)  {
+				(void) etm_iosvc_msg_deq(fmd_hdl, iosvc,
+				    &msg_ele);
+				if (etm_debug_lvl >= 3) {
+					fmd_hdl_debug(fmd_hdl, "info: valid "
+					    "ds_hdl before ds_send_msg \n");
+				}
+				(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
+
+				iosvc->ack_ok = 0;
+				ev_hdrp = (etm_proto_v1_ev_hdr_t *)
+				    ((ptrdiff_t)msg_ele.msg);
+				ev_hdrp->ev_pp.pp_xid = iosvc->cur_send_xid + 1;
+				while (!iosvc->ack_ok &&
+				    iosvc->ds_hdl != DS_INVALID_HDL &&
+				    !etm_is_dying) {
+					/*
+					 * call ds_send_msg() to send the msg,
+					 * wait for the recv end to send the
+					 * resp msg back.
+					 * If resp msg is recv-ed, ack_ok
+					 * will be set to 1.
+					 * otherwise, retry.
+					 */
+					if (etm_send_ds_msg(fmd_hdl, B_TRUE,
+					    iosvc, &msg_ele, ev_hdrp) < 0) {
+						continue;
+					}
+
+					if (etm_is_dying || iosvc->thr_is_dying)
+						break;
+				}
+
+				/*
+				 * if out of the while loop but !ack_ok, ie,
+				 * ds_hdl becomes invalid at some point
+				 * while waiting the resp msg, we need to put
+				 * the msg back to the head of the Q.
+				 */
+				if (!iosvc->ack_ok) {
+					(void) pthread_mutex_lock(
+					    &iosvc->msg_q_lock);
+					/*
+					 * put the msg back to the head of Q.
+					 * If the Q is full at this point,
+					 * drop the msg at the tail, enq this
+					 * msg to the head.
+					 */
+					etm_msg_enq_head(fmd_hdl, iosvc,
+					    &msg_ele);
+					(void) pthread_mutex_unlock(
+					    &iosvc->msg_q_lock);
+				}
+
+				/*
+				 *
+				 * grab the lock to check the Q len again
+				 */
+				(void) pthread_mutex_lock(&iosvc->msg_q_lock);
+				if (etm_is_dying || iosvc->thr_is_dying) {
+					break;
+				}
+			} /* while dequeing iosvc msgs to send */
+
+			/*
+			 * we have the mutex lock for msg_q_lock at this point
+			 * we are here because
+			 * 1) q_len == 0: then wait on the cv for Q to be filled
+			 * 2) etm_is_dying
+			 */
+			if (!etm_is_dying && !iosvc->thr_is_dying &&
+			    iosvc->msg_q_cur_len == 0) {
+				fmd_hdl_debug(fmd_hdl,
+				    "info: waiting on msg_q_cv\n");
+				(void) pthread_cond_wait(&iosvc->msg_q_cv,
+				    &iosvc->msg_q_lock);
+			}
+			(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
+			if (etm_is_dying || iosvc->thr_is_dying)  {
+				break;
+			}
+		} else {
+			(void) etm_sleep(1);
+		} /* wait for the start_sendingQ > 0 */
+	} /* etm_is_dying or thr_is_dying */
+	fmd_hdl_debug(fmd_hdl, "info; etm send thread exiting \n");
+} /* etm_send_to_remote_root */
+
+
+/*
+ * receive etm msgs from the remote root ldom by calling ds_recv_msg()
+ * if FMA events/ereports, call fmd_xprt_post() to post to fmd
+ * send ACK back by calling ds_send_msg()
+ */
+static void
+etm_recv_from_remote_root(void *arg)
+{
+	etm_iosvc_t		*iosvc = (etm_iosvc_t *)arg;	/* iosvc ptr */
+	etm_proto_v1_pp_t	*pp;		/* protocol preamble */
+	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* for FMA_EVENT msg */
+	etm_proto_v1_resp_hdr_t	*resp_hdrp;	/* for RESPONSE msg */
+	int32_t			resp_code = 0;	/* default is success */
+	int32_t			rc;		/* return value */
+	size_t			maxlen = MAXLEN;
+						/* max msg len */
+	char 			msgbuf[MAXLEN];	/* recv msg buf */
+	size_t			msg_size;	/* recv msg size */
+	size_t			hdr_sz;		/* sizeof *hdrp */
+	size_t			evsz;		/* sizeof *evp */
+	size_t			fma_event_size;	/* sizeof FMA event  */
+	nvlist_t 		*evp;		/* ptr to the nvlist */
+	char			*buf;		/* ptr to the nvlist */
+	static uint32_t		mem_alloc = 0;	/* indicate if alloc mem */
+	char 			*msg;		/* ptr to alloc mem */
+	fmd_hdl_t		*fmd_hdl = init_hdl;
+
+
+
+	fmd_hdl_debug(fmd_hdl,
+	    "info: recv from remote iosvc starting with ldom name %s \n",
+	    iosvc->ldom_name);
+
+	/*
+	 * loop forever until etm_is_dying or the thread is dying
+	 */
+
+	msg = msgbuf;
+	while (!etm_is_dying && !iosvc->thr_is_dying) {
+		if (iosvc->ds_hdl == DS_INVALID_HDL) {
+			fmd_hdl_debug(fmd_hdl,
+			    "info: ds_hdl is invalid in recv thr\n");
+			(void) etm_sleep(1);
+			continue;
+		}
+
+		/*
+		 * for now, there are FMA_EVENT and ACK msg type.
+		 * use FMA_EVENT buf as the maxlen, hdr+1 fma event.
+		 * FMA_EVENT is big enough to hold an ACK msg.
+		 * the actual msg size received is in msg_size.
+		 */
+		rc = (*etm_ds_recv_msg)(iosvc->ds_hdl, msg, maxlen, &msg_size);
+		if (rc == EFBIG) {
+			fmd_hdl_debug(fmd_hdl,
+			    "info: ds_recv_msg needs mem the size of %d\n",
+			    msg_size);
+			msg = fmd_hdl_zalloc(fmd_hdl, msg_size, FMD_SLEEP);
+			mem_alloc = 1;
+		} else if (rc == 0) {
+			fmd_hdl_debug(fmd_hdl,
+			    "info: ds_recv_msg received a msg ok\n");
+			/*
+			 * check the magic # in  msg.hdr
+			 */
+			pp = (etm_proto_v1_pp_t *)((ptrdiff_t)msg);
+			if (pp->pp_magic_num != ETM_PROTO_MAGIC_NUM) {
+				fmd_hdl_debug(fmd_hdl,
+				    "info: bad ds recv on magic\n");
+				continue;
+			}
+
+			/*
+			 * check the msg type against msg_size to be sure
+			 * that received msg is not a truncated msg
+			 */
+			if (pp->pp_msg_type == ETM_MSG_TYPE_FMA_EVENT) {
+
+				ev_hdrp = (etm_proto_v1_ev_hdr_t *)
+				    ((ptrdiff_t)msg);
+				fmd_hdl_debug(fmd_hdl, "info: ds received "
+				    "FMA EVENT xid=%d msg_size=%d\n",
+				    ev_hdrp->ev_pp.pp_xid, msg_size);
+				hdr_sz = sizeof (*ev_hdrp) +
+				    1*(sizeof (ev_hdrp->ev_lens[0]));
+				fma_event_size = hdr_sz + ev_hdrp->ev_lens[0];
+				if (fma_event_size != msg_size) {
+					fmd_hdl_debug(fmd_hdl, "info: wrong "
+					    "ev msg size received\n");
+					continue;
+					/*
+					 * Simply  do nothing. The send side
+					 * will timedcond_wait waiting on the
+					 * resp msg will timeout and
+					 * re-send the same msg.
+					 */
+				}
+				if (etm_debug_lvl >= 3) {
+					fmd_hdl_debug(fmd_hdl,  "info: recv msg"
+					    " size %d hdrsz %d evp size %d\n",
+					    msg_size, hdr_sz,
+					    ev_hdrp->ev_lens[0]);
+				}
+
+				if (ev_hdrp->ev_pp.pp_xid !=
+				    iosvc->xid_posted_ev) {
+					/*
+					 * different from last xid posted to
+					 * fmd, post to fmd now.
+					 */
+					buf = msg + hdr_sz;
+					rc = nvlist_unpack(buf,
+					    ev_hdrp->ev_lens[0], &evp, 0);
+					rc = nvlist_size(evp, &evsz,
+					    NV_ENCODE_XDR);
+					fmd_hdl_debug(fmd_hdl,
+					    "info: evp size %d before fmd"
+					    "post\n", evsz);
+
+					if ((rc = etm_post_to_fmd(fmd_hdl,
+					    iosvc->fmd_xprt, evp)) >= 0) {
+						fmd_hdl_debug(fmd_hdl,
+						    "info: xid posted to fmd %d"
+						    "\n",
+						    ev_hdrp->ev_pp.pp_xid);
+						iosvc->xid_posted_ev =
+						    ev_hdrp->ev_pp.pp_xid;
+					}
+				}
+
+				/*
+				 * ready to  send the RESPONSE msg back
+				 * reuse the msg buffer as the response buffer
+				 */
+				resp_hdrp = (etm_proto_v1_resp_hdr_t *)
+				    ((ptrdiff_t)msg);
+				resp_hdrp->resp_pp.pp_msg_type =
+				    ETM_MSG_TYPE_RESPONSE;
+
+				resp_hdrp->resp_code = resp_code;
+				resp_hdrp->resp_len = sizeof (*resp_hdrp);
+
+				/*
+				 * send the whole response msg in one send
+				 */
+				if ((*etm_ds_send_msg)(iosvc->ds_hdl, msg,
+				    sizeof (*resp_hdrp)) != 0) {
+					fmd_hdl_debug(fmd_hdl,
+					    "info: send response msg failed\n");
+				} else {
+					fmd_hdl_debug(fmd_hdl,
+					    "info: ds send resp msg ok"
+					    "size %d\n", sizeof (*resp_hdrp));
+				}
+			} else if (pp->pp_msg_type == ETM_MSG_TYPE_RESPONSE) {
+				fmd_hdl_debug(fmd_hdl,
+				    "info: ds received respond msg xid=%d"
+				    "msg_size=%d for ldom %s\n", pp->pp_xid,
+				    msg_size, iosvc->ldom_name);
+				if (sizeof (*resp_hdrp) != msg_size) {
+					fmd_hdl_debug(fmd_hdl,
+					    "info: wrong resp msg size"
+					    "received\n");
+					fmd_hdl_debug(fmd_hdl,
+					    "info: resp msg size %d recv resp"
+					    "msg size %d\n",
+					    sizeof (*resp_hdrp), msg_size);
+					continue;
+				}
+				/*
+				 * is the pp.pp_xid == iosvc->cur_send_xid+1,
+				 * if so, nudge the send routine to send next
+				 */
+				if (pp->pp_xid != iosvc->cur_send_xid+1) {
+					fmd_hdl_debug(fmd_hdl,
+					    "info: ds received resp msg xid=%d "
+					    "doesn't match cur_send_id=%d\n",
+					    pp->pp_xid, iosvc->cur_send_xid+1);
+					continue;
+				}
+				(void) pthread_mutex_lock(&iosvc->msg_ack_lock);
+				iosvc->ack_ok = 1;
+				(void) pthread_cond_signal(&iosvc->msg_ack_cv);
+				(void) pthread_mutex_unlock(
+				    &iosvc->msg_ack_lock);
+				fmd_hdl_debug(fmd_hdl,
+				    "info: signaling msg_ack_cv\n");
+			} else {
+				/*
+				 * place holder for future msg types
+				 */
+				fmd_hdl_debug(fmd_hdl,
+				    "info: ds received unrecognized msg\n");
+			}
+			if (mem_alloc) {
+				fmd_hdl_free(fmd_hdl, msg, msg_size);
+				mem_alloc = 0;
+				msg = msgbuf;
+			}
+		} else {
+			if (etm_debug_lvl >= 3) {
+				fmd_hdl_debug(fmd_hdl,
+				    "info: ds_recv_msg() failed\n");
+			}
+		} /* ds_recv_msg() returns */
+	} /* etm_is_dying */
+
+	/*
+	 * need to free the mem allocated in msg upon exiting the thread
+	 */
+	if (mem_alloc) {
+		fmd_hdl_free(fmd_hdl, msg, msg_size);
+		mem_alloc = 0;
+		msg = msgbuf;
+	}
+	fmd_hdl_debug(fmd_hdl, "info; etm recv thread exiting \n");
+} /* etm_recv_from_remote_root */
+
+
+
+/*
+ * etm_ds_init
+ *		initialize DS services function pointers by calling
+ *		dlopen() followed by  dlsym() for each ds func.
+ *		if any dlopen() or dlsym() call fails, return -ENOENT
+ *		return >0 for successs, -ENOENT for failure
+ */
+static int
+etm_ds_init(fmd_hdl_t *hdl)
+{
+	int rc = 0;
+
+	if ((etm_dl_hdl = dlopen(etm_dl_path, etm_dl_mode)) == NULL) {
+		fmd_hdl_debug(hdl, "error: failed to dlopen %s\n", etm_dl_path);
+		return (-ENOENT);
+	}
+
+	etm_ds_svc_reg = (int (*)(ds_capability_t *cap, ds_ops_t *ops))
+	    dlsym(etm_dl_hdl, "ds_svc_reg");
+	if (etm_ds_svc_reg == NULL) {
+		fmd_hdl_debug(hdl,
+		    "error: failed to dlsym ds_svc_reg() w/ error %s\n",
+		    dlerror());
+		rc = -ENOENT;
+	}
+
+
+	etm_ds_clnt_reg = (int (*)(ds_capability_t *cap, ds_ops_t *ops))
+	    dlsym(etm_dl_hdl, "ds_clnt_reg");
+	if (etm_ds_clnt_reg == NULL) {
+		fmd_hdl_debug(hdl,
+		    "error: dlsym(ds_clnt_reg) failed w/ errno %d\n", errno);
+		rc = -ENOENT;
+	}
+
+	etm_ds_send_msg = (int (*)(ds_hdl_t hdl, void *buf, size_t buflen))
+	    dlsym(etm_dl_hdl, "ds_send_msg");
+	if (etm_ds_send_msg == NULL) {
+		fmd_hdl_debug(hdl, "error: dlsym(ds_send_msg) failed\n");
+		rc = -ENOENT;
+	}
+
+	etm_ds_recv_msg = (int (*)(ds_hdl_t hdl, void *buf, size_t buflen,
+	    size_t *msglen))dlsym(etm_dl_hdl, "ds_recv_msg");
+	if (etm_ds_recv_msg == NULL) {
+		fmd_hdl_debug(hdl, "error: dlsym(ds_recv_msg) failed\n");
+		rc = -ENOENT;
+	}
+
+	etm_ds_fini = (int (*)(void))dlsym(etm_dl_hdl, "ds_fini");
+	if (etm_ds_fini == NULL) {
+		fmd_hdl_debug(hdl, "error: dlsym(ds_fini) failed\n");
+		rc = -ENOENT;
+	}
+
+	if (rc == -ENOENT) {
+		(void) dlclose(etm_dl_hdl);
+	}
+	return (rc);
+
+} /* etm_ds_init() */
+
+
+/*
  * -------------------------- FMD entry points -------------------------------
  */
 
@@ -2095,9 +3720,11 @@ _fmd_init(fmd_hdl_t *hdl)
 {
 	struct timeval		tmv;		/* timeval */
 	ssize_t			n;		/* gen use */
-	ldom_hdl_t		*lhp;		/* ldom pointer */
 	const struct facility	*fp;		/* syslog facility matching */
 	char			*facname;	/* syslog facility property */
+	uint32_t		type_mask;	/* type of the local host */
+	int			rc;		/* funcs return code */
+
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0) {
 		return; /* invalid data in configuration file */
@@ -2106,109 +3733,232 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_debug(hdl, "info: module initializing\n");
 
 	init_hdl = hdl;
-	lhp = ldom_init(etm_init_alloc, etm_init_free);
+	etm_lhp = ldom_init(etm_init_alloc, etm_init_free);
 
 	/*
-	 * Do not load this module if it is runing on a guest ldom.
+	 * decide the ldom type, do initialization accordingly
 	 */
-	if (ldom_major_version(lhp) == 1 && ldom_on_service(lhp) == 0) {
+	if ((rc = ldom_get_type(etm_lhp, &type_mask)) != 0) {
+		fmd_hdl_debug(hdl, "error: can't decide ldom type\n");
 		fmd_hdl_debug(hdl, "info: module unregistering\n");
-		ldom_fini(lhp);
+		ldom_fini(etm_lhp);
+		fmd_hdl_unregister(hdl);
+		return;
+	}
+
+	if ((type_mask & LDOM_TYPE_LEGACY) || (type_mask & LDOM_TYPE_CONTROL)) {
+		if (type_mask & LDOM_TYPE_LEGACY) {
+			/*
+			 * running on a legacy sun4v domain,
+			 * act as the the old sun4v
+			 */
+			etm_ldom_type = LDOM_TYPE_LEGACY;
+			fmd_hdl_debug(hdl, "info: running as the old sun4v\n");
+			ldom_fini(etm_lhp);
+		} else if (type_mask & LDOM_TYPE_CONTROL) {
+			etm_ldom_type = LDOM_TYPE_CONTROL;
+			fmd_hdl_debug(hdl, "info: running as control domain\n");
+
+			/*
+			 * looking for libds.so.1.
+			 * If not found, don't do DS registration. As a result,
+			 * there will be no DS callbacks or other DS services.
+			 */
+			if (etm_ds_init(hdl) >= 0) {
+				etm_filter_init(hdl);
+				etm_ckpt_init(hdl);
+
+				flags = FMD_XPRT_RDWR | FMD_XPRT_ACCEPT;
+
+				/*
+				 * ds client registration
+				 */
+				if ((rc = (*etm_ds_clnt_reg)(&iosvc_caps,
+				    &iosvc_ops))) {
+					fmd_hdl_debug(hdl,
+					"error: ds_clnt_reg(): errno %d\n", rc);
+				}
+			} else {
+				fmd_hdl_debug(hdl, "error: dlopen() libds "
+				    "failed, continue without the DS services");
+			}
+
+			/*
+			 * register for ldom status events
+			 */
+			if ((rc = ldom_register_event(etm_lhp,
+			    ldom_event_handler, hdl))) {
+				fmd_hdl_debug(hdl,
+				    "error: ldom_register_event():"
+				    " errno %d\n", rc);
+			}
+
+			/*
+			 * create the thread for handling both the ldom status
+			 * change and service events
+			 */
+			etm_async_e_tid = fmd_thr_create(hdl,
+			    etm_async_event_handler, hdl);
+		}
+
+		/* setup statistics and properties from FMD */
+
+		(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC,
+		    sizeof (etm_stats) / sizeof (fmd_stat_t),
+		    (fmd_stat_t *)&etm_stats);
+
+		etm_fma_resp_wait_time = fmd_prop_get_int32(hdl,
+		    ETM_PROP_NM_FMA_RESP_WAIT_TIME);
+		etm_debug_lvl = fmd_prop_get_int32(hdl, ETM_PROP_NM_DEBUG_LVL);
+		etm_debug_max_ev_cnt = fmd_prop_get_int32(hdl,
+		    ETM_PROP_NM_DEBUG_MAX_EV_CNT);
+		fmd_hdl_debug(hdl, "info: etm_debug_lvl %d "
+		    "etm_debug_max_ev_cnt %d\n", etm_debug_lvl,
+		    etm_debug_max_ev_cnt);
+
+		etm_resp_q_max_len = fmd_prop_get_int32(hdl,
+		    ETM_PROP_NM_MAX_RESP_Q_LEN);
+		etm_stats.etm_resp_q_max_len.fmds_value.ui64 =
+		    etm_resp_q_max_len;
+		etm_bad_acc_to_sec = fmd_prop_get_int32(hdl,
+		    ETM_PROP_NM_BAD_ACC_TO_SEC);
+
+		/*
+		 * obtain an FMD transport handle so we can post
+		 * FMA events later
+		 */
+
+		etm_fmd_xprt = fmd_xprt_open(hdl, FMD_XPRT_RDONLY, NULL, NULL);
+
+		/*
+		 * encourage protocol transaction id to be unique per module
+		 * load
+		 */
+
+		(void) gettimeofday(&tmv, NULL);
+		etm_xid_cur = (uint32_t)((tmv.tv_sec << 10) |
+		    ((unsigned long)tmv.tv_usec >> 10));
+
+		/* init the ETM transport */
+
+		if ((n = etm_xport_init(hdl)) != 0) {
+			fmd_hdl_error(hdl, "error: bad xport init errno %d\n",
+			    (-n));
+			fmd_hdl_unregister(hdl);
+			return;
+		}
+
+		/*
+		 * Cache any properties we use every time we receive an alert.
+		 */
+		syslog_file = fmd_prop_get_int32(hdl, ETM_PROP_NM_SYSLOGD);
+		syslog_cons = fmd_prop_get_int32(hdl, ETM_PROP_NM_CONSOLE);
+
+		if (syslog_file && (syslog_logfd = open("/dev/conslog",
+		    O_WRONLY | O_NOCTTY)) == -1) {
+			fmd_hdl_error(hdl,
+			    "error: failed to open /dev/conslog");
+			syslog_file = 0;
+		}
+
+		if (syslog_cons && (syslog_msgfd = open("/dev/sysmsg",
+		    O_WRONLY | O_NOCTTY)) == -1) {
+			fmd_hdl_error(hdl, "error: failed to open /dev/sysmsg");
+			syslog_cons = 0;
+		}
+
+		if (syslog_file) {
+			/*
+			 * Look up the value of the "facility" property and
+			 * use it to determine * what syslog LOG_* facility
+			 * value we use to fill in our log_ctl_t.
+			 */
+			facname = fmd_prop_get_string(hdl,
+			    ETM_PROP_NM_FACILITY);
+
+			for (fp = syslog_facs; fp->fac_name != NULL; fp++) {
+				if (strcmp(fp->fac_name, facname) == 0)
+					break;
+			}
+
+			if (fp->fac_name == NULL) {
+				fmd_hdl_error(hdl, "error: invalid 'facility'"
+				    " setting: %s\n", facname);
+				syslog_file = 0;
+			} else {
+				syslog_facility = fp->fac_value;
+				syslog_ctl.flags = SL_CONSOLE | SL_LOGONLY;
+			}
+
+			fmd_prop_free_string(hdl, facname);
+		}
+
+		/*
+		 * start the message responder and the connection acceptance
+		 * server; request protocol version be negotiated after waiting
+		 * a second for the receiver to be ready to start handshaking
+		 */
+
+		etm_resp_tid = fmd_thr_create(hdl, etm_responder, hdl);
+		etm_svr_tid = fmd_thr_create(hdl, etm_server, hdl);
+
+		(void) etm_sleep(ETM_SLEEP_QUIK);
+		etm_req_ver_negot(hdl);
+
+	} else if (type_mask & LDOM_TYPE_ROOT) {
+		etm_ldom_type = LDOM_TYPE_ROOT;
+		fmd_hdl_debug(hdl, "info: running as root domain\n");
+
+		/*
+		 * looking for libds.so.1.
+		 * If not found, don't do DS registration. As a result,
+		 * there will be no DS callbacks or other DS services.
+		 */
+		if (etm_ds_init(hdl) < 0) {
+			fmd_hdl_debug(hdl,
+			    "error: dlopen() libds failed, "
+			    "module unregistering\n");
+			ldom_fini(etm_lhp);
+			fmd_hdl_unregister(hdl);
+			return;
+		}
+
+		/*
+		 * DS service registration
+		 */
+		if ((rc = (*etm_ds_svc_reg)(&iosvc_caps, &iosvc_ops))) {
+			fmd_hdl_debug(hdl, "error: ds_svc_reg(): errno %d\n",
+			    rc);
+		}
+
+		/*
+		 * this thread is created for ds_reg_cb/ds_unreg_cb
+		 */
+		etm_async_e_tid = fmd_thr_create(hdl,
+		    etm_async_event_handler, hdl);
+
+		flags = FMD_XPRT_RDWR;
+	} else if ((type_mask & LDOM_TYPE_IO) || (type_mask == 0)) {
+		/*
+		 * Do not load this module if it is
+		 * . runing on a non-root ldom
+		 * . the domain owns no io devices
+		 */
+		fmd_hdl_debug(hdl,
+		    "info: non-root ldom, module unregistering\n");
+		ldom_fini(etm_lhp);
 		fmd_hdl_unregister(hdl);
 		return;
 	} else {
-		ldom_fini(lhp);
-	}
-
-	/* setup statistics and properties from FMD */
-
-	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC,
-	    sizeof (etm_stats) / sizeof (fmd_stat_t), (fmd_stat_t *)&etm_stats);
-
-	etm_debug_lvl = fmd_prop_get_int32(hdl, ETM_PROP_NM_DEBUG_LVL);
-	etm_debug_max_ev_cnt = fmd_prop_get_int32(hdl,
-	    ETM_PROP_NM_DEBUG_MAX_EV_CNT);
-	fmd_hdl_debug(hdl, "info: etm_debug_lvl %d "
-	    "etm_debug_max_ev_cnt %d\n", etm_debug_lvl, etm_debug_max_ev_cnt);
-
-	etm_resp_q_max_len = fmd_prop_get_int32(hdl,
-	    ETM_PROP_NM_MAX_RESP_Q_LEN);
-	etm_stats.etm_resp_q_max_len.fmds_value.ui64 = etm_resp_q_max_len;
-	etm_bad_acc_to_sec = fmd_prop_get_int32(hdl,
-	    ETM_PROP_NM_BAD_ACC_TO_SEC);
-
-	/* obtain an FMD transport handle so we can post FMA events later */
-
-	etm_fmd_xprt = fmd_xprt_open(hdl, FMD_XPRT_RDONLY, NULL, NULL);
-
-	/* encourage protocol transaction id to be unique per module load */
-
-	(void) gettimeofday(&tmv, NULL);
-	etm_xid_cur = (uint32_t)((tmv.tv_sec << 10) |
-	    ((unsigned long)tmv.tv_usec >> 10));
-
-	/* init the ETM transport */
-
-	if ((n = etm_xport_init(hdl)) != 0) {
-		fmd_hdl_error(hdl, "error: bad xport init errno %d\n", (-n));
+		/*
+		 * place holder, all other cases. unload etm for now
+		 */
+		fmd_hdl_debug(hdl,
+		    "info: other ldom type, module unregistering\n");
+		ldom_fini(etm_lhp);
 		fmd_hdl_unregister(hdl);
 		return;
 	}
-
-	/*
-	 * Cache any properties we use every time we receive an alert.
-	 */
-	syslog_file = fmd_prop_get_int32(hdl, ETM_PROP_NM_SYSLOGD);
-	syslog_cons = fmd_prop_get_int32(hdl, ETM_PROP_NM_CONSOLE);
-
-	if (syslog_file && (syslog_logfd = open("/dev/conslog",
-	    O_WRONLY | O_NOCTTY)) == -1) {
-		fmd_hdl_error(hdl, "error: failed to open /dev/conslog");
-		syslog_file = 0;
-	}
-
-	if (syslog_cons && (syslog_msgfd = open("/dev/sysmsg",
-	    O_WRONLY | O_NOCTTY)) == -1) {
-		fmd_hdl_error(hdl, "error: failed to open /dev/sysmsg");
-		syslog_cons = 0;
-	}
-
-	if (syslog_file) {
-		/*
-		 * Look up the value of the "facility" property and use it to
-		 * determine * what syslog LOG_* facility value we use to
-		 * fill in our log_ctl_t.
-		 */
-		facname = fmd_prop_get_string(hdl, ETM_PROP_NM_FACILITY);
-
-		for (fp = syslog_facs; fp->fac_name != NULL; fp++) {
-			if (strcmp(fp->fac_name, facname) == 0)
-				break;
-		}
-
-		if (fp->fac_name == NULL) {
-			fmd_hdl_error(hdl, "error: invalid 'facility'"
-			    " setting: %s\n", facname);
-			syslog_file = 0;
-		} else {
-			syslog_facility = fp->fac_value;
-			syslog_ctl.flags = SL_CONSOLE | SL_LOGONLY;
-		}
-
-		fmd_prop_free_string(hdl, facname);
-	}
-
-	/*
-	 * start the message responder and the connection acceptance server;
-	 * request protocol version be negotiated after waiting a second
-	 * for the receiver to be ready to start handshaking
-	 */
-
-	etm_resp_tid = fmd_thr_create(hdl, etm_responder, hdl);
-	etm_svr_tid = fmd_thr_create(hdl, etm_server, hdl);
-
-	(void) etm_sleep(ETM_SLEEP_QUIK);
-	etm_req_ver_negot(hdl);
 
 	fmd_hdl_debug(hdl, "info: module initialized ok\n");
 
@@ -2230,6 +3980,13 @@ etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
 	size_t			sz;	/* header size */
 	size_t			buflen;	/* size of packed FMA event */
 	uint8_t			*buf;	/* tmp buffer for packed FMA event */
+
+	/*
+	 * if this is running on a Root Domain, ignore the events,
+	 * return right away
+	 */
+	if (etm_ldom_type == LDOM_TYPE_ROOT)
+		return;
 
 	buflen = 0;
 	if ((n = nvlist_size(evp, &buflen, NV_ENCODE_XDR)) != 0) {
@@ -2266,6 +4023,20 @@ etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
 	/* allocate a buffer for the FMA event and nvlist pack it */
 
 	buf = fmd_hdl_zalloc(hdl, buflen, FMD_SLEEP);
+
+	/*
+	 * increment the ttl value if the event is from remote (a root domain)
+	 * uncomment this when enabling fault forwarding from Root domains
+	 * to Control domain.
+	 *
+	 * uint8_t			ttl;
+	 * if (fmd_event_local(hdl, evp) != FMD_EVF_LOCAL) {
+	 *	if (nvlist_lookup_uint8(evp, FMD_EVN_TTL, &ttl) == 0) {
+	 *		(void) nvlist_remove(evp, FMD_EVN_TTL, DATA_TYPE_UINT8);
+	 *		(void) nvlist_add_uint8(evp, FMD_EVN_TTL, ttl + 1);
+	 *	}
+	 * }
+	 */
 
 	if ((n = nvlist_pack(evp, (char **)&buf, &buflen,
 	    NV_ENCODE_XDR, 0)) != 0) {
@@ -2348,6 +4119,106 @@ etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
 
 } /* etm_recv() */
 
+
+/*
+ * etm_send -	receive an FMA event from FMD and enQ it in the iosvc.Q.
+ *		etm_send_to_remote_root() deQ and xprt the FMA events to a
+ *		remote root domain
+ *		return FMD_SEND_SUCCESS for success,
+ *		       FMD_SEND_FAILED for error
+ */
+
+/*ARGSUSED*/
+int
+etm_send(fmd_hdl_t *fmd_hdl, fmd_xprt_t *xp, fmd_event_t *ep, nvlist_t *nvl)
+{
+	uint32_t	pack_it;	/* whether to pack/enq the event */
+	etm_pack_msg_type_t	msg_type;
+					/* tell etm_pack_ds_msg() what to do */
+	etm_iosvc_t	*iosvc;		/* ptr to cur iosvc struct */
+	char 		*class;		/* nvlist class name */
+
+	pack_it = 1;
+	msg_type = FMD_XPRT_OTHER_MSG;
+
+	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
+	if (class == NULL) {
+		pack_it = 0;
+	} else  {
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(fmd_hdl,
+			    "info: evp class= %s in etm_send\n", class);
+		}
+
+		if (etm_ldom_type ==  LDOM_TYPE_CONTROL) {
+			iosvc =
+			    (etm_iosvc_t *)fmd_xprt_getspecific(fmd_hdl, xp);
+
+			/*
+			 * check the flag FORWARDING_FAULTS_TO_CONTROL to
+			 * decide if or not to drop fault subscription
+			 * control msgs
+			 */
+			if (strcmp(class, "resource.fm.xprt.subscribe") == 0) {
+				pack_it = 0;
+				/*
+				 * if (FORWARDING_FAULTS_TO_CONTROL == 1) {
+				 * (void) nvlist_lookup_string(nvl,
+				 *    FM_RSRC_XPRT_SUBCLASS, &subclass);
+				 * if (strcmp(subclass, "list.suspect")
+				 *    == 0) {
+				 *	pack_it = 1;
+				 *	msg_action = FMD_XPRT_OTHER_MSG;
+				 * }
+				 * if (strcmp(subclass, "list.repaired")
+				 *    == 0) {
+				 *	pack_it = 1;
+				 *	msg_action = FMD_XPRT_OTHER_MSG;
+				 * }
+				 * }
+				 */
+			}
+			if (strcmp(class, "resource.fm.xprt.run") == 0) {
+				pack_it = 1;
+				msg_type = FMD_XPRT_RUN_MSG;
+			}
+		} else { /* has to be the root domain ldom */
+			iosvc = &io_svc;
+			/*
+			 * drop all ereport and fault subscriptions
+			 * are we dropping too much here, more than just ereport
+			 * and fault subscriptions? need to check
+			 */
+			if (strcmp(class, "resource.fm.xprt.subscribe") == 0)
+				pack_it = 0;
+			if (strcmp(class, "resource.fm.xprt.run") == 0) {
+				pack_it = 1;
+				msg_type = FMD_XPRT_RUN_MSG;
+			}
+		}
+	}
+
+	if (pack_it)  {
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(fmd_hdl,
+			    "info: ldom name returned from xprt get specific="
+			    "%s xprt=%lld\n", iosvc->ldom_name, xp);
+		}
+		/*
+		 * pack the etm msg for the DS library and  enq in io_svc->Q
+		 * when the hdrp is NULL, the packing func will use the static
+		 * iosvc_hdr
+		 */
+		(void) etm_pack_ds_msg(fmd_hdl, iosvc, NULL, 0, nvl, msg_type,
+		    ETM_CKPT_NOOP);
+	}
+
+	return (FMD_SEND_SUCCESS);
+
+} /* etm_send() */
+
+
+
 /*
  * _fmd_fini - stop the server daemon and teardown the transport
  */
@@ -2355,7 +4226,10 @@ etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
 void
 _fmd_fini(fmd_hdl_t *hdl)
 {
-	ssize_t	n;	/* gen use */
+	ssize_t			n;		/* gen use */
+	etm_iosvc_t		*iosvc;		/* ptr to insvc struct */
+	etm_iosvc_q_ele_t	msg_ele;	/* iosvc msg ele */
+	uint32_t		i;		/* for loop var */
 
 	fmd_hdl_debug(hdl, "info: module finalizing\n");
 
@@ -2375,20 +4249,96 @@ _fmd_fini(fmd_hdl_t *hdl)
 		etm_resp_tid = NULL;
 	} /* if responder thread was successfully created */
 
-	/* teardown the transport and cleanup syslogging */
+	if (etm_async_e_tid != NULL) {
+		fmd_thr_signal(hdl, etm_async_e_tid);
+		fmd_thr_destroy(hdl, etm_async_e_tid);
+		etm_async_e_tid = NULL;
+	} /* if async event handler thread was successfully created */
 
-	if ((n = etm_xport_fini(hdl)) != 0) {
-		fmd_hdl_error(hdl, "warning: xport fini errno %d\n", (-n));
-	}
-	if (etm_fmd_xprt != NULL) {
-		fmd_xprt_close(hdl, etm_fmd_xprt);
+
+	if ((etm_ldom_type == LDOM_TYPE_LEGACY) ||
+	    (etm_ldom_type == LDOM_TYPE_CONTROL)) {
+
+		/* teardown the transport and cleanup syslogging */
+		if ((n = etm_xport_fini(hdl)) != 0) {
+			fmd_hdl_error(hdl, "warning: xport fini errno %d\n",
+			    (-n));
+		}
+		if (etm_fmd_xprt != NULL) {
+			fmd_xprt_close(hdl, etm_fmd_xprt);
+		}
+
+		if (syslog_logfd != -1) {
+			(void) close(syslog_logfd);
+		}
+		if (syslog_msgfd != -1) {
+			(void) close(syslog_msgfd);
+		}
 	}
 
-	if (syslog_logfd != -1) {
-		(void) close(syslog_logfd);
+	if (etm_ldom_type == LDOM_TYPE_CONTROL)  {
+		if (ldom_unregister_event(etm_lhp))
+			fmd_hdl_debug(hdl, "ldom_unregister_event() failed\n");
+
+		/*
+		 * on control side, need to go thru every iosvc struct to
+		 * 1) process remaining events in the iosvc Q:
+		 * for plan A:
+		 *    discard remaining events in the Q/free the memory,
+		 *    since fmd_xprt_log() already logged in Control D's FMD
+		 * 2) unregister the ds_hdl if valid
+		 * 3) close the fmd_xprt if it has not been closed
+		 */
+		for (i = 0; i < NUM_OF_ROOT_DOMAINS; i++) {
+			if (iosvc_list[i].ldom_name[0] != '\0') {
+				/*
+				 * found an iosvc struct for a root domain
+				 */
+				iosvc = &iosvc_list[i];
+				(void) pthread_mutex_lock(&iosvc_list_lock);
+				etm_iosvc_cleanup(hdl, iosvc);
+				(void) pthread_mutex_unlock(&iosvc_list_lock);
+
+			} else {
+				/*
+				 * reach the end of existing iosvc structures
+				 */
+				continue;
+			}
+		} /* for i<NUM_OF_ROOT_DOMAINS */
+		etm_ckpt_fini(hdl);
+		etm_filter_fini(hdl);
+
+		ldom_fini(etm_lhp);
+
+	} else if (etm_ldom_type == LDOM_TYPE_ROOT) {
+		iosvc = &io_svc;
+		if (iosvc->send_tid != NULL) {
+			fmd_thr_signal(hdl, iosvc->send_tid);
+			fmd_thr_destroy(hdl, iosvc->send_tid);
+			iosvc->send_tid = NULL;
+		} /* if io svc send thread was successfully created */
+
+		if (iosvc->recv_tid != NULL) {
+			fmd_thr_signal(hdl, iosvc->recv_tid);
+			fmd_thr_destroy(hdl, iosvc->recv_tid);
+			iosvc->recv_tid = NULL;
+		} /* if io svc receive thread was successfully created */
+
+		(void) pthread_mutex_lock(&iosvc->msg_q_lock);
+		while (iosvc->msg_q_cur_len > 0) {
+			(void) etm_iosvc_msg_deq(hdl, iosvc, &msg_ele);
+			fmd_hdl_free(hdl, msg_ele.msg, msg_ele.msg_size);
+		}
+		(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
+
+		if (iosvc->fmd_xprt != NULL)
+			fmd_xprt_close(hdl, iosvc->fmd_xprt);
+		ldom_fini(etm_lhp);
 	}
-	if (syslog_msgfd != -1) {
-		(void) close(syslog_msgfd);
+	if (etm_ds_fini) {
+		(*etm_ds_fini)();
+		(void) dlclose(etm_dl_hdl);
 	}
 
 	fmd_hdl_debug(hdl, "info: module finalized ok\n");

@@ -26,8 +26,6 @@
 #ifndef	_LDMSVCS_UTILS_H
 #define	_LDMSVCS_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/ldc.h>
@@ -79,6 +77,12 @@ typedef struct fds_channel {
 /*
  * FMA services
  */
+
+#define	LDM_DS_NAME_CPU		"fma-phys-cpu-service"
+#define	LDM_DS_NAME_MEM		"fma-phys-mem-service"
+#define	LDM_DS_NAME_PRI		"fma-pri-service"
+#define	LDM_DS_NAME_IOD		"fma-io-domain-service"
+
 typedef struct {
 	uint64_t req_num;
 } fma_req_pri_t;
@@ -139,9 +143,28 @@ typedef struct {
 } fma_mem_resp_t;
 
 
+#define	FMA_IO_RESP_OK		0
+#define	FMA_IO_RESP_FAILURE	1
+#define	FMA_IO_RESP_ILLEGAL	2
+#define	FMA_IO_RESP_UNASSIGNED	3
+
+typedef struct {
+	uint64_t req_num;
+	uint32_t msg_type;
+	uint32_t reserved;
+	uint64_t rsrc_address;
+} fma_io_req_t;
+
+typedef struct {
+	uint64_t req_num;
+	uint32_t result;
+	uint32_t reserved;
+	uint64_t virt_rsrc_address;
+	uint64_t domain_id;
+} fma_io_resp_t;
+
+
 struct ldom_hdl {
-	int major_version;
-	int service_ldom;
 	void *(*allocp)(size_t size);
 	void (*freep)(void *addr, size_t size);
 	struct ldmsvcs_info *lsinfo;
@@ -186,6 +209,9 @@ extern int ldmsvcs_mem_req_retire(struct ldom_hdl *lhp, uint64_t pa);
 extern int ldmsvcs_cpu_req_online(struct ldom_hdl *lhp, uint32_t cpuid);
 
 extern int ldmsvcs_mem_req_unretire(struct ldom_hdl *lhp, uint64_t pa);
+
+extern int ldmsvcs_io_req_id(struct ldom_hdl *lhp, uint64_t addr, uint_t type,
+    uint64_t *virt_addr, char *name, int name_len, uint64_t *did);
 
 #ifdef	__cplusplus
 }

@@ -1731,6 +1731,23 @@ fmd_thr_signal(fmd_hdl_t *hdl, pthread_t tid)
 	fmd_module_unlock(mp);
 }
 
+void
+fmd_thr_checkpoint(fmd_hdl_t *hdl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	pthread_t tid = pthread_self();
+
+	if (tid == mp->mod_thread->thr_tid ||
+	    fmd_idspace_getspecific(mp->mod_threads, tid) == NULL) {
+		fmd_api_error(mp, EFMD_THR_INVAL, "tid %u is not a valid "
+		    "auxiliary thread id for module %s\n", tid, mp->mod_name);
+	}
+
+	fmd_ckpt_save(mp);
+
+	fmd_module_unlock(mp);
+}
+
 id_t
 fmd_timer_install(fmd_hdl_t *hdl, void *arg, fmd_event_t *ep, hrtime_t delta)
 {
@@ -2257,7 +2274,27 @@ fmd_xprt_post(fmd_hdl_t *hdl, fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 		    "fmd_xprt_post() cannot be called from _fmd_init()\n");
 	}
 
-	fmd_xprt_recv(xp, nvl, hrt);
+	fmd_xprt_recv(xp, nvl, hrt, FMD_B_FALSE);
+}
+
+void
+fmd_xprt_log(fmd_hdl_t *hdl, fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
+{
+	fmd_xprt_impl_t *xip = fmd_api_transport_impl(hdl, xp);
+
+	/*
+	 * fmd_xprt_recv() must block during startup waiting for fmd to globally
+	 * clear FMD_XPRT_DSUSPENDED.  As such, we can't allow it to be called
+	 * from a module's _fmd_init() routine, because that would block
+	 * fmd from completing initial module loading, resulting in a deadlock.
+	 */
+	if ((xip->xi_flags & FMD_XPRT_ISUSPENDED) &&
+	    (pthread_self() == xip->xi_queue->eq_mod->mod_thread->thr_tid)) {
+		fmd_api_error(fmd_api_module_lock(hdl), EFMD_XPRT_INVAL,
+		    "fmd_xprt_log() cannot be called from _fmd_init()\n");
+	}
+
+	fmd_xprt_recv(xp, nvl, hrt, FMD_B_TRUE);
 }
 
 void

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <strings.h>
 #include <libdevinfo.h>
@@ -79,11 +77,19 @@ cpuboard_node_create(topo_mod_t *mp, tnode_t *parent, const char *name,
 }
 
 /*
- * Create a root complex node.
+ * cpuboard_rc_node_create()
+ * Description:
+ *     Create a root complex node pciexrc
+ * Parameters:
+ *     mp: topo module pointer
+ *     parent: topo parent node of the newly created pciexrc node
+ *     dnode: Solaris device node of the root complex
+ *     rcpath: Used to populated the dev property of the topo pciexrc node if
+ *          the local host does not own the root complex.
  */
 static tnode_t *
 cpuboard_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode,
-    int inst)
+    char *rcpath, int inst)
 {
 	int err;
 	tnode_t *rcn;
@@ -107,6 +113,12 @@ cpuboard_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode,
 	if ((dnpath = di_devfs_path(dnode)) != NULL) {
 		nvlist_t *fmri;
 
+		/*
+		 * The local host owns the root complex, so use the dev path
+		 * from the di_devfs_path(), instead of the passed in rcpath,
+		 * to populate the dev property.
+		 */
+		rcpath = dnpath;
 		fmri = topo_mod_devfmri(mp, FM_DEV_SCHEME_VERSION,
 		    dnpath, NULL);
 		if (fmri == NULL) {
@@ -147,12 +159,14 @@ cpuboard_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode,
 		return (NULL);
 	}
 	/* Add the devfs path property */
-	if (dnpath) {
+	if (rcpath) {
 		if (topo_prop_set_string(rcn, TOPO_PGROUP_IO, TOPO_IO_DEV,
-		    TOPO_PROP_IMMUTABLE, dnpath, &err) != 0) {
+		    TOPO_PROP_IMMUTABLE, rcpath, &err) != 0) {
 			topo_mod_dprintf(mp, "Failed to set DEV property\n");
 			topo_mod_seterrno(mp, err);
 		}
+	}
+	if (dnpath) {
 		di_devfs_path_free(dnpath);
 	}
 	/* T5440 device type is always "pciex" */
@@ -225,7 +239,8 @@ cpuboard_hb_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
  * match the cpuboard instance.
  */
 int
-cpuboard_hb_enum(topo_mod_t *mp, di_node_t dnode, tnode_t *cpubn, int brd)
+cpuboard_hb_enum(topo_mod_t *mp, di_node_t dnode, char *rcpath,
+    tnode_t *cpubn, int brd)
 {
 	int hb;
 	int rc;
@@ -260,7 +275,7 @@ cpuboard_hb_enum(topo_mod_t *mp, di_node_t dnode, tnode_t *cpubn, int brd)
 		return (-1);
 	}
 	/* Create the root complex node */
-	rcnode = cpuboard_rc_node_create(mp, hbnode, dnode, rc);
+	rcnode = cpuboard_rc_node_create(mp, hbnode, dnode, rcpath, rc);
 	if (rcnode == NULL) {
 		topo_mod_dprintf(mp,
 		    "unable to create rcnode: %s\n",

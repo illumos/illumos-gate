@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MACH_LDLIBS = -L$(ROOT)/usr/lib/fm/$(MACH64)
@@ -33,5 +31,3 @@ include ../../../Makefile.lib.64
 DYNFLAGS += -R/usr/lib/fm/$(MACH64)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
-
-install_h:

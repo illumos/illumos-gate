@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MACH_LDLIBS = -L$(ROOT)/usr/lib/fm
@@ -31,19 +29,4 @@ include ../Makefile.com
 
 DYNFLAGS += -R/usr/lib/fm
 
-FMHDRS = ldom.h
-HDRDIR = .
-
-ROOTFMHDRDIR = $(ROOT)/usr/platform/sun4v/include/sys/fm
-
 install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
-
-install_h: $(ROOTFMHDRS)
-
-$(ROOTFMHDRS): $(ROOTFMHDRDIR)
-
-$(ROOTFMHDRDIR):
-	$(INS.dir)
-
-$(ROOTFMHDRDIR)/%: $(HDRDIR)/%
-	$(INS.file)

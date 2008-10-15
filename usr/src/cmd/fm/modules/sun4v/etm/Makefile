@@ -19,19 +19,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = etm
 CLASS = arch
 ARCH = sun4v
 
-SRCS = etm.c etm_xport_api_dd.c
+SRCS = etm.c etm_xport_api_dd.c etm_filter.c etm_ckpt.c
 
 include ../../Makefile.plugin
 
-CPPFLAGS += -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
-LDLIBS += -L$(ROOT)/usr/lib/fm -lldom
+CPPFLAGS += -I$(SRC)/uts/sun4v  \
+	    -I$(SRC)/uts/common \
+	    -I$(ROOT)/usr/platform/sun4v/include
+LDLIBS += -L$(ROOT)/usr/lib/fm -lldom -ltopo
 LDFLAGS += -R/usr/lib/fm
+
+DYNFLAGS += -R/usr/lib

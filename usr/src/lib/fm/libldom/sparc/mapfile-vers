@@ -22,21 +22,22 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate {
     global:
 	ldom_fini;
+	ldom_find_id;
 	ldom_fmri_blacklist;
 	ldom_fmri_unblacklist;
 	ldom_fmri_retire;
 	ldom_fmri_unretire;
 	ldom_fmri_status;
 	ldom_get_core_md;
+	ldom_get_local_md;
+	ldom_get_type;
 	ldom_init;
-	ldom_major_version;
-	ldom_on_service;
+	ldom_register_event;
+	ldom_unregister_event;
     local:
 	*;
 };

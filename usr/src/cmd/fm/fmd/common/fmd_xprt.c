@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * FMD Transport Subsystem
@@ -999,7 +997,7 @@ fmd_xprt_send(fmd_xprt_t *xp)
 }
 
 void
-fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
+fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt, boolean_t logonly)
 {
 	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
 	const fmd_xprt_rule_t *xrp;
@@ -1007,7 +1005,7 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 
 	fmd_event_t *e;
 	char *class, *uuid, *code;
-	int isproto;
+	boolean_t isproto, isereport;
 
 	uint64_t *tod;
 	uint8_t ttl;
@@ -1051,7 +1049,27 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 		goto done;
 	}
 
-	fmd_dprintf(FMD_DBG_XPRT, "xprt %u posting %s\n", xip->xi_id, class);
+	fmd_dprintf(FMD_DBG_XPRT, "xprt %u %s %s\n", xip->xi_id,
+	    ((logonly == FMD_B_TRUE) ? "logging" : "posting"), class);
+
+	isereport = (strncmp(class, FM_EREPORT_CLASS,
+	    sizeof (FM_EREPORT_CLASS - 1)) == 0) ? FMD_B_TRUE : FMD_B_FALSE;
+
+	/*
+	 * The logonly flag should only be set for ereports.
+	 */
+	if ((logonly == FMD_B_TRUE) && (isereport == FMD_B_FALSE)) {
+		fmd_error(EFMD_XPRT_INVAL, "discarding nvlist %p: "
+		    "logonly flag is not valid for class %s",
+		    (void *)nvl, class);
+
+		(void) pthread_mutex_lock(&xip->xi_stats_lock);
+		xip->xi_stats->xs_discarded.fmds_value.ui64++;
+		(void) pthread_mutex_unlock(&xip->xi_stats_lock);
+
+		nvlist_free(nvl);
+		goto done;
+	}
 
 	/*
 	 * If a time-to-live value is present in the event and is zero, drop
@@ -1088,7 +1106,9 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 	 * control event.  If a FMD_EVN_TOD member is found, create a protocol
 	 * event using this time.  Otherwise create a protocol event using hrt.
 	 */
-	if ((isproto = strncmp(class, FMD_CTL_CLASS, FMD_CTL_CLASS_LEN)) == 0)
+	isproto = (strncmp(class, FMD_CTL_CLASS, FMD_CTL_CLASS_LEN) == 0) ?
+	    FMD_B_FALSE : FMD_B_TRUE;
+	if (isproto == FMD_B_FALSE)
 		e = fmd_event_create(FMD_EVT_CTL, hrt, nvl, fmd_ctl_init(nvl));
 	else if (nvlist_lookup_uint64_array(nvl, FMD_EVN_TOD, &tod, &n) != 0)
 		e = fmd_event_create(FMD_EVT_PROTOCOL, hrt, nvl, class);
@@ -1135,7 +1155,7 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 	 * Record the event in the errlog if it is an ereport.  This code will
 	 * be replaced later with a per-transport intent log instead.
 	 */
-	if (fmd_event_match(e, FMD_EVT_PROTOCOL, FM_EREPORT_CLASS ".*")) {
+	if (isereport == FMD_B_TRUE) {
 		(void) pthread_rwlock_rdlock(&dp->d_log_lock);
 		fmd_log_append(dp->d_errlog, e, NULL);
 		(void) pthread_rwlock_unlock(&dp->d_log_lock);
@@ -1156,7 +1176,10 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 		fmd_module_unlock(xip->xi_queue->eq_mod);
 	}
 
-	if (isproto)
+	if (logonly == FMD_B_TRUE) {
+		fmd_event_hold(e);
+		fmd_event_rele(e);
+	} else if (isproto == FMD_B_TRUE)
 		fmd_dispq_dispatch(dp->d_disp, e, class);
 	else
 		fmd_modhash_dispatch(dp->d_mod_hash, e);

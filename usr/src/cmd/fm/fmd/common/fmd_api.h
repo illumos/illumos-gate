@@ -213,6 +213,7 @@ extern int fmd_serd_empty(fmd_hdl_t *, const char *);
 extern pthread_t fmd_thr_create(fmd_hdl_t *, void (*)(void *), void *);
 extern void fmd_thr_destroy(fmd_hdl_t *, pthread_t);
 extern void fmd_thr_signal(fmd_hdl_t *, pthread_t);
+extern void fmd_thr_checkpoint(fmd_hdl_t *);
 
 extern id_t fmd_timer_install(fmd_hdl_t *, void *, fmd_event_t *, hrtime_t);
 extern void fmd_timer_remove(fmd_hdl_t *, id_t);
@@ -252,6 +253,7 @@ extern uint64_t fmd_event_ena_create(fmd_hdl_t *);
 extern fmd_xprt_t *fmd_xprt_open(fmd_hdl_t *, uint_t, nvlist_t *, void *);
 extern void fmd_xprt_close(fmd_hdl_t *, fmd_xprt_t *);
 extern void fmd_xprt_post(fmd_hdl_t *, fmd_xprt_t *, nvlist_t *, hrtime_t);
+extern void fmd_xprt_log(fmd_hdl_t *, fmd_xprt_t *, nvlist_t *, hrtime_t);
 extern void fmd_xprt_suspend(fmd_hdl_t *, fmd_xprt_t *);
 extern void fmd_xprt_resume(fmd_hdl_t *, fmd_xprt_t *);
 extern int fmd_xprt_error(fmd_hdl_t *, fmd_xprt_t *);

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 #include <umem.h>
 #include <fm/topo_mod.h>
@@ -316,6 +314,7 @@ cpu_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	uint32_t present = 0;
 	md_cpumap_t *mcmp;
 	md_info_t *chip = (md_info_t *)topo_mod_getspecific(mod);
+	uint32_t type = 0;
 
 	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0 ||
 	    version > FM_CPU_SCHEME_VERSION ||
@@ -341,9 +340,10 @@ cpu_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	if (lhp == NULL) {
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
+	(void) ldom_get_type(lhp, &type);
 	status = ldom_fmri_status(lhp, in);
 	rc = (status == P_FAULTED ||
-	    (status == P_OFFLINE && ldom_major_version(lhp) == 1));
+	    (status == P_OFFLINE && ((type & LDOM_TYPE_CONTROL) != 0)));
 	ldom_fini(lhp);
 
 	/* return the unusable status */

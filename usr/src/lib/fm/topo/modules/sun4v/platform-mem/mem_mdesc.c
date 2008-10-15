@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <umem.h>
 #include <sys/mdesc.h>
@@ -420,12 +418,19 @@ mem_mdesc_init(topo_mod_t *mod, md_mem_info_t *mem)
 	mde_cookie_t *listp;
 	int num_nodes;
 	int num_comps = 0;
+	uint32_t type = 0;
 
 	/* get the PRI/MD */
 	if ((lhp = ldom_init(mem_alloc, mem_free)) == NULL) {
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
-	if ((bufsiz = ldom_get_core_md(lhp, &bufp)) <= 0) {
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) != 0) {
+		bufsiz = ldom_get_core_md(lhp, &bufp);
+	} else {
+		bufsiz = ldom_get_local_md(lhp, &bufp);
+	}
+	if (bufsiz <= 0) {
 		topo_mod_dprintf(mod, "failed to get the PRI/MD\n");
 		ldom_fini(lhp);
 		return (-1);

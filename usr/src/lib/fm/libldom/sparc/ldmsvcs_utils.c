@@ -25,6 +25,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+
 #include <strings.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -40,6 +41,8 @@
 #include <pthread.h>
 #include <values.h>
 #include <libscf.h>
+
+#include <ctype.h>
 
 #include "ldmsvcs_utils.h"
 
@@ -120,7 +123,6 @@ static struct poller_s {
 static struct ldmsvcs_info *channel_init(struct ldom_hdl *lhp);
 static int channel_openreset(struct ldmsvcs_info *lsp);
 static int read_msg(struct ldmsvcs_info *lsp);
-
 
 static int
 get_smf_int_val(char *prop_nm, int min, int max, int default_val)
@@ -930,8 +932,8 @@ static void
 fds_svc_alloc(struct ldom_hdl *lhp, struct ldmsvcs_info *lsp)
 {
 	int i;
-	char *name[] = { "fma-phys-cpu-service", "fma-phys-mem-service",
-			"fma-pri-service", NULL };
+	static char *name[] = { LDM_DS_NAME_CPU, LDM_DS_NAME_MEM,
+			LDM_DS_NAME_PRI, LDM_DS_NAME_IOD, NULL };
 
 	(void) pthread_mutex_init(&lsp->fmas_svcs.mt, NULL);
 	(void) pthread_cond_init(&lsp->fmas_svcs.cv, NULL);
@@ -972,14 +974,28 @@ fds_svc_lookup(struct ldmsvcs_info *lsp, char *name)
 
 	ASSERT(svc != NULL);
 
-	ier = 0;
-	twait.tv_sec = time(NULL) + lsp->cv_twait;
-	twait.tv_nsec = 0;
+	if (svc->state == DS_SVC_INACTIVE) {
+		/* service is not registered */
+		ier = ETIMEDOUT;
+	} else {
+		ier = 0;
+		twait.tv_sec = time(NULL) + lsp->cv_twait;
+		twait.tv_nsec = 0;
 
-	while (svc->state != DS_SVC_ACTIVE && ier == 0 &&
-	    lsp->fds_chan.state != CHANNEL_UNUSABLE)
-		ier = pthread_cond_timedwait(&lsp->fmas_svcs.cv,
-		    &lsp->fmas_svcs.mt, &twait);
+		while (svc->state != DS_SVC_ACTIVE && ier == 0 &&
+		    lsp->fds_chan.state != CHANNEL_UNUSABLE)
+			ier = pthread_cond_timedwait(&lsp->fmas_svcs.cv,
+			    &lsp->fmas_svcs.mt, &twait);
+
+		/*
+		 * By now, the ds service should have registered already.
+		 * If it does not, ldmd probably does not support this service.
+		 * Then mark the service state as inactive.
+		 */
+		if (ier == ETIMEDOUT) {
+			svc->state = DS_SVC_INACTIVE;
+		}
+	}
 
 	(void) pthread_mutex_unlock(&lsp->fmas_svcs.mt);
 
@@ -1274,7 +1290,7 @@ cpu_request(struct ldom_hdl *lhp, uint32_t msg_type, uint32_t cpuid)
 	ds_data_handle_t *D;
 	fma_cpu_service_req_t *R;
 
-	char *svcname = "fma-phys-cpu-service";
+	char *svcname = LDM_DS_NAME_CPU;
 	fma_cpu_resp_t *respmsg;
 	void *resp;
 	size_t resplen, reqmsglen;
@@ -1358,7 +1374,7 @@ mem_request(struct ldom_hdl *lhp, uint32_t msg_type, uint64_t pa,
 	ds_data_handle_t *D;
 	fma_mem_service_req_t *R;
 
-	char *svcname = "fma-phys-mem-service";
+	char *svcname = LDM_DS_NAME_MEM;
 	fma_mem_resp_t *respmsg;
 	void *resp;
 	size_t resplen, reqmsglen;
@@ -1488,7 +1504,7 @@ ldmsvcs_get_core_md(struct ldom_hdl *lhp, uint64_t **buf)
 	ds_data_handle_t *D;
 	fma_req_pri_t *R;
 
-	char *svcname = "fma-pri-service";
+	char *svcname = LDM_DS_NAME_PRI;
 	void *resp;
 	size_t resplen, reqmsglen;
 	ssize_t buflen;
@@ -1591,6 +1607,81 @@ int
 ldmsvcs_mem_req_unretire(struct ldom_hdl *lhp, uint64_t pa)
 {
 	return (mem_request(lhp, FMA_MEM_REQ_RESURRECT, pa, getpagesize()));
+}
+
+int
+ldmsvcs_io_req_id(struct ldom_hdl *lhp, uint64_t addr, uint_t type,
+    uint64_t *virt_addr, char *name, int name_len, uint64_t *did)
+{
+
+	ds_hdr_t *H;
+	ds_data_handle_t *D;
+	fma_io_req_t *R;
+
+	char *svcname = LDM_DS_NAME_IOD;
+	void *resp;
+	fma_io_resp_t *iop;
+	size_t resplen, reqmsglen;
+	int offset;
+	int rc;
+
+	if (lhp->lsinfo == NULL)
+		return (-1);
+
+	reqmsglen = sizeof (ds_hdr_t) + sizeof (ds_data_handle_t) +
+	    sizeof (fma_io_req_t);
+
+	H = lhp->allocp(reqmsglen);
+	D = (void *)((ptrdiff_t)H + sizeof (ds_hdr_t));
+	R = (void *)((ptrdiff_t)D + sizeof (ds_data_handle_t));
+
+	H->msg_type = DS_DATA;
+	H->payload_len = sizeof (ds_data_handle_t) + sizeof (fma_io_req_t);
+
+	R->req_num = fds_svc_req_num();
+	R->msg_type = type;
+	R->rsrc_address = addr;
+
+	rc = ENOMSG;
+	if ((rc = sendrecv(lhp, R->req_num, H, reqmsglen,
+	    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
+		lhp->freep(H, reqmsglen);
+		return (rc);
+	}
+	lhp->freep(H, reqmsglen);
+
+	/*
+	 * resp should contain the req_num, status, virtual addr, domain id
+	 * and the domain name. The domain name may or may not be present.
+	 */
+	offset = sizeof (fma_io_resp_t);
+	if (resplen < offset) {
+		lhp->freep(resp, resplen);
+		return (-1);
+	}
+
+	iop = (fma_io_resp_t *)resp;
+	switch (iop->result) {
+	case FMA_IO_RESP_OK:
+		/* success */
+		rc = 0;
+		*virt_addr = iop->virt_rsrc_address;
+		*did = iop->domain_id;
+		if (name == NULL || name_len <= 0)
+			break;
+		*name = '\0';
+		if (resplen > offset) {
+			(void) strncpy(name, (char *)((ptrdiff_t)resp + offset),
+			    name_len);
+		}
+		break;
+	default:
+		rc = -1;
+		break;
+	}
+
+	lhp->freep(resp, resplen);
+	return (rc);
 }
 
 /* end file */

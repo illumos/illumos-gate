@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -101,6 +99,7 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 	char *pstr = NULL;
 	char *sn = NULL, *pn = NULL;
 	char *dn = NULL;
+	uint32_t type = 0;
 	ldom_hdl_t *lhp;
 	uint64_t id;
 	int cpuboards_found = 0;
@@ -118,13 +117,19 @@ cpuboard_get_pri_info(topo_mod_t *mod, cpuboard_contents_t cpubs[])
 		return (0);
 	}
 
-	if ((bufsize = ldom_get_core_md(lhp, &bufp)) < 1) {
-		topo_mod_dprintf(mod, "ldom_get_core_md error, bufsize=%d\n",
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) != 0) {
+		bufsize = ldom_get_core_md(lhp, &bufp);
+	} else {
+		bufsize = ldom_get_local_md(lhp, &bufp);
+	}
+	if (bufsize < 1) {
+		topo_mod_dprintf(mod, "Failed to get pri/md, bufsize=%d\n",
 		    bufsize);
 		ldom_fini(lhp);
 		return (0);
 	}
-	topo_mod_dprintf(mod, "pri bufsize=%d\n", bufsize);
+	topo_mod_dprintf(mod, "pri/md bufsize=%d\n", bufsize);
 
 	if ((mdp = md_init_intern(bufp, cpuboard_topo_alloc,
 	    cpuboard_topo_free)) == NULL ||
@@ -516,7 +521,7 @@ cpuboard_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 			    topo_strerror(topo_mod_errno(mod)));
 			return (-1);
 		}
-		if (cpuboard_hb_enum(mod, cpuboard_findrc(mod, i),
+		if (cpuboard_hb_enum(mod, cpuboard_findrc(mod, i), cpub_rcs[i],
 		    cpuboardn, i) < 0) {
 			topo_node_unbind(cpuboardn);
 			topo_mod_dprintf(mod, "cpuboard_hb_enum: "

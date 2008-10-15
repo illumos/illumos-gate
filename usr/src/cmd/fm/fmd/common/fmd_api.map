@@ -109,6 +109,7 @@
 	fmd_thr_create = FUNCTION extern;
 	fmd_thr_destroy = FUNCTION extern;
 	fmd_thr_signal = FUNCTION extern;
+	fmd_thr_checkpoint = FUNCTION extern;
 
 	fmd_timer_install = FUNCTION extern;
 	fmd_timer_remove = FUNCTION extern;
@@ -116,6 +117,7 @@
 	fmd_xprt_close = FUNCTION extern;
 	fmd_xprt_error = FUNCTION extern;
 	fmd_xprt_getspecific = FUNCTION extern;
+	fmd_xprt_log = FUNCTION extern;
 	fmd_xprt_open = FUNCTION extern;
 	fmd_xprt_post = FUNCTION extern;
 	fmd_xprt_resume = FUNCTION extern;

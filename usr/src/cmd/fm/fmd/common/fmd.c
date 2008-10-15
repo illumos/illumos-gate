@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/param.h>
@@ -241,7 +239,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "client.error", &fmd_cerror_ops, "unload" },	/* client error policy */
 { "client.memlim", &fmd_conf_size, "10m" },	/* client allocation limit */
 { "client.evqlim", &fmd_conf_uint32, "256" },	/* client event queue limit */
-{ "client.thrlim", &fmd_conf_uint32, "8" },	/* client aux thread limit */
+{ "client.thrlim", &fmd_conf_uint32, "20" },	/* client aux thread limit */
 { "client.thrsig", &fmd_conf_signal, "SIGUSR1" }, /* fmd_thr_signal() value */
 { "client.tmrlim", &fmd_conf_uint32, "1024" },	/* client pending timer limit */
 { "client.xprtlim", &fmd_conf_uint32, "256" },	/* client transport limit */

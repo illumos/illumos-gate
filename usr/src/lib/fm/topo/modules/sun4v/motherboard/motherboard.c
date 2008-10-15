@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -129,6 +127,7 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 	int  nfrus, num_nodes, i;
 	char *pstr = NULL;
 	char *sn, *pn, *dn, *csn;
+	uint32_t type = 0;
 	ldom_hdl_t *lhp;
 
 	lhp = ldom_init(mb_topo_alloc, mb_topo_free);
@@ -145,13 +144,19 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 		return (-1);
 	}
 
-	if ((bufsize = ldom_get_core_md(lhp, &bufp)) < 1) {
-		topo_mod_dprintf(mod, "ldom_get_core_md error, bufsize=%d\n",
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) != 0) {
+		bufsize = ldom_get_core_md(lhp, &bufp);
+	} else {
+		bufsize = ldom_get_local_md(lhp, &bufp);
+	}
+	if (bufsize < 1) {
+		topo_mod_dprintf(mod, "Failed to get the pri/md (bufsize=%d)\n",
 		    bufsize);
 		ldom_fini(lhp);
 		return (-1);
 	}
-	topo_mod_dprintf(mod, "pri bufsize=%d\n", bufsize);
+	topo_mod_dprintf(mod, "pri/md bufsize=%d\n", bufsize);
 
 	if ((mdp = md_init_intern(bufp, mb_topo_alloc, mb_topo_free)) == NULL ||
 	    (num_nodes = md_node_count(mdp)) < 1) {

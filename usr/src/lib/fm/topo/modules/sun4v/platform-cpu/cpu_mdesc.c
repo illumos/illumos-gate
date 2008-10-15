@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <umem.h>
@@ -337,13 +335,21 @@ cpu_mdesc_init(topo_mod_t *mod, md_info_t *chip)
 	ssize_t bufsiz = 0;
 	uint64_t *bufp;
 	ldom_hdl_t *lhp;
+	uint32_t type = 0;
 
 	/* get the PRI/MD */
 	if ((lhp = ldom_init(cpu_alloc, cpu_free)) == NULL) {
 		topo_mod_dprintf(mod, "ldom_init() failed\n");
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
-	if ((bufsiz = ldom_get_core_md(lhp, &bufp)) <= 0) {
+
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) != 0) {
+		bufsiz = ldom_get_core_md(lhp, &bufp);
+	} else {
+		bufsiz = ldom_get_local_md(lhp, &bufp);
+	}
+	if (bufsiz <= 0) {
 		topo_mod_dprintf(mod, "failed to get the PRI/MD\n");
 		ldom_fini(lhp);
 		return (-1);

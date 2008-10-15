@@ -35,8 +35,6 @@
 #ifndef _ETM_IMPL_H
 #define	_ETM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -93,6 +91,7 @@ extern "C" {
 #define	ETM_PROP_NM_FACILITY		"etm_alert_facility"
 
 #define	ETM_PROP_NM_MAX_RESP_Q_LEN	"etm_resp_q_max_len"
+#define	ETM_PROP_NM_FMA_RESP_WAIT_TIME	"etm_fma_resp_wait_time"
 
 #define	ETM_PROP_NM_BAD_ACC_TO_SEC	"etm_bad_acc_to_sec"
 

@@ -24,46 +24,46 @@
  * Use is subject to license terms.
  */
 
-#ifndef _CPUBOARD_TOPO_H
-#define	_CPUBOARD_TOPO_H
+/*
+ * etm_filter.h
+ *
+ * Header file of the event filter
+ *
+ */
 
-#include <fm/topo_hc.h>
-#include <fm/topo_mod.h>
+#ifndef _ETM_FILTER_H
+#define	_ETM_FILTER_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	PCI_BUS_VERS    1
+#include <fm/fmd_api.h>
 
-#define	CPUBOARD_PX_DEVTYPE	"pciex"		/* T5440 is PCI-Ex devtype */
-#define	CPUBOARD_PX_DRV  	"px"
+#include "etm_iosvc.h"
 
-#define	CPUBOARD_MAX		4		/* Max 4 cpuboards */
-#define	CHIP_MAX		CPUBOARD_MAX	/* Max 4 chips */
-#define	HOSTBRIDGE_MAX		CPUBOARD_MAX	/* Max 4 hostbridges */
+/* A physical root complex */
+typedef struct etm_prc {
+	int32_t		prc_id;			/* physical id of the rc */
+	uint64_t	prc_cfg_handle;		/* bus address */
+	char		*prc_name;		/* bound ldom name */
+	size_t		prc_name_sz;		/* size of name */
+	int		prc_status;		/* ldom query status */
+	uint64_t	prc_did;		/* ldom id */
+} etm_prc_t;
 
-#define	CPUBOARD_PX_BDF		"0x200"		/* BDF is always 2/0/0 */
+void etm_filter_init(fmd_hdl_t *hdl);
+void etm_filter_fini(fmd_hdl_t *hdl);
 
-/* cpuboard info */
-typedef struct {
-	int present;		/* cpuboard present */
-	char *sn;		/* cpuboard serial # */
-	char *pn;		/* cpuboard part # + dash # */
-} cpuboard_contents_t;
-
-/* Shared device tree root node */
-int cpuboard_hb_enum(topo_mod_t *mp, di_node_t dnode, char *rcpath,
-    tnode_t *cpubn, int brd);
-
-/* Until future PRI changes, make connection between cpuboard id and RC */
-#define	CPUBOARD0_RC	"/pci@400"
-#define	CPUBOARD1_RC	"/pci@500"
-#define	CPUBOARD2_RC	"/pci@600"
-#define	CPUBOARD3_RC	"/pci@700"
+int etm_filter_find_ldom_id(fmd_hdl_t *hdl, nvlist_t *erpt, char *name,
+    int name_size, uint64_t *did);
+int etm_filter_find_ldom_name(fmd_hdl_t *hdl, uint64_t did, char *name,
+    int name_size);
+void etm_filter_handle_ldom_event(fmd_hdl_t *hdl, etm_async_event_type_t event,
+    char *name);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _CPUBOARD_TOPO_H */
+#endif /* _ETM_FILTER_H */

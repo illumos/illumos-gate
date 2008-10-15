@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <strings.h>
 #include <umem.h>
@@ -172,6 +170,7 @@ hb_mdesc_init(topo_mod_t *mod, md_info_t *phbmd)
 	md_t *mdp;
 	ssize_t bufsiz = 0;
 	uint64_t *bufp;
+	uint32_t type = 0;
 	ldom_hdl_t *lhp;
 
 	/* get the PRI/MD */
@@ -179,7 +178,14 @@ hb_mdesc_init(topo_mod_t *mod, md_info_t *phbmd)
 		topo_mod_dprintf(mod, "ldom_init() failed\n");
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
-	if ((bufsiz = ldom_get_core_md(lhp, &bufp)) <= 0) {
+
+	(void) ldom_get_type(lhp, &type);
+	if ((type & LDOM_TYPE_CONTROL) != 0) {
+		bufsiz = ldom_get_core_md(lhp, &bufp);
+	} else {
+		bufsiz = ldom_get_local_md(lhp, &bufp);
+	}
+	if (bufsiz <= 0) {
 		topo_mod_dprintf(mod, "failed to get the PRI/MD\n");
 		ldom_fini(lhp);
 		return (-1);
