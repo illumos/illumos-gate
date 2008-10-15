@@ -3181,10 +3181,15 @@ ata_check_drive_blacklist(
 {
 	atabl_t	*blp;
 
-	for (blp = ata_drive_blacklist; blp->b_model; blp++) {
+	for (blp = ata_drive_blacklist; blp->b_model != NULL; blp++) {
 		if (!ata_strncmp(blp->b_model, aidp->ai_model,
 		    sizeof (aidp->ai_model)))
 			continue;
+		if (blp->b_fw != NULL) {
+			if (!ata_strncmp(blp->b_fw, aidp->ai_fw,
+			    sizeof (aidp->ai_fw)))
+				continue;
+		}
 		if (blp->b_flags & flags)
 			return (TRUE);
 		return (FALSE);

@@ -50,6 +50,7 @@ extern	pcibl_t	ata_pciide_blacklist[];
  */
 typedef	struct {
 	char	*b_model;
+	char    *b_fw;
 	uint_t	 b_flags;
 } atabl_t;
 

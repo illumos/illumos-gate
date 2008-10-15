@@ -121,13 +121,13 @@ pcibl_t	ata_pciide_blacklist[] = {
  */
 
 atabl_t	ata_drive_blacklist[] = {
-	{ "NEC CD-ROM DRIVE:260",	ATA_BL_1SECTOR },
-	{ "NEC CD-ROM DRIVE:272",	ATA_BL_1SECTOR },
-	{ "NEC CD-ROM DRIVE:273",	ATA_BL_1SECTOR },
+	{ "NEC CD-ROM DRIVE:260",	NULL,		ATA_BL_1SECTOR },
+	{ "NEC CD-ROM DRIVE:272",	NULL,		ATA_BL_1SECTOR },
+	{ "NEC CD-ROM DRIVE:273",	NULL,		ATA_BL_1SECTOR },
 
-	{ /* Mitsumi */ "FX001DE",	ATA_BL_1SECTOR },
+	{ /* Mitsumi */ "FX001DE",	NULL,		ATA_BL_1SECTOR },
 
-	{ "fubar",
+	{ "fubar", NULL,
 		(ATA_BL_NODMA |
 		ATA_BL_1SECTOR |
 		ATA_BL_NORVRT |
@@ -136,8 +136,12 @@ atabl_t	ata_drive_blacklist[] = {
 	},
 
 	/* Known drives that have DMA problems */
-	{ "SAMSUNG CD-ROM SN-124",	ATA_BL_NODMA },
-	{ "SAMSUNG CDRW/DVD SM-352F",	ATA_BL_NODMA },
+	{ "SAMSUNG CD-ROM SN-124",	NULL,		ATA_BL_NODMA },
+	{ "SAMSUNG CDRW/DVD SM-352F",	NULL,		ATA_BL_NODMA },
+	{ "QEMU DVD-ROM",		"0.8.1",	ATA_BL_NODMA },
+	{ "QEMU DVD-ROM",		"0.8.2",	ATA_BL_NODMA },
+	{ "QEMU CD-ROM",		"0.8.1",	ATA_BL_NODMA },
+	{ "QEMU CD-ROM",		"0.8.2",	ATA_BL_NODMA },
 
 	NULL
 };
