@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel's linker/loader
  */
@@ -126,6 +124,7 @@ static Sym *sym_lookup(struct module *, Sym *);
 static struct kobjopen_tctl *kobjopen_alloc(char *filename);
 static void kobjopen_free(struct kobjopen_tctl *ltp);
 static void kobjopen_thread(struct kobjopen_tctl *ltp);
+static int kobj_is_compressed(intptr_t);
 
 extern int kcopy(const void *, void *, size_t);
 extern int elf_mach_ok(Ehdr *);
@@ -212,7 +211,6 @@ struct lib_macro_info {
 #define	NLIBMACROS	sizeof (libmacros) / sizeof (struct lib_macro_info)
 
 char *boot_cpu_compatible_list;			/* make $CPU available */
-
 
 char *kobj_module_path;				/* module search path */
 vmem_t	*text_arena;				/* module text arena */
@@ -3728,6 +3726,11 @@ kobj_open_file(char *name)
 	if (_modrootloaded) {
 		file->_base = kobj_zalloc(MAXBSIZE, KM_WAIT);
 		file->_bsize = MAXBSIZE;
+
+		/* Check if the file is compressed */
+		if (kobj_is_compressed(fd)) {
+			file->_iscmp = 1;
+		}
 	} else {
 		if (kobj_boot_compinfo(fd, &cbuf) != 0) {
 			kobj_close_file(file);
@@ -3764,7 +3767,7 @@ kobj_comp_setup(struct _buf *file, struct compinfo *cip)
 	}
 
 	hdr = kobj_comphdr(file);
-	if (hdr->ch_magic != CH_MAGIC || hdr->ch_version != CH_VERSION ||
+	if (hdr->ch_magic != CH_MAGIC_ZLIB || hdr->ch_version != CH_VERSION ||
 	    hdr->ch_algorithm != CH_ALG_ZLIB || hdr->ch_fsize == 0 ||
 	    (hdr->ch_blksize & (hdr->ch_blksize - 1)) != 0) {
 		kobj_free(file->_dbuf, cip->fsize);
@@ -3799,6 +3802,54 @@ kobj_read_file(struct _buf *file, char *buf, uint_t size, uint_t off)
 		_kobj_printf(ops, "kobj_read_file: size=%x,", size);
 		_kobj_printf(ops, " offset=%x at", off);
 		_kobj_printf(ops, " buf=%x\n", buf);
+	}
+
+	/*
+	 * Handle compressed (gzip for now) file here. First get the
+	 * compressed size, then read the image into memory and finally
+	 * call zlib to decompress the image at the supplied memory buffer.
+	 */
+	if (file->_iscmp) {
+		ulong_t dlen;
+		vattr_t vattr;
+		struct vnode *vp = (struct vnode *)file->_fd;
+		ssize_t resid;
+		int err = 0;
+
+		if (VOP_GETATTR(vp, &vattr, 0, kcred, NULL) != 0)
+			return (-1);
+
+		file->_dbuf = kobj_alloc(vattr.va_size, KM_WAIT|KM_TMP);
+		file->_dsize = vattr.va_size;
+
+		/* Read the compressed file into memory */
+		if ((err = vn_rdwr(UIO_READ, vp, file->_dbuf, vattr.va_size,
+		    (offset_t)(0), UIO_SYSSPACE, 0, (rlim64_t)0, CRED(),
+		    &resid)) != 0) {
+
+			_kobj_printf(ops, "kobj_read_file :vn_rdwr() failed, "
+			    "error code 0x%x\n", err);
+			return (-1);
+		}
+
+		dlen = size;
+
+		/* Decompress the image at the supplied memory buffer */
+		if ((err = z_uncompress(buf, &dlen, file->_dbuf,
+		    vattr.va_size)) != Z_OK) {
+			_kobj_printf(ops, "kobj_read_file: z_uncompress "
+			    "failed, error code : 0x%x\n", err);
+			return (-1);
+		}
+
+		if (dlen != size) {
+			_kobj_printf(ops, "kobj_read_file: z_uncompress "
+			    "failed to uncompress (size returned 0x%x , "
+			    "expected size: 0x%x)\n", dlen, size);
+			return (-1);
+		}
+
+		return (0);
 	}
 
 	while (size) {
@@ -4107,12 +4158,34 @@ kobj_gethashsize(uint_t n)
 int
 kobj_get_filesize(struct _buf *file, uint64_t *size)
 {
+	int err = 0;
+	ssize_t resid;
+	uint32_t buf;
+
 	if (_modrootloaded) {
 		struct bootstat bst;
 
 		if (kobj_fstat(file->_fd, &bst) != 0)
 			return (EIO);
 		*size = bst.st_size;
+
+		if (file->_iscmp) {
+			/*
+			 * Read the last 4 bytes of the compressed (gzip)
+			 * image to get the size of its uncompressed
+			 * version.
+			 */
+			if ((err = vn_rdwr(UIO_READ, (struct vnode *)file->_fd,
+			    (char *)(&buf), 4, (offset_t)(*size - 4),
+			    UIO_SYSSPACE, 0, (rlim64_t)0, CRED(), &resid))
+			    != 0) {
+				_kobj_printf(ops, "kobj_get_filesize: "
+				    "vn_rdwr() failed with error 0x%x\n", err);
+				return (-1);
+			}
+
+			*size =  (uint64_t)buf;
+		}
 	} else {
 
 #if defined(_OBP)
@@ -4547,4 +4620,31 @@ static int
 kobj_boot_compinfo(int fd, struct compinfo *cb)
 {
 	return (boot_compinfo(fd, cb));
+}
+
+/*
+ * Check if the file is compressed (for now we handle only gzip).
+ * It returns 1 if the file is compressed and 0 otherwise.
+ */
+static int
+kobj_is_compressed(intptr_t fd)
+{
+	struct vnode *vp = (struct vnode *)fd;
+	ssize_t resid;
+	uint16_t magic_buf;
+	int err = 0;
+
+	if ((err = vn_rdwr(UIO_READ, vp, (caddr_t)((intptr_t)&magic_buf),
+	    sizeof (magic_buf), (offset_t)(0),
+	    UIO_SYSSPACE, 0, (rlim64_t)0, CRED(), &resid)) != 0) {
+
+		_kobj_printf(ops, "kobj_is_compressed: vn_rdwr() failed, "
+		    "error code 0x%x\n", err);
+		return (0);
+	}
+
+	if (magic_buf == CH_MAGIC_GZIP)
+		return (1);
+
+	return (0);
 }

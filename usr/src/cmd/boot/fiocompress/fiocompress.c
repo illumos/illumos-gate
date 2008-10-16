@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fiocompress - a utility to compress files with a filesystem.
@@ -188,7 +186,7 @@ do_comp(size_t blksize)
 		exit(-1);
 	}
 
-	hdr->ch_magic = CH_MAGIC;
+	hdr->ch_magic = CH_MAGIC_ZLIB;
 	hdr->ch_version = CH_VERSION;
 	hdr->ch_algorithm = CH_ALG_ZLIB;
 	hdr->ch_fsize = srclen;
@@ -255,9 +253,9 @@ do_decomp()
 	int ret;
 
 	hdr = (struct comphdr *)(void *)srcaddr;
-	if (hdr->ch_magic != CH_MAGIC) {
+	if (hdr->ch_magic != CH_MAGIC_ZLIB) {
 		(void) fprintf(stderr, BAD_MAGIC,
-		    srcfile, (uint64_t)hdr->ch_magic, CH_MAGIC);
+		    srcfile, (uint64_t)hdr->ch_magic, CH_MAGIC_ZLIB);
 		exit(-1);
 	}
 	if (hdr->ch_version != CH_VERSION) {

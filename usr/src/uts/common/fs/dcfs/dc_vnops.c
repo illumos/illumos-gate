@@ -37,9 +37,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/t_lock.h>
@@ -930,7 +927,7 @@ decompvp(struct vnode *vp, cred_t *cred, caller_context_t *ctp)
 	hdr = &thdr;
 	error = vn_rdwr(UIO_READ, vp, (caddr_t)hdr, sizeof (struct comphdr), 0,
 	    UIO_SYSSPACE, 0, 0, cred, NULL);
-	if (error || hdr->ch_magic != CH_MAGIC ||
+	if (error || hdr->ch_magic != CH_MAGIC_ZLIB ||
 	    hdr->ch_version != CH_VERSION || hdr->ch_algorithm != CH_ALG_ZLIB ||
 	    hdr->ch_fsize == 0 || hdr->ch_blksize < PAGESIZE ||
 	    hdr->ch_blksize > ptob(DCCACHESIZE) ||

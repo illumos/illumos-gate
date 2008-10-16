@@ -19,20 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DECOMP_H
 #define	_SYS_DECOMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	CH_MAGIC	0x5a636d70	/* Zcmp */
+#define	CH_MAGIC_ZLIB	0x5a636d70	/* ZLIB compression */
+#define	CH_MAGIC_GZIP	0x8B1F		/* GZIP compression */
 
 #define	CH_VERSION	1
 
