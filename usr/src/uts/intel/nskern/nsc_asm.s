@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #else
+#include "assym.h"	/* Determine value of CPU_THREAD */
 #include <sys/asm_linkage.h>
 #endif
 
@@ -34,7 +35,6 @@
 #define	uint8_t	uchar_t
 #endif
 
-#include "assym.h"	/* Determine value of CPU_THREAD */
 
 /*
  * Special support routines that can't be done with C
