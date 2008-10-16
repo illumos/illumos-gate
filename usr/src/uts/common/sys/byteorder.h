@@ -59,11 +59,13 @@ extern "C" {
 #if defined(_BIG_ENDIAN) && !defined(ntohl) && !defined(__lint)
 /* big-endian */
 #define	ntohl(x)	(x)
-#define	ntohll(x)	(x)
 #define	ntohs(x)	(x)
 #define	htonl(x)	(x)
-#define	htonll(x)	(x)
 #define	htons(x)	(x)
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+#define	ntohll(x)	(x)
+#define	htonll(x)	(x)
+#endif	/* !_XPG4_2 || __EXTENSIONS__ */
 
 #elif !defined(ntohl) /* little-endian */
 
@@ -87,11 +89,14 @@ extern	in_addr_t htonl(in_addr_t);
 extern	in_port_t htons(in_port_t);
 extern	in_addr_t ntohl(in_addr_t);
 extern	in_port_t ntohs(in_port_t);
-#endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) || defined(_XPG5) */
-#if !(defined(_XPG4_2) || defined(_XPG5)) || defined(__EXTENSIONS__)
+#endif	/* !_XPG4_2 || __EXTENSIONS__ || _XPG5 */
+
+#if defined(_LP64) || defined(_LONGLONG_TYPE)
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern	uint64_t htonll(uint64_t);
 extern	uint64_t ntohll(uint64_t);
-#endif	/* !(_XPG4_2||_XPG5) || __EXTENSIONS__ */
+#endif	/* !_XPG4_2 || __EXTENSIONS__ */
+#endif	/* _LP64 || _LONGLONG_TYPE  */
 #endif
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
@@ -111,8 +116,8 @@ extern	uint64_t ntohll(uint64_t);
 #define	BSWAP_32(x)	htonl(x)
 #endif	/* !__i386 && !__amd64 */
 
-#if (!defined(__i386) && !defined(__amd64)) || \
-	((defined(_XPG4_2) || defined(_XPG5)) && !defined(__EXTENSIONS__))
+#if defined(_LP64) || defined(_LONGLONG_TYPE)
+#if (!defined(__i386) && !defined(__amd64))
 #define	BSWAP_64(x)	(((uint64_t)(x) << 56) | \
 			(((uint64_t)(x) << 40) & 0xff000000000000ULL) | \
 			(((uint64_t)(x) << 24) & 0xff0000000000ULL) | \
@@ -121,9 +126,12 @@ extern	uint64_t ntohll(uint64_t);
 			(((uint64_t)(x) >> 24) & 0xff0000ULL) | \
 			(((uint64_t)(x) >> 40) & 0xff00ULL) | \
 			((uint64_t)(x)  >> 56))
-#else /* x86 with non-XPG extensions allowed */
+#else /* x86 */
 #define	BSWAP_64(x)	htonll(x)
-#endif	/* (!__i386&&!__amd64) || ((_XPG4_2||_XPG5) && !__EXTENSIONS__) */
+#endif	/* !__i386 && !__amd64 */
+#else /* no uint64_t */
+#define	BSWAP_64(x)	((BSWAP_32(x) << 32) | BSWAP_32((x) >> 32))
+#endif	/* _LP64 || _LONGLONG_TYPE  */
 
 #define	BMASK_8(x)	((x) & 0xff)
 #define	BMASK_16(x)	((x) & 0xffff)
@@ -173,13 +181,14 @@ extern	uint64_t ntohll(uint64_t);
 #define	BE_IN32(xa) htonl(*((uint32_t *)(void *)(xa)))
 #endif	/* !__i386 && !__amd64 */
 
-#if (!defined(__i386) && !defined(__amd64)) || \
-	((defined(_XPG4_2) || defined(_XPG5)) && !defined(__EXTENSIONS__))
+#if !defined(_LP64) && !defined(_LONGLONG_TYPE)
+#if (!defined(__i386) && !defined(__amd64)) /* sparc */
 #define	BE_IN64(xa) \
 	(((uint64_t)BE_IN32(xa) << 32) | BE_IN32((uint8_t *)(xa) + 4))
-#else /* x86 with non-XPG extensions allowed */
+#else /* x86 */
 #define	BE_IN64(xa) htonll(*((uint64_t *)(void *)(xa)))
-#endif	/* (!__i386&&!__amd64) || ((_XPG4_2||_XPG5) && !__EXTENSIONS__) */
+#endif	/* (!__i386 && !__amd64) */
+#endif	/* !_LP64 && !_LONGLONG_TYPE */
 
 #define	LE_IN8(xa) \
 	*((uint8_t *)(xa))
@@ -209,13 +218,13 @@ extern	uint64_t ntohll(uint64_t);
 	BE_OUT16((uint8_t *)(xa), (yv) >> 16);
 
 #if (!defined(__i386) && !defined(__amd64)) || \
-	((defined(_XPG4_2) || defined(_XPG5)) && !defined(__EXTENSIONS__))
+	(!defined(_LP64) && !defined(_LONGLONG_TYPE))
 #define	BE_OUT64(xa, yv) \
 	BE_OUT32((uint8_t *)(xa) + 4, yv); \
 	BE_OUT32((uint8_t *)(xa), (yv) >> 32);
-#else /* x86 with non-XPG extensions allowed */
+#else /* x86 with uint64_t */
 #define	BE_OUT64(xa, yv) *((uint64_t *)(void *)(xa)) = htonll((uint64_t)(yv));
-#endif	/* (!__i386&&!__amd64) || ((_XPG4_2||_XPG5) && !__EXTENSIONS__) */
+#endif	/* (!__i386 && !__amd64) || (!_LP64 && !_LONGLONG_TYPE) */
 
 #define	LE_OUT8(xa, yv) *((uint8_t *)(xa)) = (uint8_t)(yv);
 
@@ -231,7 +240,7 @@ extern	uint64_t ntohll(uint64_t);
 	LE_OUT32((uint8_t *)(xa), yv); \
 	LE_OUT32((uint8_t *)(xa) + 4, (yv) >> 32);
 
-#endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
+#endif	/* !_XPG4_2 || __EXTENSIONS__ */
 
 #ifdef	__cplusplus
 }
