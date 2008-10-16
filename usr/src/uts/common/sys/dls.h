@@ -26,8 +26,6 @@
 #ifndef	_SYS_DLS_H
 #define	_SYS_DLS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <net/if.h>
@@ -49,7 +47,7 @@ extern "C" {
 /*
  * Data-Link Services Information (text emitted by modinfo(1m))
  */
-#define	DLS_INFO	"Data-Link Services v%I%"
+#define	DLS_INFO	"Data-Link Services"
 
 /*
  * Macros for converting ppas to instance #s, Vlan ID, or minor.

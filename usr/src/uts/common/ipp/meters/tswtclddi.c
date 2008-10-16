@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/atomic.h>
@@ -71,7 +69,7 @@ extern struct mod_ops mod_ippops;
  */
 static struct modlipp modlipp = {
 	&mod_ippops,
-	D_SM_COMMENT " %I%",
+	D_SM_COMMENT,
 	&tswtcl_ops
 };
 

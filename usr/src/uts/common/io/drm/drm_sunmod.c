@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Common misc module interfaces of DRM under Solaris
  */
@@ -41,7 +39,7 @@
 #include <vm/seg_kmem.h>
 
 static struct modlmisc modlmisc = {
-	&mod_miscops, "DRM common interfaces %I%"
+	&mod_miscops, "DRM common interfaces"
 };
 
 static struct modlinkage modlinkage = {

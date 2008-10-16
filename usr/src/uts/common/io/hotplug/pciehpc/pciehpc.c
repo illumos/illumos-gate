@@ -24,8 +24,6 @@
  *  Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCIEHPC - The Standard PCI Express HotPlug Controller driver module. This
  *           driver can be used with PCI Express HotPlug controllers that
@@ -87,7 +85,7 @@ extern struct mod_ops mod_miscops;
 static struct modlmisc modlmisc =
 {
 	&mod_miscops,
-	"PCIe hotplug driver v%I%",
+	"PCIe hotplug driver",
 };
 
 static struct modlinkage modlinkage =

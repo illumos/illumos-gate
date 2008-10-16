@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -93,7 +90,7 @@ extern struct mod_ops mod_ippops;
  */
 static struct modlipp modlipp = {
 	&mod_ippops,
-	D_SM_COMMENT " %I%",
+	D_SM_COMMENT,
 	&dscpmk_ops
 };
 
@@ -225,7 +222,7 @@ dscpmk_create_action(ipp_action_id_t aid, nvlist_t **nvlpp, ipp_flags_t flags)
 					nvlist_free(nvlp);
 					kmem_free(dscpmk_data, DSCPMK_DATA_SZ);
 					return (err);
-				    }
+				}
 			}
 		}
 	}
@@ -636,7 +633,7 @@ dscpmk_info(ipp_action_id_t aid, int (*fn)(nvlist_t *, void *), void *arg,
 	/* add dscp map */
 	bcopy(dscpmk_data->dscp_map, dscp_map, sizeof (dscp_map));
 	for (cnt = 0; cnt < DSCPMK_ARRAY_COUNT; cnt++) {
-		    dscp_map[cnt] = dscpmk_data->dscp_map[cnt];
+		dscp_map[cnt] = dscpmk_data->dscp_map[cnt];
 	}
 	if ((err = nvlist_add_int32_array(nvlp, DSCPMK_DSCP_MAP,
 	    dscp_map, DSCPMK_ARRAY_COUNT)) != 0) {

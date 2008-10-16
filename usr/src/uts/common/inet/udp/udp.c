@@ -24,9 +24,7 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-const char udp_version[] = "%Z%%M%	%I%	%E% SMI";
+const char udp_version[] = "@(#)udp.c	1.206	08/10/17 SMI";
 
 #include <sys/types.h>
 #include <sys/stream.h>

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * gld - Generic LAN Driver Version 2, PSARC/1997/382
  *
@@ -393,7 +391,7 @@ static struct glddevice gld_device_list;  /* Per-system root of GLD tables */
 
 static struct modldrv modlmisc = {
 	&mod_miscops,		/* Type of module - a utility provider */
-	"Generic LAN Driver (" GLD_VERSION_STRING ") %I%"
+	"Generic LAN Driver (" GLD_VERSION_STRING ")"
 #ifdef GLD_DEBUG
 	" DEBUG"
 #endif

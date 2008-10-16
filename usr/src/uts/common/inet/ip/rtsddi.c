@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -33,7 +31,7 @@
 
 #define	INET_NAME	"rts"
 #define	INET_DEVSTRTAB	rtsinfo
-#define	INET_DEVDESC	"PF_ROUTE socket STREAMS driver %I%"
+#define	INET_DEVDESC	"PF_ROUTE socket STREAMS driver"
 #define	INET_DEVMINOR	0
 #define	INET_DEVMTFLAGS	(D_MP|D_MTQPAIR|D_SYNCSTR)
 

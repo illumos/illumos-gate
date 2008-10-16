@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(DEBUG)
 #define	BUSRA_DEBUG
@@ -140,7 +138,7 @@ static int ra_map_exist(dev_info_t *dip, char *type);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,		/* Type of module. This one is a module */
-	"Bus Resource Allocator (BUSRA) %I%",	/* Name of the module. */
+	"Bus Resource Allocator (BUSRA)",	/* Name of the module. */
 };
 
 static struct modlinkage modlinkage = {

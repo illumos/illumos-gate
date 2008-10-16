@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi.h>
 #include <sys/mtio.h>
@@ -32,7 +30,7 @@
 #include <sys/kstat.h>
 #include <sys/scsi/targets/stdef.h>
 
-const char st_conf_version[] = "%M% %I% %E%";
+const char st_conf_version[] = "st_conf.c 1.92 08/10/17";
 /*
  * General
  * -------

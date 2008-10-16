@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the device filesystem.
  *
@@ -90,7 +88,7 @@ static struct devfs_data *devfs_mntinfo;	/* linked list of instances */
  * Module linkage information
  */
 static struct modlfs modlfs = {
-	&mod_fsops, "devices filesystem %I%", &devfs_vfssw
+	&mod_fsops, "devices filesystem", &devfs_vfssw
 };
 
 static struct modlinkage modlinkage = {

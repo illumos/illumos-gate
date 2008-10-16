@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Ethernet MAC plugin for the Nemo mac module
  */
@@ -108,7 +106,7 @@ static mac_stat_info_t ether_stats[] = {
 
 static struct modlmisc mac_ether_modlmisc = {
 	&mod_miscops,
-	"Ethernet MAC plugin %I%"
+	"Ethernet MAC plugin"
 };
 
 static struct modlinkage mac_ether_modlinkage = {

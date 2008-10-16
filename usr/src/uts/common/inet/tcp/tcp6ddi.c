@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -33,7 +31,7 @@
 
 #define	INET_NAME	"tcp6"
 #define	INET_DEVSTRTAB	tcpinfov6
-#define	INET_DEVDESC	"TCP6 STREAMS driver %I%"
+#define	INET_DEVDESC	"TCP6 STREAMS driver"
 #define	INET_DEVMINOR	0
 /*
  * Note that unlike UDP, TCP uses synchronous STREAMS only

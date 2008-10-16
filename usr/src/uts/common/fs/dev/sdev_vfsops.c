@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the /dev (hence, the sdev_ prefix) filesystem.
@@ -101,7 +99,7 @@ static vfsdef_t sdev_vfssw = {
  * Module linkage information
  */
 static struct modlfs modlfs = {
-	&mod_fsops, "/dev filesystem %I%", &sdev_vfssw
+	&mod_fsops, "/dev filesystem", &sdev_vfssw
 };
 
 static struct modlinkage modlinkage = {
@@ -343,7 +341,7 @@ sdev_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	}
 
 	sdev_update_timestamps(dv->sdev_attrvp,
-		cr, AT_CTIME|AT_MTIME|AT_ATIME);
+	    cr, AT_CTIME|AT_MTIME|AT_ATIME);
 
 cleanup:
 	if (args)

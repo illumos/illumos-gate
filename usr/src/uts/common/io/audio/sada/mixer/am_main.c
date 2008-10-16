@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Mixer Audio Personality Module (mixer)
@@ -167,7 +165,7 @@ static void am_set_waiting(audio_state_t *, pid_t, int, boolean_t, boolean_t);
 /* Linkage structure for loadable drivers */
 static struct modlmisc mixer_modlmisc = {
 	&mod_miscops,		/* drv_modops */
-	MIXER_MOD_NAME " %I%",	/* drv_linkinfo */
+	MIXER_MOD_NAME,		/* drv_linkinfo */
 };
 
 static struct modlinkage mixer_modlinkage =

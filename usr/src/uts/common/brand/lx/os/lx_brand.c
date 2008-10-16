@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -125,7 +123,7 @@ struct brand lx_brand = {
 };
 
 static struct modlbrand modlbrand = {
-	&mod_brandops, "lx brand %I%", &lx_brand
+	&mod_brandops, "lx brand", &lx_brand
 };
 
 static struct modlinkage modlinkage = {

@@ -19,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -33,8 +31,8 @@
 #include <inet/ip.h>
 
 #define	INET_NAME	"icmp"
-#define	INET_MODDESC	"ICMP dummy STREAMS module %I%"
-#define	INET_DEVDESC	"ICMP STREAMS driver %I%"
+#define	INET_MODDESC	"ICMP dummy STREAMS module"
+#define	INET_DEVDESC	"ICMP STREAMS driver"
 #define	INET_DEVMINOR	0
 #define	INET_DEVSTRTAB	icmpinfov4
 #define	INET_MODSTRTAB	dummymodinfo

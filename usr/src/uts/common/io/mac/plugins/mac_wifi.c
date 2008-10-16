@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WiFi MAC Type plugin for the Nemo mac module
  *
@@ -65,7 +63,7 @@ static mac_stat_info_t wifi_stats[] = {
 
 static struct modlmisc mac_wifi_modlmisc = {
 	&mod_miscops,
-	"WiFi MAC plugin %I%"
+	"WiFi MAC plugin"
 };
 
 static struct modlinkage mac_wifi_modlinkage = {

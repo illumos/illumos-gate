@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ibdm.c
  *
@@ -163,7 +161,7 @@ int	ibdm_ignore_saa_event = 0;
 /* Modload support */
 static struct modlmisc ibdm_modlmisc	= {
 	&mod_miscops,
-	"InfiniBand Device Manager %I%",
+	"InfiniBand Device Manager",
 };
 
 struct modlinkage ibdm_modlinkage = {

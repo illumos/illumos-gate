@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -35,8 +33,8 @@
 #define	INET_NAME	"tcp"
 #define	INET_MODSTRTAB	dummymodinfo
 #define	INET_DEVSTRTAB	tcpinfov4
-#define	INET_DEVDESC	"TCP STREAMS driver %I%"
-#define	INET_MODDESC	"TCP dummy STREAMS module %I%"
+#define	INET_DEVDESC	"TCP STREAMS driver"
+#define	INET_MODDESC	"TCP dummy STREAMS module"
 #define	INET_DEVMINOR	0
 #define	INET_MODMTFLAGS	D_MP
 /*

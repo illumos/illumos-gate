@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibcm_impl.c
@@ -377,7 +375,7 @@ int		ibcm_test_mode = 0;	/* set to 1, if running tests */
 /* Module Driver Info */
 static struct modlmisc ibcm_modlmisc = {
 	&mod_miscops,
-	"IB Communication Manager %I%"
+	"IB Communication Manager"
 };
 
 /* Module Linkage */
@@ -745,7 +743,8 @@ ibcm_fini(void)
 
 	/* if detach fails, CM didn't free up some resources, so assert */
 	if (status != IBT_SUCCESS)
-	    IBTF_DPRINTF_L1(cmlog, "ibcm_fini: ibt_detach failed %d", status);
+		IBTF_DPRINTF_L1(cmlog, "ibcm_fini: ibt_detach failed %d",
+		    status);
 
 	ibcm_rc_flow_control_fini();
 
@@ -2296,8 +2295,7 @@ ibcm_hca_fini_port(ibcm_hca_info_t *hcap, uint8_t port_index)
 		    port_index + 1, ibmf_status);
 
 		if (ibmf_status == IBMF_SUCCESS)
-			hcap->hca_port_info[port_index].port_ibmf_hdl =
-								NULL;
+			hcap->hca_port_info[port_index].port_ibmf_hdl = NULL;
 		else {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port: "
 			    "ibmf_unregister failed %d port_num %d",
