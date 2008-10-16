@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the core framework routines for the
  * kernel cryptographic framework. These routines are at the
@@ -57,8 +55,8 @@ kcf_global_swq_t *gswq;	/* Global software queue */
 
 /* Thread pool related variables */
 static kcf_pool_t *kcfpool;	/* Thread pool of kcfd LWPs */
-int kcf_maxthreads;
-int kcf_minthreads;
+int kcf_maxthreads = 2;
+int kcf_minthreads = 1;
 int kcf_thr_multiple = 2;	/* Boot-time tunable for experimentation */
 static ulong_t	kcf_idlethr_timeout;
 static boolean_t kcf_sched_running = B_FALSE;
@@ -1228,7 +1226,7 @@ kcf_sched_init(void)
 	mutex_init(&gswq->gs_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&gswq->gs_cv, NULL, CV_DEFAULT, NULL);
 	gswq->gs_njobs = 0;
-	compute_min_max_threads();	/* Computes gs_maxjobs also. */
+	gswq->gs_maxjobs = kcf_maxthreads * crypto_taskq_maxalloc;
 	gswq->gs_first = gswq->gs_last = NULL;
 
 	/* Initialize the global reqid table */
@@ -1505,14 +1503,10 @@ kcf_svc_wait(int *nthrs)
 static void
 compute_min_max_threads()
 {
-	psetid_t psid = PS_MYID;
-
 	mutex_enter(&gswq->gs_lock);
-	if (cpupart_get_cpus(&psid, NULL, (uint_t *)&kcf_minthreads) != 0) {
-		cmn_err(CE_WARN, "kcf:compute_min_max_threads cpupart_get_cpus:"
-		    " failed, setting kcf_minthreads to 1");
-		kcf_minthreads = 1;
-	}
+	mutex_enter(&cpu_lock);
+	kcf_minthreads = curthread->t_cpupart->cp_ncpus;
+	mutex_exit(&cpu_lock);
 	kcf_maxthreads = kcf_thr_multiple * kcf_minthreads;
 	gswq->gs_maxjobs = kcf_maxthreads * crypto_taskq_maxalloc;
 	mutex_exit(&gswq->gs_lock);
