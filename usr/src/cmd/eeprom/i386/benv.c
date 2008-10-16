@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "benv.h"
 #include "message.h"
@@ -901,7 +899,7 @@ parse_value(benv_des_t *bd, char **next, int *line)
 			if (*c == '\\') {
 				c++;
 			}
-			if (*c == '\0' || *c == '\n') {
+			if (*c == '\0') {
 				break;
 			}
 			*result++ = *c++;
@@ -968,7 +966,7 @@ parse_benv(benv_des_t *bd)
 	pbase = (char *)bd->adr;
 	pend = pbase + bd->len;
 
-	for (tok = tnext = pbase; tnext < pend; tok = tnext)
+	for (tok = tnext = pbase; tnext < pend && '\0' != *tnext; tok = tnext)
 		if (*tok == COMM)
 			add_comm(bd, tok, pend, &tnext, &line);
 		else
