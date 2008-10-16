@@ -183,6 +183,9 @@ void
 mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 {
 	processorid_t bootcpuid = 0;
+	static int is_first_quiesce = 1;
+	static int is_first_reset = 1;
+	int reset_status = 0;
 
 	if (fcn == AD_FASTREBOOT && !newkernel.fi_valid)
 		fcn = AD_BOOT;
@@ -266,11 +269,15 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	/*
 	 * Try to quiesce devices.
 	 */
-	if (!panicstr) {
-		int reset_status = 0;
+	if (is_first_quiesce) {
+		/*
+		 * Clear is_first_quiesce before calling quiesce_devices()
+		 * so that if quiesce_devices() causes panics, it will not
+		 * be invoked again.
+		 */
+		is_first_quiesce = 0;
 
 		quiesce_active = 1;
-
 		quiesce_devices(ddi_root_node(), &reset_status);
 		if (reset_status == -1) {
 			if (fcn == AD_FASTREBOOT && !force_fastreboot) {
@@ -280,16 +287,26 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 			} else if (fcn != AD_FASTREBOOT)
 				fastreboot_capable = 0;
 		}
-
 		quiesce_active = 0;
 	}
 
 	/*
-	 * try to reset devices.  reset_leaves() should only be called when
-	 * there are no other threads that could be accessing devices
+	 * Try to reset devices. reset_leaves() should only be called
+	 * a) when there are no other threads that could be accessing devices,
+	 *    and
+	 * b) on a system that's not capable of fast reboot (fastreboot_capable
+	 *    being 0), or on a system where quiesce_devices() failed to
+	 *    complete (quiesce_active being 1).
 	 */
-	if (!panicstr && !fastreboot_capable)
+	if (is_first_reset && (!fastreboot_capable || quiesce_active)) {
+		/*
+		 * Clear is_first_reset before calling reset_devices()
+		 * so that if reset_devices() causes panics, it will not
+		 * be invoked again.
+		 */
+		is_first_reset = 0;
 		reset_leaves();
+	}
 
 	(void) spl8();
 	(*psm_shutdownf)(cmd, fcn);
