@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,6 +166,7 @@ mgmt_handle_init(void)
 	return (h);
 error:
 	mgmt_handle_fini(h);
+	free(h);
 	syslog(LOG_ERR, "iscsitgt SMF initialization problem: %s\n",
 	    scf_strerror(scf_error()));
 	return (NULL);
@@ -532,9 +531,14 @@ new_property(targ_scf_t *h,
 	} else {
 		type = SCF_TYPE_ASTRING;
 	}
-	(void) scf_transaction_property_new(h->t_trans, e, n->x_name, type);
-	(void) scf_value_set_from_string(v, type, n->x_value);
-	(void) scf_entry_add_value(e, v);
+	if ((scf_transaction_property_new(h->t_trans, e, n->x_name, type)
+	    == 0)) {
+		(void) scf_value_set_from_string(v, type, n->x_value);
+		(void) scf_entry_add_value(e, v);
+	} else {
+		scf_entry_destroy(e);
+		scf_value_destroy(v);
+	}
 }
 
 static void
@@ -775,6 +779,7 @@ mgmt_config_save2scf()
 	scf_iter_destroy(iter);
 	scf_value_destroy(value);
 	scf_property_destroy(prop);
+	mgmt_handle_fini(h);
 	return (True);
 
 error:
@@ -831,6 +836,10 @@ mgmt_param_save2scf(tgt_node_t *node, char *target_name, int lun)
 	}
 
 	(void) pthread_mutex_unlock(&scf_param_mutex);
+	scf_iter_destroy(iter);
+	scf_value_destroy(value);
+	scf_property_destroy(prop);
+	mgmt_handle_fini(h);
 	return (True);
 
 error:

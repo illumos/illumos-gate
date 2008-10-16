@@ -548,6 +548,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 				xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 				goto error;
 			}
+			free(cptr);
 		}
 	}
 
@@ -1001,6 +1002,7 @@ create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
 			goto error;
 		}
 		iscsi_inventory_change(targ_name);
+		tgt_node_free(node);
 	}
 
 	return (True);
@@ -1008,6 +1010,8 @@ create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
 error:
 	if (fd != -1)
 		(void) close(fd);
+	if (node)
+		tgt_node_free(node);
 	return (False);
 }
 
@@ -1087,8 +1091,11 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, tgt_node_t *n,
 		    ((fd = open(raw_name, O_NONBLOCK|O_RDONLY)) < 0)) {
 			*code = ERR_DISK_BACKING_NOT_VALID_RAW;
 			(void) close(fd);
+			if (raw_name)
+				free(raw_name);
 			return (False);
 		}
+		free(raw_name);
 		if (readvtoc(fd, &extvtoc, &slice) == True) {
 			*size = extvtoc.v_part[slice].p_size * 512;
 

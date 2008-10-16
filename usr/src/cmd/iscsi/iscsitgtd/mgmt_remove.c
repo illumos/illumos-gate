@@ -260,6 +260,8 @@ error:
 		free(prop);
 	if (n)
 		tgt_node_free(n);
+	if (dataset)
+		free(dataset);
 	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
@@ -286,6 +288,8 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		if (strcmp(targ->x_value, prop) == 0)
 			break;
 	}
+	free(prop);
+	prop = NULL;
 	if (targ == NULL) {
 		xml_rtn_msg(&msg, ERR_TARG_NOT_FOUND);
 		goto error;

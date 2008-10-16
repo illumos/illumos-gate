@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -188,7 +186,8 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 
 			/* get ip-addr & port */
 			for (x = tpgt->x_child; x; x = x->x_sibling) {
-				(void) get_ip_addr(x->x_value, &eid);
+				if (get_ip_addr(x->x_value, &eid) < 0)
+					continue;
 				if (isns_append_attr(cmd,
 				    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
 				    eid.ai_addrlen, (void *)&eid.ip_adr,
@@ -835,7 +834,9 @@ get_addr_family(char *node) {
 		    node, gai_strerror(ret));
 		return (-1);
 	}
-	return (ai->ai_family);
+	ret = ai->ai_family;
+	freeaddrinfo(ai);
+	return (ret);
 }
 
 static int
@@ -1392,7 +1393,7 @@ isns_reg(char *targ)
 {
 	int		so;
 	tgt_node_t	*tgt;
-	char		*iqn;
+	char		*iqn = NULL;
 
 	if (isns_server_connection_thr_running == False) {
 		syslog(LOG_ERR,
@@ -1414,13 +1415,16 @@ isns_reg(char *targ)
 		if (isns_dev_attr_reg(so, tgt, iqn, tgt->x_value) != 0) {
 			syslog(LOG_ALERT, "ISNS registration failed %s\n",
 			    tgt->x_value);
+			goto error;
 		}
 		if (isns_scn_reg(so, iqn) == -1) {
 			syslog(LOG_ERR, "ISNS SCN register failed\n");
 		}
-		free(iqn);
 	}
 
+error:
+	if (iqn)
+		free(iqn);
 	isns_close(so);
 	return (0);
 }

@@ -117,7 +117,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	tgt_node_t	*t		= NULL;
 	tgt_node_t	*list		= NULL;
 	tgt_node_t	*c		= NULL;
-	tgt_node_t	*node;
+	tgt_node_t	*node		= NULL;
 	tgt_node_t	*tpgt		= NULL;
 	Boolean_t	change_made	= False;
 	int		lun		= 0;
@@ -198,7 +198,10 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		(void) tgt_find_value_int(x, XML_ELEMENT_LUN, &lun);
 
 		/* ---- read in current parameters ---- */
-		(void) mgmt_get_param(&node, targ_name, lun);
+		if (mgmt_get_param(&node, targ_name, lun) == False) {
+			xml_rtn_msg(&msg, ERR_OPEN_PARAM_FILE_FAILED);
+			goto error;
+		}
 
 		/* ---- validate that we're indeed growing the LU ---- */
 		if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &prop) ==
@@ -439,6 +442,8 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 
 error:
 	(void) pthread_rwlock_unlock(&targ_config_mutex);
+	if (node)
+		tgt_node_free(node);
 	return (msg);
 }
 
@@ -715,6 +720,8 @@ error:
 		free(name);
 	if (ip_str)
 		free(ip_str);
+	if (res)
+		freeaddrinfo(res);
 	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
@@ -753,6 +760,9 @@ modify_zfs(tgt_node_t *x, ucred_t *cred)
 	 */
 	if (tgt_find_value_str(x, XML_ELEMENT_VALIDATE, &tru)) {
 		(void) pthread_rwlock_unlock(&targ_config_mutex);
+		if (tru)
+			free(tru);
+		free(dataset);
 		return (validate_zfs_iscsitgt(x));
 	}
 
