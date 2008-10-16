@@ -3925,26 +3925,31 @@ int
 mdi_pi_pathname_obp_set(mdi_pathinfo_t *pip, char *component)
 {
 	dev_info_t *pdip;
-	char obp_path[MAXPATHLEN];
+	char *obp_path = NULL;
+	int rc = MDI_FAILURE;
 
 	if (pip == NULL)
 		return (MDI_FAILURE);
-	bzero(obp_path, sizeof (obp_path));
 
 	pdip = mdi_pi_get_phci(pip);
 	if (pdip == NULL)
 		return (MDI_FAILURE);
+
+	obp_path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 
 	if (ddi_pathname_obp(pdip, obp_path) == NULL) {
 		(void) ddi_pathname(pdip, obp_path);
 	}
 
 	if (component) {
-		(void) strncat(obp_path, "/", sizeof (obp_path));
-		(void) strncat(obp_path, component, sizeof (obp_path));
+		(void) strncat(obp_path, "/", MAXPATHLEN);
+		(void) strncat(obp_path, component, MAXPATHLEN);
 	}
-
-	return (mdi_prop_update_string(pip, "obp-path", obp_path));
+	rc = mdi_prop_update_string(pip, "obp-path", obp_path);
+	
+	if (obp_path)
+		kmem_free(obp_path, MAXPATHLEN);
+	return (rc);
 }
 
 /*

@@ -6751,12 +6751,14 @@ int
 ddi_pathname_obp_set(dev_info_t *dip, char *component)
 {
 	dev_info_t *pdip;
-	char obp_path[MAXPATHLEN];
-
-	bzero(obp_path, sizeof (obp_path));
+	char *obp_path = NULL;
+	int rc = DDI_FAILURE;
 
 	if (dip == NULL)
 		return (DDI_FAILURE);
+
+	obp_path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
 	pdip = ddi_get_parent(dip);
 
 	if (ddi_pathname_obp(pdip, obp_path) == NULL) {
@@ -6764,11 +6766,16 @@ ddi_pathname_obp_set(dev_info_t *dip, char *component)
 	}
 
 	if (component) {
-		(void) strncat(obp_path, "/", sizeof (obp_path));
-		(void) strncat(obp_path, component, sizeof (obp_path));
+		(void) strncat(obp_path, "/", MAXPATHLEN);
+		(void) strncat(obp_path, component, MAXPATHLEN);
 	}
-	return (ddi_prop_update_string(DDI_DEV_T_NONE, dip, "obp-path",
-	    obp_path));
+	rc = ndi_prop_update_string(DDI_DEV_T_NONE, dip, "obp-path",
+	    obp_path);
+
+	if (obp_path)
+		kmem_free(obp_path, MAXPATHLEN);
+
+	return (rc);
 }
 
 /*
