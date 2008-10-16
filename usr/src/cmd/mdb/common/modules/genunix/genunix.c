@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -3505,6 +3503,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "threadlist", "?[-t] [-v [count]]",
 		"display threads and associated C stack traces", threadlist,
 		threadlist_help },
+	{ "stackinfo", "?[-h|-a]", "display kthread_t stack usage", stackinfo,
+		stackinfo_help },
 
 	/* from tsd.c */
 	{ "tsd", ":-k key", "print tsd[key-1] for this thread", ttotsd },

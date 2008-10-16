@@ -27,7 +27,6 @@
 #ifndef	_SYS_THREAD_H
 #define	_SYS_THREAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -681,6 +680,31 @@ extern int default_binding_mode;
  */
 #define	THREAD_FREEINTR(tp, cpu)	\
 		THREAD_SET_STATE(tp, TS_FREE, &(cpu)->cpu_thread_lock)
+
+/* if tunable kmem_stackinfo is set, fill kthread stack with a pattern */
+#define	KMEM_STKINFO_PATTERN	0xbadcbadcbadcbadcULL
+
+/*
+ * If tunable kmem_stackinfo is set, log the latest KMEM_LOG_STK_USAGE_SIZE
+ * dead kthreads that used their kernel stack the most.
+ */
+#define	KMEM_STKINFO_LOG_SIZE	16
+
+/* kthread name (cmd/lwpid) string size in the stackinfo log */
+#define	KMEM_STKINFO_STR_SIZE	64
+
+/*
+ * stackinfo logged data.
+ */
+typedef struct kmem_stkinfo {
+	caddr_t	kthread;	/* kthread pointer */
+	caddr_t	t_startpc;	/* where kthread started */
+	caddr_t	start;		/* kthread stack start address */
+	size_t	stksz;		/* kthread stack size */
+	size_t	percent;	/* kthread stack high water mark */
+	id_t	t_tid;		/* kthread id */
+	char	cmd[KMEM_STKINFO_STR_SIZE];	/* kthread name (cmd/lwpid) */
+} kmem_stkinfo_t;
 
 #ifdef	__cplusplus
 }

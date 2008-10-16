@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -124,12 +123,21 @@ int	lwp_default_stksize;
 
 static zone_key_t zone_thread_key;
 
+unsigned int kmem_stackinfo;		/* stackinfo feature on-off */
+kmem_stkinfo_t *kmem_stkinfo_log;	/* stackinfo circular log */
+static kmutex_t kmem_stkinfo_lock;	/* protects kmem_stkinfo_log */
+
 /*
  * forward declarations for internal thread specific data (tsd)
  */
 static void *tsd_realloc(void *, size_t, size_t);
 
 void thread_reaper(void);
+
+/* forward declarations for stackinfo feature */
+static void stkinfo_begin(kthread_t *);
+static void stkinfo_end(kthread_t *);
+static size_t stkinfo_percent(caddr_t, caddr_t, caddr_t);
 
 /*ARGSUSED*/
 static int
@@ -399,6 +407,10 @@ thread_create(
 #endif /* STACK_GROWTH_DOWN */
 	}
 
+	if (kmem_stackinfo != 0) {
+		stkinfo_begin(t);
+	}
+
 	/* set default stack flag */
 	if (stksize == lwp_default_stksize)
 		t->t_flag |= T_DFLTSTK;
@@ -616,6 +628,10 @@ thread_exit(void)
 		exitctx(t);
 	if (t->t_procp->p_pctx != NULL)
 		exitpctx(t->t_procp);
+
+	if (kmem_stackinfo != 0) {
+		stkinfo_end(t);
+	}
 
 	t->t_state = TS_ZOMB;	/* set zombie thread */
 
@@ -1874,4 +1890,249 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 	}
 	schedctl_set_cidpri(t);
 	return (on_rq);
+}
+
+/*
+ * Tunable kmem_stackinfo is set, fill the kernel thread stack with a
+ * specific pattern.
+ */
+static void
+stkinfo_begin(kthread_t *t)
+{
+	caddr_t	start;	/* stack start */
+	caddr_t	end;	/* stack end  */
+	uint64_t *ptr;	/* pattern pointer */
+
+	/*
+	 * Stack grows up or down, see thread_create(),
+	 * compute stack memory area start and end (start < end).
+	 */
+	if (t->t_stk > t->t_stkbase) {
+		/* stack grows down */
+		start = t->t_stkbase;
+		end = t->t_stk;
+	} else {
+		/* stack grows up */
+		start = t->t_stk;
+		end = t->t_stkbase;
+	}
+
+	/*
+	 * Stackinfo pattern size is 8 bytes. Ensure proper 8 bytes
+	 * alignement for start and end in stack area boundaries
+	 * (protection against corrupt t_stkbase/t_stk data).
+	 */
+	if ((((uintptr_t)start) & 0x7) != 0) {
+		start = (caddr_t)((((uintptr_t)start) & (~0x7)) + 8);
+	}
+	end = (caddr_t)(((uintptr_t)end) & (~0x7));
+
+	if ((end <= start) || (end - start) > (1024 * 1024)) {
+		/* negative or stack size > 1 meg, assume bogus */
+		return;
+	}
+
+	/* fill stack area with a pattern (instead of zeros) */
+	ptr = (uint64_t *)((void *)start);
+	while (ptr < (uint64_t *)((void *)end)) {
+		*ptr++ = KMEM_STKINFO_PATTERN;
+	}
+}
+
+
+/*
+ * Tunable kmem_stackinfo is set, create stackinfo log if doesn't already exist,
+ * compute the percentage of kernel stack really used, and set in the log
+ * if it's the latest highest percentage.
+ */
+static void
+stkinfo_end(kthread_t *t)
+{
+	caddr_t	start;	/* stack start */
+	caddr_t	end;	/* stack end  */
+	uint64_t *ptr;	/* pattern pointer */
+	size_t stksz;	/* stack size */
+	size_t smallest = 0;
+	size_t percent = 0;
+	uint_t index = 0;
+	uint_t i;
+	static size_t smallest_percent = (size_t)-1;
+	static uint_t full = 0;
+
+	/* create the stackinfo log, if doesn't already exist */
+	mutex_enter(&kmem_stkinfo_lock);
+	if (kmem_stkinfo_log == NULL) {
+		kmem_stkinfo_log = (kmem_stkinfo_t *)
+		    kmem_zalloc(KMEM_STKINFO_LOG_SIZE *
+		    (sizeof (kmem_stkinfo_t)), KM_NOSLEEP);
+		if (kmem_stkinfo_log == NULL) {
+			mutex_exit(&kmem_stkinfo_lock);
+			return;
+		}
+	}
+	mutex_exit(&kmem_stkinfo_lock);
+
+	/*
+	 * Stack grows up or down, see thread_create(),
+	 * compute stack memory area start and end (start < end).
+	 */
+	if (t->t_stk > t->t_stkbase) {
+		/* stack grows down */
+		start = t->t_stkbase;
+		end = t->t_stk;
+	} else {
+		/* stack grows up */
+		start = t->t_stk;
+		end = t->t_stkbase;
+	}
+
+	/* stack size as found in kthread_t */
+	stksz = end - start;
+
+	/*
+	 * Stackinfo pattern size is 8 bytes. Ensure proper 8 bytes
+	 * alignement for start and end in stack area boundaries
+	 * (protection against corrupt t_stkbase/t_stk data).
+	 */
+	if ((((uintptr_t)start) & 0x7) != 0) {
+		start = (caddr_t)((((uintptr_t)start) & (~0x7)) + 8);
+	}
+	end = (caddr_t)(((uintptr_t)end) & (~0x7));
+
+	if ((end <= start) || (end - start) > (1024 * 1024)) {
+		/* negative or stack size > 1 meg, assume bogus */
+		return;
+	}
+
+	/* search until no pattern in the stack */
+	if (t->t_stk > t->t_stkbase) {
+		/* stack grows down */
+#if defined(__i386) || defined(__amd64)
+		/*
+		 * 6 longs are pushed on stack, see thread_load(). Skip
+		 * them, so if kthread has never run, percent is zero.
+		 * 8 bytes alignement is preserved for a 32 bit kernel,
+		 * 6 x 4 = 24, 24 is a multiple of 8.
+		 *
+		 */
+		end -= (6 * sizeof (long));
+#endif
+		ptr = (uint64_t *)((void *)start);
+		while (ptr < (uint64_t *)((void *)end)) {
+			if (*ptr != KMEM_STKINFO_PATTERN) {
+				percent = stkinfo_percent(end,
+				    start, (caddr_t)ptr);
+				break;
+			}
+			ptr++;
+		}
+	} else {
+		/* stack grows up */
+		ptr = (uint64_t *)((void *)end);
+		ptr--;
+		while (ptr >= (uint64_t *)((void *)start)) {
+			if (*ptr != KMEM_STKINFO_PATTERN) {
+				percent = stkinfo_percent(start,
+				    end, (caddr_t)ptr);
+				break;
+			}
+			ptr--;
+		}
+	}
+
+	DTRACE_PROBE3(stack__usage, kthread_t *, t,
+	    size_t, stksz, size_t, percent);
+
+	if (percent == 0) {
+		return;
+	}
+
+	mutex_enter(&kmem_stkinfo_lock);
+	if (full == KMEM_STKINFO_LOG_SIZE && percent < smallest_percent) {
+		/*
+		 * The log is full and already contains the highest values
+		 */
+		mutex_exit(&kmem_stkinfo_lock);
+		return;
+	}
+
+	/* keep a log of the highest used stack */
+	for (i = 0; i < KMEM_STKINFO_LOG_SIZE; i++) {
+		if (kmem_stkinfo_log[i].percent == 0) {
+			index = i;
+			full++;
+			break;
+		}
+		if (smallest == 0) {
+			smallest = kmem_stkinfo_log[i].percent;
+			index = i;
+			continue;
+		}
+		if (kmem_stkinfo_log[i].percent < smallest) {
+			smallest = kmem_stkinfo_log[i].percent;
+			index = i;
+		}
+	}
+
+	if (percent >= kmem_stkinfo_log[index].percent) {
+		kmem_stkinfo_log[index].kthread = (caddr_t)t;
+		kmem_stkinfo_log[index].t_startpc = (caddr_t)t->t_startpc;
+		kmem_stkinfo_log[index].start = start;
+		kmem_stkinfo_log[index].stksz = stksz;
+		kmem_stkinfo_log[index].percent = percent;
+		kmem_stkinfo_log[index].t_tid = t->t_tid;
+		kmem_stkinfo_log[index].cmd[0] = '\0';
+		if (t->t_tid != 0) {
+			stksz = strlen((t->t_procp)->p_user.u_comm);
+			if (stksz >= KMEM_STKINFO_STR_SIZE) {
+				stksz = KMEM_STKINFO_STR_SIZE - 1;
+				kmem_stkinfo_log[index].cmd[stksz] = '\0';
+			} else {
+				stksz += 1;
+			}
+			(void) memcpy(kmem_stkinfo_log[index].cmd,
+			    (t->t_procp)->p_user.u_comm, stksz);
+		}
+		if (percent < smallest_percent) {
+			smallest_percent = percent;
+		}
+	}
+	mutex_exit(&kmem_stkinfo_lock);
+}
+
+/*
+ * Tunable kmem_stackinfo is set, compute stack utilization percentage.
+ */
+static size_t
+stkinfo_percent(caddr_t t_stk, caddr_t t_stkbase, caddr_t sp)
+{
+	size_t percent;
+	size_t s;
+
+	if (t_stk > t_stkbase) {
+		/* stack grows down */
+		if (sp > t_stk) {
+			return (0);
+		}
+		if (sp < t_stkbase) {
+			return (100);
+		}
+		percent = t_stk - sp + 1;
+		s = t_stk - t_stkbase + 1;
+	} else {
+		/* stack grows up */
+		if (sp < t_stk) {
+			return (0);
+		}
+		if (sp > t_stkbase) {
+			return (100);
+		}
+		percent = sp - t_stk + 1;
+		s = t_stkbase - t_stk + 1;
+	}
+	percent = ((100 * percent) / s) + 1;
+	if (percent > 100) {
+		percent = 100;
+	}
+	return (percent);
 }
