@@ -406,29 +406,4 @@ if [ -f /etc/acctadm.conf ]; then
 fi
 _ACCTADM
 
-# Preinstall script will create this file if vtdaemon service was
-# already installed, in which case we preserve current service state,
-# be it enabled or disabled.
-if [ -f $PKG_INSTALL_ROOT/var/tmp/vtdaemon_installed.tmp ]; then
-        rm -f $PKG_INSTALL_ROOT/var/tmp/vtdaemon_installed.tmp
-elif [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
-        # live system
-        /usr/sbin/svcadm enable svc:/system/vtdaemon:default
-	/usr/sbin/svcadm enable svc:/system/console-login:vt2
-	/usr/sbin/svcadm enable svc:/system/console-login:vt3
-	/usr/sbin/svcadm enable svc:/system/console-login:vt4
-	/usr/sbin/svcadm enable svc:/system/console-login:vt5
-	/usr/sbin/svcadm enable svc:/system/console-login:vt6
-else
-        # upgrade
-        cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<-EOF
-        /usr/sbin/svcadm enable svc:/system/vtdaemon:default
-	/usr/sbin/svcadm enable svc:/system/console-login:vt2
-	/usr/sbin/svcadm enable svc:/system/console-login:vt3
-	/usr/sbin/svcadm enable svc:/system/console-login:vt4
-	/usr/sbin/svcadm enable svc:/system/console-login:vt5
-	/usr/sbin/svcadm enable svc:/system/console-login:vt6
-	EOF
-fi
-
 exit 0

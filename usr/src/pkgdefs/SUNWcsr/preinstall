@@ -126,14 +126,4 @@ if [ "$UPDATE" = yes ]; then
 	fi
 fi
 
-# Presence of this temp file will tell postinstall script
-# that the vtdaemon service is already installed, in which case
-# the current service state will be preserved, be it enabled
-# or disabled.
-rm -f $PKG_INSTALL_ROOT/var/tmp/vtdaemon_installed.tmp > /dev/null 2>&1
-
-if [ -f $PKG_INSTALL_ROOT/var/svc/manifest/system/vtdaemon.xml ]; then
-        touch $PKG_INSTALL_ROOT/var/tmp/vtdaemon_installed.tmp
-fi
-
 exit 0
