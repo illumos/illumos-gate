@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -1205,7 +1203,7 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_RC_PSEUDO:
 			/* no adjust_for_aer for pseudo RC */
-			(void) pf_analyse_error_tbl(derr, impl, pfd_p,
+			sts_flags |= pf_analyse_error_tbl(derr, impl, pfd_p,
 			    pcie_rp_tbl, PCIE_ADV_REG(pfd_p)->pcie_ue_status);
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_UP:
