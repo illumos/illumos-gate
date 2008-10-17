@@ -15100,6 +15100,9 @@ sfmmu_alloc_scd(sf_srd_t *srdp, sf_region_map_t *new_map)
 		kmem_cache_free(sfmmuid_cache, scsfmmup);
 		return (NULL);
 	}
+	if (&mmu_init_scd) {
+		mmu_init_scd(new_scdp);
+	}
 	return (new_scdp);
 }
 

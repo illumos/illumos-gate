@@ -27,7 +27,6 @@
  * Support for Olympus-C (SPARC64-VI) and Jupiter (SPARC64-VII).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -311,9 +310,9 @@ cpu_fix_alljupiter(void)
 	cpu_hwcap_flags |= AV_SPARC_IMA;
 
 	/*
-	 * Disable shared context support.
+	 * Enable shared context support.
 	 */
-	shctx_on = 0;
+	shctx_on = 1;
 }
 
 #ifdef	OLYMPUS_C_REV_B_ERRATA_XCALL
@@ -753,6 +752,13 @@ static uint_t mmu_disable_auto_text_large_pages = ((1 << TTE64K) |
  * Set Olympus defaults. We do not use the function parameter.
  */
 /*ARGSUSED*/
+void
+mmu_init_scd(sf_scd_t *scdp)
+{
+	scdp->scd_sfmmup->sfmmu_cext = shctx_cext;
+}
+
+/*ARGSUSED*/
 int
 mmu_init_mmu_page_sizes(int32_t not_used)
 {
@@ -926,7 +932,8 @@ mmu_set_ctx_page_sizes(struct hat *hat)
 	 * If supported, reprogram the TLBs to a larger pagesize.
 	 */
 	if (hat->sfmmu_scdp != NULL) {
-		new_cext = shctx_cext;
+		new_cext = hat->sfmmu_scdp->scd_sfmmup->sfmmu_cext;
+		ASSERT(new_cext == shctx_cext);
 	} else {
 		pgsz0 = hat->sfmmu_pgsz[0];
 		pgsz1 = hat->sfmmu_pgsz[1];

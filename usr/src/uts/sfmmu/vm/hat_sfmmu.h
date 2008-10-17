@@ -2332,10 +2332,12 @@ extern struct hme_blk *sfmmu_hmetohblk(struct sf_hment *);
 /*
  * MMU-specific functions optionally imported from the CPU module
  */
+#pragma weak mmu_init_scd
 #pragma weak mmu_large_pages_disabled
 #pragma weak mmu_set_ctx_page_sizes
 #pragma weak mmu_check_page_sizes
 
+extern void mmu_init_scd(sf_scd_t *);
 extern uint_t mmu_large_pages_disabled(uint_t);
 extern void mmu_set_ctx_page_sizes(sfmmu_t *);
 extern void mmu_check_page_sizes(sfmmu_t *, uint64_t *);
