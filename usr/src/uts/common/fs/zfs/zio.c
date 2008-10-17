@@ -512,6 +512,16 @@ zio_read(zio_t *pio, spa_t *spa, const blkptr_t *bp,
 	return (zio);
 }
 
+void
+zio_skip_write(zio_t *zio)
+{
+	ASSERT(zio->io_type == ZIO_TYPE_WRITE);
+	ASSERT(zio->io_stage == ZIO_STAGE_READY);
+	ASSERT(!BP_IS_GANG(zio->io_bp));
+
+	zio->io_pipeline &= ~ZIO_VDEV_IO_STAGES;
+}
+
 zio_t *
 zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     void *data, uint64_t size, zio_prop_t *zp,

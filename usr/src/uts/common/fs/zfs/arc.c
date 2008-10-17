@@ -3077,7 +3077,7 @@ arc_write_done(zio_t *zio)
 	kmem_free(callback, sizeof (arc_write_callback_t));
 }
 
-static void
+void
 write_policy(spa_t *spa, const writeprops_t *wp, zio_prop_t *zp)
 {
 	boolean_t ismd = (wp->wp_level > 0 || dmu_ot[wp->wp_type].ot_metadata);

@@ -94,6 +94,7 @@ typedef struct writeprops {
 	uint8_t wp_dnchecksum, wp_oschecksum;
 } writeprops_t;
 
+void write_policy(spa_t *spa, const writeprops_t *wp, zio_prop_t *zp);
 int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
     arc_done_func_t *done, void *private, int priority, int zio_flags,
     uint32_t *arc_flags, const zbookmark_t *zb);

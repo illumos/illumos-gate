@@ -638,6 +638,27 @@ dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
 }
 
+void
+dmu_prealloc(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
+    dmu_tx_t *tx)
+{
+	dmu_buf_t **dbp;
+	int numbufs, i;
+
+	if (size == 0)
+		return;
+
+	VERIFY(0 == dmu_buf_hold_array(os, object, offset, size,
+	    FALSE, FTAG, &numbufs, &dbp));
+
+	for (i = 0; i < numbufs; i++) {
+		dmu_buf_t *db = dbp[i];
+
+		dmu_buf_will_not_fill(db, tx);
+	}
+	dmu_buf_rele_array(dbp, numbufs, FTAG);
+}
+
 #ifdef _KERNEL
 int
 dmu_read_uio(objset_t *os, uint64_t object, uio_t *uio, uint64_t size)
@@ -991,7 +1012,6 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	zio = arc_write(pio, os->os_spa, &wp, DBUF_IS_L2CACHEABLE(db),
 	    txg, bp, dr->dt.dl.dr_data, dmu_sync_ready, dmu_sync_done, in,
 	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
-
 	if (pio) {
 		zio_nowait(zio);
 		err = EINPROGRESS;

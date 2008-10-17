@@ -337,6 +337,8 @@ extern zio_t *zio_rewrite(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     void *data, uint64_t size, zio_done_func_t *done, void *private,
     int priority, int flags, zbookmark_t *zb);
 
+extern void zio_skip_write(zio_t *zio);
+
 extern zio_t *zio_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     zio_done_func_t *done, void *private, int flags);
 

@@ -177,7 +177,6 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	min_ibs = DN_MIN_INDBLKSHIFT;
 	max_ibs = DN_MAX_INDBLKSHIFT;
 
-
 	/*
 	 * For i/o error checking, read the first and last level-0
 	 * blocks (if they are not aligned), and all the level-1 blocks.
@@ -185,9 +184,12 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 
 	if (dn) {
 		if (dn->dn_maxblkid == 0) {
-			err = dmu_tx_check_ioerr(NULL, dn, 0, 0);
-			if (err)
-				goto out;
+			if ((off > 0 || len < dn->dn_datablksz) &&
+			    off < dn->dn_datablksz) {
+				err = dmu_tx_check_ioerr(NULL, dn, 0, 0);
+				if (err)
+					goto out;
+			}
 		} else {
 			zio_t *zio = zio_root(dn->dn_objset->os_spa,
 			    NULL, NULL, ZIO_FLAG_CANFAIL);
@@ -203,7 +205,7 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 
 			/* last level-0 block */
 			end = (off+len-1) >> dn->dn_datablkshift;
-			if (end != start &&
+			if (end != start && end <= dn->dn_maxblkid &&
 			    P2PHASE(off+len, dn->dn_datablksz)) {
 				err = dmu_tx_check_ioerr(zio, dn, 0, end);
 				if (err)

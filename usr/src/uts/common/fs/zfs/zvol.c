@@ -623,7 +623,6 @@ zvol_prealloc(zvol_state_t *zv)
 {
 	objset_t *os = zv->zv_objset;
 	dmu_tx_t *tx;
-	void *data;
 	uint64_t refd, avail, usedobjs, availobjs;
 	uint64_t resid = zv->zv_volsize;
 	uint64_t off = 0;
@@ -636,9 +635,6 @@ zvol_prealloc(zvol_state_t *zv)
 	/* Free old extents if they exist */
 	zvol_free_extents(zv);
 
-	/* allocate the blocks by writing each one */
-	data = kmem_zalloc(SPA_MAXBLOCKSIZE, KM_SLEEP);
-
 	while (resid != 0) {
 		int error;
 		uint64_t bytes = MIN(resid, SPA_MAXBLOCKSIZE);
@@ -648,16 +644,14 @@ zvol_prealloc(zvol_state_t *zv)
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		if (error) {
 			dmu_tx_abort(tx);
-			kmem_free(data, SPA_MAXBLOCKSIZE);
 			(void) dmu_free_long_range(os, ZVOL_OBJ, 0, off);
 			return (error);
 		}
-		dmu_write(os, ZVOL_OBJ, off, bytes, data, tx);
+		dmu_prealloc(os, ZVOL_OBJ, off, bytes, tx);
 		dmu_tx_commit(tx);
 		off += bytes;
 		resid -= bytes;
 	}
-	kmem_free(data, SPA_MAXBLOCKSIZE);
 	txg_wait_synced(dmu_objset_pool(os), 0);
 
 	return (0);

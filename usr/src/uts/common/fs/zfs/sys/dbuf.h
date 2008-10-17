@@ -26,8 +26,6 @@
 #ifndef	_SYS_DBUF_H
 #define	_SYS_DBUF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
@@ -55,19 +53,23 @@ extern "C" {
 #define	DB_RF_CACHED		(1 << 5)
 
 /*
- * The state transition diagram for dbufs looks like:
+ * The simplified state transition diagram for dbufs looks like:
  *
  *		+----> READ ----+
  *		|		|
  *		|		V
  *  (alloc)-->UNCACHED	     CACHED-->EVICTING-->(free)
- *		|		^
- *		|		|
- *		+----> FILL ----+
+ *		|		^	 ^
+ *		|		|	 |
+ *		+----> FILL ----+	 |
+ *		|			 |
+ *		|			 |
+ *		+--------> NOFILL -------+
  */
 typedef enum dbuf_states {
 	DB_UNCACHED,
 	DB_FILL,
+	DB_NOFILL,
 	DB_READ,
 	DB_CACHED,
 	DB_EVICTING
@@ -258,8 +260,8 @@ dmu_buf_impl_t *dbuf_find(struct dnode *dn, uint8_t level, uint64_t blkid);
 
 int dbuf_read(dmu_buf_impl_t *db, zio_t *zio, uint32_t flags);
 void dbuf_will_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
-void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dbuf_fill_done(dmu_buf_impl_t *db, dmu_tx_t *tx);
+void dmu_buf_will_not_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dmu_buf_fill_done(dmu_buf_t *db, dmu_tx_t *tx);
 dbuf_dirty_record_t *dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
