@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <fm/topo_mod.h>
@@ -271,6 +269,32 @@ niufn_declare(tnode_t *parent, const char *name, topo_instance_t i,
 	return (ntn);
 }
 
+/*
+ * Get the NIU/Neptune ethernet function number from the reg property
+ */
+static int
+niufn_instance_get(topo_mod_t *mod, di_node_t node, topo_instance_t *inst)
+{
+	di_prom_handle_t phan;
+	int rval, *intp;
+
+	*inst = (topo_instance_t)0;
+	rval = -1;
+	if ((phan = topo_mod_prominfo(mod)) != DI_PROM_HANDLE_NIL) {
+		rval = di_prom_prop_lookup_ints(phan, node,
+		    DI_PROP_REG, &intp);
+	}
+	if (rval < 0) {
+		rval = di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+		    DI_PROP_REG, &intp);
+		if (rval < 0)
+			return (-1);
+	}
+	*inst = (topo_instance_t)intp[0];
+
+	return (0);
+}
+
 static int
 niufn_instantiate(tnode_t *parent, const char *name, di_node_t pnode,
 	topo_mod_t *mod)
@@ -288,7 +312,12 @@ niufn_instantiate(tnode_t *parent, const char *name, di_node_t pnode,
 
 	sib = di_child_node(pnode);
 	while (sib != DI_NODE_NIL) {
-		inst = strtoul(di_bus_addr(sib), NULL, 10);
+		if (niufn_instance_get(mod, sib, &inst) != 0) {
+			topo_mod_dprintf(mod, "Enumeration of %s "
+			    "instance failed.\n", NIUFN);
+			sib = di_sibling_node(sib);
+			continue;
+		}
 		if ((ntn = niufn_declare(parent, NIUFN, inst, sib, mod))
 		    == NULL) {
 			topo_mod_dprintf(mod, "Enumeration of %s=%d "
