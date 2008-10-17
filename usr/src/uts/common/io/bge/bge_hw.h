@@ -68,6 +68,7 @@ extern "C" {
 #define	DEVICE_ID_5705MA3		0x165e
 #define	DEVICE_ID_5705F			0x166e
 #define	DEVICE_ID_5706			0x164a
+#define	DEVICE_ID_5780			0x166a
 #define	DEVICE_ID_5782			0x1696
 #define	DEVICE_ID_5787			0x169b
 #define	DEVICE_ID_5787M			0x1693
@@ -160,6 +161,7 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5705M) ||\
 		(bgep->chipid.device == DEVICE_ID_5705MA3) ||\
 		(bgep->chipid.device == DEVICE_ID_5705F) ||\
+		(bgep->chipid.device == DEVICE_ID_5780) ||\
 		(bgep->chipid.device == DEVICE_ID_5782) ||\
 		(bgep->chipid.device == DEVICE_ID_5788) ||\
 		(bgep->chipid.device == DEVICE_ID_5705_2) ||\
