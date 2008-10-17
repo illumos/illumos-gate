@@ -41,10 +41,10 @@ i space
 d none usr 0755 root sys
 d none usr/kernel 0755 root sys
 d none usr/kernel/drv 0755 root sys
-f none usr/kernel/drv/nsctl.conf=usr/kernel/drv/nsctl.conf 0644 root sys
-f none usr/kernel/drv/sdbc.conf=usr/kernel/drv/sdbc.conf 0644 root sys
-f none usr/kernel/drv/nskern.conf=usr/kernel/drv/nskern.conf 0644 root sys
-f none usr/kernel/drv/ncall.conf=usr/kernel/drv/ncall.conf 0644 root sys
+f none usr/kernel/drv/nsctl.conf 0644 root sys
+f none usr/kernel/drv/sdbc.conf 0644 root sys
+f none usr/kernel/drv/nskern.conf 0644 root sys
+f none usr/kernel/drv/ncall.conf 0644 root sys
 d none usr/kernel/misc 0755 root sys
 
 # /usr/lib/mdb directory structure
@@ -53,9 +53,9 @@ d none usr/lib/mdb 0755 root sys
 d none usr/lib/mdb/kvm 0755 root sys
 f none usr/lib/nskernd=usr/bin/nskernd 0555 root bin
 f none usr/lib/dscfglockd=usr/bin/dscfglockd 0555 root bin
-f none usr/lib/libdscfg.so.1=usr/lib/libdscfg.so.1 0755 root bin
-f none usr/lib/libunistat.so.1=usr/lib/libunistat.so.1 0755 root bin
-f none usr/lib/libnsctl.so.1=usr/lib/libnsctl.so.1 0755 root bin
+f none usr/lib/libdscfg.so.1 0755 root bin
+f none usr/lib/libunistat.so.1 0755 root bin
+f none usr/lib/libnsctl.so.1 0755 root bin
 f none usr/lib/ncalladm=usr/bin/ncalladm 0555 root bin
 
 d none usr/sbin 0755 root bin

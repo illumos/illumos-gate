@@ -50,10 +50,10 @@ d none usr/lib/mdb 0755 root sys
 d none usr/lib/mdb/kvm 0755 root sys
 
 d none usr/bin 0755 root bin
-f none usr/bin/iiadm=usr/bin/iiadm 0555 root bin
-f none usr/bin/iicpbmp=usr/bin/iicpbmp 0555 root bin
-f none usr/bin/iicpshd=usr/bin/iicpshd 0555 root bin
-f none usr/bin/iiboot=usr/bin/iiboot 0555 root bin
+f none usr/bin/iiadm 0555 root bin
+f none usr/bin/iicpbmp 0555 root bin
+f none usr/bin/iicpshd 0555 root bin
+f none usr/bin/iiboot 0555 root bin
 
 d none usr/sbin 0755 root bin
 s none usr/sbin/iiboot=../bin/iiboot

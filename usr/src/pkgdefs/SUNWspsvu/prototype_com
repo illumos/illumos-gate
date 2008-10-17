@@ -41,7 +41,7 @@ i space
 d none usr 0755 root sys
 d none usr/kernel 0755 root sys
 d none usr/kernel/drv 0755 root sys
-f none usr/kernel/drv/sv.conf=usr/kernel/drv/sv.conf 0644 root sys
+f none usr/kernel/drv/sv.conf 0644 root sys
 
 d none usr/lib 0755 root bin
 d none usr/lib/mdb 0755 root sys

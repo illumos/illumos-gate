@@ -47,7 +47,7 @@ e preserve usr/kernel/drv/rdc.conf 0644 root sys
 d none usr/kernel/misc 0755 root sys
 
 d none usr/lib 0755 root bin
-f none usr/lib/librdc.so.1=usr/lib/librdc.so.1 0755 root bin
+f none usr/lib/librdc.so.1 0755 root bin
 d none usr/lib/mdb 0755 root sys
 d none usr/lib/mdb/kvm 0755 root sys
 
