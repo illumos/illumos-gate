@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SYNCPROG=	syncinit syncloop syncstat
 DHCPPROG=	dhcpconfig dhtadm pntadm
@@ -72,7 +70,7 @@ SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.rdisc in.routed \
 
 MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd inetadm \
 		inetconv ipqosconf kssl/ksslcfg routeadm sppptun snoop \
-		wificonfig
+		wificonfig ipsecutils
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be

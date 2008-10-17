@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Convert datalink configuration into a series of dladm(1M) commands and
@@ -119,7 +117,8 @@ fi
 #
 for file in `ls ${PKG_INSTALL_ROOT}/etc/inet/ike/crls/* \
     ${PKG_INSTALL_ROOT}/etc/inet/ike/publickeys/* 2>/dev/null`; do
-	if /bin/od -tx1 -N3 < $file | grep '30 82' >/dev/null 2>&1
+	if dd if=$file count=2 bs=1 2>/dev/null | cat -v | \
+	    grep "0M-^B" >/dev/null 2>&1
 	then
 	    chmod 644 $file
 	fi
