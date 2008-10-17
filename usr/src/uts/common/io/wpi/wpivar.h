@@ -21,8 +21,6 @@
 #ifndef _WPIVAR_H
 #define	_WPIVAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -170,6 +168,8 @@ typedef struct wpi_softc {
 	uint16_t		sc_pwr2[14];
 
 	uint32_t		sc_tx_timer;
+	uint32_t		sc_scan_next;
+	uint32_t		sc_scan_pending;
 	uint8_t			*sc_fw_bin;
 
 	ddi_softintr_t		sc_notif_softint_id;
@@ -212,6 +212,7 @@ typedef struct wpi_softc {
 #define	WPI_F_RUNNING		(1 << 5)
 #define	WPI_F_SUSPEND		(1 << 6)
 #define	WPI_F_RADIO_OFF		(1 << 7)
+#define	WPI_F_SCANNING		(1 << 8)
 
 #define	WPI_SUCCESS		0
 #define	WPI_FAIL		(EIO)

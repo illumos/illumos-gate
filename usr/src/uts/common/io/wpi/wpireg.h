@@ -23,8 +23,6 @@
 #ifndef	_WPIREG_H_
 #define	_WPIREG_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -614,6 +612,16 @@ typedef struct wpi_start_scan {
 	uint32_t	status;
 } wpi_start_scan_t;
 
+/*
+ * structure for WPI_STOP_SCAN notification
+ */
+typedef struct wpi_stop_scan {
+	uint8_t		nchan;
+	uint8_t		status;
+	uint8_t		reserved;
+	uint8_t		chan;
+	uint64_t	tsf;
+} wpi_stop_scan_t;
 
 #define	WPI_EEPROM_MAC		0x015
 #define	WPI_EEPROM_REVISION	0x035

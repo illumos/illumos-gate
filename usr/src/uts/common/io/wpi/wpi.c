@@ -515,7 +515,7 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&sc->sc_tx_lock, NULL, MUTEX_DRIVER, sc->sc_iblk);
 	cv_init(&sc->sc_fw_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&sc->sc_cmd_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&sc->sc_tx_cv, "tx-ring", CV_DRIVER, NULL);
+
 	/*
 	 * initialize the mfthread
 	 */
@@ -552,7 +552,8 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    ieee80211_ieee2mhz(i, IEEE80211_CHAN_2GHZ);
 		ic->ic_sup_channels[i].ich_flags =
 		    IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM |
-		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ;
+		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ |
+		    IEEE80211_CHAN_PASSIVE;
 	}
 	ic->ic_ibss_chan = &ic->ic_sup_channels[0];
 	ic->ic_xmit = wpi_send;
@@ -762,7 +763,6 @@ wpi_destroy_locks(wpi_sc_t *sc)
 {
 	cv_destroy(&sc->sc_mt_cv);
 	mutex_destroy(&sc->sc_mt_lock);
-	cv_destroy(&sc->sc_tx_cv);
 	cv_destroy(&sc->sc_cmd_cv);
 	cv_destroy(&sc->sc_fw_cv);
 	mutex_destroy(&sc->sc_tx_lock);
@@ -994,10 +994,9 @@ wpi_reset_rx_ring(wpi_sc_t *sc)
 			break;
 		DELAY(1000);
 	}
-#ifdef DEBUG
 	if (ntries == 2000)
 		WPI_DBG((WPI_DEBUG_DMA, "timeout resetting Rx ring\n"));
-#endif
+
 	wpi_mem_unlock(sc);
 
 	sc->sc_rxq.cur = 0;
@@ -1096,8 +1095,6 @@ wpi_alloc_tx_ring(wpi_sc_t *sc, wpi_tx_ring_t *ring, int count, int qid)
 	return (err);
 
 fail:
-	if (ring->data)
-		kmem_free(ring->data, sizeof (wpi_tx_data_t) * count);
 	wpi_free_tx_ring(sc, ring);
 	return (err);
 }
@@ -1155,6 +1152,7 @@ wpi_free_tx_ring(wpi_sc_t *sc, wpi_tx_ring_t *ring)
 			wpi_free_dma_mem(&ring->data[i].dma_data);
 		}
 		kmem_free(ring->data, ring->count * sizeof (wpi_tx_data_t));
+		ring->data = NULL;
 	}
 }
 
@@ -1230,34 +1228,82 @@ wpi_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	int i, err = WPI_SUCCESS;
 
 	mutex_enter(&sc->sc_glock);
+	ostate = ic->ic_state;
 	switch (nstate) {
 	case IEEE80211_S_SCAN:
-		ostate = ic->ic_state;
 		switch (ostate) {
-		default:
-			break;
 		case IEEE80211_S_INIT:
+		{
+			wpi_node_t node;
+
+			sc->sc_flags |= WPI_F_SCANNING;
+			sc->sc_scan_next = 0;
+
 			/* make the link LED blink while we're scanning */
 			wpi_set_led(sc, WPI_LED_LINK, 20, 2);
 
-			ic->ic_flags |= IEEE80211_F_SCAN | IEEE80211_F_ASCAN;
-			if ((err = wpi_scan(sc)) != 0) {
-				WPI_DBG((WPI_DEBUG_80211,
-				    "could not initiate scan\n"));
-				ic->ic_flags &= ~(IEEE80211_F_SCAN |
-				    IEEE80211_F_ASCAN);
+			/*
+			 * clear association to receive beacons from all
+			 * BSS'es
+			 */
+			sc->sc_config.state = 0;
+			sc->sc_config.filter &= ~LE_32(WPI_FILTER_BSS);
+
+			WPI_DBG((WPI_DEBUG_80211, "config chan %d flags %x "
+			    "filter %x\n",
+			    sc->sc_config.chan, sc->sc_config.flags,
+			    sc->sc_config.filter));
+
+			err = wpi_cmd(sc, WPI_CMD_CONFIGURE, &sc->sc_config,
+			    sizeof (wpi_config_t), 1);
+			if (err != WPI_SUCCESS) {
+				cmn_err(CE_WARN,
+				    "could not clear association\n");
+				sc->sc_flags &= ~WPI_F_SCANNING;
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
+
+			/* add broadcast node to send probe request */
+			(void) memset(&node, 0, sizeof (node));
+			(void) memset(&node.bssid, 0xff, IEEE80211_ADDR_LEN);
+			node.id = WPI_ID_BROADCAST;
+
+			err = wpi_cmd(sc, WPI_CMD_ADD_NODE, &node,
+			    sizeof (node), 1);
+			if (err != WPI_SUCCESS) {
+				cmn_err(CE_WARN,
+				    "could not add broadcast node\n");
+				sc->sc_flags &= ~WPI_F_SCANNING;
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
 			break;
 		}
-		ic->ic_state = nstate;
+		case IEEE80211_S_SCAN:
+			mutex_exit(&sc->sc_glock);
+			/* step to next channel before actual FW scan */
+			err = sc->sc_newstate(ic, nstate, arg);
+			mutex_enter(&sc->sc_glock);
+			if ((err != 0) || ((err = wpi_scan(sc)) != 0)) {
+				cmn_err(CE_WARN,
+				    "could not initiate scan\n");
+				sc->sc_flags &= ~WPI_F_SCANNING;
+				ieee80211_cancel_scan(ic);
+			}
+			mutex_exit(&sc->sc_glock);
+			return (err);
+		default:
+			break;
+		}
 		sc->sc_clk = 0;
-
-		mutex_exit(&sc->sc_glock);
-		return (WPI_SUCCESS);
+		break;
 
 	case IEEE80211_S_AUTH:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~WPI_F_SCANNING;
+		}
+
 		/* reset state to handle reassociations correctly */
 		sc->sc_config.state = 0;
 		sc->sc_config.filter &= ~LE_32(WPI_FILTER_BSS);
@@ -1271,6 +1317,10 @@ wpi_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_RUN:
+		if (ostate == IEEE80211_S_SCAN) {
+			sc->sc_flags &= ~WPI_F_SCANNING;
+		}
+
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/* link LED blinks while monitoring */
 			wpi_set_led(sc, WPI_LED_LINK, 5, 5);
@@ -1326,7 +1376,11 @@ wpi_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		break;
 
 	case IEEE80211_S_INIT:
+		sc->sc_flags &= ~WPI_F_SCANNING;
+		break;
+
 	case IEEE80211_S_ASSOC:
+		sc->sc_flags &= ~WPI_F_SCANNING;
 		break;
 	}
 
@@ -1753,7 +1807,6 @@ static uint_t
 wpi_notif_softintr(caddr_t arg)
 {
 	wpi_sc_t *sc = (wpi_sc_t *)arg;
-	ieee80211com_t *ic = &sc->sc_ic;
 	wpi_rx_desc_t *desc;
 	wpi_rx_data_t *data;
 	uint32_t hw;
@@ -1841,13 +1894,22 @@ wpi_notif_softintr(caddr_t arg)
 			    "scanning channel %d status %x\n",
 			    scan->chan, LE_32(scan->status)));
 
-			/* fix current channel */
-			ic->ic_curchan = &ic->ic_sup_channels[scan->chan];
 			break;
 		}
 		case WPI_STOP_SCAN:
-			WPI_DBG((WPI_DEBUG_SCAN, "scan finished\n"));
-			ieee80211_end_scan(ic);
+		{
+			wpi_stop_scan_t *scan =
+			    (wpi_stop_scan_t *)(desc + 1);
+
+			WPI_DBG((WPI_DEBUG_SCAN,
+			    "completed channel %d (burst of %d) status %02x\n",
+			    scan->chan, scan->nchan, scan->status));
+
+			sc->sc_scan_pending = 0;
+			sc->sc_scan_next++;
+			break;
+		}
+		default:
 			break;
 		}
 
@@ -1900,7 +1962,9 @@ wpi_intr(caddr_t arg)
 		WPI_DBG((WPI_DEBUG_FW, "fatal firmware error\n"));
 		mutex_exit(&sc->sc_glock);
 		wpi_stop(sc);
-		sc->sc_ostate = sc->sc_ic.ic_state;
+		if (!(sc->sc_flags & WPI_F_HW_ERR_RECOVER)) {
+			sc->sc_ostate = sc->sc_ic.ic_state;
+		}
 		ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
 		sc->sc_flags |= WPI_F_HW_ERR_RECOVER;
 		return (DDI_INTR_CLAIMED);
@@ -2224,8 +2288,12 @@ wpi_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 		 * essid of the AP we want to connect.
 		 */
 		if (ic->ic_des_esslen) {
-			(void) ieee80211_new_state(ic,
-			    IEEE80211_S_SCAN, -1);
+			if (sc->sc_flags & WPI_F_RUNNING) {
+				wpi_m_stop(sc);
+				(void) wpi_m_start(sc);
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_SCAN, -1);
+			}
 		}
 	}
 }
@@ -2258,8 +2326,12 @@ wpi_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_name,
 
 	if (err == ENETRESET) {
 		if (ic->ic_des_esslen) {
-			(void) ieee80211_new_state(ic,
-			    IEEE80211_S_SCAN, -1);
+			if (sc->sc_flags & WPI_F_RUNNING) {
+				wpi_m_stop(sc);
+				(void) wpi_m_start(sc);
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_SCAN, -1);
+			}
 		}
 
 		err = 0;
@@ -2274,15 +2346,15 @@ wpi_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	wpi_sc_t	*sc  = (wpi_sc_t *)arg;
 	ieee80211com_t	*ic = &sc->sc_ic;
-	ieee80211_node_t *in = ic->ic_bss;
-	struct ieee80211_rateset *rs = &in->in_rates;
+	ieee80211_node_t *in;
 
 	mutex_enter(&sc->sc_glock);
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
+		in = ic->ic_bss;
 		*val = ((ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
-		    (rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL)
-		    : ic->ic_fixed_rate) / 2 * 1000000;
+		    IEEE80211_RATE(in->in_txrate) :
+		    ic->ic_fixed_rate) / 2 * 1000000;
 		break;
 	case MAC_STAT_NOXMTBUF:
 		*val = sc->sc_tx_nobuf;
@@ -2461,10 +2533,11 @@ wpi_thread(wpi_sc_t *sc)
 			    "try to recover fatal hw error: %d\n", times++));
 
 			wpi_stop(sc);
-			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-
 			mutex_exit(&sc->sc_mt_lock);
+
+			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 			delay(drv_usectohz(2000000));
+
 			mutex_enter(&sc->sc_mt_lock);
 			err = wpi_init(sc);
 			if (err != WPI_SUCCESS) {
@@ -2480,6 +2553,23 @@ wpi_thread(wpi_sc_t *sc)
 			delay(drv_usectohz(2000000));
 			if (sc->sc_ostate != IEEE80211_S_INIT)
 				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
+			mutex_enter(&sc->sc_mt_lock);
+		}
+
+		/*
+		 * scan next channel
+		 */
+		if (ic->ic_mach &&
+		    (sc->sc_flags & WPI_F_SCANNING) && sc->sc_scan_next) {
+
+			WPI_DBG((WPI_DEBUG_SCAN,
+			    "wpi_thread(): "
+			    "wait for probe response\n"));
+
+			sc->sc_scan_next--;
+			mutex_exit(&sc->sc_mt_lock);
+			delay(drv_usectohz(200000));
+			ieee80211_next_scan(ic);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
@@ -2503,6 +2593,8 @@ wpi_thread(wpi_sc_t *sc)
 				if (sc->sc_tx_timer == 0) {
 					sc->sc_flags |= WPI_F_HW_ERR_RECOVER;
 					sc->sc_ostate = IEEE80211_S_RUN;
+					WPI_DBG((WPI_DEBUG_FW,
+					    "wpi_thread(): send fail\n"));
 				}
 				timeout = 0;
 			}
@@ -2734,10 +2826,17 @@ wpi_scan(wpi_sc_t *sc)
 	wpi_scan_chan_t *chan;
 	struct ieee80211_frame *wh;
 	ieee80211_node_t *in = ic->ic_bss;
+	uint8_t essid[IEEE80211_NWID_LEN+1];
 	struct ieee80211_rateset *rs;
 	enum ieee80211_phymode mode;
 	uint8_t *frm;
 	int i, pktlen, nrates;
+
+	/* previous scan not completed */
+	if (sc->sc_scan_pending) {
+		WPI_DBG((WPI_DEBUG_SCAN, "previous scan not completed\n"));
+		return (WPI_SUCCESS);
+	}
 
 	data = &ring->data[ring->cur];
 	desc = data->desc;
@@ -2751,19 +2850,26 @@ wpi_scan(wpi_sc_t *sc)
 	hdr = (wpi_scan_hdr_t *)cmd->data;
 	(void) memset(hdr, 0, sizeof (wpi_scan_hdr_t));
 	hdr->first = 1;
-	hdr->nchan = 14;
+	hdr->nchan = 1;
 	hdr->len = hdr->nchan * sizeof (wpi_scan_chan_t);
-	hdr->quiet = LE_16(5);
+	hdr->quiet = LE_16(50);
 	hdr->threshold = LE_16(1);
 	hdr->filter = LE_32(5);
 	hdr->rate = wpi_plcp_signal(2);
 	hdr->id = WPI_ID_BROADCAST;
 	hdr->mask = LE_32(0xffffffff);
 	hdr->esslen = ic->ic_des_esslen;
-	if (ic->ic_des_esslen)
+
+	if (ic->ic_des_esslen) {
+		bcopy(ic->ic_des_essid, essid, ic->ic_des_esslen);
+		essid[ic->ic_des_esslen] = '\0';
+		WPI_DBG((WPI_DEBUG_SCAN, "directed scan %s\n", essid));
+
 		bcopy(ic->ic_des_essid, hdr->essid, ic->ic_des_esslen);
-	else
+	} else {
 		bzero(hdr->essid, sizeof (hdr->essid));
+	}
+
 	/*
 	 * Build a probe request frame.  Most of the following code is a
 	 * copy & paste of what is done in net80211.  Unfortunately, the
@@ -2782,6 +2888,12 @@ wpi_scan(wpi_sc_t *sc)
 	frm = (uint8_t *)(wh + 1);
 
 	/* add essid IE */
+	if (in->in_esslen) {
+		bcopy(in->in_essid, essid, in->in_esslen);
+		essid[in->in_esslen] = '\0';
+		WPI_DBG((WPI_DEBUG_SCAN, "probe with ESSID %s\n",
+		    essid));
+	}
 	*frm++ = IEEE80211_ELEMID_SSID;
 	*frm++ = in->in_esslen;
 	(void) memcpy(frm, in->in_essid, in->in_esslen);
@@ -2820,10 +2932,14 @@ wpi_scan(wpi_sc_t *sc)
 	/* align on a 4-byte boundary */
 	chan = (wpi_scan_chan_t *)frm;
 	for (i = 1; i <= hdr->nchan; i++, chan++) {
-		chan->flags = 3;
-		chan->chan = (uint8_t)i;
+		if (ic->ic_des_esslen) {
+			chan->flags = 0x3;
+		} else {
+			chan->flags = 0x1;
+		}
+		chan->chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 		chan->magic = LE_16(0x62ab);
-		chan->active = LE_16(20);
+		chan->active = LE_16(50);
 		chan->passive = LE_16(120);
 
 		frm += sizeof (wpi_scan_chan_t);
@@ -2841,6 +2957,8 @@ wpi_scan(wpi_sc_t *sc)
 	/* kick cmd ring */
 	ring->cur = (ring->cur + 1) % WPI_CMD_RING_COUNT;
 	WPI_WRITE(sc, WPI_TX_WIDX, ring->qid << 8 | ring->cur);
+
+	sc->sc_scan_pending = 1;
 
 	return (WPI_SUCCESS);	/* will be notified async. of failure/success */
 }
@@ -3235,8 +3353,13 @@ wpi_stop(wpi_sc_t *sc)
 	wpi_stop_master(sc);
 
 	sc->sc_tx_timer = 0;
+	sc->sc_flags &= ~WPI_F_SCANNING;
+	sc->sc_scan_pending = 0;
+	sc->sc_scan_next = 0;
+
 	tmp = WPI_READ(sc, WPI_RESET);
 	WPI_WRITE(sc, WPI_RESET, tmp | WPI_SW_RESET);
+
 	mutex_exit(&sc->sc_glock);
 }
 
