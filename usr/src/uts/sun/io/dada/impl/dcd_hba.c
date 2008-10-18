@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 
@@ -131,7 +128,7 @@ dcd_hba_attach(
 	int			len;
 	char			*prop_name;
 	char			*errmsg =
-		"dcd_hba_attach: cannott create property '%s' for %s%d\n";
+	    "dcd_hba_attach: cannott create property '%s' for %s%d\n";
 
 	/*
 	 * Link this instance into the list
@@ -170,9 +167,9 @@ dcd_hba_attach(
 
 	hba_tran->tran_min_xfer = hba_dma_attr->dma_attr_minxfer;
 	hba_tran->tran_min_burst_size =
-			(1<<(ddi_ffs(hba_dma_attr->dma_attr_burstsizes)-1));
+	    (1<<(ddi_ffs(hba_dma_attr->dma_attr_burstsizes)-1));
 	hba_tran->tran_max_burst_size =
-			(1<<(ddi_fls(hba_dma_attr->dma_attr_burstsizes)-1));
+	    (1<<(ddi_fls(hba_dma_attr->dma_attr_burstsizes)-1));
 
 
 
@@ -184,7 +181,7 @@ dcd_hba_attach(
 		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
-				ddi_get_name(dip), ddi_get_instance(dip));
+			    ddi_get_name(dip), ddi_get_instance(dip));
 		}
 	}
 
@@ -195,7 +192,7 @@ dcd_hba_attach(
 	 */
 #ifdef DEBUG1
 	printf("Called Set driver private with dip %x, tran %x\n",
-		dip, hba_tran);
+	    dip, hba_tran);
 #endif
 
 	return (DDI_SUCCESS);
@@ -230,7 +227,7 @@ dcd_hba_detach(dev_info_t *dip)
 	mutex_enter(&dcd_hba_mutex);
 
 	for (elem = dcd_hba_list; elem != (struct dcd_hba_inst *)NULL;
-		elem = elem->inst_next) {
+	    elem = elem->inst_next) {
 		if (elem->inst_dip == dip)
 			break;
 	}
@@ -271,7 +268,7 @@ dcd_hba_tran_alloc(
 {
 
 	return (kmem_zalloc(sizeof (dcd_hba_tran_t),
-		(flags & DCD_HBA_CANSLEEP) ? KM_SLEEP: KM_NOSLEEP));
+	    (flags & DCD_HBA_CANSLEEP) ? KM_SLEEP: KM_NOSLEEP));
 }
 
 
@@ -333,7 +330,7 @@ dcd_hba_pkt_alloc(
 	 */
 	if (callback != SLEEP_FUNC && callback != NULL_FUNC) {
 		cmn_err(CE_PANIC, " dcd_hba_pkt_alloc: callback must be"
-				" either SLEEP or NULL\n");
+		    " either SLEEP or NULL\n");
 	}
 
 
@@ -345,11 +342,11 @@ dcd_hba_pkt_alloc(
 	tgtlen = ROUNDUP(tgtlen);
 	hbalen = ROUNDUP(hbalen);
 	statuslen = ROUNDUP(statuslen);
-	pktlen = sizeof (struct dcd_pkt_wrapper)
-		+ cmdlen + tgtlen +hbalen + statuslen;
+	pktlen = sizeof (struct dcd_pkt_wrapper) +
+	    cmdlen + tgtlen +hbalen + statuslen;
 
 	hba_pkt = kmem_zalloc(pktlen,
-		(callback = SLEEP_FUNC) ? KM_SLEEP: KM_NOSLEEP);
+	    (callback = SLEEP_FUNC) ? KM_SLEEP: KM_NOSLEEP);
 
 	if (hba_pkt == NULL) {
 		ASSERT(callback == NULL_FUNC);
@@ -390,11 +387,11 @@ dcd_hba_pkt_alloc(
 	 */
 	pkt->pkt_address = *ap;
 #ifdef DEBUG1
-	printf("a_target %x, a_lun %x, a_hba_tran %x\n",
-		pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
-		pkt->pkt_address.a_hba_tran);
-	printf("From address : a_target %x, a_lun %x, a_hba_tran %x\n",
-		ap->a_target, ap->a_lun, ap->a_hba_tran);
+	printf("da_target %x, da_lun %x, a_hba_tran %x\n",
+	    pkt->pkt_address.da_target, pkt->pkt_address.da_lun,
+	    pkt->pkt_address.a_hba_tran);
+	printf("From address : da_target %x, da_lun %x, a_hba_tran %x\n",
+	    ap->da_target, ap->da_lun, ap->a_hba_tran);
 	printf("Pkt %x\n", pkt);
 
 #endif
@@ -410,7 +407,7 @@ dcd_hba_pkt_free(
 {
 
 	kmem_free((struct dcd_pkt_wrapper *)pkt,
-		((struct dcd_pkt_wrapper *)pkt)->pkt_wrapper_len);
+	    ((struct dcd_pkt_wrapper *)pkt)->pkt_wrapper_len);
 }
 
 

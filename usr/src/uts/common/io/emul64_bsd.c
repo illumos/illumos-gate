@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * pseudo scsi disk driver
@@ -241,12 +239,11 @@ emul64_bsd_get_props(dev_info_t *dip)
 	int		*properties;
 
 	for (pmp = emul64_properties, i = 0;
-		i < sizeof (emul64_properties) / sizeof (struct prop_map);
-		i++, pmp++) {
+	    i < sizeof (emul64_properties) / sizeof (struct prop_map);
+	    i++, pmp++) {
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-				DDI_PROP_DONTPASS,
-				pmp->pm_name, &properties,
-				&count) == DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, pmp->pm_name, &properties,
+		    &count) == DDI_PROP_SUCCESS) {
 			if (count >= 1) {
 				*pmp->pm_value = *properties;
 			}
@@ -390,15 +387,15 @@ bsd_scsi_inquiry(struct scsi_pkt *pkt)
 	pqdtype = tgt->emul64_tgt_dtype;
 	if (cdb->cdb_opaque[1] & 0x1) {
 		switch (cdb->cdb_opaque[2]) {
-			case 0x00:
-				return (bsd_scsi_inq_page0(pkt, pqdtype));
-			case 0x83:
-				return (bsd_scsi_inq_page83(pkt, pqdtype));
-			default:
-				cmn_err(CE_WARN, "%s: bsd_scsi_inquiry: "
-				    "unsupported 0x%x",
-				    emul64_name, cdb->cdb_opaque[2]);
-				return (0);
+		case 0x00:
+			return (bsd_scsi_inq_page0(pkt, pqdtype));
+		case 0x83:
+			return (bsd_scsi_inq_page83(pkt, pqdtype));
+		default:
+			cmn_err(CE_WARN, "%s: bsd_scsi_inquiry: "
+			    "unsupported 0x%x",
+			    emul64_name, cdb->cdb_opaque[2]);
+			return (0);
 		}
 	}
 
@@ -441,9 +438,8 @@ bsd_scsi_io(struct scsi_pkt *pkt)
 			lblkno = (uint32_t)GETG0ADDR(cdb);
 			nblks = GETG0COUNT(cdb);
 			pkt->pkt_resid = bsd_readblks(sp->cmd_emul64,
-					pkt->pkt_address.a_target,
-					pkt->pkt_address.a_lun,
-					lblkno, nblks, sp->cmd_addr);
+			    pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
+			    lblkno, nblks, sp->cmd_addr);
 			if (emul64debug) {
 				cmn_err(CE_CONT, "%s: bsd_scsi_io: "
 				    "read g0 blk=%lld (0x%llx) nblks=%d\n",
@@ -454,9 +450,8 @@ bsd_scsi_io(struct scsi_pkt *pkt)
 			lblkno = (uint32_t)GETG0ADDR(cdb);
 			nblks = GETG0COUNT(cdb);
 			pkt->pkt_resid = bsd_writeblks(sp->cmd_emul64,
-					pkt->pkt_address.a_target,
-					pkt->pkt_address.a_lun,
-					lblkno, nblks, sp->cmd_addr);
+			    pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
+			    lblkno, nblks, sp->cmd_addr);
 			if (emul64debug) {
 				cmn_err(CE_CONT, "%s: bsd_scsi_io: "
 				    "write g0 blk=%lld (0x%llx) nblks=%d\n",
@@ -467,9 +462,8 @@ bsd_scsi_io(struct scsi_pkt *pkt)
 			lblkno = (uint32_t)GETG1ADDR(cdb);
 			nblks = GETG1COUNT(cdb);
 			pkt->pkt_resid = bsd_readblks(sp->cmd_emul64,
-					pkt->pkt_address.a_target,
-					pkt->pkt_address.a_lun,
-					lblkno, nblks, sp->cmd_addr);
+			    pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
+			    lblkno, nblks, sp->cmd_addr);
 			if (emul64debug) {
 				cmn_err(CE_CONT, "%s: bsd_scsi_io: "
 				    "read g1 blk=%lld (0x%llx) nblks=%d\n",
@@ -480,9 +474,8 @@ bsd_scsi_io(struct scsi_pkt *pkt)
 			lblkno = (uint32_t)GETG1ADDR(cdb);
 			nblks = GETG1COUNT(cdb);
 			pkt->pkt_resid = bsd_writeblks(sp->cmd_emul64,
-					pkt->pkt_address.a_target,
-					pkt->pkt_address.a_lun,
-					lblkno, nblks, sp->cmd_addr);
+			    pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
+			    lblkno, nblks, sp->cmd_addr);
 			if (emul64debug) {
 				cmn_err(CE_CONT, "%s: bsd_scsi_io: "
 				    "write g1 blk=%lld (0x%llx) nblks=%d\n",
@@ -495,9 +488,8 @@ bsd_scsi_io(struct scsi_pkt *pkt)
 			lblkno |= (uint32_t)GETG4ADDRTL(cdb);
 			nblks = GETG4COUNT(cdb);
 			pkt->pkt_resid = bsd_readblks(sp->cmd_emul64,
-					pkt->pkt_address.a_target,
-					pkt->pkt_address.a_lun,
-					lblkno, nblks, sp->cmd_addr);
+			    pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
+			    lblkno, nblks, sp->cmd_addr);
 			if (emul64debug) {
 				cmn_err(CE_CONT, "%s: bsd_scsi_io: "
 				    "read g4 blk=%lld (0x%llx) nblks=%d\n",
@@ -510,9 +502,8 @@ bsd_scsi_io(struct scsi_pkt *pkt)
 			lblkno |= (uint32_t)GETG4ADDRTL(cdb);
 			nblks = GETG4COUNT(cdb);
 			pkt->pkt_resid = bsd_writeblks(sp->cmd_emul64,
-					pkt->pkt_address.a_target,
-					pkt->pkt_address.a_lun,
-					lblkno, nblks, sp->cmd_addr);
+			    pkt->pkt_address.a_target, pkt->pkt_address.a_lun,
+			    lblkno, nblks, sp->cmd_addr);
 			if (emul64debug) {
 				cmn_err(CE_CONT, "%s: bsd_scsi_io: "
 				    "write g4 blk=%lld (0x%llx) nblks=%d\n",
@@ -851,7 +842,7 @@ bsd_mode_sense_dad_mode_format(struct scsi_pkt *pkt)
 		page3.interleave = ushort_to_scsi_ushort(1);
 		EMUL64_MUTEX_ENTER(sp->cmd_emul64);
 		tgt = find_tgt(sp->cmd_emul64,
-			pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
+		    pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
 		EMUL64_MUTEX_EXIT(sp->cmd_emul64);
 		page3.sect_track = ushort_to_scsi_ushort(tgt->emul64_tgt_nsect);
 		break;
@@ -938,7 +929,7 @@ bsd_scsi_read_capacity_8(struct scsi_pkt *pkt)
 
 	EMUL64_MUTEX_ENTER(sp->cmd_emul64);
 	tgt = find_tgt(sp->cmd_emul64,
-		pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
+	    pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
 	EMUL64_MUTEX_EXIT(sp->cmd_emul64);
 	if (tgt->emul64_tgt_sectors > 0xffffffff)
 		cap.capacity = 0xffffffff;
@@ -950,7 +941,7 @@ bsd_scsi_read_capacity_8(struct scsi_pkt *pkt)
 	pkt->pkt_resid = sp->cmd_count - sizeof (struct scsi_capacity);
 
 	(void) bcopy(&cap, (caddr_t)sp->cmd_addr,
-		    sizeof (struct scsi_capacity));
+	    sizeof (struct scsi_capacity));
 	return (rval);
 }
 
@@ -964,7 +955,7 @@ bsd_scsi_read_capacity_16(struct scsi_pkt *pkt)
 
 	EMUL64_MUTEX_ENTER(sp->cmd_emul64);
 	tgt = find_tgt(sp->cmd_emul64,
-		pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
+	    pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
 	EMUL64_MUTEX_EXIT(sp->cmd_emul64);
 
 	cap.sc_capacity = uint64_to_scsi_uint64(tgt->emul64_tgt_sectors);
@@ -977,7 +968,7 @@ bsd_scsi_read_capacity_16(struct scsi_pkt *pkt)
 	pkt->pkt_resid = sp->cmd_count - sizeof (struct scsi_capacity_16);
 
 	(void) bcopy(&cap, (caddr_t)sp->cmd_addr,
-			sizeof (struct scsi_capacity_16));
+	    sizeof (struct scsi_capacity_16));
 	return (rval);
 }
 int
@@ -1019,8 +1010,8 @@ bsd_scsi_reassign_block(struct scsi_pkt *pkt)
 
 
 static int
-bsd_readblks(struct emul64 *emul64, ushort_t a_target, ushort_t a_lun,
-		diskaddr_t blkno, int nblks, unsigned char *bufaddr)
+bsd_readblks(struct emul64 *emul64, ushort_t target, ushort_t lun,
+    diskaddr_t blkno, int nblks, unsigned char *bufaddr)
 {
 	emul64_tgt_t	*tgt;
 	blklist_t	*blk;
@@ -1030,17 +1021,17 @@ bsd_readblks(struct emul64 *emul64, ushort_t a_target, ushort_t a_lun,
 	if (emul64debug) {
 		cmn_err(CE_CONT, "%s: bsd_readblks: "
 		    "<%d,%d> blk %llu (0x%llx) nblks %d\n",
-		    emul64_name, a_target, a_lun, blkno, blkno, nblks);
+		    emul64_name, target, lun, blkno, blkno, nblks);
 	}
 
 	emul64_yield_check();
 
 	EMUL64_MUTEX_ENTER(emul64);
-	tgt = find_tgt(emul64, a_target, a_lun);
+	tgt = find_tgt(emul64, target, lun);
 	EMUL64_MUTEX_EXIT(emul64);
 	if (tgt == NULL) {
 		cmn_err(CE_WARN, "%s: bsd_readblks: no target for %d,%d\n",
-		    emul64_name, a_target, a_lun);
+		    emul64_name, target, lun);
 		goto unlocked_out;
 	}
 
@@ -1100,8 +1091,8 @@ unlocked_out:
 
 
 static int
-bsd_writeblks(struct emul64 *emul64, ushort_t a_target, ushort_t a_lun,
-		diskaddr_t blkno, int nblks, unsigned char *bufaddr)
+bsd_writeblks(struct emul64 *emul64, ushort_t target, ushort_t lun,
+    diskaddr_t blkno, int nblks, unsigned char *bufaddr)
 {
 	emul64_tgt_t	*tgt;
 	blklist_t	*blk;
@@ -1112,17 +1103,17 @@ bsd_writeblks(struct emul64 *emul64, ushort_t a_target, ushort_t a_lun,
 	if (emul64debug) {
 		cmn_err(CE_CONT, "%s: bsd_writeblks: "
 		    "<%d,%d> blk %llu (0x%llx) nblks %d\n",
-		    emul64_name, a_target, a_lun, blkno, blkno, nblks);
+		    emul64_name, target, lun, blkno, blkno, nblks);
 	}
 
 	emul64_yield_check();
 
 	EMUL64_MUTEX_ENTER(emul64);
-	tgt = find_tgt(emul64, a_target, a_lun);
+	tgt = find_tgt(emul64, target, lun);
 	EMUL64_MUTEX_EXIT(emul64);
 	if (tgt == NULL) {
 		cmn_err(CE_WARN, "%s: bsd_writeblks: no target for %d,%d\n",
-		    emul64_name, a_target, a_lun);
+		    emul64_name, target, lun);
 		goto unlocked_out;
 	}
 
@@ -1186,12 +1177,10 @@ bsd_writeblks(struct emul64 *emul64, ushort_t a_target, ushort_t a_lun,
 			} else {
 				if (blk) {
 					(void) bcopy(bufaddr, blk->bl_data,
-							DEV_BSIZE);
+					    DEV_BSIZE);
 				} else {
-					bsd_allocblk(tgt,
-							blkno,
-							(caddr_t)bufaddr,
-							where);
+					bsd_allocblk(tgt, blkno,
+					    (caddr_t)bufaddr, where);
 				}
 			}
 		}
@@ -1213,14 +1202,14 @@ unlocked_out:
 }
 
 emul64_tgt_t *
-find_tgt(struct emul64 *emul64, ushort_t a_target, ushort_t a_lun)
+find_tgt(struct emul64 *emul64, ushort_t target, ushort_t lun)
 {
 	emul64_tgt_t	*tgt;
 
 	tgt = emul64->emul64_tgt;
 	while (tgt) {
-		if (tgt->emul64_tgt_saddr.a_target == a_target &&
-		    tgt->emul64_tgt_saddr.a_lun == a_lun) {
+		if (tgt->emul64_tgt_saddr.a_target == target &&
+		    tgt->emul64_tgt_saddr.a_lun == lun) {
 			break;
 		}
 		tgt = tgt->emul64_tgt_next;
@@ -1240,8 +1229,8 @@ bsd_freeblkrange(emul64_tgt_t *tgt, emul64_range_t *range)
 
 	ASSERT(mutex_owned(&tgt->emul64_tgt_blk_lock));
 	for (blk = (blklist_t *)avl_first(&tgt->emul64_tgt_data);
-		blk != NULL;
-		blk = nextblk) {
+	    blk != NULL;
+	    blk = nextblk) {
 		/*
 		 * We need to get the next block pointer now, because blk
 		 * will be freed inside the if statement.
@@ -1335,11 +1324,9 @@ bsd_tgt_overlap(emul64_tgt_t *tgt, diskaddr_t blkno, int count)
 	emul64_rng_overlap_t	rv = O_NONE;
 
 	for (nw = tgt->emul64_tgt_nowrite;
-		(nw != NULL) && (rv == O_NONE);
-		nw = nw->emul64_nwnext) {
-		rv = emul64_overlap(&nw->emul64_blocked,
-				    blkno,
-				    (size_t)count);
+	    (nw != NULL) && (rv == O_NONE);
+	    nw = nw->emul64_nwnext) {
+		rv = emul64_overlap(&nw->emul64_blocked, blkno, (size_t)count);
 	}
 	return (rv);
 }

@@ -1014,7 +1014,7 @@ dcd_doattach(dev_info_t *devi, int (*canwait)())
 	 * set by the HBA driver for this target so that we can set the
 	 * Unit structure variable so that we can send commands accordingly.
 	 */
-	target = devp->dcd_address->a_target;
+	target = devp->dcd_address->da_target;
 	(void) sprintf(prop_str, prop_template, target);
 	options = ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_NOTPROM,
 	    prop_str, -1);

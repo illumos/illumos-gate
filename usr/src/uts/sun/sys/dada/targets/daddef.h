@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef	_SYS_DADA_TARGETS_DADDF_H
 #define	_SYS_DADA_TARGETS_DADDF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include <sys/note.h>
 #include <sys/cmlb.h>
 
@@ -64,8 +62,8 @@ extern "C" {
 
 #define	STATUS_SCBP_C(statusp)	(*(uchar_t *)(statusp) & STATUS_ATA_MASK)
 
-#define	Tgt(devp)	(devp->dcd_address->a_target)
-#define	Lun(devp)	(devp->dcd_address->a_lun)
+#define	Tgt(devp)	(devp->dcd_address->da_target)
+#define	Lun(devp)	(devp->dcd_address->da_lun)
 
 #define	New_state(un, s)	\
 	(un)->un_last_state = (un)->un_state,  (un)->un_state = (s)
