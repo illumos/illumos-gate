@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The following routines implement the hat layer's
@@ -71,18 +69,13 @@ static void	hrm_getblk(int);
 	((hrm)->hrm_base == ((uintptr_t)(addr) & HRM_BASEMASK))) ? 1 : 0)
 
 /*
- * reserve enough statistic blocks for
- * chunk of bytes (pages) in a given as.
+ * Called when an address space maps in more pages while stats are being
+ * collected.
  */
 /* ARGSUSED */
 void
 hat_resvstat(size_t chunk, struct as *as, caddr_t addr)
 {
-	int nhrm = btop(chunk)/HRM_PAGES;
-
-	if (nhrm < HRM_BLIST_INCR)
-		nhrm = 0;	/* preallocate at least HRM_BLIST_INCR */
-	hrm_getblk(nhrm);
 }
 
 /*
@@ -292,13 +285,25 @@ hrm_getblk(int chunk)
 	int hrm_incr;
 
 	mutex_enter(&hat_statlock);
+	/*
+	 * XXX The whole private freelist management here really should be
+	 * overhauled.
+	 *
+	 * The freelist should have some knowledge of how much memory is
+	 * needed by a process and thus when hat_resvstat get's called, we can
+	 * increment the freelist needs for that process within this subsystem.
+	 * Thus there will be reservations for all processes which are being
+	 * watched which should be accurate, and consume less memory overall.
+	 *
+	 * For now, just make sure there's enough entries on the freelist to
+	 * handle the current chunk.
+	 */
 	if ((hrm_blist == NULL) ||
 	    (hrm_blist_num <= hrm_blist_lowater) ||
-	    (chunk && (hrm_blist_num < chunk))) {
-
+	    (chunk && (hrm_blist_num < chunk + hrm_blist_incr))) {
 		mutex_exit(&hat_statlock);
 
-		hrm_incr = chunk? chunk : hrm_blist_incr;
+		hrm_incr = chunk  + hrm_blist_incr;
 		hrm = kmem_zalloc(sizeof (struct hrmstat) * hrm_incr, KM_SLEEP);
 		hrm->hrm_base = sizeof (struct hrmstat) * hrm_incr;
 
@@ -430,6 +435,9 @@ hat_getstat(struct as *as, caddr_t addr, size_t len, uint_t id,
 	np = btop(len);
 	bzero(datap, np);
 
+	/* allocate enough statistics blocks to cover the len passed in */
+	hrm_getblk(np / HRM_PAGES);
+
 	hat_sync(as->a_hat, addr, len, clearflag);
 
 	/* allocate more statistics blocks if needed */
@@ -451,7 +459,7 @@ hat_getstat(struct as *as, caddr_t addr, size_t len, uint_t id,
 
 		h = hrm_hash(as, a);
 		n = (HRM_PAGES -
-			(((uintptr_t)a & HRM_PAGEMASK) >> MMU_PAGESHIFT));
+		    (((uintptr_t)a & HRM_PAGEMASK) >> MMU_PAGESHIFT));
 		if (n > np)
 			n = np;
 		po = ((uintptr_t)a & HRM_BASEOFFSET) >> MMU_PAGESHIFT;
