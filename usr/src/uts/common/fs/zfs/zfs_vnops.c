@@ -1647,7 +1647,7 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 		uid = crgetuid(cr);
 	if (zfsvfs->z_use_fuids == B_FALSE &&
 	    (vsecp || (vap->va_mask & AT_XVATTR) ||
-	    IS_EPHEMERAL(uid)) || IS_EPHEMERAL(gid))
+	    IS_EPHEMERAL(uid) || IS_EPHEMERAL(gid)))
 		return (EINVAL);
 
 	ZFS_ENTER(zfsvfs);
