@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * l_misc.c :
@@ -92,7 +89,6 @@ is_server_running(rmedia_handle_t *handle)
 	CLIENT		*clnt;
 	char	rbuf[sizeof (smedia_services_t) + sizeof (door_desc_t)];
 	smserver_info	*server_info;
-	struct utsname uts;
 
 	/*
 	 * We will assume that we are running at level 2 or greater
@@ -101,10 +97,13 @@ is_server_running(rmedia_handle_t *handle)
 	 * using non-rpc mechanism. This will enable the libsmedia
 	 * to be used in SINGLE user mode when inetd is not running.
 	 * We expect the server to have been started manually by user.
+	 *
+	 * Note that "localhost" is used (vs hostname (eg, "uname -n")),
+	 * as this minimizes interference with common IPSec rules.
 	 */
 
-	(void) uname(&uts);
-	clnt = clnt_create(uts.nodename, SMSERVERPROG, SMSERVERVERS, NULL);
+	clnt = clnt_create("localhost", SMSERVERPROG, SMSERVERVERS,
+	    "circuit_v");
 	if (clnt == (CLIENT *)NULL) {
 		/*
 		 * The failure could be that we are running at level 1
@@ -112,7 +111,7 @@ is_server_running(rmedia_handle_t *handle)
 		door_fd = open(smedia_service, O_RDONLY, 0644);
 		if (door_fd < 0) {
 			DPRINTF1("Error in opening %s\n",
-				smedia_service);
+			    smedia_service);
 			return (0);
 		}
 
@@ -131,13 +130,13 @@ is_server_running(rmedia_handle_t *handle)
 			return (0);
 		}
 		DPRINTF3("rsize = %d data_size = %d data_ptr = %p \n",
-			door_args.rsize, door_args.data_size,
-			door_args.data_ptr);
+		    door_args.rsize, door_args.data_size,
+		    door_args.data_ptr);
 		retping = (smedia_retping_t *)(
-			(void *)door_args.data_ptr);
+		    (void *)door_args.data_ptr);
 		if (retping->cnum != SMEDIA_CNUM_PING) {
-			DPRINTF1(
-"*** door call failed *** cnum returned = 0x%x\n", retping->cnum);
+			DPRINTF1("*** door call failed *** cnum "
+			    "returned = 0x%x\n", retping->cnum);
 			return (0);
 		}
 		return (1);
@@ -151,17 +150,16 @@ is_server_running(rmedia_handle_t *handle)
 	if (server_info->status != 0) {
 		if (clnt)
 			clnt_destroy(clnt);
-		DPRINTF1(
-		"get server_info call failed. status = %d\n",
-			server_info->status);
+		DPRINTF1("get server_info call failed. "
+		    "status = %d\n", server_info->status);
 		return (0);
 	}
 	if (server_info->vernum != SMSERVERVERS) {
 		if (clnt)
 			clnt_destroy(clnt);
-		DPRINTF2(
-		"version expected = %d version returned = %d\n",
-			SMSERVERVERS, server_info->vernum);
+		DPRINTF2("version expected = %d version "
+		    "returned = %d\n", SMSERVERVERS,
+		    server_info->vernum);
 		return (0);
 	}
 
@@ -186,12 +184,12 @@ is_server_running(rmedia_handle_t *handle)
 		return (0);
 	}
 	DPRINTF3("rsize = %d data_size = %d data_ptr = %p \n",
-		door_args.rsize, door_args.data_size,
-		door_args.data_ptr);
+	    door_args.rsize, door_args.data_size,
+	    door_args.data_ptr);
 	retping = (smedia_retping_t *)((void *)door_args.data_ptr);
 	if (retping->cnum != SMEDIA_CNUM_PING) {
-		DPRINTF1(
-"*** door call failed *** cnum returned = 0x%x\n", retping->cnum);
+		DPRINTF1("*** door call failed *** cnum returned "
+		    "= 0x%x\n", retping->cnum);
 		return (0);
 	}
 	handle->sm_clnt = clnt;
@@ -245,7 +243,7 @@ get_dev_library_handle(int32_t fd)
 			continue;
 		}
 		d_fcn_ptr = (int32_t (*)(ushort_t, ushort_t))dlsym(handle,
-						"_m_device_type");
+		    "_m_device_type");
 		if (d_fcn_ptr == NULL) {
 			DPRINTF("Could not find _m_device_type\n");
 			(void) dlclose(handle);
@@ -255,7 +253,7 @@ get_dev_library_handle(int32_t fd)
 		if (ret_val == 0) {
 			DPRINTF1("NAME %s\n", dp->d_name);
 			v_fcn_ptr = (int32_t (*)(void))dlsym(handle,
-					"_m_version_no");
+			    "_m_version_no");
 			if (v_fcn_ptr == NULL) {
 				DPRINTF("Could not find _m_version_no\n");
 				(void) dlclose(handle);
@@ -296,13 +294,13 @@ call_function(rmedia_handle_t *handle, void *ip, char *func_name)
 	lib_handle = handle->sm_lib_handle;
 	if (handle->sm_signature != LIBSMEDIA_SIGNATURE) {
 		DPRINTF2("call_function:signature expected=0x%x, found=0x%x\n",
-			LIBSMEDIA_SIGNATURE, handle->sm_signature);
+		    LIBSMEDIA_SIGNATURE, handle->sm_signature);
 		errno = EINVAL;
 		return (-1);
 	}
 
 	fcn_ptr = (int32_t (*)(rmedia_handle_t *, void*))
-				dlsym(lib_handle, func_name);
+	    dlsym(lib_handle, func_name);
 	if (fcn_ptr == NULL) {
 		DPRINTF1("Could not find %s\n", func_name);
 		errno = ENOTSUP;
@@ -321,8 +319,8 @@ release_handle(rmedia_handle_t *handle)
 		return (-1);
 	}
 	if ((handle->sm_dkinfo.dki_ctype == DKC_SCSI_CCS) ||
-		(handle->sm_dkinfo.dki_ctype == DKC_MD21) ||
-		(handle->sm_dkinfo.dki_ctype == DKC_CDROM)) {
+	    (handle->sm_dkinfo.dki_ctype == DKC_MD21) ||
+	    (handle->sm_dkinfo.dki_ctype == DKC_CDROM)) {
 		(void) close(handle->sm_door);
 		(void) close(handle->sm_death_door);
 		if (handle->sm_buf != NULL)
@@ -384,8 +382,8 @@ get_handle_from_fd(int32_t fd)
 	DPRINTF2("fd=%d signature=0x%x\n", handle->sm_fd, handle->sm_signature);
 
 	if ((handle->sm_dkinfo.dki_ctype == DKC_SCSI_CCS) ||
-		(handle->sm_dkinfo.dki_ctype == DKC_MD21) ||
-		(handle->sm_dkinfo.dki_ctype == DKC_CDROM)) {
+	    (handle->sm_dkinfo.dki_ctype == DKC_MD21) ||
+	    (handle->sm_dkinfo.dki_ctype == DKC_CDROM)) {
 
 		ret_val = is_server_running(handle);
 		if (ret_val == 0) {
@@ -426,8 +424,8 @@ get_handle_from_fd(int32_t fd)
 			return (NULL);
 		}
 		DPRINTF3("rsize = %d data_size = %d data_ptr = %p \n",
-			door_args.rsize, door_args.data_size,
-			door_args.data_ptr);
+		    door_args.rsize, door_args.data_size,
+		    door_args.data_ptr);
 		reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 		if (reterror->cnum != SMEDIA_CNUM_OPEN_FD) {
 			(void) dlclose(handle->sm_lib_handle);
@@ -453,11 +451,11 @@ get_handle_from_fd(int32_t fd)
 			free(handle);
 			if (handle->sm_clnt)
 				clnt_destroy(handle->sm_clnt);
-			DPRINTF(
-			"Num of door descriptors returned by server is not 2");
+			DPRINTF("Num of door descriptors returned by "
+			    "server is not 2");
 			if (door_args.desc_num)
-				(void) close(
-				door_args.desc_ptr->d_data.d_desc.d_descriptor);
+				(void) close(door_args.desc_ptr->\
+				    d_data.d_desc.d_descriptor);
 			return (NULL);
 		}
 		door_server = door_args.desc_ptr->d_data.d_desc.d_descriptor;
@@ -483,7 +481,7 @@ get_handle_from_fd(int32_t fd)
 		handle->sm_fd = fd;
 		door_args.desc_ptr++;
 		handle->sm_death_door =
-			door_args.desc_ptr->d_data.d_desc.d_descriptor;
+		    door_args.desc_ptr->d_data.d_desc.d_descriptor;
 		DPRINTF("door call succeeded.\n");
 		return ((smedia_handle_t)handle);
 
