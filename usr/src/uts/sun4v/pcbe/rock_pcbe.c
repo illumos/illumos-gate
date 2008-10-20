@@ -40,8 +40,6 @@
 
 #define	NT_END			0xFF
 
-#define	CPC_COUNT_HPRIV		0x8
-
 /* Counter Types */
 #define	NUM_PCBE_COUNTERS	7
 #define	RK_PERF_CYC		0x0100
@@ -287,6 +285,10 @@
 		PTR = NULL;
 
 #define	MAKE_MASK(NBITS, SHIFT)	(((unsigned long)(1<<(NBITS))-1)<<SHIFT)
+
+#define	COUNTER_MAX(_p)	((int64_t)((1ULL << (_p->counter_bits - 1)) - 1))
+#define	COUNTER_MIN(_p)	((int64_t)-(COUNTER_MAX(_p)))
+#define	COUNTER_MASK(_p)	((1ULL << _p->counter_bits) - 1)
 
 /* Global Structures and typedefs */
 struct	_rk_pcbe_ringbuf {	/*	  INIT-ER	WRITTER	  READER */
@@ -788,6 +790,22 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 	 */
 	pic->counter = 0;
 
+	/*
+	 * When synthetic counter's ring buffer reaches HWM, HV generates
+	 * PIC overflow trap to get guest's attention. This is not same as
+	 * a hardware counter overflow. Size of the ring buffer is configurable
+	 * and since there is no definite size, CPC_OVF_NOTIFY_EMT flag has no
+	 * meaning wrt synthetic counters.
+	 */
+	if ((bits & SYN_BIT) && (*flagsp & CPC_OVF_NOTIFY_EMT))
+		return (CPC_PIC_NOT_CAPABLE);
+
+	/*
+	 * This flag is used by CPC to inform the application of a counter
+	 * overflow. It is of no use to PCBE.
+	 */
+	*flagsp &= ~(CPC_OVF_NOTIFY_EMT);
+
 	switch (picnum) {
 #define	PRIV_BITS_MASK	0x7
 #define	PRIV_BIT0_MASK	0x1
@@ -822,7 +840,7 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 					    HV_RK_PERF_SRC_STRAND_M;
 				else if ((strcmp(attrs[i].ka_name,
 				    "hpriv") == 0) && attrs[i].ka_val)
-					*flagsp |= CPC_COUNT_HPRIV;
+					*flagsp |= CPC_COUNT_HV;
 				else if ((strcmp(attrs[i].ka_name,
 				    "source") == 0) && attrs[i].ka_val)
 					source = attrs[i].ka_val &
@@ -1110,6 +1128,13 @@ populate_pic_config(uint_t picnum, uint_t nattrs, kcpc_attr_t *attrs,
 			pic->sampler.syn_counter = bits;
 			break;
 		}
+
+	if ((int64_t)pic->pcbe_pic > COUNTER_MAX(pic) ||
+	    (int64_t)pic->pcbe_pic < COUNTER_MIN(pic))
+		return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+
+	pic->pcbe_pic &= COUNTER_MASK(pic);
+
 #ifdef	RKPCBE_DBG
 	set_pic_name(pic);
 #endif
@@ -1135,7 +1160,10 @@ rk_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	 */
 	if (*data != NULL) {
 		pic = *data;
-		pic->pcbe_pic = (uint64_t)preset;
+		if ((int64_t)preset > COUNTER_MAX(pic) ||
+		    (int64_t)preset < COUNTER_MIN(pic))
+			return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+		pic->pcbe_pic = preset & COUNTER_MASK(pic);
 		return (0);
 	}
 
@@ -1336,7 +1364,8 @@ rk_pcbe_sample(void *token)
 			    pic->src_type), &counter_value);
 			if (rc == H_EOK) {
 				diff = counter_value - pic->pcbe_pic;
-				pic->pcbe_pic = counter_value;
+				pic->pcbe_pic = counter_value &
+				    COUNTER_MASK(pic);
 				if (diff < 0)
 					diff += (0x1UL << pic->counter_bits);
 			}
@@ -2104,7 +2133,7 @@ sample_mccdesr(rk_pcbe_config_t *pic, int64_t *diffp)
 	    pic->src_type), &counter_value);
 	if (rc == H_EOK) {
 		*diffp = counter_value - pic->pcbe_pic;
-		pic->pcbe_pic = counter_value;
+		pic->pcbe_pic = counter_value & COUNTER_MASK(pic);
 		if (*diffp < 0) {
 			cmn_err(CE_WARN, "CPU-%d: Pic-%d, counter: %X overflow",
 			    CPU->cpu_id, pic->pcbe_picno, pic->counter);
