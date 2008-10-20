@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -177,6 +175,7 @@ signotify(int cmd, siginfo_t *siginfo, signotify_id_t *sn_id)
 	case SN_CANCEL:
 	case SN_SEND:
 
+		sid =  get_sigid(cp, (caddr_t)sn_id);
 		mutex_enter(&pidlock);
 		if ((id.sn_pid <= 0) || ((p = prfind(id.sn_pid)) == NULL)) {
 			mutex_exit(&pidlock);
@@ -197,7 +196,7 @@ signotify(int cmd, siginfo_t *siginfo, signotify_id_t *sn_id)
 			return (set_errno(EINVAL));
 		}
 
-		if (snqp->sn_snid != get_sigid(cp, (caddr_t)sn_id)) {
+		if (snqp->sn_snid != sid) {
 			mutex_exit(&p->p_lock);
 			return (set_errno(EINVAL));
 		}
