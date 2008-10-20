@@ -1642,7 +1642,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, VDEV_AUX_ERR_EXCEEDED);
 
 	/*
-	 * If marking the vdev as faulted cause the top-level vdev to become
+	 * If marking the vdev as faulted causes the top-level vdev to become
 	 * unavailable, then back off and simply mark the vdev as degraded
 	 * instead.
 	 */
@@ -1707,6 +1707,27 @@ int
 vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 {
 	vdev_t *vd;
+
+	if (spa_is_root(spa)) {
+		/*
+		 * if we're trying to online a device that's part of
+		 * the root pool, trigger an attach (if any) with only
+		 * the SCL_STATE lock held in order to avoid a deadlock
+		 * where modload tries to read from the disk
+		 */
+		spa_config_enter(spa, SCL_STATE, FTAG, RW_WRITER);
+		if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL) {
+			spa_config_exit(spa, SCL_STATE, FTAG);
+			return (ENODEV);
+		}
+		if (!vd->vdev_ops->vdev_op_leaf) {
+			spa_config_exit(spa, SCL_STATE, FTAG);
+			return (ENOTSUP);
+		}
+		vdev_close(vd);
+		vdev_open(vd);
+		spa_config_exit(spa, SCL_STATE, FTAG);
+	}
 
 	spa_vdev_state_enter(spa);
 
