@@ -1,8 +1,6 @@
 Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 The /usr/share/lib/zoneinfo/src directory contains zoneinfo timezone source
 files.  These source files have been compiled using zic(1M) to create
 the zoneinfo data files in /usr/share/lib/zoneinfo.  The zic command can be
@@ -11,7 +9,7 @@ used with the zoneinfo source files to create additional data files.
 The zoneinfo files track the Olson public source provided at
 ftp://elsie.nci.nih.gov/pub/, therefore zoneinfo files may be added and
 removed as the Solaris source is updated.  The current Solaris release of
-the zoneinfo files is based on tzdata2008e.tar.gz.
+the zoneinfo files is based on tzdata2008h.tar.gz.
 
 The /usr/share/lib/zoneinfo/GMT[+-]* timezones listed below have been
 removed from the release.  Replace usage of the
