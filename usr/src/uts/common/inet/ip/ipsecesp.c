@@ -1854,6 +1854,16 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	    espstack)) {
 		if (is_natt)
 			return (esp_fix_natt_checksums(data_mp, assoc));
+
+		if (assoc->ipsa_state == IPSA_STATE_IDLE) {
+			/*
+			 * Cluster buffering case.  Tell caller that we're
+			 * handling the packet.
+			 */
+			sadb_buf_pkt(assoc, ipsec_in_mp, ns);
+			return (IPSEC_STATUS_PENDING);
+		}
+
 		return (IPSEC_STATUS_SUCCESS);
 	}
 

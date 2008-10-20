@@ -17594,7 +17594,6 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	case IPPROTO_AH:
 	case IPPROTO_ESP: {
 		ipsec_stack_t *ipss = ipst->ips_netstack->netstack_ipsec;
-		ipsa_t *assoc;
 
 		/*
 		 * Fast path for AH/ESP. If this is the first time
@@ -17678,7 +17677,6 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			}
 			ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(
 			    first_mp, esph);
-			assoc = ii->ipsec_in_esp_sa;
 		} else {
 			ah_t *ah = ipsec_inbound_ah_sa(first_mp, ns);
 			if (ah == NULL)
@@ -17687,35 +17685,10 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			ASSERT(ii->ipsec_in_ah_sa->ipsa_input_func != NULL);
 			ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(
 			    first_mp, ah);
-			assoc = ii->ipsec_in_ah_sa;
 		}
 
 		switch (ipsec_rc) {
 		case IPSEC_STATUS_SUCCESS:
-			/*
-			 * The packet is successfully processed but
-			 * received on an SA which is in IDLE state.
-			 * We queue the packet for subsequent
-			 * processing after the SA moves to MATURE
-			 * state.
-			 */
-			if ((assoc != NULL) &&
-			    (assoc->ipsa_state == IPSA_STATE_IDLE)) {
-				ASSERT(cl_inet_idlesa != NULL);
-				in6_addr_t	srcaddr, dstaddr;
-				uint8_t		protocol;
-				protocol = (assoc->ipsa_type == SADB_SATYPE_AH)
-				    ? IPPROTO_AH : IPPROTO_ESP;
-				IPSA_COPY_ADDR(&srcaddr, assoc->ipsa_srcaddr,
-				    assoc->ipsa_addrfam);
-				IPSA_COPY_ADDR(&dstaddr, assoc->ipsa_dstaddr,
-				    assoc->ipsa_addrfam);
-				cl_inet_idlesa(protocol, assoc->ipsa_spi,
-				    assoc->ipsa_addrfam, srcaddr,
-				    dstaddr);
-				sadb_buf_pkt(assoc, first_mp, ns);
-				return;
-			}
 			break;
 		case IPSEC_STATUS_FAILED:
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);

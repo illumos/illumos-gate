@@ -4229,6 +4229,14 @@ ah_auth_in_done(mblk_t *ipsec_in)
 	}
 	freeb(phdr_mp);
 	ipsec_in->b_cont = mp;
+	if (assoc->ipsa_state == IPSA_STATE_IDLE) {
+		/*
+		 * Cluster buffering case.  Tell caller that we're
+		 * handling the packet.
+		 */
+		sadb_buf_pkt(assoc, ipsec_in, ns);
+		return (IPSEC_STATUS_PENDING);
+	}
 	return (IPSEC_STATUS_SUCCESS);
 
 ah_in_discard:

@@ -404,7 +404,6 @@ stubs_base:
 	WSTUB(ipsecah,	sadb_insertassoc,	nomod_zero);
 	WSTUB(ipsecah,	ipsecah_in_assocfailure,	nomod_zero);
 	WSTUB(ipsecah,	sadb_set_lpkt,		nomod_zero);
-	WSTUB(ipsecah,	sadb_buf_pkt,		nomod_zero);
 	WSTUB(ipsecah,	ipsecah_icmp_error,	nomod_zero);
 	END_MODULE(ipsecah);
 #endif

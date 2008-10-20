@@ -6883,12 +6883,31 @@ sadb_clear_lpkt(ipsa_t *ipsa)
 	return (opkt);
 }
 
+/*
+ * Buffer a packet that's in IDLE state as set by Solaris Clustering.
+ */
 void
 sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
 {
 	ipsec_stack_t   *ipss = ns->netstack_ipsec;
+	extern void (*cl_inet_idlesa)(uint8_t, uint32_t, sa_family_t,
+	    in6_addr_t, in6_addr_t);
+	in6_addr_t *srcaddr = (in6_addr_t *)(&ipsa->ipsa_srcaddr);
+	in6_addr_t *dstaddr = (in6_addr_t *)(&ipsa->ipsa_dstaddr);
 
 	ASSERT(ipsa->ipsa_state == IPSA_STATE_IDLE);
+
+	if (cl_inet_idlesa == NULL) {
+		ip_drop_packet(bpkt, B_TRUE, NULL, NULL,
+		    DROPPER(ipss, ipds_sadb_inidle_overflow),
+		    &ipss->ipsec_sadb_dropper);
+		return;
+	}
+
+	cl_inet_idlesa((ipsa->ipsa_type == SADB_SATYPE_AH) ?
+	    IPPROTO_AH : IPPROTO_ESP, ipsa->ipsa_spi, ipsa->ipsa_addrfam,
+	    *srcaddr, *dstaddr);
+
 	mutex_enter(&ipsa->ipsa_lock);
 	ipsa->ipsa_mblkcnt++;
 	if (ipsa->ipsa_bpkt_head == NULL) {
