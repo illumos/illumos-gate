@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * vm_usage
@@ -153,6 +151,7 @@
 #include <sys/var.h>
 #include <sys/vm_usage.h>
 #include <sys/zone.h>
+#include <sys/sunddi.h>
 #include <vm/anon.h>
 #include <vm/as.h>
 #include <vm/seg_vn.h>
@@ -1356,9 +1355,9 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 				entity_object = vmu_find_insert_object(
 				    shared_object->vmo_type ==
 				    VMUSAGE_TYPE_VNODE ? entity->vme_vnode_hash:
-					entity->vme_amp_hash,
-					shared_object->vmo_key,
-					shared_object->vmo_type);
+				    entity->vme_amp_hash,
+				    shared_object->vmo_key,
+				    shared_object->vmo_type);
 
 				virt = vmu_insert_lookup_object_bounds(
 				    entity_object, cur->vmb_start, cur->vmb_end,
@@ -1693,7 +1692,7 @@ vmu_cache_rele(vmu_cache_t *cache)
 	cache->vmc_refcnt--;
 	if (cache->vmc_refcnt == 0) {
 		kmem_free(cache->vmc_results, sizeof (vmusage_t) *
-			cache->vmc_nresults);
+		    cache->vmc_nresults);
 		kmem_free(cache, sizeof (vmu_cache_t));
 	}
 }
@@ -1704,7 +1703,7 @@ vmu_cache_rele(vmu_cache_t *cache)
  */
 static int
 vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
-    uint_t flags)
+    uint_t flags, int cpflg)
 {
 	vmusage_t *result, *out_result;
 	vmusage_t dummy;
@@ -1714,7 +1713,7 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 	uint_t types = 0;
 
 	if (nres != NULL) {
-		if (copyin((caddr_t)nres, &bufsize, sizeof (size_t)))
+		if (ddi_copyin((caddr_t)nres, &bufsize, sizeof (size_t), cpflg))
 			return (set_errno(EFAULT));
 	} else {
 		bufsize = 0;
@@ -1761,10 +1760,9 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 					dummy.vmu_zoneid = ALL_ZONES;
 					dummy.vmu_id = 0;
 					dummy.vmu_type = VMUSAGE_SYSTEM;
-					if (copyout(&dummy, out_result,
-					    sizeof (vmusage_t)))
-						return (set_errno(
-						    EFAULT));
+					if (ddi_copyout(&dummy, out_result,
+					    sizeof (vmusage_t), cpflg))
+						return (set_errno(EFAULT));
 					out_result++;
 				}
 			}
@@ -1813,15 +1811,15 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 			if (bufsize < count) {
 				ret = set_errno(EOVERFLOW);
 			} else {
-				if (copyout(result, out_result,
-				    sizeof (vmusage_t)))
+				if (ddi_copyout(result, out_result,
+				    sizeof (vmusage_t), cpflg))
 					return (set_errno(EFAULT));
 				out_result++;
 			}
 		}
 	}
 	if (nres != NULL)
-		if (copyout(&count, (void *)nres, sizeof (size_t)))
+		if (ddi_copyout(&count, (void *)nres, sizeof (size_t), cpflg))
 			return (set_errno(EFAULT));
 
 	return (ret);
@@ -1854,7 +1852,7 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
  *	EFAULT (bad address for buf or nres)
  */
 int
-vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres)
+vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
 {
 	vmu_entity_t *entity;
 	vmusage_t *result;
@@ -1913,7 +1911,8 @@ start:
 			vmu_cache_hold(cache);
 			mutex_exit(&vmu_data.vmu_lock);
 
-			ret = vmu_copyout_results(cache, buf, nres, flags_orig);
+			ret = vmu_copyout_results(cache, buf, nres, flags_orig,
+			    cpflg);
 			mutex_enter(&vmu_data.vmu_lock);
 			vmu_cache_rele(cache);
 			if (vmu_data.vmu_pending_waiters > 0)
@@ -1950,7 +1949,7 @@ start:
 			vmu_cache_rele(vmu_data.vmu_cache);
 		cache = vmu_data.vmu_cache =
 		    vmu_cache_alloc(vmu_data.vmu_nentities,
-			vmu_data.vmu_calc_flags);
+		    vmu_data.vmu_calc_flags);
 
 		result = cache->vmc_results;
 		for (entity = vmu_data.vmu_entities; entity != NULL;
@@ -1970,7 +1969,7 @@ start:
 		mutex_exit(&vmu_data.vmu_lock);
 
 		/* copy cache */
-		ret = vmu_copyout_results(cache, buf, nres, flags_orig);
+		ret = vmu_copyout_results(cache, buf, nres, flags_orig, cpflg);
 		mutex_enter(&vmu_data.vmu_lock);
 		vmu_cache_rele(cache);
 		mutex_exit(&vmu_data.vmu_lock);

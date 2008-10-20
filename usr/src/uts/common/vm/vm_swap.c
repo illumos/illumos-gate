@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Each physical swap area has an associated bitmap representing
@@ -457,6 +455,7 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 	struct anoninfo ai;
 	spgcnt_t avail;
 	int global = INGLOBALZONE(curproc);
+	struct zone *zp = curproc->p_zone;
 
 	/*
 	 * When running in a zone we want to hide the details of the swap
@@ -484,12 +483,90 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 		 */
 		avail = MAX((spgcnt_t)(availrmem - swapfs_minfree), 0);
 		ai.ani_max = (k_anoninfo.ani_max +
-		    k_anoninfo.ani_mem_resv) +avail;
+		    k_anoninfo.ani_mem_resv) + avail;
 
 		ai.ani_free = k_anoninfo.ani_free + avail;
 
 		ai.ani_resv = k_anoninfo.ani_phys_resv +
 		    k_anoninfo.ani_mem_resv;
+
+		if (!global && zp->zone_max_swap_ctl != UINT64_MAX) {
+			/*
+			 * We're in a non-global zone with a swap cap.  We
+			 * always report the system-wide values for the global
+			 * zone, even though it too can have a swap cap.
+			 */
+
+			/*
+			 * For a swap-capped zone, the numbers are contrived
+			 * since we don't have a correct value of 'reserved'
+			 * for the zone.
+			 *
+			 * The ani_max value is always the zone's swap cap.
+			 *
+			 * The ani_free value is always the difference between
+			 * the cap and the amount of swap in use by the zone.
+			 *
+			 * The ani_resv value is typically set to be the amount
+			 * of swap in use by the zone, but can be adjusted
+			 * upwards to indicate how much swap is currently
+			 * unavailable to that zone due to usage by entities
+			 * outside the zone.
+			 *
+			 * This works as follows.
+			 *
+			 * In the 'swap -s' output, the data is displayed
+			 * as follows:
+			 *    allocated = ani_max  - ani_free
+			 *    reserved  = ani_resv - allocated
+			 *    available = ani_max  - ani_resv
+			 *
+			 * Taking a contrived example, if the swap cap is 100
+			 * and the amount of swap used by the zone is 75, this
+			 * gives:
+			 *    allocated = ani_max  - ani_free  = 100 - 25 = 75
+			 *    reserved  = ani_resv - allocated =  75 - 75 =  0
+			 *    available = ani_max  - ani_resv  = 100 - 75 = 25
+			 *
+			 * In this typical case, you can see that the 'swap -s'
+			 * 'reserved' will always be 0 inside a swap capped
+			 * zone.
+			 *
+			 * However, if the system as a whole has less free
+			 * swap than the zone limits allow, then we adjust
+			 * the ani_resv value up so that it is the difference
+			 * between the zone cap and the amount of free system
+			 * swap.  Taking the above example, but when the
+			 * system as a whole only has 20 of swap available, we
+			 * get an ani_resv of 100 - 20 = 80.  This gives:
+			 *    allocated = ani_max  - ani_free  = 100 - 25 = 75
+			 *    reserved  = ani_resv - allocated =  80 - 75 =  5
+			 *    available = ani_max  - ani_resv  = 100 - 80 = 20
+			 *
+			 * In this case, you can see how the ani_resv value is
+			 * tweaked up to make the 'swap -s' numbers work inside
+			 * the zone.
+			 */
+			rctl_qty_t cap, used;
+			pgcnt_t pgcap, sys_avail;
+
+			mutex_enter(&zp->zone_mem_lock);
+			cap = zp->zone_max_swap_ctl;
+			used = zp->zone_max_swap;
+			mutex_exit(&zp->zone_mem_lock);
+
+			pgcap = MIN(btop(cap), ai.ani_max);
+			ai.ani_free = pgcap - btop(used);
+
+			/* Get the system-wide swap currently available. */
+			sys_avail = ai.ani_max - ai.ani_resv;
+			if (sys_avail < ai.ani_free)
+				ai.ani_resv = pgcap - sys_avail;
+			else
+				ai.ani_resv = btop(used);
+
+			ai.ani_max = pgcap;
+		}
 
 		if (copyout(&ai, sc_arg, sizeof (struct anoninfo)) != 0)
 			return (EFAULT);
@@ -512,6 +589,7 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 			st.ste_pages = 0;
 			st.ste_free = 0;
 			st.ste_flags = 0;
+
 			mutex_enter(&swapinfo_lock);
 			for (sip = swapinfo, nswap = 0;
 			    sip != NULL && nswap < nswapfiles;
@@ -522,6 +600,21 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 				st.ste_free += sip->si_nfpgs;
 			}
 			mutex_exit(&swapinfo_lock);
+
+			if (zp->zone_max_swap_ctl != UINT64_MAX) {
+				rctl_qty_t cap, used;
+
+				mutex_enter(&zp->zone_mem_lock);
+				cap = zp->zone_max_swap_ctl;
+				used = zp->zone_max_swap;
+				mutex_exit(&zp->zone_mem_lock);
+
+				st.ste_length = MIN(cap, st.ste_length);
+				st.ste_pages = MIN(btop(cap), st.ste_pages);
+				st.ste_free = MIN(st.ste_pages - btop(used),
+				    st.ste_free);
+			}
+
 			if (copyout(&st, ust, sizeof (swapent_t)) != 0 ||
 			    copyout(swappath, st.ste_path,
 			    strlen(swappath) + 1) != 0) {
@@ -696,10 +789,21 @@ swapctl32(int sc_cmd, void *sc_arg, int *rv)
 	struct anoninfo32 ai;
 	size_t s;
 	spgcnt_t avail;
+	int global = INGLOBALZONE(curproc);
+	struct zone *zp = curproc->p_zone;
 
+	/*
+	 * When running in a zone we want to hide the details of the swap
+	 * devices: we report there only being one swap device named "swap"
+	 * having a size equal to the sum of the sizes of all real swap devices
+	 * on the system.
+	 */
 	switch (sc_cmd) {
 	case SC_GETNSWP:
-		*rv = nswapfiles;
+		if (global)
+			*rv = nswapfiles;
+		else
+			*rv = 1;
 		return (0);
 
 	case SC_AINFO:
@@ -728,6 +832,35 @@ swapctl32(int sc_cmd, void *sc_arg, int *rv)
 			return (EOVERFLOW);
 		ai.ani_resv = s;
 
+		if (!global && zp->zone_max_swap_ctl != UINT64_MAX) {
+			/*
+			 * We're in a non-global zone with a swap cap.  We
+			 * always report the system-wide values for the global
+			 * zone, even though it too can have a swap cap.
+			 * See the comment for the SC_AINFO case in swapctl()
+			 * which explains the following logic.
+			 */
+			rctl_qty_t cap, used;
+			pgcnt_t pgcap, sys_avail;
+
+			mutex_enter(&zp->zone_mem_lock);
+			cap = zp->zone_max_swap_ctl;
+			used = zp->zone_max_swap;
+			mutex_exit(&zp->zone_mem_lock);
+
+			pgcap = MIN(btop(cap), ai.ani_max);
+			ai.ani_free = pgcap - btop(used);
+
+			/* Get the system-wide swap currently available. */
+			sys_avail = ai.ani_max - ai.ani_resv;
+			if (sys_avail < ai.ani_free)
+				ai.ani_resv = pgcap - sys_avail;
+			else
+				ai.ani_resv = btop(used);
+
+			ai.ani_max = pgcap;
+		}
+
 		if (copyout(&ai, sc_arg, sizeof (ai)) != 0)
 			return (EFAULT);
 		return (0);
@@ -735,6 +868,54 @@ swapctl32(int sc_cmd, void *sc_arg, int *rv)
 	case SC_LIST:
 		if (copyin(sc_arg, &length, sizeof (int32_t)) != 0)
 			return (EFAULT);
+		if (!global) {
+			struct swapent32 st;
+			char *swappath = "swap";
+
+			if (length < 1)
+				return (ENOMEM);
+			ust = (swapent32_t *)((swaptbl32_t *)sc_arg)->swt_ent;
+			if (copyin(ust, &st, sizeof (swapent32_t)) != 0)
+				return (EFAULT);
+			st.ste_start = PAGESIZE >> SCTRSHFT;
+			st.ste_length = (off_t)0;
+			st.ste_pages = 0;
+			st.ste_free = 0;
+			st.ste_flags = 0;
+
+			mutex_enter(&swapinfo_lock);
+			for (sip = swapinfo, nswap = 0;
+			    sip != NULL && nswap < nswapfiles;
+			    sip = sip->si_next, nswap++) {
+				st.ste_length +=
+				    (sip->si_eoff - sip->si_soff) >> SCTRSHFT;
+				st.ste_pages += sip->si_npgs;
+				st.ste_free += sip->si_nfpgs;
+			}
+			mutex_exit(&swapinfo_lock);
+
+			if (zp->zone_max_swap_ctl != UINT64_MAX) {
+				rctl_qty_t cap, used;
+
+				mutex_enter(&zp->zone_mem_lock);
+				cap = zp->zone_max_swap_ctl;
+				used = zp->zone_max_swap;
+				mutex_exit(&zp->zone_mem_lock);
+
+				st.ste_length = MIN(cap, st.ste_length);
+				st.ste_pages = MIN(btop(cap), st.ste_pages);
+				st.ste_free = MIN(st.ste_pages - btop(used),
+				    st.ste_free);
+			}
+
+			if (copyout(&st, ust, sizeof (swapent32_t)) != 0 ||
+			    copyout(swappath, (caddr_t)(uintptr_t)st.ste_path,
+			    strlen(swappath) + 1) != 0) {
+				return (EFAULT);
+			}
+			*rv = 1;
+			return (0);
+		}
 beginning:
 		tmp_nswapfiles = nswapfiles;
 		/* Return an error if not enough space for the whole table. */

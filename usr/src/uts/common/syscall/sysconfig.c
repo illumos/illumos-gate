@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -47,6 +45,7 @@
 #include <sys/mman.h>
 #include <sys/timer.h>
 #include <sys/zone.h>
+#include <sys/vm_usage.h>
 
 long
 sysconfig(int which)
@@ -153,9 +152,50 @@ sysconfig(int which)
 		return (timer_max);
 
 	case _CONFIG_PHYS_PAGES:
+		/*
+		 * If the non-global zone has a phys. memory cap, use that.
+		 * We always report the system-wide value for the global zone,
+		 * even though rcapd can be used on the global zone too.
+		 */
+		if (!INGLOBALZONE(curproc) &&
+		    curproc->p_zone->zone_phys_mcap != 0)
+			return (MIN(btop(curproc->p_zone->zone_phys_mcap),
+			    physinstalled));
+
 		return (physinstalled);
 
 	case _CONFIG_AVPHYS_PAGES:
+		/*
+		 * If the non-global zone has a phys. memory cap, use
+		 * the phys. memory cap - zone's current rss.  We always
+		 * report the system-wide value for the global zone, even
+		 * though rcapd can be used on the global zone too.
+		 */
+		if (!INGLOBALZONE(curproc) &&
+		    curproc->p_zone->zone_phys_mcap != 0) {
+			pgcnt_t cap, rss, free;
+			vmusage_t in_use;
+			size_t cnt = 1;
+
+			cap = btop(curproc->p_zone->zone_phys_mcap);
+			if (cap > physinstalled)
+				return (freemem);
+
+			if (vm_getusage(VMUSAGE_ZONE, 1, &in_use, &cnt,
+			    FKIOCTL) != 0)
+				in_use.vmu_rss_all = 0;
+			rss = btop(in_use.vmu_rss_all);
+			/*
+			 * Because rcapd implements a soft cap, it is possible
+			 * for rss to be temporarily over the cap.
+			 */
+			if (cap > rss)
+				free = cap - rss;
+			else
+				free = 0;
+			return (MIN(free, freemem));
+		}
+
 		return (freemem);
 
 	case _CONFIG_MAXPID:

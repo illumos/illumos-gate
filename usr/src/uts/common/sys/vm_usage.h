@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_VM_USAGE_H
 #define	_SYS_VM_USAGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -108,7 +106,7 @@ extern int getvmusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres);
 
 #ifdef	_KERNEL
 
-int vm_getusage(uint_t, time_t, vmusage_t *, size_t *);
+int vm_getusage(uint_t, time_t, vmusage_t *, size_t *, int);
 void vm_usage_init();
 
 #endif	/* _KERNEL */
