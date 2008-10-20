@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,9 @@ void **ctpriv)
 		    (stdinq->inq_dtype == DTYPE_DIRECT)) {
 			return (SFO_DEVICE_PROBE_VHCI);
 		}
+	}
+	if (bcmp(&stdinq->inq_vid[0], "ATA     ", 8) == 0) {
+		return (SFO_DEVICE_PROBE_VHCI);
 	}
 	return (SFO_DEVICE_PROBE_PHCI);
 }

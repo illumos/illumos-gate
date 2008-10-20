@@ -31,6 +31,7 @@ KDRVCONF=
 DRVCONF=
 TMPDRVCONF=
 TMPDRVCONF_MPXIO_ENTRY=
+TMPDRVCONF_SATA_ENTRY=
 DRVLIST=
 GUID=
 VFSTAB=/etc/vfstab
@@ -96,6 +97,9 @@ delete_mpxio_disable_entries()
 		      d
 		    }
 		/mpxio-disable[ 	]*=.*;$/{ w '$3'
+						  d
+						}
+		/disable-sata-mpxio[ 	]*=.*;$/{ w '$4'
 						  d
 						}
 		/;$/{ p
@@ -294,13 +298,17 @@ configure_mpxio()
 	# in sed's pattern space.
 	mpxiodisableno='mpxio-disable[ 	]*=[ 	]*"no"[ 	]*;'
 	mpxiodisableyes='mpxio-disable[ 	]*=[ 	]*"yes"[ 	]*;'
+	satadisableno='disable-sata-mpxio[ 	]*=[ 	]*"no"[ 	]*;'
+	satadisableyes='disable-sata-mpxio[ 	]*=[ 	]*"yes"[ 	]*;'
 
 	if [ "x$cmd" = xenable ]; then
 		mpxiodisable_cur_entry=$mpxiodisableyes
+		satadisable_cur_entry=$satadisableyes
 		propval=no
 		msg=`gettext "STMS already enabled"`
 	else
 		mpxiodisable_cur_entry=$mpxiodisableno
+		satadisable_cur_entry=$satadisableno
 		propval=yes
 		msg=`gettext "STMS already disabled"`
 	fi
@@ -309,25 +317,30 @@ configure_mpxio()
 	KDRVCONF=/kernel/drv/$d.conf
 	TMPDRVCONF=/var/run/tmp.$d.conf.$$
 	TMPDRVCONF_MPXIO_ENTRY=/var/run/tmp.$d.conf.mpxioentry.$$;
+	TMPDRVCONF_SATA_ENTRY=/var/run/tmp.$d.conf.sataentry.$$;
 
-	if delete_mpxio_disable_entries $KDRVCONF $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY; then
+	if delete_mpxio_disable_entries $KDRVCONF $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY; then
 
 		if [ -s $TMPDRVCONF_MPXIO_ENTRY ]; then
 			# $DRVCONF does have mpxiodisable entries
 			$EGREP -s "$mpxiodisable_cur_entry" $TMPDRVCONF_MPXIO_ENTRY
-			if [ $? -ne 0 ]; then
+			if [ $? -eq 0 ]; then
+				reboot_needed=`$EXPR $reboot_needed + 1`
+			else
 				# if all mpxiodisable entries are no/yes for
 				# enable/disable mpxio, notify the user
-				$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
-				continue;
-			else
-				reboot_needed=`$EXPR $reboot_needed + 1`
+				$EGREP -s "$satadisable_cur_entry" $TMPDRVCONF_SATA_ENTRY
+				if [ $? -eq 0 ]; then
+					reboot_needed=`$EXPR $reboot_needed + 1`
+				else
+					$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
+				fi
 			fi
 
 			# If mpxiodisable entries do not exist, always continue update
 		fi
 	else
-		$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
+		$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
 		gettext "failed to update " 1>&2
 		echo "$KDRVCONF." 1>&2 
 		gettext "No changes were made to your STMS configuration.\n" 1>&2
@@ -336,6 +349,7 @@ configure_mpxio()
 
 	rm $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
 	echo "mpxio-disable=\"${propval}\";" >> $TMPDRVCONF
+	echo "disable-sata-mpxio=\"${propval}\";" >> $TMPDRVCONF
 
 }
 

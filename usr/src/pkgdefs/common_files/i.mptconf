@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
@@ -40,6 +38,25 @@ add_comment_for_vhci_class()
 #
 # The mpt driver, as a pHCI driver, must specify the vHCI class it
 # belongs to(scsi_vhci).
+#
+EOF
+}
+
+add_comment_for_sata_mpxio()
+{
+	if grep "^# SATA mpxio supported" $1 > /dev/null 2>&1; then
+		return
+	fi
+
+	cat >> $1 << EOF
+
+#
+# SATA mpxio supported
+#
+# To disable SATA mpxio, set
+# disable-sata-mpxio="yes";
+# When mpxio-disable="yes" is set, the disable-sata-mpxio property
+# takes no effect
 #
 EOF
 }
@@ -136,6 +153,20 @@ update_mptconf()
 	grep '^mpxio-disable' $2 > /dev/null 2>&1
 	if [ $? != 0 ] ; then
 		echo 'mpxio-disable="yes";' >> $2
+	fi
+
+	add_comment_for_sata_mpxio $2
+	grep "^disable-sata-mpxio" $2 > /dev/null 2>&1
+	if [ $? != 0 ] ; then
+		# check for property mpxio-disable value. If the mpxio was 
+		# already enabled at upgrade, disable the sata mpxio to avoid
+		# regression
+		grep '^mpxio-disable="no"' $2 > /dev/null 2>&1
+		if [ $? = 0 ] ; then
+			echo 'disable-sata-mpxio="yes";' >> $2
+		else
+			echo 'disable-sata-mpxio="no";' >> $2
+		fi
 	fi
 
 	rm -f $NEWHDR1 $NEWHDR2 $TMPFILE
