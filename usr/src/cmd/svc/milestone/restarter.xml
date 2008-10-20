@@ -1,15 +1,14 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
- Common Development and Distribution License, Version 1.0 only
- (the "License").  You may not use this file except in compliance
- with the License.
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
 
  You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -36,7 +33,7 @@
 
 <service
 	name='system/svc/restarter'
-	type='service'
+	type='restarter'
 	version='1'>
 
 	<!--
@@ -49,18 +46,1214 @@
 
 	<single_instance/>
 
+	<!--
+	    The restarter is actually started by init, so these methods are
+	    ignored.  However, they are required by definition and are
+	    included here to avoid spurious validation errors.
+	-->
+	<exec_method
+		type='method'
+		name='start'
+		exec=':true'
+		timeout_seconds='0' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='0' />
+
 	<stability value='Unstable' />
 
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-				master restarter
+master restarter
 			</loctext>
 		</common_name>
 		<documentation>
 			<manpage title='svc.startd' section='1M'
 			    manpath='/usr/share/man' />
+			<manpage title='smf_method' section='5'
+			    manpath='/usr/share/man' />
+			<manpage title='smf' section='5'
+			    manpath='/usr/share/man' />
 		</documentation>
+
+		<!--
+		    Much of the restarter pg is populated by librestart, but
+		    because svc.startd augments the property group, we choose
+		    to define the entire property group as restarter-specific
+		    rather than define it globally and miss some of the
+                    properties.  Templates does not currently provide a way
+                    to have multiple entities 'own' and describe a property
+                    group.
+		-->
+		<pg_pattern name='restarter' type='framework'
+		    target='delegate' required='false'>
+			<description>
+				<loctext xml:lang='C'>
+Communicate restarter-set status of the service.
+				</loctext>
+			</description>
+			<prop_pattern name='alt_logfile' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The logfile for restarter actions on this service and any direct output from its methods which occurred before the /var filesystem was available.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='logfile' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The logfile for restarter actions on this service and any direct output from its methods.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='contract' type='count'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Primary process contract for a 'contract' or 'child' service.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='start_pid' type='count'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+PID last launched as the start method for this service.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='start_method_timestamp' type='time'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Time the start method was last run.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='auxiliary_state' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Restarter-set auxiliary information about the current state.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='state_timestamp' type='time'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Time the current state was reached.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='state' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The current state of this service instance.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+				<constraints>
+					<value name="online">
+						<description>
+							<loctext xml:lang='C'>
+The instance is online and running.
+							</loctext>
+						</description>
+					</value>
+					<value name="offline">
+						<description>
+							<loctext xml:lang='C'>
+The instance is enabled, but not yet running or available to run.  The most common reason for service instances to be in this state is because one or more of their dependencies are not satisfied.
+							</loctext>
+						</description>
+					</value>
+					<value name="uninitialized">
+						<description>
+							<loctext xml:lang='C'>
+The initial state for all instances before svc.startd has had a chance to evaluate on them.  Instances are in this state when their restarter has not yet started.
+							</loctext>
+						</description>
+					</value>
+					<value name="degraded">
+						<description>
+							<loctext xml:lang='C'>
+The instance is enabled and running or available to run. The instance, however, is functioning at a limited capacity in comparison to normal operation.
+							</loctext>
+						</description>
+					</value>
+					<value name="disabled">
+						<description>
+							<loctext xml:lang='C'>
+The instance is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name="maintenance">
+						<description>
+							<loctext xml:lang='C'>
+The instance is enabled, but not able to run.  Administrative action is required to restore the instance to offline and subsequent states.
+							</loctext>
+						</description>
+					</value>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='next_state' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The next expected state of this instance.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+				<constraints>
+					<value name="online">
+						<description>
+							<loctext xml:lang='C'>
+The instance is being started, and will soon be online and running.  This transition may fail and the instance may end up in offiline or maintenance instead.
+							</loctext>
+						</description>
+					</value>
+					<value name="offline">
+						<description>
+							<loctext xml:lang='C'>
+The instance has been temporarily stopped.  Most instances will leave this state once their dependencies are satisfied.
+							</loctext>
+						</description>
+					</value>
+					<value name="degraded">
+						<description>
+							<loctext xml:lang='C'>
+The instance will be enabled and availble to run, although in a limited capacity.
+							</loctext>
+						</description>
+					</value>
+					<value name="disabled">
+						<description>
+							<loctext xml:lang='C'>
+The instance will be disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name="maintenance">
+						<description>
+							<loctext xml:lang='C'>
+The instance will be in maintenance, and administrative action will be required to restore the instance to offline and subsequent states.
+							</loctext>
+						</description>
+					</value>
+					<value name="none">
+						<description>
+							<loctext xml:lang='C'>
+The instance is not currently transitioning between states.
+							</loctext>
+						</description>
+					</value>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='options' type='framework'
+		    target='this' required='false'>
+			<description>
+				<loctext xml:lang='C'>
+Specify options for the svc.startd restarter.
+				</loctext>
+			</description>
+
+			<prop_pattern name='boot_messages' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Define verbosity of messages to print to the console during boot.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='quiet'>
+					<description>
+						<loctext xml:lang='C'>
+Issue console messages only on service failures.
+						</loctext>
+					</description>
+				</value>
+				<value name='verbose'>
+					<description>
+						<loctext xml:lang='C'>
+Print a message per service started to indicate success or failure.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+				<choices>
+					<include_values type='constraints'/>
+				</choices>
+			</prop_pattern>
+
+			<prop_pattern name='logging' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Control the level of global service logging for svc.startd.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='quiet'>
+					<description>
+						<loctext xml:lang='C'>
+Send error messages requiring administrative intervention to console, syslog, and svc.startd's global logfile.
+						</loctext>
+					</description>
+				</value>
+				<value name='verbose'>
+					<description>
+						<loctext xml:lang='C'>
+Sends a message per service started to the console, error messages requiring administrative intervention to console, syslog, and svc.startd's global logfile, and information about errors which do not require intervention to the logfile.
+						</loctext>
+					</description>
+				</value>
+				<value name='debug'>
+					<description>
+						<loctext xml:lang='C'>
+Send debug messages to svc.startd's global logfile, error messages requiring administrative intervention to the console, syslog, and the logfile, and a message per service started to the console.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+				<choices>
+					<include_values type='constraints'/>
+				</choices>
+			</prop_pattern>
+
+			<prop_pattern name='milestone' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+An FRMI which defines the milestone used as the default boot level.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value
+				    name='svc:/milestone/single-user:default'>
+				</value>
+				<value
+				    name='svc:/milestone/multi-user:default'>
+				</value>
+				<value name=
+				    'svc:/milestone/multi-user-server:default'>
+				</value>
+				<value name='all'>
+					<description>
+						<loctext xml:lang='C'>
+Start all enabled services.
+						</loctext>
+					</description>
+				</value>
+				<value name='none'>
+					<description>
+						<loctext xml:lang='C'>
+Start no services.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='system' type='framework'
+		    target='this' required='false'>
+			<prop_pattern name='reconfigure' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Indicates that a reconfiguration reboot has been requested.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='startd' type='framework'
+		    target='delegate' required='false'>
+			<description>
+				<loctext xml:lang='C'>
+Information about how a service instance is managed by svc.startd, which is supplied by the service author, sometimes modified by the administrator.
+				</loctext>
+			</description>
+
+			<prop_pattern name='duration' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Defines the service's model.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='contract'>
+					<description>
+						<loctext xml:lang='C'>
+A standard system daemon, which runs forever to provide a service.  It is not considered online until the start method process exits, though child processes are monitored for errors.
+						</loctext>
+					</description>
+				</value>
+				<value name='transient'>
+					<description>
+						<loctext xml:lang='C'>
+The service is online as soon as its start method returns -- child processes are not monitored.
+						</loctext>
+					</description>
+				</value>
+				<value name='child'>
+					<description>
+						<loctext xml:lang='C'>
+A service which runs for the lifetime of the child process, and is restarted when that process exits.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+				<choices>
+					<include_values type='constraints'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='ignore_error' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+A list of events which should not be considered service errors by svc.startd.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<!--
+				    We won't recommend this as a choice since
+				    it's only here to work around the fact
+				    that startd defines this as a single
+				    value rather than a value list *and*
+				    templates doesn't currently take care
+				    of assembling separately defined
+				    values with the defined internal separator.
+				-->
+				<values>
+				<value name='signal,core'>
+					<description>
+						<loctext xml:lang='C'>
+svc.startd should ignore coredumps and signals sent from outside the service.
+						</loctext>
+					</description>
+				</value>
+				</values>
+				<choices>
+				<value name='core'>
+					<description>
+						<loctext xml:lang='C'>
+svc.startd should ignore coredumps from subprocesses.
+						</loctext>
+					</description>
+				</value>
+				<value name='signal'>
+					<description>
+						<loctext xml:lang='C'>
+svc.startd should ignore signals sent from outside the service.
+						</loctext>
+					</description>
+				</value>
+				<value name='core,signal'>
+					<description>
+						<loctext xml:lang='C'>
+svc.startd should ignore coredumps and signals sent from outside the service.
+						</loctext>
+					</description>
+				</value>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='need_session' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The instance should be launched in its own session per setpgrp(2).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='utmpx_prefix' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The instance requires that svc.startd create a valid utmpx entry prior to start method execution.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='start' type='method' target='delegate'
+		    required='true'>
+			<description>
+				<loctext xml:lang='C'>
+The start method defines how svc.startd should start the instance.
+				</loctext>
+			</description>
+			<prop_pattern name='exec' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+method executable
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The method executable may be a script, program, or keyword.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name=':true'>
+						<description>
+							<loctext xml:lang='C'>
+Always returns SMF_EXIT_OK. This token should be used when the start method is unnecessary for the particular service implementation.
+							</loctext>
+						</description>
+					</value>
+					<value name=':kill [-signal]'>
+						<description>
+							<loctext xml:lang='C'>
+Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common pkill invocations.
+
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+
+			<prop_pattern name='type' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+A method may only be of type method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+					<value name="method"/>
+				</constraints>
+			</prop_pattern>
+
+			<prop_pattern name='timeout_seconds' type='count'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name="0">
+						<common_name>
+							<loctext xml:lang='C'>
+infinite
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.
+							</loctext>
+						</description>
+					</value>
+					<value name="-1">
+						<common_name>
+							<loctext xml:lang='C'>
+infinite (legacy)
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.  0 is the preferred value.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+
+			<!-- method_context direct properties -->
+			<prop_pattern name='working_directory' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The working directory to launch the method from.  ":default" can be used as a token to indicate the home directory of the user specified by the credential or profile.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='project' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='resource_pool' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method context resource pool
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The resource pool name on which to launch the method.  :default can be used
+as a token to indicate the pool specified in the project(4) entry given in
+the project attribute.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_credential properties -->
+			<prop_pattern name='user' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential user
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The user ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='group' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential group
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The group ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='supp_groups' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential supplemental groups
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string that specifies the supplemental group memberships by ID,
+in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential privileges
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the privilege set as defined in privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='limit_privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential limit privilege set
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the limit privilege set as defined in
+privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+
+			<!-- method_profile properties -->
+			<prop_pattern name='use_profile' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+A boolean that specifies whether the profile should be used instead of the
+user, group, privileges, and limit_privileges properties.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='profile' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method profile RBAC profile specification 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The name of an RBAC (role-based access control) profile which, along with the
+method executable, identifies an entry in exec_attr(4).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_environment properties -->
+			<prop_pattern name='environment' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method environment variables
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Environment variables to insert into the environment of the method, in the
+form of a number of NAME=value strings.
+					</loctext>
+				</description>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='stop' type='method' target='delegate'
+		    required='true'>
+			<description>
+				<loctext xml:lang='C'>
+The stop method defines how svc.startd should stop the instance.
+				</loctext>
+			</description>
+			<prop_pattern name='exec' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+method executable
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The method executable may be a script, program, or keyword.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name=':true'>
+						<description>
+							<loctext xml:lang='C'>
+Always returns SMF_EXIT_OK. This token should be used when the stop method is unnecessary for the particular service implementation.
+							</loctext>
+						</description>
+					</value>
+					<value name=':kill [-signal]'>
+						<description>
+							<loctext xml:lang='C'>
+Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common pkill invocations.
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+
+			<prop_pattern name='type' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+A method may only be of type method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+					<value name="method"/>
+				</constraints>
+			</prop_pattern>
+
+			<prop_pattern name='timeout_seconds' type='count'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name="0">
+						<common_name>
+							<loctext xml:lang='C'>
+infinite
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.
+							</loctext>
+						</description>
+					</value>
+					<value name="-1">
+						<common_name>
+							<loctext xml:lang='C'>
+infinite (legacy)
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.  0 is the preferred value.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+
+			<!-- method_context direct properties -->
+			<prop_pattern name='working_directory' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The working directory to launch the method from.  ":default" can be used as a token to indicate the home directory of the user specified by the credential or profile.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='project' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='resource_pool' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method context resource pool
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The resource pool name on which to launch the method.  :default can be used
+as a token to indicate the pool specified in the project(4) entry given in
+the project attribute.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_credential properties -->
+			<prop_pattern name='user' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential user
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The user ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='group' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential group
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The group ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='supp_groups' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential supplemental groups
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string that specifies the supplemental group memberships by ID,
+in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential privileges
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the privilege set as defined in privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='limit_privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential limit privilege set
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the limit privilege set as defined in
+privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+
+			<!-- method_profile properties -->
+			<prop_pattern name='use_profile' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+A boolean that specifies whether the profile should be used instead of the
+user, group, privileges, and limit_privileges properties.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='profile' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method profile RBAC profile specification 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The name of an RBAC (role-based access control) profile which, along with the
+method executable, identifies an entry in exec_attr(4).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_environment properties -->
+			<prop_pattern name='environment' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method environment variables
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Environment variables to insert into the environment of the method, in the
+form of a number of NAME=value strings.
+					</loctext>
+				</description>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='refresh' type='method' target='delegate'
+		    required='false'>
+			<description>
+				<loctext xml:lang='C'>
+The refresh method defines how svc.startd should upload new configuration to the service without interrupting its operation.
+				</loctext>
+			</description>
+			<prop_pattern name='exec' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+method executable
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The method executable may be a script, program, or keyword.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name=':true'>
+						<description>
+							<loctext xml:lang='C'>
+Always returns SMF_EXIT_OK.
+							</loctext>
+						</description>
+					</value>
+					<value name=':kill [-signal]'>
+						<description>
+							<loctext xml:lang='C'>
+Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common kill -HUP invocations.
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+
+			<prop_pattern name='type' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+A method may only be of type method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+					<value name="method"/>
+				</constraints>
+			</prop_pattern>
+
+			<prop_pattern name='timeout_seconds' type='count'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name="0">
+						<common_name>
+							<loctext xml:lang='C'>
+infinite
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.
+							</loctext>
+						</description>
+					</value>
+					<value name="-1">
+						<common_name>
+							<loctext xml:lang='C'>
+infinite (legacy)
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.  0 is the preferred value.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+
+			<!-- method_context direct properties -->
+			<prop_pattern name='working_directory' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The working directory to launch the method from.  ":default" can be used as a token to indicate the home directory of the user specified by the credential or profile.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='project' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='resource_pool' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method context resource pool
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The resource pool name on which to launch the method.  :default can be used
+as a token to indicate the pool specified in the project(4) entry given in
+the project attribute.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_credential properties -->
+			<prop_pattern name='user' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential user
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The user ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='group' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential group
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The group ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='supp_groups' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential supplemental groups
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string that specifies the supplemental group memberships by ID,
+in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential privileges
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the privilege set as defined in privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='limit_privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential limit privilege set
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the limit privilege set as defined in
+privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+
+			<!-- method_profile properties -->
+			<prop_pattern name='use_profile' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+A boolean that specifies whether the profile should be used instead of the
+user, group, privileges, and limit_privileges properties.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='profile' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method profile RBAC profile specification 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The name of an RBAC (role-based access control) profile which, along with the
+method executable, identifies an entry in exec_attr(4).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_environment properties -->
+			<prop_pattern name='environment' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method environment variables
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Environment variables to insert into the environment of the method, in the
+form of a number of NAME=value strings.
+					</loctext>
+				</description>
+			</prop_pattern>
+		</pg_pattern>
+
 	</template>
 </service>
 

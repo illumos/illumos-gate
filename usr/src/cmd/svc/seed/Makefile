@@ -21,7 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../Makefile.cmd
 
@@ -52,6 +51,7 @@ INSTALLSEED = $(ROOT)/usr/sadm/install
 COMMON_DESCRIPTIONS = \
 	../milestone/boot-archive.xml \
 	../milestone/devices-local.xml \
+	../milestone/global.xml \
 	../milestone/identity.xml \
 	../milestone/local-fs.xml \
 	../milestone/manifest-import.xml \

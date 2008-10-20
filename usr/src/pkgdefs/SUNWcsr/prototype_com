@@ -551,6 +551,7 @@ f manifest var/svc/manifest/system/system-log.xml 0444 root sys
 f manifest var/svc/manifest/system/utmp.xml 0444 root sys
 f manifest var/svc/manifest/system/vtdaemon.xml 0444 root sys
 d none var/svc/manifest/system/svc 755 root sys
+f manifest var/svc/manifest/system/svc/global.xml 0444 root sys
 f manifest var/svc/manifest/system/svc/restarter.xml 0444 root sys
 d none var/svc/profile 755 root sys
 f none var/svc/profile/generic_open.xml 0444 root sys

@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 MYPROG =	svccfg
 PROG =		$(MYPROG)
@@ -32,6 +31,7 @@ SRCS  =		svccfg_main.c \
 		svccfg_engine.c \
 		svccfg_internal.c \
 		svccfg_libscf.c \
+		svccfg_tmpl.c \
 		svccfg_xml.c \
 		svccfg_help.c
 

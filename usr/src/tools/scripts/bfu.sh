@@ -1826,6 +1826,22 @@ smf_fix_i86pc_profile () {
 	[[ -n "$rootprefix" ]] && unset SVCCFG_REPOSITORY
 }
 
+#
+# If the new system doesn't support the templates DTD extensions
+# (due to backwards bfu), the global.xml manifest should be deleted.
+#
+smf_bkbfu_templates() {
+	mfst="var/svc/manifest/system/svc/global.xml"
+
+	grep "pg_pattern" \
+	    $rootprefix/usr/share/lib/xml/dtd/service_bundle.dtd.1> \
+	    /dev/null 2>&1
+	if [ $? -eq 1 ]; then
+		rm -f $rootprefix/$mfst
+	fi
+
+}
+
 smf_apply_conf () {
 	#
 	# Go thru the original manifests and move any that were unchanged
@@ -2252,6 +2268,8 @@ EOF
 EOF
 
 	smf_fix_i86pc_profile
+
+	smf_bkbfu_templates
 }
 
 tx_check_update() {

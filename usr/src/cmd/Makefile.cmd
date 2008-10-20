@@ -270,6 +270,16 @@ ROOTMANIFESTDIR=	$(ROOTVARSVCMANIFEST)/__nonexistent_directory__
 ROOTMANIFEST=		$(MANIFEST:%=$(ROOTMANIFESTDIR)/%)
 CHKMANIFEST=		$(MANIFEST:%.xml=%.xmlchk)
 
+# Manifests cannot be checked in parallel, because we are using the global
+# repository that is in $(SRC)/cmd/svc/seed/global.db.  This is a
+# repository that is built from the manifests in this workspace, whereas
+# the build machine's repository may be out of sync with these manifests.
+# Because we are using a private repository, svccfg-native must start up a
+# private copy of configd-native.  We cannot have multiple copies of
+# configd-native trying to access global.db simultaneously.
+
+.NO_PARALLEL:	$(CHKMANIFEST)
+
 #
 # For installing "starter scripts" of services
 #

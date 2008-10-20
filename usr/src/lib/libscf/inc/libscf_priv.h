@@ -212,9 +212,6 @@ int scf_parse_file_fmri(char *fmri, const char **scope, const char **path);
 
 ssize_t scf_canonify_fmri(const char *, char *, size_t);
 
-const char *scf_type_to_string(scf_type_t);
-scf_type_t scf_string_to_type(const char *);
-
 int _smf_refresh_instance_i(scf_instance_t *);
 
 typedef struct scf_simple_handle {
@@ -398,11 +395,6 @@ int gen_filenms_from_fmri(const char *, const char *, char *, char *);
  *             (both) pv_aux is unused
  */
 typedef struct {
-	int64_t	st_sec;
-	int32_t	st_nanosec;
-} scf_time_t;
-
-typedef struct {
 	void	*so_addr;
 	size_t	so_size;
 } scf_opaque_t;
@@ -420,6 +412,112 @@ int scf_read_propvec(const char *, const char *, boolean_t, scf_propvec_t *,
     scf_propvec_t **);
 int scf_write_propvec(const char *, const char *, scf_propvec_t *,
     scf_propvec_t **);
+
+scf_tmpl_errors_t *_scf_create_errors(const char *, int);
+int _scf_tmpl_add_error(scf_tmpl_errors_t *errs, scf_tmpl_error_type_t type,
+    const char *pg_name, const char *prop_name,
+    const char *ev1, const char *ev2, const char *actual,
+    const char *tmpl_fmri, const char *tmpl_pg_name, const char *tmpl_pg_type,
+    const char *tmpl_prop_name, const char *tmpl_prop_type);
+int _scf_tmpl_error_set_prefix(scf_tmpl_errors_t *, const char *);
+
+/*
+ * Templates definitions
+ */
+
+/*
+ * For CARDINALITY_VIOLATION and RANGE_VIOLATION, te_ev1 holds
+ * the min value and te_ev2 holds the max value
+ *
+ * For MISSING_PG te_ev1 should hold the expected pg_name and
+ * expected2 holds the expected pg_type.
+ *
+ * For SCF_TERR_PG_PATTERN_CONFLICT and SCF_TERR_GENERAL_REDEFINE te_ev1 is
+ * the FMRI holding the conflicting pg_pattern.  te_ev2 is the name of the
+ * conflicting pg_pattern, and actual is the type of the conflicting
+ * pg_pattern.
+ *
+ * SCF_TERR_PROP_PATTERN_CONFLICT te_ev1 is the FMRI holding the
+ * conflicting prop_pattern.  te_ev2 is the name of the conflicting
+ * prop_pattern, and actual is the type of the conflicting prop_pattern.
+ *
+ * For SCF_TERR_INCLUDE_VALUES te_ev1 is the type specified for the
+ * include_values element.
+ *
+ * For all other errors, te_ev1 should hold the expected value and
+ * te_ev2 is ignored
+ *
+ * te_actual holds the current value of the property
+ */
+
+struct scf_tmpl_error {
+	scf_tmpl_errors_t		*te_errs;
+	scf_tmpl_error_type_t		te_type;
+	const char			*te_pg_name;
+	const char			*te_prop_name;
+	const char			*te_ev1;
+	const char			*te_ev2;
+	const char			*te_actual;
+	const char			*te_tmpl_fmri;
+	const char			*te_tmpl_pg_name;
+	const char			*te_tmpl_pg_type;
+	const char			*te_tmpl_prop_name;
+	const char			*te_tmpl_prop_type;
+};
+
+/*
+ * The pg_pattern element has two optional attributes that play a part in
+ * selecting the appropriate prefix for the name of the pg_pattern property
+ * group. The two attributes are name and type.  The appropriate prefix
+ * encodes the presence are absence of these attributes.
+ *
+ *	SCF_PG_TM_PG_PATTERN_PREFIX	neither attribute
+ *	SCF_PG_TM_PG_PATTERN_N_PREFIX	name only
+ *	SCF_PG_TM_PG_PATTERN_T_PREFIX	type only
+ *	SCF_PG_TM_PG_PATTERN_NT_PREFIX	both name and type
+ */
+#define	SCF_PG_TM_PG_PAT_BASE		"tm_pgpat"
+#define	SCF_PG_TM_PG_PATTERN_PREFIX	((const char *)SCF_PG_TM_PG_PAT_BASE \
+	"_")
+#define	SCF_PG_TM_PG_PATTERN_N_PREFIX	((const char *)SCF_PG_TM_PG_PAT_BASE \
+	"n_")
+#define	SCF_PG_TM_PG_PATTERN_T_PREFIX	((const char *)SCF_PG_TM_PG_PAT_BASE \
+	"t_")
+#define	SCF_PG_TM_PG_PATTERN_NT_PREFIX	((const char *)SCF_PG_TM_PG_PAT_BASE \
+	"nt_")
+#define	SCF_PG_TM_PROP_PATTERN_PREFIX	((const char *)"tm_proppat_")
+
+/*
+ * Pad character to use when encoding strings for property names.
+ */
+#define	SCF_ENCODE32_PAD		('-')
+
+/*
+ * Functions for base 32 encoding/decoding
+ */
+int scf_decode32(const char *, size_t, char *, size_t, size_t *, char);
+int scf_encode32(const char *, size_t, char *, size_t, size_t *, char);
+
+/*
+ * handy functions
+ */
+/*
+ * _scf_sanitize_locale
+ * Make sure a locale string has only alpha-numeric or '_' characters
+ */
+void _scf_sanitize_locale(char *);
+
+/*
+ * _scf_read_tmpl_prop_type_as_string()
+ * Handy function to get template property type as a string
+ */
+char *_scf_read_tmpl_prop_type_as_string(const scf_prop_tmpl_t *);
+/*
+ * _scf_read_single_astring_from_pg()
+ * Given a property group (pg) and a property name (pn), this function
+ * retrives an astring value from pg/pn.
+ */
+char *_scf_read_single_astring_from_pg(scf_propertygroup_t *, const char *);
 
 #ifdef	__cplusplus
 }

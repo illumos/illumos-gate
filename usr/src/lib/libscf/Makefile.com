@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libscf.a
@@ -32,6 +30,7 @@ OBJECTS = \
 	error.o			\
 	lowlevel.o		\
 	midlevel.o		\
+	scf_tmpl.o		\
 	scf_type.o
 
 include ../../Makefile.lib

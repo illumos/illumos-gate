@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * svcs - display attributes of service instances
  *
@@ -61,7 +59,6 @@
 #include <sys/stat.h>
 
 #include <assert.h>
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -127,6 +124,7 @@ int exit_status;
 ssize_t max_scf_name_length;
 ssize_t max_scf_value_length;
 ssize_t max_scf_fmri_length;
+static ssize_t max_scf_type_length;
 static time_t now;
 static struct pfmri_list *restarters = NULL;
 static int first_paragraph = 1;		/* For -l mode. */
@@ -200,14 +198,6 @@ safe_strdup(const char *str)
 		uu_die(gettext("Out of memory.\n"));
 
 	return (cp);
-}
-
-static void
-sanitize_locale(char *locale)
-{
-	for (; *locale != '\0'; locale++)
-		if (!isalnum(*locale))
-			*locale = '_';
 }
 
 /*
@@ -2123,6 +2113,143 @@ out:
 }
 
 static void
+print_application_properties(scf_walkinfo_t *wip, scf_snapshot_t *snap)
+{
+	scf_iter_t *pg_iter, *prop_iter, *val_iter;
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *val;
+	scf_pg_tmpl_t *pt;
+	scf_prop_tmpl_t *prt;
+	char *pg_name_buf = safe_malloc(max_scf_name_length + 1);
+	char *prop_name_buf = safe_malloc(max_scf_name_length + 1);
+	char *snap_name = safe_malloc(max_scf_name_length + 1);
+	char *val_buf = safe_malloc(max_scf_value_length + 1);
+	char *desc, *cp;
+	scf_type_t type;
+	int i, j, k;
+	uint8_t vis;
+
+	if ((pg_iter = scf_iter_create(h)) == NULL ||
+	    (prop_iter = scf_iter_create(h)) == NULL ||
+	    (val_iter = scf_iter_create(h)) == NULL ||
+	    (val = scf_value_create(h)) == NULL ||
+	    (prop = scf_property_create(h)) == NULL ||
+	    (pt = scf_tmpl_pg_create(h)) == NULL ||
+	    (prt = scf_tmpl_prop_create(h)) == NULL ||
+	    (pg = scf_pg_create(h)) == NULL)
+		scfdie();
+
+	if (scf_iter_instance_pgs_typed_composed(pg_iter, wip->inst, snap,
+	    SCF_PG_APP_DEFAULT) == -1)
+		scfdie();
+
+	/*
+	 * Format for output:
+	 *	pg (pgtype)
+	 *	 description
+	 *	pg/prop (proptype) = <value> <value>
+	 *	 description
+	 */
+	while ((i = scf_iter_next_pg(pg_iter, pg)) == 1) {
+		int tmpl = 0;
+
+		if (scf_pg_get_name(pg, pg_name_buf, max_scf_name_length) < 0)
+			scfdie();
+		if (scf_snapshot_get_name(snap, snap_name,
+		    max_scf_name_length) < 0)
+			scfdie();
+
+		if (scf_tmpl_get_by_pg_name(wip->fmri, snap_name, pg_name_buf,
+		    SCF_PG_APP_DEFAULT, pt, 0) == 0)
+			tmpl = 1;
+		else
+			tmpl = 0;
+
+		(void) printf("%s (%s)\n", pg_name_buf, SCF_PG_APP_DEFAULT);
+
+		if (tmpl == 1 && scf_tmpl_pg_description(pt, NULL, &desc) > 0) {
+			(void) printf("  %s\n", desc);
+			free(desc);
+		}
+
+		if (scf_iter_pg_properties(prop_iter, pg) == -1)
+			scfdie();
+		while ((j = scf_iter_next_property(prop_iter, prop)) == 1) {
+			if (scf_property_get_name(prop, prop_name_buf,
+			    max_scf_name_length) < 0)
+				scfdie();
+			if (scf_property_type(prop, &type) == -1)
+				scfdie();
+
+			if ((tmpl == 1) &&
+			    (scf_tmpl_get_by_prop(pt, prop_name_buf, prt,
+			    0) != 0))
+				tmpl = 0;
+
+			if (tmpl == 1 &&
+			    scf_tmpl_prop_visibility(prt, &vis) != -1 &&
+			    vis == SCF_TMPL_VISIBILITY_HIDDEN)
+				continue;
+
+			(void) printf("%s/%s (%s) = ", pg_name_buf,
+			    prop_name_buf, scf_type_to_string(type));
+
+			if (scf_iter_property_values(val_iter, prop) == -1)
+				scfdie();
+
+			while ((k = scf_iter_next_value(val_iter, val)) == 1) {
+				if (scf_value_get_as_string(val, val_buf,
+				    max_scf_value_length + 1) < 0)
+					scfdie();
+				if (strpbrk(val_buf, " \t\n\"()") != NULL) {
+					(void) printf("\"");
+					for (cp = val_buf; *cp != '\0'; ++cp) {
+						if (*cp == '"' || *cp == '\\')
+							(void) putc('\\',
+							    stdout);
+
+						(void) putc(*cp, stdout);
+					}
+					(void) printf("\"");
+				} else {
+					(void) printf("%s ", val_buf);
+				}
+			}
+
+			(void) printf("\n");
+
+			if (k == -1)
+				scfdie();
+
+			if (tmpl == 1 && scf_tmpl_prop_description(prt, NULL,
+			    &desc) > 0) {
+				(void) printf("  %s\n", desc);
+				free(desc);
+			}
+		}
+		if (j == -1)
+			scfdie();
+	}
+	if (i == -1)
+		scfdie();
+
+
+	scf_iter_destroy(pg_iter);
+	scf_iter_destroy(prop_iter);
+	scf_iter_destroy(val_iter);
+	scf_value_destroy(val);
+	scf_property_destroy(prop);
+	scf_tmpl_pg_destroy(pt);
+	scf_tmpl_prop_destroy(prt);
+	scf_pg_destroy(pg);
+	free(pg_name_buf);
+	free(prop_name_buf);
+	free(snap_name);
+	free(val_buf);
+}
+
+static void
 print_detailed_dependency(scf_propertygroup_t *pg)
 {
 	scf_property_t *eprop;
@@ -2404,11 +2531,16 @@ restarter_common:
 	if (ret == -1)
 		scfdie();
 
-	scf_snapshot_destroy(snap);
 	scf_iter_destroy(pg_iter);
 
 	if (opt_processes)
 		detailed_list_processes(wip);
+
+	/* "application" type property groups */
+	if (opt_verbose == 1)
+		print_application_properties(wip, snap);
+
+	scf_snapshot_destroy(snap);
 
 	return (0);
 }
@@ -2973,7 +3105,7 @@ main(int argc, char **argv)
 	locale = setlocale(LC_MESSAGES, "");
 	if (locale) {
 		locale = safe_strdup(locale);
-		sanitize_locale(locale);
+		_scf_sanitize_locale(locale);
 	}
 
 	(void) textdomain(TEXT_DOMAIN);
@@ -2984,9 +3116,10 @@ main(int argc, char **argv)
 	max_scf_name_length = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH);
 	max_scf_value_length = scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH);
 	max_scf_fmri_length = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH);
+	max_scf_type_length = scf_limit(SCF_LIMIT_MAX_PG_TYPE_LENGTH);
 
 	if (max_scf_name_length == -1 || max_scf_value_length == -1 ||
-	    max_scf_fmri_length == -1)
+	    max_scf_fmri_length == -1 || max_scf_type_length == -1)
 		scfdie();
 
 	now = time(NULL);
@@ -3054,8 +3187,6 @@ main(int argc, char **argv)
 			break;
 
 		case 'v':
-			if (opt_mode == 'l')
-				argserr(progname);
 			opt_verbose = 1;
 			break;
 

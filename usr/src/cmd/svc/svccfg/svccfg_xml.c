@@ -19,28 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <libxml/parser.h>
-#include <libxml/xinclude.h>
-
-#include <assert.h>
-#include <ctype.h>
-#include <errno.h>
-#include <libintl.h>
-#include <libuutil.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include "svccfg.h"
 
 /*
  * XML document manipulation routines
@@ -51,12 +32,67 @@
  * internal representation.
  */
 
+#include <libxml/parser.h>
+#include <libxml/xinclude.h>
+
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <libintl.h>
+#include <libscf.h>
+#include <libscf_priv.h>
+#include <libuutil.h>
+#include <sasl/saslutil.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "svccfg.h"
+
+/*
+ * snprintf(3C) format strings for constructing property names that include
+ * the locale designation.  Use %s to indicate where the locale should go.
+ *
+ * The VALUE_* symbols are an exception.  The firs %s will be replaced with
+ * "value_".  The second %s will be replaced by the name of the value and
+ * %%s will be replaced by the locale designation.  These formats are
+ * processed twice by snprintf(3C).  The first time captures the value name
+ * and the second time captures the locale.
+ */
+#define	LOCALE_ONLY_FMT		("%s")
+#define	COMMON_NAME_FMT		("common_name_%s")
+#define	DESCRIPTION_FMT		("description_%s")
+#define	UNITS_FMT		("units_%s")
+#define	VALUE_COMMON_NAME_FMT	("%s%s_common_name_%%s")
+#define	VALUE_DESCRIPTION_FMT	("%s%s_description_%%s")
+
+/* Attribute names */
 const char * const delete_attr = "delete";
 const char * const enabled_attr = "enabled";
+const char * const lang_attr = "lang";
+const char * const manpath_attr = "manpath";
+const char * const max_attr = "max";
+const char * const min_attr = "min";
 const char * const name_attr = "name";
 const char * const override_attr = "override";
+const char * const required_attr = "required";
+const char * const section_attr = "section";
+const char * const set_attr = "set";
+const char * const target_attr = "target";
+const char * const timeout_seconds_attr = "timeout_seconds";
+const char * const title_attr = "title";
 const char * const type_attr = "type";
+const char * const uri_attr = "uri";
 const char * const value_attr = "value";
+const char * const version_attr = "version";
+const char * const xml_lang_attr = "xml:lang";
+
+/* Attribute values */
+const char * const all_value = "all";
+
 const char * const true = "true";
 const char * const false = "false";
 
@@ -67,7 +103,10 @@ const char * const false = "false";
 static const char *lxml_elements[] = {
 	"astring_list",			/* SC_ASTRING */
 	"boolean_list",			/* SC_BOOLEAN */
+	"cardinality",			/* SC_CARDINALITY */
+	"choices",			/* SC_CHOICES */
 	"common_name",			/* SC_COMMON_NAME */
+	"constraints",			/* SC_CONSTRAINTS */
 	"count_list",			/* SC_COUNT */
 	"create_default_instance",	/* SC_INSTANCE_CREATE_DEFAULT */
 	"dependency",			/* SC_DEPENDENCY */
@@ -80,8 +119,10 @@ static const char *lxml_elements[] = {
 	"fmri_list",			/* SC_FMRI */
 	"host_list",			/* SC_HOST */
 	"hostname_list",		/* SC_HOSTNAME */
+	"include_values",		/* SC_INCLUDE_VALUES */
 	"instance",			/* SC_INSTANCE */
 	"integer_list",			/* SC_INTEGER */
+	"internal_separators",		/* SC_INTERNAL_SEPARATORS */
 	"loctext",			/* SC_LOCTEXT */
 	"manpage",			/* SC_MANPAGE */
 	"method_context",		/* SC_METHOD_CONTEXT */
@@ -92,9 +133,12 @@ static const char *lxml_elements[] = {
 	"net_address_v4_list",		/* SC_NET_ADDR_V4 */
 	"net_address_v6_list",		/* SC_NET_ADDR_V6 */
 	"opaque_list",			/* SC_OPAQUE */
+	"pg_pattern",			/* SC_PG_PATTERN */
+	"prop_pattern",			/* SC_PROP_PATTERN */
 	"property",			/* SC_PROPERTY */
 	"property_group",		/* SC_PROPERTY_GROUP */
 	"propval",			/* SC_PROPVAL */
+	"range",			/* SC_RANGE */
 	"restarter",			/* SC_RESTARTER */
 	"service",			/* SC_SERVICE */
 	"service_bundle",		/* SC_SERVICE_BUNDLE */
@@ -103,9 +147,13 @@ static const char *lxml_elements[] = {
 	"stability",			/* SC_STABILITY */
 	"template",			/* SC_TEMPLATE */
 	"time_list",			/* SC_TIME */
+	"units",			/* SC_UNITS */
 	"uri_list",			/* SC_URI */
 	"ustring_list",			/* SC_USTRING */
+	"value",			/* SC_VALUE */
 	"value_node",			/* SC_VALUE_NODE */
+	"values",			/* SC_VALUES */
+	"visibility",			/* SC_VISIBILITY */
 	"xi:fallback",			/* SC_XI_FALLBACK */
 	"xi:include"			/* SC_XI_INCLUDE */
 };
@@ -117,7 +165,10 @@ static const char *lxml_elements[] = {
 static const char *lxml_prop_types[] = {
 	"astring",			/* SC_ASTRING */
 	"boolean",			/* SC_BOOLEAN */
+	"",				/* SC_CARDINALITY */
+	"",				/* SC_CHOICES */
 	"",				/* SC_COMMON_NAME */
+	"",				/* SC_CONSTRAINTS */
 	"count",			/* SC_COUNT */
 	"",				/* SC_INSTANCE_CREATE_DEFAULT */
 	"",				/* SC_DEPENDENCY */
@@ -130,8 +181,10 @@ static const char *lxml_prop_types[] = {
 	"fmri",				/* SC_FMRI */
 	"host",				/* SC_HOST */
 	"hostname",			/* SC_HOSTNAME */
+	"",				/* SC_INCLUDE_VALUES */
 	"",				/* SC_INSTANCE */
 	"integer",			/* SC_INTEGER */
+	"",				/* SC_INTERNAL_SEPARATORS */
 	"",				/* SC_LOCTEXT */
 	"",				/* SC_MANPAGE */
 	"",				/* SC_METHOD_CONTEXT */
@@ -142,9 +195,12 @@ static const char *lxml_prop_types[] = {
 	"net_address_v4",		/* SC_NET_ADDR_V4 */
 	"net_address_v6",		/* SC_NET_ADDR_V6 */
 	"opaque",			/* SC_OPAQUE */
+	"",				/* SC_PG_PATTERN */
+	"",				/* SC_PROP_PATTERN */
 	"",				/* SC_PROPERTY */
 	"",				/* SC_PROPERTY_GROUP */
 	"",				/* SC_PROPVAL */
+	"",				/* SC_RANGE */
 	"",				/* SC_RESTARTER */
 	"",				/* SC_SERVICE */
 	"",				/* SC_SERVICE_BUNDLE */
@@ -153,10 +209,14 @@ static const char *lxml_prop_types[] = {
 	"",				/* SC_STABILITY */
 	"",				/* SC_TEMPLATE */
 	"time",				/* SC_TIME */
+	"",				/* SC_UNITS */
 	"uri",				/* SC_URI */
 	"ustring",			/* SC_USTRING */
-	""				/* SC_VALUE_NODE */
-	""				/* SC_XI_FALLBACK */
+	"",				/* SC_VALUE */
+	"",				/* SC_VALUE_NODE */
+	"",				/* SC_VALUES */
+	"",				/* SC_VISIBILITY */
+	"",				/* SC_XI_FALLBACK */
 	""				/* SC_XI_INCLUDE */
 };
 
@@ -280,6 +340,49 @@ lxml_element_to_scf_type(element_t type)
 	/* NOTREACHED */
 }
 
+/*
+ * Create a SCF_TYPE_BOOLEAN property name pname and attach it to the
+ * property group at pgrp.  The value of the property will be set from the
+ * attribute named attr.  attr must have a value of 0, 1, true or false.
+ *
+ * Zero is returned on success.  An error is indicated by -1.  It indicates
+ * that either the attribute had an invalid value or that we could not
+ * attach the property to pgrp.  The attribute should not have an invalid
+ * value if the DTD is correctly written.
+ */
+static int
+new_bool_prop_from_attr(pgroup_t *pgrp, const char *pname, xmlNodePtr n,
+    const char *attr)
+{
+	uint64_t bool;
+	xmlChar *val;
+	property_t *p;
+	int r;
+
+	val = xmlGetProp(n, (xmlChar *)attr);
+	if (val == NULL)
+		return (0);
+
+	if ((xmlStrcmp(val, (xmlChar *)"0") == 0) ||
+	    (xmlStrcmp(val, (xmlChar *)"false") == 0)) {
+		bool = 0;
+	} else if ((xmlStrcmp(val, (xmlChar *)"1") == 0) ||
+	    (xmlStrcmp(val, (xmlChar *)"true") == 0)) {
+		bool = 1;
+	} else {
+		xmlFree(val);
+		return (-1);
+	}
+	xmlFree(val);
+	p = internal_property_create(pname, SCF_TYPE_BOOLEAN, 1, bool);
+	r = internal_attach_property(pgrp, p);
+
+	if (r != 0)
+		internal_property_free(p);
+
+	return (r);
+}
+
 static int
 new_str_prop_from_attr(pgroup_t *pgrp, const char *pname, scf_type_t ty,
     xmlNodePtr n, const char *attr)
@@ -289,6 +392,39 @@ new_str_prop_from_attr(pgroup_t *pgrp, const char *pname, scf_type_t ty,
 	int r;
 
 	val = xmlGetProp(n, (xmlChar *)attr);
+
+	p = internal_property_create(pname, ty, 1, val);
+	r = internal_attach_property(pgrp, p);
+
+	if (r != 0)
+		internal_property_free(p);
+
+	return (r);
+}
+
+static int
+new_opt_str_prop_from_attr(pgroup_t *pgrp, const char *pname, scf_type_t ty,
+    xmlNodePtr n, const char *attr, const char *dflt)
+{
+	xmlChar *val;
+	property_t *p;
+	int r;
+
+	val = xmlGetProp(n, (xmlChar *)attr);
+	if (val == NULL) {
+		if (dflt == NULL) {
+			/*
+			 * A missing attribute is considered to be a
+			 * success in this function, because many of the
+			 * attributes are optional.  Missing non-optional
+			 * attributes will be detected later when template
+			 * validation is done.
+			 */
+			return (0);
+		} else {
+			val = (xmlChar *)dflt;
+		}
+	}
 
 	p = internal_property_create(pname, ty, 1, val);
 	r = internal_attach_property(pgrp, p);
@@ -446,12 +582,12 @@ lxml_get_propval(pgroup_t *pgrp, xmlNodePtr propval)
 	p = internal_property_new();
 
 	p->sc_property_name = (char *)xmlGetProp(propval, (xmlChar *)name_attr);
-	if (p->sc_property_name == NULL)
+	if ((p->sc_property_name == NULL) || (*p->sc_property_name == 0))
 		uu_die(gettext("property name missing in group '%s'\n"),
 		    pgrp->sc_pgroup_name);
 
 	type = xmlGetProp(propval, (xmlChar *)type_attr);
-	if (type == NULL)
+	if ((type == NULL) || (*type == 0))
 		uu_die(gettext("property type missing for property '%s/%s'\n"),
 		    pgrp->sc_pgroup_name, p->sc_property_name);
 
@@ -459,6 +595,7 @@ lxml_get_propval(pgroup_t *pgrp, xmlNodePtr propval)
 		if (xmlStrcmp(type, (const xmlChar *)lxml_prop_types[r]) == 0)
 			break;
 	}
+	xmlFree(type);
 	if (r >= sizeof (lxml_prop_types) / sizeof (char *))
 		uu_die(gettext("property type invalid for property '%s/%s'\n"),
 		    pgrp->sc_pgroup_name, p->sc_property_name);
@@ -471,6 +608,7 @@ lxml_get_propval(pgroup_t *pgrp, xmlNodePtr propval)
 		    pgrp->sc_pgroup_name, p->sc_property_name);
 
 	v = lxml_make_value(r, val);
+	xmlFree(val);
 	internal_attach_value(p, v);
 
 	override = xmlGetProp(propval, (xmlChar *)override_attr);
@@ -490,15 +628,17 @@ lxml_get_property(pgroup_t *pgrp, xmlNodePtr property)
 
 	p = internal_property_new();
 
-	if ((p->sc_property_name = (char *)xmlGetProp(property,
-	    (xmlChar *)name_attr)) == NULL)
+	if (((p->sc_property_name = (char *)xmlGetProp(property,
+	    (xmlChar *)name_attr)) == NULL) || (*p->sc_property_name == 0))
 		uu_die(gettext("property name missing in group \'%s\'\n"),
 		    pgrp->sc_pgroup_name);
 
-	if ((type = xmlGetProp(property, (xmlChar *)type_attr)) == NULL)
+	if (((type = xmlGetProp(property, (xmlChar *)type_attr)) == NULL) ||
+	    (*type == 0)) {
 		uu_die(gettext("property type missing for "
 		    "property \'%s/%s\'\n"), pgrp->sc_pgroup_name,
 		    p->sc_property_name);
+	}
 
 	for (r = 0; r < sizeof (lxml_prop_types) / sizeof (char *); r++) {
 		if (xmlStrcmp(type, (const xmlChar *)lxml_prop_types[r]) == 0)
@@ -674,8 +814,8 @@ lxml_get_envvar(xmlNodePtr envvar)
 	char *value;
 	char *ret;
 
-	name = (char *)xmlGetProp(envvar, (xmlChar *)"name");
-	value = (char *)xmlGetProp(envvar, (xmlChar *)"value");
+	name = (char *)xmlGetProp(envvar, (xmlChar *)name_attr);
+	value = (char *)xmlGetProp(envvar, (xmlChar *)value_attr);
 
 	if (strlen(name) == 0 || strchr(name, '=') != NULL)
 		uu_die(gettext("Invalid environment variable "
@@ -803,7 +943,7 @@ lxml_get_exec_method(entity_t *entity, xmlNodePtr emeth)
 	    emeth, "exec") != 0)
 		return (-1);
 
-	timeout = xmlGetProp(emeth, (xmlChar *)"timeout_seconds");
+	timeout = xmlGetProp(emeth, (xmlChar *)timeout_seconds_attr);
 	if (timeout != NULL) {
 		uint64_t u_timeout;
 		char *endptr;
@@ -1093,7 +1233,8 @@ lxml_get_entity_stability(entity_t *entity, xmlNodePtr rstr)
 	property_t *p;
 	xmlChar *stabval;
 
-	if ((stabval = xmlGetProp(rstr, (xmlChar *)value_attr)) == NULL) {
+	if (((stabval = xmlGetProp(rstr, (xmlChar *)value_attr)) == NULL) ||
+	    (*stabval == 0)) {
 		uu_warn(gettext("no stability value found\n"));
 		stabval = (xmlChar *)strdup("External");
 	}
@@ -1156,28 +1297,45 @@ lxml_get_restarter(entity_t *entity, xmlNodePtr rstr)
 	return (0);
 }
 
-static void
-sanitize_locale(uchar_t *locale)
-{
-	for (; *locale != '\0'; locale++)
-		if (!isalnum(*locale) && *locale != '_')
-			*locale = '_';
-}
-
+/*
+ * Add a property containing the localized text from the manifest.  The
+ * property is added to the property group at pg.  The name of the created
+ * property is based on the format at pn_format.  This is an snprintf(3C)
+ * format containing a single %s conversion specification.  At conversion
+ * time, the %s is replaced by the locale designation.
+ *
+ * source is the source element and it is only used for error messages.
+ */
 static int
-lxml_get_loctext(entity_t *service, pgroup_t *pg, xmlNodePtr loctext)
+lxml_get_loctext(entity_t *service, pgroup_t *pg, xmlNodePtr loctext,
+    const char *pn_format, const char *source)
 {
+	int extra;
 	xmlNodePtr cursor;
 	xmlChar *val;
 	char *stripped, *cp;
 	property_t *p;
+	char *prop_name;
 	int r;
 
-	if ((val = xmlGetProp(loctext, (xmlChar *)"xml:lang")) == NULL)
-		if ((val = xmlGetProp(loctext, (xmlChar *)"lang")) == NULL)
+	if (((val = xmlGetProp(loctext, (xmlChar *)xml_lang_attr)) == NULL) ||
+	    (*val == 0)) {
+		if (((val = xmlGetProp(loctext,
+		    (xmlChar *)lang_attr)) == NULL) || (*val == 0)) {
 			val = (xmlChar *)"unknown";
+		}
+	}
 
-	sanitize_locale(val);
+	_scf_sanitize_locale((char *)val);
+	prop_name = safe_malloc(max_scf_name_len + 1);
+	if ((extra = snprintf(prop_name, max_scf_name_len + 1, pn_format,
+	    val)) >= max_scf_name_len + 1) {
+		extra -= max_scf_name_len;
+		uu_die(gettext("%s attribute is %d characters too long for "
+		    "%s in %s\n"),
+		    xml_lang_attr, extra, source, service->sc_name);
+	}
+	xmlFree(val);
 
 	for (cursor = loctext->xmlChildrenNode; cursor != NULL;
 	    cursor = cursor->next) {
@@ -1207,45 +1365,54 @@ lxml_get_loctext(entity_t *service, pgroup_t *pg, xmlNodePtr loctext)
 		;
 	*(cp + 1) = '\0';
 
-	p = internal_property_create((const char *)val, SCF_TYPE_USTRING, 1,
+	p = internal_property_create(prop_name, SCF_TYPE_USTRING, 1,
 	    stripped);
 
 	r = internal_attach_property(pg, p);
-	if (r != 0)
+	if (r != 0) {
 		internal_property_free(p);
+		free(prop_name);
+	}
 
 	return (r);
 }
 
+/*
+ * This function processes all loctext elements in the current XML element
+ * designated by container.  A property is created for each loctext element
+ * and added to the property group at pg.  The name of the property is
+ * derived from the loctext language designation using the format at
+ * pn_format.  pn_format should be an snprintf format string containing one
+ * %s which is replaced by the language designation.
+ *
+ * The function returns 0 on success and -1 if it is unable to attach the
+ * newly created property to pg.
+ */
 static int
-lxml_get_tm_common_name(entity_t *service, xmlNodePtr common_name)
+lxml_get_all_loctext(entity_t *service, pgroup_t *pg, xmlNodePtr container,
+    const char *pn_format, const char *source)
 {
 	xmlNodePtr cursor;
-	pgroup_t *pg;
 
 	/*
-	 * Create the property group, if absent.
+	 * Iterate through one or more loctext elements.  The locale is
+	 * used to generate the property name; the contents are the ustring
+	 * value for the property.
 	 */
-	pg = internal_pgroup_find_or_create(service,
-	    (char *)SCF_PG_TM_COMMON_NAME, (char *)SCF_GROUP_TEMPLATE);
-
-	/*
-	 * Iterate through one or more loctext elements.  The locale is the
-	 * property name; the contents are the ustring value for the property.
-	 */
-	for (cursor = common_name->xmlChildrenNode; cursor != NULL;
+	for (cursor = container->xmlChildrenNode; cursor != NULL;
 	    cursor = cursor->next) {
 		if (lxml_ignorable_block(cursor))
 			continue;
 
 		switch (lxml_xlate_element(cursor->name)) {
 		case SC_LOCTEXT:
-			if (lxml_get_loctext(service, pg, cursor))
+			if (lxml_get_loctext(service, pg, cursor, pn_format,
+			    source))
 				return (-1);
 			break;
 		default:
-			uu_die(gettext("illegal element \"%s\" on common_name "
-			    "element for \"%s\"\n"), cursor->name,
+			uu_die(gettext("illegal element \"%s\" on %s element "
+			    "for \"%s\"\n"), cursor->name, container->name,
 			    service->sc_name);
 			break;
 		}
@@ -1254,41 +1421,170 @@ lxml_get_tm_common_name(entity_t *service, xmlNodePtr common_name)
 	return (0);
 }
 
+/*
+ * Obtain the specified cardinality attribute and place it in a property
+ * named prop_name.  The converted attribute is placed at *value, and the
+ * newly created property is returned to propp.  NULL is returned to propp
+ * if the attribute is not provided in the manifest.
+ *
+ * 0 is returned upon success, and -1 indicates that the manifest contained
+ * an invalid cardinality value.
+ */
 static int
-lxml_get_tm_description(entity_t *service, xmlNodePtr description)
+lxml_get_cardinality_attribute(entity_t *service, xmlNodePtr cursor,
+    const char *attr_name, const char *prop_name, uint64_t *value,
+    property_t **propp)
 {
-	xmlNodePtr cursor;
+	char *c;
+	property_t *p;
+	xmlChar *val;
+	uint64_t count;
+	char *endptr;
+
+	*propp = NULL;
+	val = xmlGetProp(cursor, (xmlChar *)attr_name);
+	if (val == NULL)
+		return (0);
+	if (*val == 0) {
+		xmlFree(val);
+		return (0);
+	}
+
+	/*
+	 * Make sure that the string at val doesn't have a leading minus
+	 * sign.  The strtoull() call below does not catch this problem.
+	 */
+	for (c = (char *)val; *c != 0; c++) {
+		if (isspace(*c))
+			continue;
+		if (isdigit(*c))
+			break;
+		semerr(gettext("\"%c\" is not a legal character in the %s "
+		    "attribute of the %s element in %s.\n"), *c,
+		    attr_name, prop_name, service->sc_name);
+		xmlFree(val);
+		return (-1);
+	}
+	errno = 0;
+	count = strtoull((char *)val, &endptr, 10);
+	if (errno != 0 || endptr == (char *)val || *endptr) {
+		semerr(gettext("\"%s\" is not a legal number for the %s "
+		    "attribute of the %s element in %s.\n"), (char *)val,
+		    attr_name, prop_name, service->sc_name);
+		xmlFree(val);
+		return (-1);
+	}
+
+	xmlFree(val);
+
+	/* Value is valid.  Create the property. */
+	p = internal_property_create(prop_name, SCF_TYPE_COUNT, 1, count);
+	*value = count;
+	*propp = p;
+	return (0);
+}
+
+/*
+ * The cardinality is specified by two attributes max and min at cursor.
+ * Both are optional, but if present they must be unsigned integers.
+ */
+static int
+lxml_get_tm_cardinality(entity_t *service, pgroup_t *pg, xmlNodePtr cursor)
+{
+	int min_attached = 0;
+	int compare = 1;
+	property_t *min_prop;
+	property_t *max_prop;
+	uint64_t max;
+	uint64_t min;
+	int r;
+
+	r = lxml_get_cardinality_attribute(service, cursor, min_attr,
+	    SCF_PROPERTY_TM_CARDINALITY_MIN, &min, &min_prop);
+	if (r != 0)
+		return (r);
+	if (min_prop == NULL)
+		compare = 0;
+	r = lxml_get_cardinality_attribute(service, cursor, max_attr,
+	    SCF_PROPERTY_TM_CARDINALITY_MAX, &max, &max_prop);
+	if (r != 0)
+		goto errout;
+	if ((max_prop != NULL) && (compare == 1)) {
+		if (max < min) {
+			semerr(gettext("Cardinality max is less than min for "
+			    "the %s element in %s.\n"), pg->sc_pgroup_name,
+			    service->sc_fmri);
+			goto errout;
+		}
+	}
+
+	/* Attach the properties to the property group. */
+	if (min_prop) {
+		if (internal_attach_property(pg, min_prop) == 0) {
+			min_attached = 1;
+		} else {
+			goto errout;
+		}
+	}
+	if (max_prop) {
+		if (internal_attach_property(pg, max_prop) != 0) {
+			if (min_attached)
+				internal_detach_property(pg, min_prop);
+			goto errout;
+		}
+	}
+	return (0);
+
+errout:
+	if (min_prop)
+		internal_property_free(min_prop);
+	if (max_prop)
+		internal_property_free(max_prop);
+	return (-1);
+}
+
+/*
+ * Get the common_name which is present as localized text at common_name in
+ * the manifest.  The common_name is stored as the value of a property in
+ * the property group whose name is SCF_PG_TM_COMMON_NAME and type is
+ * SCF_GROUP_TEMPLATE.  This property group will be created in service if
+ * it is not already there.
+ */
+static int
+lxml_get_tm_common_name(entity_t *service, xmlNodePtr common_name)
+{
 	pgroup_t *pg;
 
 	/*
 	 * Create the property group, if absent.
 	 */
-	pg = internal_pgroup_find_or_create(service,
-	    (char *)SCF_PG_TM_DESCRIPTION, (char *)SCF_GROUP_TEMPLATE);
+	pg = internal_pgroup_find_or_create(service, SCF_PG_TM_COMMON_NAME,
+	    SCF_GROUP_TEMPLATE);
+
+	return (lxml_get_all_loctext(service, pg, common_name, LOCALE_ONLY_FMT,
+	    "common_name"));
+}
+
+/*
+ * Get the description which is present as localized text at description in
+ * the manifest.  The description is stored as the value of a property in
+ * the property group whose name is SCF_PG_TM_DESCRIPTION and type is
+ * SCF_GROUP_TEMPLATE.  This property group will be created in service if
+ * it is not already there.
+ */
+static int
+lxml_get_tm_description(entity_t *service, xmlNodePtr description)
+{
+	pgroup_t *pg;
 
 	/*
-	 * Iterate through one or more loctext elements.  The locale is the
-	 * property name; the contents are the ustring value for the property.
+	 * Create the property group, if absent.
 	 */
-	for (cursor = description->xmlChildrenNode; cursor != NULL;
-	    cursor = cursor->next) {
-		if (lxml_ignorable_block(cursor))
-			continue;
+	pg = internal_pgroup_find_or_create(service, SCF_PG_TM_DESCRIPTION,
+	    SCF_GROUP_TEMPLATE);
 
-		switch (lxml_xlate_element(cursor->name)) {
-		case SC_LOCTEXT:
-			if (lxml_get_loctext(service, pg, cursor))
-				return (-1);
-			break;
-		default:
-			uu_die(gettext("illegal element \"%s\" on description "
-			    "element for \"%s\"\n"), cursor->name,
-			    service->sc_name);
-			break;
-		}
-	}
-
-	return (0);
+	return (lxml_get_all_loctext(service, pg, description,
+	    LOCALE_ONLY_FMT, "description"));
 }
 
 static char *
@@ -1329,6 +1625,108 @@ lxml_label_to_groupname(const char *prefix, const char *in)
 	return (out);
 }
 
+/*
+ * If *p is NULL, astring_prop_value() first creates a property with the
+ * name specified in prop_name.  The address of the newly created property
+ * is placed in *p.
+ *
+ * In either case, newly created property or existing property, a new
+ * SCF_TYPE_ASTRING value will created and attached to the property at *p.
+ * The value of the newly created property is prop_value.
+ *
+ * free_flag is used to indicate whether or not the memory at prop_value
+ * should be freed when the property is freed by a call to
+ * internal_property_free().
+ */
+static void
+astring_prop_value(property_t **p, const char *prop_name, char *prop_value,
+    boolean_t free_flag)
+{
+	value_t *v;
+
+	if (*p == NULL) {
+		/* Create the property */
+		*p = internal_property_new();
+		(*p)->sc_property_name = (char *)prop_name;
+		(*p)->sc_value_type = SCF_TYPE_ASTRING;
+	}
+
+	/* Add the property value to the property's list of values. */
+	v = internal_value_new();
+	v->sc_type = SCF_TYPE_ASTRING;
+	if (free_flag == B_TRUE)
+		v->sc_free = lxml_free_str;
+	v->sc_u.sc_string = prop_value;
+	internal_attach_value(*p, v);
+}
+
+/*
+ * If p points to a null pointer, create an internal_separators property
+ * saving the address at p.  For each character at seps create a property
+ * value and attach it to the property at p.
+ */
+static void
+seps_to_prop_values(property_t **p, xmlChar *seps)
+{
+	value_t *v;
+	char val_str[2];
+
+	if (*p == NULL) {
+		*p = internal_property_new();
+		(*p)->sc_property_name =
+		    (char *)SCF_PROPERTY_INTERNAL_SEPARATORS;
+		(*p)->sc_value_type = SCF_TYPE_ASTRING;
+	}
+
+	/* Add the values to the property's list. */
+	val_str[1] = 0;		/* Terminate the string. */
+	for (; *seps != 0; seps++) {
+		v = internal_value_new();
+		v->sc_type = (*p)->sc_value_type;
+		v->sc_free = lxml_free_str;
+		val_str[0] = *seps;
+		v->sc_u.sc_string = strdup(val_str);
+		if (v->sc_u.sc_string == NULL)
+			uu_die(gettext("Out of memory\n"));
+		internal_attach_value(*p, v);
+	}
+}
+
+/*
+ * Create an internal_separators property and attach it to the property
+ * group at pg.  The separator characters are provided in the text nodes
+ * that are the children of seps.  Each separator character is stored as a
+ * property value in the internal_separators property.
+ */
+static int
+lxml_get_tm_internal_seps(entity_t *service, pgroup_t *pg, xmlNodePtr seps)
+{
+	xmlNodePtr cursor;
+	property_t *prop = NULL;
+	int r;
+
+	for (cursor = seps->xmlChildrenNode; cursor != NULL;
+	    cursor = cursor->next) {
+		if (strcmp("text", (const char *)cursor->name) == 0) {
+			seps_to_prop_values(&prop, cursor->content);
+		} else if (strcmp("comment", (const char *)cursor->name) != 0) {
+			uu_die(gettext("illegal element \"%s\" on %s element "
+			    "for \"%s\"\n"), cursor->name, seps->name,
+			    service->sc_name);
+		}
+	}
+	if (prop == NULL) {
+		semerr(gettext("The %s element in %s had an empty list of "
+		    "separators.\n"), (const char *)seps->name,
+		    service->sc_name);
+		return (-1);
+	}
+	r = internal_attach_property(pg, prop);
+	if (r != 0)
+		internal_property_free(prop);
+	return (r);
+}
+
 static int
 lxml_get_tm_manpage(entity_t *service, xmlNodePtr manpage)
 {
@@ -1340,9 +1738,10 @@ lxml_get_tm_manpage(entity_t *service, xmlNodePtr manpage)
 	 * Fetch title attribute, convert to something sanitized, and create
 	 * property group.
 	 */
-	title = xmlGetProp(manpage, (xmlChar *)"title");
+	title = xmlGetProp(manpage, (xmlChar *)title_attr);
 	pgname = (char *)lxml_label_to_groupname(SCF_PG_TM_MAN_PREFIX,
 	    (const char *)title);
+	xmlFree(title);
 
 	pg = internal_pgroup_find_or_create(service, pgname,
 	    (char *)SCF_GROUP_TEMPLATE);
@@ -1350,12 +1749,12 @@ lxml_get_tm_manpage(entity_t *service, xmlNodePtr manpage)
 	/*
 	 * Each attribute is an astring property within the group.
 	 */
-	if (new_str_prop_from_attr(pg, "title", SCF_TYPE_ASTRING, manpage,
-	    "title") != 0 ||
-	    new_str_prop_from_attr(pg, "section", SCF_TYPE_ASTRING, manpage,
-	    "section") != 0 ||
-	    new_str_prop_from_attr(pg, "manpath", SCF_TYPE_ASTRING, manpage,
-	    "manpath") != 0)
+	if (new_str_prop_from_attr(pg, SCF_PROPERTY_TM_TITLE,
+	    SCF_TYPE_ASTRING, manpage, title_attr) != 0 ||
+	    new_str_prop_from_attr(pg, SCF_PROPERTY_TM_SECTION,
+	    SCF_TYPE_ASTRING, manpage, section_attr) != 0 ||
+	    new_str_prop_from_attr(pg, SCF_PROPERTY_TM_MANPATH,
+	    SCF_TYPE_ASTRING, manpage, manpath_attr) != 0)
 		return (-1);
 
 	return (0);
@@ -1372,21 +1771,22 @@ lxml_get_tm_doclink(entity_t *service, xmlNodePtr doc_link)
 	 * Fetch name attribute, convert name to something sanitized, and create
 	 * property group.
 	 */
-	name = xmlGetProp(doc_link, (xmlChar *)"name");
+	name = xmlGetProp(doc_link, (xmlChar *)name_attr);
 
 	pgname = (char *)lxml_label_to_groupname(SCF_PG_TM_DOC_PREFIX,
 	    (const char *)name);
 
 	pg = internal_pgroup_find_or_create(service, pgname,
 	    (char *)SCF_GROUP_TEMPLATE);
+	xmlFree(name);
 
 	/*
 	 * Each attribute is an astring property within the group.
 	 */
-	if (new_str_prop_from_attr(pg, "name", SCF_TYPE_ASTRING, doc_link,
-	    "name") != 0 ||
-	    new_str_prop_from_attr(pg, "uri", SCF_TYPE_ASTRING, doc_link,
-	    "uri") != 0)
+	if (new_str_prop_from_attr(pg, SCF_PROPERTY_TM_NAME, SCF_TYPE_ASTRING,
+	    doc_link, name_attr) != 0 ||
+	    new_str_prop_from_attr(pg, SCF_PROPERTY_TM_URI, SCF_TYPE_ASTRING,
+	    doc_link, uri_attr) != 0)
 		return (-1);
 
 	return (0);
@@ -1420,6 +1820,919 @@ lxml_get_tm_documentation(entity_t *service, xmlNodePtr documentation)
 }
 
 static int
+lxml_get_prop_pattern_attributes(pgroup_t *pg, xmlNodePtr cursor)
+{
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_TM_NAME,
+	    SCF_TYPE_ASTRING, cursor, name_attr, NULL) != 0) {
+		return (-1);
+	}
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_TM_TYPE,
+	    SCF_TYPE_ASTRING, cursor, type_attr, "") != 0) {
+		return (-1);
+	}
+	if (new_bool_prop_from_attr(pg, SCF_PROPERTY_TM_REQUIRED, cursor,
+	    required_attr) != 0)
+		return (-1);
+	return (0);
+}
+
+static int
+lxml_get_tm_include_values(entity_t *service, pgroup_t *pg,
+    xmlNodePtr include_values, const char *prop_name)
+{
+	boolean_t attach_to_pg = B_FALSE;
+	property_t *p;
+	int r = 0;
+	char *type;
+
+	/* Get the type attribute of the include_values element. */
+	type = (char *)xmlGetProp(include_values, (const xmlChar *)type_attr);
+	if ((type == NULL) || (*type == 0)) {
+		uu_die(gettext("%s element requires a %s attribute in the %s "
+		    "service.\n"), include_values->name, type_attr,
+		    service->sc_name);
+	}
+
+	/* Add the type to the values of the prop_name property. */
+	p = internal_property_find(pg, prop_name);
+	if (p == NULL)
+		attach_to_pg = B_TRUE;
+	astring_prop_value(&p, prop_name, type, B_FALSE);
+	if (attach_to_pg == B_TRUE) {
+		r = internal_attach_property(pg, p);
+		if (r != 0)
+			internal_property_free(p);
+	}
+	return (r);
+}
+
+#define	RC_MIN		0
+#define	RC_MAX		1
+#define	RC_COUNT	2
+
+/*
+ * Verify that the strings at min and max are valid numeric strings.  Also
+ * verify that max is numerically >= min.
+ *
+ * 0 is returned if the range is valid, and -1 is returned if it is not.
+ */
+static int
+verify_range(entity_t *service, xmlNodePtr range, char *min, char *max)
+{
+	char *c;
+	int i;
+	int is_signed = 0;
+	int inverted = 0;
+	const char *limit[RC_COUNT];
+	char *strings[RC_COUNT];
+	uint64_t urange[RC_COUNT];	/* unsigned range. */
+	int64_t srange[RC_COUNT];	/* signed range. */
+
+	strings[RC_MIN] = min;
+	strings[RC_MAX] = max;
+	limit[RC_MIN] = min_attr;
+	limit[RC_MAX] = max_attr;
+
+	/* See if the range is signed. */
+	for (i = 0; (i < RC_COUNT) && (is_signed == 0); i++) {
+		c = strings[i];
+		while (isspace(*c)) {
+			c++;
+		}
+		if (*c == '-')
+			is_signed = 1;
+	}
+
+	/* Attempt to convert the strings. */
+	for (i = 0; i < RC_COUNT; i++) {
+		errno = 0;
+		if (is_signed) {
+			srange[i] = strtoll(strings[i], &c, 0);
+		} else {
+			urange[i] = strtoull(strings[i], &c, 0);
+		}
+		if ((errno != 0) || (c == strings[i]) || (*c != 0)) {
+			/* Conversion failed. */
+			uu_die(gettext("Unable to convert %s for the %s "
+			    "element in service %s.\n"), limit[i],
+			    (char *)range->name, service->sc_name);
+		}
+	}
+
+	/* Make sure that min is <= max */
+	if (is_signed) {
+		if (srange[RC_MAX] < srange[RC_MIN])
+			inverted = 1;
+	} else {
+		if (urange[RC_MAX] < urange[RC_MIN])
+			inverted = 1;
+	}
+	if (inverted != 0) {
+		semerr(gettext("Maximum less than minimum for the %s element "
+		    "in service %s.\n"), (char *)range->name,
+		    service->sc_name);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * This, function creates a property named prop_name.  The range element
+ * should have two attributes -- min and max.  The property value then
+ * becomes the concatenation of their value separated by a comma.  The
+ * property is then attached to the property group at pg.
+ *
+ * If pg already contains a property with a name of prop_name, it is only
+ * necessary to create a new value and attach it to the existing property.
+ */
+static int
+lxml_get_tm_range(entity_t *service, pgroup_t *pg, xmlNodePtr range,
+    const char *prop_name)
+{
+	boolean_t attach_to_pg = B_FALSE;
+	char *max;
+	char *min;
+	property_t *p;
+	char *prop_value;
+	int r = 0;
+
+	/* Get max and min from the XML description. */
+	max = (char *)xmlGetProp(range, (xmlChar *)max_attr);
+	if ((max == NULL) || (*max == 0)) {
+		uu_die(gettext("%s element is missing the %s attribute in "
+		    "service %s.\n"), (char *)range->name, max_attr,
+		    service->sc_name);
+	}
+	min = (char *)xmlGetProp(range, (xmlChar *)min_attr);
+	if ((min == NULL) || (*min == 0)) {
+		uu_die(gettext("%s element is missing the %s attribute in "
+		    "service %s.\n"), (char *)range->name, min_attr,
+		    service->sc_name);
+	}
+	if (verify_range(service, range, min, max) != 0) {
+		xmlFree(min);
+		xmlFree(max);
+		return (-1);
+	}
+
+	/* Property value is concatenation of min and max. */
+	prop_value = safe_malloc(max_scf_value_len + 1);
+	if (snprintf(prop_value, max_scf_value_len + 1, "%s,%s", min, max) >=
+	    max_scf_value_len + 1) {
+		uu_die(gettext("min and max are too long for the %s element "
+		    "of %s.\n"), (char *)range->name, service->sc_name);
+	}
+	xmlFree(min);
+	xmlFree(max);
+
+	/*
+	 * If necessary create the property and attach it to the property
+	 * group.
+	 */
+	p = internal_property_find(pg, prop_name);
+	if (p == NULL)
+		attach_to_pg = B_TRUE;
+	astring_prop_value(&p, prop_name, prop_value, B_TRUE);
+	if (attach_to_pg == B_TRUE) {
+		r = internal_attach_property(pg, p);
+		if (r != 0) {
+			internal_property_free(p);
+		}
+	}
+	return (r);
+}
+
+/*
+ * Determine how many plain characters are represented by count Base32
+ * encoded characters.  5 plain text characters are converted to 8 Base32
+ * characters.
+ */
+static size_t
+encoded_count_to_plain(size_t count)
+{
+	return (5 * ((count + 7) / 8));
+}
+
+/*
+ * The value element contains 0 or 1 common_name element followed by 0 or 1
+ * description element.  It also has a required attribute called "name".
+ * The common_name and description are stored as property values in pg.
+ * The property names are:
+ *	value_<name>_common_name_<lang>
+ *	value_<name>_description_<lang>
+ *
+ * The <name> portion of the preceeding proper names requires more
+ * explanation.  Ideally it would just the name attribute of this value
+ * element.  Unfortunately, the name attribute can contain characters that
+ * are not legal in a property name.  Thus, we base 32 encode the name
+ * attribute and use that for <name>.
+ *
+ * There are cases where the caller needs to know the name, so it is
+ * returned through the name_value pointer if it is not NULL.
+ *
+ * Parameters:
+ *	service -	Information about the service that is being
+ *			processed.  This function only uses this parameter
+ *			for producing error messages.
+ *
+ *	pg -		The property group to receive the newly created
+ *			properties.
+ *
+ *	value -		Pointer to the value element in the XML tree.
+ *
+ *	name_value -	Address to receive the value of the name attribute.
+ *			The caller must free the memory.
+ */
+static int
+lxml_get_tm_value_element(entity_t *service, pgroup_t *pg, xmlNodePtr value,
+    char **name_value)
+{
+	char *common_name_fmt;
+	xmlNodePtr cursor;
+	char *description_fmt;
+	char *encoded_value = NULL;
+	size_t extra;
+	char *value_name;
+	int r = 0;
+
+	common_name_fmt = safe_malloc(max_scf_name_len + 1);
+	description_fmt = safe_malloc(max_scf_name_len + 1);
+
+	/*
+	 * Get the value of our name attribute, so that we can use it to
+	 * construct property names.
+	 */
+	value_name = (char *)xmlGetProp(value, (xmlChar *)name_attr);
+	/* The value name must be present, but it can be empty. */
+	if (value_name == NULL) {
+		uu_die(gettext("%s element requires a %s attribute in the %s "
+		    "service.\n"), (char *)value->name, name_attr,
+		    service->sc_name);
+	}
+
+	/*
+	 * The value_name may contain characters that are not valid in in a
+	 * property name.  So we will encode value_name and then use the
+	 * encoded value in the property name.
+	 */
+	encoded_value = safe_malloc(max_scf_name_len + 1);
+	if (scf_encode32(value_name, strlen(value_name), encoded_value,
+	    max_scf_name_len + 1, &extra, SCF_ENCODE32_PAD) != 0) {
+		extra = encoded_count_to_plain(extra - max_scf_name_len);
+		uu_die(gettext("Constructed property name is %u characters "
+		    "too long for value \"%s\" in the %s service.\n"),
+		    extra, value_name, service->sc_name);
+	}
+	if ((extra = snprintf(common_name_fmt, max_scf_name_len + 1,
+	    VALUE_COMMON_NAME_FMT, SCF_PROPERTY_TM_VALUE_PREFIX,
+	    encoded_value)) >= max_scf_name_len + 1) {
+		extra = encoded_count_to_plain(extra - max_scf_name_len);
+		uu_die(gettext("Name attribute is "
+		    "%u characters too long for %s in service %s\n"),
+		    extra, (char *)value->name, service->sc_name);
+	}
+	if ((extra = snprintf(description_fmt, max_scf_name_len + 1,
+	    VALUE_DESCRIPTION_FMT, SCF_PROPERTY_TM_VALUE_PREFIX,
+	    encoded_value)) >= max_scf_name_len + 1) {
+		extra = encoded_count_to_plain(extra - max_scf_name_len);
+		uu_die(gettext("Name attribute is "
+		    "%u characters too long for %s in service %s\n"),
+		    extra, (char *)value->name, service->sc_name);
+	}
+
+	for (cursor = value->xmlChildrenNode;
+	    cursor != NULL;
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_COMMON_NAME:
+			r = lxml_get_all_loctext(service, pg, cursor,
+			    common_name_fmt, (const char *)cursor->name);
+			break;
+		case SC_DESCRIPTION:
+			r = lxml_get_all_loctext(service, pg, cursor,
+			    description_fmt, (const char *)cursor->name);
+			break;
+		default:
+			uu_die(gettext("\"%s\" is an illegal element in %s "
+			    "of service %s\n"), (char *)cursor->name,
+			    (char *)value->name, service->sc_name);
+		}
+		if (r != 0)
+			break;
+	}
+
+	free(description_fmt);
+	free(common_name_fmt);
+	if (r == 0) {
+		*name_value = safe_strdup(value_name);
+	}
+	xmlFree(value_name);
+	free(encoded_value);
+	return (r);
+}
+
+static int
+lxml_get_tm_choices(entity_t *service, pgroup_t *pg, xmlNodePtr choices)
+{
+	xmlNodePtr cursor;
+	char *name_value;
+	property_t *name_prop = NULL;
+	int r = 0;
+
+	for (cursor = choices->xmlChildrenNode;
+	    (cursor != NULL) && (r == 0);
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_INCLUDE_VALUES:
+			(void) lxml_get_tm_include_values(service, pg, cursor,
+			    SCF_PROPERTY_TM_CHOICES_INCLUDE_VALUES);
+			break;
+		case SC_RANGE:
+			r = lxml_get_tm_range(service, pg, cursor,
+			    SCF_PROPERTY_TM_CHOICES_RANGE);
+			if (r != 0)
+				goto out;
+			break;
+		case SC_VALUE:
+			r = lxml_get_tm_value_element(service, pg, cursor,
+			    &name_value);
+			if (r == 0) {
+				/*
+				 * There is no need to free the memory
+				 * associated with name_value, because the
+				 * property value will end up pointing to
+				 * the memory.
+				 */
+				astring_prop_value(&name_prop,
+				    SCF_PROPERTY_TM_CHOICES_NAME, name_value,
+				    B_TRUE);
+			} else {
+				goto out;
+			}
+			break;
+		default:
+			uu_die(gettext("%s is an invalid element of "
+			    "choices for service %s.\n"),  cursor->name,
+			    service->sc_name);
+		}
+	}
+
+out:
+	/* Attach the name property if we created one. */
+	if ((r == 0) && (name_prop != NULL)) {
+		r = internal_attach_property(pg, name_prop);
+	}
+	if ((r != 0) && (name_prop != NULL)) {
+		internal_property_free(name_prop);
+	}
+
+	return (r);
+}
+
+static int
+lxml_get_tm_constraints(entity_t *service, pgroup_t *pg, xmlNodePtr constraints)
+{
+	xmlNodePtr cursor;
+	char *name_value;
+	property_t *name_prop = NULL;
+	int r = 0;
+
+	for (cursor = constraints->xmlChildrenNode;
+	    (cursor != NULL) && (r == 0);
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_RANGE:
+			r = lxml_get_tm_range(service, pg, cursor,
+			    SCF_PROPERTY_TM_CONSTRAINT_RANGE);
+			if (r != 0)
+				goto out;
+			break;
+		case SC_VALUE:
+			r = lxml_get_tm_value_element(service, pg, cursor,
+			    &name_value);
+			if (r == 0) {
+				/*
+				 * There is no need to free the memory
+				 * associated with name_value, because the
+				 * property value will end up pointing to
+				 * the memory.
+				 */
+				astring_prop_value(&name_prop,
+				    SCF_PROPERTY_TM_CONSTRAINT_NAME, name_value,
+				    B_TRUE);
+			} else {
+				goto out;
+			}
+			break;
+		default:
+			uu_die(gettext("%s is an invalid element of "
+			    "constraints for service %s.\n"),  cursor->name,
+			    service->sc_name);
+		}
+	}
+
+out:
+	/* Attach the name property if we created one. */
+	if ((r == 0) && (name_prop != NULL)) {
+		r = internal_attach_property(pg, name_prop);
+	}
+	if ((r != 0) && (name_prop != NULL)) {
+		internal_property_free(name_prop);
+	}
+
+	return (r);
+}
+
+/*
+ * The values element contains one or more value elements.
+ */
+static int
+lxml_get_tm_values(entity_t *service, pgroup_t *pg, xmlNodePtr values)
+{
+	xmlNodePtr cursor;
+	char *name_value;
+	property_t *name_prop = NULL;
+	int r = 0;
+
+	for (cursor = values->xmlChildrenNode;
+	    (cursor != NULL) && (r == 0);
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+		if (lxml_xlate_element(cursor->name) != SC_VALUE) {
+			uu_die(gettext("\"%s\" is an illegal element in the "
+			    "%s element of %s\n"), (char *)cursor->name,
+			    (char *)values->name, service->sc_name);
+		}
+		r = lxml_get_tm_value_element(service, pg, cursor, &name_value);
+		if (r == 0) {
+			/*
+			 * There is no need to free the memory
+			 * associated with name_value, because the
+			 * property value will end up pointing to
+			 * the memory.
+			 */
+			astring_prop_value(&name_prop,
+			    SCF_PROPERTY_TM_VALUES_NAME, name_value,
+			    B_TRUE);
+		}
+	}
+
+	/* Attach the name property if we created one. */
+	if ((r == 0) && (name_prop != NULL)) {
+		r = internal_attach_property(pg, name_prop);
+	}
+	if ((r != 0) && (name_prop != NULL)) {
+		internal_property_free(name_prop);
+	}
+
+	return (r);
+}
+
+/*
+ * This function processes a prop_pattern element within a pg_pattern XML
+ * element.  First it creates a property group to hold the prop_pattern
+ * information.  The name of this property group is the concatenation of:
+ *	- SCF_PG_TM_PROP_PATTERN_PREFIX
+ *	- The unique part of the property group name of the enclosing
+ *	  pg_pattern.  The property group name of the enclosing pg_pattern
+ *	  is passed to us in pgpat_name.  The unique part, is the part
+ *	  following SCF_PG_TM_PG_PATTERN_PREFIX.
+ *	- The name of this prop_pattern element.
+ *
+ * After creating the property group, the prop_pattern attributes are saved
+ * as properties in the PG.  Finally, the prop_pattern elements are
+ * processed and added to the PG.
+ */
+static int
+lxml_get_tm_prop_pattern(entity_t *service, xmlNodePtr prop_pattern,
+    const char *pgpat_name)
+{
+	xmlNodePtr cursor;
+	int extra;
+	pgroup_t *pg;
+	property_t *p;
+	char *pg_name;
+	size_t prefix_len;
+	xmlChar *prop_pattern_name;
+	int r;
+	const char *unique;
+	value_t *v;
+
+	/* Find the unique part of the pg_pattern property group name. */
+	prefix_len = strlen(SCF_PG_TM_PG_PAT_BASE);
+	assert(strncmp(pgpat_name, SCF_PG_TM_PG_PAT_BASE, prefix_len) == 0);
+	unique = pgpat_name + prefix_len;
+
+	/*
+	 * We need to get the value of the name attribute first.  The
+	 * prop_pattern name as well as the name of the enclosing
+	 * pg_pattern both constitute part of the name of the property
+	 * group that we will create.
+	 */
+	prop_pattern_name = xmlGetProp(prop_pattern, (xmlChar *)name_attr);
+	if ((prop_pattern_name == NULL) || (*prop_pattern_name == 0)) {
+		semerr(gettext("prop_pattern name is missing for %s\n"),
+		    service->sc_name);
+		return (-1);
+	}
+	if (uu_check_name((const char *)prop_pattern_name,
+	    UU_NAME_DOMAIN) != 0) {
+		semerr(gettext("prop_pattern name, \"%s\", for %s is not "
+		    "valid.\n"), prop_pattern_name, service->sc_name);
+		xmlFree(prop_pattern_name);
+		return (-1);
+	}
+	pg_name = safe_malloc(max_scf_name_len + 1);
+	if ((extra = snprintf(pg_name, max_scf_name_len + 1, "%s%s_%s",
+	    SCF_PG_TM_PROP_PATTERN_PREFIX, unique,
+	    (char *)prop_pattern_name)) >= max_scf_name_len + 1) {
+		uu_die(gettext("prop_pattern name, \"%s\", for %s is %d "
+		    "characters too long\n"), (char *)prop_pattern_name,
+		    service->sc_name, extra - max_scf_name_len);
+	}
+
+	/*
+	 * Create the property group, the property referencing the pg_pattern
+	 * name, and add the prop_pattern attributes to the property group.
+	 */
+	pg = internal_pgroup_create_strict(service, pg_name,
+	    SCF_GROUP_TEMPLATE_PROP_PATTERN);
+	if (pg == NULL) {
+		uu_die(gettext("Property group for prop_pattern, \"%s\", "
+		    "already exists in %s\n"), prop_pattern_name,
+		    service->sc_name);
+	}
+
+	p = internal_property_create(SCF_PROPERTY_TM_PG_PATTERN,
+	    SCF_TYPE_ASTRING, 1, safe_strdup(pgpat_name));
+	/*
+	 * Unfortunately, internal_property_create() does not set the free
+	 * function for the value, so we'll set it now.
+	 */
+	v = uu_list_first(p->sc_property_values);
+	v->sc_free = lxml_free_str;
+	if (internal_attach_property(pg, p) != 0)
+		internal_property_free(p);
+
+
+	r = lxml_get_prop_pattern_attributes(pg, prop_pattern);
+	if (r != 0)
+		goto out;
+
+	/*
+	 * Now process the elements of prop_pattern
+	 */
+	for (cursor = prop_pattern->xmlChildrenNode;
+	    cursor != NULL;
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_CARDINALITY:
+			r = lxml_get_tm_cardinality(service, pg, cursor);
+			if (r != 0)
+				goto out;
+			break;
+		case SC_CHOICES:
+			r = lxml_get_tm_choices(service, pg, cursor);
+			if (r != 0)
+				goto out;
+			break;
+		case SC_COMMON_NAME:
+			(void) lxml_get_all_loctext(service, pg, cursor,
+			    COMMON_NAME_FMT, (const char *)cursor->name);
+			break;
+		case SC_CONSTRAINTS:
+			r = lxml_get_tm_constraints(service, pg, cursor);
+			if (r != 0)
+				goto out;
+			break;
+		case SC_DESCRIPTION:
+			(void) lxml_get_all_loctext(service, pg, cursor,
+			    DESCRIPTION_FMT, (const char *)cursor->name);
+			break;
+		case SC_INTERNAL_SEPARATORS:
+			r = lxml_get_tm_internal_seps(service, pg, cursor);
+			if (r != 0)
+				goto out;
+			break;
+		case SC_UNITS:
+			(void) lxml_get_all_loctext(service, pg, cursor,
+			    UNITS_FMT, "units");
+			break;
+		case SC_VALUES:
+			(void) lxml_get_tm_values(service, pg, cursor);
+			break;
+		case SC_VISIBILITY:
+			/*
+			 * The visibility element is empty, so we only need
+			 * to proccess the value attribute.
+			 */
+			(void) new_str_prop_from_attr(pg,
+			    SCF_PROPERTY_TM_VISIBILITY, SCF_TYPE_ASTRING,
+			    cursor, value_attr);
+			break;
+		default:
+			uu_die(gettext("illegal element \"%s\" in prop_pattern "
+			    "for service \"%s\"\n"), cursor->name,
+			    service->sc_name);
+		}
+	}
+
+out:
+	xmlFree(prop_pattern_name);
+	free(pg_name);
+	return (r);
+}
+
+/*
+ * Get the pg_pattern attributes and save them as properties in the
+ * property group at pg.  The pg_pattern element accepts four attributes --
+ * name, type, required and target.
+ */
+static int
+lxml_get_pg_pattern_attributes(pgroup_t *pg, xmlNodePtr cursor)
+{
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_TM_NAME,
+	    SCF_TYPE_ASTRING, cursor, name_attr, NULL) != 0) {
+		return (-1);
+	}
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_TM_TYPE,
+	    SCF_TYPE_ASTRING, cursor, type_attr, NULL) != 0) {
+		return (-1);
+	}
+	if (new_opt_str_prop_from_attr(pg, SCF_PROPERTY_TM_TARGET,
+	    SCF_TYPE_ASTRING, cursor, target_attr, NULL) != 0) {
+		return (-1);
+	}
+	if (new_bool_prop_from_attr(pg, SCF_PROPERTY_TM_REQUIRED, cursor,
+	    required_attr) != 0)
+		return (-1);
+	return (0);
+}
+
+/*
+ * There are several restrictions on the pg_pattern attributes that cannot
+ * be specifed in the service bundle DTD.  This function verifies that
+ * those restrictions have been satisfied.  The restrictions are:
+ *
+ *	- The target attribute may have a value of "instance" only when the
+ *	  template block is in a service declaration.
+ *
+ *	- The target attribute may have a value of "delegate" only when the
+ *	  template block applies to a restarter.
+ *
+ *	- The target attribute may have a value of "all" only when the
+ *	  template block applies to the master restarter.
+ *
+ * The function returns 0 on success and -1 on failure.
+ */
+static int
+verify_pg_pattern_attributes(entity_t *s, pgroup_t *pg)
+{
+	int is_restarter;
+	property_t *target;
+	value_t *v;
+
+	/* Find the value of the target property. */
+	target = internal_property_find(pg, SCF_PROPERTY_TM_TARGET);
+	if (target == NULL) {
+		uu_die(gettext("pg_pattern is missing the %s attribute "
+		    "in %s\n"), target_attr, s->sc_name);
+		return (-1);
+	}
+	v = uu_list_first(target->sc_property_values);
+	assert(v != NULL);
+	assert(v->sc_type == SCF_TYPE_ASTRING);
+
+	/*
+	 * If target has a value of instance, the template must be in a
+	 * service object.
+	 */
+	if (strcmp(v->sc_u.sc_string, "instance") == 0) {
+		if (s->sc_etype != SVCCFG_SERVICE_OBJECT) {
+			uu_warn(gettext("pg_pattern %s attribute may only "
+			    "have a value of \"instance\" when it is in a "
+			    "service declaration.\n"), target_attr);
+			return (-1);
+		}
+	}
+
+	/*
+	 * If target has a value of "delegate", the template must be in a
+	 * restarter.
+	 */
+	if (strcmp(v->sc_u.sc_string, "delegate") == 0) {
+		is_restarter = 0;
+		if ((s->sc_etype == SVCCFG_SERVICE_OBJECT) &&
+		    (s->sc_u.sc_service.sc_service_type == SVCCFG_RESTARTER)) {
+			is_restarter = 1;
+		}
+		if ((s->sc_etype == SVCCFG_INSTANCE_OBJECT) &&
+		    (s->sc_parent->sc_u.sc_service.sc_service_type ==
+		    SVCCFG_RESTARTER)) {
+			is_restarter = 1;
+		}
+		if (is_restarter == 0) {
+			uu_warn(gettext("pg_pattern %s attribute has a "
+			    "value of \"delegate\" but is not in a "
+			    "restarter service\n"), target_attr);
+			return (-1);
+		}
+	}
+
+	/*
+	 * If target has a value of "all", the template must be in the
+	 * global (SCF_SERVICE_GLOBAL) service.
+	 */
+	if (strcmp(v->sc_u.sc_string, all_value) == 0) {
+		if (s->sc_etype != SVCCFG_SERVICE_OBJECT) {
+			uu_warn(gettext("pg_pattern %s attribute has a "
+			    "value of \"%s\" but is not in a "
+			    "service entity.\n"), target_attr, all_value);
+			return (-1);
+		}
+		if (strcmp(s->sc_fmri, SCF_SERVICE_GLOBAL) != 0) {
+			uu_warn(gettext("pg_pattern %s attribute has a "
+			    "value of \"%s\" but is in the \"%s\" service.  "
+			    "pg_patterns with target \"%s\" are only allowed "
+			    "in the global service.\n"),
+			    target_attr, all_value, s->sc_fmri, all_value);
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+static int
+lxml_get_tm_pg_pattern(entity_t *service, xmlNodePtr pg_pattern)
+{
+	xmlNodePtr cursor;
+	int out_len;
+	xmlChar *name;
+	pgroup_t *pg = NULL;
+	char *pg_name;
+	int r = -1;
+	xmlChar *type;
+
+	pg_name = safe_malloc(max_scf_name_len + 1);
+
+	/*
+	 * Get the name and type attributes.  Their presence or absence
+	 * determines whcih prefix we will use for the property group name.
+	 * There are four cases -- neither attribute is present, both are
+	 * present, only name is present or only type is present.
+	 */
+	name = xmlGetProp(pg_pattern, (xmlChar *)name_attr);
+	type = xmlGetProp(pg_pattern, (xmlChar *)type_attr);
+	if ((name == NULL) || (*name == 0)) {
+		if ((type == NULL) || (*type == 0)) {
+			/* PG name contains only the prefix in this case */
+			if (strlcpy(pg_name, SCF_PG_TM_PG_PATTERN_PREFIX,
+			    max_scf_name_len + 1) >= max_scf_name_len + 1) {
+				uu_die(gettext("Unable to create pg_pattern "
+				    "property for %s\n"), service->sc_name);
+			}
+		} else {
+			/*
+			 * If we have a type and no name, the type becomes
+			 * part of the pg_pattern property group name.
+			 */
+			if ((out_len = snprintf(pg_name, max_scf_name_len + 1,
+			    "%s%s", SCF_PG_TM_PG_PATTERN_T_PREFIX, type)) >=
+			    max_scf_name_len + 1) {
+				uu_die(gettext("pg_pattern type is for %s is "
+				    "%d bytes too long\n"), service->sc_name,
+				    out_len - max_scf_name_len);
+			}
+		}
+	} else {
+		const char *prefix;
+
+		/* Make sure that the name is valid. */
+		if (uu_check_name((const char *)name, UU_NAME_DOMAIN) != 0) {
+			semerr(gettext("pg_pattern name attribute, \"%s\", "
+			    "for %s is invalid\n"), name, service->sc_name);
+			goto out;
+		}
+
+		/*
+		 * As long as the pg_pattern has a name, it becomes part of
+		 * the name of the pg_pattern property group name.  We
+		 * merely need to pick the appropriate prefix.
+		 */
+		if ((type == NULL) || (*type == 0)) {
+			prefix = SCF_PG_TM_PG_PATTERN_N_PREFIX;
+		} else {
+			prefix = SCF_PG_TM_PG_PATTERN_NT_PREFIX;
+		}
+		if ((out_len = snprintf(pg_name, max_scf_name_len + 1, "%s%s",
+		    prefix, name)) >= max_scf_name_len + 1) {
+			uu_die(gettext("pg_pattern property group name "
+			    "for %s is %d bytes too long\n"), service->sc_name,
+			    out_len - max_scf_name_len);
+		}
+	}
+
+	/*
+	 * Create the property group for holding this pg_pattern
+	 * information, and capture the pg_pattern attributes.
+	 */
+	pg = internal_pgroup_create_strict(service, pg_name,
+	    SCF_GROUP_TEMPLATE_PG_PATTERN);
+	if (pg == NULL) {
+		if ((name == NULL) || (*name == 0)) {
+			if ((type == NULL) ||(*type == 0)) {
+				semerr(gettext("pg_pattern with empty name and "
+				    "type is not unique in %s\n"),
+				    service->sc_name);
+			} else {
+				semerr(gettext("pg_pattern with empty name and "
+				    "type \"%s\" is not unique in %s\n"),
+				    type, service->sc_name);
+			}
+		} else {
+			if ((type == NULL) || (*type == 0)) {
+				semerr(gettext("pg_pattern with name \"%s\" "
+				    "and empty type is not unique in %s\n"),
+				    name, service->sc_name);
+			} else {
+				semerr(gettext("pg_pattern with name \"%s\" "
+				    "and type \"%s\" is not unique in %s\n"),
+				    name, type, service->sc_name);
+			}
+		}
+		goto out;
+	}
+
+	/*
+	 * Get the pg_pattern attributes from the manifest and verify
+	 * that they satisfy our restrictions.
+	 */
+	r = lxml_get_pg_pattern_attributes(pg, pg_pattern);
+	if (r != 0)
+		goto out;
+	if (verify_pg_pattern_attributes(service, pg) != 0) {
+		semerr(gettext("Invalid pg_pattern attributes in %s\n"),
+		    service->sc_name);
+		r = -1;
+		goto out;
+	}
+
+	/*
+	 * Now process all of the elements of pg_pattern.
+	 */
+	for (cursor = pg_pattern->xmlChildrenNode;
+	    cursor != NULL;
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+
+		switch (lxml_xlate_element(cursor->name)) {
+		case SC_COMMON_NAME:
+			(void) lxml_get_all_loctext(service, pg, cursor,
+			    COMMON_NAME_FMT, (const char *)cursor->name);
+			break;
+		case SC_DESCRIPTION:
+			(void) lxml_get_all_loctext(service, pg, cursor,
+			    DESCRIPTION_FMT, (const char *)cursor->name);
+			break;
+		case SC_PROP_PATTERN:
+			r = lxml_get_tm_prop_pattern(service, cursor,
+			    pg_name);
+			if (r != 0)
+				goto out;
+			break;
+		default:
+			uu_die(gettext("illegal element \"%s\" in pg_pattern "
+			    "for service \"%s\"\n"), cursor->name,
+			    service->sc_name);
+		}
+	}
+
+out:
+	if ((r != 0) && (pg != NULL)) {
+		internal_detach_pgroup(service, pg);
+		internal_pgroup_free(pg);
+	}
+	free(pg_name);
+	xmlFree(name);
+	xmlFree(type);
+
+	return (r);
+}
+
+static int
 lxml_get_template(entity_t *service, xmlNodePtr templ)
 {
 	xmlNodePtr cursor;
@@ -1438,6 +2751,10 @@ lxml_get_template(entity_t *service, xmlNodePtr templ)
 			break;
 		case SC_DOCUMENTATION:
 			(void) lxml_get_tm_documentation(service, cursor);
+			break;
+		case SC_PG_PATTERN:
+			if (lxml_get_tm_pg_pattern(service, cursor) != 0)
+				return (-1);
 			break;
 		default:
 			uu_die(gettext("illegal element \"%s\" on template "
@@ -1581,7 +2898,8 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, svccfg_op_t op)
 			(void) lxml_get_pgroup(i, cursor);
 			break;
 		case SC_TEMPLATE:
-			(void) lxml_get_template(i, cursor);
+			if (lxml_get_template(i, cursor) != 0)
+				return (-1);
 			break;
 		default:
 			uu_die(gettext(
@@ -1636,7 +2954,7 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 	s = internal_service_new((char *)xmlGetProp(svc,
 	    (xmlChar *)name_attr));
 
-	version = xmlGetProp(svc, (xmlChar *)"version");
+	version = xmlGetProp(svc, (xmlChar *)version_attr);
 	s->sc_u.sc_service.sc_service_version = atol((const char *)version);
 	xmlFree(version);
 
@@ -1664,10 +2982,12 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 
 		switch (e) {
 		case SC_INSTANCE:
-			(void) lxml_get_instance(s, cursor, op);
+			if (lxml_get_instance(s, cursor, op) != 0)
+				return (-1);
 			break;
 		case SC_TEMPLATE:
-			(void) lxml_get_template(s, cursor);
+			if (lxml_get_template(s, cursor) != 0)
+				return (-1);
 			break;
 		case SC_STABILITY:
 			(void) lxml_get_entity_stability(s, cursor);
@@ -1741,7 +3061,7 @@ lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
 	/*
 	 * 1.  Get bundle attributes.
 	 */
-	type = xmlGetProp(subbundle, (xmlChar *)"type");
+	type = xmlGetProp(subbundle, (xmlChar *)type_attr);
 	bundle->sc_bundle_type = lxml_xlate_bundle_type(type);
 	if (bundle->sc_bundle_type != bundle_type &&
 	    bundle_type != SVCCFG_UNKNOWN_BUNDLE) {
@@ -1772,8 +3092,8 @@ lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
 		break;
 	}
 
-	if ((bundle->sc_bundle_name = xmlGetProp(subbundle,
-	    (xmlChar *)"name")) == NULL) {
+	if (((bundle->sc_bundle_name = xmlGetProp(subbundle,
+	    (xmlChar *)name_attr)) == NULL) || (*bundle->sc_bundle_name == 0)) {
 		semerr(gettext("service bundle lacks name attribute\n"));
 		return (-1);
 	}
@@ -1797,7 +3117,8 @@ lxml_get_bundle(bundle_t *bundle, bundle_type_t bundle_type,
 				return (-1);
 			break;
 		case SC_SERVICE:
-			(void) lxml_get_service(bundle, cursor, op);
+			if (lxml_get_service(bundle, cursor, op) != 0)
+				return (-1);
 			break;
 		}
 	}

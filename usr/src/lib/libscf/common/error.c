@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libscf_impl.h"
 
 #include <assert.h>
@@ -67,6 +65,7 @@ static struct scf_error_info {
 	{SCF_ERROR_HANDLE_DESTROYED,	"object bound to destroyed handle"},
 	{SCF_ERROR_VERSION_MISMATCH,	"incompatible SCF version"},
 	{SCF_ERROR_DELETED,		"object has been deleted"},
+	{SCF_ERROR_TEMPLATE_INVALID,	"template data is invalid"},
 
 	{SCF_ERROR_CALLBACK_FAILED,	"user callback function failed"},
 

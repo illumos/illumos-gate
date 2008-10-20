@@ -220,6 +220,7 @@ static struct cmd_info {
 	{ "setprop", CS_SVC | CS_INST, NULL },
 	{ "delprop", CS_SVC | CS_INST, NULL },
 	{ "editprop", CS_SVC | CS_INST, NULL },
+	{ "describe", CS_SVC | CS_INST | CS_SNAP, NULL },
 	{ "listsnap", CS_INST | CS_SNAP, NULL },
 	{ "selectsnap", CS_INST | CS_SNAP, NULL },
 	{ "revert", CS_INST | CS_SNAP, NULL },
@@ -511,8 +512,10 @@ engine_import(uu_list_t *args)
 	uchar_t hash[MHASH_SIZE];
 	char **argv;
 	string_list_t *slp;
-	boolean_t verify = B_FALSE;
+	boolean_t validate = B_FALSE;
+	tmpl_validate_status_t vr;
 	uint_t flags = SCI_GENERALLAST;
+	tmpl_errors_t *errs;
 
 	argc = uu_list_numnodes(args);
 	if (argc < 1)
@@ -542,7 +545,7 @@ engine_import(uu_list_t *args)
 			break;
 
 		case 'V':
-			verify = B_TRUE;
+			validate = B_TRUE;
 			break;
 
 		case '?':
@@ -563,11 +566,20 @@ engine_import(uu_list_t *args)
 	file = argv[optind];
 	free(argv);
 
+	/* If we're in interactive mode, force strict validation. */
+	if (est->sc_cmd_flags & SC_CMD_IACTIVE)
+		validate = B_TRUE;
+
 	lscf_prep_hndl();
 
 	ret = mhash_test_file(g_hndl, file, 0, &pname, hash);
-	if (ret != MHASH_NEWFILE)
+	if (ret != MHASH_NEWFILE) {
+		if (ret == MHASH_FAILURE)
+			semerr(gettext("Could not hash file %s\n"), file);
+		else if (g_verbose && ret == MHASH_RECONCILED)
+			warn(gettext("No changes were necessary.\n"));
 		return (ret);
+	}
 
 	/* Load */
 	b = internal_bundle_new();
@@ -577,9 +589,28 @@ engine_import(uu_list_t *args)
 		return (-1);
 	}
 
+	/* Validate */
+	if ((vr = tmpl_validate_bundle(b, &errs)) != TVS_SUCCESS) {
+		char *prefix;
+
+		if ((validate == 0) || (vr == TVS_WARN)) {
+			prefix = gettext("Warning: ");
+		} else {
+			prefix = "";
+		}
+		tmpl_errors_print(stderr, errs, prefix);
+		if (validate && (vr != TVS_WARN)) {
+			tmpl_errors_destroy(errs);
+			semerr(gettext("Import failed.\n"));
+			return (-1);
+		}
+	}
+	tmpl_errors_destroy(errs);
+
 	/* Import */
 	if (lscf_bundle_import(b, file, flags) != 0) {
 		internal_bundle_free(b);
+		semerr(gettext("Import failed.\n"));
 		return (-1);
 	}
 
@@ -601,10 +632,6 @@ engine_import(uu_list_t *args)
 
 		free(pname);
 	}
-
-	/* Verify */
-	if (verify)
-		warn(gettext("import -V not implemented.\n"));
 
 	return (0);
 }
@@ -731,7 +758,8 @@ help(int com)
 		    "Manifest commands:	 inventory validate import export "
 		    "archive\n"
 		    "Profile commands:	 apply extract\n"
-		    "Entity commands:	 list select unselect add delete\n"
+		    "Entity commands:	 list select unselect add delete "
+		    "describe\n"
 		    "Snapshot commands:	 listsnap selectsnap revert\n"
 		    "Instance commands:	 refresh\n"
 		    "Property group commands: listpg addpg delpg\n"

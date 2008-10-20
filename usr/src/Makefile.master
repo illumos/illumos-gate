@@ -228,6 +228,8 @@ DOT_C_CHECK=	\
 MANIFEST_CHECK=	\
 	@$(ECHO) "checking $<"; \
 	SVCCFG_DTD=$(SRC)/cmd/svc/dtd/service_bundle.dtd.1 \
+	SVCCFG_REPOSITORY=$(SRC)/cmd/svc/seed/global.db \
+	SVCCFG_CONFIGD_PATH=$(SRC)/cmd/svc/configd/svc.configd-native \
 	$(SRC)/cmd/svc/svccfg/svccfg-native validate $<
 
 INS.file=	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $<

@@ -32,12 +32,14 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <inttypes.h>
 #include <libintl.h>
 #include <libscf.h>
 #include <libscf_priv.h>
 #include <libtecla.h>
 #include <libuutil.h>
 #include <limits.h>
+#include <locale.h>
 #include <stdarg.h>
 #include <string.h>
 #include <strings.h>
@@ -63,6 +65,13 @@
 #define	HASH_PG_FLAGS		0
 #define	HASH_PROP		"md5sum"
 
+/*
+ * Indentation used in the output of the describe subcommand.
+ */
+#define	TMPL_VALUE_INDENT	"  "
+#define	TMPL_INDENT		"    "
+#define	TMPL_INDENT_2X		"        "
+#define	TMPL_CHOICE_INDENT	"      "
 
 /*
  * These are the classes of elements which may appear as children of service
@@ -127,7 +136,6 @@ const char * const snap_initial = "initial";
 const char * const snap_lastimport = "last-import";
 const char * const snap_previous = "previous";
 const char * const snap_running = "running";
-
 
 scf_handle_t *g_hndl = NULL;	/* only valid after lscf_prep_hndl() */
 
@@ -359,6 +367,21 @@ entity_destroy(void *ent, int issvc)
 		scf_service_destroy(ent);
 	else
 		scf_instance_destroy(ent);
+}
+
+static int
+get_pg(const char *pg_name, scf_propertygroup_t *pg)
+{
+	int ret;
+
+	if (cur_level != NULL)
+		ret = scf_snaplevel_get_pg(cur_level, pg_name, pg);
+	else if (cur_inst != NULL)
+		ret = scf_instance_get_pg(cur_inst, pg_name, pg);
+	else
+		ret = scf_service_get_pg(cur_svc, pg_name, pg);
+
+	return (ret);
 }
 
 /*
@@ -5805,7 +5828,12 @@ lscf_service_import(void *v, void *pvt)
 	}
 
 	/* create temporary service */
-	r = snprintf(imp_tsname, max_scf_name_len + 1, "TEMP/%s", s->sc_name);
+	/*
+	 * the size of the buffer was reduced to max_scf_name_len to prevent
+	 * hitting bug 6681151.  After the bug fix, the size of the buffer
+	 * should be restored to its original value (max_scf_name_len +1)
+	 */
+	r = snprintf(imp_tsname, max_scf_name_len, "TEMP/%s", s->sc_name);
 	if (r < 0)
 		bad_error("snprintf", errno);
 	if (r > max_scf_name_len) {
@@ -9419,6 +9447,152 @@ select_callback(void *unused, scf_walkinfo_t *wip)
 	return (0);
 }
 
+static int
+validate_callback(void *fmri_p, scf_walkinfo_t *wip)
+{
+	char **fmri = fmri_p;
+
+	*fmri = strdup(wip->fmri);
+	if (*fmri == NULL)
+		uu_die(gettext("Out of memory.\n"));
+
+	return (0);
+}
+
+/*
+ * validate [fmri]
+ * Perform the validation of an FMRI instance.
+ */
+void
+lscf_validate_fmri(const char *fmri)
+{
+	int ret = 0;
+	size_t inst_sz;
+	char *inst_fmri = NULL;
+	scf_tmpl_errors_t *errs = NULL;
+	char *snapbuf = NULL;
+
+	lscf_prep_hndl();
+
+	if (fmri == NULL) {
+		inst_sz = max_scf_fmri_len + 1;
+		inst_fmri = safe_malloc(inst_sz);
+
+		if (cur_snap != NULL) {
+			snapbuf = safe_malloc(max_scf_name_len + 1);
+			if (scf_snapshot_get_name(cur_snap, snapbuf,
+			    max_scf_name_len + 1) < 0)
+				scfdie();
+		}
+		if (cur_inst == NULL) {
+			semerr(gettext("No instance selected\n"));
+			goto cleanup;
+		} else if (scf_instance_to_fmri(cur_inst, inst_fmri,
+		    inst_sz) >= inst_sz) {
+			/* sanity check. Should never get here */
+			uu_die(gettext("Unexpected error! file %s, line %d\n"),
+			    __FILE__, __LINE__);
+		}
+	} else {
+		scf_error_t scf_err;
+		int err = 0;
+
+		if ((scf_err = scf_walk_fmri(g_hndl, 1, (char **)&fmri, 0,
+		    validate_callback, &inst_fmri, &err, semerr)) != 0) {
+			uu_warn("Failed to walk instances: %s\n",
+			    scf_strerror(scf_err));
+			goto cleanup;
+		}
+		if (err != 0)
+			/* error message displayed by scf_walk_fmri */
+			goto cleanup;
+	}
+
+	ret = scf_tmpl_validate_fmri(g_hndl, inst_fmri, snapbuf, &errs,
+	    SCF_TMPL_VALIDATE_FLAG_CURRENT);
+	if (ret == -1) {
+		if (scf_error() == SCF_ERROR_TEMPLATE_INVALID) {
+			warn(gettext("Template data for %s is invalid. "
+			    "Consider reverting to a previous snapshot or "
+			    "restoring original configuration.\n"), inst_fmri);
+		} else {
+			uu_warn("%s: %s\n",
+			    gettext("Error validating the instance"),
+			    scf_strerror(scf_error()));
+		}
+	} else if (ret == 1 && errs != NULL) {
+		scf_tmpl_error_t *err = NULL;
+		char *msg;
+		size_t len = 256;	/* initial error buffer size */
+		int flag = (est->sc_cmd_flags & SC_CMD_IACTIVE) ?
+		    SCF_TMPL_STRERROR_HUMAN : 0;
+
+		msg = safe_malloc(len);
+
+		while ((err = scf_tmpl_next_error(errs)) != NULL) {
+			int ret;
+
+			if ((ret = scf_tmpl_strerror(err, msg, len,
+			    flag)) >= len) {
+				len = ret + 1;
+				msg = realloc(msg, len);
+				if (msg == NULL)
+					uu_die(gettext(
+					    "Out of memory.\n"));
+				(void) scf_tmpl_strerror(err, msg, len,
+				    flag);
+			}
+			(void) fprintf(stderr, "%s\n", msg);
+		}
+		if (msg != NULL)
+			free(msg);
+	}
+	if (errs != NULL)
+		scf_tmpl_errors_destroy(errs);
+cleanup:
+	free(inst_fmri);
+	free(snapbuf);
+}
+
+static void
+lscf_validate_file(const char *filename)
+{
+	tmpl_errors_t *errs;
+
+	bundle_t *b = internal_bundle_new();
+	if (lxml_get_bundle_file(b, filename, SVCCFG_OP_IMPORT) == 0) {
+		if (tmpl_validate_bundle(b, &errs) != TVS_SUCCESS) {
+			tmpl_errors_print(stderr, errs, "");
+			semerr(gettext("Validation failed.\n"));
+		}
+		tmpl_errors_destroy(errs);
+	}
+	(void) internal_bundle_free(b);
+}
+
+/*
+ * validate [fmri|file]
+ */
+void
+lscf_validate(const char *arg)
+{
+	const char *str;
+
+	if (strncmp(arg, SCF_FMRI_FILE_PREFIX,
+	    sizeof (SCF_FMRI_FILE_PREFIX) - 1) == 0) {
+		str = arg + sizeof (SCF_FMRI_FILE_PREFIX) - 1;
+		lscf_validate_file(str);
+	} else if (strncmp(arg, SCF_FMRI_SVC_PREFIX,
+	    sizeof (SCF_FMRI_SVC_PREFIX) - 1) == 0) {
+		str = arg + sizeof (SCF_FMRI_SVC_PREFIX) - 1;
+		lscf_validate_fmri(str);
+	} else if (access(arg, R_OK | F_OK) == 0) {
+		lscf_validate_file(arg);
+	} else {
+		lscf_validate_fmri(arg);
+	}
+}
+
 void
 lscf_select(const char *fmri)
 {
@@ -10731,16 +10905,640 @@ list_prop_info(const scf_property_t *prop, const char *name, size_t len)
 		uu_die(gettext("Could not output newline"));
 }
 
+/*
+ * Outputs template property group info for the describe subcommand.
+ * If 'templates' == 2, verbose output is printed in the format expected
+ * for describe -v, which includes all templates fields.  If pg is
+ * not NULL, we're describing the template data, not an existing property
+ * group, and formatting should be appropriate for describe -t.
+ */
 static void
-listprop(const char *pattern, int only_pgs)
+list_pg_tmpl(scf_pg_tmpl_t *pgt, scf_propertygroup_t *pg, int templates)
+{
+	char *buf;
+	uint8_t required;
+	scf_property_t *stability_prop;
+	scf_value_t *stability_val;
+
+	if (templates == 0)
+		return;
+
+	if ((stability_prop = scf_property_create(g_hndl)) == NULL ||
+	    (stability_val = scf_value_create(g_hndl)) == NULL)
+		scfdie();
+
+	if (templates == 2 && pg != NULL) {
+		if (scf_pg_get_property(pg, SCF_PROPERTY_STABILITY,
+		    stability_prop) == 0) {
+			if (prop_check_type(stability_prop,
+			    SCF_TYPE_ASTRING) == 0 &&
+			    prop_get_val(stability_prop, stability_val) == 0) {
+				char *stability;
+
+				stability = safe_malloc(max_scf_value_len + 1);
+
+				if (scf_value_get_astring(stability_val,
+				    stability, max_scf_value_len + 1) == -1 &&
+				    scf_error() != SCF_ERROR_NOT_FOUND)
+					scfdie();
+
+				safe_printf("%s%s: %s\n", TMPL_INDENT,
+				    gettext("stability"), stability);
+
+				free(stability);
+			}
+		} else if (scf_error() != SCF_ERROR_NOT_FOUND)
+			scfdie();
+	}
+
+	scf_property_destroy(stability_prop);
+	scf_value_destroy(stability_val);
+
+	if (pgt == NULL)
+		return;
+
+	if (pg == NULL || templates == 2) {
+		/* print type info only if scf_tmpl_pg_name succeeds */
+		if (scf_tmpl_pg_name(pgt, &buf) != -1) {
+			if (pg != NULL)
+				safe_printf("%s", TMPL_INDENT);
+			safe_printf("%s: ", gettext("name"));
+			safe_printf("%s\n", buf);
+			free(buf);
+		}
+
+		/* print type info only if scf_tmpl_pg_type succeeds */
+		if (scf_tmpl_pg_type(pgt, &buf) != -1) {
+			if (pg != NULL)
+				safe_printf("%s", TMPL_INDENT);
+			safe_printf("%s: ", gettext("type"));
+			safe_printf("%s\n", buf);
+			free(buf);
+		}
+	}
+
+	if (templates == 2 && scf_tmpl_pg_required(pgt, &required) == 0)
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("required"),
+		    required ? "true" : "false");
+
+	if (templates == 2 && scf_tmpl_pg_target(pgt, &buf) > 0) {
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("target"),
+		    buf);
+		free(buf);
+	}
+
+	if (templates == 2 && scf_tmpl_pg_common_name(pgt, NULL, &buf) > 0) {
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("common name"),
+		    buf);
+		free(buf);
+	}
+
+	if (scf_tmpl_pg_description(pgt, NULL, &buf) > 0) {
+		if (templates == 2)
+			safe_printf("%s%s: %s\n", TMPL_INDENT,
+			    gettext("description"), buf);
+		else
+			safe_printf("%s%s\n", TMPL_INDENT, buf);
+		free(buf);
+	}
+
+}
+
+/*
+ * With as_value set to true, indent as appropriate for the value level.
+ * If false, indent to appropriate level for inclusion in constraint
+ * or choice printout.
+ */
+static void
+print_template_value_details(scf_prop_tmpl_t *prt, const char *val_buf,
+    int as_value)
+{
+	char *buf;
+
+	if (scf_tmpl_value_common_name(prt, NULL, val_buf, &buf) > 0) {
+		if (as_value == 0)
+			safe_printf("%s", TMPL_CHOICE_INDENT);
+		else
+			safe_printf("%s", TMPL_INDENT);
+		safe_printf("%s: %s\n", gettext("value common name"), buf);
+		free(buf);
+	}
+
+	if (scf_tmpl_value_description(prt, NULL, val_buf, &buf) > 0) {
+		if (as_value == 0)
+			safe_printf("%s", TMPL_CHOICE_INDENT);
+		else
+			safe_printf("%s", TMPL_INDENT);
+		safe_printf("%s: %s\n", gettext("value description"), buf);
+		free(buf);
+	}
+}
+
+static void
+print_template_value(scf_prop_tmpl_t *prt, const char *val_buf)
+{
+	safe_printf("%s%s: ", TMPL_VALUE_INDENT, gettext("value"));
+	/* This is to be human-readable, so don't use CHARS_TO_QUOTE */
+	safe_printf("%s\n", val_buf);
+
+	print_template_value_details(prt, val_buf, 1);
+}
+
+static void
+print_template_constraints(scf_prop_tmpl_t *prt, int verbose)
+{
+	int i, printed = 0;
+	scf_values_t values;
+	scf_count_ranges_t c_ranges;
+	scf_int_ranges_t i_ranges;
+
+	printed = 0;
+	i = 0;
+	if (scf_tmpl_value_name_constraints(prt, &values) == 0) {
+		safe_printf("%s%s:\n", TMPL_VALUE_INDENT,
+		    gettext("value constraints"));
+		printed++;
+		for (i = 0; i < values.value_count; ++i) {
+			safe_printf("%s%s: %s\n", TMPL_INDENT,
+			    gettext("value name"), values.values_as_strings[i]);
+			if (verbose == 1)
+				print_template_value_details(prt,
+				    values.values_as_strings[i], 0);
+		}
+
+		scf_values_destroy(&values);
+	}
+
+	if (scf_tmpl_value_count_range_constraints(prt, &c_ranges) == 0) {
+		if (printed++ == 0)
+			safe_printf("%s%s:\n", TMPL_VALUE_INDENT,
+			    gettext("value constraints"));
+		for (i = 0; i < c_ranges.scr_num_ranges; ++i) {
+			safe_printf("%s%s: %llu to %llu\n", TMPL_INDENT,
+			    gettext("range"), c_ranges.scr_min[i],
+			    c_ranges.scr_max[i]);
+		}
+		scf_count_ranges_destroy(&c_ranges);
+	} else if (scf_error() == SCF_ERROR_CONSTRAINT_VIOLATED &&
+	    scf_tmpl_value_int_range_constraints(prt, &i_ranges) == 0) {
+		if (printed++ == 0)
+			safe_printf("%s%s:\n", TMPL_VALUE_INDENT,
+			    gettext("value constraints"));
+		for (i = 0; i < i_ranges.sir_num_ranges; ++i) {
+			safe_printf("%s%s: %lld to %lld\n", TMPL_INDENT,
+			    gettext("range"), i_ranges.sir_min[i],
+			    i_ranges.sir_max[i]);
+		}
+		scf_int_ranges_destroy(&i_ranges);
+	}
+}
+
+static void
+print_template_choices(scf_prop_tmpl_t *prt, int verbose)
+{
+	int i = 0, printed = 0;
+	scf_values_t values;
+	scf_count_ranges_t c_ranges;
+	scf_int_ranges_t i_ranges;
+
+	printed = 0;
+	if (scf_tmpl_value_name_choices(prt, &values) == 0) {
+		safe_printf("%s%s:\n", TMPL_VALUE_INDENT,
+		    gettext("value constraints"));
+		printed++;
+		for (i = 0; i < values.value_count; i++) {
+			safe_printf("%s%s: %s\n", TMPL_INDENT,
+			    gettext("value name"), values.values_as_strings[i]);
+			if (verbose == 1)
+				print_template_value_details(prt,
+				    values.values_as_strings[i], 0);
+		}
+
+		scf_values_destroy(&values);
+	}
+
+	if (scf_tmpl_value_count_range_choices(prt, &c_ranges) == 0) {
+		for (i = 0; i < c_ranges.scr_num_ranges; ++i) {
+			if (printed++ == 0)
+				safe_printf("%s%s:\n", TMPL_VALUE_INDENT,
+				    gettext("value choices"));
+			safe_printf("%s%s: %llu to %llu\n", TMPL_INDENT,
+			    gettext("range"), c_ranges.scr_min[i],
+			    c_ranges.scr_max[i]);
+		}
+		scf_count_ranges_destroy(&c_ranges);
+	} else if (scf_error() == SCF_ERROR_CONSTRAINT_VIOLATED &&
+	    scf_tmpl_value_int_range_choices(prt, &i_ranges) == 0) {
+		for (i = 0; i < i_ranges.sir_num_ranges; ++i) {
+			if (printed++ == 0)
+				safe_printf("%s%s:\n", TMPL_VALUE_INDENT,
+				    gettext("value choices"));
+			safe_printf("%s%s: %lld to %lld\n", TMPL_INDENT,
+			    gettext("range"), i_ranges.sir_min[i],
+			    i_ranges.sir_max[i]);
+		}
+		scf_int_ranges_destroy(&i_ranges);
+	}
+}
+
+static void
+list_values_by_template(scf_prop_tmpl_t *prt)
+{
+	print_template_constraints(prt, 1);
+	print_template_choices(prt, 1);
+}
+
+static void
+list_values_tmpl(scf_prop_tmpl_t *prt, scf_property_t *prop)
+{
+	char *val_buf;
+	scf_iter_t *iter;
+	scf_value_t *val;
+	int ret;
+
+	if ((iter = scf_iter_create(g_hndl)) == NULL ||
+	    (val = scf_value_create(g_hndl)) == NULL)
+		scfdie();
+
+	if (scf_iter_property_values(iter, prop) != SCF_SUCCESS)
+		scfdie();
+
+	val_buf = safe_malloc(max_scf_value_len + 1);
+
+	while ((ret = scf_iter_next_value(iter, val)) == 1) {
+		if (scf_value_get_as_string(val, val_buf,
+		    max_scf_value_len + 1) < 0)
+			scfdie();
+
+		print_template_value(prt, val_buf);
+	}
+	if (ret != 0 && scf_error() != SCF_ERROR_PERMISSION_DENIED)
+		scfdie();
+	free(val_buf);
+
+	print_template_constraints(prt, 0);
+	print_template_choices(prt, 0);
+
+}
+
+/*
+ * Outputs property info for the describe subcommand
+ * Verbose output if templates == 2, -v option of svccfg describe
+ * Displays template data if prop is not NULL, -t option of svccfg describe
+ */
+static void
+list_prop_tmpl(scf_prop_tmpl_t *prt, scf_property_t *prop, int templates)
+{
+	char *buf;
+	uint8_t u_buf;
+	int i;
+	uint64_t min, max;
+	scf_values_t values;
+
+	if (prt == NULL || templates == 0)
+		return;
+
+	if (prop == NULL) {
+		safe_printf("%s%s: ", TMPL_VALUE_INDENT, gettext("name"));
+		if (scf_tmpl_prop_name(prt, &buf) > 0) {
+			safe_printf("%s\n", buf);
+			free(buf);
+		} else
+			safe_printf("(%s)\n", gettext("any"));
+	}
+
+	if (prop == NULL || templates == 2) {
+		if (prop != NULL)
+			safe_printf("%s", TMPL_INDENT);
+		else
+			safe_printf("%s", TMPL_VALUE_INDENT);
+		safe_printf("%s: ", gettext("type"));
+		if ((buf = _scf_read_tmpl_prop_type_as_string(prt)) != NULL) {
+			safe_printf("%s\n", buf);
+			free(buf);
+		} else
+			safe_printf("(%s)\n", gettext("any"));
+	}
+
+	if (templates == 2 && scf_tmpl_prop_required(prt, &u_buf) == 0)
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("required"),
+		    u_buf ? "true" : "false");
+
+	if (templates == 2 && scf_tmpl_prop_common_name(prt, NULL, &buf) > 0) {
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("common name"),
+		    buf);
+		free(buf);
+	}
+
+	if (templates == 2 && scf_tmpl_prop_units(prt, NULL, &buf) > 0) {
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("units"),
+		    buf);
+		free(buf);
+	}
+
+	if (scf_tmpl_prop_description(prt, NULL, &buf) > 0) {
+		safe_printf("%s%s\n", TMPL_INDENT, buf);
+		free(buf);
+	}
+
+	if (templates == 2 && scf_tmpl_prop_visibility(prt, &u_buf) == 0)
+		safe_printf("%s%s: %s\n", TMPL_INDENT, gettext("visibility"),
+		    scf_tmpl_visibility_to_string(u_buf));
+
+	if (templates == 2 && scf_tmpl_prop_cardinality(prt, &min, &max) == 0) {
+		safe_printf("%s%s: %" PRIu64 "\n", TMPL_INDENT,
+		    gettext("minimum number of values"), min);
+		if (max == ULLONG_MAX) {
+			safe_printf("%s%s: %s\n", TMPL_INDENT,
+			    gettext("maximum number of values"),
+			    gettext("unlimited"));
+		} else {
+			safe_printf("%s%s: %" PRIu64 "\n", TMPL_INDENT,
+			    gettext("maximum number of values"), max);
+		}
+	}
+
+	if (templates == 2 && scf_tmpl_prop_internal_seps(prt, &values) == 0) {
+		for (i = 0; i < values.value_count; i++) {
+			if (i == 0) {
+				safe_printf("%s%s:", TMPL_INDENT,
+				    gettext("internal separators"));
+			}
+			safe_printf(" \"%s\"", values.values_as_strings[i]);
+		}
+		safe_printf("\n");
+	}
+
+	if (templates != 2)
+		return;
+
+	if (prop != NULL)
+		list_values_tmpl(prt, prop);
+	else
+		list_values_by_template(prt);
+}
+
+static char *
+read_astring(scf_propertygroup_t *pg, const char *prop_name)
+{
+	char *rv;
+
+	rv = _scf_read_single_astring_from_pg(pg, prop_name);
+	if (rv == NULL) {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			break;
+		default:
+			scfdie();
+		}
+	}
+	return (rv);
+}
+
+static void
+display_documentation(scf_iter_t *iter, scf_propertygroup_t *pg)
+{
+	size_t doc_len;
+	size_t man_len;
+	char *pg_name;
+	char *text = NULL;
+	int rv;
+
+	doc_len = strlen(SCF_PG_TM_DOC_PREFIX);
+	man_len = strlen(SCF_PG_TM_MAN_PREFIX);
+	pg_name = safe_malloc(max_scf_name_len + 1);
+	while ((rv = scf_iter_next_pg(iter, pg)) == 1) {
+		if (scf_pg_get_name(pg, pg_name, max_scf_name_len + 1) == -1) {
+			scfdie();
+		}
+		if (strncmp(pg_name, SCF_PG_TM_DOC_PREFIX, doc_len) == 0) {
+			/* Display doc_link and and uri */
+			safe_printf("%s%s:\n", TMPL_INDENT,
+			    gettext("doc_link"));
+			text = read_astring(pg, SCF_PROPERTY_TM_NAME);
+			if (text != NULL) {
+				safe_printf("%s%s%s: %s\n", TMPL_INDENT,
+				    TMPL_INDENT, gettext("name"), text);
+				uu_free(text);
+			}
+			text = read_astring(pg, SCF_PROPERTY_TM_URI);
+			if (text != NULL) {
+				safe_printf("%s%s: %s\n", TMPL_INDENT_2X,
+				    gettext("uri"), text);
+				uu_free(text);
+			}
+		} else if (strncmp(pg_name, SCF_PG_TM_MAN_PREFIX,
+		    man_len) == 0) {
+			/* Display manpage title, section and path */
+			safe_printf("%s%s:\n", TMPL_INDENT,
+			    gettext("manpage"));
+			text = read_astring(pg, SCF_PROPERTY_TM_TITLE);
+			if (text != NULL) {
+				safe_printf("%s%s%s: %s\n", TMPL_INDENT,
+				    TMPL_INDENT, gettext("title"), text);
+				uu_free(text);
+			}
+			text = read_astring(pg, SCF_PROPERTY_TM_SECTION);
+			if (text != NULL) {
+				safe_printf("%s%s%s: %s\n", TMPL_INDENT,
+				    TMPL_INDENT, gettext("section"), text);
+				uu_free(text);
+			}
+			text = read_astring(pg, SCF_PROPERTY_TM_MANPATH);
+			if (text != NULL) {
+				safe_printf("%s%s%s: %s\n", TMPL_INDENT,
+				    TMPL_INDENT, gettext("manpath"), text);
+				uu_free(text);
+			}
+		}
+	}
+	if (rv == -1)
+		scfdie();
+
+done:
+	free(pg_name);
+}
+
+static void
+list_entity_tmpl(int templates)
+{
+	char *common_name = NULL;
+	char *description = NULL;
+	char *locale = NULL;
+	scf_iter_t *iter;
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	int r;
+	scf_value_t *val;
+
+	if ((pg = scf_pg_create(g_hndl)) == NULL ||
+	    (prop = scf_property_create(g_hndl)) == NULL ||
+	    (val = scf_value_create(g_hndl)) == NULL ||
+	    (iter = scf_iter_create(g_hndl)) == NULL)
+		scfdie();
+
+	locale = setlocale(LC_MESSAGES, NULL);
+
+	if (get_pg(SCF_PG_TM_COMMON_NAME, pg) == 0) {
+		common_name = safe_malloc(max_scf_value_len + 1);
+
+		/* Try both the current locale and the "C" locale. */
+		if (scf_pg_get_property(pg, locale, prop) == 0 ||
+		    (scf_error() == SCF_ERROR_NOT_FOUND &&
+		    scf_pg_get_property(pg, "C", prop) == 0)) {
+			if (prop_get_val(prop, val) == 0 &&
+			    scf_value_get_ustring(val, common_name,
+			    max_scf_value_len + 1) != -1) {
+				safe_printf("%s%s: %s\n", TMPL_INDENT,
+				    gettext("common name"), common_name);
+			}
+		}
+	}
+
+	/*
+	 * Do description, manpages, and doc links if templates == 2.
+	 */
+	if (templates == 2) {
+		/* Get the description. */
+		if (get_pg(SCF_PG_TM_DESCRIPTION, pg) == 0) {
+			description = safe_malloc(max_scf_value_len + 1);
+
+			/* Try both the current locale and the "C" locale. */
+			if (scf_pg_get_property(pg, locale, prop) == 0 ||
+			    (scf_error() == SCF_ERROR_NOT_FOUND &&
+			    scf_pg_get_property(pg, "C", prop) == 0)) {
+				if (prop_get_val(prop, val) == 0 &&
+				    scf_value_get_ustring(val, description,
+				    max_scf_value_len + 1) != -1) {
+					safe_printf("%s%s: %s\n", TMPL_INDENT,
+					    gettext("description"),
+					    description);
+				}
+			}
+		}
+
+		/* Process doc_link & manpage elements. */
+		if (cur_level != NULL) {
+			r = scf_iter_snaplevel_pgs_typed(iter, cur_level,
+			    SCF_GROUP_TEMPLATE);
+		} else if (cur_inst != NULL) {
+			r = scf_iter_instance_pgs_typed(iter, cur_inst,
+			    SCF_GROUP_TEMPLATE);
+		} else {
+			r = scf_iter_service_pgs_typed(iter, cur_svc,
+			    SCF_GROUP_TEMPLATE);
+		}
+		if (r == 0) {
+			display_documentation(iter, pg);
+		}
+	}
+
+	free(common_name);
+	free(description);
+	scf_pg_destroy(pg);
+	scf_property_destroy(prop);
+	scf_value_destroy(val);
+	scf_iter_destroy(iter);
+}
+
+static void
+listtmpl(const char *pattern, int templates)
+{
+	scf_pg_tmpl_t *pgt;
+	scf_prop_tmpl_t *prt;
+	char *snapbuf = NULL;
+	char *fmribuf;
+	char *pg_name = NULL, *prop_name = NULL;
+	ssize_t prop_name_size;
+	char *qual_prop_name;
+	char *search_name;
+	int listed = 0;
+
+	if ((pgt = scf_tmpl_pg_create(g_hndl)) == NULL ||
+	    (prt = scf_tmpl_prop_create(g_hndl)) == NULL)
+		scfdie();
+
+	fmribuf = safe_malloc(max_scf_name_len + 1);
+	qual_prop_name = safe_malloc(max_scf_name_len + 1);
+
+	if (cur_snap != NULL) {
+		snapbuf = safe_malloc(max_scf_name_len + 1);
+		if (scf_snapshot_get_name(cur_snap, snapbuf,
+		    max_scf_name_len + 1) < 0)
+			scfdie();
+	}
+
+	if (cur_inst != NULL) {
+		if (scf_instance_to_fmri(cur_inst, fmribuf,
+		    max_scf_name_len + 1) < 0)
+			scfdie();
+	} else if (cur_svc != NULL) {
+		if (scf_service_to_fmri(cur_svc, fmribuf,
+		    max_scf_name_len + 1) < 0)
+			scfdie();
+	} else
+		abort();
+
+	/* If pattern is specified, we want to list only those items. */
+	while (scf_tmpl_iter_pgs(pgt, fmribuf, snapbuf, NULL, NULL) == 1) {
+		listed = 0;
+		if (pattern == NULL || (scf_tmpl_pg_name(pgt, &pg_name) > 0 &&
+		    fnmatch(pattern, pg_name, 0) == 0)) {
+			list_pg_tmpl(pgt, NULL, templates);
+			listed++;
+		}
+
+		scf_tmpl_prop_reset(prt);
+
+		while (scf_tmpl_iter_props(pgt, prt, NULL) == 0) {
+			search_name = NULL;
+			prop_name_size = scf_tmpl_prop_name(prt, &prop_name);
+			if ((prop_name_size > 0) && (pg_name != NULL)) {
+				if (snprintf(qual_prop_name,
+				    max_scf_name_len + 1, "%s/%s",
+				    pg_name, prop_name) >=
+				    max_scf_name_len + 1) {
+					prop_name_size = -1;
+				} else {
+					search_name = qual_prop_name;
+				}
+			}
+			if (listed > 0 || pattern == NULL ||
+			    (prop_name_size > 0 &&
+			    fnmatch(pattern, search_name,
+			    FNM_PATHNAME) == 0))
+				list_prop_tmpl(prt, NULL, templates);
+			if (prop_name != NULL) {
+				free(prop_name);
+				prop_name = NULL;
+			}
+		}
+		if (pg_name != NULL) {
+			free(pg_name);
+			pg_name = NULL;
+		}
+	}
+
+	scf_tmpl_prop_destroy(prt);
+	scf_tmpl_pg_destroy(pgt);
+	free(snapbuf);
+	free(fmribuf);
+	free(qual_prop_name);
+}
+
+static void
+listprop(const char *pattern, int only_pgs, int templates)
 {
 	scf_propertygroup_t *pg;
 	scf_property_t *prop;
 	scf_iter_t *iter, *piter;
 	char *pgnbuf, *prnbuf, *ppnbuf;
+	scf_pg_tmpl_t *pgt, *pgtp;
+	scf_prop_tmpl_t *prt;
 
 	void **objects;
 	char **names;
+	void **tmpls;
 	int allocd, i;
 
 	int ret;
@@ -10755,7 +11553,9 @@ listprop(const char *pattern, int only_pgs)
 	if ((pg = scf_pg_create(g_hndl)) == NULL ||
 	    (prop = scf_property_create(g_hndl)) == NULL ||
 	    (iter = scf_iter_create(g_hndl)) == NULL ||
-	    (piter = scf_iter_create(g_hndl)) == NULL)
+	    (piter = scf_iter_create(g_hndl)) == NULL ||
+	    (prt = scf_tmpl_prop_create(g_hndl)) == NULL ||
+	    (pgt = scf_tmpl_pg_create(g_hndl)) == NULL)
 		scfdie();
 
 	prnbuf = safe_malloc(max_scf_name_len + 1);
@@ -10767,16 +11567,15 @@ listprop(const char *pattern, int only_pgs)
 	else
 		ret = scf_iter_service_pgs(iter, cur_svc);
 	if (ret != 0) {
-		if (scf_error() == SCF_ERROR_DELETED)
-			scfdie();
 		return;
 	}
 
 	/*
 	 * We want to only list items which match pattern, and we want the
 	 * second column to line up, so during the first pass we'll save
-	 * matching items & their names in objects and names, computing the
-	 * maximum name length as we go, and then we'll print them out.
+	 * matching items, their names, and their templates in objects,
+	 * names, and tmpls, computing the maximum name length as we go,
+	 * and then we'll print them out.
 	 *
 	 * Note: We always keep an extra slot available so the array can be
 	 * NULL-terminated.
@@ -10785,9 +11584,12 @@ listprop(const char *pattern, int only_pgs)
 	allocd = 1;
 	objects = safe_malloc(sizeof (*objects));
 	names = safe_malloc(sizeof (*names));
+	tmpls = safe_malloc(sizeof (*tmpls));
 
 	while ((ret = scf_iter_next_pg(iter, pg)) == 1) {
 		int new_pg = 0;
+		int print_props = 0;
+		pgtp = NULL;
 
 		pgnlen = scf_pg_get_name(pg, NULL, 0);
 		if (pgnlen < 0)
@@ -10800,6 +11602,14 @@ listprop(const char *pattern, int only_pgs)
 			scfdie();
 		assert(szret <= pgnlen);
 
+		if (scf_tmpl_get_by_pg(pg, pgt, NULL) == -1) {
+			if (scf_error() != SCF_ERROR_NOT_FOUND)
+				scfdie();
+			pgtp = NULL;
+		} else {
+			pgtp = pgt;
+		}
+
 		if (pattern == NULL ||
 		    fnmatch(pattern, pgnbuf, 0) == 0) {
 			if (i+1 >= allocd) {
@@ -10808,23 +11618,36 @@ listprop(const char *pattern, int only_pgs)
 				    sizeof (*objects) * allocd);
 				names =
 				    realloc(names, sizeof (*names) * allocd);
-				if (objects == NULL || names == NULL)
+				tmpls = realloc(tmpls,
+				    sizeof (*tmpls) * allocd);
+				if (objects == NULL || names == NULL ||
+				    tmpls == NULL)
 					uu_die(gettext("Out of memory"));
 			}
 			objects[i] = pg;
 			names[i] = pgnbuf;
+
+			if (pgtp == NULL)
+				tmpls[i] = NULL;
+			else
+				tmpls[i] = pgt;
+
 			++i;
 
 			if (pgnlen > max_len)
 				max_len = pgnlen;
 
 			new_pg = 1;
+			print_props = 1;
 		}
 
 		if (only_pgs) {
 			if (new_pg) {
 				pg = scf_pg_create(g_hndl);
 				if (pg == NULL)
+					scfdie();
+				pgt = scf_tmpl_pg_create(g_hndl);
+				if (pgt == NULL)
 					scfdie();
 			} else
 				free(pgnbuf);
@@ -10850,7 +11673,7 @@ listprop(const char *pattern, int only_pgs)
 			    prnbuf) < 0)
 				uu_die("snprintf");
 
-			if (pattern == NULL ||
+			if (pattern == NULL || print_props == 1 ||
 			    fnmatch(pattern, ppnbuf, 0) == 0) {
 				if (i+1 >= allocd) {
 					allocd *= 2;
@@ -10858,19 +11681,38 @@ listprop(const char *pattern, int only_pgs)
 					    sizeof (*objects) * allocd);
 					names = realloc(names,
 					    sizeof (*names) * allocd);
-					if (objects == NULL || names == NULL)
-						uu_die(gettext("Out of "
-						    "memory"));
+					tmpls = realloc(tmpls,
+					    sizeof (*tmpls) * allocd);
+					if (objects == NULL || names == NULL ||
+					    tmpls == NULL)
+						uu_die(gettext(
+						    "Out of memory"));
 				}
 
 				objects[i] = prop;
 				names[i] = ppnbuf;
+
+				if (pgtp != NULL) {
+					if (scf_tmpl_get_by_prop(pgt, prnbuf,
+					    prt, NULL) < 0) {
+						if (scf_error() !=
+						    SCF_ERROR_NOT_FOUND)
+							scfdie();
+						tmpls[i] = NULL;
+					} else {
+						tmpls[i] = prt;
+					}
+				} else {
+					tmpls[i] = NULL;
+				}
+
 				++i;
 
 				if (prnlen > max_len)
 					max_len = prnlen;
 
 				prop = scf_property_create(g_hndl);
+				prt = scf_tmpl_prop_create(g_hndl);
 			} else {
 				free(ppnbuf);
 			}
@@ -10879,6 +11721,9 @@ listprop(const char *pattern, int only_pgs)
 		if (new_pg) {
 			pg = scf_pg_create(g_hndl);
 			if (pg == NULL)
+				scfdie();
+			pgt = scf_tmpl_pg_create(g_hndl);
+			if (pgt == NULL)
 				scfdie();
 		} else
 			free(pgnbuf);
@@ -10889,26 +11734,37 @@ listprop(const char *pattern, int only_pgs)
 	objects[i] = NULL;
 
 	scf_pg_destroy(pg);
+	scf_tmpl_pg_destroy(pgt);
 	scf_property_destroy(prop);
+	scf_tmpl_prop_destroy(prt);
 
 	for (i = 0; objects[i] != NULL; ++i) {
 		if (strchr(names[i], '/') == NULL) {
 			/* property group */
 			pg = (scf_propertygroup_t *)objects[i];
+			pgt = (scf_pg_tmpl_t *)tmpls[i];
 			list_pg_info(pg, names[i], max_len);
+			list_pg_tmpl(pgt, pg, templates);
 			free(names[i]);
 			scf_pg_destroy(pg);
+			if (pgt != NULL)
+				scf_tmpl_pg_destroy(pgt);
 		} else {
 			/* property */
 			prop = (scf_property_t *)objects[i];
+			prt = (scf_prop_tmpl_t *)tmpls[i];
 			list_prop_info(prop, names[i], max_len);
+			list_prop_tmpl(prt, prop, templates);
 			free(names[i]);
 			scf_property_destroy(prop);
+			if (prt != NULL)
+				scf_tmpl_prop_destroy(prt);
 		}
 	}
 
 	free(names);
 	free(objects);
+	free(tmpls);
 }
 
 void
@@ -10916,7 +11772,7 @@ lscf_listpg(const char *pattern)
 {
 	lscf_prep_hndl();
 
-	listprop(pattern, 1);
+	listprop(pattern, 1, 0);
 }
 
 /*
@@ -11061,7 +11917,7 @@ lscf_listprop(const char *pattern)
 {
 	lscf_prep_hndl();
 
-	listprop(pattern, 0);
+	listprop(pattern, 0, 0);
 }
 
 int
@@ -12806,6 +13662,110 @@ lscf_refresh(void)
 	}
 
 	free(fmribuf);
+}
+
+/*
+ * describe [-v] [-t] [pg/prop]
+ */
+int
+lscf_describe(uu_list_t *args, int hasargs)
+{
+	int ret = 0;
+	size_t i;
+	int argc;
+	char **argv = NULL;
+	string_list_t *slp;
+	int do_verbose = 0;
+	int do_templates = 0;
+	char *pattern = NULL;
+
+	lscf_prep_hndl();
+
+	if (hasargs != 0)  {
+		argc = uu_list_numnodes(args);
+		if (argc < 1)
+			goto usage;
+
+		argv = calloc(argc + 1, sizeof (char *));
+		if (argv == NULL)
+			uu_die(gettext("Out of memory.\n"));
+
+		for (slp = uu_list_first(args), i = 0;
+		    slp != NULL;
+		    slp = uu_list_next(args, slp), ++i)
+			argv[i] = slp->str;
+
+		argv[i] = NULL;
+
+		/*
+		 * We start optind = 0 because our list of arguments
+		 * starts at argv[0]
+		 */
+		optind = 0;
+		opterr = 0;
+		for (;;) {
+			ret = getopt(argc, argv, "vt");
+			if (ret == -1)
+				break;
+
+			switch (ret) {
+			case 'v':
+				do_verbose = 1;
+				break;
+
+			case 't':
+				do_templates = 1;
+				break;
+
+			case '?':
+				goto usage;
+
+			default:
+				bad_error("getopt", ret);
+			}
+		}
+
+		pattern = argv[optind];
+	}
+
+	if (cur_inst == NULL && cur_svc == NULL) {
+		semerr(emsg_entity_not_selected);
+		ret = -1;
+		goto out;
+	}
+
+	/*
+	 * list_entity_tmpl(), listprop() and listtmpl() produce verbose
+	 * output if their last parameter is set to 2.  Less information is
+	 * produced if the parameter is set to 1.
+	 */
+	if (pattern == NULL) {
+		if (do_verbose == 1)
+			list_entity_tmpl(2);
+		else
+			list_entity_tmpl(1);
+	}
+
+	if (do_templates == 0) {
+		if (do_verbose == 1)
+			listprop(pattern, 0, 2);
+		else
+			listprop(pattern, 0, 1);
+	} else {
+		if (do_verbose == 1)
+			listtmpl(pattern, 2);
+		else
+			listtmpl(pattern, 1);
+	}
+
+	ret = 0;
+out:
+	if (argv != NULL)
+		free(argv);
+	return (ret);
+usage:
+	ret = -2;
+	goto out;
 }
 
 #ifndef NATIVE_BUILD

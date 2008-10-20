@@ -47,6 +47,7 @@ uu_list_pool_t *string_pool;
 %token SCC_LIST SCC_ADD SCC_DELETE SCC_SELECT SCC_UNSELECT
 %token SCC_LISTPG SCC_ADDPG SCC_DELPG SCC_DELHASH
 %token SCC_LISTPROP SCC_SETPROP SCC_DELPROP SCC_EDITPROP
+%token SCC_DESCRIBE
 %token SCC_ADDPROPVALUE SCC_DELPROPVALUE SCC_SETENV SCC_UNSETENV
 %token SCC_LISTSNAP SCC_SELECTSNAP SCC_REVERT SCC_REFRESH
 %token SCS_REDIRECT SCS_NEWLINE SCS_EQUALS SCS_LPAREN SCS_RPAREN
@@ -96,6 +97,7 @@ command : terminator
 	| setprop_cmd
 	| delprop_cmd
 	| editprop_cmd
+	| describe_cmd
 	| addpropvalue_cmd
 	| delpropvalue_cmd
 	| setenv_cmd
@@ -130,11 +132,10 @@ unknown_cmd : SCV_WORD terminator
 
 validate_cmd : SCC_VALIDATE SCV_WORD terminator
 	{
-		bundle_t *b = internal_bundle_new();
-		lxml_get_bundle_file(b, $2, SVCCFG_OP_IMPORT);
-		(void) internal_bundle_free(b);
+		lscf_validate($2);
 		free($2);
 	}
+	| SCC_VALIDATE terminator { lscf_validate_fmri(NULL); }
 	| SCC_VALIDATE error terminator	{ synerr(SCC_VALIDATE); return(0); }
 
 import_cmd : SCC_IMPORT string_list terminator
@@ -410,6 +411,26 @@ delprop_cmd : SCC_DELPROP SCV_WORD terminator
 editprop_cmd : SCC_EDITPROP terminator	{ lscf_editprop(); }
 	| SCC_EDITPROP error terminator	{ synerr(SCC_EDITPROP); return(0); }
 
+describe_cmd : SCC_DESCRIBE string_list terminator
+	{
+		string_list_t *slp;
+		void *cookie = NULL;
+
+		if (lscf_describe($2, 1) == -2) {
+			synerr(SCC_DESCRIBE);
+			return(0);
+		}
+
+		while ((slp = uu_list_teardown($2, &cookie)) != NULL) {
+			free(slp->str);
+			free(slp);
+		}
+
+		uu_list_destroy($2);
+	}
+	| SCC_DESCRIBE terminator { lscf_describe(NULL, 0); }
+	| SCC_DESCRIBE error terminator	 { synerr(SCC_DESCRIBE); return(0); }
+
 addpropvalue_cmd : SCC_ADDPROPVALUE SCV_WORD string terminator
 	{
 		lscf_addpropvalue($2, NULL, $3);
@@ -559,3 +580,4 @@ command_token : SCC_VALIDATE	{ $$ = SCC_VALIDATE; }
 	| SCC_SELECTSNAP	{ $$ = SCC_SELECTSNAP; }
 	| SCC_REVERT		{ $$ = SCC_REVERT; }
 	| SCC_REFRESH		{ $$ = SCC_REFRESH; }
+	| SCC_DESCRIBE		{ $$ = SCC_DESCRIBE; }

@@ -29,10 +29,14 @@
 #include "svccfg_grammar.h"
 
 struct help_message help_messages[] = {
-	{ SCC_VALIDATE, "validate file\n\n"
-		"Process a manifest file without changing the repository."
+	{ SCC_VALIDATE, "validate [file | fmri]\n\n"
+"Validate a manifest file without changing the repository.\n"
+"Validate an instance FMRI against the template specifications."
 	},
-	{ SCC_IMPORT, "import file\n\nImport a manifest into the repository." },
+	{ SCC_IMPORT, "import [-V] file\n\n"
+"Import a manifest into the repository.  With -V force strict adherence\n"
+"to the template specifications."
+	},
 	{ SCC_EXPORT, "export [-a] {service | pattern} [> file]\n\n"
 "Print a manifest for service to file, or standard output if not specified."
 	},
@@ -97,6 +101,10 @@ struct help_message help_messages[] = {
 	},
 	{ SCC_EDITPROP, "editprop\n\n"
 "Invoke $EDITOR to edit the properties of the currently selected entity."
+	},
+	{ SCC_DESCRIBE, "describe [-v] [-t] [propertygroup/property]\n\n"
+"Describe the current properties.  With -v, describe verbosely.  With -t,\n"
+"show only template data, not current properties."
 	},
 	{ SCC_ADDPROPVALUE, "addpropvalue pg/name [type:] value\n\n"
 "Add the given value to the named property."

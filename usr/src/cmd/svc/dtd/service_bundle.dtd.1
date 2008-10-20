@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -21,8 +21,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <!--
@@ -303,9 +301,9 @@
 	grouping The relationship between the various FMRIs grouped
 		here; "require_all" of the FMRIs to be online, "require_any"
 		of the FMRIs to be online, or "exclude_all" of the FMRIs
-		from being online for the dependency to be satisfied.
-		"optional_all" dependencies are satisfied when all
-		of the FMRIs are either online or unable to come
+		from being online or in maintenance for the dependency to
+		be satisfied.  "optional_all" dependencies are satisfied
+		when all of the FMRIs are either online or unable to come
 		online (because they are disabled, misconfigured, or one
 		of their dependencies is unable to come online).
 
@@ -646,6 +644,225 @@
 <!ATTLIST common_name>
 
 <!--
+  units
+
+    The units a numerical property is expressed in.
+-->
+
+<!ELEMENT units
+	( loctext+ ) >
+
+<!ATTLIST units>
+
+<!--
+  visibility
+
+    Expresses how a property is typically accessed.  This isn't
+    intended as access control, but as an indicator as to how a
+    property is used.
+
+    Its attributes are:
+
+      value     'hidden', 'readonly', or 'readwrite' indicating that
+		the property should be hidden from the user, shown but
+		read-only, or modifiable.
+-->
+
+<!ELEMENT visibility EMPTY>
+
+<!ATTLIST visibility
+	value	( hidden | readonly | readwrite ) #REQUIRED >
+
+<!--
+  value
+
+    Describes a legal value for a property value, and optionally contains a
+    human-readable name and description for the specified property
+    value.
+
+    Its attributes are:
+
+      name	A string representation of the value.
+-->
+
+<!ELEMENT value
+	( common_name?, description? ) >
+
+<!ATTLIST value
+	name	CDATA #REQUIRED >
+
+<!--
+  values
+
+    Human-readable names and descriptions for valid values of a property.
+-->
+
+<!ELEMENT values
+	(value+) >
+
+<!ATTLIST values>
+
+<!--
+  cardinality
+
+    Places a constraint on the number of values the property can take
+    on.
+
+    Its attributes are:
+	min	minimum number of values
+	max	maximum number of values
+
+    Both attributes are optional.  If min is not specified, it defaults to
+    0.  If max is not specified it indicates an unlimited number of values.
+    If neither is specified this indicates 0 or more values.
+-->
+
+<!ELEMENT cardinality EMPTY>
+
+<!ATTLIST cardinality
+	min	CDATA "0"
+	max	CDATA "18446744073709551615">
+
+<!--
+  internal_separators
+
+    Indicates the separators used within a property's value used to
+    separate the actual values.  Used in situations where multiple
+    values are packed into a single property value instead of using a
+    multi-valued property.
+-->
+
+<!ELEMENT internal_separators
+	(#PCDATA) >
+
+<!ATTLIST internal_separators>
+
+<!--
+  range
+
+    Indicates a range of possible integer values.
+
+    Its attributes are:
+
+      min	The minimum value of the range (inclusive).
+      max	The maximum value of the range (inclusive).
+-->
+
+<!ELEMENT range EMPTY>
+
+<!ATTLIST range
+	min	CDATA #REQUIRED
+	max	CDATA #REQUIRED >
+
+<!--
+  constraints
+
+    Provides a set of constraints on the values a property can take on.
+-->
+
+<!ELEMENT constraints
+	( value*, range* ) >
+<!ATTLIST constraints>
+
+<!--
+  include_values
+
+    Includes an entire set of values in the choices block.
+
+    Its attributes are:
+
+	type    Either "constraints" or "values", indicating an
+		inclusion of all values allowed by the property's
+		constraints or all values for which there are
+		human-readable names and descriptions, respectively.
+-->
+
+<!ELEMENT include_values EMPTY>
+
+<!ATTLIST include_values
+	type	( constraints | values ) #REQUIRED >
+
+<!--
+  choices
+
+    Provides a set of common choices for the values a property can take
+    on.  Useful in those cases where the possibilities are unenumerable
+    or merely inconveniently legion, and a manageable subset is desired
+    for presentation in a user interface.
+-->
+
+<!ELEMENT choices
+	( value*, range*, include_values* ) >
+
+<!ATTLIST choices>
+
+<!--
+  prop_pattern
+
+
+    The prop_pattern describes one property of the enclosing property group
+    pattern.
+
+    Its attributes are:
+
+	name    The property's name.
+	type    The property's type.
+	required
+		If the property group is present, this property is required.
+
+	type can be omitted if required is false.
+-->
+
+<!ELEMENT prop_pattern
+	( common_name?, description?, units?, visibility?, cardinality?,
+	  internal_separators?, values?, constraints?, choices? ) >
+
+<!ATTLIST prop_pattern
+	name		CDATA	#REQUIRED
+	type		( count | integer | opaque | host | hostname |
+			net_address_v4 | net_address_v6 | time | astring |
+			ustring | boolean | fmri | uri ) #IMPLIED
+	required	( true | false )	"false" >
+
+<!--
+  pg_pattern
+
+    The pg_pattern describes one property group.
+    Depending on the element's attributes, these descriptions may apply
+    to just the enclosing service/instance, instances of the enclosing
+    service, delegates of the service (assuming it is a restarter), or
+    all services.
+
+    Its attributes are:
+
+	name    The property group's name.  If not specified, it
+		matches all property groups with the specified type.
+	type    The property group's type.  If not specified, it
+		matches all property groups with the specified name.
+	required
+		If the property group is required.
+	target	The scope of the pattern, which may be all, delegate,
+		instance, or this.  'all' is reserved for framework use
+		and applies the template to all services on the system.
+		'delegate' is reserved for restarters, and means the
+		template applies to all services which use the restarter.
+		'this' would refer to the defining service or instance.
+		'instance' can only be used in a service's template block,
+		and means the definition applies to all instances of this
+		service.
+
+-->
+
+<!ELEMENT pg_pattern
+	( common_name?, description?, prop_pattern* ) >
+
+<!ATTLIST pg_pattern
+	name		CDATA	""
+	type		CDATA	""
+	required	( true | false )	"false"
+	target		( this | instance | delegate | all )	"this" >
+
+<!--
   template
 
     The template contains a collection of metadata about the service.
@@ -660,7 +877,7 @@
     The template has no attributes.
 -->
 <!ELEMENT template
-        ( common_name, description?, documentation?) >
+        ( common_name, description?, documentation?, pg_pattern* ) >
 
 <!ATTLIST template>
 

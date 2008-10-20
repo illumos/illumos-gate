@@ -28,7 +28,7 @@
 cat >console-login.xml <<EOF
 <?xml version="1.0"?>
 <!--
-	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
 	NOTE:  This service manifest is not editable; its contents will
@@ -207,6 +207,129 @@ Console login
 			<manpage title='ttymon' section='1M'
 				manpath='/usr/share/man' />
 		</documentation>
+
+		<pg_pattern name='ttymon' type='application' target='this'
+		    required='false'>
+			<prop_pattern name='device' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The terminal device to be used for the console login prompt.
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+				<values>
+					<value name='/dev/console'>
+						<description>
+							<loctext xml:lang='C'>
+The default console device
+							</loctext>
+						</description>
+					</value>
+					<value name='/dev/wscons'>
+						<description>
+							<loctext xml:lang='C'>
+The physical workstation console (i.e. keyboard and monitor)
+							</loctext>
+						</description>
+					</value>
+					<value name='/dev/term/a'>
+						<description>
+							<loctext xml:lang='C'>
+Serial device A
+							</loctext>
+						</description>
+					</value>
+					<value name='/dev/term/b'>
+						<description>
+							<loctext xml:lang='C'>
+Serial device B
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='label' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+/etc/ttydefs entry
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The appropriate entry from /etc/ttydefs
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='timeout' type='count'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If no user input is given within the number of seconds defined by this property after the prompt is printed, ttymon should exit.
+					</loctext>
+				</description>
+				<units>
+					<loctext xml:lang='C'>
+seconds
+					</loctext>
+				</units>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='nohangup' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Do not force a hangup on the line by setting the speed to zero before setting the speed to the default or specified speed.
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='modules' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+STREAMS modules
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+STREAMS modules to be pushed on the terminal
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='prompt' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Prompt to be printed on console
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='terminal_type' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Sets the initial value of the TERM environment variable
+					</loctext>
+				</description>
+				<visibility value='readwrite'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>	 
+
 	</template>
 </service>
 

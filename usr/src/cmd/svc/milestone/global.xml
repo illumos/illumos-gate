@@ -1,0 +1,624 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:global'>
+
+<service
+	name='system/svc/global'
+	type='service'
+	version='1'>
+
+	<!--
+	    There's no running configuration to manage here.  However,
+	    this service stores the system-wide definitions for
+	    templates.
+	-->
+
+	<create_default_instance enabled='false' />
+
+	<single_instance/>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec=':true'
+		timeout_seconds='0' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='0' />
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+system-wide configuration definitions
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='smf' section='5'
+			    manpath='/usr/share/man' />
+			<manpage title='smf_template' section='5'
+			    manpath='/usr/share/man' />
+		</documentation>
+
+		<pg_pattern name='general' type='framework'
+		    target='all' required='true'>
+                        <description>
+                                <loctext xml:lang='C'>
+Basic information about a service instance which is supplied by the service author, sometimes modified by the administrator, and consumed by SMF and the service's restarter.
+                                </loctext>
+                        </description>
+			<prop_pattern name='enabled' type='boolean'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The service instance is expected to be started once all of its dependencies are satisfied.  If this property is not defined, the restarter will not be notified about this service instance.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='restarter' type='fmri'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The restarter responsible for managing this service instance.  If the property is unset, the default restarter, svc.startd, is assumed.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='single_instance' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Only one instance of this service may be run.  This property is currently unenforced, but will be at some point in the future.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern type='dependency' target='all' required='false'>
+                        <description>
+                                <loctext xml:lang='C'>
+A dependency declares a required condition for a service instance to start or stay running.  It is defined by the service author and consumed by SMF.
+                                </loctext>
+                        </description>
+			<prop_pattern name='entities' type='fmri'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The services, service instances, or files used to calculate this dependency.
+					</loctext>
+				</description>
+				<cardinality min='1'/>
+			</prop_pattern>
+			<prop_pattern name='external' type='boolean'>
+				<description>
+					<loctext xml:lang='C'>
+This dependency was declared by the service defined in entities.  It will be removed only when that service is deleted.
+					</loctext>
+				</description>
+				<visibility value='readonly'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='grouping' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+How to decide whether this dependency is satisfied.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='require_all'>
+					<description>
+						<loctext xml:lang='C'>
+Satisfied when all cited services are running (online or degraded), or when all indicated files are present.
+						</loctext>
+					</description>
+				</value>
+				<value name='require_any'>
+					<description>
+						<loctext xml:lang='C'>
+Satisfied when one of the cited services is running (online or degraded), or when at least one of the indicated files is present.
+						</loctext>
+					</description>
+				</value>
+				<value name='optional_all'>
+					<description>
+						<loctext xml:lang='C'>
+Satisfied if the cited services are running (online or degraded) or will not run without administrative action (disabled, maintenance, not present, or offline waiting for dependencies which will not start without administrative action).
+
+						</loctext>
+					</description>
+				</value>
+				<value name='exclude_all'>
+					<description>
+						<loctext xml:lang='C'>
+Satisfied when all of the cited services are disabled, in the maintenance state, or when cited services or files are not present.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+				<choices>
+					<include_values type='constraints'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='restart_on' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Determines whether to restart the service due to a dependency refresh, restart, or failure.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='none'>
+					<description>
+						<loctext xml:lang='C'>
+Never restart due to dependency refresh, restart, or failure.
+						</loctext>
+					</description>
+				</value>
+				<value name='error'>
+					<description>
+						<loctext xml:lang='C'>
+Restart only if the dependency encounters an error, such as an uncorrectable hardware error, or a software error such as a core dump.
+						</loctext>
+					</description>
+				</value>
+				<value name='restart'>
+					<description>
+						<loctext xml:lang='C'>
+Restart if the dependency encounters an error or is explicitly restarted.
+						</loctext>
+					</description>
+				</value>
+				<value name='refresh'>
+					<description>
+						<loctext xml:lang='C'>
+Restart if the dependency encounters an error, is explicitly restarted, or explicitly refreshed.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+				<choices>
+					<include_values type='constraints'/>
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='type' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The type of the dependency: service or file.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='service'>
+					<description>
+						<loctext xml:lang='C'>
+Depend on services or instances.
+						</loctext>
+					</description>
+				</value>
+				<value name='path'>
+					<description>
+						<loctext xml:lang='C'>
+Depend on the existance of a file path.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+				<choices>
+					<include_values type='constraints'/>
+				</choices>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern type='template_pg_pattern' target='all'
+		    required='false'>
+			<description>
+				<loctext xml:lang='C'>
+Template data about property groups.  This information is provided in the manifest by the service author and should not be modified directly.
+				</loctext>
+			</description>
+
+			<prop_pattern name='name' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Optional name of a property group which is described by this template.  No name means the name is wildcarded.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='type' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Optional type of property groups which are described by this template.  No type means that the type is wildcarded.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='required' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, entities without a property group which matches this pattern are considered invalid.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='target' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The services or service instances to which this template should be applied.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='this'>
+					<description>
+						<loctext xml:lang='C'>
+The service or instance on which the property group resides.
+						</loctext>
+					</description>
+				</value>
+				<value name='instance'>
+					<description>
+						<loctext xml:lang='C'>
+This instance, or any instance of this service.
+						</loctext>
+					</description>
+				</value>
+				<value name='delegate'>
+					<description>
+						<loctext xml:lang='C'>
+All instances which currently define this service as their restarter.
+						</loctext>
+					</description>
+				</value>
+				<value name='all'>
+					<description>
+						<loctext xml:lang='C'>
+All services and instances on the system.  "all" may only be set on the global service.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern type='template_prop_pattern' target='all'
+		    required='false'>
+			<description>
+				<loctext xml:lang='C'>
+Template data about properties.  This information is provided in the manifest by the service author and should not be modified directly.
+				</loctext>
+			</description>
+			<prop_pattern name='name' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Name of property this template applies to.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='pg_pattern' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Name of property group that describes the enclosing property group pattern.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='required' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Defines whether a property matched by this template is required.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='type' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The type that a property which this template refers to should be.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='visibility' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The visibility of this property, which is readwrite by default.  Visibility is only a cue to the user interface, and will not be explicitly enforced by SMF.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='hidden'>
+					<description>
+						<loctext xml:lang='C'>
+Hidden in default user interface views.
+						</loctext>
+					</description>
+				</value>
+				<value name='readonly'>
+					<description>
+						<loctext xml:lang='C'>
+Expected to be read only in most user interfaces.
+						</loctext>
+					</description>
+				</value>
+				<value name='readwrite'>
+					<description>
+						<loctext xml:lang='C'>
+Expected to be manipulated in many user interfaces.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+			</prop_pattern>
+			<prop_pattern name='cardinality_min' type='count'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Minimum number of required values.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='cardinality_max' type='count'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Maximum number of required values.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='internal_separators' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+List of separator characters for values.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1'/>
+			</prop_pattern>
+			<prop_pattern name='constraint_name' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Values the property is expected to be constrained to.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1'/>
+			</prop_pattern>
+			<prop_pattern name='constraint_range' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Ranges the property is expected to be constrained to.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='choices_range' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Ranges a user should be offered as a choice for this property.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1'/>
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='choices_name' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Values a users should be offered as a choice for this property.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1'/>
+			</prop_pattern>
+			<prop_pattern name='choices_include_values'
+			    type='astring' required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Whether the choices should include the defined constraints or values.
+					</loctext>
+				</description>
+				<visibility value='hidden'/>
+				<cardinality min='1' max='1'/>
+				<constraints>
+				<value name='constraints'>
+					<description>
+						<loctext xml:lang='C'>
+Include all defined constraints as choices.
+						</loctext>
+					</description>
+				</value>
+				<value name='values'>
+					<description>
+						<loctext xml:lang='C'>
+Include all defined values as choices.
+						</loctext>
+					</description>
+				</value>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='method_context' type='framework'
+		    target='all' required='false'>
+			<description>
+				<loctext xml:lang='C'>
+Specifies the default execution context for all service methods.  It is defined by the service author, may be augmented by an administrator, and is consumed by the service's restarter.
+				</loctext>
+			</description>
+
+			<!-- method_context direct properties -->
+			<prop_pattern name='working_directory' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The working directory to launch the method from.  ":default" can be used as a token to indicate the home directory of the user specified by the credential or profile.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='project' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The project ID in numeric or text form.  ":default" can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='resource_pool' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The resource pool name in which to launch the method.  ":default" can be used
+as a token to indicate the pool specified in the project(4) entry given in
+the project attribute.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_credential properties -->
+			<prop_pattern name='user' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The user ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='group' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The group ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='supp_groups' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+An optional string that specifies the supplemental group memberships by ID,
+in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='privileges' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the privilege set as defined in privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='limit_privileges' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the limit privilege set as defined in
+privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+
+			<!-- method_profile properties -->
+			<prop_pattern name='use_profile' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+A boolean that specifies whether the profile should be used instead of the
+user, group, privileges, and limit_privileges properties.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+			<prop_pattern name='profile' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The name of an RBAC (role-based access control) profile which, along with the
+method executable, identifies an entry in exec_attr(4).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1'/>
+			</prop_pattern>
+		</pg_pattern>
+
+	</template>
+</service>
+
+</service_bundle>

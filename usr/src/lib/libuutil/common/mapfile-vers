@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNWprivate_1.1 {
@@ -87,6 +85,7 @@ SUNWprivate_1.1 {
 	uu_msprintf;
 	uu_open_tmp;
 	uu_setpname;
+	uu_strdup;
 	uu_strerror;
 	uu_strtoint;
 	uu_strtouint;

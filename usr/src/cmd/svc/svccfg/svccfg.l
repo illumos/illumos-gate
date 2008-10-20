@@ -104,6 +104,7 @@ extern int yyerror(const char *);
 <INITIAL>setprop	{ BEGIN WORD; return (SCC_SETPROP); }
 <INITIAL>delprop	{ BEGIN WORD; return (SCC_DELPROP); }
 <INITIAL>editprop	{ BEGIN WORD; return (SCC_EDITPROP); }
+<INITIAL>describe	{ BEGIN WORD; return (SCC_DESCRIBE); }
 <INITIAL>addpropvalue	{ BEGIN WORD; return (SCC_ADDPROPVALUE); }
 <INITIAL>delpropvalue	{ BEGIN WORD; return (SCC_DELPROPVALUE); }
 <INITIAL>setenv		{ BEGIN WORD; return (SCC_SETENV); }

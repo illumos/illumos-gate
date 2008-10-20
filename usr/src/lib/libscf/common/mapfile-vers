@@ -23,6 +23,62 @@
 # Use is subject to license terms.
 #
 
+SUNW_1.2 {
+    global:
+        scf_count_ranges_destroy;
+	scf_int_ranges_destroy;
+	scf_string_to_type;
+	scf_tmpl_error_pg;
+	scf_tmpl_error_pg_tmpl;
+	scf_tmpl_error_prop;
+	scf_tmpl_error_prop_tmpl;
+	scf_tmpl_error_type;
+	scf_tmpl_error_value;
+	scf_tmpl_errors_destroy;
+	scf_tmpl_get_by_pg;
+	scf_tmpl_get_by_prop;
+	scf_tmpl_get_by_pg_name;
+	scf_tmpl_iter_pgs;
+	scf_tmpl_iter_props;
+	scf_tmpl_next_error;
+	scf_tmpl_pg_common_name;
+	scf_tmpl_pg_create;
+	scf_tmpl_pg_description;
+	scf_tmpl_pg_destroy;
+	scf_tmpl_pg_name;
+	scf_tmpl_pg_required;
+	scf_tmpl_pg_reset;
+	scf_tmpl_pg_target;
+	scf_tmpl_pg_type;
+	scf_tmpl_prop_cardinality;
+	scf_tmpl_prop_common_name;
+	scf_tmpl_prop_create;
+	scf_tmpl_prop_description;
+	scf_tmpl_prop_destroy;
+	scf_tmpl_prop_internal_seps;
+	scf_tmpl_prop_name;
+	scf_tmpl_prop_required;
+	scf_tmpl_prop_reset;
+	scf_tmpl_prop_type;
+	scf_tmpl_prop_units;
+	scf_tmpl_prop_visibility;
+	scf_tmpl_reset_errors;
+	scf_tmpl_strerror;
+	scf_tmpl_validate_fmri;
+	scf_tmpl_value_common_name;
+	scf_tmpl_value_count_range_choices;
+	scf_tmpl_value_count_range_constraints;
+	scf_tmpl_value_description;
+	scf_tmpl_value_in_constraint;
+	scf_tmpl_value_int_range_constraints;
+	scf_tmpl_value_name_choices;
+	scf_tmpl_value_name_constraints;
+	scf_tmpl_value_int_range_choices;
+	scf_tmpl_visibility_to_string;
+	scf_type_to_string;
+	scf_values_destroy;
+};
+
 SUNW_1.1 {
     global:
 	scf_entry_add_value;
@@ -203,8 +259,13 @@ SUNW_1.1 {
 
 SUNWprivate_1.1 {
     global:
+	gen_filenms_from_fmri;
 	scf_canonify_fmri;
 	scf_cmp_pattern;
+	_scf_create_errors;
+        scf_decode32;
+	scf_encode32;
+	scf_general_pg_setup;
 	_scf_handle_decorations;
 	_scf_notify_add_pgname;
 	_scf_notify_add_pgtype;
@@ -212,27 +273,28 @@ SUNWprivate_1.1 {
 	scf_parse_file_fmri;
 	scf_parse_fmri;
 	scf_parse_svc_fmri;
+	_scf_pg_is_read_protected;
 	_scf_pg_wait;
+	scf_read_count_property;
+	_scf_read_single_astring_from_pg;
+	_scf_read_tmpl_prop_type_as_string;
+	_scf_repository_switch;
 	_scf_request_backup;
+	_scf_sanitize_locale;
 	_scf_set_annotation;
+	scf_set_count_property;
+	scf_simple_handle_destroy;
 	_scf_snapshot_attach;
 	_scf_snapshot_delete;
 	_scf_snapshot_take_attach;
 	_scf_snapshot_take_new;
 	_scf_snapshot_take_new_named;
-	scf_string_to_type;
-	scf_type_to_string;
-	scf_walk_fmri;
-	_smf_refresh_instance_i;
-	scf_general_pg_setup;
+	_scf_tmpl_add_error;
+	_scf_tmpl_error_set_prefix;
 	scf_transaction_setup;
 	scf_transaction_restart;
-	scf_read_count_property;
-	scf_set_count_property;
-	scf_simple_handle_destroy;
-	gen_filenms_from_fmri;
-	_scf_pg_is_read_protected;
-	_scf_repository_switch;
+	scf_walk_fmri;
+	_smf_refresh_instance_i;
 	scf_read_propvec;
 	scf_write_propvec;
 	scf_clean_propvec;

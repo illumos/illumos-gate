@@ -72,16 +72,20 @@ extern int lex_lineno;
  * lxml_prop_types[]
  */
 typedef enum element {
-	SC_ASTRING = 0x0, SC_BOOLEAN, SC_COMMON_NAME, SC_COUNT,
-	SC_INSTANCE_CREATE_DEFAULT, SC_DEPENDENCY, SC_DEPENDENT, SC_DESCRIPTION,
-	SC_DOC_LINK, SC_DOCUMENTATION, SC_ENABLED, SC_EXEC_METHOD, SC_FMRI,
-	SC_HOST, SC_HOSTNAME, SC_INSTANCE, SC_INTEGER, SC_LOCTEXT, SC_MANPAGE,
-	SC_METHOD_CONTEXT, SC_METHOD_CREDENTIAL, SC_METHOD_PROFILE,
-	SC_METHOD_ENVIRONMENT, SC_METHOD_ENVVAR, SC_NET_ADDR_V4, SC_NET_ADDR_V6,
-	SC_OPAQUE, SC_PROPERTY, SC_PROPERTY_GROUP, SC_PROPVAL, SC_RESTARTER,
-	SC_SERVICE, SC_SERVICE_BUNDLE, SC_SERVICE_FMRI, SC_INSTANCE_SINGLE,
-	SC_STABILITY, SC_TEMPLATE, SC_TIME, SC_URI, SC_USTRING, SC_VALUE_NODE,
-	SC_XI_FALLBACK, SC_XI_INCLUDE
+	SC_ASTRING = 0, SC_BOOLEAN, SC_CARDINALITY, SC_CHOICES,
+	SC_COMMON_NAME, SC_CONSTRAINTS, SC_COUNT,
+	SC_INSTANCE_CREATE_DEFAULT, SC_DEPENDENCY, SC_DEPENDENT,
+	SC_DESCRIPTION, SC_DOC_LINK, SC_DOCUMENTATION, SC_ENABLED,
+	SC_EXEC_METHOD, SC_FMRI, SC_HOST, SC_HOSTNAME, SC_INCLUDE_VALUES,
+	SC_INSTANCE, SC_INTEGER, SC_INTERNAL_SEPARATORS, SC_LOCTEXT, SC_MANPAGE,
+	SC_METHOD_CONTEXT, SC_METHOD_CREDENTIAL,
+	SC_METHOD_PROFILE, SC_METHOD_ENVIRONMENT, SC_METHOD_ENVVAR,
+	SC_NET_ADDR_V4, SC_NET_ADDR_V6, SC_OPAQUE, SC_PG_PATTERN,
+	SC_PROP_PATTERN, SC_PROPERTY, SC_PROPERTY_GROUP, SC_PROPVAL, SC_RANGE,
+	SC_RESTARTER, SC_SERVICE, SC_SERVICE_BUNDLE, SC_SERVICE_FMRI,
+	SC_INSTANCE_SINGLE, SC_STABILITY, SC_TEMPLATE, SC_TIME, SC_UNITS,
+	SC_URI, SC_USTRING, SC_VALUE, SC_VALUE_NODE, SC_VALUES,
+	SC_VISIBILITY, SC_XI_FALLBACK, SC_XI_INCLUDE
 } element_t;
 
 typedef enum bundle_type {
@@ -101,8 +105,7 @@ typedef enum service_type {
 } service_type_t;
 
 typedef enum entity_type {
-	SVCCFG_SERVICE_OBJECT = 0x0, SVCCFG_INSTANCE_OBJECT,
-	SVCCFG_TEMPLATE_OBJECT
+	SVCCFG_SERVICE_OBJECT = 0x0, SVCCFG_INSTANCE_OBJECT
 } entity_type_t;
 
 enum import_state {
@@ -119,6 +122,40 @@ typedef enum svccfg_op {
 	SVCCFG_OP_APPLY,
 	SVCCFG_OP_RESTORE
 } svccfg_op_t;
+
+/*
+ * Return values for functions that validate an entity against the templates.
+ */
+typedef enum tmpl_validate_status {
+	TVS_SUCCESS = 0,
+	/*
+	 * Either conversion of ASTRING property value to a number failed,
+	 * or base 32 decoding of a property value failed.
+	 */
+	TVS_BAD_CONVERSION,
+	/* Template is defective. */
+	TVS_BAD_TEMPLATE,
+	/* Template type spec is invalid. */
+	TVS_INVALID_TYPE_SPECIFICATION,
+	/* Property group is missing a type specification. */
+	TVS_MISSING_PG_TYPE,
+	/* Template with required == true is missing type specification. */
+	TVS_MISSING_TYPE_SPECIFICATION,
+	/* No match was found for specified item. */
+	TVS_NOMATCH,
+	/* Validation error occurred */
+	TVS_VALIDATION,
+	/* Validation error that should not inhibit import. */
+	TVS_WARN,
+	/* Could not validate because of fatal errors. */
+	TVS_FATAL = -1
+} tmpl_validate_status_t;
+
+/*
+ * The composed_pg structure is used for templates validation.  It is
+ * defined in svccfg_tmpl.c
+ */
+typedef struct composed_pg composed_pg_t;
 
 typedef struct entity {
 	uu_list_node_t	sc_node;
@@ -138,21 +175,28 @@ typedef struct entity {
 			uu_list_t	*sc_service_instances;
 			service_type_t	sc_service_type;
 			uint_t		sc_service_version;
-
-			struct entity *sc_service_template;
+			/* Following used by template validation */
+			struct entity	*sc_restarter;
+			struct entity	*sc_global;
 		} sc_service;
 		struct {
-			uint_t		sc_instance_dummy;
+			uu_avl_t *sc_composed;
+			/* Following used by template validation */
+			struct entity	*sc_instance_restarter;
 		} sc_instance;
-		struct {
-			uint_t		sc_template_dummy;
-		} sc_template;
 	} sc_u;
 } entity_t;
 
+/*
+ * sc_pgroup_composed is only used for templates validation of properties.
+ * It is created in build_composed_property_groups() and destroyed in
+ * composed_pg_destroy().  It will only be set for property groups that are
+ * part of an instance -- not for service property groups.
+ */
 typedef struct pgroup {
 	uu_list_node_t	sc_node;
 	uu_list_t	*sc_pgroup_props;
+	composed_pg_t	*sc_pgroup_composed;	/* Composed properties */
 
 	const char	*sc_pgroup_name;
 	const char	*sc_pgroup_type;
@@ -168,6 +212,7 @@ typedef struct pgroup {
 
 typedef struct property {
 	uu_list_node_t	sc_node;
+	uu_avl_node_t	sc_composed_node;	/* Composed props linkage */
 	uu_list_t	*sc_property_values;
 
 	char		*sc_property_name;
@@ -204,6 +249,11 @@ typedef struct scf_callback {
 	const char	*sc_target_fmri;
 	int		sc_err;
 } scf_callback_t;
+
+/*
+ * Collection of template validation errors.
+ */
+typedef struct tmpl_errors tmpl_errors_t;
 
 #ifndef NDEBUG
 #define	bad_error(func, err)	{					\
@@ -300,6 +350,8 @@ pgroup_t *internal_pgroup_find(entity_t *, const char *, const char *);
 pgroup_t *internal_dependent_find(entity_t *, const char *);
 pgroup_t *internal_pgroup_find_or_create(entity_t *, const char *,
     const char *);
+pgroup_t *internal_pgroup_create_strict(entity_t *, const char *,
+    const char *);
 property_t *internal_property_new(void);
 void internal_property_free(property_t *);
 property_t *internal_property_find(pgroup_t *, const char *);
@@ -309,12 +361,15 @@ value_t *internal_value_new(void);
 int internal_attach_service(bundle_t *, entity_t *);
 int internal_attach_entity(entity_t *, entity_t *);
 int internal_attach_pgroup(entity_t *, pgroup_t *);
+void internal_detach_pgroup(entity_t *, pgroup_t *);
 int internal_attach_dependent(entity_t *, pgroup_t *);
 int internal_attach_property(pgroup_t *, property_t *);
+void internal_detach_property(pgroup_t *, property_t *);
 void internal_attach_value(property_t *, value_t *);
 
 int load_init(void);
 void load_fini(void);
+int load_instance(const char *, const char *, entity_t **);
 int load_pg_attrs(const scf_propertygroup_t *, pgroup_t **);
 int load_pg(const scf_propertygroup_t *, pgroup_t **, const char *,
     const char *);
@@ -340,6 +395,7 @@ void lscf_delhash(char *, int);
 void lscf_listprop(const char *);
 void lscf_addprop(char *, const char *, const uu_list_t *);
 void lscf_delprop(char *);
+int lscf_describe(uu_list_t *, int);
 void lscf_listsnap();
 void lscf_selectsnap(const char *);
 void lscf_revert(const char *);
@@ -365,6 +421,13 @@ void help(int);
 int engine_cmd_getc(engine_state_t *);
 int engine_cmd_ungetc(engine_state_t *, char);
 void engine_cmd_nputs(engine_state_t *, char *, size_t);
+
+void tmpl_errors_destroy(tmpl_errors_t *);
+void tmpl_errors_print(FILE *, tmpl_errors_t *, const char *);
+void tmpl_init(void);
+void tmpl_property_fini(property_t *);
+void tmpl_property_init(property_t *);
+tmpl_validate_status_t tmpl_validate_bundle(bundle_t *, tmpl_errors_t **);
 
 #ifdef	__cplusplus
 }

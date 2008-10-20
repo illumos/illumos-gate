@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -45,10 +43,11 @@ HDRDIR =	inc
 HDRS =		libscf.h libscf_priv.h
 
 #
-# only error descriptions are internationalized, but they aren't directly
-# surrounded by gettext(), so we use '-a' to grab all strings.
+# only error descriptions and templates messages are internationalized,
+# but they aren't directly surrounded by gettext(), so we use '-a' to grab
+# all strings.
 #
-MSGFILES =	common/error.c
+MSGFILES =	common/error.c common/scf_tmpl.c
 POFILE =	libscf.po
 XGETFLAGS +=	-a
 

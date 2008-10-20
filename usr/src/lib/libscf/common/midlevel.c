@@ -26,6 +26,7 @@
 
 #include "libscf_impl.h"
 
+#include <assert.h>
 #include <libuutil.h>
 #include <stdio.h>
 #include <strings.h>
@@ -1125,12 +1126,8 @@ get_instance_pg(scf_simple_handle_t *simple_h)
 		return (NULL);
 	}
 
-	if ((namelen = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH)) == -1) {
-		if (scf_error() == SCF_ERROR_NOT_SET) {
-			(void) scf_set_error(SCF_ERROR_INTERNAL);
-		}
-		return (NULL);
-	}
+	namelen = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH) + 1;
+	assert(namelen > 0);
 
 	if ((pg_name = malloc(namelen)) == NULL) {
 		if (scf_error() == SCF_ERROR_NOT_SET) {
@@ -1668,11 +1665,10 @@ scf_simple_prop_get(scf_handle_t *hin, const char *instance, const char *pgname,
 			if (scf_handle_decode_fmri(h, fmri_buf, NULL, svc,
 			    NULL, NULL, NULL, SCF_DECODE_FMRI_TRUNCATE) == -1)
 				goto error1;
-			if ((fmri_sz = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH)) ==
-			    -1) {
-				(void) scf_set_error(SCF_ERROR_INTERNAL);
-				goto error1;
-			}
+
+			fmri_sz = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH) + 1;
+			assert(fmri_sz > 0);
+
 			if (scf_service_to_fmri(svc, fmri_buf, fmri_sz) == -1)
 				goto error1;
 			if ((svcfmri = assemble_fmri(h, fmri_buf, pgname,
@@ -1814,10 +1810,8 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 		}
 	}
 
-	if ((namelen = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH)) == -1) {
-		(void) scf_set_error(SCF_ERROR_INTERNAL);
-		return (NULL);
-	}
+	namelen = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH) + 1;
+	assert(namelen > 0);
 
 	if ((inst = scf_instance_create(h)) == NULL ||
 	    (svc = scf_service_create(h)) == NULL ||
@@ -2646,8 +2640,8 @@ scf_read_propvec(const char *fmri, const char *pgname, boolean_t running,
 		case SCF_TYPE_TIME: {
 			scf_time_t *time = prop->pv_ptr;
 
-			ret = scf_value_get_time(v, &time->st_sec,
-			    &time->st_nanosec);
+			ret = scf_value_get_time(v, &time->t_seconds,
+			    &time->t_ns);
 			break;
 		}
 		case SCF_TYPE_OPAQUE: {
@@ -2812,8 +2806,8 @@ top:
 		case SCF_TYPE_TIME: {
 			scf_time_t *time = prop->pv_ptr;
 
-			ret = scf_value_set_time(v[i], time->st_sec,
-			    time->st_nanosec);
+			ret = scf_value_set_time(v[i], time->t_seconds,
+			    time->t_ns);
 			break;
 		}
 		case SCF_TYPE_OPAQUE: {

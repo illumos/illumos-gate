@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <errno.h>
 #include <libintl.h>
@@ -33,6 +31,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <string.h>
+#include <unistd.h>
+#include <libscf_priv.h>
 
 #include "svccfg.h"
 
@@ -248,6 +248,10 @@ internal_bundle_new()
 
 	b->sc_bundle_type = SVCCFG_UNKNOWN_BUNDLE;
 	b->sc_bundle_services = uu_list_create(entity_pool, b, 0);
+	if (b->sc_bundle_services == NULL) {
+		uu_die(gettext("Unable to create list for bundle services.  "
+		    "%s\n"), uu_strerror(uu_error()));
+	}
 
 	return (b);
 }
@@ -266,27 +270,50 @@ internal_bundle_free(bundle_t *b)
 }
 
 entity_t *
+internal_entity_new(entity_type_t entity)
+{
+	entity_t *e;
+
+	if ((e = uu_zalloc(sizeof (entity_t))) == NULL)
+		uu_die(gettext("couldn't allocate memory"));
+
+	uu_list_node_init(e, &e->sc_node, entity_pool);
+
+	e->sc_etype = entity;
+	e->sc_pgroups = uu_list_create(pgroup_pool, e, 0);
+	if (e->sc_pgroups == NULL) {
+		uu_die(gettext("Unable to create list for entity property "
+		    "groups.  %s\n"), uu_strerror(uu_error()));
+	}
+
+	return (e);
+}
+
+entity_t *
 internal_service_new(const char *name)
 {
 	entity_t *s;
 
-	if ((s = uu_zalloc(sizeof (entity_t))) == NULL)
-		uu_die(gettext("couldn't allocate memory"));
-
-	uu_list_node_init(s, &s->sc_node, entity_pool);
+	s = internal_entity_new(SVCCFG_SERVICE_OBJECT);
 
 	s->sc_name = name;
 	s->sc_fmri = uu_msprintf("svc:/%s", name);
 	if (s->sc_fmri == NULL)
 		uu_die(gettext("couldn't allocate memory"));
 
-	s->sc_etype = SVCCFG_SERVICE_OBJECT;
-	s->sc_pgroups = uu_list_create(pgroup_pool, s, 0);
 	s->sc_dependents = uu_list_create(pgroup_pool, s, 0);
+	if (s->sc_dependents == NULL) {
+		uu_die(gettext("Unable to create list for service dependents.  "
+		    "%s\n"), uu_strerror(uu_error()));
+	}
 
 	s->sc_u.sc_service.sc_service_type = SVCCFG_UNKNOWN_SERVICE;
 	s->sc_u.sc_service.sc_service_instances = uu_list_create(entity_pool, s,
 	    0);
+	if (s->sc_u.sc_service.sc_service_instances == NULL) {
+		uu_die(gettext("Unable to create list for service instances.  "
+		    "%s\n"), uu_strerror(uu_error()));
+	}
 
 	return (s);
 }
@@ -297,6 +324,11 @@ internal_service_free(entity_t *s)
 	entity_t *inst;
 	pgroup_t *pg;
 	void *cookie;
+
+	if (s->sc_u.sc_service.sc_restarter != NULL)
+		internal_instance_free(s->sc_u.sc_service.sc_restarter);
+	if (s->sc_u.sc_service.sc_global != NULL)
+		internal_instance_free(s->sc_u.sc_service.sc_global);
 
 	cookie = NULL;
 	while ((pg = uu_list_teardown(s->sc_pgroups, &cookie)) != NULL)
@@ -310,6 +342,7 @@ internal_service_free(entity_t *s)
 	while ((inst = uu_list_teardown(s->sc_u.sc_service.sc_service_instances,
 	    &cookie)) != NULL)
 		internal_instance_free(inst);
+	uu_free((void *)s->sc_fmri);
 
 	free(s);
 }
@@ -319,16 +352,14 @@ internal_instance_new(const char *name)
 {
 	entity_t *i;
 
-	if ((i = uu_zalloc(sizeof (entity_t))) == NULL)
-		uu_die(gettext("couldn't allocate memory"));
-
-	uu_list_node_init(i, &i->sc_node, entity_pool);
-
+	i = internal_entity_new(SVCCFG_INSTANCE_OBJECT);
 	i->sc_name = name;
 	/* Can't set i->sc_fmri until we're attached to a service. */
-	i->sc_etype = SVCCFG_INSTANCE_OBJECT;
-	i->sc_pgroups = uu_list_create(pgroup_pool, i, 0);
 	i->sc_dependents = uu_list_create(pgroup_pool, i, 0);
+	if (i->sc_dependents == NULL) {
+		uu_die(gettext("Unable to create list for instance "
+		    "dependents.  %s\n"), uu_strerror(uu_error()));
+	}
 
 	return (i);
 }
@@ -338,31 +369,20 @@ internal_instance_free(entity_t *i)
 {
 	pgroup_t *pg;
 	void *cookie = NULL;
+	entity_t *rs;
 
+	rs = i->sc_u.sc_instance.sc_instance_restarter;
+	if (rs != NULL)
+		internal_instance_free(rs);
 	while ((pg = uu_list_teardown(i->sc_pgroups, &cookie)) != NULL)
 		internal_pgroup_free(pg);
 
 	cookie = NULL;
 	while ((pg = uu_list_teardown(i->sc_dependents, &cookie)) != NULL)
 		internal_pgroup_free(pg);
+	uu_free((void *)i->sc_fmri);
 
 	free(i);
-}
-
-entity_t *
-internal_template_new()
-{
-	entity_t *t;
-
-	if ((t = uu_zalloc(sizeof (entity_t))) == NULL)
-		uu_die(gettext("couldn't allocate memory"));
-
-	uu_list_node_init(t, &t->sc_node, entity_pool);
-
-	t->sc_etype = SVCCFG_TEMPLATE_OBJECT;
-	t->sc_pgroups = uu_list_create(pgroup_pool, t, 0);
-
-	return (t);
 }
 
 pgroup_t *
@@ -376,6 +396,10 @@ internal_pgroup_new()
 	uu_list_node_init(p, &p->sc_node, pgroup_pool);
 
 	p->sc_pgroup_props = uu_list_create(property_pool, p, UU_LIST_SORTED);
+	if (p->sc_pgroup_props == NULL) {
+		uu_die(gettext("Unable to create list for properties.  %s\n"),
+		    uu_strerror(uu_error()));
+	}
 	p->sc_pgroup_name = "<unset>";
 	p->sc_pgroup_type = "<unset>";
 
@@ -387,6 +411,12 @@ internal_pgroup_free(pgroup_t *pg)
 {
 	property_t *prop;
 	void *cookie = NULL;
+
+	/*
+	 * Templates validation code should clean up this reference when
+	 * the validation is finished.
+	 */
+	assert(pg->sc_pgroup_composed == NULL);
 
 	while ((prop = uu_list_teardown(pg->sc_pgroup_props, &cookie)) != NULL)
 		internal_property_free(prop);
@@ -427,14 +457,20 @@ internal_pgroup_find(entity_t *e, const char *name, const char *type)
 	return (find_pgroup(e->sc_pgroups, name, type));
 }
 
-pgroup_t *
-internal_pgroup_find_or_create(entity_t *e, const char *name, const char *type)
+static pgroup_t *
+internal_pgroup_create_common(entity_t *e, const char *name, const char *type,
+	boolean_t unique)
 {
 	pgroup_t *pg;
 
 	pg = internal_pgroup_find(e, name, type);
-	if (pg != NULL)
-		return (pg);
+	if (pg != NULL) {
+		if (unique == B_TRUE) {
+			return (NULL);
+		} else {
+			return (pg);
+		}
+	}
 
 	pg = internal_pgroup_new();
 	(void) internal_attach_pgroup(e, pg);
@@ -448,6 +484,18 @@ internal_pgroup_find_or_create(entity_t *e, const char *name, const char *type)
 	return (pg);
 }
 
+pgroup_t *
+internal_pgroup_find_or_create(entity_t *e, const char *name, const char *type)
+{
+	return (internal_pgroup_create_common(e, name, type, B_FALSE));
+}
+
+pgroup_t *
+internal_pgroup_create_strict(entity_t *e, const char *name, const char *type)
+{
+	return (internal_pgroup_create_common(e, name, type, B_TRUE));
+}
+
 property_t *
 internal_property_new()
 {
@@ -459,7 +507,13 @@ internal_property_new()
 	uu_list_node_init(p, &p->sc_node, property_pool);
 
 	p->sc_property_values = uu_list_create(value_pool, p, 0);
+	if (p->sc_property_values == NULL) {
+		uu_die(gettext("Unable to create list for property values.  "
+		    "%s\n"), uu_strerror(uu_error()));
+	}
 	p->sc_property_name = "<unset>";
+
+	tmpl_property_init(p);
 
 	return (p);
 }
@@ -469,6 +523,8 @@ internal_property_free(property_t *p)
 {
 	value_t *val;
 	void *cookie = NULL;
+
+	tmpl_property_fini(p);
 
 	while ((val = uu_list_teardown(p->sc_property_values, &cookie)) !=
 	    NULL) {
@@ -587,11 +643,6 @@ internal_attach_service(bundle_t *bndl, entity_t *svc)
 int
 internal_attach_entity(entity_t *svc, entity_t *ent)
 {
-	if (ent->sc_etype == SVCCFG_TEMPLATE_OBJECT) {
-		svc->sc_u.sc_service.sc_service_template = ent;
-		return (0);
-	}
-
 	if (svc->sc_etype != SVCCFG_SERVICE_OBJECT)
 		uu_die(gettext("bad entity attach: %s is not a service\n"),
 		    svc->sc_name);
@@ -626,6 +677,12 @@ internal_attach_pgroup(entity_t *ent, pgroup_t *pgrp)
 	pgrp->sc_parent = ent;
 
 	return (0);
+}
+
+void
+internal_detach_pgroup(entity_t *ent, pgroup_t *pgrp)
+{
+	uu_list_remove(ent->sc_pgroups, pgrp);
 }
 
 int
@@ -667,6 +724,12 @@ internal_attach_property(pgroup_t *pgrp, property_t *prop)
 }
 
 void
+internal_detach_property(pgroup_t *pgrp, property_t *prop)
+{
+	uu_list_remove(pgrp->sc_pgroup_props, prop);
+}
+
+void
 internal_attach_value(property_t *prop, value_t *val)
 {
 	(void) uu_list_append(prop->sc_property_values, val);
@@ -683,9 +746,11 @@ internal_attach_value(property_t *prop, value_t *val)
 
 static char *loadbuf = NULL;
 static size_t loadbuf_sz;
+static scf_propertygroup_t *load_pgroup = NULL;
 static scf_property_t *load_prop = NULL;
 static scf_value_t *load_val = NULL;
 static scf_iter_t *load_propiter = NULL, *load_valiter = NULL;
+static scf_iter_t *load_pgiter = NULL;
 
 /*
  * Initialize the global state for the load_*() routines.
@@ -705,6 +770,8 @@ load_init(void)
 
 	if ((load_prop = scf_property_create(g_hndl)) == NULL ||
 	    (load_val = scf_value_create(g_hndl)) == NULL ||
+	    (load_pgroup = scf_pg_create(g_hndl)) == NULL ||
+	    (load_pgiter = scf_iter_create(g_hndl)) == NULL ||
 	    (load_propiter = scf_iter_create(g_hndl)) == NULL ||
 	    (load_valiter = scf_iter_create(g_hndl)) == NULL) {
 		load_fini();
@@ -721,6 +788,10 @@ load_fini(void)
 	load_propiter = NULL;
 	scf_iter_destroy(load_valiter);
 	load_valiter = NULL;
+	scf_iter_destroy(load_pgiter);
+	load_pgiter = NULL;
+	scf_pg_destroy(load_pgroup);
+	load_pgroup = NULL;
 	scf_value_destroy(load_val);
 	load_val = NULL;
 	scf_property_destroy(load_prop);
@@ -1088,6 +1159,158 @@ load_pg(const scf_propertygroup_t *pg, pgroup_t **ipgp, const char *fmri,
 out:
 	internal_pgroup_free(ipg);
 	return (r);
+}
+
+/*
+ * Load the instance for fmri from the repository into memory.  The
+ * property groups that define the instances pg_patterns and prop_patterns
+ * are also loaded.
+ *
+ * Returns 0 on success and non-zero on failure.
+ */
+int
+load_instance(const char *fmri, const char *name, entity_t **inst_ptr)
+{
+	entity_t *e = NULL;
+	scf_instance_t *inst;
+	pgroup_t *ipg;
+	int rc;
+	char *type = NULL;
+	ssize_t tsize;
+
+	assert(inst_ptr != NULL);
+
+	if ((inst = scf_instance_create(g_hndl)) == NULL) {
+		switch (scf_error()) {
+		case SCF_ERROR_NO_MEMORY:
+		case SCF_ERROR_NO_RESOURCES:
+			rc = EAGAIN;
+			goto errout;
+		default:
+			bad_error("scf_instance_create", scf_error());
+		}
+	}
+	if (scf_handle_decode_fmri(g_hndl, fmri, NULL, NULL, inst, NULL, NULL,
+	    SCF_DECODE_FMRI_EXACT|SCF_DECODE_FMRI_REQUIRE_INSTANCE) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			rc = ECONNABORTED;
+			goto errout;
+		case SCF_ERROR_DELETED:
+		case SCF_ERROR_NOT_FOUND:
+			rc = ENOENT;
+			goto errout;
+		default:
+			bad_error("scf_handle_decode_fmri", scf_error());
+		}
+	}
+	if (scf_iter_instance_pgs_composed(load_pgiter, inst, NULL) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_DELETED:
+			rc = ECANCELED;
+			goto errout;
+		case SCF_ERROR_CONNECTION_BROKEN:
+			rc = ECONNABORTED;
+			goto errout;
+		default:
+			bad_error("scf_iter_instance_pgs_composed",
+			    scf_error());
+		}
+	}
+
+	tsize = scf_limit(SCF_LIMIT_MAX_PG_TYPE_LENGTH);
+	type = uu_zalloc(tsize);
+	if (type == NULL) {
+		rc = ENOMEM;
+		goto errout;
+	}
+
+	/*
+	 * Initialize our entity structure.
+	 */
+	e = internal_instance_new(name);
+	if (e == NULL) {
+		rc = ENOMEM;
+		goto errout;
+	}
+	e->sc_fmri = uu_strdup(fmri);
+	if (e->sc_fmri == NULL) {
+		rc = ENOMEM;
+		goto errout;
+	}
+
+	/*
+	 * Walk through the property group's of the instance and capture
+	 * the property groups that are of type
+	 * SCF_GROUP_TEMPLATE_PG_PATTERN and
+	 * SCF_GROUP_TEMPLATE_PROP_PATTERN.  In other words grab the
+	 * pg_pattern and prop_pattern property groups.
+	 */
+	while ((rc = scf_iter_next_pg(load_pgiter, load_pgroup)) == 1) {
+		if (scf_pg_get_type(load_pgroup, type, tsize) <= 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+				rc = ENOENT;
+				break;
+			case SCF_ERROR_CONNECTION_BROKEN:
+				rc = ECONNABORTED;
+				break;
+			default:
+				bad_error("scf_pg_get_type", scf_error());
+			}
+			goto errout;
+		}
+		if ((strcmp(type, SCF_GROUP_TEMPLATE_PG_PATTERN) != 0) &&
+		    (strcmp(type, SCF_GROUP_TEMPLATE_PROP_PATTERN) != 0)) {
+			continue;
+		}
+		if ((rc = load_pg(load_pgroup, &ipg, fmri, NULL)) != 0) {
+			switch (rc) {
+			case ECANCELED:
+			case ECONNABORTED:
+			case EACCES:
+			case ENOMEM:
+				break;
+			default:
+				bad_error("load_pg", rc);
+			}
+			goto errout;
+		}
+		if (internal_attach_pgroup(e, ipg) != 0) {
+			rc = EBADF;
+			goto errout;
+		}
+	}
+	if (rc == -1) {
+		/* Error in iteration. */
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			rc = ECONNABORTED;
+			break;
+		case SCF_ERROR_DELETED:
+			rc = ENOENT;
+			break;
+		case SCF_ERROR_NO_RESOURCES:
+			rc = EAGAIN;
+			break;
+		default:
+			bad_error("scf_iter_next_pg", scf_error());
+		}
+		goto errout;
+	}
+
+	*inst_ptr = e;
+	scf_instance_destroy(inst);
+	return (0);
+
+errout:
+	if (type != NULL)
+		uu_free(type);
+	if (inst != NULL)
+		scf_instance_destroy(inst);
+	if (e != NULL)
+		internal_instance_free(e);
+	return (rc);
 }
 
 /*

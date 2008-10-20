@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -56,6 +57,10 @@ typedef struct scf_value scf_value_t;
 
 typedef struct scf_iter scf_iter_t;
 
+typedef struct scf_pg_tmpl scf_pg_tmpl_t;
+typedef struct scf_prop_tmpl scf_prop_tmpl_t;
+typedef struct scf_tmpl_errors scf_tmpl_errors_t;
+
 typedef struct scf_simple_app_props scf_simple_app_props_t;
 typedef struct scf_simple_prop scf_simple_prop_t;
 
@@ -82,6 +87,44 @@ typedef enum {
 	SCF_TYPE_NET_ADDR_V4,
 	SCF_TYPE_NET_ADDR_V6
 } scf_type_t;
+
+typedef struct scf_time {
+	int64_t		t_seconds;
+	int32_t		t_ns;
+} scf_time_t;
+
+/*
+ * There is no explicit initializer for this structure.  Functions
+ * which set or populate this structure assume that it is either
+ * uninitialized or destroyed.
+ */
+typedef struct scf_values {
+	scf_type_t		value_type;
+	void			*reserved;	/* reserved for future use */
+	int			value_count;
+	char			**values_as_strings;
+	union {
+		uint64_t	*v_count;
+		uint8_t		*v_boolean;
+		int64_t		*v_integer;
+		char		**v_astring;
+		char		**v_ustring;
+		char		**v_opaque;
+		scf_time_t	*v_time;
+	} values;
+} scf_values_t;
+
+typedef struct scf_count_ranges {
+	int		scr_num_ranges;
+	uint64_t	*scr_min;
+	uint64_t	*scr_max;
+} scf_count_ranges_t;
+
+typedef struct scf_int_ranges {
+	int		sir_num_ranges;
+	int64_t		*sir_min;
+	int64_t		*sir_max;
+} scf_int_ranges_t;
 
 /*
  * Return codes
@@ -111,6 +154,7 @@ typedef enum scf_error {
 	SCF_ERROR_VERSION_MISMATCH,	/* incompatible SCF version */
 	SCF_ERROR_BACKEND_READONLY,	/* backend is read-only */
 	SCF_ERROR_DELETED,		/* object has been deleted */
+	SCF_ERROR_TEMPLATE_INVALID,	/* template data is invalid */
 
 	SCF_ERROR_CALLBACK_FAILED = 1080, /* user callback function failed */
 
@@ -118,12 +162,55 @@ typedef enum scf_error {
 } scf_error_t;
 
 /*
+ * This enum MUST be kept in sync with
+ * struct _scf_tmpl_error_desc em_desc() in scf_tmpl.c
+ */
+typedef enum scf_tmpl_error_type {
+	SCF_TERR_MISSING_PG,		/* property group missing */
+	SCF_TERR_WRONG_PG_TYPE,		/* property group type incorrect */
+	SCF_TERR_MISSING_PROP,		/* missing required property */
+	SCF_TERR_WRONG_PROP_TYPE,	/* property type incorrect */
+	SCF_TERR_CARDINALITY_VIOLATION,	/* wrong number of values */
+	SCF_TERR_VALUE_CONSTRAINT_VIOLATED, /* constraint violated for value */
+	SCF_TERR_RANGE_VIOLATION,	/* value violated specified range */
+	SCF_TERR_PG_REDEFINE,		/* global or restarter pg_pattern */
+					/* redefined by the instance */
+	SCF_TERR_PROP_TYPE_MISMATCH,	/* property and value type mismatch */
+	SCF_TERR_VALUE_OUT_OF_RANGE,	/* value is out of range in template */
+	SCF_TERR_INVALID_VALUE,		/* value is not valid for the */
+					/* template */
+	SCF_TERR_PG_PATTERN_CONFLICT,	/* pg_pattern conflicts with higher */
+					/* level definition */
+	SCF_TERR_PROP_PATTERN_CONFLICT,	/* prop_pattern conflicts with higher */
+					/* level definition */
+	SCF_TERR_GENERAL_REDEFINE,	/* global or restarter template */
+					/* redefined */
+	SCF_TERR_INCLUDE_VALUES,	/* No supporting constraints or */
+					/* values for include_values */
+	SCF_TERR_PG_PATTERN_INCOMPLETE,	/* Required pg_pattern is missing */
+					/* name or type attribute. */
+	SCF_TERR_PROP_PATTERN_INCOMPLETE    /* Required prop_pattern is */
+					    /* missing a type attribute. */
+} scf_tmpl_error_type_t;
+
+typedef struct scf_tmpl_error scf_tmpl_error_t;
+
+/*
+ * scf_tmpl_strerror() human readable flag
+ */
+#define	SCF_TMPL_STRERROR_HUMAN	0x1
+
+/*
  * Standard services
  */
-#define	SCF_SERVICE_STARTD	((const char *) \
-				    "svc:/system/svc/restarter:default")
 #define	SCF_SERVICE_CONFIGD	((const char *) \
 				    "svc:/system/svc/repository:default")
+#define	SCF_INSTANCE_GLOBAL	((const char *) \
+				    "svc:/system/svc/global:default")
+#define	SCF_SERVICE_GLOBAL	((const char *) \
+				    "svc:/system/svc/global")
+#define	SCF_SERVICE_STARTD	((const char *) \
+				    "svc:/system/svc/restarter:default")
 
 /*
  * Major milestones
@@ -148,6 +235,8 @@ typedef enum scf_error {
 #define	SCF_GROUP_DEPENDENCY		((const char *)"dependency")
 #define	SCF_GROUP_METHOD		((const char *)"method")
 #define	SCF_GROUP_TEMPLATE		((const char *)"template")
+#define	SCF_GROUP_TEMPLATE_PG_PATTERN	((const char *)"template_pg_pattern")
+#define	SCF_GROUP_TEMPLATE_PROP_PATTERN	((const char *)"template_prop_pattern")
 
 /*
  * Dependency types
@@ -179,7 +268,7 @@ typedef enum scf_error {
 #define	SCF_PG_DEATHROW			((const char *)"deathrow")
 
 /*
- * Template property group names and prefix
+ * Template property group names and prefixes
  */
 #define	SCF_PG_TM_COMMON_NAME		((const char *)"tm_common_name")
 #define	SCF_PG_TM_DESCRIPTION		((const char *)"tm_description")
@@ -204,6 +293,7 @@ typedef enum scf_error {
 #define	SCF_PROPERTY_GROUP		((const char *)"group")
 #define	SCF_PROPERTY_GROUPING		((const char *)"grouping")
 #define	SCF_PROPERTY_IGNORE		((const char *)"ignore_error")
+#define	SCF_PROPERTY_INTERNAL_SEPARATORS ((const char *)"internal_separators")
 #define	SCF_PROPERTY_LIMIT_PRIVILEGES	((const char *)"limit_privileges")
 #define	SCF_PROPERTY_MAINT_OFF		((const char *)"maint_off")
 #define	SCF_PROPERTY_MAINT_ON		((const char *)"maint_on")
@@ -248,11 +338,34 @@ typedef enum scf_error {
 /*
  * Template property names
  */
+#define	SCF_PROPERTY_TM_CARDINALITY_MIN	((const char *)"cardinality_min")
+#define	SCF_PROPERTY_TM_CARDINALITY_MAX	((const char *)"cardinality_max")
+#define	SCF_PROPERTY_TM_CHOICES_INCLUDE_VALUES ((const char *) \
+					    "choices_include_values")
+#define	SCF_PROPERTY_TM_CHOICES_NAME	((const char *)"choices_name")
+#define	SCF_PROPERTY_TM_CHOICES_RANGE	((const char *)"choices_range")
+#define	SCF_PROPERTY_TM_CONSTRAINT_NAME	((const char *)"constraint_name")
+#define	SCF_PROPERTY_TM_CONSTRAINT_RANGE ((const char *)"constraint_range")
 #define	SCF_PROPERTY_TM_MANPATH		((const char *)"manpath")
-#define	SCF_PROPERTY_TM_SECTION		((const char *)"section")
-#define	SCF_PROPERTY_TM_TITLE		((const char *)"title")
 #define	SCF_PROPERTY_TM_NAME		((const char *)"name")
+#define	SCF_PROPERTY_TM_PG_PATTERN	((const char *)"pg_pattern")
+#define	SCF_PROPERTY_TM_REQUIRED	((const char *)"required")
+#define	SCF_PROPERTY_TM_SECTION		((const char *)"section")
+#define	SCF_PROPERTY_TM_TARGET		((const char *)"target")
+#define	SCF_PROPERTY_TM_TITLE		((const char *)"title")
+#define	SCF_PROPERTY_TM_TYPE		((const char *)"type")
 #define	SCF_PROPERTY_TM_URI		((const char *)"uri")
+#define	SCF_PROPERTY_TM_VALUE_PREFIX	((const char *)"value_")
+#define	SCF_PROPERTY_TM_VALUES_NAME	((const char *)"values_name")
+#define	SCF_PROPERTY_TM_VISIBILITY	((const char *)"visibility")
+#define	SCF_PROPERTY_TM_COMMON_NAME_PREFIX	((const char *)"common_name_")
+#define	SCF_PROPERTY_TM_DESCRIPTION_PREFIX	((const char *)"description_")
+#define	SCF_PROPERTY_TM_UNITS_PREFIX		((const char *)"units_")
+
+/*
+ * Templates wildcard string
+ */
+#define	SCF_TMPL_WILDCARD	((const char *)"*")
 
 /*
  * Strings used by restarters for state and next_state properties.
@@ -307,6 +420,8 @@ int scf_handle_unbind(scf_handle_t *);
 void scf_handle_destroy(scf_handle_t *);
 
 int scf_type_base_type(scf_type_t type, scf_type_t *out);
+const char *scf_type_to_string(scf_type_t);
+scf_type_t scf_string_to_type(const char *);
 
 /* values */
 scf_value_t *scf_value_create(scf_handle_t *);
@@ -509,9 +624,113 @@ int scf_handle_decode_fmri(scf_handle_t *, const char *, scf_scope_t *,
 ssize_t scf_myname(scf_handle_t *, char *, size_t);
 
 /*
+ * Property group template interfaces.
+ */
+scf_pg_tmpl_t *scf_tmpl_pg_create(scf_handle_t *);
+void scf_tmpl_pg_destroy(scf_pg_tmpl_t *);
+void scf_tmpl_pg_reset(scf_pg_tmpl_t *);
+int scf_tmpl_get_by_pg(scf_propertygroup_t *, scf_pg_tmpl_t *, int);
+int scf_tmpl_get_by_pg_name(const char *, const char *,
+    const char *, const char *, scf_pg_tmpl_t *, int);
+int scf_tmpl_iter_pgs(scf_pg_tmpl_t *, const char *, const char *,
+    const char *, int);
+#define	SCF_PG_TMPL_FLAG_REQUIRED	0x1
+#define	SCF_PG_TMPL_FLAG_EXACT		0x2
+#define	SCF_PG_TMPL_FLAG_CURRENT	0x4
+
+ssize_t scf_tmpl_pg_name(const scf_pg_tmpl_t *, char **);
+ssize_t scf_tmpl_pg_common_name(const scf_pg_tmpl_t *, const char *, char **);
+ssize_t scf_tmpl_pg_description(const scf_pg_tmpl_t *, const char *, char **);
+ssize_t scf_tmpl_pg_type(const scf_pg_tmpl_t *, char **);
+
+ssize_t scf_tmpl_pg_target(const scf_pg_tmpl_t *, char **);
+#define	SCF_TM_TARGET_ALL		((const char *)"all")
+#define	SCF_TM_TARGET_DELEGATE		((const char *)"delegate")
+#define	SCF_TM_TARGET_INSTANCE		((const char *)"instance")
+#define	SCF_TM_TARGET_THIS		((const char *)"this")
+
+int scf_tmpl_pg_required(const scf_pg_tmpl_t *, uint8_t *);
+
+/*
+ * Property template interfaces.
+ */
+scf_prop_tmpl_t *scf_tmpl_prop_create(scf_handle_t *);
+void scf_tmpl_prop_destroy(scf_prop_tmpl_t *);
+void scf_tmpl_prop_reset(scf_prop_tmpl_t *);
+int scf_tmpl_get_by_prop(scf_pg_tmpl_t *, const char *,
+    scf_prop_tmpl_t *, int);
+int scf_tmpl_iter_props(scf_pg_tmpl_t *, scf_prop_tmpl_t *, int);
+#define	SCF_PROP_TMPL_FLAG_REQUIRED	0x1
+
+ssize_t scf_tmpl_prop_name(const scf_prop_tmpl_t *, char **);
+int scf_tmpl_prop_type(const scf_prop_tmpl_t *, scf_type_t *);
+int scf_tmpl_prop_required(const scf_prop_tmpl_t *, uint8_t *);
+ssize_t scf_tmpl_prop_common_name(const scf_prop_tmpl_t *, const char *,
+    char **);
+ssize_t scf_tmpl_prop_description(const scf_prop_tmpl_t *, const char *,
+    char **);
+ssize_t scf_tmpl_prop_units(const scf_prop_tmpl_t *, const char *, char **);
+int scf_tmpl_prop_cardinality(const scf_prop_tmpl_t *prop, uint64_t *,
+    uint64_t *);
+int scf_tmpl_prop_internal_seps(const scf_prop_tmpl_t *, scf_values_t *);
+
+int scf_tmpl_prop_visibility(const scf_prop_tmpl_t *, uint8_t *);
+#define	SCF_TMPL_VISIBILITY_HIDDEN		1
+#define	SCF_TMPL_VISIBILITY_READONLY		2
+#define	SCF_TMPL_VISIBILITY_READWRITE		3
+
+const char *scf_tmpl_visibility_to_string(uint8_t);
+#define	SCF_TM_VISIBILITY_HIDDEN	((const char *)"hidden")
+#define	SCF_TM_VISIBILITY_READONLY	((const char *)"readonly")
+#define	SCF_TM_VISIBILITY_READWRITE	((const char *)"readwrite")
+
+int scf_tmpl_value_name_constraints(const scf_prop_tmpl_t *prop,
+    scf_values_t *vals);
+void scf_count_ranges_destroy(scf_count_ranges_t *);
+void scf_int_ranges_destroy(scf_int_ranges_t *);
+int scf_tmpl_value_count_range_constraints(const scf_prop_tmpl_t *,
+    scf_count_ranges_t *);
+int scf_tmpl_value_int_range_constraints(const scf_prop_tmpl_t *,
+    scf_int_ranges_t *);
+int scf_tmpl_value_count_range_choices(const scf_prop_tmpl_t *,
+    scf_count_ranges_t *);
+int scf_tmpl_value_int_range_choices(const scf_prop_tmpl_t *,
+    scf_int_ranges_t *);
+int scf_tmpl_value_name_choices(const scf_prop_tmpl_t *prop,
+    scf_values_t *vals);
+
+void scf_values_destroy(scf_values_t *);
+
+ssize_t scf_tmpl_value_common_name(const scf_prop_tmpl_t *, const char *,
+    const char *, char **);
+ssize_t scf_tmpl_value_description(const scf_prop_tmpl_t *, const char *,
+    const char *, char **);
+
+int scf_tmpl_value_in_constraint(const scf_prop_tmpl_t *pt, scf_value_t *value,
+    scf_tmpl_errors_t **errs);
+
+/*
+ * Template validation interfaces
+ */
+int scf_tmpl_validate_fmri(scf_handle_t *, const char *,
+    const char *, scf_tmpl_errors_t **, int);
+#define	SCF_TMPL_VALIDATE_FLAG_CURRENT	0x1
+
+void scf_tmpl_errors_destroy(scf_tmpl_errors_t *errs);
+scf_tmpl_error_t *scf_tmpl_next_error(scf_tmpl_errors_t *);
+void scf_tmpl_reset_errors(scf_tmpl_errors_t *errs);
+int scf_tmpl_strerror(scf_tmpl_error_t *err, char *s, size_t n, int flag);
+int scf_tmpl_error_source_fmri(const scf_tmpl_error_t *, char **);
+int scf_tmpl_error_type(const scf_tmpl_error_t *, scf_tmpl_error_type_t *);
+int scf_tmpl_error_pg_tmpl(const scf_tmpl_error_t *, char **, char **);
+int scf_tmpl_error_pg(const scf_tmpl_error_t *, char **, char **);
+int scf_tmpl_error_prop_tmpl(const scf_tmpl_error_t *, char **, char **);
+int scf_tmpl_error_prop(const scf_tmpl_error_t *, char **, char **);
+int scf_tmpl_error_value(const scf_tmpl_error_t *, char **);
+
+/*
  * Simplified calls
  */
-
 int smf_enable_instance(const char *, int);
 int smf_disable_instance(const char *, int);
 int smf_refresh_instance(const char *);

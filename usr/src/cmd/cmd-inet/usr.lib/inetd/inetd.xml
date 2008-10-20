@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -37,7 +35,7 @@
 
 <service
 	name='network/inetd'
-	type='service'
+	type='restarter'
 	version='1'>
 
 	<create_default_instance enabled='false' />
@@ -57,7 +55,7 @@
 		grouping='require_all'
 		restart_on='error'
 		type='service'>
-		<service_fmri value='svc:/system/filesystem/local'/>
+		<service_fmri value='svc:/system/filesystem/local' />
 	</dependency>
 
 	<dependency
@@ -180,7 +178,975 @@ services.
 		<documentation>
 			<manpage title='inetd' section='1M'
 				manpath='/usr/share/man' />
+			<manpage title='inetadm' section='1M'
+				manpath='/usr/share/man' />
 		</documentation>
+
+		<pg_pattern name='config' type='application' target='this'
+		    required='false'>
+			<prop_pattern name='debug' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Enable syslog-style debugging messages for inetd.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='defaults' type='application'
+		    target='this' required='true'>
+			<description>
+				<loctext xml:lang='C'>
+Defaults for properties optional for inetd services.  Defaults are inherited from inetd if the property is not specified by the service.
+				</loctext>
+			</description>
+			<prop_pattern name='bind_addr' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The address of the network interface to which the service should be bound.  An empty string value causes the service to accept connections on any network interface.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='bind_fail_interval' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Time in seconds between a failed bind attempt and a retry.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+No retries are attempted.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+No retries are attempted.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='bind_fail_max' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The maxiumum nubmer of times inetd retries binding to a service's port before giving up.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+No retry limiting is imposed.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='con_rate_offline' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The time in seconds a service will remain offline if it exceeds its configured maximum connection rate, as defined by max_con_rate.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='connection_backlog' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The limit on the number of incoming client requests that can be queued at the listening endpoints for servers.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='failrate_cnt' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Number of instances of a wait-type service which, in combination with the failrate_interval property, determine when to transition the service into maintenance.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='failrate_interval' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Time in seconds for interval to check for failrate_cnt failures of wait-type services which determine when to transition the service into maintenance.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='inherit_env' type='boolean'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+If true, pass inetd's environment on to the service's start method.  If false, the environment is cleared with the exception of SMF_*, and the environment variables from the method context.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='max_con_rate' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The maximum allowed connection rate, in connections per second for a nowait-type service.
+					</loctext>
+				</description>
+				<units>
+					<loctext xml:lang='C'>
+connections per second
+					</loctext>
+				</units>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='max_copies' type='integer'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Maximum number of copies of a nowait service that can run concurrently.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Copies limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Copies limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='tcp_trace' type='boolean'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+If true, enables logging of the service name, client IP address, and TCP port number for nowait services using syslog.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='tcp_wrappers' type='boolean'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+If true, enables TCP wrappers for nowait stream services.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern name='inetd' type='framework'
+		    target='delegate' required='true'>
+			<description>
+				<loctext xml:lang='C'>
+Basic configuration of an inetd-managed service.  Defaults are inherited from inetd if the property is not specified by the service.
+				</loctext>
+			</description>
+			<prop_pattern name='bind_addr' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The address of the network interface to which the service should be bound.  An empty string value causes the service to accept connections on any network interface.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='bind_fail_interval' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Time in seconds between a failed bind attempt and a retry.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+No retries are attempted.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+No retries are attempted.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='bind_fail_max' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The maxiumum nubmer of times inetd retries binding to a service's port before giving up.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+No retry limiting is imposed.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='con_rate_offline' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The time in seconds a service will remain offline if it exceeds its configured maximum connection rate, as defined by max_con_rate.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='connection_backlog' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The limit on the number of incoming client requests that can be queued at the listening endpoints for servers.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='endpoint_type' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+The type of socket used by the service.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<constraints>
+					<value name='tli'>
+						<description>
+							<loctext xml:lang='C'>
+TLI endpoint
+							</loctext>
+						</description>
+					</value>
+					<value name='stream'>
+						<description>
+							<loctext xml:lang='C'>
+stream socket
+							</loctext>
+						</description>
+					</value>
+					<value name='dgram'>
+						<description>
+							<loctext xml:lang='C'>
+datagram socket
+							</loctext>
+						</description>
+					</value>
+					<value name='raw'>
+						<description>
+							<loctext xml:lang='C'>
+raw socket
+							</loctext>
+						</description>
+					</value>
+					<value name='seqpacket'>
+						<description>
+							<loctext xml:lang='C'>
+sequenced packet socket
+							</loctext>
+						</description>
+					</value>
+				</constraints>
+				<choices>
+					<value name='dgram' />
+					<value name='stream' />
+					<value name='tli' />
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='failrate_cnt' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Number of instances of a wait-type service which, in combination with the failrate_interval property, determine when to transition the service into maintenance.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='failrate_interval' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Time in seconds for interval to check for failrate_cnt failures of wait-type services which determine when to transition the service into maintenance.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Failure rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='inherit_env' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, pass inetd's environment on to the service's start method.  If false, the environment is cleared with the exception of SMF_*, and the environment variables from the method context.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='isrpc' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, this is an RPC service.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='max_con_rate' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The maximum allowed connection rate, in connections per second for a nowait-type service.
+					</loctext>
+				</description>
+				<units>
+					<loctext xml:lang='C'>
+connections per second
+					</loctext>
+				</units>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Connection rate limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='max_copies' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Maximum number of copies of a nowait service that can run concurrently.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<description>
+							<loctext xml:lang='C'>
+Copies limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<description>
+							<loctext xml:lang='C'>
+Copies limiting is disabled.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+			<prop_pattern name='name' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Can be set to a service name understood by getservbyname(3SOCKET), or if isrpc is true, a service name understood by getrpcbyname(3NSL) or a valid RPC program number.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='proto' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+A list of protocols supported by the service.
+					</loctext>
+				</description>
+				<choices>
+					<value name='tcp' />
+					<value name='tcp6' />
+					<value name='tcp6only' />
+					<value name='udp' />
+					<value name='udp6' />
+					<value name='udp6only' />
+				</choices>
+			</prop_pattern>
+			<prop_pattern name='rpc_low_version' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Lowest supported RPC version.  Required when isrpc is set to true.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='rpc_high_version' type='integer'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+Highest supported RPC version.  Required when isrpc is set to true.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='tcp_trace' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, enables logging of the service name, client IP address, and TCP port number for nowait services using syslog.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='tcp_wrappers' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, enables TCP wrappers for nowait stream services.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='wait' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, this is a wait-type service.  For wait-type services, the inetd_start method will take over listening duties on the service's bound endpoint and inetd will wait for it to exit before resuming listening.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+		</pg_pattern>
+
+		<pg_pattern type='method' target='delegate' required='false'>
+			<description>
+				<loctext xml:lang='C'>
+A method defines how inetd interacts with its services.  inetd_start is executed to handle a connection.  inetd_offline is executed when the service is taken offline.  inetd_online is executed when the service is taken from offline to online.  inetd_disable is executed when the service is disabled.  inetd_refresh is executed when the service is refreshed.
+				</loctext>
+			</description>
+
+			<prop_pattern name='exec' type='astring'
+			    required='true'>
+				<common_name>
+					<loctext xml:lang='C'>
+method executable
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The method executable may be a script, program, or keyword.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name=':true'>
+						<description>
+							<loctext xml:lang='C'>
+Always returns SMF_EXIT_OK. This token should be used for methods that are required by the restarter but which are unnecessary for the particular service implementation.
+							</loctext>
+						</description>
+					</value>
+					<value name=':kill [-signal]'>
+						<description>
+							<loctext xml:lang='C'>
+Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common pkill invocations.
+
+							</loctext>
+						</description>
+					</value>
+					<value name=':kill_process [-signal]'>
+						<description>
+							<loctext xml:lang='C'>
+For wait-type services, send the specified signal, which is SIGTERM by default, to the parent process of the wait-type serviće´s start method.
+							</loctext>
+						</description>
+					</value>
+				</values>
+				<choices>
+					<include_values type='values' />
+				</choices>
+			</prop_pattern>
+
+			<prop_pattern name='type' type='astring'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+A method may only be of type method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<constraints>
+					<value name='method' />
+				</constraints>
+			</prop_pattern>
+
+			<prop_pattern name='timeout_seconds' type='count'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<values>
+					<value name='0'>
+						<common_name>
+							<loctext xml:lang='C'>
+infinite
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.
+							</loctext>
+						</description>
+					</value>
+					<value name='-1'>
+						<common_name>
+							<loctext xml:lang='C'>
+infinite (legacy)
+							</loctext>
+						</common_name>
+						<description>
+							<loctext xml:lang='C'>
+This method will never time out.  0 is the preferred value.
+							</loctext>
+						</description>
+					</value>
+				</values>
+			</prop_pattern>
+
+			<!-- method_context direct properties -->
+			<prop_pattern name='working_directory' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The working directory to launch the method from.  ":default" can be used as a token to indicate the home directory of the user specified by the credential or profile.
+
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='project' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='resource_pool' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method context resource pool
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The resource pool name on which to launch the method.  :default can be used
+as a token to indicate the pool specified in the project(4) entry given in
+the project attribute.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+
+			<!-- method_credential properties -->
+			<prop_pattern name='user' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential user
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The user ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='group' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential group
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The group ID in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='supp_groups' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential supplemental groups
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string that specifies the supplemental group memberships by ID,
+in numeric or text form.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential privileges
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the privilege set as defined in privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+			<prop_pattern name='limit_privileges' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method credential limit privilege set
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+An optional string specifying the limit privilege set as defined in
+privileges(5).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+				<internal_separators>,</internal_separators>
+			</prop_pattern>
+
+			<!-- method_profile properties -->
+			<prop_pattern name='use_profile' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+A boolean that specifies whether the profile should be used instead of the
+user, group, privileges, and limit_privileges properties.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='profile' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method profile RBAC profile specification 
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+The name of an RBAC (role-based access control) profile which, along with the
+method executable, identifies an entry in exec_attr(4).
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+
+			<!-- method_environment properties -->
+			<prop_pattern name='environment' type='astring'
+			    required='false'>
+				<common_name>
+					<loctext xml:lang='C'>
+method environment variables
+					</loctext>
+				</common_name>
+				<description>
+					<loctext xml:lang='C'>
+Environment variables to insert into the environment of the method, in the
+form of a number of NAME=value strings.
+					</loctext>
+				</description>
+			</prop_pattern>
+		</pg_pattern>
+
+                <pg_pattern name='restarter' type='framework'
+                    target='delegate' required='false'>
+                        <description>
+                                <loctext xml:lang='C'>
+Communicate restarter-set status of the service.
+                                </loctext>
+                        </description>
+
+                        <prop_pattern name='auxiliary_state' type='astring'
+                            required='false'>
+                                <description>
+                                        <loctext xml:lang='C'>
+Additional information about why a service is in the current state.  Unused by inetd.
+                                        </loctext>
+                                </description>
+                                <visibility value='hidden' />
+                                <cardinality min='1' max='1' />
+                        </prop_pattern>
+                        <prop_pattern name='state_timestamp' type='time'
+                            required='false'>
+                                <description>
+                                        <loctext xml:lang='C'>
+Time the current state was reached.
+                                        </loctext>
+                                </description>
+                                <visibility value='readonly' />
+                                <cardinality min='1' max='1' />
+                        </prop_pattern>
+                        <prop_pattern name='state' type='astring'
+                            required='false'>
+                                <description>
+                                        <loctext xml:lang='C'>
+The current state of this service instance.
+                                        </loctext>
+                                </description>
+                                <visibility value='readonly' />
+                                <cardinality min='1' max='1' />
+                                <constraints>
+                                        <value name='online'>
+                                                <description>
+                                                        <loctext xml:lang='C'>
+The instance is handling new network requests and might have existing connections alive.
+                                                        </loctext>
+                                                </description>
+                                        </value>
+                                        <value name='offline'>
+                                                <description>
+                                                        <loctext xml:lang='C'>
+Connections might be active, but no new requests are being handled.  An instance may be offline because its dependencies are unsatisfied, the service has exceeded its configured connection rate limit, the service as reached its allowed number of active connections, or inetd failed to listen on behalf of the service on all its protocols.
+                                                        </loctext>
+                                                </description>
+                                        </value>
+                                        <value name='uninitialized'>
+                                                <description>
+                                                        <loctext xml:lang='C'>
+inetd has yet to process this instance, or the inetd service has not yet been started by svc.startd.
+                                                        </loctext>
+                                                </description>
+                                        </value>
+                                        <value name='degraded'>
+                                                <description>
+                                                        <loctext xml:lang='C'>
+The instance was able to listen and process requests for some, but not all, of the protocoals specified for the instance.  Existing network connections might be active.
+                                                        </loctext>
+                                                </description>
+                                        </value>
+                                        <value name='disabled'>
+                                                <description>
+                                                        <loctext xml:lang='C'>
+The instance is disabled, is not accepting new connections, and has none active.
+                                                        </loctext>
+                                                </description>
+                                        </value>
+                                        <value name='maintenance'>
+                                                <description>
+                                                        <loctext xml:lang='C'>
+The instance is either malfunctioning and needs administrator attention, or an administrator has requested the instance enter this state.
+                                                        </loctext>
+                                                </description>
+                                        </value>
+                                </constraints>
+                        </prop_pattern>
+			<prop_pattern name='next_state' type='astring'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+The next expected state of this instance.
+					</loctext>
+				</description>
+				<visibility value='readonly' />
+				<cardinality min='1' max='1' />
+				<constraints>
+					<value name='online'>
+						<description>
+							<loctext xml:lang='C'>
+The service is being started or refreshed, and will soon be online and running.  This transition may fail and the instance may end up in offline or maintenance instead.
+							</loctext>
+						</description>
+					</value>
+					<value name='offline'>
+						<description>
+							<loctext xml:lang='C'>
+The instance has temporarily suspended accepting new network requests due to dependencies or reaching a connection or failure threshold.  Most instances will leave this state once their dependencies are satisfied or the threshold is no longer exceeded.
+							</loctext>
+						</description>
+					</value>
+					<value name='degraded'>
+						<description>
+							<loctext xml:lang='C'>
+The instance was able to listen and process requests for some, but not all, of the protocoals specified for the instance.  Existing network connections might be active.
+							</loctext>
+						</description>
+					</value>
+					<value name='disabled'>
+						<description>
+							<loctext xml:lang='C'>
+The instance will be disabled, will not be accepting new connections, and will have none active.
+							</loctext>
+						</description>
+					</value>
+					<value name='maintenance'>
+						<description>
+							<loctext xml:lang='C'>
+The instance will be in maintenance, and administrative action will be required to restore the instance to offline and subsequent states.
+							</loctext>
+						</description>
+					</value>
+				</constraints>
+			</prop_pattern>
+		</pg_pattern>
 	</template>
 </service>
 

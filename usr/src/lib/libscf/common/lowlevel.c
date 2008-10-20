@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the main implementation file for the low-level repository
  * interface.
@@ -69,6 +67,31 @@ static int32_t		lowlevel_inited;
 static uu_list_pool_t	*tran_entry_pool;
 static uu_list_pool_t	*datael_pool;
 static uu_list_pool_t	*iter_pool;
+
+/*
+ * base32[] index32[] are used in base32 encoding and decoding.
+ */
+static char base32[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+static char index32[128] = {
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 0-7 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 8-15 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 16-23 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 24-31 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 32-39 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 40-47 */
+	-1, -1, 26, 27, 28, 29, 30, 31,	/* 48-55 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 56-63 */
+	-1, 0, 1, 2, 3, 4, 5, 6,	/* 64-71 */
+	7, 8, 9, 10, 11, 12, 13, 14,	/* 72-79 */
+	15, 16, 17, 18, 19, 20, 21, 22,	/* 80-87 */
+	23, 24, 25, -1, -1, -1, -1, -1,	/* 88-95 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 96-103 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 104-111 */
+	-1, -1, -1, -1, -1, -1, -1, -1,	/* 112-119 */
+	-1, -1, -1, -1, -1, -1, -1, -1	/* 120-127 */
+};
+
+#define	DECODE32_GS	(8)	/* scf_decode32 group size */
 
 /*
  * We want MUTEX_HELD, but we also want pthreads.
@@ -2036,6 +2059,7 @@ scf_iter_create(scf_handle_t *h)
 		(void) pthread_mutex_unlock(&h->rh_lock);
 		uu_list_node_fini(iter, &iter->iter_node, iter_pool);
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
+		uu_free(iter);
 		return (NULL);
 	}
 	if (iter_attach(iter) == -1) {
@@ -4209,7 +4233,7 @@ scf_value_create(scf_handle_t *h)
 		if (h->rh_flags & HANDLE_DEAD) {
 			(void) pthread_mutex_unlock(&h->rh_lock);
 			uu_free(ret);
-			(void) scf_set_error(SCF_ERROR_INVALID_ARGUMENT);
+			(void) scf_set_error(SCF_ERROR_HANDLE_DESTROYED);
 			return (NULL);
 		}
 		h->rh_values++;
@@ -6165,9 +6189,10 @@ scf_walk_fmri(scf_handle_t *h, int argc, char **argv, int flags,
 	/*
 	 * Setup initial variables
 	 */
-	if ((max_fmri_length = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH)) == -1 ||
-	    (max_name_length = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH)) == -1)
-		return (SCF_ERROR_INTERNAL);
+	max_fmri_length = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH);
+	assert(max_fmri_length != -1);
+	max_name_length = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH);
+	assert(max_name_length != -1);
 
 	if ((fmri = malloc(max_fmri_length + 1)) == NULL ||
 	    (pgname = malloc(max_name_length + 1)) == NULL) {
@@ -6835,6 +6860,318 @@ error:
 
 	return (ret);
 }
+
+/*
+ * scf_encode32() is an implementation of Base32 encoding as described in
+ * section 6 of RFC 4648 - "The Base16, Base32, and Base64 Data
+ * Encodings". See http://www.ietf.org/rfc/rfc4648.txt?number=4648.  The
+ * input stream is divided into groups of 5 characters (40 bits).  Each
+ * group is encoded into 8 output characters where each output character
+ * represents 5 bits of input.
+ *
+ * If the input is not an even multiple of 5 characters, the output will be
+ * padded so that the output is an even multiple of 8 characters.  The
+ * standard specifies that the pad character is '='.  Unfortunately, '=' is
+ * not a legal character in SMF property names.  Thus, the caller can
+ * specify an alternate pad character with the pad argument.  If pad is 0,
+ * scf_encode32() will use '='.  Note that use of anything other than '='
+ * produces output that is not in conformance with RFC 4648.  It is
+ * suitable, however, for internal use of SMF software.  When the encoded
+ * data is used as part of an SMF property name, SCF_ENCODE32_PAD should be
+ * used as the pad character.
+ *
+ * Arguments:
+ *	input -		Address of the buffer to be encoded.
+ *	inlen -		Number of characters at input.
+ *	output -	Address of the buffer to receive the encoded data.
+ *	outmax -	Size of the buffer at output.
+ *	outlen -	If it is not NULL, outlen receives the number of
+ *			bytes placed in output.
+ *	pad -		Alternate padding character.
+ *
+ * Returns:
+ *	0	Buffer was successfully encoded.
+ *	-1	Indicates output buffer too small, or pad is one of the
+ *		standard encoding characters.
+ */
+int
+scf_encode32(const char *input, size_t inlen, char *output, size_t outmax,
+    size_t *outlen, char pad)
+{
+	uint_t group_size = 5;
+	uint_t i;
+	const unsigned char *in = (const unsigned char *)input;
+	size_t olen;
+	uchar_t *out = (uchar_t *)output;
+	uint_t oval;
+	uint_t pad_count;
+
+	/* Verify that there is enough room for the output. */
+	olen = ((inlen + (group_size - 1)) / group_size) * 8;
+	if (outlen)
+		*outlen = olen;
+	if (olen > outmax)
+		return (-1);
+
+	/* If caller did not provide pad character, use the default. */
+	if (pad == 0) {
+		pad = '=';
+	} else {
+		/*
+		 * Make sure that caller's pad is not one of the encoding
+		 * characters.
+		 */
+		for (i = 0; i < sizeof (base32) - 1; i++) {
+			if (pad == base32[i])
+				return (-1);
+		}
+	}
+
+	/* Process full groups capturing 5 bits per output character. */
+	for (; inlen >= group_size; in += group_size, inlen -= group_size) {
+		/*
+		 * The comments in this section number the bits in an
+		 * 8 bit byte 0 to 7.  The high order bit is bit 7 and
+		 * the low order bit is bit 0.
+		 */
+
+		/* top 5 bits (7-3) from in[0] */
+		*out++ = base32[in[0] >> 3];
+		/* bits 2-0 from in[0] and top 2 (7-6) from in[1] */
+		*out++ = base32[((in[0] << 2) & 0x1c) | (in[1] >> 6)];
+		/* 5 bits (5-1) from in[1] */
+		*out++ = base32[(in[1] >> 1) & 0x1f];
+		/* low bit (0) from in[1] and top 4 (7-4) from in[2] */
+		*out++ = base32[((in[1] << 4) & 0x10) | ((in[2] >> 4) & 0xf)];
+		/* low 4 (3-0) from in[2] and top bit (7) from in[3] */
+		*out++ = base32[((in[2] << 1) & 0x1e) | (in[3] >> 7)];
+		/* 5 bits (6-2) from in[3] */
+		*out++ = base32[(in[3] >> 2) & 0x1f];
+		/* low 2 (1-0) from in[3] and top 3 (7-5) from in[4] */
+		*out++ = base32[((in[3] << 3) & 0x18) | (in[4] >> 5)];
+		/* low 5 (4-0) from in[4] */
+		*out++ = base32[in[4] & 0x1f];
+	}
+
+	/* Take care of final input bytes. */
+	pad_count = 0;
+	if (inlen) {
+		/* top 5 bits (7-3) from in[0] */
+		*out++ = base32[in[0] >> 3];
+		/*
+		 * low 3 (2-0) from in[0] and top 2 (7-6) from in[1] if
+		 * available.
+		 */
+		oval = (in[0] << 2) & 0x1c;
+		if (inlen == 1) {
+			*out++ = base32[oval];
+			pad_count = 6;
+			goto padout;
+		}
+		oval |= in[1] >> 6;
+		*out++ = base32[oval];
+		/* 5 bits (5-1) from in[1] */
+		*out++ = base32[(in[1] >> 1) & 0x1f];
+		/*
+		 * low bit (0) from in[1] and top 4 (7-4) from in[2] if
+		 * available.
+		 */
+		oval = (in[1] << 4) & 0x10;
+		if (inlen == 2) {
+			*out++ = base32[oval];
+			pad_count = 4;
+			goto padout;
+		}
+		oval |= in[2] >> 4;
+		*out++ = base32[oval];
+		/*
+		 * low 4 (3-0) from in[2] and top 1 (7) from in[3] if
+		 * available.
+		 */
+		oval = (in[2] << 1) & 0x1e;
+		if (inlen == 3) {
+			*out++ = base32[oval];
+			pad_count = 3;
+			goto padout;
+		}
+		oval |= in[3] >> 7;
+		*out++ = base32[oval];
+		/* 5 bits (6-2) from in[3] */
+		*out++ = base32[(in[3] >> 2) & 0x1f];
+		/* low 2 bits (1-0) from in[3] */
+		*out++ = base32[(in[3] << 3) & 0x18];
+		pad_count = 1;
+	}
+padout:
+	/*
+	 * Pad the output so that it is a multiple of 8 bytes.
+	 */
+	for (; pad_count > 0; pad_count--) {
+		*out++ = pad;
+	}
+
+	/*
+	 * Null terminate the output if there is enough room.
+	 */
+	if (olen < outmax)
+		*out = 0;
+
+	return (0);
+}
+
+/*
+ * scf_decode32() is an implementation of Base32 decoding as described in
+ * section 6 of RFC 4648 - "The Base16, Base32, and Base64 Data
+ * Encodings". See http://www.ietf.org/rfc/rfc4648.txt?number=4648.  The
+ * input stream is divided into groups of 8 encoded characters.  Each
+ * encoded character represents 5 bits of data.  Thus, the 8 encoded
+ * characters are used to produce 40 bits or 5 bytes of unencoded data in
+ * outbuf.
+ *
+ * If the encoder did not have enough data to generate a mulitple of 8
+ * characters of encoded data, it used a pad character to get to the 8
+ * character boundry. The standard specifies that the pad character is '='.
+ * Unfortunately, '=' is not a legal character in SMF property names.
+ * Thus, the caller can specify an alternate pad character with the pad
+ * argument.  If pad is 0, scf_decode32() will use '='.  Note that use of
+ * anything other than '=' is not in conformance with RFC 4648.  It is
+ * suitable, however, for internal use of SMF software.  When the encoded
+ * data is used in SMF property names, SCF_ENCODE32_PAD should be used as
+ * the pad character.
+ *
+ * Arguments:
+ *	in -		Buffer of encoded characters.
+ *	inlen -		Number of characters at in.
+ *	outbuf -	Buffer to receive the decoded bytes.  It can be the
+ *			same buffer as in.
+ *	outmax -	Size of the buffer at outbuf.
+ *	outlen -	If it is not NULL, outlen receives the number of
+ *			bytes placed in output.
+ *	pad -		Alternate padding character.
+ *
+ * Returns:
+ *	0	Buffer was successfully decoded.
+ *	-1	Indicates an invalid input character, output buffer too
+ *		small, or pad is one of the standard encoding characters.
+ */
+int
+scf_decode32(const char *in, size_t inlen, char *outbuf, size_t outmax,
+    size_t *outlen, char pad)
+{
+	char *bufend = outbuf + outmax;
+	char c;
+	uint_t count;
+	uint32_t g[DECODE32_GS];
+	size_t i;
+	uint_t j;
+	char *out = outbuf;
+	boolean_t pad_seen = B_FALSE;
+
+	/* If caller did not provide pad character, use the default. */
+	if (pad == 0) {
+		pad = '=';
+	} else {
+		/*
+		 * Make sure that caller's pad is not one of the encoding
+		 * characters.
+		 */
+		for (i = 0; i < sizeof (base32) - 1; i++) {
+			if (pad == base32[i])
+				return (-1);
+		}
+	}
+
+	i = 0;
+	while ((i < inlen) && (out < bufend)) {
+		/* Get a group of input characters. */
+		for (j = 0, count = 0;
+		    (j < DECODE32_GS) && (i < inlen);
+		    i++) {
+			c = in[i];
+			/*
+			 * RFC 4648 allows for the encoded data to be split
+			 * into multiple lines, so skip carriage returns
+			 * and new lines.
+			 */
+			if ((c == '\r') || (c == '\n'))
+				continue;
+			if ((pad_seen == B_TRUE) && (c != pad)) {
+				/* Group not completed by pads */
+				return (-1);
+			}
+			if ((c < 0) || (c >= sizeof (index32))) {
+				/* Illegal character. */
+				return (-1);
+			}
+			if (c == pad) {
+				pad_seen = B_TRUE;
+				continue;
+			}
+			if ((g[j++] = index32[c]) == 0xff) {
+				/* Illegal character */
+				return (-1);
+			}
+			count++;
+		}
+
+		/* Pack the group into five 8 bit bytes. */
+		if ((count >= 2) && (out < bufend)) {
+			/*
+			 * Output byte 0:
+			 *	5 bits (7-3) from g[0]
+			 *	3 bits (2-0) from g[1] (4-2)
+			 */
+			*out++ = (g[0] << 3) | ((g[1] >> 2) & 0x7);
+		}
+		if ((count >= 4) && (out < bufend)) {
+			/*
+			 * Output byte 1:
+			 *	2 bits (7-6) from g[1] (1-0)
+			 *	5 bits (5-1) from g[2] (4-0)
+			 *	1 bit (0) from g[3] (4)
+			 */
+			*out++ = (g[1] << 6) | (g[2] << 1) | \
+			    ((g[3] >> 4) & 0x1);
+		}
+		if ((count >= 5) && (out < bufend)) {
+			/*
+			 * Output byte 2:
+			 *	4 bits (7-4) from g[3] (3-0)
+			 *	4 bits (3-0) from g[4] (4-1)
+			 */
+			*out++ = (g[3] << 4) | ((g[4] >> 1) & 0xf);
+		}
+		if ((count >= 7) && (out < bufend)) {
+			/*
+			 * Output byte 3:
+			 *	1 bit (7) from g[4] (0)
+			 *	5 bits (6-2) from g[5] (4-0)
+			 *	2 bits (0-1) from g[6] (4-3)
+			 */
+			*out++ = (g[4] << 7) | (g[5] << 2) |
+			    ((g[6] >> 3) & 0x3);
+		}
+		if ((count == 8) && (out < bufend)) {
+			/*
+			 * Output byte 4;
+			 *	3 bits (7-5) from g[6] (2-0)
+			 *	5 bits (4-0) from g[7] (4-0)
+			 */
+			*out++ = (g[6] << 5) | g[7];
+		}
+	}
+	if (i < inlen) {
+		/* Did not process all input characters. */
+		return (-1);
+	}
+	if (outlen)
+		*outlen = out - outbuf;
+	/* Null terminate the output if there is room. */
+	if (out < bufend)
+		*out = 0;
+	return (0);
+}
+
 
 /*
  * _scf_request_backup:  a simple wrapper routine
