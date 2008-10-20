@@ -27,8 +27,6 @@
 #ifndef	_INET_IP_IRE_H
 #define	_INET_IP_IRE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -77,7 +75,7 @@ extern "C" {
 #define	MATCH_IRE_TYPE		0x0001	/* Match IRE type */
 #define	MATCH_IRE_SRC		0x0002	/* Match IRE source address */
 #define	MATCH_IRE_MASK		0x0004	/* Match IRE mask */
-/* unused			0x0008 */
+#define	MATCH_IRE_WQ		0x0008	/* Match IRE ire_stq to write queue */
 #define	MATCH_IRE_GW		0x0010	/* Match IRE gateway */
 #define	MATCH_IRE_IPIF		0x0020	/* Match IRE ipif */
 #define	MATCH_IRE_RECURSIVE	0x0040	/* Do recursive lookup if necessary */
@@ -192,6 +190,21 @@ typedef struct {
 #define	BUMP_IRE_STATS(ire_stats, x) atomic_add_64(&(ire_stats).x, 1)
 
 #ifdef _KERNEL
+/*
+ * Structure for passing args for the IRE cache lookup functions.
+ */
+typedef struct ire_ctable_args_s {
+	void			*ict_addr;
+	void			*ict_gateway;
+	int			ict_type;
+	const ipif_t		*ict_ipif;
+	zoneid_t		ict_zoneid;
+	const ts_label_t	*ict_tsl;
+	int			ict_flags;
+	ip_stack_t		*ict_ipst;
+	queue_t			*ict_wq;
+} ire_ctable_args_t;
+
 struct ts_label_s;
 struct nce_s;
 
@@ -343,10 +356,13 @@ extern ire_t	*ire_get_next_default_ire(ire_t *, ire_t *);
 extern  void	ire_arpresolve(ire_t *,  ill_t *);
 extern  void	ire_freemblk(ire_t *);
 extern boolean_t	ire_match_args(ire_t *, ipaddr_t, ipaddr_t, ipaddr_t,
-    int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int);
+    int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int,
+    queue_t *);
 extern  int	ire_nce_init(ire_t *, struct nce_s *);
 extern  boolean_t	ire_walk_ill_match(uint_t, uint_t, ire_t *, ill_t *,
     zoneid_t, ip_stack_t *);
+extern	ire_t	*ire_arpresolve_lookup(ipaddr_t, ipaddr_t, ipif_t *, zoneid_t,
+    ip_stack_t *, queue_t *);
 
 #endif /* _KERNEL */
 

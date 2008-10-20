@@ -2525,6 +2525,7 @@ typedef struct ire_s {
 	 */
 	kmutex_t	ire_lock;
 	uint_t		ire_ipif_seqid; /* ipif_seqid of ire_ipif */
+	uint_t		ire_ipif_ifindex; /* ifindex associated with ipif */
 	clock_t		ire_last_used_time;	/* Last used time */
 	tsol_ire_gw_secattr_t *ire_gw_secattr; /* gateway security attributes */
 	zoneid_t	ire_zoneid;	/* for local address discrimination */

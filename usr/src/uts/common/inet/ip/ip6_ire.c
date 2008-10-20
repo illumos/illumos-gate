@@ -26,8 +26,6 @@
  * Copyright (c) 1990 Mentat Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains routines that manipulate Internet Routing Entries (IREs).
  */
@@ -73,6 +71,7 @@ static	ire_t	*ire_init_v6(ire_t *, const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, uint_t *, queue_t *, queue_t *,
     ushort_t, ipif_t *, const in6_addr_t *, uint32_t, uint32_t, uint_t,
     const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
+static	ire_t	*ip6_ctable_lookup_impl(ire_ctable_args_t *);
 
 
 /*
@@ -1943,36 +1942,19 @@ ire_ctable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *gateway,
     int type, const ipif_t *ipif, zoneid_t zoneid, const ts_label_t *tsl,
     int flags, ip_stack_t *ipst)
 {
-	ire_t *ire;
-	irb_t *irb_ptr;
-	ASSERT(addr != NULL);
-	ASSERT((!(flags & MATCH_IRE_GW)) || gateway != NULL);
+	ire_ctable_args_t	margs;
 
-	/*
-	 * ire_match_args_v6() will dereference ipif MATCH_IRE_SRC or
-	 * MATCH_IRE_ILL is set.
-	 */
-	if ((flags & (MATCH_IRE_SRC |  MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
-	    (ipif == NULL))
-		return (NULL);
+	margs.ict_addr = (void *)addr;
+	margs.ict_gateway = (void *)gateway;
+	margs.ict_type = type;
+	margs.ict_ipif = ipif;
+	margs.ict_zoneid = zoneid;
+	margs.ict_tsl = tsl;
+	margs.ict_flags = flags;
+	margs.ict_ipst = ipst;
+	margs.ict_wq = NULL;
 
-	irb_ptr = &ipst->ips_ip_cache_table_v6[IRE_ADDR_HASH_V6(*addr,
-	    ipst->ips_ip6_cache_table_size)];
-	rw_enter(&irb_ptr->irb_lock, RW_READER);
-	for (ire = irb_ptr->irb_ire; ire; ire = ire->ire_next) {
-		if (ire->ire_marks & IRE_MARK_CONDEMNED)
-			continue;
-
-		ASSERT(IN6_ARE_ADDR_EQUAL(&ire->ire_mask_v6, &ipv6_all_ones));
-		if (ire_match_args_v6(ire, addr, &ire->ire_mask_v6, gateway,
-		    type, ipif, zoneid, 0, tsl, flags)) {
-			IRE_REFHOLD(ire);
-			rw_exit(&irb_ptr->irb_lock);
-			return (ire);
-		}
-	}
-	rw_exit(&irb_ptr->irb_lock);
-	return (NULL);
+	return (ip6_ctable_lookup_impl(&margs));
 }
 
 /*
@@ -2849,4 +2831,44 @@ ipif_lookup_multi_ire_v6(ipif_t *ipif, const in6_addr_t *v6dstp)
 	IRB_REFRELE(irb);
 
 	return (save_ire);
+}
+
+/*
+ * This is the implementation of the IPv6 IRE cache lookup procedure.
+ * Separating the interface from the implementation allows additional
+ * flexibility when specifying search criteria.
+ */
+static ire_t *
+ip6_ctable_lookup_impl(ire_ctable_args_t *margs)
+{
+	irb_t			*irb_ptr;
+	ire_t			*ire;
+	ip_stack_t		*ipst = margs->ict_ipst;
+
+	if ((margs->ict_flags &
+	    (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
+	    (margs->ict_ipif == NULL)) {
+		return (NULL);
+	}
+
+	irb_ptr = &ipst->ips_ip_cache_table_v6[IRE_ADDR_HASH_V6(
+	    *((in6_addr_t *)(margs->ict_addr)),
+	    ipst->ips_ip6_cache_table_size)];
+	rw_enter(&irb_ptr->irb_lock, RW_READER);
+	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (ire->ire_marks & IRE_MARK_CONDEMNED)
+			continue;
+		ASSERT(IN6_ARE_ADDR_EQUAL(&ire->ire_mask_v6, &ipv6_all_ones));
+		if (ire_match_args_v6(ire, (in6_addr_t *)margs->ict_addr,
+		    &ire->ire_mask_v6, (in6_addr_t *)margs->ict_gateway,
+		    margs->ict_type, margs->ict_ipif, margs->ict_zoneid, 0,
+		    margs->ict_tsl, margs->ict_flags)) {
+			IRE_REFHOLD(ire);
+			rw_exit(&irb_ptr->irb_lock);
+			return (ire);
+		}
+	}
+
+	rw_exit(&irb_ptr->irb_lock);
+	return (NULL);
 }

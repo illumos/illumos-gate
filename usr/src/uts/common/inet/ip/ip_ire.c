@@ -357,6 +357,7 @@ static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
 static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold,
     ire_t *ref_ire);
 static	void	ip_nce_clookup_and_delete(nce_t *nce, void *arg);
+static	ire_t	*ip4_ctable_lookup_impl(ire_ctable_args_t *margs);
 #ifdef DEBUG
 static void	ire_trace_cleanup(const ire_t *);
 #endif
@@ -1632,6 +1633,8 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, nce_t *src_nce, queue_t *rfq,
 	ire->ire_ipif = ipif;
 	if (ipif != NULL) {
 		ire->ire_ipif_seqid = ipif->ipif_seqid;
+		ire->ire_ipif_ifindex =
+		    ipif->ipif_ill->ill_phyint->phyint_ifindex;
 		ire->ire_zoneid = ipif->ipif_zoneid;
 	} else {
 		ire->ire_zoneid = GLOBAL_ZONEID;
@@ -2916,7 +2919,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			continue;
 		if (ire_match_args(ire1, ire->ire_addr, ire->ire_mask,
 		    ire->ire_gateway_addr, ire->ire_type, ire->ire_ipif,
-		    ire->ire_zoneid, 0, NULL, flags)) {
+		    ire->ire_zoneid, 0, NULL, flags, NULL)) {
 			/*
 			 * Return the old ire after doing a REFHOLD.
 			 * As most of the callers continue to use the IRE
@@ -3874,7 +3877,7 @@ ire_flush_cache_v4(ire_t *ire, int flag)
 boolean_t
 ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
     int type, const ipif_t *ipif, zoneid_t zoneid, uint32_t ihandle,
-    const ts_label_t *tsl, int match_flags)
+    const ts_label_t *tsl, int match_flags, queue_t *wq)
 {
 	ill_t *ire_ill = NULL, *dst_ill;
 	ill_t *ipif_ill = NULL;
@@ -3885,6 +3888,7 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	ASSERT((ire->ire_addr & ~ire->ire_mask) == 0);
 	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP))) ||
 	    (ipif != NULL && !ipif->ipif_isv6));
+	ASSERT(!(match_flags & MATCH_IRE_WQ) || wq != NULL);
 
 	/*
 	 * HIDDEN cache entries have to be looked up specifically with
@@ -4022,6 +4026,8 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	    ire->ire_marks & IRE_MARK_PRIVATE_ADDR)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
 	    (ire_ill == ipif_ill)) &&
+	    ((!(match_flags & MATCH_IRE_WQ)) ||
+	    (ire->ire_stq == wq)) &&
 	    ((!(match_flags & MATCH_IRE_IHANDLE)) ||
 	    (ire->ire_ihandle == ihandle)) &&
 	    ((!(match_flags & MATCH_IRE_MASK)) ||
@@ -4100,7 +4106,7 @@ ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid, ip_stack_t *ipst)
 
 		ASSERT(ire->ire_mask == IP_HOST_MASK);
 		if (ire_match_args(ire, addr, ire->ire_mask, 0, IRE_CACHE,
-		    NULL, zoneid, 0, NULL, MATCH_IRE_TYPE)) {
+		    NULL, zoneid, 0, NULL, MATCH_IRE_TYPE, NULL)) {
 			ire_delete(ire);
 		}
 	}
@@ -4119,33 +4125,19 @@ ire_t *
 ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
     zoneid_t zoneid, const ts_label_t *tsl, int flags, ip_stack_t *ipst)
 {
-	irb_t *irb_ptr;
-	ire_t *ire;
+	ire_ctable_args_t	margs;
 
-	/*
-	 * ire_match_args() will dereference ipif MATCH_IRE_SRC or
-	 * MATCH_IRE_ILL is set.
-	 */
-	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
-	    (ipif == NULL))
-		return (NULL);
+	margs.ict_addr = &addr;
+	margs.ict_gateway = &gateway;
+	margs.ict_type = type;
+	margs.ict_ipif = ipif;
+	margs.ict_zoneid = zoneid;
+	margs.ict_tsl = tsl;
+	margs.ict_flags = flags;
+	margs.ict_ipst = ipst;
+	margs.ict_wq = NULL;
 
-	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(addr,
-	    ipst->ips_ip_cache_table_size)];
-	rw_enter(&irb_ptr->irb_lock, RW_READER);
-	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & IRE_MARK_CONDEMNED)
-			continue;
-		ASSERT(ire->ire_mask == IP_HOST_MASK);
-		if (ire_match_args(ire, addr, ire->ire_mask, gateway, type,
-		    ipif, zoneid, 0, tsl, flags)) {
-			IRE_REFHOLD(ire);
-			rw_exit(&irb_ptr->irb_lock);
-			return (ire);
-		}
-	}
-	rw_exit(&irb_ptr->irb_lock);
-	return (NULL);
+	return (ip4_ctable_lookup_impl(&margs));
 }
 
 /*
@@ -5448,6 +5440,7 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	*ire = ire_null;
 	ire->ire_u = in_ire->ire_u;
 	ire->ire_ipif_seqid = in_ire->ire_ipif_seqid;
+	ire->ire_ipif_ifindex = in_ire->ire_ipif_ifindex;
 	ire->ire_ipif = in_ire->ire_ipif;
 	ire->ire_stq = in_ire->ire_stq;
 	ill = ire_to_ill(ire);
@@ -5734,4 +5727,71 @@ retry_nce:
 		NCE_REFRELE(nce);
 	}
 	return (0);
+}
+
+/*
+ * This is the implementation of the IPv4 IRE cache lookup procedure.
+ * Separating the interface from the implementation allows additional
+ * flexibility when specifying search criteria.
+ */
+static ire_t *
+ip4_ctable_lookup_impl(ire_ctable_args_t *margs)
+{
+	irb_t			*irb_ptr;
+	ire_t			*ire;
+	ip_stack_t		*ipst = margs->ict_ipst;
+
+	if ((margs->ict_flags &
+	    (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
+	    (margs->ict_ipif == NULL)) {
+		return (NULL);
+	}
+
+	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(
+	    *((ipaddr_t *)margs->ict_addr), ipst->ips_ip_cache_table_size)];
+	rw_enter(&irb_ptr->irb_lock, RW_READER);
+	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (ire->ire_marks & IRE_MARK_CONDEMNED)
+			continue;
+		ASSERT(ire->ire_mask == IP_HOST_MASK);
+		if (ire_match_args(ire, *((ipaddr_t *)margs->ict_addr),
+		    ire->ire_mask, *((ipaddr_t *)margs->ict_gateway),
+		    margs->ict_type, margs->ict_ipif, margs->ict_zoneid, 0,
+		    margs->ict_tsl, margs->ict_flags, margs->ict_wq)) {
+			IRE_REFHOLD(ire);
+			rw_exit(&irb_ptr->irb_lock);
+			return (ire);
+		}
+	}
+
+	rw_exit(&irb_ptr->irb_lock);
+	return (NULL);
+}
+
+/*
+ * This function locates IRE_CACHE entries which were added by the
+ * ire_forward() path. We can fully specify the IRE we are looking for by
+ * providing the ipif_t AND the ire_stq. This is different to MATCH_IRE_ILL
+ * which uses the ipif_ill. This is inadequate with IPMP groups where
+ * illgrp_scheduler() may have been used to select an ill from the group for
+ * the outgoing interface.
+ */
+ire_t *
+ire_arpresolve_lookup(ipaddr_t addr, ipaddr_t gw, ipif_t *ipif,
+    zoneid_t zoneid, ip_stack_t *ipst, queue_t *wq)
+{
+	ire_ctable_args_t	margs;
+
+	margs.ict_addr = &addr;
+	margs.ict_gateway = &gw;
+	margs.ict_type = IRE_CACHE;
+	margs.ict_ipif = ipif;
+	margs.ict_zoneid = zoneid;
+	margs.ict_tsl = NULL;
+	margs.ict_flags = MATCH_IRE_GW | MATCH_IRE_IPIF | MATCH_IRE_ZONEONLY |
+	    MATCH_IRE_TYPE | MATCH_IRE_WQ;
+	margs.ict_ipst = ipst;
+	margs.ict_wq = wq;
+
+	return (ip4_ctable_lookup_impl(&margs));
 }

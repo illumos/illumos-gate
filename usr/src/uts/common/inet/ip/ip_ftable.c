@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains consumer routines of the IPv4 forwarding engine
  */
@@ -1759,7 +1757,7 @@ ire_find_best_route(struct radix_node *rn, void *arg)
 		if (ire_match_args(ire, margs->ift_addr, match_mask,
 		    margs->ift_gateway, margs->ift_type, margs->ift_ipif,
 		    margs->ift_zoneid, margs->ift_ihandle, margs->ift_tsl,
-		    margs->ift_flags)) {
+		    margs->ift_flags, NULL)) {
 			IRE_REFHOLD(ire);
 			rw_exit(&irb_ptr->irb_lock);
 			margs->ift_best_ire = ire;
@@ -1911,7 +1909,7 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs,
 		if (!ire_match_args(ire, margs->ift_addr, (ipaddr_t)0,
 		    margs->ift_gateway, margs->ift_type, margs->ift_ipif,
 		    margs->ift_zoneid, margs->ift_ihandle, margs->ift_tsl,
-		    margs->ift_flags))
+		    margs->ift_flags, NULL))
 			goto next_ire;
 
 		if (ire->ire_type & IRE_INTERFACE) {
