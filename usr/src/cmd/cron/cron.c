@@ -29,7 +29,6 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef lint
 /* make lint happy */
@@ -287,6 +286,7 @@ static void rm_ctevents(struct usr *);
 static void cleanup(struct runinfo *rn, int r);
 static void crabort(char *, int);
 static void msg(char *fmt, ...);
+static void ignore_msg(char *, char *, struct event *);
 static void logit(int, struct runinfo *, int);
 static void parsqdef(char *);
 static void defaults();
@@ -333,6 +333,7 @@ static int set_user_cred(const struct usr *, struct project *);
  * it's original intended use.
  */
 static time_t last_time, init_time, t_old;
+static int reset_needed; /* set to 1 when cron(1M) needs to re-initialize */
 
 static int		accept_sigcld, notifypipe[2];
 static sigset_t		defmask, childmask;
@@ -390,7 +391,7 @@ static void process_anc_files(int);
  * functions in elm.c
  */
 extern void el_init(int, time_t, time_t, int);
-extern void el_add(void *, time_t, int);
+extern int el_add(void *, time_t, int);
 extern void el_remove(int, int);
 extern int el_empty(void);
 extern void *el_first(void);
@@ -415,13 +416,17 @@ main(int argc, char *argv[])
 	struct sigaction act;
 
 	/*
-	 * reset is set to 1 via the return from ex() should ex() find
-	 * that the event to be executed is being run at the wrong time.
+	 * reset_needed is set to 1 whenever el_add() finds out that a cron
+	 * job is scheduled to be run before the time when cron(1M) daemon
+	 * initialized.
+	 * Other cases where a reset is needed is when ex() finds that the
+	 * event to be executed is being run at the wrong time, or when idle()
+	 * determines that time was reset.
 	 * We immediately return to the top of the while (TRUE) loop in
-	 * main() where the event list is cleared and rebuilt, and reset
+	 * main() where the event list is cleared and rebuilt, and reset_needed
 	 * is set back to 0.
 	 */
-	int reset = 0;
+	reset_needed = 0;
 
 	/*
 	 * Only the privileged user can run this command.
@@ -477,13 +482,14 @@ begin:
 	 */
 	(void) fcntl(notifypipe[0], F_SETFL, O_WRONLY|O_NONBLOCK);
 
-	t_old = time(NULL);
+	t_old = init_time;
 	last_time = t_old;
 	for (;;) {		/* MAIN LOOP */
 		t = time(NULL);
-		if ((t_old > t) || (t-last_time > CUSHION) || reset) {
-			reset = 0;
+		if ((t_old > t) || (t-last_time > CUSHION) || reset_needed) {
+			reset_needed = 0;
 			/* the time was set backwards or forward */
+			msg("time was reset, re-initializing");
 			el_delete();
 			u = uhead;
 			while (u != NULL) {
@@ -502,6 +508,13 @@ begin:
 			initialize(0);
 			t = time(NULL);
 			last_time = t;
+			/*
+			 * reset_needed might have been set in the functions
+			 * call path from initialize()
+			 */
+			if (reset_needed) {
+				continue;
+			}
 		}
 		t_old = t;
 
@@ -519,8 +532,14 @@ begin:
 #endif
 		}
 		if (ne_time > 0) {
-			if ((reset = idle(ne_time)) != 0)
+			/*
+			 * reset_needed may be set in the functions call path
+			 * from idle()
+			 */
+			if (idle(ne_time) || reset_needed) {
+				reset_needed = 1;
 				continue;
+			}
 		}
 
 		if (stat(QUEDEFS, &buf)) {
@@ -532,8 +551,14 @@ begin:
 
 		last_time = next_event->time; /* save execution time */
 
-		if (reset = ex(next_event))
+		/*
+		 * reset_needed may be set in the functions call path
+		 * from ex()
+		 */
+		if (ex(next_event) || reset_needed) {
+			reset_needed = 1;
 			continue;
+		}
 
 		switch (next_event->etype) {
 		case CRONEVENT:
@@ -581,8 +606,15 @@ begin:
 			    next_event->cmd, next_event->time, timebuf);
 #endif
 
-			el_add(next_event, next_event->time,
-			    (next_event->u)->ctid);
+			switch (el_add(next_event, next_event->time,
+			    (next_event->u)->ctid)) {
+			case -1:
+				ignore_msg("main", "cron", next_event);
+				break;
+			case -2: /* event time lower than init time */
+				reset_needed = 1;
+				break;
+			}
 			break;
 		default:
 			/* remove at or batch job from system */
@@ -620,8 +652,6 @@ initialize(int firstpass)
 #ifdef DEBUG
 	(void) fprintf(stderr, "in initialize\n");
 #endif
-	init_time = time(NULL);
-	el_init(8, init_time, (time_t)(60*60*24), 10);
 	if (firstpass) {
 		/* for mail(1), make sure messages come from root */
 		if (putenv("LOGNAME=root") != 0) {
@@ -659,6 +689,9 @@ initialize(int firstpass)
 		perror("! open");
 		crabort("cannot open fifo queue", REMOVE_FIFO|CONSOLE_MSG);
 	}
+
+	init_time = time(NULL);
+	el_init(8, init_time, (time_t)(60*60*24), 10);
 
 	/*
 	 * read directories, create users list, and add events to the
@@ -1031,7 +1064,9 @@ add_atevent(struct usr *u, char *job, time_t tim, int jobtype)
 	(void) fprintf(stderr, "add_atevent: user=%s, job=%s, time=%ld\n",
 	    u->name, e->cmd, e->time);
 #endif
-	el_add(e, e->time, e->of.at.eventid);
+	if (el_add(e, e->time, e->of.at.eventid) < 0) {
+		ignore_msg("add_atevent", "at", e);
+	}
 }
 
 void
@@ -1151,7 +1186,14 @@ again:
 		/* set the time for the first occurance of this event	*/
 		e->time = next_time(e, reftime);
 		/* finally, add this event to the main event list	*/
-		el_add(e, e->time, u->ctid);
+		switch (el_add(e, e->time, u->ctid)) {
+		case -1:
+			ignore_msg("readcron", "cron", e);
+			break;
+		case -2: /* event time lower than init time */
+			reset_needed = 1;
+			break;
+		}
 		cte_valid();
 #ifdef DEBUG
 		cftime(timebuf, "%C", &e->time);
@@ -2128,12 +2170,21 @@ ex(struct event *e)
 		if (next_event->etype == CRONEVENT) {
 			msg("correcting cron event\n");
 			next_event->time = next_time(next_event, dhltime);
-			el_add(next_event, next_event->time,
-			    (next_event->u)->ctid);
+			switch (el_add(next_event, next_event->time,
+			    (next_event->u)->ctid)) {
+			case -1:
+				ignore_msg("ex", "cron", next_event);
+				break;
+			case -2: /* event time lower than init time */
+				reset_needed = 1;
+				break;
+			}
 		} else { /* etype == ATEVENT */
 			msg("correcting batch event\n");
-			el_add(next_event, next_event->time,
-			    next_event->of.at.eventid);
+			if (el_add(next_event, next_event->time,
+			    next_event->of.at.eventid) < 0) {
+				ignore_msg("ex", "at", next_event);
+			}
 		}
 		delayed++;
 		t_old = time(NULL);
@@ -2687,12 +2738,22 @@ process_msg(struct message *pmsg, time_t reftime)
 		break;
 	}
 	if (next_event != NULL) {
-		if (next_event->etype == CRONEVENT)
-			el_add(next_event, next_event->time,
-			    (next_event->u)->ctid);
-		else	/* etype == ATEVENT */
-			el_add(next_event, next_event->time,
-			    next_event->of.at.eventid);
+		if (next_event->etype == CRONEVENT) {
+			switch (el_add(next_event, next_event->time,
+			    (next_event->u)->ctid)) {
+			case -1:
+				ignore_msg("process_msg", "cron", next_event);
+				break;
+			case -2: /* event time lower than init time */
+				reset_needed = 1;
+				break;
+			}
+		} else { /* etype == ATEVENT */
+			if (el_add(next_event, next_event->time,
+			    next_event->of.at.eventid) < 0) {
+				ignore_msg("process_msg", "at", next_event);
+			}
+		}
 		next_event = NULL;
 	}
 	(void) fflush(stdout);
@@ -2836,6 +2897,16 @@ msg(char *fmt, ...)
 }
 
 static void
+ignore_msg(char *func_name, char *job_type, struct event *event)
+{
+	msg("%s: ignoring %s job (user: %s, cmd: %s, time: %ld)",
+	    func_name, job_type,
+	    event->u->name ? event->u->name : "unknown",
+	    event->cmd ? event->cmd : "unknown",
+	    event->time);
+}
+
+static void
 logit(int cc, struct runinfo *rp, int rc)
 {
 	time_t t;
@@ -2869,7 +2940,15 @@ resched(int delay)
 		next_event->time = next_time(next_event, (time_t)0);
 		if (nt < next_event->time)
 			next_event->time = nt;
-		el_add(next_event, next_event->time, (next_event->u)->ctid);
+		switch (el_add(next_event, next_event->time,
+		    (next_event->u)->ctid)) {
+		case -1:
+			ignore_msg("resched", "cron", next_event);
+			break;
+		case -2: /* event time lower than init time */
+			reset_needed = 1;
+			break;
+		}
 		delayed = 1;
 		msg("rescheduling a cron job");
 		return;
