@@ -634,17 +634,17 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			sreq = kmem_cache_alloc(kcf_sreq_cache, KM_SLEEP);
 			sreq->sn_state = REQ_ALLOCATED;
 			sreq->sn_rv = CRYPTO_FAILED;
-
 			sreq->sn_params = params;
-			KCF_PROV_REFHOLD(pd);
-			sreq->sn_provider = pd;
 
 			/*
 			 * Note that we do not need to hold the context
 			 * for synchronous case as the context will never
-			 * become invalid underneath us in this case.
+			 * become invalid underneath us. We do not need to hold
+			 * the provider here either as the caller has a hold.
 			 */
 			sreq->sn_context = kcf_ctx;
+			ASSERT(KCF_PROV_REFHELD(pd));
+			sreq->sn_provider = pd;
 
 			ASSERT(taskq != NULL);
 			/*
@@ -684,7 +684,6 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			mutex_exit(&sreq->sn_lock);
 
 			error = sreq->sn_rv;
-			KCF_PROV_REFRELE(sreq->sn_provider);
 			kmem_cache_free(kcf_sreq_cache, sreq);
 
 			break;

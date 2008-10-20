@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CRYPTO_OPS_IMPL_H
 #define	_SYS_CRYPTO_OPS_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Scheduler internal structures.
@@ -370,11 +368,15 @@ typedef struct kcf_req_params {
 #define	KCF_WRAP_DIGEST_OPS_PARAMS(req, ftype, _sid, _mech, _key,	\
 	_data, _digest) {						\
 	kcf_digest_ops_params_t *dops = &(req)->rp_u.digest_params;	\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_DIGEST;				\
 	(req)->rp_optype = ftype;					\
 	dops->do_sid = _sid;						\
-	kcf_dup_mech(_mech, &dops->do_mech, &dops->do_framework_mechtype); \
+	if (mechp != NULL) {						\
+		dops->do_mech = *mechp;					\
+		dops->do_framework_mechtype = mechp->cm_type;		\
+	}								\
 	dops->do_digest_key = _key;					\
 	dops->do_data = _data;						\
 	dops->do_digest = _digest;					\
@@ -383,11 +385,15 @@ typedef struct kcf_req_params {
 #define	KCF_WRAP_MAC_OPS_PARAMS(req, ftype, _sid, _mech, _key,		\
 	_data, _mac, _templ) {						\
 	kcf_mac_ops_params_t *mops = &(req)->rp_u.mac_params;		\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_MAC;					\
 	(req)->rp_optype = ftype;					\
 	mops->mo_sid = _sid;						\
-	kcf_dup_mech(_mech, &mops->mo_mech, &mops->mo_framework_mechtype); \
+	if (mechp != NULL) {						\
+		mops->mo_mech = *mechp;					\
+		mops->mo_framework_mechtype = mechp->cm_type;		\
+	}								\
 	mops->mo_key = _key;						\
 	mops->mo_data = _data;						\
 	mops->mo_mac = _mac;						\
@@ -397,11 +403,15 @@ typedef struct kcf_req_params {
 #define	KCF_WRAP_ENCRYPT_OPS_PARAMS(req, ftype, _sid, _mech, _key,	\
 	_plaintext, _ciphertext, _templ) {				\
 	kcf_encrypt_ops_params_t *cops = &(req)->rp_u.encrypt_params;	\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_ENCRYPT;				\
 	(req)->rp_optype = ftype;					\
 	cops->eo_sid = _sid;						\
-	kcf_dup_mech(_mech, &cops->eo_mech, &cops->eo_framework_mechtype); \
+	if (mechp != NULL) {						\
+		cops->eo_mech = *mechp;					\
+		cops->eo_framework_mechtype = mechp->cm_type;		\
+	}								\
 	cops->eo_key = _key;						\
 	cops->eo_plaintext = _plaintext;				\
 	cops->eo_ciphertext = _ciphertext;				\
@@ -411,11 +421,15 @@ typedef struct kcf_req_params {
 #define	KCF_WRAP_DECRYPT_OPS_PARAMS(req, ftype, _sid, _mech, _key,	\
 	_ciphertext, _plaintext, _templ) {				\
 	kcf_decrypt_ops_params_t *cops = &(req)->rp_u.decrypt_params;	\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_DECRYPT;				\
 	(req)->rp_optype = ftype;					\
 	cops->dop_sid = _sid;						\
-	kcf_dup_mech(_mech, &cops->dop_mech, &cops->dop_framework_mechtype); \
+	if (mechp != NULL) {						\
+		cops->dop_mech = *mechp;				\
+		cops->dop_framework_mechtype = mechp->cm_type;		\
+	}								\
 	cops->dop_key = _key;						\
 	cops->dop_ciphertext = _ciphertext;				\
 	cops->dop_plaintext = _plaintext;				\
@@ -425,11 +439,15 @@ typedef struct kcf_req_params {
 #define	KCF_WRAP_SIGN_OPS_PARAMS(req, ftype, _sid, _mech, _key,		\
 	_data, _signature, _templ) {					\
 	kcf_sign_ops_params_t *sops = &(req)->rp_u.sign_params;		\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_SIGN;					\
 	(req)->rp_optype = ftype;					\
 	sops->so_sid = _sid;						\
-	kcf_dup_mech(_mech, &sops->so_mech, &sops->so_framework_mechtype); \
+	if (mechp != NULL) {						\
+		sops->so_mech = *mechp;					\
+		sops->so_framework_mechtype = mechp->cm_type;		\
+	}								\
 	sops->so_key = _key;						\
 	sops->so_data = _data;						\
 	sops->so_signature = _signature;				\
@@ -439,11 +457,15 @@ typedef struct kcf_req_params {
 #define	KCF_WRAP_VERIFY_OPS_PARAMS(req, ftype, _sid, _mech, _key,	\
 	_data, _signature, _templ) {					\
 	kcf_verify_ops_params_t *vops = &(req)->rp_u.verify_params;	\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_VERIFY;				\
 	(req)->rp_optype = ftype;					\
 	vops->vo_sid = _sid;						\
-	kcf_dup_mech(_mech, &vops->vo_mech, &vops->vo_framework_mechtype); \
+	if (mechp != NULL) {						\
+		vops->vo_mech = *mechp;					\
+		vops->vo_framework_mechtype = mechp->cm_type;		\
+	}								\
 	vops->vo_key = _key;						\
 	vops->vo_data = _data;						\
 	vops->vo_signature = _signature;				\
@@ -534,11 +556,15 @@ typedef struct kcf_req_params {
 	_private_key_attribute_count, _private_key_object_id_ptr,	\
 	_key, _wrapped_key, _wrapped_key_len_ptr) {			\
 	kcf_key_ops_params_t *kops = &(req)->rp_u.key_params;		\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_KEY;					\
 	(req)->rp_optype = ftype;					\
 	kops->ko_sid = _sid;						\
-	kcf_dup_mech(_mech, &kops->ko_mech, &kops->ko_framework_mechtype); \
+	if (mechp != NULL) {						\
+		kops->ko_mech = *mechp;					\
+		kops->ko_framework_mechtype = mechp->cm_type;		\
+	}								\
 	kops->ko_key_template = _key_template;				\
 	kops->ko_key_attribute_count = _key_attribute_count;		\
 	kops->ko_key_object_id_ptr = _key_object_id_ptr;		\
@@ -571,11 +597,15 @@ typedef struct kcf_req_params {
 	_private_key_attribute_count, _key, _out_template1,		\
 	_out_attribute_count1, _out_template2, _out_attribute_count2) {	\
 	kcf_key_ops_params_t *kops = &(req)->rp_u.key_params;		\
+	crypto_mechanism_t *mechp = _mech;				\
 									\
 	(req)->rp_opgrp = KCF_OG_NOSTORE_KEY;				\
 	(req)->rp_optype = ftype;					\
 	kops->ko_sid = _sid;						\
-	kcf_dup_mech(_mech, &kops->ko_mech, &kops->ko_framework_mechtype); \
+	if (mechp != NULL) {						\
+		kops->ko_mech = *mechp;					\
+		kops->ko_framework_mechtype = mechp->cm_type;		\
+	}								\
 	kops->ko_key_template = _key_template;				\
 	kops->ko_key_attribute_count = _key_attribute_count;		\
 	kops->ko_key_object_id_ptr = NULL;				\

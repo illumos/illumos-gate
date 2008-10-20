@@ -26,8 +26,6 @@
 #ifndef	_SYS_CRYPTO_IMPL_H
 #define	_SYS_CRYPTO_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel Cryptographic Framework private implementation definitions.
  */
@@ -1310,8 +1308,6 @@ extern void kcf_provider_zero_refcnt(kcf_provider_desc_t *);
 extern void kcf_free_provider_desc(kcf_provider_desc_t *);
 extern void kcf_soft_config_init(void);
 extern int get_sw_provider_for_mech(crypto_mech_name_t, char **);
-extern void kcf_dup_mech(crypto_mechanism_t *, crypto_mechanism_t *,
-    crypto_mech_type_t *);
 extern crypto_mech_type_t crypto_mech2id_common(char *, boolean_t);
 extern void undo_register_provider(kcf_provider_desc_t *, boolean_t);
 extern void redo_register_provider(kcf_provider_desc_t *);

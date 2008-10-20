@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -448,7 +446,7 @@ kcf_add_mech_provider(short mech_indx,
 		goto add_entry;
 
 	simple_fg_mask = mech_info->cm_func_group_mask &
-		    CRYPTO_FG_SIMPLEOP_MASK | CRYPTO_FG_RANDOM;
+	    CRYPTO_FG_SIMPLEOP_MASK | CRYPTO_FG_RANDOM;
 
 	for (i = 0; i < prov_desc->pd_mech_list_count; i++) {
 		dmi = &prov_desc->pd_mechanisms[i];
@@ -564,7 +562,7 @@ add_entry:
 			    "instead.", prov_desc->pd_description,
 			    mech_info->cm_mech_name,
 			    mech_entry->me_sw_prov->pm_prov_desc->
-				pd_description);
+			    pd_description);
 			KCF_PROV_REFRELE(prov_desc);
 			kmem_free(prov_mech, sizeof (kcf_prov_mech_desc_t));
 			prov_mech = NULL;
@@ -760,23 +758,6 @@ kcf_get_mech_entry(crypto_mech_type_t mech_type, kcf_mech_entry_t **mep)
 	*mep = &((me_tab->met_tab)[index]);
 
 	return (KCF_SUCCESS);
-}
-
-/*
- * Utility routine to save the crypto_mechanism_t structure passed
- * by a caller.
- */
-extern void
-kcf_dup_mech(crypto_mechanism_t *src_mech, crypto_mechanism_t *dst_mech,
-    crypto_mech_type_t *save_mechtype)
-{
-	ASSERT(dst_mech != NULL);
-
-	if (src_mech != NULL) {
-		/* Note that this is a struct-to-struct assignment. */
-		*dst_mech = *src_mech;
-		*save_mechtype = src_mech->cm_type;
-	}
 }
 
 /*

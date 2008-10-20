@@ -62,7 +62,7 @@ extern int kcf_sha1_threshold;
  *
  * crypto_lock protects the global array of minor structures.  It
  * also protects the cm_refcnt member of each of these structures.
- * The crypto_cv is used to signal decrements in the cm_refcnt,
+ * The cm_cv is used to signal decrements in the cm_refcnt,
  * and is used with the global crypto_lock.
  *
  * Other fields in the minor structure are protected by the
@@ -166,7 +166,6 @@ static minor_t crypto_minors_table_count = 0;
 static vmem_t *crypto_arena = NULL;	/* Arena for device minors */
 static minor_t crypto_minors_count = 0;
 static kmutex_t crypto_lock;
-static kcondvar_t crypto_cv;
 
 #define	RETURN_LIST			B_TRUE
 #define	DONT_RETURN_LIST		B_FALSE
@@ -364,7 +363,6 @@ crypto_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&crypto_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&crypto_cv, NULL, CV_DRIVER, NULL);
 	crypto_dip = dip;
 
 	/* allocate integer space for minor numbers */
@@ -404,7 +402,6 @@ crypto_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	crypto_minors = NULL;
 	crypto_minors_table_count = 0;
 	mutex_destroy(&crypto_lock);
-	cv_destroy(&crypto_cv);
 	vmem_destroy(crypto_arena);
 	crypto_arena = NULL;
 
@@ -488,6 +485,7 @@ again:
 	cv_init(&cm->cm_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_enter(&crypto_lock);
+	cm->cm_refcnt = 1;
 	crypto_minors[mn - 1] = cm;
 	crypto_minors_count++;
 	mutex_exit(&crypto_lock);
@@ -514,15 +512,17 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		return (ENODEV);
 	}
 
-	while (((cm = crypto_minors[mn - 1]) != NULL) && (cm->cm_refcnt > 0)) {
-		cv_wait(&crypto_cv, &crypto_lock);
-	}
-
+	cm = crypto_minors[mn - 1];
 	if (cm == NULL) {
 		mutex_exit(&crypto_lock);
 		cmn_err(CE_WARN, "crypto_close: duplicate close of minor %d",
 		    getminor(dev));
 		return (ENODEV);
+	}
+
+	cm->cm_refcnt --;		/* decrement refcnt held in open */
+	while (cm->cm_refcnt > 0) {
+		cv_wait(&cm->cm_cv, &crypto_lock);
 	}
 
 	/* take it out of the global table */
@@ -577,11 +577,13 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 static crypto_minor_t *
 crypto_hold_minor(minor_t minor)
 {
-	crypto_minor_t *cm = NULL;
+	crypto_minor_t *cm;
+
+	if (minor > crypto_minors_table_count)
+		return (NULL);
 
 	mutex_enter(&crypto_lock);
-	if ((minor <= crypto_minors_table_count) &&
-	    ((cm = crypto_minors[minor - 1]) != NULL)) {
+	if ((cm = crypto_minors[minor - 1]) != NULL) {
 		cm->cm_refcnt++;
 	}
 	mutex_exit(&crypto_lock);
@@ -594,7 +596,7 @@ crypto_release_minor(crypto_minor_t *cm)
 	mutex_enter(&crypto_lock);
 	cm->cm_refcnt--;
 	if (cm->cm_refcnt == 0) {
-		cv_broadcast(&crypto_cv);
+		cv_signal(&cm->cm_cv);
 	}
 	mutex_exit(&crypto_lock);
 }
