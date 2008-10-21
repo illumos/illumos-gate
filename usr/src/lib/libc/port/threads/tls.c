@@ -24,12 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 
-#define	MIN_MOD_SLOTS	16
+#define	MIN_MOD_SLOTS	8
 
 /*
  * Used to inform libc_init() that we are on the primary link map,
