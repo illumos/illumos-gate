@@ -27,8 +27,6 @@
 #ifndef _DR_UTIL_H
 #define	_DR_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sun4v Common DR Header
  */
@@ -53,6 +51,7 @@ extern uint_t	dr_debug;
 #define	DR_DBG_FLAG_MEM		0x04
 #define	DR_DBG_FLAG_IO		0x08
 #define	DR_DBG_FLAG_TRANS	0x10
+#define	DR_DBG_FLAG_KMEM	0x20
 
 #define	DR_DBG_ALL	if (dr_debug)			  printf
 #define	DR_DBG_CTL	if (dr_debug & DR_DBG_FLAG_CTL)	  printf
@@ -60,6 +59,7 @@ extern uint_t	dr_debug;
 #define	DR_DBG_MEM	if (dr_debug & DR_DBG_FLAG_MEM)	  printf
 #define	DR_DBG_IO	if (dr_debug & DR_DBG_FLAG_IO)	  printf
 #define	DR_DBG_TRANS	if (dr_debug & DR_DBG_FLAG_TRANS) printf
+#define	DR_DBG_KMEM	if (dr_debug & DR_DBG_FLAG_KMEM)  printf
 
 #define	DR_DBG_DUMP_MSG(buf, len)	dr_dbg_dump_msg(buf, len)
 
@@ -73,6 +73,7 @@ extern void dr_dbg_dump_msg(void *buf, size_t len);
 #define	DR_DBG_MEM	DR_DBG_ALL
 #define	DR_DBG_IO	DR_DBG_ALL
 #define	DR_DBG_TRANS	DR_DBG_ALL
+#define	DR_DBG_KMEM	DR_DBG_ALL
 
 #define	DR_DBG_DUMP_MSG(buf, len)
 

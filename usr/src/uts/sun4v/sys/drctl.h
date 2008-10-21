@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DRCTL_H
 #define	_SYS_DRCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -96,6 +94,26 @@ typedef struct drctl_rsrc {
 #define	res_dev_path	un.dev.path
 
 /*
+ * Response structure passed back by drctl to its clients
+ * (resource-specific DR modules).
+ */
+typedef enum {
+	DRCTL_RESP_ERR,
+	DRCTL_RESP_OK
+} drctl_resp_type_t;
+
+typedef struct drctl_resp {
+	drctl_resp_type_t resp_type;
+	union {
+		char err_msg[1];
+		drctl_rsrc_t  resources[1];
+	} un;
+} drctl_resp_t;
+
+#define	resp_err_msg		un.err_msg
+#define	resp_resources		un.resources
+
+/*
  * Message sent to DR daemon
  */
 typedef struct drd_msg {
@@ -115,7 +133,7 @@ typedef void *drctl_cookie_t;
  * _fini call.
  */
 extern int drctl_config_init(int, int,
-    drctl_rsrc_t *, int, drctl_rsrc_t **, size_t *, drctl_cookie_t);
+    drctl_rsrc_t *, int, drctl_resp_t **, size_t *, drctl_cookie_t);
 extern int drctl_config_fini(drctl_cookie_t, drctl_rsrc_t *, int);
 
 /*

@@ -68,8 +68,10 @@ static ds_svc_hdl_t ds_handle;
 /*
  * Supported DS Capability Versions
  */
-static ds_ver_t		dr_cpu_vers[] = { { 1, 0 } };
+static ds_ver_t		dr_cpu_vers[] = { { 1, 1 }, { 1, 0 } };
 #define	DR_CPU_NVERS	(sizeof (dr_cpu_vers) / sizeof (dr_cpu_vers[0]))
+
+static ds_ver_t		version;
 
 /*
  * DS Capability Description
@@ -79,6 +81,13 @@ static ds_capability_t dr_cpu_cap = {
 	dr_cpu_vers,		/* vers */
 	DR_CPU_NVERS		/* nvers */
 };
+
+#define	DRCPU_VERS_EQ(_maj, _min) \
+	((version.major == (_maj)) && (version.minor == (_min)))
+
+#define	DRCPU_VERS_GTEQ(_maj, _min) \
+	((version.major > (_maj)) ||					\
+	((version.major == (_maj)) && (version.minor >= (_min))))
 
 /*
  * DS Callbacks
@@ -220,6 +229,8 @@ dr_cpu_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 	DR_DBG_CPU("reg_handler: arg=0x%p, ver=%d.%d, hdl=0x%lx\n", arg,
 	    ver->major, ver->minor, hdl);
 
+	version.major = ver->major;
+	version.minor = ver->minor;
 	ds_handle = hdl;
 }
 
@@ -316,9 +327,39 @@ done:
 	}
 
 	/* free any allocated memory */
-	if (resp != &err_resp) {
+	if (DRCPU_VERS_GTEQ(1, 1) || (resp != &err_resp)) {
+		DR_DBG_KMEM("%s: free addr %p size %d\n",
+		    __func__, (void *)resp, resp_len);
 		kmem_free(resp, resp_len);
 	}
+}
+
+/*
+ * Create a response message which consists of a header followed
+ * by the error string passed in.
+ */
+static size_t
+dr_cpu_err_resp(dr_cpu_hdr_t *req, dr_cpu_hdr_t **respp, char *msg)
+{
+	size_t size;
+	dr_cpu_hdr_t *resp;
+
+	ASSERT((msg != NULL) && (strlen(msg) > 0));
+
+	size = sizeof (*req) + strlen(msg) + 1;
+	resp = kmem_alloc(size, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)resp, size);
+
+	resp->req_num = req->req_num;
+	resp->msg_type = DR_CPU_ERROR;
+	resp->num_records = 0;
+
+	(void) strcpy((char *)(resp) + sizeof (*resp), msg);
+
+	*respp = resp;
+
+	return (size);
 }
 
 /*
@@ -344,11 +385,10 @@ dr_cpu_list_wrk(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 	int		drctl_flags = 0;
 	drctl_rsrc_t	*drctl_req;
 	size_t		drctl_req_len;
-	drctl_rsrc_t	*drctl_res;
-	size_t		drctl_res_len = 0;
+	drctl_resp_t	*drctl_resp;
+	drctl_rsrc_t	*drctl_rsrc;
+	size_t		drctl_resp_len = 0;
 	drctl_cookie_t	drctl_res_ck;
-
-	static const char me[] = "dr_cpu_list_wrk";
 
 	ASSERT((req != NULL) && (req->num_records != 0));
 
@@ -375,7 +415,8 @@ dr_cpu_list_wrk(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 		break;
 	default:
 		/* Programming error if we reach this. */
-		cmn_err(CE_NOTE, "%s: bad msg_type %d\n", me, req->msg_type);
+		cmn_err(CE_NOTE,
+		    "%s: bad msg_type %d\n", __func__, req->msg_type);
 		ASSERT(0);
 		return (-1);
 	}
@@ -386,22 +427,48 @@ dr_cpu_list_wrk(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 	/* allocate drctl request msg based on incoming resource count */
 	drctl_req_len = sizeof (drctl_rsrc_t) * count;
 	drctl_req = kmem_zalloc(drctl_req_len, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)drctl_req, drctl_req_len);
 
 	/* copy the cpuids for the drctl call from the incoming request msg */
 	for (idx = 0; idx < count; idx++)
 		drctl_req[idx].res_cpu_id = req_cpus[idx];
 
-	if ((rv = drctl_config_init(drctl_cmd, drctl_flags, drctl_req,
-	    count, &drctl_res, &drctl_res_len, &drctl_res_ck)) != 0) {
-		DR_DBG_CPU("%s: drctl_config_init returned: %d\n", me, rv);
+	rv = drctl_config_init(drctl_cmd, drctl_flags, drctl_req,
+	    count, &drctl_resp, &drctl_resp_len, &drctl_res_ck);
+
+	ASSERT((drctl_resp != NULL) && (drctl_resp_len != 0));
+
+	if (rv != 0) {
+		DR_DBG_CPU("%s: drctl_config_init "
+		    "returned: %d\n", __func__, rv);
+
+		if (DRCPU_VERS_EQ(1, 0)) {
+			rv = -1;
+		} else {
+			ASSERT(DRCPU_VERS_GTEQ(1, 1));
+			ASSERT(drctl_resp->resp_type == DRCTL_RESP_ERR);
+
+			*resp_len = dr_cpu_err_resp(req,
+			    resp, drctl_resp->resp_err_msg);
+		}
+
+		DR_DBG_KMEM("%s: free addr %p size %ld\n",
+		    __func__, (void *)drctl_resp, drctl_resp_len);
+		kmem_free(drctl_resp, drctl_resp_len);
+		DR_DBG_KMEM("%s: free addr %p size %ld\n",
+		    __func__, (void *)drctl_req, drctl_req_len);
 		kmem_free(drctl_req, drctl_req_len);
-		return (-1);
+
+		return (rv);
 	}
 
-	ASSERT((drctl_res != NULL) && (drctl_res_len != 0));
+	ASSERT(drctl_resp->resp_type == DRCTL_RESP_OK);
+
+	drctl_rsrc = drctl_resp->resp_resources;
 
 	/* create the result scratch array */
-	res = dr_cpu_res_array_init(req, drctl_res, count);
+	res = dr_cpu_res_array_init(req, drctl_rsrc, count);
 
 	/*
 	 * For unconfigure, check if there are any conditions
@@ -440,12 +507,13 @@ dr_cpu_list_wrk(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 		    DRCTL_STATUS_CONFIG_FAILURE : DRCTL_STATUS_CONFIG_SUCCESS;
 
 		DR_DBG_CPU("%s: cpuid %d status %d result %d off '%s'\n",
-		    me, req_cpus[idx], drctl_req[idx].status, result,
+		    __func__, req_cpus[idx], drctl_req[idx].status, result,
 		    (res[idx].string) ? res[idx].string : "");
 	}
 
 	if ((rv = drctl_config_fini(&drctl_res_ck, drctl_req, count)) != 0)
-		DR_DBG_CPU("%s: drctl_config_fini returned: %d\n", me, rv);
+		DR_DBG_CPU("%s: drctl_config_fini "
+		    "returned: %d\n", __func__, rv);
 
 	/*
 	 * Operation completed without any fatal errors.
@@ -459,7 +527,11 @@ dr_cpu_list_wrk(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 	/*
 	 * Deallocate any scratch memory.
 	 */
-	kmem_free(drctl_res, drctl_res_len);
+	DR_DBG_KMEM("%s: free addr %p size %ld\n",
+	    __func__, (void *)drctl_resp, drctl_resp_len);
+	kmem_free(drctl_resp, drctl_resp_len);
+	DR_DBG_KMEM("%s: free addr %p size %ld\n",
+	    __func__, (void *)drctl_req, drctl_req_len);
 	kmem_free(drctl_req, drctl_req_len);
 
 	dr_cpu_res_array_fini(res, count);
@@ -481,6 +553,8 @@ dr_cpu_res_array_init(dr_cpu_hdr_t *req, drctl_rsrc_t *rsrc, int nrsrc)
 
 	/* allocate zero filled buffer to initialize fields */
 	res = kmem_zalloc(nrsrc * sizeof (dr_cpu_res_t), KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)res, nrsrc * sizeof (dr_cpu_res_t));
 
 	/*
 	 * Fill in the result information for each resource.
@@ -510,6 +584,8 @@ dr_cpu_res_array_init(dr_cpu_hdr_t *req, drctl_rsrc_t *rsrc, int nrsrc)
 			err_len = strlen(err_str) + 1;
 
 			res[idx].string = kmem_alloc(err_len, KM_SLEEP);
+			DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+			    __func__, (void *)(res[idx].string), err_len);
 			bcopy(err_str, res[idx].string, err_len);
 		}
 	}
@@ -527,11 +603,15 @@ dr_cpu_res_array_fini(dr_cpu_res_t *res, int nres)
 		/* deallocate the error string if present */
 		if (res[idx].string) {
 			str_len = strlen(res[idx].string) + 1;
+			DR_DBG_KMEM("%s: free addr %p size %ld\n",
+			    __func__, (void *)(res[idx].string), str_len);
 			kmem_free(res[idx].string, str_len);
 		}
 	}
 
 	/* deallocate the result array itself */
+	DR_DBG_KMEM("%s: free addr %p size %ld\n",
+	    __func__, (void *)res, sizeof (dr_cpu_res_t) * nres);
 	kmem_free(res, sizeof (dr_cpu_res_t) * nres);
 }
 
@@ -575,6 +655,8 @@ dr_cpu_pack_response(dr_cpu_hdr_t *req, dr_cpu_res_t *res, dr_cpu_hdr_t **respp)
 
 	/* allocate the message buffer */
 	resp = kmem_zalloc(resp_len, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)resp, resp_len);
 
 	/*
 	 * Fill in the header information.
@@ -704,6 +786,8 @@ dr_cpu_check_psrset(uint32_t *cpuids, dr_cpu_res_t *res, int nres)
 	 * the number of CPUs.
 	 */
 	psrset = kmem_zalloc(sizeof (*psrset) * nres, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)psrset, sizeof (*psrset) * nres);
 
 	for (cpu_idx = 0; cpu_idx < nres; cpu_idx++) {
 
@@ -754,12 +838,16 @@ dr_cpu_check_psrset(uint32_t *cpuids, dr_cpu_res_t *res, int nres)
 			err_len = strlen(err_str) + 1;
 
 			res[cpu_idx].string = kmem_alloc(err_len, KM_SLEEP);
+			DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+			    __func__, (void *)(res[cpu_idx].string), err_len);
 			bcopy(err_str, res[cpu_idx].string, err_len);
 
 			DR_DBG_CPU("cpu %d: %s\n", cpuids[cpu_idx], err_str);
 		}
 	}
 
+	DR_DBG_KMEM("%s: free addr %p size %ld\n",
+	    __func__, (void *)psrset, sizeof (*psrset) * nres);
 	kmem_free(psrset, sizeof (*psrset) * nres);
 }
 
@@ -840,6 +928,8 @@ dr_cpu_check_bound_thr(cpu_t *cp, dr_cpu_res_t *res)
 		err_len = strlen(err_str) + 1;
 
 		res->string = kmem_alloc(err_len, KM_SLEEP);
+		DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+		    __func__, (void *)(res->string), err_len);
 		bcopy(err_str, res->string, err_len);
 
 		DR_DBG_CPU("cpu %d: %s\n", cp->cpu_id, err_str);
@@ -875,6 +965,7 @@ dr_cpu_list_status(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 	rlen = sizeof (dr_cpu_hdr_t);
 	rlen += req->num_records * sizeof (dr_cpu_stat_t);
 	rp = kmem_zalloc(rlen, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %d\n", __func__, (void *)rp, rlen);
 
 	/* fill in the known data */
 	rp->req_num = req->req_num;
@@ -917,6 +1008,8 @@ dr_cpu_list_status(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 
 	listsz = num_nodes * sizeof (mde_cookie_t);
 	listp = kmem_zalloc(listsz, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %d\n",
+	    __func__, (void *)listp, listsz);
 
 	for (idx = 0; idx < req->num_records; idx++) {
 
@@ -935,6 +1028,8 @@ dr_cpu_list_status(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
 		}
 	}
 
+	DR_DBG_KMEM("%s: free addr %p size %d\n",
+	    __func__, (void *)listp, listsz);
 	kmem_free(listp, listsz);
 
 	(void) md_fini_handle(mdp);
@@ -1339,6 +1434,8 @@ dr_cpu_probe(processorid_t cpuid)
 
 	listsz = num_nodes * sizeof (mde_cookie_t);
 	listp = kmem_zalloc(listsz, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %d\n",
+	    __func__, (void *)listp, listsz);
 
 	cpunode = dr_cpu_find_node_md(cpuid, mdp, listp);
 
@@ -1368,8 +1465,11 @@ dr_cpu_probe(processorid_t cpuid)
 	rv = 0;
 
 done:
-	if (listp)
+	if (listp) {
+		DR_DBG_KMEM("%s: free addr %p size %d\n",
+		    __func__, (void *)listp, listsz);
 		kmem_free(listp, listsz);
+	}
 
 	if (mdp)
 		(void) md_fini_handle(mdp);
@@ -1393,6 +1493,8 @@ dr_cpu_deprobe(processorid_t cpuid)
 	if (e_ddi_branch_destroy(dip, &fdip, 0)) {
 		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
+		DR_DBG_KMEM("%s: alloc addr %p size %d\n",
+		    __func__, (void *)path, MAXPATHLEN);
 		/*
 		 * If non-NULL, fdip is held and must be released.
 		 */
@@ -1405,6 +1507,8 @@ dr_cpu_deprobe(processorid_t cpuid)
 		cmn_err(CE_NOTE, "node removal failed: %s (%p)",
 		    path, (fdip) ? (void *)fdip : (void *)dip);
 
+		DR_DBG_KMEM("%s: free addr %p size %d\n",
+		    __func__, (void *)path, MAXPATHLEN);
 		kmem_free(path, MAXPATHLEN);
 
 		return (-1);

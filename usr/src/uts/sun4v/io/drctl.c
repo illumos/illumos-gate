@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * DR control module for LDoms
  */
@@ -53,8 +52,8 @@ static int drctl_open(dev_t *, int, int, cred_t *);
 static int drctl_close(dev_t, int, int, cred_t *);
 static int drctl_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
-static void *pack_message(int, int, int, void *, size_t *);
-static int send_message(void *, size_t, void **, size_t *);
+static void *pack_message(int, int, int, void *, size_t *, size_t *);
+static int send_message(void *, size_t, drctl_resp_t **, size_t *);
 
 
 /*
@@ -273,41 +272,115 @@ drctl_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 }
 
 /*
- * This driver guarantees that if drctl_config_init returns 0,
- * a valid response buffer will be passed back to the caller.  This
- * routine can be used to generate that response in cases where the
- * upcall has not resulted in a response message from userland.
+ * Create a reponse structure which includes an array of drctl_rsrc_t
+ * structures in which each status element is set to the 'status'
+ * arg.  There is no error text, so set the 'offset' elements to 0.
  */
-static drctl_rsrc_t *
+static drctl_resp_t *
 drctl_generate_resp(drctl_rsrc_t *res,
     int count, size_t *rsize, drctl_status_t status)
 {
-	int		idx;
+	int		i;
 	size_t		size;
-	drctl_rsrc_t	*rbuf;
+	drctl_rsrc_t	*rsrc;
+	drctl_resp_t	*resp;
 
-	size = count * sizeof (*res);
-	rbuf  = kmem_alloc(size, KM_SLEEP);
+	size = offsetof(drctl_resp_t, resp_resources) + (count * sizeof (*res));
+	resp  = kmem_alloc(size, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)resp, size);
 
-	bcopy(res, rbuf, size);
+	resp->resp_type = DRCTL_RESP_OK;
+	rsrc = resp->resp_resources;
 
-	for (idx = 0; idx < count; idx++) {
-		rbuf[idx].status = status;
-		rbuf[idx].offset = 0;
+	bcopy(res, rsrc, count * sizeof (*res));
+
+	for (i = 0; i < count; i++) {
+		rsrc[i].status = status;
+		rsrc[i].offset = 0;
 	}
 
 	*rsize = size;
-	return (rbuf);
+
+	return (resp);
 }
+
+/*
+ * Generate an error response message.
+ */
+static drctl_resp_t *
+drctl_generate_err_resp(char *msg, size_t *size)
+{
+	drctl_resp_t	*resp;
+
+	ASSERT(msg != NULL);
+	ASSERT(size != NULL);
+
+	*size = offsetof(drctl_resp_t, resp_err_msg) + strlen(msg) + 1;
+	resp = kmem_alloc(*size, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)resp, *size);
+
+	resp->resp_type = DRCTL_RESP_ERR;
+	(void) strcpy(resp->resp_err_msg, msg);
+
+	return (resp);
+}
+
+/*
+ * Since response comes from userland, verify that it is at least the
+ * minimum size based on the size of the original request.  Verify
+ * that any offsets to error strings are within the string area of
+ * the response and, force the string area to be null-terminated.
+ */
+static int
+verify_response(int cmd,
+    int count, drctl_resp_t *resp, size_t sent_len, size_t resp_len)
+{
+	drctl_rsrc_t *rsrc = resp->resp_resources;
+	size_t rcvd_len = resp_len - (offsetof(drctl_resp_t, resp_resources));
+	int is_cpu = 0;
+	int i;
+
+	switch (cmd) {
+	case DRCTL_CPU_CONFIG_REQUEST:
+	case DRCTL_CPU_UNCONFIG_REQUEST:
+		if (rcvd_len < sent_len)
+			return (EIO);
+		is_cpu = 1;
+		break;
+	case DRCTL_IO_UNCONFIG_REQUEST:
+	case DRCTL_IO_CONFIG_REQUEST:
+		if (count != 1)
+			return (EIO);
+		break;
+	default:
+		return (EIO);
+	}
+
+	for (i = 0; i < count; i++)
+		if ((rsrc[i].offset > 0) &&
+		    /* string can't be inside the bounds of original request */
+		    (((rsrc[i].offset < sent_len) && is_cpu) ||
+		    /* string must start inside the message */
+		    (rsrc[i].offset >= rcvd_len)))
+			return (EIO);
+
+	/* If there are any strings, terminate the string area. */
+	if (rcvd_len > sent_len)
+		*((char *)rsrc + rcvd_len - 1) = '\0';
+
+	return (0);
+}
+
 
 static int
 drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
-    int count, drctl_rsrc_t **rbuf, size_t *rsize)
+    int count, drctl_resp_t **rbuf, size_t *rsize, size_t *rq_size)
 {
 	int	rv = 0;
 	size_t	size;
 	char	*bufp;
-	static const char me[] = "drctl_config_common";
 
 	switch (cmd) {
 	case DRCTL_CPU_CONFIG_REQUEST:
@@ -329,7 +402,7 @@ drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
 	}
 
 	if (rv != 0) {
-		DR_DBG_CTL("%s: invalid cmd %d\n", me, cmd);
+		DR_DBG_CTL("%s: invalid cmd %d\n", __func__, cmd);
 		return (rv);
 	}
 
@@ -339,124 +412,98 @@ drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
 	 * response, so generate a response with all ops 'allowed'.
 	 */
 	if (flags == DRCTL_FLAG_FORCE) {
-		if (rbuf != NULL) {
-			*rbuf = drctl_generate_resp(res, count, &size,
-			    DRCTL_STATUS_ALLOW);
-			*rsize = size;
-		}
+		if (rbuf != NULL)
+			*rbuf = drctl_generate_resp(res,
+			    count, rsize, DRCTL_STATUS_ALLOW);
 		return (0);
 	}
 
-	bufp = pack_message(cmd, flags, count, (void *)res, &size);
+	bufp = pack_message(cmd, flags, count, (void *)res, &size, rq_size);
 	DR_DBG_CTL("%s: from pack_message, bufp = %p size %ld\n",
-	    me, (void *)bufp, size);
+	    __func__, (void *)bufp, size);
+
 	if (bufp == NULL || size == 0)
-		return (EIO);
+		return (EINVAL);
 
-	rv = send_message(bufp, size, (void **)rbuf, rsize);
-
-	/*
-	 * For failure, as part of our contract with the caller,
-	 * generate a response message, but mark all proposed
-	 * changes as 'denied'.
-	 */
-	if (rv != 0 && rbuf != NULL) {
-		*rbuf = drctl_generate_resp(res, count, &size,
-		    DRCTL_STATUS_DENY);
-		*rsize = size;
-	}
-
-	return (rv);
+	return (send_message(bufp, size, rbuf, rsize));
 }
-
-/*
- * Since the response comes from userland, make sure it is
- * at least the minimum size and, if it contains error
- * strings, that the string area is null-terminated.
- */
-static int
-verify_response(int count, drctl_rsrc_t *resp, size_t size)
-{
-	int idx;
-	int need_terminator = 0;
-	static const char me[] = "verify_response";
-
-	if (resp == NULL || size < count * sizeof (*resp)) {
-		DR_DBG_CTL("%s: BAD size - count %d size %ld\n",
-		    me, count, size);
-		return (EIO);
-	}
-
-	for (idx = 0; idx < count; idx++) {
-
-		if (resp[idx].offset != 0)
-			need_terminator++;
-	}
-
-	if (need_terminator && *((caddr_t)(resp) + size - 1) != '\0') {
-		DR_DBG_CTL("%s: unterm. strings: resp %p size %ld char %d\n",
-		    me, (void *)resp, size, *((caddr_t)(resp) + size - 1));
-		/* Don't fail the transaction, but don't advertise strings */
-		for (idx = 0; idx < count; idx++)
-			resp[idx].offset = 0;
-	}
-
-	return (0);
-}
-
 
 /*
  * Prepare for a reconfig operation.
  */
 int
 drctl_config_init(int cmd, int flags, drctl_rsrc_t *res,
-    int count, drctl_rsrc_t **rbuf, size_t *rsize, drctl_cookie_t ck)
+    int count, drctl_resp_t **rbuf, size_t *rsize, drctl_cookie_t ck)
 {
-	static char me[] = "drctl_config_init";
-	int idx;
+	static char inval_msg[] = "Invalid command format received.\n";
+	static char unsup_msg[] = "Unsuppported command received.\n";
+	static char unk_msg  [] = "Failure reason unknown.\n";
+	static char rsp_msg  [] = "Invalid response from "
+	    "reconfiguration daemon.\n";
+	static char drd_msg  [] = "Cannot communicate with reconfiguration "
+	    "daemon (drd) in target domain.\n"
+	    "drd(1M) SMF service may not be enabled.\n";
+	static char busy_msg [] = "Busy executing earlier command; "
+	    "please try again later.\n";
+	size_t rq_size;
+	char *ermsg;
 	int rv;
 
-	if (ck == 0)
+	if (ck == 0) {
+		*rbuf = drctl_generate_err_resp(inval_msg, rsize);
+
 		return (EINVAL);
+	}
 
 	mutex_enter(&drctlp->drc_lock);
 
 	if (drctlp->drc_busy != NULL) {
 		mutex_exit(&drctlp->drc_lock);
+		*rbuf = drctl_generate_err_resp(busy_msg, rsize);
+
 		return (EBUSY);
 	}
 
 	DR_DBG_CTL("%s: cmd %d flags %d res %p count %d\n",
-	    me, cmd, flags, (void *)res, count);
+	    __func__, cmd, flags, (void *)res, count);
 
 	/* Mark the link busy.  Below we will fill in the actual cookie. */
 	drctlp->drc_busy = (drctl_cookie_t)-1;
 	mutex_exit(&drctlp->drc_lock);
 
-	if ((rv = drctl_config_common(cmd,
-	    flags, res, count, rbuf, rsize)) == 0 &&
-	    verify_response(count, *rbuf, *rsize) == 0) {
-		drctlp->drc_busy = ck;
-		drctlp->drc_cmd = cmd;
-		drctlp->drc_flags = flags;
-
+	rv = drctl_config_common(cmd, flags, res, count, rbuf, rsize, &rq_size);
+	if (rv == 0) {
 		/*
-		 * If there wasn't a valid response msg passed back,
-		 * create a response with each resource op denied.
+		 * If the upcall to the daemon returned successfully, we
+		 * still need to validate the format of the returned msg.
 		 */
-		if (*rbuf == NULL || *rsize == 0) {
-			drctl_rsrc_t *bp = *rbuf;
-
-			*rsize = count * sizeof (*bp);
-			bp = kmem_zalloc(*rsize, KM_SLEEP);
-			bcopy(res, bp, *rsize);
-
-			for (idx = 0; idx < count; idx++) {
-				bp[idx].status = DRCTL_STATUS_DENY;
-				bp[idx].offset = 0;
-			}
+		if ((rv = verify_response(cmd,
+		    count, *rbuf, rq_size, *rsize)) != 0) {
+			DR_DBG_KMEM("%s: free addr %p size %ld\n",
+			    __func__, (void *)*rbuf, *rsize);
+			kmem_free(*rbuf, *rsize);
+			*rbuf = drctl_generate_err_resp(rsp_msg, rsize);
+			drctlp->drc_busy = NULL;
+		} else { /* message format is valid */
+			drctlp->drc_busy = ck;
+			drctlp->drc_cmd = cmd;
+			drctlp->drc_flags = flags;
 		}
 	} else {
+		switch (rv) {
+		case ENOTSUP:
+			ermsg = unsup_msg;
+			break;
+		case EIO:
+			ermsg = drd_msg;
+			break;
+		default:
+			ermsg = unk_msg;
+			break;
+		}
+
+		*rbuf = drctl_generate_err_resp(ermsg, rsize);
+
 		drctlp->drc_cmd = -1;
 		drctlp->drc_flags = 0;
 		drctlp->drc_busy = NULL;
@@ -474,6 +521,7 @@ drctl_config_fini(drctl_cookie_t ck, drctl_rsrc_t *res, int count)
 	int rv;
 	int notify_cmd;
 	int flags;
+	size_t rq_size;
 
 	mutex_enter(&drctlp->drc_lock);
 
@@ -519,7 +567,8 @@ drctl_config_fini(drctl_cookie_t ck, drctl_rsrc_t *res, int count)
 		goto done;
 	}
 
-	rv = drctl_config_common(notify_cmd, flags, res, count, NULL, 0);
+	rv = drctl_config_common(notify_cmd,
+	    flags, res, count, NULL, 0, &rq_size);
 
 done:
 	drctlp->drc_cmd = -1;
@@ -556,36 +605,63 @@ drctl_ioctl(dev_t dev,
  * back in obufp, its size in osize.
  */
 static int
-send_message(void *msg, size_t size, void **obufp, size_t *osize)
+send_message(void *msg, size_t size, drctl_resp_t **obufp, size_t *osize)
 {
+	drctl_resp_t *bufp;
+	drctl_rsrc_t *rsrcs;
+	size_t rsrcs_size;
 	int rv;
 
-	rv = i_drctl_send(msg, size, obufp, osize);
+	rv = i_drctl_send(msg, size, (void **)&rsrcs, &rsrcs_size);
 
+	if ((rv == 0) && ((rsrcs == NULL) ||(rsrcs_size == 0)))
+		rv = EINVAL;
+
+	if (rv == 0) {
+		if (obufp != NULL) {
+			ASSERT(osize != NULL);
+
+			*osize =
+			    offsetof(drctl_resp_t, resp_resources) + rsrcs_size;
+			bufp =
+			    kmem_alloc(*osize, KM_SLEEP);
+			DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+			    __func__, (void *)bufp, *osize);
+			bufp->resp_type = DRCTL_RESP_OK;
+			bcopy(rsrcs, bufp->resp_resources, rsrcs_size);
+			*obufp = bufp;
+		}
+
+		DR_DBG_KMEM("%s: free addr %p size %ld\n",
+		    __func__, (void *)rsrcs, rsrcs_size);
+		kmem_free(rsrcs, rsrcs_size);
+	}
+
+	DR_DBG_KMEM("%s:free addr %p size %ld\n", __func__, msg, size);
 	kmem_free(msg, size);
 
 	return (rv);
 }
 
 static void *
-pack_message(int cmd, int flags, int count, void *data, size_t *osize)
+pack_message(int cmd,
+    int flags, int count, void *data, size_t *osize, size_t *data_size)
 {
 	drd_msg_t *msgp = NULL;
 	size_t hdr_size = offsetof(drd_msg_t, data);
-	size_t data_size = 0;
 
 	switch (cmd) {
 	case DRCTL_CPU_CONFIG_REQUEST:
 	case DRCTL_CPU_CONFIG_NOTIFY:
 	case DRCTL_CPU_UNCONFIG_REQUEST:
 	case DRCTL_CPU_UNCONFIG_NOTIFY:
-		data_size = count * sizeof (drctl_rsrc_t);
+		*data_size = count * sizeof (drctl_rsrc_t);
 		break;
 	case DRCTL_IO_CONFIG_REQUEST:
 	case DRCTL_IO_CONFIG_NOTIFY:
 	case DRCTL_IO_UNCONFIG_REQUEST:
 	case DRCTL_IO_UNCONFIG_NOTIFY:
-		data_size = sizeof (drctl_rsrc_t) +
+		*data_size = sizeof (drctl_rsrc_t) +
 		    strlen(((drctl_rsrc_t *)data)->res_dev_path);
 		break;
 	default:
@@ -595,12 +671,14 @@ pack_message(int cmd, int flags, int count, void *data, size_t *osize)
 	}
 
 	if (data_size) {
-		*osize = hdr_size + data_size;
+		*osize = hdr_size + *data_size;
 		msgp = kmem_alloc(*osize, KM_SLEEP);
+		DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+		    __func__, (void *)msgp, *osize);
 		msgp->cmd = cmd;
 		msgp->count = count;
 		msgp->flags = flags;
-		bcopy(data, msgp->data, data_size);
+		bcopy(data, msgp->data, *data_size);
 	}
 
 	return (msgp);

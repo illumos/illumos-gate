@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/door.h>
 #include <sys/note.h>
@@ -109,12 +107,17 @@ retry:
 		if (obufp != NULL) {
 			*obufp = door_args.rbuf;
 			*osize = door_args.rsize;
+			DR_DBG_KMEM("%s: (door) alloc addr %p size %ld\n",
+			    __func__,
+			    (void *)(door_args.rbuf), door_args.rsize);
 		} else {
 			/*
 			 * No output buffer pointer was passed in,
 			 * so the response buffer allocated by the
 			 * door code must be deallocated.
 			 */
+			DR_DBG_KMEM("%s: free addr %p size %ld\n", __func__,
+			    (void *)(door_args.rbuf), door_args.rsize);
 			kmem_free(door_args.rbuf, door_args.rsize);
 		}
 	} else {

@@ -404,6 +404,8 @@ dr_vio_find_parent_md(md_t *mdp, mde_cookie_t node)
 	max_nodes = md_node_count(mdp);
 	listsz = max_nodes * sizeof (mde_cookie_t);
 	listp = kmem_zalloc(listsz, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %d\n",
+	    __func__, (void *)listp, listsz);
 
 	num_nodes = md_scan_dag(mdp, node,
 	    md_find_name(mdp, "channel-devices"),
@@ -414,6 +416,8 @@ dr_vio_find_parent_md(md_t *mdp, mde_cookie_t node)
 	if (num_nodes == 1)
 		pnode = listp[0];
 
+	DR_DBG_KMEM("%s: free addr %p size %d\n",
+	    __func__, (void *)listp, listsz);
 	kmem_free(listp, listsz);
 
 	return (pnode);
@@ -441,11 +445,11 @@ dr_io_configure(dr_vio_req_t *req, dr_vio_res_t *res)
 	int		drctl_flags = 0;
 	drctl_rsrc_t	*drctl_req;
 	size_t		drctl_req_len;
-	drctl_rsrc_t	*drctl_res = NULL;
-	size_t		drctl_res_len = 0;
+	drctl_rsrc_t	*drctl_rsrc = NULL;
 	drctl_cookie_t	drctl_res_ck;
 	char		*p;
-	size_t		reason_len;
+	drctl_resp_t	*drctl_resp;
+	size_t		drctl_resp_len = 0;
 
 	res->result = DR_VIO_RES_FAILURE;
 
@@ -473,6 +477,8 @@ dr_io_configure(dr_vio_req_t *req, dr_vio_res_t *res)
 
 	listsz = nnodes * sizeof (mde_cookie_t);
 	listp = kmem_zalloc(listsz, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %d\n",
+	    __func__, (void *)listp, listsz);
 
 	/*
 	 * Get the MD device node.
@@ -520,6 +526,8 @@ dr_io_configure(dr_vio_req_t *req, dr_vio_res_t *res)
 
 	drctl_req_len = sizeof (drctl_rsrc_t) + MAXPATHLEN;
 	drctl_req = kmem_zalloc(drctl_req_len, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)drctl_req, drctl_req_len);
 	drctl_req->status = DRCTL_STATUS_INIT;
 
 	drctl_cmd = DRCTL_IO_CONFIG_REQUEST;
@@ -534,24 +542,38 @@ dr_io_configure(dr_vio_req_t *req, dr_vio_res_t *res)
 	(void) sprintf(p + strlen(p), "/%s@%ld", name, devid);
 	DR_DBG_IO("%s: devpath=%s\n", __func__, drctl_req->res_dev_path);
 
-	if ((rv = drctl_config_init(drctl_cmd, drctl_flags, drctl_req,
-	    1, &drctl_res, &drctl_res_len, &drctl_res_ck)) != 0) {
+	rv = drctl_config_init(drctl_cmd, drctl_flags, drctl_req,
+	    1, &drctl_resp, &drctl_resp_len, &drctl_res_ck);
 
+	ASSERT((drctl_resp != NULL) && (drctl_resp_len != 0));
+
+	drctl_rsrc = drctl_resp->resp_resources;
+
+	if (rv != 0) {
 		DR_DBG_IO("%s: drctl_config_init failed: %d\n", __func__, rv);
+
+		ASSERT(drctl_resp->resp_type == DRCTL_RESP_ERR);
+
+		(void) strlcpy(res->reason,
+		    drctl_resp->resp_err_msg, DR_VIO_MAXREASONLEN);
+
+		DR_DBG_IO("%s: %s\n", __func__, res->reason);
+
 		goto done;
 
-	} else if (drctl_res->status == DRCTL_STATUS_DENY) {
+	}
+
+	ASSERT(drctl_resp->resp_type == DRCTL_RESP_OK);
+
+	if (drctl_rsrc->status == DRCTL_STATUS_DENY) {
+
 		res->result = DR_VIO_RES_BLOCKED;
 
 		DR_DBG_IO("%s: drctl_config_init denied\n", __func__);
-		p = (char *)drctl_res + drctl_res->offset;
-		reason_len = strlen(p);
+		p = (char *)drctl_rsrc + drctl_rsrc->offset;
 
-		if (reason_len >= DR_VIO_MAXREASONLEN)
-			reason_len = DR_VIO_MAXREASONLEN - 1;
+		(void) strlcpy(res->reason, p, DR_VIO_MAXREASONLEN);
 
-		(void) strncpy(res->reason, p, reason_len);
-		res->reason[reason_len] = '\0';
 		DR_DBG_IO("%s: %s\n", __func__, res->reason);
 
 		drctl_req->status = DRCTL_STATUS_CONFIG_FAILURE;
@@ -579,8 +601,11 @@ dr_io_configure(dr_vio_req_t *req, dr_vio_res_t *res)
 		DR_DBG_IO("%s: drctl_config_fini returned: %d\n", __func__, rv);
 
 done:
-	if (listp)
+	if (listp) {
+		DR_DBG_KMEM("%s: free addr %p size %d\n",
+		    __func__, (void *)listp, listsz);
 		kmem_free(listp, listsz);
+	}
 
 	if (mdp)
 		(void) md_fini_handle(mdp);
@@ -588,9 +613,15 @@ done:
 	if (pdip)
 		e_ddi_branch_rele(pdip);
 
+	DR_DBG_KMEM("%s: free addr %p size %ld\n",
+	    __func__, (void *)drctl_req, drctl_req_len);
 	kmem_free(drctl_req, drctl_req_len);
-	if (drctl_res)
-		kmem_free(drctl_res, drctl_res_len);
+
+	if (drctl_resp) {
+		DR_DBG_KMEM("%s: free addr %p size %ld\n",
+		    __func__, (void *)drctl_resp, drctl_resp_len);
+		kmem_free(drctl_resp, drctl_resp_len);
+	}
 
 	if (rv == 0) {
 		res->result = DR_VIO_RES_OK;
@@ -618,10 +649,10 @@ dr_io_unconfigure(dr_vio_req_t *req, dr_vio_res_t *res)
 	int		drctl_flags = 0;
 	drctl_rsrc_t	*drctl_req;
 	size_t		drctl_req_len;
-	drctl_rsrc_t	*drctl_res = NULL;
-	size_t		drctl_res_len = 0;
+	drctl_rsrc_t	*drctl_rsrc = NULL;
 	drctl_cookie_t	drctl_res_ck;
-	size_t		reason_len;
+	drctl_resp_t	*drctl_resp;
+	size_t		drctl_resp_len;
 
 	if ((dip = dr_io_find_node(name, devid)) == NULL) {
 		DR_DBG_IO("%s: %s@%ld already unconfigured\n",
@@ -640,6 +671,8 @@ dr_io_unconfigure(dr_vio_req_t *req, dr_vio_res_t *res)
 
 	drctl_req_len = sizeof (drctl_rsrc_t) + MAXPATHLEN;
 	drctl_req = kmem_zalloc(drctl_req_len, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)drctl_req, drctl_req_len);
 	drctl_req->status = DRCTL_STATUS_INIT;
 
 	drctl_cmd = DRCTL_IO_UNCONFIG_REQUEST;
@@ -652,24 +685,35 @@ dr_io_unconfigure(dr_vio_req_t *req, dr_vio_res_t *res)
 	(void) ddi_pathname(dip, p + strlen(p));
 	DR_DBG_IO("%s: devpath=%s\n", __func__, drctl_req->res_dev_path);
 
-	if ((rv = drctl_config_init(drctl_cmd, drctl_flags, drctl_req,
-	    1, &drctl_res, &drctl_res_len, &drctl_res_ck)) != 0) {
+	rv = drctl_config_init(drctl_cmd, drctl_flags, drctl_req,
+	    1, &drctl_resp, &drctl_resp_len, &drctl_res_ck);
+
+	ASSERT((drctl_resp != NULL) && (drctl_resp_len != 0));
+
+	drctl_rsrc = drctl_resp->resp_resources;
+
+	if (rv != 0) {
 
 		DR_DBG_IO("%s: drctl_config_init failed: %d\n", __func__, rv);
-		goto done;
 
-	} else if (drctl_res->status == DRCTL_STATUS_DENY) {
+		ASSERT(drctl_resp->resp_type == DRCTL_RESP_ERR);
+
+		(void) strlcpy(res->reason,
+		    drctl_resp->resp_err_msg, DR_VIO_MAXREASONLEN);
+
+		DR_DBG_IO("%s: %s\n", __func__, res->reason);
+
+		goto done;
+	}
+
+	if (drctl_rsrc->status == DRCTL_STATUS_DENY) {
 		res->result = DR_VIO_RES_BLOCKED;
 
 		DR_DBG_IO("%s: drctl_config_init denied\n", __func__);
-		p = (char *)drctl_res + drctl_res->offset;
-		reason_len = strlen(p);
+		p = (char *)drctl_rsrc + drctl_rsrc->offset;
 
-		if (reason_len >= DR_VIO_MAXREASONLEN)
-			reason_len = DR_VIO_MAXREASONLEN - 1;
+		(void) strlcpy(res->reason, p, DR_VIO_MAXREASONLEN);
 
-		(void) strncpy(res->reason, p, reason_len);
-		res->reason[reason_len] = '\0';
 		DR_DBG_IO("%s: %s\n", __func__, res->reason);
 
 		drctl_req->status = DRCTL_STATUS_CONFIG_FAILURE;
@@ -678,6 +722,8 @@ dr_io_unconfigure(dr_vio_req_t *req, dr_vio_res_t *res)
 	} else if (rv = e_ddi_branch_destroy(dip, &fdip, 0)) {
 		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
+		DR_DBG_KMEM("%s: alloc addr %p size %d\n",
+		    __func__, (void *)path, MAXPATHLEN);
 		/*
 		 * If non-NULL, fdip is held and must be released.
 		 */
@@ -693,6 +739,8 @@ dr_io_unconfigure(dr_vio_req_t *req, dr_vio_res_t *res)
 
 		drctl_req->status = DRCTL_STATUS_CONFIG_FAILURE;
 
+		DR_DBG_KMEM("%s: free addr %p size %d\n",
+		    __func__, (void *)path, MAXPATHLEN);
 		kmem_free(path, MAXPATHLEN);
 	} else {
 		drctl_req->status = DRCTL_STATUS_CONFIG_SUCCESS;
@@ -711,10 +759,15 @@ dr_io_unconfigure(dr_vio_req_t *req, dr_vio_res_t *res)
 		dr_generate_event(DR_TYPE_VIO, SE_HINT_REMOVE);
 	}
 done:
+	DR_DBG_KMEM("%s: free addr %p size %ld\n",
+	    __func__, (void *)drctl_req, drctl_req_len);
 	kmem_free(drctl_req, drctl_req_len);
 
-	if (drctl_res)
-		kmem_free(drctl_res, drctl_res_len);
+	if (drctl_resp) {
+		DR_DBG_KMEM("%s: free addr %p size %ld\n",
+		    __func__, (void *)drctl_resp, drctl_resp_len);
+		kmem_free(drctl_resp, drctl_resp_len);
+	}
 
 	return (rv);
 }
@@ -734,6 +787,8 @@ dr_vio_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	 */
 	res_len = sizeof (dr_vio_res_t) + DR_VIO_MAXREASONLEN;
 	res = kmem_zalloc(res_len, KM_SLEEP);
+	DR_DBG_KMEM("%s: alloc addr %p size %ld\n",
+	    __func__, (void *)res, res_len);
 	res->result = DR_VIO_RES_FAILURE;
 
 	/*
@@ -776,8 +831,11 @@ done:
 	if (ds_cap_send(ds_vio_handle, res, res_len) != 0)
 		DR_DBG_IO("ds_send failed\n");
 
-	if (res)
+	if (res) {
+		DR_DBG_KMEM("%s: free addr %p size %ld\n",
+		    __func__, (void *)res, res_len);
 		kmem_free(res, res_len);
+	}
 }
 
 static void
