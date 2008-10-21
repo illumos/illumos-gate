@@ -30,7 +30,7 @@ include ../Makefile.com
 
 DATAFILES += depend
 
-LICENSEFILES += $(CMN_LIC_DIR)/lic_SNIA
+LICENSEFILES += ../../lib/hbaapi/THIRDPARTYLICENSE
 
 .KEEP_STATE:
 

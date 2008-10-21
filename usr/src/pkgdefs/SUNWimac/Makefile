@@ -27,7 +27,7 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-LICENSEFILES += $(CMN_LIC_DIR)/lic_SNIA
+LICENSEFILES += ../../lib/libima/THIRDPARTYLICENSE
 
 all: $(FILES) depend
 

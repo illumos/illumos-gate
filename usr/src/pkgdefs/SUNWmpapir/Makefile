@@ -27,7 +27,7 @@ include ../Makefile.com
 
 DATAFILES += i.preserve
 
-LICENSEFILES += $(CMN_LIC_DIR)/lic_SNIA
+LICENSEFILES += ../../lib/mpapi/libmpapi/THIRDPARTYLICENSE
 
 .KEEP_STATE:
 

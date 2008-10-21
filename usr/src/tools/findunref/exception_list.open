@@ -180,6 +180,7 @@
 ./src/uts/sparc/uhci/Makefile
 ./src/lib/pam_modules/smb/amd64/Makefile
 ./src/lib/pam_modules/smb/sparcv9/Makefile
+./src/cmd/isns/isnsd/xml_def/isnsmgmtSchema.xsd
 
 #
 # Ignore dtrace scripts only used by developers
