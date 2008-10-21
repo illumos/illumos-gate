@@ -1327,9 +1327,9 @@ ipw2100_ring_alloc(struct ipw2100_softc *sc)
 		err = ipw2100_dma_region_alloc(sc, &sc->sc_dma_txbufs[i],
 		    IPW2100_TXBUF_SIZE, DDI_DMA_WRITE, DDI_DMA_STREAMING);
 		if (err != DDI_SUCCESS) {
-			while (i >= 0) {
-				ipw2100_dma_region_free(&sc->sc_dma_txbufs[i]);
+			while (i > 0) {
 				i--;
+				ipw2100_dma_region_free(&sc->sc_dma_txbufs[i]);
 			}
 			goto fail1;
 		}
@@ -1350,9 +1350,9 @@ ipw2100_ring_alloc(struct ipw2100_softc *sc)
 		err = ipw2100_dma_region_alloc(sc, &sc->sc_dma_rxbufs[i],
 		    IPW2100_RXBUF_SIZE, DDI_DMA_READ, DDI_DMA_STREAMING);
 		if (err != DDI_SUCCESS) {
-			while (i >= 0) {
-				ipw2100_dma_region_free(&sc->sc_dma_rxbufs[i]);
+			while (i > 0) {
 				i--;
+				ipw2100_dma_region_free(&sc->sc_dma_rxbufs[i]);
 			}
 			goto fail3;
 		}
