@@ -84,6 +84,7 @@ static void vnet_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val);
 void vnet_fdbe_add(vnet_t *vnetp, vnet_res_t *vresp);
 static void vnet_fdbe_del(vnet_t *vnetp, vnet_res_t *vresp);
 
+static void vnet_rx_frames_untag(uint16_t pvid, mblk_t **mp);
 static void vnet_rx(vio_net_handle_t vrh, mblk_t *mp);
 static void vnet_tx_update(vio_net_handle_t vrh);
 static void vnet_res_start_task(void *arg);
@@ -625,10 +626,14 @@ vnet_m_tx(void *arg, mblk_t *mp)
 	mac_register_t		*macp;
 	struct ether_header	*ehp;
 	boolean_t		is_unicast;
+	boolean_t		is_pvid;	/* non-default pvid ? */
+	boolean_t		hres;		/* Hybrid resource ? */
 
 	vnetp = (vnet_t *)arg;
 	DBG1(vnetp, "enter\n");
 	ASSERT(mp != NULL);
+
+	is_pvid = (vnetp->pvid != vnetp->default_vlan_id) ? B_TRUE : B_FALSE;
 
 	while (mp != NULL) {
 
@@ -675,8 +680,10 @@ vnet_m_tx(void *arg, mblk_t *mp)
 
 			if ((is_unicast) && (vnetp->hio_fp != NULL)) {
 				vresp = vnetp->hio_fp;
+				hres = B_TRUE;
 			} else {
 				vresp = vnetp->vsw_fp;
+				hres = B_FALSE;
 			}
 			if (vresp == NULL) {
 				/*
@@ -692,6 +699,32 @@ vnet_m_tx(void *arg, mblk_t *mp)
 			VNET_FDBE_REFHOLD(vresp);
 
 			RW_EXIT(&vnetp->vsw_fp_rw);
+
+			/*
+			 * In the case of a hybrid resource we need to insert
+			 * the tag for the pvid case here; unlike packets that
+			 * are destined to a vnet/vsw in which case the vgen
+			 * layer does the tagging before sending it over ldc.
+			 */
+			if (hres == B_TRUE) {
+				/*
+				 * Determine if the frame being transmitted
+				 * over the hybrid resource is untagged. If so,
+				 * insert the tag before transmitting.
+				 */
+				if (is_pvid == B_TRUE &&
+				    ehp->ether_type != htons(ETHERTYPE_VLAN)) {
+
+					mp = vnet_vlan_insert_tag(mp,
+					    vnetp->pvid);
+					if (mp == NULL) {
+						VNET_FDBE_REFRELE(vresp);
+						mp = next;
+						continue;
+					}
+
+				}
+			}
 
 			macp = &vresp->macreg;
 			resid_mp = macp->m_callbacks->mc_tx(macp->m_driver, mp);
@@ -961,17 +994,88 @@ vnet_fdbe_find_cb(mod_hash_key_t key, mod_hash_val_t val)
 	VNET_FDBE_REFHOLD((vnet_res_t *)val);
 }
 
+/*
+ * Frames received that are tagged with the pvid of the vnet device must be
+ * untagged before sending up the stack. This function walks the chain of rx
+ * frames, untags any such frames and returns the updated chain.
+ *
+ * Arguments:
+ *    pvid:  pvid of the vnet device for which packets are being received
+ *    mp:    head of pkt chain to be validated and untagged
+ *
+ * Returns:
+ *    mp:    head of updated chain of packets
+ */
+static void
+vnet_rx_frames_untag(uint16_t pvid, mblk_t **mp)
+{
+	struct ether_vlan_header	*evhp;
+	mblk_t				*bp;
+	mblk_t				*bpt;
+	mblk_t				*bph;
+	mblk_t				*bpn;
+
+	bpn = bph = bpt = NULL;
+
+	for (bp = *mp; bp != NULL; bp = bpn) {
+
+		bpn = bp->b_next;
+		bp->b_next = bp->b_prev = NULL;
+
+		evhp = (struct ether_vlan_header *)bp->b_rptr;
+
+		if (ntohs(evhp->ether_tpid) == ETHERTYPE_VLAN &&
+		    VLAN_ID(ntohs(evhp->ether_tci)) == pvid) {
+
+			bp = vnet_vlan_remove_tag(bp);
+			if (bp == NULL) {
+				continue;
+			}
+
+		}
+
+		/* build a chain of processed packets */
+		if (bph == NULL) {
+			bph = bpt = bp;
+		} else {
+			bpt->b_next = bp;
+			bpt = bp;
+		}
+
+	}
+
+	*mp = bph;
+}
+
 static void
 vnet_rx(vio_net_handle_t vrh, mblk_t *mp)
 {
-	vnet_res_t *vresp = (vnet_res_t *)vrh;
-	vnet_t *vnetp = vresp->vnetp;
+	vnet_res_t	*vresp = (vnet_res_t *)vrh;
+	vnet_t		*vnetp = vresp->vnetp;
 
-	if ((vnetp != NULL) && (vnetp->mh)) {
-		mac_rx(vnetp->mh, NULL, mp);
-	} else {
+	if ((vnetp == NULL) || (vnetp->mh == 0)) {
 		freemsgchain(mp);
+		return;
 	}
+
+	/*
+	 * Packets received over a hybrid resource need additional processing
+	 * to remove the tag, for the pvid case. The underlying resource is
+	 * not aware of the vnet's pvid and thus packets are received with the
+	 * vlan tag in the header; unlike packets that are received over a ldc
+	 * channel in which case the peer vnet/vsw would have already removed
+	 * the tag.
+	 */
+	if (vresp->type == VIO_NET_RES_HYBRID &&
+	    vnetp->pvid != vnetp->default_vlan_id) {
+
+		vnet_rx_frames_untag(vnetp->pvid, &mp);
+		if (mp == NULL) {
+			return;
+		}
+	}
+
+	mac_rx(vnetp->mh, NULL, mp);
 }
 
 void
