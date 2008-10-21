@@ -22,10 +22,14 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNW_1.10 {		# SunOS 5.11 (Solaris 11)
+    global:
+	SUNW_1.10;
+} SUNW_1.9.1;
+
+SUNW_1.9.1 {		# SunOS 5.10 (Solaris 10 update 5)
     global:
 	inet_aton;
 } SUNW_1.9;
