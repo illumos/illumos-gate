@@ -186,7 +186,7 @@ typedef struct iwk_softc {
 #define	IWK_F_SUSPEND		(1 << 7)
 #define	IWK_F_RADIO_OFF		(1 << 8)
 #define	IWK_F_STATISTICS	(1 << 9)
-#define	IWK_F_READY		(1 << 10)
+#define	IWK_F_QUIESCED		(1 << 10)
 
 #define	IWK_SUCCESS		0
 #define	IWK_FAIL		EIO

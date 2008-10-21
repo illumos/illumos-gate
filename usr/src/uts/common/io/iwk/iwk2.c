@@ -314,6 +314,7 @@ static void	iwk_write_error_log(iwk_sc_t *);
 
 static int	iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int	iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static int	iwk_quiesce(dev_info_t *dip);
 
 /*
  * GLD specific operations
@@ -356,7 +357,7 @@ extern pri_t minclsyspri;
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(iwk_devops, nulldev, nulldev, iwk_attach,
-    iwk_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    iwk_detach, nodev, NULL, D_MP, NULL, iwk_quiesce);
 
 static struct modldrv iwk_modldrv = {
 	&mod_driverops,
@@ -895,6 +896,35 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+int
+iwk_quiesce(dev_info_t *dip)
+{
+	iwk_sc_t	*sc;
+
+	sc = ddi_get_soft_state(iwk_soft_state_p, ddi_get_instance(dip));
+	ASSERT(sc != NULL);
+
+	/* no message prints and no lock accquisition */
+#ifdef DEBUG
+	iwk_dbg_flags = 0;
+#endif
+	sc->sc_flags |= IWK_F_QUIESCED;
+
+	iwk_stop(sc);
+
+	return (DDI_SUCCESS);
+}
+
 static void
 iwk_destroy_locks(iwk_sc_t *sc)
 {
@@ -1237,10 +1267,10 @@ iwk_reset_rx_ring(iwk_sc_t *sc)
 			break;
 		DELAY(1000);
 	}
-#ifdef DEBUG
+
 	if (n == 2000)
 		IWK_DBG((IWK_DEBUG_DMA, "timeout resetting Rx ring\n"));
-#endif
+
 	iwk_mac_access_exit(sc);
 
 	sc->sc_rxq.cur = 0;
@@ -3877,8 +3907,8 @@ iwk_stop(iwk_sc_t *sc)
 	uint32_t tmp;
 	int i;
 
-
-	mutex_enter(&sc->sc_glock);
+	if (!(sc->sc_flags & IWK_F_QUIESCED))
+		mutex_enter(&sc->sc_glock);
 
 	IWK_WRITE(sc, CSR_RESET, CSR_RESET_REG_FLAG_NEVO_RESET);
 	/* disable interrupts */
@@ -3904,7 +3934,9 @@ iwk_stop(iwk_sc_t *sc)
 	sc->sc_tx_timer = 0;
 	tmp = IWK_READ(sc, CSR_RESET);
 	IWK_WRITE(sc, CSR_RESET, tmp | CSR_RESET_REG_FLAG_SW_RESET);
-	mutex_exit(&sc->sc_glock);
+
+	if (!(sc->sc_flags & IWK_F_QUIESCED))
+		mutex_exit(&sc->sc_glock);
 }
 
 /*
@@ -5077,9 +5109,9 @@ static int iwk_rx_sens(iwk_sc_t *sc)
 
 	actual_rx_time = rx_general_p->channel_load;
 	if (!actual_rx_time) {
-		cmn_err(CE_WARN, "iwk_rx_sens(): "
+		IWK_DBG((IWK_DEBUG_CALIBRATION, "iwk_rx_sens(): "
 		    "can't make rx sensitivity calibration,"
-		    "because has not enough rx time\n");
+		    "because has not enough rx time\n"));
 		return (DDI_FAILURE);
 	}
 
