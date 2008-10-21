@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -126,7 +124,7 @@ EOFB
 [ -n "$ttymon_timeout" -a "$ttymon_timeout" -ne 0 ] && \
     ttymon_opt timeout "$ttymon_timeout"
 
-/usr/sbin/svcadm refresh svc:/system/console-login
+/usr/sbin/svcadm refresh svc:/system/console-login:default
 
 EOFA
 }
