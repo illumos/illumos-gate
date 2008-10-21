@@ -310,8 +310,16 @@ Plofspath(const char *path, char *s, size_t n)
 		mt_find.mnt_mountp = tmp;
 		rv = getmntany(fp, &mt, &mt_find);
 
-		/* We only care about lofs mount points */
-		if ((rv == 0) && (strcmp(mt.mnt_fstype, "lofs") == 0)) {
+		/*
+		 * We only care about lofs mount points.  But we need to
+		 * ignore lofs mounts where the source path is the same
+		 * as the target path.  (This can happen when a non-global
+		 * zone has a lofs mount of a global zone filesystem, since
+		 * the source path can't expose information about global
+		 * zone paths to the non-global zone.)
+		 */
+		if ((rv == 0) && (strcmp(mt.mnt_fstype, "lofs") == 0) &&
+		    (strcmp(mt.mnt_special, mt.mnt_mountp) != 0)) {
 			char tmp2[PATH_MAX + 1];
 
 			/*
