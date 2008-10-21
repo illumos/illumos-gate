@@ -30,7 +30,6 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
 
 /*
  * sfe_mii.h : MII registers

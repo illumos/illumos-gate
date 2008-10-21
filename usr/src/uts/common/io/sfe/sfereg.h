@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
-
 #ifndef	_SFEREG_H_
 #define	_SFEREG_H_
 /*

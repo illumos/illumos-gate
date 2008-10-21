@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
-
 /*
  * System Header files.
  */

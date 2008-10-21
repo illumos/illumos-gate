@@ -55,7 +55,7 @@
 #include "sfe_util.h"
 #include "sfereg.h"
 
-char	ident[] = "sis900/dp83815 driver";
+char	ident[] = "sis900/dp83815 driver v" "2.6.1t29os";
 
 /* Debugging support */
 #ifdef DEBUG_LEVEL
@@ -537,7 +537,7 @@ sfe_reset_chip_sis900(struct gem_dev *dp)
 	OUTL(dp, IMR, 0);
 	lp->isr_pended |= INL(dp, ISR) & lp->our_intr_bits;
 
-	OUTL(dp, RFCR, 0);
+	OUTLINL(dp, RFCR, 0);
 
 	OUTL(dp, CR, CR_RST | CR_TXR | CR_RXR);
 	drv_usecwait(10);
@@ -822,8 +822,8 @@ sfe_set_rx_filter_sis900(struct gem_dev *dp)
 	DPRINTF(4, (CE_CONT, CONS "%s: %s: called", dp->name, __func__));
 
 	if ((dp->rxmode & RXMODE_ENABLE) == 0) {
-		/* disalbe rx filter */
-		OUTL(dp, RFCR, 0);
+		/* disable rx filter */
+		OUTLINL(dp, RFCR, 0);
 		return (GEM_SUCCESS);
 	}
 
@@ -862,9 +862,9 @@ sfe_set_rx_filter_sis900(struct gem_dev *dp)
 		/* Disable Rx filter and load mac address */
 		for (i = 0; i < ETHERADDRL/2; i++) {
 			/* For sis900, index is in word */
-			OUTL(dp, RFCR,
+			OUTLINL(dp, RFCR,
 			    (RFADDR_MAC_SIS900+i) << RFCR_RFADDR_SHIFT_SIS900);
-			OUTL(dp, RFDR, (mac[i*2+1] << 8) | mac[i*2]);
+			OUTLINL(dp, RFDR, (mac[i*2+1] << 8) | mac[i*2]);
 		}
 
 		bcopy(mac, lp->mac_addr, ETHERADDRL);
@@ -873,13 +873,13 @@ sfe_set_rx_filter_sis900(struct gem_dev *dp)
 	/* Load Multicast hash table */
 	for (i = 0; i < hash_size; i++) {
 		/* For sis900, index is in word */
-		OUTL(dp, RFCR,
+		OUTLINL(dp, RFCR,
 		    (RFADDR_MULTICAST_SIS900 + i) << RFCR_RFADDR_SHIFT_SIS900);
-		OUTL(dp, RFDR, hash_tbl[i]);
+		OUTLINL(dp, RFDR, hash_tbl[i]);
 	}
 
 	/* Load rx filter mode and enable rx filter */
-	OUTL(dp, RFCR, RFCR_RFEN | mode);
+	OUTLINL(dp, RFCR, RFCR_RFEN | mode);
 
 	return (GEM_SUCCESS);
 }
@@ -2295,7 +2295,7 @@ sfedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  */
 /* ======================================================== */
 DDI_DEFINE_STREAM_OPS(sfe_ops, nulldev, nulldev, sfeattach, sfedetach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+	nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */

@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
-
 #ifndef _SFE_UTIL_H_
 #define	_SFE_UTIL_H_
 #include <sys/mac.h>
@@ -66,9 +64,13 @@ typedef	int32_t		seqnum_t;
 #define	OUTW(dp, p, v)	\
 	ddi_put16((dp)->regs_handle, \
 		(void *)((caddr_t)((dp)->base_addr) + (p)), v)
-#define	OUTL(dp, p, v)	\
+#define	OUTL(dp, p, v)  \
 	ddi_put32((dp)->regs_handle, \
-		(void *)((caddr_t)((dp)->base_addr) + (p)), v)
+	    (void *)((caddr_t)((dp)->base_addr) + (p)), v)
+#define	OUTLINL(dp, p, v) \
+	ddi_put32((dp)->regs_handle, \
+	    (void *)((caddr_t)((dp)->base_addr) + (p)), v); \
+	(void) INL((dp), (p))
 #define	INB(dp, p)	\
 	ddi_get8((dp)->regs_handle, \
 		(void *)(((caddr_t)(dp)->base_addr) + (p)))
