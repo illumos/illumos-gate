@@ -1005,7 +1005,6 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
 		ASSERT(vd->vdev_ops == &vdev_mirror_ops);
 		int err = zvol_dumpio_vdev(vd->vdev_child[c],
 		    addr, offset, size, doread, isdump);
-		ASSERT3U(err, ==, 0);
 		if (err != 0) {
 			numerrors++;
 		} else if (doread) {
@@ -1016,8 +1015,9 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (numerrors < vd->vdev_children ? 0 : EIO);
 
-	ASSERT(vdev_writeable(vd));
-	if (!vdev_writeable(vd))
+	if (doread && !vdev_readable(vd))
+		return (EIO);
+	else if (!doread && !vdev_writeable(vd))
 		return (EIO);
 
 	dvd = vd->vdev_tsd;
