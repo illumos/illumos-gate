@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <nfs/nfs4_clnt.h>
 #include <nfs/rnode4.h>
@@ -71,9 +70,9 @@ lock_bucket(cred_t *cr, mntinfo4_t *mi)
 	uint32_t hash_key;
 
 	hash_key = (uint32_t)(crgetuid(cr) + crgetruid(cr))
-			% NFS4_NUM_OO_BUCKETS;
+	    % NFS4_NUM_OO_BUCKETS;
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE, "lock_bucket: "
-		"hash_key %d for cred %p", hash_key, (void*)cr));
+	    "hash_key %d for cred %p", hash_key, (void*)cr));
 
 	ASSERT(hash_key >= 0 && hash_key < NFS4_NUM_OO_BUCKETS);
 	ASSERT(mi != NULL);
@@ -99,7 +98,7 @@ void
 nfs4_rnode_remove_lock_owner(rnode4_t *rp, nfs4_lock_owner_t *lop)
 {
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"nfs4_rnode_remove_lock_owner"));
+	    "nfs4_rnode_remove_lock_owner"));
 
 	mutex_enter(&rp->r_statev4_lock);
 
@@ -179,13 +178,13 @@ void
 open_owner_rele(nfs4_open_owner_t *oop)
 {
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"open_owner_rele"));
+	    "open_owner_rele"));
 
 	mutex_enter(&oop->oo_lock);
 	oop->oo_ref_count--;
 	if (oop->oo_ref_count == 0) {
 		NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-			"open_owner_rele: freeing open owner"));
+		    "open_owner_rele: freeing open owner"));
 		oop->oo_valid = 0;
 		mutex_exit(&oop->oo_lock);
 		/*
@@ -215,7 +214,7 @@ void
 open_stream_rele(nfs4_open_stream_t *osp, rnode4_t *rp)
 {
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"open_stream_rele"));
+	    "open_stream_rele"));
 
 	ASSERT(!mutex_owned(&rp->r_os_lock));
 
@@ -226,7 +225,7 @@ open_stream_rele(nfs4_open_stream_t *osp, rnode4_t *rp)
 		nfs4_open_owner_t *tmp_oop;
 
 		NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-			"open_stream_rele: freeing open stream"));
+		    "open_stream_rele: freeing open stream"));
 		osp->os_valid = 0;
 		tmp_oop = osp->os_open_owner;
 		mutex_exit(&osp->os_sync_lock);
@@ -263,14 +262,14 @@ void
 lock_owner_rele(nfs4_lock_owner_t *lop)
 {
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"lock_owner_rele"));
+	    "lock_owner_rele"));
 
 	mutex_enter(&lop->lo_lock);
 	lop->lo_ref_count--;
 	if (lop->lo_ref_count == 0) {
 		NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-			"lock_owner_rele: freeing lock owner: "
-			"%x", lop->lo_pid));
+		    "lock_owner_rele: freeing lock owner: "
+		    "%x", lop->lo_pid));
 		lop->lo_valid = 0;
 		/*
 		 * If there are no references, the lock_owner should
@@ -373,7 +372,7 @@ find_open_stream(nfs4_open_owner_t *oop, rnode4_t *rp)
 	nfs4_open_stream_t	*osp;
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"find_open_stream"));
+	    "find_open_stream"));
 
 	mutex_enter(&rp->r_os_lock);
 	/* Now, no one can add or delete to rp's open streams list */
@@ -383,8 +382,8 @@ find_open_stream(nfs4_open_owner_t *oop, rnode4_t *rp)
 		if (osp->os_open_owner == oop && osp->os_valid != 0) {
 			/* match */
 			NFS4_DEBUG(nfs4_client_state_debug,
-				(CE_NOTE, "find_open_stream "
-				"got a match"));
+			    (CE_NOTE, "find_open_stream "
+			    "got a match"));
 
 			osp->os_ref_count++;
 			mutex_exit(&rp->r_os_lock);
@@ -411,7 +410,7 @@ find_lock_owner(rnode4_t *rp, pid_t pid, lown_which_t which)
 	nfs4_lock_owner_t	*lop, *next_lop;
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"find_lock_owner: pid %x, which %d", pid, which));
+	    "find_lock_owner: pid %x, which %d", pid, which));
 
 	ASSERT(which == LOWN_ANY || which == LOWN_VALID_STATEID);
 
@@ -427,8 +426,8 @@ find_lock_owner(rnode4_t *rp, pid_t pid, lown_which_t which)
 			    lop->lo_just_created != NFS4_JUST_CREATED) {
 				/* Found a matching lock owner */
 				NFS4_DEBUG(nfs4_client_state_debug,
-					(CE_NOTE, "find_lock_owner: "
-					"got a match"));
+				    (CE_NOTE, "find_lock_owner: "
+				    "got a match"));
 
 				lop->lo_ref_count++;
 				mutex_exit(&lop->lo_lock);
@@ -653,7 +652,7 @@ void
 nfs4_set_lock_stateid(nfs4_lock_owner_t *lop, stateid4 stateid)
 {
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"nfs4_set_lock_stateid"));
+	    "nfs4_set_lock_stateid"));
 
 	ASSERT(lop);
 	ASSERT(lop->lo_flags & NFS4_LOCK_SEQID_INUSE);
@@ -818,7 +817,7 @@ create_lock_owner(rnode4_t *rp, pid_t pid)
 	nfs4_lock_owner_t	*lop;
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"create_lock_owner: pid %x", pid));
+	    "create_lock_owner: pid %x", pid));
 
 	ASSERT(mutex_owned(&rp->r_statev4_lock));
 
@@ -837,7 +836,7 @@ create_lock_owner(rnode4_t *rp, pid_t pid)
 	 * A Solaris lock_owner is <seq_num><pid>
 	 */
 	lop->lock_owner_name.ln_seq_num =
-		atomic_add_64_nv(&lock_owner_seq_num, 1);
+	    atomic_add_64_nv(&lock_owner_seq_num, 1);
 	lop->lock_owner_name.ln_pid = pid;
 
 	cv_init(&lop->lo_cv_seqid_sync, NULL, CV_DEFAULT, NULL);
@@ -862,7 +861,7 @@ void
 nfs4_set_lock_seqid(seqid4 seqid, nfs4_lock_owner_t *lop)
 {
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"nfs4_set_lock_seqid"));
+	    "nfs4_set_lock_seqid"));
 
 	ASSERT(lop != NULL);
 	ASSERT(lop->lo_flags & NFS4_LOCK_SEQID_INUSE);
@@ -876,7 +875,7 @@ nfs4_set_new_lock_owner_args(lock_owner4 *owner, pid_t pid)
 	nfs4_lo_name_t *cast_namep;
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"nfs4_set_new_lock_owner_args"));
+	    "nfs4_set_new_lock_owner_args"));
 
 	owner->owner_len = sizeof (*cast_namep);
 	owner->owner_val = kmem_alloc(owner->owner_len, KM_SLEEP);
@@ -897,7 +896,7 @@ nfs4_setlockowner_args(lock_owner4 *owner, rnode4_t *rp, pid_t pid)
 	nfs4_lock_owner_t *lop;
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"nfs4_setlockowner_args"));
+	    "nfs4_setlockowner_args"));
 
 	/* This increments lop's ref count */
 	lop = find_lock_owner(rp, pid, LOWN_VALID_STATEID);
@@ -909,7 +908,7 @@ nfs4_setlockowner_args(lock_owner4 *owner, rnode4_t *rp, pid_t pid)
 	owner->owner_len = sizeof (lop->lock_owner_name);
 	owner->owner_val = kmem_alloc(owner->owner_len, KM_SLEEP);
 	bcopy(&lop->lock_owner_name, owner->owner_val,
-		owner->owner_len);
+	    owner->owner_len);
 	mutex_exit(&lop->lo_lock);
 	lock_owner_rele(lop);
 	return;
@@ -969,7 +968,7 @@ nfs4_start_open_seqid_sync(nfs4_open_owner_t *oop, mntinfo4_t *mi)
 
 	while (oop->oo_seqid_inuse) {
 		NFS4_DEBUG(nfs4_seqid_sync, (CE_NOTE,
-			"nfs4_start_open_seqid_sync waiting on cv"));
+		    "nfs4_start_open_seqid_sync waiting on cv"));
 
 		cv_wait(&oop->oo_cv_seqid_sync, &oop->oo_lock);
 	}
@@ -988,7 +987,7 @@ nfs4_start_open_seqid_sync(nfs4_open_owner_t *oop, mntinfo4_t *mi)
 		nfs4_end_open_seqid_sync(oop);
 
 	NFS4_DEBUG(nfs4_seqid_sync, (CE_NOTE,
-		"nfs4_start_open_seqid_sync: error=%d", error));
+	    "nfs4_start_open_seqid_sync: error=%d", error));
 
 done:
 	return (error);
@@ -1052,8 +1051,8 @@ nfs4_is_otw_open_necessary(nfs4_open_owner_t *oop, int flag, vnode_t *vp,
 
 		if (!do_otw) {
 			NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-				"nfs4_is_otw_open_necessary: can skip this "
-				"open OTW"));
+			    "nfs4_is_otw_open_necessary: can skip this "
+			    "open OTW"));
 			if (!just_been_created) {
 				osp->os_open_ref_count++;
 				if (flag & FREAD)
@@ -1144,7 +1143,7 @@ nfs4_is_otw_open_necessary(nfs4_open_owner_t *oop, int flag, vnode_t *vp,
 		if (rsp->rs_sp != NULL) {
 			mutex_enter(&rsp->rs_sp->s_lock);
 			nfs4_inc_state_ref_count_nolock(rsp->rs_sp,
-							VTOMI4(vp));
+			    VTOMI4(vp));
 			mutex_exit(&rsp->rs_sp->s_lock);
 		}
 #ifdef	DEBUG
@@ -1203,9 +1202,9 @@ nfs4_setup_lock_args(nfs4_lock_owner_t *lop, nfs4_open_owner_t *oop,
 		nown->lock_owner.clientid = clientid;
 		nown->lock_owner.owner_len = sizeof (lop->lock_owner_name);
 		nown->lock_owner.owner_val =
-			kmem_alloc(nown->lock_owner.owner_len, KM_SLEEP);
+		    kmem_alloc(nown->lock_owner.owner_len, KM_SLEEP);
 		bcopy(&lop->lock_owner_name, nown->lock_owner.owner_val,
-			nown->lock_owner.owner_len);
+		    nown->lock_owner.owner_len);
 	} else {
 		exist_lock_owner4 *eown;
 		/* have an existing lock owner */
@@ -1255,12 +1254,12 @@ nfs4_start_lock_seqid_sync(nfs4_lock_owner_t *lop, mntinfo4_t *mi)
 	ASSERT(lop->lo_seqid_holder != curthread);
 	while (lop->lo_flags & NFS4_LOCK_SEQID_INUSE) {
 		NFS4_DEBUG(nfs4_seqid_sync, (CE_NOTE,
-			"nfs4_start_lock_seqid_sync: waiting on cv"));
+		    "nfs4_start_lock_seqid_sync: waiting on cv"));
 
 		cv_wait(&lop->lo_cv_seqid_sync, &lop->lo_lock);
 	}
 	NFS4_DEBUG(nfs4_seqid_sync, (CE_NOTE, "nfs4_start_lock_seqid_sync: "
-		"NFS4_LOCK_SEQID_INUSE"));
+	    "NFS4_LOCK_SEQID_INUSE"));
 
 	lop->lo_flags |= NFS4_LOCK_SEQID_INUSE;
 	lop->lo_seqid_holder = curthread;
@@ -1276,7 +1275,7 @@ nfs4_start_lock_seqid_sync(nfs4_lock_owner_t *lop, mntinfo4_t *mi)
 		nfs4_end_lock_seqid_sync(lop);
 
 	NFS4_DEBUG(nfs4_seqid_sync, (CE_NOTE,
-		"nfs4_start_lock_seqid_sync: error=%d", error));
+	    "nfs4_start_lock_seqid_sync: error=%d", error));
 
 done:
 	return (error);
@@ -1330,8 +1329,8 @@ nfs4_find_or_create_lock_owner(pid_t pid, rnode4_t *rp, cred_t *cr,
 		if (lop->lo_pid == pid && lop->lo_valid != 0) {
 			/* Found a matching lock owner */
 			NFS4_DEBUG(nfs4_client_state_debug,
-				(CE_NOTE, "nfs4_find_or_create_lock_owner: "
-				"got a match"));
+			    (CE_NOTE, "nfs4_find_or_create_lock_owner: "
+			    "got a match"));
 			lop->lo_ref_count++;
 			break;
 		}
@@ -1372,7 +1371,7 @@ nfs4_find_or_create_lock_owner(pid_t pid, rnode4_t *rp, cred_t *cr,
 		if ((*ospp)->os_failed_reopen) {
 			mutex_exit(&(*ospp)->os_sync_lock);
 			NFS4_DEBUG((nfs4_open_stream_debug ||
-				    nfs4_client_lock_debug), (CE_NOTE,
+			    nfs4_client_lock_debug), (CE_NOTE,
 			    "nfs4_find_or_create_lock_owner: os_failed_reopen;"
 			    "osp %p, cr %p, rp %s", (void *)(*ospp),
 			    (void *)cr, rnode4info(rp)));
@@ -1451,7 +1450,7 @@ find_freed_open_owner(cred_t *cr, nfs4_oo_hash_bucket_t *bucketp,
 	nfs4_open_owner_t		*foop;
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
-		"find_freed_open_owner: cred %p", (void*)cr));
+	    "find_freed_open_owner: cred %p", (void*)cr));
 
 	ASSERT(mutex_owned(&mi->mi_lock));
 	ASSERT(mutex_owned(&bucketp->b_lock));
@@ -1461,8 +1460,8 @@ find_freed_open_owner(cred_t *cr, nfs4_oo_hash_bucket_t *bucketp,
 	    foop = list_next(&mi->mi_foo_list, foop)) {
 		if (!crcmp(foop->oo_cred, cr)) {
 			NFS4_DEBUG(nfs4_client_foo_debug, (CE_NOTE,
-				"find_freed_open_owner: got a match open owner "
-				"%p", (void *)foop));
+			    "find_freed_open_owner: got a match open owner "
+			    "%p", (void *)foop));
 			foop->oo_ref_count = 1;
 			foop->oo_valid = 1;
 			list_remove(&mi->mi_foo_list, foop);
@@ -1490,10 +1489,10 @@ nfs4_free_open_owner(nfs4_open_owner_t *oop, mntinfo4_t *mi)
 
 	if (mi->mi_foo_num < mi->mi_foo_max) {
 		NFS4_DEBUG(nfs4_client_foo_debug, (CE_NOTE,
-			"nfs4_free_open_owner: num free %d, max free %d, "
-			"insert open owner %p for mntinfo4 %p",
-			mi->mi_foo_num, mi->mi_foo_max, (void *)oop,
-			(void *)mi));
+		    "nfs4_free_open_owner: num free %d, max free %d, "
+		    "insert open owner %p for mntinfo4 %p",
+		    mi->mi_foo_num, mi->mi_foo_max, (void *)oop,
+		    (void *)mi));
 		list_insert_head(&mi->mi_foo_list, oop);
 		mi->mi_foo_num++;
 		return;
@@ -1770,7 +1769,7 @@ nfs4open_dg_save_lost_rqst(int error, nfs4_lost_rqst_t *lost_rqstp,
 	if (error == ETIMEDOUT || error == EINTR ||
 	    NFS4_FRC_UNMT_ERR(error, vp->v_vfsp)) {
 		NFS4_DEBUG(nfs4_lost_rqst_debug, (CE_NOTE,
-			"nfs4open_dg_save_lost_rqst: error %d", error));
+		    "nfs4open_dg_save_lost_rqst: error %d", error));
 
 		lost_rqstp->lr_op = OP_OPEN_DOWNGRADE;
 		/*
@@ -1996,8 +1995,8 @@ cred_retry:
 		osp->os_dc_openacc = new_acc;
 
 		nfs4_attr_cache(vp,
-				&res.array[1].nfs_resop4_u.opgetattr.ga_res,
-				t, cred_otw, TRUE, NULL);
+		    &res.array[1].nfs_resop4_u.opgetattr.ga_res,
+		    t, cred_otw, TRUE, NULL);
 	}
 
 	if (!ep->error)
@@ -2095,8 +2094,8 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 		 * use the mntinfo parentfh
 		 */
 		argop[0].nfs_argop4_u.opcputfh.sfh =
-			(vp->v_flag & VROOT) ? mi->mi_srvparentfh :
-						VTOSV(vp)->sv_dfh;
+		    (vp->v_flag & VROOT) ? mi->mi_srvparentfh :
+		    VTOSV(vp)->sv_dfh;
 		args.ctag = TAG_REOPEN_LOST;
 	} else {
 		argop[0].nfs_argop4_u.opcputfh.sfh = VTOR4(dvp)->r_fh;
@@ -2124,7 +2123,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 	destcfp[destclen] = '\0';
 	if (claim == CLAIM_DELEGATE_CUR) {
 		open_args->open_claim4_u.delegate_cur_info.delegate_stateid =
-				resend_rqstp->lr_ostateid;
+		    resend_rqstp->lr_ostateid;
 		open_args->open_claim4_u.delegate_cur_info.cfile = destcfp;
 	} else {
 		open_args->open_claim4_u.cfile = destcfp;
@@ -2193,8 +2192,8 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 
 		sfh = sfh4_get(&gf_res->object, VTOMI4(dvp));
 		*vpp = makenfs4node(sfh, garp, dvp->v_vfsp, t, cr, dvp,
-			fn_get(VTOSV(dvp)->sv_name,
-			open_args->open_claim4_u.cfile));
+		    fn_get(VTOSV(dvp)->sv_name,
+		    open_args->open_claim4_u.cfile, sfh));
 		sfh4_rele(&sfh);
 		NFS4_DEBUG(nfs4_lost_rqst_debug, (CE_NOTE,
 		    "nfs4_resend_open_otw: made vp %p for file %s",
@@ -2232,7 +2231,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 		 */
 		(void) nfs_rw_enter_sig(&mi->mi_fh_lock, RW_READER, 0);
 		fh_different =
-			(nfs4cmpfh(&rp->r_fh->sfh_fh, &gf_res->object) != 0);
+		    (nfs4cmpfh(&rp->r_fh->sfh_fh, &gf_res->object) != 0);
 		if (fh_different) {
 			if (mi->mi_fh_expire_type == FH4_PERSISTENT ||
 			    mi->mi_fh_expire_type & FH4_NOEXPIRE_WITH_OPEN) {
@@ -2251,10 +2250,10 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 				kmem_free(destcfp, destclen + 1);
 				nfs4args_copen_free(open_args);
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
-						(caddr_t)&res);
+				    (caddr_t)&res);
 				nfs_rw_exit(&mi->mi_fh_lock);
 				nfs4_fail_recov(vp, failed_msg, ep->error,
-						ep->stat);
+				    ep->stat);
 				return;
 			} else {
 				/*
@@ -2271,7 +2270,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 				    garp->n4g_va.va_mask & AT_NODEID &&
 				    rp->r_attr.va_mask & AT_NODEID &&
 				    rp->r_attr.va_nodeid !=
-					garp->n4g_va.va_nodeid) {
+				    garp->n4g_va.va_nodeid) {
 					/*
 					 * We have fids, but they don't
 					 * compare. So kill the file.
@@ -2283,10 +2282,10 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 					kmem_free(destcfp, destclen + 1);
 					nfs4args_copen_free(open_args);
 					(void) xdr_free(xdr_COMPOUND4res_clnt,
-							(caddr_t)&res);
+					    (caddr_t)&res);
 					nfs_rw_exit(&mi->mi_fh_lock);
 					nfs4_fail_recov(vp, failed_msg,
-							ep->error, ep->stat);
+					    ep->error, ep->stat);
 					return;
 				} else {
 					/*

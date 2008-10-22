@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
  *	All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -445,7 +444,7 @@ makenfs4node_by_fh(nfs4_sharedfh_t *sfh, nfs4_sharedfh_t *psfh,
 	vnode_t *vp;
 	rnode4_t *rp;
 	svnode_t *svp;
-	nfs4_fname_t *name;
+	nfs4_fname_t *name, *svpname;
 	int index;
 
 	ASSERT(npp && *npp);
@@ -455,23 +454,33 @@ makenfs4node_by_fh(nfs4_sharedfh_t *sfh, nfs4_sharedfh_t *psfh,
 	index = rtable4hash(sfh);
 	rw_enter(&rtable4[index].r_lock, RW_READER);
 
-	rp = r4find(&rtable4[index], sfh, vfsp);
-	if (rp != NULL) {
-		rw_exit(&rtable4[index].r_lock);
-		vp = RTOV4(rp);
-		fn_rele(&name);
-		return (vp);
-	}
-
 	vp = make_rnode4(sfh, &rtable4[index], vfsp,
 	    nfs4_vnodeops, nfs4_putapage, &newnode, cr);
+
+	svp = VTOSV(vp);
+	rp = VTOR4(vp);
 	if (newnode) {
-		svp = vtosv(vp);
 		svp->sv_forw = svp->sv_back = svp;
 		svp->sv_name = name;
 		if (psfh != NULL)
 			sfh4_hold(psfh);
 		svp->sv_dfh = psfh;
+	} else if (vp->v_type == VDIR) {
+		/*
+		 * It is possible that due to a server
+		 * side rename fnames have changed.
+		 * update the fname here.
+		 */
+		mutex_enter(&rp->r_svlock);
+		svpname = svp->sv_name;
+		if (svp->sv_name != name) {
+			svp->sv_name = name;
+			mutex_exit(&rp->r_svlock);
+			fn_rele(&svpname);
+		} else {
+			mutex_exit(&rp->r_svlock);
+			fn_rele(&name);
+		}
 	} else {
 		fn_rele(&name);
 	}

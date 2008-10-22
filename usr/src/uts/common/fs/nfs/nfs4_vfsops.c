@@ -2090,11 +2090,9 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	nfs4_mnt_kstat_init(vfsp);
 
 	/*
-	 * Initialize the shared filehandle pool, and get the fname for
-	 * the filesystem root.
+	 * Initialize the shared filehandle pool.
 	 */
 	sfh4_createtab(&mi->mi_filehandles);
-	mi->mi_fname = fn_get(NULL, ".");
 
 	/*
 	 * Save server path we're attempting to mount.
@@ -2234,10 +2232,15 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	nfs_rw_exit(&svp->sv_lock);
 
 	/*
-	 * Make the root vnode without attributes.
+	 * Get the fname for filesystem root.
 	 */
+	mi->mi_fname = fn_get(NULL, ".", mi->mi_rootfh);
 	mfname = mi->mi_fname;
 	fn_hold(mfname);
+
+	/*
+	 * Make the root vnode without attributes.
+	 */
 	rtvp = makenfs4node_by_fh(mi->mi_rootfh, NULL,
 	    &mfname, NULL, mi, cr, gethrtime());
 	rtvp->v_type = vtype;

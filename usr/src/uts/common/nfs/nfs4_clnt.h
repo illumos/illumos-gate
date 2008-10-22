@@ -2082,12 +2082,29 @@ extern void sfh4_printfhandle(const nfs4_sharedfh_t *);
  * protected by fn_lock, except for the reference count, which is managed
  * using atomic add/subtract.
  *
+ * Additionally shared filehandle for this fname is stored.
+ * Normally, fn_get() when it creates this fname stores the passed in
+ * shared fh in fn_sfh by doing sfh_hold. Similarly the path which
+ * destroys this fname releases the reference on this fh by doing sfh_rele.
+ *
+ * fn_get uses the fn_sfh to refine the comparision in cases
+ * where we have matched the name but have differing file handles,
+ * this normally happens due to
+ *
+ *	1. Server side rename of a file/directory.
+ *	2. Another client renaming a file/directory on the server.
+ *
+ * Differing names but same filehandle is possible as in the case of hardlinks,
+ * but differing filehandles with same name component will later confuse
+ * the client and can cause various panics.
+ *
  * Lock order: child and then parent.
  */
 
 typedef struct nfs4_fname {
 	struct nfs4_fname *fn_parent;	/* parent name; null if fs root */
 	char *fn_name;			/* the actual name */
+	nfs4_sharedfh_t *fn_sfh;	/* The fh for this fname */
 	ssize_t fn_len;			/* strlen(fn_name) */
 	uint32_t fn_refcnt;		/* reference count */
 	kmutex_t fn_lock;
@@ -2100,7 +2117,7 @@ typedef struct nfs4_fname {
 extern vnode_t	nfs4_xattr_notsupp_vnode;
 #define	NFS4_XATTR_DIR_NOTSUPP	&nfs4_xattr_notsupp_vnode
 
-extern nfs4_fname_t *fn_get(nfs4_fname_t *, char *);
+extern nfs4_fname_t *fn_get(nfs4_fname_t *, char *, nfs4_sharedfh_t *);
 extern void fn_hold(nfs4_fname_t *);
 extern void fn_rele(nfs4_fname_t **);
 extern char *fn_name(nfs4_fname_t *);

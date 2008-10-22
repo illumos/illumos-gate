@@ -2145,7 +2145,7 @@ xdr_READDIR4res_clnt(XDR *xdrs, READDIR4res_clnt *objp, READDIR4args *aobjp)
 				    aobjp->cr,
 				    aobjp->dvp,
 				    fn_get(VTOSV(aobjp->dvp)->sv_name,
-				    dp->d_name));
+				    dp->d_name, sfhp));
 				sfh4_rele(&sfhp);
 				dnlc_update(aobjp->dvp, dp->d_name, vp);
 				VN_RELE(vp);

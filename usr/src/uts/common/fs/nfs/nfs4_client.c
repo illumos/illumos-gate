@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,8 +27,6 @@
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -3040,6 +3038,8 @@ nfs_free_mi4(mntinfo4_t *mi)
 	}
 	mutex_exit(&mi->mi_msg_list_lock);
 	list_destroy(&mi->mi_msg_list);
+	if (mi->mi_fname != NULL)
+		fn_rele(&mi->mi_fname);
 	if (mi->mi_rootfh != NULL)
 		sfh4_rele(&mi->mi_rootfh);
 	if (mi->mi_srvparentfh != NULL)
@@ -3083,7 +3083,6 @@ nfs_free_mi4(mntinfo4_t *mi)
 	list_destroy(&mi->mi_bseqid_list);
 	list_destroy(&mi->mi_lost_state);
 	avl_destroy(&mi->mi_filehandles);
-	fn_rele(&mi->mi_fname);
 	kmem_free(mi, sizeof (*mi));
 }
 void
@@ -3958,7 +3957,7 @@ fncmp(const void *p1, const void *p2)
  */
 
 nfs4_fname_t *
-fn_get(nfs4_fname_t *parent, char *name)
+fn_get(nfs4_fname_t *parent, char *name, nfs4_sharedfh_t *sfh)
 {
 	nfs4_fname_t key;
 	nfs4_fname_t *fnp;
@@ -3970,15 +3969,51 @@ fn_get(nfs4_fname_t *parent, char *name)
 	 * If there's already an fname registered with the given name, bump
 	 * its reference count and return it.  Otherwise, create a new one
 	 * and add it to the parent's AVL tree.
+	 *
+	 * fname entries we are looking for should match both name
+	 * and sfh stored in the fname.
 	 */
-
+again:
 	if (parent != NULL) {
 		mutex_enter(&parent->fn_lock);
 		fnp = avl_find(&parent->fn_children, &key, &where);
 		if (fnp != NULL) {
+			/*
+			 * This hold on fnp is released below later,
+			 * in case this is not the fnp we want.
+			 */
 			fn_hold(fnp);
+
+			if (fnp->fn_sfh == sfh) {
+				/*
+				 * We have found our entry.
+				 * put an hold and return it.
+				 */
+				mutex_exit(&parent->fn_lock);
+				return (fnp);
+			}
+
+			/*
+			 * We have found an entry that has a mismatching
+			 * fn_sfh. This could be a stale entry due to
+			 * server side rename. We will remove this entry
+			 * and make sure no such entries exist.
+			 */
 			mutex_exit(&parent->fn_lock);
-			return (fnp);
+			mutex_enter(&fnp->fn_lock);
+			if (fnp->fn_parent == parent) {
+				/*
+				 * Remove ourselves from parent's
+				 * fn_children tree.
+				 */
+				mutex_enter(&parent->fn_lock);
+				avl_remove(&parent->fn_children, fnp);
+				mutex_exit(&parent->fn_lock);
+				fn_rele(&fnp->fn_parent);
+			}
+			mutex_exit(&fnp->fn_lock);
+			fn_rele(&fnp);
+			goto again;
 		}
 	}
 
@@ -3992,6 +4027,14 @@ fn_get(nfs4_fname_t *parent, char *name)
 	fnp->fn_name = kmem_alloc(fnp->fn_len + 1, KM_SLEEP);
 	(void) strcpy(fnp->fn_name, name);
 	fnp->fn_refcnt = 1;
+
+	/*
+	 * This hold on sfh is later released
+	 * when we do the final fn_rele() on this fname.
+	 */
+	sfh4_hold(sfh);
+	fnp->fn_sfh = sfh;
+
 	avl_create(&fnp->fn_children, fncmp, sizeof (nfs4_fname_t),
 	    offsetof(nfs4_fname_t, fn_tree));
 	NFS4_DEBUG(nfs4_fname_debug, (CE_NOTE,
@@ -4053,6 +4096,7 @@ recur:
 		mutex_exit(&parent->fn_lock);
 	}
 	kmem_free(fnp->fn_name, fnp->fn_len + 1);
+	sfh4_rele(&fnp->fn_sfh);
 	mutex_destroy(&fnp->fn_lock);
 	avl_destroy(&fnp->fn_children);
 	kmem_free(fnp, sizeof (nfs4_fname_t));

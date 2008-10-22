@@ -1327,7 +1327,7 @@ recov_retry:
 		int rnode_err = 0;
 
 		vp = makenfs4node(otw_sfh, garp, dvp->v_vfsp, t, cr,
-		    dvp, fn_get(VTOSV(dvp)->sv_name, file_name));
+		    dvp, fn_get(VTOSV(dvp)->sv_name, file_name, otw_sfh));
 
 		if (e.error)
 			PURGE_ATTRCACHE4(vp);
@@ -5487,7 +5487,7 @@ recov_retry:
 			nfs4_attr_cache(nvp, garp, t, cr, FALSE, NULL);
 		} else {
 			nvp = makenfs4node(sfhp, garp, dvp->v_vfsp, t, cr,
-			    dvp, fn_get(VTOSV(dvp)->sv_name, nm));
+			    dvp, fn_get(VTOSV(dvp)->sv_name, nm, sfhp));
 			/*
 			 * If v_type == VNON, then garp was NULL because
 			 * the last op in the compound failed and makenfs4node
@@ -5946,7 +5946,7 @@ recov_retry:
 		nfs4_attr_cache(nvp, garp, t, cr, FALSE, NULL);
 	} else {
 		nvp = makenfs4node(sfhp, garp, dvp->v_vfsp, t, cr,
-		    dvp, fn_get(VTOSV(dvp)->sv_name, nm));
+		    dvp, fn_get(VTOSV(dvp)->sv_name, nm, sfhp));
 	}
 	sfh4_rele(&sfhp);
 
@@ -6401,7 +6401,7 @@ recov_retry:
 	sfhp = sfh4_get(&gf_res->object, VTOMI4(dvp));
 	vp = makenfs4node(sfhp, &res.array[3].nfs_resop4_u.opgetattr.ga_res,
 	    dvp->v_vfsp, t, cr, dvp,
-	    fn_get(VTOSV(dvp)->sv_name, XATTR_RPATH));
+	    fn_get(VTOSV(dvp)->sv_name, XATTR_RPATH, sfhp));
 	sfh4_rele(&sfhp);
 
 	if (e.error)
@@ -7011,7 +7011,7 @@ recov_retry:
 	sfhp = sfh4_get(&gf_res->object, mi);
 	if (e.error) {
 		*vpp = vp = makenfs4node(sfhp, NULL, dvp->v_vfsp, t, cr, dvp,
-		    fn_get(VTOSV(dvp)->sv_name, nm));
+		    fn_get(VTOSV(dvp)->sv_name, nm, sfhp));
 		if (vp->v_type == VNON) {
 			vattr.va_mask = AT_TYPE;
 			/*
@@ -7034,7 +7034,7 @@ recov_retry:
 		*vpp = vp = makenfs4node(sfhp,
 		    &res.array[idx_fattr].nfs_resop4_u.opgetattr.ga_res,
 		    dvp->v_vfsp, t, cr,
-		    dvp, fn_get(VTOSV(dvp)->sv_name, nm));
+		    dvp, fn_get(VTOSV(dvp)->sv_name, nm, sfhp));
 	}
 
 	/*
@@ -7559,7 +7559,7 @@ recov_retry:
 	 * to create the new shadow vnode.
 	 */
 	nvp = makenfs4node(VTOR4(svp)->r_fh, NULL, tdvp->v_vfsp, t, cr,
-	    tdvp, fn_get(VTOSV(tdvp)->sv_name, tnm));
+	    tdvp, fn_get(VTOSV(tdvp)->sv_name, tnm, VTOR4(svp)->r_fh));
 
 	/* Update target cache attribute, readdir and dnlc caches */
 	dinfo.di_garp = &res.array[4].nfs_resop4_u.opgetattr.ga_res;
