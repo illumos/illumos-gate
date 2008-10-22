@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
@@ -86,6 +84,7 @@ void
 uniqtime(struct timeval *tv)
 {
 	static struct timeval last;
+	static int last_timechanged;
 	timestruc_t ts;
 	time_t sec;
 	int usec, nsec;
@@ -115,10 +114,18 @@ uniqtime(struct timeval *tv)
 	sec = ts.tv_sec;
 
 	/*
+	 * If the system hres time has been changed since the last time
+	 * we are called. then all bets are off; just update our
+	 * local copy of timechanged and accept the reported time as is.
+	 */
+	if (last_timechanged != timechanged) {
+		last_timechanged = timechanged;
+	}
+	/*
 	 * Try to keep timestamps unique, but don't be obsessive about
 	 * it in the face of large differences.
 	 */
-	if ((sec <= last.tv_sec) &&		/* same or lower seconds, and */
+	else if ((sec <= last.tv_sec) &&	/* same or lower seconds, and */
 	    ((sec != last.tv_sec) ||		/* either different second or */
 	    (usec <= last.tv_usec)) &&		/* lower microsecond, and */
 	    ((last.tv_sec - sec) <= 5)) {	/* not way back in time */
