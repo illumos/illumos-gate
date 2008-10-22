@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <stdarg.h>
@@ -195,7 +193,19 @@ forkx(int flags)
 	 * will not receive any signals).
 	 */
 	(void) mutex_lock(&udp->atfork_lock);
-	_prefork_handler();
+
+	/*
+	 * Posix (SUSv3) requires fork() to be async-signal-safe.
+	 * This cannot be made to happen with fork handlers in place
+	 * (they grab locks).  To be in nominal compliance, don't run
+	 * any fork handlers if we are called within a signal context.
+	 * This leaves the child process in a questionable state with
+	 * respect to its locks, but at least the parent process does
+	 * not become deadlocked due to the calling thread attempting
+	 * to acquire a lock that it already owns.
+	 */
+	if (self->ul_siglink == NULL)
+		_prefork_handler();
 
 	/*
 	 * Block every other thread attempting thr_suspend() or thr_continue().
@@ -237,13 +247,15 @@ forkx(int flags)
 		postfork1_child();
 		restore_signals(self);
 		(void) mutex_unlock(&udp->fork_lock);
-		_postfork_child_handler();
+		if (self->ul_siglink == NULL)
+			_postfork_child_handler();
 	} else {
 		/* restart all threads that were suspended for fork() */
 		continue_fork(0);
 		restore_signals(self);
 		(void) mutex_unlock(&udp->fork_lock);
-		_postfork_parent_handler();
+		if (self->ul_siglink == NULL)
+			_postfork_parent_handler();
 	}
 
 	(void) mutex_unlock(&udp->atfork_lock);
