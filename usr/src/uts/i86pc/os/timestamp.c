@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,6 +42,7 @@
 #include <sys/dtrace.h>
 #include <sys/time.h>
 #include <sys/panic.h>
+#include <sys/cpu.h>
 
 /*
  * Using the Pentium's TSC register for gethrtime()
@@ -81,25 +80,13 @@
  * TSCs and account for it (it is assumed that while there may exist skew,
  * there does not exist drift).  To determine the skew between CPUs, we
  * have newly onlined CPUs call tsc_sync_slave(), while the CPU performing
- * the online operation calls tsc_sync_master().  Once both CPUs are ready,
- * the master sets a shared flag, and each reads its TSC register.  To reduce
- * bias, we then wait until both CPUs are ready again, but this time the
- * slave sets the shared flag, and each reads its TSC register again. The
- * master compares the average of the two sample values, and, if observable
- * skew is found, changes the gethrtimef function pointer to point to a
- * gethrtime() implementation which will take the discovered skew into
- * consideration.
+ * the online operation calls tsc_sync_master().
  *
  * In the absence of time-of-day clock adjustments, gethrtime() must stay in
  * sync with gettimeofday().  This is problematic; given (c), the software
  * cannot drive its time-of-day source from TSC, and yet they must somehow be
  * kept in sync.  We implement this by having a routine, tsc_tick(), which
  * is called once per second from the interrupt which drives time-of-day.
- * tsc_tick() recalculates nsec_scale based on the number of the CPU cycles
- * since boot versus the number of seconds since boot.  This algorithm
- * becomes more accurate over time and converges quickly; the error in
- * nsec_scale is typically under 1 ppm less than 10 seconds after boot, and
- * is less than 100 ppb 1 minute after boot.
  *
  * Note that the hrtime base for gethrtime, tsc_hrtime_base, is modified
  * atomically with nsec_scale under CLOCK_LOCK.  This assures that time
@@ -131,7 +118,8 @@ static volatile int tsc_sync_go;
  */
 #define	TSC_SYNC_STOP		1
 #define	TSC_SYNC_GO		2
-#define	TSC_SYNC_AGAIN		3
+#define	TSC_SYNC_DONE		3
+#define	SYNC_ITERATIONS		10
 
 #define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) {	 	\
 	unsigned int *_l = (unsigned int *)&(tsc); 	\
@@ -148,9 +136,14 @@ static volatile int tsc_sync_go;
 int tsc_master_slave_sync_needed = 1;
 
 static int	tsc_max_delta;
-static hrtime_t tsc_sync_snaps[2];
-static hrtime_t tsc_sync_delta[NCPU];
 static hrtime_t tsc_sync_tick_delta[NCPU];
+typedef struct tsc_sync {
+	volatile hrtime_t master_tsc, slave_tsc;
+} tsc_sync_t;
+static tsc_sync_t *tscp;
+static hrtime_t largest_tsc_delta = 0;
+static ulong_t shortest_write_time = ~0UL;
+
 static hrtime_t	tsc_last = 0;
 static hrtime_t	tsc_last_jumped = 0;
 static hrtime_t	tsc_hrtime_base = 0;
@@ -387,153 +380,131 @@ tsc_gethrtimeunscaled_delta(void)
 }
 
 /*
- * Called by the master after the sync operation is complete.  If the
- * slave is discovered to lag, gethrtimef will be changed to point to
- * tsc_gethrtime_delta().
- */
-static void
-tsc_digest(processorid_t target)
-{
-	hrtime_t tdelta, hdelta = 0;
-	int max = tsc_max_delta;
-	processorid_t source = CPU->cpu_id;
-	int update;
-
-	update = tsc_sync_delta[source] != 0 ||
-	    gethrtimef == tsc_gethrtime_delta;
-
-	/*
-	 * We divide by 2 since each of the data points is the sum of two TSC
-	 * reads; this takes the average of the two.
-	 */
-	tdelta = (tsc_sync_snaps[TSC_SLAVE] - tsc_sync_snaps[TSC_MASTER]) / 2;
-	if ((tdelta > max) || ((tdelta >= 0) && update)) {
-		TSC_CONVERT_AND_ADD(tdelta, hdelta, nsec_scale);
-		tsc_sync_delta[target] = tsc_sync_delta[source] - hdelta;
-		tsc_sync_tick_delta[target] = tsc_sync_tick_delta[source]
-		    -tdelta;
-		gethrtimef = tsc_gethrtime_delta;
-		gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
-		return;
-	}
-
-	tdelta = -tdelta;
-	if ((tdelta > max) || update) {
-		TSC_CONVERT_AND_ADD(tdelta, hdelta, nsec_scale);
-		tsc_sync_delta[target] = tsc_sync_delta[source] + hdelta;
-		tsc_sync_tick_delta[target] = tsc_sync_tick_delta[source]
-		    + tdelta;
-		gethrtimef = tsc_gethrtime_delta;
-		gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
-	}
-
-}
-
-/*
- * Called by a CPU which has just performed an online operation on another
- * CPU.  It is expected that the newly onlined CPU will call tsc_sync_slave().
+ * Called by the master in the TSC sync operation (usually the boot CPU).
+ * If the slave is discovered to have a skew, gethrtimef will be changed to
+ * point to tsc_gethrtime_delta(). Calculating skews is precise only when
+ * the master and slave TSCs are read simultaneously; however, there is no
+ * algorithm that can read both CPUs in perfect simultaneity. The proposed
+ * algorithm is an approximate method based on the behaviour of cache
+ * management. The slave CPU continuously reads TSC and then reads a global
+ * variable which the master CPU updates. The moment the master's update reaches
+ * the slave's visibility (being forced by an mfence operation) we use the TSC
+ * reading taken on the slave. A corresponding TSC read will be taken on the
+ * master as soon as possible after finishing the mfence operation. But the
+ * delay between causing the slave to notice the invalid cache line and the
+ * competion of mfence is not repeatable. This error is heuristically assumed
+ * to be 1/4th of the total write time as being measured by the two TSC reads
+ * on the master sandwiching the mfence. Furthermore, due to the nature of
+ * bus arbitration, contention on memory bus, etc., the time taken for the write
+ * to reflect globally can vary a lot. So instead of taking a single reading,
+ * a set of readings are taken and the one with least write time is chosen
+ * to calculate the final skew.
  */
 void
 tsc_sync_master(processorid_t slave)
 {
-	ulong_t flags;
-	hrtime_t hrt;
+	ulong_t flags, source, min_write_time = ~0UL;
+	hrtime_t write_time, x, mtsc_after, tdelta;
+	tsc_sync_t *tsc = tscp;
+	int cnt;
 
 	if (!tsc_master_slave_sync_needed)
 		return;
 
-	ASSERT(tsc_sync_go != TSC_SYNC_GO);
-
 	flags = clear_int_flag();
+	source = CPU->cpu_id;
 
+	for (cnt = 0; cnt < SYNC_ITERATIONS; cnt++) {
+		while (tsc_sync_go != TSC_SYNC_GO)
+			SMT_PAUSE();
+
+		tsc->master_tsc = tsc_read();
+		membar_enter();
+		mtsc_after = tsc_read();
+		while (tsc_sync_go != TSC_SYNC_DONE)
+			SMT_PAUSE();
+		write_time =  mtsc_after - tsc->master_tsc;
+		if (write_time <= min_write_time) {
+			min_write_time = write_time;
+			/*
+			 * Apply heuristic adjustment only if the calculated
+			 * delta is > 1/4th of the write time.
+			 */
+			x = tsc->slave_tsc - mtsc_after;
+			if (x < 0)
+				x = -x;
+			if (x > (min_write_time/4))
+				/*
+				 * Subtract 1/4th of the measured write time
+				 * from the master's TSC value, as an estimate
+				 * of how late the mfence completion came
+				 * after the slave noticed the cache line
+				 * change.
+				 */
+				tdelta = tsc->slave_tsc -
+				    (mtsc_after - (min_write_time/4));
+			else
+				tdelta = tsc->slave_tsc - mtsc_after;
+			tsc_sync_tick_delta[slave] =
+			    tsc_sync_tick_delta[source] - tdelta;
+		}
+
+		tsc->master_tsc = tsc->slave_tsc = write_time = 0;
+		membar_enter();
+		tsc_sync_go = TSC_SYNC_STOP;
+	}
+	if (tdelta < 0)
+		tdelta = -tdelta;
+	if (tdelta > largest_tsc_delta)
+		largest_tsc_delta = tdelta;
+	if (min_write_time < shortest_write_time)
+		shortest_write_time = min_write_time;
 	/*
-	 * Wait for the slave CPU to arrive.
+	 * Enable delta variants of tsc functions if the largest of all chosen
+	 * deltas is > smallest of the write time.
 	 */
-	while (tsc_ready != TSC_SYNC_GO)
-		continue;
-
-	/*
-	 * Tell the slave CPU to begin reading its TSC; read our own.
-	 */
-	tsc_sync_go = TSC_SYNC_GO;
-	hrt = tsc_read();
-
-	/*
-	 * Tell the slave that we're ready, and wait for the slave to tell us
-	 * to read our TSC again.
-	 */
-	tsc_ready = TSC_SYNC_AGAIN;
-	while (tsc_sync_go != TSC_SYNC_AGAIN)
-		continue;
-
-	hrt += tsc_read();
-	tsc_sync_snaps[TSC_MASTER] = hrt;
-
-	/*
-	 * Wait for the slave to finish reading its TSC.
-	 */
-	while (tsc_ready != TSC_SYNC_STOP)
-		continue;
-
-	/*
-	 * At this point, both CPUs have performed their tsc_read() calls.
-	 * We'll digest it now before letting the slave CPU return.
-	 */
-	tsc_digest(slave);
-	tsc_sync_go = TSC_SYNC_STOP;
-
+	if (largest_tsc_delta > shortest_write_time) {
+		gethrtimef = tsc_gethrtime_delta;
+		gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
+	}
 	restore_int_flag(flags);
 }
 
-/*
- * Called by a CPU which has just been onlined.  It is expected that the CPU
- * performing the online operation will call tsc_sync_master().
- */
 void
 tsc_sync_slave(void)
 {
 	ulong_t flags;
-	hrtime_t hrt;
+	hrtime_t s1;
+	tsc_sync_t *tsc = tscp;
+	int cnt;
 
 	if (!tsc_master_slave_sync_needed)
 		return;
 
-	ASSERT(tsc_sync_go != TSC_SYNC_GO);
-
 	flags = clear_int_flag();
 
-	/* to test tsc_gethrtime_delta, add wrmsr(REG_TSC, 0) here */
+	for (cnt = 0; cnt < SYNC_ITERATIONS; cnt++) {
+		/* Re-fill the cache line */
+		s1 = tsc->master_tsc;
+		membar_enter();
+		tsc_sync_go = TSC_SYNC_GO;
+		do {
+			/*
+			 * Do not put an SMT_PAUSE here. For instance,
+			 * if the master and slave are really the same
+			 * hyper-threaded CPU, then you want the master
+			 * to yield to the slave as quickly as possible here,
+			 * but not the other way.
+			 */
+			s1 = tsc_read();
+		} while (tsc->master_tsc == 0);
+		tsc->slave_tsc = s1;
+		membar_enter();
+		tsc_sync_go = TSC_SYNC_DONE;
 
-	/*
-	 * Tell the master CPU that we're ready, and wait for the master to
-	 * tell us to begin reading our TSC.
-	 */
-	tsc_ready = TSC_SYNC_GO;
-	while (tsc_sync_go != TSC_SYNC_GO)
-		continue;
-
-	hrt = tsc_read();
-
-	/*
-	 * Wait for the master CPU to be ready to read its TSC again.
-	 */
-	while (tsc_ready != TSC_SYNC_AGAIN)
-		continue;
-
-	/*
-	 * Tell the master CPU to read its TSC again; read ours again.
-	 */
-	tsc_sync_go = TSC_SYNC_AGAIN;
-
-	hrt += tsc_read();
-	tsc_sync_snaps[TSC_SLAVE] = hrt;
-
-	/*
-	 * Tell the master that we're done, and wait to be dismissed.
-	 */
-	tsc_ready = TSC_SYNC_STOP;
-	while (tsc_sync_go != TSC_SYNC_STOP)
-		continue;
+		while (tsc_sync_go != TSC_SYNC_STOP)
+			SMT_PAUSE();
+	}
 
 	restore_int_flag(flags);
 }
@@ -623,6 +594,11 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 	scalehrtimef = tsc_scalehrtime;
 	hrtime_tick = tsc_tick;
 	gethrtime_hires = 1;
+	/*
+	 * Allocate memory for the structure used in the tsc sync logic.
+	 * This structure should be aligned on a multiple of cache line size.
+	 */
+	tscp = kmem_zalloc(PAGESIZE, KM_SLEEP);
 }
 
 int
@@ -643,12 +619,8 @@ void
 tsc_adjust_delta(hrtime_t tdelta)
 {
 	int		i;
-	hrtime_t	hdelta = 0;
-
-	TSC_CONVERT(tdelta, hdelta, nsec_scale);
 
 	for (i = 0; i < NCPU; i++) {
-		tsc_sync_delta[i] += hdelta;
 		tsc_sync_tick_delta[i] += tdelta;
 	}
 
