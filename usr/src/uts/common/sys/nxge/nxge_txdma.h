@@ -78,6 +78,7 @@ typedef struct _tx_msg_t {
 	nxge_os_dma_handle_t	buf_dma_handle; /* premapped buffer handle */
 	nxge_os_dma_handle_t 	dma_handle;	/* DMA handle for normal send */
 	nxge_os_dma_handle_t 	dvma_handle;	/* Fast DVMA  handle */
+	struct _tx_msg_t	*nextp;
 
 	p_mblk_t 		tx_message;
 	uint32_t 		tx_msg_size;
@@ -150,6 +151,9 @@ typedef struct _tx_ring_t {
 #define	NXGE_TX_RING_OFFLINED	0x02
 	uint32_t		tx_ring_offline;
 	boolean_t		tx_ring_busy;
+
+	p_tx_msg_t		tx_free_list_p;
+	nxge_os_mutex_t		freelock;
 
 	nxge_os_mutex_t		lock;
 	uint16_t 		index;

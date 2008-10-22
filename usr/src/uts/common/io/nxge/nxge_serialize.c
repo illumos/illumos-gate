@@ -256,14 +256,16 @@ nxge_serial_ungetn(nxge_serialize_t *p, mblk_t *head, mblk_t *tail, int n)
 static void
 nxge_onetrack(void *s)
 {
-	int		k, i;
-	mblk_t		*mp, *ignore;
+	int		k;
+	mblk_t		*mp, *n, *ignore;
 	nxge_serialize_t *p = (nxge_serialize_t *)s;
 
-	NXGE_DEBUG_MSG((NULL, TX_CTL,
-	    "==> nxge_onetrack: s %p", s));
+	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_onetrack: s %p", s));
+
 	(void) nxge_tx_s_begin(p);
+
 	mutex_enter(&p->serial);
+
 	while (p->s_state & NXGE_TX_STHREAD_RUNNING) {
 		CALLB_CPR_SAFE_BEGIN(&p->s_cprinfo);
 		if (p->s_state & NXGE_TX_STHREAD_DESTROY) {
@@ -273,12 +275,13 @@ nxge_onetrack(void *s)
 		if (p->s_state & NXGE_TX_STHREAD_DESTROY) {
 			break;
 		}
-		CALLB_CPR_SAFE_END(&p->s_cprinfo,
-		    &p->serial)
+		CALLB_CPR_SAFE_END(&p->s_cprinfo, &p->serial)
+
 		while (k = nxge_serial_getn(p, &mp, &ignore)) {
 			hrtime_t t0 = gethrtime();
-			for (i = 0; i < k; i++) {
-				mblk_t *n = mp->b_next;
+
+			while (mp != NULL) {
+				n = mp->b_next;
 				mp->b_next = NULL;
 
 				NXGE_DEBUG_MSG((NULL, TX_CTL,
@@ -308,8 +311,6 @@ nxge_onetrack(void *s)
 				mp = n;
 			}
 
-			ASSERT(mp == NULL);
-
 			/*
 			 * Update the total time and count of the serializer
 			 * function and * generate the avg time required to
@@ -323,11 +324,9 @@ nxge_onetrack(void *s)
 
 	mutex_exit(&p->serial);
 
-	NXGE_DEBUG_MSG((NULL, TX_CTL,
-	    "<== nxge_onetrack: s %p", s));
+	NXGE_DEBUG_MSG((NULL, TX_CTL, "<== nxge_onetrack: s %p", s));
 	nxge_tx_s_end(s);
 }
-
 
 /*
  * Return values:
@@ -338,18 +337,21 @@ static int
 nxge_freelance(nxge_serialize_t *s)
 {
 	int i, n, c = 0;
-	mblk_t *mp, *t;
+	mblk_t *mp, *t, *next;
 
-	NXGE_DEBUG_MSG((NULL, TX_CTL,
-	    "==> nxge_freelance: s %p", s));
+	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_freelance: s %p", s));
+
 	while (n = nxge_serial_getn(s, &mp, &t)) {
 		if ((n > nxge_maxhrs) || ((c += n) > nxge_maxhrs)) {
 			nxge_serial_ungetn(s, mp, t, n);
 			return (1);
 		}
-		for (i = 0; i < n; i++) {
-			mblk_t *next = mp->b_next;
+
+		i = 0;
+		while (mp != NULL) {
+			next = mp->b_next;
 			mp->b_next = NULL;
+
 			if (s->serialop(mp, s->cookie)) {
 				mp->b_next = next;
 				nxge_serial_ungetn(s, mp, t, n - i);
@@ -360,11 +362,11 @@ nxge_freelance(nxge_serialize_t *s)
 			    "==> nxge_freelance: s %p mp %p", s, mp));
 
 			mp = next;
+			i++;
 		}
 	}
-	NXGE_DEBUG_MSG((NULL, TX_CTL,
-	    "<== nxge_freelance: s %p", s));
 
+	NXGE_DEBUG_MSG((NULL, TX_CTL, "<== nxge_freelance: s %p", s));
 	return (0);
 }
 

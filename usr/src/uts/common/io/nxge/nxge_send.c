@@ -40,6 +40,8 @@ static void nxge_hcksum_retrieve(mblk_t *,
     uint32_t *, uint32_t *);
 static uint32_t nxge_csgen(uint16_t *, int);
 
+extern void nxge_txdma_freemsg_task(p_tx_ring_t ringp);
+
 extern uint32_t		nxge_reclaim_pending;
 extern uint32_t 	nxge_bcopy_thresh;
 extern uint32_t 	nxge_dvma_thresh;
@@ -1005,6 +1007,8 @@ nxge_start_control_header_only:
 	}
 
 	MUTEX_EXIT(&tx_ring_p->lock);
+
+	nxge_txdma_freemsg_task(tx_ring_p);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_start"));
 
