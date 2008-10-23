@@ -15072,71 +15072,18 @@ ill_clear_bcast_mark(ill_t *ill, ipaddr_t addr)
 	}
 }
 
-/*
- * This function must be called only after the broadcast ires
- * have been grouped together. For a given address addr, nominate
- * only one of the ires whose interface is not FAILED or OFFLINE.
- *
- * This is also called when an ipif goes down, so that we can nominate
- * a different ire with the same address for receiving.
- */
-static void
-ill_mark_bcast(ill_group_t *illgrp, ipaddr_t addr, ip_stack_t *ipst)
+ire_t *
+irep_insert(ill_group_t *illgrp, ipaddr_t addr, ire_t *ire, ire_t ***pirep)
 {
-	irb_t *irb;
-	ire_t *ire;
-	ire_t *ire1;
-	ire_t *save_ire;
-	ire_t **irep = NULL;
 	boolean_t first = B_TRUE;
 	ire_t *clear_ire = NULL;
 	ire_t *start_ire = NULL;
-	ire_t	*new_lb_ire;
-	ire_t	*new_nlb_ire;
-	boolean_t new_lb_ire_used = B_FALSE;
-	boolean_t new_nlb_ire_used = B_FALSE;
 	uint64_t match_flags;
 	uint64_t phyi_flags;
 	boolean_t fallback = B_FALSE;
-	uint_t	max_frag;
 
-	ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, NULL, ALL_ZONES,
-	    NULL, MATCH_IRE_TYPE, ipst);
 	/*
-	 * We may not be able to find some ires if a previous
-	 * ire_create failed. This happens when an ipif goes
-	 * down and we are unable to create BROADCAST ires due
-	 * to memory failure. Thus, we have to check for NULL
-	 * below. This should handle the case for LOOPBACK,
-	 * POINTOPOINT and interfaces with some POINTOPOINT
-	 * logicals for which there are no BROADCAST ires.
-	 */
-	if (ire == NULL)
-		return;
-	/*
-	 * Currently IRE_BROADCASTS are deleted when an ipif
-	 * goes down which runs exclusively. Thus, setting
-	 * IRE_MARK_RCVD should not race with ire_delete marking
-	 * IRE_MARK_CONDEMNED. We grab the lock below just to
-	 * be consistent with other parts of the code that walks
-	 * a given bucket.
-	 */
-	save_ire = ire;
-	irb = ire->ire_bucket;
-	new_lb_ire = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
-	if (new_lb_ire == NULL) {
-		ire_refrele(ire);
-		return;
-	}
-	new_nlb_ire = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
-	if (new_nlb_ire == NULL) {
-		ire_refrele(ire);
-		kmem_cache_free(ire_cache, new_lb_ire);
-		return;
-	}
-	IRB_REFHOLD(irb);
-	rw_enter(&irb->irb_lock, RW_WRITER);
-	/*
+	 * irb_lock must be held by the caller.
 	 * Get to the first ire matching the address and the
 	 * group. If the address does not match we are done
 	 * as we could not find the IRE. If the address matches
@@ -15161,8 +15108,8 @@ redo:
 		 * Note down the insertion point which will be used
 		 * later.
 		 */
-		if (first && (irep == NULL))
-			irep = ire->ire_ptpn;
+		if (first && (*pirep == NULL))
+			*pirep = ire->ire_ptpn;
 		/*
 		 * PHYI_FAILED is set when the interface fails.
 		 * This interface might have become good, but the
@@ -15207,10 +15154,74 @@ redo:
 	    fallback) {
 		match_flags = PHYI_FAILED;
 		ire = start_ire;
-		irep = NULL;
+		*pirep = NULL;
 		goto redo;
 	}
-	ire_refrele(save_ire);
+	return (clear_ire);
+}
+
+/*
+ * This function must be called only after the broadcast ires
+ * have been grouped together. For a given address addr, nominate
+ * only one of the ires whose interface is not FAILED or OFFLINE.
+ *
+ * This is also called when an ipif goes down, so that we can nominate
+ * a different ire with the same address for receiving.
+ */
+static void
+ill_mark_bcast(ill_group_t *illgrp, ipaddr_t addr, ip_stack_t *ipst)
+{
+	irb_t *irb;
+	ire_t *ire;
+	ire_t *ire1;
+	ire_t *save_ire;
+	ire_t **irep = NULL;
+	ire_t *clear_ire = NULL;
+	ire_t	*new_lb_ire;
+	ire_t	*new_nlb_ire;
+	boolean_t new_lb_ire_used = B_FALSE;
+	boolean_t new_nlb_ire_used = B_FALSE;
+	boolean_t refrele_lb_ire = B_FALSE;
+	boolean_t refrele_nlb_ire = B_FALSE;
+	uint_t	max_frag;
+
+	ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, NULL, ALL_ZONES,
+	    NULL, MATCH_IRE_TYPE, ipst);
+	/*
+	 * We may not be able to find some ires if a previous
+	 * ire_create failed. This happens when an ipif goes
+	 * down and we are unable to create BROADCAST ires due
+	 * to memory failure. Thus, we have to check for NULL
+	 * below. This should handle the case for LOOPBACK,
+	 * POINTOPOINT and interfaces with some POINTOPOINT
+	 * logicals for which there are no BROADCAST ires.
+	 */
+	if (ire == NULL)
+		return;
+	/*
+	 * Currently IRE_BROADCASTS are deleted when an ipif
+	 * goes down which runs exclusively. Thus, setting
+	 * IRE_MARK_RCVD should not race with ire_delete marking
+	 * IRE_MARK_CONDEMNED. We grab the lock below just to
+	 * be consistent with other parts of the code that walks
+	 * a given bucket.
+	 */
+	save_ire = ire;
+	irb = ire->ire_bucket;
+	new_lb_ire = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
+	if (new_lb_ire == NULL) {
+		ire_refrele(ire);
+		return;
+	}
+	new_nlb_ire = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
+	if (new_nlb_ire == NULL) {
+		ire_refrele(ire);
+		kmem_cache_free(ire_cache, new_lb_ire);
+		return;
+	}
+	IRB_REFHOLD(irb);
+	rw_enter(&irb->irb_lock, RW_WRITER);
+	clear_ire = irep_insert(illgrp, addr, ire, &irep);
 
 	/*
 	 * irep non-NULL indicates that we entered the while loop
@@ -15224,6 +15235,13 @@ redo:
 	 */
 	if (clear_ire != NULL && irep != NULL && *irep != clear_ire) {
 		ire_t *clear_ire_stq = NULL;
+		ire_t *clr_ire = NULL;
+		ire_t *ire_next = NULL;
+
+		if (clear_ire->ire_stq == NULL)
+			ire_next = clear_ire->ire_next;
+
+		rw_exit(&irb->irb_lock);
 
 		bzero(new_lb_ire, sizeof (ire_t));
 		/* XXX We need a recovery strategy here. */
@@ -15247,118 +15265,161 @@ redo:
 		    NULL,
 		    ipst) == NULL)
 			cmn_err(CE_PANIC, "ire_init() failed");
-		if (clear_ire->ire_stq == NULL) {
-			ire_t *ire_next = clear_ire->ire_next;
-			if (ire_next != NULL &&
-			    ire_next->ire_stq != NULL &&
-			    ire_next->ire_addr == clear_ire->ire_addr &&
-			    ire_next->ire_ipif->ipif_ill ==
-			    clear_ire->ire_ipif->ipif_ill) {
-				clear_ire_stq = ire_next;
 
-				bzero(new_nlb_ire, sizeof (ire_t));
-				/* XXX We need a recovery strategy here. */
-				if (ire_init(new_nlb_ire,
-				    (uchar_t *)&clear_ire_stq->ire_addr,
-				    (uchar_t *)&clear_ire_stq->ire_mask,
-				    (uchar_t *)&clear_ire_stq->ire_src_addr,
-				    (uchar_t *)&clear_ire_stq->ire_gateway_addr,
-				    &clear_ire_stq->ire_max_frag,
-				    NULL,
-				    clear_ire_stq->ire_rfq,
-				    clear_ire_stq->ire_stq,
-				    clear_ire_stq->ire_type,
-				    clear_ire_stq->ire_ipif,
-				    clear_ire_stq->ire_cmask,
-				    clear_ire_stq->ire_phandle,
-				    clear_ire_stq->ire_ihandle,
-				    clear_ire_stq->ire_flags,
-				    &clear_ire_stq->ire_uinfo,
-				    NULL,
-				    NULL,
-				    ipst) == NULL)
-					cmn_err(CE_PANIC, "ire_init() failed");
+		refrele_lb_ire = B_TRUE;
+
+		if (ire_next != NULL &&
+		    ire_next->ire_stq != NULL &&
+		    ire_next->ire_addr == clear_ire->ire_addr &&
+		    ire_next->ire_ipif->ipif_ill ==
+		    clear_ire->ire_ipif->ipif_ill) {
+			clear_ire_stq = ire_next;
+
+			bzero(new_nlb_ire, sizeof (ire_t));
+			/* XXX We need a recovery strategy here. */
+			if (ire_init(new_nlb_ire,
+			    (uchar_t *)&clear_ire_stq->ire_addr,
+			    (uchar_t *)&clear_ire_stq->ire_mask,
+			    (uchar_t *)&clear_ire_stq->ire_src_addr,
+			    (uchar_t *)&clear_ire_stq->ire_gateway_addr,
+			    &clear_ire_stq->ire_max_frag,
+			    NULL,
+			    clear_ire_stq->ire_rfq,
+			    clear_ire_stq->ire_stq,
+			    clear_ire_stq->ire_type,
+			    clear_ire_stq->ire_ipif,
+			    clear_ire_stq->ire_cmask,
+			    clear_ire_stq->ire_phandle,
+			    clear_ire_stq->ire_ihandle,
+			    clear_ire_stq->ire_flags,
+			    &clear_ire_stq->ire_uinfo,
+			    NULL,
+			    NULL,
+			    ipst) == NULL)
+				cmn_err(CE_PANIC, "ire_init() failed");
+
+				refrele_nlb_ire = B_TRUE;
 			}
-		}
 
+		rw_enter(&irb->irb_lock, RW_WRITER);
 		/*
-		 * Delete the ire. We can't call ire_delete() since
-		 * we are holding the bucket lock. We can't release the
-		 * bucket lock since we can't allow irep to change. So just
-		 * mark it CONDEMNED. The IRB_REFRELE will delete the
-		 * ire from the list and do the refrele.
+		 * irb_lock was dropped across call to ire_init() due to
+		 * lock ordering issue with ipst->ips_ndp{4,6}->ndp_g_lock
+		 * mutex lock. Therefore irep could have changed. call
+		 * irep_insert() to get the new insertion point (irep) and
+		 * recheck all known conditions.
 		 */
-		clear_ire->ire_marks |= IRE_MARK_CONDEMNED;
-		irb->irb_marks |= IRB_MARK_CONDEMNED;
+		irep = NULL;
+		clr_ire = irep_insert(illgrp, addr, save_ire, &irep);
+		if ((irep != NULL) && (*irep != clear_ire) &&
+		    (clr_ire == clear_ire)) {
+			if ((clear_ire_stq != NULL) &&
+			    (clr_ire->ire_next != clear_ire_stq))
+				clear_ire_stq = NULL;
+			/*
+			 * Delete the ire. We can't call ire_delete() since
+			 * we are holding the bucket lock. We can't release the
+			 * bucket lock since we can't allow irep to change.
+			 * So just mark it CONDEMNED.
+			 * The IRB_REFRELE will delete the ire from the list
+			 * and do the refrele.
+			 */
+			clear_ire->ire_marks |= IRE_MARK_CONDEMNED;
+			irb->irb_marks |= IRB_MARK_CONDEMNED;
 
-		if (clear_ire_stq != NULL && clear_ire_stq->ire_nce != NULL) {
-			nce_fastpath_list_delete(clear_ire_stq->ire_nce);
-			clear_ire_stq->ire_marks |= IRE_MARK_CONDEMNED;
-		}
+			if (clear_ire_stq != NULL &&
+			    clear_ire_stq->ire_nce != NULL) {
+				nce_fastpath_list_delete(
+				    clear_ire_stq->ire_nce);
+				clear_ire_stq->ire_marks |= IRE_MARK_CONDEMNED;
+			}
 
-		/*
-		 * Also take care of otherfields like ib/ob pkt count
-		 * etc. Need to dup them. ditto in ill_bcast_delete_and_add
-		 */
+			/*
+			 * Also take care of otherfields like ib/ob pkt count
+			 * etc. Need to dup them.
+			 * ditto in ill_bcast_delete_and_add
+			 */
 
-		/* Set the max_frag before adding the ire */
-		max_frag = *new_lb_ire->ire_max_fragp;
-		new_lb_ire->ire_max_fragp = NULL;
-		new_lb_ire->ire_max_frag = max_frag;
-
-		/* Add the new ire's. Insert at *irep */
-		new_lb_ire->ire_bucket = clear_ire->ire_bucket;
-		ire1 = *irep;
-		if (ire1 != NULL)
-			ire1->ire_ptpn = &new_lb_ire->ire_next;
-		new_lb_ire->ire_next = ire1;
-		/* Link the new one in. */
-		new_lb_ire->ire_ptpn = irep;
-		membar_producer();
-		*irep = new_lb_ire;
-		new_lb_ire_used = B_TRUE;
-		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_inserted);
-		new_lb_ire->ire_bucket->irb_ire_cnt++;
-		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), new_lb_ire->ire_ipif,
-		    (char *), "ire", (void *), new_lb_ire);
-		new_lb_ire->ire_ipif->ipif_ire_cnt++;
-
-		if (clear_ire_stq != NULL) {
 			/* Set the max_frag before adding the ire */
-			max_frag = *new_nlb_ire->ire_max_fragp;
-			new_nlb_ire->ire_max_fragp = NULL;
-			new_nlb_ire->ire_max_frag = max_frag;
+			max_frag = *new_lb_ire->ire_max_fragp;
+			new_lb_ire->ire_max_fragp = NULL;
+			new_lb_ire->ire_max_frag = max_frag;
 
-			new_nlb_ire->ire_bucket = clear_ire->ire_bucket;
-			irep = &new_lb_ire->ire_next;
-			/* Add the new ire. Insert at *irep */
+			/* Add the new ire's. Insert at *irep */
+			new_lb_ire->ire_bucket = clear_ire->ire_bucket;
 			ire1 = *irep;
 			if (ire1 != NULL)
-				ire1->ire_ptpn = &new_nlb_ire->ire_next;
-			new_nlb_ire->ire_next = ire1;
+				ire1->ire_ptpn = &new_lb_ire->ire_next;
+			new_lb_ire->ire_next = ire1;
 			/* Link the new one in. */
-			new_nlb_ire->ire_ptpn = irep;
+			new_lb_ire->ire_ptpn = irep;
 			membar_producer();
-			*irep = new_nlb_ire;
-			new_nlb_ire_used = B_TRUE;
+			*irep = new_lb_ire;
+			new_lb_ire_used = B_TRUE;
 			BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
 			    ire_stats_inserted);
-			new_nlb_ire->ire_bucket->irb_ire_cnt++;
-			DTRACE_PROBE3(ipif__incr__cnt,
-			    (ipif_t *), new_nlb_ire->ire_ipif,
-			    (char *), "ire", (void *), new_nlb_ire);
-			new_nlb_ire->ire_ipif->ipif_ire_cnt++;
-			DTRACE_PROBE3(ill__incr__cnt,
-			    (ill_t *), new_nlb_ire->ire_stq->q_ptr,
-			    (char *), "ire", (void *), new_nlb_ire);
-			((ill_t *)(new_nlb_ire->ire_stq->q_ptr))->ill_ire_cnt++;
+			new_lb_ire->ire_bucket->irb_ire_cnt++;
+			DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *),
+			    new_lb_ire->ire_ipif,
+			    (char *), "ire", (void *), new_lb_ire);
+			new_lb_ire->ire_ipif->ipif_ire_cnt++;
+
+			if (clear_ire_stq != NULL) {
+				ill_t	*ire_ill;
+				/* Set the max_frag before adding the ire */
+				max_frag = *new_nlb_ire->ire_max_fragp;
+				new_nlb_ire->ire_max_fragp = NULL;
+				new_nlb_ire->ire_max_frag = max_frag;
+
+				new_nlb_ire->ire_bucket = clear_ire->ire_bucket;
+				irep = &new_lb_ire->ire_next;
+				/* Add the new ire. Insert at *irep */
+				ire1 = *irep;
+				if (ire1 != NULL)
+					ire1->ire_ptpn = &new_nlb_ire->ire_next;
+				new_nlb_ire->ire_next = ire1;
+				/* Link the new one in. */
+				new_nlb_ire->ire_ptpn = irep;
+				membar_producer();
+				*irep = new_nlb_ire;
+				new_nlb_ire_used = B_TRUE;
+				BUMP_IRE_STATS(ipst->ips_ire_stats_v4,
+				    ire_stats_inserted);
+				new_nlb_ire->ire_bucket->irb_ire_cnt++;
+				DTRACE_PROBE3(ipif__incr__cnt,
+				    (ipif_t *), new_nlb_ire->ire_ipif,
+				    (char *), "ire", (void *), new_nlb_ire);
+				new_nlb_ire->ire_ipif->ipif_ire_cnt++;
+				DTRACE_PROBE3(ill__incr__cnt,
+				    (ill_t *), new_nlb_ire->ire_stq->q_ptr,
+				    (char *), "ire", (void *), new_nlb_ire);
+				ire_ill = (ill_t *)new_nlb_ire->ire_stq->q_ptr;
+				ire_ill->ill_ire_cnt++;
+			}
 		}
 	}
+	ire_refrele(save_ire);
 	rw_exit(&irb->irb_lock);
-	if (!new_lb_ire_used)
-		kmem_cache_free(ire_cache, new_lb_ire);
-	if (!new_nlb_ire_used)
-		kmem_cache_free(ire_cache, new_nlb_ire);
+	/*
+	 * Since we dropped the irb_lock across call to ire_init()
+	 * and rechecking known conditions, it is possible that
+	 * the checks might fail, therefore undo the work done by
+	 * ire_init() by calling ire_refrele() on the newly created ire.
+	 */
+	if (!new_lb_ire_used) {
+		if (refrele_lb_ire) {
+			ire_refrele(new_lb_ire);
+		} else {
+			kmem_cache_free(ire_cache, new_lb_ire);
+		}
+	}
+	if (!new_nlb_ire_used) {
+		if (refrele_nlb_ire) {
+			ire_refrele(new_nlb_ire);
+		} else {
+			kmem_cache_free(ire_cache, new_nlb_ire);
+		}
+	}
 	IRB_REFRELE(irb);
 }
 
