@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<proc_service.h>
@@ -555,7 +553,7 @@ _rd_objpad_enable32(struct rd_agent *rap, size_t padsize)
 
 static rd_err_e
 iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
-	rl_iter_f *cb, void *client_data, uint_t *abort_iter)
+	rl_iter_f *cb, void *client_data, uint_t *abort_iterp)
 {
 	while (lmaddr) {
 		Rt_map		rmap;
@@ -672,7 +670,7 @@ iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
 		if ((*cb)(&lobj, client_data) == 0) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_CALLBACKR0)));
 			RDAGLOCK(rap);
-			*abort_iter = 1;
+			*abort_iterp = 1;
 			break;
 		}
 		RDAGLOCK(rap);
@@ -682,8 +680,9 @@ iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
 }
 
 
-rd_err_e
-_rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
+static rd_err_e
+_rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
+    uint_t *abort_iterp)
 {
 	Rtld_db_priv	db_priv;
 	TList		list;
@@ -691,7 +690,6 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 	Addr		lnp;
 	unsigned long	ident;
 	rd_err_e	rc;
-	uint_t		abort_iter = 0;
 
 	LOG(ps_plog(MSG_ORIG(MSG_DB_LOADOBJITER), rap->rd_dmodel, cb,
 	    client_data));
@@ -759,19 +757,34 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 			ident = (unsigned long)lnode.data;
 
 		if ((rc = iter_map(rap, ident, (psaddr_t)lml.lm_head,
-		    cb, client_data, &abort_iter)) != RD_OK) {
+		    cb, client_data, abort_iterp)) != RD_OK) {
 			return (rc);
 		}
-		if (abort_iter)
+		if (*abort_iterp != 0)
 			break;
 	}
 
-	if (rc != RD_OK)
+	return (rc);
+}
+
+
+rd_err_e
+_rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
+{
+	rd_err_e	rc, rc_brand;
+	uint_t		abort_iter = 0;
+
+	/* First iterate over the native target objects */
+	rc = _rd_loadobj_iter32_native(rap, cb, client_data, &abort_iter);
+	if (abort_iter != 0)
 		return (rc);
 
-	if (rap->rd_helper.rh_ops != NULL)
-		return (rap->rd_helper.rh_ops->rho_loadobj_iter(
-		    rap->rd_helper.rh_data, cb, client_data));
+	/* Then iterate over any branded objects. */
+	if ((rap->rd_helper.rh_ops != NULL) &&
+	    (rap->rd_helper.rh_ops->rho_loadobj_iter != NULL))
+		rc_brand = rap->rd_helper.rh_ops->rho_loadobj_iter(
+		    rap->rd_helper.rh_data, cb, client_data);
 
-	return (RD_OK);
+	rc = (rc == RD_OK) ? rc_brand : rc;
+	return (rc);
 }
