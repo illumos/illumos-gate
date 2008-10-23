@@ -387,6 +387,8 @@ hxge_syserr_intr(caddr_t arg1, caddr_t arg2)
 
 	if (estat.bits.tdc_err0 || estat.bits.tdc_err1) {
 		/* TDMC */
+		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+		    "==> hxge_syserr_intr: device error - TDMC"));
 		(void) hxge_txdma_handle_sys_errors(hxgep);
 	} else if (estat.bits.rdc_err0 || estat.bits.rdc_err1) {
 		/* RDMC */

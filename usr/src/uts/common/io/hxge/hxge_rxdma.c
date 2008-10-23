@@ -97,10 +97,6 @@ static hxge_status_t hxge_rxdma_fatal_err_recover(p_hxge_t hxgep,
 	uint16_t channel);
 static hxge_status_t hxge_rx_port_fatal_err_recover(p_hxge_t hxgep);
 
-#define	HXGE_RXDMA_RBB_MAX(x) (((x) >> 4) * 15)
-#define	HXGE_RXDMA_RBB_MIN(x) ((x) >> 4)
-#define	HXGE_RXDMA_RBB_THRESHOLD(x) (((x) >> 4) * 14)
-
 hxge_status_t
 hxge_init_rxdma_channels(p_hxge_t hxgep)
 {
@@ -257,13 +253,8 @@ hxge_enable_rxdma_channel(p_hxge_t hxgep, uint16_t channel,
 		return (HXGE_ERROR | rs);
 	}
 
-	/*
-	 * Kick the DMA engine with the initial kick and indicate
-	 * that we have remaining blocks to post.
-	 */
-	rbr_p->pages_to_post = HXGE_RXDMA_RBB_MIN(rbr_p->rbb_max);
-	hpi_rxdma_rdc_rbr_kick(handle, channel,
-	    HXGE_RXDMA_RBB_MAX(rbr_p->rbb_max));
+	/* Kick the DMA engine */
+	hpi_rxdma_rdc_rbr_kick(handle, channel, rbr_p->rbb_max);
 
 	/* Clear the rbr empty bit */
 	(void) hpi_rxdma_channel_rbr_empty_clear(handle, channel);
@@ -998,9 +989,6 @@ void hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p,
 void
 hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 {
-	hpi_handle_t	handle;
-	uint64_t	rbr_qlen, blocks_to_post = 0ULL;
-
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_post_page"));
 
 	/* Reuse this buffer */
@@ -1021,42 +1009,9 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 	rx_rbr_p->rbr_wr_index = ((rx_rbr_p->rbr_wr_index + 1) &
 	    rx_rbr_p->rbr_wrap_mask);
 	rx_rbr_p->rbr_desc_vp[rx_rbr_p->rbr_wr_index] = rx_msg_p->shifted_addr;
-
-	/*
-	 * Don't post when index is close to 0 or near the max to reduce the
-	 * number rbr_emepty errors
-	 */
-	rx_rbr_p->pages_to_post++;
-	handle = HXGE_DEV_HPI_HANDLE(hxgep);
-
-	/*
-	 * False RBR Empty Workaround
-	 */
-	RXDMA_REG_READ64(handle, RDC_RBR_QLEN, rx_rbr_p->rdc, &rbr_qlen);
-	rbr_qlen = rbr_qlen & 0xffff;
-
-	if ((rbr_qlen > 0) &&
-	    (rbr_qlen < HXGE_RXDMA_RBB_THRESHOLD(rx_rbr_p->rbb_max))) {
-		blocks_to_post =
-		    HXGE_RXDMA_RBB_MAX(rx_rbr_p->rbb_max) - rbr_qlen;
-	}
-
-	/*
-	 * Clamp posting to what we have available.
-	 */
-	if ((blocks_to_post > 0) &&
-	    (blocks_to_post > rx_rbr_p->pages_to_post)) {
-		blocks_to_post = rx_rbr_p->pages_to_post;
-	}
-
-	/*
-	 * Post blocks to the hardware, if any is available.
-	 */
-	if (blocks_to_post > 0) {
-		hpi_rxdma_rdc_rbr_kick(handle, rx_rbr_p->rdc, blocks_to_post);
-		rx_rbr_p->pages_to_post -= blocks_to_post;
-	}
 	MUTEX_EXIT(&rx_rbr_p->post_lock);
+
+	hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc, 1);
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
 	    "<== hxge_post_page (channel %d post_next_index %d)",
@@ -2762,10 +2717,6 @@ hxge_map_rxdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	rbrp->rbr_max_size = nmsgs;
 	rbrp->rbr_wrap_mask = (rbrp->rbb_max - 1);
 
-	rbrp->pages_to_post = 0;
-	rbrp->pages_to_skip = 20;
-	rbrp->pages_to_post_threshold = rbrp->rbb_max - rbrp->pages_to_skip / 2;
-
 	/*
 	 * Buffer sizes suggested by NIU architect. 256, 512 and 2K.
 	 */
@@ -3493,7 +3444,6 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 
 	rbrp->rbr_wr_index = (rbrp->rbb_max - 1);
 	rbrp->rbr_rd_index = 0;
-	rbrp->pages_to_post = 0;
 
 	rcrp->comp_rd_index = 0;
 	rcrp->comp_wt_index = 0;

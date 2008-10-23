@@ -429,10 +429,6 @@ typedef struct _rx_rbr_ring_t {
 	 */
 	uint32_t		rbr_ref_cnt;
 	rbr_state_t		rbr_state;	/* POSTING, etc */
-
-	int			pages_to_post;
-	int			pages_to_post_threshold;
-	int			pages_to_skip;
 } rx_rbr_ring_t, *p_rx_rbr_ring_t;
 
 /* Receive Mailbox */

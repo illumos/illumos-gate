@@ -3493,7 +3493,7 @@ hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name, uint_t pr_flags,
  * Module loading and removing entry points.
  */
 DDI_DEFINE_STREAM_OPS(hxge_dev_ops, nulldev, nulldev, hxge_attach, hxge_detach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, NULL);
 
 extern struct mod_ops mod_driverops;
 

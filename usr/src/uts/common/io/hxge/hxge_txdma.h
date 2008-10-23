@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_TXDMA_H
 #define	_SYS_HXGE_HXGE_TXDMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -187,7 +185,6 @@ typedef struct _tx_rings_t {
 	p_tx_ring_t		*rings;
 	boolean_t		txdesc_allocated;
 	uint32_t		ndmas;
-	uint32_t		dma_to_reenable;
 	hxge_os_dma_common_t	tdc_dma;
 	hxge_os_dma_common_t	tdc_mbox;
 } tx_rings_t, *p_tx_rings_t;
