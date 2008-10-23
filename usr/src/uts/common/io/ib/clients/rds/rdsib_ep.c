@@ -72,8 +72,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stream.h>
 #include <sys/ib/clients/rds/rdsib_cm.h>
 #include <sys/ib/clients/rds/rdsib_ib.h>
@@ -871,10 +869,10 @@ rds_failover_session(void *arg)
 
 		bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
 		dstip.family = AF_INET;
-		dstip.un.ip4addr = htonl(remip);
+		dstip.un.ip4addr = remip;
 		ipattr.ipa_dst_ip = &dstip;
 		ipattr.ipa_src_ip.family = AF_INET;
-		ipattr.ipa_src_ip.un.ip4addr = htonl(myip);
+		ipattr.ipa_src_ip.un.ip4addr = myip;
 		ipattr.ipa_ndst = 1;
 		ipattr.ipa_max_paths = 1;
 		RDS_DPRINTF2(LABEL, "ibt_get_ip_paths: 0x%x <-> 0x%x ",
@@ -1318,10 +1316,10 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 
 		bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
 		dstip.family = AF_INET;
-		dstip.un.ip4addr = ntohl(remip1);
+		dstip.un.ip4addr = remip1;
 		ipattr.ipa_dst_ip = &dstip;
 		ipattr.ipa_src_ip.family = AF_INET;
-		ipattr.ipa_src_ip.un.ip4addr = ntohl(localip1);
+		ipattr.ipa_src_ip.un.ip4addr = localip1;
 		ipattr.ipa_ndst = 1;
 		ipattr.ipa_max_paths = 1;
 		RDS_DPRINTF2(LABEL, "ibt_get_ip_paths: 0x%x <-> 0x%x ",
@@ -2066,10 +2064,10 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 
 			bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
 			dstip.family = AF_INET;
-			dstip.un.ip4addr = htonl(recvip1);
+			dstip.un.ip4addr = recvip1;
 			ipattr.ipa_dst_ip = &dstip;
 			ipattr.ipa_src_ip.family = AF_INET;
-			ipattr.ipa_src_ip.un.ip4addr = htonl(sendip1);
+			ipattr.ipa_src_ip.un.ip4addr = sendip1;
 			ipattr.ipa_ndst = 1;
 			ipattr.ipa_max_paths = 1;
 			RDS_DPRINTF2(LABEL, "ibt_get_ip_paths: 0x%x <-> 0x%x ",

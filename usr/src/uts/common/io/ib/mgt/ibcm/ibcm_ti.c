@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
 #include <sys/ib/ibtl/ibti.h>
 #include <sys/ib/mgt/ibcm/ibcm_arp.h>
@@ -6138,8 +6136,7 @@ ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
 		if (src_ip->family == AF_INET) {
 			bcopy(&ipp->ip_cm_sin.sin_addr, &src_ip->un.ip4addr,
 			    sizeof (in_addr_t));
-			IBTF_DPRINTF_L4(cmlog, "ibt_get_src_ip: Got %lX",
-			    src_ip->un.ip4addr);
+			IBCM_PRINT_IP("ibt_get_src_ip", src_ip);
 		} else if (src_ip->family == AF_INET6) {
 			bcopy(&ipp->ip_cm_sin6.sin6_addr, &src_ip->un.ip6addr,
 			    sizeof (in6_addr_t));
@@ -6244,6 +6241,8 @@ ibt_format_ip_private_data(ibt_ip_cm_info_t *ip_cm_info,
 		ip_data.ip_ipv = IBT_CM_IP_IPV_V4;
 		ip_data.ip_srcv4 = ip_cm_info->src_addr.un.ip4addr;
 		ip_data.ip_dstv4 = ip_cm_info->dst_addr.un.ip4addr;
+		IBCM_PRINT_IP("format: src", &ip_cm_info->src_addr);
+		IBCM_PRINT_IP("format: dst", &ip_cm_info->dst_addr);
 	} else if (ip_cm_info->src_addr.family == AF_INET6) {
 		ip_data.ip_ipv = IBT_CM_IP_IPV_V6;
 		bcopy(&ip_cm_info->src_addr.un.ip6addr,
@@ -6290,6 +6289,8 @@ ibt_get_ip_data(ibt_priv_data_len_t priv_data_len, void *priv_data,
 		ip_cm_infop->src_addr.un.ip4addr = ip_data.ip_srcv4;
 		ip_cm_infop->dst_addr.family = AF_INET;
 		ip_cm_infop->dst_addr.un.ip4addr = ip_data.ip_dstv4;
+		IBCM_PRINT_IP("get_ip_data: src", &ip_cm_infop->src_addr);
+		IBCM_PRINT_IP("get_ip_data: dst", &ip_cm_infop->dst_addr);
 	} else if (ip_data.ip_ipv == IBT_CM_IP_IPV_V6) {
 		/* Copy IPv6 Addr */
 		ip_cm_infop->src_addr.family = AF_INET6;

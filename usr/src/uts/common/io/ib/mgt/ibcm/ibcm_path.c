@@ -100,6 +100,24 @@ static ibt_status_t ibcm_process_get_paths(void *tq_arg);
 static ibt_status_t ibcm_get_comp_pgids(ib_gid_t, ib_gid_t, ib_guid_t,
     ib_gid_t **, uint_t *);
 
+int ibcm_printip = 0;
+
+/*
+ * Function:
+ *	ibcm_printip
+ * Input:
+ *	label		Arbitrary qualifying string
+ *	ipa		Pointer to IP Address to print
+ */
+void
+ibcm_ip_print(char *label, ibt_ip_addr_t *ipaddr)
+{
+	uint8_t *ipa = (uint8_t *)&ipaddr->un.ip4addr;
+
+	IBTF_DPRINTF_L2(cmlog, "ip_print: %s: %d.%d.%d.%d", label,
+	    ipa[0], ipa[1], ipa[2], ipa[3]);
+}
+
 /*
  * Function:
  *	ibt_aget_paths
@@ -1026,7 +1044,6 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			    &num_path_plus, &p_arg->paths[rec_found]);
 			if ((retval != IBT_SUCCESS) &&
 			    (retval != IBT_INSUFF_DATA) &&
-			    (p_arg->flags & IBT_PATH_APM) &&
 			    (sl->p_count > 0) &&
 			    (dinfo->num_dest > 0)) {
 				ibtl_cm_port_list_t sl_tmp = *sl;
@@ -4089,7 +4106,6 @@ ibcm_process_get_ip_paths(void *tq_arg)
 			goto ippath_error;
 		}
 
-		sl->p_src_ip.un.ip4addr = htonl(sl->p_src_ip.un.ip4addr);
 		/*
 		 * Accumulate all destination information.
 		 * Get GID info for the specified input ip-addr.
@@ -4103,8 +4119,7 @@ ibcm_process_get_ip_paths(void *tq_arg)
 		}
 	}
 	IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: SrcIP %lX DstIP %lX",
-	    sl->p_src_ip.un.ip4addr,
-	    htonl(p_arg->attr.ipa_dst_ip[0].un.ip4addr));
+	    sl->p_src_ip.un.ip4addr, p_arg->attr.ipa_dst_ip[0].un.ip4addr);
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: SGID %llX:%llX, "
 	    "DGID0: %llX:%llX", sl->p_sgid.gid_prefix, sl->p_sgid.gid_guid,
@@ -4356,7 +4371,7 @@ ibcm_val_ipattr(ibt_ip_path_attr_t *attrp, ibt_path_flags_t flags)
 		ibt_ip_addr_t	dst_ip = attrp->ipa_dst_ip[i];
 
 		IBTF_DPRINTF_L3(cmlog, "ibcm_val_ipattr: DstIP[%d]:= family %d "
-		    "IP %lX", i, dst_ip.family, htonl(dst_ip.un.ip4addr));
+		    "IP %lX", i, dst_ip.family, dst_ip.un.ip4addr);
 
 		if (dst_ip.family == AF_UNSPEC) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: ERROR: "
@@ -4366,7 +4381,7 @@ ibcm_val_ipattr(ibt_ip_path_attr_t *attrp, ibt_path_flags_t flags)
 	}
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_val_ipattr: SrcIP: family %d, IP %lX",
-	    attrp->ipa_src_ip.family, htonl(attrp->ipa_src_ip.un.ip4addr));
+	    attrp->ipa_src_ip.family, attrp->ipa_src_ip.un.ip4addr);
 
 	return (IBT_SUCCESS);
 }
@@ -4384,6 +4399,9 @@ ibcm_get_ip_path(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_get_ip_path(%p, %X, %p, %p, %p %p %p %p)",
 	    ibt_hdl, flags, attrp, paths, num_path_p, src_ip_p, func, arg);
+
+	if (src_ip_p != NULL)
+		IBCM_PRINT_IP("ibcm_get_ip_path src_ip", &src_ip_p->ip_primary);
 
 	retval = ibcm_val_ipattr(attrp, flags);
 	if (retval != IBT_SUCCESS)
@@ -4407,6 +4425,7 @@ ibcm_get_ip_path(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 	    sizeof (ibcm_ip_path_tqargs_t));
 	bcopy(attrp->ipa_dst_ip, path_tq->attr.ipa_dst_ip,
 	    sizeof (ibt_ip_addr_t) * attrp->ipa_ndst);
+	IBCM_PRINT_IP("ibcm_get_ip_path dst_ip", attrp->ipa_dst_ip);
 
 	/* Ignore IBT_PATH_AVAIL flag, if only one path is requested. */
 	if ((flags & IBT_PATH_AVAIL) && (attrp->ipa_max_paths == 1)) {

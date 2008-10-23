@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_MGT_IBCM_IBCM_IMPL_H
 #define	_SYS_IB_MGT_IBCM_IBCM_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibcm_impl.h
@@ -1891,6 +1889,14 @@ void		ibcm_decode_tranid(uint64_t tran_id, uint32_t *cm_tran_priv);
 ibcm_status_t	ibcm_ar_init(void);
 ibcm_status_t	ibcm_ar_fini(void);
 
+/* IP Addressing API debugging */
+extern int ibcm_printip;	/* set to 1 to enable IBTF DPRINTFs */
+extern void ibcm_ip_print(char *label, ibt_ip_addr_t *ipa);
+
+#define	IBCM_PRINT_IP(LABEL, IP_ADDR)			\
+	if (ibcm_printip) {			\
+		ibcm_ip_print(LABEL, IP_ADDR);	\
+	}
 /*
  * These functions are called to do timeout processing from CM connection
  * state transitions. (Also for SIDR REQ and SIDR REP processing)

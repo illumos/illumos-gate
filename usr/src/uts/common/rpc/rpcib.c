@@ -1645,7 +1645,7 @@ rib_chk_srv_ibaddr(struct netbuf *raddr,
 	case AF_INET:
 		sin4 = (struct sockaddr_in *)raddr->buf;
 		d_ip->family = AF_INET;
-		d_ip->un.ip4addr = htonl(sin4->sin_addr.s_addr);
+		d_ip->un.ip4addr = sin4->sin_addr.s_addr;
 		break;
 
 	case AF_INET6:
@@ -1684,7 +1684,7 @@ rib_chk_srv_ibaddr(struct netbuf *raddr,
 
 	if (srcip.ip_primary.family == AF_INET) {
 		s_ip->family = AF_INET;
-		s_ip->un.ip4addr = htonl(srcip.ip_primary.un.ip4addr);
+		s_ip->un.ip4addr = srcip.ip_primary.un.ip4addr;
 	} else {
 		s_ip->family = AF_INET6;
 		s_ip->un.ip6addr = srcip.ip_primary.un.ip6addr;
@@ -1862,7 +1862,7 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
 	case AF_INET:
 		sin4 = (struct sockaddr_in *)raddr->buf;
 		dstip.family = AF_INET;
-		dstip.un.ip4addr = htonl(sin4->sin_addr.s_addr);
+		dstip.un.ip4addr = sin4->sin_addr.s_addr;
 
 		for (i = 0; i < nif4; i++) {
 			num_paths_p = 0;
@@ -1872,7 +1872,7 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rib_hca_t **hca)
 			ipattr.ipa_max_paths	= 1;
 			ipattr.ipa_src_ip.family = dstip.family;
 			ipattr.ipa_src_ip.un.ip4addr =
-			    htonl(sin4arr[i].sin_addr.s_addr);
+			    sin4arr[i].sin_addr.s_addr;
 
 			ibt_status = ibt_get_ip_paths(rib_stat->ibt_clnt_hdl,
 			    IBT_PATH_NO_FLAGS,

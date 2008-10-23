@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
 #include <sys/callb.h>
 
@@ -6461,12 +6459,12 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 
 		/* fill in the REP msg based on ret_args from client */
 		if (clnt_info->reply_event->rep.cm_rdma_ra_out >
-		    ((uint8_t *)&cm_req_msg->req_local_eec_no_plus)[3]) {
+		    ((uint8_t *)&cm_req_msg->req_local_qpn_plus)[3]) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_process_req_cm_hdlr "
 			    "statep 0x%p ERROR: InitiatorDepth(%d) is Greater "
 			    "than ResponderResource(%d)", statep,
 			    clnt_info->reply_event->rep.cm_rdma_ra_out,
-			    ((uint8_t *)&cm_req_msg->req_local_eec_no_plus)[3]);
+			    ((uint8_t *)&cm_req_msg->req_local_qpn_plus)[3]);
 			*reject_reason = IBT_CM_NOT_SUPPORTED;
 			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
 			    IBT_CM_FAILURE_REQ, IBT_CM_NOT_SUPPORTED, NULL, 0);

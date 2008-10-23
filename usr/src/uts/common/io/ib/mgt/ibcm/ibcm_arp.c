@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -362,9 +360,9 @@ ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
 	mutex_exit(&ib_s->lock);
 
 	destaddr.family = AF_INET_OFFLOAD;
-	destaddr.un.ip4addr = htonl(destip);
+	destaddr.un.ip4addr = destip;
 	srcaddr.family = AF_INET_OFFLOAD;
-	srcaddr.un.ip4addr = htonl(srcip);
+	srcaddr.un.ip4addr = srcip;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: SrcIP %lX, DstIP %lX",
 	    srcaddr.un.ip4addr, destaddr.un.ip4addr);
