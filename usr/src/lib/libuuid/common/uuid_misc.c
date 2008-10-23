@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,8 +48,6 @@
  * suitability of this software for any purpose.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <uuid/uuid.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -64,7 +61,7 @@ void		string_to_struct(struct uuid *, uuid_t);
 void		get_system_time(uuid_time_t *);
 
 /*
- * Name:	_get_current_time
+ * Name:	get_current_time
  *
  * Description:	get-current_time -- get time as 60 bit 100ns ticks
  *		since the beginning of unix time.
@@ -75,7 +72,7 @@ void		get_system_time(uuid_time_t *);
  *
  */
 void
-_get_current_time(uuid_time_t *timestamp)
+get_current_time(uuid_time_t *timestamp)
 {
 	uuid_time_t		time_now;
 	static uuid_time_t	time_last = 0;
@@ -113,7 +110,7 @@ _get_current_time(uuid_time_t *timestamp)
 }
 
 /*
- * Name:	_get_random
+ * Name:	get_random
  *
  * Description:	Gets a random number.
  *
@@ -121,7 +118,7 @@ _get_current_time(uuid_time_t *timestamp)
  *
  */
 uint16_t
-_get_random(void)
+get_random(void)
 {
 	static int	initted = 0;
 	uuid_time_t	time_now;

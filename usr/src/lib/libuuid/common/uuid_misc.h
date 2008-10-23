@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_UUID_MISC_H
 #define	_UUID_MISC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The copyright in this file is taken from the original Leach
@@ -59,19 +56,33 @@ extern "C" {
 
 #include <uuid/uuid.h>
 #include <sys/types.h>
+#include <thread.h>
 
-typedef uint64_t	uuid_time_t;
+typedef uint64_t		uuid_time_t;
 
 /*
  * data type for UUID generator persistent state
  */
 typedef struct {
-	uuid_time_t	ts;	/* saved timestamp */
-	uuid_node_t	node;	/* saved node ID */
-	uint16_t	cs;	/* saved clock sequence */
+	uuid_time_t		ts;	/* saved timestamp */
+	uuid_node_t		node;	/* saved node ID */
+	uint16_t		clock;	/* saved clock sequence */
 } uuid_state_t;
 
-#ifdef __cplusplus
+typedef struct {
+	mutex_t			lock;
+	uuid_state_t		state;
+} shared_buffer_t;
+
+#define	STATE_LOCATION		"/var/sadm/system/uuid_state"
+#define	URANDOM_PATH		"/dev/urandom"
+#define	MAX_RETRY		8
+#define	VER1_MASK		0xefff
+
+#define	STATE_FILE		1
+#define	TEMP_FILE		2
+
+#ifdef	__cplusplus
 }
 #endif
 
