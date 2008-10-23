@@ -20207,7 +20207,6 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	int		pbuf_idx, pbuf_idx_nxt;
 	int		seg_len, len, spill, af;
 	boolean_t	add_buffer, zcopy, clusterwide;
-	boolean_t	buf_trunked = B_FALSE;
 	boolean_t	rconfirm = B_FALSE;
 	boolean_t	done = B_FALSE;
 	uint32_t	cksum;
@@ -20221,10 +20220,11 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	uint16_t	*up;
 	int		err;
 	conn_t		*connp;
-	mblk_t		*mp, *mp1, *fw_mp_head = NULL;
-	uchar_t		*pld_start;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	ip_stack_t 	*ipst = tcps->tcps_netstack->netstack_ip;
+	int		usable_mmd, tail_unsent_mmd;
+	uint_t		snxt_mmd, obsegs_mmd, obbytes_mmd;
+	mblk_t		*xmit_tail_mmd;
 
 #ifdef	_BIG_ENDIAN
 #define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
@@ -20267,6 +20267,9 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	ASSERT(CONN_IS_LSO_MD_FASTPATH(connp));
 	ASSERT(!CONN_IPSEC_OUT_ENCAPSULATED(connp));
 
+	usable_mmd = tail_unsent_mmd = 0;
+	snxt_mmd = obsegs_mmd = obbytes_mmd = 0;
+	xmit_tail_mmd = NULL;
 	/*
 	 * Note that tcp will only declare at most 2 payload spans per
 	 * packet, which is much lower than the maximum allowable number
@@ -20465,6 +20468,20 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				*tail_unsent = (int)MBLKL(*xmit_tail);
 			}
 		}
+		/*
+		 * Record current values for parameters we may need to pass
+		 * to tcp_send() or tcp_multisend_data(). We checkpoint at
+		 * each iteration of the outer loop (each multidata message
+		 * creation). If we have a failure in the inner loop, we send
+		 * any complete multidata messages we have before reverting
+		 * to using the traditional non-md path.
+		 */
+		snxt_mmd = *snxt;
+		usable_mmd = *usable;
+		xmit_tail_mmd = *xmit_tail;
+		tail_unsent_mmd = *tail_unsent;
+		obsegs_mmd = obsegs;
+		obbytes_mmd = obbytes;
 
 		/*
 		 * max_pld limits the number of mblks in tcp's transmit
@@ -20543,6 +20560,29 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			    /* hardware checksum flag */
 			    hwcksum_flags, tcps) != 0)) {
 legacy_send:
+				/*
+				 * We arrive here from a failure within the
+				 * inner (packetizer) loop or we fail one of
+				 * the conditionals above. We restore the
+				 * previously checkpointed values for:
+				 *    xmit_tail
+				 *    usable
+				 *    tail_unsent
+				 *    snxt
+				 *    obbytes
+				 *    obsegs
+				 * We should then be able to dispatch any
+				 * complete multidata before reverting to the
+				 * traditional path with consistent parameters
+				 * (the inner loop updates these as it
+				 * iterates).
+				 */
+				*xmit_tail = xmit_tail_mmd;
+				*usable = usable_mmd;
+				*tail_unsent = tail_unsent_mmd;
+				*snxt = snxt_mmd;
+				obbytes = obbytes_mmd;
+				obsegs = obsegs_mmd;
 				if (md_mp != NULL) {
 					/* Unlink message from the chain */
 					if (md_mp_head != NULL) {
@@ -21123,24 +21163,47 @@ legacy_send_no_md:
 			    HOOKS4_INTERESTED_PHYSICAL_OUT(ipst) ||
 			    af == AF_INET6 &&
 			    HOOKS6_INTERESTED_PHYSICAL_OUT(ipst)) {
-				/* build header(IP/TCP) mblk for this segment */
-				if ((mp = dupb(md_hbuf)) == NULL)
-					goto legacy_send;
+				mblk_t	*mp, *mp1;
+				uchar_t	*hdr_rptr, *hdr_wptr;
+				uchar_t	*pld_rptr, *pld_wptr;
 
-				mp->b_rptr = pkt_info->hdr_rptr;
-				mp->b_wptr = pkt_info->hdr_wptr;
-
-				/* build payload mblk for this segment */
-				if ((mp1 = dupb(*xmit_tail)) == NULL) {
-					freemsg(mp);
+				/*
+				 * We reconstruct a pseudo packet for the hooks
+				 * framework using mmd_transform_link().
+				 * If it is a split packet we pullup the
+				 * payload. FW_HOOKS expects a pkt comprising
+				 * of two mblks: a header and the payload.
+				 */
+				if ((mp = mmd_transform_link(pkt)) == NULL) {
+					TCP_STAT(tcps, tcp_mdt_allocfail);
 					goto legacy_send;
 				}
-				mp1->b_wptr = md_pbuf->b_rptr + cur_pld_off;
-				mp1->b_rptr = mp1->b_wptr -
-				    tcp->tcp_last_sent_len;
-				linkb(mp, mp1);
 
-				pld_start = mp1->b_rptr;
+				if (pkt_info->pld_cnt > 1) {
+					/* split payload, more than one pld */
+					if ((mp1 = msgpullup(mp->b_cont, -1)) ==
+					    NULL) {
+						freemsg(mp);
+						TCP_STAT(tcps,
+						    tcp_mdt_allocfail);
+						goto legacy_send;
+					}
+					freemsg(mp->b_cont);
+					mp->b_cont = mp1;
+				} else {
+					mp1 = mp->b_cont;
+				}
+				ASSERT(mp1 != NULL && mp1->b_cont == NULL);
+
+				/*
+				 * Remember the message offsets. This is so we
+				 * can detect changes when we return from the
+				 * FW_HOOKS callbacks.
+				 */
+				hdr_rptr = mp->b_rptr;
+				hdr_wptr = mp->b_wptr;
+				pld_rptr = mp->b_cont->b_rptr;
+				pld_wptr = mp->b_cont->b_wptr;
 
 				if (af == AF_INET) {
 					DTRACE_PROBE4(
@@ -21172,72 +21235,30 @@ legacy_send_no_md:
 					    mblk_t *, mp);
 				}
 
-				if (buf_trunked && mp != NULL) {
-					/*
-					 * Need to pass it to normal path.
-					 */
-					CALL_IP_WPUT(tcp->tcp_connp, q, mp);
-					mp = NULL;
-				} else if (mp == NULL ||
-				    mp->b_rptr != pkt_info->hdr_rptr ||
-				    mp->b_wptr != pkt_info->hdr_wptr ||
+				if (mp == NULL ||
 				    (mp1 = mp->b_cont) == NULL ||
-				    mp1->b_rptr != pld_start ||
-				    mp1->b_wptr != pld_start +
-				    tcp->tcp_last_sent_len ||
+				    mp->b_rptr != hdr_rptr ||
+				    mp->b_wptr != hdr_wptr ||
+				    mp1->b_rptr != pld_rptr ||
+				    mp1->b_wptr != pld_wptr ||
 				    mp1->b_cont != NULL) {
 					/*
-					 * Need to pass all packets of this
-					 * buffer to normal path, either when
-					 * packet is blocked, or when boundary
-					 * of header buffer or payload buffer
-					 * has been changed by FW_HOOKS[6].
+					 * We abandon multidata processing and
+					 * return to the normal path, either
+					 * when a packet is blocked, or when
+					 * the boundaries of header buffer or
+					 * payload buffer have been changed by
+					 * FW_HOOKS[6].
 					 */
-					buf_trunked = B_TRUE;
-					if (md_mp_head != NULL) {
-						err = (intptr_t)rmvb(md_mp_head,
-						    md_mp);
-						if (err == 0)
-							md_mp_head = NULL;
-					}
-
-					/* send down what we've got so far */
-					if (md_mp_head != NULL) {
-						tcp_multisend_data(tcp, ire,
-						    ill, md_mp_head, obsegs,
-						    obbytes, &rconfirm);
-					}
-					md_mp_head = NULL;
-
 					if (mp != NULL)
-						CALL_IP_WPUT(tcp->tcp_connp,
-						    q, mp);
-
-					mp1 = fw_mp_head;
-					do {
-						mp = mp1;
-						mp1 = mp1->b_next;
-						mp->b_next = NULL;
-						mp->b_prev = NULL;
-						CALL_IP_WPUT(tcp->tcp_connp,
-						    q, mp);
-					} while (mp1 != NULL);
-
-					fw_mp_head = mp = NULL;
-				} else {
-					if (fw_mp_head == NULL)
-						fw_mp_head = mp;
-					else
-						fw_mp_head->b_prev->b_next = mp;
-					fw_mp_head->b_prev = mp;
+						freemsg(mp);
+					goto legacy_send;
 				}
+				/* Finished with the pseudo packet */
+				freemsg(mp);
 			}
-
-			if (mp != NULL) {
-				DTRACE_IP_FASTPATH(md_hbuf, pkt_info->hdr_rptr,
-				    ill, ipha, ip6h);
-			}
-
+			DTRACE_IP_FASTPATH(md_hbuf, pkt_info->hdr_rptr,
+			    ill, ipha, ip6h);
 			/* advance header offset */
 			cur_hdr_off += hdr_frag_sz;
 
@@ -21279,18 +21300,6 @@ legacy_send_no_md:
 			    (uintptr_t)INT_MAX);
 			*tail_unsent = (int)MBLKL(*xmit_tail);
 			add_buffer = B_TRUE;
-		}
-
-		while (fw_mp_head) {
-			mp = fw_mp_head;
-			fw_mp_head = fw_mp_head->b_next;
-			mp->b_prev = mp->b_next = NULL;
-			freemsg(mp);
-		}
-		if (buf_trunked) {
-			TCP_STAT(tcps, tcp_mdt_discarded);
-			freeb(md_mp);
-			buf_trunked = B_FALSE;
 		}
 	} while (!done && *usable > 0 && num_burst_seg > 0 &&
 	    (tcp_mdt_chain || max_pld > 0));
