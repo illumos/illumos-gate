@@ -539,6 +539,25 @@ tmp_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	struct tmount	*tm = (struct tmount *)VFSTOTM(vfsp);
 	ulong_t	blocks;
 	dev32_t d32;
+	zoneid_t eff_zid;
+	struct zone *zp;
+
+	/*
+	 * The file system may have been mounted by the global zone on
+	 * behalf of the non-global zone.  In that case, the tmount zone_id
+	 * will be the global zone.  We still want to show the swap cap inside
+	 * the zone in this case, even though the file system was mounted by
+	 * the global zone.
+	 */
+	if (curproc->p_zone->zone_id != GLOBAL_ZONEUNIQID)
+		zp = curproc->p_zone;
+	else
+		zp = tm->tm_vfsp->vfs_zone;
+
+	if (zp == NULL)
+		eff_zid = GLOBAL_ZONEUNIQID;
+	else
+		eff_zid = zp->zone_id;
 
 	sbp->f_bsize = PAGESIZE;
 	sbp->f_frsize = PAGESIZE;
@@ -567,6 +586,28 @@ tmp_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	 * Total number of blocks is what's available plus what's been used
 	 */
 	sbp->f_blocks = (fsblkcnt64_t)(sbp->f_bfree + tm->tm_anonmem);
+
+	if (eff_zid != GLOBAL_ZONEUNIQID &&
+	    zp->zone_max_swap_ctl != UINT64_MAX) {
+		/*
+		 * If the fs is used by a non-global zone with a swap cap,
+		 * then report the capped size.
+		 */
+		rctl_qty_t cap, used;
+		pgcnt_t pgcap, pgused;
+
+		mutex_enter(&zp->zone_mem_lock);
+		cap = zp->zone_max_swap_ctl;
+		used = zp->zone_max_swap;
+		mutex_exit(&zp->zone_mem_lock);
+
+		pgcap = btop(cap);
+		pgused = btop(used);
+
+		sbp->f_bfree = MIN(pgcap - pgused, sbp->f_bfree);
+		sbp->f_bavail = sbp->f_bfree;
+		sbp->f_blocks = MIN(pgcap, sbp->f_blocks);
+	}
 
 	/*
 	 * The maximum number of files available is approximately the number
