@@ -205,6 +205,21 @@ pt_close_aout(mdb_tgt_t *t)
 	pt->p_fio = NULL;
 }
 
+typedef struct tdb_mapping {
+	const char *tm_thr_lib;
+	const char *tm_db_dir;
+	const char *tm_db_name;
+} tdb_mapping_t;
+
+static const tdb_mapping_t tdb_map[] = {
+	{ "/lwp/amd64/libthread.so",	"/usr/lib/lwp/", "libthread_db.so" },
+	{ "/lwp/sparcv9/libthread.so",	"/usr/lib/lwp/", "libthread_db.so" },
+	{ "/lwp/libthread.so",		"/usr/lib/lwp/", "libthread_db.so" },
+	{ "/libthread.so",		"/lib/", "libthread_db.so" },
+	{ "/libc_hwcap",		"/lib/", "libc_db.so" },
+	{ "/libc.so",			"/lib/", "libc_db.so" }
+};
+
 /*
  * Pobject_iter callback that we use to search for the presence of libthread in
  * order to load the corresponding libthread_db support.  We derive the
@@ -221,44 +236,33 @@ thr_check(mdb_tgt_t *t, const prmap_t *pmp, const char *name)
 {
 	pt_data_t *pt = t->t_data;
 	const mdb_tdb_ops_t *ops;
-	char *p, *q;
+	char *p;
 
-	char path[MAXPATHLEN + 8]; /* +8 for "/64" "_db" and '\0' */
+	char path[MAXPATHLEN];
 
-	const char *const libs[] = { "/libc.so", "/libthread.so" };
 	int libn;
 
 	if (name == NULL)
 		return (0); /* no rtld_db object name; keep going */
 
-	for (libn = 0; libn < sizeof (libs) / sizeof (libs[0]); libn++) {
-		if ((p = strstr(name, libs[libn])) != NULL)
+	for (libn = 0; libn < sizeof (tdb_map) / sizeof (tdb_map[0]); libn++) {
+		if ((p = strstr(name, tdb_map[libn].tm_thr_lib)) != NULL)
 			break;
 	}
 
 	if (p == NULL)
 		return (0); /* no match; keep going */
 
-	(void) strncpy(path, name, MAXPATHLEN);
-	path[MAXPATHLEN] = '\0';
-	q = strstr(path, libs[libn]);
-	ASSERT(q != NULL);
+	path[0] = '\0';
+	(void) strlcat(path, mdb.m_root, sizeof (path));
+	(void) strlcat(path, tdb_map[libn].tm_db_dir, sizeof (path));
+#if !defined(_ILP32)
+	(void) strlcat(path, "64/", sizeof (path));
+#endif /* !_ILP32 */
+	(void) strlcat(path, tdb_map[libn].tm_db_name, sizeof (path));
 
-	/*
-	 * If the 64-bit debugger is looking at a 32-bit victim, append /64 to
-	 * the library directory name so we load the 64-bit version.
-	 */
-	if (Pstatus(t->t_pshandle)->pr_dmodel != PR_MODEL_NATIVE) {
-		(void) strcpy(q, "/64");
-		q += 3;
-		(void) strcpy(q, p);
-	}
-
-	p = strchr(p, '.');
-	q = strchr(q, '.');
-	(void) strcpy(q, "_db");
-	q += 3;
-	(void) strcpy(q, p);
+	/* Append the trailing library version number. */
+	(void) strlcat(path, strrchr(name, '.'), sizeof (path));
 
 	if ((ops = mdb_tdb_load(path)) == NULL) {
 		if (libn != 0 || errno != ENOENT)
@@ -309,7 +313,7 @@ pt_rtld_event(mdb_tgt_t *t, int vid, void *private)
 	struct ps_prochandle *P = t->t_pshandle;
 	pt_data_t *pt = t->t_data;
 	rd_event_msg_t rdm;
-	int rv, docontinue = 1;
+	int docontinue = 1;
 
 	if (rd_event_getmsg(pt->p_rtld, &rdm) == RD_OK) {
 
@@ -322,15 +326,8 @@ pt_rtld_event(mdb_tgt_t *t, int vid, void *private)
 
 			Pupdate_maps(P);
 
-			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
-				rv = Pobject_iter_resolved(P,
-				    (proc_map_f *)thr_check, t);
-			} else {
-				rv = Pobject_iter(P,
-				    (proc_map_f *)thr_check, t);
-			}
-
-			if ((rv == 0) && (pt->p_ptl_ops != &proc_lwp_ops)) {
+			if (Pobject_iter(P, (proc_map_f *)thr_check, t) == 0 &&
+			    pt->p_ptl_ops != &proc_lwp_ops) {
 				mdb_dprintf(MDB_DBG_TGT, "unloading thread_db "
 				    "support after dlclose\n");
 				PTL_DTOR(t);
@@ -785,14 +782,7 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	else {
 		t->t_pshandle = C;
 		pt->p_rtld = Prd_agent(C);
-
-		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
-			(void) Pobject_iter_resolved(t->t_pshandle,
-			    (proc_map_f *)thr_check, t);
-		} else {
-			(void) Pobject_iter(t->t_pshandle,
-			    (proc_map_f *)thr_check, t);
-		}
+		(void) Pobject_iter(t->t_pshandle, (proc_map_f *)thr_check, t);
 	}
 
 	(void) mdb_tgt_sespec_activate_all(t);
@@ -1820,13 +1810,8 @@ pt_tmodel(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		pt->p_ptl_hdl = NULL;
 
 		if (ptl_ops == &proc_tdb_ops) {
-			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
-				(void) Pobject_iter(t->t_pshandle,
-				    (proc_map_f *)thr_check, t);
-			} else {
-				(void) Pobject_iter_resolved(t->t_pshandle,
-				    (proc_map_f *)thr_check, t);
-			}
+			(void) Pobject_iter(t->t_pshandle, (proc_map_f *)
+			    thr_check, t);
 		}
 	}
 
@@ -2208,15 +2193,8 @@ pt_activate_common(mdb_tgt_t *t)
 	 * and initialize the corresponding libthread_db.  If this fails, fall
 	 * back to our native LWP implementation and issue a warning.
 	 */
-	if (t->t_pshandle != NULL && Pstate(t->t_pshandle) != PS_IDLE) {
-		if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
-			(void) Pobject_iter_resolved(t->t_pshandle,
-			    (proc_map_f *)thr_check, t);
-		} else {
-			(void) Pobject_iter(t->t_pshandle,
-			    (proc_map_f *)thr_check, t);
-		}
-	}
+	if (t->t_pshandle != NULL && Pstate(t->t_pshandle) != PS_IDLE)
+		(void) Pobject_iter(t->t_pshandle, (proc_map_f *)thr_check, t);
 
 	/*
 	 * If there's a global object named '_mdb_abort_info', assuming we're
@@ -2628,14 +2606,11 @@ pt_lookup_by_name_thr(mdb_tgt_t *t, const char *object,
 		pl.pl_found = FALSE;
 
 		if (object == MDB_TGT_OBJ_EVERY) {
-			if ((mdb.m_flags & MDB_FL_LMRAW) == 0) {
-				if (Pobject_iter_resolved(P, pt_lookup_cb,
-				    &pl) == -1)
-					return (-1); /* errno is set for us */
-			} else {
-				if (Pobject_iter(P, pt_lookup_cb, &pl) == -1)
-					return (-1); /* errno is set for us */
-			}
+			if (Pobject_iter_resolved(P, pt_lookup_cb, &pl) == -1)
+				return (-1); /* errno is set for us */
+			if ((!pl.pl_found) &&
+			    (Pobject_iter(P, pt_lookup_cb, &pl) == -1))
+				return (-1); /* errno is set for us */
 		} else {
 			const prmap_t *pmp;
 
