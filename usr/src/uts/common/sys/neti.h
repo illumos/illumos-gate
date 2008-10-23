@@ -178,13 +178,14 @@ typedef struct net_instance_s net_instance_t;
 
 struct net_instance_int_s {
 	LIST_ENTRY(net_instance_int_s)	nini_next;
-	int				nini_ref;
+	uint_t				nini_ref;
 	void				*nini_created;
 	struct net_instance_int_s	*nini_parent;
 	net_instance_t			*nini_instance;
 	hook_notify_t			nini_notify;
 	uint32_t			nini_flags;
 	kcondvar_t			nini_cv;
+	boolean_t			nini_condemned;
 };
 typedef struct net_instance_int_s net_instance_int_t;
 LIST_HEAD(nini_head_s, net_instance_int_s);
@@ -231,12 +232,14 @@ extern zoneid_t net_getzoneidbynetid(netid_t);
  * Functions available for public use.
  */
 extern hook_event_token_t net_event_register(net_handle_t, hook_event_t *);
+extern int net_event_shutdown(net_handle_t, hook_event_t *);
 extern int net_event_unregister(net_handle_t, hook_event_t *);
 extern int net_event_notify_register(net_handle_t, char *,
     hook_notify_fn_t, void *);
 extern int net_event_notify_unregister(net_handle_t, char *, hook_notify_fn_t);
 
 extern int net_family_register(net_handle_t, hook_family_t *);
+extern int net_family_shutdown(net_handle_t, hook_family_t *);
 extern int net_family_unregister(net_handle_t, hook_family_t *);
 
 extern int net_hook_register(net_handle_t, char *, hook_t *);

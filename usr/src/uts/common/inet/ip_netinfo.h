@@ -27,8 +27,6 @@
 #ifndef	_INET_IP_NETINFO_H
 #define	_INET_IP_NETINFO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -45,6 +43,8 @@ extern void ipv4_hook_init(ip_stack_t *);
 extern void ipv6_hook_init(ip_stack_t *);
 extern void ipv4_hook_destroy(ip_stack_t *);
 extern void ipv6_hook_destroy(ip_stack_t *);
+extern void ipv4_hook_shutdown(ip_stack_t *);
+extern void ipv6_hook_shutdown(ip_stack_t *);
 extern void ip_ne_queue_func(void *);
 
 #endif	/* _KERNEL */

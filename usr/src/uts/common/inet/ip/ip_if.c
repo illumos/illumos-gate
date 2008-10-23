@@ -4309,7 +4309,6 @@ ill_delete_interface_type(ill_if_t *interface)
 static void
 ill_glist_delete(ill_t *ill)
 {
-	hook_nic_event_int_t *info;
 	ip_stack_t	*ipst;
 
 	if (ill == NULL)
@@ -4352,18 +4351,20 @@ ill_glist_delete(ill_t *ill)
 	 * that the ordering of delivered events to listeners matches the
 	 * order of them in the kernel.
 	 */
-	info = ill->ill_nic_event_info;
-	if (info != NULL && info->hnei_event.hne_event == NE_DOWN) {
-		mutex_enter(&ill->ill_lock);
-		ill_nic_info_dispatch(ill);
-		mutex_exit(&ill->ill_lock);
-	}
+	mutex_enter(&ill->ill_lock);
+	ill_nic_info_dispatch(ill);
+	mutex_exit(&ill->ill_lock);
 
 	/* Generate NE_UNPLUMB event for ill_name. */
 	(void) ill_hook_event_create(ill, 0, NE_UNPLUMB, ill->ill_name,
 	    ill->ill_name_length);
 
 	ill_phyint_free(ill);
+
+	mutex_enter(&ill->ill_lock);
+	ill_nic_info_dispatch(ill);
+	mutex_exit(&ill->ill_lock);
+
 	rw_exit(&ipst->ips_ill_g_lock);
 }
 
@@ -10851,9 +10852,6 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				mutex_exit(&ill->ill_lock);
 				mutex_exit(&connp->conn_lock);
 				ill_delete_tail(ill);
-				mutex_enter(&ill->ill_lock);
-				ill_nic_info_dispatch(ill);
-				mutex_exit(&ill->ill_lock);
 				mi_free(ill);
 				return (0);
 			}
@@ -11011,9 +11009,6 @@ ip_sioctl_removeif_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q,
 	if (ipif->ipif_id == 0 && ipif->ipif_net_type == IRE_LOOPBACK) {
 		ASSERT(ill->ill_state_flags & ILL_CONDEMNED);
 		ill_delete_tail(ill);
-		mutex_enter(&ill->ill_lock);
-		ill_nic_info_dispatch(ill);
-		mutex_exit(&ill->ill_lock);
 		mi_free(ill);
 		return (0);
 	}

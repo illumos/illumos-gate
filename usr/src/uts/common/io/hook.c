@@ -426,6 +426,10 @@ hook_stack_init(netstackid_t stackid, netstack_t *ns)
 	return (hks);
 }
 
+/*
+ * Set the shutdown flag to indicate that we should stop accepting new
+ * register calls as we're now in the cleanup process.
+ */
 /*ARGSUSED*/
 static void
 hook_stack_shutdown(netstackid_t stackid, void *arg)
@@ -732,6 +736,7 @@ int
 hook_family_remove(hook_family_int_t *hfi)
 {
 	hook_stack_t *hks;
+	boolean_t notifydone;
 
 	ASSERT(hfi != NULL);
 	hks = hfi->hfi_stack;
@@ -743,6 +748,7 @@ hook_family_remove(hook_family_int_t *hfi)
 		/*
 		 * If we're trying to destroy the hook_stack_t...
 		 */
+		CVW_EXIT_WRITE(&hks->hks_lock);
 		return (ENXIO);
 	}
 
@@ -762,11 +768,15 @@ hook_family_remove(hook_family_int_t *hfi)
 
 	CVW_ENTER_WRITE(&hfi->hfi_lock);
 	hook_wait_destroy(&hfi->hfi_waiter);
+	notifydone = hfi->hfi_shutdown;
+	hfi->hfi_shutdown = B_TRUE;
 	CVW_EXIT_WRITE(&hfi->hfi_lock);
 
 	CVW_EXIT_WRITE(&hks->hks_lock);
 
-	hook_stack_notify_run(hks, hfi->hfi_family.hf_name, HN_UNREGISTER);
+	if (!notifydone)
+		hook_stack_notify_run(hks, hfi->hfi_family.hf_name,
+		    HN_UNREGISTER);
 
 	hook_wait_unsetflag(&hks->hks_waiter, FWF_DEL_ACTIVE);
 
@@ -825,6 +835,50 @@ hook_family_free(hook_family_int_t *hfi, hook_stack_t *hks)
 	mutex_exit(&hook_stack_lock);
 }
 
+/*
+ * Function:	hook_family_shutdown
+ * Returns:	int - 0 = Succ, Else = Fail
+ * Parameters:	hfi(I) - internal family pointer
+ *
+ * As an alternative to removing a family, we may desire to just generate
+ * a series of callbacks to indicate that we will be going away in the
+ * future. The hfi_condemned flag isn't set because we aren't trying to
+ * remove the structure.
+ */
+int
+hook_family_shutdown(hook_family_int_t *hfi)
+{
+	hook_stack_t *hks;
+	boolean_t notifydone;
+
+	ASSERT(hfi != NULL);
+	hks = hfi->hfi_stack;
+
+	CVW_ENTER_WRITE(&hks->hks_lock);
+
+	if (hook_wait_setflag(&hks->hks_waiter, FWF_WAIT_MASK,
+	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
+		/*
+		 * If we're trying to destroy the hook_stack_t...
+		 */
+		CVW_EXIT_WRITE(&hks->hks_lock);
+		return (ENXIO);
+	}
+
+	CVW_ENTER_WRITE(&hfi->hfi_lock);
+	notifydone = hfi->hfi_shutdown;
+	hfi->hfi_shutdown = B_TRUE;
+	CVW_EXIT_WRITE(&hfi->hfi_lock);
+	CVW_EXIT_WRITE(&hks->hks_lock);
+
+	if (!notifydone)
+		hook_stack_notify_run(hks, hfi->hfi_family.hf_name,
+		    HN_UNREGISTER);
+
+	hook_wait_unsetflag(&hks->hks_waiter, FWF_DEL_ACTIVE);
+
+	return (0);
+}
 
 /*
  * Function:	hook_family_copy
@@ -911,7 +965,8 @@ hook_family_notify_register(hook_family_int_t *hfi,
 	CVW_ENTER_READ(&hks->hks_lock);
 	CVW_ENTER_WRITE(&hfi->hfi_lock);
 
-	if (hfi->hfi_stack->hks_shutdown != 0) {
+	if ((hfi->hfi_stack->hks_shutdown != 0) ||
+	    hfi->hfi_condemned || hfi->hfi_shutdown) {
 		CVW_EXIT_WRITE(&hfi->hfi_lock);
 		CVW_EXIT_READ(&hks->hks_lock);
 		return (ESHUTDOWN);
@@ -1011,7 +1066,7 @@ hook_event_add(hook_family_int_t *hfi, hook_event_t *he)
 
 	CVW_ENTER_WRITE(&hfi->hfi_lock);
 
-	if (hfi->hfi_condemned) {
+	if (hfi->hfi_condemned || hfi->hfi_shutdown) {
 		CVW_EXIT_WRITE(&hfi->hfi_lock);
 		CVW_EXIT_READ(&hks->hks_lock);
 		hook_event_free(new, NULL);
@@ -1104,6 +1159,7 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 {
 	boolean_t free_family;
 	hook_event_int_t *hei;
+	boolean_t notifydone;
 
 	ASSERT(hfi != NULL);
 	ASSERT(he != NULL);
@@ -1132,6 +1188,12 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 
 	CVW_ENTER_WRITE(&hei->hei_lock);
 	/*
+	 * The hei_shutdown flag is used to indicate whether or not we have
+	 * done a shutdown and thus already walked through the notify list.
+	 */
+	notifydone = hei->hei_shutdown;
+	hei->hei_shutdown = B_TRUE;
+	/*
 	 * If there are any hooks still registered for this event or
 	 * there are any notifiers registered, return an error indicating
 	 * that the event is still busy.
@@ -1157,8 +1219,9 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 
 	CVW_EXIT_WRITE(&hfi->hfi_lock);
 
-	hook_notify_run(&hfi->hfi_nhead,
-	    hfi->hfi_family.hf_name, NULL, he->he_name, HN_UNREGISTER);
+	if (!notifydone)
+		hook_notify_run(&hfi->hfi_nhead,
+		    hfi->hfi_family.hf_name, NULL, he->he_name, HN_UNREGISTER);
 
 	hook_wait_unsetflag(&hfi->hfi_waiter, FWF_DEL_ACTIVE);
 
@@ -1167,6 +1230,60 @@ hook_event_remove(hook_family_int_t *hfi, hook_event_t *he)
 		if (free_family)
 			hook_family_free(hfi, hfi->hfi_stack);
 	}
+
+	return (0);
+}
+
+/*
+ * Function:	hook_event_shutdown
+ * Returns:	int - 0 = Succ, Else = Fail
+ * Parameters:	hfi(I) - internal family pointer
+ *		he(I)  - event pointer
+ *
+ * As with hook_family_shutdown, we want to generate the notify callbacks
+ * as if the event was being removed but not actually do the remove.
+ */
+int
+hook_event_shutdown(hook_family_int_t *hfi, hook_event_t *he)
+{
+	hook_event_int_t *hei;
+	boolean_t notifydone;
+
+	ASSERT(hfi != NULL);
+	ASSERT(he != NULL);
+
+	CVW_ENTER_WRITE(&hfi->hfi_lock);
+
+	/*
+	 * Set the flag so that we can call hook_event_notify_run without
+	 * holding any locks but at the same time prevent other changes to
+	 * the event at the same time.
+	 */
+	if (hook_wait_setflag(&hfi->hfi_waiter, FWF_WAIT_MASK,
+	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
+		CVW_EXIT_WRITE(&hfi->hfi_lock);
+		return (ENXIO);
+	}
+
+	hei = hook_event_find(hfi, he->he_name);
+	if (hei == NULL) {
+		hook_wait_unsetflag(&hfi->hfi_waiter, FWF_DEL_ACTIVE);
+		CVW_EXIT_WRITE(&hfi->hfi_lock);
+		return (ESRCH);
+	}
+
+	CVW_ENTER_WRITE(&hei->hei_lock);
+	notifydone = hei->hei_shutdown;
+	hei->hei_shutdown = B_TRUE;
+	CVW_EXIT_WRITE(&hei->hei_lock);
+
+	CVW_EXIT_WRITE(&hfi->hfi_lock);
+
+	if (!notifydone)
+		hook_notify_run(&hfi->hfi_nhead,
+		    hfi->hfi_family.hf_name, NULL, he->he_name, HN_UNREGISTER);
+
+	hook_wait_unsetflag(&hfi->hfi_waiter, FWF_DEL_ACTIVE);
 
 	return (0);
 }
@@ -1324,7 +1441,7 @@ hook_event_notify_register(hook_family_int_t *hfi, char *event,
 
 	CVW_ENTER_READ(&hfi->hfi_lock);
 
-	if (hfi->hfi_condemned) {
+	if (hfi->hfi_condemned || hfi->hfi_shutdown) {
 		CVW_EXIT_READ(&hfi->hfi_lock);
 		CVW_EXIT_READ(&hks->hks_lock);
 		return (ESHUTDOWN);
@@ -1342,7 +1459,7 @@ hook_event_notify_register(hook_family_int_t *hfi, char *event,
 	 * synchronise access to hei_condemned.
 	 */
 	CVW_ENTER_WRITE(&hei->hei_lock);
-	if (hei->hei_condemned) {
+	if (hei->hei_condemned || hei->hei_shutdown) {
 		CVW_EXIT_WRITE(&hei->hei_lock);
 		CVW_EXIT_READ(&hfi->hfi_lock);
 		CVW_EXIT_READ(&hks->hks_lock);
@@ -1482,6 +1599,15 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 	}
 
 	CVW_ENTER_WRITE(&hei->hei_lock);
+
+	/*
+	 * If we've run either the remove() or shutdown(), do not allow any
+	 * more hooks to be added to this event.
+	 */
+	if (hei->hei_shutdown) {
+		error = ESHUTDOWN;
+		goto bad_add;
+	}
 
 	hi = hook_find(hei, h);
 	if (hi != NULL) {

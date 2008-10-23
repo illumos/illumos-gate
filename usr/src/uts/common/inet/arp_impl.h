@@ -237,6 +237,7 @@ typedef struct ar_s {
 extern void	arp_hook_init(arp_stack_t *);
 extern void	arp_hook_destroy(arp_stack_t *);
 extern void	arp_net_init(arp_stack_t *, netstackid_t);
+extern void	arp_net_shutdown(arp_stack_t *);
 extern void	arp_net_destroy(arp_stack_t *);
 
 #endif	/* _KERNEL */

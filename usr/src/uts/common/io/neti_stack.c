@@ -38,7 +38,7 @@
 #include <sys/sdt.h>
 
 
-typedef boolean_t napplyfn_t(kmutex_t *, neti_stack_t *, void *);
+typedef boolean_t napplyfn_t(neti_stack_t *, void *);
 
 static void *neti_stack_init(netstackid_t stackid, netstack_t *ns);
 static void neti_stack_fini(netstackid_t stackid, void *arg);
@@ -47,12 +47,12 @@ static net_instance_int_t *net_instance_int_create(net_instance_t *nin,
 static void neti_stack_shutdown(netstackid_t stackid, void *arg);
 static void net_instance_int_free(net_instance_int_t *nini);
 
-static boolean_t neti_stack_apply_create(kmutex_t *, neti_stack_t *, void *);
-static boolean_t neti_stack_apply_destroy(kmutex_t *, neti_stack_t *, void *);
-static boolean_t neti_stack_apply_shutdown(kmutex_t *, neti_stack_t *, void *);
+static boolean_t neti_stack_apply_create(neti_stack_t *, void *);
+static boolean_t neti_stack_apply_destroy(neti_stack_t *, void *);
+static boolean_t neti_stack_apply_shutdown(neti_stack_t *, void *);
 static void neti_apply_all_instances(neti_stack_t *, napplyfn_t *);
 static void neti_apply_all_stacks(void *, napplyfn_t *);
-static boolean_t wait_for_nini_inprogress(neti_stack_t *, kmutex_t *,
+static boolean_t wait_for_nini_inprogress(neti_stack_t *,
     net_instance_int_t *, uint32_t);
 
 static nini_head_t neti_instance_list;
@@ -129,7 +129,6 @@ neti_stack_init(netstackid_t stackid, netstack_t *ns)
 
 	mutex_enter(&nts->nts_lock);
 	nts->nts_flags &= ~NSF_ZONE_CREATE;
-	cv_signal(&nts->nts_cv);
 	mutex_exit(&nts->nts_lock);
 
 	mutex_exit(&neti_stack_lock);
@@ -191,6 +190,7 @@ neti_stack_shutdown(netstackid_t stackid, void *arg)
 	mutex_enter(&nts->nts_lock);
 
 	nts->nts_netstack = NULL;
+	nts->nts_flags &= ~NSF_ZONE_SHUTDOWN;
 	mutex_exit(&nts->nts_lock);
 
 	mutex_exit(&neti_stack_lock);
@@ -204,7 +204,7 @@ neti_stack_shutdown(netstackid_t stackid, void *arg)
  * with assurance that nobody else will be doing any work (_create, _shutdown)
  * on it, so there is no need to set and use flags to guard against
  * simultaneous execution (ie. no need to set NSF_CLOSING.)
- *  What is required, however, is to make sure that we don't corrupt the
+ * What is required, however, is to make sure that we don't corrupt the
  * list of neti_stack_t's for other code that walks it.
  */
 /*ARGSUSED*/
@@ -216,10 +216,10 @@ neti_stack_fini(netstackid_t stackid, void *arg)
 	struct net_data *nd;
 
 	mutex_enter(&neti_stack_lock);
+	mutex_enter(&nts->nts_lock);
+
 	LIST_REMOVE(nts, nts_next);
 
-	mutex_enter(&nts->nts_lock);
-	nts->nts_flags |= NSF_ZONE_DESTROY;
 	/*
 	 * Walk through all of the protocol stacks and mark them as being
 	 * destroyed.
@@ -230,15 +230,12 @@ neti_stack_fini(netstackid_t stackid, void *arg)
 
 	LIST_FOREACH(n, &nts->nts_instances, nini_next) {
 		ASSERT((n->nini_flags & NSS_SHUTDOWN_ALL) != 0);
-		if (n->nini_instance->nin_shutdown == NULL)
-			continue;
 		if ((n->nini_flags & NSS_DESTROY_ALL) == 0)
 			n->nini_flags |= NSS_DESTROY_NEEDED;
 	}
 	mutex_exit(&nts->nts_lock);
 
 	neti_apply_all_instances(nts, neti_stack_apply_destroy);
-	mutex_exit(&neti_stack_lock);
 
 	while (!LIST_EMPTY(&nts->nts_instances)) {
 		n = LIST_FIRST(&nts->nts_instances);
@@ -246,6 +243,7 @@ neti_stack_fini(netstackid_t stackid, void *arg)
 
 		net_instance_int_free(n);
 	}
+	mutex_exit(&neti_stack_lock);
 
 	ASSERT(LIST_EMPTY(&nts->nts_netd_head));
 
@@ -282,17 +280,45 @@ net_instance_int_create(net_instance_t *nin, net_instance_int_t *parent)
 	return (nini);
 }
 
+/*
+ * Free'ing of a net_instance_int_t is only to be done when we know nobody
+ * else has is using it. For both parents and clones, this is indicated by
+ * nini_ref being greater than 0, however, nini_ref is managed differently
+ * for its two uses. For parents, nini_ref is increased when a new clone is
+ * created and it is decremented here. For clones, nini_ref is adjusted by
+ * code elsewhere (e.g. in neti_stack_apply_*) and is not changed here.
+ */
 static void
 net_instance_int_free(net_instance_int_t *nini)
 {
+	/*
+	 * This mutex guards the use of nini_ref.
+	 */
+	ASSERT(mutex_owned(&neti_stack_lock));
 
-	cv_destroy(&nini->nini_cv);
-
-	if (nini->nini_parent != NULL)
+	/*
+	 * For 'parent' structures, nini_ref will drop to 0 when
+	 * the last clone has been free'd... but for clones, it
+	 * is possible for nini_ref to be non-zero if we get in
+	 * here when all the locks have been given up to execute
+	 * a callback or wait_for_nini_inprogress. In that case,
+	 * we do not want to free the structure and just indicate
+	 * that it is on the "doomed" list, thus we set the
+	 * condemned flag.
+	 */
+	if (nini->nini_parent != NULL) {
+		if (nini->nini_ref > 0)
+			nini->nini_condemned = B_TRUE;
 		nini->nini_parent->nini_ref--;
+		if (nini->nini_parent->nini_ref == 0)
+			net_instance_int_free(nini->nini_parent);
+		nini->nini_parent = NULL;
+	}
 
-	ASSERT(nini->nini_ref == 0);
-	kmem_free(nini, sizeof (*nini));
+	if (nini->nini_ref == 0) {
+		cv_destroy(&nini->nini_cv);
+		kmem_free(nini, sizeof (*nini));
+	}
 }
 
 net_instance_t *
@@ -357,6 +383,7 @@ net_instance_register(net_instance_t *nin)
 			mutex_exit(&nts->nts_lock);
 			continue;
 		}
+
 		/*
 		 * This function returns with the NSS_CREATE_NEEDED flag
 		 * set in "dup", so it is adequately prepared for the
@@ -431,6 +458,7 @@ net_instance_unregister(net_instance_t *nin)
 				tmp->nini_flags |= NSS_SHUTDOWN_NEEDED;
 			if ((tmp->nini_flags & NSS_DESTROY_ALL) == 0)
 				tmp->nini_flags |= NSS_DESTROY_NEEDED;
+			break;
 		}
 		mutex_exit(&nts->nts_lock);
 	}
@@ -468,9 +496,8 @@ net_instance_unregister(net_instance_t *nin)
 		}
 		mutex_exit(&nts->nts_lock);
 	}
-	mutex_exit(&neti_stack_lock);
 
-	net_instance_int_free(parent);
+	mutex_exit(&neti_stack_lock);
 
 	return (DDI_SUCCESS);
 }
@@ -484,7 +511,7 @@ neti_apply_all_instances(neti_stack_t *nts, napplyfn_t *applyfn)
 
 	n = LIST_FIRST(&nts->nts_instances);
 	while (n != NULL) {
-		if ((applyfn)(&neti_stack_lock, nts, n->nini_parent)) {
+		if ((applyfn)(nts, n->nini_parent)) {
 			/* Lock dropped - restart at head */
 			n = LIST_FIRST(&nts->nts_instances);
 		} else {
@@ -509,7 +536,7 @@ neti_apply_all_stacks(void *parent, napplyfn_t *applyfn)
 		 * the waiting to be done in wait_for_nini_progress with
 		 * the passing in of cmask.
 		 */
-		if ((applyfn)(&neti_stack_lock, nts, parent)) {
+		if ((applyfn)(nts, parent)) {
 			/* Lock dropped - restart at head */
 			nts = LIST_FIRST(&neti_stack_list);
 		} else {
@@ -519,7 +546,7 @@ neti_apply_all_stacks(void *parent, napplyfn_t *applyfn)
 }
 
 static boolean_t
-neti_stack_apply_create(kmutex_t *lockp, neti_stack_t *nts, void *parent)
+neti_stack_apply_create(neti_stack_t *nts, void *parent)
 {
 	void *result;
 	boolean_t dropped = B_FALSE;
@@ -527,8 +554,7 @@ neti_stack_apply_create(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 	net_instance_t *nin;
 
 	ASSERT(parent != NULL);
-	ASSERT(lockp != NULL);
-	ASSERT(mutex_owned(lockp));
+	ASSERT(mutex_owned(&neti_stack_lock));
 
 	mutex_enter(&nts->nts_lock);
 
@@ -541,17 +567,19 @@ neti_stack_apply_create(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		return (dropped);
 	}
 
-	if (wait_for_nini_inprogress(nts, lockp, tmp, 0))
+	tmp->nini_ref++;
+
+	if (wait_for_nini_inprogress(nts, tmp, 0))
 		dropped = B_TRUE;
 
-	if (tmp->nini_flags & NSS_CREATE_NEEDED) {
+	if ((tmp->nini_flags & NSS_CREATE_NEEDED) && !tmp->nini_condemned) {
 		nin = tmp->nini_instance;
 		tmp->nini_flags &= ~NSS_CREATE_NEEDED;
 		tmp->nini_flags |= NSS_CREATE_INPROGRESS;
 		DTRACE_PROBE2(neti__stack__create__inprogress,
 		    neti_stack_t *, nts, net_instance_int_t *, tmp);
 		mutex_exit(&nts->nts_lock);
-		mutex_exit(lockp);
+		mutex_exit(&neti_stack_lock);
 		dropped = B_TRUE;
 
 		ASSERT(tmp->nini_created == NULL);
@@ -564,7 +592,7 @@ neti_stack_apply_create(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		    void *, result, neti_stack_t *, nts);
 
 		ASSERT(result != NULL);
-		mutex_enter(lockp);
+		mutex_enter(&neti_stack_lock);
 		mutex_enter(&nts->nts_lock);
 		tmp->nini_created = result;
 		tmp->nini_flags &= ~NSS_CREATE_INPROGRESS;
@@ -573,21 +601,26 @@ neti_stack_apply_create(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		DTRACE_PROBE2(neti__stack__create__completed,
 		    neti_stack_t *, nts, net_instance_int_t *, tmp);
 	}
+	tmp->nini_ref--;
+
+	if (tmp->nini_condemned) {
+		net_instance_int_free(tmp);
+		dropped = B_TRUE;
+	}
 	mutex_exit(&nts->nts_lock);
 	return (dropped);
 }
 
 
 static boolean_t
-neti_stack_apply_shutdown(kmutex_t *lockp, neti_stack_t *nts, void *parent)
+neti_stack_apply_shutdown(neti_stack_t *nts, void *parent)
 {
 	boolean_t dropped = B_FALSE;
 	net_instance_int_t *tmp;
 	net_instance_t *nin;
 
 	ASSERT(parent != NULL);
-	ASSERT(lockp != NULL);
-	ASSERT(mutex_owned(lockp));
+	ASSERT(mutex_owned(&neti_stack_lock));
 
 	mutex_enter(&nts->nts_lock);
 
@@ -599,8 +632,11 @@ neti_stack_apply_shutdown(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		mutex_exit(&nts->nts_lock);
 		return (dropped);
 	}
+	ASSERT((tmp->nini_flags & NSS_SHUTDOWN_ALL) != 0);
 
-	if (wait_for_nini_inprogress(nts, lockp, tmp, NSS_CREATE_NEEDED))
+	tmp->nini_ref++;
+
+	if (wait_for_nini_inprogress(nts, tmp, NSS_CREATE_NEEDED))
 		dropped = B_TRUE;
 
 	nin = tmp->nini_instance;
@@ -612,19 +648,25 @@ neti_stack_apply_shutdown(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 			tmp->nini_flags &= ~NSS_SHUTDOWN_NEEDED;
 			tmp->nini_flags |= NSS_SHUTDOWN_COMPLETED;
 		}
+		tmp->nini_ref--;
+
+		if (tmp->nini_condemned) {
+			net_instance_int_free(tmp);
+			dropped = B_TRUE;
+		}
 
 		mutex_exit(&nts->nts_lock);
 		return (dropped);
 	}
 
-	if (tmp->nini_flags & NSS_SHUTDOWN_NEEDED) {
+	if ((tmp->nini_flags & NSS_SHUTDOWN_NEEDED) && !tmp->nini_condemned) {
 		ASSERT((tmp->nini_flags & NSS_CREATE_COMPLETED) != 0);
 		tmp->nini_flags &= ~NSS_SHUTDOWN_NEEDED;
 		tmp->nini_flags |= NSS_SHUTDOWN_INPROGRESS;
 		DTRACE_PROBE2(neti__stack__shutdown__inprogress,
 		    neti_stack_t *, nts, net_instance_int_t *, tmp);
 		mutex_exit(&nts->nts_lock);
-		mutex_exit(lockp);
+		mutex_exit(&neti_stack_lock);
 		dropped = B_TRUE;
 
 		ASSERT(nin->nin_shutdown != NULL);
@@ -635,7 +677,7 @@ neti_stack_apply_shutdown(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		DTRACE_PROBE1(neti__stack__shutdown__end,
 		    neti_stack_t *, nts);
 
-		mutex_enter(lockp);
+		mutex_enter(&neti_stack_lock);
 		mutex_enter(&nts->nts_lock);
 		tmp->nini_flags &= ~NSS_SHUTDOWN_INPROGRESS;
 		tmp->nini_flags |= NSS_SHUTDOWN_COMPLETED;
@@ -644,20 +686,25 @@ neti_stack_apply_shutdown(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		    neti_stack_t *, nts, net_instance_int_t *, tmp);
 	}
 	ASSERT((tmp->nini_flags & NSS_SHUTDOWN_COMPLETED) != 0);
+	tmp->nini_ref--;
+
+	if (tmp->nini_condemned) {
+		net_instance_int_free(tmp);
+		dropped = B_TRUE;
+	}
 	mutex_exit(&nts->nts_lock);
 	return (dropped);
 }
 
 static boolean_t
-neti_stack_apply_destroy(kmutex_t *lockp, neti_stack_t *nts, void *parent)
+neti_stack_apply_destroy(neti_stack_t *nts, void *parent)
 {
 	boolean_t dropped = B_FALSE;
 	net_instance_int_t *tmp;
 	net_instance_t *nin;
 
 	ASSERT(parent != NULL);
-	ASSERT(lockp != NULL);
-	ASSERT(mutex_owned(lockp));
+	ASSERT(mutex_owned(&neti_stack_lock));
 
 	mutex_enter(&nts->nts_lock);
 
@@ -670,15 +717,17 @@ neti_stack_apply_destroy(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		return (dropped);
 	}
 
+	tmp->nini_ref++;
+
 	/*
 	 * We pause here so that when we continue we know that we're the
 	 * only one doing anything active with this node.
 	 */
-	if (wait_for_nini_inprogress(nts, lockp, tmp,
+	if (wait_for_nini_inprogress(nts, tmp,
 	    NSS_CREATE_NEEDED|NSS_SHUTDOWN_NEEDED))
 		dropped = B_TRUE;
 
-	if (tmp->nini_flags & NSS_DESTROY_NEEDED) {
+	if ((tmp->nini_flags & NSS_DESTROY_NEEDED) && !tmp->nini_condemned) {
 		ASSERT((tmp->nini_flags & NSS_SHUTDOWN_COMPLETED) != 0);
 		nin = tmp->nini_instance;
 		tmp->nini_flags &= ~NSS_DESTROY_NEEDED;
@@ -686,7 +735,7 @@ neti_stack_apply_destroy(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		DTRACE_PROBE2(neti__stack__destroy__inprogress,
 		    neti_stack_t *, nts, net_instance_int_t *, tmp);
 		mutex_exit(&nts->nts_lock);
-		mutex_exit(lockp);
+		mutex_exit(&neti_stack_lock);
 		dropped = B_TRUE;
 
 		ASSERT(nin->nin_destroy != NULL);
@@ -697,7 +746,7 @@ neti_stack_apply_destroy(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		DTRACE_PROBE1(neti__stack__destroy__end,
 		    neti_stack_t *, nts);
 
-		mutex_enter(lockp);
+		mutex_enter(&neti_stack_lock);
 		mutex_enter(&nts->nts_lock);
 		tmp->nini_flags &= ~NSS_DESTROY_INPROGRESS;
 		tmp->nini_flags |= NSS_DESTROY_COMPLETED;
@@ -705,32 +754,41 @@ neti_stack_apply_destroy(kmutex_t *lockp, neti_stack_t *nts, void *parent)
 		DTRACE_PROBE2(neti__stack__destroy__completed,
 		    neti_stack_t *, nts, net_instance_int_t *, tmp);
 	}
+	tmp->nini_ref--;
+
+	if (tmp->nini_condemned) {
+		net_instance_int_free(tmp);
+		dropped = B_TRUE;
+	}
 	mutex_exit(&nts->nts_lock);
 	return (dropped);
 }
 
 static boolean_t
-wait_for_nini_inprogress(neti_stack_t *nts, kmutex_t *lockp,
-    net_instance_int_t *nini, uint32_t cmask)
+wait_for_nini_inprogress(neti_stack_t *nts, net_instance_int_t *nini,
+    uint32_t cmask)
 {
 	boolean_t dropped = B_FALSE;
 
-	ASSERT(lockp != NULL);
-	ASSERT(mutex_owned(lockp));
+	ASSERT(mutex_owned(&neti_stack_lock));
 
 	while (nini->nini_flags & (NSS_ALL_INPROGRESS|cmask)) {
-		DTRACE_PROBE2(netstack__wait__nms__inprogress,
+		DTRACE_PROBE2(neti__wait__nini__inprogress,
 		    neti_stack_t *, nts, net_instance_int_t *, nini);
 		dropped = B_TRUE;
-		mutex_exit(lockp);
+		mutex_exit(&neti_stack_lock);
 
 		cv_wait(&nini->nini_cv, &nts->nts_lock);
 
 		/* First drop netstack_lock to preserve order */
 		mutex_exit(&nts->nts_lock);
-		mutex_enter(lockp);
+		DTRACE_PROBE2(wait__nini__inprogress__pause,
+		    neti_stack_t *, nts, net_instance_int_t *, nini);
+		mutex_enter(&neti_stack_lock);
 		mutex_enter(&nts->nts_lock);
 	}
+	DTRACE_PROBE2(neti__wait__nini__inprogress__complete,
+	    neti_stack_t *, nts, net_instance_int_t *, nini);
 	return (dropped);
 }
 

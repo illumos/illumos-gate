@@ -5496,10 +5496,6 @@ ip_modclose(ill_t *ill)
 	if (ill->ill_credp != NULL)
 		crfree(ill->ill_credp);
 
-	mutex_enter(&ill->ill_lock);
-	ill_nic_info_dispatch(ill);
-	mutex_exit(&ill->ill_lock);
-
 	/*
 	 * Now we are done with the module close pieces that
 	 * need the netstack_t.
@@ -5736,16 +5732,11 @@ ip_stack_shutdown(netstackid_t stackid, void *arg)
 	ip_loopback_cleanup(ipst);
 
 	/*
-	 * The destroy functions here will end up causing notify callbacks
-	 * in the hook framework and these need to be run before the shtudown
-	 * of the hook framework is begun - that happens from netstack after
-	 * IP shutdown has completed.  If we leave doing these actions until
-	 * ip_stack_fini then the notify callbacks for the net_*_unregister
-	 * are happening against a backdrop of shattered terain.
+	 * The *_hook_shutdown()s start the process of notifying any
+	 * consumers that things are going away.... nothing is destroyed.
 	 */
-	ipv4_hook_destroy(ipst);
-	ipv6_hook_destroy(ipst);
-	ip_net_destroy(ipst);
+	ipv4_hook_shutdown(ipst);
+	ipv6_hook_shutdown(ipst);
 }
 
 /*
@@ -5756,6 +5747,15 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 {
 	ip_stack_t *ipst = (ip_stack_t *)arg;
 	int ret;
+
+	/*
+	 * At this point, all of the notifications that the events and
+	 * protocols are going away have been run, meaning that we can
+	 * now set about starting to clean things up.
+	 */
+	ipv4_hook_destroy(ipst);
+	ipv6_hook_destroy(ipst);
+	ip_net_destroy(ipst);
 
 #ifdef NS_DEBUG
 	printf("ip_stack_fini(%p, stack %d)\n", (void *)ipst, stackid);

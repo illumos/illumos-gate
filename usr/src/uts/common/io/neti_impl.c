@@ -422,6 +422,23 @@ net_family_unregister(net_handle_t info, hook_family_t *hf)
 	return (ret);
 }
 
+int
+net_family_shutdown(net_handle_t info, hook_family_t *hf)
+{
+
+	ASSERT(info != NULL);
+	ASSERT(hf != NULL);
+
+	if (info->netd_hooks == NULL)
+		return (ENXIO);
+
+	if (strcmp(info->netd_hooks->hfi_family.hf_name,
+	    hf->hf_name) != 0)
+		return (EINVAL);
+
+	return (hook_family_shutdown(info->netd_hooks));
+}
+
 /*
  * Function:	net_event_register
  * Returns:	internal event pointer - NULL = Fail
@@ -467,6 +484,19 @@ net_event_unregister(net_handle_t info, hook_event_t *he)
 		return (ENXIO);
 
 	return (hook_event_remove(info->netd_hooks, he));
+}
+
+int
+net_event_shutdown(net_handle_t info, hook_event_t *he)
+{
+
+	ASSERT(info != NULL);
+	ASSERT(he != NULL);
+
+	if (info->netd_hooks == NULL)
+		return (ENXIO);
+
+	return (hook_event_shutdown(info->netd_hooks, he));
 }
 
 /*

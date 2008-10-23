@@ -85,13 +85,35 @@ arp_net_init(arp_stack_t *as, netstackid_t stackid)
 	ASSERT(as->as_net_data != NULL);
 }
 
+void
+arp_net_shutdown(arp_stack_t *as)
+{
+	if (as->as_arpnicevents != NULL) {
+		(void) net_event_shutdown(as->as_net_data,
+		    &as->as_arp_nic_events);
+	}
+
+	if (as->as_arp_physical_out != NULL) {
+		(void) net_event_shutdown(as->as_net_data,
+		    &as->as_arp_physical_out_event);
+	}
+
+	if (as->as_arp_physical_in != NULL) {
+		(void) net_event_shutdown(as->as_net_data,
+		    &as->as_arp_physical_in_event);
+	}
+
+	(void) net_family_shutdown(as->as_net_data, &as->as_arproot);
+}
+
 /*
  * Unregister ARP netinfo functions.
  */
 void
 arp_net_destroy(arp_stack_t *as)
 {
-	(void) net_protocol_unregister(as->as_net_data);
+	if (net_protocol_unregister(as->as_net_data) == 0)
+		as->as_net_data = NULL;
 }
 
 /*

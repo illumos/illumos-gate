@@ -68,6 +68,7 @@ static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
 static	void	*ipf_stack_create __P((const netid_t));
 static	void	ipf_stack_destroy __P((const netid_t, void *));
+static	void	ipf_stack_shutdown __P((const netid_t, void *));
 static	int	ipf_property_g_update __P((dev_info_t *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
@@ -498,6 +499,19 @@ static int ipf_detach_check_all()
  */
 /* ARGSUSED */
 static void
+ipf_stack_shutdown(const netid_t id, void *arg)
+{
+	ipf_stack_t *ifs = (ipf_stack_t *)arg;
+
+	ipf_kstat_fini(ifs);
+}
+
+
+/*
+ * Destroy things for ipf for one stack.
+ */
+/* ARGSUSED */
+static void
 ipf_stack_destroy(const netid_t id, void *arg)
 {
 	ipf_stack_t *ifs = (ipf_stack_t *)arg;
@@ -526,8 +540,6 @@ ipf_stack_destroy(const netid_t id, void *arg)
 		ifs->ifs_next->ifs_pnext = ifs->ifs_pnext;
 	*ifs->ifs_pnext = ifs->ifs_next;
 	mutex_exit(&ipf_stack_lock);
-
-	ipf_kstat_fini(ifs);
 
 	if (tid != NULL)
 		(void) untimeout(tid);
@@ -592,7 +604,7 @@ ddi_attach_cmd_t cmd;
 		ipfncb->nin_name = "ipf";
 		ipfncb->nin_create = ipf_stack_create;
 		ipfncb->nin_destroy = ipf_stack_destroy;
-		ipfncb->nin_shutdown = NULL;
+		ipfncb->nin_shutdown = ipf_stack_shutdown;
 		i = net_instance_register(ipfncb);
 
 #ifdef IPFDEBUG

@@ -222,7 +222,7 @@ ip_net_init(ip_stack_t *ipst, netstack_t *ns)
 
 
 /*
- * Unregister IPv4 and IPv6 functions and inject queues
+ * Unregister IPv4 and IPv6 functions.
  */
 void
 ip_net_destroy(ip_stack_t *ipst)
@@ -299,6 +299,43 @@ ipv4_hook_init(ip_stack_t *ipst)
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_event_register failed for ipv4/nic_events");
 	}
+}
+
+void
+ipv4_hook_shutdown(ip_stack_t *ipst)
+{
+	if (ipst->ips_ipv4firewall_forwarding != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_forwarding_event);
+	}
+
+	if (ipst->ips_ipv4firewall_physical_in != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_physical_in_event);
+	}
+
+	if (ipst->ips_ipv4firewall_physical_out != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_physical_out_event);
+	}
+
+	if (ipst->ips_ipv4firewall_loopback_in != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_loopback_in_event);
+	}
+
+	if (ipst->ips_ipv4firewall_loopback_out != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_loopback_out_event);
+	}
+
+	if (ipst->ips_ipv4nicevents != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_nic_events);
+	}
+
+	(void) net_family_shutdown(ipst->ips_ipv4_net_data,
+	    &ipst->ips_ipv4root);
 }
 
 void
@@ -406,6 +443,43 @@ ipv6_hook_init(ip_stack_t *ipst)
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_event_register failed for ipv6/nic_events");
 	}
+}
+
+void
+ipv6_hook_shutdown(ip_stack_t *ipst)
+{
+	if (ipst->ips_ipv6firewall_forwarding != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_forwarding_event);
+	}
+
+	if (ipst->ips_ipv6firewall_physical_in != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_physical_in_event);
+	}
+
+	if (ipst->ips_ipv6firewall_physical_out != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_physical_out_event);
+	}
+
+	if (ipst->ips_ipv6firewall_loopback_in != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_loopback_in_event);
+	}
+
+	if (ipst->ips_ipv6firewall_loopback_out != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_loopback_out_event);
+	}
+
+	if (ipst->ips_ipv6nicevents != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_nic_events);
+	}
+
+	(void) net_family_shutdown(ipst->ips_ipv6_net_data,
+	    &ipst->ips_ipv6root);
 }
 
 void
@@ -1252,6 +1326,7 @@ ip_getlifaddr_impl(sa_family_t family, phy_if_t phy_ifdata,
 				ipif_refrele(ipif);
 				return (1);
 			}
+			sin->sin_family = AF_INET;
 		}
 	} else {
 		if ((ipif = ipif_getby_indexes((uint_t)phy_ifdata,
@@ -1267,6 +1342,7 @@ ip_getlifaddr_impl(sa_family_t family, phy_if_t phy_ifdata,
 				ipif_refrele(ipif);
 				return (1);
 			}
+			sin6->sin6_family = AF_INET6;
 		}
 	}
 	ipif_refrele(ipif);

@@ -154,6 +154,7 @@ typedef struct hook_event_int {
 	hook_notify_head_t		hei_nhead;
 	flagwait_t			hei_waiter;
 	boolean_t			hei_condemned;
+	boolean_t			hei_shutdown;
 } hook_event_int_t;
 
 /*
@@ -175,6 +176,7 @@ typedef struct hook_family_int {
 	hook_notify_head_t		hfi_nhead;
 	flagwait_t			hfi_waiter;
 	boolean_t			hfi_condemned;
+	boolean_t			hfi_shutdown;
 } hook_family_int_t;
 
 /*
@@ -217,12 +219,14 @@ extern int hook_event_notify_register(hook_family_int_t *, char *,
 extern int hook_event_notify_unregister(hook_family_int_t *, char *,
     hook_notify_fn_t);
 extern int hook_event_remove(hook_family_int_t *, hook_event_t *);
+extern int hook_event_shutdown(hook_family_int_t *, hook_event_t *);
 
 extern hook_family_int_t *hook_family_add(hook_family_t *, hook_stack_t *);
 extern int hook_family_notify_register(hook_family_int_t *, hook_notify_fn_t,
     void *);
 extern int hook_family_notify_unregister(hook_family_int_t *, hook_notify_fn_t);
 extern int hook_family_remove(hook_family_int_t *);
+extern int hook_family_shutdown(hook_family_int_t *);
 
 extern int hook_stack_notify_register(netstackid_t, hook_notify_fn_t, void *);
 extern int hook_stack_notify_unregister(netstackid_t, hook_notify_fn_t);

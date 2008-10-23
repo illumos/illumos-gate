@@ -4526,8 +4526,7 @@ arp_stack_shutdown(netstackid_t stackid, void *arg)
 {
 	arp_stack_t *as = (arp_stack_t *)arg;
 
-	arp_hook_destroy(as);
-	arp_net_destroy(as);
+	arp_net_shutdown(as);
 }
 
 /*
@@ -4539,6 +4538,8 @@ arp_stack_fini(netstackid_t stackid, void *arg)
 {
 	arp_stack_t *as = (arp_stack_t *)arg;
 
+	arp_hook_destroy(as);
+	arp_net_destroy(as);
 	rw_destroy(&as->as_arl_lock);
 	nd_free(&as->as_nd);
 	kmem_free(as->as_param_arr, sizeof (arp_param_arr));
