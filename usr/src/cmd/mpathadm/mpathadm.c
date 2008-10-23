@@ -1098,6 +1098,7 @@ compareLUName(MP_CHAR *cmpString, MP_CHAR *deviceProperty)
 		 * the end anyway
 		 */
 
+		fd1 = fd2 = -1;
 		if (((fd1 = open(cmpString, O_RDONLY|O_NDELAY)) >= 0) &&
 		    ((fd2 = open(deviceProperty, O_RDONLY|O_NDELAY)) >= 0) &&
 		    (devid_get(fd1, &devid1) == 0) &&
@@ -1114,6 +1115,13 @@ compareLUName(MP_CHAR *cmpString, MP_CHAR *deviceProperty)
 		}
 		if (NULL != devid2) {
 			devid_free(devid2);
+		}
+
+		if (fd1 >= 0) {
+			(void) close(fd1);
+		}
+		if (fd2 >= 0) {
+			(void) close(fd2);
 		}
 	} /* compare */
 
@@ -1836,7 +1844,7 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 				 * the end anyway
 				 */
 
-
+				fd1 = fd2 = -1;
 				if (((fd1 = open(luFileName,
 					O_RDONLY|O_NDELAY)) >= 0) &&
 				    ((fd2 = open(luProps.deviceFileName,
@@ -1855,6 +1863,13 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 				}
 				if (NULL != devid2) {
 					devid_free(devid2);
+				}
+
+				if (fd1 >= 0) {
+					(void) close(fd1);
+				}
+				if (fd2 >= 0) {
+					(void) close(fd2);
 				}
 			}
 			if (B_TRUE == foundIt) {

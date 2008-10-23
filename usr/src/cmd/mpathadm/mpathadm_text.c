@@ -333,7 +333,7 @@ MP_CHAR * getTextString(int stringVal) {
 			    "information"));
 		case ERR_LU_ACCESS_STATE_UNCHANGED:
 			return (gettext("ERROR: LU access state unchanged.  "
-			    "No active TPG found."));
+			    "No standby TPG found."));
 
 		/* strings to display info */
 		case TEXT_PATH_STATE_OKAY:
