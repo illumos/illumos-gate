@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+NOTE:  This service manifest is not editable; its contents will
+be overwritten by package or patch operations, including
+operating system upgrade.  Make customizations in a different
+file.
+
+BSD 3 Clause License
+
+Copyright (c) 2007, The Storage Networking Industry Association.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+	- Redistributions of source code must retain the above copyright
+	  notice, this list of conditions and the following disclaimer.
+
+	- Redistributions in binary form must reproduce the above copyright
+	  notice, this list of conditions and the following disclaimer in
+	  the documentation and/or other materials provided with the
+	  distribution.
+
+	- Neither the name of The Storage Networking Industry Association (SNIA)
+	  nor the names of its contributors may be used to endorse or promote
+	  products derived from this software without specific prior written
+	  permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+	
+-->
+
+<service_bundle type='manifest' name='SUNWndmpr:ndmpd'>
+
+<!-- Name the service to 'system/ndmpd'  -->
+<service
+	name='system/ndmpd'
+	type='service'
+	version='1'>
+
+
+	<!-- Create default service instance.  -->
+	<create_default_instance enabled='false' />
+
+	<!-- Service has single instance  -->
+	<single_instance/>
+
+	<!-- Identify dependencies.  -->
+	<dependency
+		name='milestone'
+		grouping='require_all'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/milestone/sysconfig' />
+	</dependency>
+
+	<!-- Identify start/stop/refresh methods -->
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-ndmp'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential
+				user='root' group='sys'
+			/>
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<property_group name='general' type='framework'>
+		<!-- To Start/Stop/Refresh the service -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.ndmp' />
+		<!-- To Configure service parameters -->
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.ndmp' />
+	</property_group>
+
+	<property_group name='read' type='application'>
+		<!-- To read protected parameters -->
+		<propval name='read_authorization' type='astring'
+			value='solaris.smf.read.ndmp' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.ndmp' />
+		<propval name='cram-md5-username' type='astring' value='' />
+		<propval name='cram-md5-password' type='astring' value='' />
+		<propval name='cleartext-username' type='astring' value='' />
+		<propval name='cleartext-password' type='astring' value='' />
+	</property_group>
+
+	<property_group name='ndmpd' type='application'>
+		<stability value='Evolving' />
+		<propval name='debug-path' type='astring' value='/var/ndmp' />
+		<propval name='plugin-path' type='astring' value='/var/ndmp' />
+		<propval name='dump-pathnode' type='boolean' value='false' />
+		<propval name='tar-pathnode' type='boolean' value='false' />
+		<propval name='ignore-ctime' type='boolean' value='false' />
+		<propval name='token-maxseq' type='integer' value='9' />
+		<propval name='version' type='integer' value='4' />
+		<propval name='dar-support' type='boolean' value='false' />
+		<propval name='backup-quarantine' type='boolean' value='false' />
+		<propval name='restore-quarantine' type='boolean' value='false' />
+		<propval name='overwrite-quarantine' type='boolean' value='false' />
+		<propval name='mover-nic' type='astring' value='' />
+		<propval name='fh-inode' type='boolean' value='false' />
+		<propval name='include-lmtime' type='boolean' value='false' />
+		<propval name='restore-fullpath' type='boolean' value='false' />
+		<propval name='socket-css' type='integer' value='65' />
+		<propval name='socket-crs' type='integer' value='80' />
+		<propval name='mover-recordsize' type='integer' value='60' />
+		<propval name='restore-wildcard-enable' type='boolean' value='false' />
+		<propval name='tcp-port' type='integer' value='10000' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.ndmp' />
+	</property_group>
+
+	<!-- Create Service Template information -->
+	<template>
+		<common_name>
+			<loctext xml:lang='C'> NDMP Service</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='ndmpd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+
+</service>
+
+</service_bundle>

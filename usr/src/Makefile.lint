@@ -201,6 +201,9 @@ COMMON_SUBDIRS = \
 	cmd/msgid \
 	cmd/mt \
 	cmd/mv \
+	cmd/ndmpadm \
+	cmd/ndmpd \
+	cmd/ndmpstat \
 	cmd/newform \
 	cmd/newgrp \
 	cmd/newtask \
@@ -372,6 +375,7 @@ COMMON_SUBDIRS = \
 	lib/libmd \
 	lib/libmp \
 	lib/libmtmalloc \
+	lib/libndmp \
 	lib/libnsctl \
 	lib/libnsl \
 	lib/libnvpair \
@@ -447,9 +451,6 @@ COMMON_SUBDIRS = \
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
-	$(CLOSED)/cmd/ndmpadm \
-	$(CLOSED)/cmd/ndmpd \
-	$(CLOSED)/cmd/ndmpstat \
 	$(CLOSED)/cmd/pax \
 	$(CLOSED)/cmd/pcitool \
 	$(CLOSED)/cmd/sed_xpg4 \
@@ -457,7 +458,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/tail \
 	$(CLOSED)/cmd/tr_xpg4 \
 	$(CLOSED)/lib/libc_i18n \
-	$(CLOSED)/lib/libndmp \
 	$(CLOSED)/lib/smartcard
 
 i386_SUBDIRS= \

@@ -23,13 +23,11 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 
 LICENSEFILES += $(OSBL)
-$(CLOSED_BUILD)LICENSEFILES += ../../../closed/cmd/ndmpd/LICENSE
+$(CLOSED_BUILD)LICENSEFILES += ../../cmd/ndmpd/LICENSE
 CDDL=
 
 all: $(FILES) depend

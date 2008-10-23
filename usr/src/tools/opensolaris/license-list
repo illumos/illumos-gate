@@ -1,5 +1,4 @@
 usr/closed/cmd/man/src/util/solbookv1/THIRDPARTYLICENSE
-usr/closed/cmd/ndmpd/LICENSE
 usr/closed/lib/smartcard/ocfserv/opencard/core/event/THIRDPARTYLICENSE
 usr/src/cmd/agents/snmp/THIRDPARTYLICENSE
 usr/src/cmd/ast/THIRDPARTYLICENSE
@@ -50,6 +49,7 @@ usr/src/cmd/man/src/util/nsgmls.src/COPYING
 usr/src/cmd/man/src/util/solbookv2/THIRDPARTYLICENSE
 usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE
 usr/src/cmd/mt/THIRDPARTYLICENSE
+usr/src/cmd/ndmpd/LICENSE
 usr/src/cmd/perl/5.8.4/distrib/ext/Cwd/THIRDPARTYLICENSE
 usr/src/cmd/perl/THIRDPARTYLICENSE
 usr/src/cmd/refer/THIRDPARTYLICENSE

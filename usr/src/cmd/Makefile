@@ -268,6 +268,9 @@ COMMON_SUBDIRS=		\
 	mt		\
 	mv		\
 	mvdir		\
+	ndmpadm		\
+	ndmpd		\
+	ndmpstat	\
 	netadm		\
 	netfiles	\
 	newform		\
@@ -464,9 +467,6 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
 	$(CLOSED)/cmd/mtst	\
-	$(CLOSED)/cmd/ndmpadm	\
-	$(CLOSED)/cmd/ndmpd	\
-	$(CLOSED)/cmd/ndmpstat	\
 	$(CLOSED)/cmd/od	\
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\
@@ -631,6 +631,8 @@ MSGSUBDIRS=		\
 	mpathadm	\
 	msgfmt		\
 	mv		\
+	ndmpadm		\
+	ndmpstat	\
 	newgrp		\
 	newtask		\
 	nice		\
@@ -744,8 +746,6 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/llc2	\
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
-	$(CLOSED)/cmd/ndmpadm   \
-	$(CLOSED)/cmd/ndmpstat  \
 	$(CLOSED)/cmd/od	\
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\
