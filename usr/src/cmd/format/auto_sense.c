@@ -1803,10 +1803,11 @@ find_scsi_ctlr_type()
 	mlp = controlp;
 
 	while (mlp != NULL) {
-		if (mlp->ctlr_type->ctype_ctype == DKC_SCSI_CCS) {
+		if (mlp->ctlr_type->ctype_ctype == DKC_SCSI_CCS ||
+		    mlp->ctlr_type->ctype_ctype == DKC_VBD) {
 			return (mlp->ctlr_type);
 		}
-	mlp = mlp->next;
+		mlp = mlp->next;
 	}
 
 	impossible("no SCSI controller type");
@@ -1827,15 +1828,16 @@ find_scsi_ctlr_info(
 {
 	struct ctlr_info	*ctlr;
 
-	if (dkinfo->dki_ctype != DKC_SCSI_CCS) {
+	if (dkinfo->dki_ctype != DKC_SCSI_CCS &&
+	    dkinfo->dki_ctype != DKC_VBD) {
 		return (NULL);
 	}
 
 	for (ctlr = ctlr_list; ctlr != NULL; ctlr = ctlr->ctlr_next) {
 		if (ctlr->ctlr_addr == dkinfo->dki_addr &&
-			ctlr->ctlr_space == dkinfo->dki_space &&
-				ctlr->ctlr_ctype->ctype_ctype ==
-					DKC_SCSI_CCS) {
+		    ctlr->ctlr_space == dkinfo->dki_space &&
+		    (ctlr->ctlr_ctype->ctype_ctype == DKC_SCSI_CCS ||
+		    ctlr->ctlr_ctype->ctype_ctype == DKC_VBD)) {
 			return (ctlr);
 		}
 	}
@@ -2049,7 +2051,8 @@ find_scsi_disk_info(
 	struct dk_cinfo		*dp;
 
 	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
-		assert(dkinfo->dki_ctype == DKC_SCSI_CCS);
+		assert(dkinfo->dki_ctype == DKC_SCSI_CCS ||
+		    dkinfo->dki_ctype == DKC_VBD);
 		dp = &disk->disk_dkinfo;
 		if (dp->dki_ctype == dkinfo->dki_ctype &&
 			dp->dki_cnum == dkinfo->dki_cnum &&
