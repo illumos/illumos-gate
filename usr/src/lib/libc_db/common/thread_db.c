@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -300,6 +298,11 @@ td_read_bootstrap_data(td_thragent_t *ta_p)
 		else if (ps_pdread(ph_p, psaddr,
 		    &psaddr, sizeof (psaddr)) != PS_OK)
 			return (TD_DBERR);
+		if (psaddr == NULL) {
+			/* primary linkmap in the tgt is not initialized */
+			ta_p->bootstrap_addr = NULL;
+			psaddr = uberdata_addr;
+		}
 		ta_p->uberdata_addr = psaddr;
 	} else {
 #if defined(_LP64) && defined(_SYSCALL32)
@@ -312,6 +315,11 @@ td_read_bootstrap_data(td_thragent_t *ta_p)
 		else if (ps_pdread(ph_p, (psaddr_t)psaddr,
 		    &psaddr, sizeof (psaddr)) != PS_OK)
 			return (TD_DBERR);
+		if (psaddr == NULL) {
+			/* primary linkmap in the tgt is not initialized */
+			ta_p->bootstrap_addr = NULL;
+			psaddr = (caddr32_t)uberdata_addr;
+		}
 		ta_p->uberdata_addr = (psaddr_t)psaddr;
 #else
 		return (TD_DBERR);
