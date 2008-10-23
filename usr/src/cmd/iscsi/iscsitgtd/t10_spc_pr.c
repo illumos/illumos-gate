@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * []------------------------------------------------------------------[]
  * | Implementation of SPC-3 Persistent Reserve emulation		|
@@ -570,7 +568,7 @@ spc_pr_in_readkeys(char *transportID, scsi3_pgr_t *pgr, void *bp,
 	}
 
 	SCSI_WRITE32(buf->PRgeneration, pgr->pgr_generation);
-	SCSI_WRITE32(buf->add_len, i * sizeof (key->k_key));
+	SCSI_WRITE32(buf->add_len, pgr->pgr_numkeys * sizeof (key->k_key));
 
 	return (hsize + min(i, max_buf_keys) * sizeof (key->k_key));
 }
@@ -623,7 +621,8 @@ spc_pr_in_readrsrv(
 	}
 
 	SCSI_WRITE32(buf->PRgeneration, pgr->pgr_generation);
-	SCSI_WRITE32(buf->add_len, i * sizeof (scsi_prin_rsrvdesc_t));
+	SCSI_WRITE32(buf->add_len,
+	    pgr->pgr_numrsrv * sizeof (scsi_prin_rsrvdesc_t));
 
 	return (hsize + min(i, max_buf_rsrv)* sizeof (scsi_prin_rsrvdesc_t));
 }
