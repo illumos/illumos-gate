@@ -1002,6 +1002,8 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 
 	DTRACE_PROBE1(plockstat, mutex__block, mp);
 
+	/* defer signals until the assignment of mp->mutex_owner */
+	sigoff(self);
 	for (;;) {
 		/*
 		 * A return value of EOWNERDEAD or ELOCKUNMAPPED
@@ -1032,6 +1034,8 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 			break;
 		}
 	}
+	sigon(self);
+
 	if (msp)
 		msp->mutex_sleep_time += gethrtime() - begin_sleep;
 	self->ul_wchan = NULL;
@@ -1061,6 +1065,7 @@ mutex_trylock_kernel(mutex_t *mp)
 	int error;
 	int acquired;
 
+	sigoff(self);
 	for (;;) {
 		/*
 		 * A return value of EOWNERDEAD or ELOCKUNMAPPED
@@ -1091,6 +1096,7 @@ mutex_trylock_kernel(mutex_t *mp)
 			break;
 		}
 	}
+	sigon(self);
 
 	if (acquired) {
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
@@ -1259,8 +1265,10 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 
 	ASSERT(!(mp->mutex_type & USYNC_PROCESS));
 
-	if (MUTEX_OWNER(mp) == self)
+	if (MUTEX_OWNED(mp, self))
 		return (EBUSY);
+
+	enter_critical(self);
 
 	/* short-cut, not definitive (see below) */
 	if (mp->mutex_flag & LOCK_NOTRECOVERABLE) {
@@ -1297,11 +1305,8 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 	 * Being fair would reduce the speed of such programs and well-written
 	 * programs will not suffer in any case.
 	 */
-	enter_critical(self);
-	if (spinners_incr(&mp->mutex_lockword, max_spinners) == -1) {
-		exit_critical(self);
+	if (spinners_incr(&mp->mutex_lockword, max_spinners) == -1)
 		goto done;
-	}
 	DTRACE_PROBE1(plockstat, mutex__spin, mp);
 	for (count = 1; ; count++) {
 		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
@@ -1358,7 +1363,6 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 		}
 		count++;
 	}
-	exit_critical(self);
 
 done:
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
@@ -1367,10 +1371,12 @@ done:
 		 * We shouldn't own the mutex.
 		 * Just clear the lock; everyone has already been waked up.
 		 */
-		mp->mutex_owner = 0;
+		*ownerp = 0;
 		(void) clear_lockbyte(&mp->mutex_lockword);
 		error = ENOTRECOVERABLE;
 	}
+
+	exit_critical(self);
 
 	if (error) {
 		if (count) {
@@ -1457,6 +1463,8 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	if (shared_mutex_held(mp))
 		return (EBUSY);
 
+	enter_critical(self);
+
 	/* short-cut, not definitive (see below) */
 	if (mp->mutex_flag & LOCK_NOTRECOVERABLE) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
@@ -1468,14 +1476,12 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	 * Make one attempt to acquire the lock before
 	 * incurring the overhead of the spin loop.
 	 */
-	enter_critical(self);
 #if defined(__sparc) && !defined(_LP64)
 	/* horrible hack, necessary only on 32-bit sparc */
 	if (fix_alignment_problem) {
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_ownerpid = udp->pid;
 			mp->mutex_owner = (uintptr_t)self;
-			exit_critical(self);
 			error = 0;
 			goto done;
 		}
@@ -1484,11 +1490,9 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	if (set_lock_byte64(lockp, udp->pid) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
 		/* mp->mutex_ownerpid was set by set_lock_byte64() */
-		exit_critical(self);
 		error = 0;
 		goto done;
 	}
-	exit_critical(self);
 	if (!tryhard)
 		goto done;
 	if (ncpus == 0)
@@ -1504,11 +1508,8 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	 * We cannot know if the owner is running on a processor.
 	 * We just spin and hope that it is on a processor.
 	 */
-	enter_critical(self);
-	if (spinners_incr(&mp->mutex_lockword, max_spinners) == -1) {
-		exit_critical(self);
+	if (spinners_incr(&mp->mutex_lockword, max_spinners) == -1)
 		goto done;
-	}
 	DTRACE_PROBE1(plockstat, mutex__spin, mp);
 	for (count = 1; ; count++) {
 #if defined(__sparc) && !defined(_LP64)
@@ -1568,7 +1569,6 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 		}
 		count++;
 	}
-	exit_critical(self);
 
 done:
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
@@ -1582,6 +1582,8 @@ done:
 		(void) clear_lockbyte64(&mp->mutex_lockword64);
 		error = ENOTRECOVERABLE;
 	}
+
+	exit_critical(self);
 
 	if (error) {
 		if (count) {
@@ -1709,15 +1711,16 @@ mutex_wakeup_all(mutex_t *mp)
 static lwpid_t
 mutex_unlock_queue(mutex_t *mp, int release_all)
 {
+	ulwp_t *self = curthread;
 	lwpid_t lwpid = 0;
 	uint32_t old_lockword;
 
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
+	sigoff(self);
 	mp->mutex_owner = 0;
 	old_lockword = clear_lockbyte(&mp->mutex_lockword);
 	if ((old_lockword & WAITERMASK) &&
 	    (release_all || (old_lockword & SPINNERMASK) == 0)) {
-		ulwp_t *self = curthread;
 		no_preempt(self);	/* ensure a prompt wakeup */
 		if (release_all)
 			mutex_wakeup_all(mp);
@@ -1726,6 +1729,7 @@ mutex_unlock_queue(mutex_t *mp, int release_all)
 		if (lwpid == 0)
 			preempt(self);
 	}
+	sigon(self);
 	return (lwpid);
 }
 
@@ -1739,6 +1743,7 @@ mutex_unlock_process(mutex_t *mp, int release_all)
 	uint64_t old_lockword64;
 
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
+	sigoff(self);
 	mp->mutex_owner = 0;
 #if defined(__sparc) && !defined(_LP64)
 	/* horrible hack, necessary only on 32-bit sparc */
@@ -1753,6 +1758,7 @@ mutex_unlock_process(mutex_t *mp, int release_all)
 			(void) ___lwp_mutex_wakeup(mp, release_all);
 			preempt(self);
 		}
+		sigon(self);
 		return;
 	}
 #endif
@@ -1764,6 +1770,7 @@ mutex_unlock_process(mutex_t *mp, int release_all)
 		(void) ___lwp_mutex_wakeup(mp, release_all);
 		preempt(self);
 	}
+	sigon(self);
 }
 
 void
@@ -1861,10 +1868,6 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 	ASSERT(self->ul_sleepq == NULL && self->ul_link == NULL &&
 	    self->ul_wchan == NULL);
 	self->ul_sp = 0;
-	queue_unlock(qp);
-
-	if (msp)
-		msp->mutex_sleep_time += gethrtime() - begin_sleep;
 
 	ASSERT(error == 0 || error == EINVAL || error == ETIME);
 
@@ -1878,6 +1881,11 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		(void) clear_lockbyte(&mp->mutex_lockword);
 		error = ENOTRECOVERABLE;
 	}
+
+	queue_unlock(qp);
+
+	if (msp)
+		msp->mutex_sleep_time += gethrtime() - begin_sleep;
 
 	if (error) {
 		DTRACE_PROBE2(plockstat, mutex__blocked, mp, 0);
@@ -2218,10 +2226,13 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	    self->ul_uberdata->uberflags.uf_all) == 0) {
 		/*
 		 * Only one thread exists so we don't need an atomic operation.
+		 * We do, however, need to protect against signals.
 		 */
 		if (mp->mutex_lockw == 0) {
+			sigoff(self);
 			mp->mutex_lockw = LOCKSET;
 			mp->mutex_owner = (uintptr_t)self;
+			sigon(self);
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
@@ -2256,11 +2267,14 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	    (mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK))) == 0) {
 		if (mtype & USYNC_PROCESS)
 			return (fast_process_lock(mp, tsp, mtype, MUTEX_LOCK));
+		sigoff(self);
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
+			sigon(self);
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
+		sigon(self);
 		if (mtype && MUTEX_OWNER(mp) == self)
 			return (mutex_recursion(mp, mtype, MUTEX_LOCK));
 		if (mutex_trylock_adaptive(mp, 1) != 0)
@@ -2333,10 +2347,13 @@ mutex_trylock(mutex_t *mp)
 	    udp->uberflags.uf_all) == 0) {
 		/*
 		 * Only one thread exists so we don't need an atomic operation.
+		 * We do, however, need to protect against signals.
 		 */
 		if (mp->mutex_lockw == 0) {
+			sigoff(self);
 			mp->mutex_lockw = LOCKSET;
 			mp->mutex_owner = (uintptr_t)self;
+			sigon(self);
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
@@ -2355,11 +2372,14 @@ mutex_trylock(mutex_t *mp)
 	    (mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK))) == 0) {
 		if (mtype & USYNC_PROCESS)
 			return (fast_process_lock(mp, NULL, mtype, MUTEX_TRY));
+		sigoff(self);
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
+			sigon(self);
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
+		sigon(self);
 		if (mtype && MUTEX_OWNER(mp) == self)
 			return (mutex_recursion(mp, mtype, MUTEX_TRY));
 		if (__td_event_report(self, TD_LOCK_TRY, udp)) {
@@ -2471,8 +2491,10 @@ mutex_unlock(mutex_t *mp)
 		 * Only one thread exists so we don't need an atomic operation.
 		 * Also, there can be no waiters.
 		 */
+		sigoff(self);
 		mp->mutex_owner = 0;
 		mp->mutex_lockword = 0;
+		sigon(self);
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 		return (0);
 	}
@@ -3269,6 +3291,7 @@ cond_sleep_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 
 	self->ul_sp = stkptr();
 	self->ul_wchan = cvp;
+	sigoff(self);
 	mp->mutex_owner = 0;
 	/* mp->mutex_ownerpid is cleared by ___lwp_cond_wait() */
 	if (mtype & LOCK_PRIO_INHERIT) {
@@ -3289,6 +3312,7 @@ cond_sleep_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 		set_parking_flag(self, 0);
 	error = ___lwp_cond_wait(cvp, mp, tsp, 1);
 	set_parking_flag(self, 0);
+	sigon(self);
 	self->ul_sp = 0;
 	self->ul_wchan = NULL;
 	return (error);

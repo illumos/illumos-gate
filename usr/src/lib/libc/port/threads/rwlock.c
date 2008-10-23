@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/sdt.h>
@@ -480,9 +478,10 @@ shared_rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 		ASSERT_CONSISTENT_STATE(readers);
 		/*
 		 * The calls to __lwp_rwlock_*() below will release the mutex,
-		 * so we need a dtrace probe here.
+		 * so we need a dtrace probe here.  The owner field of the
+		 * mutex is cleared in the kernel when the mutex is released,
+		 * so we should not clear it here.
 		 */
-		mp->mutex_owner = 0;
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 		/*
 		 * The waiters bit may be inaccurate.
