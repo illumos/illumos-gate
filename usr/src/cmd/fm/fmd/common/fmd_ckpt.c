@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/stat.h>
@@ -1057,7 +1055,11 @@ fmd_ckpt_restore_case(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 	fmd_ckpt_restore_events(ckp, fcfc->fcfc_events,
 	    (void (*)(void *, fmd_event_t *))fmd_case_insert_event, cp);
 
-	n = fmd_ckpt_restore_suspects(ckp, cp, fcfc->fcfc_suspects);
+	/*
+	 * Once solved, treat suspects from resource cache as master copy.
+	 */
+	if ((n = ((fmd_case_impl_t *)cp)->ci_nsuspects) == 0)
+		n = fmd_ckpt_restore_suspects(ckp, cp, fcfc->fcfc_suspects);
 
 	if (fcfc->fcfc_state == FCF_CASE_SOLVED)
 		fmd_case_transition_update(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);

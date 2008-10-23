@@ -430,8 +430,7 @@ engine serd.cpu.amd.l2t_sb@chip/core/strand,
 event fault.cpu.amd.l2cachetag@chip/core/strand, engine=serd.cpu.amd.l2t_sb@chip/core/strand;
 
 prop fault.cpu.amd.l2cachetag@chip/core/strand (0)->
-    ereport.cpu.amd.bu.l2t_ecc1@chip/core/strand,
-    ereport.cpu.amd.bu.l2t_par@chip/core/strand;
+    ereport.cpu.amd.bu.l2t_ecc1@chip/core/strand;
 
 /* 								#L2T_MULTI#
  * A multi-bit tag array fault in an l2 cache can cause:

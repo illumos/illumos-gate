@@ -27,8 +27,6 @@
  * this platform.c allows eft to run on Solaris systems.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -266,7 +264,7 @@ platform_getpath(nvlist_t *nvl)
 			    FM_FMRI_DEV_ID, FM_FMRI_DEV_PATH);
 			return (NULL);
 		}
-	} else if (strcmp(scheme, FM_FMRI_SCHEME_CPU) != 0) {
+	} else if (strcmp(scheme, FM_FMRI_SCHEME_CPU) == 0) {
 		if (nvlist_lookup_uint32(dfmri, FM_FMRI_CPU_ID, &cpuid) == 0)
 			type = DT_CPU;
 		else {
@@ -514,6 +512,9 @@ cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 	char *propn, *path = NULL;
 	nvlist_t *p_nv, *pg_nv, *pv_nv;
 	nvpair_t *nvp, *pg_nvp, *pv_nvp;
+
+	if (topo_node_flags(node) == TOPO_NODE_FACILITY)
+		return (TOPO_WALK_NEXT);
 
 	path = hc_path(node);
 	if (path == NULL)

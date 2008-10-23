@@ -1872,7 +1872,8 @@ hc_is_replaced(topo_mod_t *mod, tnode_t *node, void *pdata)
 		    NV_UNIQUE_NAME) == 0)
 			if (nvlist_add_uint32(hap->ha_nvl,
 			    TOPO_METH_REPLACED_RET,
-			    FMD_OBJ_STATE_UNKNOWN) == 0)
+			    present ? FMD_OBJ_STATE_UNKNOWN :
+			    FMD_OBJ_STATE_NOT_PRESENT) == 0)
 				return (0);
 		return (ETOPO_PROP_NVL);
 	}

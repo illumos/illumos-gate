@@ -304,6 +304,7 @@ fmd_case_mkcode(fmd_case_t *cp)
 
 typedef struct {
 	int	*fcl_countp;
+	int	fcl_maxcount;
 	uint8_t *fcl_ba;
 	nvlist_t **fcl_nva;
 	int	*fcl_msgp;
@@ -316,6 +317,8 @@ fmd_case_set_lst(fmd_asru_link_t *alp, void *arg)
 	boolean_t b;
 	int state;
 
+	if (*entryp->fcl_countp >= entryp->fcl_maxcount)
+		return;
 	if (nvlist_lookup_boolean_value(alp->al_event, FM_SUSPECT_MESSAGE,
 	    &b) == 0 && b == B_FALSE)
 		*entryp->fcl_msgp = B_FALSE;
@@ -403,6 +406,7 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 	 * Finally, store each suspect's faulty status into the bitmap 'ba'.
 	 */
 	fcl.fcl_countp = &count;
+	fcl.fcl_maxcount = cip->ci_nsuspects;
 	fcl.fcl_msgp = &msg;
 	fcl.fcl_ba = ba;
 	fcl.fcl_nva = nva;
@@ -633,6 +637,15 @@ fmd_case_publish(fmd_case_t *cp, uint_t state)
 	switch (state) {
 	case FMD_CASE_SOLVED:
 		(void) pthread_mutex_lock(&cip->ci_lock);
+
+		/*
+		 * If we already have a code, then case is already solved.
+		 */
+		if (cip->ci_code != NULL) {
+			(void) pthread_mutex_unlock(&cip->ci_lock);
+			break;
+		}
+
 		if (cip->ci_tv_valid == 0) {
 			fmd_time_gettimeofday(&cip->ci_tv);
 			cip->ci_tv_valid = 1;
@@ -943,7 +956,26 @@ fmd_case_recreate(fmd_module_t *mp, fmd_xprt_t *xp,
 		cip->ci_mod = mp;
 		fmd_module_hold(mp);
 
-		fmd_case_destroy_suspects(cip);
+		/*
+		 * It's possible that fmd crashed or was restarted during a
+		 * previous solve operation between the asru cache being created
+		 * and the ckpt file being updated to SOLVED. Thus when the DE
+		 * recreates the case here from the checkpoint file, the state
+		 * will be UNSOLVED and yet we are having to reclaim because
+		 * the case was in the asru cache. If this happens, revert the
+		 * case back to the UNSOLVED state and let the DE solve it again
+		 */
+		if (state == FMD_CASE_UNSOLVED) {
+			fmd_asru_hash_delete_case(fmd.d_asrus,
+			    (fmd_case_t *)cip);
+			fmd_case_destroy_suspects(cip);
+			fmd_case_code_hash_delete(fmd.d_cases, cip);
+			fmd_free(cip->ci_code, cip->ci_codelen);
+			cip->ci_code = NULL;
+			cip->ci_codelen = 0;
+			cip->ci_tv_valid = 0;
+		}
+
 		cip->ci_state = state;
 
 		(void) pthread_mutex_unlock(&cip->ci_lock);
@@ -1709,7 +1741,7 @@ fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 	fmd_asru_hash_apply_by_case(fmd.d_asrus, cp, fmd_case_not_faulty,
 	    &not_faulty);
 
-	if (!faulty) {
+	if (cip->ci_state >= FMD_CASE_REPAIRED && !faulty) {
 		/*
 		 * If none of the suspects is faulty, replay the list.repaired.
 		 * If all suspects are already either usable or not present then
@@ -1741,7 +1773,7 @@ fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 			    class);
 			fmd_dispq_dispatch(fmd.d_disp, e, class);
 		}
-	} else if (not_faulty) {
+	} else if (faulty && not_faulty) {
 		/*
 		 * if some but not all of the suspects are not faulty, replay
 		 * the list.updated.

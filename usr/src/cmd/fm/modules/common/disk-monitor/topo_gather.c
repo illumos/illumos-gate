@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Gathers properties exported by libtopo and uses them to construct diskmon
  * data structures, which hold the configuration information for the
@@ -321,7 +319,8 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	(void) topo_prop_get_string(node, TOPO_PGROUP_STORAGE,
 	    TOPO_STORAGE_CAPACITY, &capacity, &err);
 
-	frup = new_dmfru(manuf, model, firmrev, serial,
+	frup = new_dmfru(manuf != NULL ? manuf : "", model != NULL ? model : "",
+	    firmrev != NULL ? firmrev : "", serial != NULL ? serial : "",
 	    capacity == NULL ? 0 : strtoull(capacity, 0, 0));
 
 	if (model)
