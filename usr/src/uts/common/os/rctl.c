@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
 #include <sys/id_space.h>
@@ -2872,12 +2870,15 @@ rctl_init(void)
 }
 
 /*
- * rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc)
+ * rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
+ *     int chargeproc)
  *
  * Increments the amount of locked memory on a project, and
- * zone. If proj is NULL, the proj and zone of proc_t p is used.  If
- * chargeproc is non-zero, then the charged amount is cached on p->p_locked_mem
- * so that the charge can be migrated when a process changes projects.
+ * zone. If proj is non-NULL the project must be held by the
+ * caller; if it is NULL the proj and zone of proc_t p are used.
+ * If chargeproc is non-zero, then the charged amount is cached
+ * on p->p_locked_mem so that the charge can be migrated when a
+ * process changes projects.
  *
  * Return values
  *    0 - success
@@ -2897,7 +2898,7 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	if (proj != NULL) {
 		projp = proj;
-		zonep = zone_find_by_id(projp->kpj_zoneid);
+		zonep = proj->kpj_zone;
 	} else {
 		projp = p->p_task->tk_proj;
 		zonep = p->p_zone;
@@ -2932,18 +2933,18 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 	}
 out:
 	mutex_exit(&zonep->zone_mem_lock);
-	if (proj != NULL)
-		zone_rele(zonep);
 	return (ret);
 }
 
 /*
- * rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc)
+ * rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
+ *     int creditproc)
  *
  * Decrements the amount of locked memory on a project and
- * zone.  If proj is NULL, the proj and zone of proc_t p is used.  If
- * creditproc is non-zero, then the quantity of locked memory is subtracted
- * from p->p_locked_mem.
+ * zone.  If proj is non-NULL the project must be held by the
+ * caller; if it is NULL the proj and zone of proc_t p are used.
+ * If creditproc is non-zero, then the quantity of locked memory
+ * is subtracted from p->p_locked_mem.
  *
  * Return values
  *   none
@@ -2957,7 +2958,7 @@ rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 
 	if (proj != NULL) {
 		projp = proj;
-		zonep = zone_find_by_id(projp->kpj_zoneid);
+		zonep = proj->kpj_zone;
 	} else {
 		ASSERT(p != NULL);
 		ASSERT(MUTEX_HELD(&p->p_lock));
@@ -2974,8 +2975,6 @@ rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 		p->p_locked_mem -= inc;
 	}
 	mutex_exit(&zonep->zone_mem_lock);
-	if (proj != NULL)
-		zone_rele(zonep);
 }
 
 /*
