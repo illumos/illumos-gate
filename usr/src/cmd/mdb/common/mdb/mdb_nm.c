@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/elf.h>
 #include <sys/elf_SPARC.h>
@@ -472,8 +469,15 @@ nm_object_iter_cb(void *data, const mdb_map_t *mp, const char *name)
 {
 	nm_object_iter_t *noip = data;
 
-	return (nm_symbol_iter(name, noip->noi_which, noip->noi_type,
-	    noip->noi_cb, noip->noi_niip));
+	/*
+	 * Since we're interating over all the objects in a target,
+	 * don't return an error if we hit an object that we can't
+	 * get symbol data for.
+	 */
+	if (nm_symbol_iter(name, noip->noi_which, noip->noi_type,
+	    noip->noi_cb, noip->noi_niip) != 0)
+		mdb_warn("unable to dump symbol data for: %s\n", name);
+	return (0);
 }
 
 int
