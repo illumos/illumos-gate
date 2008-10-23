@@ -303,11 +303,6 @@ found:
 	if (nhead != 0 && nsect != 0)
 		(void) copy_solaris_part(&cur_disk->fdisk_part);
 
-	if (cur_disk->fdisk_part.numsect == 0) {
-		err_print("\nNo fdisk solaris partition found.\n");
-		goto exit;
-	}
-
 	if ((cur_disk->label_type == L_TYPE_EFI) &&
 	    (cur_disk->disk_parts->etoc->efi_flags &
 		EFI_GPT_PRIMARY_CORRUPT)) {
@@ -316,6 +311,17 @@ found:
 		    err_print("Use the 'backup' command to restore ");
 		    err_print("the primary label.\n");
 	}
+
+#if defined(_SUNOS_VTOC_16)
+	/*
+	 * If there is no fdisk solaris partition.
+	 */
+	if (cur_disk->fdisk_part.numsect == 0) {
+		err_print("No Solaris fdisk partition found.\n");
+		goto exit;
+	}
+#endif /* defined(_SUNOS_VTOC_16) */
+
 	/*
 	 * If the label of the disk is marked dirty,
 	 * see if they'd like to label the disk now.
