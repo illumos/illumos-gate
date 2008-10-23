@@ -3470,8 +3470,6 @@ cmlb_dkio_get_extvtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
 #endif
 
 #elif defined(_SUNOS_VTOC_16)
-	mutex_exit(CMLB_MUTEX(cl));
-
 	/*
 	 * The cl_vtoc structure is a "struct dk_vtoc"  which is always
 	 * 32-bit to maintain compatibility with existing on-disk
@@ -3479,6 +3477,7 @@ cmlb_dkio_get_extvtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
 	 * it out to extvtoc
 	 */
 	vtoc32tovtoc(cl->cl_vtoc, ext_vtoc);
+	mutex_exit(CMLB_MUTEX(cl));
 
 	if (ddi_copyout(&ext_vtoc, (void *)arg, sizeof (struct extvtoc), flag))
 		return (EFAULT);

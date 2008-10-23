@@ -208,6 +208,7 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", cmlb_lun::cl_alter_behavior))
 _NOTE(SCHEME_PROTECTS_DATA("private data", cmlb_geom))
 _NOTE(SCHEME_PROTECTS_DATA("safe sharing", cmlb_lun::cl_f_geometry_is_valid))
 
+_NOTE(MUTEX_PROTECTS_DATA(cmlb_lun::cl_mutex, cmlb_lun::cl_vtoc))
 
 
 #define	DK_TG_READ(ihdlp, bufaddr, start_block, reqlength, tg_cookie)\

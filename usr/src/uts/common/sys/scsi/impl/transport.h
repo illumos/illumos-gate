@@ -26,7 +26,6 @@
 #ifndef	_SYS_SCSI_IMPL_TRANSPORT_H
 #define	_SYS_SCSI_IMPL_TRANSPORT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Include the loadable module wrapper.
@@ -296,7 +295,12 @@ size_t	scsi_hba_tran_size();			/* private */
 
 
 #ifdef __lock_lint
-_NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_hba_tran::tran_sd))
+_NOTE(SCHEME_PROTECTS_DATA("stable data",
+	scsi_hba_tran::tran_sd
+	scsi_hba_tran::tran_hba_dip
+	scsi_hba_tran::tran_hba_flags
+	scsi_hba_tran::tran_open_flag
+	scsi_hba_tran::tran_pkt_cache_ptr))
 /*
  * we only modify the dma atributes (like dma_attr_granular) upon
  * attach and in response to a setcap.  It is also up to the target

@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one	scsi_device
 one	__ddi_xbuf_attr
@@ -44,6 +43,8 @@ do
 	add $ptr target warlock_dummy
 done
 root	scsi_hba_bus_power
+root	scsi_hba_fm_init_child
+root	sdrunout
 
 add scsi_watch_request::swr_callback targets sd_media_watch_cb sd_mhd_watch_cb
 add sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi

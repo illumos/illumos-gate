@@ -26,7 +26,6 @@
 #ifndef	_SYS_SCSI_SCSI_RESOURCE_H
 #define	_SYS_SCSI_SCSI_RESOURCE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __lock_lint
 #include <note.h>
@@ -93,8 +92,14 @@ struct scsi_pkt_cache_wrapper {
 };
 
 #ifdef __lock_lint
-_NOTE(SCHEME_PROTECTS_DATA("unique per packet", \
-	scsi_pkt_cache_wrapper::pcw_orig_comp))
+_NOTE(SCHEME_PROTECTS_DATA("unique per packet",
+	scsi_pkt_cache_wrapper::pcw_orig_comp
+	scsi_pkt_cache_wrapper::pcw_bp
+	scsi_pkt_cache_wrapper::pcw_curwin
+	scsi_pkt_cache_wrapper::pcw_flags
+	scsi_pkt_cache_wrapper::pcw_granular
+	scsi_pkt_cache_wrapper::pcw_total_xfer
+	scsi_pkt_cache_wrapper::pcw_totalwin))
 #endif
 struct buf	*scsi_pkt2bp(struct scsi_pkt *);
 
