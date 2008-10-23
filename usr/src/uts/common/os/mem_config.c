@@ -289,9 +289,15 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	 * this may change with COD or in larger SSM systems with
 	 * nested latency groups, so we must not assume that the
 	 * node does not yet exist.
+	 *
+	 * Also, using pt_base (page table base address)
+	 * and tpgs (total number of pages) to mimic the case when a
+	 * memory board is already installed in a system at boot
+	 * time.  This will ensure the entire address range is
+	 * specified in order to have proper deletion.
 	 */
-	pnum = base + npgs - 1;
-	mem_node_add_slice(base, pnum);
+	pnum = pt_base + tpgs - 1;
+	mem_node_add_slice(pt_base, pnum);
 
 	/*
 	 * Allocate or resize page counters as necessary to accommodate
@@ -300,8 +306,8 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	mnode = PFN_2_MEM_NODE(pnum);
 	if (page_ctrs_adjust(mnode) != 0) {
 
-		mem_node_pre_del_slice(base, pnum);
-		mem_node_post_del_slice(base, pnum, 0);
+		mem_node_pre_del_slice(pt_base, pnum);
+		mem_node_post_del_slice(pt_base, pnum, 0);
 
 		hat_unload(kas.a_hat, (caddr_t)pp, ptob(metapgs),
 		    HAT_UNLOAD_UNMAP|HAT_UNLOAD_UNLOCK);
