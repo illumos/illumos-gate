@@ -383,6 +383,7 @@ static void
 map_set(struct ps_prochandle *P, map_info_t *mptr, const char *lname)
 {
 	file_info_t *fptr;
+	char buf[PATH_MAX];
 
 	if ((fptr = mptr->map_file) == NULL &&
 	    (fptr = file_info_new(P, mptr)) == NULL)
@@ -408,11 +409,9 @@ map_set(struct ps_prochandle *P, map_info_t *mptr, const char *lname)
 	    (fptr->file_lname = strdup(lname)) != NULL)
 		fptr->file_lbase = basename(fptr->file_lname);
 
-	/*
-	 * Don't bother to set file_rname/file_rbase since lname is really
-	 * just a token name (either "a.out" or "ld.so.1") and not a real
-	 * filesystem object path.
-	 */
+	if ((Pfindmap(P, mptr, buf, sizeof (buf)) != NULL) &&
+	    ((fptr->file_rname = strdup(buf)) != NULL))
+		fptr->file_rbase = basename(fptr->file_rname);
 }
 
 static void
