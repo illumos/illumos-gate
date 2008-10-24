@@ -772,7 +772,12 @@ mm_lmp_activate_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		}
 	}
 
-	mms_trace(MMS_ERR, "lm activate %d failed", flag);
+	mms_trace(MMS_ERR, "lm activate %d failed, set LM to present", flag);
+	if (mm_lm_state_soft(mm_wka, "present")) {
+		mms_trace(MMS_ERR,
+		    "mm_lmp_activate_cmd_func: "
+		    "LM state changed failed");
+	}
 	cmd->cmd_remove = 1;
 	return (MM_CMD_ERROR);
 }

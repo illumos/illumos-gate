@@ -395,6 +395,8 @@ tm_be_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 	int			found_cart_drive = 0;
 	int			found_ready_cart_drive = 0;
 
+	char			*err_text = NULL;
+
 
 	/* Need to set end_cmd buf correctly for any MM_MOUNT_ERROR return */
 
@@ -499,13 +501,14 @@ tm_be_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 			    NULL);
 			return (MM_MOUNT_ERROR);
 		}
-
+		err_text = mm_return_err_text(cmd->cmd_err_ptr);
 		mm_response_error(end_cmd,
 		    ECLASS_EXPLICIT,
 		    "ENOSOLUTIONS",
-		    MM_5105_MSG,
+		    MM_5110_MSG,
+		    "err_text", err_text,
 		    NULL);
-
+		free(err_text);
 		return (MM_MOUNT_ERROR);
 	}
 	if (found_ready_cart_drive == 0) {
@@ -557,7 +560,7 @@ tm_be_cancel_all(mm_command_t *cmd) {
 }
 
 int
-tm_be_set_mount(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
+tm_be_set_mount(mm_command_t *cmd, mm_db_t *db,
 		mm_command_t *end_cmd) {
 	cmd_mount_info_t	*mount_info = &cmd->cmd_mount_info;
 
@@ -630,22 +633,18 @@ tm_be_set_mount(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		MM_UNSET_FLAG(cmd->cmd_flags, MM_CMD_DISPATCHABLE);
 
 	} else {
-
 		mms_trace(MMS_ERR,
 		    "no drives found due to other candidates");
-		if (mm_wka->wka_begin_end.be_mode ==
-		    ACCESS_MODE_BLOCKING) {
-			return (MM_BE_BLOCKING);
+		mm_set_least_severe(cmd);
+		if (cmd->cmd_err_ptr == NULL) {
+			mms_trace(MMS_ERR,
+			    "cmd has no errors, set ENOMATCH");
+			mm_response_error(end_cmd,
+			    ECLASS_EXPLICIT, ENOMATCH,
+			    MM_5052_MSG,
+			    NULL);
 		}
-		/* May want to add additional arg's to this message? */
-		mm_response_error(end_cmd,
-		    ECLASS_RETRY,
-		    "ETMPUNAVAIL",
-		    MM_5104_MSG,
-		    NULL);
-
 		return (MM_BE_ERROR);
-
 	}
 
 	/* Select Is done - print the results */
@@ -660,6 +659,17 @@ tm_be_set_mount(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db,
 		mount_info->cmi_drive);
 	mms_trace(MMS_DEVP, "DM is %s",
 		mount_info->cmi_dm);
+
+	/* since this mount will work, clear the error flags for it */
+	if (cmd->cmd_eclass != NULL) {
+		free(cmd->cmd_eclass);
+		cmd->cmd_eclass = NULL;
+	}
+	if (cmd->cmd_ecode != NULL) {
+		free(cmd->cmd_ecode);
+		cmd->cmd_ecode = NULL;
+	}
+	cmd->cmd_mount_info.cmi_mount_ok = 1;
 
 	return (MM_BE_DISPATCH);
 }
@@ -745,6 +755,86 @@ tm_be_set_unmount(mm_wka_t *mm_wka, mm_command_t *cmd,
 }
 
 void
+tm_be_rm_error_candidates(mm_command_t *cmd, mm_command_t *err_cmd) {
+	/* remove candidates set in err_cmd */
+	/* from the beginend candidatea list in cmd */
+
+	mm_cmd_err_t	*err = err_cmd->cmd_err_ptr;
+	mm_command_t		*cur_cmd;
+	cmd_mount_info_t	*cur_mount_info;
+
+	cmi_cart_list_t		*cart = NULL;
+	cmi_drive_list_t	*drive = NULL;
+
+	mms_list_t			*cart_list;
+
+	int			seen_same = 0;
+	mm_cmd_err_t		*cur_err = NULL;
+
+	mms_trace(MMS_DEVP,
+	    "tm_be_rm_error_candidates: ");
+	if (err == NULL) {
+		mms_trace(MMS_ERR,
+		    "tm_be_rm_error_candidates: "
+		    "error ptr set to NULL");
+		return;
+	}
+
+	mms_trace(MMS_DEVP,
+	    "  Error to remove:");
+	mm_print_err(err);
+
+	mms_list_foreach(&cmd->cmd_beginend_list, cur_cmd) {
+		/* same command */
+		if (cur_cmd == err_cmd) {
+			seen_same = 1;
+			continue;
+		}
+		if (seen_same == 0) {
+			continue;
+		}
+
+		/* check cur_cmd's error */
+		mms_list_foreach(&cur_cmd->cmd_err_list, cur_err) {
+			if (mm_same_err(err, cur_err)) {
+			cur_err->err_already_used = 1;
+			mms_trace(MMS_DEVP,
+			    "  matched an err");
+			}
+		}
+		cur_cmd->cmd_err_ptr = NULL;
+		mm_set_least_severe(cur_cmd);
+
+		cur_mount_info = &cur_cmd->cmd_mount_info;
+		cart_list = &cur_mount_info->cmi_cart_list;
+		mms_list_foreach(cart_list, cart) {
+			/* Check this cart */
+			if ((err->retry_cart != NULL) &&
+			    (cart->cmi_cart_id != NULL) &&
+			    (strcmp(err->retry_cart,
+			    cart->cmi_cart_id) == 0)) {
+				cart->cmi_cart_used = 1;
+				mms_trace(MMS_DEVP,
+				    "tm_be_rm_error_candidates: "
+				    "set a cart as used");
+			}
+			mms_list_foreach(&cart->cmi_drive_list, drive) {
+				/* check this drive */
+				if ((err->retry_drive != NULL) &&
+				    (drive->cmi_drive_name != NULL) &&
+				    (strcmp(err->retry_drive,
+				    drive->cmi_drive_name) == 0)) {
+					drive->cmi_drive_used = 1;
+					mms_trace(MMS_DEVP,
+					    "tm_be_rm_error_candidates: "
+					    "set a drive as used");
+				}
+			}
+		}
+	}
+}
+
+void
 tm_be_rm_mount_candidates(mm_command_t *cmd, mm_command_t *set_cmd) {
 	/* remove candidates set in set_cmd */
 	/* from the beginend candidatea list in cmd */
@@ -760,7 +850,7 @@ tm_be_rm_mount_candidates(mm_command_t *cmd, mm_command_t *set_cmd) {
 	int			seen_same = 0;
 
 	mms_trace(MMS_DEVP,
-	    "remove %s and %s from candidate lists",
+	    "set %s and %s as used candidates",
 	    set_mount_info->cmi_cartridge,
 	    set_mount_info->cmi_drive);
 	mms_list_foreach(&cmd->cmd_beginend_list, cur_cmd) {
@@ -777,16 +867,15 @@ tm_be_rm_mount_candidates(mm_command_t *cmd, mm_command_t *set_cmd) {
 		mms_list_foreach(cart_list, cart) {
 			if (strcmp(set_mount_info->cmi_cartridge,
 				cart->cmi_cart_id) == 0) {
-				cart->cmi_remove_cart = 1;
+				cart->cmi_cart_used = 1;
 			}
 			mms_list_foreach(&cart->cmi_drive_list, drive) {
 				if (strcmp(set_mount_info->cmi_drive,
 					drive->cmi_drive_name) == 0) {
-					drive->cmi_remove_drive = 1;
+					drive->cmi_drive_used = 1;
 				}
 			}
 		}
-		mm_mount_clean_candidates(cur_cmd);
 	}
 }
 
@@ -1280,9 +1369,8 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 
 	/* Errors */
 	int			mount_has_error = 0;
-	int			mount_would_block = 0;
-	int			only_retry = 1;
-	int			retry_in_use = 1;
+
+	char			*err_text = NULL;
 
 	/* This is the function can return */
 	/* MM_BE_ERROR */
@@ -1298,12 +1386,14 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 	/* Instead of returning set mount_has_error or mount_would_block */
 	/* After calling for ever mount generate the correct error code */
 	mms_list_foreach(&cmd->cmd_beginend_list, cur_cmd) {
+		cur_cmd->cmd_mount_info.cmi_mount_ok = 0;
 		rc = tm_be_mount_ready(cur_cmd->wka_ptr, cur_cmd, db, cmd);
 		switch (rc) {
 
 		case MM_MOUNT_ERROR:
 			/* Error code should be set */
 			mms_trace(MMS_ERR,
+			    "tm_be_mounts: "
 			    "internal error, tm_be_mount_ready");
 			mount_has_error = 1;
 			break;
@@ -1312,36 +1402,31 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 			/* The mount is ready, mount_info should be set */
 			/* continue to state 1 */
 			mms_trace(MMS_DEVP,
+			    "tm_be_mounts: "
 			    "mount is ready to go ");
+			cur_cmd->cmd_mount_info.cmi_mount_ok = 1;
 			break;
 
 		case MM_MOUNT_NEED_UNLOAD:
 			/* this immediate mount needs to */
 			/* wait for an unload */
 			mms_trace(MMS_DEVP,
+			    "tm_be_mounts: "
 			    "mount needs to wait "
 			    "for unload to complete");
+			cur_cmd->cmd_mount_info.cmi_mount_ok = 1;
 			break;
 
 		case MM_MOUNT_NOT_READY:
-			if (mm_wka->wka_begin_end.be_mode ==
-				ACCESS_MODE_IMMEDIATE) {
-				/* Error code should be set */
-				mms_trace(MMS_ERR,
-				    "immediate begin-end group "
-				    "is not ready");
-				mount_has_error = 1;
-				break;
-			}
-			/* Error code should be set */
+			mount_has_error = 1;
 			mms_trace(MMS_ERR,
-			    "blocking mount not ready, "
+			    "tm_be_mounts: "
+			    "mount not ready, "
 			    "wait longer and try later");
-			mount_would_block = 1;
-			break;
-
+				break;
 		default:
 			mms_trace(MMS_ERR,
+			    "tm_be_mounts: "
 			    "bad rc mm_mount_ready");
 			mm_system_error(cmd,
 				"bad rc mm_mount_ready");
@@ -1356,107 +1441,120 @@ tm_be_mounts(mm_command_t *cmd, mm_data_t *mm_data) {
 		mms_trace(MMS_ERR,
 		    "at least one mount had "
 		    "an error for this begin-end");
-		/* Check every command's error class */
-		/* If there are only retry errors use the retry class */
+
+		/* at least one mount had an error */
+		/* for each mount set the least sever errror */
+		/* if any mount has a error more severe than retry */
+		/* return error for the end command */
+		/* since this mount will not work for immediate or blocking */
 		mms_list_foreach(&cmd->cmd_beginend_list, cur_cmd) {
-			if ((cur_cmd->cmd_eclass != NULL) &&
-			    (strcmp(cur_cmd->cmd_eclass, ECLASS_RETRY) != 0)) {
-				/* found a mount where class is not retry */
-				only_retry = 0;
-			} else if ((cur_cmd->cmd_eclass != NULL) &&
-			    (strcmp(cur_cmd->cmd_eclass,
-			    ECLASS_RETRY) == 0)) {
-				/* This is a retry class */
-				/* Check if this is an inuse error */
-				if ((strcmp(cur_cmd->cmd_ecode,
-				    "EDRVINUSE") == 0) ||
-				    (strcmp(cur_cmd->cmd_ecode,
-				    "ECARTINUSE") == 0)) {
-					retry_in_use = 1;
+			if (cur_cmd->cmd_mount_info.cmi_mount_ok) {
+				mms_trace(MMS_ERR,
+				    "tm_be_mounts: "
+				    "this mount is ok, no errors");
+			} else {
+				mms_trace(MMS_ERR,
+				    "tm_be_mounts: "
+				    "this mount has errors, set least severe");
+
+				mm_set_least_severe(cur_cmd);
+				if (strcmp(cur_cmd->cmd_eclass,
+				    ECLASS_RETRY) != 0) {
+					/* this is not a retry error class */
+					/* return error for this end command */
+					mms_trace(MMS_ERR,
+					    "at least one mount's "
+					    "least severe error is"
+					    " more severe than retry, "
+					    "this begin-end group "
+					    "will not work");
+					/* One or more mount has errors */
+					/* that are non retry */
+					err_text =
+					    mm_return_err_text(cur_cmd->
+					    cmd_err_ptr);
+					mm_response_error(cmd,
+					    ECLASS_EXPLICIT,
+					    "ENOSOLUTIONS",
+					    MM_5110_MSG,
+					    "err_text", err_text,
+					    NULL);
+					free(err_text);
+					return (MM_BE_ERROR);
 				}
 			}
-
-			if ((cur_cmd->cmd_eclass != NULL) &&
-			    (strcmp(cur_cmd->cmd_eclass,
-			    ECLASS_INTERNAL) == 0)) {
-				/* This mount had a system error */
-				/* Set system error and return */
-				mm_system_error(cmd,
-				    "internal error processing "
-				    "a begin-end mount cmd");
-				return (MM_BE_ERROR);
-			}
-
 		}
 
-		if (only_retry) {
-			mms_trace(MMS_ERR,
-			    "all mounts have retry error class ");
-			if (retry_in_use) {
-				mms_trace(MMS_ERR,
-				    "at least one mount "
-				    "has an in-use error");
-				/* Set error for retry */
-				mm_response_error(cmd,
-				    ECLASS_RETRY,
-				    "ETMPINUSE",
-				    MM_5104_MSG,
-				    NULL);
 
-			} else {
-				/* Set error for retry */
-				mm_response_error(cmd,
-				    ECLASS_RETRY,
-				    "ETMPUNAVAIL",
-				    MM_5104_MSG,
-				    NULL);
-			}
-		} else {
-			mms_trace(MMS_ERR,
-			    "at least one mount had a eclass"
-			    " more severe than retry ");
-			/* One or more mount has errors */
-			/* that are non retry */
-			mm_response_error(cmd,
-			    ECLASS_EXPLICIT,
-			    "ENOSOLUTIONS",
-			    MM_5105_MSG,
-			    NULL);
-		}
-		return (MM_BE_ERROR);
+
 	}
-	if (mount_would_block) {
-		mms_trace(MMS_ERR,
-		    "at least one mount has "
-		    "to block for this begin-end");
-		return (MM_BE_BLOCKING);
-	}
+
+	/* All mounts are either ok or retry */
+	/* Determine which error to return/block */
+	/* for immediate, return retry or nosolutions */
+	/* for blocking, block or return nosolutions */
+
+
 	/* Mount candidate lists have been set up, */
 	/* divide the resources and set up the exact */
 	/* Drive/cartridge combination */
+
+	mount_has_error = 0;
 	mms_list_foreach(&cmd->cmd_beginend_list, cur_cmd) {
+
 		mms_trace(MMS_DEVP, "set up a mount for dispatch");
-		rc = tm_be_set_mount(cur_cmd->wka_ptr,
-				cur_cmd, db, cmd);
-		if (rc == MM_BE_ERROR) {
-			mms_trace(MMS_ERR, "error setting up mount");
-			/* error set for end command already */
-			return (MM_BE_ERROR);
-		} else if (rc == MM_BE_BLOCKING) {
-			mms_trace(MMS_ERR,
-			    "blocking mount not ready, "
-			    "wait longer and try later");
-			return (MM_BE_BLOCKING);
+
+		/* tm_be_set_mount returns MM_BE_ERROR or MM_BE_DISPATCH */
+
+		if (cur_cmd->cmd_mount_info.cmi_mount_ok) {
+			rc = tm_be_set_mount(cur_cmd,
+			    db, cmd);
+		} else {
+			rc = MM_BE_ERROR;
 		}
-		/* remove cmi_cart and cmi_drive from */
-		/* above from the remaining */
-		/* unmount candidates */
-		tm_be_rm_mount_candidates(cmd, cur_cmd);
+
+		if (rc == MM_BE_ERROR) {
+			mount_has_error = 1;
+			/* If the cur err ptr is null or */
+			/* pointing to a non-retry error class */
+			/* This begin-end group cannot succeede */
+			if ((cur_cmd->cmd_err_ptr == NULL) ||
+			    (strcmp(cur_cmd->cmd_err_ptr->eclass,
+			    ECLASS_RETRY) != 0)) {
+				mms_trace(MMS_ERR,
+				    "tm_be_mounts: "
+				    "There are no valid "
+				    "solutions to this mount ");
+
+				err_text =
+				    mm_return_err_text(cur_cmd->
+				    cmd_err_ptr);
+				mm_response_error(cmd,
+				    ECLASS_EXPLICIT,
+				    "ENOSOLUTIONS",
+				    MM_5110_MSG,
+				    "err_text", err_text,
+				    NULL);
+				free(err_text);
+				return (MM_BE_ERROR);
+			}
+			tm_be_rm_error_candidates(cmd, cur_cmd);
+		} else {
+			tm_be_rm_mount_candidates(cmd, cur_cmd);
+		}
 	}
 
-
-	/* Need to remove all dispatch releated stuff from the functions */
-	/* used by tm_be_set_mount or mm_set_immediate_mount */
+	if (mount_has_error) {
+		/* If this is immediate, return retry error class for the end */
+		/* if this is blocking, then block for the whole group */
+		/* Set error for retry */
+		mm_response_error(cmd,
+		    ECLASS_RETRY,
+		    "ETMPUNAVAIL",
+		    MM_5104_MSG,
+		    NULL);
+		return (MM_BE_BLOCKING);
+	}
 	mms_list_foreach(&cmd->cmd_beginend_list, cur_cmd) {
 		if (mm_dispatch_now(mm_wka, cur_cmd, db)) {
 			/* error should be set */

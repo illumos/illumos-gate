@@ -984,6 +984,8 @@ mm_destroy_cmd(mm_command_t *cmd)
 		mms_list_destroy(&cmd->cmd_const_list);
 		mm_free_list(&cmd->cmd_resp_list);
 		mms_list_destroy(&cmd->cmd_resp_list);
+		mm_free_err_list(cmd);
+		mms_list_destroy(&cmd->cmd_err_list);
 	}
 
 	/* Message */

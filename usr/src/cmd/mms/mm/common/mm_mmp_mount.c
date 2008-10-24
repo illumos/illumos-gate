@@ -510,18 +510,28 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 		    " DriveStateSoft != ready ",
 		    candidate_drive);
 		drive->cmi_drive_not_ready = 1;
+		mm_response_error(cmd,
+		    ECLASS_RETRY,
+		    "EDRVINUSE",
+		    MM_5025_MSG,
+		    "drive", candidate_drive,
+		    NULL);
+		mm_set_retry_drive(cmd,
+		    candidate_drive);
 		if (mount_info->cmi_when == MM_IMMEDIATE) {
+			rc = 0; goto end;
+		} else {
+			mms_trace(MMS_DEVP,
+			    "drive in use, keep as"
+			    " candidate for blocking mounts");
 			mm_response_error(cmd,
 			    ECLASS_RETRY,
 			    "EDRVINUSE",
 			    MM_5025_MSG,
 			    "drive", candidate_drive,
 			    NULL);
-			rc = 0; goto end;
-		} else {
-			mms_trace(MMS_DEVP,
-			    "drive in use, keep as"
-			    " candidate for blocking mounts");
+			mm_set_retry_drive(cmd,
+			    candidate_drive);
 		}
 		/* Keep this drive as a candidate for blocking mounts */
 
@@ -543,14 +553,15 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			    "This drive is in the process of "
 			    "unloading/loading");
 			drive->cmi_drive_not_ready = 1;
+			mm_response_error(cmd,
+			    ECLASS_RETRY,
+			    "EDRVUNLOADING",
+			    MM_5102_MSG,
+			    "drive", candidate_drive,
+			    NULL);
+			mm_set_retry_drive(cmd,
+			    candidate_drive);
 			if (mount_info->cmi_when == MM_IMMEDIATE) {
-				/* make a real error message for this */
-				mm_response_error(cmd,
-				    ECLASS_RETRY,
-				    "EDRVUNLOADING",
-				    MM_5102_MSG,
-				    "drive", candidate_drive,
-				    NULL);
 				rc = 0; goto end;
 			}
 		} else {
@@ -564,13 +575,15 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 				drive->cmi_drive_not_ready = 1;
 				mms_trace(MMS_DEVP,
 				    "drive is loaded with a non-mms tape");
+				mm_response_error(cmd,
+				    ECLASS_RETRY,
+				    "EDRVINUSE",
+				    MM_5028_MSG,
+				    "drive", candidate_drive,
+				    NULL);
+				mm_set_retry_drive(cmd,
+				    candidate_drive);
 				if (mount_info->cmi_when == MM_IMMEDIATE) {
-					mm_response_error(cmd,
-					    ECLASS_RETRY,
-					    "EDRVINUSE",
-					    MM_5028_MSG,
-					    "drive", candidate_drive,
-					    NULL);
 					rc = 0; goto end;
 				}
 			}
@@ -677,28 +690,29 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 			    "drive",
 			    candidate_drive,
 			    NULL);
+			mm_set_retry_drive(cmd,
+			    candidate_drive);
 			rc = 0; goto end;
 		} else if (strcmp(dm_stat->dm_stat_soft,
 		    "not ready") == 0) {
 			/* drive is not ready for blocked */
 			drive->cmi_drive_not_ready = 1;
+			mm_response_error(cmd,
+			    ECLASS_RETRY,
+			    "EDMSTILLBOOTING",
+			    MM_5034_MSG,
+			    "dm",
+			    dm_stat->dm_stat_name,
+			    "drive",
+			    candidate_drive,
+			    NULL);
 			if (mount_info->cmi_when == MM_IMMEDIATE) {
-				mm_response_error(cmd,
-				    ECLASS_RETRY,
-				    "EDMSTILLBOOTING",
-				    MM_5034_MSG,
-				    "dm",
-				    dm_stat->dm_stat_name,
-				    "drive",
-				    candidate_drive,
-				    NULL);
 				rc = 0; goto end;
 			}
 		} else if (strcmp(dm_stat->dm_stat_soft,
 		    "present") == 0) {
 			/* drive is not ready for blocked */
 			drive->cmi_drive_not_ready = 1;
-			if (mount_info->cmi_when == MM_IMMEDIATE) {
 				mm_response_error(cmd,
 				    ECLASS_CONFIG,
 				    "EDRVNODMCONFIGURED",
@@ -708,6 +722,9 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 				    "drive",
 				    candidate_drive,
 				    NULL);
+				mm_set_retry_drive(cmd,
+				    candidate_drive);
+			if (mount_info->cmi_when == MM_IMMEDIATE) {
 				rc = 0; goto end;
 			}
 		} else if ((mount_info->cmi_operation == MM_MOUNT) &&
@@ -715,14 +732,16 @@ mm_candidate_drive_ok(mm_wka_t *mm_wka,
 		    "reserved") == 0)) {
 			/* drive is not ready for blocked */
 			drive->cmi_drive_not_ready = 1;
+			mm_response_error(cmd,
+			    ECLASS_RETRY,
+			    "EDRVINUSE",
+			    MM_5098_MSG,
+			    "dm",
+			    dm_stat->dm_stat_name,
+			    NULL);
+			mm_set_retry_drive(cmd,
+			    candidate_drive);
 			if (mount_info->cmi_when == MM_IMMEDIATE) {
-				mm_response_error(cmd,
-				    ECLASS_RETRY,
-				    "EDRVINUSE",
-				    MM_5098_MSG,
-				    "dm",
-				    dm_stat->dm_stat_name,
-				    NULL);
 				rc = 0; goto end;
 			}
 		}
@@ -873,16 +892,17 @@ mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
 		/* mark this cartridge not ready */
 		/* for blocked mounts */
 		cart_struct->cmi_cart_not_ready = 1;
-
+		/* State is 'in use' */
+		mm_response_error(cmd,
+		    ECLASS_RETRY,
+		    "ECARTINUSE",
+		    MM_5038_MSG,
+		    "cart",
+		    candidate_cartid,
+		    NULL);
+		mm_set_retry_cart(cmd,
+		    (char *)candidate_cartid);
 		if (mount_info->cmi_when == MM_IMMEDIATE) {
-			/* State is 'in use' */
-			mm_response_error(cmd,
-			    ECLASS_RETRY,
-			    "ECARTINUSE",
-			    MM_5038_MSG,
-			    "cart",
-			    candidate_cartid,
-			    NULL);
 			rc = 0; goto end;
 		}
 	}
@@ -1115,6 +1135,8 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 			    "lib",
 			    lib_stat->lib_stat_name,
 			    NULL);
+			mm_set_retry_lib(cmd,
+			    candidate_library);
 		}
 		if (strcmp(lm_stat->lm_stat_soft,
 		    "present") == 0) {
@@ -1127,6 +1149,8 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 			    "lib",
 			    lib_stat->lib_stat_name,
 			    NULL);
+			mm_set_retry_lib(cmd,
+			    candidate_library);
 		}
 		if (strcmp(lm_stat->lm_stat_soft,
 		    "disconnected") == 0) {
@@ -1152,6 +1176,8 @@ mm_candidate_library_ok(mm_command_t *cmd, mm_db_t *db,
 			    "lib",
 			    lib_stat->lib_stat_name,
 			    NULL);
+			mm_set_retry_lib(cmd,
+			    candidate_library);
 		}
 		rc = 0; goto end;
 	}
@@ -1297,6 +1323,7 @@ mm_setup_drive_unmount(mm_command_t *cmd,
 	    strdup(candidate_drive);
 	drive->cmi_mode_valid = 1;
 	drive->cmi_drive_not_ready = 0;
+	drive->cmi_drive_used = 0;
 
 	drive->cmi_dm_name = mms_strapp(drive->cmi_dm_name, dm_name);
 	drive->cmi_dm_shape_priority = 0;
@@ -1503,6 +1530,7 @@ mm_setup_drive(mm_command_t *cmd,
 	    strdup(candidate_drive);
 	drive->cmi_mode_valid = 1;
 	drive->cmi_drive_not_ready = drive_not_ready;
+	drive->cmi_drive_used = 0;
 
 	drive->cmi_dm_name =
 	    strdup(PQgetvalue(dm,
@@ -1606,6 +1634,7 @@ mm_setup_cart(mm_command_t *cmd,
 	    bit_format);
 
 	cart->cmi_cart_not_ready = 0;
+	cart->cmi_cart_used = 0;
 
 	cart->cmi_cart_priority = atoi(candidate_priority);
 	cart->cmi_cart_num_mounts = atoi(candidate_num_mounts);
@@ -1657,11 +1686,13 @@ mm_mount_candidate_loaded(mm_command_t *cmd) {
 		cur_cartid = cart->cmi_cart_id;
 		/* The list should already be ordered */
 		/* select the 1st available */
-		if (cart->cmi_cart_not_ready) {
+		if (cart->cmi_cart_not_ready ||
+		    cart->cmi_cart_used) {
 			continue;
 		}
 		mms_list_foreach(&cart->cmi_drive_list, drive) {
-			if (drive->cmi_drive_not_ready) {
+			if (drive->cmi_drive_not_ready ||
+			    drive->cmi_drive_used) {
 				continue;
 			}
 			if (drive->cmi_drive_loaded) {
@@ -1711,7 +1742,8 @@ mm_mount_open_drive(mm_command_t *cmd) {
 	/* The list should already be ordered */
 	/* select the 1st available */
 	mms_list_foreach(&mount_info->cmi_cart_list, cart) {
-		if (cart->cmi_cart_not_ready) {
+		if (cart->cmi_cart_not_ready ||
+		    cart->cmi_cart_used) {
 			continue;
 		}
 		cur_library = cart->cmi_library;
@@ -1723,7 +1755,8 @@ mm_mount_open_drive(mm_command_t *cmd) {
 		/* The list should already be ordered */
 		/* select the 1st available */
 		mms_list_foreach(&cart->cmi_drive_list, drive) {
-			if (drive->cmi_drive_not_ready) {
+			if (drive->cmi_drive_not_ready ||
+			    drive->cmi_drive_used) {
 				continue;
 			}
 			/* only look at non-loaded drives */
@@ -1770,14 +1803,16 @@ mm_unmount_2_drive(mm_command_t *cmd, mm_db_t *db) {
 	    "mm_unmount_2_drive: ");
 
 	mms_list_foreach(&mount_info->cmi_cart_list, cart) {
-		if (cart->cmi_cart_not_ready) {
+		if (cart->cmi_cart_not_ready ||
+		    cart->cmi_cart_used) {
 			continue;
 		}
 		cur_library = cart->cmi_library;
 		cur_cartid = cart->cmi_cart_id;
 		cur_pcl = cart->cmi_cart_pcl;
 		mms_list_foreach(&cart->cmi_drive_list, drive) {
-			if (drive->cmi_drive_not_ready) {
+			if (drive->cmi_drive_not_ready ||
+			    drive->cmi_drive_used) {
 				continue;
 			}
 			cur_drive = drive->cmi_drive_name;
@@ -1874,7 +1909,8 @@ mm_mount_loaded_drive(mm_command_t *cmd, mm_db_t *db,
 	/* The list should already be ordered */
 	/* select the 1st available */
 	mms_list_foreach(&mount_info->cmi_cart_list, cart) {
-		if (cart->cmi_cart_not_ready) {
+		if (cart->cmi_cart_not_ready ||
+		    cart->cmi_cart_used) {
 			continue;
 		}
 		cur_library = cart->cmi_library;
@@ -1887,7 +1923,8 @@ mm_mount_loaded_drive(mm_command_t *cmd, mm_db_t *db,
 		/* select the 1st available */
 
 		mms_list_foreach(&cart->cmi_drive_list, drive) {
-			if (drive->cmi_drive_not_ready) {
+			if (drive->cmi_drive_not_ready ||
+			    drive->cmi_drive_used) {
 				continue;
 			}
 			cur_drive = drive->cmi_drive_name;
@@ -2141,18 +2178,14 @@ void
 mm_set_mount_objs(mm_command_t *cmd, mm_db_t *db) {
 	cmd_mount_info_t	*mount_info = &cmd->cmd_mount_info;
 
+
+
 	if (mm_db_exec(HERE, db, "delete from \"TASK\" "
 	    "where \"TaskID\" = '%s';",
 	    cmd->cmd_uuid) != MM_DB_OK) {
 		mms_trace(MMS_ERR,
 		    "mm_set_mount_objs: "
 		    "db error deleting TASK");
-	}
-
-	if (mm_new_tm_task(db, cmd, "dispatched") != MM_DB_OK) {
-		mms_trace(MMS_ERR,
-		    "mm_set_mount_objs: "
-		    "db error inserting TASK");
 	}
 
 	/* Delete all old TASK objects and create them anew */
@@ -2178,6 +2211,24 @@ mm_set_mount_objs(mm_command_t *cmd, mm_db_t *db) {
 		    "db error deleting TASKCARTRIDGE");
 	}
 
+	if ((mount_info->cmi_drive == NULL) ||
+	    (mount_info->cmi_library == NULL) ||
+	    (mount_info->cmi_cartridge == NULL) ||
+	    (mount_info->cmi_dm == NULL)) {
+		mms_trace(MMS_ERR,
+		    "mm_set_mount_objs: "
+		    "mount info incomplete");
+		mm_system_error(cmd,
+		    "internal error setting task info, "
+		    "mount info incomplete");
+		return;
+	}
+
+	if (mm_new_tm_task(db, cmd, "dispatched") != MM_DB_OK) {
+		mms_trace(MMS_ERR,
+		    "mm_set_mount_objs: "
+		    "db error inserting TASK");
+	}
 
 	if (mm_set_tm_drive(db,
 	    cmd->cmd_uuid,
@@ -3485,6 +3536,8 @@ mm_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db, int is_retry) {
 		    "No candidate "
 		    "cartridge/library/drive "
 		    "combination found");
+		/* set least severe error */
+		mm_set_least_severe(cmd);
 		return (MM_MOUNT_ERROR);
 	}
 	if (found_ready_cart_drive == 0) {
@@ -3527,6 +3580,8 @@ mm_mount_ready(mm_wka_t *mm_wka, mm_command_t *cmd, mm_db_t *db, int is_retry) {
 	if (rc == MM_CMD_ERROR) {
 		mms_trace(MMS_ERR,
 		    "error setting up immediate mount");
+		/* set least severe error */
+		mm_set_least_severe(cmd);
 		return (MM_MOUNT_ERROR);
 	} else if (rc == MM_DISPATCH_DEPEND) {
 		/* this immediate mount needs to */

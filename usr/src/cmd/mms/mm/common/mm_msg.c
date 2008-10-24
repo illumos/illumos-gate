@@ -1320,6 +1320,9 @@ mm_response_error(mm_command_t *cmd, char *eclass, char *ecode,
 	char *buf;
 	char *text;
 
+	mm_cmd_err_t *err = NULL;
+
+
 	mms_trace(MMS_ERR, "mm_response_error");
 	mms_trace(MMS_ERR, "Class:: %s",
 	    eclass);
@@ -1355,6 +1358,23 @@ mm_response_error(mm_command_t *cmd, char *eclass, char *ecode,
 	SQL_CHK_LEN(&cmd->cmd_buf, 0, &cmd->cmd_bufsize, strlen(buf) + 1);
 	strcpy(cmd->cmd_buf, buf);
 	free(buf);
+
+	/* insert this error into the cmd's err_list */
+	if ((err = mm_alloc_err()) == NULL) {
+		mms_trace(MMS_ERR,
+		    "mm_response_error: "
+		    "could not allocate err struct");
+		return;
+	}
+	err->eclass = strdup(eclass);
+	err->ecode = strdup(ecode);
+	err->err_bufsize = cmd->cmd_bufsize;
+	err->err_buf = strdup(cmd->cmd_buf);
+	err->retry_drive = NULL;
+	err->retry_cart = NULL;
+	err->retry_lib = NULL;
+	mms_list_insert_tail(&cmd->cmd_err_list, err);
+
 	return;
 
 no_mem:

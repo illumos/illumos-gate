@@ -276,6 +276,7 @@ struct cmi_cart_list {
 	int			cmi_remove_cart;
 	int			cmi_cart_not_ready;
 	int			cmi_cart_loaded;
+	int			cmi_cart_used;
 };
 
 typedef struct cmi_drive_list cmi_drive_list_t;
@@ -292,6 +293,7 @@ struct cmi_drive_list {
 	int			cmi_drive_not_ready;
 	int			cmi_dm_shape_priority;
 	int			cmi_dm_density_priority;
+	int			cmi_drive_used;
 };
 
 #define	MM_MOUNT 0
@@ -311,6 +313,7 @@ struct cmd_mount_info {
 	char			*cmi_handle;
 	mms_list_t			cmi_cart_list;
 	int			cmi_total_carts;
+	int			cmi_mount_ok;
 
 	/* Recovery */
 	int			cmi_retries;
@@ -433,6 +436,19 @@ struct mm_msg {
 	int			msg_flags;
 };
 
+typedef struct mm_cmd_err mm_cmd_err_t;
+struct mm_cmd_err {
+	mms_list_node_t		mm_cmd_err_next;
+	char	*ecode;
+	char	*eclass;
+	char	*err_buf;
+	int	err_bufsize;
+	char	*retry_drive;
+	char	*retry_cart;
+	char	*retry_lib;
+	int	err_already_used;
+};
+
 typedef	struct	mm_wka {
 	cci_t			wka_conn;
 	mms_list_node_t		wka_next;
@@ -499,6 +515,10 @@ struct	mm_command	{
 	mms_list_t		cmd_source_list;
 	mms_list_t		cmd_dest_list;
 	mms_list_t		cmd_const_list;
+	/* error list */
+	mms_list_t		cmd_err_list;
+	mm_cmd_err_t		*cmd_err_ptr;
+
 
 	mms_list_t		cmd_beginend_list;
 	int			cmd_begin_has_end;

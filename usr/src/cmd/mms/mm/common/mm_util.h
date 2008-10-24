@@ -22,9 +22,9 @@
  * Use is subject to license terms.
  */
 
-
 #ifndef	_MM_UTIL_H
 #define	_MM_UTIL_H
+
 
 /*
  * Parser command xml text file line callback structure
@@ -103,4 +103,16 @@ extern int	mm_in_char_list(mms_list_t *list, char *str);
 extern char	*mm_return_char(mms_list_t *list, int index);
 extern void	mm_free_list(mms_list_t *list);
 extern char	*mm_ret_response_msg(mm_command_t *cmd);
+extern void	mm_free_err_list(mm_command_t *cmd);
+extern mm_cmd_err_t *mm_alloc_err();
+extern void mm_print_err_list(mm_command_t *cmd);
+extern void mm_print_err(mm_cmd_err_t *err);
+extern void mm_set_retry_drive(mm_command_t *cmd, char *drive);
+extern void mm_set_retry_lib(mm_command_t *cmd, char *lib);
+extern void mm_set_retry_cart(mm_command_t *cmd, char *cart);
+extern void mm_set_least_severe(mm_command_t *cmd);
+extern int mm_same_err(mm_cmd_err_t *err1, mm_cmd_err_t *err2);
+extern void mm_clear_cur_err(mm_command_t *cmd);
+extern void mm_rm_err(mm_command_t *cmd, mm_cmd_err_t *err);
+extern char *mm_return_err_text(mm_cmd_err_t *err);
 #endif /* _MM_UTIL_H */

@@ -377,6 +377,10 @@ MM_MSG(MM_5108_MSG, gettext("Standard privilege client may not modify " \
 MM_MSG(MM_5109_MSG, gettext("Administrator privilege client may not modify " \
 	"object $object$ attribute $attribute$."))
 
+#define	MM_5110_MSG 5110
+MM_MSG(MM_5110_MSG, gettext("No solutions to this begin-end group, " \
+	"one or more mounts cannot complete - $err_text$"))
+
 #ifdef	__cplusplus
 }
 #endif

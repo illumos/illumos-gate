@@ -72,9 +72,328 @@ extern void uuid_generate_random(uuid_t uu);
 extern void uuid_generate(uuid_t uu); /* hits bug id 6397009 */
 extern void uuid_unparse(uuid_t uu, char *out);
 
+/*
+ * mm_err_eclass_rank
+ *   return int of the rank of this eclass
+ *   higher numbers mean more severe
+ */
+int
+mm_err_eclass_rank(char *eclass)
+{
+	/* 13 total error classes */
+
+	if (strcmp(eclass, ECLASS_LANGUAGE) == 0)
+		return (13);
+	if (strcmp(eclass, ECLASS_EXPLICIT) == 0)
+		return (12);
+	if (strcmp(eclass, ECLASS_INTERNAL) == 0)
+		return (11);
+	if (strcmp(eclass, ECLASS_INVALID) == 0)
+		return (10);
+	if (strcmp(eclass, ECLASS_DM_INVALID) == 0)
+		return (9);
+	if (strcmp(eclass, ECLASS_DM_CONFIG) == 0)
+		return (8);
+	if (strcmp(eclass, ECLASS_EXIST) == 0)
+		return (7);
+	if (strcmp(eclass, ECLASS_SUBOP) == 0)
+		return (6);
+	if (strcmp(eclass, ECLASS_CONFIG) == 0)
+		return (5);
+	if (strcmp(eclass, ECLASS_STATE) == 0)
+		return (4);
+	if (strcmp(eclass, ECLASS_PERMPRIV) == 0)
+		return (3);
+	if (strcmp(eclass, ECLASS_COMPAT) == 0)
+		return (2);
+	if (strcmp(eclass, ECLASS_RETRY) == 0)
+		return (1);
+	return (0);
+}
+
+char *
+mm_return_err_text(mm_cmd_err_t *err) {
+	/* Generate a quick text for this error */
+	/* to be used as error text for an end command */
+	char *buf = NULL;
+
+	mms_trace(MMS_DEVP,
+	    "mm_return_err_text: ");
+
+	if (err == NULL) {
+		mms_trace(MMS_DEVP,
+		    "err ptr is NULL");
+		buf = mms_strapp(buf,
+		    "none");
+		return (buf);
+	}
+
+	if (err->eclass != NULL) {
+		buf = mms_strapp(buf,
+		    "%s ", err->eclass);
+		mms_trace(MMS_DEVP,
+		    "  %s", err->eclass);
+
+	}
+	if (err->ecode != NULL) {
+		buf = mms_strapp(buf,
+		    "%s ", err->ecode);
+		mms_trace(MMS_DEVP,
+		    "  %s", err->ecode);
+	}
+	if (err->retry_cart != NULL) {
+		buf = mms_strapp(buf,
+		    "%s ", err->retry_cart);
+		mms_trace(MMS_DEVP,
+		    "  %s", err->retry_cart);
+	}
+	if (err->retry_drive != NULL) {
+		buf = mms_strapp(buf,
+		    "%s ", err->retry_drive);
+		mms_trace(MMS_DEVP,
+		    "  %s", err->retry_drive);
+	}
+	if (err->retry_lib != NULL) {
+		buf = mms_strapp(buf,
+		    "%s ", err->retry_lib);
+		mms_trace(MMS_DEVP,
+		    "  %s", err->retry_lib);
+	}
+	if (buf == NULL) {
+		buf = mms_strapp(buf,
+		    "none");
+		mms_trace(MMS_DEVP,
+		    "err ptr not NULL, but empty");
+	}
+	return (buf);
+}
+
+
+
+int
+mm_same_err_helper(char *str1, char *str2) {
+	if (str1 == NULL) {
+		if (str2 == NULL) {
+			/* both ptrs are NULL, return 0 */
+			return (0);
+		} else {
+			/* str1 is NULL, str2 is not */
+			return (1);
+		}
+	} else {
+		/* str1 is not NULL */
+		if (str2 == NULL) {
+			/* str1 is not, str2 is NULL */
+			return (1);
+		}
+	}
+
+	/* both str's are not NULL */
+	return (strcmp(str1, str2));
+}
+
+
+int
+mm_same_err(mm_cmd_err_t *err1, mm_cmd_err_t *err2) {
+
+	if ((err1 == NULL) ||
+	    (err2 == NULL)) {
+		mms_trace(MMS_DEVP,
+		    "mm_same_err: "
+		    "err1 or err2 is NULL");
+		return (0);
+	}
+	if ((err1->eclass == NULL) ||
+	    (err2->eclass == NULL)) {
+		mms_trace(MMS_DEVP,
+		    "mm_same_err: "
+		    "one or both err class was NULL");
+		return (0);
+	}
+	if (strcmp(err1->eclass, err2->eclass) != 0) {
+		mms_trace(MMS_DEVP,
+		    "mm_same_err: "
+		    "eclasses are different");
+		return (0);
+	}
+
+	if (mm_same_err_helper(err1->retry_cart,
+	    err2->retry_cart) != 0) {
+		mms_trace(MMS_DEVP,
+		    "mm_same_err: "
+		    "retry cart is different");
+		return (0);
+	}
+	if (mm_same_err_helper(err1->retry_drive,
+	    err2->retry_drive) != 0) {
+		mms_trace(MMS_DEVP,
+		    "mm_same_err: "
+		    "retry drive is different");
+		return (0);
+	}
+	if (mm_same_err_helper(err1->retry_lib,
+	    err2->retry_lib) != 0) {
+		mms_trace(MMS_DEVP,
+		    "mm_same_err: "
+		    "retry lib is different");
+		return (0);
+	}
+	mms_trace(MMS_DEVP,
+	    "mm_same_err: "
+	    "errors are the same");
+	return (1);
+}
 
 void
-mm_clear_db(PGresult **results) {
+mm_set_buf_to_err(mm_command_t *cmd, mm_cmd_err_t *err)
+{
+
+	/* set current cmd_buf to least_err */
+	if (cmd->cmd_buf != NULL) {
+		free(cmd->cmd_buf);
+		cmd->cmd_buf = NULL;
+	}
+	cmd->cmd_buf = strdup(err->err_buf);
+	cmd->cmd_bufsize = err->err_bufsize;
+	if (cmd->cmd_ecode != NULL) {
+		free(cmd->cmd_ecode);
+		cmd->cmd_ecode = NULL;
+	}
+	if (cmd->cmd_eclass != NULL) {
+		free(cmd->cmd_eclass);
+		cmd->cmd_eclass = NULL;
+	}
+	cmd->cmd_ecode = strdup(err->ecode);
+	cmd->cmd_eclass = strdup(err->eclass);
+}
+
+void
+mm_clear_cur_err(mm_command_t *cmd)
+{
+	if (cmd->cmd_ecode != NULL) {
+		free(cmd->cmd_ecode);
+		cmd->cmd_ecode = NULL;
+	}
+	if (cmd->cmd_eclass != NULL) {
+		free(cmd->cmd_eclass);
+		cmd->cmd_eclass = NULL;
+	}
+	if (cmd->cmd_buf != NULL) {
+		free(cmd->cmd_buf);
+		cmd->cmd_buf = NULL;
+	}
+	cmd->cmd_bufsize = 0;
+
+}
+
+
+void
+mm_set_least_severe(mm_command_t *cmd)
+{
+
+	mm_cmd_err_t *err = NULL;
+	mm_cmd_err_t *least_err = NULL;
+	int		cur_rank = 0;
+	int		least_rank = 0;
+	int		first = 1;
+
+
+	mms_list_foreach(&cmd->cmd_err_list, err) {
+		if (err->err_already_used) {
+			continue;
+		}
+		if (err->eclass == NULL)
+			continue;
+		if (first) {
+			least_err = err;
+			least_rank =
+			    mm_err_eclass_rank(least_err->eclass);
+			first = 0;
+			continue;
+		}
+		cur_rank = mm_err_eclass_rank(err->eclass);
+		if (cur_rank < least_rank) {
+			least_rank = cur_rank;
+			least_err = err;
+		}
+
+	}
+	if (first) {
+		mms_trace(MMS_ERR,
+		    "mm_set_least_severe: "
+		    "there are no unused "
+		    "errors in the list");
+		cmd->cmd_err_ptr = NULL;
+		return;
+	}
+	mms_trace(MMS_ERR,
+	    "mm_set_least_severe: "
+	    "setting error %s %s",
+	    least_err->eclass,
+	    least_err->ecode);
+	mm_set_buf_to_err(cmd, least_err);
+	cmd->cmd_err_ptr = least_err;
+}
+
+void
+mm_set_retry_drive(mm_command_t *cmd, char *drive)
+{
+	mm_cmd_err_t *err = NULL;
+	if ((err = mms_list_tail(&cmd->cmd_err_list)) == NULL) {
+		return;
+	}
+	if (err->retry_drive != NULL) {
+		free(err->retry_drive);
+		err->retry_drive = NULL;
+	}
+	if (drive == NULL) {
+		return;
+	}
+	err->retry_drive =
+	    mms_strapp(err->retry_drive,
+	    drive);
+}
+
+void
+mm_set_retry_lib(mm_command_t *cmd, char *lib)
+{
+	mm_cmd_err_t *err = NULL;
+	if ((err = mms_list_tail(&cmd->cmd_err_list)) == NULL) {
+		return;
+	}
+	if (err->retry_lib != NULL) {
+		free(err->retry_lib);
+		err->retry_lib = NULL;
+	}
+	if (lib == NULL) {
+		return;
+	}
+	err->retry_lib=
+	    mms_strapp(err->retry_lib,
+	    lib);
+}
+void
+mm_set_retry_cart(mm_command_t *cmd, char *cart)
+{
+	mm_cmd_err_t *err = NULL;
+	if ((err = mms_list_tail(&cmd->cmd_err_list)) == NULL) {
+		return;
+	}
+	if (err->retry_cart != NULL) {
+		free(err->retry_cart);
+		err->retry_cart = NULL;
+	}
+	if (cart == NULL) {
+		return;
+	}
+	err->retry_cart =
+	    mms_strapp(err->retry_cart,
+	    cart);
+}
+
+void
+mm_clear_db(PGresult **results)
+{
 	if (*results != NULL) {
 		PQclear(*results);
 		*results = NULL;
@@ -82,7 +401,74 @@ mm_clear_db(PGresult **results) {
 }
 
 void
-mm_system_error(mm_command_t *cmd, char *fmt, ...) {
+mm_rm_err(mm_command_t *cmd, mm_cmd_err_t *err)
+{
+	mm_cmd_err_t *cur_err = NULL;
+	mm_cmd_err_t *next_err = NULL;
+
+	for (cur_err = mms_list_head(&cmd->cmd_err_list);
+	    cur_err != NULL;
+	    cur_err = next_err) {
+		next_err = mms_list_next(&cmd->cmd_err_list,
+		    cur_err);
+		if (mm_same_err(err, cur_err)) {
+			cur_err->err_already_used = 1;
+			mms_trace(MMS_DEVP,
+			    "mm_rm_err: "
+			    "an error marked as used");
+		}
+
+	}
+
+
+}
+
+void
+mm_print_err(mm_cmd_err_t *err)
+{
+
+	mms_trace(MMS_DEVP,
+	    "    %s, %s %s",
+	    err->eclass,
+	    err->ecode,
+	    err->err_buf);
+	if (err->retry_drive != NULL)
+		mms_trace(MMS_DEVP,
+		    "  retry_drive = %s",
+		    err->retry_drive);
+	if (err->retry_cart != NULL)
+		mms_trace(MMS_DEVP,
+		    "  retry_cart = %s",
+		    err->retry_cart);
+	if (err->retry_lib != NULL)
+		mms_trace(MMS_DEVP,
+		    "  retry_lib = %s",
+		    err->retry_lib);
+}
+
+void
+mm_print_err_list(mm_command_t *cmd)
+{
+	mm_cmd_err_t *err = NULL;
+	int	err_count = 1;
+
+	mms_trace(MMS_DEVP,
+	    "mm_print_err_list: "
+	    "error list is :");
+	mms_list_foreach(&cmd->cmd_err_list, err) {
+		if (err->err_already_used)
+			continue;
+		mms_trace(MMS_DEVP,
+		    "  Error # %d:",
+		    err_count);
+		mm_print_err(err);
+		err_count ++;
+	}
+}
+
+void
+mm_system_error(mm_command_t *cmd, char *fmt, ...)
+{
 	va_list		args;
 	char		*text;
 
@@ -336,6 +722,7 @@ mm_alloc_cmd(mm_wka_t *mm_wka) {
 	mm_cmd->cmd_task = NULL;
 	mm_cmd->cmd_textcmd = NULL;
 	mm_cmd->cmd_report = NULL;
+	mm_cmd->cmd_err_ptr = NULL;
 
 	/* mount command info */
 	mm_cmd->cmd_mount_info.cmi_dm = NULL;
@@ -370,6 +757,11 @@ mm_alloc_cmd(mm_wka_t *mm_wka) {
 	    offsetof(mm_char_list_t, mm_char_list_next));
 	mms_list_create(&mm_cmd->cmd_resp_list, sizeof (mm_char_list_t),
 	    offsetof(mm_char_list_t, mm_char_list_next));
+	/* error list */
+
+	mms_list_create(&mm_cmd->cmd_err_list, sizeof (mm_cmd_err_t),
+	    offsetof(mm_cmd_err_t, mm_cmd_err_next));
+
 
 	/* Initalize the access mode list */
 	mms_list_create(&mm_cmd->cmd_mount_info.cmi_mode_list,
@@ -1079,4 +1471,98 @@ mm_add_to_const(mm_command_t *cmd, char *str) {
 		return (0);
 	}
 	return (1);
+}
+
+/*
+ * mm_free_err:
+ * -free's memory inside mm_cmd_err_t
+ * -caller should free the struct itself
+ */
+
+void
+mm_free_err(mm_cmd_err_t *cmd_error) {
+	if (cmd_error->ecode != NULL) {
+		free(cmd_error->ecode);
+		cmd_error->ecode = NULL;
+	}
+	if (cmd_error->eclass != NULL) {
+		free(cmd_error->eclass);
+		cmd_error->eclass = NULL;
+	}
+	if (cmd_error->err_buf != NULL) {
+		free(cmd_error->err_buf);
+		cmd_error->err_buf = NULL;
+	}
+	if (cmd_error->retry_drive != NULL) {
+		free(cmd_error->retry_drive);
+		cmd_error->retry_drive = NULL;
+	}
+	if (cmd_error->retry_cart != NULL) {
+		free(cmd_error->retry_cart);
+		cmd_error->retry_cart = NULL;
+	}
+	if (cmd_error->retry_lib != NULL) {
+		free(cmd_error->retry_lib);
+		cmd_error->retry_lib = NULL;
+	}
+	cmd_error->err_bufsize = 0;
+}
+
+/*
+ * mm_free_err_list:
+ * -free's an entire cmd's err list
+ * -caller should call list destroy on the actual list
+ */
+void
+mm_free_err_list(mm_command_t *cmd) {
+
+	mm_cmd_err_t	*cur_err;
+	mm_cmd_err_t	*next_err;
+
+	mms_list_t	*err_list;
+
+	err_list = &cmd->cmd_err_list;
+
+	/* If the obj is already in the list, skip */
+	for (cur_err = mms_list_head(err_list);
+	    cur_err != NULL;
+	    cur_err = next_err) {
+		next_err = mms_list_next(err_list, cur_err);
+		/* remove this from the list and free */
+		mms_list_remove(err_list,
+		    cur_err);
+		mm_free_err(cur_err);
+		free(cur_err);
+	}
+
+}
+
+/*
+ * mm_alloc_err:
+ * -allocates and initializes a new mm_cmd_err_t struct
+ */
+
+mm_cmd_err_t *
+mm_alloc_err() {
+
+	mm_cmd_err_t *err = NULL;
+
+	err = (mm_cmd_err_t *)calloc(1, sizeof (mm_cmd_err_t));
+	if (err == NULL) {
+		mms_trace(MMS_ERR,
+		    "mm_alloc_err: "
+		    "Unable to malloc mm_cmd_err_t: %s",
+		    strerror(errno));
+		return (NULL);
+	}
+	err->eclass = NULL;
+	err->ecode = NULL;
+	err->err_buf = NULL;
+	err->err_bufsize = 0;
+	err->retry_drive = NULL;
+	err->retry_cart = NULL;
+	err->retry_lib = NULL;
+	err->err_already_used = 0;
+
+	return (err);
 }
