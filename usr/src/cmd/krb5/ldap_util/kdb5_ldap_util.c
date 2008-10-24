@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * kadmin/ldap_util/kdb5_ldap_util.c
  *
@@ -359,8 +358,10 @@ int main(argc, argv)
 		goto cleanup;
 	    }
 	} else if (strcmp(*argv, "-k") == 0 && ARG_VAL) {
-	    if (krb5_string_to_enctype(koptarg, &global_params.enctype))
-		com_err(argv[0], 0, gettext("%s is an invalid enctype"), koptarg);
+	    if (krb5_string_to_enctype(koptarg, &global_params.enctype)) {
+		/* Solaris Kerberos */
+		com_err(progname, 0, gettext("%s is an invalid enctype"), koptarg);
+	    }
 	    else
 		global_params.mask |= KADM5_CONFIG_ENCTYPE;
 	} else if (strcmp(*argv, "-M") == 0 && ARG_VAL) {
@@ -482,7 +483,8 @@ int main(argc, argv)
 	retval = kadm5_get_config_params(util_context, 1,
 					 &global_params, &global_params);
 	if (retval) {
-	    com_err(argv[0], retval, gettext("while retreiving configuration parameters"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while retreiving configuration parameters"));
 	    exit_status++;
 	    goto cleanup;
 	}
@@ -490,7 +492,8 @@ int main(argc, argv)
     }
 
     if ((retval = krb5_ldap_lib_init()) != 0) {
-	com_err(argv[0], retval, gettext("while initializing error handling"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while initializing error handling"));
 	exit_status++;
 	goto cleanup;
     }
@@ -498,7 +501,8 @@ int main(argc, argv)
     /* Initialize the ldap context */
     ldap_context = calloc(sizeof(krb5_ldap_context), 1);
     if (ldap_context == NULL) {
-	com_err(argv[0], ENOMEM, gettext("while initializing ldap handle"));
+	/* Solaris Kerberos */
+	com_err(progname, ENOMEM, gettext("while initializing ldap handle"));
 	exit_status++;
 	goto cleanup;
     }
@@ -511,7 +515,8 @@ int main(argc, argv)
 	if (passwd == NULL) {
 	    passwd = (char *)malloc(MAX_PASSWD_LEN);
 	    if (passwd == NULL) {
-		com_err(argv[0], ENOMEM, gettext("while retrieving ldap configuration"));
+		/* Solaris Kerberos */
+		com_err(progname, ENOMEM, gettext("while retrieving ldap configuration"));
 		exit_status++;
 		goto cleanup;
 	    }
@@ -519,7 +524,8 @@ int main(argc, argv)
 	    if (prompt == NULL) {
 		free(passwd);
 		passwd = NULL;
-		com_err(argv[0], ENOMEM, gettext("while retrieving ldap configuration"));
+		/* Solaris Kerberos */
+		com_err(progname, ENOMEM, gettext("while retrieving ldap configuration"));
 		exit_status++;
 		goto cleanup;
 	    }
@@ -530,7 +536,8 @@ int main(argc, argv)
 	    db_retval = krb5_read_password(util_context, prompt, NULL, passwd, &passwd_len);
 
 	    if ((db_retval) || (passwd_len == 0)) {
-		com_err(argv[0], ENOMEM, gettext("while retrieving ldap configuration"));
+		/* Solaris Kerberos */
+		com_err(progname, db_retval, gettext("while retrieving ldap configuration"));
 		free(passwd);
 		passwd = NULL;
 		exit_status++;
@@ -546,14 +553,16 @@ int main(argc, argv)
 
 	ldap_context->server_info_list = (krb5_ldap_server_info **) calloc (2, sizeof (krb5_ldap_server_info *)) ;
 	if (ldap_context->server_info_list == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while initializing server list"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while initializing server list"));
 	    exit_status++;
 	    goto cleanup;
 	}
 
 	ldap_context->server_info_list[0] = (krb5_ldap_server_info *) calloc (1, sizeof (krb5_ldap_server_info));
 	if (ldap_context->server_info_list[0] == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while initializing server list"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while initializing server list"));
 	    exit_status++;
 	    goto cleanup;
 	}
@@ -562,7 +571,8 @@ int main(argc, argv)
 
 	ldap_context->server_info_list[0]->server_name = strdup(ldap_server);
 	if (ldap_context->server_info_list[0]->server_name == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while initializing server list"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while initializing server list"));
 	    exit_status++;
 	    goto cleanup;
 	}
@@ -570,7 +580,8 @@ int main(argc, argv)
     if (bind_dn) {
 	ldap_context->bind_dn = strdup(bind_dn);
 	if (ldap_context->bind_dn == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while retrieving ldap configuration"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while retrieving ldap configuration"));
 	    exit_status++;
 	    goto cleanup;
 	}
@@ -582,7 +593,8 @@ int main(argc, argv)
     if (realm_name_required) {
 	if ((global_params.enctype != ENCTYPE_UNKNOWN) &&
 	    (!krb5_c_valid_enctype(global_params.enctype))) {
-	    com_err(argv[0], KRB5_PROG_KEYTYPE_NOSUPP,
+	    /* Solaris Kerberos */
+	    com_err(progname, KRB5_PROG_KEYTYPE_NOSUPP,
 		    gettext("while setting up enctype %d"), global_params.enctype);
 	}
     }
@@ -599,7 +611,8 @@ int main(argc, argv)
 
     db_retval = krb5_ldap_read_server_params(util_context, conf_section, KRB5_KDB_SRV_TYPE_OTHER);
     if (db_retval) {
-	com_err(argv[0], db_retval, gettext("while reading ldap configuration"));
+	/* Solaris Kerberos */
+	com_err(progname, db_retval, gettext("while reading ldap configuration"));
 	exit_status++;
 	goto cleanup;
     }

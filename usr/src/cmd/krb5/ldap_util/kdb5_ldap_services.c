@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kadmin/ldap_util/kdb5_ldap_services.c
@@ -207,7 +205,8 @@ void kdb5_ldap_create_service(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
     krb5_error_code retval = 0;
     krb5_ldap_service_params *srvparams = NULL;
     krb5_boolean print_usage = FALSE;
@@ -505,7 +504,8 @@ void kdb5_ldap_modify_service(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname; 
     krb5_error_code retval = 0;
     krb5_ldap_service_params *srvparams = NULL;
     krb5_boolean print_usage = FALSE;
@@ -578,7 +578,8 @@ void kdb5_ldap_modify_service(argc, argv)
 
     retval = krb5_ldap_read_service(util_context, servicedn, &srvparams, &in_mask);
     if (retval) {
-	com_err(argv[0], retval, gettext("while reading information of service '%s'"),
+	/* Solaris Kerberos */
+	com_err(me, retval, gettext("while reading information of service '%s'"),
 		servicedn);
 	goto err_nomsg;
     }
@@ -1070,7 +1071,8 @@ rem_service_entry_from_file(argc, argv, file_name, service_object)
     char *service_object;
 {
     int     st        = EINVAL;
-    char    *me       = argv[0];
+    /* Solaris Kerberos */
+    char    *me       = progname;
     char    *tmp_file = NULL;
     int     tmpfd     = -1;
     FILE    *pfile    = NULL;
@@ -1184,7 +1186,8 @@ kdb5_ldap_destroy_service(argc, argv)
 	    if (argv[i+1]) {
 		stashfilename=strdup(argv[i+1]);
 		if (stashfilename == NULL) {
-		    com_err(argv[0], ENOMEM, gettext("while destroying service"));
+		    /* Solaris Kerberos */
+		    com_err(progname, ENOMEM, gettext("while destroying service"));
 		    exit_status++;
 		    goto cleanup;
 		}
@@ -1197,7 +1200,8 @@ kdb5_ldap_destroy_service(argc, argv)
 	    if ((argv[i]) && (servicedn == NULL)) {
 		servicedn=strdup(argv[i]);
 		if (servicedn == NULL) {
-		    com_err(argv[0], ENOMEM, gettext("while destroying service"));
+		    /* Solaris Kerberos */
+		    com_err(progname, ENOMEM, gettext("while destroying service"));
 		    exit_status++;
 		    goto cleanup;
 		}
@@ -1228,7 +1232,8 @@ kdb5_ldap_destroy_service(argc, argv)
 
     if ((retval = krb5_ldap_read_service(util_context, servicedn,
 					 &lserparams, &mask))) {
-	com_err(argv[0], retval, gettext("while destroying service '%s'"), servicedn);
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while destroying service '%s'"), servicedn);
 	exit_status++;
 	goto cleanup;
     }
@@ -1236,7 +1241,8 @@ kdb5_ldap_destroy_service(argc, argv)
     retval = krb5_ldap_delete_service(util_context, lserparams, servicedn);
 
     if (retval) {
-	com_err(argv[0], retval, gettext("while destroying service '%s'"), servicedn);
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while destroying service '%s'"), servicedn);
 	exit_status++;
 	goto cleanup;
     }
@@ -1244,7 +1250,8 @@ kdb5_ldap_destroy_service(argc, argv)
     if (stashfilename == NULL) {
 	stashfilename = strdup(DEF_SERVICE_PASSWD_FILE);
 	if (stashfilename == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while destroying service"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while destroying service"));
 	    exit_status++;
 	    goto cleanup;
 	}
@@ -1304,13 +1311,15 @@ void kdb5_ldap_view_service(argc, argv)
 
     servicedn=strdup(argv[1]);
     if (servicedn == NULL) {
-	com_err(argv[0], ENOMEM, gettext("while viewing service"));
+	/* Solaris Kerberos */
+	com_err(progname, ENOMEM, gettext("while viewing service"));
 	exit_status++;
 	goto cleanup;
     }
 
     if ((retval = krb5_ldap_read_service(util_context, servicedn, &lserparams, &mask))) {
-	com_err(argv[0], retval, gettext("while viewing service '%s'"), servicedn);
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while viewing service '%s'"), servicedn);
 	exit_status++;
 	goto cleanup;
     }
@@ -1347,7 +1356,8 @@ void kdb5_ldap_list_services(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
     krb5_error_code retval = 0;
     char *basedn = NULL;
     char **list = NULL;
@@ -1528,7 +1538,8 @@ kdb5_ldap_set_service_password(argc, argv)
     krb5_ldap_context *lparams = NULL;
     char *file_name = NULL;
     char *tmp_file = NULL;
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
     int filelen = 0;
     int random_passwd = 0;
     int set_dir_pwd = 1;
@@ -1911,7 +1922,8 @@ kdb5_ldap_stash_service_password(argc, argv)
 {
     int ret = 0;
     unsigned int passwd_len = 0;
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
     char *service_object = NULL;
     char *file_name = NULL, *tmp_file = NULL;
     char passwd[MAX_SERVICE_PASSWD_LEN];

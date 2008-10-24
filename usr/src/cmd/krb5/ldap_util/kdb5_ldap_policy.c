@@ -1,7 +1,11 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kadmin/ldap_util/kdb5_ldap_policy.c
+ */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /* Copyright (c) 2004-2005, Novell, Inc.
@@ -51,7 +55,7 @@ static char *strdur(time_t duration);
 
 extern char *yes;
 extern kadm5_config_params global_params;
-                                                                                                                             
+                 
 static krb5_error_code init_ldap_realm (int argc, char *argv[]) {
     /* This operation is being performed in the context of a realm. So,
      * initialize the realm */
@@ -71,7 +75,8 @@ static krb5_error_code init_ldap_realm (int argc, char *argv[]) {
         retval = krb5_ldap_read_krbcontainer_params (util_context,
                 &(ldap_context->krbcontainer));
         if (retval != 0) {
-            com_err(argv[0], retval, gettext("while reading kerberos container information"));
+	    /* Solaris Kerberos */
+            com_err(progname, retval, gettext("while reading kerberos container information"));
             goto cleanup;
         }
     }
@@ -99,7 +104,9 @@ kdb5_ldap_create_policy(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
+
     krb5_error_code retval = 0;
     krb5_ldap_policy_params *policyparams = NULL;
     krb5_boolean print_usage = FALSE;
@@ -326,7 +333,9 @@ kdb5_ldap_destroy_policy(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
+
     krb5_error_code retval = 0;
     krb5_ldap_policy_params *policyparams = NULL;
     krb5_boolean print_usage = FALSE;
@@ -430,7 +439,9 @@ kdb5_ldap_modify_policy(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
+
     krb5_error_code retval = 0;
     krb5_ldap_policy_params *policyparams = NULL;
     krb5_boolean print_usage = FALSE;
@@ -687,7 +698,9 @@ kdb5_ldap_view_policy(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
+
     krb5_ldap_policy_params *policyparams = NULL;
     krb5_error_code retval = 0;
     krb5_boolean print_usage = FALSE;
@@ -808,7 +821,9 @@ void kdb5_ldap_list_policies(argc, argv)
     int argc;
     char *argv[];
 {
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
+
     krb5_error_code retval = 0;
     krb5_boolean print_usage = FALSE;
     char *basedn = NULL;

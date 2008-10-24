@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -295,8 +294,10 @@ int main(argc, argv)
 		 exit(1);
 	    }
        } else if (strcmp(*argv, "-k") == 0 && ARG_VAL) {
-	    if (krb5_string_to_enctype(koptarg, &global_params.enctype))
-		 com_err(argv[0], 0, gettext("%s is an invalid enctype"), koptarg);
+	    if (krb5_string_to_enctype(koptarg, &global_params.enctype)) {
+		/* Solaris Kerberos */
+		 com_err(progname, 0, gettext("%s is an invalid enctype"), koptarg);
+	    }
 	    else
 		 global_params.mask |= KADM5_CONFIG_ENCTYPE;
        } else if (strcmp(*argv, "-M") == 0 && ARG_VAL) {
@@ -340,7 +341,8 @@ int main(argc, argv)
     retval = kadm5_get_config_params(util_context, 1,
 				     &global_params, &global_params);
     if (retval) {
-	 com_err(argv[0], retval,
+		/* Solaris Kerberos */
+		com_err(progname, retval,
 		    gettext("while retreiving configuration parameters"));
 	 exit(1);
     }
@@ -355,8 +357,10 @@ int main(argc, argv)
 
     if ((global_params.enctype != ENCTYPE_UNKNOWN) &&
 	(!krb5_c_valid_enctype(global_params.enctype))) {
-	com_err(argv[0], KRB5_PROG_KEYTYPE_NOSUPP,
+	/* Solaris Kerberos */
+	com_err(progname, KRB5_PROG_KEYTYPE_NOSUPP,
 	    gettext("while setting up enctype %d"), global_params.enctype);
+	exit(1);
     }
 
     cmd = cmd_lookup(cmd_argv[0]);
@@ -393,15 +397,17 @@ void set_dbname(argc, argv)
     krb5_error_code retval;
 
     if (argc < 3) {
-		com_err(argv[0], 0, gettext("Too few arguments"));
-		com_err(argv[0], 0, gettext("Usage: %s dbpathname realmname"),
-			argv[0]);
+		/* Solaris Kerberos */
+		com_err(progname, 0, gettext("Too few arguments"));
+		com_err(progname, 0, gettext("Usage: %s dbpathname realmname"),
+			progname);
 	exit_status++;
 	return;
     }
     if (dbactive) {
 	if ((retval = krb5_db_fini(util_context)) && retval!= KRB5_KDB_DBNOTINITED) {
-	    com_err(argv[0], retval, gettext("while closing previous database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while closing previous database"));
 	    exit_status++;
 	    return;
 	}
@@ -414,7 +420,8 @@ void set_dbname(argc, argv)
 	dbactive = FALSE;
     }
 
-    (void) set_dbname_help(argv[0], argv[1]);
+    /* Solaris Kerberos */
+    (void) set_dbname_help(progname, argv[1]);
     return;
 }
 #endif
@@ -490,6 +497,8 @@ static int open_db_and_mkey()
 	if (retval) {
 		com_err(progname, retval,
 		    gettext("while calculated master key salt"));
+	    /* Solaris Kerberos */
+	    exit_status++;
 	    return(1);
 	}
 
@@ -507,6 +516,8 @@ static int open_db_and_mkey()
 	if (retval) {
 	    com_err(progname, retval,
 		gettext("while transforming master key from password"));
+	    /* Solaris Kerberos */
+	    exit_status++;
 	    return(1);
 	}
 	free(scratch.data);
@@ -594,7 +605,8 @@ add_random_key(argc, argv)
     krb5_int32 num_keysalts = 0;
 
     int free_keysalts;
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
     char *ks_str = NULL;
     char *pr_str;
 

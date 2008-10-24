@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -66,7 +64,6 @@ extern int exit_status;
 extern krb5_boolean dbactive;
 extern kadm5_config_params global_params;
 
-
 void
 kdb5_destroy(argc, argv)
     int argc;
@@ -85,19 +82,23 @@ kdb5_destroy(argc, argv)
     retval1 = kadm5_init_krb5_context(&context);
     if( retval1 )
     {
-	com_err(argv[0], retval1, "while initializing krb5_context");
+	/* Solaris Kerberos */
+	com_err(progname, retval1, "while initializing krb5_context");
 	exit(1);
     }
 
     if ((retval1 = krb5_set_default_realm(context,
 					  util_context->default_realm))) {
-	com_err(argv[0], retval1, "while setting default realm name");
+	/* Solaris Kerberos */
+	com_err(progname, retval1, "while setting default realm name");
 	exit(1);
     }
     
+/* Solaris Kerberos */
+#if 0
     if (strrchr(argv[0], '/'))
 	argv[0] = strrchr(argv[0], '/')+1;
-
+#endif
     dbname = global_params.dbname;
 
     optind = 1;
@@ -155,7 +156,8 @@ kdb5_destroy(argc, argv)
 	(void)unlink(global_params.stash_file);
 
     if (retval1) {
-		com_err(argv[0], retval1,
+		/* Solaris Kerberos */
+		com_err(progname, retval1,
 			gettext("deleting database '%s'"), dbname);
 	exit_status++; return;
     }

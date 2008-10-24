@@ -29,10 +29,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
 #ifndef _KDB5_LDAP_UTIL_H_
 #define _KDB5_LDAP_UTIL_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kdb_ldap.h>
 #include "kdb5_ldap_realm.h"
@@ -62,6 +66,9 @@
 #define VIEW_POLICY           13
 #define DESTROY_POLICY        14
 #define LIST_POLICY           15
+
+/* Solaris Kerberos */
+extern char *progname;
 
 extern int exit_status;
 extern krb5_context util_context;

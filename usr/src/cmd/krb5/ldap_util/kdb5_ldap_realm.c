@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kadmin/ldap_util/kdb5_ldap_realm.c
@@ -161,7 +159,8 @@ static int get_ticket_policy(rparams,i,argv,argc)
     krb5_boolean no_msg = FALSE;
 
     krb5_boolean print_usage = FALSE;
-    char *me = argv[0];
+    /* Solaris Kerberos */
+    char *me = progname;
 
     time(&now);
     if (!strcmp(argv[*i], "-maxtktlife")) {
@@ -373,7 +372,8 @@ void kdb5_ldap_create(argc, argv)
 		rparams->subtree = list;
 	    } else if(strncmp(argv[i], "", strlen(argv[i]))==0) {
 		 /* dont allow subtree value to be set at the root(NULL, "") of the tree */
-		 com_err(argv[0], EINVAL,
+		 /* Solaris Kerberos */
+		 com_err(progname, EINVAL,
 			  gettext("for subtree while creating realm '%s'"),
 			   global_params.realm);
 		 goto err_nomsg;
@@ -385,7 +385,8 @@ void kdb5_ldap_create(argc, argv)
 		goto err_usage;
 	    if(strncmp(argv[i], "", strlen(argv[i]))==0) {
 		 /* dont allow containerref value to be set at the root(NULL, "") of the tree */
-		 com_err(argv[0], EINVAL,
+		 /* Solaris Kerberos */
+		 com_err(progname, EINVAL,
 			  gettext("for container reference while creating realm '%s'"),
 			   global_params.realm);
 		 goto err_nomsg;
@@ -410,7 +411,8 @@ void kdb5_ldap_create(argc, argv)
 		rparams->search_scope = atoi(argv[i]);
 		if ((rparams->search_scope != 1) &&
 		    (rparams->search_scope != 2)) {
-		    com_err(argv[0], EINVAL,
+		    /* Solaris Kerberos */
+		    com_err(progname, EINVAL,
 			    gettext("invalid search scope while creating realm '%s'"),
 			    global_params.realm);
 		    goto err_nomsg;
@@ -507,7 +509,8 @@ void kdb5_ldap_create(argc, argv)
 	retval = krb5_read_password(util_context, KRB5_KDC_MKEY_1, KRB5_KDC_MKEY_2,
 				    pw_str, &pw_size);
 	if (retval) {
-	    com_err(argv[0], retval, gettext("while reading master key from keyboard"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while reading master key from keyboard"));
 	    goto err_nomsg;
 	}
 	mkey_password = pw_str;
@@ -525,7 +528,8 @@ void kdb5_ldap_create(argc, argv)
     rparams->realm_name = strdup(global_params.realm);
     if (rparams->realm_name == NULL) {
 	retval = ENOMEM;
-	com_err(argv[0], ENOMEM, gettext("while creating realm '%s'"),
+	/* Solaris Kerberos */
+	com_err(progname, ENOMEM, gettext("while creating realm '%s'"),
 		global_params.realm);
 	goto err_nomsg;
     }
@@ -597,11 +601,13 @@ void kdb5_ldap_create(argc, argv)
 	retval = krb5_ldap_read_krbcontainer_params(util_context,
 						    &(ldap_context->krbcontainer));
 	if (retval) {
-	    com_err(argv[0], retval, gettext("while reading kerberos container information"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while reading kerberos container information"));
 	    goto cleanup;
 	}
     } else if (retval) {
-	com_err(argv[0], retval, gettext("while reading kerberos container information"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading kerberos container information"));
 	goto cleanup;
     }
 
@@ -617,7 +623,8 @@ void kdb5_ldap_create(argc, argv)
 					      global_params.realm,
 					      &(ldap_context->lrparams),
 					      &mask))) {
-	com_err(argv[0], retval, gettext("while reading information of realm '%s'"),
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading information of realm '%s'"),
 		global_params.realm);
 	goto err_nomsg;
     }
@@ -632,7 +639,8 @@ void kdb5_ldap_create(argc, argv)
 					  global_params.mkey_name,
 					  global_params.realm,
 					  0, &master_princ))) {
-	com_err(argv[0], retval, gettext("while setting up master key name"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while setting up master key name"));
 	goto err_nomsg;
     }
 
@@ -644,7 +652,8 @@ void kdb5_ldap_create(argc, argv)
 	pwd.length = strlen(mkey_password);
 	retval = krb5_principal2salt(util_context, master_princ, &master_salt);
 	if (retval) {
-	    com_err(argv[0], retval, gettext("while calculating master key salt"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while calculating master key salt"));
 	    goto err_nomsg;
 	}
 
@@ -655,7 +664,8 @@ void kdb5_ldap_create(argc, argv)
 	    free(master_salt.data);
 
 	if (retval) {
-	    com_err(argv[0], retval, gettext("while transforming master key from password"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while transforming master key from password"));
 	    goto err_nomsg;
 	}
 
@@ -698,14 +708,16 @@ void kdb5_ldap_create(argc, argv)
 	/* Create 'K/M' ... */
 	rblock.flags |= KRB5_KDB_DISALLOW_ALL_TIX;
 	if ((retval = kdb_ldap_create_principal(util_context, master_princ, MASTER_KEY, &rblock))) {
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
 	/* Create 'krbtgt' ... */
 	rblock.flags = 0; /* reset the flags */
 	if ((retval = kdb_ldap_create_principal(util_context, &tgt_princ, TGT_KEY, &rblock))) {
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	/*
@@ -719,14 +731,16 @@ void kdb5_ldap_create(argc, argv)
 	/* Create 'kadmin/admin' ... */
 	snprintf(princ_name, sizeof(princ_name), "%s@%s", KADM5_ADMIN_SERVICE, global_params.realm);
 	if ((retval = krb5_parse_name(util_context, princ_name, &p))) {
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	rblock.max_life = ADMIN_LIFETIME;
 	rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED;
 	if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY, &rblock))) {
 	    krb5_free_principal(util_context, p);
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	krb5_free_principal(util_context, p);
@@ -735,14 +749,16 @@ void kdb5_ldap_create(argc, argv)
 	/* Create 'kadmin/changepw' ... */
 	snprintf(princ_name, sizeof(princ_name), "%s@%s", KADM5_CHANGEPW_SERVICE, global_params.realm);
 	if ((retval = krb5_parse_name(util_context, princ_name, &p))) {
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	rblock.max_life = CHANGEPW_LIFETIME;
 	rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED | KRB5_KDB_PWCHANGE_SERVICE;
 	if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY, &rblock))) {
 	    krb5_free_principal(util_context, p);
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	krb5_free_principal(util_context, p);
@@ -750,26 +766,30 @@ void kdb5_ldap_create(argc, argv)
 	/* Create 'kadmin/history' ... */
 	snprintf(princ_name, sizeof(princ_name), "%s@%s", KADM5_HIST_PRINCIPAL, global_params.realm);
 	if ((retval = krb5_parse_name(util_context, princ_name, &p))) {
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	rblock.max_life = global_params.max_life;
 	rblock.flags = 0;
 	if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY, &rblock))) {
 	    krb5_free_principal(util_context, p);
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	krb5_free_principal(util_context, p);
 
 	/* Create 'kadmin/<hostname>' ... */
 	if ((retval=krb5_sname_to_principal(util_context, NULL, KADM5_ADMIN_HOST_SERVICE, KRB5_NT_SRV_HST, &p))) {
-	    com_err(argv[0], retval, gettext("krb5_sname_to_principal, while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("krb5_sname_to_principal, while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
 	if ((retval=krb5_copy_principal(util_context, p, &temp_p))) {
-	    com_err(argv[0], retval, gettext("krb5_copy_principal, while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("krb5_copy_principal, while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
@@ -778,7 +798,8 @@ void kdb5_ldap_create(argc, argv)
 	temp_p->realm.length = strlen(util_context->default_realm);
 	temp_p->realm.data = strdup(util_context->default_realm);
 	if (temp_p->realm.data == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
@@ -786,7 +807,8 @@ void kdb5_ldap_create(argc, argv)
 	rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED;
 	if ((retval = kdb_ldap_create_principal(util_context, temp_p, TGT_KEY, &rblock))) {
 	    krb5_free_principal(util_context, p);
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	krb5_free_principal(util_context, temp_p);
@@ -794,12 +816,14 @@ void kdb5_ldap_create(argc, argv)
 
 	/* Solaris Kerberos: Create 'changepw/<hostname>' ... */
 	if ((retval=krb5_sname_to_principal(util_context, NULL, KADM5_CHANGEPW_HOST_SERVICE, KRB5_NT_SRV_HST, &p))) {
-	    com_err(argv[0], retval, gettext("krb5_sname_to_principal, while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("krb5_sname_to_principal, while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
 	if ((retval=krb5_copy_principal(util_context, p, &temp_p))) {
-	    com_err(argv[0], retval, gettext("krb5_copy_principal, while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("krb5_copy_principal, while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
@@ -808,7 +832,8 @@ void kdb5_ldap_create(argc, argv)
 	temp_p->realm.length = strlen(util_context->default_realm);
 	temp_p->realm.data = strdup(util_context->default_realm);
 	if (temp_p->realm.data == NULL) {
-	    com_err(argv[0], ENOMEM, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, ENOMEM, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 
@@ -816,7 +841,8 @@ void kdb5_ldap_create(argc, argv)
 	rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED | KRB5_KDB_PWCHANGE_SERVICE;
 	if ((retval = kdb_ldap_create_principal(util_context, temp_p, TGT_KEY, &rblock))) {
 	    krb5_free_principal(util_context, p);
-	    com_err(argv[0], retval, gettext("while adding entries to the database"));
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while adding entries to the database"));
 	    goto err_nomsg;
 	}
 	krb5_free_principal(util_context, temp_p);
@@ -844,7 +870,8 @@ void kdb5_ldap_create(argc, argv)
 							 LDAP_KDC_SERVICE, rparams->kdcservers[i],
 							 rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 		    printf(gettext("failed\n"));
-		    com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+		    /* Solaris Kerberos */
+		    com_err(progname, retval, gettext("while assigning rights to '%s'"),
 			    rparams->realm_name);
 		    goto err_nomsg;
 		}
@@ -860,7 +887,8 @@ void kdb5_ldap_create(argc, argv)
 							 LDAP_ADMIN_SERVICE, rparams->adminservers[i],
 							 rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 		    printf(gettext("failed\n"));
-		    com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+		    /* Solaris Kerberos */
+		    com_err(progname, retval, gettext("while assigning rights to '%s'"),
 			    rparams->realm_name);
 		    goto err_nomsg;
 		}
@@ -876,7 +904,8 @@ void kdb5_ldap_create(argc, argv)
 							 LDAP_PASSWD_SERVICE, rparams->passwdservers[i],
 							 rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 		    printf(gettext("failed\n"));
-		    com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+		    /* Solaris Kerberos */
+		    com_err(progname, retval, gettext("while assigning rights to '%s'"),
 			    rparams->realm_name);
 		    goto err_nomsg;
 		}
@@ -896,7 +925,8 @@ void kdb5_ldap_create(argc, argv)
 				     master_princ,
 				     &master_keyblock, NULL);
 	if (retval) {
-	    com_err(argv[0], errno, gettext("while storing key"));
+	    /* Solaris Kerberos */
+	    com_err(progname, errno, gettext("while storing key"));
 	    printf(gettext("Warning: couldn't stash master key.\n"));
 	}
     }
@@ -925,7 +955,8 @@ cleanup:
 
     if (retval) {
 	if (!no_msg) {
-	    com_err(argv[0], retval, gettext("while creating realm '%s'"),
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while creating realm '%s'"),
 		    global_params.realm);
 	}
 	exit_status++;
@@ -978,7 +1009,8 @@ void kdb5_ldap_modify(argc, argv)
 
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
 						     &(ldap_context->krbcontainer)))) {
-	com_err(argv[0], retval, gettext("while reading Kerberos container information"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading Kerberos container information"));
 	goto err_nomsg;
     }
 
@@ -1032,7 +1064,8 @@ void kdb5_ldap_modify(argc, argv)
 		rparams->subtree =  slist;
 	    } else if(strncmp(argv[i], "", strlen(argv[i]))==0) {
 		 /* dont allow subtree value to be set at the root(NULL, "") of the tree */
-		    com_err(argv[0], EINVAL,
+		    /* Solaris Kerberos */
+		    com_err(progname, EINVAL,
 			    gettext("for subtree while modifying realm '%s'"),
 			    global_params.realm);
 		    goto err_nomsg;
@@ -1044,7 +1077,8 @@ void kdb5_ldap_modify(argc, argv)
 		goto err_usage;
 	    if(strncmp(argv[i], "", strlen(argv[i]))==0) {
 		 /* dont allow containerref value to be set at the root(NULL, "") of the tree */
-		 com_err(argv[0], EINVAL,
+		 /* Solaris Kerberos */
+		 com_err(progname, EINVAL,
 			  gettext("for container reference while modifying realm '%s'"),
 			   global_params.realm);
 		 goto err_nomsg;
@@ -1070,7 +1104,8 @@ void kdb5_ldap_modify(argc, argv)
 		if ((rparams->search_scope != 1) &&
 		    (rparams->search_scope != 2)) {
 		    retval = EINVAL;
-		    com_err(argv[0], retval,
+		    /* Solaris Kerberos */
+		    com_err(progname, retval,
 			    gettext("specified for search scope while modifying information of realm '%s'"),
 			    global_params.realm);
 		    goto err_nomsg;
@@ -1575,7 +1610,8 @@ void kdb5_ldap_modify(argc, argv)
 								LDAP_KDC_SERVICE, oldkdcdns[i],
 								rparams->realm_name, oldsubtrees, rightsmask)) != 0) {
 			printf(gettext("failed\n"));
-			com_err(argv[0], retval, gettext("while assigning rights '%s'"),
+			/* Solaris Kerberos */
+			com_err(progname, retval, gettext("while assigning rights '%s'"),
 				rparams->realm_name);
 			goto err_nomsg;
 		    }
@@ -1592,7 +1628,8 @@ void kdb5_ldap_modify(argc, argv)
 							     LDAP_KDC_SERVICE, newkdcdns[i], rparams->realm_name,
 							     rparams->subtree, rightsmask)) != 0) {
 			printf(gettext("failed\n"));
-			com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+			/* Solaris Kerberos */
+			com_err(progname, retval, gettext("while assigning rights to '%s'"),
 				rparams->realm_name);
 			goto err_nomsg;
 		    }
@@ -1654,7 +1691,8 @@ void kdb5_ldap_modify(argc, argv)
 								LDAP_ADMIN_SERVICE, oldadmindns[i],
 								rparams->realm_name, oldsubtrees, rightsmask)) != 0) {
 			printf(gettext("failed\n"));
-			com_err(argv[0], retval, gettext("while assigning rights '%s'"),
+			/* Solaris Kerberos */
+			com_err(progname, retval, gettext("while assigning rights '%s'"),
 				rparams->realm_name);
 			goto err_nomsg;
 		    }
@@ -1672,7 +1710,8 @@ void kdb5_ldap_modify(argc, argv)
 							     LDAP_ADMIN_SERVICE, newadmindns[i],
 							     rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 			printf(gettext("failed\n"));
-			com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+			/* Solaris Kerberos */
+			com_err(progname, retval, gettext("while assigning rights to '%s'"),
 				rparams->realm_name);
 			goto err_nomsg;
 		    }
@@ -1734,7 +1773,8 @@ void kdb5_ldap_modify(argc, argv)
 								  LDAP_PASSWD_SERVICE, oldpwddns[i],
 								  rparams->realm_name, oldsubtrees, rightsmask))) {
 			printf(gettext("failed\n"));
-			com_err(argv[0], retval, gettext("while assigning rights '%s'"),
+			/* Solaris Kerberos */
+			com_err(progname, retval, gettext("while assigning rights '%s'"),
 				rparams->realm_name);
 			goto err_nomsg;
 		    }
@@ -1751,7 +1791,8 @@ void kdb5_ldap_modify(argc, argv)
 							       LDAP_PASSWD_SERVICE, newpwddns[i],
 							       rparams->realm_name, rparams->subtree, rightsmask))) {
 			printf(gettext("failed\n"));
-			com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+			/* Solaris Kerberos */
+			com_err(progname, retval, gettext("while assigning rights to '%s'"),
 				rparams->realm_name);
 			goto err_nomsg;
 		    }
@@ -1822,9 +1863,11 @@ cleanup:
     }
 
     if (retval) {
-	if (!no_msg)
-	    com_err(argv[0], retval, gettext("while modifying information of realm '%s'"),
+	if (!no_msg) {
+	    /* Solaris Kerberos */
+	    com_err(progname, retval, gettext("while modifying information of realm '%s'"),
 		    global_params.realm);
+	}
 	exit_status++;
     }
 
@@ -1850,7 +1893,8 @@ void kdb5_ldap_view(argc, argv)
     ldap_context = (krb5_ldap_context *) dal_handle->db_context;
     if (!(ldap_context)) {
 	retval = EINVAL;
-	com_err(argv[0], retval, gettext("while initializing database"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while initializing database"));
 	exit_status++;
 	return;
     }
@@ -1858,14 +1902,16 @@ void kdb5_ldap_view(argc, argv)
     /* Read the kerberos container information */
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
 						     &(ldap_context->krbcontainer))) != 0) {
-	com_err(argv[0], retval, gettext("while reading kerberos container information"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading kerberos container information"));
 	exit_status++;
 	return;
     }
 
     if ((retval = krb5_ldap_read_realm_params(util_context,
 					      global_params.realm, &rparams, &mask)) || (!rparams)) {
-	com_err(argv[0], retval, gettext("while reading information of realm '%s'"),
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading information of realm '%s'"),
 		global_params.realm);
 	exit_status++;
 	return;
@@ -2055,7 +2101,8 @@ void kdb5_ldap_list(argc, argv)
     /* Read the kerberos container information */
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
 						     &(ldap_context->krbcontainer))) != 0) {
-	com_err(argv[0], retval, gettext("while reading kerberos container information"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading kerberos container information"));
 	exit_status++;
 	return;
     }
@@ -2064,7 +2111,8 @@ void kdb5_ldap_list(argc, argv)
     if (retval != 0) {
 	krb5_ldap_free_krbcontainer_params(ldap_context->krbcontainer);
 	ldap_context->krbcontainer = NULL;
-	com_err (argv[0], retval, gettext("while listing realms"));
+	/* Solaris Kerberos */
+	com_err (progname, retval, gettext("while listing realms"));
 	exit_status++;
 	return;
     }
@@ -2484,7 +2532,8 @@ kdb5_ldap_destroy(argc, argv)
     dal_handle = (kdb5_dal_handle *)util_context->db_context;
     ldap_context = (krb5_ldap_context *) dal_handle->db_context;
     if (!(ldap_context)) {
-	com_err(argv[0], EINVAL, gettext("while initializing database"));
+	/* Solaris Kerberos */
+	com_err(progname, EINVAL, gettext("while initializing database"));
 	exit_status++;
 	return;
     }
@@ -2492,7 +2541,8 @@ kdb5_ldap_destroy(argc, argv)
     /* Read the kerberos container from the LDAP Server */
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
 						     &(ldap_context->krbcontainer))) != 0) {
-	com_err(argv[0], retval, gettext("while reading kerberos container information"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading kerberos container information"));
 	exit_status++;
 	return;
     }
@@ -2500,7 +2550,8 @@ kdb5_ldap_destroy(argc, argv)
     /* Read the Realm information from the LDAP Server */
     if ((retval = krb5_ldap_read_realm_params(util_context, global_params.realm,
 					      &(ldap_context->lrparams), &mask)) != 0) {
-	com_err(argv[0], retval, gettext("while reading realm information"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while reading realm information"));
 	exit_status++;
 	return;
     }
@@ -2522,7 +2573,8 @@ kdb5_ldap_destroy(argc, argv)
 							      LDAP_KDC_SERVICE, rparams->kdcservers[i],
 							      rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 		    printf(gettext("failed\n"));
-		    com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+		    /* Solaris Kerberos */
+		    com_err(progname, retval, gettext("while assigning rights to '%s'"),
 			    rparams->realm_name);
 		    return;
 		}
@@ -2537,7 +2589,8 @@ kdb5_ldap_destroy(argc, argv)
 							      LDAP_ADMIN_SERVICE, rparams->adminservers[i],
 							      rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 		    printf(gettext("failed\n"));
-		    com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+		    /* Solaris Kerberos */
+		    com_err(progname, retval, gettext("while assigning rights to '%s'"),
 			    rparams->realm_name);
 		    return;
 		}
@@ -2552,7 +2605,8 @@ kdb5_ldap_destroy(argc, argv)
 							      LDAP_PASSWD_SERVICE, rparams->passwdservers[i],
 							      rparams->realm_name, rparams->subtree, rightsmask)) != 0) {
 		    printf(gettext("failed\n"));
-		    com_err(argv[0], retval, gettext("while assigning rights to '%s'"),
+		    /* Solaris Kerberos */
+		    com_err(progname, retval, gettext("while assigning rights to '%s'"),
 			    rparams->realm_name);
 		    return;
 		}
@@ -2564,7 +2618,8 @@ kdb5_ldap_destroy(argc, argv)
     /* Delete the realm container and all the associated principals */
     retval = krb5_ldap_delete_realm(util_context, global_params.realm);
     if (retval) {
-	com_err(argv[0], retval, gettext("deleting database of '%s'"), global_params.realm);
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("deleting database of '%s'"), global_params.realm);
 	exit_status++;
 	return;
     }
@@ -2583,7 +2638,8 @@ kdb5_ldap_destroy(argc, argv)
 	    (void) strncat(stashbuf, global_params.realm,
 		(MAXPATHLEN-strlen(stashbuf)));
 	} else {
-	    com_err(argv[0], EINVAL,
+	    /* Solaris Kerberos */
+	    com_err(progname, EINVAL,
 		gettext("can not determine stash file name for '%s'"),
 		global_params.realm);
 	    exit_status++;
@@ -2598,7 +2654,8 @@ kdb5_ldap_destroy(argc, argv)
 	if ((stb.st_mode & S_IFMT) == S_IFREG) {
 	    (void)unlink(stash_file);
 	} else {
-	    com_err(argv[0], EINVAL,
+	    /* Solaris Kerberos */
+	    com_err(progname, EINVAL,
 		gettext("stash file '%s' not a regular file, can not delete"),
 		stash_file);
 	    exit_status++;
@@ -2609,7 +2666,8 @@ kdb5_ldap_destroy(argc, argv)
 	 * If the error is something other than the file doesn't exist set an
 	 * error.
 	 */
-	com_err(argv[0], EINVAL,
+	/* Solaris Kerberos */
+	com_err(progname, EINVAL,
 	    gettext("could not stat stash file '%s', could not delete"),
 	    stash_file);
 	exit_status++;

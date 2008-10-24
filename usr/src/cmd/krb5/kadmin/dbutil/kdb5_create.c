@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -171,10 +169,15 @@ void kdb5_create(argc, argv)
     kdb_log_context *log_ctx;
     krb5_keyblock mkey;
     krb5_data master_salt = { 0, NULL };
-	   
+	
+    /* Solaris Kerberos */
+    (void) memset(&mkey, 0, sizeof (mkey));
+
+/* Solaris Kerberos */ 
+#if 0  
     if (strrchr(argv[0], '/'))
 	argv[0] = strrchr(argv[0], '/')+1;
-
+#endif
     while ((optchar = getopt(argc, argv, "s")) != -1) {
 	switch(optchar) {
 	case 's':
@@ -207,7 +210,8 @@ void kdb5_create(argc, argv)
     printf ("Loading random data\n");
     retval = krb5_c_random_os_entropy (util_context, 1, NULL);
     if (retval) {
-      com_err (argv[0], retval, "Loading random data");
+      /* Solaris Kerberos */
+      com_err (progname, retval, "Loading random data");
       exit_status++; return;
     }
 #endif    
@@ -217,7 +221,8 @@ void kdb5_create(argc, argv)
 					  global_params.mkey_name,
 					  global_params.realm,  
 					  &mkey_fullname, &master_princ))) {
-	com_err(argv[0], retval,
+	/* Solaris Kerberos */
+	com_err(progname, retval,
 			gettext("while setting up master key name"));
 	exit_status++; return;
     }
@@ -248,7 +253,8 @@ void kdb5_create(argc, argv)
 				    "master key to verify"),
 			    pw_str, &pw_size);
 	if (retval) {
-	    com_err(argv[0], retval,
+	    /* Solaris Kerberos */
+	    com_err(progname, retval,
 		    gettext("while reading master key from keyboard"));
 	    exit_status++; return;
 	}
@@ -259,7 +265,8 @@ void kdb5_create(argc, argv)
     pwd.length = strlen(mkey_password);
     retval = krb5_principal2salt(util_context, master_princ, &master_salt);
     if (retval) {
-	com_err(argv[0], retval,
+	/* Solaris Kerberos */
+	com_err(progname, retval,
 		gettext("while calculated master key salt"));
 	exit_status++;
 	goto cleanup;
@@ -268,7 +275,8 @@ void kdb5_create(argc, argv)
     retval = krb5_c_string_to_key(util_context, global_params.enctype,
 				  &pwd, &master_salt, &mkey);
     if (retval) {
-	com_err(argv[0], retval,
+	/* Solaris Kerberos */
+	com_err(progname, retval,
 	    gettext("while transforming master key from password"));
 	exit_status++;
 	goto cleanup;
@@ -276,7 +284,8 @@ void kdb5_create(argc, argv)
 
     retval = krb5_copy_keyblock(util_context, &mkey, &rblock.key);
     if (retval) {
-	com_err(argv[0], retval, gettext("while copying master key"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while copying master key"));
 	exit_status++; 
 	goto cleanup;
     }
@@ -285,13 +294,15 @@ void kdb5_create(argc, argv)
     seed.data = (char *)mkey.contents;
 
     if ((retval = krb5_c_random_seed(util_context, &seed))) {
-	com_err(argv[0], retval, 
+	/* Solaris Kerberos */
+	com_err(progname, retval, 
 		gettext("while initializing random key generator"));
 	exit_status++; 
 	goto cleanup;
     }
     if ((retval = krb5_db_create(util_context, db5util_db_args))) {
-	com_err(argv[0], retval, 
+	/* Solaris Kerberos */
+	com_err(progname, retval, 
 		gettext("while creating database '%s'"),
 		global_params.dbname);
 	exit_status++;
@@ -299,20 +310,22 @@ void kdb5_create(argc, argv)
     }
 #if 0 /************** Begin IFDEF'ed OUT *******************************/
     if (retval = krb5_db_fini(util_context)) {
-	com_err(argv[0], retval,
+	/* Solaris Kerberos */
+	com_err(progname, retval,
 		gettext("while closing current database"));
 	exit_status++;
 	goto cleanup;
     }
     if ((retval = krb5_db_set_name(util_context, global_params.dbname))) {
-	com_err(argv[0], retval,
+	/* Solaris Kerberos */
+	com_err(progname, retval,
 		gettext("while setting active database to '%s'"),
                global_params.dbname);
 	exit_status++;
 	goto cleanup;
     }
     if ((retval = krb5_db_init(util_context))) {
-	com_err(argv[0], retval,
+	com_err(progname, retval,
 		gettext("while initializing the database '%s'"),
 	global_params.dbname);
 	exit_status++;
@@ -323,7 +336,8 @@ void kdb5_create(argc, argv)
     /* Solaris Kerberos: for iprop */
     if (log_ctx && log_ctx->iproprole) {
 	if (retval = ulog_map(util_context, &global_params, FKCOMMAND)) {
-		com_err(argv[0], retval,
+		/* Solaris Kerberos */
+		com_err(progname, retval,
 			gettext("while creating update log"));
 		exit_status++;
 		goto cleanup;
@@ -351,7 +365,8 @@ void kdb5_create(argc, argv)
     if ((retval = add_principal(util_context, master_princ, MASTER_KEY, &rblock, &mkey)) ||
 	(retval = add_principal(util_context, &tgt_princ, TGT_KEY, &rblock, &mkey))) {
 	(void) krb5_db_fini(util_context);
-	com_err(argv[0], retval, gettext("while adding entries to the database"));
+	/* Solaris Kerberos */
+	com_err(progname, retval, gettext("while adding entries to the database"));
 	exit_status++;
 	goto cleanup;
     }
@@ -367,7 +382,8 @@ void kdb5_create(argc, argv)
 				      mkey_password);
 
     if (retval) {
-	com_err(argv[0], errno, gettext("while storing key"));
+	/* Solaris Kerberos */
+	com_err(progname, errno, gettext("while storing key"));
 	printf(gettext("Warning: couldn't stash master key.\n"));
     }
 

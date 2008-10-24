@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
  *
@@ -1345,7 +1344,10 @@ dump_db(argc, argv)
 {
     FILE		*f;
     struct dump_args	arglist;
+/* Solaris Kerberos */
+#if 0
     char		*programname;
+#endif
     char		*ofile;
     krb5_error_code	kret, retval;
     dump_version	*dump;
@@ -1361,9 +1363,12 @@ dump_db(argc, argv)
     /*
      * Parse the arguments.
      */
+/* Solaris Kerberos */
+#if 0
     programname = argv[0];
     if (strrchr(programname, (int) '/'))
 	programname = strrchr(argv[0], (int) '/') + 1;
+#endif
     ofile = (char *) NULL;
     dump = &r1_3_version;
     arglist.verbose = 0;
@@ -1435,7 +1440,8 @@ dump_db(argc, argv)
      * to be opened if we try a dump that uses it.
      */
     if (!dbactive) {
-	com_err(argv[0], 0, Err_no_database);
+	/* Solaris Kerberos */
+	com_err(progname, 0, Err_no_database); /* Solaris Kerberos */
 	exit_status++;
 	return;
     }
@@ -1453,7 +1459,8 @@ dump_db(argc, argv)
 						(char *) NULL, 0,
 						&master_key);
 		    if (retval) {
-			    com_err(argv[0], retval,
+			    /* Solaris Kerberos */
+			    com_err(progname, retval,
 				    gettext("while reading master key"));
 			    exit(1);
 		    }
@@ -1461,7 +1468,8 @@ dump_db(argc, argv)
 						       master_princ,
 						       &master_key);
 		    if (retval) {
-			    com_err(argv[0], retval,
+			    /* Solaris Kerberos */
+			    com_err(progname, retval,
 				    gettext("while verifying master key"));
 			    exit(1);
 		    }
@@ -1475,7 +1483,8 @@ dump_db(argc, argv)
 					     TRUE, 
 					     new_mkey_file, 0,
 					     &new_master_key))) { 
-		    com_err(argv[0], retval,
+		    /* Solaris Kerberos */
+		    com_err(progname, retval,
 			    gettext("while reading new master key"));
 		    exit(1);
 	    }
@@ -1501,16 +1510,18 @@ dump_db(argc, argv)
 	 */
 	unlink(ofile);
 	if (!(f = fopen(ofile, "w"))) {
+			/* Solaris Kerberos */
 			fprintf(stderr, gettext(ofopen_error),
-		    programname, ofile, error_message(errno));
+		    progname, ofile, error_message(errno));
 	    exit_status++;
 	    return;
        }
 	if ((kret = krb5_lock_file(util_context,
 				   fileno(f),
 				   KRB5_LOCKMODE_EXCLUSIVE))) {
+			/* Solaris Kerberos */
 			fprintf(stderr, gettext(oflock_error),
-		    programname, ofile, error_message(kret));
+		    progname, ofile, error_message(kret));
 	    exit_status++;
 	}
 	else
@@ -1519,15 +1530,17 @@ dump_db(argc, argv)
 	f = stdout;
     }
     if (f && !(kret)) {
-	arglist.programname = programname;
+	/* Solaris Kerberos */
+	arglist.programname = progname;
 	arglist.ofile = f;
 	arglist.kcontext = util_context;
 	fprintf(arglist.ofile, "%s", dump->header);
 
 	if (dump_sno) {
 		if (ulog_map(util_context, &global_params, FKCOMMAND)) {
+			/* Solaris Kerberos */
 			fprintf(stderr,
-			    gettext("%s: Could not map log\n"), programname);
+			    gettext("%s: Could not map log\n"), progname);
 			exit_status++;
 			goto error;
 		}
@@ -1537,8 +1550,9 @@ dump_db(argc, argv)
 		 * but that's ok since the lock func handles incr locks held.
 		 */
 		if (krb5_db_lock(util_context, KRB5_LOCKMODE_SHARED)) {
+			/* Solaris Kerberos */
 			fprintf(stderr,
-			    gettext("%s: Couldn't grab lock\n"), programname);
+			    gettext("%s: Couldn't grab lock\n"), progname);
 			exit_status++;
 			goto error;
 		}
@@ -1558,8 +1572,9 @@ dump_db(argc, argv)
 				    dump->dump_princ,
 				    (krb5_pointer) &arglist,
 				    db_arg_index > 0 ? (char **)&db_args : NULL))) {
+	     /* Solaris Kerberos */
 	     fprintf(stderr, dumprec_err,
-		     programname, dump->name, error_message(kret));
+		     progname, dump->name, error_message(kret));
 	     exit_status++;
 		if (dump_sno)
 			(void) krb5_db_unlock(util_context);
@@ -1567,8 +1582,9 @@ dump_db(argc, argv)
 	if (dump->dump_policy &&
 	    (kret = krb5_db_iter_policy( util_context, "*", dump->dump_policy,
 					 &arglist))) { 
+	     /* Solaris Kerberos */
 	     fprintf(stderr, gettext(dumprec_err),
-		programname, dump->name,
+		progname, dump->name,
 		     error_message(kret));
 	     exit_status++;
 	}
@@ -2548,7 +2564,10 @@ load_db(argc, argv)
     FILE		*f;
     extern char		*optarg;
     extern int		optind;
+/* Solaris Kerberos */
+#if 0
     char		*programname;
+#endif
     char		*dumpfile;
     char		*dbname;
     char		*dbname_tmp;
@@ -2566,9 +2585,12 @@ load_db(argc, argv)
     /*
      * Parse the arguments.
      */
+/* Solaris Kerberos */
+#if 0
     programname = argv[0];
     if (strrchr(programname, (int) '/'))
 	programname = strrchr(argv[0], (int) '/') + 1;
+#endif
     dumpfile = (char *) NULL;
     dbname = global_params.dbname;
     load = NULL;
@@ -2618,7 +2640,8 @@ load_db(argc, argv)
 
     if (!(dbname_tmp = (char *) malloc(strlen(dbname)+
 				       strlen(dump_tmptrail)+1))) {
-		fprintf(stderr, gettext(no_name_mem_fmt), argv[0]);
+		/* Solaris Kerberos */
+		fprintf(stderr, gettext(no_name_mem_fmt), progname);
 	exit_status++;
 	return;
     }
@@ -2629,7 +2652,8 @@ load_db(argc, argv)
      * Initialize the Kerberos context and error tables.
      */
     if ((kret = kadm5_init_krb5_context(&kcontext))) {
-	fprintf(stderr, gettext(ctx_err_fmt), programname);
+	/* Solaris Kerberos */
+	fprintf(stderr, gettext(ctx_err_fmt), progname);
 	free(dbname_tmp);
 	exit_status++;
 	return;
@@ -2637,7 +2661,8 @@ load_db(argc, argv)
 
     if( (kret = krb5_set_default_realm(kcontext, util_context->default_realm)) )
     {
-	fprintf(stderr, gettext("%s: Unable to set the default realm\n"), programname);
+	/* Solaris Kerberos */
+	fprintf(stderr, gettext("%s: Unable to set the default realm\n"), progname);
 	free(dbname_tmp);
 	exit_status++;
 	return;
@@ -2649,15 +2674,17 @@ load_db(argc, argv)
      */
     if (dumpfile) {
 	if ((f = fopen(dumpfile, "r")) == NULL) {
+			/* Solaris Kerberos */
 			fprintf(stderr, gettext(dfile_err_fmt),
-			    programname, dumpfile,
+			    progname, dumpfile,
 		     error_message(errno)); 
 	     exit_status++;
 	     return;
 	}
 	if ((kret = krb5_lock_file(kcontext, fileno(f),
 				   KRB5_LOCKMODE_SHARED))) {
-	     fprintf(stderr, gettext("%s: Cannot lock %s: %s\n"), programname,
+	     /* Solaris Kerberos */
+	     fprintf(stderr, gettext("%s: Cannot lock %s: %s\n"), progname,
 		     dumpfile, error_message(errno));
 	     exit_status++;
 	     return;
@@ -2673,7 +2700,8 @@ load_db(argc, argv)
     if (load) {
 	 /* only check what we know; some headers only contain a prefix */
 	 if (strncmp(buf, load->header, strlen(load->header)) != 0) {
-			fprintf(stderr, gettext(head_bad_fmt), programname, dumpfile);
+			/* Solaris Kerberos */
+			fprintf(stderr, gettext(head_bad_fmt), progname, dumpfile);
 	      exit_status++;
 	      if (dumpfile) fclose(f);
 	      return;
@@ -2692,18 +2720,20 @@ load_db(argc, argv)
 			  strlen(ov_version.header)) == 0)
 	      load = &ov_version;
 	 else {
+			/* Solaris Kerberos */
 			fprintf(stderr, gettext(head_bad_fmt),
-				programname, dumpfile);
+				progname, dumpfile);
 	      exit_status++;
 	      if (dumpfile) fclose(f);
 	      return;
 	 }
     }
     if (load->updateonly && !update) {
+		/* Solaris Kerberos */
 		fprintf(stderr,
 		    gettext("%s: dump version %s can only "
 			"be loaded with the -update flag\n"),
-		    programname, load->name);
+		    progname, load->name);
 	 exit_status++;
 	 return;
     }
@@ -2720,7 +2750,8 @@ load_db(argc, argv)
 
 	 if ((kret = kadm5_get_config_params(kcontext, 1,
 					     &newparams, &newparams))) {
-	      com_err(argv[0], kret,
+	      /* Solaris Kerberos */
+	      com_err(progname, kret,
 			    gettext("while retreiving new "
 				"configuration parameters"));
 	      exit_status++;
@@ -2745,11 +2776,13 @@ load_db(argc, argv)
 	     */
 
 	    if (emsg != NULL) {
-		fprintf(stderr, "%s: %s\n", programname, emsg);
+		/* Solaris Kerberos */
+		fprintf(stderr, "%s: %s\n", progname, emsg);
 		krb5_free_error_message (kcontext, emsg);
 	    } else {
+		/* Solaris Kerberos */
 		fprintf(stderr, dbcreaterr_fmt,
-			programname, dbname, error_message(kret));
+			progname, dbname, error_message(kret));
 	    }
 	    exit_status++;
 	    kadm5_free_config_params(kcontext, &newparams);
@@ -2770,11 +2803,13 @@ load_db(argc, argv)
 		 */
 
 		if (emsg != NULL) {
-		    fprintf(stderr, "%s: %s\n", programname, emsg);
+		    /* Solaris Kerberos */
+		    fprintf(stderr, "%s: %s\n", progname, emsg);
 		    krb5_free_error_message (kcontext, emsg);
 		} else {
+		    /* Solaris Kerberos */
 		    fprintf(stderr, dbinit_err_fmt,
-			    programname, error_message(kret));
+			    progname, error_message(kret));
 		}
 		exit_status++;
 		goto error;
@@ -2792,8 +2827,9 @@ load_db(argc, argv)
 	 * anyway.
 	 */
 	if (kret != KRB5_PLUGIN_OP_NOTSUPP) {
+	    /* Solaris Kerberos */
 	    fprintf(stderr, gettext("%s: %s while permanently locking database\n"),
-		    programname, error_message(kret));
+		    progname, error_message(kret));
 	    exit_status++;
 	    goto error;
 	}
@@ -2808,9 +2844,10 @@ load_db(argc, argv)
 			caller = FKPROPD;
 
 		if (ulog_map(kcontext, &global_params, caller)) {
+			/* Solaris Kerberos */
 			fprintf(stderr,
 				gettext("%s: Could not map log\n"),
-				programname);
+				progname);
 			exit_status++;
 			goto error;
 		}
@@ -2848,10 +2885,12 @@ load_db(argc, argv)
 		}
 	}
 
-    if (restore_dump(programname, kcontext, (dumpfile) ? dumpfile : stdin_name,
+    /* Solaris Kerberos */
+    if (restore_dump(progname, kcontext, (dumpfile) ? dumpfile : stdin_name,
 		     f, verbose, load)) {
+	 /* Solaris Kerberos */
 	 fprintf(stderr, gettext(restfail_fmt),
-		 programname, load->name);
+		 progname, load->name);
 	 exit_status++;
     }
 
@@ -2863,15 +2902,17 @@ load_db(argc, argv)
     
     if (db_locked && (kret = krb5_db_unlock(kcontext))) {
 	 /* change this error? */
+		/* Solaris Kerberos */
 		fprintf(stderr, gettext(dbunlockerr_fmt),
-		 programname, dbname, error_message(kret));
+		 progname, dbname, error_message(kret));
 	 exit_status++;
     }
 
 #if 0
     if ((kret = krb5_db_fini(kcontext))) {
+		/* Solaris Kerberos */
 		fprintf(stderr, gettext(close_err_fmt),
-		 programname, error_message(kret));
+		 progname, error_message(kret));
 	 exit_status++;
     }
 #endif
@@ -2885,8 +2926,9 @@ load_db(argc, argv)
 	 * anyway.
 	 */
 	if (kret != 0 && kret != KRB5_PLUGIN_OP_NOTSUPP) {
+	    /* Solaris Kerberos */
 	    fprintf(stderr, gettext("%s: cannot make newly loaded database live (%s)\n"),
-		    programname, error_message(kret));
+		    progname, error_message(kret));
 	    exit_status++;
 	}
     }
@@ -2906,8 +2948,9 @@ error:
 	       * it anyway.
 	       */
 	      if (kret != 0 && kret != KRB5_PLUGIN_OP_NOTSUPP) {
+		   /* Solaris Kerberos */
 		   fprintf(stderr, gettext(dbdelerr_fmt),
-			   programname, dbname, error_message(kret));
+			   progname, dbname, error_message(kret));
 		   exit_status++;
 	      }
 	 }
