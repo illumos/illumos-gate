@@ -1102,13 +1102,16 @@ check_for_stale_data(boolean_t nocache)
 	/*
 	 * Check if mib data has changed (hotplug? link-reset?)
 	 */
-	ret = snmp_get_int(hdl, OID_entLastChangeTime, 0, &cur_change_time,
-	    &snmp_syserr);
-	(void) time(&change_time_check);
-	if ((ret == 0) && (cur_change_time == change_time)) {
-		(void) rw_unlock(&stale_tree_rwlp);
-		return;
-	}
+	do {
+		snmp_syserr = 0;
+		ret = snmp_get_int(hdl, OID_entLastChangeTime, 0,
+		    &cur_change_time, &snmp_syserr);
+		(void) time(&change_time_check);
+		if ((ret == 0) && (cur_change_time == change_time)) {
+			(void) rw_unlock(&stale_tree_rwlp);
+			return;
+		}
+	} while (ret != 0 && snmp_syserr == EINTR);
 
 	/*
 	 * If we can't read entLastChangeTime we assume we need to rebuild
