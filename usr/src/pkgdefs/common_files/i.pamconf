@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -30,6 +28,7 @@ PAM_TMP=/tmp/pam_conf.$$
 KERB_ENTRIES=$PAM_TMP/scr.$$
 PPP_ENTRIES=$PAM_TMP/scp.$$
 CRON_ENTRIES=$PAM_TMP/scc.$$
+CUPS_ENTRIES=$PAM_TMP/scd.$$
 mkdir $PAM_TMP  || exit 1
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -71,6 +70,15 @@ cron		account		required	pam_unix_account.so.1
 EOF
 }
 
+setup_cups_changes(){
+#
+# No comments or blanks lines allowed in entries below
+#
+cat > ${CUPS_ENTRIES} << EOF
+cups		account		required	pam_unix_account.so.1
+EOF
+}
+
 #  Returns zero (success) if system is labeled (aka Trusted Extensions).
 #  1 otherwise.
 #
@@ -105,6 +113,7 @@ EOF
 setup_kerb_changes
 setup_ppp_changes
 setup_cron_changes
+setup_cups_changes
 while read src dest
 do
     if [ ! -f $dest ] ; then
@@ -292,6 +301,30 @@ do
 	if [ -f /tmp/pamconf.$$ ] ; then
 		cat /tmp/pamconf.$$ >> $dest
 		echo "${dest} updating entries for cron, \c" \
+		    >> ${CLEANUP_FILE}
+		echo "please examine/update any new entries" \
+		    >> ${CLEANUP_FILE}
+    		rm -f /tmp/pamconf.$$
+    	fi
+#
+# update pam.conf to append cups entries if not already present
+#
+	rm -f /tmp/pamconf.$$
+	while read e1 e2 e3 e4 e5
+	do
+		# See if the entry already exists
+		grep \
+"^[# 	]*$e1[ 	][ 	]*$e2[ 	][ 	]*$e3[ 	][ 	]*$e4" \
+		$dest >/dev/null 2>&1
+		if [ $? = 1 ] ; then
+			# Doesn't exist, enter into pam.conf
+			echo "$e1\t$e2 $e3\t\t$e4 $e5" >> /tmp/pamconf.$$
+		fi
+	done < ${CUPS_ENTRIES}
+	# Append cups lines if any were not present already.
+	if [ -f /tmp/pamconf.$$ ] ; then
+		cat /tmp/pamconf.$$ >> $dest
+		echo "${dest} updating entries for cups, \c" \
 		    >> ${CLEANUP_FILE}
 		echo "please examine/update any new entries" \
 		    >> ${CLEANUP_FILE}
