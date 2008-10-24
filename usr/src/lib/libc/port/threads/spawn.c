@@ -39,6 +39,7 @@
 		POSIX_SPAWN_SETSIGMASK |	\
 		POSIX_SPAWN_SETSCHEDPARAM |	\
 		POSIX_SPAWN_SETSCHEDULER |	\
+		POSIX_SPAWN_SETSIGIGN_NP |	\
 		POSIX_SPAWN_NOSIGCHLD_NP |	\
 		POSIX_SPAWN_WAITPID_NP |	\
 		POSIX_SPAWN_NOEXECERR_NP)
@@ -49,6 +50,7 @@ typedef struct {
 	int		sa_schedpolicy;
 	pid_t		sa_pgroup;
 	sigset_t	sa_sigdefault;
+	sigset_t	sa_sigignore;
 	sigset_t	sa_sigmask;
 } spawn_attr_t;
 
@@ -71,18 +73,27 @@ static int
 perform_flag_actions(spawn_attr_t *sap)
 {
 	int sig;
+	struct sigaction action;
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETSIGMASK) {
 		(void) __lwp_sigmask(SIG_SETMASK, &sap->sa_sigmask, NULL);
 	}
 
-	if (sap->sa_psflags & POSIX_SPAWN_SETSIGDEF) {
-		struct sigaction sigdfl;
+	if (sap->sa_psflags & POSIX_SPAWN_SETSIGIGN_NP) {
+		(void) memset(&action, 0, sizeof (action));
+		action.sa_handler = SIG_IGN;
+		for (sig = 1; sig < NSIG; sig++) {
+			if (sigismember(&sap->sa_sigignore, sig))
+				(void) __sigaction(sig, &action, NULL);
+		}
+	}
 
-		(void) memset(&sigdfl, 0, sizeof (sigdfl));
+	if (sap->sa_psflags & POSIX_SPAWN_SETSIGDEF) {
+		(void) memset(&action, 0, sizeof (action));
+		action.sa_handler = SIG_DFL;
 		for (sig = 1; sig < NSIG; sig++) {
 			if (sigismember(&sap->sa_sigdefault, sig))
-				(void) __sigaction(sig, &sigdfl, NULL);
+				(void) __sigaction(sig, &action, NULL);
 		}
 	}
 
@@ -690,6 +701,34 @@ posix_spawnattr_getsigdefault(
 		return (EINVAL);
 
 	*sigdefault = sap->sa_sigdefault;
+	return (0);
+}
+
+int
+posix_spawnattr_setsigignore_np(
+	posix_spawnattr_t *attr,
+	const sigset_t *sigignore)
+{
+	spawn_attr_t *sap = attr->__spawn_attrp;
+
+	if (sap == NULL)
+		return (EINVAL);
+
+	sap->sa_sigignore = *sigignore;
+	return (0);
+}
+
+int
+posix_spawnattr_getsigignore_np(
+	const posix_spawnattr_t *attr,
+	sigset_t *sigignore)
+{
+	spawn_attr_t *sap = attr->__spawn_attrp;
+
+	if (sap == NULL)
+		return (EINVAL);
+
+	*sigignore = sap->sa_sigignore;
 	return (0);
 }
 

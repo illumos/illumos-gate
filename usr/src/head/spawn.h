@@ -48,9 +48,12 @@ extern "C" {
 /*
  * non-portable Solaris extensions
  */
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+#define	POSIX_SPAWN_SETSIGIGN_NP	0x0800
 #define	POSIX_SPAWN_NOSIGCHLD_NP	0x1000
 #define	POSIX_SPAWN_WAITPID_NP		0x2000
 #define	POSIX_SPAWN_NOEXECERR_NP	0x4000
+#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 typedef struct {
 	void *__spawn_attrp;	/* implementation-private */
@@ -146,6 +149,21 @@ extern int posix_spawnattr_getsigdefault(
 	const posix_spawnattr_t *_RESTRICT_KYWD attr,
 	sigset_t *_RESTRICT_KYWD sigdefault);
 
+/*
+ * non-portable Solaris extensions
+ */
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+
+extern int posix_spawnattr_setsigignore_np(
+	posix_spawnattr_t *_RESTRICT_KYWD attr,
+	const sigset_t *_RESTRICT_KYWD sigignore);
+
+extern int posix_spawnattr_getsigignore_np(
+	const posix_spawnattr_t *_RESTRICT_KYWD attr,
+	sigset_t *_RESTRICT_KYWD sigignore);
+
+#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+
 extern int posix_spawnattr_setsigmask(
 	posix_spawnattr_t *_RESTRICT_KYWD attr,
 	const sigset_t *_RESTRICT_KYWD sigmask);
@@ -175,6 +193,10 @@ extern int posix_spawnattr_setschedpolicy();
 extern int posix_spawnattr_getschedpolicy();
 extern int posix_spawnattr_setsigdefault();
 extern int posix_spawnattr_getsigdefault();
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
+extern int posix_spawnattr_setsigignore_np();
+extern int posix_spawnattr_getsigignore_np();
+#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 extern int posix_spawnattr_setsigmask();
 extern int posix_spawnattr_getsigmask();
 
