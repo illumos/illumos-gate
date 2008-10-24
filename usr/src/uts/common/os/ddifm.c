@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Fault Management for Device Drivers
  *
@@ -144,8 +142,8 @@ int ddi_system_fmcap = 0;
 
 static struct i_ddi_fmkstat ddifm_kstat_template = {
 	{"erpt_dropped", KSTAT_DATA_UINT64 },
+	{"fm_cache_miss", KSTAT_DATA_UINT64 },
 	{"fm_cache_full", KSTAT_DATA_UINT64 },
-	{"fm_cache_grew", KSTAT_DATA_UINT64 },
 	{"acc_err", KSTAT_DATA_UINT64 },
 	{"dma_err", KSTAT_DATA_UINT64 }
 };

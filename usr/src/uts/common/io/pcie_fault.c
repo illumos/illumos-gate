@@ -2181,8 +2181,7 @@ pf_hdl_compare(dev_info_t *dip, ddi_fm_error_t *derr, uint32_t flag,
 	int		status;
 
 	mutex_enter(&fcp->fc_lock);
-	for (fep = fcp->fc_active->fce_next; fep != NULL;
-	    fep = fep->fce_next) {
+	for (fep = fcp->fc_head; fep != NULL; fep = fep->fce_next) {
 		ddi_fmcompare_t compare_func;
 
 		/*

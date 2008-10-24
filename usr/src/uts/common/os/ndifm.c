@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Fault Management for Nexus Device Drivers
  *
@@ -126,14 +124,12 @@
  *	unbound by the requesting child.  ndi_fmc_insert() and
  *	ndi_fmc_remove() may be called from any user or kernel context.
  *
- *	FM caches are allocated during ddi_fm_init() and maintained
- *	as an array of elements that may be on one of two lists:
- *	free or active.  The free list is a singly-linked list of
- *	elements available for activity.  ndi_fm_insert() moves the
- *	element at the head of the free to the active list.  The active
- *	list is a doubly-linked searchable list.
- *	When a handle is unmapped or unbound, its associated cache
- *	entry is removed from the active list back to the free list.
+ *	FM cache element is implemented by kmem_cache. The elements are
+ *	stored in a doubly-linked searchable list.  When a handle is created,
+ *	ndi_fm_insert() allocates an entry from the kmem_cache and inserts
+ *	the entry to the head of the list.  When a handle is unmapped
+ *	or unbound, ndi_fm_remove() removes its associated cache entry from
+ *	the list.
  *
  *      Upon detection of an error, the nexus may invoke ndi_fmc_error() to
  *      iterate over the handle cache of one or more of its FM compliant
@@ -164,45 +160,31 @@
 #include <sys/sysmacros.h>
 #include <sys/devops.h>
 #include <sys/atomic.h>
+#include <sys/kmem.h>
 #include <sys/fm/io/ddi.h>
+
+kmem_cache_t *ndi_fm_entry_cache;
+
+void
+ndi_fm_init(void)
+{
+	ndi_fm_entry_cache = kmem_cache_create("ndi_fm_entry_cache",
+	    sizeof (ndi_fmcentry_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+}
 
 /*
  * Allocate and initialize a fault management resource cache
  * A fault management cache consists of a set of cache elements that
- * may be on one of two lists: free or active.
- *
- * At creation time, every element but one is placed on the free list
- * except for the first element.  This element is reserved as the first
- * element of the active list and serves as an anchor for the active
- * list in ndi_fmc_insert() and ndi_fmc_remove().  In these functions,
- * it is not neccessary to check for the existence or validity of
- * the active list.
+ * are allocated from "ndi_fm_entry_cache".
  */
+/* ARGSUSED */
 void
 i_ndi_fmc_create(ndi_fmc_t **fcpp, int qlen, ddi_iblock_cookie_t ibc)
 {
 	ndi_fmc_t *fcp;
-	ndi_fmcentry_t *fep;
-
-	ASSERT(qlen > 1);
 
 	fcp = kmem_zalloc(sizeof (ndi_fmc_t), KM_SLEEP);
 	mutex_init(&fcp->fc_lock, NULL, MUTEX_DRIVER, ibc);
-	mutex_init(&fcp->fc_free_lock, NULL, MUTEX_DRIVER, NULL);
-
-	/* Preallocate and initialize entries for this fm cache */
-	fcp->fc_elems = kmem_zalloc(qlen * sizeof (ndi_fmcentry_t), KM_SLEEP);
-
-	fcp->fc_len = qlen;
-
-	/* Intialize the active and free lists */
-	fcp->fc_active = fcp->fc_tail = fcp->fc_elems;
-	fcp->fc_free = fcp->fc_elems + 1;
-	qlen--;
-	for (fep = fcp->fc_free; qlen > 1; qlen--) {
-		fep->fce_prev = fep + 1;
-		fep++;
-	}
 
 	*fcpp = fcp;
 }
@@ -213,97 +195,20 @@ i_ndi_fmc_create(ndi_fmc_t **fcpp, int qlen, ddi_iblock_cookie_t ibc)
 void
 i_ndi_fmc_destroy(ndi_fmc_t *fcp)
 {
+	ndi_fmcentry_t *fep, *pp;
+
 	if (fcp == NULL)
 		return;
 
-	kmem_free(fcp->fc_elems, fcp->fc_len * sizeof (ndi_fmcentry_t));
-	kmem_free(fcp, sizeof (ndi_fmc_t));
-}
-
-/*
- * Grow an existing fault management cache by grow_sz number of entries
- */
-static int
-fmc_grow(ndi_fmc_t *fcp, int flag, int grow_sz)
-{
-	int olen, nlen;
-	void *resource;
-	ndi_fmcentry_t *ncp, *oep, *nep, *nnep;
-
-	ASSERT(grow_sz);
-	ASSERT(MUTEX_HELD(&fcp->fc_free_lock));
-
-	/* Allocate a new cache */
-	nlen = grow_sz + fcp->fc_len;
-	if ((ncp = kmem_zalloc(nlen * sizeof (ndi_fmcentry_t),
-	    KM_NOSLEEP)) == NULL)
-		return (1);
-
-	/* Migrate old cache to new cache */
-	oep = fcp->fc_elems;
-	olen = fcp->fc_len;
-	for (nep = ncp; ; olen--) {
-		resource = nep->fce_resource = oep->fce_resource;
-		nep->fce_bus_specific = oep->fce_bus_specific;
-		if (resource) {
-			if (flag == DMA_HANDLE) {
-				((ddi_dma_impl_t *)resource)->
-				    dmai_error.err_fep = nep;
-			} else if (flag == ACC_HANDLE) {
-				((ddi_acc_impl_t *)resource)->
-				    ahi_err->err_fep = nep;
-			}
-		}
-
-		/*
-		 * This is the last entry.  Set the tail pointer and
-		 * terminate processing of the old cache.
-		 */
-		if (olen == 1) {
-			fcp->fc_tail = nep;
-			++nep;
-			break;
-		}
-
-		/*
-		 * Set the next and previous pointer for the new cache
-		 * entry.
-		 */
-		nnep = nep + 1;
-		nep->fce_next = nnep;
-		nnep->fce_prev = nep;
-
-		/* Advance to the next entry */
-		++oep;
-		nep = nnep;
-	}
-
-	/* Initialize and add remaining new cache entries to the free list */
-	for (fcp->fc_free = nep; nlen > fcp->fc_len + 1; nlen--) {
-		nep->fce_prev = nep + 1;
-		nep++;
-	}
-
-	oep = fcp->fc_elems;
-	olen = fcp->fc_len;
-	nlen = grow_sz + olen;
-
-	/*
-	 * Update the FM cache array and active list pointers.
-	 * Updates to these pointers require us to acquire the
-	 * FMA cache lock to prevent accesses to a stale active
-	 * list in ndi_fmc_error().
-	 */
-
+	/* Free all the cached entries, this should not happen though */
 	mutex_enter(&fcp->fc_lock);
-	fcp->fc_active = ncp;
-	fcp->fc_elems = ncp;
-	fcp->fc_len = nlen;
+	for (fep = fcp->fc_head; fep != NULL; fep = pp) {
+		pp = fep->fce_next;
+		kmem_cache_free(ndi_fm_entry_cache, fep);
+	}
 	mutex_exit(&fcp->fc_lock);
-
-	kmem_free(oep, olen * sizeof (ndi_fmcentry_t));
-
-	return (0);
+	mutex_destroy(&fcp->fc_lock);
+	kmem_free(fcp, sizeof (ndi_fmc_t));
 }
 
 /*
@@ -346,27 +251,12 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 		fcp = fmhdl->fh_acc_cache;
 		fpp = &((ddi_acc_impl_t *)resource)->ahi_err->err_fep;
 	}
-	ASSERT(*fpp == NULL);
 
-	mutex_enter(&fcp->fc_free_lock);
-
-	/* Get an entry from the free list */
-	fep = fcp->fc_free;
+	fep = kmem_cache_alloc(ndi_fm_entry_cache, KM_NOSLEEP);
 	if (fep == NULL) {
-		if (fmc_grow(fcp, flag,
-		    (flag == ACC_HANDLE ? default_acccache_sz :
-		    default_dmacache_sz)) != 0) {
-
-			/* Unable to get an entry or grow this cache */
-			atomic_add_64(
-			    &fmhdl->fh_kstat.fek_fmc_full.value.ui64, 1);
-			mutex_exit(&fcp->fc_free_lock);
-			return;
-		}
-		atomic_add_64(&fmhdl->fh_kstat.fek_fmc_grew.value.ui64, 1);
-		fep = fcp->fc_free;
+		atomic_inc_64(&fmhdl->fh_kstat.fek_fmc_full.value.ui64);
+		return;
 	}
-	fcp->fc_free = fep->fce_prev;
 
 	/*
 	 * Set-up the handle resource and bus_specific information.
@@ -375,15 +265,18 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 	fep->fce_bus_specific = bus_specific;
 	fep->fce_resource = resource;
 	fep->fce_next = NULL;
-	*fpp = fep;
 
 	/* Add entry to the end of the active list */
 	mutex_enter(&fcp->fc_lock);
+	ASSERT(*fpp == NULL);
+	*fpp = fep;
 	fep->fce_prev = fcp->fc_tail;
-	fcp->fc_tail->fce_next = fep;
+	if (fcp->fc_tail != NULL)
+		fcp->fc_tail->fce_next = fep;
+	else
+		fcp->fc_head = fep;
 	fcp->fc_tail = fep;
 	mutex_exit(&fcp->fc_lock);
-	mutex_exit(&fcp->fc_free_lock);
 }
 
 /*
@@ -419,7 +312,7 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 		ASSERT(fcp);
 
-		mutex_enter(&fcp->fc_free_lock);
+		mutex_enter(&fcp->fc_lock);
 		fep = ((ddi_dma_impl_t *)resource)->dmai_error.err_fep;
 		((ddi_dma_impl_t *)resource)->dmai_error.err_fep = NULL;
 	} else if (flag == ACC_HANDLE) {
@@ -432,7 +325,7 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 		ASSERT(fcp);
 
-		mutex_enter(&fcp->fc_free_lock);
+		mutex_enter(&fcp->fc_lock);
 		fep = ((ddi_acc_impl_t *)resource)->ahi_err->err_fep;
 		((ddi_acc_impl_t *)resource)->ahi_err->err_fep = NULL;
 	} else {
@@ -443,7 +336,8 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 	 * Resource not in cache, return
 	 */
 	if (fep == NULL) {
-		mutex_exit(&fcp->fc_free_lock);
+		mutex_exit(&fcp->fc_lock);
+		atomic_inc_64(&fmhdl->fh_kstat.fek_fmc_miss.value.ui64);
 		return;
 	}
 
@@ -452,18 +346,17 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 	 * to synchronize access to the cache for ndi_fmc_insert()
 	 * and ndi_fmc_error()
 	 */
-	mutex_enter(&fcp->fc_lock);
-	fep->fce_prev->fce_next = fep->fce_next;
+	if (fep == fcp->fc_head)
+		fcp->fc_head = fep->fce_next;
+	else
+		fep->fce_prev->fce_next = fep->fce_next;
 	if (fep == fcp->fc_tail)
 		fcp->fc_tail = fep->fce_prev;
 	else
 		fep->fce_next->fce_prev = fep->fce_prev;
 	mutex_exit(&fcp->fc_lock);
 
-	/* Add entry back to the free list */
-	fep->fce_prev = fcp->fc_free;
-	fcp->fc_free = fep;
-	mutex_exit(&fcp->fc_free_lock);
+	kmem_cache_free(ndi_fm_entry_cache, fep);
 }
 
 int
@@ -495,8 +388,7 @@ ndi_fmc_entry_error(dev_info_t *dip, int flag, ddi_fm_error_t *derr,
 		 * Check active resource entries
 		 */
 		mutex_enter(&fcp->fc_lock);
-		for (fep = fcp->fc_active->fce_next; fep != NULL;
-		    fep = fep->fce_next) {
+		for (fep = fcp->fc_head; fep != NULL; fep = fep->fce_next) {
 			ddi_fmcompare_t compare_func;
 
 			/*
@@ -652,8 +544,7 @@ ndi_fmc_entry_error_all(dev_info_t *dip, int flag, ddi_fm_error_t *derr)
 		 * Check active resource entries
 		 */
 		mutex_enter(&fcp->fc_lock);
-		for (fep = fcp->fc_active->fce_next; fep != NULL;
-		    fep = fep->fce_next) {
+		for (fep = fcp->fc_head; fep != NULL; fep = fep->fce_next) {
 			/* Set the error for this resource handle */
 			nonfatal++;
 			if (flag == ACC_HANDLE) {

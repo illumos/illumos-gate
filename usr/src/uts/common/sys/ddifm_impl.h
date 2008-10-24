@@ -26,8 +26,6 @@
 #ifndef	_DDIFM_IMPL_H
 #define	_DDIFM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dditypes.h>
 #include <sys/errorq.h>
 
@@ -37,8 +35,8 @@ extern "C" {
 
 struct i_ddi_fmkstat {
 	kstat_named_t	fek_erpt_dropped;	/* total ereports dropped */
-	kstat_named_t	fek_fmc_full;		/* total fmc insert fails */
-	kstat_named_t	fek_fmc_grew;		/* total fmc grew succeed */
+	kstat_named_t	fek_fmc_miss;		/* total fmc misses */
+	kstat_named_t	fek_fmc_full;		/* total fmc allocs fail */
 	kstat_named_t	fek_acc_err;		/* total access errors */
 	kstat_named_t	fek_dma_err;		/* total dma errors */
 };
@@ -65,12 +63,8 @@ struct i_ddi_fmc_entry {
 
 struct i_ddi_fmc {
 	kmutex_t fc_lock;			/* cache active access */
-	kmutex_t fc_free_lock;			/* cache freelist access */
-	int fc_len;				/* length of FM cache array */
-	struct i_ddi_fmc_entry *fc_elems;	/* FM cache array */
-	struct i_ddi_fmc_entry *fc_free;	/* free list */
+	struct i_ddi_fmc_entry *fc_head;	/* active handle list */
 	struct i_ddi_fmc_entry *fc_tail;	/* tail of active handle list */
-	struct i_ddi_fmc_entry *fc_active;	/* active handle list */
 };
 
 /* Error handler targets */
@@ -109,8 +103,10 @@ extern pci_fm_err_t pci_err_tbl[];
 typedef int (*ddi_fmcompare_t)(dev_info_t *, const void *, const void *,
     const void *);
 
+extern void ndi_fm_init(void);
+
 /* driver defect error reporting */
-void i_ddi_drv_ereport_post(dev_info_t *, const char *, nvlist_t *, int);
+extern void i_ddi_drv_ereport_post(dev_info_t *, const char *, nvlist_t *, int);
 
 /* target error handler add/remove/dispatch */
 extern void i_ddi_fm_handler_enter(dev_info_t *);

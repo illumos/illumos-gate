@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/dditypes.h>
@@ -2032,8 +2030,8 @@ devinfo_fm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%<u>%-11s IPL CAPS DROP FMCFULL FMCGREW ACCERR "
-		    "DMAERR %11s %11s%</u>\n", "ADDR", "DMACACHE", "ACCCACHE");
+		mdb_printf("%<u>%?s IPL CAPS DROP FMCFULL FMCMISS ACCERR "
+		    "DMAERR %?s %?s%</u>\n", "ADDR", "DMACACHE", "ACCCACHE");
 	}
 
 	if (mdb_vread(&devi, sizeof (devi), addr) == -1) {
@@ -2047,8 +2045,7 @@ devinfo_fm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%-11p %3u %c%c%c%c %4llu %7llu %7llu %6llu %6llu %11p "
-	    "%11p\n",
+	mdb_printf("%?p %3u %c%c%c%c %4llu %7llu %7llu %6llu %6llu %?p %?p\n",
 	    (uintptr_t)devi.devi_fmhdl, fhdl.fh_ibc,
 	    (DDI_FM_EREPORT_CAP(fhdl.fh_cap) ? 'E' : '-'),
 	    (DDI_FM_ERRCB_CAP(fhdl.fh_cap) ? 'C' : '-'),
@@ -2056,7 +2053,7 @@ devinfo_fm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (DDI_FM_DMA_ERR_CAP(fhdl.fh_cap) ? 'D' : '-'),
 	    fhdl.fh_kstat.fek_erpt_dropped.value.ui64,
 	    fhdl.fh_kstat.fek_fmc_full.value.ui64,
-	    fhdl.fh_kstat.fek_fmc_grew.value.ui64,
+	    fhdl.fh_kstat.fek_fmc_miss.value.ui64,
 	    fhdl.fh_kstat.fek_acc_err.value.ui64,
 	    fhdl.fh_kstat.fek_dma_err.value.ui64,
 	    fhdl.fh_dma_cache, fhdl.fh_acc_cache);
@@ -2075,7 +2072,7 @@ devinfo_fmce(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%<u>%-11s    %11s    %11s%</u>\n", "ADDR",
+		mdb_printf("%<u>%?s %?s %?s%</u>\n", "ADDR",
 		    "RESOURCE", "BUS_SPECIFIC");
 	}
 
@@ -2084,7 +2081,7 @@ devinfo_fmce(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%-11p    %11p    %11p\n",
+	mdb_printf("%?p %?p %?p\n",
 	    (uintptr_t)addr, fce.fce_resource, fce.fce_bus_specific);
 
 
@@ -2095,7 +2092,6 @@ int
 devinfo_fmc_walk_init(mdb_walk_state_t *wsp)
 {
 	struct i_ddi_fmc fec;
-	struct i_ddi_fmc_entry fe;
 
 	if (wsp->walk_addr == NULL)
 		return (WALK_ERR);
@@ -2105,17 +2101,10 @@ devinfo_fmc_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (fec.fc_active == NULL)
+	if (fec.fc_head == NULL)
 		return (WALK_DONE);
 
-	if (mdb_vread(&fe, sizeof (fe), (uintptr_t)fec.fc_active) == -1) {
-		mdb_warn("failed to read active fm cache list at %p",
-		    fec.fc_active);
-		return (WALK_ERR);
-	}
-
-	wsp->walk_data = fe.fce_next;
-	wsp->walk_addr = (uintptr_t)fe.fce_next;
+	wsp->walk_addr = (uintptr_t)fec.fc_head;
 	return (WALK_NEXT);
 }
 
