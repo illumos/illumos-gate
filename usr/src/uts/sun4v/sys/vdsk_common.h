@@ -473,22 +473,33 @@ typedef struct vd_scsi {
 	    (mt) == VD_MEDIA_DVD ? DK_DVDROM :				\
 	    DK_UNKNOWN)
 
+/*
+ * If the media type returned by the DKIOCGMEDIAINFO ioctl is greater than
+ * 0xFFFF then this is not an optical media and we consider that this is
+ * a fixed media.
+ *
+ * Otherwise, we have an optical media. If this is a SCSI media then the media
+ * type is actually the profile number returned by the SCSI GET CONFIGURATION
+ * command. In that case, the possible values we can have are described in the
+ * SCSI Multi-Media Commands (MMC) documentation.
+ *
+ * Not all SCSI optical media profile numbers are defined in Solaris. However
+ * undefined profiles are essentially different variants of DVD (like Blu-Ray
+ * or HD-DVD). So we consider that any optical media that we can not explicitly
+ * identify is a DVD.
+ */
+#define	DK_MEDIA_OPTICAL_MAX	0xFFFF
+
 #define	DK_MEDIATYPE2VD_MEDIATYPE(mt)					\
-	((mt) == DK_REMOVABLE_DISK ? VD_MEDIA_FIXED :			\
+	(((mt) > DK_MEDIA_OPTICAL_MAX)? VD_MEDIA_FIXED :		\
+	    (mt) == DK_REMOVABLE_DISK ? VD_MEDIA_FIXED :		\
 	    (mt) == DK_MO_ERASABLE ? VD_MEDIA_FIXED :			\
 	    (mt) == DK_MO_WRITEONCE ? VD_MEDIA_FIXED :			\
 	    (mt) == DK_AS_MO ? VD_MEDIA_FIXED :				\
 	    (mt) == DK_CDROM ? VD_MEDIA_CD :				\
 	    (mt) == DK_CDR ? VD_MEDIA_CD :				\
 	    (mt) == DK_CDRW ? VD_MEDIA_CD :				\
-	    (mt) == DK_DVDROM ? VD_MEDIA_DVD :				\
-	    (mt) == DK_DVDR ? VD_MEDIA_DVD :				\
-	    (mt) == DK_DVDRAM ? VD_MEDIA_DVD :				\
-	    (mt) == DK_FIXED_DISK ? VD_MEDIA_FIXED :			\
-	    (mt) == DK_FLOPPY ? VD_MEDIA_FIXED :			\
-	    (mt) == DK_ZIP ? VD_MEDIA_FIXED :				\
-	    (mt) == DK_JAZ ? VD_MEDIA_FIXED :				\
-	    VD_MEDIA_FIXED)
+	    VD_MEDIA_DVD)
 
 /*
  * Hooks for EFI support

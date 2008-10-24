@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/crc32.h>
 #include <sys/cred.h>
 #include <sys/ddi.h>
@@ -51,12 +49,16 @@
  * certainly be able to remove that code if RFE 6213117 is ever implemented.
  */
 
+#ifdef DEBUG
+
 #define	VD_EFI_DEBUG	if (vd_efi_debug) vd_efi_print
 
-#ifdef DEBUG
-static int vd_efi_debug = 1;
-#else
 static int vd_efi_debug = 0;
+
+#else
+
+#define	VD_EFI_DEBUG(...)
+
 #endif
 
 #define	VD_EFI_GPE_LEN(vdisk, nparts) \

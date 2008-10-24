@@ -183,7 +183,8 @@ static int 	vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr,
 		    void *cb_arg, vio_desc_direction_t dir, boolean_t);
 
 static int	vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp);
-static int	vdc_drain_response(vdc_t *vdcp, struct buf *buf);
+static int	vdc_drain_response(vdc_t *vdcp, vio_cb_type_t cb_type,
+		    struct buf *buf);
 static int	vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx);
 static int	vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep);
 static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
@@ -1397,7 +1398,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	}
 
 	if (ddi_in_panic())
-		(void) vdc_drain_response(vdc, NULL);
+		(void) vdc_drain_response(vdc, CB_STRATEGY, NULL);
 
 	DMSG(vdc, 0, "[%d] End\n", instance);
 
@@ -1462,7 +1463,11 @@ vdc_strategy(struct buf *buf)
 		bioerror(buf, rv);
 		biodone(buf);
 	} else if (ddi_in_panic()) {
-		(void) vdc_drain_response(vdc, buf);
+		rv = vdc_drain_response(vdc, CB_STRATEGY, buf);
+		if (rv != 0) {
+			bioerror(buf, EIO);
+			biodone(buf);
+		}
 	}
 
 	return (0);
@@ -3141,8 +3146,16 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 	 */
 	mutex_enter(&vdcp->lock);
 	vdcp->sync_op_cnt++;
-	while (vdcp->sync_op_blocked && vdcp->state != VDC_STATE_DETACH)
-		cv_wait(&vdcp->sync_blocked_cv, &vdcp->lock);
+	while (vdcp->sync_op_blocked && vdcp->state != VDC_STATE_DETACH) {
+		if (ddi_in_panic()) {
+			/* don't block if we are panicking */
+			vdcp->sync_op_cnt--;
+			mutex_exit(&vdcp->lock);
+			return (EIO);
+		} else {
+			cv_wait(&vdcp->sync_blocked_cv, &vdcp->lock);
+		}
+	}
 
 	if (vdcp->state == VDC_STATE_DETACH) {
 		cv_broadcast(&vdcp->sync_blocked_cv);
@@ -3163,6 +3176,13 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 
 	if (status != 0) {
 		vdcp->sync_op_pending = B_FALSE;
+	} else if (ddi_in_panic()) {
+		if (vdc_drain_response(vdcp, CB_SYNC, NULL) == 0) {
+			status = vdcp->sync_op_status;
+		} else {
+			vdcp->sync_op_pending = B_FALSE;
+			status = EIO;
+		}
 	} else {
 		/*
 		 * block until our transaction completes.
@@ -3229,21 +3249,32 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
  *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
- *	buf	- if buf is NULL then we drain all responses, otherwise we
+ *	cb_type	- the type of request we want to drain. If type is CB_SYNC
+ *		  then we drain all responses until we find a CB_SYNC request.
+ *		  If the type is CB_STRATEGY then the behavior depends on the
+ *		  value of the buf argument.
+ *	buf	- if the cb_type argument is CB_SYNC then the buf argument
+ *		  must be NULL. If the cb_type argument is CB_STRATEGY and
+ *		  if buf is NULL then we drain all responses, otherwise we
  *		  poll until we receive a ACK/NACK for the specific I/O
  *		  described by buf.
  *
  * Return Code:
- *	0	- Success
+ *	0	- Success. If we were expecting a response to a particular
+ *		  CB_SYNC or CB_STRATEGY request then this means that a
+ *		  response has been received.
  */
 static int
-vdc_drain_response(vdc_t *vdc, struct buf *buf)
+vdc_drain_response(vdc_t *vdc, vio_cb_type_t cb_type, struct buf *buf)
 {
 	int 			rv, idx, retries;
 	size_t			msglen;
 	vdc_local_desc_t 	*ldep = NULL;	/* Local Dring Entry Pointer */
 	vio_dring_msg_t		dmsg;
 	struct buf		*mbuf;
+	boolean_t		ack;
+
+	ASSERT(cb_type == CB_STRATEGY || cb_type == CB_SYNC);
 
 	mutex_enter(&vdc->lock);
 
@@ -3284,14 +3315,16 @@ vdc_drain_response(vdc_t *vdc, struct buf *buf)
 		}
 
 		/*
-		 * set the appropriate return value for the current request.
+		 * Record if the packet was ACK'ed or not. If the packet was not
+		 * ACK'ed then we will just mark the request as failed; we don't
+		 * want to reset the connection at this point.
 		 */
 		switch (dmsg.tag.vio_subtype) {
 		case VIO_SUBTYPE_ACK:
-			rv = 0;
+			ack = B_TRUE;
 			break;
 		case VIO_SUBTYPE_NACK:
-			rv = EAGAIN;
+			ack = B_FALSE;
 			break;
 		default:
 			continue;
@@ -3310,47 +3343,49 @@ vdc_drain_response(vdc_t *vdc, struct buf *buf)
 			continue;
 		}
 
-		if (buf != NULL && ldep->cb_type == CB_STRATEGY) {
+		switch (ldep->cb_type) {
+
+		case CB_STRATEGY:
 			mbuf = ldep->cb_arg;
-			mbuf->b_resid = mbuf->b_bcount -
-			    ldep->dep->payload.nbytes;
-			bioerror(mbuf, (rv == EAGAIN)? EIO:
-			    ldep->dep->payload.status);
-			biodone(mbuf);
-		} else {
-			mbuf = NULL;
-		}
+			if (mbuf != NULL) {
+				mbuf->b_resid = mbuf->b_bcount -
+				    ldep->dep->payload.nbytes;
+				bioerror(mbuf,
+				    ack ? ldep->dep->payload.status : EIO);
+				biodone(mbuf);
+			}
+			rv = vdc_depopulate_descriptor(vdc, idx);
+			if (buf != NULL && buf == mbuf) {
+				rv = 0;
+				goto done;
+			}
+			break;
 
-		DMSG(vdc, 1, "[%d] Depopulating idx=%d state=%d\n",
-		    vdc->instance, idx, ldep->dep->hdr.dstate);
-
-		rv = vdc_depopulate_descriptor(vdc, idx);
-		if (rv) {
-			DMSG(vdc, 0,
-			    "[%d] Entry @ %d - depopulate failed ..\n",
-			    vdc->instance, idx);
-		}
-
-		/* we have received an ACK/NACK for the specified buffer */
-		if (buf != NULL && buf == mbuf) {
-			rv = 0;
+		case CB_SYNC:
+			rv = vdc_depopulate_descriptor(vdc, idx);
+			vdc->sync_op_status = ack ? rv : EIO;
+			vdc->sync_op_pending = B_FALSE;
+			cv_signal(&vdc->sync_pending_cv);
+			if (cb_type == CB_SYNC) {
+				rv = 0;
+				goto done;
+			}
 			break;
 		}
 
 		/* if this is the last descriptor - break out of loop */
 		if ((idx + 1) % vdc->dring_len == vdc->dring_curr_idx) {
-			if (buf != NULL) {
-				/*
-				 * We never got a response for the specified
-				 * buffer so we fail the I/O.
-				 */
-				bioerror(buf, EIO);
-				biodone(buf);
-			}
+			/*
+			 * If we were expecting a response for a particular
+			 * request then we return with an error otherwise we
+			 * have successfully completed the drain.
+			 */
+			rv = (buf != NULL || cb_type == CB_SYNC)? ESRCH: 0;
 			break;
 		}
 	}
 
+done:
 	mutex_exit(&vdc->lock);
 	DMSG(vdc, 0, "End idx=%d\n", idx);
 
@@ -7834,10 +7869,15 @@ vdc_validate_geometry(vdc_t *vdc)
 	if (rv) {
 		DMSG(vdc, 1, "[%d] Failed to read disk block 0\n",
 		    vdc->instance);
+	} else if (ddi_in_panic()) {
+		rv = vdc_drain_response(vdc, CB_STRATEGY, buf);
+		if (rv == 0) {
+			rv = geterror(buf);
+		}
 	} else {
 		rv = biowait(buf);
-		biofini(buf);
 	}
+	biofini(buf);
 	kmem_free(buf, sizeof (buf_t));
 
 	if (rv != 0 || label.dkl_magic != DKL_MAGIC ||

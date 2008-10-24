@@ -185,6 +185,7 @@ typedef struct vd_driver_type {
 vd_driver_type_t vds_driver_types[] = {
 	{ "dad",	VD_DRIVER_DISK },	/* Solaris */
 	{ "did",	VD_DRIVER_DISK },	/* Sun Cluster */
+	{ "dlmfdrv",	VD_DRIVER_DISK },	/* Hitachi HDLM */
 	{ "emcp",	VD_DRIVER_DISK },	/* EMC Powerpath */
 	{ "lofi",	VD_DRIVER_VOLUME },	/* Solaris */
 	{ "md",		VD_DRIVER_VOLUME },	/* Solaris - SVM */
