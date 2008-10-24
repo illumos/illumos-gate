@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/os/kuserok.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,16 +22,19 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_kuserok()
  */
 
 #include "k5-int.h"
-/* #if !defined(_WIN32)            Not yet for Windows */
+#if !defined(_WIN32)		/* Not yet for Windows */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -44,6 +46,23 @@
 #include <gssapiP_krb5.h>
 #include <syslog.h>
 
+#if defined(_AIX) && defined(_IBMR2)
+#include <sys/access.h>
+/* xlc has a bug with "const" */
+#define getpwnam(user) getpwnam((char *)user)
+#endif
+
+#define MAX_USERNAME 65
+#define	CACHE_FILENAME_LEN 35
+
+#if defined(__APPLE__) && defined(__MACH__)
+#include <hfs/hfs_mount.h>	/* XXX */
+#define FILE_OWNER_OK(UID)  ((UID) == 0 || (UID) == UNKNOWNUID)
+#else
+#define FILE_OWNER_OK(UID)  ((UID) == 0)
+#endif
+
+/* Solaris Kerberos */
 extern void
 gsscred_set_options();
 
@@ -55,8 +74,6 @@ safechown(const char *src, uid_t uid, gid_t gid, int mode);
 
 extern const char *error_message(long);
 
-#define	MAX_USERNAME 65
-#define	CACHE_FILENAME_LEN 35
 
 krb5_data tgtname = {
 	0,
@@ -64,6 +81,7 @@ krb5_data tgtname = {
 	KRB5_TGS_NAME
 };
 
+/* Solaris Kerberos */
 static krb5_error_code
 krb5_move_ccache(krb5_context kcontext, krb5_principal client,
 		struct passwd *pwd)
@@ -182,6 +200,7 @@ krb5_move_ccache(krb5_context kcontext, krb5_principal client,
 
 
 /*
+ * Solaris Kerberos:
  * krb5_gsscred: Given a kerberos principal try to find the corresponding
  * local uid via the gss cred table. Return TRUE if the uid was found in the
  * cred table, otherwise return FALSE.
@@ -254,33 +273,20 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
     char *princname;
     char linebuf[BUFSIZ];
     char *newline;
+    /* Solaris Kerberos */
     uid_t uid;
     int gobble;
 
     /* no account => no access */
-#ifdef HAVE_GETPWNAM_R
     char pwbuf[BUFSIZ];
     struct passwd pwx;
-#if !defined(GETPWNAM_R_4_ARGS)
-    /* POSIX */
-    if (getpwnam_r(luser, &pwx, pwbuf, sizeof(pwbuf), &pwd) != 0)
-	pwd = NULL;
-#else
-    /* draft POSIX */
-    pwd = getpwnam_r(luser, &pwx, pwbuf, sizeof(pwbuf));
-#endif
-#else
-    pwd = getpwnam(luser);
-#endif
-    if (pwd == NULL)
+    if (k5_getpwnam_r(luser, &pwx, pwbuf, sizeof(pwbuf), &pwd) != 0)
 	return(FALSE);
-
     (void) strncpy(pbuf, pwd->pw_dir, sizeof(pbuf) - 1);
     pbuf[sizeof(pbuf) - 1] = '\0';
     (void) strncat(pbuf, "/.k5login", sizeof(pbuf) - 1 - strlen(pbuf));
 
     if (access(pbuf, F_OK)) {	 /* not accessible */
-
 	/*
 	 * if he's trying to log in as himself, and there is no .k5login file,
 	 * let him.  First, have krb5 check it's rules.  If no success,
@@ -290,6 +296,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 	if (!(krb5_aname_to_localname(context, principal,
 				      sizeof(kuser), kuser))
 	    && (strcmp(kuser, luser) == 0)) {
+		/* Solaris Kerberos */
 		if (krb5_move_ccache(context, principal, pwd))
 			return (FALSE);
 	    	return(TRUE);
@@ -316,6 +323,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 	return(FALSE);			/* no hope of matching */
 
     /* open ~/.k5login */
+    /* Solaris Kerberos */
     if ((fp = fopen(pbuf, "rF")) == NULL) {
 	free(princname);
 	return(FALSE);
@@ -329,7 +337,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 	free(princname);
 	return(FALSE);
     }
-    if ((sbuf.st_uid != pwd->pw_uid) && sbuf.st_uid) {
+    if (sbuf.st_uid != pwd->pw_uid && !FILE_OWNER_OK(sbuf.st_uid)) {
 	fclose(fp);
 	free(princname);
 	return(FALSE);
@@ -345,6 +353,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 	    *newline = '\0';
 	if (!strcmp(linebuf, princname)) {
 	    isok = TRUE;
+	    /* Solaris Kerberos */
 	    if (krb5_move_ccache(context, principal, pwd))
 		return (FALSE);
 	    continue;
@@ -358,6 +367,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
     return(isok);
 }
 
+/* Solaris Kerberos */
 OM_uint32
 krb5_gss_userok(OM_uint32 *minor,
 		const gss_name_t pname,
@@ -394,3 +404,27 @@ krb5_gss_userok(OM_uint32 *minor,
 	krb5_free_context(ctxt);
 	return (GSS_S_COMPLETE);
 }
+
+#else /* _WIN32 */
+
+/*
+ * If the given Kerberos name "server" translates to the same name as "luser"
+ * (using * krb5_aname_to_lname()), returns TRUE.
+ */
+krb5_boolean KRB5_CALLCONV
+krb5_kuserok(context, principal, luser)
+    krb5_context context;
+    krb5_principal principal;
+    const char *luser;
+{
+    char kuser[50];
+
+    if (krb5_aname_to_localname(context, principal, sizeof(kuser), kuser))
+        return FALSE;
+
+    if (strcmp(kuser, luser) == 0)
+	    return TRUE;
+
+    return FALSE;
+}
+#endif /* _WIN32 */

@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * clients/kinit/kinit.c
@@ -39,26 +38,31 @@
 #include <libintl.h>
 
 #include <krb5.h>
-
 #ifdef KRB5_KRB4_COMPAT
 #include <kerberosIV/krb.h>
 #define HAVE_KRB524
 #else
 #undef HAVE_KRB524
-#endif /* KRB5_KRB4_COMPAT */
-
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <errno.h>
+#include <com_err.h>
 #include <netdb.h>
 #include <locale.h>
 
 #ifdef GETOPT_LONG
 #include <getopt.h>
-#else /* GETOPT_LONG */
+#else
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#else /* HAVE_UNISTD_H */
+#ifdef sun
+/* SunOS4 unistd didn't declare these; okay to make unconditional?  */
+extern int optind;
+extern char *optarg;
+#endif /* sun */
+#else
 extern int optind;
 extern char *optarg;
 extern int getopt();
@@ -67,9 +71,9 @@ extern int getopt();
 
 #ifndef _WIN32
 #define GET_PROGNAME(x) (strrchr((x), '/') ? strrchr((x), '/')+1 : (x))
-#else /* _WIN32 */
+#else
 #define GET_PROGNAME(x) max(max(strrchr((x), '/'), strrchr((x), '\\')) + 1,(x))
-#endif /* _WIN32 */
+#endif
 
 #ifdef HAVE_PWD_H
 #include <pwd.h>
@@ -108,7 +112,7 @@ static char* progname_v5 = 0;
 #ifdef KRB5_KRB4_COMPAT
 static char* progname_v4 = 0;
 static char* progname_v524 = 0;
-#endif /* KRB5_KRB4_COMPAT */
+#endif
 #include <locale.h>
 
 static int got_k5 = 0;
@@ -117,9 +121,9 @@ static int got_k4 = 0;
 static int default_k5 = 1;
 #if defined(KRB5_KRB4_COMPAT) && defined(KINIT_DEFAULT_BOTH)
 static int default_k4 = 1;
-#else /* KRB5_KRB4_COMPAT && KINIT_DEFAULT_BOTH */
+#else
 static int default_k4 = 0;
-#endif /* KRB5_KRB4_COMPAT && KINIT_DEFAULT_BOTH */
+#endif
 
 static int authed_k5 = 0;
 static int authed_k4 = 0;
@@ -153,6 +157,9 @@ struct k_opts
     char* k4_cache_name;
 
     action_type action;
+
+    int num_pa_opts;
+    krb5_gic_opt_pa_data *pa_opts;
 };
 
 int	forwardable_flag = 0;
@@ -193,7 +200,7 @@ struct k4_data
     char inst[INST_SZ + 1];
     char realm[REALM_SZ + 1];
     char name[ANAME_SZ + 1 + INST_SZ + 1 + REALM_SZ + 1];
-#endif /*KRB5_KRB4_COMPAT */
+#endif
 };
 
 char	*realmdef[] = { "realms", NULL, "kinit", NULL };
@@ -210,8 +217,8 @@ char	*appdef[] = { "appdefaults", "kinit", NULL };
 krb5_preauthtype * preauth = NULL;
 krb5_preauthtype preauth_list[2] = { 0, -1 };
 
-static void _kwarnd_add_warning(char *, time_t);
-static void _kwarnd_del_warning(char *);
+static void _kwarnd_add_warning(char *, char *, time_t);
+static void _kwarnd_del_warning(char *, char *);
 
 #ifdef GETOPT_LONG
 /* if struct[2] == NULL, then long_getopt acts as if the short flag
@@ -230,15 +237,13 @@ struct option long_options[] = {
 };
 
 #define GETOPT(argc, argv, str) getopt_long(argc, argv, str, long_options, 0)
-#else /* GETOPT_LONG */
+#else
 #define GETOPT(argc, argv, str) getopt(argc, argv, str)
-#endif /* GETOPT_LONG */
-
-/* Save the program name for the error messages */
-static char *progname;
+#endif
 
 static void
 usage(progname)
+     char *progname;
 {
 #define USAGE_BREAK "\n\t"
 
@@ -247,12 +252,12 @@ usage(progname)
 #define USAGE_LONG_PROXIABLE   " | --proxiable | --noproxiable"
 #define USAGE_LONG_ADDRESSES   " | --addresses | --noaddresses"
 #define USAGE_BREAK_LONG       USAGE_BREAK
-#else /* GETOPT_LONG */
+#else
 #define USAGE_LONG_FORWARDABLE ""
 #define USAGE_LONG_PROXIABLE   ""
 #define USAGE_LONG_ADDRESSES   ""
 #define USAGE_BREAK_LONG       ""
-#endif /* GETOPT_LONG */
+#endif
 
     fprintf(stderr, "%s : %s  [-V] "
 	    "[-l lifetime] [-s start_time] "
@@ -266,9 +271,10 @@ usage(progname)
 	    USAGE_BREAK
 	    "[-v] [-R] "
 	    "[-k [-t keytab_file]] "
-	    USAGE_BREAK
 	    "[-c cachename] "
-	    "[-S service_name] [principal]"
+	    USAGE_BREAK
+	    "[-S service_name]"
+	    "[-X <attribute>[=<value>]] [principal]"
 	    "\n\n", 
 	    gettext("Usage"), progname);
 
@@ -319,7 +325,51 @@ fprintf(stderr, USAGE_OPT_FMT, indent, col1)
     /* This options is not yet available: */
     /* ULINE("\t", "-C Kerberos 4 cache name",     OPTTYPE_KRB4); */
     ULINE("\t", gettext("-S service"),                   OPTTYPE_BOTH);
+    ULINE("\t", gettext("-X <attribute>[=<value>]"),     OPTTYPE_KRB5);
     exit(2);
+}
+
+static krb5_context errctx;
+static void extended_com_err_fn (const char *myprog, errcode_t code,
+				 const char *fmt, va_list args)
+{
+    const char *emsg;
+    emsg = krb5_get_error_message (errctx, code);
+    fprintf (stderr, "%s: %s ", myprog, emsg);
+    krb5_free_error_message (errctx, emsg);
+    vfprintf (stderr, fmt, args);
+    fprintf (stderr, "\n");
+}
+
+static int
+add_preauth_opt(struct k_opts *opts, char *av)
+{
+    char *sep, *v;
+    krb5_gic_opt_pa_data *p, *x;
+
+    if (opts->num_pa_opts == 0) {
+	opts->pa_opts = malloc(sizeof(krb5_gic_opt_pa_data));
+	if (opts->pa_opts == NULL)
+	    return ENOMEM;
+    } else {
+	size_t newsize = (opts->num_pa_opts + 1) * sizeof(krb5_gic_opt_pa_data);
+	x = realloc(opts->pa_opts, newsize);
+	if (x == NULL)
+	    return ENOMEM;
+	opts->pa_opts = x;
+    }
+    p = &opts->pa_opts[opts->num_pa_opts];
+    sep = strchr(av, '=');
+    if (sep) {
+	*sep = '\0';
+	v = ++sep;
+	p->value = v;
+    } else {
+	p->value = "yes";
+    }
+    p->attr = av;
+    opts->num_pa_opts++;
+    return 0;
 }
 
 static char *
@@ -335,7 +385,7 @@ parse_options(argc, argv, opts, progname)
     int use_k5 = 0;
     int i;
 
-    while ((i = GETOPT(argc, argv, "r:fpFP54aAVl:s:c:kt:RS:v"))
+    while ((i = GETOPT(argc, argv, "r:fpFP54aAVl:s:c:kt:RS:vX:"))
 	   != -1) {
 	switch (i) {
 	case 'V':
@@ -418,6 +468,14 @@ parse_options(argc, argv, opts, progname)
 		errflg++;
 	    } else {
 		opts->k5_cache_name = optarg;
+	    }
+	    break;
+	case 'X':
+	    code = add_preauth_opt(opts, optarg);
+	    if (code)
+	    {
+		com_err(progname, code, "while adding preauth option");
+		errflg++;
 	    }
 	    break;
 #if 0
@@ -548,6 +606,7 @@ struct k4_data* k4;
 	com_err(progname, code, gettext("while initializing Kerberos 5 library"));
 	return 0;
     }
+    errctx = k5->ctx;
     if (opts->k5_cache_name)
     {
 	code = krb5_cc_resolve(k5->ctx, opts->k5_cache_name, &k5->cc);
@@ -655,6 +714,7 @@ k5_end(k5)
 	krb5_cc_close(k5->ctx, k5->cc);
     if (k5->ctx)
 	krb5_free_context(k5->ctx);
+    errctx = NULL;
     memset(k5, 0, sizeof(*k5));
 }
 
@@ -800,14 +860,17 @@ k5_kinit(opts, k5)
     krb5_keytab keytab = 0;
     krb5_creds my_creds;
     krb5_error_code code = 0;
-    krb5_get_init_creds_opt options;
+    krb5_get_init_creds_opt *options = NULL;
+    int i;
     krb5_timestamp now;
     krb5_deltat lifetime = 0, rlife = 0, krb5_max_duration;
 
     if (!got_k5)
 	return 0;
 
-    krb5_get_init_creds_opt_init(&options);
+    code = krb5_get_init_creds_opt_alloc(k5->ctx, &options);
+    if (code)
+	goto cleanup;
     memset(&my_creds, 0, sizeof(my_creds));
 
     /*
@@ -876,10 +939,10 @@ k5_kinit(opts, k5)
 
     /* cmdline opts take precedence over krb5.conf file values */
     if (!opts->not_proxiable && proxiable_flag) {
-	    krb5_get_init_creds_opt_set_proxiable(&options, 1);
+	    krb5_get_init_creds_opt_set_proxiable(options, 1);
     }
     if (!opts->not_forwardable && forwardable_flag) {
-	    krb5_get_init_creds_opt_set_forwardable(&options, 1);
+	    krb5_get_init_creds_opt_set_forwardable(options, 1);
     }
     if (renewable_flag) {
 	    /*
@@ -890,7 +953,7 @@ k5_kinit(opts, k5)
     }
     if (no_address_flag) {
 	    /* cmdline opts will overwrite this below if needbe */
-	    krb5_get_init_creds_opt_set_address_list(&options, NULL);
+	    krb5_get_init_creds_opt_set_address_list(options, NULL);
     }
 
 
@@ -900,17 +963,17 @@ k5_kinit(opts, k5)
     */
 
     if (opts->lifetime)
-	krb5_get_init_creds_opt_set_tkt_life(&options, opts->lifetime);
+	krb5_get_init_creds_opt_set_tkt_life(options, opts->lifetime);
     if (opts->rlife)
-	krb5_get_init_creds_opt_set_renew_life(&options, opts->rlife);
+	krb5_get_init_creds_opt_set_renew_life(options, opts->rlife);
     if (opts->forwardable)
-	krb5_get_init_creds_opt_set_forwardable(&options, 1);
+	krb5_get_init_creds_opt_set_forwardable(options, 1);
     if (opts->not_forwardable)
-	krb5_get_init_creds_opt_set_forwardable(&options, 0);
+	krb5_get_init_creds_opt_set_forwardable(options, 0);
     if (opts->proxiable)
-	krb5_get_init_creds_opt_set_proxiable(&options, 1);
+	krb5_get_init_creds_opt_set_proxiable(options, 1);
     if (opts->not_proxiable)
-	krb5_get_init_creds_opt_set_proxiable(&options, 0);
+	krb5_get_init_creds_opt_set_proxiable(options, 0);
     if (opts->addresses)
     {
 	krb5_address **addresses = NULL;
@@ -919,10 +982,10 @@ k5_kinit(opts, k5)
 	    com_err(progname, code, gettext("getting local addresses"));
 	    goto cleanup;
 	}
-	krb5_get_init_creds_opt_set_address_list(&options, addresses);
+	krb5_get_init_creds_opt_set_address_list(options, addresses);
     }
     if (opts->no_addresses)
-	krb5_get_init_creds_opt_set_address_list(&options, NULL);
+	krb5_get_init_creds_opt_set_address_list(options, NULL);
 
     if ((opts->action == INIT_KT) && opts->keytab_name)
     {
@@ -934,20 +997,31 @@ k5_kinit(opts, k5)
 	}
     }
 
+    for (i = 0; i < opts->num_pa_opts; i++) {
+	code = krb5_get_init_creds_opt_set_pa(k5->ctx, options,
+					      opts->pa_opts[i].attr,
+					      opts->pa_opts[i].value);
+	if (code != 0) {
+	    com_err(progname, code, "while setting '%s'='%s'",
+		    opts->pa_opts[i].attr, opts->pa_opts[i].value);
+	    goto cleanup;
+	}
+    }
+
     switch (opts->action) {
     case INIT_PW:
 	code = krb5_get_init_creds_password(k5->ctx, &my_creds, k5->me,
 					    0, kinit_prompter, 0,
 					    opts->starttime, 
 					    opts->service_name,
-					    &options);
+					    options);
 	break;
     case INIT_KT:
 	code = krb5_get_init_creds_keytab(k5->ctx, &my_creds, k5->me,
 					  keytab,
 					  opts->starttime, 
 					  opts->service_name,
-					  &options);
+					  options);
 	break;
     case VALIDATE:
 	code = krb5_get_validated_creds(k5->ctx, &my_creds, k5->me, k5->cc,
@@ -1007,51 +1081,25 @@ k5_kinit(opts, k5)
 	goto cleanup;
     }
 
-	/*
-	 * Solaris Kerberos:
-	 * The service ticket may or may not be host-based. If the requested
-	 * ticket is host-based and a "fallback" mechanism is being used to
-	 * determine the realm, subsequent searches by kerberos applications
-	 * will search for a service ticket with an empty server realm. If a
-	 * fallback mechanism is not being used, then it will search for a
-	 * service ticket with a server realm. By storing the credentials
-	 * twice (with and without a server realm), we ensure that the
-	 * credential will be found in both cases.
-	 */
-	if (opts->service_name) {
-
-		free(my_creds.server->realm.data);
-		my_creds.server->realm.data =
-		    malloc(strlen(KRB5_REFERRAL_REALM) + 1);
-		if (!my_creds.server->realm.data) {
-			code = ENOMEM;
-			goto cleanup;
-		}
-		
-		strlcpy(my_creds.server->realm.data, KRB5_REFERRAL_REALM,
-		    strlen(KRB5_REFERRAL_REALM) + 1);
-		my_creds.server->realm.length = strlen(KRB5_REFERRAL_REALM);
-
- 		code = krb5_cc_store_cred(k5->ctx, k5->cc, &my_creds);
-		if (code) {
-			com_err(progname, code,
-			    gettext("while storing credentials"));
-			goto cleanup;
-		}
-	}
-
     if (opts->action == RENEW) {
-        _kwarnd_del_warning(opts->principal_name);
-        _kwarnd_add_warning(opts->principal_name, my_creds.times.endtime);
+        _kwarnd_del_warning(progname, opts->principal_name);
+        _kwarnd_add_warning(progname, opts->principal_name, my_creds.times.endtime);
     } else if ((opts->action == INIT_KT) || (opts->action == INIT_PW)) { 
-        _kwarnd_add_warning(opts->principal_name, my_creds.times.endtime);
+        _kwarnd_add_warning(progname, opts->principal_name, my_creds.times.endtime);
     }
 
     notix = 0;
 
  cleanup:
+    if (options)
+	krb5_get_init_creds_opt_free(k5->ctx, options);
     if (my_creds.client == k5->me) {
 	my_creds.client = 0;
+    }
+    if (opts->pa_opts) {
+	free(opts->pa_opts);
+	opts->pa_opts = NULL;
+	opts->num_pa_opts = 0;
     }
     krb5_free_cred_contents(k5->ctx, &my_creds);
     if (keytab)
@@ -1255,6 +1303,7 @@ main(argc, argv)
     struct k_opts opts;
     struct k5_data k5;
     struct k4_data k4;
+    char *progname;
 
     (void) setlocale(LC_ALL, "");
 
@@ -1294,6 +1343,8 @@ main(argc, argv)
     memset(&k5, 0, sizeof(k5));
     memset(&k4, 0, sizeof(k4));
 
+    set_com_err_hook (extended_com_err_fn);
+
     parse_options(argc, argv, &opts, progname);
 
     got_k5 = k5_begin(&opts, &k5, &k4);
@@ -1325,7 +1376,7 @@ main(argc, argv)
 }
 
 static void 
-_kwarnd_add_warning(char *me, time_t endtime) 
+_kwarnd_add_warning(char *progname, char *me, time_t endtime) 
 { 
     if (kwarn_add_warning(me, endtime) != 0) 
         fprintf(stderr, gettext(
@@ -1335,7 +1386,7 @@ _kwarnd_add_warning(char *me, time_t endtime)
 
 
 static void 
-_kwarnd_del_warning(char *me) 
+_kwarnd_del_warning(char *progname, char *me) 
 {
     if (kwarn_del_warning(me) != 0)
         fprintf(stderr, gettext( 

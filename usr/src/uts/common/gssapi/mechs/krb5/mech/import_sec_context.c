@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/gssapi/krb5/import_sec_context.c
@@ -148,7 +147,6 @@ krb5_gss_import_sec_context(minor_status, interprocess_token, context_handle)
        *minor_status = (OM_uint32) G_VALIDATE_FAILED;
        return(GSS_S_FAILURE);
     }
-
     ctx->mech_used = krb5_gss_convert_static_mech_oid(ctx->mech_used);
     
     *context_handle = (gss_ctx_id_t) ctx;

@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2000 by the Massachusetts Institute of Technology.
@@ -270,7 +269,7 @@ krb5_error_code kg_make_confounder (krb5_context context,
 krb5_error_code kg_encrypt (krb5_context context, 
 				      krb5_keyblock *key, int usage,
 				      krb5_pointer iv,
-				      krb5_pointer in,
+				      krb5_const_pointer in,
 				      krb5_pointer out,
 				      unsigned int length);
 krb5_error_code
@@ -283,7 +282,7 @@ kg_arcfour_docrypt (krb5_context,
 krb5_error_code kg_decrypt (krb5_context context,
 				      krb5_keyblock *key,  int usage,
 				      krb5_pointer iv,
-				      krb5_pointer in,
+				      krb5_const_pointer in,
 				      krb5_pointer out,
 				      unsigned int length);
 
@@ -326,6 +325,9 @@ krb5_error_code kg_ctx_internalize (krb5_context kcontext,
 					      size_t *lenremain);
 
 OM_uint32 kg_sync_ccache_name (krb5_context context, OM_uint32 *minor_status);
+
+OM_uint32 kg_caller_provided_ccache_name (OM_uint32 *minor_status, 
+                                          int *out_caller_provided_name);
 
 OM_uint32 kg_get_ccache_name (OM_uint32 *minor_status, 
                               const char **out_name);
@@ -666,7 +668,7 @@ krb5_error_code gss_krb5int_make_seal_token_v3(krb5_context,
 					       gss_buffer_t,
 					       int, int);
 
-OM_uint32 gss_krb5int_unseal_token_v3(krb5_context context,
+OM_uint32 gss_krb5int_unseal_token_v3(krb5_context *contextptr,
 				      OM_uint32 *minor_status,
 				      krb5_gss_ctx_id_rec *ctx,
 				      unsigned char *ptr, int bodysize,

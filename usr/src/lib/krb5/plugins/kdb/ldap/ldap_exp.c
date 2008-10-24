@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kdb/kdb_ldap/ldap_exp.c
@@ -94,6 +93,6 @@ kdb_vftabl kdb_function_table = {
   /* fetch_master_key */		       NULL /* krb5_ldap_fetch_mkey */,
   /* verify_master_key */		       NULL /* krb5_ldap_verify_master_key */,
   /* Search enc type */                        NULL,
-  /* db_change_pwd */                          NULL
+  /* Change pwd   */                           NULL
 
 };

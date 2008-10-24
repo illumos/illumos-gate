@@ -1,9 +1,8 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 2001 by the Massachusetts Institute of Technology.
@@ -36,21 +35,23 @@
  * contains that default code.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /* ARGSUSED */
-krb5_error_code krb5int_des_init_state(
-	krb5_context context, const krb5_keyblock *key,
+krb5_error_code krb5int_des_init_state
+(krb5_context context, const krb5_keyblock *key,
 	krb5_keyusage usage, krb5_data *new_state )
 {
   new_state->length = 8;
   new_state->data = (void *) MALLOC(8);
   if (new_state->data) {
+    /* Solaris Kerberos */
     (void) memset (new_state->data, 0, new_state->length);
     /* We need to copy in the key for des-cbc-cr--ick, but that's how it works*/
     if (key->enctype == ENCTYPE_DES_CBC_CRC) {
+      /* Solaris Kerberos */
       (void) memcpy (new_state->data, key->contents, new_state->length);
-    }
+  }
   } else {
     return ENOMEM;
   }
@@ -58,8 +59,8 @@ krb5_error_code krb5int_des_init_state(
 }
 
 /* ARGSUSED */
-krb5_error_code krb5int_default_free_state(
-	krb5_context context, krb5_data *state)
+krb5_error_code krb5int_default_free_state
+(krb5_context context, krb5_data *state)
 {
   if (state->data) {
     FREE (state->data, state->length);
@@ -69,3 +70,5 @@ krb5_error_code krb5int_default_free_state(
   return 0;
 }
 
+    
+  

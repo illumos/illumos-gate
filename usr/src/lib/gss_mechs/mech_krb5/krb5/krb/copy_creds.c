@@ -1,11 +1,4 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
  * lib/krb5/krb/copy_creds.c
  *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
@@ -34,7 +27,7 @@
  * krb5_copy_cred()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * Copy credentials, allocating fresh storage where needed.
@@ -50,11 +43,7 @@ krb5_copy_creds(krb5_context context, const krb5_creds *incred, krb5_creds **out
     if (!(tempcred = (krb5_creds *)malloc(sizeof(*tempcred))))
 	return ENOMEM;
 
-#ifdef HAVE_C_STRUCTURE_ASSIGNMENT
-    *tempcred = *incred;		/* copy everything quickly */
-#else
-    memcpy(tempcred, incred, sizeof(krb5_creds));
-#endif
+    *tempcred = *incred;
     retval = krb5_copy_principal(context, incred->client, &tempcred->client);
     if (retval)
 	goto cleanlast;

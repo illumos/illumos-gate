@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/ustime.c
  *
@@ -32,10 +31,10 @@
  * this time adjustment be done.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 krb5_error_code KRB5_CALLCONV
-krb5_us_timeofday(krb5_context context, krb5_int32 *seconds, krb5_int32 *microseconds)
+krb5_us_timeofday(krb5_context context, krb5_timestamp *seconds, krb5_int32 *microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
     krb5_int32 sec, usec;

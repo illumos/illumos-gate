@@ -1,9 +1,8 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/cp_key_cnt.c
  *
@@ -33,18 +32,16 @@
  * krb5_copy_keyblock()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * Copy a keyblock, including alloc'ed storage.
  */
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV
-krb5_copy_keyblock_contents(
-	krb5_context 	context,
-	const krb5_keyblock *from,
-	krb5_keyblock 	*to)
+krb5_copy_keyblock_contents(krb5_context context, const krb5_keyblock *from, krb5_keyblock *to)
 {
+	/* Solaris Kerberos */
 	krb5_error_code ret = EINVAL;
 
 	if (to != NULL && from != NULL) {

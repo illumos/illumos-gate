@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2000 by the Massachusetts Institute of Technology.
@@ -87,14 +86,14 @@
 #include <strings.h>
 #endif
 
-/* SUNW15resync - Solaris kerberos does not need this feature in this file */ 
-#ifdef USE_LOGIN_LIBRARY
-#undef USE_LOGIN_LIBRARY
-#endif
-
 #if defined(USE_LOGIN_LIBRARY)
 #include <Kerberos/KerberosLoginPrivate.h>
 #elif defined(USE_LEASH)
+#ifdef _WIN64
+#define LEASH_DLL "leashw64.dll"
+#else
+#define LEASH_DLL "leashw32.dll"
+#endif
 static void (*pLeash_AcquireInitialTicketsIfNeeded)(krb5_context,krb5_principal,char*,int) = NULL;
 static HANDLE hLeashDLL = INVALID_HANDLE_VALUE;
 #endif
@@ -237,6 +236,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    krb5_cc_cursor cur;
    krb5_creds creds;
    int got_endtime;
+   int caller_provided_ccache_name = 0;
 
    cred->ccache = NULL;
 
@@ -245,36 +245,41 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    if (GSS_ERROR(kg_sync_ccache_name(context, minor_status)))
        return(GSS_S_FAILURE);
 
+   /* check to see if the caller provided a ccache name if so 
+    * we will just use that and not search the cache collection */
+   if (GSS_ERROR(kg_caller_provided_ccache_name (minor_status, &caller_provided_ccache_name))) {
+       return(GSS_S_FAILURE);
+   }
+
 #if defined(USE_LOGIN_LIBRARY) || defined(USE_LEASH)
-   if (desired_name != NULL) {
+   if (desired_name && !caller_provided_ccache_name) {
 #if defined(USE_LOGIN_LIBRARY)
+       KLStatus err = klNoErr;
        char *ccache_name = NULL;
        KLPrincipal kl_desired_princ = NULL;
+
+       err = __KLCreatePrincipalFromKerberos5Principal ((krb5_principal) desired_name,
+                                                        &kl_desired_princ);
        
-       if ((code = __KLCreatePrincipalFromKerberos5Principal ((krb5_principal) desired_name,
-                                                              &kl_desired_princ))) {
-           *minor_status = code;
-           return(GSS_S_NO_CRED);
+       if (!err) {
+           err = KLAcquireInitialTickets (kl_desired_princ, NULL, NULL, &ccache_name);
+       }
+
+       if (!err) {
+           err = krb5_cc_resolve (context, ccache_name, &ccache);
        }
        
-       if ((code = KLAcquireInitialTickets (kl_desired_princ, NULL, NULL, &ccache_name))) {
-           KLDisposePrincipal (kl_desired_princ);
-           *minor_status = code;
-           return(GSS_S_NO_CRED);
+       if (err) {
+           *minor_status = err;
+           return(GSS_S_CRED_UNAVAIL);
        }
        
-       if ((code = krb5_cc_resolve (context, ccache_name, &ccache))) {
-           KLDisposeString (ccache_name);
-           KLDisposePrincipal (kl_desired_princ);
-           *minor_status = code;
-           return(GSS_S_NO_CRED);
-       }
-   
        if (kl_desired_princ != NULL) { KLDisposePrincipal (kl_desired_princ); }
        if (ccache_name      != NULL) { KLDisposeString (ccache_name); }
+       
 #elif defined(USE_LEASH)
        if ( hLeashDLL == INVALID_HANDLE_VALUE ) {
-	   hLeashDLL = LoadLibrary("leashw32.dll");
+	   hLeashDLL = LoadLibrary(LEASH_DLL);
 	   if ( hLeashDLL != INVALID_HANDLE_VALUE ) {
 	       (FARPROC) pLeash_AcquireInitialTicketsIfNeeded =
 		   GetProcAddress(hLeashDLL, "not_an_API_Leash_AcquireInitialTicketsIfNeeded");
@@ -330,6 +335,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    /* get out the principal name and see if it matches */
 
    if ((code = krb5_cc_get_principal(context, ccache, &princ))) {
+      /* Solaris Kerberos */
       (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
@@ -339,6 +345,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    if (desired_name != (gss_name_t) NULL) {
       if (! krb5_principal_compare(context, princ, (krb5_principal) desired_name)) {
 	 (void)krb5_free_principal(context, princ);
+	 /* Solaris Kerberos */
 	 (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
 	 (void)krb5_cc_close(context, ccache);
 	 *minor_status = KG_CCACHE_NOMATCH;
@@ -353,6 +360,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    /* iterate over the ccache, find the tgt */
 
    if ((code = krb5_cc_start_seq_get(context, ccache, &cur))) {
+      /* Solaris Kerberos */
       (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
@@ -373,6 +381,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 				   krb5_princ_realm(context, princ)->data,
 				   0);
    if (code) {
+      /* Solaris Kerberos */
       (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
@@ -398,6 +407,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    if (code && code != KRB5_CC_END) {
       /* this means some error occurred reading the ccache */
       (void)krb5_cc_end_seq_get(context, ccache, &cur);
+      /* Solaris Kerberos */
       (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
@@ -405,6 +415,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    } else if (! got_endtime) {
       /* this means the ccache was entirely empty */
       (void)krb5_cc_end_seq_get(context, ccache, &cur);
+      /* Solaris Kerberos */
       (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = KG_EMPTY_CCACHE;
@@ -412,6 +423,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    } else {
       /* this means that we found an endtime to use. */
       if ((code = krb5_cc_end_seq_get(context, ccache, &cur))) {
+	 /* Solaris Kerberos */
 	 (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
 	 (void)krb5_cc_close(context, ccache);
 	 *minor_status = code;
@@ -640,11 +652,11 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
 							    &ret_mechs)) ||
 	   (cred->prerfc_mech &&
 	    GSS_ERROR(ret = generic_gss_add_oid_set_member(minor_status,
-							(const gss_OID) gss_mech_krb5_old,
+							  (const gss_OID) gss_mech_krb5_old,
 							   &ret_mechs))) ||
 	   (cred->rfc_mech &&
 	    GSS_ERROR(ret = generic_gss_add_oid_set_member(minor_status,
-							(const gss_OID)	   gss_mech_krb5,
+							  (const gss_OID) gss_mech_krb5,
 							   &ret_mechs)))) {
 	   if (cred->ccache)
 	       (void)krb5_cc_close(context, cred->ccache);

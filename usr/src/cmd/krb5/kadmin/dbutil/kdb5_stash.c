@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -78,8 +77,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-
-#include <k5-int.h>
+#include "k5-int.h"
 #include <kadm5/admin.h>
 #include "com_err.h"
 #include <kadm5/admin.h>
@@ -145,7 +143,6 @@ kdb5_stash(argc, argv)
 
     if (!krb5_c_valid_enctype(global_params.enctype)) {
 	char tmp[32];
-
 	if (krb5_enctype_to_string(global_params.enctype,
 					    tmp, sizeof (tmp)))
 	    com_err(argv[0], KRB5_PROG_KEYTYPE_NOSUPP,

@@ -1,8 +1,7 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= klist
@@ -26,7 +25,7 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 		$(DEFS)
 
 LDFLAGS += $(KRUNPATH)
-LDLIBS += $(KMECHLIB) -lsocket
+LDLIBS += $(KMECHLIB)
 
 $(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50 
 

@@ -1,16 +1,15 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 
 #include "autoconf.h"
 #include "com_err.h"
-#include "krb5.h"
-#if 0 /* SUNW14resync */
+#include "k5-int.h"
+#if 0 /* Solaris Kerberos */
 #include "krb5_err.h"
 #include "kv5m_err.h"
 #include "asn1_err.h"
@@ -42,6 +41,10 @@ int krb5int_lib_init(void)
 
     krb5int_set_error_info_callout_fn (error_message);
 
+#ifdef SHOW_INITFINI_FUNCS
+    printf("krb5int_lib_init\n");
+#endif
+
 #if !USE_BUNDLE_ERROR_STRINGS
     add_error_table(&et_krb5_error_table);
     add_error_table(&et_kv5m_error_table);
@@ -62,6 +65,7 @@ int krb5int_lib_init(void)
     err = k5_mutex_finish_init(&krb5int_us_time_mutex);
     if (err)
 	return err;
+
     return 0;
 }
 
@@ -77,12 +81,22 @@ krb5_error_code krb5int_initialize_library (void)
 
 void krb5int_lib_fini(void)
 {
-    if (!INITIALIZER_RAN(krb5int_lib_init) || PROGRAM_EXITING())
+    if (!INITIALIZER_RAN(krb5int_lib_init) || PROGRAM_EXITING()) {
+#ifdef SHOW_INITFINI_FUNCS
+	printf("krb5int_lib_fini: skipping\n");
+#endif
 	return;
+    }
 
-    krb5int_rc_terminate();
-    krb5int_kt_finalize();
+#ifdef SHOW_INITFINI_FUNCS
+    printf("krb5int_lib_fini\n");
+#endif
+
+    k5_mutex_destroy(&krb5int_us_time_mutex);
+
     krb5int_cc_finalize();
+    krb5int_kt_finalize();
+    krb5int_rc_terminate();
 
 #if defined(_WIN32) || defined(USE_CCAPI)
     krb5_stdcc_shutdown();

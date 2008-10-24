@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -395,7 +393,7 @@ new:	if ((bp = (BKT *)malloc(sizeof(BKT) + mp->pagesize)) == NULL)
 #ifdef STATISTICS
 	++mp->pagealloc;
 #endif
-#if defined(DEBUG) || defined(PURIFY)
+#if defined(DEBUG) || defined(PURIFY) || 1
 	memset(bp, 0xff, sizeof(BKT) + mp->pagesize);
 #endif
 	bp->page = (char *)bp + sizeof(BKT);
@@ -453,8 +451,7 @@ mpool_look(mp, pgno)
 
 	head = &mp->hqh[HASHKEY(pgno)];
 	for (bp = head->cqh_first; bp != (void *)head; bp = bp->hq.cqe_next)
-		if ((bp->pgno == pgno) &&
-			(bp->flags & MPOOL_INUSE == MPOOL_INUSE)) {
+		if ((bp->pgno == pgno) && (bp->flags & MPOOL_INUSE)) {
 #ifdef STATISTICS
 			++mp->cachehit;
 #endif

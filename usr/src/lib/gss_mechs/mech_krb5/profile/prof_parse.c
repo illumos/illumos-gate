@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "prof_int.h"
 
@@ -91,10 +90,10 @@ static errcode_t parse_std_line(char *line, struct parse_state *state)
 	
 	if (*line == 0)
 		return 0;
-	if (line[0] == ';' || line[0] == '#')
-		return 0;
-	strip_line(line);
 	cp = skip_over_blanks(line);
+	if (cp[0] == ';' || cp[0] == '#')
+		return 0;
+	strip_line(cp);
 	ch = *cp;
 	if (ch == 0)
 		return 0;
@@ -122,7 +121,6 @@ static errcode_t parse_std_line(char *line, struct parse_state *state)
 		 * Finish off the rest of the line.
 		 */
 		cp = p+1;
-
 		if (*cp == '*') {
 			profile_make_node_final(state->current_section);
 			cp++;
@@ -182,9 +180,6 @@ static errcode_t parse_std_line(char *line, struct parse_state *state)
 	} else if (value[0] == '{' && *(skip_over_blanks(value+1)) == 0)
 		do_subsection++;
 	else {
-		/*
-		 * Skip over trailing whitespace characters
-		 */
 		cp = value + strlen(value) - 1;
 		while ((cp > value) && isspace((int) (*cp)))
 			*cp-- = 0;
@@ -240,7 +235,7 @@ errcode_t profile_parse_file(FILE *f, struct profile_node **root)
 	errcode_t retval;
 	struct parse_state state;
 
-	bptr = (char *) malloc (BUF_SIZE);
+	bptr = malloc (BUF_SIZE);
 	if (!bptr)
 		return ENOMEM;
 
@@ -255,7 +250,7 @@ errcode_t profile_parse_file(FILE *f, struct profile_node **root)
 #ifndef PROFILE_SUPPORTS_FOREIGN_NEWLINES
 		retval = parse_line(bptr, &state);
 		if (retval) {
-			/* check if an unconfigured file */
+			/* Solaris Kerberos: check if an unconfigured file */
 			if (strstr(bptr, "___"))
 				retval = PROF_NO_PROFILE;
 			free (bptr);
@@ -322,8 +317,10 @@ errcode_t profile_parse_file(FILE *f, struct profile_node **root)
  */
 static int need_double_quotes(char *str)
 {
-	if (!str || !*str)
-		return 0;
+	if (!str)
+                return 0;
+	if (str[0] == '\0')
+		return 1;
 	if (isspace((int) (*str)) ||isspace((int) (*(str + strlen(str) - 1))))
 		return 1;
 	if (strchr(str, '\n') || strchr(str, '\t') || strchr(str, '\b'))

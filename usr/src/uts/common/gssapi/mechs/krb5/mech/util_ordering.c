@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -28,7 +27,7 @@
  */
 
 /*
- * $Id: util_ordering.c,v 1.4 1996/10/21 20:17:11 tytso Exp $
+ * $Id: util_ordering.c 19310 2007-03-29 21:36:38Z tlyu $
  */
 
 /*
@@ -41,8 +40,8 @@
  * functions to check sequence numbers for replay and sequencing
  */
 
-#include <mechglueP.h>
-#include <gssapiP_generic.h>
+#include "mechglueP.h"
+#include "gssapiP_generic.h"
 
 #define QUEUE_LENGTH 20
 
@@ -156,7 +155,7 @@ queue_insert(queue *q, int after, gssint_uint64 seqnum)
       q->length++;
    }
 }
-   
+
 gss_int32
 g_order_init(void **vqueue, gssint_uint64 seqnum,
 	     int do_replay, int do_sequence, int wide_nums)
@@ -164,7 +163,7 @@ g_order_init(void **vqueue, gssint_uint64 seqnum,
    queue *q;
 
    if ((q = (queue *) MALLOC(sizeof(queue))) == NULL)
-      return (ENOMEM);
+      return(ENOMEM);
 
    q->do_replay = do_replay;
    q->do_sequence = do_sequence;
@@ -176,7 +175,7 @@ g_order_init(void **vqueue, gssint_uint64 seqnum,
    q->elem[q->start] = ((gssint_uint64)0 - 1) & q->mask;
 
    *vqueue = (void *) q;
-   return (0);
+   return(0);
 }
 
 gss_int32
@@ -185,11 +184,11 @@ g_order_check(void **vqueue, gssint_uint64 seqnum)
    queue *q;
    int i;
    gssint_uint64 expected;
-   
+
    q = (queue *) (*vqueue);
 
    if (!q->do_replay && !q->do_sequence)
-      return (GSS_S_COMPLETE);
+      return(GSS_S_COMPLETE);
 
    /* All checks are done relative to the initial sequence number, to
       avoid (or at least put off) the pain of wrapping.  */
@@ -203,34 +202,35 @@ g_order_check(void **vqueue, gssint_uint64 seqnum)
    seqnum &= q->mask;
 
    /* rule 1: expected sequence number */
+
    expected = (QELEM(q,q->start+q->length-1)+1) & q->mask;
-   if (seqnum == expected) {
+   if (seqnum == expected) { 
       queue_insert(q, q->start+q->length-1, seqnum);
-      return (GSS_S_COMPLETE);
+      return(GSS_S_COMPLETE);
    }
 
    /* rule 2: > expected sequence number */
    if (after(seqnum, expected, q->mask)) {
       queue_insert(q, q->start+q->length-1, seqnum);
       if (q->do_replay && !q->do_sequence)
-         return (GSS_S_COMPLETE);
+	 return(GSS_S_COMPLETE);
       else
-         return (GSS_S_GAP_TOKEN);
+	 return(GSS_S_GAP_TOKEN);
    }
 
    /* rule 3: seqnum < seqnum(first) */
    if (after(QELEM(q,q->start), seqnum, q->mask)) {
       if (q->do_replay && !q->do_sequence)
-         return (GSS_S_OLD_TOKEN);
+	 return(GSS_S_OLD_TOKEN);
       else
-         return (GSS_S_UNSEQ_TOKEN);
+	 return(GSS_S_UNSEQ_TOKEN);
    }
 
    /* rule 4+5: seqnum in [seqnum(first),seqnum(last)]  */
 
    else {
       if (seqnum == QELEM(q,q->start+q->length-1))
-         return (GSS_S_DUPLICATE_TOKEN);
+	 return(GSS_S_DUPLICATE_TOKEN);
 
       for (i=q->start; i<q->start+q->length-1; i++) {
          if (seqnum == QELEM(q,i))
@@ -247,7 +247,7 @@ g_order_check(void **vqueue, gssint_uint64 seqnum)
    }
 
    /* this should never happen */
-   return (GSS_S_FAILURE);
+   return(GSS_S_FAILURE);
 }
 
 void
@@ -271,7 +271,7 @@ gss_uint32
 g_queue_size(void *vqueue, size_t *sizep)
 {
     *sizep += sizeof(queue);
-    return (0);
+    return 0;
 }
 
 gss_uint32
@@ -281,7 +281,7 @@ g_queue_externalize(void *vqueue, unsigned char **buf, size_t *lenremain)
     *buf += sizeof(queue);
     *lenremain -= sizeof(queue);
     
-    return (0);
+    return 0;
 }
 
 gss_uint32
@@ -295,5 +295,5 @@ g_queue_internalize(void **vqueue, unsigned char **buf, size_t *lenremain)
     *buf += sizeof(queue);
     *lenremain -= sizeof(queue);
     *vqueue = q;
-    return (0);
+    return 0;
 }

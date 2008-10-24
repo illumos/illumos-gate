@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/kdb/kdb_ldap/ldap_tkt_policy.c
  *
@@ -303,7 +301,7 @@ krb5_ldap_delete_policy(context, policyname)
     krb5_ldap_context           *ldap_context=NULL;
     krb5_ldap_server_handle     *ldap_server_handle=NULL;
 
-    if (policyname == NULL) {
+	if (policyname == NULL) {
 	st = EINVAL;
 	prepend_err_str (context, gettext("Ticket Policy Object DN missing"),st,st);
 	goto cleanup;

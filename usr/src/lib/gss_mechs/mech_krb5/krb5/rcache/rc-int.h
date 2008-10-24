@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/keytab/rc-int.h
  *
@@ -73,7 +71,8 @@ typedef struct _krb5_rc_ops krb5_rc_ops;
 
 krb5_error_code krb5_rc_register_type (krb5_context, const krb5_rc_ops *);
 
-extern krb5_rc_ops *krb5_rc_dfl_ops;
+/* Solaris Kerberos */
+extern krb5_rc_ops const *krb5_rc_dfl_ops;
 extern const krb5_rc_ops krb5_rc_none_ops;
 
 #endif /* __KRB5_RCACHE_INT_H__ */

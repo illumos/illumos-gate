@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -27,5 +26,5 @@
 
 #include "k5-int.h"
 
-extern struct krb5_cksumtypes krb5_cksumtypes_list[];
+extern const struct krb5_cksumtypes krb5_cksumtypes_list[];
 extern const int krb5_cksumtypes_length;

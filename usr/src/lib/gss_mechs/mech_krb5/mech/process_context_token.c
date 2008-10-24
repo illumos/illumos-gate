@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -25,7 +23,7 @@
 #include "gssapiP_krb5.h"
 
 /*
- * $Id: process_context_token.c 16171 2004-03-15 17:45:01Z raeburn $
+ * $Id: process_context_token.c 18396 2006-07-25 20:29:43Z lxs $
  */
 
 OM_uint32
@@ -54,7 +52,7 @@ krb5_gss_process_context_token(minor_status, context_handle,
    /* "unseal" the token */
 
    if (GSS_ERROR(majerr = kg_unseal(minor_status, context_handle, 
-				    token_buffer,
+                                    token_buffer,
 				    GSS_C_NO_BUFFER, NULL, NULL,
 				    KG_TOK_DEL_CTX)))
       return(majerr);

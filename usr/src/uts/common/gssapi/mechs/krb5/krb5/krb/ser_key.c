@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/ser_key.c
  *
@@ -26,8 +25,8 @@
 /*
  * ser_key.c - Serialize a krb5_keyblock structure.
  */
-#include <k5-int.h>
-#include <int-proto.h>
+#include "k5-int.h"
+#include "int-proto.h"
 
 /*
  * Routines to deal with externalizing the krb5_keyblock:
@@ -70,6 +69,7 @@ krb5_keyblock_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
      *	krb5_int32			for KV5M_KEYBLOCK
      */
     kret = EINVAL;
+    /* Solaris Kerberos */
     keyblock = (krb5_keyblock *) arg;
     if (keyblock) {
 	*sizep += (sizeof(krb5_int32) +
@@ -99,6 +99,7 @@ krb5_keyblock_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
+    /* Solaris Kerberos */
     keyblock = (krb5_keyblock *) arg;
     if (keyblock) {
 	kret = ENOMEM;
@@ -168,6 +169,7 @@ krb5_keyblock_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet 
 	    keyblock->length = (int) ibuf;
 
 	    /* Get the string */
+	    /* Solaris Kerberos */
 	    keyblock->contents = (krb5_octet *) MALLOC((size_t) (ibuf));
 	    if ((keyblock->contents)&&
 		!(kret = krb5_ser_unpack_bytes(keyblock->contents,

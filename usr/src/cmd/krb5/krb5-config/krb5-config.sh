@@ -1,10 +1,9 @@
 #!/bin/sh
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2001, 2002, 2003 by the Massachusetts Institute of Technology.
 # All Rights Reserved.
@@ -31,7 +30,7 @@
 #
 
 # Configurable parameters set by autoconf
-version_string="Solaris Kerberos (based on MIT Kerberos 5 release 1.4.0)"
+version_string="Solaris Kerberos (based on MIT Kerberos 5 release 1.6.3)"
 
 prefix=/usr
 exec_prefix=${prefix}

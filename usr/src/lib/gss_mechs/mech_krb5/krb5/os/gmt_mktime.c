@@ -1,14 +1,7 @@
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* This code placed in the public domain by Mark W. Eichin */
 
 #include <stdio.h>
-#include <k5-int.h>
+#include "autoconf.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -43,7 +36,7 @@ static const int days_in_month[12] = {
 
 #define hasleapday(year) (year%400?(year%100?(year%4?0:1):0):1)
 
-time_t gmt_mktime(struct tm *t)
+time_t krb5int_gmt_mktime(struct tm *t)
 {
   time_t accum;
 
@@ -60,6 +53,7 @@ time_t gmt_mktime(struct tm *t)
    */
   assert_time(t->tm_year>=1);
   assert_time(t->tm_year<=138);
+
   assert_time(t->tm_mon>=0);
   assert_time(t->tm_mon<=11);
   assert_time(t->tm_mday>=1);
@@ -97,3 +91,37 @@ time_t gmt_mktime(struct tm *t)
 
   return accum;
 }
+
+#ifdef TEST_LEAP
+int
+main (int argc, char *argv[])
+{
+  int yr;
+  time_t t;
+  struct tm tm = {
+    .tm_mon = 0, .tm_mday = 1,
+    .tm_hour = 0, .tm_min = 0, .tm_sec = 0,
+  };
+  for (yr = 60; yr <= 104; yr++)
+    {
+      printf ("1/1/%d%c -> ", 1900 + yr, hasleapday((1900+yr)) ? '*' : ' ');
+      tm.tm_year = yr;
+      t = gmt_mktime (&tm);
+      if (t == (time_t) -1)
+	printf ("-1\n");
+      else
+	{
+	  long u;
+	  if (t % (24 * 60 * 60))
+	    printf ("(not integral multiple of days) ");
+	  u = t / (24 * 60 * 60);
+	  printf ("%3ld*365%+ld\t0x%08lx\n",
+		  (long) (u / 365), (long) (u % 365),
+		  (long) t);
+	}
+    }
+  t = 0x80000000, printf ("time 0x%lx -> %s", t, ctime (&t));
+  t = 0x7fffffff, printf ("time 0x%lx -> %s", t, ctime (&t));
+  return 0;
+}
+#endif

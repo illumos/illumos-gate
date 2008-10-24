@@ -1,14 +1,14 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * prof-int.h
  */
 
+/* Solaris Kerberos */
 #ifndef __PROF_INT_H
 
 #include <time.h>
@@ -19,20 +19,10 @@
 #define PROFILE_SUPPORTS_FOREIGN_NEWLINES
 #endif
 
-#include <k5-thread.h>
-#include <com_err.h>
-#include <profile.h>
-#include "prof_err.h"  /* SUNW14resync */
-#include "osconf.h"  /* SUNW14resync */
-
-
-#define STAT_ONCE_PER_SECOND
-
-#if defined(_WIN32)
-#define SIZEOF_INT      4
-#define SIZEOF_SHORT    2
-#define SIZEOF_LONG     4
-#endif
+#include "k5-thread.h"
+#include "k5-platform.h"
+#include "com_err.h"
+#include "profile.h"
 
 typedef long prf_magic_t;
 
@@ -41,28 +31,41 @@ typedef long prf_magic_t;
  * particular configuration file.
  *
  * Locking strategy:
- * - filespec is fixed after creation
+ * - filespec, fslen are fixed after creation
  * - refcount and next should only be tweaked with the global lock held
  * - other fields can be tweaked after grabbing the in-struct lock
  */
 struct _prf_data_t {
 	prf_magic_t	magic;
 	k5_mutex_t	lock;
-	char		*comment;
 	struct profile_node *root;
-#ifdef STAT_ONCE_PER_SECOND
 	time_t		last_stat;
-#endif
 	time_t		timestamp; /* time tree was last updated from file */
+	unsigned long	frac_ts;   /* fractional part of timestamp, if any */
 	int		flags;	/* r/w, dirty */
 	int		upd_serial; /* incremented when data changes */
+	char		*comment;
+
+	size_t		fslen;
+
+	/* Some separation between fields controlled by different
+	   mutexes.  Theoretically, both could be accessed at the same
+	   time from different threads on different CPUs with separate
+	   caches.  Don't let the threads clobber each other's
+	   changes.  One mutex controlling the whole thing would be
+	   better, but sufficient separation might suffice.
+
+	   This is icky.  I just hope it's adequate.
+
+	   For next major release, fix this.  */
+	union { double d; void *p; UINT64_TYPE ll; k5_mutex_t m; } pad;
+
 	int		refcount; /* prf_file_t references */
 	struct _prf_data_t *next;
 	/* Was: "profile_filespec_t filespec".  Now: flexible char
 	   array ... except, we need to work in C89, so an array
 	   length must be specified.  */
-	size_t		fslen;
-	const char	filespec[sizeof(DEFAULT_SECURE_PROFILE_PATH)];
+	const char	filespec[sizeof("/etc/krb5.conf")];
 };
 
 typedef struct _prf_data_t *prf_data_t;
@@ -210,6 +213,8 @@ errcode_t profile_rename_node
 
 /* prof_file.c */
 
+errcode_t KRB5_CALLCONV profile_copy (profile_t, profile_t *);
+
 errcode_t profile_open_file
 	(const_profile_filespec_t file, prf_file_t *ret_prof);
 
@@ -259,5 +264,6 @@ errcode_t profile_get_value
 	
 /* prof_set.c -- included from profile.h */
 
+/* Solaris Kerberos */
 #define __PROF_INT_H
 #endif

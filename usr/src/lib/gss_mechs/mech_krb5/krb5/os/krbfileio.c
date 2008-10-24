@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include "k5-int.h"
@@ -11,12 +10,11 @@
 #include <fcntl.h>
 
 #ifndef O_BINARY
-#define	O_BINARY	0
+#define O_BINARY 0
 #endif
 
 krb5_error_code
 krb5_create_secure_file(krb5_context context, const char *pathname)
-
 {
 	int 	fd;
 	int 	open_flag;

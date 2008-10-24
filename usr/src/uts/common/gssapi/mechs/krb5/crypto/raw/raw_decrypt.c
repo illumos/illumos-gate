@@ -1,9 +1,8 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,20 +30,17 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <raw.h>
+#include "k5-int.h"
+#include "raw.h"
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_raw_decrypt(context, enc, hash, key, usage, ivec, input, output)
-     krb5_context context;
-     krb5_const struct krb5_enc_provider *enc;
-     krb5_const struct krb5_hash_provider *hash;
-     krb5_const krb5_keyblock *key;
-     krb5_keyusage usage;
-     krb5_const krb5_data *ivec;
-     krb5_const krb5_data *input;
-     krb5_data *output;
+krb5_raw_decrypt(krb5_context context,
+		 const struct krb5_enc_provider *enc,
+		 const struct krb5_hash_provider *hash,
+		 const krb5_keyblock *key, krb5_keyusage usage,
+		 const krb5_data *ivec, const krb5_data *input,
+		 krb5_data *output)
 {
-	return ((*(enc->decrypt))(context, key, ivec, input, output));
+    return((*(enc->decrypt))(context, key, ivec, input, output));
 }

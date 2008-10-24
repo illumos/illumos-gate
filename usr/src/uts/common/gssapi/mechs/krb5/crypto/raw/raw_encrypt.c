@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,8 +30,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <raw.h>
+#include "k5-int.h"
+#include "raw.h"
 
 /*ARGSUSED*/
 void
@@ -50,13 +49,11 @@ krb5_raw_encrypt_length(const struct krb5_enc_provider *enc,
 /*ARGSUSED*/
 krb5_error_code
 krb5_raw_encrypt(krb5_context context,
-		krb5_const struct krb5_enc_provider *enc,
-		krb5_const struct krb5_hash_provider *hash,
-		krb5_const krb5_keyblock *key,
-		krb5_keyusage usage,
-		krb5_const krb5_data *ivec,
-		krb5_const krb5_data *input,
-		krb5_data *output)
+		 const struct krb5_enc_provider *enc,
+		 const struct krb5_hash_provider *hash,
+		 const krb5_keyblock *key, krb5_keyusage usage,
+		 const krb5_data *ivec, const krb5_data *input,
+		 krb5_data *output)
 {
-	return((*(enc->encrypt))(context, key, ivec, input, output));
+    return((*(enc->encrypt))(context, key, ivec, input, output));
 }

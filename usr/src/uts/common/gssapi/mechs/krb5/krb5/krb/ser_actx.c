@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/ser_actx.c
  *
@@ -34,9 +33,9 @@
 /*
  * ser_actx.c - Serialize krb5_auth_context structure.
  */
-#include <k5-int.h>
-#include <int-proto.h>
-#include <auth_con.h>
+#include "k5-int.h"
+#include "int-proto.h"
+#include "auth_con.h"
 
 #define	TOKEN_RADDR	950916
 #define	TOKEN_RPORT	950917
@@ -94,6 +93,7 @@ krb5_auth_context_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
      *	krb5_int32		for KV5M_AUTH_CONTEXT
      */
     kret = EINVAL;
+    /* Solaris Kerberos */
     auth_context = (krb5_auth_context) arg;
     if (auth_context) {
 	kret = 0;
@@ -202,14 +202,14 @@ krb5_auth_context_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octe
     size_t		required;
     krb5_octet		*bp;
     size_t		remain;
-    size_t		obuf;
+    size_t              obuf;
     krb5_int32		obuf32;
-
 
     required = 0;
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
+    /* Solaris Kerberos */
     auth_context = (krb5_auth_context) arg;
     if (auth_context) {
 	kret = ENOMEM;
@@ -555,7 +555,7 @@ krb5_auth_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_oc
  * Register the auth_context serializer.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_ser_auth_context_init(krb5_context	kcontext)
+krb5_ser_auth_context_init(krb5_context kcontext)
 {
     krb5_error_code	kret;
     kret = krb5_register_serializer(kcontext, &krb5_auth_context_ser_entry);

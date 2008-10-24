@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * src/lib/krb5/asn.1/asn1_get.c
  * 
@@ -66,7 +64,7 @@ asn1_get_tag_2(asn1buf *buf, taginfo *t)
 		retval = asn1buf_remove_octet(buf,&o);
 		if (retval) return retval;
 		tn = (tn<<7) + (asn1_tagnum)(o&0x7F);
-	    }while(tn&0x80);
+	    }while(o&0x80);
 	    t->tagnum = tn;
 	}
     }

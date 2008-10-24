@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,6 @@
 #ifndef __KRB5_KDC_UTIL__
 #define __KRB5_KDC_UTIL__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "kdb.h"
 
@@ -118,7 +117,7 @@ void
 rep_etypes2str(char *s, size_t len, krb5_kdc_rep *rep);
 
 /* do_as_req.c */
-krb5_error_code process_as_req (krb5_kdc_req *,
+krb5_error_code process_as_req (krb5_kdc_req *, krb5_data *,
 					  const krb5_fulladdr *,
 					  krb5_data ** );
 
@@ -157,20 +156,26 @@ void get_preauth_hint_list (krb5_kdc_req * request,
 				      krb5_db_entry *client,
 				      krb5_db_entry *server,
 				      krb5_data *e_data);
+krb5_error_code load_preauth_plugins(krb5_context context);
+krb5_error_code unload_preauth_plugins(krb5_context context);
+
 krb5_error_code check_padata
-    (krb5_context context, krb5_db_entry *client,
-	       krb5_kdc_req *request, krb5_enc_tkt_part *enc_tkt_reply);
+    (krb5_context context, krb5_db_entry *client, krb5_data *req_pkt,
+	       krb5_kdc_req *request, krb5_enc_tkt_part *enc_tkt_reply,
+	       void **padata_context, krb5_data *e_data);
     
 krb5_error_code return_padata
     (krb5_context context, krb5_db_entry *client,
-	       krb5_kdc_req *request, krb5_kdc_rep *reply,
-	       krb5_key_data *client_key, krb5_keyblock *encrypting_key);
+	       krb5_data *req_pkt, krb5_kdc_req *request, krb5_kdc_rep *reply,
+	       krb5_key_data *client_key, krb5_keyblock *encrypting_key,
+	       void **padata_context);
     
+krb5_error_code free_padata_context
+    (krb5_context context, void **padata_context);
+
 /* replay.c */
-krb5_boolean kdc_check_lookaside (krb5_data *, const krb5_fulladdr *,
-					    krb5_data **);
-void kdc_insert_lookaside (krb5_data *, const krb5_fulladdr *,
-				     krb5_data *);
+krb5_boolean kdc_check_lookaside (krb5_data *, krb5_data **);
+void kdc_insert_lookaside (krb5_data *, krb5_data *);
 void kdc_free_lookaside(krb5_context);
 
 /* which way to convert key? */
@@ -203,6 +208,10 @@ void enable_v4_crossrealm(char *);
 #define ADDRTYPE2FAMILY(X) \
   ((X) == ADDRTYPE_INET ? AF_INET : -1)
 #endif
+
+/* RFC 4120: KRB5KDC_ERR_KEY_TOO_WEAK
+ * RFC 4556: KRB5KDC_ERR_DH_KEY_PARAMETERS_NOT_ACCEPTED */
+#define KRB5KDC_ERR_KEY_TOO_WEAK KRB5KDC_ERR_DH_KEY_PARAMETERS_NOT_ACCEPTED
 
 #ifdef	__cplusplus
 }

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,19 +30,17 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <dk.h>
+#include "dk.h"
 
-static unsigned char kerberos[] = "kerberos";
+static const unsigned char kerberos[] = "kerberos";
 #define kerberos_len (sizeof(kerberos)-1)
 
 krb5_error_code
-krb5_dk_string_to_key(
-	krb5_context context,
-	krb5_const struct krb5_enc_provider *enc,
-	krb5_const krb5_data *string,
-	krb5_const krb5_data *salt,
-	krb5_const krb5_data *parms,
-	krb5_keyblock *key)
+krb5int_dk_string_to_key(
+			 krb5_context context,
+			 const struct krb5_enc_provider *enc,
+			 const krb5_data *string, const krb5_data *salt,
+			 const krb5_data *parms, krb5_keyblock *key)
 {
     krb5_error_code ret;
     size_t keybytes, keylength, concatlen;
@@ -72,35 +69,37 @@ krb5_dk_string_to_key(
 
     /* construct input string ( = string + salt), fold it, make_key it */
 
-    (void) memcpy(concat, string->data, string->length);
+    memcpy(concat, string->data, string->length);
     if (salt)
-	(void) memcpy(concat+string->length, salt->data, salt->length);
+	memcpy(concat+string->length, salt->data, salt->length);
 
     krb5_nfold(concatlen*8, concat, keybytes*8, foldstring);
 
     indata.length = keybytes;
-    indata.data = (char *)foldstring;
+    indata.data = (char *) foldstring;
 
+    /* Solaris Kerberos */
     memset(&foldkey, 0, sizeof (krb5_keyblock));
     foldkey.enctype = key->enctype;
     foldkey.length = keylength;
     foldkey.contents = foldkeydata;
 
+    /* Solaris Kerberos */
     (*(enc->make_key))(context, &indata, &foldkey);
 
     /* now derive the key from this one */
 
     indata.length = kerberos_len;
-    indata.data = (char *)kerberos;
-
+    indata.data = (char *) kerberos;
+    /* Solaris Kerberos */
     if ((ret = krb5_derive_key(context, enc, &foldkey, key, &indata)))
 	(void) memset(key->contents, 0, key->length);
 
     /* ret is set correctly by the prior call */
 
-    (void) memset(concat, 0, concatlen);
-    (void) memset(foldstring, 0, keybytes);
-    (void) memset(foldkeydata, 0, keylength);
+    memset(concat, 0, concatlen);
+    memset(foldstring, 0, keybytes);
+    memset(foldkeydata, 0, keylength);
 
     free(foldkeydata);
     free(foldstring);

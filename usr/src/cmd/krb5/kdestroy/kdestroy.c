@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * clients/kdestroy/kdestroy.c
@@ -126,6 +125,7 @@ main(argc, argv)
     int use_k5 = 0;
     int use_k4 = 0;
 
+    progname = GET_PROGNAME(argv[0]);
     /* set locale and domain for internationalization */ 
     (void) setlocale(LC_ALL, ""); 
 
@@ -140,9 +140,8 @@ main(argc, argv)
     got_k4 = 1;
 #endif
 
-    progname = (strrchr(*argv, '/') ? strrchr(*argv, '/')+1 : argv[0]);
-
-    while ((c = getopt(argc, argv, "54qc:")) != -1) {	switch (c) {
+    while ((c = getopt(argc, argv, "54qc:")) != -1) {
+	switch (c) {
 	case 'q':
 	    quiet = 1;
 	    break;	
@@ -231,9 +230,6 @@ main(argc, argv)
     	}
 
 	if (cache_name) {
-
-
-
 #ifdef KRB5_KRB4_COMPAT
 	    v4 = 0;	/* Don't do v4 if doing v5 and cache name given. */
 #endif

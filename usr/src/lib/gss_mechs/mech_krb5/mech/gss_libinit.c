@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 
@@ -49,7 +48,7 @@ int gssint_lib_init(void)
     err = k5_key_register(K5_KEY_GSS_KRB5_CCACHE_NAME, free);
     if (err)
 	return err;
-#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+#ifndef _WIN32
     err = k5_mutex_finish_init(&kg_kdc_flag_mutex);
     if (err)
 	return err;
@@ -75,7 +74,7 @@ void gssint_lib_fini(void)
     k5_key_delete(K5_KEY_GSS_KRB5_SET_CCACHE_OLD_NAME);
     k5_key_delete(K5_KEY_GSS_KRB5_CCACHE_NAME);
     k5_mutex_destroy(&kg_vdb.mutex);
-#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+#ifndef _WIN32
     k5_mutex_destroy(&kg_kdc_flag_mutex);
 #endif
     k5_mutex_destroy(&gssint_krb5_keytab_lock);

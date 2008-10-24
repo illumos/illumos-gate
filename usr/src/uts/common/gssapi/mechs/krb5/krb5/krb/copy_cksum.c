@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/copy_cksum.c
  *
@@ -33,7 +32,7 @@
  * krb5_copy_checksum()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV
@@ -43,14 +42,11 @@ krb5_copy_checksum(krb5_context context, const krb5_checksum *ckfrom, krb5_check
 
     if (!(tempto = (krb5_checksum *)MALLOC(sizeof(*tempto))))
 	return ENOMEM;
-#ifdef HAVE_C_STRUCTURE_ASSIGNMENT
     *tempto = *ckfrom;
-#else
-    (void) memcpy(tempto, ckfrom, sizeof(krb5_checksum));
-#endif
 
     if (!(tempto->contents =
 	  (krb5_octet *)MALLOC(tempto->length))) {
+	krb5_xfree(tempto);
 	return ENOMEM;
     }
     (void) memcpy((char *) tempto->contents, (char *) ckfrom->contents,

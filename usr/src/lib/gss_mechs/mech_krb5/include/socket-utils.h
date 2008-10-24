@@ -1,12 +1,11 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright (C) 2001 by the Massachusetts Institute of Technology,
+ * Copyright (C) 2001,2005 by the Massachusetts Institute of Technology,
  * Cambridge, MA, USA.  All Rights Reserved.
  * 
  * This software is being provided to you, the LICENSEE, by the 
@@ -59,11 +58,10 @@
 
 /* for HAVE_SOCKLEN_T, KRB5_USE_INET6, etc */
 #include "autoconf.h"
-#if 0   /* SUNW14resync */
-#include "krb5/autoconf.h"
 /* for sockaddr_storage */
 #include "port-sockets.h"
-#endif   /* SUNW14resync */
+/* for "inline" if needed */
+#include "k5-platform.h"
 
 #if defined (__GNUC__)
 /*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
 #ifndef K5_THREAD_H
 #define K5_THREAD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef _KERNEL
 
 #include <sys/ksynch.h>
@@ -66,7 +64,6 @@ k5_mutex_unlock(k5_mutex_t *m)
 #else /* _KERNEL */
 
 #include "autoconf.h"
-
 #ifndef KRB5_CALLCONV
 # define KRB5_CALLCONV
 #endif
@@ -200,7 +197,7 @@ typedef struct {
 #if __GNUC__ >= 2
 #define K5_DEBUG_LOC		(__extension__ (k5_debug_loc)K5_DEBUG_LOC_INIT)
 #else
-static inline k5_debug_loc k5_debug_make_loc(const char *file, short line)
+static inline k5_debug_loc k5_debug_make_loc(const char *file, int line)
 {
     k5_debug_loc l;
     l.filename = file;
@@ -250,6 +247,12 @@ timediff(k5_debug_time_t t2, k5_debug_time_t t1)
 {
     return (t2.tv_sec - t1.tv_sec) * 1000000 + (t2.tv_usec - t1.tv_usec);
 }
+static inline k5_debug_time_t get_current_time(void)
+{
+    struct timeval tv;
+    if (gettimeofday(&tv,0) < 0) { tv.tv_sec = tv.tv_usec = 0; }
+    return tv;
+}
 struct k5_timediff_stats {
     k5_debug_timediff_t valmin, valmax, valsum, valsqsum;
 };
@@ -258,10 +261,20 @@ typedef struct {
     k5_debug_time_t time_acquired, time_created;
     struct k5_timediff_stats lockwait, lockheld;
 } k5_debug_mutex_stats;
-#define k5_mutex_init_stats(S) \
-	(memset((S), 0, sizeof(struct k5_debug_mutex_stats)), 0)
+#define k5_mutex_init_stats(S)					\
+	(memset((S), 0, sizeof(k5_debug_mutex_stats)),	\
+	 (S)->time_created = get_current_time(),		\
+	 0)
 #define k5_mutex_finish_init_stats(S) 	(0)
 #define K5_MUTEX_STATS_INIT	{ 0, {0}, {0}, {0}, {0} }
+typedef k5_debug_time_t k5_mutex_stats_tmp;
+#define k5_mutex_stats_start()	get_current_time()
+void KRB5_CALLCONV krb5int_mutex_lock_update_stats(k5_debug_mutex_stats *m,
+						   k5_mutex_stats_tmp start);
+void KRB5_CALLCONV krb5int_mutex_unlock_update_stats(k5_debug_mutex_stats *m);
+#define k5_mutex_lock_update_stats	krb5int_mutex_lock_update_stats
+#define k5_mutex_unlock_update_stats	krb5int_mutex_unlock_update_stats
+void KRB5_CALLCONV krb5int_mutex_report_stats(/* k5_mutex_t *m */);
 
 #else
 
@@ -269,6 +282,26 @@ typedef char k5_debug_mutex_stats;
 #define k5_mutex_init_stats(S)		(*(S) = 's', 0)
 #define k5_mutex_finish_init_stats(S)	(0)
 #define K5_MUTEX_STATS_INIT		's'
+typedef int k5_mutex_stats_tmp;
+#define k5_mutex_stats_start()		(0)
+#ifdef __GNUC__
+static void
+k5_mutex_lock_update_stats(k5_debug_mutex_stats *m, k5_mutex_stats_tmp t)
+{
+}
+#else
+# define k5_mutex_lock_update_stats(M,S)	(S)
+#endif
+#define k5_mutex_unlock_update_stats(M)	(*(M) = 's')
+
+/* If statistics tracking isn't enabled, these functions don't actually
+   do anything.  Declare anyways so we can do type checking etc.  */
+void KRB5_CALLCONV krb5int_mutex_lock_update_stats(k5_debug_mutex_stats *m,
+						   k5_mutex_stats_tmp start);
+void KRB5_CALLCONV krb5int_mutex_unlock_update_stats(k5_debug_mutex_stats *m);
+void KRB5_CALLCONV krb5int_mutex_report_stats(/* k5_mutex_t *m */);
+
+#define krb5int_mutex_report_stats(M)	((M)->stats = 'd')
 
 #endif
 
@@ -328,7 +361,6 @@ typedef struct {
 	 ASSERT((M)->locked == K5_MUTEX_DEBUG_UNLOCKED))
 
 #else /* threads disabled and not debugging */
-
 typedef char k5_os_nothread_mutex;
 # define K5_OS_NOTHREAD_MUTEX_PARTIAL_INITIALIZER	0
 /* Empty inline functions avoid the "statement with no effect"
@@ -379,7 +411,6 @@ typedef unsigned char k5_os_nothread_once_t;
 
 
 #ifndef ENABLE_THREADS
-
 typedef k5_os_nothread_mutex k5_os_mutex;
 # define K5_OS_MUTEX_PARTIAL_INITIALIZER	\
 		K5_OS_NOTHREAD_MUTEX_PARTIAL_INITIALIZER
@@ -403,9 +434,13 @@ typedef k5_os_nothread_mutex k5_os_mutex;
 
    Linux: Stub mutex routines exist, but pthread_once does not.
 
-   Solaris: In libc there's a pthread_once that doesn't seem
-   to do anything.  Bleah.  But pthread_mutexattr_setrobust_np
-   is defined only in libpthread.
+   Solaris: In libc there's a pthread_once that doesn't seem to do
+   anything.  Bleah.  But pthread_mutexattr_setrobust_np is defined
+   only in libpthread.  However, some version of GNU libc (Red Hat's
+   Fedora Core 5, reportedly) seems to have that function, but no
+   declaration, so we'd have to declare it in order to test for its
+   address.  We now have tests to see if pthread_once actually works,
+   so stick with that for now.
 
    IRIX 6.5 stub pthread support in libc is really annoying.  The
    pthread_mutex_lock function returns ENOSYS for a program not linked
@@ -503,7 +538,7 @@ typedef struct {
 	    _r2;					\
 	})
 # else
-static inline int
+static int
 k5_pthread_mutex_lock(k5_os_mutex *m)
 {
     int r = pthread_mutex_lock(&m->p);
@@ -593,7 +628,7 @@ static int return_after_yield(int r)
 #  define K5_OS_MUTEX_PARTIAL_INITIALIZER \
 	{ PTHREAD_MUTEX_INITIALIZER, K5_OS_NOTHREAD_MUTEX_PARTIAL_INITIALIZER }
 # endif
-
+asdfsdf
 # define k5_os_mutex_finish_init(M)		\
 	k5_os_nothread_mutex_finish_init(&(M)->n)
 # define k5_os_mutex_init(M)			\
@@ -671,7 +706,7 @@ typedef struct {
 # define k5_os_mutex_destroy(M)		\
 	(CloseHandle((M)->h) ? ((M)->h = 0, 0) : GetLastError())
 
-static inline int k5_os_mutex_lock(k5_os_mutex *m)
+static int k5_os_mutex_lock(k5_os_mutex *m)
 {
     DWORD res;
     res = WaitForSingleObject(m->h, INFINITE);

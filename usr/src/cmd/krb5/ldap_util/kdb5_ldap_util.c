@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kadmin/ldap_util/kdb5_ldap_util.c
@@ -480,8 +479,7 @@ int main(argc, argv)
     }
 
     if (realm_name_required) {
-	/* Solaris kerberos: using older kadm5_get_config_params interface */
-	retval = kadm5_get_config_params(util_context, NULL, NULL,
+	retval = kadm5_get_config_params(util_context, 1,
 					 &global_params, &global_params);
 	if (retval) {
 	    com_err(argv[0], retval, gettext("while retreiving configuration parameters"));

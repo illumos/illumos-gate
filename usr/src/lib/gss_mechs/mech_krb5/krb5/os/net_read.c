@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/net_read.c
  *
@@ -26,9 +25,7 @@
  * 
  */
 
-#define NEED_LOWLEVEL_IO
-#define NEED_SOCKETS
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * krb5_net_read() reads from the file descriptor "fd" to the buffer

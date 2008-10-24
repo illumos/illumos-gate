@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/full_ipadr.c
  *
@@ -28,8 +27,7 @@
  * Take an IP addr & port and generate a full IP address.
  */
 
-#define NEED_SOCKETS
-#include <k5-int.h>
+#include "k5-int.h"
 
 #ifdef HAVE_NETINET_IN_H
    

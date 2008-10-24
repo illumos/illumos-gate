@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/kdb/kdb_ldap/ldap_misc.c
  *
@@ -1267,12 +1266,9 @@ getepochtime(strtime, epochtime)
 	*epochtime = 0;
 	return EINVAL;
     }
-    /* Solaris kerberos: don't have krb5int_gmt_mktime at this point */
-#if 0 /************** Begin IFDEF'ed OUT *******************************/
+
     *epochtime = krb5int_gmt_mktime(&tme);
-#else
-    *epochtime = gmt_mktime(&tme);
-#endif /**************** END IFDEF'ed OUT *******************************/
+
     return 0;
 }
 

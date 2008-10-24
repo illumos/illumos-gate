@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,13 +30,13 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <cksumtypes.h>
+#include "k5-int.h"
+#include "cksumtypes.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_verify_checksum(krb5_context context, const krb5_keyblock *key,
-		    krb5_keyusage usage, const krb5_data *data,
-		    const krb5_checksum *cksum, krb5_boolean *valid)
+		       krb5_keyusage usage, const krb5_data *data,
+		       const krb5_checksum *cksum, krb5_boolean *valid)
 {
     int i;
     size_t hashsize;

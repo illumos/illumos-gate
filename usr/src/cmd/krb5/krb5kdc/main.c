@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kdc/main.c
@@ -188,7 +187,7 @@ init_realm(krb5_context kcontext, char *progname, kdc_realm_t *rdp, char *realm,
     krb5_klog_set_context(rdp->realm_context);
 
     kret = krb5_read_realm_params(rdp->realm_context, rdp->realm_name,
-				  (char *) NULL, (char *) NULL, &rparams);
+				  &rparams);
     if (kret) {
 	com_err(progname, kret, gettext("while reading realm parameters"));
 	goto whoops;
@@ -657,6 +656,9 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 	    }
 	    kdc_realmlist[0] = rdatap;
 	    kdc_numrealms++;
+	} else {
+    	    if (lrealm)
+		free(lrealm);
 	}
     }
 
@@ -673,8 +675,7 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
 
     /* Ensure that this is set for our first request. */
     kdc_active_realm = kdc_realmlist[0];
-    if (lrealm)
-	free(lrealm);
+
     if (default_udp_ports)
 	free(default_udp_ports);
     if (default_tcp_ports)
@@ -784,6 +785,8 @@ int main(int argc, char **argv)
 
     setup_signal_handlers();
 
+    load_preauth_plugins(kcontext);
+
     retval = setup_sam();
     if (retval) {
 	com_err(argv[0], retval, gettext("while initializing SAM"));
@@ -838,6 +841,7 @@ int main(int argc, char **argv)
 	errout++;
     }
     krb5_klog_syslog(LOG_INFO, "shutting down");
+    unload_preauth_plugins(kcontext);
     krb5_klog_close(kdc_context);
     finish_realms(argv[0]);
     if (kdc_realmlist) 

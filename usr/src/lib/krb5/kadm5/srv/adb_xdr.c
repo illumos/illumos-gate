@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -26,17 +25,17 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_xdr.c,v 1.4 2001/07/25 19:03:35 epeisach Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_xdr.c,v 1.2 1998/02/14 02:31:34 tlyu Exp $";
+static char *rcsid = "$Header$";
 #endif
 
 #include <sys/types.h>
+#include	"server_internal.h"
 #include <krb5.h>
 #include <rpc/rpc.h> /* SUNWresync121 XXX */
-#include "server_internal.h"
 #include "admin_xdr.h"
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
@@ -133,3 +132,4 @@ osa_free_princ_ent(osa_princ_ent_t val)
     xdr_osa_princ_ent_rec(&xdrs, val);
     free(val);
 }
+                                                                                                                            

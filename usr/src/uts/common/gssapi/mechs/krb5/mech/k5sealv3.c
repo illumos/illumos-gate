@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/gssapi/krb5/k5sealv3.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -23,13 +22,13 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.	Furthermore if you modify this software you must label
+ * permission.  Furthermore if you modify this software you must label
  * your software as modified software and not distribute it in such a
  * fashion that it might be confused with the original M.I.T. software.
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  */
 /* draft-ietf-krb-wg-gssapi-cfx-05 */
@@ -41,10 +40,18 @@
 #define ASSERT assert
 #endif
 
-#include <k5-int.h>
-#include <gssapiP_krb5.h>
+/* Solaris Kerberos */
+#include "k5-int.h"		/* for zap() */
+#include "k5-platform.h"
+
+/* Solaris Kerberos */
+#include "k5-platform-store_16.h"
+#include "k5-platform-store_64.h"
+#include "k5-platform-load_16.h"
+#include "k5-platform-load_64.h"
+
+#include "gssapiP_krb5.h"
 #include <sys/int_limits.h>
-#include <k5-platform.h>
 
 static int
 rotate_left (void *ptr, size_t bufsiz, size_t rc)
@@ -278,7 +285,6 @@ gss_krb5int_make_seal_token_v3 (krb5_context context,
 
 	err = krb5_c_make_checksum(context, ctx->cksumtype, key,
 				   key_usage, &plain, &sum);
-
 	bzero(plain.data, plain.length);
 	FREE(plain.data, plain.length);
 	plain.data = 0;
@@ -342,13 +348,14 @@ error:
    conf_state is only valid if SEAL. */
 
 OM_uint32
-gss_krb5int_unseal_token_v3(krb5_context context,
+gss_krb5int_unseal_token_v3(krb5_context *contextptr,
 			    OM_uint32 *minor_status,
 			    krb5_gss_ctx_id_rec *ctx,
 			    unsigned char *ptr, int bodysize,
 			    gss_buffer_t message_buffer,
 			    int *conf_state, int *qop_state, int toktype)
 {
+    krb5_context context = *contextptr;
     krb5_data plain;
     gssint_uint64 seqnum;
     size_t ec, rrc;
@@ -403,7 +410,7 @@ gss_krb5int_unseal_token_v3(krb5_context context,
        namely, a copy of the AP-REQ subkey, if it was provided.  So
        the initiator may think we wanted a subkey, and set the flag,
        even though we weren't trying to set the subkey.  The "other"
-       key, the one not ASSERTed by the acceptor, will have the same
+       key, the one not asserted by the acceptor, will have the same
        value in that case, though, so we can just ignore the flag.  */
     if (ctx->have_acceptor_subkey && (ptr[2] & FLAG_ACCEPTOR_SUBKEY)) {
 	key = ctx->acceptor_subkey;
@@ -429,7 +436,7 @@ gss_krb5int_unseal_token_v3(krb5_context context,
 	rrc = load_16_be(ptr+6);
 	seqnum = load_64_be(ptr+8);
 	if (!rotate_left(ptr+16, bodysize-16, rrc)) {
-    no_mem:
+	no_mem:
 	    *minor_status = ENOMEM;
 	    return GSS_S_FAILURE;
 	}
@@ -491,7 +498,7 @@ gss_krb5int_unseal_token_v3(krb5_context context,
 	       Rotate the first two.  */
 	    store_16_be(0, ptr+4);
 	    store_16_be(0, ptr+6);
-	    plain.length = bodysize - ec;
+	    plain.length = bodysize-ec;
 	    plain.data = (char *)ptr;
 	    if (!rotate_left(ptr, bodysize-ec, 16))
 		goto no_mem;
@@ -556,7 +563,7 @@ gss_krb5int_unseal_token_v3(krb5_context context,
 	err = krb5_c_verify_checksum(context, key, key_usage,
 				     &plain, &sum, &valid);
 	if (err) {
-error:
+	error:
 	    FREE(plain.data, plain.length);
 	    *minor_status = err;
 	    return GSS_S_BAD_SIG; /* XXX */

@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -25,8 +24,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <cksumtypes.h>
+#include "k5-int.h"
+#include "cksumtypes.h"
 
 krb5_boolean KRB5_CALLCONV
 krb5_c_is_coll_proof_cksum(krb5_cksumtype ctype)
@@ -47,5 +46,5 @@ krb5_c_is_coll_proof_cksum(krb5_cksumtype ctype)
 krb5_boolean KRB5_CALLCONV
 is_coll_proof_cksum(krb5_cksumtype ctype)
 {
-  return krb5_c_is_coll_proof_cksum (ctype);
+    return krb5_c_is_coll_proof_cksum (ctype);
 }

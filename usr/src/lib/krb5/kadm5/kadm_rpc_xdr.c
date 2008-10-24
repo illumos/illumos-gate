@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -28,10 +27,10 @@
  */
 
 #include <rpc/rpc.h>
-#include <krb5.h>
-#include <k5-int.h>
+#include <errno.h>
 #include <kadm5/admin.h>
 #include <kadm5/kadm_rpc.h>
+#include <krb5.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -571,6 +570,7 @@ xdr_generic_ret(XDR *xdrs, generic_ret *objp)
 	if (!xdr_kadm5_ret_t(xdrs, &objp->code)) {
 		return (FALSE);
 	}
+
 	return(TRUE);
 }
 
@@ -653,6 +653,7 @@ xdr_gprincs_ret(XDR *xdrs, gprincs_ret *objp)
 	       return (FALSE);
 	  }
      }
+
      return (TRUE);
 }
 
@@ -812,7 +813,7 @@ xdr_chrand_ret(XDR *xdrs, chrand_ret *objp)
 		       return FALSE;
 	     }
 	}
-	
+
 	return (TRUE);
 }
 
@@ -853,6 +854,7 @@ xdr_gprinc_ret(XDR *xdrs, gprinc_ret *objp)
 		  }
 	     }
 	}
+
 	return (TRUE);
 }
 
@@ -923,6 +925,7 @@ xdr_gpol_ret(XDR *xdrs, gpol_ret *objp)
 	    if (!xdr_kadm5_policy_ent_rec(xdrs, &objp->rec))
 		return (FALSE);
 	}
+
 	return (TRUE);
 }
 
@@ -957,6 +960,7 @@ xdr_gpols_ret(XDR *xdrs, gpols_ret *objp)
 	       return (FALSE);
 	  }
      }
+
      return (TRUE);
 }
 
@@ -968,6 +972,7 @@ bool_t xdr_getprivs_ret(XDR *xdrs, getprivs_ret *objp)
      if (! xdr_kadm5_ret_t(xdrs, &objp->code) ||
 	 ! xdr_long(xdrs, &objp->privs))
 	  return FALSE;
+
      return TRUE;
 }
 
@@ -983,7 +988,7 @@ xdr_krb5_principal(XDR *xdrs, krb5_principal *objp)
        ok, and the other solutions are even uglier */
 
     if (!context &&
-	krb5_init_context(&context))
+	kadm5_init_krb5_context(&context))
        return(FALSE);
 
     switch(xdrs->x_op) {
@@ -1045,7 +1050,7 @@ xdr_krb5_enctype(XDR *xdrs, krb5_enctype *objp)
 bool_t
 xdr_krb5_salttype(XDR *xdrs, krb5_int32 *objp)
 {
-    if (!xdr_int(xdrs, (int32_t *) objp)) /* SUNWresync121 XXX */
+    if (!xdr_int(xdrs, (int32_t *) objp))
 	return FALSE;
     return TRUE;
 }

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -30,22 +29,22 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <etypes.h>
+#include "k5-int.h"
+#include "etypes.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_string_to_key_with_params(krb5_context context,
-                                 krb5_enctype enctype,
-                                 const krb5_data *string,
-                                 const krb5_data *salt,
-                                 const krb5_data *params,
-                                 krb5_keyblock *key);
+				 krb5_enctype enctype,
+				 const krb5_data *string,
+				 const krb5_data *salt,
+				 const krb5_data *params,
+				 krb5_keyblock *key);
 
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV
 krb5_c_string_to_key(krb5_context context, krb5_enctype enctype,
-                     const krb5_data *string, const krb5_data *salt,
-                     krb5_keyblock *key)
+		     const krb5_data *string, const krb5_data *salt,
+		     krb5_keyblock *key)
 {
     return krb5_c_string_to_key_with_params(context, enctype, string, salt,
 					    NULL, key);
@@ -53,7 +52,7 @@ krb5_c_string_to_key(krb5_context context, krb5_enctype enctype,
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_string_to_key_with_params(krb5_context context, krb5_enctype enctype,
-                                 const krb5_data *string,
+				 const krb5_data *string,
 				 const krb5_data *salt,
 				 const krb5_data *params, krb5_keyblock *key)
 {
@@ -64,7 +63,7 @@ krb5_c_string_to_key_with_params(krb5_context context, krb5_enctype enctype,
 
     for (i=0; i<krb5_enctypes_length; i++) {
 	if (krb5_enctypes_list[i].etype == enctype)
-            break;
+	    break;
     }
 
     if (i == krb5_enctypes_length)
@@ -72,21 +71,21 @@ krb5_c_string_to_key_with_params(krb5_context context, krb5_enctype enctype,
 
     enc = krb5_enctypes_list[i].enc;
 /* xxx AFS string2key function is indicated by a special length  in
-* the salt in much of the code.  However only the DES enctypes can
-* deal with this.  Using s2kparams would be a much better solution.*/
+ * the salt in much of the code.  However only the DES enctypes can
+ * deal with this.  Using s2kparams would be a much better solution.*/
     if (salt && salt->length == SALT_TYPE_AFS_LENGTH) {
-        switch (enctype) {
-        case ENCTYPE_DES_CBC_CRC:
-        case ENCTYPE_DES_CBC_MD4:
-        case ENCTYPE_DES_CBC_MD5:
-            break;
-        default:
-            return (KRB5_CRYPTO_INTERNAL);
-        }
+	switch (enctype) {
+	case ENCTYPE_DES_CBC_CRC:
+	case ENCTYPE_DES_CBC_MD4:
+	case ENCTYPE_DES_CBC_MD5:
+	    break;
+	default:
+	    return (KRB5_CRYPTO_INTERNAL);
+	}
     }
- 
-    keybytes = enc->keybytes; 
-    keylength = enc->keylength; 
+
+    keybytes = enc->keybytes;
+    keylength = enc->keylength;
 
     if ((key->contents = (krb5_octet *) malloc(keylength)) == NULL)
 	return(ENOMEM);
@@ -94,14 +93,17 @@ krb5_c_string_to_key_with_params(krb5_context context, krb5_enctype enctype,
     key->magic = KV5M_KEYBLOCK;
     key->enctype = enctype;
     key->length = keylength;
+    /* Solaris Kerberos */
     key->dk_list = NULL;
     key->hKey = CK_INVALID_HANDLE;
 
+    /* Solaris Kerberos */
     ret = (*krb5_enctypes_list[i].str2key)(context, enc, string, salt,
 			params, key);
     if (ret) {
 	memset(key->contents, 0, keylength);
 	free(key->contents);
+        /* Solaris Kerberos */
 	key->contents = NULL;
     }
 

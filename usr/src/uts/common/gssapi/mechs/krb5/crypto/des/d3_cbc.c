@@ -1,8 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1995 by Richard P. Basch.  All Rights Reserved.
@@ -26,21 +25,16 @@
  * express or implied warranty.
  */
 
-#include <des_int.h>
+#include "des_int.h"
 
 /*
  * Triple-DES CBC encryption mode.
  */
 #ifndef _KERNEL
 int
-mit_des3_cbc_encrypt(context, in, out, length, key, ivec, encrypt)
-	krb5_context context;
-	const mit_des_cblock *in;
-	mit_des_cblock *out;
-	long length;
-	krb5_keyblock *key;
-	mit_des_cblock ivec;
-	int encrypt;
+mit_des3_cbc_encrypt(krb5_context context, const mit_des_cblock *in, mit_des_cblock *out,
+		     unsigned long length, krb5_keyblock *key,
+		     const mit_des_cblock ivec, int encrypt)
 {
     int ret = KRB5_PROG_ETYPE_NOSUPP;
 /* EXPORT DELETE START */
@@ -66,7 +60,7 @@ mit_des3_cbc_encrypt(context, in, out, length, key, ivec, encrypt)
     }
 
     mechanism.mechanism = algos.enc_algo;
-    mechanism.pParameter = ivec;
+    mechanism.pParameter = (void*)ivec;
     if (ivec != NULL)
     	mechanism.ulParameterLen = sizeof(mit_des_cblock);
     else
@@ -118,8 +112,8 @@ int
 mit_des3_cbc_encrypt(krb5_context context,
 	const mit_des_cblock *in,
 	mit_des_cblock *out,
-        long length, krb5_keyblock *key,
-        mit_des_cblock ivec, int encrypt)
+        unsigned long length, krb5_keyblock *key,
+        const mit_des_cblock ivec, int encrypt)
 {
 	int ret = KRB5_PROG_ETYPE_NOSUPP;
 /* EXPORT DELETE START */

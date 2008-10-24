@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/ser_princ.c
@@ -23,7 +22,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  *
@@ -32,8 +34,8 @@
 /*
  * ser_princ.c - Serialize a krb5_principal structure.
  */
-#include <k5-int.h>
-#include <int-proto.h>
+#include "k5-int.h"
+#include "int-proto.h"
 
 /*
  * Routines to deal with externalizing the krb5_principal:
@@ -75,10 +77,12 @@ krb5_principal_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
      *	krb5_int32			for KV5M_PRINCIPAL
      */
     kret = EINVAL;
+    /* Solaris Kerberos */
     principal = (krb5_principal) arg;
     if ((principal) &&
 	!(kret = krb5_unparse_name(kcontext, principal, &fname))) {
 	*sizep += (3*sizeof(krb5_int32)) + strlen(fname);
+	/* Solaris Kerberos */
 	krb5_xfree_wrap(fname, strlen(fname) + 1);
     }
     return(kret);
@@ -101,6 +105,7 @@ krb5_principal_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet *
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
+    /* Solaris Kerberos */
     principal = (krb5_principal) arg;
     if (principal) {
 	kret = ENOMEM;
@@ -117,6 +122,7 @@ krb5_principal_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet *
 		*buffer = bp;
 		*lenremain = remain;
 
+		/* Solaris Kerberos */
 		krb5_xfree_wrap(fname, strlen(fname) + 1);
 	    }
 	}
@@ -136,6 +142,7 @@ krb5_principal_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet
     krb5_octet		*bp;
     size_t		remain;
     char		*tmpname;
+    /* Solaris Kerberos */
     int			tmpsize;
     bp = *buffer;
     remain = *lenremain;
@@ -149,6 +156,7 @@ krb5_principal_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet
 	/* See if we have enough data for the length */
 	if (!(kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain))) {
 	    /* Get the string */
+	    /* Solaris Kerberos */
 	    tmpsize = ibuf+1;
 	    tmpname = (char *) MALLOC(tmpsize);
 	    if ((tmpname) &&
@@ -172,6 +180,7 @@ krb5_principal_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet
 		}
 		if (kret && principal)
 		    krb5_free_principal(kcontext, principal);
+		/* Solaris Kerberos */
 		FREE(tmpname,tmpsize);
 	    }
 	}

@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/crypto/des/weak_key.c
  *
@@ -17,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
@@ -30,8 +32,8 @@
  * Originally written 8/85 by Steve Miller, MIT Project Athena.
  */
 
-#include <k5-int.h>
-#include <des_int.h>
+#include "k5-int.h"
+#include "des_int.h"
 
 /*
  * The following are the weak DES keys:
@@ -69,14 +71,13 @@ static const mit_des_cblock weak[16] = {
  * Requires: key has correct odd parity.
  */
 int
-mit_des_is_weak_key(key)
-     mit_des_cblock key;
+mit_des_is_weak_key(mit_des_cblock key)
 {
     int i;
     const mit_des_cblock *weak_p = weak;
 
     for (i = 0; i < (sizeof(weak)/sizeof(mit_des_cblock)); i++) {
-	if (!memcmp((char *)weak_p++,(char *)key,sizeof(mit_des_cblock)))
+	if (!memcmp(weak_p++,key,sizeof(mit_des_cblock)))
 	    return 1;
     }
 

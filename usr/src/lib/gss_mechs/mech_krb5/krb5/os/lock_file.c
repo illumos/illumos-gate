@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/lock_file.c
  *
@@ -28,7 +27,7 @@
  * libos: krb5_lock_file routine
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <stdio.h>
 
 #if !defined(_WIN32)
@@ -69,10 +68,7 @@ krb5_lock_file(krb5_context context, int fd, int mode)
     krb5_error_code	retval = 0;
 #ifdef POSIX_FILE_LOCKS
     int lock_cmd = F_SETLKW;
-    static struct flock flock_zero;
     struct flock lock_arg = { 0 };
-
-    lock_arg = flock_zero;
 #endif
 
     switch (mode & ~KRB5_LOCKMODE_DONTBLOCK) {

@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kdb/kdb_db2.c
@@ -69,7 +68,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <utime.h>
-#include <kdb5.h>
+#include "kdb5.h"
 #include "kdb_db2.h"
 #include "kdb_xdr.h"
 #include "policy_db.h"
@@ -937,7 +936,6 @@ krb5_db2_db_destroy(krb5_context context, char *dbname)
 
     if (retval1 || retval2)
 	return (retval1 ? retval1 : retval2);
-
 
     assert (strlen(dbname) + strlen("%s.kadm5") < sizeof(policy_db_name));
     sprintf(policy_db_name, "%s.kadm5", dbname);

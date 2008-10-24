@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -66,7 +65,7 @@ k5_sha1_hash(krb5_context context,
     return(ret);
 }
 
-const struct krb5_hash_provider krb5_hash_sha1 = {
+const struct krb5_hash_provider krb5int_hash_sha1 = {
     SHS_DIGESTSIZE,
     SHS_DATASIZE,
     k5_sha1_hash

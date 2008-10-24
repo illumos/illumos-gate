@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -7,6 +7,7 @@
  *
  * This file of the Kerberos V5 software is derived from public-domain code
  * contributed by Daniel J. Bernstein, <brnstnd@acf10.nyu.edu>.
+ *
  */
 
 /*
@@ -16,11 +17,8 @@
 #ifndef _KRB5_RC_FILE_H
 #define	_KRB5_RC_FILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* Solaris Kerberos */
 
 #include "rc_common.h"
 #include "rc_io.h"
@@ -54,7 +52,7 @@ struct file_data {
 	char recovering;
 };
 
-extern krb5_rc_ops krb5_rc_file_ops;
+extern const krb5_rc_ops krb5_rc_file_ops;
 
 krb5_error_code KRB5_CALLCONV krb5_rc_file_init 
     	(krb5_context,
@@ -62,7 +60,7 @@ krb5_error_code KRB5_CALLCONV krb5_rc_file_init
 		   krb5_deltat);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_recover 
 	(krb5_context,
-		   krb5_rcache);
+		   krb5_rcache); 
 krb5_error_code KRB5_CALLCONV krb5_rc_file_recover_or_init 
     	(krb5_context,
 		   krb5_rcache,
@@ -97,9 +95,5 @@ krb5_error_code krb5_rc_file_close_no_free
 void krb5_rc_free_entry 
 	(krb5_context,
 		   krb5_donot_replay **);
-
-#ifdef __cplusplus
-}
 #endif
 
-#endif /* !_KRB5_RC_FILE_H */

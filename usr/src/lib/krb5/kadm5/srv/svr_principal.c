@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -26,20 +25,21 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_principal.c,v 1.30.8.1 2004/12/20 21:16:20 tlyu Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_principal.c,v 1.30.8.1 2004/12/20 21:16:20 tlyu Exp $";
+static char *rcsid = "$Header$";
 #endif
 
 #include	<sys/types.h>
 #include	<sys/time.h>
+#include	<errno.h>
+#include	"server_internal.h"
 #include	<kadm5/admin.h>
 #include	<kdb.h>
 #include	<stdio.h>
 #include	<string.h>
-#include	"server_internal.h"
 #include	<stdarg.h>
 #include	<stdlib.h>
 #ifdef USE_PASSWORD_SERVER
@@ -202,10 +202,6 @@ kadm5_create_principal(void *server_handle,
 			    kadm5_principal_ent_t entry, long mask,
 			    char *password)
 {
-	/*
-	 * Default to using the new API with the default set of
-	 * key/salt combinations.
-	 */
     return
 	kadm5_create_principal_3(server_handle, entry, mask,
 				 0, NULL, password);
@@ -250,6 +246,7 @@ kadm5_create_principal_3(void *server_handle,
 
     switch(ret) {
     case KADM5_UNK_PRINC:
+	/* Solaris Kerberos */
 	memset(&kdb, 0, sizeof(krb5_db_entry));
 	memset(&adb, 0, sizeof(osa_princ_ent_rec));
 	break;
@@ -311,6 +308,7 @@ kadm5_create_principal_3(void *server_handle,
     kdb.len = KRB5_KDB_V1_BASE_LENGTH; /* gag me with a chainsaw */
 
     /*
+     * Solaris Kerberos:
      * If KADM5_ATTRIBUTES is set, we want to rope in not only
      * entry->attributes, but also the generic params.flags
      * obtained previously via kadm5_get_config_params.
@@ -1122,106 +1120,214 @@ static kadm5_ret_t add_to_history(krb5_context context,
 				  osa_pw_hist_ent *pw)
 {
      osa_pw_hist_ent *histp;
-     int i;
+     uint32_t nhist;
+     unsigned int i, knext, nkeys;
 
-	/* A history of 1 means just check the current password */
-	if (pol->pw_history_num == 1)
-		return (0);
+     nhist = pol->pw_history_num;
+     /* A history of 1 means just check the current password */
+     if (nhist <= 1)
+	  return 0;
 
-	/* resize the adb->old_keys array if necessary */
-	if (adb->old_key_len < pol->pw_history_num-1) {
-		if (adb->old_keys == NULL) {
-			adb->old_keys = (osa_pw_hist_ent *)
-						malloc((adb->old_key_len + 1) *
-						sizeof (osa_pw_hist_ent));
-		} else {
-			adb->old_keys = (osa_pw_hist_ent *)
-			realloc(adb->old_keys,
-				(adb->old_key_len + 1) *
-				sizeof (osa_pw_hist_ent));
-		}
-		if (adb->old_keys == NULL)
-			return (ENOMEM);
+     nkeys = adb->old_key_len;
+     knext = adb->old_key_next;
+     /* resize the adb->old_keys array if necessary */
+     if (nkeys + 1 < nhist) {
+	  if (adb->old_keys == NULL) {
+	       adb->old_keys = (osa_pw_hist_ent *)
+		    malloc((nkeys + 1) * sizeof (osa_pw_hist_ent));
+	  } else {
+	       adb->old_keys = (osa_pw_hist_ent *)
+		    realloc(adb->old_keys,
+			    (nkeys + 1) * sizeof (osa_pw_hist_ent));
+	  }
+	  if (adb->old_keys == NULL)
+	       return(ENOMEM);
+	  
+	  memset(&adb->old_keys[nkeys], 0, sizeof(osa_pw_hist_ent));
+     	  nkeys = ++adb->old_key_len;
+	  /*
+	   * To avoid losing old keys, shift forward each entry after
+	   * knext.
+	   */
+	  for (i = nkeys - 1; i > knext; i--) {
+	      adb->old_keys[i] = adb->old_keys[i - 1];
+	  }
+	  memset(&adb->old_keys[knext], 0, sizeof(osa_pw_hist_ent));
+     } else if (nkeys + 1 > nhist) {
+	 /*
+	  * The policy must have changed!  Shrink the array.
+	  * Can't simply realloc() down, since it might be wrapped.
+	  * To understand the arithmetic below, note that we are
+	  * copying into new positions 0 .. N-1 from old positions
+	  * old_key_next-N .. old_key_next-1, modulo old_key_len,
+	  * where N = pw_history_num - 1 is the length of the
+	  * shortened list.        Matt Crawford, FNAL
+	  */
+	 /*
+	  * M = adb->old_key_len, N = pol->pw_history_num - 1
+	  *
+	  * tmp[0] .. tmp[N-1] = old[(knext-N)%M] .. old[(knext-1)%M]
+	  */
+	 int j;
+	 osa_pw_hist_t tmp;
 
-		memset(&adb->old_keys[adb->old_key_len], 0,
-					sizeof (osa_pw_hist_ent));
-		adb->old_key_len++;
-		for (i = adb->old_key_len - 1; i > adb->old_key_next; i--)
-			adb->old_keys[i] = adb->old_keys[i - 1];
-		memset(&adb->old_keys[adb->old_key_next], 0,
-					sizeof (osa_pw_hist_ent));
-	} else if (adb->old_key_len > pol->pw_history_num-1) {
-		/*
-		 * The policy must have changed!  Shrink the array.
-		 * Can't simply realloc() down, since it might be wrapped.
-		 * To understand the arithmetic below, note that we are
-		 * copying into new positions 0 .. N-1 from old positions
-		 * old_key_next-N .. old_key_next-1, modulo old_key_len,
-		 * where N = pw_history_num - 1 is the length of the
-		 * shortened list.	Matt Crawford, FNAL
-		 */
-		int j;
-		histp = (osa_pw_hist_ent *)
-		malloc((pol->pw_history_num - 1) * sizeof (osa_pw_hist_ent));
-		if (histp) {
-			for (i = 0; i < pol->pw_history_num - 1; i++) {
-				/*
-				 * We need the number we use the modulus
-				 * operator on to be positive, so after
-				 * subtracting pol->pw_history_num-1, we
-				 * add back adb->old_key_len.
-				 */
-				j = KADM_MOD(i - (pol->pw_history_num - 1) +
-							adb->old_key_len);
-				histp[i] = adb->old_keys[j];
-			}
-			/* Now free the ones we don't keep (the oldest ones) */
-			for (i = 0; i < adb->old_key_len -   \
-					(pol->pw_history_num-1); i++) {
-				for (j = 0; j <   \
-				    adb->old_keys[KADM_MOD(i)].n_key_data; j++)
-					krb5_free_key_data_contents(context,
-					    &adb->old_keys[KADM_MOD(i)].
-					    key_data[j]);
-				free(adb->old_keys[KADM_MOD(i)].key_data);
-			}
-			free((void *)adb->old_keys);
-			adb->old_keys = histp;
-			adb->old_key_len = pol->pw_history_num - 1;
-			adb->old_key_next = 0;
-		} else {
-			return (ENOMEM);
-		}
-	}
+	 tmp = (osa_pw_hist_ent *)
+	     malloc((nhist - 1) * sizeof (osa_pw_hist_ent));
+	 if (tmp == NULL)
+	     return ENOMEM;
+	 for (i = 0; i < nhist - 1; i++) {
+	     /*
+	      * Add nkeys once before taking remainder to avoid
+	      * negative values.
+	      */
+	     j = (i + nkeys + knext - (nhist - 1)) % nkeys;
+	     tmp[i] = adb->old_keys[j];
+	 }
+	 /* Now free the ones we don't keep (the oldest ones) */
+	 for (i = 0; i < nkeys - (nhist - 1); i++) {
+	     j = (i + nkeys + knext) % nkeys;
+	     histp = &adb->old_keys[j];
+	     for (j = 0; j < histp->n_key_data; j++) {
+		 krb5_free_key_data_contents(context, &histp->key_data[j]);
+	     }
+	     free(histp->key_data);
+	 }
+	 free((void *)adb->old_keys);
+	 adb->old_keys = tmp;
+	 nkeys = adb->old_key_len = nhist - 1;
+	 knext = adb->old_key_next = 0;
+     }
 
-	if (adb->old_key_next + 1 > adb->old_key_len)
-		adb->old_key_next = 0;
+     /*
+      * If nhist decreased since the last password change, and nkeys+1
+      * is less than the previous nhist, it is possible for knext to
+      * index into unallocated space.  This condition would not be
+      * caught by the resizing code above.
+      */
+     if (knext + 1 > nkeys)
+	 knext = adb->old_key_next = 0;
+     /* free the old pw history entry if it contains data */
+     histp = &adb->old_keys[knext];
+     for (i = 0; i < histp->n_key_data; i++)
+	  krb5_free_key_data_contents(context, &histp->key_data[i]);
+     free(histp->key_data);
 
-	/* free the old pw history entry if it contains data */
-	histp = &adb->old_keys[adb->old_key_next];
-	for (i = 0; i < histp->n_key_data; i++)
-		krb5_free_key_data_contents(context, &histp->key_data[i]);
-	free(histp->key_data);
+     /* store the new entry */
+     adb->old_keys[knext] = *pw;
 
-	/* store the new entry */
-	adb->old_keys[adb->old_key_next] = *pw;
+     /* update the next pointer */
+     if (++adb->old_key_next == nhist - 1)
+	 adb->old_key_next = 0;
 
-	/* update the next pointer */
-	if (++adb->old_key_next == pol->pw_history_num-1)
-		adb->old_key_next = 0;
-
-	return (0);
+     return(0);
 }
 #undef KADM_MOD
+
+#ifdef USE_PASSWORD_SERVER
+/* FIXME: don't use global variable for this */
+krb5_boolean use_password_server = 0;
+
+static krb5_boolean
+kadm5_use_password_server (void)
+{
+    return use_password_server;
+}
+
+void
+kadm5_set_use_password_server (void)
+{
+    use_password_server = 1;
+}
+#endif
+
+#ifdef USE_PASSWORD_SERVER
+
+/*
+ * kadm5_launch_task () runs a program (task_path) to synchronize the 
+ * Apple password server with the Kerberos database.  Password server
+ * programs can receive arguments on the command line (task_argv)
+ * and a block of data via stdin (data_buffer).
+ *
+ * Because a failure to communicate with the tool results in the
+ * password server falling out of sync with the database,
+ * kadm5_launch_task() always fails if it can't talk to the tool.
+ */
+
+static kadm5_ret_t
+kadm5_launch_task (krb5_context context,
+                   const char *task_path, char * const task_argv[],
+                   const char *data_buffer) 
+{
+    kadm5_ret_t ret = 0;
+    int data_pipe[2];
+    
+    if (data_buffer != NULL) {
+        ret = pipe (data_pipe);
+        if (ret) { ret = errno; }
+    }
+
+    if (!ret) {
+        pid_t pid = fork ();
+        if (pid == -1) {
+            ret = errno;
+        } else if (pid == 0) {
+            /* The child: */
+            
+            if (data_buffer != NULL) {
+                if (dup2 (data_pipe[0], STDIN_FILENO) == -1) {
+                    _exit (1);
+                }
+            } else {
+                close (data_pipe[0]);
+            }
+
+            close (data_pipe[1]);
+            
+            execv (task_path, task_argv);
+            
+            _exit (1); /* Fail if execv fails */
+        } else {
+            /* The parent: */
+            int status;
+                       
+            if (data_buffer != NULL) {
+                /* Write out the buffer to the child */
+                if (krb5_net_write (context, data_pipe[1],
+                                    data_buffer, strlen (data_buffer)) < 0) {
+                    /* kill the child to make sure waitpid() won't hang later */
+                    ret = errno;
+                    kill (pid, SIGKILL);
+                }
+            }
+
+            close (data_buffer[0]);
+            close (data_buffer[1]);
+
+            waitpid (pid, &status, 0);
+
+            if (!ret) {
+                if (WIFEXITED (status)) {
+                    /* child read password and exited.  Check the return value. */
+                    if ((WEXITSTATUS (status) != 0) && (WEXITSTATUS (status) != 252)) {
+                       ret = KRB5KDC_ERR_POLICY; /* password change rejected */
+                    }
+                } else {
+                    /* child read password but crashed or was killed */
+                    ret = KRB5KRB_ERR_GENERIC; /* FIXME: better error */
+                }
+            }
+        }
+    }
+
+    return ret;
+}
+
+#endif
 
 kadm5_ret_t
 kadm5_chpass_principal(void *server_handle,
 			    krb5_principal principal, char *password)
 {
-	/*
-	 * Default to using the new API with the default set of
-	 * key/salt combinations.
-	 */
     return
 	kadm5_chpass_principal_3(server_handle, principal, FALSE,
 				 0, NULL, password);
@@ -1352,6 +1458,42 @@ kadm5_chpass_principal_3(void *server_handle,
 	kdb.pw_expiration = 0;
     }
 
+#ifdef USE_PASSWORD_SERVER
+    if (kadm5_use_password_server () &&
+        (krb5_princ_size (handle->context, principal) == 1)) {
+        krb5_data *princ = krb5_princ_component (handle->context, principal, 0);
+        const char *path = "/usr/sbin/mkpassdb";
+        char *argv[] = { "mkpassdb", "-setpassword", NULL, NULL };
+        char *pstring = NULL;
+        char pwbuf[256];
+        int pwlen = strlen (password);
+
+        if (pwlen > 254) pwlen = 254;
+        strncpy (pwbuf, password, pwlen);
+        pwbuf[pwlen] = '\n';
+        pwbuf[pwlen + 1] = '\0';
+
+        if (!ret) {
+            pstring = malloc ((princ->length + 1) * sizeof (char));
+            if (pstring == NULL) { ret = errno; }
+        }
+
+        if (!ret) {
+            memcpy (pstring, princ->data, princ->length);
+            pstring [princ->length] = '\0';
+            argv[2] = pstring;
+
+            ret = kadm5_launch_task (handle->context, path, argv, pwbuf);
+        }
+        
+        if (pstring != NULL)
+            free (pstring);
+        
+        if (ret)
+            goto done;
+    }
+#endif
+
     ret = krb5_dbe_update_last_pwd_change(handle->context, &kdb, now);
     if (ret)
 	goto done;
@@ -1388,6 +1530,7 @@ kadm5_randkey_principal(void *server_handle,
 			krb5_keyblock **keyblocks,
 			int *n_keys)
 {
+	 /* Solaris Kerberos: */
 	krb5_key_salt_tuple keysalts[2];
 
 	/*
@@ -1406,7 +1549,6 @@ kadm5_randkey_principal(void *server_handle,
 	return (kadm5_randkey_principal_3(server_handle, principal,
 			FALSE, 2, keysalts, keyblocks, n_keys));
 }
-
 kadm5_ret_t
 kadm5_randkey_principal_3(void *server_handle,
 			krb5_principal principal,
@@ -1543,6 +1685,175 @@ done:
 
     return ret;
 }
+
+#if 0 /* Solaris Kerberos */
+/*
+ * kadm5_setv4key_principal:
+ *
+ * Set only ONE key of the principal, removing all others.  This key
+ * must have the DES_CBC_CRC enctype and is entered as having the
+ * krb4 salttype.  This is to enable things like kadmind4 to work.
+ */
+kadm5_ret_t
+kadm5_setv4key_principal(void *server_handle,
+		       krb5_principal principal,
+		       krb5_keyblock *keyblock)
+{
+    krb5_db_entry		kdb;
+    osa_princ_ent_rec		adb;
+    krb5_int32			now;
+    kadm5_policy_ent_rec	pol;
+    krb5_keysalt		keysalt;
+    int				i, k, kvno, ret, have_pol = 0;
+#if 0
+    int                         last_pwd;
+#endif
+    kadm5_server_handle_t	handle = server_handle;
+    krb5_key_data               tmp_key_data;
+
+    memset( &tmp_key_data, 0, sizeof(tmp_key_data));
+
+    CHECK_HANDLE(server_handle);
+
+    krb5_clear_error_message(handle->context);
+
+    if (principal == NULL || keyblock == NULL)
+	return EINVAL;
+    if (hist_princ && /* this will be NULL when initializing the databse */
+	((krb5_principal_compare(handle->context,
+				 principal, hist_princ)) == TRUE))
+	return KADM5_PROTECT_PRINCIPAL;
+
+    if (keyblock->enctype != ENCTYPE_DES_CBC_CRC)
+	return KADM5_SETV4KEY_INVAL_ENCTYPE;
+    
+    if ((ret = kdb_get_entry(handle, principal, &kdb, &adb)))
+       return(ret);
+
+    for (kvno = 0, i=0; i<kdb.n_key_data; i++)
+	 if (kdb.key_data[i].key_data_kvno > kvno)
+	      kvno = kdb.key_data[i].key_data_kvno;
+
+    if (kdb.key_data != NULL)
+	 cleanup_key_data(handle->context, kdb.n_key_data, kdb.key_data);
+    
+    kdb.key_data = (krb5_key_data*)krb5_db_alloc(handle->context, NULL, sizeof(krb5_key_data));
+    if (kdb.key_data == NULL)
+	 return ENOMEM;
+    memset(kdb.key_data, 0, sizeof(krb5_key_data));
+    kdb.n_key_data = 1;
+    keysalt.type = KRB5_KDB_SALTTYPE_V4;
+    /* XXX data.magic? */
+    keysalt.data.length = 0;
+    keysalt.data.data = NULL;
+
+    /* use tmp_key_data as temporary location and reallocate later */
+    ret = krb5_dbekd_encrypt_key_data(handle->context, &master_keyblock,
+				      keyblock, &keysalt, kvno + 1,
+				      &tmp_key_data);
+    if (ret) {
+	goto done;
+    }
+
+    for (k = 0; k < tmp_key_data.key_data_ver; k++) {
+	kdb.key_data->key_data_type[k] = tmp_key_data.key_data_type[k];
+	kdb.key_data->key_data_length[k] = tmp_key_data.key_data_length[k];
+	if (tmp_key_data.key_data_contents[k]) {
+	    kdb.key_data->key_data_contents[k] = krb5_db_alloc(handle->context, NULL, tmp_key_data.key_data_length[k]);
+	    if (kdb.key_data->key_data_contents[k] == NULL) {
+		cleanup_key_data(handle->context, kdb.n_key_data, kdb.key_data);
+		kdb.key_data = NULL;
+		kdb.n_key_data = 0;
+		ret = ENOMEM;
+		goto done;
+	    }
+	    memcpy (kdb.key_data->key_data_contents[k], tmp_key_data.key_data_contents[k], tmp_key_data.key_data_length[k]);
+
+	    memset (tmp_key_data.key_data_contents[k], 0, tmp_key_data.key_data_length[k]);
+	    free (tmp_key_data.key_data_contents[k]);
+	    tmp_key_data.key_data_contents[k] = NULL;
+	}
+    }
+
+
+
+    kdb.attributes &= ~KRB5_KDB_REQUIRES_PWCHANGE;
+
+    ret = krb5_timeofday(handle->context, &now);
+    if (ret)
+	goto done;
+
+    if ((adb.aux_attributes & KADM5_POLICY)) {
+	if ((ret = kadm5_get_policy(handle->lhandle, adb.policy,
+				    &pol)) != KADM5_OK) 
+	   goto done;
+	have_pol = 1;
+
+#if 0
+	/*
+	  * The spec says this check is overridden if the caller has
+	  * modify privilege.  The admin server therefore makes this
+	  * check itself (in chpass_principal_wrapper, misc.c).  A
+	  * local caller implicitly has all authorization bits.
+	  */
+	if (ret = krb5_dbe_lookup_last_pwd_change(handle->context,
+						  &kdb, &last_pwd))
+	     goto done;
+	if((now - last_pwd) < pol.pw_min_life &&
+	   !(kdb.attributes & KRB5_KDB_REQUIRES_PWCHANGE)) {
+	     ret = KADM5_PASS_TOOSOON;
+	     goto done;
+	}
+#endif
+#if 0
+	/*
+	 * Should we be checking/updating pw history here?
+	 */
+	if(pol.pw_history_num > 1) {
+	    if(adb.admin_history_kvno != hist_kvno) {
+		ret = KADM5_BAD_HIST_KEY;
+		goto done;
+	    }
+
+	    if (ret = check_pw_reuse(handle->context,
+				     &hist_key,
+				     kdb.n_key_data, kdb.key_data,
+				     adb.old_key_len, adb.old_keys))
+		goto done;
+	}
+#endif
+	
+	if (pol.pw_max_life)
+	   kdb.pw_expiration = now + pol.pw_max_life;
+	else
+	   kdb.pw_expiration = 0;
+    } else {
+	kdb.pw_expiration = 0;
+    }
+
+    ret = krb5_dbe_update_last_pwd_change(handle->context, &kdb, now);
+    if (ret)
+	 goto done;
+
+    if ((ret = kdb_put_entry(handle, &kdb, &adb)))
+	goto done;
+
+    ret = KADM5_OK;
+done:
+    for (i = 0; i < tmp_key_data.key_data_ver; i++) {
+	if (tmp_key_data.key_data_contents[i]) {
+	    memset (tmp_key_data.key_data_contents[i], 0, tmp_key_data.key_data_length[i]);
+	    free (tmp_key_data.key_data_contents[i]);
+	}
+    }
+
+    kdb_free_entry(handle, &kdb, &adb);
+    if (have_pol)
+	 kadm5_free_policy_ent(handle->lhandle, &pol);
+
+    return ret;
+}
+#endif
 
 kadm5_ret_t
 kadm5_setkey_principal(void *server_handle,
@@ -1869,6 +2180,13 @@ kadm5_ret_t kadm5_decrypt_key(void *server_handle,
 					   &handle->master_keyblock, key_data,
 					   keyblock, keysalt)))
 	 return ret;
+
+    /*
+     * Coerce the enctype of the output keyblock in case we got an
+     * inexact match on the enctype; this behavior will go away when
+     * the key storage architecture gets redesigned for 1.3.
+     */
+    keyblock->enctype = ktype;
 
     if (kvnop)
 	 *kvnop = key_data->key_data_kvno;

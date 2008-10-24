@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,63 +30,56 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <dk.h>
+#include "k5-int.h"
+#include "dk.h"
 
 #define K5CLENGTH 5 /* 32 bit net byte order integer + one byte seed */
 
 static krb5_error_code
 krb5_dk_decrypt_maybe_trunc_hmac(krb5_context context,
-	const struct krb5_enc_provider *enc,
-        const struct krb5_hash_provider *hash,
-        const krb5_keyblock *key,
-        krb5_keyusage usage,
-        const krb5_data *ivec,
-        const krb5_data *input,
-        krb5_data *output,
-        size_t hmacsize);
+				 const struct krb5_enc_provider *enc,
+				 const struct krb5_hash_provider *hash,
+				 const krb5_keyblock *key,
+				 krb5_keyusage usage,
+				 const krb5_data *ivec,
+				 const krb5_data *input,
+				 krb5_data *output,
+				 size_t hmacsize);
 
 krb5_error_code
 krb5_dk_decrypt(
-     krb5_context context, 
-     const struct krb5_enc_provider *enc,
-     const struct krb5_hash_provider *hash,
-     const krb5_keyblock *key,
-     krb5_keyusage usage,
-     const krb5_data *ivec,
-     const krb5_data *input,
-     krb5_data *output)
+		krb5_context context, 
+		const struct krb5_enc_provider *enc,
+		const struct krb5_hash_provider *hash,
+		const krb5_keyblock *key, krb5_keyusage usage,
+		const krb5_data *ivec, const krb5_data *input,
+		krb5_data *output)
 {
     return krb5_dk_decrypt_maybe_trunc_hmac(context, enc, hash, key, usage,
-                                            ivec, input, output, 0);
+					    ivec, input, output, 0);
 }
 
 krb5_error_code
 krb5int_aes_dk_decrypt(
-     krb5_context context,
-     const struct krb5_enc_provider *enc,
-     const struct krb5_hash_provider *hash,
-     const krb5_keyblock *key,
-     krb5_keyusage usage,
-     const krb5_data *ivec,
-     const krb5_data *input,
-     krb5_data *output)
+		       krb5_context context,
+		       const struct krb5_enc_provider *enc,
+		       const struct krb5_hash_provider *hash,
+		       const krb5_keyblock *key, krb5_keyusage usage,
+		       const krb5_data *ivec, const krb5_data *input,
+		       krb5_data *output)
 {
     return krb5_dk_decrypt_maybe_trunc_hmac(context, enc, hash, key, usage,
-                                            ivec, input, output, 96 / 8);
+					    ivec, input, output, 96 / 8);
 }
 
 static krb5_error_code
 krb5_dk_decrypt_maybe_trunc_hmac(
-     krb5_context context,
-     krb5_const struct krb5_enc_provider *enc,
-     krb5_const struct krb5_hash_provider *hash,
-     krb5_const krb5_keyblock *key,
-     krb5_keyusage usage,
-     krb5_const krb5_data *ivec,
-     krb5_const krb5_data *input,
-     krb5_data *output,
-     size_t hmacsize)
+				 krb5_context context,
+				 const struct krb5_enc_provider *enc,
+				 const struct krb5_hash_provider *hash,
+				 const krb5_keyblock *key, krb5_keyusage usage,
+				 const krb5_data *ivec, const krb5_data *input,
+				 krb5_data *output, size_t hmacsize)
 {
     krb5_error_code ret;
     size_t hashsize, blocksize, enclen, plainlen;
@@ -127,11 +119,12 @@ krb5_dk_decrypt_maybe_trunc_hmac(
     }
 
     /* decrypt the ciphertext */
+
     d1.length = enclen;
     d1.data = input->data;
 
     d2.length = enclen;
-    d2.data = (char *)plaindata;
+    d2.data = (char *) plaindata;
 
     if ((ret = ((*(enc->decrypt))(context, derived_encr_key,
 			ivec, &d1, &d2))) != 0)
@@ -144,12 +137,13 @@ krb5_dk_decrypt_maybe_trunc_hmac(
     }
 
     /* verify the hash */
+
     if ((cksum = (unsigned char *) MALLOC(hashsize)) == NULL) {
 	    ret = ENOMEM;
 	    goto cleanup;
     }
     d1.length = hashsize;
-    d1.data = (char *)cksum;
+    d1.data = (char *) cksum;
 
 #ifdef _KERNEL
     if ((ret = krb5_hmac(context, derived_hmac_key, &d2, &d1)) != 0)

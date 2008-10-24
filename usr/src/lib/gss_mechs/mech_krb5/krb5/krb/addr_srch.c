@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/addr_srch.c
  *
@@ -28,15 +27,14 @@
  * krb5_address_search()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * if addr is listed in addrlist, or addrlist is null, return TRUE.
  * if not listed, return FALSE
  */
 krb5_boolean
-krb5_address_search(krb5_context context, krb5_const krb5_address *addr,
-	krb5_address *krb5_const *addrlist)
+krb5_address_search(krb5_context context, const krb5_address *addr, krb5_address *const *addrlist)
 {
     if (!addrlist)
 	return TRUE;

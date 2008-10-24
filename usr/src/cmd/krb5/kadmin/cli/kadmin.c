@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1994 by the Massachusetts Institute of Technology.
@@ -32,7 +31,6 @@
  * the OVSecure library
  */
 
-#include <krb5.h>
 #include <kadm5/admin.h>
 #include <krb5/adm_proto.h>
 #include <stdio.h>
@@ -45,6 +43,7 @@
 #include <time.h>
 #include "kadmin.h"
 #include <libintl.h>
+#include <krb5.h>
 
 /*
  * Solaris:  the following are needed for paging
@@ -571,10 +570,11 @@ char *kadmin_startup(argc, argv)
 
     /* register the WRFILE keytab type and set it as the default */
     {
-	 /* XXX krb5_defkeyname is an internal library global and
-            should go away */
-	 extern char *krb5_defkeyname;
-	 krb5_defkeyname = DEFAULT_KEYTAB;
+#define DEFAULT_KEYTAB "WRFILE:/etc/krb5/krb5.keytab"
+	/* XXX krb5_defkeyname is an internal library global and
+	   should go away */
+	extern char *krb5_defkeyname;
+	krb5_defkeyname = DEFAULT_KEYTAB;
     }
     
     if ((retval = kadm5_init_iprop(handle)) != 0) {

@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/chk_trans.c
  *
@@ -27,8 +26,21 @@
  *
  * krb5_check_transited_list()
  */
-#include <k5-int.h>
+#include "k5-int.h"
 #include <stdarg.h>
+
+#if defined (TEST) || defined (TEST2)
+# undef DEBUG
+# define DEBUG
+#endif
+
+#ifdef DEBUG
+#define verbose krb5int_chk_trans_verbose
+static int verbose = 0;
+# define Tprintf(ARGS) if (verbose) printf ARGS
+#else
+# define Tprintf(ARGS) (void)(0)
+#endif
 
 #define MAXLEN 512
 
@@ -38,9 +50,13 @@ process_intermediates (krb5_error_code (*fn)(krb5_data *, void *), void *data,
     unsigned int len1, len2, i;
     char *p1, *p2;
 
+    Tprintf (("process_intermediates(%.*s,%.*s)\n",
+	      (int) n1->length, n1->data, (int) n2->length, n2->data));
+
     len1 = n1->length;
     len2 = n2->length;
 
+    Tprintf (("(walking intermediates now)\n"));
     /* Simplify...  */
     if (len1 > len2) {
 	const krb5_data *p;
@@ -54,8 +70,11 @@ process_intermediates (krb5_error_code (*fn)(krb5_data *, void *), void *data,
     /* Okay, now len1 is always shorter or equal.  */
     if (len1 == len2) {
 	if (memcmp (n1->data, n2->data, len1)) {
+	    Tprintf (("equal length but different strings in path: '%.*s' '%.*s'\n",
+		      (int) n1->length, n1->data, (int) n2->length, n2->data));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
+	Tprintf (("(end intermediates)\n"));
 	return 0;
     }
     /* Now len1 is always shorter.  */
@@ -67,9 +86,13 @@ process_intermediates (krb5_error_code (*fn)(krb5_data *, void *), void *data,
     if (p1[0] == '/') {
 	/* X.500 style names, with common prefix.  */
 	if (p2[0] != '/') {
+	    Tprintf (("mixed name formats in path: x500='%.*s' domain='%.*s'\n",
+		      (int) len1, p1, (int) len2, p2));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
 	if (memcmp (p1, p2, len1)) {
+	    Tprintf (("x500 names with different prefixes '%.*s' '%.*s'\n",
+		      (int) len1, p1, (int) len2, p2));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
 	for (i = len1 + 1; i < len2; i++)
@@ -86,12 +109,17 @@ process_intermediates (krb5_error_code (*fn)(krb5_data *, void *), void *data,
     } else {
 	/* Domain style names, with common suffix.  */
 	if (p2[0] == '/') {
+	    Tprintf (("mixed name formats in path: domain='%.*s' x500='%.*s'\n",
+		      (int) len1, p1, (int) len2, p2));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
 	if (memcmp (p1, p2 + (len2 - len1), len1)) {
+	    Tprintf (("domain names with different suffixes '%.*s' '%.*s'\n",
+		      (int) len1, p1, (int) len2, p2));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
 	for (i = len2 - len1 - 1; i > 0; i--) {
+	    Tprintf (("looking at '%.*s'\n", (int) (len2 - i), p2+i));
 	    if (p2[i-1] == '.') {
 		krb5_data d;
 		krb5_error_code r;
@@ -104,6 +132,7 @@ process_intermediates (krb5_error_code (*fn)(krb5_data *, void *), void *data,
 	    }
 	}
     }
+    Tprintf (("(end intermediates)\n"));
     return 0;
 }
 
@@ -114,6 +143,7 @@ maybe_join (krb5_data *last, krb5_data *buf, int bufsiz)
 	return 0;
     if (buf->data[0] == '/') {
 	if (last->length + buf->length > bufsiz) {
+	    Tprintf (("too big: last=%d cur=%d max=%d\n", last->length, buf->length, bufsiz));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
 	memmove (buf->data+last->length, buf->data, buf->length);
@@ -124,6 +154,7 @@ maybe_join (krb5_data *last, krb5_data *buf, int bufsiz)
 	   empty; the strcat will be a no-op.  It should probably
 	   be an error case, but let's be flexible.  */
 	if (last->length+buf->length > bufsiz) {
+	    Tprintf (("too big\n"));
 	    return KRB5KRB_AP_ERR_ILL_CR_TKT;
 	}
 	memcpy (buf->data + buf->length, last->data, last->length);
@@ -164,7 +195,13 @@ foreach_realm (krb5_error_code (*fn)(krb5_data *comp,void *data), void *data,
     last_component.data = last;
     last_component.length = 0;
 
+#define print_data(fmt,d) Tprintf((fmt,(int)(d)->length,(d)->data))
+    print_data ("client realm: %.*s\n", crealm);
+    print_data ("server realm: %.*s\n", srealm);
+    print_data ("transit enc.: %.*s\n", transit);
+
     if (transit->length == 0) {
+	Tprintf (("no other realms transited\n"));
 	return 0;
     }
 
@@ -225,6 +262,8 @@ foreach_realm (krb5_error_code (*fn)(krb5_data *comp,void *data), void *data,
 	}
     }
     /* At end.  Must be normal state.  */
+    if (next_lit)
+	Tprintf (("ending in next-char-literal state\n"));
     /* Process trailing element or comma.  */
     if (bufp == buf) {
 	/* Trailing comma.  */
@@ -266,10 +305,12 @@ check_realm_in_list (krb5_data *realm, void *data)
     struct check_data *cdata = data;
     int i;
 
+    Tprintf ((".. checking '%.*s'\n", (int) realm->length, realm->data));
     for (i = 0; cdata->tgs[i]; i++) {
 	if (same_data (krb5_princ_realm (cdata->ctx, cdata->tgs[i]), realm))
 	    return 0;
     }
+    Tprintf (("BAD!\n"));
     return KRB5KRB_AP_ERR_ILL_CR_TKT;
 }
 
@@ -281,30 +322,34 @@ krb5_check_transited_list (krb5_context ctx, const krb5_data *trans_in,
     struct check_data cdata;
     krb5_error_code r;
 
-    /* 
-     * Work around buggy implementations that include NULL terminator in length.
-     */
     trans.length = trans_in->length;
     trans.data = (char *) trans_in->data;
     if (trans.length && (trans.data[trans.length-1] == '\0'))
 	trans.length--;
 
+    Tprintf (("krb5_check_transited_list(trans=\"%.*s\", crealm=\"%.*s\", srealm=\"%.*s\")\n",
+	      (int) trans.length, trans.data,
+	      (int) crealm->length, crealm->data,
+	      (int) srealm->length, srealm->data));
     if (trans.length == 0)
 	return 0;
-
     r = krb5_walk_realm_tree (ctx, crealm, srealm, &cdata.tgs,
 			      KRB5_REALM_BRANCH_CHAR);
     if (r) {
+	Tprintf (("error %ld\n", (long) r));
 	return r;
     }
 #ifdef DEBUG /* avoid compiler warning about 'd' unused */
     {
 	int i;
+	Tprintf (("tgs list = {\n"));
 	for (i = 0; cdata.tgs[i]; i++) {
 	    char *name;
 	    r = krb5_unparse_name (ctx, cdata.tgs[i], &name);
+	    Tprintf (("\t'%s'\n", name));
 	    free (name);
 	}
+	Tprintf (("}\n"));
     }
 #endif
     cdata.ctx = ctx;
@@ -312,3 +357,85 @@ krb5_check_transited_list (krb5_context ctx, const krb5_data *trans_in,
     krb5_free_realm_tree (ctx, cdata.tgs);
     return r;
 }
+
+#ifdef TEST
+
+static krb5_error_code
+print_a_realm (krb5_data *realm, void *data)
+{
+    printf ("%.*s\n", (int) realm->length, realm->data);
+    return 0;
+}
+
+int main (int argc, char *argv[]) {
+    const char *me;
+    krb5_data crealm, srealm, transit;
+    krb5_error_code r;
+    int expand_only = 0;
+
+    me = strrchr (argv[0], '/');
+    me = me ? me+1 : argv[0];
+
+    while (argc > 3 && argv[1][0] == '-') {
+	if (!strcmp ("-v", argv[1]))
+	    verbose++, argc--, argv++;
+	else if (!strcmp ("-x", argv[1]))
+	    expand_only++, argc--, argv++;
+	else
+	    goto usage;
+    }
+
+    if (argc != 4) {
+    usage:
+	printf ("usage: %s [-v] [-x] clientRealm serverRealm transitEncoding\n",
+		me);
+	return 1;
+    }
+
+    crealm.data = argv[1];
+    crealm.length = strlen(argv[1]);
+    srealm.data = argv[2];
+    srealm.length = strlen(argv[2]);
+    transit.data = argv[3];
+    transit.length = strlen(argv[3]);
+
+    if (expand_only) {
+
+	printf ("client realm: %s\n", argv[1]);
+	printf ("server realm: %s\n", argv[2]);
+	printf ("transit enc.: %s\n", argv[3]);
+
+	if (argv[3][0] == 0) {
+	    printf ("no other realms transited\n");
+	    return 0;
+	}
+
+	r = foreach_realm (print_a_realm, NULL, &crealm, &srealm, &transit);
+	if (r)
+	    printf ("--> returned error %ld\n", (long) r);
+	return r != 0;
+
+    } else {
+
+	/* Actually check the values against the supplied krb5.conf file.  */
+	krb5_context ctx;
+	r = krb5_init_context (&ctx);
+	if (r) {
+	    com_err (me, r, "initializing krb5 context");
+	    return 1;
+	}
+	r = krb5_check_transited_list (ctx, &transit, &crealm, &srealm);
+	if (r == KRB5KRB_AP_ERR_ILL_CR_TKT) {
+	    printf ("NO\n");
+	} else if (r == 0) {
+	    printf ("YES\n");
+	} else {
+	    printf ("kablooey!\n");
+	    com_err (me, r, "checking transited-realm list");
+	    return 1;
+	}
+	return 0;
+    }
+}
+
+#endif /* TEST */

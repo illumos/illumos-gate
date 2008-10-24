@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/bld_princ.c
  *
@@ -29,12 +28,12 @@
  */
 
 #include <stdarg.h>
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_build_principal_va(krb5_context context, krb5_principal princ,
-	unsigned int rlen, const char *realm, va_list ap)
+KRB5_CALLCONV
+krb5_build_principal_va(krb5_context context, krb5_principal princ, unsigned int rlen, const char *realm, va_list ap)
 {
     register int i, count = 0;
     register char *next;
@@ -92,9 +91,9 @@ krb5_build_principal_va(krb5_context context, krb5_principal princ,
 }
 
 krb5_error_code KRB5_CALLCONV_C
-krb5_build_principal(krb5_context context,  krb5_principal * princ,
-		unsigned int rlen,
-		const char * realm, ...)
+krb5_build_principal(krb5_context context,  krb5_principal * princ, 
+		     unsigned int rlen,
+		     const char * realm, ...)
 {
     va_list ap;
     krb5_error_code retval;

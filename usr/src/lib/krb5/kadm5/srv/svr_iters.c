@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -21,11 +20,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 1.6 2003/01/12 18:17:02 epeisach Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 1.6 2003/01/12 18:17:02 epeisach Exp $";
+static char *rcsid = "$Header$";
 #endif
 
 #include "autoconf.h"
@@ -41,6 +40,7 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 
 
 #include	<sys/types.h>
 #include	<string.h>
+#include	"server_internal.h"
 #include	<kadm5/admin.h>
 #ifdef SOLARIS_REGEXPS
 #include	<regexpr.h>
@@ -50,7 +50,6 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 
 #endif
 #include <stdlib.h>
 
-#include	"server_internal.h"
 
 struct iter_data {
      krb5_context context;

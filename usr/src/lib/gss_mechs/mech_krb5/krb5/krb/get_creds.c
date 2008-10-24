@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/get_creds.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_get_credentials()
  */
@@ -50,7 +49,7 @@
  returns errors from encryption routines, system errors
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*ARGSUSED*/
 static krb5_error_code
@@ -58,6 +57,7 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
 			  krb5_creds *in_creds, krb5_creds *mcreds,
 			  krb5_flags *fields)
 {
+    /* Solaris Kerberos */
     krb5_error_code ret = 0;
 
     if (!in_creds || !in_creds->server || !in_creds->client)
@@ -66,6 +66,7 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
     memset((char *)mcreds, 0, sizeof(krb5_creds));
     mcreds->magic = KV5M_CREDS;
     /*
+     * Solaris Kerberos:
      * Set endtime appropriately to make sure we do not rope in
      * expired creds. If endtime is set to 0 (which it almost always
      * is, courtesy memset/calloc) the krb5_cc_retrieve_cred() call in
@@ -90,7 +91,7 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
     mcreds->authdata = in_creds->authdata;
     mcreds->server = in_creds->server;
     mcreds->client = in_creds->client;
-
+    
     *fields = KRB5_TC_MATCH_TIMES /*XXX |KRB5_TC_MATCH_SKEY_TYPE */
 	| KRB5_TC_MATCH_AUTHDATA
 	| KRB5_TC_SUPPORTED_KTYPES;
@@ -101,13 +102,13 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
 	*fields |= KRB5_TC_MATCH_KTYPE;
 	ret = krb5_get_tgs_ktypes (context, mcreds->server, &ktypes);
 	for (i = 0; ktypes[i]; i++)
-            if (ktypes[i] == mcreds->keyblock.enctype)
+	    if (ktypes[i] == mcreds->keyblock.enctype)
 		break;
 	if (ktypes[i] == 0)
-            ret = KRB5_CC_NOT_KTYPE;
+	    ret = KRB5_CC_NOT_KTYPE;
 	free (ktypes);
 	if (ret)
-            return ret;
+	    return ret;
     }
     if (options & KRB5_GC_USER_USER) {
 	/* also match on identical 2nd tkt and tkt encrypted in a
@@ -147,6 +148,7 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
     ncreds->magic = KV5M_CREDS;
 
     /* The caller is now responsible for cleaning up in_creds */
+    /* Solaris Kerberos */
     if ((retval = krb5_cc_retrieve_cred(context, ccache, fields, &mcreds,
 					ncreds)) !=0) {
 	krb5_xfree(ncreds);
@@ -169,6 +171,7 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 	register int i = 0;
 	krb5_error_code rv2;
 	while (tgts[i]) {
+	    /* Solaris Kerberos */
 	    if ((rv2 = krb5_cc_store_cred(context, ccache, tgts[i])) != 0) {
 		retval = rv2;
 		break;
@@ -192,8 +195,16 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 	&& not_ktype)
 	retval = KRB5_CC_NOT_KTYPE;
 
-    if (!retval)
+    if (!retval) {
+        /* the purpose of the krb5_get_credentials call is to 
+         * obtain a set of credentials for the caller.  the 
+         * krb5_cc_store_cred() call is to optimize performance
+         * for future calls.  Ignore any errors, since the credentials
+         * are still valid even if we fail to store them in the cache.
+         */
+	/* Solaris Kerberos */
 	retval = krb5_cc_store_cred(context, ccache, *out_creds);
+    }
     return retval;
 }
 
@@ -201,7 +212,7 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 #define INT_GC_RENEW 2
 
 /*ARGSUSED*/
-static krb5_error_code
+static krb5_error_code 
 krb5_get_credentials_val_renew_core(krb5_context context, krb5_flags options,
 				    krb5_ccache ccache, krb5_creds *in_creds,
 				    krb5_creds **out_creds, int which)
@@ -212,11 +223,11 @@ krb5_get_credentials_val_renew_core(krb5_context context, krb5_flags options,
 
     switch(which) {
     case INT_GC_VALIDATE:
-	    retval = krb5_get_cred_from_kdc_validate(context, ccache,
+	    retval = krb5_get_cred_from_kdc_validate(context, ccache, 
 					     in_creds, out_creds, &tgts);
 	    break;
     case INT_GC_RENEW:
-	    retval = krb5_get_cred_from_kdc_renew(context, ccache,
+	    retval = krb5_get_cred_from_kdc_renew(context, ccache, 
 					     in_creds, out_creds, &tgts);
 	    break;
     default:
@@ -229,8 +240,9 @@ krb5_get_credentials_val_renew_core(krb5_context context, krb5_flags options,
 
     retval = krb5_cc_get_principal(context, ccache, &tmp);
     if (retval) return retval;
-
+    
     retval = krb5_cc_initialize(context, ccache, tmp);
+    /* Solaris Kerberos */
     if (retval) {
 	krb5_free_principal(context, tmp);
 	return retval;
@@ -246,8 +258,8 @@ krb5_get_credentials_validate(krb5_context context, krb5_flags options,
 			      krb5_ccache ccache, krb5_creds *in_creds,
 			      krb5_creds **out_creds)
 {
-    return(krb5_get_credentials_val_renew_core(context, options, ccache,
-					       in_creds, out_creds,
+    return(krb5_get_credentials_val_renew_core(context, options, ccache, 
+					       in_creds, out_creds, 
 					       INT_GC_VALIDATE));
 }
 
@@ -257,8 +269,8 @@ krb5_get_credentials_renew(krb5_context context, krb5_flags options,
 			   krb5_creds **out_creds)
 {
 
-    return(krb5_get_credentials_val_renew_core(context, options, ccache,
-					       in_creds, out_creds,
+    return(krb5_get_credentials_val_renew_core(context, options, ccache, 
+					       in_creds, out_creds, 
 					       INT_GC_RENEW));
 }
 
@@ -313,12 +325,12 @@ krb5_validate_or_renew_creds(krb5_context context, krb5_creds *creds,
     }
 
     if (validate)
-	ret = krb5_get_cred_from_kdc_validate(context, ccache,
+	ret = krb5_get_cred_from_kdc_validate(context, ccache, 
 					      &in_creds, &out_creds, &tgts);
     else
-	ret = krb5_get_cred_from_kdc_renew(context, ccache,
+	ret = krb5_get_cred_from_kdc_renew(context, ccache, 
 					   &in_creds, &out_creds, &tgts);
-
+   
     /* ick.  copy the struct contents, free the container */
     if (out_creds) {
 	*creds = *out_creds;

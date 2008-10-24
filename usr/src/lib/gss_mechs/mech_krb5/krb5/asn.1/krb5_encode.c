@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * src/lib/krb5/asn.1/krb5_encode.c
@@ -26,7 +25,7 @@
  * or implied warranty.
  */
 
-#include "krb5.h"
+#include "k5-int.h"
 #include "asn1_k_encode.h"
 #include "asn1_encode.h"
 #include "krbasn1.h"
@@ -699,6 +698,23 @@ krb5_error_code encode_krb5_authdata(const krb5_authdata **rep, krb5_data **code
   krb5_cleanup();
 }
 
+krb5_error_code encode_krb5_authdata_elt(const krb5_authdata *rep, krb5_data **code)
+{
+  asn1_error_code retval;
+  asn1buf *buf=NULL;
+  unsigned int length;
+  
+  if(rep == NULL) return ASN1_MISSING_FIELD;
+
+  retval = asn1buf_create(&buf);
+  if(retval) return retval;
+
+  retval = asn1_encode_krb5_authdata_elt(buf,rep, &length);
+  if(retval) return retval;
+
+  krb5_cleanup();
+}
+
 krb5_error_code encode_krb5_alt_method(const krb5_alt_method *rep, krb5_data **code)
 {
   krb5_setup();
@@ -883,9 +899,118 @@ krb5_error_code encode_krb5_setpw_req(const krb5_principal target,
 
   krb5_addfield(target,2,asn1_encode_realm);
   krb5_addfield(target,1,asn1_encode_principal_name);
+  /* Solaris Kerberos */
   krb5_addlenfield(strlen(password), (const unsigned char *)password,0,asn1_encode_octetstring);
   krb5_makeseq();
 
 
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_pa_pk_as_req(const krb5_pa_pk_as_req *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_pa_pk_as_req(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_pa_pk_as_req_draft9(const krb5_pa_pk_as_req_draft9 *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_pa_pk_as_req_draft9(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_pa_pk_as_rep(const krb5_pa_pk_as_rep *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_pa_pk_as_rep(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_pa_pk_as_rep_draft9(const krb5_pa_pk_as_rep_draft9 *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_pa_pk_as_rep_draft9(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_auth_pack(const krb5_auth_pack *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_auth_pack(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_auth_pack_draft9(const krb5_auth_pack_draft9 *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_auth_pack_draft9(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_kdc_dh_key_info(const krb5_kdc_dh_key_info *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_kdc_dh_key_info(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_reply_key_pack(const krb5_reply_key_pack *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_reply_key_pack(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_reply_key_pack_draft9(const krb5_reply_key_pack_draft9 *rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_reply_key_pack_draft9(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_td_trusted_certifiers(const krb5_external_principal_identifier **rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_td_trusted_certifiers(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_typed_data(const krb5_typed_data **rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_sequence_of_typed_data(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
+  krb5_cleanup();
+}
+
+krb5_error_code encode_krb5_td_dh_parameters(const krb5_algorithm_identifier **rep, krb5_data **code)
+{
+  krb5_setup();
+  retval = asn1_encode_sequence_of_algorithm_identifier(buf,rep,&length);
+  if(retval) return retval;
+  sum += length;
   krb5_cleanup();
 }

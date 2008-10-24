@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This command provides an simple interface to configure, destroy, and to obtain
@@ -180,7 +179,6 @@ function setup_kdc_conf {
 	printf "\t\tprofile = $KRB5_KRB_CONF\n" 1>&3
 	printf "\t\tdatabase_name = $PRINCDB\n" 1>&3
 	printf "\t\tmaster_key_type = $ENCTYPE\n" 1>&3
-	printf "\t\tadmin_keytab = $KADM5KT\n" 1>&3
 	printf "\t\tacl_file = $KADM5ACL\n" 1>&3
 	printf "\t\tkadmind_port = 749\n" 1>&3
 	printf "\t\tmax_life = 8h 0m 0s\n" 1>&3
@@ -366,18 +364,6 @@ function setup_mkeytab {
 		check_ret $? $KADMINL
 	fi
 
-	$KADMINL -q "ktadd -k $KADM5KT kadmin/$fqhn" 1>$TMP_FILE 2>&1
-	check_ret $? $KADMINL
-	$KADMINL -q "ktadd -k $KADM5KT changepw/$fqhn" 1>$TMP_FILE 2>&1
-	check_ret $? $KADMINL
-
-	# To support Horowitz change password protocol
-	$KADMINL -q "ktadd -k $KADM5KT kadmin/changepw" 1>$TMP_FILE 2>&1
-	check_ret $? $KADMINL
-
-	$KADMINL -q "ktadd -k $KADM5KT kiprop/$fqhn" 1>$TMP_FILE 2>&1
-	check_ret $? $KADMINL
-
 	$KADMINL -q "ank -randkey host/$fqhn" 1>$TMP_FILE 2>&1
 	check_ret $? $KADMINL
 	$KADMINL -q "ktadd host/$fqhn" 1>$TMP_FILE 2>&1
@@ -520,11 +506,11 @@ function setup_slave {
 function destroy_kdc {
 
 	# Check first to see if this is an existing KDC or server
-	if [[ -f $KRB5KT || -f $KADM5KT || -f $PRINCDB || -f $OLDPRINCDB ]]
+	if [[ -f $KRB5KT || -f $PRINCDB || -f $OLDPRINCDB ]]
 	then
 		if [[ -z $PWFILE ]]; then
 			printf "\n$(gettext "Some of the following files are present on this system"):\n"
-			echo "\t$KRB5KT\n\t$KADM5KT\n\t$PRINCDB\n\t$OLDPRINCDB\n\t$STASH\n"
+			echo "\t$KRB5KT\n\t$PRINCDB\n\t$OLDPRINCDB\n\t$STASH\n"
 			if [[ -z $d_option ]]; then
 				printf "$(gettext "You must first run 'kdcmgr destroy' to remove all of these files before creating a KDC server").\n\n"
 				cleanup 1
@@ -541,7 +527,7 @@ function destroy_kdc {
 	fi
 
 	printf "$(gettext "yes")\n" | kdb5_util destroy > /dev/null 2>&1
-	rm -f $KRB5KT $KADM5KT
+	rm -f $KRB5KT
 }
 
 function kadm5_acl_configed {
@@ -592,9 +578,7 @@ function status_kdc {
 	if [[ $is_master -eq 0 && ! -s $KPROPACL ]]; then
 		printf "$(gettext "%s not found").\n" $KPROPACL
 	fi
-	if [[ $is_master -eq 1 && ! -s $KADM5KT ]]; then
-		printf "$(gettext "%s not found").\n" $KADM5KT
-	fi
+
 	test ! -s $STASH &&
 	    printf "$(gettext "Stash file not found") (/var/krb5/.k5.*).\n"
 	echo
@@ -611,7 +595,6 @@ KADM5ACL=/etc/krb5/kadm5.acl
 KPROPACL=/etc/krb5/kpropd.acl
 
 KRB5KT=/etc/krb5/krb5.keytab
-KADM5KT=/etc/krb5/kadm5.keytab
 PRINCDB=/var/krb5/principal
 OLDPRINCDB=/var/krb5/principal.old
 STASH=/var/krb5/.k5.*

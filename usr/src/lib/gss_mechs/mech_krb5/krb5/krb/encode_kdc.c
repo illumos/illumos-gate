@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/encode_kdc.c
  *
@@ -28,7 +27,7 @@
  * krb5_encode_kdc_rep() function.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  Takes KDC rep parts in *rep and *encpart, and formats it into *enc_rep,
@@ -55,7 +54,7 @@ krb5_encode_kdc_rep(krb5_context context, krb5_msgtype type,
     krb5_enc_kdc_rep_part tmp_encpart;
     krb5_keyusage usage;
 
-    if (!valid_enctype(dec_rep->enc_part.enctype))
+    if (!krb5_c_valid_enctype(dec_rep->enc_part.enctype))
 	return KRB5_PROG_ETYPE_NOSUPP;
 
     switch (type) {

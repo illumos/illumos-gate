@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/addr_order.c
  *
@@ -28,7 +27,7 @@
  * krb5_address_order()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 #ifndef min
 #define min(a,b) ((a) < (b) ? (a) : (b))
@@ -40,8 +39,7 @@
  */
 /*ARGSUSED*/
 int KRB5_CALLCONV
-krb5_address_order(krb5_context context, krb5_const krb5_address *addr1,
-	krb5_const krb5_address *addr2)
+krb5_address_order(krb5_context context, const krb5_address *addr1, const krb5_address *addr2)
 {
     int dir;
     register int i;

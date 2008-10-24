@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 2002 Naval Research Laboratory (NRL/CCS)
@@ -53,6 +52,7 @@
 #include "etypes.h"
 #include "dk.h"
 
+/* Solaris Kerberos */
 static krb5_error_code dr
 (krb5_context context,
 const struct krb5_enc_provider *enc, const krb5_keyblock *inkey,
@@ -151,6 +151,7 @@ krb5_error_code krb5int_c_combine_keys
 
     input.length = key2->length;
     input.data = (char *) key2->contents;
+    /* Solaris Kerberos */
     if ((ret = dr(context, enc, key1, r1, &input)))
 	goto cleanup;
 
@@ -166,6 +167,7 @@ krb5_error_code krb5int_c_combine_keys
 
     input.length = key1->length;
     input.data = (char *) key1->contents;
+    /* Solaris Kerberos */
     if ((ret = dr(context, enc, key2, r2, &input)))
 	goto cleanup;
 
@@ -211,6 +213,7 @@ krb5_error_code krb5int_c_combine_keys
     tkey.length = keylength;
     tkey.contents = output;
 
+    /* Solaris Kerberos */
     if ((ret = (*(enc->make_key))(context, &randbits, &tkey)))
 	goto cleanup;
 
@@ -252,6 +255,7 @@ krb5_error_code krb5int_c_combine_keys
 	myalloc = 1;
     }
 
+    /* Solaris Kerberos */
     if ((ret = krb5_derive_key(context, enc, &tkey, outkey, &input))) {
 	if (myalloc) {
 	    free(outkey->contents);
@@ -292,6 +296,7 @@ cleanup:
  * Our DR function; mostly taken from derive.c
  */
 
+    /* Solaris Kerberos */
 static krb5_error_code dr
 (	krb5_context context,
 	const struct krb5_enc_provider *enc, 
@@ -336,6 +341,7 @@ static krb5_error_code dr
 
     n = 0;
     while (n < keybytes) {
+	/* Solaris Kerberos */
 	(*(enc->encrypt))(context, inkey, 0, &inblock, &outblock);
 
 	if ((keybytes - n) <= outblock.length) {

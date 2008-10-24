@@ -1,9 +1,7 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"$
 
 /*
  * Copyright (C) 2003 by the Massachusetts Institute of Technology.
@@ -29,8 +27,8 @@
  * or implied warranty.
  */
 
-#include <k5-int.h>
-#include <etypes.h>
+#include "k5-int.h"
+#include "etypes.h"
 
 /*ARGSUSED*/
 krb5_error_code

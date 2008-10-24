@@ -1,7 +1,4 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
-#include <krb5.h>
 /* Solaris Kerberos: gssrpc not supported */
 #if 0 /************** Begin IFDEF'ed OUT *******************************/
 #include <gssrpc/rpc.h>
@@ -14,6 +11,7 @@
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
+#include <krb5.h>
 #include <strings.h>
 
 /* Solaris Kerberos: this function taken from MIT's src/lib/rpc/xdr.c */

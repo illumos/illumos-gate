@@ -1,33 +1,14 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * Data Types for policy and principal information that
+ * exists in the respective databases.
  *
- *	Openvision retains the copyright to derivative works of
- *	this source code.  Do *NOT* create a derivative of this
- *	source code before consulting with your legal department.
- *	Do *NOT* integrate *ANY* of this source code into another
- *	product before consulting with your legal department.
- *
- *	For further information, read the top-level Openvision
- *	copyright which is contained in the top-level MIT Kerberos
- *	copyright.
- *
- * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
- *
- */
-
-
-/*
- * Data Types for policys, and principal information that
- * exist in the respective databases.
- *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/adb.h,v 1.21 1998/02/14 02:34:09 tlyu Exp $
+ * $Header$
  *
  * This file was originally created with rpcgen.
  * It has been hacked up since then.
@@ -104,6 +85,7 @@ typedef struct _osa_policy_ent_t {
 
 typedef	void	(*osa_adb_iter_princ_func) (void *, osa_princ_ent_t);
 typedef	void	(*osa_adb_iter_policy_func) (void *, osa_policy_ent_t);
+  
 
 /*
  * Return Code (the rest are in adb_err.h)

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,8 +30,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <dk.h>
+#include "k5-int.h"
+#include "dk.h"
 
 #define K5CLENGTH 5 /* 32 bit net byte order integer + one byte seed */
 
@@ -45,27 +44,23 @@
 
 void
 krb5_dk_encrypt_length(const struct krb5_enc_provider *enc,
-		    const struct krb5_hash_provider *hash,
-		    size_t inputlen, size_t *length)
+		       const struct krb5_hash_provider *hash,
+		       size_t inputlen, size_t *length)
 {
     size_t blocksize, hashsize;
 
     blocksize = enc->block_size;
     hashsize = hash->hashsize;
-
     *length = krb5_roundup(blocksize+inputlen, blocksize) + hashsize;
 }
 
 krb5_error_code
-krb5_dk_encrypt(
-	krb5_context context,
-	krb5_const struct krb5_enc_provider *enc,
-	krb5_const struct krb5_hash_provider *hash,
-	krb5_const krb5_keyblock *key,
-	krb5_keyusage usage,
-	krb5_const krb5_data *ivec,
-	krb5_const krb5_data *input,
-	krb5_data *output)
+krb5_dk_encrypt(krb5_context context,
+		const struct krb5_enc_provider *enc,
+		const struct krb5_hash_provider *hash,
+		const krb5_keyblock *key, krb5_keyusage usage,
+		const krb5_data *ivec, const krb5_data *input,
+		krb5_data *output)
 {
     size_t blocksize, plainlen, enclen;
     krb5_error_code ret;
@@ -133,6 +128,7 @@ krb5_dk_encrypt(
 	cn = NULL;
 
     /* hash the plaintext */
+
     d2.length = enclen - plainlen;
     d2.data = output->data+plainlen;
 
@@ -180,7 +176,7 @@ krb5int_aes_encrypt_length(enc, hash, inputlen, length)
     hashsize = 96 / 8;
 
     /* No roundup, since CTS requires no padding once we've hit the
-	block size.  */
+       block size.  */
     *length = blocksize+inputlen + hashsize;
 }
 

@@ -1,8 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -17,7 +16,7 @@
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
- * notice appear in all copies and that Both that copyright notice and
+ * notice appear in all copies and that both that copyright notice and
  * this permission notice appear in supporting documentation, and that
  * the name of FundsXpress. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
@@ -30,8 +29,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <dk.h>
+#include "k5-int.h"
+#include "dk.h"
 
 #define K5CLENGTH 5 /* 32 bit net byte order integer + one byte seed */
 
@@ -252,6 +251,7 @@ init_derived_keydata(krb5_context context,
 	KRB5_LOG0(KRB5_INFO,"init_ef_derived_keydata() end.");
 	return (rv);
 }
+
 
 krb5_error_code
 krb5_derive_key(context, enc, inkey, outkey, in_constant)

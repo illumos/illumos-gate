@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -51,7 +50,7 @@ krb5_gss_sign(minor_status, context_handle,
      OM_uint32 gssd_ctx_verifier;
 #endif
 {
-     return(kg_seal(minor_status, context_handle, 0,
+   return(kg_seal(minor_status, context_handle, 0,
 		  qop_req, message_buffer, NULL,
 		  message_token, KG_TOK_SIGN_MSG));
 }
@@ -66,7 +65,7 @@ krb5_gss_get_mic(minor_status, context_handle, qop_req,
     gss_buffer_t	message_buffer;
     gss_buffer_t	message_token;
 {
-     return(kg_seal(minor_status, context_handle, 0,
+    return(kg_seal(minor_status, context_handle, 0,
 		   (int) qop_req, message_buffer, NULL,
 		   message_token, KG_TOK_MIC_MSG));
 }

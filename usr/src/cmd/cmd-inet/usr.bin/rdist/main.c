@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,13 +16,12 @@
  * University may not be used to endorse or promote products derived
  * from this software without specific prior written permission.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include <string.h>
 #include <syslog.h>
-#include <krb5defs.h>
 #include <k5-int.h>
+#include <krb5defs.h>
 #include <priv_utils.h>
 
 #define	NHOSTS 100

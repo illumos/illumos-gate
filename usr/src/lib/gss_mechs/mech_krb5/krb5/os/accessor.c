@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/os/accessor.c
  *
@@ -79,6 +77,36 @@ krb5int_accessor(krb5int_access *internals, krb5_int32 version)
 	    S (krb5_ser_unpack_int64, krb5_ser_unpack_int64),
 	    S (asn1_ldap_encode_sequence_of_keys, krb5int_ldap_encode_sequence_of_keys),
 	    S (asn1_ldap_decode_sequence_of_keys, krb5int_ldap_decode_sequence_of_keys),
+	    S (encode_krb5_pa_pk_as_req, encode_krb5_pa_pk_as_req),
+	    S (encode_krb5_pa_pk_as_req_draft9, encode_krb5_pa_pk_as_req_draft9),
+            S (encode_krb5_pa_pk_as_rep, encode_krb5_pa_pk_as_rep),
+	    S (encode_krb5_pa_pk_as_rep_draft9, encode_krb5_pa_pk_as_rep_draft9),
+	    S (encode_krb5_auth_pack, encode_krb5_auth_pack),
+	    S (encode_krb5_auth_pack_draft9, encode_krb5_auth_pack_draft9),
+	    S (encode_krb5_kdc_dh_key_info, encode_krb5_kdc_dh_key_info),
+	    S (encode_krb5_reply_key_pack, encode_krb5_reply_key_pack),
+	    S (encode_krb5_reply_key_pack_draft9, encode_krb5_reply_key_pack_draft9),
+	    S (encode_krb5_typed_data, encode_krb5_typed_data),
+	    S (encode_krb5_td_trusted_certifiers, encode_krb5_td_trusted_certifiers),
+	    S (encode_krb5_td_dh_parameters, encode_krb5_td_dh_parameters),
+	    S (decode_krb5_pa_pk_as_req, decode_krb5_pa_pk_as_req),
+	    S (decode_krb5_pa_pk_as_req_draft9, decode_krb5_pa_pk_as_req_draft9),
+	    S (decode_krb5_pa_pk_as_rep, decode_krb5_pa_pk_as_rep),
+	    S (decode_krb5_pa_pk_as_rep_draft9, decode_krb5_pa_pk_as_rep_draft9),
+	    S (decode_krb5_auth_pack, decode_krb5_auth_pack),
+	    S (decode_krb5_auth_pack_draft9, decode_krb5_auth_pack_draft9),
+	    S (decode_krb5_kdc_dh_key_info, decode_krb5_kdc_dh_key_info),
+	    S (decode_krb5_principal_name, decode_krb5_principal_name),
+	    S (decode_krb5_reply_key_pack, decode_krb5_reply_key_pack),
+	    S (decode_krb5_reply_key_pack_draft9, decode_krb5_reply_key_pack_draft9),
+	    S (decode_krb5_typed_data, decode_krb5_typed_data),
+	    S (decode_krb5_td_trusted_certifiers, decode_krb5_td_trusted_certifiers),
+	    S (decode_krb5_td_dh_parameters, decode_krb5_td_dh_parameters),
+	    S (decode_krb5_as_req, decode_krb5_as_req),
+	    S (encode_krb5_kdc_req_body, encode_krb5_kdc_req_body),
+	    S (krb5_free_kdc_req, krb5_free_kdc_req),
+	    S (krb5int_set_prompt_types, krb5int_set_prompt_types),
+	    S (encode_krb5_authdata_elt, encode_krb5_authdata_elt),
 #if DESIGNATED_INITIALIZERS
 	};
 #else

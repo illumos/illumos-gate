@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/bld_pr_ext.c
  *
@@ -28,14 +27,14 @@
  * Build a principal from a list of lengths and strings
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 #include <stdarg.h>
 
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV_C
 krb5_build_principal_ext(krb5_context context,  krb5_principal * princ,
-	unsigned int rlen, const char * realm, ...)
+			 unsigned int rlen, const char * realm, ...)
 {
     va_list ap;
     register int i, count = 0;

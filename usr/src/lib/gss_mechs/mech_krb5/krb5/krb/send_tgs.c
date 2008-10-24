@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/send_tgs.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,34 +28,34 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_send_tgs()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  Sends a request to the TGS and waits for a response.
  options is used for the options in the KRB_TGS_REQ.
  timestruct values are used for from, till, rtime " " "
- enctype is used for enctype " " ", and to encrypt the authorization data,
+ enctype is used for enctype " " ", and to encrypt the authorization data, 
  sname is used for sname " " "
  addrs, if non-NULL, is used for addresses " " "
  authorization_dat, if non-NULL, is used for authorization_dat " " "
  second_ticket, if required by options, is used for the 2nd ticket in the req.
  in_cred is used for the ticket & session key in the KRB_AP_REQ header " " "
  (the KDC realm is extracted from in_cred->server's realm)
-
+ 
  The response is placed into *rep.
  rep->response.data is set to point at allocated storage which should be
  freed by the caller when finished.
 
  returns system errors
  */
-static krb5_error_code
+static krb5_error_code 
 krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cred, krb5_data *outbuf)
-{
+{   
     krb5_error_code       retval;
     krb5_checksum         checksum;
     krb5_authenticator 	  authent;
@@ -65,11 +64,10 @@ krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cre
     krb5_data           * toutbuf;
 
     /* Generate checksum */
-    retval = krb5_c_make_checksum(context, context->kdc_req_sumtype,
+    if ((retval = krb5_c_make_checksum(context, context->kdc_req_sumtype,
 				       &in_cred->keyblock,
 				       KRB5_KEYUSAGE_TGS_REQ_AUTH_CKSUM,
-				       in_data, &checksum);
-    if (retval) {
+				       in_data, &checksum))) {
 	free(checksum.contents);
 	return(retval);
     }
@@ -103,7 +101,7 @@ krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cre
 	/* Cleanup scratch and scratch data */
         goto cleanup_data;
 
-    /* call the encryption routine */
+    /* call the encryption routine */ 
     if ((retval = krb5_encrypt_helper(context, &in_cred->keyblock,
 				      KRB5_KEYUSAGE_TGS_REQ_AUTH,
 				      scratch, &request.authenticator)))
@@ -113,7 +111,7 @@ krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cre
     *outbuf = *toutbuf;
     krb5_xfree(toutbuf);
 
-cleanup:
+
     memset(request.authenticator.ciphertext.data, 0,
            request.authenticator.ciphertext.length);
     free(request.authenticator.ciphertext.data);
@@ -125,7 +123,6 @@ cleanup_data:
     memset(scratch->data, 0, scratch->length);
     free(scratch->data);
 
-cleanup_scratch:
     free(scratch);
 
     return retval;
@@ -149,7 +146,7 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
     krb5_pa_data ap_req_padata;
     int tcp_only = 0, use_master;
 
-    /*
+    /* 
      * in_creds MUST be a valid credential NOT just a partially filled in
      * place holder for us to get credentials for the caller.
      */
@@ -180,10 +177,10 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
 					   &scratch)))
 	    return(retval);
 
-	retval = krb5_encrypt_helper(context, &in_cred->keyblock,
+	if ((retval = krb5_encrypt_helper(context, &in_cred->keyblock,
 					  KRB5_KEYUSAGE_TGS_REQ_AD_SESSKEY,
-					  scratch, &tgsreq.authorization_data);
-	if (retval) {
+					  scratch,
+					  &tgsreq.authorization_data))) {
 	    krb5_xfree(tgsreq.authorization_data.ciphertext.data);
 	    krb5_free_data(context, scratch);
 	    return retval;
@@ -237,7 +234,7 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
 	krb5_pa_data * const * counter;
 	register unsigned int i = 0;
 	for (counter = padata; *counter; counter++, i++);
-	combined_padata = (krb5_pa_data **)malloc(i+2);
+	combined_padata = malloc((i+2) * sizeof(*combined_padata));
 	if (!combined_padata) {
 	    krb5_xfree(ap_req_padata.contents);
 	    retval = ENOMEM;
@@ -279,6 +276,7 @@ send_again:
 	    if (!tcp_only) {
 		krb5_error *err_reply;
 		retval = decode_krb5_error(&rep->response, &err_reply);
+		/* Solaris Kerberos */
 		if (retval == 0) {
 		    if (err_reply->error == KRB_ERR_RESPONSE_TOO_BIG) {
 			tcp_only = 1;
@@ -299,7 +297,7 @@ send_again:
     krb5_free_data(context, scratch);
     
 send_tgs_error_2:;
-    if (sec_ticket)
+    if (sec_ticket) 
 	krb5_free_ticket(context, sec_ticket);
 
 send_tgs_error_1:;
@@ -307,10 +305,9 @@ send_tgs_error_1:;
 	krb5_xfree(tgsreq.ktype);
     if (tgsreq.authorization_data.ciphertext.data) {
 	memset(tgsreq.authorization_data.ciphertext.data, 0,
-               tgsreq.authorization_data.ciphertext.length);
+               tgsreq.authorization_data.ciphertext.length); 
 	krb5_xfree(tgsreq.authorization_data.ciphertext.data);
     }
-
 
     return retval;
 }

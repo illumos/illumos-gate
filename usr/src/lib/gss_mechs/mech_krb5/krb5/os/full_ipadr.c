@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/full_ipadr.c
  *
@@ -28,15 +27,14 @@
  * Take an IP addr & port and generate a full IP address.
  */
 
-#define NEED_SOCKETS
-#include <k5-int.h>
+#include "k5-int.h"
 
 #ifdef HAVE_NETINET_IN_H
 
 #include "os-proto.h"
 
 krb5_error_code
-krb5_make_full_ipaddr(krb5_context context, krb5_int32 adr, 
+krb5_make_full_ipaddr(krb5_context context, krb5_int32 adr,
 		      /*krb5_int16*/int port, krb5_address **outaddr)
 {
     unsigned long smushaddr = (unsigned long) adr; /* already in net order */

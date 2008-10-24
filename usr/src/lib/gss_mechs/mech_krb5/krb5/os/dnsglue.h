@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/dnsglue.h
  *
@@ -49,9 +48,9 @@
 #ifndef KRB5_DNSGLUE_H
 #define KRB5_DNSGLUE_H
 
+#include "autoconf.h"
 #ifdef KRB5_DNS_LOOKUP
 
-#define NEED_SOCKETS
 #include "k5-int.h"
 #include "os-proto.h"
 #ifdef WSHELPER
@@ -84,6 +83,15 @@
 #endif
 #endif
 
+#endif
+
+#if HAVE_NS_INITPARSE
+/*
+ * Solaris 7 has ns_rr_cl rather than ns_rr_class.
+ */
+#if !defined(ns_rr_class) && defined(ns_rr_cl)
+#define ns_rr_class ns_rr_cl
+#endif
 #endif
 
 #if HAVE_RES_NSEARCH
@@ -133,6 +141,7 @@
  * failure, goto LABEL.
  */
 
+/* Solaris Kerberos */
 #define SAFE_GETUINT16(base, max, ptr, incr, s, label)	\
     do {						\
 	if (!INCR_OK(base, max, ptr, incr)) goto label;	\

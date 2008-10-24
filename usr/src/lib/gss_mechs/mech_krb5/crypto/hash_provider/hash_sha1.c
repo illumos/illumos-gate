@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,13 +30,14 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <hash_provider.h>
+#include "k5-int.h"
+#include "hash_provider.h"
 
+/* Solaris Kerberos */
 static krb5_error_code
 k5_sha1_hash(krb5_context context,
-	unsigned int icount, krb5_const krb5_data *input,
-	krb5_data *output)
+	     unsigned int icount, krb5_const krb5_data *input,
+	     krb5_data *output)
 {
     CK_MECHANISM mechanism;
 
@@ -50,7 +50,7 @@ k5_sha1_hash(krb5_context context,
     return(0);
 }
 
-const struct krb5_hash_provider krb5_hash_sha1 = {
+const struct krb5_hash_provider krb5int_hash_sha1 = {
     SHS_DIGESTSIZE,
     SHS_DATASIZE,
     k5_sha1_hash

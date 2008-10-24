@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/read_msg.c
  *
@@ -17,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
@@ -25,7 +27,6 @@
  * Write a message to the network
  */
 
-#define NEED_SOCKETS
 #include "k5-int.h"
 #include <errno.h>
 
@@ -33,7 +34,7 @@ krb5_error_code
 krb5_read_message(krb5_context context, krb5_pointer fdp, krb5_data *inbuf)
 {
 	krb5_int32	len;
-   int      len2, ilen;
+	int		len2, ilen;
 	char		*buf = NULL;
 	int		fd = *( (int *) fdp);
 	
@@ -41,15 +42,15 @@ krb5_read_message(krb5_context context, krb5_pointer fdp, krb5_data *inbuf)
 		return((len2 < 0) ? errno : ECONNABORTED);
 	len = ntohl(len);
 
-   if ((len & VALID_UINT_BITS) != len)  /* Overflow size_t??? */
-      return ENOMEM;
+	if ((len & VALID_UINT_BITS) != len)  /* Overflow size_t??? */
+		return ENOMEM;
 
 	inbuf->length = ilen = (int) len;
 	if (ilen) {
 		/*
 		 * We may want to include a sanity check here someday....
 		 */
-		if (!(buf = malloc(ilen))) {
+		if (!(buf = malloc(inbuf->length))) {
 			return(ENOMEM);
 		}
 		if ((len2 = krb5_net_read(context, fd, buf, ilen)) != ilen) {

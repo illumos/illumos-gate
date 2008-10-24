@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/rcache/rc_base.h
  *
@@ -9,7 +8,6 @@
 
 #ifndef KRB5_RC_H
 #define KRB5_RC_H
-#include <stdlib.h>
 #include "k5-int.h"
 
 /* all the stuff that was here is now in rcache.h, included by krb5/krb5.h */

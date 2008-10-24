@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,9 +30,9 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <des_int.h>
-#include <keyhash_provider.h>
+#include "k5-int.h"
+#include "des_int.h"
+#include "keyhash_provider.h"
 #ifdef _KERNEL
 #include <sys/kmem.h>
 #include <sys/crypto/api.h>
@@ -68,7 +67,7 @@ k5_descbc_hash(krb5_context context,
     return(ret);
 }
 
-const struct krb5_keyhash_provider krb5_keyhash_descbc = {
+const struct krb5_keyhash_provider krb5int_keyhash_descbc = {
     MIT_DES_BLOCK_LENGTH,
     k5_descbc_hash,
     NULL

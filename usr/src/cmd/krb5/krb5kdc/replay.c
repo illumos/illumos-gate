@@ -29,7 +29,6 @@
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "k5-int.h"
 #include "kdc_util.h"
@@ -44,7 +43,6 @@ typedef struct _krb5_kdc_replay_ent {
     time_t db_age;
     krb5_data *req_packet;
     krb5_data *reply_packet;
-    krb5_address *addr;		/* XXX should these not be pointers? */
 } krb5_kdc_replay_ent;
 
 static krb5_kdc_replay_ent root_ptr = {0};
@@ -61,10 +59,6 @@ static int num_entries = 0;
 #define MATCH(ptr) (((ptr)->req_packet->length == inpkt->length) &&	\
 		    !memcmp((ptr)->req_packet->data, inpkt->data,	\
 			    inpkt->length) &&				\
-		    ((ptr)->addr->length == from->address->length) &&	\
-		    !memcmp((ptr)->addr->contents,			\
-			    from->address->contents,			\
-			    from->address->length)&&			\
 		    ((ptr)->db_age == db_age))
 /* XXX
    Todo:  quench the size of the queue...
@@ -74,8 +68,7 @@ static int num_entries = 0;
    FALSE if the caller should do the work */
 
 krb5_boolean
-kdc_check_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
-		    krb5_data **outpkt)
+kdc_check_lookaside(krb5_data *inpkt, krb5_data **outpkt)
 {
     krb5_int32 timenow;
     register krb5_kdc_replay_ent *eptr, *last, *hold;
@@ -110,7 +103,6 @@ kdc_check_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
 		max_hits_per_entry = max(max_hits_per_entry, eptr->num_hits);
 		krb5_free_data(kdc_context, eptr->req_packet);
 		krb5_free_data(kdc_context, eptr->reply_packet);
-		krb5_free_address(kdc_context, eptr->addr);
 		hold = eptr;
 		last->next = eptr->next;
 		eptr = last;
@@ -128,8 +120,7 @@ kdc_check_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
    already there, and can fail softly due to other weird errors. */
 
 void
-kdc_insert_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
-		     krb5_data *outpkt)
+kdc_insert_lookaside(krb5_data *inpkt, krb5_data *outpkt)
 {
     register krb5_kdc_replay_ent *eptr;    
     krb5_int32 timenow;
@@ -159,12 +150,6 @@ kdc_insert_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
 	free(eptr);
 	return;
     }
-    if (krb5_copy_addr(kdc_context, from->address, &eptr->addr)) {
-	krb5_free_data(kdc_context, eptr->req_packet);
-	krb5_free_data(kdc_context, eptr->reply_packet);
-	free(eptr);
-	return;
-    }
     eptr->next = root_ptr.next;
     root_ptr.next = eptr;
     num_entries++;
@@ -181,7 +166,6 @@ kdc_free_lookaside(krb5_context kcontext)
 	     eptr; eptr = eptr->next) {
 		krb5_free_data(kcontext, eptr->req_packet);
 		krb5_free_data(kcontext, eptr->reply_packet);
-		krb5_free_address(kcontext, eptr->addr);
 		hold = eptr;
 		last->next = eptr->next;
 		eptr = last;

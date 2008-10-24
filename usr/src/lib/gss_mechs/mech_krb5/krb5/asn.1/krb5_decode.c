@@ -1,11 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
  * src/lib/krb5/asn.1/krb5_decode.c
  * 
  * Copyright 1994 by the Massachusetts Institute of Technology.
@@ -31,7 +24,7 @@
  * or implied warranty.
  */
 
-#include "krb5.h"
+#include "k5-int.h"
 #include "krbasn1.h"
 #include "asn1_k_decode.h"
 #include "asn1_decode.h"
@@ -533,6 +526,7 @@ krb5_error_code decode_krb5_safe_with_body(
   setup();
   alloc_field(*rep,krb5_safe);
   clear_field(rep,checksum);
+  tmpbody.magic = 0;
 
   check_apptag(20);
   { begin_structure();
@@ -940,3 +934,150 @@ krb5_error_code decode_krb5_predicted_sam_response(const krb5_data *code, krb5_p
   cleanup(free);
 }
 
+krb5_error_code decode_krb5_pa_pk_as_req(const krb5_data *code, krb5_pa_pk_as_req **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_pa_pk_as_req);
+
+  retval = asn1_decode_pa_pk_as_req(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_pa_pk_as_req_draft9(const krb5_data *code, krb5_pa_pk_as_req_draft9 **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_pa_pk_as_req_draft9);
+
+  retval = asn1_decode_pa_pk_as_req_draft9(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_pa_pk_as_rep(const krb5_data *code, krb5_pa_pk_as_rep **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_pa_pk_as_rep);
+
+  retval = asn1_decode_pa_pk_as_rep(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_pa_pk_as_rep_draft9(const krb5_data *code, krb5_pa_pk_as_rep_draft9 **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_pa_pk_as_rep_draft9);
+
+  retval = asn1_decode_pa_pk_as_rep_draft9(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_auth_pack(const krb5_data *code, krb5_auth_pack **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_auth_pack);
+
+  retval = asn1_decode_auth_pack(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_auth_pack_draft9(const krb5_data *code, krb5_auth_pack_draft9 **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_auth_pack_draft9);
+
+  retval = asn1_decode_auth_pack_draft9(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_kdc_dh_key_info(const krb5_data *code, krb5_kdc_dh_key_info **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_kdc_dh_key_info);
+
+  retval = asn1_decode_kdc_dh_key_info(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_principal_name(const krb5_data *code, krb5_principal_data **rep) 
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_principal_data);
+
+  retval = asn1_decode_krb5_principal_name(&buf, rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_reply_key_pack(const krb5_data *code, krb5_reply_key_pack **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_reply_key_pack);
+
+  retval = asn1_decode_reply_key_pack(&buf, *rep);
+  if (retval)
+    goto error_out;
+
+  cleanup_manual();
+error_out:
+  if (rep && *rep) {
+    if ((*rep)->replyKey.contents)
+	free((*rep)->replyKey.contents);
+    if ((*rep)->asChecksum.contents)
+      free((*rep)->asChecksum.contents);
+    free(*rep);
+    *rep = NULL;
+  }
+  return retval;
+}
+
+krb5_error_code decode_krb5_reply_key_pack_draft9(const krb5_data *code, krb5_reply_key_pack_draft9 **rep)
+{
+  setup_buf_only();
+  alloc_field(*rep, krb5_reply_key_pack_draft9);
+
+  retval = asn1_decode_reply_key_pack_draft9(&buf, *rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_typed_data(const krb5_data *code, krb5_typed_data ***rep)
+{
+  setup_buf_only();
+  retval = asn1_decode_sequence_of_typed_data(&buf, rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_td_trusted_certifiers(const krb5_data *code, krb5_external_principal_identifier ***rep)
+{
+  setup_buf_only();
+  retval = asn1_decode_sequence_of_external_principal_identifier(&buf, rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}
+
+krb5_error_code decode_krb5_td_dh_parameters(const krb5_data *code, krb5_algorithm_identifier ***rep)
+{
+  setup_buf_only();
+  retval = asn1_decode_sequence_of_algorithm_identifier(&buf, rep);
+  if (retval) clean_return(retval);
+
+  cleanup(free);
+}

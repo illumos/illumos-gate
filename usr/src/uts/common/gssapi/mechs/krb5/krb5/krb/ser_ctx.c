@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/ser_ctx.c
  *
@@ -30,7 +29,7 @@
  * ser_ctx.c	- Routines to deal with serializing the krb5_context and
  *		  krb5_os_context structures.
  */
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * Routines to deal with externalizing the krb5_context:
@@ -128,8 +127,7 @@ krb5_context_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
      *	krb5_int32			for trailer.
      */
     kret = EINVAL;
-    context = (krb5_context) arg;
-    if (context) {
+    if ((context = (krb5_context) arg)) {
 	/* Calculate base length */
 	required = (14 * sizeof(krb5_int32) +
 		    (context->in_tkt_ktype_count * sizeof(krb5_int32)) +
@@ -489,7 +487,7 @@ krb5_context_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet *
 				   &bp, &remain);
     if (kret && (kret != EINVAL) && (kret != ENOENT))
 	goto cleanup;
-   
+    
 #ifndef _KERNEL 
     /* Attempt to read in the profile */
     kret = krb5_internalize_opaque(kcontext, PROF_MAGIC_PROFILE,
@@ -554,8 +552,7 @@ krb5_oscontext_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet *
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
-    os_ctx = (krb5_os_context) arg;
-    if (os_ctx) {
+    if ((os_ctx = (krb5_os_context) arg)) {
 	kret = ENOMEM;
 	if (!krb5_oscontext_size(kcontext, arg, &required) &&
 	    (required <= remain)) {
@@ -600,9 +597,8 @@ krb5_oscontext_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet
 	kret = ENOMEM;
 
 	/* Get memory for the context */
-	os_ctx = (krb5_os_context) 
-	    		MALLOC(sizeof(struct _krb5_os_context));
-	if ((os_ctx) &&
+	if ((os_ctx = (krb5_os_context) 
+	     MALLOC(sizeof(struct _krb5_os_context))) &&
 	    (remain >= 4*sizeof(krb5_int32))) {
 	    (void) memset(os_ctx, 0, sizeof(struct _krb5_os_context));
 	    os_ctx->magic = KV5M_OS_CONTEXT;

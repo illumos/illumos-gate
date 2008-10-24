@@ -1,12 +1,9 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SERVER_ACL_H
-#define	_SERVER_ACL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,6 +54,9 @@ extern "C" {
  * or implied warranty.
  *
  */
+
+#ifndef	SERVER_ACL_H__
+#define	SERVER_ACL_H__
 
 #include <admin.h> /* SUNWresync121 XXX */
 
@@ -136,8 +136,8 @@ krb5_error_code kadm5int_acl_impose_restrictions
 		   kadm5_principal_ent_rec *,
 		   long *,
 		   restriction_t *);
+#endif	/* SERVER_ACL_H__ */
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* !_SERVER_ACL_H */

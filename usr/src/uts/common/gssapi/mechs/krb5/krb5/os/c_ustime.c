@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/crypto/os/c_ustime.c
@@ -33,12 +32,9 @@
  *
  * krb5_mstimeofday for BSD 4.3
  */
-
-
-#define	NEED_SOCKETS
+ 
 #include "k5-int.h"
 #include "k5-thread.h"
-
 
 k5_mutex_t krb5int_us_time_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
 
@@ -65,7 +61,6 @@ get_time_now(struct time_now *n)
 
 #else
 
-
 /* Everybody else is UNIX, right?  POSIX 1996 doesn't give us
    gettimeofday, but what real OS doesn't?  */
 
@@ -88,6 +83,7 @@ get_time_now(struct time_now *n)
     n->usec = tv.tv_usec;
     return 0;
 }
+
 #endif
 
 static struct time_now last_time;

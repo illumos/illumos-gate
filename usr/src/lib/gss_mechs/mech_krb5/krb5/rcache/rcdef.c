@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/rcache/rcdef.c
@@ -23,12 +22,15 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
  *
- * replay cache default set of operation vectors.
+ * replay cache default operationvectors.
  */
 
 #include "k5-int.h"
@@ -40,7 +42,7 @@
  * Solaris Kerberos
  * MIT 1.4 just has "dfl" while we now have "FILE" and "MEMORY".
  */
-krb5_rc_ops krb5_rc_file_ops = {
+const krb5_rc_ops krb5_rc_file_ops = {
 	0,
 	"FILE",
 	krb5_rc_file_init,
@@ -55,7 +57,7 @@ krb5_rc_ops krb5_rc_file_ops = {
 	krb5_rc_file_resolve
 };
 
-krb5_rc_ops krb5_rc_mem_ops = {
+const krb5_rc_ops krb5_rc_mem_ops = {
 	0,
 	"MEMORY",
 	krb5_rc_mem_init,
@@ -71,4 +73,4 @@ krb5_rc_ops krb5_rc_mem_ops = {
 	krb5_rc_mem_resolve
 };
 
-krb5_rc_ops *krb5_rc_dfl_ops = &krb5_rc_file_ops;
+krb5_rc_ops const *krb5_rc_dfl_ops = &krb5_rc_file_ops;

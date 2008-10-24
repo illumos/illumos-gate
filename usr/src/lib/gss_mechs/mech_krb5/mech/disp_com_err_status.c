@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -23,12 +21,12 @@
  */
 
 /*
- * $Id: disp_com_err_status.c 16391 2004-06-02 23:40:12Z raeburn $
+ * $Id: disp_com_err_status.c 18721 2006-10-16 16:18:29Z epeisach $
  */
 
 #include "gssapiP_generic.h"
-#include "com_err.h"
 #include "gss_libinit.h"
+#include "com_err.h"
 
 /* XXXX internationalization!! */
 

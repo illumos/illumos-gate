@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -21,11 +20,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_dict.c,v 1.7 2003/01/05 23:27:59 hartmans Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_dict.c,v 1.7 2003/01/05 23:27:59 hartmans Exp $";
+static char *rcsid = "$Header$";
 #endif
 
 #include    <sys/types.h>
@@ -34,6 +33,7 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_dict.c,
 #include    <sys/stat.h>
 #include    <unistd.h>
 #include <errno.h>
+#include    "server_internal.h"
 #include    <kadm5/admin.h>
 #include    <stdlib.h>
 #include    <stdio.h>
@@ -44,7 +44,6 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_dict.c,
 #include    "adm_proto.h"
 #include    <syslog.h>
 #include    <libintl.h>
-#include    "server_internal.h"
 
 static char	    **word_list = NULL;	    /* list of word pointers */
 static char	    *word_block = NULL;	    /* actual word data */
@@ -110,6 +109,7 @@ int init_dict(kadm5_config_params *params)
     if(word_list != NULL && word_block != NULL)
 	return KADM5_OK;
     if (! (params->mask & KADM5_CONFIG_DICT_FILE)) {
+	/* Solaris Kerberos */
 	 krb5_klog_syslog(LOG_INFO, 
 		dgettext(TEXT_DOMAIN,
 			"No dictionary file specified, continuing "
@@ -118,6 +118,7 @@ int init_dict(kadm5_config_params *params)
     }
     if ((fd = open(params->dict_file, O_RDONLY)) == -1) {
 	 if (errno == ENOENT) {
+	/* Solaris Kerberos */
 	      krb5_klog_syslog(LOG_ERR, 
 		     dgettext(TEXT_DOMAIN,
 			"WARNING!  Cannot find dictionary file %s, "

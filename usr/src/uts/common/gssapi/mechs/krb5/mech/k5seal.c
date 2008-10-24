@@ -1,13 +1,12 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +16,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -53,43 +52,24 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <gssapiP_krb5.h>
+#include "gssapiP_krb5.h"
 #include <k5-int.h>
 
 static krb5_error_code
 make_seal_token_v1 (krb5_context context,
-			      krb5_keyblock *enc,
-			      krb5_keyblock *seq,
-			      gssint_uint64 *seqnum,
-			      int direction,
-			      gss_buffer_t text,
-			      gss_buffer_t token,
-			      int signalg,
-			      int cksum_size,
-			      int sealalg,
-			      int encrypt,
-			      int toktype,
-			      int bigend,
-			      gss_OID oid);
-
-static krb5_error_code
-make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
-		   signalg, cksum_size, sealalg, encrypt, toktype,
-		   bigend, oid)
-    krb5_context context;
-    krb5_keyblock *enc;
-    krb5_keyblock *seq;
-    gssint_uint64 *seqnum;
-    int direction;
-    gss_buffer_t text;
-    gss_buffer_t token;
-    int signalg;
-    int cksum_size;
-    int sealalg;
-    int encrypt;
-    int toktype;
-    int bigend;
-    gss_OID oid;
+		    krb5_keyblock *enc,
+		    krb5_keyblock *seq,
+		    gssint_uint64 *seqnum,
+		    int direction,
+		    gss_buffer_t text,
+		    gss_buffer_t token,
+		    int signalg,
+		    size_t cksum_size,
+		    int sealalg,
+		    int encrypt,
+		    int toktype,
+		    int bigend,
+		    gss_OID oid)
 {
     krb5_error_code code;
     size_t sumlen;
@@ -97,15 +77,13 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
     krb5_data plaind;
     krb5_checksum md5cksum;
     krb5_checksum cksum;
-	/*
-	 * msglen contains the message length
-	 * we are signing/encrypting.  tmsglen
-	 * contains the length of the message
-	 * we plan to write out to the token.
-	 * tlen is the length of the token
-	 * including header.
-	 */
-    int conflen=0, tmsglen, tlen, msglen;
+				/* msglen contains the message length
+				 * we are signing/encrypting.  tmsglen
+				 * contains the length of the message
+				 * we plan to write out to the token.
+				 * tlen is the length of the token
+				 * including header. */
+    unsigned  conflen=0, tmsglen, tlen, msglen;
     unsigned char *t, *ptr;
     unsigned char *plain;
     unsigned char pad;
@@ -134,57 +112,51 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
     /* create the token buffer */
     /* Do we need confounder? */
     if (encrypt || (!bigend && (toktype == KG_TOK_SEAL_MSG)))
-	conflen = kg_confounder_size(context, enc);
-    else
-	conflen = 0;
+      conflen = kg_confounder_size(context, enc);
+    else conflen = 0;
 
     if (toktype == KG_TOK_SEAL_MSG) {
-	switch (sealalg) {
-		case SEAL_ALG_MICROSOFT_RC4:
-			msglen = conflen + text->length+1;
-			pad = 1;
-			break;
-		default:
-			/* XXX knows that des block size is 8 */
-			msglen = (conflen+text->length+8)&(~7);
-			pad = 8-(text->length%8);
-	}
-	tmsglen = msglen;
+      switch (sealalg) {
+      case SEAL_ALG_MICROSOFT_RC4:
+	msglen = conflen + text->length+1;
+	pad = 1;
+	break;
+      default:
+	/* XXX knows that des block size is 8 */
+	msglen = (conflen+text->length+8)&(~7);
+	      pad = 8-(text->length%8);
+      }
+      tmsglen = msglen;
     } else {
-	tmsglen = 0;
-	msglen = text->length;
-	pad = 0;
+      tmsglen = 0;
+      msglen = text->length;
+      pad = 0;
     }
-
     tlen = g_token_size((gss_OID) oid, 14+cksum_size+tmsglen);
 
     if ((t = (unsigned char *) xmalloc(tlen)) == NULL)
-	return(ENOMEM);
+      return(ENOMEM);
 
     /*** fill in the token */
 
     ptr = t;
-
     g_make_token_header((gss_OID) oid, 14+cksum_size+tmsglen, &ptr, toktype);
 
     /* 0..1 SIGN_ALG */
-
     ptr[0] = (unsigned char) (signalg & 0xff);
     ptr[1] = (unsigned char) ((signalg >> 8) & 0xff);
 
     /* 2..3 SEAL_ALG or Filler */
-
     if ((toktype == KG_TOK_SEAL_MSG) && encrypt) {
 	ptr[2] = (unsigned char) (sealalg & 0xff);
 	ptr[3] = (unsigned char) ((sealalg >> 8) & 0xff);
     } else {
-	/* No seal */
-	ptr[2] = 0xff;
-	ptr[3] = 0xff;
+      /* No seal */
+      ptr[2] = 0xff;
+      ptr[3] = 0xff;
     }
 
     /* 4..5 Filler */
-
     ptr[4] = 0xff;
     ptr[5] = 0xff;
 
@@ -194,21 +166,21 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
     switch (signalg) {
     case SGN_ALG_DES_MAC_MD5:
     case SGN_ALG_MD2_5:
-	md5cksum.checksum_type = CKSUMTYPE_RSA_MD5;
-	break;
+      md5cksum.checksum_type = CKSUMTYPE_RSA_MD5;
+      break;
     case SGN_ALG_HMAC_SHA1_DES3_KD:
-	md5cksum.checksum_type = CKSUMTYPE_HMAC_SHA1_DES3;
-	break;
+      md5cksum.checksum_type = CKSUMTYPE_HMAC_SHA1_DES3;
+      break;
     case SGN_ALG_HMAC_MD5:
-	md5cksum.checksum_type = CKSUMTYPE_HMAC_MD5_ARCFOUR;
-	if (toktype != KG_TOK_SEAL_MSG)
-		sign_usage = 15;
-	break;
+      md5cksum.checksum_type = CKSUMTYPE_HMAC_MD5_ARCFOUR;
+      if (toktype != KG_TOK_SEAL_MSG)
+	sign_usage = 15;
+      break;
     default:
 	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, error2 signalg=%d\n", 
 		signalg);
 #ifndef	_KERNEL
-	abort ();
+      abort ();
 #else
 	return (GSS_S_DEFECTIVE_TOKEN);
 #endif /* _KERNEL */
@@ -218,28 +190,28 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
     if (code) {
 	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, krb5_c_checksum_length() "
 		"error code=%d\n", code);
-	return(code);
+      return(code);
     }
-    md5cksum.length = (size_t)sumlen;
+    md5cksum.length = sumlen;
+
 
     if ((plain = (unsigned char *) xmalloc(msglen ? msglen : 1)) == NULL) {
-	xfree_wrap(t, tlen);
-	return(ENOMEM);
+      xfree_wrap(t, tlen);
+      return(ENOMEM);
     }
 
     if (conflen) {
-	if ((code = kg_make_confounder(context, enc, plain))) {
-		xfree_wrap(plain, msglen ? msglen : 1);
-		xfree_wrap(t, tlen);
-		KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, "
-			"kg_make_confounder() error code=%d\n", code);
-		return(code);
-	}
+      if ((code = kg_make_confounder(context, enc, plain))) {
+	xfree_wrap(plain, msglen ? msglen : 1);
+	xfree_wrap(t, tlen);
+	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, "
+		"kg_make_confounder() error code=%d\n", code);
+	return(code);
+      }
     }
 
     (void) memcpy(plain+conflen, text->value, text->length);
-    if (pad)
-	(void) memset(plain+conflen+text->length, pad, pad);
+    if (pad) (void) memset(plain+conflen+text->length, pad, pad);
 
     /* compute the checksum */
 
@@ -252,70 +224,67 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
     }
     (void) memcpy(data_ptr, ptr-2, 8);
     if (bigend)
-	(void) memcpy(data_ptr+8, text->value, text->length);
+      (void) memcpy(data_ptr+8, text->value, text->length);
     else
-	(void) memcpy(data_ptr+8, plain, msglen);
-
+      (void) memcpy(data_ptr+8, plain, msglen);
     plaind.length = 8 + (bigend ? text->length : msglen);
     plaind.data = data_ptr;
-
     code = krb5_c_make_checksum(context, md5cksum.checksum_type, seq,
-			    sign_usage, &plaind, &md5cksum);
-
+				sign_usage, &plaind, &md5cksum);
     xfree_wrap(data_ptr,8 + (bigend ? text->length : msglen));
 
     if (code) {
-	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, "
-		"krb5_c_make_checksum() error code=%d\n", code);
-	xfree_wrap(plain, msglen ? msglen : 1);
-	xfree_wrap(t, tlen);
-	return(code);
+      KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, "
+      	"krb5_c_make_checksum() error code=%d\n", code);
+      xfree_wrap(plain, msglen ? msglen : 1);
+      xfree_wrap(t, tlen);
+      return(code);
     }
-
     switch(signalg) {
     case SGN_ALG_DES_MAC_MD5:
     case 3:
 
-       if ((code = kg_encrypt(context, seq, KG_USAGE_SEAL,
-			       (g_OID_equal(oid, gss_mech_krb5_old) ?
-				seq->contents : NULL),
-			       md5cksum.contents, md5cksum.contents, 16))) {
-	    xfree_wrap(md5cksum.contents, md5cksum.length);
-	    xfree_wrap(t, tlen);
+      if ((code = kg_encrypt(context, seq, KG_USAGE_SEAL,
+			     (g_OID_equal(oid, gss_mech_krb5_old) ?
+			      seq->contents : NULL),
+			     md5cksum.contents, md5cksum.contents, 16))) {
+	xfree_wrap(md5cksum.contents, md5cksum.length);
+	xfree_wrap(t, tlen);
+	
+	KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, kg_encrypt() "
+	        "error code=%d\n", code);
+	return code;
+      }
 
-	    KRB5_LOG(KRB5_ERR, "make_seal_token_v1() end, kg_encrypt() "
-		    "error code=%d\n", code);
-	    return code;
-	}
+      cksum.length = cksum_size;
+      cksum.contents = md5cksum.contents + 16 - cksum.length;
 
-	cksum.length = cksum_size;
-	cksum.contents = md5cksum.contents + 16 - cksum.length;
-
-	(void) memcpy(ptr+14, cksum.contents, cksum.length);
-	break;
+     (void) memcpy(ptr+14, cksum.contents, cksum.length);
+      break;
 
     case SGN_ALG_HMAC_SHA1_DES3_KD:
-	/*
-	 * Using key derivation, the call to krb5_c_make_checksum
-	 * already dealt with encrypting.
-	 */
-	if (md5cksum.length != cksum_size)
+      /*
+       * Using key derivation, the call to krb5_c_make_checksum
+       * already dealt with encrypting.
+       */
+      if (md5cksum.length != cksum_size)
 	{
 		KRB5_LOG1(KRB5_ERR, "make_seal_token_v1() end, error "
-				   "md5cksum.length %d != "
-				   "cksum_size %d\n", 
-				   md5cksum.length, cksum_size);
+				   "md5cksum.length %u != "
+				   "cksum_size %u\n", 
+				   (unsigned int)md5cksum.length,
+				   (unsigned int) cksum_size);
 #ifndef	_KERNEL
-		abort ();
+	abort ();
 #else
-		return (GSS_S_DEFECTIVE_TOKEN);
+	return (GSS_S_DEFECTIVE_TOKEN);
 #endif
 	}
-	(void) memcpy(ptr+14, md5cksum.contents, md5cksum.length);
-	break;
+      (void) memcpy(ptr+14, md5cksum.contents, md5cksum.length);
+      break;
     case SGN_ALG_HMAC_MD5:
-	KRB5_LOG(KRB5_INFO, "make_seal_token_v1() cksum_size = %d",
-		cksum_size);
+	KRB5_LOG(KRB5_INFO, "make_seal_token_v1() cksum_size = %u",
+		(unsigned int)cksum_size);
 	(void) memcpy(ptr+14, md5cksum.contents, cksum_size);
 	break;
     }
@@ -332,55 +301,56 @@ make_seal_token_v1(context, enc, seq, seqnum, direction, text, token,
 		    "error code=%d\n", code);
 	return(code);
     }
+
     if (encrypt) {
-	switch(sealalg) {
-	case SEAL_ALG_MICROSOFT_RC4:
+      switch(sealalg) {
+      case SEAL_ALG_MICROSOFT_RC4:
 	{
-		unsigned char bigend_seqnum[4];
-		krb5_keyblock *enc_key;
-		int i;
-		bigend_seqnum[0] = (*seqnum>>24) & 0xff;
-		bigend_seqnum[1] = (*seqnum>>16) & 0xff;
-		bigend_seqnum[2] = (*seqnum>>8) & 0xff;
-		bigend_seqnum[3] = *seqnum & 0xff;
-		code = krb5_copy_keyblock (context, enc, &enc_key);
-		if (code)
-		{
-			xfree_wrap(plain, msglen ? msglen : 1);
-			xfree_wrap(t, tlen);
-			return(code);
-		}
-		for (i = 0; i <= 15; i++)
-			((char *) enc_key->contents)[i] ^=0xf0;
-		code = kg_arcfour_docrypt (context,
-			enc_key, 0,
-			bigend_seqnum, 4,
-			plain, tmsglen,
-			ptr+14+cksum_size);
-		krb5_free_keyblock (context, enc_key);
-		if (code)
-		{
-			xfree_wrap(plain, msglen ? msglen : 1);
-			xfree_wrap(t, tlen);
-			return(code);
-		}
+	  unsigned char bigend_seqnum[4];
+	  krb5_keyblock *enc_key;
+	  int i;
+	  bigend_seqnum[0] = (*seqnum>>24) & 0xff;
+	  bigend_seqnum[1] = (*seqnum>>16) & 0xff;
+	  bigend_seqnum[2] = (*seqnum>>8) & 0xff;
+	  bigend_seqnum[3] = *seqnum & 0xff;
+	  code = krb5_copy_keyblock (context, enc, &enc_key);
+	  if (code)
+	    {
+	      xfree_wrap(plain, msglen ? msglen : 1);
+	      xfree_wrap(t, tlen);
+	      return(code);
+	    }	      
+	  for (i = 0; i <= 15; i++)
+	    ((char *) enc_key->contents)[i] ^=0xf0;
+	  code = kg_arcfour_docrypt (context, enc_key, 0,
+				     bigend_seqnum, 4, 
+				     plain, tmsglen,
+				     ptr+14+cksum_size);
+	  krb5_free_keyblock (context, enc_key);
+	  if (code)
+	    {
+	      xfree_wrap(plain, msglen ? msglen : 1);
+	      xfree_wrap(t, tlen);
+	      return(code);
+	    }
 	}
-        break;
-	default:
+	break;
+      default:
 	    if ((code = kg_encrypt(context, enc, KG_USAGE_SEAL, NULL,
-                                   (krb5_pointer) plain,
-                                   (krb5_pointer) (ptr+cksum_size+14),
-                                   tmsglen))) {
-		xfree_wrap(plain, msglen ? msglen : 1);
-		xfree_wrap(t, tlen);
-		return(code);
-            }
+				   (krb5_pointer) plain,
+				   (krb5_pointer) (ptr+cksum_size+14),
+				   tmsglen))) {
+	      xfree_wrap(plain, msglen ? msglen : 1);
+	      xfree_wrap(t, tlen);
+	      return(code);
+	    }
       }
     }else {
       if (tmsglen)
 	(void) memcpy(ptr+14+cksum_size, plain, tmsglen);
     }
     xfree_wrap(plain, msglen ? msglen : 1);
+
 
     /* that's it.  return the token */
 
@@ -421,10 +391,10 @@ kg_seal(minor_status, context_handle, conf_req_flag, qop_req,
 
     /* Only default qop or matching established cryptosystem is allowed.
 
-	There are NO EXTENSIONS to this set for AES and friends!	 The
-	new spec says "just use 0".  The old spec plus extensions would
-	actually allow for certain non-zero values.  Fix this to handle
-	them later.  */
+       There are NO EXTENSIONS to this set for AES and friends!  The
+       new spec says "just use 0".  The old spec plus extensions would
+       actually allow for certain non-zero values.  Fix this to handle
+       them later.  */
     if (qop_req != 0) {
 	*minor_status = (OM_uint32) G_UNKNOWN_QOP;
 	KRB5_LOG0(KRB5_ERR, "kg_seal() end, error G_UNKNOWN_QOP\n");
@@ -457,20 +427,20 @@ kg_seal(minor_status, context_handle, conf_req_flag, qop_req,
     {
     case 0:
 	code = make_seal_token_v1(context, ctx->enc, ctx->seq,
-                                  &ctx->seq_send, ctx->initiate,
-                                  input_message_buffer, output_message_buffer,
-                                  ctx->signalg, ctx->cksum_size, ctx->sealalg,
-                                  conf_req_flag, toktype, ctx->big_endian,
-                                  ctx->mech_used);
+				  &ctx->seq_send, ctx->initiate,
+				  input_message_buffer, output_message_buffer,
+				  ctx->signalg, ctx->cksum_size, ctx->sealalg,
+				  conf_req_flag, toktype, ctx->big_endian,
+				  ctx->mech_used);
 	break;
     case 1:
 	code = gss_krb5int_make_seal_token_v3(context, ctx,
-                                              input_message_buffer,
-                                              output_message_buffer,
-                                              conf_req_flag, toktype);
+					      input_message_buffer,
+					      output_message_buffer,
+					      conf_req_flag, toktype);
 	break;
     default:
-	code = G_UNKNOWN_QOP;
+	code = G_UNKNOWN_QOP;	/* XXX */
 	break;
     }
 
@@ -484,7 +454,7 @@ kg_seal(minor_status, context_handle, conf_req_flag, qop_req,
     if (conf_state)
 	*conf_state = conf_req_flag;
 
-   *minor_status = 0;
+    *minor_status = 0;
    if (ctx->endtime < now) {
 	(void) gss_release_buffer(minor_status, output_message_buffer);
 	KRB5_LOG(KRB5_ERR, "kg_seal() end, error GSS_S_CONTEXT_EXPIRED "

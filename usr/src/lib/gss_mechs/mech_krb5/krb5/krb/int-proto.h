@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/int-proto.h
  *
@@ -17,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
@@ -45,6 +47,12 @@ krb5_error_code krb5_ser_authenticator_init (krb5_context);
 krb5_error_code krb5_ser_checksum_init (krb5_context);
 krb5_error_code krb5_ser_keyblock_init (krb5_context);
 krb5_error_code krb5_ser_principal_init (krb5_context);
+
+krb5_error_code
+krb5_preauth_supply_preauth_data(krb5_context context,
+				 krb5_gic_opt_ext *opte,
+				 const char *attr,
+				 const char *value);
 
 #endif /* KRB5_INT_FUNC_PROTO__ */
 

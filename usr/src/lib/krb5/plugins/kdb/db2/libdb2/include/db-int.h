@@ -1,12 +1,11 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _KRB5_DB2_MISC_H
 #define	_KRB5_DB2_MISC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -50,7 +49,7 @@ extern "C" {
 #ifndef	_DB_INT_H_
 #define	_DB_INT_H_
 
-#include <db.h>
+#include "db.h"
 
 /* deal with autoconf-based stuff */
 

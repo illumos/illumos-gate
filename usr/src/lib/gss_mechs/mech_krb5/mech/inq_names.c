@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/gssapi/krb5/inq_names.c
  *
@@ -81,12 +79,13 @@ krb5_gss_inquire_names_for_mech(minor_status, mechanism, name_types)
 						     name_types)
 	      ) == GSS_S_COMPLETE) &&
 	    ((major = generic_gss_add_oid_set_member(minor_status,
-						    (const gss_OID) gss_nt_krb5_name,
+						    (const gss_OID) gss_nt_krb5_name, /* Solaris Kerberos */
 						     name_types)
 	      ) == GSS_S_COMPLETE)
 	    ) {
+	    /* Solaris Kerberos */
 	    major = generic_gss_add_oid_set_member(minor_status,
-						(const gss_OID) gss_nt_krb5_principal,
+						  (const gss_OID) gss_nt_krb5_principal,
 						   name_types);
 	}
 

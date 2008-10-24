@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/os/init_ctx.c
@@ -34,21 +33,22 @@
  */
 
 #define NEED_WINDOWS
-#include <k5-int.h>
+
+#include "k5-int.h"
 #ifndef _KERNEL
 #include "os-proto.h"
+#if 0 /* Solaris Kerberos */
+#include "prof_int.h"		/* XXX for profile_copy, not public yet */
 #endif
-
-/* SUNW14resync: Solaris kerb does not need this feature in this file */
-#ifdef USE_LOGIN_LIBRARY
-#undef USE_LOGIN_LIBRARY
+errcode_t KRB5_CALLCONV profile_copy (profile_t, profile_t *);
 #endif
 
 #ifdef USE_LOGIN_LIBRARY
 #include "KerberosLoginPrivate.h"
-#endif 
+#endif
 
 #if defined(_WIN32)
+#include <winsock.h>
 
 static krb5_error_code
 get_from_windows_dir(
@@ -183,7 +183,7 @@ get_from_registry(
 
 #ifndef _KERNEL
 static void
-free_filespecs(profile_filespec_t *files) 
+free_filespecs(profile_filespec_t *files)
 {
     char **cp;
 
@@ -195,7 +195,7 @@ free_filespecs(profile_filespec_t *files)
     free(files);
 }
 
-/* This function is needed by KfM's KerberosPreferences API
+/* This function is needed by KfM's KerberosPreferences API 
  * because it needs to be able to specify "secure" */
 krb5_error_code
 os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
@@ -252,17 +252,17 @@ os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
     unsigned int ent_len;
     const char *s, *t;
 
-#ifdef USE_LOGIN_LIBRARY 
-    /* If __KLAllowHomeDirectoryAccess() == FALSE, we are probably 
-       trying to authenticate to a fileserver for the user's homedir. */ 
-    if (secure || !__KLAllowHomeDirectoryAccess ()) {
-#else 
-    if (secure) { 
-#endif 
-	filepath = DEFAULT_SECURE_PROFILE_PATH; 
-    } else {  
-	filepath = getenv("KRB5_CONFIG"); 
-	if (!filepath) filepath = DEFAULT_PROFILE_PATH;
+#ifdef USE_LOGIN_LIBRARY
+    /* If __KLAllowHomeDirectoryAccess() == FALSE, we are probably
+        trying to authenticate to a fileserver for the user's homedir. */
+    if (!__KLAllowHomeDirectoryAccess ())
+	secure = 1;
+#endif
+    if (secure) {
+	filepath = DEFAULT_SECURE_PROFILE_PATH;
+    } else { 
+        filepath = getenv("KRB5_CONFIG");
+        if (!filepath) filepath = DEFAULT_PROFILE_PATH;
     }
 
     /* count the distinct filename components */
@@ -331,9 +331,11 @@ add_kdc_config_file(profile_filespec_t **pfiles)
     return 0;
 }
 
-/* Set the profile paths in the context. If secure is set to TRUE then 
-   do not include user paths (from environment variables, etc.)
-*/
+
+/* Set the profile paths in the context.  If secure is set to TRUE
+   then do not include user paths (from environment variables, etc).
+   If kdc is TRUE, include kdc.conf from whereever we expect to find
+   it.  */
 static krb5_error_code
 os_init_paths(krb5_context ctx, krb5_boolean kdc)
 {
@@ -347,7 +349,7 @@ os_init_paths(krb5_context ctx, krb5_boolean kdc)
 
     retval = os_get_default_config_files(&files, secure);
 
-    if (retval == 0 && kdc == TRUE)
+    if (retval == 0 && kdc)
 	retval = add_kdc_config_file(&files);
 
     if (!retval) {
@@ -390,25 +392,43 @@ krb5_os_init_context(krb5_context ctx, krb5_boolean kdc)
 {
 	krb5_os_context os_ctx;
 	krb5_error_code	retval = 0;
+#ifdef _WIN32
+    WORD wVersionRequested;
+    WSADATA wsaData;
+#endif /* _WIN32 */
 
 	os_ctx = ctx->os_context;
 	os_ctx->magic = KV5M_OS_CONTEXT;
-
 	os_ctx->time_offset = 0;
 	os_ctx->usec_offset = 0;
 	os_ctx->os_flags = 0;
 	os_ctx->default_ccname = 0;
 
 #ifndef _KERNEL
-	krb5_cc_set_default_name(ctx, NULL);
+	ctx->vtbl = 0;
+	PLUGIN_DIR_INIT(&ctx->libkrb5_plugins);
+	PLUGIN_DIR_INIT(&ctx->preauth_plugins);
+	ctx->preauth_context = NULL;
 
 	retval = os_init_paths(ctx, kdc);
-#endif
 	/*
 	 * If there's an error in the profile, return an error.  Just
 	 * ignoring the error is a Bad Thing (tm).
 	 */
+     
+        if (!retval) {
+                krb5_cc_set_default_name(ctx, NULL);
 
+#ifdef _WIN32
+                /* We initialize winsock to version 1.1 but 
+                 * we do not care if we succeed or fail.
+                 */
+                wVersionRequested = 0x0101;
+                WSAStartup (wVersionRequested, &wsaData);
+#endif /* _WIN32 */
+        }
+
+#endif
 	return retval;
 }
 
@@ -417,30 +437,7 @@ krb5_os_init_context(krb5_context ctx, krb5_boolean kdc)
 krb5_error_code KRB5_CALLCONV
 krb5_get_profile (krb5_context ctx, profile_t *profile)
 {
-    krb5_error_code	retval = 0;
-    profile_filespec_t *files = 0;
-
-    retval = os_get_default_config_files(&files, ctx->profile_secure);
-
-    if (!retval) {
-	retval = profile_init((const_profile_filespec_t *) files,
-                               profile); 
-    }
-
-    if (files)
-        free_filespecs(files);
-
-    if (retval == ENOENT)
-        return KRB5_CONFIG_CANTOPEN;
-
-    if ((retval == PROF_SECTION_NOTOP) ||
-        (retval == PROF_SECTION_SYNTAX) ||
-        (retval == PROF_RELATION_SYNTAX) ||
-        (retval == PROF_EXTRA_CBRACE) ||
-        (retval == PROF_MISSING_OBRACE))
-        return KRB5_CONFIG_BADFORMAT;
-
-    return retval;
+    return profile_copy (ctx->profile, profile);
 }	
 
 #endif
@@ -513,7 +510,7 @@ krb5_os_free_context(krb5_context ctx)
 
 	os_ctx = ctx->os_context;
 	
-        if (os_ctx->default_ccname) {
+	if (os_ctx->default_ccname) {
 		FREE(os_ctx->default_ccname,
 			strlen(os_ctx->default_ccname) + 1);
                 os_ctx->default_ccname = 0;
@@ -523,8 +520,19 @@ krb5_os_free_context(krb5_context ctx)
 
 #ifndef _KERNEL
 	if (ctx->profile) {
-	    profile_release(ctx->profile);
+		profile_release(ctx->profile);
 	    ctx->profile = 0;
 	}
+
+	if (ctx->preauth_context) {
+		krb5_free_preauth_context(ctx);
+		ctx->preauth_context = NULL;
+	}
+	krb5int_close_plugin_dirs (&ctx->preauth_plugins);
+	krb5int_close_plugin_dirs (&ctx->libkrb5_plugins);
+
 #endif
 }
+#ifdef _WIN32
+        WSACleanup();
+#endif /* _WIN32 */

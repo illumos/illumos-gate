@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/os/genaddrs.c
@@ -29,28 +28,16 @@
  * Take an IP addr & port and generate a full IP address.
  */
 
-#define NEED_SOCKETS
-#include <k5-int.h>
+#include "k5-int.h"
 #include "os-proto.h"
 
-#if !defined(_WINSOCKAPI_) && !defined(HAVE_MACSOCK_H)
+#if !defined(_WINSOCKAPI_)
 #include <netinet/in.h>
 #endif
+
+/* Solaris Kerberos */
 #include <inet/ip.h>
 #include <inet/ip6.h>
-
-#ifndef GETPEERNAME_ARG2_TYPE
-#define GETPEERNAME_ARG2_TYPE struct sockaddr
-#endif
-#ifndef GETPEERNAME_ARG3_TYPE
-#define GETPEERNAME_ARG3_TYPE size_t
-#endif
-#ifndef GETSOCKNAME_ARG2_TYPE
-#define GETSOCKNAME_ARG2_TYPE struct sockaddr
-#endif
-#ifndef GETSOCKNAME_ARG3_TYPE
-#define GETSOCKNAME_ARG3_TYPE size_t
-#endif
 
 struct addrpair {
     krb5_address addr, port;
@@ -73,6 +60,7 @@ static void *cvtaddr (struct sockaddr_storage *a, struct addrpair *ap)
 	SET (ap->port, ss2sin6(a)->sin6_port, ADDRTYPE_IPPORT);
 	if (IN6_IS_ADDR_V4MAPPED (&ss2sin6(a)->sin6_addr)) {
 	    ap->addr.addrtype = ADDRTYPE_INET;
+	    /* Solaris Kerberos */
 	    ap->addr.contents = (IPV6_ADDR_LEN - IPV4_ADDR_LEN) + 
 		(krb5_octet *) &ss2sin6(a)->sin6_addr;
 	    ap->addr.length = IPV4_ADDR_LEN;

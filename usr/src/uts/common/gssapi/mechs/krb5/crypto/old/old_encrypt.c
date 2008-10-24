@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,8 +30,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <old.h>
+#include "k5-int.h"
+#include "old.h"
 
 void
 krb5_old_encrypt_length(const struct krb5_enc_provider *enc,
@@ -51,13 +50,13 @@ krb5_old_encrypt_length(const struct krb5_enc_provider *enc,
 /*ARGSUSED*/
 krb5_error_code
 krb5_old_encrypt(krb5_context context,
-		krb5_const struct krb5_enc_provider *enc,
-		krb5_const struct krb5_hash_provider *hash,
-		krb5_const krb5_keyblock *key,
-		krb5_keyusage usage,
-		krb5_const krb5_data *ivec,
-		krb5_const krb5_data *input,
-		krb5_data *output)
+		 const struct krb5_enc_provider *enc,
+		 const struct krb5_hash_provider *hash,
+		 const krb5_keyblock *key,
+		 krb5_keyusage usage,
+		 const krb5_data *ivec,
+		 const krb5_data *input,
+		 krb5_data *output)
 {
     krb5_error_code ret;
     size_t blocksize, hashsize, enclen;
@@ -83,7 +82,6 @@ krb5_old_encrypt(krb5_context context,
 
     if ((ret = krb5_c_random_make_octets(context, &datain)))
 	return(ret);
-
     (void) memcpy(output->data+blocksize+hashsize, input->data, input->length);
 
     /* compute the checksum */
@@ -93,7 +91,7 @@ krb5_old_encrypt(krb5_context context,
 
     if ((ret = ((*(hash->hash))(context, 1, output, &datain))))
 	goto cleanup;
-	
+
     /* encrypt it */
 
     /* XXX this is gross, but I don't have much choice */
@@ -105,7 +103,7 @@ krb5_old_encrypt(krb5_context context,
     } else
 	real_ivec = 1;
 
-     if ((ret = ((*(enc->encrypt))(context, key, ivec, output, output))))
+    if ((ret = ((*(enc->encrypt))(context, key, ivec, output, output))))
 	goto cleanup;
 
     /* update ivec */

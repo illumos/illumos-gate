@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -24,6 +23,7 @@
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
+ *
  */
 
 /*
@@ -72,11 +72,13 @@
 #include    <netinet/in.h>
 #include    <arpa/inet.h>  /* inet_ntoa */
 #include    <gssapi/gssapi.h>
+#include    "gssapiP_krb5.h" /* for kg_get_context */
 #include    <rpc/rpc.h>
 #include    <kadm5/admin.h>
 #include    <kadm5/kadm_rpc.h>
 #include    <server_acl.h>
 #include    <krb5/adm_proto.h>
+#include    "kdb_kt.h"	/* for krb5_ktkdb_set_context */
 #include    <string.h>
 #include    <kadm5/server_internal.h>
 #include    <gssapi_krb5.h>
@@ -88,6 +90,16 @@
 
 #include <rpc/rpcsec_gss.h>
 #include    "misc.h"
+
+#ifdef PURIFY
+#include    "purify.h"
+
+int	signal_pure_report = 0;
+int	signal_pure_clear = 0;
+void	request_pure_report(int);
+void	request_pure_clear(int);
+#endif /* PURIFY */
+
 
 #ifndef	FD_SETSIZE
 #define	FD_SETSIZE	256
@@ -101,16 +113,12 @@
 extern int daemon(int, int);
 #endif
 
-
-
-static int signal_request_exit = 0;
-static int schpw;
+static int	signal_request_exit = 0;
 kadm5_config_params chgpw_params;
-void kadm_svc_run(void);
-void setup_signal_handlers(iprop_role iproprole);
-void sig_exit(int);
-void sig_pipe(int);
-krb5_error_code log_kt_error(char*, char*);
+void    setup_signal_handlers(iprop_role iproprole);
+void	request_exit(int);
+void	sig_pipe(int);
+void	kadm_svc_run(void);
 
 #ifdef POSIX_SIGNALS
 static struct sigaction s_action;
@@ -132,15 +140,9 @@ void *global_server_handle;
  * compatible with old clients.  They are defined in <kadm5/admin.h>,
  * but only if USE_KADM5_API_VERSION == 1.
  */
-#define	OVSEC_KADM_ADMIN_SERVICE_P	"ovsec_adm@admin"
-#define	OVSEC_KADM_CHANGEPW_SERVICE_P	"ovsec_adm@changepw"
+#define OVSEC_KADM_ADMIN_SERVICE_P	"ovsec_adm@admin"
+#define OVSEC_KADM_CHANGEPW_SERVICE_P	"ovsec_adm@changepw"
 
-/*
- * This enables us to set the keytab that gss_acquire_cred uses, but
- * it also restricts us to linking against the Kv5 GSS-API library.
- * Since this is *k*admind, that shouldn't be a problem.
- */
-extern char *krb5_overridekeyname;
 
 extern void krb5_iprop_prog_1();
 extern kadm5_ret_t kiprop_get_adm_host_srv_name(
@@ -148,9 +150,8 @@ extern kadm5_ret_t kiprop_get_adm_host_srv_name(
 	const char *,
 	char **);
 
-static krb5_context context;  /* XXX yuck.  the signal handlers need this */
+static int schpw;
 
-static krb5_context hctx;
 
 in_port_t l_port = 0;	/* global local port num, for BSM audits */
 
@@ -170,9 +171,9 @@ int nofork = 0; /* global; don't fork (debug mode) */
 
 static void usage()
 {
-	fprintf(stderr, gettext("Usage: kadmind [-x db_args]* [-r realm] [-m] [-d] "
-	    "[-p port-number]\n"));
-	exit(1);
+     fprintf(stderr, gettext("Usage: kadmind [-x db_args]* [-r realm] [-m] [-d] "
+         "[-p port-number]\n"));
+     exit(1);
 }
 
 /*
@@ -398,80 +399,83 @@ set_svc_domnames(char *svcname, char **dnames,
 	}
 }
 
+/* XXX yuck.  the signal handlers need this */
+static krb5_context context;
 
+static krb5_context hctx;
 
-
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-	SVCXPRT *transp;
-	extern char *optarg;
-	extern int optind, opterr;
-	int ret, rlen, oldnames = 0;
-	OM_uint32 OMret, major_status, minor_status;
-	char *whoami;
-	FILE *acl_file;
-	gss_buffer_desc in_buf;
-	struct servent *srv;
-	struct sockaddr_in addr;
-	struct sockaddr_in *sin;
-	int s;
-	int optchar;
-	struct netconfig *nconf;
-	void *handlep;
-	int fd;
-	struct t_info tinfo;
-	struct t_bind tbindstr, *tres;
+     register	SVCXPRT *transp;
+     extern	char *optarg;
+     extern	int optind, opterr;
+     int ret, rlen, oldnames = 0;
+     OM_uint32 OMret, major_status, minor_status;
+     char *whoami;
+     FILE *acl_file;
+     gss_buffer_desc in_buf;
+     struct servent *srv;
+     struct sockaddr_in addr;
+     struct sockaddr_in *sin;
+     int s;
+     auth_gssapi_name names[6];
+     gss_buffer_desc gssbuf;
+     gss_OID nt_krb5_name_oid;
+     int optchar;
+     struct netconfig *nconf;
+     void *handlep;
+     int fd;
+     struct t_info tinfo;
+     struct t_bind tbindstr, *tres;
 
-	struct t_optmgmt req, resp;
-	struct opthdr *opt;
-	char reqbuf[128];
-	struct rlimit rl;
+     struct t_optmgmt req, resp;
+     struct opthdr *opt;
+     char reqbuf[128];
+     struct rlimit rl;
+     
+     char *kiprop_name = NULL; /* IProp svc name */
+     kdb_log_context *log_ctx;
+     kadm5_server_handle_t handle;
+     krb5_context ctx;
+     
+     kadm5_config_params params;
+     char **db_args      = NULL;
+     int    db_args_size = 0;
+     const char *errmsg;
+     char **dnames = NULL;
+     int retdn;
+     int iprop_supported;
 
-	char *kiprop_name = NULL; /* IProp svc name */
-	kdb_log_context *log_ctx;
-	kadm5_server_handle_t handle;
-	krb5_context ctx;
+     /* Solaris Kerberos: Stores additional error messages */
+     char *emsg = NULL;
+     
+     /* Solaris Kerberos: Indicates whether loalhost is master or not */
+     krb5_boolean is_master;
+     
+     /* Solaris Kerberos: Used for checking acl file */
+     gss_name_t name;
 
-	kadm5_config_params params;
-	char **db_args      = NULL;
-	int    db_args_size = 0;
-	auth_gssapi_name names[6];
-     	gss_buffer_desc gssbuf;
-     	gss_OID nt_krb5_name_oid;
+     /* This is OID value the Krb5_Name NameType */
+     gssbuf.value = "{1 2 840 113554 1 2 2 1}";
+     gssbuf.length = strlen(gssbuf.value);
+     major_status = gss_str_to_oid(&minor_status, &gssbuf, &nt_krb5_name_oid);
+     if (major_status != GSS_S_COMPLETE) {
+	     fprintf(stderr,
+	         gettext("Couldn't create KRB5 Name NameType OID\n"));
+	     display_status("str_to_oid", major_status, minor_status);
+	     exit(1);
+     }
 
-	char **dnames = NULL;
-	int retdn;
-	int iprop_supported;
+     names[0].name = names[1].name = names[2].name = names[3].name = NULL;
+     names[4].name  = names[5].name =NULL;
+     names[0].type = names[1].type = names[2].type = names[3].type =
+	    (gss_OID) nt_krb5_name_oid;
+     names[4].type = names[5].type = (gss_OID) nt_krb5_name_oid;
 
-	/* Solaris Kerberos: Stores additional error messages */
-	char *emsg = NULL;
-
-	/* Solaris Kerberos: Indicates whether loalhost is master or not */
-	krb5_boolean is_master;
-
-	/* Solaris Kerberos: Used for checking acl file */
-	gss_name_t name;
-	
-	/* This is OID value the Krb5_Name NameType */
-     	gssbuf.value = "{1 2 840 113554 1 2 2 1}";
-     	gssbuf.length = strlen(gssbuf.value);
-     	major_status = gss_str_to_oid(&minor_status, &gssbuf,
-				    &nt_krb5_name_oid);
-     	if (major_status != GSS_S_COMPLETE) {
-		fprintf(stderr,
-			gettext("Couldn't create KRB5 Name NameType OID\n"));
-		display_status("str_to_oid", major_status, minor_status);
-		exit(1);
-     	}
-
-	names[0].name = names[1].name = names[2].name = 
-		names[3].name = names[4].name  = names[5].name =NULL;
-	names[0].type = names[1].type = names[2].type = 
-		names[3].type = names[4].type = names[5].type =
-		(gss_OID) nt_krb5_name_oid;
-
-	whoami = (strrchr(argv[0], '/') ? strrchr(argv[0], '/') + 1 : argv[0]);
+#ifdef PURIFY
+     purify_start_batch();
+#endif /* PURIFY */
+     whoami = (strrchr(argv[0], '/') ? strrchr(argv[0], '/')+1 : argv[0]);
 
 	(void) setlocale(LC_ALL, "");
 
@@ -481,9 +485,9 @@ main(int argc, char *argv[])
 
 	(void) textdomain(TEXT_DOMAIN);
 
-	nofork = 0;
+     nofork = 0;
 
-	memset((char *) &params, 0, sizeof (params));
+     memset((char *) &params, 0, sizeof(params));
 
 	while ((optchar = getopt(argc, argv, "r:mdp:x:")) != EOF) {
 		switch (optchar) {
@@ -537,24 +541,70 @@ main(int argc, char *argv[])
 		(void) enable_extended_FILE_stdio(-1, -1);
 	}
 
-	if (ret = krb5_init_context(&context)) {
-		fprintf(stderr,
-		    gettext("%s: %s while initializing context, aborting\n"),
-		    whoami, error_message(ret));
-		exit(1);
-	}
+     if ((ret = kadm5_init_krb5_context(&context))) {
+	  fprintf(stderr,
+	      gettext("%s: %s while initializing context, aborting\n"),
+		  whoami, error_message(ret));
+	  exit(1);
+     }
 
-	krb5_klog_init(context, "admin_server", whoami, 1);
-    /* SUNW14resync */
-#if 0
-    krb5_klog_syslog(LOG_INFO, "Seeding random number generator");
-          ret = krb5_c_random_os_entropy(context, 1, NULL);
-	if(ret) {
-	krb5_klog_syslog(LOG_ERR, "Error getting random seed: %s, aborting",
-			     error_message(ret));
-	exit(1);
-	}
-#endif
+     krb5_klog_init(context, "admin_server", whoami, 1);
+
+     /* Solaris Kerberos */
+     if((ret = kadm5_init2("kadmind", NULL,
+			  NULL, &params,
+			  KADM5_STRUCT_VERSION,
+			  KADM5_API_VERSION_2,
+			  db_args,
+			  &global_server_handle,
+			  &emsg)) != KADM5_OK) {
+	  krb5_klog_syslog(LOG_ERR,
+		gettext("%s while initializing, aborting"),
+			   (emsg ? emsg : error_message(ret)));
+	  fprintf(stderr,
+     	    gettext("%s: %s while initializing, aborting\n"),
+		  whoami, (emsg ? emsg : error_message(ret)));
+	  if (emsg)
+		free(emsg);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
+
+     if( db_args )
+     {
+	 free(db_args), db_args=NULL;
+     }
+     
+     if ((ret = kadm5_get_config_params(context, 1, &params,
+					&params))) {
+	  const char *e_txt = krb5_get_error_message (context, ret);
+	  /* Solaris Kerberos: Remove double "whoami" */
+	  krb5_klog_syslog(LOG_ERR, gettext("%s while initializing, aborting"),
+			   e_txt);
+	  fprintf(stderr,
+		  gettext("%s: %s while initializing, aborting\n"),
+		  whoami, e_txt);
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
+
+#define REQUIRED_PARAMS (KADM5_CONFIG_REALM | KADM5_CONFIG_ACL_FILE)
+
+     if ((params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
+	  /* Solaris Kerberos: Keep error messages consistent */
+	  krb5_klog_syslog(LOG_ERR,
+		gettext("Missing required configuration values (%lx)"
+			   "while initializing, aborting"),
+			   (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
+	  fprintf(stderr,
+		    gettext("%s: Missing required configuration values "
+			"(%lx) while initializing, aborting\n"), whoami,
+		  (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
+	  krb5_klog_close(context);
+	  kadm5_destroy(global_server_handle);
+	  exit(1);
+     }
 
 	/*
 	 * When using the Horowitz/IETF protocol for
@@ -568,17 +618,17 @@ main(int argc, char *argv[])
 	chgpw_params.kpasswd_protocol = KRB5_CHGPWD_CHANGEPW_V2;
 	chgpw_params.mask |= KADM5_CONFIG_KPASSWD_PROTOCOL;
 
-	if (ret = kadm5_get_config_params(context, NULL, NULL, &chgpw_params,
-		&chgpw_params)) {
-		/* Solaris Kerberos: Remove double "whoami" */
-		krb5_klog_syslog(LOG_ERR, gettext("%s while initializing,"
-		    " aborting"), error_message(ret));
-		fprintf(stderr,
-		    gettext("%s: %s while initializing, aborting\n"),
-		    whoami, error_message(ret));
-		krb5_klog_close(context);
-		exit(1);
-	}
+     if (ret = kadm5_get_config_params(context, 1, &chgpw_params,
+     	&chgpw_params)) {
+	/* Solaris Kerberos: Remove double "whoami" */
+     	krb5_klog_syslog(LOG_ERR, gettext("%s while initializing,"
+     			" aborting"), error_message(ret));
+     	fprintf(stderr,
+     	    gettext("%s: %s while initializing, aborting\n"),
+     	    whoami, error_message(ret));
+     	krb5_klog_close(context);
+     	exit(1);
+     }
 
 	/*
 	 * We now setup the socket and bind() to port 464, so that
@@ -586,76 +636,17 @@ main(int argc, char *argv[])
 	 * from non-Solaris Kerberos V5 clients such as Microsoft,
 	 * MIT, AIX, HP etc
 	 */
-	if ((schpw = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		krb5_klog_syslog(LOG_ERR, gettext( "cannot create simple "
-				"chpw socket: %s"), error_message(errno));
-		fprintf(stderr, gettext("Cannot create simple chpw "
-					"socket: %s"), error_message(errno));
-		krb5_klog_close(context);
-		exit(1);
-	}
-
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = INADDR_ANY;
-	addr.sin_port = htons(chgpw_params.kpasswd_port);
-
-	if (bind(schpw, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		char portbuf[32];
-		int oerrno = errno;
-		fprintf(stderr, gettext("%s: Cannot bind socket.\n"), whoami);
-		fprintf(stderr, gettext("bind: %s\n"), error_message(oerrno));
-		errno = oerrno;
-		(void) snprintf(portbuf, sizeof (portbuf), "%d",
-				ntohs(addr.sin_port));
-		krb5_klog_syslog(LOG_ERR, gettext("cannot bind simple "
-				"chpw socket: %s"), error_message(oerrno));
-		if(oerrno == EADDRINUSE) {
-			char *w = strrchr(whoami, '/');
-			if (w) {
-				w++;
-			}
-			else {
-				w = whoami;
-			}
-			fprintf(stderr, gettext(
-				"This probably means that another %s process\n"
-				"is already running, or that another program\n"
-				"is using the server port (number %d).\n"
-				"If another %s is already running, you should\n"
-				"kill it before restarting the server.\n"),
-				w, ntohs(addr.sin_port), w);
-		}
-		krb5_klog_close(context);
-		exit(1);
-	}
-
-	if (ret = kadm5_get_config_params(context, NULL, NULL, &params,
-		&params)) {
-		/* Solaris Kerberos: Remove double "whoami" */
-		krb5_klog_syslog(LOG_ERR, gettext("%s while initializing,"
-		    " aborting"), error_message(ret));
-		fprintf(stderr,
-		    gettext("%s: %s while initializing, aborting\n"),
-		    whoami, error_message(ret));
-		krb5_klog_close(context);
-		exit(1);
-	}
-#define	REQUIRED_PARAMS (KADM5_CONFIG_REALM | KADM5_CONFIG_ACL_FILE)
-
-	if ((params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
-		/* Solaris Kerberos: Keep error messages consistent */
-		krb5_klog_syslog(LOG_ERR,
-		    gettext("Missing required configuration values "
-			"(%lx) while initializing, aborting"),
-		    (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
-		fprintf(stderr,
-		    gettext("%s: Missing required configuration values "
-			"(%lx) while initializing, aborting\n"), whoami,
-		    (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
-		krb5_klog_close(context);
-		exit(1);
-	}
+     if ((schpw = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	 const char *e_txt = krb5_get_error_message (context, ret);
+	 krb5_klog_syslog(LOG_ERR,
+			 gettext( "Cannot create simple " "chpw socket: %s"),
+			  e_txt);
+	 fprintf(stderr, gettext("Cannot create simple chpw socket: %s"),
+		 e_txt);
+	 kadm5_destroy(global_server_handle);
+	 krb5_klog_close(context);
+	 exit(1);
+     }
 
 	/* Solaris Kerberos: Ensure that kadmind is only run on a master kdc */
 	if (ret = kadm5_is_master(context, params.realm, &is_master)){
@@ -687,11 +678,11 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	memset((char *) &addr, 0, sizeof (struct sockaddr_in));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = INADDR_ANY;
-	l_port = addr.sin_port = htons(params.kadmind_port);
-	sin = &addr;
+     memset((char *) &addr, 0, sizeof (struct sockaddr_in));
+     addr.sin_family = AF_INET;
+     addr.sin_addr.s_addr = INADDR_ANY;
+     l_port = addr.sin_port = htons(params.kadmind_port);
+     sin = &addr;
 
 	if ((handlep = setnetconfig()) == (void *) NULL) {
 		(void) krb5_klog_syslog(LOG_ERR,
@@ -699,6 +690,7 @@ main(int argc, char *argv[])
 		krb5_klog_close(context);
 		exit(1);
 	}
+
 	while (nconf = getnetconfig(handlep)) {
 		if ((nconf->nc_semantics == NC_TPI_COTS_ORD) &&
 		    (strcmp(nconf->nc_protofmly, NC_INET) == 0) &&
@@ -760,71 +752,92 @@ main(int argc, char *argv[])
 	sin = (struct sockaddr_in *) tbindstr.addr.buf;
 	/* SUNWresync121 XXX (void) memset(&addr, 0, sizeof(addr)); */
 
-	if (t_bind(fd, &tbindstr, tres) < 0) {
-		int oerrno = errno;
-		fprintf(stderr, gettext("%s: Cannot bind socket.\n"), whoami);
-		fprintf(stderr, gettext("bind: %s\n"), error_message(oerrno));
-		errno = oerrno;
-		krb5_klog_syslog(LOG_ERR, gettext("Cannot bind socket: %s"),
-		    error_message(errno));
-		if (oerrno == EADDRINUSE) {
-			char *w = strrchr(whoami, '/');
+     if (t_bind(fd, &tbindstr, tres) < 0) {
+	  int oerrno = errno;
+	  const char *e_txt = krb5_get_error_message (context, errno);
+	  fprintf(stderr, gettext("%s: Cannot bind socket.\n"), whoami);
+	  fprintf(stderr, gettext("bind: %s\n"), e_txt);
+	  errno = oerrno;
+	  krb5_klog_syslog(LOG_ERR, gettext("Cannot bind socket: %s"), e_txt);
+	  if(oerrno == EADDRINUSE) {
+	       char *w = strrchr(whoami, '/');
+	       if (w) {
+		    w++;
+	       }
+	       else {
+		    w = whoami;
+	       }
+	       fprintf(stderr, gettext(
+"This probably means that another %s process is already\n"
+"running, or that another program is using the server port (number %d)\n"
+"after being assigned it by the RPC portmap daemon.  If another\n"
+"%s is already running, you should kill it before\n"
+"restarting the server.  If, on the other hand, another program is\n"
+"using the server port, you should kill it before running\n"
+"%s, and ensure that the conflict does not occur in the\n"
+"future by making sure that %s is started on reboot\n"
+		       "before portmap.\n"), w, ntohs(addr.sin_port), w, w, w);
+	       krb5_klog_syslog(LOG_ERR, gettext("Check for already-running %s or for "
+		      "another process using port %d"), w,
+		      htons(addr.sin_port));
+	  }
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
+     memset(&addr, 0, sizeof(addr));
+     addr.sin_family = AF_INET;
+     addr.sin_addr.s_addr = INADDR_ANY;
 
-			if (w) {
-				w++;
-			} else {
-				w = whoami;
-			}
-			fprintf(stderr, gettext(
-				"This probably means that another %s "
-				"process is already\n"
-				"running, or that another program is using "
-				"the server port (number %d)\n"
-				"after being assigned it by the RPC "
-				"portmap deamon.	If another\n"
-				"%s is already running, you should kill "
-				"it before\n"
-				"restarting the server. If, on the other hand, "
-				"another program is\n"
-				"using the server port, you should kill it "
-				"before running\n"
-				"%s, and ensure that the conflict does "
-				"not occur in the\n"
-				"future by making sure that %s is started "
-				"on reboot\n"
-				"before portmap.\n"),
-			    w, ntohs(addr.sin_port), w, w, w);
-			krb5_klog_syslog(LOG_ERR,
-			    gettext("Check for already-running %s or for "
-				"another process using port %d"), w,
-			    htons(addr.sin_port));
-		}
-		krb5_klog_close(context);
-		exit(1);
-	}
-	transp = svc_tli_create(fd, nconf, NULL, 0, 0);
-	(void) t_free((char *) tres, T_BIND);
-	if (transp == NULL) {
-		fprintf(stderr, gettext("%s: Cannot create RPC service.\n"),
-			whoami);
-		krb5_klog_syslog(LOG_ERR, gettext("Cannot create RPC service: %m"));
-		krb5_klog_close(context);
-		exit(1);
-	}
-	if (!svc_register(transp, KADM, KADMVERS, kadm_1, 0)) {
-		fprintf(stderr,
-		    gettext("%s: Cannot register RPC service.\n"), whoami);
-		krb5_klog_syslog(LOG_ERR,
-		    gettext("Cannot register RPC service, failing."));
-		krb5_klog_close(context);
-		exit(1);
-	}
+     addr.sin_port = htons(chgpw_params.kpasswd_port);
 
-	/*
-	 * XXX krb5_defkeyname is an internal library global and should go
-	 * away
-	 */
-	krb5_overridekeyname = params.admin_keytab;
+     if (bind(schpw, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+	  char portbuf[32];
+	  int oerrno = errno;
+	  const char *e_txt = krb5_get_error_message (context, errno);
+	  fprintf(stderr, gettext("%s: Cannot bind socket.\n"), whoami);
+	  fprintf(stderr, gettext("bind: %s\n"), e_txt);
+	  errno = oerrno;
+	  (void) snprintf(portbuf, sizeof (portbuf), "%d", ntohs(addr.sin_port));
+	  krb5_klog_syslog(LOG_ERR, gettext("cannot bind simple chpw socket: %s"),
+			   e_txt);
+	  if(oerrno == EADDRINUSE) {
+	       char *w = strrchr(whoami, '/');
+	       if (w) {
+		    w++;
+	       }
+	       else {
+		    w = whoami;
+	       }
+	       fprintf(stderr, gettext(
+"This probably means that another %s process is already\n"
+"running, or that another program is using the server port (number %d).\n"
+"If another %s is already running, you should kill it before\n"
+"restarting the server.\n"),
+		       w, ntohs(addr.sin_port), w);
+ 	  }
+ 	  krb5_klog_close(context);
+	  exit(1);
+     }
+     
+     transp = svc_tli_create(fd, nconf, NULL, 0, 0);
+     (void) t_free((char *) tres, T_BIND);
+     (void) endnetconfig(handlep);
+     if(transp == NULL) {
+	  fprintf(stderr, gettext("%s: Cannot create RPC service.\n"), whoami);
+	  krb5_klog_syslog(LOG_ERR, gettext("Cannot create RPC service: %m"));
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);	  
+	  exit(1);
+     }
+     if(!svc_register(transp, KADM, KADMVERS, kadm_1, 0)) {
+	  fprintf(stderr, gettext("%s: Cannot register RPC service.\n"), whoami);
+	  krb5_klog_syslog(LOG_ERR, gettext("Cannot register RPC service, failing."));
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);	  
+	  exit(1);
+     }
+
 
 	/* Solaris Kerberos:
 	 * The only service principals which matter here are
@@ -864,17 +877,69 @@ main(int argc, char *argv[])
 		krb5_klog_close(context);
 		exit(1);
 	}
-
 	names[2].name = KADM5_ADMIN_SERVICE_P;
 	names[3].name = KADM5_CHANGEPW_SERVICE_P;
 	names[4].name = OVSEC_KADM_ADMIN_SERVICE_P;
 	names[5].name = OVSEC_KADM_CHANGEPW_SERVICE_P;
 
-	/*
-	 * Try to acquire creds for the old OV services as well as the new
-	 * names, but if that fails just fall back on the new names.
-	 */
-	
+	if (names[0].name == NULL || names[1].name == NULL ||
+	    names[2].name == NULL || names[3].name == NULL ||
+	    names[4].name == NULL || names[5].name == NULL) {
+		krb5_klog_syslog(LOG_ERR,
+		    gettext("Cannot initialize GSS-API authentication, "
+			"failing."));
+		fprintf(stderr,
+		    gettext("%s: Cannot initialize "
+			"GSS-API authentication.\n"),
+		    whoami);
+		krb5_klog_close(context);
+		exit(1);
+	}
+
+     /*
+      * Go through some contortions to point gssapi at a kdb keytab.
+      * This prevents kadmind from needing to use an actual file-based
+      * keytab.
+      */
+     /* XXX extract kadm5's krb5_context */
+     hctx = ((kadm5_server_handle_t)global_server_handle)->context;
+     /* Set ktkdb's internal krb5_context. */
+     ret = krb5_ktkdb_set_context(hctx);
+     if (ret) {
+	  krb5_klog_syslog(LOG_ERR, "Can't set kdb keytab's internal context.");
+	  goto kterr;
+     }
+     /* Solaris Kerberos */
+     ret = krb5_db_set_mkey(hctx, &((kadm5_server_handle_t)global_server_handle)->master_keyblock);
+     if (ret) {
+	  krb5_klog_syslog(LOG_ERR, "Can't set master key for kdb keytab.");
+	  goto kterr;
+     }
+     ret = krb5_kt_register(context, &krb5_kt_kdb_ops);
+     if (ret) {
+	  krb5_klog_syslog(LOG_ERR, "Can't register kdb keytab.");
+	  goto kterr;
+     }
+     /* Tell gssapi about the kdb keytab. */
+     ret = krb5_gss_register_acceptor_identity("KDB:");
+     if (ret) {
+	  krb5_klog_syslog(LOG_ERR, "Can't register acceptor keytab.");
+	  goto kterr;
+     }
+kterr:
+     if (ret) {
+	  krb5_klog_syslog(LOG_ERR, "%s", krb5_get_error_message (context, ret));
+	  fprintf(stderr, "%s: Can't set up keytab for RPC.\n", whoami);
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
+
+     /*
+      * Try to acquire creds for the old OV services as well as the
+      * new names, but if that fails just fall back on the new names.
+      */
+     
 	if (rpc_gss_set_svc_name(names[5].name,
 				"kerberos_v5", 0, KADM, KADMVERS) &&
 	    rpc_gss_set_svc_name(names[4].name,
@@ -894,13 +959,10 @@ main(int argc, char *argv[])
 	if (rpc_gss_set_svc_name(names[0].name,
 				"kerberos_v5", 0, KADM, KADMVERS))
 		oldnames++;
-	else
-		log_kt_error(names[0].name, whoami);
+
 	if (rpc_gss_set_svc_name(names[1].name,
 				"kerberos_v5", 0, KADM, KADMVERS))
 		oldnames++;
-	else
-		log_kt_error(names[1].name, whoami);
 
 	retdn = getdomnames(context, params.realm, &dnames);
 	if (retdn == 0 && dnames) {
@@ -915,26 +977,28 @@ main(int argc, char *argv[])
 				dnames, KADM, KADMVERS);
 	}
 
-	/* if set_names succeeded, this will too */
-	in_buf.value = names[1].name;
-	in_buf.length = strlen(names[1].name) + 1;
-	(void) gss_import_name(&OMret, &in_buf, (gss_OID) nt_krb5_name_oid,
-	    &gss_changepw_name);
-	if (oldnames) {
-		in_buf.value = names[3].name;
-		in_buf.length = strlen(names[3].name) + 1;
-		(void) gss_import_name(&OMret, &in_buf,
-					(gss_OID) nt_krb5_name_oid,
-					&gss_oldchangepw_name);
-	}
-	if (ret = kadm5int_acl_init(context, 0, params.acl_file)) {
-		krb5_klog_syslog(LOG_ERR, gettext("Cannot initialize acl file: %s"),
-		    error_message(ret));
-		fprintf(stderr, gettext("%s: Cannot initialize acl file: %s\n"),
-		    whoami, error_message(ret));
-		krb5_klog_close(context);
-		exit(1);
-	}
+     /* if set_names succeeded, this will too */
+     in_buf.value = names[1].name;
+     in_buf.length = strlen(names[1].name) + 1;
+     (void) gss_import_name(&OMret, &in_buf, (gss_OID) nt_krb5_name_oid,
+			    &gss_changepw_name);
+     if (oldnames) {
+	  in_buf.value = names[3].name;
+	  in_buf.length = strlen(names[3].name) + 1;
+	  (void) gss_import_name(&OMret, &in_buf, (gss_OID) nt_krb5_name_oid,
+				 &gss_oldchangepw_name);
+     }
+
+     if ((ret = kadm5int_acl_init(context, 0, params.acl_file))) {
+	  errmsg = krb5_get_error_message (context, ret);
+	  krb5_klog_syslog(LOG_ERR, gettext("Cannot initialize acl file: %s"),
+		 errmsg);
+	  fprintf(stderr, gettext("%s: Cannot initialize acl file: %s\n"),
+		  whoami, errmsg);
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
 
 	/*
 	 * Solaris Kerberos:
@@ -974,33 +1038,6 @@ main(int argc, char *argv[])
 
 	/*
 	 * Solaris Kerberos:
-	 * Call a private version of kadm5_init which potentially returns an
-	 * additional error string in case of failure.
-	 */
-	if ((ret = kadm5_init2("kadmind", NULL,
-		    NULL, &params,
-		    KADM5_STRUCT_VERSION,
-		    KADM5_API_VERSION_2,
-		    db_args,
-		    &global_server_handle,
-		    &emsg)) != KADM5_OK) {
-
-		krb5_klog_syslog(LOG_ERR,
-		    gettext("%s while initializing, aborting"),
-		    (emsg ? emsg : error_message(ret)));
-		fprintf(stderr,
-		    gettext("%s: %s while initializing, aborting\n"),
-		    whoami, (emsg ? emsg : error_message(ret)));
-		if (emsg)
-		    free(emsg);
-
-		krb5_klog_close(context);
-		kadm5_destroy(context);
-		exit(1);
-	}
-
-	/*
-	 * Solaris Kerberos:
 	 * List the logs (FILE, STDERR, etc) which are currently being
 	 * logged to and print to stderr. Useful when trying to
 	 * track down a failure via SMF.
@@ -1012,21 +1049,31 @@ main(int argc, char *argv[])
 		    error_message(ret));
 	}
 
-	if (!nofork && (ret = daemon(0, 0))) {
-		ret = errno;
-		krb5_klog_syslog(LOG_ERR,
-		    gettext("Cannot detach from tty: %s"),
-		    error_message(ret));
-		fprintf(stderr, gettext("%s: Cannot detach from tty: %s\n"),
-		    whoami, error_message(ret));
-		krb5_klog_close(context);
-		exit(1);
-	}
-
-	if( db_args )
-	{
-	    free(db_args), db_args=NULL;
-	}
+     if (!nofork && (ret = daemon(0, 0))) {
+	  ret = errno;
+	  errmsg = krb5_get_error_message (context, ret);
+	  krb5_klog_syslog(LOG_ERR,
+		    gettext("Cannot detach from tty: %s"), errmsg); 
+	  fprintf(stderr, gettext("%s: Cannot detach from tty: %s\n"),
+		  whoami, errmsg);
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
+     
+    /* SUNW14resync */
+#if 0
+     krb5_klog_syslog(LOG_INFO, "Seeding random number generator");
+     ret = krb5_c_random_os_entropy(context, 1, NULL);
+     if (ret) {
+	  krb5_klog_syslog(LOG_ERR, "Error getting random seed: %s, aborting",
+			   krb5_get_error_message(context, ret));
+	  kadm5_destroy(global_server_handle);
+	  krb5_klog_close(context);
+	  exit(1);
+     }
+#endif
+	  
 
 	handle = global_server_handle;
 	ctx = handle->context;
@@ -1117,10 +1164,6 @@ main(int argc, char *argv[])
 			rpc_gss_error_t err;
 			(void) rpc_gss_get_error(&err);
 
-		/* Try to determine if the error was caused by a missing keytab or
-		 * missing keytab entries (and log it).
-		 */
-			log_kt_error(kiprop_name, whoami);
 			krb5_klog_syslog(LOG_ERR,
     gettext("Unable to set RPCSEC_GSS service name (`%s'), failing."),
 					kiprop_name ? kiprop_name : "<null>");
@@ -1191,7 +1234,6 @@ main(int argc, char *argv[])
 	exit(0);
 }
 
-
 /*
  * Function: kadm_svc_run
  * 
@@ -1203,16 +1245,16 @@ main(int argc, char *argv[])
  * Effects:
  * Modifies:
  */
-void
-kadm_svc_run(void)
-{
-	struct pollfd	*rfd = 0;
-	struct	timeval	    timeout;
-	int pollret;
-	int nfds = 0;
-	int i;
 
-	while(signal_request_exit == 0) {
+void kadm_svc_run(void)
+{
+     struct pollfd	*rfd = 0;
+     struct	timeval	    timeout;
+     int pollret;
+     int nfds = 0;
+     int i;
+
+     while(signal_request_exit == 0) {
 		timeout.tv_sec = TIMEOUT;
 		timeout.tv_usec = 0;
 
@@ -1268,10 +1310,10 @@ kadm_svc_run(void)
  * Purpose: Setup signal handling functions with System V's signal().
  */
 void setup_signal_handlers(iprop_role iproprole) {
-	signal(SIGINT, sig_exit);
-	signal(SIGTERM, sig_exit);
-	signal(SIGQUIT, sig_exit);
-	signal(SIGPIPE, sig_pipe);
+     signal(SIGINT, request_exit);
+     signal(SIGTERM, request_exit);
+     signal(SIGQUIT, request_exit);
+     signal(SIGPIPE, sig_pipe);
 
 	/*
 	 * IProp will fork for a full-resync, we don't want to
@@ -1285,125 +1327,41 @@ void setup_signal_handlers(iprop_role iproprole) {
 
 
 /*
- * Function: sig_exit
- *
+ * Function: request_exit
+ * 
  * Purpose: sets flags saying the server got a signal and that it
- *          should exit when convenient.
+ *	    should exit when convient.
  *
+ * Arguments:
+ * Requires:
  * Effects:
- *      Modifies signal_request_exit which ideally makes the server exit
- *      at some point.
+ *	modifies signal_request_exit which ideally makes the server exit
+ *	at some point.
  *
  * Modifies:
- *      Signal_request_exit
+ *	signal_request_exit
  */
-void sig_exit(int signum)
-{
-	krb5_klog_syslog(LOG_NOTICE, gettext("Got signal to request exit"));
-	signal_request_exit = 1;
-	return;
-}
 
+void request_exit(int signum)
+{
+     krb5_klog_syslog(LOG_NOTICE, gettext("Got signal to request exit"));
+     signal_request_exit = 1;
+     return;
+}
 
 /*
  * Function: sig_pipe
  *
  * Purpose: SIGPIPE handler
  *
- * Effects: krb5_klog_syslog a message that a SIGPIPE occurred and returns,
+ * Effects: krb5_klog_syslogs a message that a SIGPIPE occurred and returns,
  * thus causing the read() or write() to fail and, presumable, the RPC
- * to recover.	Otherwise, the process aborts.
+ * to recover.  Otherwise, the process aborts.
  */
-void
-sig_pipe(int unused)
+void sig_pipe(int unused)
 {
-	krb5_klog_syslog(LOG_NOTICE, gettext("Warning: Received a SIGPIPE; "
-		"probably a client aborted.  Continuing."));
-}
-
-
-/*
- * Given a service name (s_name) determine if the keytab file exists
- * and if the keytab entry is present. Log missing keytab
- * at LOG_ERR and log missing keytab entries at LOG_WARNING.
- * If any of krb5_* (or strdup) fail it will return the failure. 
- */
-krb5_error_code log_kt_error(char *s_name, char *whoami) {
-	krb5_keytab kt;
-	krb5_principal princ;
-	krb5_keytab_entry entry;
-	krb5_error_code	code = 0;
-	char kt_name[MAX_KEYTAB_NAME_LEN];
-	char *service;
-	char *host;
-
-	service = strdup(s_name);
-	if(!service)
-		return ENOMEM;
-
-	host = strchr(service, '@');
-	*host++ = '\0';
-	if (code = krb5_sname_to_principal(context, host,
-				service, KRB5_NT_SRV_HST, &princ)) {
-		krb5_klog_syslog(LOG_ERR,
-				gettext("krb5_sname_to_principal failed: %s"),
-				error_message(code));
-		fprintf(stderr, gettext("%s: krb5_sname_to_principal failed: %s\n"),
-				whoami, error_message(code));
-		free(service);
-		return code;
-	} 
-
-	if (code = krb5_kt_default_name(context, kt_name, sizeof (kt_name))) {
-		krb5_klog_syslog(LOG_ERR,
-				gettext("krb5_kt_default_name failed: %s"),
-				error_message(code));
-		fprintf(stderr, gettext("%s: krb5_kt_default_name failed: %s\n"),
-				whoami, error_message(code));
-		krb5_free_principal(context, princ);
-		free(service);
-		return code;
-	}
-
-	if (code = krb5_kt_default(context, &kt)) {
-		krb5_klog_syslog(LOG_ERR,
-				gettext("krb5_kt_default failed: %s"),
-				error_message(code));
-		fprintf(stderr, gettext("%s: krb5_kt_default failed: %s\n"),
-				whoami, error_message(code));
-		krb5_free_principal(context, princ);
-		free(service);
-		return code;
-	} 
-
-	code = krb5_kt_get_entry(context, kt, princ, 0, 0, &entry);
-
-	switch (code) {
-		case 0:
-			krb5_kt_free_entry(context, &entry);
-			break;
-		case KRB5_KT_NOTFOUND:
-			krb5_klog_syslog(LOG_WARNING,
-					gettext("Keytab entry \"%s/%s\" is missing from \"%s\""),
-					service, host,
-					kt_name);
-			fprintf(stderr, gettext("%s: Keytab entry \"%s/%s\" is missing from \"%s\".\n"),
-					whoami,
-					service, host,
-					kt_name);
-			break;
-		case ENOENT:
-			krb5_klog_syslog(LOG_ERR,
-					gettext("Keytab file \"%s\" does not exist"),
-					kt_name);
-			fprintf(stderr, gettext("%s: Keytab file \"%s\" does not exist.\n"),
-					whoami,
-					kt_name);
-			break;
-	}
-	krb5_kt_close(context,kt);
-	krb5_free_principal(context, princ);
-	free(service);
-	return code;
+     krb5_klog_syslog(LOG_NOTICE, gettext("Warning: Received a SIGPIPE; "
+	    "probably a client aborted.  Continuing."));
+     return;
 }
 

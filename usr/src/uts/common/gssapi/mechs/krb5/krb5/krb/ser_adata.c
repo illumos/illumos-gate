@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/ser_adata.c
  *
@@ -17,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  *
@@ -26,8 +28,8 @@
 /*
  * ser_adata.c - Serialize a krb5_authdata structure.
  */
-#include <k5-int.h>
-#include <int-proto.h>
+#include "k5-int.h"
+#include "int-proto.h"
 
 /*
  * Routines to deal with externalizing the krb5_authdata:
@@ -40,7 +42,7 @@ static krb5_error_code krb5_authdata_size
 static krb5_error_code krb5_authdata_externalize
 	(krb5_context, krb5_pointer, krb5_octet **, size_t *);
 static krb5_error_code krb5_authdata_internalize
-	(krb5_context, krb5_pointer *, krb5_octet **, size_t *);
+	(krb5_context,krb5_pointer *, krb5_octet **, size_t *);
 
 /* Local data */
 static const krb5_ser_entry krb5_authdata_ser_entry = {
@@ -70,6 +72,7 @@ krb5_authdata_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
      *	krb5_int32		for KV5M_AUTHDATA
      */
     kret = EINVAL;
+    /* Solaris Kerberos */
     authdata = (krb5_authdata *) arg;
     if (authdata) {
 	*sizep += (sizeof(krb5_int32) +
@@ -98,6 +101,7 @@ krb5_authdata_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
+    /* Solaris Kerberos */
     authdata = (krb5_authdata *) arg;
     if (authdata) {
 	kret = ENOMEM;
@@ -165,6 +169,7 @@ krb5_authdata_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet 
 	    authdata->length = (int) ibuf;
 
 	    /* Get the string */
+	    /* Solaris Kerberos */
 	    authdata->contents = (krb5_octet *)
 		 			MALLOC((size_t) (ibuf));
 	    if ((authdata->contents) &&

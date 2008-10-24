@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
@@ -46,7 +45,6 @@
 #include <kdb.h>
 #include <kadm5/admin.h>
 #include <krb5/adm_proto.h>
-
 
 #include <krb5.h>
 #include <krb5/kdb.h>
@@ -100,7 +98,7 @@ int kadm5_create(kadm5_config_params *params)
       * The lock file has to exist before calling kadm5_init, but
       * params->admin_lockfile may not be set yet...
       */
-     if ((retval = kadm5_get_config_params(context, NULL, NULL,
+     if ((retval = kadm5_get_config_params(context, 1,
 					   params, &lparams))) {
 	com_err(progname, retval, gettext("while looking up the Kerberos configuration"));
 	  return 1;
@@ -288,7 +286,7 @@ int add_admin_princ(void *handle, krb5_context context,
 				  "to-be-random");
      if (ret) {
 	  if (ret != KADM5_DUP) {
-		com_err(progname, ret,
+	       com_err(progname, ret,
 			gettext(str_PUT_PRINC), fullname);
 	       krb5_free_principal(context, ent.principal);
 	       free(fullname);
@@ -296,9 +294,9 @@ int add_admin_princ(void *handle, krb5_context context,
 	  }
      } else {
 	  /* only randomize key if we created the principal */
-	ret = kadm5_randkey_principal(handle, ent.principal, NULL, NULL);
-	if (ret) {
-		com_err(progname, ret,
+	  ret = kadm5_randkey_principal(handle, ent.principal, NULL, NULL);
+	  if (ret) {
+	       com_err(progname, ret,
 			gettext(str_RANDOM_KEY), fullname);
 	       krb5_free_principal(context, ent.principal);
 	       free(fullname);

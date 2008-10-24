@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/crypto/des/string2key.c
@@ -80,6 +79,7 @@ mit_afs_string_to_key (krb5_context context,
 		    krb5_keyblock *keyblock, const krb5_data *data,
 		    const krb5_data *salt)
 {
+    /* Solaris Kerberos */
     krb5_error_code retval = KRB5_PROG_ETYPE_NOSUPP;
 /* EXPORT DELETE START */
   /* totally different approach from MIT string2key. */
@@ -90,6 +90,7 @@ mit_afs_string_to_key (krb5_context context,
     char *realm = salt->data;
     unsigned int i, j;
     krb5_octet *key = keyblock->contents;
+    /* Solaris Kerberos */
     krb5_keyblock usekey;
 
     if (data->length <= 8) {
@@ -133,7 +134,6 @@ mit_afs_string_to_key (krb5_context context,
       mit_des_cblock ikey, tkey;
       unsigned int pw_len = salt->length+data->length;
       unsigned char *password = malloc(pw_len+1);
-
       if (!password) return ENOMEM;
 
       /* Some bound checks from the original code are elided here as
@@ -149,6 +149,7 @@ mit_afs_string_to_key (krb5_context context,
       memcpy (tkey, ikey, sizeof(tkey));
       mit_des_fixup_key_parity (tkey);
 
+    /* Solaris Kerberos */
       usekey.enctype = ENCTYPE_DES_CBC_CRC;
       usekey.contents = tkey;
       usekey.length = 8;
@@ -157,7 +158,7 @@ mit_afs_string_to_key (krb5_context context,
 
       memcpy (ikey, tkey, sizeof(ikey));
       mit_des_fixup_key_parity (tkey);
-
+      /* Solaris Kerberos */
       if (usekey.hKey != CK_INVALID_HANDLE) {
          (void) C_DestroyObject(krb_ctx_hSession(context), usekey.hKey);
          usekey.hKey = CK_INVALID_HANDLE;
@@ -170,6 +171,7 @@ mit_afs_string_to_key (krb5_context context,
       /* now fix up key parity again */
       mit_des_fixup_key_parity(key);
       
+      /* Solaris Kerberos */
       if (usekey.hKey != CK_INVALID_HANDLE) {
          (void) C_DestroyObject(krb_ctx_hSession(context), usekey.hKey);
          usekey.hKey = CK_INVALID_HANDLE;
@@ -383,6 +385,7 @@ char *afs_crypt(const char *pw, const char *salt,
  
 	for(i=0; i<66; i++)
 		block[i] = 0;
+	/* Solaris Kerberos */
 	for(i=0; ((c= *pw) != NULL) && i<64; pw++){
 		for(j=0; j<7; j++, i++)
 			block[i] = (c>>(6-j)) & 01;
@@ -435,7 +438,7 @@ char *afs_crypt(const char *pw, const char *salt,
  
 static void krb5_afs_crypt_setkey(char *key, char *E, char (*KS)[48])
 {
-	int i, j, k;
+	register int i, j, k;
 	int t;
 	/*
 	 * The C and D arrays used to calculate the key schedule.

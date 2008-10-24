@@ -1,6 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*-
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -114,10 +111,8 @@ __kdb2_hash_open(file, flags, mode, info, dflags)
 		errno = EINVAL;
 		return (NULL);
 	}
-	if (!(hashp = (HTAB *)calloc(1, sizeof(HTAB)))) {
-		errno = ENOMEM;
+	if (!(hashp = (HTAB *)calloc(1, sizeof(HTAB))))
 		return (NULL);
-	}
 	hashp->fp = -1;
 
 	/* set this now, before file goes away... */
@@ -276,6 +271,7 @@ __kdb2_hash_open(file, flags, mode, info, dflags)
 	return (dbp);
 
 error2:
+	save_errno = errno;
 	hdestroy(hashp);
 	errno = save_errno;
 	return (NULL);

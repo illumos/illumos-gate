@@ -25,7 +25,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * slave/kpropd.c
@@ -710,6 +709,21 @@ krb5_error_code do_iprop(kdb_log_context *log_ctx) {
 		exit(1);
 	}
 
+	/* Solaris Kerberos */
+	if (krb5_is_referral_realm(krb5_princ_realm(kpropd_context,
+	    iprop_svc_principal))) {
+		krb5_data *r = krb5_princ_realm(kpropd_context,
+		    iprop_svc_principal);
+		assert(def_realm != NULL);
+		r->length = strlen(def_realm);
+		r->data = strdup(def_realm);
+		if (r->data == NULL) {
+			com_err(progname, retval,
+			    ("while determining local service principal name"));
+			exit(1);
+		}
+	}
+
 	if (retval = krb5_unparse_name(kpropd_context, iprop_svc_principal,
 				&iprop_svc_princstr)) {
 		com_err(progname, retval,
@@ -1251,7 +1265,7 @@ void PRS(argc,argv)
 	strcpy(temp_file_name, file);
 	strcat(temp_file_name, tmp);
 
-	retval = kadm5_get_config_params(kpropd_context, NULL, NULL, &params,
+	retval = kadm5_get_config_params(kpropd_context, 1, NULL, &params,
 	    &params);
 	if (retval) {
 		com_err(progname, retval, gettext("while initializing"));

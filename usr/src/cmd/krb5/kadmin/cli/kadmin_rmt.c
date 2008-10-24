@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Contains remote client specific code.
@@ -12,8 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libintl.h>
-#include <krb5.h>
 #include <k5-int.h>
+#include <krb5.h>
 
 extern void *handle;
 

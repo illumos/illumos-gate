@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/os/an_to_ln.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,21 +28,18 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_aname_to_localname()
  */
-
 
 /*
  * We're only to AN_TO_LN rules at this point, and not doing the
  * database lookup  (moved from configure script)
  */
-#ifndef AN_TO_LN_RULES
 #define AN_TO_LN_RULES
-#endif
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <ctype.h>
 #if	HAVE_REGEX_H
 #include <regex.h>
@@ -68,13 +64,6 @@
 #define	KDBM_OPEN(db, fl, mo)	dbm_open(db, fl, mo)
 #define	KDBM_CLOSE(db)		dbm_close(db)
 #define	KDBM_FETCH(db, key)	dbm_fetch(db, key)
-#else /*ANAME_DB*/
-extern DBM	*db_dbm_open (char *, int, int);
-extern void	db_dbm_close (DBM *);
-extern datum	db_dbm_fetch (DBM *, datum);
-#define KDBM_OPEN(db, fl, mo)	db_dbm_open(db, fl, mo)
-#define KDBM_CLOSE(db)		db_dbm_close(db)
-#define KDBM_FETCH(db, key)	db_dbm_fetch(db, key)
 #endif /*ANAME_DB*/
 
 /*
@@ -198,7 +187,7 @@ db_an_to_ln(context, dbname, aname, lnsize, lname)
  *	<rule> ...
  *		Where:	<rule> is of the form:
  *			"s/" <regexp> "/" <text> "/" ["g"]
- *
+ * 
  * In order to be able to select rule validity, the native system must support
  * one of compile(3), re_comp(3) or regcomp(3).  In order to be able to
  * transform (e.g. substitute), the native system must support regcomp(3) or
@@ -208,7 +197,7 @@ db_an_to_ln(context, dbname, aname, lnsize, lname)
 /*
  * aname_do_match() 	- Does our name match the parenthesized regular
  *			  expression?
- *
+ * 
  * Chew up the match portion of the regular expression and update *contextp.
  * If no re_comp() or regcomp(), then always return a match.
  */
@@ -256,8 +245,7 @@ aname_do_match(char *string, char **contextp)
 #elif	HAVE_REGEXPR_H
 		compile(regexp,
 			regexp_buffer,
-			&regexp_buffer[RE_BUF_SIZE],
-			'\0');
+			&regexp_buffer[RE_BUF_SIZE]);
 		if (step(string, regexp_buffer)) {
 		    if ((loc1 == string) &&
 			(loc2 == &string[strlen(string)]))
@@ -290,8 +278,8 @@ aname_do_match(char *string, char **contextp)
  * string.
  */
 #define use_bytes(x) \
-	out_used += (x); \
-	if (out_used > MAX_FORMAT_BUFFER) goto mem_err
+    out_used += (x); \
+    if (out_used > MAX_FORMAT_BUFFER) goto mem_err
 
 static int
 do_replacement(char *regexp, char *repl, int doall, char *in, char *out)
@@ -342,8 +330,7 @@ do_replacement(char *regexp, char *repl, int doall, char *in, char *out)
 
     compile(regexp,
 	    regexp_buffer,
-	    &regexp_buffer[RE_BUF_SIZE],
-	    '\0');
+	    &regexp_buffer[RE_BUF_SIZE]);
     cp = in;
     op = out;
     matched = 0;
@@ -406,6 +393,7 @@ aname_replacer(char *string, char **contextp, char **result)
     kret = ENOMEM;
     *result = (char *) NULL;
     /* Allocate the formatting buffers */
+    /* Solaris Kerberos */
     if (((in = (char *) malloc(MAX_FORMAT_BUFFER)) != NULL) &&
 	((out = (char *) malloc(MAX_FORMAT_BUFFER)) != NULL)) {
 	/*
@@ -421,10 +409,11 @@ aname_replacer(char *string, char **contextp, char **result)
 	 */
 	for (cp = *contextp; *cp; ) {
 	    /* Skip leading whitespace */
-	    while (isspace(*cp))
+	    while (isspace((int) (*cp)))
 		cp++;
 
 	    /*
+	     * Solaris Kerberos
 	     * Find our separators.  First two characters must be "s<sep>"
 	     * We must also find another "<sep>" followed by another * "<sep>".
 	     */
@@ -446,6 +435,7 @@ aname_replacer(char *string, char **contextp, char **result)
 		/* Figure out sizes of strings and allocate them */
 		rule_size = (size_t) (ep - &cp[2]);
 		repl_size = (size_t) (tp - &ep[1]);
+		/* Solaris Kerberos */
 		if (((rule = (char *) malloc(rule_size+1)) != NULL) &&
 		    ((repl = (char *) malloc(repl_size+1)) != NULL)) {
 
@@ -511,8 +501,7 @@ aname_replacer(char *string, char **contextp, char **result)
  * the principal name.
  */
 static krb5_error_code
-rule_an_to_ln(krb5_context context, char *rule,
-	krb5_const_principal aname, const int lnsize, char *lname)
+rule_an_to_ln(krb5_context context, char *rule, krb5_const_principal aname, const unsigned int lnsize, char *lname)
 {
     krb5_error_code	kret;
     char		*current;
@@ -555,9 +544,12 @@ rule_an_to_ln(krb5_context context, char *rule,
 			    if (*current == '$') {
 				if ((sscanf(current+1, "%d", &compind) == 1) &&
 				    (compind <= num_comps) &&
-				    (datap = (compind > 0) ?
-					krb5_princ_component(context, aname, compind-1) :
-					krb5_princ_realm(context, aname))) {
+				    (datap =
+				     (compind > 0)
+				     ? krb5_princ_component(context, aname,
+							    compind-1)
+				     : krb5_princ_realm(context, aname))
+				    ) {
 				    if ((datap->length < MAX_FORMAT_BUFFER)
 					&&  (selstring_used+datap->length
 					     < MAX_FORMAT_BUFFER)) {
@@ -573,7 +565,7 @@ rule_an_to_ln(krb5_context context, char *rule,
 				    *cout = '\0';
 				    current++;
 				    /* Point past number */
-				    while (isdigit((int) *current))
+				    while (isdigit((int) (*current)))
 					current++;
 				}
 				else
@@ -691,20 +683,18 @@ an_to_ln_realm_chk(
  * that name is returned as the lname.
  */
 static krb5_error_code
-default_an_to_ln(krb5_context context, krb5_const_principal aname,
-	const int lnsize, char *lname)
+default_an_to_ln(krb5_context context, krb5_const_principal aname, const unsigned int lnsize, char *lname)
 {
     krb5_error_code retval;
     char *def_realm;
     unsigned int realm_length;
 
     realm_length = krb5_princ_realm(context, aname)->length;
-
-
+    
     if ((retval = krb5_get_default_realm(context, &def_realm))) {
 	return(retval);
     }
-
+    /* Solaris Kerberos */
     /* compare against default realm and auth_to_local_realm(s) */
     if ((((size_t) realm_length != strlen(def_realm)) ||
         (memcmp(def_realm, krb5_princ_realm(context, aname)->data,
@@ -718,11 +708,11 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname,
     if (krb5_princ_size(context, aname) != 1) {
         if (krb5_princ_size(context, aname) == 2 ) {
            /* Check to see if 2nd component is the local realm. */
-            if (strncmp(krb5_princ_component(context, aname, 1)->data,
-			def_realm, realm_length) ||
-		realm_length !=
-		    krb5_princ_component(context, aname, 1)->length) {
+           if ( strncmp(krb5_princ_component(context, aname,1)->data,def_realm,
+                        realm_length) ||
+                realm_length != krb5_princ_component(context, aname,1)->length) {
 		    /* XXX an_to_ln_realm_chk ? */
+		/* Solaris Kerberos */
 		free(def_realm);
                 return KRB5_LNAME_NOTRANS;
 	    }
@@ -730,13 +720,14 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname,
         else {
            /* no components or more than one component to non-realm part of name
            --no translation. */
+	    /* Solaris Kerberos */
 	    free(def_realm);
             return KRB5_LNAME_NOTRANS;
 	}
     }
 
     free(def_realm);
-    strncpy(lname, krb5_princ_component(context, aname,0)->data,
+    strncpy(lname, krb5_princ_component(context, aname,0)->data, 
 	    min(krb5_princ_component(context, aname,0)->length,lnsize));
     if (lnsize <= krb5_princ_component(context, aname,0)->length ) {
 	retval = KRB5_CONFIG_NOTENUFSPACE;
@@ -759,9 +750,8 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname,
  returns system errors, NOT_ENOUGH_SPACE
 */
 
-krb5_error_code
-krb5_aname_to_localname(krb5_context context,
-	krb5_const_principal aname, const int lnsize_in, char *lname)
+krb5_error_code KRB5_CALLCONV
+krb5_aname_to_localname(krb5_context context, krb5_const_principal aname, const int lnsize_in, char *lname)
 {
     krb5_error_code	kret;
     char		*realm;
@@ -775,7 +765,7 @@ krb5_aname_to_localname(krb5_context context,
     unsigned int        lnsize;
 
     if (lnsize_in < 0)
-	return KRB5_CONFIG_NOTENUFSPACE;
+      return KRB5_CONFIG_NOTENUFSPACE;
 
     lnsize = lnsize_in; /* Unsigned */
 
@@ -914,3 +904,4 @@ krb5_aname_to_localname(krb5_context context,
     }
     return(kret);
 }
+

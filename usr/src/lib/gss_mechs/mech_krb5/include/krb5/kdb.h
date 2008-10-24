@@ -61,9 +61,6 @@
 #ifndef KRB5_KDB5__
 #define KRB5_KDB5__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /* Salt types */
 #define KRB5_KDB_SALTTYPE_NORMAL	0
 #define KRB5_KDB_SALTTYPE_V4		1
@@ -91,8 +88,6 @@
 /* Creation flags */
 #define KRB5_KDB_CREATE_BTREE		0x00000001
 #define KRB5_KDB_CREATE_HASH		0x00000002
-
-#if !defined(_WIN32)
 
 /*
  * Note --- these structures cannot be modified without changing the
@@ -138,7 +133,7 @@ typedef struct _krb5_keysalt {
 typedef struct _krb5_db_entry_new {
     krb5_magic 		  magic;		/* NOT saved */
     krb5_ui_2		  len;			
-    krb5_ui_4             mask;                 /* members currently changed/set */
+    krb5_ui_4             mask;                 /* members currently changed/set */	
     krb5_flags 		  attributes;
     krb5_deltat		  max_life;
     krb5_deltat		  max_renewable_life;
@@ -174,6 +169,7 @@ typedef struct __krb5_key_salt_tuple {
 #define KRB5_TL_SECURID_STATE           0x0006
 #define KRB5_TL_DB_ARGS                 0x7fff
 #endif /* SECURID */
+#define KRB5_TL_USER_CERTIFICATE        0x0007
     
 /*
  * Determines the number of failed KDC requests before DISALLOW_ALL_TIX is set
@@ -188,6 +184,7 @@ typedef struct __krb5_key_salt_tuple {
 #define KRB5_KDC_MKEY_1	"Enter KDC database master key"
 #define KRB5_KDC_MKEY_2	"Re-enter KDC database master key to verify"
 
+
 extern char *krb5_mkey_pwd_prompt1;
 extern char *krb5_mkey_pwd_prompt2;
 
@@ -196,6 +193,7 @@ extern char *krb5_mkey_pwd_prompt2;
  *
  * Data encoding is little-endian.
  */
+#include "k5-platform.h"
 #define	krb5_kdb_decode_int16(cp, i16)	\
 	*((krb5_int16 *) &(i16)) = (((krb5_int16) ((unsigned char) (cp)[0]))| \
 			      ((krb5_int16) ((unsigned char) (cp)[1]) << 8))
@@ -536,5 +534,4 @@ krb5_db_free_policy( krb5_context kcontext,
 
 #define KRB5_KDB_DEF_FLAGS	0
 
-#endif /* !defined(_WIN32) */
 #endif /* KRB5_KDB5__ */

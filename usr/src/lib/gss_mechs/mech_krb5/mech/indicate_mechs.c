@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -23,7 +21,7 @@
  */
 
 /*
- * $Id: indicate_mechs.c 18131 2006-06-14 22:27:54Z tlyu $
+ * $Id: indicate_mechs.c 18330 2006-07-17 16:39:35Z tlyu $
  */
 
 #include "gssapiP_krb5.h"

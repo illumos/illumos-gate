@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/gssapi/krb5/rel_oid.c
  *
@@ -31,7 +29,10 @@
  * rel_oid.c - Release an OID.
  */
 #include "gssapiP_krb5.h"
-#include "mglueP.h"
+
+/* Solaris Kerberos - resync 163 */
+OM_uint32 generic_gss_release_oid (OM_uint32 *, gss_OID *);
+
 
 OM_uint32 krb5_gss_internal_release_oid (OM_uint32 *, /* minor_status */
 					 gss_OID * /* oid */

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * prof_init.c --- routines that manipulate the user-visible profile_t
@@ -19,16 +18,13 @@
 #endif
 #include <errno.h>
 
-/* Find a 4-byte integer type */
-#if	(SIZEOF_SHORT == 4)
-typedef short	prof_int32;
-#elif	(SIZEOF_INT == 4)
-typedef int	prof_int32;
-#elif	(SIZEOF_LONG == 4)
-typedef long	prof_int32;
-#else	/* SIZEOF_LONG == 4 */
-error(do not have a 4-byte integer type)
-#endif	/* SIZEOF_LONG == 4 */
+#ifdef HAVE_STDINT_H
+# include <stdint.h>
+#endif
+#ifdef HAVE_INTTYPES_H
+# include <inttypes.h>
+#endif
+typedef int32_t prof_int32;
 
 errcode_t KRB5_CALLCONV
 profile_init(const_profile_filespec_t *files, profile_t *ret_profile)
@@ -76,6 +72,39 @@ profile_init(const_profile_filespec_t *files, profile_t *ret_profile)
         return 0;
 }
 
+#define COUNT_LINKED_LIST(COUNT, PTYPE, START, FIELD)	\
+	{						\
+	    int cll_counter = 0;			\
+	    PTYPE cll_ptr = (START);			\
+	    while (cll_ptr != NULL) {			\
+		cll_counter++;				\
+		cll_ptr = cll_ptr->FIELD;		\
+	    }						\
+	    (COUNT) = cll_counter;			\
+	}
+
+errcode_t KRB5_CALLCONV
+profile_copy(profile_t old_profile, profile_t *new_profile)
+{
+    size_t size, i;
+    const_profile_filespec_t *files;
+    prf_file_t file;
+    errcode_t err;
+
+    /* The fields we care about are read-only after creation, so
+       no locking is needed.  */
+    COUNT_LINKED_LIST (size, prf_file_t, old_profile->first_file, next);
+    files = malloc ((size+1) * sizeof(*files));
+    if (files == NULL)
+	return errno;
+    for (i = 0, file = old_profile->first_file; i < size; i++, file = file->next)
+	files[i] = file->data->filespec;
+    files[size] = NULL;
+    err = profile_init (files, new_profile);
+    free (files);
+    return err;
+}
+
 errcode_t KRB5_CALLCONV
 profile_init_path(const_profile_filespec_list_t filepath,
 		  profile_t *ret_profile)
@@ -98,6 +127,7 @@ profile_init_path(const_profile_filespec_list_t filepath,
 		return ENOMEM;
 
 	/* measure, copy, and skip each one */
+	/* Solaris Kerberos */
 	for(s = filepath, i=0; ((t = strchr(s, ':')) != NULL) ||
 			((t=s+strlen(s)) != NULL); s=t+1, i++) {
 		ent_len = t-s;
@@ -131,31 +161,31 @@ profile_init_path(const_profile_filespec_list_t filepath,
 errcode_t KRB5_CALLCONV
 profile_is_writable(profile_t profile, int *writable)
 {
-	if (!profile || profile->magic != PROF_MAGIC_PROFILE)
-		return PROF_MAGIC_PROFILE;
-	
-	if (!writable) 
-		return EINVAL;
-	
-	if (profile->first_file)
-		*writable = (profile->first_file->data->flags & PROFILE_FILE_RW);
-	
-	return 0;
+    if (!profile || profile->magic != PROF_MAGIC_PROFILE)
+        return PROF_MAGIC_PROFILE;
+    
+    if (!writable) 
+        return EINVAL;
+    
+    if (profile->first_file)
+        *writable = (profile->first_file->data->flags & PROFILE_FILE_RW);
+    
+    return 0;
 }
 
 errcode_t KRB5_CALLCONV
 profile_is_modified(profile_t profile, int *modified)
 {
-	if (!profile || profile->magic != PROF_MAGIC_PROFILE)
-		return PROF_MAGIC_PROFILE;
-	
-	if (!modified) 
-		return EINVAL;
-	
-	if (profile->first_file)
-		*modified = (profile->first_file->data->flags & PROFILE_FILE_DIRTY);
-	
-	return 0;
+    if (!profile || profile->magic != PROF_MAGIC_PROFILE)
+        return PROF_MAGIC_PROFILE;
+    
+    if (!modified) 
+        return EINVAL;
+    
+    if (profile->first_file)
+        *modified = (profile->first_file->data->flags & PROFILE_FILE_DIRTY);
+    
+    return 0;
 }
 
 errcode_t KRB5_CALLCONV
@@ -277,7 +307,7 @@ errcode_t profile_ser_externalize(const char *unused, profile_t profile,
 	    fcount = 0;
 	    for (pfp = profile->first_file; pfp; pfp = pfp->next)
 		fcount++;
-	    pack_int32((prof_int32)PROF_MAGIC_PROFILE, &bp, &remain);
+	    pack_int32(PROF_MAGIC_PROFILE, &bp, &remain);
 	    pack_int32(fcount, &bp, &remain);
 	    for (pfp = profile->first_file; pfp; pfp = pfp->next) {
 		slen = (prof_int32) strlen(pfp->data->filespec);
@@ -288,7 +318,7 @@ errcode_t profile_ser_externalize(const char *unused, profile_t profile,
 		    remain -= (size_t) slen;
 		}
 	    }
-	    pack_int32((prof_int32)PROF_MAGIC_PROFILE, &bp, &remain);
+	    pack_int32(PROF_MAGIC_PROFILE, &bp, &remain);
 	    retval = 0;
 	    *bufpp = bp;
 	    *remainp = remain;

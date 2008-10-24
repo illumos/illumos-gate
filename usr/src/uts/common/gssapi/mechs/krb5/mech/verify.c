@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -70,10 +68,9 @@ krb5_gss_verify_mic(minor_status, context_handle,
     OM_uint32		rstat;
     int			qstate;
 
-
     rstat = kg_unseal(minor_status, context_handle,
-		    token_buffer, message_buffer,
-		    NULL, &qstate, KG_TOK_MIC_MSG);
+		      token_buffer, message_buffer,
+		      NULL, &qstate, KG_TOK_MIC_MSG);
     if (!rstat && qop_state)
 	*qop_state = (gss_qop_t) qstate;
     return(rstat);

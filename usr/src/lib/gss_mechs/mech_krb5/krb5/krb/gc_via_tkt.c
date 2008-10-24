@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/gc_via_tgt.c
  *
@@ -243,6 +242,35 @@ krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
 	    goto error_4;
 
 	retval = (krb5_error_code) err_reply->error + ERROR_TABLE_BASE_krb5;
+	if (err_reply->text.length > 0) {
+#if 0
+	    const char *m;
+#endif
+	    switch (err_reply->error) {
+	    case KRB_ERR_GENERIC:
+		krb5_set_error_message(context, retval,
+				       "KDC returned error string: %s",
+				       err_reply->text.data);
+		break;
+	    default:
+#if 0 /* We should stop the KDC from sending back this text, because
+	 if the local language doesn't match the KDC's language, we'd
+	 just wind up printing out the error message in two languages.
+	 Well, when we get some localization.  Which is already
+	 happening in KfM.  */
+		m = error_message(retval);
+		/* Special case: MIT KDC may return this same string
+		   in the e-text field.  */
+		if (strlen (m) == err_reply->text.length-1
+		    && !strcmp(m, err_reply->text.data))
+		    break;
+		krb5_set_error_message(context, retval,
+				       "%s (KDC supplied additional data: %s)",
+				       m, err_reply->text.data);
+#endif
+		break;
+	    }
+	}
 
 	krb5_free_error(context, err_reply);
 	goto error_4;

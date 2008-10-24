@@ -1,11 +1,4 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
  * All rights reserved.
@@ -33,8 +26,8 @@
 
 #include "k5-int.h"
 
-extern const struct krb5_enc_provider krb5_enc_des;
-extern const struct krb5_enc_provider krb5_enc_des3;
+extern const struct krb5_enc_provider krb5int_enc_des;
+extern const struct krb5_enc_provider krb5int_enc_des3;
 extern const struct krb5_enc_provider krb5int_enc_arcfour;
 extern const struct krb5_enc_provider krb5int_enc_aes128;
 extern const struct krb5_enc_provider krb5int_enc_aes256;

@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -25,8 +24,9 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <etypes.h>
+#include "k5-int.h"
+#include "etypes.h"
+
 krb5_error_code KRB5_CALLCONV
 krb5_string_to_enctype(char *string, krb5_enctype *enctypep)
 {

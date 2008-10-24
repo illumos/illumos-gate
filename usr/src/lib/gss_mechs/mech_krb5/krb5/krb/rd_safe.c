@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/rd_safe.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,14 +28,14 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_rd_safe()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include "cleanup.h"
-#include <auth_con.h>
+#include "auth_con.h"
 
 #define in_clock_skew(date) (labs((date)-currenttime) < context->clockskew)
 
@@ -45,7 +44,7 @@
  data in *outbuf.
 
  key specifies the key to be used for decryption of the message.
-
+ 
  sender_addr and recv_addr specify the full addresses (host and port) of
  the sender and receiver.
 
@@ -64,15 +63,18 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
     krb5_data *scratch;
     krb5_boolean valid;
 
+    /* Solaris Kerberos */
     KRB5_LOG0(KRB5_INFO, "krb5_rd_safe_basic() start");
 
-    if (!krb5_is_krb_safe(inbuf)){
+    if (!krb5_is_krb_safe(inbuf)) {
+	/* Solaris Kerberos */
 	KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() end, error retval=%d", 
 		    KRB5KRB_AP_ERR_MSG_TYPE);
 	return KRB5KRB_AP_ERR_MSG_TYPE;
     }
 
-    if ((retval = decode_krb5_safe_with_body(inbuf, &message, &safe_body))){
+    if ((retval = decode_krb5_safe_with_body(inbuf, &message, &safe_body))) {
+	/* Solaris Kerberos */
 	KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() end, error retval=%d", 
 		    retval);
 	return retval;
@@ -80,6 +82,7 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
 
     if (!krb5_c_valid_cksumtype(message->checksum->checksum_type)) {
 	retval = KRB5_PROG_SUMTYPE_NOSUPP;
+	/* Solaris Kerberos */
 	KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 		    retval);
 	goto cleanup;
@@ -87,6 +90,7 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
     if (!krb5_c_is_coll_proof_cksum(message->checksum->checksum_type) ||
 	!krb5_c_is_keyed_cksum(message->checksum->checksum_type)) {
 	retval = KRB5KRB_AP_ERR_INAPP_CKSUM;
+	/* Solaris Kerberos */
 	KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 		    retval);
 	goto cleanup;
@@ -94,6 +98,7 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
 
     if (!krb5_address_compare(context, sender_addr, message->s_address)) {
 	retval = KRB5KRB_AP_ERR_BADADDR;
+	/* Solaris Kerberos */
 	KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 		    retval);
 	goto cleanup;
@@ -103,6 +108,7 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
 	if (recv_addr) {
 	    if (!krb5_address_compare(context, recv_addr, message->r_address)) {
 		retval = KRB5KRB_AP_ERR_BADADDR;
+		/* Solaris Kerberos */
 		KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 			retval);
 		goto cleanup;
@@ -110,15 +116,16 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
 	} else {
 	    krb5_address **our_addrs;
 	
-	    if ((retval = krb5_os_localaddr(context, &our_addrs))){
+	    if ((retval = krb5_os_localaddr(context, &our_addrs))) {
+		/* Solaris Kerberos */
 		KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 			retval);
 		goto cleanup;
 	    }
-	
 	    if (!krb5_address_search(context, message->r_address, our_addrs)) {
 		krb5_free_addresses(context, our_addrs);
 		retval = KRB5KRB_AP_ERR_BADADDR;
+		/* Solaris Kerberos */
 		KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 			retval);
 		goto cleanup;
@@ -142,34 +149,36 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
 
     message->checksum = &our_cksum;
 
-    if ((retval = encode_krb5_safe_with_body(message, &safe_body, &scratch))){
+    if ((retval = encode_krb5_safe_with_body(message, &safe_body, &scratch))) {
+	/* Solaris Kerberos */
 	KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 		retval);
 	goto cleanup;
     }
 
     message->checksum = his_cksum;
-			
+			 
     retval = krb5_c_verify_checksum(context, keyblock,
 				    KRB5_KEYUSAGE_KRB_SAFE_CKSUM,
 				    scratch, his_cksum, &valid);
 
     (void) memset((char *)scratch->data, 0, scratch->length);
     krb5_free_data(context, scratch);
-
+    
     if (!valid) {
 	/*
-         * Checksum over only the KRB-SAFE-BODY, like RFC 1510 says, in
+	 * Checksum over only the KRB-SAFE-BODY, like RFC 1510 says, in
 	 * case someone actually implements it correctly.
 	 */
 	retval = krb5_c_verify_checksum(context, keyblock,
-                                        KRB5_KEYUSAGE_KRB_SAFE_CKSUM,
-                                        &safe_body, his_cksum, &valid);
+					KRB5_KEYUSAGE_KRB_SAFE_CKSUM,
+					&safe_body, his_cksum, &valid);
 	if (!valid) {
-		retval = KRB5KRB_AP_ERR_MODIFIED;
-		KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
+	    retval = KRB5KRB_AP_ERR_MODIFIED;
+	    /* Solaris Kerberos */
+	    KRB5_LOG(KRB5_ERR, "krb5_rd_safe_basic() error retval=%d", 
 			retval);
-		goto cleanup;
+	    goto cleanup;
 	}
     }
 
@@ -180,9 +189,10 @@ krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyb
     *outbuf = message->user_data;
     message->user_data.data = NULL;
     retval = 0;
-
+    
 cleanup:
     krb5_free_safe(context, message);
+    /* Solaris Kerberos */
     KRB5_LOG(KRB5_INFO, "krb5_rd_safe_basic() end, retval=%d", 
 		    retval);
     return retval;
@@ -197,12 +207,12 @@ krb5_rd_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
 
     if (((auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_RET_TIME) ||
       (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_RET_SEQUENCE)) &&
-      (outdata == NULL))
+      (outdata == NULL)) 
 	/* Need a better error */
 	return KRB5_RC_REQUIRED;
 
     if ((auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_TIME) &&
-      (auth_context->rcache == NULL))
+      (auth_context->rcache == NULL)) 
 	return KRB5_RC_REQUIRED;
 
     /* Get keyblock */
@@ -219,7 +229,7 @@ krb5_rd_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
     if (auth_context->local_addr) {
     	if (auth_context->local_port) {
             if (!(retval = krb5_make_fulladdr(context, auth_context->local_addr,
-                                 	      auth_context->local_port,
+                                 	      auth_context->local_port, 
 					      &local_fulladdr))){
                 CLEANUP_PUSH(local_fulladdr.contents, free);
 	        plocal_fulladdr = &local_fulladdr;
@@ -234,7 +244,7 @@ krb5_rd_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
     if (auth_context->remote_addr) {
     	if (auth_context->remote_port) {
             if (!(retval = krb5_make_fulladdr(context,auth_context->remote_addr,
-                                 	      auth_context->remote_port,
+                                 	      auth_context->remote_port, 
 					      &remote_fulladdr))){
                 CLEANUP_PUSH(remote_fulladdr.contents, free);
 	        premote_fulladdr = &remote_fulladdr;
@@ -269,14 +279,14 @@ krb5_rd_safe(krb5_context context, krb5_auth_context auth_context, const krb5_da
 	    goto error;
 	}
 
-	if ((retval = krb5_gen_replay_name(context, auth_context->remote_addr,
+	if ((retval = krb5_gen_replay_name(context, auth_context->remote_addr, 
 					   "_safe", &replay.client)))
 	    goto error;
 
 	replay.server = "";		/* XXX */
 	replay.cusec = replaydata.usec;
 	replay.ctime = replaydata.timestamp;
-	if ((retval = krb5_rc_store(context, auth_context->rcache, &replay)) != 0) {
+	if ((retval = krb5_rc_store(context, auth_context->rcache, &replay))) {
 	    krb5_xfree(replay.client);
 	    goto error;
 	}
@@ -307,3 +317,4 @@ error:
     return retval;
 
 }
+

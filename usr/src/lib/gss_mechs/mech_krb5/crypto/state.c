@@ -1,8 +1,7 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/crypto/state.c
@@ -38,8 +37,8 @@
  * krb5_c_init_state and krb5_c_free_state used by clients of the
  * Kerberos crypto library.
  */
-#include <k5-int.h>
-#include <etypes.h>
+#include "k5-int.h"
+#include "etypes.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_init_state (krb5_context context, const krb5_keyblock *key,
@@ -55,6 +54,7 @@ krb5_c_init_state (krb5_context context, const krb5_keyblock *key,
     if (i == krb5_enctypes_length)
 	return(KRB5_BAD_ENCTYPE);
 
+    /* Solaris Kerberos */
     return (*(krb5_enctypes_list[i].enc->init_state))
       (context, key, keyusage, new_state);
 }
@@ -73,6 +73,7 @@ krb5_c_free_state (krb5_context context, const krb5_keyblock *key,
     if (i == krb5_enctypes_length)
 	return(KRB5_BAD_ENCTYPE);
 
-    return (*(krb5_enctypes_list[i].enc->free_state))
+    /* Solaris Kerberos */
+    return     (*(krb5_enctypes_list[i].enc->free_state))
       (context, state);
 }

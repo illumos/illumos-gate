@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * prof_get.c --- routines that expose the public interfaces for
  * 	querying items from the profile.
@@ -40,7 +39,7 @@ static errcode_t init_list(struct profile_string_list *list)
 {
 	list->num = 0;
 	list->max = 10;
-	list->list = (char **) malloc(list->max * sizeof(char *));
+	list->list = malloc(list->max * sizeof(char *));
 	if (list->list == 0)
 		return ENOMEM;
 	list->list[0] = 0;
@@ -80,13 +79,13 @@ static errcode_t add_to_list(struct profile_string_list *list, const char *str)
 	
 	if (list->num+1 >= list->max) {
 		newmax = list->max + 10;
-		newlist = (char **) realloc(list->list, newmax * sizeof(char *));
+		newlist = realloc(list->list, newmax * sizeof(char *));
 		if (newlist == 0)
 			return ENOMEM;
 		list->max = newmax;
 		list->list = newlist;
 	}
-	newstr = (char *) malloc(strlen(str)+1);
+	newstr = malloc(strlen(str)+1);
 	if (newstr == 0)
 		return ENOMEM;
 	strcpy(newstr, str);
@@ -162,7 +161,7 @@ profile_get_values(profile_t profile, const char *const *names,
 	return 0;
 	
 cleanup:
-	end_list(&values, (char ***)NULL);
+	end_list(&values, 0);
 	return retval;
 }
 
@@ -218,7 +217,7 @@ profile_get_string(profile_t profile, const char *name, const char *subname,
 		value = def_val;
     
 	if (value) {
-	  *ret_string = (char *) malloc(strlen(value)+1);
+		*ret_string = malloc(strlen(value)+1);
 		if (*ret_string == 0)
 			return ENOMEM;
 		strcpy(*ret_string, value);
@@ -367,7 +366,7 @@ profile_get_subsection_names(profile_t profile, const char **names,
 	return 0;
 	
 cleanup:
-	end_list(&values, (char ***)NULL);
+	end_list(&values, 0);
 	return retval;
 }
 
@@ -403,7 +402,7 @@ profile_get_relation_names(profile_t profile, const char **names,
 	return 0;
 	
 cleanup:
-	end_list(&values, (char ***)NULL);
+	end_list(&values, 0);
 	return retval;
 }
 
@@ -432,7 +431,7 @@ profile_iterator(void **iter_p, char **ret_name, char **ret_value)
 
 	if (ret_name) {
 		if (name) {
-		  *ret_name = (char *) malloc(strlen(name)+1);
+			*ret_name = malloc(strlen(name)+1);
 			if (!*ret_name)
 				return ENOMEM;
 			strcpy(*ret_name, name);
@@ -441,7 +440,7 @@ profile_iterator(void **iter_p, char **ret_name, char **ret_value)
 	}
 	if (ret_value) {
 		if (value) {
-		  *ret_value = (char *) malloc(strlen(value)+1);
+			*ret_value = malloc(strlen(value)+1);
 			if (!*ret_value) {
 				if (ret_name) {
 					free(*ret_name);

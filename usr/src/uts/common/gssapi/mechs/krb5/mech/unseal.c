@@ -1,11 +1,10 @@
 /* EXPORT DELETE START */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -54,7 +53,7 @@ krb5_gss_unseal(minor_status, context_handle,
      OM_uint32 gssd_ctx_verifier;
 #endif
 {
-     return(kg_unseal(minor_status, context_handle,
+   return(kg_unseal(minor_status, context_handle,
 		    input_message_buffer, output_message_buffer,
 		    conf_state, qop_state, KG_TOK_SEAL_MSG));
 }
@@ -78,8 +77,8 @@ krb5_gss_unwrap(minor_status, context_handle,
     int			qstate;
 
     rstat = kg_unseal(minor_status, context_handle,
-		    input_message_buffer, output_message_buffer,
-		    conf_state, &qstate, KG_TOK_WRAP_MSG);
+		      input_message_buffer, output_message_buffer,
+		      conf_state, &qstate, KG_TOK_WRAP_MSG);
     if (!rstat && qop_state)
 	*qop_state = (gss_qop_t) qstate;
     return(rstat);

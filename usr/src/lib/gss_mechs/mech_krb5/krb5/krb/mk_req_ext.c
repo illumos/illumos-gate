@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/mk_req_ext.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,14 +28,14 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_mk_req_extended()
  */
 
 
-#include <k5-int.h>
-#include <auth_con.h>
+#include "k5-int.h"
+#include "auth_con.h"
 
 /*
  Formats a KRB_AP_REQ message into outbuf, with more complete options than
@@ -71,7 +70,7 @@
  returns system errors
 */
 
-static krb5_error_code
+static krb5_error_code 
 krb5_generate_authenticator (krb5_context,
 				       krb5_authenticator *, krb5_principal,
 				       krb5_checksum *, krb5_keyblock *,
@@ -88,9 +87,9 @@ krb5int_generate_and_save_subkey (krb5_context context,
      * we have /dev/random and PKCS#11 to handle Random Numbers.
      */
     /* Provide some more fodder for random number code.
-	This isn't strong cryptographically; the point here is not
-	to guarantee randomness, but to make it less likely that multiple
-	sessions could pick the same subkey.  */
+       This isn't strong cryptographically; the point here is not
+       to guarantee randomness, but to make it less likely that multiple
+       sessions could pick the same subkey.  */
     struct {
 	krb5_int32 sec, usec;
     } rnd_data;
@@ -103,6 +102,7 @@ krb5int_generate_and_save_subkey (krb5_context context,
 #endif
     krb5_error_code retval;
 
+    /* Solaris Kerberos */
     if (auth_context->send_subkey != NULL) {
 	krb5_free_keyblock(context, auth_context->send_subkey);
 	auth_context->send_subkey = NULL;
@@ -111,6 +111,7 @@ krb5int_generate_and_save_subkey (krb5_context context,
     if ((retval = krb5_generate_subkey(context, keyblock, &auth_context->send_subkey)))
 	return retval;
 
+    /* Solaris Kerberos */
     if (auth_context->recv_subkey != NULL) {
 	krb5_free_keyblock(context, auth_context->recv_subkey);
 	auth_context->recv_subkey = NULL;
@@ -126,13 +127,9 @@ krb5int_generate_and_save_subkey (krb5_context context,
 }
 
 krb5_error_code KRB5_CALLCONV
-krb5_mk_req_extended(
-    krb5_context 	  context,
-    krb5_auth_context	* auth_context,
-    const krb5_flags 	  ap_req_options,
-    krb5_data		* in_data,
-    krb5_creds 		* in_creds,
-    krb5_data 		* outbuf)
+krb5_mk_req_extended(krb5_context context, krb5_auth_context *auth_context,
+		     krb5_flags ap_req_options, krb5_data *in_data,
+		     krb5_creds *in_creds, krb5_data *outbuf)
 {
     krb5_error_code 	  retval;
     krb5_checksum	  checksum;
@@ -146,16 +143,16 @@ krb5_mk_req_extended(
     request.ap_options = ap_req_options & AP_OPTS_WIRE_MASK;
     request.authenticator.ciphertext.data = 0;
     request.ticket = 0;
-
-    if (!in_creds->ticket.length)
+    
+    if (!in_creds->ticket.length) 
 	return(KRB5_NO_TKT_SUPPLIED);
 
     /* we need a native ticket */
     if ((retval = decode_krb5_ticket(&(in_creds)->ticket, &request.ticket)))
 	return(retval);
-
+    
     /* verify that the ticket is not expired */
-    if ((retval = krb5_validate_times(context, &in_creds->times)))
+    if ((retval = krb5_validate_times(context, &in_creds->times)) != 0)
 	goto cleanup;
 
     /* generate auth_context if needed */
@@ -165,19 +162,20 @@ krb5_mk_req_extended(
 	*auth_context = new_auth_context;
     }
 
-    /* set auth context keyblock */
     if ((*auth_context)->keyblock != NULL) {
 	krb5_free_keyblock(context, (*auth_context)->keyblock);
 	(*auth_context)->keyblock = NULL;
     }
-    if ((retval = krb5_copy_keyblock(context, &in_creds->keyblock,
+
+    /* set auth context keyblock */
+    if ((retval = krb5_copy_keyblock(context, &in_creds->keyblock, 
 				     &((*auth_context)->keyblock))))
 	goto cleanup;
 
     /* generate seq number if needed */
     if ((((*auth_context)->auth_context_flags & KRB5_AUTH_CONTEXT_DO_SEQUENCE)
      || ((*auth_context)->auth_context_flags & KRB5_AUTH_CONTEXT_RET_SEQUENCE))
-      && ((*auth_context)->local_seq_number == 0))
+      && ((*auth_context)->local_seq_number == 0)) 
 	if ((retval = krb5_generate_seq_number(context, &in_creds->keyblock,
 				     &(*auth_context)->local_seq_number)))
 	    goto cleanup;
@@ -185,34 +183,35 @@ krb5_mk_req_extended(
 
     /* generate subkey if needed */
     if (!in_data &&(*auth_context)->checksum_func) {
-	retval = (*auth_context)->checksum_func(context,
-			*auth_context,
-			(*auth_context)->checksum_func_data,
-			&in_data);
+	retval = (*auth_context)->checksum_func( context,
+						 *auth_context,
+						 (*auth_context)->checksum_func_data,
+						 &in_data);
 	if (retval)
-            goto cleanup;
+	    goto cleanup;
     }
 
     if ((ap_req_options & AP_OPTS_USE_SUBKEY)&&(!(*auth_context)->send_subkey)) {
 	retval = krb5int_generate_and_save_subkey (context, *auth_context,
-                                                   &in_creds->keyblock);
+						   &in_creds->keyblock);
 	if (retval)
-            goto cleanup;
+	    goto cleanup;
     }
 
+
     if (in_data) {
-	if ((*auth_context)->req_cksumtype == 0x8003) {
+
+      if ((*auth_context)->req_cksumtype == 0x8003) {
 	    /* XXX Special hack for GSSAPI */
 	    checksum.checksum_type = 0x8003;
 	    checksum.length = in_data->length;
 	    checksum.contents = (krb5_octet *) in_data->data;
 	} else {
-	    retval = krb5_c_make_checksum(context,
+	    if ((retval = krb5_c_make_checksum(context, 
 					       (*auth_context)->req_cksumtype,
 					       (*auth_context)->keyblock,
 					       KRB5_KEYUSAGE_AP_REQ_AUTH_CKSUM,
-					       in_data, &checksum);
-	    if (retval)
+					       in_data, &checksum)))
 		goto cleanup_cksum;
 	}
 	checksump = &checksum;
@@ -237,7 +236,7 @@ krb5_mk_req_extended(
     if ((retval = encode_krb5_authenticator((*auth_context)->authentp,
 					    &scratch)))
 	goto cleanup_cksum;
-
+    
     /* Null out these fields, to prevent pointer sharing problems;
      * they were supplied by the caller
      */
@@ -246,19 +245,14 @@ krb5_mk_req_extended(
     (*auth_context)->authentp->authorization_data = NULL;
 
     /* call the encryption routine */
-    retval = krb5_encrypt_helper(context, &in_creds->keyblock,
+    if ((retval = krb5_encrypt_helper(context, &in_creds->keyblock,
 				      KRB5_KEYUSAGE_AP_REQ_AUTH,
-				      scratch, &request.authenticator);
-    if (retval)
+				      scratch, &request.authenticator)))
 	goto cleanup_cksum;
 
     if ((retval = encode_krb5_ap_req(&request, &toutbuf)))
 	goto cleanup_cksum;
-#ifdef HAVE_C_STRUCTURE_ASSIGNMENT
     *outbuf = *toutbuf;
-#else
-    memcpy(outbuf, toutbuf, sizeof(krb5_data));
-#endif
 
     krb5_xfree(toutbuf);
 
@@ -283,17 +277,10 @@ cleanup:
 }
 
 static krb5_error_code
-krb5_generate_authenticator(
-    krb5_context context,
-    krb5_authenticator *authent,
-    krb5_principal client,
-    krb5_checksum *cksum,
-    krb5_keyblock *key,
-    krb5_ui_4 seq_number,
-    krb5_authdata **authorization)
+krb5_generate_authenticator(krb5_context context, krb5_authenticator *authent, krb5_principal client, krb5_checksum *cksum, krb5_keyblock *key, krb5_ui_4 seq_number, krb5_authdata **authorization)
 {
     krb5_error_code retval;
-
+    
     authent->client = client;
     authent->checksum = cksum;
     if (key) {

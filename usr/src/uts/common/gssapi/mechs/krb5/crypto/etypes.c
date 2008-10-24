@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -35,7 +34,7 @@
 /* Solaris Kerberos:
  * we don't provide these functions to the kernel
  */
-#define	krb5_des_string_to_key	NULL
+#define	krb5int_des_string_to_key	NULL
 #define	krb5_dk_string_to_key	NULL
 #define	krb5int_arcfour_string_to_key	NULL
 #endif 	/* _KERNEL */
@@ -59,11 +58,11 @@
 struct krb5_keytypes krb5_enctypes_list[] = {
     { ENCTYPE_DES_CBC_CRC,
       "des-cbc-crc", "DES cbc mode with CRC-32",
-      &krb5_enc_des, &krb5_hash_crc32,
+      &krb5int_enc_des, &krb5int_hash_crc32,
       krb5_old_encrypt_length, krb5_old_encrypt, krb5_old_decrypt,
       CKSUMTYPE_RSA_MD5,
 #ifndef _KERNEL
-      krb5_des_string_to_key,
+      krb5int_des_string_to_key,
 #else
       SUN_CKM_DES_CBC,
       NULL,
@@ -73,11 +72,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 },
     { ENCTYPE_DES_CBC_MD5,
       "des-cbc-md5", "DES cbc mode with RSA-MD5",
-      &krb5_enc_des, &krb5int_hash_md5,
+      &krb5int_enc_des, &krb5int_hash_md5,
       krb5_old_encrypt_length, krb5_old_encrypt, krb5_old_decrypt,
       CKSUMTYPE_RSA_MD5,
 #ifndef _KERNEL
-      krb5_des_string_to_key,
+      krb5int_des_string_to_key,
 #else
       SUN_CKM_DES_CBC,
       SUN_CKM_MD5,
@@ -87,11 +86,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 },
     { ENCTYPE_DES_CBC_MD5,
       "des", "DES cbc mode with RSA-MD5", /* alias */
-      &krb5_enc_des, &krb5int_hash_md5,
+      &krb5int_enc_des, &krb5int_hash_md5,
       krb5_old_encrypt_length, krb5_old_encrypt, krb5_old_decrypt,
       CKSUMTYPE_RSA_MD5,
 #ifndef _KERNEL
-      krb5_des_string_to_key,
+      krb5int_des_string_to_key,
 #else
       SUN_CKM_DES_CBC,
       SUN_CKM_MD5,
@@ -101,11 +100,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
  },
     { ENCTYPE_DES_CBC_RAW,
       "des-cbc-raw", "DES cbc mode raw",
-      &krb5_enc_des, NULL,
+      &krb5int_enc_des, NULL,
       krb5_raw_encrypt_length, krb5_raw_encrypt, krb5_raw_decrypt,
       NULL,
 #ifndef _KERNEL
-      krb5_des_string_to_key,
+      krb5int_des_string_to_key,
 #else
       SUN_CKM_DES_CBC,
       NULL,
@@ -116,11 +115,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 
     { ENCTYPE_DES3_CBC_RAW,
       "des3-cbc-raw", "Triple DES cbc mode raw",
-      &krb5_enc_des3, NULL,
+      &krb5int_enc_des3, NULL,
       krb5_raw_encrypt_length, krb5_raw_encrypt, krb5_raw_decrypt,
       NULL,
 #ifndef _KERNEL
-      krb5_dk_string_to_key,
+      krb5int_dk_string_to_key,
 #else
       SUN_CKM_DES3_CBC,
       NULL,
@@ -131,11 +130,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 
     { ENCTYPE_DES3_CBC_SHA1,
       "des3-cbc-sha1", "Triple DES cbc mode with HMAC/sha1",
-      &krb5_enc_des3, &krb5_hash_sha1,
+      &krb5int_enc_des3, &krb5int_hash_sha1,
       krb5_dk_encrypt_length, krb5_dk_encrypt, krb5_dk_decrypt,
       CKSUMTYPE_HMAC_SHA1_DES3,
 #ifndef _KERNEL
-      krb5_dk_string_to_key,
+      krb5int_dk_string_to_key,
 #else
       SUN_CKM_DES3_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -145,11 +144,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
  },
     { ENCTYPE_DES3_CBC_SHA1,	/* alias */
       "des3-hmac-sha1", "Triple DES cbc mode with HMAC/sha1",
-      &krb5_enc_des3, &krb5_hash_sha1,
+      &krb5int_enc_des3, &krb5int_hash_sha1,
       krb5_dk_encrypt_length, krb5_dk_encrypt, krb5_dk_decrypt,
       CKSUMTYPE_HMAC_SHA1_DES3,
 #ifndef _KERNEL
-      krb5_dk_string_to_key,
+      krb5int_dk_string_to_key,
 #else
       SUN_CKM_DES3_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -159,11 +158,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 },
     { ENCTYPE_DES3_CBC_SHA1,	/* alias */
       "des3-cbc-sha1-kd", "Triple DES cbc mode with HMAC/sha1",
-      &krb5_enc_des3, &krb5_hash_sha1,
+      &krb5int_enc_des3, &krb5int_hash_sha1,
       krb5_dk_encrypt_length, krb5_dk_encrypt, krb5_dk_decrypt,
       CKSUMTYPE_HMAC_SHA1_DES3,
 #ifndef _KERNEL
-      krb5_dk_string_to_key,
+      krb5int_dk_string_to_key,
 #else
       SUN_CKM_DES3_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -176,11 +175,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
        */
     { ENCTYPE_DES3_CBC_SHA1,	/* alias */
       "des3-cbc-hmac-sha1-kd", "Triple DES cbc mode with HMAC/sha1",
-      &krb5_enc_des3, &krb5_hash_sha1,
+      &krb5int_enc_des3, &krb5int_hash_sha1,
       krb5_dk_encrypt_length, krb5_dk_encrypt, krb5_dk_decrypt,
       CKSUMTYPE_HMAC_SHA1_DES3,
 #ifndef _KERNEL
-      krb5_dk_string_to_key,
+      krb5int_dk_string_to_key,
 #else
       SUN_CKM_DES3_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -191,11 +190,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 
     { ENCTYPE_DES_HMAC_SHA1,
       "des-hmac-sha1", "DES with HMAC/sha1",
-      &krb5_enc_des, &krb5_hash_sha1,
+      &krb5int_enc_des, &krb5int_hash_sha1,
       krb5_dk_encrypt_length, krb5_dk_encrypt, krb5_dk_decrypt,
       NULL,
 #ifndef _KERNEL
-      krb5_dk_string_to_key,
+      krb5int_dk_string_to_key,
 #else
       SUN_CKM_DES_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -205,8 +204,9 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 },
     { ENCTYPE_ARCFOUR_HMAC,
       "arcfour-hmac","ArcFour with HMAC/md5", &krb5int_enc_arcfour,
-	&krb5int_hash_md5, krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
-	krb5_arcfour_decrypt,
+      &krb5int_hash_md5,
+krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
+      krb5_arcfour_decrypt,
 	CKSUMTYPE_HMAC_MD5_ARCFOUR,
 #ifndef _KERNEL
 	krb5int_arcfour_string_to_key,
@@ -218,9 +218,10 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #endif /* !_KERNEL */
     },
     { ENCTYPE_ARCFOUR_HMAC,  /* alias */
-	"rc4-hmac", "ArcFour with HMAC/md5", &krb5int_enc_arcfour,
-	&krb5int_hash_md5, krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
-	krb5_arcfour_decrypt, 
+      "rc4-hmac", "ArcFour with HMAC/md5", &krb5int_enc_arcfour,
+      &krb5int_hash_md5,
+      krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
+      krb5_arcfour_decrypt, 
 	CKSUMTYPE_HMAC_MD5_ARCFOUR,
 #ifndef _KERNEL
 	krb5int_arcfour_string_to_key,
@@ -232,9 +233,10 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #endif /* !_KERNEL */
     },
     { ENCTYPE_ARCFOUR_HMAC,  /* alias */
-	"arcfour-hmac-md5", "ArcFour with HMAC/md5", &krb5int_enc_arcfour,
-	&krb5int_hash_md5, krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
-	krb5_arcfour_decrypt,
+      "arcfour-hmac-md5", "ArcFour with HMAC/md5", &krb5int_enc_arcfour,
+      &krb5int_hash_md5,
+      krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
+      krb5_arcfour_decrypt,
 	CKSUMTYPE_HMAC_MD5_ARCFOUR,
 #ifndef _KERNEL
 	krb5int_arcfour_string_to_key,
@@ -261,10 +263,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #endif /* !_KERNEL */
     },
     { ENCTYPE_ARCFOUR_HMAC_EXP, /* alias */
-	"rc4-hmac-exp", "Exportable ArcFour with HMAC/md5",
-	&krb5int_enc_arcfour,
-	&krb5int_hash_md5, krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
-	krb5_arcfour_decrypt,
+      "rc4-hmac-exp", "Exportable ArcFour with HMAC/md5",
+      &krb5int_enc_arcfour,
+      &krb5int_hash_md5,
+      krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
+      krb5_arcfour_decrypt,
 	CKSUMTYPE_HMAC_MD5_ARCFOUR,
 #ifndef _KERNEL
 	krb5int_arcfour_string_to_key,
@@ -276,10 +279,11 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #endif /* !_KERNEL */
     },
     { ENCTYPE_ARCFOUR_HMAC_EXP, /* alias */
-	"arcfour-hmac-md5-exp", "Exportable ArcFour with HMAC/md5",
-	&krb5int_enc_arcfour,
-	&krb5int_hash_md5, krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
-	krb5_arcfour_decrypt,
+      "arcfour-hmac-md5-exp", "Exportable ArcFour with HMAC/md5",
+      &krb5int_enc_arcfour,
+      &krb5int_hash_md5,
+      krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
+      krb5_arcfour_decrypt,
 	CKSUMTYPE_HMAC_MD5_ARCFOUR,
 #ifndef _KERNEL
 	krb5int_arcfour_string_to_key,
@@ -296,12 +300,12 @@ struct krb5_keytypes krb5_enctypes_list[] = {
      * more info.
      */
     { ENCTYPE_AES128_CTS_HMAC_SHA1_96,
-	"aes128-cts-hmac-sha1-96", "AES-128 CTS mode with 96-bit SHA-1 HMAC",
-	&krb5int_enc_aes128, &krb5_hash_sha1,
-	krb5int_aes_encrypt_length, krb5int_aes_dk_encrypt, krb5int_aes_dk_decrypt,
-	CKSUMTYPE_HMAC_SHA1_96_AES128,
+      "aes128-cts-hmac-sha1-96", "AES-128 CTS mode with 96-bit SHA-1 HMAC",
+      &krb5int_enc_aes128, &krb5int_hash_sha1,
+      krb5int_aes_encrypt_length, krb5int_aes_dk_encrypt, krb5int_aes_dk_decrypt,
+      CKSUMTYPE_HMAC_SHA1_96_AES128,
 #ifndef _KERNEL
-	krb5int_aes_string_to_key,
+      krb5int_aes_string_to_key,
 #else
       SUN_CKM_AES_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -311,7 +315,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
     },
     { ENCTYPE_AES128_CTS_HMAC_SHA1_96,
 	"aes128-cts", "AES-128 CTS mode with 96-bit SHA-1 HMAC",
-	&krb5int_enc_aes128, &krb5_hash_sha1,
+	&krb5int_enc_aes128, &krb5int_hash_sha1,
 	krb5int_aes_encrypt_length, krb5int_aes_dk_encrypt, krb5int_aes_dk_decrypt,
 	CKSUMTYPE_HMAC_SHA1_96_AES128,
 #ifndef _KERNEL
@@ -324,12 +328,12 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #endif /* !_KERNEL */
     },
     { ENCTYPE_AES256_CTS_HMAC_SHA1_96,
-	"aes256-cts-hmac-sha1-96", "AES-256 CTS mode with 96-bit SHA-1 HMAC",
-	&krb5int_enc_aes256, &krb5_hash_sha1,
-	krb5int_aes_encrypt_length, krb5int_aes_dk_encrypt, krb5int_aes_dk_decrypt,
-	CKSUMTYPE_HMAC_SHA1_96_AES256,
+      "aes256-cts-hmac-sha1-96", "AES-256 CTS mode with 96-bit SHA-1 HMAC",
+      &krb5int_enc_aes256, &krb5int_hash_sha1,
+      krb5int_aes_encrypt_length, krb5int_aes_dk_encrypt, krb5int_aes_dk_decrypt,
+      CKSUMTYPE_HMAC_SHA1_96_AES256,
 #ifndef _KERNEL
-	krb5int_aes_string_to_key,
+      krb5int_aes_string_to_key,
 #else
       SUN_CKM_AES_CBC,
       SUN_CKM_SHA1_HMAC,
@@ -339,7 +343,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
     },
     { ENCTYPE_AES256_CTS_HMAC_SHA1_96,
 	"aes256-cts", "AES-256 CTS mode with 96-bit SHA-1 HMAC",
-	&krb5int_enc_aes256, &krb5_hash_sha1,
+	&krb5int_enc_aes256, &krb5int_hash_sha1,
 	krb5int_aes_encrypt_length, krb5int_aes_dk_encrypt, krb5int_aes_dk_decrypt,
 	CKSUMTYPE_HMAC_SHA1_96_AES256,
 #ifndef _KERNEL

@@ -1,11 +1,4 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
  * lib/krb5/keytab/ktdefault.c
  *
  * Copyright 1990 by the Massachusetts Institute of Technology.
@@ -29,12 +22,12 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * Get a default keytab.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <stdio.h>
 
 krb5_error_code KRB5_CALLCONV

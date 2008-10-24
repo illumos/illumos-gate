@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/copy_data.c
  *
@@ -28,7 +27,7 @@
  * krb5_copy_data()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * Copy a data structure, with fresh allocation.
@@ -61,7 +60,7 @@ krb5_copy_data(krb5_context context, const krb5_data *indata, krb5_data **outdat
     return 0;
 }
 
-krb5_error_code
+krb5_error_code 
 krb5int_copy_data_contents(krb5_context context, const krb5_data *indata, krb5_data *outdata)
 {
     if (!indata) {
@@ -71,14 +70,12 @@ krb5int_copy_data_contents(krb5_context context, const krb5_data *indata, krb5_d
     outdata->length = indata->length;
     if (outdata->length) {
 	if (!(outdata->data = malloc(outdata->length))) {
-            krb5_xfree(outdata);
-            return ENOMEM;
+	    return ENOMEM;
 	}
-        memcpy((char *)outdata->data, (char *)indata->data, outdata->length);
+	memcpy((char *)outdata->data, (char *)indata->data, outdata->length);
     } else
-        outdata->data = 0;
+	outdata->data = 0;
     outdata->magic = KV5M_DATA;
 
     return 0;
 }
-

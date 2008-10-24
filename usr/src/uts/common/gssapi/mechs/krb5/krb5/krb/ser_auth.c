@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/ser_auth.c
  *
@@ -17,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  *
@@ -26,8 +28,8 @@
 /*
  * ser_auth.c - Serialize krb5_authenticator structure.
  */
-#include <k5-int.h>
-#include <int-proto.h>
+#include "k5-int.h"
+#include "int-proto.h"
 
 /*
  * Routines to deal with externalizing the krb5_authenticator:
@@ -71,6 +73,7 @@ krb5_authenticator_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
      *	krb5_int32		for KV5M_AUTHENTICATOR
      */
     kret = EINVAL;
+    /* Solaris Kerberos */
     authenticator = (krb5_authenticator *) arg;
     if (authenticator) {
 	required = sizeof(krb5_int32)*6;
@@ -133,6 +136,7 @@ krb5_authenticator_externalize(krb5_context kcontext, krb5_pointer arg, krb5_oct
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
+    /* Solaris Kerberos */
     authenticator = (krb5_authenticator *) arg;
     if (authenticator) {
 	kret = ENOMEM;

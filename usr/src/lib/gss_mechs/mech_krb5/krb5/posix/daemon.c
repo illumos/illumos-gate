@@ -1,10 +1,3 @@
-/*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -38,7 +31,7 @@
  * SUCH DAMAGE.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/file.h>
@@ -69,7 +62,7 @@ daemon(nochdir, noclose)
 #else
 	{
 		int n;
-	
+	    
 		/*
 		 * The open below may hang on pseudo ttys if the person
 		 * who starts named logs out before this point.  Thus,

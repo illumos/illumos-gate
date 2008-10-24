@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
  *
@@ -21,17 +19,18 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_policy.c,v 1.2 2001/06/20 05:01:37 mitchb Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_policy.c,v 1.2 2001/06/20 05:01:37 mitchb Exp $";
+static char *rcsid = "$Header$";
 #endif
 
+#include	"server_internal.h"
 #include	<sys/types.h>
 #include	<kadm5/admin.h>
-#include	"server_internal.h"
 #include	<stdlib.h>
+#include	<errno.h>
 
 #define MAX_PW_HISTORY	10
 #define MIN_PW_HISTORY	1
@@ -182,7 +181,7 @@ kadm5_delete_policy(void *server_handle, kadm5_policy_t name)
 	return EINVAL;
     if(strlen(name) == 0)
 	return KADM5_BAD_POLICY;
-    if((ret = krb5_db_get_policy(handle->context, name, &entry, &cnt)))
+    if((ret = krb5_db_get_policy(handle->context, name, &entry,&cnt)))
 	return ret;
     if( cnt != 1 )
 	return KADM5_UNK_POLICY;
@@ -230,9 +229,9 @@ kadm5_modify_policy_internal(void *server_handle,
     if((mask & KADM5_POLICY))
 	return KADM5_BAD_MASK;
 		
-    if((ret = krb5_db_get_policy(handle->context, entry->policy, &p, &cnt)))
+    if ((ret = krb5_db_get_policy(handle->context, entry->policy, &p, &cnt)))
 	return ret;
-    if( cnt != 1 )
+    if (cnt != 1)
 	return KADM5_UNK_POLICY;
 
     if ((mask & KADM5_PW_MAX_LIFE))

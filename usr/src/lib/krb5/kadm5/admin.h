@@ -6,7 +6,6 @@
 #ifndef	__KADM5_ADMIN_H__
 #define	__KADM5_ADMIN_H__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,8 +62,8 @@ extern "C" {
 #include	<sys/types.h>
 #include	<rpc/types.h>
 #include	<rpc/rpc.h>
-#include	<krb5.h>
 #include	<k5-int.h>
+#include	<krb5.h>
 #include	<krb5/kdb.h>
 #include	<com_err.h>
 #include	<kadm5/kadm_err.h>
@@ -274,13 +273,6 @@ typedef struct _kadm5_policy_ent_t {
 	long		policy_refcnt;
 } kadm5_policy_ent_rec, *kadm5_policy_ent_t;
 
-#if 0 /************** Begin IFDEF'ed OUT *******************************/
-typedef struct __krb5_key_salt_tuple {
-     krb5_enctype	ks_enctype;
-     krb5_int32		ks_salttype;
-} krb5_key_salt_tuple;
-#endif /**************** END IFDEF'ed OUT *******************************/
-
 /*
  * New types to indicate which protocol to use when sending
  * password change requests
@@ -296,7 +288,6 @@ typedef enum {
 typedef struct _kadm5_config_params {
      long		mask;
      char *		realm;
-     char *		profile;
      int		kadmind_port;
      int		kpasswd_port;
 
@@ -379,7 +370,7 @@ kadm5_get_cpw_host_srv_name(krb5_context context,
 
 #if USE_KADM5_API_VERSION > 1
 krb5_error_code kadm5_get_config_params(krb5_context context,
-					char *kdcprofile, char *kdcenv,
+					int use_kdc_config,
 					kadm5_config_params *params_in,
 					kadm5_config_params *params_out);
 
@@ -404,7 +395,6 @@ kadm5_ret_t    kadm5_init(char *client_name, char *pass,
 			  krb5_ui_4 api_version,
 			  char **db_args,
 			  void **server_handle);
-
 kadm5_ret_t    kadm5_init_with_password(char *client_name,
 					char *pass, 
 					char *service_name,

@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -28,7 +27,7 @@
  */
 
 /*
- * $Id: util_validate.c 16475 2004-06-17 02:23:21Z raeburn $
+ * $Id: util_validate.c 18721 2006-10-16 16:18:29Z epeisach $
  */
 
 /*
@@ -51,11 +50,9 @@
 #include <limits.h>
 #endif
 
-
 #ifdef HAVE_BSD_DB
 #include <sys/file.h>
 #include <db.h>
-
 
 static const int one = 1;
 static const DBT dbtone = { (void *) &one, sizeof(one) };
@@ -133,7 +130,6 @@ static int g_save(db, type, ptr)
 
    /* SUNW15resync */
    ret = (g_set_entry_add(gs, ptr, (void *)(intptr_t)type) == 0);
-
    (void) k5_mutex_unlock(&db->mutex);
    return ret;
 #endif

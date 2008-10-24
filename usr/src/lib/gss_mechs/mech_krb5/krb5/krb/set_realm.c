@@ -1,6 +1,5 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -38,12 +37,12 @@ krb5_set_principal_realm(krb5_context context, krb5_principal principal, const c
 	char	*newrealm;
 	
 	if (!realm || !*realm)
-		return EINVAL;
+		return EINVAL; /* Solaris Kerberos */
 
 	length = strlen(realm);
 	newrealm = malloc(length+1); /* Include room for the null */
 	if (!newrealm)
-		return ENOMEM;
+		return ENOMEM;  /* Solaris Kerberos */
 	strcpy(newrealm, realm);
 	
 	(void) krb5_xfree(krb5_princ_realm(context,principal)->data);

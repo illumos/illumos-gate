@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/port2ip.c
  *
@@ -28,8 +27,7 @@
  * Take an ADDRPORT address and split into IP addr & port.
  */
 
-#define NEED_SOCKETS
-#include <k5-int.h>
+#include "k5-int.h"
 
 #ifdef HAVE_NETINET_IN_H
 #include "os-proto.h"

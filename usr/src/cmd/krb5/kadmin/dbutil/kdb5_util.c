@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -326,10 +325,22 @@ int main(argc, argv)
     if (cmd_argv[0] == NULL)
 	 usage();
     
-    retval = kadm5_get_config_params(util_context, NULL, NULL,
+    if( !util_context->default_realm )
+    {
+	char *temp = NULL;
+	retval = krb5_get_default_realm(util_context, &temp);
+	if( retval )
+	{
+	    com_err (progname, retval, "while getting default realm");
+	    exit(1);
+	}
+	util_context->default_realm = temp;
+    }
+
+    retval = kadm5_get_config_params(util_context, 1,
 				     &global_params, &global_params);
     if (retval) {
-		com_err(argv[0], retval,
+	 com_err(argv[0], retval,
 		    gettext("while retreiving configuration parameters"));
 	 exit(1);
     }
@@ -491,9 +502,8 @@ static int open_db_and_mkey()
 			global_params.enctype);
 	}
 
-	retval = krb5_c_string_to_key(util_context,
-				global_params.enctype, 
-				&pwd, &scratch, &master_key);
+	retval = krb5_c_string_to_key(util_context, global_params.enctype, 
+				      &pwd, &scratch, &master_key);
 	if (retval) {
 	    com_err(progname, retval,
 		gettext("while transforming master key from password"));

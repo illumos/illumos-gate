@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * These routines check and fix parity of encryption keys for the DES
  * algorithm.
@@ -10,7 +9,7 @@
  */
 
 
-#include <des_int.h>
+#include "des_int.h"
 
 /*
  * des_fixup_key_parity: Forces odd parity per byte; parity is bits
@@ -22,8 +21,7 @@
 #define parity_char(x) pstep(pstep(pstep((x),4),2),1)
 
 void
-mit_des_fixup_key_parity(key)
-     register mit_des_cblock key;
+mit_des_fixup_key_parity(mit_des_cblock key)
 {
     int i;
     for (i=0; i<sizeof(mit_des_cblock); i++) 
@@ -41,8 +39,7 @@ mit_des_fixup_key_parity(key)
  *                       correct des parity.
  */
 int
-mit_des_check_key_parity(key)
-     register mit_des_cblock key;
+mit_des_check_key_parity(mit_des_cblock key)
 {
     int i;
     

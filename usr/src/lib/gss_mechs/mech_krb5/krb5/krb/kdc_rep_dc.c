@@ -1,11 +1,4 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
  * lib/krb5/krb/kdc_rep_dc.c
  *
  * Copyright 1990 by the Massachusetts Institute of Technology.
@@ -15,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,12 +22,12 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_kdc_rep_decrypt_proc()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * Decrypt the encrypted portion of the KDC_REP message, using the key
@@ -64,11 +57,10 @@ krb5_kdc_rep_decrypt_proc(krb5_context context, const krb5_keyblock *key, krb5_c
 	return(ENOMEM);
     }
 
-    /*(void) (dec_rep->enc_part.enctype);*/
+    /*dec_rep->enc_part.enctype;*/
 
-    retval = krb5_c_decrypt(context, key, usage, 0, &dec_rep->enc_part,
-				 &scratch);
-    if (retval) {
+    if ((retval = krb5_c_decrypt(context, key, usage, 0, &dec_rep->enc_part,
+				 &scratch))) {
 	free(scratch.data);
 	return(retval);
     }

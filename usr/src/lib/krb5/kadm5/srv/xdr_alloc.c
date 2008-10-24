@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -54,65 +53,29 @@ static char sccsid[] = "@(#)xdr_mem.c 1.19 87/08/11 Copyr 1984 Sun Micro";
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
- * $Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/rpc/xdr_alloc.c,v 1.6 1996/07/22 20:41:21 marc Exp $
- * 
- * $Log: xdr_alloc.c,v $
- * Revision 1.6  1996/07/22 20:41:21  marc
- * this commit includes all the changes on the OV_9510_INTEGRATION and
- * OV_MERGE branches.  This includes, but is not limited to, the new openvision
- * admin system, and major changes to gssapi to add functionality, and bring
- * the implementation in line with rfc1964.  before committing, the
- * code was built and tested for netbsd and solaris.
- *
- * Revision 1.5.4.1  1996/07/18 04:19:49  marc
- * merged in changes from OV_9510_BP to OV_9510_FINAL1
- *
- * Revision 1.5.2.1  1996/06/20  23:40:30  marc
- * File added to the repository on a branch
- *
- * Revision 1.5  1996/05/12  06:19:25  marc
- * renamed lots of types: u_foo to unsigned foo, and foo32 to rpc_foo32.  This is to make autoconfiscation less painful.
- *
- * Revision 1.4  1995/12/13  14:03:14  grier
- * Longs to ints for Alpha
- *
- * Revision 1.3  1993/12/09  18:57:25  bjaspan
- * [secure-releng/833] misc bugfixes to admin library
- *
- * Revision 1.3  1993/12/06  21:23:08  bjaspan
- * add xdralloc_release
- *
- * Revision 1.2  1993/10/26  21:13:19  bjaspan
- * add casts for correctness
- *
- * Revision 1.1  1993/10/19  03:11:39  bjaspan
- * Initial revision
- *
  */
-
-#if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/rpc/xdr_alloc.c,v 1.6 1996/07/22 20:41:21 marc Exp $";
-#endif
 
 #include "admin.h"
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <dyn/dyn.h>
 
+/* Solaris Kerberos - 116 resync */
 static bool_t	xdralloc_putlong();
 static bool_t	xdralloc_putbytes();
 static unsigned int	xdralloc_getpos();
 static rpc_inline_t *	xdralloc_inline();
 static void	xdralloc_destroy();
-static bool_t	xdralloc_notsup();
-
+static bool_t	xdralloc_notsup_getlong();
+static bool_t	xdralloc_notsup_getbytes();
+static bool_t	xdralloc_notsup_setpos();
 static struct	xdr_ops xdralloc_ops = {
-     xdralloc_notsup,
+     xdralloc_notsup_getlong,
      xdralloc_putlong,
-     xdralloc_notsup,
+     xdralloc_notsup_getbytes,
      xdralloc_putbytes,
      xdralloc_getpos,
-     xdralloc_notsup,
+     xdralloc_notsup_setpos,
      xdralloc_inline,
      xdralloc_destroy,
 };
@@ -121,9 +84,7 @@ static struct	xdr_ops xdralloc_ops = {
  * The procedure xdralloc_create initializes a stream descriptor for a
  * memory buffer.  
  */
-void xdralloc_create(xdrs, op)
-   register XDR *xdrs;
-   enum xdr_op op;
+void xdralloc_create(XDR *xdrs, enum xdr_op op)
 {
      xdrs->x_op = op;
      xdrs->x_ops = &xdralloc_ops;
@@ -131,35 +92,35 @@ void xdralloc_create(xdrs, op)
      /* not allowed to fail */
 }
 
-caddr_t xdralloc_getdata(xdrs)
-   XDR *xdrs;
+caddr_t xdralloc_getdata(XDR *xdrs)
 {
      return (caddr_t) DynGet((DynObject) xdrs->x_private, 0);
 }
 
-void xdralloc_release(xdrs)
-   XDR *xdrs;
+void xdralloc_release(XDR *xdrs)
 {
      DynRelease((DynObject) xdrs->x_private);
 }
 
-static void xdralloc_destroy(xdrs)
-   XDR *xdrs;
+static void xdralloc_destroy(XDR *xdrs)
 {
      DynDestroy((DynObject) xdrs->x_private);
 }
 
-static bool_t xdralloc_notsup()
+static bool_t xdralloc_notsup_getlong(
+     register XDR *xdrs,
+     long *lp)
 {
      return FALSE;
 }
 
-static bool_t xdralloc_putlong(xdrs, lp)
-   register XDR *xdrs;
-   rpc_int32 *lp;
+static bool_t xdralloc_putlong(
+     register XDR *xdrs,
+     long *lp)
 {
-     int l = htonl((rpc_u_int32) *(int *)lp);
-     
+     int l = htonl((uint32_t) *lp); /* XXX need bounds checking */
+
+     /* XXX assumes sizeof(int)==4 */
      if (DynInsert((DynObject) xdrs->x_private,
 		   DynSize((DynObject) xdrs->x_private), &l,
 		   sizeof(int)) != DYN_OK)
@@ -167,28 +128,45 @@ static bool_t xdralloc_putlong(xdrs, lp)
      return (TRUE);
 }
 
-static bool_t xdralloc_putbytes(xdrs, addr, len)
-   register XDR *xdrs;
-   caddr_t addr;
-   register unsigned int len;
+
+static bool_t xdralloc_notsup_getbytes(
+     register XDR *xdrs,
+     caddr_t addr,
+     register unsigned int len)
+{
+     return FALSE;
+}
+
+
+static bool_t xdralloc_putbytes(
+     register XDR *xdrs,
+     caddr_t addr,
+     register unsigned int len)
 {
      if (DynInsert((DynObject) xdrs->x_private,
 		   DynSize((DynObject) xdrs->x_private),
-		   addr, len) != DYN_OK)
+		   addr, (int) len) != DYN_OK)
 	  return FALSE;
      return TRUE;
 }
 
-static unsigned int xdralloc_getpos(xdrs)
-   register XDR *xdrs;
+static unsigned int xdralloc_getpos(XDR *xdrs)
 {
      return DynSize((DynObject) xdrs->x_private);
 }
 
+static bool_t xdralloc_notsup_setpos(
+     register XDR *xdrs,
+     unsigned int lp)
+{
+     return FALSE;
+}
 
-static rpc_inline_t *xdralloc_inline(xdrs, len)
-   register XDR *xdrs;
-   int len;
+
+
+static rpc_inline_t *xdralloc_inline(
+     register XDR *xdrs,
+     int len)
 {
      return (rpc_inline_t *) 0;
 }

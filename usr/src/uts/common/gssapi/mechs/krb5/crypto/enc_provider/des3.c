@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,8 +30,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <des_int.h>
+#include "k5-int.h"
+#include "des_int.h"
 
 static krb5_error_code
 k5_des3_docrypt(krb5_context context,
@@ -126,7 +125,7 @@ k5_des3_make_key(krb5_context context, krb5_const krb5_data *randombits,
     return(ret);
 }
 
-const struct krb5_enc_provider krb5_enc_des3 = {
+const struct krb5_enc_provider krb5int_enc_des3 = {
     8,
     21, 24,
     k5_des3_encrypt,

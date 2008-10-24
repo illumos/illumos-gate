@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,6 @@
 #ifndef _KDB_LDAP_H
 #define _KDB_LDAP_H 1
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* We want the interfaces marked "deprecated" in OpenLDAP.  */
 #define LDAP_DEPRECATED 1
 #include <ldap.h>
@@ -60,6 +58,11 @@
 
 #include <k5-thread.h>
 #include <k5-platform.h> /* Solaris Kerberos */
+#include <k5-platform-store_16.h>
+#include <k5-platform-store_32.h>
+#include <k5-platform-load_16.h>
+#include <k5-platform-load_32.h>
+
 #include <kdb5.h>
 #include "k5-int.h"
 #include "ldap_krbcontainer.h"

@@ -1,11 +1,11 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
+  * Copyright2001 by the Massachusetts Institute of Technology.
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
  * Permission to use, copy, modify, distribute, and sell this software
@@ -71,11 +71,13 @@ kg_confounder_size(context, key)
      krb5_context context;
      krb5_keyblock *key;
 {
+   krb5_error_code code;
    size_t blocksize;
    /* We special case rc4*/
    if (key->enctype == ENCTYPE_ARCFOUR_HMAC)
-	return 8;
-   if (krb5_c_block_size(context, key->enctype, &blocksize) != 0)
+     return 8;
+   code = krb5_c_block_size(context, key->enctype, &blocksize);
+   if (code)
       return(-1); /* XXX */
 
    return(blocksize);
@@ -89,15 +91,16 @@ kg_make_confounder(context, key, buf)
 {
    krb5_error_code code;
    size_t blocksize;
-   krb5_data random;
+   krb5_data lrandom;
 
-   if (code = krb5_c_block_size(context, key->enctype, &blocksize))
+   code = krb5_c_block_size(context, key->enctype, &blocksize);
+   if (code)
        return(code);
 
-   random.length = blocksize;
-   random.data = (char *) buf;
+   lrandom.length = blocksize;
+   lrandom.data = (char *) buf;
 
-   return(krb5_c_random_make_octets(context, &random));
+   return(krb5_c_random_make_octets(context, &lrandom));
 }
 
 int
@@ -120,7 +123,7 @@ kg_encrypt(context, key, usage, iv, in, out, length)
      krb5_keyblock *key;
      int usage;
      krb5_pointer iv;
-     krb5_pointer in;
+     krb5_const_pointer in;
      krb5_pointer out;
      unsigned int length;
 {
@@ -132,7 +135,8 @@ kg_encrypt(context, key, usage, iv, in, out, length)
    KRB5_LOG0(KRB5_INFO, "kg_encrypt() start.");
 
    if (iv) {
-       if (code = krb5_c_block_size(context, key->enctype, &blocksize))
+       code = krb5_c_block_size(context, key->enctype, &blocksize);
+       if (code)
 	   return(code);
 
        ivd.length = blocksize;
@@ -146,7 +150,7 @@ kg_encrypt(context, key, usage, iv, in, out, length)
    }
 
    inputd.length = length;
-   inputd.data = in;
+   inputd.data = (char *)in; /* Solaris Kerberos */
 
    outputd.ciphertext.length = length;
    outputd.ciphertext.data = out;
@@ -167,7 +171,7 @@ kg_decrypt(context, key, usage, iv, in, out, length)
      krb5_keyblock *key;
      int usage;
      krb5_pointer iv;
-     krb5_pointer in;
+     krb5_const_pointer in;
      krb5_pointer out;
      unsigned int length;
 {
@@ -178,7 +182,8 @@ kg_decrypt(context, key, usage, iv, in, out, length)
    KRB5_LOG0(KRB5_INFO, "kg_decrypt() start.");
 
    if (iv) {
-       if (code = krb5_c_block_size(context, key->enctype, &blocksize))
+       code = krb5_c_block_size(context, key->enctype, &blocksize);
+       if (code)
 	   return(code);
 
        ivd.length = blocksize;
@@ -193,7 +198,7 @@ kg_decrypt(context, key, usage, iv, in, out, length)
 
    inputd.enctype = ENCTYPE_UNKNOWN;
    inputd.ciphertext.length = length;
-   inputd.ciphertext.data = in;
+   inputd.ciphertext.data = (char *)in; /* Solaris Kerberos */
 
    outputd.length = length;
    outputd.data = out;
@@ -267,7 +272,7 @@ kg_arcfour_docrypt (krb5_context context,
 #endif /* _KERNEL */
   if (code)
     goto cleanup_arcfour;
-  	
+	  
   input.data = ( void *) kd_data;
   input.length = kd_data_len;
   output.data = (void *) seq_enc_key.contents;
@@ -280,11 +285,9 @@ kg_arcfour_docrypt (krb5_context context,
 
   if (code)
     goto cleanup_arcfour;
-
   input.data = ( void * ) input_buf;
   input.length = input_len;
-
-  output.data = (char *)output_buf;
+  output.data = (void * ) output_buf;
   output.length = input_len;
 
   /*
@@ -304,3 +307,4 @@ kg_arcfour_docrypt (krb5_context context,
   KRB5_LOG(KRB5_INFO, "kg_arcfour_docrypt() end code = %d", code);
   return (code);
 }
+		    

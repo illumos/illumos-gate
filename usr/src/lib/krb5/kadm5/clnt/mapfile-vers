@@ -22,29 +22,28 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNWprivate_1.1 {
     global:
 	_kadm5_get_kpasswd_protocol;
-	chpass_principal3_1;
-	chpass_principal_1;
+	chpass_principal3_2;
+	chpass_principal_2;
 	chpw_error_message;
-	chrand_principal3_1;
-	chrand_principal_1;
-	create_policy_1;
-	create_principal3_1;
-	create_principal_1;
-	delete_policy_1;
-	delete_principal_1;
+	chrand_principal3_2;
+	chrand_principal_2;
+	create_policy_2;
+	create_principal3_2;
+	create_principal_2;
+	delete_policy_2;
+	delete_principal_2;
 	display_status;
-	get_policy_1;
-	get_pols_1;
-	get_principal_1;
-	get_princs_1;
-	get_privs_1;
-	init_1;
+	get_policy_2;
+	get_pols_2;
+	get_principal_2;
+	get_princs_2;
+	get_privs_2;
+	init_2;
 	kadm5_chpass_principal;
 	kadm5_chpass_principal_3;
 	kadm5_chpass_principal_util;
@@ -106,16 +105,16 @@ SUNWprivate_1.1 {
 	krb5_klog_init;
 	krb5_klog_syslog;
 	krb5_log_error_table;
-	krb5_mk_chpw_req;
-	krb5_rd_chpw_rep;
+	krb5int_mk_chpw_req;
+	krb5int_rd_chpw_rep;
 	krb5_read_realm_params;
 	krb5_string_to_flags;
 	krb5_string_to_keysalts;
-	modify_policy_1;
-	modify_principal_1;
-	rename_principal_1;
-	setkey_principal3_1;
-	setkey_principal_1;
+	modify_policy_2;
+	modify_principal_2;
+	rename_principal_2;
+	setkey_principal3_2;
+	setkey_principal_2;
 	xdr_chpass3_arg;
 	xdr_chpass_arg;
 	xdr_chrand3_arg;

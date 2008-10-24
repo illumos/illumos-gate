@@ -1,11 +1,13 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_init.c,v 1.13.2.2 2000/05/09 13:17:14 raeburn Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+
+/*
+ * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
+ */
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,13 +33,6 @@
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- */
-
-
-/*
- * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
- *
- * $Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/clnt/client_init.c,v 1.6 1996/11/07 17:13:44 tytso Exp $
  */
 
 #include <stdio.h>
@@ -545,27 +540,15 @@ _kadm5_initialize_rpcsec_gss_handle(kadm5_server_handle_t handle,
 		goto cleanup;
 	}
 
-	r = init_1(&handle->api_version, handle->clnt, &rpc_err_code);
+	r = init_2(&handle->api_version, handle->clnt);
+	/* Solaris Kerberos: 163 resync */
 	if (r == NULL) {
 		ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
 			"error during admin api initialization\n"));
-
-		if (rpc_err_code == RPC_CANTENCODEARGS) {
-			ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
-				"encryption needed to encode RPC data may not be "
-				"installed/configured on this system"));
-			code = KADM5_RPC_ERROR_CANTENCODEARGS;
-		} else if (rpc_err_code == RPC_CANTDECODEARGS) {
-			ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
-				"encryption needed to decode RPC data may not be "
-				"installed/configured on the server"));
-			code = KADM5_RPC_ERROR_CANTDECODEARGS;
-		} else
-			code = KADM5_RPC_ERROR;
-
+		code = KADM5_RPC_ERROR;
 		goto error;
-
 	}
+
 	if (r->code) {
 		code = r->code;
 		ADMIN_LOG(LOG_ERR,
@@ -701,11 +684,8 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	  return KADM5_BAD_CLIENT_PARAMS;
      }
 			
-     if ((code = kadm5_get_config_params(handle->context,
-					DEFAULT_PROFILE_PATH,
-					"KRB5_CONFIG",
-					params_in,
-					&handle->params))) {
+     if ((code = kadm5_get_config_params(handle->context, 0,
+					 params_in, &handle->params))) {
 	  krb5_free_context(handle->context);
 	  free(handle->lhandle);
 	  free(handle);
@@ -959,8 +939,10 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 		 * to prevent a double free in the "error" code.
 		 */
 		if (code != 0) {
-			if (init_type != INIT_CREDS)
+			if (init_type != INIT_CREDS) {
 				krb5_cc_close(handle->context, ccache);
+				ccache = NULL;
+			}
 			goto error;
 		}
 	}

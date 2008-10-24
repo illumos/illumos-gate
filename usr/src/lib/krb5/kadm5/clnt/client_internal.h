@@ -1,12 +1,11 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__KADM5_CLIENT_INTERNAL_H__
 #define	__KADM5_CLIENT_INTERNAL_H__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -29,9 +28,9 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_internal.h,v 1.1 1996/07/24 22:22:43 tlyu Exp $
+ * $Header$
  * 
- * $Log: client_internal.h,v $
+ * $Log$
  * Revision 1.1  1996/07/24 22:22:43  tlyu
  * 	* Makefile.in, configure.in: break out client lib into a
  * 		subdirectory
@@ -91,6 +90,7 @@
 extern "C" {
 #endif
 
+
 #include "admin_internal.h"
 
 typedef struct _kadm5_server_handle_t {
@@ -101,6 +101,7 @@ typedef struct _kadm5_server_handle_t {
 	int		destroy_cache;
 	CLIENT *	clnt;
 	krb5_context	context;
+	/* Solaris Kerberos */
 	gss_cred_id_t	my_cred;
 	kadm5_config_params params;
 	struct _kadm5_server_handle_t *lhandle;

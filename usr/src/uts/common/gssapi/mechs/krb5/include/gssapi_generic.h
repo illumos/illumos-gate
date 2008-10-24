@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,8 @@
 #ifndef _GSSAPI_GENERIC_H_
 #define _GSSAPI_GENERIC_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * $Id: gssapi_generic.h,v 1.16 2003/03/06 20:26:35 lxs Exp $
+ * $Id: gssapi_generic.h 15252 2003-03-06 20:26:39Z lxs $
  */
 
 #include <gssapi/gssapi.h>

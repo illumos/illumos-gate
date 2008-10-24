@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * kadmin/v5server/keytab.c
  *
@@ -150,11 +149,11 @@ krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
     kerror = krb5_db_get_principal(context, principal, &
 				       db_entry, &n, &more);
     if (kerror) {
-        /* krb5_db_close_database(context); */
+      /*        krb5_db_close_database(context); */
         return(kerror);
     }
     if (n != 1) {
-	/* krb5_db_close_database(context); */
+      /* krb5_db_close_database(context); */
 	return KRB5_KT_NOTFOUND;
     }
 
@@ -209,7 +208,7 @@ krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
     /* Close database */
   error:
     krb5_db_free_principal(context, &db_entry, 1);
-    /* krb5_db_close_database(context); */
+    /*    krb5_db_close_database(context); */
     return(kerror);
 }
 

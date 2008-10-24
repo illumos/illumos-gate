@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * prof_tree.c --- these routines maintain the parse tree of the
@@ -95,17 +94,17 @@ errcode_t profile_create_node(const char *name, const char *value,
 {
 	struct profile_node *new;
 
-	new = (struct profile_node *)malloc(sizeof(struct profile_node));
+	new = malloc(sizeof(struct profile_node));
 	if (!new)
 		return ENOMEM;
 	memset(new, 0, sizeof(struct profile_node));
-	new->name = (char *) strdup(name);
+	new->name = strdup(name);
 	if (new->name == 0) {
 	    profile_free_node(new);
 	    return ENOMEM;
 	}
 	if (value) {
-	new->value = (char *) strdup(value);
+		new->value = strdup(value);
 		if (new->value == 0) {
 		    profile_free_node(new);
 		    return ENOMEM;
@@ -360,6 +359,7 @@ errcode_t profile_find_node_subsection(struct profile_node *section,
 	struct profile_node *p;
 	errcode_t	retval;
 
+	/* Solaris Kerberos */
 	if (section == (struct profile_node *)NULL)
 		return (PROF_NO_PROFILE);
 
@@ -422,8 +422,7 @@ errcode_t profile_node_iterator_create(profile_t profile,
 		done_idx = 1;
 	}
 
-	if ((iter = (struct profile_iterator *)
-		malloc(sizeof(struct profile_iterator))) == NULL)
+	if ((iter = malloc(sizeof(struct profile_iterator))) == NULL)
 		return ENOMEM;
 
 	iter->magic = PROF_MAGIC_ITERATOR;
@@ -538,6 +537,7 @@ get_new_file:
 		 * or find the containing section if not.
 		 */
 		section = iter->file->data->root;
+		assert(section != NULL);
 		for (cpp = iter->names; cpp[iter->done_idx]; cpp++) {
 			for (p=section->first_child; p; p = p->next) {
 				if (!strcmp(p->name, *cpp) && !p->value)
@@ -584,6 +584,8 @@ get_new_file:
 			skip_num--;
 			continue;
 		}
+		if (p->deleted)
+			continue;
 		break;
 	}
 	iter->num++;
@@ -645,7 +647,7 @@ errcode_t profile_set_relation_value(struct profile_node *node,
 	if (!node->value)
 		return PROF_SET_SECTION_VALUE;
 
-	cp = (char *) malloc(strlen(new_value)+1);
+	cp = malloc(strlen(new_value)+1);
 	if (!cp)
 		return ENOMEM;
 
@@ -674,7 +676,7 @@ errcode_t profile_rename_node(struct profile_node *node, const char *new_name)
 	/*
 	 * Make sure we can allocate memory for the new name, first!
 	 */
-	new_string = (char *) malloc(strlen(new_name)+1);
+	new_string = malloc(strlen(new_name)+1);
 	if (!new_string)
 		return ENOMEM;
 	strcpy(new_string, new_name);

@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -26,12 +25,12 @@
 /*
  * Copyright 1993-1994 OpenVision Technologies, Inc., All Rights Reserved.
  * 
- * $Header: /cvs/krbdev/krb5/src/kadmin/passwd/kpasswd.c,v 1.25 2001/02/26 18:22:08 epeisach Exp $
+ * $Header$
  *
  *
  */
 
-static char rcsid[] = "$Id: kpasswd.c,v 1.25 2001/02/26 18:22:08 epeisach Exp $";
+static char rcsid[] = "$Id: kpasswd.c 17258 2005-06-21 01:36:03Z raeburn $";
 
 #include <kadm5/admin.h>
 #include <krb5.h>

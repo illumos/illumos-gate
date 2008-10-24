@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*-
  * Copyright (c) 1990, 1993
@@ -52,6 +51,7 @@ static char sccsid[] = "@(#)dbm.c	8.6 (Berkeley) 11/7/95";
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+
 #include <libintl.h>
 #include "db-ndbm.h"
 #include "hash.h"
@@ -96,6 +96,7 @@ kdb2_fetch(key)
 	if (__cur_db == NULL) {
 		no_open_db();
 		item.dptr = 0;
+		item.dsize = 0;
 		return (item);
 	}
 	return (kdb2_dbm_fetch(__cur_db, key));
@@ -109,6 +110,7 @@ kdb2_firstkey()
 	if (__cur_db == NULL) {
 		no_open_db();
 		item.dptr = 0;
+		item.dsize = 0;
 		return (item);
 	}
 	return (kdb2_dbm_firstkey(__cur_db));
@@ -123,6 +125,7 @@ kdb2_nextkey(key)
 	if (__cur_db == NULL) {
 		no_open_db();
 		item.dptr = 0;
+		item.dsize = 0;
 		return (item);
 	}
 	return (kdb2_dbm_nextkey(__cur_db));

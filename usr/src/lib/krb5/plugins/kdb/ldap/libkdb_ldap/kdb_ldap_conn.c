@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kdb/kdb_ldap/kdb_ldap_conn.c
@@ -65,10 +64,8 @@ krb5_validate_ldap_context(krb5_context context, krb5_ldap_context *ldap_context
 	goto err_out;
     }
 
-    if (ldap_context->bind_pwd == NULL &&
-	ldap_context->service_password_file != NULL &&
-	ldap_context->service_cert_path == NULL) {
-
+    if (ldap_context->bind_pwd == NULL && ldap_context->service_password_file !=
+	NULL && ldap_context->service_cert_path == NULL) {
 	if ((st=krb5_ldap_readpassword(context, ldap_context, &password)) != 0) {
 	    prepend_err_str(context, gettext("Error reading password from stash: "), st, st);
 	    goto err_out;
@@ -168,6 +165,7 @@ krb5_ldap_initialize(ldap_context, server_info)
     krb5_error_code             st=0;
     krb5_ldap_server_handle     *ldap_server_handle=NULL;
     char			*errstr = NULL;
+
 
     ldap_server_handle = calloc(1, sizeof(krb5_ldap_server_handle));
     if (ldap_server_handle == NULL) {

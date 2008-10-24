@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/rcache/rc_io.c
@@ -12,6 +11,7 @@
  * contributed by Daniel J. Bernstein, <brnstnd@acf10.nyu.edu>.
  *
  */
+
 
 /*
  * I/O functions for the replay cache default implementation.
@@ -24,10 +24,9 @@
 #endif
 
 #define KRB5_RC_VNO	0x0501		/* krb5, rcache v 1 */
-#define NEED_SOCKETS
-#define NEED_LOWLEVEL_IO
 
-#include <krb5.h>
+#include "k5-int.h"
+#include <stdio.h> /* for P_tmpdir */
 #include <sys/types.h>
 #include <unistd.h>
 #include <syslog.h> /* SUNW */
@@ -47,7 +46,8 @@
 #error find some way to use net-byte-order file version numbers.
 #endif
 
-#define free(x) ((void) free((char *) (x)))
+/* Solaris Kerberos */
+#define FREE_RC(x) ((void) free((char *) (x)))
 #define UNIQUE getpid() /* hopefully unique number */
 
 #define GETDIR (dir = getdir(), dirlen = strlen(dir) + sizeof(PATH_SEPARATOR) - 1)
@@ -55,13 +55,14 @@
 static char *
 getdir(void)
 {
-     char *dir;
+    char *dir;
 
 #if defined(_WIN32)
-     if (!(dir = getenv("TEMP")))
-	 if (!(dir = getenv("TMP")))
-	     dir = "C:";
+	if (!(dir = getenv("TEMP")))
+	    if (!(dir = getenv("TMP")))
+		dir = "C:";
 #else
+     /* Solaris Kerberos */
      if (geteuid() == 0)
 	 dir = "/var/krb5/rcache/root";
      else
@@ -73,63 +74,67 @@ getdir(void)
 krb5_error_code
 krb5_rc_io_creat(krb5_context context, krb5_rc_iostuff *d, char **fn)
 {
- char *c;
- krb5_int16 rc_vno = htons(KRB5_RC_VNO);
- krb5_error_code retval = 0;
- int do_not_unlink = 0;
- char *dir;
- size_t dirlen;
+    char *c;
+    krb5_int16 rc_vno = htons(KRB5_RC_VNO);
+    krb5_error_code retval = 0;
+    int do_not_unlink = 0;
+    char *dir;
+    size_t dirlen;
 
- GETDIR;
- if (fn && *fn)
-  {
+    GETDIR;
+    if (fn && *fn)
+    {
+    /* Solaris Kerberos */
    if (*fn[0] == '/') {
 	d->fn = strdup(*fn);
 	if (d->fn == NULL)
 		return (KRB5_RC_IO_MALLOC);
    } else {
 	if (!(d->fn = malloc(strlen(*fn) + dirlen + 1)))
-		return KRB5_RC_IO_MALLOC;
+	    return KRB5_RC_IO_MALLOC;
 	(void) strcpy(d->fn, dir);
 	(void) strcat(d->fn, PATH_SEPARATOR);
 	(void) strcat(d->fn, *fn);
    }
-   d->fd = THREEPARAMOPEN(d->fn, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL | O_BINARY, 0600);
-  }
- else
-  {
-      /* %d is max 11 digits (-, 10 digits of 32-bit number)
-	 * 11 + /krb5_RC + aaa = 24, +6 for slop */
-   if (!(d->fn = malloc(30 + dirlen)))
-     return KRB5_RC_IO_MALLOC;
-   if (fn)
-     if (!(*fn = malloc(35))) {
-       free(d->fn);
-       return KRB5_RC_IO_MALLOC;
-     }
-   (void) sprintf(d->fn, "%s%skrb5_RC%d", dir, PATH_SEPARATOR, (int) UNIQUE);
-   c = d->fn + strlen(d->fn);
-   (void) strcpy(c, "aaa");
-   while ((d->fd = THREEPARAMOPEN(d->fn, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL | O_BINARY, 0600)) == -1)
-    {
-     if ((c[2]++) == 'z')
-      {
-       c[2] = 'a';
-       if ((c[1]++) == 'z')
-	{
-         c[1] = 'a';
-         if ((c[0]++) == 'z')
-           break; /* sigh */
-        }
-      }
+    d->fd = THREEPARAMOPEN(d->fn, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL |
+		       O_BINARY, 0600);
     }
-   if (fn)
-     (void) strcpy(*fn, d->fn + dirlen);
-  }
- if (d->fd == -1)
- {
-   switch(errno)
+    else
     {
+	/* %d is max 11 digits (-, 10 digits of 32-bit number)
+	 * 11 + /krb5_RC + aaa = 24, +6 for slop */
+	if (!(d->fn = malloc(30 + dirlen)))
+	    return KRB5_RC_IO_MALLOC;
+	if (fn)
+	    if (!(*fn = malloc(35))) {
+		FREE_RC(d->fn);
+		return KRB5_RC_IO_MALLOC;
+	    }
+	(void) sprintf(d->fn, "%s%skrb5_RC%d", dir, PATH_SEPARATOR,
+		       (int) UNIQUE);
+	c = d->fn + strlen(d->fn);
+	(void) strcpy(c, "aaa");
+	while ((d->fd = THREEPARAMOPEN(d->fn, O_WRONLY | O_CREAT | O_TRUNC |
+				       O_EXCL | O_BINARY, 0600)) == -1)
+	{
+	    if ((c[2]++) == 'z')
+	    {
+		c[2] = 'a';
+		if ((c[1]++) == 'z')
+		{
+		    c[1] = 'a';
+		    if ((c[0]++) == 'z')
+			break; /* sigh */
+		}
+	    }
+	}
+	if (fn)
+	    (void) strcpy(*fn, d->fn + dirlen);
+    }
+    if (d->fd == -1)
+    {
+	switch(errno)
+	{
 	case EFBIG:
 #ifdef EDQUOT
 	case EDQUOT:
@@ -137,6 +142,7 @@ krb5_rc_io_creat(krb5_context context, krb5_rc_iostuff *d, char **fn)
 	case ENOSPC:
 	    retval = KRB5_RC_IO_SPACE;
 	    goto cleanup;
+
 	case EIO:
 	    retval = KRB5_RC_IO_IO;
 	    goto cleanup;
@@ -146,15 +152,20 @@ krb5_rc_io_creat(krb5_context context, krb5_rc_iostuff *d, char **fn)
 	case EROFS:
 	case EEXIST:
 	    retval = KRB5_RC_IO_PERM;
+	    krb5_set_error_message(context, retval,
+				   "Cannot create replay cache: %s",
+				   strerror(errno));
 	    do_not_unlink = 1;
 	    goto cleanup;
 
 	default:
 	    retval = KRB5_RC_IO_UNKNOWN;
+	    krb5_set_error_message(context, retval,
+				   "Cannot create replay cache: %s",
+				   strerror(errno));
 	    goto cleanup;
+	}
     }
-  }
-
     retval = krb5_rc_io_write(context, d, (krb5_pointer)&rc_vno,
 			      sizeof(rc_vno));
     if (retval)
@@ -167,17 +178,19 @@ krb5_rc_io_creat(krb5_context context, krb5_rc_iostuff *d, char **fn)
 	if (d->fn) {
 	    if (!do_not_unlink)
 		(void) unlink(d->fn);
-	    free(d->fn);
+	    FREE_RC(d->fn);
 	    d->fn = NULL;
 	}
-	(void) close(d->fd);
+	if (d->fd != -1) {
+	  (void) close(d->fd);
+	}
     }
     return retval;
 }
 
 static krb5_error_code
 krb5_rc_io_open_internal(krb5_context context, krb5_rc_iostuff *d, char *fn,
-char* full_pathname)
+			 char* full_pathname)
 {
     krb5_int16 rc_vno;
     krb5_error_code retval = 0;
@@ -194,7 +207,7 @@ char* full_pathname)
 		return (KRB5_RC_IO_MALLOC);
     } else {
 	if (!(d->fn = malloc(strlen(fn) + dirlen + 1)))
-		return KRB5_RC_IO_MALLOC;
+	    return KRB5_RC_IO_MALLOC;
 	(void) strcpy(d->fn, dir);
 	(void) strcat(d->fn, PATH_SEPARATOR);
 	(void) strcat(d->fn, fn);
@@ -223,6 +236,7 @@ char* full_pathname)
 	/* make sure the rcache is a regular file */
 	if (((fstatb.st_mode & S_IFMT) != S_IFREG)) {
 	    retval = KRB5_RC_IO_PERM;
+
 	    goto cleanup;
 	}
 #endif
@@ -254,14 +268,14 @@ char* full_pathname)
 
     do_not_unlink = 0;
     retval = krb5_rc_io_read(context, d, (krb5_pointer) &rc_vno,
-	    sizeof(rc_vno));
+			     sizeof(rc_vno));
     if (retval)
 	goto cleanup;
 
     if (ntohs(rc_vno) != KRB5_RC_VNO)
 	retval = KRB5_RCACHE_BADVNO;
 
-cleanup:
+ cleanup:
     if (use_errno) {
 	switch(errno)
 	{
@@ -281,23 +295,28 @@ cleanup:
 	    case EACCES:
 	    case EROFS:
 		retval = KRB5_RC_IO_PERM;
+	    	krb5_set_error_message (context, retval,
+			    "Cannot open replay cache %s: %s",
+			    d->fn, strerror(errno));
 		break;
 
 	    default:
 		retval = KRB5_RC_IO_UNKNOWN;
+		krb5_set_error_message (context, retval,
+			    "Cannot open replay cache %s: %s",
+			    d->fn, strerror(errno));
 	}
     }
     /* Solaris: END made changes to be safer and better code structure */
     if (retval) {
 	if (d->fn) {
-	    if (!do_not_unlink) {
-		/* unlink in case there is a bogus RC. */
+	    if (!do_not_unlink)
 		(void) unlink(d->fn);
-	    }
-	    free(d->fn);
+	    FREE_RC(d->fn);
 	    d->fn = NULL;
 	}
-	(void) close(d->fd);
+	if (d->fd >= 0) 
+	     (void) close(d->fd);
     }
     return retval;
 }
@@ -312,7 +331,7 @@ krb5_error_code
 krb5_rc_io_move(krb5_context context, krb5_rc_iostuff *new1,
 		krb5_rc_iostuff *old)
 {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__CYGWIN__)
     char *new_fn = NULL;
     char *old_fn = NULL;
     off_t offset = 0;
@@ -391,14 +410,26 @@ krb5_rc_io_write(krb5_context context, krb5_rc_iostuff *d, krb5_pointer buf,
     if (write(d->fd, (char *) buf, num) == -1)
 	switch(errno)
 	{
-	case EBADF: return KRB5_RC_IO_UNKNOWN;
-	case EFBIG: return KRB5_RC_IO_SPACE;
 #ifdef EDQUOT
-	case EDQUOT: return KRB5_RC_IO_SPACE;
+	case EDQUOT:
 #endif
-	case ENOSPC: return KRB5_RC_IO_SPACE;
-	case EIO: return KRB5_RC_IO_IO;
-	default: return KRB5_RC_IO_UNKNOWN;
+	case EFBIG:
+	case ENOSPC:
+	    krb5_set_error_message (context, KRB5_RC_IO_SPACE,
+				    "Can't write to replay cache: %s",
+				    strerror(errno));
+	    return KRB5_RC_IO_SPACE;
+	case EIO:
+	    krb5_set_error_message (context, KRB5_RC_IO_IO,
+				    "Can't write to replay cache: %s",
+				    strerror(errno));
+	    return KRB5_RC_IO_IO;
+	case EBADF:
+	default:
+	    krb5_set_error_message (context, KRB5_RC_IO_UNKNOWN,
+				    "Can't write to replay cache: %s",
+				    strerror(errno));
+	    return KRB5_RC_IO_UNKNOWN;
 	}
     return 0;
 }
@@ -416,7 +447,11 @@ krb5_rc_io_sync(krb5_context context, krb5_rc_iostuff *d)
 	{
 	case EBADF: return KRB5_RC_IO_UNKNOWN;
 	case EIO: return KRB5_RC_IO_IO;
-	default: return KRB5_RC_IO_UNKNOWN;
+	default:
+	    krb5_set_error_message(context, KRB5_RC_IO_UNKNOWN,
+				   "Cannot sync replay cache file: %s",
+				   strerror(errno));
+	    return KRB5_RC_IO_UNKNOWN;
 	}
     }
     return 0;
@@ -431,9 +466,13 @@ krb5_rc_io_read(krb5_context context, krb5_rc_iostuff *d, krb5_pointer buf,
     if ((count = read(d->fd, (char *) buf, num)) == -1)
 	switch(errno)
 	{
-	case EBADF: return KRB5_RC_IO_UNKNOWN;
 	case EIO: return KRB5_RC_IO_IO;
-	default: return KRB5_RC_IO_UNKNOWN;
+	case EBADF:
+	default:
+	    krb5_set_error_message(context, KRB5_RC_IO_UNKNOWN,
+				   "Can't read from replay cache: %s",
+				   strerror(errno));
+	    return KRB5_RC_IO_UNKNOWN;
 	}
     if (count == 0)
 	return KRB5_RC_IO_EOF;
@@ -445,7 +484,7 @@ krb5_error_code
 krb5_rc_io_close(krb5_context context, krb5_rc_iostuff *d)
 {
     if (d->fn != NULL) {
-	free(d->fn);
+	FREE_RC(d->fn);
 	d->fn = NULL;
     }
     if (d->fd != -1) {
@@ -460,17 +499,29 @@ krb5_rc_io_close(krb5_context context, krb5_rc_iostuff *d)
 krb5_error_code
 krb5_rc_io_destroy(krb5_context context, krb5_rc_iostuff *d)
 {
- if (unlink(d->fn) == -1)
-   switch(errno)
-    {
-     case EBADF: return KRB5_RC_IO_UNKNOWN;
-     case EIO: return KRB5_RC_IO_IO;
-     case EPERM: return KRB5_RC_IO_PERM;
-     case EBUSY: return KRB5_RC_IO_PERM;
-     case EROFS: return KRB5_RC_IO_PERM;
-     default: return KRB5_RC_IO_UNKNOWN;
-    }
- return 0;
+    if (unlink(d->fn) == -1)
+	switch(errno)
+	{
+	case EIO:
+	    krb5_set_error_message(context, KRB5_RC_IO_IO,
+				   "Can't destroy replay cache: %s",
+				   strerror(errno));
+	    return KRB5_RC_IO_IO;
+	case EPERM:
+	case EBUSY:
+	case EROFS:
+	    krb5_set_error_message(context, KRB5_RC_IO_PERM,
+				   "Can't destroy replay cache: %s",
+				   strerror(errno));
+	    return KRB5_RC_IO_PERM;
+	case EBADF:
+	default:
+	    krb5_set_error_message(context, KRB5_RC_IO_UNKNOWN,
+				   "Can't destroy replay cache: %s",
+				   strerror(errno));
+	    return KRB5_RC_IO_UNKNOWN;
+	}
+    return 0;
 }
 
 /*ARGSUSED*/

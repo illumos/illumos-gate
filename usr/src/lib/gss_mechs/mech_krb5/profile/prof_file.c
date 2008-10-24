@@ -1,8 +1,7 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * prof_file.c ---- routines that manipulate an individual profile file.
  */
@@ -55,6 +54,9 @@ MAKE_FINI_FUNCTION(profile_library_finalizer);
 
 int profile_library_initializer(void)
 {
+#ifdef SHOW_INITFINI_FUNCS
+    printf("profile_library_initializer\n");
+#endif
 #if !USE_BUNDLE_ERROR_STRINGS
     add_error_table(&et_prof_error_table);
 #endif
@@ -62,8 +64,15 @@ int profile_library_initializer(void)
 }
 void profile_library_finalizer(void)
 {
-    if (! INITIALIZER_RAN(profile_library_initializer) || PROGRAM_EXITING())
+    if (! INITIALIZER_RAN(profile_library_initializer) || PROGRAM_EXITING()) {
+#ifdef SHOW_INITFINI_FUNCS
+	printf("profile_library_finalizer: skipping\n");
+#endif
 	return;
+    }
+#ifdef SHOW_INITFINI_FUNCS
+    printf("profile_library_finalizer\n");
+#endif
     k5_mutex_destroy(&g_shared_trees_mutex);
 #if !USE_BUNDLE_ERROR_STRINGS
     remove_error_table(&et_prof_error_table);
@@ -85,6 +94,7 @@ static void profile_free_file_data(prf_data_t);
 		assert(d->fslen <= 1000); /* XXX */		\
 		assert(d->filespec[d->fslen] == 0);		\
 		assert(d->fslen = strlen(d->filespec));		\
+		assert(d->root != NULL);			\
 	    }							\
 	}
 
@@ -118,7 +128,7 @@ static int rw_access(const_profile_filespec_t filespec)
 	 * checks the r/w permissions.
 	 */
 	FILE	*f;
-
+	/* Solaris Kerberos */
 	f = fopen(filespec, "r+F");
 	if (f) {
 		fclose(f);
@@ -143,6 +153,7 @@ static int r_access(const_profile_filespec_t filespec)
 	 */
 	FILE	*f;
 
+	/* Solaris Kerberos */
 	f = fopen(filespec, "rF");
 	if (f) {
 		fclose(f);
@@ -196,7 +207,7 @@ errcode_t profile_open_file(const_profile_filespec_t filespec,
 
 	scan_shared_trees_unlocked();
 
-	prf = (prf_file_t) malloc(sizeof(struct _prf_file_t));
+	prf = malloc(sizeof(struct _prf_file_t));
 	if (!prf)
 		return ENOMEM;
 	memset(prf, 0, sizeof(struct _prf_file_t));
@@ -208,25 +219,12 @@ errcode_t profile_open_file(const_profile_filespec_t filespec,
 #ifdef HAVE_PWD_H
 		if (home_env == NULL) {
 		    uid_t uid;
-		    struct passwd *pw;
-#ifdef HAVE_GETPWUID_R
-		    struct passwd pwx;
+		    struct passwd *pw, pwx;
 		    char pwbuf[BUFSIZ];
-#endif
 
 		    uid = getuid();
-#ifndef HAVE_GETPWUID_R
-		    pw = getpwuid(uid);
-#elif defined(GETPWUID_R_4_ARGS)
-		    /* earlier POSIX drafts */
-		    pw = getpwuid_r(uid, &pwx, pwbuf, sizeof(pwbuf));
-#else
-		    /* POSIX */
-		    if (getpwuid_r(uid, &pwx, pwbuf, sizeof(pwbuf), &pw) != 0)
-			/* Probably already null, but let's make sure.  */
-			pw = NULL;
-#endif /* getpwuid variants */
-		    if (pw != NULL && pw->pw_dir[0] != 0)
+		    if (!k5_getpwuid_r(uid, &pwx, pwbuf, sizeof(pwbuf), &pw)
+			&& pw != NULL && pw->pw_dir[0] != 0)
 			home_env = pw->pw_dir;
 		}
 #endif
@@ -257,9 +255,9 @@ errcode_t profile_open_file(const_profile_filespec_t filespec,
 		break;
 	}
 	if (data) {
-	    retval = profile_update_file_data(data);
 	    data->refcount++;
 	    (void) k5_mutex_unlock(&g_shared_trees_mutex);
+	    retval = profile_update_file_data(data);
 	    free(expanded_filename);
 	    prf->data = data;
 	    *ret_prof = prf;
@@ -311,9 +309,8 @@ errcode_t profile_update_file_data(prf_data_t data)
 	errcode_t retval;
 #ifdef HAVE_STAT
 	struct stat st;
-#ifdef STAT_ONCE_PER_SECOND
+	unsigned long frac;
 	time_t now;
-#endif
 #endif
 	FILE *f;
 
@@ -322,22 +319,29 @@ errcode_t profile_update_file_data(prf_data_t data)
 	    return retval;
 
 #ifdef HAVE_STAT
-#ifdef STAT_ONCE_PER_SECOND
 	now = time(0);
-	if (now == data->last_stat) {
+	if (now == data->last_stat && data->root != NULL) {
 	    k5_mutex_unlock(&data->lock);
 	    return 0;
 	}
-#endif
 	if (stat(data->filespec, &st)) {
 	    retval = errno;
 	    k5_mutex_unlock(&data->lock);
 	    return retval;
 	}
-#ifdef STAT_ONCE_PER_SECOND
 	data->last_stat = now;
+#if defined HAVE_STRUCT_STAT_ST_MTIMENSEC
+	frac = st.st_mtimensec;
+#elif defined HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC
+	frac = st.st_mtimespec.tv_nsec;
+#elif defined HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
+	frac = st.st_mtim.tv_nsec;
+#else
+	frac = 0;
 #endif
-	if (st.st_mtime == data->timestamp) {
+	if (st.st_mtime == data->timestamp
+	    && frac == data->frac_ts
+	    && data->root != NULL) {
 	    k5_mutex_unlock(&data->lock);
 	    return 0;
 	}
@@ -361,6 +365,7 @@ errcode_t profile_update_file_data(prf_data_t data)
 	}
 #endif
 	errno = 0;
+	/* Solaris Kerberos */
 	f = fopen(data->filespec, "rF");
 	if (f == NULL) {
 		retval = errno;
@@ -379,8 +384,10 @@ errcode_t profile_update_file_data(prf_data_t data)
 	    k5_mutex_unlock(&data->lock);
 	    return retval;
 	}
+	assert(data->root != NULL);
 #ifdef HAVE_STAT
 	data->timestamp = st.st_mtime;
+	data->frac_ts = frac;
 #endif
 	k5_mutex_unlock(&data->lock);
 	return 0;
@@ -407,10 +414,10 @@ static errcode_t write_data_to_file(prf_data_t data, const char *outfile,
 	retval = ENOMEM;
 	
 	new_file = old_file = 0;
-	new_file = (char *) malloc(strlen(outfile) + 5);
+	new_file = malloc(strlen(outfile) + 5);
 	if (!new_file)
 		goto errout;
-	old_file = (char *) malloc(strlen(outfile) + 5);
+	old_file = malloc(strlen(outfile) + 5);
 	if (!old_file)
 		goto errout;
 
@@ -419,6 +426,7 @@ static errcode_t write_data_to_file(prf_data_t data, const char *outfile,
 
 	errno = 0;
 
+	/* Solaris Kerberos */
 	f = fopen(new_file, "wF");
 	if (!f) {
 		retval = errno;
@@ -533,19 +541,19 @@ errcode_t profile_flush_file_data_to_file(prf_data_t data, const char *outfile)
 void profile_dereference_data(prf_data_t data)
 {
     int err;
-    scan_shared_trees_unlocked();
     err = k5_mutex_lock(&g_shared_trees_mutex);
     if (err)
 	return;
     profile_dereference_data_locked(data);
     (void) k5_mutex_unlock(&g_shared_trees_mutex);
-    scan_shared_trees_unlocked();
 }
 void profile_dereference_data_locked(prf_data_t data)
 {
+    scan_shared_trees_locked();
     data->refcount--;
     if (data->refcount == 0)
 	profile_free_file_data(data);
+    scan_shared_trees_locked();
 }
 
 int profile_lock_global()

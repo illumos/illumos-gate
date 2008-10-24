@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2006 by the Massachusetts Institute of Technology.
@@ -264,6 +263,6 @@ kdb_vftabl kdb_function_table = {
   /* db_free */                                wrap_krb5_db2_free,
   /* set_master_key */			       wrap_krb5_db2_set_master_key_ext,
   /* get_master_key */			       wrap_krb5_db2_db_get_mkey,
-  /* blah blah blah */			       0,0,0,0,0,0,
+  /* blah blah blah */ 0,0,0,0,0,0,
   /* promote_db */			       wrap_krb5_db2_promote_db,
 };

@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 #include <security/cryptoki.h>
@@ -102,7 +101,8 @@ switch (errorno) {
 			"KRB5 error code 28"));
 	case 29:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 29"));
+			"A service is not available that is required to "
+			"process the request"));
 	case 30:
 		return (dgettext(TEXT_DOMAIN,
 			"KRB5 error code 30"));
@@ -168,10 +168,10 @@ switch (errorno) {
 			"Inappropriate type of checksum in message"));
 	case 51:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 51"));
+			"Policy rejects transited path"));
 	case 52:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 52"));
+			"Response too big for UDP, retry with TCP"));
 	case 53:
 		return (dgettext(TEXT_DOMAIN,
 			"KRB5 error code 53"));
@@ -201,19 +201,19 @@ switch (errorno) {
 			"Field is too long for this implementation"));
 	case 62:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 62"));
+			"Client not trusted"));
 	case 63:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 63"));
+			"KDC not trusted"));
 	case 64:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 64"));
+			"Invalid signature"));
 	case 65:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 65"));
+			"Key parameters not accepted"));
 	case 66:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 66"));
+			"Certificate mismatch"));
 	case 67:
 		return (dgettext(TEXT_DOMAIN,
 			"KRB5 error code 67"));
@@ -225,40 +225,40 @@ switch (errorno) {
 			"KRB5 error code 69"));
 	case 70:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 70"));
+			"Can't verify certificate"));
 	case 71:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 71"));
+			"Invalid certificate"));
 	case 72:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 72"));
+			"Revoked certificate"));
 	case 73:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 73"));
+			"Revocation status unknown"));
 	case 74:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 74"));
+			"Revocation status unavailable"));
 	case 75:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 75"));
+			"Client name mismatch"));
 	case 76:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 76"));
+			"KDC name mismatch"));
 	case 77:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 77"));
+			"Inconsistent key purpose"));
 	case 78:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 78"));
+			"Digest in certificate not accepted"));
 	case 79:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 79"));
+			"Checksum must be included"));
 	case 80:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 80"));
+			"Digest in signed-data not accepted"));
 	case 81:
 		return (dgettext(TEXT_DOMAIN,
-			"KRB5 error code 81"));
+			"Public key encryption not supported"));
 	case 82:
 		return (dgettext(TEXT_DOMAIN,
 			"KRB5 error code 82"));

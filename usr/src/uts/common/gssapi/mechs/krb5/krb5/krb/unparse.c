@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/unparse.c
  *
@@ -35,7 +34,7 @@
  */
 
 
-#include <k5-int.h>
+#include "k5-int.h"
 #ifndef	_KERNEL
 #include <stdio.h>
 #endif
@@ -97,7 +96,7 @@ krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal, regi
 				totalsize++;
 		totalsize++;	/* This is for the separator */
 	}
-	if (nelem == 0 )
+	if (nelem == 0)
 		totalsize++;
 
 	/*
@@ -163,7 +162,7 @@ krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal, regi
 	}
 
 	if (i > 0)
-		q--;		/* Back up last component separator */
+	    q--;		/* Back up last component separator */
 	*q++ = REALM_SEP;
 	
 	cp = krb5_princ_realm(context, principal)->data;
@@ -204,8 +203,8 @@ krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal, regi
 krb5_error_code KRB5_CALLCONV
 krb5_unparse_name(krb5_context context, krb5_const_principal principal, register char **name)
 {
-	if (name)			/* name == NULL will return error from _ext */
-		*name = NULL;
+        if (name)                       /* name == NULL will return error from _ext */
+            *name = NULL;
 	return(krb5_unparse_name_ext(context, principal, name, NULL));
 }
 

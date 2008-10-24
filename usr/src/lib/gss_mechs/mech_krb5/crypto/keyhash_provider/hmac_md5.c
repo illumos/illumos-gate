@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/crypto/keyhash_provider/hmac_md5.c
@@ -37,10 +36,10 @@
 * Implemented based on draft-brezak-win2k-krb-rc4-hmac-03
  */
 
-#include <k5-int.h>
-#include <arcfour.h>
-#include <hash_provider.h>
-#include <keyhash_provider.h>
+#include "k5-int.h"
+#include "keyhash_provider.h"
+#include "arcfour.h"
+#include "hash_provider.h"
 
 static  krb5_error_code
 k5_hmac_md5_hash (krb5_context context,
@@ -64,14 +63,15 @@ k5_hmac_md5_hash (krb5_context context,
   ks.length = key->length;
   ds.data = malloc(ds.length);
   if (ds.data == NULL)
-    return (ENOMEM);
+    return ENOMEM;
   ks.contents = (void *) ds.data;
 
   ks_constant.data = "signaturekey";
   ks_constant.length = strlen(ks_constant.data)+1; /* Including null*/
 
+  /* Solaris Kerberos */
   ret = krb5_hmac(context, &krb5int_hash_md5, key, 1,
-		&ks_constant, &ds);
+		   &ks_constant, &ds);
   if (ret)
     goto cleanup;
 
@@ -81,6 +81,7 @@ k5_hmac_md5_hash (krb5_context context,
   t[2] = (ms_usage >>16) & 0xff;
   t[3] = (ms_usage>>24) & 0XFF;
 
+  /* Solaris Kerberos */
   mechanism.mechanism = CKM_MD5;
   mechanism.pParameter = NULL_PTR;
   mechanism.ulParameterLen = 0;
@@ -126,10 +127,11 @@ cleanup:
   return (ret);
 }
 
-const struct krb5_keyhash_provider 
-krb5int_keyhash_hmac_md5 = {
-	16,
-	k5_hmac_md5_hash,
-	NULL /*checksum  again*/
+		 
+
+const struct krb5_keyhash_provider krb5int_keyhash_hmac_md5 = {
+  16,
+  k5_hmac_md5_hash,
+  NULL /*checksum  again*/
 };
 

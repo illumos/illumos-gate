@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/rd_error.c
  *
@@ -28,7 +27,7 @@
  * krb5_rd_error() routine
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  *  Parses an error message from enc_errbuf and returns an allocated
@@ -48,3 +47,4 @@ krb5_rd_error(krb5_context context, const krb5_data *enc_errbuf, krb5_error **de
 	return KRB5KRB_AP_ERR_MSG_TYPE;
     return(decode_krb5_error(enc_errbuf, dec_error));
 }
+

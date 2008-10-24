@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/serialize.c
  *
@@ -34,9 +33,13 @@
 /*
  * Base routines to deal with serialization of Kerberos metadata.
  */
-#include <k5-int.h>
+#include "k5-int.h"
 
+/* Solaris Kerberos */
 #include <k5-platform.h>
+#include <k5-platform-store_64.h>
+#include <k5-platform-load_64.h>
+
 /*
  * krb5_find_serializer()	- See if a particular type is registered.
  */
@@ -57,7 +60,7 @@ krb5_find_serializer(krb5_context kcontext, krb5_magic odtype)
     }
     return(res);
 }
-
+
 /*
  * krb5_register_serializer()	- Register a particular serializer.
  */
@@ -77,10 +80,10 @@ krb5_register_serializer(krb5_context kcontext, const krb5_ser_entry *entry)
 					       (kcontext->ser_ctx_count+1)))) {
 	    /* Copy in old table */
 	    if (kcontext->ser_ctx_count)
-		    (void) memcpy(stable, kcontext->ser_ctx,
-			   sizeof(krb5_ser_entry) * kcontext->ser_ctx_count);
+	        (void) memcpy((void*)stable, kcontext->ser_ctx,
+		        sizeof(krb5_ser_entry) * kcontext->ser_ctx_count);
 	    /* Copy in new entry */
-	    (void) memcpy(&stable[kcontext->ser_ctx_count], entry,
+	    (void) memcpy((void*)&stable[kcontext->ser_ctx_count], entry,
 		   sizeof(krb5_ser_entry));
 	    if (kcontext->ser_ctx) 
 		krb5_xfree_wrap(kcontext->ser_ctx,
@@ -92,10 +95,10 @@ krb5_register_serializer(krb5_context kcontext, const krb5_ser_entry *entry)
 	    kret = ENOMEM;
     }
     else
-	(void) memcpy(stable, entry, sizeof(krb5_ser_entry));
+	(void) memcpy((void*)stable, entry, sizeof(krb5_ser_entry));
     return(kret);
 }
-
+
 /*
  * krb5_size_opaque()	- Determine the size necessary to serialize a given
  *			  piece of opaque data.
@@ -112,7 +115,7 @@ krb5_size_opaque(krb5_context kcontext, krb5_magic odtype, krb5_pointer arg, siz
 	kret = (shandle->sizer) ? (*shandle->sizer)(kcontext, arg, sizep) : 0;
     return(kret);
 }
-
+
 /*
  * krb5_externalize_opaque()	- Externalize a piece of opaque data.
  */
@@ -129,7 +132,7 @@ krb5_externalize_opaque(krb5_context kcontext, krb5_magic odtype, krb5_pointer a
 	    (*shandle->externalizer)(kcontext, arg, bufpp, sizep) : 0;
     return(kret);
 }
-
+
 /*
  * Externalize a piece of arbitrary data.
  */
@@ -163,7 +166,7 @@ krb5_externalize_data(krb5_context kcontext, krb5_pointer arg, krb5_octet **bufp
     }
     return(kret);
 }
-
+
 /*
  * krb5_internalize_opaque()	- Convert external representation into a data
  *				  structure.
@@ -181,9 +184,9 @@ krb5_internalize_opaque(krb5_context kcontext, krb5_magic odtype, krb5_pointer *
 	    (*shandle->internalizer)(kcontext, argp, bufpp, sizep) : 0;
     return(kret);
 }
-
+
 /*
- * krb5_ser_pack_int32()	- Pack a 4-byte integer if space is availble.
+ * krb5_ser_pack_int32()	- Pack a 4-byte integer if space is available.
  *				  Update buffer pointer and remaining space.
  */
 krb5_error_code KRB5_CALLCONV
@@ -201,7 +204,7 @@ krb5_ser_pack_int32(krb5_int32 iarg, krb5_octet **bufp, size_t *remainp)
     else
 	return(ENOMEM);
 }
-
+
 /*
  * krb5_ser_pack_int64()	- Pack an 8-byte integer if space is available.
  *				  Update buffer pointer and remaining space.
@@ -216,9 +219,9 @@ krb5_ser_pack_int64(krb5_int64 iarg, krb5_octet **bufp, size_t *remainp)
 	return(0);
     }
     else
-        return(ENOMEM);
+	return(ENOMEM);
 }
-
+
 /*
  * krb5_ser_pack_bytes()	- Pack a string of bytes.
  */
@@ -234,7 +237,7 @@ krb5_ser_pack_bytes(krb5_octet *ostring, size_t osize, krb5_octet **bufp, size_t
     else
 	return(ENOMEM);
 }
-
+
 /*
  * krb5_ser_unpack_int32()	- Unpack a 4-byte integer if it's there.
  */
@@ -253,7 +256,7 @@ krb5_ser_unpack_int32(krb5_int32 *intp, krb5_octet **bufp, size_t *remainp)
     else
 	return(ENOMEM);
 }
-
+
 /*
  * krb5_ser_unpack_int64()	- Unpack an 8-byte integer if it's there.
  */
@@ -267,9 +270,9 @@ krb5_ser_unpack_int64(krb5_int64 *intp, krb5_octet **bufp, size_t *remainp)
 	return(0);
     }
     else
-        return(ENOMEM);
+	return(ENOMEM);
 }
-
+
 /*
  * krb5_ser_unpack_bytes()	- Unpack a byte string if it's there.
  */

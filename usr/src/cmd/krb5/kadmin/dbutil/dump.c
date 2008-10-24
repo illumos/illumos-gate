@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -2719,8 +2718,7 @@ load_db(argc, argv)
 	 newparams.mask |= KADM5_CONFIG_DBNAME;
 	 newparams.dbname = dbname_tmp;
 
-	 /* Solaris kerberos: using older kadm5_get_config_params interface */
-	 if ((kret = kadm5_get_config_params(kcontext, NULL, NULL,
+	 if ((kret = kadm5_get_config_params(kcontext, 1,
 					     &newparams, &newparams))) {
 	      com_err(argv[0], kret,
 			    gettext("while retreiving new "

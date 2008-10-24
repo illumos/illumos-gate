@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kdb/kdb_ldap/kdb_ldap.c
@@ -133,12 +132,7 @@ krb5_ldap_read_startup_information(krb5_context context)
         memset((char *) &params_in, 0, sizeof(params_in));
         memset((char *) &params_out, 0, sizeof(params_out));
 
-	/* Solaris Kerberos: not supported yet */
-#if 0 /************** Begin IFDEF'ed OUT *******************************/
         retval = kadm5_get_config_params(context, 1, &params_in, &params_out);
-#else
-        retval = kadm5_get_config_params(context, NULL, NULL, &params_in, &params_out);
-#endif /**************** END IFDEF'ed OUT *******************************/
         if (retval) {
             if ((mask & LDAP_REALM_MAXTICKETLIFE) == 0) {
                 ldap_context->lrparams->max_life = 24 * 60 * 60; /* 1 day */

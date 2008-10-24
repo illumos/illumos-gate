@@ -28,7 +28,6 @@
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "k5-int.h"
 #include "kdc_util.h"
@@ -552,6 +551,18 @@ subrealm(char *r1, char *r2)
  *        names.
  */
 
+static char *
+data2string (krb5_data *d)
+{
+    char *s;
+    s = malloc(d->length + 1);
+    if (s) {
+	memcpy(s, d->data, d->length);
+	s[d->length] = 0;
+    }
+    return s;
+}
+
 krb5_error_code 
 add_to_transited(krb5_data *tgt_trans, krb5_data *new_trans,
 		 krb5_principal tgs, krb5_principal client,
@@ -574,19 +585,15 @@ add_to_transited(krb5_data *tgt_trans, krb5_data *new_trans,
   int         pl, pl1;       /* prefix length                               */
   int         added;         /* TRUE = new realm has been added             */
 
-  if (!(realm = (char *) malloc(krb5_princ_realm(kdc_context, tgs)->length+1))) {
-    return(ENOMEM);
-  }
-  memcpy(realm, krb5_princ_realm(kdc_context, tgs)->data, 
-	 krb5_princ_realm(kdc_context, tgs)->length);
-  realm[krb5_princ_realm(kdc_context, tgs)->length] = '\0';
+  realm = data2string(krb5_princ_realm(kdc_context, tgs));
+  if (realm == NULL)
+      return(ENOMEM);
 
-  if (!(otrans = (char *) malloc(tgt_trans->length+1))) {
-    free(realm);
-    return(ENOMEM);
+  otrans = data2string(tgt_trans);
+  if (otrans == NULL) {
+      free(realm);
+      return(ENOMEM);
   }
-  memcpy(otrans, tgt_trans->data, tgt_trans->length);
-  otrans[tgt_trans->length] = '\0';
   /* Keep track of start so we can free */
   otrans_ptr = otrans;
 
@@ -703,8 +710,12 @@ add_to_transited(krb5_data *tgt_trans, krb5_data *new_trans,
       /* subrealm of the next field too, and we will catch     */
       /* it in a future iteration.                             */
 
-      if ((next[nlst] != '.') && (next[0] != '/') &&
-          (pl = subrealm(exp, realm))) {
+	/* Note that the second test here is an unsigned comparison,
+	   so the first half (or a cast) is also required.  */
+      assert(nlst < 0 || nlst < sizeof(next));
+      if ((nlst < 0 || next[nlst] != '.') &&
+	  (next[0] != '/') &&
+	  (pl = subrealm(exp, realm))) {
         added = TRUE;
 	current[sizeof(current) - 1] = '\0';
 	if (strlen(current) + (pl>0?pl:-pl) + 2 >= MAX_REALM_LN) {

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
  *
@@ -21,12 +19,12 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_misc_free.c,v 1.2 1996/10/18 19:45:53 bjaspan Exp $
+ * $Header$
  * 
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_misc_free.c,v 1.2 1996/10/18 19:45:53 bjaspan Exp $";
+static char *rcsid = "$Header$";
 #endif
 #include	<kadm5/admin.h>
 #include	<stdlib.h>

@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -31,7 +30,7 @@
 #define _GSSAPIP_GENERIC_H_
 
 /*
- * $Id: gssapiP_generic.h 18131 2006-06-14 22:27:54Z tlyu $
+ * $Id: gssapiP_generic.h 18396 2006-07-25 20:29:43Z lxs $
  */
 
 #if defined(_WIN32)
@@ -64,9 +63,9 @@ typedef UINT64_TYPE gssint_uint64;
 /** helper macros **/
 
 #if 0 /* SUNW15resync - on Solaris g_OID_equal is in gssapi_ext.h */
-#define	g_OID_equal(o1, o2) \
-	(((o1)->length == (o2)->length) && \
-	(memcmp((o1)->elements, (o2)->elements, (o1)->length) == 0))
+#define g_OID_equal(o1, o2) \
+   (((o1)->length == (o2)->length) && \
+    (memcmp((o1)->elements,(o2)->elements,(unsigned int) (o1)->length) == 0))
 #endif
 
 /* this code knows that an int on the wire is 32 bits.  The type of
@@ -98,7 +97,7 @@ typedef UINT64_TYPE gssint_uint64;
    (ptr) += 2;
 
 #define TWRITE_STR(ptr, str, len) \
-  (void) memcpy((ptr), (char *) (str), (len));	\
+  (void) memcpy((ptr), (char *) (str), (len)); \
    (ptr) += (len);
 
 #define TREAD_STR(ptr, str, len) \
@@ -261,20 +260,20 @@ OM_uint32 generic_gss_create_empty_oid_set
 
 OM_uint32 generic_gss_add_oid_set_member
 (OM_uint32 *,	/* minor_status */
-	    gss_OID_desc * const,		/* member_oid */
+	    const gss_OID_desc * const,		/* member_oid */
 	    gss_OID_set *	/* oid_set */
 	   );
 
 OM_uint32 generic_gss_test_oid_set_member
 (OM_uint32 *,	/* minor_status */
-	    gss_OID_desc * const,		/* member */
+	    const gss_OID_desc * const,		/* member */
 	    gss_OID_set,	/* set */
 	    int *		/* present */
 	   );
 
 OM_uint32 generic_gss_oid_to_str
 (OM_uint32 *,	/* minor_status */
-	    gss_OID_desc * const,		/* oid */
+	    const gss_OID_desc * const,		/* oid */
 	    gss_buffer_t	/* oid_str */
 	   );
 

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
  *
@@ -21,15 +19,15 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/misc_free.c,v 1.18 1997/05/28 17:35:05 bjaspan Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/misc_free.c,v 1.18 1997/05/28 17:35:05 bjaspan Exp $";
+static char *rcsid = "$Header$";
 #endif
+#include	"server_internal.h"
 #include	<kadm5/admin.h>
 #include	<stdlib.h>
-#include	"server_internal.h"
 
 kadm5_ret_t
 kadm5_free_policy_ent(void *server_handle, kadm5_policy_ent_t val)

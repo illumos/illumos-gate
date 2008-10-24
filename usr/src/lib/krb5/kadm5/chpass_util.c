@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -25,10 +24,6 @@
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
- * 
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/chpass_util.c,v 1.18.18.1 2000/05/19 22:24:14 raeburn Exp $
- *
- *
  */
 
 
@@ -43,6 +38,7 @@
 #include "admin_internal.h"
 
 #include <krb5.h>
+#include <strings.h>
 
 #define string_text error_message
 
@@ -112,7 +108,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   } else { /* read the password */
     krb5_context context;
 
-    if ((code = (int) krb5_init_context(&context)) == 0) {
+    if ((code = (int) kadm5_init_krb5_context(&context)) == 0) {
       pwsize = sizeof(buffer);
       code = krb5_read_password(context, KADM5_PW_FIRST_PROMPT,
 				KADM5_PW_SECOND_PROMPT,
@@ -127,16 +123,16 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
       memset(buffer, 0, sizeof(buffer));
 #endif      
       if (code == KRB5_LIBOS_BADPWDMATCH) {
-	strncpy(msg_ret, string_text(CHPASS_UTIL_NEW_PASSWORD_MISMATCH),
+	(void) strncpy(msg_ret, string_text(CHPASS_UTIL_NEW_PASSWORD_MISMATCH),
 		msg_len - 1);
 	msg_ret[msg_len - 1] = '\0';
 	return(code);
       } else {
-        strncpy(msg_ret, error_message(code), msg_len - 1);
-        strncat(msg_ret, " ", msg_len - 1);
-        strncat(msg_ret, string_text(CHPASS_UTIL_WHILE_READING_PASSWORD),
+        (void) strncpy(msg_ret, error_message(code), msg_len - 1);
+        (void) strncat(msg_ret, " ", msg_len - 1);
+        (void) strncat(msg_ret, string_text(CHPASS_UTIL_WHILE_READING_PASSWORD),
 		msg_len - 1);
-        strncat(msg_ret, string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED),
+        (void) strncat(msg_ret, string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED),
 		msg_len - 1);
 	msg_ret[msg_len - 1] = '\0';
 	return(code);
@@ -298,7 +294,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
     return(code);
-		} else {
+  } else {
 
   /* We should never get here, but just in case ... */
   sprintf(buffer, "%s %s", error_message(code), 

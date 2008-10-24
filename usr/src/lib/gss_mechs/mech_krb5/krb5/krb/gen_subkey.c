@@ -1,8 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/gen_subkey.c
  *
- * Copyright 1991 by the Massachusetts Institute of Technology.
+ * Copyright 1991, 2002 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -28,7 +27,7 @@
  * Routine to automatically generate a subsession key based on an input key.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*ARGSUSED*/
 krb5_error_code
@@ -45,7 +44,7 @@ krb5_generate_subkey(krb5_context context, const krb5_keyblock *key, krb5_keyblo
     krb5_data seed;
 
     seed.length = key->length;
-    seed.data = (char *)key->contents;
+    seed.data = key->contents;
     if ((retval = krb5_c_random_add_entropy(context, KRB5_C_RANDSOURCE_TRUSTEDPARTY, &seed)))
 	return(retval);
 #endif /* 0 */
@@ -53,6 +52,7 @@ krb5_generate_subkey(krb5_context context, const krb5_keyblock *key, krb5_keyblo
     if ((*subkey = (krb5_keyblock *) malloc(sizeof(krb5_keyblock))) == NULL)
 	return(ENOMEM);
 
+    /* Solaris Kerberos */
     (void) memset(*subkey, 0, sizeof(krb5_keyblock));
 
     if ((retval = krb5_c_make_random_key(context, key->enctype, *subkey))) {

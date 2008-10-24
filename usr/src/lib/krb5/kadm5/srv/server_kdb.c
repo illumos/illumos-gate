@@ -2,7 +2,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -25,11 +24,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_kdb.c,v 1.4 2003/06/13 22:30:59 tlyu Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_kdb.c,v 1.4 2003/06/13 22:30:59 tlyu Exp $";
+static char *rcsid = "$Header$";
 #endif
 
 #include <stdio.h>
@@ -73,8 +72,12 @@ krb5_error_code kdb_init_master(kadm5_server_handle_t handle,
 				       handle->params.mkey_name,
 				       realm, NULL, &master_princ)))
 	goto done;
+/* Solaris Kerberos */
+#if 0
+    master_keyblock.enctype = handle->params.enctype;
+#endif
 
-
+    /* Solaris Kerberos */
     ret = krb5_db_fetch_mkey(handle->context, master_princ,
 			     handle->params.enctype, from_kbd,
 			     FALSE /* only prompt once */,
@@ -85,6 +88,7 @@ krb5_error_code kdb_init_master(kadm5_server_handle_t handle,
     if (ret)
 	goto done;
 				 
+    /* Solaris Kerberos */
     if ((ret = krb5_db_verify_master_key(handle->context, master_princ,
 					 &handle->master_keyblock))) {
 	  krb5_db_fini(handle->context);
@@ -202,6 +206,7 @@ krb5_error_code kdb_init_hist(kadm5_server_handle_t handle, char *r)
     if (ret)
 	goto done;
 
+    /* Solaris Kerberos */
     ret = krb5_dbekd_decrypt_key_data(handle->context,
 				 &handle->master_keyblock, key_data, &hist_key, NULL);
     if (ret)
@@ -281,6 +286,7 @@ kdb_get_entry(kadm5_server_handle_t handle,
 	    return(ret);
 	}
 
+	/* Solaris Kerberos */
 	xdrmem_create(&xdrs, (caddr_t)tl_data.tl_data_contents,
 		      tl_data.tl_data_length, XDR_DECODE);
 	if (! xdr_osa_princ_ent_rec(&xdrs, adb)) {
@@ -372,6 +378,7 @@ kdb_put_entry(kadm5_server_handle_t handle,
     }
     tl_data.tl_data_type = KRB5_TL_KADM_DATA;
     tl_data.tl_data_length = xdr_getpos(&xdrs);
+    /* Solaris Kerberos */
     tl_data.tl_data_contents = (unsigned char *) xdralloc_getdata(&xdrs);
 
     ret = krb5_dbe_update_tl_data(handle->context, kdb, &tl_data);

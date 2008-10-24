@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -26,11 +25,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_principal.c,v 1.11 2004/06/16 03:11:53 tlyu Exp $
+ * $Header$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_principal.c,v 1.11 2004/06/16 03:11:53 tlyu Exp $";
+static char *rcsid = "$Header$";
 #endif
 
 #include    <rpc/rpc.h>  /* SUNWresync121 XXX */
@@ -39,6 +38,7 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_princi
 #ifdef HAVE_MEMORY_H
 #include    <memory.h>
 #endif
+#include    <errno.h>
 #include    "client_internal.h"
 
 #ifdef DEBUG /* SUNWresync14 XXX */
@@ -95,7 +95,7 @@ kadm5_create_principal(void *server_handle,
 	 arg.rec.tl_data = NULL;
     }
 	 
-    r = create_principal_1(&arg, handle->clnt);
+    r = create_principal_2(&arg, handle->clnt);
 
     if (handle->api_version == KADM5_API_VERSION_1)
 	 krb5_free_principal(handle->context, arg.rec.mod_name);
@@ -156,7 +156,7 @@ kadm5_create_principal_3(void *server_handle,
 	 arg.rec.tl_data = NULL;
     }
 	 
-    r = create_principal3_1(&arg, handle->clnt);
+    r = create_principal3_2(&arg, handle->clnt);
 
     if (handle->api_version == KADM5_API_VERSION_1)
 	 krb5_free_principal(handle->context, arg.rec.mod_name);
@@ -179,7 +179,7 @@ kadm5_delete_principal(void *server_handle, krb5_principal principal)
 	return EINVAL;
     arg.princ = principal;
     arg.api_version = handle->api_version;
-    r = delete_principal_1(&arg, handle->clnt);
+    r = delete_principal_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();    
     return r->code;
@@ -228,7 +228,7 @@ kadm5_modify_principal(void *server_handle,
     } else
 	 arg.rec.mod_name = NULL;
     
-    r = modify_principal_1(&arg, handle->clnt);
+    r = modify_principal_2(&arg, handle->clnt);
 
     if (handle->api_version == KADM5_API_VERSION_1)
 	 krb5_free_principal(handle->context, arg.rec.mod_name);    
@@ -257,7 +257,7 @@ kadm5_get_principal(void *server_handle,
     else
        arg.mask = mask;
     arg.api_version = handle->api_version;
-    r = get_principal_1(&arg, handle->clnt);
+    r = get_principal_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();
     if (handle->api_version == KADM5_API_VERSION_1) {
@@ -297,7 +297,7 @@ kadm5_get_principals(void *server_handle,
 	return EINVAL;
     arg.exp = exp;
     arg.api_version = handle->api_version;
-    r = get_princs_1(&arg, handle->clnt);
+    r = get_princs_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();
     if(r->code == 0) {
@@ -326,7 +326,7 @@ kadm5_rename_principal(void *server_handle,
     arg.api_version = handle->api_version;
     if (source == NULL || dest == NULL)
 	return EINVAL;
-    r = rename_principal_1(&arg, handle->clnt);
+    r = rename_principal_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();        
     return r->code;
@@ -348,7 +348,7 @@ kadm5_chpass_principal(void *server_handle,
 
     if(princ == NULL)
 	return EINVAL;
-    r = chpass_principal_1(&arg, handle->clnt);
+    r = chpass_principal_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();        
     return r->code;
@@ -375,7 +375,7 @@ kadm5_chpass_principal_3(void *server_handle,
 
     if(princ == NULL)
 	return EINVAL;
-    r = chpass_principal3_1(&arg, handle->clnt);
+    r = chpass_principal3_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();        
     return r->code;
@@ -398,7 +398,7 @@ kadm5_setv4key_principal(void *server_handle,
 
     if(princ == NULL || keyblock == NULL)
 	return EINVAL;
-    r = setv4key_principal_1(&arg, handle->clnt);
+    r = setv4key_principal_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();        
     return r->code;
@@ -423,7 +423,7 @@ kadm5_setkey_principal(void *server_handle,
 
     if(princ == NULL || keyblocks == NULL)
 	return EINVAL;
-    r = setkey_principal_1(&arg, handle->clnt);
+    r = setkey_principal_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();        
     return r->code;
@@ -453,7 +453,7 @@ kadm5_setkey_principal_3(void *server_handle,
 
     if(princ == NULL || keyblocks == NULL)
 	return EINVAL;
-    r = setkey_principal3_1(&arg, handle->clnt);
+    r = setkey_principal3_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();        
     return r->code;
@@ -497,7 +497,7 @@ kadm5_randkey_principal_old(void *server_handle,
 
 	if(princ == NULL)
 		return EINVAL;
-	r = chrand_principal_1(&arg, handle->clnt);
+	r = chrand_principal_2(&arg, handle->clnt);
 	if (r == NULL)
 		return KADM5_RPC_ERROR;
 	if (handle->api_version == KADM5_API_VERSION_1) {
@@ -537,7 +537,7 @@ kadm5_randkey_principal_3(void *server_handle,
     kadm5_server_handle_t handle = server_handle;
     int			i, ret;
 
-    /* For safety */
+    /* Solaris Kerberos - For safety */
     if (n_keys)
 	*n_keys = 0;
     if (key)
@@ -553,7 +553,7 @@ kadm5_randkey_principal_3(void *server_handle,
 
     if(princ == NULL)
 	return EINVAL;
-    r = chrand_principal3_1(&arg, handle->clnt);
+    r = chrand_principal3_2(&arg, handle->clnt);
     if(r == NULL)
 	eret();
     if (handle->api_version == KADM5_API_VERSION_1) {
@@ -589,7 +589,7 @@ kadm5_randkey_principal(void *server_handle,
 			krb5_principal princ,
 			krb5_keyblock **key, int *n_keys)
 {
-
+	/* Solaris Kerberos */
 	kadm5_ret_t kret;
 
 	/*

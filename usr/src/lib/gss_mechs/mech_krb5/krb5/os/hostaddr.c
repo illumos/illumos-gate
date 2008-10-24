@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/os/hostaddr.c
  *
@@ -29,15 +27,12 @@
  *
  */
 
-#define NEED_SOCKETS
-#include <k5-int.h>
+#include "k5-int.h"
 
-#include <fake-addrinfo.h>
-#include <socket-utils.h>
+#include "fake-addrinfo.h"
 
 krb5_error_code
-krb5_os_hostaddr(krb5_context context, const char *name,
-	krb5_address ***ret_addrs)
+krb5_os_hostaddr(krb5_context context, const char *name, krb5_address ***ret_addrs)
 {
     krb5_error_code 	retval;
     krb5_address 	**addrs;

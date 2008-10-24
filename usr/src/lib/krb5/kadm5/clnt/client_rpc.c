@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -35,375 +34,380 @@
 static struct timeval TIMEOUT = { 25, 0 };
 
 generic_ret *
-create_principal_1(argp, clnt)
-	cprinc_arg *argp;
-	CLIENT *clnt;
+create_principal_2(cprinc_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CREATE_PRINCIPAL, (xdrproc_t) xdr_cprinc_arg, 
-		(caddr_t) argp, (xdrproc_t) xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CREATE_PRINCIPAL,
+		      (xdrproc_t) xdr_cprinc_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-create_principal3_1(argp, clnt)
-	cprinc3_arg *argp;
-	CLIENT *clnt;
+create_principal3_2(cprinc3_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CREATE_PRINCIPAL3, xdr_cprinc3_arg,
-		      (caddr_t) argp, /* SUNWresync121 XXX */
-		      xdr_generic_ret,
-		      (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CREATE_PRINCIPAL3,
+		      (xdrproc_t) xdr_cprinc3_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-delete_principal_1(argp, clnt)
-	dprinc_arg *argp;
-	CLIENT *clnt;
+delete_principal_2(dprinc_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, DELETE_PRINCIPAL, xdr_dprinc_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, DELETE_PRINCIPAL,
+		      (xdrproc_t) xdr_dprinc_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-modify_principal_1(argp, clnt)
-	mprinc_arg *argp;
-	CLIENT *clnt;
+modify_principal_2(mprinc_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, MODIFY_PRINCIPAL, xdr_mprinc_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, MODIFY_PRINCIPAL,
+		      (xdrproc_t) xdr_mprinc_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-rename_principal_1(argp, clnt)
-	rprinc_arg *argp;
-	CLIENT *clnt;
+rename_principal_2(rprinc_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, RENAME_PRINCIPAL, xdr_rprinc_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, RENAME_PRINCIPAL,
+		      (xdrproc_t) xdr_rprinc_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 gprinc_ret *
-get_principal_1(argp, clnt)
-	gprinc_arg *argp;
-	CLIENT *clnt;
+get_principal_2(gprinc_arg *argp, CLIENT *clnt)
 {
-	static gprinc_ret res;
+	static gprinc_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, GET_PRINCIPAL, xdr_gprinc_arg, (caddr_t) argp,
-		xdr_gprinc_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, GET_PRINCIPAL,
+		      (xdrproc_t) xdr_gprinc_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_gprinc_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 gprincs_ret *
-get_princs_1(argp, clnt)
-	gprincs_arg *argp;
-	CLIENT *clnt;
+get_princs_2(gprincs_arg *argp, CLIENT *clnt)
 {
-	static gprincs_ret res;
+	static gprincs_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, GET_PRINCS, xdr_gprincs_arg, (caddr_t) argp,
-		      xdr_gprincs_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) { 
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, GET_PRINCS,
+		      (xdrproc_t) xdr_gprincs_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_gprincs_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) { 
 	     return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-chpass_principal_1(argp, clnt)
-	chpass_arg *argp;
-	CLIENT *clnt;
+chpass_principal_2(chpass_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CHPASS_PRINCIPAL, xdr_chpass_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
-	}
-	return (&res);
-}
-
-generic_ret *
-chpass_principal3_1(argp, clnt)
-	chpass3_arg *argp;
-	CLIENT *clnt;
-{
-	static generic_ret res;
-
-	if (clnt == NULL)
-		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CHPASS_PRINCIPAL3, xdr_chpass3_arg,
-		      (caddr_t) argp, /* SUNWresync 121 XXX */ 
-		      xdr_generic_ret, (caddr_t) &res,
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CHPASS_PRINCIPAL,
+		      (xdrproc_t) xdr_chpass_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
 		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-setv4key_principal_1(argp, clnt)
-	setv4key_arg *argp;
-	CLIENT *clnt;
+chpass_principal3_2(chpass3_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, SETV4KEY_PRINCIPAL, xdr_setv4key_arg,
-		      (caddr_t) argp, /* SUNWresync121 XXX */
-		      xdr_generic_ret, (caddr_t) &res,
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CHPASS_PRINCIPAL3,
+		      (xdrproc_t) xdr_chpass3_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
 		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-setkey_principal_1(argp, clnt)
-	setkey_arg *argp;
-	CLIENT *clnt;
+setv4key_principal_2(setv4key_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, SETKEY_PRINCIPAL, xdr_setkey_arg,
-		      (caddr_t) argp, /* SUNWresync121 XXX */
-		      xdr_generic_ret, (caddr_t) &res,
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, SETV4KEY_PRINCIPAL,
+		      (xdrproc_t) xdr_setv4key_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
 		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-setkey_principal3_1(argp, clnt)
-	setkey3_arg *argp;
-	CLIENT *clnt;
+setkey_principal_2(setkey_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, SETKEY_PRINCIPAL3, xdr_setkey3_arg,
-		      (caddr_t) argp, /* SUNWresync121 XXX */
-		      xdr_generic_ret, (caddr_t) &res,
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, SETKEY_PRINCIPAL,
+		      (xdrproc_t) xdr_setkey_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
 		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
+}
+
+generic_ret *
+setkey_principal3_2(setkey3_arg *argp, CLIENT *clnt)
+{
+	static generic_ret clnt_res;
+
+	/* Solaris Kerberos */
+	if (clnt == NULL)
+		return (NULL);
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, SETKEY_PRINCIPAL3,
+		      (xdrproc_t) xdr_setkey3_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
+		return (NULL);
+	}
+	return (&clnt_res);
 }
 
 chrand_ret *
-chrand_principal_1(argp, clnt)
-	chrand_arg *argp;
-	CLIENT *clnt;
+chrand_principal_2(chrand_arg *argp, CLIENT *clnt)
 {
-	static chrand_ret res;
+	static chrand_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CHRAND_PRINCIPAL, xdr_chrand_arg, (caddr_t) argp,
-		xdr_chrand_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
-	}
-	return (&res);
-}
-
-chrand_ret *
-chrand_principal3_1(argp, clnt)
-	chrand3_arg *argp;
-	CLIENT *clnt;
-{
-	static chrand_ret res;
-
-	if (clnt == NULL)
-		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CHRAND_PRINCIPAL3, xdr_chrand3_arg, 
-		      (caddr_t) argp, /* SUNWresync121 XXX */
-		      xdr_chrand_ret, (caddr_t) &res,
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CHRAND_PRINCIPAL,
+		      (xdrproc_t) xdr_chrand_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_chrand_ret, (caddr_t) &clnt_res,
 		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
+}
+
+chrand_ret *
+chrand_principal3_2(chrand3_arg *argp, CLIENT *clnt)
+{
+	static chrand_ret clnt_res;
+
+	/* Solaris Kerberos */
+	if (clnt == NULL)
+		return (NULL);
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CHRAND_PRINCIPAL3,
+		      (xdrproc_t) xdr_chrand3_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_chrand_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
+		return (NULL);
+	}
+	return (&clnt_res);
 }
 
 generic_ret *
-create_policy_1(argp, clnt)
-	cpol_arg *argp;
-	CLIENT *clnt;
+create_policy_2(cpol_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, CREATE_POLICY, xdr_cpol_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, CREATE_POLICY,
+		      (xdrproc_t) xdr_cpol_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-delete_policy_1(argp, clnt)
-	dpol_arg *argp;
-	CLIENT *clnt;
+delete_policy_2(dpol_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, DELETE_POLICY, xdr_dpol_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, DELETE_POLICY,
+		      (xdrproc_t) xdr_dpol_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 generic_ret *
-modify_policy_1(argp, clnt)
-	mpol_arg *argp;
-	CLIENT *clnt;
+modify_policy_2(mpol_arg *argp, CLIENT *clnt)
 {
-	static generic_ret res;
+	static generic_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, MODIFY_POLICY, xdr_mpol_arg, (caddr_t) argp,
-		xdr_generic_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, MODIFY_POLICY,
+		      (xdrproc_t) xdr_mpol_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 gpol_ret *
-get_policy_1(argp, clnt)
-	gpol_arg *argp;
-	CLIENT *clnt;
+get_policy_2(gpol_arg *argp, CLIENT *clnt)
 {
-	static gpol_ret res;
+	static gpol_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, GET_POLICY, xdr_gpol_arg, (caddr_t) argp,
-		xdr_gpol_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, GET_POLICY,
+		      (xdrproc_t) xdr_gpol_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_gpol_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) {
 		return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
 gpols_ret *
-get_pols_1(argp, clnt)
-	gpols_arg *argp;
-	CLIENT *clnt;
+get_pols_2(gpols_arg *argp, CLIENT *clnt)
 {
-	static gpols_ret res;
+	static gpols_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-	memset((char *)&res, 0, sizeof(res));
-	if (clnt_call(clnt, GET_POLS, xdr_gpols_arg, (caddr_t) argp,
-		      xdr_gpols_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) { 
+	memset((char *)&clnt_res, 0, sizeof(clnt_res));
+	if (clnt_call(clnt, GET_POLS,
+		      (xdrproc_t) xdr_gpols_arg, (caddr_t) argp,
+		      (xdrproc_t) xdr_gpols_ret, (caddr_t) &clnt_res,
+		      TIMEOUT) != RPC_SUCCESS) { 
 	     return (NULL);
 	}
-	return (&res);
+	return (&clnt_res);
 }
 
-getprivs_ret *get_privs_1(argp, clnt)
-   void *argp;
-   CLIENT *clnt;
+getprivs_ret *
+get_privs_2(void *argp, CLIENT *clnt)
 {
-     static getprivs_ret res;
+     static getprivs_ret clnt_res;
 
+	/* Solaris Kerberos */
 	if (clnt == NULL)
 		return (NULL);
-     memset((char *)&res, 0, sizeof(res));
-     if (clnt_call(clnt, GET_PRIVS, xdr_u_int, (caddr_t) argp,
-		   xdr_getprivs_ret, (caddr_t) &res, TIMEOUT) != RPC_SUCCESS) {
+     memset((char *)&clnt_res, 0, sizeof(clnt_res));
+     if (clnt_call(clnt, GET_PRIVS,
+		   (xdrproc_t) xdr_u_int, (caddr_t) argp,
+		   (xdrproc_t) xdr_getprivs_ret, (caddr_t) &clnt_res,
+		   TIMEOUT) != RPC_SUCCESS) {
 	  return (NULL);
      }
-     return (&res);
+     return (&clnt_res);
 }
 
 generic_ret *
-init_1(argp, clnt, rpc_err_code)
-   void *argp;
-   CLIENT *clnt;
-   enum clnt_stat *rpc_err_code;
+init_2(void *argp, CLIENT *clnt)
 {
-     static generic_ret res;
+     static generic_ret clnt_res;
 
-     enum clnt_stat retval;
+	/* Solaris Kerberos */
+     if (clnt == NULL)
+         return (NULL);
 
-	if (clnt == NULL)
-		return (NULL);
-     memset((char *)&res, 0, sizeof(res));
-     retval = clnt_call(clnt, INIT, xdr_u_int, (caddr_t) argp,
-		   xdr_generic_ret, (caddr_t) &res, TIMEOUT);
-
-     if (retval != RPC_SUCCESS) {
-	  *rpc_err_code = retval;
+     memset((char *)&clnt_res, 0, sizeof(clnt_res));
+     if (clnt_call(clnt, INIT,
+		   (xdrproc_t) xdr_u_int, (caddr_t) argp,
+		   (xdrproc_t) xdr_generic_ret, (caddr_t) &clnt_res,
+		   TIMEOUT) != RPC_SUCCESS) {
 	  return (NULL);
      }
-     return (&res);
+     return (&clnt_res);
 }

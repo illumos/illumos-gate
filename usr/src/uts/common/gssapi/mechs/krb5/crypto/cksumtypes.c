@@ -1,9 +1,8 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,15 +30,15 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <hash_provider.h>
-#include <keyhash_provider.h>
-#include <cksumtypes.h>
+#include "k5-int.h"
+#include "hash_provider.h"
+#include "keyhash_provider.h"
+#include "cksumtypes.h"
 
-struct krb5_cksumtypes krb5_cksumtypes_list[] = {
+const struct krb5_cksumtypes krb5_cksumtypes_list[] = {
     { CKSUMTYPE_CRC32, KRB5_CKSUMFLAG_NOT_COLL_PROOF,
       "crc32", "CRC-32",
-      NULL, NULL, &krb5_hash_crc32, 0,
+      NULL, NULL, &krb5int_hash_crc32, 0,
 #ifdef _KERNEL
       NULL,
       CRYPTO_MECH_INVALID
@@ -48,7 +47,7 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
 
     { CKSUMTYPE_DESCBC, 0,
       "des-cbc", "DES cbc mode",
-      ENCTYPE_DES_CBC_CRC, &krb5_keyhash_descbc,
+      ENCTYPE_DES_CBC_CRC, &krb5int_keyhash_descbc,
       NULL,  NULL,
 #ifdef _KERNEL
       NULL,
@@ -66,7 +65,7 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
 },
     { CKSUMTYPE_RSA_MD5_DES, 0,
       "md5-des", "RSA-MD5 with DES cbc mode",
-      ENCTYPE_DES_CBC_CRC, &krb5_keyhash_md5des,
+      ENCTYPE_DES_CBC_CRC, &krb5int_keyhash_md5des,
       NULL, NULL,
 #ifdef _KERNEL
       SUN_CKM_MD5,
@@ -76,7 +75,7 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
 
     { CKSUMTYPE_NIST_SHA, 0,
       "sha", "NIST-SHA",
-      NULL, NULL, &krb5_hash_sha1, 0,
+      NULL, NULL, &krb5int_hash_sha1, 0,
 #ifdef _KERNEL
       SUN_CKM_SHA1,
       CRYPTO_MECH_INVALID
@@ -85,7 +84,7 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
 
     { CKSUMTYPE_HMAC_SHA1_DES3, KRB5_CKSUMFLAG_DERIVE,
       "hmac-sha1-des3", "HMAC-SHA1 DES3 key",
-      NULL, NULL, &krb5_hash_sha1, 0,
+      NULL, NULL, &krb5int_hash_sha1, 0,
 #ifdef _KERNEL
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID
@@ -93,31 +92,34 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
  },
     { CKSUMTYPE_HMAC_SHA1_DES3, KRB5_CKSUMFLAG_DERIVE,
       "hmac-sha1-des3-kd", "HMAC-SHA1 DES3 key", /* alias */
-      NULL, NULL, &krb5_hash_sha1, 0,
+      NULL, NULL, &krb5int_hash_sha1, 0,
 #ifdef _KERNEL
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID
 #endif /* _KERNEL */
 },
     { CKSUMTYPE_HMAC_MD5_ARCFOUR, 0,
-	"hmac-md5-rc4", "Microsoft HMAC MD5 (RC4 key)",
-	ENCTYPE_ARCFOUR_HMAC, &krb5int_keyhash_hmac_md5, NULL, 0,
+      "hmac-md5-rc4", "Microsoft HMAC MD5 (RC4 key)", 
+      ENCTYPE_ARCFOUR_HMAC, &krb5int_keyhash_hmac_md5,
+      NULL, 0,
 #ifdef _KERNEL
       SUN_CKM_MD5,
       CRYPTO_MECH_INVALID
 #endif /* _KERNEL */
     },
     { CKSUMTYPE_HMAC_MD5_ARCFOUR, 0,
-	"hmac-md5-enc", "Microsoft HMAC MD5 (RC4 key)",  /*Heimdal alias*/
-	ENCTYPE_ARCFOUR_HMAC, &krb5int_keyhash_hmac_md5, NULL, 0,
+      "hmac-md5-enc", "Microsoft HMAC MD5 (RC4 key)",  /*Heimdal alias*/
+      ENCTYPE_ARCFOUR_HMAC, &krb5int_keyhash_hmac_md5,
+      NULL, 0,
 #ifdef _KERNEL
       SUN_CKM_MD5,
       CRYPTO_MECH_INVALID
 #endif /* _KERNEL */
     },
     { CKSUMTYPE_HMAC_MD5_ARCFOUR, 0,
-	"hmac-md5-earcfour", "Microsoft HMAC MD5 (RC4 key)",  /* alias*/
-	ENCTYPE_ARCFOUR_HMAC, &krb5int_keyhash_hmac_md5, NULL, 0,
+      "hmac-md5-earcfour", "Microsoft HMAC MD5 (RC4 key)",  /* alias*/
+      ENCTYPE_ARCFOUR_HMAC, &krb5int_keyhash_hmac_md5,
+      NULL, 0,
 #ifdef _KERNEL
       SUN_CKM_MD5,
       CRYPTO_MECH_INVALID
@@ -125,16 +127,16 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
     },
 
     { CKSUMTYPE_HMAC_SHA1_96_AES128, KRB5_CKSUMFLAG_DERIVE,
-	"hmac-sha1-96-aes128", "HMAC-SHA1 AES128 key",
-	NULL, NULL, &krb5_hash_sha1, 12,
+      "hmac-sha1-96-aes128", "HMAC-SHA1 AES128 key",
+	NULL, NULL, &krb5int_hash_sha1, 12,
 #ifdef _KERNEL
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID
 #endif /* _KERNEL */
     },
     { CKSUMTYPE_HMAC_SHA1_96_AES256, KRB5_CKSUMFLAG_DERIVE,
-	"hmac-sha1-96-aes256", "HMAC-SHA1 AES256 key",
-	0, NULL, &krb5_hash_sha1, 12,
+      "hmac-sha1-96-aes256", "HMAC-SHA1 AES256 key",
+	0, NULL, &krb5int_hash_sha1, 12,
 #ifdef _KERNEL
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID
@@ -146,6 +148,7 @@ struct krb5_cksumtypes krb5_cksumtypes_list[] = {
 const int krb5_cksumtypes_length =
 sizeof(krb5_cksumtypes_list)/sizeof(struct krb5_cksumtypes);
 
+/* Solaris Kerberos */
 #ifdef _KERNEL
 void
 setup_kef_cksumtypes()

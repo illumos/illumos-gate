@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/toffset.c
  *
@@ -17,7 +16,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  *
@@ -33,10 +35,8 @@
  * between the system time and the "real time" as passed to this
  * routine
  */
-krb5_error_code 
-krb5_set_real_time(context, seconds, microseconds)
-    krb5_context context;
-    krb5_int32 seconds, microseconds;
+krb5_error_code KRB5_CALLCONV
+krb5_set_real_time(krb5_context context, krb5_timestamp seconds, krb5_int32 microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
     krb5_int32 sec, usec;
@@ -58,9 +58,7 @@ krb5_set_real_time(context, seconds, microseconds)
  * is useful for running the krb5 routines through test suites
  */
 krb5_error_code 
-krb5_set_debugging_time(context, seconds, microseconds)
-    krb5_context context;
-    krb5_int32 seconds, microseconds;
+krb5_set_debugging_time(krb5_context context, krb5_timestamp seconds, krb5_int32 microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
 
@@ -76,8 +74,7 @@ krb5_set_debugging_time(context, seconds, microseconds)
  * routines return the "natural" time.
  */
 krb5_error_code 
-krb5_use_natural_time(context)
-    krb5_context context;
+krb5_use_natural_time(krb5_context context)
 {
     krb5_os_context os_ctx = context->os_context;
 
@@ -89,10 +86,8 @@ krb5_use_natural_time(context)
 /*
  * This routine returns the current time offsets in use.
  */
-krb5_error_code
-krb5_get_time_offsets(context, seconds, microseconds)
-    krb5_context context;
-    krb5_int32 *seconds, *microseconds;
+krb5_error_code KRB5_CALLCONV
+krb5_get_time_offsets(krb5_context context, krb5_timestamp *seconds, krb5_int32 *microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
 
@@ -108,9 +103,7 @@ krb5_get_time_offsets(context, seconds, microseconds)
  * This routine sets the time offsets directly.
  */
 krb5_error_code 
-krb5_set_time_offsets(context, seconds, microseconds)
-    krb5_context context;
-    krb5_int32 seconds, microseconds;
+krb5_set_time_offsets(krb5_context context, krb5_timestamp seconds, krb5_int32 microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
 

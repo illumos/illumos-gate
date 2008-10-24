@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/copy_auth.c
  *
@@ -33,7 +32,7 @@
  * krb5_copy_authdata()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*ARGSUSED*/
 static krb5_error_code
@@ -43,17 +42,12 @@ krb5_copy_authdatum(krb5_context context, const krb5_authdata *inad, krb5_authda
 
     if (!(tmpad = (krb5_authdata *)MALLOC(sizeof(*tmpad))))
 	return ENOMEM;
-#ifdef HAVE_C_STRUCTURE_ASSIGNMENT
     *tmpad = *inad;
-#else
-    (void) memcpy(tmpad, inad, sizeof(krb5_authdata));
-#endif
     if (!(tmpad->contents = (krb5_octet *)MALLOC(inad->length))) {
 	krb5_xfree_wrap(tmpad, inad->length);
 	return ENOMEM;
     }
-    (void) memcpy((char *)tmpad->contents, (char *)inad->contents,
-	inad->length);
+    (void) memcpy((char *)tmpad->contents, (char *)inad->contents, inad->length);
     *outad = tmpad;
     return 0;
 }

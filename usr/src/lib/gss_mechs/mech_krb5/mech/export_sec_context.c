@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/gssapi/krb5/export_sec_context.c
  *
@@ -61,10 +59,6 @@ krb5_gss_export_sec_context(minor_status, context_handle, interprocess_token)
     kret = krb5_gss_ser_init(context);
     if (kret)
 	goto error_out;
-
-    { gss_OID go = ctx->mech_used;
-    printf("export ctx len=%lu\n", go->length);
-    }
 
     /* Determine size needed for externalization of context */
     bufsize = 0;

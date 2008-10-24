@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -335,7 +334,7 @@ krb5_string_to_keysalts(string, tupleseps, ksaltseps, dups, ksaltp, nksaltp)
 	septmp = ksseplist;
 	for (sp = strchr(kp, (int) *septmp);
 	     *(++septmp) && !sp;
-	     sp = strchr(kp, (int)*septmp));
+	     sp = strchr(kp, (int)*septmp)); /* Solaris Kerberos */
 
 	if (sp) {
 	    /* Separate enctype from salttype */

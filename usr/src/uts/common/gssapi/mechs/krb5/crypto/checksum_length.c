@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -25,13 +24,13 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <cksumtypes.h>
+#include "k5-int.h"
+#include "cksumtypes.h"
 
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV
 krb5_c_checksum_length(krb5_context context, krb5_cksumtype cksumtype,
-		    size_t *length)
+		       size_t *length)
 {
     int i;
 
@@ -44,11 +43,11 @@ krb5_c_checksum_length(krb5_context context, krb5_cksumtype cksumtype,
 	return(KRB5_BAD_ENCTYPE);
 
     if (krb5_cksumtypes_list[i].keyhash)
-        *length = krb5_cksumtypes_list[i].keyhash->hashsize;
-    else if (krb5_cksumtypes_list[i].trunc_size) 
-        *length = krb5_cksumtypes_list[i].trunc_size; 
+	*length = krb5_cksumtypes_list[i].keyhash->hashsize;
+    else if (krb5_cksumtypes_list[i].trunc_size)
+	*length = krb5_cksumtypes_list[i].trunc_size;
     else
-        *length = krb5_cksumtypes_list[i].hash->hashsize;
+	*length = krb5_cksumtypes_list[i].hash->hashsize;
 
     return(0);
 }

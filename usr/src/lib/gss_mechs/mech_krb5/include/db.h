@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*-
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -79,7 +78,7 @@ typedef enum { DB_BTREE, DB_HASH, DB_RECNO } DBTYPE;
  * is so that the access methods can skip copying the key/data pair when
  * the DB_LOCK flag isn't set.
  */
-#if SIZEOF_INT == 4
+#if UINT_MAX >= 0xffffffffUL
 #define	DB_LOCK		0x20000000	/* Do locking. */
 #define	DB_SHMEM	0x40000000	/* Use shared memory. */
 #define	DB_TXN		0x80000000	/* Do transactions. */

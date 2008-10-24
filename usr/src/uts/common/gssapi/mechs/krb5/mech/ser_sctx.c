@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/gssapi/krb5/ser_sctx.c
@@ -654,13 +653,13 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
 		if (kret == EINVAL)
 		    kret = 0;
 	    }
-
+		
 #ifndef PROVIDE_KERNEL_IMPORT
 	    if (!kret)
 		kret = krb5_internalize_opaque(kcontext,
 					       KV5M_CONTEXT,
-				       (krb5_pointer *) &ctx->k5_context,
-				       &bp, &remain);
+					       (krb5_pointer *) &ctx->k5_context,
+					       &bp, &remain);
 
 	    if (!kret)
 		kret = krb5_internalize_opaque(kcontext,

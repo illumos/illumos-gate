@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/free_hstrl.c
  *
@@ -32,7 +31,7 @@
 #include <stdio.h>
 
 /*
- Frees the storage taken by a realm list returned by krb5_get_local_realm.
+ Frees the storage taken by a realm list returned by krb5_get_host_realm.
  */
 
 krb5_error_code KRB5_CALLCONV

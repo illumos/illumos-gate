@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * src/lib/krb5/asn.1/asn1_k_decode.c
  * 
@@ -166,6 +165,28 @@
   } else { len = 0; var = 0; }
 
 /*
+ * Deal with implicitly tagged fields
+ */
+#define get_implicit_octet_string(len, var, tagexpect)		    \
+  if (tagnum != (tagexpect)) return ASN1_MISSING_FIELD;		    \
+  if (asn1class != CONTEXT_SPECIFIC || construction != PRIMITIVE)   \
+     return ASN1_BAD_ID;					    \
+  retval = asn1buf_remove_octetstring(&subbuf, taglen, &(var));	    \
+  if (retval) return retval;					    \
+  (len) = taglen;						    \
+  next_tag()
+
+#define opt_implicit_octet_string(len, var, tagexpect)		    \
+  if (tagnum == (tagexpect)) {					    \
+    if (asn1class != CONTEXT_SPECIFIC || construction != PRIMITIVE) \
+	return ASN1_BAD_ID;					    \
+    retval = asn1buf_remove_octetstring(&subbuf, taglen, &(var));   \
+    if (retval) return retval;					    \
+    (len) = taglen;						    \
+    next_tag();							    \
+  } else { (len) = 0; (var) = NULL; }
+
+/*
  * begin_structure
  *
  * Declares some variables for decoding SEQUENCE types.  This is meant
@@ -182,10 +203,55 @@
   if (retval) return retval;					\
   next_tag()
 
+/*
+ * This is used for structures which have no tagging.
+ * It is the same as begin_structure() except next_tag()
+ * is not called.
+ */
+#define begin_structure_no_tag()				\
+  asn1buf subbuf;						\
+  int seqindef;							\
+  int indef;							\
+  retval = asn1_get_sequence(buf, &length, &seqindef);		\
+  if (retval) return retval;					\
+  retval = asn1buf_imbed(&subbuf, buf, length, seqindef);	\
+  if (retval) return retval
+
 /* skip trailing garbage */
 #define end_structure()						\
   retval = asn1buf_sync(buf, &subbuf, asn1class, tagnum,	\
 			length, indef, seqindef);		\
+  if (retval) return retval
+
+/*
+ * begin_choice
+ *
+ * Declares some variables for decoding CHOICE types.  This is meant
+ * to be called in an inner block that ends with a call to
+ * end_choice().
+ */
+#define begin_choice()						\
+  asn1buf subbuf;						\
+  int seqindef;							\
+  int indef;							\
+  taginfo t;							\
+  retval = asn1_get_tag_2(buf, &t);				\
+  if (retval) return retval;					\
+  tagnum = t.tagnum;                                            \
+  taglen = t.length;                                            \
+  indef = t.indef;                                              \
+  length = t.length;                                            \
+  seqindef = t.indef;                                           \
+  asn1class = t.asn1class;					\
+  construction = t.construction;				\
+  retval = asn1buf_imbed(&subbuf, buf, length, seqindef);	\
+  if (retval) return retval
+
+/* skip trailing garbage */
+#define end_choice()						\
+  length -= t.length;						\
+  retval = asn1buf_sync(buf, &subbuf, t.asn1class, t.tagnum,	\
+			length, t.indef, seqindef);		\
   if (retval) return retval
 
 /*
@@ -375,7 +441,7 @@ asn1_error_code asn1_decode_principal_name(asn1buf *buf, krb5_principal *val)
 	if((*val)->data == NULL) return ENOMEM;
 	retval = asn1_decode_generalstring(&seqbuf,
 					   &((*val)->data[size-1].length),
-			   &((*val)->data[size-1].data));
+					   &((*val)->data[size-1].data));
 	if(retval) return retval;
       }
       (*val)->length = size;
@@ -535,7 +601,7 @@ asn1_error_code asn1_decode_ticket(asn1buf *buf, krb5_ticket *val)
       taginfo t;
       retval = asn1_get_tag_2(buf, &t);
       if (retval) return retval;
-      }
+  }
   cleanup();
 }
 
@@ -1104,6 +1170,411 @@ asn1_error_code asn1_decode_predicted_sam_response(asn1buf *buf, krb5_predicted_
     opt_string(val->msd,6,asn1_decode_charstring); /* should be octet */
     end_structure();
     val->magic = KV5M_PREDICTED_SAM_RESPONSE;
+  }
+  cleanup();
+}
+
+/* PKINIT */
+
+asn1_error_code asn1_decode_external_principal_identifier(asn1buf *buf, krb5_external_principal_identifier *val)
+{
+    setup();
+    {
+      begin_structure();
+      opt_implicit_octet_string(val->subjectName.length, val->subjectName.data, 0);
+      opt_implicit_octet_string(val->issuerAndSerialNumber.length, val->issuerAndSerialNumber.data, 1);
+      opt_implicit_octet_string(val->subjectKeyIdentifier.length, val->subjectKeyIdentifier.data, 2);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_sequence_of_external_principal_identifier(asn1buf *buf, krb5_external_principal_identifier ***val)
+{
+    decode_array_body(krb5_external_principal_identifier,asn1_decode_external_principal_identifier);
+}
+
+asn1_error_code asn1_decode_pa_pk_as_req(asn1buf *buf, krb5_pa_pk_as_req *val)
+{
+  setup();
+  {
+    begin_structure();
+    get_implicit_octet_string(val->signedAuthPack.length, val->signedAuthPack.data, 0);
+    opt_field(val->trustedCertifiers, 1, asn1_decode_sequence_of_external_principal_identifier, NULL);
+    opt_implicit_octet_string(val->kdcPkId.length, val->kdcPkId.data, 2);
+    end_structure();
+  }
+  cleanup();
+}
+
+#if 0	/* XXX   This needs to be tested!!! XXX */
+asn1_error_code asn1_decode_trusted_ca(asn1buf *buf, krb5_trusted_ca *val)
+{
+    setup();
+    { 
+      char *start, *end;
+      size_t alloclen;
+
+      begin_explicit_choice();
+      if (t.tagnum == choice_trusted_cas_principalName) {
+	val->choice = choice_trusted_cas_principalName;
+      } else if (t.tagnum == choice_trusted_cas_caName) {
+	val->choice = choice_trusted_cas_caName;
+	start = subbuf.next;
+	{
+	  sequence_of_no_tagvars(&subbuf);
+	  unused_var(size);
+	  end_sequence_of_no_tagvars(&subbuf);
+	}
+	end = subbuf.next;
+	alloclen = end - start;
+	val->u.caName.data = malloc(alloclen);
+	if (val->u.caName.data == NULL)
+	  return ENOMEM;
+	memcpy(val->u.caName.data, start, alloclen);
+	val->u.caName.length = alloclen;
+	next_tag();
+      } else if (t.tagnum == choice_trusted_cas_issuerAndSerial) {
+	val->choice = choice_trusted_cas_issuerAndSerial;
+	start = subbuf.next;
+	{
+	  sequence_of_no_tagvars(&subbuf);
+	  unused_var(size);
+	  end_sequence_of_no_tagvars(&subbuf);
+	}
+	end = subbuf.next;
+	alloclen = end - start;
+	val->u.issuerAndSerial.data = malloc(alloclen);
+	if (val->u.issuerAndSerial.data == NULL)
+	  return ENOMEM;
+	memcpy(val->u.issuerAndSerial.data, start, alloclen);
+	val->u.issuerAndSerial.length = alloclen;
+	next_tag();
+      } else return ASN1_BAD_ID;
+      end_explicit_choice();
+    }
+    cleanup();
+}
+#else
+asn1_error_code asn1_decode_trusted_ca(asn1buf *buf, krb5_trusted_ca *val)
+{
+    setup();
+    { begin_choice();
+      if (tagnum == choice_trusted_cas_principalName) {
+	val->choice = choice_trusted_cas_principalName;
+	asn1_decode_krb5_principal_name(&subbuf, &(val->u.principalName));
+      } else if (tagnum == choice_trusted_cas_caName) {
+	val->choice = choice_trusted_cas_caName;
+	get_implicit_octet_string(val->u.caName.length, val->u.caName.data, choice_trusted_cas_caName);
+      } else if (tagnum == choice_trusted_cas_issuerAndSerial) {
+	val->choice = choice_trusted_cas_issuerAndSerial;
+	get_implicit_octet_string(val->u.issuerAndSerial.length, val->u.issuerAndSerial.data,
+				  choice_trusted_cas_issuerAndSerial);
+      } else return ASN1_BAD_ID;
+      end_choice();
+    }
+    cleanup();
+}
+#endif
+
+asn1_error_code asn1_decode_sequence_of_trusted_ca(asn1buf *buf, krb5_trusted_ca ***val)
+{
+    decode_array_body(krb5_trusted_ca, asn1_decode_trusted_ca);
+}
+
+asn1_error_code asn1_decode_pa_pk_as_req_draft9(asn1buf *buf, krb5_pa_pk_as_req_draft9 *val)
+{
+  setup();
+  { begin_structure();
+    get_implicit_octet_string(val->signedAuthPack.length, val->signedAuthPack.data, 0);
+    opt_field(val->trustedCertifiers, 1, asn1_decode_sequence_of_trusted_ca, NULL);
+    opt_lenfield(val->kdcCert.length, val->kdcCert.data, 2, asn1_decode_octetstring);
+    opt_lenfield(val->encryptionCert.length, val->encryptionCert.data, 2, asn1_decode_octetstring);
+    end_structure();
+  }
+  cleanup();
+}
+
+asn1_error_code asn1_decode_dh_rep_info(asn1buf *buf, krb5_dh_rep_info *val)
+{
+    setup();
+    { begin_structure();
+      get_implicit_octet_string(val->dhSignedData.length, val->dhSignedData.data, 0);
+
+      opt_lenfield(val->serverDHNonce.length, val->serverDHNonce.data, 1, asn1_decode_octetstring);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_pk_authenticator(asn1buf *buf, krb5_pk_authenticator *val)
+{
+    setup();
+    { begin_structure();
+      get_field(val->cusec, 0, asn1_decode_int32);
+      get_field(val->ctime, 1, asn1_decode_kerberos_time);
+      get_field(val->nonce, 2, asn1_decode_int32);
+      opt_lenfield(val->paChecksum.length, val->paChecksum.contents, 3, asn1_decode_octetstring);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_pk_authenticator_draft9(asn1buf *buf, krb5_pk_authenticator_draft9 *val)
+{
+    setup();
+    { begin_structure();
+      alloc_field(val->kdcName,krb5_principal_data);
+      get_field(val->kdcName, 0, asn1_decode_principal_name); 
+      get_field(val->kdcName, 1, asn1_decode_realm); 
+      get_field(val->cusec, 2, asn1_decode_int32);
+      get_field(val->ctime, 3, asn1_decode_kerberos_time);
+      get_field(val->nonce, 4, asn1_decode_int32);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_algorithm_identifier(asn1buf *buf,  krb5_algorithm_identifier *val) {
+
+  setup();
+  { begin_structure_no_tag();
+    /*
+     * Forbid indefinite encoding because we don't read enough tag
+     * information from the trailing octets ("ANY DEFINED BY") to
+     * synchronize EOC tags, etc.
+     */
+    if (seqindef) return ASN1_BAD_FORMAT;
+    /*
+     * Set up tag variables because we don't actually call anything
+     * that fetches tag info for us; it's all buried in the decoder
+     * primitives.
+     */
+    tagnum = ASN1_TAGNUM_CEILING;
+    asn1class = UNIVERSAL;
+    construction = PRIMITIVE;
+    taglen = 0;
+    indef = 0;
+    retval = asn1_decode_oid(&subbuf, &val->algorithm.length, 
+			     &val->algorithm.data);
+    if(retval) return retval;
+    val->parameters.length = 0;
+    val->parameters.data = NULL;
+
+    if(length > subbuf.next - subbuf.base) {
+      unsigned int size = length - (subbuf.next - subbuf.base);
+      retval = asn1buf_remove_octetstring(&subbuf, size, 
+					  &val->parameters.data);
+      if(retval) return retval;
+      val->parameters.length = size;
+    }
+    
+    end_structure();
+  }
+  cleanup();      
+}
+
+asn1_error_code asn1_decode_subject_pk_info(asn1buf *buf, krb5_subject_pk_info *val)
+{
+    asn1_octet unused;
+    setup();
+    { begin_structure_no_tag();
+
+      retval = asn1_decode_algorithm_identifier(&subbuf, &val->algorithm);
+      if (retval) return retval;
+
+      /* SubjectPublicKey encoded as a BIT STRING */
+      next_tag();
+      if (asn1class != UNIVERSAL || construction != PRIMITIVE ||
+          tagnum != ASN1_BITSTRING)
+        return ASN1_BAD_ID;
+
+      retval = asn1buf_remove_octet(&subbuf, &unused);
+      if(retval) return retval;
+
+      /* Number of unused bits must be between 0 and 7. */
+      /* What to do if unused is not zero? */
+      if (unused > 7) return ASN1_BAD_FORMAT;
+      taglen--;
+
+      val->subjectPublicKey.length = 0;
+      val->subjectPublicKey.data = NULL;
+      retval = asn1buf_remove_octetstring(&subbuf, taglen, 
+					  &val->subjectPublicKey.data);
+      if(retval) return retval;
+      val->subjectPublicKey.length = taglen;
+      /*
+       * We didn't call any macro that does next_tag(); do so now to
+       * preload tag of any trailing encodings.
+       */
+      next_tag();
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_sequence_of_algorithm_identifier(asn1buf *buf, krb5_algorithm_identifier ***val)
+{
+    decode_array_body(krb5_algorithm_identifier, asn1_decode_algorithm_identifier);
+}
+
+asn1_error_code asn1_decode_kdc_dh_key_info (asn1buf *buf, krb5_kdc_dh_key_info *val)
+{
+    setup();
+    { begin_structure();
+      retval = asn1buf_remove_octetstring(&subbuf, taglen, &val->subjectPublicKey.data);
+      if(retval) return retval;
+      val->subjectPublicKey.length = taglen;
+      next_tag();
+      get_field(val->nonce, 1, asn1_decode_int32);
+      opt_field(val->dhKeyExpiration, 2, asn1_decode_kerberos_time, 0);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_reply_key_pack (asn1buf *buf, krb5_reply_key_pack *val)
+{
+    setup();
+    { begin_structure();
+      get_field(val->replyKey, 0, asn1_decode_encryption_key);
+      get_field(val->asChecksum, 1, asn1_decode_checksum); 
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_reply_key_pack_draft9 (asn1buf *buf, krb5_reply_key_pack_draft9 *val)
+{
+    setup();
+    { begin_structure();
+      get_field(val->replyKey, 0, asn1_decode_encryption_key);
+      get_field(val->nonce, 1, asn1_decode_int32); 
+      end_structure();
+    }
+    cleanup();
+}
+
+
+asn1_error_code asn1_decode_krb5_principal_name (asn1buf *buf, krb5_principal *val)
+{
+    setup();
+    { begin_structure();
+      get_field(*val, 0, asn1_decode_realm);
+      get_field(*val, 1, asn1_decode_principal_name);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_auth_pack(asn1buf *buf, krb5_auth_pack *val)
+{
+    setup();
+    { begin_structure();
+      get_field(val->pkAuthenticator, 0, asn1_decode_pk_authenticator);
+      if (tagnum == 1) { alloc_field(val->clientPublicValue, krb5_subject_pk_info); }      
+      /* can't call opt_field because it does decoder(&subbuf, &(val)); */
+      if (asn1buf_remains(&subbuf, seqindef)) {                             
+	if ((asn1class != CONTEXT_SPECIFIC || construction != CONSTRUCTED)  
+	    && (tagnum || taglen || asn1class != UNIVERSAL))                
+	  return ASN1_BAD_ID;                                               
+	if (tagnum == 1) {                                        
+	  retval = asn1_decode_subject_pk_info(&subbuf, 
+					       val->clientPublicValue);
+	  if (!taglen && indef) { get_eoc(); }
+	  next_tag();
+	} else val->clientPublicValue = NULL;  
+      }      
+      /* can't call opt_field because it does decoder(&subbuf, &(val)); */
+      if (asn1buf_remains(&subbuf, seqindef)) {
+        if (tagnum == 2) {
+	  asn1_decode_sequence_of_algorithm_identifier(&subbuf, &val->supportedCMSTypes);
+	  if (!taglen && indef) { get_eoc(); }
+	  next_tag();
+	} else val->supportedCMSTypes = NULL;
+      }
+      opt_lenfield(val->clientDHNonce.length, val->clientDHNonce.data, 3, asn1_decode_octetstring);
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_auth_pack_draft9(asn1buf *buf, krb5_auth_pack_draft9 *val)
+{
+    setup();
+    { begin_structure();
+      get_field(val->pkAuthenticator, 0, asn1_decode_pk_authenticator_draft9);
+      if (tagnum == 1) {
+	alloc_field(val->clientPublicValue, krb5_subject_pk_info);      
+	/* can't call opt_field because it does decoder(&subbuf, &(val)); */
+	if (asn1buf_remains(&subbuf, seqindef)) {                             
+	  if ((asn1class != CONTEXT_SPECIFIC || construction != CONSTRUCTED)  
+	    && (tagnum || taglen || asn1class != UNIVERSAL))                
+	    return ASN1_BAD_ID;                                               
+	  if (tagnum == 1) {                                        
+	    retval = asn1_decode_subject_pk_info(&subbuf, 
+					         val->clientPublicValue);
+	    if (!taglen && indef) { get_eoc(); }
+	    next_tag();
+	  } else val->clientPublicValue = NULL;  
+	}
+      }
+      end_structure();
+    }
+    cleanup();
+}
+
+asn1_error_code asn1_decode_pa_pk_as_rep(asn1buf *buf, krb5_pa_pk_as_rep *val)
+{
+  setup();
+  { begin_choice();
+    if (tagnum == choice_pa_pk_as_rep_dhInfo) {
+      val->choice = choice_pa_pk_as_rep_dhInfo;
+      get_field_body(val->u.dh_Info, asn1_decode_dh_rep_info);
+    } else if (tagnum == choice_pa_pk_as_rep_encKeyPack) {
+      val->choice = choice_pa_pk_as_rep_encKeyPack;
+      get_implicit_octet_string(val->u.encKeyPack.length, val->u.encKeyPack.data,
+				choice_pa_pk_as_rep_encKeyPack);
+    } else {
+      val->choice = choice_pa_pk_as_rep_UNKNOWN;
+    }
+    end_choice();
+  }
+  cleanup();
+}
+
+asn1_error_code asn1_decode_pa_pk_as_rep_draft9(asn1buf *buf, krb5_pa_pk_as_rep_draft9 *val)
+{
+  setup();
+  { begin_structure();
+    if (tagnum == choice_pa_pk_as_rep_draft9_dhSignedData) {
+      val->choice = choice_pa_pk_as_rep_draft9_dhSignedData;
+      get_lenfield(val->u.dhSignedData.length, val->u.dhSignedData.data,
+		    choice_pa_pk_as_rep_draft9_dhSignedData, asn1_decode_octetstring);
+    } else if (tagnum == choice_pa_pk_as_rep_draft9_encKeyPack) {
+      val->choice = choice_pa_pk_as_rep_draft9_encKeyPack;
+      get_lenfield(val->u.encKeyPack.length, val->u.encKeyPack.data,
+		    choice_pa_pk_as_rep_draft9_encKeyPack, asn1_decode_octetstring);
+    } else {
+      val->choice = choice_pa_pk_as_rep_draft9_UNKNOWN;
+    }
+    end_structure();
+  }
+  cleanup();
+}
+
+asn1_error_code asn1_decode_sequence_of_typed_data(asn1buf *buf, krb5_typed_data ***val)
+{
+    decode_array_body(krb5_typed_data,asn1_decode_typed_data);
+}
+
+asn1_error_code asn1_decode_typed_data(asn1buf *buf, krb5_typed_data *val) 
+{
+  setup();
+  { begin_structure();
+    get_field(val->type,0,asn1_decode_int32);
+    get_lenfield(val->length,val->data,1,asn1_decode_octetstring);
+    end_structure();
   }
   cleanup();
 }

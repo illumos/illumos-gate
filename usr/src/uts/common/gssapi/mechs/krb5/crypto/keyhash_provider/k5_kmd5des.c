@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -39,8 +38,8 @@
  * This means that the MD5* functions are called instead of krb5_MD5*.
  */
 
-#include <krb5.h>
 #include <des_int.h>
+#include <krb5.h>
 #include <keyhash_provider.h>
 #include <sys/kmem.h>
 #include <sys/crypto/api.h>
@@ -262,7 +261,7 @@ cleanup:
     return(ret);
 }
 
-const struct krb5_keyhash_provider krb5_keyhash_md5des = {
+const struct krb5_keyhash_provider krb5int_keyhash_md5des = {
     CONFLENGTH+MD5_CKSUM_LENGTH,
     k5_md5des_hash,
     k5_md5des_verify

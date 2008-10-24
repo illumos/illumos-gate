@@ -1,8 +1,7 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -30,9 +29,9 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <etypes.h>
-#include <dk.h>
+#include "k5-int.h"
+#include "etypes.h"
+#include "dk.h"
 
 #define K5CLENGTH 5 /* 32 bit net byte order integer + one byte seed */
 
@@ -130,6 +129,7 @@ krb5_dk_make_checksum(context, hash, key, usage, input, output)
 	if (krb5_enctypes_list[i].etype == key->enctype)
 	    break;
     }
+
     if (i == krb5_enctypes_length) {
 	KRB5_LOG(KRB5_ERR, "krb5_ck_make_checksum bad enctype: %d",
 		key->enctype);

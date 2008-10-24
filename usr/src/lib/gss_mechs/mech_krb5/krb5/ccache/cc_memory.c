@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/ccache/cc_memory.c
@@ -82,6 +81,19 @@ static krb5_error_code KRB5_CALLCONV krb5_mcc_store
 static krb5_error_code KRB5_CALLCONV krb5_mcc_set_flags 
 	(krb5_context, krb5_ccache id , krb5_flags flags );
 
+static krb5_error_code KRB5_CALLCONV krb5_mcc_ptcursor_new(
+    krb5_context,
+    krb5_cc_ptcursor *);
+
+static krb5_error_code KRB5_CALLCONV krb5_mcc_ptcursor_next(
+    krb5_context,
+    krb5_cc_ptcursor,
+    krb5_ccache *);
+
+static krb5_error_code KRB5_CALLCONV krb5_mcc_ptcursor_free(
+    krb5_context,
+    krb5_cc_ptcursor *);
+
 extern const krb5_cc_ops krb5_mcc_ops;
 extern krb5_error_code krb5_change_cache (void);
 
@@ -103,6 +115,10 @@ typedef struct krb5_mcc_list_node {
     struct krb5_mcc_list_node *next;
     krb5_mcc_data *cache;
 } krb5_mcc_list_node;
+
+struct krb5_mcc_ptcursor_data {
+    struct krb5_mcc_list_node *cur;
+};
 
 k5_mutex_t krb5int_mcc_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
 static krb5_mcc_list_node *mcc_head = 0;
@@ -242,7 +258,7 @@ krb5_mcc_resolve (krb5_context context, krb5_ccache *id, const char *residual)
 
     err = k5_mutex_lock(&krb5int_mcc_mutex);
     if (err) {
-        /* SUNW14resync - fix mem leak */
+        /* Solaris Kerberos - fix mem leak */
         krb5_xfree(lid);
 	return err;
     }
@@ -450,6 +466,8 @@ new_mcc_data (const char *name, krb5_mcc_data **dataptr)
     return 0;
 }
 
+static krb5_error_code random_string (krb5_context, char *, unsigned int);
+ 
 /*
  * Effects:
  * Creates a new file cred cache whose name is guaranteed to be
@@ -464,11 +482,12 @@ new_mcc_data (const char *name, krb5_mcc_data **dataptr)
  *              krb5_ccache.  id is undefined.
  * system errors (from open)
  */
+
 krb5_error_code KRB5_CALLCONV
 krb5_mcc_generate_new (krb5_context context, krb5_ccache *id)
 {
     krb5_ccache lid;
-    char scratch[6+1]; /* 6 for the scratch part, +1 for NUL */
+    char uniquename[8];
     krb5_error_code err;
     krb5_mcc_data *d;
 
@@ -478,25 +497,76 @@ krb5_mcc_generate_new (krb5_context context, krb5_ccache *id)
 	return KRB5_CC_NOMEM;
 
     lid->ops = &krb5_mcc_ops;
-
-    (void) strcpy(scratch, "XXXXXX");
-    mktemp(scratch);
-
+    
     err = k5_mutex_lock(&krb5int_mcc_mutex);
     if (err) {
 	free(lid);
 	return err;
     }
-    err = new_mcc_data(scratch, &d);
+    
+    /* Check for uniqueness with mutex locked to avoid race conditions */
+    while (1) {
+        krb5_mcc_list_node *ptr;
+
+        random_string (context, uniquename, sizeof (uniquename));
+        
+	for (ptr = mcc_head; ptr; ptr=ptr->next) {
+            if (!strcmp(ptr->cache->name, uniquename)) {
+		break;  /* got a match, loop again */
+            }
+	}
+        if (!ptr) break; /* got to the end without finding a match */
+    }
+    
+    err = new_mcc_data(uniquename, &d);
+
     k5_mutex_unlock(&krb5int_mcc_mutex);
     if (err) {
 	krb5_xfree(lid);
 	return err;
     }
     lid->data = d;
-    *id = lid; /* SUNW14resync - fix to 1.4.2 */
+    *id = lid;
     krb5_change_cache ();
     return KRB5_OK;
+}
+
+/* Utility routine: Creates a random memory ccache name. 
+ * This algorithm was selected because it creates readable 
+ * random ccache names in a fixed size buffer.  */
+
+static krb5_error_code
+random_string (krb5_context context, char *string, unsigned int length)
+{
+    static const unsigned char charlist[] =
+        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    krb5_error_code err = 0;
+    unsigned char *bytes = NULL;
+    unsigned int bytecount = length - 1;
+    
+    if (!err) {
+        bytes = malloc (bytecount);
+        if (bytes == NULL) { err = ENOMEM; }
+    }
+    
+    if (!err) {
+        krb5_data data;
+        data.length = bytecount;
+        data.data = (char *) bytes;
+        err = krb5_c_random_make_octets (context, &data);
+    }
+    
+    if (!err) {
+        unsigned int i;
+        for (i = 0; i < bytecount; i++) {
+            string [i] = charlist[bytes[i] % (sizeof (charlist) - 1)];
+        }
+        string[length - 1] = '\0';
+    }
+    
+    if (bytes != NULL) { free (bytes); }
+    
+    return err;
 }
 
 /*
@@ -575,6 +645,13 @@ krb5_mcc_set_flags(krb5_context context, krb5_ccache id, krb5_flags flags)
     return KRB5_OK;
 }
 
+static krb5_error_code KRB5_CALLCONV
+krb5_mcc_get_flags(krb5_context context, krb5_ccache id, krb5_flags *flags)
+{
+    *flags = 0;
+    return KRB5_OK;
+}
+
 /* store: Save away creds in the ccache.  */
 krb5_error_code KRB5_CALLCONV
 krb5_mcc_store(krb5_context ctx, krb5_ccache id, krb5_creds *creds)
@@ -593,13 +670,100 @@ krb5_mcc_store(krb5_context ctx, krb5_ccache id, krb5_creds *creds)
     }
     err = k5_mutex_lock(&mptr->lock);
     if (err) {
-        /* SUNW14resync - fix mem leak */
+        /* Solaris Kerberos - fix mem leaks */
+	krb5_free_creds(ctx, new_node->creds);
 	free(new_node);
 	return err;
     }
     new_node->next = mptr->link;
     mptr->link = new_node;
     k5_mutex_unlock(&mptr->lock);
+    return 0;
+}
+
+static krb5_error_code KRB5_CALLCONV
+krb5_mcc_ptcursor_new(
+    krb5_context context,
+    krb5_cc_ptcursor *cursor)
+{
+    krb5_error_code ret = 0;
+    krb5_cc_ptcursor n = NULL;
+    struct krb5_mcc_ptcursor_data *cdata = NULL;
+
+    *cursor = NULL;
+
+    n = malloc(sizeof(*n));
+    if (n == NULL)
+	return ENOMEM;
+    n->ops = &krb5_mcc_ops;
+    cdata = malloc(sizeof(struct krb5_mcc_ptcursor_data));
+    if (cdata == NULL) {
+	ret = ENOMEM;
+	goto errout;
+    }
+    n->data = cdata;
+    ret = k5_mutex_lock(&krb5int_mcc_mutex);
+    if (ret)
+	goto errout;
+    cdata->cur = mcc_head;
+    ret = k5_mutex_unlock(&krb5int_mcc_mutex);
+    if (ret)
+	goto errout;
+
+errout:
+    if (ret) {
+	krb5_mcc_ptcursor_free(context, &n);
+    }
+    *cursor = n;
+    return ret;
+}
+
+static krb5_error_code KRB5_CALLCONV
+krb5_mcc_ptcursor_next(
+    krb5_context context,
+    krb5_cc_ptcursor cursor,
+    krb5_ccache *ccache)
+{
+    krb5_error_code ret = 0;
+    struct krb5_mcc_ptcursor_data *cdata = NULL;
+
+    *ccache = NULL;
+    cdata = cursor->data;
+    if (cdata->cur == NULL)
+	return 0;
+
+    *ccache = malloc(sizeof(**ccache));
+    if (*ccache == NULL)
+	return ENOMEM;
+
+    (*ccache)->ops = &krb5_mcc_ops;
+    (*ccache)->data = cdata->cur->cache;
+    ret = k5_mutex_lock(&krb5int_mcc_mutex);
+    if (ret)
+	goto errout;
+    cdata->cur = cdata->cur->next;
+    ret = k5_mutex_unlock(&krb5int_mcc_mutex);
+    if (ret)
+	goto errout;
+errout:
+    if (ret && *ccache != NULL) {
+	free(*ccache);
+	*ccache = NULL;
+    }
+    return ret;
+}
+
+static krb5_error_code KRB5_CALLCONV
+krb5_mcc_ptcursor_free(
+    krb5_context context,
+    krb5_cc_ptcursor *cursor)
+{
+    if (*cursor == NULL)
+	return 0;
+    if ((*cursor)->data != NULL)
+	free((*cursor)->data);
+    free(*cursor);
+    *cursor = NULL;
     return 0;
 }
 
@@ -620,4 +784,11 @@ const krb5_cc_ops krb5_mcc_ops = {
      krb5_mcc_end_seq_get,
      krb5_mcc_remove_cred,
      krb5_mcc_set_flags,
+     krb5_mcc_get_flags,
+     krb5_mcc_ptcursor_new,
+     krb5_mcc_ptcursor_next,
+     krb5_mcc_ptcursor_free,
+     NULL,
+     NULL,
+     NULL,
 };

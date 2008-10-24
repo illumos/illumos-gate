@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/os/changepw.c
@@ -33,24 +32,24 @@
  */
 
 #define	NEED_SOCKETS
-#include <krb5.h>
 #include <k5-int.h>
 #include <kadm5/admin.h>
 #include <client_internal.h>
 #include <gssapi/gssapi.h>
 #include <gssapi_krb5.h>
 #include <gssapiP_krb5.h>
+#include <krb5.h>
 
 /* #include "adm_err.h" */
 #include <stdio.h>
 #include <errno.h>
 
-extern krb5_error_code krb5_mk_chpw_req(krb5_context  context,
+extern krb5_error_code krb5int_mk_chpw_req(krb5_context  context,
 					krb5_auth_context auth_context,
 					krb5_data *ap_req, char *passwd,
 					krb5_data *packet);
 
-extern krb5_error_code krb5_rd_chpw_rep(krb5_context context,
+extern krb5_error_code krb5int_rd_chpw_rep(krb5_context context,
 					krb5_auth_context auth_context,
 					krb5_data *packet, int *result_code,
 					krb5_data *result_data);
@@ -268,7 +267,7 @@ krb5_data *srvr_msg;
 			goto cleanup;
 		}
 
-		if (code = krb5_mk_chpw_req(context, auth_context,
+		if (code = krb5int_mk_chpw_req(context, auth_context,
 					    &ap_req, newpw, &chpw_req))
 		{
 			code = errno;
@@ -326,7 +325,7 @@ krb5_data *srvr_msg;
 						NULL, &remote_kaddr))
 			goto cleanup;
 
-		if (code = krb5_rd_chpw_rep(context, auth_context, &chpw_rep,
+		if (code = krb5int_rd_chpw_rep(context, auth_context, &chpw_rep,
 					&local_result_code, srvr_msg))
 			goto cleanup;
 

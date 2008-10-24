@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/rcache/rc_none.c
  *
@@ -7,9 +5,9 @@
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
- * require a specific license from the United States Government.
- * It is the responsibility of any person or organization contemplating
- * export to obtain such a license before exporting.
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
  * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
@@ -18,7 +16,7 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.	Furthermore if you modify this software you must label
+ * permission.  Furthermore if you modify this software you must label
  * your software as modified software and not distribute it in such a
  * fashion that it might be confused with the original M.I.T. software.
  * M.I.T. makes no representations about the suitability of
@@ -33,16 +31,16 @@
 #include "rc-int.h"
 
 static krb5_error_code KRB5_CALLCONV
-krb5_rc_none_init(krb5_context ctx, krb5_rcache rc, krb5_deltat lifespan)
+krb5_rc_none_init(krb5_context ctx, krb5_rcache rc, krb5_deltat d)
 {
-	return (0);
+    return 0;
 }
 #define krb5_rc_none_recover_or_init krb5_rc_none_init
 
 static krb5_error_code KRB5_CALLCONV
 krb5_rc_none_noargs(krb5_context ctx, krb5_rcache rc)
 {
-	return (0);
+    return 0;
 }
 #define krb5_rc_none_recover	krb5_rc_none_noargs
 #define krb5_rc_none_destroy	krb5_rc_none_noargs
@@ -52,39 +50,39 @@ krb5_rc_none_noargs(krb5_context ctx, krb5_rcache rc)
 static krb5_error_code KRB5_CALLCONV
 krb5_rc_none_store(krb5_context ctx, krb5_rcache rc, krb5_donot_replay *r)
 {
-	return (0);
+    return 0;
 }
 
 static krb5_error_code KRB5_CALLCONV
 krb5_rc_none_get_span(krb5_context ctx, krb5_rcache rc, krb5_deltat *d)
 {
-	return (0);
+    return 0;
 }
 
 static char * KRB5_CALLCONV
 krb5_rc_none_get_name(krb5_context ctx, krb5_rcache rc)
 {
-	return ("");
+    return "";
 }
 
 static krb5_error_code KRB5_CALLCONV
 krb5_rc_none_resolve(krb5_context ctx, krb5_rcache rc, char *name)
 {
-	rc->data = "NONE";
-	return (0);
+    rc->data = "NONE";
+    return 0;
 }
 
 const krb5_rc_ops krb5_rc_none_ops = {
-	(0),
-	"NONE",
-	krb5_rc_none_init,
-	krb5_rc_none_recover,
-	krb5_rc_none_recover_or_init,
-	krb5_rc_none_destroy,
-	krb5_rc_none_close,
-	krb5_rc_none_store,
-	krb5_rc_none_expunge,
-	krb5_rc_none_get_span,
-	krb5_rc_none_get_name,
-	krb5_rc_none_resolve
+    0,
+    "NONE",
+    krb5_rc_none_init,
+    krb5_rc_none_recover,
+    krb5_rc_none_recover_or_init,
+    krb5_rc_none_destroy,
+    krb5_rc_none_close,
+    krb5_rc_none_store,
+    krb5_rc_none_expunge,
+    krb5_rc_none_get_span,
+    krb5_rc_none_get_name,
+    krb5_rc_none_resolve
 };

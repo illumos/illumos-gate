@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1990-1998 by the Massachusetts Institute of Technology.
@@ -26,9 +25,12 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ * 
+ *
+ * krb5_free_address()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 static void cleanup_dk_list(krb5_context, krb5_keyblock *);
 
@@ -204,7 +206,7 @@ krb5_free_cred_contents(krb5_context context, krb5_creds *val)
     }
 }
 
-void KRB5_CALLCONV
+void KRB5_CALLCONV 
 krb5_free_cred_enc_part(krb5_context context, register krb5_cred_enc_part *val)
 {
     register krb5_cred_info **temp;
@@ -701,7 +703,7 @@ krb5_free_sam_challenge_contents(krb5_context ctx, krb5_sam_challenge *sc)
 
 void KRB5_CALLCONV
 krb5_free_sam_challenge_2_contents(krb5_context ctx,
-                                   krb5_sam_challenge_2 *sc2)
+				   krb5_sam_challenge_2 *sc2)
 {
     krb5_checksum **cksump;
 
@@ -715,14 +717,14 @@ krb5_free_sam_challenge_2_contents(krb5_context ctx,
             krb5_free_checksum(ctx, *cksump);
             cksump++;
 	}
-        krb5_xfree(sc2->sam_cksum);
+	krb5_xfree(sc2->sam_cksum);
 	sc2->sam_cksum = 0;
     }
 }
 
 void KRB5_CALLCONV
 krb5_free_sam_challenge_2_body(krb5_context ctx,
-                               krb5_sam_challenge_2_body *sc2)
+			       krb5_sam_challenge_2_body *sc2)
 {
     if (!sc2)
 	return;
@@ -732,11 +734,11 @@ krb5_free_sam_challenge_2_body(krb5_context ctx,
 
 void KRB5_CALLCONV
 krb5_free_sam_challenge_2_body_contents(krb5_context ctx,
-                                        krb5_sam_challenge_2_body *sc2)
+					krb5_sam_challenge_2_body *sc2)
 {
     if (!sc2)
 	return;
-    if (sc2->sam_type_name.data)
+    if (sc2->sam_type_name.data) 
 	krb5_free_data_contents(ctx, &sc2->sam_type_name);
     if (sc2->sam_track_id.data)
 	krb5_free_data_contents(ctx, &sc2->sam_track_id);

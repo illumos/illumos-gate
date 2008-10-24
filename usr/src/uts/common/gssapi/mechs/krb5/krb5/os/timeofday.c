@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/timeofday.c
  *
@@ -22,7 +21,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
@@ -31,7 +33,7 @@
  */
 
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 #ifdef	_KERNEL
 #include <sys/time.h>
@@ -40,20 +42,11 @@
 #include <errno.h>
 #endif
 
-#ifdef POSIX_TYPES
-#define timetype time_t
-#else
-#define timetype long
-#endif
-
-#ifndef HAVE_ERRNO
-extern int errno;
-#endif
-
-krb5_error_code KRB5_CALLCONV 
-krb5_timeofday(krb5_context context, register krb5_int32 *timeret)
+krb5_error_code KRB5_CALLCONV
+krb5_timeofday(krb5_context context, register krb5_timestamp *timeret)
 {
     krb5_os_context os_ctx = context->os_context;
+    /* Solaris Kerberos */
     krb5_int32 tval;
 
     if (os_ctx->os_flags & KRB5_OS_TOFFSET_TIME) {
@@ -68,7 +61,8 @@ krb5_timeofday(krb5_context context, register krb5_int32 *timeret)
 			 &usecs))
 		return kret;
     }
-    if (tval == (timetype) -1)
+    /* Solaris Kerberos */
+    if (tval == (krb5_int32) -1)
 #ifdef _KERNEL
 	return 1;
 #else
@@ -77,6 +71,5 @@ krb5_timeofday(krb5_context context, register krb5_int32 *timeret)
     if (os_ctx->os_flags & KRB5_OS_TOFFSET_VALID)
 	    tval += os_ctx->time_offset;
     *timeret = tval;
-  	
     return 0;
 }

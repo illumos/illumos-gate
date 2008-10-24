@@ -1,10 +1,4 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-/*
  * lib/krb5/os/read_pwd.c
  *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
@@ -215,7 +209,7 @@ read_pwd_proc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam)
     switch(msg) {
     case WM_INITDIALOG:
 	dp = (pwd_params *) lParam;
-	SetWindowLong(hdlg, DWL_USER, lParam);
+	SetWindowLongPtr(hdlg, DWLP_USER, lParam);
 	SetDlgItemText(hdlg, ID_READ_PWD_PROMPT, dp->pwd_prompt);
 	SetDlgItemText(hdlg, ID_READ_PWD_PROMPT2, dp->pwd_prompt2);
 	SetDlgItemText(hdlg, ID_READ_PWD_PWD, "");
@@ -223,7 +217,7 @@ read_pwd_proc(HWND hdlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	return TRUE;
 
     case WM_COMMAND:
-	dp = (pwd_params *) GetWindowLong(hdlg, DWL_USER);
+	dp = (pwd_params *) GetWindowLongPtr(hdlg, DWLP_USER);
         switch (wParam) {
 	case IDOK:
 	    *(dp->pwd_size_return) =

@@ -1,9 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/krb5/ccache/ccfns.c
  *
- * Copyright 2000 by the Massachusetts Institute of Technology.
+ * Copyright 2000, 2007 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -67,7 +65,29 @@ krb5_error_code KRB5_CALLCONV
 krb5_cc_store_cred (krb5_context context, krb5_ccache cache,
 		    krb5_creds *creds)
 {
-    return cache->ops->store(context, cache, creds);
+    krb5_error_code ret;
+    krb5_ticket *tkt;
+    krb5_principal s1, s2;
+
+    ret = cache->ops->store(context, cache, creds);
+    if (ret) return ret;
+
+    /*
+     * If creds->server and the server in the decoded ticket differ,
+     * store both principals.
+     */
+    s1 = creds->server;
+    ret = decode_krb5_ticket(&creds->ticket, &tkt);
+    /* Bail out on errors in case someone is storing a non-ticket. */
+    if (ret) return 0;
+    s2 = tkt->server;
+    if (!krb5_principal_compare(context, s1, s2)) {
+	creds->server = s2;
+	ret = cache->ops->store(context, cache, creds);
+	creds->server = s1;
+    }
+    krb5_free_ticket(context, tkt);
+    return ret;
 }
 
 krb5_error_code KRB5_CALLCONV
@@ -75,7 +95,23 @@ krb5_cc_retrieve_cred (krb5_context context, krb5_ccache cache,
 		       krb5_flags flags, krb5_creds *mcreds,
 		       krb5_creds *creds)
 {
-    return cache->ops->retrieve(context, cache, flags, mcreds, creds);
+    krb5_error_code ret;
+    krb5_data tmprealm;
+
+    ret = cache->ops->retrieve(context, cache, flags, mcreds, creds);
+    if (ret != KRB5_CC_NOTFOUND)
+	return ret;
+    if (!krb5_is_referral_realm(&mcreds->server->realm))
+	return ret;
+
+    /*
+     * Retry using client's realm if service has referral realm.
+     */
+    tmprealm = mcreds->server->realm;
+    mcreds->server->realm = mcreds->client->realm;
+    ret = cache->ops->retrieve(context, cache, flags, mcreds, creds);
+    mcreds->server->realm = tmprealm;
+    return ret;
 }
 
 krb5_error_code KRB5_CALLCONV
@@ -117,6 +153,12 @@ krb5_error_code KRB5_CALLCONV
 krb5_cc_set_flags (krb5_context context, krb5_ccache cache, krb5_flags flags)
 {
     return cache->ops->set_flags(context, cache, flags);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_cc_get_flags (krb5_context context, krb5_ccache cache, krb5_flags *flags)
+{
+    return cache->ops->get_flags(context, cache, flags);
 }
 
 const char * KRB5_CALLCONV

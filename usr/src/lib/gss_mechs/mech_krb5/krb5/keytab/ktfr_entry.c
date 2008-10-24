@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/keytab/ktfr_entry.c
@@ -29,25 +28,24 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_kt_free_entry()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_free_keytab_entry_contents (krb5_context context, krb5_keytab_entry *entry)
-
-
 {
     if (!entry)
 	return 0;
-
+    
     krb5_free_principal(context, entry->principal);
     if (entry->key.contents) {
 	memset((char *)entry->key.contents, 0, entry->key.length);
-        krb5_free_keyblock_contents(context, &entry->key);
+	/* Solaris Kerberos */
+	krb5_free_keyblock_contents(context, &entry->key);
     }
     return 0;
 }

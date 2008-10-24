@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/decode_kdc.c
  *
@@ -28,7 +27,7 @@
  * krb5_decode_kdc_rep() function.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  Takes a KDC_REP message and decrypts encrypted part using etype and
@@ -69,7 +68,7 @@ krb5_decode_kdc_rep(krb5_context context, krb5_data *enc_rep, const krb5_keybloc
 	return retval;
 
     if ((retval = krb5_kdc_rep_decrypt_proc(context, key, &usage,
-					    local_dec_rep)))
+					    local_dec_rep))) 
 	krb5_free_kdc_rep(context, local_dec_rep);
     else
     	*dec_rep = local_dec_rep;

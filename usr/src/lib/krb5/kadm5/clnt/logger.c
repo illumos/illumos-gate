@@ -1,4 +1,9 @@
 /*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * lib/kadm/logger.c
  *
  * Copyright 1995 by the Massachusetts Institute of Technology.
@@ -16,19 +21,14 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  *
  */
-
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /* KADM5 wants non-syslog log files to contain syslog-like entries */
 #define VERBOSE_LOGS
@@ -41,9 +41,18 @@
 #include "com_err.h"
 #include <stdio.h>
 #include <ctype.h>
+#include <ctype.h>
+#ifdef	HAVE_SYSLOG_H
 #include <syslog.h>
+#endif	/* HAVE_SYSLOG_H */
+#ifdef	HAVE_STDARG_H
 #include <stdarg.h>
+#else	/* HAVE_STDARG_H */
+#include <varargs.h>
+#endif	/* HAVE_STDARG_H */
 #include <libintl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define	KRB5_KLOG_MAX_ERRMSG_SIZE	2048
 #ifndef	MAXHOSTNAMELEN
@@ -196,7 +205,6 @@ struct log_control {
     char		*log_whoami;
     char		*log_hostname;
     krb5_boolean	log_opened;
-
 };
 
 static struct log_control log_control = {
@@ -214,8 +222,8 @@ static struct log_entry	def_log_entry;
  */
 #define	DEVICE_OPEN(d, m)	fopen(d, m)
 #define	CONSOLE_OPEN(m)		fopen("/dev/console", m)
-#define	DEVICE_PRINT(f, m)	((fprintf(f, m) >= 0) ? 		\
-				 (fprintf(f, "\r\n"), fflush(f), 0) :	\
+#define	DEVICE_PRINT(f, m)	((fprintf(f, "%s\r\n", m) >= 0) ? 	\
+				 (fflush(f), 0) :			\
 				 -1)
 #define	DEVICE_CLOSE(d)		fclose(d)
 
@@ -236,6 +244,8 @@ klog_rotate(struct log_entry *le)
 	char *tmp;
 	FILE *fp;
 	int num_vers;
+	mode_t old_umask;
+
 
 	/*
 	 * By default we don't rotate.
@@ -304,17 +314,18 @@ klog_rotate(struct log_entry *le)
 		 */
 		le->lfu_last_rotated = t;
 
+		/*
+		 * Default log file creation mode should be read-only
+		 * by owner(root), but the admin can override with
+		 * chmod(1) if desired.
+		 */ 
+
+		old_umask = umask(077);
 		fp = fopen(old_name, le->lfu_fopen_mode);
 
-		if (fp != NULL) {
+		umask(old_umask);
 
-			/* Set the permissions to 644 */
-			if (fchmod(fileno(fp),
-			    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) == -1) {
-			fprintf(stderr,
-gettext("During rotate, couldn't set permissions for log file %s: %s\n"),
-				old_name, error_message(errno));
-			}
+		if (fp != NULL) {
 
 			(void) fclose(le->lfu_filep);
 			le->lfu_filep = fp;
@@ -347,17 +358,16 @@ gettext("During rotate, couldn't set permissions for log file %s: %s\n"),
  * klog_com_err_proc()	- Handle com_err(3) messages as specified by the
  *			  profile.
  */
+static krb5_context err_context;
 static void
-klog_com_err_proc(whoami, code, format, ap)
-    const char	*whoami;
-    long	code;
-    const char	*format;
-    va_list	ap;
+klog_com_err_proc(const char *whoami, long code, const char *format, va_list ap)
 {
     char	outbuf[KRB5_KLOG_MAX_ERRMSG_SIZE];
     int		lindex;
-    char	*actual_format;
+    const char	*actual_format;
+#ifdef	HAVE_SYSLOG
     int		log_pri = -1;
+#endif	/* HAVE_SYSLOG */
     char	*cp;
     char	*syslogp;
 
@@ -371,15 +381,18 @@ klog_com_err_proc(whoami, code, format, ap)
 
     /* If reporting an error message, separate it. */
     if (code) {
-	outbuf[sizeof(outbuf) - 1] = '\0';
+        const char *emsg;
+        outbuf[sizeof(outbuf) - 1] = '\0';
 
-	strncat(outbuf, error_message(code),
-		sizeof(outbuf) - 1 - strlen(outbuf));
+	emsg = krb5_get_error_message (err_context, code);
+	strncat(outbuf, emsg, sizeof(outbuf) - 1 - strlen(outbuf));
 	strncat(outbuf, " - ", sizeof(outbuf) - 1 - strlen(outbuf));
+	krb5_free_error_message(err_context, emsg);
     }
     cp = &outbuf[strlen(outbuf)];
     
-    actual_format = (char *) format;
+    actual_format = format;
+#ifdef	HAVE_SYSLOG
     /*
      * This is an unpleasant hack.  If the first character is less than
      * 8, then we assume that it is a priority.
@@ -389,38 +402,61 @@ klog_com_err_proc(whoami, code, format, ap)
      * intermediate representation.
      */
     if ((((unsigned char) *format) > 0) && (((unsigned char) *format) <= 8)) {
-	actual_format = (char *) (format + 1);
+	actual_format = (format + 1);
 	switch ((unsigned char) *format) {
+#ifdef	LOG_EMERG
 	case 1:
 	    log_pri = LOG_EMERG;
 	    break;
+#endif /* LOG_EMERG */
+#ifdef	LOG_ALERT
 	case 2:
 	    log_pri = LOG_ALERT;
 	    break;
+#endif /* LOG_ALERT */
+#ifdef	LOG_CRIT
 	case 3:
 	    log_pri = LOG_CRIT;
 	    break;
+#endif /* LOG_CRIT */
 	default:
 	case 4:
 	    log_pri = LOG_ERR;
 	    break;
+#ifdef	LOG_WARNING
 	case 5:
 	    log_pri = LOG_WARNING;
 	    break;
+#endif /* LOG_WARNING */
+#ifdef	LOG_NOTICE
 	case 6:
 	    log_pri = LOG_NOTICE;
 	    break;
+#endif /* LOG_NOTICE */
+#ifdef	LOG_INFO
 	case 7:
 	    log_pri = LOG_INFO;
 	    break;
+#endif /* LOG_INFO */
+#ifdef	LOG_DEBUG
 	case 8:
 	    log_pri = LOG_DEBUG;
 	    break;
+#endif /* LOG_DEBUG */
 	}
     } 
+#endif	/* HAVE_SYSLOG */
 
     /* Now format the actual message */
-    vsnprintf(cp, sizeof (outbuf) - (cp - outbuf), actual_format, ap);
+#if	HAVE_VSNPRINTF
+    vsnprintf(cp, sizeof(outbuf) - (cp - outbuf), actual_format, ap);
+#elif	HAVE_VSPRINTF
+    vsprintf(cp, actual_format, ap);
+#else	/* HAVE_VSPRINTF */
+    sprintf(cp, actual_format, ((int *) ap)[0], ((int *) ap)[1],
+	    ((int *) ap)[2], ((int *) ap)[3],
+	    ((int *) ap)[4], ((int *) ap)[5]);
+#endif	/* HAVE_VSPRINTF */
     
     /*
      * Now that we have the message formatted, perform the output to each
@@ -436,14 +472,13 @@ klog_com_err_proc(whoami, code, format, ap)
 	    /*
 	     * Files/standard error.
 	     */
-	    if (fprintf(log_control.log_entries[lindex].lfu_filep,
+	    if (fprintf(log_control.log_entries[lindex].lfu_filep, "%s\n",
 			outbuf) < 0) {
 		/* Attempt to report error */
 		fprintf(stderr, krb5_log_error_table(LOG_FILE_ERR), whoami,
 			log_control.log_entries[lindex].lfu_fname);
 	    }
 	    else {
-		fprintf(log_control.log_entries[lindex].lfu_filep, "\n");
 		fflush(log_control.log_entries[lindex].lfu_filep);
 	    }
 	    break;
@@ -459,6 +494,7 @@ klog_com_err_proc(whoami, code, format, ap)
 			log_control.log_entries[lindex].ldu_devname);
 	    }
 	    break;
+#ifdef	HAVE_SYSLOG
 	case K_LOG_SYSLOG:
 	    /*
 	     * System log.
@@ -476,6 +512,7 @@ klog_com_err_proc(whoami, code, format, ap)
 	    /* Log the message with our header trimmed off */
 	    syslog(log_pri, syslogp);
 	    break;
+#endif /* HAVE_SYSLOG */
 	default:
 	    break;
 	}
@@ -504,25 +541,24 @@ klog_com_err_proc(whoami, code, format, ap)
  *			  where/how to send output.
  */
 krb5_error_code
-krb5_klog_init(kcontext, ename, whoami, do_com_err)
-    krb5_context	kcontext;
-    char		*ename;
-    char		*whoami;
-    krb5_boolean	do_com_err;
+krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do_com_err)
 {
     const char	*logging_profent[3];
     const char	*logging_defent[3];
     char	**logging_specs;
     int		i, ngood;
     char	*cp, *cp2;
-    char	savec;
+    char	savec = '\0';
     int		error;
     int		do_openlog, log_facility;
     FILE	*f;
+    mode_t      old_umask;
 
     /* Initialize */
     do_openlog = 0;
     log_facility = 0;
+
+    err_context = kcontext;
 
     /*
      * Look up [logging]-><ename> in the profile.  If that doesn't
@@ -567,9 +603,9 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		 *	<whitespace><data><whitespace>
 		 * so, trim off the leading and trailing whitespace here.
 		 */
-		for (cp = logging_specs[i]; isspace(*cp); cp++);
+		for (cp = logging_specs[i]; isspace((int) *cp); cp++);
 		for (cp2 = &logging_specs[i][strlen(logging_specs[i])-1];
-		     isspace(*cp2); cp2--);
+		     isspace((int) *cp2); cp2--);
 		cp2++;
 		*cp2 = '\0';
 		/*
@@ -582,16 +618,13 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		    if (cp[4] == ':' || cp[4] == '=') {
 			log_control.log_entries[i].lfu_fopen_mode = 
 				(cp[4] == ':') ? "a+F" : "wF";
+			old_umask = umask(077);
 			f = fopen(&cp[5],
 				log_control.log_entries[i].lfu_fopen_mode);
+			umask(old_umask);
 			if (f) {
-			    char rotate_kw[128];
-				/* Set the permissions to 644 */
-			    if (fchmod(fileno(f),
-					S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) == -1) {
-			    		fprintf(stderr,gettext("Couldn't set permissions for log file %s: %s\n"),
-				    		&cp[5], error_message(errno));
-			    }
+                            char rotate_kw[128];
+
 			    log_control.log_entries[i].lfu_filep = f;
 			    log_control.log_entries[i].log_type = K_LOG_FILE;
 			    log_control.log_entries[i].lfu_fname = &cp[5];
@@ -642,12 +675,13 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 			
 			   }
 			} else {
-			    fprintf(stderr,gettext("Couldn't open log file %s: %s\n"),
+			    fprintf(stderr, gettext("Couldn't open log file %s: %s\n"),
 				    &cp[5], error_message(errno));
 			    continue;
 			}
 		    }
 		}
+#ifdef	HAVE_SYSLOG
 		/*
 		 * Is this a syslog?
 		 */
@@ -662,7 +696,8 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 			/*
 			 * Find the end of the severity.
 			 */
-			if (cp2 = strchr(&cp[7], ':')) {
+			cp2 = strchr(&cp[7], ':');
+			if (cp2) {
 			    savec = *cp2;
 			    *cp2 = '\0';
 			    cp2++;
@@ -674,32 +709,46 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 			if (!strcasecmp(&cp[7], "ERR")) {
 			    log_control.log_entries[i].lsu_severity = LOG_ERR;
 			}
+#ifdef	LOG_EMERG
 			else if (!strcasecmp(&cp[7], "EMERG")) {
 			    log_control.log_entries[i].lsu_severity =
 				LOG_EMERG;
 			}
+#endif	/* LOG_EMERG */
+#ifdef	LOG_ALERT
 			else if (!strcasecmp(&cp[7], "ALERT")) {
 			    log_control.log_entries[i].lsu_severity =
 				LOG_ALERT;
 			}
+#endif	/* LOG_ALERT */
+#ifdef	LOG_CRIT
 			else if (!strcasecmp(&cp[7], "CRIT")) {
 			    log_control.log_entries[i].lsu_severity = LOG_CRIT;
 			}
+#endif	/* LOG_CRIT */
+#ifdef	LOG_WARNING
 			else if (!strcasecmp(&cp[7], "WARNING")) {
 			    log_control.log_entries[i].lsu_severity =
 				LOG_WARNING;
 			}
+#endif	/* LOG_WARNING */
+#ifdef	LOG_NOTICE
 			else if (!strcasecmp(&cp[7], "NOTICE")) {
 			    log_control.log_entries[i].lsu_severity =
 				LOG_NOTICE;
 			}
+#endif	/* LOG_NOTICE */
+#ifdef	LOG_INFO
 			else if (!strcasecmp(&cp[7], "INFO")) {
 			    log_control.log_entries[i].lsu_severity = LOG_INFO;
 			}
+#endif	/* LOG_INFO */
+#ifdef	LOG_DEBUG
 			else if (!strcasecmp(&cp[7], "DEBUG")) {
 			    log_control.log_entries[i].lsu_severity =
 				LOG_DEBUG;
 			}
+#endif	/* LOG_DEBUG */
 			else
 			    error = 1;
 
@@ -771,12 +820,14 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 			log_facility = log_control.log_entries[i].lsu_facility;
 		    }
 		}
+#endif	/* HAVE_SYSLOG */
 		/*
 		 * Is this a standard error specification?
 		 */
 		else if (!strcasecmp(cp, "STDERR")) {
-		    if (log_control.log_entries[i].lfu_filep =
-			fdopen(fileno(stderr), "a+F")) {
+		    log_control.log_entries[i].lfu_filep =
+			fdopen(fileno(stderr), "a+F");
+		    if (log_control.log_entries[i].lfu_filep) {
 			log_control.log_entries[i].log_type = K_LOG_STDERR;
 			log_control.log_entries[i].lfu_fname =
 			    "standard error";
@@ -786,8 +837,9 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		 * Is this a specification of the console?
 		 */
 		else if (!strcasecmp(cp, "CONSOLE")) {
-		    if (log_control.log_entries[i].ldu_filep =
-			CONSOLE_OPEN("a+F")) {
+		    log_control.log_entries[i].ldu_filep =
+			CONSOLE_OPEN("a+F");
+		    if (log_control.log_entries[i].ldu_filep) {
 			log_control.log_entries[i].log_type = K_LOG_CONSOLE;
 			log_control.log_entries[i].ldu_devname = "console";
 		    }
@@ -800,8 +852,9 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		     * We handle devices very similarly to files.
 		     */
 		    if (cp[6] == '=') {
-			if (log_control.log_entries[i].ldu_filep =
-			    DEVICE_OPEN(&cp[7], "wF")) {
+			log_control.log_entries[i].ldu_filep = 
+			    DEVICE_OPEN(&cp[7], "wF");
+			if (log_control.log_entries[i].ldu_filep) {
 			    log_control.log_entries[i].log_type = K_LOG_DEVICE;
 			    log_control.log_entries[i].ldu_devname = &cp[7];
 			}
@@ -843,14 +896,21 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 	log_control.log_nentries = 1;
     }
     if (log_control.log_nentries) {
-	if (log_control.log_whoami = (char *) malloc(strlen(whoami)+1))
+	log_control.log_whoami = (char *) malloc(strlen(whoami)+1);
+	if (log_control.log_whoami)
 	    strcpy(log_control.log_whoami, whoami);
-	if (log_control.log_hostname = (char *) malloc(MAXHOSTNAMELEN))
+
+	log_control.log_hostname = (char *) malloc(MAXHOSTNAMELEN + 1);
+	if (log_control.log_hostname) {
 	    gethostname(log_control.log_hostname, MAXHOSTNAMELEN);
+	    log_control.log_hostname[MAXHOSTNAMELEN] = '\0';
+	}
+#ifdef	HAVE_OPENLOG
 	if (do_openlog) {
 	    openlog(whoami, LOG_NDELAY|LOG_PID, log_facility);
 	    log_control.log_opened = 1;
 	}
+#endif /* HAVE_OPENLOG */
 	if (do_com_err)
 	    (void) set_com_err_hook(klog_com_err_proc);
     }
@@ -861,8 +921,7 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
  * krb5_klog_close()	- Close the logging context and free all data.
  */
 void
-krb5_klog_close(kcontext)
-    krb5_context	kcontext;
+krb5_klog_close(krb5_context kcontext)
 {
     int lindex;
     (void) reset_com_err_hook();
@@ -882,11 +941,13 @@ krb5_klog_close(kcontext)
 	     */
 	    DEVICE_CLOSE(log_control.log_entries[lindex].ldu_filep);
 	    break;
+#ifdef	HAVE_SYSLOG
 	case K_LOG_SYSLOG:
 	    /*
 	     * System log.
 	     */
 	    break;
+#endif	/* HAVE_SYSLOG */
 	default:
 	    break;
 	}
@@ -903,16 +964,17 @@ krb5_klog_close(kcontext)
     if (log_control.log_hostname)
 	free(log_control.log_hostname);
     log_control.log_hostname = (char *) NULL;
+#ifdef	HAVE_CLOSELOG
     if (log_control.log_opened)
 	closelog();
+#endif	/* HAVE_CLOSELOG */
 }
 
 /*
  * severity2string()	- Convert a severity to a string.
  */
-static char *
-severity2string(severity)
-    int	severity;
+static const char *
+severity2string(int severity)
 {
     int s;
     const char *ss;
@@ -920,30 +982,44 @@ severity2string(severity)
     s = severity & LOG_PRIMASK;
     ss = krb5_log_error_table(LOG_UFO_STRING);
     switch (s) {
+#ifdef	LOG_EMERG
     case LOG_EMERG:
 	ss = krb5_log_error_table(LOG_EMERG_STRING);
 	break;
+#endif	/* LOG_EMERG */
+#ifdef	LOG_ALERT
     case LOG_ALERT:
 	ss = krb5_log_error_table(LOG_ALERT_STRING);
 	break;
+#endif	/* LOG_ALERT */
+#ifdef	LOG_CRIT
     case LOG_CRIT:
 	ss = krb5_log_error_table(LOG_CRIT_STRING);
 	break;
+#endif	/* LOG_CRIT */
     case LOG_ERR:
 	ss = krb5_log_error_table(LOG_ERR_STRING);
 	break;
+#ifdef	LOG_WARNING
     case LOG_WARNING:
 	ss = krb5_log_error_table(LOG_WARNING_STRING);
 	break;
+#endif	/* LOG_WARNING */
+#ifdef	LOG_NOTICE
     case LOG_NOTICE:
 	ss = krb5_log_error_table(LOG_NOTICE_STRING);
 	break;
+#endif	/* LOG_NOTICE */
+#ifdef	LOG_INFO
     case LOG_INFO:
 	ss = krb5_log_error_table(LOG_INFO_STRING);
 	break;
+#endif	/* LOG_INFO */
+#ifdef	LOG_DEBUG
     case LOG_DEBUG:
 	ss = krb5_log_error_table(LOG_DEBUG_STRING);
 	break;
+#endif	/* LOG_DEBUG */
     }
     return((char *) ss);
 }
@@ -954,17 +1030,16 @@ severity2string(severity)
  *			  by krb5_klog_init().
  */
 static int
-klog_vsyslog(priority, format, arglist)
-    int		priority;
-    const char	*format;
-    va_list	arglist;
+klog_vsyslog(int priority, const char *format, va_list arglist)
 {
     char	outbuf[KRB5_KLOG_MAX_ERRMSG_SIZE];
     int		lindex;
     char	*syslogp;
     char	*cp;
     time_t	now;
+#ifdef	HAVE_STRFTIME
     size_t	soff;
+#endif	/* HAVE_STRFTIME */
 
     /*
      * Format a syslog-esque message of the format:
@@ -977,6 +1052,7 @@ klog_vsyslog(priority, format, arglist)
      */
     cp = outbuf;
     (void) time(&now);
+#ifdef	HAVE_STRFTIME
     /*
      * Format the date: mon dd hh:mm:ss
      */
@@ -985,9 +1061,19 @@ klog_vsyslog(priority, format, arglist)
 	cp += soff;
     else
 	return(-1);
+#else	/* HAVE_STRFTIME */
+    /*
+     * Format the date:
+     * We ASSUME here that the output of ctime is of the format:
+     *	dow mon dd hh:mm:ss tzs yyyy\n
+     *  012345678901234567890123456789
+     */
+    strncpy(outbuf, ctime(&now) + 4, 15);
+    cp += 15;
+#endif	/* HAVE_STRFTIME */
 #ifdef VERBOSE_LOGS
-    sprintf(cp, " %s %s[%d](%s): ", 
-	    log_control.log_hostname, log_control.log_whoami, getpid(),
+    sprintf(cp, " %s %s[%ld](%s): ",
+	    log_control.log_hostname, log_control.log_whoami, (long) getpid(),
 	    severity2string(priority));
 #else
     sprintf(cp, " ");
@@ -995,7 +1081,26 @@ klog_vsyslog(priority, format, arglist)
     syslogp = &outbuf[strlen(outbuf)];
 
     /* Now format the actual message */
-    vsnprintf(syslogp, sizeof (outbuf) - (syslogp - outbuf), format, arglist);
+#ifdef	HAVE_VSNPRINTF
+    vsnprintf(syslogp, sizeof(outbuf) - (syslogp - outbuf), format, arglist);
+#elif	HAVE_VSPRINTF
+    vsprintf(syslogp, format, arglist);
+#else	/* HAVE_VSPRINTF */
+    sprintf(syslogp, format, ((int *) arglist)[0], ((int *) arglist)[1],
+	    ((int *) arglist)[2], ((int *) arglist)[3],
+	    ((int *) arglist)[4], ((int *) arglist)[5]);
+#endif	/* HAVE_VSPRINTF */
+
+    /*
+     * If the user did not use krb5_klog_init() instead of dropping
+     * the request on the floor, syslog it - if it exists
+     */
+#ifdef HAVE_SYSLOG
+    if (log_control.log_nentries == 0) {
+	/* Log the message with our header trimmed off */
+	syslog(priority, "%s", syslogp);
+    }
+#endif
 
     /*
      * Now that we have the message formatted, perform the output to each
@@ -1011,14 +1116,14 @@ klog_vsyslog(priority, format, arglist)
 	    /*
 	     * Files/standard error.
 	     */
-	    if (fprintf(log_control.log_entries[lindex].lfu_filep, 
+	    if (fprintf(log_control.log_entries[lindex].lfu_filep, "%s\n",
 			outbuf) < 0) {
 		/* Attempt to report error */
 		fprintf(stderr, krb5_log_error_table(LOG_FILE_ERR),
+			log_control.log_whoami,
 			log_control.log_entries[lindex].lfu_fname);
 	    }
 	    else {
-		fprintf(log_control.log_entries[lindex].lfu_filep, "\n");
 		fflush(log_control.log_entries[lindex].lfu_filep);
 	    }
 	    break;
@@ -1031,17 +1136,20 @@ klog_vsyslog(priority, format, arglist)
 			     outbuf) < 0) {
 		/* Attempt to report error */
 		fprintf(stderr, krb5_log_error_table(LOG_DEVICE_ERR),
+			log_control.log_whoami,
 			log_control.log_entries[lindex].ldu_devname);
 	    }
 	    break;
+#ifdef	HAVE_SYSLOG
 	case K_LOG_SYSLOG:
 	    /*
 	     * System log.
 	     */
 					       
 	    /* Log the message with our header trimmed off */
-	    syslog(priority, syslogp);
+	    syslog(priority, "%s", syslogp);
 	    break;
+#endif /* HAVE_SYSLOG */
 	default:
 	    break;
 	}

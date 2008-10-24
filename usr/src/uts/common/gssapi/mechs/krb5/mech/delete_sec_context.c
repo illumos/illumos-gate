@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -31,7 +30,7 @@
 #include "mglueP.h"  /* SUNW15resync - for KGSS_ macros */
 
 /*
- * $Id: delete_sec_context.c 16465 2004-06-16 02:37:23Z tlyu $
+ * $Id: delete_sec_context.c 18396 2006-07-25 20:29:43Z lxs $
  */
 
 
@@ -196,7 +195,7 @@ krb5_gss_delete_sec_context(minor_status,
 
    if (ctx->mech_used)
        (void) KGSS_RELEASE_OID(minor_status, &ctx->mech_used);
-
+   
    if (ctx->k5_context)
        krb5_free_context(ctx->k5_context);
 

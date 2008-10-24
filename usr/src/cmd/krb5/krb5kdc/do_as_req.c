@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kdc/do_as_req.c
@@ -58,8 +57,8 @@ static krb5_error_code prepare_error_as (krb5_kdc_req *, int, krb5_data *,
 
 /*ARGSUSED*/
 krb5_error_code
-process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
-	       krb5_data **response)
+process_as_req(krb5_kdc_req *request, krb5_data *req_pkt,
+	       const krb5_fulladdr *from, krb5_data **response)
 {
     krb5_db_entry client, server;
     krb5_kdc_rep reply;
@@ -87,6 +86,7 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     char ktypestr[128];
     char rep_etypestr[128];
     char fromstringbuf[70];
+    void *pa_context = NULL;
     struct in_addr from_in4;	/* IPv4 address of sender */
 
     ticket_reply.enc_part.ciphertext.data = 0;
@@ -94,6 +94,7 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     (void) memset(&encrypting_key, 0, sizeof(krb5_keyblock));
     reply.padata = 0; /* avoid bogus free in error_out */
     (void) memset(&session_key, 0, sizeof(krb5_keyblock));
+    enc_tkt_reply.authorization_data = NULL;
 
     ktypes2str(ktypestr, sizeof(ktypestr),
 	       request->nktypes, request->ktype);
@@ -289,7 +290,8 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
      * Check the preauthentication if it is there.
      */
     if (request->padata) {
-	errcode = check_padata(kdc_context, &client, request, &enc_tkt_reply);
+	errcode = check_padata(kdc_context, &client, req_pkt, request,
+			       &enc_tkt_reply, &pa_context, &e_data);
 	if (errcode) {
 #ifdef KRBCONF_KDC_MODIFIES_KDB
 	    /*
@@ -419,8 +421,8 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
     reply_encpart.caddrs = enc_tkt_reply.caddrs;
 
     /* Fetch the padata info to be returned */
-    errcode = return_padata(kdc_context, &client, request, &reply, client_key,
-			    &encrypting_key);
+    errcode = return_padata(kdc_context, &client, req_pkt, request,
+			    &reply, client_key, &encrypting_key, &pa_context);
     if (errcode) {
 	status = "KDC_RETURN_PADATA";
 	goto errout;
@@ -471,7 +473,14 @@ process_as_req(krb5_kdc_req *request, const krb5_fulladdr *from,
 #endif	/* KRBCONF_KDC_MODIFIES_KDB */
 
 errout:
+    if (pa_context)
+	free_padata_context(kdc_context, &pa_context);
+
     if (status) {
+	const char * emsg = 0;
+	if (errcode) 
+	    emsg = krb5_get_error_message (kdc_context, errcode);
+
 	    audit_krb5kdc_as_req(&from_in4, (in_port_t)from->port,
 				0, cname, sname, errcode);
         krb5_klog_syslog(LOG_INFO, "AS_REQ (%s) %s: %s: %s for %s%s%s",
@@ -480,19 +489,30 @@ errout:
 	       cname ? cname : "<unknown client>",
 	       sname ? sname : "<unknown server>",
 	       errcode ? ", " : "",
-	       errcode ? error_message(errcode) : "");
+	       errcode ? emsg : "");
+	if (errcode)
+	    krb5_free_error_message (kdc_context, emsg);
     }
     if (errcode) {
-	if (status == 0)
-	    status = error_message (errcode);
+        int got_err = 0;
+	if (status == 0) {
+	    status = krb5_get_error_message (kdc_context, errcode);
+	    got_err = 1;
+	}
 	errcode -= ERROR_TABLE_BASE_krb5;
 	if (errcode < 0 || errcode > 128)
 	    errcode = KRB_ERR_GENERIC;
 	    
 	errcode = prepare_error_as(request, errcode, &e_data, response,
 				   status);
+	if (got_err) {
+	    krb5_free_error_message (kdc_context, status);
+	    status = 0;
+	}
     }
 
+    if (enc_tkt_reply.authorization_data != NULL)
+	krb5_free_authdata(kdc_context, enc_tkt_reply.authorization_data);
     if (encrypting_key.contents)
 	krb5_free_keyblock_contents(kdc_context, &encrypting_key);
     if (reply.padata)
@@ -572,7 +592,7 @@ prepare_error_as (krb5_kdc_req *request, int error, krb5_data *e_data,
     free(errpkt.text.data);
     if (retval)
 	free(scratch);
-    else
+    else 
 	*response = scratch;
 
     return retval;

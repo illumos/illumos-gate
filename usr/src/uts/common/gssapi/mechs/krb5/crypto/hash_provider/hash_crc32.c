@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -25,16 +24,15 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <gssapiP_krb5.h>
-#include <crc-32.h>
-#include <hash_provider.h>
+#include "k5-int.h"
+#include "crc-32.h"
+#include "hash_provider.h"
 
 /* ARGSUSED */
 static krb5_error_code
 k5_crc32_hash(krb5_context context,
-	unsigned int icount, krb5_const krb5_data *input,
-	krb5_data *output)
+	      unsigned int icount, krb5_const krb5_data *input,
+	      krb5_data *output)
 {
     unsigned long c, cn;
     int i;
@@ -56,7 +54,7 @@ k5_crc32_hash(krb5_context context,
     return(0);
 }
 
-const struct krb5_hash_provider krb5_hash_crc32 = {
+const struct krb5_hash_provider krb5int_hash_crc32 = {
     CRC32_CKSUM_LENGTH,
     1,
     k5_crc32_hash

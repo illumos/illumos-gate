@@ -3,11 +3,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
+ * Copyright 2001 by the Massachusetts Institute of Technology.
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -17,7 +17,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -53,18 +53,13 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <gssapiP_krb5.h>
-#include <k5-int.h>
-
-/*
- * $Id: k5unseal.c,v 1.19.6.2 2000/05/31 17:17:38 raeburn Exp $
- */
+#include "gssapiP_krb5.h"
+#include "k5-int.h"
 
 /* message_buffer is an input if SIGN, output if SEAL, and ignored if DEL_CTX
-   conf_state is only valid if SEAL.
-   */
+   conf_state is only valid if SEAL. */
 
-OM_uint32
+static OM_uint32
 kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 	     conf_state, qop_state, toktype)
     krb5_context context;
@@ -88,8 +83,8 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
     char *data_ptr;
     krb5_timestamp now;
     unsigned char *plain;
-    int cksum_len = 0;
-    int plainlen;
+    unsigned int cksum_len = 0;
+    size_t plainlen;
     int direction;
     krb5_ui_4 seqnum;
     OM_uint32 retval;
@@ -142,11 +137,11 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
        but few enough that we can try them all. */
 
     if ((ctx->sealalg == SEAL_ALG_NONE && signalg > 1) ||
-	(ctx->sealalg == SEAL_ALG_1 && signalg != SGN_ALG_3)  ||
+	(ctx->sealalg == SEAL_ALG_1 && signalg != SGN_ALG_3) ||
 	(ctx->sealalg == SEAL_ALG_DES3KD &&
-	 signalg != SGN_ALG_HMAC_SHA1_DES3_KD) ||
+	 signalg != SGN_ALG_HMAC_SHA1_DES3_KD)||
 	(ctx->sealalg == SEAL_ALG_MICROSOFT_RC4 &&
-	 signalg != SGN_ALG_HMAC_MD5)) {
+	signalg != SGN_ALG_HMAC_MD5)) {
 	*minor_status = 0;
 	KRB5_LOG0(KRB5_ERR, "kg_unseal_v1() end, error4 GSS_S_DEFECTIVE_TOKEN\n");
 	return GSS_S_DEFECTIVE_TOKEN;
@@ -161,7 +156,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 	cksum_len = 8;
 	if (toktype != KG_TOK_SEAL_MSG)
 	  sign_usage = 15;
-	break;
+	    break;
     case SGN_ALG_3:
 	cksum_len = 16;
 	break;
@@ -198,8 +193,9 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 #endif /* _KERNEL */
 
     /* get the token parameters */
+
     if ((code = kg_get_seq_num(context, ctx->seq, ptr+14, ptr+6, &direction,
-	&seqnum))) {
+			       &seqnum))) {
 	*minor_status = code;
 	return(GSS_S_BAD_SIG);
     }
@@ -218,25 +214,24 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 		KRB5_LOG0(KRB5_ERR, "kg_unseal_v1() end, error ENOMEM\n");
 		return(GSS_S_FAILURE);
 	    }
-            if (ctx->enc->enctype == ENCTYPE_ARCFOUR_HMAC) {
-		unsigned char bigend_seqnum[4];
-		krb5_keyblock *enc_key;
-		int i;
-
-		bigend_seqnum[0] = (seqnum>>24) & 0xff;
-		bigend_seqnum[1] = (seqnum>>16) & 0xff;
-		bigend_seqnum[2] = (seqnum>>8) & 0xff;
-		bigend_seqnum[3] = seqnum & 0xff;
-		code = krb5_copy_keyblock (context, ctx->enc, &enc_key);
-		if (code)
+	    if (ctx->enc->enctype == ENCTYPE_ARCFOUR_HMAC) {
+	      unsigned char bigend_seqnum[4];
+	      krb5_keyblock *enc_key;
+	      int i;
+	      bigend_seqnum[0] = (seqnum>>24) & 0xff;
+	      bigend_seqnum[1] = (seqnum>>16) & 0xff;
+	      bigend_seqnum[2] = (seqnum>>8) & 0xff;
+	      bigend_seqnum[3] = seqnum & 0xff;
+	      code = krb5_copy_keyblock (context, ctx->enc, &enc_key);
+	      if (code)
 		{
-                  xfree_wrap(plain, tmsglen);
+		  xfree_wrap(plain, tmsglen);
 		  *minor_status = code;
 		  return(GSS_S_FAILURE);
 		}
 
-		for (i = 0; i <= 15; i++)
-			((char *) enc_key->contents)[i] ^=0xf0;
+	      for (i = 0; i <= 15; i++)
+		((char *) enc_key->contents)[i] ^=0xf0;
 
 #ifndef _KERNEL
 		/*
@@ -266,7 +261,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
                 xfree_wrap(plain, tmsglen);
 		*minor_status = code;
 		return(GSS_S_FAILURE);
-            }
+	    }
 	} else {
 	    plain = ptr+14+cksum_len;
 	}
@@ -332,11 +327,11 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
     case SGN_ALG_3:
 	md5cksum.checksum_type = CKSUMTYPE_RSA_MD5;
 	break;
+    case SGN_ALG_HMAC_MD5:
+      md5cksum.checksum_type = CKSUMTYPE_HMAC_MD5_ARCFOUR;
+      break;
     case SGN_ALG_HMAC_SHA1_DES3_KD:
 	md5cksum.checksum_type = CKSUMTYPE_HMAC_SHA1_DES3;
-	break;
-    case SGN_ALG_HMAC_MD5:
-	md5cksum.checksum_type = CKSUMTYPE_HMAC_MD5_ARCFOUR;
 	break;
     default:
 	KRB5_LOG(KRB5_ERR, "kg_unseal_v1() end, error2 signalg=%d\n", signalg);
@@ -348,8 +343,8 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 #endif /* _KERNEL */
     }
 
-    if (code = krb5_c_checksum_length(context, md5cksum.checksum_type,
-		&sumlen))
+    code = krb5_c_checksum_length(context, md5cksum.checksum_type, &sumlen);
+    if (code)
     {
 	KRB5_LOG(KRB5_ERR, "kg_unseal_v1() end, krb5_c_checksum_length() error "
 		"code=%d\n", code);
@@ -698,20 +693,20 @@ kg_unseal(minor_status, context_handle, input_token_buffer,
     if (ctx->proto)
 	switch (toktype) {
 	case KG_TOK_SIGN_MSG:
-            toktype2 = 0x0404;
-            break;
+	    toktype2 = 0x0404;
+	    break;
 	case KG_TOK_SEAL_MSG:
-            toktype2 = 0x0504;
-            break;
+	    toktype2 = 0x0504;
+	    break;
 	case KG_TOK_DEL_CTX:
-            toktype2 = 0x0405;
-            break;
+	    toktype2 = 0x0405;
+	    break;
 	default:
-            toktype2 = toktype;
-            break;
+	    toktype2 = toktype;
+	    break;
 	}
     else
-        toktype2 = toktype;
+	toktype2 = toktype;
     err = g_verify_token_header(ctx->mech_used,
 				(uint32_t *)&bodysize, &ptr, toktype2,
 				input_token_buffer->length,
@@ -721,15 +716,13 @@ kg_unseal(minor_status, context_handle, input_token_buffer,
 	return GSS_S_DEFECTIVE_TOKEN;
     }
 
-
-
     if (ctx->proto == 0) {
 	err = kg_unseal_v1(ctx->k5_context, minor_status, ctx, ptr, bodysize,
 			    message_buffer, conf_state, qop_state,
 			    toktype);
 
     } else {
-	err = gss_krb5int_unseal_token_v3(ctx->k5_context, minor_status, ctx,
+	err = gss_krb5int_unseal_token_v3(&ctx->k5_context, minor_status, ctx,
                                            ptr, bodysize, message_buffer,
                                            conf_state, qop_state, toktype);
     }

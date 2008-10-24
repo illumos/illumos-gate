@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -22,9 +21,8 @@
  *
  */
 
-
-#include <kadm5/admin.h>
 #include "server_internal.h"
+#include <kadm5/admin.h>
 
 kadm5_ret_t kadm5_chpass_principal_util(void *server_handle,
 					krb5_principal princ,

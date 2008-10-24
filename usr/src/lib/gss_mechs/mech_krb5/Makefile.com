@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -49,7 +48,8 @@ CRYPTO = cksumtype_to_string.o \
 	keyed_checksum_types.o keyed_cksum.o \
 	make_random_key.o string_to_cksumtype.o \
 	string_to_enctype.o string_to_key.o valid_cksumtype.o \
-	valid_enctype.o pkcs11slot.o state.o pbkdf2.o old_api_glue.o
+	valid_enctype.o pkcs11slot.o state.o pbkdf2.o old_api_glue.o \
+	keylengths.o random_to_key.o
 
 CRYPTO_UTS= cksumtypes.o decrypt.o encrypt.o encrypt_length.o \
 	etypes.o nfold.o verify_checksum.o default_state.o \
@@ -136,7 +136,7 @@ K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	recvauth.o  send_tgs.o  sendauth.o  srv_rcache.o  str_conv.o \
 	tgtname.o  valid_times.o  walk_rtree.o appdefault.o deltat.o \
 	enc_helper.o gic_keytab.o gic_opt.o gic_pwd.o preauth2.o \
-	vfy_increds.o vic_opt.o set_realm.o krb5_libinit.o chpw.o \
+	preauth.o vfy_increds.o vic_opt.o set_realm.o krb5_libinit.o chpw.o \
 	init_keyblock.o init_allocated_keyblock.o get_set_keyblock.o kerrs.o \
 	getuid.o
 
@@ -191,7 +191,7 @@ GSSAPI_UTS= gen_oids.o
 PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
 	prof_set.o prof_get.o
 
-SUPPORT_OBJS= fake-addrinfo.o threads.o errors.o plugins.o
+SUPPORT_OBJS= fake-addrinfo.o init-addrinfo.o threads.o errors.o plugins.o
 
 KWARN_OBJS= kwarnd_clnt_stubs.o kwarnd_clnt.o kwarnd_handle.o kwarnd_xdr.o
 
@@ -487,9 +487,9 @@ include $(REL_PATH)/../../Makefile.targ
 OS_FLAGS = -DHAVE_LIBSOCKET -DHAVE_LIBNSL -DTIME_WITH_SYS_TIME \
 	-DHAVE_UNISTD_H -DHAVE_SYS_TIME_H -DHAVE_REGEX_H \
 	-DHAVE_REGEXP_H -DHAVE_RE_COMP -DHAVE_REGCOMP \
-	-DPOSIX_TYPES -DNDBM -DAN_TO_LN_RULES \
+	-DPOSIX_TYPES -DNDBM \
 	-DHAVE_STDLIB_H -DHAVE_STDARG_H -DHAVE_SYS_TYPES_H \
-	-DHAVE_NETINET_IN_H -DUSE_LOGIN_LIBRARY -DHAVE_SRAND48 \
+	-DHAVE_NETINET_IN_H -DHAVE_SRAND48 \
 	-DHAVE_SRAND -DHAVE_SRANDOM -DHAVE_GETPID \
 	-DHAVE_ERRNO -DHAVE_STRFTIME -DHAVE_STRPTIME -DHAVE_STRERROR \
 	-DHAVE_STAT -DSIZEOF_INT=4 -DPROVIDE_KERNEL_IMPORT \

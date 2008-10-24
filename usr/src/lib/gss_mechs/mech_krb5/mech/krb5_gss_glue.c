@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -28,7 +27,7 @@
  */
 
 /*
- * $Id: krb5_gss_glue.c 18268 2006-06-29 19:44:34Z tlyu $
+ * $Id: krb5_gss_glue.c 18262 2006-06-29 04:38:48Z tlyu $
  */
 
 #include "gssapiP_krb5.h"
@@ -42,7 +41,7 @@ static OM_uint32 k5glue_acquire_cred
             gss_name_t,       /* desired_name */
             OM_uint32,        /* time_req */
             gss_OID_set,      /* desired_mechs */
- 	    gss_cred_usage_t, /* cred_usage */
+            gss_cred_usage_t, /* cred_usage */
             gss_cred_id_t*,   /* output_cred_handle */
             gss_OID_set*,     /* actual_mechs */
             OM_uint32*        /* time_rec */
@@ -616,7 +615,7 @@ k5glue_acquire_cred(ctx, minor_status, desired_name, time_req, desired_mechs,
      gss_name_t desired_name;
      OM_uint32 time_req;
      gss_OID_set desired_mechs;
-     gss_cred_usage_t  cred_usage;
+     gss_cred_usage_t cred_usage;
      gss_cred_id_t *output_cred_handle;
      gss_OID_set *actual_mechs;
      OM_uint32 *time_rec;

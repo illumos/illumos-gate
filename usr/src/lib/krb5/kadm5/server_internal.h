@@ -1,8 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -25,7 +24,7 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/server_internal.h,v 1.31 2001/07/08 12:24:56 epeisach Exp $
+ * $Header$
  */
 
 /*
@@ -41,6 +40,7 @@
 #include    <memory.h>
 #endif
 #include    <stdlib.h>
+#include    <errno.h>
 #include    "k5-int.h"
 #include    <krb5/kdb.h>
 #include    <kadm5/admin.h>
@@ -55,7 +55,7 @@ typedef struct _kadm5_server_handle_t {
 	krb5_principal	current_caller;
 	kadm5_config_params  params;
 	struct _kadm5_server_handle_t *lhandle;
-	char **db_args;
+        char **db_args;
 	krb5_keyblock	master_keyblock;
 } kadm5_server_handle_rec, *kadm5_server_handle_t;
 
@@ -75,6 +75,7 @@ typedef struct _osa_princ_ent_t {
   krb5_kvno                   admin_history_kvno;
   osa_pw_hist_ent             *old_keys;
 } osa_princ_ent_rec, *osa_princ_ent_t;
+
 
 kadm5_ret_t    adb_policy_init(kadm5_server_handle_t handle);
 kadm5_ret_t    adb_policy_close(kadm5_server_handle_t handle);
@@ -96,7 +97,8 @@ krb5_error_code     kdb_put_entry(kadm5_server_handle_t handle,
 				  krb5_db_entry *kdb, osa_princ_ent_rec *adb);
 krb5_error_code     kdb_delete_entry(kadm5_server_handle_t handle,
 				     krb5_principal name);
-krb5_error_code     kdb_iter_entry(kadm5_server_handle_t handle, char *,
+krb5_error_code     kdb_iter_entry(kadm5_server_handle_t handle,
+				   char *match_entry,
 				   void (*iter_fct)(void *, krb5_principal), 
 				   void *data);
 
@@ -161,4 +163,5 @@ bool_t          xdr_osa_princ_ent_rec(XDR *xdrs, osa_princ_ent_t objp);
 
 void
 osa_free_princ_ent(osa_princ_ent_t val);
+
 #endif /* __KADM5_SERVER_INTERNAL_H__ */

@@ -1,8 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/keytab/srvtab/kts_resolv.c
@@ -30,7 +29,6 @@
  * or implied warranty.
  */
 
-#define NEED_SOCKETS
 #include "k5-int.h"
 #include <stdio.h>
 
@@ -126,6 +124,7 @@ krb5_ktsrvtab_resolve(krb5_context context, const char *name, krb5_keytab *id)
     FILE *fp;
 
     /* Make sure we can open the srvtab file for reading. */
+    /* Solaris Kerberos */
     fp = fopen(name, "rF");
     if (!fp)
 	return(errno);
@@ -273,6 +272,7 @@ krb5_ktsrvtab_get_name(krb5_context context, krb5_keytab id, char *name, unsigne
     name++;
     len -= strlen(id->ops->prefix)+1;
 
+    /* Solaris Kerberos */
     if (len < strlen(KTFILENAME(id))+1)
 	return(KRB5_KT_NAME_TOOLONG);
     strcpy(name, KTFILENAME(id));
@@ -391,8 +391,10 @@ const struct _krb5_kt_ops krb5_kts_ops = {
 #include <stdio.h>
 
 #ifdef ANSI_STDIO
+/* Solaris Kerberos */
 #define		READ_MODE	"rbF"
 #else
+/* Solaris Kerberos */
 #define		READ_MODE	"rF"
 #endif
 

@@ -1,12 +1,11 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_KRB5_RC_MEM_H
 #define	_KRB5_RC_MEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rc-int.h"
 
@@ -40,7 +39,7 @@ struct global_rcache {
 
 extern struct global_rcache grcache;
 
-extern krb5_rc_ops krb5_rc_mem_ops;
+extern const krb5_rc_ops krb5_rc_mem_ops;
 
 krb5_error_code KRB5_CALLCONV krb5_rc_mem_init
 	(krb5_context, krb5_rcache, krb5_deltat);

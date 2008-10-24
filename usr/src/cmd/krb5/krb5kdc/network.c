@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,9 +30,7 @@
  *
  * Network code for Kerberos v5 KDC.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define NEED_SOCKETS
 #include "k5-int.h"
 #include "com_err.h"
 #include "kdc_util.h"
@@ -44,8 +42,8 @@
 
 #include <stddef.h>
 #include <ctype.h>
-#include <port-sockets.h>
-/* #include <socket-utils.h> */
+#include "port-sockets.h"
+/* #include "socket-utils.h" */
 
 #ifdef HAVE_NETINET_IN_H
 #include <sys/types.h>
@@ -73,7 +71,7 @@
 #include <sys/filio.h>		/* FIONBIO */
 #endif
 
-#include <fake-addrinfo.h>
+#include "fake-addrinfo.h"
 
 /* Misc utility routines.  */
 static void
@@ -231,7 +229,7 @@ static SET(struct connection *) connections;
 /* Set<u_short> udp_port_data, tcp_port_data; */
 static SET(u_short) udp_port_data, tcp_port_data;
 
-#include <cm.h>
+#include "cm.h"
 
 static struct select_state sstate;
 
@@ -911,6 +909,38 @@ kill_tcp_connection(struct connection *conn)
     tcp_data_counter--;
 }
 
+static krb5_error_code
+make_toolong_error (krb5_data **out)
+{
+    krb5_error errpkt;
+    krb5_error_code retval;
+    krb5_data *scratch;
+
+    retval = krb5_us_timeofday(kdc_context, &errpkt.stime, &errpkt.susec);
+    if (retval)
+	return retval;
+    errpkt.error = KRB_ERR_FIELD_TOOLONG;
+    errpkt.server = tgs_server;
+    errpkt.client = NULL;
+    errpkt.cusec = 0;
+    errpkt.ctime = 0;
+    errpkt.text.length = 0;
+    errpkt.text.data = 0;
+    errpkt.e_data.length = 0;
+    errpkt.e_data.data = 0;
+    scratch = malloc(sizeof(*scratch));
+    if (scratch == NULL)
+	return ENOMEM;
+    retval = krb5_mk_error(kdc_context, &errpkt, scratch);
+    if (retval) {
+	free(scratch);
+	return retval;
+    }
+
+    *out = scratch;
+    return 0;
+}
+
 static void
 process_tcp_connection(struct connection *conn, const char *prog, int selflags)
 {
@@ -941,7 +971,10 @@ process_tcp_connection(struct connection *conn, const char *prog, int selflags)
 	}
 	if (conn->u.tcp.sgnum == 0) {
 	    /* finished sending */
-	    /* should go back to reading */
+	    /* We should go back to reading, though if we sent a
+	       FIELD_TOOLONG error in reply to a length with the high
+	       bit set, RFC 4120 says we have to close the TCP
+	       stream.  */
 	    goto kill_tcp_connection;
 	}
     } else if (selflags & SSF_READ) {
@@ -973,12 +1006,20 @@ process_tcp_connection(struct connection *conn, const char *prog, int selflags)
 				      | (p[2] <<  8)
 				      | p[3]);
 		if (conn->u.tcp.msglen > conn->u.tcp.bufsiz - 4) {
+		    krb5_error_code err;
 		    /* message too big */
 		    krb5_klog_syslog(LOG_ERR, "TCP client %s wants %lu bytes, cap is %lu",
 				     conn->u.tcp.addrbuf, (unsigned long) conn->u.tcp.msglen,
 				     (unsigned long) conn->u.tcp.bufsiz - 4);
 		    /* XXX Should return an error.  */
-		    goto kill_tcp_connection;
+		    err = make_toolong_error (&conn->u.tcp.response);
+		    if (err) {
+			krb5_klog_syslog(LOG_ERR,
+					 "error constructing KRB_ERR_FIELD_TOOLONG error! %s",
+					 error_message(err));
+			goto kill_tcp_connection;
+		    }
+		    goto have_response;
 		}
 	    }
 	} else {
@@ -1007,6 +1048,7 @@ process_tcp_connection(struct connection *conn, const char *prog, int selflags)
 		com_err(prog, err, gettext("while dispatching (tcp)"));
 		goto kill_tcp_connection;
 	    }
+	have_response:
 	    conn->u.tcp.lenbuf[0] = 0xff & (conn->u.tcp.response->length >> 24);
 	    conn->u.tcp.lenbuf[1] = 0xff & (conn->u.tcp.response->length >> 16);
 	    conn->u.tcp.lenbuf[2] = 0xff & (conn->u.tcp.response->length >> 8);
@@ -1037,7 +1079,10 @@ krb5_error_code
 listen_and_process(const char *prog)
 {
     int			nfound;
-    struct select_state sout;
+    /* This struct contains 3 fd_set objects; on some platforms, they
+       can be rather large.  Making this static avoids putting all
+       that junk on the stack.  */
+    static struct select_state sout;
     int			i, sret;
     krb5_error_code	err;
 

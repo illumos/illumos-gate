@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1990 Dennis Ferguson.  All rights reserved.
@@ -17,7 +16,7 @@
 /*
  * des_cbc_encrypt.c - an implementation of the DES cipher function in cbc mode
  */
-#include <des_int.h>
+#include "des_int.h"
 
 /*
  * des_cbc_encrypt - {en,de}crypt a stream in CBC mode

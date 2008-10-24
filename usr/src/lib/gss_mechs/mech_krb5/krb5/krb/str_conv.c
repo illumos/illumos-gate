@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kadm/str_conv.c
@@ -70,7 +69,8 @@ struct salttype_lookup_entry {
 /*
  * Lookup tables.
  */
-#include <krb5/kdb.h>
+
+#include "kdb.h"
 static const struct salttype_lookup_entry salttype_table[] = {
 /* salt type			input specifier	output string  */
 /*-----------------------------	--------------- ---------------*/
@@ -161,18 +161,14 @@ krb5_string_to_timestamp(char *string, krb5_timestamp *timestampp)
     struct tm timebuf;
     time_t now, ret_time;
     char *s;
-/*
- * Solaris Kerberos:
- * The format strings shouldn't conflict with SCCS keywords
- */
     static const char * const atime_format_table[] = {
-	"%Y" "%m" "%d" "%H" "%M" "%S",		/* yyyymmddhhmmss */
+	"%Y%m%d%H%M%S",		/* yyyymmddhhmmss		*/
 	"%Y.%m.%d.%H.%M.%S",	/* yyyy.mm.dd.hh.mm.ss		*/
-	"%y" "%m" "%d" "%H" "%M" "%S",		/* yymmddhhmmss	*/
+	"%y%m%d%H%M%S",		/* yymmddhhmmss			*/
 	"%y.%m.%d.%H.%M.%S",	/* yy.mm.dd.hh.mm.ss		*/
-	"%y" "%m" "%d" "%H" "%M",		/* yymmddhhmm		*/
-	"%H" "%M" "%S",		/* hhmmss			*/
-	"%H" "%M",			/* hhmm				*/
+	"%y%m%d%H%M",		/* yymmddhhmm			*/
+	"%H%M%S",		/* hhmmss			*/
+	"%H%M",			/* hhmm				*/
 	"%T",			/* hh:mm:ss			*/
 	"%R",			/* hh:mm			*/
 	/* The following not really supported unless native strptime present */
@@ -279,6 +275,7 @@ krb5_timestamp_to_sfstring(krb5_timestamp timestamp, char *buffer, size_t buflen
     return((ndone) ? 0 : ENOMEM);
 }
 
+/* Solaris Kerberos */
 #ifdef SUNW_INC_DEAD_CODE
 /* relative time (delta-t) conversions */
 

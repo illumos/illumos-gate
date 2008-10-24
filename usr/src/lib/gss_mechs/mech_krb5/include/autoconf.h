@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* autoconf.h.  Generated automatically by configure.  */
 /* autoconf.h.in.  Generated automatically from configure.in by autoheader.  */
 /* Edited to remove KRB4 compatible and SIZEOF_LONG
@@ -49,6 +48,23 @@
 #define HAVE_UNISTD_H 1
 #define KRB5_USE_INET 1
 #define KRB5_USE_INET6 1
+
+/* Solaris Kerberos  - 163 Resync */
+#define LIBDIR "/usr/lib"
+
+/* Type of getpeername second argument. */
+#define GETPEERNAME_ARG2_TYPE GETSOCKNAME_ARG2_TYPE
+
+/* Type of getpeername second argument. */
+#define GETPEERNAME_ARG3_TYPE GETSOCKNAME_ARG3_TYPE
+
+/* Type of pointer target for argument 2 to getsockname */
+#define GETSOCKNAME_ARG2_TYPE struct sockaddr
+
+/* Type of pointer target for argument 3 to getsockname */
+#define GETSOCKNAME_ARG3_TYPE socklen_t
+
+#define	HAVE_GETEUID	1
 
 /* Define if you have the getaddrinfo function */
 #define HAVE_GETADDRINFO 1

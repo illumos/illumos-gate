@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/os-proto.h
  *
@@ -35,7 +34,7 @@ struct addrlist;
 krb5_error_code krb5_locate_kdc
     (krb5_context, const krb5_data *, struct addrlist *, int, int, int);
 
-/* Solaris/SUNW14resync */
+/* Solaris Kerberos */
 krb5_error_code krb5_get_servername 
 	(krb5_context,
 	const krb5_data *,
@@ -65,6 +64,8 @@ krb5_error_code krb5_try_realm_txt_rr(const char *, const char *,
 
 /* Obsolete interface - leave prototype here until code removed */
 krb5_error_code krb5_secure_config_files(krb5_context ctx);
+
+void krb5int_debug_fprint (const char *fmt, ...);
 
 int _krb5_use_dns_realm (krb5_context);
 int _krb5_use_dns_kdc (krb5_context);

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/recvauth.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,15 +28,14 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * convenience sendauth/recvauth functions
  */
 
-#define NEED_SOCKETS
-#include <k5-int.h>
-#include <auth_con.h>
-#include <com_err.h>
+#include "k5-int.h"
+#include "auth_con.h"
+#include "com_err.h"
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -159,14 +157,14 @@ recvauth_common(krb5_context context,
          * Setup the replay cache.
          */
         if (server) {
-            problem = krb5_get_server_rcache(context,
+            problem = krb5_get_server_rcache(context, 
 			krb5_princ_component(context, server, 0), &rcache);
         } else {
     	    null_server.length = 7;
     	    null_server.data = "default";
     	    problem = krb5_get_server_rcache(context, &null_server, &rcache);
         }
-        if (!problem)
+        if (!problem) 
 	    problem = krb5_auth_con_setrcache(context, *auth_context, rcache);
 	local_rcache = 1;
     }
@@ -187,7 +185,7 @@ recvauth_common(krb5_context context,
 
 	memset((char *)&error, 0, sizeof(error));
 	krb5_us_timeofday(context, &error.stime, &error.susec);
-	if(server)
+	if(server) 
 		error.server = server;
 	else {
 		/* If this fails - ie. ENOMEM we are hosed
@@ -206,12 +204,13 @@ recvauth_common(krb5_context context,
 	    goto cleanup;
 	}
 	strcpy(error.text.data, message);
+	/* Solaris Kerberos */
 	if ((retval = krb5_mk_error(context, &error, &outbuf)) != 0) {
 	    free(error.text.data);
 	    goto cleanup;
 	}
 	free(error.text.data);
-	if(need_error_free)
+	if(need_error_free) 
 		krb5_free_principal(context, error.server);
 
     } else {
@@ -243,6 +242,7 @@ cleanup:;
 	if (local_authcon) {
 	    krb5_auth_con_free(context, *auth_context);
 	} else if (local_rcache && rcache != NULL) {
+	    /* Solaris Kerberos */
 	    (void) krb5_rc_close(context, rcache);
 	    krb5_auth_con_setrcache(context, *auth_context, NULL);
 	}
@@ -253,7 +253,7 @@ cleanup:;
 krb5_error_code KRB5_CALLCONV
 krb5_recvauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointer fd, char *appl_version, krb5_principal server, krb5_int32 flags, krb5_keytab keytab, krb5_ticket **ticket)
 {
-    return recvauth_common(context, auth_context, fd, appl_version,
+    return recvauth_common (context, auth_context, fd, appl_version,
 			    server, flags, keytab, ticket, 0);
 }
 

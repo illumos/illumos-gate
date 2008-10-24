@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/rd_priv.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,14 +28,14 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_rd_priv()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include "cleanup.h"
-#include <auth_con.h>
+#include "auth_con.h"
 
 #define in_clock_skew(date) (labs((date)-currenttime) < context->clockskew)
 
@@ -46,7 +45,7 @@ Parses a KRB_PRIV message from inbuf, placing the confidential user
 data in *outbuf.
 
 key specifies the key to be used for decryption of the message.
-
+ 
 remote_addr and local_addr specify the full
 addresses (host and port) of the sender and receiver.
 
@@ -62,15 +61,7 @@ Returns system errors, integrity errors.
 */
 
 static krb5_error_code
-krb5_rd_priv_basic(
-    krb5_context 	  context,
-    const krb5_data     * inbuf,
-    const krb5_keyblock * keyblock,
-    const krb5_address  * local_addr,
-    const krb5_address  * remote_addr,
-    krb5_pointer 	  i_vector,
-    krb5_replay_data    * replaydata,
-    krb5_data 		* outbuf)
+krb5_rd_priv_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyblock *keyblock, const krb5_address *local_addr, const krb5_address *remote_addr, krb5_pointer i_vector, krb5_replay_data *replaydata, krb5_data *outbuf)
 {
     krb5_error_code 	  retval;
     krb5_priv 		* privmsg;
@@ -85,7 +76,7 @@ krb5_rd_priv_basic(
     /* decode private message */
     if ((retval = decode_krb5_priv(inbuf, &privmsg)))
 	return retval;
-
+    
     if (i_vector) {
 	if ((retval = krb5_c_block_size(context, keyblock->enctype,
 					&blocksize)))
@@ -102,7 +93,7 @@ krb5_rd_priv_basic(
     }
 
     if ((retval = krb5_c_decrypt(context, keyblock,
-				 KRB5_KEYUSAGE_KRB_PRIV_ENCPART,
+				 KRB5_KEYUSAGE_KRB_PRIV_ENCPART, 
 				 i_vector?&ivdata:0,
 				 &privmsg->enc_part, &scratch)))
 	goto cleanup_scratch;
@@ -115,7 +106,7 @@ krb5_rd_priv_basic(
 	retval = KRB5KRB_AP_ERR_BADADDR;
 	goto cleanup_data;
     }
-
+    
     if (privmsg_enc_part->r_address) {
 	if (local_addr) {
 	    if (!krb5_address_compare(context, local_addr,
@@ -129,7 +120,7 @@ krb5_rd_priv_basic(
 	    if ((retval = krb5_os_localaddr(context, &our_addrs))) {
 		goto cleanup_data;
 	    }
-	    if (!krb5_address_search(context, privmsg_enc_part->r_address,
+	    if (!krb5_address_search(context, privmsg_enc_part->r_address, 
 				     our_addrs)) {
 		krb5_free_addresses(context, our_addrs);
 		retval =  KRB5KRB_AP_ERR_BADADDR;
@@ -153,23 +144,19 @@ cleanup_data:;
     krb5_free_priv_enc_part(context, privmsg_enc_part);
 
 cleanup_scratch:;
-    (void) memset(scratch.data, 0, scratch.length);
+    /* Solaris Kerberos */
+    (void) memset(scratch.data, 0, scratch.length); 
     krb5_xfree(scratch.data);
 
 cleanup_privmsg:;
-    krb5_xfree(privmsg->enc_part.ciphertext.data);
+    krb5_xfree(privmsg->enc_part.ciphertext.data); 
     krb5_xfree(privmsg);
 
     return retval;
 }
 
 krb5_error_code KRB5_CALLCONV
-krb5_rd_priv(
-    krb5_context 	  context,
-    krb5_auth_context 	  auth_context,
-    const krb5_data   	* inbuf,
-    krb5_data 	      	* outbuf,
-    krb5_replay_data  	* outdata)
+krb5_rd_priv(krb5_context context, krb5_auth_context auth_context, const krb5_data *inbuf, krb5_data *outbuf, krb5_replay_data *outdata)
 {
     krb5_error_code 	  retval;
     krb5_keyblock       * keyblock;
@@ -199,7 +186,7 @@ krb5_rd_priv(
     if (auth_context->local_addr) {
     	if (auth_context->local_port) {
             if (!(retval = krb5_make_fulladdr(context, auth_context->local_addr,
-                                 	      auth_context->local_port,
+                                 	      auth_context->local_port, 
 					      &local_fulladdr))){
                 CLEANUP_PUSH(local_fulladdr.contents, free);
 	        plocal_fulladdr = &local_fulladdr;
@@ -214,7 +201,7 @@ krb5_rd_priv(
     if (auth_context->remote_addr) {
     	if (auth_context->remote_port) {
             if (!(retval = krb5_make_fulladdr(context,auth_context->remote_addr,
-                                 	      auth_context->remote_port,
+                                 	      auth_context->remote_port, 
 					      &remote_fulladdr))){
                 CLEANUP_PUSH(remote_fulladdr.contents, free);
 	        premote_fulladdr = &remote_fulladdr;
@@ -251,15 +238,14 @@ krb5_rd_priv(
 	    goto error;
 	}
 
-	if ((retval = krb5_gen_replay_name(context, auth_context->remote_addr,
+	if ((retval = krb5_gen_replay_name(context, auth_context->remote_addr, 
 					   "_priv", &replay.client)))
 	    goto error;
 
 	replay.server = "";		/* XXX */
 	replay.cusec = replaydata.usec;
 	replay.ctime = replaydata.timestamp;
-	retval = krb5_rc_store(context, auth_context->rcache, &replay);
-	if (retval) {
+	if ((retval = krb5_rc_store(context, auth_context->rcache, &replay))) {
 	    krb5_xfree(replay.client);
 	    goto error;
 	}
@@ -290,3 +276,4 @@ error:;
     return retval;
 
 }
+

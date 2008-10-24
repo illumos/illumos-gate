@@ -1,9 +1,7 @@
 #ifndef __KRBASN1_H__
 #define __KRBASN1_H__
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <k5-int.h>
+#include "k5-int.h"
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>		/* For INT_MAX */
@@ -59,7 +57,7 @@ typedef int asn1_tagnum;
 #define ASN1_OCTETSTRING	4
 #define ASN1_NULL		5
 #define ASN1_OBJECTIDENTIFIER	6
-#define	ASN1_ENUMERATED		10
+#define ASN1_ENUMERATED 10
 #define ASN1_SEQUENCE		16
 #define ASN1_SET		17
 #define ASN1_PRINTABLESTRING	19

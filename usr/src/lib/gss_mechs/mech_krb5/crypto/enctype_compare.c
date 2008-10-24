@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  * 
@@ -25,13 +24,13 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <etypes.h>
+#include "k5-int.h"
+#include "etypes.h"
 
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV
 krb5_c_enctype_compare(krb5_context context, krb5_enctype e1, krb5_enctype e2,
-		    krb5_boolean *similar)
+		       krb5_boolean *similar)
 {
     int i, j;
 

@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/krb/srv_rcache.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,15 +28,16 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * Allocate & prepare a default replay cache for a server.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <ctype.h>
 #include <stdio.h>
 
+/* Macro for valid RC name characters*/
 #define isvalidrcname(x) ((!ispunct(x))&&isgraph(x))
 krb5_error_code KRB5_CALLCONV
 krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
@@ -57,12 +57,12 @@ krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
     
     if (piece == NULL)
 	return ENOMEM;
-
+    
     cachetype = krb5_rc_default_type(context);
 
     /*
-     * Solaris: Check to see if something other than the default replay cache
-     * name will be used.  If so then skip over the construction of
+     * Solaris Kerberos: Check to see if something other than the default replay
+     * cache name will be used.  If so then skip over the construction of
      * said name.
      */
     if ((def_env = krb5_rc_default_name(context)) != 0) {

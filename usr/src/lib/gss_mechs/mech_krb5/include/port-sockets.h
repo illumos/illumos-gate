@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _PORT_SOCKET_H
 #define _PORT_SOCKET_H
@@ -67,10 +66,16 @@ typedef WSABUF sg_buf;
 #define ETIMEDOUT WSAETIMEDOUT
 #endif
 
-#else /* not _WIN32 */
+#elif defined(__palmos__)
 
 /* If this source file requires it, define struct sockaddr_in
    (and possibly other things related to network I/O).  */
+
+#include "autoconf.h"
+#include <netdb.h>
+typedef int socklen_t;
+
+#else /* UNIX variants */
 
 #include "autoconf.h"
 

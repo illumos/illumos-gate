@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * src/lib/krb5/asn.1/asn1_k_encode.c
  * 
@@ -100,6 +98,50 @@
     return retval; }\
   sum += length;\
   retval = asn1_make_etag(buf,CONTEXT_SPECIFIC,tag,length,&length);\
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum += length; }
+
+/* asn1_addfield_implicit -- add an implicitly tagged field, or component, to the encoding */
+#define asn1_addfield_implicit(value,tag,encoder)\
+{ retval = encoder(buf,value,&length);\
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum += length;\
+  retval = asn1_make_tag(buf,CONTEXT_SPECIFIC,PRIMITIVE,tag,length,&length); \
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum += length; }
+
+/* asn1_insert_implicit_octetstring -- add an octet string with implicit tagging */
+#define asn1_insert_implicit_octetstring(len,value,tag)\
+{ retval = asn1buf_insert_octetstring(buf,len,value);\
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum += len;\
+  retval = asn1_make_tag(buf,CONTEXT_SPECIFIC,PRIMITIVE,tag,len,&length); \
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum += length; }
+
+/* asn1_insert_implicit_bitstring -- add a bitstring with implicit tagging */
+#define asn1_insert_implicit_bitstring(len,value,tag)\
+{ retval = asn1buf_insert_octetstring(buf,len,value);\
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum += len;\
+  retval = asn1buf_insert_octet(buf, 0);\
+  if(retval){\
+    asn1buf_destroy(&buf);\
+    return retval; }\
+  sum++;\
+  retval = asn1_make_tag(buf,UNIVERSAL,PRIMITIVE,tag,len+1,&length); \
   if(retval){\
     asn1buf_destroy(&buf);\
     return retval; }\
@@ -720,13 +762,17 @@ asn1_error_code asn1_encode_etype_info_entry(asn1buf *buf, const krb5_etype_info
   if(val == NULL || (val->length > 0 && val->length != KRB5_ETYPE_NO_SALT &&
 		     val->salt == NULL))
      return ASN1_MISSING_FIELD;
-  if(val->s2kparams.data != NULL)
+  if(val->s2kparams.data != NULL) {
+      /* Solaris Kerberos */
       asn1_addlenfield(val->s2kparams.length, (const uchar_t *)val->s2kparams.data, 2,
 		       asn1_encode_octetstring);
+  }
   if (val->length >= 0 && val->length != KRB5_ETYPE_NO_SALT){
-      if (etype_info2)
+      if (etype_info2) {
+          /* Solaris Kerberos */
 	  asn1_addlenfield(val->length, (const char *)val->salt,1,
 			   asn1_encode_generalstring)
+      }
       else 	  asn1_addlenfield(val->length,val->salt,1,
 				   asn1_encode_octetstring);
   }
@@ -960,4 +1006,394 @@ asn1_error_code asn1_encode_krb_saved_safe_body(asn1buf *buf, const krb5_data *b
   }
   *retlen = body->length;
   return 0;
+}
+
+/*
+ * PKINIT
+ */
+
+asn1_error_code asn1_encode_pk_authenticator(asn1buf *buf, const krb5_pk_authenticator *val, unsigned int *retlen)
+{
+  asn1_setup();
+  asn1_addlenfield(val->paChecksum.length, val->paChecksum.contents, 3, asn1_encode_octetstring);
+  asn1_addfield(val->nonce, 2, asn1_encode_integer);
+  asn1_addfield(val->ctime, 1, asn1_encode_kerberos_time);
+  asn1_addfield(val->cusec, 0, asn1_encode_integer);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_pk_authenticator_draft9(asn1buf *buf, const krb5_pk_authenticator_draft9 *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  asn1_addfield(val->nonce, 4, asn1_encode_integer);
+  asn1_addfield(val->ctime, 3, asn1_encode_kerberos_time);
+  asn1_addfield(val->cusec, 2, asn1_encode_integer);
+  asn1_addfield(val->kdcName, 1, asn1_encode_realm);
+  asn1_addfield(val->kdcName, 0, asn1_encode_principal_name);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+
+asn1_error_code asn1_encode_algorithm_identifier(asn1buf *buf, const krb5_algorithm_identifier *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->parameters.length != 0) {
+    retval = asn1buf_insert_octetstring(buf, val->parameters.length, 
+					val->parameters.data);
+    if(retval) {
+      asn1buf_destroy(&buf);
+      return retval;
+    }
+    sum += val->parameters.length;
+  }
+  
+  retval = asn1_encode_oid(buf, val->algorithm.length, 
+			   val->algorithm.data,
+			   &length);
+  
+  if(retval) {
+    asn1buf_destroy(&buf);
+    return retval;
+  }
+  sum += length;  
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_subject_pk_info(asn1buf *buf, const krb5_subject_pk_info *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  asn1_insert_implicit_bitstring(val->subjectPublicKey.length,val->subjectPublicKey.data,ASN1_BITSTRING);
+
+  if (val->algorithm.parameters.length != 0) {
+    retval = asn1buf_insert_octetstring(buf, val->algorithm.parameters.length, 
+					val->algorithm.parameters.data);
+    if(retval) {
+      asn1buf_destroy(&buf);
+      return retval;
+    }
+    sum += val->algorithm.parameters.length;
+  }
+  
+  retval = asn1_encode_oid(buf, val->algorithm.algorithm.length, 
+			   val->algorithm.algorithm.data,
+			   &length);
+  
+  if(retval) {
+    asn1buf_destroy(&buf);
+    return retval;
+  }
+  sum += length;  
+  
+  retval = asn1_make_etag(buf, UNIVERSAL, ASN1_SEQUENCE, 
+			  val->algorithm.parameters.length + length, 
+			  &length);
+
+  if(retval) {
+    asn1buf_destroy(&buf);
+    return retval;
+  }
+  sum += length;  
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_sequence_of_algorithm_identifier(asn1buf *buf, const krb5_algorithm_identifier **val, unsigned int *retlen)
+{
+  asn1_setup();
+  int i;
+
+  if(val == NULL || val[0] == NULL) return ASN1_MISSING_FIELD;
+
+  for(i=0; val[i] != NULL; i++);
+  for(i--; i>=0; i--){
+    retval = asn1_encode_algorithm_identifier(buf,val[i],&length);
+    if(retval) return retval;
+    sum += length;
+  }
+  asn1_makeseq();
+
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_auth_pack(asn1buf *buf, const krb5_auth_pack *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->clientDHNonce.length != 0)
+    asn1_addlenfield(val->clientDHNonce.length, val->clientDHNonce.data, 3, asn1_encode_octetstring);
+  if (val->supportedCMSTypes != NULL)
+    asn1_addfield((const krb5_algorithm_identifier **)val->supportedCMSTypes,2,asn1_encode_sequence_of_algorithm_identifier);
+  if (val->clientPublicValue != NULL)
+    asn1_addfield(val->clientPublicValue,1,asn1_encode_subject_pk_info);
+  asn1_addfield(&(val->pkAuthenticator),0,asn1_encode_pk_authenticator);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_auth_pack_draft9(asn1buf *buf, const krb5_auth_pack_draft9 *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->clientPublicValue != NULL)
+    asn1_addfield(val->clientPublicValue, 1, asn1_encode_subject_pk_info);
+  asn1_addfield(&(val->pkAuthenticator), 0, asn1_encode_pk_authenticator_draft9);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_external_principal_identifier(asn1buf *buf, const krb5_external_principal_identifier *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  /* Verify there is something to encode */
+  if (val->subjectKeyIdentifier.length == 0 && val->issuerAndSerialNumber.length == 0 && val->subjectName.length == 0)
+    return ASN1_MISSING_FIELD;
+
+  if (val->subjectKeyIdentifier.length != 0) 
+    asn1_insert_implicit_octetstring(val->subjectKeyIdentifier.length,val->subjectKeyIdentifier.data,2);
+
+  if (val->issuerAndSerialNumber.length != 0) 
+    asn1_insert_implicit_octetstring(val->issuerAndSerialNumber.length,val->issuerAndSerialNumber.data,1);
+
+  if (val->subjectName.length != 0) 
+    asn1_insert_implicit_octetstring(val->subjectName.length,val->subjectName.data,0);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_sequence_of_external_principal_identifier(asn1buf *buf, const krb5_external_principal_identifier **val, unsigned int *retlen)
+{
+  asn1_setup();
+  int i;
+
+  if(val == NULL || val[0] == NULL) return ASN1_MISSING_FIELD;
+
+  for(i=0; val[i] != NULL; i++);
+  for(i--; i>=0; i--){
+    retval = asn1_encode_external_principal_identifier(buf,val[i],&length);
+    if(retval) return retval;
+    sum += length;
+  }
+  asn1_makeseq();
+
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_pa_pk_as_req(asn1buf *buf, const krb5_pa_pk_as_req *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->kdcPkId.length != 0) 
+    asn1_insert_implicit_octetstring(val->kdcPkId.length,val->kdcPkId.data,2);
+
+  if (val->trustedCertifiers != NULL)
+    asn1_addfield((const krb5_external_principal_identifier **)val->trustedCertifiers,1,asn1_encode_sequence_of_external_principal_identifier);
+
+  asn1_insert_implicit_octetstring(val->signedAuthPack.length,val->signedAuthPack.data,0);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_trusted_ca(asn1buf *buf, const krb5_trusted_ca *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  switch (val->choice) {
+    case choice_trusted_cas_issuerAndSerial:
+      asn1_insert_implicit_octetstring(val->u.issuerAndSerial.length,val->u.issuerAndSerial.data,2);
+      break;
+    case choice_trusted_cas_caName:
+      asn1_insert_implicit_octetstring(val->u.caName.length,val->u.caName.data,1);
+      break;
+    case choice_trusted_cas_principalName:
+      asn1_addfield_implicit(val->u.principalName,0,asn1_encode_principal_name);
+      break;
+    default:
+      return ASN1_MISSING_FIELD;
+  }
+
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_sequence_of_trusted_ca(asn1buf *buf, const krb5_trusted_ca **val, unsigned int *retlen)
+{
+  asn1_setup();
+  int i;
+
+  if(val == NULL || val[0] == NULL) return ASN1_MISSING_FIELD;
+
+  for(i=0; val[i] != NULL; i++);
+  for(i--; i>=0; i--){
+    retval = asn1_encode_trusted_ca(buf,val[i],&length);
+    if(retval) return retval;
+    sum += length;
+  }
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_pa_pk_as_req_draft9(asn1buf *buf, const krb5_pa_pk_as_req_draft9 *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->encryptionCert.length != 0)
+    asn1_insert_implicit_octetstring(val->encryptionCert.length,val->encryptionCert.data,3);
+
+  if (val->kdcCert.length != 0) 
+    asn1_insert_implicit_octetstring(val->kdcCert.length,val->kdcCert.data,2);
+
+  if (val->trustedCertifiers != NULL)
+    asn1_addfield((const krb5_trusted_ca **)val->trustedCertifiers,1,asn1_encode_sequence_of_trusted_ca);
+
+  asn1_insert_implicit_octetstring(val->signedAuthPack.length,val->signedAuthPack.data,0);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_dh_rep_info(asn1buf *buf, const krb5_dh_rep_info *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->serverDHNonce.length != 0)
+    asn1_insert_implicit_octetstring(val->serverDHNonce.length,val->serverDHNonce.data,1);
+  
+  asn1_insert_implicit_octetstring(val->dhSignedData.length,val->dhSignedData.data,0);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_kdc_dh_key_info(asn1buf *buf, const krb5_kdc_dh_key_info *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  if (val->dhKeyExpiration != 0) 
+    asn1_addfield(val->dhKeyExpiration, 2, asn1_encode_kerberos_time);
+  asn1_addfield(val->nonce, 1, asn1_encode_integer);
+
+  asn1_insert_implicit_bitstring(val->subjectPublicKey.length,val->subjectPublicKey.data,3);
+  retval = asn1_make_etag(buf, CONTEXT_SPECIFIC, 0, 
+			  val->subjectPublicKey.length + 1 + length,
+			  &length);
+  if(retval) {
+    asn1buf_destroy(&buf);
+    return retval;
+  }
+  sum += length; 
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_reply_key_pack(asn1buf *buf, const krb5_reply_key_pack *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  asn1_addfield(&(val->asChecksum), 1, asn1_encode_checksum);
+  asn1_addfield(&(val->replyKey), 0, asn1_encode_encryption_key);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_reply_key_pack_draft9(asn1buf *buf, const krb5_reply_key_pack_draft9 *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  asn1_addfield(val->nonce, 1, asn1_encode_integer);
+  asn1_addfield(&(val->replyKey), 0, asn1_encode_encryption_key);
+
+  asn1_makeseq();
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_pa_pk_as_rep(asn1buf *buf, const krb5_pa_pk_as_rep *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  switch (val->choice)
+  {
+    case choice_pa_pk_as_rep_dhInfo:
+      asn1_addfield(&(val->u.dh_Info), choice_pa_pk_as_rep_dhInfo, asn1_encode_dh_rep_info);
+      break;
+    case choice_pa_pk_as_rep_encKeyPack:
+      asn1_insert_implicit_octetstring(val->u.encKeyPack.length,val->u.encKeyPack.data,1);
+      break;
+    default:
+      return ASN1_MISSING_FIELD;
+  }
+
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_pa_pk_as_rep_draft9(asn1buf *buf, const krb5_pa_pk_as_rep_draft9 *val, unsigned int *retlen)
+{
+  asn1_setup();
+
+  switch (val->choice)
+  {
+    case choice_pa_pk_as_rep_draft9_dhSignedData:
+      asn1_insert_implicit_octetstring(val->u.dhSignedData.length,val->u.dhSignedData.data,0);
+      break;
+    case choice_pa_pk_as_rep_encKeyPack:
+      asn1_insert_implicit_octetstring(val->u.encKeyPack.length,val->u.encKeyPack.data,1);
+      break;
+    default:
+      return ASN1_MISSING_FIELD;
+  }
+
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_td_trusted_certifiers(asn1buf *buf, const krb5_external_principal_identifier **val, unsigned int *retlen)
+{
+  asn1_setup();
+  retval = asn1_encode_sequence_of_external_principal_identifier(buf, val, &length);
+  if (retval) {
+    asn1buf_destroy(&buf);
+    return retval;
+  }
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_sequence_of_typed_data(asn1buf *buf, const krb5_typed_data **val, unsigned int *retlen)
+{
+  asn1_setup();
+  int i;
+
+  if(val == NULL || val[0] == NULL) return ASN1_MISSING_FIELD;
+
+  for(i=0; val[i] != NULL; i++);
+  for(i--; i>=0; i--){
+    retval = asn1_encode_typed_data(buf,val[i],&length);
+    if(retval) return retval;
+    sum += length;
+  }
+  asn1_makeseq();
+
+  asn1_cleanup();
+}
+
+asn1_error_code asn1_encode_typed_data(asn1buf *buf, const krb5_typed_data *val, unsigned int *retlen)
+{
+  asn1_setup();
+  asn1_addlenfield(val->length, val->data, 1, asn1_encode_octetstring);
+  asn1_addfield(val->type, 0, asn1_encode_integer);
+  asn1_makeseq();
+  asn1_cleanup();
 }

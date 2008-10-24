@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -26,8 +25,8 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
- * $Id: server_init.c,v 1.8 2002/10/15 15:40:49 epeisach Exp $
- * $Source: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_init.c,v $
+ * $Id: server_init.c 18584 2006-09-13 20:30:23Z raeburn $
+ * $Source$
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
@@ -36,7 +35,9 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_init.c,
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <com_err.h>
+#include "k5-int.h"		/* needed for gssapiP_krb5.h */
 #include <kadm5/admin.h>
 #include <krb5.h>
 #include "server_internal.h"
@@ -251,10 +252,8 @@ kadm5_ret_t kadm5_init2(char *client_name, char *pass,
      }
 #endif
 
-     ret = kadm5_get_config_params(handle->context, (char *) NULL,
-				       (char *) NULL, params_in,
+     ret = kadm5_get_config_params(handle->context, 1, params_in,
 				       &handle->params);
-
      if (ret) {
 	  krb5_free_context(handle->context);
 	  free_db_args(handle);

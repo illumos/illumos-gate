@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kdb/decrypt_key.c
@@ -70,12 +69,11 @@
  */
 
 krb5_error_code
-krb5_dbekd_decrypt_key_data(context, mkey, key_data, dbkey, keysalt)
-    krb5_context 	  context;
-    const krb5_keyblock	* mkey;
-    const krb5_key_data	* key_data;
-    krb5_keyblock 	* dbkey;
-    krb5_keysalt 	* keysalt;
+krb5_dbekd_decrypt_key_data( krb5_context 	  context,
+			     const krb5_keyblock	* mkey,
+			     const krb5_key_data	* key_data,
+			     krb5_keyblock 	* dbkey,
+			     krb5_keysalt 	* keysalt)
 {
     krb5_error_code 	  retval = 0;
     krb5_int16		  tmplen;

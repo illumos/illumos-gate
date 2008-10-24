@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -56,8 +55,8 @@
 #include <stdio.h>
 #include <syslog.h>
 #include <sys/param.h>
-#include <gssapi_krb5.h>
 #include "k5-int.h"
+#include <gssapi_krb5.h>
 #include <kadm5/server_internal.h>
 #include <kadm5/admin.h>
 #include <adm_proto.h> /* SUNWresync121 XXX */
@@ -118,6 +117,7 @@ static int acl_debug_level = 0;
  */
 static const char *acl_catchall_entry = NULL;
 
+/* Solaris Kerberos */
 #define ACL_LINE2LONG_MSG dgettext(TEXT_DOMAIN, \
 			"%s: line %d too long, truncated\n")
 #define ACL_OP_BAD_MSG dgettext(TEXT_DOMAIN, \
@@ -229,7 +229,7 @@ kadm5int_acl_parse_line(lp)
 	    for (op=acle_ops; *op; op++) {
 		char rop;
 
-		rop = (isupper((int) *op)) ? tolower((int) *op) : *op;
+		rop = (isupper((unsigned char) *op)) ? tolower((unsigned char) *op) : *op;
 		found = 0;
 		for (t=0; acl_op_table[t].ao_op; t++) {
 		    if (rop == acl_op_table[t].ao_op) {
@@ -514,7 +514,7 @@ kadm5int_acl_load_acl_file()
 
     DPRINT(DEBUG_CALLS, acl_debug_level, ("* kadm5int_acl_load_acl_file()\n"));
     /* Open the ACL file for read */
-    afp = fopen(acl_acl_file, "rF");
+    afp = fopen(acl_acl_file, "rF"); /* Solaris Kerberos */
     if (afp) {
 	alineno = 1;
 	aentpp = &acl_list_head;
@@ -592,6 +592,7 @@ kadm5int_acl_match_data(e1, e2, targetflag, ws)
 	retval = 1;
 	if (ws && !targetflag) {
 	    if (ws->nwild >= 9) {
+		/* Solaris Kerberos */
 		DPRINT(DEBUG_ACL, acl_debug_level,
 		    ("Too many wildcards in ACL entry %s\n", e1->data));
 	    }
@@ -603,6 +604,7 @@ kadm5int_acl_match_data(e1, e2, targetflag, ws)
 	     (e1->data[1] >= '1') && (e1->data[1] <= '9')) {
 	int	n = e1->data[1] - '1';
 	if (n >= ws->nwild) {
+	    /* Solaris Kerberos */
 	    DPRINT(DEBUG_ACL, acl_debug_level,
 		   ("Too many backrefs in ACL entry %s\n", e1->data));
 	}
@@ -790,6 +792,7 @@ kadm5int_acl_check(kcontext, caller, opmask, principal, restrictions)
 
     DPRINT(DEBUG_CALLS, acl_debug_level, ("* acl_op_permitted()\n"));
 
+    /* Solaris Kerberos */
     if (restrictions)
         *restrictions = NULL;
 

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/crypto/pbkdf2.c
@@ -15,7 +14,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,7 +28,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * Implementation of PBKDF2 from RFC 2898.
  * Not currently used; likely to be used when we get around to AES support.
@@ -38,10 +37,11 @@
 #ifndef _KERNEL
 
 #include <ctype.h>
-#include <k5-int.h>
-#include <hash_provider.h>
+#include "k5-int.h"
+#include "hash_provider.h"
 
 /*
+ * Solaris Kerberos:
  * MIT code ripped out, use PBKDF2 algorithm from PKCS#11
  * provider.
  */

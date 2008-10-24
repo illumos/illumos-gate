@@ -1,12 +1,11 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MISC_H
 #define	_MISC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,11 +51,12 @@ randkey_principal_wrapper_3(void *server_handle,
 			    krb5_keyblock **keys, int *n_keys);
 
 kadm5_ret_t
-chpass_util_wrapper(void *server_handle, krb5_principal princ,
-		    char *new_pw, char **ret_pw,
-		    char *msg_ret, unsigned int msg_len);
+schpw_util_wrapper(void *server_handle, krb5_principal princ,
+		   char *new_pw, char **ret_pw,
+		   char *msg_ret, unsigned int msg_len);
 
-kadm5_ret_t check_min_life(void *server_handle, krb5_principal principal);
+kadm5_ret_t check_min_life(void *server_handle, krb5_principal principal,
+			   char *msg_ret, unsigned int msg_len);
 
 kadm5_ret_t kadm5_get_principal_v1(void *server_handle,
 				   krb5_principal principal, 
@@ -65,9 +65,19 @@ kadm5_ret_t kadm5_get_principal_v1(void *server_handle,
 kadm5_ret_t kadm5_get_policy_v1(void *server_handle, kadm5_policy_t name,
 				kadm5_policy_ent_t *ent);
 
+
+krb5_error_code process_chpw_request(krb5_context context, 
+				     void *server_handle, 
+				     char *realm, int s, 
+				     krb5_keytab keytab, 
+				     struct sockaddr_in *sockin, 
+				     krb5_data *req, krb5_data *rep);
+
 #ifdef SVC_GETARGS
 void  kadm_1(struct svc_req *, SVCXPRT *);
 #endif
+
+void trunc_name(size_t *len, char **dots);
 
 #ifdef	__cplusplus
 }

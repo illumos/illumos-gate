@@ -1,12 +1,12 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include "int-proto.h"
 
+/* Solaris Kerberos */
 extern krb5_error_code krb5_libdefault_boolean();
 
 static krb5_error_code
@@ -18,14 +18,18 @@ krb5_cc_copy_creds_except(krb5_context context, krb5_ccache incc, krb5_ccache ou
    krb5_creds creds;
 
    flags = 0;				/* turns off OPENCLOSE mode */
+   /* Solaris Kerberos */
    if ((code = krb5_cc_set_flags(context, incc, flags)) != NULL)
       return(code);
+   /* Solaris Kerberos */
    if ((code = krb5_cc_set_flags(context, outcc, flags)) != NULL)
       return(code);
 
+   /* Solaris Kerberos */
    if ((code = krb5_cc_start_seq_get(context, incc, &cur)) != NULL)
       goto cleanup;
 
+   /* Solaris Kerberos */
    while ((code = krb5_cc_next_cred(context, incc, &cur, &creds)) == NULL) {
       if (krb5_principal_compare(context, princ, creds.server))
 	 continue;
@@ -44,11 +48,13 @@ krb5_cc_copy_creds_except(krb5_context context, krb5_ccache incc, krb5_ccache ou
 cleanup:
    flags = KRB5_TC_OPENCLOSE;
 
+   /* Solaris Kerberos */
    if (code)
       (void) krb5_cc_set_flags(context, incc, flags);
    else
       code = krb5_cc_set_flags(context, incc, flags);
 
+   /* Solaris Kerberos */
    if (code)
       (void) krb5_cc_set_flags(context, outcc, flags);
    else
@@ -83,6 +89,7 @@ krb5_verify_init_creds(krb5_context context,
    authcon = NULL;
    ap_req.data = NULL;
 
+   /* Solaris Kerberos */
    if (server_arg)
       server = server_arg;
    else if (ret = krb5_sname_to_principal(context, NULL, NULL, 
@@ -101,12 +108,15 @@ krb5_verify_init_creds(krb5_context context,
       ret = krb5_kt_default(context, &keytab);
    }
 
-   /* Warning: be very, very careful when modifying the logic here */
+   /*
+    * Solaris Kerberos:
+    * Warning: be very, very careful when modifying the logic here
+    */
    if (keytab == NULL ||
        (ret = krb5_kt_get_entry(context, keytab, server, 0, 0, &kte))) {
        /* this means there is no keying material.  This is ok, as long as
 	  it is not prohibited by the configuration */
-
+       /* Solaris Kerberos */
        int nofail = 1;  /* Solaris Kerberos: default return error if keytab problems */
 
        if (options &&
@@ -115,6 +125,7 @@ krb5_verify_init_creds(krb5_context context,
 	    nofail = options->ap_req_nofail;
        } else {
 	   /* 
+	    * Solaris Kerberos:
 	    * Check verify_ap_req_nofail if set in config file.  Note this logic
 	    * assumes that krb5_libdefault_boolean will not set nofail to a
 	    * default value if verify_ap_req_nofail is not explictly set in
@@ -139,7 +150,7 @@ krb5_verify_init_creds(krb5_context context,
    if (krb5_principal_compare(context, server, creds->server)) {
       /* make an ap_req */
       if ((ret = krb5_mk_req_extended(context, &authcon, 0, NULL, creds,
-				     &ap_req)))
+				      &ap_req)))
 	 goto cleanup;
    } else {
       /* this is unclean, but it's the easiest way without ripping the
@@ -153,10 +164,11 @@ krb5_verify_init_creds(krb5_context context,
 
       if ((ret = krb5_cc_resolve(context, "MEMORY:rd_req", &ccache)))
 	 goto cleanup;
-
+      /* Solaris Kerberos */
       if ((ret = krb5_cc_initialize(context, ccache, creds->client)) != NULL)
 	 goto cleanup;
 
+      /* Solaris Kerberos */
       if ((ret = krb5_cc_store_cred(context, ccache, creds)) != NULL)
 	 goto cleanup;
 
@@ -169,12 +181,12 @@ krb5_verify_init_creds(krb5_context context,
       in_creds.times.endtime += 5*60;
 
       if ((ret = krb5_get_credentials(context, 0, ccache, &in_creds,
-				     &out_creds)))
+				      &out_creds)))
 	 goto cleanup;
 
       /* make an ap_req */
       if ((ret = krb5_mk_req_extended(context, &authcon, 0, NULL, out_creds,
-				     &ap_req)))
+				      &ap_req)))
 	 goto cleanup;
    }
 
@@ -187,7 +199,7 @@ krb5_verify_init_creds(krb5_context context,
    /* verify the ap_req */
 
    if ((ret = krb5_rd_req(context, &authcon, &ap_req, server, keytab,
-			 NULL, NULL)))
+			  NULL, NULL)))
       goto cleanup;
 
    /* if we get this far, then the verification succeeded.  We can
@@ -199,10 +211,12 @@ krb5_verify_init_creds(krb5_context context,
 
 	   retcc = NULL;
 
+	   /* Solaris Kerberos */
 	   if (((ret = krb5_cc_resolve(context, "MEMORY:rd_req2", &retcc)) != NULL) ||
 	       ((ret = krb5_cc_initialize(context, retcc, creds->client)) != NULL) ||
 	       ((ret = krb5_cc_copy_creds_except(context, ccache, retcc,
 						creds->server)) != NULL)) {
+	       /* Solaris Kerberos */
 	       if (retcc)
 		   (void) krb5_cc_destroy(context, retcc);
 	   } else {
@@ -220,8 +234,10 @@ krb5_verify_init_creds(krb5_context context,
 cleanup:
    if (!server_arg && server)
       krb5_free_principal(context, server);
+    /* Solaris Kerberos */
    if (!keytab_arg && keytab)
       (void) krb5_kt_close(context, keytab);
+    /* Solaris Kerberos */
    if (ccache)
       (void) krb5_cc_destroy(context, ccache);
    if (out_creds)

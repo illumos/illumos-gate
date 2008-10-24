@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/gssapi/krb5/set_ccache.c
@@ -65,6 +64,7 @@ gss_krb5_ccache_name(minor_status, name, out_name)
         }
         if (!err) {
             old_name = gss_out_name;
+            /* Solaris Kerberos */
             gss_out_name = (char *)tmp_name;
         }            
     }

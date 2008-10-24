@@ -3,15 +3,16 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/kad5/kadm_host_srv_names.c
  */
 
+#include <k5-int.h>
 #include "admin.h"
 #include <stdio.h>
 #include <os-proto.h>
+
 
 #define	KADM5_MASTER "admin_server"
 #define	KADM5_KPASSWD "kpasswd_server"

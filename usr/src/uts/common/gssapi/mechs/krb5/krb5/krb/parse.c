@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/parse.c
  *
@@ -14,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,13 +27,14 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * krb5_parse_name() routine.
  *
  * Rewritten by Theodore Ts'o to properly handle arbitrary quoted
  * characters in the principal name.
  */
+
 
 #include "k5-int.h"
 
@@ -48,27 +48,27 @@
  * converts a single-string representation of the name to the
  * multi-part principal format used in the protocols.
  *
- * principal will point to allocated storage which should be freed by
+ * principal will point to allocated storage which should be freed by 
  * the caller (using krb5_free_principal) after use.
- *
+ * 
  * Conventions:  / is used to separate components.  If @ is present in the
  * string, then the rest of the string after it represents the realm name.
  * Otherwise the local realm name is used.
- *
+ * 
  * error return:
  *	KRB5_PARSE_MALFORMED	badly formatted string
  *
  * also returns system errors:
- *	ENOMEM	MALLOC failed/out of memory
+ *	ENOMEM	malloc failed/out of memory
  *
  * get_default_realm() is called; it may return other errors.
  */
 
-#define	REALM_SEP	'@'
+#define REALM_SEP	'@'
 #define	COMPONENT_SEP	'/'
-#define	QUOTECHAR	'\\'
+#define QUOTECHAR	'\\'
 
-#define	FCOMPNUM	10
+#define FCOMPNUM	10
 
 
 /*
@@ -79,9 +79,9 @@
 krb5_error_code KRB5_CALLCONV
 krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincipal)
 {
-	const char	*cp;
-	char		*q;
-	int		i, c, size;
+	register const char	*cp;
+	register char	*q;
+	register int    i,c,size;
 	int		components = 0;
 	const char	*parsed_realm = NULL;
 	int		fcompsize[FCOMPNUM];
@@ -109,7 +109,7 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 				 * QUOTECHAR can't be at the last
 				 * character of the name!
 				 */
-				return (KRB5_PARSE_MALFORMED);
+				return(KRB5_PARSE_MALFORMED);
 			size++;
 			continue;
 		} else if (c == COMPONENT_SEP) {
@@ -118,7 +118,7 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 				 * Shouldn't see a component separator
 				 * after we've parsed out the realm name!
 				 */
-				return (KRB5_PARSE_MALFORMED);
+				return(KRB5_PARSE_MALFORMED);
 			if (i < FCOMPNUM) {
 				fcompsize[i] = size;
 			}
@@ -130,8 +130,8 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 				 * Multiple realm separaters
 				 * not allowed; zero-length realms are.
 				 */
-				return (KRB5_PARSE_MALFORMED);
-			parsed_realm = cp + 1;
+				return(KRB5_PARSE_MALFORMED);
+			parsed_realm = cp+1;
 			if (i < FCOMPNUM) {
 				fcompsize[i] = size;
 			}
@@ -141,25 +141,25 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 	}
 	if (parsed_realm)
 		realmsize = size;
-	else if (i < FCOMPNUM)
+	else if (i < FCOMPNUM) 
 		fcompsize[i] = size;
 	components = i + 1;
 	/*
 	 * Now, we allocate the principal structure and all of its
 	 * component pieces
 	 */
-	principal = (krb5_principal)MALLOC(sizeof (krb5_principal_data));
+	principal = (krb5_principal)MALLOC(sizeof(krb5_principal_data));
 	if (!principal) {
-		return (ENOMEM);
+		return(ENOMEM);
 	}
-	principal->data = (krb5_data *)MALLOC(sizeof (krb5_data) * components);
+	principal->data = (krb5_data *)MALLOC(sizeof(krb5_data) * components);
 	if (!principal->data) {
-	    krb5_xfree_wrap((char *)principal, sizeof (krb5_principal_data));
-	    return (ENOMEM);
+	    krb5_xfree_wrap((char *)principal, sizeof(krb5_principal_data));
+	    return ENOMEM;
 	}
 	principal->length = components;
 	/*
-	 * If a realm was not found, then use the default realm....
+	 * If a realm was not found, then use the defualt realm....
 	 */
 	/*
 	 * In the kernel we import the ctx and it always contains the
@@ -175,7 +175,7 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 			sizeof (krb5_data) * components);
 		    krb5_xfree_wrap((char *)principal,
 			sizeof (krb5_principal_data));
-		    return (retval);
+		    return(retval);
 		}
 		default_realm_size = strlen(default_realm);
 	    }
@@ -192,7 +192,7 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 		size = 0;
 		parsed_realm = NULL;
 		/*LINTED*/
-		for (i = 0, cp = name; (c = *cp); cp++) {
+		for (i=0,cp = name; (c = *cp); cp++) {
 			if (c == QUOTECHAR) {
 				cp++;
 				size++;
@@ -213,12 +213,13 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 			krb5_princ_realm(context, principal)->length = size;
 		else
 			if (krb5_princ_size(context, principal) > i)
-				krb5_princ_component(context, principal,
-						    i)->length = size;
+				krb5_princ_component(context, principal, i)->length = size;
 		if (i + 1 != components) {
 #ifndef _KERNEL
-			fprintf(stderr,
-				"Programming error in krb5_parse_name!");
+#if !defined(_WIN32)
+		    fprintf(stderr,
+			    "Programming error in krb5_parse_name!");
+#endif
 		    ASSERT(i + 1 == components);
 		    abort();
 #else
@@ -231,9 +232,8 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 		 * usual case), then just copy the sizes to the
 		 * principal structure
 		 */
-		for (i = 0; i < components; i++)
-			krb5_princ_component(context,
-			    principal, i)->length = fcompsize[i];
+		for (i=0; i < components; i++)
+			krb5_princ_component(context, principal, i)->length = fcompsize[i];
 	}
 	/*	
 	 * Now, we need to allocate the space for the strings themselves.....
@@ -252,9 +252,9 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 	}
 	krb5_princ_set_realm_length(context, principal, realmsize);
 	krb5_princ_set_realm_data(context, principal, tmpdata);
-	for (i = 0; i < components; i++) {
-		char *tmpdata2 = MALLOC(krb5_princ_component(context,
-			principal, i)->length + 1);
+	for (i=0; i < components; i++) {
+		char *tmpdata2 =
+		  MALLOC(krb5_princ_component(context, principal, i)->length + 1);
 		if (!tmpdata2) {
                         /*
                          * Release the principle and realm strings remembering
@@ -291,7 +291,7 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 	 */
 	q = krb5_princ_component(context, principal, 0)->data;
 	/*LINTED*/
-	for (i = 0, cp = name; (c = *cp); cp++) {
+	for (i=0,cp = name; (c = *cp); cp++) {
 		if (c == QUOTECHAR) {
 			cp++;
 			switch (c = *cp) {
@@ -314,15 +314,13 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 			i++;
 			*q++ = '\0';
 			if (c == COMPONENT_SEP) 
-				q = krb5_princ_component(context,
-				    principal, i)->data;
+				q = krb5_princ_component(context, principal, i)->data;
 			else
 				q = krb5_princ_realm(context, principal)->data;
 		} else
 			*q++ = (char) c;
 	}
 	*q++ = '\0';
-
 	if (!parsed_realm)
 #ifndef _KERNEL
 		(void) strcpy(krb5_princ_realm(context, principal)->data,

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * util/support/plugins.c
  *
@@ -28,6 +26,12 @@
  *
  * Plugin module support, and shims around dlopen/whatever.
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 
 #include "k5-plugin.h"
 #if USE_DLOPEN
@@ -462,20 +466,13 @@ krb5int_open_plugin_dirs (const char * const *dirnames,
         } else {
             /* load all plugins in each directory */
 #ifndef _WIN32
-	    DIR *dir = NULL;
+	    DIR *dir = opendir (dirnames[i]);
             
-            if (!err) {
-                dir = opendir(dirnames[i]);
-                if (dir == NULL) {
-                    err = errno;
-                    Tprintf ("-> error %d/%s\n", err, strerror (err));
-                }
-            }
-            
-            while (!err) {
+            while (dir != NULL && !err) {
                 struct dirent *d = NULL;
                 char *filepath = NULL;
                 struct plugin_file_handle *handle = NULL;
+                int len;
                 
                 d = readdir (dir);
                 if (d == NULL) { break; }
@@ -484,9 +481,13 @@ krb5int_open_plugin_dirs (const char * const *dirnames,
                     (strcmp (d->d_name, "..") == 0)) {
                     continue;
                 }
-                
+
+		/* Solaris Kerberos: Only open files with a .so extension */
+		len = NAMELEN (d);
+		if (len < 3 || strcmp(".so", d->d_name + len - 3 ) != 0)
+			continue;
+
 		if (!err) {
-                    int len = NAMELEN (d);
 		    filepath = malloc (dirnamelen + len + 1); /* NULL */
 		    if (filepath == NULL) { 
 			err = errno; 

@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -47,10 +46,10 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/kadmin/cli/keytab.c,v 1.28 2
 #include <string.h>
 #include <libintl.h>
 
-#include <krb5.h>
 #include <kadm5/admin.h>
 #include <krb5/adm_proto.h>
 #include "kadmin.h"
+#include <krb5.h>
 
 static int add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
 			 krb5_boolean keepold,

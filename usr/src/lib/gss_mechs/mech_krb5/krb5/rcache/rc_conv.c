@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/rcache/rc_conv.c
  *
@@ -12,6 +11,8 @@
  * An implementation for the default replay cache type.
  */
 
+/* Solaris Kerberos - resync */
+#define FREE_RC(x) ((void) free((char *) (x)))
 
 #include "rc_base.h"
 
@@ -31,7 +32,7 @@ krb5_auth_to_rep(krb5_context context, krb5_tkt_authent *auth, krb5_donot_replay
    return retval; /* shouldn't happen */
  if ((retval = krb5_unparse_name(context, auth->authenticator->client,
 				 &rep->client))) {
-     free(rep->server);
+     FREE_RC(rep->server);
      return retval; /* shouldn't happen. */
  }
  return 0;

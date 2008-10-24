@@ -1,15 +1,14 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
@@ -31,7 +30,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * Solaris Kerberos defines memory management macros in <krb5.h>,
@@ -56,11 +55,8 @@ n-fold(k-bits):
 /* input length is in bits */
 
 void
-krb5_nfold(inbits, in, outbits, out)
-     int inbits;
-     krb5_const unsigned char *in;
-     int outbits;
-     unsigned char *out;
+krb5_nfold(unsigned int inbits, const unsigned char *in, unsigned int outbits,
+	   unsigned char *out)
 {
     int a,b,c,lcm;
     int byte, i, msbit;

@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * lib/kdb/kdb_ldap/ldap_principal.c
  *
@@ -30,7 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,13 +138,13 @@ krb5_ldap_free_principal(kcontext , entries, nentries)
 }
 
 krb5_error_code
-krb5_ldap_iterate(
-    krb5_context           context,
-    char                   *match_expr,
-    krb5_error_code        (*func) (krb5_pointer, krb5_db_entry *),
-    krb5_pointer           func_arg,
+krb5_ldap_iterate(context, match_expr, func, func_arg, db_args)
+    krb5_context           context;
+    char                   *match_expr;
+    krb5_error_code        (*func) (krb5_pointer, krb5_db_entry *);
+    krb5_pointer           func_arg;
     /* Solaris Kerberos: adding support for -rev/recurse flags */
-    char                   **db_args)
+    char                   **db_args;
 {
     krb5_db_entry            entry;
     krb5_principal           principal;

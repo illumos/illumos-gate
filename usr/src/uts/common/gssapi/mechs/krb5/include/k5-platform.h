@@ -1,14 +1,13 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * k5-platform.h
  *
- * Copyright 2003, 2004 Massachusetts Institute of Technology.
+ * Copyright 2003, 2004, 2005 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -39,12 +38,16 @@
  * + 64-bit types and load/store code
  * + SIZE_MAX
  * + shared library init/fini hooks
+ * + consistent getpwnam/getpwuid interfaces
  */
 
 #ifndef K5_PLATFORM_H
 #define K5_PLATFORM_H
 
+/* Solaris Kerberos */
 #ifndef _KERNEL
+#include <sys/types.h>
+
 #include "autoconf.h"
 
 /* Initialization and finalization function support for libraries.
@@ -52,19 +55,43 @@
    At top level, before the functions are defined or even declared:
    MAKE_INIT_FUNCTION(init_fn);
    MAKE_FINI_FUNCTION(fini_fn);
+   Then:
    int init_fn(void) { ... }
    void fini_fn(void) { if (INITIALIZER_RAN(init_fn)) ... }
-
    In code, in the same file:
    err = CALL_INIT_FUNCTION(init_fn);
 
    To trigger or verify the initializer invocation from another file,
-   an additional function must be created.
+   a helper function must be created.
+
+   This model handles both the load-time execution (Windows) and
+   delayed execution (pthread_once) approaches, and should be able to
+   guarantee in both cases that the init function is run once, in one
+   thread, before other stuff in the library is done; furthermore, the
+   finalization code should only run if the initialization code did.
+   (Maybe I could've made the "if INITIALIZER_RAN" test implicit, via
+   another function hidden in macros, but this is hairy enough
+   already.)
 
    The init_fn and fini_fn names should be chosen such that any
    exported names staring with those names, and optionally followed by
    additional characters, fits in with any namespace constraints on
    the library in question.
+
+
+   There's also PROGRAM_EXITING() currently always defined as zero.
+   If there's some trivial way to find out if the fini function is
+   being called because the program that the library is linked into is
+   exiting, we can just skip all the work because the resources are
+   about to be freed up anyways.  Generally this is likely to be the
+   same as distinguishing whether the library was loaded dynamically
+   while the program was running, or loaded as part of program
+   startup.  On most platforms, I don't think we can distinguish these
+   cases easily, and it's probably not worth expending any significant
+   effort.  (Note in particular that atexit() won't do, because if the
+   library is explicitly loaded and unloaded, it would have to be able
+   to deregister the atexit callback function.  Also, the system limit
+   on atexit callbacks may be small.)
 
 
    Implementation outline:
@@ -86,6 +113,11 @@
    just check the flag) and returns the stored error code (or the
    pthread_once error).
 
+   (That's the basic idea.  With some debugging assert() calls and
+   such, it's a bit more complicated.  And we also need to handle
+   doing the pthread test at run time on systems where that works, so
+   we use the k5_once_t stuff instead.)
+
    UNIX, with compiler support: MAKE_FINI_FUNCTION declares the
    function as a destructor, and the run time linker support or
    whatever will cause it to be invoked when the library is unloaded,
@@ -99,12 +131,20 @@
    UNIX, no library finalization support: The finalization function
    never runs, and we leak memory.  Tough.
 
+   DELAY_INITIALIZER will be defined by the configure script if we
+   want to use k5_once instead of load-time initialization.  That'll
+   be the preferred method on most systems except Windows, where we
+   have to initialize some mutexes.
+
+
 
 
    For maximum flexibility in defining the macros, the function name
    parameter should be a simple name, not even a macro defined as
    another name.  The function should have a unique name, and should
    conform to whatever namespace is used by the library in question.
+   (We do have export lists, but (1) they're not used for all
+   platforms, and (2) they're not used for static libraries.)
 
    If the macro expansion needs the function to have been declared, it
    must include a declaration.  If it is not necessary for the symbol
@@ -118,7 +158,8 @@
 
    This is going to be compiler- and environment-specific, and may
    require some support at library build time, and/or "asm"
-   statements.
+   statements.  But through macro expansion and auxiliary functions,
+   we should be able to handle most things except #pragma.
 
    It's okay for this code to require that the library be built
    with the same compiler and compiler options throughout, but
@@ -137,7 +178,12 @@
    work, we'll only have memory leaks in a load/use/unload cycle.  If
    anyone (like, say, the OS vendor) complains about this, they can
    tell us how to get a shared library finalization function invoked
-   automatically.  */
+   automatically.
+
+   Currently there's --disable-delayed-initialization for preventing
+   the initialization from being delayed on UNIX, but that's mainly
+   just for testing the linker options for initialization, and will
+   probably be removed at some point.  */
 
 /* Helper macros.  */
 
@@ -160,22 +206,6 @@ typedef struct { k5_once_t once; int error, did_run; void (*fn)(void); } k5_init
 # else
 #  define MAYBE_DUMMY_INIT(NAME)
 # endif
-# define MAKE_INIT_FUNCTION(NAME)				\
-	static int NAME(void);					\
-	MAYBE_DUMMY_INIT(NAME)					\
-	/* forward declaration for use in initializer */	\
-	static void JOIN__2(NAME, aux) (void);			\
-	static k5_init_t JOIN__2(NAME, once) =			\
-		{ K5_ONCE_INIT, 0, 0, JOIN__2(NAME, aux) };	\
-	static void JOIN__2(NAME, aux) (void)			\
-	{							\
-	    JOIN__2(NAME, once).did_run = 1;			\
-	    JOIN__2(NAME, once).error = NAME();			\
-	}							\
-	/* so ';' following macro use won't get error */	\
-	static int NAME(void)
-# define CALL_INIT_FUNCTION(NAME)	\
-	k5_call_init_function(& JOIN__2(NAME, once))
 # ifdef __GNUC__
 /* Do it in macro form so we get the file/line of the invocation if
    the assertion fails.  */
@@ -187,23 +217,45 @@ typedef struct { k5_once_t once; int error, did_run; void (*fn)(void); } k5_init
 		 ? k5int_err						\
 		 : (assert(k5int_i->did_run != 0), k5int_i->error));	\
 	    }))
-# else /* __GNUC__ */
-static int k5_call_init_function(k5_init_t *i)
-{
-    int err;
-    err = k5_once(&i->once, i->fn);
-    if (err)
-	return err;
-    assert (i->did_run != 0);
-    return i->error;
-}
-# endif  /* __GNUC__ */
+#  define MAYBE_DEFINE_CALLINIT_FUNCTION
+# else
+#  define MAYBE_DEFINE_CALLINIT_FUNCTION			\
+	static int k5_call_init_function(k5_init_t *i)	\
+	{							\
+	    int err;						\
+	    err = k5_once(&i->once, i->fn);			\
+	    if (err)						\
+		return err;					\
+	    assert (i->did_run != 0);				\
+	    return i->error;					\
+	}
+# endif
+# define MAKE_INIT_FUNCTION(NAME)				\
+	static int NAME(void);					\
+	MAYBE_DUMMY_INIT(NAME)					\
+	/* forward declaration for use in initializer */	\
+	static void JOIN__2(NAME, aux) (void);			\
+	static k5_init_t JOIN__2(NAME, once) =			\
+		{ K5_ONCE_INIT, 0, 0, JOIN__2(NAME, aux) };	\
+	MAYBE_DEFINE_CALLINIT_FUNCTION				\
+	static void JOIN__2(NAME, aux) (void)			\
+	{							\
+	    JOIN__2(NAME, once).did_run = 1;			\
+	    JOIN__2(NAME, once).error = NAME();			\
+	}							\
+	/* so ';' following macro use won't get error */	\
+	static int NAME(void)
+# define CALL_INIT_FUNCTION(NAME)	\
+	k5_call_init_function(& JOIN__2(NAME, once))
 /* This should be called in finalization only, so we shouldn't have
    multiple active threads mucking around in our library at this
    point.  So ignore the once_t object and just look at the flag.
 
-   XXX Could we have problems with memory coherence between
-   processors if we don't invoke mutex/once routines?  */
+   XXX Could we have problems with memory coherence between processors
+   if we don't invoke mutex/once routines?  Probably not, the
+   application code should already be coordinating things such that
+   the library code is not in use by this point, and memory
+   synchronization will be needed there.  */
 # define INITIALIZER_RAN(NAME)	\
 	(JOIN__2(NAME, once).did_run && JOIN__2(NAME, once).error == 0)
 
@@ -214,6 +266,7 @@ static int k5_call_init_function(k5_init_t *i)
 /* Run initializer at load time, via GCC/C++ hook magic.  */
 
 # ifdef USE_LINKER_INIT_OPTION
+     /* Both gcc and linker option??  Favor gcc.  */
 #  define MAYBE_DUMMY_INIT(NAME)		\
 	void JOIN__2(NAME, auxinit) () { }
 # else
@@ -239,6 +292,8 @@ typedef struct { int error; unsigned char did_run; } k5_init_t;
 	 ? JOIN__2(NAME, ran).error		\
 	 : (abort(),0))
 # define INITIALIZER_RAN(NAME)	(JOIN__2(NAME,ran).did_run == 3 && JOIN__2(NAME, ran).error == 0)
+
+# define PROGRAM_EXITING()		(0)
 
 #elif defined(USE_LINKER_INIT_OPTION) || defined(_WIN32)
 
@@ -279,8 +334,34 @@ typedef struct { int error; unsigned char did_run; } k5_init_t;
    matter what compiler we're using.  Do it the same way
    regardless.  */
 
-# define MAKE_FINI_FUNCTION(NAME)	\
+# ifdef __hpux
+
+     /* On HP-UX, we need this auxiliary function.  At dynamic load or
+	unload time (but *not* program startup and termination for
+	link-time specified libraries), the linker-indicated function
+	is called with a handle on the library and a flag indicating
+	whether it's being loaded or unloaded.
+
+	The "real" fini function doesn't need to be exported, so
+	declare it static.
+
+	As usual, the final declaration is just for syntactic
+	convenience, so the top-level invocation of this macro can be
+	followed by a semicolon.  */
+
+#  include <dl.h>
+#  define MAKE_FINI_FUNCTION(NAME)					    \
+	static void NAME(void);						    \
+	void JOIN__2(NAME, auxfini)(shl_t, int); /* silence gcc warnings */ \
+	void JOIN__2(NAME, auxfini)(shl_t h, int l) { if (!l) NAME(); }	    \
+	static void NAME(void)
+
+# else /* not hpux */
+
+#  define MAKE_FINI_FUNCTION(NAME)	\
 	void NAME(void)
+
+# endif
 
 #elif defined(__GNUC__) && defined(DESTRUCTOR_ATTR_WORKS)
 /* If we're using gcc, if the C++ support works, the compiler should
@@ -302,11 +383,11 @@ typedef struct { int error; unsigned char did_run; } k5_init_t;
 # define MAKE_FINI_FUNCTION(NAME)	\
 	static void NAME(void)
 
-#else  /* DELAY_INITIALIZER */
+#else
 
 # error "Don't know how to do unload-time finalization for this configuration."
 
-#endif /* DELAY_INITIALIZER */
+#endif
 
 #endif /* !_KERNEL */
 
@@ -347,19 +428,22 @@ typedef struct { int error; unsigned char did_run; } k5_init_t;
    unaligned word stores and gcc/asm instructions for byte swaps,
    etc.)  */
 
-static  void
+/* Solaris Kerberos: To avoid problems with lint the following
+   functions can be found in separate header files. */
+#if 0
+static void
 store_16_be (unsigned int val, unsigned char *p)
 {
     p[0] = (val >>  8) & 0xff;
     p[1] = (val      ) & 0xff;
 }
-static  void
+static void
 store_16_le (unsigned int val, unsigned char *p)
 {
     p[1] = (val >>  8) & 0xff;
     p[0] = (val      ) & 0xff;
 }
-static  void
+static void
 store_32_be (unsigned int val, unsigned char *p)
 {
     p[0] = (val >> 24) & 0xff;
@@ -367,7 +451,7 @@ store_32_be (unsigned int val, unsigned char *p)
     p[2] = (val >>  8) & 0xff;
     p[3] = (val      ) & 0xff;
 }
-static  void
+static void
 store_32_le (unsigned int val, unsigned char *p)
 {
     p[3] = (val >> 24) & 0xff;
@@ -375,7 +459,7 @@ store_32_le (unsigned int val, unsigned char *p)
     p[1] = (val >>  8) & 0xff;
     p[0] = (val      ) & 0xff;
 }
-static  void
+static void
 store_64_be (UINT64_TYPE val, unsigned char *p)
 {
     p[0] = (unsigned char)((val >> 56) & 0xff);
@@ -387,7 +471,7 @@ store_64_be (UINT64_TYPE val, unsigned char *p)
     p[6] = (unsigned char)((val >>  8) & 0xff);
     p[7] = (unsigned char)((val      ) & 0xff);
 }
-static  void
+static void
 store_64_le (UINT64_TYPE val, unsigned char *p)
 {
     p[7] = (unsigned char)((val >> 56) & 0xff);
@@ -399,12 +483,12 @@ store_64_le (UINT64_TYPE val, unsigned char *p)
     p[1] = (unsigned char)((val >>  8) & 0xff);
     p[0] = (unsigned char)((val      ) & 0xff);
 }
-static  unsigned short
+static unsigned short
 load_16_be (unsigned char *p)
 {
     return (p[1] | (p[0] << 8));
 }
-static  unsigned short
+static unsigned short
 load_16_le (unsigned char *p)
 {
     return (p[0] | (p[1] << 8));
@@ -419,17 +503,17 @@ load_32_le (unsigned char *p)
 {
     return (p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
 }
-static  UINT64_TYPE
+static UINT64_TYPE
 load_64_be (unsigned char *p)
 {
     return ((UINT64_TYPE)load_32_be(p) << 32) | load_32_be(p+4);
 }
-static  UINT64_TYPE
+static UINT64_TYPE
 load_64_le (unsigned char *p)
 {
     return ((UINT64_TYPE)load_32_le(p+4) << 32) | load_32_le(p);
 }
-
+#endif
 
 /* Make the interfaces to getpwnam and getpwuid consistent.
    Model the wrappers on the POSIX thread-safe versions, but
@@ -445,3 +529,4 @@ load_64_le (unsigned char *p)
 
 
 #endif /* K5_PLATFORM_H */
+

@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/rcache/ser_rc.c
@@ -35,7 +34,7 @@
 /*
  * ser_rcdfl.c - Serialize replay cache context.
  */
-#include <k5-int.h>
+#include "k5-int.h"
 #include "rc-int.h"
 
 /*
@@ -73,6 +72,7 @@ krb5_rcache_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
     size_t		required;
 
     kret = EINVAL;
+    /* Solaris Kerberos */
     if ((rcache = (krb5_rcache) arg) != NULL) {
 	/*
 	 * Saving FILE: variants of krb5_rcache requires at minimum:
@@ -115,6 +115,7 @@ krb5_rcache_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **bu
     bp = *buffer;
     remain = *lenremain;
     kret = EINVAL;
+    /* Solaris Kerberos */
     if ((rcache = (krb5_rcache) arg) != NULL) {
 	kret = ENOMEM;
 	if (!krb5_rcache_size(kcontext, arg, &required) &&
@@ -188,16 +189,15 @@ krb5_rcache_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet **
 					   &bp, &remain))) {
 	    rcname[ibuf] = '\0';
 	    if (!(kret = krb5_rc_resolve_full(kcontext, &rcache, rcname))) {
-		(void) krb5_rc_close(kcontext, rcache);
 		(void) krb5_rc_recover(kcontext, rcache);
-		if (!kret &&
+		if (!kret && 
 		    !(kret = krb5_ser_unpack_int32(&ibuf, &bp, &remain)) &&
 		    (ibuf == KV5M_RCACHE)) {
 		    *buffer = bp;
 		    *lenremain = remain;
 		    *argp = (krb5_pointer) rcache;
 		}
-		else
+		else /* Solaris Kerberos */
 		    (void)krb5_rc_close(kcontext, rcache);
 	    }
 	    free(rcname);

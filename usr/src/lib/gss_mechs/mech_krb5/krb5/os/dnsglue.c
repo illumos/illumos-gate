@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/dnsglue.c
  *
@@ -30,9 +29,22 @@
  * or implied warranty.
  * 
  */
+#include "autoconf.h"
 #ifdef KRB5_DNS_LOOKUP
 
 #include "dnsglue.h"
+
+/*
+ * Only use res_ninit() if there's also a res_ndestroy(), to avoid
+ * memory leaks (Linux & Solaris) and outright corruption (AIX 4.x,
+ * 5.x).  While we're at it, make sure res_nsearch() is there too.
+ *
+ * In any case, it is probable that platforms having broken
+ * res_ninit() will have thread safety hacks for res_init() and _res.
+ */
+#if HAVE_RES_NINIT && HAVE_RES_NDESTROY && HAVE_RES_NSEARCH
+#define USE_RES_NINIT 1
+#endif
 
 /*
  * Opaque handle
@@ -59,7 +71,7 @@ static int initparse(struct krb5int_dns_state *);
 /*
  * krb5int_dns_init()
  *
- * Initialize an opaue handl.  Do name lookup and initial parsing of
+ * Initialize an opaque handle.  Do name lookup and initial parsing of
  * reply, skipping question section.  Prepare to iterate over answer
  * section.  Returns -1 on error, 0 on success.
  */
@@ -67,7 +79,7 @@ int
 krb5int_dns_init(struct krb5int_dns_state **dsp,
 		 char *host, int nclass, int ntype)
 {
-#if HAVE_RES_NSEARCH
+#if USE_RES_NINIT
     struct __res_state statbuf;
 #endif
     struct krb5int_dns_state *ds;
@@ -92,12 +104,14 @@ krb5int_dns_init(struct krb5int_dns_state **dsp,
     ds->cur_ans = 0;
 #endif
 
-#if HAVE_RES_NSEARCH
+#if USE_RES_NINIT
     memset(&statbuf, 0, sizeof(statbuf));
     ret = res_ninit(&statbuf);
+#else
+    ret = res_init();
+#endif
     if (ret < 0)
 	return -1;
-#endif
 
     do {
 	p = (ds->ansp == NULL)
@@ -110,7 +124,7 @@ krb5int_dns_init(struct krb5int_dns_state **dsp,
 	ds->ansp = p;
 	ds->ansmax = nextincr;
 
-#if HAVE_RES_NSEARCH
+#if USE_RES_NINIT
 	len = res_nsearch(&statbuf, host, ds->nclass, ds->ntype,
 			  ds->ansp, ds->ansmax);
 #else
@@ -141,12 +155,8 @@ krb5int_dns_init(struct krb5int_dns_state **dsp,
     ret = 0;
 
 errout:
-#if HAVE_RES_NSEARCH
-#if HAVE_RES_NDESTROY
+#if USE_RES_NINIT
     res_ndestroy(&statbuf);
-#else
-    res_nclose(&statbuf);
-#endif
 #endif
     if (ret < 0) {
 	if (ds->ansp != NULL) {
@@ -310,6 +320,11 @@ krb5int_dns_nextans(struct krb5int_dns_state *ds,
 
 	if (!INCR_OK(ds->ansp, ds->anslen, p, rdlen))
 	    return -1;
+/* Solaris Kerberos - resync */
+#if 0
+	if (rdlen > INT_MAX)
+	    return -1;
+#endif
 	if (nclass == ds->nclass && ntype == ds->ntype) {
 	    *pp = p;
 	    *lenp = rdlen;

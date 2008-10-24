@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * kdc/do_tgs_req.c
@@ -34,7 +33,6 @@
  * KDC Routines to deal with TGS_REQ's
  */
 
-#define NEED_SOCKETS
 #include "k5-int.h"
 #include "com_err.h"
 
@@ -504,6 +502,8 @@ tgt_again:
 	    goto cleanup;
 	}
 	enc_tkt_transited.tr_type = KRB5_DOMAIN_X500_COMPRESS;
+	enc_tkt_transited.magic = 0;
+	enc_tkt_transited.tr_contents.magic = 0;
 	enc_tkt_transited.tr_contents.data = 0;
 	enc_tkt_transited.tr_contents.length = 0;
 	enc_tkt_reply.transited = enc_tkt_transited;
@@ -541,7 +541,8 @@ tgt_again:
 			      tlen,
 			      enc_tkt_reply.transited.tr_contents.data,
 			      tdots);
-	else
+	else {
+	    const char *emsg = krb5_get_error_message(kdc_context, errcode);
 	    krb5_klog_syslog (LOG_ERR,
 			      "unexpected error checking transit from "
 			      "'%s' to '%s' via '%.*s%s': %s",
@@ -549,7 +550,9 @@ tgt_again:
 			      sname ? sname : "<unknown server>",
 			      tlen,
 			      enc_tkt_reply.transited.tr_contents.data,
-			      tdots, error_message (errcode));
+			      tdots, emsg);
+	    krb5_free_error_message(kdc_context, emsg);
+	}
     } else
 	krb5_klog_syslog (LOG_INFO, "not checking transit path");
     if (reject_bad_transit
@@ -578,7 +581,7 @@ tgt_again:
 		if ((errcode = krb5_unparse_name(kdc_context, client2, &tmp)))
 			tmp = 0;
 		if (tmp != NULL)
-			limit_string(tmp);
+		    limit_string(tmp);
 		audit_krb5kdc_tgs_req_2ndtktmm(
 			(struct in_addr *)from->address->contents,
 			(in_port_t)from->port,
@@ -695,6 +698,7 @@ tgt_again:
     
 cleanup:
     if (status) {
+	const char * emsg = NULL;
 	    audit_krb5kdc_tgs_req((struct in_addr *)from->address->contents,
 				(in_port_t)from->port, 0,
 				cname ? cname : "<unknown client>",
@@ -702,7 +706,9 @@ cleanup:
 				errcode);
 	if (!errcode)
 	    rep_etypes2str(rep_etypestr, sizeof(rep_etypestr), &reply);
-        krb5_klog_syslog(LOG_INFO,
+	if (errcode) 
+	    emsg = krb5_get_error_message (kdc_context, errcode);
+	krb5_klog_syslog(LOG_INFO,
 			 "TGS_REQ (%s) %s: %s: authtime %d, "
 			 "%s%s %s for %s%s%s",
 			 ktypestr,
@@ -712,18 +718,27 @@ cleanup:
 			 cname ? cname : "<unknown client>",
 			 sname ? sname : "<unknown server>",
 			 errcode ? ", " : "",
-			 errcode ? error_message(errcode) : "");
+			 errcode ? emsg : "");
+	if (errcode)
+	    krb5_free_error_message (kdc_context, emsg);
     }
     
     if (errcode) {
-	if (status == 0)
-	    status = error_message (errcode);
+        int got_err = 0;
+	if (status == 0) {
+	    status = krb5_get_error_message (kdc_context, errcode);
+	    got_err = 1;
+	}
 	errcode -= ERROR_TABLE_BASE_krb5;
 	if (errcode < 0 || errcode > 128)
 	    errcode = KRB_ERR_GENERIC;
 	    
 	retval = prepare_error_tgs(request, header_ticket, errcode,
 				   fromstring, response, status);
+	if (got_err) {
+	    krb5_free_error_message (kdc_context, status);
+	    status = 0;
+	}
     }
     
     if (header_ticket)

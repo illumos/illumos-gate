@@ -1,9 +1,8 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/krb5/keytab/ktbase.c
@@ -34,9 +33,9 @@
  * Registration functions for keytab.
  */
 
-#include <k5-int.h>
-#include <k5-thread.h>
-#include <kt-int.h>
+#include "k5-int.h"
+#include "k5-thread.h"
+#include "kt-int.h"
 
 extern const krb5_kt_ops krb5_ktf_ops;
 extern const krb5_kt_ops krb5_ktf_writable_ops;
@@ -46,14 +45,17 @@ struct krb5_kt_typelist {
     const krb5_kt_ops *ops;
     const struct krb5_kt_typelist *next;
 };
+/* Solaris Kerberos */
 static const struct krb5_kt_typelist krb5_kt_typelist_wrfile  = {
     &krb5_ktf_writable_ops,
     0
 };
-static const struct krb5_kt_typelist krb5_kt_typelist_file  = {
+/* Solaris Kerberos */
+static const  struct krb5_kt_typelist krb5_kt_typelist_file  = {
     &krb5_ktf_ops,
     &krb5_kt_typelist_wrfile
 };
+/* Solaris Kerberos */
 static const struct krb5_kt_typelist krb5_kt_typelist_srvtab = {
     &krb5_kts_ops,
     &krb5_kt_typelist_file
@@ -72,6 +74,7 @@ krb5int_kt_finalize(void)
 {
     struct krb5_kt_typelist *t, *t_next;
     k5_mutex_destroy(&kt_typehead_lock);
+    /* Solaris Kerberos */
     for (t = (struct krb5_kt_typelist *)kt_typehead; t != &krb5_kt_typelist_srvtab;
 	t = t_next) {
         t_next = (struct krb5_kt_typelist *)t->next;
@@ -139,9 +142,9 @@ krb5_kt_resolve (krb5_context context, const char *name, krb5_keytab *ktid)
 
     pfxlen = cp - name;
 
-    if ( pfxlen == 1 && isalpha(name[0]) ) {
-        /* We found a drive letter not a prefix - use FILE: */
-        pfx = strdup("FILE:");
+    if ( pfxlen == 1 && isalpha((unsigned char) name[0]) ) {
+        /* We found a drive letter not a prefix - use FILE */
+        pfx = strdup("FILE");
         if (!pfx)
             return ENOMEM;
 
@@ -177,7 +180,6 @@ krb5_kt_resolve (krb5_context context, const char *name, krb5_keytab *ktid)
     return KRB5_KT_UNKNOWN_TYPE;
 }
 
-
 /*
  * Routines to deal with externalizingt krb5_keytab.
  *	krb5_keytab_size();
@@ -209,6 +211,7 @@ krb5_keytab_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
     krb5_ser_handle	shandle;
 
     kret = EINVAL;
+    /* Solaris Kerberos */
     keytab = (krb5_keytab) arg;
     shandle = (krb5_ser_handle) keytab->ops->serializer;
     if ((keytab != NULL) && (keytab->ops) &&
@@ -225,6 +228,7 @@ krb5_keytab_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **bu
     krb5_ser_handle	shandle;
 
     kret = EINVAL;
+    /* Solaris Kerberos */
     keytab = (krb5_keytab) arg;
     shandle = (krb5_ser_handle) keytab->ops->serializer;
     if ((keytab != NULL) && (keytab->ops) &&
@@ -240,6 +244,7 @@ krb5_keytab_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet **
     krb5_ser_handle	shandle;
 
     kret = EINVAL;
+    /* Solaris Kerberos */
     shandle = (krb5_ser_handle) krb5_kt_dfl_ops.serializer;
     if ((shandle != NULL) && (shandle->internalizer))
 	kret = (*shandle->internalizer)(kcontext, argp, buffer, lenremain);

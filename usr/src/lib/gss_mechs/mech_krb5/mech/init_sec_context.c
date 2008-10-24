@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2000,2002, 2003 by the Massachusetts Institute of Technology.
@@ -78,8 +77,8 @@
  */
 
 #include "k5-int.h"
-#include "gssapiP_krb5.h"
 #include "gss_libinit.h"
+#include "gssapiP_krb5.h"
 #include "mglueP.h"
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
@@ -92,7 +91,7 @@ static OM_uint32 get_default_cred(OM_uint32 *, void *, gss_cred_id_t *);
 /* Solaris Kerberos end */
 
 /*
- * $Id: init_sec_context.c 18131 2006-06-14 22:27:54Z tlyu $
+ * $Id: init_sec_context.c 18721 2006-10-16 16:18:29Z epeisach $
  */
 
 /* XXX This is for debugging only!!!  Should become a real bitfield
@@ -232,7 +231,7 @@ make_gss_checksum (krb5_context context, krb5_auth_context auth_context,
 	    krb5_free_data_contents(context, &credmsg);
 	return(ENOMEM);
     }
-
+    /* Solaris Kerberos */
     ptr = (uchar_t *)data->checksum_data.data; /* SUNW15resync */
 
     TWRITE_INT(ptr, data->md5.length, 0);
@@ -370,9 +369,7 @@ setup_enc(
    krb5_gss_ctx_id_rec *ctx,
    krb5_context context)
 {
-
    krb5_error_code code;
-   OM_uint32 ret = GSS_S_COMPLETE;
    int i;
    krb5int_access kaccess;
 
@@ -446,7 +443,6 @@ setup_enc(
 	   goto fail;
        goto copy_subkey;
    }
-
 fail:
    /* SUNW15resync - (as in prev snv code) add if-code and success label fix */
   if (code) {
@@ -455,7 +451,7 @@ fail:
   }
 
 success:
-   return (ret);
+   return (GSS_S_COMPLETE);
 }
 
 /*
@@ -711,7 +707,7 @@ mutual_auth(
       return(GSS_S_NO_CONTEXT);
    }
 
-   ctx = (krb5_gss_ctx_id_rec *)*context_handle; /* SUNW15resync */
+   ctx = (krb5_gss_ctx_id_t) *context_handle;
 
    /* make sure the context is non-established, and that certain
       arguments are unchanged */
@@ -999,7 +995,7 @@ krb5_gss_init_sec_context(minor_status, claimant_cred_handle,
    return(major_status);
 }
 
-#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+#ifndef _WIN32
 k5_mutex_t kg_kdc_flag_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
 static int kdc_flag = 0;
 #endif
@@ -1008,12 +1004,14 @@ krb5_error_code
 krb5_gss_init_context (krb5_context *ctxp)
 {
     krb5_error_code err;
+#ifndef _WIN32
     int is_kdc;
+#endif
 
     err = gssint_initialize_library();
     if (err)
 	return err;
-#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+#ifndef _WIN32
     err = k5_mutex_lock(&kg_kdc_flag_mutex);
     if (err)
 	return err;
@@ -1022,14 +1020,12 @@ krb5_gss_init_context (krb5_context *ctxp)
 
     if (is_kdc)
 	return krb5int_init_context_kdc(ctxp);
-    else
-	return krb5_init_context(ctxp);
 #endif
-    return krb5_init_context(ctxp);
 
+    return krb5_init_context(ctxp);
 }
 
-#if 0 /* SUNW15resync - revisit when mech resynced w/1.5 */
+#ifndef _WIN32
 krb5_error_code
 krb5_gss_use_kdc_context()
 {
@@ -1395,26 +1391,6 @@ load_root_cred_using_keytab(
 		(void) krb5_kt_close(context, keytab);
 		*minor_status = code;
 		return (GSS_S_FAILURE);
-	}
-	/*
-	 * Solaris Kerberos:
-	 * If the client's realm is empty (using a fallback method to determine
-	 * the realm) then make sure to set the client's realm to the default
-	 * realm. This ensures that the TGT is built correctly.
-	 */
-	if (krb5_is_referral_realm(&(me->realm))) {
-		char *realm;
-
-		free(me->realm.data);
-		code = krb5_get_default_realm(context, &realm);
-		if (code) {
-			(void) krb5_kt_close(context, keytab);
-			*minor_status = code;
-			return (GSS_S_FAILURE);
-		}
-
-		me->realm.data = realm;
-		me->realm.length = strlen(realm);
 	}
 
 	my_creds.client = me;

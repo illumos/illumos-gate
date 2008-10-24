@@ -1,20 +1,19 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- *
+ * 
  * All rights reserved.
- *
+ * 
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -25,14 +24,15 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
+/* Solaris Kerberos */
 #ifdef _KERNEL
 /*
  * In kernel, use the Kernel encryption framework HMAC
@@ -101,6 +101,7 @@ krb5_hmac(krb5_context context, const krb5_keyblock *key,
  * opad is the byte 0x5c repeated blocksize times
  * and text is the data being protected
  */
+
 krb5_error_code
 krb5_hmac(krb5_context context,
 	krb5_const struct krb5_hash_provider *hash,
@@ -115,6 +116,7 @@ krb5_hmac(krb5_context context,
     krb5_data *hashin, hashout;
     krb5_error_code ret;
 
+    /* Solaris Kerberos */
     KRB5_LOG0(KRB5_INFO, "krb5_hmac() start\n");
 
     if (hash == NULL) {
@@ -162,11 +164,11 @@ krb5_hmac(krb5_context context,
 
     /* create the inner padded key */
 
+    /* Solaris Kerberos */
     (void) memset(xorkey, 0x36, blocksize);
 
-    for (i=0; i<key->length; i++) {
+    for (i=0; i<key->length; i++)
 	xorkey[i] ^= key->contents[i];
-    }
 
     /* compute the inner hash */
 
@@ -179,11 +181,13 @@ krb5_hmac(krb5_context context,
     hashout.length = hashsize;
     hashout.data = (char *) ihash;
 
+    /* Solaris Kerberos */
     if ((ret = ((*(hash->hash))(context, icount+1, hashin, &hashout))))
 	goto cleanup;
 
     /* create the outer padded key */
 
+    /* Solaris Kerberos */
     (void) memset(xorkey, 0x5c, blocksize);
 
     for (i=0; i<key->length; i++)
@@ -197,12 +201,14 @@ krb5_hmac(krb5_context context,
 
     output->length = hashsize;
 
+    /* Solaris Kerberos */
     if ((ret = ((*(hash->hash))(context, 2, hashin, output))))
 	(void) memset(output->data, 0, output->length);
 
     /* ret is set correctly by the prior call */
 
 cleanup:
+    /* Solaris Kerberos */
     (void) memset(xorkey, 0, blocksize);
     (void) memset(ihash, 0, hashsize);
 
@@ -210,6 +216,7 @@ cleanup:
     FREE(ihash, hashsize);
     FREE(xorkey, blocksize);
 
+    /* Solaris Kerberos */
     KRB5_LOG(KRB5_INFO, "krb5_hmac() end ret=%d\n", ret);
     return(ret);
 }

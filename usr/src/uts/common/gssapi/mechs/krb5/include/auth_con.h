@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef KRB5_AUTH_CONTEXT
 #define KRB5_AUTH_CONTEXT
@@ -22,8 +21,8 @@ struct _krb5_auth_context {
     krb5_pointer	i_vector;		/* mk_priv, rd_priv only */
     krb5_rcache		rcache;
     krb5_enctype      * permitted_etypes;	/* rd_req */
-    krb5_mk_req_checksum_func checksum_func;
-    void 		*checksum_func_data;
+  krb5_mk_req_checksum_func checksum_func;
+  void *checksum_func_data;
 };
 
 

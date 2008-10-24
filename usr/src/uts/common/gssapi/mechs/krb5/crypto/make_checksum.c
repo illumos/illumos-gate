@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -31,17 +30,15 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <cksumtypes.h>
-#include <etypes.h>
-
-#include <dk.h>
-
+#include "k5-int.h"
+#include "cksumtypes.h"
+#include "etypes.h"
+#include "dk.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
-		    const krb5_keyblock *key, krb5_keyusage usage,
-		    const krb5_data *input, krb5_checksum *cksum)
+		     const krb5_keyblock *key, krb5_keyusage usage,
+		     const krb5_data *input, krb5_checksum *cksum)
 {
     int i, e1, e2;
     krb5_data data;
@@ -67,7 +64,7 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
     context->kef_cksum_mt = krb5_cksumtypes_list[i].kef_cksum_mt;
 #endif
     cksum->length = cksumlen;
-    
+
     if ((cksum->contents = (krb5_octet *) MALLOC(cksum->length)) == NULL)
 	return(ENOMEM);
 
@@ -75,8 +72,8 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
     data.data = (char *) cksum->contents;
 
     if (krb5_cksumtypes_list[i].keyhash) {
-
 	/* check if key is compatible */
+
 	if (krb5_cksumtypes_list[i].keyed_etype) {
 	    for (e1=0; e1<krb5_enctypes_length; e1++) 
 		if (krb5_enctypes_list[e1].etype ==
@@ -145,8 +142,8 @@ krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
     if (!ret) {
 	cksum->magic = KV5M_CHECKSUM;
 	cksum->checksum_type = cksumtype;
-        if (krb5_cksumtypes_list[i].trunc_size) {
-            krb5_octet *trunc;
+	if (krb5_cksumtypes_list[i].trunc_size) {
+	    krb5_octet *trunc;
             size_t old_len = cksum->length;
 
             /*

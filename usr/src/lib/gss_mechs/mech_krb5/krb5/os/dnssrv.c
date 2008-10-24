@@ -1,4 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/dnssrv.c
  *
@@ -28,6 +27,7 @@
  * do DNS SRV RR queries
  */
 
+#include "autoconf.h"
 #ifdef KRB5_DNS_LOOKUP
 
 #include "dnsglue.h"

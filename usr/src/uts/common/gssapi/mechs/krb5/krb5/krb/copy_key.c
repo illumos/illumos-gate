@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/copy_key.c
  *
@@ -33,7 +32,7 @@
  * krb5_copy_keyblock()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 /*
  * krb5_copy_keyblock_data
@@ -112,4 +111,3 @@ krb5_copy_keyblock(context, from, to)
 	*to = new_key;
 	return (ret);
 }
-

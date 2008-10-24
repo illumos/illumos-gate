@@ -1,8 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
@@ -30,8 +29,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <k5-int.h>
-#include <etypes.h>
+#include "k5-int.h"
+#include "etypes.h"
 
 
 #ifdef _KERNEL
@@ -174,8 +173,8 @@ init_key_uef(CK_SESSION_HANDLE hSession, krb5_keyblock *key)
 /*ARGSUSED*/
 krb5_error_code KRB5_CALLCONV 
 krb5_c_encrypt(krb5_context context, const krb5_keyblock *key,
-	    krb5_keyusage usage, const krb5_data *ivec,
-	    const krb5_data *input, krb5_enc_data *output)
+	       krb5_keyusage usage, const krb5_data *ivec,
+	       const krb5_data *input, krb5_enc_data *output)
 {
     krb5_error_code ret;
     int i;

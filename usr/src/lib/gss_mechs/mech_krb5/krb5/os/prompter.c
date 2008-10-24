@@ -1,6 +1,5 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#include <k5-int.h>
-#if (!defined(_WIN32) || (defined(_WIN32) && defined(__CYGWIN32__))) && !defined(macintosh)
+#include "k5-int.h"
+#if !defined(_WIN32) || (defined(_WIN32) && defined(__CYGWIN32__))
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>

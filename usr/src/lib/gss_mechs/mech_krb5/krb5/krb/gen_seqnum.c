@@ -1,9 +1,8 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/krb/gen_seqnum.c
  *
@@ -35,7 +34,7 @@
  * then taking the output and slicing it up.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -54,7 +53,7 @@ krb5_generate_seq_number(krb5_context context, const krb5_keyblock *key, krb5_ui
 
 
     seed.length = key->length;
-    seed.data = (char *)key->contents;
+    seed.data = key->contents;
     if ((retval = krb5_c_random_add_entropy(context, KRB5_C_RANDSOURCE_TRUSTEDPARTY, &seed)))
 	return(retval);
 #endif /* 0 */
