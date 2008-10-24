@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <locale.h>
 #include <security/cryptoki.h>
 #include <security/pkcs11.h>
@@ -772,16 +771,16 @@ switch (errorno) {
 	case 247: /* KRB5_CC_NOSUPP */
 		return (dgettext(TEXT_DOMAIN,
 			"Ccache function not supported: not implemented"));
-	case 249: /* KRB5_RC_BADNAME */
+	case 248: /* KRB5_RC_BADNAME */
 		return (dgettext(TEXT_DOMAIN,
 			"Bad replay cache name"));
-	case 250: /* KRB5_CONF_NOT_CONFIGURED */
+	case 249: /* KRB5_CONF_NOT_CONFIGURED */
 		return (dgettext(TEXT_DOMAIN,
 			"krb5 conf file not configured"));
-	case 251: /* PKCS_ERR */
+	case 250: /* PKCS_ERR */
 		return (dgettext(TEXT_DOMAIN,
 			"Error in the PKCS 11 library calls"));
-	case 252: /* KRB5_DELTAT_BADFORMAT */
+	case 251: /* KRB5_DELTAT_BADFORMAT */
 		return (dgettext(TEXT_DOMAIN,
 			"Delta time bad format"));
 	default:
