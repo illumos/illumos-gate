@@ -1,10 +1,15 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1987, 1988 by MIT Student Information Processing Board
  *
  * For copyright information, see copyright.h.
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
 #include "ss_internal.h"
 #include "copyright.h"
 #define	size	sizeof(ss_data *)
@@ -44,9 +49,10 @@ int ss_create_invocation(subsystem_name, version_string, info_ptr,
 	new_table->info_dirs = (char **)malloc(sizeof(char *));
 	*new_table->info_dirs = (char *)NULL;
 	new_table->info_ptr = info_ptr;
-	new_table->prompt = malloc((unsigned)strlen(subsystem_name)+4);
+	/* Solaris Kerberos */
+	new_table->prompt = malloc((unsigned)strlen(subsystem_name)+3);
 	strcpy(new_table->prompt, subsystem_name);
-	strcat(new_table->prompt, ":  ");
+	strcat(new_table->prompt, ": ");
 #ifdef silly
 	new_table->abbrev_info = ss_abbrev_initialize("/etc/passwd", code_ptr);
 #else
