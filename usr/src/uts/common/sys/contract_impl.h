@@ -26,8 +26,6 @@
 #ifndef	_SYS_CONTRACT_IMPL_H
 #define	_SYS_CONTRACT_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/list.h>
 #include <sys/poll.h>
@@ -108,6 +106,15 @@ typedef struct ct_param32 {
 
 #endif /* _SYSCALL32 */
 
+/*
+ * in kernel version of parameter structure.
+ */
+typedef struct ct_kparam {
+	ct_param_t	param;		/* copy of user ct_param_t */
+	void		*ctpm_kbuf;	/* kernel buffer for parameter value */
+	uint32_t	ret_size;	/* parameter value size for copyout */
+} ct_kparam_t;
+
 struct proc;
 
 /*
@@ -116,9 +123,9 @@ struct proc;
 typedef struct ctmplops {
 	struct ct_template	*(*ctop_dup)(struct ct_template *);
 	void		(*ctop_free)(struct ct_template *);
-	int		(*ctop_set)(struct ct_template *, ct_param_t *,
+	int		(*ctop_set)(struct ct_template *, ct_kparam_t *,
 			const cred_t *);
-	int		(*ctop_get)(struct ct_template *, ct_param_t *);
+	int		(*ctop_get)(struct ct_template *, ct_kparam_t *);
 	int		(*ctop_create)(struct ct_template *, ctid_t *);
 	uint_t		allevents;
 } ctmplops_t;
@@ -308,12 +315,18 @@ typedef struct ct_listener {
  * Contract template interfaces
  */
 void ctmpl_free(ct_template_t *);
-int ctmpl_set(ct_template_t *, ct_param_t *, const cred_t *);
-int ctmpl_get(ct_template_t *, ct_param_t *);
+int ctmpl_set(ct_template_t *, ct_kparam_t *, const cred_t *);
+int ctmpl_get(ct_template_t *, ct_kparam_t *);
 ct_template_t *ctmpl_dup(ct_template_t *);
 void ctmpl_activate(ct_template_t *);
 void ctmpl_clear(ct_template_t *);
 int ctmpl_create(ct_template_t *, ctid_t *);
+
+/*
+ * Contract parameter functions
+ */
+int ctparam_copyin(const void *, ct_kparam_t *, int, int);
+int ctparam_copyout(ct_kparam_t *, void *, int);
 
 /*
  * Contract functions

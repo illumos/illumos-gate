@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mutex.h>
 #include <sys/debug.h>
 #include <sys/types.h>
@@ -223,9 +221,11 @@ ctmpl_process_free(struct ct_template *template)
  * the desired terms.
  */
 static int
-ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
+ctmpl_process_set(struct ct_template *tmpl, ct_kparam_t *kparam,
+    const cred_t *cr)
 {
 	ctmpl_process_t *ctp = tmpl->ctmpl_data;
+	ct_param_t *param = &kparam->param;
 	contract_t *ct;
 	int error;
 	uint64_t param_value;
@@ -233,12 +233,12 @@ ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 
 	if ((param->ctpm_id == CTPP_SVC_FMRI) ||
 	    (param->ctpm_id == CTPP_CREATOR_AUX)) {
-		str_value = (char *)param->ctpm_value;
+		str_value = (char *)kparam->ctpm_kbuf;
 		str_value[param->ctpm_size - 1] = '\0';
 	} else {
 		if (param->ctpm_size < sizeof (uint64_t))
 			return (EINVAL);
-		param_value = *(uint64_t *)param->ctpm_value;
+		param_value = *(uint64_t *)kparam->ctpm_kbuf;
 		/*
 		 * No process contract parameters are > 32 bits.
 		 * Unless it is a string.
@@ -355,17 +355,18 @@ ctmpl_process_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
  * returns the requested term.
  */
 static int
-ctmpl_process_get(struct ct_template *template, ct_param_t *param)
+ctmpl_process_get(struct ct_template *template, ct_kparam_t *kparam)
 {
 	ctmpl_process_t *ctp = template->ctmpl_data;
-	uint64_t *param_value = param->ctpm_value;
+	ct_param_t *param = &kparam->param;
+	uint64_t *param_value = kparam->ctpm_kbuf;
 
 	if (param->ctpm_id == CTPP_SUBSUME ||
 	    param->ctpm_id == CTPP_PARAMS ||
 	    param->ctpm_id == CTPP_EV_FATAL) {
 		if (param->ctpm_size < sizeof (uint64_t))
 			return (EINVAL);
-		param->ctpm_size = sizeof (uint64_t);
+		kparam->ret_size = sizeof (uint64_t);
 	}
 
 	switch (param->ctpm_id) {
@@ -378,28 +379,28 @@ ctmpl_process_get(struct ct_template *template, ct_param_t *param)
 		break;
 	case CTPP_SVC_FMRI:
 		if (ctp->ctp_svc_fmri == NULL) {
-			param->ctpm_size =
-			    strlcpy((char *)param->ctpm_value,
+			kparam->ret_size =
+			    strlcpy((char *)kparam->ctpm_kbuf,
 			    CT_PR_SVC_DEFAULT, param->ctpm_size);
 		} else {
-			param->ctpm_size =
-			    strlcpy((char *)param->ctpm_value,
+			kparam->ret_size =
+			    strlcpy((char *)kparam->ctpm_kbuf,
 			    refstr_value(ctp->ctp_svc_fmri), param->ctpm_size);
 		}
-		param->ctpm_size++;
+		kparam->ret_size++;
 		break;
 	case CTPP_CREATOR_AUX:
 		if (ctp->ctp_svc_aux == NULL) {
-			param->ctpm_size =
-			    strlcpy((char *)param->ctpm_value,
+			kparam->ret_size =
+			    strlcpy((char *)kparam->ctpm_kbuf,
 			    refstr_value(conp_svc_aux_default),
 			    param->ctpm_size);
 		} else {
-			param->ctpm_size =
-			    strlcpy((char *)param->ctpm_value,
+			kparam->ret_size =
+			    strlcpy((char *)kparam->ctpm_kbuf,
 			    refstr_value(ctp->ctp_svc_aux), param->ctpm_size);
 		}
-		param->ctpm_size++;
+		kparam->ret_size++;
 		break;
 	case CTPP_EV_FATAL:
 		*param_value = ctp->ctp_ev_fatal;

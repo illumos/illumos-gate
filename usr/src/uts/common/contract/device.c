@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mutex.h>
 #include <sys/debug.h>
 #include <sys/types.h>
@@ -498,9 +496,11 @@ ctmpl_device_free(struct ct_template *template)
  * the {PRIV_SYS_DEVICES} privilege asserted in its effective set.
  */
 static int
-ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
+ctmpl_device_set(struct ct_template *tmpl, ct_kparam_t *kparam,
+    const cred_t *cr)
 {
 	ctmpl_device_t *dtmpl = tmpl->ctmpl_data;
+	ct_param_t *param = &kparam->param;
 	int error;
 	dev_info_t *dip;
 	int spec_type;
@@ -510,12 +510,12 @@ ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
 	ASSERT(MUTEX_HELD(&tmpl->ctmpl_lock));
 
 	if (param->ctpm_id == CTDP_MINOR) {
-		str_value = (char *)param->ctpm_value;
+		str_value = (char *)kparam->ctpm_kbuf;
 		str_value[param->ctpm_size - 1] = '\0';
 	} else {
 		if (param->ctpm_size < sizeof (uint64_t))
 			return (EINVAL);
-		param_value = *(uint64_t *)param->ctpm_value;
+		param_value = *(uint64_t *)kparam->ctpm_kbuf;
 	}
 
 	switch (param->ctpm_id) {
@@ -597,10 +597,11 @@ ctmpl_device_set(struct ct_template *tmpl, ct_param_t *param, const cred_t *cr)
  * returns the value of the requested term.
  */
 static int
-ctmpl_device_get(struct ct_template *template, ct_param_t *param)
+ctmpl_device_get(struct ct_template *template, ct_kparam_t *kparam)
 {
 	ctmpl_device_t *dtmpl = template->ctmpl_data;
-	uint64_t *param_value = param->ctpm_value;
+	ct_param_t *param = &kparam->param;
+	uint64_t *param_value = kparam->ctpm_kbuf;
 
 	ASSERT(MUTEX_HELD(&template->ctmpl_lock));
 
@@ -608,7 +609,7 @@ ctmpl_device_get(struct ct_template *template, ct_param_t *param)
 	    param->ctpm_id == CTDP_NONEG) {
 		if (param->ctpm_size < sizeof (uint64_t))
 			return (EINVAL);
-		param->ctpm_size = sizeof (uint64_t);
+		kparam->ret_size = sizeof (uint64_t);
 	}
 
 	switch (param->ctpm_id) {
@@ -620,9 +621,9 @@ ctmpl_device_get(struct ct_template *template, ct_param_t *param)
 		break;
 	case CTDP_MINOR:
 		if (dtmpl->ctd_minor) {
-			param->ctpm_size = strlcpy((char *)param->ctpm_value,
+			kparam->ret_size = strlcpy((char *)kparam->ctpm_kbuf,
 			    dtmpl->ctd_minor, param->ctpm_size);
-			param->ctpm_size++;
+			kparam->ret_size++;
 		} else {
 			return (ENOENT);
 		}

@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All rights reserved.  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.29	*/
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/vmparam.h>
@@ -86,39 +83,45 @@ extern	void	oprgetstatus(kthread_t *, prstatus_t *, zone_t *);
 extern	void	oprgetpsinfo(proc_t *, prpsinfo_t *, kthread_t *);
 static	int	oprgetmap(proc_t *, list_t *);
 
-/*ARGSUSED*/
 static int
 prctioctl(prnode_t *pnp, int cmd, intptr_t arg, int flag, cred_t *cr)
 {
 	int error = 0;
-	ct_param_t param;
+	ct_kparam_t kparam;
+	ct_param_t *param = &kparam.param;
 	ct_template_t *tmpl;
 
 	if (cmd != CT_TSET && cmd != CT_TGET)
 		return (EINVAL);
 
-	if (copyin((void *)arg, &param, sizeof (ct_param_t)))
-		return (EFAULT);
-
-	if ((error = prlock(pnp, ZNO)) != 0)
+	error = ctparam_copyin((void *)arg, &kparam, flag, cmd);
+	if (error != 0)
 		return (error);
+
+	if ((error = prlock(pnp, ZNO)) != 0) {
+		kmem_free(kparam.ctpm_kbuf, param->ctpm_size);
+		return (error);
+	}
 
 	tmpl = pnp->pr_common->prc_thread->t_lwp->lwp_ct_active[pnp->pr_cttype];
 	if (tmpl == NULL) {
 		prunlock(pnp);
+		kmem_free(kparam.ctpm_kbuf, param->ctpm_size);
 		return (ESTALE);
 	}
 
 	if (cmd == CT_TSET)
-		error = ctmpl_set(tmpl, &param, cr);
+		error = ctmpl_set(tmpl, &kparam, cr);
 	else
-		error = ctmpl_get(tmpl, &param);
+		error = ctmpl_get(tmpl, &kparam);
 
 	prunlock(pnp);
 
-	if (cmd == CT_TGET && error == 0 &&
-	    copyout(&param, (void *)arg, sizeof (ct_param_t)))
-		error = EFAULT;
+	if (cmd == CT_TGET && error == 0) {
+		error = ctparam_copyout(&kparam, (void *)arg, flag);
+	} else {
+		kmem_free(kparam.ctpm_kbuf, param->ctpm_size);
+	}
 
 	return (error);
 }

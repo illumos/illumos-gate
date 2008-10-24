@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Contracts
  * ---------
@@ -171,6 +169,7 @@
 #include <sys/list.h>
 #include <sys/sysmacros.h>
 #include <sys/proc.h>
+#include <sys/ctfs.h>
 #include <sys/contract_impl.h>
 #include <sys/contract/process_impl.h>
 #include <sys/dditypes.h>
@@ -1418,6 +1417,82 @@ contract_type_pbundle(ct_type_t *type, proc_t *pp)
 }
 
 /*
+ * ctparam_copyin
+ *
+ * copyin a ct_param_t for CT_TSET or CT_TGET commands.
+ * If ctparam_copyout() is not called after ctparam_copyin(), then
+ * the caller must kmem_free() the buffer pointed by kparam->ctpm_kbuf.
+ *
+ * The copyin/out of ct_param_t is not done in ctmpl_set() and ctmpl_get()
+ * because prctioctl() calls ctmpl_set() and ctmpl_get() while holding a
+ * process lock.
+ */
+int
+ctparam_copyin(const void *uaddr, ct_kparam_t *kparam, int flag, int cmd)
+{
+	uint32_t size;
+	void *ubuf;
+	ct_param_t *param = &kparam->param;
+	STRUCT_DECL(ct_param, uarg);
+
+	STRUCT_INIT(uarg, flag);
+	if (copyin(uaddr, STRUCT_BUF(uarg), STRUCT_SIZE(uarg)))
+		return (EFAULT);
+	size = STRUCT_FGET(uarg, ctpm_size);
+	ubuf = STRUCT_FGETP(uarg, ctpm_value);
+
+	if (size > CT_PARAM_MAX_SIZE || size == 0)
+		return (EINVAL);
+
+	kparam->ctpm_kbuf = kmem_alloc(size, KM_SLEEP);
+	if (cmd == CT_TSET) {
+		if (copyin(ubuf, kparam->ctpm_kbuf, size)) {
+			kmem_free(kparam->ctpm_kbuf, size);
+			return (EFAULT);
+		}
+	}
+	param->ctpm_id = STRUCT_FGET(uarg, ctpm_id);
+	param->ctpm_size = size;
+	param->ctpm_value = ubuf;
+	kparam->ret_size = 0;
+
+	return (0);
+}
+
+/*
+ * ctparam_copyout
+ *
+ * copyout a ct_kparam_t and frees the buffer pointed by the member
+ * ctpm_kbuf of ct_kparam_t
+ */
+int
+ctparam_copyout(ct_kparam_t *kparam, void *uaddr, int flag)
+{
+	int r = 0;
+	ct_param_t *param = &kparam->param;
+	STRUCT_DECL(ct_param, uarg);
+
+	STRUCT_INIT(uarg, flag);
+
+	STRUCT_FSET(uarg, ctpm_id, param->ctpm_id);
+	STRUCT_FSET(uarg, ctpm_size, kparam->ret_size);
+	STRUCT_FSETP(uarg, ctpm_value, param->ctpm_value);
+	if (copyout(STRUCT_BUF(uarg), uaddr, STRUCT_SIZE(uarg))) {
+		r = EFAULT;
+		goto error;
+	}
+	if (copyout(kparam->ctpm_kbuf, param->ctpm_value,
+	    MIN(kparam->ret_size, param->ctpm_size))) {
+		r = EFAULT;
+	}
+
+error:
+	kmem_free(kparam->ctpm_kbuf, param->ctpm_size);
+
+	return (r);
+}
+
+/*
  * ctmpl_free
  *
  * Frees a template.
@@ -1458,9 +1533,10 @@ ctmpl_dup(ct_template_t *template)
  * Sets the requested terms of a template.
  */
 int
-ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
+ctmpl_set(ct_template_t *template, ct_kparam_t *kparam, const cred_t *cr)
 {
 	int result = 0;
+	ct_param_t *param = &kparam->param;
 	uint64_t param_value;
 
 	if (param->ctpm_id == CTP_COOKIE ||
@@ -1469,7 +1545,7 @@ ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
 		if (param->ctpm_size < sizeof (uint64_t)) {
 			return (EINVAL);
 		} else {
-			param_value = *(uint64_t *)param->ctpm_value;
+			param_value = *(uint64_t *)kparam->ctpm_kbuf;
 		}
 	}
 
@@ -1503,7 +1579,7 @@ ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
 		 */
 		/* FALLTHROUGH */
 	default:
-		result = template->ctmpl_ops->ctop_set(template, param, cr);
+		result = template->ctmpl_ops->ctop_set(template, kparam, cr);
 	}
 	mutex_exit(&template->ctmpl_lock);
 
@@ -1517,7 +1593,7 @@ ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
  *
  * If the term requested is a variable-sized term and the buffer
  * provided is too small for the data, we truncate the data and return
- * the buffer size necessary to fit the term in param->ctpm_size. If the
+ * the buffer size necessary to fit the term in kparam->ret_size. If the
  * term requested is fix-sized (uint64_t) and the buffer provided is too
  * small, we return EINVAL.  This should never happen if you're using
  * libcontract(3LIB), only if you call ioctl with a hand constructed
@@ -1527,9 +1603,10 @@ ctmpl_set(ct_template_t *template, ct_param_t *param, const cred_t *cr)
  * parameters.
  */
 int
-ctmpl_get(ct_template_t *template, ct_param_t *param)
+ctmpl_get(ct_template_t *template, ct_kparam_t *kparam)
 {
 	int result = 0;
+	ct_param_t *param = &kparam->param;
 	uint64_t *param_value;
 
 	if (param->ctpm_id == CTP_COOKIE ||
@@ -1538,8 +1615,8 @@ ctmpl_get(ct_template_t *template, ct_param_t *param)
 		if (param->ctpm_size < sizeof (uint64_t)) {
 			return (EINVAL);
 		} else {
-			param_value = param->ctpm_value;
-			param->ctpm_size = sizeof (uint64_t);
+			param_value = kparam->ctpm_kbuf;
+			kparam->ret_size = sizeof (uint64_t);
 		}
 	}
 
@@ -1555,7 +1632,7 @@ ctmpl_get(ct_template_t *template, ct_param_t *param)
 		*param_value = template->ctmpl_ev_crit;
 		break;
 	default:
-		result = template->ctmpl_ops->ctop_get(template, param);
+		result = template->ctmpl_ops->ctop_get(template, kparam);
 	}
 	mutex_exit(&template->ctmpl_lock);
 
