@@ -672,7 +672,8 @@ scsi_dmafree(struct scsi_pkt *pkt)
 void
 scsi_cache_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	ASSERT(pkt->pkt_numcookies == 0 || pkt->pkt_flags & PCW_BOUND);
+	ASSERT(pkt->pkt_numcookies == 0 ||
+	    ((struct scsi_pkt_cache_wrapper *)pkt)->pcw_flags & PCW_BOUND);
 	ASSERT(pkt->pkt_handle != NULL);
 	scsi_dmafree_attr(pkt);
 
