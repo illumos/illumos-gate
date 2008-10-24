@@ -19,40 +19,42 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(lint)
 
 #include <sys/systm.h>
 
-#else	/* lint */
-
-#include <sys/asm_linkage.h>
-#include <sys/machthread.h>
-#include <sys/privregs.h>
-#include "assym.h"
-
-#endif	/* lint */
-
-#ifdef	lint
+void
+sn1_brand_syscall32_callback(void)
+{
+}
 
 void
 sn1_brand_syscall_callback(void)
 {
 }
 
-#else	/* lint */
+#else	/* !lint */
 
-#ifdef sun4v
+#include <sys/asm_linkage.h>
+#include <sys/machthread.h>
+#include <sys/privregs.h>
+#include <sn1_offsets.h>
+#include "assym.h"
+
+#if defined(sun4v)
 
 #define GLOBALS_SWAP(reg)				\
 	rdpr	%gl, reg				;\
 	wrpr	reg, 1, %gl
 
+/*
+ * The GLOBALS_RESTORE macro can only be one instruction since it's
+ * used in a delay slot.
+ */
 #define GLOBALS_RESTORE(reg)				\
 	wrpr	reg, 0, %gl
 
@@ -62,6 +64,10 @@ sn1_brand_syscall_callback(void)
 	rdpr	%pstate, reg				;\
 	wrpr	reg, PSTATE_AG, %pstate
 
+/*
+ * The GLOBALS_RESTORE macro can only be one instruction since it's
+ * used in a delay slot.
+ */
 #define GLOBALS_RESTORE(reg)				\
 	wrpr	reg, %g0, %pstate
 
@@ -72,16 +78,57 @@ sn1_brand_syscall_callback(void)
 	 * %g1: return point
 	 * %g2: pointer to our cpu structure
 	 */
-	ENTRY(sn1_brand_syscall_callback)
+	ENTRY(sn1_brand_syscall32_callback)
+	/*
+	 * If the trapping thread has the address mask bit clear, then it's
+	 * a 64-bit process, and has no business calling 32-bit syscalls.
+	 */
+	rdpr	%tstate, %g3		! %tstate.am is the trapping
+	andcc	%g3, TSTATE_AM, %g3	!   threads address mask bit
+	bne,pt	%xcc, _entry
+	nop
+	jmp	%g1			! 64 bit process, bail out
+	nop
+	SET_SIZE(sn1_brand_syscall32_callback)
 
 	/*
-	 * save some locals in the CPU tmp area to give us a little
+	 * Input parameters:
+	 * %g1: return point
+	 * %g2: pointer to our cpu structure
+	 */
+	ENTRY(sn1_brand_syscall_callback)
+	/*
+	 * If the trapping thread has the address mask bit set, then it's
+	 * a 32-bit process, and has no business calling 64-bit syscalls.
+	 */
+	rdpr	%tstate, %g3		! %tstate.am is the trapping
+	andcc	%g3, TSTATE_AM, %g3	!   threads address mask bit
+	be,pt	%xcc, _entry
+	nop
+	jmp	%g1			! 32 bit process, bail out
+	nop
+	SET_SIZE(sn1_brand_syscall_callback)
+
+	ENTRY(sn1_brand_syscall_callback_common)
+_entry:
+	/*
+	 * Input parameters:
+	 * %g1: return point
+	 * %g2: pointer to our cpu structure
+	 *
+	 * Note that we're free to use any %g? registers as long as
+	 * we are are executing with alternate globals.  If we're
+	 * executing with user globals we need to backup any registers
+	 * that we want to use so that we can restore them when we're
+	 * done.
+	 *
+	 * Save some locals in the CPU tmp area to give us a little
 	 * room to work.
 	 */
 	stn	%l0, [%g2 + CPU_TMP1]
 	stn	%l1, [%g2 + CPU_TMP2]
 
-#ifdef sun4v
+#if defined(sun4v)
 	/*
 	 * On sun4v save our input parameters (which are stored in the
 	 * alternate globals) since we'll need to switch between alternate
@@ -90,87 +137,145 @@ sn1_brand_syscall_callback(void)
 	 */
 	stn	%l2, [%g2 + CPU_TMP3]
 	stn	%l3, [%g2 + CPU_TMP4]
-	mov	%g1, %l2
-	mov	%g2, %l3
+
+	mov	%g1, %l2		! save %g1 in %l2
+	mov	%g2, %l3		! save %g2 in %l3
 #endif /* sun4v */
 
 	/*
 	 * Switch from the alternate to user globals to grab the syscall
-	 * number, then switch back to the alternate globals.
-	 *
-	 * If the system call number is >= 1024, then it is coming from the
-	 * emulation support library and should not be emulated.
+	 * number.
 	 */
 	GLOBALS_SWAP(%l0)		! switch to normal globals
-	cmp	%g1, 1024		! is this call from the library?
-	bl,a	1f
+
+	/*
+	 * If the system call number is >= 1024, then it is a native
+	 * syscall that doesn't need emulation.
+	 */
+	cmp	%g1, 1024		! is this a native syscall?
+	bl,a	_indirect_check		! probably not, continue checking
 	mov	%g1, %l1		! delay slot - grab syscall number
+
+	/*
+	 * This is a native syscall, probably from the emulation library.
+	 * Subtract 1024 from the syscall number and let it go through.
+	 */
 	sub	%g1, 1024, %g1		! convert magic num to real syscall
-	ba	2f			! jump back into syscall path
-1:
+	ba	_exit			! jump back into syscall path
+	GLOBALS_RESTORE(%l0)		! delay slot -
+					! switch back to alternate globals
+
+_indirect_check:
+	/*
+	 * If the system call number is 0 (SYS_syscall), then this might be
+	 * an indirect syscall, in which case the actual syscall number
+	 * would be stored in %o0, in which case we need to redo the
+	 * the whole >= 1024 check.
+	 */
+	brnz,pt %g1, _emulation_check	! is this an indirect syscall?
+	nop				! if not, goto the emulation check
+
+	/*
+	 * Indirect syscalls are only supported for 32 bit processes so
+	 * consult the tstate address mask again.
+	 */
+	rdpr	%tstate, %l1		! %tstate.am is the trapping
+	andcc	%l1, TSTATE_AM, %l1	!   threads address mask bit
+	be,a,pn	%xcc, _exit
 	GLOBALS_RESTORE(%l0)		! delay slot -
 					! switch back to alternate globals
 
 	/*
+	 * The caller is 32 bit and this an indirect system call.
+	 */
+	cmp	%o0, 1024		! is this a native syscall?
+	bl,a	_emulation_check	! no, goto the emulation check
+	mov	%o0, %l1		! delay slot - grab syscall number
+
+	/*
+	 * This is native indirect syscall, probably from the emulation library.
+	 * Subtract 1024 from the syscall number and let it go through.
+	 */
+	sub	%o0, 1024, %o0		! convert magic num to real syscall
+	ba	_exit			! jump back into syscall path
+	GLOBALS_RESTORE(%l0)		! delay slot -
+					! switch back to alternate globals
+
+_emulation_check:
+	GLOBALS_RESTORE(%l0)		! switch back to alternate globals
+
+	/*
 	 * Check to see if we want to interpose on this system call.  If
 	 * not, we jump back into the normal syscall path and pretend
-	 * nothing happened.
+	 * nothing happened.  %l1 contains the syscall we're invoking.
 	 */
 	set	sn1_emulation_table, %g3
 	ldn	[%g3], %g3
 	add	%g3, %l1, %g3
 	ldub	[%g3], %g3
-	brz	%g3, 2f
+	brz	%g3, _exit
 	nop
 
 	/*
 	 * Find the address of the userspace handler.
-	 * cpu->cpu_thread->t_procp->p_brandhdlr.
+	 * cpu->cpu_thread->t_procp->p_brand_data->spd_handler.
 	 */
-#ifdef sun4v
+#if defined(sun4v)
 	! restore the alternate global registers after incrementing %gl
 	mov	%l3, %g2
 #endif /* sun4v */
-	ldn	[%g2 + CPU_THREAD], %g3		! load thread pointer
-	ldn	[%g3 + T_PROCP], %g3		! get proc pointer
-	ldn	[%g3 + P_BRAND_DATA], %g3	! get brand handler
-	brz	%g3, 2f				! has it been set?
+	ldn	[%g2 + CPU_THREAD], %g3		! get thread ptr
+	ldn	[%g3 + T_PROCP], %g4		! get proc ptr
+	ldn	[%g4 + P_BRAND_DATA], %g5	! get brand data ptr
+	ldn	[%g5 + SPD_HANDLER], %g5	! get userland brand handler ptr
+	brz	%g5, _exit			! has it been set?
+	nop
+
+	/*
+	 * Make sure this isn't an agent lwp.  We can't do syscall
+	 * interposition for system calls made by a agent lwp.  See
+	 * the block comments in the top of the brand emulation library
+	 * for more information.
+	 */
+	ldn	[%g4 + P_AGENTTP], %g4		! get agent thread ptr
+	cmp	%g3, %g4			! is this an agent thread?
+	be,pn	%xcc, _exit			! if so don't emulate
 	nop
 
 	/*
 	 * Now the magic happens.  Grab the trap return address and then
 	 * reset it to point to the user space handler.  When we execute
 	 * the 'done' instruction, we will jump into our handler instead of
-	 * the user's code.  We also stick the old return address in %g6,
+	 * the user's code.  We also stick the old return address in %g5,
 	 * so we can return to the proper instruction in the user's code.
 	 * Note: we also pass back the base address of the syscall
 	 * emulation table.  This is a performance hack to avoid having to
 	 * look it up on every call.
 	 */
 	rdpr	%tnpc, %l1		! save old tnpc
-	wrpr	%g0, %g3, %tnpc		! setup tnpc
+	wrpr	%g0, %g5, %tnpc		! setup tnpc
 	GLOBALS_SWAP(%l0)		! switch to normal globals
-	mov	%l1, %g6		! pass tnpc to user code in %g6
+	mov	%l1, %g5		! pass tnpc to user code in %g5
 	GLOBALS_RESTORE(%l0)		! switch back to alternate globals
 
 	/* Update the address we're going to return to */
-#ifdef sun4v
+#if defined(sun4v)
 	set	fast_trap_done_chk_intr, %l2
 #else /* !sun4v */
 	set	fast_trap_done_chk_intr, %g1
 #endif /* !sun4v */
 
-2:
+_exit:
 	/*
 	 * Restore registers before returning.
 	 *
 	 * Note that %g2 should be loaded with the CPU struct addr and
 	 * %g1 should be loaded the address we're going to return to.
 	 */
-#ifdef sun4v
+#if defined(sun4v)
 	! restore the alternate global registers after incrementing %gl
-	mov	%l3, %g2
-	mov	%l2, %g1
+	mov	%l2, %g1		! restore %g1 from %l2
+	mov	%l3, %g2		! restore %g2 from %l3
 
 	ldn	[%g2 + CPU_TMP4], %l3	! restore locals
 	ldn	[%g2 + CPU_TMP3], %l2
@@ -181,5 +286,5 @@ sn1_brand_syscall_callback(void)
 
 	jmp	%g1
 	nop
-	SET_SIZE(sn1_brand_syscall_callback)
-#endif	/* lint */
+	SET_SIZE(sn1_brand_syscall_callback_common)
+#endif	/* !lint */

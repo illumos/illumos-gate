@@ -155,7 +155,6 @@ lx_proc_exit(proc_t *p, klwp_t *lwp)
 		lx_exitlwp(lwp);
 		kmem_free(p->p_brand_data, sizeof (struct lx_proc_data));
 		p->p_brand_data = NULL;
-		p->p_brand = &native_brand;
 	}
 }
 

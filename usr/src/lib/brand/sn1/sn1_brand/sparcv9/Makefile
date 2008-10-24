@@ -19,17 +19,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/brand/sn1/i386/Makefile
+# lib/brand/sn1/sparcv9/Makefile
 
-ISASRCDIR=.
-
-ASFLAGS	+= $(AS_PICFLAGS) -P -D_ASM
+ISASRCDIR =		../sparc
 
 include ../Makefile.com
+include $(SRC)/lib/Makefile.lib.64
 
-install: all $(ROOTLIBS)
+#
+# see ../Makefile.com for why we explicity make ld.so.1 our interpreter
+#
+DYNFLAGS +=		-Wl,-I$(NATIVE_DIR)/usr/lib/64/ld.so.1
+ASFLAGS_$(CURTYPE) +=	${AS_PICFLAGS}
+
+CLEANFILES +=		$(DYNLIB)
+CLOBBERFILES +=		$(ROOTLIBS64)
+
+install: all $(ROOTLIBS64)

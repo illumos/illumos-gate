@@ -19,17 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# lib/brand/sn1/Makefile.sn1
 #
-# lib/brand/sn1/sparc/Makefile
+# include global definitions
 
-ISASRCDIR=.
+BRAND =	sn1
 
-include ../Makefile.com
+include $(SRC)/lib/brand/Makefile.brand
 
-ASFLAGS += -xarch=v8plus ${AS_PICFLAGS}
-
-install: all $(ROOTLIBS)

@@ -1,4 +1,3 @@
-#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -23,22 +22,22 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# sn1 boot script.
-#
-# The argument to this script is the root of the zone.
-#
 
-PATH=/sbin:/usr/bin:/usr/sbin; export PATH
+SUNWprivate_1.1 {
+	global:
+		rtld_db_brand_ops32;
+	local:
+		*;
+};
 
-ZONEROOT=$1
-
-if [ `uname -p` = "i386" ]; then
-	ARCH64=amd64
-elif [ `uname -p` = "sparc" ]; then
-	ARCH64=sparcv9
-else
-	echo "Unsupported architecture: " `uname -p` >&2
-	exit 2
-fi
-
-exit 0
+#Externally defined symbols
+{
+    global:
+	ps_pauxv =		NODIRECT PARENT;
+	ps_pdmodel =		NODIRECT PARENT;
+	ps_pglobal_lookup =	NODIRECT PARENT;
+	ps_pglobal_sym =	NODIRECT PARENT;
+	ps_plog =		NODIRECT PARENT;
+	ps_pread =		NODIRECT PARENT;
+	ps_pwrite =		NODIRECT PARENT;
+};

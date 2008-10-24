@@ -19,26 +19,32 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../../Makefile.lib
+default: all
 
-SUBDIRS=	$(MACH) $(VARIANT_SUBDIRS) zone
-$(BUILD64)SUBDIRS += $(MACH64)
+include Makefile.sn1
 
-all :=          TARGET= all
-clean :=        TARGET= clean
-clobber :=      TARGET= clobber
-install :=      TARGET= install
-lint :=         TARGET= lint
+# Build everything in parallel; use .WAIT for dependencies
+.PARALLEL:
+
+SUBDIRS =	librtld_db sn1_brand zone
+MSGSUBDIRS =	librtld_db sn1_brand zone
+
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
+_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
 all install clean clobber lint: $(SUBDIRS)
+
+_msg: $(MSGSUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

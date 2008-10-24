@@ -1,4 +1,3 @@
-#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -23,22 +22,20 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# sn1 boot script.
+# lib/brand/sn1/amd64/Makefile
+
+ISASRCDIR =		.
+
+include ../Makefile.com
+include $(SRC)/lib/Makefile.lib.64
+
 #
-# The argument to this script is the root of the zone.
+# see ../Makefile.com for why we MUST explicity make ld.so.1 our interpreter
 #
+DYNFLAGS +=		-Wl,-I$(NATIVE_DIR)/usr/lib/64/ld.so.1
+CPPFLAGS += 		-D_SYSCALL32
 
-PATH=/sbin:/usr/bin:/usr/sbin; export PATH
+CLEANFILES +=		$(DYNLIB)
+CLOBBERFILES +=		$(ROOTLIBS64)
 
-ZONEROOT=$1
-
-if [ `uname -p` = "i386" ]; then
-	ARCH64=amd64
-elif [ `uname -p` = "sparc" ]; then
-	ARCH64=sparcv9
-else
-	echo "Unsupported architecture: " `uname -p` >&2
-	exit 2
-fi
-
-exit 0
+install: all $(ROOTLIBS64)

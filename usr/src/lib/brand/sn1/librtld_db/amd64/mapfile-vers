@@ -19,41 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-LIBRARY =	sn1_brand.a
-VERS	=	.1
-COBJS	=	sn1_brand.o
-ASOBJS	=	sn1_handler.o
-OBJECTS	=	$(COBJS) $(ASOBJS)
-
-include ../../../Makefile.lib
-
-LIBS =		$(DYNLIB)
-CSRCS	=	$(COBJS:%o=../common/%c)
-ASSRCS	=	$(ASOBJS:%o=$(ISASRCDIR)/%s)
-SRCS	=	$(CSRCS) $(ASSRCS)
-SRCDIR	=	../common
-
-LDLIBS +=	-Wl,-esn1_init -lc
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I../common
-DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION)
-ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I../common
-
-.KEEP_STATE:
-
-all: $(LIBS)
-
-lint: lintcheck
-
-pics/%.o: $(ISASRCDIR)/%.s
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
-
-include ../../../Makefile.targ
-
+SUNWprivate_1.1 {
+	global:
+		rtld_db_brand_ops64;
+};

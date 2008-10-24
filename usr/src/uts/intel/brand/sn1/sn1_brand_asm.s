@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(lint)
 
 #include <sys/systm.h>
@@ -34,6 +32,7 @@
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
 #include <sys/segments.h>
+#include <sn1_offsets.h>
 #include "assym.h"
 
 #endif	/* lint */
@@ -149,12 +148,14 @@ sn1_brand_int91_callback(void)
 /*
  * See if this process has a user-space hdlr registered for it.  For the
  * sn1 brand, the per-process brand data holds the address of the handler.
- * As shown in the stack diagrams above, the callback code leaves that data
- * at these offsets.
+ * As shown in the stack diagrams below, the callback code leaves that data
+ * at these offsets.  So check if sn1_proc_data_t->spd_handler is non-NULL.
  */
-#define	CHECK_FOR_HANDLER(scr)						  \
-	GET_PROCP(SP_REG, 1, scr)		/* get proc pointer */   ;\
-	cmp	$0, P_BRAND_DATA(scr)		/* check p_brand_data */ ;\
+#define	CHECK_FOR_HANDLER(scr)						 \
+	GET_P_BRAND_DATA(SP_REG, 1, scr)	/* get p_brand_data */	;\
+	cmp	$0, scr							;\
+	je	9f							;\
+	cmp	$0, SPD_HANDLER(scr)		/* check spd_handler */ ;\
 	je	9f
 
 /*
@@ -213,11 +214,12 @@ ENTRY(sn1_brand_syscall32_callback)
 	movl	%ecx, (%rsp)	/* Save post-syscall addr on stack	*/
 
 	/*
-	 * To 'return' to our user-space hdlr, we just need to copy
-	 * its address into %ecx.  user-space hdlr == p_brand_data for sn1
+	 * To 'return' to our user-space handler, we just need to copy
+	 * its address into %rcx.
 	 */
-	GET_P_BRAND_DATA(%r15, 1, %rcx);
-	movq	(%r15), %r15	/* Restore scratch register */
+	GET_P_BRAND_DATA(%r15, 1, %rcx);/* get p_brand_data ptr	*/
+	movq	SPD_HANDLER(%rcx), %rcx	/* get p_brand_data->spd_handler ptr */
+	movq	(%r15), %r15		/* Restore scratch register	*/
 	jmp	nopop_sys_syscall32_sysretl
 9:
 	popq	%r15
@@ -239,11 +241,12 @@ ENTRY(sn1_brand_syscall_callback)
 	movq	%rcx, (%rsp)	/* Save post-syscall addr on stack	*/
 
 	/*
-	 * To 'return' to our user-space hdlr, we just need to copy
-	 * its address into %ecx.  user-space hdlr == p_brand_data for sn1
+	 * To 'return' to our user-space handler, we just need to copy
+	 * its address into %rcx.
 	 */
-	GET_P_BRAND_DATA(%r15, 1, %rcx);
-	movq	(%r15), %r15	/* Restore scratch register */
+	GET_P_BRAND_DATA(%r15, 1, %rcx);/* get p_brand_data ptr	*/
+	movq	SPD_HANDLER(%rcx), %rcx	/* get p_brand_data->spd_handler ptr */
+	movq	(%r15), %r15		/* Restore scratch register	*/
 	jmp	nopop_sys_syscall_sysretq
 9:
 	popq	%r15
@@ -264,7 +267,8 @@ ENTRY(sn1_brand_sysenter_callback)
 
 	subq	$4, %rcx		/* Save room for user ret addr	*/
 	movq	%rdx, (%rcx)		/* Save current return addr	*/
-	GET_P_BRAND_DATA(%rsp, 1, %rdx)	/* get p_brand_data */
+	GET_P_BRAND_DATA(%rsp, 1, %rdx)	/* get p_brand_data		*/
+	movq	SPD_HANDLER(%rdx), %rdx	/* get p_brand_data->spd_handler ptr */
 	popq	%r15			/* Restore scratch register	*/
 	sysexit
 9:
@@ -288,8 +292,9 @@ ENTRY(sn1_brand_int91_callback)
 	CALLBACK_PROLOGUE(%rax, %r15, %r15b)
 	pushq	%rax				/* Save scratch register */
 
-	GET_P_BRAND_DATA(%rsp, 2, %r15)		/* get p_brand_data */
-	GET_V(%rsp, 2, V_SSP, %rax)		/* Get saved %esp */
+	GET_P_BRAND_DATA(%rsp, 2, %r15)	/* get p_brand_data */
+	movq	SPD_HANDLER(%r15), %r15	/* get sn1_proc_data->spd_handler ptr */
+	GET_V(%rsp, 2, V_SSP, %rax)	/* Get saved %esp */
 	movq	%r15, (%rax)	/* replace iret target address with hdlr */
 
 	/*
@@ -341,8 +346,9 @@ ENTRY(sn1_brand_syscall_callback)
 	pushl	%eax				/* Save scratch register */
 
 	/* replace iret target address with user-space hdlr */
-	GET_P_BRAND_DATA(%esp, 2, %ebx)
-	SET_V(%esp, 2, V_U_EIP, %ebx)
+	GET_P_BRAND_DATA(%esp, 2, %ebx)	/* get p_brand_data ptr		*/
+	movl	SPD_HANDLER(%ebx), %ebx	/* get p_brand_data->spd_handler ptr */
+	SET_V(%esp, 2, V_U_EIP, %ebx)	/* set iret target address to hdlr */
 
 	/*
 	 * Adjust the caller's stack so we return to the instruction after
@@ -375,7 +381,8 @@ ENTRY(sn1_brand_sysenter_callback)
 
 	subl	$4, %ecx		/* Save room for user ret addr	*/
 	movl	%edx, (%ecx)		/* Save current return addr	*/
-	GET_P_BRAND_DATA(%esp, 1, %edx)	/* get p_brand_data */
+	GET_P_BRAND_DATA(%esp, 1, %edx)	/* get p_brand_data		*/
+	movl	SPD_HANDLER(%edx), %edx	/* get p_brand_data->spd_handler */
 	popl	%ebx			/* Restore scratch register	*/
 	sysexit
 9:

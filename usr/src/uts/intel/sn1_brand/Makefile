@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of the kernel component of
 #	the N-1 Solaris brand
 #
@@ -31,15 +29,18 @@
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE		= ../..
+UTSBASE =	../..
+SN1_BASE =	$(UTSBASE)/common/brand/sn1
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= sn1_brand
-OBJECTS		= $(SN1_BRAND_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(SN1_BRAND_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_BRAND_DIR)/$(MODULE)
+MODULE =	sn1_brand
+OFFSETS_H =	$(OBJS_DIR)/sn1_offsets.h
+OFFSETS_SRC =	$(SN1_BASE)/sn1_offsets.in
+OBJECTS =	$(SN1_BRAND_OBJS:%=$(OBJS_DIR)/%)
+LINTS =		$(SN1_BRAND_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE =	$(ROOT_BRAND_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -49,12 +50,17 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+ALL_TARGET =		$(OFFSETS_H) $(BINARY)
+LINT_TARGET =		$(MODULE).lint
+INSTALL_TARGET =	$(OFFSETS_H) $(BINARY) $(ROOTMODULE)
 
-INC_PATH	+= -I$(UTSBASE)/common/brand/sn1
+
+#
+#	Update compiler variables.
+#
+INC_PATH +=	-I$(SN1_BASE) -I$(OBJS_DIR)
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/genassym/$(OBJS_DIR)
+LDFLAGS +=	-dy -Nexec/elfexec
 
 #
 # Ugh, this is a gross hack.  Sn1_brand_asm.s uses lots of defines
@@ -87,6 +93,12 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+#
+# Create genassym.h
+#
+$(OFFSETS_H): $(OFFSETS_SRC)
+	$(OFFSETS_CREATE) <$(OFFSETS_SRC) >$@
 
 #
 #	Include common targets.

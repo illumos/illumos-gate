@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Fake Solaris N-1 Brand
 #
@@ -33,3 +31,7 @@
 f none usr/lib/sn1_brand.so.1 0755 root bin
 d none usr/lib/amd64 0755 root bin
 f none usr/lib/amd64/sn1_brand.so.1 0755 root bin
+d none usr/lib/brand/sn1/amd64 755 root bin
+s none usr/lib/brand/sn1/64=amd64 755 root bin
+f none usr/lib/brand/sn1/amd64/sn1_librtld_db.so.1 755 root bin
+f none usr/lib/brand/sn1/sn1_librtld_db.so.1 755 root bin

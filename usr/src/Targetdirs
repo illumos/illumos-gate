@@ -354,7 +354,8 @@ ROOT.BIN64= \
 	/usr/ccs/bin/$(MACH64)  \
 	/usr/ccs/lib/$(MACH64) \
 	/usr/lib/$(MACH64) \
-        /usr/lib/$(MACH64)/gss \
+	/usr/lib/$(MACH64)/gss \
+	/usr/lib/brand/sn1/$(MACH64) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
 	/usr/lib/fp/libp/$(MACH64) \
@@ -506,6 +507,7 @@ SYM.ROOT.BIN64= \
 	/lib/64 \
 	/lib/secure/64 \
 	/usr/lib/64 \
+	/usr/lib/brand/sn1/64 \
 	/usr/lib/elfedit/64 \
 	/usr/lib/libp/64 \
 	/usr/lib/link_audit/64 \
@@ -665,6 +667,7 @@ $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/lx/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/sn1/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/link_audit/64:=	LINKDEST=$(MACH64)

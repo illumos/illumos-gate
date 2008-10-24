@@ -19,18 +19,31 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/brand/sn1/amd64/Makefile
 
-ISASRCDIR=.
+include ../../../Makefile.lib
 
-include ../Makefile.com
-include ../../../Makefile.lib.64
+default:	all
 
-CPPFLAGS += -D_SYSCALL32
+SUBDIRS =	$(MACH) $(VARIANT_SUBDIRS)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-install: all $(ROOTLIBS64)
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+install :=	TARGET= install
+lint :=		TARGET= lint
+_msg :=		TARGET= _msg
+
+.KEEP_STATE:
+
+all install clean clobber _msg: $(SUBDIRS)
+
+lint: $(SUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
