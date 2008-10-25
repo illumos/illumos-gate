@@ -2118,6 +2118,10 @@ startup_end(void)
 }
 
 extern char hw_serial[];
+/*
+ * Don't remove the following 2 variables.  They are necessary
+ * for reading the hostid from the legacy file (/kernel/misc/sysinit).
+ */
 char *_hs1107 = hw_serial;
 ulong_t  _bdhs34;
 
@@ -2532,11 +2536,16 @@ pat_sync(void)
  * it in the kernel, for subsequent saving by a userland process
  * once the system is up and the root filesystem is mounted r/w.
  *
+ * In order to gracefully support upgrade on OpenSolaris, if
+ * /etc/hostid does not exist, we will attempt to get a serial number
+ * using the legacy method (/kernel/misc/sysinit).
+ *
  * In an attempt to make the hostid less prone to abuse
  * (for license circumvention, etc), we store it in /etc/hostid
  * in rot47 format.
  */
 extern volatile unsigned long tenmicrodata;
+static int atoi(char *);
 
 static int32_t
 set_soft_hostid(void)
@@ -2546,6 +2555,7 @@ set_soft_hostid(void)
 	token_t token;
 	int done = 0;
 	u_longlong_t tmp;
+	int i;
 	int32_t hostid = -1;
 	unsigned char *c;
 	hrtime_t tsc;
@@ -2562,12 +2572,23 @@ set_soft_hostid(void)
 	 */
 
 	if ((file = kobj_open_file(hostid_file)) == (struct _buf *)-1) {
-		/* hostid file not found */
-		tsc = tsc_read();
-		if (tsc == 0)	/* tsc_read can return zero sometimes */
-			hostid = (int32_t)tenmicrodata & 0x0CFFFFF;
-		else
-			hostid = (int32_t)tsc & 0x0CFFFFF;
+		/*
+		 * hostid file not found - try to load sysinit module
+		 * and see if it has a nonzero hostid value...use that
+		 * instead of generating a new hostid here if so.
+		 */
+		if ((i = modload("misc", "sysinit")) != -1) {
+			if (strlen(hw_serial) > 0)
+				hostid = (int32_t)atoi(hw_serial);
+			(void) modunload(i);
+		}
+		if (hostid == -1) {
+			tsc = tsc_read();
+			if (tsc == 0)	/* tsc_read can return zero sometimes */
+				hostid = (int32_t)tenmicrodata & 0x0CFFFFF;
+			else
+				hostid = (int32_t)tsc & 0x0CFFFFF;
+		}
 	} else {
 		/* hostid file found */
 		while (!done) {
@@ -2628,6 +2649,18 @@ set_soft_hostid(void)
 	 */
 	return (hostid);
 }
+
+static int
+atoi(char *p)
+{
+	int i = 0;
+
+	while (*p != '\0')
+		i = 10 * i + (*p++ - '0');
+
+	return (i);
+}
+
 #endif /* _SOFT_HOSTID */
 
 void

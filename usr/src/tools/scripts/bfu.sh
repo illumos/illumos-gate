@@ -2872,14 +2872,6 @@ bfucmd="
 	${GZIPBIN-$GATE/public/bin/$bfu_isa/gzip}
 "
 #
-# Conditionally add extract_hostid program to the bfucmd list if we
-# are on x86 - to migrate hostid from /kernel/misc/sysinit to /etc/hostid
-#
-if [ $target_isa = i386 ]; then
-    bfucmd="$bfucmd ${EXTRACT_HOSTID-$GATE/public/bin/$bfu_isa/extract_hostid}"
-fi
-
-#
 # Scripts needed by BFU. These must be modified to use the interpreters in
 # /tmp/bfubin. The interpreters in /usr/bin may not be compatible with the
 # libraries in the archives being extracted.
@@ -4225,61 +4217,6 @@ fixup_mpxio()
 		#
 		[ $mpxio_child -eq 0 ] && disable_mpxio_using_fpconf
 	fi
-}
-
-# Migrate hostid from /kernel/misc/sysinit binary to new format
-# stored in /etc/hostid.  The ON-private 'extract_hostid' binary
-# (built as part of the ON tools) must be in bfu's path - usually
-# copied from $GATE/public/$isa/bin/.
-#
-migrate_hostid()
-{
-#
-# Currently, we only support a single hostid per machine, which
-# is set in the global zone.  Don't do anything to non-global zone
-# roots.  Still have to allow for alternate roots that aren't in
-# a non-global zone, though.
-#
-numzones=`zoneadm list -pi|wc -l`
-if [ $numzones -ne 1 ]; then
-    for zmpt in \
-	`zoneadm list -pi|nawk -F: '$2 != "global" {print $4} 2>/dev/null'`
-    do
-	if [ "$zmpt" = "$root" ]; then
-	    set -
-	    return 0
-	fi
-    done
-fi
-#
-# if /etc/hostid exists - already migrated - do nothing
-#
-if [ -f ${rootprefix}/etc/hostid ]; then
-    print "New hostid mechanism already in use..."
-    return 0
-fi
-#
-# try to get hostid from /kernel/misc/sysinit 
-#
-if [ -f ${rootprefix}/kernel/misc/sysinit ]; then
-    hostid=`extract_hostid ${rootprefix}/kernel/misc/sysinit 2>/dev/null`
-	if [ $? -eq 0 ]; then
-	    echo "# DO NOT EDIT" > ${rootprefix}/etc/hostid
-	    r=`echo "0x${hostid}" | perl -e \
-		'while(<STDIN>){chop;tr/!-~/P-~!-O/;print $_,"\n";}exit 0;'`
-	    printf "\"%s\"\n"  $r >> ${rootprefix}/etc/hostid
-	    print "Moving hostid from /kernel/misc/sysinit to /etc/hostid ... done"
-	elif [ "$force_override" = "no" ]; then
-	    print "\n\nERROR: Unable to extract current hostid from sysinit file, " \
-		"and /etc/hostid does not exist.  Machine will be initialized " \
-		"with a new hostid at first reboot after bfu.  If this is OK, you " \
-		"must run bfu with the -f flag."
-	    exit
-	fi
-	return 0
-fi
-
-return 0
 }
 
 #
@@ -7657,10 +7594,6 @@ mondo_loop() {
 	# files.
 	#
 	rm -f $root/usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-*-topology.xml
-
-	# Migrate hostid
-	#
-	migrate_hostid
 
 	# End of pre-archive extraction hacks.
 

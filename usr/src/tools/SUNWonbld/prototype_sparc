@@ -37,7 +37,6 @@ f none opt/onbld/bin/sparc/ctfdump 555 root bin
 f none opt/onbld/bin/sparc/ctfmerge 555 root bin
 f none opt/onbld/bin/sparc/ctfstabs 555 root bin
 f none opt/onbld/bin/sparc/cw 555 root bin
-f none opt/onbld/bin/sparc/extract_hostid 555 root bin
 f none opt/onbld/bin/sparc/fastfs 555 root bin
 f none opt/onbld/bin/sparc/findunref 555 root bin
 f none opt/onbld/bin/sparc/forth 555 root bin

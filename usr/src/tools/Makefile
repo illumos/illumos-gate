@@ -42,7 +42,6 @@ COMMON_SUBDIRS= \
 	env \
 	fastfs \
 	findunref \
-	hostid \
 	ndrgen \
 	onbld \
 	pmodes \
