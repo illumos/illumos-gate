@@ -161,14 +161,14 @@ acs_start_ssi(char *acshost, char *ssiport)
 	int	st;
 	mms_list_t	proclist;
 	pid_t   pid;
-	char    env_acshost[MAXHOSTNAMELEN + 13]; /* CSI_HOSTNAME=<hostname> */
+	char    env_acshost[NI_MAXHOST + 13]; /* CSI_HOSTNAME=<hostname> */
 	char    env_acsport[128];
 	int	status;
 	char	acspath[2048];
 	char	ssibuf[1024];
 	char	sockbuf[1024];
 	char	*cmd[3];
-	char	*bufp;
+	char	*hostport;
 
 	if (acshost == NULL) {
 		return (MMS_MGMT_NOARG);
@@ -189,24 +189,24 @@ acs_start_ssi(char *acshost, char *ssiport)
 
 	(void) snprintf(env_acshost, sizeof (env_acshost), "CSI_HOSTNAME=%s",
 	    acshost);
-	bufp = strrchr(env_acshost, ':');
-	if (bufp != NULL) {
-		*bufp = '\0';
-		bufp++;
+	hostport = strrchr(env_acshost, ':');
+	if (hostport != NULL) {
+		*hostport = '\0';
+		hostport++;
+		/* don't set if we're using the default port */
+		if (strcmp(hostport, "50004") == 0) {
+			hostport = NULL;
+		}
 	}
 
-	if (!bufp) {
-		/* use default port */
-		bufp = "50004";
+	if (hostport != NULL) {
+		(void) snprintf(env_acsport, sizeof (env_acsport),
+		    "CSI_HOSTPORT=%s", hostport);
 	}
-
-	(void) snprintf(env_acsport, sizeof (env_acsport), "CSI_HOSTPORT=%s",
-	    bufp);
-
 
 	(void) snprintf(ssibuf, sizeof (ssibuf), "MMS_SSI_PATH=%s", acspath);
 
-	if (ssiport) {
+	if (ssiport != NULL) {
 		(void) snprintf(sockbuf, sizeof (sockbuf),
 		    "ACSAPI_SSI_SOCKET=%s", ssiport);
 	} else {
@@ -216,7 +216,9 @@ acs_start_ssi(char *acshost, char *ssiport)
 
 	/* set required envvars */
 	(void) putenv(env_acshost);
-	(void) putenv(env_acsport);
+	if (hostport != NULL) {
+		(void) putenv(env_acsport);
+	}
 	(void) putenv(sockbuf);
 	(void) putenv(ssibuf);
 
@@ -226,7 +228,7 @@ acs_start_ssi(char *acshost, char *ssiport)
 
 	pid = exec_mgmt_cmd(NULL, NULL, 0, 0, B_TRUE, cmd);
 
-	status  = check_exit(pid, NULL);
+	status = check_exit(pid, NULL);
 
 	if (status != 0) {
 		mms_trace(MMS_ERR,
