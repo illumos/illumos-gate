@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -295,6 +293,8 @@ wordvbuild(char *string, int *r_wordc, char ***r_wordv)
 	for (wordcount = 0, cp = saltedbuffer; *cp; wordcount++) {
 		while (*cp && isspace(*cp))
 			cp++;
+		if (*cp == 0)
+			break;
 		while (*cp && !isspace(*cp))
 			cp++;
 	}
