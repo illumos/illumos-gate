@@ -426,7 +426,7 @@ dm_read_input(void)
 		 * Read a command
 		 */
 		rc = mms_dmpm_parse(&root, &err_list, buf);
-		if (rc < 0) {
+		if (rc == 1) {
 			dm_parse_err(root, &err_list);
 			mms_pe_destroy(&err_list);
 			mms_pn_destroy(root);

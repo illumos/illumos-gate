@@ -40,7 +40,6 @@
 #include <mms_parser.h>
 #include <mms_par_impl.h>
 
-
 /*
  * Redefine yylex to accept a pointer to the work area
  */
@@ -61,14 +60,16 @@
 
 %option noyywrap
 %option debug prefix = "mms_mmsp_"
-%x prolog comment
+%s allow_quote no_quote
 
 DIGIT		([+-]*[0-9]+)
 DECNUM		(([\+-]*[0-9]+)|([\+-]*[0-9]+))
 DECNUM_STR	((\"[\+-]*[0-9]+\")|('[\+-]*[0-9]+'))
 WORD		([a-zA-Z][a-zA-Z0-9_]*)
 STRING		((\"[^"]*\")|(\'[^']*\'))
-BADSTRING	((\"[^"]+)|(\'[^']+))
+BAD_STRING	((\"[^"]*)|(\'[^']*))
+NO_QUOTE_IN_STRING	((\"[^"']*\")|(\'[^"']*\'))
+NO_QUOTE_BAD_STRING	((\"[^"']*\')|(\'[^'"]*\"))
 RANGE		(\.\.)
 MMP_COMMENT	(#[^\n]*)
 
@@ -128,7 +129,15 @@ MMP_COMMENT	(#[^\n]*)
 			return (syment->sym_code);
 		}
 
-{STRING}	{
+<no_quote>{NO_QUOTE_BAD_STRING}	{
+			SAVE_TOKEN(yytext + 1);
+			mms_par_error(mms_pwka,
+			    "single or double quote not allowed in string");
+			mms_pwka->par_wka_flags &= ~MMS_PW_KEYWORD;
+			return (QUOTE_IN_STRING);
+		}
+
+<no_quote>{NO_QUOTE_IN_STRING}	{
 			mms_sym_t *syment = NULL;
 
 			/* Remove the enclosing quotes */
@@ -157,7 +166,36 @@ MMP_COMMENT	(#[^\n]*)
 			return (STRING);
 		}
 
-{BADSTRING}	{
+<allow_quote>{STRING}	{
+			mms_sym_t *syment = NULL;
+
+			/* Remove the enclosing quotes */
+			yytext[yyleng - 1] = '\0';
+			if (strlen(yytext + 1) > MMS_PAR_MAX_TOKEN) {
+				mms_par_error(mms_pwka, "token size exceeded "
+				    "MMS_PAR_MAX_TOKEN");
+				return (ERR_TOKEN_TOO_BIG);
+			}
+			SAVE_TOKEN(yytext + 1);
+			mms_pwka->par_wka_col += yyleng;
+			if (mms_pwka->par_wka_flags & MMS_PW_ERROR_CODE) {
+				/* Error code may be any string */
+				mms_pwka->par_wka_flags &= ~MMS_PW_ERROR_CODE;
+				return (ERROR_CODE);
+			}
+			if (mms_pwka->par_wka_flags & MMS_PW_KEYWORD) {
+				/* Looking for a keyword or an objectname */
+				mms_pwka->par_wka_flags &= ~MMS_PW_KEYWORD;
+				syment = mms_par_lookup_sym(lvalp->str,
+				    mms_pwka);
+				if (syment != NULL) {
+					return (syment->sym_code);
+				}
+			}
+			return (STRING);
+		}
+
+<allow_quote>{BAD_STRING}	{
 			mms_par_error(mms_pwka, "No ending quote");
 			mms_pwka->par_wka_flags &= ~MMS_PW_KEYWORD;
 			return (NO_ENDING_QUOTE);
@@ -200,4 +238,14 @@ void
 mms_mmsp_delete_buffer()
 {
 	yy_delete_buffer(mmsp_buffer);
+}
+
+void
+mms_mmsp_allow_quote(int flag)
+{
+	if (flag) {
+		BEGIN(allow_quote);
+	} else {
+		BEGIN(no_quote);
+	}
 }

@@ -141,6 +141,7 @@ int	mms_config_parse(mms_par_node_t **cmd_node,
 
 void	mms_mmsp_scan_string(char *);
 void	mms_mmsp_delete_buffer();
+void	mms_mmsp_allow_quote();
 
 void	mms_cfg_scan_string(char *);
 void	mms_cfg_delete_buffer();
