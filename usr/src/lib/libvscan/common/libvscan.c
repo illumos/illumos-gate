@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +41,8 @@
 #include <arpa/inet.h>
 #include <libintl.h>
 #include <libvscan.h>
+
+#define	VS_DOOR_CALL_RETRIES	3
 
 #define	VS_INSTANCE_FMRI	"svc:/system/filesystem/vscan:icap"
 
@@ -175,6 +175,7 @@ static int vs_validate(const vs_prop_hd_t *, uint64_t);
 static int vs_is_valid_types(const char *);
 static int vs_is_valid_host(const char *);
 static int vs_checkauth(char *);
+static int vs_door_call(int, door_arg_t *);
 
 static int vs_props_get_engines(char *[], int *);
 static void vs_engid_to_pgname(const char *, char [VS_PGNAME_ENGINE_LEN]);
@@ -1371,12 +1372,12 @@ vs_statistics(vs_stats_t *stats)
 	arg.rbuf = (char *)rsp;
 	arg.rsize = sizeof (vs_stats_rsp_t);
 
-	if ((door_call(door_fd, &arg) < 0) ||
-	    (rsp->vsr_magic != VS_STATS_DOOR_MAGIC)) {
-		rc = VS_ERR_DAEMON_COMM;
-	} else {
+	rc = vs_door_call(door_fd, &arg);
+
+	if ((rc == VS_ERR_NONE) && (rsp->vsr_magic == VS_STATS_DOOR_MAGIC))
 		*stats = rsp->vsr_stats;
-	}
+	else
+		rc = VS_ERR_DAEMON_COMM;
 
 	(void) close(door_fd);
 
@@ -1418,16 +1419,36 @@ vs_statistics_reset()
 	arg.rbuf = NULL;
 	arg.rsize = 0;
 
-	if (door_call(door_fd, &arg) < 0)
-		rc = VS_ERR_DAEMON_COMM;
-	else
-		rc = VS_ERR_NONE;
+	rc = vs_door_call(door_fd, &arg);
 
 	(void) close(door_fd);
 	free(req);
 	return (rc);
 }
 
+/*
+ * Door call with retries.
+ *
+ * Returns VS_ERR_NONE on success, otherwise VS_ERR_DAEMON_COMM.
+ */
+static int
+vs_door_call(int fd, door_arg_t *arg)
+{
+	int rc = -1;
+	int i;
+
+	for (i = 0; i < VS_DOOR_CALL_RETRIES; ++i) {
+		errno = 0;
+
+		if ((rc = door_call(fd, arg)) == 0)
+			break;
+
+		if (errno != EAGAIN && errno != EINTR)
+			break;
+	}
+
+	return ((rc == 0) ? VS_ERR_NONE : VS_ERR_DAEMON_COMM);
+}
 
 /*
  * vs_checkauth

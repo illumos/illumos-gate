@@ -24,9 +24,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
@@ -35,6 +34,7 @@
 #include <sys/sunddi.h> /* for string functions */
 #include <sys/vscan.h>
 
+#define	VS_DOOR_RETRIES			3
 
 /* max time (secs) to wait for door calls to complete during door_close */
 #define	VS_DOOR_CLOSE_TIMEOUT_DEFAULT	30
@@ -131,6 +131,7 @@ int
 vscan_door_scan_file(vs_scan_req_t *scan_req)
 {
 	int err;
+	int i;
 	door_arg_t arg;
 	uint32_t result = 0;
 
@@ -148,8 +149,16 @@ vscan_door_scan_file(vs_scan_req_t *scan_req)
 	arg.rbuf = (char *)&result;
 	arg.rsize = sizeof (uint32_t);
 
-	if ((err = door_ki_upcall_limited(vscan_door_handle, &arg, NULL,
-	    SIZE_MAX, 0)) != 0) {
+	for (i = 0; i < VS_DOOR_RETRIES; ++i) {
+		if ((err = door_ki_upcall_limited(vscan_door_handle, &arg,
+		    NULL, SIZE_MAX, 0)) == 0)
+			break;
+
+		if (err != EAGAIN && err != EINTR)
+			break;
+	}
+
+	if (err != 0) {
 		cmn_err(CE_WARN, "Internal communication error (%d)"
 		    "- failed to send scan request to vscand", err);
 		result = VS_STATUS_ERROR;
