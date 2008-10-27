@@ -470,6 +470,7 @@ hxge_ldgv_init(p_hxge_t hxgep, int *navail_p, int *nrequired_p)
 	p_hxge_ldg_t		ldgp, ptr;
 	p_hxge_ldv_t		ldvp;
 	hxge_status_t		status = HXGE_OK;
+	peu_intr_mask_t		parity_err_mask;
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_ldgv_init"));
 	if (!*navail_p) {
@@ -645,7 +646,13 @@ hxge_ldgv_init(p_hxge_t hxgep, int *navail_p, int *nrequired_p)
 	ldgvp->ldvp_syserr = ldvp;
 
 	/* Reset PEU error mask to allow PEU error interrupts */
-	HXGE_REG_WR32(hxgep->hpi_handle, PEU_INTR_MASK, 0x0);
+	/*
+	 * Keep the msix parity error mask here and remove it
+	 * after ddi_intr_enable call to avoid a msix par err
+	 */
+	parity_err_mask.value = 0;
+	parity_err_mask.bits.eic_msix_parerr_mask = 1;
+	HXGE_REG_WR32(hxgep->hpi_handle, PEU_INTR_MASK, parity_err_mask.value);
 
 	/*
 	 * Unmask the system interrupt states.

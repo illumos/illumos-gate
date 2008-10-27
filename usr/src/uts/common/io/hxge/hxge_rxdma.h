@@ -33,9 +33,9 @@ extern "C" {
 #include <hxge_rdc_hw.h>
 #include <hpi_rxdma.h>
 
-#define	RXDMA_CK_DIV_DEFAULT		7500 	/* 25 usec */
+#define	RXDMA_CK_DIV_DEFAULT		8 	/* 27 nsec */
 #define	RXDMA_RCR_PTHRES_DEFAULT	0x20
-#define	RXDMA_RCR_TO_DEFAULT		0x8
+#define	RXDMA_RCR_TO_DEFAULT		0x1
 #define	RXDMA_HDR_SIZE_DEFAULT		2
 #define	RXDMA_HDR_SIZE_FULL		6	/* entire header of 6B */
 

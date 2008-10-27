@@ -167,6 +167,7 @@ static int hxge_set_priv_prop(p_hxge_t hxgep, const char *pr_name,
 static int hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name,
     uint_t pr_flags, uint_t pr_valsize, void *pr_val);
 static void hxge_link_poll(void *arg);
+static void hxge_link_update(p_hxge_t hxge, link_state_t state);
 
 mac_priv_prop_t hxge_priv_props[] = {
 	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
@@ -548,20 +549,18 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	hxge_intrs_enable(hxgep);
 
+	/*
+	 * Take off all peu parity error mask here after ddi_intr_enable
+	 * is called
+	 */
+	HXGE_REG_WR32(hxgep->hpi_handle, PEU_INTR_MASK, 0x0);
+
 	if ((status = hxge_mac_register(hxgep)) != HXGE_OK) {
 		HXGE_DEBUG_MSG((hxgep, DDI_CTL,
 		    "unable to register to mac layer (%d)", status));
 		goto hxge_attach_fail;
 	}
 	mac_link_update(hxgep->mach, LINK_STATE_UNKNOWN);
-	hxgep->timeout.link_status = 0;
-	hxgep->timeout.ticks = drv_usectohz(2 * 1000000);
-
-	/* Start the link status timer to check the link status */
-	MUTEX_ENTER(&hxgep->timeout.lock);
-	hxgep->timeout.id = timeout(hxge_link_poll, (void *)hxgep,
-	    hxgep->timeout.ticks);
-	MUTEX_EXIT(&hxgep->timeout.lock);
 
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "registered to mac (instance %d)",
 	    instance));
@@ -657,12 +656,6 @@ hxge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * Stop the xcvr polling.
 	 */
 	hxgep->suspended = cmd;
-
-	/* Stop the link status timer before unregistering */
-	MUTEX_ENTER(&hxgep->timeout.lock);
-	if (hxgep->timeout.id)
-		(void) untimeout(hxgep->timeout.id);
-	MUTEX_EXIT(&hxgep->timeout.lock);
 
 	if (hxgep->mach && (status = mac_unregister(hxgep->mach)) != 0) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
@@ -2471,6 +2464,16 @@ hxge_m_start(void *arg)
 		    hxge_check_hw_state, HXGE_CHECK_TIMER);
 
 		hxgep->hxge_mac_state = HXGE_MAC_STARTED;
+
+		hxgep->timeout.link_status = 0;
+		hxgep->timeout.report_link_status = B_TRUE;
+		hxgep->timeout.ticks = drv_usectohz(2 * 1000000);
+
+		/* Start the link status timer to check the link status */
+		MUTEX_ENTER(&hxgep->timeout.lock);
+		hxgep->timeout.id = timeout(hxge_link_poll, (void *)hxgep,
+		    hxgep->timeout.ticks);
+		MUTEX_EXIT(&hxgep->timeout.lock);
 	}
 
 	MUTEX_EXIT(hxgep->genlock);
@@ -2494,6 +2497,15 @@ hxge_m_stop(void *arg)
 		hxge_stop_timer(hxgep, hxgep->hxge_timerid);
 		hxgep->hxge_timerid = 0;
 	}
+
+	/* Stop the link status timer before unregistering */
+	MUTEX_ENTER(&hxgep->timeout.lock);
+	if (hxgep->timeout.id) {
+		(void) untimeout(hxgep->timeout.id);
+		hxgep->timeout.id = 0;
+	}
+	hxge_link_update(hxgep, LINK_STATE_DOWN);
+	MUTEX_EXIT(&hxgep->timeout.lock);
 
 	MUTEX_ENTER(hxgep->genlock);
 
@@ -4408,27 +4420,21 @@ hxge_link_poll(void *arg)
 {
 	p_hxge_t		hxgep = (p_hxge_t)arg;
 	hpi_handle_t		handle;
-	p_hxge_stats_t		statsp;
 	cip_link_stat_t		link_stat;
 	hxge_timeout		*to = &hxgep->timeout;
 
 	handle = HXGE_DEV_HPI_HANDLE(hxgep);
-	statsp = (p_hxge_stats_t)hxgep->statsp;
 	HXGE_REG_RD32(handle, CIP_LINK_STAT, &link_stat.value);
 
-	if (to->link_status != link_stat.bits.xpcs0_link_up) {
+	if (to->report_link_status ||
+	    (to->link_status != link_stat.bits.xpcs0_link_up)) {
 		to->link_status = link_stat.bits.xpcs0_link_up;
+		to->report_link_status = B_FALSE;
 
 		if (link_stat.bits.xpcs0_link_up) {
-			mac_link_update(hxgep->mach, LINK_STATE_UP);
-			statsp->mac_stats.link_speed = 10000;
-			statsp->mac_stats.link_duplex = 2;
-			statsp->mac_stats.link_up = 1;
+			hxge_link_update(hxgep, LINK_STATE_UP);
 		} else {
-			mac_link_update(hxgep->mach, LINK_STATE_DOWN);
-			statsp->mac_stats.link_speed = 0;
-			statsp->mac_stats.link_duplex = 0;
-			statsp->mac_stats.link_up = 0;
+			hxge_link_update(hxgep, LINK_STATE_DOWN);
 		}
 	}
 
@@ -4436,4 +4442,21 @@ hxge_link_poll(void *arg)
 	MUTEX_ENTER(&to->lock);
 	to->id = timeout(hxge_link_poll, arg, to->ticks);
 	MUTEX_EXIT(&to->lock);
+}
+
+static void
+hxge_link_update(p_hxge_t hxgep, link_state_t state)
+{
+	p_hxge_stats_t		statsp = (p_hxge_stats_t)hxgep->statsp;
+
+	mac_link_update(hxgep->mach, state);
+	if (state == LINK_STATE_UP) {
+		statsp->mac_stats.link_speed = 10000;
+		statsp->mac_stats.link_duplex = 2;
+		statsp->mac_stats.link_up = 1;
+	} else {
+		statsp->mac_stats.link_speed = 0;
+		statsp->mac_stats.link_duplex = 0;
+		statsp->mac_stats.link_up = 0;
+	}
 }

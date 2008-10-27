@@ -241,6 +241,7 @@ typedef struct _hxge_timeout {
 	clock_t		ticks;
 	kmutex_t	lock;
 	uint32_t	link_status;
+	boolean_t	report_link_status;
 } hxge_timeout;
 
 /*
