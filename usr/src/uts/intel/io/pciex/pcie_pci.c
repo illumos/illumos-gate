@@ -210,7 +210,6 @@ typedef struct {
 	kmutex_t		pepb_err_mutex;	/* Error handling mutex */
 	kmutex_t		pepb_peek_poke_mutex;
 	boolean_t		pepb_no_aer_msi;
-	int			pepb_fmcap;
 	ddi_iblock_cookie_t	pepb_fm_ibc;
 	int			port_type;
 } pepb_devstate_t;
@@ -305,8 +304,7 @@ pepb_probe(dev_info_t *devi)
 static int
 pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	int			instance;
-	int			intr_types;
+	int			instance, intr_types, fmcap;
 	char			device_type[8];
 	pepb_devstate_t		*pepb;
 	ddi_acc_handle_t	config_handle;
@@ -350,9 +348,9 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * initialize fma support before we start accessing config space
 	 */
 	pci_targetq_init();
-	pepb->pepb_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
 	    DDI_FM_DMACHK_CAPABLE;
-	ddi_fm_init(devi, &pepb->pepb_fmcap, &pepb->pepb_fm_ibc);
+	ddi_fm_init(devi, &fmcap, &pepb->pepb_fm_ibc);
 
 	mutex_init(&pepb->pepb_err_mutex, NULL, MUTEX_DRIVER,
 	    (void *)pepb->pepb_fm_ibc);
@@ -1210,7 +1208,7 @@ pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 	ASSERT(ibc != NULL);
 	*ibc = pepb->pepb_fm_ibc;
 
-	return (pepb->pepb_fmcap);
+	return (DEVI(dip)->devi_fmhdl->fh_cap);
 }
 
 static int
@@ -1761,7 +1759,7 @@ pepb_intr_handler(caddr_t arg1, caddr_t arg2)
 		mutex_enter(&pepb_p->pepb_peek_poke_mutex);
 		mutex_enter(&pepb_p->pepb_err_mutex);
 
-		if (pepb_p->pepb_fmcap & DDI_FM_EREPORT_CAPABLE)
+		if ((DEVI(dip)->devi_fmhdl->fh_cap) & DDI_FM_EREPORT_CAPABLE)
 			sts = pf_scan_fabric(dip, &derr, NULL);
 
 		mutex_exit(&pepb_p->pepb_err_mutex);

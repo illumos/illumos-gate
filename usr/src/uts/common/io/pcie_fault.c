@@ -332,6 +332,7 @@ pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_UP:
 		case PCIE_PCIECAP_DEV_TYPE_DOWN:
+		case PCIE_PCIECAP_DEV_TYPE_ROOT:
 		{
 			pf_data_t *pfd_p = PCIE_BUS2PFD(bus_p);
 			pf_pci_err_regs_t *err_p = PCI_ERR_REG(pfd_p);
@@ -352,7 +353,6 @@ pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 			if (PCIE_IS_BDG(bus_p))
 				scan_flag |= pf_dispatch(dip, impl, B_TRUE);
 			break;
-		case PCIE_PCIECAP_DEV_TYPE_ROOT:
 		default:
 			ASSERT(B_FALSE);
 		}
