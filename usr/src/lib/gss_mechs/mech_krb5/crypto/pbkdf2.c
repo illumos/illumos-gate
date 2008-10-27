@@ -3,7 +3,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * lib/crypto/pbkdf2.c
  *
@@ -14,7 +13,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * Implementation of PBKDF2 from RFC 2898.
  * Not currently used; likely to be used when we get around to AES support.
@@ -96,7 +95,7 @@ krb5int_pbkdf2_hmac_sha1(
 		/* using outlen to avoid 64bit alignment issues */
 		outlen = (CK_ULONG)out->length;
 		tmpl[attrs].pValue = &outlen;
-		tmpl[attrs].ulValueLen = sizeof(outlen);
+		tmpl[attrs].ulValueLen = sizeof (outlen);
 		attrs++;
 	}
 
@@ -113,7 +112,7 @@ krb5int_pbkdf2_hmac_sha1(
 	params.ulPasswordLen = &passlen;
 
 	rv = C_GenerateKey(krb_ctx_hSession(context), &mechanism, tmpl,
-		attrs, &hKey);
+	    attrs, &hKey);
 
 	if (rv != CKR_OK)
 		ret = PKCS_ERR;
@@ -123,12 +122,12 @@ krb5int_pbkdf2_hmac_sha1(
 		tmpl[0].pValue = out->data;
 		tmpl[0].ulValueLen = out->length;
 		rv = C_GetAttributeValue(krb_ctx_hSession(context), hKey,
-			tmpl, 1);
+		    tmpl, 1);
 		if (rv != CKR_OK)
 			ret = PKCS_ERR;
+		(void) C_DestroyObject(krb_ctx_hSession(context), hKey);
 	}
 
-	(void) C_DestroyObject(krb_ctx_hSession(context), hKey);
 	return (ret);
 }
 #endif /* !_KERNEL */
