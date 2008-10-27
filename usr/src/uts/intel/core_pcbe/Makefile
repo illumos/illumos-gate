@@ -36,7 +36,8 @@ MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CORE_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
-ROOTLINK	= $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.23 $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.26 $(USR_PCBE_DIR)/pcbe.GenuineIntel.6.37
+SOFTLINKS	= pcbe.GenuineIntel.6.23 pcbe.GenuineIntel.6.26 pcbe.GenuineIntel.6.37
+ROOTSOFTLINKS	= $(SOFTLINKS:%=$(USR_PCBE_DIR)/%)
 
 #
 #	Include common rules.
@@ -49,7 +50,7 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_MODULE	= core_pcbe
 LINT_TARGET	= $(LINT_MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTSOFTLINKS)
 
 #
 #	Default build targets.
@@ -72,8 +73,8 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-$(ROOTLINK):	$(ROOTMODULE)
-	-$(RM) $@; ln $(ROOTMODULE) $@
+$(ROOTSOFTLINKS):	$(ROOTMODULE)
+	-$(RM) $@; $(SYMLINK) $(MODULE) $@
 
 #
 #	Include common targets.

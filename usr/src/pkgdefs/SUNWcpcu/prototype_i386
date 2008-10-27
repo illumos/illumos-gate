@@ -49,9 +49,9 @@ f none usr/kernel/pcbe/pcbe.GenuineIntel.6 755 root sys
 l none usr/kernel/pcbe/pcbe.GenuineIntel.5=pcbe.GenuineIntel.6 755 root sys
 f none usr/kernel/pcbe/pcbe.GenuineIntel.15 755 root sys
 f none usr/kernel/pcbe/pcbe.GenuineIntel.6.15 755 root sys
-l none usr/kernel/pcbe/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15 755 root sys
-l none usr/kernel/pcbe/pcbe.GenuineIntel.6.26=pcbe.GenuineIntel.6.15 755 root sys
-l none usr/kernel/pcbe/pcbe.GenuineIntel.6.37=pcbe.GenuineIntel.6.15 755 root sys
+s none usr/kernel/pcbe/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15
+s none usr/kernel/pcbe/pcbe.GenuineIntel.6.26=pcbe.GenuineIntel.6.15
+s none usr/kernel/pcbe/pcbe.GenuineIntel.6.37=pcbe.GenuineIntel.6.15
 d none usr/kernel/pcbe/amd64 755 root sys
 f none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.15 755 root sys
 f none usr/kernel/pcbe/amd64/pcbe.AuthenticAMD.15 755 root sys
@@ -59,9 +59,9 @@ l none usr/kernel/pcbe/amd64/pcbe.AuthenticAMD.16=pcbe.AuthenticAMD.15 755 root 
 f none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6 755 root sys
 l none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.5=pcbe.GenuineIntel.6 755 root sys
 f none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.15 755 root sys
-l none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15 755 root sys
-l none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.26=pcbe.GenuineIntel.6.15 755 root sys
-l none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.37=pcbe.GenuineIntel.6.15 755 root sys
+s none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15
+s none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.26=pcbe.GenuineIntel.6.15
+s none usr/kernel/pcbe/amd64/pcbe.GenuineIntel.6.37=pcbe.GenuineIntel.6.15
 d none usr/bin/amd64 755 root bin
 f none usr/bin/amd64/cputrack 555 root bin
 d none usr/lib/amd64 755 root bin
