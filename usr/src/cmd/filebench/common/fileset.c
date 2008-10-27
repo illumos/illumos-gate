@@ -35,6 +35,7 @@
 #include "filebench.h"
 #include "fileset.h"
 #include "gamma_dist.h"
+#include "utils.h"
 
 /*
  * File sets, of type fileset_t, are entities which contain
@@ -48,9 +49,10 @@
  * Fileset entities are allocated by fileset_define() which is called from
  * parser_gram.y: parser_fileset_define(). The filesetentry tree corrseponding
  * to the eventual directory and file tree to be instantiated on the storage
- * medium is built by fileset_populate(), which is called from
- * fileset_createset(). After calling fileset_populate(), fileset_createset()
- * will call fileset_create() to pre-allocate designated files and directories.
+ * medium is built by fileset_populate(), which is This routine is called
+ * from fileset_createset(), which is in turn called by fileset_createset().
+ * After calling fileset_populate(), fileset_createset() will call
+ * fileset_create() to pre-allocate designated files and directories.
  *
  * Fileset_createset() is called from parser_gram.y: parser_create_fileset()
  * when a "create fileset" or "run" command is encountered. When the
@@ -129,8 +131,8 @@ fileset_usage(void)
 /*
  * Frees up memory mapped file region of supplied size. The
  * file descriptor "fd" indicates which memory mapped file.
- * If successful, returns 0. Otherwise returns -1 times the number of
- * times msync() failed.
+ * If successful, returns 0. Otherwise returns -1 if "size"
+ * is zero, or -1 times the number of times msync() failed.
  */
 static int
 fileset_freemem(int fd, off64_t size)
@@ -166,17 +168,17 @@ fileset_resolvepath(filesetentry_t *entry)
 	char pathtmp[MAXPATHLEN];
 	char *s;
 
-	*path = 0;
+	path[0] = '\0';
 	while (fsep->fse_parent) {
 		(void) strcpy(pathtmp, "/");
-		(void) strcat(pathtmp, fsep->fse_path);
-		(void) strcat(pathtmp, path);
-		(void) strcpy(path, pathtmp);
+		(void) fb_strlcat(pathtmp, fsep->fse_path, MAXPATHLEN);
+		(void) fb_strlcat(pathtmp, path, MAXPATHLEN);
+		(void) fb_strlcpy(path, pathtmp, MAXPATHLEN);
 		fsep = fsep->fse_parent;
 	}
 
 	s = malloc(strlen(path) + 1);
-	(void) strcpy(s, path);
+	(void) fb_strlcpy(s, path, MAXPATHLEN);
 	return (s);
 }
 
@@ -233,7 +235,6 @@ null_str:
 
 	filebench_log(LOG_ERROR,
 	    "Failed to create directory path %s: Out of memory", path);
-
 	return (FILEBENCH_ERROR);
 }
 
@@ -250,9 +251,9 @@ fileset_create_subdirs(fileset_t *fileset, char *filesetpath)
 	/* walk the subdirectory list, enstanciating subdirs */
 	direntry = fileset->fs_dirlist;
 	while (direntry) {
-		(void) strcpy(full_path, filesetpath);
+		(void) fb_strlcpy(full_path, filesetpath, MAXPATHLEN);
 		part_path = fileset_resolvepath(direntry);
-		(void) strcat(full_path, part_path);
+		(void) fb_strlcat(full_path, part_path, MAXPATHLEN);
 		free(part_path);
 
 		/* now create this portion of the subdirectory tree */
@@ -265,12 +266,56 @@ fileset_create_subdirs(fileset_t *fileset, char *filesetpath)
 }
 
 /*
+ * given a fileset entry, determines if the associated leaf directory
+ * needs to be made or not, and if so does the mkdir.
+ */
+static int
+fileset_alloc_leafdir(filesetentry_t *entry)
+{
+	fileset_t *fileset;
+	char path[MAXPATHLEN];
+	struct stat64 sb;
+	char *pathtmp;
+
+	fileset = entry->fse_fileset;
+	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, avd_get_str(fileset->fs_name), MAXPATHLEN);
+	pathtmp = fileset_resolvepath(entry);
+	(void) fb_strlcat(path, pathtmp, MAXPATHLEN);
+	free(pathtmp);
+
+	filebench_log(LOG_DEBUG_IMPL, "Populated %s", entry->fse_path);
+
+	/* see if not reusing and this directory does not exist */
+	if (!((entry->fse_flags & FSE_REUSING) && (stat64(path, &sb) == 0))) {
+
+		/* No file or not reusing, so create */
+		if (mkdir(path, 0755) < 0) {
+			filebench_log(LOG_ERROR,
+			    "Failed to pre-allocate leaf directory %s: %s",
+			    path, strerror(errno));
+
+			return (FILEBENCH_ERROR);
+		}
+	}
+
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+	entry->fse_flags |= FSE_EXISTS;
+	fileset->fs_num_act_leafdirs++;
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
+
+	return (FILEBENCH_OK);
+}
+
+/*
  * given a fileset entry, determines if the associated file
  * needs to be allocated or not, and if so does the allocation.
  */
 static int
 fileset_alloc_file(filesetentry_t *entry)
 {
+	fileset_t *fileset;
 	char path[MAXPATHLEN];
 	char *buf;
 	struct stat64 sb;
@@ -278,12 +323,13 @@ fileset_alloc_file(filesetentry_t *entry)
 	off64_t seek;
 	int fd;
 
-	*path = 0;
-	(void) strcpy(path, avd_get_str(entry->fse_fileset->fs_path));
-	(void) strcat(path, "/");
-	(void) strcat(path, avd_get_str(entry->fse_fileset->fs_name));
+	fileset = entry->fse_fileset;
+	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, avd_get_str(fileset->fs_name), MAXPATHLEN);
 	pathtmp = fileset_resolvepath(entry);
-	(void) strcat(path, pathtmp);
+	(void) fb_strlcat(path, pathtmp, MAXPATHLEN);
+	free(pathtmp);
 
 	filebench_log(LOG_DEBUG_IMPL, "Populated %s", entry->fse_path);
 
@@ -300,16 +346,14 @@ fileset_alloc_file(filesetentry_t *entry)
 			filebench_log(LOG_DEBUG_IMPL,
 			    "Re-using file %s", path);
 
-			if (!avd_get_bool(entry->fse_fileset->fs_cached))
+			if (!avd_get_bool(fileset->fs_cached))
 				(void) fileset_freemem(fd,
 				    entry->fse_size);
 
-			(void) ipc_mutex_lock(
-			    &entry->fse_fileset->fs_pick_lock);
+			(void) ipc_mutex_lock(&fileset->fs_pick_lock);
 			entry->fse_flags |= FSE_EXISTS;
-			entry->fse_fileset->fs_num_act_files++;
-			(void) ipc_mutex_unlock(
-			    &entry->fse_fileset->fs_pick_lock);
+			fileset->fs_num_act_files++;
+			(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 
 			(void) close(fd);
 			return (FILEBENCH_OK);
@@ -325,16 +369,14 @@ fileset_alloc_file(filesetentry_t *entry)
 			(void) ftruncate(fd, (off_t)entry->fse_size);
 #endif
 
-			if (!avd_get_bool(entry->fse_fileset->fs_cached))
+			if (!avd_get_bool(fileset->fs_cached))
 				(void) fileset_freemem(fd,
 				    entry->fse_size);
 
-			(void) ipc_mutex_lock(
-			    &entry->fse_fileset->fs_pick_lock);
+			(void) ipc_mutex_lock(&fileset->fs_pick_lock);
 			entry->fse_flags |= FSE_EXISTS;
-			entry->fse_fileset->fs_num_act_files++;
-			(void) ipc_mutex_unlock(
-			    &entry->fse_fileset->fs_pick_lock);
+			fileset->fs_num_act_files++;
+			(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 
 			(void) close(fd);
 			return (FILEBENCH_OK);
@@ -354,10 +396,10 @@ fileset_alloc_file(filesetentry_t *entry)
 	if ((buf = (char *)malloc(FILE_ALLOC_BLOCK)) == NULL)
 		return (FILEBENCH_ERROR);
 
-	(void) ipc_mutex_lock(&entry->fse_fileset->fs_pick_lock);
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
 	entry->fse_flags |= FSE_EXISTS;
-	entry->fse_fileset->fs_num_act_files++;
-	(void) ipc_mutex_unlock(&entry->fse_fileset->fs_pick_lock);
+	fileset->fs_num_act_files++;
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 
 	for (seek = 0; seek < entry->fse_size; ) {
 		off64_t wsize;
@@ -381,7 +423,7 @@ fileset_alloc_file(filesetentry_t *entry)
 		seek += wsize;
 	}
 
-	if (!avd_get_bool(entry->fse_fileset->fs_cached))
+	if (!avd_get_bool(fileset->fs_cached))
 		(void) fileset_freemem(fd, entry->fse_size);
 
 	(void) close(fd);
@@ -438,13 +480,12 @@ fileset_openfile(fileset_t *fileset,
 	int fd;
 	int open_attrs = 0;
 
-	*path = 0;
-	(void) strcpy(path, avd_get_str(fileset->fs_path));
-	(void) strcat(path, "/");
-	(void) strcat(path, avd_get_str(fileset->fs_name));
+	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, avd_get_str(fileset->fs_name), MAXPATHLEN);
 	pathtmp = fileset_resolvepath(entry);
-	(void) strcat(path, pathtmp);
-	(void) strcpy(dir, path);
+	(void) fb_strlcat(path, pathtmp, MAXPATHLEN);
+	(void) fb_strlcpy(dir, path, MAXPATHLEN);
 	free(pathtmp);
 	(void) trunc_dirname(dir);
 
@@ -489,7 +530,8 @@ fileset_openfile(fileset_t *fileset,
 
 /*
  * Selects a fileset entry from a fileset. If the
- * FILESET_PICKDIR flag is set it will pick a directory
+ * FILESET_PICKLEAFDIR flag is set it will pick a leaf directory entry,
+ * if the FILESET_PICKDIR flag is set it will pick a non leaf directory
  * entry, otherwise a file entry. The FILESET_PICKRESET
  * flag will cause it to reset the free list to the
  * overall list (file or directory). The FILESET_PICKUNIQUE
@@ -512,72 +554,130 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
 
 	/* see if we have to wait for available files or directories */
-	if (flags & FILESET_PICKDIR) {
-		while (fileset->fs_idle_dirs == 0) {
-			(void) pthread_cond_wait(&fileset->fs_idle_dirs_cv,
-			    &fileset->fs_pick_lock);
-		}
-	} else {
+	switch (flags & FILESET_PICKMASK) {
+	case FILESET_PICKFILE:
+		if (fileset->fs_filelist == NULL)
+			goto empty;
 		while (fileset->fs_idle_files == 0) {
 			(void) pthread_cond_wait(&fileset->fs_idle_files_cv,
 			    &fileset->fs_pick_lock);
 		}
+		break;
+	case FILESET_PICKDIR:
+		if (fileset->fs_dirlist == NULL)
+			goto empty;
+		while (fileset->fs_idle_dirs == 0) {
+			(void) pthread_cond_wait(&fileset->fs_idle_dirs_cv,
+			    &fileset->fs_pick_lock);
+		}
+		break;
+	case FILESET_PICKLEAFDIR:
+		if (fileset->fs_leafdirlist == NULL)
+			goto empty;
+		while (fileset->fs_idle_leafdirs == 0) {
+			(void) pthread_cond_wait(&fileset->fs_idle_leafdirs_cv,
+			    &fileset->fs_pick_lock);
+		}
+		break;
 	}
 
 	/* see if asking for impossible */
-	if (flags & FILESET_PICKEXISTS) {
-		if (fileset->fs_num_act_files == 0) {
-			(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
-			return (NULL);
+	switch (flags & FILESET_PICKMASK) {
+	case FILESET_PICKFILE:
+		if (flags & FILESET_PICKEXISTS) {
+			if (fileset->fs_num_act_files == 0) {
+				(void) ipc_mutex_unlock(
+				    &fileset->fs_pick_lock);
+				return (NULL);
+			}
+		} else if (flags & FILESET_PICKNOEXIST) {
+			if (fileset->fs_num_act_files ==
+			    fileset->fs_realfiles) {
+				(void) ipc_mutex_unlock(
+				    &fileset->fs_pick_lock);
+				return (NULL);
+			}
 		}
-	} else if (flags & FILESET_PICKNOEXIST) {
-		if (fileset->fs_num_act_files == fileset->fs_realfiles) {
-			(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
-			return (NULL);
+		break;
+	case FILESET_PICKLEAFDIR:
+		if (flags & FILESET_PICKEXISTS) {
+			if (fileset->fs_num_act_leafdirs == 0) {
+				(void) ipc_mutex_unlock(
+				    &fileset->fs_pick_lock);
+				return (NULL);
+			}
+		} else if (flags & FILESET_PICKNOEXIST) {
+			if (fileset->fs_num_act_leafdirs ==
+			    fileset->fs_realleafdirs) {
+				(void) ipc_mutex_unlock(
+				    &fileset->fs_pick_lock);
+				return (NULL);
+			}
 		}
+		break;
+	case FILESET_PICKDIR:
+	default:
+		break;
 	}
 
 	while (entry == NULL) {
 
-		if ((flags & FILESET_PICKDIR) && (flags & FILESET_PICKRESET)) {
-			entry = fileset->fs_dirlist;
-			while (entry) {
-				entry->fse_flags |= FSE_FREE;
-				entry = entry->fse_dirnext;
+		if (flags & FILESET_PICKRESET) {
+			switch (flags & FILESET_PICKMASK) {
+			case FILESET_PICKFILE:
+				entry = fileset->fs_filelist;
+				while (entry) {
+					entry->fse_flags |= FSE_FREE;
+					entry = entry->fse_filenext;
+				}
+				fileset->fs_filefree = fileset->fs_filelist;
+				break;
+			case FILESET_PICKDIR:
+				entry = fileset->fs_dirlist;
+				while (entry) {
+					entry->fse_flags |= FSE_FREE;
+					entry = entry->fse_dirnext;
+				}
+				fileset->fs_dirfree = fileset->fs_dirlist;
+				break;
+			case FILESET_PICKLEAFDIR:
+				entry = fileset->fs_leafdirlist;
+				while (entry) {
+					entry->fse_flags |= FSE_FREE;
+					entry = entry->fse_leafdirnext;
+				}
+				fileset->fs_leafdirfree =
+				    fileset->fs_leafdirlist;
+				break;
 			}
-			fileset->fs_dirfree = fileset->fs_dirlist;
-		}
-
-		if (!(flags & FILESET_PICKDIR) && (flags & FILESET_PICKRESET)) {
-			entry = fileset->fs_filelist;
-			while (entry) {
-				entry->fse_flags |= FSE_FREE;
-				entry = entry->fse_filenext;
-			}
-			fileset->fs_filefree = fileset->fs_filelist;
 		}
 
 		if (flags & FILESET_PICKUNIQUE) {
-			if (flags & FILESET_PICKDIR) {
-				entry = fileset->fs_dirfree;
-				if (entry == NULL)
-					goto empty;
-				fileset->fs_dirfree = entry->fse_dirnext;
-			} else {
+			switch (flags & FILESET_PICKMASK) {
+			case FILESET_PICKFILE:
 				entry = fileset->fs_filefree;
 				if (entry == NULL)
 					goto empty;
 				fileset->fs_filefree = entry->fse_filenext;
+				break;
+			case FILESET_PICKDIR:
+				entry = fileset->fs_dirfree;
+				if (entry == NULL)
+					goto empty;
+				fileset->fs_dirfree = entry->fse_dirnext;
+				break;
+			case FILESET_PICKLEAFDIR:
+				entry = fileset->fs_leafdirfree;
+				if (entry == NULL)
+					goto empty;
+				fileset->fs_leafdirfree =
+				    entry->fse_leafdirnext;
+				break;
 			}
 			entry->fse_flags &= ~FSE_FREE;
 		} else {
-			if (flags & FILESET_PICKDIR) {
-				entry = fileset->fs_dirrotor;
-				if (entry == NULL)
-				fileset->fs_dirrotor =
-				    entry = fileset->fs_dirlist;
-				fileset->fs_dirrotor = entry->fse_dirnext;
-			} else {
+			switch (flags & FILESET_PICKMASK) {
+			case FILESET_PICKFILE:
 				if (flags & FILESET_PICKNOEXIST) {
 					entry = fileset->fs_file_ne_rotor;
 					if (entry == NULL)
@@ -595,6 +695,22 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 					fileset->fs_filerotor[tid] =
 					    entry->fse_filenext;
 				}
+				break;
+			case FILESET_PICKDIR:
+				entry = fileset->fs_dirrotor;
+				if (entry == NULL)
+					fileset->fs_dirrotor =
+					    entry = fileset->fs_dirlist;
+				fileset->fs_dirrotor = entry->fse_dirnext;
+				break;
+			case FILESET_PICKLEAFDIR:
+				entry = fileset->fs_leafdirrotor;
+				if (entry == NULL)
+					fileset->fs_leafdirrotor =
+					    entry = fileset->fs_leafdirlist;
+				fileset->fs_leafdirrotor =
+				    entry->fse_leafdirnext;
+				break;
 			}
 		}
 
@@ -624,10 +740,17 @@ fileset_pick(fileset_t *fileset, int flags, int tid)
 	}
 
 	/* update file or directory idle counts */
-	if (flags & FILESET_PICKDIR)
-		fileset->fs_idle_dirs--;
-	else
+	switch (flags & FILESET_PICKMASK) {
+	case FILESET_PICKFILE:
 		fileset->fs_idle_files--;
+		break;
+	case FILESET_PICKDIR:
+		fileset->fs_idle_dirs--;
+		break;
+	case FILESET_PICKLEAFDIR:
+		fileset->fs_idle_leafdirs--;
+		break;
+	}
 
 	/* Indicate that file or directory is now busy */
 	entry->fse_flags |= FSE_BUSY;
@@ -650,7 +773,6 @@ void
 fileset_unbusy(filesetentry_t *entry, int update_exist, int new_exist_val)
 {
 	fileset_t *fileset = NULL;
-	int fse_is_dir;
 
 	if (entry)
 		fileset = entry->fse_fileset;
@@ -661,7 +783,6 @@ fileset_unbusy(filesetentry_t *entry, int update_exist, int new_exist_val)
 	}
 
 	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
-	fse_is_dir = entry->fse_flags & FSE_DIR;
 
 	/* increment idle count, clear FSE_BUSY and signal IF it was busy */
 	if (entry->fse_flags & FSE_BUSY) {
@@ -677,18 +798,28 @@ fileset_unbusy(filesetentry_t *entry, int update_exist, int new_exist_val)
 		}
 
 		/* increment idle count and signal waiting threads */
-		if (fse_is_dir) {
-			fileset->fs_idle_dirs++;
-			if (fileset->fs_idle_dirs == 1) {
-				(void) pthread_cond_signal(
-				    &fileset->fs_idle_dirs_cv);
-			}
-		} else {
+		switch (entry->fse_flags & FSE_TYPE_MASK) {
+		case FSE_TYPE_FILE:
 			fileset->fs_idle_files++;
 			if (fileset->fs_idle_files == 1) {
 				(void) pthread_cond_signal(
 				    &fileset->fs_idle_files_cv);
 			}
+			break;
+		case FSE_TYPE_DIR:
+			fileset->fs_idle_dirs++;
+			if (fileset->fs_idle_dirs == 1) {
+				(void) pthread_cond_signal(
+				    &fileset->fs_idle_dirs_cv);
+			}
+			break;
+		case FSE_TYPE_LEAFDIR:
+			fileset->fs_idle_leafdirs++;
+			if (fileset->fs_idle_leafdirs == 1) {
+				(void) pthread_cond_signal(
+				    &fileset->fs_idle_leafdirs_cv);
+			}
+			break;
 		}
 	}
 
@@ -699,20 +830,32 @@ fileset_unbusy(filesetentry_t *entry, int update_exist, int new_exist_val)
 
 				/* asked to set, and it was clear */
 				entry->fse_flags |= FSE_EXISTS;
-				if (fse_is_dir)
-					fileset->fs_num_act_dirs++;
-				else
+				switch (entry->fse_flags & FSE_TYPE_MASK) {
+				case FSE_TYPE_FILE:
 					fileset->fs_num_act_files++;
+					break;
+				case FSE_TYPE_DIR:
+					break;
+				case FSE_TYPE_LEAFDIR:
+					fileset->fs_num_act_leafdirs++;
+					break;
+				}
 			}
 		} else {
 			if (entry->fse_flags & FSE_EXISTS) {
 
 				/* asked to clear, and it was set */
 				entry->fse_flags &= (~FSE_EXISTS);
-				if (fse_is_dir)
-					fileset->fs_num_act_dirs--;
-				else
+				switch (entry->fse_flags & FSE_TYPE_MASK) {
+				case FSE_TYPE_FILE:
 					fileset->fs_num_act_files--;
+					break;
+				case FSE_TYPE_DIR:
+					break;
+				case FSE_TYPE_LEAFDIR:
+					fileset->fs_num_act_leafdirs--;
+					break;
+				}
 			}
 		}
 	}
@@ -741,7 +884,7 @@ fileset_create(fileset_t *fileset)
 	filesetentry_t *entry;
 	char path[MAXPATHLEN];
 	struct stat64 sb;
-	int pickflags = FILESET_PICKUNIQUE | FILESET_PICKRESET;
+	int pickflags;
 	hrtime_t start = gethrtime();
 	char *fileset_path;
 	char *fileset_name;
@@ -761,6 +904,9 @@ fileset_create(fileset_t *fileset)
 		return (FILEBENCH_ERROR);
 	}
 
+	/* declare all files currently non existant (single threaded code) */
+	fileset->fs_num_act_files = 0;
+
 #ifdef HAVE_RAW_SUPPORT
 	/* treat raw device as special case */
 	if (fileset->fs_attrs & FILESET_IS_RAW_DEV)
@@ -770,9 +916,9 @@ fileset_create(fileset_t *fileset)
 	/* XXX Add check to see if there is enough space */
 
 	/* set up path to fileset */
-	(void) strcpy(path, fileset_path);
-	(void) strcat(path, "/");
-	(void) strcat(path, fileset_name);
+	(void) fb_strlcpy(path, fileset_path, MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, fileset_name, MAXPATHLEN);
 
 	/* if exists and resusing, then don't create new */
 	if (((stat64(path, &sb) == 0)&& (strlen(path) > 3) &&
@@ -802,7 +948,7 @@ fileset_create(fileset_t *fileset)
 
 	/* make the filesets directory tree unless in reuse mode */
 	if (!reusing && (avd_get_bool(fileset->fs_prealloc))) {
-		filebench_log(LOG_INFO,
+		filebench_log(LOG_VERBOSE,
 		    "making tree for filset %s", path);
 
 		(void) mkdir(path, 0755);
@@ -822,6 +968,8 @@ fileset_create(fileset_t *fileset)
 	randno = ((RAND_MAX * (100
 	    - avd_get_int(fileset->fs_preallocpercent))) / 100);
 
+	/* alloc any files, as required */
+	pickflags = FILESET_PICKUNIQUE | FILESET_PICKRESET;
 	while (entry = fileset_pick(fileset, pickflags, 0)) {
 		pthread_t tid;
 		int newrand;
@@ -892,6 +1040,30 @@ fileset_create(fileset_t *fileset)
 		}
 	}
 
+	/* alloc any leaf directories, as required */
+	pickflags =
+	    FILESET_PICKUNIQUE | FILESET_PICKRESET | FILESET_PICKLEAFDIR;
+	while (entry = fileset_pick(fileset, pickflags, 0)) {
+
+		pickflags = FILESET_PICKUNIQUE | FILESET_PICKLEAFDIR;
+
+		/* entry doesn't need to be locked during initialization */
+		fileset_unbusy(entry, FALSE, FALSE);
+
+		if (rand() < randno)
+			continue;
+
+		preallocated++;
+
+		if (reusing)
+			entry->fse_flags |= FSE_REUSING;
+		else
+			entry->fse_flags &= (~FSE_REUSING);
+
+		if (fileset_alloc_leafdir(entry) == FILEBENCH_ERROR)
+			return (FILEBENCH_ERROR);
+	}
+
 exit:
 	filebench_log(LOG_VERBOSE,
 	    "Preallocated %d of %llu of %s %s in %llu seconds",
@@ -936,7 +1108,23 @@ fileset_insdirlist(fileset_t *fileset, filesetentry_t *entry)
 }
 
 /*
- * Obtaines a filesetentry entity for a file to be placed in a
+ * Adds an entry to the fileset's leaf directory list. Single
+ * threaded so no locking needed.
+ */
+static void
+fileset_insleafdirlist(fileset_t *fileset, filesetentry_t *entry)
+{
+	if (fileset->fs_leafdirlist == NULL) {
+		fileset->fs_leafdirlist = entry;
+		entry->fse_leafdirnext = NULL;
+	} else {
+		entry->fse_leafdirnext = fileset->fs_leafdirlist;
+		fileset->fs_leafdirlist = entry;
+	}
+}
+
+/*
+ * Obtains a filesetentry entity for a file to be placed in a
  * (sub)directory of a fileset. The size of the file may be
  * specified by fileset_meansize, or calculated from a gamma
  * distribution of parameter fileset_sizegamma and of mean size
@@ -968,7 +1156,7 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
 
 	entry->fse_parent = parent;
 	entry->fse_fileset = fileset;
-	entry->fse_flags = FSE_FREE;
+	entry->fse_flags = FSE_TYPE_FILE | FSE_FREE;
 	fileset_insfilelist(fileset, entry);
 
 	(void) snprintf(tmpname, sizeof (tmpname), "%08d", serial);
@@ -997,6 +1185,50 @@ fileset_populate_file(fileset_t *fileset, filesetentry_t *parent, int serial)
 	fileset->fs_bytes += entry->fse_size;
 
 	fileset->fs_realfiles++;
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Obtaines a filesetentry entity for a leaf directory to be placed in a
+ * (sub)directory of a fileset. The leaf directory will always be empty so
+ * it can be created and deleted (mkdir, rmdir) at will. The filesetentry
+ * entity is placed on the leaf directory list in the specified parent
+ * filesetentry entity, which may be a (sub) directory filesetentry, or
+ * the root filesetentry in the fileset. It is also placed on the fileset's
+ * list of all contained leaf directories. Returns FILEBENCH_OK if successful
+ * or FILEBENCH_ERROR if ipc memory cannot be allocated.
+ */
+static int
+fileset_populate_leafdir(fileset_t *fileset, filesetentry_t *parent, int serial)
+{
+	char tmpname[16];
+	filesetentry_t *entry;
+
+	if ((entry = (filesetentry_t *)ipc_malloc(FILEBENCH_FILESETENTRY))
+	    == NULL) {
+		filebench_log(LOG_ERROR,
+		    "fileset_populate_file: Can't malloc filesetentry");
+		return (FILEBENCH_ERROR);
+	}
+
+	/* Another currently idle leaf directory */
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+	fileset->fs_idle_leafdirs++;
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
+
+	entry->fse_parent = parent;
+	entry->fse_fileset = fileset;
+	entry->fse_flags = FSE_TYPE_LEAFDIR | FSE_FREE;
+	fileset_insleafdirlist(fileset, entry);
+
+	(void) snprintf(tmpname, sizeof (tmpname), "%08d", serial);
+	if ((entry->fse_path = (char *)ipc_pathalloc(tmpname)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "fileset_populate_file: Can't alloc path string");
+		return (FILEBENCH_ERROR);
+	}
+
+	fileset->fs_realleafdirs++;
 	return (FILEBENCH_OK);
 }
 
@@ -1052,7 +1284,8 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 	}
 
 	entry->fse_parent = parent;
-	entry->fse_flags = FSE_DIR | FSE_FREE;
+	entry->fse_fileset = fileset;
+	entry->fse_flags = FSE_TYPE_DIR | FSE_FREE;
 	fileset_insdirlist(fileset, entry);
 
 	if (fileset->fs_dirdepthrv) {
@@ -1093,8 +1326,8 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 		isleaf = 1;
 
 	/*
-	 * Create directory of random width according to distribution, or
-	 * if root directory, continue until #files required
+	 * Create directory of random width filled with files according
+	 * to distribution, or if root directory, continue until #files required
 	 */
 	for (i = 1; ((parent == NULL) || (i < ranwidth + 1)) &&
 	    (fileset->fs_realfiles < fileset->fs_constentries);
@@ -1109,6 +1342,26 @@ fileset_populate_subdir(fileset_t *fileset, filesetentry_t *parent,
 		if (ret != 0)
 			return (ret);
 	}
+
+	/*
+	 * Create directory of random width filled with leaf directories
+	 * according to distribution, or if root directory, continue until
+	 * the number of leaf directories required has been generated.
+	 */
+	for (i = 1; ((parent == NULL) || (i < ranwidth + 1)) &&
+	    (fileset->fs_realleafdirs < fileset->fs_constleafdirs);
+	    i++) {
+		int ret = 0;
+
+		if (parent && isleaf)
+			ret = fileset_populate_leafdir(fileset, entry, i);
+		else
+			ret = fileset_populate_subdir(fileset, entry, i, depth);
+
+		if (ret != 0)
+			return (ret);
+	}
+
 	return (FILEBENCH_OK);
 }
 
@@ -1127,6 +1380,7 @@ static int
 fileset_populate(fileset_t *fileset)
 {
 	int entries = (int)avd_get_int(fileset->fs_entries);
+	int leafdirs = (int)avd_get_int(fileset->fs_leafdirs);
 	int meandirwidth;
 	int ret;
 
@@ -1140,19 +1394,26 @@ fileset_populate(fileset_t *fileset)
 		return (FILEBENCH_OK);
 #endif /* HAVE_RAW_SUPPORT */
 
-	/* save value of entries obtained for later, in case it was random */
+	/*
+	 * save value of entries and leaf dirs obtained for later
+	 * in case it was random
+	 */
 	fileset->fs_constentries = entries;
+	fileset->fs_constleafdirs = leafdirs;
 
-	/* declare all files currently non existant */
+	/* declare all files and leafdirs currently non existant */
 	fileset->fs_num_act_files = 0;
+	fileset->fs_num_act_leafdirs = 0;
 
 	/* initialize idle files and directories condition variables */
-	(void) pthread_cond_init(&fileset->fs_idle_dirs_cv, ipc_condattr());
 	(void) pthread_cond_init(&fileset->fs_idle_files_cv, ipc_condattr());
+	(void) pthread_cond_init(&fileset->fs_idle_dirs_cv, ipc_condattr());
+	(void) pthread_cond_init(&fileset->fs_idle_leafdirs_cv, ipc_condattr());
 
 	/* no files or dirs idle (or busy) yet */
 	fileset->fs_idle_files = 0;
 	fileset->fs_idle_dirs = 0;
+	fileset->fs_idle_leafdirs = 0;
 
 	/* initialize locks and other condition variables */
 	(void) pthread_mutex_init(&fileset->fs_pick_lock,
@@ -1177,7 +1438,7 @@ fileset_populate(fileset_t *fileset)
 	 *	# ave size of file
 	 *	max size of file
 	 */
-	fileset->fs_meandepth = log(entries) / log(meandirwidth);
+	fileset->fs_meandepth = log(entries+leafdirs) / log(meandirwidth);
 
 	/* Has a random variable been supplied for dirdepth? */
 	if (fileset->fs_dirdepthrv) {
@@ -1202,9 +1463,9 @@ exists:
 		    avd_get_str(fileset->fs_name),
 		    (u_longlong_t)(fileset->fs_bytes / 1024UL / 1024UL));
 	} else {
-		filebench_log(LOG_VERBOSE, "Fileset %s: %d files, "
+		filebench_log(LOG_VERBOSE, "Fileset %s: %d files, %d leafdirs "
 		    "avg dir = %d, avg depth = %.1lf, mbytes=%llu",
-		    avd_get_str(fileset->fs_name), entries,
+		    avd_get_str(fileset->fs_name), entries, leafdirs,
 		    meandirwidth,
 		    fileset->fs_meandepth,
 		    (u_longlong_t)(fileset->fs_bytes / 1024UL / 1024UL));
@@ -1456,6 +1717,7 @@ fileset_print(fileset_t *fileset, int first)
 	}
 	return (FILEBENCH_OK);
 }
+
 /*
  * checks to see if the path/name pair points to a raw device. If
  * so it sets the raw device flag (FILESET_IS_RAW_DEV) and returns 1.
@@ -1480,9 +1742,9 @@ fileset_checkraw(fileset_t *fileset)
 	if ((setname = avd_get_str(fileset->fs_name)) == NULL)
 		return (FILEBENCH_OK);
 
-	(void) strcpy(path, pathname);
-	(void) strcat(path, "/");
-	(void) strcat(path, setname);
+	(void) fb_strlcpy(path, pathname, MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, setname, MAXPATHLEN);
 	if ((stat64(path, &sb) == 0) &&
 	    ((sb.st_mode & S_IFMT) == S_IFBLK) && sb.st_rdev) {
 		fileset->fs_attrs |= FILESET_IS_RAW_DEV;

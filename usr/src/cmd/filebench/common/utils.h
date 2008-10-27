@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FB_UTILS_H
 #define	_FB_UTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "config.h"
 
@@ -40,6 +38,14 @@ extern "C" {
 #define	E_USAGE		2		/* Exit status for usage error */
 
 extern char *fb_stralloc(char *str);
+
+#ifdef sun
+#define	fb_strlcat	strlcat
+#define	fb_strlcpy	strlcpy
+#else
+extern size_t fb_strlcat(char *dst, const char *src, size_t dstsize);
+extern size_t fb_strlcpy(char *dst, const char *src, size_t dstsize);
+#endif /* sun */
 
 #ifdef	__cplusplus
 }

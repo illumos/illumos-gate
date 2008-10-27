@@ -49,22 +49,27 @@ WORKLOADS = \
 	filemicro_statfile.f \
 	filemicro_writefsync.f \
 	fileserver.f \
+	listdirs.f \
+	makedirs.f \
 	mongo.f \
 	multistreamread.f \
 	multistreamreaddirect.f \
 	multistreamwrite.f \
 	multistreamwritedirect.f \
 	oltp.f \
+	openfiles.f \
 	randomread.f \
 	randomrw.f \
 	randomwrite.f \
 	ratelimcopyfiles.f \
+	removedirs.f \
 	singlestreamread.f \
 	singlestreamreaddirect.f \
 	singlestreamwrite.f \
 	singlestreamwritedirect.f \
 	tpcso.f \
 	varmail.f \
+	videoserver.f \
 	webproxy.f \
 	webserver.f
 

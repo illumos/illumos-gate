@@ -126,6 +126,7 @@ name                    { return FSA_NAME;}
 namelength              { return FSA_NAMELENGTH; }
 nice                    { return FSA_NICE;}
 entries                 { return FSA_ENTRIES;}
+leafdirs                { return FSA_LEAFDIRS;}
 prealloc                { return FSA_PREALLOC; }
 paralloc                { return FSA_PARALLOC; }
 reuse                   { return FSA_REUSE; }

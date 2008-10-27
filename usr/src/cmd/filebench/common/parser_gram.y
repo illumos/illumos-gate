@@ -185,6 +185,7 @@ static void parser_version(cmd_t *cmd);
 %token FSA_HIGHWATER FSA_DIRECTIO FSA_DIRWIDTH FSA_FD FSA_SRCFD FSA_ROTATEFD
 %token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA FSA_DIRDEPTHRV
 %token FSA_DIRGAMMA FSA_USEISM FSA_TYPE FSA_RANDTABLE FSA_RANDSRC FSA_RANDROUND
+%token FSA_LEAFDIRS
 %token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN FSA_MASTER
 %token FSA_CLIENT
 %token FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC FSS_ROUND
@@ -1441,6 +1442,7 @@ attrs_define_fileset:
 | FSA_DIRGAMMA { $$ = FSA_DIRGAMMA;}
 | FSA_CACHED { $$ = FSA_CACHED;}
 | FSA_ENTRIES { $$ = FSA_ENTRIES;};
+| FSA_LEAFDIRS { $$ = FSA_LEAFDIRS;};
 
 randvar_attr_name:
   FSA_NAME { $$ = FSA_NAME;}
@@ -2009,16 +2011,11 @@ static void
 parser_eventgen(cmd_t *cmd)
 {
 	attr_t *attr;
-	fbint_t rate;
 
 	/* Get the rate from attribute */
 	if (attr = get_attr_integer(cmd, FSA_RATE)) {
 		if (attr->attr_avd) {
-			rate = avd_get_int(attr->attr_avd);
-			filebench_log(LOG_VERBOSE,
-			    "Eventgen: %llu per second",
-			    (u_longlong_t)rate);
-			eventgen_setrate(rate);
+			eventgen_setrate(attr->attr_avd);
 		}
 	}
 }
@@ -2727,8 +2724,19 @@ parser_fileset_define(cmd_t *cmd)
 	if (attr = get_attr_integer(cmd, FSA_ENTRIES)) {
 		fileset->fs_entries = attr->attr_avd;
 	} else {
-		filebench_log(LOG_ERROR, "Fileset has zero entries");
 		fileset->fs_entries = avd_int_alloc(0);
+	}
+
+	/* Get the number of leafdirs in the fileset */
+	if (attr = get_attr_integer(cmd, FSA_LEAFDIRS)) {
+		fileset->fs_leafdirs = attr->attr_avd;
+	} else {
+		fileset->fs_leafdirs = avd_int_alloc(0);
+	}
+
+	if ((avd_get_int(fileset->fs_entries) == 0) &&
+	    (avd_get_int(fileset->fs_leafdirs) == 0)) {
+		filebench_log(LOG_ERROR, "Fileset has no files or leafdirs");
 	}
 
 	/* Get the mean dir width of the fileset */

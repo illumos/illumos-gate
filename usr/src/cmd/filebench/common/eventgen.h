@@ -26,8 +26,6 @@
 #ifndef	_FB_EVENTGEN_H
 #define	_FB_EVENTGEN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 #include "vars.h"
 
@@ -37,7 +35,7 @@ extern "C" {
 
 #define	FB_SEC2NSEC	1000000000UL
 void eventgen_init(void);
-void eventgen_setrate(fbint_t rate);
+void eventgen_setrate(avd_t rate);
 var_t *eventgen_ratevar(var_t *var);
 void eventgen_usage(void);
 void eventgen_reset(void);

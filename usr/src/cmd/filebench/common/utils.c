@@ -25,8 +25,6 @@
  * Portions Copyright 2008 Denis Cheng
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
@@ -42,9 +40,10 @@
 #include "parsertypes.h"
 
 /*
- * For now, just two routines: one to allocate a string in shared
- * memory, and one to get the final file or directory name from a
- * supplied pathname.
+ * For now, just three routines: one to allocate a string in shared
+ * memory, one to emulate a strlcpy() function and one to emulate a
+ * strlcat() function, both the second and third only used in non
+ * Solaris environments,
  *
  */
 
@@ -65,3 +64,65 @@ fb_stralloc(char *str)
 	(void) strcpy(newstr, str);
 	return (newstr);
 }
+
+#ifndef sun
+
+/*
+ * Implements the strlcpy function when compilied for non Solaris
+ * operating systems. On solaris the strlcpy() function is used
+ * directly.
+ */
+size_t
+fb_strlcpy(char *dst, const char *src, size_t dstsize)
+{
+	uint_t i;
+
+	for (i = 0; i < (dstsize - 1); i++) {
+
+		/* quit if at end of source string */
+		if (src[i] == '\0')
+			break;
+
+		dst[i] = src[i];
+	}
+
+	/* set end of dst string to \0 */
+	dst[i] = '\0';
+	i++;
+
+	return (i);
+}
+
+/*
+ * Implements the strlcat function when compilied for non Solaris
+ * operating systems. On solaris the strlcat() function is used
+ * directly.
+ */
+size_t
+fb_strlcat(char *dst, const char *src, size_t dstsize)
+{
+	uint_t i, j;
+
+	/* find the end of the current destination string */
+	for (i = 0; i < (dstsize - 1); i++) {
+		if (dst[i] == '\0')
+			break;
+	}
+
+	/* append the source string to the destination string */
+	for (j = 0; i < (dstsize - 1); i++) {
+		if (src[j] == '\0')
+			break;
+
+		dst[i] = src[j];
+		j++;
+	}
+
+	/* set end of dst string to \0 */
+	dst[i] = '\0';
+	i++;
+
+	return (i);
+}
+
+#endif /* !sun */

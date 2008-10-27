@@ -25,8 +25,6 @@
  * Portions Copyright 2008 Denis Cheng
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The event generator in this module is the producer half of a
  * metering system which blocks flows using consumer routines in the
@@ -86,16 +84,18 @@ eventgen_thread(void)
 	while (1) {
 		struct timespec sleeptime;
 		hrtime_t delta;
-		int count;
+		int count, rate;
 
-		if (filebench_shm->shm_eventgen_hz == 0) {
+		if (filebench_shm->shm_eventgen_hz == NULL) {
 			(void) sleep(1);
 			continue;
+		} else {
+			rate = avd_get_int(filebench_shm->shm_eventgen_hz);
 		}
+
 		/* Sleep for 10xperiod */
 		sleeptime.tv_sec = 0;
-		sleeptime.tv_nsec = FB_SEC2NSEC /
-		    filebench_shm->shm_eventgen_hz;
+		sleeptime.tv_nsec = FB_SEC2NSEC / rate;
 
 		sleeptime.tv_nsec *= 10;
 		if (sleeptime.tv_nsec < 1000UL)
@@ -108,7 +108,7 @@ eventgen_thread(void)
 		(void) nanosleep(&sleeptime, NULL);
 		delta = gethrtime() - last;
 		last = gethrtime();
-		count = (filebench_shm->shm_eventgen_hz * delta) / FB_SEC2NSEC;
+		count = (rate * delta) / FB_SEC2NSEC;
 
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "delta %llums count %d",
@@ -117,8 +117,7 @@ eventgen_thread(void)
 		/* Send 'count' events */
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		/* Keep the producer with a max of 5 second depth */
-		if (filebench_shm->shm_eventgen_q <
-		    (5 * filebench_shm->shm_eventgen_hz))
+		if (filebench_shm->shm_eventgen_q < (5 * rate))
 			filebench_shm->shm_eventgen_q += count;
 
 		(void) pthread_cond_signal(&filebench_shm->shm_eventgen_cv);
@@ -157,22 +156,35 @@ eventgen_init(void)
 var_t *
 eventgen_ratevar(var_t *var)
 {
-	VAR_SET_INT(var, filebench_shm->shm_eventgen_hz);
+	VAR_SET_INT(var, avd_get_int(filebench_shm->shm_eventgen_hz));
 	return (var);
 }
 
 /*
  * Sets the event generator rate to that supplied by
- * fbint_t rate.
+ * var_t *rate.
  */
 void
-eventgen_setrate(fbint_t rate)
+eventgen_setrate(avd_t rate)
 {
-	filebench_shm->shm_eventgen_hz = (int)rate;
+	filebench_shm->shm_eventgen_hz = rate;
+	if (rate == NULL) {
+		filebench_log(LOG_ERROR,
+		    "eventgen_setrate() called without a rate");
+		return;
+	}
+
+	if (AVD_IS_VAR(rate)) {
+		filebench_log(LOG_VERBOSE,
+		    "Eventgen rate taken from variable");
+	} else {
+		filebench_log(LOG_VERBOSE, "Eventgen: %llu per second",
+		    (u_longlong_t)avd_get_int(rate));
+	}
 }
 
 /*
- * Turns off the event generator by setting the rate to zero
+ * Clears the event queue so we have a clean start
  */
 void
 eventgen_reset(void)

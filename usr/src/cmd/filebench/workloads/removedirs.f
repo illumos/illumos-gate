@@ -18,34 +18,34 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This package information file defines software dependencies associated
-# with the pkg.  You can define three types of pkg dependencies with this file:
-#	 P indicates a prerequisite for installation
-#	 I indicates an incompatible package
-#	 R indicates a reverse dependency
-# <pkg.abbr> see pkginfo(4), PKG parameter
-# <name> see pkginfo(4), NAME parameter
-# <version> see pkginfo(4), VERSION parameter
-# <arch> see pkginfo(4), ARCH parameter
-# <type> <pkg.abbr> <name>
-#	(<arch>)<version>
-#	(<arch>)<version>
-#	...
-# <type> <pkg.abbr> <name>
-# ...
+# Creates a fileset with $ndirs empty leaf directories then rmdir's all of them
 #
+set $dir=/tmp
+set $ndirs=10000
+set $meandirwidth=100
+set $nthreads=16
 
-P SUNWcar	Core Architecture, (Root)
-P SUNWcakr	Core Solaris Kernel Architecture (Root)
-P SUNWkvm	Core Architecture, (Kvm)
-P SUNWcsr	Core Solaris, (Root)
-P SUNWcsu	Core Solaris, (Usr)
-P SUNWcsl	Core Solaris Libraries
-P SUNWperl584core	Perl 5.8.4 (core)
-P SUNWlibmsr	
-P SUNWtecla	Tecla command-line editing library
+set mode quit firstdone
+
+define fileset name=bigfileset,path=$dir,size=0,leafdirs=$ndirs,dirwidth=$meandirwidth,prealloc
+
+define process name=remdir,instances=1
+{
+  thread name=fileopener,memsize=1m,instances=$nthreads
+  {
+    flowop removedir name=dirremover,filesetname=bigfileset
+  }
+}
+
+echo  "RemoveDir Version 1.0 personality successfully loaded"
+usage "Usage: set \$dir=<dir>          defaults to $dir"
+usage "       set \$meandirwidth=<size> defaults to $meandirwidth"
+usage "       set \$ndirs=<value>      defaults to $ndirs"
+usage "       set \$nthreads=<value>   defaults to $nthreads"
+usage "(sets mean dir width and dir depth is calculated as log (width, ndirs)"
+usage " "
+usage "       run"

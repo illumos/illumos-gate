@@ -38,6 +38,7 @@
 #include <inttypes.h>
 #include <fcntl.h>
 #include <math.h>
+#include <dirent.h>
 
 #ifdef HAVE_UTILITY_H
 #include <utility.h>
@@ -75,7 +76,7 @@
 #include "flowop.h"
 #include "fileset.h"
 #include "fb_random.h"
-
+#include "utils.h"
 /*
  * These routines implement the flowops from the f language. Each
  * flowop has has a name such as "read", and a set of function pointers
@@ -128,6 +129,9 @@ static int flowoplib_openfile(threadflow_t *, flowop_t *flowop);
 static int flowoplib_openfile_common(threadflow_t *, flowop_t *flowop, int fd);
 static int flowoplib_createfile(threadflow_t *, flowop_t *flowop);
 static int flowoplib_closefile(threadflow_t *, flowop_t *flowop);
+static int flowoplib_makedir(threadflow_t *, flowop_t *flowop);
+static int flowoplib_removedir(threadflow_t *, flowop_t *flowop);
+static int flowoplib_listdir(threadflow_t *, flowop_t *flowop);
 static int flowoplib_fsync(threadflow_t *, flowop_t *flowop);
 static int flowoplib_readwholefile(threadflow_t *, flowop_t *flowop);
 static int flowoplib_writewholefile(threadflow_t *, flowop_t *flowop);
@@ -192,6 +196,12 @@ static flowoplib_t flowoplib_funcs[] = {
 	flowoplib_createfile, flowoplib_destruct_generic,
 	FLOW_TYPE_IO, 0, "closefile", flowoplib_init_generic,
 	flowoplib_closefile, flowoplib_destruct_generic,
+	FLOW_TYPE_IO, 0, "makedir", flowoplib_init_generic,
+	flowoplib_makedir, flowoplib_destruct_generic,
+	FLOW_TYPE_IO, 0, "removedir", flowoplib_init_generic,
+	flowoplib_removedir, flowoplib_destruct_generic,
+	FLOW_TYPE_IO, 0, "listdir", flowoplib_init_generic,
+	flowoplib_listdir, flowoplib_destruct_generic,
 	FLOW_TYPE_IO, 0, "fsync", flowoplib_init_generic,
 	flowoplib_fsync, flowoplib_destruct_generic,
 	FLOW_TYPE_IO, 0, "fsyncset", flowoplib_init_generic,
@@ -996,7 +1006,7 @@ static int
 flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 {
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == NULL)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1006,7 +1016,7 @@ flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 	}
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz) {
+	while (filebench_shm->shm_eventgen_hz != NULL) {
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q > 0) {
 			filebench_shm->shm_eventgen_q--;
@@ -1059,7 +1069,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == NULL)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1114,7 +1124,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	events = iops;
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz) {
+	while (filebench_shm->shm_eventgen_hz != NULL) {
 
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q >= events) {
@@ -1147,7 +1157,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == NULL)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1188,7 +1198,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	events = ops;
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz) {
+	while (filebench_shm->shm_eventgen_hz != NULL) {
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q >= events) {
 			filebench_shm->shm_eventgen_q -= events;
@@ -1222,7 +1232,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == 0)
+	if (filebench_shm->shm_eventgen_hz == NULL)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1281,7 +1291,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	    (u_longlong_t)bytes, (u_longlong_t)events);
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz) {
+	while (filebench_shm->shm_eventgen_hz != NULL) {
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q >= events) {
 			filebench_shm->shm_eventgen_q -= events;
@@ -1775,10 +1785,10 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 		int open_attrs = 0;
 		char name[MAXPATHLEN];
 
-		(void) strcpy(name,
-		    avd_get_str(flowop->fo_fileset->fs_path));
-		(void) strcat(name, "/");
-		(void) strcat(name, fileset_name);
+		(void) fb_strlcpy(name,
+		    avd_get_str(flowop->fo_fileset->fs_path), MAXPATHLEN);
+		(void) fb_strlcat(name, "/", MAXPATHLEN);
+		(void) fb_strlcat(name, fileset_name, MAXPATHLEN);
 
 		if (avd_get_bool(flowop->fo_dsync)) {
 #ifdef sun
@@ -1987,12 +1997,11 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 		(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 	}
 
-	*path = 0;
-	(void) strcpy(path, avd_get_str(fileset->fs_path));
-	(void) strcat(path, "/");
-	(void) strcat(path, avd_get_str(fileset->fs_name));
+	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, avd_get_str(fileset->fs_name), MAXPATHLEN);
 	pathtmp = fileset_resolvepath(file);
-	(void) strcat(path, pathtmp);
+	(void) fb_strlcat(path, pathtmp, MAXPATHLEN);
 	free(pathtmp);
 
 	/* delete the selected file */
@@ -2118,6 +2127,200 @@ flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
 }
 
 /*
+ * Obtain a filesetentry for a leaf directory. Result placed where dirp
+ * points. Supply with flowop and a flag to indicate whether an existent
+ * or non-existent leaf directory is required. Returns FILEBENCH_NORSC
+ * if all out of the appropriate type of directories, FILEBENCH_ERROR
+ * if the flowop does not point to a fileset, and FILEBENCH_OK otherwise.
+ */
+static int
+flowoplib_pickleafdir(filesetentry_t **dirp, flowop_t *flowop, int flags)
+{
+	fileset_t	*fileset;
+
+	if ((fileset = flowop->fo_fileset) == NULL) {
+		filebench_log(LOG_ERROR, "flowop NO fileset");
+		return (FILEBENCH_ERROR);
+	}
+
+	if ((*dirp = fileset_pick(fileset,
+	    FILESET_PICKLEAFDIR | flags, 0)) == NULL) {
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s failed to pick directory from fileset %s",
+		    flowop->fo_name,
+		    avd_get_str(fileset->fs_name));
+		return (FILEBENCH_NORSC);
+	}
+
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Obtain the full pathname of the directory described by the filesetentry
+ * indicated by "dir", and copy it into the character array pointed to by
+ * path. Returns FILEBENCH_ERROR on errors, FILEBENCH_OK otherwise.
+ */
+static int
+flowoplib_getdirpath(filesetentry_t *dir, char *path)
+{
+	char		*fileset_path;
+	char		*fileset_name;
+	char		*part_path;
+
+	if ((fileset_path = avd_get_str(dir->fse_fileset->fs_path)) == NULL) {
+		filebench_log(LOG_ERROR, "Fileset path not set");
+		return (FILEBENCH_ERROR);
+	}
+
+	if ((fileset_name = avd_get_str(dir->fse_fileset->fs_name)) == NULL) {
+		filebench_log(LOG_ERROR, "Fileset name not set");
+		return (FILEBENCH_ERROR);
+	}
+
+	(void) fb_strlcpy(path, fileset_path, MAXPATHLEN);
+	(void) fb_strlcat(path, "/", MAXPATHLEN);
+	(void) fb_strlcat(path, fileset_name, MAXPATHLEN);
+
+	if ((part_path = fileset_resolvepath(dir)) == NULL)
+		return (FILEBENCH_ERROR);
+
+	(void) fb_strlcat(path, part_path, MAXPATHLEN);
+	free(part_path);
+
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Use mkdir to create a directory.  Obtains the fileset name from the
+ * flowop, selects a non-existent leaf directory and obtains its full
+ * path, then uses mkdir to create it on the storage subsystem (make it
+ * existent). Returns FILEBENCH_NORSC is there are no more non-existent
+ * directories in the fileset, FILEBENCH_ERROR on other errors, and
+ * FILEBENCH_OK on success.
+ */
+static int
+flowoplib_makedir(threadflow_t *threadflow, flowop_t *flowop)
+{
+	filesetentry_t	*dir;
+	int		ret;
+	char		full_path[MAXPATHLEN];
+
+	if ((ret = flowoplib_pickleafdir(&dir, flowop,
+	    FILESET_PICKNOEXIST)) != FILEBENCH_OK)
+		return (ret);
+
+	if ((ret = flowoplib_getdirpath(dir, full_path)) != FILEBENCH_OK)
+		return (ret);
+
+	flowop_beginop(threadflow, flowop);
+	(void) mkdir(full_path, 0755);
+	flowop_endop(threadflow, flowop, 0);
+
+	/* indicate that it is no longer busy and now exists */
+	fileset_unbusy(dir, TRUE, TRUE);
+
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Use rmdir to delete a directory.  Obtains the fileset name from the
+ * flowop, selects an existent leaf directory and obtains its full path,
+ * then uses rmdir to remove it from the storage subsystem (make it
+ * non-existent). Returns FILEBENCH_NORSC is there are no more existent
+ * directories in the fileset, FILEBENCH_ERROR on other errors, and
+ * FILEBENCH_OK on success.
+ */
+static int
+flowoplib_removedir(threadflow_t *threadflow, flowop_t *flowop)
+{
+	filesetentry_t *dir;
+	int		ret;
+	char		full_path[MAXPATHLEN];
+
+	if ((ret = flowoplib_pickleafdir(&dir, flowop,
+	    FILESET_PICKEXISTS)) != FILEBENCH_OK)
+		return (ret);
+
+	if ((ret = flowoplib_getdirpath(dir, full_path)) != FILEBENCH_OK)
+		return (ret);
+
+	flowop_beginop(threadflow, flowop);
+	(void) rmdir(full_path);
+	flowop_endop(threadflow, flowop, 0);
+
+	/* indicate that it is no longer busy and no longer exists */
+	fileset_unbusy(dir, TRUE, FALSE);
+
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Use opendir(), multiple readdir() calls, and closedir() to list the
+ * contents of a directory.  Obtains the fileset name from the
+ * flowop, selects a normal subdirectory (which always exist) and obtains
+ * its full path, then uses opendir() to get a DIR handle to it from the
+ * file system, a readdir() loop to access each directory entry, and
+ * finally cleans up with a closedir(). The latency reported is the total
+ * for all this activity, and it also reports the total number of bytes
+ * in the entries as the amount "read". Returns FILEBENCH_ERROR on errors,
+ * and FILEBENCH_OK on success.
+ */
+static int
+flowoplib_listdir(threadflow_t *threadflow, flowop_t *flowop)
+{
+	fileset_t	*fileset;
+	filesetentry_t	*dir;
+	DIR		*dir_handlep;
+	struct dirent	*direntp;
+	int		dir_bytes = 0;
+	int		ret;
+	char		full_path[MAXPATHLEN];
+
+	if ((fileset = flowop->fo_fileset) == NULL) {
+		filebench_log(LOG_ERROR, "flowop NO fileset");
+		return (FILEBENCH_ERROR);
+	}
+
+	if ((dir = fileset_pick(fileset,
+	    FILESET_PICKDIR, 0)) == NULL) {
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s failed to pick directory from fileset %s",
+		    flowop->fo_name,
+		    avd_get_str(fileset->fs_name));
+		return (FILEBENCH_NORSC);
+	}
+
+	if ((ret = flowoplib_getdirpath(dir, full_path)) != FILEBENCH_OK)
+		return (ret);
+
+	flowop_beginop(threadflow, flowop);
+
+	/* open the directory */
+	if ((dir_handlep = opendir(full_path)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "flowop %s failed to open directory in fileset %s\n",
+		    flowop->fo_name, avd_get_str(fileset->fs_name));
+		return (FILEBENCH_ERROR);
+	}
+
+	/* read through the directory entries */
+	while ((direntp = readdir(dir_handlep)) != NULL) {
+		dir_bytes += (strlen(direntp->d_name) +
+		    sizeof (struct dirent) - 1);
+	}
+
+	/* close the directory */
+	(void) closedir(dir_handlep);
+
+	flowop_endop(threadflow, flowop, dir_bytes);
+
+	/* indicate that it is no longer busy */
+	fileset_unbusy(dir, FALSE, FALSE);
+
+	return (FILEBENCH_OK);
+}
+
+/*
  * Emulate stat of a file. Picks an arbitrary filesetentry with
  * an existing file from the flowop's fileset, then performs a
  * stat() operation on it. Returns FILEBENCH_ERROR if the flowop has no
@@ -2151,7 +2354,6 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 		fileset = flowop->fo_fileset;
 	}
 
-
 	if (fileset == NULL) {
 		filebench_log(LOG_ERROR,
 		    "statfile with no fileset specified");
@@ -2182,12 +2384,13 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 		}
 
 		/* resolve path and do a stat on file */
-		*path = 0;
-		(void) strcpy(path, avd_get_str(fileset->fs_path));
-		(void) strcat(path, "/");
-		(void) strcat(path, avd_get_str(fileset->fs_name));
+		(void) fb_strlcpy(path, avd_get_str(fileset->fs_path),
+		    MAXPATHLEN);
+		(void) fb_strlcat(path, "/", MAXPATHLEN);
+		(void) fb_strlcat(path, avd_get_str(fileset->fs_name),
+		    MAXPATHLEN);
 		pathtmp = fileset_resolvepath(file);
-		(void) strcat(path, pathtmp);
+		(void) fb_strlcat(path, pathtmp, MAXPATHLEN);
 		free(pathtmp);
 
 		/* stat the file */

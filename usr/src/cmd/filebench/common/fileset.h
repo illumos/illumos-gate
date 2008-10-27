@@ -59,18 +59,22 @@ extern "C" {
 #define	FSE_MAXTID 16384
 
 #define	FSE_MAXPATHLEN 16
-#define	FSE_DIR		0x01
-#define	FSE_FREE	0x02
-#define	FSE_EXISTS	0x04
-#define	FSE_BUSY	0x08
-#define	FSE_THRD_WAITNG	0x10
-#define	FSE_REUSING	0x20
+#define	FSE_TYPE_FILE		0x00
+#define	FSE_TYPE_DIR		0x01
+#define	FSE_TYPE_LEAFDIR	0x02
+#define	FSE_TYPE_MASK		0x03
+#define	FSE_FREE		0x04
+#define	FSE_EXISTS		0x08
+#define	FSE_BUSY		0x10
+#define	FSE_REUSING		0x20
+#define	FSE_THRD_WAITNG		0x40
 
 typedef struct filesetentry {
 	struct filesetentry	*fse_next;
 	struct filesetentry	*fse_parent;
 	struct filesetentry	*fse_filenext;	/* List of files */
 	struct filesetentry	*fse_dirnext;	/* List of directories */
+	struct filesetentry	*fse_leafdirnext; /* List of leaf dirs */
 	struct fileset		*fse_fileset;	/* Parent fileset */
 	char			*fse_path;
 	int			fse_depth;
@@ -78,10 +82,15 @@ typedef struct filesetentry {
 	int			fse_flags;	/* protected by fs_pick_lock */
 } filesetentry_t;
 
-#define	FILESET_PICKANY	    0x1 /* Pick any file from the set */
-#define	FILESET_PICKUNIQUE  0x2 /* Pick a unique file from set until empty */
-#define	FILESET_PICKRESET   0x4 /* Reset FILESET_PICKUNIQUE selection list */
-#define	FILESET_PICKDIR	    0x8 /* Pick a directory */
+/* type of fileset entry to obtain */
+#define	FILESET_PICKFILE    0x00 /* Pick a file from the set */
+#define	FILESET_PICKDIR	    0x01 /* Pick a directory */
+#define	FILESET_PICKLEAFDIR 0x02 /* Pick a leaf directory */
+#define	FILESET_PICKMASK    0x03 /* Pick type mask */
+/* other pick flags */
+#define	FILESET_PICKUNIQUE  0x04 /* Pick a unique file or leafdir from the */
+				    /* fileset until empty */
+#define	FILESET_PICKRESET   0x08 /* Reset FILESET_PICKUNIQUE selection list */
 #define	FILESET_PICKEXISTS  0x10 /* Pick an existing file */
 #define	FILESET_PICKNOEXIST 0x20 /* Pick a file that doesn't exist */
 
@@ -96,6 +105,10 @@ typedef struct fileset {
 	avd_t		fs_entries;	/* Number of entries attr */
 					/* (possibly random) */
 	fbint_t		fs_constentries; /* Constant version of enties attr */
+	avd_t		fs_leafdirs;	/* Number of leaf directories attr */
+					/* (possibly random) */
+	fbint_t		fs_constleafdirs; /* Constant version of leafdirs */
+					    /* attr */
 	avd_t		fs_preallocpercent; /* Prealloc size */
 	int		fs_attrs;	/* Attributes */
 	avd_t		fs_dirwidth;	/* Explicit or mean for distribution */
@@ -116,28 +129,37 @@ typedef struct fileset {
 	double		fs_meanwidth;	/* Specified mean dir width */
 	double		fs_meansize;	/* Specified mean file size */
 	int		fs_realfiles;	/* Actual files */
+	int		fs_realleafdirs; /* Actual explicit leaf directories */
 	off64_t		fs_bytes;	/* Total space consumed by files */
+
+	int64_t		fs_idle_files;	/* number of files NOT busy */
+	pthread_cond_t	fs_idle_files_cv; /* idle files condition variable */
 	fbint_t		fs_num_act_files;   /* total number of files */
 					    /* actually existing in the */
 					    /* host or server's file system */
-	fbint_t		fs_num_act_dirs;   /* total number of directories */
-					    /* actually existing in the */
-					    /* host or server's file system */
-	int64_t		fs_idle_files;	/* number of files NOT busy */
-	pthread_cond_t	fs_idle_files_cv; /* idle files condition variable */
 	int64_t		fs_idle_dirs;	/* number of dirs NOT busy */
 	pthread_cond_t	fs_idle_dirs_cv; /* idle dirs condition variable */
+
+	int64_t		fs_idle_leafdirs; /* number of dirs NOT busy */
+	pthread_cond_t	fs_idle_leafdirs_cv; /* idle dirs condition variable */
+	fbint_t		fs_num_act_leafdirs; /* total number of leaf dirs */
+					    /* actually existing in the */
+					    /* host or server's file system */
 	pthread_mutex_t	fs_pick_lock;	/* per fileset "pick" function lock */
 	pthread_cond_t	fs_thrd_wait_cv; /* per fileset file busy wait cv */
 	filesetentry_t	*fs_filelist;	/* List of files */
-	filesetentry_t	*fs_dirlist;	/* List of directories */
 	filesetentry_t	*fs_filefree;	/* Ptr to next free file */
-	filesetentry_t	*fs_dirfree;	/* Ptr to next free directory */
 	filesetentry_t	*fs_filerotor[FSE_MAXTID];	/* next file to */
 							/* select */
 	filesetentry_t	*fs_file_ne_rotor;	/* next non existent file */
 						/* to select for createfile */
+	filesetentry_t	*fs_dirlist;	/* List of directories */
+	filesetentry_t	*fs_dirfree;	/* List of free directories */
 	filesetentry_t	*fs_dirrotor;	/* Ptr to next directory to select */
+	filesetentry_t	*fs_leafdirlist; /* List of leaf directories */
+	filesetentry_t	*fs_leafdirfree; /* Ptr to next free leaf directory */
+	filesetentry_t	*fs_leafdirrotor;	/* Ptr to next leaf */
+						/* directory to select */
 } fileset_t;
 
 int fileset_createset(fileset_t *);

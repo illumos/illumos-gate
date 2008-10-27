@@ -18,34 +18,26 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This package information file defines software dependencies associated
-# with the pkg.  You can define three types of pkg dependencies with this file:
-#	 P indicates a prerequisite for installation
-#	 I indicates an incompatible package
-#	 R indicates a reverse dependency
-# <pkg.abbr> see pkginfo(4), PKG parameter
-# <name> see pkginfo(4), NAME parameter
-# <version> see pkginfo(4), VERSION parameter
-# <arch> see pkginfo(4), ARCH parameter
-# <type> <pkg.abbr> <name>
-#	(<arch>)<version>
-#	(<arch>)<version>
-#	...
-# <type> <pkg.abbr> <name>
-# ...
-#
 
-P SUNWcar	Core Architecture, (Root)
-P SUNWcakr	Core Solaris Kernel Architecture (Root)
-P SUNWkvm	Core Architecture, (Kvm)
-P SUNWcsr	Core Solaris, (Root)
-P SUNWcsu	Core Solaris, (Usr)
-P SUNWcsl	Core Solaris Libraries
-P SUNWperl584core	Perl 5.8.4 (core)
-P SUNWlibmsr	
-P SUNWtecla	Tecla command-line editing library
+DEFAULTS {
+        runtime = 120;
+        dir = /export/home/tmp;
+        stats = /tmp;
+        filesystem = zfs;
+        description = "fileserver zfs";
+}
+
+CONFIG video_server {
+	function = generic;
+	personality = videoserver;
+	filesize = 2g;
+	numactivevids = 8;
+	numpassivevids = 40;
+	nthreads = 16;
+	srvbwrate = 32;
+	repintval = 60;
+}

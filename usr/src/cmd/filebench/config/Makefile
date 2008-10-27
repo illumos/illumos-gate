@@ -28,7 +28,7 @@
 include ../../Makefile.cmd
 
 CONFIGS = fileio.prof filemacro.prof filemicro.prof generic.func \
-seqread.prof randomread.prof multi_fileserver.prof
+seqread.prof randomread.prof multi_fileserver.prof videoserver.prof
 ROOTUSRBENCHDIR = $(ROOT)/usr/benchmarks
 ROOTUSRBENCHFBCONFIGDIR = $(ROOTUSRBENCHDIR)/filebench/config
 FBCONFIGS = $(CONFIGS:%=$(ROOTUSRBENCHFBCONFIGDIR)/%)

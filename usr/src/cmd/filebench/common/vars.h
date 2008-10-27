@@ -76,6 +76,9 @@ typedef struct avd {
 #define	AVD_IS_RANDOM(vp)	((vp) && ((vp)->avd_type == AVD_IND_RANDVAR))
 #define	AVD_IS_STRING(vp)	((vp) && (((vp)->avd_type == AVD_VAL_STR) || \
 				((vp)->avd_type == AVD_VARVAL_STR)))
+#define	AVD_IS_VAR(vp)		((vp) && (((vp)->avd_type == AVD_IND_VAR) || \
+				((vp)->avd_type == AVD_VARVAL_INT) || \
+				((vp)->avd_type == AVD_VARVAL_DBL)))
 
 typedef struct var {
 	char		*var_name;
