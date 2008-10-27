@@ -163,7 +163,7 @@ typedef enum {
 } vp_channel_t;
 
 typedef enum {
-	VP_BOUND_TX,
+	VP_BOUND_TX = 1,
 	VP_BOUND_RX
 
 } vpc_type_t;

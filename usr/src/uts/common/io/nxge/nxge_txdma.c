@@ -94,30 +94,51 @@ static void nxge_txdma_fixup_hung_channel(p_nxge_t nxgep,
 nxge_status_t
 nxge_init_txdma_channels(p_nxge_t nxgep)
 {
-	nxge_grp_set_t *set = &nxgep->tx_set;
-	int i, count;
+	nxge_grp_set_t	*set = &nxgep->tx_set;
+	int		i, tdc, count;
+	nxge_grp_t	*group;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_init_txdma_channels"));
 
 	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
 		if ((1 << i) & set->lg.map) {
-			int tdc;
-			nxge_grp_t *group = set->group[i];
+			group = set->group[i];
+
 			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
 				if ((1 << tdc) & group->map) {
-					if ((nxge_grp_dc_add(nxgep,
-					    group, VP_BOUND_TX, tdc)))
-						return (NXGE_ERROR);
+					if ((nxge_grp_dc_add(nxgep, group,
+					    VP_BOUND_TX, tdc)))
+						goto init_txdma_channels_exit;
 				}
 			}
 		}
+
 		if (++count == set->lg.count)
 			break;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_txdma_channels"));
-
 	return (NXGE_OK);
+
+init_txdma_channels_exit:
+	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
+		if ((1 << i) & set->lg.map) {
+			group = set->group[i];
+
+			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
+				if ((1 << tdc) & group->map) {
+					nxge_grp_dc_remove(nxgep,
+					    VP_BOUND_TX, tdc);
+				}
+			}
+		}
+
+		if (++count == set->lg.count)
+			break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_txdma_channels"));
+	return (NXGE_ERROR);
 }
 
 nxge_status_t
@@ -3497,10 +3518,7 @@ nxge_tx_port_fatal_err_recover(p_nxge_t nxgep)
 		if ((1 << tdc) & set->owned.map) {
 			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
 			if (ring) {
-				MUTEX_ENTER(&ring->lock);
 				(void) nxge_txdma_reclaim(nxgep, ring, 0);
-				MUTEX_EXIT(&ring->lock);
-
 				nxge_txdma_freemsg_task(ring);
 			}
 		}

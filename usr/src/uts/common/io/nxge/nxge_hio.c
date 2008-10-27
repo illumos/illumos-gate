@@ -373,7 +373,7 @@ nxge_grp_remove(
 }
 
 /*
- * nx_hio_dc_add
+ * nxge_grp_dc_add
  *
  *	Add a DMA channel to a VR/Group.
  *
@@ -404,7 +404,7 @@ nxge_grp_dc_add(
 		return (0);
 
 	switch (type) {
-	default:
+	case VP_BOUND_TX:
 		set = &nxge->tx_set;
 		if (channel > NXGE_MAX_TDCS) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
@@ -420,6 +420,11 @@ nxge_grp_dc_add(
 			return (NXGE_ERROR);
 		}
 		break;
+
+	default:
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+		    "nxge_grp_dc_add: unknown type channel(%d)", channel));
+		return (NXGE_ERROR);
 	}
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL,
@@ -477,6 +482,11 @@ nxge_grp_dc_add(
 	if ((status = (*dc->init)(nxge, channel)) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nxge_grp_dc_add(%d): channel init failed", channel));
+		MUTEX_ENTER(&nhd->lock);
+		(void) memset(dc, 0, sizeof (*dc));
+		NXGE_DC_RESET(set->owned.map, channel);
+		set->owned.count--;
+		MUTEX_EXIT(&nhd->lock);
 		return (NXGE_ERROR);
 	}
 
@@ -508,11 +518,14 @@ nxge_grp_dc_remove(
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_grp_dc_remove"));
 
-	if ((dc = nxge_grp_dc_find(nxge, type, channel)) == 0) {
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_dc_remove: find(%d) failed", channel));
-		return;
+	if ((dc = nxge_grp_dc_find(nxge, type, channel)) == 0)
+		goto nxge_grp_dc_remove_exit;
+
+	if ((dc->group == NULL) && (dc->next == 0) &&
+	    (dc->channel == 0) && (dc->page == 0) && (dc->type == 0)) {
+		goto nxge_grp_dc_remove_exit;
 	}
+
 	group = (nxge_grp_t *)dc->group;
 
 	if (isLDOMguest(nxge)) {
@@ -535,8 +548,8 @@ nxge_grp_dc_remove(
 	if (nxge_grp_dc_unlink(nxge, group, channel) != dc) {
 		MUTEX_EXIT(&nhd->lock);
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_dc_remove(%d) failed", channel));
-		return;
+		    "nxge_grp_dc_remove(%d) failed", channel));
+		goto nxge_grp_dc_remove_exit;
 	}
 
 	uninit = dc->uninit;
@@ -551,6 +564,7 @@ nxge_grp_dc_remove(
 
 	(*uninit)(nxge, channel);
 
+nxge_grp_dc_remove_exit:
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_grp_dc_remove"));
 }
 
@@ -1110,7 +1124,7 @@ nxge_hio_share_assign(
 	fp = &nhd->hio.vr;
 	if ((hv_rv = (*fp->assign)(vr->region, cookie, &vr->cookie))) {
 		NXGE_ERROR_MSG((nxge, HIO_CTL,
-		    "nx_hio_share_assign: "
+		    "nxge_hio_share_assign: "
 		    "vr->assign() returned %d", hv_rv));
 		nxge_hio_unshare(vr);
 		return (-EIO);
@@ -1128,7 +1142,7 @@ nxge_hio_share_assign(
 			    (vr->cookie, dc->channel, &slot);
 			if (hv_rv != 0) {
 				NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-				    "nx_hio_share_assign: "
+				    "nxge_hio_share_assign: "
 				    "tx->assign(%x, %d) failed: %ld",
 				    vr->cookie, dc->channel, hv_rv));
 				return (-EIO);
@@ -1156,7 +1170,7 @@ nxge_hio_share_assign(
 			    (vr->cookie, dc->channel, &slot);
 			if (hv_rv != 0) {
 				NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-				    "nx_hio_share_assign: "
+				    "nxge_hio_share_assign: "
 				    "rx->assign(%x, %d) failed: %ld",
 				    vr->cookie, dc->channel, hv_rv));
 				return (-EIO);
@@ -1193,7 +1207,7 @@ nxge_hio_share_unassign(
 		hv_rv = (*tx->unassign)(vr->cookie, dc->page);
 		if (hv_rv != 0) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-			    "nx_hio_dc_unshare: "
+			    "nxge_hio_share_unassign: "
 			    "tx->unassign(%x, %d) failed: %ld",
 			    vr->cookie, dc->page, hv_rv));
 		}
@@ -1206,7 +1220,7 @@ nxge_hio_share_unassign(
 		hv_rv = (*rx->unassign)(vr->cookie, dc->page);
 		if (hv_rv != 0) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-			    "nx_hio_dc_unshare: "
+			    "nxge_hio_share_unassign: "
 			    "rx->unassign(%x, %d) failed: %ld",
 			    vr->cookie, dc->page, hv_rv));
 		}
@@ -1217,7 +1231,8 @@ nxge_hio_share_unassign(
 	if (fp->unassign) {
 		hv_rv = (*fp->unassign)(vr->cookie);
 		if (hv_rv != 0) {
-			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_unshare: "
+			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+			    "nxge_hio_share_unassign: "
 			    "vr->assign(%x) failed: %ld",
 			    vr->cookie, hv_rv));
 		}
@@ -1447,7 +1462,7 @@ nxge_hio_unshare(
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_unshare"));
 
 	if (!nxge) {
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_unshare: "
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_unshare: "
 		    "vr->nxge is NULL"));
 		return;
 	}
@@ -1515,7 +1530,7 @@ nxge_hio_remres(
 	nxge_grp_t *group;
 
 	if (!nxge) {
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_remres: "
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_remres: "
 		    "vr->nxge is NULL"));
 		return;
 	}
@@ -1598,7 +1613,8 @@ nxge_hio_tdc_share(
 		if (count == 0) {
 			(void) atomic_swap_32(&ring->tx_ring_offline,
 			    NXGE_TX_RING_ONLINE);
-			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
+			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+			    "nxge_hio_tdc_share: "
 			    "Tx ring %d was always BUSY", channel));
 			return (-EIO);
 		}
@@ -1613,7 +1629,7 @@ nxge_hio_tdc_share(
 
 
 	if (nxge_intr_remove(nxge, VP_BOUND_TX, channel) != NXGE_OK) {
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_tdc_share: "
 		    "Failed to remove interrupt for TxDMA channel %d",
 		    channel));
 		return (NXGE_ERROR);
@@ -1635,7 +1651,7 @@ nxge_hio_tdc_share(
 	 */
 	if (nxge_init_fzc_tdc(nxge, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_dc_share: FZC TDC failed: %d", channel));
+		    "nxge_hio_tdc_share: FZC TDC failed: %d", channel));
 		return (-EIO);
 	}
 
@@ -1692,7 +1708,7 @@ nxge_hio_rdc_share(
 
 	/* Disable interrupts. */
 	if (nxge_intr_remove(nxge, VP_BOUND_RX, channel) != NXGE_OK) {
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_rdc_share: "
+		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_rdc_share: "
 		    "Failed to remove interrupt for RxDMA channel %d",
 		    channel));
 		return (NXGE_ERROR);
@@ -1747,7 +1763,7 @@ nxge_hio_rdc_share(
 	 */
 	if (nxge_rx_mac_enable(nxge) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_rdc_share: Rx MAC still disabled"));
+		    "nxge_hio_rdc_share: Rx MAC still disabled"));
 	}
 
 	/*
@@ -1756,7 +1772,7 @@ nxge_hio_rdc_share(
 	 */
 	if (nxge_init_fzc_rdc(nxge, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_rdc_share: RZC RDC failed: %ld", channel));
+		    "nxge_hio_rdc_share: RZC RDC failed: %ld", channel));
 		return (-EIO);
 	}
 
@@ -1776,7 +1792,7 @@ nxge_hio_rdc_share(
 
 	if (nxge_init_fzc_rdc_tbl(nxge, vr->rdc_tbl) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_rdc_share: nxge_init_fzc_rdc_tbl failed"));
+		    "nxge_hio_rdc_share: nxge_init_fzc_rdc_tbl failed"));
 		return (-EIO);
 	}
 
@@ -1854,7 +1870,7 @@ nxge_hio_dc_share(
 	if (channel == limit) {
 		MUTEX_EXIT(&nhd->lock);
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_dc_share: there are no channels to share"));
+		    "nxge_hio_dc_share: there are no channels to share"));
 		return (-EIO);
 	}
 
@@ -2018,7 +2034,7 @@ nxge_hio_rdc_unshare(
 		/* Be sure to re-enable the RX MAC. */
 		if (nxge_rx_mac_enable(nxge) != NXGE_OK) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-			    "nx_hio_rdc_share: Rx MAC still disabled"));
+			    "nxge_hio_rdc_unshare: Rx MAC still disabled"));
 		}
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_rdc_unshare: "
 		    "Failed to initialize RxDMA channel %d", channel));
@@ -2046,14 +2062,14 @@ nxge_hio_rdc_unshare(
 	 */
 	if (nxge_rx_mac_enable(nxge) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_rdc_share: Rx MAC still disabled"));
+		    "nxge_hio_rdc_unshare: Rx MAC still disabled"));
 		return;
 	}
 
 	/* Re-add this interrupt. */
 	if (nxge_intr_add(nxge, VP_BOUND_RX, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_rdc_unshare: Failed to add interrupt for "
+		    "nxge_hio_rdc_unshare: Failed to add interrupt for "
 		    "RxDMA CHANNEL %d", channel));
 	}
 
@@ -2095,7 +2111,7 @@ nxge_hio_dc_unshare(
 	NXGE_DC_RESET(group->map, channel);
 	if ((dc = nxge_grp_dc_unlink(nxge, group, channel)) == 0) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nx_hio_dc_unshare(%d) failed", channel));
+		    "nxge_hio_dc_unshare(%d) failed", channel));
 		return;
 	}
 

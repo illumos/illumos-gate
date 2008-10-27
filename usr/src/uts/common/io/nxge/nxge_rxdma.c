@@ -136,8 +136,9 @@ static void nxge_rxdma_databuf_free(p_rx_rbr_ring_t);
 nxge_status_t
 nxge_init_rxdma_channels(p_nxge_t nxgep)
 {
-	nxge_grp_set_t *set = &nxgep->rx_set;
-	int i, count;
+	nxge_grp_set_t	*set = &nxgep->rx_set;
+	int		i, count, rdc, channel;
+	nxge_grp_t	*group;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_init_rxdma_channels"));
 
@@ -156,13 +157,13 @@ nxge_init_rxdma_channels(p_nxge_t nxgep)
 	 */
 	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
 		if ((1 << i) & set->lg.map) {
-			int channel;
-			nxge_grp_t *group = set->group[i];
+			group = set->group[i];
+
 			for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
 				if ((1 << channel) & group->map) {
 					if ((nxge_grp_dc_add(nxgep,
 					    group, VP_BOUND_RX, channel)))
-						return (NXGE_ERROR);
+						goto init_rxdma_channels_exit;
 				}
 			}
 		}
@@ -171,8 +172,27 @@ nxge_init_rxdma_channels(p_nxge_t nxgep)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_rxdma_channels"));
-
 	return (NXGE_OK);
+
+init_rxdma_channels_exit:
+	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
+		if ((1 << i) & set->lg.map) {
+			group = set->group[i];
+
+			for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
+				if ((1 << rdc) & group->map) {
+					nxge_grp_dc_remove(nxgep,
+					    VP_BOUND_RX, rdc);
+				}
+			}
+		}
+
+		if (++count == set->lg.count)
+			break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_rxdma_channels"));
+	return (NXGE_ERROR);
 }
 
 nxge_status_t
