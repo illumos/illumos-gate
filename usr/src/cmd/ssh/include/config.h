@@ -406,17 +406,8 @@ extern "C" {
 /* Define on *nto-qnx systems */
 /* #undef MISSING_FD_MASK */
 
-/* Define if you want smartcard support */
-/* #undef SMARTCARD */
-
-/* Define if you want smartcard support using sectok */
-/* #undef USE_SECTOK */
-
 /* Use libedit for sftp */
 #undef USE_LIBEDIT
-
-/* Define if you want smartcard support using OpenSC */
-/* #undef USE_OPENSC */
 
 /* Define if you want to use OpenSSL's internally seeded PRNG only */
 #define	OPENSSL_PRNG_ONLY 1

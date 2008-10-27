@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@
 #include "sys-queue.h"
 RCSID("$OpenBSD: ssh-agent.c,v 1.105 2002/10/01 20:34:12 markus Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_SOLARIS_PRIVILEGE
 #include <priv.h>
 #endif /* HAVE_SOLARIS_PRIVILEGE */
@@ -61,10 +59,6 @@ RCSID("$OpenBSD: ssh-agent.c,v 1.105 2002/10/01 20:34:12 markus Exp $");
 #include "authfd.h"
 #include "compat.h"
 #include "log.h"
-
-#ifdef SMARTCARD
-#include "scard.h"
-#endif
 
 typedef enum {
 	AUTH_UNUSED,
@@ -539,90 +533,6 @@ no_identities(SocketEntry *e, u_int type)
 	buffer_free(&msg);
 }
 
-#ifdef SMARTCARD
-static void
-process_add_smartcard_key (SocketEntry *e)
-{
-	char *sc_reader_id = NULL, *pin;
-	int i, version, success = 0;
-	Key **keys, *k;
-	Identity *id;
-	Idtab *tab;
-
-	sc_reader_id = buffer_get_string(&e->request, NULL);
-	pin = buffer_get_string(&e->request, NULL);
-	keys = sc_get_keys(sc_reader_id, pin);
-	xfree(sc_reader_id);
-	xfree(pin);
-
-	if (keys == NULL || keys[0] == NULL) {
-		error("sc_get_keys failed");
-		goto send;
-	}
-	for (i = 0; keys[i] != NULL; i++) {
-		k = keys[i];
-		version = k->type == KEY_RSA1 ? 1 : 2;
-		tab = idtab_lookup(version);
-		if (lookup_identity(k, version) == NULL) {
-			id = xmalloc(sizeof(Identity));
-			id->key = k;
-			id->comment = xstrdup("smartcard key");
-			id->death = 0;
-			TAILQ_INSERT_TAIL(&tab->idlist, id, next);
-			tab->nentries++;
-			success = 1;
-		} else {
-			key_free(k);
-		}
-		keys[i] = NULL;
-	}
-	xfree(keys);
-send:
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
-}
-
-static void
-process_remove_smartcard_key(SocketEntry *e)
-{
-	char *sc_reader_id = NULL, *pin;
-	int i, version, success = 0;
-	Key **keys, *k = NULL;
-	Identity *id;
-	Idtab *tab;
-
-	sc_reader_id = buffer_get_string(&e->request, NULL);
-	pin = buffer_get_string(&e->request, NULL);
-	keys = sc_get_keys(sc_reader_id, pin);
-	xfree(sc_reader_id);
-	xfree(pin);
-
-	if (keys == NULL || keys[0] == NULL) {
-		error("sc_get_keys failed");
-		goto send;
-	}
-	for (i = 0; keys[i] != NULL; i++) {
-		k = keys[i];
-		version = k->type == KEY_RSA1 ? 1 : 2;
-		if ((id = lookup_identity(k, version)) != NULL) {
-			tab = idtab_lookup(version);
-			TAILQ_REMOVE(&tab->idlist, id, next);
-			tab->nentries--;
-			free_identity(id);
-			success = 1;
-		}
-		key_free(k);
-		keys[i] = NULL;
-	}
-	xfree(keys);
-send:
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
-}
-#endif /* SMARTCARD */
-
 /* dispatch incoming messages */
 
 static void
@@ -709,14 +619,6 @@ process_message(SocketEntry *e)
 	case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
 		process_remove_all_identities(e, 2);
 		break;
-#ifdef SMARTCARD
-	case SSH_AGENTC_ADD_SMARTCARD_KEY:
-		process_add_smartcard_key(e);
-		break;
-	case SSH_AGENTC_REMOVE_SMARTCARD_KEY:
-		process_remove_smartcard_key(e);
-		break;
-#endif /* SMARTCARD */
 	default:
 		/* Unknown message.  Respond with failure. */
 		error("Unknown message %d", type);

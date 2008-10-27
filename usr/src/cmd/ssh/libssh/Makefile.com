@@ -70,8 +70,6 @@ OBJECTS =	\
 		entropy.o \
 		readpass.o \
 		rsa.o \
-		scard.o \
-		scard-opensc.o \
 		ssh-dss.o \
 		ssh-gss.o \
 		ssh-rsa.o \

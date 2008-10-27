@@ -13,8 +13,6 @@
 
 /* $OpenBSD: ssh-keygen.c,v 1.160 2007/01/21 01:41:54 stevesk Exp $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "includes.h"
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -34,10 +32,6 @@
 #include "match.h"
 #include "hostfile.h"
 #include "tildexpand.h"
-
-#ifdef SMARTCARD
-#include "scard.h"
-#endif
 
 /* Number of bits in the RSA/DSA key.  This value can be set on the command line. */
 u_int32_t bits = 1024;
@@ -432,52 +426,6 @@ do_print_public(struct passwd *pw)
 	fprintf(stdout, "\n");
 	exit(0);
 }
-
-#ifdef SMARTCARD
-static void
-do_upload(struct passwd *pw, const char *sc_reader_id)
-{
-	Key *prv = NULL;
-	struct stat st;
-	int ret;
-
-	if (!have_identity)
-		ask_filename(pw, gettext("Enter file in which the key is"));
-	if (stat(identity_file, &st) < 0) {
-		perror(identity_file);
-		exit(1);
-	}
-	prv = load_identity(identity_file);
-	if (prv == NULL) {
-		error("load failed");
-		exit(1);
-	}
-	ret = sc_put_key(prv, sc_reader_id);
-	key_free(prv);
-	if (ret < 0)
-		exit(1);
-	log("loading key done");
-	exit(0);
-}
-
-static void
-do_download(struct passwd *pw, const char *sc_reader_id)
-{
-	Key **keys = NULL;
-	int i;
-
-	keys = sc_get_keys(sc_reader_id, NULL);
-	if (keys == NULL)
-		fatal("cannot read public key from smartcard");
-	for (i = 0; keys[i]; i++) {
-		key_write(keys[i], stdout);
-		key_free(keys[i]);
-		fprintf(stdout, "\n");
-	}
-	xfree(keys);
-	exit(0);
-}
-#endif /* SMARTCARD */
 
 static void
 do_fingerprint(struct passwd *pw)
@@ -967,9 +915,6 @@ usage(void)
 	"  -B          Show bubblebabble digest of key file.\n"
 	"  -c          Change comment in private and public key files.\n"
 	"  -C comment  Provide new comment.\n"
-#ifdef SMARTCARD
-	"  -D reader   Download public key from smartcard.\n"
-#endif /* SMARTCARD */
 	"  -e          Convert OpenSSH to IETF SECSH key file.\n"
 	"  -f filename Filename of the key file.\n"
 	"  -F hostname Find hostname in known hosts file.\n"
@@ -982,9 +927,6 @@ usage(void)
 	"  -q          Quiet.\n"
 	"  -R hostname Remove host from known_hosts file.\n"
 	"  -t type     Specify type of key to create.\n"
-#ifdef SMARTCARD
-	"  -U reader   Upload private key to smartcard.\n"
-#endif /* SMARTCARD */
 	"  -y          Read private key file and print public key.\n"
 	), __progname);
 
@@ -998,15 +940,11 @@ int
 main(int argc, char **argv)
 {
 	char dotsshdir[MAXPATHLEN], comment[1024], *passphrase1, *passphrase2;
-	char *reader_id = NULL;
 	char *rr_hostname = NULL;
 	Key *private, *public;
 	struct passwd *pw;
 	struct stat st;
 	int opt, type, fd;
-#ifdef SMARTCARD
-	int download = 0;
-#endif /* SMARTCARD */
 	FILE *f;
 
 	extern int optind;
@@ -1034,11 +972,8 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-#ifdef SMARTCARD
-#define GETOPT_ARGS "deiqpclBHRxXyb:f:F:t:U:D:P:N:C:"
-#else
 #define GETOPT_ARGS "BcdeHilpqxXyb:C:f:F:N:P:R:t:"
-#endif /* SMARTCARD */
+
 	while ((opt = getopt(argc, argv, GETOPT_ARGS)) != -1) {
 		switch (opt) {
 		case 'b':
@@ -1106,13 +1041,6 @@ main(int argc, char **argv)
 		case 't':
 			key_type_name = optarg;
 			break;
-#ifdef SMARTCARD
-		case 'D':
-			download = 1;
-		case 'U':
-			reader_id = optarg;
-			break;
-#endif
 		case '?':
 		default:
 			usage();
@@ -1140,16 +1068,6 @@ main(int argc, char **argv)
 		do_convert_from_ssh2(pw);
 	if (print_public)
 		do_print_public(pw);
-	if (reader_id != NULL) {
-#ifdef SMARTCARD
-		if (download)
-			do_download(pw, reader_id);
-		else
-			do_upload(pw, reader_id);
-#else /* SMARTCARD */
-		fatal("no support for smartcards.");
-#endif /* SMARTCARD */
-	}
 
 	arc4random_stir();
 

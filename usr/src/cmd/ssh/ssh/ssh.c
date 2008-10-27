@@ -74,10 +74,6 @@ RCSID("$OpenBSD: ssh.c,v 1.186 2002/09/19 01:58:18 djm Exp $");
 
 #include "g11n.h"
 
-#ifdef SMARTCARD
-#include "scard.h"
-#endif
-
 #ifdef HAVE___PROGNAME
 extern char *__progname;
 #else
@@ -176,9 +172,6 @@ usage(void)
 		"  -x          Disable X11 connection forwarding (default).\n"
 		"  -i file     Identity for public key authentication "
 			    "(default: ~/.ssh/identity)\n"
-#ifdef SMARTCARD
-		"  -I reader   Set smartcard reader.\n"
-#endif
 		"  -t          Tty; allocate a tty even if command is given.\n"
 		"  -T          Do not allocate a tty.\n"
 		"  -v          Verbose; display verbose debugging messages.\n"
@@ -356,11 +349,7 @@ again:
 			    xstrdup(optarg);
 			break;
 		case 'I':
-#ifdef SMARTCARD
-			options.smartcard_device = xstrdup(optarg);
-#else
 			fprintf(stderr, "no support for smartcards.\n");
-#endif
 			break;
 		case 't':
 			if (tty_flag)
@@ -1178,29 +1167,7 @@ load_public_identity_files(void)
 	char *filename;
 	int i = 0;
 	Key *public;
-#ifdef SMARTCARD
-	Key **keys;
 
-	if (options.smartcard_device != NULL &&
-	    options.num_identity_files < SSH_MAX_IDENTITY_FILES &&
-	    (keys = sc_get_keys(options.smartcard_device, NULL)) != NULL ) {
-		int count = 0;
-		for (i = 0; keys[i] != NULL; i++) {
-			count++;
-			memmove(&options.identity_files[1], &options.identity_files[0],
-			    sizeof(char *) * (SSH_MAX_IDENTITY_FILES - 1));
-			memmove(&options.identity_keys[1], &options.identity_keys[0],
-			    sizeof(Key *) * (SSH_MAX_IDENTITY_FILES - 1));
-			options.num_identity_files++;
-			options.identity_keys[0] = keys[i];
-			options.identity_files[0] = xstrdup("smartcard key");;
-		}
-		if (options.num_identity_files > SSH_MAX_IDENTITY_FILES)
-			options.num_identity_files = SSH_MAX_IDENTITY_FILES;
-		i = count;
-		xfree(keys);
-	}
-#endif /* SMARTCARD */
 	for (; i < options.num_identity_files; i++) {
 		filename = tilde_expand_filename(options.identity_files[i],
 		    original_real_uid);

@@ -37,8 +37,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: authfd.c,v 1.57 2002/09/11 18:27:26 stevesk Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <openssl/evp.h>
 
 #include "ssh.h"
@@ -588,25 +586,6 @@ ssh_remove_identity(AuthenticationConnection *auth, Key *key)
 	return decode_reply(type);
 }
 
-int
-ssh_update_card(AuthenticationConnection *auth, int add, const char *reader_id, const char *pin)
-{
-	Buffer msg;
-	int type;
-
-	buffer_init(&msg);
-	buffer_put_char(&msg, add ? SSH_AGENTC_ADD_SMARTCARD_KEY :
-	    SSH_AGENTC_REMOVE_SMARTCARD_KEY);
-	buffer_put_cstring(&msg, reader_id);
-	buffer_put_cstring(&msg, pin);
-	if (ssh_request_reply(auth, &msg, &msg) == 0) {
-		buffer_free(&msg);
-		return 0;
-	}
-	type = buffer_get_char(&msg);
-	buffer_free(&msg);
-	return decode_reply(type);
-}
 
 /*
  * Removes all identities from the agent.  This call is not meant to be used

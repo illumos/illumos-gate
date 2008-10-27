@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -40,8 +40,6 @@
 
 #include "includes.h"
 RCSID("$OpenBSD: ssh-add.c,v 1.63 2002/09/19 15:51:23 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <openssl/evp.h>
 
@@ -196,28 +194,6 @@ add_file(AuthenticationConnection *ac, const char *filename)
 	return ret;
 }
 
-#ifdef SMARTCARD
-static int
-update_card(AuthenticationConnection *ac, int add, const char *id)
-{
-	char *pin;
-
-	pin = read_passphrase("Enter passphrase for smartcard: ", RP_ALLOW_STDIN);
-	if (pin == NULL)
-		return -1;
-
-	if (ssh_update_card(ac, add, id, pin)) {
-		fprintf(stderr, "Card %s: %s\n",
-		    add ? "added" : "removed", id);
-		return 0;
-	} else {
-		fprintf(stderr, "Could not %s card: %s\n",
-		    add ? "add" : "remove", id);
-		return -1;
-	}
-}
-#endif /* SMARTCARD */
-
 static int
 list_identities(AuthenticationConnection *ac, int do_fp)
 {
@@ -315,10 +291,6 @@ usage(void)
 		"  -x          Lock agent.\n"
 		"  -X          Unlock agent.\n"
 		"  -t life     Set lifetime (seconds) when adding identities.\n"
-#ifdef SMARTCARD
-		"  -s reader   Add key in smartcard reader.\n"
-		"  -e reader   Remove key in smartcard reader.\n"
-#endif /* SMARTCARD */
 		), __progname);
 }
 
@@ -328,9 +300,6 @@ main(int argc, char **argv)
 	extern char *optarg;
 	extern int optind;
 	AuthenticationConnection *ac = NULL;
-#ifdef SMARTCARD
-	char *sc_reader_id = NULL;
-#endif /* SMARTCARD */
 	int i, ch, deleting = 0, ret = 0;
 
 	__progname = get_progname(argv[0]);
@@ -371,15 +340,6 @@ main(int argc, char **argv)
 				ret = 1;
 			goto done;
 			break;
-#ifdef SMARTCARD
-		case 's':
-			sc_reader_id = optarg;
-			break;
-		case 'e':
-			deleting = 1;
-			sc_reader_id = optarg;
-			break;
-#endif /* SMARTCARD */
 		case 't':
 			if ((lifetime = convtime(optarg)) == -1) {
 				fprintf(stderr, gettext("Invalid lifetime\n"));
@@ -395,13 +355,6 @@ main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
-#ifdef SMARTCARD
-	if (sc_reader_id != NULL) {
-		if (update_card(ac, !deleting, sc_reader_id) == -1)
-			ret = 1;
-		goto done;
-	}
-#endif /* SMARTCARD */
 	if (argc == 0) {
 		char buf[MAXPATHLEN];
 		struct passwd *pw;
