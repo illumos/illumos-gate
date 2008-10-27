@@ -53,17 +53,9 @@
 		type='astring'
                 value='solaris.smf.manage.mms' />
             <propval
-		name='modify_authorization'
-		type='astring'
-                value='solaris.smf.modify.mms' />
-            <propval
 		name='value_authorization'
 		type='astring'
-                value='solaris.smf.value.mms' />
-            <propval
-		name='read_authorization'
-		type='astring'
-                value='solaris.smf.read.mms' />
+                value='solaris.smf.manage.mms' />
         </property_group>
 
 	<property_group name='config' type='application'>
@@ -71,6 +63,10 @@
 		name='type'
 		type='astring'
 		value='server' />
+            <propval
+		name='value_authorization'
+		type='astring'
+                value='solaris.smf.value.mms' />
 	</property_group>
 
 	<property_group name='manager' type='application'>
@@ -153,6 +149,7 @@
 			exec=':kill -HUP'
 			timeout_seconds='60'>
 		</exec_method>
+
 		<property_group name='option' type='application'>
 		    <propval
 			name='ssi_path'
@@ -206,9 +203,9 @@
 			type='astring'
 			value='/var/mms/db/data' />
 		    <propval
-			name='log'
+			name='value_authorization'
 			type='astring'
-			value='log' />
+			value='solaris.smf.value.mms' />
 		</property_group>
 	</instance>
 
@@ -264,22 +261,19 @@
 			name='trace'
 			type='astring'
 			value='developer' />
-		</property_group>
-
-		<property_group name='option' type='application'>
 		    <propval
 			name='db_reconnect_max_retry'
 			type='integer'
 			value='50' />
-		</property_group>
-
-		<property_group name='option' type='application'>
 		    <propval
 			name='db_reconnect_timeout'
 			type='integer'
 			value='3' />
+	            <propval
+			name='value_authorization'
+			type='astring'
+			value='solaris.smf.value.mms' />
 		</property_group>
-
 	</instance>
 
 	<stability value='Unstable' />
@@ -287,15 +281,14 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-			Sun Media Management System service
+			    Media Management System service
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='mms_services' section='8'
-				manpath='/usr/man' />
+			<manpage title='mms' section='5'
+				manpath='/usr/share/man' />
 		</documentation>
 	</template>
-
 
 </service>
 

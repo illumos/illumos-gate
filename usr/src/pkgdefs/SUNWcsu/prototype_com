@@ -542,6 +542,15 @@ f none usr/lib/help/auths/locale/C/SysPowerMgmtSuspendtoRAM.html 0444 root bin
 f none usr/lib/help/auths/locale/C/SysPowerMgmtBrightness.html 0444 root bin
 f none usr/lib/help/auths/locale/C/SysCpuPowerMgmt.html 0444 root bin
 f none usr/lib/help/auths/locale/C/SmfManageZFSSnap.html 0444 root bin
+f none usr/lib/help/auths/locale/C/MMSHeader.html 0444 root bin
+f none usr/lib/help/auths/locale/C/AuthMMSMedia.html 0444 root bin
+f none usr/lib/help/auths/locale/C/AuthMMSRequest.html 0444 root bin
+f none usr/lib/help/auths/locale/C/AuthMMSDeviceState.html 0444 root bin
+f none usr/lib/help/auths/locale/C/AuthMMSDeviceLog.html 0444 root bin
+f none usr/lib/help/auths/locale/C/AuthMMSIORead.html 0444 root bin
+f none usr/lib/help/auths/locale/C/AuthMMSIOWrite.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SmfManageMMS.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SmfValueMMS.html 0444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 d none usr/lib/help/profiles/locale/C 755 root bin
@@ -605,6 +614,9 @@ f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspendtoDisk.html 444 root 
 f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtSuspendtoRAM.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSysPowerMgmtBrightness.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtCPUPowerManagement.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtMMSAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtMMSOper.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtMMSUser.html 444 root bin
 d none usr/lib/iconv 755 root bin
 f none usr/lib/iconv/646da.8859.t 444 root bin
 f none usr/lib/iconv/646de.8859.t 444 root bin

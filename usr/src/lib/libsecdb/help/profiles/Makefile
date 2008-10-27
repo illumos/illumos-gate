@@ -89,8 +89,10 @@ HTMLENTS = \
 	RtSysPowerMgmtSuspendtoDisk.html \
 	RtSysPowerMgmtSuspendtoRAM.html \
 	RtSysPowerMgmtBrightness.html \
-	RtCPUPowerManagement.html
-
+	RtCPUPowerManagement.html \
+	RtMMSAdmin.html \
+	RtMMSOper.html \
+	RtMMSUser.html
 
 HELPDIR =	$(ROOT)/usr/lib/help
 PROFDIR =	$(HELPDIR)/profiles

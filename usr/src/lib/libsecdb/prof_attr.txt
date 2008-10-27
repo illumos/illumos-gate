@@ -54,9 +54,9 @@ Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;hel
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range,solaris.smf.manage.coreadm,solaris.smf.value.coreadm;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:profiles=NDMP Management;help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:profiles=NDMP Management;help=RtMediaRestore.html
-MMS Administrator:::MMS Media Manager Administrator:auths=solaris.smf.manage.mms,solaris.smf.modify.mms,solaris.smf.value.mms,solaris.mms.*
-MMS Operator:::MMS Media Manager Operator:auths=solaris.smf.manage.mms,solaris.mms.media.*,solaris.mms.request.*,solaris.mms.device.state.*,solaris.mms.device.log.*
-MMS User:::MMS Tape User:auths=solaris.mms.io.*
+MMS Administrator:::MMS Media Manager Administrator:auths=solaris.smf.manage.mms,solaris.smf.value.mms,solaris.mms.*;help=RtMMSAdmin.html
+MMS Operator:::MMS Media Manager Operator:auths=solaris.smf.manage.mms,solaris.mms.media.*,solaris.mms.request.*,solaris.mms.device.state.*,solaris.mms.device.log.*;help=RtMMSOper.html
+MMS User:::MMS Tape User:auths=solaris.mms.io.*;help=RtMMSUser.html
 NDMP Management:::Manage the NDMP service:auths=solaris.smf.manage.ndmp,solaris.smf.value.ndmp,solaris.smf.read.ndmp;help=RtNdmpMngmnt.html
 Network Autoconf:::Manage network auto-magic configuration via nwamd:auths=solaris.network.autoconf;help=RtNetAutoconf.html
 Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns;profiles=Network Wifi Management,Inetd Management,Network Autoconf;help=RtNetMngmnt.html

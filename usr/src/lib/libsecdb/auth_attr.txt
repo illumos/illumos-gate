@@ -74,6 +74,7 @@ solaris.login.remote:::Remote Login::help=LoginRemote.html
 solaris.mail.:::Mail::help=MailHeader.html
 solaris.mail.mailq:::Mail Queue::help=MailQueue.html
 #
+solaris.mms.:::Media Management System (MMS)::help=MMSHeader.html
 solaris.mms.media:::MMS Media Import, Export, Label and Move::help=AuthMMSMedia.html
 solaris.mms.request:::Handle MMS Device Manager Requests::help=AuthMMSRequest.html
 solaris.mms.device.state:::Start and Stop MMS Device Managers::help=AuthMMSDeviceState.html
@@ -185,9 +186,7 @@ solaris.smf.modify.stmf:::Modify STMF Properties::help=SmfSTMFValue.html
 solaris.smf.value.iscsitgt:::Change Values of ISCSI Target Service Properties::help=SmfValueIscsitgt.html
 #
 solaris.smf.manage.mms:::Manage MMS Service States::help=SmfManageMMS.html
-solaris.smf.modify.mms:::Add/Remove Values of MMS Service Properties::help=SmfModifyMMS.html
 solaris.smf.value.mms:::Change Values of MMS Service Properties::help=SmfValueMMS.html
-solaris.smf.read.mms:::Read Permission for Protected MMS Service Properties::help=SmfReadMMS.html
 solaris.smf.manage.isns:::Manage iSNS Service States::help=isnsStates.html
 solaris.smf.value.isns:::Modify iSNS Service Property Values::help=isnsValue.html
 solaris.isnsmgr.write:::Modify iSNS configuration::help=AuthISNSmgrWrite.html

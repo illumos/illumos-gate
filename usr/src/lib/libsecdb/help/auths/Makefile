@@ -148,7 +148,16 @@ HTMLENTS = \
 	SysPowerMgmtSuspendtoRAM.html \
 	SysPowerMgmtBrightness.html \
 	SysCpuPowerMgmt.html \
-	SmfManageZFSSnap.html
+	SmfManageZFSSnap.html \
+	MMSHeader.html \
+	AuthMMSDeviceLog.html \
+	AuthMMSDeviceState.html \
+	AuthMMSIORead.html \
+	AuthMMSIOWrite.html \
+	AuthMMSMedia.html \
+	AuthMMSRequest.html \
+	SmfManageMMS.html \
+	SmfValueMMS.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths
