@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,11 @@ LABEL(alignloop):
         inc     %r8
         jnz     LABEL(alignloop)
 
+#ifdef USE_AS_STRNCPY
+	test	%r11, %r11		/* must check remaining size */
+	jz	LABEL(exitn)		/* If we've already done, exit */
+#endif
+
 	.p2align 4
 
 LABEL(alignafter):
@@ -104,7 +109,7 @@ LABEL(8):                               /* 8-byte */
 LABEL(8loop):
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -122,7 +127,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -140,7 +145,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -158,7 +163,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -176,7 +181,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -194,7 +199,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -212,7 +217,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -230,7 +235,7 @@ LABEL(8loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -258,7 +263,7 @@ LABEL(64):				/* 64-byte */
 LABEL(64loop):
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -276,7 +281,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -294,7 +299,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -312,7 +317,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -330,7 +335,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -348,7 +353,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -366,7 +371,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -384,7 +389,7 @@ LABEL(64loop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -416,7 +421,7 @@ LABEL(pre):                              /* 64-byte prefetch */
 LABEL(preloop):
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -434,7 +439,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -452,7 +457,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -470,7 +475,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -488,7 +493,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -506,7 +511,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -524,7 +529,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -542,7 +547,7 @@ LABEL(preloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -578,7 +583,7 @@ LABEL(NT):				/* 64-byte NT */
 LABEL(NTloop):
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -596,7 +601,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -614,7 +619,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -632,7 +637,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -650,7 +655,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -668,7 +673,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -686,7 +691,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8
@@ -704,7 +709,7 @@ LABEL(NTloop):
 
 #ifdef USE_AS_STRNCPY
 	sub	$8, %r11
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rcx, %r8

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,11 @@ LABEL(alignloop):
         inc     %r8
         jnz     LABEL(alignloop)
 
+#ifdef USE_AS_STRNCMP
+        test	%r14, %r14
+        jz	LABEL(exitafter)
+#endif
+
         .p2align 4
 
 LABEL(alignafter):
@@ -109,6 +114,15 @@ LABEL(pagealigntry):			/* page align by "destination" */
 	mov	$AMD64PAGESIZE, %r15d
         and     $AMD64PAGEMASK, %ebp
         sub	%r15d, %ebp
+	/*
+	 * When we go to 64gobble, %ebp was adjusted at the top of 64loop.
+	 * When we go to 64nibble(crossing page boundary), we'll compare
+	 * 128 byte since we'll fall through to 64gobble. Therefore, %ebp
+	 * needs to be re-adjusted(add 64) when we fall into 64nibble.
+	 * It can be done by adjusting %r15 since %r15 is only used to
+	 * rewind %ebp when crossing page boundary.
+	 */
+	sub	$64, %r15d
 
 LABEL(64):                              /* 64-byte */
 	mov     $0xfefefefefefefeff, %rbx /* magic number */
@@ -130,7 +144,7 @@ LABEL(64nibble):
 
 #ifdef USE_AS_STRNCMP
 	dec	%r14
-	jl	LABEL(exit)
+	jle	LABEL(exit)
 #endif
 
         cmp     %dl, %al		/* check if same character */
@@ -151,7 +165,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -181,7 +195,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -211,7 +225,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -241,7 +255,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -271,7 +285,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -301,7 +315,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -331,7 +345,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
@@ -361,7 +375,7 @@ LABEL(64gobble):
 
 #ifdef USE_AS_STRNCMP
 	sub	$8, %r14
-	jl	LABEL(tail)
+	jle	LABEL(tail)
 #endif
 
         mov     %rbx, %r8
