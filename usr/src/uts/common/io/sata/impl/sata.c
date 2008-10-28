@@ -116,18 +116,20 @@ sata_test_atapi_packet_command(sata_hba_inst_t *, int);
 #define		SATA_INJECT_PKT_FAULT	1
 uint32_t	sata_inject_fault = 0;
 
-uint32_t	sata_fault_cmd = 0;
-uint32_t	sata_inject_fault_type = 0;
 uint32_t	sata_inject_fault_count = 0;
 uint32_t	sata_inject_fault_pause_count = 0;
+uint32_t	sata_fault_type = 0;
+uint32_t	sata_fault_cmd = 0;
+dev_info_t	*sata_fault_ctrl = NULL;
+sata_device_t	sata_fault_device;
 
-static	void sata_inject_pkt_fault(sata_pkt_t *, uint8_t, int *, int);
+static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #endif
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.38"};
+static char sata_rev_tag[] = {"1.39"};
 
 /*
  * SATA cb_ops functions
@@ -830,10 +832,14 @@ sata_hba_attach(dev_info_t *dip, sata_hba_tran_t *sata_tran,
 
 	/*
 	 * Set-up kstats here, if necessary.
-	 * (postponed until phase 2 of the development).
+	 * (postponed until future phase of the development).
 	 */
 
-
+	/*
+	 * Indicate that HBA is attached. This will enable events processing
+	 * for this HBA.
+	 */
+	sata_hba_inst->satahba_attached = 1;
 	/*
 	 * Probe controller ports. This operation will describe a current
 	 * controller/port/multipliers/device configuration and will create
@@ -844,7 +850,6 @@ sata_hba_attach(dev_info_t *dip, sata_hba_tran_t *sata_tran,
 	 */
 	sata_probe_ports(sata_hba_inst);
 
-	sata_hba_inst->satahba_attached = 1;
 	return (DDI_SUCCESS);
 
 fail:
@@ -4944,6 +4949,7 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
 		    "sata_txlt_write_buffer: rejecting command because "
 		    "of interrupt context\n", NULL);
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (TRAN_BUSY);
 	}
 
@@ -5128,8 +5134,16 @@ sata_reidentify_device(sata_pkt_txlate_t *spx)
 			if (sata_initialize_device(sata_hba_inst, sdinfo) !=
 			    SATA_SUCCESS) {
 				/* retry */
-				(void) sata_initialize_device(sata_hba_inst,
+				rval = sata_initialize_device(sata_hba_inst,
 				    sdinfo);
+				if (rval == SATA_RETRY)
+					sata_log(sata_hba_inst, CE_WARN,
+					    "SATA device at port %d pmport %d -"
+					    " default device features could not"
+					    " be set. Device may not operate "
+					    "as expected.",
+					    sata_device.satadev_addr.cport,
+					    sata_device.satadev_addr.pmport);
 			}
 			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 			    scsipkt->pkt_comp != NULL)
@@ -8307,10 +8321,18 @@ sata_add_device(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst, int cport,
 		 * will show the warning.
 		 */
 		if (sata_initialize_device(sata_hba_inst,
-		    SATA_CPORTINFO_DRV_INFO(cportinfo)) != SATA_SUCCESS)
+		    SATA_CPORTINFO_DRV_INFO(cportinfo)) != SATA_SUCCESS) {
 			/* Retry */
-			(void) sata_initialize_device(sata_hba_inst,
+			rval = sata_initialize_device(sata_hba_inst,
 			    SATA_CPORTINFO_DRV_INFO(cportinfo));
+
+			if (rval == SATA_RETRY)
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device at port %d - "
+				    "default device features could not be set."
+				    " Device may not operate as expected.",
+				    cportinfo->cport_addr.cport);
+		}
 
 		cdip = sata_create_target_node(pdip, sata_hba_inst,
 		    &sata_device.satadev_addr);
@@ -8369,11 +8391,19 @@ sata_add_device(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst, int cport,
 		 * attach but syslog will show the warning.
 		 */
 		if (sata_initialize_device(sata_hba_inst,
-		    pmportinfo->pmport_sata_drive) != SATA_SUCCESS)
+		    pmportinfo->pmport_sata_drive) != SATA_SUCCESS) {
 			/* Retry */
-			(void) sata_initialize_device(sata_hba_inst,
+			rval = sata_initialize_device(sata_hba_inst,
 			    pmportinfo->pmport_sata_drive);
 
+			if (rval == SATA_RETRY)
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device at port %d pmport %d - "
+				    "default device features could not be set."
+				    " Device may not operate as expected.",
+				    pmportinfo->pmport_addr.cport,
+				    pmportinfo->pmport_addr.pmport);
+		}
 		cdip = sata_create_target_node(pdip, sata_hba_inst,
 		    &sata_device.satadev_addr);
 		mutex_enter(&cportinfo->cport_mutex);
@@ -8610,7 +8640,7 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device,
 	int prev_device_state = 0;
 	clock_t start_time;
 	int retry = B_FALSE;
-	int rval;
+	int rval_probe, rval_init;
 
 	/* We only care about host sata cport for now */
 	cportinfo = SATA_CPORT_INFO(sata_hba_inst,
@@ -8637,11 +8667,11 @@ retry_probe:
 	cportinfo->cport_state |= SATA_STATE_PROBING;
 	mutex_exit(&cportinfo->cport_mutex);
 
-	rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+	rval_probe = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
 	    (SATA_DIP(sata_hba_inst), sata_device);
 
 	mutex_enter(&cportinfo->cport_mutex);
-	if (rval != SATA_SUCCESS) {
+	if (rval_probe != SATA_SUCCESS) {
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
 		mutex_exit(&cportinfo->cport_mutex);
 		SATA_LOG_D((sata_hba_inst, CE_WARN, "sata_reprobe_port: "
@@ -8759,12 +8789,13 @@ retry_probe:
 	mutex_exit(&cportinfo->cport_mutex);
 	/*
 	 * Figure out what kind of device we are really
-	 * dealing with.
+	 * dealing with. Failure of identifying device does not fail this
+	 * function.
 	 */
-	rval = sata_probe_device(sata_hba_inst, sata_device);
-
+	rval_probe = sata_probe_device(sata_hba_inst, sata_device);
+	rval_init = SATA_FAILURE;
 	mutex_enter(&cportinfo->cport_mutex);
-	if (rval == SATA_SUCCESS) {
+	if (rval_probe == SATA_SUCCESS) {
 		/*
 		 * If we are dealing with the same type of a device as before,
 		 * restore its settings flags.
@@ -8774,12 +8805,16 @@ retry_probe:
 			sdinfo->satadrv_settings = prev_device_settings;
 
 		mutex_exit(&cportinfo->cport_mutex);
+		rval_init = SATA_SUCCESS;
 		/* Set initial device features, if necessary */
 		if (init_device == B_TRUE) {
-			rval = sata_initialize_device(sata_hba_inst, sdinfo);
+			rval_init = sata_initialize_device(sata_hba_inst,
+			    sdinfo);
 		}
-		if (rval == SATA_SUCCESS)
-			return (rval);
+		if (rval_init == SATA_SUCCESS)
+			return (rval_init);
+		/* else we will retry if retry was asked for */
+
 	} else {
 		/*
 		 * If there was some device info before we probe the device,
@@ -8815,13 +8850,27 @@ retry_probe:
 			/* sleep for a while */
 			delay(drv_usectohz(SATA_DEV_RETRY_DLY));
 			goto retry_probe;
-		} else {
-			mutex_enter(&cportinfo->cport_mutex);
-			if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL)
+		}
+		/* else no more retries */
+		mutex_enter(&cportinfo->cport_mutex);
+		if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
+			if (rval_init == SATA_RETRY) {
+				/*
+				 * Setting drive features have failed, but
+				 * because the drive is still accessible,
+				 * keep it and emit a warning message.
+				 */
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device at port %d - desired "
+				    "drive features could not be set. "
+				    "Device may not operate as expected.",
+				    cportinfo->cport_addr.cport);
+			} else {
 				SATA_CPORTINFO_DRV_INFO(cportinfo)->
 				    satadrv_state = SATA_DSTATE_FAILED;
-			mutex_exit(&cportinfo->cport_mutex);
+			}
 		}
+		mutex_exit(&cportinfo->cport_mutex);
 	}
 	return (SATA_SUCCESS);
 }
@@ -8831,7 +8880,8 @@ retry_probe:
  * Specified device is initialized to a default state.
  *
  * Returns SATA_SUCCESS if all device features are set successfully,
- * SATA_FAILURE otherwise
+ * SATA_RETRY if device is accessible but device features were not set
+ * successfully, and SATA_FAILURE otherwise.
  */
 static int
 sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
@@ -10316,10 +10366,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 	rval = (*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt);
 
 #ifdef SATA_INJECT_FAULTS
-	if (sata_inject_fault == SATA_INJECT_PKT_FAULT)
-		if (sata_fault_cmd == scmd->satacmd_cmd_reg)
-			sata_inject_pkt_fault(spkt, scmd->satacmd_cmd_reg,
-			    &rval, sata_inject_fault_type);
+	sata_inject_pkt_fault(spkt, &rval, sata_fault_type);
 #endif
 
 	if (rval == SATA_TRAN_ACCEPTED &&
@@ -10571,7 +10618,8 @@ done:
  * SATAC_SF_DISABLE_WRITE_CACHE
  *
  * If operation fails, system log messgage is emitted.
- * Returns SATA_SUCCESS when the operation succeeds, SATA_FAILURE otherwise.
+ * Returns SATA_SUCCESS when the operation succeeds, SATA_RETRY if
+ * command was sent but did not succeed, and SATA_FAILURE otherwise.
  */
 
 static int
@@ -10582,6 +10630,7 @@ sata_set_cache_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo,
 	sata_cmd_t *scmd;
 	sata_pkt_txlate_t *spx;
 	int rval = SATA_SUCCESS;
+	int hba_rval;
 	char *infop;
 
 	ASSERT(sdinfo != NULL);
@@ -10620,8 +10669,14 @@ sata_set_cache_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo,
 	scmd->satacmd_features_reg = cache_op;
 
 	/* Transfer command to HBA */
-	if (((*SATA_START_FUNC(sata_hba_inst))(
-	    SATA_DIP(sata_hba_inst), spkt) != SATA_TRAN_ACCEPTED) ||
+	hba_rval = (*SATA_START_FUNC(sata_hba_inst))(
+	    SATA_DIP(sata_hba_inst), spkt);
+
+#ifdef SATA_INJECT_FAULTS
+	sata_inject_pkt_fault(spkt, &rval, sata_fault_type);
+#endif
+
+	if ((hba_rval != SATA_TRAN_ACCEPTED) ||
 	    (spkt->satapkt_reason != SATA_PKT_COMPLETED)) {
 		/* Pkt execution failed */
 		switch (cache_op) {
@@ -10639,7 +10694,7 @@ sata_set_cache_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo,
 			break;
 		}
 		SATA_LOG_D((sata_hba_inst, CE_WARN, "%s", infop));
-		rval = SATA_FAILURE;
+		rval = SATA_RETRY;
 	}
 failure:
 	/* Free allocated resources */
@@ -12724,11 +12779,15 @@ sata_check_modser(char *buf, int buf_len)
  * device (packet) identify data is updated, not the flags indicating the
  * supported features.
  *
- * Returns TRUE if successful or there was nothing to do. Device Identify data
- * in the drive info structure pointed to by the sdinfo argumens is updated
- * even when no features were set or changed.
+ * Returns SATA_SUCCESS if successful or there was nothing to do.
+ * Device Identify data in the drive info structure pointed to by the sdinfo
+ * arguments is updated even when no features were set or changed.
  *
- * Returns FALSE if device features could not be set.
+ * Returns SATA_FAILURE if device features could not be set or DMA mode
+ * for a disk cannot be set and device identify data cannot be fetched.
+ *
+ * Returns SATA_RETRY if device features could not be set (other than disk
+ * DMA mode) but the device identify data was fetched successfully.
  *
  * Note: This function may fail the port, making it inaccessible.
  * In such case the explicit port disconnect/connect or physical device
@@ -12740,6 +12799,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
     sata_drive_info_t *sdinfo, int restore)
 {
 	int rval = SATA_SUCCESS;
+	int rval_set;
 	sata_drive_info_t new_sdinfo;
 	char *finfo = "sata_set_drive_features: cannot";
 	char *finfox;
@@ -12750,7 +12810,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 	new_sdinfo.satadrv_type = sdinfo->satadrv_type;
 	if (sata_fetch_device_identify_data(sata_hba_inst, &new_sdinfo) != 0) {
 		/*
-		 * Cannot get device identification - retry later
+		 * Cannot get device identification - caller may retry later
 		 */
 		SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 		    "%s fetch device identify data\n", finfo);
@@ -12833,11 +12893,10 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 		}
 
 		/* Try to set read cache mode */
-		if (sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
-		    cache_op) != SATA_SUCCESS) {
-			/* Pkt execution failed */
-			rval = SATA_FAILURE;
-		}
+		rval_set = sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
+		    cache_op);
+		if (rval != SATA_FAILURE && rval_set != SATA_SUCCESS)
+			rval = rval_set;
 	}
 
 	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_WRITE_CACHE) &&
@@ -12854,16 +12913,15 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 			    "disabling write cache\n", NULL);
 		}
 		/* Try to set write cache mode */
-		if (sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
-		    cache_op) != SATA_SUCCESS) {
-			/* Pkt execution failed */
-			rval = SATA_FAILURE;
-		}
+		rval_set = sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
+		    cache_op);
+		if (rval != SATA_FAILURE && rval_set != SATA_SUCCESS)
+			rval = rval_set;
 	}
-
-	if (rval == SATA_FAILURE)
+	if (rval != SATA_SUCCESS)
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
 		    "%s %s", finfo, finfox));
+
 update_sdinfo:
 	/*
 	 * We need to fetch Device Identify data again
@@ -13778,6 +13836,8 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 	sata_address_t *saddr;
 	sata_drive_info_t *sdinfo;
 	sata_port_stats_t *pstats;
+	sata_cport_info_t *cportinfo;
+	sata_pmport_info_t *pmportinfo;
 	int cport, pmport;
 	char buf1[SATA_EVENT_MAX_MSG_LENGTH + 1];
 	char buf2[SATA_EVENT_MAX_MSG_LENGTH + 1];
@@ -13790,9 +13850,8 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 
 	/*
 	 * There is a possibility that an event will be generated on HBA
-	 * that has not completed attachment or is detaching.
-	 * HBA driver should prevent this, but just in case it does not,
-	 * we need to ignore events for such HBA.
+	 * that has not completed attachment or is detaching. We still want
+	 * to process events until HBA is detached.
 	 */
 	mutex_enter(&sata_mutex);
 	for (sata_hba_inst = sata_hba_list; sata_hba_inst != NULL;
@@ -13823,6 +13882,28 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 	pmport = saddr->pmport;
 
 	buf1[0] = buf2[0] = '\0';
+
+	/*
+	 * If event relates to port or device, check port state.
+	 * Port has to be initialized, or we cannot accept an event.
+	 */
+	if ((saddr->qual & (SATA_ADDR_CPORT | SATA_ADDR_PMPORT |
+	    SATA_ADDR_DCPORT | SATA_ADDR_DPMPORT)) != 0) {
+		if ((saddr->qual & (SATA_ADDR_CPORT | SATA_ADDR_DCPORT)) != 0) {
+			mutex_enter(&sata_hba_inst->satahba_mutex);
+			cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
+			mutex_exit(&sata_hba_inst->satahba_mutex);
+			if (cportinfo == NULL || cportinfo->cport_state == 0)
+				return;
+		} else {
+			mutex_enter(&sata_hba_inst->satahba_mutex);
+			pmportinfo = SATA_PMPORT_INFO(sata_hba_inst,
+			    cport, pmport);
+			mutex_exit(&sata_hba_inst->satahba_mutex);
+			if (pmportinfo == NULL || pmportinfo->pmport_state == 0)
+				return;
+		}
+	}
 
 	/*
 	 * Events refer to devices, ports and controllers - each has
@@ -14052,7 +14133,7 @@ loop:
 	    sata_hba_inst = sata_hba_inst->satahba_next) {
 		ASSERT(sata_hba_inst != NULL);
 		mutex_enter(&sata_hba_inst->satahba_mutex);
-		if (sata_hba_inst->satahba_attached != 1 ||
+		if (sata_hba_inst->satahba_attached == 0 ||
 		    (sata_hba_inst->satahba_event_flags &
 		    SATA_EVNT_SKIP) != 0) {
 			mutex_exit(&sata_hba_inst->satahba_mutex);
@@ -14155,6 +14236,7 @@ sata_process_controller_events(sata_hba_inst_t *sata_hba_inst)
 	int ncport;
 	uint32_t event_flags;
 	sata_address_t *saddr;
+	sata_cport_info_t *cportinfo;
 
 	SATADBG1(SATA_DBG_EVENTS_CNTRL, sata_hba_inst,
 	    "Processing controller %d event(s)",
@@ -14176,6 +14258,17 @@ sata_process_controller_events(sata_hba_inst_t *sata_hba_inst)
 	 * We may have to process events for more than one port/device.
 	 */
 	for (ncport = 0; ncport < SATA_NUM_CPORTS(sata_hba_inst); ncport++) {
+		/*
+		 * Not all ports may be processed in attach by the time we
+		 * get an event. Check if port info is initialized.
+		 */
+		mutex_enter(&sata_hba_inst->satahba_mutex);
+		cportinfo = SATA_CPORT_INFO(sata_hba_inst, ncport);
+		mutex_exit(&sata_hba_inst->satahba_mutex);
+		if (cportinfo == NULL || cportinfo->cport_state == NULL)
+			continue;
+
+		/* We have initialized controller port info */
 		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, ncport)));
 		event_flags = (SATA_CPORT_INFO(sata_hba_inst, ncport))->
 		    cport_event_flags;
@@ -14360,7 +14453,7 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 	sata_drive_info_t *sdinfo;
 	sata_cport_info_t *cportinfo;
 	sata_device_t sata_device;
-	int rval;
+	int rval_probe, rval_set;
 
 	/* We only care about host sata cport for now */
 	cportinfo = SATA_CPORT_INFO(sata_hba_inst, saddr->cport);
@@ -14425,11 +14518,11 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 	 * block on its own mutex.
 	 */
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
-	rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+	rval_probe = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
 	    (SATA_DIP(sata_hba_inst), &sata_device);
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 	sata_update_port_info(sata_hba_inst, &sata_device);
-	if (rval != SATA_SUCCESS) {
+	if (rval_probe != SATA_SUCCESS) {
 		/* Something went wrong? Fail the port */
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
 		sdinfo = SATA_CPORT_DRV_INFO(sata_hba_inst, saddr->cport);
@@ -14482,8 +14575,9 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 	old_sdinfo = *sdinfo;	/* local copy of the drive info */
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 
-	if (sata_set_drive_features(sata_hba_inst, &old_sdinfo, 1) ==
-	    SATA_FAILURE) {
+	rval_set = sata_set_drive_features(sata_hba_inst, &old_sdinfo, 1);
+
+	if (rval_set  != SATA_SUCCESS) {
 		/*
 		 * Restoring drive setting failed.
 		 * Probe the port first, to check if the port state has changed
@@ -14492,11 +14586,11 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 		sata_device.satadev_addr = *saddr;
 		sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
 		/* probe port */
-		rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+		rval_probe = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
 		    (SATA_DIP(sata_hba_inst), &sata_device);
 		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
-		if (rval == SATA_SUCCESS &&
+		if (rval_probe == SATA_SUCCESS &&
 		    (sata_device.satadev_state &
 		    (SATA_PSTATE_SHUTDOWN | SATA_PSTATE_FAILED)) == 0 &&
 		    (sata_device.satadev_scr.sstatus  &
@@ -14529,6 +14623,18 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 					mutex_exit(&sata_mutex);
 					return;
 				}
+				if (rval_set == SATA_RETRY) {
+					/*
+					 * Setting drive features failed, but
+					 * the drive is still accessible,
+					 * so emit a warning message before
+					 * return.
+					 */
+					mutex_exit(&SATA_CPORT_INFO(
+					    sata_hba_inst,
+					    saddr->cport)->cport_mutex);
+					goto done;
+				}
 			}
 			/* Fail the drive */
 			sdinfo->satadrv_state = SATA_DSTATE_FAILED;
@@ -14536,19 +14642,28 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA device at port %d - device failed",
 			    saddr->cport);
-		} else {
-			/*
-			 * No point of retrying - some other event processing
-			 * would or already did port info cleanup.
-			 * To be safe (HBA may need it),
-			 * request clearing device reset condition.
-			 */
-			sdinfo->satadrv_event_flags |=
-			    SATA_EVNT_CLEAR_DEVICE_RESET;
 		}
+		/*
+		 * No point of retrying - device failed or some other event
+		 * processing or already did or will do port info cleanup.
+		 * To be safe (HBA may need it),
+		 * request clearing device reset condition.
+		 */
+		sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
 		sdinfo->satadrv_event_flags &= ~SATA_EVNT_INPROC_DEVICE_RESET;
 		sdinfo->satadrv_reset_time = 0;
 		return;
+	}
+done:
+	/*
+	 * If setting of drive features failed, but the drive is still
+	 * accessible, emit a warning message.
+	 */
+	if (rval_set == SATA_RETRY) {
+		sata_log(sata_hba_inst, CE_WARN,
+		    "SATA device at port %d - desired setting could not be "
+		    "restored after reset. Device may not operate as expected.",
+		    saddr->cport);
 	}
 	/*
 	 * Raise the flag indicating that the next sata command could
@@ -15536,12 +15651,19 @@ static	uint32_t sata_fault_suspend_count = 0;
 /*
  * Inject sata pkt fault
  * It modifies returned values of the sata packet.
+ * It returns immediately if:
+ * pkt fault injection is not enabled (via sata_inject_fault,
+ * sata_inject_fault_count), or invalid fault is specified (sata_fault_type),
+ * or pkt does not contain command to be faulted (set in sata_fault_cmd), or
+ * pkt is not directed to specified fault controller/device
+ * (sata_fault_ctrl_dev and sata_fault_device).
+ * If fault controller is not specified, fault injection applies to all
+ * controllers and devices.
+ *
  * First argument is the pointer to the executed sata packet.
- * The second argument specifies SATA command to be affected (not all commands
- * are instrumented).
- * Third argument is a pointer to a value returned by the HBA tran_start
+ * Second argument is a pointer to a value returned by the HBA tran_start
  * function.
- * Fourth argument specifies injected error. Injected sata packet faults
+ * Third argument specifies injected error. Injected sata packet faults
  * are the satapkt_reason values.
  * SATA_PKT_BUSY		-1	Not completed, busy
  * SATA_PKT_DEV_ERROR		1	Device reported error
@@ -15552,11 +15674,15 @@ static	uint32_t sata_fault_suspend_count = 0;
  * SATA_PKT_TIMEOUT		6	Operation timeut
  * SATA_PKT_RESET		7	Aborted by reset request
  *
+ * Additional global variables affecting the execution:
+ *
  * sata_inject_fault_count variable specifies number of times in row the
  * error is injected. Value of -1 specifies permanent fault, ie. every time
- * the fault injection pointnis reached, the fault is injected and anu pause
+ * the fault injection point is reached, the fault is injected and a pause
  * between fault injection specified by sata_inject_fault_pause_count is
- * ignored).
+ * ignored). Fault injection routine decrements sata_inject_fault_count
+ * (if greater than zero) until it reaches 0. No fault is injected when
+ * sata_inject_fault_count is 0 (zero).
  *
  * sata_inject_fault_pause_count variable specifies number of times a fault
  * injection is bypassed (pause between fault injections).
@@ -15575,17 +15701,39 @@ static	uint32_t sata_fault_suspend_count = 0;
 
 
 static	void
-sata_inject_pkt_fault(sata_pkt_t *spkt, uint8_t cmd, int *rval,
-    int fault)
+sata_inject_pkt_fault(sata_pkt_t *spkt, int *rval, int fault)
 {
-	if (fault == 0)
+
+	if (sata_inject_fault != SATA_INJECT_PKT_FAULT)
 		return;
+
 	if (sata_inject_fault_count == 0)
 		return;
 
-	if (spkt->satapkt_cmd.satacmd_cmd_reg != cmd)
+	if (fault == 0)
 		return;
 
+	if (sata_fault_cmd != spkt->satapkt_cmd.satacmd_cmd_reg)
+		return;
+
+	if (sata_fault_ctrl != NULL) {
+		sata_pkt_txlate_t *spx =
+		    (sata_pkt_txlate_t *)spkt->satapkt_framework_private;
+
+		if (sata_fault_ctrl != NULL && sata_fault_ctrl !=
+		    spx->txlt_sata_hba_inst->satahba_dip)
+			return;
+
+		if (sata_fault_device.satadev_addr.cport !=
+		    spkt->satapkt_device.satadev_addr.cport ||
+		    sata_fault_device.satadev_addr.pmport !=
+		    spkt->satapkt_device.satadev_addr.pmport ||
+		    sata_fault_device.satadev_addr.qual !=
+		    spkt->satapkt_device.satadev_addr.qual)
+			return;
+	}
+
+	/* Modify pkt return parameters */
 	if (*rval != SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
 		sata_fault_count = 0;

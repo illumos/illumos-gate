@@ -763,7 +763,7 @@ typedef struct sata_atapi_cmd {
 
 #endif
 
-/* sata_rev_tag 1.38 */
+/* sata_rev_tag 1.39 */
 
 #ifdef	__cplusplus
 }
