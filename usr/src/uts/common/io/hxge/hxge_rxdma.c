@@ -2024,14 +2024,19 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 
 	if (cs.bits.rbr_empty) {
 		rdc_stats->rbr_empty++;
-		if (rdc_stats->rbr_empty == 1)
+		if (rdc_stats->rbr_empty == 1) {
 			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 			    "==> hxge_rx_err_evnts(channel %d): "
 			    "rbr empty error", channel));
+		}
+
 		/*
-		 * DMA channel is disabled due to rbr_empty bit is set
-		 * although it is not fatal. Enable the DMA channel here
-		 * to work-around the hardware bug.
+		 * Wait for channel to be quiet.
+		 */
+		(void) hpi_rxdma_cfg_rdc_wait_for_qst(handle, channel);
+
+		/*
+		 * Re-enable the DMA.
 		 */
 		(void) hpi_rxdma_cfg_rdc_enable(handle, channel);
 	}
@@ -2533,6 +2538,7 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
 	/* Map in the receive completion ring */
 	rcrp = (p_rx_rcr_ring_t)KMEM_ZALLOC(sizeof (rx_rcr_ring_t), KM_SLEEP);
 	rcrp->rdc = dma_channel;
+	rcrp->hxgep = hxgep;
 
 	hxge_port_rcr_size = hxgep->hxge_port_rcr_size;
 	rcrp->comp_size = hxge_port_rcr_size;
@@ -2710,6 +2716,7 @@ hxge_map_rxdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	    (void *) hxgep->interrupt_cookie);
 	MUTEX_INIT(&rbrp->post_lock, NULL, MUTEX_DRIVER,
 	    (void *) hxgep->interrupt_cookie);
+
 	rbrp->rdc = channel;
 	rbrp->num_blocks = num_chunks;
 	rbrp->tnblocks = nmsgs;

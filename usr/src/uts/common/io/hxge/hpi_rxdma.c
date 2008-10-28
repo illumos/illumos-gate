@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hpi_rxdma.h>
 #include <hxge_common.h>
 #include <hxge_impl.h>
@@ -61,6 +59,25 @@ hpi_rxdma_cfg_logical_page_handle(hpi_handle_t handle, uint8_t rdc,
 	return (HPI_SUCCESS);
 }
 
+hpi_status_t
+hpi_rxdma_cfg_rdc_wait_for_qst(hpi_handle_t handle, uint8_t rdc)
+{
+	rdc_rx_cfg1_t	cfg;
+	uint32_t	count = RXDMA_RESET_TRY_COUNT;
+	uint32_t	delay_time = RXDMA_RESET_DELAY;
+
+	RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
+
+	while ((count--) && (cfg.bits.qst == 0)) {
+		HXGE_DELAY(delay_time);
+		RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
+	}
+
+	if (cfg.bits.qst == 0)
+		return (HPI_FAILURE);
+
+	return (HPI_SUCCESS);
+}
 
 /* RX DMA functions */
 static hpi_status_t
@@ -84,29 +101,34 @@ hpi_rxdma_cfg_rdc_ctl(hpi_handle_t handle, uint8_t rdc, uint8_t op)
 		RXDMA_REG_WRITE64(handle, RDC_RX_CFG1, rdc, cfg.value);
 
 		HXGE_DELAY(delay_time);
+		RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
 
+		while ((count--) && (cfg.bits.qst == 1)) {
+			HXGE_DELAY(delay_time);
+			RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
+		}
+		if (cfg.bits.qst == 1) {
+			cmn_err(CE_CONT, "hxge rdc(%d): not enabled\n", rdc);
+			return (HPI_FAILURE);
+		}
 		break;
+
 	case RXDMA_OP_DISABLE:
 		RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
 		cfg.bits.enable = 0;
 		RXDMA_REG_WRITE64(handle, RDC_RX_CFG1, rdc, cfg.value);
 
 		HXGE_DELAY(delay_time);
-		RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
-
-		while ((count--) && (cfg.bits.qst == 0)) {
-			HXGE_DELAY(delay_time);
-			RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
-		}
-		if (cfg.bits.qst == 0) {
+		if (hpi_rxdma_cfg_rdc_wait_for_qst(handle,
+		    rdc) != HPI_SUCCESS) {
 			HPI_ERROR_MSG((handle.function, HPI_ERR_CTL,
 			    " hpi_rxdma_cfg_rdc_ctl"
 			    " RXDMA_OP_DISABLE Failed for RDC %d \n",
 			    rdc));
 			return (error);
 		}
-
 		break;
+
 	case RXDMA_OP_RESET:
 		cfg.value = 0;
 		cfg.bits.reset = 1;
@@ -124,8 +146,8 @@ hpi_rxdma_cfg_rdc_ctl(hpi_handle_t handle, uint8_t rdc, uint8_t op)
 			    " Reset Failed for RDC %d \n", rdc));
 			return (error);
 		}
-
 		break;
+
 	default:
 		return (HPI_RXDMA_SW_PARAM_ERROR);
 	}

@@ -26,8 +26,6 @@
 #ifndef _HPI_RXDMA_H
 #define	_HPI_RXDMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -165,6 +163,7 @@ typedef struct _rdc_desc_cfg_t {
 #define	hpi_rxdma_rdc_rbr_kick(handle, rdc, num_buffers) \
 	RXDMA_REG_WRITE64(handle, RDC_RBR_KICK, rdc, num_buffers)
 
+hpi_status_t hpi_rxdma_cfg_rdc_wait_for_qst(hpi_handle_t handle, uint8_t rdc);
 hpi_status_t hpi_rxdma_cfg_rdc_ring(hpi_handle_t handle, uint8_t rdc,
     rdc_desc_cfg_t *rdc_desc_params);
 hpi_status_t hpi_rxdma_cfg_clock_div_set(hpi_handle_t handle, uint16_t count);
