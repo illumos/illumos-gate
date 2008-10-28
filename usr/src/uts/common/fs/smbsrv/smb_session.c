@@ -40,7 +40,7 @@ uint32_t smb_keep_alive = SSN_KEEP_ALIVE_TIMEOUT;
 static int smb_session_message(smb_session_t *);
 static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
     uint8_t *, size_t);
-
+static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
 
 
@@ -990,6 +990,64 @@ smb_session_list_signal(smb_session_list_t *se)
 		session = list_next(&se->se_act.lst, session);
 	}
 	rw_exit(&se->se_lock);
+}
+
+/*
+ * smb_session_lookup_user
+ */
+static smb_user_t *
+smb_session_lookup_user(smb_session_t *session, char *domain, char *name)
+{
+	smb_user_t	*user;
+	smb_llist_t	*ulist;
+
+	ulist = &session->s_user_list;
+	smb_llist_enter(ulist, RW_READER);
+	user = smb_llist_head(ulist);
+	while (user) {
+		ASSERT(user->u_magic == SMB_USER_MAGIC);
+		if (!utf8_strcasecmp(user->u_name, name) &&
+		    !utf8_strcasecmp(user->u_domain, domain)) {
+			mutex_enter(&user->u_mutex);
+			if (user->u_state == SMB_USER_STATE_LOGGED_IN) {
+				user->u_refcnt++;
+				mutex_exit(&user->u_mutex);
+				break;
+			}
+			mutex_exit(&user->u_mutex);
+		}
+		user = smb_llist_next(ulist, user);
+	}
+	smb_llist_exit(ulist);
+
+	return (user);
+}
+
+/*
+ * If a user attempts to log in subsequently from the specified session,
+ * duplicates the existing SMB user instance such that all SMB user
+ * instances that corresponds to the same user on the given session
+ * reference the same user's cred.
+ *
+ * Returns NULL if the given user hasn't yet logged in from this
+ * specified session.  Otherwise, returns a user instance that corresponds
+ * to this subsequent login.
+ */
+smb_user_t *
+smb_session_dup_user(smb_session_t *session, char *domain, char *account_name)
+{
+	smb_user_t *orig_user = NULL;
+	smb_user_t *user = NULL;
+
+	orig_user = smb_session_lookup_user(session, domain,
+	    account_name);
+
+	if (orig_user) {
+		user = smb_user_dup(orig_user);
+		smb_user_release(orig_user);
+	}
+
+	return (user);
 }
 
 /*

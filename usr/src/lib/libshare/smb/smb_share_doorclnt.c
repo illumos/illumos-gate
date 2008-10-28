@@ -456,7 +456,7 @@ smb_share_create(smb_share_t *si)
 }
 
 uint32_t
-smb_share_modify(char *sharename, char *cmnt, char *ad_container)
+smb_share_modify(smb_share_t *si)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
@@ -468,9 +468,7 @@ smb_share_modify(char *sharename, char *cmnt, char *ad_container)
 
 	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
 	smb_dr_put_uint32(enc_ctx, SMB_SHROP_MODIFY);
-	smb_dr_put_string(enc_ctx, sharename);
-	smb_dr_put_string(enc_ctx, cmnt);
-	smb_dr_put_string(enc_ctx, ad_container);
+	smb_dr_put_share(enc_ctx, si);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {

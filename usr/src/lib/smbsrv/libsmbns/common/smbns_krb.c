@@ -22,9 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1990 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
@@ -352,10 +349,13 @@ krb5_display_stat(OM_uint32 maj, OM_uint32 min, char *caller_mod)
 	    &msg_ctx, &msg);
 	syslog(LOG_ERR, "%s: major status error: %s\n",
 	    caller_mod, (char *)msg.value);
+	(void) gss_release_buffer(&min2, &msg);
+
 	(void) gss_display_status(&min2, min, GSS_C_MECH_CODE, GSS_C_NULL_OID,
 	    &msg_ctx, &msg);
 	syslog(LOG_ERR, "%s: minor status error: %s\n",
 	    caller_mod, (char *)msg.value);
+	(void) gss_release_buffer(&min2, &msg);
 }
 
 /*

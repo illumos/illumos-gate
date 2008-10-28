@@ -231,6 +231,7 @@ smb_user_login(
 	user->u_name = smb_kstrdup(account_name, user->u_name_len);
 	user->u_domain = smb_kstrdup(domain_name, user->u_domain_len);
 	user->u_cred = cr;
+	user->u_privcred = smb_cred_create_privs(cr, privileges);
 	user->u_audit_sid = audit_sid;
 
 	if (!smb_idpool_alloc(&session->s_uid_pool, &user->u_uid)) {
@@ -238,7 +239,9 @@ smb_user_login(
 			smb_llist_constructor(&user->u_tree_list,
 			    sizeof (smb_tree_t), offsetof(smb_tree_t, t_lnd));
 			mutex_init(&user->u_mutex, NULL, MUTEX_DEFAULT, NULL);
-			crhold(cr);
+			crhold(user->u_cred);
+			if (user->u_privcred)
+				crhold(user->u_privcred);
 			user->u_state = SMB_USER_STATE_LOGGED_IN;
 			user->u_magic = SMB_USER_MAGIC;
 			smb_llist_enter(&session->s_user_list, RW_WRITER);
@@ -418,14 +421,12 @@ smb_user_release(
 smb_user_t *
 smb_user_lookup_by_uid(
     smb_session_t	*session,
-    cred_t		**cr,
     uint16_t		uid)
 {
 	smb_user_t	*user;
 
 	ASSERT(session);
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
-	ASSERT(cr);
 
 	smb_llist_enter(&session->s_user_list, RW_READER);
 	user = smb_llist_head(&session->s_user_list);
@@ -438,7 +439,6 @@ smb_user_lookup_by_uid(
 
 			case SMB_USER_STATE_LOGGED_IN:
 				/* The user exists and is still logged in. */
-				*cr = user->u_cred;
 				user->u_refcnt++;
 				mutex_exit(&user->u_mutex);
 				smb_llist_exit(&session->s_user_list);
@@ -465,37 +465,6 @@ smb_user_lookup_by_uid(
 	}
 	smb_llist_exit(&session->s_user_list);
 	return (NULL);
-}
-
-/*
- * smb_user_lookup_by_name
- */
-smb_user_t *
-smb_user_lookup_by_name(smb_session_t *session, char *domain, char *name)
-{
-	smb_user_t	*user;
-	smb_llist_t	*ulist;
-
-	ulist = &session->s_user_list;
-	smb_llist_enter(ulist, RW_READER);
-	user = smb_llist_head(ulist);
-	while (user) {
-		ASSERT(user->u_magic == SMB_USER_MAGIC);
-		if (!utf8_strcasecmp(user->u_name, name) &&
-		    !utf8_strcasecmp(user->u_domain, domain)) {
-			mutex_enter(&user->u_mutex);
-			if (user->u_state == SMB_USER_STATE_LOGGED_IN) {
-				user->u_refcnt++;
-				mutex_exit(&user->u_mutex);
-				break;
-			}
-			mutex_exit(&user->u_mutex);
-		}
-		user = smb_llist_next(ulist, user);
-	}
-	smb_llist_exit(ulist);
-
-	return (user);
 }
 
 /*
@@ -797,6 +766,8 @@ smb_user_delete(
 	smb_idpool_destructor(&user->u_tid_pool);
 	smb_idpool_free(&session->s_uid_pool, user->u_uid);
 	crfree(user->u_cred);
+	if (user->u_privcred)
+		crfree(user->u_privcred);
 	kmem_free(user->u_name, (size_t)user->u_name_len);
 	kmem_free(user->u_domain, (size_t)user->u_domain_len);
 	kmem_cache_free(user->u_server->si_cache_user, user);
@@ -837,4 +808,16 @@ smb_user_get_tree(
 
 	smb_llist_exit(tree_list);
 	return (tree);
+}
+
+cred_t *
+smb_user_getcred(smb_user_t *user)
+{
+	return (user->u_cred);
+}
+
+cred_t *
+smb_user_getprivcred(smb_user_t *user)
+{
+	return ((user->u_privcred)? user->u_privcred : user->u_cred);
 }

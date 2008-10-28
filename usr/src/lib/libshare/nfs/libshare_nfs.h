@@ -31,8 +31,6 @@
 #ifndef _LIBSHARE_NFS_H
 #define	_LIBSHARE_NFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -40,6 +38,8 @@ extern "C" {
 /* property names used by NFS */
 #define	SHOPT_RO	"ro"
 #define	SHOPT_RW	"rw"
+#define	SHOPT_NONE	"none"
+#define	SHOPT_ROOT_MAPPING	"root_mapping"
 
 #define	SHOPT_SEC	"sec"
 #define	SHOPT_SECURE	"secure"

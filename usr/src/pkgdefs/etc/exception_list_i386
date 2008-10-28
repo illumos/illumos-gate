@@ -958,7 +958,6 @@ usr/include/smbsrv/cp_latin5.h		i386
 usr/include/smbsrv/cp_latin6.h		i386
 usr/include/smbsrv/cp_unicode.h		i386
 usr/include/smbsrv/cp_usascii.h		i386
-usr/include/smbsrv/crypt.h		i386
 usr/include/smbsrv/ctype.h		i386
 usr/include/smbsrv/doserror.h		i386
 usr/include/smbsrv/hash_table.h		i386

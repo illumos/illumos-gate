@@ -1056,7 +1056,6 @@ usr/include/smbsrv/cp_latin5.h		sparc
 usr/include/smbsrv/cp_latin6.h		sparc
 usr/include/smbsrv/cp_unicode.h		sparc
 usr/include/smbsrv/cp_usascii.h		sparc
-usr/include/smbsrv/crypt.h		sparc
 usr/include/smbsrv/ctype.h		sparc
 usr/include/smbsrv/doserror.h		sparc
 usr/include/smbsrv/hash_table.h		sparc

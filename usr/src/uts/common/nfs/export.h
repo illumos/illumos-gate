@@ -29,12 +29,11 @@
 #ifndef	_NFS_EXPORT_H
 #define	_NFS_EXPORT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nfs/nfs_sec.h>
 #include <nfs/auth.h>
 #include <sys/vnode.h>
 #include <nfs/nfs4.h>
+#include <sys/kiconv.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,6 +66,7 @@ struct secinfo {
 					/* how many children (self included) */
 					/* use this flavor. */
 	int 		s_window;	/* window */
+	uint_t		s_rootid;	/* UID to use for authorized roots */
 	int		s_rootcnt;	/* count of root names */
 	caddr_t		*s_rootnames;	/* array of root names */
 					/* they are strings for AUTH_DES and */
@@ -81,6 +81,7 @@ struct secinfo32 {
 					/* how many children (self included) */
 					/* use this flavor. */
 	int32_t 	s_window;	/* window */
+	uint32_t	s_rootid;	/* UID to use for authorized roots */
 	int32_t		s_rootcnt;	/* count of root names */
 	caddr32_t	s_rootnames;	/* array of root names */
 					/* they are strings for AUTH_DES and */
@@ -108,6 +109,7 @@ struct sec_ol {
 #define	M_RWL		0x08	/* exported ro to all listed */
 #define	M_ROOT		0x10	/* root list is defined */
 #define	M_4SEC_EXPORTED	0x20	/* this is an explicitly shared flavor */
+#define	M_NONE		0x40	/* none list is defined */
 
 /* invalid secinfo reference count */
 #define	SEC_REF_INVALID(p) ((p)->s_refcnt < 1)
@@ -178,6 +180,8 @@ struct exportdata32 {
 #define	EX_VOLMIG	0x400	/* XXX nfsv4 fh expire at migration */
 #define	EX_NOEXPOPEN	0x800	/* XXX nfsv4 fh no expire with open */
 #endif /* VOLATILE_FH_TEST */
+
+#define	EX_CHARMAP	0x1000	/* NFS may need a character set conversion */
 
 #ifdef	_KERNEL
 
@@ -277,6 +281,16 @@ struct log_buffer {
 #define	LOG_BUFFER_RELE(lbp)	{ \
 	log_buffer_rele(lbp); \
 }
+
+/*
+ * Structure for character set conversion mapping based on client address.
+ */
+struct charset_cache {
+	struct charset_cache *next;
+	kiconv_t	inbound;
+	kiconv_t	outbound;
+	struct sockaddr	client_addr;
+};
 
 /* Forward declarations */
 struct exportinfo;
@@ -393,6 +407,7 @@ struct exportinfo {
 	struct auth_cache	*exi_cache[AUTH_TABLESIZE];
 	struct log_buffer	*exi_logbuffer;
 	struct exp_visible	*exi_visible;
+	struct charset_cache	*exi_charset;
 	unsigned		exi_volatile_dev:1;
 #ifdef VOLATILE_FH_TEST
 	uint32_t		exi_volatile_id;

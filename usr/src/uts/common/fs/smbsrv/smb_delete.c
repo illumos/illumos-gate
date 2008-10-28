@@ -23,15 +23,19 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_delete.c	1.10	08/08/07 SMI"
-
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 #include <sys/nbmlock.h>
 
-static uint32_t smb_delete_check(smb_request_t *, smb_node_t *);
-static boolean_t smb_delete_check_path(smb_request_t *, boolean_t *);
+static int smb_delete_check_path(smb_request_t *, boolean_t *);
+static int smb_delete_single_file(smb_request_t *, smb_error_t *);
+static int smb_delete_multiple_files(smb_request_t *, smb_error_t *);
+static int smb_delete_find_fname(smb_request_t *, uint32_t *);
+static int smb_delete_check_attr(smb_request_t *, smb_error_t *);
+static int smb_delete_remove_file(smb_request_t *, smb_error_t *);
+
+static void smb_delete_error(smb_error_t *, uint32_t, uint16_t, uint16_t);
 
 /*
  * smb_com_delete
@@ -89,14 +93,15 @@ static boolean_t smb_delete_check_path(smb_request_t *, boolean_t *);
 smb_sdrc_t
 smb_pre_delete(smb_request_t *sr)
 {
-	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
 	int rc;
+	smb_fqi_t *fqi;
+
+	fqi = &sr->arg.dirop.fqi;
 
 	if ((rc = smbsr_decode_vwv(sr, "w", &fqi->srch_attr)) == 0)
 		rc = smbsr_decode_data(sr, "%S", sr, &fqi->path);
 
-	DTRACE_SMB_2(op__Delete__start, smb_request_t *, sr,
-	    struct smb_fqi *, fqi);
+	DTRACE_SMB_2(op__Delete__start, smb_request_t *, sr, smb_fqi_t *, fqi);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -110,201 +115,386 @@ smb_post_delete(smb_request_t *sr)
 /*
  * smb_com_delete
  *
- * readonly
- * If a readonly entry is matched the search aborts with status
- * NT_STATUS_CANNOT_DELETE. Entries found prior to the readonly
- * entry will have been deleted.
+ * 1. pre-process pathname -  smb_delete_check_path()
+ *    checks dot, bad path syntax, wildcards in path
  *
- * directories:
- * smb_com_delete does not delete directories:
- * A non-wildcard delete that finds a directory should result in
- * NT_STATUS_FILE_IS_A_DIRECTORY.
- * A wildcard delete that finds a directory will either:
- *	- abort with status NT_STATUS_FILE_IS_A_DIRECTORY, if
- *	  FILE_ATTRIBUTE_DIRECTORY is specified in the search attributes, or
- *	- skip that entry, if FILE_ATTRIBUTE_DIRECTORY is NOT specified
- *	  in the search attributes
- * Entries found prior to the directory entry will have been deleted.
+ * 2. process the path to get directory node & last_comp,
+ *    store these in fqi
+ *    - If smb_pathname_reduce cannot find the specified path,
+ *      the error (ENOTDIR) is translated to NT_STATUS_OBJECT_PATH_NOT_FOUND
+ *      if the target is a single file (no wildcards).  If there are
+ *      wildcards in the last_comp, NT_STATUS_OBJECT_NAME_NOT_FOUND is
+ *      used instead.
+ *    - If the directory node is the mount point and the last component
+ *      is ".." NT_STATUS_OBJECT_PATH_SYNTAX_BAD is returned.
  *
- * search attribute not matched
- * If an entry is found but it is either hidden or system and those
- * attributes are not specified in the search attributes:
- *	- if deleting a single file, status NT_STATUS_NO_SUCH_FILE
- *	- if wildcard delete, skip the entry and continue
+ * 3. check access permissions
  *
- * path not found
- * If smb_rdir_open cannot find the specified path, the error code
- * is set to NT_STATUS_OBJECT_PATH_NOT_FOUND. If there are wildcards
- * in the last_component, NT_STATUS_OBJECT_NAME_NOT_FOUND should be set
- * instead.
+ * 4. invoke the appropriate deletion routine to find and remove
+ *    the specified file(s).
+ *    - if target is a single file (no wildcards) - smb_delete_single_file
+ *    - if the target contains wildcards - smb_delete_multiple_files
  *
- * smb_delete_check_path() - checks dot, bad path syntax, wildcards in path
+ * Returns: SDRC_SUCCESS or SDRC_ERROR
  */
-
 smb_sdrc_t
 smb_com_delete(smb_request_t *sr)
 {
-	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
 	int rc;
-	int deleted = 0;
-	struct smb_node *node = NULL;
-	smb_odir_context_t *pc;
-	unsigned short sattr;
+	smb_error_t err;
+	uint32_t status;
 	boolean_t wildcards;
+	smb_fqi_t *fqi;
 
-	if (smb_delete_check_path(sr, &wildcards) != B_TRUE)
+	fqi = &sr->arg.dirop.fqi;
+
+	if (smb_delete_check_path(sr, &wildcards) != 0)
 		return (SDRC_ERROR);
 
-	/*
-	 * specify all search attributes so that delete-specific
-	 * search attribute handling can be performed
-	 */
-	sattr = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_HIDDEN |
-	    FILE_ATTRIBUTE_SYSTEM;
-
-	if (smb_rdir_open(sr, fqi->path, sattr) != 0) {
-		/*
-		 * If there are wildcards in the last_component,
-		 * NT_STATUS_OBJECT_NAME_NOT_FOUND
-		 * should be used in place of NT_STATUS_OBJECT_PATH_NOT_FOUND
-		 */
-		if ((wildcards == B_TRUE) &&
-		    (sr->smb_error.status == NT_STATUS_OBJECT_PATH_NOT_FOUND)) {
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
+	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->path,
+	    sr->tid_tree->t_snode, sr->tid_tree->t_snode,
+	    &fqi->dir_snode, fqi->last_comp);
+	if (rc == 0) {
+		if (fqi->dir_snode->vp->v_type != VDIR) {
+			smb_node_release(fqi->dir_snode);
+			rc = ENOTDIR;
 		}
-
-		return (SDRC_ERROR);
 	}
-
-	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
-
-	/*
-	 * This while loop is meant to deal with wildcards.
-	 * It is not expected that wildcards will exist for
-	 * streams.  For the streams case, it is expected
-	 * that the below loop will be executed only once.
-	 */
-
-	while ((rc = smb_rdir_next(sr, &node, pc)) == 0) {
-		/* check directory */
-		if (pc->dc_dattr & FILE_ATTRIBUTE_DIRECTORY) {
-			smb_node_release(node);
-			if (wildcards == B_FALSE) {
-				smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
-				    ERRDOS, ERROR_ACCESS_DENIED);
-				goto delete_error;
-			} else {
-				if (SMB_SEARCH_DIRECTORY(fqi->srch_attr) != 0)
-					break;
-				else
-					continue;
-			}
-		}
-
-		/* check readonly */
-		if (SMB_PATHFILE_IS_READONLY(sr, node)) {
-			smb_node_release(node);
-			smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
-			    ERRDOS, ERROR_ACCESS_DENIED);
-			goto delete_error;
-		}
-
-		/* check search attributes */
-		if (((pc->dc_dattr & FILE_ATTRIBUTE_HIDDEN) &&
-		    !(SMB_SEARCH_HIDDEN(fqi->srch_attr))) ||
-		    ((pc->dc_dattr & FILE_ATTRIBUTE_SYSTEM) &&
-		    !(SMB_SEARCH_SYSTEM(fqi->srch_attr)))) {
-			smb_node_release(node);
-			if (wildcards == B_FALSE) {
-				smbsr_error(sr, NT_STATUS_NO_SUCH_FILE,
-				    ERRDOS, ERROR_FILE_NOT_FOUND);
-				goto delete_error;
-			} else {
-				continue;
-			}
-		}
-
-		/*
-		 * NT does not always close a file immediately, which
-		 * can cause the share and access checking to fail
-		 * (the node refcnt is greater than one), and the file
-		 * doesn't get deleted. Breaking the oplock before
-		 * share and access checking gives the client a chance
-		 * to close the file.
-		 */
-
-		smb_oplock_break(node);
-
-		smb_node_start_crit(node, RW_READER);
-
-		if (smb_delete_check(sr, node) != NT_STATUS_SUCCESS) {
-			smb_node_end_crit(node);
-			smb_node_release(node);
-			goto delete_error;
-		}
-
-		/*
-		 * Use node->od_name so as to skip mangle checks and
-		 * stream processing (which have already been done in
-		 * smb_rdir_next()).
-		 * Use node->dir_snode to obtain the correct parent node
-		 * (especially for streams).
-		 */
-		rc = smb_fsop_remove(sr, sr->user_cr, node->dir_snode,
-		    node->od_name, 1);
-
-		smb_node_end_crit(node);
-		smb_node_release(node);
-		node = NULL;
-
-		if (rc != 0) {
-			if (rc != ENOENT) {
-				smbsr_errno(sr, rc);
-				goto delete_error;
-			}
+	if (rc != 0) {
+		if (rc == ENOTDIR) {
+			if (wildcards)
+				status = NT_STATUS_OBJECT_NAME_NOT_FOUND;
+			else
+				status = NT_STATUS_OBJECT_PATH_NOT_FOUND;
+			smbsr_error(sr, status, ERRDOS, ERROR_FILE_NOT_FOUND);
 		} else {
-			deleted++;
+			smbsr_errno(sr, rc);
 		}
+
+		return (SDRC_ERROR);
 	}
+
+	if ((fqi->dir_snode == sr->tid_tree->t_snode) &&
+	    (strcmp(fqi->last_comp, "..") == 0)) {
+		smb_node_release(fqi->dir_snode);
+		smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
+		    ERRDOS, ERROR_BAD_PATHNAME);
+		return (SDRC_ERROR);
+	}
+
+	rc = smb_fsop_access(sr, sr->user_cr, fqi->dir_snode,
+	    FILE_LIST_DIRECTORY);
+	if (rc != 0) {
+		smb_node_release(fqi->dir_snode);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (SDRC_ERROR);
+	}
+
+	if (wildcards)
+		rc = smb_delete_multiple_files(sr, &err);
+	else
+		rc = smb_delete_single_file(sr, &err);
+
+	if (rc != 0)
+		smbsr_set_error(sr, &err);
+	else
+		rc = smbsr_encode_empty_result(sr);
+
+	return (rc == 0 ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+/*
+ * smb_delete_single_file
+ *
+ * Find the specified file and, if its attributes match the search
+ * criteria, delete it.
+ *
+ * Returns 0 - success (file deleted)
+ *        -1 - error, err is populated with error details
+ */
+static int
+smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
+{
+	smb_fqi_t *fqi;
+	smb_attr_t ret_attr;
+
+	fqi = &sr->arg.dirop.fqi;
+
+	if (smb_fsop_lookup_name(sr, sr->user_cr, 0, sr->tid_tree->t_snode,
+	    fqi->dir_snode, fqi->last_comp, &fqi->last_snode, &ret_attr) != 0) {
+		smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+		    ERRDOS, ERROR_FILE_NOT_FOUND);
+		return (-1);
+	}
+
+	if (smb_delete_check_attr(sr, err) != 0) {
+		smb_node_release(fqi->last_snode);
+		return (-1);
+	}
+
+	if (smb_delete_remove_file(sr, err) != 0) {
+		smb_node_release(fqi->last_snode);
+		return (-1);
+	}
+
+	smb_node_release(fqi->last_snode);
+	return (0);
+}
+
+/*
+ * smb_delete_multiple_files
+ *
+ * For each matching file found by smb_delete_find_name:
+ * 1. lookup file
+ * 2. check the file's attributes
+ *    - The search ends with an error if a readonly file
+ *      (NT_STATUS_CANNOT_DELETE) is matched.
+ *    - The search ends (but not an error) if a directory is
+ *      matched and the request's search did not include
+ *      directories.
+ *    - Otherwise, if smb_delete_check_attr fails the file
+ *      is skipped and the search continues (at step 1)
+ * 3. delete the file
+ *
+ * Returns 0 - success
+ *        -1 - error, err is populated with error details
+ */
+static int
+smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
+{
+	int rc, deleted = 0;
+	uint32_t cookie = 0;
+	smb_fqi_t *fqi;
+	smb_attr_t ret_attr;
+
+	fqi = &sr->arg.dirop.fqi;
+
+	for (;;) {
+		rc = smb_delete_find_fname(sr, &cookie);
+		if (rc != 0)
+			break;
+
+		rc = smb_fsop_lookup_name(sr, sr->user_cr, 0,
+		    sr->tid_tree->t_snode, fqi->dir_snode,
+		    fqi->last_comp_od, &fqi->last_snode, &ret_attr);
+		if (rc != 0)
+			break;
+
+		if (smb_delete_check_attr(sr, err) != 0) {
+			smb_node_release(fqi->last_snode);
+			if (err->status == NT_STATUS_CANNOT_DELETE) {
+				return (-1);
+			}
+			if ((err->status == NT_STATUS_FILE_IS_A_DIRECTORY) &&
+			    (SMB_SEARCH_DIRECTORY(fqi->srch_attr) != 0))
+				break;
+			continue;
+		}
+
+		if (smb_delete_remove_file(sr, err) == 0) {
+			++deleted;
+			smb_node_release(fqi->last_snode);
+			continue;
+		}
+		if (err->status == NT_STATUS_OBJECT_NAME_NOT_FOUND) {
+			smb_node_release(fqi->last_snode);
+			continue;
+		}
+
+		smb_node_release(fqi->last_snode);
+		return (-1);
+	}
+
 
 	if ((rc != 0) && (rc != ENOENT)) {
-		smbsr_errno(sr, rc);
-		goto delete_error;
+		smbsr_map_errno(rc, err);
+		return (-1);
 	}
 
 	if (deleted == 0) {
-		if (wildcards == B_FALSE)
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		else
-			smbsr_error(sr, NT_STATUS_NO_SUCH_FILE,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		goto delete_error;
+		smb_delete_error(err, NT_STATUS_NO_SUCH_FILE,
+		    ERRDOS, ERROR_FILE_NOT_FOUND);
+		return (-1);
 	}
 
-	smb_rdir_close(sr);
-	kmem_free(pc, sizeof (*pc));
-
-	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
-
-delete_error:
-	smb_rdir_close(sr);
-	kmem_free(pc, sizeof (*pc));
-	return (SDRC_ERROR);
+	return (0);
 }
+
+/*
+ * smb_delete_find_fname
+ *
+ * Find next filename that matches search pattern (fqi->last_comp)
+ * and save it in fqi->last_comp_od.
+ *
+ * Returns: 0 - success
+ *          errno
+ */
+static int
+smb_delete_find_fname(smb_request_t *sr, uint32_t *cookie)
+{
+	int rc, n_name;
+	ino64_t fileid;
+	smb_fqi_t *fqi;
+	char name83[SMB_SHORTNAMELEN];
+	char shortname[SMB_SHORTNAMELEN];
+	boolean_t ignore_case;
+
+	fqi = &sr->arg.dirop.fqi;
+
+	ignore_case = SMB_TREE_IS_CASEINSENSITIVE(sr);
+
+	for (;;) {
+		n_name = sizeof (fqi->last_comp_od)  - 1;
+
+		rc = smb_fsop_readdir(sr, sr->user_cr, fqi->dir_snode, cookie,
+		    fqi->last_comp_od, &n_name, &fileid, NULL, NULL, NULL);
+
+		if (rc != 0)
+			return (rc);
+
+		/* check for EOF */
+		if (n_name == 0)
+			return (ENOENT);
+
+		fqi->last_comp_od[n_name] = '\0';
+
+		if (smb_match_name(fileid, fqi->last_comp_od, shortname, name83,
+		    fqi->last_comp, ignore_case))
+			return (0);
+	}
+}
+
+/*
+ * smb_delete_check_attr
+ *
+ * Check file's dos atributes to ensure that
+ * 1. the file is not a directory - NT_STATUS_FILE_IS_A_DIRECTORY
+ * 2. the file is not readonly - NT_STATUS_CANNOT_DELETE
+ * 3. the file's dos attributes comply with the specified search attributes
+ *     If the file is either hidden or system and those attributes
+ *     are not specified in the search attributes - NT_STATUS_NO_SUCH_FILE
+ *
+ * Returns: 0 - file's attributes pass all checks
+ *         -1 - err populated with error details
+ */
+static int
+smb_delete_check_attr(smb_request_t *sr, smb_error_t *err)
+{
+	smb_fqi_t *fqi;
+	smb_node_t *node;
+	uint16_t dosattr, sattr;
+
+	fqi = &sr->arg.dirop.fqi;
+	sattr = fqi->srch_attr;
+	node = fqi->last_snode;
+	dosattr = smb_node_get_dosattr(node);
+
+	if (dosattr & FILE_ATTRIBUTE_DIRECTORY) {
+		smb_delete_error(err, NT_STATUS_FILE_IS_A_DIRECTORY,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (-1);
+	}
+
+	if (SMB_PATHFILE_IS_READONLY(sr, node)) {
+		smb_delete_error(err, NT_STATUS_CANNOT_DELETE,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		return (-1);
+	}
+
+	if ((dosattr & FILE_ATTRIBUTE_HIDDEN) && !(SMB_SEARCH_HIDDEN(sattr))) {
+		smb_delete_error(err, NT_STATUS_NO_SUCH_FILE,
+		    ERRDOS, ERROR_FILE_NOT_FOUND);
+		return (-1);
+	}
+
+	if ((dosattr & FILE_ATTRIBUTE_SYSTEM) && !(SMB_SEARCH_SYSTEM(sattr))) {
+		smb_delete_error(err, NT_STATUS_NO_SUCH_FILE,
+		    ERRDOS, ERROR_FILE_NOT_FOUND);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * smb_delete_remove_file
+ *
+ * For consistency with Windows 2000, the range check should be done
+ * after checking for sharing violations.  Attempting to delete a
+ * locked file will result in sharing violation, which is the same
+ * thing that will happen if you try to delete a non-locked open file.
+ *
+ * Note that windows 2000 rejects lock requests on open files that
+ * have been opened with metadata open modes.  The error is
+ * STATUS_ACCESS_DENIED.
+ *
+ * NT does not always close a file immediately, which can cause the
+ * share and access checking to fail (the node refcnt is greater
+ * than one), and the file doesn't get deleted. Breaking the oplock
+ * before share and access checking gives the client a chance to
+ * close the file.
+ *
+ * Returns: 0 - success
+ *         -1 - error, err populated with error details
+ */
+static int
+smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
+{
+	int rc;
+	uint32_t status;
+	smb_fqi_t *fqi;
+	smb_node_t *node;
+
+	fqi = &sr->arg.dirop.fqi;
+	node = fqi->last_snode;
+
+	smb_oplock_break(node);
+
+	smb_node_start_crit(node, RW_READER);
+
+	status = smb_node_delete_check(node);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_delete_error(err, NT_STATUS_SHARING_VIOLATION,
+		    ERRDOS, ERROR_SHARING_VIOLATION);
+		smb_node_end_crit(node);
+		return (-1);
+	}
+
+	status = smb_range_check(sr, node, 0, UINT64_MAX, B_TRUE);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_delete_error(err, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERROR_ACCESS_DENIED);
+		smb_node_end_crit(node);
+		return (-1);
+	}
+
+	rc = smb_fsop_remove(sr, sr->user_cr, node->dir_snode,
+	    node->od_name, 1);
+	if (rc != 0) {
+		if (rc == ENOENT)
+			smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		else
+			smbsr_map_errno(rc, err);
+
+		smb_node_end_crit(node);
+		return (-1);
+	}
+
+	smb_node_end_crit(node);
+	return (0);
+}
+
 
 /*
  * smb_delete_check_path
  *
- * Perform initial validation on the pathname and last_component.
+ * Perform initial validation on the pathname and last_comp.
  *
- * dot:
- * A filename of '.' should result in NT_STATUS_OBJECT_NAME_INVALID
- * Any wildcard filename that resolves to '.' should result in
- * NT_STATUS_OBJECT_NAME_INVALID if the search attributes include
- * FILE_ATTRIBUTE_DIRECTORY, otherwise handled as directory (see above).
+ * wildcards in path:
+ * Wildcards in the path (excluding the last_comp) should result
+ * in NT_STATUS_OBJECT_NAME_INVALID.
  *
  * bad path syntax:
  * On unix .. at the root of a file system links to the root. Thus
@@ -313,23 +503,26 @@ delete_error:
  * NT_STATUS_OBJECT_PATH_SYNTAX_BAD. It is currently not possible
  * (and questionable if it's desirable) to deal with all cases
  * but paths beginning with \\.. are handled. See bad_paths[].
- * Cases like "\\dir\\..\\.." will still result in "\\" which is
- * contrary to windows behavior.
+ * Cases like "\\dir\\..\\.." will be caught and handled after the
+ * pnreduce.  Cases like "\\dir\\..\\..\\filename" will still result
+ * in "\\filename" which is contrary to windows behavior.
  *
- * wildcards in path:
- * Wildcards in the path (excluding the last_component) should result
- * in NT_STATUS_OBJECT_NAME_INVALID.
+ * dot:
+ * A filename of '.' should result in NT_STATUS_OBJECT_NAME_INVALID
+ * Any wildcard filename that resolves to '.' should result in
+ * NT_STATUS_OBJECT_NAME_INVALID if the search attributes include
+ * FILE_ATTRIBUTE_DIRECTORY
  *
  * Returns:
- *	B_TRUE:  path is valid. Sets *wildcard to TRUE if wildcard delete
+ *   0:  path is valid. Sets *wildcard to TRUE if wildcard delete
  *	         i.e. if wildcards in last component
- *	B_FALSE: path is invalid. Sets error information in sr.
+ *  -1: path is invalid. Sets error information in sr.
  */
-static boolean_t
+static int
 smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 {
-	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
-	char *p, *last_component;
+	smb_fqi_t *fqi = &sr->arg.dirop.fqi;
+	char *p, *last_comp;
 	int i, wildcards;
 
 	struct {
@@ -342,6 +535,7 @@ smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 		{"..\\", 3}
 	};
 
+	/* check for wildcards in path */
 	wildcards = smb_convert_unicode_wildcards(fqi->path);
 
 	/* find last component, strip trailing '\\' */
@@ -351,81 +545,50 @@ smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
 		--p;
 	}
 	if ((p = strrchr(fqi->path, '\\')) == NULL) {
-		last_component = fqi->path;
+		last_comp = fqi->path;
 	} else {
-		last_component = ++p;
+		last_comp = ++p;
 
-		/*
-		 * Any wildcards in path (excluding last_component) should
-		 * result in NT_STATUS_OBJECT_NAME_INVALID
-		 */
-		if (smb_convert_unicode_wildcards(last_component)
-		    != wildcards) {
+		/* wildcards in path > wildcards in last_comp */
+		if (smb_convert_unicode_wildcards(last_comp) != wildcards) {
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 			    ERRDOS, ERROR_INVALID_NAME);
-			return (B_FALSE);
+			return (-1);
 		}
 	}
 
-	/*
-	 * path above the mount point => NT_STATUS_OBJECT_PATH_SYNTAX_BAD
-	 * This test doesn't cover all cases: e.g. \dir\..\..
-	 */
+	/* path above the mount point */
 	for (i = 0; i < sizeof (bad_paths) / sizeof (bad_paths[0]); ++i) {
 		bad = &bad_paths[i];
 		if (strncmp(fqi->path, bad->name, bad->len) == 0) {
 			smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
 			    ERRDOS, ERROR_BAD_PATHNAME);
-			return (B_FALSE);
+			return (-1);
 		}
 	}
 
-	/*
-	 * Any file pattern that resolves to '.' is considered invalid.
-	 * In the wildcard case, only an error if FILE_ATTRIBUTE_DIRECTORY
-	 * is specified in search attributes, otherwise skipped (below)
-	 */
-	if ((strcmp(last_component, ".") == 0) ||
+	/* last component is, or resolves to, '.' (dot) */
+	if ((strcmp(last_comp, ".") == 0) ||
 	    (SMB_SEARCH_DIRECTORY(fqi->srch_attr) &&
-	    (smb_match(last_component, ".")))) {
+	    (smb_match(last_comp, ".")))) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);
-		return (B_FALSE);
+		return (-1);
 	}
 
 	*wildcard = (wildcards != 0);
-	return (B_TRUE);
+	return (0);
 }
 
 /*
- * For consistency with Windows 2000, the range check should be done
- * after checking for sharing violations.  Attempting to delete a
- * locked file will result in sharing violation, which is the same
- * thing that will happen if you try to delete a non-locked open file.
- *
- * Note that windows 2000 rejects lock requests on open files that
- * have been opened with metadata open modes.  The error is
- * STATUS_ACCESS_DENIED.
+ * smb_delete_error
  */
-static uint32_t
-smb_delete_check(smb_request_t *sr, smb_node_t *node)
+static void
+smb_delete_error(smb_error_t *err,
+    uint32_t status, uint16_t errcls, uint16_t errcode)
 {
-	uint32_t status;
-
-	status = smb_node_delete_check(node);
-
-	if (status == NT_STATUS_SHARING_VIOLATION) {
-		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
-		    ERRDOS, ERROR_SHARING_VIOLATION);
-		return (status);
-	}
-
-	status = smb_range_check(sr, node, 0, UINT64_MAX, B_TRUE);
-
-	if (status != NT_STATUS_SUCCESS) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERROR_ACCESS_DENIED);
-	}
-
-	return (status);
+	err->severity = ERROR_SEVERITY_ERROR;
+	err->status = status;
+	err->errcls = errcls;
+	err->errcode = errcode;
 }

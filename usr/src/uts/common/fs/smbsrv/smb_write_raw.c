@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB: write_raw
  * 5.27       WRITE_RAW: Write Raw Bytes
@@ -261,6 +259,8 @@ smb_com_write_raw(struct smb_request *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	fnode = sr->fid_ofile->f_node;
 	stability = ((write_mode & WR_MODE_WR_THRU) ||

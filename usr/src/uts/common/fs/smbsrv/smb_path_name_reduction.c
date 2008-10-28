@@ -72,7 +72,7 @@ smb_is_executable(char *path)
  */
 
 int
-smbd_fs_query(struct smb_request *sr, struct smb_fqi *fqi, int fqm)
+smbd_fs_query(smb_request_t *sr, smb_fqi_t *fqi, int fqm)
 {
 	int rc;
 

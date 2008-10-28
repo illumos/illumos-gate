@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_write.c	1.10	08/08/08 SMI"
-
 #include <sys/sdt.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -92,6 +90,8 @@ smb_com_write(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (param->rw_count == 0) {
 		rc = smb_write_truncate(sr, param);
@@ -177,6 +177,8 @@ smb_com_write_and_close(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (param->rw_count == 0) {
 		rc = smb_write_truncate(sr, param);
@@ -276,6 +278,8 @@ smb_com_write_and_unlock(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (param->rw_count == 0) {
 		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, 0, 0);
@@ -379,6 +383,8 @@ smb_com_write_andx(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (SMB_WRMODE_IS_STABLE(param->rw_mode) &&
 	    STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {

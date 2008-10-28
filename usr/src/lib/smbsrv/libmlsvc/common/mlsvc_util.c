@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility functions to support the RPC interface library.
  */
@@ -80,8 +78,12 @@ mlsvc_is_local_domain(const char *domain)
 
 	if (strchr(domain, '.') != NULL)
 		rc = smb_getfqhostname(hostname, MAXHOSTNAMELEN);
-	else
-		rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
+	else {
+		if (strlen(domain) < NETBIOS_NAME_SZ)
+			rc = smb_getnetbiosname(hostname, MAXHOSTNAMELEN);
+		else
+			rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
+	}
 
 	if (rc != 0)
 		return (-1);
@@ -403,8 +405,8 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 			status = sam_create_trust_account(server, domain,
 			    &auth);
 			if (status == NT_STATUS_SUCCESS) {
-				(void) smb_gethostname(machine_passwd,
-				    sizeof (machine_passwd), 0);
+				(void) smb_getnetbiosname(machine_passwd,
+				    sizeof (machine_passwd));
 				(void) utf8_strlwr(machine_passwd);
 			}
 		}

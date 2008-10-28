@@ -29,8 +29,6 @@
  *	Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -79,6 +77,7 @@
 #include <nfs/nfs_clnt.h>
 #include <nfs/nfs_acl.h>
 #include <nfs/nfs_log.h>
+#include <nfs/nfs_cmd.h>
 #include <nfs/lm.h>
 #include <nfs/nfs_dispatch.h>
 #include <nfs/nfs4_drc.h>
@@ -455,8 +454,8 @@ nfs_svc(struct nfs_svc_args *arg, model_t model)
 
 	/* Double check the vers min/max ranges */
 	if ((nfs_versmin > nfs_versmax) ||
-		(nfs_versmin < NFS_VERSMIN) ||
-		(nfs_versmax > NFS_VERSMAX)) {
+	    (nfs_versmin < NFS_VERSMIN) ||
+	    (nfs_versmax > NFS_VERSMAX)) {
 		nfs_versmin = NFS_VERSMIN_DEFAULT;
 		nfs_versmax = NFS_VERSMAX_DEFAULT;
 	}
@@ -474,7 +473,7 @@ nfs_svc(struct nfs_svc_args *arg, model_t model)
 
 	/* Create a transport handle. */
 	error = svc_tli_kcreate(fp, readsize, buf, &addrmask, &xprt,
-				sctp, NULL, NFS_SVCPOOL_ID, TRUE);
+	    sctp, NULL, NFS_SVCPOOL_ID, TRUE);
 
 	if (error)
 		kmem_free(addrmask.buf, addrmask.maxlen);
@@ -500,7 +499,7 @@ rfs4_server_start(int nfs4_srv_delegation)
 	if (nfs_server_upordown != NFS_SERVER_RUNNING) {
 		/* Do we need to stop and wait on the previous server? */
 		while (nfs_server_upordown == NFS_SERVER_STOPPING ||
-			nfs_server_upordown == NFS_SERVER_OFFLINE)
+		    nfs_server_upordown == NFS_SERVER_OFFLINE)
 			cv_wait(&nfs_server_upordown_cv,
 			    &nfs_server_upordown_lock);
 
@@ -527,7 +526,7 @@ rfs4_server_start(int nfs4_srv_delegation)
 				/* cold start */
 				rfs4_state_init();
 				nfs4_drc = rfs4_init_drc(nfs4_drc_max,
-							nfs4_drc_hash);
+				    nfs4_drc_hash);
 			}
 
 			/*
@@ -556,8 +555,8 @@ rdma_start(struct rdma_svc_args *rsa)
 
 	/* Double check the vers min/max ranges */
 	if ((rsa->nfs_versmin > rsa->nfs_versmax) ||
-		(rsa->nfs_versmin < NFS_VERSMIN) ||
-		(rsa->nfs_versmax > NFS_VERSMAX)) {
+	    (rsa->nfs_versmin < NFS_VERSMIN) ||
+	    (rsa->nfs_versmax > NFS_VERSMAX)) {
 		rsa->nfs_versmin = NFS_VERSMIN_DEFAULT;
 		rsa->nfs_versmax = NFS_VERSMAX_DEFAULT;
 	}
@@ -1618,6 +1617,14 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 				}
 				goto done;
 			}
+
+			/* check to see if we might need charmap */
+			if (exi->exi_export.ex_flags & EX_CHARMAP) {
+				struct sockaddr *ca;
+				ca =  (struct sockaddr *)
+				    svc_getrpccaller(req->rq_xprt)->buf;
+				(void) nfscmd_charmap(exi, ca);
+			}
 		}
 	} else
 		cr = NULL;
@@ -1631,7 +1638,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 
 	if (!(dis_flags & RPC_IDEMPOTENT)) {
 		dupstat = SVC_DUP_EXT(xprt, req, res, disp->dis_ressz, &dr,
-				&dupcached);
+		    &dupcached);
 
 		switch (dupstat) {
 		case DUP_ERROR:
@@ -1655,7 +1662,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 			if (curthread->t_flag & T_WOULDBLOCK) {
 				curthread->t_flag &= ~T_WOULDBLOCK;
 				SVC_DUPDONE_EXT(xprt, dr, res, NULL,
-					disp->dis_ressz, DUP_DROP);
+				    disp->dis_ressz, DUP_DROP);
 				if (res != (char *)&res_buf)
 					SVC_FREERES(xprt);
 				error++;
@@ -1663,12 +1670,12 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 			}
 			if (dis_flags & RPC_AVOIDWORK) {
 				SVC_DUPDONE_EXT(xprt, dr, res, NULL,
-					disp->dis_ressz, DUP_DROP);
+				    disp->dis_ressz, DUP_DROP);
 			} else {
 				SVC_DUPDONE_EXT(xprt, dr, res,
-					disp->dis_resfree == nullfree ? NULL :
-					disp->dis_resfree,
-					disp->dis_ressz, DUP_DONE);
+				    disp->dis_resfree == nullfree ? NULL :
+				    disp->dis_resfree,
+				    disp->dis_ressz, DUP_DONE);
 				dupcached = TRUE;
 			}
 			break;
@@ -1754,7 +1761,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	 */
 	if (logging_enabled) {
 		nfslog_write_record(nfslog_exi, req, args, (char *)&res_buf,
-			cr, &nb, nfslog_rec_id, NFSLOG_ONE_BUFFER);
+		    cr, &nb, nfslog_rec_id, NFSLOG_ONE_BUFFER);
 		exi_rele(nfslog_exi);
 		kmem_free((&nb)->buf, (&nb)->len);
 	}
@@ -1795,7 +1802,7 @@ static void
 rfs_dispatch(struct svc_req *req, SVCXPRT *xprt)
 {
 	common_dispatch(req, xprt, NFS_VERSMIN, NFS_VERSMAX,
-		"NFS", rfs_disptable);
+	    "NFS", rfs_disptable);
 }
 
 static char *aclcallnames_v2[] = {
@@ -1921,7 +1928,7 @@ static void
 acl_dispatch(struct svc_req *req, SVCXPRT *xprt)
 {
 	common_dispatch(req, xprt, NFS_ACL_VERSMIN, NFS_ACL_VERSMAX,
-		"ACL", acl_disptable);
+	    "ACL", acl_disptable);
 }
 
 int
@@ -2056,15 +2063,37 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 	switch (rpcflavor) {
 	case AUTH_NONE:
 		anon_res = crsetugid(cr, exi->exi_export.ex_anon,
-				exi->exi_export.ex_anon);
+		    exi->exi_export.ex_anon);
 		(void) crsetgroups(cr, 0, NULL);
 		break;
 
 	case AUTH_UNIX:
 		if (!stat || crgetuid(cr) == 0 && !(access & NFSAUTH_ROOT)) {
 			anon_res = crsetugid(cr, exi->exi_export.ex_anon,
-					exi->exi_export.ex_anon);
+			    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
+		} else if (!stat || crgetuid(cr) == 0 &&
+		    access & NFSAUTH_ROOT) {
+			/*
+			 * It is root, so apply rootid to get real UID
+			 * Find the secinfo structure.  We should be able
+			 * to find it by the time we reach here.
+			 * nfsauth_access() has done the checking.
+			 */
+			secp = NULL;
+			for (i = 0; i < exi->exi_export.ex_seccnt; i++) {
+				struct secinfo *sptr;
+				sptr = &exi->exi_export.ex_secinfo[i];
+				if (sptr->s_secinfo.sc_nfsnum == nfsflavor) {
+					secp = sptr;
+					break;
+				}
+			}
+			if (secp != NULL) {
+				(void) crsetugid(cr, secp->s_rootid,
+				    secp->s_rootid);
+				(void) crsetgroups(cr, 0, NULL);
+			}
 		}
 		break;
 
@@ -2106,11 +2135,12 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 		 * to anon.
 		 */
 		if (principal && sec_svc_inrootlist(rpcflavor, principal,
-			secp->s_rootcnt, secp->s_rootnames)) {
-			if (crgetuid(cr) == 0)
+		    secp->s_rootcnt, secp->s_rootnames)) {
+			if (crgetuid(cr) == 0 && secp->s_rootid == 0)
 				return (1);
 
-			(void) crsetugid(cr, 0, 0);
+
+			(void) crsetugid(cr, secp->s_rootid, secp->s_rootid);
 
 			/*
 			 * NOTE: If and when kernel-land privilege tracing is
@@ -2135,7 +2165,7 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 			return (1);
 
 		anon_res = crsetugid(cr, exi->exi_export.ex_anon,
-			exi->exi_export.ex_anon);
+		    exi->exi_export.ex_anon);
 		(void) crsetgroups(cr, 0, NULL);
 		break;
 	default:
@@ -2227,15 +2257,36 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 	switch (rpcflavor) {
 	case AUTH_NONE:
 		anon_res = crsetugid(cr, exi->exi_export.ex_anon,
-				exi->exi_export.ex_anon);
+		    exi->exi_export.ex_anon);
 		(void) crsetgroups(cr, 0, NULL);
 		break;
 
 	case AUTH_UNIX:
 		if (crgetuid(cr) == 0 && !(access & NFSAUTH_ROOT)) {
 			anon_res = crsetugid(cr, exi->exi_export.ex_anon,
-					exi->exi_export.ex_anon);
+			    exi->exi_export.ex_anon);
 			(void) crsetgroups(cr, 0, NULL);
+		} else if (crgetuid(cr) == 0 && access & NFSAUTH_ROOT) {
+			/*
+			 * It is root, so apply rootid to get real UID
+			 * Find the secinfo structure.  We should be able
+			 * to find it by the time we reach here.
+			 * nfsauth_access() has done the checking.
+			 */
+			secp = NULL;
+			for (i = 0; i < exi->exi_export.ex_seccnt; i++) {
+				struct secinfo *sptr;
+				sptr = &exi->exi_export.ex_secinfo[i];
+				if (sptr->s_secinfo.sc_nfsnum == nfsflavor) {
+					secp = &exi->exi_export.ex_secinfo[i];
+					break;
+				}
+			}
+			if (secp != NULL) {
+				(void) crsetugid(cr, secp->s_rootid,
+				    secp->s_rootid);
+				(void) crsetgroups(cr, 0, NULL);
+			}
 		}
 		break;
 
@@ -2273,14 +2324,14 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 		/*
 		 * Map root principals listed in the share's root= list to root,
 		 * and map any others principals that were mapped to root by RPC
-		 * to anon.
+		 * to anon. If not going to anon, set to rootid (root_mapping).
 		 */
 		if (principal && sec_svc_inrootlist(rpcflavor, principal,
-			secp->s_rootcnt, secp->s_rootnames)) {
-			if (crgetuid(cr) == 0)
+		    secp->s_rootcnt, secp->s_rootnames)) {
+			if (crgetuid(cr) == 0 && secp->s_rootid == 0)
 				return (1);
 
-			(void) crsetugid(cr, 0, 0);
+			(void) crsetugid(cr, secp->s_rootid, secp->s_rootid);
 
 			/*
 			 * NOTE: If and when kernel-land privilege tracing is
@@ -2305,7 +2356,7 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 			return (1);
 
 		anon_res = crsetugid(cr, exi->exi_export.ex_anon,
-			exi->exi_export.ex_anon);
+		    exi->exi_export.ex_anon);
 		(void) crsetgroups(cr, 0, NULL);
 		break;
 	} /* switch on rpcflavor */
@@ -2318,11 +2369,11 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 
 	if (anon_res != 0) {
 		cmn_err(CE_NOTE,
-			"nfs_server: client %s%ssent wrong "
-			"authentication for %s",
-			client_name(req), client_addr(req, buf),
-			exi->exi_export.ex_path ?
-			exi->exi_export.ex_path : "?");
+		    "nfs_server: client %s%ssent wrong "
+		    "authentication for %s",
+		    client_name(req), client_addr(req, buf),
+		    exi->exi_export.ex_path ?
+		    exi->exi_export.ex_path : "?");
 		return (0);
 	}
 
@@ -2373,14 +2424,14 @@ client_addr(struct svc_req *req, char *buf)
 	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 
 	if (ca->sa_family == AF_INET) {
-	    b = (uchar_t *)&((struct sockaddr_in *)ca)->sin_addr;
-	    (void) sprintf(buf, "%s(%d.%d.%d.%d) ", frontspace,
-		b[0] & 0xFF, b[1] & 0xFF, b[2] & 0xFF, b[3] & 0xFF);
+		b = (uchar_t *)&((struct sockaddr_in *)ca)->sin_addr;
+		(void) sprintf(buf, "%s(%d.%d.%d.%d) ", frontspace,
+		    b[0] & 0xFF, b[1] & 0xFF, b[2] & 0xFF, b[3] & 0xFF);
 	} else if (ca->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 		sin6 = (struct sockaddr_in6 *)ca;
 		(void) kinet_ntop6((uchar_t *)&sin6->sin6_addr,
-				buf, INET6_ADDRSTRLEN);
+		    buf, INET6_ADDRSTRLEN);
 
 	} else {
 
@@ -2591,8 +2642,9 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 				VN_HOLD(realvp);
 				VN_RELE(*vpp);
 				*vpp = realvp;
-			} else
-			    break;
+			} else {
+				break;
+			}
 		/* LINTED */
 		} while (TRUE);
 
@@ -2610,8 +2662,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 		if (vn_mountedvfs(mc_dvp) != NULL) {
 			error = traverse(&mc_dvp);
 			if (error) {
-			    VN_RELE(*vpp);
-			    goto publicfh_done;
+				VN_RELE(*vpp);
+				goto publicfh_done;
 			}
 		}
 

@@ -88,7 +88,7 @@ DWORD
 netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 {
 	char resource_domain[SMB_PI_MAX_DOMAIN];
-	char server[MLSVC_DOMAIN_NAME_MAX * 2];
+	char server[NETBIOS_NAME_SZ * 2];
 	mlsvc_handle_t netr_handle;
 	smb_ntdomain_t *di;
 	DWORD status;
@@ -285,8 +285,8 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	arg.servername = alloca(len);
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 
-	arg.hostname = alloca(MLSVC_DOMAIN_NAME_MAX);
-	rc = smb_gethostname((char *)arg.hostname, MLSVC_DOMAIN_NAME_MAX, 0);
+	arg.hostname = alloca(NETBIOS_NAME_SZ);
+	rc = smb_getnetbiosname((char *)arg.hostname, NETBIOS_NAME_SZ);
 	if (rc != 0) {
 		mlrpc_heap_destroy(heap.heap);
 		return (NT_STATUS_INTERNAL_ERROR);

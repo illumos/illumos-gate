@@ -85,7 +85,7 @@ smb_autohome_add(const char *username)
 		/*
 		 * autohome shares will be added for each login attempt
 		 */
-		(void) smb_shr_create(&si, B_FALSE);
+		(void) smb_shr_add(&si);
 		return;
 	}
 
@@ -100,7 +100,7 @@ smb_autohome_add(const char *username)
 	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
 	si.shr_flags = SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
 
-	(void) smb_shr_create(&si, B_FALSE);
+	(void) smb_shr_add(&si);
 }
 
 /*
@@ -115,7 +115,7 @@ smb_autohome_remove(const char *username)
 
 	if (smb_shr_get((char *)username, &si) == NERR_Success) {
 		if (si.shr_flags & SMB_SHRF_AUTOHOME)
-			(void) smb_shr_delete((char *)username, B_FALSE);
+			(void) smb_shr_remove((char *)username);
 	}
 }
 

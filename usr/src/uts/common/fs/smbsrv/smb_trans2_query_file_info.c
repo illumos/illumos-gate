@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB: trans2_query_file_information
  *
@@ -178,11 +176,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	filebuf = kmem_alloc(MAXNAMELEN+1, KM_SLEEP);
 	mangled_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	if (infolev > SMB_INFO_PASSTHROUGH)
-		infolev -= SMB_INFO_PASSTHROUGH;
-
 	switch (infolev) {
-	case FileAccessInformation:
+	case SMB_FILE_ACCESS_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 		    sr->fid_ofile->f_granted_access);
 		break;
@@ -343,8 +338,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		alt_nm_ptr = (*mangled_name == 0) ?
 		    utf8_strupr(filename) : mangled_name;
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr,
-		    smb_ascii_or_unicode_strlen(sr, alt_nm_ptr), alt_nm_ptr);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lU", sr,
+		    mts_wcequiv_strlen(alt_nm_ptr), alt_nm_ptr);
 		break;
 
 	case SMB_QUERY_FILE_STREAM_INFO:

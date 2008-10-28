@@ -49,7 +49,6 @@ extern "C" {
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/alloc.h>
 #include <smbsrv/codepage.h>
-#include <smbsrv/crypt.h>
 #include <smbsrv/ctype.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/msgbuf.h>
@@ -187,11 +186,14 @@ extern boolean_t smb_match_netlogon_seqnum(void);
 extern int smb_setdomainprops(char *, char *, char *);
 extern void smb_update_netlogon_seqnum(void);
 
-/* smb_door_client.c */
+/* maximum password length on Windows 2000 and above */
+#define	SMB_PASSWD_MAXLEN	127
+#define	SMB_USERNAME_MAXLEN	40
+
 typedef struct smb_joininfo {
 	char domain_name[MAXHOSTNAMELEN];
-	char domain_username[BUF_LEN + 1];
-	char domain_passwd[BUF_LEN + 1];
+	char domain_username[SMB_USERNAME_MAXLEN + 1];
+	char domain_passwd[SMB_PASSWD_MAXLEN + 1];
 	uint32_t mode;
 } smb_joininfo_t;
 
@@ -269,11 +271,16 @@ extern int smb_getfqdomainname(char *, size_t);
 extern int smb_gethostname(char *, size_t, int);
 extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
+
+#define	SMB_SAMACCT_MAXLEN	(NETBIOS_NAME_SZ + 1)
+extern int smb_getsamaccount(char *, size_t);
+
 extern smb_sid_t *smb_getdomainsid(void);
 
 extern int smb_get_nameservers(struct in_addr *, int);
 extern void smb_tonetbiosname(char *, char *, char);
 
+extern int smb_chk_hostaccess(ipaddr_t, char *);
 
 void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);

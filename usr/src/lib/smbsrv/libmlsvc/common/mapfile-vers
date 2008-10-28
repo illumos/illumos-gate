@@ -43,15 +43,16 @@ SUNWprivate {
 	smb_autohome_add;
 	smb_autohome_remove;
 	smb_logon;
+	smb_shr_add;
 	smb_shr_chkname;
 	smb_shr_count;
-	smb_shr_create;
-	smb_shr_delete;
 	smb_shr_get;
+	smb_shr_hostaccess;
 	smb_shr_iterate;
 	smb_shr_iterinit;
 	smb_shr_list;
 	smb_shr_modify;
+	smb_shr_remove;
 	smb_shr_rename;
 	smb_shr_start;
 	smb_shr_stop;

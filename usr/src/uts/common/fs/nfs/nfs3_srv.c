@@ -54,6 +54,7 @@
 
 #include <nfs/nfs.h>
 #include <nfs/export.h>
+#include <nfs/nfs_cmd.h>
 
 #include <sys/strsubr.h>
 
@@ -385,6 +386,8 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	nfs_fh3 *fhp;
 	struct sec_ol sec = {0, 0};
 	bool_t publicfh_flag = FALSE, auth_weak = FALSE;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	dvap = NULL;
 
@@ -437,13 +440,22 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->what.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_ACCES;
+		goto out1;
+	}
+
 	/*
 	 * If the public filehandle is used then allow
 	 * a multi-component lookup
 	 */
 	if (PUBLIC_FH3(&args->what.dir)) {
 		publicfh_flag = TRUE;
-		error = rfs_publicfh_mclookup(args->what.name, dvp, cr, &vp,
+		error = rfs_publicfh_mclookup(name, dvp, cr, &vp,
 		    &exi, &sec);
 		if (error && exi != NULL)
 			exi_rele(exi); /* See comment below Re: publicfh_flag */
@@ -452,13 +464,10 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		 * request didn't come from an unlabeled admin_low client.
 		 */
 		if (is_system_labeled() && error == 0) {
-			struct sockaddr *ca;
 			int		addr_type;
 			void		*ipaddr;
 			tsol_tpc_t	*tp;
 
-			ca = (struct sockaddr *)svc_getrpccaller(
-			    req->rq_xprt)->buf;
 			if (ca->sa_family == AF_INET) {
 				addr_type = IPV4_VERSION;
 				ipaddr = &((struct sockaddr_in *)ca)->sin_addr;
@@ -481,9 +490,12 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 				TPC_RELE(tp);
 		}
 	} else {
-		error = VOP_LOOKUP(dvp, args->what.name, &vp,
+		error = VOP_LOOKUP(dvp, name, &vp,
 		    NULL, 0, NULL, cr, NULL, NULL, NULL);
 	}
+
+	if (name != args->what.name)
+		kmem_free(name, MAXPATHLEN + 1);
 
 	if (is_system_labeled() && error == 0) {
 		bslabel_t *clabel = req->rq_label;
@@ -775,6 +787,8 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	struct iovec iov;
 	struct uio uio;
 	char *data;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	vap = NULL;
 
@@ -866,14 +880,30 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 		goto out;
 	}
 
+	*(data + MAXPATHLEN - uio.uio_resid) = '\0';
+
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, data, NFSCMD_CONV_OUTBOUND,
+	    MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		/*
+		 * Even though the conversion failed, we return
+		 * something. We just don't translate it.
+		 */
+		name = data;
+	}
+
 	resp->status = NFS3_OK;
 	vattr_to_post_op_attr(vap, &resp->resok.symlink_attributes);
-	resp->resok.data = data;
-	*(data + MAXPATHLEN - uio.uio_resid) = '\0';
+	resp->resok.data = name;
 
 	DTRACE_NFSV3_4(op__readlink__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, vp, READLINK3res *, resp);
 	VN_RELE(vp);
+
+	if (name != data)
+		kmem_free(data, MAXPATHLEN + 1);
 
 	return;
 
@@ -1485,6 +1515,8 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 	nfstime3 *mtime;
 	len_t reqsize;
 	bool_t trunc;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	dbvap = NULL;
 	davap = NULL;
@@ -1541,6 +1573,16 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 		}
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->where.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		/* This is really a Solaris EILSEQ */
+		resp->status = NFS3ERR_INVAL;
+		goto out1;
+	}
+
 	if (args->how.mode == EXCLUSIVE) {
 		va.va_mask = AT_TYPE | AT_MODE | AT_MTIME;
 		va.va_type = VREG;
@@ -1578,7 +1620,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 				/*
 				 * Does file already exist?
 				 */
-				error = VOP_LOOKUP(dvp, args->where.name, &tvp,
+				error = VOP_LOOKUP(dvp, name, &tvp,
 				    NULL, 0, NULL, cr, NULL, NULL, NULL);
 
 				/*
@@ -1657,7 +1699,7 @@ tryagain:
 	 * itself.  It would have been nice to have the file open mode
 	 * passed as part of the arguments.
 	 */
-	error = VOP_CREATE(dvp, args->where.name, &va, excl, VWRITE,
+	error = VOP_CREATE(dvp, name, &va, excl, VWRITE,
 	    &vp, cr, 0, NULL, NULL);
 
 #ifdef DEBUG
@@ -1688,7 +1730,7 @@ tryagain:
 		/*
 		 * Lookup the file so that we can get a vnode for it.
 		 */
-		error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0,
+		error = VOP_LOOKUP(dvp, name, &vp, NULL, 0,
 		    NULL, cr, NULL, NULL, NULL);
 		if (error) {
 			/*
@@ -1770,6 +1812,9 @@ tryagain:
 		}
 	}
 
+	if (name != args->where.name)
+		kmem_free(name, MAXPATHLEN + 1);
+
 #ifdef DEBUG
 	if (!rfs3_do_post_op_attr)
 		vap = NULL;
@@ -1822,6 +1867,9 @@ out1:
 	DTRACE_NFSV3_4(op__create__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, dvp, CREATE3res *, resp);
 
+	if (name != NULL && name != args->where.name)
+		kmem_free(name, MAXPATHLEN + 1);
+
 	if (tvp != NULL) {
 		if (in_crit)
 			nbl_end_crit(tvp);
@@ -1852,6 +1900,8 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 	struct vattr dbva;
 	struct vattr *davap;
 	struct vattr dava;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	dbvap = NULL;
 	davap = NULL;
@@ -1917,10 +1967,22 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->where.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_INVAL;
+		goto out1;
+	}
+
 	va.va_mask |= AT_TYPE;
 	va.va_type = VDIR;
 
-	error = VOP_MKDIR(dvp, args->where.name, &va, &vp, cr, NULL, 0, NULL);
+	error = VOP_MKDIR(dvp, name, &va, &vp, cr, NULL, 0, NULL);
+
+	if (name != args->where.name)
+		kmem_free(name, MAXPATHLEN + 1);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -2017,6 +2079,9 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 	struct vattr dbva;
 	struct vattr *davap;
 	struct vattr dava;
+	struct sockaddr *ca;
+	char *name = NULL;
+	char *symdata = NULL;
 
 	dbvap = NULL;
 	davap = NULL;
@@ -2087,11 +2152,29 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto err1;
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->where.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		/* This is really a Solaris EILSEQ */
+		resp->status = NFS3ERR_INVAL;
+		goto err1;
+	}
+
+	symdata = nfscmd_convname(ca, exi, args->symlink.symlink_data,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+	if (symdata == NULL) {
+		/* This is really a Solaris EILSEQ */
+		resp->status = NFS3ERR_INVAL;
+		goto err1;
+	}
+
+
 	va.va_mask |= AT_TYPE;
 	va.va_type = VLNK;
 
-	error = VOP_SYMLINK(dvp, args->where.name, &va,
-	    args->symlink.symlink_data, cr, NULL, 0);
+	error = VOP_SYMLINK(dvp, name, &va, symdata, cr, NULL, 0);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -2107,7 +2190,7 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 	if (error)
 		goto err;
 
-	error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0, NULL, cr,
+	error = VOP_LOOKUP(dvp, name, &vp, NULL, 0, NULL, cr,
 	    NULL, NULL, NULL);
 
 	/*
@@ -2169,6 +2252,11 @@ err:
 err1:
 	vattr_to_wcc_data(dbvap, davap, &resp->resfail.dir_wcc);
 out:
+	if (name != NULL && name != args->where.name)
+		kmem_free(name, MAXPATHLEN + 1);
+	if (symdata != NULL && symdata != args->symlink.symlink_data)
+		kmem_free(symdata, MAXPATHLEN + 1);
+
 	DTRACE_NFSV3_4(op__symlink__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, dvp, SYMLINK3res *, resp);
 
@@ -2199,6 +2287,8 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 	struct vattr dava;
 	int mode;
 	enum vcexcl excl;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	dbvap = NULL;
 	davap = NULL;
@@ -2304,12 +2394,24 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->where.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_INVAL;
+		goto out1;
+	}
+
 	excl = EXCL;
 
 	mode = 0;
 
-	error = VOP_CREATE(dvp, args->where.name, &va, excl, mode,
+	error = VOP_CREATE(dvp, name, &va, excl, mode,
 	    &vp, cr, 0, NULL, NULL);
+
+	if (name != args->where.name)
+		kmem_free(name, MAXPATHLEN + 1);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -2408,6 +2510,8 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	struct vattr *avap;
 	struct vattr ava;
 	vnode_t *targvp = NULL;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	bvap = NULL;
 	avap = NULL;
@@ -2469,11 +2573,20 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 		}
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->object.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_INVAL;
+		goto err1;
+	}
+
 	/*
 	 * Check for a conflict with a non-blocking mandatory share
 	 * reservation and V4 delegations
 	 */
-	error = VOP_LOOKUP(vp, args->object.name, &targvp, NULL, 0,
+	error = VOP_LOOKUP(vp, name, &targvp, NULL, 0,
 	    NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		goto err;
@@ -2484,13 +2597,13 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	}
 
 	if (!nbl_need_check(targvp)) {
-		error = VOP_REMOVE(vp, args->object.name, cr, NULL, 0);
+		error = VOP_REMOVE(vp, name, cr, NULL, 0);
 	} else {
 		nbl_start_crit(targvp, RW_READER);
 		if (nbl_conflict(targvp, NBL_REMOVE, 0, 0, 0, NULL)) {
 			error = EACCES;
 		} else {
-			error = VOP_REMOVE(vp, args->object.name, cr, NULL, 0);
+			error = VOP_REMOVE(vp, name, cr, NULL, 0);
 		}
 		nbl_end_crit(targvp);
 	}
@@ -2531,6 +2644,10 @@ err1:
 out:
 	DTRACE_NFSV3_4(op__remove__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, vp, REMOVE3res *, resp);
+
+	if (name != NULL && name != args->object.name)
+		kmem_free(name, MAXPATHLEN + 1);
+
 	if (vp != NULL)
 		VN_RELE(vp);
 }
@@ -2552,6 +2669,8 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 	struct vattr bva;
 	struct vattr *avap;
 	struct vattr ava;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	bvap = NULL;
 	avap = NULL;
@@ -2613,7 +2732,19 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	error = VOP_RMDIR(vp, args->object.name, rootdir, cr, NULL, 0);
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->object.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_INVAL;
+		goto err1;
+	}
+
+	error = VOP_RMDIR(vp, name, rootdir, cr, NULL, 0);
+
+	if (name != args->object.name)
+		kmem_free(name, MAXPATHLEN + 1);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -2690,6 +2821,9 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	struct exportinfo *to_exi;
 	vnode_t *srcvp = NULL;
 	bslabel_t *clabel;
+	struct sockaddr *ca;
+	char *name = NULL;
+	char *toname = NULL;
 
 	fbvap = NULL;
 	favap = NULL;
@@ -2794,11 +2928,28 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		}
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->from.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_INVAL;
+		goto err1;
+	}
+
+	toname = nfscmd_convname(ca, exi, args->to.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (toname == NULL) {
+		resp->status = NFS3ERR_INVAL;
+		goto err1;
+	}
+
 	/*
 	 * Check for a conflict with a non-blocking mandatory share
 	 * reservation or V4 delegations.
 	 */
-	error = VOP_LOOKUP(fvp, args->from.name, &srcvp, NULL, 0,
+	error = VOP_LOOKUP(fvp, name, &srcvp, NULL, 0,
 	    NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		goto err;
@@ -2818,7 +2969,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	 * first to avoid VOP_LOOKUP if possible.
 	 */
 	if (rfs4_deleg_policy != SRV_NEVER_DELEGATE &&
-	    VOP_LOOKUP(tvp, args->to.name, &targvp, NULL, 0, NULL, cr,
+	    VOP_LOOKUP(tvp, toname, &targvp, NULL, 0, NULL, cr,
 	    NULL, NULL, NULL) == 0) {
 
 		if (rfs4_check_delegated(FWRITE, targvp, TRUE)) {
@@ -2830,16 +2981,13 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	}
 
 	if (!nbl_need_check(srcvp)) {
-		error = VOP_RENAME(fvp, args->from.name, tvp,
-		    args->to.name, cr, NULL, 0);
+		error = VOP_RENAME(fvp, name, tvp, toname, cr, NULL, 0);
 	} else {
 		nbl_start_crit(srcvp, RW_READER);
-		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0, NULL)) {
+		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0, NULL))
 			error = EACCES;
-		} else {
-			error = VOP_RENAME(fvp, args->from.name, tvp,
-			    args->to.name, cr, NULL, 0);
-		}
+		else
+			error = VOP_RENAME(fvp, name, tvp, toname, cr, NULL, 0);
 		nbl_end_crit(srcvp);
 	}
 	if (error == 0)
@@ -2883,12 +3031,19 @@ err:
 	if (curthread->t_flag & T_WOULDBLOCK) {
 		curthread->t_flag &= ~T_WOULDBLOCK;
 		resp->status = NFS3ERR_JUKEBOX;
-	} else
+	} else {
 		resp->status = puterrno3(error);
+	}
 err1:
 	vattr_to_wcc_data(fbvap, favap, &resp->resfail.fromdir_wcc);
 	vattr_to_wcc_data(tbvap, tavap, &resp->resfail.todir_wcc);
+
 out:
+	if (name != NULL && name != args->from.name)
+		kmem_free(name, MAXPATHLEN + 1);
+	if (toname != NULL && toname != args->to.name)
+		kmem_free(toname, MAXPATHLEN + 1);
+
 	DTRACE_NFSV3_4(op__rename__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, fvp, RENAME3res *, resp);
 	if (fvp != NULL)
@@ -2920,6 +3075,8 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 	nfs_fh3	*fh3;
 	struct exportinfo *to_exi;
 	bslabel_t *clabel;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	vap = NULL;
 	bvap = NULL;
@@ -3024,7 +3181,16 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	error = VOP_LINK(dvp, vp, args->link.name, cr, NULL, 0);
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->link.name,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN + 1);
+
+	if (name == NULL) {
+		resp->status = NFS3ERR_SERVERFAULT;
+		goto out1;
+	}
+
+	error = VOP_LINK(dvp, vp, name, cr, NULL, 0);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -3072,6 +3238,9 @@ out:
 	} else
 		resp->status = puterrno3(error);
 out1:
+	if (name != NULL && name != args->link.name)
+		kmem_free(name, MAXPATHLEN + 1);
+
 	DTRACE_NFSV3_4(op__link__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, vp, LINK3res *, resp);
 
@@ -3135,6 +3304,7 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 	int bufsize;
 	int namlen;
 	uint_t count;
+	struct sockaddr *ca;
 
 	vap = NULL;
 
@@ -3284,6 +3454,19 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 		}
 	}
 
+	/*
+	 * Have a valid readir buffer for the native character
+	 * set. Need to check if a conversion is necessary and
+	 * potentially rewrite the whole buffer. Note that if the
+	 * conversion expands names enough, the structure may not
+	 * fit. In this case, we need to drop entries until if fits
+	 * and patch the counts in order that the next readdir will
+	 * get the correct entries.
+	 */
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	data = nfscmd_convdirent(ca, exi, data, count, &resp->status);
+
+
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
 #if 0 /* notyet */
@@ -3405,6 +3588,9 @@ rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
 	int space_left;
 	int i;
 	uint_t *namlen = NULL;
+	char *ndata = NULL;
+	struct sockaddr *ca;
+	size_t ret;
 
 	vap = NULL;
 
@@ -3675,6 +3861,25 @@ good:
 		dp = nextdp(dp);
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	ret = nfscmd_convdirplus(ca, exi, data, nents, args->dircount, &ndata);
+	if (ndata == NULL)
+		ndata = data;
+
+	if (ret > 0) {
+		/*
+		 * We had to drop one or more entries in order to fit
+		 * during the character conversion.  We need to patch
+		 * up the size and eof info.
+		 */
+		if (iseof)
+			iseof = FALSE;
+
+		ret = nfscmd_dropped_entrysize((struct dirent64 *)data,
+		    nents, ret);
+	}
+
+
 #if 0 /* notyet */
 	/*
 	 * Don't do this.  It causes local disk writes when just
@@ -3692,14 +3897,17 @@ good:
 	resp->status = NFS3_OK;
 	vattr_to_post_op_attr(vap, &resp->resok.dir_attributes);
 	resp->resok.cookieverf = 0;
-	resp->resok.reply.entries = (entryplus3 *)data;
+	resp->resok.reply.entries = (entryplus3 *)ndata;
 	resp->resok.reply.eof = iseof;
 	resp->resok.size = nents;
-	resp->resok.count = args->dircount;
+	resp->resok.count = args->dircount - ret;
 	resp->resok.maxcount = args->maxcount;
 
 	DTRACE_NFSV3_4(op__readdirplus__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, vp, READDIRPLUS3res *, resp);
+	if (ndata != data)
+		kmem_free(data, args->dircount);
+
 
 	VN_RELE(vp);
 
@@ -3709,8 +3917,9 @@ out:
 	if (curthread->t_flag & T_WOULDBLOCK) {
 		curthread->t_flag &= ~T_WOULDBLOCK;
 		resp->status = NFS3ERR_JUKEBOX;
-	} else
+	} else {
 		resp->status = puterrno3(error);
+	}
 out1:
 	DTRACE_NFSV3_4(op__readdirplus__done, struct svc_req *, req,
 	    cred_t *, cr, vnode_t *, vp, READDIRPLUS3res *, resp);

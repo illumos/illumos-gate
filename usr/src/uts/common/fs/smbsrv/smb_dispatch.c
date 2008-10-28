@@ -26,8 +26,6 @@
  * Dispatching SMB requests.
  */
 
-#pragma ident	"@(#)smb_dispatch.c	1.7	08/08/07 SMI"
-
 /*
  * ALMOST EVERYTHING YOU NEED TO KNOW ABOUT A SERVER MESSAGE BLOCK
  *
@@ -716,13 +714,14 @@ andx_more:
 	 * override the user credentials.
 	 */
 	if (!(sdd->sdt_flags & SDDF_SUPPRESS_UID) && (sr->uid_user == NULL)) {
-		sr->uid_user = smb_user_lookup_by_uid(sr->session,
-		    &sr->user_cr, sr->smb_uid);
+		sr->uid_user = smb_user_lookup_by_uid(sr->session, sr->smb_uid);
 		if (sr->uid_user == NULL) {
 			smbsr_error(sr, 0, ERRSRV, ERRbaduid);
 			smbsr_cleanup(sr);
 			goto report_error;
 		}
+
+		sr->user_cr = smb_user_getcred(sr->uid_user);
 
 		if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID) &&
 		    (sr->tid_tree == NULL)) {

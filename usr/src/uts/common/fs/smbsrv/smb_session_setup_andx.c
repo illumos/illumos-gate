@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"@(#)smb_session_setup_andx.c	1.6	08/07/08 SMI"
 /*
  * SMB: session_setup_andx
  *
@@ -246,11 +245,13 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	uint16_t maxbufsize, maxmpxcount, vcnumber = 0;
 	uint32_t sesskey;
 	uint32_t capabilities = 0;
-	char *account_name = "";
-	char *primary_domain = "";
+	char *username = "";
+	char *userdomain = "";
 	char *native_os = "";
 	char *native_lanman = "";
 	char *hostname = sr->sr_cfg->skc_hostname;
+	char *nbdomain = sr->sr_cfg->skc_nbdomain;
+	char *fqdn = sr->sr_cfg->skc_fqdn;
 	smb_token_t *usr_token = NULL;
 	smb_user_t *user = NULL;
 	int security = sr->sr_cfg->skc_secmode;
@@ -264,6 +265,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	smb_session_key_t *session_key = NULL;
 	int rc;
 	char ipaddr_buf[INET6_ADDRSTRLEN];
+	boolean_t known_domain;
 
 	if (sr->session->dialect >= NT_LM_0_12) {
 		rc = smbsr_decode_vwv(sr, "b.wwwwlww4.l", &sr->andx_com,
@@ -293,8 +295,8 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		    sr,
 		    ci_pwlen, ci_password,
 		    cs_pwlen, cs_password,
-		    &account_name,
-		    &primary_domain,
+		    &username,
+		    &userdomain,
 		    &native_os);
 
 		if (rc != 0) {
@@ -344,11 +346,11 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		 * name and the primary domain but we don't care about the
 		 * the native OS or native LanMan fields.
 		 */
-		if (smbsr_decode_data(sr, "%u", sr, &account_name) != 0)
-			account_name = "";
+		if (smbsr_decode_data(sr, "%u", sr, &username) != 0)
+			username = "";
 
-		if (smbsr_decode_data(sr, "%u", sr, &primary_domain) != 0)
-			primary_domain = "";
+		if (smbsr_decode_data(sr, "%u", sr, &userdomain) != 0)
+			userdomain = "";
 
 		sr->session->native_os = NATIVE_OS_UNKNOWN;
 	}
@@ -365,54 +367,69 @@ smb_com_session_setup_andx(smb_request_t *sr)
 
 	bzero(&clnt_info, sizeof (netr_client_t));
 
-	if (*primary_domain == 0)
-		primary_domain = sr->sr_cfg->skc_resource_domain;
+	/*
+	 * Both local and domain users can be authenticated in
+	 * domain mode. Whether a user is local or not is determined
+	 * by given domain name in the request. If client does not
+	 * specify the domain name, both local and domain
+	 * authentications should be tried. The preferred order is to
+	 * try the local authentication first.
+	 */
+	known_domain = B_TRUE;
+	if (*userdomain == 0) {
+		userdomain = hostname;
+		if (security == SMB_SECMODE_DOMAIN)
+			known_domain = B_FALSE;
+	}
 
 	if ((cs_pwlen == 0) &&
 	    (ci_pwlen == 0 || (ci_pwlen == 1 && *ci_password == 0))) {
 		/* anonymous user */
 		clnt_info.flags |= NETR_CFLG_ANON;
-		account_name = "nobody";
-	} else if (*account_name == '\0') {
+		username = "nobody";
+	} else if (*username == '\0') {
 		if (ci_password)
 			kmem_free(ci_password, ci_pwlen + 1);
 		if (cs_password)
 			kmem_free(cs_password, cs_pwlen + 1);
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		return (SDRC_ERROR);
-	} else if (utf8_strcasecmp(primary_domain, hostname) == 0) {
-		/*
-		 * When domain name is equal to hostname, it means
-		 * the user is local even if system is running in
-		 * domain mode, so perform a local logon.
-		 */
-		clnt_info.flags |= NETR_CFLG_LOCAL;
 	} else if (security == SMB_SECMODE_DOMAIN) {
-		clnt_info.flags |= NETR_CFLG_DOMAIN;
+		/*
+		 * If the system is running in domain mode, domain
+		 * authentication will be performed only when the client
+		 * sends the domain that matches either the NetBIOS name
+		 * or FQDN of the domain. Otherwise, local authentication
+		 * will be performed.
+		 */
+		if (utf8_strcasecmp(userdomain, nbdomain) == 0 ||
+		    utf8_strcasecmp(userdomain, fqdn) == 0)
+			clnt_info.flags |= NETR_CFLG_DOMAIN;
+		else
+			clnt_info.flags |= NETR_CFLG_LOCAL;
 	} else if (security == SMB_SECMODE_WORKGRP) {
 		clnt_info.flags |= NETR_CFLG_LOCAL;
 	}
 
 	/*
-	 * If this is an additional setup for an existing user
-	 * on this session, duplicate the authenticated user.
-	 * Otherwise authenticate as new user.
+	 * If the domain is unknown, we are unable to determine
+	 * whether the specified user is local or domain until
+	 * the authentication has taken place; thus, the user
+	 * lookup will be postponed until the user is successfully
+	 * authenticated.
 	 */
-	user = smb_user_lookup_by_name(sr->session, primary_domain,
-	    account_name);
+	if (known_domain)
+		user = smb_session_dup_user(sr->session,
+		    (clnt_info.flags & NETR_CFLG_LOCAL) ?
+		    hostname : nbdomain, username);
 
-	if (user) {
-		smb_user_t *orig_user = user;
-
-		user = smb_user_dup(orig_user);
-		smb_user_release(orig_user);
-	} else {
+	if (user == NULL) {
 		cred_t		*cr;
 		uint32_t	privileges;
 
 		clnt_info.logon_level = NETR_NETWORK_LOGON;
-		clnt_info.domain = primary_domain;
-		clnt_info.username = account_name;
+		clnt_info.domain = userdomain;
+		clnt_info.username = username;
 		clnt_info.workstation = sr->session->workstation;
 		clnt_info.ipaddr = sr->session->ipaddr;
 		clnt_info.local_ipaddr = sr->session->local_ipaddr;
@@ -432,7 +449,38 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		    &clnt_info);
 
 		usr_token = smb_upcall_get_token(&clnt_info);
-		if (usr_token == 0) {
+
+		/*
+		 * If the domain is unknown and we fail to authenticate
+		 * the user locally, pass-through authentication will be
+		 * attempted.
+		 */
+		if (!known_domain) {
+			if (usr_token == NULL) {
+				clnt_info.domain = nbdomain;
+				clnt_info.flags &= ~NETR_CFLG_LOCAL;
+				clnt_info.flags |= NETR_CFLG_DOMAIN;
+				usr_token = smb_upcall_get_token(&clnt_info);
+			}
+
+			/*
+			 * Now that the user has successfully been
+			 * authenticated, the clnt_info.domain is valid.
+			 * Try to see if the user has already logged in from
+			 * this session.
+			 *
+			 * If this is a subsequent login, a duplicate user
+			 * instance will be returned. Otherwise, NULL is
+			 * returned.
+			 */
+			if (usr_token != NULL)
+				user = smb_session_dup_user(sr->session,
+				    clnt_info.domain, username);
+		}
+
+
+		/* authentication fails */
+		if (usr_token == NULL) {
 			if (ci_password)
 				kmem_free(ci_password, ci_pwlen + 1);
 			if (cs_password)
@@ -448,15 +496,21 @@ smb_com_session_setup_andx(smb_request_t *sr)
 			    sizeof (smb_session_key_t));
 		}
 
-		cr = smb_cred_create(usr_token, &privileges);
-		if (cr != NULL) {
-			user = smb_user_login(sr->session, cr,
-			    usr_token->tkn_domain_name,
-			    usr_token->tkn_account_name,
-			    usr_token->tkn_flags,
-			    privileges,
-			    usr_token->tkn_audit_sid);
-			smb_cred_rele(cr);
+		/* first login */
+		if (user == NULL) {
+			cr = smb_cred_create(usr_token, &privileges);
+			if (cr != NULL) {
+				user = smb_user_login(sr->session, cr,
+				    usr_token->tkn_domain_name,
+				    usr_token->tkn_account_name,
+				    usr_token->tkn_flags,
+				    privileges,
+				    usr_token->tkn_audit_sid);
+				smb_cred_rele(user->u_cred);
+
+				if (user->u_privcred)
+					smb_cred_rele(user->u_privcred);
+			}
 		}
 		smb_token_free(usr_token);
 	}
@@ -531,7 +585,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	    sr,
 	    "Windows NT 4.0",
 	    "NT LAN Manager 4.0",
-	    sr->sr_cfg->skc_resource_domain);
+	    nbdomain);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

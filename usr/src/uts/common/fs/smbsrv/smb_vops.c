@@ -225,15 +225,17 @@ smb_vop_write(vnode_t *vp, uio_t *uiop, int ioflag, uint32_t *lcount,
  *
  * All attributes are retrieved.
  *
- * A named stream's attributes (as far as CIFS is concerned) are those of the
- * unnamed (i.e. data) stream (minus the size attribute), and the size of the
- * named stream.  Though the file system may store attributes other than size
- * with the named stream, these should not be used by CIFS for any purpose.
- *
  * When vp denotes a named stream, then unnamed_vp should be passed in (denoting
  * the corresponding unnamed stream).
+ * A named stream's attributes (as far as CIFS is concerned) are those of the
+ * unnamed stream (minus the size attribute, and the type), plus  the size of
+ * the named stream, and a type value of VREG.
+ * Although the file system may store other attributes with the named stream,
+ * these should not be used by CIFS for any purpose.
+ *
+ * File systems without VFSFT_XVATTR do not support DOS attributes or create
+ * time (crtime). In this case the mtime is used as the crtime.
  */
-
 int
 smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
     int flags, cred_t *cr)
@@ -252,7 +254,6 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 	if (vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
 		xva_init(&tmp_xvattr);
 		xoap = xva_getxoptattr(&tmp_xvattr);
-
 		ASSERT(xoap);
 
 		smb_sa_to_va_mask(ret_attr->sa_mask,
@@ -264,16 +265,12 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
 		XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
 
-		if ((error = VOP_GETATTR(use_vp, &tmp_xvattr.xva_vattr, flags,
-		    cr, &smb_ct)) != 0)
+		error = VOP_GETATTR(use_vp, &tmp_xvattr.xva_vattr, flags,
+		    cr, &smb_ct);
+		if (error != 0)
 			return (error);
 
 		ret_attr->sa_vattr = tmp_xvattr.xva_vattr;
-
-		/*
-		 * Copy special attributes to ret_attr parameter
-		 */
-
 		ret_attr->sa_dosattr = 0;
 
 		ASSERT(tmp_xvattr.xva_vattr.va_mask & AT_XVATTR);
@@ -303,32 +300,25 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 
 		ret_attr->sa_crtime = xoap->xoa_createtime;
 
-		if (unnamed_vp && (ret_attr->sa_mask & SMB_AT_SIZE)) {
-			/*
-			 * Retrieve stream size attribute into temporary
-			 * structure, in case the underlying file system
-			 * returns attributes other than the size (we do not
-			 * want to have ret_attr's other fields get
-			 * overwritten).
-			 *
-			 * Note that vp is used here, and not use_vp.
-			 * Also, only AT_SIZE is needed.
-			 */
+		if (unnamed_vp) {
+			ret_attr->sa_vattr.va_type = VREG;
 
-			tmp_xvattr.xva_vattr.va_mask = AT_SIZE;
+			if (ret_attr->sa_mask & SMB_AT_SIZE) {
+				tmp_xvattr.xva_vattr.va_mask = AT_SIZE;
 
-			if ((error = VOP_GETATTR(vp, &tmp_xvattr.xva_vattr,
-			    flags, cr, &smb_ct)) != 0)
-				return (error);
+				error = VOP_GETATTR(vp, &tmp_xvattr.xva_vattr,
+				    flags, cr, &smb_ct);
+				if (error != 0)
+					return (error);
 
-			ret_attr->sa_vattr.va_size =
-			    tmp_xvattr.xva_vattr.va_size;
+				ret_attr->sa_vattr.va_size =
+				    tmp_xvattr.xva_vattr.va_size;
 
+			}
 		}
 
-		if (ret_attr->sa_vattr.va_type == VDIR) {
+		if (ret_attr->sa_vattr.va_type == VDIR)
 			ret_attr->sa_dosattr |= FILE_ATTRIBUTE_DIRECTORY;
-		}
 
 		return (error);
 	}
@@ -336,47 +326,33 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 	/*
 	 * Support for file systems without VFSFT_XVATTR
 	 */
-
 	smb_sa_to_va_mask(ret_attr->sa_mask,
 	    &ret_attr->sa_vattr.va_mask);
 
 	error = VOP_GETATTR(use_vp, &ret_attr->sa_vattr, flags, cr, &smb_ct);
-
 	if (error != 0)
 		return (error);
-
-	/*
-	 * "Fake" DOS attributes and create time, filesystem doesn't support
-	 * them.
-	 */
 
 	ret_attr->sa_dosattr = 0;
 	ret_attr->sa_crtime = ret_attr->sa_vattr.va_mtime;
 
-	if (unnamed_vp && (ret_attr->sa_mask & SMB_AT_SIZE)) {
-		/*
-		 * Retrieve stream size attribute into temporary structure,
-		 * in case the underlying file system returns attributes
-		 * other than the size (we do not want to have ret_attr's
-		 * other fields get overwritten).
-		 *
-		 * Note that vp is used here, and not use_vp.
-		 * Also, only AT_SIZE is needed.
-		 */
+	if (unnamed_vp) {
+		ret_attr->sa_vattr.va_type = VREG;
 
-		tmp_attr.sa_vattr.va_mask = AT_SIZE;
-		error = VOP_GETATTR(vp, &tmp_attr.sa_vattr, flags, cr, &smb_ct);
+		if (ret_attr->sa_mask & SMB_AT_SIZE) {
+			tmp_attr.sa_vattr.va_mask = AT_SIZE;
 
-		if (error != 0)
-			return (error);
+			error = VOP_GETATTR(vp, &tmp_attr.sa_vattr,
+			    flags, cr, &smb_ct);
+			if (error != 0)
+				return (error);
 
-
-		ret_attr->sa_vattr.va_size = tmp_attr.sa_vattr.va_size;
+			ret_attr->sa_vattr.va_size = tmp_attr.sa_vattr.va_size;
+		}
 	}
 
-	if (ret_attr->sa_vattr.va_type == VDIR) {
+	if (ret_attr->sa_vattr.va_type == VDIR)
 		ret_attr->sa_dosattr |= FILE_ATTRIBUTE_DIRECTORY;
-	}
 
 	return (error);
 }
@@ -440,22 +416,7 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 	if ((error = VOP_SETATTR(use_vp, vap, flags, cr, &smb_ct)) != 0)
 		return (error);
 
-	/*
-	 * If the size of the stream needs to be set, set it on
-	 * the stream file directly.  (All other indicated attributes
-	 * are set on the stream's unnamed stream, except under the
-	 * exception described in the function header.)
-	 */
-
 	if (at_size) {
-		/*
-		 * set_attr->sa_vattr.va_size already contains the
-		 * size as set by the caller
-		 *
-		 * Note that vp is used here, and not use_vp.
-		 * Also, only AT_SIZE is needed.
-		 */
-
 		set_attr->sa_vattr.va_mask = AT_SIZE;
 		error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags, cr,
 		    &smb_ct);
@@ -1252,7 +1213,6 @@ smb_vop_getdents_entries(
 	uint32_t	next_cookie;
 	int		ebufsize;
 	char		*tmp_name;
-	int		error;
 	int		rc;
 	char		shortname[SMB_SHORTNAMELEN];
 	char		name83[SMB_SHORTNAMELEN];
@@ -1303,11 +1263,11 @@ smb_vop_getdents_entries(
 			continue;
 		}
 
-		error = smb_vop_lookup(dvp, edp->ed_name, &fvp,
+		rc = smb_vop_lookup(dvp, edp->ed_name, &fvp,
 		    NULL, 0, NULL, cr);
 
-		if (error) {
-			if (error == ENOENT) {
+		if (rc) {
+			if (rc == ENOENT) {
 				*cookiep = next_cookie;
 				if (dp) {
 					/*LINTED E_BAD_PTR_CAST_ALIGN*/
@@ -1325,7 +1285,7 @@ smb_vop_getdents_entries(
 			if (ebuf)
 				kmem_free(ebuf, ebufsize);
 
-			return (error);
+			return (rc);
 		}
 
 		ret_snode = smb_node_lookup(sr, NULL, cr, fvp,
@@ -1365,27 +1325,19 @@ smb_vop_getdents_entries(
 				name83[SMB_SHORTNAMELEN - 1] = '\0';
 			}
 
-			error = smb_gather_dents_info(arg, edp->ed_ino,
+			rc = smb_gather_dents_info(arg, edp->ed_ino,
 			    strlen(tmp_name), tmp_name, next_cookie, dircountp,
 			    &ret_attr, ret_snode, shortname, name83);
 
-			if (error > 0) {
-				if (ebuf)
-					kmem_free(ebuf, ebufsize);
-				return (error);
-			}
-
-			/*
-			 * Treat errors from smb_gather_dents_info() that are
-			 * < 0 the same as EOF.
-			 */
-			if (error < 0) {
+			if (rc < 0) {
 				if (ebuf)
 					kmem_free(ebuf, ebufsize);
 				*maxentries = 0;
 				return (0);
 			}
-			(*maxentries)--;
+
+			if (rc > 0)
+				(*maxentries)--;
 		} else {
 			smb_node_release(ret_snode);
 		}

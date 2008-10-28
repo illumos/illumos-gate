@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <rpc/types.h>
@@ -57,6 +55,8 @@ void (*rfs4_client_clrst)(struct nfs4clrst_args *) = NULL;
 
 /* This filled in by nfssrv:_init() */
 void (*nfs_srv_quiesce_func)(void) = NULL;
+
+extern void nfscmd_args(uint_t);
 
 /*
  * These will be reset by klmmod:lm_svc(), when lockd starts NLM service,
@@ -382,6 +382,21 @@ nfssys(enum nfssys_op opcode, void *arg)
 		if (copyin(arg, &did, sizeof (did)))
 			return (set_errno(EFAULT));
 		mountd_args(did);
+		error = 0;
+		break;
+	}
+
+	case NFSCMD_ARGS: {
+		uint_t	did;
+
+		/*
+		 * For now, only passing down the door fd; if we
+		 * ever need to pass down more info, we can use
+		 * a (properly aligned) struct.
+		 */
+		if (copyin(arg, &did, sizeof (did)))
+			return (set_errno(EFAULT));
+		nfscmd_args(did);
 		error = 0;
 		break;
 	}

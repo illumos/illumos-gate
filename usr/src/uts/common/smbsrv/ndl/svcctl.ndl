@@ -26,8 +26,6 @@
 #ifndef _MLSVC_SVCCTL_NDL_
 #define _MLSVC_SVCCTL_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NT Service Control Services (SVCCTL) RPC interface definition.
  * This interface provides remote access to add, remove, start and
@@ -224,6 +222,19 @@ struct svc_config {
 };
 typedef struct svc_config svc_config_t;
 
+struct svc_failure_actions {
+	DWORD reset_period;
+	DWORD rebootmsg_offset;
+	DWORD command_offset;
+	DWORD actions;
+	DWORD actions_offset;
+};
+typedef struct svc_failure_actions svc_failure_actions_t;
+
+struct svc_description {
+	DWORD desc;		/* offset of description string */
+};
+typedef struct svc_description svc_description_t;
 
 /*
  ***********************************************************************
@@ -283,16 +294,6 @@ struct svcctl_QueryServiceStatus {
 /*
  ***********************************************************************
  * EnumServicesStatus
- *
- * This should probably be:
- *	...
- *	INOUT	DWORD buf_size;
- *    SIZE_IS(buf_size)
- *	OUT	BYTE *services;
- *	OUT	DWORD bytes_needed;
- *	OUT	DWORD svc_num;
- *	INOUT	DWORD *resume_handle;
- *	...
  ***********************************************************************
  */
 OPERATION(SVCCTL_OPNUM_EnumServicesStatus)
@@ -300,12 +301,12 @@ struct svcctl_EnumServicesStatus {
 	IN		svcctl_handle_t manager_handle;
 	IN		DWORD svc_type;
 	IN		DWORD svc_state;
-	INOUT		DWORD buf_size;
-	IN		DWORD address;
-	OUT		BYTE services[1024];
+	IN		DWORD buf_size;
+    SIZE_IS(buf_size)
+	OUT REFERENCE	LPBYTE services;
 	OUT		DWORD bytes_needed;
 	OUT		DWORD svc_num;
-	OUT		DWORD resume_handle;
+	INOUT		DWORD *resume_handle;
 	OUT		DWORD status;
 };
 
@@ -330,9 +331,9 @@ struct svcctl_QueryServiceConfig {
  */
 OPERATION(SVCCTL_OPNUM_GetServiceDisplayNameW)
 struct svcctl_GetServiceDisplayNameW {
-	IN		svcctl_handle_t service_handle;
-	IN		LPTSTR service_name;
-	OUT		LPTSTR display_name;
+	IN		svcctl_handle_t manager_handle;
+	IN REFERENCE	LPTSTR service_name;
+	OUT REFERENCE	LPTSTR display_name;
 	INOUT		DWORD buf_size;
 	OUT		DWORD status;
 };
@@ -344,10 +345,26 @@ struct svcctl_GetServiceDisplayNameW {
  */
 OPERATION(SVCCTL_OPNUM_GetServiceKeyNameW)
 struct svcctl_GetServiceKeyNameW {
-	IN		svcctl_handle_t service_handle;
-	IN		LPTSTR service_name;
-	OUT		LPTSTR key_name;
+	IN		svcctl_handle_t manager_handle;
+	IN REFERENCE	LPTSTR service_name;
+	OUT REFERENCE	LPTSTR key_name;
 	INOUT		DWORD buf_size;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * QueryServiceConfig2W  
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_QueryServiceConfig2W)
+struct svcctl_QueryServiceConfig2W {
+	IN		svcctl_handle_t service_handle;
+	IN		DWORD info_level;
+	IN		DWORD buf_size;
+    SIZE_IS(buf_size)
+	OUT REFERENCE	LPBYTE buffer;
+	OUT		DWORD bytes_needed;
 	OUT		DWORD status;
 };
 
@@ -374,6 +391,8 @@ union svcctl_interface {
 		struct svcctl_GetServiceDisplayNameW SvcGetServiceDisplayNameW;
 	CASE(SVCCTL_OPNUM_GetServiceKeyNameW)
 		struct svcctl_GetServiceKeyNameW	SvcGetServiceKeyNameW;
+	CASE(SVCCTL_OPNUM_QueryServiceConfig2W)
+		struct svcctl_QueryServiceConfig2W	SvcQueryServiceConfig2W;
 };
 
 typedef union svcctl_interface	svcctl_interface_t;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbns_dyndns.c	1.10	08/07/24 SMI"
-
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
@@ -186,14 +184,18 @@ display_stat(OM_uint32 maj, OM_uint32 min)
 	gss_buffer_desc msg;
 	OM_uint32 msg_ctx = 0;
 	OM_uint32 min2;
+
 	(void) gss_display_status(&min2, maj, GSS_C_GSS_CODE, GSS_C_NULL_OID,
 	    &msg_ctx, &msg);
 	syslog(LOG_ERR, "dyndns: GSS major status error: %s\n",
 	    (char *)msg.value);
+	(void) gss_release_buffer(&min2, &msg);
+
 	(void) gss_display_status(&min2, min, GSS_C_MECH_CODE, GSS_C_NULL_OID,
 	    &msg_ctx, &msg);
 	syslog(LOG_ERR, "dyndns: GSS minor status error: %s\n",
 	    (char *)msg.value);
+	(void) gss_release_buffer(&min2, &msg);
 }
 
 static char *

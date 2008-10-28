@@ -360,16 +360,16 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	smb_node_t		*snode = NULL;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
-	smb_share_t 		si;
+	smb_share_t 		*si;
 	smb_attr_t		attr;
 	cred_t			*u_cred;
 	int			rc;
+	uint32_t		access = 0; /* read/write is assumed */
+	uint32_t		hostaccess;
 
 	ASSERT(user);
 	u_cred = user->u_cred;
 	ASSERT(u_cred);
-
-	bzero(&si, sizeof (smb_share_t));
 
 	if (user->u_flags & SMB_USER_FLAG_IPC) {
 		smb_tree_log(sr, sharename, "access denied: IPC only");
@@ -377,10 +377,13 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		return (NULL);
 	}
 
-	if (smb_kshare_getinfo(sr->sr_server->sv_lmshrd, sharename, &si) !=
-	    NERR_Success) {
+	si = kmem_zalloc(sizeof (smb_share_t), KM_SLEEP);
+
+	if (smb_kshare_getinfo(sr->sr_server->sv_lmshrd, (char *)sharename, si,
+	    sr->session->ipaddr) != NERR_Success) {
 		smb_tree_log(sr, sharename, "share not found");
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
+		kmem_free(si, sizeof (smb_share_t));
 		return (NULL);
 	}
 
@@ -389,19 +392,31 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	 * Only a user with admin rights is allowed to map these
 	 * shares.
 	 */
-	if (si.shr_flags & SMB_SHRF_ADMIN) {
+	if (si->shr_flags & SMB_SHRF_ADMIN) {
 		if (!smb_user_is_admin(user)) {
 			smb_tree_log(sr, sharename, "access denied: not admin");
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRSRV, ERRaccess);
+			kmem_free(si, sizeof (smb_share_t));
 			return (NULL);
 		}
+	}
+
+	hostaccess = si->shr_access_value & SMB_SHRF_ACC_ALL;
+
+	if (hostaccess == SMB_SHRF_ACC_RO) {
+		access = SMB_TREE_READONLY;
+	} else if (hostaccess == SMB_SHRF_ACC_NONE) {
+		kmem_free(si, sizeof (smb_share_t));
+		smb_tree_log(sr, sharename, "access denied: host access");
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+		return (NULL);
 	}
 
 	/*
 	 * Check that the shared directory exists.
 	 */
-	rc = smb_pathname_reduce(sr, u_cred, si.shr_path, 0, 0, &dir_snode,
+	rc = smb_pathname_reduce(sr, u_cred, si->shr_path, 0, 0, &dir_snode,
 	    last_component);
 
 	if (rc == 0) {
@@ -415,17 +430,22 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		if (snode)
 			smb_node_release(snode);
 
-		smb_tree_log(sr, sharename, "bad path: %s", si.shr_path);
+		smb_tree_log(sr, sharename, "bad path: %s", si->shr_path);
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
+		kmem_free(si, sizeof (smb_share_t));
 		return (NULL);
 	}
 
-	tree = smb_tree_alloc(user, sharename, si.shr_path, STYPE_DISKTREE,
+	tree = smb_tree_alloc(user, sharename, si->shr_path, STYPE_DISKTREE,
 	    snode);
+
 	if (tree == NULL)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+	else
+		tree->t_flags |= access;
 
 	smb_node_release(snode);
+	kmem_free(si, sizeof (smb_share_t));
 	return (tree);
 }
 

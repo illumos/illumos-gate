@@ -23,14 +23,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_auth.c	1.5	08/07/08 SMI"
-
 #include <strings.h>
 #include <stdlib.h>
 #include <smbsrv/codepage.h>
 #include <smbsrv/oem.h>
 #include <smbsrv/ctype.h>
-#include <smbsrv/crypt.h>
 #include <smbsrv/libsmb.h>
 
 extern void randomize(char *data, unsigned len);

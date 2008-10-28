@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/mlsvc.h>
+#include <smbsrv/netbios.h>
 
 #ifndef _KERNEL
 #include <syslog.h>
@@ -96,8 +97,8 @@ typedef struct netr_session_key {
 
 typedef struct netr_info {
 	DWORD flags;
-	char server[MLSVC_DOMAIN_NAME_MAX * 2];
-	char hostname[MLSVC_DOMAIN_NAME_MAX * 2];
+	char server[NETBIOS_NAME_SZ * 2];
+	char hostname[NETBIOS_NAME_SZ * 2];
 	netr_cred_t client_challenge;
 	netr_cred_t server_challenge;
 	netr_cred_t client_credential;

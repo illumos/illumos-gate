@@ -1648,12 +1648,11 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 /*
  * smb_fsop_lookup_name()
  *
- * Sanity checks on dir_snode done in smb_fsop_lookup().
+ * If name indicates that the file is a stream file, perform
+ * stream specific lookup, otherwise call smb_fsop_lookup.
  *
- * Note: This function is called only from the open path.
- * It will check if the file is a stream.
- * It will also return an error if the looked-up file is in
- * a child mount.
+ * Return an error if the looked-up file is in outside the tree.
+ * (Required when invoked from open path.)
  */
 
 int

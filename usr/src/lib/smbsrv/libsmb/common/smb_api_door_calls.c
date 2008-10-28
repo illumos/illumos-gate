@@ -288,12 +288,12 @@ xdr_smb_dr_joininfo_t(XDR *xdrs, smb_joininfo_t *objp)
 	    sizeof (char), (xdrproc_t)xdr_char))
 		return (FALSE);
 
-	if (!xdr_vector(xdrs, (char *)objp->domain_username, BUF_LEN + 1,
-	    sizeof (char), (xdrproc_t)xdr_char))
+	if (!xdr_vector(xdrs, (char *)objp->domain_username,
+	    SMB_USERNAME_MAXLEN + 1, sizeof (char), (xdrproc_t)xdr_char))
 		return (FALSE);
 
-	if (!xdr_vector(xdrs, (char *)objp->domain_passwd, BUF_LEN + 1,
-	    sizeof (char), (xdrproc_t)xdr_char))
+	if (!xdr_vector(xdrs, (char *)objp->domain_passwd,
+	    SMB_PASSWD_MAXLEN + 1, sizeof (char), (xdrproc_t)xdr_char))
 		return (FALSE);
 
 	if (!xdr_uint32_t(xdrs, &objp->mode))

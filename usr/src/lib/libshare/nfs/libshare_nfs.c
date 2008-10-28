@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NFS specific functions
  */
@@ -156,10 +154,43 @@ struct option_defs optdefs[] = {
 	{SHOPT_LOG, OPT_LOG, OPT_TYPE_LOGTAG},
 #define	OPT_CKSUM	13
 	{SHOPT_CKSUM, OPT_CKSUM, OPT_TYPE_STRINGSET},
+#define	OPT_NONE	14
+	{SHOPT_NONE, OPT_NONE, OPT_TYPE_ACCLIST},
+#define	OPT_ROOT_MAPPING	15
+	{SHOPT_ROOT_MAPPING, OPT_ROOT_MAPPING, OPT_TYPE_USER},
+#define	OPT_CHARSET_MAP	16
+	{"", OPT_CHARSET_MAP, OPT_TYPE_ACCLIST},
 #ifdef VOLATILE_FH_TEST	/* XXX added for testing volatile fh's only */
-#define	OPT_VOLFH	14
+#define	OPT_VOLFH	17
 	{SHOPT_VOLFH, OPT_VOLFH},
 #endif /* VOLATILE_FH_TEST */
+	NULL
+};
+
+/*
+ * Codesets that may need to be converted to UTF-8 for file paths.
+ * Add new names here to add new property support. If we ever get a
+ * way to query the kernel for character sets, this should become
+ * dynamically loaded. Make sure changes here are reflected in
+ * cmd/fs.d/nfs/mountd/nfscmd.c
+ */
+
+static char *legal_conv[] = {
+	"euc-cn",
+	"euc-jp",
+	"euc-jpms",
+	"euc-kr",
+	"euc-tw",
+	"iso8859-1",
+	"iso8859-2",
+	"iso8859-5",
+	"iso8859-6",
+	"iso8859-7",
+	"iso8859-8",
+	"iso8859-9",
+	"iso8859-13",
+	"iso8859-15",
+	"koi8-r",
 	NULL
 };
 
@@ -171,6 +202,8 @@ static char *seclist[] = {
 	SHOPT_RW,
 	SHOPT_ROOT,
 	SHOPT_WINDOW,
+	SHOPT_NONE,
+	SHOPT_ROOT_MAPPING,
 	NULL
 };
 
@@ -179,6 +212,25 @@ struct securities {
 	sa_security_t security;
 	struct securities *next;
 };
+
+/*
+ * findcharset(charset)
+ *
+ * Returns B_TRUE if the charset is a legal conversion otherwise
+ * B_FALSE. This will need to be rewritten to be more efficient when
+ * we have a dynamic list of legal conversions.
+ */
+
+static boolean_t
+findcharset(char *charset)
+{
+	int i;
+
+	for (i = 0; legal_conv[i] != NULL; i++)
+		if (strcmp(charset, legal_conv[i]) == 0)
+			return (B_TRUE);
+	return (B_FALSE);
+}
 
 /*
  * findopt(name)
@@ -196,6 +248,8 @@ findopt(char *name)
 			if (strcmp(optdefs[i].tag, name) == 0)
 				return (i);
 		}
+		if (findcharset(name))
+			return (OPT_CHARSET_MAP);
 	}
 	return (-1);
 }
@@ -938,6 +992,14 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 				configlog(export,
 				    strlen(value) ? value : "global");
 			break;
+		case OPT_CHARSET_MAP:
+			/*
+			 * Set EX_CHARMAP when there is at least one
+			 * charmap conversion property. This will get
+			 * checked by the nfs server when it needs to.
+			 */
+			export->ex_flags |= EX_CHARMAP;
+			break;
 		default:
 			/* have a syntactic error */
 			(void) printf(dgettext(TEXT_DOMAIN,
@@ -1031,6 +1093,7 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 	char *type;
 	int longform;
 	int err = SC_NOERROR;
+	uint32_t val;
 
 	type = sa_get_security_attr(secopts, "sectype");
 	if (type != NULL) {
@@ -1085,6 +1148,9 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 				}
 			}
 			break;
+		case OPT_NONE:
+			sp->s_flags |= M_NONE;
+			break;
 		case OPT_WINDOW:
 			if (value != NULL) {
 				sp->s_window = atoi(value);
@@ -1092,6 +1158,21 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 				if (sp->s_window < 0)
 					sp->s_window = DEF_WIN;
 			}
+			break;
+		case OPT_ROOT_MAPPING:
+			if (value != NULL && is_a_number(value)) {
+				val = strtoul(value, NULL, 0);
+			} else {
+				struct passwd *pw;
+				pw = getpwnam(value != NULL ? value : "nobody");
+				if (pw != NULL) {
+					val = pw->pw_uid;
+				} else {
+					val = UID_NOBODY;
+				}
+				endpwent();
+			}
+			sp->s_rootid = val;
 			break;
 		default:
 			break;
@@ -1136,6 +1217,8 @@ printarg(char *path, struct exportdata *ep)
 		(void) printf("NOSUB ");
 	if (ep->ex_flags & EX_LOG)
 		(void) printf("LOG ");
+	if (ep->ex_flags & EX_CHARMAP)
+		(void) printf("CHARMAP ");
 	if (ep->ex_flags & EX_LOG_ALLOPS)
 		(void) printf("LOG_ALLOPS ");
 	if (ep->ex_flags == 0)
@@ -1159,9 +1242,11 @@ printarg(char *path, struct exportdata *ep)
 		if (sp->s_flags & M_ROL) (void) printf("M_ROL ");
 		if (sp->s_flags & M_RW) (void) printf("M_RW ");
 		if (sp->s_flags & M_RWL) (void) printf("M_RWL ");
+		if (sp->s_flags & M_NONE) (void) printf("M_NONE ");
 		if (sp->s_flags == 0) (void) printf("(none)");
 		(void) printf("\n");
 		(void) printf("\t\ts_window = %d\n", sp->s_window);
+		(void) printf("\t\ts_rootid = %d\n", sp->s_rootid);
 		(void) printf("\t\ts_rootcnt = %d ", sp->s_rootcnt);
 		(void) fflush(stdout);
 		for (j = 0; j < sp->s_rootcnt; j++)
@@ -1979,16 +2064,22 @@ nfs_disable_share(sa_share_t share, char *path)
 }
 
 /*
- * check ro vs rw values.  Over time this may get beefed up.
- * for now it just does simple checks.
+ * check_rorwnone(v1, v2, v3)
+ *
+ * check ro vs rw vs none values.  Over time this may get beefed up.
+ * for now it just does simple checks. v1 is never NULL but v2 or v3
+ * could be.
  */
 
 static int
-check_rorw(char *v1, char *v2)
+check_rorwnone(char *v1, char *v2, char *v3)
 {
 	int ret = SA_OK;
-	if (strcmp(v1, v2) == 0)
+	if (v2 != NULL && strcmp(v1, v2) == 0)
 		ret = SA_VALUE_CONFLICT;
+	else if (v3 != NULL && strcmp(v1, v3) == 0)
+		ret = SA_VALUE_CONFLICT;
+
 	return (ret);
 }
 
@@ -2004,7 +2095,8 @@ nfs_validate_property(sa_handle_t handle, sa_property_t property,
 {
 	int ret = SA_OK;
 	char *propname;
-	char *other;
+	char *other1;
+	char *other2;
 	int optindex;
 	nfsl_config_t *configlist;
 	sa_group_t parent_group;
@@ -2030,8 +2122,7 @@ nfs_validate_property(sa_handle_t handle, sa_property_t property,
 			 * be in the repository at the same time.
 			 */
 			if (public_exists(handle, parent_group)) {
-				if (propname != NULL)
-					sa_free_attr_string(propname);
+				sa_free_attr_string(propname);
 				return (SA_VALUE_CONFLICT);
 			}
 		}
@@ -2079,42 +2170,61 @@ nfs_validate_property(sa_handle_t handle, sa_property_t property,
 					ret = SA_BAD_VALUE;
 				}
 				break;
-			case OPT_TYPE_ACCLIST:
+			case OPT_TYPE_ACCLIST: {
+				sa_property_t oprop1;
+				sa_property_t oprop2;
+				char *ovalue1 = NULL;
+				char *ovalue2 = NULL;
+
+				if (parent == NULL)
+					break;
 				/*
 				 * access list handling. Should eventually
 				 * validate that all the values make sense.
 				 * Also, ro and rw may have cross value
 				 * conflicts.
 				 */
-				if (strcmp(propname, SHOPT_RO) == 0)
-					other = SHOPT_RW;
-				else if (strcmp(propname, SHOPT_RW) == 0)
-					other = SHOPT_RO;
-				else
-					other = NULL;
-
-				if (other != NULL && parent != NULL) {
-					/* compare rw(ro) with ro(rw) */
-					sa_property_t oprop;
-					oprop = sa_get_property(parent, other);
-					if (oprop != NULL) {
-						/*
-						 * only potential
-						 * confusion if other
-						 * exists
-						 */
-						char *ovalue;
-						ovalue = sa_get_property_attr(
-						    oprop, "value");
-						if (ovalue != NULL) {
-							ret = check_rorw(value,
-							    ovalue);
-							sa_free_attr_string(
-							    ovalue);
-						}
-					}
+				if (strcmp(propname, SHOPT_RO) == 0) {
+					other1 = SHOPT_RW;
+					other2 = SHOPT_NONE;
+				} else if (strcmp(propname, SHOPT_RW) == 0) {
+					other1 = SHOPT_RO;
+					other2 = SHOPT_NONE;
+				} else if (strcmp(propname, SHOPT_NONE) == 0) {
+					other1 = SHOPT_RO;
+					other2 = SHOPT_RW;
+				} else {
+					other1 = NULL;
+					other2 = NULL;
 				}
+				if (other1 == NULL && other2 == NULL)
+					break;
+
+				/* compare rw(ro) with ro(rw) */
+
+				oprop1 = sa_get_property(parent, other1);
+				oprop2 = sa_get_property(parent, other2);
+				if (oprop1 == NULL && oprop2 == NULL)
+					break;
+				/*
+				 * Only potential confusion if other1
+				 * or other2 exists. Check the values
+				 * and run the check if there is a
+				 * value other than the one we are
+				 * explicitly looking at.
+				 */
+				ovalue1 = sa_get_property_attr(oprop1, "value");
+				ovalue2 = sa_get_property_attr(oprop2, "value");
+				if (ovalue1 != NULL || ovalue2 != NULL)
+					ret = check_rorwnone(value, ovalue1,
+					    ovalue2);
+
+				if (ovalue1 != NULL)
+					sa_free_attr_string(ovalue1);
+				if (ovalue2 != NULL)
+					sa_free_attr_string(ovalue2);
 				break;
+			}
 			case OPT_TYPE_LOGTAG:
 				if (nfsl_getconfig_list(&configlist) == 0) {
 					int error;

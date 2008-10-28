@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_info.c	1.9	08/07/17 SMI"
-
 #include <sys/types.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -150,10 +148,12 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_oplock_enable = smb_config_getbool(SMB_CI_OPLOCK_ENABLE);
 	kcfg->skc_sync_enable = smb_config_getbool(SMB_CI_SYNC_ENABLE);
 	kcfg->skc_secmode = smb_config_get_secmode();
-	(void) smb_getdomainname(kcfg->skc_resource_domain,
-	    sizeof (kcfg->skc_resource_domain));
-	(void) smb_gethostname(kcfg->skc_hostname, sizeof (kcfg->skc_hostname),
-	    1);
+	(void) smb_getdomainname(kcfg->skc_nbdomain,
+	    sizeof (kcfg->skc_nbdomain));
+	(void) smb_getfqdomainname(kcfg->skc_fqdn,
+	    sizeof (kcfg->skc_fqdn));
+	(void) smb_getnetbiosname(kcfg->skc_hostname,
+	    sizeof (kcfg->skc_hostname));
 	(void) smb_config_getstr(SMB_CI_SYS_CMNT, kcfg->skc_system_comment,
 	    sizeof (kcfg->skc_system_comment));
 }
@@ -175,6 +175,20 @@ smb_getnetbiosname(char *buf, size_t buflen)
 	if (buflen >= NETBIOS_NAME_SZ)
 		buf[NETBIOS_NAME_SZ - 1] = '\0';
 
+	return (0);
+}
+
+/*
+ * Get the SAM account of the current system.
+ * Returns 0 on success, otherwise, -1 to indicate an error.
+ */
+int
+smb_getsamaccount(char *buf, size_t buflen)
+{
+	if (smb_getnetbiosname(buf, buflen - 1) != 0)
+		return (-1);
+
+	(void) strlcat(buf, "$", buflen);
 	return (0);
 }
 

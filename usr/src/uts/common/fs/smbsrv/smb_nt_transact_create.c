@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This command is used to create or open a file or directory, when EAs
  * or an SD must be applied to the file. The functionality is similar
@@ -166,6 +164,12 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 
 	if (op->dattr & FILE_FLAG_DELETE_ON_CLOSE)
 		op->create_options |= FILE_DELETE_ON_CLOSE;
+
+	if (op->dattr & FILE_FLAG_BACKUP_SEMANTICS)
+		op->create_options |= FILE_OPEN_FOR_BACKUP_INTENT;
+
+	if (op->create_options & FILE_OPEN_FOR_BACKUP_INTENT)
+		sr->user_cr = smb_user_getprivcred(sr->uid_user);
 
 	if (op->rootdirfid == 0) {
 		op->fqi.dir_snode = sr->tid_tree->t_snode;

@@ -401,11 +401,6 @@ smbd_service_init(void)
 		if (smbd_locate_dc_start(resource_domain) != 0)
 			smbd_report("dc discovery failed %s", strerror(errno));
 
-	smbd.s_door_lmshr = smb_share_dsrv_start();
-	if (smbd.s_door_lmshr < 0) {
-		smbd_report("share initialization failed");
-	}
-
 	smbd.s_door_srv = smb_door_srv_start();
 	if (smbd.s_door_srv < 0)
 		return (rc);
@@ -429,14 +424,19 @@ smbd_service_init(void)
 
 	smb_pwd_init(B_TRUE);
 
-	rc = smbd_kernel_bind();
-	if (rc != 0) {
-		smbd_report("kernel bind error: %s", strerror(errno));
+	if ((rc = smb_shr_start()) != 0) {
+		smbd_report("share initialization failed: %s", strerror(errno));
 		return (rc);
 	}
 
-	if ((rc = smb_shr_start()) != 0) {
-		smbd_report("share initialization failed: %s", strerror(errno));
+	smbd.s_door_lmshr = smb_share_dsrv_start();
+	if (smbd.s_door_lmshr < 0) {
+		smbd_report("share initialization failed");
+	}
+
+	rc = smbd_kernel_bind();
+	if (rc != 0) {
+		smbd_report("kernel bind error: %s", strerror(errno));
 		return (rc);
 	}
 
@@ -563,8 +563,8 @@ smbd_refresh_monitor(void *arg)
 		smb_set_netlogon_cred();
 
 		smb_load_kconfig(&smb_io.sio_data.cfg);
-		new_dom = smb_io.sio_data.cfg.skc_resource_domain;
-		old_dom = smbd.s_kcfg.skc_resource_domain;
+		new_dom = smb_io.sio_data.cfg.skc_nbdomain;
+		old_dom = smbd.s_kcfg.skc_nbdomain;
 		len = strlen(old_dom);
 		new_secmod = smb_config_get_secmode();
 		if ((len != strlen(new_dom)) ||

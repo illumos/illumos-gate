@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/syslog.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -91,6 +89,8 @@ smb_com_read(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if ((rc = smb_common_read(sr, param)) != 0) {
 		smbsr_errno(sr, rc);
@@ -174,6 +174,8 @@ smb_com_lock_and_read(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	status = smb_lock_range(sr, param->rw_offset, (uint64_t)param->rw_count,
 	    UINT_MAX, SMB_LOCK_TYPE_READWRITE);
@@ -286,6 +288,8 @@ smb_com_read_raw(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
+
 	rc = smb_common_read(sr, param);
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
@@ -365,6 +369,8 @@ smb_com_read_andx(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if ((rc = smb_common_read(sr, param)) != 0) {
 		smbsr_errno(sr, rc);

@@ -58,6 +58,7 @@
 
 #include <nfs/nfs.h>
 #include <nfs/export.h>
+#include <nfs/nfs_cmd.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -338,6 +339,8 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	fhandle_t *fhp = da->da_fhandle;
 	struct sec_ol sec = {0, 0};
 	bool_t publicfh_flag = FALSE, auth_weak = FALSE;
+	char *name;
+	struct sockaddr *ca;
 
 	/*
 	 * Trusted Extension doesn't support NFSv2. MOUNT
@@ -384,6 +387,15 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		return;
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, da->da_name, NFSCMD_CONV_INBOUND,
+	    MAXPATHLEN);
+
+	if (name == NULL) {
+		dr->dr_status = NFSERR_ACCES;
+		return;
+	}
+
 	/*
 	 * If the public filehandle is used then allow
 	 * a multi-component lookup, i.e. evaluate
@@ -395,15 +407,19 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 */
 	if (PUBLIC_FH2(fhp)) {
 		publicfh_flag = TRUE;
-		error = rfs_publicfh_mclookup(da->da_name, dvp, cr, &vp, &exi,
+		error = rfs_publicfh_mclookup(name, dvp, cr, &vp, &exi,
 		    &sec);
 	} else {
 		/*
 		 * Do a normal single component lookup.
 		 */
-		error = VOP_LOOKUP(dvp, da->da_name, &vp, NULL, 0, NULL, cr,
+		error = VOP_LOOKUP(dvp, name, &vp, NULL, 0, NULL, cr,
 		    NULL, NULL, NULL);
 	}
+
+	if (name != da->da_name)
+		kmem_free(name, MAXPATHLEN);
+
 
 	if (!error) {
 		va.va_mask = AT_ALL;	/* we want everything */
@@ -471,6 +487,8 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	struct uio uio;
 	vnode_t *vp;
 	struct vattr va;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	vp = nfs_fhtovp(fhp, exi);
 	if (vp == NULL) {
@@ -533,6 +551,16 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	VN_RELE(vp);
 
 	rl->rl_count = (uint32_t)(NFS_MAXPATHLEN - uio.uio_resid);
+	rl->rl_data[rl->rl_count] = '\0';
+
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, rl->rl_data,
+	    NFSCMD_CONV_OUTBOUND, MAXPATHLEN);
+
+	if (name != NULL && name != rl->rl_data) {
+		kmem_free(rl->rl_data, NFS_MAXPATHLEN);
+		rl->rl_data = name;
+	}
 
 	/*
 	 * XNFS and RFC1094 require us to return ENXIO if argument
@@ -1602,6 +1630,7 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 	int mode;
 	int lookup_ok;
 	bool_t trunc;
+	struct sockaddr *ca;
 
 	/*
 	 * Disallow NULL paths
@@ -1666,10 +1695,19 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 		va.va_mask &= ~AT_SIZE;
 	} else if ((va.va_mode & IFMT) == IFSOCK) {
 		va.va_type = VSOCK;
-	} else
+	} else {
 		va.va_type = VREG;
+	}
 	va.va_mode &= ~IFMT;
 	va.va_mask |= AT_TYPE;
+
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, name, NFSCMD_CONV_INBOUND,
+	    MAXPATHLEN);
+	if (name == NULL) {
+		dr->dr_status = puterrno(EINVAL);
+		return;
+	}
 
 	/*
 	 * Why was the choice made to use VWRITE as the mode to the
@@ -1830,6 +1868,8 @@ out:
 
 	dr->dr_status = puterrno(error);
 
+	if (name != args->ca_da.da_name)
+		kmem_free(name, MAXPATHLEN);
 }
 void *
 rfs_create_getfh(struct nfscreatargs *args)
@@ -2175,6 +2215,8 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 	vnode_t *vp;
 	vnode_t *svp;
 	int lerror;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	/*
 	 * Disallow NULL paths
@@ -2209,17 +2251,25 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 		return;
 	}
 
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	name = nfscmd_convname(ca, exi, args->sla_tnm,
+	    NFSCMD_CONV_INBOUND, MAXPATHLEN);
+
+	if (name == NULL) {
+		*status = NFSERR_ACCES;
+		return;
+	}
+
 	va.va_type = VLNK;
 	va.va_mask |= AT_TYPE;
 
-	error = VOP_SYMLINK(vp, args->sla_from.da_name, &va, args->sla_tnm, cr,
-	    NULL, 0);
+	error = VOP_SYMLINK(vp, args->sla_from.da_name, &va, name, cr, NULL, 0);
 
 	/*
 	 * Force new data and metadata out to stable storage.
 	 */
-	lerror = VOP_LOOKUP(vp, args->sla_from.da_name, &svp, NULL,
-	    0, NULL, cr, NULL, NULL, NULL);
+	lerror = VOP_LOOKUP(vp, args->sla_from.da_name, &svp, NULL, 0,
+	    NULL, cr, NULL, NULL, NULL);
 
 	if (!lerror) {
 		(void) VOP_FSYNC(svp, 0, cr, NULL);
@@ -2234,6 +2284,8 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 	VN_RELE(vp);
 
 	*status = puterrno(error);
+	if (name != args->sla_tnm)
+		kmem_free(name, MAXPATHLEN);
 
 }
 void *
@@ -2412,6 +2464,10 @@ rfs_readdir(struct nfsrddirargs *rda, struct nfsrddirres *rd,
 	struct iovec iov;
 	struct uio uio;
 	vnode_t *vp;
+	char *ndata = NULL;
+	struct sockaddr *ca;
+	size_t nents;
+	int ret;
 
 	vp = nfs_fhtovp(&rda->rda_fh, exi);
 	if (vp == NULL) {
@@ -2483,6 +2539,32 @@ rfs_readdir(struct nfsrddirargs *rda, struct nfsrddirres *rd,
 			    uio.uio_resid);
 			rd->rd_eof = iseof ? TRUE : FALSE;
 		}
+	}
+
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+	nents = nfscmd_countents((char *)rd->rd_entries, rd->rd_size);
+	ret = nfscmd_convdirplus(ca, exi, (char *)rd->rd_entries, nents,
+	    rda->rda_count, &ndata);
+
+	if (ret != 0) {
+		size_t dropbytes;
+		/*
+		 * We had to drop one or more entries in order to fit
+		 * during the character conversion.  We need to patch
+		 * up the size and eof info.
+		 */
+		if (rd->rd_eof)
+			rd->rd_eof = FALSE;
+		dropbytes = nfscmd_dropped_entrysize(
+		    (struct dirent64 *)rd->rd_entries, nents, ret);
+		rd->rd_size -= dropbytes;
+	}
+	if (ndata == NULL) {
+		ndata = (char *)rd->rd_entries;
+	} else if (ndata != (char *)rd->rd_entries) {
+		kmem_free(rd->rd_entries, rd->rd_bufsize);
+		rd->rd_entries = (void *)ndata;
+		rd->rd_bufsize = rda->rda_count;
 	}
 
 bad:

@@ -511,7 +511,7 @@ smb_open_subr(smb_request_t *sr)
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
-			    ERRDOS, ERROR_ALREADY_EXISTS);
+			    ERRDOS, ERROR_FILE_EXISTS);
 			return (NT_STATUS_OBJECT_NAME_COLLISION);
 		}
 

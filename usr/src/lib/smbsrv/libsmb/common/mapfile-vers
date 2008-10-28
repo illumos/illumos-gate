@@ -93,6 +93,7 @@ SUNWprivate {
 	smb_auth_set_info;
 	smb_auth_validate_lm;
 	smb_auth_validate_nt;
+	smb_chk_hostaccess;
 	smb_config_get;
 	smb_config_get_fg_flag;
 	smb_config_get_localsid;
@@ -164,6 +165,7 @@ SUNWprivate {
 	smb_getfqhostname;
 	smb_gethostname;
 	smb_getnetbiosname;
+	smb_getsamaccount;
 	smb_idmap_batch_create;
 	smb_idmap_batch_destroy;
 	smb_idmap_batch_getid;

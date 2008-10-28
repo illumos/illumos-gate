@@ -24,8 +24,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_share.h>
@@ -935,7 +933,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		    &xa->rep_data_mb);
 
 		if (sr->session->signing.flags & SMB_SIGNING_ENABLED)
-			smb_sign_reply(sr, NULL);
+			smb_sign_reply(sr, &reply);
 
 		(void) smb_session_send(sr->session, 0, &reply);
 	}
@@ -959,7 +957,7 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 		return (SDRC_NOT_IMPLEMENTED);
 
 	(void) utf8_strlwr(share);
-	rc = smb_kshare_getinfo(sr->sr_server->sv_lmshrd, share, &si);
+	rc = smb_kshare_getinfo(sr->sr_server->sv_lmshrd, share, &si, NULL);
 	if ((rc != NERR_Success) || (si.shr_flags & SMB_SHRF_LONGNAME)) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
@@ -1018,7 +1016,7 @@ smb_trans_net_workstation_getinfo(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_SUCCESS);
 	}
 
-	domain = sr->sr_cfg->skc_resource_domain;
+	domain = sr->sr_cfg->skc_nbdomain;
 	hostname = sr->sr_cfg->skc_hostname;
 
 	MBC_INIT(&str_mb, max_bytes);
@@ -1321,7 +1319,7 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 
 	si = sr->sr_cfg;
 
-	if (utf8_strcasecmp(si->skc_resource_domain, (char *)domain) != 0) {
+	if (utf8_strcasecmp(si->skc_nbdomain, (char *)domain) != 0) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}

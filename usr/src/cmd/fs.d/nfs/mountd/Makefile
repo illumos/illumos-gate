@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 FSTYPE	  =	nfs
 TYPEPROG  =	mountd
@@ -33,7 +31,7 @@ include		../../Makefile.fstype
 
 COMMON	  =	$(FSLIB) nfs_sec.o sharetab.o daemon.o
 LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
-		nfsauth_xdr.o exportlist.o hashset.o
+		nfsauth_xdr.o exportlist.o hashset.o nfs_cmd.o
 OBJS	  = 	$(LOCAL) $(COMMON)
 SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
 		../lib/sharetab.c ../lib/daemon.c

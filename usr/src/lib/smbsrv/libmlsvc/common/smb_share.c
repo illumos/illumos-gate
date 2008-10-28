@@ -24,73 +24,89 @@
  */
 
 /*
- * Lan Manager (SMB/CIFS) share interface implementation. This interface
- * returns Win32 error codes, usually network error values (lmerr.h).
+ * SMB/CIFS share cache implementation.
  */
 
 #include <errno.h>
 #include <synch.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <syslog.h>
 #include <thread.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <synch.h>
 #include <pthread.h>
-#include <ctype.h>
 #include <assert.h>
-#include <sys/mnttab.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <libshare.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
 
-#include <libshare.h>
-
 #include <smbsrv/lm.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/cifs.h>
-
-#include <smbsrv/ctype.h>
-#include <smbsrv/smb_vops.h>
 #include <smbsrv/nterror.h>
+
+#define	SMB_SHR_ERROR_THRESHOLD		3
 
 /*
  * Cache functions and vars
  */
-#define	SMB_SHARE_HTAB_SZ	1024
+#define	SMB_SHR_HTAB_SZ			1024
 
-static HT_HANDLE *smb_shr_handle = NULL;
-static rwlock_t smb_shr_lock;
-static pthread_t smb_shr_populate_thr;
+/*
+ * Cache handle
+ *
+ * Shares cache is a hash table.
+ *
+ * sc_cache		pointer to hash table handle
+ * sc_cache_lck		synchronize cache read/write accesses
+ * sc_state		cache state machine values
+ * sc_nops		number of inflight/pending cache operations
+ * sc_mtx		protects handle fields
+ */
+typedef struct smb_shr_cache {
+	HT_HANDLE	*sc_cache;
+	rwlock_t	sc_cache_lck;
+	mutex_t		sc_mtx;
+	cond_t		sc_cv;
+	uint32_t	sc_state;
+	uint32_t	sc_nops;
+} smb_shr_cache_t;
+
+/*
+ * Cache states
+ */
+#define	SMB_SHR_CACHE_STATE_NONE	0
+#define	SMB_SHR_CACHE_STATE_CREATED	1
+#define	SMB_SHR_CACHE_STATE_DESTROYING	2
+
+/*
+ * Cache lock modes
+ */
+#define	SMB_SHR_CACHE_RDLOCK	0
+#define	SMB_SHR_CACHE_WRLOCK	1
+
+static smb_shr_cache_t smb_shr_cache;
 
 static uint32_t smb_shr_cache_create(void);
 static void smb_shr_cache_destroy(void);
-static void *smb_shr_cache_populate(void *);
+static uint32_t smb_shr_cache_lock(int);
+static void smb_shr_cache_unlock(void);
+static int smb_shr_cache_count(void);
+static smb_share_t *smb_shr_cache_iterate(smb_shriter_t *);
+
+static smb_share_t *smb_shr_cache_findent(char *);
 static uint32_t smb_shr_cache_addent(smb_share_t *);
 static void smb_shr_cache_delent(char *);
-static uint32_t smb_shr_cache_chgent(smb_share_t *);
 static void smb_shr_cache_freent(HT_ITEM *);
-static uint32_t smb_shr_cache_loadent(sa_share_t, sa_resource_t);
-static void smb_shr_cache_loadgrp(sa_group_t);
-
-static void smb_shr_set_ahcnt(char *, int);
-static void smb_shr_set_oemname(smb_share_t *);
-static uint32_t smb_shr_create_autohome(smb_share_t *);
-static uint32_t smb_shr_create_ipc(void);
 
 /*
  * sharemgr functions
  */
-static uint32_t smb_shr_sa_delent(smb_share_t *);
-static uint32_t smb_shr_sa_addent(smb_share_t *);
-static uint32_t smb_shr_sa_getent(sa_share_t, sa_resource_t, smb_share_t *);
-static sa_group_t smb_shr_sa_getdefgrp(sa_handle_t);
+static void *smb_shr_sa_loadall(void *);
+static void smb_shr_sa_loadgrp(sa_group_t);
+static uint32_t smb_shr_sa_load(sa_share_t, sa_resource_t);
+static uint32_t smb_shr_sa_get(sa_share_t, sa_resource_t, smb_share_t *);
 
 /*
  * share publishing
@@ -117,7 +133,6 @@ typedef struct smb_shr_pitem {
  * share publishing queue
  */
 typedef struct smb_shr_pqueue {
-	int		spq_cnt;
 	list_t		spq_list;
 	mutex_t		spq_mtx;
 	cond_t		spq_cv;
@@ -125,18 +140,23 @@ typedef struct smb_shr_pqueue {
 } smb_shr_pqueue_t;
 
 static smb_shr_pqueue_t ad_queue;
-static pthread_t smb_shr_publish_thr;
 
 static int smb_shr_publisher_start(void);
 static void smb_shr_publisher_stop(void);
 static void smb_shr_publisher_send(smb_ads_handle_t *, list_t *, const char *);
+static void smb_shr_publisher_queue(const char *, const char *, char);
 static void *smb_shr_publisher(void *);
-static void smb_shr_publish(const char *, const char *, char);
-
+static void smb_shr_publisher_flush(list_t *);
+static void smb_shr_publish(const char *, const char *);
+static void smb_shr_unpublish(const char *, const char *);
 
 /*
- * smb_shr_start
- *
+ * Utility/helper functions
+ */
+static uint32_t smb_shr_addipc(void);
+static void smb_shr_set_oemname(smb_share_t *);
+
+/*
  * Starts the publisher thread and another thread which
  * populates the share cache by share information stored
  * by sharemgr
@@ -144,16 +164,22 @@ static void smb_shr_publish(const char *, const char *, char);
 int
 smb_shr_start(void)
 {
+	pthread_t load_thr;
 	pthread_attr_t tattr;
 	int rc;
 
 	if ((rc = smb_shr_publisher_start()) != 0)
 		return (rc);
 
+	if (smb_shr_cache_create() != NERR_Success)
+		return (ENOMEM);
+
+	if (smb_shr_addipc() != NERR_Success)
+		return (ENOMEM);
+
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&smb_shr_populate_thr, &tattr,
-	    smb_shr_cache_populate, 0);
+	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
 	(void) pthread_attr_destroy(&tattr);
 
 	return (rc);
@@ -167,18 +193,17 @@ smb_shr_stop(void)
 }
 
 /*
- * smb_shr_count
- *
  * Return the total number of shares
  */
 int
 smb_shr_count(void)
 {
-	int n_shares;
+	int n_shares = 0;
 
-	(void) rw_rdlock(&smb_shr_lock);
-	n_shares = ht_get_total_items(smb_shr_handle);
-	(void) rw_unlock(&smb_shr_lock);
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
+		n_shares = smb_shr_cache_count();
+		smb_shr_cache_unlock();
+	}
 
 	return (n_shares);
 }
@@ -208,39 +233,39 @@ smb_shr_iterinit(smb_shriter_t *shi)
 smb_share_t *
 smb_shr_iterate(smb_shriter_t *shi)
 {
-	HT_ITEM *item;
 	smb_share_t *share = NULL;
+	smb_share_t *cached_si;
 
-	if (smb_shr_handle == NULL || shi == NULL)
+	if (shi == NULL)
 		return (NULL);
 
-	(void) rw_rdlock(&smb_shr_lock);
-	if (shi->si_first) {
-		item = ht_findfirst(smb_shr_handle, &shi->si_hashiter);
-		shi->si_first = B_FALSE;
-	} else {
-		item = ht_findnext(&shi->si_hashiter);
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
+		if ((cached_si = smb_shr_cache_iterate(shi)) != NULL) {
+			share = &shi->si_share;
+			bcopy(cached_si, share, sizeof (smb_share_t));
+		}
+		smb_shr_cache_unlock();
 	}
-
-	if (item && item->hi_data) {
-		share = &shi->si_share;
-		bcopy(item->hi_data, share, sizeof (smb_share_t));
-	}
-	(void) rw_unlock(&smb_shr_lock);
 
 	return (share);
 }
 
 /*
- * smb_shr_create
+ * Adds the given share to cache, publishes the share in ADS
+ * if it has an AD container, calls kernel to take a hold on
+ * the shared file system. If it can't take a hold on the
+ * shared file system, it's either because shared directory
+ * does not exist or some other error has occurred, in any
+ * case the share is removed from the cache.
  *
- * Adds the given to cache and if 'store' is B_TRUE it's also
- * added to sharemgr
+ * If the specified share is an autohome share which already
+ * exists in the cache, just increments the reference count.
  */
 uint32_t
-smb_shr_create(smb_share_t *si, boolean_t store)
+smb_shr_add(smb_share_t *si)
 {
-	uint32_t status = NERR_Success;
+	smb_share_t *cached_si;
+	uint32_t status;
 	int rc;
 
 	assert(si != NULL);
@@ -248,33 +273,41 @@ smb_shr_create(smb_share_t *si, boolean_t store)
 	if (!smb_shr_chkname(si->shr_name))
 		return (ERROR_INVALID_NAME);
 
-	if (si->shr_flags & SMB_SHRF_AUTOHOME)
-		return (smb_shr_create_autohome(si));
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
+		return (NERR_InternalError);
 
-	if (smb_shr_exists(si->shr_name))
-		return (NERR_DuplicateShare);
-
-	if ((status = smb_shr_cache_addent(si)) != NERR_Success)
-		return (status);
-
-	if (store && (si->shr_flags & SMB_SHRF_PERM)) {
-		if ((status = smb_shr_sa_addent(si)) != NERR_Success) {
-			(void) smb_shr_cache_delent(si->shr_name);
-			return (status);
+	cached_si = smb_shr_cache_findent(si->shr_name);
+	if (cached_si) {
+		if (si->shr_flags & SMB_SHRF_AUTOHOME) {
+			cached_si->shr_refcnt++;
+			status = NERR_Success;
+		} else {
+			status = NERR_DuplicateShare;
 		}
+		smb_shr_cache_unlock();
+		return (status);
 	}
 
+	if ((status = smb_shr_cache_addent(si)) != NERR_Success) {
+		smb_shr_cache_unlock();
+		return (status);
+	}
+
+	/* don't hold the lock across door call */
+	smb_shr_cache_unlock();
+
+	/* call kernel to take a hold on the shared file system */
 	rc = mlsvc_set_share(SMB_SHROP_ADD, si->shr_path, si->shr_name);
 
 	if (rc == 0) {
-		smb_shr_publish(si->shr_name, si->shr_container,
-		    SMB_SHR_PUBLISH);
-		return (status);
+		smb_shr_publish(si->shr_name, si->shr_container);
+		return (NERR_Success);
 	}
 
-	smb_shr_cache_delent(si->shr_name);
-	if (store && (si->shr_flags & SMB_SHRF_PERM))
-		(void) smb_shr_sa_delent(si);
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) == NERR_Success) {
+		smb_shr_cache_delent(si->shr_name);
+		smb_shr_cache_unlock();
+	}
 
 	/*
 	 * rc == ENOENT means the shared directory doesn't exist
@@ -283,47 +316,60 @@ smb_shr_create(smb_share_t *si, boolean_t store)
 }
 
 /*
- * smb_shr_delete
+ * Removes the specified share from cache, removes it from AD
+ * if it has an AD container, and calls the kernel to release
+ * the hold on the shared file system.
  *
- * Removes the specified share.
+ * If this is an autohome share then decrement the reference
+ * count. If it reaches 0 then it proceeds with removing steps.
  */
 uint32_t
-smb_shr_delete(char *sharename, boolean_t store)
+smb_shr_remove(char *sharename)
 {
-	smb_share_t si;
-	uint32_t status = NERR_Success;
+	smb_share_t *si;
+	char path[MAXPATHLEN];
+	char container[MAXPATHLEN];
 
 	assert(sharename != NULL);
 
-	if ((status = smb_shr_get(sharename, &si)) != NERR_Success)
-		return (status);
+	if (!smb_shr_chkname(sharename))
+		return (ERROR_INVALID_NAME);
 
-	if (si.shr_type & STYPE_IPC)
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
+		return (NERR_InternalError);
+
+	if ((si = smb_shr_cache_findent(sharename)) == NULL) {
+		smb_shr_cache_unlock();
+		return (NERR_NetNameNotFound);
+	}
+
+	if (si->shr_type & STYPE_IPC) {
+		/* IPC$ share cannot be removed */
+		smb_shr_cache_unlock();
 		return (ERROR_ACCESS_DENIED);
+	}
 
-	if (si.shr_flags & SMB_SHRF_AUTOHOME) {
-		si.shr_refcnt--;
-		if (si.shr_refcnt > 0) {
-			smb_shr_set_ahcnt(si.shr_name, si.shr_refcnt);
-			return (status);
+	if (si->shr_flags & SMB_SHRF_AUTOHOME) {
+		if ((--si->shr_refcnt) > 0) {
+			smb_shr_cache_unlock();
+			return (NERR_Success);
 		}
 	}
 
-	if (store && (si.shr_flags & SMB_SHRF_PERM)) {
-		if (smb_shr_sa_delent(&si) != NERR_Success)
-			return (NERR_InternalError);
-	}
+	(void) strlcpy(path, si->shr_path, sizeof (path));
+	(void) strlcpy(container, si->shr_container, sizeof (container));
+	smb_shr_cache_delent(sharename);
+	smb_shr_cache_unlock();
 
-	smb_shr_cache_delent(si.shr_name);
-	smb_shr_publish(si.shr_name, si.shr_container, SMB_SHR_UNPUBLISH);
-	(void) mlsvc_set_share(SMB_SHROP_DELETE, si.shr_path, si.shr_name);
+	smb_shr_unpublish(sharename, container);
+
+	/* call kernel to release the hold on the shared file system */
+	(void) mlsvc_set_share(SMB_SHROP_DELETE, path, sharename);
 
 	return (NERR_Success);
 }
 
 /*
- * smb_shr_rename
- *
  * Rename a share. Check that the current name exists and the new name
  * doesn't exist. The rename is performed by deleting the current share
  * definition and creating a new share with the new name.
@@ -331,7 +377,8 @@ smb_shr_delete(char *sharename, boolean_t store)
 uint32_t
 smb_shr_rename(char *from_name, char *to_name)
 {
-	smb_share_t si;
+	smb_share_t *from_si;
+	smb_share_t to_si;
 	uint32_t status;
 
 	assert((from_name != NULL) && (to_name != NULL));
@@ -339,148 +386,136 @@ smb_shr_rename(char *from_name, char *to_name)
 	if (!smb_shr_chkname(from_name) || !smb_shr_chkname(to_name))
 		return (ERROR_INVALID_NAME);
 
-	if (!smb_shr_exists(from_name))
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
+		return (NERR_InternalError);
+
+	if ((from_si = smb_shr_cache_findent(from_name)) == NULL) {
+		smb_shr_cache_unlock();
 		return (NERR_NetNameNotFound);
+	}
 
-	if (smb_shr_exists(to_name))
-		return (NERR_DuplicateShare);
-
-	if ((status = smb_shr_get(from_name, &si)) != NERR_Success)
-		return (status);
-
-	if (si.shr_type & STYPE_IPC)
+	if (from_si->shr_type & STYPE_IPC) {
+		/* IPC$ share cannot be renamed */
+		smb_shr_cache_unlock();
 		return (ERROR_ACCESS_DENIED);
+	}
 
-	(void) strlcpy(si.shr_name, to_name, sizeof (si.shr_name));
-	if ((status = smb_shr_cache_addent(&si)) != NERR_Success)
+	if (smb_shr_cache_findent(to_name) != NULL) {
+		smb_shr_cache_unlock();
+		return (NERR_DuplicateShare);
+	}
+
+	bcopy(from_si, &to_si, sizeof (smb_share_t));
+	(void) strlcpy(to_si.shr_name, to_name, sizeof (to_si.shr_name));
+
+	if ((status = smb_shr_cache_addent(&to_si)) != NERR_Success) {
+		smb_shr_cache_unlock();
 		return (status);
+	}
 
 	smb_shr_cache_delent(from_name);
-	smb_shr_publish(from_name, si.shr_container, SMB_SHR_UNPUBLISH);
-	smb_shr_publish(to_name, si.shr_container, SMB_SHR_PUBLISH);
+	smb_shr_cache_unlock();
+
+	smb_shr_unpublish(from_name, to_si.shr_container);
+	smb_shr_publish(to_name, to_si.shr_container);
 
 	return (NERR_Success);
 }
 
 /*
- * smb_shr_get
- *
  * Load the information for the specified share into the supplied share
  * info structure.
  */
 uint32_t
 smb_shr_get(char *sharename, smb_share_t *si)
 {
-	HT_ITEM *item;
+	smb_share_t *cached_si;
+	uint32_t status = NERR_NetNameNotFound;
 
-	(void) utf8_strlwr(sharename);
-
-	(void) rw_rdlock(&smb_shr_lock);
-	item = ht_find_item(smb_shr_handle, sharename);
-	if (item == NULL || item->hi_data == NULL) {
-		(void) rw_unlock(&smb_shr_lock);
+	if (sharename == NULL || *sharename == '\0')
 		return (NERR_NetNameNotFound);
+
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
+		cached_si = smb_shr_cache_findent(sharename);
+		if (cached_si != NULL) {
+			bcopy(cached_si, si, sizeof (smb_share_t));
+			status = NERR_Success;
+		}
+
+		smb_shr_cache_unlock();
 	}
 
-	bcopy(item->hi_data, si, sizeof (smb_share_t));
-	(void) rw_unlock(&smb_shr_lock);
-
-	return (NERR_Success);
+	return (status);
 }
 
 /*
- * smb_shr_modify
- *
  * Modifies an existing share. Properties that can be modified are:
  *
  *   o comment
  *   o AD container
+ *   o host access
  */
 uint32_t
-smb_shr_modify(char *sharename, const char *cmnt,
-    const char *ad_container, boolean_t store)
+smb_shr_modify(smb_share_t *new_si)
 {
-	smb_share_t si;
-	uint32_t status;
-	boolean_t cmnt_changed = B_FALSE;
+	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
-	char shr_container[MAXPATHLEN];
+	char old_container[MAXPATHLEN];
+	uint32_t access;
 
-	assert(sharename != NULL);
+	assert(new_si != NULL);
 
-	if ((cmnt == NULL) && (ad_container == NULL))
-		/* no changes */
-		return (NERR_Success);
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) != NERR_Success)
+		return (NERR_InternalError);
 
-	if ((status = smb_shr_get(sharename, &si)) != NERR_Success)
-		return (status);
+	if ((si = smb_shr_cache_findent(new_si->shr_name)) == NULL) {
+		smb_shr_cache_unlock();
+		return (NERR_NetNameNotFound);
+	}
 
-	if (si.shr_type & STYPE_IPC)
+	if (si->shr_type & STYPE_IPC) {
+		/* IPC$ share cannot be modified */
+		smb_shr_cache_unlock();
 		return (ERROR_ACCESS_DENIED);
-
-	if (cmnt) {
-		cmnt_changed = (strcmp(cmnt, si.shr_cmnt) != 0);
-		if (cmnt_changed)
-			(void) strlcpy(si.shr_cmnt, cmnt, sizeof (si.shr_cmnt));
 	}
 
-	if (ad_container) {
-		adc_changed = (strcmp(ad_container, si.shr_container) != 0);
-		if (adc_changed) {
-			/* save current container needed for unpublishing */
-			(void) strlcpy(shr_container, si.shr_container,
-			    sizeof (shr_container));
-			(void) strlcpy(si.shr_container, ad_container,
-			    sizeof (si.shr_container));
-		}
+	if (strcmp(new_si->shr_cmnt, si->shr_cmnt) != 0)
+		(void) strlcpy(si->shr_cmnt, new_si->shr_cmnt,
+		    sizeof (si->shr_cmnt));
+
+	adc_changed = (strcmp(new_si->shr_container, si->shr_container) != 0);
+	if (adc_changed) {
+		/* save current container - needed for unpublishing */
+		(void) strlcpy(old_container, si->shr_container,
+		    sizeof (old_container));
+		(void) strlcpy(si->shr_container, new_si->shr_container,
+		    sizeof (si->shr_container));
 	}
 
-	if (!cmnt_changed && !adc_changed)
-		/* no changes */
-		return (NERR_Success);
+	access = (new_si->shr_flags & SMB_SHRF_ACC_ALL);
+	si->shr_flags |= access;
 
-	if (store && (si.shr_flags & SMB_SHRF_PERM)) {
-		if (smb_shr_sa_addent(&si) != NERR_Success)
-			return (NERR_InternalError);
-	}
+	if (access & SMB_SHRF_ACC_NONE)
+		(void) strlcpy(si->shr_access_none, new_si->shr_access_none,
+		    sizeof (si->shr_access_none));
 
-	(void) smb_shr_cache_chgent(&si);
+	if (access & SMB_SHRF_ACC_RO)
+		(void) strlcpy(si->shr_access_ro, new_si->shr_access_ro,
+		    sizeof (si->shr_access_ro));
+
+	if (access & SMB_SHRF_ACC_RW)
+		(void) strlcpy(si->shr_access_rw, new_si->shr_access_rw,
+		    sizeof (si->shr_access_rw));
+
+	smb_shr_cache_unlock();
 
 	if (adc_changed) {
-		smb_shr_publish(si.shr_name, shr_container,
-		    SMB_SHR_UNPUBLISH);
-		smb_shr_publish(si.shr_name, si.shr_container,
-		    SMB_SHR_PUBLISH);
+		smb_shr_unpublish(new_si->shr_name, old_container);
+		smb_shr_publish(new_si->shr_name, new_si->shr_container);
 	}
 
 	return (NERR_Success);
 }
-
-void
-smb_shr_list(int offset, smb_shrlist_t *list)
-{
-	smb_shriter_t iterator;
-	smb_share_t *si;
-	int n = 0;
-
-	bzero(list, sizeof (smb_shrlist_t));
-	smb_shr_iterinit(&iterator);
-
-	while ((si = smb_shr_iterate(&iterator)) != NULL) {
-		if (--offset > 0)
-			continue;
-
-		if ((si->shr_flags & SMB_SHRF_TRANS) &&
-		    ((si->shr_type & STYPE_IPC) == 0)) {
-			bcopy(si, &list->sl_shares[n], sizeof (smb_share_t));
-			if (++n == LMSHARES_PER_REQUEST)
-				break;
-		}
-	}
-
-	list->sl_cnt = n;
-}
-
 
 /*
  * smb_shr_exists
@@ -490,18 +525,86 @@ smb_shr_list(int offset, smb_shrlist_t *list)
 boolean_t
 smb_shr_exists(char *sharename)
 {
-	boolean_t exists;
+	boolean_t exists = B_FALSE;
 
 	if (sharename == NULL || *sharename == '\0')
 		return (B_FALSE);
 
-	(void) utf8_strlwr(sharename);
-
-	(void) rw_rdlock(&smb_shr_lock);
-	exists = (ht_find_item(smb_shr_handle, sharename) != NULL);
-	(void) rw_unlock(&smb_shr_lock);
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
+		exists = (smb_shr_cache_findent(sharename) != NULL);
+		smb_shr_cache_unlock();
+	}
 
 	return (exists);
+}
+
+/*
+ * If the shared directory does not begin with a /, one will be
+ * inserted as a prefix. If ipaddr is not zero, then also return
+ * information about access based on the host level access lists, if
+ * present. Also return access check if there is an IP address and
+ * shr_accflags.
+ *
+ * The value of smb_chk_hostaccess is checked for an access match.
+ * -1 is wildcard match
+ * 0 is no match
+ * 1 is match
+ *
+ * Precedence is none is checked first followed by ro then rw if
+ * needed.  If x is wildcard (< 0) then check to see if the other
+ * values are a match. If a match, that wins.
+ */
+void
+smb_shr_hostaccess(smb_share_t *si, ipaddr_t ipaddr)
+{
+	int acc = SMB_SHRF_ACC_OPEN;
+
+	/*
+	 * Check to see if there area any share level access
+	 * restrictions.
+	 */
+	if (ipaddr != 0 && (si->shr_flags & SMB_SHRF_ACC_ALL) != 0) {
+		int none = SMB_SHRF_ACC_OPEN;
+		int rw = SMB_SHRF_ACC_OPEN;
+		int ro = SMB_SHRF_ACC_OPEN;
+
+		if (si->shr_flags & SMB_SHRF_ACC_NONE)
+			none = smb_chk_hostaccess(ipaddr, si->shr_access_none);
+		if (si->shr_flags & SMB_SHRF_ACC_RW)
+			rw = smb_chk_hostaccess(ipaddr, si->shr_access_rw);
+		if (si->shr_flags & SMB_SHRF_ACC_RO)
+			ro = smb_chk_hostaccess(ipaddr, si->shr_access_ro);
+
+		/* make first pass to get basic value */
+		if (none != 0)
+			acc = SMB_SHRF_ACC_NONE;
+		else if (ro != 0)
+			acc = SMB_SHRF_ACC_RO;
+		else if (rw != 0)
+			acc = SMB_SHRF_ACC_RW;
+
+		/* make second pass to handle '*' case */
+		if (none < 0) {
+			acc = SMB_SHRF_ACC_NONE;
+			if (ro > 0)
+				acc = SMB_SHRF_ACC_RO;
+			else if (rw > 0)
+				acc = SMB_SHRF_ACC_RW;
+		} else if (ro < 0) {
+			acc = SMB_SHRF_ACC_RO;
+			if (none > 0)
+				acc = SMB_SHRF_ACC_NONE;
+			else if (rw > 0)
+				acc = SMB_SHRF_ACC_RW;
+		} else if (rw < 0) {
+			acc = SMB_SHRF_ACC_RW;
+			if (none > 0)
+				acc = SMB_SHRF_ACC_NONE;
+			else if (ro > 0)
+				acc = SMB_SHRF_ACC_RO;
+		}
+	}
+	si->shr_access_value = acc;	/* return access here */
 }
 
 /*
@@ -585,13 +688,10 @@ smb_shr_is_admin(char *sharename)
 /*
  * smb_shr_chkname
  *
- * Check if any invalid char is present in share name. According to
- * MSDN article #236388: "Err Msg: The Share Name Contains Invalid
- * Characters", the list of invalid character is:
+ * Check for invalid characters in a share name.  The list of invalid
+ * characters includes control characters and the following:
  *
  * " / \ [ ] : | < > + ; , ? * =
- *
- * Also rejects if control characters are embedded.
  */
 boolean_t
 smb_shr_chkname(char *sharename)
@@ -616,336 +716,101 @@ smb_shr_chkname(char *sharename)
 /*
  * smb_shr_get_realpath
  *
- * Derive the real path of a share from the path provided by a
- * Windows client application during the share addition.
+ * Derive the real path for a share from the path provided by a client.
+ * For instance, the real path of C:\ may be /cvol or the real path of
+ * F:\home may be /vol1/home.
  *
- * For instance, the real path of C:\ is /cvol and the
- * real path of F:\home is /vol1/home.
- *
- * clipath  - path provided by the Windows client is in the
+ * clntpath - path provided by the Windows client is in the
  *            format of <drive letter>:\<dir>
  * realpath - path that will be stored as the directory field of
  *            the smb_share_t structure of the share.
- * maxlen   - maximum length fo the realpath buffer
+ * maxlen   - maximum length of the realpath buffer
  *
  * Return LAN Manager network error code.
  */
-/*ARGSUSED*/
 uint32_t
-smb_shr_get_realpath(const char *clipath, char *realpath, int maxlen)
+smb_shr_get_realpath(const char *clntpath, char *realpath, int maxlen)
 {
-	/* XXX do this translation */
-	return (NERR_Success);
-}
+	const char *p;
+	int len;
 
-/*
- * ============================================
- * Cache management functions
- * ============================================
- */
+	if ((p = strchr(clntpath, ':')) != NULL)
+		++p;
+	else
+		p = clntpath;
 
-/*
- * smb_shr_cache_create
- *
- * Create the share hash table.
- */
-static uint32_t
-smb_shr_cache_create(void)
-{
-	if (smb_shr_handle == NULL) {
-		(void) rwlock_init(&smb_shr_lock, USYNC_THREAD, 0);
-		(void) rw_wrlock(&smb_shr_lock);
+	(void) strlcpy(realpath, p, maxlen);
+	(void) strcanon(realpath, "/\\");
+	(void) strsubst(realpath, '\\', '/');
 
-		smb_shr_handle = ht_create_table(SMB_SHARE_HTAB_SZ,
-		    MAXNAMELEN, 0);
-		if (smb_shr_handle == NULL) {
-			(void) rw_unlock(&smb_shr_lock);
-			return (NERR_InternalError);
-		}
-
-		(void) ht_register_callback(smb_shr_handle,
-		    smb_shr_cache_freent);
-		(void) rw_unlock(&smb_shr_lock);
-	}
+	len = strlen(realpath);
+	if ((len > 1) && (realpath[len - 1] == '/'))
+		realpath[len - 1] = '\0';
 
 	return (NERR_Success);
 }
 
-/*
- * smb_shr_cache_destroy
- *
- * Destroys the share hash table.
- */
-static void
-smb_shr_cache_destroy(void)
+void
+smb_shr_list(int offset, smb_shrlist_t *list)
 {
-	if (smb_shr_handle) {
-		(void) rw_wrlock(&smb_shr_lock);
-		ht_destroy_table(smb_shr_handle);
-		(void) rw_unlock(&smb_shr_lock);
-		(void) rwlock_destroy(&smb_shr_lock);
-		smb_shr_handle = NULL;
-	}
-}
+	smb_shriter_t iterator;
+	smb_share_t *si;
+	int n = 0;
 
-/*
- * smb_shr_cache_populate
- *
- * Load shares from sharemgr
- */
-/*ARGSUSED*/
-static void *
-smb_shr_cache_populate(void *args)
-{
-	sa_handle_t handle;
-	sa_group_t group, subgroup;
-	char *gstate;
-	boolean_t gdisabled;
+	bzero(list, sizeof (smb_shrlist_t));
+	smb_shr_iterinit(&iterator);
 
-	if (smb_shr_cache_create() != NERR_Success) {
-		syslog(LOG_ERR, "share: failed creating the cache");
-		return (NULL);
-	}
-
-	if (smb_shr_create_ipc() != NERR_Success) {
-		syslog(LOG_ERR, "share: failed creating IPC$");
-		return (NULL);
-	}
-
-	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL) {
-		syslog(LOG_ERR, "share: failed connecting to backend");
-		return (NULL);
-	}
-
-	for (group = sa_get_group(handle, NULL);
-	    group != NULL; group = sa_get_next_group(group)) {
-		gstate = sa_get_group_attr(group, "state");
-		if (gstate == NULL)
+	while ((si = smb_shr_iterate(&iterator)) != NULL) {
+		if (--offset > 0)
 			continue;
 
-		gdisabled = (strcasecmp(gstate, "disabled") == 0);
-		sa_free_attr_string(gstate);
-		if (gdisabled)
-			continue;
-
-		smb_shr_cache_loadgrp(group);
-		for (subgroup = sa_get_sub_group(group);
-		    subgroup != NULL;
-		    subgroup = sa_get_next_group(subgroup)) {
-			smb_shr_cache_loadgrp(subgroup);
+		if ((si->shr_flags & SMB_SHRF_TRANS) &&
+		    ((si->shr_type & STYPE_IPC) == 0)) {
+			bcopy(si, &list->sl_shares[n], sizeof (smb_share_t));
+			if (++n == LMSHARES_PER_REQUEST)
+				break;
 		}
-
 	}
 
-	sa_fini(handle);
-	return (NULL);
+	list->sl_cnt = n;
 }
 
+/*
+ * ============================================
+ * Private helper/utility functions
+ * ============================================
+ */
+
+/*
+ * Add IPC$ to the cache upon startup.
+ */
 static uint32_t
-smb_shr_cache_addent(smb_share_t *si)
-{
-	smb_share_t *cache_ent;
-	uint32_t status = NERR_Success;
-
-	/*
-	 * allocate memory for the entry that needs to be cached.
-	 */
-	if ((cache_ent = malloc(sizeof (smb_share_t))) == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
-
-	bcopy(si, cache_ent, sizeof (smb_share_t));
-
-	(void) utf8_strlwr(cache_ent->shr_name);
-	smb_shr_set_oemname(cache_ent);
-	if ((si->shr_type & STYPE_IPC) == 0)
-		cache_ent->shr_type = STYPE_DISKTREE;
-	cache_ent->shr_type |= smb_shr_is_special(cache_ent->shr_name);
-
-	(void) rw_wrlock(&smb_shr_lock);
-	if (ht_add_item(smb_shr_handle, cache_ent->shr_name, cache_ent)
-	    == NULL) {
-		syslog(LOG_DEBUG, "share: failed adding %s to cache",
-		    cache_ent->shr_name);
-		free(cache_ent);
-		status = NERR_InternalError;
-	}
-	(void) rw_unlock(&smb_shr_lock);
-
-	return (status);
-}
-
-static void
-smb_shr_cache_delent(char *sharename)
-{
-	(void) utf8_strlwr(sharename);
-	(void) rw_wrlock(&smb_shr_lock);
-	(void) ht_remove_item(smb_shr_handle, sharename);
-	(void) rw_unlock(&smb_shr_lock);
-}
-
-static uint32_t
-smb_shr_cache_chgent(smb_share_t *si)
-{
-	smb_share_t *cache_ent;
-	uint32_t status = NERR_Success;
-
-	/*
-	 * allocate memory for the entry that needs to be cached.
-	 */
-	if ((cache_ent = malloc(sizeof (smb_share_t))) == NULL)
-		return (ERROR_NOT_ENOUGH_MEMORY);
-
-	bcopy(si, cache_ent, sizeof (smb_share_t));
-	(void) utf8_strlwr(cache_ent->shr_name);
-
-	(void) rw_wrlock(&smb_shr_lock);
-	if (ht_replace_item(smb_shr_handle, cache_ent->shr_name, cache_ent)
-	    == NULL) {
-		syslog(LOG_DEBUG, "share: failed modifying %s",
-		    cache_ent->shr_name);
-		free(cache_ent);
-		status = NERR_InternalError;
-	}
-	(void) rw_unlock(&smb_shr_lock);
-
-	return (status);
-}
-
-static uint32_t
-smb_shr_create_autohome(smb_share_t *si)
-{
-	uint32_t status = NERR_Success;
-	int rc;
-
-	if (si->shr_refcnt == 0) {
-		if ((status = smb_shr_cache_addent(si)) != NERR_Success)
-			return (status);
-
-		rc = mlsvc_set_share(SMB_SHROP_ADD, si->shr_path, si->shr_name);
-
-		if (rc != 0) {
-			smb_shr_cache_delent(si->shr_name);
-			return ((rc == ENOENT)
-			    ? NERR_UnknownDevDir : NERR_InternalError);
-		}
-
-		smb_shr_publish(si->shr_name, si->shr_container,
-		    SMB_SHR_PUBLISH);
-	}
-
-	si->shr_refcnt++;
-	smb_shr_set_ahcnt(si->shr_name, si->shr_refcnt);
-	return (status);
-}
-
-static uint32_t
-smb_shr_create_ipc(void)
+smb_shr_addipc(void)
 {
 	smb_share_t ipc;
+	uint32_t status = NERR_InternalError;
 
 	bzero(&ipc, sizeof (smb_share_t));
 	(void) strcpy(ipc.shr_name, "IPC$");
 	(void) strcpy(ipc.shr_cmnt, "Remote IPC");
 	ipc.shr_flags = SMB_SHRF_TRANS;
 	ipc.shr_type = STYPE_IPC;
-	return (smb_shr_cache_addent(&ipc));
-}
 
-/*
- * loads the given resource
- */
-static uint32_t
-smb_shr_cache_loadent(sa_share_t share, sa_resource_t resource)
-{
-	smb_share_t si;
-	uint32_t status;
-
-	if ((status = smb_shr_sa_getent(share, resource, &si)) != NERR_Success)
-		return (status);
-
-	if ((status = smb_shr_cache_addent(&si)) == NERR_Success)
-		smb_shr_publish(si.shr_name, si.shr_container, SMB_SHR_PUBLISH);
-
-	if (status != NERR_Success) {
-		syslog(LOG_ERR, "share: failed loading %s (%d)", si.shr_name,
-		    status);
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) == NERR_Success) {
+		status = smb_shr_cache_addent(&ipc);
+		smb_shr_cache_unlock();
 	}
 
 	return (status);
 }
 
 /*
- * smb_shr_cache_loadgrp
- *
- * Helper function for smb_shr_cache_populate.
- * It attempts to load the shares contained in the given group.
- * It will check to see if "smb" protocol is enabled or
- * not on the given group. This is needed in the ZFS case where
- * the top level ZFS group won't have "smb" protocol
- * enabled but the sub-groups will.
- */
-static void
-smb_shr_cache_loadgrp(sa_group_t group)
-{
-	sa_share_t share;
-	sa_resource_t resource;
-
-	/* Don't bother if "smb" isn't set on the group */
-	if (sa_get_optionset(group, SMB_PROTOCOL_NAME) == NULL)
-		return;
-
-	for (share = sa_get_share(group, NULL);
-	    share != NULL; share = sa_get_next_share(share)) {
-		for (resource = sa_get_share_resource(share, NULL);
-		    resource != NULL;
-		    resource = sa_get_next_resource(resource)) {
-			(void) smb_shr_cache_loadent(share, resource);
-		}
-	}
-}
-
-/*
- * smb_shr_cache_freent
- *
- * Call back to free given cache entry
- */
-static void
-smb_shr_cache_freent(HT_ITEM *item)
-{
-	if (item && item->hi_data)
-		free(item->hi_data);
-}
-
-/*
- * smb_shr_set_ahcnt
- *
- * sets the autohome reference count for the given share
- */
-static void
-smb_shr_set_ahcnt(char *sharename, int refcnt)
-{
-	smb_share_t *si;
-	HT_ITEM *item;
-
-	(void) rw_wrlock(&smb_shr_lock);
-	item = ht_find_item(smb_shr_handle, sharename);
-	if (item == NULL || item->hi_data == NULL) {
-		(void) rw_unlock(&smb_shr_lock);
-		return;
-	}
-
-	si = (smb_share_t *)item->hi_data;
-	si->shr_refcnt = refcnt;
-	(void) rw_unlock(&smb_shr_lock);
-}
-
-/*
  * smb_shr_set_oemname
  *
- * Generates the OEM name of the given share. If it's
- * shorter than 13 chars it'll be saved in si->shr_oemname.
- * Otherwise si->shr_oemname will be empty and SMB_SHRF_LONGNAME
- * will be set in si->shr_flags.
+ * Generate the OEM name for the specified share.  If the name is
+ * shorter than 13 bytes the oemname will be saved in si->shr_oemname.
+ * Otherwise si->shr_oemname will be empty and SMB_SHRF_LONGNAME will
+ * be set in si->shr_flags.
  */
 static void
 smb_shr_set_oemname(smb_share_t *si)
@@ -986,77 +851,357 @@ smb_shr_set_oemname(smb_share_t *si)
 
 /*
  * ============================================
- * Interfaces to sharemgr
+ * Cache management functions
+ *
+ * All cache functions are private
  * ============================================
  */
 
 /*
- * Stores the given share in sharemgr
+ * Create the share cache (hash table).
  */
 static uint32_t
-smb_shr_sa_addent(smb_share_t *si)
+smb_shr_cache_create(void)
 {
-	sa_handle_t handle;
-	sa_share_t share;
-	sa_group_t group;
-	sa_resource_t resource;
-	boolean_t share_created = B_FALSE;
-	int err;
+	uint32_t status = NERR_Success;
 
-	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
-		return (NERR_InternalError);
-
-	share = sa_find_share(handle, si->shr_path);
-	if (share == NULL) {
-		group = smb_shr_sa_getdefgrp(handle);
-		if (group == NULL) {
-			sa_fini(handle);
-			return (NERR_InternalError);
+	(void) mutex_lock(&smb_shr_cache.sc_mtx);
+	switch (smb_shr_cache.sc_state) {
+	case SMB_SHR_CACHE_STATE_NONE:
+		smb_shr_cache.sc_cache = ht_create_table(SMB_SHR_HTAB_SZ,
+		    MAXNAMELEN, 0);
+		if (smb_shr_cache.sc_cache == NULL) {
+			status = NERR_InternalError;
+			break;
 		}
 
-		share = sa_add_share(group, si->shr_path, SA_SHARE_PERMANENT,
-		    &err);
-		if (share == NULL) {
-			sa_fini(handle);
-			return (NERR_InternalError);
-		}
-		share_created = B_TRUE;
+		(void) ht_register_callback(smb_shr_cache.sc_cache,
+		    smb_shr_cache_freent);
+		smb_shr_cache.sc_nops = 0;
+		smb_shr_cache.sc_state = SMB_SHR_CACHE_STATE_CREATED;
+		break;
+
+	default:
+		assert(0);
+		status = NERR_InternalError;
+		break;
 	}
+	(void) mutex_unlock(&smb_shr_cache.sc_mtx);
 
-	resource = sa_get_share_resource(share, si->shr_name);
-	if (resource == NULL) {
-		resource = sa_add_resource(share, si->shr_name,
-		    SA_SHARE_PERMANENT, &err);
-		if (resource == NULL)
-			goto failure;
-	}
-
-	if (sa_set_resource_attr(resource, "description", si->shr_cmnt)
-	    != SA_OK) {
-		goto failure;
-	}
-
-	if (sa_set_resource_attr(resource, SMB_SHROPT_AD_CONTAINER,
-	    si->shr_container) != SA_OK) {
-		goto failure;
-	}
-
-	sa_fini(handle);
-	return (NERR_Success);
-
-failure:
-	if (share_created && (share != NULL))
-		(void) sa_remove_share(share);
-
-	if (resource != NULL)
-		(void) sa_remove_resource(resource);
-
-	sa_fini(handle);
-	return (NERR_InternalError);
+	return (status);
 }
 
+/*
+ * Destroy the share cache (hash table).
+ * Wait for inflight/pending operations to finish or abort before
+ * destroying the cache.
+ */
+static void
+smb_shr_cache_destroy(void)
+{
+	(void) mutex_lock(&smb_shr_cache.sc_mtx);
+	if (smb_shr_cache.sc_state == SMB_SHR_CACHE_STATE_CREATED) {
+		smb_shr_cache.sc_state = SMB_SHR_CACHE_STATE_DESTROYING;
+		while (smb_shr_cache.sc_nops > 0)
+			(void) cond_wait(&smb_shr_cache.sc_cv,
+			    &smb_shr_cache.sc_mtx);
+
+		smb_shr_cache.sc_cache = NULL;
+		smb_shr_cache.sc_state = SMB_SHR_CACHE_STATE_NONE;
+	}
+	(void) mutex_unlock(&smb_shr_cache.sc_mtx);
+}
+
+/*
+ * If the cache is in "created" state, lock the cache for read
+ * or read/write based on the specified mode.
+ *
+ * Whenever a lock is granted, the number of inflight cache
+ * operations is incremented.
+ */
 static uint32_t
-smb_shr_sa_getent(sa_share_t share, sa_resource_t resource, smb_share_t *si)
+smb_shr_cache_lock(int mode)
+{
+	(void) mutex_lock(&smb_shr_cache.sc_mtx);
+	switch (smb_shr_cache.sc_state) {
+	case SMB_SHR_CACHE_STATE_CREATED:
+		smb_shr_cache.sc_nops++;
+		break;
+
+	case SMB_SHR_CACHE_STATE_DESTROYING:
+		(void) mutex_unlock(&smb_shr_cache.sc_mtx);
+		return (NERR_InternalError);
+
+	case SMB_SHR_CACHE_STATE_NONE:
+	default:
+		assert(0);
+		(void) mutex_unlock(&smb_shr_cache.sc_mtx);
+		return (NERR_InternalError);
+
+	}
+	(void) mutex_unlock(&smb_shr_cache.sc_mtx);
+
+	/*
+	 * Lock has to be taken outside the mutex otherwise
+	 * there could be a deadlock
+	 */
+	if (mode == SMB_SHR_CACHE_RDLOCK)
+		(void) rw_rdlock(&smb_shr_cache.sc_cache_lck);
+	else
+		(void) rw_wrlock(&smb_shr_cache.sc_cache_lck);
+
+	return (NERR_Success);
+}
+
+/*
+ * Decrement the number of inflight operations and then unlock.
+ */
+static void
+smb_shr_cache_unlock(void)
+{
+	(void) mutex_lock(&smb_shr_cache.sc_mtx);
+	assert(smb_shr_cache.sc_nops > 0);
+	smb_shr_cache.sc_nops--;
+	(void) cond_broadcast(&smb_shr_cache.sc_cv);
+	(void) mutex_unlock(&smb_shr_cache.sc_mtx);
+
+	(void) rw_unlock(&smb_shr_cache.sc_cache_lck);
+}
+
+/*
+ * Return the total number of shares
+ */
+static int
+smb_shr_cache_count(void)
+{
+	return (ht_get_total_items(smb_shr_cache.sc_cache));
+}
+
+/*
+ * looks up the given share name in the cache and if it
+ * finds a match returns a pointer to the cached entry.
+ * Note that since a pointer is returned this function
+ * MUST be protected by smb_shr_cache_lock/unlock pair
+ */
+static smb_share_t *
+smb_shr_cache_findent(char *sharename)
+{
+	HT_ITEM *item;
+
+	(void) utf8_strlwr(sharename);
+	item = ht_find_item(smb_shr_cache.sc_cache, sharename);
+	if (item && item->hi_data)
+		return ((smb_share_t *)item->hi_data);
+
+	return (NULL);
+}
+
+/*
+ * Return a pointer to the first/next entry in
+ * the cache based on the given iterator.
+ *
+ * Calls to this function MUST be protected by
+ * smb_shr_cache_lock/unlock.
+ */
+static smb_share_t *
+smb_shr_cache_iterate(smb_shriter_t *shi)
+{
+	HT_ITEM *item;
+
+	if (shi->si_first) {
+		item = ht_findfirst(smb_shr_cache.sc_cache, &shi->si_hashiter);
+		shi->si_first = B_FALSE;
+	} else {
+		item = ht_findnext(&shi->si_hashiter);
+	}
+
+	if (item && item->hi_data)
+		return ((smb_share_t *)item->hi_data);
+
+	return (NULL);
+}
+
+/*
+ * Add the specified share to the cache.  Memory needs to be allocated
+ * for the cache entry and the passed information is copied to the
+ * allocated space.
+ */
+static uint32_t
+smb_shr_cache_addent(smb_share_t *si)
+{
+	smb_share_t *cache_ent;
+	uint32_t status = NERR_Success;
+
+	if ((cache_ent = malloc(sizeof (smb_share_t))) == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	bcopy(si, cache_ent, sizeof (smb_share_t));
+
+	(void) utf8_strlwr(cache_ent->shr_name);
+	smb_shr_set_oemname(cache_ent);
+
+	if ((si->shr_type & STYPE_IPC) == 0)
+		cache_ent->shr_type = STYPE_DISKTREE;
+	cache_ent->shr_type |= smb_shr_is_special(cache_ent->shr_name);
+
+	if (smb_shr_is_admin(cache_ent->shr_name))
+		cache_ent->shr_flags |= SMB_SHRF_ADMIN;
+
+	if (si->shr_flags & SMB_SHRF_AUTOHOME)
+		cache_ent->shr_refcnt = 1;
+
+	if (ht_add_item(smb_shr_cache.sc_cache, cache_ent->shr_name, cache_ent)
+	    == NULL) {
+		syslog(LOG_DEBUG, "share: %s: cache update failed",
+		    cache_ent->shr_name);
+		free(cache_ent);
+		status = NERR_InternalError;
+	}
+
+	return (status);
+}
+
+/*
+ * Delete the specified share from the cache.
+ */
+static void
+smb_shr_cache_delent(char *sharename)
+{
+	(void) utf8_strlwr(sharename);
+	(void) ht_remove_item(smb_shr_cache.sc_cache, sharename);
+}
+
+/*
+ * Call back to free the given cache entry.
+ */
+static void
+smb_shr_cache_freent(HT_ITEM *item)
+{
+	if (item && item->hi_data)
+		free(item->hi_data);
+}
+
+/*
+ * ============================================
+ * Interfaces to sharemgr
+ *
+ * All functions in this section are private
+ * ============================================
+ */
+
+/*
+ * Load shares from sharemgr
+ */
+/*ARGSUSED*/
+static void *
+smb_shr_sa_loadall(void *args)
+{
+	sa_handle_t handle;
+	sa_group_t group, subgroup;
+	char *gstate;
+	boolean_t gdisabled;
+
+	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL) {
+		syslog(LOG_ERR, "share: failed to get libshare API handle");
+		return (NULL);
+	}
+
+	for (group = sa_get_group(handle, NULL);
+	    group != NULL; group = sa_get_next_group(group)) {
+		gstate = sa_get_group_attr(group, "state");
+		if (gstate == NULL)
+			continue;
+
+		gdisabled = (strcasecmp(gstate, "disabled") == 0);
+		sa_free_attr_string(gstate);
+		if (gdisabled)
+			continue;
+
+		smb_shr_sa_loadgrp(group);
+
+		for (subgroup = sa_get_sub_group(group);
+		    subgroup != NULL;
+		    subgroup = sa_get_next_group(subgroup)) {
+			smb_shr_sa_loadgrp(subgroup);
+		}
+
+	}
+
+	sa_fini(handle);
+	return (NULL);
+}
+
+/*
+ * Load the shares contained in the specified group.
+ *
+ * Don't process groups on which the smb protocol is disabled.
+ * The top level ZFS group won't have the smb protocol enabled
+ * but sub-groups will.
+ *
+ * We will tolerate a limited number of errors and then give
+ * up on the current group.  A typical error might be that the
+ * shared directory no longer exists.
+ */
+static void
+smb_shr_sa_loadgrp(sa_group_t group)
+{
+	sa_share_t share;
+	sa_resource_t resource;
+	int error_count = 0;
+
+	if (sa_get_optionset(group, SMB_PROTOCOL_NAME) == NULL)
+		return;
+
+	for (share = sa_get_share(group, NULL);
+	    share != NULL;
+	    share = sa_get_next_share(share)) {
+		for (resource = sa_get_share_resource(share, NULL);
+		    resource != NULL;
+		    resource = sa_get_next_resource(resource)) {
+			if (smb_shr_sa_load(share, resource))
+				++error_count;
+
+			if (error_count > SMB_SHR_ERROR_THRESHOLD)
+				break;
+		}
+
+		if (error_count > SMB_SHR_ERROR_THRESHOLD)
+			break;
+	}
+}
+
+/*
+ * Load a share definition from sharemgr and add it to the cache.
+ */
+static uint32_t
+smb_shr_sa_load(sa_share_t share, sa_resource_t resource)
+{
+	smb_share_t si;
+	uint32_t status;
+
+	if ((status = smb_shr_sa_get(share, resource, &si)) != NERR_Success) {
+		syslog(LOG_DEBUG, "share: failed to load %s (%d)",
+		    si.shr_name, status);
+		return (status);
+	}
+
+	if ((status = smb_shr_add(&si)) != NERR_Success) {
+		syslog(LOG_DEBUG, "share: failed to cache %s (%d)",
+		    si.shr_name, status);
+		return (status);
+	}
+
+	return (NERR_Success);
+}
+
+/*
+ * Read the specified share information from sharemgr and return
+ * it in the given smb_share_t structure.
+ *
+ * Shares read from sharemgr are marked as permanent/persistent.
+ */
+static uint32_t
+smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 {
 	sa_property_t prop;
 	sa_optionset_t opts;
@@ -1073,7 +1218,6 @@ smb_shr_sa_getent(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 	}
 
 	bzero(si, sizeof (smb_share_t));
-	/* Share is read from SMF so it should be permanent */
 	si->shr_flags = SMB_SHRF_PERM;
 
 	(void) strlcpy(si->shr_path, path, sizeof (si->shr_path));
@@ -1103,90 +1247,74 @@ smb_shr_sa_getent(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 			free(val);
 		}
 	}
+
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_NONE);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_none, val,
+			    sizeof (si->shr_access_none));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_NONE;
+		}
+	}
+
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_RO);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_ro, val,
+			    sizeof (si->shr_access_ro));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_RO;
+		}
+	}
+
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_RW);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_rw, val,
+			    sizeof (si->shr_access_rw));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_RW;
+		}
+	}
+
 	sa_free_derived_optionset(opts);
-
 	return (NERR_Success);
-}
-
-/*
- * Removes the share from sharemgr
- */
-static uint32_t
-smb_shr_sa_delent(smb_share_t *si)
-{
-	sa_handle_t handle;
-	sa_share_t share;
-	sa_resource_t resource;
-
-	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
-		return (NERR_InternalError);
-
-	if ((share = sa_find_share(handle, si->shr_path)) == NULL) {
-		sa_fini(handle);
-		return (NERR_InternalError);
-	}
-
-	if ((resource = sa_get_share_resource(share, si->shr_name)) == NULL) {
-		sa_fini(handle);
-		return (NERR_InternalError);
-	}
-
-	if (sa_remove_resource(resource) != SA_OK) {
-		sa_fini(handle);
-		return (NERR_InternalError);
-	}
-
-	sa_fini(handle);
-	return (NERR_Success);
-}
-
-/*
- * smb_shr_sa_getdefgrp
- *
- * If default group for CIFS shares (i.e. "smb") exists
- * then it will return the group handle, otherwise it will
- * create the group and return the handle.
- *
- * All the shares created by CIFS clients (this is only possible
- * via RPC) will be added to "smb" groups.
- */
-static sa_group_t
-smb_shr_sa_getdefgrp(sa_handle_t handle)
-{
-	sa_group_t group = NULL;
-	int err;
-
-	group = sa_get_group(handle, SMB_DEFAULT_SHARE_GROUP);
-	if (group != NULL)
-		return (group);
-
-	group = sa_create_group(handle, SMB_DEFAULT_SHARE_GROUP, &err);
-	if (group == NULL)
-		return (NULL);
-
-	if (sa_create_optionset(group, SMB_DEFAULT_SHARE_GROUP) == NULL) {
-		(void) sa_remove_group(group);
-		group = NULL;
-	}
-
-	return (group);
 }
 
 /*
  * ============================================
  * Share publishing functions
+ *
+ * All the functions are private
  * ============================================
  */
 
+static void
+smb_shr_publish(const char *sharename, const char *container)
+{
+	smb_shr_publisher_queue(sharename, container, SMB_SHR_PUBLISH);
+}
+
+static void
+smb_shr_unpublish(const char *sharename, const char *container)
+{
+	smb_shr_publisher_queue(sharename, container, SMB_SHR_UNPUBLISH);
+}
+
 /*
- * Put the share on publish queue.
+ * In domain mode, put a share on the publisher queue.
+ * This is a no-op if the smb service is in Workgroup mode.
  */
 static void
-smb_shr_publish(const char *sharename, const char *container, char op)
+smb_shr_publisher_queue(const char *sharename, const char *container, char op)
 {
 	smb_shr_pitem_t *item = NULL;
 
 	if (container == NULL || *container == '\0')
+		return;
+
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
 		return;
 
 	(void) mutex_lock(&ad_queue.spq_mtx);
@@ -1200,10 +1328,8 @@ smb_shr_publish(const char *sharename, const char *container, char op)
 	}
 	(void) mutex_unlock(&ad_queue.spq_mtx);
 
-	if ((item = malloc(sizeof (smb_shr_pitem_t))) == NULL) {
-		syslog(LOG_DEBUG, "failed allocating share publish item");
+	if ((item = malloc(sizeof (smb_shr_pitem_t))) == NULL)
 		return;
-	}
 
 	item->spi_op = op;
 	(void) strlcpy(item->spi_name, sharename, sizeof (item->spi_name));
@@ -1212,16 +1338,23 @@ smb_shr_publish(const char *sharename, const char *container, char op)
 
 	(void) mutex_lock(&ad_queue.spq_mtx);
 	list_insert_tail(&ad_queue.spq_list, item);
-	ad_queue.spq_cnt++;
 	(void) cond_signal(&ad_queue.spq_cv);
 	(void) mutex_unlock(&ad_queue.spq_mtx);
 }
 
+/*
+ * Publishing won't be activated if the smb service is running in
+ * Workgroup mode.
+ */
 static int
 smb_shr_publisher_start(void)
 {
+	pthread_t publish_thr;
 	pthread_attr_t tattr;
 	int rc;
+
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+		return (0);
 
 	(void) mutex_lock(&ad_queue.spq_mtx);
 	if (ad_queue.spq_state != SMB_SHR_PQS_NOQUEUE) {
@@ -1237,8 +1370,7 @@ smb_shr_publisher_start(void)
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&smb_shr_publish_thr, &tattr,
-	    smb_shr_publisher, 0);
+	rc = pthread_create(&publish_thr, &tattr, smb_shr_publisher, 0);
 	(void) pthread_attr_destroy(&tattr);
 
 	return (rc);
@@ -1247,6 +1379,9 @@ smb_shr_publisher_start(void)
 static void
 smb_shr_publisher_stop(void)
 {
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+		return;
+
 	(void) mutex_lock(&ad_queue.spq_mtx);
 	switch (ad_queue.spq_state) {
 	case SMB_SHR_PQS_READY:
@@ -1261,8 +1396,13 @@ smb_shr_publisher_stop(void)
 }
 
 /*
- * This functions waits to be signaled and once running
- * will publish/unpublish any items in the ad_queue
+ * This is the publisher daemon thread.  While running, the thread waits
+ * on a conditional variable until notified that a share needs to be
+ * [un]published or that the thread should be terminated.
+ *
+ * Entries may remain in the outgoing queue if the Active Directory
+ * service is inaccessible, in which case the thread wakes up every 60
+ * seconds to retry.
  */
 /*ARGSUSED*/
 static void *
@@ -1271,93 +1411,111 @@ smb_shr_publisher(void *arg)
 	smb_ads_handle_t *ah;
 	smb_shr_pitem_t *shr;
 	list_t publist;
+	timestruc_t pubretry;
 	char hostname[MAXHOSTNAMELEN];
 
 	(void) mutex_lock(&ad_queue.spq_mtx);
-	if (ad_queue.spq_state == SMB_SHR_PQS_READY) {
-		ad_queue.spq_state = SMB_SHR_PQS_PUBLISHING;
-	} else {
+	if (ad_queue.spq_state != SMB_SHR_PQS_READY) {
 		(void) mutex_unlock(&ad_queue.spq_mtx);
 		return (NULL);
 	}
+	ad_queue.spq_state = SMB_SHR_PQS_PUBLISHING;
 	(void) mutex_unlock(&ad_queue.spq_mtx);
 
 	(void) smb_gethostname(hostname, MAXHOSTNAMELEN, 0);
+
 	list_create(&publist, sizeof (smb_shr_pitem_t),
 	    offsetof(smb_shr_pitem_t, spi_lnd));
 
 	for (;;) {
 		(void) mutex_lock(&ad_queue.spq_mtx);
-		while ((ad_queue.spq_cnt == 0) &&
-		    (ad_queue.spq_state == SMB_SHR_PQS_PUBLISHING))
-			(void) cond_wait(&ad_queue.spq_cv, &ad_queue.spq_mtx);
+
+		while (list_is_empty(&ad_queue.spq_list) &&
+		    (ad_queue.spq_state == SMB_SHR_PQS_PUBLISHING)) {
+			if (list_is_empty(&publist)) {
+				(void) cond_wait(&ad_queue.spq_cv,
+				    &ad_queue.spq_mtx);
+			} else {
+				pubretry.tv_sec = 60;
+				pubretry.tv_nsec = 0;
+				(void) cond_reltimedwait(&ad_queue.spq_cv,
+				    &ad_queue.spq_mtx, &pubretry);
+				break;
+			}
+		}
 
 		if (ad_queue.spq_state != SMB_SHR_PQS_PUBLISHING) {
 			(void) mutex_unlock(&ad_queue.spq_mtx);
 			break;
 		}
 
-		if ((ah = smb_ads_open()) == NULL) {
-			(void) mutex_unlock(&ad_queue.spq_mtx);
-			continue;
-		}
-
 		/*
-		 * Transfer queued items to the local list so the mutex
-		 * can be quickly released
+		 * Transfer queued items to the local list so that
+		 * the mutex can be released.
 		 */
 		while ((shr = list_head(&ad_queue.spq_list)) != NULL) {
 			list_remove(&ad_queue.spq_list, shr);
-			ad_queue.spq_cnt--;
 			list_insert_tail(&publist, shr);
 		}
+
 		(void) mutex_unlock(&ad_queue.spq_mtx);
 
-		smb_shr_publisher_send(ah, &publist, hostname);
-		smb_ads_close(ah);
+		if ((ah = smb_ads_open()) != NULL) {
+			smb_shr_publisher_send(ah, &publist, hostname);
+			smb_ads_close(ah);
+		}
 	}
 
-	/* Remove any leftover items from publishing queue */
 	(void) mutex_lock(&ad_queue.spq_mtx);
-	while ((shr = list_head(&ad_queue.spq_list)) != NULL) {
-		list_remove(&ad_queue.spq_list, shr);
-		free(shr);
-	}
-	ad_queue.spq_cnt = 0;
+	smb_shr_publisher_flush(&ad_queue.spq_list);
 	list_destroy(&ad_queue.spq_list);
 	ad_queue.spq_state = SMB_SHR_PQS_NOQUEUE;
 	(void) mutex_unlock(&ad_queue.spq_mtx);
 
+	smb_shr_publisher_flush(&publist);
 	list_destroy(&publist);
 	return (NULL);
 }
 
 /*
- * Takes item from the given list and [un]publish them one by one.
- * In each iteration it checks the status of the publisher thread
- * and if it's been stopped then it continues to just empty the list
+ * Remove items from the specified queue and [un]publish them.
  */
 static void
 smb_shr_publisher_send(smb_ads_handle_t *ah, list_t *publist, const char *host)
 {
 	smb_shr_pitem_t *shr;
-	boolean_t publish = B_TRUE;
 
 	while ((shr = list_head(publist)) != NULL) {
-		list_remove(publist, shr);
-		if (publish) {
+		(void) mutex_lock(&ad_queue.spq_mtx);
+		if (ad_queue.spq_state != SMB_SHR_PQS_PUBLISHING) {
 			(void) mutex_unlock(&ad_queue.spq_mtx);
-			if (ad_queue.spq_state != SMB_SHR_PQS_PUBLISHING)
-				publish = B_FALSE;
-			(void) mutex_unlock(&ad_queue.spq_mtx);
-
-			if (shr->spi_op == SMB_SHR_PUBLISH)
-				(void) smb_ads_publish_share(ah, shr->spi_name,
-				    NULL, shr->spi_container, host);
-			else
-				(void) smb_ads_remove_share(ah, shr->spi_name,
-				    NULL, shr->spi_container, host);
+			return;
 		}
+		(void) mutex_unlock(&ad_queue.spq_mtx);
+
+		list_remove(publist, shr);
+
+		if (shr->spi_op == SMB_SHR_PUBLISH)
+			(void) smb_ads_publish_share(ah, shr->spi_name,
+			    NULL, shr->spi_container, host);
+		else
+			(void) smb_ads_remove_share(ah, shr->spi_name,
+			    NULL, shr->spi_container, host);
+
+		free(shr);
+	}
+}
+
+/*
+ * Flush all remaining items from the specified list/queue.
+ */
+static void
+smb_shr_publisher_flush(list_t *lst)
+{
+	smb_shr_pitem_t *shr;
+
+	while ((shr = list_head(lst)) != NULL) {
+		list_remove(lst, shr);
 		free(shr);
 	}
 }

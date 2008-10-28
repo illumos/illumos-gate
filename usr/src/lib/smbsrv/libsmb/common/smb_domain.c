@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines the NT domain environment values and the domain
  * database interface. The database is a single linked list of
@@ -79,13 +77,13 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 	smb_sid_t *sid = NULL;
 	char sidstr[128];
 	char *lsidstr;
-	char hostname[MAXHOSTNAMELEN];
+	char hostname[NETBIOS_NAME_SZ];
 	int rc;
 
 	if (rwlock_init(&nt_domain_lock, USYNC_THREAD, NULL))
 		return (SMB_DOMAIN_NODOMAIN_SID);
 
-	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0) {
+	if (smb_getnetbiosname(hostname, NETBIOS_NAME_SZ) != 0) {
 		(void) rwlock_destroy(&nt_domain_lock);
 		return (SMB_DOMAIN_NOMACHINE_SID);
 	}

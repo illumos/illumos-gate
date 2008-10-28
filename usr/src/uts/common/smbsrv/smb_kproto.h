@@ -295,7 +295,7 @@ char	*smb_xlate_com_cd_to_str(int);
 char	*smb_xlate_dialect_cd_to_str(int);
 
 void	smb_od_destruct(struct smb_session *, struct smb_odir *);
-int	smbd_fs_query(struct smb_request *, struct smb_fqi *, int);
+int	smbd_fs_query(smb_request_t *, smb_fqi_t *, int);
 int smb_component_match(struct smb_request *sr, ino64_t fileid,
     struct smb_odir *od, smb_odir_context_t *pc);
 
@@ -505,6 +505,7 @@ void smb_session_list_delete_tail(smb_session_list_t *);
 smb_session_t *smb_session_list_activate_head(smb_session_list_t *);
 void smb_session_list_terminate(smb_session_list_t *, smb_session_t *);
 void smb_session_list_signal(smb_session_list_t *);
+smb_user_t *smb_session_dup_user(smb_session_t *, char *, char *);
 
 void smb_session_correct_keep_alive_values(smb_session_list_t *, uint32_t);
 smb_request_t *smb_request_alloc(smb_session_t *, int);
@@ -530,6 +531,7 @@ uint32_t smb_ofile_open_check(smb_ofile_t *, cred_t *,
     uint32_t, uint32_t);
 uint32_t smb_ofile_rename_check(smb_ofile_t *);
 uint32_t smb_ofile_delete_check(smb_ofile_t *);
+cred_t *smb_ofile_getcred(smb_ofile_t *);
 
 
 #define	smb_ofile_granted_access(_of_)	((_of_)->f_granted_access)
@@ -555,8 +557,7 @@ smb_user_t *smb_user_login(smb_session_t *, cred_t *,
 smb_user_t *smb_user_dup(smb_user_t *);
 void smb_user_logoff(smb_user_t *);
 void smb_user_logoff_all(smb_session_t *);
-smb_user_t *smb_user_lookup_by_uid(smb_session_t *, cred_t **, uint16_t);
-smb_user_t *smb_user_lookup_by_name(smb_session_t *, char *, char *);
+smb_user_t *smb_user_lookup_by_uid(smb_session_t *, uint16_t);
 smb_user_t *smb_user_lookup_by_state(smb_session_t *, smb_user_t *);
 smb_tree_t *smb_user_lookup_tree(smb_user_t *, uint16_t);
 smb_tree_t *smb_user_lookup_share(smb_user_t *, const char *, smb_tree_t *);
@@ -566,6 +567,8 @@ void smb_user_close_pid(smb_user_t *, uint16_t);
 void smb_user_disconnect_trees(smb_user_t *user);
 void smb_user_disconnect_share(smb_user_t *, const char *);
 void smb_user_release(smb_user_t *);
+cred_t *smb_user_getcred(smb_user_t *);
+cred_t *smb_user_getprivcred(smb_user_t *);
 
 /*
  * SMB tree functions (file smb_tree.c)
@@ -585,6 +588,7 @@ void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
 cred_t *smb_cred_create(smb_token_t *, uint32_t *);
 void smb_cred_rele(cred_t *cr);
 int smb_cred_is_member(cred_t *cr, smb_sid_t *sid);
+cred_t *smb_cred_create_privs(cred_t *, uint32_t);
 
 smb_xa_t *smb_xa_create(smb_session_t *session, smb_request_t *sr,
     uint32_t total_parameter_count, uint32_t total_data_count,

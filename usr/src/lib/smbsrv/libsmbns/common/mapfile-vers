@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate {
     global:
@@ -43,7 +41,6 @@ SUNWprivate {
 	smb_ads_publish_share;
 	smb_ads_refresh;
 	smb_ads_remove_share;
-	smb_ads_update_attrs;
 	smb_browser_netlogon;
 	smb_browser_reconfig;
 	smb_ccache_init;

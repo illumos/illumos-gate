@@ -31,7 +31,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <sys/nbmlock.h>
 
-static int smb_do_rename(smb_request_t *, struct smb_fqi *, struct smb_fqi *);
+static int smb_do_rename(smb_request_t *, smb_fqi_t *, smb_fqi_t *);
 
 /*
  * smb_com_rename
@@ -54,8 +54,8 @@ static int smb_do_rename(smb_request_t *, struct smb_fqi *, struct smb_fqi *);
 smb_sdrc_t
 smb_pre_rename(smb_request_t *sr)
 {
-	struct smb_fqi *src_fqi = &sr->arg.dirop.fqi;
-	struct smb_fqi *dst_fqi = &sr->arg.dirop.dst_fqi;
+	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
 	int rc;
 
 	if ((rc = smbsr_decode_vwv(sr, "w", &src_fqi->srch_attr)) == 0) {
@@ -81,8 +81,8 @@ smb_sdrc_t
 smb_com_rename(smb_request_t *sr)
 {
 	static kmutex_t mutex;
-	struct smb_fqi *src_fqi = &sr->arg.dirop.fqi;
-	struct smb_fqi *dst_fqi = &sr->arg.dirop.dst_fqi;
+	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
 	struct smb_node *dst_node;
 	int rc;
 
@@ -162,10 +162,10 @@ smb_com_rename(smb_request_t *sr)
 static int
 smb_do_rename(
     smb_request_t *sr,
-    struct smb_fqi *src_fqi,
-    struct smb_fqi *dst_fqi)
+    smb_fqi_t *src_fqi,
+    smb_fqi_t *dst_fqi)
 {
-	struct smb_node *src_node;
+	smb_node_t *src_node;
 	char *dstname;
 	DWORD status;
 	int rc;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Security Access Manager RPC (SAMR) library interface functions for
  * query and lookup calls.
@@ -540,15 +538,15 @@ static int
 samr_set_user_password(smb_auth_info_t *auth, BYTE *oem_password)
 {
 	unsigned char nt_key[SMBAUTH_SESSION_KEY_SZ];
-	char hostname[64];
+	char hostname[NETBIOS_NAME_SZ];
 
 	randomize((char *)oem_password, SAMR_SET_USER_DATA_SZ);
 
 	/*
-	 * The new password is going to be
-	 * the hostname in lower case.
+	 * The new password is going to be the NetBIOS name of the system
+	 * in lower case.
 	 */
-	if (smb_gethostname(hostname, 64, 0) != 0)
+	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0)
 		return (-1);
 
 	(void) utf8_strlwr(hostname);

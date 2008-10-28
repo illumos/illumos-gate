@@ -353,8 +353,8 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 	for (i = 0, sim = sib->sib_maps; i < sib->sib_nmap; i++, sim++) {
 		if (sim->sim_stat != IDMAP_SUCCESS) {
 			if (sib->sib_flags == SMB_IDMAP_SID2ID) {
-				syslog(LOG_DEBUG, "[%d] %s-%d (%d)",
-				    sim->sim_idtype, sim->sim_sid,
+				smb_tracef("[%d] %s-%d (%d)",
+				    sim->sim_idtype, sim->sim_domsid,
 				    sim->sim_rid, sim->sim_stat);
 			}
 			return (sim->sim_stat);

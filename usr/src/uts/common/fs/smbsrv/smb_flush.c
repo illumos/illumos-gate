@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The flush SMB is sent to ensure all data and allocation information
  * for the corresponding file has been written to stable storage. This
@@ -122,6 +120,8 @@ smb_com_flush(smb_request_t *sr)
 static void
 smb_flush_file(struct smb_request *sr, struct smb_ofile *ofile)
 {
+	sr->user_cr = smb_ofile_getcred(ofile);
+
 	if ((ofile->f_node->flags & NODE_FLAGS_WRITE_THROUGH) == 0)
 		(void) smb_fsop_commit(sr, sr->user_cr, ofile->f_node);
 }

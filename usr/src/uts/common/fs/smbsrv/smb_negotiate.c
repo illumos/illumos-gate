@@ -256,6 +256,9 @@ smb_com_negotiate(smb_request_t *sr)
 	unsigned short		max_mpx_count;
 	int16_t			tz_correction;
 	char			ipaddr_buf[INET_ADDRSTRLEN];
+	char			*tmpbuf;
+	int			buflen;
+	smb_msgbuf_t		mb;
 
 	if (sr->session->s_state != SMB_SESSION_STATE_ESTABLISHED) {
 		/* The protocol has already been negotiated. */
@@ -281,10 +284,6 @@ smb_com_negotiate(smb_request_t *sr)
 			sel_pos = pos;
 		}
 	}
-	if (sel_pos < 0) {
-		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		return (SDRC_ERROR);
-	}
 
 	smb_get_security_info(sr, &secmode, (unsigned char *)key,
 	    &keylen, &sesskey);
@@ -293,7 +292,6 @@ smb_com_negotiate(smb_request_t *sr)
 	tz_correction = sr->sr_gmtoff / 60;
 
 	switch (dialect) {
-	case DIALECT_UNKNOWN:
 	case PC_NETWORK_PROGRAM_1_0:	/* core */
 		(void) sosetsockopt(sr->session->sock, SOL_SOCKET, SO_RCVBUF,
 		    (const void *)&smb_dos_tcp_rcvbuf,
@@ -354,7 +352,7 @@ smb_com_negotiate(smb_request_t *sr)
 		    VAR_BCC,
 		    (int)keylen,
 		    key,		/* encryption key */
-		    sr->sr_cfg->skc_resource_domain);
+		    sr->sr_cfg->skc_nbdomain);
 		break;
 
 	case NT_LM_0_12:
@@ -402,8 +400,25 @@ smb_com_negotiate(smb_request_t *sr)
 
 		max_mpx_count = sr->sr_cfg->skc_maxworkers;
 
+		/*
+		 * skc_nbdomain is not expected to be aligned.
+		 * Use temporary buffer to avoid alignment padding
+		 */
+		buflen = mts_wcequiv_strlen(sr->sr_cfg->skc_nbdomain) +
+		    sizeof (mts_wchar_t);
+		tmpbuf = kmem_zalloc(buflen, KM_SLEEP);
+		smb_msgbuf_init(&mb, (uint8_t *)tmpbuf, buflen,
+		    SMB_MSGBUF_UNICODE);
+		if (smb_msgbuf_encode(&mb, "U",
+		    sr->sr_cfg->skc_nbdomain) < 0) {
+			smb_msgbuf_term(&mb);
+			kmem_free(tmpbuf, buflen);
+			smbsr_error(sr, 0, ERRSRV, ERRerror);
+			return (SDRC_ERROR);
+		}
+
 		rc = smbsr_encode_result(sr, 17, VAR_BCC,
-		    "bwbwwllllTwbw#cZ",
+		    "bwbwwllllTwbw#c#c",
 		    17,		/* wct */
 		    sel_pos,	/* dialect index */
 		    secmode,	/* security mode */
@@ -413,18 +428,23 @@ smb_com_negotiate(smb_request_t *sr)
 		    0xFFFF,	/* max raw size */
 		    sesskey,	/* session key */
 		    capabilities,
-		    &time_val,			/* system time */
+		    &time_val,	/* system time */
 		    tz_correction,
-		    keylen,			/* Encryption Key Length */
+		    keylen,	/* Encryption Key Length */
 		    VAR_BCC,
 		    (int)keylen,
-		    key,			/* encryption key */
-		    sr->sr_cfg->skc_resource_domain);
+		    key,	/* encryption key */
+		    buflen,
+		    tmpbuf);	/* skc_nbdomain */
+
+		smb_msgbuf_term(&mb);
+		kmem_free(tmpbuf, buflen);
 		break;
 
 	default:
-		smbsr_error(sr, 0, ERRSRV, ERRerror);
-		return (SDRC_ERROR);
+		sel_pos = -1;
+		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, sel_pos, 0);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	if (rc != 0)

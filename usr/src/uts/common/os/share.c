@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -48,7 +46,6 @@ static void print_share(struct shrlock *);
 #endif
 
 static int isreadonly(struct vnode *);
-static int lock_blocks_share(struct vnode *, struct shrlock *);
 
 /*
  * Add the share reservation shr to vp.
@@ -78,17 +75,6 @@ add_share(struct vnode *vp, struct shrlock *shr)
 	if (shr->s_deny & ~(F_NODNY|F_RDDNY|F_WRDNY|F_RWDNY|F_COMPAT|
 	    F_MANDDNY|F_RMDNY)) {
 		return (EINVAL);
-	}
-
-	/*
-	 * If the caller wants non-blocking mandatory semantics, make sure
-	 * that there isn't already a conflicting lock.
-	 */
-	if (shr->s_deny & F_MANDDNY) {
-		ASSERT(nbl_in_crit(vp));
-		if (lock_blocks_share(vp, shr)) {
-			return (EAGAIN);
-		}
 	}
 
 	mutex_enter(&vp->v_lock);
@@ -605,110 +591,6 @@ nbl_share_conflict(vnode_t *vp, nbl_op_t op, caller_context_t *ct)
 
 	mutex_exit(&vp->v_lock);
 	return (conflict);
-}
-
-/*
- * Return non-zero if the given lock request conflicts with an existing
- * non-blocking mandatory share reservation.
- */
-
-int
-share_blocks_lock(vnode_t *vp, flock64_t *flkp)
-{
-	caller_context_t ct;
-
-	ASSERT(nbl_in_crit(vp));
-
-	ct.cc_pid = flkp->l_pid;
-	ct.cc_sysid = flkp->l_sysid;
-	ct.cc_caller_id = 0;
-
-	if ((flkp->l_type == F_RDLCK || flkp->l_type == F_WRLCK) &&
-	    nbl_share_conflict(vp, nbl_lock_to_op(flkp->l_type), &ct))
-		return (1);
-	else
-		return (0);
-}
-
-/*
- * Wait for all share reservations to go away that block the given lock
- * request.  Returns 0 after successfully waiting, or EINTR.
- */
-
-int
-wait_for_share(vnode_t *vp, flock64_t *flkp)
-{
-	int result = 0;
-
-	ASSERT(nbl_in_crit(vp));
-
-	/*
-	 * We have to hold the vnode's lock before leaving the nbmand
-	 * critical region, to prevent a race with the thread that deletes
-	 * the share that's blocking us.  Then we have to drop the lock
-	 * before reentering the critical region, to avoid a deadlock.
-	 */
-	while (result == 0 && share_blocks_lock(vp, flkp)) {
-		mutex_enter(&vp->v_lock);
-		nbl_end_crit(vp);
-		if (cv_wait_sig(&vp->v_cv, &vp->v_lock) == 0)
-			result = EINTR;
-		mutex_exit(&vp->v_lock);
-		nbl_start_crit(vp, RW_WRITER);
-	}
-
-	return (result);
-}
-
-/*
- * Determine if the given share reservation conflicts with any existing
- * locks or mapped regions for the file.  This is used to compensate for
- * the fact that most Unix applications don't get a share reservation, so
- * we use existing locks as an indication of what files are open.
- *
- * XXX needs a better name to reflect that it also looks for mapped file
- * conflicts.
- *
- * Returns non-zero if there is a conflict, zero if okay.
- */
-
-static int
-lock_blocks_share(vnode_t *vp, struct shrlock *shr)
-{
-	struct flock64 lck;
-	int error;
-	v_mode_t mode = 0;
-
-	if ((shr->s_deny & (F_RWDNY|F_COMPAT)) == 0) {
-		/* if no deny mode, then there's no conflict */
-		return (0);
-	}
-
-	/* check for conflict with mapped region */
-	if ((shr->s_deny & F_RWDNY) == F_WRDNY) {
-		mode = V_WRITE;
-	} else if ((shr->s_deny & F_RWDNY) == F_RDDNY) {
-		mode = V_READ;
-	} else {
-		mode = V_RDORWR;
-	}
-	if (vn_is_mapped(vp, mode))
-		return (1);
-
-	lck.l_type = ((shr->s_deny & F_RDDNY) ? F_WRLCK : F_RDLCK);
-	lck.l_whence = 0;
-	lck.l_start = 0;
-	lck.l_len = 0;			/* to EOF */
-
-	/* XXX should use non-NULL cred? */
-	error = VOP_FRLOCK(vp, F_GETLK, &lck, 0, 0, NULL, NULL, NULL);
-	if (error != 0) {
-		cmn_err(CE_WARN, "lock_blocks_share: unexpected error (%d)",
-		    error);
-		return (1);
-	}
-
-	return (lck.l_type == F_UNLCK ? 0 : 1);
 }
 
 /*

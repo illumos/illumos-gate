@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,14 +39,14 @@
 #ifndef _SHARETAB_H
 #define	_SHARETAB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define	SHOPT_RO	"ro"
 #define	SHOPT_RW	"rw"
+#define	SHOPT_NONE	"none"
+#define	SHOPT_ROOT_MAPPING	"root_mapping"
 
 #define	SHOPT_SEC	"sec"
 #define	SHOPT_SECURE	"secure"

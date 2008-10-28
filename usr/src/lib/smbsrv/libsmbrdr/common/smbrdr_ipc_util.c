@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The IPC connection information is encapsulated within SMB Redirector.
  * Utility functions are defined here to allow other modules to get and
@@ -51,7 +49,7 @@ static smbrdr_ipc_t	orig_ipc_info;
 static int
 smbrdr_get_machine_pwd_hash(unsigned char *hash)
 {
-	char pwd[SMB_PI_MAX_PASSWD];
+	char pwd[SMB_PASSWD_MAXLEN + 1];
 	int rc = 0;
 
 	rc = smb_config_getstr(SMB_CI_MACHINE_PASSWD, pwd, sizeof (pwd));
@@ -82,8 +80,7 @@ smbrdr_ipc_init(void)
 	bzero(&ipc_info, sizeof (smbrdr_ipc_t));
 	bzero(&orig_ipc_info, sizeof (smbrdr_ipc_t));
 
-	(void) smb_gethostname(ipc_info.user, MLSVC_ACCOUNT_NAME_MAX - 1, 0);
-	(void) strlcat(ipc_info.user, "$", MLSVC_ACCOUNT_NAME_MAX);
+	(void) smb_getsamaccount(ipc_info.user, SMB_USERNAME_MAXLEN);
 	rc = smbrdr_get_machine_pwd_hash(ipc_info.passwd);
 	if (rc != 0)
 		*ipc_info.passwd = 0;
@@ -126,8 +123,7 @@ void
 smbrdr_ipc_commit()
 {
 	(void) rw_wrlock(&smbrdr_ipc_lock);
-	(void) smb_gethostname(ipc_info.user, MLSVC_ACCOUNT_NAME_MAX - 1, 0);
-	(void) strlcat(ipc_info.user, "$", MLSVC_ACCOUNT_NAME_MAX);
+	(void) smb_getsamaccount(ipc_info.user, SMB_USERNAME_MAXLEN);
 	(void) smbrdr_get_machine_pwd_hash(ipc_info.passwd);
 	(void) memcpy(&orig_ipc_info, &ipc_info, sizeof (smbrdr_ipc_t));
 	(void) rw_unlock(&smbrdr_ipc_lock);

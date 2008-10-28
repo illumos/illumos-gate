@@ -38,7 +38,6 @@ HDRS=	alloc.h			\
 	cp_latin6.h		\
 	cp_unicode.h		\
 	cp_usascii.h		\
-	crypt.h			\
 	ctype.h			\
 	doserror.h		\
 	hash_table.h		\

@@ -26,9 +26,8 @@
 #ifndef	_SMBSRV_SMBINFO_H
 #define	_SMBSRV_SMBINFO_H
 
-#pragma ident	"@(#)smbinfo.h	1.5	08/07/08 SMI"
-
 #include <sys/types.h>
+#include <smbsrv/netbios.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -96,11 +95,9 @@ extern "C" {
 #define	SMB_SECMODE_DOMAIN	2
 
 #define	SMB_PI_MAX_HOST		48
-#define	SMB_PI_MAX_DOMAIN	48
+#define	SMB_PI_MAX_DOMAIN	256
 #define	SMB_PI_MAX_SCOPE	16
 #define	SMB_PI_MAX_COMMENT	58
-#define	SMB_PI_MAX_USERNAME	40
-#define	SMB_PI_MAX_PASSWD	40
 #define	SMB_PI_MAX_NATIVE_OS	32
 #define	SMB_PI_MAX_LANMAN	32
 
@@ -132,8 +129,8 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_oplock_enable;
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
-
-	char skc_resource_domain[SMB_PI_MAX_DOMAIN];
+	char skc_nbdomain[NETBIOS_NAME_SZ];
+	char skc_fqdn[SMB_PI_MAX_DOMAIN];
 	char skc_hostname[SMB_PI_MAX_HOST];
 	char skc_system_comment[SMB_PI_MAX_COMMENT];
 } smb_kmod_cfg_t;

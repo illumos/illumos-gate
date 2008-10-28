@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -98,7 +96,6 @@ static int check_client_old(struct share *, struct netbuf *,
     struct nd_hostservlist *, int);
 static int check_client_new(struct share *, struct netbuf *,
 	struct nd_hostservlist *, int);
-static int  in_access_list(struct netbuf *, struct nd_hostservlist *, char *);
 static void mnt(struct svc_req *, SVCXPRT *);
 static void mnt_pathconf(struct svc_req *);
 static void mount(struct svc_req *r);
@@ -115,7 +112,13 @@ static int rejecting;
 static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
 
+/* Needs to be accessed by nfscmd.c */
+int  in_access_list(struct netbuf *, struct nd_hostservlist *, char *);
+
+extern void nfscmd_func(void *, char *, size_t, door_desc_t *, uint_t);
+
 thread_t	nfsauth_thread;
+thread_t	cmd_thread;
 
 /* ARGSUSED */
 static void *
@@ -179,6 +182,41 @@ nfsauth_svc(void *arg)
 	return (NULL);
 }
 
+/*
+ * NFS command service thread code for setup and handling of the
+ * nfs_cmd requests for character set conversion and other future
+ * events.
+ */
+
+static void *
+cmd_svc(void *arg)
+{
+	int	doorfd = -1;
+	uint_t	darg;
+
+	if ((doorfd = door_create(nfscmd_func, NULL,
+	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
+		syslog(LOG_ERR, "Unable to create cmd door: %m\n");
+		exit(10);
+	}
+
+	/*
+	 * Must pass the doorfd down to the kernel.
+	 */
+	darg = doorfd;
+	(void) _nfssys(NFSCMD_ARGS, &darg);
+
+	/*
+	 * Wait for incoming calls
+	 */
+	/*CONSTCOND*/
+	for (;;)
+		(void) pause();
+
+	/*NOTREACHED*/
+	syslog(LOG_ERR, gettext("Cmd door server exited"));
+	return (NULL);
+}
 
 int
 main(int argc, char *argv[])
@@ -373,6 +411,17 @@ main(int argc, char *argv[])
 	 */
 	if (thr_create(NULL, 0, nfsauth_svc, 0, thr_flags, &nfsauth_thread)) {
 		fprintf(stderr, gettext("Failed to create NFSAUTH svc thread"));
+		exit(2);
+	}
+
+	/*
+	 * Create the cmd service thread with same signal disposition
+	 * as the main thread. We need to create a separate thread
+	 * since mountd() will be both an RPC server (for remote
+	 * traffic) _and_ a doors server (for kernel upcalls).
+	 */
+	if (thr_create(NULL, 0, cmd_svc, 0, thr_flags, &cmd_thread)) {
+		syslog(LOG_ERR, gettext("Failed to create CMD svc thread"));
 		exit(2);
 	}
 
@@ -1489,6 +1538,8 @@ static char *optlist[] = {
 	SHOPT_ACLOK,
 #define	OPT_SEC		8
 	SHOPT_SEC,
+#define	OPT_NONE	9
+	SHOPT_NONE,
 	NULL
 };
 
@@ -1552,8 +1603,9 @@ getclientsflavors_old(struct share *sh, struct netbuf *nb,
     struct nd_hostservlist *clnames, int *flavors)
 {
 	char *opts, *p, *val;
-	int ok = 0;
+	boolean_t ok = B_FALSE;
 	int defaultaccess = 1;
+	boolean_t reject = B_FALSE;
 
 	opts = strdup(sh->sh_opts);
 	if (opts == NULL) {
@@ -1577,10 +1629,19 @@ getclientsflavors_old(struct share *sh, struct netbuf *nb,
 			if (in_access_list(nb, clnames, val))
 				ok++;
 			break;
+
+		case OPT_NONE:
+			defaultaccess = 0;
+			if (in_access_list(nb, clnames, val))
+				reject = B_TRUE;
 		}
 	}
 
 	free(opts);
+
+	/* none takes precedence over everything else */
+	if (reject)
+		ok = B_TRUE;
 
 	return (defaultaccess || ok);
 }
@@ -1609,7 +1670,9 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
 	char *opts, *p, *val;
 	char *lasts;
 	char *f;
-	int access_ok, count, c;
+	boolean_t access_ok;
+	int count, c, perm;
+	boolean_t reject = B_FALSE;
 
 	opts = strdup(sh->sh_opts);
 	if (opts == NULL) {
@@ -1618,9 +1681,9 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
 	}
 
 	p = opts;
-	count = c = 0;
+	perm = count = c = 0;
 	/* default access is rw */
-	access_ok = 1;
+	access_ok = B_TRUE;
 
 	while (*p) {
 		switch (getsubopt(&p, optlist, &val)) {
@@ -1640,24 +1703,32 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
 				val = NULL;
 			}
 			/* for a new sec=xxx option, default is rw access */
-			access_ok = 1;
+			access_ok = B_TRUE;
 			break;
 
 		case OPT_RO:
 		case OPT_RW:
 			if (in_access_list(nb, clnames, val)) {
 				count = c;
-				access_ok = 1;
+				access_ok = B_TRUE;
 			} else {
-				access_ok = 0;
+				access_ok = B_FALSE;
 			}
+			break;
+
+		case OPT_NONE:
+			if (in_access_list(nb, clnames, val))
+				reject = B_TRUE; /* none overides rw/ro */
 			break;
 		}
 	}
 
-	if (!access_ok) {
+	if (reject)
+		access_ok = B_FALSE;
+
+	if (!access_ok)
 		c = count;
-	}
+
 	free(opts);
 
 	return (c);
@@ -1692,6 +1763,7 @@ check_client_old(struct share *sh, struct netbuf *nb,
 	int list = 0;	/* Set when "ro", "rw" is found */
 	int ro_val = 0;	/* Set if ro option is 'ro=' */
 	int rw_val = 0;	/* Set if rw option is 'rw=' */
+	boolean_t reject = B_FALSE; /* if none= contains the host */
 
 	opts = strdup(sh->sh_opts);
 	if (opts == NULL) {
@@ -1738,12 +1810,22 @@ check_client_old(struct share *sh, struct netbuf *nb,
 			if (in_access_list(nb, clnames, val))
 				perm |= NFSAUTH_ROOT;
 			break;
+
+		case OPT_NONE:
+			/*
+			 * Check if  the client should have no access
+			 * to this share at all. This option behaves
+			 * more like "root" than either "rw" or "ro".
+			 */
+			if (in_access_list(nb, clnames, val))
+				reject = B_TRUE;
+			break;
 		}
 	}
 
 	free(opts);
 
-	if (flavor != match)
+	if (flavor != match || reject)
 		return (NFSAUTH_DENIED);
 
 	if (list) {
@@ -1847,6 +1929,7 @@ check_client_new(struct share *sh, struct netbuf *nb,
 	int list = 0;	/* Set when "ro", "rw" is found */
 	int ro_val = 0;	/* Set if ro option is 'ro=' */
 	int rw_val = 0;	/* Set if rw option is 'rw=' */
+	boolean_t reject;
 
 	opts = strdup(sh->sh_opts);
 	if (opts == NULL) {
@@ -1911,6 +1994,16 @@ check_client_new(struct share *sh, struct netbuf *nb,
 			if (in_access_list(nb, clnames, val))
 				perm |= NFSAUTH_ROOT;
 			break;
+
+		case OPT_NONE:
+			/*
+			 * Check if  the client should have no access
+			 * to this share at all. This option behaves
+			 * more like "root" than either "rw" or "ro".
+			 */
+			if (in_access_list(nb, clnames, val))
+				perm |= NFSAUTH_DENIED;
+			break;
 		}
 	}
 
@@ -1918,7 +2011,7 @@ done:
 	/*
 	 * If no match then set the perm accordingly
 	 */
-	if (!match)
+	if (!match || perm & NFSAUTH_DENIED)
 		return (NFSAUTH_DENIED);
 
 	if (list) {

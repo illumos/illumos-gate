@@ -19,21 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_IPC_UTIL_H
 #define	_SMBSRV_IPC_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines the data structure for the IPC connection and utility
  * function prototypes.
  */
 
-#include <smbsrv/mlsvc.h>
+#include <smbsrv/libsmb.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,7 +44,7 @@ extern "C" {
  * IPC connection.
  */
 typedef struct {
-	char user[MLSVC_ACCOUNT_NAME_MAX];
+	char user[SMB_USERNAME_MAXLEN];
 	unsigned char passwd[SMBAUTH_HASH_SZ];
 } smbrdr_ipc_t;
 

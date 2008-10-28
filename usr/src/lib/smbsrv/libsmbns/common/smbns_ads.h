@@ -79,7 +79,7 @@ typedef struct smb_ads_host_list {
 	smb_ads_host_info_t *ah_list;
 } smb_ads_host_list_t;
 
-smb_ads_host_info_t *smb_ads_find_host(char *, char *, int *);
+smb_ads_host_info_t *smb_ads_find_host(char *, char *);
 char *smb_ads_convert_directory(char *);
 
 #ifdef __cplusplus

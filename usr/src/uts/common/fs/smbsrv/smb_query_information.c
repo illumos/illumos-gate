@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB: query_information
  *
@@ -68,7 +66,7 @@
 smb_sdrc_t
 smb_pre_query_information(smb_request_t *sr)
 {
-	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t *fqi = &sr->arg.dirop.fqi;
 	int rc;
 
 	if ((rc = smbsr_decode_data(sr, "%S", sr, &fqi->path)) == 0) {
@@ -77,7 +75,7 @@ smb_pre_query_information(smb_request_t *sr)
 	}
 
 	DTRACE_SMB_2(op__QueryInformation__start, smb_request_t *, sr,
-	    struct smb_fqi *, fqi);
+	    smb_fqi_t *, fqi);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

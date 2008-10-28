@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_process_exit.c	1.4	08/08/07 SMI"
-
 /*
  * SMB: process_exit
  *
@@ -73,12 +71,13 @@ smb_com_process_exit(smb_request_t *sr)
 {
 	int rc;
 
-	sr->uid_user = smb_user_lookup_by_uid(sr->session, &sr->user_cr,
-	    sr->smb_uid);
+	sr->uid_user = smb_user_lookup_by_uid(sr->session, sr->smb_uid);
 	if (sr->uid_user == NULL) {
 		rc = smbsr_encode_empty_result(sr);
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_user_getcred(sr->uid_user);
 
 	/*
 	 * If request has a valid tree ID, only look for the PID within

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The seek message is sent to set the current file pointer for FID.
  * This request should generally only be used by clients wishing to
@@ -108,6 +106,8 @@ smb_com_seek(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (mode == SMB_SEEK_END)
 		(void) smb_set_file_size(sr, sr->fid_ofile->f_node);

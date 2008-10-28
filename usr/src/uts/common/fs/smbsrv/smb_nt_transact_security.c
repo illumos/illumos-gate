@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_nt_transact_security.c	1.9	08/08/07 SMI"
-
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nterror.h>
@@ -94,6 +92,8 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (sr->tid_tree->t_acltype != ACE_T) {
 		/*
@@ -182,6 +182,8 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, 0, 0);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	if (SMB_TREE_IS_READONLY(sr)) {
 		smbsr_error(sr, NT_STATUS_MEDIA_WRITE_PROTECTED, 0, 0);
@@ -538,7 +540,9 @@ smb_decode_acl(struct smb_xa *xa, uint32_t offset)
 		ace->se_sid = smb_decode_sid(xa, sid_offs);
 		if (ace->se_sid == NULL)
 			goto decode_error;
-		sidlen = smb_sid_len(ace->se_sid);
+		/* This is SID length plus any paddings between ACEs */
+		sidlen = ace->se_hdr.se_bsize -
+		    (SMB_ACE_HDRSIZE + sizeof (ace->se_mask));
 		aclbuf.chain_offset += sidlen;
 		sid_offs += sidlen;
 	}

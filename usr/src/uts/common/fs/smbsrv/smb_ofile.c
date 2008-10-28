@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_ofile.c	1.12	08/08/08 SMI"
-
 /*
  * General Structures Layout
  * -------------------------
@@ -205,7 +203,8 @@ smb_ofile_open(
 	of->f_granted_access = op->desired_access;
 	of->f_share_access = op->share_access;
 	of->f_create_options = op->create_options;
-	of->f_cr = tree->t_user->u_cred;
+	of->f_cr = (op->create_options & FILE_OPEN_FOR_BACKUP_INTENT) ?
+	    smb_user_getprivcred(tree->t_user) : tree->t_user->u_cred;
 	crhold(of->f_cr);
 	of->f_ftype = ftype;
 	of->f_server = tree->t_server;
@@ -915,4 +914,10 @@ smb_ofile_delete_check(smb_ofile_t *of)
 
 	mutex_exit(&of->f_mutex);
 	return (NT_STATUS_SUCCESS);
+}
+
+cred_t *
+smb_ofile_getcred(smb_ofile_t *of)
+{
+	return (of->f_cr);
 }

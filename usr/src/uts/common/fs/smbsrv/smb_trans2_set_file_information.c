@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_trans2_set_file_information.c	1.8	08/08/08 SMI"
-
 /*
  * SMB: trans2_set_file_information
  *
@@ -133,6 +131,8 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	info->node = sr->fid_ofile->f_node;
 

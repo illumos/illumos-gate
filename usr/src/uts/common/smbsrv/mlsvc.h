@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_MLSVC_H
 #define	_SMBSRV_MLSVC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MLSVC RPC layer public interface definitions.
  */
@@ -116,14 +114,6 @@ typedef struct mlsvc_string {
  * The maximum number of domains (NT limit).
  */
 #define	MLSVC_DOMAIN_MAX		32
-
-/*
- * Some buffer size limits. I don't know if these are definitive
- * limits for NT but these numbers appear in various places.
- */
-#define	MLSVC_DOMAIN_NAME_MAX		32
-#define	MLSVC_ACCOUNT_NAME_MAX		32
-#define	MLSVC_CLIENT_NAME_MAX		48
 
 /* 32-byte machine account password (null-terminated) */
 #define	MLSVC_MACHINE_ACCT_PASSWD_MAX	32 + 1

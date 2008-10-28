@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_kshare.c	1.7	08/08/07 SMI"
-
 /*
  * Kernel door client for LanMan share management.
  */
@@ -66,14 +64,14 @@ smb_kshare_fini(door_handle_t dhdl)
 }
 
 uint32_t
-smb_kshare_getinfo(door_handle_t dhdl, const char *share_name, smb_share_t *si)
+smb_kshare_getinfo(door_handle_t dhdl, char *share_name, smb_share_t *si,
+    uint32_t ipaddr)
 {
 	door_arg_t arg;
 	char *buf;
 	unsigned int used;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	uint32_t rc;
 	int opcode = SMB_SHROP_GETINFO;
 
@@ -82,10 +80,9 @@ smb_kshare_getinfo(door_handle_t dhdl, const char *share_name, smb_share_t *si)
 	enc_ctx = smb_dr_encode_start(buf, SMB_SHARE_DSIZE);
 	smb_dr_put_uint32(enc_ctx, opcode);
 	smb_dr_put_string(enc_ctx, share_name);
+	smb_dr_put_uint32(enc_ctx, ipaddr);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		cmn_err(CE_WARN, "smb_kshare_getinfo: Encode error %d",
-		    status);
+	if (smb_dr_encode_finish(enc_ctx, &used) != 0) {
 		kmem_free(buf, SMB_SHARE_DSIZE);
 		return (NERR_InternalError);
 	}
@@ -98,7 +95,6 @@ smb_kshare_getinfo(door_handle_t dhdl, const char *share_name, smb_share_t *si)
 	arg.rsize = SMB_SHARE_DSIZE;
 
 	if (door_ki_upcall_limited(dhdl, &arg, NULL, SIZE_MAX, 0) != 0) {
-		cmn_err(CE_WARN, "smb_kshare_getinfo: Door call failed");
 		kmem_free(buf, SMB_SHARE_DSIZE);
 		return (NERR_InternalError);
 	}
@@ -111,11 +107,8 @@ smb_kshare_getinfo(door_handle_t dhdl, const char *share_name, smb_share_t *si)
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	smb_dr_get_share(dec_ctx, si);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		cmn_err(CE_WARN, "smb_kshare_getinfo: Decode error %d",
-		    status);
+	if (smb_dr_decode_finish(dec_ctx) != 0)
 		rc = NERR_InternalError;
-	}
 
 	kmem_free(buf, SMB_SHARE_DSIZE);
 	return (rc);
@@ -130,7 +123,6 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 	unsigned int used;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	uint32_t rc;
 	int opcode = SMB_SHROP_ENUM;
 
@@ -145,8 +137,7 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 	smb_dr_put_ushort(enc_ctx, enuminfo->es_bufsize);
 	smb_dr_put_string(enc_ctx, enuminfo->es_username);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		cmn_err(CE_WARN, "smb_kshare_enum: Encode error %d", status);
+	if (smb_dr_encode_finish(enc_ctx, &used) != 0) {
 		kmem_free(door_buf, door_bufsz);
 		return (NERR_InternalError);
 	}
@@ -159,7 +150,6 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 	arg.rsize = door_bufsz;
 
 	if (door_ki_upcall_limited(dhdl, &arg, NULL, SIZE_MAX, 0) != 0) {
-		cmn_err(CE_WARN, "smb_kshare_enum: Door call failed");
 		kmem_free(door_buf, door_bufsz);
 		return (NERR_InternalError);
 	}
@@ -180,10 +170,8 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 		    enuminfo->es_bufsize);
 	}
 
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		cmn_err(CE_WARN, "smb_kshare_enum: Decode error %d", status);
+	if (smb_dr_decode_finish(dec_ctx) != 0)
 		rc = NERR_InternalError;
-	}
 
 	kmem_free(door_buf, door_bufsz);
 	return (rc);

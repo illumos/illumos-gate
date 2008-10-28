@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides the high level interface to the SAM RPC
  * functions.
@@ -64,13 +62,11 @@ extern DWORD samr_set_user_info(mlsvc_handle_t *, smb_auth_info_t *);
 DWORD
 sam_create_trust_account(char *server, char *domain, smb_auth_info_t *auth)
 {
-	char account_name[MAXHOSTNAMELEN];
+	char account_name[SMB_SAMACCT_MAXLEN];
 	DWORD status;
 
-	if (smb_gethostname(account_name, MAXHOSTNAMELEN - 2, 1) != 0)
-		return (NT_STATUS_NO_MEMORY);
-
-	(void) strlcat(account_name, "$", MAXHOSTNAMELEN);
+	if (smb_getsamaccount(account_name, SMB_SAMACCT_MAXLEN) != 0)
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	/*
 	 * The trust account value here should match
@@ -210,12 +206,10 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 DWORD
 sam_remove_trust_account(char *server, char *domain)
 {
-	char account_name[MAXHOSTNAMELEN];
+	char account_name[SMB_SAMACCT_MAXLEN];
 
-	if (smb_gethostname(account_name, MAXHOSTNAMELEN - 2, 1) != 0)
-		return (NT_STATUS_NO_MEMORY);
-
-	(void) strcat(account_name, "$");
+	if (smb_getsamaccount(account_name, SMB_SAMACCT_MAXLEN) != 0)
+		return (NT_STATUS_INTERNAL_ERROR);
 
 	return (sam_delete_account(server, domain, account_name));
 }

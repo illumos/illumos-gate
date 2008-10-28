@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbd_share_doorsvc.c	1.6	08/08/05 SMI"
-
 /*
  * LanMan share door server
  */
@@ -149,11 +147,11 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	unsigned int dec_status;
 	unsigned int enc_status;
 	char *sharename, *sharename2;
-	char *cmnt, *ad_container;
 	smb_share_t lmshr_info;
 	smb_shrlist_t lmshr_list;
 	smb_enumshare_info_t esi;
 	int offset;
+	ipaddr_t ipaddr;
 
 	if ((cookie != SMB_SHARE_DSRV_COOKIE) || (ptr == NULL) ||
 	    (size < sizeof (uint32_t))) {
@@ -182,7 +180,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		rc = smb_shr_delete(sharename, B_FALSE);
+		rc = smb_shr_remove(sharename);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_free_string(sharename);
@@ -207,12 +205,15 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 	case SMB_SHROP_GETINFO:
 		sharename = smb_dr_get_string(dec_ctx);
+		ipaddr = smb_dr_get_uint32(dec_ctx);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
 			smb_dr_free_string(sharename);
 			goto decode_error;
 		}
 
+
 		rc = smb_shr_get(sharename, &lmshr_info);
+		smb_shr_hostaccess(&lmshr_info, ipaddr);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_put_share(enc_ctx, &lmshr_info);
@@ -224,30 +225,22 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		rc = smb_shr_create(&lmshr_info, B_FALSE);
+		rc = smb_shr_add(&lmshr_info);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_put_share(enc_ctx, &lmshr_info);
 		break;
 
 	case SMB_SHROP_MODIFY:
-		sharename = smb_dr_get_string(dec_ctx);
-		cmnt = smb_dr_get_string(dec_ctx);
-		ad_container = smb_dr_get_string(dec_ctx);
+		smb_dr_get_share(dec_ctx, &lmshr_info);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
-			smb_dr_free_string(sharename);
-			smb_dr_free_string(cmnt);
-			smb_dr_free_string(ad_container);
 			goto decode_error;
 		}
 
-		rc = smb_shr_modify(sharename, cmnt, ad_container, B_FALSE);
+		rc = smb_shr_modify(&lmshr_info);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 
-		smb_dr_free_string(sharename);
-		smb_dr_free_string(cmnt);
-		smb_dr_free_string(ad_container);
 		break;
 
 	case SMB_SHROP_LIST:

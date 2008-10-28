@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_trans2_find.c	1.13	08/08/07 SMI"
 
 /*
  * This module provides functions for TRANS2_FIND_FIRST2 and
@@ -44,6 +43,8 @@
  *  SMB_FIND_FILE_FULL_DIRECTORY_INFO  0x102
  *  SMB_FIND_FILE_NAMES_INFO           0x103
  *  SMB_FIND_FILE_BOTH_DIRECTORY_INFO  0x104
+ *  SMB_FIND_FILE_ID_FULL_DIRECTORY_INFO  0x105
+ *  SMB_FIND_FILE_ID_BOTH_DIRECTORY_INFO  0x106
  *
  * The following sections detail the data returned for each
  * InformationLevel. The requested information is placed in the Data
@@ -136,6 +137,21 @@
  *  ULONG EaSize;                      Size of file's extended attributes
  *  STRING FileName;                   Name of the file
  *
+ *
+ *  SMB_FIND_FILE_ID_FULL_DIRECTORY_INFO
+ *
+ *  This is the same as SMB_FIND_FILE_FULL_DIRECTORY_INFO but with
+ *  FileId inserted after EaSize. FileId is preceded by a 4 byte
+ *  alignment padding.
+ *
+ *  Response Field                     Description
+ *  =================================  ==================================
+ *  ...
+ *  ULONG EaSize;                      Size of file's extended attributes
+ *  UCHAR Reserved[4]
+ *  LARGE_INTEGER FileId               Internal file system unique id.
+ *  STRING FileName;                   Name of the file
+ *
  * 4.3.4.6   SMB_FIND_FILE_BOTH_DIRECTORY_INFO
  *
  *  Response Field                     Description
@@ -157,6 +173,21 @@
  *  UCHAR ShortNameLength;             Length of file's short name in bytes
  *  UCHAR Reserved
  *  WCHAR ShortName[12];               File's 8.3 conformant name in Unicode
+ *  STRING FileName;                   Files full length name
+ *
+ *
+ *  SMB_FIND_FILE_ID_BOTH_DIRECTORY_INFO
+ *
+ *  This is the same as SMB_FIND_FILE_BOTH_DIRECTORY_INFO but with
+ *  FileId inserted after ShortName. FileId is preceded by a 2 byte
+ *  alignment pad.
+ *
+ *  Response Field                     Description
+ *  =================================  ==================================
+ *  ...
+ *  WCHAR ShortName[12];               File's 8.3 conformant name in Unicode
+ *  UCHAR Reserved[2]
+ *  LARGE_INTEGER FileId               Internal file system unique id.
  *  STRING FileName;                   Files full length name
  *
  * 4.3.4.7   SMB_FIND_FILE_NAMES_INFO
@@ -315,6 +346,18 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
+	/*
+	 * stream files not allowed
+	 */
+	if (smb_stream_parse_name(path, NULL, NULL)) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (SDRC_ERROR);
+	}
+
+	if (fflag & SMB_FIND_WITH_BACKUP_INTENT)
+		sr->user_cr = smb_user_getprivcred(sr->uid_user);
+
 	maxdata = smb_trans2_find_get_maxdata(sr, infolev, fflag);
 	if (maxdata == 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_LEVEL,
@@ -437,6 +480,19 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
  *                                      resume search; else 0
  *  UCHAR Data[TotalDataCount]         Level dependent info about the
  *                                      matches found in the search
+ *
+ *
+ * The last parameter in the request is a filename, which is a
+ * null-terminated unicode string.
+ *
+ * smb_mbc_decodef(&xa->req_param_mb, "%www lwu", sr,
+ *    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag, &fname)
+ *
+ * The filename parameter is not currently decoded because we a
+ * expect 2-byte null but Mac OS 10 clients send a 1-byte null,
+ * which leads to a decode error.
+ * Thus, we do not support resume by filename.  We treat a request
+ * to resume by filename as SMB_FIND_CONTINUE_FROM_LAST.
  */
 smb_sdrc_t
 smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
@@ -449,21 +505,17 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	char *pattern;
 	uint16_t sattr;
 
-	/*
-	 * The last parameter in the request is a path, which is a
-	 * null-terminated unicode string.
-	 *
-	 * smb_mbc_decodef(&xa->req_param_mb, "%www lwu", sr,
-	 *    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag, &path)
-	 *
-	 * We don't reference this parameter and it is not currently
-	 * decoded because we a expect 2-byte null but Mac OS 10
-	 * clients send a 1-byte null, which leads to a decode error.
-	 */
 	if (smb_mbc_decodef(&xa->req_param_mb, "%wwwlw", sr,
 	    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag) != 0) {
 		return (SDRC_ERROR);
 	}
+
+	/* continuation by filename not supported */
+	if (cookie == 0)
+		fflag |= SMB_FIND_CONTINUE_FROM_LAST;
+
+	if (fflag & SMB_FIND_WITH_BACKUP_INTENT)
+		sr->user_cr = smb_user_getprivcred(sr->uid_user);
 
 	sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree, sr->smb_sid);
 	if (sr->sid_odir == NULL) {
@@ -562,8 +614,21 @@ smb_trans2_find_get_maxdata(smb_request_t *sr, uint16_t infolev, uint16_t fflag)
 		maxdata += 4 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 4;
 		break;
 
+	case SMB_FIND_FILE_FULL_DIRECTORY_INFO:
+		maxdata += 4 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 4 + 4;
+		break;
+
+	case SMB_FIND_FILE_ID_FULL_DIRECTORY_INFO:
+		maxdata += 4 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 4 + 4 + 4 + 8;
+		break;
+
 	case SMB_FIND_FILE_BOTH_DIRECTORY_INFO:
 		maxdata += 4 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 4 + 4 + 2 + 24;
+		break;
+
+	case SMB_FIND_FILE_ID_BOTH_DIRECTORY_INFO:
+		maxdata += 4 + 4 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 4 + 4 + 2 + 24
+		    + 2 + 8;
 		break;
 
 	case SMB_FIND_FILE_NAMES_INFO:
@@ -675,7 +740,6 @@ out:
 }
 
 
-
 /*
  * smb_get_dents
  *
@@ -759,8 +823,6 @@ int smb_get_dents(
 }
 
 
-
-
 /*
  * smb_gather_dents_info
  *
@@ -768,14 +830,15 @@ int smb_get_dents(
  * the needed information in the buffer. It is passed as the call back
  * function for smb_fsop_getdents() to gather trans2 find info.
  *
- * If the buffer space is not enough, -1 will be returned. Regardless
- * of valid entry or not, 0 will be returned; however, only valid entry
- * will be stored in the buffer.
+ * Only valid entry will be stored in the buffer.
+ *
+ * Returns: -1 - error, buffer too small
+ *           n - number of valid entries (0 or 1)
  */
 int /*ARGSUSED*/
 smb_gather_dents_info(
     char	*args,
-    ino_t	fileid,
+	ino_t	fileid,
     int		namelen,
     char	*name,
     uint32_t	cookie,
@@ -840,7 +903,7 @@ smb_gather_dents_info(
 	ihdr->uio.uio_loffset += reclen;
 
 	kmem_free(v5_name, MAXNAMELEN-1);
-	return (0);
+	return (1);
 }
 
 
@@ -920,6 +983,14 @@ smb_trans2_find_process_ients(
  * The function returns -1 when the max data requested by client
  * is reached. If the entry is valid and successful encoded, 0
  * will be returned; otherwise, 1 will be returned.
+ *
+ * We always null terminate the filename. The space for the null
+ * is included in the maxdata calculation and is therefore included
+ * in the next_entry_offset. namelen is the unterminated length of
+ * the filename. For levels except STANDARD and EA_SIZE, if the
+ * filename is ascii the name length returned to the client should
+ * include the null terminator. Otherwise the length returned to
+ * the client should not include the terminator.
  */
 int /*ARGSUSED*/
 smb_trans2_find_mbc_encode(
@@ -933,10 +1004,10 @@ smb_trans2_find_mbc_encode(
     smb_node_t		*dir_snode,
     smb_node_t		*sd_snode)
 {
-	int uni_namelen;
-	int shortlen;
+	int namelen, shortlen, buflen;
 	uint32_t next_entry_offset;
 	char buf83[26];
+	char *tmpbuf;
 	smb_msgbuf_t mb;
 	uint32_t dattr = 0;
 	uint32_t dsize32 = 0;
@@ -947,14 +1018,25 @@ smb_trans2_find_mbc_encode(
 	smb_attr_t lnkattr;
 	int rc;
 
-	uni_namelen = smb_ascii_or_unicode_strlen(sr, ient->name);
-	if (uni_namelen == -1)
+	namelen = smb_ascii_or_unicode_strlen(sr, ient->name);
+	if (namelen == -1)
 		return (1);
 
-	next_entry_offset = maxdata + uni_namelen;
+	next_entry_offset = maxdata + namelen;
 
-	if (MBC_ROOM_FOR(&xa->rep_data_mb, (maxdata + uni_namelen)) == 0)
+	if (MBC_ROOM_FOR(&xa->rep_data_mb, (maxdata + namelen)) == 0)
 		return (-1);
+
+	/*
+	 * If ascii the filename length returned to the client should
+	 * include the null terminator for levels except STANDARD and
+	 * EASIZE.
+	 */
+	if (!(sr->smb_flg2 & SMB_FLAGS2_UNICODE)) {
+		if ((infolev != SMB_INFO_STANDARD) &&
+		    (infolev != SMB_INFO_QUERY_EA_SIZE))
+			namelen += 1;
+	}
 
 	if (ient->attr.sa_vattr.va_type == VLNK) {
 		rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
@@ -1014,7 +1096,7 @@ smb_trans2_find_mbc_encode(
 		    dsize32,
 		    asize32,
 		    dattr,
-		    uni_namelen,
+		    namelen,
 		    ient->name);
 		break;
 
@@ -1023,7 +1105,24 @@ smb_trans2_find_mbc_encode(
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 			    ient->cookie);
 
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlbz", sr,
+		/*
+		 * Unicode filename should NOT be aligned. Encode ('u')
+		 * into a temporary buffer, then encode buffer as a
+		 * byte stream ('#c').
+		 * Regardless of whether unicode or ascii, a single
+		 * termination byte is used.
+		 */
+		buflen = namelen + sizeof (mts_wchar_t);
+		tmpbuf = kmem_zalloc(buflen, KM_SLEEP);
+		smb_msgbuf_init(&mb, (uint8_t *)tmpbuf, buflen, mb_flags);
+		if (smb_msgbuf_encode(&mb, "u", ient->name) < 0) {
+			smb_msgbuf_term(&mb);
+			kmem_free(tmpbuf, buflen);
+			return (-1);
+		}
+		tmpbuf[namelen] = '\0';
+
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlb#c", sr,
 		    ient->attr.sa_crtime.tv_sec ?
 		    smb_gmt2local(sr, ient->attr.sa_crtime.tv_sec) :
 		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
@@ -1033,8 +1132,12 @@ smb_trans2_find_mbc_encode(
 		    asize32,
 		    dattr,
 		    0L,		/* EA Size */
-		    uni_namelen,
-		    ient->name);
+		    namelen,
+		    namelen + 1,
+		    tmpbuf);
+
+		smb_msgbuf_term(&mb);
+		kmem_free(tmpbuf, buflen);
 		break;
 
 	case SMB_FIND_FILE_DIRECTORY_INFO:
@@ -1049,7 +1152,42 @@ smb_trans2_find_mbc_encode(
 		    (uint64_t)datasz,
 		    (uint64_t)allocsz,
 		    dattr,
-		    uni_namelen,
+		    namelen,
+		    ient->name);
+		break;
+
+	case SMB_FIND_FILE_FULL_DIRECTORY_INFO:
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllu", sr,
+		    next_entry_offset,
+		    ient->cookie,
+		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
+		    &ient->attr.sa_vattr.va_mtime,
+		    &ient->attr.sa_vattr.va_atime,
+		    &ient->attr.sa_vattr.va_mtime,
+		    &ient->attr.sa_vattr.va_ctime,
+		    (uint64_t)datasz,
+		    (uint64_t)allocsz,
+		    dattr,
+		    namelen,
+		    0L,
+		    ient->name);
+		break;
+
+	case SMB_FIND_FILE_ID_FULL_DIRECTORY_INFO:
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlll4.qu", sr,
+		    next_entry_offset,
+		    ient->cookie,
+		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
+		    &ient->attr.sa_vattr.va_mtime,
+		    &ient->attr.sa_vattr.va_atime,
+		    &ient->attr.sa_vattr.va_mtime,
+		    &ient->attr.sa_vattr.va_ctime,
+		    (uint64_t)datasz,
+		    (uint64_t)allocsz,
+		    dattr,
+		    namelen,
+		    0L,
+		    ient->attr.sa_vattr.va_nodeid,
 		    ient->name);
 		break;
 
@@ -1057,11 +1195,11 @@ smb_trans2_find_mbc_encode(
 		bzero(buf83, sizeof (buf83));
 		smb_msgbuf_init(&mb, (uint8_t *)buf83, sizeof (buf83),
 		    mb_flags);
-		if (smb_msgbuf_encode(&mb, "u", ient->shortname) < 0) {
+		if (smb_msgbuf_encode(&mb, "U", ient->shortname) < 0) {
 			smb_msgbuf_term(&mb);
 			return (-1);
 		}
-		shortlen = smb_ascii_or_unicode_strlen(sr, ient->shortname);
+		shortlen = mts_wcequiv_strlen(ient->shortname);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllb.24cu",
 		    sr,
@@ -1075,10 +1213,43 @@ smb_trans2_find_mbc_encode(
 		    (uint64_t)datasz,
 		    (uint64_t)allocsz,
 		    dattr,
-		    uni_namelen,
+		    namelen,
 		    0L,
 		    shortlen,
 		    buf83,
+		    ient->name);
+
+		smb_msgbuf_term(&mb);
+		break;
+
+	case SMB_FIND_FILE_ID_BOTH_DIRECTORY_INFO:
+		bzero(buf83, sizeof (buf83));
+		smb_msgbuf_init(&mb, (uint8_t *)buf83, sizeof (buf83),
+		    mb_flags);
+		if (smb_msgbuf_encode(&mb, "u", ient->shortname) < 0) {
+			smb_msgbuf_term(&mb);
+			return (-1);
+		}
+		shortlen = smb_ascii_or_unicode_strlen(sr, ient->shortname);
+
+		(void) smb_mbc_encodef(&xa->rep_data_mb,
+		    "%llTTTTqqlllb.24c2.qu",
+		    sr,
+		    next_entry_offset,
+		    ient->cookie,
+		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
+		    &ient->attr.sa_vattr.va_mtime,
+		    &ient->attr.sa_vattr.va_atime,
+		    &ient->attr.sa_vattr.va_mtime,
+		    &ient->attr.sa_vattr.va_ctime,
+		    (uint64_t)datasz,
+		    (uint64_t)allocsz,
+		    dattr,
+		    namelen,
+		    0L,
+		    shortlen,
+		    buf83,
+		    ient->attr.sa_vattr.va_nodeid,
 		    ient->name);
 
 		smb_msgbuf_term(&mb);
@@ -1088,7 +1259,7 @@ smb_trans2_find_mbc_encode(
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lllu", sr,
 		    next_entry_offset,
 		    ient->cookie,
-		    uni_namelen,
+		    namelen,
 		    ient->name);
 		break;
 	}

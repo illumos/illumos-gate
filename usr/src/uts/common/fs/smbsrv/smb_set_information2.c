@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_set_information2.c	1.5	08/08/08 SMI"
-
 /*
  * SMB: set_information2
  *
@@ -89,6 +87,8 @@ smb_com_set_information2(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_ofile_getcred(sr->fid_ofile);
 
 	node = sr->fid_ofile->f_node;
 

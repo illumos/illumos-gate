@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * basic API declarations for share management
  */
@@ -51,6 +49,7 @@ extern "C" {
 #define	OPT_TYPE_PATH		4
 #define	OPT_TYPE_PROTOCOL	5
 #define	OPT_TYPE_NAME		6
+#define	OPT_TYPE_ACCLIST	7
 
 struct option_defs {
 	char *tag;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_tree_connect.c	1.4	08/08/07 SMI"
-
 #include <smbsrv/smb_incl.h>
 
 
@@ -359,8 +357,7 @@ smb_post_tree_disconnect(smb_request_t *sr)
 smb_sdrc_t
 smb_com_tree_disconnect(smb_request_t *sr)
 {
-	sr->uid_user = smb_user_lookup_by_uid(sr->session, &sr->user_cr,
-	    sr->smb_uid);
+	sr->uid_user = smb_user_lookup_by_uid(sr->session, sr->smb_uid);
 	if (sr->uid_user != NULL)
 		sr->tid_tree = smb_user_lookup_tree(sr->uid_user,
 		    sr->smb_tid);
@@ -369,6 +366,8 @@ smb_com_tree_disconnect(smb_request_t *sr)
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRinvnid);
 		return (SDRC_ERROR);
 	}
+
+	sr->user_cr = smb_user_getcred(sr->uid_user);
 
 	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
 	smb_tree_disconnect(sr->tid_tree);

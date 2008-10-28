@@ -143,6 +143,9 @@ struct sa_plugin_ops sa_plugin_ops = {
 struct option_defs optdefs[] = {
 	{SMB_SHROPT_AD_CONTAINER, OPT_TYPE_STRING},
 	{SMB_SHROPT_NAME, OPT_TYPE_NAME},
+	{SHOPT_RO, OPT_TYPE_ACCLIST},
+	{SHOPT_RW, OPT_TYPE_ACCLIST},
+	{SHOPT_NONE, OPT_TYPE_ACCLIST},
 	{NULL, NULL},
 };
 
@@ -192,6 +195,20 @@ is_a_number(char *number)
 	}
 
 	return (isnum);
+}
+
+/*
+ * check ro vs rw values.  Over time this may get beefed up.
+ * for now it just does simple checks.
+ */
+
+static int
+check_rorw(char *v1, char *v2)
+{
+	int ret = SA_OK;
+	if (strcmp(v1, v2) == 0)
+		ret = SA_VALUE_CONFLICT;
+	return (ret);
 }
 
 /*
@@ -580,7 +597,7 @@ smb_resource_changed(sa_resource_t resource)
 	if ((res = smb_build_shareinfo(share, resource, &si)) != SA_OK)
 		return (res);
 
-	res = smb_share_modify(si.shr_name, si.shr_cmnt, si.shr_container);
+	res = smb_share_modify(&si);
 
 	if (res != NERR_Success)
 		return (SA_CONFIG_ERR);
@@ -688,6 +705,7 @@ smb_validate_property(sa_handle_t handle, sa_property_t property,
 	int optindex;
 	sa_group_t parent_group;
 	char *value;
+	char *other;
 
 	propname = sa_get_property_attr(property, "type");
 
@@ -736,6 +754,42 @@ smb_validate_property(sa_handle_t handle, sa_property_t property,
 		case OPT_TYPE_STRING:
 			/* whatever is here should be ok */
 			break;
+		case OPT_TYPE_ACCLIST: {
+			sa_property_t oprop;
+			char *ovalue;
+			/*
+			 * access list handling. Should eventually
+			 * validate that all the values make sense.
+			 * Also, ro and rw may have cross value
+			 * conflicts.
+			 */
+			if (parent == NULL)
+				break;
+			if (strcmp(propname, SHOPT_RO) == 0)
+				other = SHOPT_RW;
+			else if (strcmp(propname, SHOPT_RW) == 0)
+				other = SHOPT_RO;
+			else
+				other = NULL;
+			if (other == NULL)
+				break;
+
+			/* compare rw(ro) with ro(rw) */
+			oprop = sa_get_property(parent, other);
+			if (oprop == NULL)
+				break;
+			/*
+			 * only potential
+			 * confusion if other
+			 * exists
+			 */
+			ovalue = sa_get_property_attr(oprop, "value");
+			if (ovalue != NULL) {
+				ret = check_rorw(value, ovalue);
+				sa_free_attr_string(ovalue);
+			}
+			break;
+		}
 		default:
 			break;
 		}
@@ -1867,6 +1921,36 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 			(void) strlcpy(si->shr_container, val,
 			    sizeof (si->shr_container));
 			free(val);
+		}
+	}
+
+	prop = sa_get_property(opts, SHOPT_RO);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_ro, val,
+			    sizeof (si->shr_access_ro));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_RO;
+		}
+	}
+
+	prop = sa_get_property(opts, SHOPT_RW);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_rw, val,
+			    sizeof (si->shr_access_rw));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_RW;
+		}
+	}
+
+	prop = sa_get_property(opts, SHOPT_NONE);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_access_none, val,
+			    sizeof (si->shr_access_none));
+			free(val);
+			si->shr_flags |= SMB_SHRF_ACC_NONE;
 		}
 	}
 

@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * NT Token library (kernel/user)
  */
@@ -41,7 +38,6 @@
 #endif /* _KERNEL */
 
 #include <smbsrv/string.h>
-#include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_xdr.h>
 

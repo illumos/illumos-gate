@@ -59,6 +59,8 @@ typedef enum smb_adjoin_status {
 	SMB_ADJOIN_ERR_GET_DCLEVEL,
 	SMB_ADJOIN_ERR_ADD_TRUST_ACCT,
 	SMB_ADJOIN_ERR_MOD_TRUST_ACCT,
+	SMB_ADJOIN_ERR_DUP_TRUST_ACCT,
+	SMB_ADJOIN_ERR_TRUST_ACCT,
 	SMB_ADJOIN_ERR_GET_ENCTYPES,
 	SMB_ADJOIN_ERR_INIT_KRB_CTX,
 	SMB_ADJOIN_ERR_GET_SPNS,
@@ -87,7 +89,6 @@ extern int smb_ads_add_share(smb_ads_handle_t *, const char *, const char *,
 extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, int);
 extern char *smb_adjoin_report_err(smb_adjoin_status_t);
 extern int smb_ads_domain_change_cleanup(char *);
-extern int smb_ads_update_attrs(void);
 
 /* DYNDNS functions */
 extern void dns_msgid_init(void);

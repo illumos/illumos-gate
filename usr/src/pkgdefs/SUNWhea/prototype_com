@@ -410,6 +410,7 @@ f none usr/include/nfs/nfs4_idmap_impl.h 644 root bin
 f none usr/include/nfs/nfs4_kprot.h 644 root bin
 f none usr/include/nfs/nfs_acl.h 644 root bin
 f none usr/include/nfs/nfs_clnt.h 644 root bin
+f none usr/include/nfs/nfs_cmd.h 644 root bin
 f none usr/include/nfs/nfs_log.h 644 root bin
 f none usr/include/nfs/nfs_sec.h 644 root bin
 f none usr/include/nfs/nfsid_map.h 644 root bin

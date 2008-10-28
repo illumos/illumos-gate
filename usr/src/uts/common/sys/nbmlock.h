@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NBMLOCK_H
 #define	_NBMLOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Non-blocking mandatory locking support.
@@ -63,7 +61,6 @@ extern int nbl_lock_conflict(vnode_t *, nbl_op_t, u_offset_t, ssize_t, int,
     caller_context_t *);
 extern int nbl_svmand(vnode_t *, cred_t *, int *);
 
-extern nbl_op_t nbl_lock_to_op(int);
 
 #ifdef __cplusplus
 }

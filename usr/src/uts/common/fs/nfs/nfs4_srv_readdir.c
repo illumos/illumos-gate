@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -49,6 +47,7 @@
 #include <nfs/nfs.h>
 #include <nfs/export.h>
 #include <nfs/nfs4.h>
+#include <nfs/nfs_cmd.h>
 
 
 /*
@@ -285,31 +284,31 @@ rfs4_get_sb_encode(vfs_t *vfsp, rfs4_sb_encode_t *psbe)
 	/* Calculate space available */
 	if (sb.f_bavail != (fsblkcnt64_t)-1) {
 		psbe->space_avail =
-			(fattr4_space_avail) sb.f_frsize *
-			(fattr4_space_avail) sb.f_bavail;
+		    (fattr4_space_avail) sb.f_frsize *
+		    (fattr4_space_avail) sb.f_bavail;
 	} else {
 		psbe->space_avail =
-			(fattr4_space_avail) sb.f_bavail;
+		    (fattr4_space_avail) sb.f_bavail;
 	}
 
 	/* Calculate space free */
 	if (sb.f_bfree != (fsblkcnt64_t)-1) {
 		psbe->space_free =
-			(fattr4_space_free) sb.f_frsize *
-			(fattr4_space_free) sb.f_bfree;
+		    (fattr4_space_free) sb.f_frsize *
+		    (fattr4_space_free) sb.f_bfree;
 	} else {
 		psbe->space_free =
-			(fattr4_space_free) sb.f_bfree;
+		    (fattr4_space_free) sb.f_bfree;
 	}
 
 	/* Calculate space total */
 	if (sb.f_blocks != (fsblkcnt64_t)-1) {
 		psbe->space_total =
-			(fattr4_space_total) sb.f_frsize *
-			(fattr4_space_total) sb.f_blocks;
+		    (fattr4_space_total) sb.f_frsize *
+		    (fattr4_space_total) sb.f_blocks;
 	} else {
 		psbe->space_total =
-			(fattr4_space_total) sb.f_blocks;
+		    (fattr4_space_total) sb.f_blocks;
 	}
 
 	/* For use later on attr encode */
@@ -399,6 +398,8 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	int lu_set, lg_set;
 	utf8string owner, group;
 	int owner_error, group_error;
+	struct sockaddr *ca;
+	char *name = NULL;
 
 	DTRACE_NFSV4_2(op__readdir__start, struct compound_state *, cs,
 	    READDIR4args *, args);
@@ -458,14 +459,14 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 
 	/* Is there pseudo-fs work that is needed for this readdir? */
 	check_visible = PSEUDO(cs->exi) ||
-		! is_exported_sec(cs->nfsflavor, cs->exi) ||
-		cs->access & CS_ACCESS_LIMITED;
+	    ! is_exported_sec(cs->nfsflavor, cs->exi) ||
+	    cs->access & CS_ACCESS_LIMITED;
 
 	/* Check the requested attributes and only do the work if needed */
 
 	if (ar & (FATTR4_MAXFILESIZE_MASK |
-		FATTR4_MAXLINK_MASK |
-		FATTR4_MAXNAME_MASK)) {
+	    FATTR4_MAXLINK_MASK |
+	    FATTR4_MAXNAME_MASK)) {
 		if (error = rfs4_get_pc_encode(cs->vp, &dpce, ar, cs->cr)) {
 			*cs->statusp = resp->status = puterrno4(error);
 			goto out;
@@ -530,7 +531,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 		if (mpcount > MAXBSIZE)
 			args->maxcount = mpcount = MAXBSIZE;
 		mp = allocb_wait(RNDUP(mpcount), BPRI_MED,
-				STR_NOSIG, &alloc_err);
+		    STR_NOSIG, &alloc_err);
 	}
 
 	ASSERT(mp != NULL);
@@ -553,10 +554,10 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	 */
 	if (args->maxcount < (mpcount - 128))
 		ptr_redzone =
-			(uint32_t *)(((char *)ptr) + RNDUP(args->maxcount));
+		    (uint32_t *)(((char *)ptr) + RNDUP(args->maxcount));
 	else
 		ptr_redzone =
-			(uint32_t *)((((char *)ptr) + RNDUP(mpcount)) - 128);
+		    (uint32_t *)((((char *)ptr) + RNDUP(mpcount)) - 128);
 
 	/*
 	 * Set the dircount; this will be used as the size for the
@@ -594,6 +595,8 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	}
 
 	rddir_next_offset = (offset_t)args->cookie;
+
+	ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
 
 readagain:
 
@@ -646,7 +649,7 @@ readagain:
 	lastentry_ptr = ptr;
 	no_space = 0;
 	for (dp = (struct dirent64 *)rddir_data;
-			!no_space && rddir_result_size > 0; dp = nextdp(dp)) {
+	    !no_space && rddir_result_size > 0; dp = nextdp(dp)) {
 
 		/* reset expseudo */
 		expseudo = 0;
@@ -681,54 +684,54 @@ readagain:
 		 * encoded later in the "attributes" section.
 		 */
 		ae = ar;
-		if (ar != 0) {
-			error = nfs4_readdir_getvp(dvp, dp->d_name,
-						&vp, &newexi, req, cs,
-						expseudo);
-			if (error == ENOENT) {
-				rddir_next_offset = dp->d_off;
-				continue;
-			}
+		if (ar == 0)
+			goto reencode_attrs;
 
-			rddirattr_error = error;
+		error = nfs4_readdir_getvp(dvp, dp->d_name,
+		    &vp, &newexi, req, cs, expseudo);
+		if (error == ENOENT) {
+			rddir_next_offset = dp->d_off;
+			continue;
+		}
 
-			/*
-			 * The vp obtained from above may be from a
-			 * different filesystem mount and the vfs-like
-			 * attributes should be obtained from that
-			 * different vfs; only do this if appropriate.
-			 */
-			if (vp &&
-			    (vfs_different = (dvp->v_vfsp != vp->v_vfsp))) {
-				if (ar & (FATTR4_FILES_AVAIL_MASK |
-					FATTR4_FILES_FREE_MASK |
-					FATTR4_FILES_TOTAL_MASK |
-					FATTR4_FILES_AVAIL_MASK |
-					FATTR4_FILES_FREE_MASK |
-					FATTR4_FILES_TOTAL_MASK)) {
-				    if (error =
-					rfs4_get_sb_encode(dvp->v_vfsp, &sbe)) {
-					    /* Remove attrs from encode */
-					    ae &= ~(FATTR4_FILES_AVAIL_MASK |
-						FATTR4_FILES_FREE_MASK |
-						FATTR4_FILES_TOTAL_MASK |
-						FATTR4_FILES_AVAIL_MASK |
-						FATTR4_FILES_FREE_MASK |
-						FATTR4_FILES_TOTAL_MASK);
-					    rddirattr_error = error;
-				    }
+		rddirattr_error = error;
+
+		/*
+		 * The vp obtained from above may be from a
+		 * different filesystem mount and the vfs-like
+		 * attributes should be obtained from that
+		 * different vfs; only do this if appropriate.
+		 */
+		if (vp &&
+		    (vfs_different = (dvp->v_vfsp != vp->v_vfsp))) {
+			if (ar & (FATTR4_FILES_AVAIL_MASK |
+			    FATTR4_FILES_FREE_MASK |
+			    FATTR4_FILES_TOTAL_MASK |
+			    FATTR4_FILES_AVAIL_MASK |
+			    FATTR4_FILES_FREE_MASK |
+			    FATTR4_FILES_TOTAL_MASK)) {
+				if (error =
+				    rfs4_get_sb_encode(dvp->v_vfsp,
+				    &sbe)) {
+					/* Remove attrs from encode */
+					ae &= ~(FATTR4_FILES_AVAIL_MASK |
+					    FATTR4_FILES_FREE_MASK |
+					    FATTR4_FILES_TOTAL_MASK |
+					    FATTR4_FILES_AVAIL_MASK |
+					    FATTR4_FILES_FREE_MASK |
+					    FATTR4_FILES_TOTAL_MASK);
+					rddirattr_error = error;
 				}
-				if (ar & (FATTR4_MAXFILESIZE_MASK |
-					FATTR4_MAXLINK_MASK |
-					FATTR4_MAXNAME_MASK)) {
-				    if (error =
-					rfs4_get_pc_encode(cs->vp,
-							&pce, ar, cs->cr)) {
-					    ar &= ~(FATTR4_MAXFILESIZE_MASK |
-						    FATTR4_MAXLINK_MASK |
-						    FATTR4_MAXNAME_MASK);
-					    rddirattr_error = error;
-				    }
+			}
+			if (ar & (FATTR4_MAXFILESIZE_MASK |
+			    FATTR4_MAXLINK_MASK |
+			    FATTR4_MAXNAME_MASK)) {
+				if (error = rfs4_get_pc_encode(cs->vp,
+				    &pce, ar, cs->cr)) {
+					ar &= ~(FATTR4_MAXFILESIZE_MASK |
+					    FATTR4_MAXLINK_MASK |
+					    FATTR4_MAXNAME_MASK);
+					rddirattr_error = error;
 				}
 			}
 		}
@@ -739,8 +742,15 @@ reencode_attrs:
 		/* encode the COOKIE for the entry */
 		IXDR_PUT_U_HYPER(ptr, dp->d_off);
 
+		name = nfscmd_convname(ca, cs->exi, dp->d_name,
+		    NFSCMD_CONV_OUTBOUND, MAXPATHLEN + 1);
+
+		if (name == NULL) {
+			rddir_next_offset = dp->d_off;
+			continue;
+		}
 		/* Calculate the dirent name length */
-		namelen = strlen(dp->d_name);
+		namelen = strlen(name);
 
 		rndup = RNDUP(namelen) / BYTES_PER_XDR_UNIT;
 
@@ -755,9 +765,12 @@ reencode_attrs:
 		/* encode the RNDUP FILL first */
 		ptr[rndup - 1] = 0;
 		/* encode the NAME of the entry */
-		bcopy(dp->d_name, (char *)ptr, namelen);
+		bcopy(name, (char *)ptr, namelen);
 		/* now bump the ptr after... */
 		ptr += rndup;
+
+		if (name != dp->d_name)
+			kmem_free(name, MAXPATHLEN + 1);
 
 		/*
 		 * Keep checking on the dircount to see if we have
@@ -788,14 +801,14 @@ reencode_attrs:
 		if (ae != 0) {
 			if (!vp) {
 				ae = ar & (FATTR4_RDATTR_ERROR_MASK |
-					FATTR4_MOUNTED_ON_FILEID_MASK);
+				    FATTR4_MOUNTED_ON_FILEID_MASK);
 			} else {
 				va.va_mask = AT_ALL;
 				rddirattr_error =
-					VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
+				    VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
 				if (rddirattr_error)
 					ae = ar & (FATTR4_RDATTR_ERROR_MASK |
-						FATTR4_MOUNTED_ON_FILEID_MASK);
+					    FATTR4_MOUNTED_ON_FILEID_MASK);
 			}
 		}
 
@@ -839,7 +852,7 @@ reencode_attrs:
 				if (ae & FATTR4_SUPPORTED_ATTRS_MASK) {
 					IXDR_PUT_INT32(ptr, 2);
 					IXDR_PUT_HYPER(ptr,
-							rfs4_supported_attrs);
+					    rfs4_supported_attrs);
 				}
 				if (ae & FATTR4_TYPE_MASK) {
 					uint_t ftype = vt_to_nf4[va.va_type];
@@ -858,7 +871,7 @@ reencode_attrs:
 				if (ae & FATTR4_CHANGE_MASK) {
 					u_longlong_t change;
 					NFS4_SET_FATTR4_CHANGE(change,
-							va.va_ctime);
+					    va.va_ctime);
 					IXDR_PUT_HYPER(ptr, change);
 				}
 				if (ae & FATTR4_SIZE_MASK) {
@@ -919,8 +932,8 @@ reencode_attrs:
 				}
 				if (ae & FATTR4_RDATTR_ERROR_MASK) {
 					rddirattr_error =
-						(rddirattr_error == 0 ?
-						0 : puterrno4(rddirattr_error));
+					    (rddirattr_error == 0 ?
+					    0 : puterrno4(rddirattr_error));
 					IXDR_PUT_U_INT32(ptr, rddirattr_error);
 				}
 
@@ -974,8 +987,8 @@ reencode_attrs:
 					uint_t isit;
 					pc_val = FALSE;
 					(void) VOP_PATHCONF(vp,
-							_PC_CHOWN_RESTRICTED,
-							&pc_val, cs->cr, NULL);
+					    _PC_CHOWN_RESTRICTED,
+					    &pc_val, cs->cr, NULL);
 					isit = (pc_val ? TRUE : FALSE);
 					IXDR_PUT_U_INT32(ptr, isit);
 				}
@@ -1146,29 +1159,26 @@ reencode_attrs:
 			 */
 			if (ae & FATTR4_OWNER_MASK) {
 				if (!lu_set) {
-				    owner_error = nfs_idmap_uid_str(va.va_uid,
-								&owner, TRUE);
-				    if (!owner_error) {
-					    lu_set = TRUE;
-					    lastuid = va.va_uid;
-				    }
-				} else {
-				    if (va.va_uid != lastuid) {
+					owner_error = nfs_idmap_uid_str(
+					    va.va_uid, &owner, TRUE);
+					if (!owner_error) {
+						lu_set = TRUE;
+						lastuid = va.va_uid;
+					}
+				} else 	if (va.va_uid != lastuid) {
 					if (owner.utf8string_len != 0) {
-					    kmem_free(owner.utf8string_val,
-						owner.utf8string_len);
+						kmem_free(owner.utf8string_val,
+						    owner.utf8string_len);
 						owner.utf8string_len = 0;
 						owner.utf8string_val = NULL;
 					}
 					owner_error = nfs_idmap_uid_str(
-							va.va_uid,
-							&owner, TRUE);
+					    va.va_uid, &owner, TRUE);
 					if (!owner_error) {
 						lastuid = va.va_uid;
 					} else {
 						lu_set = FALSE;
 					}
-				    }
 				}
 				if (!owner_error) {
 					if ((ptr +
@@ -1187,14 +1197,14 @@ reencode_attrs:
 					}
 					/* encode the LENGTH of owner string */
 					IXDR_PUT_U_INT32(ptr,
-							owner.utf8string_len);
+					    owner.utf8string_len);
 					/* encode the RNDUP FILL first */
 					rndup = RNDUP(owner.utf8string_len) /
-						BYTES_PER_XDR_UNIT;
+					    BYTES_PER_XDR_UNIT;
 					ptr[rndup - 1] = 0;
 					/* encode the OWNER */
 					bcopy(owner.utf8string_val, ptr,
-						owner.utf8string_len);
+					    owner.utf8string_len);
 					ptr += rndup;
 				}
 			}
@@ -1204,29 +1214,28 @@ reencode_attrs:
 			 */
 			if (ae & FATTR4_OWNER_GROUP_MASK) {
 				if (!lg_set) {
-				    group_error =
+					group_error =
 					    nfs_idmap_gid_str(va.va_gid,
-							&group, TRUE);
-				    if (!group_error) {
-					    lg_set = TRUE;
-					    lastgid = va.va_gid;
-				    }
-				} else {
-				    if (va.va_gid != lastgid) {
+					    &group, TRUE);
+					if (!group_error) {
+						lg_set = TRUE;
+						lastgid = va.va_gid;
+					}
+				} else if (va.va_gid != lastgid) {
 					if (group.utf8string_len != 0) {
-					    kmem_free(group.utf8string_val,
-						group.utf8string_len);
-					    group.utf8string_len = 0;
-					    group.utf8string_val = NULL;
+						kmem_free(
+						    group.utf8string_val,
+						    group.utf8string_len);
+						group.utf8string_len = 0;
+						group.utf8string_val = NULL;
 					}
 					group_error =
-						nfs_idmap_gid_str(va.va_gid,
-								&group, TRUE);
+					    nfs_idmap_gid_str(va.va_gid,
+					    &group, TRUE);
 					if (!group_error)
 						lastgid = va.va_gid;
 					else
 						lg_set = FALSE;
-				    }
 				}
 				if (!group_error) {
 					if ((ptr +
@@ -1245,14 +1254,14 @@ reencode_attrs:
 					}
 					/* encode the LENGTH of owner string */
 					IXDR_PUT_U_INT32(ptr,
-							group.utf8string_len);
+					    group.utf8string_len);
 					/* encode the RNDUP FILL first */
 					rndup = RNDUP(group.utf8string_len) /
-						BYTES_PER_XDR_UNIT;
+					    BYTES_PER_XDR_UNIT;
 					ptr[rndup - 1] = 0;
 					/* encode the OWNER */
 					bcopy(group.utf8string_val, ptr,
-						group.utf8string_len);
+					    group.utf8string_len);
 					ptr += rndup;
 				}
 			}
@@ -1286,9 +1295,9 @@ reencode_attrs:
 				if (ae & FATTR4_RAWDEV_MASK) {
 					fattr4_rawdev rd;
 					rd.specdata1 =
-						(uint32)getmajor(va.va_rdev);
+					    (uint32)getmajor(va.va_rdev);
 					rd.specdata2 =
-						(uint32)getminor(va.va_rdev);
+					    (uint32)getminor(va.va_rdev);
 					IXDR_PUT_U_INT32(ptr, rd.specdata1);
 					IXDR_PUT_U_INT32(ptr, rd.specdata2);
 				}
@@ -1342,7 +1351,7 @@ reencode_attrs:
 					u_longlong_t sec =
 					    (u_longlong_t)va.va_atime.tv_sec;
 					uint_t nsec =
-						(uint_t)va.va_atime.tv_nsec;
+					    (uint_t)va.va_atime.tv_nsec;
 					IXDR_PUT_HYPER(ptr, sec);
 					IXDR_PUT_INT32(ptr, nsec);
 				}
@@ -1365,7 +1374,7 @@ reencode_attrs:
 					u_longlong_t sec =
 					    (u_longlong_t)va.va_ctime.tv_sec;
 					uint_t nsec =
-						(uint_t)va.va_ctime.tv_nsec;
+					    (uint_t)va.va_ctime.tv_nsec;
 					IXDR_PUT_HYPER(ptr, sec);
 					IXDR_PUT_INT32(ptr, nsec);
 				}
@@ -1373,7 +1382,7 @@ reencode_attrs:
 					u_longlong_t sec =
 					    (u_longlong_t)va.va_mtime.tv_sec;
 					uint_t nsec =
-						(uint_t)va.va_mtime.tv_nsec;
+					    (uint_t)va.va_mtime.tv_nsec;
 					IXDR_PUT_HYPER(ptr, sec);
 					IXDR_PUT_INT32(ptr, nsec);
 				}
@@ -1406,9 +1415,9 @@ reencode_attrs:
 
 		/* "go back" and encode the attributes' length */
 		attr_length =
-			(char *)ptr -
-			(char *)attr_offset_ptr -
-			BYTES_PER_XDR_UNIT;
+		    (char *)ptr -
+		    (char *)attr_offset_ptr -
+		    BYTES_PER_XDR_UNIT;
 		IXDR_PUT_U_INT32(attr_offset_ptr, attr_length);
 
 		/*

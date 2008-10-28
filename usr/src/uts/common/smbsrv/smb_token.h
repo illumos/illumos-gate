@@ -26,8 +26,6 @@
 #ifndef _SMB_TOKEN_H
 #define	_SMB_TOKEN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <smbsrv/netrauth.h>
 #include <smbsrv/smb_privilege.h>
 #include <smbsrv/smb_sid.h>
@@ -132,18 +130,6 @@ typedef struct smb_token {
 	smb_session_key_t *tkn_session_key;
 	smb_posix_grps_t *tkn_posix_grps;
 } smb_token_t;
-
-/*
- * This is the max buffer length for holding certain fields of
- * any access token: domain, account, workstation, and IP with the
- * format as show below:
- * [domain name]\[user account] [workstation] (IP)
- *
- * This is not meant to be the maximum buffer length for holding
- * the entire context of a token.
- */
-#define	NTTOKEN_BASIC_INFO_MAXLEN (SMB_PI_MAX_DOMAIN + SMB_PI_MAX_USERNAME \
-					+ SMB_PI_MAX_HOST + INET_ADDRSTRLEN + 8)
 
 /*
  * Information returned by an RPC call is allocated on an internal heap

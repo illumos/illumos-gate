@@ -36,6 +36,7 @@
 #include <smbsrv/wintypes.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_common_door.h>
+#include <netinet/in.h>
 
 #ifndef _KERNEL
 #include <libshare.h>
@@ -52,6 +53,10 @@ extern "C" {
  */
 #define	SMB_SHROPT_AD_CONTAINER	"ad-container"
 #define	SMB_SHROPT_NAME		"name"	/* name is a pseudo property */
+/* next three properties use access-list a al NFS */
+#define	SHOPT_RO		"ro"	/* share is read-only */
+#define	SHOPT_RW		"rw"	/* share defaults to read-write */
+#define	SHOPT_NONE		"none"	/* share doesn't allow access */
 
 #define	SMB_DEFAULT_SHARE_GROUP	"smb"
 #define	SMB_PROTOCOL_NAME	"smb"
@@ -82,6 +87,11 @@ extern "C" {
  * SMB_SHRF_AUTOHOME	Autohome share.
  * SMB_SHRF_LONGNAME	Share name in OEM is longer than 13 chars
  * SMB_SHRF_ADMIN	Admin share
+ * SMB_SHRF_ACC_OPEN	No restrictions set
+ * SMB_SHRF_ACC_NONE	"none" property set
+ * SMB_SHRF_ACC_RO	"ro" (readonly) property set
+ * SMB_SHRF_ACC_RW	"rw" (read/write) property set
+ * SMB_SHRF_ACC_ALL	All of the access bits
  *
  * All autohome shares are transient but not all transient shares are autohome.
  * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
@@ -92,6 +102,14 @@ extern "C" {
 #define	SMB_SHRF_AUTOHOME	0x0004
 #define	SMB_SHRF_LONGNAME	0x0008
 #define	SMB_SHRF_ADMIN		0x0010
+
+/* Access Flags */
+#define	SMB_SHRF_ACC_OPEN	0x0000
+#define	SMB_SHRF_ACC_NONE	0x0100
+#define	SMB_SHRF_ACC_RO		0x0200
+#define	SMB_SHRF_ACC_RW		0x0400
+#define	SMB_SHRF_ACC_ALL	0x0F00
+
 
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
@@ -108,6 +126,10 @@ typedef struct smb_share {
 	uint32_t	shr_flags;
 	uint32_t	shr_type;
 	uint32_t	shr_refcnt;
+	uint32_t	shr_access_value;	/* host return access value */
+	char		shr_access_none[MAXPATHLEN];
+	char		shr_access_ro[MAXPATHLEN];
+	char		shr_access_rw[MAXPATHLEN];
 } smb_share_t;
 
 typedef struct smb_shriter {
@@ -164,12 +186,13 @@ void smb_shr_iterinit(smb_shriter_t *);
 smb_share_t *smb_shr_iterate(smb_shriter_t *);
 void smb_shr_list(int, smb_shrlist_t *);
 int smb_shr_count(void);
-uint32_t smb_shr_create(smb_share_t *, boolean_t);
-uint32_t smb_shr_delete(char *, boolean_t);
+uint32_t smb_shr_add(smb_share_t *);
+uint32_t smb_shr_remove(char *);
 uint32_t smb_shr_rename(char *, char *);
 uint32_t smb_shr_get(char *, smb_share_t *);
-uint32_t smb_shr_modify(char *, const char *, const char *, boolean_t);
+uint32_t smb_shr_modify(smb_share_t *);
 uint32_t smb_shr_get_realpath(const char *, char *, int);
+void smb_shr_hostaccess(smb_share_t *, ipaddr_t);
 
 boolean_t smb_shr_exists(char *);
 int smb_shr_is_special(char *);
@@ -186,13 +209,13 @@ uint32_t smb_share_get(char *, smb_share_t *);
 uint32_t smb_share_delete(char *);
 uint32_t smb_share_rename(char *, char *);
 uint32_t smb_share_create(smb_share_t *);
-uint32_t smb_share_modify(char *, char *, char *);
+uint32_t smb_share_modify(smb_share_t *);
 
 #else
 
 door_handle_t smb_kshare_init(int);
 void smb_kshare_fini(door_handle_t);
-uint32_t smb_kshare_getinfo(door_handle_t, const char *, smb_share_t *);
+uint32_t smb_kshare_getinfo(door_handle_t, char *, smb_share_t *, ipaddr_t);
 int smb_kshare_upcall(door_handle_t, void *, boolean_t);
 uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 

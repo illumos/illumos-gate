@@ -260,9 +260,9 @@ smb_netlogon_query(struct name_entry *server,
 	smb_msgbuf_t mb;
 	int offset, announce_len, data_length, name_lengths;
 	unsigned char buffer[MAX_DATAGRAM_LENGTH];
-	char hostname[MAXHOSTNAMELEN];
+	char hostname[NETBIOS_NAME_SZ];
 
-	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0)
+	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0)
 		return;
 
 	name_lengths = strlen(mailbox)+1+strlen(hostname)+1;
@@ -344,7 +344,7 @@ smb_netlogon_samlogon(struct name_entry *server,
 	int announce_len;
 	int data_length;
 	int name_length;
-	char hostname[MAXHOSTNAMELEN];
+	char hostname[NETBIOS_NAME_SZ];
 
 	syslog(LOG_DEBUG, "NetLogonSamLogonReq: %s", domain);
 
@@ -356,7 +356,7 @@ smb_netlogon_samlogon(struct name_entry *server,
 	domain_sid = ntdp->sid;
 	domain_sid_len = smb_sid_len(domain_sid);
 
-	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0)
+	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0)
 		return;
 
 	/*
@@ -549,7 +549,6 @@ int
 smb_msdcs_lookup_ads(char *nbt_domain, char *server)
 {
 	smb_ads_host_info_t *hinfo = NULL;
-	int ads_port = 0;
 	char ads_domain[MAXHOSTNAMELEN];
 	char *p;
 	char *nbt_hostname;
@@ -562,8 +561,7 @@ smb_msdcs_lookup_ads(char *nbt_domain, char *server)
 	if (smb_resolve_fqdn(nbt_domain, ads_domain, MAXHOSTNAMELEN) != 1)
 		return (0);
 
-	if ((hinfo = smb_ads_find_host(ads_domain, server, &ads_port))
-	    == NULL) {
+	if ((hinfo = smb_ads_find_host(ads_domain, server)) == NULL) {
 		syslog(LOG_DEBUG, "msdcsLookupADS: unable to find host");
 		return (0);
 	}

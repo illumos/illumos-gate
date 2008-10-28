@@ -23,11 +23,9 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Generic vnode operations.
@@ -287,10 +285,7 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		    (bfp->l_type == F_RDLCK || bfp->l_type == F_WRLCK)) {
 			frcmd |= NBMLCK;
 		}
-		/*
-		 * Check whether there is an NBMAND share reservation that
-		 * conflicts with the lock request.
-		 */
+
 		if (nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_WRITER);
 			serialize = 1;
@@ -301,10 +296,6 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 					error = EAGAIN;
 					goto done;
 				}
-			}
-			if (share_blocks_lock(vp, bfp)) {
-				error = EAGAIN;
-				goto done;
 			}
 		}
 		break;
@@ -319,19 +310,10 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			bfp->l_pid = ttoproc(curthread)->p_pid;
 			bfp->l_sysid = 0;
 		}
-		/*
-		 * If there is an NBMAND share reservation that conflicts
-		 * with the lock request, block until the conflicting share
-		 * reservation goes away.
-		 */
+
 		if (nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_WRITER);
 			serialize = 1;
-			if (share_blocks_lock(vp, bfp)) {
-				error = wait_for_share(vp, bfp);
-				if (error != 0)
-					goto done;
-			}
 		}
 		break;
 

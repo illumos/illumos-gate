@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Utility routines and top-level conflict detection code for NBMAND
@@ -69,33 +67,6 @@ int
 nbl_in_crit(vnode_t *vp)
 {
 	return (RW_LOCK_HELD(&vp->v_nbllock));
-}
-
-/*
- * Return the nbl_op_t that corresponds to the given lock type (read or
- * write).
- */
-
-nbl_op_t
-nbl_lock_to_op(int lock_type)
-{
-	int level;
-
-	switch (lock_type) {
-	case F_WRLCK:
-		return (NBL_READWRITE);
-	case F_RDLCK:
-		return (NBL_READ);
-	default:
-#ifdef DEBUG
-		level = CE_PANIC;
-#else
-		level = CE_WARN;
-#endif
-		cmn_err(level, "unexpected lock type: %d\n", lock_type);
-		return (NBL_WRITE);	/* pick something restrictive */
-	}
-	/*NOTREACHED*/
 }
 
 /*

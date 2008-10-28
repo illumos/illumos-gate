@@ -634,7 +634,7 @@ static DWORD
 lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
     struct mlrpc_xaction *mxa)
 {
-	char domain_name[MLSVC_DOMAIN_NAME_MAX];
+	char domain_name[MAXHOSTNAMELEN];
 	smb_sid_t *sid = NULL;
 	int security_mode;
 	int rc;
@@ -644,10 +644,10 @@ lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
 	security_mode = smb_config_get_secmode();
 
 	if (security_mode != SMB_SECMODE_DOMAIN) {
-		rc = smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1);
+		rc = smb_getnetbiosname(domain_name, sizeof (domain_name));
 		sid = smb_sid_dup(nt_domain_local_sid());
 	} else {
-		rc = smb_getdomainname(domain_name, MLSVC_DOMAIN_NAME_MAX);
+		rc = smb_getdomainname(domain_name, sizeof (domain_name));
 		sid = smb_getdomainsid();
 	}
 
@@ -679,13 +679,13 @@ static DWORD
 lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
     struct mlrpc_xaction *mxa)
 {
-	char domain_name[MLSVC_DOMAIN_NAME_MAX];
+	char domain_name[NETBIOS_NAME_SZ];
 	smb_sid_t *domain_sid;
 	int rc;
 
 	bzero(info, sizeof (struct mslsa_AccountDomainInfo));
 
-	if (smb_gethostname(domain_name, MLSVC_DOMAIN_NAME_MAX, 1) != 0)
+	if (smb_getnetbiosname(domain_name, NETBIOS_NAME_SZ) != 0)
 		return (NT_STATUS_NO_MEMORY);
 
 	if ((domain_sid = nt_domain_local_sid()) == NULL)

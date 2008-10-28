@@ -46,6 +46,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <libshare.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -109,6 +110,9 @@ static boolean_t srvsvc_add_autohome(struct mlrpc_xaction *, srvsvc_enum_t *,
 static char *srvsvc_share_mkpath(struct mlrpc_xaction *, char *);
 
 static uint32_t srvsvc_estimate_objcnt(uint32_t, uint32_t, uint32_t);
+
+static uint32_t srvsvc_sa_add(char *, char *, char *);
+static uint32_t srvsvc_sa_delete(char *);
 
 static char empty_string[1];
 
@@ -909,6 +913,7 @@ srvsvc_s_NetSessionDel(void *arg, struct mlrpc_xaction *mxa)
  *		default:	char *nullptr;
  *		} bufptr,
  *	OUT	DWORD status
+ *
  */
 static int
 srvsvc_s_NetServerGetInfo(void *arg, struct mlrpc_xaction *mxa)
@@ -918,9 +923,9 @@ srvsvc_s_NetServerGetInfo(void *arg, struct mlrpc_xaction *mxa)
 	struct mslm_SERVER_INFO_101 *info101;
 	struct mslm_SERVER_INFO_102 *info102;
 	char sys_comment[SMB_PI_MAX_COMMENT];
-	char hostname[MAXHOSTNAMELEN];
+	char hostname[NETBIOS_NAME_SZ];
 
-	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0) {
+	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0) {
 netservergetinfo_no_memory:
 		bzero(param, sizeof (struct mslm_NetServerGetInfo));
 		return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1170,7 +1175,6 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 	DWORD parm_stat;
 	struct mslm_NetShareAdd *param = arg;
 	struct mslm_SHARE_INFO_2 *info2;
-	smb_share_t si;
 	char realpath[MAXPATHLEN];
 	int32_t native_os;
 
@@ -1228,17 +1232,8 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	(void) memset(&si, 0, sizeof (smb_share_t));
-	(void) strlcpy(si.shr_name, (const char *)info2->shi2_netname,
-	    MAXNAMELEN);
-
-	(void) strlcpy(si.shr_path, realpath, MAXPATHLEN);
-	(void) strlcpy(si.shr_cmnt, (const char *)info2->shi2_remark,
-	    SMB_SHARE_CMNT_MAX);
-
-	si.shr_flags = SMB_SHRF_PERM;
-
-	param->status = smb_shr_create(&si, B_TRUE);
+	param->status = srvsvc_sa_add((char *)info2->shi2_netname, realpath,
+	    (char *)info2->shi2_remark);
 	param->parm_err = (native_os == NATIVE_OS_WIN95) ? 0 : &parm_err;
 	return (MLRPC_DRC_OK);
 }
@@ -1982,7 +1977,7 @@ srvsvc_s_NetShareDel(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	param->status = smb_shr_delete((char *)param->netname, B_TRUE);
+	param->status = srvsvc_sa_delete((char *)param->netname);
 	return (MLRPC_DRC_OK);
 }
 
@@ -2021,6 +2016,113 @@ srvsvc_s_NetSetFileSecurity(void *arg, struct mlrpc_xaction *mxa)
 
 	param->status = ERROR_ACCESS_DENIED;
 	return (MLRPC_DRC_OK);
+}
+
+/*
+ * If the default "smb" share group exists then return the group
+ * handle, otherwise create the group and return the handle.
+ *
+ * All shares created via the srvsvc will be added to the "smb"
+ * group.
+ */
+static sa_group_t
+srvsvc_sa_get_smbgrp(sa_handle_t handle)
+{
+	sa_group_t group = NULL;
+	int err;
+
+	group = sa_get_group(handle, SMB_DEFAULT_SHARE_GROUP);
+	if (group != NULL)
+		return (group);
+
+	group = sa_create_group(handle, SMB_DEFAULT_SHARE_GROUP, &err);
+	if (group == NULL)
+		return (NULL);
+
+	if (sa_create_optionset(group, SMB_DEFAULT_SHARE_GROUP) == NULL) {
+		(void) sa_remove_group(group);
+		group = NULL;
+	}
+
+	return (group);
+}
+
+/*
+ * Stores the given share in sharemgr
+ */
+static uint32_t
+srvsvc_sa_add(char *sharename, char *path, char *cmnt)
+{
+	sa_handle_t handle;
+	sa_share_t share;
+	sa_group_t group;
+	sa_resource_t resource;
+	boolean_t new_share = B_FALSE;
+	uint32_t status = NERR_Success;
+	int err;
+
+	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
+		return (NERR_InternalError);
+
+	share = sa_find_share(handle, path);
+	if (share == NULL) {
+		group = srvsvc_sa_get_smbgrp(handle);
+		if (group == NULL) {
+			sa_fini(handle);
+			return (NERR_InternalError);
+		}
+
+		share = sa_add_share(group, path, SA_SHARE_PERMANENT, &err);
+		if (share == NULL) {
+			sa_fini(handle);
+			return (NERR_InternalError);
+		}
+		new_share = B_TRUE;
+	}
+
+	resource = sa_get_share_resource(share, sharename);
+	if (resource == NULL) {
+		resource = sa_add_resource(share, sharename,
+		    SA_SHARE_PERMANENT, &err);
+		if (resource == NULL) {
+			if (new_share)
+				(void) sa_remove_share(share);
+			sa_fini(handle);
+			return (NERR_InternalError);
+		}
+	}
+
+	if (sa_set_resource_attr(resource, "description", cmnt) != SA_OK) {
+		/* removing the last resource will also remove the share */
+		(void) sa_remove_resource(resource);
+		status = NERR_InternalError;
+	}
+
+	sa_fini(handle);
+	return (status);
+}
+
+/*
+ * Removes the share from sharemgr
+ */
+static uint32_t
+srvsvc_sa_delete(char *sharename)
+{
+	sa_handle_t handle;
+	sa_resource_t resource;
+	uint32_t status;
+
+	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
+		return (NERR_InternalError);
+
+	status = NERR_InternalError;
+	if ((resource = sa_find_resource(handle, sharename)) != NULL) {
+		if (sa_remove_resource(resource) == SA_OK)
+			status = NERR_Success;
+	}
+
+	sa_fini(handle);
+	return (status);
 }
 
 static mlrpc_stub_table_t srvsvc_stub_table[] = {

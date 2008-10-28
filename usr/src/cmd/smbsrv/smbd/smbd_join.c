@@ -141,8 +141,8 @@ smbd_join(smb_joininfo_t *info)
 	smb_ntdomain_t *pi;
 	uint32_t status;
 	unsigned char passwd_hash[SMBAUTH_HASH_SZ];
-	char plain_passwd[PASS_LEN + 1];
-	char plain_user[PASS_LEN + 1];
+	char plain_passwd[SMB_PASSWD_MAXLEN + 1];
+	char plain_user[SMB_USERNAME_MAXLEN + 1];
 	char nbt_domain[SMB_PI_MAX_DOMAIN];
 	char fqdn[MAXHOSTNAMELEN];
 	char dc[MAXHOSTNAMELEN];
@@ -499,7 +499,7 @@ smb_set_netlogon_cred(void)
 	smb_ntdomain_t domain_info;
 	char kpasswd_srv[MAXHOSTNAMELEN];
 	char kpasswd_domain[MAXHOSTNAMELEN];
-	char sam_acct[MLSVC_ACCOUNT_NAME_MAX];
+	char sam_acct[SMB_SAMACCT_MAXLEN];
 	char *ipc_usr, *dom;
 	boolean_t new_domain = B_FALSE;
 
@@ -519,8 +519,7 @@ smb_set_netlogon_cred(void)
 	 * If the domain join initiated by smbadm join CLI is in
 	 * progress, don't do anything.
 	 */
-	(void) smb_gethostname(sam_acct, MLSVC_ACCOUNT_NAME_MAX - 1, 0);
-	(void) strlcat(sam_acct, "$", MLSVC_ACCOUNT_NAME_MAX);
+	(void) smb_getsamaccount(sam_acct, sizeof (sam_acct));
 	ipc_usr = smbrdr_ipc_get_user();
 	if (strcasecmp(ipc_usr, sam_acct))
 		return;

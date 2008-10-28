@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_util.c	1.8	08/08/08 SMI"
-
 #include <sys/tzfile.h>
 #include <sys/atomic.h>
 #include <sys/kidmap.h>
@@ -1883,26 +1881,13 @@ smb_cred_create(smb_token_t *token, uint32_t *privileges)
 
 	*privileges = 0;
 
-	/*
-	 * Support for backup and restore privileges will be disabled until
-	 * the BACKUP_SEMANTICS and backup intent attributes are supported.
-	 */
-#ifdef SUPPORT_FILE_OPEN_FOR_BACKUP
 	if (smb_token_query_privilege(token, SE_BACKUP_LUID)) {
 		*privileges |= SMB_USER_PRIV_BACKUP;
-		(void) crsetpriv(cr, PRIV_FILE_DAC_READ,
-		    PRIV_FILE_DAC_SEARCH, PRIV_SYS_MOUNT, NULL);
 	}
 
 	if (smb_token_query_privilege(token, SE_RESTORE_LUID)) {
 		*privileges |= SMB_USER_PRIV_RESTORE;
-		(void) crsetpriv(cr, PRIV_FILE_DAC_WRITE,
-		    PRIV_FILE_CHOWN, PRIV_FILE_CHOWN_SELF,
-		    PRIV_FILE_DAC_SEARCH, PRIV_FILE_LINK_ANY,
-		    PRIV_FILE_OWNER, PRIV_FILE_SETID, PRIV_SYS_LINKDIR,
-		    PRIV_SYS_MOUNT, NULL);
 	}
-#endif /* SUPPORT_FILE_OPEN_FOR_BACKUP */
 
 	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID)) {
 		*privileges |= SMB_USER_PRIV_TAKE_OWNERSHIP;
@@ -2032,4 +2017,40 @@ smb_sync_fsattr(struct smb_request *sr, cred_t *cr, smb_node_t *node)
 	}
 
 	return (rc);
+}
+
+/*
+ * smb_cred_create_privs
+ *
+ * Creates a duplicate credential that contains system privileges for
+ * certain SMB privileges: Backup and Restore.
+ *
+ */
+cred_t *
+smb_cred_create_privs(cred_t *user_cr, uint32_t privileges)
+{
+	cred_t *cr = NULL;
+
+	ASSERT(user_cr != NULL);
+
+	if (privileges & (SMB_USER_PRIV_BACKUP | SMB_USER_PRIV_RESTORE))
+		cr = crdup(user_cr);
+
+	if (cr == NULL)
+		return (NULL);
+
+	if (privileges & SMB_USER_PRIV_BACKUP) {
+		(void) crsetpriv(cr, PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH, PRIV_SYS_MOUNT, NULL);
+	}
+
+	if (privileges & SMB_USER_PRIV_RESTORE) {
+		(void) crsetpriv(cr, PRIV_FILE_DAC_WRITE,
+		    PRIV_FILE_CHOWN, PRIV_FILE_CHOWN_SELF,
+		    PRIV_FILE_DAC_SEARCH, PRIV_FILE_LINK_ANY,
+		    PRIV_FILE_OWNER, PRIV_FILE_SETID, PRIV_SYS_LINKDIR,
+		    PRIV_SYS_MOUNT, NULL);
+	}
+
+	return (cr);
 }

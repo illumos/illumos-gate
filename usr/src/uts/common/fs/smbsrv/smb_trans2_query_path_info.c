@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_trans2_query_path_info.c	1.9	08/07/24 SMI"
 
 /*
  * SMB: trans2_query_path_information
@@ -65,6 +64,7 @@
  *  SMB_QUERY_FILE_ALT_NAME_INFO     0x108
  *  SMB_QUERY_FILE_STREAM_INFO       0x109
  *  SMB_QUERY_FILE_COMPRESSION_INFO  0x10B
+ *  SMB_FILE_INTERNAL_INFORMATION    1006
  *
  * The requested information is placed in the Data portion of the
  * transaction response.  For the information levels greater than 0x100,
@@ -552,8 +552,8 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		alt_nm_ptr = ((*short_name == 0) ?
 		    utf8_strupr(name) : short_name);
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr,
-		    smb_ascii_or_unicode_strlen(sr, alt_nm_ptr), alt_nm_ptr);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lU", sr,
+		    mts_wcequiv_strlen(alt_nm_ptr), alt_nm_ptr);
 		break;
 
 	case SMB_QUERY_FILE_STREAM_INFO:
@@ -565,6 +565,12 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb,
 		    "qwbbb3.", datasz, 0, 0, 0, 0);
+		break;
+
+	case SMB_FILE_INTERNAL_INFORMATION:
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "q",
+		    ap->sa_vattr.va_nodeid);
 		break;
 
 	default:

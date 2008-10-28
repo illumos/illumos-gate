@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)secdb.c	1.5	08/07/08 SMI"
-
 /*
  * Security database interface.
  */
@@ -782,11 +780,13 @@ smb_setup_luinfo(smb_userinfo_t *lui, netr_client_t *clnt, uid_t uid)
 	smb_group_t grp;
 	struct passwd pw;
 	char pwbuf[1024];
+	char nbname[NETBIOS_NAME_SZ];
 
+	(void) smb_getnetbiosname(nbname, sizeof (nbname));
 	lui->sid_name_use = SidTypeUser;
 	lui->domain_sid = smb_sid_dup(nt_domain_local_sid());
 	lui->name = strdup(clnt->username);
-	lui->domain_name = strdup(clnt->domain);
+	lui->domain_name = strdup(nbname);
 	lui->n_groups = 0;
 	lui->groups = NULL;
 	lui->n_other_grps = 0;

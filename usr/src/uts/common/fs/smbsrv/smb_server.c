@@ -1426,6 +1426,7 @@ smb_server_ulist_geti(
 			user = smb_llist_next(ulist, user);
 		}
 		smb_llist_exit(ulist);
+		sn = list_next(&se->se_act.lst, sn);
 	}
 	rw_exit(&se->se_lock);
 	return (cnt);

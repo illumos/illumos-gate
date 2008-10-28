@@ -92,7 +92,7 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 
 	netr_info->flags |= flags;
 
-	rc = smb_getnetbiosname(netr_info->hostname, MLSVC_DOMAIN_NAME_MAX);
+	rc = smb_getnetbiosname(netr_info->hostname, NETBIOS_NAME_SZ);
 	if (rc != 0)
 		return (NT_STATUS_UNSUCCESSFUL);
 
@@ -112,19 +112,6 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 
 		}
 	}
-
-	/*
-	 * The NETLOGON credential chain establishment has unset
-	 * both ServerPrincipalName and dNSHostName attributes of the
-	 * workstation trust account. Those attributes will be updated
-	 * here to avoid any Kerberos authentication errors from happening.
-	 *
-	 * Later, when NT4 domain controller is supported, we need to
-	 * find a way to disable the following code.
-	 */
-	if (smb_ads_update_attrs() == -1)
-		syslog(LOG_DEBUG, "netlogon_auth: ServerPrincipalName"
-		    " and dNSHostName attributes might have been unset.");
 
 	return ((rc) ? NT_STATUS_UNSUCCESSFUL : NT_STATUS_SUCCESS);
 }
@@ -225,7 +212,7 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
-	char account_name[MLSVC_DOMAIN_NAME_MAX * 2];
+	char account_name[NETBIOS_NAME_SZ * 2];
 
 	bzero(&arg, sizeof (struct netr_ServerAuthenticate2));
 	opnum = NETR_OPNUM_ServerAuthenticate2;
@@ -519,7 +506,7 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	int opnum;
 	int rc;
 	BYTE new_password[NETR_OWF_PASSWORD_SZ];
-	char account_name[MLSVC_DOMAIN_NAME_MAX * 2];
+	char account_name[NETBIOS_NAME_SZ * 2];
 
 	bzero(&arg, sizeof (struct netr_PasswordSet));
 	opnum = NETR_OPNUM_ServerPasswordSet;

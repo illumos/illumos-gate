@@ -353,11 +353,11 @@ samr_s_enum_local_domains(struct samr_EnumLocalDomain *param,
 	struct samr_LocalDomainEntry *entry;
 	char *hostname;
 
-	hostname = MLRPC_HEAP_MALLOC(mxa, MAXHOSTNAMELEN);
+	hostname = MLRPC_HEAP_MALLOC(mxa, NETBIOS_NAME_SZ);
 	if (hostname == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0)
+	if (smb_getnetbiosname(hostname, NETBIOS_NAME_SZ) != 0)
 		return (NT_STATUS_NO_MEMORY);
 
 	entry = MLRPC_HEAP_NEWN(mxa, struct samr_LocalDomainEntry, 2);
@@ -442,7 +442,7 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 	ndr_handle_t *hd;
 	samr_keydata_t *data;
 	char *domain;
-	char hostname[MAXHOSTNAMELEN];
+	char hostname[NETBIOS_NAME_SZ];
 	int alias_cnt, user_cnt;
 	int rc = 0;
 
@@ -471,7 +471,7 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		break;
 
 	case NT_DOMAIN_LOCAL:
-		rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
+		rc = smb_getnetbiosname(hostname, sizeof (hostname));
 		if (rc == 0) {
 			domain = hostname;
 			user_cnt = smb_pwd_num();

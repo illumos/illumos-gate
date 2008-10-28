@@ -747,6 +747,7 @@ typedef struct smb_user {
 	char			*u_domain;
 	time_t			u_logon_time;
 	cred_t			*u_cred;
+	cred_t			*u_privcred;
 
 	smb_llist_t		u_tree_list;
 	smb_idpool_t		u_tid_pool;
@@ -1052,17 +1053,20 @@ typedef struct smb_rw_param {
 	uint8_t rw_andx;		/* SMB secondary andx command */
 } smb_rw_param_t;
 
-struct smb_fqi {			/* fs_query_info */
-	char			*path;
-	uint16_t		srch_attr;
-	struct smb_node		*dir_snode;
-	smb_attr_t		dir_attr;
-	char			last_comp[MAXNAMELEN];
-	int			last_comp_was_found;
-	char			last_comp_od[MAXNAMELEN];
-	struct smb_node		*last_snode;
-	smb_attr_t		last_attr;
-};
+/*
+ * fs_query_info
+ */
+typedef struct smb_fqi {
+	char		*path;
+	uint16_t	srch_attr;
+	smb_node_t	*dir_snode;
+	smb_attr_t	dir_attr;
+	char		last_comp[MAXNAMELEN];
+	int		last_comp_was_found;
+	char		last_comp_od[MAXNAMELEN];
+	smb_node_t	*last_snode;
+	smb_attr_t	last_attr;
+} smb_fqi_t;
 
 #define	SMB_NULL_FQI_NODES(fqi) \
 	(fqi).last_snode = NULL;	\
@@ -1310,7 +1314,7 @@ typedef struct smb_request {
 	    } tcon;
 
 	    struct open_param {
-		struct smb_fqi	fqi;
+		smb_fqi_t	fqi;
 		uint16_t	omode;
 		uint16_t	oflags;
 		uint16_t	ofun;
@@ -1334,8 +1338,8 @@ typedef struct smb_request {
 	    } open;
 
 	    struct dirop {
-		struct smb_fqi	fqi;
-		struct smb_fqi	dst_fqi;
+		smb_fqi_t	fqi;
+		smb_fqi_t	dst_fqi;
 	    } dirop;
 
 	    smb_rw_param_t	*rw;
