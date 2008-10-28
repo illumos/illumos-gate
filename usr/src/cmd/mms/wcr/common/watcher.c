@@ -2203,7 +2203,67 @@ wcr_exec_ssi(wcr_wka_t *wka, wcr_net_LM_t *net_LM)
 	}
 }
 
+void
+wcr_exec_restart_ssi(wcr_wka_t *wka, wcr_net_LM_t *net_LM, int status)
+{
+	time_t		cur_time;
+	char		*cmd_str = NULL;
+	char		*response = NULL;
+	char		*ssi_path = NULL;
 
+	/* Get SSI path from smf */
+	if ((ssi_path = mms_cfg_alloc_getvar(MMS_CFG_SSI_PATH, NULL)) == NULL) {
+		/* report service configuration repoistory scf_error() */
+		mms_trace(MMS_ERR, "using default-path, ssi path cfg error");
+		ssi_path = strdup("/opt/mms/bin/acsls");
+	}
+
+	/*
+	 * Count number of restarts in a time period.
+	 */
+	time(&cur_time);
+	if (WEXITSTATUS(status) == 2 ||
+	    net_LM->wcr_ssi_starts == 0 ||
+	    (cur_time - net_LM->wcr_time) > wka->wcr_time) {
+		net_LM->wcr_time = cur_time;
+		net_LM->wcr_ssi_starts = 1;
+	} else {
+		net_LM->wcr_ssi_starts++;
+	}
+	if (wka->wcr_starts != -1 &&
+	    net_LM->wcr_ssi_starts >= wka->wcr_starts) {
+		/*
+		 * SSI
+		 * Restarted n times in s seconds.
+		 * Log system message and set watcher to maintenance
+		 */
+		mms_trace(MMS_ERR,
+		    "SSI restarting too quickly, "
+		    "putting watcher in maintenance mode.");
+		/* Send message 8001 */
+		/* generate show command for current WD host */
+		cmd_str = mms_strapp(cmd_str,
+		    WCR_SSI_PATH_MSG,
+		    ssi_path);
+		/* Send MMP command to MM */
+		if ((response = wcr_send_cmd(cmd_str, wka))
+		    == NULL) {
+			mms_trace(MMS_ERR,
+			    "Error sending ssi error message");
+		} else {
+			free(response);
+		}
+		free(cmd_str);
+	} else {
+		/*
+		 * SSI
+		 * Was aborted or exited w/ status != 1 or != 0
+		 * Restart
+		 */
+		sleep(5);
+		wcr_exec_ssi(wka, net_LM);
+	}
+}
 void
 wcr_exec_all_ssi(wcr_wka_t *wka) {
 	wcr_net_LM_t	*net_LM;
@@ -3194,7 +3254,8 @@ wcr_chk_child_death(wcr_wka_t *wka)
 					mms_trace(MMS_NOTICE,
 					    "SSI exited with status - %d",
 					    WEXITSTATUS(status));
-					wcr_exec_ssi(wka, net_LM);
+					wcr_exec_restart_ssi(wka, net_LM,
+					    status);
 				} else {
 					wcr_old_dev(pid, wka);
 				}

@@ -37,6 +37,8 @@ typedef struct wcr_net_LM {
 	char		wcr_ssi_host[MAXHOSTNAMELEN];
 	int		wcr_ssi_port;
 	int		wcr_acsls_port;
+	int		wcr_ssi_starts;
+	int		wcr_time;
 	pid_t		wcr_dev_pid;
 	mms_list_node_t	wcr_net_LM_next;
 	char		*wcr_lm_name;
@@ -194,6 +196,11 @@ typedef struct wcr_DM_LM {
 	"arguments [ 'wcr_host' '%s' 'lmname1' '%s' "\
 	"'ssiport1' '%d' 'ssihost1' '%s' 'lmname2' '%s' "\
 	"'ssiport2' '%d' 'ssihost2' '%s']];"
+
+#define	WCR_SSI_PATH_MSG "message task[\"wcr ssi path error\"] "\
+	"who [ administrator ] severity [ error ] "\
+	"message [ id ['SUNW' 'MMS' '8001' ]"\
+	"arguments [ 'ssipath' '%s']];"
 
 
 #ifdef	__cplusplus

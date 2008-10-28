@@ -41,6 +41,11 @@ WCR_MSG(WCR_8000_MSG, gettext("Conflicting ssi configuration on $wcr_host$, " \
 	"Same SSI port configured for different ACSLS libraries: $lmname1$ " \
 	"$ssiport1$ $ssihost1$, $lmname2$ $ssiport2$ $ssihost2$"))
 
+#define	WCR_8001_MSG 8001
+WCR_MSG(WCR_8001_MSG, gettext("Error starting SSI, check that the path " \
+	"$ssipath$ is correct and use cpstop/cpstart to restart the lm " \
+	"service"))
+
 #ifdef	__cplusplus
 }
 #endif
