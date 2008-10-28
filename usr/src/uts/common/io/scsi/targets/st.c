@@ -477,7 +477,7 @@ static struct dev_ops st_ops = {
 	&st_cb_ops,		/* driver operations */
 	(struct bus_ops *)0,	/* bus operations */
 	nulldev,		/* power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 /*
