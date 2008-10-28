@@ -157,7 +157,8 @@ i386_SUBDIRS= \
 	SUNWxsvc \
 	SUNWxvmipar \
 	SUNWxvmipau \
-	SUNWxvmpv
+	SUNWxvmpv	\
+	SUNWntxn
 
 i386_XMODS= \
 	BRCMbnx \

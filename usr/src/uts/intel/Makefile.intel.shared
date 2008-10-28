@@ -203,6 +203,7 @@ DRV_KMODS	+= bofi
 DRV_KMODS	+= bscbus
 DRV_KMODS	+= bscv
 DRV_KMODS	+= chxge
+DRV_KMODS	+= ntxn
 DRV_KMODS	+= clone
 DRV_KMODS	+= cmdk
 DRV_KMODS	+= cn

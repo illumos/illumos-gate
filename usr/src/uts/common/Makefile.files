@@ -1780,3 +1780,9 @@ ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
 			iscsi_sess.o radius_auth.o iscsi_crc.o	\
 			iscsi_stats.o radius_packet.o iscsi_doorclt.o	\
 			iscsi_targetparam.o utils.o
+
+#
+#	ntxn 10Gb/1Gb NIC driver module
+#
+NTXN_OBJS =	unm_nic_init.o unm_gem.o unm_nic_hw.o unm_ndd.o	\
+			unm_nic_main.o unm_nic_isr.o unm_nic_ctx.o niu.o
