@@ -45,6 +45,7 @@
 #include "mm_db_version.h"
 #include <mms_cfg.h>
 #include <net_cfg_service.h>
+#include <fcntl.h>
 
 static char *_SrcFile = __FILE__;
 static mm_db_rval_t db_connect(mm_db_t *db, char *database_name);
@@ -144,16 +145,31 @@ try_again:
 	db_version = atoi(PQgetvalue(db->mm_db_results, 0, 1));
 	if (db_version != MM_DB_VERSION) {
 		if (db_version > MM_DB_VERSION) {
-			mms_trace(MMS_ERR,
+			mms_trace(MMS_INFO,
 			    "down-grade database version from %d to %d",
 			    db_version, MM_DB_VERSION);
+			if (mm_db_downgrade(db, db_version, MM_DB_VERSION)
+			    != MM_DB_OK) {
+				mms_trace(MMS_ERR,
+				    "down-grade database failed");
+				return (MM_DB_ERROR);
+			}
 		} else {
-			mms_trace(MMS_ERR,
+			mms_trace(MMS_INFO,
 			    "up-grade database version from %d to %d",
 			    db_version, MM_DB_VERSION);
+			if (mm_db_upgrade(db, db_version, MM_DB_VERSION)
+			    != MM_DB_OK) {
+				mms_trace(MMS_ERR, "up-grade database failed");
+				return (MM_DB_ERROR);
+			}
+		}
+		if (mm_db_exec(HERE, db, "UPDATE \"MM\" SET "
+		    "\"DBVersion\" =  '%d';", MM_DB_VERSION) != MM_DB_OK) {
+			mms_trace(MMS_ERR, "Error upgrade DBVersion");
 		}
 		mm_clear_db(&db->mm_db_results);
-		return (MM_DB_ERROR);
+		mms_trace(MMS_DEVP, "database mods done");
 	}
 	mms_trace(MMS_INFO, "mm and database version %d", MM_DB_VERSION);
 	mm_clear_db(&db->mm_db_results);
@@ -873,4 +889,331 @@ mm_db_escape_string(char *from)
 		    "mms_escape string\nfrom - %s\nto - %s", from, to);
 	}
 	return (to);
+}
+
+mm_db_rval_t
+mm_db_upgrade(mm_db_t *db, int dbcurver, int dbnewver)
+{
+	char		linebuf[100];
+	char		*cmdbuf = NULL;
+	FILE		*dbfp;
+	char		*verpos;
+	char		*sqlcmd = NULL;
+	char		*dbpath = NULL;
+	char		filebuf[4096];
+	char		cfgvar[2048];
+	ptrdiff_t	verlen;
+	char		verbuf[10];
+	int		vernum;
+	int		multicmd = 0;
+	int		fileIn;
+	int		fileOut;
+	int		bytes;
+	int		st = 0;
+
+	if (db_version_check("/etc/mms/db/mms_db") != dbnewver) {
+		mms_trace(MMS_ERR, "Error, db file found in "
+		    "/etc/mms/db/mms_db does not match new version %d",
+		    dbnewver);
+		return (MM_DB_ERROR);
+	}
+
+	if ((dbfp = fopen("/etc/mms/db/mms_db", "r")) == NULL) {
+		printf("Error, mms_db not found\n");
+		return (-1);
+	}
+
+	/* Begin transaction block */
+	if (mm_db_exec(HERE, db, "BEGIN;") != MM_DB_OK) {
+		mms_trace(MMS_ERR, "Upgrade cmd"
+		    " failed for BEGIN");
+		return (MM_DB_ERROR);
+	}
+
+	/*
+	 * Read in a SQL command
+	 * Check the database version
+	 */
+	while (fgets(linebuf, sizeof (linebuf), dbfp) != NULL) {
+		if (isdigit(linebuf[0])) {
+			verpos = strchr(linebuf, ' ');
+			verlen = verpos - linebuf;
+			strncpy(verbuf, linebuf, verlen);
+			vernum = atoi(verbuf);
+			if (vernum > dbcurver && linebuf[verlen - 1] == 'u') {
+				/* Start of a database command, read it in */
+				if (strchr(linebuf, ';') != NULL) {
+					cmdbuf = mms_strapp(cmdbuf, "%s",
+					    linebuf);
+					sqlcmd = strchr(cmdbuf, ' ') + 1;
+					/* Run SQL command on database */
+					if (mm_db_exec(HERE, db, "%s",
+					    sqlcmd) != MM_DB_OK) {
+						mms_trace(MMS_ERR, "Upgrade cmd"
+						    " failed for %s", sqlcmd);
+						mm_clear_db(&db->mm_db_results);
+						(void) mm_db_exec(HERE, db,
+						    "ROLLBACK;");
+						return (MM_DB_ERROR);
+					}
+					free(cmdbuf);
+					cmdbuf = NULL;
+					sqlcmd = NULL;
+				} else {
+					cmdbuf = mms_strapp(cmdbuf, "%s",
+					    linebuf);
+					multicmd = 1;
+				}
+			}
+		} else if (multicmd == 1) {
+			cmdbuf = mms_strapp(cmdbuf, "%s",
+			    linebuf);
+			if (strchr(linebuf, ';') != NULL) {
+				multicmd = 0;
+				sqlcmd = strchr(cmdbuf, ' ') + 1;
+				/* Run SQL command on database */
+				if (mm_db_exec(HERE, db, "%s", sqlcmd)
+				    != MM_DB_OK) {
+					mms_trace(MMS_ERR, "Upgrade cmd"
+					    " failed for %s", sqlcmd);
+					mm_clear_db(&db->mm_db_results);
+					(void) mm_db_exec(HERE, db,
+					    "ROLLBACK;");
+					return (MM_DB_ERROR);
+				}
+				free(cmdbuf);
+				cmdbuf = NULL;
+				sqlcmd = NULL;
+			}
+		}
+	}
+
+	/*
+	 * End transaction block
+	 * Commit changes to db, db does rollback on error
+	 */
+	if (mm_db_exec(HERE, db, "COMMIT;") != MM_DB_OK) {
+		mms_trace(MMS_ERR, "Upgrade cmd"
+		    " failed for COMMIT");
+		return (MM_DB_ERROR);
+	}
+
+	fclose(dbfp);
+
+	/* Get path to mmsdb schema file */
+	st = mms_cfg_getvar(MMS_CFG_DB_DATA, cfgvar);
+	if (st == 0) {
+		dbpath = mms_strapp(dbpath, "%s/../mmsdb", cfgvar);
+	}
+
+	if (st != 0) {
+		mms_trace(MMS_ERR, "mms_cfg_getvar error,"
+		    "mmsdb not known");
+		return (MM_DB_ERROR);
+	}
+
+	/* Make a copy of the newer db schema */
+	if ((fileIn = open("/etc/mms/db/mms_db", O_RDONLY)) == -1) {
+		mms_trace(MMS_ERR, "Failed to open db schema for read");
+	}
+
+	if ((fileOut = open(dbpath, O_WRONLY, O_CREAT)) == -1) {
+		mms_trace(MMS_ERR, "Failed to open db schema for write");
+	}
+
+	while ((bytes = read(fileIn, filebuf, sizeof (filebuf))) > 0)
+		write(fileOut, filebuf, bytes);
+
+	close(fileIn);
+	close(fileOut);
+
+	return (MM_DB_OK);
+}
+
+mm_db_rval_t
+mm_db_downgrade(mm_db_t *db, int dbcurver, int dbnewver)
+{
+	char		linebuf[100];
+	char		*cmdbuf = NULL;
+	FILE		*dbfp;
+	char		*verpos;
+	int		sqlcmdsize = 50;
+	char		**sqlcmds = (char **)malloc(sqlcmdsize *
+	    sizeof (char *));
+	char		**tmpbuf;
+	char		*sqlptr;
+	char		*dbpath = NULL;
+	char		cfgvar[2048];
+	int		cmdcount = -1;
+	ptrdiff_t	verlen;
+	char		verbuf[10];
+	int		vernum;
+	int		multicmd = 0;
+	int		i;
+	int		st = 0;
+
+	/* Get path to mmsdb schema file */
+	st = mms_cfg_getvar(MMS_CFG_DB_DATA, cfgvar);
+	if (st == 0) {
+		dbpath = mms_strapp(dbpath, "%s/../mmsdb", cfgvar);
+	}
+
+	if (st != 0) {
+		mms_trace(MMS_ERR, "mms_cfg_getvar error,"
+		    "mmsdb not known");
+		free(sqlcmds);
+		free(dbpath);
+		return (MM_DB_ERROR);
+	}
+
+	if (db_version_check(dbpath) != dbcurver) {
+		mms_trace(MMS_ERR, "Error, db file found in %s"
+		    "does not match current version %d",
+		    dbpath, dbcurver);
+		free(dbpath);
+		free(sqlcmds);
+		return (MM_DB_ERROR);
+	}
+
+	if ((dbfp = fopen(dbpath, "r")) == NULL) {
+		mms_trace(MMS_ERR, "Error, mmsdb not found for downgrade\n");
+		free(dbpath);
+		free(sqlcmds);
+		return (MM_DB_ERROR);
+	}
+
+	/* Begin transaction block */
+	if (mm_db_exec(HERE, db, "BEGIN;") != MM_DB_OK) {
+		mms_trace(MMS_ERR, "Downgrade cmd"
+		    " failed for BEGIN");
+		free(dbpath);
+		free(sqlcmds);
+		return (MM_DB_ERROR);
+	}
+
+	/*
+	 * Read in a SQL command
+	 * Check the database version
+	 */
+	while (fgets(linebuf, sizeof (linebuf), dbfp) != NULL) {
+		if (isdigit(linebuf[0])) {
+			verpos = strchr(linebuf, ' ');
+			verlen = verpos - linebuf;
+			strncpy(verbuf, linebuf, verlen);
+			vernum = atoi(verbuf);
+			if (vernum > dbnewver && linebuf[verlen - 1] == 'd') {
+				/* Check SQL cmd buffer size */
+				if (cmdcount+1 > sqlcmdsize) {
+					sqlcmdsize = sqlcmdsize * 2;
+					tmpbuf = (char **)
+					    realloc(sqlcmds, sqlcmdsize);
+					if (tmpbuf != NULL)
+						sqlcmds = tmpbuf;
+					else {
+						mms_trace(MMS_ERR,
+						    "realloc failed in "
+						    "mm_db_downgrade");
+						free(dbpath);
+						for (i = 0; i < cmdcount - 1;
+						    i++)
+							free(sqlcmds[i]);
+						free(sqlcmds);
+						return (MM_DB_ERROR);
+					}
+				}
+
+				/* Start of a database command, read it in */
+				if (strchr(linebuf, ';') != NULL) {
+					cmdbuf = mms_strapp(cmdbuf, "%s",
+					    linebuf);
+					sqlptr = strchr(cmdbuf, ' ') + 1;
+					cmdcount++;
+					sqlcmds[cmdcount] = strdup(sqlptr);
+					free(cmdbuf);
+					cmdbuf = NULL;
+					sqlptr = NULL;
+				} else {
+					cmdbuf = mms_strapp(cmdbuf, "%s",
+					    linebuf);
+					multicmd = 1;
+				}
+			}
+		} else if (multicmd == 1) {
+			cmdbuf = mms_strapp(cmdbuf, "%s",
+			    linebuf);
+			if (strchr(linebuf, ';') != NULL) {
+				multicmd = 0;
+				sqlptr = strchr(cmdbuf, ' ') + 1;
+				cmdcount++;
+				sqlcmds[cmdcount] = strdup(sqlptr);
+				free(cmdbuf);
+				cmdbuf = NULL;
+				sqlptr = NULL;
+			}
+		}
+	}
+	for (i = cmdcount; i > -1; i--) {
+		/* Run SQL command on database */
+		if (mm_db_exec(HERE, db, "%s", sqlcmds[i]) != MM_DB_OK) {
+			mms_trace(MMS_ERR, "Downgrade cmd"
+			    " failed for %s", sqlcmds[i]);
+			mm_clear_db(&db->mm_db_results);
+			free(dbpath);
+			(void) mm_db_exec(HERE, db, "ROLLBACK;");
+			return (MM_DB_ERROR);
+		}
+		free(sqlcmds[i]);
+	}
+
+	free(sqlcmds);
+
+	/*
+	 * End transaction block
+	 * Commit changes to db, db does rollback on error
+	 */
+	if (mm_db_exec(HERE, db, "COMMIT;") != MM_DB_OK) {
+		mms_trace(MMS_ERR, "Downgrade cmd"
+		    " failed for COMMIT");
+		free(dbpath);
+		return (MM_DB_ERROR);
+	}
+
+	fclose(dbfp);
+
+	free(dbpath);
+	return (MM_DB_OK);
+}
+
+int
+db_version_check(char *dbfile)
+{
+	char linebuf[100];
+	char verbuf[10];
+	char *verpos;
+	ptrdiff_t verlen;
+	FILE *dbfp;
+	int vernum;
+	int version = 0;
+
+	if ((dbfp = fopen(dbfile, "r")) == NULL) {
+		mms_trace(MMS_ERR, "db_version_check "
+		    "database file  not found\n");
+		return (-1);
+	}
+
+	while (fgets(linebuf, sizeof (linebuf), dbfp) != NULL) {
+		if (isdigit(linebuf[0])) {
+			verpos = strchr(linebuf, ' ');
+			verlen = verpos - linebuf - 1;
+			strncpy(verbuf, linebuf, verlen);
+			vernum = atoi(verbuf);
+			if (vernum > version)
+				version = vernum;
+			memset(verbuf, '\0', sizeof (verbuf));
+		}
+	}
+
+	fclose(dbfp);
+
+	return (version);
 }

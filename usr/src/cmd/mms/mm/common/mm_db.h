@@ -81,6 +81,9 @@ extern mm_db_rval_t mm_db_txn_commit(mm_db_t *);
 extern mm_db_rval_t mm_db_create_attribute(mm_db_t *, char *, char *);
 extern mm_db_rval_t mm_db_create_attribute2(mm_db_t *, char *, char *, char **);
 extern mm_db_rval_t mm_db_delete_attribute(mm_db_t *, char *, char *);
+extern mm_db_rval_t mm_db_upgrade(mm_db_t *db, int dbcurver, int dbnewver);
+extern mm_db_rval_t mm_db_downgrade(mm_db_t *db, int dbcurver, int dbnewver);
+extern int db_version_check(char *dbfile);
 extern char *mm_db_sql_err_rsp(int, char *, char *, char *);
 extern char *mm_db_escape_string(char *from);
 
