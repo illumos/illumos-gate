@@ -2827,7 +2827,6 @@ ar_query_delete(ace_t *ace, void *arg)
 	arp_stack_t *as = ar->ar_as;
 	ip_stack_t *ipst = as->as_netstack->netstack_ip;
 
-	mi_timer(ace->ace_arl->arl_wq, ace->ace_mp, -1L);
 	while ((mp = *mpp) != NULL) {
 		/* The response queue was stored in the query b_prev. */
 		if ((queue_t *)mp->b_prev == ar->ar_wq ||
@@ -2995,6 +2994,14 @@ ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace)
 	arl_t *src_arl;
 
 	mp = ace->ace_query_mp;
+	/*
+	 * ar_query_delete may have just blown off the outstanding
+	 * ace_query_mp entries because the client who sent the query
+	 * went away. If this happens just before the ace_mp timer
+	 * goes off, we'd find a null ace_query_mp which is not an error.
+	 * The unresolved ace itself, and the timer, will be removed
+	 * when the arl stream goes away.
+	 */
 	if (!mp)
 		return (0);
 	if (DB_TYPE(mp) == M_IOCTL)
@@ -4326,7 +4333,6 @@ ar_wsrv(queue_t *q)
 			 * we complete the operation with a failure indication.
 			 * Otherwise, we restart the timer.
 			 */
-			ASSERT(ace->ace_query_mp != NULL);
 			ms = ar_query_xmit(as, ace, NULL);
 			if (ms == 0)
 				ar_query_reply(ace, ENXIO, NULL, (uint32_t)0);
