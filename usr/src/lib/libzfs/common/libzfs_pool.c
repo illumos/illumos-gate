@@ -49,6 +49,12 @@
 
 static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 
+#if defined(__i386) || defined(__amd64)
+#define	BOOTCMD	"installgrub(1M)"
+#else
+#define	BOOTCMD	"installboot(1M)"
+#endif
+
 /*
  * ====================================================================
  *   zpool property functions
@@ -316,6 +322,17 @@ pool_uses_efi(nvlist_t *config)
 	}
 	return (B_FALSE);
 }
+
+static boolean_t
+pool_is_bootable(zpool_handle_t *zhp)
+{
+	char bootfs[ZPOOL_MAXNAMELEN];
+
+	return (zpool_get_prop(zhp, ZPOOL_PROP_BOOTFS, bootfs,
+	    sizeof (bootfs), NULL) == 0 && strncmp(bootfs, "-",
+	    sizeof (bootfs)) != 0);
+}
+
 
 /*
  * Given an nvlist of zpool properties to be set, validate that they are
@@ -1008,6 +1025,24 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 		return (zfs_error(hdl, EZFS_BADVERSION, msg));
 	}
 
+	if (pool_is_bootable(zhp) && nvlist_lookup_nvlist_array(nvroot,
+	    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0) {
+		uint64_t s;
+
+		for (s = 0; s < nspares; s++) {
+			char *path;
+
+			if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
+			    &path) == 0 && pool_uses_efi(spares[s])) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "device '%s' contains an EFI label and "
+				    "cannot be used on root pools."),
+				    zpool_vdev_name(hdl, NULL, spares[s]));
+				return (zfs_error(hdl, EZFS_POOL_NOTSUP, msg));
+			}
+		}
+	}
+
 	if (zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL) <
 	    SPA_VERSION_L2CACHE &&
 	    nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
@@ -1436,7 +1471,6 @@ vdev_online(nvlist_t *nv)
 int
 zpool_get_physpath(zpool_handle_t *zhp, char *physpath)
 {
-	char bootfs[ZPOOL_MAXNAMELEN];
 	nvlist_t *vdev_root;
 	nvlist_t **child;
 	uint_t count;
@@ -1446,8 +1480,7 @@ zpool_get_physpath(zpool_handle_t *zhp, char *physpath)
 	 * Make sure this is a root pool, as phys_path doesn't mean
 	 * anything to a non-root pool.
 	 */
-	if (zpool_get_prop(zhp, ZPOOL_PROP_BOOTFS, bootfs,
-	    sizeof (bootfs), NULL) != 0)
+	if (!pool_is_bootable(zhp))
 		return (-1);
 
 	verify(nvlist_lookup_nvlist(zhp->zpool_config,
@@ -1721,6 +1754,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	uint_t children;
 	nvlist_t *config_root;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	boolean_t rootpool = pool_is_bootable(zhp);
 
 	if (replacing)
 		(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
@@ -1728,6 +1762,16 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	else
 		(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 		    "cannot attach %s to %s"), new_disk, old_disk);
+
+	/*
+	 * If this is a root pool, make sure that we're not attaching an
+	 * EFI labeled device.
+	 */
+	if (rootpool && pool_uses_efi(nvroot)) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "EFI labeled devices are not supported on root pools."));
+		return (zfs_error(hdl, EZFS_POOL_NOTSUP, msg));
+	}
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, old_disk, &avail_spare, &l2cache,
@@ -1795,8 +1839,19 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 
 	zcmd_free_nvlists(&zc);
 
-	if (ret == 0)
+	if (ret == 0) {
+		if (rootpool) {
+			/*
+			 * XXX - This should be removed once we can
+			 * automatically install the bootblocks on the
+			 * newly attached disk.
+			 */
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "Please "
+			    "be sure to invoke %s to make '%s' bootable.\n"),
+			    BOOTCMD, new_disk);
+		}
 		return (0);
+	}
 
 	switch (errno) {
 	case ENOTSUP:
@@ -2803,6 +2858,13 @@ zpool_label_disk(libzfs_handle_t *hdl, zpool_handle_t *zhp, char *name)
 
 	if (zhp) {
 		nvlist_t *nvroot;
+
+		if (pool_is_bootable(zhp)) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "EFI labeled devices are not supported on root "
+			    "pools."));
+			return (zfs_error(hdl, EZFS_POOL_NOTSUP, errbuf));
+		}
 
 		verify(nvlist_lookup_nvlist(zhp->zpool_config,
 		    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);

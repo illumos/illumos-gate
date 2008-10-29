@@ -5153,8 +5153,9 @@ get_rootdev_list()
 		return
 	elif [ "$rootfstype" = "zfs" ]; then
 		rootpool=`df -k ${rootprefix:-/} | tail +2 | cut -d/ -f1`
-		rootdevlist=`zpool iostat -v "$rootpool" | tail +5 |
-		    grep -v mirror | sed -n -e '/--/q' -e p | awk '{print $1}'`
+		rootdevlist=`LC_ALL=C zpool iostat -v "$rootpool" | tail +5 |
+		    egrep -v "mirror|spare|replacing" |
+		    sed -n -e '/--/q' -e p | awk '{print $1}'`
 	else
 		metadev=`grep -v "^#" $rootprefix/etc/vfstab | \
 			grep "[	 ]/[ 	]" | nawk '{print $2}'`

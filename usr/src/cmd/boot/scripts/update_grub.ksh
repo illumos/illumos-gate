@@ -25,8 +25,6 @@
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
 ALT_ROOT=
 
@@ -88,8 +86,9 @@ get_rootdev_list()
 		return
 	elif [ "$is_zfs_boot" = "yes" ]; then
 		rootpool=`df -k ${ALT_ROOT:-/} | tail +2 | cut -d/ -f1`
-		rootdevlist=`zpool iostat -v "$rootpool" | tail +5 |
-		    grep -v mirror | sed -n -e '/--/q' -e p | awk '{print $1}'`
+		rootdevlist=`LC_ALL=C zpool iostat -v "$rootpool" | tail +5 |
+		    egrep -v "mirror|spare|replacing" |
+		    sed -n -e '/--/q' -e p | awk '{print $1}'`
 	else
 		metadev=`grep -v "^#" "$ALT_ROOT"/etc/vfstab | \
 		    grep "[	 ]/[ 	]" | nawk '{print $2}'`
