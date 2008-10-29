@@ -21,19 +21,16 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 #
 # Preremove script for SUNWdcar.
 #
-# This script removes the hardware provider section for the dca
-# driver from /etc/crypto/kcf.conf
+# This script removes the driver with rem_drv(1M) if necessary.
 #
 DRV=dca
-
 NAMEMAJOR="${BASEDIR}/etc/name_to_major"
 
 #
@@ -54,54 +51,4 @@ if [ $? -eq 0 ]; then
     ${REM_DRV} ${DRV} || exit 1
 fi
 
-pkg_start="# Start $PKGINST"
-pkg_end="# End $PKGINST"
-kcfconf=${BASEDIR}/etc/crypto/kcf.conf
-tmpfile=/tmp/$$kcfconf
-error=no
-
-#
-# If /etc/crypto/kcf.conf doesn't exist, bail immediately
-#
-if [ ! -f "$kcfconf" ]
-then
-	echo "$0: ERROR - $kcfconf doesn't exist"
-	exit 2
-fi
-
-#
-# Strip all entries belonging to this package
-#
-start=0
-end=0
-egrep -s "$pkg_start" $kcfconf && start=1
-egrep -s "$pkg_end" $kcfconf && end=1
-
-if [ $start -ne $end ] ; then
-	echo "$0: missing Start or End delimiters for $PKGINST in $kcfconf."
-	echo "$0: $kcfconf may be corrupted and was not updated."
-	error=yes
-	exit 2
-fi
-
-if [ $start -eq 1 ]
-then
-	# To preserve the gid
-	cp -p $kcfconf $tmpfile
-	sed -e "/$pkg_start/,/$pkg_end/d" $kcfconf > $tmpfile || error=yes
-	if [ "$error" = no ]
-	then 
-		mv $tmpfile $kcfconf || error=yes
-	fi
-	rm -f $tmpfile
-else
-	echo "$0: WARNING - no entries to be removed from $kcfconf" 
-	exit 0
-fi
-
-if [ "$error" = yes ]
-then
-	echo "$0: ERROR - failed to update $kcfconf."
-	exit 2
-fi
 exit 0

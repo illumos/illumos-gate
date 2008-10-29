@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <locale.h>
 #include <sys/types.h>
+#include <zone.h>
 #include <sys/stat.h>
 #include "cryptoadm.h"
 
@@ -41,7 +42,7 @@ static entry_t *dup_entry(entry_t *);
 static mechlist_t *dup_mechlist(mechlist_t *);
 static entry_t *getent(char *, entrylist_t *);
 static int interpret(char *, entry_t **);
-static int parse_dislist(char *, entry_t *);
+static int parse_sup_dis_list(char *, entry_t *);
 
 
 /*
@@ -51,10 +52,10 @@ static int parse_dislist(char *, entry_t *);
 static mechlist_t *
 dup_mechlist(mechlist_t *plist)
 {
-	mechlist_t *pres = NULL;
-	mechlist_t *pcur;
-	mechlist_t *ptmp;
-	int rc = SUCCESS;
+	mechlist_t	*pres = NULL;
+	mechlist_t	*pcur;
+	mechlist_t	*ptmp;
+	int		rc = SUCCESS;
 
 	while (plist != NULL) {
 		if (!(ptmp = create_mech(plist->name))) {
@@ -95,10 +96,39 @@ get_mech_count(mechlist_t *plist)
 	return (count);
 }
 
+/*
+ * Create one item of type entry_t with the provider name.
+ * Return NULL if there's not enough memory or provname is NULL.
+ */
+entry_t *
+create_entry(char *provname)
+{
+	entry_t		*pent = NULL;
+
+	if (provname == NULL) {
+		return (NULL);
+	}
+
+	pent = calloc(1, sizeof (entry_t));
+	if (pent == NULL) {
+		cryptodebug("out of memory.");
+		return (NULL);
+	}
+
+	(void) strlcpy(pent->name, provname, MAXNAMELEN);
+	pent->suplist = NULL;
+	pent->sup_count = 0;
+	pent->dislist = NULL;
+	pent->dis_count = 0;
+	pent->load = B_TRUE;
+
+	return (pent);
+}
 
 /*
- * Duplicate an entry.  A null pointer is returned if the storage space
- * available is insufficient or the input argument is NULL.
+ * Duplicate an entry for a provider from kcf.conf.
+ * Return NULL if memory is insufficient or the input argument is NULL.
+ * Called by getent().
  */
 static entry_t *
 dup_entry(entry_t *pent1)
@@ -109,16 +139,14 @@ dup_entry(entry_t *pent1)
 		return (NULL);
 	}
 
-	if ((pent2 = malloc(sizeof (entry_t))) == NULL) {
+	if ((pent2 = create_entry(pent1->name)) == NULL) {
 		cryptodebug("out of memory.");
 		return (NULL);
 	}
 
-	(void) strlcpy(pent2->name, pent1->name, sizeof (pent2->name));
 	pent2->sup_count = pent1->sup_count;
 	pent2->dis_count = pent1->dis_count;
-	pent2->suplist = NULL;
-	pent2->dislist = NULL;
+	pent2->load = pent1->load;
 	if (pent1->suplist != NULL) {
 		pent2->suplist = dup_mechlist(pent1->suplist);
 		if (pent2->suplist == NULL) {
@@ -143,23 +171,23 @@ dup_entry(entry_t *pent1)
  * in the kcf.conf configuration file.
  *
  * Arguments:
- * 	buf: an input argument which is a char string with the format of
+ *	buf: an input argument which is a char string with the format of
  *	     "disabledlist=m1,m2,..." or "supportedlist=m1,m2,..."
  *	pent: the entry for the disabledlist.  This is an IN/OUT argument.
  *
  * Return value: SUCCESS or FAILURE.
  */
 static int
-parse_dislist(char *buf, entry_t *pent)
+parse_sup_dis_list(char *buf, entry_t *pent)
 {
-	mechlist_t *pmech;
-	mechlist_t *phead;
-	char *next_token;
-	char *value;
-	int count;
-	int supflag = B_FALSE;
-	int disflag = B_FALSE;
-	int rc = SUCCESS;
+	mechlist_t	*pmech = NULL;
+	mechlist_t	*phead = NULL;
+	char		*next_token;
+	char		*value;
+	int		count;
+	int		supflag = B_FALSE;
+	int		disflag = B_FALSE;
+	int		rc = SUCCESS;
 
 	if (strncmp(buf, EF_SUPPORTED, strlen(EF_SUPPORTED)) == 0) {
 		supflag = B_TRUE;
@@ -219,33 +247,32 @@ parse_dislist(char *buf, entry_t *pent)
 }
 
 
-
 /*
- * This routine converts a char string into an entry_t structure
+ * Convert a char string containing a line about a provider
+ * from kcf.conf into an entry_t structure.
+ *
+ * See ent2str(), the reverse of this function, for the format of
+ * kcf.conf lines.
  */
 static int
 interpret(char *buf, entry_t **ppent)
 {
-	entry_t *pent;
-	char *token1;
-	char *token2;
-	char *token3;
-	int rc;
+	entry_t	*pent = NULL;
+	char	*token1;
+	char	*token2;
+	char	*token3;
+	int	rc;
 
+	/* Get provider name */
 	if ((token1 = strtok(buf, SEP_COLON)) == NULL) { /* buf is NULL */
 		return (FAILURE);
 	};
 
-	pent = malloc(sizeof (entry_t));
+	pent = create_entry(token1);
 	if (pent == NULL) {
 		cryptodebug("out of memory.");
 		return (FAILURE);
 	}
-	(void) strlcpy(pent->name, token1, sizeof (pent->name));
-	pent->suplist = NULL;
-	pent->dislist = NULL;
-	pent->sup_count = 0;
-	pent->dis_count = 0;
 
 	if ((token2 = strtok(NULL, SEP_SEMICOLON)) == NULL) {
 		/* The entry contains a provider name only */
@@ -253,15 +280,28 @@ interpret(char *buf, entry_t **ppent)
 		return (FAILURE);
 	}
 
-	/* need to get token3 first to satisfy nested strtok invocations */
-	token3 = strtok(NULL, SEP_SEMICOLON);
+	if (strncmp(token2, EF_UNLOAD, strlen(EF_UNLOAD)) == 0) {
+		pent->load = B_FALSE; /* cryptoadm unload */
+		if ((token2 = strtok(NULL, SEP_SEMICOLON)) == NULL) {
+			/* The entry contains a provider name:unload only */
+			free_entry(pent);
+			return (FAILURE);
+		}
+	}
 
-	if (token2 && ((rc = parse_dislist(token2, pent)) != SUCCESS)) {
+	/* need to get token3 first to satisfy nested strtok invocations */
+	token3 = strtok(NULL, SEP_SEMICOLON); /* optional */
+
+	/* parse supportedlist (or disabledlist if no supportedlist) */
+	if ((token2 != NULL) && ((rc = parse_sup_dis_list(token2, pent)) !=
+	    SUCCESS)) {
 		free_entry(pent);
 		return (rc);
 	}
 
-	if (token3 && ((rc = parse_dislist(token3, pent)) != SUCCESS)) {
+	/* parse disabledlist (if there's a supportedlist) */
+	if ((token3 != NULL) && ((rc = parse_sup_dis_list(token3, pent)) !=
+	    SUCCESS)) {
 		free_entry(pent);
 		return (rc);
 	}
@@ -272,14 +312,15 @@ interpret(char *buf, entry_t **ppent)
 
 
 /*
- * Add an entry to the end of an entry list. If the entry list is NULL, will
- * create an entry list with the pent.
+ * Add an entry about a provider from kcf.conf to the end of an entry list.
+ * If the entry list pplist is NULL, create the linked list with pent as the
+ * first element.
  */
 static int
 build_entrylist(entry_t *pent, entrylist_t **pplist)
 {
-	entrylist_t *pentlist;
-	entrylist_t *pcur;
+	entrylist_t	*pentlist;
+	entrylist_t	*pcur = NULL;
 
 	pentlist = malloc(sizeof (entrylist_t));
 	if (pentlist == NULL) {
@@ -305,7 +346,7 @@ build_entrylist(entry_t *pent, entrylist_t **pplist)
 
 /*
  * Find the entry with the "provname" name from the entry list and duplicate
- * it.
+ * it.  Called by getent_kef().
  */
 static entry_t *
 getent(char *provname, entrylist_t *entrylist)
@@ -335,7 +376,11 @@ getent(char *provname, entrylist_t *entrylist)
 }
 
 
-
+/*
+ * Free memory in entry_t.
+ * That is, the supported and disabled lists for a provider
+ * from kcf.conf.
+ */
 void
 free_entry(entry_t  *pent)
 {
@@ -349,6 +394,10 @@ free_entry(entry_t  *pent)
 }
 
 
+/*
+ * Free elements in a entrylist_t linked list,
+ * which lists providers in kcf.conf.
+ */
 void
 free_entrylist(entrylist_t *entrylist)
 {
@@ -364,21 +413,27 @@ free_entrylist(entrylist_t *entrylist)
 
 /*
  * Convert an entry to a string.  This routine builds a string for the entry
- * to be inserted in the config file.  Based on the content of each entry,
- * the result string can be one of the 4 forms:
- *  - name
+ * to be inserted in the kcf.conf file.  Based on the content of each entry,
+ * the result string can be one of these 6 forms:
  *  - name:supportedlist=m1,m2,...,mj
  *  - name:disabledlist=m1,m2,...,mj
  *  - name:supportedlist=m1,...,mj;disabledlist=m1,m2,...,mk
  *
- * Note that the caller is responsible for freeing the returned string.
+ *  - name:unload;supportedlist=m1,m2,...,mj
+ *  - name:unload;disabledlist=m1,m2,...,mj
+ *  - name:unload;supportedlist=m1,...,mj;disabledlist=m1,m2,...,mk
+ *
+ * Note that the caller is responsible for freeing the returned string
+ * (with free_entry()).
+ * See interpret() for the reverse of this function: converting a string
+ * to an entry_t.
  */
 char *
 ent2str(entry_t *pent)
 {
-	char	*buf;
-	mechlist_t  *phead;
-	boolean_t supflag = B_FALSE;
+	char		*buf;
+	mechlist_t	*pcur = NULL;
+	boolean_t	semicolon_separator = B_FALSE;
 
 
 	if (pent == NULL) {
@@ -395,12 +450,26 @@ ent2str(entry_t *pent)
 		return (NULL);
 	}
 
-	/* convert the supported list if any */
-	phead = pent->suplist;
-	if (phead != NULL) {
-		supflag = B_TRUE;
-
+	if (!pent->load) { /* add "unload" keyword */
 		if (strlcat(buf, SEP_COLON, BUFSIZ) >= BUFSIZ) {
+			free(buf);
+			return (NULL);
+		}
+
+		if (strlcat(buf, EF_UNLOAD, BUFSIZ) >= BUFSIZ) {
+			free(buf);
+			return (NULL);
+		}
+
+		semicolon_separator = B_TRUE;
+	}
+
+	/* convert the supported list if any */
+	pcur = pent->suplist;
+	if (pcur != NULL) {
+		if (strlcat(buf,
+		    semicolon_separator ? SEP_SEMICOLON : SEP_COLON,
+		    BUFSIZ) >= BUFSIZ) {
 			free(buf);
 			return (NULL);
 		}
@@ -410,14 +479,14 @@ ent2str(entry_t *pent)
 			return (NULL);
 		}
 
-		while (phead != NULL) {
-			if (strlcat(buf, phead->name, BUFSIZ) >= BUFSIZ) {
+		while (pcur != NULL) {
+			if (strlcat(buf, pcur->name, BUFSIZ) >= BUFSIZ) {
 				free(buf);
 				return (NULL);
 			}
 
-			phead = phead->next;
-			if (phead != NULL) {
+			pcur = pcur->next;
+			if (pcur != NULL) {
 				if (strlcat(buf, SEP_COMMA, BUFSIZ)
 				    >= BUFSIZ) {
 					free(buf);
@@ -425,31 +494,32 @@ ent2str(entry_t *pent)
 				}
 			}
 		}
+		semicolon_separator = B_TRUE;
 	}
 
 	/* convert the disabled list if any */
-	phead = pent->dislist;
-	if (phead != NULL) {
-		if (supflag) {
-			if (strlcat(buf, ";disabledlist=", BUFSIZ) >= BUFSIZ) {
-				free(buf);
-				return (NULL);
-			}
-		} else {
-			if (strlcat(buf, ":disabledlist=", BUFSIZ) >= BUFSIZ) {
-				free(buf);
-				return (NULL);
-			}
+	pcur = pent->dislist;
+	if (pcur != NULL) {
+		if (strlcat(buf,
+		    semicolon_separator ? SEP_SEMICOLON : SEP_COLON,
+		    BUFSIZ) >= BUFSIZ) {
+			free(buf);
+			return (NULL);
 		}
 
-		while (phead != NULL) {
-			if (strlcat(buf, phead->name, BUFSIZ) >= BUFSIZ) {
+		if (strlcat(buf, EF_DISABLED, BUFSIZ) >= BUFSIZ) {
+			free(buf);
+			return (NULL);
+		}
+
+		while (pcur != NULL) {
+			if (strlcat(buf, pcur->name, BUFSIZ) >= BUFSIZ) {
 				free(buf);
 				return (NULL);
 			}
 
-			phead = phead->next;
-			if (phead != NULL) {
+			pcur = pcur->next;
+			if (pcur != NULL) {
 				if (strlcat(buf, SEP_COMMA, BUFSIZ)
 				    >= BUFSIZ) {
 					free(buf);
@@ -457,6 +527,7 @@ ent2str(entry_t *pent)
 				}
 			}
 		}
+		semicolon_separator = B_TRUE;
 	}
 
 	if (strlcat(buf, "\n", BUFSIZ) >= BUFSIZ) {
@@ -476,11 +547,11 @@ ent2str(entry_t *pent)
 int
 enable_mechs(entry_t **ppent, boolean_t allflag, mechlist_t *mlist)
 {
-	entry_t *pent;
-	mechlist_t *phead; /* the current and resulting disabled list */
-	mechlist_t *ptr;
-	mechlist_t *pcur;
-	boolean_t found;
+	entry_t		*pent;
+	mechlist_t	*phead; /* the current and resulting disabled list */
+	mechlist_t	*ptr = NULL;
+	mechlist_t	*pcur = NULL;
+	boolean_t	found;
 
 	pent = *ppent;
 	if (pent == NULL) {
@@ -498,7 +569,7 @@ enable_mechs(entry_t **ppent, boolean_t allflag, mechlist_t *mlist)
 	 * for each mechanism in the to-be-enabled mechanism list,
 	 * -	check if it is in the current disabled list
 	 * -	if found, delete it from the disabled list
-	 * 	otherwise, give a warning.
+	 *	otherwise, give a warning.
 	 */
 	ptr = mlist;
 	while (ptr != NULL) {
@@ -540,6 +611,11 @@ enable_mechs(entry_t **ppent, boolean_t allflag, mechlist_t *mlist)
 }
 
 
+/*
+ * Determine if the kernel provider name, path, is a device
+ * (that is, it contains a slash character (e.g., "mca/0").
+ * If so, it is a hardware provider; otherwise it is a software provider.
+ */
 boolean_t
 is_device(char *path)
 {
@@ -552,7 +628,7 @@ is_device(char *path)
 
 /*
  * Split a hardware provider name with the "name/inst_num" format into
- * a name and a number.
+ * a name and a number (e.g., split "mca/0" into "mca" instance 0).
  */
 int
 split_hw_provname(char *provname, char *pname, int *inst_num)
@@ -581,17 +657,23 @@ split_hw_provname(char *provname, char *pname, int *inst_num)
 
 
 /*
- * Retrieve information from kcf.conf and build a device entry list and
- * a software entry list
+ * Retrieve information from kcf.conf and build a hardware device entry list
+ * and a software entry list of kernel crypto providers.
+ *
+ * This list is usually incomplete, as kernel crypto providers only have to
+ * be listed in kcf.conf if a mechanism is disabled (by cryptoadm) or
+ * if the kernel provider module is not one of the default kernel providers.
+ *
+ * The kcf.conf file is available only in the global zone.
  */
 int
 get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 {
-	FILE *pfile;
-	char buffer[BUFSIZ];
-	int len;
-	entry_t *pent = NULL;
-	int rc = SUCCESS;
+	FILE	*pfile = NULL;
+	char	buffer[BUFSIZ];
+	int	len;
+	entry_t	*pent = NULL;
+	int	rc = SUCCESS;
 
 	if ((pfile = fopen(_PATH_KCF_CONF, "r")) == NULL) {
 		cryptodebug("failed to open the kcf.conf file for read only");
@@ -607,7 +689,7 @@ get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 		}
 
 		len = strlen(buffer);
-		if (buffer[len-1] == '\n') { /* get rid of trailing '\n' */
+		if (buffer[len - 1] == '\n') { /* get rid of trailing '\n' */
 			len--;
 		}
 		buffer[len] = '\0';
@@ -637,24 +719,28 @@ get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 
 /*
  * Retrieve information from admin device and build a device entry list and
- * a software entry list.  This is used where there is no kcf.conf, e.g.
+ * a software entry list.  This is used where there is no kcf.conf, e.g., the
  * non-global zone.
  */
 int
 get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 {
-	crypto_get_dev_list_t *pdevlist_kernel = NULL;
-	crypto_get_soft_list_t *psoftlist_kernel = NULL;
-	char *devname;
-	int inst_num;
-	int mcount;
-	mechlist_t *pmech;
-	entry_t *pent = NULL;
-	int i;
-	char *psoftname;
-	entrylist_t *tmp_pdev = NULL;
-	entrylist_t *tmp_psoft = NULL;
+	crypto_get_dev_list_t	*pdevlist_kernel = NULL;
+	crypto_get_soft_list_t	*psoftlist_kernel = NULL;
+	char			*devname;
+	int			inst_num;
+	int			mcount;
+	mechlist_t		*pmech = NULL;
+	entry_t			*pent_dev = NULL, *pent_soft = NULL;
+	int			i;
+	char			*psoftname;
+	entrylist_t		*tmp_pdev = NULL;
+	entrylist_t		*tmp_psoft = NULL;
+	entrylist_t		*phardlist = NULL, *psoftlist = NULL;
 
+	/*
+	 * Get hardware providers
+	 */
 	if (get_dev_list(&pdevlist_kernel) != SUCCESS) {
 		cryptodebug("failed to get hardware provider list from kernel");
 		return (FAILURE);
@@ -674,28 +760,30 @@ get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 			goto fail_out;
 		}
 
-		if ((pent = malloc(sizeof (entry_t))) == NULL) {
+		if ((pent_dev = create_entry(devname)) == NULL) {
 			cryptodebug("out of memory.");
 			free_mechlist(pmech);
 			goto fail_out;
 		}
+		pent_dev->suplist = pmech;
+		pent_dev->sup_count = mcount;
 
-		(void) strlcpy(pent->name, devname, MAXNAMELEN);
-		pent->suplist = pmech;
-		pent->sup_count = mcount;
-		pent->dislist = NULL;
-		pent->dis_count = 0;
-
-		if (build_entrylist(pent, &tmp_pdev) != SUCCESS) {
+		if (build_entrylist(pent_dev, &tmp_pdev) != SUCCESS) {
 			goto fail_out;
 		}
-
-		/* because incorporated in tmp_pdev */
-		pent = NULL;
 	}
 
 	free(pdevlist_kernel);
 	pdevlist_kernel = NULL;
+
+	/*
+	 * Get software providers
+	 */
+	if (getzoneid() == GLOBAL_ZONEID) {
+		if (get_kcfconf_info(&phardlist, &psoftlist) != SUCCESS) {
+			goto fail_out;
+		}
+	}
 
 	if (get_soft_list(&psoftlist_kernel) != SUCCESS) {
 		cryptodebug("failed to get software provider list from kernel");
@@ -706,26 +794,23 @@ get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 	    i < psoftlist_kernel->sl_soft_count;
 	    i++, psoftname = psoftname + strlen(psoftname) + 1) {
 		pmech = NULL;
-		if (get_soft_info(psoftname, &pmech) != SUCCESS) {
+		if (get_soft_info(psoftname, &pmech, phardlist, psoftlist) !=
+		    SUCCESS) {
 			cryptodebug(
 			    "failed to retrieve the mechanism list for %s.",
 			    psoftname);
 			goto fail_out;
 		}
 
-		if ((pent = malloc(sizeof (entry_t))) == NULL) {
+		if ((pent_soft = create_entry(psoftname)) == NULL) {
 			cryptodebug("out of memory.");
 			free_mechlist(pmech);
 			goto fail_out;
 		}
+		pent_soft->suplist = pmech;
+		pent_soft->sup_count = get_mech_count(pmech);
 
-		(void) strlcpy(pent->name, psoftname, MAXNAMELEN);
-		pent->suplist = pmech;
-		pent->sup_count = get_mech_count(pmech);
-		pent->dislist = NULL;
-		pent->dis_count = 0;
-
-		if (build_entrylist(pent, &tmp_psoft) != SUCCESS) {
+		if (build_entrylist(pent_soft, &tmp_psoft) != SUCCESS) {
 			goto fail_out;
 		}
 	}
@@ -739,8 +824,10 @@ get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 	return (SUCCESS);
 
 fail_out:
-	if (pent != NULL)
-		free_entry(pent);
+	if (pent_dev != NULL)
+		free_entry(pent_dev);
+	if (pent_soft != NULL)
+		free_entry(pent_soft);
 
 	free_entrylist(tmp_pdev);
 	free_entrylist(tmp_psoft);
@@ -754,28 +841,36 @@ fail_out:
 }
 
 /*
- * Find the entry in the "kcf.conf" file with "provname" as the provider name.
- * Return the entry if found, otherwise return NULL.
+ * Return configuration information for a kernel provider from kcf.conf.
+ * For kernel software providers return a enabled list and disabled list.
+ * For kernel hardware providers return just a disabled list.
+ *
+ * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
+ * If NULL, this function calls get_kcfconf_info() internally.
  */
 entry_t *
-getent_kef(char *provname)
+getent_kef(char *provname, entrylist_t *phardlist, entrylist_t *psoftlist)
 {
-	entrylist_t *pdevlist = NULL;
-	entrylist_t *psoftlist = NULL;
-	entry_t *pent = NULL;
+	entry_t		*pent = NULL;
+	boolean_t	memory_allocated = B_FALSE;
 
-	if (get_kcfconf_info(&pdevlist, &psoftlist) != SUCCESS) {
-		return (NULL);
+	if ((phardlist == NULL) || (psoftlist == NULL)) {
+		if (get_kcfconf_info(&phardlist, &psoftlist) != SUCCESS) {
+			return (NULL);
+		}
+		memory_allocated = B_TRUE;
 	}
 
 	if (is_device(provname)) {
-		pent = getent(provname, pdevlist);
+		pent = getent(provname, phardlist);
 	} else {
 		pent = getent(provname, psoftlist);
 	}
 
-	free_entrylist(pdevlist);
-	free_entrylist(psoftlist);
+	if (memory_allocated) {
+		free_entrylist(phardlist);
+		free_entrylist(psoftlist);
+	}
 
 	return (pent);
 }
@@ -786,7 +881,7 @@ getent_kef(char *provname)
 void
 print_mechlist(char *provname, mechlist_t *pmechlist)
 {
-	mechlist_t *ptr;
+	mechlist_t *ptr = NULL;
 
 	if (provname == NULL) {
 		return;
@@ -812,32 +907,26 @@ print_mechlist(char *provname, mechlist_t *pmechlist)
 
 
 /*
- * Update the kcf.conf file based on the specified entry and the update mode.
- * - If update_mode is MODIFY_MODE or DELETE_MODE, the entry with the same
- *   provider name will be modified or deleted.
- * - If update_mode is ADD_MODE, this must be a hardware provider without
- *   an entry in the kcf.conf file yet.  Need to locate its driver package
- *   bracket and insert an entry into the bracket.
+ * Update the kcf.conf file based on the update mode:
+ * - If update_mode is MODIFY_MODE, modify the entry with the same name.
+ *   If not found, append a new entry to the kcf.conf file.
+ * - If update_mode is DELETE_MODE, delete the entry with the same name.
+ * - If update_mode is ADD_MODE, append a new entry to the kcf.conf file.
  */
 int
 update_kcfconf(entry_t *pent, int update_mode)
 {
 	boolean_t	add_it = B_FALSE;
 	boolean_t	delete_it = B_FALSE;
-	boolean_t	found_package = B_FALSE;
 	boolean_t	found_entry = B_FALSE;
-	FILE	*pfile;
-	FILE	*pfile_tmp;
-	char	buffer[BUFSIZ];
-	char	buffer2[BUFSIZ];
-	char	devname[MAXNAMELEN];
-	char	tmpfile_name[MAXPATHLEN];
-	char	*name;
-	char	*str;
-	char	*new_str = NULL;
-	int	inst_num;
-	int rc = SUCCESS;
-
+	FILE		*pfile = NULL;
+	FILE		*pfile_tmp = NULL;
+	char		buffer[BUFSIZ];
+	char		buffer2[BUFSIZ];
+	char		tmpfile_name[MAXPATHLEN];
+	char		*name;
+	char		*new_str = NULL;
+	int		rc = SUCCESS;
 
 	if (pent == NULL) {
 		cryptoerror(LOG_STDERR, gettext("internal error."));
@@ -845,25 +934,23 @@ update_kcfconf(entry_t *pent, int update_mode)
 	}
 
 	/* Check the update_mode */
-	if (update_mode == ADD_MODE) {
+	switch (update_mode) {
+	case ADD_MODE:
 		add_it = B_TRUE;
-		/* Get the hardware provider name first */
-		if (split_hw_provname(pent->name, devname, &inst_num) ==
-		    FAILURE) {
-			return (FAILURE);
-		}
-
-		/* Convert the entry to be a string  */
+		/* FALLTHROUGH */
+	case MODIFY_MODE:
+		/* Convert the entry a string to add to kcf.conf  */
 		if ((new_str = ent2str(pent)) == NULL) {
 			return (FAILURE);
 		}
-	} else if (update_mode == DELETE_MODE) {
+		break;
+	case DELETE_MODE:
 		delete_it = B_TRUE;
-	} else if (update_mode != MODIFY_MODE) {
+		break;
+	default:
 		cryptoerror(LOG_STDERR, gettext("internal error."));
 		return (FAILURE);
 	}
-
 
 	/* Open the kcf.conf file */
 	if ((pfile = fopen(_PATH_KCF_CONF, "r+")) == NULL) {
@@ -880,7 +967,7 @@ update_kcfconf(entry_t *pent, int update_mode)
 		err = errno;
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to update the configuration - %s"),
-			strerror(err));
+		    strerror(err));
 		(void) fclose(pfile);
 		return (FAILURE);
 	}
@@ -913,7 +1000,6 @@ update_kcfconf(entry_t *pent, int update_mode)
 	 */
 	while (fgets(buffer, BUFSIZ, pfile) != NULL) {
 		if (add_it) {
-			/* always keep the current line */
 			if (fputs(buffer, pfile_tmp) == EOF) {
 				err = errno;
 				cryptoerror(LOG_STDERR, gettext(
@@ -923,26 +1009,9 @@ update_kcfconf(entry_t *pent, int update_mode)
 				break;
 			}
 
-			/*
-			 * If the current position is the beginning of a driver
-			 * package and if the driver name matches the hardware
-			 * provider name, then we want to insert the entry
-			 * here.
-			 */
-			if ((strstr(buffer, HW_DRIVER_STRING) != NULL) &&
-			    (strstr(buffer, devname) != NULL)) {
-				found_package = B_TRUE;
-				if (fputs(new_str, pfile_tmp) == EOF) {
-					err = errno;
-					cryptoerror(LOG_STDERR, gettext(
-					    "failed to write to a temp file: "
-					    "%s."), strerror(err));
-					rc = FAILURE;
-					break;
-				}
-			}
 		} else { /* modify or delete */
 			found_entry = B_FALSE;
+
 			if (!(buffer[0] == '#' || buffer[0] == ' ' ||
 			    buffer[0] == '\n'|| buffer[0] == '\t')) {
 				/*
@@ -969,13 +1038,8 @@ update_kcfconf(entry_t *pent, int update_mode)
 				 * This is the entry to be updated; get the
 				 * updated string and place into buffer.
 				 */
-				if ((str = ent2str(pent)) == NULL) {
-					rc = FAILURE;
-					break;
-				} else {
-					(void) strlcpy(buffer, str, BUFSIZ);
-					free(str);
-				}
+				(void) strlcpy(buffer, new_str, BUFSIZ);
+				free(new_str);
 			}
 
 			if (!(found_entry && delete_it)) {
@@ -992,26 +1056,18 @@ update_kcfconf(entry_t *pent, int update_mode)
 		}
 	}
 
-	if (add_it) {
-		free(new_str);
-	}
-
-	if ((add_it && !found_package) || (rc == FAILURE)) {
-		if (add_it && !found_package) {
-			cryptoerror(LOG_STDERR,
-			    gettext("failed to update configuration - no "
-			    "driver package information."));
+	if ((!delete_it) && (rc != FAILURE)) {
+		if (add_it || !found_entry) {
+			/* append new entry to end of file */
+			if (fputs(new_str, pfile_tmp) == EOF) {
+				err = errno;
+				cryptoerror(LOG_STDERR, gettext(
+				    "failed to write to a temp file: %s."),
+				    strerror(err));
+				rc = FAILURE;
+			}
+			free(new_str);
 		}
-
-		(void) fclose(pfile);
-		(void) fclose(pfile_tmp);
-		if (unlink(tmpfile_name) != 0) {
-			err = errno;
-			cryptoerror(LOG_STDERR, gettext(
-			    "(Warning) failed to remove %s: %s"),
-			    tmpfile_name, strerror(err));
-		}
-		return (FAILURE);
 	}
 
 	(void) fclose(pfile);
@@ -1066,11 +1122,11 @@ int
 disable_mechs(entry_t **ppent, mechlist_t *infolist, boolean_t allflag,
 mechlist_t *dislist)
 {
-	entry_t *pent;
-	mechlist_t *plist;
-	mechlist_t *phead;
-	mechlist_t *pmech;
-	int rc = SUCCESS;
+	entry_t		*pent;
+	mechlist_t	*plist = NULL;
+	mechlist_t	*phead = NULL;
+	mechlist_t	*pmech = NULL;
+	int		rc = SUCCESS;
 
 	pent = *ppent;
 	if (pent == NULL) {
@@ -1131,9 +1187,9 @@ mechlist_t *dislist)
 boolean_t
 filter_mechlist(mechlist_t **pmechlist, const char *mech)
 {
-	int cnt = 0;
-	mechlist_t *ptr, *pptr;
-	boolean_t mech_present = B_FALSE;
+	int		cnt = 0;
+	mechlist_t	*ptr, *pptr;
+	boolean_t	mech_present = B_FALSE;
 
 	ptr = pptr = *pmechlist;
 
@@ -1172,21 +1228,22 @@ filter_mechlist(mechlist_t **pmechlist, const char *mech)
  * The flag has_random is set to B_TRUE if the provider does random
  * numbers. The flag has_mechs is set by the caller to B_TRUE if the provider
  * has some mechanisms.
+ *
+ * If pent is NULL, the provider doesn't have a kcf.conf entry.
  */
 void
-print_kef_policy(entry_t *pent, boolean_t has_random, boolean_t has_mechs)
+print_kef_policy(char *provname, entry_t *pent, boolean_t has_random,
+    boolean_t has_mechs)
 {
-	mechlist_t *ptr;
-	boolean_t rnd_disabled = B_FALSE;
+	mechlist_t	*ptr = NULL;
+	boolean_t	rnd_disabled = B_FALSE;
 
-	if (pent == NULL) {
-		return;
+	if (pent != NULL) {
+		rnd_disabled = filter_mechlist(&pent->dislist, RANDOM);
+		ptr = pent->dislist;
 	}
 
-	rnd_disabled = filter_mechlist(&pent->dislist, RANDOM);
-	ptr = pent->dislist;
-
-	(void) printf("%s:", pent->name);
+	(void) printf("%s:", provname);
 
 	if (has_mechs == B_TRUE) {
 		/*
@@ -1218,37 +1275,50 @@ print_kef_policy(entry_t *pent, boolean_t has_random, boolean_t has_mechs)
 	(void) printf("\n");
 }
 
+
 /*
  * Check if a kernel software provider is in the kernel.
+ *
+ * Parameters:
+ * provname		Provider name
+ * psoftlist_kernel	Optional software provider list.  If NULL, it will be
+ *			obtained from get_soft_list().
+ * in_kernel		Set to B_TRUE if device is in the kernel, else B_FALSE
  */
 int
-check_active_for_soft(char *provname, boolean_t *is_active)
+check_kernel_for_soft(char *provname, crypto_get_soft_list_t *psoftlist_kernel,
+    boolean_t *in_kernel)
 {
-	crypto_get_soft_list_t	*psoftlist_kernel = NULL;
-	char	*ptr;
-	int	i;
+	char		*ptr;
+	int		i;
+	boolean_t	psoftlist_allocated = B_FALSE;
 
 	if (provname == NULL) {
 		cryptoerror(LOG_STDERR, gettext("internal error."));
 		return (FAILURE);
 	}
 
-	if (get_soft_list(&psoftlist_kernel) == FAILURE) {
-		cryptodebug("failed to get the software provider list from"
-		    "kernel.");
-		return (FAILURE);
+	if (psoftlist_kernel == NULL) {
+		if (get_soft_list(&psoftlist_kernel) == FAILURE) {
+			cryptodebug("failed to get the software provider list"
+			" from kernel.");
+			return (FAILURE);
+		}
+		psoftlist_allocated = B_TRUE;
 	}
 
-	*is_active = B_FALSE;
+	*in_kernel = B_FALSE;
 	ptr = psoftlist_kernel->sl_soft_names;
 	for (i = 0; i < psoftlist_kernel->sl_soft_count; i++) {
 		if (strcmp(provname, ptr) == 0) {
-			*is_active = B_TRUE;
+			*in_kernel = B_TRUE;
 			break;
 		}
 		ptr = ptr + strlen(ptr) + 1;
 	}
-	free(psoftlist_kernel);
+
+	if (psoftlist_allocated)
+		free(psoftlist_kernel);
 
 	return (SUCCESS);
 }
@@ -1256,14 +1326,21 @@ check_active_for_soft(char *provname, boolean_t *is_active)
 
 /*
  * Check if a kernel hardware provider is in the kernel.
+ *
+ * Parameters:
+ * provname	Provider name
+ * pdevlist	Optional Hardware Crypto Device List.  If NULL, it will be
+ *		obtained from get_dev_list().
+ * in_kernel	Set to B_TRUE if device is in the kernel, otherwise B_FALSE
  */
 int
-check_active_for_hard(char *provname, boolean_t *is_active)
+check_kernel_for_hard(char *provname,
+    crypto_get_dev_list_t *pdevlist, boolean_t *in_kernel)
 {
-	crypto_get_dev_list_t	*pdevlist = NULL;
-	char 	devname[MAXNAMELEN];
-	int	inst_num;
-	int	i;
+	char		devname[MAXNAMELEN];
+	int		inst_num;
+	int		i;
+	boolean_t	dev_list_allocated = B_FALSE;
 
 	if (provname == NULL) {
 		cryptoerror(LOG_STDERR, gettext("internal error."));
@@ -1274,20 +1351,25 @@ check_active_for_hard(char *provname, boolean_t *is_active)
 		return (FAILURE);
 	}
 
-	if (get_dev_list(&pdevlist) == FAILURE) {
-		cryptoerror(LOG_STDERR, gettext("internal error."));
-		return (FAILURE);
+	if (pdevlist == NULL) {
+		if (get_dev_list(&pdevlist) == FAILURE) {
+			cryptoerror(LOG_STDERR, gettext("internal error."));
+			return (FAILURE);
+		}
+		dev_list_allocated = B_TRUE;
 	}
 
-	*is_active = B_FALSE;
+	*in_kernel = B_FALSE;
 	for (i = 0; i < pdevlist->dl_dev_count; i++) {
 		if ((strcmp(pdevlist->dl_devs[i].le_dev_name, devname) == 0) &&
 		    (pdevlist->dl_devs[i].le_dev_instance == inst_num)) {
-			*is_active = B_TRUE;
+			*in_kernel = B_TRUE;
 			break;
 		}
 	}
-	free(pdevlist);
+
+	if (dev_list_allocated)
+		free(pdevlist);
 
 	return (SUCCESS);
 }

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is part of the core Kernel Cryptographic Framework.
@@ -54,19 +52,33 @@
 
 #define	KCF_MAX_PROVIDERS	512	/* max number of providers */
 
-static kmutex_t prov_tab_mutex; /* ensure exclusive access to the table */
+/*
+ * Prov_tab is an array of providers which is updated when
+ * a crypto provider registers with kcf. The provider calls the
+ * SPI routine, crypto_register_provider(), which in turn calls
+ * kcf_prov_tab_add_provider().
+ *
+ * A provider unregisters by calling crypto_unregister_provider()
+ * which triggers the removal of the prov_tab entry.
+ * It also calls kcf_remove_mech_provider().
+ *
+ * prov_tab entries are not updated from kcf.conf or by cryptoadm(1M).
+ */
 static kcf_provider_desc_t **prov_tab = NULL;
+static kmutex_t prov_tab_mutex; /* ensure exclusive access to the table */
 static uint_t prov_tab_num = 0; /* number of providers in table */
 static uint_t prov_tab_max = KCF_MAX_PROVIDERS;
 
 #if DEBUG
 extern int kcf_frmwrk_debug;
-static void kcf_prov_tab_dump(void);
+static void kcf_prov_tab_dump(char *message);
 #endif /* DEBUG */
 
+
 /*
- * Initialize the providers table. The providers table is dynamically
- * allocated with prov_tab_max entries.
+ * Initialize a mutex and the KCF providers table, prov_tab.
+ * The providers table is dynamically allocated with prov_tab_max entries.
+ * Called from kcf module _init().
  */
 void
 kcf_prov_tab_init(void)
@@ -124,7 +136,7 @@ kcf_prov_tab_add_provider(kcf_provider_desc_t *prov_desc)
 
 #if DEBUG
 	if (kcf_frmwrk_debug >= 1)
-		kcf_prov_tab_dump();
+		kcf_prov_tab_dump("kcf_prov_tab_add_provider");
 #endif /* DEBUG */
 
 	return (CRYPTO_SUCCESS);
@@ -170,7 +182,7 @@ kcf_prov_tab_rem_provider(crypto_provider_id_t prov_id)
 
 #if DEBUG
 	if (kcf_frmwrk_debug >= 1)
-		kcf_prov_tab_dump();
+		kcf_prov_tab_dump("kcf_prov_tab_rem_provider");
 #endif /* DEBUG */
 
 	return (CRYPTO_SUCCESS);
@@ -817,21 +829,34 @@ kcf_get_sw_prov(crypto_mech_type_t mech_type, kcf_provider_desc_t **pd,
 }
 
 #if DEBUG
-
+/*
+ * Dump the Kernel crypto providers table, prov_tab.
+ * If kcf_frmwrk_debug is >=2, also dump the mechanism lists.
+ */
 static void
-kcf_prov_tab_dump(void)
+kcf_prov_tab_dump(char *message)
 {
-	uint_t i;
+	uint_t i, j;
 
 	mutex_enter(&prov_tab_mutex);
+	printf("Providers table prov_tab at %s:\n",
+	    message != NULL ? message : "");
 
-	printf("Providers table:\n");
 	for (i = 0; i < KCF_MAX_PROVIDERS; i++) {
-		if (prov_tab[i] != NULL) {
-			printf("[%d]: (%s) %s\n",
-			    i, (prov_tab[i]->pd_prov_type ==
-			    CRYPTO_HW_PROVIDER) ? "HW" : "SW",
-			    prov_tab[i]->pd_description);
+		kcf_provider_desc_t *p = prov_tab[i];
+		if (p != NULL) {
+			printf("[%d]: (%s) %d mechanisms, %s\n", i,
+			    (p->pd_prov_type == CRYPTO_HW_PROVIDER) ?
+			    "HW" : "SW",
+			    p->pd_mech_list_count, p->pd_description);
+			if (kcf_frmwrk_debug >= 2) {
+				printf("\tpd_mechanisms: ");
+				for (j = 0; j < p->pd_mech_list_count; ++j) {
+					printf("%s \n",
+					    p->pd_mechanisms[j].cm_mech_name);
+				}
+				printf("\n");
+			}
 		}
 	}
 	printf("(end of providers table)\n");

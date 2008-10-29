@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -33,72 +31,6 @@
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
-
-# Add hardware provider section for the n2cp driver
-# to /etc/crypto/kcf.conf
-
-pkg_start="# Start $PKGINST"
-pkg_end="# End $PKGINST"
-kcfconf=${BASEDIR}/etc/crypto/kcf.conf
-tmpfile=/tmp/$$kcfconf
-error=no
-
-#
-# If /etc/crypto/kcf.conf doesn't exist, bail immediately
-#
-if [ ! -f "$kcfconf" ]
-then
-	echo "$0: ERROR - $kcfconf doesn't exist"
-        exit 2
-fi
-
-#
-# If the package has been already installed, remove old entries
-#
-start=0
-end=0
-egrep -s "$pkg_start" $kcfconf && start=1
-egrep -s "$pkg_end" $kcfconf && end=1
-
-if [ $start -ne $end ] ; then
-	echo "$0: missing Start or End delimiters for $PKGINST in $kcfconf."
-	echo "$0: $kcfconf may be corrupted and was not updated."
-	error=yes
-	exit 2
-fi
-
-if [ $start -eq 1 ]
-then
-	cp -p $kcfconf $tmpfile || error=yes
-	sed -e "/$pkg_start/,/$pkg_end/d" $kcfconf > $tmpfile || error=yes
-else
-	cp -p $kcfconf $tmpfile || error=yes
-fi
-
-#
-# Append the delimiters for this package
-#
-echo "$pkg_start driver_names=n2cp" >> $tmpfile || error=yes
-echo "$pkg_end" >> $tmpfile || error=yes
-
-#
-# Install the updated config file and clean up the tmp file
-#
-if [ "$error" = no ]
-then
-	mv $tmpfile $kcfconf || error=yes
-fi
-rm -f $tmpfile
-
-#
-# All done, if any of the steps above fail, report the error
-#
-if [ "$error" = yes ]
-then
-	echo "$0: ERROR - failed to update $kcfconf."
-        exit 2
-fi
-
 NAMEMAJOR="${BASEDIR}/etc/name_to_major"
 
 if [ "${BASEDIR:=/}" = "/" ]

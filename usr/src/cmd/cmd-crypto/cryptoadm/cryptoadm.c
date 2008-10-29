@@ -248,9 +248,9 @@ usage(void)
 /*
  * Get the provider type.  This function returns
  * - PROV_UEF_LIB if provname contains an absolute path name
- * - PROV_KEF_SOFT if provname is a base name only
+ * - PROV_KEF_SOFT if provname is a base name only (e.g., "aes").
  * - PROV_KEF_HARD if provname contains one slash only and the slash is not
- *	the 1st character.
+ *	the 1st character (e.g., "mca/0").
  * - PROV_BADNAME otherwise.
  */
 static int
@@ -287,11 +287,11 @@ get_provider_type(char *provname)
 static cryptoadm_provider_t *
 get_provider(int argc, char **argv)
 {
-	int c = 0;
-	boolean_t found = B_FALSE;
-	cryptoadm_provider_t *provider = NULL;
-	char *provstr = NULL, *savstr;
-	boolean_t is_metaslot = B_FALSE;
+	int			c = 0;
+	boolean_t		found = B_FALSE;
+	cryptoadm_provider_t	*provider = NULL;
+	char			*provstr = NULL, *savstr;
+	boolean_t		is_metaslot = B_FALSE;
 
 	while (!found && ++c < argc) {
 		if (strncmp(argv[c], METASLOT_KEYWORD,
@@ -457,21 +457,21 @@ process_feature_operands(int argc, char **argv)
  * mechanism operands and save it in the static variable mecharglist.
  *
  * This function returns
- * 	ERROR_USAGE: mechanism operand is missing.
- * 	FAILURE: out of memory.
- * 	SUCCESS: otherwise.
+ *	ERROR_USAGE: mechanism operand is missing.
+ *	FAILURE: out of memory.
+ *	SUCCESS: otherwise.
  */
 static int
 process_mech_operands(int argc, char **argv, boolean_t quiet)
 {
-	mechlist_t *pmech;
-	mechlist_t *pcur = NULL;
-	mechlist_t *phead = NULL;
-	boolean_t found = B_FALSE;
-	char *mechliststr = NULL;
-	char *curmech = NULL;
-	int c = -1;
-	int rc = SUCCESS;
+	mechlist_t	*pmech;
+	mechlist_t	*pcur = NULL;
+	mechlist_t	*phead = NULL;
+	boolean_t	found = B_FALSE;
+	char		*mechliststr = NULL;
+	char		*curmech = NULL;
+	int		c = -1;
+	int		rc = SUCCESS;
 
 	while (!found && ++c < argc) {
 		if ((strncmp(argv[c], KN_MECH, strlen(KN_MECH)) == 0) &&
@@ -489,8 +489,8 @@ process_mech_operands(int argc, char **argv, boolean_t quiet)
 			 * view it as a literal keyword.
 			 */
 			cryptoerror(LOG_STDERR,
-				gettext("the %s operand is missing.\n"),
-				"mechanism");
+			    gettext("the %s operand is missing.\n"),
+			    "mechanism");
 		return (ERROR_USAGE);
 	}
 	(void) strtok(argv[c], "=");
@@ -530,17 +530,17 @@ process_mech_operands(int argc, char **argv, boolean_t quiet)
 
 
 /*
- * The top level function for the list subcommand and options.
+ * The top level function for the "cryptoadm list" subcommand and options.
  */
 static int
 do_list(int argc, char **argv)
 {
-	boolean_t	mflag = B_FALSE;
-	boolean_t	pflag = B_FALSE;
-	boolean_t	vflag = B_FALSE;
-	char	ch;
-	cryptoadm_provider_t 	*prov = NULL;
-	int	rc = SUCCESS;
+	boolean_t		mflag = B_FALSE;
+	boolean_t		pflag = B_FALSE;
+	boolean_t		vflag = B_FALSE;
+	char			ch;
+	cryptoadm_provider_t	*prov = NULL;
+	int			rc = SUCCESS;
 
 	argc -= 1;
 	argv += 1;
@@ -551,7 +551,7 @@ do_list(int argc, char **argv)
 	}
 
 	/*
-	 * [-v] [-m] [-p] [provider=<>] [mechanism=<>]
+	 * cryptoadm list [-v] [-m] [-p] [provider=<>] [mechanism=<>]
 	 */
 	if (argc > 5) {
 		usage();
@@ -631,21 +631,23 @@ do_list(int argc, char **argv)
 		rc = ERROR_USAGE;
 		goto out;
 	} else { /* do the listing for a provider only */
+		char	*provname = prov->cp_name;
+
 		if (mflag || vflag) {
 			if (vflag)
 				(void) printf(gettext("Provider: %s\n"),
-					prov->cp_name);
+				    provname);
 			switch (prov->cp_type) {
 			case PROV_UEF_LIB:
-				rc = list_mechlist_for_lib(prov->cp_name,
-					mecharglist, NULL, B_FALSE,
-					vflag, mflag);
+				rc = list_mechlist_for_lib(provname,
+				    mecharglist, NULL, B_FALSE, vflag, mflag);
 				break;
 			case PROV_KEF_SOFT:
-				rc = list_mechlist_for_soft(prov->cp_name);
+				rc = list_mechlist_for_soft(provname,
+				    NULL, NULL);
 				break;
 			case PROV_KEF_HARD:
-				rc = list_mechlist_for_hard(prov->cp_name);
+				rc = list_mechlist_for_hard(provname);
 				break;
 			default: /* should not come here */
 				rc = FAILURE;
@@ -654,12 +656,12 @@ do_list(int argc, char **argv)
 		} else if (pflag) {
 			switch (prov->cp_type) {
 			case PROV_UEF_LIB:
-				rc = list_policy_for_lib(prov->cp_name);
+				rc = list_policy_for_lib(provname);
 				break;
 			case PROV_KEF_SOFT:
 				if (getzoneid() == GLOBAL_ZONEID) {
-					rc = list_policy_for_soft(
-					    prov->cp_name);
+					rc = list_policy_for_soft(provname,
+					    NULL, NULL);
 				} else {
 					/*
 					 * TRANSLATION_NOTE
@@ -676,7 +678,7 @@ do_list(int argc, char **argv)
 			case PROV_KEF_HARD:
 				if (getzoneid() == GLOBAL_ZONEID) {
 					rc = list_policy_for_hard(
-					    prov->cp_name);
+					    provname, NULL, NULL, NULL);
 				} else {
 					/*
 					 * TRANSLATION_NOTE
@@ -713,14 +715,14 @@ out:
 
 
 /*
- * The top level function for the disable subcommand.
+ * The top level function for the "cryptoadm disable" subcommand.
  */
 static int
 do_disable(int argc, char **argv)
 {
 	cryptoadm_provider_t	*prov = NULL;
-	int	rc = SUCCESS;
-	boolean_t auto_key_migrate_flag = B_FALSE;
+	int			rc = SUCCESS;
+	boolean_t		auto_key_migrate_flag = B_FALSE;
 
 	if ((argc < 3) || (argc > 5)) {
 		usage();
@@ -752,7 +754,7 @@ do_disable(int argc, char **argv)
 			return (rc);
 		}
 	} else if (!allflag && !rndflag &&
-		(rc = process_mech_operands(argc, argv, B_FALSE)) != SUCCESS) {
+	    (rc = process_mech_operands(argc, argv, B_FALSE)) != SUCCESS) {
 			return (rc);
 	}
 
@@ -830,15 +832,16 @@ out:
 
 
 /*
- * The top level function fo the enable subcommand.
+ * The top level function for the "cryptoadm enable" subcommand.
  */
 static int
 do_enable(int argc, char **argv)
 {
-	cryptoadm_provider_t 	*prov = NULL;
-	int	rc = SUCCESS;
-	char *alt_token = NULL, *alt_slot = NULL;
-	boolean_t use_default = B_FALSE, auto_key_migrate_flag = B_FALSE;
+	cryptoadm_provider_t	*prov = NULL;
+	int			rc = SUCCESS;
+	char 			*alt_token = NULL, *alt_slot = NULL;
+	boolean_t		use_default = B_FALSE;
+	boolean_t		auto_key_migrate_flag = B_FALSE;
 
 	if ((argc < 3) || (argc > 6)) {
 		usage();
@@ -944,12 +947,12 @@ out:
 
 
 /*
- * The top level function fo the install subcommand.
+ * The top level function for the "cryptoadm install" subcommand.
  */
 static int
 do_install(int argc, char **argv)
 {
-	cryptoadm_provider_t 	*prov = NULL;
+	cryptoadm_provider_t	*prov = NULL;
 	int	rc;
 
 	if (argc < 3) {
@@ -1034,12 +1037,12 @@ out:
 
 
 /*
- * The top level function for the uninstall subcommand.
+ * The top level function for the "cryptoadm uninstall" subcommand.
  */
 static int
 do_uninstall(int argc, char **argv)
 {
-	cryptoadm_provider_t 	*prov = NULL;
+	cryptoadm_provider_t	*prov = NULL;
 	int	rc = SUCCESS;
 
 	if (argc != 3) {
@@ -1064,8 +1067,10 @@ do_uninstall(int argc, char **argv)
 
 	if (prov->cp_type == PROV_UEF_LIB) {
 		rc = uninstall_uef_lib(prov->cp_name);
+
 	} else if (prov->cp_type == PROV_KEF_SOFT) {
 		if (getzoneid() == GLOBAL_ZONEID) {
+			/* unload and remove from kcf.conf */
 			rc = uninstall_kef(prov->cp_name);
 		} else {
 			/*
@@ -1089,15 +1094,16 @@ do_uninstall(int argc, char **argv)
 
 
 /*
- * The top level function for the unload subcommand.
+ * The top level function for the "cryptoadm unload" subcommand.
  */
 static int
 do_unload(int argc, char **argv)
 {
-	cryptoadm_provider_t 	*prov = NULL;
-	entry_t	*pent;
-	boolean_t	is_active;
-	int rc = SUCCESS;
+	cryptoadm_provider_t	*prov = NULL;
+	entry_t			*pent = NULL;
+	boolean_t		in_kernel = B_FALSE;
+	int			rc = SUCCESS;
+	char			*provname = NULL;
 
 	if (argc != 3) {
 		usage();
@@ -1111,10 +1117,11 @@ do_unload(int argc, char **argv)
 		    gettext("unable to determine provider name."));
 		goto out;
 	}
+	provname = prov->cp_name;
 	if (prov->cp_type != PROV_KEF_SOFT) {
 		cryptoerror(LOG_STDERR,
 		    gettext("%s is not a valid kernel software provider."),
-		    prov->cp_name);
+		    provname);
 		rc = FAILURE;
 		goto out;
 	}
@@ -1133,43 +1140,52 @@ do_unload(int argc, char **argv)
 		goto out;
 	}
 
-	/* Check if it is in the kcf.conf file first */
-	if ((pent = getent_kef(prov->cp_name)) == NULL) {
+	if (check_kernel_for_soft(provname, NULL, &in_kernel) == FAILURE) {
+		cryptodebug("internal error");
+		rc = FAILURE;
+		goto out;
+	} else if (in_kernel == B_FALSE) {
 		cryptoerror(LOG_STDERR,
-		    gettext("provider %s does not exist."), prov->cp_name);
+		    gettext("provider %s is not loaded or does not exist."),
+		    provname);
 		rc = FAILURE;
 		goto out;
 	}
-	free_entry(pent);
+
+	/* Get kcf.conf entry.  If none, build a new entry */
+	if ((pent = getent_kef(provname, NULL, NULL)) == NULL) {
+		if ((pent = create_entry(provname)) == NULL) {
+			cryptoerror(LOG_STDERR, gettext("out of memory."));
+			rc = FAILURE;
+			goto out;
+		}
+	}
 
 	/* If it is unloaded already, return  */
-	if (check_active_for_soft(prov->cp_name, &is_active) == FAILURE) {
-		cryptodebug("internal error");
+	if (!pent->load) { /* unloaded already */
 		cryptoerror(LOG_STDERR,
-		    gettext("failed to unload %s."), prov->cp_name);
+		    gettext("failed to unload %s."), provname);
 		rc = FAILURE;
 		goto out;
-	}
-
-	if (is_active == B_FALSE) { /* unloaded already */
-		rc = SUCCESS;
-		goto out;
-	} else if (unload_kef_soft(prov->cp_name, B_TRUE) == FAILURE) {
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to unload %s."), prov->cp_name);
-		rc = FAILURE;
+	} else if (unload_kef_soft(provname) != FAILURE) {
+		/* Mark as unloaded in kcf.conf */
+		pent->load = B_FALSE;
+		rc = update_kcfconf(pent, MODIFY_MODE);
 	} else {
-		rc = SUCCESS;
+		cryptoerror(LOG_STDERR,
+		    gettext("failed to unload %s."), provname);
+		rc = FAILURE;
 	}
 out:
 	free(prov);
+	free_entry(pent);
 	return (rc);
 }
 
 
 
 /*
- * The top level function for the refresh subcommand.
+ * The top level function for the "cryptoadm refresh" subcommand.
  */
 static int
 do_refresh(int argc)
@@ -1179,19 +1195,20 @@ do_refresh(int argc)
 		return (ERROR_USAGE);
 	}
 
-	/*
-	 * Note:  in non-global zone, this must silently return SUCCESS
-	 * due to integration with SMF, for "svcadm refresh cryptosvc"
-	 */
-	if (getzoneid() != GLOBAL_ZONEID)
+	if (getzoneid() == GLOBAL_ZONEID) {
+		return (refresh());
+	} else { /* non-global zone */
+		/*
+		 * Note:  in non-global zone, this must silently return SUCCESS
+		 * due to integration with SMF, for "svcadm refresh cryptosvc"
+		 */
 		return (SUCCESS);
-
-	return (refresh());
+	}
 }
 
 
 /*
- * The top level function for the start subcommand.
+ * The top level function for the "cryptoadm start" subcommand.
  */
 static int
 do_start(int argc)
@@ -1211,7 +1228,7 @@ do_start(int argc)
 }
 
 /*
- * The top level function for the stop subcommand.
+ * The top level function for the "cryptoadm stop" subcommand.
  */
 static int
 do_stop(int argc)
@@ -1227,34 +1244,28 @@ do_stop(int argc)
 
 
 /*
- * List all the providers.
+ * Print a list all the the providers.
+ * Called for "cryptoadm list" or "cryptoadm list -v" (no -m or -p).
  */
 static int
 list_simple_for_all(boolean_t verbose)
 {
-	uentrylist_t	*pliblist;
-	uentrylist_t	*plibptr;
-	entrylist_t	*pdevlist_conf;
-	entrylist_t	*psoftlist_conf;
-	entrylist_t	*pdevlist_zone;
-	entrylist_t	*psoftlist_zone;
-	entrylist_t	*ptr;
+	uentrylist_t		*pliblist = NULL;
+	uentrylist_t		*plibptr = NULL;
+	entry_t			*pent = NULL;
 	crypto_get_dev_list_t	*pdevlist_kernel = NULL;
-	boolean_t	is_active;
-	int	ru = SUCCESS;
-	int	rs = SUCCESS;
-	int	rd = SUCCESS;
-	int	i;
+	int			rc = SUCCESS;
+	int			i;
 
 	/* get user-level providers */
 	(void) printf(gettext("\nUser-level providers:\n"));
 	if (get_pkcs11conf_info(&pliblist) != SUCCESS) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "failed to retrieve the list of user-level providers."));
-		ru = FAILURE;
+		rc = FAILURE;
 	}
-	plibptr = pliblist;
-	while (plibptr != NULL) {
+
+	for (plibptr = pliblist; plibptr != NULL; plibptr = plibptr->next) {
 		if (strcmp(plibptr->puent->name, METASLOT_KEYWORD) != 0) {
 			(void) printf(gettext("Provider: %s\n"),
 			    plibptr->puent->name);
@@ -1265,7 +1276,6 @@ list_simple_for_all(boolean_t verbose)
 				(void) printf("\n");
 			}
 		}
-		plibptr = plibptr->next;
 	}
 	free_uentrylist(pliblist);
 
@@ -1273,51 +1283,58 @@ list_simple_for_all(boolean_t verbose)
 	(void) printf(gettext("\nKernel software providers:\n"));
 
 	if (getzoneid() == GLOBAL_ZONEID) {
-		/* use kcf.conf for kernel software providers in global zone */
-		pdevlist_conf = NULL;
-		psoftlist_conf = NULL;
+		/* get kernel software providers from kernel ioctl */
+		crypto_get_soft_list_t		*psoftlist_kernel = NULL;
+		uint_t				sl_soft_count;
+		char				*psoftname;
+		entrylist_t			*pdevlist_conf = NULL;
+		entrylist_t			*psoftlist_conf = NULL;
 
-		if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf) !=
-		    SUCCESS) {
-			cryptoerror(LOG_STDERR,
-			    gettext("failed to retrieve the "
-			    "list of kernel software providers.\n"));
-			rs = FAILURE;
-		}
+		if (get_soft_list(&psoftlist_kernel) == FAILURE) {
+			cryptoerror(LOG_ERR, gettext("Failed to retrieve the "
+			    "software provider list from kernel."));
+			rc = FAILURE;
+		} else {
+			sl_soft_count = psoftlist_kernel->sl_soft_count;
 
-		ptr = psoftlist_conf;
-		while (ptr != NULL) {
-			if (check_active_for_soft(ptr->pent->name, &is_active)
+			if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf)
 			    == FAILURE) {
-				rs = FAILURE;
-				cryptoerror(LOG_STDERR, gettext("failed to "
-				    "get the state of a kernel software "
-				    "providers.\n"));
-				break;
-			}
-
-			(void) printf("\t%s", ptr->pent->name);
-			if (is_active == B_FALSE) {
-				(void) printf(gettext(" (inactive)\n"));
+				cryptoerror(LOG_ERR,
+				    "failed to retrieve the providers' "
+				    "information from file kcf.conf - %s.",
+				    _PATH_KCF_CONF);
+				free(psoftlist_kernel);
+				rc = FAILURE;
 			} else {
-				(void) printf("\n");
+
+				for (i = 0,
+				    psoftname = psoftlist_kernel->sl_soft_names;
+				    i < sl_soft_count;
+				    ++i, psoftname += strlen(psoftname) + 1) {
+					pent = getent_kef(psoftname,
+					    pdevlist_conf, psoftlist_conf);
+					(void) printf("\t%s%s\n", psoftname,
+					    (pent == NULL) || (pent->load) ?
+					    "" : gettext(" (inactive)"));
+				}
+				free_entrylist(pdevlist_conf);
+				free_entrylist(psoftlist_conf);
 			}
-			ptr = ptr->next;
+			free(psoftlist_kernel);
 		}
 
-		free_entrylist(pdevlist_conf);
-		free_entrylist(psoftlist_conf);
 	} else {
 		/* kcf.conf not there in non-global zone, use /dev/cryptoadm */
-		pdevlist_zone = NULL;
-		psoftlist_zone = NULL;
+		entrylist_t	*pdevlist_zone = NULL;
+		entrylist_t	*psoftlist_zone = NULL;
+		entrylist_t	*ptr;
 
 		if (get_admindev_info(&pdevlist_zone, &psoftlist_zone) !=
 		    SUCCESS) {
 			cryptoerror(LOG_STDERR,
 			    gettext("failed to retrieve the "
 			    "list of kernel software providers.\n"));
-			rs = FAILURE;
+			rc = FAILURE;
 		}
 
 		ptr = psoftlist_zone;
@@ -1335,7 +1352,7 @@ list_simple_for_all(boolean_t verbose)
 	if (get_dev_list(&pdevlist_kernel) == FAILURE) {
 		cryptoerror(LOG_STDERR, gettext("failed to retrieve "
 		    "the list of kernel hardware providers.\n"));
-		rd = FAILURE;
+		rc = FAILURE;
 	} else {
 		for (i = 0; i < pdevlist_kernel->dl_dev_count; i++) {
 			(void) printf("\t%s/%d\n",
@@ -1345,38 +1362,30 @@ list_simple_for_all(boolean_t verbose)
 	}
 	free(pdevlist_kernel);
 
-	if (ru == FAILURE || rs == FAILURE || rd == FAILURE) {
-		return (FAILURE);
-	} else {
-		return (SUCCESS);
-	}
+	return (rc);
 }
 
 
 
 /*
  * List all the providers. And for each provider, list the mechanism list.
+ * Called for "cryptoadm list -m" or "cryptoadm list -mv" .
  */
 static int
 list_mechlist_for_all(boolean_t verbose)
 {
-	crypto_get_dev_list_t	*pdevlist_kernel;
-	uentrylist_t	*pliblist;
-	uentrylist_t	*plibptr;
-	entrylist_t	*pdevlist_conf;
-	entrylist_t	*psoftlist_conf;
-	entrylist_t	*pdevlist_zone;
-	entrylist_t	*psoftlist_zone;
-	entrylist_t	*ptr;
-	mechlist_t	*pmechlist;
-	boolean_t	is_active;
-	char	provname[MAXNAMELEN];
-	char	devname[MAXNAMELEN];
-	int 	inst_num;
-	int	count;
-	int	i;
-	int	rv;
-	int	rc = SUCCESS;
+	crypto_get_dev_list_t	*pdevlist_kernel = NULL;
+	uentrylist_t		*pliblist = NULL;
+	uentrylist_t		*plibptr = NULL;
+	entry_t			*pent = NULL;
+	mechlist_t		*pmechlist = NULL;
+	char			provname[MAXNAMELEN];
+	char			devname[MAXNAMELEN];
+	int			inst_num;
+	int			count;
+	int			i;
+	int			rv;
+	int			rc = SUCCESS;
 
 	/* get user-level providers */
 	(void) printf(gettext("\nUser-level providers:\n"));
@@ -1410,6 +1419,7 @@ list_mechlist_for_all(boolean_t verbose)
 
 	/* get kernel software providers */
 	(void) printf(gettext("\nKernel software providers:\n"));
+
 	/*
 	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
@@ -1417,48 +1427,57 @@ list_mechlist_for_all(boolean_t verbose)
 	 */
 	(void) printf(gettext("==========================\n"));
 	if (getzoneid() == GLOBAL_ZONEID) {
-		/* use kcf.conf for kernel software providers in global zone */
-		pdevlist_conf = NULL;
-		psoftlist_conf = NULL;
+		/* get kernel software providers from kernel ioctl */
+		crypto_get_soft_list_t		*psoftlist_kernel = NULL;
+		uint_t				sl_soft_count;
+		char				*psoftname;
+		int				i;
+		entrylist_t			*pdevlist_conf = NULL;
+		entrylist_t			*psoftlist_conf = NULL;
 
-		if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf) !=
-		    SUCCESS) {
-			cryptoerror(LOG_STDERR, gettext("failed to retrieve "
-			    "the list of kernel software providers.\n"));
-			rc = FAILURE;
+		if (get_soft_list(&psoftlist_kernel) == FAILURE) {
+			cryptoerror(LOG_ERR, gettext("Failed to retrieve the "
+			    "software provider list from kernel."));
+			return (FAILURE);
+		}
+		sl_soft_count = psoftlist_kernel->sl_soft_count;
+
+		if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf)
+		    == FAILURE) {
+			cryptoerror(LOG_ERR,
+			    "failed to retrieve the providers' "
+			    "information from file kcf.conf - %s.",
+			    _PATH_KCF_CONF);
+			free(psoftlist_kernel);
+			return (FAILURE);
 		}
 
-		ptr = psoftlist_conf;
-		while (ptr != NULL) {
-			if (check_active_for_soft(ptr->pent->name, &is_active)
-			    == SUCCESS) {
-				if (is_active) {
-					rv = list_mechlist_for_soft(
-					    ptr->pent->name);
-					if (rv == FAILURE) {
-						rc = FAILURE;
-					}
-				} else {
-					(void) printf(gettext(
-					    "%s: (inactive)\n"),
-					    ptr->pent->name);
+		for (i = 0, psoftname = psoftlist_kernel->sl_soft_names;
+		    i < sl_soft_count;
+		    ++i, psoftname += strlen(psoftname) + 1) {
+			pent = getent_kef(psoftname, pdevlist_conf,
+			    psoftlist_conf);
+			if ((pent == NULL) || (pent->load)) {
+				rv = list_mechlist_for_soft(psoftname,
+				    NULL, NULL);
+				if (rv == FAILURE) {
+					rc = FAILURE;
 				}
 			} else {
-				/* should not happen */
-				(void) printf(gettext(
-				    "%s: failed to get the mechanism list.\n"),
-				    ptr->pent->name);
-				rc = FAILURE;
+				(void) printf(gettext("%s: (inactive)\n"),
+				    psoftname);
 			}
-			ptr = ptr->next;
 		}
 
+		free(psoftlist_kernel);
 		free_entrylist(pdevlist_conf);
 		free_entrylist(psoftlist_conf);
+
 	} else {
 		/* kcf.conf not there in non-global zone, use /dev/cryptoadm */
-		pdevlist_zone = NULL;
-		psoftlist_zone = NULL;
+		entrylist_t	*pdevlist_zone = NULL;
+		entrylist_t	*psoftlist_zone = NULL;
+		entrylist_t	*ptr;
 
 		if (get_admindev_info(&pdevlist_zone, &psoftlist_zone) !=
 		    SUCCESS) {
@@ -1467,16 +1486,15 @@ list_mechlist_for_all(boolean_t verbose)
 			rc = FAILURE;
 		}
 
-		ptr = psoftlist_zone;
-		while (ptr != NULL) {
-			rv = list_mechlist_for_soft(ptr->pent->name);
+		for (ptr = psoftlist_zone; ptr != NULL; ptr = ptr->next) {
+			rv = list_mechlist_for_soft(ptr->pent->name,
+			    pdevlist_zone, psoftlist_zone);
 			if (rv == FAILURE) {
 				(void) printf(gettext(
 				    "%s: failed to get the mechanism list.\n"),
 				    ptr->pent->name);
 				rc = FAILURE;
 			}
-			ptr = ptr->next;
 		}
 
 		free_entrylist(pdevlist_zone);
@@ -1522,21 +1540,21 @@ list_mechlist_for_all(boolean_t verbose)
 
 /*
  * List all the providers. And for each provider, list the policy information.
+ * Called for "cryptoadm list -p".
  */
 static int
 list_policy_for_all(void)
 {
-	crypto_get_dev_list_t	*pdevlist_kernel;
-	uentrylist_t	*pliblist;
-	uentrylist_t	*plibptr;
-	entrylist_t	*pdevlist_conf;
-	entrylist_t	*psoftlist_conf;
-	entrylist_t	*ptr;
-	entrylist_t	*phead;
-	boolean_t	found;
-	char	provname[MAXNAMELEN];
-	int	i;
-	int	rc = SUCCESS;
+	crypto_get_dev_list_t	*pdevlist_kernel = NULL;
+	uentrylist_t		*pliblist = NULL;
+	entrylist_t		*pdevlist_conf = NULL;
+	entrylist_t		*psoftlist_conf = NULL;
+	entrylist_t		*ptr = NULL;
+	entrylist_t		*phead = NULL;
+	boolean_t		found = B_FALSE;
+	char			provname[MAXNAMELEN];
+	int			i;
+	int			rc = SUCCESS;
 
 	/* Get user-level providers */
 	(void) printf(gettext("\nUser-level providers:\n"));
@@ -1549,8 +1567,10 @@ list_policy_for_all(void)
 	if (get_pkcs11conf_info(&pliblist) == FAILURE) {
 		cryptoerror(LOG_STDERR, gettext("failed to retrieve "
 		    "the list of user-level providers.\n"));
+		rc = FAILURE;
 	} else {
-		plibptr = pliblist;
+		uentrylist_t	*plibptr = pliblist;
+
 		while (plibptr != NULL) {
 			/* skip metaslot entry */
 			if (strcmp(plibptr->puent->name,
@@ -1574,27 +1594,30 @@ list_policy_for_all(void)
 	 */
 	(void) printf(gettext("==========================\n"));
 
-	/* Get all entries from the kcf.conf file */
-	pdevlist_conf = NULL;
+	/* Get all entries from the kernel */
 	if (getzoneid() == GLOBAL_ZONEID) {
-		/* use kcf.conf for kernel software providers in global zone */
-		psoftlist_conf = NULL;
+		/* get kernel software providers from kernel ioctl */
+		crypto_get_soft_list_t		*psoftlist_kernel = NULL;
+		uint_t				sl_soft_count;
+		char				*psoftname;
+		int				i;
 
-		if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf) ==
-		    FAILURE) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "failed to retrieve the list of kernel "
-			    "providers.\n"));
-			return (FAILURE);
+		if (get_soft_list(&psoftlist_kernel) == FAILURE) {
+			cryptoerror(LOG_ERR, gettext("Failed to retrieve the "
+			    "software provider list from kernel."));
+			rc = FAILURE;
+		} else {
+			sl_soft_count = psoftlist_kernel->sl_soft_count;
+
+			for (i = 0, psoftname = psoftlist_kernel->sl_soft_names;
+			    i < sl_soft_count;
+			    ++i, psoftname += strlen(psoftname) + 1) {
+				(void) list_policy_for_soft(psoftname,
+				    pdevlist_conf, psoftlist_conf);
+			}
+			free(psoftlist_kernel);
 		}
 
-		ptr = psoftlist_conf;
-		while (ptr != NULL) {
-			(void) list_policy_for_soft(ptr->pent->name);
-			ptr = ptr->next;
-		}
-
-		free_entrylist(psoftlist_conf);
 	} else {
 		/* kcf.conf not there in non-global zone, no policy info */
 
@@ -1631,9 +1654,16 @@ list_policy_for_all(void)
 	if (get_dev_list(&pdevlist_kernel) != SUCCESS) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "failed to retrieve the list of hardware providers.\n"));
-		free_entrylist(pdevlist_conf);
 		return (FAILURE);
 	}
+
+	if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf) == FAILURE) {
+		cryptoerror(LOG_ERR, "failed to retrieve the providers' "
+		    "information from file kcf.conf - %s.",
+		    _PATH_KCF_CONF);
+		return (FAILURE);
+	}
+
 
 	/*
 	 * For each hardware provider from kernel, check if it has an entry
@@ -1647,6 +1677,7 @@ list_policy_for_all(void)
 		(void) snprintf(provname, sizeof (provname), "%s/%d",
 		    pdevlist_kernel->dl_devs[i].le_dev_name,
 		    pdevlist_kernel->dl_devs[i].le_dev_instance);
+
 		found = B_FALSE;
 		phead = ptr = pdevlist_conf;
 		while (!found && ptr) {
@@ -1659,7 +1690,8 @@ list_policy_for_all(void)
 		}
 
 		if (found) {
-			(void) list_policy_for_hard(ptr->pent->name);
+			(void) list_policy_for_hard(ptr->pent->name,
+			    pdevlist_conf, psoftlist_conf, pdevlist_kernel);
 			if (phead == ptr) {
 				pdevlist_conf = pdevlist_conf->next;
 			} else {
@@ -1668,7 +1700,8 @@ list_policy_for_all(void)
 			free_entry(ptr->pent);
 			free(ptr);
 		} else {
-			(void) list_policy_for_hard(provname);
+			(void) list_policy_for_hard(provname, pdevlist_conf,
+			    psoftlist_conf, pdevlist_kernel);
 		}
 	}
 
@@ -1677,13 +1710,12 @@ list_policy_for_all(void)
 	 * the config file, these providers must have been detached.
 	 * Should print out their policy information also.
 	 */
-	ptr = pdevlist_conf;
-	while (ptr != NULL) {
-		print_kef_policy(ptr->pent, B_FALSE, B_TRUE);
-		ptr = ptr->next;
+	for (ptr = pdevlist_conf; ptr != NULL; ptr = ptr->next) {
+		print_kef_policy(ptr->pent->name, ptr->pent, B_FALSE, B_TRUE);
 	}
 
 	free_entrylist(pdevlist_conf);
+	free_entrylist(psoftlist_conf);
 	free(pdevlist_kernel);
 
 	return (rc);

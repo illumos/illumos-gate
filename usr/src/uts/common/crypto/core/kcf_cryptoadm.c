@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Core KCF (Kernel Cryptographic Framework). This file implements
  * the cryptoadm entry points.
@@ -48,9 +46,13 @@
 kmutex_t soft_config_mutex;
 
 /*
- * This linked list contains software configuration entries that
- * are loaded into the kernel by the CRYPTO_LOAD_SOFT_CONFIG ioctl.
- * It is protected by the soft_config_mutex.
+ * This linked list contains software configuration entries.
+ * The initial list is just software providers loaded by kcf_soft_config_init().
+ * Additional entries may appear for both hardware and software providers
+ * from kcf.conf.  These come from "cryptoadm start", which reads file kcf.conf
+ * and updates this table using the CRYPTO_LOAD_SOFT_CONFIG ioctl.
+ * Further cryptoadm commands modify this file and update this table with ioctl.
+ * This list is protected by the soft_config_mutex.
  */
 kcf_soft_conf_entry_t *soft_config_list;
 
@@ -61,17 +63,190 @@ static void free_soft_config_entry(kcf_soft_conf_entry_t *);
 
 #define	KCF_MAX_CONFIG_ENTRIES 512 /* maximum entries in soft_config_list */
 
+#if DEBUG
+extern int kcf_frmwrk_debug;
+static void kcf_soft_config_dump(char *message);
+#endif /* DEBUG */
+
+/*
+ * Count and return the number of mechanisms in an array of crypto_mech_name_t
+ * (excluding final NUL-character string element).
+ */
+static int
+count_mechanisms(crypto_mech_name_t mechs[]) {
+	int	count;
+	for (count = 0; mechs[count][0] != '\0'; ++count);
+	return (count);
+}
+
+/*
+ * Initialize a mutex and populate soft_config_list with default entries
+ * of kernel software providers.
+ * Called from kcf module _init().
+ */
 void
 kcf_soft_config_init(void)
 {
+	typedef struct {
+		char			*name;
+		crypto_mech_name_t	*mechs;
+	} initial_soft_config_entry_t;
+
+	/*
+	 * This provides initial default values to soft_config_list.
+	 * It is equivalent to these lines in /etc/crypto/kcf.conf
+	 * (without line breaks and indenting):
+	 *
+	 * # /etc/crypto/kcf.conf
+	 * des:supportedlist=CKM_DES_CBC,CKM_DES_ECB,CKM_DES3_CBC,CKM_DES3_ECB
+	 * aes:supportedlist=CKM_AES_ECB,CKM_AES_CBC,CKM_AES_CTR,CKM_AES_CCM
+	 * arcfour:supportedlist=CKM_RC4
+	 * blowfish:supportedlist=CKM_BLOWFISH_ECB,CKM_BLOWFISH_CBC
+	 * ecc:supportedlist=CKM_EC_KEY_PAIR_GEN,CKM_ECDH1_DERIVE,CKM_ECDSA,\
+	 * CKM_ECDSA_SHA1
+	 * sha1:supportedlist=CKM_SHA_1,CKM_SHA_1_HMAC_GENERAL,CKM_SHA_1_HMAC
+	 * sha2:supportedlist=CKM_SHA256,CKM_SHA256_HMAC,
+	 * CKM_SHA256_HMAC_GENERAL,CKM_SHA384,CKM_SHA384_HMAC,\
+	 * CKM_SHA384_HMAC_GENERAL,CKM_SHA512,CKM_SHA512_HMAC,\
+	 * CKM_SHA512_HMAC_GENERAL
+	 * md4:supportedlist=CKM_MD4
+	 * md5:supportedlist=CKM_MD5,CKM_MD5_HMAC_GENERAL,CKM_MD5_HMAC
+	 * rsa:supportedlist=CKM_RSA_PKCS,CKM_RSA_X_509,CKM_MD5_RSA_PKCS,\
+	 * CKM_SHA1_RSA_PKCS,CKM_SHA256_RSA_PKCS,CKM_SHA384_RSA_PKCS,\
+	 * CKM_SHA512_RSA_PKCS
+	 * swrand:supportedlist=random
+	 *
+	 * WARNING: If you add a new kernel crypto provider or mechanism,
+	 * you must update these constants.
+	 *
+	 * 1. To add a new mechanism to a provider add the string to the
+	 * appropriate array below.
+	 *
+	 * 2. To add a new provider, create a new *_mechs array listing the
+	 * provider's mechanism(s).  For example:
+	 *	sha3_mechs[SHA3_MECH_COUNT] = {"CKM_SHA_3"};
+	 * Add the new *_mechs array to initial_soft_config_entry[].
+	 */
+	static crypto_mech_name_t	des_mechs[] = {
+	    "CKM_DES_CBC", "CKM_DES_ECB", "CKM_DES3_CBC", "CKM_DES3_ECB", ""};
+	static crypto_mech_name_t	aes_mechs[] = {
+	    "CKM_AES_ECB", "CKM_AES_CBC", "CKM_AES_CTR", "CKM_AES_CCM", ""};
+	static crypto_mech_name_t 	arcfour_mechs[] = {
+	    "CKM_RC4", ""};
+	static crypto_mech_name_t	blowfish_mechs[] = {
+	    "CKM_BLOWFISH_ECB", "CKM_BLOWFISH_CBC", ""};
+	static crypto_mech_name_t	ecc_mechs[] = {
+	    "CKM_EC_KEY_PAIR_GEN", "CKM_ECDH1_DERIVE", "CKM_ECDSA",
+	    "CKM_ECDSA_SHA1", ""};
+	static crypto_mech_name_t	sha1_mechs[] = {
+	    "CKM_SHA_1", "CKM_SHA_1_HMAC_GENERAL", "CKM_SHA_1_HMAC", ""};
+	static crypto_mech_name_t	sha2_mechs[] = {
+	    "CKM_SHA256", "CKM_SHA256_HMAC", "CKM_SHA256_HMAC_GENERAL",
+	    "CKM_SHA384", "CKM_SHA384_HMAC", "CKM_SHA384_HMAC_GENERAL",
+	    "CKM_SHA512", "CKM_SHA512_HMAC", "CKM_SHA512_HMAC_GENERAL", ""};
+	static crypto_mech_name_t	md4_mechs[] = {
+	    "CKM_MD4", ""};
+	static crypto_mech_name_t	md5_mechs[] = {
+	    "CKM_MD5", "CKM_MD5_HMAC_GENERAL", "CKM_MD5_HMAC", ""};
+	static crypto_mech_name_t	rsa_mechs[] = {
+	    "CKM_RSA_PKCS", "CKM_RSA_X_509", "CKM_MD5_RSA_PKCS",
+	    "CKM_SHA1_RSA_PKCS", "CKM_SHA256_RSA_PKCS", "CKM_SHA384_RSA_PKCS",
+	    "CKM_SHA512_RSA_PKCS", ""};
+	static crypto_mech_name_t	swrand_mechs[] = {
+	    "random", NULL};
+	static initial_soft_config_entry_t
+	    initial_soft_config_entry[] = {
+		"des", des_mechs,
+		"aes", aes_mechs,
+		"arcfour", arcfour_mechs,
+		"blowfish", blowfish_mechs,
+		"ecc", ecc_mechs,
+		"sha1", sha1_mechs,
+		"sha2", sha2_mechs,
+		"md4", md4_mechs,
+		"md5", md5_mechs,
+		"rsa", rsa_mechs,
+		"swrand", swrand_mechs
+	};
+	const int	initial_soft_config_entries =
+	    sizeof (initial_soft_config_entry)
+	    / sizeof (initial_soft_config_entry_t);
+	int		i;
+
 	mutex_init(&soft_config_mutex, NULL, MUTEX_DRIVER, NULL);
+
+	/*
+	 * Initialize soft_config_list with default providers.
+	 * Populate the linked list backwards so the first entry appears first.
+	 */
+	for (i = initial_soft_config_entries - 1; i >= 0; --i) {
+		initial_soft_config_entry_t *p = &initial_soft_config_entry[i];
+		crypto_mech_name_t	*mechsp;
+		char			*namep;
+		uint_t			namelen, alloc_size;
+		int			mech_count, r;
+
+		/* allocate/initialize memory for name and mechanism list */
+		namelen = strlen(p->name) + 1;
+		namep = kmem_alloc(namelen, KM_SLEEP);
+		(void) strlcpy(namep, p->name, namelen);
+		mech_count = count_mechanisms(p->mechs);
+		alloc_size = mech_count * CRYPTO_MAX_MECH_NAME;
+		mechsp = kmem_alloc(alloc_size, KM_SLEEP);
+		bcopy(p->mechs, mechsp, alloc_size);
+
+		r = add_soft_config(namep, mech_count, mechsp);
+		if (r != 0)
+			cmn_err(CE_WARN,
+			    "add_soft_config(%s) failed; returned %d\n",
+			    namep, r);
+	}
+#if DEBUG
+	if (kcf_frmwrk_debug >= 1)
+		kcf_soft_config_dump("kcf_soft_config_init");
+#endif /* DEBUG */
 }
+
+
+#if DEBUG
+/*
+ * Dump soft_config_list, containing a list of kernel software providers
+ * and (optionally) hardware providers, with updates from kcf.conf.
+ * Dump mechanism lists too if kcf_frmwrk_debug is >= 2.
+ */
+static void
+kcf_soft_config_dump(char *message)
+{
+	kcf_soft_conf_entry_t	*p;
+	uint_t			i;
+
+	mutex_enter(&soft_config_mutex);
+	printf("Soft provider config list soft_config_list: %s\n",
+	    message != NULL ? message : "");
+
+	for (p = soft_config_list; p != NULL; p = p->ce_next) {
+		printf("ce_name: %s, %d ce_mechs\n", p->ce_name, p->ce_count);
+		if (kcf_frmwrk_debug >= 2) {
+			printf("\tce_mechs: ");
+			for (i = 0; i < p->ce_count; i++) {
+				printf("%s ", p->ce_mechs[i]);
+			}
+			printf("\n");
+		}
+	}
+	printf("(end of soft_config_list)\n");
+
+	mutex_exit(&soft_config_mutex);
+}
+#endif /* DEBUG */
 
 
 /*
  * Utility routine to identify the providers to filter out and
  * present only one provider. This happens when a hardware provider
  * registers multiple units of the same device instance.
+ *
+ * Called from crypto_get_dev_list().
  */
 static void
 filter_providers(uint_t count, kcf_provider_desc_t **provider_array,
@@ -103,7 +278,11 @@ filter_providers(uint_t count, kcf_provider_desc_t **provider_array,
 }
 
 
-/* called from the CRYPTO_GET_DEV_LIST ioctl */
+/*
+ * Return a list of kernel hardware providers and a count of each
+ * provider's supported mechanisms.
+ * Called from the CRYPTO_GET_DEV_LIST ioctl.
+ */
 int
 crypto_get_dev_list(uint_t *count, crypto_dev_list_entry_t **array)
 {
@@ -119,7 +298,7 @@ crypto_get_dev_list(uint_t *count, crypto_dev_list_entry_t **array)
 	 * Take snapshot of provider table returning only hardware providers
 	 * that are in a usable state. Logical providers not included.
 	 */
-	rval =  kcf_get_hw_prov_tab(&provider_count, &provider_array, KM_SLEEP,
+	rval = kcf_get_hw_prov_tab(&provider_count, &provider_array, KM_SLEEP,
 	    NULL, 0, B_FALSE);
 	if (rval != CRYPTO_SUCCESS)
 		return (rval);
@@ -161,9 +340,9 @@ crypto_get_dev_list(uint_t *count, crypto_dev_list_entry_t **array)
 }
 
 /*
- * Called from the CRYPTO_GET_SOFT_LIST ioctl, this routine returns
- * a buffer containing the null terminated names of software providers
+ * Return a buffer containing the null terminated names of software providers
  * loaded by CRYPTO_LOAD_SOFT_CONFIG.
+ * Called from the CRYPTO_GET_SOFT_LIST ioctl.
  */
 int
 crypto_get_soft_list(uint_t *count, char **array, size_t *len)
@@ -225,6 +404,10 @@ out:
 	return (CRYPTO_SUCCESS);
 }
 
+/*
+ * Check if a mechanism name is already in a mechanism name array
+ * Called by crypto_get_dev_info().
+ */
 static boolean_t
 duplicate(char *name, crypto_mech_name_t *array, int count)
 {
@@ -238,7 +421,11 @@ duplicate(char *name, crypto_mech_name_t *array, int count)
 	return (B_FALSE);
 }
 
-/* called from the CRYPTO_GET_DEV_INFO ioctl */
+/*
+ * Return a list of kernel hardware providers for a given name and instance.
+ * For each entry, also return a list of their supported mechanisms.
+ * Called from the CRYPTO_GET_DEV_INFO ioctl.
+ */
 int
 crypto_get_dev_info(char *name, uint_t instance, uint_t *count,
     crypto_mech_name_t **array)
@@ -256,7 +443,7 @@ crypto_get_dev_info(char *name, uint_t instance, uint_t *count,
 	 * Logical providers not included. NULL name matches
 	 * all hardware providers.
 	 */
-	rv =  kcf_get_hw_prov_tab(&provider_count, &provider_array, KM_SLEEP,
+	rv = kcf_get_hw_prov_tab(&provider_count, &provider_array, KM_SLEEP,
 	    name, instance, B_FALSE);
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
@@ -311,7 +498,11 @@ out:
 	return (CRYPTO_SUCCESS);
 }
 
-/* called from the CRYPTO_GET_SOFT_INFO ioctl */
+/*
+ * Given a kernel software provider name, return a list of mechanisms
+ * it supports.
+ * Called from the CRYPTO_GET_SOFT_INFO ioctl.
+ */
 int
 crypto_get_soft_info(caddr_t name, uint_t *count, crypto_mech_name_t **array)
 {
@@ -321,29 +512,25 @@ crypto_get_soft_info(caddr_t name, uint_t *count, crypto_mech_name_t **array)
 
 	provider = kcf_prov_tab_lookup_by_name(name);
 	if (provider == NULL) {
-		if (in_soft_config_list(name)) {
-			char *tmp;
-			int name_len;
+		char *tmp;
+		int name_len;
 
-			/* strlen("crypto/") + NULL terminator == 8 */
-			name_len = strlen(name);
-			tmp = kmem_alloc(name_len + 8, KM_SLEEP);
-			bcopy("crypto/", tmp, 7);
-			bcopy(name, &tmp[7], name_len);
-			tmp[name_len + 7] = '\0';
+		/* strlen("crypto/") + NULL terminator == 8 */
+		name_len = strlen(name);
+		tmp = kmem_alloc(name_len + 8, KM_SLEEP);
+		bcopy("crypto/", tmp, 7);
+		bcopy(name, &tmp[7], name_len);
+		tmp[name_len + 7] = '\0';
 
-			modh = ddi_modopen(tmp, KRTLD_MODE_FIRST, NULL);
-			kmem_free(tmp, name_len + 8);
+		modh = ddi_modopen(tmp, KRTLD_MODE_FIRST, NULL);
+		kmem_free(tmp, name_len + 8);
 
-			if (modh == NULL) {
-				return (CRYPTO_ARGUMENTS_BAD);
-			}
+		if (modh == NULL) {
+			return (CRYPTO_ARGUMENTS_BAD);
+		}
 
-			provider = kcf_prov_tab_lookup_by_name(name);
-			if (provider == NULL) {
-				return (CRYPTO_ARGUMENTS_BAD);
-			}
-		} else {
+		provider = kcf_prov_tab_lookup_by_name(name);
+		if (provider == NULL) {
 			return (CRYPTO_ARGUMENTS_BAD);
 		}
 	}
@@ -355,6 +542,13 @@ crypto_get_soft_info(caddr_t name, uint_t *count, crypto_mech_name_t **array)
 	return (rv);
 }
 
+
+/*
+ * Change the mechanism list for a provider.
+ * If "direction" is CRYPTO_MECH_ADDED, add new mechanisms.
+ * If "direction" is CRYPTO_MECH_REMOVED, remove the mechanism list.
+ * Called from crypto_load_dev_disabled().
+ */
 static void
 kcf_change_mechs(kcf_provider_desc_t *provider, uint_t count,
     crypto_mech_name_t *array, crypto_event_change_t direction)
@@ -463,7 +657,7 @@ crypto_load_dev_disabled(char *name, uint_t instance, uint_t new_count,
 	 * Get provider table entries matching name and instance
 	 * for providers that are are in a usable or unverified state.
 	 */
-	rv =  kcf_get_hw_prov_tab(&provider_count, &provider_array, KM_SLEEP,
+	rv = kcf_get_hw_prov_tab(&provider_count, &provider_array, KM_SLEEP,
 	    name, instance, B_TRUE);
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
@@ -561,7 +755,7 @@ out:
 		 * This check assumes that enable and disable are separate
 		 * administrative actions and are not done in a single action.
 		 */
-		if (new_count < prev_count && (in_soft_config_list(name)) &&
+		if ((new_count < prev_count) &&
 		    (modload("crypto", name) != -1)) {
 			struct modctl *mcp;
 			boolean_t load_again = B_FALSE;
@@ -590,7 +784,10 @@ crypto_load_soft_config(caddr_t name, uint_t count, crypto_mech_name_t *array)
 	return (add_soft_config(name, count, array));
 }
 
-/* called from the CRYPTO_UNLOAD_SOFT_MODULE ioctl */
+/*
+ * Unload a kernel software crypto module.
+ * Called from the CRYPTO_UNLOAD_SOFT_MODULE ioctl.
+ */
 int
 crypto_unload_soft_module(caddr_t name)
 {
@@ -623,11 +820,14 @@ crypto_unload_soft_module(caddr_t name)
 	return (CRYPTO_SUCCESS);
 }
 
-/* called from CRYPTO_GET_DEV_LIST ioctl */
+/*
+ * Free the list of kernel hardware crypto providers.
+ * Called by get_dev_list() for the CRYPTO_GET_DEV_LIST ioctl.
+ */
 void
 crypto_free_dev_list(crypto_dev_list_entry_t *array, uint_t count)
 {
-	if (count ==  0 || array == NULL)
+	if (count == 0 || array == NULL)
 		return;
 
 	kmem_free(array, count * sizeof (crypto_dev_list_entry_t));
@@ -813,6 +1013,10 @@ crypto_build_permitted_mech_names(kcf_provider_desc_t *provider,
 	return (CRYPTO_SUCCESS);
 }
 
+/*
+ * Free memory for elements in a kcf_soft_config_entry_t.  This entry must
+ * have been previously removed from the soft_config_list linked list.
+ */
 static void
 free_soft_config_entry(kcf_soft_conf_entry_t *p)
 {
@@ -822,14 +1026,18 @@ free_soft_config_entry(kcf_soft_conf_entry_t *p)
 }
 
 /*
- * Called from the CRYPTO_LOAD_SOFT_CONFIG ioctl, this routine stores
- * configuration information for software providers in a linked list.
+ * Store configuration information for software providers in a linked list.
  * If the list already contains an entry for the specified provider
  * and the specified mechanism list has at least one mechanism, then
  * the mechanism list for the provider is updated. If the mechanism list
  * is empty, the entry for the provider is removed.
  *
- * Important note: the array argument is consumed.
+ * Called from kcf_soft_config_init() (to initially populate the list
+ * with default kernel providers) and from crypto_load_soft_config() for
+ * the CRYPTO_LOAD_SOFT_CONFIG ioctl (for third-party kernel modules).
+ *
+ * Important note: the name and array arguments must be allocated memory
+ * and are consumed in soft_config_list.
  */
 static int
 add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
@@ -881,7 +1089,7 @@ add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
 		soft_config_list = new_entry;
 		soft_config_count++;
 		entry = new_entry;
-	} else {
+	} else { /* mechanism already in list */
 		kmem_free(new_entry->ce_name, name_len);
 		kmem_free(new_entry, sizeof (kcf_soft_conf_entry_t));
 	}
@@ -950,25 +1158,4 @@ get_sw_provider_for_mech(crypto_mech_name_t mech, char **name)
 	*name = kmem_alloc(name_len, KM_SLEEP);
 	bcopy(tmp_name, *name, name_len);
 	return (CRYPTO_SUCCESS);
-}
-
-/*
- * This routine searches the soft_config_list for the specified
- * software provider, returning B_TRUE if it is in the list.
- */
-boolean_t
-in_soft_config_list(char *provider_name)
-{
-	kcf_soft_conf_entry_t *p;
-	boolean_t rv = B_FALSE;
-
-	mutex_enter(&soft_config_mutex);
-	for (p = soft_config_list; p != NULL; p = p->ce_next) {
-		if (strcmp(provider_name, p->ce_name) == 0) {
-			rv = B_TRUE;
-			break;
-		}
-	}
-	mutex_exit(&soft_config_mutex);
-	return (rv);
 }

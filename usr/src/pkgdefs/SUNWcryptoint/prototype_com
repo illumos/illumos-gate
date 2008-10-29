@@ -36,8 +36,6 @@
 i pkginfo
 i copyright
 i depend
-i postinstall
-i preremove
 #
 # source locations relative to the prototype file
 #

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -52,9 +49,9 @@ setup_soft_conf(entry_t *pent)
 {
 	crypto_load_soft_config_t	*pload_soft_conf;
 	mechlist_t	*plist;
-	uint_t	sup_count;
-	size_t	extra_mech_size = 0;
-	int	i;
+	uint_t		sup_count;
+	size_t		extra_mech_size = 0;
+	int		i;
 
 	if (pent == NULL) {
 		return (NULL);
@@ -95,11 +92,11 @@ setup_soft_conf(entry_t *pent)
 crypto_load_soft_disabled_t *
 setup_soft_dis(entry_t *pent)
 {
-	crypto_load_soft_disabled_t	*pload_soft_dis;
-	mechlist_t	*plist;
-	size_t	extra_mech_size = 0;
-	uint_t	dis_count;
-	int	i;
+	crypto_load_soft_disabled_t	*pload_soft_dis = NULL;
+	mechlist_t	*plist = NULL;
+	size_t		extra_mech_size = 0;
+	uint_t		dis_count;
+	int		i;
 
 	if (pent == NULL) {
 		return (NULL);
@@ -140,13 +137,13 @@ setup_soft_dis(entry_t *pent)
 crypto_load_dev_disabled_t *
 setup_dev_dis(entry_t *pent)
 {
-	crypto_load_dev_disabled_t	*pload_dev_dis;
-	mechlist_t	*plist;
-	size_t	extra_mech_size = 0;
-	uint_t	dis_count;
-	int	i;
-	char 	pname[MAXNAMELEN];
-	int	inst_num;
+	crypto_load_dev_disabled_t	*pload_dev_dis = NULL;
+	mechlist_t	*plist = NULL;
+	size_t		extra_mech_size = 0;
+	uint_t		dis_count;
+	int		i;
+	char		pname[MAXNAMELEN];
+	int		inst_num;
 
 	if (pent == NULL) {
 		return (NULL);
@@ -216,12 +213,14 @@ setup_unload_soft(entry_t *pent)
 /*
  * Prepare the calling argument for the GET_SOFT_INFO call for the provider
  * with the number of mechanisms specified in the second argument.
+ *
+ * Called by get_soft_info().
  */
 static crypto_get_soft_info_t *
 setup_get_soft_info(char *provname, int count)
 {
-	crypto_get_soft_info_t *psoft_info;
-	size_t extra_mech_size = 0;
+	crypto_get_soft_info_t	*psoft_info;
+	size_t			extra_mech_size = 0;
 
 	if (provname == NULL) {
 		return (NULL);
@@ -250,9 +249,9 @@ setup_get_soft_info(char *provname, int count)
 int
 get_dev_list(crypto_get_dev_list_t **ppdevlist)
 {
-	crypto_get_dev_list_t *pdevlist;
-	int fd;
-	int count = DEFAULT_DEV_NUM;
+	crypto_get_dev_list_t	*pdevlist;
+	int			fd = -1;
+	int			count = DEFAULT_DEV_NUM;
 
 	pdevlist = malloc(sizeof (crypto_get_dev_list_t) +
 	    sizeof (crypto_dev_list_entry_t) * (count - 1));
@@ -318,13 +317,13 @@ get_dev_list(crypto_get_dev_list_t **ppdevlist)
 int
 get_dev_info(char *devname, int inst_num, int count, mechlist_t **ppmechlist)
 {
-	crypto_get_dev_info_t *dev_info;
-	mechlist_t *phead;
-	mechlist_t *pcur;
-	mechlist_t *pmech;
-	int fd;
-	int i;
-	int rc;
+	crypto_get_dev_info_t	*dev_info;
+	mechlist_t	*phead;
+	mechlist_t	*pcur;
+	mechlist_t	*pmech;
+	int		fd = -1;
+	int		i;
+	int		rc;
 
 	if (devname == NULL || count < 1) {
 		cryptodebug("get_dev_info(): devname is NULL or bogus count");
@@ -395,22 +394,26 @@ get_dev_info(char *devname, int inst_num, int count, mechlist_t **ppmechlist)
 }
 
 
-
 /*
  * Get the supported mechanism list of the software provider from kernel.
+ *
+ * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
+ * If NULL, this function calls get_kcfconf_info() internally.
  */
 int
-get_soft_info(char *provname, mechlist_t **ppmechlist)
+get_soft_info(char *provname, mechlist_t **ppmechlist,
+	entrylist_t *phardlist, entrylist_t *psoftlist)
 {
+	boolean_t		in_kernel = B_FALSE;
 	crypto_get_soft_info_t	*psoft_info;
-	mechlist_t	*phead;
-	mechlist_t	*pmech;
-	mechlist_t	*pcur;
-	entry_t	*pent;
-	int	count;
-	int	fd;
-	int	rc;
-	int	i;
+	mechlist_t		*phead;
+	mechlist_t		*pmech;
+	mechlist_t		*pcur;
+	entry_t			*pent = NULL;
+	int			count;
+	int			fd = -1;
+	int			rc;
+	int			i;
 
 	if (provname == NULL) {
 		return (FAILURE);
@@ -418,18 +421,33 @@ get_soft_info(char *provname, mechlist_t **ppmechlist)
 
 	if (getzoneid() == GLOBAL_ZONEID) {
 		/* use kcf.conf for kernel software providers in global zone */
-		if ((pent = getent_kef(provname)) == NULL) {
-			cryptoerror(LOG_STDERR, gettext("%s does not exist."),
-			    provname);
-			return (FAILURE);
+		if ((pent = getent_kef(provname, phardlist, psoftlist)) ==
+		    NULL) {
+
+			/* No kcf.conf entry for this provider */
+			if (check_kernel_for_soft(provname, NULL, &in_kernel)
+			    == FAILURE) {
+				return (FAILURE);
+			} else if (in_kernel == B_FALSE) {
+				cryptoerror(LOG_STDERR,
+				    gettext("%s does not exist."), provname);
+				return (FAILURE);
+			}
+
+			/*
+			 * Set mech count to 1.  It will be reset to the
+			 * correct value later if the setup buffer is too small.
+			 */
+			count = 1;
+		} else {
+			count = pent->sup_count;
+			free_entry(pent);
 		}
-		count = pent->sup_count;
-		free_entry(pent);
 	} else {
 		/*
-		 * kcf.conf not there in non-global zone, set mech count to 1;
-		 * it will be reset to the correct value later if the setup
-		 * buffer is too small
+		 * kcf.conf not there in non-global zone: set mech count to 1.
+		 * It will be reset to the correct value later if the setup
+		 * buffer is too small.
 		 */
 		count = 1;
 	}
@@ -483,7 +501,7 @@ get_soft_info(char *provname, mechlist_t **ppmechlist)
 	}
 
 
-	/* Get the mechanism list and return it */
+	/* Build the mechanism linked list and return it */
 	rc = SUCCESS;
 	phead = pcur = NULL;
 	for (i = 0; i < psoft_info->si_count; i++) {
@@ -519,9 +537,9 @@ int
 get_soft_list(crypto_get_soft_list_t **ppsoftlist)
 {
 	crypto_get_soft_list_t *psoftlist = NULL;
-	int count = DEFAULT_SOFT_NUM;
-	int len;
-	int fd;
+	int	count = DEFAULT_SOFT_NUM;
+	int	len;
+	int	fd = -1;
 
 	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDONLY)) == -1) {
 		cryptoerror(LOG_STDERR, gettext("failed to open %s: %s"),

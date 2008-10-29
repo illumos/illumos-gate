@@ -37,23 +37,27 @@
 #include <sys/crypto/elfsign.h>
 #include "cryptoadm.h"
 
-static int err; /* to store the value of errno in case being overwritten */
 static int check_hardware_provider(char *, char *, int *, int *);
 
 /*
  * Display the mechanism list for a kernel software provider.
+ * This implements part of the "cryptoadm list -m" command.
+ *
+ * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
+ * If NULL, this function obtains it by calling get_kcfconf_info() internally.
  */
 int
-list_mechlist_for_soft(char *provname)
+list_mechlist_for_soft(char *provname,
+    entrylist_t *phardlist, entrylist_t *psoftlist)
 {
-	mechlist_t *pmechlist;
-	int rc;
+	mechlist_t	*pmechlist = NULL;
+	int		rc;
 
 	if (provname == NULL) {
 		return (FAILURE);
 	}
 
-	rc = get_soft_info(provname, &pmechlist);
+	rc = get_soft_info(provname, &pmechlist, phardlist, psoftlist);
 	if (rc == SUCCESS) {
 		(void) filter_mechlist(&pmechlist, RANDOM);
 		print_mechlist(provname, pmechlist);
@@ -65,20 +69,20 @@ list_mechlist_for_soft(char *provname)
 	}
 
 	return (rc);
-
 }
 
 /*
  * Display the mechanism list for a kernel hardware provider.
+ * This implements part of the "cryptoadm list -m" command.
  */
 int
 list_mechlist_for_hard(char *provname)
 {
-	mechlist_t *pmechlist;
-	char	devname[MAXNAMELEN];
-	int	inst_num;
-	int	count;
-	int rc = SUCCESS;
+	mechlist_t	*pmechlist = NULL;
+	char		devname[MAXNAMELEN];
+	int		inst_num;
+	int		count;
+	int		rc = SUCCESS;
 
 	if (provname == NULL) {
 		return (FAILURE);
@@ -107,27 +111,36 @@ list_mechlist_for_hard(char *provname)
 
 /*
  * Display the policy information for a kernel software provider.
+ * This implements part of the "cryptoadm list -p" command.
+ *
+ * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
+ * If NULL, this function obtains it by calling get_kcfconf_info() internally.
  */
 int
-list_policy_for_soft(char *provname)
+list_policy_for_soft(char *provname,
+    entrylist_t *phardlist, entrylist_t *psoftlist)
 {
-	int rc;
-	entry_t *pent = NULL;
-	mechlist_t *pmechlist;
-	boolean_t has_random = B_FALSE;
-	boolean_t has_mechs = B_FALSE;
+	int		rc;
+	entry_t		*pent = NULL;
+	mechlist_t	*pmechlist = NULL;
+	boolean_t	has_random = B_FALSE;
+	boolean_t	has_mechs = B_FALSE;
+	boolean_t	in_kernel = B_FALSE;
 
 	if (provname == NULL) {
 		return (FAILURE);
 	}
 
-	if ((pent = getent_kef(provname)) == NULL) {
+	if (check_kernel_for_soft(provname, NULL, &in_kernel) == FAILURE) {
+		return (FAILURE);
+	} else if (in_kernel == B_FALSE) {
 		cryptoerror(LOG_STDERR, gettext("%s does not exist."),
 		    provname);
 		return (FAILURE);
 	}
+	pent = getent_kef(provname, phardlist, psoftlist);
 
-	rc = get_soft_info(provname, &pmechlist);
+	rc = get_soft_info(provname, &pmechlist, phardlist, psoftlist);
 	if (rc == SUCCESS) {
 		has_random = filter_mechlist(&pmechlist, RANDOM);
 		if (pmechlist != NULL) {
@@ -141,7 +154,7 @@ list_policy_for_soft(char *provname)
 		return (rc);
 	}
 
-	print_kef_policy(pent, has_random, has_mechs);
+	print_kef_policy(provname, pent, has_random, has_mechs);
 	free_entry(pent);
 	return (SUCCESS);
 }
@@ -150,19 +163,27 @@ list_policy_for_soft(char *provname)
 
 /*
  * Display the policy information for a kernel hardware provider.
+ * This implements part of the "cryptoadm list -p" command.
+ *
+ * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
+ * If NULL, this function obtains it by calling get_kcfconf_info() internally.
+ * Parameter pdevlist is supplied by get_dev_list().
+ * If NULL, this function obtains it by calling get_dev_list() internally.
  */
 int
-list_policy_for_hard(char *provname)
+list_policy_for_hard(char *provname,
+	entrylist_t *phardlist, entrylist_t *psoftlist,
+	crypto_get_dev_list_t *pdevlist)
 {
-	entry_t *pent;
-	boolean_t is_active;
-	mechlist_t *pmechlist;
-	char	devname[MAXNAMELEN];
-	int	inst_num;
-	int	count;
-	int rc = SUCCESS;
-	boolean_t has_random = B_FALSE;
-	boolean_t has_mechs = B_FALSE;
+	entry_t		*pent = NULL;
+	boolean_t	in_kernel;
+	mechlist_t	*pmechlist = NULL;
+	char		devname[MAXNAMELEN];
+	int		inst_num;
+	int		count;
+	int		rc = SUCCESS;
+	boolean_t	has_random = B_FALSE;
+	boolean_t 	has_mechs = B_FALSE;
 
 	if (provname == NULL) {
 		return (FAILURE);
@@ -199,15 +220,15 @@ list_policy_for_hard(char *provname)
 	 * the disabled list from the config file entry.  Otherwise,
 	 * if it is active, then all the mechanisms for it are enabled.
 	 */
-	if ((pent = getent_kef(provname)) != NULL) {
-		print_kef_policy(pent, has_random, has_mechs);
+	if ((pent = getent_kef(provname, phardlist, psoftlist)) != NULL) {
+		print_kef_policy(provname, pent, has_random, has_mechs);
 		free_entry(pent);
 		return (SUCCESS);
 	} else {
-		if (check_active_for_hard(provname, &is_active) ==
-		    FAILURE) {
+		if (check_kernel_for_hard(provname, pdevlist,
+		    &in_kernel) == FAILURE) {
 			return (FAILURE);
-		} else if (is_active == B_TRUE) {
+		} else if (in_kernel == B_TRUE) {
 			(void) printf(gettext(
 			    "%s: all mechanisms are enabled."), provname);
 			if (has_random)
@@ -230,20 +251,24 @@ list_policy_for_hard(char *provname)
 }
 
 
-
+/*
+ * Disable a kernel hardware provider.
+ * This implements the "cryptoadm disable" command for
+ * kernel hardware providers.
+ */
 int
 disable_kef_hardware(char *provname, boolean_t rndflag, boolean_t allflag,
     mechlist_t *dislist)
 {
-	crypto_load_dev_disabled_t	*pload_dev_dis;
-	mechlist_t 	*infolist;
-	entry_t		*pent;
-	boolean_t	new_dev_entry = B_FALSE;
-	char	devname[MAXNAMELEN];
-	int	inst_num;
-	int	count;
-	int	fd;
-	int	rc = SUCCESS;
+	crypto_load_dev_disabled_t	*pload_dev_dis = NULL;
+	mechlist_t			*infolist = NULL;
+	entry_t				*pent = NULL;
+	boolean_t			new_dev_entry = B_FALSE;
+	char				devname[MAXNAMELEN];
+	int				inst_num;
+	int				count;
+	int				fd = -1;
+	int				rc = SUCCESS;
 
 	if (provname == NULL) {
 		return (FAILURE);
@@ -267,18 +292,13 @@ disable_kef_hardware(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * Get the entry of this hardware provider from the config file.
 	 * If there is no entry yet, create one for it.
 	 */
-	if ((pent = getent_kef(provname)) == NULL) {
-		if ((pent = malloc(sizeof (entry_t))) == NULL) {
+	if ((pent = getent_kef(provname, NULL, NULL)) == NULL) {
+		if ((pent = create_entry(provname)) == NULL) {
 			cryptoerror(LOG_STDERR, gettext("out of memory."));
 			free_mechlist(infolist);
 			return (FAILURE);
 		}
 		new_dev_entry = B_TRUE;
-		(void) strlcpy(pent->name, provname, MAXNAMELEN);
-		pent->suplist = NULL;
-		pent->sup_count = 0;
-		pent->dislist = NULL;
-		pent->dis_count = 0;
 	}
 
 	/*
@@ -353,25 +373,25 @@ disable_kef_hardware(char *provname, boolean_t rndflag, boolean_t allflag,
 }
 
 
-
+/*
+ * Disable a kernel software provider.
+ * This implements the "cryptoadm disable" command for
+ * kernel software providers.
+ */
 int
 disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
     mechlist_t *dislist)
 {
 	crypto_load_soft_disabled_t	*pload_soft_dis = NULL;
-	mechlist_t 	*infolist;
-	entry_t		*pent;
-	boolean_t	is_active;
-	int	fd;
+	mechlist_t			*infolist = NULL;
+	entry_t				*pent = NULL;
+	entrylist_t			*phardlist = NULL;
+	entrylist_t			*psoftlist = NULL;
+	boolean_t			in_kernel = B_FALSE;
+	int				fd = -1;
+	int				rc = SUCCESS;
 
 	if (provname == NULL) {
-		return (FAILURE);
-	}
-
-	/* Get the entry of this provider from the config file. */
-	if ((pent = getent_kef(provname)) == NULL) {
-		cryptoerror(LOG_STDERR,
-		    gettext("%s does not exist."), provname);
 		return (FAILURE);
 	}
 
@@ -380,101 +400,137 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * If it is unloaded, return FAILURE, because the disable subcommand
 	 * can not perform on inactive (unloaded) providers.
 	 */
-	if (check_active_for_soft(provname, &is_active) == FAILURE) {
-		free_entry(pent);
+	if (check_kernel_for_soft(provname, NULL, &in_kernel) == FAILURE) {
 		return (FAILURE);
-	} else if (is_active == B_FALSE) {
-		/*
-		 * TRANSLATION_NOTE
-		 * "disable" is a keyword and not to be translated.
-		 */
+	} else if (in_kernel == B_FALSE) {
 		cryptoerror(LOG_STDERR,
-		    gettext("can not do %1$s on an unloaded "
-		    "kernel software provider -- %2$s."), "disable", provname);
-		free_entry(pent);
+		    gettext("%s is not loaded or does not exist."),
+		    provname);
 		return (FAILURE);
 	}
 
-	/* Get the mechanism list for the software provider */
-	if (get_soft_info(provname, &infolist) == FAILURE) {
-		free(pent);
+	if (get_kcfconf_info(&phardlist, &psoftlist) == FAILURE) {
+		cryptoerror(LOG_ERR,
+		    "failed to retrieve the providers' "
+		    "information from the configuration file - %s.",
+		    _PATH_KCF_CONF);
 		return (FAILURE);
 	}
 
-	/* See comments in disable_kef_hardware() */
+	/*
+	 * Get the entry of this provider from the kcf.conf file, if any.
+	 * Otherwise, create a new kcf.conf entry for writing back to the file.
+	 */
+	pent = getent_kef(provname, phardlist, psoftlist);
+	if (pent == NULL) { /* create a new entry */
+		pent = create_entry(provname);
+		if (pent == NULL) {
+			cryptodebug("out of memory.");
+			rc = FAILURE;
+			goto out;
+		}
+	}
+
+	/* Get the mechanism list for the software provider from the kernel */
+	if (get_soft_info(provname, &infolist, phardlist, psoftlist) ==
+	    FAILURE) {
+		rc = FAILURE;
+		goto out;
+	}
+
+	if ((infolist != NULL) && (infolist->name[0] != '\0')) {
+		/*
+		 * Replace the supportedlist from kcf.conf with possibly
+		 * more-up-to-date list from the kernel.  This is the case
+		 * for default software providers that had more mechanisms
+		 * added in the current version of the kernel.
+		 */
+		free_mechlist(pent->suplist);
+		pent->suplist = infolist;
+	}
+
+	/*
+	 * kCF treats random as an internal mechanism. So, we need to
+	 * filter it from the mechanism list here, if we are NOT disabling
+	 * or enabling the random feature. Note that we map random feature at
+	 * cryptoadm(1M) level to the "random" mechanism in kCF.
+	 */
 	if (!rndflag) {
 		(void) filter_mechlist(&infolist, RANDOM);
 	}
 
 	/* Calculate the new disabled list */
 	if (disable_mechs(&pent, infolist, allflag, dislist) == FAILURE) {
-		free_entry(pent);
-		free_mechlist(infolist);
-		return (FAILURE);
+		rc = FAILURE;
+		goto out;
 	}
-
-	/* infolist is no longer needed; free it */
-	free_mechlist(infolist);
 
 	/* Update the kcf.conf file with the updated entry */
 	if (update_kcfconf(pent, MODIFY_MODE) == FAILURE) {
-		free_entry(pent);
-		return (FAILURE);
+		rc = FAILURE;
+		goto out;
 	}
 
-	/* Inform kernel about the new disabled list. */
+	/* Setup argument to inform kernel about the new disabled list. */
 	if ((pload_soft_dis = setup_soft_dis(pent)) == NULL) {
-		free_entry(pent);
-		return (FAILURE);
+		rc = FAILURE;
+		goto out;
 	}
-
-	/* pent is no longer needed; free it. */
-	free_entry(pent);
 
 	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDWR)) == -1) {
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to open %s for RW: %s"),
 		    ADMIN_IOCTL_DEVICE, strerror(errno));
-		free(pload_soft_dis);
-		return (FAILURE);
+		rc = FAILURE;
+		goto out;
 	}
 
+	/* Inform kernel about the new disabled list. */
 	if (ioctl(fd, CRYPTO_LOAD_SOFT_DISABLED, pload_soft_dis) == -1) {
 		cryptodebug("CRYPTO_LOAD_SOFT_DISABLED ioctl failed: %s",
 		    strerror(errno));
-		free(pload_soft_dis);
-		(void) close(fd);
-		return (FAILURE);
+		rc = FAILURE;
+		goto out;
 	}
 
 	if (pload_soft_dis->sd_return_value != CRYPTO_SUCCESS) {
 		cryptodebug("CRYPTO_LOAD_SOFT_DISABLED ioctl return_value = "
 		    "%d", pload_soft_dis->sd_return_value);
-		free(pload_soft_dis);
-		(void) close(fd);
-		return (FAILURE);
+		rc = FAILURE;
+		goto out;
 	}
 
+out:
+	free_entrylist(phardlist);
+	free_entrylist(psoftlist);
+	free_mechlist(infolist);
+	free_entry(pent);
 	free(pload_soft_dis);
-	(void) close(fd);
-	return (SUCCESS);
+	if (fd != -1)
+		(void) close(fd);
+	return (rc);
 }
 
 
+/*
+ * Enable a kernel software or hardware provider.
+ * This implements the "cryptoadm enable" command for kernel providers.
+ */
 int
 enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
     mechlist_t *mlist)
 {
 	crypto_load_soft_disabled_t	*pload_soft_dis = NULL;
 	crypto_load_dev_disabled_t	*pload_dev_dis = NULL;
-	entry_t		*pent;
-	boolean_t redo_flag = B_FALSE;
-	int	fd;
-	int	rc = SUCCESS;
+	entry_t				*pent = NULL;
+	boolean_t			redo_flag = B_FALSE;
+	boolean_t			in_kernel = B_FALSE;
+	int				fd = -1;
+	int				rc = SUCCESS;
 
 
-	/* Get the entry with the provider name from the kcf.conf file */
-	pent = getent_kef(provname);
+	/* Get the entry of this provider from the kcf.conf file, if any. */
+	pent = getent_kef(provname, NULL, NULL);
 
 	if (is_device(provname)) {
 		if (pent == NULL) {
@@ -485,14 +541,20 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 			cryptoerror(LOG_STDERR, gettext(
 			    "all mechanisms are enabled already for %s."),
 			    provname);
+			free_entry(pent);
 			return (SUCCESS);
 		}
 	} else { /* a software module */
-		if (pent == NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("%s does not exist."), provname);
+		if (check_kernel_for_soft(provname, NULL, &in_kernel) ==
+		    FAILURE) {
+			free_entry(pent);
 			return (FAILURE);
-		} else if (pent->dis_count == 0) {
+		} else if (in_kernel == B_FALSE) {
+			cryptoerror(LOG_STDERR, gettext("%s does not exist."),
+			    provname);
+			free_entry(pent);
+			return (FAILURE);
+		} else if ((pent == NULL) || (pent->dis_count == 0)) {
 			/* nothing to be enabled. */
 			cryptoerror(LOG_STDERR, gettext(
 			    "all mechanisms are enabled already for %s."),
@@ -502,8 +564,13 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 		}
 	}
 
+	/*
+	 * kCF treats random as an internal mechanism. So, we need to
+	 * filter it from the mechanism list here, if we are NOT disabling
+	 * or enabling the random feature. Note that we map random feature at
+	 * cryptoadm(1M) level to the "random" mechanism in kCF.
+	 */
 	if (!rndflag) {
-		/* See comments in disable_kef_hardware() */
 		redo_flag = filter_mechlist(&pent->dislist, RANDOM);
 		if (redo_flag)
 			pent->dis_count--;
@@ -528,9 +595,9 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 	}
 
 	/*
-	 * Update the kcf.conf file  with the updated entry.
+	 * Update the kcf.conf file with the updated entry.
 	 * For a hardware provider, if there is no more disabled mechanism,
-	 * the entire entry in the config file should be removed.
+	 * remove the entire kcf.conf entry.
 	 */
 	if (is_device(pent->name) && (pent->dis_count == 0)) {
 		rc = update_kcfconf(pent, DELETE_MODE);
@@ -549,18 +616,21 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDWR)) == -1) {
 		cryptoerror(LOG_STDERR, gettext("failed to open %s: %s"),
 		    ADMIN_IOCTL_DEVICE, strerror(errno));
+		free_entry(pent);
 		return (FAILURE);
 	}
 
 	if (is_device(provname)) {
 		/*  LOAD_DEV_DISABLED */
 		if ((pload_dev_dis = setup_dev_dis(pent)) == NULL) {
+			free_entry(pent);
 			return (FAILURE);
 		}
 
 		if (ioctl(fd, CRYPTO_LOAD_DEV_DISABLED, pload_dev_dis) == -1) {
 			cryptodebug("CRYPTO_LOAD_DEV_DISABLED ioctl failed: "
 			    "%s", strerror(errno));
+			free_entry(pent);
 			free(pload_dev_dis);
 			(void) close(fd);
 			return (FAILURE);
@@ -570,14 +640,16 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 			cryptodebug("CRYPTO_LOAD_DEV_DISABLED ioctl "
 			    "return_value = %d",
 			    pload_dev_dis->dd_return_value);
+			free_entry(pent);
 			free(pload_dev_dis);
 			(void) close(fd);
 			return (FAILURE);
 		}
 
-	} else {
+	} else { /* a software module */
 		/* LOAD_SOFT_DISABLED */
 		if ((pload_soft_dis = setup_soft_dis(pent)) == NULL) {
+			free_entry(pent);
 			return (FAILURE);
 		}
 
@@ -585,6 +657,7 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 		    == -1) {
 			cryptodebug("CRYPTO_LOAD_SOFT_DISABLED ioctl failed: "
 			    "%s", strerror(errno));
+			free_entry(pent);
 			free(pload_soft_dis);
 			(void) close(fd);
 			return (FAILURE);
@@ -594,12 +667,15 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 			cryptodebug("CRYPTO_LOAD_SOFT_DISABLED ioctl "
 			    "return_value = %d",
 			    pload_soft_dis->sd_return_value);
+			free_entry(pent);
 			free(pload_soft_dis);
 			(void) close(fd);
 			return (FAILURE);
 		}
 	}
 
+	free_entry(pent);
+	free(pload_soft_dis);
 	(void) close(fd);
 	return (SUCCESS);
 }
@@ -615,26 +691,27 @@ int
 install_kef(char *provname, mechlist_t *mlist)
 {
 	crypto_load_soft_config_t	*pload_soft_conf = NULL;
-	boolean_t	found;
-	entry_t	*pent;
-	FILE	*pfile;
-	FILE	*pfile_tmp;
-	char	tmpfile_name[MAXPATHLEN];
-	char	*ptr;
-	char	*str;
-	char	*name;
-	char	buffer[BUFSIZ];
-	char	buffer2[BUFSIZ];
-	int	found_count;
-	int	fd;
-	int	rc = SUCCESS;
+	boolean_t			found;
+	entry_t				*pent = NULL;
+	FILE				*pfile = NULL;
+	FILE				*pfile_tmp = NULL;
+	char				tmpfile_name[MAXPATHLEN];
+	char				*ptr;
+	char				*str;
+	char				*name;
+	char				buffer[BUFSIZ];
+	char				buffer2[BUFSIZ];
+	int				found_count;
+	int				fd = -1;
+	int				rc = SUCCESS;
+	int				err;
 
 	if ((provname == NULL) || (mlist == NULL)) {
 		return (FAILURE);
 	}
 
 	/* Check if the provider already exists */
-	if ((pent = getent_kef(provname)) != NULL) {
+	if ((pent = getent_kef(provname, NULL, NULL)) != NULL) {
 		cryptoerror(LOG_STDERR, gettext("%s exists already."),
 		    provname);
 		free_entry(pent);
@@ -642,16 +719,12 @@ install_kef(char *provname, mechlist_t *mlist)
 	}
 
 	/* Create an entry with provname and mlist. */
-	if ((pent = malloc(sizeof (entry_t))) == NULL) {
+	if ((pent = create_entry(provname)) == NULL) {
 		cryptoerror(LOG_STDERR, gettext("out of memory."));
 		return (FAILURE);
 	}
-
-	(void) strlcpy(pent->name, provname, MAXNAMELEN);
 	pent->sup_count = get_mech_count(mlist);
 	pent->suplist = mlist;
-	pent->dis_count = 0;
-	pent->dislist = NULL;
 
 	/* Append an entry for this software module to the kcf.conf file. */
 	if ((str = ent2str(pent)) == NULL) {
@@ -737,7 +810,7 @@ install_kef(char *provname, mechlist_t *mlist)
 			} else {
 				/*
 				 * Found a second entry with #libname.
-				 * Should not happen. The kcf.conf ffile
+				 * Should not happen. The kcf.conf file
 				 * is corrupted. Give a warning and skip
 				 * this entry.
 				 */
@@ -792,6 +865,7 @@ install_kef(char *provname, mechlist_t *mlist)
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to close %s: %s"), tmpfile_name,
 		    strerror(err));
+		free_entry(pent);
 		return (FAILURE);
 	}
 
@@ -799,7 +873,7 @@ install_kef(char *provname, mechlist_t *mlist)
 		err = errno;
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to update the configuration - %s"),
-			strerror(err));
+		    strerror(err));
 		cryptodebug("failed to rename %s to %s: %s", tmpfile_name,
 		    _PATH_KCF_CONF, strerror(err));
 		rc = FAILURE;
@@ -823,6 +897,7 @@ install_kef(char *provname, mechlist_t *mlist)
 			    "(Warning) failed to remove %s: %s"),
 			    tmpfile_name, strerror(err));
 		}
+		free_entry(pent);
 		return (FAILURE);
 	}
 
@@ -875,234 +950,113 @@ install_kef(char *provname, mechlist_t *mlist)
 int
 uninstall_kef(char *provname)
 {
-	entry_t		*pent;
-	boolean_t	is_active;
-	boolean_t	in_package;
-	boolean_t	found;
-	FILE	*pfile;
-	FILE	*pfile_tmp;
-	char	tmpfile_name[MAXPATHLEN];
-	char	*name;
-	char	strbuf[BUFSIZ];
-	char	buffer[BUFSIZ];
-	char	buffer2[BUFSIZ];
-	char	*str;
-	int	len;
-	int	rc = SUCCESS;
+	entry_t		*pent = NULL;
+	int		rc = SUCCESS;
+	boolean_t	in_kernel = B_FALSE;
+	boolean_t	in_kcfconf = B_FALSE;
+	int		fd = -1;
+	crypto_load_soft_config_t *pload_soft_conf = NULL;
 
-
-	/* Check if it is in the kcf.conf file first. */
-	if ((pent = getent_kef(provname)) == NULL) {
-		cryptoerror(LOG_STDERR,
-		    gettext("%s does not exist."), provname);
+	/* Check to see if the provider exists first. */
+	if (check_kernel_for_soft(provname, NULL, &in_kernel) == FAILURE) {
+		return (FAILURE);
+	} else if (in_kernel == B_FALSE) {
+		cryptoerror(LOG_STDERR, gettext("%s does not exist."),
+		    provname);
 		return (FAILURE);
 	}
 
+	/*
+	 * If it is loaded, unload it first.  This does 2 ioctl calls:
+	 * CRYPTO_UNLOAD_SOFT_MODULE and CRYPTO_LOAD_SOFT_DISABLED.
+	 */
+	if (unload_kef_soft(provname) == FAILURE) {
+		cryptoerror(LOG_STDERR,
+		    gettext("failed to unload %s during uninstall.\n"),
+		    provname);
+		return (FAILURE);
+	}
 
 	/*
-	 * Get rid of the disabled list for the provider and get the converted
-	 * string for the entry.  This is to prepare the string for a provider
-	 * that is in a package.
+	 * Inform kernel to remove the configuration of this software module.
 	 */
-	free_mechlist(pent->dislist);
-	pent->dis_count = 0;
-	pent->dislist = NULL;
-	str = ent2str(pent);
+
+	/* Setup ioctl() parameter */
+	pent = getent_kef(provname, NULL, NULL);
+	if (pent != NULL) { /* in kcf.conf */
+		in_kcfconf = B_TRUE;
+		free_mechlist(pent->suplist);
+		pent->suplist = NULL;
+		pent->sup_count = 0;
+	} else if ((pent = create_entry(provname)) == NULL) {
+		cryptoerror(LOG_STDERR, gettext("out of memory."));
+		return (FAILURE);
+	}
+	if ((pload_soft_conf = setup_soft_conf(pent)) == NULL) {
+		free_entry(pent);
+		return (FAILURE);
+	}
+
+	/* Open the /dev/cryptoadm device */
+	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDWR)) == -1) {
+		int	err = errno;
+		cryptoerror(LOG_STDERR, gettext("failed to open %s: %s"),
+		    ADMIN_IOCTL_DEVICE, strerror(err));
+		free_entry(pent);
+		free(pload_soft_conf);
+		return (FAILURE);
+	}
+
+	if (ioctl(fd, CRYPTO_LOAD_SOFT_CONFIG,
+	    pload_soft_conf) == -1) {
+		cryptodebug("CRYPTO_LOAD_SOFT_CONFIG ioctl failed: %s",
+		    strerror(errno));
+		free_entry(pent);
+		free(pload_soft_conf);
+		(void) close(fd);
+		return (FAILURE);
+	}
+
+	if (pload_soft_conf->sc_return_value != CRYPTO_SUCCESS) {
+		cryptodebug("CRYPTO_LOAD_SOFT_CONFIG ioctl = return_value = %d",
+		    pload_soft_conf->sc_return_value);
+		free_entry(pent);
+		free(pload_soft_conf);
+		(void) close(fd);
+		return (FAILURE);
+	}
+
+	/* ioctl cleanup */
+	free(pload_soft_conf);
+	(void) close(fd);
+
+
+	/* Finally, remove entry from kcf.conf, if present */
+	if (in_kcfconf && (pent != NULL)) {
+		rc = update_kcfconf(pent, DELETE_MODE);
+	}
+
 	free_entry(pent);
-	if (str == NULL) {
-		cryptoerror(LOG_STDERR, gettext("internal error."));
-		return (FAILURE);
-	}
-	(void) snprintf(strbuf, sizeof (strbuf), "%s%s", "#", str);
-	free(str);
-
-	/* If it is not loaded, unload it first  */
-	if (check_active_for_soft(provname, &is_active) == FAILURE) {
-		return (FAILURE);
-	} else if ((is_active == B_TRUE) &&
-	    (unload_kef_soft(provname, B_TRUE) == FAILURE)) {
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to uninstall %s.\n"), provname);
-		return (FAILURE);
-	}
-
-	/*
-	 * Remove the entry from the config file.  If the provider to be
-	 * uninstalled is in a package, just comment it off.
-	 */
-	if ((pfile = fopen(_PATH_KCF_CONF, "r+")) == NULL) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to update the configuration - %s"),
-		    strerror(err));
-		cryptodebug("failed to open %s for write.", _PATH_KCF_CONF);
-		return (FAILURE);
-	}
-
-	if (lockf(fileno(pfile), F_TLOCK, 0) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to lock the configuration - %s"),
-		    strerror(err));
-		(void) fclose(pfile);
-		return (FAILURE);
-	}
-
-	/*
-	 * Create a temporary file in the /etc/crypto directory to save
-	 * the new configuration file first.
-	 */
-	(void) strlcpy(tmpfile_name, TMPFILE_TEMPLATE, sizeof (tmpfile_name));
-	if (mkstemp(tmpfile_name) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to create a temporary file - %s"),
-		    strerror(err));
-		(void) fclose(pfile);
-		return (FAILURE);
-	}
-
-	if ((pfile_tmp = fopen(tmpfile_name, "w")) == NULL) {
-		err = errno;
-		cryptoerror(LOG_STDERR, gettext("failed to open %s - %s"),
-		    tmpfile_name, strerror(err));
-		if (unlink(tmpfile_name) != 0) {
-			err = errno;
-			cryptoerror(LOG_STDERR, gettext(
-			    "(Warning) failed to remove %s: %s"), tmpfile_name,
-			    strerror(err));
-		}
-		(void) fclose(pfile);
-		return (FAILURE);
-	}
-
-	/*
-	 * Loop thru the config file.  If the kernel software provider
-	 * to be uninstalled is in a package, just comment it off.
-	 */
-	in_package = B_FALSE;
-	while (fgets(buffer, BUFSIZ, pfile) != NULL) {
-		found = B_FALSE;
-		if (!(buffer[0] == ' ' || buffer[0] == '\n' ||
-		    buffer[0] == '\t')) {
-			if (strstr(buffer, " Start ") != NULL) {
-				in_package = B_TRUE;
-			} else if (strstr(buffer, " End ") != NULL) {
-				in_package = B_FALSE;
-			} else if (buffer[0] != '#') {
-				(void) strlcpy(buffer2, buffer, BUFSIZ);
-
-				/* get rid of trailing '\n' */
-				len = strlen(buffer2);
-				if (buffer2[len-1] == '\n') {
-					len--;
-				}
-				buffer2[len] = '\0';
-
-				if ((name = strtok(buffer2, SEP_COLON))
-				    == NULL) {
-					rc = FAILURE;
-					break;
-				} else if (strcmp(provname, name) == 0) {
-					found = B_TRUE;
-				}
-			}
-		}
-
-		if (found) {
-			if (in_package) {
-				if (fputs(strbuf, pfile_tmp) == EOF) {
-					rc = FAILURE;
-				}
-			}
-		} else {
-			if (fputs(buffer, pfile_tmp) == EOF) {
-				rc = FAILURE;
-			}
-		}
-
-		if (rc == FAILURE) {
-			break;
-		}
-	}
-
-	if (rc == FAILURE) {
-		cryptoerror(LOG_STDERR, gettext("write error."));
-		(void) fclose(pfile);
-		(void) fclose(pfile_tmp);
-		if (unlink(tmpfile_name) != 0) {
-			err = errno;
-			cryptoerror(LOG_STDERR, gettext(
-			    "(Warning) failed to remove %s: %s"), tmpfile_name,
-			    strerror(err));
-		}
-		return (FAILURE);
-	}
-
-	(void) fclose(pfile);
-	if (fclose(pfile_tmp) != 0) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to close %s: %s"), tmpfile_name,
-		    strerror(err));
-		return (FAILURE);
-	}
-
-	/* Now update the real config file */
-	if (rename(tmpfile_name, _PATH_KCF_CONF) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to update the configuration - %s"),
-		    strerror(err));
-		cryptodebug("failed to rename %1$s to %2$s: %3$s", tmpfile,
-		    _PATH_KCF_CONF, strerror(err));
-		rc = FAILURE;
-	} else if (chmod(_PATH_KCF_CONF,
-	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to update the configuration - %s"),
-		    strerror(err));
-		cryptodebug("failed to chmod to %s: %s", _PATH_KCF_CONF,
-		    strerror(err));
-		rc = FAILURE;
-	} else {
-		rc = SUCCESS;
-	}
-
-	if ((rc == FAILURE) && (unlink(tmpfile_name) != 0)) {
-		err = errno;
-		cryptoerror(LOG_STDERR, gettext(
-		    "(Warning) failed to remove %s: %s"), tmpfile_name,
-		    strerror(err));
-	}
-
 	return (rc);
-
 }
 
 
+/*
+ * Implement the "cryptoadm refresh" command for global zones.
+ * That is, send the current contents of kcf.conf to the kernel via ioctl().
+ */
 int
 refresh(void)
 {
-	crypto_get_soft_list_t		*psoftlist_kernel = NULL;
 	crypto_load_soft_config_t	*pload_soft_conf = NULL;
 	crypto_load_soft_disabled_t	*pload_soft_dis = NULL;
 	crypto_load_dev_disabled_t	*pload_dev_dis = NULL;
-	entrylist_t	*pdevlist = NULL;
-	entrylist_t	*psoftlist = NULL;
-	entrylist_t	*ptr;
-	boolean_t	found;
-	char 	*psoftname;
-	int	fd;
-	int	rc = SUCCESS;
-	int	i;
-
-	if (get_soft_list(&psoftlist_kernel) == FAILURE) {
-		cryptoerror(LOG_ERR, gettext("Failed to retrieve the "
-		    "software provider list from kernel."));
-		return (FAILURE);
-	}
+	entrylist_t			*pdevlist = NULL;
+	entrylist_t			*psoftlist = NULL;
+	entrylist_t			*ptr;
+	int				fd = -1;
+	int				rc = SUCCESS;
+	int				err;
 
 	if (get_kcfconf_info(&pdevlist, &psoftlist) == FAILURE) {
 		cryptoerror(LOG_ERR, "failed to retrieve the providers' "
@@ -1110,37 +1064,6 @@ refresh(void)
 		    _PATH_KCF_CONF);
 		return (FAILURE);
 	}
-
-	/*
-	 * If a kernel software provider is in kernel, but it is not in the
-	 * kcf.conf file, it must have been pkgrm'ed and needs to be unloaded
-	 * now.
-	 */
-	if (psoftlist_kernel->sl_soft_count > 0) {
-		psoftname = psoftlist_kernel->sl_soft_names;
-		for (i = 0; i < psoftlist_kernel->sl_soft_count; i++) {
-			ptr = psoftlist;
-			found = B_FALSE;
-			while (ptr != NULL) {
-				if (strcmp(psoftname, ptr->pent->name) == 0) {
-					found = B_TRUE;
-					break;
-				}
-				ptr = ptr->next;
-			}
-
-			if (!found) {
-				rc = unload_kef_soft(psoftname, B_FALSE);
-				if (rc == FAILURE) {
-					cryptoerror(LOG_ERR, gettext(
-					    "WARNING - the provider %s is "
-					    "still in kernel."), psoftname);
-				}
-			}
-			psoftname = psoftname + strlen(psoftname) + 1;
-		}
-	}
-	free(psoftlist_kernel);
 
 	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDWR)) == -1) {
 		err = errno;
@@ -1152,15 +1075,26 @@ refresh(void)
 	}
 
 	/*
-	 * For each software module, pass two sets of information to kernel
-	 * - the supported list and the disabled list
+	 * For each software provider module, pass two sets of information to
+	 * the kernel: the supported list and the disabled list.
 	 */
-	ptr = psoftlist;
-	while (ptr != NULL) {
+	for (ptr = psoftlist; ptr != NULL; ptr = ptr->next) {
+		entry_t		*pent = ptr->pent;
+
 		/* load the supported list */
-		if ((pload_soft_conf = setup_soft_conf(ptr->pent)) == NULL) {
+		if ((pload_soft_conf = setup_soft_conf(pent)) == NULL) {
+			cryptodebug("setup_soft_conf() failed");
 			rc = FAILURE;
 			break;
+		}
+
+		if (!pent->load) { /* unloaded--mark as loaded */
+			pent->load = B_TRUE;
+			rc = update_kcfconf(pent, MODIFY_MODE);
+			if (rc != SUCCESS) {
+				free(pload_soft_conf);
+				break;
+			}
 		}
 
 		if (ioctl(fd, CRYPTO_LOAD_SOFT_CONFIG, pload_soft_conf)
@@ -1181,10 +1115,14 @@ refresh(void)
 			break;
 		}
 
+		free(pload_soft_conf);
+
 		/* load the disabled list */
 		if (ptr->pent->dis_count != 0) {
 			pload_soft_dis = setup_soft_dis(ptr->pent);
 			if (pload_soft_dis == NULL) {
+				cryptodebug("setup_soft_dis() failed");
+				free(pload_soft_dis);
 				rc = FAILURE;
 				break;
 			}
@@ -1209,9 +1147,6 @@ refresh(void)
 			}
 			free(pload_soft_dis);
 		}
-
-		free(pload_soft_conf);
-		ptr = ptr->next;
 	}
 
 	if (rc != SUCCESS) {
@@ -1220,9 +1155,11 @@ refresh(void)
 	}
 
 
-	/* Pass the disabledlist information for Device to kernel */
-	ptr = pdevlist;
-	while (ptr != NULL) {
+	/*
+	 * For each hardware provider module, pass the disabled list
+	 * information to the kernel.
+	 */
+	for (ptr = pdevlist; ptr != NULL; ptr = ptr->next) {
 		/* load the disabled list */
 		if (ptr->pent->dis_count != 0) {
 			pload_dev_dis = setup_dev_dis(ptr->pent);
@@ -1250,8 +1187,6 @@ refresh(void)
 			}
 			free(pload_dev_dis);
 		}
-
-		ptr = ptr->next;
 	}
 
 	(void) close(fd);
@@ -1260,38 +1195,36 @@ refresh(void)
 
 /*
  * Unload the kernel software provider. Before calling this function, the
- * caller should check if the provider is in the config file and if it
- * is kernel. This routine makes 3 ioctl calls to remove it from kernel
- * completely. The argument do_check set to B_FALSE means that the
- * caller knows the provider is not the config file and hence the check
- * is skipped.
+ * caller should check to see if the provider is in the kernel.
+ *
+ * This routine makes 2 ioctl calls to remove it completely from the kernel:
+ *	CRYPTO_UNLOAD_SOFT_MODULE - does a modunload of the KCF module
+ *	CRYPTO_LOAD_SOFT_DISABLED - updates kernel disabled mechanism list
+ *
+ * This implements part of "cryptoadm unload" and "cryptoadm uninstall".
  */
 int
-unload_kef_soft(char *provname, boolean_t do_check)
+unload_kef_soft(char *provname)
 {
-	crypto_unload_soft_module_t 	*punload_soft = NULL;
-	crypto_load_soft_config_t	*pload_soft_conf = NULL;
+	crypto_unload_soft_module_t	*punload_soft = NULL;
 	crypto_load_soft_disabled_t	*pload_soft_dis = NULL;
-	entry_t	*pent = NULL;
-	int	fd;
+	entry_t				*pent = NULL;
+	int				fd = -1;
+	int				err;
 
 	if (provname == NULL) {
 		cryptoerror(LOG_STDERR, gettext("internal error."));
 		return (FAILURE);
 	}
 
-	if (!do_check) {
+	pent = getent_kef(provname, NULL, NULL);
+	if (pent == NULL) { /* not in kcf.conf */
 		/* Construct an entry using the provname */
-		pent = calloc(1, sizeof (entry_t));
+		pent = create_entry(provname);
 		if (pent == NULL) {
 			cryptoerror(LOG_STDERR, gettext("out of memory."));
 			return (FAILURE);
 		}
-		(void) strlcpy(pent->name, provname, MAXNAMELEN);
-	} else if ((pent = getent_kef(provname)) == NULL) {
-		cryptoerror(LOG_STDERR, gettext("%s does not exist."),
-		    provname);
-		return (FAILURE);
 	}
 
 	/* Open the admin_ioctl_device */
@@ -1299,11 +1232,13 @@ unload_kef_soft(char *provname, boolean_t do_check)
 		err = errno;
 		cryptoerror(LOG_STDERR, gettext("failed to open %s: %s"),
 		    ADMIN_IOCTL_DEVICE, strerror(err));
+		free_entry(pent);
 		return (FAILURE);
 	}
 
 	/* Inform kernel to unload this software module */
 	if ((punload_soft = setup_unload_soft(pent)) == NULL) {
+		free_entry(pent);
 		(void) close(fd);
 		return (FAILURE);
 	}
@@ -1334,39 +1269,6 @@ unload_kef_soft(char *provname, boolean_t do_check)
 	}
 
 	free(punload_soft);
-
-	/*
-	 * Inform kernel to remove the configuration of this software
-	 * module.
-	 */
-	free_mechlist(pent->suplist);
-	pent->suplist = NULL;
-	pent->sup_count = 0;
-	if ((pload_soft_conf = setup_soft_conf(pent)) == NULL) {
-		free_entry(pent);
-		(void) close(fd);
-		return (FAILURE);
-	}
-
-	if (ioctl(fd, CRYPTO_LOAD_SOFT_CONFIG, pload_soft_conf) == -1) {
-		cryptodebug("CRYPTO_LOAD_SOFT_CONFIG ioctl failed: %s",
-		    strerror(errno));
-		free_entry(pent);
-		free(pload_soft_conf);
-		(void) close(fd);
-		return (FAILURE);
-	}
-
-	if (pload_soft_conf->sc_return_value != CRYPTO_SUCCESS) {
-		cryptodebug("CRYPTO_LOAD_SOFT_CONFIG ioctl return_value = "
-		    "%d", pload_soft_conf->sc_return_value);
-		free_entry(pent);
-		free(pload_soft_conf);
-		(void) close(fd);
-		return (FAILURE);
-	}
-
-	free(pload_soft_conf);
 
 	/* Inform kernel to remove the disabled entries if any */
 	if (pent->dis_count == 0) {
