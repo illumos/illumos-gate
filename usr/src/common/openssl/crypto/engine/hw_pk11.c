@@ -3039,6 +3039,7 @@ pk11_choose_slots(int *any_slot_found)
 	fprintf(stderr, "%s: this token has CKF_RNG flag\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
 			pk11_have_random = CK_TRUE;
+			rand_SLOTID = current_slot;
 			break;
 			}
 		}
@@ -3046,6 +3047,8 @@ pk11_choose_slots(int *any_slot_found)
 #ifdef	DEBUG_SLOT_SELECTION
 	fprintf(stderr, "%s: == checking pubkey slots ==\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
+
+	pubkey_SLOTID = pSlotList[0];
 	for (i = 0; i < ulSlotCount; i++)
 		{
 		CK_BBOOL slot_has_rsa = CK_FALSE;
@@ -3168,6 +3171,8 @@ pk11_choose_slots(int *any_slot_found)
 #ifdef	DEBUG_SLOT_SELECTION
 	fprintf(stderr, "%s: == checking cipher/digest ==\n", PK11_DBG);
 #endif	/* DEBUG_SLOT_SELECTION */
+
+	SLOTID = pSlotList[0];
 	for (i = 0; i < ulSlotCount; i++)
 		{
 #ifdef	DEBUG_SLOT_SELECTION
