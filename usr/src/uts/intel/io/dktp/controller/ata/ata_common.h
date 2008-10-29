@@ -85,6 +85,7 @@ extern "C" {
 #define	AD_INT13LBA		0x80	/* supports LBA at Int13 interface */
 #define	AD_NORVRT		0x100	/* block revert-to-defaults */
 #define	AD_EXT48		0x200	/* 48 bit (extended) LBA */
+#define	AD_BLLBA48		0x400
 #define	ATAPIDRV(X)  ((X)->ad_flags & AD_ATAPI)
 
 

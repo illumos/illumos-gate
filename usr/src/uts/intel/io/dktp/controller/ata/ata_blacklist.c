@@ -142,6 +142,7 @@ atabl_t	ata_drive_blacklist[] = {
 	{ "QEMU DVD-ROM",		"0.8.2",	ATA_BL_NODMA },
 	{ "QEMU CD-ROM",		"0.8.1",	ATA_BL_NODMA },
 	{ "QEMU CD-ROM",		"0.8.2",	ATA_BL_NODMA },
+	{ "VMware Virtual IDE Hard Drive", NULL,	ATA_BL_LBA48 },
 
 	NULL
 };

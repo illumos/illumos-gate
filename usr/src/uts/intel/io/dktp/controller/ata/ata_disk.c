@@ -452,8 +452,8 @@ ata_get_capacity(ata_drv_t *ata_drvp, uint64_t *capacity)
 	cap28 = ata_calculate_28bits_capacity(ata_drvp);
 	*capacity = cap28;
 
-	/* No 48-bit mode before ATA 6 */
-	if (!IS_ATA_VERSION_SUPPORTED(aidp, 6))
+	if (!IS_ATA_VERSION_SUPPORTED(aidp, 6) &&
+	    !(ata_drvp->ad_flags & AD_BLLBA48))
 		return (0);
 
 	/* Check that 48 bit addressing is supported & enabled */

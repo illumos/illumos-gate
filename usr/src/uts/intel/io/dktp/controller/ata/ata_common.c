@@ -1246,6 +1246,11 @@ ata_init_drive(
 	else
 		ata_drvp->ad_flags &= ~AD_1SECTOR;
 
+	if (ata_check_drive_blacklist(&ata_drvp->ad_id, ATA_BL_LBA48))
+		ata_drvp->ad_flags |= AD_BLLBA48;
+	else
+		ata_drvp->ad_flags &= ~AD_BLLBA48;
+
 	/* Check if this drive has the "revert to defaults" bug */
 	if (!ata_check_revert_to_defaults(ata_drvp))
 		ata_drvp->ad_flags |= AD_NORVRT;

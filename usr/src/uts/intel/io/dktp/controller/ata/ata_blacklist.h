@@ -89,6 +89,12 @@ extern	atabl_t	ata_drive_blacklist[];
 				 * controller has trouble supporting it
 				 */
 
+#define	ATA_BL_LBA48	0x80
+				/*
+				 * the drive's ATA version is less than 6,
+				 * but it support the LBA48 mode.
+				 */
+
 #ifdef	__cplusplus
 }
 #endif
