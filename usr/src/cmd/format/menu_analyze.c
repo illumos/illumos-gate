@@ -53,7 +53,7 @@ a_read()
 
 	if (check(
 "Ready to analyze (won't harm SunOS). This takes a long time, \n"
-"but is interruptable with CTRL-C. Continue"))
+"but is interruptible with CTRL-C. Continue"))
 		return (-1);
 	return (do_scan(SCAN_VALID, F_NORMAL));
 }
@@ -77,7 +77,7 @@ a_refresh()
 
 	if (check(
 "Ready to analyze (won't harm data). This takes a long time, \n"
-"but is interruptable with CTRL-C. Continue"))
+"but is interruptible with CTRL-C. Continue"))
 		return (-1);
 	return (do_scan(SCAN_VALID | SCAN_WRITE, F_NORMAL));
 }
@@ -102,7 +102,7 @@ a_test()
 
 	if (check(
 "Ready to analyze (won't harm data). This takes a long time, \n"
-"but is interruptable with CTRL-C. Continue"))
+"but is interruptible with CTRL-C. Continue"))
 		return (-1);
 	return (do_scan(SCAN_VALID | SCAN_PATTERN | SCAN_WRITE, F_NORMAL));
 }
@@ -125,7 +125,7 @@ a_write()
 
 	if (check(
 "Ready to analyze (will corrupt data). This takes a long time, \n"
-"but is interruptable with CTRL-C. Continue"))
+"but is interruptible with CTRL-C. Continue"))
 		return (-1);
 	return (do_scan(SCAN_PATTERN, F_NORMAL));
 }
@@ -149,7 +149,7 @@ a_compare()
 
 	if (check(
 "Ready to analyze (will corrupt data). This takes a long time, \n"
-"but is interruptable with CTRL-C. Continue"))
+"but is interruptible with CTRL-C. Continue"))
 		return (-1);
 	return (do_scan(SCAN_PATTERN | SCAN_COMPARE, F_NORMAL));
 }
@@ -442,7 +442,7 @@ a_purge()
 
 	if (check(
 "Ready to purge (will corrupt data). This takes a long time, \n"
-"but is interruptable with CTRL-C. Continue"))
+"but is interruptible with CTRL-C. Continue"))
 		return (-1);
 
 	status = do_scan(SCAN_PATTERN | SCAN_PURGE, F_NORMAL);
@@ -480,7 +480,7 @@ a_verify()
 	}
 
 	if (check("Ready to verify (will corrupt data). This takes a long time,"
-	    "\nbut is interruptable with CTRL-C. Continue")) {
+	    "\nbut is interruptible with CTRL-C. Continue")) {
 		return (-1);
 	}
 
