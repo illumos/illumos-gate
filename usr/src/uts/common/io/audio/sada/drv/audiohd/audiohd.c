@@ -3787,7 +3787,7 @@ audiohd_finish_input_path(hda_codec_t *codec)
 	    istream = istream->next_stream) {
 		wid = istream->adc_wid;
 		w = codec->widget[wid];
-		while ((w->wid_wid != istream->sum_wid) &&
+		while (w && (w->wid_wid != istream->sum_wid) &&
 		    (w->type != WTYPE_PIN)) {
 			if ((w->type == WTYPE_AUDIO_SEL) && (w->nconns > 1))
 				(void) audioha_codec_verb_get(statep, caddr,
@@ -3822,7 +3822,7 @@ audiohd_finish_input_path(hda_codec_t *codec)
 		 * is a pin widget, we already finish "select connection"
 		 * operation for the whole path.
 		 */
-		if (w->type == WTYPE_PIN)
+		if (w && w->type == WTYPE_PIN)
 			continue;
 
 		/*
@@ -3830,6 +3830,8 @@ audiohd_finish_input_path(hda_codec_t *codec)
 		 */
 		wid = istream->sum_wid;
 		wsum = codec->widget[wid];
+		if (wsum == NULL)
+			continue;
 		if (wsum->outamp_cap) {
 			(void) audioha_codec_4bit_verb_get(statep,
 			    caddr,
@@ -3857,7 +3859,7 @@ audiohd_finish_input_path(hda_codec_t *codec)
 
 			wid = wsum->avail_conn[istream->sum_selconn[i]];
 			w = codec->widget[wid];
-			while (w->type != WTYPE_PIN) {
+			while (w && w->type != WTYPE_PIN) {
 				if ((w->type != WTYPE_AUDIO_MIX) &&
 				    (w->nconns > 1))
 					(void) audioha_codec_verb_get(statep,
