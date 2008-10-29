@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Makefile.mech_krb5, global definitions for dealing with Kerberos V5
 # plug in.
 
@@ -35,3 +33,5 @@ KERBRUNPATH64 = -R$(KERBLIBDIR64)
 CPPFLAGS +=	-DKRB5_DNS_LOOKUP \
 		-DKRB5_DNS_LOOKUP_KDC
 
+# Ensure assert()s are not in the non-debug bits
+$(RELEASE_BUILD)CPPFLAGS += -DNDEBUG
