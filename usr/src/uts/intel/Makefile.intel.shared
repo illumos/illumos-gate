@@ -329,6 +329,7 @@ DRV_KMODS	+= stmf
 DRV_KMODS	+= stmf_sbd
 DRV_KMODS	+= fct
 DRV_KMODS	+= qlt
+DRV_KMODS	+= iscsit
 DRV_KMODS	+= ncall nsctl sdbc nskern sv
 DRV_KMODS	+= ii rdc rdcsrv rdcstub 
 
@@ -552,6 +553,7 @@ MISC_KMODS	+= ibcm
 MISC_KMODS	+= ibdm
 MISC_KMODS	+= ibmf
 MISC_KMODS	+= ibtl
+MISC_KMODS	+= idm
 MISC_KMODS	+= idmap
 MISC_KMODS	+= iommulib
 MISC_KMODS	+= ipc

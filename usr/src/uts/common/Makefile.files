@@ -815,6 +815,14 @@ FCT_OBJS += discovery.o fct.o
 
 QLT_OBJS += 2400.o 2500.o qlt.o qlt_dma.o
 
+ISCSIT_SHARED_OBJS += \
+		iscsit_common.o
+
+ISCSIT_OBJS +=	$(ISCSIT_SHARED_OBJS) \
+		iscsit.o iscsit_tgt.o iscsit_sess.o iscsit_login.o \
+		iscsit_text.o iscsit_isns.o iscsit_radiusauth.o \
+		iscsit_radiuspacket.o iscsit_auth.o iscsit_authclient.o
+
 STMF_OBJS += lun_map.o stmf.o
 
 STMF_SBD_OBJS += filedisk.o memdisk.o sbd.o sbd_scsi.o
@@ -1630,6 +1638,11 @@ SFE_OBJS += sfe.o sfe_util.o
 DDA_OBJS += dda.o
 
 DMD_OBJS += dmd.o
+
+IDM_SHARED_OBJS += base64.o
+
+IDM_OBJS +=	$(IDM_SHARED_OBJS) \
+		idm.o idm_impl.o idm_text.o idm_conn_sm.o idm_so.o
 
 #
 #	Build up defines and paths.

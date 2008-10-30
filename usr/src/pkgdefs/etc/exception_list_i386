@@ -876,6 +876,21 @@ lib/llib-liscsitgt.ln			i386
 lib/amd64/libiscsitgt.so		i386
 lib/amd64/llib-liscsitgt.ln		i386
 #
+# These files are used by the COMSTAR iSCSI target port provider
+#
+usr/include/sys/idm			i386
+usr/include/sys/idm/idm.h		i386
+usr/include/sys/idm/idm_conn_sm.h	i386
+usr/include/sys/idm/idm_impl.h		i386
+usr/include/sys/idm/idm_so.h		i386
+usr/include/sys/idm/idm_text.h		i386
+usr/include/sys/idm/idm_transport.h	i386
+usr/include/sys/iscsit/chap.h		i386
+usr/include/sys/iscsit/iscsi_if.h	i386
+usr/include/sys/iscsit/isns_protocol.h	i386
+usr/include/sys/iscsit/radius_packet.h	i386
+usr/include/sys/iscsit/radius_protocol.h	i386
+#
 # libshare is private and the 64-bit sharemgr is not delivered.
 #
 usr/lib/libshare.so			i386

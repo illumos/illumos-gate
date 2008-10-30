@@ -62,6 +62,7 @@ COMMON_MODULES_KVM = \
 	genunix \
 	hook \
 	neti \
+	idm \
 	ii \
 	ip \
 	ipc \

@@ -74,6 +74,12 @@ ib/adapters/tavor/%.check:	ib/adapters/tavor/%.h
 ib/adapters/hermon/%.check:	ib/adapters/hermon/%.h
 	$(DOT_H_CHECK)
 
+idm/%.check:		idm/%.h
+	$(DOT_H_CHECK)
+
+iscsit/%.check:		iscsit/%.h
+	$(DOT_H_CHECK)
+
 lvm/%.check:	lvm/%.h
 	$(DOT_H_CHECK)
 
@@ -180,6 +186,8 @@ ROOTDIRS=			\
 	$(ROOTDIR)/ib/mgt/ibmf	\
 	$(ROOTDIR)/ib/ibnex	\
 	$(ROOTDIR)/ib/clients/ibd \
+	$(ROOTDIR)/idm		\
+	$(ROOTDIR)/iscsit	\
 	$(ROOTDIR)/lvm		\
 	$(ROOTDIR)/pcmcia	\
 	$(ROOTDIR)/scsi		\
@@ -226,6 +234,9 @@ ROOTIBMGTHDRS= $(IBMGTHDRS:%=$(ROOTDIR)/ib/mgt/%)
 ROOTIBMFHDRS= $(IBMFHDRS:%=$(ROOTDIR)/ib/mgt/ibmf/%)
 ROOTTAVORHDRS= $(TAVORHDRS:%=$(ROOTDIR)/ib/adapters/tavor/%)
 ROOTHERMONHDRS= $(HERMONHDRS:%=$(ROOTDIR)/ib/adapters/hermon/%)
+
+ROOTIDMHDRS= $(IDMHDRS:%=$(ROOTDIR)/idm/%)
+ROOTISCSITHDRS= $(ISCSITHDRS:%=$(ROOTDIR)/iscsit/%)
 
 ROOTISOHDRS= $(ISOHDRS:%=$(ROOTDIR)/iso/%)
 

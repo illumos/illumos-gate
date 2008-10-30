@@ -281,9 +281,13 @@ COMMON_SUBDIRS= \
 	SUNWippcore \
 	SUNWipplr \
 	SUNWipplu \
+	SUNWiscsidmr \
+	SUNWiscsidmu \
 	SUNWiscsir \
 	SUNWiscsitgtr \
 	SUNWiscsitgtu \
+	SUNWiscsitr \
+	SUNWiscsitu \
 	SUNWiscsiu \
 	SUNWisns \
 	SUNWisnsadm \

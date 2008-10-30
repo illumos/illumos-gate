@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ISCSI_PROTOCOL_H
 #define	_ISCSI_PROTOCOL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,6 +82,12 @@ uint32_t iscsi_crc32c_continued(void *address, unsigned long length,
 
 /* text separtor between key value pairs exhanged in login */
 #define	ISCSI_TEXT_SEPARATOR	'='
+
+/* reserved text constants for Text Mode Negotiation */
+#define	ISCSI_TEXT_NONE			"None"
+#define	ISCSI_TEXT_REJECT		"Reject"
+#define	ISCSI_TEXT_IRRELEVANT		"Irrelevant"
+#define	ISCSI_TEXT_NOTUNDERSTOOD	"NotUnderstood"
 
 /* Sun's initiator session ID */
 #define	ISCSI_SUN_ISID_0	0x40	/* ISID - EN format */
@@ -357,9 +361,17 @@ typedef struct _iscsi_scsi_task_mgt_rsp_hdr {
 #define	SCSI_TCP_TM_RESP_NO_TASK	0x01
 #define	SCSI_TCP_TM_RESP_NO_LUN		0x02
 #define	SCSI_TCP_TM_RESP_TASK_ALLEGIANT	0x03
-#define	SCSI_TCP_TM_RESP_NO_FAILOVER	0x04
-#define	SCSI_TCP_TM_RESP_IN_PRGRESS	0x05
+#define	SCSI_TCP_TM_RESP_NO_ALLG_REASSN	0x04
+#define	SCSI_TCP_TM_RESP_FUNC_NOT_SUPP	0x05
+#define	SCSI_TCP_TM_RESP_FUNC_AUTH_FAIL	0x06
 #define	SCSI_TCP_TM_RESP_REJECTED	0xff
+
+/*
+ * Maintained for backward compatibility.
+ */
+
+#define	SCSI_TCP_TM_RESP_NO_FAILOVER	SCSI_TCP_TM_RESP_NO_ALLG_REASSN
+#define	SCSI_TCP_TM_RESP_IN_PRGRESS	SCSI_TCP_TM_RESP_FUNC_NOT_SUPP
 
 /* Ready To Transfer Header */
 typedef struct _iscsi_rtt_hdr {
@@ -464,6 +476,8 @@ typedef struct _iscsi_text_rsp_hdr {
 	 */
 } iscsi_text_rsp_hdr_t;
 
+#define	ISCSI_ISID_LEN	6
+
 /* Login Header */
 typedef struct _iscsi_login_hdr {
 	uint8_t opcode;
@@ -472,7 +486,7 @@ typedef struct _iscsi_login_hdr {
 	uint8_t min_version;	/* Min. version supported */
 	uint8_t hlength;
 	uint8_t dlength[3];
-	uint8_t isid[6];	/* Initiator Session ID */
+	uint8_t isid[ISCSI_ISID_LEN];	/* Initiator Session ID */
 	uint16_t tsid;	/* Target Session ID */
 	uint32_t itt;	/* Initiator Task Tag */
 	uint16_t cid;
@@ -502,7 +516,7 @@ typedef struct _iscsi_login_rsp_hdr {
 	uint8_t active_version;	/* Active version */
 	uint8_t hlength;
 	uint8_t dlength[3];
-	uint8_t isid[6];	/* Initiator Session ID */
+	uint8_t isid[ISCSI_ISID_LEN];	/* Initiator Session ID */
 	uint16_t tsid;	/* Target Session ID */
 	uint32_t itt;	/* Initiator Task Tag */
 	uint32_t rsvd3;
@@ -631,7 +645,9 @@ typedef struct _iscsi_reject_rsp_hdr {
 	uint8_t rsvd2;
 	uint8_t rsvd3;
 	uint8_t dlength[3];
-	uint8_t rsvd4[16];
+	uint8_t rsvd4[8];
+	uint8_t	must_be_ff[4];
+	uint8_t	rsvd4a[4];
 	uint32_t statsn;
 	uint32_t expcmdsn;
 	uint32_t maxcmdsn;
@@ -674,6 +690,19 @@ typedef struct _iscsi_reject_rsp_hdr {
 #define	ISCSI_DEFAULT_ERROR_RECOVERY_LEVEL	0
 #define	ISCSI_DEFAULT_IFMARKER			FALSE
 #define	ISCSI_DEFAULT_OFMARKER			FALSE
+
+/*
+ * Minimum values from the iSCSI specification
+ */
+
+#define	ISCSI_MIN_TIME2RETAIN			0
+#define	ISCSI_MIN_TIME2WAIT			0
+#define	ISCSI_MIN_ERROR_RECOVERY_LEVEL		0
+#define	ISCSI_MIN_RECV_DATA_SEGMENT_LENGTH	0x200
+#define	ISCSI_MIN_FIRST_BURST_LENGTH		0x200
+#define	ISCSI_MIN_MAX_BURST_LENGTH		0x200
+#define	ISCSI_MIN_CONNECTIONS			1
+#define	ISCSI_MIN_MAX_OUTSTANDING_R2T		1
 
 /*
  * Maximum values from the iSCSI specification

@@ -113,6 +113,7 @@ SUBDIRS += \
 	libinetcfg	\
 	libinetutil	\
 	libipmp		\
+	libiscsit	\
 	libiscsitgt	\
 	libkmf		\
 	libkstat	\
@@ -388,6 +389,7 @@ HDRSUBDIRS=		\
 	libipmi		\
 	libipmp		\
 	libipp		\
+	libiscsit	\
 	libiscsitgt	\
 	libkstat	\
 	libkvm		\
@@ -545,6 +547,7 @@ libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
 libidmap:	libnsl
 libinetcfg:	libnsl libsocket libdlpi
+libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv

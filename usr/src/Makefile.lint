@@ -166,7 +166,9 @@ COMMON_SUBDIRS = \
 	cmd/iscsi \
 	cmd/iscsiadm \
 	cmd/iscsid \
+	cmd/iscsitsvc \
 	cmd/isns \
+	cmd/itadm \
 	cmd/join \
 	cmd/kbd \
 	cmd/killall \
@@ -364,6 +366,7 @@ COMMON_SUBDIRS = \
 	lib/libipmp \
 	lib/libipp \
 	lib/libipsecutil \
+	lib/libiscsit \
 	lib/libiscsitgt \
 	lib/libkmf \
 	lib/libkstat \

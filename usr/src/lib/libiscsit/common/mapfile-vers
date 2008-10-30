@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+SUNW_1.1 {
+	global:
+		it_config_load;
+		it_config_commit;
+		it_config_setprop;
+		it_config_free;
+		it_tgt_create;
+		it_tgt_setprop;
+		it_tgt_delete;
+		it_tgt_free;
+		it_tpg_create;
+		it_tpg_delete;
+		it_tpg_free;
+		it_ini_create;
+		it_ini_delete;
+		it_ini_setprop;
+		it_ini_free;
+		it_tpgt_create;
+		it_tpgt_delete;
+		it_tpgt_free;
+		it_portal_create;
+};
+
+SUNWprivate {
+	global:
+		it_config_to_nv;
+		it_nv_to_config;
+		it_nv_to_tgtlist;
+		it_tgtlist_to_nv;
+		it_tgt_to_nv;
+		it_nv_to_tgt;
+		it_tpgt_to_nv;
+		it_nv_to_tpgt;
+		it_tpgtlist_to_nv;
+		it_nv_to_tpgtlist;
+		it_tpg_to_nv;
+		it_nv_to_tpg;
+		it_tpglist_to_nv;
+		it_nv_to_tpglist;
+		it_ini_to_nv;
+		it_nv_to_ini;
+		it_inilist_to_nv;
+		it_nv_to_inilist;
+		it_common_convert_sa;
+		it_config_free_cmn;
+		it_tgt_free_cmn;
+		it_tpg_free_cmn;
+		it_ini_free_cmn;
+		it_tpgt_free_cmn;
+		sockaddr_to_str;
+		validate_iscsi_name;
+	local:
+	    *;
+};
+

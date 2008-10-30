@@ -952,6 +952,21 @@ lib/llib-liscsitgt.ln			sparc
 lib/sparcv9/libiscsitgt.so		sparc
 lib/sparcv9/llib-liscsitgt.ln		sparc
 #
+# These files are used by the COMSTAR iSCSI target port provider
+#
+usr/include/sys/idm			sparc
+usr/include/sys/idm/idm.h		sparc
+usr/include/sys/idm/idm_conn_sm.h	sparc
+usr/include/sys/idm/idm_impl.h		sparc
+usr/include/sys/idm/idm_so.h		sparc
+usr/include/sys/idm/idm_text.h		sparc
+usr/include/sys/idm/idm_transport.h	sparc
+usr/include/sys/iscsit/chap.h		sparc
+usr/include/sys/iscsit/iscsi_if.h	sparc
+usr/include/sys/iscsit/isns_protocol.h	sparc
+usr/include/sys/iscsit/radius_packet.h	sparc
+usr/include/sys/iscsit/radius_protocol.h	sparc
+#
 # libshare is private and the 64-bit sharemg is not delivered.
 #
 usr/lib/libshare.so			sparc
