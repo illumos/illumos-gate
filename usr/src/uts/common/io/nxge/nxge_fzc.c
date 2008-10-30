@@ -936,6 +936,9 @@ nxge_fzc_rdc_tbl_unbind(p_nxge_t nxge, int rdc_tbl)
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	nx_rdc_tbl_t *table;
 
+	if (nhd == NULL)
+		return (0);
+
 	NXGE_DEBUG_MSG((nxge, DMA_CTL, "==> nxge_fzc_rdc_tbl_unbind(%d)",
 	    rdc_tbl));
 
