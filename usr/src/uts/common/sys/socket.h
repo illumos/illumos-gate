@@ -39,8 +39,6 @@
 #ifndef	_SYS_SOCKET_H
 #define	_SYS_SOCKET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/feature_tests.h>
@@ -193,6 +191,8 @@ struct	linger {
  */
 #define	AF_UNSPEC	0		/* unspecified */
 #define	AF_UNIX		1		/* local to host (pipes, portals) */
+#define	AF_LOCAL	AF_UNIX		/* Synonym for AF_UNIX */
+#define	AF_FILE		AF_UNIX		/* Synonym for AF_UNIX */
 #define	AF_INET		2		/* internetwork: UDP, TCP, etc. */
 #define	AF_IMPLINK	3		/* arpanet imp addresses */
 #define	AF_PUP		4		/* pup protocols: e.g. BSP */
@@ -230,6 +230,8 @@ struct	linger {
  */
 #define	PF_UNSPEC	AF_UNSPEC
 #define	PF_UNIX		AF_UNIX
+#define	PF_LOCAL	PF_UNIX
+#define	PF_FILE		PF_UNIX
 #define	PF_INET		AF_INET
 #define	PF_IMPLINK	AF_IMPLINK
 #define	PF_PUP		AF_PUP

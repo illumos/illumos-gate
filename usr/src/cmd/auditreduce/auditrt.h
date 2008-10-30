@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _AUDITRT_H
 #define	_AUDITRT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -111,7 +109,7 @@ typedef struct audit_pcb audit_pcb_t;
  */
 #define	PF_ROOT		0x01	/* current pcb is the root of process tree */
 #define	PF_LEAF		0x02	/* current pcb is a leaf of process tree */
-#define	PF_FILE		0x04	/* current pcb uses files as input, not pipes */
+#define	PF_USEFILE	0x04	/* current pcb uses files as input, not pipes */
 
 /*
  * Message selection options

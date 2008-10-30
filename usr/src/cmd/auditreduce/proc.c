@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * Main processor for auditreduce.
  * Mproc() is the entry point for this module. It is the only visible
@@ -482,7 +481,7 @@ int	*nr;
 		 * Must be check here because the start time of the file name
 		 * may be after the first record(s).
 		 */
-		if (pcb->pcb_nrecs == 0 && (pcb->pcb_flags & PF_FILE)) {
+		if (pcb->pcb_nrecs == 0 && (pcb->pcb_flags & PF_USEFILE)) {
 			/*
 			 * If the first record read failed then use the time
 			 * that was in the filename to judge.
@@ -509,7 +508,7 @@ int	*nr;
 			pcb->pcb_nrecs++;	/* # of read recs from stream */
 			nrecs++;		/* # of recs read this call */
 			/* Only check record if at bottom of process tree. */
-			if (pcb->pcb_flags & PF_FILE) {
+			if (pcb->pcb_flags & PF_USEFILE) {
 				check_order(pcb); /* check time sequence */
 				if ((ret2 = check_rec(pcb)) == 0) {
 					pcb->pcb_nprecs++;
@@ -541,7 +540,7 @@ int	*nr;
 		if (ret < 0 || ret2 == -2) {
 			pcb->pcb_nrecs++;	/* # of read records */
 			if (!f_quiet) {
-				if (pcb->pcb_flags & PF_FILE) {
+				if (pcb->pcb_flags & PF_USEFILE) {
 					/* Ignore if this is not_terminated. */
 					if (!strstr((pcb->pcb_cur)->fcb_file,
 							"not_terminated")) {
@@ -558,12 +557,12 @@ int	*nr;
 			 * Only mark infile for deleting if we have succesfully
 			 * processed all of it.
 			 */
-			if (pcb->pcb_flags & PF_FILE)
+			if (pcb->pcb_flags & PF_USEFILE)
 				(pcb->pcb_cur)->fcb_flags |= FF_DELETE;
 		}
 		if (fclose(pcb->pcb_fpr) == EOF) {
 			if (!f_quiet) {
-				if (pcb->pcb_flags & PF_FILE) {
+				if (pcb->pcb_flags & PF_USEFILE) {
 					str = (pcb->pcb_cur)->fcb_file;
 				} else {
 					str = "pipe";
@@ -600,7 +599,7 @@ audit_pcb_t *pcb;
 	/*
 	 * For file give filename, too.
 	 */
-	if (pcb->pcb_flags & PF_FILE) {
+	if (pcb->pcb_flags & PF_USEFILE) {
 	(void) fprintf(stderr, "%s closed %s: %d records read recs: \
 		%d record written.\n", ar, (pcb->pcb_cur)->fcb_file,
 		pcb->pcb_nrecs, pcb->pcb_nprecs);

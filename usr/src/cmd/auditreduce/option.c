@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * Command line option processing for auditreduce.
  * The entry point is process_options(), which is called by main().
@@ -220,8 +219,8 @@ start_over:
 		}
 		if (error) {
 			(void) fprintf(stderr,
-				gettext("%s command line error - %s.\n"),
-				ar, error_str);
+			    gettext("%s command line error - %s.\n"),
+			    ar, error_str);
 			return (-1);
 		}
 	}
@@ -253,7 +252,7 @@ start_over:
 	}
 	if (m_after >= m_before) {
 		error_str =
-			gettext("'a' parameter must be before 'b' parameter");
+		    gettext("'a' parameter must be before 'b' parameter");
 		error_combo = TRUE;
 	}
 	if (f_delete &&
@@ -370,8 +369,8 @@ proc_object(char *optarg)
 
 		if (he->h_addrtype == AF_INET6) {
 			/* LINTED */
-			if (IN6_IS_ADDR_V4MAPPED((in6_addr_t *)
-				he->h_addr_list[0])) {
+			if (IN6_IS_ADDR_V4MAPPED(
+			    (in6_addr_t *)he->h_addr_list[0])) {
 				/* address is IPv4 (32 bits) */
 				(void) memcpy(&obj_id, he->h_addr_list[0], 4);
 				ip_type = AU_IPv4;
@@ -1132,7 +1131,7 @@ proc_pcb(audit_pcb_t *pcb, char *suffix, int i)
 	pcb->pcb_size = AUDITBUFSIZE;
 	pcb->pcb_rec = (char *)a_calloc(1, AUDITBUFSIZE);
 	pcb->pcb_time = -1;
-	pcb->pcb_flags |= PF_FILE;	/* note this one controls files */
+	pcb->pcb_flags |= PF_USEFILE;	/* note this one controls files */
 	pcb->pcb_procno = i;	/* save index into audit_pcbs [] for id */
 }
 
