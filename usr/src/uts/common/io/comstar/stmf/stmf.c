@@ -4077,17 +4077,18 @@ stmf_handle_target_reset(scsi_task_t *task)
 	iss = (stmf_i_scsi_session_t *)task->task_session->ss_stmf_private;
 	ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 
-	/* Grab the session lock as a writer to prevent any changes in it */
-	rw_enter(iss->iss_lockp, RW_WRITER);
-
 	/*
 	 * To sync with LUN reset, grab this lock. The session is not going
 	 * anywhere as there is atleast one task pending (this task).
 	 */
 	mutex_enter(&stmf_state.stmf_lock);
+
+	/* Grab the session lock as a writer to prevent any changes in it */
+	rw_enter(iss->iss_lockp, RW_WRITER);
+
 	if (iss->iss_flags & ISS_RESET_ACTIVE) {
-		mutex_exit(&stmf_state.stmf_lock);
 		rw_exit(iss->iss_lockp);
+		mutex_exit(&stmf_state.stmf_lock);
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 				STMF_SAA_OPERATION_IN_PROGRESS);
 		return;
@@ -4107,8 +4108,8 @@ stmf_handle_target_reset(scsi_task_t *task)
 		ilu = (stmf_i_lu_t *)(lm_ent->ent_lu->lu_stmf_private);
 		if (ilu->ilu_flags & ILU_RESET_ACTIVE) {
 			atomic_and_32(&iss->iss_flags, ~ISS_RESET_ACTIVE);
-			mutex_exit(&stmf_state.stmf_lock);
 			rw_exit(iss->iss_lockp);
+			mutex_exit(&stmf_state.stmf_lock);
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 					STMF_SAA_OPERATION_IN_PROGRESS);
 			return;
@@ -4117,8 +4118,8 @@ stmf_handle_target_reset(scsi_task_t *task)
 	if (lf == 0) {
 		/* No luns in this session */
 		atomic_and_32(&iss->iss_flags, ~ISS_RESET_ACTIVE);
-		mutex_exit(&stmf_state.stmf_lock);
 		rw_exit(iss->iss_lockp);
+		mutex_exit(&stmf_state.stmf_lock);
 		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 		return;
 	}
@@ -4133,8 +4134,8 @@ stmf_handle_target_reset(scsi_task_t *task)
 		ilu = (stmf_i_lu_t *)(lm_ent->ent_lu->lu_stmf_private);
 		atomic_or_32(&ilu->ilu_flags, ILU_RESET_ACTIVE);
 	}
-	mutex_exit(&stmf_state.stmf_lock);
 	rw_exit(iss->iss_lockp);
+	mutex_exit(&stmf_state.stmf_lock);
 
 	for (i = 0; i < lm->lm_nentries; i++) {
 		if (lm->lm_plus[i] == NULL)
@@ -4281,13 +4282,18 @@ stmf_worker_loop:;
 		dec_qdepth = 0;
 		if (wait_timer && (ddi_get_lbolt() >= wait_timer)) {
 			wait_timer = 0;
-			if (w->worker_task_head == NULL)
-				w->worker_task_head = w->worker_wait_head;
-			else
-				w->worker_task_tail->itask_worker_next =
-					w->worker_wait_head;
-			w->worker_task_tail = w->worker_wait_tail;
-			w->worker_wait_head = w->worker_wait_tail = NULL;
+			if (w->worker_wait_head) {
+				ASSERT(w->worker_wait_tail);
+				if (w->worker_task_head == NULL)
+					w->worker_task_head =
+					    w->worker_wait_head;
+				else
+					w->worker_task_tail->itask_worker_next =
+						w->worker_wait_head;
+				w->worker_task_tail = w->worker_wait_tail;
+				w->worker_wait_head = w->worker_wait_tail =
+				    NULL;
+			}
 		}
 		if ((itask = w->worker_task_head) == NULL) {
 			break;
@@ -4845,7 +4851,6 @@ stmf_dlun0_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 			}
 			map >>= 1;
 		}
-		itask->itask_allocated_buf_map = 0;
 	}
 	return (STMF_ABORT_SUCCESS);
 }

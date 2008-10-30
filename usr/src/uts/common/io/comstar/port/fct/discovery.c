@@ -1982,7 +1982,7 @@ fct_process_els(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 
 		if ((*ppcmd)->icmd_flags & ICMD_BEING_ABORTED) {
 			dq = 1;
-		} if (irp->irp_sa_elses_count > 1) {
+		} else if (irp->irp_sa_elses_count > 1) {
 			dq = 1;
 			/* This els might have set the CLEANUP flag */
 			atomic_and_32(&irp->irp_flags, ~IRP_SESSION_CLEANUP);
