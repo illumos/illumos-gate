@@ -26,8 +26,6 @@
 #ifndef _SYS_MD_MIRROR_H
 #define	_SYS_MD_MIRROR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/callb.h>
 #include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_mirror_shared.h>
@@ -290,6 +288,7 @@ typedef struct md_mps {
 #define	MD_MPS_DIRTY_RD		0x0800		/* re: MD_STR_DIRTY_RD	*/
 #define	MD_MPS_RESYNC_READ	0x1000
 #define	MD_MPS_FLAG_ERROR	0x2000		/* re: MD_STR_FLAG_ERR	*/
+#define	MD_MPS_BLOCKABLE_IO	0x4000		/* re: MD_STR_BLOCK_OK  */
 
 #define	MPS_FREE(kc, ps)			\
 {						\

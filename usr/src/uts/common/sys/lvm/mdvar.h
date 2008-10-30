@@ -597,6 +597,7 @@ typedef struct md_resync_thds_cnt {
 #define	MD_STR_DMR	0x00040000	/* Directed Read request */
 #define	MD_STR_DIRTY_RD	0x00080000	/* Read of a dirty block */
 #define	MD_STR_FLAG_ERR	0x00100000	/* Flag any write error on this i/o */
+#define	MD_STR_BLOCK_OK	0x00200000	/* Flag if caller i/o can be blocked */
 
 /*
  * Bits for return value of md_getdevnum

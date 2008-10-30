@@ -3400,6 +3400,8 @@ daemon_io(daemon_queue_t *dq)
 		flag |= MD_STR_WAR;
 	if (ps->ps_flags & MD_MPS_ABR)
 		flag |= MD_STR_ABR;
+	if (ps->ps_flags & MD_MPS_BLOCKABLE_IO)
+		flag |= MD_STR_BLOCK_OK;
 
 	/*
 	 * If this is a resync read, ie MD_STR_DIRTY_RD not set, set
@@ -3709,14 +3711,19 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 	 * suspend all writes until the state change has been made. As it is
 	 * not possible to read from the target of a resync, there is no need
 	 * to suspend resync writes.
+	 * Note that we only block here if the caller can handle a busy-wait.
+	 * The MD_STR_BLOCK_OK flag is set for daemon_io originated i/o only.
 	 */
 
 	if (!(flag & MD_STR_WAR)) {
-		mutex_enter(&un->un_suspend_wr_mx);
-		while (un->un_suspend_wr_flag) {
-			cv_wait(&un->un_suspend_wr_cv, &un->un_suspend_wr_mx);
+		if (flag & MD_STR_BLOCK_OK) {
+			mutex_enter(&un->un_suspend_wr_mx);
+			while (un->un_suspend_wr_flag) {
+				cv_wait(&un->un_suspend_wr_cv,
+				    &un->un_suspend_wr_mx);
+			}
+			mutex_exit(&un->un_suspend_wr_mx);
 		}
-		mutex_exit(&un->un_suspend_wr_mx);
 		(void) md_unit_readerlock(ui);
 	}
 
@@ -3763,6 +3770,25 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 	ps->ps_firstblk = pb->b_lblkno;
 	ps->ps_lastblk = pb->b_lblkno + lbtodb(pb->b_bcount) - 1;
 	ps->ps_changecnt = un->un_changecnt;
+
+	/*
+	 * Check for suspended writes here. This is where we can defer the
+	 * write request to the daemon_io queue which will then call us with
+	 * the MD_STR_BLOCK_OK flag set and we'll busy-wait (if necessary) at
+	 * the top of this routine.
+	 */
+	if (!(flag & MD_STR_WAR) && !(flag & MD_STR_BLOCK_OK)) {
+		mutex_enter(&un->un_suspend_wr_mx);
+		if (un->un_suspend_wr_flag) {
+			ps->ps_flags |= MD_MPS_BLOCKABLE_IO;
+			mutex_exit(&un->un_suspend_wr_mx);
+			md_unit_readerexit(ui);
+			daemon_request(&md_mirror_daemon, daemon_io,
+			    (daemon_queue_t *)ps, REQ_OLD);
+			return;
+		}
+		mutex_exit(&un->un_suspend_wr_mx);
+	}
 
 	/*
 	 * If not MN owner and this is an ABR write, make sure the current
