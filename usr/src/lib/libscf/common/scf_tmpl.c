@@ -5709,10 +5709,6 @@ _value_in_constraint(scf_propertygroup_t *pg, scf_property_t *prop,
 				    SCF_TERR_PROP_TYPE_MISMATCH, NULL, pt,
 				    NULL, value) == -1)
 					return (-1);
-			} else {
-				if (_add_tmpl_wrong_prop_type_error(errs, pg,
-				    pt, prop) == -1)
-					return (-1);
 			}
 		}
 		return (1);
