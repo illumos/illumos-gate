@@ -506,6 +506,8 @@ mem_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		retval = 1;
 	}
 
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	if (nvlist_add_uint32(*out, TOPO_METH_UNUSABLE_RET, retval) != 0) {
 		nvlist_free(*out);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Ereport-handling routines for memory errors
  */
@@ -60,6 +58,7 @@
 #define	VF_L2ESYR_C2C	0x8000000000000000ULL
 #define	UTS2_CPUS_PER_CHIP	64
 #define	FBR_ERROR	".fbr"
+#define	DSU_ERROR	".dsu"
 
 extern ldom_hdl_t *cpumem_diagnosis_lhp;
 
@@ -293,7 +292,10 @@ cmd_evdisp_t
 cmd_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
-	return (xe_common(hdl, ep, nvl, class, clcode, cmd_ce_common));
+	if (strcmp(class, "ereport.cpu.ultraSPARC-T2plus.dsc") == 0)
+		return (CMD_EVD_UNUSED); /* drop VF dsc's */
+	else
+		return (xe_common(hdl, ep, nvl, class, clcode, cmd_ce_common));
 }
 
 /*ARGSUSED*/
@@ -325,7 +327,15 @@ cmd_evdisp_t
 cmd_ue(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
-	return (xe_common(hdl, ep, nvl, class, clcode, cmd_ue_common));
+	if (strcmp(class, "ereport.cpu.ultraSPARC-T2plus.dsu") == 0)
+		/*
+		 * VF dsu's need to be treated like branch errors,
+		 * because we can't localize to a single DIMM or pair of
+		 * DIMMs given missing/invalid parts of the dram-ear.
+		 */
+		return (cmd_fb(hdl, ep, nvl, class, clcode));
+	else
+		return (xe_common(hdl, ep, nvl, class, clcode, cmd_ue_common));
 }
 
 /*ARGSUSED*/
@@ -412,6 +422,9 @@ cmd_fb(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 			cmd_branch_create_fault(hdl, branch,
 			    "fault.memory.link-c", det);
 		}
+	} else if (strcmp(strrchr(class, '.'), DSU_ERROR) == 0) {
+		fmd_hdl_debug(hdl, "Processing dsu event");
+		cmd_branch_create_fault(hdl, branch, "fault.memory.bank", det);
 	} else {
 		fmd_hdl_debug(hdl, "Processing fbu event");
 		cmd_branch_create_fault(hdl, branch, "fault.memory.link-u",

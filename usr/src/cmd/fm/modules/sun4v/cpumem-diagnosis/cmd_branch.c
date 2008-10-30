@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <cmd_mem.h>
 #include <cmd_branch.h>
 #include <cmd_dimm.h>
@@ -45,31 +43,34 @@
 #define	BUF_SIZE	120
 #define	LEN_CMP		6
 
-int
-is_t5440_unum(const char *unum)
-{
-	if ((strncmp(unum, "MB/CPU", LEN_CMP) == 0) ||
-	    (strncmp(unum, "MB/MEM", LEN_CMP) == 0))
-		return (1);
-	return (0);
-}
+/*
+ * mbd_label: If a DIMM associated with this branch is located on a memory
+ * expansion board or riser board, return (pointer to) the label of that board;
+ * otherwise return NULL.
+ * We assume that there will be at most one such board for any branch.
+ */
 
-int
-is_dimm_on_memboard(cmd_branch_t *branch)
+char *
+mbd_label(fmd_hdl_t *hdl, cmd_branch_t *branch, const char *nacname)
 {
 	cmd_dimm_t *dimm;
 	cmd_branch_memb_t *bm;
+	char *p;
+	size_t s;
 
-	if (is_t5440_unum(branch->branch_unum)) {
-		for (bm = cmd_list_next(&branch->branch_dimms); bm != NULL;
-		    bm = cmd_list_next(bm)) {
-			dimm = bm->dimm;
-			if (strstr(dimm->dimm_unum, "MEM") != NULL) {
-				return (1);
-			}
+	for (bm = cmd_list_next(&branch->branch_dimms); bm != NULL;
+	    bm = cmd_list_next(bm)) {
+		dimm = bm->dimm;
+		if ((p = strstr(dimm->dimm_unum, nacname)) != NULL) {
+			p = strchr(p, '/');	/* include instance number */
+			s = p - dimm->dimm_unum;
+			p = fmd_hdl_zalloc(hdl, s+1, FMD_SLEEP);
+			(void) strncpy(p, dimm->dimm_unum, s);
+			*(p + s) = '\0';
+			return (p);
 		}
 	}
-	return (0);
+	return (NULL);
 }
 
 void
@@ -129,8 +130,9 @@ branch_dimm_create(fmd_hdl_t *hdl, char *dimm_unum, char **serids,
 	return (NULL);
 }
 
-static fmd_hdl_t *br_hdl; /* for exclusive use of callback */
+static fmd_hdl_t *br_hdl; /* for use by callbacks */
 static int br_dimmcount;
+static nvlist_t *br_memb_nvl;
 
 /*ARGSUSED*/
 static int
@@ -224,10 +226,67 @@ branch_dimmlist_create(fmd_hdl_t *hdl, cmd_branch_t *branch)
 	topo_walk_fini(twp);
 	fmd_hdl_topo_rele(hdl, thp);
 
-	for (dimm_count = 0, bp = &branch->branch_dimms; bp != NULL;
-	    bp = cmd_list_next(bp), dimm_count++)
+	for (dimm_count = 0, bp = cmd_list_next(&branch->branch_dimms);
+	    bp != NULL; bp = cmd_list_next(bp), dimm_count++)
 		;
 	return (dimm_count);
+}
+
+/*ARGSUSED*/
+static int
+fru_by_label_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	char *lbl;
+	int err;
+	char *target = (char *)arg;
+
+	if (topo_node_label(node, &lbl, &err) < 0)
+		return (TOPO_WALK_NEXT);	/* no label, try next */
+
+	if ((strcmp(target, lbl) == 0) &&
+	    (topo_node_fru(node, &br_memb_nvl, NULL, &err) == 0)) {
+		topo_hdl_strfree(thp, lbl);
+		return (TOPO_WALK_TERMINATE);
+	}
+	topo_hdl_strfree(thp, lbl);
+	return (TOPO_WALK_NEXT);
+}
+
+static nvlist_t *
+fru_by_label(fmd_hdl_t *hdl, const char *target)
+{
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
+
+	br_memb_nvl = NULL;
+	if (((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) != NULL) &&
+	    ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
+	    fru_by_label_cb, (void *)target, &err)) != NULL)) {
+		br_hdl = hdl;
+		(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+		topo_walk_fini(twp);
+	}
+	fmd_hdl_topo_rele(hdl, thp);
+	return (br_memb_nvl);
+}
+
+static void
+add_bdflt_to_case(fmd_hdl_t *hdl, char *label, const char *fltnm,
+    uint8_t board_cert, fmd_case_t *cp)
+{
+	nvlist_t *memb_nvl, *flt;
+
+	memb_nvl = fru_by_label(hdl, label);
+	if (memb_nvl != NULL) {
+		flt = cmd_nvl_create_fault(hdl, fltnm, board_cert,
+		    memb_nvl, memb_nvl, NULL);
+		flt = cmd_fault_add_location(hdl, flt, label);
+		if (flt != NULL) {
+			fmd_case_add_suspect(hdl, cp, flt);
+		}
+		nvlist_free(memb_nvl);
+	}
 }
 
 /*
@@ -237,8 +296,6 @@ branch_dimmlist_create(fmd_hdl_t *hdl, cmd_branch_t *branch)
  * motherboard, cpuboard, and dimms are in the suspect list.
  * If there is no dimm on the memory board, the cpu board and
  * the dimms are in the suspect list
- * memory board fault does not supported in this pharse of
- * the project.
  * The board certainty = total board certainty / number of
  * the faulty boards in the suspect list.
  */
@@ -246,39 +303,55 @@ void
 cmd_branch_create_fault(fmd_hdl_t *hdl, cmd_branch_t *branch,
     const char *fltnm, nvlist_t *asru)
 {
-	nvlist_t *flt, *mbnvl;
+	nvlist_t *flt;
 	cmd_branch_memb_t *bm;
 	cmd_dimm_t *dimm;
 	int dimm_count = 0;
 	uint_t cert = 0;
 	uint_t board_cert = 0;
-	char *fruloc = NULL;
-	int count_board_fault = 1;
-	int memb_flag = 0;
+	char *fruloc = NULL, *membd_label;
 
 	/* attach the dimms to the branch */
 	dimm_count = branch_dimmlist_create(hdl, branch);
 
-	if (is_dimm_on_memboard(branch)) {
-		mbnvl = init_mb(hdl);
-		if (mbnvl != NULL)
-			count_board_fault++;
-		memb_flag = 1;
+	if ((membd_label = mbd_label(hdl, branch, "MEM")) != NULL) {
+		board_cert = CMD_BOARDS_CERT / 3; /* CPU, MEM, MB */
+
+		/*
+		 * Batoka with memory expansion.  CPU expansion board will
+		 * be added below.  Add memory expansion board and motherboard
+		 * FRUs here.
+		 */
+
+		add_bdflt_to_case(hdl, membd_label, fltnm, board_cert,
+		    branch->branch_case.cc_cp);
+		fmd_hdl_strfree(hdl, membd_label);
+		add_bdflt_to_case(hdl, "MB", fltnm, board_cert,
+		    branch->branch_case.cc_cp);
+
+	} else if ((membd_label = mbd_label(hdl, branch, "MR")) != NULL) {
+
+		board_cert = CMD_BOARDS_CERT / 2; /* MB, MR */
+
+		/*
+		 * Maramba or similar platform with mezzanine board.
+		 * Motherboard FRU will be added below.  Add the mezzanine
+		 * board here.
+		 */
+
+		add_bdflt_to_case(hdl, membd_label, fltnm, board_cert,
+		    branch->branch_case.cc_cp);
+		fmd_hdl_strfree(hdl, membd_label);
+	} else {
+		board_cert = CMD_BOARDS_CERT; /* only MB or CPU */
 	}
 
-	board_cert = CMD_BOARDS_CERT / count_board_fault;
-
-	/* add the motherboard fault */
-	if ((memb_flag) && (mbnvl != NULL)) {
-		fmd_hdl_debug(hdl,
-		    "cmd_branch_create_fault: create motherboard fault");
-		flt = cmd_boardfru_create_fault(hdl, mbnvl, fltnm,
-		    board_cert, "MB");
-		if (flt != NULL)
-			fmd_case_add_suspect(hdl, branch->branch_case.cc_cp,
-			    flt);
-		nvlist_free(mbnvl);
-	}
+	/*
+	 * The code which follows adds to the suspect list the FRU which
+	 * contains the ereport 'detector'.  This can be either a CPU
+	 * expansion board (Batoka), or motherboard (Huron, Maramba, or
+	 * derivative).
+	 */
 
 	fruloc = cmd_getfru_loc(hdl, asru);
 	flt = cmd_boardfru_create_fault(hdl, asru, fltnm, board_cert, fruloc);
