@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VM - paged vnode.
@@ -840,16 +838,6 @@ pvn_vplist_dirty(
 		ASSERT(pp->p_vnode == vp);
 
 		/*
-		 * Skip this page if the offset is out of the desired range.
-		 * Just move the marker and continue.
-		 */
-		if (pp->p_offset < off) {
-			page_vpsub(&vp->v_pages, mark);
-			page_vpadd(where_to_move, mark);
-			continue;
-		}
-
-		/*
 		 * If just flushing dirty pages to disk and this vnode
 		 * is using a sorted list of pages, we can stop processing
 		 * as soon as we find an unmodified page. Since all the
@@ -898,6 +886,16 @@ pvn_vplist_dirty(
 				mutex_enter(vphm);
 				continue;
 			}
+		}
+
+		/*
+		 * Skip this page if the offset is out of the desired range.
+		 * Just move the marker and continue.
+		 */
+		if (pp->p_offset < off) {
+			page_vpsub(&vp->v_pages, mark);
+			page_vpadd(where_to_move, mark);
+			continue;
 		}
 
 		/*
