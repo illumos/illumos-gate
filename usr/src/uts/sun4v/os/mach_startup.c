@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/machsystm.h>
 #include <sys/archsystm.h>
 #include <sys/prom_plat.h>
@@ -113,13 +111,12 @@ cpu_halt(void)
 	uint_t s;
 
 	/*
-	 * If this CPU is online, and there's multiple CPUs
-	 * in the system, then we should notate our halting
+	 * If this CPU is online then we should notate our halting
 	 * by adding ourselves to the partition's halted CPU
 	 * bitmap. This allows other CPUs to find/awaken us when
 	 * work becomes available.
 	 */
-	if (CPU->cpu_flags & CPU_OFFLINE || ncpus == 1)
+	if (CPU->cpu_flags & CPU_OFFLINE)
 		hset_update = 0;
 
 	/*
