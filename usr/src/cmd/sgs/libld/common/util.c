@@ -644,15 +644,6 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'V',
 				    MSG_ORIG(MSG_ARG_T_VERSION), 0)) != 0) {
 					return (c);
-
-				/*
-				 * Translate --version-script <optarg> to
-				 * -M <optarg>
-				 */
-				} else if ((c = str2chr(lml, ndx, argc, argv,
-				    arg, 'M', MSG_ORIG(MSG_ARG_T_VERSCRIPT),
-				    MSG_ARG_T_VERSCRIPT_SIZE)) != 0) {
-					return (c);
 				}
 				break;
 			case 'w':

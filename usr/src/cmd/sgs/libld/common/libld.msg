@@ -95,8 +95,7 @@
 @ MSG_ARG_DETAIL_CL	"\t[-L path], [--library-path path]\n\
 			 \t\t\tsearch for libraries in directory `path'\n"
 @ MSG_ARG_DETAIL_M	"\t[-m]\t\tprint memory map\n"
-@ MSG_ARG_DETAIL_CM	"\t[-M mapfile], [--version-script mapfile]\n\
-			 \t\t\tuse processing directives contained \
+@ MSG_ARG_DETAIL_CM	"\t[-M mapfile]\tuse processing directives contained \
 			 in `mapfile'\n"
 @ MSG_ARG_DETAIL_CN	"\t[-N string]\tcreate a dynamic dependency for \
 			 `string'\n"
@@ -1199,7 +1198,6 @@
 @ MSG_ARG_T_STRIP	"-strip-all"
 @ MSG_ARG_T_UNDEF	"-undefined"
 @ MSG_ARG_T_VERSION	"-version"
-@ MSG_ARG_T_VERSCRIPT	"-version-script"
 @ MSG_ARG_T_WHOLEARC	"-whole-archive"
 
 # File and pathname strings

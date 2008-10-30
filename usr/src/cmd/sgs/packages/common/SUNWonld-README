@@ -1400,3 +1400,4 @@ Bugid   Risk Synopsis
 	(link-editor components only)
 	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
 6756953 customer requests that DT_CONFIG strings be honored for secure apps (D)
+6765299 ld --version-script option not compatible with GNU ld (D)
