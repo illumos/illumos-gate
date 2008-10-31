@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -53,6 +52,6 @@ d none platform 755 root sys
 d none platform/sun4v 755 root sys
 d none platform/sun4v/kernel 755 root sys
 d none platform/sun4v/kernel/drv 755 root sys
-e renameold platform/sun4v/kernel/drv/nxge.conf 0644 root sys
+e renamenew platform/sun4v/kernel/drv/nxge.conf 0644 root sys
 d none platform/sun4v/kernel/drv/sparcv9 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/nxge 755 root sys

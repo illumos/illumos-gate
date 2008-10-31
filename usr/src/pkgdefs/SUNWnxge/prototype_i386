@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -51,6 +50,6 @@
 d none kernel			0755	root	sys
 d none kernel/drv		0755	root	sys
 f none kernel/drv/nxge		0755	root	sys
-e renameold kernel/drv/nxge.conf 0644 root sys
+e renamenew kernel/drv/nxge.conf 0644 root sys
 d none kernel/drv/amd64		0755	root	sys
 f none kernel/drv/amd64/nxge	0755	root	sys
