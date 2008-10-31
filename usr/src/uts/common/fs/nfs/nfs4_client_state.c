@@ -1628,11 +1628,11 @@ nfs4_get_otw_cred_by_osp(rnode4_t *rp, cred_t *cr,
 			if (next_osp)
 				mutex_exit(&next_osp->os_sync_lock);
 			open_owner_rele(oop);
-		} else {
-			next_osp = NULL;
 		}
-	} else  {
+	}
+	if (next_osp == NULL) {
 		int delay_rele = 0;
+		*first_time = FALSE;
 
 		/* return the next open stream for this rnode */
 		mutex_enter(&rp->r_os_lock);
@@ -1690,15 +1690,13 @@ nfs4_get_otw_cred_by_osp(rnode4_t *rp, cred_t *cr,
 			*osp = next_osp;
 	} else {
 		/* just return the cred provided to us */
-		if (*first_time != TRUE)
-			*last_time = TRUE;
+		*last_time = TRUE;
 		*osp = NULL;
 		ret_cr = cr;
 		crhold(ret_cr);
 	}
 
-	if (*first_time)
-		*first_time = FALSE;
+	*first_time = FALSE;
 	return (ret_cr);
 }
 
