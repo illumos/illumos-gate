@@ -1233,6 +1233,9 @@ nanosleep(timespec_t *rqtp, timespec_t *rmtp)
 	int ret = 1;
 	model_t datamodel = get_udatamodel();
 
+	timecheck = timechanged;
+	gethrestime(&now);
+
 	if (datamodel == DATAMODEL_NATIVE) {
 		if (copyin(rqtp, &rqtime, sizeof (rqtime)))
 			return (set_errno(EFAULT));
@@ -1249,8 +1252,6 @@ nanosleep(timespec_t *rqtp, timespec_t *rmtp)
 		return (set_errno(EINVAL));
 
 	if (timerspecisset(&rqtime)) {
-		timecheck = timechanged;
-		gethrestime(&now);
 		timespecadd(&rqtime, &now);
 		mutex_enter(&curthread->t_delay_lock);
 		while ((ret = cv_waituntil_sig(&curthread->t_delay_cv,

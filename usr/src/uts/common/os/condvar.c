@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/thread.h>
 #include <sys/proc.h>
 #include <sys/debug.h>
@@ -654,7 +652,7 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 	if (when == NULL)
 		return (cv_wait_sig_swap(cvp, mp));
 
-	gethrestime_lasttick(&now);
+	gethrestime(&now);
 	delta = *when;
 	timespecsub(&delta, &now);
 	if (delta.tv_sec < 0 || (delta.tv_sec == 0 && delta.tv_nsec == 0)) {
@@ -665,6 +663,7 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 		 */
 		rval = cv_timedwait_sig(cvp, mp, lbolt);
 	} else {
+		gethrestime_lasttick(&now);
 		if (timecheck == timechanged) {
 			rval = cv_timedwait_sig(cvp, mp,
 			    lbolt + timespectohz(when, now));
