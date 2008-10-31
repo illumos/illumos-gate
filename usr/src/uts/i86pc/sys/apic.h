@@ -775,6 +775,7 @@ extern void x2apic_send_ipi();
 extern void apic_ret();
 extern int apic_detect_x2apic();
 extern void apic_enable_x2apic();
+extern int apic_local_mode();
 extern void apic_change_eoi();
 extern void apic_send_EOI(uint32_t);
 extern void apic_send_directed_EOI(uint32_t);
@@ -820,6 +821,8 @@ extern apic_reg_ops_t *apic_reg_ops;
 extern int apic_mode;
 extern int apic_direct_EOI;
 extern void x2apic_update_psm();
+extern void apic_change_ops();
+extern void apic_common_send_ipi(int, int);
 
 
 #ifdef	__cplusplus

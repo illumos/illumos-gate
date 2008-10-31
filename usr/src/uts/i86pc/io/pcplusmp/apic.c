@@ -67,6 +67,7 @@
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
 #include <sys/x_call.h>
+#include <sys/reboot.h>
 
 /*
  *	Local Function Prototypes
@@ -702,7 +703,6 @@ apic_init_intr()
 		}
 		apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect);
 	}
-
 }
 
 static void
@@ -814,7 +814,7 @@ apic_cpu_start(processorid_t cpun, caddr_t arg)
 	outb(CMOS_DATA, BIOS_SHUTDOWN);
 
 	/*
-	 * According to x2APIC specification in section '2.3.5.1' of
+	 * According to X2APIC specification in section '2.3.5.1' of
 	 * Interrupt Command Register Semantics, the semantics of
 	 * programming the Interrupt Command Register to dispatch an interrupt
 	 * is simplified. A single MSR write to the 64-bit ICR is required
@@ -1009,7 +1009,7 @@ apic_intr_enter(int ipl, int *vectorp)
 }
 
 /*
- * This macro is a common code used by MMIO local apic and x2apic
+ * This macro is a common code used by MMIO local apic and X2APIC
  * local apic.
  */
 #define	APIC_INTR_EXIT() \
@@ -1023,7 +1023,7 @@ apic_intr_enter(int ipl, int *vectorp)
 }
 
 /*
- * Any changes made to this function must also change x2apic
+ * Any changes made to this function must also change X2APIC
  * version of intr_exit.
  */
 void
@@ -1064,13 +1064,12 @@ psm_intr_exit_fn(void)
 
 /*
  * Mask all interrupts below or equal to the given IPL.
- * Any changes made to this function must also change x2apic
+ * Any changes made to this function must also change X2APIC
  * version of setspl.
  */
 static void
 apic_setspl(int ipl)
 {
-
 #if defined(__amd64)
 	setcr8((ulong_t)apic_cr8pri[ipl]);
 #else
@@ -1089,7 +1088,7 @@ apic_setspl(int ipl)
 }
 
 /*
- * x2apic version of setspl.
+ * X2APIC version of setspl.
  * Mask all interrupts below or equal to the given IPL
  */
 static void
@@ -1102,7 +1101,9 @@ x2apic_setspl(int ipl)
 }
 
 /*
- * generates an interprocessor interrupt to another CPU
+ * generates an interprocessor interrupt to another CPU. Any changes made to
+ * this routine must be accompanied by similar changes to
+ * apic_common_send_ipi().
  */
 static void
 apic_send_ipi(int cpun, int ipl)
@@ -1335,13 +1336,42 @@ static int
 apic_post_cpu_start()
 {
 	int cpun;
+	static int cpus_started = 1;
+	struct psm_ops *pops = &apic_ops;
+
+	/* We know this CPU + BSP  started successfully. */
+	cpus_started++;
 
 	/*
 	 * On BSP we would have enabled X2APIC, if supported by processor,
 	 * in acpi_probe(), but on AP we do it here.
+	 *
+	 * We enable X2APIC mode only if BSP is running in X2APIC & the
+	 * local APIC mode of the current CPU is MMIO (xAPIC).
 	 */
-	if (apic_detect_x2apic()) {
+	if (apic_mode == LOCAL_X2APIC && apic_detect_x2apic() &&
+	    apic_local_mode() == LOCAL_APIC) {
 		apic_enable_x2apic();
+	}
+
+	/*
+	 * We change psm_send_ipi and send_dirintf only if Solaris
+	 * is booted in kmdb & the current CPU is the last CPU being
+	 * brought up. We don't need to do anything if Solaris is running
+	 * in MMIO mode (xAPIC).
+	 */
+	if ((boothowto & RB_DEBUG) &&
+	    (cpus_started == boot_ncpus || cpus_started == apic_nproc) &&
+	    apic_mode == LOCAL_X2APIC) {
+		/*
+		 * We no longer need help from apic_common_send_ipi()
+		 * since we will not start any more CPUs.
+		 *
+		 * We will need to revisit this if we start supporting
+		 * hot-plugging of CPUs.
+		 */
+		pops->psm_send_ipi = x2apic_send_ipi;
+		send_dirintf = pops->psm_send_ipi;
 	}
 
 	splx(ipltospl(LOCK_LEVEL));
@@ -2466,10 +2496,30 @@ x2apic_update_psm()
 
 	ASSERT(pops != NULL);
 
-	pops->psm_send_ipi =  x2apic_send_ipi;
+	/*
+	 * We don't need to do any magic if one of the following
+	 * conditions is true :
+	 * - Not being run under kernel debugger.
+	 * - MP is not set.
+	 * - Booted with one CPU only.
+	 * - One CPU configured.
+	 *
+	 * We set apic_common_send_ipi() since kernel debuggers
+	 * attempt to send IPIs to other slave CPUs during
+	 * entry (exit) from (to) debugger.
+	 */
+	if (!(boothowto & RB_DEBUG) || use_mp == 0 ||
+	    apic_nproc == 1 || boot_ncpus == 1) {
+		pops->psm_send_ipi =  x2apic_send_ipi;
+	} else {
+		pops->psm_send_ipi =  apic_common_send_ipi;
+	}
+
 	pops->psm_intr_exit = x2apic_intr_exit;
 	pops->psm_setspl = x2apic_setspl;
 
-	/* global functions */
 	send_dirintf = pops->psm_send_ipi;
+
+	apic_mode = LOCAL_X2APIC;
+	apic_change_ops();
 }
