@@ -147,6 +147,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	if (tgt_find_attr_str(t, XML_ELEMENT_INCORE, &m) == True) {
 		if (strcmp(m, "true") == 0) {
 			free(m);
+			free(name);
 			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (modify_zfs(x, cred));
 		}
@@ -230,6 +231,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		if ((strcmp(prop, TGT_TYPE_DISK) != 0) &&
 		    (strcmp(prop, TGT_TYPE_TAPE) != 0)) {
 			xml_rtn_msg(&msg, ERR_RESIZE_WRONG_DTYPE);
+			free(prop);
 			goto error;
 		}
 		free(prop);
@@ -249,7 +251,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 
 		/* ---- update the parameter node with new size ---- */
 		if ((c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &new_lu_size))
-		    == False) {
+		    == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			goto error;
 		}
@@ -270,6 +272,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		bzero(buf, sizeof (buf));
 		if (write(fd, buf, sizeof (buf)) != sizeof (buf)) {
 			xml_rtn_msg(&msg, ERR_LUN_NOT_GROWN);
+			(void) close(fd);
 			goto error;
 		}
 		(void) close(fd);
@@ -279,6 +282,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 
 		prop = NULL;
 		tgt_node_free(node);
+		node = NULL;
 		change_made = True;
 	}
 
@@ -311,6 +315,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 				break;
 			} else {
 				xml_rtn_msg(&msg, ERR_TPGT_NO_IPADDR);
+				free(prop);
 				goto error;
 			}
 		}
@@ -356,6 +361,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		c = tgt_node_alloc(XML_ELEMENT_INIT, String, prop);
 		if (c == NULL) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
+			free(prop);
 			goto error;
 		}
 		if ((list = tgt_node_next(t, XML_ELEMENT_ACLLIST,
@@ -367,6 +373,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			list = tgt_node_alloc(XML_ELEMENT_ACLLIST, String, "");
 			if (list == NULL) {
 				xml_rtn_msg(&msg, ERR_NO_MEM);
+				free(prop);
 				goto error;
 			}
 			tgt_node_add(list, c);
@@ -386,6 +393,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		if (modify_element(XML_ELEMENT_ALIAS, prop, t, MatchName) ==
 		    False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
+			free(prop);
 			goto error;
 		}
 		free(prop);
