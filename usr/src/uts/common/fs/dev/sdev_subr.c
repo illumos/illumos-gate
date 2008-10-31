@@ -2971,7 +2971,6 @@ done:
 	return (error);
 }
 
-
 static int
 sdev_modctl_lookup(const char *path, vnode_t **r_vp)
 {
@@ -2983,6 +2982,8 @@ sdev_modctl_lookup(const char *path, vnode_t **r_vp)
 	int error;
 	int persisted = 0;
 
+	ASSERT(INGLOBALZONE(curproc));
+
 	if (error = pn_get((char *)path, UIO_SYSSPACE, &pn))
 		return (error);
 	nm = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -2991,20 +2992,84 @@ sdev_modctl_lookup(const char *path, vnode_t **r_vp)
 	VN_HOLD(vp);
 
 	while (pn_pathleft(&pn)) {
-		ASSERT(vp->v_type == VDIR);
+		ASSERT(vp->v_type == VDIR || vp->v_type == VLNK);
 		(void) pn_getcomponent(&pn, nm);
+
+		/*
+		 * Deal with the .. special case where we may be
+		 * traversing up across a mount point, to the
+		 * root of this filesystem or global root.
+		 */
+		if (nm[0] == '.' && nm[1] == '.' && nm[2] == 0) {
+checkforroot:
+			if (VN_CMP(vp, rootdir)) {
+				nm[1] = 0;
+			} else if (vp->v_flag & VROOT) {
+				vfs_t *vfsp;
+				cvp = vp;
+				vfsp = cvp->v_vfsp;
+				vfs_rlock_wait(vfsp);
+				vp = cvp->v_vfsp->vfs_vnodecovered;
+				if (vp == NULL ||
+				    (cvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)) {
+					vfs_unlock(vfsp);
+					VN_RELE(cvp);
+					error = EIO;
+					break;
+				}
+				VN_HOLD(vp);
+				vfs_unlock(vfsp);
+				VN_RELE(cvp);
+				cvp = NULL;
+				goto checkforroot;
+			}
+		}
+
 		error = VOP_LOOKUP(vp, nm, &cvp, NULL, 0, NULL, kcred, NULL,
 		    NULL, NULL);
-		VN_RELE(vp);
-
-		if (error)
+		if (error) {
+			VN_RELE(vp);
 			break;
+		}
 
 		/* traverse mount points encountered on our journey */
 		if (vn_ismntpt(cvp) && (error = traverse(&cvp)) != 0) {
+			VN_RELE(vp);
 			VN_RELE(cvp);
 			break;
 		}
+
+		/*
+		 * symbolic link, can be either relative and absolute
+		 */
+		if ((cvp->v_type == VLNK) && pn_pathleft(&pn)) {
+			struct pathname linkpath;
+			pn_alloc(&linkpath);
+			if (error = pn_getsymlink(cvp, &linkpath, kcred)) {
+				pn_free(&linkpath);
+				break;
+			}
+			if (pn_pathleft(&linkpath) == 0)
+				(void) pn_set(&linkpath, ".");
+			error = pn_insert(&pn, &linkpath, strlen(nm));
+			pn_free(&linkpath);
+			if (pn.pn_pathlen == 0) {
+				VN_RELE(vp);
+				return (ENOENT);
+			}
+			if (pn.pn_path[0] == '/') {
+				pn_skipslash(&pn);
+				VN_RELE(vp);
+				VN_RELE(cvp);
+				vp = rootdir;
+				VN_HOLD(vp);
+			} else {
+				VN_RELE(cvp);
+			}
+			continue;
+		}
+
+		VN_RELE(vp);
 
 		/*
 		 * Direct the operation to the persisting filesystem
