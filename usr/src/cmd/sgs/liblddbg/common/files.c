@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/auxv.h>
 #include	<string.h>
@@ -626,14 +625,20 @@ Dbg_file_cntl(Lm_list *lml, Aliste flmco, Aliste tlmco)
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
+/*
+ * Report archive rescan operation.
+ *	argv_start_ndx, argv_end_ndx - Index range of command line arguments
+ *		from which archives are to be reprocessed.
+ */
 void
-Dbg_file_ar_rescan(Lm_list *lml)
+Dbg_file_ar_rescan(Lm_list *lml, int argv_start_ndx, int argv_end_ndx)
 {
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_FIL_AR_RESCAN));
+	dbg_print(lml, MSG_INTL(MSG_FIL_AR_RESCAN),
+	    argv_start_ndx, argv_end_ndx);
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
 

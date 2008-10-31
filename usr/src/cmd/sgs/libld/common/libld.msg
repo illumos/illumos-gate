@@ -207,8 +207,18 @@
 			 a minimum\n"
 @ MSG_ARG_DETAIL_ZRREL	"\t[-z relaxreloc]\trelax rules used for relocations \
 			 against COMDAT sections\n"
-@ MSG_ARG_DETAIL_ZRS	"\t[-z rescan]\trescan archive list until no further \
-			 member\n\t\t\textraction occurs\n"
+@ MSG_ARG_DETAIL_ZRS	"\t[-z rescan]\tafter processing all arguments, rescan \
+			 archive list\n\
+			 \t\t\tuntil no further member extraction occurs\n"
+@ MSG_ARG_DETAIL_ZRSN	"\t[-z rescan-now]\timmediately rescan archive list \
+			 until\n\
+			 \t\t\tno further member extraction occurs\n"
+@ MSG_ARG_DETAIL_ZRSGRP	"\t[-z rescan-start archives... -z rescan-end],\n\
+			 \t[--start-group archives... --end-group], \
+			 [-( archives... -)]\n\
+			 \t\t\trescan specified archive group upon reaching\n\
+			 \t\t\tthe end of the group, until no further\n\
+			 \t\t\tmember extraction occurs\n"
 @ MSG_ARG_DETAIL_ZTARG	"\t[-z target=platform]\n\
 			 \t\t\ttarget machine for cross linking\n"
 @ MSG_ARG_DETAIL_ZT	"\t[-z text]\tdisallow output relocations against \
@@ -398,8 +408,8 @@
 
 # Recording name conflicts
 
-@ MSG_REC_OPTCNFLT	"recording name conflict: file `%s' and -h option \
-			 provide identical dependency names: %s"
+@ MSG_REC_OPTCNFLT	"recording name conflict: file `%s' and %s provide \
+			 identical dependency names: %s"
 @ MSG_REC_OBJCNFLT	"recording name conflict: file `%s' and file `%s' \
 			 provide identical dependency names: %s  %s"
 @ MSG_REC_CNFLTHINT	"(possible multiple inclusion of the same file)"
@@ -798,26 +808,54 @@
 
 # Argument processing messages
 
-@ MSG_ARG_DY_INCOMP	"option %s is incompatible with building a dynamic \
+@ MSG_ARG_DY_INCOMP	"%s option is incompatible with building a dynamic \
 			 executable"
-@ MSG_ARG_ST_INCOMP	"option %s is incompatible with building a static \
-			 object (-dn/-r)"
+@ MSG_MARG_DY_INCOMP	"%s is incompatible with building a dynamic \
+			 executable"
+@ MSG_ARG_ST_INCOMP	"%s option is incompatible with building a static \
+			 object (-dn, -r, --relocatable)"
+@ MSG_MARG_ST_INCOMP	"%s is incompatible with building a static \
+			 object (-dn, -r, --relocatable)"
 @ MSG_ARG_INCOMP	"option %s and %s are incompatible"
+@ MSG_MARG_INCOMP	"%s and %s are incompatible"
 @ MSG_ARG_MTONCE	"option %s appears more than once, first setting taken"
+@ MSG_MARG_MTONCE	"%s appears more than once, first setting taken"
 @ MSG_ARG_ILLEGAL	"option %s has illegal argument `%s'"
 @ MSG_ARG_YP		"option -YP and -Y%c may not be specified concurrently"
-@ MSG_ARG_STRIP		"option -r and -s both set; only debugging \
+@ MSG_ARG_STRIP		"%s specified with %s; only debugging \
 			 information stripped"
 @ MSG_ARG_NOFILES	"no files on input command line"
 @ MSG_ARG_NOFLTR	"option %s is only meaningful when building a filter"
 @ MSG_ARG_NODEFLIB	"the default library search path has been suppressed, \
-			 but no runpaths have been specified (see -R option)"
+			 but no runpaths have been specified via %s"
 @ MSG_ARG_NOENTRY	"entry point symbol `%s' is undefined"
 
-@ MSG_ARG_FLAGS		"Flags processing errors"
-@ MSG_ARG_FILES		"File processing errors. No output written to %s"
-@ MSG_ARG_SYM_WARN	"Symbol referencing errors"
-@ MSG_ARG_SYM_FATAL	"Symbol referencing errors. No output written to %s"
+@ MSG_ARG_FLAGS		"flags processing errors"
+@ MSG_ARG_FILES		"file processing errors. No output written to %s"
+@ MSG_ARG_SYM_WARN	"symbol referencing errors"
+@ MSG_ARG_SYM_FATAL	"symbol referencing errors. No output written to %s"
+@ MSG_ARG_AR_GRP_OLAP	"%s cannot be nested"
+@ MSG_ARG_AR_GRP_BAD	"%s used without corresponding %s"
+
+
+# Messages used to refer to options where there is more than
+# one name accepted.
+
+@ MSG_MARG_AR_GRPS	"archive rescan groups \
+			 (-z rescan-start, -(, --start-group)"
+@ MSG_MARG_AR_GRP_END	"archive rescan group end option \
+			 (-z rescan-end, -), --end-group)"
+@ MSG_MARG_AR_GRP_START	"archive rescan group start option \
+			 (-z rescan-start, -(, --start-group)"
+@ MSG_MARG_ENTRY	"entry point option (-e, --entry)"
+@ MSG_MARG_FILTER_AUX	"auxiliary filter option (-f, --auxiliary)"
+@ MSG_MARG_FILTER	"filter option (-F, --filter)"
+@ MSG_MARG_OUTFILE	"output object option (-o, --output)"
+@ MSG_MARG_REL		"relocatable object option (-r, --relocatable)"
+@ MSG_MARG_RPATH	"runpath option (-R, -rpath)"
+@ MSG_MARG_SO		"shared object option (-G, -shared)"
+@ MSG_MARG_SONAME	"soname option (-h, --soname)"
+@ MSG_MARG_STRIP	"strip option (-s, --strip-all)"
 
 # Entrance criteria messages
 
@@ -1087,19 +1125,12 @@
 @ MSG_ARG_BTRANS	"-Btrans"
 @ MSG_ARG_C		"-c"
 @ MSG_ARG_D		"-d"
-@ MSG_ARG_E		"-e"
 @ MSG_ARG_DY		"-dy"
-@ MSG_ARG_F		"-f"
-@ MSG_ARG_CF		"-F"
-@ MSG_ARG_CG		"-G"
-@ MSG_ARG_H		"-h"
 @ MSG_ARG_CI		"-I"
 @ MSG_ARG_CN		"-N"
-@ MSG_ARG_O		"-o"
 @ MSG_ARG_P		"-p"
 @ MSG_ARG_CP		"-P"
 @ MSG_ARG_CQ		"-Q"
-@ MSG_ARG_R		"-r"
 @ MSG_ARG_CY		"-Y"
 @ MSG_ARG_CYL		"-YL"
 @ MSG_ARG_CYP		"-YP"
@@ -1164,6 +1195,9 @@
 @ MSG_ARG_LD32		"ld32="
 @ MSG_ARG_LD64		"ld64="
 @ MSG_ARG_RESCAN	"rescan"
+@ MSG_ARG_RESCAN_NOW	"rescan-now"
+@ MSG_ARG_RESCAN_START	"rescan-start"
+@ MSG_ARG_RESCAN_END	"rescan-end"
 @ MSG_ARG_NOLDYNSYM	"noldynsym"
 @ MSG_ARG_RELAXRELOC	"relaxreloc"
 @ MSG_ARG_NORELAXRELOC	"norelaxreloc"
@@ -1186,6 +1220,7 @@
 @ MSG_ARG_T_AUXFLTR	"-auxiliary"
 @ MSG_ARG_T_MULDEFS	"-allow-multiple-definition"
 @ MSG_ARG_T_INTERP	"-dynamic-linker"
+@ MSG_ARG_T_ENDGROUP	"-end-group"
 @ MSG_ARG_T_ENTRY	"-entry"
 @ MSG_ARG_T_STDFLTR	"-filter"
 @ MSG_ARG_T_HELP	"-help"
@@ -1195,10 +1230,13 @@
 @ MSG_ARG_T_NOWHOLEARC	"-no-whole-archive"
 @ MSG_ARG_T_OUTPUT	"-output"
 @ MSG_ARG_T_RELOCATABLE	"-relocatable"
+@ MSG_ARG_T_STARTGROUP	"-start-group"
 @ MSG_ARG_T_STRIP	"-strip-all"
 @ MSG_ARG_T_UNDEF	"-undefined"
 @ MSG_ARG_T_VERSION	"-version"
 @ MSG_ARG_T_WHOLEARC	"-whole-archive"
+@ MSG_ARG_T_OPAR	"("
+@ MSG_ARG_T_CPAR	")"
 
 # File and pathname strings
 

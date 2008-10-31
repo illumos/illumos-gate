@@ -151,6 +151,10 @@ struct ofl_desc {
 	Word		ofl_objscnt;	/* 	and count */
 	List		ofl_ars;	/* archive library list */
 	Word		ofl_arscnt;	/* 	and count */
+	int		ofl_ars_gsandx; /* archive group argv index. 0 means */
+					/*	no current group, < 0 means */
+					/*	error reported. >0 is cur ndx */
+	Word		ofl_ars_gsndx;	/* current -zrescan-start ofl_ars ndx */
 	List		ofl_sos;	/* shared object list */
 	Word		ofl_soscnt;	/* 	and count */
 	List		ofl_soneed;	/* list of implicitly required .so's */

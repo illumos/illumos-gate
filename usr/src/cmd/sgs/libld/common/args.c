@@ -187,11 +187,74 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRREL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRS));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRSN));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRSGRP));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTARG));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZT));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTW));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZV));
+}
+
+/*
+ * Rescan the archives seen on the command line in order
+ * to handle circularly dependent archives, stopping when
+ * no further member extraction occurs.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	isgrp - True if this is a an archive group search, False
+ *		to search starting with argv[1] through end_arg_ndx
+ *	end_arg_ndx - Index of final argv element to consider.
+ */
+static uintptr_t
+ld_rescan_archives(Ofl_desc *ofl, int isgrp, int end_arg_ndx)
+{
+	ofl->ofl_flags1 |= FLG_OF1_EXTRACT;
+
+	while (ofl->ofl_flags1 & FLG_OF1_EXTRACT) {
+		Listnode	*lnp;
+		Ar_desc		*adp;
+		Word		start_ndx = isgrp ? ofl->ofl_ars_gsndx : 0;
+		Word		ndx = 0;
+
+		ofl->ofl_flags1 &= ~FLG_OF1_EXTRACT;
+
+		DBG_CALL(Dbg_file_ar_rescan(ofl->ofl_lml,
+		    isgrp ? ofl->ofl_ars_gsandx : 1, end_arg_ndx));
+
+		for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
+			/* If not to starting index yet, skip it */
+			if (ndx++ < start_ndx)
+				continue;
+
+			/*
+			 * If this archive was processed with -z allextract,
+			 * then all members have already been extracted.
+			 */
+			if (adp->ad_elf == NULL)
+				continue;
+
+			/*
+			 * Reestablish any archive specific command line flags.
+			 */
+			ofl->ofl_flags1 &= ~MSK_OF1_ARCHIVE;
+			ofl->ofl_flags1 |= (adp->ad_flags & MSK_OF1_ARCHIVE);
+
+			/*
+			 * Re-process the archive.  Note that a file descriptor
+			 * is unnecessary, as the file is already available in
+			 * memory.
+			 */
+			if (ld_process_archive(adp->ad_name, -1,
+			    adp, ofl) == S_ERROR)
+				return (S_ERROR);
+			if (ofl->ofl_flags & FLG_OF_FATAL)
+				return (1);
+		}
+	}
+
+	return (1);
 }
 
 /*
@@ -215,7 +278,7 @@ check_flags(Ofl_desc * ofl, int argc)
 			 * object isn't allowed.  Warn the user, but proceed.
 			 */
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_ARG_INCOMP), MSG_ORIG(MSG_ARG_R),
+			    MSG_INTL(MSG_MARG_INCOMP), MSG_INTL(MSG_MARG_REL),
 			    MSG_ORIG(MSG_ARG_ZCOMBRELOC));
 			ofl->ofl_flags &= ~FLG_OF_COMREL;
 		}
@@ -304,7 +367,8 @@ check_flags(Ofl_desc * ofl, int argc)
 		 */
 		if ((ofl->ofl_dtflags_1 & DF_1_NODEFLIB) && !ofl->ofl_rpath)
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_ARG_NODEFLIB));
+			    MSG_INTL(MSG_ARG_NODEFLIB),
+			    MSG_INTL(MSG_MARG_RPATH));
 
 		/*
 		 * By default, text relocation warnings are given when building
@@ -374,8 +438,8 @@ check_flags(Ofl_desc * ofl, int argc)
 			}
 			if (ofl->ofl_soname) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_DY_INCOMP),
-				    MSG_ORIG(MSG_ARG_H));
+				    MSG_INTL(MSG_MARG_DY_INCOMP),
+				    MSG_INTL(MSG_MARG_SONAME));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 			if (Btflag) {
@@ -387,12 +451,12 @@ check_flags(Ofl_desc * ofl, int argc)
 			if (ofl->ofl_filtees) {
 				if (ofl->ofl_flags & FLG_OF_AUX) {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_ARG_DY_INCOMP),
-					    MSG_ORIG(MSG_ARG_F));
+					    MSG_INTL(MSG_MARG_DY_INCOMP),
+					    MSG_INTL(MSG_MARG_FILTER_AUX));
 				} else {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_ARG_DY_INCOMP),
-					    MSG_ORIG(MSG_ARG_CF));
+					    MSG_INTL(MSG_MARG_DY_INCOMP),
+					    MSG_INTL(MSG_MARG_FILTER));
 				}
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
@@ -440,8 +504,9 @@ check_flags(Ofl_desc * ofl, int argc)
 
 			if (ofl->ofl_interp) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_INCOMP),
-				    MSG_ORIG(MSG_ARG_R), MSG_ORIG(MSG_ARG_CI));
+				    MSG_INTL(MSG_MARG_INCOMP),
+				    MSG_INTL(MSG_MARG_REL),
+				    MSG_ORIG(MSG_ARG_CI));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 		}
@@ -455,7 +520,8 @@ check_flags(Ofl_desc * ofl, int argc)
 		}
 		if (ofl->ofl_soname) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_H));
+			    MSG_INTL(MSG_MARG_ST_INCOMP),
+			    MSG_INTL(MSG_MARG_SONAME));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 		if (ofl->ofl_depaudit) {
@@ -476,12 +542,12 @@ check_flags(Ofl_desc * ofl, int argc)
 		if (ofl->ofl_filtees) {
 			if (ofl->ofl_flags & FLG_OF_AUX) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_ST_INCOMP),
-				    MSG_ORIG(MSG_ARG_F));
+				    MSG_INTL(MSG_MARG_ST_INCOMP),
+				    MSG_INTL(MSG_MARG_FILTER_AUX));
 			} else {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_ST_INCOMP),
-				    MSG_ORIG(MSG_ARG_CF));
+				    MSG_INTL(MSG_MARG_ST_INCOMP),
+				    MSG_INTL(MSG_MARG_FILTER));
 			}
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
@@ -493,13 +559,14 @@ check_flags(Ofl_desc * ofl, int argc)
 		}
 		if (Gflag) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_CG));
+			    MSG_INTL(MSG_MARG_ST_INCOMP),
+			    MSG_INTL(MSG_MARG_SO));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 		if (aflag && rflag) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_ARG_INCOMP), MSG_ORIG(MSG_ARG_A),
-			    MSG_ORIG(MSG_ARG_R));
+			    MSG_INTL(MSG_MARG_INCOMP), MSG_ORIG(MSG_ARG_A),
+			    MSG_INTL(MSG_MARG_REL));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 
@@ -510,7 +577,9 @@ check_flags(Ofl_desc * ofl, int argc)
 			 */
 			if (sflag) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_ARG_STRIP));
+				    MSG_INTL(MSG_ARG_STRIP),
+				    MSG_INTL(MSG_MARG_REL),
+				    MSG_INTL(MSG_MARG_STRIP));
 			}
 
 			if (ztflag == 0)
@@ -518,8 +587,9 @@ check_flags(Ofl_desc * ofl, int argc)
 
 			if (ofl->ofl_interp) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_INCOMP),
-				    MSG_ORIG(MSG_ARG_R), MSG_ORIG(MSG_ARG_CI));
+				    MSG_INTL(MSG_MARG_INCOMP),
+				    MSG_INTL(MSG_MARG_REL),
+				    MSG_ORIG(MSG_ARG_CI));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 		} else {
@@ -836,8 +906,8 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_entry)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_ARG_MTONCE),
-				    MSG_ORIG(MSG_ARG_E));
+				    MSG_INTL(MSG_MARG_MTONCE),
+				    MSG_INTL(MSG_MARG_ENTRY));
 			else
 				ofl->ofl_entry = (void *)optarg;
 			break;
@@ -847,8 +917,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			if (ofl->ofl_filtees &&
 			    (!(ofl->ofl_flags & FLG_OF_AUX))) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_INCOMP),
-				    MSG_ORIG(MSG_ARG_F), MSG_ORIG(MSG_ARG_CF));
+				    MSG_INTL(MSG_MARG_INCOMP),
+				    MSG_INTL(MSG_MARG_FILTER_AUX),
+				    MSG_INTL(MSG_MARG_FILTER));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			} else {
 				if ((ofl->ofl_filtees =
@@ -864,8 +935,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			if (ofl->ofl_filtees &&
 			    (ofl->ofl_flags & FLG_OF_AUX)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_INCOMP),
-				    MSG_ORIG(MSG_ARG_CF), MSG_ORIG(MSG_ARG_F));
+				    MSG_INTL(MSG_MARG_INCOMP),
+				    MSG_INTL(MSG_MARG_FILTER),
+				    MSG_INTL(MSG_MARG_FILTER_AUX));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			} else {
 				if ((ofl->ofl_filtees =
@@ -879,8 +951,8 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_soname)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_ARG_MTONCE),
-				    MSG_ORIG(MSG_ARG_H));
+				    MSG_INTL(MSG_MARG_MTONCE),
+				    MSG_INTL(MSG_MARG_SONAME));
 			else
 				ofl->ofl_soname = (const char *)optarg;
 			break;
@@ -920,8 +992,8 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_name)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_ARG_MTONCE),
-				    MSG_ORIG(MSG_ARG_O));
+				    MSG_INTL(MSG_MARG_MTONCE),
+				    MSG_INTL(MSG_MARG_OUTFILE));
 			else
 				ofl->ofl_name = (const char *)optarg;
 			break;
@@ -1153,6 +1225,39 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_GLOBAUDIT)) == 0) {
 				ofl->ofl_dtflags_1 |= DF_1_GLOBAUDIT;
+
+			/*
+			 * Check archive group usage
+			 *	-z rescan-start ... -z rescan-end
+			 * to ensure they don't overlap and are well formed.
+			 */
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_RESCAN_START)) == 0) {
+				if (ofl->ofl_ars_gsandx == 0) {
+					ofl->ofl_ars_gsandx = ndx;
+				} else if (ofl->ofl_ars_gsandx > 0) {
+					/* Another group is still open */
+					eprintf(ofl->ofl_lml, ERR_FATAL,
+					    MSG_INTL(MSG_ARG_AR_GRP_OLAP),
+					    MSG_INTL(MSG_MARG_AR_GRPS));
+					ofl->ofl_flags |= FLG_OF_FATAL;
+					/* Don't report cascading errors */
+					ofl->ofl_ars_gsandx = -1;
+				}
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_RESCAN_END)) == 0) {
+				if (ofl->ofl_ars_gsandx > 0) {
+					ofl->ofl_ars_gsandx = 0;
+				} else if (ofl->ofl_ars_gsandx == 0) {
+					/* There was no matching begin */
+					eprintf(ofl->ofl_lml, ERR_FATAL,
+					    MSG_INTL(MSG_ARG_AR_GRP_BAD),
+					    MSG_INTL(MSG_MARG_AR_GRP_END),
+					    MSG_INTL(MSG_MARG_AR_GRP_START));
+					ofl->ofl_flags |= FLG_OF_FATAL;
+					/* Don't report cascading errors */
+					ofl->ofl_ars_gsandx = -1;
+				}
 			/*
 			 * The following options just need validation as they
 			 * are interpreted on the second pass through the
@@ -1181,7 +1286,8 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_WEAKEXT)) &&
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_TARGET),
-			    MSG_ARG_TARGET_SIZE)) {
+			    MSG_ARG_TARGET_SIZE) &&
+			    strcmp(optarg, MSG_ORIG(MSG_ARG_RESCAN_NOW))) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_Z), optarg);
@@ -1539,6 +1645,20 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    (Sym_desc *)S_ERROR)
 						return (S_ERROR);
 					ofl->ofl_dtracesym = sdp;
+				} else if (strcmp(optarg,
+				    MSG_ORIG(MSG_ARG_RESCAN_NOW)) == 0) {
+					if (ld_rescan_archives(ofl, 0, ndx) ==
+					    S_ERROR)
+						return (S_ERROR);
+				} else if (strcmp(optarg,
+				    MSG_ORIG(MSG_ARG_RESCAN_START)) == 0) {
+					ofl->ofl_ars_gsndx = ofl->ofl_arscnt;
+					ofl->ofl_ars_gsandx = ndx;
+				} else if (strcmp(optarg,
+				    MSG_ORIG(MSG_ARG_RESCAN_END)) == 0) {
+					if (ld_rescan_archives(ofl, 1, ndx) ==
+					    S_ERROR)
+						return (S_ERROR);
 				}
 			default:
 				break;
@@ -1577,6 +1697,16 @@ process_flags_com(Ofl_desc *ofl, int argc, char **argv, int *e)
 			break;
 		ofl->ofl_objscnt++;
 	}
+
+	/* Did an unterminated archive group run off the end? */
+	if (ofl->ofl_ars_gsandx > 0) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_AR_GRP_BAD),
+		    MSG_INTL(MSG_MARG_AR_GRP_START),
+		    MSG_INTL(MSG_MARG_AR_GRP_END));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (S_ERROR);
+	}
+
 	return (1);
 }
 
@@ -1705,42 +1835,11 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 	 * (above) as they may already have resolved any undefined references
 	 * from any explicit dependencies.
 	 */
-	if (ofl->ofl_flags1 & FLG_OF1_RESCAN)
-		ofl->ofl_flags1 |= FLG_OF1_EXTRACT;
-	while ((ofl->ofl_flags1 & (FLG_OF1_RESCAN | FLG_OF1_EXTRACT)) ==
-	    (FLG_OF1_RESCAN | FLG_OF1_EXTRACT)) {
-		Listnode	*lnp;
-		Ar_desc		*adp;
-
-		ofl->ofl_flags1 &= ~FLG_OF1_EXTRACT;
-
-		DBG_CALL(Dbg_file_ar_rescan(ofl->ofl_lml));
-
-		for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
-			/*
-			 * If this archive was processed with -z allextract,
-			 * then all members have already been extracted.
-			 */
-			if (adp->ad_elf == NULL)
-				continue;
-
-			/*
-			 * Reestablish any archive specific command line flags.
-			 */
-			ofl->ofl_flags1 &= ~MSK_OF1_ARCHIVE;
-			ofl->ofl_flags1 |= (adp->ad_flags & MSK_OF1_ARCHIVE);
-
-			/*
-			 * Re-process the archive.  Note that a file descriptor
-			 * is unnecessary, as the file is already available in
-			 * memory.
-			 */
-			if (ld_process_archive(adp->ad_name, -1,
-			    adp, ofl) == S_ERROR)
-				return (S_ERROR);
-			if (ofl->ofl_flags & FLG_OF_FATAL)
-				return (1);
-		}
+	if (ofl->ofl_flags1 & FLG_OF1_RESCAN) {
+		if (ld_rescan_archives(ofl, 0, argc) == S_ERROR)
+			return (S_ERROR);
+		if (ofl->ofl_flags & FLG_OF_FATAL)
+			return (1);
 	}
 
 	/*

@@ -1401,3 +1401,5 @@ Bugid   Risk Synopsis
 	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
 6756953 customer requests that DT_CONFIG strings be honored for secure apps (D)
 6765299 ld --version-script option not compatible with GNU ld (D)
+6748160 problem with -zrescan (D)
+	PSARC/2008/651 New ld archive rescan options

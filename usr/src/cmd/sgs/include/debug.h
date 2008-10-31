@@ -672,7 +672,7 @@ extern	void	Dbg_file_analyze(Rt_map *);
 extern	void	Dbg_file_aout(Lm_list *, const char *, ulong_t, ulong_t,
 		    ulong_t, const char *, Aliste);
 extern	void	Dbg_file_ar(Lm_list *, const char *, int);
-extern	void	Dbg_file_ar_rescan(Lm_list *);
+extern	void	Dbg_file_ar_rescan(Lm_list *, int, int);
 extern	void	Dbg_file_bind_entry(Lm_list *, Bnd_desc *);
 extern	void	Dbg_file_bindings(Rt_map *, int);
 extern	void	Dbg_file_cleanup(Lm_list *, const char *, Aliste);

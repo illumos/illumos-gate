@@ -438,8 +438,8 @@
 @ MSG_FIL_DEL_RESCAN	"pending deletions; rescanning orphan list for \
 			 available deletions"
 
-@ MSG_FIL_AR_RESCAN	"rescanning archive list; additional members may \
-			 satisfy prior extractions"
+@ MSG_FIL_AR_RESCAN	"rescanning archives from args[%d-%d]; additional \
+			 members may satisfy prior extractions"
 
 @ MSG_FIL_CONFIG_ERR	"configuration file=%s: %s"
 @ MSG_FIL_CONFIG_ERR_1	"ignored (configuration building)"

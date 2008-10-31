@@ -1268,7 +1268,7 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		    (strcmp(ofl->ofl_soname, ifl->ifl_soname) == 0)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REC_OPTCNFLT), ifl->ifl_name,
-			    ifl->ifl_soname);
+			    MSG_INTL(MSG_MARG_SONAME), ifl->ifl_soname);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}

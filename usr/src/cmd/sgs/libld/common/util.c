@@ -510,6 +510,26 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				return (c);
 			}
 			break;
+		case '(':
+			/*
+			 * Translate -( to -z rescan-start
+			 */
+			if ((c = str2chr(lml, ndx, argc, argv,
+			    arg, 'z', MSG_ORIG(MSG_ARG_T_OPAR), 0)) != 0) {
+				optarg = (char *)MSG_ORIG(MSG_ARG_RESCAN_START);
+				return (c);
+			}
+			break;
+		case ')':
+			/*
+			 * Translate -) to -z rescan-end
+			 */
+			if ((c = str2chr(lml, ndx, argc, argv,
+			    arg, 'z', MSG_ORIG(MSG_ARG_T_CPAR), 0)) != 0) {
+				optarg = (char *)MSG_ORIG(MSG_ARG_RESCAN_END);
+				return (c);
+			}
+			break;
 		case '-':
 			switch (*(arg + 1)) {
 			case 'a':
@@ -549,6 +569,16 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'e',
 				    MSG_ORIG(MSG_ARG_T_ENTRY),
 				    MSG_ARG_T_ENTRY_SIZE)) != 0) {
+					return (c);
+				}
+				/*
+				 * Translate --end-group to -z rescan-end
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_ENDGROUP), 0)) != 0) {
+					optarg = (char *)
+					    MSG_ORIG(MSG_ARG_RESCAN_END);
 					return (c);
 				}
 				break;
@@ -625,6 +655,16 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				/* Translate --strip-all to -s */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 's',
 				    MSG_ORIG(MSG_ARG_T_STRIP), 0)) != 0) {
+					return (c);
+				}
+				/*
+				 * Translate --start-group to -z rescan-start
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'z',
+				    MSG_ORIG(MSG_ARG_T_STARTGROUP), 0)) != 0) {
+					optarg = (char *)
+					    MSG_ORIG(MSG_ARG_RESCAN_START);
 					return (c);
 				}
 				break;
