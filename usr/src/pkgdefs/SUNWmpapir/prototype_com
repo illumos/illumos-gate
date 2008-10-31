@@ -32,4 +32,4 @@ s none lib/libMPAPI.so=libMPAPI.so.1
 f none lib/llib-lMPAPI 0644 root bin
 f none lib/llib-lMPAPI.ln 0644 root bin
 d none etc 0755 root sys
-e preserve etc/mpapi.conf 0644 root bin
+e preserve etc/mpapi.conf 0644 root sys

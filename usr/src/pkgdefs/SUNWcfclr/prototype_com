@@ -41,4 +41,4 @@ i i.preserve
 i depend
 i copyright
 d none etc 0755 root sys
-e preserve etc/hba.conf 0644 root bin
+e preserve etc/hba.conf 0644 root sys
