@@ -170,6 +170,7 @@ extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 extern void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
 extern void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
+extern boolean_t npe_check_and_set_mmcfg(dev_info_t *dip);
 
 /*
  * Module linkage information for the kernel.
@@ -416,25 +417,8 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			break;
 
 		case PCI_ADDR_CONFIG:
-			/*
-			 * Check for AMD's northbridges
-			 *	AND
-			 * for any PCI device.
-			 *
-			 * This is a workaround fix for
-			 * AMD-8132's inability to handle MMCFG
-			 * accesses on Galaxy's PE servers
-			 *	AND
-			 * to disable MMCFG for any PCI device.
-			 *
-			 * If a device is *not* found to have PCIe
-			 * capability, then assume it is a PCI device.
-			 */
-
-			if (is_amd_northbridge(rdip) == 0 ||
-			    (ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
-			    DDI_PROP_DONTPASS, "pcie-capid-pointer",
-			    PCI_CAP_NEXT_PTR_NULL) == PCI_CAP_NEXT_PTR_NULL)) {
+			/* Check and see if MMCFG is supported */
+			if (!npe_check_and_set_mmcfg(rdip)) {
 				if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
 				    mp->map_handlep->ah_acc.devacc_attr_access
 				    != DDI_DEFAULT_ACC) {
@@ -444,6 +428,7 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				return (DDI_SUCCESS);
 			}
 
+			pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
 
 			/* FALLTHROUGH */
 		case PCI_ADDR_MEM64:
@@ -511,15 +496,8 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 		*vaddrp = (caddr_t)offset;
 
-		/*
-		 * Check for AMD's northbridges, pci devices and
-		 * devices underneath a pci bridge.  This is to setup
-		 * I/O based config space access.
-		 */
-		if (is_amd_northbridge(rdip) == 0 ||
-		    (ddi_prop_get_int(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-		    "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL) ==
-		    PCI_CAP_NEXT_PTR_NULL)) {
+		/* Check if MMCFG is supported */
+		if (!npe_check_and_set_mmcfg(rdip)) {
 			int ret;
 
 			if ((ret = pci_fm_acc_setup(hp, offset, len)) ==

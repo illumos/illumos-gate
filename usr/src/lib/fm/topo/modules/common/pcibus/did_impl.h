@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DID_IMPL_H
 #define	_DID_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/pci.h>
 #include <fm/libtopo.h>
@@ -70,11 +68,12 @@ struct did {
 	topo_mod_t *dp_mod; /* module that allocated the did private data */
 	di_node_t dp_src; /* di_node_t from which the info was derived */
 	int dp_refcnt;	/* multiple nodes allowed to point at a did_t */
-	uint_t dp_excap;	/* PCI-Express capabilities */
+	uint_t dp_excap;	/* PCI-Express port/device type */
 	int dp_physlot;		/* PCI-Express physical slot # */
 	char *dp_physlot_label; /* PCI-Express slot implemented */
 	int dp_class;		/* PCI class */
 	int dp_subclass;	/* PCI subclass */
+	char *dp_devtype;	/* PCI 1275 spec device-type */
 	int dp_board;		/* Board number */
 	int dp_bridge;		/* Bridge number */
 	int dp_rc;		/* Root Complex number */

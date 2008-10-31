@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PCI_PCI_COMMON_H
 #define	_PCI_PCI_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,28 +44,6 @@ typedef struct pci_state {
 	kmutex_t pci_peek_poke_mutex;
 	kmutex_t pci_err_mutex;
 } pci_state_t;
-
-/* AMD's northbridges vendor-id and device-ids */
-#define	AMD_NTBRDIGE_VID		0x1022	/* AMD vendor-id */
-#define	AMD_HT_NTBRIDGE_DID		0x1100	/* HT Configuration */
-#define	AMD_AM_NTBRIDGE_DID		0x1101	/* Address Map */
-#define	AMD_DC_NTBRIDGE_DID		0x1102	/* DRAM Controller */
-#define	AMD_MC_NTBRIDGE_DID		0x1103	/* Misc Controller */
-
-/*
- * Check if the given device is an AMD northbridge
- */
-#define	IS_AMD_NTBRIDGE(vid, did) \
-	    (((vid) == AMD_NTBRDIGE_VID) && \
-	    (((did) == AMD_HT_NTBRIDGE_DID) || \
-	    ((did) == AMD_AM_NTBRIDGE_DID) || \
-	    ((did) == AMD_DC_NTBRIDGE_DID) || \
-	    ((did) == AMD_MC_NTBRIDGE_DID)))
-
-/*
- * Check if the give device is a PCI northbridge
- */
-int		is_amd_northbridge(dev_info_t *dip);
 
 /*
  * These are the access routines.

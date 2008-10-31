@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	File that has code which is common between pci(7d) and npe(7d)
@@ -66,7 +64,6 @@ static void	pci_disable_intr(dev_info_t *, dev_info_t *,
 /* Extern decalration for pcplusmp module */
 extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
 		    psm_intr_op_t, int *);
-
 
 /*
  * pci_name_child:
@@ -1580,28 +1577,4 @@ pci_config_rep_wr64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 		for (; repcount; repcount--)
 			pci_config_wr64(hdlp, host_addr++, *dev_addr);
 	}
-}
-
-
-/*
- * Enable Legacy PCI config space access for the following four north bridges
- *	Host bridge: AMD HyperTransport Technology Configuration
- *	Host bridge: AMD Address Map
- *	Host bridge: AMD DRAM Controller
- *	Host bridge: AMD Miscellaneous Control
- */
-int
-is_amd_northbridge(dev_info_t *dip)
-{
-	int vendor_id, device_id;
-
-	vendor_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "vendor-id", -1);
-	device_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "device-id", -1);
-
-	if (IS_AMD_NTBRIDGE(vendor_id, device_id))
-		return (0);
-
-	return (1);
 }

@@ -27,8 +27,6 @@
 #ifndef _DID_PROPS_H
 #define	_DID_PROPS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/pci.h>
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
@@ -72,7 +70,9 @@ typedef struct txprop {
 #define	DI_AADDRPROP	"assigned-addresses"
 
 extern int did_props_set(tnode_t *, did_t *, txprop_t[], int);
+extern tnode_t *find_predecessor(tnode_t *, char *);
 
+extern char *pci_devtype_get(topo_mod_t *, di_node_t);
 extern int pciex_cap_get(topo_mod_t *, di_node_t);
 extern int pci_BDF_get(topo_mod_t *, di_node_t, int *, int *, int *);
 extern int pci_classcode_get(topo_mod_t *, di_node_t, uint_t *, uint_t *);

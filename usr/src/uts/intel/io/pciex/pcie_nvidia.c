@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Library file that has code for PCIe booting
@@ -67,10 +65,6 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 		capsp &= PCI_CAP_PTR_MASK;
 		cap = (*pci_getb_func)(bus, dev, func, capsp);
 
-		if (cap == PCI_CAP_ID_PCIX && cdip)
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
-			    "pcix-capid-pointer", capsp);
-
 		if (cap == PCI_CAP_ID_PCI_E) {
 #ifdef	DEBUG
 			if (pci_boot_debug)
@@ -86,7 +80,7 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 			 * device is a PCIe2PCI bridge
 			 */
 			*is_pci_bridge =
-			    ((status & PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) ==
+			    ((status & PCIE_PCIECAP_DEV_TYPE_MASK) ==
 			    PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) ? 1 : 0;
 
 			/*
@@ -100,11 +94,6 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 				*slot_number =
 				    PCIE_SLOTCAP_PHY_SLOT_NUM(slot_cap);
 
-				if (cdip)
-					(void) ndi_prop_update_int(
-					    DDI_DEV_T_NONE, cdip,
-					    "pcie-slotcap-reg", slot_cap);
-
 				/* Is PCI Express HotPlug capability set? */
 				if (cdip &&
 				    (slot_cap & PCIE_SLOTCAP_HP_CAPABLE)) {
@@ -113,21 +102,6 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 					    "pci-hotplug-type",
 					    INBAND_HPC_PCIE);
 				}
-			}
-
-			/*
-			 * Can only do I/O based config space access at
-			 * this early stage. Meaning, one cannot access
-			 * extended config space i.e. > 256 bytes.
-			 * So, AER cap_id property will be created much later.
-			 */
-			if (cdip) {
-				(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
-				    "pcie-capid-reg",
-				    (*pci_getw_func)(bus, dev, func,
-					capsp + PCIE_PCIECAP));
-				(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
-				    "pcie-capid-pointer", capsp);
 			}
 
 			found_pciex = B_TRUE;

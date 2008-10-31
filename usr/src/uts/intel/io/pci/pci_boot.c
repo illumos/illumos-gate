@@ -98,12 +98,14 @@ static void process_devfunc(uchar_t, uchar_t, uchar_t, uchar_t,
 static void add_compatible(dev_info_t *, ushort_t, ushort_t,
     ushort_t, ushort_t, uchar_t, uint_t, int);
 static int add_reg_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int, int);
-static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int);
+static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int,
+    ushort_t);
 static void add_model_prop(dev_info_t *, uint_t);
 static void add_bus_range_prop(int);
 static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
+static int get_pci_cap(uchar_t bus, uchar_t dev, uchar_t func, uint8_t cap_id);
 static void fix_ppb_res(uchar_t, boolean_t);
 static void alloc_res_array();
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
@@ -591,6 +593,40 @@ get_parbus_mem_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
 }
 
 /*
+ * given a cap_id, return its cap_id location in config space
+ */
+static int
+get_pci_cap(uchar_t bus, uchar_t dev, uchar_t func, uint8_t cap_id)
+{
+	uint8_t curcap, cap_id_loc;
+	uint16_t status;
+	int location = -1;
+
+	/*
+	 * Need to check the Status register for ECP support first.
+	 * Also please note that for type 1 devices, the
+	 * offset could change. Should support type 1 next.
+	 */
+	status = pci_getw(bus, dev, func, PCI_CONF_STAT);
+	if (!(status & PCI_STAT_CAP)) {
+		return (-1);
+	}
+	cap_id_loc = pci_getb(bus, dev, func, PCI_CONF_CAP_PTR);
+
+	/* Walk the list of capabilities */
+	while (cap_id_loc && cap_id_loc != (uint8_t)-1) {
+		curcap = pci_getb(bus, dev, func, cap_id_loc);
+
+		if (curcap == cap_id) {
+			location = cap_id_loc;
+			break;
+		}
+		cap_id_loc = pci_getb(bus, dev, func, cap_id_loc + 1);
+	}
+	return (location);
+}
+
+/*
  * Assign valid resources to unconfigured pci(e) bridges. We are trying
  * to reprogram the bridge when its
  * 		i)   SECBUS == SUBBUS	||
@@ -641,9 +677,8 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	/*
 	 * If pcie bridge, check to see if link is enabled
 	 */
-	cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
-	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+	cap_ptr = get_pci_cap(bus, dev, func, PCI_CAP_ID_PCI_E);
+	if (cap_ptr != -1) {
 		cmd_reg = pci_getw(bus, dev, func,
 		    (uint16_t)cap_ptr + PCIE_LINKCTL);
 		if (cmd_reg & PCIE_LINKCTL_LINK_DISABLE) {
@@ -1505,7 +1540,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	set_devpm_d0(bus, dev, func);
 
 	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI))
-		add_ppb_props(dip, bus, dev, func, pciex);
+		add_ppb_props(dip, bus, dev, func, pciex, is_pci_bridge);
 	else {
 		/*
 		 * Record the non-PPB devices on the bus for possible
@@ -2175,7 +2210,7 @@ done:
 
 static void
 add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
-    int pciex)
+    int pciex, ushort_t is_pci_bridge)
 {
 	char *dev_type;
 	int i;
@@ -2206,7 +2241,7 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	pci_bus_res[secbus].dip = dip;
 	pci_bus_res[secbus].par_bus = bus;
 
-	dev_type = pciex ? "pciex" : "pci";
+	dev_type = (pciex && !is_pci_bridge) ? "pciex" : "pci";
 
 	/* setup bus number hierarchy */
 	pci_bus_res[secbus].sub_bus = subbus;

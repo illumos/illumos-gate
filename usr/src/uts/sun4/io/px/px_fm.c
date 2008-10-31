@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PX Fault Management Architecture
  */
@@ -36,6 +34,8 @@
 #include <sys/fm/io/pci.h>
 #include <sys/membar.h>
 #include "px_obj.h"
+
+extern uint_t px_ranges_phi_mask;
 
 #define	PX_PCIE_PANIC_BITS \
 	(PCIE_AER_UCE_DLP | PCIE_AER_UCE_FCP | PCIE_AER_UCE_TO | \
@@ -205,6 +205,8 @@ px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip, pci_regspec_t *rp)
 				errp->err_cf = px_err_pio_hdl_check;
 			break;
 		default:
+			/* Illegal state, remove the handle from cache */
+			ndi_fmc_remove(rdip, ACC_HANDLE, (void *)hp);
 			break;
 		}
 	} else if (mp->map_op == DDI_MO_UNMAP) {
@@ -268,8 +270,8 @@ px_in_addr_range(dev_info_t *dip, px_ranges_t *ranges_p, uint64_t addr)
 {
 	uint64_t	addr_low, addr_high;
 
-	addr_low = ((uint64_t)ranges_p->parent_high << 32) |
-	    (uint64_t)ranges_p->parent_low;
+	addr_low = (uint64_t)(ranges_p->parent_high & px_ranges_phi_mask) << 32;
+	addr_low |= (uint64_t)ranges_p->parent_low;
 	addr_high = addr_low + ((uint64_t)ranges_p->size_high << 32) +
 	    (uint64_t)ranges_p->size_low;
 

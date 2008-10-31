@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DID_H
 #define	_DID_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/pci.h>
 #include <fm/topo_mod.h>
@@ -61,6 +59,7 @@ extern int did_rc(did_t *);
 extern int did_physslot(did_t *);
 extern int did_inherit(did_t *, did_t *);
 extern int did_excap(did_t *);
+extern void did_excap_set(did_t *, int);
 extern int did_bdf(did_t *);
 extern did_t *did_link_get(did_t *);
 extern did_t *did_chain_get(did_t *);

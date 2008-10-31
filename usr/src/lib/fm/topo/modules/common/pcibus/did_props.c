@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <alloca.h>
 #include <string.h>
@@ -446,7 +444,7 @@ FRU_fmri_set(topo_mod_t *mp, tnode_t *tn)
 	return (0);
 }
 
-static tnode_t *
+tnode_t *
 find_predecessor(tnode_t *tn, char *mod_name)
 {
 	tnode_t *pnode = topo_node_parent(tn);
@@ -620,12 +618,9 @@ static int
 EXCAP_set(tnode_t *tn, did_t *pd,
     const char *dpnm, const char *tpgrp, const char *tpnm)
 {
-	int excap;
+	int excap = did_excap(pd);
 	int err;
 	int e = 0;
-
-	if ((excap = did_excap(pd)) <= 0)
-		return (0);
 
 	switch (excap & PCIE_PCIECAP_DEV_TYPE_MASK) {
 	case PCIE_PCIECAP_DEV_TYPE_ROOT:

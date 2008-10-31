@@ -1762,7 +1762,8 @@ pf_adjust_for_no_aer(pf_data_t *pfd_p)
 			aer_ue &= ~PCIE_AER_UCE_CA;
 
 		/* Check if the device sent a UR */
-		if (!(status & PCIE_DEVSTS_UR_DETECTED))
+		if (!(PCIE_ERR_REG(pfd_p)->pcie_err_status &
+		    PCIE_DEVSTS_UR_DETECTED))
 			aer_ue &= ~PCIE_AER_UCE_UR;
 
 		/*
@@ -1782,7 +1783,7 @@ pf_adjust_for_no_aer(pf_data_t *pfd_p)
 		 * occur, SERR should be set since they are not masked. So if
 		 * SERR is not set, none of them occurred.
 		 */
-		if (!(PCI_ERR_REG(pfd_p)->pci_err_status & PCI_STAT_S_SYSERR))
+		if (!(status & PCI_STAT_S_SYSERR))
 			aer_ue &= ~PCIE_AER_UCE_TO;
 	}
 

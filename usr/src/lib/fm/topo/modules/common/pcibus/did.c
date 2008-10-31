@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * did.c
@@ -114,8 +112,30 @@ slotnm_cp(did_t *from, did_t *to, int *nslots)
 }
 
 static int
-di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
-    int *slotnum, char **slotnm)
+di_devtype_get(topo_mod_t *mp, di_node_t src, char **devtype)
+{
+	int sz;
+	uchar_t *buf;
+
+	/*
+	 * For PCI the device type defined the type of device directly below.
+	 * For PCIe RP and Switches, the device-type should be "pciex".  For
+	 * PCIe-PCI and PCI-PCI bridges it should be "pci".  NICs = "network",
+	 * Graphics = "display", etc..
+	 */
+	if (di_bytes_get(mp, src, DI_DEVTYPPROP, &sz, &buf) == 0) {
+		*devtype = topo_mod_strdup(mp, (char *)buf);
+	} else {
+		*devtype = NULL;
+	}
+
+	if (*devtype != NULL)
+		return (0);
+	return (-1);
+}
+
+static int
+di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotnm)
 {
 	char *slotbuf;
 	int sz;
@@ -123,18 +143,6 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
 
 	*slotnum = -1;
 	(void) di_uintprop_get(mp, src, DI_PHYSPROP, (uint_t *)slotnum);
-	/*
-	 * If no physical slot number property was found, then the
-	 * capabilities register may indicate the pci-express device
-	 * implements a slot, and we should record which slot.
-	 */
-	if (*slotnum == -1 && (excap & PCIE_PCIECAP_SLOT_IMPL) != 0) {
-		uint_t slotcap;
-		int e;
-		e = di_uintprop_get(mp, src, "pcie-slotcap-reg", &slotcap);
-		if (e == 0)
-			*slotnum = slotcap >> PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT;
-	}
 	if (*slotnum == -1)
 		return (0);
 
@@ -263,16 +271,16 @@ did_create(topo_mod_t *mp, di_node_t src,
 		np->dp_class = -1;
 	}
 	/*
-	 * There *may* be a PCI-express capabilities register we can capture.
-	 * If there wasn't one, the capabilities will be the out-of-bounds
-	 * value of zero.
+	 * There *may* be a device type we can capture.
 	 */
-	(void) di_uintprop_get(mp, src, "pcie-capid-reg", &np->dp_excap);
+	(void) di_devtype_get(mp, src, &np->dp_devtype);
 	/*
 	 * There *may* be a physical slot number property we can capture.
 	 */
 	if (di_physlotinfo_get(mp,
-	    src, np->dp_excap, &np->dp_physlot, &np->dp_physlot_label) < 0) {
+	    src, &np->dp_physlot, &np->dp_physlot_label) < 0) {
+		if (np->dp_devtype != NULL)
+			topo_mod_strfree(mp, np->dp_devtype);
 		topo_mod_free(mp, np, sizeof (did_t));
 		return (NULL);
 	}
@@ -280,6 +288,8 @@ did_create(topo_mod_t *mp, di_node_t src,
 	 * There *may* be PCI slot info we can capture
 	 */
 	if (di_slotinfo_get(mp, src, &np->dp_nslots, &np->dp_slotnames) < 0) {
+		if (np->dp_devtype != NULL)
+			topo_mod_strfree(mp, np->dp_devtype);
 		if (np->dp_physlot_label != NULL)
 			topo_mod_strfree(mp, np->dp_physlot_label);
 		topo_mod_free(mp, np, sizeof (did_t));
@@ -345,6 +355,8 @@ did_destroy(did_t *dp)
 	 * code will need to change
 	 */
 
+	if (dp->dp_devtype != NULL)
+		topo_mod_strfree(dp->dp_mod, dp->dp_devtype);
 	if (dp->dp_physlot_label != NULL)
 		topo_mod_strfree(dp->dp_mod, dp->dp_physlot_label);
 	slotnm_destroy(dp->dp_slotnames);
@@ -435,6 +447,12 @@ did_excap(did_t *dp)
 	return ((int)dp->dp_excap);
 }
 
+void
+did_excap_set(did_t *dp, int type)
+{
+	dp->dp_excap = type;
+}
+
 int
 did_bdf(did_t *dp)
 {
@@ -493,6 +511,17 @@ pci_classcode_get(topo_mod_t *mp, di_node_t dn, uint_t *class, uint_t *sub)
 	*sub = dp->dp_subclass;
 	did_rele(dp);
 	return (0);
+}
+
+char *
+pci_devtype_get(topo_mod_t *mp, di_node_t dn)
+{
+	did_t *dp;
+
+	if ((dp = did_find(mp, dn)) == NULL)
+		return (NULL);
+	did_rele(dp);
+	return (dp->dp_devtype);
 }
 
 int

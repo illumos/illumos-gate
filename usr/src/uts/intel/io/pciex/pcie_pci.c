@@ -211,7 +211,6 @@ typedef struct {
 	kmutex_t		pepb_peek_poke_mutex;
 	boolean_t		pepb_no_aer_msi;
 	ddi_iblock_cookie_t	pepb_fm_ibc;
-	int			port_type;
 } pepb_devstate_t;
 
 /* soft state flags */
@@ -245,9 +244,7 @@ static void	pepb_uninitchild(dev_info_t *);
 static int 	pepb_initchild(dev_info_t *child);
 static void 	pepb_save_config_regs(pepb_devstate_t *pepb_p);
 static void	pepb_restore_config_regs(pepb_devstate_t *pepb_p);
-static int	pepb_pcie_device_type(dev_info_t *dip, int *port_type);
-static int	pepb_pcie_port_type(dev_info_t *dip,
-			ddi_acc_handle_t config_handle);
+static boolean_t pepb_is_pcie_device_type(dev_info_t *dip);
 
 /* interrupt related declarations */
 static int	pepb_msi_intr_supported(dev_info_t *, int intr_type);
@@ -360,7 +357,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/*
 	 * Make sure the "device_type" property exists.
 	 */
-	if (pepb_pcie_device_type(devi, &pepb->port_type) == DDI_SUCCESS)
+	if (pepb_is_pcie_device_type(devi))
 		(void) strcpy(device_type, "pciex");
 	else
 		(void) strcpy(device_type, "pci");
@@ -547,7 +544,7 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 	case DDI_CTLOPS_PEEK:
 	case DDI_CTLOPS_POKE:
-		if (pepb->port_type != PCIE_PCIECAP_DEV_TYPE_ROOT)
+		if (!PCIE_IS_RP(PCIE_DIP2BUS(dip)))
 			return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
 		    ddi_ctlops, &pepb->pepb_err_mutex,
@@ -865,29 +862,15 @@ pepb_restore_config_regs(pepb_devstate_t *pepb_p)
 	}
 }
 
-static int
-pepb_pcie_device_type(dev_info_t *dip, int *port_type)
+static boolean_t
+pepb_is_pcie_device_type(dev_info_t *dip)
 {
-	ddi_acc_handle_t handle;
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
 
-	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-	*port_type = pepb_pcie_port_type(dip, handle);
-	pci_config_teardown(&handle);
+	if (PCIE_IS_SW(bus_p) || PCIE_IS_RP(bus_p) || PCIE_IS_PCI2PCIE(bus_p))
+		return (B_TRUE);
 
-	/* No PCIe CAP regs, we are not PCIe device_type */
-	if (*port_type < 0)
-		return (DDI_FAILURE);
-
-	/* check for all PCIe device_types */
-	if ((*port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
-	    (*port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-	    (*port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
-	    (*port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
-		return (DDI_SUCCESS);
-
-	return (DDI_FAILURE);
-
+	return (B_FALSE);
 }
 
 /*
@@ -1183,20 +1166,6 @@ pepb_msi_intr_supported(dev_info_t *dip, int intr_type)
 	return (DDI_SUCCESS);
 }
 
-static int
-pepb_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
-{
-	uint_t cap_loc;
-
-	/* Need to look at the port type information here */
-	cap_loc = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
-
-	return (cap_loc == PCI_CAP_NEXT_PTR_NULL ? -1 :
-	    pci_config_get16(handle, cap_loc + PCIE_PCIECAP) &
-	    PCIE_PCIECAP_DEV_TYPE_MASK);
-}
-
 /*ARGSUSED*/
 int
 pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
@@ -1214,24 +1183,8 @@ pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 static int
 pepb_check_slot_disabled(dev_info_t *dip)
 {
-	int			rval = 0;
-	uint8_t			pcie_cap_ptr;
-	ddi_acc_handle_t	config_handle;
-
-	if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS)
-		return (rval);
-
-	pcie_cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
-
-	if (pcie_cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		if (pci_config_get16(config_handle,
-		    pcie_cap_ptr + PCIE_LINKCTL) & PCIE_LINKCTL_LINK_DISABLE)
-			rval = 1;
-	}
-
-	pci_config_teardown(&config_handle);
-	return (rval);
+	return ((PCIE_CAP_GET(16, PCIE_DIP2BUS(dip), PCIE_LINKCTL) &
+	    PCIE_LINKCTL_LINK_DISABLE) ? 1 : 0);
 }
 
 static int
@@ -1682,15 +1635,12 @@ static void
 pepb_intel_sw_workaround(dev_info_t *dip)
 {
 	uint16_t		vid, regw;
-	int			port_type;
 	ddi_acc_handle_t	cfg_hdl;
 
 	if (pepb_intel_workaround_disable)
 		return;
 
-	(void) pepb_pcie_device_type(dip, &port_type);
-	if (!((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
-	    (port_type == PCIE_PCIECAP_DEV_TYPE_DOWN)))
+	if (!PCIE_IS_SW(PCIE_DIP2BUS(dip)))
 		return;
 
 	(void) pci_config_setup(dip, &cfg_hdl);

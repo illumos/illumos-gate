@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fm/protocol.h>
 #include <assert.h>
 #include <stdio.h>
@@ -161,10 +159,70 @@ pciexfn_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
     topo_instance_t i)
 {
 	did_t *pd;
-	tnode_t *ntn;
+	tnode_t *ntn, *ptn;
+	di_node_t pdn;
+	uint_t class, subclass;
+	char *devtyp, *pdevtyp;
+	int pcie_devtyp, pexcap;
+	boolean_t dev_is_pcie, pdev_is_pcie;
+
+	/* We need the parent's dev info node for some of the info */
+	ptn = find_predecessor(parent, PCIEX_FUNCTION);
+	/* If this is the first child under root, get root's ptn */
+	if (ptn == NULL)
+		ptn = find_predecessor(parent, PCIEX_ROOT);
+	if (ptn == NULL)
+		return (NULL);
+	pdn = topo_node_getspecific(ptn);
+
+	/* Get the required info to populate the excap */
+	(void) pci_classcode_get(mod, dn, &class, &subclass);
+	devtyp = pci_devtype_get(mod, dn);
+	pdevtyp = pci_devtype_get(mod, pdn);
+	pexcap = pciex_cap_get(mod, pdn);
+
+	dev_is_pcie = devtyp && (strcmp(devtyp, "pciex") == 0);
+	pdev_is_pcie = pdevtyp && (strcmp(pdevtyp, "pciex") == 0);
+
+	/*
+	 * Populate the excap with correct PCIe device type.
+	 *
+	 * Device	Parent		Device		Parent	Device
+	 * excap	device-type	device-type	excap	Class Code
+	 * -------------------------------------------------------------------
+	 * PCI(default)	pci		N/A		N/A	!= bridge
+	 * PCIe		pciex		N/A		N/A	!= bridge
+	 * Root Port	Defined in hostbridge
+	 * Switch Up	pciex		pciex		!= up	= bridge
+	 * Switch Down	pciex		pciex		= up	= bridge
+	 * PCIe-PCI	pciex		pci		N/A	= bridge
+	 * PCI-PCIe	pci		pciex		N/A	= bridge
+	 */
+	pcie_devtyp = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
+	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI) {
+		if (pdev_is_pcie) {
+			if (dev_is_pcie) {
+				if (pexcap != PCIE_PCIECAP_DEV_TYPE_UP)
+					pcie_devtyp = PCIE_PCIECAP_DEV_TYPE_UP;
+				else
+					pcie_devtyp =
+					    PCIE_PCIECAP_DEV_TYPE_DOWN;
+			} else {
+				pcie_devtyp = PCIE_PCIECAP_DEV_TYPE_PCIE2PCI;
+			}
+		} else {
+			if (dev_is_pcie)
+				pcie_devtyp = PCIE_PCIECAP_DEV_TYPE_PCI2PCIE;
+		}
+	} else {
+		if (pdev_is_pcie)
+			pcie_devtyp = PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
+	}
 
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
+	did_excap_set(pd, pcie_devtyp);
+
 	if ((ntn = pci_tnode_create(mod, parent, PCIEX_FUNCTION, i, dn))
 	    == NULL)
 		return (NULL);
@@ -252,6 +310,8 @@ pcifn_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
+	did_excap_set(pd, PCIE_PCIECAP_DEV_TYPE_PCI_DEV);
+
 	if ((ntn = pci_tnode_create(mod, parent, PCI_FUNCTION, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Fn_common_props, Fn_propcnt) < 0) {
@@ -348,12 +408,12 @@ static int
 pci_bridge_declare(topo_mod_t *mod, tnode_t *fn, di_node_t din, int board,
     int bridge, int rc, int depth)
 {
-	int err, excap, extyp;
+	int err;
+	char *devtyp;
 
-	excap = pciex_cap_get(mod, din);
-	extyp = excap & PCIE_PCIECAP_DEV_TYPE_MASK;
-	if (excap <= 0 ||
-	    extyp != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
+	devtyp = pci_devtype_get(mod, din);
+	/* Check if the children are PCI or PCIe */
+	if (strcmp(devtyp, "pciex") == 0)
 		err = pci_children_instantiate(mod, fn, din, board, bridge,
 		    rc, TRUST_BDF, depth + 1);
 	else

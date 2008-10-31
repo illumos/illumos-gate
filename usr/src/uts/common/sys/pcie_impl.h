@@ -85,6 +85,8 @@ extern "C" {
 	    PCIE_IS_BDG(bus_p))
 #define	PCIE_IS_PCIE_BDG(bus_p) \
 	(bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
+#define	PCIE_IS_PCI2PCIE(bus_p) \
+	(bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)
 #define	PCIE_IS_PCIE_SEC(bus_p) \
 	(PCIE_IS_PCIE(bus_p) && PCIE_IS_BDG(bus_p) && !PCIE_IS_PCIE_BDG(bus_p))
 #define	PCIX_ECC_VERSION_CHECK(bus_p) \

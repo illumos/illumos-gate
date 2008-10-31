@@ -1774,11 +1774,13 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 			parent_is_pci_or_pciex = 1;
 	}
 
-	if (parent_is_pci_or_pciex && ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL) !=
-	    PCI_CAP_NEXT_PTR_NULL) {
-		child_is_pciex = 1;
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "compatible", (caddr_t)dev_type,
+	    &dev_len) == DDI_PROP_SUCCESS) {
+		if (strstr(dev_type, "pciex"))
+			child_is_pciex = 1;
 	}
+
 
 	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
 		if ((airqp = apic_find_irq(dip, ispec, type)) != NULL) {

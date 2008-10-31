@@ -35,6 +35,7 @@
 #include <sys/autoconf.h>
 #include <sys/hwconf.h>
 #include <sys/pcie.h>
+#include <sys/pci_cap.h>
 #include <sys/ddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcicfg.h>
@@ -2859,8 +2860,8 @@ static int
 pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	uint8_t pcie_dev)
 {
-	int ret, cap_id_loc;
-	uint16_t val;
+	int ret;
+	uint16_t cap_id_loc, val;
 	uint32_t wordval;
 	uint8_t byteval;
 
@@ -2985,28 +2986,14 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 			return (ret);
 		}
 	}
-	if ((cap_id_loc = pcicfg_get_cap(config_handle, PCI_CAP_ID_PCIX)) > 0) {
-		/* create the pcix-capid-pointer property */
-		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		    "pcix-capid-pointer", cap_id_loc)) != DDI_SUCCESS)
-			return (ret);
-	}
-	if (pcie_dev && (cap_id_loc = pcicfg_get_cap(config_handle,
-					PCI_CAP_ID_PCI_E)) > 0) {
-		/* create the pcie-capid-pointer property */
-		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		    "pcie-capid-pointer", cap_id_loc)) != DDI_SUCCESS)
-			return (ret);
+	(void) PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_id_loc);
+	if (pcie_dev && cap_id_loc != PCI_CAP_NEXT_PTR_NULL) {
 		val = pci_config_get16(config_handle, cap_id_loc +
 				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		/* if slot implemented, get physical slot number */
 		if (val) {
 			wordval = pci_config_get32(config_handle, cap_id_loc +
 					PCIE_SLOTCAP);
-			/* create the slotcap-reg property */
-			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE,
-			    dip, "pcie-slotcap-reg", wordval)) != DDI_SUCCESS)
-				return (ret);
 			/* create the property only if slotnum set correctly? */
 			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 			    "physical-slot#", PCIE_SLOTCAP_PHY_SLOT_NUM(
@@ -4496,61 +4483,24 @@ debug(char *fmt, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 }
 #endif
 
-/*
- * given a cap_id, return its cap_id location in config space
- */
-static int
-pcicfg_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
-{
-	uint8_t curcap;
-	uint_t	cap_id_loc;
-	uint16_t	status;
-	int location = -1;
-
-	/*
-	 * Need to check the Status register for ECP support first.
-	 * Also please note that for type 1 devices, the
-	 * offset could change. Should support type 1 next.
-	 */
-	status = pci_config_get16(config_handle, PCI_CONF_STAT);
-	if (!(status & PCI_STAT_CAP)) {
-		return (-1);
-	}
-	cap_id_loc = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
-
-	/* Walk the list of capabilities */
-	while (cap_id_loc) {
-
-		curcap = pci_config_get8(config_handle, cap_id_loc);
-
-		if (curcap == cap_id) {
-			location = cap_id_loc;
-			break;
-		}
-		cap_id_loc = pci_config_get8(config_handle,
-		    cap_id_loc + 1);
-	}
-	return (location);
-}
-
 /*ARGSUSED*/
 static uint8_t
 pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
 {
-	int cap_id_loc;
+	uint16_t cap_id_loc, slot_id_loc;
 	uint8_t num_slots = 0;
 
 	/* just depend on the pcie_cap for now. */
-	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_PCI_E))
-							> 0) {
+	(void) PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_id_loc);
+	(void) PCI_CAP_LOCATE(handle, PCI_CAP_ID_SLOT_ID, &slot_id_loc);
+	if (cap_id_loc != PCI_CAP_NEXT_PTR_NULL) {
 		if (pci_config_get8(handle, cap_id_loc +
 					PCI_CAP_ID_REGS_OFF) &
 					PCIE_PCIECAP_SLOT_IMPL)
 			num_slots = 1;
 	} else /* not a PCIe switch/bridge. Must be a PCI-PCI[-X] bridge */
-	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_SLOT_ID))
-								> 0) {
-		uint8_t esr_reg = pci_config_get8(handle, cap_id_loc + 2);
+	if (slot_id_loc != PCI_CAP_NEXT_PTR_NULL) {
+		uint8_t esr_reg = pci_config_get8(handle, slot_id_loc + 2);
 		num_slots = PCI_CAPSLOT_NSLOTS(esr_reg);
 	}
 	/* XXX - need to cover PCI-PCIe bridge with n slots */
@@ -4608,10 +4558,11 @@ static int
 pcicfg_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
 {
 	int port_type = -1;
-	int cap_loc;
+	uint16_t cap_loc;
 
 	/* Note: need to look at the port type information here */
-	if ((cap_loc = pcicfg_get_cap(handle, PCI_CAP_ID_PCI_E)) > 0)
+	(void) PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_loc);
+	if (cap_loc != PCI_CAP_NEXT_PTR_NULL)
 		port_type = pci_config_get16(handle,
 			cap_loc + PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
