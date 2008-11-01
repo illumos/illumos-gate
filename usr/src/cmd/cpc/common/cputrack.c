@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <stdio.h>
@@ -351,8 +350,8 @@ pinit_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 		else
 #endif
 			(void) fprintf(stderr, gettext(
-				"%6d: init_lwp: can't bind perf counters "
-				    "to lwp%d - %s\n"), (int)pid, (int)lwpid,
+			    "%6d: init_lwp: can't bind perf counters "
+			    "to lwp%d - %s\n"), (int)pid, (int)lwpid,
 			    errstr);
 		return (-1);
 	}
@@ -376,7 +375,23 @@ pfini_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 
 	set = cpc_setgrp_getset(sgrp);
 	nreq = cpc_setgrp_getbufs(sgrp, &data1, &data2, &scratch);
-	if (cpc_set_sample(cpc, set, *data1) == 0) {
+	if (cpc_set_sample(cpc, set, *scratch) == 0) {
+		if (opts->nsets == 1) {
+			/*
+			 * When we only have one set of counts, the sample
+			 * gives us the accumulated count.
+			 */
+			*data1 = *scratch;
+		} else {
+			/*
+			 * When we have more than one set of counts, the
+			 * sample gives us the count for the latest sample
+			 * period. *data1 contains the accumulated count but
+			 * does not include the count for the latest sample
+			 * period for this set of counters.
+			 */
+			cpc_buf_add(cpc, *data1, *data1, *scratch);
+		}
 		if (opts->verbose)
 			print_sample(pid, lwpid, "fini_lwp",
 			    *data1, nreq, cpc_setgrp_getname(sgrp));
@@ -722,8 +737,8 @@ p4_ht_error(void)
 
 	(void) fprintf(stderr, "%s\n",
 	    gettext("Pentium 4 processors with HyperThreading present.\nOffline"
-		" all but one logical processor on each physical processor in"
-		" order to use\ncputrack.\n"));
+	    " all but one logical processor on each physical processor in"
+	    " order to use\ncputrack.\n"));
 
 
 	if ((kc = kstat_open()) == NULL)
