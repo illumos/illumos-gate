@@ -9,7 +9,7 @@ used with the zoneinfo source files to create additional data files.
 The zoneinfo files track the Olson public source provided at
 ftp://elsie.nci.nih.gov/pub/, therefore zoneinfo files may be added and
 removed as the Solaris source is updated.  The current Solaris release of
-the zoneinfo files is based on tzdata2008h.tar.gz.
+the zoneinfo files is based on tzdata2008i.tar.gz.
 
 The /usr/share/lib/zoneinfo/GMT[+-]* timezones listed below have been
 removed from the release.  Replace usage of the

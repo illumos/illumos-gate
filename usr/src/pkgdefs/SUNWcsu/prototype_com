@@ -1150,6 +1150,7 @@ f none usr/share/lib/zoneinfo/America/Argentina/Jujuy 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/La_Rioja 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/Mendoza 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/Rio_Gallegos 644 root bin
+f none usr/share/lib/zoneinfo/America/Argentina/Salta 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/San_Juan 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/San_Luis 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/Tucuman 644 root bin
