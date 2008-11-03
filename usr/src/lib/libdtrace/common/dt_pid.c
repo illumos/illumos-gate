@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <strings.h>
 #include <stdlib.h>
@@ -370,17 +368,17 @@ dt_pid_mod_filt(void *arg, const prmap_t *pmp, const char *obj)
 	char name[DTRACE_MODNAMELEN];
 	dt_pid_probe_t *pp = arg;
 
-	if (gmatch(obj, pp->dpp_mod))
-		return (dt_pid_per_mod(pp, pmp, obj));
-
-	(void) Plmid(pp->dpp_pr, pmp->pr_vaddr, &pp->dpp_lmid);
-
 	if ((pp->dpp_obj = strrchr(obj, '/')) == NULL)
 		pp->dpp_obj = obj;
 	else
 		pp->dpp_obj++;
 
-	dt_pid_objname(name, sizeof (name), pp->dpp_lmid, obj);
+	if (gmatch(pp->dpp_obj, pp->dpp_mod))
+		return (dt_pid_per_mod(pp, pmp, obj));
+
+	(void) Plmid(pp->dpp_pr, pmp->pr_vaddr, &pp->dpp_lmid);
+
+	dt_pid_objname(name, sizeof (name), pp->dpp_lmid, pp->dpp_obj);
 
 	if (gmatch(name, pp->dpp_mod))
 		return (dt_pid_per_mod(pp, pmp, obj));

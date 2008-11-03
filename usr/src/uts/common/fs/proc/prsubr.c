@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -128,6 +126,7 @@ prchoose(proc_t *p)
 	kthread_t *t_jdstop = NULL;	/* jobcontrol stop with directed stop */
 	kthread_t *t_req = NULL;	/* requested stop */
 	kthread_t *t_istop = NULL;	/* event-of-interest stop */
+	kthread_t *t_dtrace = NULL;	/* DTrace stop */
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
@@ -192,7 +191,9 @@ prchoose(proc_t *p)
 				}
 				break;
 			case PR_REQUESTED:
-				if (t_req == NULL)
+				if (t->t_dtrace_stop && t_dtrace == NULL)
+					t_dtrace = t;
+				else if (t_req == NULL)
 					t_req = t;
 				break;
 			case PR_SYSENTRY:
@@ -232,6 +233,8 @@ prchoose(proc_t *p)
 		t = t_jdstop;
 	else if (t_istop)
 		t = t_istop;
+	else if (t_dtrace)
+		t = t_dtrace;
 	else if (t_req)
 		t = t_req;
 	else if (t_hold)
