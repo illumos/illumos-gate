@@ -692,7 +692,7 @@ ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr, uint32_t hw_addr_length)
 		ace->ace_flags |= ACE_F_RESOLVED;
 		if (ace->ace_query_mp != NULL)
 			ar_query_reply(ace, 0, NULL, (uint32_t)0);
-		else if (hwchanged)
+		if (hwchanged)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
