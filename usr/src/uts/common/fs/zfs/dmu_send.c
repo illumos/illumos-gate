@@ -773,6 +773,7 @@ restore_object(struct restorearg *ra, objset_t *os, struct drr_object *drro)
 {
 	int err;
 	dmu_tx_t *tx;
+	void *data = NULL;
 
 	err = dmu_object_info(os, drro->drr_object, NULL);
 
@@ -789,6 +790,12 @@ restore_object(struct restorearg *ra, objset_t *os, struct drr_object *drro)
 	    drro->drr_blksz > SPA_MAXBLOCKSIZE ||
 	    drro->drr_bonuslen > DN_MAX_BONUSLEN) {
 		return (EINVAL);
+	}
+
+	if (drro->drr_bonuslen) {
+		data = restore_read(ra, P2ROUNDUP(drro->drr_bonuslen, 8));
+		if (ra->err)
+			return (ra->err);
 	}
 
 	tx = dmu_tx_create(os);
@@ -831,18 +838,13 @@ restore_object(struct restorearg *ra, objset_t *os, struct drr_object *drro)
 	dmu_object_set_checksum(os, drro->drr_object, drro->drr_checksum, tx);
 	dmu_object_set_compress(os, drro->drr_object, drro->drr_compress, tx);
 
-	if (drro->drr_bonuslen) {
+	if (data != NULL) {
 		dmu_buf_t *db;
-		void *data;
+
 		VERIFY(0 == dmu_bonus_hold(os, drro->drr_object, FTAG, &db));
 		dmu_buf_will_dirty(db, tx);
 
 		ASSERT3U(db->db_size, >=, drro->drr_bonuslen);
-		data = restore_read(ra, P2ROUNDUP(drro->drr_bonuslen, 8));
-		if (data == NULL) {
-			dmu_tx_commit(tx);
-			return (ra->err);
-		}
 		bcopy(data, db->db_data, drro->drr_bonuslen);
 		if (ra->byteswap) {
 			dmu_ot[drro->drr_bonustype].ot_byteswap(db->db_data,
