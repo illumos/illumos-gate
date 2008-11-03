@@ -23,8 +23,6 @@
     Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
-    ident	"%Z%%M%	%I%	%E% SMI"
-
     NOTE:  This service manifest is not editable; its contents will
     be overwritten by package or patch operations, including
     operating system upgrade.  Make customizations in a different
@@ -123,8 +121,8 @@
 
 		<!-- Specifies whether remote messages are logged.
 		     log_from_remote=false is equivalent to the -t
-		     command-line option. The default value for
-		     log_from_remote is true.
+		     command-line option. log_from_remote=true
+		     is equivalent to the -T command-line option.
 		-->
 		<propval
 			name='log_from_remote'

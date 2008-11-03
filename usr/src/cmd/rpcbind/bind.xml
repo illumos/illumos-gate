@@ -24,8 +24,6 @@
     Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
-    ident	"%Z%%M%	%I%	%E% SMI"
-
     Service manifest for rpcbind
 
     NOTE:  This service manifest is not editable; its contents will
@@ -168,8 +166,8 @@
 		     calls from hosts other than the localhost.
 		     Setting local_only to true will make rpcbind serve
 		     only those requests that come in from the local machine.
-		     the default value is false, i.e. allow connections
-		     from other systems too.
+		     Setting local_only to false will allow access from
+		     other hosts.
 		-->
 		<propval
 			name='local_only'
