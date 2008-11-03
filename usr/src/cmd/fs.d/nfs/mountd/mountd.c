@@ -1507,12 +1507,14 @@ netmatch(struct netbuf *nb, char *name)
 		    : 0;
 		addr &= mask;
 	} else {
-		if ((addr & 0x00ffffff) == 0)
-			mask = 0xff000000;
-		else if ((addr & 0x0000ffff) == 0)
-			mask = 0xffff0000;
-		else if ((addr & 0x000000ff) == 0)
-			mask = 0xffffff00;
+		if ((addr & IN_CLASSA_HOST) == 0)
+			mask = IN_CLASSA_NET;
+		else if ((addr & IN_CLASSB_HOST) == 0)
+			mask = IN_CLASSB_NET;
+		else if ((addr & IN_CLASSC_HOST) == 0)
+			mask = IN_CLASSC_NET;
+		else
+			mask = IN_CLASSE_NET;
 	}
 
 	return ((claddr & mask) == addr);
