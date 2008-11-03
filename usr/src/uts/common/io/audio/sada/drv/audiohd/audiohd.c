@@ -819,10 +819,19 @@ audiohd_restore_codec_gpio(audiohd_state_t *statep)
 			continue;
 		wid = codec->wid_afg;
 
+		/*
+		 * GPIO controls which are laptop specific workarounds and
+		 * might be changed. Some laptops use GPIO, so we need to
+		 * enable and set the GPIO correctly.
+		 */
 		(void) audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
 		(void) audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_STCK, AUDIOHDC_GPIO_DATA_CTRL);
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_DATA, AUDIOHDC_GPIO_STCK_CTRL);
 
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
@@ -2830,11 +2839,19 @@ audiohd_create_codec(audiohd_state_t *statep)
 		}
 
 		ASSERT(codec->wid_afg == wid);
+		/*
+		 * GPIO controls which are laptop specific workarounds and
+		 * might be changed. Some laptops use GPIO, so we need to
+		 * enable and set the GPIO correctly.
+		 */
 		(void) audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_SET_GPIO_MASK, AUDIOHDC_GPIO_ENABLE);
-
 		(void) audioha_codec_verb_get(statep, i, wid,
 		    AUDIOHDC_VERB_SET_GPIO_DIREC, AUDIOHDC_GPIO_DIRECT);
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_STCK, AUDIOHDC_GPIO_DATA_CTRL);
+		(void) audioha_codec_verb_get(statep, i, wid,
+		    AUDIOHDC_VERB_SET_GPIO_DATA, AUDIOHDC_GPIO_STCK_CTRL);
 
 		/* power-up audio function group */
 		(void) audioha_codec_verb_get(statep, i, wid,
