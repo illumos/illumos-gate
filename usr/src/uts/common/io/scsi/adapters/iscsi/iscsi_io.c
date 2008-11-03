@@ -1632,6 +1632,16 @@ iscsi_rx_process_itt_to_icmdp(iscsi_sess_t *isp, iscsi_hdr_t *ihp,
 		return (ISCSI_STATUS_INTERNAL_ERROR);
 	}
 
+	/* ensure that icmdp is still in Active state */
+	if (isp->sess_cmd_table[cmd_table_idx]->cmd_state !=
+	    ISCSI_CMD_STATE_ACTIVE) {
+		cmn_err(CE_WARN, "iscsi session(%u) received itt:0x%x "
+		    "but icmdp (%p) is not in active state",
+		    isp->sess_oid, ihp->itt,
+		    (void *)isp->sess_cmd_table[cmd_table_idx]);
+		return (ISCSI_STATUS_INTERNAL_ERROR);
+	}
+
 	/* make sure this is a SCSI cmd */
 	*icmdp = isp->sess_cmd_table[cmd_table_idx];
 
