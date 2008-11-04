@@ -149,6 +149,7 @@ i386_SUBDIRS= \
 	SUNWrmodr \
 	SUNWrmodu \
 	SUNWrtw \
+	SUNWrum \
 	SUNWsi3124 \
 	SUNWural \
 	SUNWvia823x \

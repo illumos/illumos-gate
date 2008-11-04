@@ -289,6 +289,7 @@ DRV_KMODS	+= rpcib
 DRV_KMODS	+= rsm
 DRV_KMODS	+= rts
 DRV_KMODS	+= rtw
+DRV_KMODS	+= rum
 DRV_KMODS	+= sad
 DRV_KMODS	+= sctp
 DRV_KMODS	+= sctp6

@@ -804,6 +804,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/rtw/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/rum/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sata/adapters/ahci/%.c
 	$(COMPILE.c) -o $@ $<
@@ -1804,6 +1808,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rsm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rtw/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rum/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sata/adapters/ahci/%.c
