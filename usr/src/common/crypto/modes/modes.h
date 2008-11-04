@@ -44,6 +44,7 @@ extern "C" {
 #define	CBC_MODE			0x00000004
 #define	CTR_MODE			0x00000008
 #define	CCM_MODE			0x00000010
+#define	GCM_MODE			0x00000020
 
 /*
  * cc_keysched:		Pointer to key schedule.
@@ -176,6 +177,54 @@ typedef struct ccm_ctx {
 #define	ccm_copy_to		ccm_common.cc_copy_to
 #define	ccm_flags		ccm_common.cc_flags
 
+/*
+ * gcm_tag_len:		Length of authentication tag.
+ *
+ * gcm_ghash:		Stores output from the GHASH function.
+ *
+ * gcm_processed_data_len:
+ *			Length of processed plaintext (encrypt) or
+ *			length of processed ciphertext (decrypt).
+ *
+ * gcm_pt_buf:		Stores the decrypted plaintext returned by
+ *			decrypt_final when the computed authentication
+ *			tag matches the	user supplied tag.
+ *
+ * gcm_pt_buf_len:	Length of the plaintext buffer.
+ *
+ * gcm_H:		Subkey.
+ *
+ * gcm_J0:		Pre-counter block generated from the IV.
+ *
+ * gcm_len_a_len_c:	64-bit representations of the bit lengths of
+ *			AAD and ciphertext.
+ *
+ * gcm_kmflag:		Current value of kmflag. Used only for allocating
+ *			the plaintext buffer during decryption.
+ */
+typedef struct gcm_ctx {
+	struct common_ctx gcm_common;
+	size_t gcm_tag_len;
+	size_t gcm_processed_data_len;
+	size_t gcm_pt_buf_len;
+	uint32_t gcm_tmp[4];
+	uint64_t gcm_ghash[2];
+	uint64_t gcm_H[2];
+	uint64_t gcm_J0[2];
+	uint64_t gcm_len_a_len_c[2];
+	uint8_t *gcm_pt_buf;
+	int gcm_kmflag;
+} gcm_ctx_t;
+
+#define	gcm_keysched		gcm_common.cc_keysched
+#define	gcm_keysched_len	gcm_common.cc_keysched_len
+#define	gcm_cb			gcm_common.cc_iv
+#define	gcm_remainder		gcm_common.cc_remainder
+#define	gcm_remainder_len	gcm_common.cc_remainder_len
+#define	gcm_lastp		gcm_common.cc_lastp
+#define	gcm_copy_to		gcm_common.cc_copy_to
+#define	gcm_flags		gcm_common.cc_flags
+
 typedef struct aes_ctx {
 	union {
 		ecb_ctx_t acu_ecb;
@@ -183,6 +232,7 @@ typedef struct aes_ctx {
 		ctr_ctx_t acu_ctr;
 #ifdef _KERNEL
 		ccm_ctx_t acu_ccm;
+		gcm_ctx_t acu_gcm;
 #endif
 	} acu;
 } aes_ctx_t;
@@ -260,13 +310,34 @@ extern int ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *, char *, size_t,
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
+extern int gcm_mode_encrypt_contiguous_blocks(gcm_ctx_t *, char *, size_t,
+    crypto_data_t *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
+extern int gcm_mode_decrypt_contiguous_blocks(gcm_ctx_t *, char *, size_t,
+    crypto_data_t *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
 int ccm_encrypt_final(ccm_ctx_t *, crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
+int gcm_encrypt_final(gcm_ctx_t *, crypto_data_t *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int ccm_decrypt_final(ccm_ctx_t *, crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
+extern int gcm_decrypt_final(gcm_ctx_t *, crypto_data_t *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
 extern int ctr_mode_final(ctr_ctx_t *, crypto_data_t *,
@@ -282,6 +353,11 @@ extern int ccm_init_ctx(ccm_ctx_t *, char *, int, boolean_t, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
+extern int gcm_init_ctx(gcm_ctx_t *, char *, size_t,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*copy_block)(uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
 extern void calculate_ccm_mac(ccm_ctx_t *, uint8_t *,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *));
 
@@ -293,7 +369,9 @@ extern void *ecb_alloc_ctx(int);
 extern void *cbc_alloc_ctx(int);
 extern void *ctr_alloc_ctx(int);
 extern void *ccm_alloc_ctx(int);
+extern void *gcm_alloc_ctx(int);
 extern void crypto_free_mode_ctx(void *);
+extern void gcm_set_kmflag(gcm_ctx_t *, int);
 
 #ifdef	__cplusplus
 }

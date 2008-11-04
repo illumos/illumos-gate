@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 #include <stdlib.h>
 #endif
@@ -172,25 +170,33 @@ crypto_free_mode_ctx(void *ctx)
 {
 	common_ctx_t *common_ctx = (common_ctx_t *)ctx;
 
-	if (common_ctx->cc_flags & ECB_MODE)
+	switch (common_ctx->cc_flags &
+	    (ECB_MODE|CBC_MODE|CTR_MODE|CCM_MODE|GCM_MODE)) {
+	case ECB_MODE:
 #ifdef _KERNEL
 		kmem_free(common_ctx, sizeof (ecb_ctx_t));
 #else
 		free(common_ctx);
 #endif
-	else if (common_ctx->cc_flags & CBC_MODE)
+		break;
+
+	case CBC_MODE:
 #ifdef _KERNEL
 		kmem_free(common_ctx, sizeof (cbc_ctx_t));
 #else
 		free(common_ctx);
 #endif
-	else if (common_ctx->cc_flags & CTR_MODE)
+		break;
+
+	case CTR_MODE:
 #ifdef _KERNEL
 		kmem_free(common_ctx, sizeof (ctr_ctx_t));
 #else
 		free(common_ctx);
 #endif
-	else if (common_ctx->cc_flags & CCM_MODE) {
+		break;
+
+	case CCM_MODE:
 #ifdef _KERNEL
 		if (((ccm_ctx_t *)ctx)->ccm_pt_buf != NULL)
 			kmem_free(((ccm_ctx_t *)ctx)->ccm_pt_buf,
@@ -200,6 +206,20 @@ crypto_free_mode_ctx(void *ctx)
 #else
 		if (((ccm_ctx_t *)ctx)->ccm_pt_buf != NULL)
 			free(((ccm_ctx_t *)ctx)->ccm_pt_buf);
+		free(ctx);
+#endif
+		break;
+
+	case GCM_MODE:
+#ifdef _KERNEL
+		if (((gcm_ctx_t *)ctx)->gcm_pt_buf != NULL)
+			kmem_free(((gcm_ctx_t *)ctx)->gcm_pt_buf,
+			    ((gcm_ctx_t *)ctx)->gcm_pt_buf_len);
+
+		kmem_free(ctx, sizeof (gcm_ctx_t));
+#else
+		if (((gcm_ctx_t *)ctx)->gcm_pt_buf != NULL)
+			free(((gcm_ctx_t *)ctx)->gcm_pt_buf);
 		free(ctx);
 #endif
 	}

@@ -26,8 +26,6 @@
 #ifndef _SYS_CRYPTO_COMMON_H
 #define	_SYS_CRYPTO_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Header file for the common data structures of the cryptographic framework
  */
@@ -84,6 +82,16 @@ typedef struct CK_AES_CCM_PARAMS {
 	uchar_t *authData;
 } CK_AES_CCM_PARAMS;
 
+/* CK_AES_GCM_PARAMS provides parameters to the CKM_AES_GCM mechanism */
+typedef struct CK_AES_GCM_PARAMS {
+	uchar_t *pIv;
+	ulong_t ulIvLen;
+	ulong_t ulIvBits;
+	uchar_t *pAAD;
+	ulong_t ulAADLen;
+	ulong_t ulTagBits;
+} CK_AES_GCM_PARAMS;
+
 #ifdef _KERNEL
 /*
  * CK_ECDH1_DERIVE_PARAMS provides the parameters to the
@@ -116,6 +124,16 @@ typedef struct CK_AES_CCM_PARAMS32 {
 	caddr32_t nonce;
 	caddr32_t authData;
 } CK_AES_CCM_PARAMS32;
+
+/* needed for 32-bit applications running on 64-bit kernels */
+typedef struct CK_AES_GCM_PARAMS32 {
+	caddr32_t pIv;
+	uint32_t ulIvLen;
+	uint32_t ulIvBits;
+	caddr32_t pAAD;
+	uint32_t ulAADLen;
+	uint32_t ulTagBits;
+} CK_AES_GCM_PARAMS32;
 
 typedef struct CK_ECDH1_DERIVE_PARAMS32 {
 	uint32_t	kdf;
@@ -173,6 +191,7 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_AES_ECB			"CKM_AES_ECB"
 #define	SUN_CKM_AES_CTR			"CKM_AES_CTR"
 #define	SUN_CKM_AES_CCM			"CKM_AES_CCM"
+#define	SUN_CKM_AES_GCM			"CKM_AES_GCM"
 #define	SUN_CKM_RC4			"CKM_RC4"
 #define	SUN_CKM_RSA_PKCS		"CKM_RSA_PKCS"
 #define	SUN_CKM_RSA_X_509		"CKM_RSA_X_509"

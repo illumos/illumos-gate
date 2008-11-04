@@ -1691,6 +1691,10 @@ aes_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
 		rv = ccm_mode_encrypt_contiguous_blocks(ctx, data, length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
+	} else if (aes_ctx->ac_flags & GCM_MODE) {
+		rv = gcm_mode_encrypt_contiguous_blocks(ctx, data, length,
+		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
+		    aes_xor_block);
 #endif
 	} else if (aes_ctx->ac_flags & CBC_MODE) {
 		rv = cbc_encrypt_contiguous_blocks(ctx,
@@ -1721,6 +1725,10 @@ aes_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
 #ifdef _KERNEL
 	} else if (aes_ctx->ac_flags & CCM_MODE) {
 		rv = ccm_mode_decrypt_contiguous_blocks(ctx, data, length,
+		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
+		    aes_xor_block);
+	} else if (aes_ctx->ac_flags & GCM_MODE) {
+		rv = gcm_mode_decrypt_contiguous_blocks(ctx, data, length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
 #endif

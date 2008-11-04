@@ -231,6 +231,7 @@ typedef enum dprov_mech_type {
 	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
 	AES_CTR_MECH_INFO_TYPE,		/* SUN_CKM_AES_CTR */
 	AES_CCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_CCM */
+	AES_GCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_CCM */
 	RC4_MECH_INFO_TYPE,		/* SUN_CKM_RC4 */
 	RSA_PKCS_MECH_INFO_TYPE,	/* SUN_CKM_RSA_PKCS */
 	RSA_X_509_MECH_INFO_TYPE,	/* SUN_CKM_RSA_X_509 */
@@ -490,6 +491,13 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* AES-CCM */
 	{SUN_CKM_AES_CCM, AES_CCM_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT | CRYPTO_FG_ENCRYPT_MAC |
+	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
+	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
+	    CRYPTO_FG_MAC_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES-GCM */
+	{SUN_CKM_AES_GCM, AES_GCM_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT | CRYPTO_FG_ENCRYPT_MAC |
 	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
@@ -2298,6 +2306,7 @@ dprov_valid_cipher_mech(crypto_mech_type_t mech_type)
 	    mech_type == AES_ECB_MECH_INFO_TYPE ||
 	    mech_type == AES_CTR_MECH_INFO_TYPE ||
 	    mech_type == AES_CCM_MECH_INFO_TYPE ||
+	    mech_type == AES_GCM_MECH_INFO_TYPE ||
 	    mech_type == RC4_MECH_INFO_TYPE ||
 	    mech_type == RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == RSA_X_509_MECH_INFO_TYPE ||
@@ -4371,6 +4380,88 @@ out:
 	return (rv);
 }
 
+/*
+ * Resource control checks don't need to be done. Why? Because this routine
+ * knows the size of the structure, and it can't be overridden by a user.
+ * This is different from the crypto module, which has no knowledge of
+ * specific mechanisms, and therefore has to trust specified size of the
+ * parameter.  This trust, or lack of trust, is why the size of the
+ * parameter has to be charged against the project resource control.
+ */
+static int
+copyin_aes_gcm_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
+    int *out_error, int mode)
+{
+	STRUCT_DECL(crypto_mechanism, mech);
+	STRUCT_DECL(CK_AES_GCM_PARAMS, params);
+	CK_AES_GCM_PARAMS *aes_gcm_params;
+	caddr_t pp;
+	size_t param_len;
+	int error = 0;
+	int rv = 0;
+
+	STRUCT_INIT(mech, mode);
+	STRUCT_INIT(params, mode);
+	bcopy(in_mech, STRUCT_BUF(mech), STRUCT_SIZE(mech));
+	pp = STRUCT_FGETP(mech, cm_param);
+	param_len = STRUCT_FGET(mech, cm_param_len);
+
+	if (param_len != STRUCT_SIZE(params)) {
+		rv = CRYPTO_ARGUMENTS_BAD;
+		goto out;
+	}
+
+	out_mech->cm_type = STRUCT_FGET(mech, cm_type);
+	out_mech->cm_param = NULL;
+	out_mech->cm_param_len = 0;
+	if (pp != NULL) {
+		size_t nonce_len, auth_data_len, total_param_len;
+
+		if (copyin((char *)pp, STRUCT_BUF(params), param_len) != 0) {
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+
+		nonce_len = STRUCT_FGET(params, ulIvLen);
+		auth_data_len = STRUCT_FGET(params, ulAADLen);
+
+		/* allocate param structure */
+		total_param_len =
+		    sizeof (CK_AES_GCM_PARAMS) + nonce_len + auth_data_len;
+		aes_gcm_params = kmem_alloc(total_param_len, KM_NOSLEEP);
+		if (aes_gcm_params == NULL) {
+			rv = CRYPTO_HOST_MEMORY;
+			goto out;
+		}
+		aes_gcm_params->ulTagBits = STRUCT_FGET(params, ulTagBits);
+		aes_gcm_params->ulIvLen = nonce_len;
+		aes_gcm_params->ulAADLen = auth_data_len;
+		aes_gcm_params->pIv
+		    = (uchar_t *)aes_gcm_params + sizeof (CK_AES_GCM_PARAMS);
+		aes_gcm_params->pAAD = aes_gcm_params->pIv + nonce_len;
+
+		if (copyin((char *)STRUCT_FGETP(params, pIv),
+		    aes_gcm_params->pIv, nonce_len) != 0) {
+			kmem_free(aes_gcm_params, total_param_len);
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		if (copyin((char *)STRUCT_FGETP(params, pAAD),
+		    aes_gcm_params->pAAD, auth_data_len) != 0) {
+			kmem_free(aes_gcm_params, total_param_len);
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		out_mech->cm_param = (char *)aes_gcm_params;
+		out_mech->cm_param_len = sizeof (CK_AES_GCM_PARAMS);
+	}
+out:
+	*out_error = error;
+	return (rv);
+}
 
 /*
  * Resource control checks don't need to be done. Why? Because this routine
@@ -4594,6 +4685,10 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 		rv = copyin_aes_ccm_mech(umech, kmech, &error, mode);
 		goto out;
 
+	case AES_GCM_MECH_INFO_TYPE:
+		rv = copyin_aes_gcm_mech(umech, kmech, &error, mode);
+		goto out;
+
 	case DH_PKCS_DERIVE_MECH_INFO_TYPE:
 		expected_param_len = param_len;
 		break;
@@ -4690,6 +4785,22 @@ dprov_free_mechanism(crypto_provider_handle_t provider,
 			mech->cm_param = NULL;
 			mech->cm_param_len = 0;
 		}
+		return (CRYPTO_SUCCESS);
+	}
+	case AES_GCM_MECH_INFO_TYPE: {
+		CK_AES_GCM_PARAMS *params;
+		size_t total_param_len;
+
+		if ((mech->cm_param != NULL) && (mech->cm_param_len != 0)) {
+			/* LINTED: pointer alignment */
+			params = (CK_AES_GCM_PARAMS *)mech->cm_param;
+			total_param_len = mech->cm_param_len +
+			    params->ulIvLen + params->ulAADLen;
+			kmem_free(params, total_param_len);
+			mech->cm_param = NULL;
+			mech->cm_param_len = 0;
+		}
+		return (CRYPTO_SUCCESS);
 	}
 
 	default:
