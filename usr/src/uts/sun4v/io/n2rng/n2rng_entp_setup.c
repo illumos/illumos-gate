@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -191,7 +189,11 @@ n2rng_logic_test(n2rng_t *n2rng, int rngid)
 	}
 
 	if (correctcount < LOGIC_TEST_MATCHES_NEEDED) {
-		cmn_err(CE_WARN, "n2rng: logic error on rng(%d), only %d "
+		/*
+		 * Don't log a warning here since the calling routine will
+		 * retry and log it's own warning if the retry fails.
+		 */
+		DBG2(n2rng, DHEALTH, "n2rng: logic error on rng(%d), only %d "
 		    "matches found", rngid, correctcount);
 		for (i = 0; i < LOGIC_TEST_WORDS; i++) {
 			DBG3(n2rng, DHEALTH, "buffer[%d] %016llx, cycles = %d",
