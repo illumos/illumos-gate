@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/atomic.h>
@@ -722,9 +720,11 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 	size_t len = uio->uio_resid;
 	mntnode_t *mnp = VTOM(vp);
 	char *buf;
-	mntsnap_t *snap = &mnp->mnt_read;
+	mntsnap_t *snap;
 	int datamodel;
 
+	rw_enter(&mnp->mnt_contents, RW_READER);
+	snap = &mnp->mnt_read;
 	if (off == (off_t)0 || snap->mnts_count == 0) {
 		/*
 		 * It is assumed that any kernel callers wishing
@@ -738,17 +738,28 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 			datamodel = DATAMODEL_LP64;
 		else
 			datamodel = get_udatamodel();
-		if ((error = mntfs_snapshot(mnp, 1, datamodel)) != 0)
+		if (!rw_tryupgrade(&mnp->mnt_contents)) {
+			rw_exit(&mnp->mnt_contents);
+			rw_enter(&mnp->mnt_contents, RW_WRITER);
+		}
+		if ((error = mntfs_snapshot(mnp, 1, datamodel)) != 0) {
+			rw_exit(&mnp->mnt_contents);
 			return (error);
+		}
+		rw_downgrade(&mnp->mnt_contents);
 	}
 	if ((size_t)(off + len) > snap->mnts_textsize)
 		len = snap->mnts_textsize - off;
 
-	if (off < 0 || len > snap->mnts_textsize)
+	if (off < 0 || len > snap->mnts_textsize) {
+		rw_exit(&mnp->mnt_contents);
 		return (EFAULT);
+	}
 
-	if (len == 0)
+	if (len == 0) {
+		rw_exit(&mnp->mnt_contents);
 		return (0);
+	}
 
 	/*
 	 * The mnttab image is stored in the user's address space,
@@ -763,6 +774,7 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 	}
 	kmem_free(buf, len);
 	vfs_mnttab_readop();
+	rw_exit(&mnp->mnt_contents);
 	return (error);
 }
 
@@ -776,9 +788,10 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	vnode_t *rvp;
 	extern timespec_t vfs_mnttab_ctime;
 	mntdata_t *mntdata = MTOD(VTOM(vp));
-	mntsnap_t *snap = mnp->mnt_read.mnts_count ?
-	    &mnp->mnt_read : &mnp->mnt_ioctl;
+	mntsnap_t *snap;
 
+	rw_enter(&mnp->mnt_contents, RW_READER);
+	snap = mnp->mnt_read.mnts_count ? &mnp->mnt_read : &mnp->mnt_ioctl;
 	/*
 	 * Return all the attributes.  Should be refined
 	 * so that it returns only those asked for.
@@ -814,6 +827,7 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 */
 	vap->va_size = snap->mnts_textsize ? snap->mnts_textsize :
 	    mntdata->mnt_size;
+	rw_exit(&mnp->mnt_contents);
 	/*
 	 * Fetch mtime from the vfs mnttab timestamp
 	 */
@@ -859,6 +873,7 @@ mntgetnode(vnode_t *dp)
 	mnp = kmem_zalloc(sizeof (mntnode_t), KM_SLEEP);
 	mnp->mnt_vnode = vn_alloc(KM_SLEEP);
 	mnp->mnt_mountvp = VTOM(dp)->mnt_mountvp;
+	rw_init(&mnp->mnt_contents, NULL, RW_DEFAULT, NULL);
 	vp = MTOV(mnp);
 	vp->v_flag = VNOCACHE|VNOMAP|VNOSWAP|VNOMOUNT;
 	vn_setops(vp, mntvnodeops);
@@ -877,6 +892,7 @@ mntfreenode(mntnode_t *mnp)
 {
 	vnode_t *vp = MTOV(mnp);
 
+	rw_destroy(&mnp->mnt_contents);
 	vn_invalid(vp);
 	vn_free(vp);
 	kmem_free(mnp, sizeof (*mnp));
@@ -904,8 +920,13 @@ static int
 mntseek(vnode_t *vp, offset_t ooff, offset_t *noffp,
 	caller_context_t *ct)
 {
-	if (*noffp == 0)
+	mntnode_t *mnp = VTOM(vp);
+
+	if (*noffp == 0) {
+		rw_enter(&mnp->mnt_contents, RW_WRITER);
 		VTOM(vp)->mnt_offset = 0;
+		rw_exit(&mnp->mnt_contents);
+	}
 
 	return (0);
 }
@@ -921,8 +942,10 @@ mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp,
 	caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
-	mntsnap_t *snap = &mnp->mnt_read;
+	mntsnap_t *snap;
 
+	rw_enter(&mnp->mnt_contents, RW_READER);
+	snap = &mnp->mnt_read;
 	if (mnp->mnt_ioctl.mnts_time.tv_sec > snap->mnts_time.tv_sec ||
 	    (mnp->mnt_ioctl.mnts_time.tv_sec == snap->mnts_time.tv_sec &&
 	    mnp->mnt_ioctl.mnts_time.tv_nsec > snap->mnts_time.tv_nsec))
@@ -941,6 +964,8 @@ mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp,
 		if (*phpp == (pollhead_t *)NULL)
 			*revp |= POLLRDBAND;
 	}
+	rw_exit(&mnp->mnt_contents);
+
 	if (*revp || *phpp != NULL || any) {
 		return (0);
 	}
@@ -960,17 +985,27 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 {
 	uint_t *up = (uint_t *)arg;
 	mntnode_t *mnp = VTOM(vp);
-	mntsnap_t *snap = &mnp->mnt_ioctl;
+	mntsnap_t *snap;
 	int error;
 
 	error = 0;
+	rw_enter(&mnp->mnt_contents, RW_READER);
+	snap = &mnp->mnt_ioctl;
 	switch (cmd) {
 
 	case MNTIOC_NMNTS: {		/* get no. of mounted resources */
 		if (snap->mnts_count == 0) {
+			if (!rw_tryupgrade(&mnp->mnt_contents)) {
+				rw_exit(&mnp->mnt_contents);
+				rw_enter(&mnp->mnt_contents, RW_WRITER);
+			}
 			if ((error =
-			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK)) != 0)
+			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK))
+			    != 0) {
+				rw_exit(&mnp->mnt_contents);
 				return (error);
+			}
+			rw_downgrade(&mnp->mnt_contents);
 		}
 		if (suword32(up, snap->mnts_count) != 0)
 			error = EFAULT;
@@ -983,9 +1018,17 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		size_t len;
 
 		if (snap->mnts_count == 0) {
+			if (!rw_tryupgrade(&mnp->mnt_contents)) {
+				rw_exit(&mnp->mnt_contents);
+				rw_enter(&mnp->mnt_contents, RW_WRITER);
+			}
 			if ((error =
-			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK)) != 0)
+			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK))
+			    != 0) {
+				rw_exit(&mnp->mnt_contents);
 				return (error);
+			}
+			rw_downgrade(&mnp->mnt_contents);
 		}
 
 		len = 2 * snap->mnts_count * sizeof (uint_t);
@@ -1090,11 +1133,18 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		size_t idx;
 		uintptr_t addr;
 
+		if (!rw_tryupgrade(&mnp->mnt_contents)) {
+			rw_exit(&mnp->mnt_contents);
+			rw_enter(&mnp->mnt_contents, RW_WRITER);
+		}
 		idx = mnp->mnt_offset;
 		if (snap->mnts_count == 0 || idx == 0) {
 			if ((error =
-			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK)) != 0)
+			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK))
+			    != 0) {
+				rw_exit(&mnp->mnt_contents);
 				return (error);
+			}
 		}
 		/*
 		 * If the next index is beyond the end of the current mnttab,
@@ -1102,6 +1152,7 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		 */
 		if (idx >= snap->mnts_count) {
 			*rvalp = 1;
+			rw_exit(&mnp->mnt_contents);
 			return (0);
 		}
 
@@ -1119,8 +1170,10 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		}
 #endif
 
-		if (error != 0)
+		if (error != 0) {
+			rw_exit(&mnp->mnt_contents);
 			return (error);
+		}
 
 		mnp->mnt_offset++;
 		break;
@@ -1131,6 +1184,7 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		break;
 	}
 
+	rw_exit(&mnp->mnt_contents);
 	return (error);
 }
 
