@@ -158,10 +158,14 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 			/*
 			 * For the following modes, check the link status
 			 * before sending the packet out:
-			 * nxge_lb_normal, nxge_lb_ext10g, nxge_lb_phy10g
+			 * nxge_lb_normal,
+			 * nxge_lb_ext10g,
+			 * nxge_lb_ext1000,
+			 * nxge_lb_ext100,
+			 * nxge_lb_ext10.
 			 */
 			if (nxgep->statsp->port_stats.lb_mode <
-			    nxge_lb_serdes10g) {
+			    nxge_lb_phy10g) {
 				if (!statsp->mac_stats.link_up) {
 					freemsg(mp);
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
