@@ -75,8 +75,8 @@ static int	scsa2usb_cleanup(dev_info_t *, scsa2usb_state_t *);
 static void	scsa2usb_validate_attrs(scsa2usb_state_t *);
 static void	scsa2usb_create_luns(scsa2usb_state_t *);
 static int	scsa2usb_is_usb(dev_info_t *);
-static int	scsa2usb_fake_inquiry(scsa2usb_state_t *,
-					scsa2usb_cmd_t *, uint_t);
+static void	scsa2usb_fake_inquiry(scsa2usb_state_t *,
+		    struct scsi_inquiry *);
 static void	scsa2usb_do_inquiry(scsa2usb_state_t *,
 						uint_t, uint_t);
 static int	scsa2usb_do_tur(scsa2usb_state_t *, struct scsi_address *);
@@ -3089,14 +3089,22 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 		 */
 		if (!(scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_INQUIRY)) {
 			uchar_t evpd = 0x01;
+			unsigned int bufsize;
+			int count;
 
-			if (cmd->cmd_cdb[1] & evpd) {
-
+			if (cmd->cmd_cdb[1] & evpd)
 				return (SCSA2USB_REJECT);
-			}
-			cmd->cmd_pkt->pkt_resid -=
-			    scsa2usb_fake_inquiry(scsa2usbp, cmd,
-			    cmd->cmd_pkt->pkt_address.a_lun);
+
+			scsa2usb_fake_inquiry(scsa2usbp, inq);
+
+			/* Copy no more than requested */
+			count = MIN(cmd->cmd_bp->b_bcount,
+			    sizeof (struct scsi_inquiry));
+			bufsize = cmd->cmd_pkt->pkt_cdbp[4];
+			count = MIN(count, bufsize);
+			bcopy(inq, cmd->cmd_bp->b_un.b_addr, count);
+
+			cmd->cmd_pkt->pkt_resid = bufsize - count;
 			cmd->cmd_pkt->pkt_state |= STATE_XFERRED_DATA;
 
 			return (SCSA2USB_JUST_ACCEPT);
@@ -4124,8 +4132,8 @@ scsa2usb_do_inquiry(scsa2usb_state_t *scsa2usbp, uint_t target, uint_t lun)
 
 	/* is it inquiry-challenged? */
 	if (!(scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_INQUIRY)) {
-		(void) scsa2usb_fake_inquiry(scsa2usbp, NULL, lun);
-
+		scsa2usb_fake_inquiry(scsa2usbp,
+		    &scsa2usbp->scsa2usb_lun_inquiry[lun]);
 		return;
 	}
 
@@ -4172,7 +4180,8 @@ scsa2usb_do_inquiry(scsa2usb_state_t *scsa2usbp, uint_t target, uint_t lun)
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 		scsa2usbp->scsa2usb_attrs &=
 		    ~SCSA2USB_ATTRS_REDUCED_CMD;
-		(void) scsa2usb_fake_inquiry(scsa2usbp, NULL, lun);
+		scsa2usb_fake_inquiry(scsa2usbp,
+		    &scsa2usbp->scsa2usb_lun_inquiry[lun]);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 	}
 
@@ -4188,22 +4197,15 @@ scsa2usb_do_inquiry(scsa2usb_state_t *scsa2usbp, uint_t target, uint_t lun)
  *    build an inquiry for a given device that doesnt like inquiry
  *    commands.
  */
-static int
-scsa2usb_fake_inquiry(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd,
-    uint_t lun)
+static void
+scsa2usb_fake_inquiry(scsa2usb_state_t *scsa2usbp, struct scsi_inquiry *inqp)
 {
 	usb_client_dev_data_t *dev_data = scsa2usbp->scsa2usb_dev_data;
-	struct scsi_inquiry *inqp;
 	int len;
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_fake_inquiry:");
 
-	if (cmd) {
-		inqp = (struct scsi_inquiry *)cmd->cmd_bp->b_un.b_addr;
-	} else {
-		inqp = &scsa2usbp->scsa2usb_lun_inquiry[lun];
-	}
 	bzero(inqp, sizeof (struct scsi_inquiry));
 	for (len = 0; len < sizeof (inqp->inq_vid); len++) {
 		*(inqp->inq_vid + len) = ' ';
@@ -4245,12 +4247,6 @@ scsa2usb_fake_inquiry(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd,
 	    ((dev_data->dev_descr->bcdDevice>>4) & 0xF);
 	inqp->inq_revision[3] = 0x30 +
 	    ((dev_data->dev_descr->bcdDevice) & 0xF);
-
-	/* Copy inquiry data in to soft state */
-	bcopy(inqp, &scsa2usbp->scsa2usb_lun_inquiry[lun],
-	    sizeof (struct scsi_inquiry));
-
-	return (sizeof (struct scsi_inquiry));
 }
 
 

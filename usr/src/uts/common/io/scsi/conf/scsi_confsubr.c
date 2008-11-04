@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility SCSI configuration routines
  */
@@ -703,6 +701,7 @@ done:
 	    ((SUN_INQSIZE - inq_pkt->pkt_resid) < SUN_MIN_INQLEN)) {
 		rval = SCSIPROBE_NONCCS;
 	} else {
+		ASSERT(inq_pkt->pkt_resid >= 0);
 		bcopy((caddr_t)inq_bp->b_un.b_addr,
 		    (caddr_t)devp->sd_inq, (SUN_INQSIZE - inq_pkt->pkt_resid));
 		rval = SCSIPROBE_EXISTS;
