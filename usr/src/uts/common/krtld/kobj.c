@@ -3728,9 +3728,7 @@ kobj_open_file(char *name)
 		file->_bsize = MAXBSIZE;
 
 		/* Check if the file is compressed */
-		if (kobj_is_compressed(fd)) {
-			file->_iscmp = 1;
-		}
+		file->_iscmp = kobj_is_compressed(fd);
 	} else {
 		if (kobj_boot_compinfo(fd, &cbuf) != 0) {
 			kobj_close_file(file);
@@ -3809,7 +3807,7 @@ kobj_read_file(struct _buf *file, char *buf, uint_t size, uint_t off)
 	 * compressed size, then read the image into memory and finally
 	 * call zlib to decompress the image at the supplied memory buffer.
 	 */
-	if (file->_iscmp) {
+	if (file->_iscmp == CH_MAGIC_GZIP) {
 		ulong_t dlen;
 		vattr_t vattr;
 		struct vnode *vp = (struct vnode *)file->_fd;
@@ -4169,7 +4167,7 @@ kobj_get_filesize(struct _buf *file, uint64_t *size)
 			return (EIO);
 		*size = bst.st_size;
 
-		if (file->_iscmp) {
+		if (file->_iscmp == CH_MAGIC_GZIP) {
 			/*
 			 * Read the last 4 bytes of the compressed (gzip)
 			 * image to get the size of its uncompressed
@@ -4624,7 +4622,7 @@ kobj_boot_compinfo(int fd, struct compinfo *cb)
 
 /*
  * Check if the file is compressed (for now we handle only gzip).
- * It returns 1 if the file is compressed and 0 otherwise.
+ * It returns CH_MAGIC_GZIP if the file is compressed and 0 otherwise.
  */
 static int
 kobj_is_compressed(intptr_t fd)
@@ -4644,7 +4642,7 @@ kobj_is_compressed(intptr_t fd)
 	}
 
 	if (magic_buf == CH_MAGIC_GZIP)
-		return (1);
+		return (CH_MAGIC_GZIP);
 
 	return (0);
 }
