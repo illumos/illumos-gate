@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -1332,7 +1330,7 @@ listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		(void) printf("%s: %s\n", gettext("TPGT"), n1->x_value);
 		n2 = NULL;
 		addrs = 0;
-		while (n2 = tgt_node_next_child(n1, XML_ELEMENT_IPADDR, n2)) {
+		while (n2 = tgt_node_next(n1, XML_ELEMENT_IPADDR, n2)) {
 			if (verbose == True)
 				(void) printf("%s%s: %s\n", dospace(1),
 				    gettext("IP Address"),

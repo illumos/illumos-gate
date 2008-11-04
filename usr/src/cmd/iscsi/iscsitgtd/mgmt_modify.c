@@ -679,6 +679,7 @@ modify_tpgt(tgt_node_t *x)
 	char		*name	= NULL;
 	char		*ip_str	= NULL;
 	tgt_node_t	*tnode	= NULL;
+	tgt_node_t	*list	= NULL;
 
 	(void) pthread_rwlock_wrlock(&targ_config_mutex);
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &name) == False) {
@@ -702,7 +703,17 @@ modify_tpgt(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_TPGT_NOT_FOUND);
 		goto error;
 	}
-	if (modify_element(XML_ELEMENT_IPADDR, ip_str, tnode, MatchBoth) ==
+
+	if ((list = tgt_node_next(tnode, XML_ELEMENT_IPADDRLIST, NULL))
+	    == NULL) {
+		list = tgt_node_alloc(XML_ELEMENT_IPADDRLIST, String, "");
+		if (list == NULL) {
+			xml_rtn_msg(&msg, ERR_NO_MEM);
+			goto error;
+		}
+		tgt_node_add(tnode, list);
+	}
+	if (modify_element(XML_ELEMENT_IPADDR, ip_str, list, MatchBoth) ==
 	    False) {
 		xml_rtn_msg(&msg, ERR_NO_MEM);
 		goto error;

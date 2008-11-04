@@ -144,7 +144,7 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 {
 	tgt_node_t	*t, *x;
 	tgt_node_t	*pgt	= NULL;
-	tgt_node_t	*ip	= NULL;
+	tgt_node_t	*iplist	= NULL;
 	tgt_node_t	*tpgt	= NULL;
 	ip_t		eid;
 
@@ -172,11 +172,11 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 			    XML_ELEMENT_TPGT, tpgt)) != NULL) {
 				if (strcmp(pgt->x_value, tpgt->x_value) != 0)
 					continue;
-				if ((ip = tgt_node_next(tpgt,
-				    XML_ELEMENT_IPADDR, NULL)) != NULL)
+				if ((iplist = tgt_node_next(tpgt,
+				    XML_ELEMENT_IPADDRLIST, NULL)) != NULL)
 					break;
 			}
-			if (tpgt == NULL || ip == NULL)
+			if (tpgt == NULL || iplist == NULL)
 				continue;
 			if (isns_append_attr(cmd, ISNS_PG_TAG_ATTR_ID,
 			    ISNS_PG_TAG_SZ, NULL,
@@ -185,7 +185,7 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 			}
 
 			/* get ip-addr & port */
-			for (x = tpgt->x_child; x; x = x->x_sibling) {
+			for (x = iplist->x_child; x; x = x->x_sibling) {
 				if (get_ip_addr(x->x_value, &eid) < 0)
 					continue;
 				if (isns_append_attr(cmd,

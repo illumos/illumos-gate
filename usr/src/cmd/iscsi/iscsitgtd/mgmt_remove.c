@@ -332,7 +332,7 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		}
 		if ((list = tgt_node_next(targ, XML_ELEMENT_TPGTLIST, NULL)) ==
 		    NULL) {
-			xml_rtn_msg(&msg, ERR_ACL_NOT_FOUND);
+			xml_rtn_msg(&msg, ERR_TPGT_NOT_FOUND);
 			goto error;
 		}
 		c = tgt_node_alloc(XML_ELEMENT_TPGT, String, prop);
@@ -448,6 +448,7 @@ remove_initiator(tgt_node_t *x)
 		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
 	}
 
+	free(name);
 	(void) pthread_rwlock_unlock(&targ_config_mutex);
 	return (msg);
 }
@@ -462,6 +463,7 @@ remove_tpgt(tgt_node_t *x)
 	tgt_node_t	*lnp		= NULL;
 	tgt_node_t	*node		= NULL;
 	tgt_node_t	*c		= NULL;
+	tgt_node_t	*list		= NULL;
 	Boolean_t	change_made	= False;
 
 	(void) pthread_rwlock_wrlock(&targ_config_mutex);
@@ -504,19 +506,27 @@ remove_tpgt(tgt_node_t *x)
 			(void) pthread_rwlock_unlock(&targ_config_mutex);
 			return (msg);
 		}
+		if ((list = tgt_node_next(node, XML_ELEMENT_IPADDRLIST, NULL))
+		    == NULL) {
+			xml_rtn_msg(&msg, ERR_TPGT_NO_IPADDR);
+			goto error;
+		}
 		c = tgt_node_alloc(XML_ELEMENT_IPADDR, String, prop);
-		if (tgt_node_remove(node, c, MatchBoth) == False) {
+		if (tgt_node_remove(list, c, MatchBoth) == False) {
 			xml_rtn_msg(&msg, ERR_INVALID_IP);
 			goto error;
 		}
 		tgt_node_free(c);
 		free(prop);
+		if (list->x_child == NULL)
+			(void) tgt_node_remove(node, list, MatchName);
 		change_made = True;
 	}
 	if ((change_made != True) &&
 	    (tgt_find_value_str(x, XML_ELEMENT_ALL, &prop) == True)) {
 		tgt_node_remove(main_config, node, MatchBoth);
 		change_made = True;
+		free(prop);
 	}
 
 	if (change_made == True) {

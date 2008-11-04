@@ -27,8 +27,6 @@
 #ifndef _ISCSITGT_IMPL_H
 #define	_ISCSITGT_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Block comment which describes the contents of this file.
  */
@@ -106,6 +104,7 @@ typedef enum {
 #define	XML_ELEMENT_INAME	"iscsi-name"
 #define	XML_ELEMENT_MAXRECV	"maxrecv"
 #define	XML_ELEMENT_IPADDR	"ip-address"
+#define	XML_ELEMENT_IPADDRLIST	"ip-address-list"
 #define	XML_ELEMENT_ALL		"all"
 #define	XML_ELEMENT_VERBOSE	"verbose"
 #define	XML_ELEMENT_LIST	"list"
