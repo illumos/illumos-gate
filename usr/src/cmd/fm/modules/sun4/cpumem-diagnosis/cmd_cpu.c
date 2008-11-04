@@ -1661,7 +1661,7 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, uint8_t level,
 	cpu->cpu_type = type;
 	cpu->cpu_version = CMD_CPU_VERSION;
 
-	if (cpu->cpu_level > CMD_CPU_LEVEL_THREAD) {
+	if (cpu->cpu_level == CMD_CPU_LEVEL_THREAD) {
 		cmd_bufname(cpu->cpu_bufname, sizeof (cpu->cpu_bufname),
 		    "cpu_%d", cpu->cpu_cpuid);
 	} else {
@@ -1675,15 +1675,31 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, uint8_t level,
 	    cpu->cpu_cpuid);
 #endif /* sun4u */
 
-	cmd_fmri_init(hdl, &cpu->cpu_asru, asru, "cpu_asru_%d", cpu->cpu_cpuid);
+	if (cpu->cpu_level == CMD_CPU_LEVEL_THREAD) {
+		cmd_fmri_init(hdl, &cpu->cpu_asru, asru, "cpu_asru_%d",
+		    cpu->cpu_cpuid);
+	} else {
+		cmd_fmri_init(hdl, &cpu->cpu_asru, asru, "cpu_asru_%d_%d",
+		    cpu->cpu_cpuid, cpu->cpu_level);
+	}
 
 	if ((fru = cpu_getfru(hdl, cpu)) != NULL) {
-		cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d",
-		    cpu->cpu_cpuid);
+		if (cpu->cpu_level == CMD_CPU_LEVEL_THREAD) {
+			cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d",
+			    cpu->cpu_cpuid);
+		} else {
+			cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d_%d",
+			    cpu->cpu_cpuid, cpu->cpu_level);
+		}
 		nvlist_free(fru);
 	} else {
-		cmd_fmri_init(hdl, &cpu->cpu_fru, asru, "cpu_fru_%d",
-		    cpu->cpu_cpuid);
+		if (cpu->cpu_level == CMD_CPU_LEVEL_THREAD) {
+			cmd_fmri_init(hdl, &cpu->cpu_fru, asru, "cpu_fru_%d",
+			    cpu->cpu_cpuid);
+		} else {
+			cmd_fmri_init(hdl, &cpu->cpu_fru, asru, "cpu_fru_%d_%d",
+			    cpu->cpu_cpuid, cpu->cpu_level);
+		}
 	}
 
 	cpu_buf_create(hdl, cpu);

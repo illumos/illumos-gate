@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Fault-handling routines for page retirement faults
@@ -46,24 +44,32 @@ void
 cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
     fmd_event_t *ep, uint64_t afar)
 {
-	cmd_page_t *page = cmd_page_lookup(afar);
+	cmd_page_t *page = NULL;
 	const char *uuid;
 	nvlist_t *flt;
 #ifdef sun4v
 	nvlist_t *nvlfru;
 #endif
 
-	if (page == NULL)
-		page = cmd_page_create(hdl, modasru, afar);
-
-	if (page->page_flags & CMD_MEM_F_FAULTING) {
+	page = cmd_page_lookup(afar);
+	if (page != NULL) {
 		/*
-		 * We've already faulted this page.  No need to kick it while
-		 * it's down -- don't fault it again.
+		 * If the page has already been retired then *page
+		 * would have been freed and recreated. Thus the
+		 * flag would be 0x0 - check to see if the page
+		 * is unusable (retired).
 		 */
-		return;
+		if (page->page_flags & CMD_MEM_F_FAULTING ||
+		    fmd_nvl_fmri_unusable(hdl, page->page_asru_nvl)) {
+			/* Page already faulted, don't fault again. */
+			page->page_flags |= CMD_MEM_F_FAULTING;
+			return;
+		}
+	} else {
+		page = cmd_page_create(hdl, modasru, afar);
 	}
 
+	page->page_flags |= CMD_MEM_F_FAULTING;
 	if (page->page_case.cc_cp == NULL)
 		page->page_case.cc_cp = cmd_case_create(hdl,
 		    &page->page_header, CMD_PTR_PAGE_CASE, &uuid);
