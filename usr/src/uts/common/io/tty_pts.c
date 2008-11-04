@@ -276,12 +276,6 @@ again:
 		}
 	}
 
-	/*
-	 * queue has already been setup with a pointer to
-	 * the stream head that is being referenced
-	 */
-	pty->pt_vnode = strq2vp(q);
-	VN_RELE(pty->pt_vnode);
 	pty->pt_sdev = dev;
 	q->q_ptr = WR(q)->q_ptr = pty;
 	pty->pt_flags &= ~PF_SLAVEGONE;
@@ -302,6 +296,12 @@ again:
 	 * waiting for slave queue to finish open.
 	 */
 	mutex_enter(&pty->ptc_lock);
+	/*
+	 * queue has already been setup with a pointer to
+	 * the stream head that is being referenced
+	 */
+	pty->pt_vnode = strq2vp(q);
+	VN_RELE(pty->pt_vnode);
 	pty->pt_ttycommon.t_readq = q;
 	pty->pt_ttycommon.t_writeq = WR(q);
 	/* tell master device that slave is ready for writing */
@@ -335,17 +335,16 @@ ptslclose(queue_t *q, int flag, cred_t *cred)
 	mutex_enter(&pty->ptc_lock);
 	pty->pt_ttycommon.t_readq = NULL;
 	pty->pt_ttycommon.t_writeq = NULL;
+	while (pty->pt_flags & PF_IOCTL) {
+		pty->pt_flags |= PF_WAIT;
+		cv_wait(&pty->pt_cv_flags, &pty->ptc_lock);
+	}
+	pty->pt_vnode = NULL;
 	mutex_exit(&pty->ptc_lock);
 
 	qprocsoff(q);
 
 	mutex_enter(&pty->ptc_lock);
-
-	while (pty->pt_flags & PF_IOCTL) {
-		pty->pt_flags |= PF_WAIT;
-		cv_wait(&pty->pt_cv_flags, &pty->ptc_lock);
-	}
-
 	/*
 	 * ptc_lock mutex is not dropped across
 	 * the call to the routine ttycommon_close
@@ -370,7 +369,6 @@ ptslclose(queue_t *q, int flag, cred_t *cred)
 		ptcpollwakeup(pty, FWRITE);	/* wake up writers/selectors */
 		cv_broadcast(&pty->pt_cv_flags);
 	}
-	pty->pt_vnode = NULL;
 	pty->pt_sdev = 0;
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	mutex_exit(&pty->ptc_lock);
