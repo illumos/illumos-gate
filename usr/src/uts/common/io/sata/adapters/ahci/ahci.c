@@ -1177,8 +1177,13 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 		    "ahci_tran_probe_port: port %d DISK found", port);
 		break;
 
-	case SATA_DTYPE_ATAPICD:
-		sd->satadev_type = SATA_DTYPE_ATAPICD;
+	case SATA_DTYPE_ATAPI:
+		/*
+		 * HBA driver only knows it's an ATAPI device, and don't know
+		 * it's CD/DVD or tape because the ATAPI device type need to
+		 * be determined by checking IDENTIFY PACKET DEVICE data
+		 */
+		sd->satadev_type = SATA_DTYPE_ATAPI;
 		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
 		    "ahci_tran_probe_port: port %d ATAPI found", port);
 		break;
@@ -1775,11 +1780,12 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	}
 
 	ncookies = scmd->satacmd_num_dma_cookies;
-	AHCIDBG2(AHCIDBG_INFO, ahci_ctlp,
+	AHCIDBG2(AHCIDBG_PRDT, ahci_ctlp,
 	    "ncookies = 0x%x, ahci_dma_prdt_number = 0x%x",
 	    ncookies, ahci_dma_prdt_number);
 
 	ASSERT(ncookies <= ahci_dma_prdt_number);
+	ahci_portp->ahciport_prd_bytecounts[cmd_slot] = 0;
 
 	/* *** now fill the scatter gather list ******* */
 	for (i = 0; i < ncookies; i++) {
@@ -1789,7 +1795,13 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 		    scmd->satacmd_dma_cookie_list[i]._dmu._dmac_la[1];
 		cmd_table->ahcict_prdt[i].ahcipi_descr_info =
 		    scmd->satacmd_dma_cookie_list[i].dmac_size - 1;
+		ahci_portp->ahciport_prd_bytecounts[cmd_slot] +=
+		    scmd->satacmd_dma_cookie_list[i].dmac_size;
 	}
+
+	AHCIDBG2(AHCIDBG_PRDT, ahci_ctlp,
+	    "ahciport_prd_bytecounts 0x%x for cmd_slot 0x%x",
+	    ahci_portp->ahciport_prd_bytecounts[cmd_slot], cmd_slot);
 
 	/* The ACMD field is filled in for ATAPI command */
 	if (scmd->satacmd_cmd_reg == SATAC_PACKET) {
@@ -1841,40 +1853,46 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	spkt->satapkt_hba_driver_private = (void *)(intptr_t)0;
 
 #if AHCI_DEBUG
-	/* Dump the command header and table */
-	AHCIDBG0(AHCIDBG_COMMAND, ahci_ctlp, "\n");
-	AHCIDBG3(AHCIDBG_COMMAND, ahci_ctlp,
-	    "Command header&table for spkt 0x%p cmd_reg 0x%x port %d",
-	    spkt, scmd->satacmd_cmd_reg, port);
-	ptr = (uint32_t *)cmd_header;
-	AHCIDBG4(AHCIDBG_COMMAND, ahci_ctlp,
-	    "  Command Header:%8x %8x %8x %8x",
-	    ptr[0], ptr[1], ptr[2], ptr[3]);
+	if (ahci_debug_flags & AHCIDBG_ATACMD &&
+	    scmd->satacmd_cmd_reg != SATAC_PACKET ||
+	    ahci_debug_flags & AHCIDBG_ATAPICMD &&
+	    scmd->satacmd_cmd_reg == SATAC_PACKET) {
 
-	/* Dump the H2D register FIS */
-	ptr = (uint32_t *)h2d_register_fisp;
-	AHCIDBG4(AHCIDBG_COMMAND, ahci_ctlp,
-	    "  Command FIS:   %8x %8x %8x %8x",
-	    ptr[0], ptr[1], ptr[2], ptr[3]);
+		/* Dump the command header and table */
+		ahci_log(ahci_ctlp, CE_WARN, "\n");
+		ahci_log(ahci_ctlp, CE_WARN, "Command header&table for spkt "
+		    "0x%p cmd_reg 0x%x port %d", spkt,
+		    scmd->satacmd_cmd_reg, port);
+		ptr = (uint32_t *)cmd_header;
+		ahci_log(ahci_ctlp, CE_WARN,
+		    "  Command Header:%8x %8x %8x %8x",
+		    ptr[0], ptr[1], ptr[2], ptr[3]);
 
-	/* Dump the ACMD register FIS */
-	ptr2 = (uint8_t *)&(cmd_table->ahcict_atapi_cmd);
-	for (i = 0; i < SATA_ATAPI_MAX_CDB_LEN/8; i++)
-		if (ahci_debug_flags & AHCIDBG_COMMAND)
+		/* Dump the H2D register FIS */
+		ptr = (uint32_t *)h2d_register_fisp;
+		ahci_log(ahci_ctlp, CE_WARN,
+		    "  Command FIS:   %8x %8x %8x %8x",
+		    ptr[0], ptr[1], ptr[2], ptr[3]);
+
+		/* Dump the ACMD register FIS */
+		ptr2 = (uint8_t *)&(cmd_table->ahcict_atapi_cmd);
+		for (i = 0; i < SATA_ATAPI_MAX_CDB_LEN/8; i++)
+			if (ahci_debug_flags & AHCIDBG_ATAPICMD)
+				ahci_log(ahci_ctlp, CE_WARN,
+				    "  ATAPI command: %2x %2x %2x %2x "
+				    "%2x %2x %2x %2x",
+				    ptr2[8 * i], ptr2[8 * i + 1],
+				    ptr2[8 * i + 2], ptr2[8 * i + 3],
+				    ptr2[8 * i + 4], ptr2[8 * i + 5],
+				    ptr2[8 * i + 6], ptr2[8 * i + 7]);
+
+		/* Dump the PRDT */
+		for (i = 0; i < ncookies; i++) {
+			ptr = (uint32_t *)&(cmd_table->ahcict_prdt[i]);
 			ahci_log(ahci_ctlp, CE_WARN,
-			    "  ATAPI command: %2x %2x %2x %2x "
-			    "%2x %2x %2x %2x",
-			    ptr2[8 * i], ptr2[8 * i + 1],
-			    ptr2[8 * i + 2], ptr2[8 * i + 3],
-			    ptr2[8 * i + 4], ptr2[8 * i + 5],
-			    ptr2[8 * i + 6], ptr2[8 * i + 7]);
-
-	/* Dump the PRDT */
-	for (i = 0; i < ncookies; i++) {
-		ptr = (uint32_t *)&(cmd_table->ahcict_prdt[i]);
-		AHCIDBG5(AHCIDBG_COMMAND, ahci_ctlp,
-		    "  Cookie %d:      %8x %8x %8x %8x",
-		    i, ptr[0], ptr[1], ptr[2], ptr[3]);
+			    "  Cookie %d:      %8x %8x %8x %8x",
+			    i, ptr[0], ptr[1], ptr[2], ptr[3]);
+		}
 	}
 #endif
 
@@ -3727,7 +3745,7 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp,
 		break;
 
 	case AHCI_SIGNATURE_ATAPI:
-		ahci_portp->ahciport_device_type = SATA_DTYPE_ATAPICD;
+		ahci_portp->ahciport_device_type = SATA_DTYPE_ATAPI;
 		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
 		    "ATAPI device is found at port: %d", port);
 		break;
@@ -4534,6 +4552,10 @@ ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
 	int finished_slot;
 	sata_pkt_t *satapkt;
 	ahci_fis_d2h_register_t *rcvd_fisp;
+#if AHCI_DEBUG
+	ahci_cmd_header_t *cmd_header;
+	uint32_t cmd_dmacount;
+#endif
 
 	mutex_enter(&ahci_portp->ahciport_mutex);
 
@@ -4588,6 +4610,49 @@ ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
 
 		satapkt = ahci_portp->ahciport_slot_pkts[finished_slot];
 		ASSERT(satapkt != NULL);
+#if AHCI_DEBUG
+		/*
+		 * For non-native queued commands, the PRD byte count field
+		 * shall contain an accurate count of the number of bytes
+		 * transferred for the command before the PxCI bit is cleared
+		 * to '0' for the command.
+		 *
+		 * The purpose of this field is to let software know how many
+		 * bytes transferred for a given operation in order to
+		 * determine if underflow occurred. When issuing native command
+		 * queuing commands, this field should not be used and is not
+		 * required to be valid since in this case underflow is always
+		 * illegal.
+		 *
+		 * For data reads, the HBA will update its PRD byte count with
+		 * the total number of bytes received from the last FIS, and
+		 * may be able to continue normally. For data writes, the
+		 * device will detect an error, and HBA most likely will get
+		 * a fatal error.
+		 *
+		 * Therefore, here just put code to debug part. And please
+		 * refer to the comment above ahci_intr_fatal_error for the
+		 * definition of underflow error.
+		 */
+		cmd_dmacount =
+		    ahci_portp->ahciport_prd_bytecounts[finished_slot];
+		if (cmd_dmacount) {
+			cmd_header =
+			    &ahci_portp->ahciport_cmd_list[finished_slot];
+			AHCIDBG3(AHCIDBG_INTR|AHCIDBG_PRDT, ahci_ctlp,
+			    "ahci_intr_cmd_cmplt: port %d, "
+			    "PRD Byte Count = 0x%x, "
+			    "ahciport_prd_bytecounts = 0x%x", port,
+			    cmd_header->ahcich_prd_byte_count,
+			    cmd_dmacount);
+
+			if (cmd_header->ahcich_prd_byte_count != cmd_dmacount) {
+				AHCIDBG1(AHCIDBG_UNDERFLOW, ahci_ctlp,
+				    "ahci_intr_cmd_cmplt: port %d, "
+				    "an underflow occurred", port);
+			}
+		}
+#endif
 
 		/*
 		 * For SATAC_SMART command with SATA_SMART_RETURN_STATUS
@@ -5059,6 +5124,8 @@ ahci_intr_non_fatal_error(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	int current_slot;
 	uint32_t current_tags;
 	sata_pkt_t *satapkt;
+	ahci_cmd_header_t *cmd_header;
+	uint32_t cmd_dmacount;
 #endif
 
 	mutex_enter(&ahci_portp->ahciport_mutex);
@@ -5122,6 +5189,25 @@ ahci_intr_non_fatal_error(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 			    "ahci_intr_non_fatal_error: port %d, "
 			    "satapkt 0x%p is being processed when error occurs",
 			    port, (void *)satapkt);
+
+			/*
+			 * PRD Byte Count field of command header is not
+			 * required to reflect the total number of bytes
+			 * transferred when an overflow occurs, so here
+			 * just log the value.
+			 */
+			cmd_dmacount =
+			    ahci_portp->ahciport_prd_bytecounts[current_slot];
+			if (cmd_dmacount) {
+				cmd_header = &ahci_portp->
+				    ahciport_cmd_list[current_slot];
+				AHCIDBG3(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
+				    "ahci_intr_non_fatal_error: port %d, "
+				    "PRD Byte Count = 0x%x, "
+				    "ahciport_prd_bytecounts = 0x%x", port,
+				    cmd_header->ahcich_prd_byte_count,
+				    cmd_dmacount);
+			}
 		}
 	} else if (NCQ_CMD_IN_PROGRESS(ahci_portp)) {
 		/*
@@ -6549,9 +6635,9 @@ loop:
  * to higher level software.
  *
  * Fatal errors include the following:
- * 	PxIS.IFS - Interface Fatal Error Status
- * 	PxIS.HBDS - Host Bus Data Error Status
- * 	PxIS.HBFS - Host Bus Fatal Error Status
+ *	PxIS.IFS - Interface Fatal Error Status
+ *	PxIS.HBDS - Host Bus Data Error Status
+ *	PxIS.HBFS - Host Bus Fatal Error Status
  *	PxIS.TFES - Task File Error Status
  *
  * WARNING!!! ahciport_mutex should be acquired before the function is called.
@@ -6568,6 +6654,9 @@ ahci_fatal_error_recovery_handler(ahci_ctl_t *ahci_ctlp,
 	ahci_fis_d2h_register_t	*ahci_rcvd_fisp;
 	sata_cmd_t	*sata_cmd = NULL;
 	sata_pkt_t	*spkt = NULL;
+#if AHCI_DEBUG
+	ahci_cmd_header_t *cmd_header;
+#endif
 
 	AHCIDBG1(AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_fatal_error_recovery_handler enter: port %d", port);
@@ -6598,6 +6687,22 @@ ahci_fatal_error_recovery_handler(ahci_ctl_t *ahci_ctlp,
 				goto next;
 			}
 		}
+
+#if AHCI_DEBUG
+		/*
+		 * Debugging purpose...
+		 */
+		if (ahci_portp->ahciport_prd_bytecounts[failed_slot]) {
+			cmd_header =
+			    &ahci_portp->ahciport_cmd_list[failed_slot];
+			AHCIDBG3(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
+			    "ahci_fatal_error_recovery_handler: port %d, "
+			    "PRD Byte Count = 0x%x, "
+			    "ahciport_prd_bytecounts = 0x%x", port,
+			    cmd_header->ahcich_prd_byte_count,
+			    ahci_portp->ahciport_prd_bytecounts[failed_slot]);
+		}
+#endif
 
 		sata_cmd = &spkt->satapkt_cmd;
 
@@ -6682,11 +6787,11 @@ next:
 	 * the error when a COMRESET has not been performed as part of the
 	 * error recovery.
 	 */
-	if (spkt && ahci_portp->ahciport_device_type == SATA_DTYPE_ATAPICD)
+	if (spkt && ahci_portp->ahciport_device_type == SATA_DTYPE_ATAPI)
 		ahci_get_rqsense_data(ahci_ctlp, ahci_portp, port, spkt);
 out:
 	AHCIDBG5(AHCIDBG_ERRS, ahci_ctlp,
-	    "ahci_fatal_error_recovery_handler: port %d interface error "
+	    "ahci_fatal_error_recovery_handler: port %d fatal error "
 	    "occurred slot_status = 0x%x, pending_tags = 0x%x, "
 	    "pending_ncq_tags = 0x%x failed_tags = 0x%x",
 	    port, slot_status, ahci_portp->ahciport_pending_tags,

@@ -28,8 +28,6 @@
 #ifndef _AHCIREG_H
 #define	_AHCIREG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -663,9 +661,6 @@ typedef struct ahci_cmd_header {
 
 #define	BZERO_PRD_BYTE_COUNT(cmd_header)			\
 	(cmd_header->ahcich_prd_byte_count = 0)
-
-#define	SET_PRD_BYTE_COUNT(cmd_header, count)			\
-	(cmd_header->ahcich_prd_byte_count = count)
 
 	/* DW 2 - Command Table Base Address */
 	uint32_t	ahcich_cmd_tab_base_addr;

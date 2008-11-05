@@ -27,8 +27,6 @@
 #ifndef _SATA_HBA_H
 #define	_SATA_HBA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -199,9 +197,14 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
  */
 
 #define	SATA_DTYPE_NONE			0x00	/* No device attached */
-#define	SATA_DTYPE_ATADISK		0x01	/* ATA Disk */
-#define	SATA_DTYPE_ATAPICD		0x02	/* Atapi CD/DVD device */
-#define	SATA_DTYPE_ATAPINONCD		0x03	/* Atapi non-CD/DVD device */
+#define	SATA_DTYPE_ATADISK		0x01	/* ATA disk */
+#define	SATA_DTYPE_ATAPI		0x40	/* ATAPI device */
+#define	SATA_DTYPE_ATAPICD	\
+	(SATA_DTYPE_ATAPI|0x02)			/* ATAPI CD/DVD device */
+#define	SATA_DTYPE_ATAPITAPE	\
+	(SATA_DTYPE_ATAPI|0x04)			/* ATAPI tape */
+#define	SATA_DTYPE_ATAPIDISK	\
+	(SATA_DTYPE_ATAPI|0x08)			/* ATAPI disk */
 #define	SATA_DTYPE_PMULT		0x10	/* Port Multiplier */
 #define	SATA_DTYPE_UNKNOWN		0x20	/* Device attached, unkown */
 

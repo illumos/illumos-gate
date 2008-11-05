@@ -153,7 +153,7 @@ struct sata_cport_info {
 						 * SATA_DTYPE_NONE
 						 * SATA_DTYPE_ATADISK
 						 * SATA_DTYPE_ATAPICD
-						 * SATA_DTYPE_ATAPINONCD
+						 * SATA_DTYPE_ATAPITAPE
 						 * SATA_DTYPE_PMULT
 						 * SATA_DTYPE_UNKNOWN
 						 */
@@ -209,7 +209,7 @@ struct sata_drive_info {
 						 * Attached device type:
 						 * SATA_DTYPE_ATADISK
 						 * SATA_DTYPE_ATAPICD
-						 * SATA_DTYPE_ATAPINONCD
+						 * SATA_DTYPE_ATAPITAPE
 						 */
 	uint32_t	satadrv_type;
 
@@ -290,7 +290,7 @@ struct sata_pmport_info {
 						 * SATA_DTYPE_NONE
 						 * SATA_DTYPE_ATADISK
 						 * SATA_DTYPE_ATAPICD
-						 * SATA_DTYPE_ATAPINONCD
+						 * SATA_DTYPE_ATAPITAPE
 						 * SATA_DTYPE_UNKNOWN
 						 */
 	uint32_t	pmport_dev_type;
@@ -328,7 +328,8 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
  * ATA disks and ATAPI CD/DVD now.
  */
 #define	SATA_VALID_DEV_TYPE	(SATA_DTYPE_ATADISK | \
-				SATA_DTYPE_ATAPICD)
+				SATA_DTYPE_ATAPICD | \
+				SATA_DTYPE_ATAPITAPE)
 
 /*
  * Device feature_support (satadrv_features_support)
@@ -763,7 +764,7 @@ typedef struct sata_atapi_cmd {
 
 #endif
 
-/* sata_rev_tag 1.39 */
+/* sata_rev_tag 1.40 */
 
 #ifdef	__cplusplus
 }

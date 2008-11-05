@@ -139,6 +139,10 @@ typedef struct ahci_port {
 	/* Keep all the pending sata packets */
 	sata_pkt_t		*ahciport_slot_pkts[AHCI_PORT_MAX_CMD_SLOTS];
 
+	/* Keep the byte count of all PRD entries for every sata packet */
+	uint32_t		\
+			ahciport_prd_bytecounts[AHCI_PORT_MAX_CMD_SLOTS];
+
 	/* Keep the error retrieval sata packet */
 	sata_pkt_t		*ahciport_err_retri_pkt;
 
@@ -342,7 +346,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 
 #define	AHCIDBG_INIT		0x0001
 #define	AHCIDBG_ENTRY		0x0002
-#define	AHCIDBG_DUMP_PRB	0x0004
+#define	AHCIDBG_PRDT		0x0004
 #define	AHCIDBG_EVENT		0x0008
 #define	AHCIDBG_POLL_LOOP	0x0010
 #define	AHCIDBG_PKTCOMP		0x0020
@@ -351,12 +355,12 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_VERBOSE		0x0100
 #define	AHCIDBG_INTR		0x0200
 #define	AHCIDBG_ERRS		0x0400
-#define	AHCIDBG_COOKIES		0x0800
-#define	AHCIDBG_POWER		0x1000
-#define	AHCIDBG_COMMAND		0x2000
-#define	AHCIDBG_SENSEDATA	0x4000
-#define	AHCIDBG_NCQ		0x8000
-#define	AHCIDBG_PM		0x10000
+#define	AHCIDBG_ATACMD		0x0800
+#define	AHCIDBG_ATAPICMD	0x1000
+#define	AHCIDBG_SENSEDATA	0x2000
+#define	AHCIDBG_NCQ		0x4000
+#define	AHCIDBG_PM		0x8000
+#define	AHCIDBG_UNDERFLOW	0x10000
 
 extern int ahci_debug_flag;
 

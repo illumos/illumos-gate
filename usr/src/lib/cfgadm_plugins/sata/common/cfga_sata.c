@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -1207,7 +1205,7 @@ is_devinfo_blk(char *minor_path)
  * The dynamic component buffer returned by this function has to be freed!
  */
 int
-sata_make_dyncomp(const char *ap_id, char **dyncomp)
+sata_make_dyncomp(const char *ap_id, char **dyncomp, const char *type)
 {
 	char	*devpath = NULL;
 	char	*cp = NULL;
@@ -1284,6 +1282,12 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 			    "%s/%s", devpath, dep->d_name);
 
 			/*
+			 * Break directly for tape device
+			 */
+			if (strcmp(type, "tape") == 0)
+				break;
+
+			/*
 			 * If stat() fails, the device *may* be retired.
 			 * Check via libdevinfo if the device has a BLK minor.
 			 * We don't use libdevinfo all the time, since taking
@@ -1318,8 +1322,10 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 			goto bailout;
 
 		/*
-		 * Look for links to the physical path in /dev/dsk,
-		 * since we ONLY looked for BLOCK devices above.
+		 * Look for links to the physical path in /dev/dsk
+		 * and /dev/rmt. So far, sata modue supports disk,
+		 * dvd and tape devices, so we will first look for
+		 * BLOCK devices, and then look for tape devices.
 		 */
 		(void) physpath_to_devlink("/dev/dsk",
 		    minor_path, &devlink, &l_errno);
@@ -1341,6 +1347,22 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 			}
 
 			free(devlink);
+		} else if (strcmp(type, "tape") == 0) {
+
+			/*
+			 * For tape device, logical name looks like
+			 * rmt/X
+			 */
+			(void) physpath_to_devlink("/dev/rmt",
+			    minor_path, &devlink, &l_errno);
+
+			if (devlink != NULL) {
+				if ((cp = strstr(devlink, "rmt/")) != NULL) {
+					*dyncomp = strdup(cp);
+				}
+
+				free(devlink);
+			}
 		}
 
 		return (SATA_CFGA_OK);
@@ -1619,7 +1641,8 @@ cfga_list_ext(
 			 * This is the case where we need to generate
 			 * a dynamic component of the ap_id, i.e. device.
 			 */
-			rv = sata_make_dyncomp(ap_id, &dyncomp);
+			rv = sata_make_dyncomp(ap_id, &dyncomp,
+			    (*ap_id_list)->ap_type);
 			if (rv != CFGA_SATA_OK)
 				goto bailout;
 			if (dyncomp != NULL) {

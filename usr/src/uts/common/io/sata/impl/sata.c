@@ -129,7 +129,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.39"};
+static char sata_rev_tag[] = {"1.40"};
 
 /*
  * SATA cb_ops functions
@@ -416,6 +416,9 @@ int	sata_write_cache = 1;		/* enabled */
 
 /* Default write cache setting for SATA ATAPI CD/DVD */
 int 	sata_atapicdvd_write_cache = 1; /* enabled */
+
+/* Default write cache setting for SATA ATAPI tape */
+int	sata_atapitape_write_cache = 1; /* enabled */
 
 /*
  * Linked list of HBA instances
@@ -2133,7 +2136,7 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		return (TRAN_FATAL_ERROR);
 	}
 
-	if (sdinfo->satadrv_type == SATA_DTYPE_ATAPICD) {
+	if (sdinfo->satadrv_type & SATA_DTYPE_ATAPI) {
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 		rval = sata_txlt_atapi(spx);
 		SATADBG1(SATA_DBG_SCSI_IF, sata_hba_inst,
@@ -2412,11 +2415,17 @@ sata_scsi_reset(struct scsi_address *ap, int level)
  * dma_max
  * interconnect-type	(INTERCONNECT_SATA)
  *
- * Supported capabilities for ATAPI devices (CD/DVD):
+ * Supported capabilities for ATAPI CD/DVD devices:
  * auto-rqsense		(always supported)
  * sector_size
  * dma_max
+ * max-cdb-length
  * interconnect-type	(INTERCONNECT_SATA)
+ *
+ * Supported capabilities for ATAPI TAPE devices:
+ * auto-rqsense		(always supported)
+ * dma_max
+ * max-cdb-length
  *
  * Request for other capabilities is rejected as unsupported.
  *
@@ -2505,6 +2514,13 @@ sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 
 	case SCSI_CAP_INTERCONNECT_TYPE:
 		rval = INTERCONNECT_SATA;	/* SATA interconnect type */
+		break;
+
+	case SCSI_CAP_CDB_LEN:
+		if (sdinfo->satadrv_type & SATA_DTYPE_ATAPI)
+			rval = sdinfo->satadrv_atapi_cdb_len;
+		else
+			rval = -1;
 		break;
 
 	default:
@@ -6985,7 +7001,7 @@ sata_build_lsense_page_30(
 /*
  * Start command for ATAPI device.
  * This function processes scsi_pkt requests.
- * Only CD/DVD devices are supported.
+ * Now only CD/DVD and tape devices are supported.
  * Most commands are packet without any translation into Packet Command.
  * Some may be trapped and executed as SATA commands (not clear which one).
  *
@@ -7026,11 +7042,15 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 	}
 
 	/*
-	 * ATAPI device executes some ATA commands in addition to MMC command
-	 * set. These ATA commands may be executed by the regular SATA
-	 * translation functions. None needs to be captured now.
-	 * Other commands belong to MMC command set and are delivered
-	 * to ATAPI device via Packet Command.
+	 * ATAPI device executes some ATA commands in addition to those
+	 * commands sent via PACKET command. These ATA commands may be
+	 * executed by the regular SATA translation functions. None needs
+	 * to be captured now.
+	 *
+	 * Commands sent via PACKET command include:
+	 *	MMC command set for ATAPI CD/DVD device
+	 *	SSC command set for ATAPI TAPE device
+	 *
 	 */
 
 	/* Check the size of cdb */
@@ -7204,7 +7224,16 @@ sata_txlt_atapi_completion(sata_pkt_t *sata_pkt)
 		sense = sata_arq_sense(spx);
 
 		if (sata_pkt->satapkt_reason == SATA_PKT_DEV_ERROR) {
-			scsipkt->pkt_reason = CMD_INCOMPLETE;
+			/*
+			 * pkt_reason should be CMD_CMPLT for DEVICE ERROR.
+			 * Under this condition ERR bit is set for ATA command,
+			 * and CHK bit set for ATAPI command.
+			 *
+			 * Please check st_intr & sdintr about how pkt_reason
+			 * is used.
+			 */
+			scsipkt->pkt_reason = CMD_CMPLT;
+
 			/*
 			 * We may not have ARQ data if there was a double
 			 * error. But sense data in sata packet was pre-set
@@ -8921,12 +8950,15 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
  * The default write cache setting for SATA HDD is provided by sata_write_cache
  * static variable. ATAPI CD/DVDs devices have write cache default is
  * determined by sata_atapicdvd_write_cache static variable.
+ * ATAPI tape devices have write cache default is determined by
+ * sata_atapitape_write_cache static variable.
  * 1 - enable
  * 0 - disable
  * any other value - current drive setting
  *
- * Although there is not reason to disable write cache on CD/DVD devices,
- * the default setting control is provided for the maximun flexibility.
+ * Although there is not reason to disable write cache on CD/DVD devices
+ * and tape devices, the default setting control is provided for the maximun
+ * flexibility.
  *
  * In the future, it may be overridden by the
  * disk-write-cache-enable property setting, if it is defined.
@@ -8936,7 +8968,8 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
 static void
 sata_init_write_cache_mode(sata_drive_info_t *sdinfo)
 {
-	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
+	switch (sdinfo->satadrv_type) {
+	case SATA_DTYPE_ATADISK:
 		if (sata_write_cache == 1)
 			sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
 		else if (sata_write_cache == 0)
@@ -8945,7 +8978,8 @@ sata_init_write_cache_mode(sata_drive_info_t *sdinfo)
 		 * When sata_write_cache value is not 0 or 1,
 		 * a current setting of the drive's write cache is used.
 		 */
-	} else { /* Assume ATAPI CD/DVD device */
+		break;
+	case SATA_DTYPE_ATAPICD:
 		if (sata_atapicdvd_write_cache == 1)
 			sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
 		else if (sata_atapicdvd_write_cache == 0)
@@ -8954,6 +8988,17 @@ sata_init_write_cache_mode(sata_drive_info_t *sdinfo)
 		 * When sata_write_cache value is not 0 or 1,
 		 * a current setting of the drive's write cache is used.
 		 */
+		break;
+	case SATA_DTYPE_ATAPITAPE:
+		if (sata_atapitape_write_cache == 1)
+			sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
+		else if (sata_atapitape_write_cache == 0)
+			sdinfo->satadrv_settings &= ~SATA_DEV_WRITE_CACHE;
+		/*
+		 * When sata_write_cache value is not 0 or 1,
+		 * a current setting of the drive's write cache is used.
+		 */
+		break;
 	}
 }
 
@@ -9179,7 +9224,7 @@ sata_probe_device(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 			 * HBA supports ATAPI - try to issue Identify Packet
 			 * Device command.
 			 */
-			new_sdinfo.satadrv_type = SATA_DTYPE_ATAPICD;
+			new_sdinfo.satadrv_type = SATA_DTYPE_ATAPI;
 			rval = sata_identify_device(sata_hba_inst, &new_sdinfo);
 		}
 	}
@@ -9333,32 +9378,29 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 
 	/* fetch device identify data */
 	if ((rval = sata_fetch_device_identify_data(sata_hba_inst,
-	    sdinfo)) != 0)
+	    sdinfo)) != SATA_SUCCESS)
 		goto fail_unknown;
 
 	cfg_word = sdinfo->satadrv_id.ai_config;
-	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK &&
-	    (cfg_word & SATA_ATA_TYPE_MASK) != SATA_ATA_TYPE) {
-		/* Change device type to reflect Identify Device data */
-		if (((cfg_word & SATA_ATAPI_TYPE_MASK) ==
-		    SATA_ATAPI_TYPE) &&
-		    ((cfg_word & SATA_ATAPI_ID_DEV_TYPE) ==
-		    SATA_ATAPI_CDROM_DEV)) {
+
+	/* Set the correct device type */
+	if ((cfg_word & SATA_ATA_TYPE_MASK) == SATA_ATA_TYPE) {
+		sdinfo->satadrv_type = SATA_DTYPE_ATADISK;
+	} else if ((cfg_word & SATA_ATAPI_TYPE_MASK) == SATA_ATAPI_TYPE) {
+		switch (cfg_word & SATA_ATAPI_ID_DEV_TYPE) {
+		case SATA_ATAPI_CDROM_DEV:
 			sdinfo->satadrv_type = SATA_DTYPE_ATAPICD;
-		} else {
+			break;
+		case SATA_ATAPI_SQACC_DEV:
+			sdinfo->satadrv_type = SATA_DTYPE_ATAPITAPE;
+			break;
+		default:
 			sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
 		}
-	} else if (sdinfo->satadrv_type == SATA_DTYPE_ATAPICD &&
-	    (((cfg_word & SATA_ATAPI_TYPE_MASK) != SATA_ATAPI_TYPE) ||
-	    ((cfg_word & SATA_ATAPI_ID_DEV_TYPE) != SATA_ATAPI_CDROM_DEV))) {
-		/* Change device type to reflect Identify Device data ! */
-		if ((sdinfo->satadrv_id.ai_config & SATA_ATA_TYPE_MASK) ==
-		    SATA_ATA_TYPE) {
-			sdinfo->satadrv_type = SATA_DTYPE_ATADISK;
-		} else {
+	} else {
 			sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
-		}
 	}
+
 	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
 		if (sdinfo->satadrv_capacity == 0) {
 			/* Non-LBA disk. Too bad... */
@@ -9424,15 +9466,26 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 
 	cmn_err(CE_CONT, "?%s :\n", msg_buf);
 
-	if (sdinfo->satadrv_type == SATA_DTYPE_UNKNOWN) {
+	switch (sdinfo->satadrv_type) {
+	case SATA_DTYPE_ATADISK:
+		(void) sprintf(msg_buf, "SATA disk device at");
+		break;
+
+	case SATA_DTYPE_ATAPICD:
+		(void) sprintf(msg_buf, "SATA CD/DVD (ATAPI) device at");
+		break;
+
+	case SATA_DTYPE_ATAPITAPE:
+		(void) sprintf(msg_buf, "SATA tape (ATAPI) device at");
+		break;
+
+	case SATA_DTYPE_UNKNOWN:
 		(void) sprintf(msg_buf,
 		    "Unsupported SATA device type (cfg 0x%x) at ",
 		    sdinfo->satadrv_id.ai_config);
-	} else {
-		(void) sprintf(msg_buf, "SATA %s device at",
-		    sdinfo->satadrv_type == SATA_DTYPE_ATADISK ?
-		    "disk":"CD/DVD (ATAPI)");
+		break;
 	}
+
 	if (sdinfo->satadrv_addr.qual == SATA_ADDR_DCPORT)
 		cmn_err(CE_CONT, "?\t%s port %d\n",
 		    msg_buf, sdinfo->satadrv_addr.cport);
@@ -9460,10 +9513,9 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
 		cmn_err(CE_CONT, "?\tserial number %s\n", msg_buf);
 	} else {
-		/* Assuming ATAPI CD/DVD */
 		/*
-		 * SOme drives do not implement serial number and may
-		 * violate the spec by provinding spaces rather than zeros
+		 * Some drives do not implement serial number and may
+		 * violate the spec by providing spaces rather than zeros
 		 * in serial number field. Scan the buffer to detect it.
 		 */
 		for (i = 0; i < sizeof (sdinfo->satadrv_id.ai_drvser); i++) {
@@ -10354,7 +10406,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 	scmd->satacmd_lba_high_lsb = 0;		/* N/A */
 	scmd->satacmd_features_reg = 0;		/* N/A */
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
-	if (sdinfo->satadrv_type == SATA_DTYPE_ATAPICD) {
+	if (sdinfo->satadrv_type & SATA_DTYPE_ATAPI) {
 		/* Identify Packet Device cmd */
 		scmd->satacmd_cmd_reg = SATAC_ID_PACKET_DEVICE;
 	} else {
@@ -12293,10 +12345,10 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 		break;
 	}
 	case SATA_DTYPE_UNKNOWN:
-	case SATA_DTYPE_ATAPINONCD:
 	case SATA_DTYPE_PMULT:	/* Until PMult is supported */
 	case SATA_DTYPE_ATADISK:
 	case SATA_DTYPE_ATAPICD:
+	case SATA_DTYPE_ATAPITAPE:
 	{
 		dev_info_t *tdip = NULL;
 		dev_info_t *dip = NULL;
@@ -12448,6 +12500,10 @@ sata_ioctl_get_ap_type(sata_hba_inst_t *sata_hba_inst,
 
 	case SATA_DTYPE_ATAPICD:
 		ap_type = "cd/dvd";
+		break;
+
+	case SATA_DTYPE_ATAPITAPE:
+		ap_type = "tape";
 		break;
 
 	case SATA_DTYPE_PMULT:
@@ -12819,7 +12875,8 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 	finfox = (restore != 0) ? " restore device features" :
 	    " initialize device features\n";
 
-	if (sdinfo->satadrv_type == SATA_DTYPE_ATADISK) {
+	switch (sdinfo->satadrv_type) {
+	case SATA_DTYPE_ATADISK:
 		/* Arbitrarily set UDMA mode */
 		if (sata_set_dma_mode(sata_hba_inst, &new_sdinfo) !=
 		    SATA_SUCCESS) {
@@ -12827,7 +12884,9 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 			    "%s set UDMA mode\n", finfo));
 			return (SATA_FAILURE);
 		}
-	} else { /* Assume SATA ATAPI CD/DVD */
+		break;
+	case SATA_DTYPE_ATAPICD:
+	case SATA_DTYPE_ATAPITAPE:
 		/*  Set Removable Media Status Notification, if necessary */
 		if ((new_sdinfo.satadrv_id.ai_cmdset83 &
 		    SATA_RM_STATUS_NOTIFIC) != 0 && restore != 0) {
@@ -12858,6 +12917,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 				rval = SATA_FAILURE;
 			}
 		}
+		break;
 	}
 
 	if (!(new_sdinfo.satadrv_id.ai_cmdset82 & SATA_LOOK_AHEAD) &&
