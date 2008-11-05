@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Ereport-handling routines for memory errors
@@ -190,8 +188,8 @@ iorxefrx_match(fmd_hdl_t *hdl, cmd_errcl_t errcl, cmd_errcl_t matchmask,
 		 */
 		if ((CMD_ERRCL_ISIOXE(rf->rf_errcl) ||
 		    CMD_ERRCL_ISIOXE(errcl)) &&
-			((rf->rf_afsr_agentid & TOM_AID_MATCH_MASK) ==
-			(afsr_agentid & TOM_AID_MATCH_MASK)))
+		    ((rf->rf_afsr_agentid & TOM_AID_MATCH_MASK) ==
+		    (afsr_agentid & TOM_AID_MATCH_MASK)))
 			return (rf);
 
 		/*
@@ -352,7 +350,7 @@ cmd_ioxefrx_fire(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	if (nvlist_lookup_string(nvl, FM_EREPORT_PAYLOAD_NAME_ERR_TYPE,
 	    &typenm) == 0)
-	    rferr->rf_type = cmd_mem_name2type(typenm, minorvers);
+		rferr->rf_type = cmd_mem_name2type(typenm, minorvers);
 
 	/*
 	 * Need to send in the io_jpid that we get from the device path above
@@ -518,7 +516,7 @@ cmd_ioxe(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		    matchmask));
 	} else  if (fmd_nvl_class_match(hdl, nvl, "ereport.io.fire.*")) {
 			return (cmd_ioxefrx_fire(hdl, ep, nvl, class, clcode,
-				matchmask));
+			    matchmask));
 	} else
 		return (ioxe_common(hdl, ep, nvl, class, clcode));
 }
@@ -548,19 +546,15 @@ cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
  * DRAMs are numbered D0 to D35, but that doesn't tell us what DIMM
  * they're on!
  *
- *  Corrected version of the table that came from bugid 6346507
- *  bit 2 dram was correct in the original, dram 2 dimm was not.
- *
  * Data bits are numbers, 0 - 127.
  * ECC bits C0 - C8 => 128-136
  * MTAG bits MT0 - MT2 => 137-139
  * MTAG ECC bits MTC0 - MTC3 => 140-143
  *
- * This is for Uniboard systems.  Other systems may be different.
- * Awk code edited for "C" declaration.
+ *
+ * Uniboard Server Systems.
  */
-
-int uni_upos2dram[] = {
+int unib_upos2dram[] = {
 	/* 0 */ 3, /* 1 */ 3, /* 2 */ 3, /* 3 */ 1,
 	/* 4 */ 2, /* 5 */ 0, /* 6 */ 1, /* 7 */ 2,
 	/* 8 */ 4, /* 9 */ 4, /* 10 */ 4, /* 11 */ 4,
@@ -600,10 +594,9 @@ int uni_upos2dram[] = {
 };
 
 /*
- * This is for daktari systems and should apply to all 480 490 880 890
+ * Camelot Server Systems.
  */
-
-int dak_upos2dram[] = {
+int cams_upos2dram[] = {
 	/* 0 */ 5, /* 1 */ 5, /* 2 */ 5, /* 3 */ 5,
 	/* 4 */ 7, /* 5 */ 7, /* 6 */ 7, /* 7 */ 7,
 	/* 8 */ 6, /* 9 */ 6, /* 10 */ 6, /* 11 */ 6,
@@ -643,11 +636,9 @@ int dak_upos2dram[] = {
 };
 
 /*
- * This is for Excalibur based systems and should apply to
- * SunBlade 1000/2000 280R and Netra 20s
+ * Camelot Tower Systems.
  */
-
-int exc_upos2dram[] = {
+int camt_upos2dram[] = {
 	/* 0 */ 18, /* 1 */ 0, /* 2 */ 0, /* 3 */ 0,
 	/* 4 */ 9, /* 5 */ 18, /* 6 */ 27, /* 7 */ 9,
 	/* 8 */ 28, /* 9 */ 28, /* 10 */ 28, /* 11 */ 28,
@@ -684,6 +675,90 @@ int exc_upos2dram[] = {
 	/* 132 */  27, /* 133 */ 20, /* 134 */ 2, /* 135 */ 11,
 	/* 136 */ 20, /* 137 */ 9, /* 138 */ 18, /* 139 */ 27,
 	/* 140 */ 0, /* 141 */ 9, /* 142 */ 18, /* 143 */ 27
+};
+
+/*
+ * Fiesta Server Systems.
+ */
+int fies_upos2dram[] = {
+	/* 0 */ 7, /* 1 */ 7, /* 2 */ 7, /* 3 */ 7,
+	/* 4 */ 16, /* 5 */ 16, /* 6 */ 16, /* 7 */ 16,
+	/* 8 */ 25, /* 9 */ 25, /* 10 */ 25, /* 11 */ 25,
+	/* 12 */ 34, /* 13 */ 34, /* 14 */ 34, /* 15 */ 34,
+	/* 16 */ 6, /* 17 */ 6, /* 18 */ 6, /* 19 */ 6,
+	/* 20 */ 15, /* 21 */ 15, /* 22 */ 15, /* 23 */ 15,
+	/* 24 */ 24, /* 25 */ 24, /* 26 */ 24, /* 27 */ 24,
+	/* 28 */ 33, /* 29 */ 33, /* 30 */ 33, /* 31 */ 33,
+	/* 32 */ 23, /* 33 */ 23, /* 34 */ 23, /* 35 */ 23,
+	/* 36 */ 32, /* 37 */ 32, /* 38 */ 32, /* 39 */ 32,
+	/* 40 */ 22, /* 41 */ 22, /* 42 */ 22, /* 43 */ 22,
+	/* 44 */ 31, /* 45 */ 31, /* 46 */ 31, /* 47 */ 31,
+	/* 48 */ 5, /* 49 */ 5, /* 50 */ 5, /* 51 */ 5,
+	/* 52 */ 14, /* 53 */ 14, /* 54 */ 14, /* 55 */ 14,
+	/* 56 */ 4, /* 57 */ 4, /* 58 */ 4, /* 59 */ 4,
+	/* 60 */ 13, /* 61 */ 13, /* 62 */ 13, /* 63 */ 13,
+	/* 64 */ 18, /* 65 */ 18, /* 66 */ 18, /* 67 */ 18,
+	/* 68 */ 27, /* 69 */ 27, /* 70 */ 27, /* 71 */ 27,
+	/* 72 */ 0, /* 73 */ 0, /* 74 */ 0, /* 75 */ 0,
+	/* 76 */ 9, /* 77 */ 9, /* 78 */ 9, /* 79 */ 9,
+	/* 80 */ 19, /* 81 */ 19, /* 82 */ 19, /* 83 */ 19,
+	/* 84 */ 28, /* 85 */ 28, /* 86 */ 28, /* 87 */ 28,
+	/* 88 */ 1, /* 89 */ 1, /* 90 */ 1, /* 91 */ 1,
+	/* 92 */ 10, /* 93 */ 10, /* 94 */ 10, /* 95 */ 10,
+	/* 96 */ 3, /* 97 */ 3, /* 98 */ 3, /* 99 */ 3,
+	/* 100 */ 12, /* 101 */ 12, /* 102 */ 12, /* 103 */ 12,
+	/* 104 */ 20, /* 105 */ 20, /* 106 */ 20, /* 107 */ 20,
+	/* 108 */ 29, /* 109 */ 29, /* 110 */ 29, /* 111 */ 29,
+	/* 112 */ 8, /* 113 */ 8, /* 114 */ 8, /* 115 */ 8,
+	/* 116 */ 17, /* 117 */ 17, /* 118 */ 17, /* 119 */ 17,
+	/* 120 */ 21, /* 121 */ 21, /* 122 */ 21, /* 123 */ 21,
+	/* 124 */ 30, /* 125 */ 30, /* 126 */ 30, /* 127 */ 30,
+	/* 128 */ 2, /* 129 */ 2, /* 130 */ 2, /* 131 */ 2,
+	/* 132 */ 11, /* 133 */ 11, /* 134 */ 11, /* 135 */ 11,
+	/* 136 */ 26, /* 137 */ 26, /* 138 */ 26, /* 139 */ 26,
+	/* 140 */ 35, /* 141 */ 35, /* 142 */ 35, /* 143 */ 35
+};
+
+/*
+ * Fiesta Tower Systems.
+ */
+int fiet_upos2dram[] = {
+	/* 0 */ 0, /* 1 */ 0, /* 2 */ 0, /* 3 */ 0,
+	/* 4 */ 9, /* 5 */ 9, /* 6 */ 9, /* 7 */ 9,
+	/* 8 */ 18, /* 9 */ 18, /* 10 */ 18, /* 11 */ 18,
+	/* 12 */ 27, /* 13 */ 27, /* 14 */ 27, /* 15 */ 27,
+	/* 16 */ 19, /* 17 */ 19, /* 18 */ 19, /* 19 */ 19,
+	/* 20 */ 28, /* 21 */ 28, /* 22 */ 28, /* 23 */ 28,
+	/* 24 */ 1, /* 25 */ 1, /* 26 */ 1, /* 27 */ 1,
+	/* 28 */ 10, /* 29 */ 10, /* 30 */ 10, /* 31 */ 10,
+	/* 32 */ 20, /* 33 */ 20, /* 34 */ 20, /* 35 */ 20,
+	/* 36 */ 29, /* 37 */ 29, /* 38 */ 29, /* 39 */ 29,
+	/* 40 */ 2, /* 41 */ 2, /* 42 */ 2, /* 43 */ 2,
+	/* 44 */ 11, /* 45 */ 11, /* 46 */ 11, /* 47 */ 11,
+	/* 48 */ 21, /* 49 */ 21, /* 50 */ 21, /* 51 */ 21,
+	/* 52 */ 30, /* 53 */ 30, /* 54 */ 30, /* 55 */ 30,
+	/* 56 */ 3, /* 57 */ 3, /* 58 */ 3, /* 59 */ 3,
+	/* 60 */ 12, /* 61 */ 12, /* 62 */ 12, /* 63 */ 12,
+	/* 64 */ 8, /* 65 */ 8, /* 66 */ 8, /* 67 */ 8,
+	/* 68 */ 17, /* 69 */ 17, /* 70 */ 17, /* 71 */ 17,
+	/* 72 */ 22, /* 73 */ 22, /* 74 */ 22, /* 75 */ 22,
+	/* 76 */ 31, /* 77 */ 31, /* 78 */ 31, /* 79 */ 31,
+	/* 80 */ 4, /* 81 */ 4, /* 82 */ 4, /* 83 */ 4,
+	/* 84 */ 13, /* 85 */ 13, /* 86 */ 13, /* 87 */ 13,
+	/* 88 */ 23, /* 89 */ 23, /* 90 */ 23, /* 91 */ 23,
+	/* 92 */ 32, /* 93 */ 32, /* 94 */ 32, /* 95 */ 32,
+	/* 96 */ 5, /* 97 */ 5, /* 98 */ 5, /* 99 */ 5,
+	/* 100 */ 14, /* 101 */ 14, /* 102 */ 14, /* 103 */ 14,
+	/* 104 */ 24, /* 105 */ 24, /* 106 */ 24, /* 107 */ 24,
+	/* 108 */ 33, /* 109 */ 33, /* 110 */ 33, /* 111 */ 33,
+	/* 112 */ 6, /* 113 */ 6, /* 114 */ 6, /* 115 */ 6,
+	/* 116 */ 15, /* 117 */ 15, /* 118 */ 15, /* 119 */ 15,
+	/* 120 */ 25, /* 121 */ 25, /* 122 */ 25, /* 123 */ 25,
+	/* 124 */ 34, /* 125 */ 34, /* 126 */ 34, /* 127 */ 34,
+	/* 128 */ 7, /* 129 */ 7, /* 130 */ 7, /* 131 */ 7,
+	/* 132 */ 16, /* 133 */ 16, /* 134 */ 16, /* 135 */ 16,
+	/* 136 */ 26, /* 137 */ 26, /* 138 */ 26, /* 139 */ 26,
+	/* 140 */ 35, /* 141 */ 35, /* 142 */ 35, /* 143 */ 35
 };
 
 /*
@@ -769,6 +844,45 @@ int msynd2bit [] = {  /* msynd 0-F */
 	-1, 139,  -1,  -1
 };
 
+typedef enum plats2dram {
+	UNI_S_PLAT = 0,	/* UniBoard Server Systems */
+	CAM_S_PLAT,	/* Camelot Server Systems */
+	CAM_T_PLAT,	/* Camelot Tower Systems */
+	FIE_S_PLAT,	/* Fiesta Server Systems */
+	FIE_T_PLAT,	/* Fiesta Tower Systems */
+	NONE
+} plats_t;
+
+struct plat2dram_map {
+	char	*platnm;
+	plats_t	plat;
+} dram_plat[] = {
+	/* Platform name		DRAM Map	Code Name */
+	{"SUNW,Sun-Fire-15000",		UNI_S_PLAT}, /* Starcat */
+	{"SUNW,Sun-Fire",		UNI_S_PLAT}, /* Serengeti */
+	{"SUNW,Netra-T12",		UNI_S_PLAT}, /* Lightweight 8 */
+	{"SUNW,Sun-Fire-480R",		CAM_S_PLAT}, /* Cherrystone */
+	{"SUNW,Sun-Fire-880",		CAM_S_PLAT}, /* Daktari */
+	{"SUNW,Sun-Fire-V490",		CAM_S_PLAT}, /* Sebring */
+	{"SUNW,Sun-Fire-V890",		CAM_S_PLAT}, /* Silverstone */
+	{"SUNW,Sun-Blade-1000",		CAM_T_PLAT}, /* Excalibur */
+	{"SUNW,Netra-T4",		CAM_T_PLAT}, /* Netra 20 */
+	{"SUNW,Sun-Fire-V440",		FIE_S_PLAT}, /* Chalupa */
+	{"SUNW,Sun-Fire-V445",		FIE_S_PLAT}, /* Boston */
+	{"SUNW,A70",			FIE_S_PLAT}, /* Chicago */
+	{"SUNW,Sun-Fire-V215",		FIE_S_PLAT}, /* Seattle 1U */
+	{"SUNW,Sun-Fire-V245",		FIE_S_PLAT}, /* Seattle 2U */
+	{"SUNW,Netra-440",		FIE_S_PLAT}, /* Netra 440 */
+	{"SUNW,Sun-Blade-1500",		FIE_T_PLAT}, /* Taco */
+	{"SUNW,Sun-Blade-2500",		FIE_T_PLAT}, /* Enchilada */
+	{"SUNW,Sun-Fire-V210",		FIE_T_PLAT}, /* Enchilada 1U */
+	{"SUNW,Sun-Fire-V240",		FIE_T_PLAT}, /* Enchilada 2U */
+	{"SUNW,Sun-Fire-V250",		FIE_T_PLAT}, /* Enchilada 2P */
+	{"SUNW,Netra-210",		FIE_T_PLAT}, /* Netra 210 */
+	{"SUNW,Netra-240",		FIE_T_PLAT}, /* Netra 240 */
+	{NULL,				NONE}
+};
+
 int
 cmd_synd2upos(uint16_t syndrome) {
 	return (esynd2bit[syndrome]);
@@ -776,16 +890,36 @@ cmd_synd2upos(uint16_t syndrome) {
 
 const char *fmd_fmri_get_platform();
 
+/*
+ * Return the DRAM within the DIMM associated with the unit position.
+ */
 int
 cmd_upos2dram(uint16_t unit_position) {
 
-	const char *plat_name = fmd_fmri_get_platform();
+	int		i, dram;
+	plats_t		plat = NONE;
+	const char 	*plat_name = fmd_fmri_get_platform();
+	int		*plat_upos2dram[] = {
+		unib_upos2dram,
+		cams_upos2dram,
+		camt_upos2dram,
+		fies_upos2dram,
+		fiet_upos2dram
+	};
 
-	if (strcmp(plat_name, "SUNW,SunFire") == 0)
-		return (uni_upos2dram[unit_position]);
-	else if (strcmp(plat_name, "SUNW,V880") == 0)
-		return (dak_upos2dram[unit_position]);
-	else if (strcmp(plat_name, "SUNW,SunBlade") == 0)
-		return (exc_upos2dram[unit_position]);
-	else return (-1);
+	/* get DRAM map from platform name */
+	for (i = 0; dram_plat[i].platnm != NULL; i++) {
+		if (strcmp(plat_name, dram_plat[i].platnm) == 0) {
+			plat = dram_plat[i].plat;
+			break;
+		}
+	}
+
+	if (plat != NONE) {
+		dram = plat_upos2dram[plat][unit_position];
+	} else {
+		dram = -1;
+	}
+
+	return (dram);
 }

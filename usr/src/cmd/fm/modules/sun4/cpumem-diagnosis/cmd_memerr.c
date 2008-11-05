@@ -45,6 +45,7 @@
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
 #include <sys/errclassify.h>
+#include <assert.h>
 
 #ifdef sun4v
 #include <cmd_hc_sun4v.h>
@@ -242,8 +243,10 @@ mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
 		return;				/* not a CE */
 
 	for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL; ) {
-		if (ip->mq_unit_position > unit_position) break;
-		else if (ip->mq_unit_position == unit_position &&
+		if (ip->mq_unit_position > unit_position) {
+			/* list is in unit position order */
+			break;
+		} else if (ip->mq_unit_position == unit_position &&
 		    ip->mq_phys_addr == afar) {
 			/*
 			 * Found a duplicate cw, unit_position, and afar.
@@ -251,8 +254,11 @@ mq_add(fmd_hdl_t *hdl, cmd_dimm_t *dimm, fmd_event_t *ep,
 			 * node added below.
 			 */
 			ip = mq_destroy(hdl, &dimm->mq_root[cw], ip);
-		} else ip = cmd_list_next(ip);
+		} else {
+			ip = cmd_list_next(ip);
+		}
 	}
+
 	jp = mq_create(hdl, ep, afar, unit_position, now);
 	if (ip == NULL)
 		cmd_list_append(&dimm->mq_root[cw], jp);
@@ -273,14 +279,16 @@ mq_prune(fmd_hdl_t *hdl, cmd_dimm_t *dimm, uint64_t now)
 
 	for (cw = 0; cw < CMD_MAX_CKWDS; cw++) {
 		for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL; ) {
-			if (ip->mq_tstamp < now - (72*60*60)) {
+			if (ip->mq_tstamp < now - CMD_MQ_TIMELIM) {
 				/*
 				 * This event has timed out - delete the
 				 * mq block as well as serd for the event.
 				 */
 				ip = mq_destroy(hdl, &dimm->mq_root[cw], ip);
-			} /* tstamp < now - ce_t */
-			else ip = cmd_list_next(ip);
+			} else {
+				/* tstamp < now - ce_t */
+				ip = cmd_list_next(ip);
+			}
 		} /* per checkword */
 	} /* cw = 0...3 */
 }
@@ -326,20 +334,48 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 	upos_pair_t upos_array[8]; /* max per cw = 2, * 4 cw's */
 	cmd_mq_t *ip;
 
+	/*
+	 * Each upos_array[] member represents a pair of CEs for the same
+	 * unit position (symbol) which on a sun4u is a bit, and on sun4v
+	 * is a (4 bit) nibble.
+	 * MQSC rule 4 requires pairs of CEs from the same symbol (same DIMM
+	 * for rule 4A, and same DRAM for rule 4B) for a violation - this
+	 * is why CE pairs are tracked.
+	 */
 	upos_pairs = 0;
 	upos_array[0].mq1 = NULL;
+
+	/* Loop through all checkwords */
 	for (cw = 0; cw < CMD_MAX_CKWDS; cw++) {
 		i = upos_pairs;
 		curr_upos = -1;
+
+		/*
+		 * mq_root[] is an array of cumulative lists of CEs
+		 * indexed by checkword where the list is in unit position
+		 * order. Loop through checking for duplicate unit position
+		 * entries (filled in at mq_create()).
+		 * The upos_array[] is filled in each time a duplicate
+		 * unit position is found; the first time through the loop
+		 * of a unit position sets curr_upos but does not fill in
+		 * upos_array[] until the second symbol is found.
+		 */
 		for (ip = cmd_list_next(&dimm->mq_root[cw]); ip != NULL;
 		    ip = cmd_list_next(ip)) {
-			if (curr_upos != ip->mq_unit_position)
+			if (curr_upos != ip->mq_unit_position) {
+				/* Set initial current position */
 				curr_upos = ip->mq_unit_position;
-			else if (i > upos_pairs &&
-			    curr_upos == upos_array[i-1].upos)
-				continue; /* skip triples, quads, etc. */
-			else if (upos_array[i].mq1 == NULL) {
-				/* we have a pair */
+			} else if (i > upos_pairs &&
+			    curr_upos == upos_array[i-1].upos) {
+				/*
+				 * Only keep track of CE pairs; skip
+				 * triples, quads, etc...
+				 */
+				continue;
+			} else if (upos_array[i].mq1 == NULL) {
+				/*
+				 * Have a pair, add to upos_array[].
+				 */
 				upos_array[i].upos = curr_upos;
 				upos_array[i].dram = ip->mq_dram;
 				upos_array[i].mq1 = cmd_list_prev(ip);
@@ -347,7 +383,9 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 				upos_array[++i].mq1 = NULL;
 			}
 		}
+
 		if (i - upos_pairs >= 2) {
+			/* Rule 4A Violation. */
 			flt = cmd_dimm_create_fault(hdl,
 			    dimm, "fault.memory.dimm", CMD_FLTMAXCONF);
 			for (j = upos_pairs; j < i; j++) {
@@ -365,22 +403,58 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 			return;
 		}
 		upos_pairs = i;
+		assert(upos_pairs < 8);
 	}
 
-	if (upos_pairs  < 3)
+	if (upos_pairs < 3)
 		return; /* 4B violation needs at least 3 pairs */
 
-	for (i = 0; i < upos_pairs; i++) {
-		for (j = i+1; j < upos_pairs; j++) {
-			if (upos_array[i].dram != upos_array[j].dram)
+	/*
+	 * Walk through checking for a rule 4B violation.
+	 * Since we only keep track of two CE pairs per CW we'll only have
+	 * a max of potentially 8 elements in the array. So as not to run
+	 * off the end of the array, need to be careful with i and j indexes.
+	 */
+	for (i = 0; i < (upos_pairs - 2); i++) {
+		if (upos_array[i].dram == -1) {
+			/*
+			 * Don't match failure codes. There is
+			 * no platform DRAM xlation - return.
+			 */
+			fmd_hdl_debug(hdl, "Unable to determine DRAM"
+			    " from the unit position\n");
+			return;
+		}
+
+		for (j = i+1; j < (upos_pairs - 1); j++) {
+			if (upos_array[i].dram != upos_array[j].dram) {
+				/*
+				 * These two pairs aren't the same dram;
+				 * continue looking for pairs that are.
+				 */
 				continue;
+			}
+
 			for (k = j+1; k < upos_pairs; k++) {
-				if (upos_array[j].dram != upos_array[k].dram)
+				if (upos_array[j].dram != upos_array[k].dram) {
+					/*
+					 * DRAMs must be the same for a rule
+					 * 4B violation. Continue looking for
+					 * pairs that have the same DRAMs.
+					 */
 					continue;
+				}
+
 				if ((upos_array[i].upos !=
 				    upos_array[j].upos) ||
 				    (upos_array[j].upos !=
 				    upos_array[k].upos)) {
+					/*
+					 * We've determined that all the dram
+					 * CEs are the same dram, if all the
+					 * unit positions are not the same,
+					 * then we have a rule 4B violation.
+					 */
 					flt = cmd_dimm_create_fault(hdl,
 					    dimm, "fault.memory.dimm",
 					    CMD_FLTMAXCONF);
@@ -402,12 +476,12 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 					fmd_case_add_ereport(hdl,
 					    dimm->dimm_case.cc_cp,
 					    upos_array[k].mq2->mq_ep);
+					dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+					cmd_dimm_dirty(hdl, dimm);
 					fmd_case_add_suspect(hdl,
 					    dimm->dimm_case.cc_cp, flt);
 					fmd_case_solve(hdl,
 					    dimm->dimm_case.cc_cp);
-					dimm->dimm_flags |= CMD_MEM_F_FAULTING;
-					cmd_dimm_dirty(hdl, dimm);
 					return;
 				}
 			}
@@ -443,7 +517,7 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
 		CMD_STAT_BUMP(bad_mem_asru);
-		return (NULL);
+		return (CMD_EVD_BAD);
 	}
 
 	if ((dimm = cmd_dimm_lookup(hdl, asru)) == NULL &&

@@ -117,7 +117,7 @@ typedef struct cmd_mq {
 	uint16_t mq_ckwd;		/* phys addr mod 64 */
 	uint64_t mq_phys_addr;		/* from ereport */
 	uint16_t mq_unit_position;	/* bit for sun4u, nibble for sun4v */
-	uint16_t mq_dram;		/* by table lookup from unit pos */
+	int16_t mq_dram;		/* by table lookup from unit pos */
 	fmd_event_t *mq_ep;		/* ereport - for potential fault */
 	char *mq_serdnm;		/* serd eng to retain CE events */
 } cmd_mq_t;
@@ -132,6 +132,7 @@ struct cmd_dimm {
 	    mq_root[CMD_MAX_CKWDS];	/* per-checkword CEs to correlate */
 };
 
+#define	CMD_MQ_TIMELIM	(72*60*60)	/* 72 hours */
 #define	CMD_MQ_SERDT	MAXINT		/* Never expected to fire */
 #define	CMD_MQ_SERDN	2		/* Dup CEs not allowed */
 
