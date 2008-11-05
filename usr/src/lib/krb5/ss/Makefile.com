@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libss.a
 VERS= .1
@@ -71,7 +69,7 @@ CFLAGS +=	$(CCVERBOSE) -I..
 
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) $(ZIGNORE)
 
-LDLIBS +=	-lc
+LDLIBS +=	-lc -ltecla
 
 $(PICS) :=      CFLAGS += $(XFFLAG)
 

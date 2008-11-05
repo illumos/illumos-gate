@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -20,8 +20,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This package information file defines software dependencies associated
 # with the pkg.  You can define three types of pkg dependencies with this file:
@@ -52,3 +50,4 @@ P SUNWcsl	Core Solaris Libraries
 P SUNWkrbr	Kerberos version 5 support (Root)
 P SUNWgss	GSSAPI V2
 P SUNWgssc	GSSAPI CONFIG V2
+P SUNWtecla	Tecla command-line editing library

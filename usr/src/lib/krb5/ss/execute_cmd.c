@@ -1,9 +1,7 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1987, 1988, 1989 by Massachusetts Institute of Technology
@@ -214,7 +212,8 @@ int ss_execute_line (sci_idx, line_ptr)
     }
 
     /* parse it */
-    argv = ss_parse(sci_idx, line_ptr, &argc);
+    /* Solaris Kerberos */
+    (void) ss_parse(sci_idx, line_ptr, &argc, &argv, 0);
     if (argc == 0)
         return 0;
 

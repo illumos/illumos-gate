@@ -1,10 +1,14 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1987, 1988 by MIT Student Information Processing Board
  *
  * For copyright information, see copyright.h.
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 
 #ifndef _ss_ss_internal_h
 #define _ss_ss_internal_h __FILE__
@@ -91,7 +95,8 @@ typedef struct _ss_data {	/* init values */
      (*code_ptr=0,ss_info(sci_idx)->current_request)
 void ss_unknown_function();
 void ss_delete_info_dir();
-char **ss_parse (int, char *, int *);
+/* Solaris Kerberos */
+int ss_parse (int, char *, int *, char ***, int);
 ss_abbrev_info *ss_abbrev_initialize (char *, int *);
 void ss_page_stdin (void);
 int ss_pager_create (void);
