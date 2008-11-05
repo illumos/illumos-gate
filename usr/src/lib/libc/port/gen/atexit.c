@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _atexit = atexit
 
 #include "lint.h"
@@ -123,7 +121,10 @@ _exithandle(void)
 {
 	atexit_root_t *arp = &curthread->ul_uberdata->atexit_root;
 	_exthdlr_t *p;
+	int cancel_state;
 
+	/* disable cancellation while running atexit handlers */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	(void) mutex_lock(&arp->exitfns_lock);
 	arp->exit_frame_monitor = _getfp() + STACK_BIAS;
 	p = arp->head;
@@ -134,6 +135,7 @@ _exithandle(void)
 		p = arp->head;
 	}
 	(void) mutex_unlock(&arp->exitfns_lock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 }
 
 /*
@@ -286,7 +288,10 @@ _preexec_exit_handlers(Lc_addr_range_t range[], uint_t count)
 	atexit_root_t *arp = &curthread->ul_uberdata->atexit_root;
 	_exthdlr_t *o;		/* previous node */
 	_exthdlr_t *p;		/* this node */
+	int cancel_state;
 
+	/* disable cancellation while running atexit handlers */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	(void) mutex_lock(&arp->exitfns_lock);
 	o = NULL;
 	p = arp->head;
@@ -307,6 +312,7 @@ _preexec_exit_handlers(Lc_addr_range_t range[], uint_t count)
 		}
 	}
 	(void) mutex_unlock(&arp->exitfns_lock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
 	_preexec_tsd_unload(range, count);
 	_preexec_atfork_unload(range, count);
