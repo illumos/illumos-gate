@@ -141,6 +141,183 @@ span.new {
 </style>
 '
 
+# Upload the webrev via rsync. Return 0 on success, 1 on error.
+rsync_upload()
+{
+	if (( $# != 1 )); then
+		return 1
+	fi
+
+	typeset dst=$1
+
+	# if destination specification is not in the form of host:remote_dir
+	# then assume it is just remote hostname and append a colon and
+	# destination directory formed from local webrev directory name
+	if [[ -z ${dst##*:} ]]; then
+		if [[ "${dst}" == *: ]]; then
+			dst=${dst}${WNAME}
+		else
+			dst=${dst}:${WNAME}
+		fi
+	fi
+
+	print " Syncing webrev: \c"
+	# end source directory with a slash in order to copy just
+	# directory contents, not the whole directory
+	$RSYNC -r -q $WDIR/ $dst
+	if (( $? != 0 )); then
+		print "failed to sync webrev directory " \
+		    "'$WDIR' to '$dst'"
+		return 1
+	fi
+
+	print "Done."
+	return 0
+}
+
+# Upload the webrev via SSH. Return 0 on success, 1 on error.
+ssh_upload()
+{
+	if (( $# != 1 )); then
+		return 1
+	fi
+
+	typeset dst=$1
+	typeset -r host_spec=${dst%%:*}
+	typeset -r dir_spec=${dst##*:}
+
+	# if destination specification is not in the form of host:remote_dir
+	# then assume it is just remote hostname and append a colon
+	if [[ "${dst}" != *:* ]]; then
+		dst=${dst}:
+	fi
+
+	if [[ -z $tflag || -z $dir_spec ]]; then
+		dir_rm=$WNAME
+	else
+		if [[ "${dir_spec}" == */* ]]; then
+			dir_rm=${dir_spec%%/*}
+		else
+			dir_rm=${dir_spec##*/}
+		fi
+	fi
+
+	if [[ "${dir_spec}" != /* ]]; then
+		print "Removing old remote webrev: \c"
+		if [[ -z "$dir_rm" ]]; then
+			echo "empty directory for removal"
+			return 1
+		fi
+		typeset -r batch_file_rm=$( $MKTEMP /tmp/$webrev_remove.XXX )
+		echo "rename $dir_rm .trash/removed.$$" > $batch_file_rm
+		# we do not care about return value because this might be
+		# the first time this directory is uploaded
+		$SFTP -b $batch_file_rm $host_spec 2>/dev/null 1>&2
+		rm -f $batch_file_rm
+		print "Done."
+	fi
+
+	# if the supplied path is absolute we assume all directories are
+	# created, otherwise try to create all directories in the path
+	# except the last one which will be created by scp
+	if [[ "${dir_spec}" == */* && "${dir_spec}" != /* ]]; then
+		print "Creating directories: \c"
+		typeset -r dirs_mk=${dir_spec%/*}
+		typeset -r batch_file_mkdir=$( $MKTEMP /tmp/$webrev_mkdir.XXX )
+                OLDIFS=$IFS
+                IFS=/
+                mk=
+                for dir in $dirs_mk; do
+                        if [[ -z $mk ]]; then
+                                mk=$dir
+                        else
+                                mk=$mk/$dir
+                        fi
+                        echo "mkdir $mk" >> $batch_file_mkdir
+                done
+                IFS=$OLDIFS
+		$SFTP -b $batch_file_mkdir $host_spec 2>/dev/null 1>&2
+		if (( $? != 0 )); then
+			echo "Failed to create remote directories"
+			rm -f $batch_file_mkdir
+			return 1
+		fi
+		rm -f $batch_file_mkdir
+		print "Done."
+	fi
+
+	print "Uploading webrev: \c"
+	$SCP -q -C -B -o PreferredAuthentications=publickey -r \
+		$WDIR $dst
+	if (( $? != 0 )); then
+		print "failed to upload webrev directory" \
+		    "'$WDIR' to '$dst'"
+		return 1
+	fi
+
+	print "Done."
+	return 0
+}
+
+#
+# Upload webrev to remote site
+#
+upload_webrev()
+{
+	# default host
+	host_spec="cr.opensolaris.org"
+	typeset -r rsync_prefix="rsync://"
+	typeset -r ssh_prefix="ssh://"
+
+	# if remote target is not specified, build the target from scratch
+	# using the default values
+	if [[ -z $tflag ]]; then
+		dst_rsync="$host_spec:$WNAME"
+		dst_ssh="$host_spec:$WNAME"
+	fi
+
+	if [[ ! -d "$WDIR" ]]; then
+		echo "webrev directory '$WDIR' does not exist"
+		return 1
+	fi
+
+	# Perform a late check to make sure we do not upload closed source
+	# to remote target when -n is used. If the user used custom remote
+	# target he probably knows what he is doing.
+	if [[ -n $nflag && -z $tflag ]]; then
+		/usr/bin/find $WDIR -type d -name closed \
+			| $GREP closed >/dev/null
+		if (( $? == 0 )); then
+			echo "directory '$WDIR' contains \"closed\" directory"
+			return 1
+		fi
+	fi
+
+	# we have the URI for remote destination now so let's start the upload
+	if [[ -n $tflag ]]; then
+		if [[ "${remote_target}" == ${rsync_prefix}?* ]]; then
+			rsync_upload ${remote_target##$rsync_prefix}
+			return $?
+		elif [[ "${remote_target}" == ${ssh_prefix}?* ]]; then
+			ssh_upload ${remote_target##$ssh_prefix}
+			return $?
+		else
+			echo "invalid upload URI ($remote_target)"
+			return 1
+		fi
+	else
+		# try rsync first and fallback to SSH in case it fails
+		rsync_upload $dst_rsync
+		if (( $? != 0 )); then
+			echo "rsync upload failed, falling back to SSH"
+			ssh_upload $dst_ssh
+		fi
+		return $?
+	fi
+
+	return 0
+}
+
 #
 # input_cmd | html_quote | output_cmd
 # or
@@ -1445,7 +1622,7 @@ function env_from_flist
 	# list.  Then copy those into our local versions of those
 	# variables if they have not been set already.
 	#
-	eval `sed -e "s/#.*$//" $FLIST | grep = `
+	eval `sed -e "s/#.*$//" $FLIST | $GREP = `
 
 	if [[ -z $codemgr_ws && -n $CODEMGR_WS ]]; then
 		codemgr_ws=$CODEMGR_WS
@@ -1626,7 +1803,7 @@ function build_old_new_mercurial
 		hg cat -R $CWS -r $HG_PARENT $CWS/$PDIR/$PF > \
 		    $olddir/$PDIR/$PF 2>/dev/null
 
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )); then
 			rm -f $olddir/$PDIR/$PF
 		else
 			if [[ -n $old_mode ]]; then
@@ -1727,6 +1904,9 @@ Options:
 	-i <filename>: Include <filename> in the index.html file.
 	-o <outdir>: Output webrev to specified directory.
 	-p <compare-against>: Use specified parent wkspc or basis for comparison
+	-t <remote_target>: Specify remote destination for webrev upload
+	-U: upload the webrev to remote destination
+	-n: do not generate the webrev (useful with -U)
 	-w <wxfile>: Use specified wx active file.
 
 Environment:
@@ -1764,10 +1944,15 @@ PATH=$(dirname $(whence $0)):$PATH
 [[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
 [[ -z $PS2PDF ]] && PS2PDF=`look_for_prog ps2pdf`
 [[ -z $PERL ]] && PERL=`look_for_prog perl`
+[[ -z $RSYNC ]] && RSYNC=`look_for_prog rsync`
 [[ -z $SCCS ]] && SCCS=`look_for_prog sccs`
 [[ -z $AWK ]] && AWK=`look_for_prog nawk`
 [[ -z $AWK ]] && AWK=`look_for_prog gawk`
 [[ -z $AWK ]] && AWK=`look_for_prog awk`
+[[ -z $SCP ]] && SCP=`look_for_prog scp`
+[[ -z $SFTP ]] && SFTP=`look_for_prog sftp`
+[[ -z $MKTEMP ]] && MKTEMP=`look_for_prog mktemp`
+[[ -z $GREP ]] && GREP=`look_for_prog grep`
 
 
 if [[ ! -x $PERL ]]; then
@@ -1795,23 +1980,22 @@ integer TOTL TINS TDEL TMOD TUNC
 flist_mode=
 flist_file=
 iflag=
+lflag=
+Nflag=
+nflag=
+Oflag=
 oflag=
 pflag=
-lflag=
+tflag=
+uflag=
+Uflag=
 wflag=
-Oflag=
-Nflag=
-while getopts "i:o:p:lwON" opt
+remote_target=
+while getopts "i:o:p:lwONnt:U" opt
 do
 	case $opt in
 	i)	iflag=1
 		INCLUDE_FILE=$OPTARG;;
-
-	o)	oflag=1
-		WDIR=$OPTARG;;
-
-	p)	pflag=1
-		codemgr_parent=$OPTARG;;
 
 	#
 	# If -l has been specified, we need to abort further options
@@ -1821,11 +2005,24 @@ do
 	l)	lflag=1
 		break;;
 
-	w)	wflag=1;;
+	N)	Nflag=1;;
+
+	n)	nflag=1;;
 
 	O)	Oflag=1;;
 
-	N)	Nflag=1;;
+	o)	oflag=1
+		WDIR=$OPTARG;;
+
+	p)	pflag=1
+		codemgr_parent=$OPTARG;;
+
+	t)	tflag=1
+		remote_target=$OPTARG;;
+
+	U)	Uflag=1;;
+
+	w)	wflag=1;;
 
 	?)	usage;;
 	esac
@@ -1835,6 +2032,17 @@ FLIST=/tmp/$$.flist
 
 if [[ -n $wflag && -n $lflag ]]; then
 	usage
+fi
+
+# more sanity checking
+if [[ -n $nflag && -z $Uflag ]]; then
+	print "it does not make sense to skip webrev generation without -U"
+	exit 1
+fi
+
+if [[ -n $tflag && -z $Uflag ]]; then
+	echo "remote target has to be used only for upload"
+	exit 1
 fi
 
 #
@@ -2111,7 +2319,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	# if we don't have one.
 	#
 	if [[ -z $HG_PARENT ]]; then
-		eval `sed -e "s/#.*$//" $wxfile | grep HG_PARENT=`
+		eval `sed -e "s/#.*$//" $wxfile | $GREP HG_PARENT=`
 	fi
 
 	#
@@ -2121,7 +2329,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	#
 	if [[ -z $HG_PARENT && -x $HG_ACTIVE ]]; then
 		$HG_ACTIVE -w $codemgr_ws -p $real_parent | \
-		    eval `sed -e "s/#.*$//" | grep HG_PARENT=`
+		    eval `sed -e "s/#.*$//" | $GREP HG_PARENT=`
 	elif [[ -z $HG_PARENT ]]; then
 		print -u2 "Error: Cannot discover parent revision"
 		exit 1
@@ -2203,10 +2411,21 @@ fi
 WDIR=${WDIR:-$CWS/webrev}
 
 #
-# Name of the webrev, derived from the workspace name; in the
-# future this could potentially be an option.
+# Name of the webrev, derived from the workspace name or output directory;
+# in the future this could potentially be an option.
 #
-WNAME=${CWS##*/}
+if [[ -n $oflag ]]; then
+	WNAME=${WDIR##*/}
+else
+	WNAME=${CWS##*/}
+fi
+
+# Do not generate the webrev, just upload it. We trust the user that the
+# webrev is OpenSolaris one.
+if [[ -n $Uflag && -n $nflag ]]; then
+	upload_webrev
+	exit $?
+fi
 
 if [ "${WDIR%%/*}" ]; then
 	WDIR=$PWD/$WDIR
@@ -2835,3 +3054,8 @@ exec 1<&3			# dup FD 3 to restore stdout.
 exec 3<&-			# close FD 3.
 
 print "Done."
+
+if [[ -n $Uflag ]]; then
+	upload_webrev
+	exit $?
+fi

@@ -927,6 +927,27 @@ def cdm_restore(ui, repo, backup, **opts):
     bk = CdmBackup(ui, wslist[repo], backup)
     bk.restore(gen)
 
+
+def cdm_webrev(ui, repo, **opts):
+    '''generate webrev and optionally upload it
+
+    This command passes all arguments to webrev script'''
+
+    webrev_args = ""
+    for key in opts.keys():
+    	if opts[key]:
+	    if type(opts[key]) == type(True):
+	        webrev_args += '-' + key + ' '
+            else:
+	        webrev_args += '-' + key + ' ' + opts[key] + ' '
+
+    retval = os.system('webrev ' + webrev_args)
+    if retval != 0:
+        return retval - 255
+
+    return 0
+
+
 cmdtable = {
     'apply': (cdm_apply, [('p', 'parent', '', 'parent workspace'),
                           ('r', 'remain', None, 'do not change directories')],
@@ -1008,4 +1029,15 @@ cmdtable = {
                'hg rtichk [-N] [-p PARENT]'),
     'tagchk': (cdm_tagchk, [('p', 'parent', '', 'parent workspace')],
                'hg tagchk [-p PARENT]'),
+    'webrev': (cdm_webrev, [('i', 'i', '', 'include file'),
+                            ('l', 'l', '', 'extract file list from putback -n'),
+                            ('N', 'N', None, 'supress comments'),
+                            ('n', 'n', None, 'do not generate webrev'),
+			    ('O', 'O', None, 'OpenSolaris mode'),
+                            ('o', 'o', '', 'output directory'),
+                            ('p', 'p', '', 'use specified parent'),
+                            ('t', 't', '', 'upload target'),
+			    ('U', 'U', None, 'upload the webrev'),
+                            ('w', 'w', '', 'use wx active file')],
+               'hg webrev [WEBREV_OPTIONS]'),
 }
