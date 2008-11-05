@@ -110,6 +110,7 @@ f none kernel/drv/mm 755 root sys
 f none kernel/drv/mpt 755 root sys
 e mptconf kernel/drv/mpt.conf 644 root sys
 f none kernel/drv/mouse8042 755 root sys
+f none kernel/drv/nulldriver 755 root sys
 f none kernel/drv/openeepr 755 root sys
 f none kernel/drv/options 755 root sys
 f none kernel/drv/pci_pci 755 root sys
@@ -324,6 +325,7 @@ f none kernel/drv/amd64/mc-amd 755 root sys
 f none kernel/drv/amd64/mm 755 root sys
 f none kernel/drv/amd64/mpt 755 root sys
 f none kernel/drv/amd64/mouse8042 755 root sys
+f none kernel/drv/amd64/nulldriver 755 root sys
 f none kernel/drv/amd64/openeepr 755 root sys
 f none kernel/drv/amd64/options 755 root sys
 f none kernel/drv/amd64/pci_pci 755 root sys

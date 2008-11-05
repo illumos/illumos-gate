@@ -102,6 +102,7 @@ f none kernel/drv/sparcv9/lofi 755 root sys
 f none kernel/drv/sparcv9/log 755 root sys
 f none kernel/drv/sparcv9/mm 755 root sys
 f none kernel/drv/sparcv9/mouse8042 755 root sys
+f none kernel/drv/sparcv9/nulldriver 755 root sys
 f none kernel/drv/sparcv9/openeepr 755 root sys
 f none kernel/drv/sparcv9/options 755 root sys
 f none kernel/drv/sparcv9/pci_pci 755 root sys

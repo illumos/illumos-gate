@@ -62,6 +62,7 @@ static char *rootname;		/* node name of top_devinfo */
 kmutex_t global_vhci_lock;
 
 major_t mm_major;
+major_t	nulldriver_major;
 
 /*
  * Forward declarations
@@ -469,6 +470,7 @@ i_ddi_init_root()
 	clone_dip = i_ddi_attach_pseudo_node("clone");
 	clone_major = ddi_driver_major(clone_dip);
 	mm_major = ddi_name_to_major("mm");
+	nulldriver_major = ddi_name_to_major("nulldriver");
 
 	/*
 	 * Attach scsi_vhci for MPXIO, this registers scsi vhci class

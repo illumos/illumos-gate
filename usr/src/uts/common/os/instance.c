@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Instance number assignment code
  */
@@ -317,7 +315,7 @@ in_set_instance(dev_info_t *dip, in_drv_t *dp, major_t major)
  * Return 1 if instance block was assigned for the path.
  *
  * For multi-port NIC cards, sequential instance assignment across all
- * ports on a card is highly deseriable since the ppa is typically the
+ * ports on a card is highly desirable since the ppa is typically the
  * same as the instance number, and the ppa is used in the NIC's public
  * /dev name. This sequential assignment typically occurs as a result
  * of in_preassign_instance() after initial install, or by
@@ -759,6 +757,10 @@ e_ddi_keep_instance(dev_info_t *dip)
 {
 	in_node_t *np, *ap;
 	in_drv_t *dp;
+
+	/* Don't make nulldriver instance assignments permanent */
+	if (ddi_driver_major(dip) == nulldriver_major)
+		return;
 
 	/*
 	 * Allow implementation override

@@ -196,6 +196,7 @@ extern dev_info_t *pseudo_dip;
 extern dev_info_t *clone_dip;
 extern major_t clone_major;
 extern major_t mm_major;
+extern major_t nulldriver_major;
 
 extern struct devnames *devnamesp;
 extern struct devnames orphanlist;

@@ -794,7 +794,7 @@ NSKERN_OBJS +=	nsc_ddi.o \
 		nsc_proc.o \
 		nsc_raw.o \
 		nsc_thread.o \
-		nskernd.o 
+		nskernd.o
 
 SV_OBJS +=	sv.o
 
@@ -1801,3 +1801,6 @@ ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
 #
 NTXN_OBJS =	unm_nic_init.o unm_gem.o unm_nic_hw.o unm_ndd.o	\
 			unm_nic_main.o unm_nic_isr.o unm_nic_ctx.o niu.o
+#	nulldriver module
+#
+NULLDRIVER_OBJS =	nulldriver.o

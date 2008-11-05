@@ -224,6 +224,7 @@ DRV_KMODS	+= smbsrv
 DRV_KMODS	+= vscan
 DRV_KMODS	+= nsmb
 DRV_KMODS	+= fm
+DRV_KMODS	+= nulldriver
 
 #
 # Don't build some of these for OpenSolaris, since they will be

@@ -261,6 +261,7 @@ DRV_KMODS_32	+= mscsi
 DRV_KMODS_32	+= msm
 DRV_KMODS	+= nca
 DRV_KMODS	+= nsmb
+DRV_KMODS	+= nulldriver
 DRV_KMODS	+= nv_sata
 DRV_KMODS	+= nxge
 DRV_KMODS	+= openeepr
