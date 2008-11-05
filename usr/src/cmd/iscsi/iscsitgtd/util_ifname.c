@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libdlpi.h>
 #include <ctype.h>
@@ -297,7 +295,7 @@ if_setup(int *n)
 	}
 
 	lifn.lifn_family = AF_UNSPEC;
-	lifn.lifn_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
+	lifn.lifn_flags = LIFC_ALLZONES | LIFC_EXTERNAL_SOURCE;
 	if (ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0)
 		return (NULL);
 
@@ -313,7 +311,7 @@ if_setup(int *n)
 	}
 
 	lifc.lifc_family = AF_UNSPEC;
-	lifc.lifc_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
+	lifn.lifn_flags = LIFC_ALLZONES | LIFC_EXTERNAL_SOURCE;
 	lifc.lifc_len = bufsize;
 	lifc.lifc_buf = buf;
 
