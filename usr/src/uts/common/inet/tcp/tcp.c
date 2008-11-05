@@ -1630,6 +1630,7 @@ tcp_cleanup(tcp_t *tcp)
 	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	netstack_t	*ns = tcps->tcps_netstack;
+	mblk_t		*tcp_rsrv_mp;
 
 	tcp_bind_hash_remove(tcp);
 
@@ -1682,6 +1683,7 @@ tcp_cleanup(tcp_t *tcp)
 	tcp_iphc = tcp->tcp_iphc;
 	tcp_iphc_len = tcp->tcp_iphc_len;
 	tcp_hdr_grown = tcp->tcp_hdr_grown;
+	tcp_rsrv_mp = tcp->tcp_rsrv_mp;
 
 	if (connp->conn_cred != NULL) {
 		crfree(connp->conn_cred);
@@ -1702,6 +1704,7 @@ tcp_cleanup(tcp_t *tcp)
 	tcp->tcp_iphc = tcp_iphc;
 	tcp->tcp_iphc_len = tcp_iphc_len;
 	tcp->tcp_hdr_grown = tcp_hdr_grown;
+	tcp->tcp_rsrv_mp = tcp_rsrv_mp;
 
 	tcp->tcp_connp = connp;
 
@@ -3863,20 +3866,6 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 
 	TCP_STAT(tcps, tcp_clean_death_nondetached);
 
-	/*
-	 * If T_ORDREL_IND has not been sent yet (done when service routine
-	 * is run) postpone cleaning up the endpoint until service routine
-	 * has sent up the T_ORDREL_IND. Avoid clearing out an existing
-	 * client_errno since tcp_close uses the client_errno field.
-	 */
-	if (tcp->tcp_fin_rcvd && !tcp->tcp_ordrel_done) {
-		if (err != 0)
-			tcp->tcp_client_errno = err;
-
-		tcp->tcp_deferred_clean_death = B_TRUE;
-		return (-1);
-	}
-
 	/* If sodirect, not anymore */
 	SOD_PTR_ENTER(tcp, sodp);
 	if (sodp != NULL) {
@@ -4206,13 +4195,10 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 	ASSERT((connp->conn_fanout != NULL && connp->conn_ref >= 4) ||
 	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
 
-	/* Cancel any pending timeout */
-	if (tcp->tcp_ordrelid != 0) {
-		if (tcp->tcp_timeout) {
-			(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_ordrelid);
-		}
-		tcp->tcp_ordrelid = 0;
-		tcp->tcp_timeout = B_FALSE;
+	/* End point has closed this TCP, no need to send up T_ordrel_ind. */
+	if (tcp->tcp_ordrel_mp != NULL) {
+		freeb(tcp->tcp_ordrel_mp);
+		tcp->tcp_ordrel_mp = NULL;
 	}
 
 	mutex_enter(&tcp->tcp_eager_lock);
@@ -5404,6 +5390,7 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 
 		ASSERT(tcp->tcp_tcps == NULL);
 		ASSERT(connp->conn_netstack == NULL);
+		ASSERT(tcp->tcp_rsrv_mp != NULL);
 		ns = tcps->tcps_netstack;
 		netstack_hold(ns);
 		connp->conn_netstack = ns;
@@ -5417,8 +5404,18 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 	    tcps->tcps_netstack)) == NULL)
 		return (NULL);
 	tcp = connp->conn_tcp;
+	/*
+	 * Pre-allocate the tcp_rsrv_mp.  This mblk will not be freed
+	 * until this conn_t/tcp_t is freed at ipcl_conn_destroy().
+	 */
+	if ((tcp->tcp_rsrv_mp = allocb(0, BPRI_HI)) == NULL) {
+		ipcl_conn_destroy(connp);
+		return (NULL);
+	}
+	mutex_init(&tcp->tcp_rsrv_mp_lock, NULL, MUTEX_DEFAULT, NULL);
 	tcp->tcp_tcps = tcps;
 	TCPS_REFHOLD(tcps);
+
 	return ((void *)connp);
 }
 
@@ -5723,6 +5720,15 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		goto error3;
 
 	eager = econnp->conn_tcp;
+
+	/*
+	 * Pre-allocate the T_ordrel_ind mblk so that at close time, we
+	 * will always have that to send up.  Otherwise, we need to do
+	 * special handling in case the allocation fails at that time.
+	 */
+	ASSERT(eager->tcp_ordrel_mp == NULL);
+	if ((eager->tcp_ordrel_mp = mi_tpi_ordrel_ind()) == NULL)
+		goto error3;
 
 	/* Inherit various TCP parameters from the listener */
 	eager->tcp_naglim = tcp->tcp_naglim;
@@ -6183,6 +6189,17 @@ tcp_connect(tcp_t *tcp, mblk_t *mp)
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tcr)) {
 		tcp_err_ack(tcp, mp, TPROTO, 0);
+		return;
+	}
+
+	/*
+	 * Pre-allocate the T_ordrel_ind mblk so that at close time, we
+	 * will always have that to send up.  Otherwise, we need to do
+	 * special handling in case the allocation fails at that time.
+	 */
+	ASSERT(tcp->tcp_ordrel_mp == NULL);
+	if ((tcp->tcp_ordrel_mp = mi_tpi_ordrel_ind()) == NULL) {
+		tcp_err_ack(tcp, mp, TSYSERR, ENOMEM);
 		return;
 	}
 
@@ -7794,6 +7811,10 @@ tcp_reinit(tcp_t *tcp)
 		freeb(tcp->tcp_fused_sigurg_mp);
 		tcp->tcp_fused_sigurg_mp = NULL;
 	}
+	if (tcp->tcp_ordrel_mp != NULL) {
+		freeb(tcp->tcp_ordrel_mp);
+		tcp->tcp_ordrel_mp = NULL;
+	}
 
 	/*
 	 * Following is a union with two members which are
@@ -7990,7 +8011,6 @@ tcp_reinit_values(tcp)
 	tcp->tcp_detached = 0;
 	tcp->tcp_bind_pending = 0;
 	tcp->tcp_unbind_pending = 0;
-	tcp->tcp_deferred_clean_death = 0;
 
 	tcp->tcp_snd_ws_ok = B_FALSE;
 	tcp->tcp_snd_ts_ok = B_FALSE;
@@ -8004,7 +8024,6 @@ tcp_reinit_values(tcp)
 	tcp->tcp_set_timer = 0;
 
 	tcp->tcp_active_open = 0;
-	ASSERT(tcp->tcp_timeout == B_FALSE);
 	tcp->tcp_rexmit = B_FALSE;
 	tcp->tcp_xmit_zc_clean = B_FALSE;
 
@@ -8124,7 +8143,7 @@ tcp_reinit_values(tcp)
 
 	PRESERVE(tcp->tcp_acceptor_lockp);
 
-	ASSERT(tcp->tcp_ordrelid == 0);
+	ASSERT(tcp->tcp_ordrel_mp == NULL);
 	PRESERVE(tcp->tcp_acceptor_id);
 	DONTCARE(tcp->tcp_ipsec_overhead);
 
@@ -8197,6 +8216,9 @@ tcp_reinit_values(tcp)
 	tcp->tcp_sodirect = NULL;
 
 	tcp->tcp_closemp_used = B_FALSE;
+
+	PRESERVE(tcp->tcp_rsrv_mp);
+	PRESERVE(tcp->tcp_rsrv_mp_lock);
 
 #ifdef DEBUG
 	DONTCARE(tcp->tcmp_stk[0]);
@@ -15159,8 +15181,7 @@ est:
 	 */
 	if (tcp->tcp_ipv6_recvancillary != 0) {
 		mp = tcp_rput_add_ancillary(tcp, mp, &ipp);
-		if (mp == NULL)
-			return;
+		ASSERT(mp != NULL);
 	}
 
 	if (tcp->tcp_listener || tcp->tcp_hard_binding) {
@@ -15491,36 +15512,10 @@ ack_check:
 			    tcp->tcp_fused_sigurg);
 		}
 
-		if ((mp1 = mi_tpi_ordrel_ind()) != NULL) {
-			tcp->tcp_ordrel_done = B_TRUE;
-			putnext(tcp->tcp_rq, mp1);
-			if (tcp->tcp_deferred_clean_death) {
-				/*
-				 * tcp_clean_death was deferred
-				 * for T_ORDREL_IND - do it now
-				 */
-				(void) tcp_clean_death(tcp,
-				    tcp->tcp_client_errno, 20);
-				tcp->tcp_deferred_clean_death =	B_FALSE;
-			}
-		} else {
-			/*
-			 * Run the orderly release in the
-			 * service routine.
-			 */
-			qenable(tcp->tcp_rq);
-			/*
-			 * Caveat(XXX): The machine may be so
-			 * overloaded that tcp_rsrv() is not scheduled
-			 * until after the endpoint has transitioned
-			 * to TCPS_TIME_WAIT
-			 * and tcp_time_wait_interval expires. Then
-			 * tcp_timer() will blow away state in tcp_t
-			 * and T_ORDREL_IND will never be delivered
-			 * upstream. Unlikely but potentially
-			 * a problem.
-			 */
-		}
+		mp1 = tcp->tcp_ordrel_mp;
+		tcp->tcp_ordrel_mp = NULL;
+		tcp->tcp_ordrel_done = B_TRUE;
+		putnext(tcp->tcp_rq, mp1);
 	}
 done:
 	ASSERT(!(flags & TH_MARKNEXT_NEEDED));
@@ -16229,25 +16224,6 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 	putnext(q, mp);
 }
 
-/*
- * Called as the result of a qbufcall or a qtimeout to remedy a failure
- * to allocate a T_ordrel_ind in tcp_rsrv().  qenable(q) will make
- * tcp_rsrv() try again.
- */
-static void
-tcp_ordrel_kick(void *arg)
-{
-	conn_t 	*connp = (conn_t *)arg;
-	tcp_t	*tcp = connp->conn_tcp;
-
-	tcp->tcp_ordrelid = 0;
-	tcp->tcp_timeout = B_FALSE;
-	if (!TCP_IS_DETACHED(tcp) && tcp->tcp_rq != NULL &&
-	    tcp->tcp_fin_rcvd && !tcp->tcp_ordrel_done) {
-		qenable(tcp->tcp_rq);
-	}
-}
-
 /* ARGSUSED */
 static void
 tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
@@ -16260,7 +16236,9 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 	sodirect_t	*sodp;
 	boolean_t	fc;
 
-	freeb(mp);
+	mutex_enter(&tcp->tcp_rsrv_mp_lock);
+	tcp->tcp_rsrv_mp = mp;
+	mutex_exit(&tcp->tcp_rsrv_mp_lock);
 
 	TCP_STAT(tcps, tcp_rsrv_calls);
 
@@ -16348,60 +16326,6 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 			BUMP_MIB(&tcps->tcps_mib, tcpOutWinUpdate);
 		}
 	}
-
-	/* Handle a failure to allocate a T_ORDREL_IND here */
-	if (tcp->tcp_fin_rcvd && !tcp->tcp_ordrel_done) {
-		ASSERT(tcp->tcp_listener == NULL);
-
-		SOD_PTR_ENTER(tcp, sodp);
-		if (sodp != NULL) {
-			if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
-				sodp->sod_uioa.uioa_state &= UIOA_CLR;
-				sodp->sod_uioa.uioa_state |= UIOA_FINI;
-			}
-			/* No more sodirect */
-			tcp->tcp_sodirect = NULL;
-			if (!SOD_QEMPTY(sodp)) {
-				/* Notify mblk(s) to process */
-				(void) tcp_rcv_sod_wakeup(tcp, sodp);
-				/* sod_wakeup() does the mutex_exit() */
-			} else {
-				/* Nothing to process */
-				mutex_exit(sodp->sod_lockp);
-			}
-		} else if (tcp->tcp_rcv_list != NULL) {
-			/*
-			 * Push any mblk(s) enqueued from co processing.
-			 */
-			(void) tcp_rcv_drain(tcp->tcp_rq, tcp);
-			ASSERT(tcp->tcp_rcv_list == NULL ||
-			    tcp->tcp_fused_sigurg);
-		}
-
-		mp = mi_tpi_ordrel_ind();
-		if (mp) {
-			tcp->tcp_ordrel_done = B_TRUE;
-			putnext(q, mp);
-			if (tcp->tcp_deferred_clean_death) {
-				/*
-				 * tcp_clean_death was deferred for
-				 * T_ORDREL_IND - do it now
-				 */
-				tcp->tcp_deferred_clean_death = B_FALSE;
-				(void) tcp_clean_death(tcp,
-				    tcp->tcp_client_errno, 22);
-			}
-		} else if (!tcp->tcp_timeout && tcp->tcp_ordrelid == 0) {
-			/*
-			 * If there isn't already a timer running
-			 * start one.  Use a 4 second
-			 * timer as a fallback since it can't fail.
-			 */
-			tcp->tcp_timeout = B_TRUE;
-			tcp->tcp_ordrelid = TCP_TIMER(tcp, tcp_ordrel_kick,
-			    MSEC_TO_TICK(4000));
-		}
-	}
 }
 
 /*
@@ -16409,15 +16333,13 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
  * result of flow control relief.  Since we don't actually queue anything in
  * TCP, we have no data to send out of here.  What we do is clear the receive
  * window, and send out a window update.
- * This routine is also called to drive an orderly release message upstream
- * if the attempt in tcp_rput failed.
  */
 static void
 tcp_rsrv(queue_t *q)
 {
-	conn_t *connp = Q_TO_CONN(q);
-	tcp_t	*tcp = connp->conn_tcp;
-	mblk_t	*mp;
+	conn_t		*connp = Q_TO_CONN(q);
+	tcp_t		*tcp = connp->conn_tcp;
+	mblk_t		*mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/* No code does a putq on the read side */
@@ -16428,24 +16350,18 @@ tcp_rsrv(queue_t *q)
 		return;
 	}
 
-	mp = allocb(0, BPRI_HI);
-	if (mp == NULL) {
-		/*
-		 * We are under memory pressure. Return for now and we
-		 * we will be called again later.
-		 */
-		if (!tcp->tcp_timeout && tcp->tcp_ordrelid == 0) {
-			/*
-			 * If there isn't already a timer running
-			 * start one.  Use a 4 second
-			 * timer as a fallback since it can't fail.
-			 */
-			tcp->tcp_timeout = B_TRUE;
-			tcp->tcp_ordrelid = TCP_TIMER(tcp, tcp_ordrel_kick,
-			    MSEC_TO_TICK(4000));
-		}
+	/*
+	 * If tcp->tcp_rsrv_mp == NULL, it means that tcp_rsrv() has already
+	 * been run.  So just return.
+	 */
+	mutex_enter(&tcp->tcp_rsrv_mp_lock);
+	if ((mp = tcp->tcp_rsrv_mp) == NULL) {
+		mutex_exit(&tcp->tcp_rsrv_mp_lock);
 		return;
 	}
+	tcp->tcp_rsrv_mp = NULL;
+	mutex_exit(&tcp->tcp_rsrv_mp_lock);
+
 	CONN_INC_REF(connp);
 	squeue_enter(connp->conn_sqp, mp, tcp_rsrv_input, connp,
 	    SQTAG_TCP_RSRV);
@@ -18494,26 +18410,10 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	}
 	ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_fused_sigurg);
 	if (tcp->tcp_fin_rcvd && !tcp->tcp_ordrel_done) {
-		mp = mi_tpi_ordrel_ind();
-		if (mp) {
-			tcp->tcp_ordrel_done = B_TRUE;
-			putnext(q, mp);
-			if (tcp->tcp_deferred_clean_death) {
-				/*
-				 * tcp_clean_death was deferred
-				 * for T_ORDREL_IND - do it now
-				 */
-				(void) tcp_clean_death(tcp,
-				    tcp->tcp_client_errno, 21);
-				tcp->tcp_deferred_clean_death = B_FALSE;
-			}
-		} else {
-			/*
-			 * Run the orderly release in the
-			 * service routine.
-			 */
-			qenable(q);
-		}
+		mp = tcp->tcp_ordrel_mp;
+		tcp->tcp_ordrel_mp = NULL;
+		tcp->tcp_ordrel_done = B_TRUE;
+		putnext(q, mp);
 	}
 	if (tcp->tcp_hard_binding) {
 		tcp->tcp_hard_binding = B_FALSE;

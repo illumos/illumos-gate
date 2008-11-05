@@ -698,6 +698,21 @@ ipcl_conn_destroy(conn_t *connp)
 		}
 		ASSERT(tcp->tcp_iphc_len == 0);
 
+		if (tcp->tcp_ordrel_mp != NULL) {
+			freeb(tcp->tcp_ordrel_mp);
+			tcp->tcp_ordrel_mp = NULL;
+		}
+
+		/*
+		 * tcp_rsrv_mp can be NULL if tcp_get_conn() fails to allocate
+		 * the mblk.
+		 */
+		if (tcp->tcp_rsrv_mp != NULL) {
+			freeb(tcp->tcp_rsrv_mp);
+			tcp->tcp_rsrv_mp = NULL;
+			mutex_destroy(&tcp->tcp_rsrv_mp_lock);
+		}
+
 		ASSERT(connp->conn_latch == NULL);
 		ASSERT(connp->conn_policy == NULL);
 
