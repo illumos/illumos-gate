@@ -26,7 +26,6 @@
 #ifndef	_SYS_SCSI_IMPL_TRANSPORT_H
 #define	_SYS_SCSI_IMPL_TRANSPORT_H
 
-
 /*
  * Include the loadable module wrapper.
  */
@@ -63,19 +62,17 @@ struct scsi_hba_tran {
 	 * Private fields for use by the HBA itself.
 	 */
 	void		*tran_hba_private;	/* HBA softstate */
-	void		*tran_tgt_private;	/* target-specific info */
 
 	/*
-	 * Only used to refer to a particular scsi device
-	 * if the entire scsi_hba_tran structure is "cloned"
-	 * per target device, otherwise NULL.
+	 * The following two fields are only used in the SCSI_HBA_TRAN_CLONE
+	 * case.
 	 */
+	void		*tran_tgt_private;	/* target-specific info */
 	struct scsi_device	*tran_sd;
 
 	/*
 	 * Vectors to point to specific HBA entry points
 	 */
-
 	int		(*tran_tgt_init)(
 				dev_info_t		*hba_dip,
 				dev_info_t		*tgt_dip,
@@ -274,6 +271,7 @@ struct scsi_hba_tran {
 	ddi_dma_attr_t	tran_dma_attr;
 
 	void		*tran_extension;
+
 	/*
 	 * An fm_capable HBA driver can set tran_fm_capable prior to
 	 * scsi_hba_attach_setup().  If not set, SCSA provides a default
@@ -315,56 +313,57 @@ _NOTE(SCHEME_PROTECTS_DATA("serialized by target driver", \
  * Prototypes for SCSI HBA interface functions
  *
  * All these functions are public interfaces, with the
- * exception of scsi_initialize_hba_interface() and
- * scsi_uninitialize_hba_interface(), called by the
- * scsi module _init() and _fini(), respectively.
+ * exception of:
+ *	interface				called by
+ *	scsi_initialize_hba_interface()		_init() of scsi module
+ *	scsi_uninitialize_hba_interface()	_fini() of scsi module
  */
 
-extern void		scsi_initialize_hba_interface(void);
+void		scsi_initialize_hba_interface(void);
 
 #ifdef	NO_SCSI_FINI_YET
-extern void		scsi_uninitialize_hba_interface(void);
+void		scsi_uninitialize_hba_interface(void);
 #endif	/* NO_SCSI_FINI_YET */
 
-extern int		scsi_hba_init(
+int		scsi_hba_init(
 				struct modlinkage	*modlp);
 
-extern void		scsi_hba_fini(
+void		scsi_hba_fini(
 				struct modlinkage	*modlp);
 
-extern int		scsi_hba_attach(
+int		scsi_hba_attach(
 				dev_info_t		*hba_dip,
 				ddi_dma_lim_t		*hba_lim,
 				scsi_hba_tran_t		*hba_tran,
 				int			flags,
 				void			*hba_options);
 
-extern int		scsi_hba_attach_setup(
+int		scsi_hba_attach_setup(
 				dev_info_t		*hba_dip,
 				ddi_dma_attr_t		*hba_dma_attr,
 				scsi_hba_tran_t		*hba_tran,
 				int			flags);
 
-extern int		scsi_hba_detach(
+int		scsi_hba_detach(
 				dev_info_t		*hba_dip);
 
-extern scsi_hba_tran_t	*scsi_hba_tran_alloc(
+scsi_hba_tran_t	*scsi_hba_tran_alloc(
 				dev_info_t		*hba_dip,
 				int			flags);
 
-extern int		scsi_tran_ext_alloc(
+int		scsi_tran_ext_alloc(
 				scsi_hba_tran_t		*hba_tran,
 				size_t			length,
 				int			flags);
 
-extern void		scsi_tran_ext_free(
+void		scsi_tran_ext_free(
 				scsi_hba_tran_t		*hba_tran,
 				size_t			length);
 
-extern void		scsi_hba_tran_free(
+void		scsi_hba_tran_free(
 				scsi_hba_tran_t		*hba_tran);
 
-extern int		scsi_hba_probe(
+int		scsi_hba_probe(
 				struct scsi_device	*sd,
 				int			(*callback)(void));
 
@@ -373,12 +372,19 @@ char			*scsi_get_device_type_string(
 				dev_info_t		*hba_dip,
 				struct scsi_device	*devp);
 
-extern int		scsi_get_device_type_scsi_options(
+int		scsi_get_scsi_maxluns(
+				struct scsi_device	*sd);
+
+int		scsi_get_scsi_options(
+				struct scsi_device	*sd,
+				int			default_scsi_options);
+
+int		scsi_get_device_type_scsi_options(
 				dev_info_t		*hba_dip,
 				struct scsi_device	*devp,
 				int			default_scsi_options);
 
-extern struct scsi_pkt	*scsi_hba_pkt_alloc(
+struct scsi_pkt	*scsi_hba_pkt_alloc(
 				dev_info_t		*hba_dip,
 				struct scsi_address	*ap,
 				int			cmdlen,
@@ -388,29 +394,29 @@ extern struct scsi_pkt	*scsi_hba_pkt_alloc(
 				int			(*callback)(caddr_t),
 				caddr_t			arg);
 
-extern void		scsi_hba_pkt_free(
+void		scsi_hba_pkt_free(
 				struct scsi_address	*ap,
 				struct scsi_pkt		*pkt);
 
 
-extern int		scsi_hba_lookup_capstr(
+int		scsi_hba_lookup_capstr(
 				char			*capstr);
 
-extern int		scsi_hba_in_panic(void);
+int		scsi_hba_in_panic(void);
 
-extern int		scsi_hba_open(
+int		scsi_hba_open(
 				dev_t			*devp,
 				int			flags,
 				int			otyp,
 				cred_t			*credp);
 
-extern int		scsi_hba_close(
+int		scsi_hba_close(
 				dev_t			dev,
 				int			flag,
 				int			otyp,
 				cred_t			*credp);
 
-extern int		scsi_hba_ioctl(
+int		scsi_hba_ioctl(
 				dev_t			dev,
 				int			cmd,
 				intptr_t		arg,
@@ -418,7 +424,7 @@ extern int		scsi_hba_ioctl(
 				cred_t			*credp,
 				int			*rvalp);
 
-extern void		scsi_hba_nodename_compatible_get(
+void		scsi_hba_nodename_compatible_get(
 				struct scsi_inquiry	*inq,
 				char			*binding_set,
 				int			dtype_node,
@@ -427,12 +433,12 @@ extern void		scsi_hba_nodename_compatible_get(
 				char			***compatiblep,
 				int			*ncompatiblep);
 
-extern void		scsi_hba_nodename_compatible_free(
+void		scsi_hba_nodename_compatible_free(
 				char			*nodename,
 				char			**compatible);
 
 
-extern int		scsi_hba_prop_update_inqstring(
+int		scsi_hba_prop_update_inqstring(
 				struct scsi_device	*devp,
 				char			*name,
 				char			*data,
@@ -440,6 +446,11 @@ extern int		scsi_hba_prop_update_inqstring(
 
 /*
  * Flags for scsi_hba_attach
+ *
+ * SCSI_HBA_TRAN_CLONE		TRAN_CLONE is a KLUDGE to address current
+ *				limitations of the scsi_address(9S) structure
+ *				via duplication of scsi_hba_tran(9S) and
+ *				introduction of tran_tgt_private.
  */
 #define	SCSI_HBA_TRAN_CLONE	0x01		/* clone scsi_hba_tran_t */
 						/* structure per target */
@@ -476,7 +487,6 @@ extern int		scsi_hba_prop_update_inqstring(
 #define	MINOR2INST(x)		((x) >> INST_MINOR_SHIFT)
 
 #endif	/* _KERNEL */
-
 
 #ifdef	__cplusplus
 }

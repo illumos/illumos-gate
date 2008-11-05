@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -397,39 +396,29 @@ static char scsi_tmpname[64];
 char *
 scsi_dname(int dtyp)
 {
-	static char *dnames[] = {
-		"Direct Access",
-		"Sequential Access",
-		"Printer",
-		"Processor",
-		"Write-Once/Read-Many",
-		"Read-Only Direct Access",
-		"Scanner",
-		"Optical",
-		"Changer",
-		"Communications",
-		"Array Controller"
-	};
+	static char	*dnames[] = DTYPE_ASCII;
+	char		*dname = NULL;
 
-	if ((dtyp & DTYPE_MASK) <= DTYPE_COMM) {
-		return (dnames[dtyp&DTYPE_MASK]);
-	} else if (dtyp == DTYPE_NOTPRESENT) {
-		return ("Not Present");
-	}
-	return ("<unknown device type>");
-
+	if ((dtyp & DTYPE_MASK) < (sizeof (dnames) / sizeof (*dnames)))
+		dname = dnames[dtyp&DTYPE_MASK];
+	else if (dtyp == DTYPE_NOTPRESENT)
+		dname = "Not Present";
+	if ((dname == NULL) || (*dname == '\0'))
+		dname = "<unknown device type>";
+	return (dname);
 }
 
 char *
 scsi_rname(uchar_t reason)
 {
-	static char *rnames[] = CMD_REASON_ASCII;
+	static char	*rnames[] = CMD_REASON_ASCII;
+	char		*rname = NULL;
 
-	if ((reason > CMD_DEV_GONE) || (reason == (CMD_TERMINATED + 1))) {
-		return ("<unknown reason>");
-	} else {
-		return (rnames[reason]);
-	}
+	if (reason < (sizeof (rnames) / sizeof (*rnames)))
+		rname = rnames[reason];
+	if ((rname == NULL) || (*rname == '\0'))
+		rname = "<unknown reason>";
+	return (rname);
 }
 
 char *
@@ -513,7 +502,7 @@ static struct scsi_asq_key_strings extended_sense_list[] = {
 	0x00, 0x01, "filemark detected",
 	0x00, 0x02, "end of partition/medium detected",
 	0x00, 0x03, "setmark detected",
-	0x00, 0x04, "begining of partition/medium detected",
+	0x00, 0x04, "beginning of partition/medium detected",
 	0x00, 0x05, "end of data detected",
 	0x00, 0x06, "i/o process terminated",
 	0x00, 0x11, "audio play operation in progress",
@@ -942,7 +931,7 @@ static struct scsi_asq_key_strings extended_sense_list[] = {
 	0x5e, 0x03, "idle condition activated by command",
 	0x5e, 0x04, "standby condition activated by command",
 	0x60, 0x00, "lamp failure",
-	0x61, 0x00, "video aquisition error",
+	0x61, 0x00, "video acquisition error",
 	0x62, 0x00, "scan head positioning error",
 	0x63, 0x00, "end of user area encountered on this track",
 	0x63, 0x01, "packet does not fit in available space",
@@ -966,11 +955,11 @@ static struct scsi_asq_key_strings extended_sense_list[] = {
 	0x69, 0x01, "multiple LUN failures",
 	0x69, 0x02, "parity/data mismatch",
 	0x6a, 0x00, "informational, refer to log",
-	0x6b, 0x00, "state change has occured",
+	0x6b, 0x00, "state change has occurred",
 	0x6b, 0x01, "redundancy level got better",
 	0x6b, 0x02, "redundancy level got worse",
-	0x6c, 0x00, "rebuild failure occured",
-	0x6d, 0x00, "recalculate failure occured",
+	0x6c, 0x00, "rebuild failure occurred",
+	0x6d, 0x00, "recalculate failure occurred",
 	0x6e, 0x00, "command to logical unit failed",
 	0x6f, 0x00, "copy protect key exchange failure authentication failure",
 	0x6f, 0x01, "copy protect key exchange failure key not present",
@@ -1132,7 +1121,7 @@ scsi_generic_errmsg(struct scsi_device *devp, char *label, int severity,
 		pad[i] = ' ';
 	}
 
-	bzero(buf, 256);
+	bzero(buf, SCSI_ERRMSG_BUF_LEN);
 	com = cmd_name;
 	(void) sprintf(buf, "Error for Command: %s",
 	    scsi_cmd_name(com, cmdlist, tmpbuf));
@@ -1150,7 +1139,7 @@ scsi_generic_errmsg(struct scsi_device *devp, char *label, int severity,
 
 	if (blkno != -1 || err_blkno != -1 &&
 	    ((com & 0xf) == SCMD_READ) || ((com & 0xf) == SCMD_WRITE)) {
-		bzero(buf, 256);
+		bzero(buf, SCSI_ERRMSG_BUF_LEN);
 		(void) sprintf(buf, "Requested Block: %ld", blkno);
 		buflen = strlen(buf);
 		if (buflen < SCSI_ERRMSG_COLUMN_LEN) {
@@ -1165,7 +1154,7 @@ scsi_generic_errmsg(struct scsi_device *devp, char *label, int severity,
 		impl_scsi_log(dev, label, CE_CONT, buf);
 	}
 
-	bzero(buf, 256);
+	bzero(buf, SCSI_ERRMSG_BUF_LEN);
 	(void) strcpy(buf, "Vendor: ");
 	inq_fill(devp->sd_inq->inq_vid, 8, &buf[strlen(buf)]);
 	buflen = strlen(buf);
@@ -1187,18 +1176,18 @@ scsi_generic_errmsg(struct scsi_device *devp, char *label, int severity,
 		    NULL, NULL, &fru_code_ptr, NULL, NULL);
 		fru_code = (fru_code_ptr ? *fru_code_ptr : 0);
 
-		bzero(buf, 256);
+		bzero(buf, SCSI_ERRMSG_BUF_LEN);
 		(void) sprintf(buf, "Sense Key: %s\n",
 		    sense_keys[sense_key]);
 		impl_scsi_log(dev, label, CE_CONT, buf);
 
-		bzero(buf, 256);
+		bzero(buf, SCSI_ERRMSG_BUF_LEN);
 		if ((fru_code != 0) &&
 		    (decode_fru != NULL)) {
 			(*decode_fru)(devp, buf, SCSI_ERRMSG_BUF_LEN,
 			    fru_code);
 			if (buf[0] != NULL) {
-				bzero(buf1, 256);
+				bzero(buf1, SCSI_ERRMSG_BUF_LEN);
 				(void) sprintf(&buf1[strlen(buf1)],
 				    "ASC: 0x%x (%s)", asc,
 				    scsi_asc_ascq_name(asc, ascq,
@@ -1447,6 +1436,94 @@ scsi_get_device_type_scsi_options(dev_info_t *dip,
 		kmem_free(string, strlen(string) + 1);
 	}
 	return (options);
+}
+
+/*
+ * Find the scsi_options for a scsi_device. The precedence is:
+ *
+ *	target<%d>-scsi-options		highest
+ *	device-type-scsi-options
+ *	per bus scsi-options (parent)
+ *	global scsi-options
+ *	default_scsi_options argument	lowest
+ *
+ * If the global is used then it has already been established
+ * on the parent scsi_hba_attach_setup.
+ */
+int
+scsi_get_scsi_options(struct scsi_device *sd, int default_scsi_options)
+{
+	dev_info_t	*parent;
+	int		options = -1;
+	int		tgt;
+	char		topt[32];
+
+	if ((sd == NULL) || (sd->sd_dev == NULL))
+		return (default_scsi_options);
+
+	parent = ddi_get_parent(sd->sd_dev);
+
+	if ((tgt = ddi_prop_get_int(DDI_DEV_T_ANY, sd->sd_dev,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "target", -1)) != -1) {
+		(void) sprintf(topt, "target%d-scsi-options", tgt);
+		options = ddi_prop_get_int(DDI_DEV_T_ANY, parent,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, topt, -1);
+	}
+
+	if (options == -1)
+		options = scsi_get_device_type_scsi_options(parent, sd, -1);
+
+	if (options == -1)
+		options = ddi_prop_get_int(DDI_DEV_T_ANY, parent,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-options", -1);
+
+	if (options == -1)
+		options = default_scsi_options;
+
+	return (options);
+}
+
+/*
+ * Use scsi-options to return the maximum number of LUNs.
+ */
+int
+scsi_get_scsi_maxluns(struct scsi_device *sd)
+{
+	int	options;
+	int	maxluns;
+
+	ASSERT(sd && sd->sd_inq);
+	options = scsi_get_scsi_options(sd, SCSI_OPTIONS_NLUNS_DEFAULT);
+
+	switch (SCSI_OPTIONS_NLUNS(options)) {
+	default:
+	case SCSI_OPTIONS_NLUNS_DEFAULT:
+		/* based on scsi version of target */
+		if (sd->sd_inq->inq_ansi < SCSI_VERSION_3)
+			maxluns = SCSI_8LUN_PER_TARGET;		/* 8 */
+		else
+			maxluns = SCSI_16LUNS_PER_TARGET;	/* 16 */
+		break;
+	case SCSI_OPTIONS_NLUNS_1:
+		maxluns = SCSI_1LUN_PER_TARGET;		/* 1 */
+		break;
+	case SCSI_OPTIONS_NLUNS_8:
+		maxluns = SCSI_8LUN_PER_TARGET;		/* 8 */
+		break;
+	case SCSI_OPTIONS_NLUNS_16:
+		maxluns = SCSI_16LUNS_PER_TARGET;	/* 16 */
+		break;
+	case SCSI_OPTIONS_NLUNS_32:
+		maxluns = SCSI_32LUNS_PER_TARGET;	/* 32 */
+		break;
+	}
+
+	/* For SCSI-1 we never support > 8 LUNs */
+	if ((sd->sd_inq->inq_ansi <= SCSI_VERSION_1) &&
+	    (maxluns > SCSI_8LUN_PER_TARGET))
+		maxluns = SCSI_8LUN_PER_TARGET;
+
+	return (maxluns);
 }
 
 /*

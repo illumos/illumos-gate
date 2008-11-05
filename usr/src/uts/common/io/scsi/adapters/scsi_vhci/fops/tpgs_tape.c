@@ -101,7 +101,7 @@ tpgs_tape_device_probe(struct scsi_device *sd, struct scsi_inquiry *inq,
 	VHCI_DEBUG(6, (CE_NOTE, NULL, "tpgs_tape_device_probe: vidpid %s\n",
 	    inq->inq_vid));
 
-	if (inq->inq_tpgs == 0) {
+	if (inq->inq_tpgs == TPGS_FAILOVER_NONE) {
 		VHCI_DEBUG(4, (CE_WARN, NULL,
 		    "!tpgs_tape_device_probe: not a standard tpgs device"));
 		return (SFO_DEVICE_PROBE_PHCI);
@@ -121,21 +121,21 @@ tpgs_tape_device_probe(struct scsi_device *sd, struct scsi_inquiry *inq,
 		return (SFO_DEVICE_PROBE_PHCI);
 	}
 
-	if (inq->inq_tpgs == SCSI_IMPLICIT_FAILOVER) {
+	if (inq->inq_tpgs == TPGS_FAILOVER_IMPLICIT) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "
 		    "with implicit failover\n"));
 		return (SFO_DEVICE_PROBE_VHCI);
 	}
-	if (inq->inq_tpgs == SCSI_EXPLICIT_FAILOVER) {
+	if (inq->inq_tpgs == TPGS_FAILOVER_EXPLICIT) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "
 		    "with explicit failover\n"));
 		return (SFO_DEVICE_PROBE_VHCI);
 	}
-	if (inq->inq_tpgs == SCSI_BOTH_FAILOVER) {
+	if (inq->inq_tpgs == TPGS_FAILOVER_BOTH) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "

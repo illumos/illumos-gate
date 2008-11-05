@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	_KERNEL
 
 #include <sys/scsi/scsi_types.h>
@@ -47,27 +45,29 @@
  */
 
 int scsi_options =
-	SCSI_OPTIONS_PARITY	|
-	SCSI_OPTIONS_SYNC	|
-	SCSI_OPTIONS_LINK	|
-	SCSI_OPTIONS_TAG	|
-	SCSI_OPTIONS_DR		|
-	SCSI_OPTIONS_FAST	|
-	SCSI_OPTIONS_FAST20	|
-	SCSI_OPTIONS_FAST40	|
-	SCSI_OPTIONS_FAST80	|
-	SCSI_OPTIONS_FAST160	|
-	SCSI_OPTIONS_FAST320	|
-	SCSI_OPTIONS_QAS	|
-	SCSI_OPTIONS_WIDE;
+	SCSI_OPTIONS_DR			|
+	SCSI_OPTIONS_LINK		|
+	SCSI_OPTIONS_SYNC		|
+	SCSI_OPTIONS_PARITY		|
+	SCSI_OPTIONS_TAG		|
+	SCSI_OPTIONS_FAST		|
+	SCSI_OPTIONS_WIDE		|
+	SCSI_OPTIONS_FAST20		|
+	SCSI_OPTIONS_FAST40		|
+	SCSI_OPTIONS_FAST80		|
+	SCSI_OPTIONS_FAST160		|
+	SCSI_OPTIONS_FAST320		|
+	SCSI_OPTIONS_NLUNS_DEFAULT	|
+	SCSI_OPTIONS_QAS		|
+	0;
 
 /*
- * Scsi bus or device reset recovery time (milli secondss.)
+ * Scsi bus or device reset recovery time in milliseconds.
  */
 unsigned int	scsi_reset_delay = SCSI_DEFAULT_RESET_DELAY;
 
 /*
- * SCSI selection timeout in milli secondss.
+ * SCSI selection timeout in milliseconds.
  */
 int	scsi_selection_timeout = SCSI_DEFAULT_SELECTION_TIMEOUT;
 

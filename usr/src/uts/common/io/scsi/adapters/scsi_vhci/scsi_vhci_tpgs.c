@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -265,17 +264,17 @@ vhci_tpgs_inquiry(struct scsi_address *ap, struct buf *bp, int *mode)
 		return (1);
 	}
 
-	if (inq.inq_tpgs == 0) {
+	if (inq.inq_tpgs == TPGS_FAILOVER_NONE) {
 		VHCI_DEBUG(1, (CE_WARN, NULL,
 		    "!vhci_tpgs_inquiry: zero tpgs_bits"));
 		return (1);
 	}
 	retval = 0;
-	if (inq.inq_tpgs == SCSI_IMPLICIT_FAILOVER) {
+	if (inq.inq_tpgs == TPGS_FAILOVER_IMPLICIT) {
 		*mode = SCSI_IMPLICIT_FAILOVER;
-	} else if (inq.inq_tpgs == SCSI_EXPLICIT_FAILOVER) {
+	} else if (inq.inq_tpgs == TPGS_FAILOVER_EXPLICIT) {
 		*mode = SCSI_EXPLICIT_FAILOVER;
-	} else if (inq.inq_tpgs == SCSI_BOTH_FAILOVER) {
+	} else if (inq.inq_tpgs == TPGS_FAILOVER_BOTH) {
 		*mode = SCSI_BOTH_FAILOVER;
 	} else {
 		VHCI_DEBUG(1, (CE_WARN, NULL,

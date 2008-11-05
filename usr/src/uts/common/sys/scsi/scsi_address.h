@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_SCSI_ADDRESS_H
 #define	_SYS_SCSI_SCSI_ADDRESS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi_types.h>
 
@@ -71,9 +68,33 @@ struct scsi_address {
 						/* Not used */
 };
 
-/* Address property names */
+/* Device unit-address property names */
 #define	SCSI_ADDR_PROP_TARGET		"target"
 #define	SCSI_ADDR_PROP_LUN		"lun"
+
+/*
+ * Normalized representation of a scsi_lun (with SCSI-2 lun positioned
+ * for compatibility).
+ */
+typedef uint64_t	scsi_lun64_t;
+#define	PRIlun64	PRIx64
+#ifdef	_LP64
+#define	SCSI_LUN64_ILLEGAL	(-1L)
+#else	/* _LP64 */
+#define	SCSI_LUN64_ILLEGAL	(-1LL)
+#endif	/* _LP64 */
+
+/* Structure of a 64-bit SCSI LUN per SCSI standard */
+typedef	struct scsi_lun {
+	uchar_t	sl_lun1_msb;	/* format */
+	uchar_t	sl_lun1_lsb;	/* first level */
+	uchar_t	sl_lun2_msb;
+	uchar_t	sl_lun2_lsb;	/* second level */
+	uchar_t	sl_lun3_msb;
+	uchar_t	sl_lun3_lsb;	/* third level */
+	uchar_t	sl_lun4_msb;
+	uchar_t	sl_lun4_lsb;	/* fourth level */
+} scsi_lun_t;
 
 #ifdef	__cplusplus
 }

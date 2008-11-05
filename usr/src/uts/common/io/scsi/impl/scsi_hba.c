@@ -1156,6 +1156,21 @@ failure:
 		if (hba->tran_tgt_free != NULL) {
 			(*hba->tran_tgt_free) (dip, child_dip, hba, sd);
 		}
+
+		/*
+		 * If a inquiry data is still allocated (by scsi_probe()) we
+		 * free the allocation here. This keeps scsi_inq valid for the
+		 * same duration as the corresponding inquiry properties. It
+		 * also allows a tran_tgt_init() implementation that establishes
+		 * sd_inq to deal with deallocation in its tran_tgt_free
+		 * (setting sd_inq back to NULL) without upsetting the
+		 * framework.
+		 */
+		if (sd->sd_inq) {
+			kmem_free(sd->sd_inq, SUN_INQSIZE);
+			sd->sd_inq = (struct scsi_inquiry *)NULL;
+		}
+
 		mutex_destroy(&sd->sd_mutex);
 		if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
 			kmem_free(hba, sizeof (scsi_hba_tran_t));

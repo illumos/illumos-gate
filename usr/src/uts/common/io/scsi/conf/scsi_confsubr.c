@@ -357,30 +357,28 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
 	}
 }
 
-
 /*
  * Undo scsi_slave - older interface, but still supported
+ *
+ * NOTE: The 'sd_inq' inquiry data is now freed by scsi_hba/scsi_vhci code
+ * as part of free of scsi_device(9S).
  */
+/*ARGSUSED*/
 void
 scsi_unslave(struct scsi_device *devp)
 {
-	if (devp->sd_inq) {
-		kmem_free((caddr_t)devp->sd_inq, SUN_INQSIZE);
-		devp->sd_inq = (struct scsi_inquiry *)NULL;
-	}
 }
-
 
 /*
  * Undo scsi_probe
+ *
+ * NOTE: The 'sd_inq' inquiry data is now freed by scsi_hba/scsi_vhci code
+ * as part of free of scsi_device(9S).
  */
+/*ARGSUSED*/
 void
 scsi_unprobe(struct scsi_device *devp)
 {
-	if (devp->sd_inq) {
-		kmem_free((caddr_t)devp->sd_inq, SUN_INQSIZE);
-		devp->sd_inq = (struct scsi_inquiry *)NULL;
-	}
 }
 
 /*
