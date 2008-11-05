@@ -27,7 +27,6 @@
 
 /* $Id: cancel.c 147 2006-04-25 16:51:06Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -170,15 +169,22 @@ main(int ac, char *av[])
 				}
 
 				if (jobs != NULL && *jobs != NULL) {
-					char jobid[32];
-					char *jid;
+					char *mesg = "cancelled";
+					id = papiJobGetId(*jobs);
 
-					snprintf(jobid, sizeof (jobid), "%u",
-					    papiJobGetId(*jobs));
+					status = papiJobCancel(svc,
+					    printer, id);
 
-					jid = jobid;
-					exit_code = berkeley_cancel_request(svc,
-					    stdout, printer, 1, &jid);
+					if (status == PAPI_NOT_AUTHORIZED) {
+						mesg = papiStatusString(status);
+						exit_code = 1;
+					} else if (status != PAPI_OK) {
+						mesg = verbose_papi_message(
+						    svc, status);
+						exit_code = 1;
+					}
+					fprintf(OUT, "%s-%d: %s\n", printer,
+					    id, mesg);
 
 				}
 				papiJobListFree(jobs);
