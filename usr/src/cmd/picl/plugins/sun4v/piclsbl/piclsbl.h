@@ -26,8 +26,6 @@
 #ifndef	_PICLSBL_H
 #define	_PICLSBL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -51,6 +49,10 @@ typedef struct disk_lookup {
 #define	PCPCOMM_TIMEOUT	0x10
 
 #define	NAC_DISK_PREFIX	"HDD"
+
+/* sun4v platforms that do not need to handle SBL events */
+#define	ERIE_PLATFORM	"SUNW,Sun-Fire-T1000"
+#define	ERIE_PLATFORM2	"SUNW,SPARC-Enterprise-T1000"
 
 /* message types */
 #define	PCP_SBL_CONTROL		0x3

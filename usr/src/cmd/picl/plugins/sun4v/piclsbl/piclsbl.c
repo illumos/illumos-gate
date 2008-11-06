@@ -19,16 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  PICL Ontario platform plug-in to message the SC to light
  *  or extinguish the hdd 'OK2RM' ready-to-service light in
  *  the event of a soft unconfigure or configure, respectively.
+ *
+ *  Erie platforms (T1000) do not have ok-to-remove LEDs
+ *  so they do not need handlers for the SBL events.
  */
 
 #include <picl.h>
@@ -48,6 +49,8 @@
 #include <fcntl.h>
 #include <sys/param.h>
 #include <sys/raidioctl.h>
+#include <sys/utsname.h>
+#include <sys/systeminfo.h>
 #include <libpcp.h>
 #include "piclsbl.h"
 
@@ -87,7 +90,7 @@ load_pcp_libs()
 	char pcp_dl_lib[80];
 
 	(void) snprintf(pcp_dl_lib, sizeof (pcp_dl_lib), "%s%s",
-				LIB_PCP_PATH, PCPLIB);
+	    LIB_PCP_PATH, PCPLIB);
 
 	/* load the library and set up function pointers */
 	if ((pcp_handle = dlopen(pcp_dl_lib, RTLD_NOW)) == (void *) NULL)
@@ -98,7 +101,7 @@ load_pcp_libs()
 	pcp_send_recv_ptr = (int(*)())dlsym(pcp_handle, "pcp_send_recv");
 
 	if (pcp_init_ptr == NULL || pcp_send_recv_ptr == NULL ||
-		pcp_close_ptr == NULL)
+	    pcp_close_ptr == NULL)
 		return (1);
 
 	return (0);
@@ -129,7 +132,7 @@ cb_find_disk(picl_nodehdl_t node, void *args)
 		n = strstr(path, "/sd");
 		strncpy(n, "\0", 1);
 		(void) snprintf(hba_devctl, MAXPATHLEN, "/devices%s:devctl",
-				path);
+		    path);
 
 		return (PICL_WALK_TERMINATE);
 	}
@@ -212,7 +215,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * setup the request data to attach to the libpcp msg
 	 */
 	if ((req_ptr = (pcp_sbl_req_t *)umem_zalloc(sizeof (pcp_sbl_req_t),
-			UMEM_DEFAULT)) == NULL)
+	    UMEM_DEFAULT)) == NULL)
 		goto sbl_return;
 
 	/*
@@ -250,14 +253,14 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 
 	/* first, find the disk */
 	status = ptree_walk_tree_by_class(root_node, "disk", (void *)&lookup,
-						cb_find_disk);
+	    cb_find_disk);
 	if (status != PICL_SUCCESS)
 		goto sbl_return;
 
 	if (lookup.result == DISK_FOUND) {
 		/* now, lookup it's location in the node */
 		status = ptree_get_propval_by_name(lookup.disk, "Location",
-				(void *)&hdd_location, PICL_PROPNAMELEN_MAX);
+		    (void *)&hdd_location, PICL_PROPNAMELEN_MAX);
 		if (status != PICL_SUCCESS) {
 			syslog(LOG_ERR, "piclsbl: failed hdd discovery");
 			goto sbl_return;
@@ -269,12 +272,12 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * The disk NAC will always be HDD#
 	 */
 	if (strncmp(hdd_location, NAC_DISK_PREFIX,
-		strlen(NAC_DISK_PREFIX)) == 0) {
-			(void) sscanf(hdd_location, "%*3s%d", &req_ptr->sbl_id);
-			target = (int)req_ptr->sbl_id;
+	    strlen(NAC_DISK_PREFIX)) == 0) {
+		(void) sscanf(hdd_location, "%*3s%d", &req_ptr->sbl_id);
+		target = (int)req_ptr->sbl_id;
 	} else {
-			/* this is not one of the onboard disks */
-			goto sbl_return;
+		/* this is not one of the onboard disks */
+		goto sbl_return;
 	}
 
 	/*
@@ -301,7 +304,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 				break;
 			else if (retries == 3) {
 				syslog(LOG_ERR, "piclsbl: ",
-					"SC channel initialization failed");
+				    "SC channel initialization failed");
 				goto sbl_return;
 			}
 			/* continue */
@@ -320,12 +323,12 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * send the request, receive the response
 	 */
 	if ((*pcp_send_recv_ptr)(channel_fd, &send_msg, &recv_msg,
-		PCPCOMM_TIMEOUT) < 0) {
+	    PCPCOMM_TIMEOUT) < 0) {
 		/* we either timed out or erred; either way try again */
 		int s = PCPCOMM_TIMEOUT;
 		(void) sleep(s);
 		if ((*pcp_send_recv_ptr)(channel_fd, &send_msg, &recv_msg,
-				PCPCOMM_TIMEOUT) < 0) {
+		    PCPCOMM_TIMEOUT) < 0) {
 			syslog(LOG_ERR, "piclsbl: communication failure");
 			goto sbl_return;
 		}
@@ -352,13 +355,13 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * ensure the LED action taken is the one requested
 	 */
 	if ((req_ptr->sbl_action == PCP_SBL_DISABLE) &&
-		(resp_ptr->sbl_state != SBL_STATE_OFF))
+	    (resp_ptr->sbl_state != SBL_STATE_OFF))
 		syslog(LOG_ERR, "piclsbl: OK2RM LED not OFF after disk "
-				"configuration");
+		    "configuration");
 	else if ((req_ptr->sbl_action == PCP_SBL_ENABLE) &&
-			(resp_ptr->sbl_state != SBL_STATE_ON))
+	    (resp_ptr->sbl_state != SBL_STATE_ON))
 		syslog(LOG_ERR, "piclsbl: OK2RM LED not ON after disk "
-				"unconfiguration");
+		    "unconfiguration");
 	else if (resp_ptr->sbl_state == SBL_STATE_UNKNOWN)
 		syslog(LOG_ERR, "piclsbl: OK2RM LED set to unknown state");
 
@@ -376,6 +379,14 @@ sbl_return:
 static void
 piclsbl_init(void)
 {
+	char	platbuf[SYS_NMLN];
+
+	/* check for Erie platform name */
+	if ((sysinfo(SI_PLATFORM, platbuf, SYS_NMLN) != -1) &&
+	    ((strcmp(platbuf, ERIE_PLATFORM) == 0) ||
+	    (strcmp(platbuf, ERIE_PLATFORM2) == 0)))
+		return;
+
 	/* retrieve the root node for lookups in the event handler */
 	if ((ptree_get_root(&root_node)) != NULL)
 		return;
