@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +85,6 @@ wakeup(int n)
 }
 
 extern char *inet_ntoa();
-extern boolean_t rflg;
 
 static struct hostdata *
 iplookup(struct in_addr ipaddr)
@@ -118,12 +115,12 @@ iplookup(struct in_addr ipaddr)
 	if (! rflg && sigsetjmp(nisjmp, 1) == 0) {
 		(void) snoop_alarm(3, wakeup);
 		hp = getipnodebyaddr((char *)&ipaddr, sizeof (int),
-			AF_INET, &error_num);
+		    AF_INET, &error_num);
 		if (hp == NULL && inet_lnaof(ipaddr) == 0) {
 			np = getnetbyaddr(inet_netof(ipaddr), AF_INET);
 			if (np)
 				return (addhost(AF_INET, &ipaddr, np->n_name,
-					np->n_aliases));
+				    np->n_aliases));
 		}
 		(void) snoop_alarm(0, wakeup);
 	}
@@ -244,14 +241,14 @@ addhost(int family, const void *ipaddr, const char *name, char **aliases)
 					    aliases[ind] != NULL;
 					    ind++) {
 						(void) fprintf(namefile, " %s",
-								aliases[ind]);
+						    aliases[ind]);
 					}
 				}
 				(void) fprintf(namefile, "\n");
 			}
 		} else if (family == AF_INET6) {
 			np = (char *)inet_ntop(AF_INET6, (void *)ipaddr, aname,
-					sizeof (aname));
+			    sizeof (aname));
 			if (np) {
 				(void) fprintf(namefile, "%s\t%s", np, name);
 				if (aliases) {
@@ -259,14 +256,14 @@ addhost(int family, const void *ipaddr, const char *name, char **aliases)
 					    aliases[ind] != NULL;
 					    ind++) {
 						(void) fprintf(namefile, " %s",
-								aliases[ind]);
+						    aliases[ind]);
 					}
 				}
 				(void) fprintf(namefile, "\n");
 			}
 		} else {
 			(void) fprintf(stderr, "addhost: unknown family %d\n",
-				family);
+			    family);
 		}
 	}
 	return (n);
@@ -386,7 +383,7 @@ lgetipnodebyname(const char *name, int af, int flags, int *error_num)
 					}
 					/* found ipv6 addr */
 					hp->h_addr_list[ind] =
-						(char *)&h6->h6_addr;
+					    (char *)&h6->h6_addr;
 					ind++;
 				}
 			}
@@ -416,8 +413,8 @@ lgetipnodebyname(const char *name, int af, int flags, int *error_num)
 						hp->h_addr_list[ind] =
 						    (char *)&h46_addr[ind];
 						IN6_INADDR_TO_V4MAPPED(
-							&h->h4_addr,
-							&h46_addr[ind]);
+						    &h->h4_addr,
+						    &h46_addr[ind]);
 						ind++;
 					}
 				}

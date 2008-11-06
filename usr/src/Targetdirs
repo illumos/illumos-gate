@@ -65,6 +65,7 @@ ROOT.SYS= \
 	/dev \
 	/dev/dsk \
 	/dev/fd \
+	/dev/ipnet \
 	/dev/net \
 	/dev/rdsk \
 	/dev/rmt \

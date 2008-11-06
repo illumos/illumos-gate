@@ -57,6 +57,9 @@ extern "C" {
 #ifndef ABS
 #define	ABS(a)		((a) < 0 ? -(a) : (a))
 #endif
+#ifndef	SIGNOF
+#define	SIGNOF(a)	((a) < 0 ? -1 : (a) > 0)
+#endif
 
 #ifdef _KERNEL
 

@@ -262,6 +262,32 @@ net_getlifaddr(net_handle_t info, phy_if_t nic, lif_if_t ifdata,
 	    nelem, type, storage));
 }
 
+int
+net_getlifzone(net_handle_t info, phy_if_t phy_ifdata, lif_if_t ifdata,
+    zoneid_t *zoneid)
+{
+	ASSERT(info != NULL);
+
+	if (info->netd_condemned != 0 || info->netd_stack == NULL)
+		return (-1);
+
+	return (info->netd_info.neti_getlifzone(info, phy_ifdata, ifdata,
+	    zoneid));
+}
+
+int
+net_getlifflags(net_handle_t info, phy_if_t phy_ifdata, lif_if_t ifdata,
+    uint64_t *flags)
+{
+	ASSERT(info != NULL);
+
+	if (info->netd_condemned != 0 || info->netd_stack == NULL)
+		return (-1);
+
+	return (info->netd_info.neti_getlifflags(info, phy_ifdata, ifdata,
+	    flags));
+}
+
 phy_if_t
 net_phygetnext(net_handle_t info, phy_if_t nic)
 {

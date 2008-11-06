@@ -59,7 +59,8 @@ MMS Operator:::MMS Media Manager Operator:auths=solaris.smf.manage.mms,solaris.m
 MMS User:::MMS Tape User:auths=solaris.mms.io.*;help=RtMMSUser.html
 NDMP Management:::Manage the NDMP service:auths=solaris.smf.manage.ndmp,solaris.smf.value.ndmp,solaris.smf.read.ndmp;help=RtNdmpMngmnt.html
 Network Autoconf:::Manage network auto-magic configuration via nwamd:auths=solaris.network.autoconf;help=RtNetAutoconf.html
-Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns;profiles=Network Wifi Management,Inetd Management,Network Autoconf;help=RtNetMngmnt.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns;profiles=Network Wifi Management,Inetd Management,Network Autoconf,Network Observability;help=RtNetMngmnt.html
+Network Observability:::Allow access to observability devices:privs=net_observability;help=RtNetObservability.html
 Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html

@@ -7596,6 +7596,16 @@ mondo_loop() {
 	#
 	rm -f $root/usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-*-topology.xml
 
+	#
+	# Remove old SVVS lo driver and related files.  It was renamed to
+	# svvslo.  The renamed files will be extracted using their new names.
+	#
+	rm -f $usr/kernel/drv/lo.conf
+	rm -f $usr/kernel/drv/lo
+	rm -f $usr/kernel/drv/sparcv9/lo
+	rm -f $usr/kernel/drv/amd64/lo
+	rm -f $usr/include/sys/lo.h
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

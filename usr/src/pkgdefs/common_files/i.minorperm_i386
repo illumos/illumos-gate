@@ -221,6 +221,7 @@ openeepr:openprom
 wc:*
 ip:ip
 ip6:ip6
+ipnet:lo0
 icmp:icmp
 icmp6:icmp6
 udp:udp

@@ -249,6 +249,7 @@ f none usr/include/inet/ip6.h 644 root bin
 f none usr/include/inet/ip6_asp.h 644 root bin
 f none usr/include/inet/ipclassifier.h 644 root bin
 f none usr/include/inet/ipdrop.h 644 root bin
+f none usr/include/inet/ipnet.h 644 root bin
 f none usr/include/inet/ipp_common.h 644 root bin
 d none usr/include/inet/kssl 755 root bin
 f none usr/include/inet/kssl/ksslapi.h 644 root bin

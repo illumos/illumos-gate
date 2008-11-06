@@ -298,6 +298,7 @@ const struct ioc {
 	 */
 	{ (uint_t)DLIOCRAW,	"DLIOCRAW",	NULL },
 	{ (uint_t)DLIOCNATIVE,	"DLIOCNATIVE",	NULL },
+	{ (uint_t)DLIOCIPNETINFO, "DLIOCIPNETINFO", NULL},
 
 	{ (uint_t)LDOPEN,	"LDOPEN",	NULL },
 	{ (uint_t)LDCLOSE,	"LDCLOSE",	NULL },
@@ -607,8 +608,8 @@ const struct ioc {
 	{ (uint_t)SIOCTMYADDR,		"SIOCTMYADDR",	"sioc_addrreq" },
 	{ (uint_t)SIOCTONLINK,		"SIOCTONLINK",	"sioc_addrreq" },
 	{ (uint_t)SIOCTMYSITE,		"SIOCTMYSITE",	"sioc_addrreq" },
-	{ (uint_t)SIOCGTUNPARAM,	"SIOCGTUNPARAM",	"iftun_req" },
-	{ (uint_t)SIOCSTUNPARAM,	"SIOCSTUNPARAM",	"iftun_req" },
+	{ (uint_t)SIOCGTUNPARAM,        "SIOCGTUNPARAM",        "iftun_req" },
+	{ (uint_t)SIOCSTUNPARAM,        "SIOCSTUNPARAM",        "iftun_req" },
 	{ (uint_t)SIOCFIPSECONFIG,	"SIOCFIPSECONFIG",	NULL },
 	{ (uint_t)SIOCSIPSECONFIG,	"SIOCSIPSECONFIG",	NULL },
 	{ (uint_t)SIOCDIPSECONFIG,	"SIOCDIPSECONFIG",	NULL },

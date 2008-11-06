@@ -59,6 +59,10 @@ static int 		ip_getmtu(net_handle_t, phy_if_t, lif_if_t);
 static int 		ip_getpmtuenabled(net_handle_t);
 static int 		ip_getlifaddr(net_handle_t, phy_if_t, lif_if_t,
 			    size_t, net_ifaddr_t [], void *);
+static int		ip_getlifzone(net_handle_t, phy_if_t, lif_if_t,
+			    zoneid_t *);
+static int		ip_getlifflags(net_handle_t, phy_if_t, lif_if_t,
+			    uint64_t *);
 static phy_if_t		ip_phygetnext(net_handle_t, phy_if_t);
 static phy_if_t 	ip_phylookup(net_handle_t, const char *);
 static lif_if_t 	ip_lifgetnext(net_handle_t, phy_if_t, lif_if_t);
@@ -73,6 +77,10 @@ static int 		ipv6_getifname(net_handle_t, phy_if_t, char *,
 static int 		ipv6_getmtu(net_handle_t, phy_if_t, lif_if_t);
 static int 		ipv6_getlifaddr(net_handle_t, phy_if_t, lif_if_t,
 			    size_t, net_ifaddr_t [], void *);
+static int		ipv6_getlifzone(net_handle_t, phy_if_t, lif_if_t,
+			    zoneid_t *);
+static int		ipv6_getlifflags(net_handle_t, phy_if_t, lif_if_t,
+			    uint64_t *);
 static phy_if_t 	ipv6_phygetnext(net_handle_t, phy_if_t);
 static phy_if_t 	ipv6_phylookup(net_handle_t, const char *);
 static lif_if_t 	ipv6_lifgetnext(net_handle_t, phy_if_t, lif_if_t);
@@ -111,6 +119,8 @@ static net_protocol_t ipv4info = {
 	ip_getmtu,
 	ip_getpmtuenabled,
 	ip_getlifaddr,
+	ip_getlifzone,
+	ip_getlifflags,
 	ip_phygetnext,
 	ip_phylookup,
 	ip_lifgetnext,
@@ -128,6 +138,8 @@ static net_protocol_t ipv6info = {
 	ipv6_getmtu,
 	ip_getpmtuenabled,
 	ipv6_getlifaddr,
+	ipv6_getlifzone,
+	ipv6_getlifflags,
 	ipv6_phygetnext,
 	ipv6_phylookup,
 	ipv6_lifgetnext,
@@ -891,6 +903,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 	ip6_t *ip6h;
 	ire_t *ire;
 	mblk_t *mp;
+	zoneid_t zoneid;
 
 	ASSERT(packet != NULL);
 	ASSERT(packet->ni_packet != NULL);
@@ -935,6 +948,8 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 		 * provide similar functionality for IPv6.
 		 */
 		mp = packet->ni_packet;
+		zoneid =
+		    netstackid_to_zoneid(ipst->ips_netstack->netstack_stackid);
 
 		if (!isv6) {
 			struct sockaddr *sock;
@@ -946,8 +961,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 			 * Currently this function only supports IPv4.
 			 */
 			switch (ipfil_sendpkt(sock, mp, packet->ni_physical,
-			    netstackid_to_zoneid(
-			    ipst->ips_netstack->netstack_stackid))) {
+			    zoneid)) {
 			case 0 :
 			case EINPROGRESS:
 				return (0);
@@ -989,7 +1003,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 			    ire->ire_ipif->ipif_ill, ipha_t *, NULL, ip6_t *,
 			    ip6h, int, 1);
 			ip_wput_local_v6(ire->ire_rfq,
-			    ire->ire_ipif->ipif_ill, ip6h, mp, ire, 0);
+			    ire->ire_ipif->ipif_ill, ip6h, mp, ire, 0, zoneid);
 			ire_refrele(ire);
 			return (0);
 		}
@@ -1406,6 +1420,78 @@ ip_getifaddr_type(sa_family_t family, ipif_t *ill_ipif,
 
 	(void) memcpy(storage, src_addr, mem_size);
 	return (1);
+}
+
+/*
+ * Shared implementation to determine the zoneid associated with an IPv4/IPv6
+ * address
+ */
+static int
+ip_getlifzone_impl(sa_family_t family, phy_if_t phy_ifdata, lif_if_t ifdata,
+    ip_stack_t *ipst, zoneid_t *zoneid)
+{
+	ipif_t  *ipif;
+
+	ipif = ipif_getby_indexes((uint_t)phy_ifdata,
+	    UNMAP_IPIF_ID((uint_t)ifdata), (family == AF_INET6), ipst);
+	if (ipif == NULL)
+		return (-1);
+	*zoneid = IP_REAL_ZONEID(ipif->ipif_zoneid, ipst);
+	ipif_refrele(ipif);
+	return (0);
+}
+
+/*
+ * Determine the zoneid associated with an IPv4 address
+ */
+static int
+ip_getlifzone(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    zoneid_t *zoneid)
+{
+	return (ip_getlifzone_impl(AF_INET, phy_ifdata, ifdata,
+	    neti->netd_stack->nts_netstack->netstack_ip, zoneid));
+}
+
+/*
+ * Determine the zoneid associated with an IPv6 address
+ */
+static int
+ipv6_getlifzone(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    zoneid_t *zoneid)
+{
+	return (ip_getlifzone_impl(AF_INET6, phy_ifdata, ifdata,
+	    neti->netd_stack->nts_netstack->netstack_ip, zoneid));
+}
+
+static int
+ip_getlifflags_impl(sa_family_t family, phy_if_t phy_ifdata, lif_if_t ifdata,
+    ip_stack_t *ipst, uint64_t *flags)
+{
+	ipif_t *ipif;
+
+	ipif = ipif_getby_indexes((uint_t)phy_ifdata,
+	    UNMAP_IPIF_ID((uint_t)ifdata), (family == AF_INET6), ipst);
+	if (ipif == NULL)
+		return (-1);
+	*flags = ipif->ipif_flags;
+	ipif_refrele(ipif);
+	return (0);
+}
+
+static int
+ip_getlifflags(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    uint64_t *flags)
+{
+	return (ip_getlifflags_impl(AF_INET, phy_ifdata, ifdata,
+	    neti->netd_stack->nts_netstack->netstack_ip, flags));
+}
+
+static int
+ipv6_getlifflags(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    uint64_t *flags)
+{
+	return (ip_getlifflags_impl(AF_INET6, phy_ifdata, ifdata,
+	    neti->netd_stack->nts_netstack->netstack_ip, flags));
 }
 
 /*

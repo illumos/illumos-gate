@@ -35,11 +35,8 @@
 #ifndef	_SYS_DLPI_H
 #define	_SYS_DLPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
-
 #include <sys/types.h>
 #include <sys/stream.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -51,9 +48,20 @@ extern "C" {
 #define	DLIOCRAW	(DLIOC|1)	/* M_DATA "raw" mode */
 #define	DLIOCNATIVE	(DLIOC|2)	/* Native traffic mode */
 #define	DLIOCMARGININFO	(DLIOC|3)	/* margin size info */
+#define	DLIOCIPNETINFO	(DLIOC|4)	/* ipnet header */
 #define	DLIOCHDRINFO	(DLIOC|10)	/* IP fast-path */
-
 #define	DL_IOC_HDR_INFO	DLIOCHDRINFO
+
+#define	DL_IPNETINFO_VERSION	0x1
+
+typedef struct dl_ipnetinfo {
+	uint8_t		dli_version;	/* DL_IPNETINFO_* version */
+	uint8_t		dli_ipver;	/* packet IP header version */
+	uint16_t	dli_len;	/* length of dl_ipnetinfo_t */
+	uint32_t	dli_pad;	/* alignment pad */
+	uint64_t	dli_srczone; 	/* packet source zone ID (if any) */
+	uint64_t	dli_dstzone;	/* packet dest zone ID (if any) */
+} dl_ipnetinfo_t;
 
 /*
  * DLPI revision definition history
@@ -264,7 +272,7 @@ extern "C" {
 #define	DL_IPV6		0x80000002ul	/* IPv6 Tunnel Link */
 #define	SUNW_DL_VNI	0x80000003ul	/* Virtual network interface */
 #define	DL_WIFI		0x80000004ul	/* IEEE 802.11 */
-
+#define	DL_IPNET	0x80000005ul	/* ipnet(7D) link */
 /*
  * DLPI provider service supported.
  * These must be allowed to be bitwise-OR for dl_service_mode in

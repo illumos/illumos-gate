@@ -46,6 +46,8 @@ static int 	arp_getmtu(net_handle_t, phy_if_t, lif_if_t);
 static int 	arp_getpmtuenabled(net_handle_t);
 static int 	arp_getlifaddr(net_handle_t, phy_if_t, lif_if_t, size_t,
 		    net_ifaddr_t [], void *);
+static int	arp_getlifzone(net_handle_t, phy_if_t, lif_if_t, zoneid_t *);
+static int	arp_getlifflags(net_handle_t, phy_if_t, lif_if_t, uint64_t *);
 static phy_if_t arp_phygetnext(net_handle_t, phy_if_t);
 static phy_if_t arp_phylookup(net_handle_t, const char *);
 static lif_if_t arp_lifgetnext(net_handle_t, phy_if_t, lif_if_t);
@@ -61,6 +63,8 @@ static net_protocol_t arp_netinfo = {
 	arp_getmtu,
 	arp_getpmtuenabled,
 	arp_getlifaddr,
+	arp_getlifzone,
+	arp_getlifflags,
 	arp_phygetnext,
 	arp_phylookup,
 	arp_lifgetnext,
@@ -345,6 +349,28 @@ arp_ispartialchecksum(net_handle_t net, mblk_t *mb)
 /*ARGSUSED*/
 static int
 arp_isvalidchecksum(net_handle_t net, mblk_t *mb)
+{
+	return (-1);
+}
+
+/*
+ * Unsupported with ARP.
+ */
+/*ARGSUSED*/
+static int
+arp_getlifzone(net_handle_t net, phy_if_t phy_ifdata, lif_if_t ifdata,
+    zoneid_t *zoneid)
+{
+	return (-1);
+}
+
+/*
+ * Unsupported with ARP.
+ */
+/*ARGSUSED*/
+static int
+arp_getlifflags(net_handle_t net, phy_if_t phy_ifdata, lif_if_t ifdata,
+    uint64_t *flags)
 {
 	return (-1);
 }

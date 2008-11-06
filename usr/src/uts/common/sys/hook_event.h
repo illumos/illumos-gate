@@ -74,7 +74,9 @@ typedef enum nic_event {
 	NE_UNPLUMB,
 	NE_UP,
 	NE_DOWN,
-	NE_ADDRESS_CHANGE
+	NE_ADDRESS_CHANGE,
+	NE_LIF_UP,
+	NE_LIF_DOWN
 } nic_event_t;
 
 typedef void *nic_event_data_t;

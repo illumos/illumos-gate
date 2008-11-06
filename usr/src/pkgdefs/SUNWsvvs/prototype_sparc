@@ -1,8 +1,6 @@
 #
-# Copyright 1990-1993,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -29,7 +27,7 @@
 # SUNWsvvs
 #
 d none usr/kernel/drv/sparcv9 755 root sys  
-f none usr/kernel/drv/sparcv9/lo 755 root sys  
+f none usr/kernel/drv/sparcv9/svvslo 755 root sys  
 f none usr/kernel/drv/sparcv9/tidg 755 root sys  
 f none usr/kernel/drv/sparcv9/tivc 755 root sys  
 f none usr/kernel/drv/sparcv9/tmux 755 root sys  

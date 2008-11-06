@@ -292,7 +292,8 @@ typedef struct tcp_s {
 		tcp_cork : 1,		/* tcp_cork option */
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
 		tcp_lso :1,		/* Lower layer is capable of LSO */
-		tcp_pad_to_bit_31 : 17;
+		tcp_refuse :1,		/* Connection needs refusing */
+		tcp_pad_to_bit_31 : 16;
 
 	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
 
@@ -393,6 +394,10 @@ typedef struct tcp_s {
 	int	tcp_ip_hdr_len;		/* Byte len of our current IPvx hdr */
 	tcph_t	*tcp_tcph;		/* tcp header within combined hdr */
 	int32_t	tcp_tcp_hdr_len;	/* tcp header len within combined */
+	/* Saved peer headers in the case of re-fusion */
+	ipha_t	tcp_saved_ipha;
+	ip6_t	tcp_saved_ip6h;
+	tcph_t	tcp_saved_tcph;
 
 	uint32_t tcp_sum;		/* checksum to compensate for source */
 					/* routed packets. Host byte order */

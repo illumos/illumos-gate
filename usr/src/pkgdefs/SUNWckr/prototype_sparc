@@ -87,6 +87,7 @@ f none kernel/drv/sparcv9/i8042 755 root sys
 f none kernel/drv/sparcv9/icmp 755 root sys
 f none kernel/drv/sparcv9/icmp6 755 root sys
 f none kernel/drv/sparcv9/ip 755 root sys
+f none kernel/drv/sparcv9/ipnet 755 root sys
 f none kernel/drv/sparcv9/ip6 755 root sys
 f none kernel/drv/sparcv9/ippctl 755 root sys
 f none kernel/drv/sparcv9/ipsecah 755 root sys

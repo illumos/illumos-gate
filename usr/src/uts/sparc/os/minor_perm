@@ -44,9 +44,9 @@ fd:* 0666 root sys
 fasttrap:fasttrap 0666 root sys
 fssnap:* 0640 root sys
 fssnap:ctl 0666 root sys
+ipnet:lo0 0666 root sys
 kstat:* 0666 root sys
 ksyms:* 0666 root sys
-lo:* 0666 root sys
 lockstat:* 0644 root sys
 lofi:* 0600 root sys
 lofi:ctl 0644 root sys
@@ -82,6 +82,7 @@ su:[a-z],cu 0600 uucp uucp
 su:ssp 0600 root sys
 su:sspctl 0600 root sys
 SUNW,fdtwo:* 0666 root sys
+svvslo:* 0666 root sys
 sy:tty 0666 root tty
 sysmsg:msglog 0600 root sys
 sysmsg:sysmsg 0600 root sys

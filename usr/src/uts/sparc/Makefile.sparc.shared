@@ -204,7 +204,7 @@ ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
 DRV_KMODS	+= aggr arp bl bofi clone cn conskbd consms cpuid
 DRV_KMODS	+= crypto cryptoadm devinfo dump
 DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace
-DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipsecah
+DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipnet ipsecah
 DRV_KMODS	+= ipsecesp iwscn keysock kmdb kstat ksyms llc1
 DRV_KMODS	+= lofi
 DRV_KMODS	+= log logindmux kssl mm nca physmem pm poll pool
@@ -453,7 +453,7 @@ DACF_KMODS	+= consconfig_dacf
 #	delivered with a released system. However, during development
 #	it is convenient to build and install the SVVS kernel modules.
 #
-SVVS_KMODS	+= lmodb lmode lmodr lmodt lo tidg tivc tmux
+SVVS_KMODS	+= lmodb lmode lmodr lmodt svvslo tidg tivc tmux
 
 SVVS		+= svvs
 

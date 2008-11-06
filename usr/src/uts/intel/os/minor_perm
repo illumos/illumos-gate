@@ -43,9 +43,9 @@ fasttrap:fasttrap 0666 root sys
 fbt:fbt 0644 root sys
 fd:* 0666 root sys
 id:* 0640 root sys
+ipnet:lo0 0666 root sys
 kstat:* 0666 root sys
 ksyms:* 0666 root sys
-lo:* 0666 root sys
 lockstat:* 0644 root sys
 lofi:* 0600 root sys
 lofi:ctl 0644 root sys
@@ -73,6 +73,7 @@ sgen:* 0600 root sys
 cmdk:* 0640 root sys
 st:* 0666 root sys
 sdt:sdt 0644 root sys
+svvslo:* 0666 root sys
 sy:tty 0666 root tty
 sysmsg:msglog 0600 root sys
 sysmsg:sysmsg 0600 root sys

@@ -202,9 +202,12 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	 * around until tcp_accept_finish() is called on this eager --
 	 * this won't happen until we're done since we're inside the
 	 * eager's perimeter now.
+	 *
+	 * We can also get called in the case were a connection needs
+	 * to be re-fused. In this case tcp_saved_listener will be
+	 * NULL but tcp_refuse will be true.
 	 */
-	ASSERT(tcp->tcp_saved_listener != NULL);
-
+	ASSERT(tcp->tcp_saved_listener != NULL || tcp->tcp_refuse);
 	/*
 	 * Lookup peer endpoint; search for the remote endpoint having
 	 * the reversed address-port quadruplet in ESTABLISHED state,
@@ -329,36 +332,43 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		 * inherit the listener's q_hiwat value; this is temporary
 		 * since we'll repeat the process in tcp_accept_finish().
 		 */
-		(void) tcp_fuse_set_rcv_hiwat(tcp,
-		    tcp->tcp_saved_listener->tcp_rq->q_hiwat);
+		if (!tcp->tcp_refuse) {
+			(void) tcp_fuse_set_rcv_hiwat(tcp,
+			    tcp->tcp_saved_listener->tcp_rq->q_hiwat);
 
-		/*
-		 * Set the stream head's write offset value to zero since we
-		 * won't be needing any room for TCP/IP headers; tell it to
-		 * not break up the writes (this would reduce the amount of
-		 * work done by kmem); and configure our receive buffer.
-		 * Note that we can only do this for the active connect tcp
-		 * since our eager is still detached; it will be dealt with
-		 * later in tcp_accept_finish().
-		 */
-		DB_TYPE(mp) = M_SETOPTS;
-		mp->b_wptr += sizeof (*stropt);
+			/*
+			 * Set the stream head's write offset value to zero
+			 * since we won't be needing any room for TCP/IP
+			 * headers; tell it to not break up the writes (this
+			 * would reduce the amount of work done by kmem); and
+			 * configure our receive buffer. Note that we can only
+			 * do this for the active connect tcp since our eager
+			 * is still detached; it will be dealt with later in
+			 * tcp_accept_finish().
+			 */
+			DB_TYPE(mp) = M_SETOPTS;
+			mp->b_wptr += sizeof (*stropt);
 
-		stropt = (struct stroptions *)mp->b_rptr;
-		stropt->so_flags = SO_MAXBLK | SO_WROFF | SO_HIWAT;
-		stropt->so_maxblk = tcp_maxpsz_set(peer_tcp, B_FALSE);
-		stropt->so_wroff = 0;
+			stropt = (struct stroptions *)mp->b_rptr;
+			stropt->so_flags = SO_MAXBLK | SO_WROFF | SO_HIWAT;
+			stropt->so_maxblk = tcp_maxpsz_set(peer_tcp, B_FALSE);
+			stropt->so_wroff = 0;
 
-		/*
-		 * Record the stream head's high water mark for
-		 * peer endpoint; this is used for flow-control
-		 * purposes in tcp_fuse_output().
-		 */
-		stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(peer_tcp,
-		    peer_rq->q_hiwat);
+			/*
+			 * Record the stream head's high water mark for
+			 * peer endpoint; this is used for flow-control
+			 * purposes in tcp_fuse_output().
+			 */
+			stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(peer_tcp,
+			    peer_rq->q_hiwat);
 
-		/* Send the options up */
-		putnext(peer_rq, mp);
+			tcp->tcp_refuse = B_FALSE;
+			peer_tcp->tcp_refuse = B_FALSE;
+			/* Send the options up */
+			putnext(peer_rq, mp);
+		}
+		tcp->tcp_refuse = B_FALSE;
+		peer_tcp->tcp_refuse = B_FALSE;
 	} else {
 		TCP_STAT(tcps, tcp_fusion_unqualified);
 	}
@@ -410,6 +420,10 @@ tcp_unfuse(tcp_t *tcp)
 	/* Unfuse the endpoints */
 	peer_tcp->tcp_fused = tcp->tcp_fused = B_FALSE;
 	peer_tcp->tcp_loopback_peer = tcp->tcp_loopback_peer = NULL;
+	freeb(peer_tcp->tcp_fused_sigurg_mp);
+	freeb(tcp->tcp_fused_sigurg_mp);
+	peer_tcp->tcp_fused_sigurg_mp = NULL;
+	tcp->tcp_fused_sigurg_mp = NULL;
 }
 
 /*
@@ -536,8 +550,27 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	/* If this connection requires IP, unfuse and use regular path */
 	if (tcp_loopback_needs_ip(tcp, ns) ||
 	    tcp_loopback_needs_ip(peer_tcp, ns) ||
-	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst)) {
+	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst) ||
+	    list_head(&ipst->ips_ipobs_cb_list) != NULL) {
 		TCP_STAT(tcps, tcp_fusion_aborted);
+		tcp->tcp_refuse = B_TRUE;
+		peer_tcp->tcp_refuse = B_TRUE;
+
+		bcopy(peer_tcp->tcp_tcph, &tcp->tcp_saved_tcph,
+		    sizeof (tcph_t));
+		bcopy(tcp->tcp_tcph, &peer_tcp->tcp_saved_tcph,
+		    sizeof (tcph_t));
+		if (tcp->tcp_ipversion == IPV4_VERSION) {
+			bcopy(peer_tcp->tcp_ipha, &tcp->tcp_saved_ipha,
+			    sizeof (ipha_t));
+			bcopy(tcp->tcp_ipha, &peer_tcp->tcp_saved_ipha,
+			    sizeof (ipha_t));
+		} else {
+			bcopy(peer_tcp->tcp_ip6h, &tcp->tcp_saved_ip6h,
+			    sizeof (ip6_t));
+			bcopy(tcp->tcp_ip6h, &peer_tcp->tcp_saved_ip6h,
+			    sizeof (ip6_t));
+		}
 		goto unfuse;
 	}
 

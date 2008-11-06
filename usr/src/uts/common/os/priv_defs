@@ -223,6 +223,11 @@ privilege PRIV_NET_MAC_AWARE
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
+privilege PRIV_NET_OBSERVABILITY
+
+	Allows a process to access /dev/lo0 and the devices in /dev/ipnet/
+	while not requiring them to need PRIV_NET_RAWACCESS.
+
 privilege PRIV_NET_PRIVADDR
 
 	Allows a process to bind to a privileged port

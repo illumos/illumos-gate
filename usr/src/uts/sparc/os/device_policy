@@ -68,6 +68,12 @@ softmac		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 # Virtual network interface access permission
 #
 vni		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
+
+#
+# IP observability device access permission
+#
+ipnet		read_priv_set=net_observability write_priv_set=net_observability
+
 #
 # Disk devices.
 #

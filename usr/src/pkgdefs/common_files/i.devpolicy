@@ -50,7 +50,7 @@ do
 	rm -f $dest.$$
 
 	# potential additions
-	additions="aggr bge dnet keysock ibd icmp icmp6 ipsecah ipsecesp openeepr random spdsock vni ipf pfil scsi_vhci"
+	additions="aggr bge dnet keysock ibd icmp icmp6 ipnet ipsecah ipsecesp openeepr random spdsock vni ipf pfil scsi_vhci"
 
 	for dev in $additions
 	do

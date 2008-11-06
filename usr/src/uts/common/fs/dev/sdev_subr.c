@@ -614,6 +614,9 @@ static struct sdev_vop_table vtab[] =
 	{ "net", devnet_vnodeops_tbl, NULL, &devnet_vnodeops, devnet_validate,
 	SDEV_DYNAMIC | SDEV_VTOR },
 
+	{ "ipnet", devipnet_vnodeops_tbl, NULL, &devipnet_vnodeops,
+	devipnet_validate, SDEV_DYNAMIC | SDEV_VTOR | SDEV_NO_NCACHE },
+
 	{ NULL, NULL, NULL, NULL, NULL, 0}
 };
 
@@ -2328,7 +2331,7 @@ tryagain:
 		}
 	}
 
-
+lookup_create_node:
 	/* first thread that is doing the lookup on this node */
 	if (!dv) {
 		if (!rw_tryupgrade(&ddv->sdev_contents)) {
@@ -2451,6 +2454,24 @@ found:
 		switch (vtor(dv)) {
 		case SDEV_VTOR_VALID:
 			break;
+		case SDEV_VTOR_STALE:
+			/*
+			 * The name exists, but the cache entry is
+			 * stale and needs to be re-created.
+			 */
+			ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+			if (rw_tryupgrade(&ddv->sdev_contents) == 0) {
+				rw_exit(&ddv->sdev_contents);
+				rw_enter(&ddv->sdev_contents, RW_WRITER);
+			}
+			error = sdev_cache_update(ddv, &dv, nm,
+			    SDEV_CACHE_DELETE);
+			rw_downgrade(&ddv->sdev_contents);
+			if (error == 0) {
+				dv = NULL;
+				goto lookup_create_node;
+			}
+			/* FALLTHRU */
 		case SDEV_VTOR_INVALID:
 			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
 			sdcmn_err7(("lookup: destroy invalid "

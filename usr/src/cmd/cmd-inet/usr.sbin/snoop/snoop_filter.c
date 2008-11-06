@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -50,6 +48,7 @@
 #include <arpa/inet.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcent.h>
+#include <sys/dlpi.h>
 
 #include <snoop.h>
 #include "snoop_vlan.h"
@@ -92,6 +91,12 @@
 #define	AT_SRC_NET_OFFSET	14
 #define	AT_DST_NODE_OFFSET	16
 #define	AT_SRC_NODE_OFFSET	17
+
+/*
+ * Offset for the source and destination zoneid in the ipnet header.
+ */
+#define	IPNET_SRCZONE_OFFSET 8
+#define	IPNET_DSTZONE_OFFSET 16
 
 int eaddr;	/* need ethernet addr */
 
@@ -368,10 +373,10 @@ codeprint()
 			op++;
 			if ((int)*op < 0)
 				printf("\t%2d:   0x%08x (%d)\n",
-					op - oplist, *op, *op);
+				    op - oplist, *op, *op);
 			else
 				printf("\t%2d:   %d (0x%08x)\n",
-					op - oplist, *op, *op);
+				    op - oplist, *op, *op);
 		}
 	}
 	printf("\t%2d: STOP\n", op - oplist);
@@ -593,21 +598,21 @@ want_packet(uchar_t *pkt, int len, int origlen)
 
 			case 2:
 				*((ushort_t *)(sp)) =
-					*((ushort_t *)(base + off));
+				    *((ushort_t *)(base + off));
 				*(((ushort_t *)sp) + 1) =
-					*((ushort_t *)(base + off) + 1);
+				    *((ushort_t *)(base + off) + 1);
 				break;
 
 			case 1:
 			case 3:
 				*((uchar_t *)(sp)) =
-					*((uchar_t *)(base + off));
+				    *((uchar_t *)(base + off));
 				*(((uchar_t *)sp) + 1) =
-					*((uchar_t *)(base + off) + 1);
+				    *((uchar_t *)(base + off) + 1);
 				*(((uchar_t *)sp) + 2) =
-					*((uchar_t *)(base + off) + 2);
+				    *((uchar_t *)(base + off) + 2);
 				*(((uchar_t *)sp) + 3) =
-					*((uchar_t *)(base + off) + 3);
+				    *((uchar_t *)(base + off) + 3);
 				break;
 			}
 			*sp = ntohl(*sp);
@@ -917,41 +922,38 @@ want_packet(uchar_t *pkt, int len, int origlen)
 			break;
 		case OP_OFFSET_ETHERTYPE:
 			/*
-			 * Set base to the location of the ethertype.
-			 * If the packet is VLAN tagged, move base
-			 * to the ethertype field in the VLAN header.
-			 * Otherwise, set it to the appropriate field
-			 * for this link type.
+			 * Set base to the location of the ethertype as
+			 * appropriate for this link type.  Note that it's
+			 * not called "ethertype" for every link type, but
+			 * we need to call it something.
 			 */
 			if (offp >= &offstack[MAXSS])
 				return (0);
 			*++offp = base;
 			base = pkt + interface->network_type_offset;
+
+			/*
+			 * Below, we adjust the offset for unusual
+			 * link-layer headers that may have the protocol
+			 * type in a variable location beyond what was set
+			 * above.
+			 */
+			switch (interface->mac_type) {
+			case DL_ETHER:
+			case DL_CSMACD:
+				/*
+				 * If this is a VLAN-tagged packet, we need
+				 * to point to the ethertype field in the
+				 * VLAN header.  Move past the ethertype
+				 * field in the ethernet header.
+				 */
+				if (ntohs(get_u16(base)) == ETHERTYPE_VLAN)
+					base += (ENCAP_ETHERTYPE_OFF);
+				break;
+			}
 			if (base > pkt + len) {
 				/* Went too far, drop the packet */
 				return (0);
-			}
-
-			/*
-			 * VLAN links are only supported on Ethernet-like
-			 * links.
-			 */
-			if (interface->mac_type == DL_ETHER ||
-			    interface->mac_type == DL_CSMACD) {
-				if (ntohs(get_u16(base)) == ETHERTYPE_VLAN) {
-					/*
-					 * We need to point to the
-					 * ethertype field in the VLAN
-					 * tag, so also move past the
-					 * ethertype field in the
-					 * ethernet header.
-					 */
-					base += (ENCAP_ETHERTYPE_OFF);
-				}
-				if (base > pkt + len) {
-					/* Went too far, drop the packet */
-					return (0);
-				}
 			}
 			break;
 		}
@@ -1038,6 +1040,24 @@ compare_value_mask(uint_t offset, uint_t len, uint_t val, int mask)
 	emitop(OP_AND);
 	load_const(val);
 	emitop(OP_EQ);
+}
+
+/*
+ * Compare two zoneid's. The arg val passed in is stored in network
+ * byte order.
+ */
+static void
+compare_value_zone(uint_t offset, uint64_t val)
+{
+	int i;
+
+	for (i = 0; i < sizeof (uint64_t) / 4; i++) {
+		load_const(ntohl(((uint32_t *)&val)[i]));
+		load_value(offset + i * 4, 4);
+		emitop(OP_EQ);
+		if (i != 0)
+			emitop(OP_AND);
+	}
 }
 
 /* Emit an operator into the code array */
@@ -1253,7 +1273,7 @@ next()
 				tkp = p;
 			} else if (base == 16) {
 				size = 2 + strspn(token+2,
-					"0123456789abcdefABCDEF");
+				    "0123456789abcdefABCDEF");
 				size1 = p - token;
 				if (size != size1) {
 					tokentype = ALPHA;
@@ -1294,14 +1314,16 @@ next()
 	*tkp = '\0';
 }
 
-static struct match_type {
+typedef struct match_type {
 	char		*m_name;
 	int		m_offset;
 	int		m_size;
 	int		m_value;
 	int		m_depend;
 	enum optype	m_optype;
-} match_types[] = {
+} match_type_t;
+
+static match_type_t ether_match_types[] = {
 	/*
 	 * Table initialized assuming Ethernet data link headers.
 	 * m_offset is an offset beyond the offset op, which is why
@@ -1331,15 +1353,44 @@ static struct match_type {
 	0,		0,  0, 0,		 0,	0
 };
 
+static match_type_t ipnet_match_types[] = {
+	/*
+	 * Table initialized assuming Ethernet data link headers.
+	 * m_offset is an offset beyond the offset op, which is why
+	 * the offset is zero for when snoop needs to check an ethertype.
+	 */
+	"ip",		0,  2, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	-1,	OP_OFFSET_ETHERTYPE,
+	"ip6",		0,  2, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	-1,	OP_OFFSET_ETHERTYPE,
+	"tcp",		9,  1, IPPROTO_TCP,	 0,	OP_OFFSET_LINK,
+	"tcp",		6,  1, IPPROTO_TCP,	 1,	OP_OFFSET_LINK,
+	"udp",		9,  1, IPPROTO_UDP,	 0,	OP_OFFSET_LINK,
+	"udp",		6,  1, IPPROTO_UDP,	 1,	OP_OFFSET_LINK,
+	"icmp",		9,  1, IPPROTO_ICMP,	 0,	OP_OFFSET_LINK,
+	"icmp6",	6,  1, IPPROTO_ICMPV6,	 1,	OP_OFFSET_LINK,
+	"ospf",		9,  1, IPPROTO_OSPF,	 0,	OP_OFFSET_LINK,
+	"ospf",		6,  1, IPPROTO_OSPF,	 1,	OP_OFFSET_LINK,
+	"ip-in-ip",	9,  1, IPPROTO_ENCAP,	 0,	OP_OFFSET_LINK,
+	"esp",		9,  1, IPPROTO_ESP,	 0,	OP_OFFSET_LINK,
+	"esp",		6,  1, IPPROTO_ESP,	 1,	OP_OFFSET_LINK,
+	"ah",		9,  1, IPPROTO_AH,	 0,	OP_OFFSET_LINK,
+	"ah",		6,  1, IPPROTO_AH,	 1,	OP_OFFSET_LINK,
+	"sctp",		9,  1, IPPROTO_SCTP,	 0,	OP_OFFSET_LINK,
+	"sctp",		6,  1, IPPROTO_SCTP,	 1,	OP_OFFSET_LINK,
+	0,		0,  0, 0,		 0,	0
+};
+
 static void
-generate_check(struct match_type *mtp)
+generate_check(match_type_t match_types[], int index, int type)
 {
+	match_type_t *mtp = &match_types[index];
 	/*
 	 * Note: this code assumes the above dependencies are
 	 * not cyclic.  This *should* always be true.
 	 */
 	if (mtp->m_depend != -1)
-		generate_check(&match_types[mtp->m_depend]);
+		generate_check(match_types, mtp->m_depend, type);
 
 	emitop(mtp->m_optype);
 	load_value(mtp->m_offset, mtp->m_size);
@@ -1364,14 +1415,25 @@ static int
 comparison(char *s)
 {
 	unsigned int	i, n_checks = 0;
+	match_type_t	*match_types;
+
+	switch (interface->mac_type) {
+	case DL_ETHER:
+		match_types = ether_match_types;
+		break;
+	case DL_IPNET:
+		match_types = ipnet_match_types;
+		break;
+	default:
+		return (0);
+	}
 
 	for (i = 0; match_types[i].m_name != NULL; i++) {
-
 		if (strcmp(s, match_types[i].m_name) != 0)
 			continue;
 
 		n_checks++;
-		generate_check(&match_types[i]);
+		generate_check(match_types, i, interface->mac_type);
 		if (n_checks > 1)
 			emitop(OP_OR);
 	}
@@ -1416,11 +1478,9 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 	found_host = 0;
 
 	if (tokentype == ADDR_IP) {
-		hp = lgetipnodebyname(hostname, AF_INET,
-					0, &error_num);
+		hp = lgetipnodebyname(hostname, AF_INET, 0, &error_num);
 		if (hp == NULL) {
-			hp = getipnodebyname(hostname, AF_INET,
-							0, &error_num);
+			hp = getipnodebyname(hostname, AF_INET, 0, &error_num);
 			freehp = 1;
 		}
 		if (hp == NULL) {
@@ -1433,11 +1493,9 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 		}
 		inet_type = IPV4_ONLY;
 	} else if (tokentype == ADDR_IP6) {
-		hp = lgetipnodebyname(hostname, AF_INET6,
-					0, &error_num);
+		hp = lgetipnodebyname(hostname, AF_INET6, 0, &error_num);
 		if (hp == NULL) {
-			hp = getipnodebyname(hostname, AF_INET6,
-							0, &error_num);
+			hp = getipnodebyname(hostname, AF_INET6, 0, &error_num);
 			freehp = 1;
 		}
 		if (hp == NULL) {
@@ -1454,11 +1512,10 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 		switch (inet_type) {
 		case IPV4_ONLY:
 			/* Only IPv4 address is needed */
-			hp = lgetipnodebyname(hostname, AF_INET,
-						0, &error_num);
+			hp = lgetipnodebyname(hostname, AF_INET, 0, &error_num);
 			if (hp == NULL) {
-				hp = getipnodebyname(hostname, AF_INET,
-								0, &error_num);
+				hp = getipnodebyname(hostname, AF_INET,	0,
+				    &error_num);
 				freehp = 1;
 			}
 			if (hp != NULL) {
@@ -1467,11 +1524,11 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 			break;
 		case IPV6_ONLY:
 			/* Only IPv6 address is needed */
-			hp = lgetipnodebyname(hostname, AF_INET6,
-						0, &error_num);
+			hp = lgetipnodebyname(hostname, AF_INET6, 0,
+			    &error_num);
 			if (hp == NULL) {
-				hp = getipnodebyname(hostname, AF_INET6,
-								0, &error_num);
+				hp = getipnodebyname(hostname, AF_INET6, 0,
+				    &error_num);
 				freehp = 1;
 			}
 			if (hp != NULL) {
@@ -1481,10 +1538,10 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 		case IPV4_AND_IPV6:
 			/* Both IPv4 and IPv6 are needed */
 			hp = lgetipnodebyname(hostname, AF_INET6,
-					AI_ALL | AI_V4MAPPED, &error_num);
+			    AI_ALL | AI_V4MAPPED, &error_num);
 			if (hp == NULL) {
 				hp = getipnodebyname(hostname, AF_INET6,
-					AI_ALL | AI_V4MAPPED, &error_num);
+				    AI_ALL | AI_V4MAPPED, &error_num);
 				freehp = 1;
 			}
 			if (hp != NULL) {
@@ -1524,7 +1581,7 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 	 * The code below generates the filter.
 	 */
 	if (hp != NULL && hp->h_addrtype == AF_INET) {
-		ethertype_match(ETHERTYPE_IP);
+		ethertype_match(interface->network_type_ip);
 		emitop(OP_BRFL);
 		n = chain(n);
 		emitop(OP_OFFSET_LINK);
@@ -1560,7 +1617,8 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 		while (addr6ptr != NULL) {
 			if (IN6_IS_ADDR_V4MAPPED(addr6ptr)) {
 				if (first) {
-					ethertype_match(ETHERTYPE_IP);
+					ethertype_match(
+					    interface->network_type_ip);
 					emitop(OP_BRFL);
 					n = chain(n);
 					emitop(OP_OFFSET_LINK);
@@ -1604,7 +1662,8 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 						resolve_chain(n);
 						n = 0;
 					}
-					ethertype_match(ETHERTYPE_IPV6);
+					ethertype_match(
+					    interface->network_type_ipv6);
 					emitop(OP_BRFL);
 					n = chain(n);
 					emitop(OP_OFFSET_LINK);
@@ -1638,6 +1697,27 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
 	/* only free struct hostent returned by getipnodebyname() */
 	if (freehp) {
 		freehostent(hp);
+	}
+}
+
+/*
+ * Match on zoneid. The arg zone passed in is in network byte order.
+ */
+static void
+zone_match(enum direction which, uint64_t zone)
+{
+
+	switch (which) {
+	case TO:
+		compare_value_zone(IPNET_DSTZONE_OFFSET, zone);
+		break;
+	case FROM:
+		compare_value_zone(IPNET_SRCZONE_OFFSET, zone);
+		break;
+	case ANY:
+		compare_value_zone(IPNET_SRCZONE_OFFSET, zone);
+		compare_value_zone(IPNET_DSTZONE_OFFSET, zone);
+		emitop(OP_OR);
 	}
 }
 
@@ -1745,7 +1825,7 @@ etheraddr_match(enum direction which, char *hostname)
 		if (ether_hostton(hostname, &e))
 			if (!arp_for_ether(hostname, &e))
 				pr_err("cannot obtain ether addr for %s",
-					hostname);
+				    hostname);
 		ep = &e;
 	}
 	memcpy(&addr, (ushort_t *)ep, 4);
@@ -1809,11 +1889,20 @@ ethertype_match(int val)
 			emitop(OP_OFFSET_ZERO);
 		}
 	}
-	compare_value(ether_offset, 2, val);
+	compare_value(ether_offset, interface->network_type_len, val);
 	if (interface->mac_type == DL_ETHER ||
 	    interface->mac_type == DL_CSMACD) {
 		emitop(OP_OFFSET_POP);
 	}
+}
+
+static void
+ipnettype_match(int val)
+{
+	int ipnet_offset = interface->network_type_offset;
+
+	emitop(OP_OFFSET_ETHERTYPE);
+	compare_value(ipnet_offset, 2, val);
 }
 
 /*
@@ -1890,8 +1979,7 @@ port_match(enum direction which, char *portname)
 	} else {
 		sp = getservbyname(portname, NULL);
 		if (sp == NULL)
-			pr_err("invalid port number or name: %s",
-				portname);
+			pr_err("invalid port number or name: %s", portname);
 		port = ntohs(sp->s_port);
 	}
 
@@ -2216,7 +2304,7 @@ primary()
 		}
 
 		if (EQ("bootp") || EQ("dhcp")) {
-			ethertype_match(ETHERTYPE_IP);
+			ethertype_match(interface->network_type_ip);
 			emitop(OP_BRFL);
 			m = chain(0);
 			emitop(OP_OFFSET_LINK);
@@ -2241,7 +2329,7 @@ primary()
 		}
 
 		if (EQ("dhcp6")) {
-			ethertype_match(ETHERTYPE_IPV6);
+			ethertype_match(interface->network_type_ipv6);
 			emitop(OP_BRFL);
 			m = chain(0);
 			emitop(OP_OFFSET_LINK);
@@ -2343,7 +2431,7 @@ primary()
 			emitop(OP_OFFSET_POP);
 			emitop(OP_BRFL);
 			m = chain(0);
-			ethertype_match(ETHERTYPE_IP);
+			ethertype_match(interface->network_type_ip);
 			resolve_chain(m);
 			opstack++;
 			next();
@@ -2405,26 +2493,26 @@ primary()
 		}
 
 		if (EQ("slp")) {
-		    /* filter out TCP handshakes */
-		    emitop(OP_OFFSET_LINK);
-		    compare_value(9, 1, IPPROTO_TCP);
-		    emitop(OP_LOAD_CONST);
-		    emitval(52);
-		    emitop(OP_LOAD_CONST);
-		    emitval(2);
-		    emitop(OP_LOAD_SHORT);
-		    emitop(OP_GE);
-		    emitop(OP_AND);	/* proto == TCP && len < 52 */
-		    emitop(OP_NOT);
-		    emitop(OP_BRFL);	/* pkt too short to be a SLP call */
-		    m = chain(0);
+			/* filter out TCP handshakes */
+			emitop(OP_OFFSET_LINK);
+			compare_value(9, 1, IPPROTO_TCP);
+			emitop(OP_LOAD_CONST);
+			emitval(52);
+			emitop(OP_LOAD_CONST);
+			emitval(2);
+			emitop(OP_LOAD_SHORT);
+			emitop(OP_GE);
+			emitop(OP_AND);	/* proto == TCP && len < 52 */
+			emitop(OP_NOT);
+			emitop(OP_BRFL); /* pkt too short to be a SLP call */
+			m = chain(0);
 
-		    emitop(OP_OFFSET_POP);
-		    emitop(OP_OFFSET_SLP);
-		    resolve_chain(m);
-		    opstack++;
-		    next();
-		    break;
+			emitop(OP_OFFSET_POP);
+			emitop(OP_OFFSET_SLP);
+			resolve_chain(m);
+			opstack++;
+			next();
+			break;
 		}
 
 		if (EQ("ldap")) {
@@ -2436,6 +2524,16 @@ primary()
 		}
 
 		if (EQ("and") || EQ("or")) {
+			break;
+		}
+
+		if (EQ("zone")) {
+			next();
+			if (tokentype != NUMBER)
+				pr_err("zoneid expected");
+			zone_match(dir, BE_64((uint64_t)(tokenval)));
+			opstack++;
+			next();
 			break;
 		}
 

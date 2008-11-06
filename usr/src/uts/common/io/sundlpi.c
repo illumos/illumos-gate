@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Common Sun DLPI routines.
  */
@@ -583,6 +581,7 @@ dl_mactypestr(t_uscalar_t mactype)
 	case DL_IPV4:		return ("IPv4 Tunnel");
 	case DL_IPV6:		return ("IPv6 Tunnel");
 	case DL_WIFI:		return ("IEEE 802.11");
+	case DL_IPNET:		return ("IPNET");
 	default:		return ("<unknown mactype>");
 	}
 }

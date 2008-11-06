@@ -234,6 +234,7 @@ DRV_KMODS	+= intel_nb5000
 DRV_KMODS	+= ip
 DRV_KMODS	+= ip6
 DRV_KMODS	+= ipf
+DRV_KMODS       += ipnet
 DRV_KMODS	+= ippctl
 DRV_KMODS	+= ipsecah
 DRV_KMODS	+= ipsecesp
@@ -643,7 +644,7 @@ GENUNIX_KMODS	+= genunix
 #	delivered with a released system. However, during development
 #	it is convenient to build and install the SVVS kernel modules.
 #
-SVVS_KMODS	+= lmodb lmode lmodr lmodt lo tidg tivc tmux
+SVVS_KMODS	+= lmodb lmode lmodr lmodt svvslo tidg tivc tmux
 
 SVVS		+= svvs
 

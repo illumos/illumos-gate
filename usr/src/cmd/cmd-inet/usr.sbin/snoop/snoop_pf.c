@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS	*/
-
 #include <stdio.h>
 #include <stddef.h>
 #include <ctype.h>
@@ -44,6 +42,8 @@
 #include <netinet/if_ether.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
 #include <netdb.h>
 #include <rpc/rpc.h>
 #include <setjmp.h>
@@ -82,21 +82,154 @@ int opstack;	/* operand stack depth */
 #define	IPV6_ONLY	1
 #define	IPV4_AND_IPV6	2
 
-/*
- * The following constants represent the offsets in bytes from the beginning
- * of the packet of the link and IP(v6) layer source/destination/type fields,
- * initialized for Ethernet. Media specific code can set any unavailable
- * link layer property's offset to -1 to indicate that the property's value
- * is not available from the frame.
- */
-static int link_header_len = 14, link_type_offset = 12;
-static int link_dest_offset = 0, link_src_offset = 6;
-static int link_addr_len = 6;
+typedef struct {
+	int	transport_protocol;
+	int	network_protocol;
+	/*
+	 * offset is the offset in bytes from the beginning
+	 * of the network protocol header to where the transport
+	 * protocol type is.
+	 */
+	int	offset;
+} transport_protocol_table_t;
 
-#define	IPV4_SRCADDR_OFFSET	(link_header_len + 12)
-#define	IPV4_DSTADDR_OFFSET	(link_header_len + 16)
-#define	IPV6_SRCADDR_OFFSET	(link_header_len + 8)
-#define	IPV6_DSTADDR_OFFSET	(link_header_len + 24)
+typedef struct network_table {
+	char *nmt_name;
+	int nmt_val;
+} network_table_t;
+
+static network_table_t ether_network_mapping_table[] = {
+	{ "pup", ETHERTYPE_PUP },
+	{ "ip", ETHERTYPE_IP },
+	{ "arp", ETHERTYPE_ARP },
+	{ "revarp", ETHERTYPE_REVARP },
+	{ "at", ETHERTYPE_AT },
+	{ "aarp", ETHERTYPE_AARP },
+	{ "vlan", ETHERTYPE_VLAN },
+	{ "ip6", ETHERTYPE_IPV6 },
+	{ "slow", ETHERTYPE_SLOW },
+	{ "ppoed", ETHERTYPE_PPPOED },
+	{ "ppoes", ETHERTYPE_PPPOES },
+	{ "NULL", -1 }
+
+};
+
+static network_table_t ib_network_mapping_table[] = {
+	{ "pup", ETHERTYPE_PUP },
+	{ "ip", ETHERTYPE_IP },
+	{ "arp", ETHERTYPE_ARP },
+	{ "revarp", ETHERTYPE_REVARP },
+	{ "at", ETHERTYPE_AT },
+	{ "aarp", ETHERTYPE_AARP },
+	{ "vlan", ETHERTYPE_VLAN },
+	{ "ip6", ETHERTYPE_IPV6 },
+	{ "slow", ETHERTYPE_SLOW },
+	{ "ppoed", ETHERTYPE_PPPOED },
+	{ "ppoes", ETHERTYPE_PPPOES },
+	{ "NULL", -1 }
+
+};
+
+static network_table_t ipnet_network_mapping_table[] = {
+	{ "ip", (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION) },
+	{ "ip6", (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION) },
+	{ "NULL", -1 }
+
+};
+
+static transport_protocol_table_t ether_transport_mapping_table[] = {
+	{IPPROTO_TCP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_TCP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMPV6, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ENCAP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{-1, 0, 0}	/* must be the final entry */
+};
+
+static transport_protocol_table_t ipnet_transport_mapping_table[] = {
+	{IPPROTO_TCP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_TCP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMPV6, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ENCAP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	    IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	    IPV6_TYPE_HEADER_OFFSET},
+	{-1, 0, 0}	/* must be the final entry */
+};
+
+static transport_protocol_table_t ib_transport_mapping_table[] = {
+	{IPPROTO_TCP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_TCP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMPV6, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ENCAP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{-1, 0, 0}	/* must be the final entry */
+};
+
+typedef struct datalink {
+	uint_t	dl_type;
+	void	(*dl_match_fn)(uint_t datatype);
+	transport_protocol_table_t *dl_transport_mapping_table;
+	network_table_t *dl_net_map_tbl;
+	int dl_link_header_len;
+	int dl_link_type_offset;
+	int dl_link_dest_offset;
+	int dl_link_src_offset;
+	int dl_link_addr_len;
+} datalink_t;
+
+datalink_t	dl;
+
+#define	IPV4_SRCADDR_OFFSET	(dl.dl_link_header_len + 12)
+#define	IPV4_DSTADDR_OFFSET	(dl.dl_link_header_len + 16)
+#define	IPV6_SRCADDR_OFFSET	(dl.dl_link_header_len + 8)
+#define	IPV6_DSTADDR_OFFSET	(dl.dl_link_header_len + 24)
+
+#define	IPNET_SRCZONE_OFFSET 8
+#define	IPNET_DSTZONE_OFFSET 16
 
 static int inBrace = 0, inBraceOR = 0;
 static int foundOR = 0;
@@ -116,6 +249,8 @@ static void pf_check_vlan_tag(uint_t offset);
 static void pf_clear_offset_register();
 static void pf_emit_load_offset(uint_t offset);
 static void pf_match_ethertype(uint_t ethertype);
+static void pf_match_ipnettype(uint_t type);
+static void pf_match_ibtype(uint_t type);
 static void pf_check_transport_protocol(uint_t transport_protocol);
 static void pf_compare_value_mask_generic(int offset, uint_t len,
     uint_t val, int mask, uint_t op);
@@ -441,6 +576,24 @@ pf_compare_value_mask_generic(int offset, uint_t len, uint_t val, int mask,
 }
 
 /*
+ * Like pf_compare_value() but compare on a 64-bit zoneid value.
+ * The argument val passed in is in network byte order.
+ */
+static void
+pf_compare_zoneid(int offset, uint64_t val)
+{
+	int i;
+
+	for (i = 0; i < sizeof (uint64_t) / 2; i ++) {
+		pf_emit(ENF_PUSHWORD + offset / 2 + i);
+		pf_emit(ENF_PUSHLIT | ENF_EQ);
+		pf_emit(((uint16_t *)&val)[i]);
+		if (i != 0)
+			pf_emit(ENF_AND);
+	}
+}
+
+/*
  * Generate pf code to match an IPv4 or IPv6 address.
  */
 static void
@@ -549,8 +702,16 @@ pf_ipaddr_match(which, hostname, inet_type)
 	}
 
 	if (hp != NULL && hp->h_addrtype == AF_INET) {
-		pf_match_ethertype(ETHERTYPE_IP);
-		pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
+		for (; dl.dl_net_map_tbl->nmt_val != -1;
+		    dl.dl_net_map_tbl++) {
+			if (strcmp("ip",
+				dl.dl_net_map_tbl->nmt_name) == 0) {
+				dl.dl_match_fn(
+					dl.dl_net_map_tbl->nmt_val);
+			}
+		}
+		if (dl.dl_type == DL_ETHER)
+			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
 		h_addr_index = 0;
 		addr4ptr = (uint_t *)hp->h_addr_list[h_addr_index];
 		while (addr4ptr != NULL) {
@@ -579,9 +740,21 @@ pf_ipaddr_match(which, hostname, inet_type)
 		while (addr6ptr != NULL) {
 			if (IN6_IS_ADDR_V4MAPPED(addr6ptr)) {
 				if (first) {
-					pf_match_ethertype(ETHERTYPE_IP);
-					pf_check_vlan_tag(
-					    ENCAP_ETHERTYPE_OFF/2);
+					for (; dl.dl_net_map_tbl->nmt_val != -1;
+					    dl.dl_net_map_tbl++) {
+						if (strcmp("ip",
+							dl.dl_net_map_tbl->
+							nmt_name) == 0) {
+							dl.dl_match_fn(
+								dl.
+								dl_net_map_tbl->
+								nmt_val);
+						}
+					}
+					if (dl.dl_type == DL_ETHER) {
+						pf_check_vlan_tag(
+							ENCAP_ETHERTYPE_OFF/2);
+					}
 					pass++;
 				}
 				IN6_V4MAPPED_TO_INADDR(addr6ptr,
@@ -616,9 +789,21 @@ pf_ipaddr_match(which, hostname, inet_type)
 		while (addr6ptr != NULL) {
 			if (!IN6_IS_ADDR_V4MAPPED(addr6ptr)) {
 				if (first) {
-					pf_match_ethertype(ETHERTYPE_IPV6);
-					pf_check_vlan_tag(
-					    ENCAP_ETHERTYPE_OFF/2);
+					for (; dl.dl_net_map_tbl->nmt_val != -1;
+					    dl.dl_net_map_tbl++) {
+						if (strcmp("ip6",
+							dl.dl_net_map_tbl->
+							nmt_name) == 0) {
+							dl.dl_match_fn(
+								dl.
+								dl_net_map_tbl->
+								nmt_val);
+						}
+					}
+					if (dl.dl_type == DL_ETHER) {
+						pf_check_vlan_tag(
+							ENCAP_ETHERTYPE_OFF/2);
+					}
 					pass++;
 				}
 				if (addr6offset == -1) {
@@ -716,17 +901,17 @@ pf_etheraddr_match(which, hostname)
 
 	switch (which) {
 	case TO:
-		pf_compare_address(link_dest_offset, link_addr_len,
+		pf_compare_address(dl.dl_link_dest_offset, dl.dl_link_addr_len,
 		    (uchar_t *)ep);
 		break;
 	case FROM:
-		pf_compare_address(link_src_offset, link_addr_len,
+		pf_compare_address(dl.dl_link_src_offset, dl.dl_link_addr_len,
 		    (uchar_t *)ep);
 		break;
 	case ANY:
-		pf_compare_address(link_dest_offset, link_addr_len,
+		pf_compare_address(dl.dl_link_dest_offset, dl.dl_link_addr_len,
 		    (uchar_t *)ep);
-		pf_compare_address(link_src_offset, link_addr_len,
+		pf_compare_address(dl.dl_link_src_offset, dl.dl_link_addr_len,
 		    (uchar_t *)ep);
 		pf_emit(ENF_OR);
 		break;
@@ -780,6 +965,31 @@ pf_netaddr_match(which, netname)
 	case ANY:
 		pf_compare_value_mask(IPV4_SRCADDR_OFFSET, 4, addr, mask);
 		pf_compare_value_mask(IPV4_DSTADDR_OFFSET, 4, addr, mask);
+		pf_emit(ENF_OR);
+		break;
+	}
+}
+
+/*
+ * Emit code to match on src or destination zoneid.
+ * The zoneid passed in is in network byte order.
+ */
+static void
+pf_match_zone(enum direction which, uint64_t zoneid)
+{
+	if (dl.dl_type != DL_IPNET)
+		pr_err("zone filter option unsupported on media");
+
+	switch (which) {
+	case TO:
+		pf_compare_zoneid(IPNET_DSTZONE_OFFSET, zoneid);
+		break;
+	case FROM:
+		pf_compare_zoneid(IPNET_SRCZONE_OFFSET, zoneid);
+		break;
+	case ANY:
+		pf_compare_zoneid(IPNET_SRCZONE_OFFSET, zoneid);
+		pf_compare_zoneid(IPNET_DSTZONE_OFFSET, zoneid);
 		pf_emit(ENF_OR);
 		break;
 	}
@@ -863,7 +1073,8 @@ pf_check_vlan_tag(uint_t offset)
 		/*
 		 * Check the ethertype.
 		 */
-		pf_compare_value(link_type_offset, 2, htons(ETHERTYPE_VLAN));
+		pf_compare_value(dl.dl_link_type_offset, 2,
+		    htons(ETHERTYPE_VLAN));
 
 		/*
 		 * And if it's not VLAN, don't load offset to the offset
@@ -929,38 +1140,20 @@ pf_match_ethertype(uint_t ethertype)
 	else
 		pf_check_vlan_tag(2);
 
-	pf_compare_value(link_type_offset, 2, htons(ethertype));
+	pf_compare_value(dl.dl_link_type_offset, 2, htons(ethertype));
 }
 
-typedef struct {
-	int	transport_protocol;
-	int	network_protocol;
-	/*
-	 * offset is the offset in bytes from the beginning
-	 * of the network protocol header to where the transport
-	 * protocol type is.
-	 */
-	int	offset;
-} transport_protocol_table_t;
+static void
+pf_match_ipnettype(uint_t type)
+{
+	pf_compare_value(dl.dl_link_type_offset, 2, htons(type));
+}
 
-static transport_protocol_table_t mapping_table[] = {
-	{IPPROTO_TCP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_TCP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_UDP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_UDP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_OSPF, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_OSPF, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_SCTP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_SCTP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_ICMP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_ICMPV6, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_ENCAP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_ESP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_ESP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_AH, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_AH, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
-	{-1, 0, 0}	/* must be the final entry */
-};
+static void
+pf_match_ibtype(uint_t type)
+{
+	pf_compare_value(dl.dl_link_type_offset, 2, htons(type));
+}
 
 /*
  * This function uses the table above to generate a
@@ -979,14 +1172,17 @@ pf_check_transport_protocol(uint_t transport_protocol)
 	int i = 0;
 	uint_t number_of_matches = 0;
 
-	for (i = 0; mapping_table[i].transport_protocol != -1; i++) {
+	for (; dl.dl_transport_mapping_table->transport_protocol != -1;
+	    dl.dl_transport_mapping_table++) {
 		if (transport_protocol ==
-		    (uint_t)mapping_table[i].transport_protocol) {
+		    (uint_t)dl.dl_transport_mapping_table->transport_protocol) {
 			number_of_matches++;
-			pf_match_ethertype(mapping_table[i].network_protocol);
+			dl.dl_match_fn(dl.dl_transport_mapping_table->
+			    network_protocol);
 			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
 			pf_compare_value(
-			    mapping_table[i].offset + link_header_len, 1,
+			    dl.dl_transport_mapping_table->offset +
+			    dl.dl_link_header_len, 1,
 			    transport_protocol);
 			pf_emit(ENF_AND);
 			if (number_of_matches > 1) {
@@ -1003,6 +1199,15 @@ pf_check_transport_protocol(uint_t transport_protocol)
 }
 
 static void
+pf_matchfn(char *proto)
+{
+	for (; dl.dl_net_map_tbl->nmt_val != -1; dl.dl_net_map_tbl++) {
+		if (strcmp(proto, dl.dl_net_map_tbl->nmt_name) == 0)
+			dl.dl_match_fn(dl.dl_net_map_tbl->nmt_val);
+	}
+}
+
+static void
 pf_primary()
 {
 	for (;;) {
@@ -1010,21 +1215,21 @@ pf_primary()
 			break;
 
 		if (EQ("ip")) {
-			pf_match_ethertype(ETHERTYPE_IP);
+			pf_matchfn("ip");
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("ip6")) {
-			pf_match_ethertype(ETHERTYPE_IPV6);
+			pf_matchfn("ip6");
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("pppoe")) {
-			pf_match_ethertype(ETHERTYPE_PPPOED);
+			pf_matchfn("pppoe");
 			pf_match_ethertype(ETHERTYPE_PPPOES);
 			pf_emit(ENF_OR);
 			opstack++;
@@ -1033,28 +1238,28 @@ pf_primary()
 		}
 
 		if (EQ("pppoed")) {
-			pf_match_ethertype(ETHERTYPE_PPPOED);
+			pf_matchfn("pppoed");
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("pppoes")) {
-			pf_match_ethertype(ETHERTYPE_PPPOES);
+			pf_matchfn("pppoes");
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("arp")) {
-			pf_match_ethertype(ETHERTYPE_ARP);
+			pf_matchfn("arp");
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("vlan")) {
-			pf_match_ethertype(ETHERTYPE_VLAN);
+			pf_matchfn("vlan");
 			pf_compare_value_mask_neq(VLAN_ID_OFFSET, 2,
 			    0, VLAN_ID_MASK);
 			pf_emit(ENF_AND);
@@ -1067,7 +1272,7 @@ pf_primary()
 			next();
 			if (tokentype != NUMBER)
 				pr_err("VLAN ID expected");
-			pf_match_ethertype(ETHERTYPE_VLAN);
+			pf_matchfn("vlan-id");
 			pf_compare_value_mask(VLAN_ID_OFFSET, 2, tokenval,
 			    VLAN_ID_MASK);
 			pf_emit(ENF_AND);
@@ -1077,7 +1282,7 @@ pf_primary()
 		}
 
 		if (EQ("rarp")) {
-			pf_match_ethertype(ETHERTYPE_REVARP);
+			pf_matchfn("rarp");
 			opstack++;
 			next();
 			break;
@@ -1208,7 +1413,7 @@ pf_primary()
 				pr_err("IP proto type expected");
 			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
 			pf_compare_value(
-			    IPV4_TYPE_HEADER_OFFSET + link_header_len, 1,
+			    IPV4_TYPE_HEADER_OFFSET + dl.dl_link_header_len, 1,
 			    tokenval);
 			opstack++;
 			next();
@@ -1217,7 +1422,7 @@ pf_primary()
 
 		if (EQ("broadcast")) {
 			pf_clear_offset_register();
-			pf_compare_value(link_dest_offset, 4, 0xffffffff);
+			pf_compare_value(dl.dl_link_dest_offset, 4, 0xffffffff);
 			opstack++;
 			next();
 			break;
@@ -1225,7 +1430,8 @@ pf_primary()
 
 		if (EQ("multicast")) {
 			pf_clear_offset_register();
-			pf_compare_value_mask(link_dest_offset, 1, 0x01, 0x01);
+			pf_compare_value_mask(
+			    dl.dl_link_dest_offset, 1, 0x01, 0x01);
 			opstack++;
 			next();
 			break;
@@ -1249,6 +1455,16 @@ pf_primary()
 			next();
 			pf_netaddr_match(dir, token);
 			dir = ANY;
+			opstack++;
+			next();
+			break;
+		}
+
+		if (EQ("zone")) {
+			next();
+			if (tokentype != NUMBER)
+				pr_err("zoneid expected after inet");
+			pf_match_zone(dir, BE_64((uint64_t)(tokenval)));
 			opstack++;
 			next();
 			break;
@@ -1357,11 +1573,44 @@ pf_compile(e, print)
 	/*
 	 * Set media specific packet offsets that this code uses.
 	 */
+	if (interface->mac_type == DL_ETHER) {
+		dl.dl_type = DL_ETHER;
+		dl.dl_match_fn = pf_match_ethertype;
+		dl.dl_transport_mapping_table =
+		    &ether_transport_mapping_table[0];
+		dl.dl_net_map_tbl =
+		    &ether_network_mapping_table[0];
+		dl.dl_link_header_len = 14;
+		dl.dl_link_type_offset = 12;
+		dl.dl_link_dest_offset = 0;
+		dl.dl_link_src_offset = 6;
+		dl.dl_link_addr_len = 6;
+	}
+
 	if (interface->mac_type == DL_IB) {
-		link_header_len = 4;
-		link_type_offset = 0;
-		link_dest_offset = link_src_offset = -1;
-		link_addr_len = 20;
+		dl.dl_type = DL_IB;
+		dl.dl_link_header_len = 4;
+		dl.dl_link_type_offset = 0;
+		dl.dl_link_dest_offset = dl.dl_link_src_offset = -1;
+		dl.dl_link_addr_len = 20;
+		dl.dl_match_fn = pf_match_ibtype;
+		dl.dl_transport_mapping_table =
+		    &ib_transport_mapping_table[0];
+		dl.dl_net_map_tbl =
+		    &ib_network_mapping_table[0];
+	}
+
+	if (interface->mac_type == DL_IPNET) {
+		dl.dl_type = DL_IPNET;
+		dl.dl_link_header_len = 24;
+		dl.dl_link_type_offset = 0;
+		dl.dl_link_dest_offset = dl.dl_link_src_offset = -1;
+		dl.dl_link_addr_len = -1;
+		dl.dl_match_fn = pf_match_ipnettype;
+		dl.dl_transport_mapping_table =
+		    &ipnet_transport_mapping_table[0];
+		dl.dl_net_map_tbl =
+		    &ipnet_network_mapping_table[0];
 	}
 
 	next();

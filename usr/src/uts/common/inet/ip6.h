@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IP6_H
 #define	_INET_IP6_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -366,7 +364,7 @@ extern int	ip_total_hdrs_len_v6(ip6_pkt_t *);
 extern int	ipsec_ah_get_hdr_size_v6(mblk_t *, boolean_t);
 extern void	ip_wput_v6(queue_t *, mblk_t *);
 extern void	ip_wput_local_v6(queue_t *, ill_t *, ip6_t *, mblk_t *,
-    ire_t *, int);
+    ire_t *, int, zoneid_t);
 extern void	ip_output_v6(void *, mblk_t *, void *, int);
 extern void	ip_xmit_v6(mblk_t *, ire_t *, uint_t, conn_t *, int,
     struct ipsec_out_s *);

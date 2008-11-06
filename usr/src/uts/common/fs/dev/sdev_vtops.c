@@ -285,6 +285,7 @@ devvt_prunedir(struct sdev_node *ddv)
 		case SDEV_VTOR_SKIP:
 			continue;
 		case SDEV_VTOR_INVALID:
+		case SDEV_VTOR_STALE:
 			sdcmn_err7(("destroy invalid "
 			    "node: %s(%p)\n", dv->sdev_name, (void *)dv));
 			break;

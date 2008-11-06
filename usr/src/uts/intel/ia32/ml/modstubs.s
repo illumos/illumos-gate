@@ -1330,6 +1330,13 @@ fcnname/**/_info:							\
 	END_MODULE(dcopy);
 #endif
 
+#ifndef IPNET_MODULE
+	MODULE(ipnet,drv);
+	STUB(ipnet, ipnet_if_getdev, nomod_zero);
+	STUB(ipnet, ipnet_walk_if, nomod_zero);
+	END_MODULE(ipnet);
+#endif
+
 / this is just a marker for the area of text that contains stubs 
 
 	ENTRY_NP(stubs_end)

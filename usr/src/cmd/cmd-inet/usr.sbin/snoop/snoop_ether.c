@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,36 +41,50 @@
 #include <sys/ib/clients/ibd/ibd.h>
 #include <sys/ethernet.h>
 #include <sys/vlan.h>
+#include <sys/zone.h>
+#include <sys/byteorder.h>
+#include <limits.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
 
 #include "at.h"
 #include "snoop.h"
 
-static	uint_t ether_header_len(char *), fddi_header_len(char *),
-		tr_header_len(char *), ib_header_len(char *);
+static uint_t ether_header_len(char *), fddi_header_len(char *),
+	tr_header_len(char *), ib_header_len(char *), ipnet_header_len(char *);
 static uint_t interpret_ether(), interpret_fddi(), interpret_tr();
-static uint_t interpret_ib(int, char *, int, int);
+static uint_t interpret_ib(int, char *, int, int),
+	interpret_ipnet(int, char *, int, int);
 static void addr_copy_swap(struct ether_addr *, struct ether_addr *);
 
 interface_t *interface;
 interface_t INTERFACES[] = {
 
 	/* IEEE 802.3 CSMA/CD network */
-	{ DL_CSMACD, 1550, 12, ether_header_len, interpret_ether, B_TRUE },
+	{ DL_CSMACD, 1550, 12, 2, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ether_header_len, interpret_ether, B_TRUE },
 
 	/* Ethernet Bus */
-	{ DL_ETHER, 1550, 12, ether_header_len, interpret_ether, B_TRUE },
+	{ DL_ETHER, 1550, 12, 2, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ether_header_len, interpret_ether, B_TRUE },
 
 	/* Fiber Distributed data interface */
-	{ DL_FDDI, 4500, 19, fddi_header_len, interpret_fddi, B_FALSE },
+	{ DL_FDDI, 4500, 19, 2, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    fddi_header_len, interpret_fddi, B_FALSE },
 
 	/* Token Ring interface */
-	{ DL_TPR, 17800, 0, tr_header_len, interpret_tr, B_FALSE },
+	{ DL_TPR, 17800, 0, 2, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    tr_header_len, interpret_tr, B_FALSE },
 
 	/* Infiniband */
-	{ DL_IB, 4096, 0, ib_header_len, interpret_ib, B_TRUE },
+	{ DL_IB, 4096, 0, 2, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ib_header_len, interpret_ib, B_TRUE },
 
-	{ (uint_t)-1, 0, 0, 0, 0, 0 }
+	/* ipnet */
+	{ DL_IPNET, INT_MAX, 0, 2, IPV4_VERSION, IPV6_VERSION,
+	    ipnet_header_len, interpret_ipnet, B_TRUE },
 
+	{ (uint_t)-1, 0, 0, 0, 0, NULL, NULL, B_FALSE }
 };
 
 /* externals */
@@ -698,7 +710,7 @@ print_sr(struct tr_ri *rh)
 	static char line[512];
 
 	sprintf(line, "TR Source Route dir=%d, mtu=%d",
-			rh->dir, Mtutab[rh->mtu]);
+	    rh->dir, Mtutab[rh->mtu]);
 
 	hops = (int)(rh->len - 2) / (int)2;
 
@@ -1516,7 +1528,7 @@ interpret_ib(int flags, char *header, int elen, int origlen)
 	if (origlen < IPOIB_HDRSIZE) {
 		if (flags & F_SUM)
 			(void) snprintf(get_sum_line(), MAXLINE,
-				"RUNT (short packet - %d bytes)", origlen);
+			    "RUNT (short packet - %d bytes)", origlen);
 		if (flags & F_DTAIL)
 			show_header("RUNT:  ", "Short packet", origlen);
 		return (elen);
@@ -1536,24 +1548,24 @@ interpret_ib(int flags, char *header, int elen, int origlen)
 
 	if (flags & F_SUM) {
 		(void) snprintf(get_sum_line(), MAXLINE,
-			"IPIB Type=%04X (%s), size = %d bytes",
-			ethertype,
-			print_ethertype(ethertype),
-			origlen);
+		    "IPIB Type=%04X (%s), size = %d bytes",
+		    ethertype,
+		    print_ethertype(ethertype),
+		    origlen);
 	}
 
 	if (flags & F_DTAIL) {
 		show_header("IPIB:  ", "IPIB Header", elen);
 		show_space();
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-			"Packet %d arrived at %d:%02d:%d.%02d",
-			pi_frame, pi_time_hour, pi_time_min,
-			pi_time_sec, pi_time_usec / 10000);
+		    "Packet %d arrived at %d:%02d:%d.%02d",
+		    pi_frame, pi_time_hour, pi_time_min,
+		    pi_time_sec, pi_time_usec / 10000);
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-			"Packet size = %d bytes", elen, elen);
+		    "Packet size = %d bytes", elen, elen);
 		(void) snprintf(get_line(0, 2), get_line_remain(),
-			"Ethertype = %04X (%s)", ethertype,
-			print_ethertype(ethertype));
+		    "Ethertype = %04X (%s)", ethertype,
+		    print_ethertype(ethertype));
 		show_space();
 	}
 
@@ -1572,4 +1584,86 @@ interpret_ib(int flags, char *header, int elen, int origlen)
 	}
 
 	return (elen);
+}
+
+uint_t
+ipnet_header_len(char *hdr)
+{
+	return (sizeof (dl_ipnetinfo_t));
+}
+
+#define	MAX_UINT64_STR	22
+static uint_t
+interpret_ipnet(int flags, char *header, int elen, int origlen)
+{
+	dl_ipnetinfo_t dl;
+	size_t len = elen - sizeof (dl_ipnetinfo_t);
+	char *off = (char *)header + sizeof (dl_ipnetinfo_t);
+	int blen = MAX(origlen, 8252);
+	char szone[MAX_UINT64_STR];
+	char dzone[MAX_UINT64_STR];
+
+	(void) memcpy(&dl, header, sizeof (dl));
+	if (data != NULL && datalen != 0 && datalen < blen) {
+		free(data);
+		data = NULL;
+		datalen = 0;
+	}
+	if (data == NULL) {
+		data = (char *)malloc(blen);
+		if (!data)
+			pr_err("Warning: malloc failure");
+		datalen = blen;
+	}
+
+	if (dl.dli_srczone == ALL_ZONES)
+		sprintf(szone, "Unknown");
+	else
+		sprintf(szone, "%llu", BE_64(dl.dli_srczone));
+
+	if (dl.dli_dstzone == ALL_ZONES)
+		sprintf(dzone, "Unknown");
+	else
+		sprintf(dzone, "%llu", BE_64(dl.dli_dstzone));
+
+	if (flags & F_SUM) {
+		(void) snprintf(get_sum_line(), MAXLINE,
+		    "IPNET src zone %s dst zone %s", szone, dzone);
+	}
+
+	if (flags & F_DTAIL) {
+		show_header("IPNET:  ", "IPNET Header", elen);
+		show_space();
+		(void) sprintf(get_line(0, 0),
+		    "Packet %d arrived at %d:%02d:%d.%05d",
+		    pi_frame,
+		    pi_time_hour, pi_time_min, pi_time_sec,
+		    pi_time_usec / 10);
+		(void) sprintf(get_line(0, 0),
+		    "Packet size = %d bytes",
+		    elen);
+		(void) snprintf(get_line(0, 0), get_line_remain(),
+		    "dli_version = %d", dl.dli_version);
+		(void) snprintf(get_line(0, 0), get_line_remain(),
+		    "dli_type = %d", dl.dli_ipver);
+		(void) snprintf(get_line(0, 2), get_line_remain(),
+		    "dli_srczone = %s", szone);
+		(void) snprintf(get_line(0, 2), get_line_remain(),
+		    "dli_dstzone = %s", dzone);
+		show_space();
+	}
+	memcpy(data, off, len);
+
+	switch (dl.dli_ipver) {
+	case IPV4_VERSION:
+		(void) interpret_ip(flags, (struct ip *)data, len);
+		break;
+	case IPV6_VERSION:
+		(void) interpret_ipv6(flags, (ip6_t *)data, len);
+		break;
+	default:
+		break;
+	}
+
+	return (0);
 }

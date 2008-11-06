@@ -39,7 +39,7 @@ udp 41
 tcp 42
 rts 43
 arp 44
-lo 46
+svvslo 46
 tivc 47
 tidg 48
 tmux 49
@@ -226,3 +226,4 @@ mem_cache 277
 bmc 278
 fm 279
 nulldriver 280
+ipnet 281

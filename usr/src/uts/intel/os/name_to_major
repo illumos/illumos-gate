@@ -23,7 +23,7 @@ udp 41
 tcp 42
 rts 43
 arp 44
-lo 46
+svvslo 46
 tivc 47
 tidg 48
 tmux 49
@@ -153,3 +153,4 @@ fm 257
 amd_iommu 258
 xpvtap 259
 nulldriver 260
+ipnet 261

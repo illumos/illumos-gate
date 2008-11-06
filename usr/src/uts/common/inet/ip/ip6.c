@@ -3259,9 +3259,8 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 			if (!IPCL_IS_IPTUN(connp) &&
 			    (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
 			    secure)) {
-				first_mp1 = ipsec_check_inbound_policy
-				    (first_mp1, connp, NULL, ip6h,
-				    mctl_present);
+				first_mp1 = ipsec_check_inbound_policy(
+				    first_mp1, connp, NULL, ip6h, mctl_present);
 			}
 			if (first_mp1 != NULL) {
 				if (mctl_present)
@@ -6855,6 +6854,26 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	if (first_mp == NULL)
 		return;
 
+	/*
+	 * Attach any necessary label information to this packet.
+	 */
+	if (is_system_labeled() && !tsol_get_pkt_label(mp, IPV6_VERSION)) {
+		if (ip6opt_ls != 0)
+			ip0dbg(("tsol_get_pkt_label v6 failed\n"));
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+		goto discard;
+	}
+
+	/* IP observability hook. */
+	if (ipst->ips_ipobs_enabled) {
+		zoneid_t dzone;
+
+		dzone = ip_get_zoneid_v6(&ip6h->ip6_dst, mp, ill, ipst,
+		    ALL_ZONES);
+		ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone, ill,
+		    IPV6_VERSION, 0, ipst);
+	}
+
 	if ((ip6h->ip6_vcf & IPV6_VERS_AND_FLOW_MASK) ==
 	    IPV6_DEFAULT_VERS_AND_FLOW) {
 		/*
@@ -7282,18 +7301,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			/* Known router alert */
 			goto ipv6forus;
 		}
-	}
-
-	/*
-	 * Attach any necessary label information to this packet.
-	 */
-	if (is_system_labeled() && !tsol_get_pkt_label(mp, IPV6_VERSION)) {
-		if (ip6opt_ls != 0)
-			ip0dbg(("tsol_get_pkt_label v6 failed\n"));
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		freemsg(hada_mp);
-		freemsg(first_mp);
-		return;
 	}
 
 	/*
@@ -10519,7 +10526,7 @@ ipsec_out_attach_if(ipsec_out_t *io, int attach_index)
  */
 void
 ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
-    ire_t *ire, int fanout_flags)
+    ire_t *ire, int fanout_flags, zoneid_t zoneid)
 {
 	uint32_t	ports;
 	mblk_t		*mp = first_mp, *first_mp1;
@@ -10568,6 +10575,25 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 
 	if (first_mp == NULL)
 		return;
+
+	if (ipst->ips_ipobs_enabled) {
+		zoneid_t szone, dzone, lookup_zoneid = ALL_ZONES;
+		zoneid_t stackzoneid = netstackid_to_zoneid(
+		    ipst->ips_netstack->netstack_stackid);
+
+		szone = (stackzoneid == GLOBAL_ZONEID) ? zoneid : stackzoneid;
+		/*
+		 * ::1 is special, as we cannot lookup its zoneid by
+		 * address.  For this case, restrict the lookup to the
+		 * source zone.
+		 */
+		if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_dst))
+			lookup_zoneid = zoneid;
+		dzone = ip_get_zoneid_v6(&ip6h->ip6_dst, mp, ill, ipst,
+		    lookup_zoneid);
+		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill,
+		    IPV6_VERSION, 0, ipst);
+	}
 
 	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
 	    ip6h, __dtrace_ipsr_ill_t *, ill, ipha_t *, NULL, ip6_t *, ip6h,
@@ -11007,8 +11033,8 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 						 * disabled.
 						 */
 						ip_wput_local_v6(RD(q), ill,
-						    nip6h, nmp,
-						    ire, fanout_flags);
+						    nip6h, nmp, ire,
+						    fanout_flags, zoneid);
 					}
 				} else {
 					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
@@ -11437,8 +11463,10 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		    ipst->ips_ipv6firewall_loopback_out,
 		    NULL, ill, ip6h, first_mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, first_mp);
-		if (first_mp != NULL)
-			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0);
+		if (first_mp != NULL) {
+			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0,
+			    zoneid);
+		}
 	}
 }
 
@@ -12000,6 +12028,8 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 	boolean_t	multirt_send = B_FALSE;
 	mblk_t		*next_mp = NULL;
 	ip_stack_t	*ipst = ire->ire_ipst;
+	boolean_t	fp_prepend = B_FALSE;
+	uint32_t	hlen;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	ASSERT(!IN6_IS_ADDR_V4MAPPED(&ire->ire_addr_v6));
@@ -12201,7 +12231,6 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			ASSERT(nce->nce_ipversion != IPV4_VERSION);
 			mutex_enter(&nce->nce_lock);
 			if ((mp1 = nce->nce_fp_mp) != NULL) {
-				uint32_t hlen;
 				uchar_t	*rptr;
 
 				hlen = MBLKL(mp1);
@@ -12237,6 +12266,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 					 */
 					bcopy(mp1->b_rptr, rptr, hlen);
 					mutex_exit(&nce->nce_lock);
+					fp_prepend = B_TRUE;
 				}
 			} else {
 				/*
@@ -12314,6 +12344,16 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 					ASSERT(ire1 == NULL);
 					break;
 				}
+			}
+
+			if (ipst->ips_ipobs_enabled) {
+				zoneid_t	szone;
+
+				szone = ip_get_zoneid_v6(&ip6h->ip6_src,
+				    mp_ip6h, out_ill, ipst, ALL_ZONES);
+				ipobs_hook(mp_ip6h, IPOBS_HOOK_OUTBOUND, szone,
+				    ALL_ZONES, out_ill, IPV6_VERSION,
+				    fp_prepend ? hlen : 0, ipst);
 			}
 
 			/*

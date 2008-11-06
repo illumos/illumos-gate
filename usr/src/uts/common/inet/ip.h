@@ -1841,6 +1841,7 @@ typedef struct ill_s {
 	mblk_t	*ill_bcast_mp;		/* DLPI header for broadcasts. */
 	mblk_t	*ill_resolver_mp;	/* Resolver template. */
 	mblk_t	*ill_unbind_mp;		/* unbind mp from ill_dl_up() */
+	mblk_t	*ill_promiscoff_mp;	/* for ill_leave_allmulti() */
 	mblk_t	*ill_dlpi_deferred;	/* b_next chain of control messages */
 	mblk_t	*ill_phys_addr_mp;	/* mblk which holds ill_phys_addr */
 #define	ill_last_mp_to_free	ill_phys_addr_mp
@@ -1869,7 +1870,8 @@ typedef struct ill_s {
 
 		ill_note_link : 1,	/* supports link-up notification */
 		ill_capab_reneg : 1, /* capability renegotiation to be done */
-		ill_pad_to_bit_31 : 18;
+		ill_need_recover_multicast : 1,
+		ill_pad_to_bit_31 : 17;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -1888,11 +1890,6 @@ typedef struct ill_s {
 	 */
 	int	ill_arp_muxid;		/* muxid returned from plink for arp */
 	int	ill_ip_muxid;		/* muxid returned from plink for ip */
-
-	/*
-	 * NIC event information attached, to be used by nic event hooks.
-	 */
-	hook_nic_event_int_t	*ill_nic_event_info;
 
 	/* Used for IP frag reassembly throttling on a per ILL basis.  */
 	uint_t	ill_ipf_gen;		/* Generation of next fragment queue */
@@ -1993,6 +1990,7 @@ typedef struct ill_s {
 	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
 	uint32_t	ill_dhcpinit;	/* IP_DHCPINIT_IFs for ill */
 	uint_t		ill_ilm_cnt;    /* ilms referencing this ill */
+	uint_t		ill_ipallmulti_cnt; /* ip_join_allmulti() calls */
 } ill_t;
 
 /*
@@ -2510,7 +2508,7 @@ typedef struct ire_s {
 	uint32_t	ire_ihandle;	/* Associate interface IREs to cache */
 	ipif_t		*ire_ipif;	/* the interface that this ire uses */
 	uint32_t	ire_flags;	/* flags related to route (RTF_*) */
-	uint_t	ire_ipsec_overhead;	/* IPSEC overhead */
+	uint_t ire_ipsec_overhead;	/* IPSEC overhead */
 	/*
 	 * Neighbor Cache Entry for IPv6; arp info for IPv4
 	 */
@@ -3124,8 +3122,9 @@ extern void	ill_frag_timer(void *);
 extern ill_t	*ill_first(int, int, ill_walk_context_t *, ip_stack_t *);
 extern ill_t	*ill_next(ill_walk_context_t *, ill_t *);
 extern void	ill_frag_timer_start(ill_t *);
-extern void	ill_nic_info_dispatch(ill_t *);
-extern void	ill_nic_info_plumb(ill_t *, boolean_t);
+extern void	ill_nic_event_dispatch(ill_t *, lif_if_t, nic_event_t,
+    nic_event_data_t, size_t);
+extern void	ill_nic_event_plumb(ill_t *, boolean_t);
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
@@ -3366,6 +3365,53 @@ extern int	ip_cgtp_filter_is_registered(netstackid_t);
 #endif
 
 /*
+ * IP observability hook support
+ */
+
+/*
+ * ipobs_hooktype_t describes the hook types supported
+ * by the ip module. IPOBS_HOOK_LOCAL refers to packets
+ * which are looped back internally within the ip module.
+ */
+
+typedef enum ipobs_hook_type {
+	IPOBS_HOOK_LOCAL,
+	IPOBS_HOOK_OUTBOUND,
+	IPOBS_HOOK_INBOUND
+} ipobs_hook_type_t;
+
+typedef void ipobs_cbfunc_t(mblk_t *);
+
+typedef struct ipobs_cb {
+	ipobs_cbfunc_t	*ipobs_cbfunc;
+	list_node_t	ipobs_cbnext;
+} ipobs_cb_t;
+
+/*
+ * This structure holds the data passed back from the ip module to
+ * observability consumers.
+ *
+ * ihd_mp	  Pointer to the IP packet.
+ * ihd_zsrc	  Source zoneid; set to ALL_ZONES when unknown.
+ * ihd_zdst	  Destination zoneid; set to ALL_ZONES when unknown.
+ * ihd_htype	  IPobs hook type, see above for the defined types.
+ * ihd_ipver	  IP version of the packet.
+ * ihd_ifindex	  Interface index that the packet was received/sent over.
+ *		  For local packets, this is the index of the interface
+ *		  associated with the local destination address.
+ * ihd_stack	  Netstack the packet is from.
+ */
+typedef struct ipobs_hook_data {
+	mblk_t			*ihd_mp;
+	zoneid_t		ihd_zsrc;
+	zoneid_t		ihd_zdst;
+	ipobs_hook_type_t	ihd_htype;
+	uint16_t		ihd_ipver;
+	uint64_t		ihd_ifindex;
+	netstack_t		*ihd_stack;
+} ipobs_hook_data_t;
+
+/*
  * Per-ILL Multidata Transmit capabilities.
  */
 struct ill_mdt_capab_s {
@@ -3482,7 +3528,10 @@ extern void tcp_wput(queue_t *, mblk_t *);
 extern int	ip_fill_mtuinfo(struct in6_addr *, in_port_t,
 	struct ip6_mtuinfo *, netstack_t *);
 extern	ipif_t *conn_get_held_ipif(conn_t *, ipif_t **, int *);
-
+extern void ipobs_register_hook(netstack_t *, ipobs_cbfunc_t *);
+extern void ipobs_unregister_hook(netstack_t *, ipobs_cbfunc_t *);
+extern void ipobs_hook(mblk_t *, int, zoneid_t, zoneid_t, const ill_t *, int,
+    uint32_t, ip_stack_t *);
 typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 
 /*

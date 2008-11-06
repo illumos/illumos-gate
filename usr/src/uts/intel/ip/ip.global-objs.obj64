@@ -326,7 +326,6 @@ udp_random_anon_port
 udp_rinitv4
 udp_rinitv6
 udp_valid_levels_arr
-udp_version
 udp_winit
 udpinfov4
 udpinfov6

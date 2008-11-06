@@ -44,7 +44,6 @@
 #include <sys/sunldi.h>
 #include <sys/file.h>
 #include <sys/bitmap.h>
-
 #include <sys/kmem.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -252,7 +251,6 @@ static void	illgrp_reset_schednext(ill_t *ill);
 static ill_t	*ill_prev_usesrc(ill_t *);
 static int	ill_relink_usesrc_ills(ill_t *, ill_t *, uint_t);
 static void	ill_disband_usesrc_group(ill_t *);
-
 static void	conn_cleanup_stale_ire(conn_t *, caddr_t);
 
 #ifdef DEBUG
@@ -491,7 +489,7 @@ static nv_t	ipif_nv_tbl[] = {
 
 static uchar_t	ip_six_byte_all_ones[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
-static ip_m_t	ip_m_tbl[] = {
+static ip_m_t   ip_m_tbl[] = {
 	{ DL_ETHER, IFT_ETHER, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
 	    ip_ether_v6intfid },
 	{ DL_CSMACD, IFT_ISO88023, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
@@ -749,6 +747,12 @@ ill_delete(ill_t *ill)
 	 * it points only at ills.
 	 */
 	reset_conn_ill(ill);
+
+	/*
+	 * Remove multicast references added as a result of calls to
+	 * ip_join_allmulti().
+	 */
+	ip_purge_allmulti(ill);
 
 	/*
 	 * ill_down will arrange to blow off any IRE's dependent on this
@@ -4343,28 +4347,11 @@ ill_glist_delete(ill_t *ill)
 		ill->ill_ppa = UINT_MAX;
 	}
 
-	/*
-	 * Run the unplumb hook after the NIC has disappeared from being
-	 * visible so that attempts to revalidate its existance will fail.
-	 *
-	 * This needs to be run inside the ill_g_lock perimeter to ensure
-	 * that the ordering of delivered events to listeners matches the
-	 * order of them in the kernel.
-	 */
-	mutex_enter(&ill->ill_lock);
-	ill_nic_info_dispatch(ill);
-	mutex_exit(&ill->ill_lock);
-
-	/* Generate NE_UNPLUMB event for ill_name. */
-	(void) ill_hook_event_create(ill, 0, NE_UNPLUMB, ill->ill_name,
+	/* Generate one last event for this ill. */
+	ill_nic_event_dispatch(ill, 0, NE_UNPLUMB, ill->ill_name,
 	    ill->ill_name_length);
 
 	ill_phyint_free(ill);
-
-	mutex_enter(&ill->ill_lock);
-	ill_nic_info_dispatch(ill);
-	mutex_exit(&ill->ill_lock);
-
 	rw_exit(&ipst->ips_ill_g_lock);
 }
 
@@ -5090,6 +5077,8 @@ ill_lookup_on_name(char *name, boolean_t do_alloc, boolean_t isv6,
 		*error = 0;
 	*did_alloc = B_TRUE;
 	rw_exit(&ipst->ips_ill_g_lock);
+	ill_nic_event_dispatch(ill, MAP_IPIF_ID(ill->ill_ipif->ipif_id),
+	    NE_PLUMB, ill->ill_name, ill->ill_name_length);
 	return (ill);
 done:
 	if (ill != NULL) {
@@ -6277,27 +6266,9 @@ ipif_is_quiescent(ipif_t *ipif)
 static boolean_t
 ipif_is_freeable(ipif_t *ipif)
 {
-
-	ill_t *ill;
-
 	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
-
-	if (ipif->ipif_refcnt != 0 || !IPIF_FREE_OK(ipif)) {
-		return (B_FALSE);
-	}
-
-	ill = ipif->ipif_ill;
-	if (ill->ill_ipif_up_count != 0 || ill->ill_ipif_dup_count != 0 ||
-	    ill->ill_logical_down) {
-		return (B_TRUE);
-	}
-
-	/* This is the last ipif going down or being deleted on this ill */
-	if (!ILL_FREE_OK(ill) || ill->ill_refcnt != 0) {
-		return (B_FALSE);
-	}
-
-	return (B_TRUE);
+	ASSERT(ipif->ipif_id != 0);
+	return (ipif->ipif_refcnt == 0 && IPIF_FREE_OK(ipif));
 }
 
 /*
@@ -8039,8 +8010,6 @@ ipsq_current_finish(ipsq_t *ipsq)
 		mutex_enter(&ill->ill_lock);
 		dlpi_pending = ill->ill_dlpi_pending;
 		ipif->ipif_state_flags &= ~IPIF_CHANGING;
-		/* Send any queued event */
-		ill_nic_info_dispatch(ill);
 		mutex_exit(&ill->ill_lock);
 	}
 
@@ -8193,13 +8162,13 @@ ip_extract_tunreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
 {
 	boolean_t exists;
 	struct iftun_req *ta;
-	ipif_t	*ipif;
-	ill_t	*ill;
+	ipif_t  *ipif;
+	ill_t   *ill;
 	boolean_t isv6;
-	mblk_t	*mp1;
-	int	error;
-	conn_t	*connp;
-	ip_stack_t	*ipst;
+	mblk_t  *mp1;
+	int error;
+	conn_t  *connp;
+	ip_stack_t  *ipst;
 
 	/* Existence verified in ip_wput_nondata */
 	mp1 = mp->b_cont->b_cont;
@@ -9427,7 +9396,7 @@ int
 ip_sioctl_tunparam(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *dummy_ifreq)
 {
-	ill_t  		*ill;
+	ill_t		*ill;
 	mblk_t		*mp1;
 	conn_t		*connp;
 	boolean_t	success;
@@ -11224,7 +11193,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * Don't attach nic event message for SIOCLIFADDIF ioctl.
 	 */
 	if (iocp != NULL && iocp->ioc_cmd != SIOCLIFADDIF) {
-		(void) ill_hook_event_create(ill, MAP_IPIF_ID(ipif->ipif_id),
+		ill_nic_event_dispatch(ill, MAP_IPIF_ID(ipif->ipif_id),
 		    NE_ADDRESS_CHANGE, sin, sinlen);
 	}
 
@@ -13920,9 +13889,7 @@ ipif_arp_start_dad(ipif_t *ipif)
 		 * DAD completion would have done, and continue.
 		 */
 		ipif_mask_reply(ipif);
-		ip_rts_ifmsg(ipif);
-		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-		sctp_update_ipif(ipif, SCTP_IPIF_UP);
+		ipif_up_notify(ipif);
 		ipif->ipif_addr_ready = 1;
 		return;
 	}
@@ -13949,9 +13916,7 @@ ipif_ndp_start_dad(ipif_t *ipif)
 		 * problem.  Just send out the routing socket notification that
 		 * DAD completion would have done, and continue.
 		 */
-		ip_rts_ifmsg(ipif);
-		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-		sctp_update_ipif(ipif, SCTP_IPIF_UP);
+		ipif_up_notify(ipif);
 		ipif->ipif_addr_ready = 1;
 	}
 	NCE_REFRELE(nce);
@@ -15661,7 +15626,7 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 	for (ill = illgrp->illgrp_ill; ill != NULL;
 	    ill = ill->ill_group_next) {
 		if (ill->ill_join_allmulti)
-			(void) ip_leave_allmulti(ill->ill_ipif);
+			ill_leave_allmulti(ill);
 	}
 
 	/*
@@ -15671,13 +15636,9 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 	 * one of them is failed and another is a good one and
 	 * the good one (not marked inactive) is leaving the group.
 	 */
-	ret = 0;
-	for (ill = illgrp->illgrp_ill; ill != NULL;
-	    ill = ill->ill_group_next) {
-		/* Never pick an offline interface */
+	for (ill = illgrp->illgrp_ill; ill != NULL; ill = ill->ill_group_next) {
 		if (ill->ill_phyint->phyint_flags & PHYI_OFFLINE)
 			continue;
-
 		if (ill->ill_phyint->phyint_flags & PHYI_FAILED) {
 			fallback_failed_ill = ill;
 			continue;
@@ -15688,11 +15649,11 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 		}
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
-				ret = ip_join_allmulti(ill->ill_ipif);
+				ret = ill_join_allmulti(ill);
 				/*
-				 * ip_join_allmulti can fail because of memory
-				 * failures. So, make sure we join at least
-				 * on one ill.
+				 * ill_join_allmulti() can fail because of
+				 * memory failures so make sure we join at
+				 * least on one ill.
 				 */
 				if (ill->ill_join_allmulti)
 					return (0);
@@ -15709,17 +15670,13 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 	}
 	if ((ill = fallback_inactive_ill) != NULL) {
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
-			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
-				ret = ip_join_allmulti(ill->ill_ipif);
-				return (ret);
-			}
+			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr))
+				return (ill_join_allmulti(ill));
 		}
 	} else if ((ill = fallback_failed_ill) != NULL) {
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
-			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
-				ret = ip_join_allmulti(ill->ill_ipif);
-				return (ret);
-			}
+			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr))
+				return (ill_join_allmulti(ill));
 		}
 	}
 	return (0);
@@ -15816,7 +15773,7 @@ ill_handoff_responsibility(ill_t *ill, ill_group_t *illgrp)
 	} else {
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
-				(void) ip_join_allmulti(ill->ill_ipif);
+				(void) ill_join_allmulti(ill);
 				break;
 			}
 		}
@@ -16116,8 +16073,8 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
 		/*
 		 * When ipif_up_done() calls this function, the multicast
 		 * groups have not been joined yet. So, there is no point in
-		 * nomination. ip_join_allmulti will handle groups when
-		 * ill_recover_multicast is called from ipif_up_done() later.
+		 * nomination. ill_join_allmulti() will handle groups when
+		 * ill_recover_multicast() is called from ipif_up_done() later.
 		 */
 		(void) ill_nominate_mcast_rcv(illgrp);
 		/*
@@ -16567,7 +16524,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		if (ipst->ips_ipmp_hook_emulation &&
 		    phyi_tmp != NULL) {
 			/* First phyint in group - group PLUMB event */
-			ill_nic_info_plumb(ill, B_TRUE);
+			ill_nic_event_plumb(ill, B_TRUE);
 		}
 		mutex_exit(&phyi->phyint_lock);
 		RELEASE_ILL_LOCKS(ill_v4, ill_v6);
@@ -16799,12 +16756,12 @@ ilm_send_multicast_reqs(ill_t *from_ill, ill_t *to_ill)
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
 			/*
 			 * There is no need to hold ill locks as we are
-			 * writer on both ills and when ill_join_allmulti
-			 * is changed the thread is always a writer.
+			 * writer on both ills and when ill_join_allmulti()
+			 * is called the thread is always a writer.
 			 */
 			if (from_ill->ill_join_allmulti &&
 			    !to_ill->ill_join_allmulti) {
-				(void) ip_join_allmulti(to_ill->ill_ipif);
+				(void) ill_join_allmulti(to_ill);
 			}
 		} else if (ilm->ilm_notify_driver) {
 
@@ -16844,7 +16801,7 @@ from:
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
 			if (from_ill->ill_join_allmulti)
-				(void) ip_leave_allmulti(from_ill->ill_ipif);
+				ill_leave_allmulti(from_ill);
 		} else if (ilm_numentries_v6(from_ill, &ilm->ilm_v6addr) == 0) {
 			(void) ip_ll_send_disabmulti_req(from_ill,
 			    &ilm->ilm_v6addr);
@@ -18314,7 +18271,7 @@ ill_dl_down(ill_t *ill)
 
 	mutex_enter(&ill->ill_lock);
 	ill->ill_dl_up = 0;
-	(void) ill_hook_event_create(ill, 0, NE_DOWN, NULL, 0);
+	ill_nic_event_dispatch(ill, 0, NE_DOWN, NULL, 0);
 	mutex_exit(&ill->ill_lock);
 }
 
@@ -18707,6 +18664,8 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 		ipif_was_up = B_TRUE;
 		/* Update status in SCTP's list */
 		sctp_update_ipif(ipif, SCTP_IPIF_DOWN);
+		ill_nic_event_dispatch(ipif->ipif_ill,
+		    MAP_IPIF_ID(ipif->ipif_id), NE_LIF_DOWN, NULL, 0);
 	}
 
 	/*
@@ -20480,11 +20439,18 @@ ipif_up_done(ipif_t *ipif)
 
 	}
 
-	/* This is the first interface on this ill */
-	if (ipif->ipif_ipif_up_count == 1 && !loopback) {
+	if (ill->ill_need_recover_multicast) {
 		/*
 		 * Need to recover all multicast memberships in the driver.
-		 * This had to be deferred until we had attached.
+		 * This had to be deferred until we had attached.  The same
+		 * code exists in ipif_up_done_v6() to recover IPv6
+		 * memberships.
+		 *
+		 * Note that it would be preferable to unconditionally do the
+		 * ill_recover_multicast() in ill_dl_up(), but we cannot do
+		 * that since ill_join_allmulti() depends on ill_dl_up being
+		 * set, and it is not set until we receive a DL_BIND_ACK after
+		 * having called ill_dl_up().
 		 */
 		ill_recover_multicast(ill);
 	}
@@ -20537,12 +20503,8 @@ ipif_up_done(ipif_t *ipif)
 	 * been validated.  Otherwise, if it isn't ready yet, wait for
 	 * duplicate address detection to do its thing.
 	 */
-	if (ipif->ipif_addr_ready) {
-		ip_rts_ifmsg(ipif);
-		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-		/* Let SCTP update the status for this ipif */
-		sctp_update_ipif(ipif, SCTP_IPIF_UP);
-	}
+	if (ipif->ipif_addr_ready)
+		ipif_up_notify(ipif);
 	return (0);
 
 bad:
@@ -22774,7 +22736,7 @@ ill_phyint_reinit(ill_t *ill)
 		 * for the ill_names should ipmp_hook_emulation be turned on
 		 * later.
 		 */
-		ill_nic_info_plumb(ill, B_FALSE);
+		ill_nic_event_plumb(ill, B_FALSE);
 	}
 	RELEASE_ILL_LOCKS(ill, ill_other);
 	mutex_exit(&phyi->phyint_lock);
@@ -22786,7 +22748,7 @@ ill_phyint_reinit(ill_t *ill)
  * It will be sent when we leave the ipsq.
  */
 void
-ill_nic_info_plumb(ill_t *ill, boolean_t group)
+ill_nic_event_plumb(ill_t *ill, boolean_t group)
 {
 	phyint_t	*phyi = ill->ill_phyint;
 	char		*name;
@@ -22803,33 +22765,7 @@ ill_nic_info_plumb(ill_t *ill, boolean_t group)
 		name = ill->ill_name;
 	}
 
-	(void) ill_hook_event_create(ill, 0, NE_PLUMB, name, namelen);
-}
-
-/*
- * Unhook the nic event message from the ill and enqueue it
- * into the nic event taskq.
- */
-void
-ill_nic_info_dispatch(ill_t *ill)
-{
-	hook_nic_event_int_t *info;
-
-	ASSERT(MUTEX_HELD(&ill->ill_lock));
-
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		if (ddi_taskq_dispatch(eventq_queue_nic,
-		    ip_ne_queue_func, info, DDI_SLEEP) == DDI_FAILURE) {
-			ip2dbg(("ill_nic_info_dispatch: "
-			    "ddi_taskq_dispatch failed\n"));
-			if (info->hnei_event.hne_data != NULL) {
-				kmem_free(info->hnei_event.hne_data,
-				    info->hnei_event.hne_datalen);
-			}
-			kmem_free(info, sizeof (*info));
-		}
-		ill->ill_nic_event_info = NULL;
-	}
+	ill_nic_event_dispatch(ill, 0, NE_PLUMB, name, namelen);
 }
 
 /*
@@ -23089,13 +23025,20 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	 */
 	if (ill->ill_sap == 0) {
 		if (ill->ill_isv6)
-			ill->ill_sap  = IP6_DL_SAP;
+			ill->ill_sap = IP6_DL_SAP;
 		else
-			ill->ill_sap  = IP_DL_SAP;
+			ill->ill_sap = IP_DL_SAP;
 	}
 
 	ill->ill_ifname_pending = 1;
 	ill->ill_ifname_pending_err = 0;
+
+	/*
+	 * When the first ipif comes up in ipif_up_done(), multicast groups
+	 * that were joined while this ill was not bound to the DLPI link need
+	 * to be recovered by ill_recover_multicast().
+	 */
+	ill->ill_need_recover_multicast = 1;
 
 	ill_refhold(ill);
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
@@ -24443,50 +24386,26 @@ ill_hook_event2str(nic_event_t event)
 		return ("DOWN");
 	case NE_ADDRESS_CHANGE:
 		return ("ADDRESS_CHANGE");
+	case NE_LIF_UP:
+		return ("LIF_UP");
+	case NE_LIF_DOWN:
+		return ("LIF_DOWN");
 	default:
 		return ("UNKNOWN");
 	}
 }
 
-static void
-ill_hook_event_destroy(ill_t *ill)
-{
-	hook_nic_event_int_t	*info;
-
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		if (info->hnei_event.hne_data != NULL) {
-			kmem_free(info->hnei_event.hne_data,
-			    info->hnei_event.hne_datalen);
-		}
-		kmem_free(info, sizeof (*info));
-
-		ill->ill_nic_event_info = NULL;
-	}
-
-}
-
-boolean_t
-ill_hook_event_create(ill_t *ill, lif_if_t lif, nic_event_t event,
+void
+ill_nic_event_dispatch(ill_t *ill, lif_if_t lif, nic_event_t event,
     nic_event_data_t data, size_t datalen)
 {
 	ip_stack_t		*ipst = ill->ill_ipst;
 	hook_nic_event_int_t	*info;
 	const char		*str = NULL;
 
-	/* destroy nic event info if it exists */
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		str = ill_hook_event2str(info->hnei_event.hne_event);
-		ip2dbg(("ill_hook_event_create: unexpected nic event %s "
-		    "attached for %s\n", str, ill->ill_name));
-		ill_hook_event_destroy(ill);
-	}
-
 	/* create a new nic event info */
-	info = kmem_alloc(sizeof (*info), KM_NOSLEEP);
-	if (info == NULL)
+	if ((info = kmem_alloc(sizeof (*info), KM_NOSLEEP)) == NULL)
 		goto fail;
-
-	ill->ill_nic_event_info = info;
 
 	if (event == NE_UNPLUMB)
 		info->hnei_event.hne_nic = ill->ill_phyint->phyint_ifindex;
@@ -24502,19 +24421,35 @@ ill_hook_event_create(ill_t *ill, lif_if_t lif, nic_event_t event,
 
 	if (data != NULL && datalen != 0) {
 		info->hnei_event.hne_data = kmem_alloc(datalen, KM_NOSLEEP);
-		if (info->hnei_event.hne_data != NULL) {
-			bcopy(data, info->hnei_event.hne_data, datalen);
-			info->hnei_event.hne_datalen = datalen;
-		} else {
-			ill_hook_event_destroy(ill);
+		if (info->hnei_event.hne_data == NULL)
 			goto fail;
-		}
+		bcopy(data, info->hnei_event.hne_data, datalen);
+		info->hnei_event.hne_datalen = datalen;
 	}
 
-	return (B_TRUE);
+	if (ddi_taskq_dispatch(eventq_queue_nic, ip_ne_queue_func, info,
+	    DDI_NOSLEEP) == DDI_SUCCESS)
+		return;
+
 fail:
+	if (info != NULL) {
+		if (info->hnei_event.hne_data != NULL) {
+			kmem_free(info->hnei_event.hne_data,
+			    info->hnei_event.hne_datalen);
+		}
+		kmem_free(info, sizeof (hook_nic_event_t));
+	}
 	str = ill_hook_event2str(event);
-	ip2dbg(("ill_hook_event_create: could not attach %s nic event "
+	ip2dbg(("ill_nic_event_dispatch: could not dispatch %s nic event "
 	    "information for %s (ENOMEM)\n", str, ill->ill_name));
-	return (B_FALSE);
+}
+
+void
+ipif_up_notify(ipif_t *ipif)
+{
+	ip_rts_ifmsg(ipif);
+	ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
+	sctp_update_ipif(ipif, SCTP_IPIF_UP);
+	ill_nic_event_dispatch(ipif->ipif_ill, MAP_IPIF_ID(ipif->ipif_id),
+	    NE_LIF_UP, NULL, 0);
 }

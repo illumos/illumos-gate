@@ -26,8 +26,6 @@
 #ifndef _LIBDLPI_H
 #define	_LIBDLPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/dlpi.h>
 
@@ -63,7 +61,8 @@ extern "C" {
 #define	DLPI_NOATTACH	0x0010	/* Do not attach PPA */
 #define	DLPI_NATIVE	0x0020	/* Open DLPI link in native mode */
 #define	DLPI_DEVONLY	0x0040	/* Open DLPI link under /dev only */
-
+#define	DLPI_DEVIPNET	0x0080	/* Open IP DLPI link under /dev/ipnet */
+#define	DLPI_IPNETINFO	0x0100	/* Request ipnetinfo headers */
 /*
  * Timeout to be used in DLPI-related operations, in seconds.
  */
@@ -93,6 +92,7 @@ enum {
 	DLPI_ENOTEINVAL,	/* invalid DLPI notification type */
 	DLPI_ENOTENOTSUP,	/* DLPI notification not supported by link */
 	DLPI_ENOTEIDINVAL,	/* invalid DLPI notification id */
+	DLPI_EIPNETINFONOTSUP,	/* DLPI_IPNETINFO not supported */
 	DLPI_ERRMAX		/* Highest + 1 libdlpi error code */
 };
 

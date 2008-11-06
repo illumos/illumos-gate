@@ -204,7 +204,9 @@ Network Management:suser:cmd:::/usr/sbin/ipqosconf:euid=0
 Network Management:suser:cmd:::/usr/sbin/rndc:privs=file_dac_read
 Network Management:suser:cmd:::/usr/sbin/route:uid=0
 Network Management:suser:cmd:::/usr/sbin/snoop:uid=0
+Network Management:solaris:cmd:::/usr/sbin/snoop:privs=net_observability
 Network Management:suser:cmd:::/usr/sbin/spray:euid=0
+Network Observability:solaris:cmd:::/usr/sbin/snoop:privs=net_observability
 Network Link Security:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
 Network IPsec Management:solaris:cmd:::/usr/lib/inet/certdb:euid=0;privs=none

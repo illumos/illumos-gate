@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Provider Interface (Version 2)
  */
@@ -49,6 +47,7 @@
 #include <libdlpi.h>
 #include <libintl.h>
 #include <libinetutil.h>
+#include <dirent.h>
 
 #include "libdlpi_impl.h"
 
@@ -95,18 +94,35 @@ void
 dlpi_walk(dlpi_walkfunc_t *fn, void *arg, uint_t flags)
 {
 	struct i_dlpi_walklink_arg warg;
+	struct dirent *d;
+	DIR *dp;
 
 	warg.fn = fn;
 	warg.arg = arg;
 
-	(void) dladm_walk(i_dlpi_walk_link, &warg, DATALINK_CLASS_ALL,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	if (flags & DLPI_DEVIPNET) {
+		if ((dp = opendir("/dev/ipnet")) == NULL)
+			return;
+
+		while ((d = readdir(dp)) != NULL) {
+			if (d->d_name[0] == '.')
+				continue;
+
+			if (warg.fn(d->d_name, warg.arg))
+				break;
+		}
+
+		(void) closedir(dp);
+	} else {
+		(void) dladm_walk(i_dlpi_walk_link, &warg, DATALINK_CLASS_ALL,
+		    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	}
 }
 
 int
 dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 {
-	int		retval;
+	int		retval, on = 1;
 	int		cnt;
 	ifspec_t	ifsp;
 	dlpi_impl_t  	*dip;
@@ -119,6 +135,13 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	    !ifparse_ifspec(linkname, &ifsp))
 		return (DLPI_ELINKNAMEINVAL);
 
+	/*
+	 * Ensure flags values are sane.
+	 */
+	if ((flags & (DLPI_DEVIPNET|DLPI_DEVONLY)) ==
+	    (DLPI_DEVIPNET|DLPI_DEVONLY))
+		return (DLPI_EINVAL);
+
 	/* Allocate a new dlpi_impl_t. */
 	if ((dip = calloc(1, sizeof (dlpi_impl_t))) == NULL)
 		return (DL_SYSERR);
@@ -126,16 +149,18 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	/* Fill in known/default libdlpi handle values. */
 	dip->dli_timeout = DLPI_DEF_TIMEOUT;
 	dip->dli_ppa = ifsp.ifsp_ppa;
-	dip->dli_mod_cnt = ifsp.ifsp_modcnt;
 	dip->dli_oflags = flags;
 	dip->dli_notifylistp = NULL;
 	dip->dli_note_processing = B_FALSE;
 	if (getenv("DLPI_DEVONLY") != NULL)
 		dip->dli_oflags |= DLPI_DEVONLY;
 
-	for (cnt = 0; cnt != dip->dli_mod_cnt; cnt++) {
-		(void) strlcpy(dip->dli_modlist[cnt], ifsp.ifsp_mods[cnt],
-		    DLPI_LINKNAME_MAX);
+	if (!(flags & DLPI_DEVIPNET)) {
+		dip->dli_mod_cnt = ifsp.ifsp_modcnt;
+		for (cnt = 0; cnt != dip->dli_mod_cnt; cnt++) {
+			(void) strlcpy(dip->dli_modlist[cnt],
+			    ifsp.ifsp_mods[cnt], DLPI_LINKNAME_MAX);
+		}
 	}
 
 	/* Copy linkname provided to the function. */
@@ -173,7 +198,7 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 			 * of failure from errno.
 			 */
 			retval = DL_SYSERR;
-		} else {
+		} else if (!(dip->dli_oflags & DLPI_DEVIPNET)) {
 			retval = i_dlpi_style2_open(dip);
 		}
 		if (retval != DLPI_SUCCESS) {
@@ -189,6 +214,12 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	    ioctl(dip->dli_fd, DLIOCRAW, 0) < 0) {
 		dlpi_close((dlpi_handle_t)dip);
 		return (DLPI_ERAWNOTSUP);
+	}
+
+	if ((dip->dli_oflags & DLPI_IPNETINFO) &&
+	    ioctl(dip->dli_fd, DLIOCIPNETINFO, &on) < 0) {
+		dlpi_close((dlpi_handle_t)dip);
+		return (DLPI_EIPNETINFONOTSUP);
 	}
 
 	/*
@@ -978,12 +1009,13 @@ dlpi_iftype(uint_t dlpitype)
 
 /*
  * This function attempts to open a device under the following namespaces:
+ *	/dev/ipnet	- if DLPI_DEVIPNET is specified
  *      /dev/net	- if a data-link with the specified name exists
  *	/dev		- if DLPI_DEVONLY is specified, or if there is no
  *			  data-link with the specified name (could be /dev/ip)
  *
- * In particular, this function is used to open a data-link node, or some
- * special node, such as "/dev/ip" node. It is usually be called firstly
+ * In particular, if DLPI_DEVIPNET is not specified, this function is used to
+ * open a data-link node, or "/dev/ip" node. It is usually be called firstly
  * with style1 being B_TRUE, and if that fails and the return value is not
  * DLPI_ENOTSTYLE2, the function will again be called with style1 being
  * B_FALSE (style-1 open attempt first, then style-2 open attempt).
@@ -1019,7 +1051,13 @@ i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 	if (flags & DLPI_EXCL)
 		oflags |= O_EXCL;
 
-	if (style1 && !(flags & DLPI_DEVONLY)) {
+	if (flags & DLPI_DEVIPNET) {
+		(void) snprintf(path, sizeof (path), "/dev/ipnet/%s", provider);
+		if ((*fd = open(path, oflags)) != -1)
+			return (DLPI_SUCCESS);
+		else
+			return (errno == ENOENT ? DLPI_ENOLINK : DL_SYSERR);
+	} else if (style1 && !(flags & DLPI_DEVONLY)) {
 		char		driver[DLPI_LINKNAME_MAX];
 		char		device[DLPI_LINKNAME_MAX];
 		datalink_id_t	linkid;
@@ -1600,7 +1638,8 @@ static const char *libdlpi_errlist[] = {
 	"DLPI notification not supported by link",
 						/* DLPI_ENOTENOTSUP */
 	"invalid DLPI notification type",	/* DLPI_ENOTEINVAL */
-	"invalid DLPI notification id"		/* DLPI_ENOTEIDINVAL */
+	"invalid DLPI notification id",		/* DLPI_ENOTEIDINVAL */
+	"DLPI_IPNETINFO not supported"		/* DLPI_EIPNETINFONOTSUP */
 };
 
 const char *
@@ -1648,7 +1687,8 @@ static const dlpi_mactype_t dlpi_mactypes[] = {
 	{ DL_IB,		"Infiniband"		},
 	{ DL_IPV4,		"IPv4 Tunnel"		},
 	{ DL_IPV6,		"IPv6 Tunnel"		},
-	{ DL_WIFI,		"IEEE 802.11"		}
+	{ DL_WIFI,		"IEEE 802.11"		},
+	{ DL_IPNET,		"IPNET"			}
 };
 
 const char *

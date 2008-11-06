@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS	*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -80,11 +78,12 @@ static int sumcount;
 int x_offset = -1;
 int x_length = 0x7fffffff;
 FILE *namefile;
-int Pflg;
-boolean_t qflg = B_FALSE;
-boolean_t rflg = B_FALSE;
+boolean_t Pflg;
+boolean_t Iflg;
+boolean_t qflg;
+boolean_t rflg;
 #ifdef	DEBUG
-boolean_t zflg = B_FALSE;		/* debugging packet corrupt flag */
+boolean_t zflg;
 #endif
 struct Pf_ext_packetfilt pf;
 
@@ -105,12 +104,13 @@ main(int argc, char **argv)
 	struct Pf_ext_packetfilt *fp = NULL;
 	char *icapfile = NULL;
 	char *ocapfile = NULL;
-	int nflg = 0;
-	int Nflg = 0;
+	boolean_t nflg = B_FALSE;
+	boolean_t Nflg = B_FALSE;
 	int Cflg = 0;
+	boolean_t Uflg = B_FALSE;
 	int first = 1;
 	int last  = 0x7fffffff;
-	int use_kern_pf;
+	boolean_t use_kern_pf;
 	char *p, *p2;
 	char names[MAXPATHLEN + 1];
 	char self[MAXHOSTNAMELEN + 1];
@@ -228,8 +228,8 @@ main(int argc, char **argv)
 	}
 	(void) setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
-	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:vVp:f:c:x:?rqz"))
-				!= EOF) {
+	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:I:vVp:f:c:x:U?rqz"))
+	    != EOF) {
 		switch (c) {
 		case 'a':
 			audiodev = getenv("AUDIODEV");
@@ -238,7 +238,7 @@ main(int argc, char **argv)
 			audio = open(audiodev, O_WRONLY);
 			if (audio < 0) {
 				pr_err("Audio device %s: %m",
-					audiodev);
+				    audiodev);
 				exit(1);
 			}
 			break;
@@ -251,8 +251,14 @@ main(int argc, char **argv)
 			default:	usage();
 			}
 			break;
+		case 'I':
+			if (device != NULL)
+				usage();
+			Iflg = B_TRUE;
+			device = optarg;
+			break;
 		case 'P':
-			Pflg++;
+			Pflg = B_TRUE;
 			break;
 		case 'D':
 			flags |= F_DROPS;
@@ -267,16 +273,18 @@ main(int argc, char **argv)
 			ocapfile = optarg;
 			break;
 		case 'N':
-			Nflg++;
+			Nflg = B_TRUE;
 			break;
 		case 'n':
-			nflg++;
+			nflg = B_TRUE;
 			(void) strlcpy(names, optarg, MAXPATHLEN);
 			break;
 		case 's':
 			snaplen = atoi(optarg);
 			break;
 		case 'd':
+			if (Iflg)
+				usage();
 			device = optarg;
 			break;
 		case 'v':
@@ -306,12 +314,12 @@ main(int argc, char **argv)
 				    strcmp(p+1, self) == 0)
 				(void) fprintf(stderr,
 				"Warning: cannot capture packets from %s\n",
-					self);
+				    self);
 				*p = ' ';
 			} else if (strcmp(optarg, self) == 0)
 				(void) fprintf(stderr,
 				"Warning: cannot capture packets from %s\n",
-					self);
+				    self);
 			argstr = optarg;
 			break;
 		case 'x':
@@ -330,13 +338,16 @@ main(int argc, char **argv)
 			maxcount = atoi(optarg);
 			break;
 		case 'C':
-			Cflg++;
+			Cflg = B_TRUE;
 			break;
 		case 'q':
 			qflg = B_TRUE;
 			break;
 		case 'r':
 			rflg = B_TRUE;
+			break;
+		case 'U':
+			Uflg = B_TRUE;
 			break;
 #ifdef	DEBUG
 		case 'z':
@@ -363,6 +374,7 @@ main(int argc, char **argv)
 	if (!icapfile) {
 		use_kern_pf = check_device(&dh, &device);
 	} else {
+		use_kern_pf = B_FALSE;
 		cap_open_read(icapfile);
 
 		if (!nflg) {
@@ -371,6 +383,9 @@ main(int argc, char **argv)
 			(void) strlcat(names, ".names", MAXPATHLEN);
 		}
 	}
+
+	if (Uflg)
+		use_kern_pf = B_FALSE;
 
 	/* attempt to read .names file if it exists before filtering */
 	if ((!Nflg) && names[0] != '\0') {
@@ -383,7 +398,7 @@ main(int argc, char **argv)
 	}
 
 	if (argstr) {
-		if (!icapfile && use_kern_pf) {
+		if (use_kern_pf) {
 			ret = pf_compile(argstr, Cflg);
 			switch (ret) {
 			case 0:
@@ -447,7 +462,7 @@ main(int argc, char **argv)
 			}
 			flags = 0;
 			(void) fprintf(stderr,
-				"Creating name file %s\n", names);
+			    "Creating name file %s\n", names);
 		}
 
 		if (flags & F_DTAIL)
@@ -646,7 +661,7 @@ get_sum_line()
 		sumcount = 0;			/* error recovery */
 		pr_err(
 		    "get_sum_line: sumline overflow (sumcount=%d, MAXSUM=%d)\n",
-			tsumcount, MAXSUM);
+		    tsumcount, MAXSUM);
 	}
 
 	sumline[sumcount][0] = '\0';
@@ -764,9 +779,11 @@ usage(void)
 	(void) fprintf(stderr,
 	"\t[ -a ]			# Listen to packets on audio\n");
 	(void) fprintf(stderr,
-	"\t[ -d device ]		# Listen on interface named device\n");
+	"\t[ -d link ]		# Listen on named link\n");
 	(void) fprintf(stderr,
 	"\t[ -s snaplen ]		# Truncate packets\n");
+	(void) fprintf(stderr,
+	"\t[ -I IP interface ]		# Listen on named IP interface\n");
 	(void) fprintf(stderr,
 	"\t[ -c count ]		# Quit after count packets\n");
 	(void) fprintf(stderr,
@@ -892,7 +909,7 @@ snoop_alarm(int s_sec, void (*s_handler)())
 		} else {
 			if (nalarm == 0 || nalarm > hp->s_time)
 				nalarm = now < hp->s_time ? hp->s_time :
-					now + 1;
+				    now + 1;
 			tp = hp;
 		}
 	}
@@ -974,7 +991,7 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 				if ((hp->s_time - now) > 0) {
 					if (nalarm == 0 || nalarm > hp->s_time)
 						nalarm = now < hp->s_time ?
-							hp->s_time : now + 1;
+						    hp->s_time : now + 1;
 				}
 			}
 		}
@@ -1027,8 +1044,8 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 		}
 		if (snoop_nrecover >= SNOOP_MAXRECOVER) {
 			(void) fprintf(stderr,
-				"snoop: WARNING: skipping from packet %d\n",
-				count);
+			    "snoop: WARNING: skipping from packet %d\n",
+			    count);
 			snoop_nrecover = 0;
 		} else {
 			/* continue trying */
@@ -1036,7 +1053,7 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 		}
 	} else if (snoop_nrecover >= SNOOP_MAXRECOVER) {
 		(void) fprintf(stderr,
-			"snoop: ERROR: cannot recover from packet %d\n", count);
+		    "snoop: ERROR: cannot recover from packet %d\n", count);
 		exit(1);
 	}
 
@@ -1055,7 +1072,7 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 		/* Inform user that snoop has taken a fault */
 		(void) fprintf(stderr,
 		    "WARNING: received signal %d from packet %d\n",
-				sig, count);
+		    sig, count);
 	}
 
 	/* Reset interpreter variables */

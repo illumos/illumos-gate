@@ -26,8 +26,6 @@
 #ifndef	_INET_IP_IMPL_H
 #define	_INET_IP_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IP implementation private declarations.  These interfaces are
  * used to build the IP module and are not meant to be accessed
@@ -507,7 +505,7 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
  * Macro that hands off one or more messages directly to DLD
  * when the interface is marked with ILL_CAPAB_POLL.
  */
-#define	IP_DLS_ILL_TX(ill, ipha, mp, ipst) {				\
+#define	IP_DLS_ILL_TX(ill, ipha, mp, ipst, hlen) {			\
 	ill_dls_capab_t *ill_dls = ill->ill_dls_capab;			\
 	ASSERT(ILL_DLS_CAPABLE(ill));					\
 	ASSERT(ill_dls != NULL);					\
@@ -520,7 +518,15 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	    ipst->ips_ipv4firewall_physical_out,			\
 	    NULL, ill, ipha, mp, mp, 0, ipst);				\
 	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);		\
-	if (mp != NULL)	{						\
+	if (mp != NULL) {						\
+		if (ipst->ips_ipobs_enabled) {				\
+			zoneid_t szone;					\
+									\
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,	\
+			    ipst, ALL_ZONES);				\
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,	\
+			    ALL_ZONES, ill, IPV4_VERSION, hlen, ipst);	\
+		}							\
 		DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,		\
 		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,	\
 		    ipha_t *, ipha, ip6_t *, NULL, int,	0);		\
@@ -528,9 +534,23 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	}								\
 }
 
+/*
+ * In non-global zone exclusive IP stacks, data structures such as IRE
+ * entries pretend that they're in the global zone.  The following
+ * macro evaluates to the real zoneid instead of a pretend
+ * GLOBAL_ZONEID.
+ */
+#define	IP_REAL_ZONEID(zoneid, ipst)					\
+	(((zoneid) == GLOBAL_ZONEID) ?					\
+	    netstackid_to_zoneid((ipst)->ips_netstack->netstack_stackid) : \
+	    (zoneid))
+
 extern int	ip_wput_frag_mdt_min;
 extern boolean_t ip_can_frag_mdt(mblk_t *, ssize_t, ssize_t);
 extern mblk_t   *ip_prepend_zoneid(mblk_t *, zoneid_t, ip_stack_t *);
+extern zoneid_t	ip_get_zoneid_v4(ipaddr_t, mblk_t *, ip_stack_t *, zoneid_t);
+extern zoneid_t	ip_get_zoneid_v6(in6_addr_t *, mblk_t *, const ill_t *,
+    ip_stack_t *, zoneid_t);
 
 #endif	/* _KERNEL */
 

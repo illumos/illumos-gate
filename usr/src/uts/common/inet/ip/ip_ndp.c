@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -2561,11 +2559,8 @@ ndp_timer(void *arg)
 					    "%s on %s", sbuf, ibuf);
 				}
 				if ((ipif->ipif_flags & IPIF_UP) &&
-				    !ipif->ipif_addr_ready) {
-					ip_rts_ifmsg(ipif);
-					ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-					sctp_update_ipif(ipif, SCTP_IPIF_UP);
-				}
+				    !ipif->ipif_addr_ready)
+					ipif_up_notify(ipif);
 				ipif->ipif_addr_ready = 1;
 				ipif_refrele(ipif);
 			}

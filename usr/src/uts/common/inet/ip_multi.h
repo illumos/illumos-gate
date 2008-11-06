@@ -27,8 +27,6 @@
 #ifndef	_INET_IP_MULTI_H
 #define	_INET_IP_MULTI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -99,8 +97,11 @@ extern	int		ip_addmulti_v6(const in6_addr_t *, ill_t *, int,
 extern	int		ip_delmulti(ipaddr_t, ipif_t *, boolean_t, boolean_t);
 extern	int		ip_delmulti_v6(const in6_addr_t *, ill_t *, int,
     zoneid_t, boolean_t, boolean_t);
-extern	int		ip_join_allmulti(ipif_t *);
-extern	int		ip_leave_allmulti(ipif_t *);
+extern	int		ill_join_allmulti(ill_t *);
+extern	void		ill_leave_allmulti(ill_t *);
+extern	int		ip_join_allmulti(uint_t, boolean_t, ip_stack_t *);
+extern	int		ip_leave_allmulti(uint_t, boolean_t, ip_stack_t *);
+extern	void		ip_purge_allmulti(ill_t *);
 extern	void		ip_multicast_loopback(queue_t *, ill_t *, mblk_t *,
     int, zoneid_t);
 extern	int		ip_mforward(ill_t *, ipha_t *, mblk_t *);

@@ -127,6 +127,10 @@ struct net_protocol_s {
 	int		(*netp_getpmtuenabled)(net_handle_t);
 	int		(*netp_getlifaddr)(net_handle_t, phy_if_t, lif_if_t,
 			    size_t, net_ifaddr_t [], void *);
+	int		(*neti_getlifzone)(net_handle_t, phy_if_t, lif_if_t,
+			    zoneid_t *);
+	int		(*neti_getlifflags)(net_handle_t, phy_if_t, lif_if_t,
+			    uint64_t *);
 	phy_if_t	(*netp_phygetnext)(net_handle_t, phy_if_t);
 	phy_if_t	(*netp_phylookup)(net_handle_t, const char *);
 	lif_if_t	(*netp_lifgetnext)(net_handle_t, phy_if_t, lif_if_t);
@@ -274,6 +278,8 @@ extern int net_getmtu(net_handle_t, phy_if_t, lif_if_t);
 extern int net_getpmtuenabled(net_handle_t);
 extern int net_getlifaddr(net_handle_t, phy_if_t, lif_if_t,
     int, net_ifaddr_t [], void *);
+extern zoneid_t net_getlifzone(net_handle_t, phy_if_t, lif_if_t, zoneid_t *);
+extern int net_getlifflags(net_handle_t, phy_if_t, lif_if_t, uint64_t *);
 extern phy_if_t net_phygetnext(net_handle_t, phy_if_t);
 extern phy_if_t net_phylookup(net_handle_t, const char *);
 extern lif_if_t net_lifgetnext(net_handle_t, phy_if_t, lif_if_t);

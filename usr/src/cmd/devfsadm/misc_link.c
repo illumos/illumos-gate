@@ -93,8 +93,8 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo",
 	    "(^lockstat$)|(^SUNW,rtvc$)|(^vol$)|(^log$)|(^sy$)|"
-	    "(^ksyms$)|(^clone$)|(^tl$)|(^tnf$)|(^kstat$)|(^mdesc$)|"
-	    "(^eeprom$)|(^ptsl$)|(^mm$)|(^wc$)|(^dump$)|(^cn$)|(^lo$)|(^ptm$)|"
+	    "(^ksyms$)|(^clone$)|(^tl$)|(^tnf$)|(^kstat$)|(^mdesc$)|(^eeprom$)|"
+	    "(^ptsl$)|(^mm$)|(^wc$)|(^dump$)|(^cn$)|(^svvslo$)|(^ptm$)|"
 	    "(^ptc$)|(^openeepr$)|(^poll$)|(^sysmsg$)|(^random$)|(^trapstat$)|"
 	    "(^cryptoadm$)|(^crypto$)|(^pool$)|(^poolctl$)|(^bl$)|(^kmdb$)|"
 	    "(^sysevent$)|(^kssl$)|(^physmem$)",
@@ -104,7 +104,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    "(^ip$)|(^tcp$)|(^udp$)|(^icmp$)|(^sctp$)|"
 	    "(^ip6$)|(^tcp6$)|(^udp6$)|(^icmp6$)|(^sctp6$)|"
 	    "(^rts$)|(^arp$)|(^ipsecah$)|(^ipsecesp$)|(^keysock$)|(^spdsock$)|"
-	    "(^nca$)|(^rds$)|(^sdp$)",
+	    "(^nca$)|(^rds$)|(^sdp$)|(^ipnet$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
 	},
 	{ "pseudo", "ddi_pseudo",

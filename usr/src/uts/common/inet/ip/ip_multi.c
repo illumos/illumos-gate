@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
@@ -626,7 +624,7 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
 		if (ilm_numentries_v6(ill, &v6group) > 1)
 			return (0);
 		if (ill->ill_group == NULL)
-			ret = ip_join_allmulti(ipif);
+			ret = ill_join_allmulti(ill);
 		else
 			ret = ill_nominate_mcast_rcv(ill->ill_group);
 		if (ret != 0)
@@ -718,7 +716,7 @@ ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 		if (ilm_numentries_v6(ill, v6group) > 1)
 			return (0);
 		if (ill->ill_group == NULL)
-			ret = ip_join_allmulti(ill->ill_ipif);
+			ret = ill_join_allmulti(ill);
 		else
 			ret = ill_nominate_mcast_rcv(ill->ill_group);
 
@@ -854,7 +852,6 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 	ill_t	*ill = ipif->ipif_ill;
 	ilm_t *ilm;
 	in6_addr_t v6group;
-	int	ret;
 
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
@@ -899,20 +896,13 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 		if (ilm_numentries_v6(ill, &v6group) != 0)
 			return (0);
 
-		/*
-		 * If we never joined, then don't leave.  This can happen
-		 * if we're in an IPMP group, since only one ill per IPMP
-		 * group receives all multicast packets.
-		 */
-		if (!ill->ill_join_allmulti) {
-			ASSERT(ill->ill_group != NULL);
-			return (0);
+		/* If we never joined, then don't leave. */
+		if (ill->ill_join_allmulti) {
+			ill_leave_allmulti(ill);
+			if (ill->ill_group != NULL)
+				(void) ill_nominate_mcast_rcv(ill->ill_group);
 		}
-
-		ret = ip_leave_allmulti(ipif);
-		if (ill->ill_group != NULL)
-			(void) ill_nominate_mcast_rcv(ill->ill_group);
-		return (ret);
+		return (0);
 	}
 
 	if (!IS_LOOPBACK(ill))
@@ -939,7 +929,6 @@ ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 {
 	ipif_t	*ipif;
 	ilm_t *ilm;
-	int	ret;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -995,20 +984,13 @@ ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 		if (ilm_numentries_v6(ill, v6group) != 0)
 			return (0);
 
-		/*
-		 * If we never joined, then don't leave.  This can happen
-		 * if we're in an IPMP group, since only one ill per IPMP
-		 * group receives all multicast packets.
-		 */
-		if (!ill->ill_join_allmulti) {
-			ASSERT(ill->ill_group != NULL);
-			return (0);
+		/* If we never joined, then don't leave. */
+		if (ill->ill_join_allmulti) {
+			ill_leave_allmulti(ill);
+			if (ill->ill_group != NULL)
+				(void) ill_nominate_mcast_rcv(ill->ill_group);
 		}
-
-		ret = ip_leave_allmulti(ipif);
-		if (ill->ill_group != NULL)
-			(void) ill_nominate_mcast_rcv(ill->ill_group);
-		return (ret);
+		return (0);
 	}
 
 	if (!IS_LOOPBACK(ill))
@@ -1123,13 +1105,12 @@ ip_ll_delmulti_v6(ipif_t *ipif, const in6_addr_t *v6group)
  * one ill joining the allmulti group.
  */
 int
-ip_join_allmulti(ipif_t *ipif)
+ill_join_allmulti(ill_t *ill)
 {
-	ill_t	*ill = ipif->ipif_ill;
-	mblk_t	*mp;
+	mblk_t		*promiscon_mp, *promiscoff_mp;
 	uint32_t	addrlen, addroff;
 
-	ASSERT(IAM_WRITER_IPIF(ipif));
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	if (!ill->ill_dl_up) {
 		/*
@@ -1142,18 +1123,25 @@ ip_join_allmulti(ipif_t *ipif)
 	ASSERT(!ill->ill_join_allmulti);
 
 	/*
-	 * Create a DL_PROMISCON_REQ message and send it directly to
-	 * the DLPI provider.  We don't need to do this for certain
-	 * media types for which we never need to turn promiscuous
-	 * mode on.
+	 * Create a DL_PROMISCON_REQ message and send it directly to the DLPI
+	 * provider.  We don't need to do this for certain media types for
+	 * which we never need to turn promiscuous mode on.  While we're here,
+	 * pre-allocate a DL_PROMISCOFF_REQ message to make sure that
+	 * ill_leave_allmulti() will not fail due to low memory conditions.
 	 */
 	if ((ill->ill_net_type == IRE_IF_RESOLVER) &&
 	    !(ill->ill_phyint->phyint_flags & PHYI_MULTI_BCAST)) {
-		mp = ill_create_dl(ill, DL_PROMISCON_REQ,
+		promiscon_mp = ill_create_dl(ill, DL_PROMISCON_REQ,
 		    sizeof (dl_promiscon_req_t), &addrlen, &addroff);
-		if (mp == NULL)
+		promiscoff_mp = ill_create_dl(ill, DL_PROMISCOFF_REQ,
+		    sizeof (dl_promiscoff_req_t), &addrlen, &addroff);
+		if (promiscon_mp == NULL || promiscoff_mp == NULL) {
+			freemsg(promiscon_mp);
+			freemsg(promiscoff_mp);
 			return (ENOMEM);
-		ill_dlpi_send(ill, mp);
+		}
+		ill->ill_promiscoff_mp = promiscoff_mp;
+		ill_dlpi_send(ill, promiscon_mp);
 	}
 
 	ill->ill_join_allmulti = B_TRUE;
@@ -1166,21 +1154,19 @@ ip_join_allmulti(ipif_t *ipif)
  * With ill groups, we need to nominate some other ill as
  * this ipif->ipif_ill is leaving the group.
  */
-int
-ip_leave_allmulti(ipif_t *ipif)
+void
+ill_leave_allmulti(ill_t *ill)
 {
-	ill_t	*ill = ipif->ipif_ill;
-	mblk_t	*mp;
-	uint32_t	addrlen, addroff;
+	mblk_t		*promiscoff_mp = ill->ill_promiscoff_mp;
 
-	ASSERT(IAM_WRITER_IPIF(ipif));
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	if (!ill->ill_dl_up) {
 		/*
 		 * Nobody there. All multicast addresses will be re-joined
 		 * when we get the DL_BIND_ACK bringing the interface up.
 		 */
-		return (0);
+		return;
 	}
 
 	ASSERT(ill->ill_join_allmulti);
@@ -1193,15 +1179,94 @@ ip_leave_allmulti(ipif_t *ipif)
 	 */
 	if ((ill->ill_net_type == IRE_IF_RESOLVER) &&
 	    !(ill->ill_phyint->phyint_flags & PHYI_MULTI_BCAST)) {
-		mp = ill_create_dl(ill, DL_PROMISCOFF_REQ,
-		    sizeof (dl_promiscoff_req_t), &addrlen, &addroff);
-		if (mp == NULL)
-			return (ENOMEM);
-		ill_dlpi_send(ill, mp);
+		ASSERT(promiscoff_mp != NULL);
+		ill->ill_promiscoff_mp = NULL;
+		ill_dlpi_send(ill, promiscoff_mp);
 	}
 
 	ill->ill_join_allmulti = B_FALSE;
+}
+
+static ill_t *
+ipsq_enter_byifindex(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
+{
+	ill_t		*ill;
+	boolean_t	in_ipsq;
+
+	ill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL, NULL,
+	    ipst);
+	if (ill != NULL) {
+		if (!ill_waiter_inc(ill)) {
+			ill_refrele(ill);
+			return (NULL);
+		}
+		ill_refrele(ill);
+		in_ipsq = ipsq_enter(ill, B_FALSE);
+		ill_waiter_dcr(ill);
+		if (!in_ipsq)
+			ill = NULL;
+	}
+	return (ill);
+}
+
+int
+ip_join_allmulti(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
+{
+	ill_t		*ill;
+	int		ret;
+
+	if ((ill = ipsq_enter_byifindex(ifindex, isv6, ipst)) == NULL)
+		return (ENODEV);
+	if (isv6) {
+		ret = ip_addmulti_v6(&ipv6_all_zeros, ill, ifindex,
+		    ill->ill_zoneid, ILGSTAT_NONE, MODE_IS_EXCLUDE, NULL);
+	} else {
+		ret = ip_addmulti(INADDR_ANY, ill->ill_ipif, ILGSTAT_NONE,
+		    MODE_IS_EXCLUDE, NULL);
+	}
+	ill->ill_ipallmulti_cnt++;
+	ipsq_exit(ill->ill_phyint->phyint_ipsq);
+	return (ret);
+}
+
+int
+ip_leave_allmulti(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
+{
+	ill_t		*ill;
+
+	if ((ill = ipsq_enter_byifindex(ifindex, isv6, ipst)) == NULL)
+		return (ENODEV);
+	ASSERT(ill->ill_ipallmulti_cnt != 0);
+	if (isv6) {
+		(void) ip_delmulti_v6(&ipv6_all_zeros, ill, ifindex,
+		    ill->ill_zoneid, B_TRUE, B_TRUE);
+	} else {
+		(void) ip_delmulti(INADDR_ANY, ill->ill_ipif, B_TRUE, B_TRUE);
+	}
+	ill->ill_ipallmulti_cnt--;
+	ipsq_exit(ill->ill_phyint->phyint_ipsq);
 	return (0);
+}
+
+/*
+ * Delete the allmulti memberships that were added as part of
+ * ip_join_allmulti().
+ */
+void
+ip_purge_allmulti(ill_t *ill)
+{
+	ASSERT(IAM_WRITER_ILL(ill));
+
+	for (; ill->ill_ipallmulti_cnt > 0; ill->ill_ipallmulti_cnt--) {
+		if (ill->ill_isv6) {
+			(void) ip_delmulti_v6(&ipv6_all_zeros, ill,
+			    ill->ill_phyint->phyint_ifindex, ill->ill_zoneid,
+			    B_TRUE, B_TRUE);
+		} else {
+			(void) ip_delmulti(INADDR_ANY, ill->ill_ipif, B_TRUE,
+			    B_TRUE);
+		}
+	}
 }
 
 /*
@@ -1477,6 +1542,9 @@ ill_recover_multicast(ill_t *ill)
 	char    addrbuf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
+
+	ill->ill_need_recover_multicast = 0;
+
 	ILM_WALKER_HOLD(ill);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		/*
@@ -1492,7 +1560,7 @@ ill_recover_multicast(ill_t *ill)
 		    sizeof (addrbuf))));
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
 			if (ill->ill_group == NULL) {
-				(void) ip_join_allmulti(ill->ill_ipif);
+				(void) ill_join_allmulti(ill);
 			} else {
 				/*
 				 * We don't want to join on this ill,
@@ -1522,6 +1590,9 @@ ill_leave_multicast(ill_t *ill)
 	char    addrbuf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
+
+	ill->ill_need_recover_multicast = 1;
+
 	ILM_WALKER_HOLD(ill);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		/*
@@ -1536,7 +1607,7 @@ ill_leave_multicast(ill_t *ill)
 		    inet_ntop(AF_INET6, &ilm->ilm_v6addr, addrbuf,
 		    sizeof (addrbuf))));
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
-			(void) ip_leave_allmulti(ill->ill_ipif);
+			ill_leave_allmulti(ill);
 			/*
 			 * If we were part of an IPMP group, then
 			 * ill_handoff_responsibility() has already

@@ -70,6 +70,7 @@ i i.preserve
 d none dev 755 root sys
 d none dev/dsk 755 root sys
 d none dev/fd 555 root root
+d none dev/ipnet 755 root sys
 d none dev/net 755 root sys
 d none dev/pts 755 root sys
 d none dev/rdsk 755 root sys

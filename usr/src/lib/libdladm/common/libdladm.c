@@ -340,6 +340,9 @@ dladm_media2str(uint32_t media, char *buf)
 	case DL_ASYNC:
 		s = "AsyncCharacter";
 		break;
+	case DL_IPNET:
+		s = "IPNET";
+		break;
 	default:
 		s = "--";
 		break;

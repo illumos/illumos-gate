@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-const char udp_version[] = "@(#)udp.c	1.206	08/10/17 SMI";
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
@@ -80,6 +78,7 @@ const char udp_version[] = "@(#)udp.c	1.206	08/10/17 SMI";
 #include <inet/ipclassifier.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ipp_common.h>
+#include <inet/ipnet.h>
 
 /*
  * The ipsec_info.h header file is here since it has the definition for the
@@ -6341,7 +6340,7 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, ipha, mp, ipst);
+		IP_DLS_ILL_TX(ill, ipha, mp, ipst, ire_fp_mp_len);
 	} else {
 		DTRACE_PROBE4(ip4__physical__out__start,
 		    ill_t *, NULL, ill_t *, ill,
@@ -6351,13 +6350,18 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 		    NULL, ill, ipha, mp, mp, ll_multicast, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL) {
+			if (ipst->ips_ipobs_enabled) {
+				ipobs_hook(mp, IPOBS_HOOK_OUTBOUND,
+				    IP_REAL_ZONEID(connp->conn_zoneid, ipst),
+				    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len,
+				    ipst);
+			}
 			DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
 			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,
 			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
 			putnext(ire->ire_stq, mp);
 		}
 	}
-
 	IRE_REFRELE(ire);
 }
 

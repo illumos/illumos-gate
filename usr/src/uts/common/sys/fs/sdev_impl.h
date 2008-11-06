@@ -271,6 +271,7 @@ typedef enum {
 #define	SDEV_VTOR_INVALID	-1
 #define	SDEV_VTOR_SKIP		0
 #define	SDEV_VTOR_VALID		1
+#define	SDEV_VTOR_STALE		2
 
 /* convenient macros */
 #define	SDEV_IS_GLOBAL(dv)	\
@@ -626,6 +627,7 @@ extern int prof_lookup();
 extern void prof_filldir(struct sdev_node *);
 extern int devpts_validate(struct sdev_node *dv);
 extern int devnet_validate(struct sdev_node *dv);
+extern int devipnet_validate(struct sdev_node *dv);
 extern int devvt_validate(struct sdev_node *dv);
 extern void *sdev_get_vtor(struct sdev_node *dv);
 
@@ -657,11 +659,13 @@ extern kmem_cache_t *sdev_node_cache;
 extern struct vnodeops		*sdev_vnodeops;
 extern struct vnodeops		*devpts_vnodeops;
 extern struct vnodeops		*devnet_vnodeops;
+extern struct vnodeops		*devipnet_vnodeops;
 extern struct vnodeops		*devvt_vnodeops;
 extern struct sdev_data *sdev_origins; /* mount info for global /dev instance */
 extern const fs_operation_def_t	sdev_vnodeops_tbl[];
 extern const fs_operation_def_t	devpts_vnodeops_tbl[];
 extern const fs_operation_def_t	devnet_vnodeops_tbl[];
+extern const fs_operation_def_t devipnet_vnodeops_tbl[];
 extern const fs_operation_def_t	devvt_vnodeops_tbl[];
 extern const fs_operation_def_t	devsys_vnodeops_tbl[];
 extern const fs_operation_def_t	devpseudo_vnodeops_tbl[];

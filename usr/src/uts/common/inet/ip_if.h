@@ -27,8 +27,6 @@
 #ifndef	_INET_IP_IF_H
 #define	_INET_IP_IF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <net/route.h>
 
 #ifdef	__cplusplus
@@ -260,6 +258,7 @@ extern	int	ipif_ndp_up(ipif_t *);
 extern	int	ipif_ndp_setup_multicast(ipif_t *, struct nce_s **);
 extern	int	ipif_up_done(ipif_t *);
 extern	int	ipif_up_done_v6(ipif_t *);
+extern	void	ipif_up_notify(ipif_t *);
 extern	void	ipif_update_other_ipifs_v6(ipif_t *, ill_group_t *);
 extern	void	ipif_recreate_interface_routes_v6(ipif_t *, ipif_t *);
 extern	void	ill_update_source_selection(ill_t *);

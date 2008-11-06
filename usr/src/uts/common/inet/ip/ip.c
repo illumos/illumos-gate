@@ -791,6 +791,9 @@ static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
 
 static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
     ipha_t *, ill_t *, boolean_t);
+
+static void ipobs_init(ip_stack_t *);
+static void ipobs_fini(ip_stack_t *);
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
 /* How long, in seconds, we allow frags to hang around. */
@@ -1230,10 +1233,10 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 146 */ { SIOCTMYSITE, sizeof (struct sioc_addrreq), 0,
 			MISC_CMD, ip_sioctl_tmysite, NULL },
 	/* 147 */ { SIOCGTUNPARAM, sizeof (struct iftun_req), IPI_REPL,
-			TUN_CMD, ip_sioctl_tunparam, NULL },
+		    TUN_CMD, ip_sioctl_tunparam, NULL },
 	/* 148 */ { SIOCSTUNPARAM, sizeof (struct iftun_req),
-			IPI_PRIV | IPI_WR,
-			TUN_CMD, ip_sioctl_tunparam, NULL },
+		    IPI_PRIV | IPI_WR,
+		    TUN_CMD, ip_sioctl_tunparam, NULL },
 
 	/* IPSECioctls handled in ip_sioctl_copyin_setup itself */
 	/* 149 */ { SIOCFIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
@@ -4156,9 +4159,7 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 			if ((ipif->ipif_flags & IPIF_UP) &&
 			    !ipif->ipif_addr_ready) {
 				ipif_mask_reply(ipif);
-				ip_rts_ifmsg(ipif);
-				ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-				sctp_update_ipif(ipif, SCTP_IPIF_UP);
+				ipif_up_notify(ipif);
 			}
 			ipif->ipif_addr_ready = 1;
 			ipif_refrele(ipif);
@@ -5829,6 +5830,7 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	mutex_destroy(&ipst->ips_ip_addr_avail_lock);
 	rw_destroy(&ipst->ips_ill_g_lock);
 
+	ipobs_fini(ipst);
 	ip_ire_fini(ipst);
 	ip6_asp_free(ipst);
 	conn_drain_fini(ipst);
@@ -6033,6 +6035,7 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ipst->ips_ip_src_id = 1;
 	rw_init(&ipst->ips_srcid_lock, NULL, RW_DEFAULT, NULL);
 
+	ipobs_init(ipst);
 	ip_net_init(ipst, ns);
 	ipv4_hook_init(ipst);
 	ipv6_hook_init(ipst);
@@ -8532,7 +8535,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 			return;
 		}
 		case IRE_IF_NORESOLVER: {
-
 			if (dst_ill->ill_phys_addr_length != IP_ADDR_LEN &&
 			    dst_ill->ill_resolver_mp == NULL) {
 				ip1dbg(("ip_newroute: dst_ill %p "
@@ -14054,7 +14056,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		 * may be queued depending on the availability
 		 * of transmit resources at the media layer.
 		 */
-		IP_DLS_ILL_TX(stq_ill, ipha, mp, ipst);
+		IP_DLS_ILL_TX(stq_ill, ipha, mp, ipst, hlen);
 	} else {
 		DTRACE_PROBE4(ip4__physical__out__start,
 		    ill_t *, NULL, ill_t *, stq_ill,
@@ -15147,6 +15149,18 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			continue;
 		}
 
+		if (ipst->ips_ipobs_enabled) {
+			zoneid_t dzone;
+
+			/*
+			 * On the inbound path the src zone will be unknown as
+			 * this packet has come from the wire.
+			 */
+			dzone = ip_get_zoneid_v4(dst, mp, ipst, ALL_ZONES);
+			ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone,
+			    ill, IPV4_VERSION, 0, ipst);
+		}
+
 		/*
 		 * Reuse the cached ire only if the ipha_dst of the previous
 		 * packet is the same as the current packet AND it is not
@@ -15157,6 +15171,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			ire_refrele(ire);
 			ire = NULL;
 		}
+
 		opt_len = ipha->ipha_version_and_hdr_length -
 		    IP_SIMPLE_HDR_VERSION;
 
@@ -15848,7 +15863,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 		mutex_enter(&ill->ill_lock);
 		ill->ill_dl_up = 1;
-		(void) ill_hook_event_create(ill, 0, NE_UP, NULL, 0);
+		ill_nic_event_dispatch(ill, 0, NE_UP, NULL, 0);
 		mutex_exit(&ill->ill_lock);
 
 		/*
@@ -16411,7 +16426,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		iocp = (struct iocblk *)mp->b_rptr;
 
 		switch (iocp->ioc_cmd) {
-		int mode;
+			int mode;
 
 		case DL_IOC_HDR_INFO:
 			/*
@@ -20132,7 +20147,7 @@ ip_trash_ire_reclaim_stack(ip_stack_t *ipst)
 mblk_t *
 ip_unbind(queue_t *q, mblk_t *mp)
 {
-	conn_t	*connp = Q_TO_CONN(q);
+	conn_t  *connp = Q_TO_CONN(q);
 
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 
@@ -22670,6 +22685,19 @@ another:;
 		if (mp == NULL)
 			goto release_ire_and_ill;
 
+		if (ipst->ips_ipobs_enabled) {
+			zoneid_t szone;
+
+			/*
+			 * On the outbound path the destination zone will be
+			 * unknown as we're sending this packet out on the
+			 * wire.
+			 */
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp, ipst,
+			    ALL_ZONES);
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone, ALL_ZONES,
+			    ire->ire_ipif->ipif_ill, IPV4_VERSION, 0, ipst);
+		}
 		mp->b_prev = SET_BPREV_FLAG(IPP_LOCAL_OUT);
 		DTRACE_PROBE2(ip__xmit__1, mblk_t *, mp, ire_t *, ire);
 		pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_TRUE);
@@ -25118,6 +25146,24 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 	if (first_mp == NULL)
 		return;
 
+	if (ipst->ips_ipobs_enabled) {
+		zoneid_t szone, dzone, lookup_zoneid = ALL_ZONES;
+		zoneid_t stackzoneid = netstackid_to_zoneid(
+		    ipst->ips_netstack->netstack_stackid);
+
+		dzone = (stackzoneid == GLOBAL_ZONEID) ? zoneid : stackzoneid;
+		/*
+		 * 127.0.0.1 is special, as we cannot lookup its zoneid by
+		 * address.  Restrict the lookup below to the destination zone.
+		 */
+		if (ipha->ipha_src == ntohl(INADDR_LOOPBACK))
+			lookup_zoneid = zoneid;
+		szone = ip_get_zoneid_v4(ipha->ipha_src, mp, ipst,
+		    lookup_zoneid);
+		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill,
+		    IPV4_VERSION, 0, ipst);
+	}
+
 	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
 	    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha, ip6_t *, NULL,
 	    int, 1);
@@ -25864,9 +25910,10 @@ send:
 
 		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, ipsec_mp);
 
-		if (ipsec_mp != NULL)
+		if (ipsec_mp != NULL) {
 			ip_wput_local_v6(RD(q), out_ill,
-			    ip6h, ipsec_mp, ire, 0);
+			    ip6h, ipsec_mp, ire, 0, zoneid);
+		}
 		if (ire_need_rele)
 			ire_refrele(ire);
 		return;
@@ -29381,12 +29428,8 @@ ipmp_hook_emulation_changed(ip_stack_t *ipst)
 			else
 				ill = phyi->phyint_illv6;
 
-			if (ill != NULL) {
-				mutex_enter(&ill->ill_lock);
-				ill_nic_info_plumb(ill, B_TRUE);
-				ill_nic_info_dispatch(ill);
-				mutex_exit(&ill->ill_lock);
-			}
+			if (ill != NULL)
+				ill_nic_event_plumb(ill, B_TRUE);
 		}
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
@@ -30201,4 +30244,170 @@ ip6_pkt_free(ip6_pkt_t *ipp)
 	}
 	ipp->ipp_fields &= ~(IPPF_HOPOPTS | IPPF_RTDSTOPTS | IPPF_DSTOPTS |
 	    IPPF_RTHDR);
+}
+
+zoneid_t
+ip_get_zoneid_v4(ipaddr_t addr, mblk_t *mp, ip_stack_t *ipst,
+    zoneid_t lookup_zoneid)
+{
+	ire_t		*ire;
+	int		ire_flags = MATCH_IRE_TYPE;
+	zoneid_t	zoneid = ALL_ZONES;
+
+	if (is_system_labeled() && !tsol_can_accept_raw(mp, B_FALSE))
+		return (ALL_ZONES);
+
+	if (lookup_zoneid != ALL_ZONES)
+		ire_flags |= MATCH_IRE_ZONEONLY;
+	ire = ire_ctable_lookup(addr, NULL, IRE_LOCAL | IRE_LOOPBACK, NULL,
+	    lookup_zoneid, NULL, ire_flags, ipst);
+	if (ire != NULL) {
+		zoneid = IP_REAL_ZONEID(ire->ire_zoneid, ipst);
+		ire_refrele(ire);
+	}
+	return (zoneid);
+}
+
+zoneid_t
+ip_get_zoneid_v6(in6_addr_t *addr, mblk_t *mp, const ill_t *ill,
+    ip_stack_t *ipst, zoneid_t lookup_zoneid)
+{
+	ire_t		*ire;
+	int		ire_flags = MATCH_IRE_TYPE;
+	zoneid_t	zoneid = ALL_ZONES;
+	ipif_t		*ipif_arg = NULL;
+
+	if (is_system_labeled() && !tsol_can_accept_raw(mp, B_FALSE))
+		return (ALL_ZONES);
+
+	if (IN6_IS_ADDR_LINKLOCAL(addr)) {
+		ire_flags |= MATCH_IRE_ILL_GROUP;
+		ipif_arg = ill->ill_ipif;
+	}
+	if (lookup_zoneid != ALL_ZONES)
+		ire_flags |= MATCH_IRE_ZONEONLY;
+	ire = ire_ctable_lookup_v6(addr, NULL, IRE_LOCAL | IRE_LOOPBACK,
+	    ipif_arg, lookup_zoneid, NULL, ire_flags, ipst);
+	if (ire != NULL) {
+		zoneid = IP_REAL_ZONEID(ire->ire_zoneid, ipst);
+		ire_refrele(ire);
+	}
+	return (zoneid);
+}
+
+/*
+ * IP obserability hook support functions.
+ */
+
+static void
+ipobs_init(ip_stack_t *ipst)
+{
+	ipst->ips_ipobs_enabled = B_FALSE;
+	list_create(&ipst->ips_ipobs_cb_list, sizeof (ipobs_cb_t),
+	    offsetof(ipobs_cb_t, ipobs_cbnext));
+	mutex_init(&ipst->ips_ipobs_cb_lock, NULL, MUTEX_DEFAULT, NULL);
+	ipst->ips_ipobs_cb_nwalkers = 0;
+	cv_init(&ipst->ips_ipobs_cb_cv, NULL, CV_DRIVER, NULL);
+}
+
+static void
+ipobs_fini(ip_stack_t *ipst)
+{
+	ipobs_cb_t *cb;
+
+	mutex_enter(&ipst->ips_ipobs_cb_lock);
+	while (ipst->ips_ipobs_cb_nwalkers != 0)
+		cv_wait(&ipst->ips_ipobs_cb_cv, &ipst->ips_ipobs_cb_lock);
+
+	while ((cb = list_head(&ipst->ips_ipobs_cb_list)) != NULL) {
+		list_remove(&ipst->ips_ipobs_cb_list, cb);
+		kmem_free(cb, sizeof (*cb));
+	}
+	list_destroy(&ipst->ips_ipobs_cb_list);
+	mutex_exit(&ipst->ips_ipobs_cb_lock);
+	mutex_destroy(&ipst->ips_ipobs_cb_lock);
+	cv_destroy(&ipst->ips_ipobs_cb_cv);
+}
+
+void
+ipobs_hook(mblk_t *mp, int htype, zoneid_t zsrc, zoneid_t zdst,
+    const ill_t *ill, int ipver, uint32_t hlen, ip_stack_t *ipst)
+{
+	ipobs_cb_t *ipobs_cb;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	mutex_enter(&ipst->ips_ipobs_cb_lock);
+	ipst->ips_ipobs_cb_nwalkers++;
+	mutex_exit(&ipst->ips_ipobs_cb_lock);
+	for (ipobs_cb = list_head(&ipst->ips_ipobs_cb_list); ipobs_cb != NULL;
+	    ipobs_cb = list_next(&ipst->ips_ipobs_cb_list, ipobs_cb)) {
+		mblk_t  *mp2 = allocb(sizeof (ipobs_hook_data_t),
+		    BPRI_HI);
+		if (mp2 != NULL) {
+			ipobs_hook_data_t *ihd =
+			    (ipobs_hook_data_t *)mp2->b_rptr;
+			if (((ihd->ihd_mp = dupmsg(mp)) == NULL) &&
+			    ((ihd->ihd_mp = copymsg(mp)) == NULL)) {
+				freemsg(mp2);
+				continue;
+			}
+			ihd->ihd_mp->b_rptr += hlen;
+			ihd->ihd_htype = htype;
+			ihd->ihd_ipver = ipver;
+			ihd->ihd_zsrc = zsrc;
+			ihd->ihd_zdst = zdst;
+			ihd->ihd_ifindex = ill->ill_phyint->phyint_ifindex;
+			ihd->ihd_stack = ipst->ips_netstack;
+			mp2->b_wptr += sizeof (*ihd);
+			ipobs_cb->ipobs_cbfunc(mp2);
+		}
+	}
+	mutex_enter(&ipst->ips_ipobs_cb_lock);
+	ipst->ips_ipobs_cb_nwalkers--;
+	if (ipst->ips_ipobs_cb_nwalkers == 0)
+		cv_broadcast(&ipst->ips_ipobs_cb_cv);
+	mutex_exit(&ipst->ips_ipobs_cb_lock);
+}
+
+void
+ipobs_register_hook(netstack_t *ns, pfv_t func)
+{
+	ipobs_cb_t   *cb;
+	ip_stack_t *ipst = ns->netstack_ip;
+
+	cb = kmem_alloc(sizeof (*cb), KM_SLEEP);
+
+	mutex_enter(&ipst->ips_ipobs_cb_lock);
+	while (ipst->ips_ipobs_cb_nwalkers != 0)
+		cv_wait(&ipst->ips_ipobs_cb_cv, &ipst->ips_ipobs_cb_lock);
+	ASSERT(ipst->ips_ipobs_cb_nwalkers == 0);
+
+	cb->ipobs_cbfunc = func;
+	list_insert_head(&ipst->ips_ipobs_cb_list, cb);
+	ipst->ips_ipobs_enabled = B_TRUE;
+	mutex_exit(&ipst->ips_ipobs_cb_lock);
+}
+
+void
+ipobs_unregister_hook(netstack_t *ns, pfv_t func)
+{
+	ipobs_cb_t	*curcb;
+	ip_stack_t	*ipst = ns->netstack_ip;
+
+	mutex_enter(&ipst->ips_ipobs_cb_lock);
+	while (ipst->ips_ipobs_cb_nwalkers != 0)
+		cv_wait(&ipst->ips_ipobs_cb_cv, &ipst->ips_ipobs_cb_lock);
+
+	for (curcb = list_head(&ipst->ips_ipobs_cb_list); curcb != NULL;
+	    curcb = list_next(&ipst->ips_ipobs_cb_list, curcb)) {
+		if (func == curcb->ipobs_cbfunc) {
+			list_remove(&ipst->ips_ipobs_cb_list, curcb);
+			kmem_free(curcb, sizeof (*curcb));
+			break;
+		}
+	}
+	if (list_is_empty(&ipst->ips_ipobs_cb_list))
+		ipst->ips_ipobs_enabled = B_FALSE;
+	mutex_exit(&ipst->ips_ipobs_cb_lock);
 }

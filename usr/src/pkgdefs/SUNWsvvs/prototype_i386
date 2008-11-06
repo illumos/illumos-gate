@@ -1,8 +1,6 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -28,7 +26,7 @@
 #
 # SUNWsvvs
 #
-f none usr/kernel/drv/lo 755 root sys
+f none usr/kernel/drv/svvslo 755 root sys
 f none usr/kernel/drv/tidg 755 root sys
 f none usr/kernel/drv/tivc 755 root sys
 f none usr/kernel/drv/tmux 755 root sys
@@ -37,7 +35,7 @@ f none usr/kernel/strmod/lmode 755 root sys
 f none usr/kernel/strmod/lmodr 755 root sys
 f none usr/kernel/strmod/lmodt 755 root sys
 d none usr/kernel/drv/amd64 755 root sys  
-f none usr/kernel/drv/amd64/lo 755 root sys  
+f none usr/kernel/drv/amd64/svvslo 755 root sys  
 f none usr/kernel/drv/amd64/tidg 755 root sys  
 f none usr/kernel/drv/amd64/tivc 755 root sys  
 f none usr/kernel/drv/amd64/tmux 755 root sys  

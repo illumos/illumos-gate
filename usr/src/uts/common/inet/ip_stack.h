@@ -412,6 +412,12 @@ struct ip_stack {
 
 	net_handle_t		ips_ipv4_net_data;
 	net_handle_t		ips_ipv6_net_data;
+
+	boolean_t		ips_ipobs_enabled;
+	list_t			ips_ipobs_cb_list;
+	kmutex_t		ips_ipobs_cb_lock;
+	uint_t			ips_ipobs_cb_nwalkers;
+	kcondvar_t		ips_ipobs_cb_cv;
 };
 typedef struct ip_stack ip_stack_t;
 

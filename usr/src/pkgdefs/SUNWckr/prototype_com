@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This required package information file contains a list of package contents.
@@ -87,6 +85,7 @@ f none kernel/drv/icmp.conf 644 root sys
 f none kernel/drv/icmp6.conf 644 root sys
 f none kernel/drv/ip.conf 644 root sys
 f none kernel/drv/ip6.conf 644 root sys
+f none kernel/drv/ipnet.conf 644 root sys
 f none kernel/drv/ippctl.conf 644 root sys
 f none kernel/drv/ipsecah.conf 644 root sys
 f none kernel/drv/ipsecesp.conf 644 root sys

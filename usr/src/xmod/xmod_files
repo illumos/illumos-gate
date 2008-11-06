@@ -4,9 +4,9 @@
 ../closed/uts/common/io/lmode.c
 ../closed/uts/common/io/lmodr.c
 ../closed/uts/common/io/lmodt.c
-../closed/uts/common/io/lo.c
-../closed/uts/common/io/lo.conf
-../closed/uts/common/sys/lo.h
+../closed/uts/common/io/svvslo.c
+../closed/uts/common/io/svvslo.conf
+../closed/uts/common/sys/svvslo.h
 ../closed/uts/common/io/tidg.c
 ../closed/uts/common/sys/tidg.h
 ../closed/uts/common/io/tidg.conf

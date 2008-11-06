@@ -8019,6 +8019,7 @@ tcp_reinit_values(tcp)
 	tcp->tcp_zero_win_probe = 0;
 
 	tcp->tcp_loopback = 0;
+	tcp->tcp_refuse = 0;
 	tcp->tcp_localnet = 0;
 	tcp->tcp_syn_defense = 0;
 	tcp->tcp_set_timer = 0;
@@ -17866,6 +17867,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	tcp_t		*tcp = connp->conn_tcp;
 	uint32_t	msize;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -17886,6 +17888,16 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	tcp->tcp_squeue_bytes -= msize;
 	mutex_exit(&tcp->tcp_non_sq_lock);
 
+	/* Check to see if this connection wants to be re-fused. */
+	if (tcp->tcp_refuse && !ipst->ips_ipobs_enabled) {
+		if (tcp->tcp_ipversion == IPV4_VERSION) {
+			tcp_fuse(tcp, (uchar_t *)&tcp->tcp_saved_ipha,
+			    &tcp->tcp_saved_tcph);
+		} else {
+			tcp_fuse(tcp, (uchar_t *)&tcp->tcp_saved_ip6h,
+			    &tcp->tcp_saved_tcph);
+		}
+	}
 	/* Bypass tcp protocol for fused tcp loopback */
 	if (tcp->tcp_fused && tcp_fuse_output(tcp, mp, msize))
 		return;
@@ -19462,7 +19474,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, ipha, mp, ipst);
+		IP_DLS_ILL_TX(ill, ipha, mp, ipst, ire_fp_mp_len);
 	} else {
 		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
 		DTRACE_PROBE4(ip4__physical__out__start,
@@ -19474,6 +19486,12 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 
 		if (mp != NULL) {
+			if (ipst->ips_ipobs_enabled) {
+				ipobs_hook(mp, IPOBS_HOOK_OUTBOUND,
+				    IP_REAL_ZONEID(connp->conn_zoneid, ipst),
+				    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len,
+				    ipst);
+			}
 			DTRACE_IP_FASTPATH(mp, ipha, out_ill, ipha, NULL);
 			putnext(ire->ire_stq, mp);
 		}
@@ -21258,6 +21276,24 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 		atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, obsegs);
 	ire->ire_last_used_time = lbolt;
 
+	if (ipst->ips_ipobs_enabled) {
+		multidata_t *dlmdp = mmd_getmultidata(md_mp_head);
+		pdesc_t *dl_pkt;
+		pdescinfo_t pinfo;
+		mblk_t *nmp;
+		zoneid_t szone = tcp->tcp_connp->conn_zoneid;
+
+		for (dl_pkt = mmd_getfirstpdesc(dlmdp, &pinfo);
+		    (dl_pkt != NULL);
+		    dl_pkt = mmd_getnextpdesc(dl_pkt, &pinfo)) {
+			if ((nmp = mmd_transform_link(dl_pkt)) == NULL)
+				continue;
+			ipobs_hook(nmp, IPOBS_HOOK_OUTBOUND, szone,
+			    ALL_ZONES, ill, tcp->tcp_ipversion, 0, ipst);
+			freemsg(nmp);
+		}
+	}
+
 	/* send it down */
 	if (ILL_DLS_CAPABLE(ill)) {
 		ill_dls_capab_t *ill_dls = ill->ill_dls_capab;
@@ -21437,7 +21473,7 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, ipha, mp, ipst);
+		IP_DLS_ILL_TX(ill, ipha, mp, ipst, ire_fp_mp_len);
 	} else {
 		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
 		DTRACE_PROBE4(ip4__physical__out__start,
@@ -21449,6 +21485,13 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 
 		if (mp != NULL) {
+			if (ipst->ips_ipobs_enabled) {
+				zoneid_t szone = tcp->tcp_connp->conn_zoneid;
+
+				ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
+				    ALL_ZONES, ill, tcp->tcp_ipversion,
+				    ire_fp_mp_len, ipst);
+			}
 			DTRACE_IP_FASTPATH(mp, ipha, out_ill, ipha, NULL);
 			putnext(ire->ire_stq, mp);
 		}

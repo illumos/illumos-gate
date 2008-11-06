@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
 
 #include <stdio.h>
 #include <string.h>
@@ -52,6 +50,7 @@
 #include <ctype.h>
 #include <values.h>
 #include <libdlpi.h>
+#include <sys/dlpi.h>
 
 #include "snoop.h"
 
@@ -89,6 +88,7 @@ boolean_t
 check_device(dlpi_handle_t *dhp, char **devicep)
 {
 	int	retval;
+	int	flags = DLPI_PASSIVE | DLPI_RAW;
 
 	/*
 	 * Determine which network device
@@ -105,7 +105,7 @@ check_device(dlpi_handle_t *dhp, char **devicep)
 		unsigned bufsize;
 
 		if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-		    pr_err("socket");
+			pr_err("socket");
 
 		if (ioctl(s, SIOCGIFNUM, (char *)&numifs) < 0) {
 			pr_err("check_device: ioctl SIOCGIFNUM");
@@ -139,8 +139,8 @@ check_device(dlpi_handle_t *dhp, char **devicep)
 			if (ioctl(s, SIOCGIFFLAGS, (char *)ifr) < 0)
 				pr_err("ioctl SIOCGIFFLAGS");
 			if ((ifr->ifr_flags &
-				(IFF_VIRTUAL|IFF_LOOPBACK|IFF_UP|
-				IFF_RUNNING)) == (IFF_UP|IFF_RUNNING))
+			    (IFF_VIRTUAL|IFF_LOOPBACK|IFF_UP|
+			    IFF_RUNNING)) == (IFF_UP|IFF_RUNNING))
 				break;
 		}
 
@@ -150,9 +150,11 @@ check_device(dlpi_handle_t *dhp, char **devicep)
 		*devicep = ifr->ifr_name;
 		(void) close(s);
 	}
-
-	retval = dlpi_open(*devicep, dhp, DLPI_PASSIVE|DLPI_RAW);
-	if (retval != DLPI_SUCCESS) {
+	if (Iflg)
+		flags |= DLPI_DEVIPNET;
+	if (Iflg || strcmp(*devicep, "lo0") == 0)
+		flags |= DLPI_IPNETINFO;
+	if ((retval = dlpi_open(*devicep, dhp, flags)) != DLPI_SUCCESS) {
 		pr_err("cannot open \"%s\": %s", *devicep,
 		    dlpi_strerror(retval));
 	}
@@ -187,15 +189,20 @@ void
 initdevice(dlpi_handle_t dh, ulong_t snaplen, ulong_t chunksize,
     struct timeval *timeout, struct Pf_ext_packetfilt *fp)
 {
-	extern int Pflg;
 	int 	retv;
 	int 	netfd;
+	int	val = 1;
 
 	retv = dlpi_bind(dh, DLPI_ANY_SAP, NULL);
 	if (retv != DLPI_SUCCESS)
 		pr_errdlpi(dh, "cannot bind on", retv);
 
-	(void) fprintf(stderr, "Using device %s ", dlpi_linkname(dh));
+	if (Iflg) {
+		(void) fprintf(stderr, "Using device ipnet/%s ",
+		    dlpi_linkname(dh));
+	} else {
+		(void) fprintf(stderr, "Using device %s ", dlpi_linkname(dh));
+	}
 
 	/*
 	 * If Pflg not set - use physical level
@@ -394,9 +401,9 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 			nhdrp->sbh_totlen = ntohl(hdrp->sbh_totlen);
 			nhdrp->sbh_drops = ntohl(hdrp->sbh_drops);
 			nhdrp->sbh_timestamp.tv_sec =
-				ntohl(hdrp->sbh_timestamp.tv_sec);
+			    ntohl(hdrp->sbh_timestamp.tv_sec);
 			nhdrp->sbh_timestamp.tv_usec =
-				ntohl(hdrp->sbh_timestamp.tv_usec);
+			    ntohl(hdrp->sbh_timestamp.tv_usec);
 		}
 
 		/* Enhanced check for valid header */
@@ -412,14 +419,15 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 		    (nhdrp->sbh_msglen > nhdrp->sbh_origlen) ||
 		    (nhdrp->sbh_totlen < nhdrp->sbh_msglen) ||
 		    (nhdrp->sbh_timestamp.tv_sec == 0)) {
-			if (cap)
+			if (cap) {
 				(void) fprintf(stderr, "(warning) bad packet "
 				    "header in capture file");
-			else
+			} else {
 				(void) fprintf(stderr, "(warning) bad packet "
 				    "header in buffer");
+			}
 			(void) fprintf(stderr, " offset %d: length=%d\n",
-				bp - buf, nhdrp->sbh_totlen);
+			    bp - buf, nhdrp->sbh_totlen);
 			goto err;
 		}
 
@@ -433,7 +441,7 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 				    " greater than MTU in buffer");
 
 			(void) fprintf(stderr, " offset %d: length=%d\n",
-				bp - buf, nhdrp->sbh_totlen);
+			    bp - buf, nhdrp->sbh_totlen);
 		}
 
 		/*
@@ -454,16 +462,16 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 
 		header_okay = 1;
 		if (!filter ||
-			want_packet(pktp,
-				nhdrp->sbh_msglen,
-				nhdrp->sbh_origlen)) {
+		    want_packet(pktp,
+		    nhdrp->sbh_msglen,
+		    nhdrp->sbh_origlen)) {
 			count++;
 
 			/*
 			 * Start deadman timer for interpreter processing
 			 */
 			(void) snoop_alarm(SNOOP_ALARM_GRAN*SNOOP_MAXRECOVER,
-				NULL);
+			    NULL);
 
 			encap_levels = 0;
 			if (!cap || count >= first)
@@ -507,7 +515,7 @@ err:
 			bp += sizeof (int);
 		} else {
 			for (bp += sizeof (int); bp <= bufstop;
-				bp += sizeof (int)) {
+			    bp += sizeof (int)) {
 				hdrp = (struct sb_hdr *)bp;
 				/* An approximate timestamp located */
 				if ((hdrp->sbh_timestamp.tv_sec >> 8) ==
@@ -528,8 +536,8 @@ static void
 cap_write_error(const char *msgtype)
 {
 	(void) fprintf(stderr,
-		    "snoop: cannot write %s to capture file: %s\n",
-		    msgtype, strerror(errno));
+	    "snoop: cannot write %s to capture file: %s\n",
+	    msgtype, strerror(errno));
 	exit(1);
 }
 
@@ -668,17 +676,17 @@ cap_open_read(const char *name)
 
 		default:
 			pr_err("capture file: %s: Version %d unrecognized\n",
-				name, cap_vers);
+			    name, cap_vers);
 		}
 
 		for (interface = &INTERFACES[0]; interface->mac_type != -1;
-				interface++)
+		    interface++)
 			if (interface->mac_type == device_mac_type)
 				break;
 
 		if (interface->mac_type == -1)
 			pr_err("Mac Type = %x is not supported\n",
-				device_mac_type);
+			    device_mac_type);
 	} else {
 		/* Use heuristic to check if it's an old-style file */
 

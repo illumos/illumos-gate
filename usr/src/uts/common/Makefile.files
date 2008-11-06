@@ -499,6 +499,8 @@ NETI_OBJS +=	neti_impl.o neti_mod.o neti_stack.o
 
 KEYSOCK_OBJS +=	keysockddi.o keysock.o keysock_opt_data.o
 
+IPNET_OBJS += ipnet.o
+
 SPDSOCK_OBJS += spdsockddi.o spdsock.o spdsock_opt_data.o
 
 IPSECESP_OBJS += ipsecespddi.o ipsecesp.o
@@ -973,7 +975,8 @@ DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
 
 DEV_OBJS  +=	sdev_subr.o	sdev_vfsops.o	sdev_vnops.o	\
 		sdev_ptsops.o	sdev_comm.o	sdev_profile.o	\
-		sdev_ncache.o	sdev_netops.o	sdev_vtops.o
+		sdev_ncache.o	sdev_netops.o	sdev_vtops.o	\
+		sdev_ipnetops.o
 
 CTFS_OBJS +=	ctfs_all.o ctfs_cdir.o ctfs_ctl.o ctfs_event.o \
 		ctfs_latest.o ctfs_root.o ctfs_sym.o ctfs_tdir.o ctfs_tmpl.o

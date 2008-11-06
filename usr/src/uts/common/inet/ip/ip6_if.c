@@ -26,8 +26,6 @@
  * Copyright (c) 1990 Mentat Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the interface control functions for IPv6.
  */
@@ -3148,7 +3146,7 @@ ipif_up_done_v6(ipif_t *ipif)
 	ipif_saved_ire_cnt = ipif->ipif_saved_ire_cnt;
 	ipif_saved_irep = ipif_recover_ire_v6(ipif);
 
-	if (ipif->ipif_ipif_up_count == 1 && !loopback) {
+	if (ill->ill_need_recover_multicast) {
 		/*
 		 * Need to recover all multicast memberships in the driver.
 		 * This had to be deferred until we had attached.
@@ -3187,11 +3185,8 @@ ipif_up_done_v6(ipif_t *ipif)
 		}
 	}
 
-	if (ipif->ipif_addr_ready) {
-		ip_rts_ifmsg(ipif);
-		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-		sctp_update_ipif(ipif, SCTP_IPIF_UP);
-	}
+	if (ipif->ipif_addr_ready)
+		ipif_up_notify(ipif);
 
 	if (ipif_saved_irep != NULL) {
 		kmem_free(ipif_saved_irep,
@@ -3200,6 +3195,7 @@ ipif_up_done_v6(ipif_t *ipif)
 
 	if (src_ipif_held)
 		ipif_refrele(src_ipif);
+
 	return (0);
 
 bad:

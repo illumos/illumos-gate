@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * vnode ops for the /dev/pts directory
  *	The lookup is based on the internal pty table. We also
@@ -248,6 +246,7 @@ devpts_prunedir(struct sdev_node *ddv)
 		case SDEV_VTOR_SKIP:
 			continue;
 		case SDEV_VTOR_INVALID:
+		case SDEV_VTOR_STALE:
 			sdcmn_err7(("prunedir: destroy invalid "
 			    "node: %s(%p)\n", dv->sdev_name, (void *)dv));
 			break;
