@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/fmd_fmri.h>
 #include <strings.h>
 #include <libzfs.h>
@@ -153,6 +151,34 @@ fmd_fmri_present(nvlist_t *nvl)
 	}
 
 	ret = (find_vdev(cb.cb_pool, vdev_guid) != NULL);
+
+	zpool_close(cb.cb_pool);
+
+	return (ret);
+}
+
+int
+fmd_fmri_replaced(nvlist_t *nvl)
+{
+	uint64_t pool_guid, vdev_guid;
+	cbdata_t cb;
+	int ret;
+
+	(void) nvlist_lookup_uint64(nvl, FM_FMRI_ZFS_POOL, &pool_guid);
+
+	cb.cb_guid = pool_guid;
+	cb.cb_pool = NULL;
+
+	if (zpool_iter(g_zfs, find_pool, &cb) != 1)
+		return (FMD_OBJ_STATE_NOT_PRESENT);
+
+	if (nvlist_lookup_uint64(nvl, FM_FMRI_ZFS_VDEV, &vdev_guid) != 0) {
+		zpool_close(cb.cb_pool);
+		return (FMD_OBJ_STATE_STILL_PRESENT);
+	}
+
+	ret = (find_vdev(cb.cb_pool, vdev_guid) != NULL) ?
+	    FMD_OBJ_STATE_STILL_PRESENT : FMD_OBJ_STATE_NOT_PRESENT;
 
 	zpool_close(cb.cb_pool);
 
