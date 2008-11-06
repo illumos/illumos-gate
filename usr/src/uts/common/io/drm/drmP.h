@@ -40,8 +40,6 @@
 #ifndef	_DRMP_H
 #define	_DRMP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -317,9 +315,6 @@ typedef struct drm_pci_id_list
 typedef int drm_ioctl_t(DRM_IOCTL_ARGS);
 typedef struct drm_ioctl_desc {
 	int	(*func)(DRM_IOCTL_ARGS);
-	int	auth_needed;
-	int	root_only;
-	char	*desc;
 	int	flags;
 } drm_ioctl_desc_t;
 

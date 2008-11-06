@@ -55,8 +55,6 @@
 #include "i915_drv.h"
 #include "drm_pciids.h"
 
-#define	i915_max_ioctl  0x20 /* changed from 15 */
-
 /*
  * copied from vgasubr.h
  */
@@ -90,10 +88,6 @@ static int i915_detach(dev_info_t *, ddi_detach_cmd_t);
 static drm_pci_id_list_t i915_pciidlist[] = {
 	i915_PCI_IDS
 };
-
-drm_ioctl_desc_t i915_ioctls[i915_max_ioctl];
-
-extern void i915_init_ioctl_arrays(void);
 
 /*
  * Local routines
@@ -962,8 +956,6 @@ i915_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 static void i915_configure(drm_driver_t *driver)
 {
-	i915_init_ioctl_arrays();
-
 	driver->buf_priv_size	=	1;	/* No dev_priv */
 	driver->load	=	i915_driver_load;
 	driver->unload	=	i915_driver_unload;
