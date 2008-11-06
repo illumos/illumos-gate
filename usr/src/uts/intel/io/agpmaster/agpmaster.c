@@ -92,7 +92,8 @@ int agpm_debug = 0;
 #define	IS_INTEL_915(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_915) || \
 	(agpmaster->agpm_id == INTEL_IGD_915GM) || \
 	(agpmaster->agpm_id == INTEL_IGD_945) || \
-	(agpmaster->agpm_id == INTEL_IGD_945GM))
+	(agpmaster->agpm_id == INTEL_IGD_945GM) || \
+	(agpmaster->agpm_id == INTEL_IGD_945GME))
 
 /* Intel 965 series */
 #define	IS_INTEL_965(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_946GZ) || \
@@ -633,6 +634,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_915GM:
 	case INTEL_IGD_945:
 	case INTEL_IGD_945GM:
+	case INTEL_IGD_945GME:
 	case INTEL_IGD_946GZ:
 	case INTEL_IGD_965G1:
 	case INTEL_IGD_965G2:
