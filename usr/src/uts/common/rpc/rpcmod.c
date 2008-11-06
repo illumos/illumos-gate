@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel RPC filtering module
  */
@@ -2147,12 +2145,30 @@ mir_svc_release(queue_t *wq, mblk_t *mp)
 	 * Start idle processing if this is the last reference.
 	 */
 	if ((mir->mir_ref_cnt == 1) && (mir->mir_inrservice == 0)) {
+		cmp = mir->mir_svc_pend_mp;
+		mir->mir_svc_pend_mp = NULL;
+	}
+
+	if (cmp) {
+		RPCLOG(16, "mir_svc_release: sending a held "
+		    "disconnect/ord rel indication upstream on queue 0x%p\n",
+		    (void *)RD(wq));
+
+		mutex_exit(&mir->mir_mutex);
+
+		putnext(RD(wq), cmp);
+
+		mutex_enter(&mir->mir_mutex);
+	}
+
+	/*
+	 * Start idle processing if this is the last reference.
+	 */
+	if (mir->mir_ref_cnt == 1 && mir->mir_inrservice == 0) {
 
 		RPCLOG(16, "mir_svc_release starting idle timer on 0x%p "
 		    "because ref cnt is zero\n", (void *) wq);
 
-		cmp = mir->mir_svc_pend_mp;
-		mir->mir_svc_pend_mp = NULL;
 		mir_svc_idle_start(wq, mir);
 	}
 
@@ -2167,14 +2183,6 @@ mir_svc_release(queue_t *wq, mblk_t *mp)
 		cv_signal(&mir->mir_condvar);
 
 	mutex_exit(&mir->mir_mutex);
-
-	if (cmp) {
-		RPCLOG(16, "mir_svc_release: sending a held "
-		    "disconnect/ord rel indication upstream on queue 0x%p\n",
-		    (void *)RD(wq));
-
-		putnext(RD(wq), cmp);
-	}
 }
 
 /*
