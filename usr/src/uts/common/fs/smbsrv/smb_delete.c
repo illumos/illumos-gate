@@ -196,6 +196,8 @@ smb_com_delete(smb_request_t *sr)
 	else
 		rc = smb_delete_single_file(sr, &err);
 
+	smb_node_release(fqi->dir_snode);
+
 	if (rc != 0)
 		smbsr_set_error(sr, &err);
 	else
