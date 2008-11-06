@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Architecture-independent CPU control functions.
  */
@@ -2451,11 +2449,12 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 	 * reporting PBIND_NONE for a process when some LWPs are bound.
 	 */
 	binding = tp->t_bind_cpu;
+	if (binding != PBIND_NONE)
+		*obind = binding;	/* record old binding */
 
 	switch (bind) {
 	case PBIND_QUERY:
 		/* Just return the old binding */
-		*obind = binding;
 		thread_unlock(tp);
 		return (0);
 
@@ -2471,7 +2470,6 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 		 *  binding
 		 */
 		TB_CPU_SOFT_SET(tp);
-		*obind = binding;
 		thread_unlock(tp);
 		return (0);
 
@@ -2481,16 +2479,10 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 		 *  binding
 		 */
 		TB_CPU_HARD_SET(tp);
-		*obind = binding;
 		thread_unlock(tp);
 		return (0);
 
-	case PBIND_NONE:
-		break;
-
 	default:
-		/* record old binding */
-		*obind = binding;
 		break;
 	}
 
