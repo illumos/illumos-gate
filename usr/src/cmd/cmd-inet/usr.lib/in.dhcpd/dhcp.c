@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <alloca.h>
@@ -1544,6 +1542,8 @@ gen_reply_pkt(dsvc_clnt_t *pcd, PKT_LIST *plp, int type, uint_t *len,
 			(void) memcpy(&plen, plp->opts[CD_MAX_DHCP_SIZE]->value,
 			    sizeof (uint16_t));
 			plen = ntohs(plen);
+			if (plen < DHCP_DEF_MAX_SIZE)
+				plen = DHCP_DEF_MAX_SIZE;
 		}
 	} else {
 		/*
@@ -2001,8 +2001,8 @@ purge_offer(dsvc_clnt_t *pcd, boolean_t expired, boolean_t purge_cache)
 		pcd->off_ip.s_addr = htonl(INADDR_ANY);
 
 		(void) mutex_lock(&ifp->ifp_mtx);
-		ifp->offers--;
-		assert((int)ifp->offers >= 0);
+		if (ifp->offers > 0)
+			ifp->offers--;
 		if (expired)
 			ifp->expired++;
 		(void) mutex_unlock(&ifp->ifp_mtx);

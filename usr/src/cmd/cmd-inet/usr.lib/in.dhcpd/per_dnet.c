@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,8 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +79,7 @@ initntab(void)
 	    DSVC_SUCCESS) {
 		if (listppp) {
 			for (ind = 0; listppp[ind] != NULL && ind < cnt;
-				ind++)
+			    ind++)
 				free(listppp[ind]);
 			free(listppp);
 		}
@@ -444,6 +441,7 @@ open_clnt(dsvc_dnet_t *pnd, dsvc_clnt_t **pcdp, uchar_t *cid,
 	pcd = (dsvc_clnt_t *)smalloc(sizeof (dsvc_clnt_t));
 	(void) mutex_init(&pcd->pcd_mtx, USYNC_THREAD, NULL);
 	(void) mutex_init(&pcd->pkt_mtx, USYNC_THREAD, NULL);
+	(void) mutex_lock(&pcd->pcd_mtx);
 	pcd->pkthead = pcd->pkttail = NULL;
 	pcd->pnd = pnd;
 	(void) memcpy(pcd->cid, cid, cid_len);
@@ -457,11 +455,13 @@ open_clnt(dsvc_dnet_t *pnd, dsvc_clnt_t **pcdp, uchar_t *cid,
 #ifdef	DEBUG
 		dhcpmsg(LOG_DEBUG, "Duplicate client\n");
 #endif	/* DEBUG */
+		(void) mutex_unlock(&pcd->pcd_mtx);
 		(void) mutex_destroy(&pcd->pcd_mtx);
 		(void) mutex_destroy(&pcd->pkt_mtx);
 		free(pcd);
 		return (DSVC_BUSY);
 	}
+	(void) mutex_unlock(&pcd->pcd_mtx);
 	(void) mutex_lock(&pnd->thr_mtx);
 	pnd->nclients++;
 	(void) mutex_unlock(&pnd->thr_mtx);
@@ -497,8 +497,11 @@ get_client(hash_tbl *table, uchar_t *cid, uchar_t cid_len)
 	    &tpcd, B_TRUE);
 
 	/* refresh client hash entry's timer */
-	if (pcd != NULL)
+	if (pcd != NULL) {
+		(void) mutex_lock(&pcd->pcd_mtx);
 		hash_Dtime(pcd->chand, time(NULL) + table->dfree_time);
+		(void) mutex_unlock(&pcd->pcd_mtx);
+	}
 	return (pcd);
 }
 
@@ -584,8 +587,8 @@ unhash_offer(dsvc_clnt_t *pcd, boolean_t force)
 			pcd->off_ip.s_addr = htonl(INADDR_ANY);
 			(void) mutex_unlock(&pcd->pcd_mtx);
 			(void) mutex_lock(&ifp->ifp_mtx);
-			ifp->offers--;
-			assert((int)ifp->offers >= 0);
+			if (ifp->offers > 0)
+				ifp->offers--;
 			ifp->expired++;
 			(void) mutex_unlock(&ifp->ifp_mtx);
 		} else if (force == B_FALSE) {
