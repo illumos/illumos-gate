@@ -27,8 +27,6 @@
 #ifndef	_NS_SLDAP_H
 #define	_NS_SLDAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -282,8 +280,11 @@ typedef enum {
 	NS_PASSWD_INVALID_SYNTAX	= 6,	/* can not be changed: */
 						/* new password has */
 						/* invalid syntax -- */
-						/* same value as attr */
-						/* cn, sn, uid, etc. */
+						/* trivial password: same */
+						/* value as attr, cn, sn, */
+						/* uid, etc. */
+						/* or strong password */
+						/* policies check */
 	NS_PASSWD_TOO_SHORT		= 7,	/* can not be changed: */
 						/* new password has */
 						/* less chars than */

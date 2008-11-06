@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -1997,6 +1996,8 @@ __s_api_prepend_automountmapname_to_dn(
 ns_ldap_passwd_status_t
 __s_api_set_passwd_status(int errnum, char *errmsg)
 {
+	syslog(LOG_DEBUG, "libsldap: got LDAP errnum %d & message: %s ", errnum,
+	    (errmsg != NULL) ? errmsg : "error msg not available");
 	if (errmsg) {
 		if (errnum ==
 		    LDAP_INVALID_CREDENTIALS) {
@@ -2053,13 +2054,24 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * syntax error: the new password
 			 * has length less than defined
 			 * minimum
+			 * Not true anymore with strong password
+			 * policies on LDAP server: errmsg that
+			 * contain NS_PWDERR_INVALID_SYNTAX may
+			 * have different meanings.
+			 * To keep compatibility with older password
+			 * policy, check if errmsg is strictly equal
+			 * to NS_PWDERR_INVALID_SYNTAX and if yes only,
+			 * return NS_PASSWD_TOO_SHORT.
 			 */
+			if (strcmp(errmsg,
+			    NS_PWDERR_INVALID_SYNTAX) == 0)
+				return (NS_PASSWD_TOO_SHORT);
 			if (strstr(errmsg,
 			    NS_PWDERR_INVALID_SYNTAX))
-				return (NS_PASSWD_TOO_SHORT);
+				return (NS_PASSWD_INVALID_SYNTAX);
 			/*
 			 * case 6 (Modify passwd):
-			 * trivial password: same valule as
+			 * trivial password: same value as
 			 * that of attribute cn, sn, or uid ...
 			 */
 			if (strstr(errmsg,
