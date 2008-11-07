@@ -55,6 +55,7 @@ uint_t inb_mc_snapshotgen;
 size_t inb_mc_snapshotsz;
 static dev_info_t *inb_dip;
 int nb_allow_detach = 0;
+int nb_no_smbios;
 
 static uint64_t
 rank_to_base(uint8_t branch, uint8_t rank, uint8_t *interleave, uint64_t *limit,
@@ -409,6 +410,8 @@ inb_mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		inb_dip = dip;
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
 		    inb_mc_name());
+		nb_no_smbios = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "no-smbios", 0);
 		nb_pci_cfg_setup(dip);
 		if (nb_dev_init()) {
 			nb_pci_cfg_free();

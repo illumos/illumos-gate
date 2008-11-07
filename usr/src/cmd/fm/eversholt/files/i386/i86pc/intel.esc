@@ -238,34 +238,15 @@ prop fault.memory.intel.page_ue@
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
-prop fault.memory.intel.page_ue@
-    motherboard/memory-controller/dram-channel/dimm/rank (1)->
-    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
-    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
-
-prop fault.memory.intel.page_ue@
-    motherboard/memory-controller/dram-channel/dimm/rank (0)->
-    EREPORT_BUS_ERROR;
-
 prop fault.memory.intel.dimm_ue@
     motherboard/memory-controller/dram-channel<channel_num>/dimm/rank[rank_num]
     { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
-prop fault.memory.intel.dimm_ue@
-    motherboard/memory-controller/dram-channel/dimm/rank (1)->
-    ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
-    ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
-
-prop fault.memory.intel.dimm_ue@
-    motherboard/memory-controller/dram-channel/dimm/rank (0)->
-    EREPORT_BUS_ERROR;
-
 event upset.memory.intel.discard@motherboard/memory-controller{within(1s)};
 
-prop upset.memory.intel.discard@motherboard/memory-controller
-    { !payloadprop_defined("rank") } (1)->
+prop upset.memory.intel.discard@motherboard/memory-controller (0)->
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
@@ -442,6 +423,11 @@ prop upset.discard@rank (0)-> EREPORT_BUS_ERROR;
 #define	CPU_MEM_CE_PGFLTS \
     (count(stat.ce_pgflt@motherboard/chip/memory-controller/dram-channel/dimm))
 
+#define SET_RES_OFFSET \
+    (!payloadprop_defined("resource[0].hc-specific.offset") || \
+    setpayloadprop("asru-offset", \
+    payloadprop("resource[0].hc-specific.offset")))
+
 engine stat.ce_pgflt@motherboard/chip/memory-controller/dram-channel/dimm;
 
 event ereport.cpu.intel.quickpath.mem_ue@motherboard/chip/memory-controller
@@ -453,9 +439,9 @@ event fault.memory.intel.page_ue@
 
 prop fault.memory.intel.page_ue@
     motherboard/chip/memory-controller/dram-channel/dimm/rank
-    { CONTAINS_RANK &&
-    (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
-    SET_ADDR && SET_OFFSET } (1)->
+    { CONTAINS_RANK && (payloadprop_defined("physaddr") ||
+    payloadprop_defined("resource[0].hc-specific.offset")) &&
+    SET_ADDR && SET_RES_OFFSET } (1)->
     ereport.cpu.intel.quickpath.mem_ue@motherboard/chip/memory-controller;
 
 event fault.memory.intel.dimm_ue@
@@ -486,9 +472,9 @@ event fault.memory.intel.page_ce@
 
 prop fault.memory.intel.page_ce@
     motherboard/chip/memory-controller/dram-channel/dimm/rank
-    { CONTAINS_RANK &&
-    (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
-    SET_ADDR && SET_OFFSET } (1)->
+    { CONTAINS_RANK && (payloadprop_defined("physaddr") ||
+    payloadprop_defined("resource[0].hc-specific.offset")) &&
+    SET_ADDR && SET_RES_OFFSET } (1)->
     ereport.cpu.intel.quickpath.mem_ce@motherboard/chip/memory-controller;
 
 engine serd.memory.intel.dimm_ce@

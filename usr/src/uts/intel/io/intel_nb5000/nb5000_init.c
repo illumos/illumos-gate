@@ -53,7 +53,6 @@ static int nb_sw_scrub_disabled = 0;
 int nb_5000_memory_controller = 0;
 int nb_number_memory_controllers = NB_5000_MAX_MEM_CONTROLLERS;
 int nb_dimms_per_channel = 0;
-static int ndimms = 0;
 
 nb_dimm_t **nb_dimms;
 int nb_ndimm;
@@ -64,8 +63,12 @@ rank_select_t nb_ranks[NB_5000_MAX_MEM_CONTROLLERS][NB_MAX_MEM_RANK_SELECT];
 uint32_t top_of_low_memory;
 uint8_t spare_rank[NB_5000_MAX_MEM_CONTROLLERS];
 
+extern int nb_no_smbios;
+
 errorq_t *nb_queue;
 kmutex_t nb_mutex;
+
+static int nb_dimm_slots;
 
 static uint8_t nb_err0_int;
 static uint8_t nb_err1_int;
@@ -242,8 +245,7 @@ nb_fini()
 			dimmp++;
 		}
 	}
-	kmem_free(nb_dimms, sizeof (nb_dimm_t *) *
-	    nb_number_memory_controllers * 2 * nb_dimms_per_channel);
+	kmem_free(nb_dimms, sizeof (nb_dimm_t *) * nb_dimm_slots);
 	nb_dimms = NULL;
 	dimm_fini();
 }
@@ -475,19 +477,6 @@ nb_used_spare_rank(int branch, int bad_rank)
 	}
 }
 
-/*ARGSUSED*/
-static int
-memoryarray(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
-{
-	smbios_memarray_t ma;
-
-	if (sp->smbstr_type == SMB_TYPE_MEMARRAY &&
-	    smbios_info_memarray(shp, sp->smbstr_id, &ma) == 0) {
-		ndimms += ma.smbma_ndevs;
-	}
-	return (0);
-}
-
 find_dimm_label_t *
 find_dimms_per_channel()
 {
@@ -495,10 +484,11 @@ find_dimms_per_channel()
 	smbios_info_t si;
 	smbios_system_t sy;
 	id_t id;
-	int read_memarray = 1;
+	int i, j;
+	uint16_t mtr;
 	find_dimm_label_t *rt = NULL;
 
-	if (ksmbios != NULL) {
+	if (ksmbios != NULL && nb_no_smbios == 0) {
 		if ((id = smbios_info_system(ksmbios, &sy)) != SMB_ERR &&
 		    smbios_info_common(ksmbios, id, &si) != SMB_ERR) {
 			for (pl = platform_label; pl->sys_vendor; pl++) {
@@ -509,21 +499,25 @@ find_dimms_per_channel()
 				    strlen(pl->sys_product)) == 0) {
 					nb_dimms_per_channel =
 					    pl->dimms_per_channel;
-					read_memarray = 0;
 					rt = &pl->dimm_label;
 					break;
 				}
 			}
 		}
-		if (read_memarray)
-			(void) smbios_iter(ksmbios, memoryarray, 0);
 	}
 	if (nb_dimms_per_channel == 0) {
-		if (ndimms) {
-			nb_dimms_per_channel = ndimms /
-			    (nb_number_memory_controllers * 2);
-		} else {
-			nb_dimms_per_channel = NB_MAX_DIMMS_PER_CHANNEL;
+		/*
+		 * Scan all memory channels if we find a channel which has more
+		 * dimms then we have seen before set nb_dimms_per_channel to
+		 * the number of dimms on the channel
+		 */
+		for (i = 0; i < nb_number_memory_controllers; i++) {
+			for (j = nb_dimms_per_channel;
+			    j < NB_MAX_DIMMS_PER_CHANNEL; j++) {
+				mtr = MTR_RD(i, j);
+				if (MTR_PRESENT(mtr))
+					nb_dimms_per_channel = j + 1;
+			}
 		}
 	}
 	return (rt);
@@ -537,13 +531,29 @@ dimm_label(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 	smbios_memdevice_t md;
 
 	if (sp->smbstr_type == SMB_TYPE_MEMDEVICE) {
+		if (*dimmpp >= &nb_dimms[nb_dimm_slots])
+			return (-1);
 		dimmp = **dimmpp;
-		if (dimmp && smbios_info_memdevice(shp, sp->smbstr_id,
-		    &md) == 0 && md.smbmd_dloc != NULL) {
-			(void) snprintf(dimmp->label,
-			    sizeof (dimmp->label), "%s", md.smbmd_dloc);
+		if (smbios_info_memdevice(shp, sp->smbstr_id, &md) == 0 &&
+		    md.smbmd_dloc != NULL) {
+			if (md.smbmd_size) {
+				/*
+				 * if there is no physical dimm for this smbios
+				 * record it is because this system has less
+				 * physical slots than the controller supports
+				 * so skip empty slots to find the slot this
+				 * smbios record belongs too
+				 */
+				while (dimmp == NULL) {
+					if (*dimmpp >= &nb_dimms[nb_dimm_slots])
+						return (-1);
+					dimmp = *(++(*dimmpp));
+				}
+				(void) snprintf(dimmp->label,
+				    sizeof (dimmp->label), "%s", md.smbmd_dloc);
+				(*dimmpp)++;
+			}
 		}
-		(*dimmpp)++;
 	}
 	return (0);
 }
@@ -553,7 +563,7 @@ nb_smbios()
 {
 	nb_dimm_t **dimmpp;
 
-	if (ksmbios != NULL) {
+	if (ksmbios != NULL && nb_no_smbios == 0) {
 		dimmpp = nb_dimms;
 		(void) smbios_iter(ksmbios, dimm_label, &dimmpp);
 	}
@@ -586,8 +596,9 @@ nb_dimms_init(find_dimm_label_t *label_function)
 		nb_mode = NB_MEMORY_MIRROR;
 	else
 		nb_mode = NB_MEMORY_NORMAL;
+	nb_dimm_slots = nb_number_memory_controllers * 2 * nb_dimms_per_channel;
 	nb_dimms = (nb_dimm_t **)kmem_zalloc(sizeof (nb_dimm_t *) *
-	    nb_number_memory_controllers * 2 * nb_dimms_per_channel, KM_SLEEP);
+	    nb_dimm_slots, KM_SLEEP);
 	dimmpp = nb_dimms;
 	for (i = 0; i < nb_number_memory_controllers; i++) {
 		if (nb_mode == NB_MEMORY_NORMAL) {
@@ -1193,11 +1204,13 @@ nb_dev_reinit()
 	nb_dimm_t **old_nb_dimms;
 	int old_nb_dimms_per_channel;
 	find_dimm_label_t *label_function_p;
+	int dimm_slot = nb_dimm_slots;
 
 	old_nb_dimms = nb_dimms;
 	old_nb_dimms_per_channel = nb_dimms_per_channel;
 
 	dimm_fini();
+	nb_dimms_per_channel = 0;
 	label_function_p = find_dimms_per_channel();
 	dimm_init();
 	nb_dimms_init(label_function_p);
@@ -1220,8 +1233,7 @@ nb_dev_reinit()
 			dimmp++;
 		}
 	}
-	kmem_free(old_nb_dimms, sizeof (nb_dimm_t *) *
-	    nb_number_memory_controllers * 2 * old_nb_dimms_per_channel);
+	kmem_free(old_nb_dimms, sizeof (nb_dimm_t *) * dimm_slot);
 }
 
 void
