@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <synch.h>
 #include <strings.h>
@@ -1081,7 +1078,7 @@ static bool_t
 is_same_connection(__nis_ldap_conn_t *lc, LDAPURLDesc *ludpp)
 {
 	return (strcasecmp(ludpp->lud_host, lc->sp) == 0 &&
-		ludpp->lud_port == lc->port);
+	    ludpp->lud_port == lc->port);
 }
 
 static __nis_ldap_conn_t *
@@ -1193,16 +1190,16 @@ findReferralCon(char **referralsp, int *stat)
 		}
 #endif
 		lc = createCon(ludpp->lud_host, proxyInfo.proxy_dn,
-					proxyInfo.proxy_passwd,
-					proxyInfo.auth_method,
-					ludpp->lud_port);
+		    proxyInfo.proxy_passwd,
+		    proxyInfo.auth_method,
+		    ludpp->lud_port);
 		if (lc == 0) {
 			ldap_free_urldesc(ludpp);
 			(void) rw_unlock(&referralConLock);
 			*stat = LDAP_NO_MEMORY;
 			logmsg(MSG_NOTIMECHECK, LOG_INFO,
-				"%s: Could not connect to host: %s",
-				myself, NIL(ludpp->lud_host));
+			    "%s: Could not connect to host: %s",
+			    myself, NIL(ludpp->lud_host));
 			return (NULL);
 		}
 
@@ -1212,7 +1209,7 @@ findReferralCon(char **referralsp, int *stat)
 		} else {
 			/* Insert at end of list */
 			for (tmp = ldapReferralCon; tmp->next != 0;
-				tmp = tmp->next) {}
+			    tmp = tmp->next) {}
 			tmp->next = lc;
 		}
 		lc = find_connection_from_list(ldapReferralCon, ludpp, stat);
@@ -1223,8 +1220,8 @@ findReferralCon(char **referralsp, int *stat)
 	(void) rw_unlock(&referralConLock);
 	if (lc == NULL) {
 		logmsg(MSG_NOTIMECHECK, LOG_INFO,
-			"%s: Could not find a connection to %s, ...",
-			myself, NIL(referralsp[0]));
+		    "%s: Could not find a connection to %s, ...",
+		    myself, NIL(referralsp[0]));
 	}
 
 	return (lc);
@@ -1367,6 +1364,8 @@ ldapSearch(__nis_ldap_search_t *ls, int *numValues, __nis_rule_value_t *rvIn,
 					proxyInfo.follow_referral == follow;
 	int			doIndex = 1;
 	char			**referralsp = NULL;
+
+	ctrls[0] = ctrls[1] = ctrls[2] = 0;
 
 	if (ldapStat == 0)
 		ldapStat = &stat;
@@ -2081,8 +2080,8 @@ ldapModifyObjectClass(__nis_ldap_conn_t **lc, char *dn,
 	if (rv == 0) {
 		stat = LDAP_OPERATIONS_ERROR;
 		logmsg(MSG_NOTIMECHECK, LOG_WARNING,
-			"%s: addObjectClasses failed for %s",
-			myself, NIL(dn));
+		    "%s: addObjectClasses failed for %s",
+		    myself, NIL(dn));
 		goto cleanup;
 	}
 
@@ -2093,11 +2092,11 @@ ldapModifyObjectClass(__nis_ldap_conn_t **lc, char *dn,
 	 * update.
 	 */
 	ls = buildLdapSearch(dn, LDAP_SCOPE_BASE, 0, 0, "objectClass=*",
-				oc, 0, 1);
+	    oc, 0, 1);
 	if (ls == 0) {
 		logmsg(MSG_NOTIMECHECK, LOG_INFO,
-			"%s: Unable to build DN search for \"%s\"",
-			myself, NIL(dn));
+		    "%s: Unable to build DN search for \"%s\"",
+		    myself, NIL(dn));
 		/* Fall through to try just adding the object classes */
 		goto addObjectClasses;
 	}
@@ -2107,8 +2106,8 @@ ldapModifyObjectClass(__nis_ldap_conn_t **lc, char *dn,
 	freeLdapSearch(ls);
 	if (rvldap == 0) {
 		logmsg(MSG_NOTIMECHECK, LOG_INFO,
-			"%s: No data for DN search (\"%s\"); LDAP status %d",
-			myself, NIL(dn), lderr);
+		    "%s: No data for DN search (\"%s\"); LDAP status %d",
+		    myself, NIL(dn), lderr);
 		/* Fall through to try just adding the object classes */
 		goto addObjectClasses;
 	}
@@ -2119,14 +2118,14 @@ ldapModifyObjectClass(__nis_ldap_conn_t **lc, char *dn,
 	 */
 	for (i = 0, ocrvldap = -1; i < rvldap->numAttrs; i++) {
 		if (rvldap->attrName[i] != 0 &&
-			strcasecmp("objectClass", rvldap->attrName[i]) == 0) {
+		    strcasecmp("objectClass", rvldap->attrName[i]) == 0) {
 			ocrvldap = i;
 			break;
 		}
 	}
 	for (i = 0, ocrv = -1; i < rv->numAttrs; i++) {
 		if (rv->attrName[i] != 0 &&
-			strcasecmp("objectClass", rv->attrName[i]) == 0) {
+		    strcasecmp("objectClass", rv->attrName[i]) == 0) {
 			ocrv = i;
 			break;
 		}
@@ -2139,8 +2138,8 @@ ldapModifyObjectClass(__nis_ldap_conn_t **lc, char *dn,
 	if (ocrv >= 0 && ocrvldap >= 0) {
 		for (i = 0; i < rvldap->attrVal[ocrvldap].numVals; i++) {
 			removeSingleValue(&rv->attrVal[ocrv],
-				rvldap->attrVal[ocrvldap].val[i].value,
-				rvldap->attrVal[ocrvldap].val[i].length);
+			    rvldap->attrVal[ocrvldap].val[i].value,
+			    rvldap->attrVal[ocrvldap].val[i].length);
 		}
 		/*
 		 * If no 'objectClass' values left in 'rv', delete
@@ -2164,7 +2163,7 @@ addObjectClasses:
 		stat = LDAP_OPERATIONS_ERROR;
 		logmsg(MSG_NOTIMECHECK, LOG_WARNING,
 	"%s: Unable to create LDAP modify changes with object classes for %s",
-			myself, NIL(dn));
+		    myself, NIL(dn));
 		goto cleanup;
 	}
 	msgid = ldap_modify((*lc)->ld, dn, mods);
@@ -2175,20 +2174,20 @@ addObjectClasses:
 			stat = LDAP_TIMEOUT;
 		} else if (stat == -1) {
 			(void) ldap_get_option((*lc)->ld,
-				LDAP_OPT_ERROR_NUMBER, &stat);
+			    LDAP_OPT_ERROR_NUMBER, &stat);
 		} else {
 			stat = ldap_parse_result((*lc)->ld, msg, &lderr, NULL,
-				NULL, &referralsp, NULL, 0);
+			    NULL, &referralsp, NULL, 0);
 			if (stat == LDAP_SUCCESS)
 				stat = lderr;
 			stat = ldap_result2error((*lc)->ld, msg, 0);
 		}
 	} else {
 		(void) ldap_get_option((*lc)->ld, LDAP_OPT_ERROR_NUMBER,
-			&stat);
+		    &stat);
 	}
 	if (proxyInfo.follow_referral == follow &&
-			stat == LDAP_REFERRAL && referralsp != NULL) {
+	    stat == LDAP_REFERRAL && referralsp != NULL) {
 		releaseCon(*lc, stat);
 		if (msg != NULL)
 			(void) ldap_msgfree(msg);
@@ -2201,7 +2200,7 @@ addObjectClasses:
 		msgid = ldap_modify((*lc)->ld, dn, mods);
 		if (msgid == -1) {
 			(void) ldap_get_option((*lc)->ld,
-				LDAP_OPT_ERROR_NUMBER, &stat);
+			    LDAP_OPT_ERROR_NUMBER, &stat);
 			goto cleanup;
 		}
 		stat = ldap_result((*lc)->ld, msgid, 0, &tv, &msg);
@@ -2209,10 +2208,10 @@ addObjectClasses:
 			stat = LDAP_TIMEOUT;
 		} else if (stat == -1) {
 			(void) ldap_get_option((*lc)->ld,
-				LDAP_OPT_ERROR_NUMBER, &stat);
+			    LDAP_OPT_ERROR_NUMBER, &stat);
 		} else {
 			stat = ldap_parse_result((*lc)->ld, msg, &lderr,
-				NULL, NULL, NULL, NULL, 0);
+			    NULL, NULL, NULL, NULL, 0);
 			if (stat == LDAP_SUCCESS)
 				stat = lderr;
 		}
