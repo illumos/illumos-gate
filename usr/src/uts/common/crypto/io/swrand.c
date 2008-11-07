@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Software based random number provider for the Kernel Cryptographic
@@ -56,6 +54,7 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/hold_page.h>
+#include <rng/fips_random.h>
 
 #define	RNDPOOLSIZE		1024	/* Pool size in bytes */
 #define	HASHBUFSIZE		64	/* Buffer size used for pool mixing */
@@ -95,7 +94,9 @@ static int pindex;			/* Global index for adding/extracting */
 static int bstart, bindex;		/* Global vars for adding/extracting */
 					/* from the buffer */
 static uint8_t leftover[HASHSIZE];	/* leftover output */
+static uint32_t	swrand_XKEY[6];		/* one extra word for getentropy */
 static int leftover_bytes;		/* leftover length */
+static uint32_t previous_bytes[SHA1WORDS];	/* previous random bytes */
 
 static physmem_entsrc_t entsrc;		/* Physical mem as an entropy source */
 static timeout_id_t rnd_timeout_id;
@@ -253,6 +254,8 @@ _init(void)
 	mutex_enter(&srndpool_lock);
 	swrand_schedule_timeout();
 	mutex_exit(&srndpool_lock);
+	(void) swrand_get_entropy((uint8_t *)swrand_XKEY, HASHSIZE, B_TRUE);
+	bcopy(swrand_XKEY, previous_bytes, HASHSIZE);
 
 	return (0);
 }
@@ -303,7 +306,6 @@ swrand_generate_random(crypto_provider_handle_t provider,
 	return (CRYPTO_SUCCESS);
 }
 
-
 /*
  * Extraction of entropy from the pool.
  *
@@ -318,6 +320,8 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 	int i, bytes;
 	HASH_CTX hashctx;
 	uint8_t digest[HASHSIZE], *pool;
+	uint32_t tempout[SHA1WORDS];
+	int size;
 
 	mutex_enter(&srndpool_lock);
 	if (leftover_bytes > 0) {
@@ -379,25 +383,45 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 			pindex &= (RNDPOOLSIZE - 1);
 		}
 
-		/*
-		 * Hash the digest again before output to obscure
-		 * what was fed back to the pool.
-		 */
-		HashInit(&hashctx);
-		HashUpdate(&hashctx, digest, HASHSIZE);
-		if (len >= HASHSIZE)
-			HashFinal(ptr, &hashctx);
-		else {
-			HashFinal(digest, &hashctx);
-			bcopy(digest, ptr, bytes);
-			leftover_bytes = HASHSIZE - bytes;
-			bcopy(digest + bytes, leftover, leftover_bytes);
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		fips_random_inner(swrand_XKEY, tempout, (uint32_t *)digest);
+
+		if (len >= HASHSIZE) {
+			size = HASHSIZE;
+		} else {
+			size = min(bytes, HASHSIZE);
 		}
 
-		len -= bytes;
-		ptr += bytes;
-		BUMP_SWRAND_STATS(ss_bytesOut, bytes);
+		/*
+		 * FIPS 140-2: Continuous RNG test - each generation
+		 * of an n-bit block shall be compared with the previously
+		 * generated block. Test shall fail if any two compared
+		 * n-bit blocks are equal.
+		 */
+		for (i = 0; i < size/BYTES_IN_WORD; i++) {
+			if (tempout[i] != previous_bytes[i])
+				break;
+		}
+		if (i == size/BYTES_IN_WORD)
+			cmn_err(CE_WARN, "swrand: The value of 160-bit block "
+			    "random bytes are same as the previous one.\n");
+
+		bcopy(tempout, previous_bytes, HASHSIZE);
+
+		bcopy(tempout, ptr, size);
+		if (len < HASHSIZE) {
+			leftover_bytes = HASHSIZE - bytes;
+			bcopy(tempout + bytes, leftover, leftover_bytes);
+		}
+
+		ptr += size;
+		len -= size;
+		BUMP_SWRAND_STATS(ss_bytesOut, size);
 	}
+
+	/* Zero out sensitive information */
+	bzero(digest, HASHSIZE);
+	bzero(tempout, HASHSIZE);
 	mutex_exit(&srndpool_lock);
 	return (0);
 }

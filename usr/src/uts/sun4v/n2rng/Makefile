@@ -20,11 +20,10 @@
 #
 # uts/sun4v/n2rng/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the n2rng driver kernel module.
 #
@@ -35,6 +34,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE = ../..
+COM_DIR   = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -67,8 +67,13 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # lint pass one enforcement
 #
-CFLAGS += -v -DN2
-LINTFLAGS += -DN2
+CFLAGS += -v -DN2 -I$(COM_DIR)
+LINTFLAGS += -DN2 -I$(COM_DIR)
+
+#
+# module dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
 
 #
 #	Default build targets.

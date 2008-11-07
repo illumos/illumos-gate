@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_RANDOM_H
 #define	_SYS_RANDOM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/atomic.h>
@@ -54,7 +52,7 @@ typedef struct swrand_stats {
 
 #ifdef	_KERNEL
 
-#define	BUMP_CPU_RND_STATS(rm, x, v)    (((rm)->rm_stats).x += (v))
+#define	BUMP_CPU_RND_STATS(rm, x, v)    (((rm)->rm_mag.rm_stats).x += (v))
 #define	BUMP_RND_STATS(x, v)	atomic_add_64(&(rnd_stats).x, (v))
 #define	BUMP_SWRAND_STATS(x, v)	atomic_add_64(&(swrand_stats).x, (v))
 

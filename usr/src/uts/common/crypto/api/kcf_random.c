@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the interfaces that the /dev/random
@@ -44,9 +42,9 @@
  * kmem-magazine-style, to avoid cache line contention.
  *
  * LOCKING HIERARCHY:
- *	1) rmp->rm_lock protects the per-cpu pseudo-random generators.
+ *	1) rmp->rm_mag.rm_lock protects the per-cpu pseudo-random generators.
  * 	2) rndpool_lock protects the high-quality randomness pool.
- *		It may be locked while a rmp->rm_lock is held.
+ *		It may be locked while a rmp->rm_mag.rm_lock is held.
  *
  * A history note: The kernel API and the software-based algorithms in this
  * file used to be part of the /dev/random driver.
@@ -68,6 +66,7 @@
 #include <sys/sysmacros.h>
 #include <sys/cpuvar.h>
 #include <sys/taskq.h>
+#include <rng/fips_random.h>
 
 #define	RNDPOOLSIZE		1024	/* Pool size in bytes */
 #define	MINEXTRACTBYTES		20
@@ -95,16 +94,6 @@ typedef enum    extract_type {
 
 /* HMAC-SHA1 */
 #define	HMAC_KEYSIZE			20
-#define	HMAC_BLOCK_SIZE			64
-#define	HMAC_KEYSCHED			sha1keysched_t
-#define	SET_ENCRYPT_KEY(k, s, ks)	hmac_key((k), (s), (ks))
-#define	HMAC_ENCRYPT(ks, p, s, d)	hmac_encr((ks), (uint8_t *)(p), s, d)
-
-/* HMAC-SHA1 "keyschedule" */
-typedef struct sha1keysched_s {
-	SHA1_CTX ictx;
-	SHA1_CTX octx;
-} sha1keysched_t;
 
 /*
  * Cache of random bytes implemented as a circular buffer. findex and rindex
@@ -130,9 +119,6 @@ static void rndc_addbytes(uint8_t *, size_t);
 static void rndc_getbytes(uint8_t *ptr, size_t len);
 static void rnd_handler(void *);
 static void rnd_alloc_magazines();
-static void hmac_key(uint8_t *, size_t, void *);
-static void hmac_encr(void *, uint8_t *, size_t, uint8_t *);
-
 
 void
 kcf_rnd_init()
@@ -577,11 +563,9 @@ kcf_rnd_get_bytes(uint8_t *ptr, size_t len, boolean_t noblock,
  * of cache-line-padding structures.
  */
 #define	RND_CPU_CACHE_SIZE	64
-#define	RND_CPU_PAD_SIZE	RND_CPU_CACHE_SIZE*5
+#define	RND_CPU_PAD_SIZE	RND_CPU_CACHE_SIZE*6
 #define	RND_CPU_PAD (RND_CPU_PAD_SIZE - \
-	(sizeof (kmutex_t) + 3*sizeof (uint8_t *) + sizeof (HMAC_KEYSCHED) + \
-	sizeof (uint64_t) + 3*sizeof (uint32_t) + sizeof (rnd_stats_t)))
-
+	sizeof (rndmag_t))
 /*
  * Per-CPU random state.  Somewhat like like kmem's magazines, this provides
  * a per-CPU instance of the pseudo-random generator.  We have it much easier
@@ -599,18 +583,24 @@ typedef struct rndmag_s
 	uint8_t 	*rm_buffer;	/* Start of buffer */
 	uint8_t		*rm_eptr;	/* End of buffer */
 	uint8_t		*rm_rptr;	/* Current read pointer */
-	HMAC_KEYSCHED 	rm_ks;		/* seed */
-	uint64_t 	rm_counter;	/* rotating counter for extracting */
 	uint32_t	rm_oblocks;	/* time to rekey? */
 	uint32_t	rm_ofuzz;	/* Rekey backoff state */
 	uint32_t	rm_olimit;	/* Hard rekey limit */
 	rnd_stats_t	rm_stats;	/* Per-CPU Statistics */
-	uint8_t		rm_pad[RND_CPU_PAD];
+	uint32_t	rm_key[SHA1WORDS];	/* FIPS XKEY */
+	uint32_t	rm_seed[SHA1WORDS];	/* seed for rekey */
+	uint32_t	rm_previous[SHA1WORDS]; /* previous random bytes */
 } rndmag_t;
 
+typedef struct rndmag_pad_s
+{
+	rndmag_t	rm_mag;
+	uint8_t		rm_pad[RND_CPU_PAD];
+} rndmag_pad_t;
+
 /*
- * Generate random bytes for /dev/urandom by encrypting a
- * rotating counter with a key created from bytes extracted
+ * Generate random bytes for /dev/urandom by applying the
+ * FIPS 186-2 algorithm with a key created from bytes extracted
  * from the pool.  A maximum of PRNG_MAXOBLOCKS output blocks
  * is generated before a new key is obtained.
  *
@@ -619,30 +609,32 @@ typedef struct rndmag_s
  * Called with rmp locked; releases lock.
  */
 static int
-rnd_generate_pseudo_bytes(rndmag_t *rmp, uint8_t *ptr, size_t len)
+rnd_generate_pseudo_bytes(rndmag_pad_t *rmp, uint8_t *ptr, size_t len)
 {
 	size_t bytes = len;
 	int nblock, size;
 	uint32_t oblocks;
-	uint8_t digest[HASHSIZE];
+	uint32_t tempout[SHA1WORDS];
+	uint32_t seed[SHA1WORDS];
+	int i;
+	hrtime_t timestamp;
+	uint8_t *src, *dst;
 
-	ASSERT(mutex_owned(&rmp->rm_lock));
+	ASSERT(mutex_owned(&rmp->rm_mag.rm_lock));
 
 	/* Nothing is being asked */
 	if (len == 0) {
-		mutex_exit(&rmp->rm_lock);
+		mutex_exit(&rmp->rm_mag.rm_lock);
 		return (0);
 	}
 
 	nblock = howmany(len, HASHSIZE);
 
-	rmp->rm_oblocks += nblock;
-	oblocks = rmp->rm_oblocks;
+	rmp->rm_mag.rm_oblocks += nblock;
+	oblocks = rmp->rm_mag.rm_oblocks;
 
 	do {
-		if (oblocks >= rmp->rm_olimit) {
-			hrtime_t timestamp;
-			uint8_t key[HMAC_KEYSIZE];
+		if (oblocks >= rmp->rm_mag.rm_olimit) {
 
 			/*
 			 * Contention-avoiding rekey: see if
@@ -650,14 +642,15 @@ rnd_generate_pseudo_bytes(rndmag_t *rmp, uint8_t *ptr, size_t len)
 			 * Do an 'exponential back-in' to ensure we don't
 			 * run too long without rekey.
 			 */
-			if (rmp->rm_ofuzz) {
+			if (rmp->rm_mag.rm_ofuzz) {
 				/*
 				 * Decaying exponential back-in for rekey.
 				 */
 				if ((rnbyte_cnt < MINEXTRACTBYTES) ||
 				    (!mutex_tryenter(&rndpool_lock))) {
-					rmp->rm_olimit += rmp->rm_ofuzz;
-					rmp->rm_ofuzz >>= 1;
+					rmp->rm_mag.rm_olimit +=
+					    rmp->rm_mag.rm_ofuzz;
+					rmp->rm_mag.rm_ofuzz >>= 1;
 					goto punt;
 				}
 			} else {
@@ -665,49 +658,71 @@ rnd_generate_pseudo_bytes(rndmag_t *rmp, uint8_t *ptr, size_t len)
 			}
 
 			/* Get a new chunk of entropy */
-			(void) rnd_get_bytes(key, HMAC_KEYSIZE,
-			    ALWAYS_EXTRACT, B_FALSE);
+			(void) rnd_get_bytes((uint8_t *)rmp->rm_mag.rm_key,
+			    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
 
-			/* Set up key */
-			SET_ENCRYPT_KEY(key, HMAC_KEYSIZE, &rmp->rm_ks);
-
-			/* Get new counter value by encrypting timestamp */
-			timestamp = gethrtime();
-			HMAC_ENCRYPT(&rmp->rm_ks, &timestamp,
-			    sizeof (timestamp), digest);
-			rmp->rm_olimit = PRNG_MAXOBLOCKS/2;
-			rmp->rm_ofuzz = PRNG_MAXOBLOCKS/4;
-			bcopy(digest, &rmp->rm_counter, sizeof (uint64_t));
+			rmp->rm_mag.rm_olimit = PRNG_MAXOBLOCKS/2;
+			rmp->rm_mag.rm_ofuzz = PRNG_MAXOBLOCKS/4;
 			oblocks = 0;
-			rmp->rm_oblocks = nblock;
+			rmp->rm_mag.rm_oblocks = nblock;
 		}
 punt:
-		/* Hash counter to produce prn stream */
+		timestamp = gethrtime();
+
+		src = (uint8_t *)&timestamp;
+		dst = (uint8_t *)rmp->rm_mag.rm_seed;
+
+		for (i = 0; i < HASHSIZE; i++) {
+			dst[i] ^= src[i % sizeof (timestamp)];
+		}
+
+		bcopy(rmp->rm_mag.rm_seed, seed, HASHSIZE);
+
+		fips_random_inner(rmp->rm_mag.rm_key, tempout,
+		    seed);
+
 		if (bytes >= HASHSIZE) {
 			size = HASHSIZE;
-			HMAC_ENCRYPT(&rmp->rm_ks, &rmp->rm_counter,
-			    sizeof (rmp->rm_counter), ptr);
 		} else {
 			size = min(bytes, HASHSIZE);
-			HMAC_ENCRYPT(&rmp->rm_ks, &rmp->rm_counter,
-			    sizeof (rmp->rm_counter), digest);
-			bcopy(digest, ptr, size);
 		}
+
+		/*
+		 * FIPS 140-2: Continuous RNG test - each generation
+		 * of an n-bit block shall be compared with the previously
+		 * generated block. Test shall fail if any two compared
+		 * n-bit blocks are equal.
+		 */
+		for (i = 0; i < size/BYTES_IN_WORD; i++) {
+			if (tempout[i] != rmp->rm_mag.rm_previous[i])
+				break;
+		}
+		if (i == size/BYTES_IN_WORD)
+			cmn_err(CE_WARN, "kcf_random: The value of 160-bit "
+			    "block random bytes are same as the previous "
+			    "one.\n");
+
+		bcopy(tempout, rmp->rm_mag.rm_previous,
+		    HASHSIZE);
+
+		bcopy(tempout, ptr, size);
 		ptr += size;
 		bytes -= size;
-		rmp->rm_counter++;
 		oblocks++;
 		nblock--;
 	} while (bytes > 0);
 
-	mutex_exit(&rmp->rm_lock);
+	/* Zero out sensitive information */
+	bzero(seed, HASHSIZE);
+	bzero(tempout, HASHSIZE);
+	mutex_exit(&rmp->rm_mag.rm_lock);
 	return (0);
 }
 
 /*
  * Per-CPU Random magazines.
  */
-static rndmag_t *rndmag;
+static rndmag_pad_t *rndmag;
 static uint8_t	*rndbuf;
 static size_t 	rndmag_total;
 /*
@@ -728,7 +743,7 @@ size_t	rndmag_size = 1280;
 int
 kcf_rnd_get_pseudo_bytes(uint8_t *ptr, size_t len)
 {
-	rndmag_t *rmp;
+	rndmag_pad_t *rmp;
 	uint8_t *cptr, *eptr;
 
 	/*
@@ -741,7 +756,7 @@ kcf_rnd_get_pseudo_bytes(uint8_t *ptr, size_t len)
 	 */
 	for (;;) {
 		rmp = &rndmag[CPU->cpu_seqid];
-		mutex_enter(&rmp->rm_lock);
+		mutex_enter(&rmp->rm_mag.rm_lock);
 
 		/*
 		 * Big requests bypass buffer and tail-call the
@@ -752,27 +767,27 @@ kcf_rnd_get_pseudo_bytes(uint8_t *ptr, size_t len)
 			return (rnd_generate_pseudo_bytes(rmp, ptr, len));
 		}
 
-		cptr = rmp->rm_rptr;
+		cptr = rmp->rm_mag.rm_rptr;
 		eptr = cptr + len;
 
-		if (eptr <= rmp->rm_eptr) {
-			rmp->rm_rptr = eptr;
+		if (eptr <= rmp->rm_mag.rm_eptr) {
+			rmp->rm_mag.rm_rptr = eptr;
 			bcopy(cptr, ptr, len);
 			BUMP_CPU_RND_STATS(rmp, rs_urndOut, len);
-			mutex_exit(&rmp->rm_lock);
+			mutex_exit(&rmp->rm_mag.rm_lock);
 
 			return (0);
 		}
 		/*
 		 * End fast path.
 		 */
-		rmp->rm_rptr = rmp->rm_buffer;
+		rmp->rm_mag.rm_rptr = rmp->rm_mag.rm_buffer;
 		/*
 		 * Note:  We assume the generate routine always succeeds
 		 * in this case (because it does at present..)
 		 * It also always releases rm_lock.
 		 */
-		(void) rnd_generate_pseudo_bytes(rmp, rmp->rm_buffer,
+		(void) rnd_generate_pseudo_bytes(rmp, rmp->rm_mag.rm_buffer,
 		    rndbuf_len);
 	}
 }
@@ -788,8 +803,9 @@ kcf_rnd_get_pseudo_bytes(uint8_t *ptr, size_t len)
 static void
 rnd_alloc_magazines()
 {
-	rndmag_t *rmp;
+	rndmag_pad_t *rmp;
 	int i;
+	uint8_t discard_buf[HASHSIZE];
 
 	rndbuf_len = roundup(rndbuf_len, HASHSIZE);
 	if (rndmag_size < rndbuf_len)
@@ -800,20 +816,40 @@ rnd_alloc_magazines()
 	rndmag_total = rndmag_size * random_max_ncpus;
 
 	rndbuf = kmem_alloc(rndmag_total, KM_SLEEP);
-	rndmag = kmem_zalloc(sizeof (rndmag_t) * random_max_ncpus, KM_SLEEP);
+	rndmag = kmem_zalloc(sizeof (rndmag_pad_t) * random_max_ncpus,
+	    KM_SLEEP);
 
 	for (i = 0; i < random_max_ncpus; i++) {
 		uint8_t *buf;
 
 		rmp = &rndmag[i];
-		mutex_init(&rmp->rm_lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&rmp->rm_mag.rm_lock, NULL, MUTEX_DRIVER, NULL);
 
 		buf = rndbuf + i * rndmag_size;
 
-		rmp->rm_buffer = buf;
-		rmp->rm_eptr = buf + rndbuf_len;
-		rmp->rm_rptr = buf + rndbuf_len;
-		rmp->rm_oblocks = 1;
+		rmp->rm_mag.rm_buffer = buf;
+		rmp->rm_mag.rm_eptr = buf + rndbuf_len;
+		rmp->rm_mag.rm_rptr = buf + rndbuf_len;
+		rmp->rm_mag.rm_oblocks = 1;
+
+		mutex_enter(&rndpool_lock);
+		/*
+		 * FIPS 140-2: the first n-bit (n > 15) block generated
+		 * after power-up, initialization, or reset shall not
+		 * be used, but shall be saved for comparison.
+		 */
+		(void) rnd_get_bytes(discard_buf,
+		    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
+		bcopy(discard_buf, rmp->rm_mag.rm_previous,
+		    HMAC_KEYSIZE);
+		/* rnd_get_bytes() will call mutex_exit(&rndpool_lock) */
+		mutex_enter(&rndpool_lock);
+		(void) rnd_get_bytes((uint8_t *)rmp->rm_mag.rm_key,
+		    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
+		/* rnd_get_bytes() will call mutex_exit(&rndpool_lock) */
+		mutex_enter(&rndpool_lock);
+		(void) rnd_get_bytes((uint8_t *)rmp->rm_mag.rm_seed,
+		    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
 	}
 }
 
@@ -904,71 +940,6 @@ rnd_handler(void *arg)
 
 	kcf_rnd_schedule_timeout(B_FALSE);
 }
-
-/* Hashing functions */
-
-static void
-hmac_key(uint8_t *key, size_t keylen, void *buf)
-{
-	uint32_t *ip, *op;
-	uint32_t ipad[HMAC_BLOCK_SIZE/sizeof (uint32_t)];
-	uint32_t opad[HMAC_BLOCK_SIZE/sizeof (uint32_t)];
-	HASH_CTX *icontext, *ocontext;
-	int i;
-	int nints;
-
-	icontext = buf;
-	ocontext = (SHA1_CTX *)((uint8_t *)buf + sizeof (HASH_CTX));
-
-	bzero((uchar_t *)ipad, HMAC_BLOCK_SIZE);
-	bzero((uchar_t *)opad, HMAC_BLOCK_SIZE);
-	bcopy(key, (uchar_t *)ipad, keylen);
-	bcopy(key, (uchar_t *)opad, keylen);
-
-	/*
-	 * XOR key with ipad (0x36) and opad (0x5c) as defined
-	 * in RFC 2104.
-	 */
-	ip = ipad;
-	op = opad;
-	nints = HMAC_BLOCK_SIZE/sizeof (uint32_t);
-
-	for (i = 0; i < nints; i++) {
-		ip[i] ^= 0x36363636;
-		op[i] ^= 0x5c5c5c5c;
-	}
-
-	/* Perform hash with ipad */
-	HashInit(icontext);
-	HashUpdate(icontext, (uchar_t *)ipad, HMAC_BLOCK_SIZE);
-
-	/* Perform hash with opad */
-	HashInit(ocontext);
-	HashUpdate(ocontext, (uchar_t *)opad, HMAC_BLOCK_SIZE);
-}
-
-static void
-hmac_encr(void *ctx, uint8_t *ptr, size_t len, uint8_t *digest)
-{
-	HASH_CTX *saved_contexts;
-	HASH_CTX icontext;
-	HASH_CTX ocontext;
-
-	saved_contexts = (HASH_CTX *)ctx;
-	icontext = saved_contexts[0];
-	ocontext = saved_contexts[1];
-
-	HashUpdate(&icontext, ptr, len);
-	HashFinal(digest, &icontext);
-
-	/*
-	 * Perform Hash(K XOR OPAD, DIGEST), where DIGEST is the
-	 * Hash(K XOR IPAD, DATA).
-	 */
-	HashUpdate(&ocontext, digest, HASHSIZE);
-	HashFinal(digest, &ocontext);
-}
-
 
 static void
 rndc_addbytes(uint8_t *ptr, size_t len)
