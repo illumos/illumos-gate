@@ -52,17 +52,17 @@ def normalize_arc(caseid):
 	return re.sub(r'^([A-Z][A-Z]*ARC)[/ \t]', '\\1 ', caseid)
 
 def comchk(comments, check_db=True, output=sys.stderr):
-        '''Validate checkin comments against ON standards.
+	'''Validate checkin comments against ON standards.
 
-        Comments must be a list of one-line comments, with no trailing
-        newline.
-        
-        If check_db is True (the default), validate CR and ARC
-        synopses against the databases.
+	Comments must be a list of one-line comments, with no trailing
+	newline.
+	
+	If check_db is True (the default), validate CR and ARC
+	synopses against the databases.
 
-        Error messages intended for the user are written to output,
-        which defaults to stderr
-        '''
+	Error messages intended for the user are written to output,
+	which defaults to stderr
+	'''
 	bugnospcre = re.compile(r'^(\d{7})([^ ].*)')
 	ignorere = re.compile(r'^(Portions contributed by |Contributed by |back[ -]?out )')
 
@@ -77,10 +77,10 @@ def comchk(comments, check_db=True, output=sys.stderr):
 	blanks = False
 
 	for com in comments:
-                # Our input must be newline-free, comments are line-wise.
-                if com.find('\n') != -1:
-                        raise ValueError("newline in comment '%s'" % com)
-                
+		# Our input must be newline-free, comments are line-wise.
+		if com.find('\n') != -1:
+			raise ValueError("newline in comment '%s'" % com)
+
 		# Ignore valid comments we can't check
 		if ignorere.search(com):
 			continue
@@ -112,9 +112,8 @@ def comchk(comments, check_db=True, output=sys.stderr):
 		# ARC case
 		match = arcre.search(com)
 		if match:
-			case = normalize_arc(match.group(1))
-			if case not in arcs: arcs[case] = []
-			arcs[case].append(match.group(2))
+			arc, case = re.split('[/ \t]', match.group(1), 1)
+			arcs.setdefault((arc, case), []).append(match.group(2))
 			continue
 
 		# Anything else is bogus
@@ -143,24 +142,23 @@ def comchk(comments, check_db=True, output=sys.stderr):
 		for entered in insts:
 			synopsis = results[crid]["synopsis"]
 			if not re.search(r'^' + re.escape(synopsis) +
-					 r'( \([^)]+\))?$', entered):
+					r'( \([^)]+\))?$', entered):
 				errors['nomatch'].append([crid, synopsis,
-							  entered])
+							entered])
+
+	if check_db:
+		valid = ARC(arcs.keys())
 
 	for case, insts in arcs.iteritems():
 		if len(insts) > 1:
-			errors['dup'].append(case)
+			errors['dup'].append(' '.join(case))
 
-		if not check_db:
+ 		if not check_db:
 			continue
-
-		com, id = case.split(' ')
-		arc = ARC(com, id)
-
-		if not arc.valid():
-			errors['nonexistent'].append(case)
+                
+		if not case in valid:
+			errors['nonexistent'].append(' '.join(case))
 			continue
-
 		#
 		# The opensolaris.org ARC interfaces only give us the
 		# first 40 characters of the case name, so we must limit
@@ -171,15 +169,15 @@ def comchk(comments, check_db=True, output=sys.stderr):
 		# trailing (fix nit)-type comment, and re-try.
 		#
 		for entered in insts:
-			if entered[0:40] == arc.name():
-				continue
+			if entered[0:40] == valid[case]:
+				break
 			else:
 				# Try again with trailing (fix ...) removed.
 				dbcom = re.sub(r' \([^)]+\)$', '', entered)
-				if dbcom[0:40] != arc.name():
-					errors['nomatch'].append([case,
-								  arc.name(),
-								  entered])
+				if dbcom[0:40] != valid[case]:
+					errors['nomatch'].append(
+						[' '.join(case), valid[case],
+						 entered])
 
 	if blanks:
 		output.write("WARNING: Blank line(s) in comments\n")

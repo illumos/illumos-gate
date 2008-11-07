@@ -34,6 +34,7 @@
 
 import re
 import urllib
+import urllib2
 import htmllib
 import os
 from socket import socket, AF_INET, SOCK_STREAM
@@ -52,122 +53,13 @@ class NonExistentBug(BugException):
 	def __str__(self):
 		return "Bug %s does not exist" % self.data
 
-class Monaco(object):
-	"""
-	Query bug database.
+class BugDBException(Exception):
+	def __init__(self, data=''):
+		self.data = data
+		Exception.__init__(self, data)
 
-	Methods:
-	queryBugs()
-	expertQuery()
-	"""
-	
-	def __init__(self):
-		self.__baseURL = "http://hestia.sfbay.sun.com/cgi-bin/expert?"
-
-	def expertQuery(self, cmd, format="Normal+text", header=False):
-		"""Return results of user-supplied bug query.
-
-		Argument:
-		cmd: query to run
-
-		Keyword arguments:
-		format: desired output format (default="Normal+text")
-		header: include headers in output? (default=False)
-
-		Returns:
-		List of lines representing the output from Monaco
-		"""
-
-		url = self.__baseURL + "format=" + format + ";Go=2;"
-		if not header: url += "no_header=on;"
-		url += "cmds=" + urllib.quote_plus("\n".join(cmd))
-		myMonaco = urllib.urlopen(url)
-		return myMonaco.readlines()
-
-	def queryBugs(self, crs):
-		"""Return all info for requested change reports.
-
-		Argument:
-		crs: list of change request ids
-
-		Returns:
-		Dictionary, mapping CR=>dictionary, where the nested dictionary
-		is a mapping of field=>value
-		"""
-		monacoFields = [ "cr_number", "category", "sub_category",
-			"area", "release", "build", "responsible_manager",
-			"responsible_engineer", "priority", "status", "sub_status",
-			"submitted_by", "date_submitted", "synopsis" ]
-		cmd = []
-		cmd.append("set What = cr." + ', cr.'.join(monacoFields))
-		cmd.append("")
-		cmd.append("set Which = cr.cr_number in (" + ','.join(crs) +")")
-		cmd.append("")
-		cmd.append("set FinalClauses = order by cr.cr_number")
-		cmd.append("")
-		cmd.append("doMeta genQuery cr")
-		output = self.expertQuery(cmd, "Pipe-delimited+text")
-		results = {}
-		for line in output:
-			line = line.rstrip('\n')
-                        
-			#
-			# We request synopsis last, and split on only
-			# the number of separators that we expect to
-			# see such that a | in the synopsis doesn't
-			# throw us out of whack.
-			#
-			values = line.split('|', len(monacoFields) - 1)
-			v = 0
-			cr = values[0]
-			results[cr] = {}
-			for field in monacoFields:
-				results[cr][field] = values[v]
-				v += 1
-		return results
-
-class BooBug(object):
-	"""Look up a single bug on bugs.opensolaris.org."""
-	def __init__(self, cr):
-		cr = str(cr)
-		url = "http://bugs.opensolaris.org/view_bug.do?bug_id="+cr
-		data = urllib.urlopen(url).readlines()
-		self.__fields = {}
-		self.__fields["cr_number"] = cr
-		htmlParser = htmllib.HTMLParser(None)
-		metaHtmlRe = re.compile(r'^<meta name="([^"]+)" content="([^"]*)">$')
-		for line in data:
-			m = metaHtmlRe.search(line)
-			if not m:
-				continue
-			val = urllib.unquote(m.group(2))
-			htmlParser.save_bgn()
-			htmlParser.feed(val)
-			self.__fields[m.group(1)] = htmlParser.save_end()
-		htmlParser.close()
-		if "synopsis" not in self.__fields:
-			raise NonExistentBug(cr)
-	
-	def synopsis(self):
-		return self.__fields["synopsis"]
-	def product(self):
-		return self.__fields["product"]
-	def cat(self):
-		return self.__fields["category"]
-	def subcat(self):
-		return self.__fields["subcategory"]
-	def keywords(self):
-		return self.__fields["keywords"]
-	def state(self):
-		return self.__fields["state"]
-	def submit_date(self):
-		return self.__fields["submit_date"]
-	def type(self):
-		return self.__fields["type"]
-	def date(self):
-		return self.__fields["date"]
-	def number(self):
-		return self.__fields["cr_number"]
+	def __str__(self):
+		return "Unknown bug database: %s" % self.data
 
 class BugDB(object):
 	"""Lookup change requests.
@@ -183,18 +75,118 @@ class BugDB(object):
 	print r["6505625"]["synopsis"]
 	"""
 
-	def __init__(self, forceBoo = False):
+	def __init__(self, priority = ("bugster",), forceBoo = False):
 		"""Create a BugDB object.
 
 		Keyword argument:
 		forceBoo: use b.o.o even from SWAN (default=False)
+		priority: use bug databases in this order
 		"""
-		if forceBoo:
-			self.__onSWAN = False
-		else:
-			self.__onSWAN = onSWAN()
-			if self.__onSWAN:
-				self.__m = Monaco()
+		self.__validBugDB = ["bugster"]
+		self.__onSWAN = not forceBoo and onSWAN()
+		for database in priority:
+			if database not in self.__validBugDB:
+				raise BugDBException, database
+		self.__priority = priority
+
+
+	def __boobug(self, cr):
+		cr = str(cr)
+		url = "http://bugs.opensolaris.org/view_bug.do"
+   		req = urllib2.Request(url, urllib.urlencode({"bug_id": cr}))
+		results = {}
+		try:
+			data = urllib2.urlopen(req).readlines()
+		except urllib2.HTTPError, e:
+			if e.code != 404:
+				print "ERROR: HTTP error at " + \
+					req.get_full_url() + \
+					" got error: " + str(e.code)
+				raise e
+			else:
+				raise NonExistentBug
+		except urllib2.URLError, e:
+			print "ERROR: could not connect to " + \
+				req.get_full_url() + \
+				' got error: "' + e.reason[1] + '"'
+			raise e
+		htmlParser = htmllib.HTMLParser(None)
+		metaHtmlRe = re.compile(r'^<meta name="([^"]+)" content="([^"]*)">$')
+		for line in data:
+			m = metaHtmlRe.search(line)
+			if not m:
+				continue
+			val = urllib.unquote(m.group(2))
+			htmlParser.save_bgn()
+			htmlParser.feed(val)
+			results[m.group(1)] = htmlParser.save_end()
+		htmlParser.close()
+
+		if "synopsis" not in results:
+			raise NonExistentBug(cr)
+					
+		results["cr_number"] = cr
+		results["sub_category"] = results.pop("subcategory")
+		results["status"] = results.pop("state")
+		results["date_submitted"] = results.pop("submit_date")
+		
+		return results
+
+
+	def __monaco(self, crs):
+		"""Return all info for requested change reports.
+
+		Argument:
+		crs: list of change request ids
+
+		Returns:
+		Dictionary, mapping CR=>dictionary, where the nested dictionary
+		is a mapping of field=>value
+		"""
+		
+		#
+		# We request synopsis last, and split on only
+		# the number of separators that we expect to
+		# see such that a | in the synopsis doesn't
+		# throw us out of whack.
+		#
+		monacoFields = [ "cr_number", "category", "sub_category",
+			"area", "release", "build", "responsible_manager",
+			"responsible_engineer", "priority", "status", "sub_status",
+			"submitted_by", "date_submitted", "synopsis" ]
+		cmd = []
+		cmd.append("set What = cr." + ', cr.'.join(monacoFields))
+		cmd.append("")
+		cmd.append("set Which = cr.cr_number in (" + ','.join(crs) +")")
+		cmd.append("")
+		cmd.append("set FinalClauses = order by cr.cr_number")
+		cmd.append("")
+		cmd.append("doMeta genQuery cr")
+		url = "http://hestia.sfbay.sun.com/cgi-bin/expert?format="
+		url += "Pipe-delimited+text;Go=2;no_header=on;cmds="
+		url += urllib.quote_plus("\n".join(cmd))
+		results = {}
+		try:
+			data = urllib2.urlopen(url).readlines()
+		except urllib2.HTTPError, e:
+			print "ERROR: HTTP error at " + url + \
+				" got error: " + str(e.code)
+			raise e
+
+		except urllib2.URLError, e:
+			print "ERROR: could not connect to " + url + \
+				' got error: "' + e.reason[1] + '"'
+			raise e
+		for line in data:
+			line = line.rstrip('\n')
+			values = line.split('|', len(monacoFields) - 1)
+			v = 0
+			cr = values[0]
+			results[cr] = {}
+			for field in monacoFields:
+				results[cr][field] = values[v]
+				v += 1
+		return results
 
 	def lookup(self, crs):
 		"""Return all info for requested change reports.
@@ -207,72 +199,61 @@ class BugDB(object):
 		Dictionary, mapping CR=>dictionary, where the nested dictionary
 		is a mapping of field=>value
 		"""
+		results = {}
 		if not isinstance(crs, list):
 			crs = [str(crs)]
-		if self.__onSWAN:
-			results = self.__m.queryBugs(crs)
-			return self.__m.queryBugs(crs)
-		# else we're off-swan and querying via boo, which we can
-		# only do one bug at a time
-		results = {}
-		for cr in crs:
-			cr = str(cr)
-			try:
-				b = BooBug(cr)
-			except NonExistentBug:
-				continue
-			
-			results[cr] = {}
-			results[cr]["cr_number"] = cr
-			results[cr]["product"] = b.product()
-			results[cr]["synopsis"] = b.synopsis()
-			results[cr]["category"] = b.cat()
-			results[cr]["sub_category"] = b.subcat()
-			results[cr]["keywords"] = b.keywords()
-			results[cr]["status"] = b.state()
-			results[cr]["date_submitted"] = b.submit_date()
-			results[cr]["type"] = b.type()
-			results[cr]["date"] = b.date()
+		for database in self.__priority:
+			if database == "bugster":				
+				if self.__onSWAN:
+					results.update(self.__monaco(crs))
+				# else we're off-swan and querying via boo, which we can
+				# only do one bug at a time
+				else:
+					for cr in crs:
+						cr = str(cr)
+						try:
+							results[cr] = self.__boobug(cr)
+						except NonExistentBug:
+							continue
 
+			# the CR has already been found by one bug database
+			# so don't bother looking it up in the others
+			for cr in crs:
+				if cr in results:
+					crs.remove(cr)
+		
 		return results
-
 ####################################################################
+def ARC(arclist):
+	opts = {}
+	url = "http://opensolaris.org/cgi/arc.py"
+	opts["n"] = str(len(arclist))
+	for i, arc in enumerate(arclist):
+		arc, case = arc
+		opts["arc" + str(i)] = arc
+		opts["case" + str(i)] = case
+	req = urllib2.Request(url, urllib.urlencode(opts))
+	try:
+		data = urllib2.urlopen(req).readlines()
+	except urllib2.HTTPError, e:
+		print "ERROR: HTTP error at " + req.get_ful_url() + \
+			" got error: " + str(e.code)
+		raise e
 
-class ARC(object):
-	"""Lookup an ARC case on opensolaris.org.
-
-	Usage:
-	a = ARC("PSARC", "2008/002")
-	if a.valid():
-		print a.name()
-	"""
-	def __init__(self, arc, case):
-		self.__valid = False
-		q = "http://opensolaris.org/cgi/arc.py?n=1"
-		q += "&arc0=" + arc
-		q += "&case0=" + case
-		data = urllib.urlopen(q).readlines()
-		self.__fields = {}
-		for line in data:
-			line = line.rstrip('\n')
-			fields = line.split('|')
-			validity = fields[0]
-
-			if validity != "0":
-				return
-			else:
-				self.__fields["Name"] = fields[2]
-
-		self.__valid = True
-
-	def valid(self):
-		return self.__valid
-	def name(self):
-		return self.__fields["Name"]
-	def status(self):
-		return self.__fields["Status"]
-	def type(self):
-		return self.__fields["Type"]
+	except urllib2.URLError, e:
+		print "ERROR: could not connect to " + req.get_ful_url() + \
+			' got error: "' + e.reason[1] + '"'
+		raise e
+	ret = {}
+	for line in data:
+		oneline = line.rstrip('\n')
+		fields = oneline.split('|')
+		# check if each is valid ( fields[0]::validity )
+		if fields[0] != "0":
+			continue
+		arc, case = fields[1].split(" ")
+		ret[(arc, case)] = fields[2]
+	return ret
 
 ####################################################################
 
