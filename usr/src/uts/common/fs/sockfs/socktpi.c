@@ -677,7 +677,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		case AF_UNIX: {
 			struct sockaddr_un *soun =
 			    (struct sockaddr_un *)so->so_laddr_sa;
-			struct vnode *vp;
+			struct vnode *vp, *rvp;
 			struct vattr vattr;
 
 			ASSERT(so->so_ux_bound_vp == NULL);
@@ -716,6 +716,13 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * cross-linkage between the underlying filesystem
 			 * node and the socket node.
 			 */
+
+			if ((VOP_REALVP(vp, &rvp, NULL) == 0) && (vp != rvp)) {
+				VN_HOLD(rvp);
+				VN_RELE(vp);
+				vp = rvp;
+			}
+
 			ASSERT(SOTOV(so)->v_stream);
 			mutex_enter(&vp->v_lock);
 			vp->v_stream = SOTOV(so)->v_stream;
