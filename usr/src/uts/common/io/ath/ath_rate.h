@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 #ifndef _ATH_RATE_H
 #define	_ATH_RATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,7 +46,7 @@ extern "C" {
 
 void ath_rate_ctl_start(ath_t *asc, struct ieee80211_node *in);
 void ath_rate_ctl_reset(ath_t *asc, enum ieee80211_state state);
-void ath_rate_ctl(ieee80211com_t *isc, struct ieee80211_node *in);
+void ath_rate_ctl(void *arg, struct ieee80211_node *in);
 void ath_rate_update(ath_t *asc, struct ieee80211_node *in, int32_t rate);
 void ath_rate_setup(ath_t *asc, uint32_t mode);
 void ath_rate_cb(void *arg, struct ieee80211_node *in);

@@ -46,8 +46,6 @@
 #ifndef	_ATH_IMPL_H
 #define	_ATH_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -178,6 +176,7 @@ struct ath_stats {
 	uint32_t	ast_tx_rts;	/* tx frames with rts enabled */
 	uint32_t	ast_tx_shortpre; /* tx frames with short preamble */
 	uint32_t	ast_tx_altrate;	/* tx frames with alternate rate */
+	uint32_t	ast_tx_protect;	/* tx frames with protection */
 	int16_t		ast_tx_rssi;	/* tx rssi of last ack */
 	int16_t		ast_tx_rssidelta; /* tx rssi delta */
 	uint32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
@@ -224,8 +223,10 @@ typedef struct dma_area dma_area_t;
 struct ath_buf {
 	int			bf_flags;	/* tx descriptor flags */
 	struct ath_desc		*bf_desc;	/* virtual addr of desc */
+	struct ath_desc_status	bf_status;	/* tx/rx status */
 	uint32_t		bf_daddr;	/* physical addr of desc */
 	dma_area_t		bf_dma;		/* dma area for buf */
+	mblk_t			*bf_m;		/* message for buf */
 	struct ieee80211_node	*bf_in;		/* pointer to the node */
 
 	/* we're in list of asc->asc_txbuf_list or asc->asc_rxbuf_list */
@@ -259,6 +260,7 @@ struct ath_txq {
 typedef struct ath {
 	ieee80211com_t		asc_isc;	/* IEEE 802.11 common */
 	dev_info_t		*asc_dev;	/* back pointer to dev_info_t */
+	ddi_taskq_t		*asc_tq;	/* private task queue */
 	struct ath_hal		*asc_ah;	/* Atheros HAL */
 	uint32_t		asc_invalid : 1, /* being detached */
 				asc_isrunning : 1, /* device is operational */
@@ -267,6 +269,8 @@ typedef struct ath {
 				asc_splitmic : 1, /* Split TKIP mic keys */
 				asc_hasclrkey: 1; /* CLR key supported */
 	const HAL_RATE_TABLE	*asc_rates[IEEE80211_MODE_MAX]; /* h/w rate */
+	uint8_t			asc_protrix;	/* protect rate index */
+	uint8_t			asc_mcastantenna; /* Multicast antenna number */
 
 	ddi_acc_handle_t	asc_cfg_handle;	/* DDI I/O handle */
 	ddi_acc_handle_t	asc_io_handle;	/* DDI I/O handle */
@@ -287,6 +291,7 @@ typedef struct ath {
 	kmutex_t		asc_rxbuflock;	/* recv lock for above data */
 	uint32_t		*asc_rxlink;	/* link ptr in last RX desc */
 	uint32_t		asc_rx_pend;
+	uint64_t		asc_lastrx;	/* tsf at last rx'd frame */
 
 	list_t			asc_txbuf_list;
 	kmutex_t		asc_txbuflock;	/* txbuf lock */

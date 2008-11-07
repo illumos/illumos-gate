@@ -35,8 +35,6 @@
  * THE POSSIBILITY OF SUCH DAMAGES.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -235,6 +233,13 @@ ath_setcurmode(ath_t *asc, enum ieee80211_phymode mode)
 
 	asc->asc_currates = rt;
 	asc->asc_curmode = mode;
+
+	/*
+	 * All protection frames are transmitted at 2Mb/s for
+	 * 11g, otherwise at 1Mb/s.
+	 * select protection rate index from rate table.
+	 */
+	asc->asc_protrix = (mode == IEEE80211_MODE_11G ? 1 : 0);
 }
 
 /* Set correct parameters for a certain mode */
@@ -540,6 +545,7 @@ ath_beacon_config(ath_t *asc)
 	struct ieee80211_node *in = ic->ic_bss;
 	uint32_t nexttbtt;
 
+	/* extract tstamp from last beacon and convert to TU */
 	nexttbtt = (ATH_LE_READ_4(in->in_tstamp.data + 4) << 22) |
 	    (ATH_LE_READ_4(in->in_tstamp.data) >> 10);
 	nexttbtt += in->in_intval;
@@ -602,6 +608,40 @@ ath_beacon_config(ath_t *asc)
 		asc->asc_imask |= HAL_INT_SWBA;	/* beacon prepare */
 		ATH_HAL_INTRSET(ah, asc->asc_imask);
 	}
+}
+/*
+ * Allocate tx/rx key slots for TKIP.  We allocate one slot for
+ * each key. MIC is right after the decrypt/encrypt key.
+ */
+static uint16_t
+key_alloc_pair(ath_t *asc, ieee80211_keyix *txkeyix,
+    ieee80211_keyix *rxkeyix)
+{
+	uint16_t i, keyix;
+
+	ASSERT(!asc->asc_splitmic);
+	for (i = 0; i < ATH_N(asc->asc_keymap)/4; i++) {
+		uint8_t b = asc->asc_keymap[i];
+		if (b == 0xff)
+			continue;
+		for (keyix = i * NBBY; keyix < (i + 1) * NBBY;
+		    keyix++, b >>= 1) {
+			if ((b & 1) || isset(asc->asc_keymap, keyix+64)) {
+				/* full pair unavailable */
+				continue;
+			}
+			setbit(asc->asc_keymap, keyix);
+			setbit(asc->asc_keymap, keyix+64);
+			ATH_DEBUG((ATH_DBG_AUX,
+			    "key_alloc_pair: key pair %u,%u\n",
+			    keyix, keyix+64));
+			*txkeyix = *rxkeyix = keyix;
+			return (1);
+		}
+	}
+	ATH_DEBUG((ATH_DBG_AUX, "key_alloc_pair:"
+	    " out of pair space\n"));
+	return (0);
 }
 
 /*
@@ -709,8 +749,11 @@ ath_key_alloc(ieee80211com_t *ic, const struct ieee80211_key *k,
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT) {
 		return (key_alloc_single(asc, keyix, rxkeyix));
 	} else if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP &&
-	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 && asc->asc_splitmic) {
-		return (key_alloc_2pair(asc, keyix, rxkeyix));
+	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0) {
+		if (asc->asc_splitmic)
+			return (key_alloc_2pair(asc, keyix, rxkeyix));
+		else
+			return (key_alloc_pair(asc, keyix, rxkeyix));
 	} else {
 		return (key_alloc_single(asc, keyix, rxkeyix));
 	}
@@ -745,18 +788,25 @@ ath_key_delete(ieee80211com_t *ic, const struct ieee80211_key *k)
 		 */
 		clrbit(asc->asc_keymap, keyix);
 		if (cip->ic_cipher == IEEE80211_CIPHER_TKIP &&
-		    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 &&
-		    asc->asc_splitmic) {
-			clrbit(asc->asc_keymap, keyix+64);	/* TX key MIC */
-			clrbit(asc->asc_keymap, keyix+32);	/* RX key */
-			clrbit(asc->asc_keymap, keyix+32+64);	/* RX key MIC */
+		    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0) {
+			/*
+			 * If splitmic is true +64 is TX key MIC,
+			 * else +64 is RX key + RX key MIC.
+			 */
+			clrbit(asc->asc_keymap, keyix+64);
+			if (asc->asc_splitmic) {
+				/* Rx key */
+				clrbit(asc->asc_keymap, keyix+32);
+				/* RX key MIC */
+				clrbit(asc->asc_keymap, keyix+32+64);
+			}
 		}
 	}
 	return (1);
 }
 
 static void
-ath_keyprint(const char *tag, uint_t ix,
+ath_keyprint(ath_t *asc, const char *tag, uint_t ix,
     const HAL_KEYVAL *hk, const uint8_t mac[IEEE80211_ADDR_LEN])
 {
 	static const char *ciphers[] = {
@@ -780,12 +830,22 @@ ath_keyprint(const char *tag, uint_t ix,
 	    ieee80211_macaddr_sprintf(mac));
 	(void) strlcat(buf, buft, sizeof (buf));
 	if (hk->kv_type == HAL_CIPHER_TKIP) {
-		(void) snprintf(buft, sizeof (buft), " mic ");
+		(void) snprintf(buft, sizeof (buft), " %s ",
+		    asc->asc_splitmic ? "mic" : "rxmic");
 		(void) strlcat(buf, buft, sizeof (buf));
 		for (i = 0; i < sizeof (hk->kv_mic); i++) {
 			(void) snprintf(buft, sizeof (buft), "%02x",
 			    hk->kv_mic[i]);
 			(void) strlcat(buf, buft, sizeof (buf));
+		}
+		if (!asc->asc_splitmic) {
+			(void) snprintf(buft, sizeof (buft), " txmic ");
+			(void) strlcat(buf, buft, sizeof (buf));
+			for (i = 0; i < sizeof (hk->kv_txmic); i++) {
+				(void) snprintf(buft, sizeof (buft), "%02x",
+				    hk->kv_txmic[i]);
+				(void) strlcat(buf, buft, sizeof (buf));
+			}
 		}
 	}
 	ATH_DEBUG((ATH_DBG_AUX, "%s", buf));
@@ -806,18 +866,37 @@ ath_keyset_tkip(ath_t *asc, const struct ieee80211_key *k,
 
 	ASSERT(k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP);
 	if ((k->wk_flags & IEEE80211_KEY_XR) == IEEE80211_KEY_XR) {
-		/*
-		 * TX key goes at first index, RX key at +32.
-		 * The hal handles the MIC keys at index+64.
-		 */
-		(void) memcpy(hk->kv_mic, k->wk_txmic, sizeof (hk->kv_mic));
-		ath_keyprint("ath_keyset_tkip:", k->wk_keyix, hk, zerobssid);
-		if (!ATH_HAL_KEYSET(ah, k->wk_keyix, hk, zerobssid))
-			return (0);
+		if (asc->asc_splitmic) {
+			/*
+			 * TX key goes at first index, RX key at +32.
+			 * The hal handles the MIC keys at index+64.
+			 */
+			(void) memcpy(hk->kv_mic, k->wk_txmic,
+			    sizeof (hk->kv_mic));
+			ath_keyprint(asc, "ath_keyset_tkip:", k->wk_keyix, hk,
+			    zerobssid);
+			if (!ATH_HAL_KEYSET(ah, k->wk_keyix, hk, zerobssid))
+				return (0);
 
-		(void) memcpy(hk->kv_mic, k->wk_rxmic, sizeof (hk->kv_mic));
-		ath_keyprint("ath_keyset_tkip:", k->wk_keyix+32, hk, mac);
-		return (ATH_HAL_KEYSET(ah, k->wk_keyix+32, hk, mac));
+			(void) memcpy(hk->kv_mic, k->wk_rxmic,
+			    sizeof (hk->kv_mic));
+			ath_keyprint(asc, "ath_keyset_tkip:", k->wk_keyix+32,
+			    hk, mac);
+			return (ATH_HAL_KEYSET(ah, k->wk_keyix+32, hk, mac));
+		} else {
+			/*
+			 * Room for both TX+RX MIC keys in one key cache
+			 * slot, just set key at the first index; the hal
+			 * will handle the reset.
+			 */
+			(void) memcpy(hk->kv_mic, k->wk_rxmic,
+			    sizeof (hk->kv_mic));
+			(void) memcpy(hk->kv_txmic, k->wk_txmic,
+			    sizeof (hk->kv_txmic));
+			ath_keyprint(asc, "ath_keyset_tkip", k->wk_keyix, hk,
+			    mac);
+			return (ATH_HAL_KEYSET(ah, k->wk_keyix, hk, mac));
+		}
 	} else if (k->wk_flags & IEEE80211_KEY_XR) {
 		/*
 		 * TX/RX key goes at first index.
@@ -825,7 +904,8 @@ ath_keyset_tkip(ath_t *asc, const struct ieee80211_key *k,
 		 */
 		(void) memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
 		    k->wk_txmic : k->wk_rxmic, sizeof (hk->kv_mic));
-		ath_keyprint("ath_keyset_tkip:", k->wk_keyix, hk, zerobssid);
+		ath_keyprint(asc, "ath_keyset_tkip:", k->wk_keyix, hk,
+		    zerobssid);
 		return (ATH_HAL_KEYSET(ah, k->wk_keyix, hk, zerobssid));
 	}
 	return (0);
@@ -869,11 +949,10 @@ ath_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 	}
 
 	if (hk.kv_type == HAL_CIPHER_TKIP &&
-	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 &&
-	    asc->asc_splitmic) {
+	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0) {
 		return (ath_keyset_tkip(asc, k, &hk, mac));
 	} else {
-		ath_keyprint("ath_keyset:", k->wk_keyix, &hk, mac);
+		ath_keyprint(asc, "ath_keyset:", k->wk_keyix, &hk, mac);
 		return (ATH_HAL_KEYSET(ah, k->wk_keyix, &hk, mac));
 	}
 }

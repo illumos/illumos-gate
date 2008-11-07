@@ -38,8 +38,6 @@
 #ifndef _ATH_AUX_H
 #define	_ATH_AUX_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

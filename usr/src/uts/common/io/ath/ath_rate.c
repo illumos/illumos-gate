@@ -35,8 +35,6 @@
  * THE POSSIBILITY OF SUCH DAMAGES.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -78,7 +76,10 @@ ath_rate_update(ath_t *asc, struct ieee80211_node *in, int32_t rate)
 	const HAL_RATE_TABLE *rt = asc->asc_currates;
 	uint8_t rix;
 
+	ASSERT(rt != NULL);
+
 	in->in_txrate = rate;
+
 	/* management/control frames always go at the lowest speed */
 	an->an_tx_mgtrate = rt->info[0].rateCode;
 	an->an_tx_mgtratesp = an->an_tx_mgtrate | rt->info[0].shortPreamble;
@@ -228,9 +229,9 @@ ath_rate_ctl_reset(ath_t *asc, enum ieee80211_state state)
  * Examine and potentially adjust the transmit rate.
  */
 void
-ath_rate_ctl(ieee80211com_t *isc, struct ieee80211_node *in)
+ath_rate_ctl(void *arg, struct ieee80211_node *in)
 {
-	ath_t *asc = (ath_t *)isc;
+	ath_t *asc = arg;
 	struct ath_node *an = ATH_NODE(in);
 	struct ieee80211_rateset *rs = &in->in_rates;
 	int32_t mod = 0, nrate, enough;

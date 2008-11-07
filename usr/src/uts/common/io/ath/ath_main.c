@@ -36,7 +36,6 @@
  *
  */
 
-
 /*
  * Driver for the Atheros Wireless LAN controller.
  *
@@ -175,7 +174,7 @@ static ddi_device_acc_attr_t ath_desc_accattr = {
 };
 
 /*
- * Describes the chip's DMA engine
+ * DMA attributes for rx/tx buffers
  */
 static ddi_dma_attr_t ath_dma_attr = {
 	DMA_ATTR_V0,		/* version number */
@@ -305,7 +304,6 @@ ath_setup_desc(ath_t *asc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = bf->bf_daddr;
 	ds->ds_data = bf->bf_dma.cookie.dmac_address;
-	ds->ds_vdata = bf->bf_dma.mem_va;
 	ATH_HAL_SETUPRXDESC(asc->asc_ah, ds,
 	    bf->bf_dma.alength,		/* buffer size */
 	    0);
@@ -378,10 +376,86 @@ ath_free_dma_mem(dma_area_t *dma_p)
 }
 
 
+/*
+ * Initialize tx/rx buffer list. Allocate DMA memory for
+ * each buffer.
+ */
+static int
+ath_buflist_setup(dev_info_t *devinfo, ath_t *asc, list_t *bflist,
+    struct ath_buf **pbf, struct ath_desc **pds, int nbuf, uint_t dmabflags)
+{
+	int i, err;
+	struct ath_buf *bf = *pbf;
+	struct ath_desc *ds = *pds;
+
+	list_create(bflist, sizeof (struct ath_buf),
+	    offsetof(struct ath_buf, bf_node));
+	for (i = 0; i < nbuf; i++, bf++, ds++) {
+		bf->bf_desc = ds;
+		bf->bf_daddr = asc->asc_desc_dma.cookie.dmac_address +
+		    ((uintptr_t)ds - (uintptr_t)asc->asc_desc);
+		list_insert_tail(bflist, bf);
+
+		/* alloc DMA memory */
+		err = ath_alloc_dma_mem(devinfo, &ath_dma_attr,
+		    asc->asc_dmabuf_size, &ath_desc_accattr, DDI_DMA_STREAMING,
+		    dmabflags, &bf->bf_dma);
+		if (err != DDI_SUCCESS)
+			return (err);
+	}
+	*pbf = bf;
+	*pds = ds;
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Destroy tx/rx buffer list. Free DMA memory.
+ */
+static void
+ath_buflist_cleanup(list_t *buflist)
+{
+	struct ath_buf *bf;
+
+	if (!buflist)
+		return;
+
+	bf = list_head(buflist);
+	while (bf != NULL) {
+		if (bf->bf_m != NULL) {
+			freemsg(bf->bf_m);
+			bf->bf_m = NULL;
+		}
+		/* Free DMA buffer */
+		ath_free_dma_mem(&bf->bf_dma);
+		if (bf->bf_in != NULL) {
+			ieee80211_free_node(bf->bf_in);
+			bf->bf_in = NULL;
+		}
+		list_remove(buflist, bf);
+		bf = list_head(buflist);
+	}
+	list_destroy(buflist);
+}
+
+
+static void
+ath_desc_free(ath_t *asc)
+{
+	ath_buflist_cleanup(&asc->asc_txbuf_list);
+	ath_buflist_cleanup(&asc->asc_rxbuf_list);
+
+	/* Free descriptor DMA buffer */
+	ath_free_dma_mem(&asc->asc_desc_dma);
+
+	kmem_free((void *)asc->asc_vbufptr, asc->asc_vbuflen);
+	asc->asc_vbufptr = NULL;
+}
+
 static int
 ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 {
-	int i, err;
+	int err;
 	size_t size;
 	struct ath_desc *ds;
 	struct ath_buf *bf;
@@ -412,78 +486,31 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 	    (IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
 	    IEEE80211_WEP_CRCLEN), asc->asc_cachelsz);
 
-	/* create RX buffer list and allocate DMA memory */
-	list_create(&asc->asc_rxbuf_list, sizeof (struct ath_buf),
-	    offsetof(struct ath_buf, bf_node));
-	for (i = 0; i < ATH_RXBUF; i++, bf++, ds++) {
-		bf->bf_desc = ds;
-		bf->bf_daddr = asc->asc_desc_dma.cookie.dmac_address +
-		    ((uintptr_t)ds - (uintptr_t)asc->asc_desc);
-		list_insert_tail(&asc->asc_rxbuf_list, bf);
-
-		/* alloc DMA memory */
-		err = ath_alloc_dma_mem(devinfo, &ath_dma_attr,
-		    asc->asc_dmabuf_size, &ath_desc_accattr,
-		    DDI_DMA_STREAMING, DDI_DMA_READ | DDI_DMA_STREAMING,
-		    &bf->bf_dma);
-		if (err != DDI_SUCCESS)
-			return (err);
+	/* create RX buffer list */
+	err = ath_buflist_setup(devinfo, asc, &asc->asc_rxbuf_list, &bf, &ds,
+	    ATH_RXBUF, DDI_DMA_READ | DDI_DMA_STREAMING);
+	if (err != DDI_SUCCESS) {
+		ath_desc_free(asc);
+		return (err);
 	}
 
-	/* create TX buffer list and allocate DMA memory */
-	list_create(&asc->asc_txbuf_list, sizeof (struct ath_buf),
-	    offsetof(struct ath_buf, bf_node));
-	for (i = 0; i < ATH_TXBUF; i++, bf++, ds++) {
-		bf->bf_desc = ds;
-		bf->bf_daddr = asc->asc_desc_dma.cookie.dmac_address +
-		    ((uintptr_t)ds - (uintptr_t)asc->asc_desc);
-		list_insert_tail(&asc->asc_txbuf_list, bf);
-
-		/* alloc DMA memory */
-		err = ath_alloc_dma_mem(devinfo, &ath_dma_attr,
-		    asc->asc_dmabuf_size, &ath_desc_accattr,
-		    DDI_DMA_STREAMING, DDI_DMA_STREAMING, &bf->bf_dma);
-		if (err != DDI_SUCCESS)
-			return (err);
+	/* create TX buffer list */
+	err = ath_buflist_setup(devinfo, asc, &asc->asc_txbuf_list, &bf, &ds,
+	    ATH_TXBUF, DDI_DMA_STREAMING);
+	if (err != DDI_SUCCESS) {
+		ath_desc_free(asc);
+		return (err);
 	}
+
 
 	return (DDI_SUCCESS);
-}
-
-static void
-ath_desc_free(ath_t *asc)
-{
-	struct ath_buf *bf;
-
-	/* Free TX DMA buffer */
-	bf = list_head(&asc->asc_txbuf_list);
-	while (bf != NULL) {
-		ath_free_dma_mem(&bf->bf_dma);
-		list_remove(&asc->asc_txbuf_list, bf);
-		bf = list_head(&asc->asc_txbuf_list);
-	}
-	list_destroy(&asc->asc_txbuf_list);
-
-	/* Free RX DMA uffer */
-	bf = list_head(&asc->asc_rxbuf_list);
-	while (bf != NULL) {
-		ath_free_dma_mem(&bf->bf_dma);
-		list_remove(&asc->asc_rxbuf_list, bf);
-		bf = list_head(&asc->asc_rxbuf_list);
-	}
-	list_destroy(&asc->asc_rxbuf_list);
-
-	/* Free descriptor DMA buffer */
-	ath_free_dma_mem(&asc->asc_desc_dma);
-
-	kmem_free((void *)asc->asc_vbufptr, asc->asc_vbuflen);
-	asc->asc_vbufptr = NULL;
 }
 
 static void
 ath_printrxbuf(struct ath_buf *bf, int32_t done)
 {
 	struct ath_desc *ds = bf->bf_desc;
+	const struct ath_rx_status *rs = &bf->bf_status.ds_rxstat;
 
 	ATH_DEBUG((ATH_DBG_RECV, "ath: R (%p %p) %08x %08x %08x "
 	    "%08x %08x %08x %c\n",
@@ -491,7 +518,7 @@ ath_printrxbuf(struct ath_buf *bf, int32_t done)
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1],
-	    !done ? ' ' : (ds->ds_rxstat.rs_status == 0) ? '*' : '!'));
+	    !done ? ' ' : (rs->rs_status == 0) ? '*' : '!'));
 }
 
 static void
@@ -501,6 +528,7 @@ ath_rx_handler(ath_t *asc)
 	struct ath_buf *bf;
 	struct ath_hal *ah = asc->asc_ah;
 	struct ath_desc *ds;
+	struct ath_rx_status *rs;
 	mblk_t *rx_mp;
 	struct ieee80211_frame *wh;
 	int32_t len, loop = 1;
@@ -529,9 +557,10 @@ ath_rx_handler(ath_t *asc)
 			break;
 		}
 
+		rs = &bf->bf_status.ds_rxstat;
 		status = ATH_HAL_RXPROCDESC(ah, ds,
 		    bf->bf_daddr,
-		    ATH_PA2DESC(asc, ds->ds_link));
+		    ATH_PA2DESC(asc, ds->ds_link), rs);
 		if (status == HAL_EINPROGRESS) {
 			mutex_exit(&asc->asc_rxbuflock);
 			break;
@@ -539,21 +568,21 @@ ath_rx_handler(ath_t *asc)
 		list_remove(&asc->asc_rxbuf_list, bf);
 		mutex_exit(&asc->asc_rxbuflock);
 
-		if (ds->ds_rxstat.rs_status != 0) {
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
+		if (rs->rs_status != 0) {
+			if (rs->rs_status & HAL_RXERR_CRC)
 				asc->asc_stats.ast_rx_crcerr++;
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_FIFO)
+			if (rs->rs_status & HAL_RXERR_FIFO)
 				asc->asc_stats.ast_rx_fifoerr++;
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT)
+			if (rs->rs_status & HAL_RXERR_DECRYPT)
 				asc->asc_stats.ast_rx_badcrypt++;
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_PHY) {
+			if (rs->rs_status & HAL_RXERR_PHY) {
 				asc->asc_stats.ast_rx_phyerr++;
-				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
+				phyerr = rs->rs_phyerr & 0x1f;
 				asc->asc_stats.ast_rx_phy[phyerr]++;
 			}
 			goto rx_next;
 		}
-		len = ds->ds_rxstat.rs_datalen;
+		len = rs->rs_datalen;
 
 		/* less than sizeof(struct ieee80211_frame) */
 		if (len < 20) {
@@ -596,8 +625,7 @@ ath_rx_handler(ath_t *asc)
 		 * Send frame up for processing.
 		 */
 		(void) ieee80211_input(ic, rx_mp, in,
-		    ds->ds_rxstat.rs_rssi,
-		    ds->ds_rxstat.rs_tstamp);
+		    rs->rs_rssi, rs->rs_tstamp);
 
 		ieee80211_free_node(in);
 
@@ -616,6 +644,7 @@ static void
 ath_printtxbuf(struct ath_buf *bf, int done)
 {
 	struct ath_desc *ds = bf->bf_desc;
+	const struct ath_tx_status *ts = &bf->bf_status.ds_txstat;
 
 	ATH_DEBUG((ATH_DBG_SEND, "ath: T(%p %p) %08x %08x %08x %08x %08x"
 	    " %08x %08x %08x %c\n",
@@ -623,7 +652,7 @@ ath_printtxbuf(struct ath_buf *bf, int done)
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1], ds->ds_hw[2], ds->ds_hw[3],
-	    !done ? ' ' : (ds->ds_txstat.ts_status == 0) ? '*' : '!'));
+	    !done ? ' ' : (ts->ts_status == 0) ? '*' : '!'));
 }
 
 /*
@@ -836,7 +865,7 @@ ath_tx_start(ath_t *asc, struct ieee80211_node *in, struct ath_buf *bf,
 		/* SIFS + data */
 		ctsduration += ath_hal_computetxtime(ah,
 		    rt, pktlen, rix, shortPreamble);
-		if ((flags & HAL_TXDESC_NOACK) == 0) {	/* SIFS + ACK */
+		if ((flags & HAL_TXDESC_NOACK) == 0) {  /* SIFS + ACK */
 			ctsduration += ath_hal_computetxtime(ah,
 			    rt, IEEE80211_ACK_SIZE, cix, shortPreamble);
 		}
@@ -1058,7 +1087,6 @@ ath_m_tx(void *arg, mblk_t *mp)
 	}
 
 	return (mp);
-
 }
 
 static int
@@ -1070,6 +1098,7 @@ ath_tx_processq(ath_t *asc, struct ath_txq *txq)
 	struct ath_desc *ds;
 	struct ieee80211_node *in;
 	int32_t sr, lr, nacked = 0;
+	struct ath_tx_status *ts;
 	HAL_STATUS status;
 	struct ath_node *an;
 
@@ -1082,7 +1111,8 @@ ath_tx_processq(ath_t *asc, struct ath_txq *txq)
 			break;
 		}
 		ds = bf->bf_desc;	/* last decriptor */
-		status = ATH_HAL_TXPROCDESC(ah, ds);
+		ts = &bf->bf_status.ds_txstat;
+		status = ATH_HAL_TXPROCDESC(ah, ds, ts);
 #ifdef DEBUG
 		ath_printtxbuf(bf, status == HAL_OK);
 #endif
@@ -1096,47 +1126,38 @@ ath_tx_processq(ath_t *asc, struct ath_txq *txq)
 		if (in != NULL) {
 			an = ATH_NODE(in);
 			/* Successful transmition */
-			if (ds->ds_txstat.ts_status == 0) {
+			if (ts->ts_status == 0) {
 				an->an_tx_ok++;
-				an->an_tx_antenna =
-				    ds->ds_txstat.ts_antenna;
-				if (ds->ds_txstat.ts_rate &
-				    HAL_TXSTAT_ALTRATE)
+				an->an_tx_antenna = ts->ts_antenna;
+				if (ts->ts_rate & HAL_TXSTAT_ALTRATE)
 					asc->asc_stats.ast_tx_altrate++;
 				asc->asc_stats.ast_tx_rssidelta =
-				    ds->ds_txstat.ts_rssi -
-				    asc->asc_stats.ast_tx_rssi;
-				asc->asc_stats.ast_tx_rssi =
-				    ds->ds_txstat.ts_rssi;
+				    ts->ts_rssi - asc->asc_stats.ast_tx_rssi;
+				asc->asc_stats.ast_tx_rssi = ts->ts_rssi;
 			} else {
 				an->an_tx_err++;
-				if (ds->ds_txstat.ts_status &
-				    HAL_TXERR_XRETRY)
-					asc->asc_stats.
-					    ast_tx_xretries++;
-				if (ds->ds_txstat.ts_status &
-				    HAL_TXERR_FIFO)
+				if (ts->ts_status & HAL_TXERR_XRETRY)
+					asc->asc_stats.ast_tx_xretries++;
+				if (ts->ts_status & HAL_TXERR_FIFO)
 					asc->asc_stats.ast_tx_fifoerr++;
-				if (ds->ds_txstat.ts_status &
-				    HAL_TXERR_FILT)
-					asc->asc_stats.
-					    ast_tx_filtered++;
+				if (ts->ts_status & HAL_TXERR_FILT)
+					asc->asc_stats.ast_tx_filtered++;
 				an->an_tx_antenna = 0;	/* invalidate */
 			}
-			sr = ds->ds_txstat.ts_shortretry;
-			lr = ds->ds_txstat.ts_longretry;
+			sr = ts->ts_shortretry;
+			lr = ts->ts_longretry;
 			asc->asc_stats.ast_tx_shortretry += sr;
 			asc->asc_stats.ast_tx_longretry += lr;
 			/*
 			 * Hand the descriptor to the rate control algorithm.
 			 */
-			if ((ds->ds_txstat.ts_status & HAL_TXERR_FILT) == 0 &&
+			if ((ts->ts_status & HAL_TXERR_FILT) == 0 &&
 			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0) {
 				/*
 				 * If frame was ack'd update the last rx time
 				 * used to workaround phantom bmiss interrupts.
 				 */
-				if (ds->ds_txstat.ts_status == 0) {
+				if (ts->ts_status == 0) {
 					nacked++;
 					an->an_tx_ok++;
 				} else {
@@ -1274,6 +1295,9 @@ ath_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 
 	if (nstate == IEEE80211_S_INIT) {
 		asc->asc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
+		/*
+		 * Disable interrupts.
+		 */
 		ATH_HAL_INTRSET(ah, asc->asc_imask &~ HAL_INT_GLOBAL);
 		ATH_UNLOCK(asc);
 		goto done;
@@ -1289,6 +1313,7 @@ ath_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	}
 
 	rfilt = ath_calcrxfilter(asc);
+
 	if (nstate == IEEE80211_S_SCAN)
 		bssid = ic->ic_macaddr;
 	else
@@ -1318,43 +1343,6 @@ ath_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	 * Reset the rate control state.
 	 */
 	ath_rate_ctl_reset(asc, nstate);
-
-	if (nstate == IEEE80211_S_RUN && (ostate != IEEE80211_S_RUN)) {
-		nvlist_t *attr_list = NULL;
-		sysevent_id_t eid;
-		int32_t err = 0;
-		char *str_name = "ATH";
-		char str_value[256] = {0};
-
-		ATH_DEBUG((ATH_DBG_80211, "ath: ath new state(RUN): "
-		    "ic_flags=0x%08x iv=%d"
-		    " bssid=%s capinfo=0x%04x chan=%d\n",
-		    ic->ic_flags,
-		    in->in_intval,
-		    ieee80211_macaddr_sprintf(in->in_bssid),
-		    in->in_capinfo,
-		    ieee80211_chan2ieee(ic, in->in_chan)));
-
-		(void) sprintf(str_value, "%s%s%d", "-i ",
-		    ddi_driver_name(asc->asc_dev),
-		    ddi_get_instance(asc->asc_dev));
-		if (nvlist_alloc(&attr_list,
-		    NV_UNIQUE_NAME_TYPE, KM_SLEEP) == 0) {
-			err = nvlist_add_string(attr_list,
-			    str_name, str_value);
-			if (err != DDI_SUCCESS)
-				ATH_DEBUG((ATH_DBG_80211, "ath: "
-				    "ath_new_state: error log event\n"));
-			err = ddi_log_sysevent(asc->asc_dev,
-			    DDI_VENDOR_SUNW, "class",
-			    "subclass", attr_list,
-			    &eid, DDI_NOSLEEP);
-			if (err != DDI_SUCCESS)
-				ATH_DEBUG((ATH_DBG_80211, "ath: "
-				    "ath_new_state(): error log event\n"));
-			nvlist_free(attr_list);
-		}
-	}
 
 	ATH_UNLOCK(asc);
 done:
@@ -1435,7 +1423,7 @@ ath_watchdog(void *arg)
 				ath_rate_ctl(ic, ic->ic_bss);
 			else
 				ieee80211_iterate_nodes(&ic->ic_sta,
-				    ath_rate_cb, asc);
+				    ath_rate_ctl, asc);
 		}
 
 		ntimer = 1;
@@ -1446,6 +1434,14 @@ ath_watchdog(void *arg)
 	if (ntimer != 0)
 		ieee80211_start_watchdog(ic, ntimer);
 }
+
+static void
+ath_tx_proc(void *arg)
+{
+	ath_t *asc = arg;
+	ath_tx_handler(asc);
+}
+
 
 static uint_t
 ath_intr(caddr_t arg)
@@ -1495,7 +1491,11 @@ ath_intr(caddr_t arg)
 			ddi_trigger_softintr(asc->asc_softint_id);
 		}
 		if (status & HAL_INT_TX) {
-			ath_tx_handler(asc);
+			if (ddi_taskq_dispatch(asc->asc_tq, ath_tx_proc,
+			    asc, DDI_NOSLEEP) != DDI_SUCCESS) {
+				ath_problem("ath: ath_intr(): "
+				    "No memory available for tx taskq\n");
+			}
 		}
 		ATH_UNLOCK(asc);
 
@@ -1503,12 +1503,14 @@ ath_intr(caddr_t arg)
 			/* This will occur only in Host-AP or Ad-Hoc mode */
 			return (DDI_INTR_CLAIMED);
 		}
+
 		if (status & HAL_INT_BMISS) {
 			if (ic->ic_state == IEEE80211_S_RUN) {
 				(void) ieee80211_new_state(ic,
 				    IEEE80211_S_ASSOC, -1);
 			}
 		}
+
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -1726,6 +1728,7 @@ ath_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	uint32_t *mfilt = asc->asc_mcast_hash;
 
 	ATH_LOCK(asc);
+
 	/* calculate XOR of eight 6bit values */
 	val = ATH_LE_READ_4(mca + 0);
 	pos = (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
@@ -1747,7 +1750,6 @@ ath_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	ATH_UNLOCK(asc);
 	return (0);
 }
-
 /*
  * callback functions for /get/set properties
  */
@@ -2042,6 +2044,9 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		    ath_get_hal_status_desc(status), status));
 		goto attach_fail2;
 	}
+	ATH_DEBUG((ATH_DBG_ATTACH, "mac %d.%d phy %d.%d",
+	    ah->ah_macVersion, ah->ah_macRev,
+	    ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf));
 	ATH_HAL_INTRSET(ah, 0);
 	asc->asc_ah = ah;
 
@@ -2098,13 +2103,6 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	for (i = 0; i < asc->asc_keymax; i++)
 		ATH_HAL_KEYRESET(ah, i);
 
-	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
-		setbit(asc->asc_keymap, i);
-		setbit(asc->asc_keymap, i+32);
-		setbit(asc->asc_keymap, i+64);
-		setbit(asc->asc_keymap, i+32+64);
-	}
-
 	ATH_HAL_GETREGDOMAIN(ah, (uint32_t *)&ath_regdomain);
 	ATH_HAL_GETCOUNTRYCODE(ah, &ath_countrycode);
 	/*
@@ -2138,6 +2136,10 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail3;
 	}
 
+	if ((asc->asc_tq = ddi_taskq_create(devinfo, "ath_taskq", 1,
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
+		goto attach_fail4;
+	}
 	/* Setup transmit queues in the HAL */
 	if (ath_txq_setup(asc))
 		goto attach_fail4;
@@ -2177,12 +2179,33 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 			ATH_DEBUG((ATH_DBG_ATTACH, "Support H/W TKIP MIC\n"));
 			ic->ic_caps |= IEEE80211_C_TKIPMIC;
 		}
-		if (ATH_HAL_TKIPSPLIT(ah))
+
+		/*
+		 * If the h/w supports storing tx+rx MIC keys
+		 * in one cache slot automatically enable use.
+		 */
+		if (ATH_HAL_HASTKIPSPLIT(ah) ||
+		    !ATH_HAL_SETTKIPSPLIT(ah, AH_FALSE)) {
 			asc->asc_splitmic = 1;
+		}
 	}
 	ic->ic_caps |= IEEE80211_C_WPA;	/* Support WPA/WPA2 */
 
 	asc->asc_hasclrkey = ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_CLR);
+	/*
+	 * Mark key cache slots associated with global keys
+	 * as in use.  If we knew TKIP was not to be used we
+	 * could leave the +32, +64, and +32+64 slots free.
+	 */
+	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
+		setbit(asc->asc_keymap, i);
+		setbit(asc->asc_keymap, i+64);
+		if (asc->asc_splitmic) {
+			setbit(asc->asc_keymap, i+32);
+			setbit(asc->asc_keymap, i+32+64);
+		}
+	}
+
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
 	ic->ic_state = IEEE80211_S_INIT;
@@ -2292,6 +2315,8 @@ attach_fail5:
 	(void) ieee80211_detach(ic);
 attach_fail4:
 	ath_desc_free(asc);
+	if (asc->asc_tq)
+		ddi_taskq_destroy(asc->asc_tq);
 attach_fail3:
 	ah->ah_detach(asc->asc_ah);
 attach_fail2:
@@ -2378,6 +2403,7 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 */
 	ieee80211_detach(&asc->asc_isc);
 	ath_desc_free(asc);
+	ddi_taskq_destroy(asc->asc_tq);
 	ath_txq_cleanup(asc);
 	asc->asc_ah->ah_detach(asc->asc_ah);
 
@@ -2453,7 +2479,7 @@ DDI_DEFINE_STREAM_OPS(ath_dev_ops, nulldev, nulldev, ath_attach, ath_detach,
 
 static struct modldrv ath_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ath driver",		/* short description */
+	"ath driver 1.4/HAL 0.10.5.6",		/* short description */
 	&ath_dev_ops		/* driver specific ops */
 };
 

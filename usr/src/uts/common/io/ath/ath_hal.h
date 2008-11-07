@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2006 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Use is subject to license terms.
@@ -40,8 +40,6 @@
 #ifndef _ATH_HAL_H
 #define	_ATH_HAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ath_hal.h is released by Atheros and used to describe the Atheros
  * Hardware Access Layer(HAL) interface. All kinds of data structures,
@@ -57,7 +55,7 @@ extern "C" {
 #endif
 
 /* HAL version of this release */
-#define	HAL_ABI_VERSION	0x06052200	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x08052700	/* YYMMDDnn */
 
 /* HAL data type definition */
 typedef void *		HAL_SOFTC;	/* pointer to driver/OS state */
@@ -73,20 +71,23 @@ typedef uint16_t 	HAL_REG_DOMAIN;	/* regulatory domain code */
 #define	HAL_BEACON_ENA		0x00800000	/* beacon xmit enable */
 #define	HAL_BEACON_RESET_TSF	0x01000000	/* clear TSF */
 
-#define	CHANNEL_RAD_INT	0x0001	/* Radar interference detected on channel */
-#define	CHANNEL_CW_INT	0x0002	/* CW interference detected on channel */
-#define	CHANNEL_BUSY	0x0004	/* Busy, occupied or overlap with adjoin chan */
-#define	CHANNEL_TURBO	0x0010	/* Turbo Channel */
-#define	CHANNEL_CCK	0x0020	/* CCK channel */
-#define	CHANNEL_OFDM	0x0040	/* OFDM channel */
-#define	CHANNEL_2GHZ	0x0080	/* 2 GHz spectrum channel. */
-#define	CHANNEL_5GHZ	0x0100	/* 5 GHz spectrum channel */
-#define	CHANNEL_PASSIVE	0x0200	/* Only passive scan allowed in the channel */
-#define	CHANNEL_DYN	0x0400	/* dynamic CCK-OFDM channel */
-#define	CHANNEL_XR	0x0800	/* XR channel */
-#define	CHANNEL_STURBO	0x2000	/* Static turbo, no 11a-only usage */
-#define	CHANNEL_HALF	0x4000 	/* Half rate channel */
-#define	CHANNEL_QUARTER	0x8000 	/* Quarter rate channel */
+#define	CHANNEL_RAD_INT	0x00001	/* Radar interference detected on channel */
+#define	CHANNEL_CW_INT	0x00002	/* CW interference detected on channel */
+#define	CHANNEL_BUSY	0x00004	/* Busy, occupied or overlap with adjoin chan */
+#define	CHANNEL_TURBO	0x00010	/* Turbo Channel */
+#define	CHANNEL_CCK	0x00020	/* CCK channel */
+#define	CHANNEL_OFDM	0x00040	/* OFDM channel */
+#define	CHANNEL_2GHZ	0x00080	/* 2 GHz spectrum channel. */
+#define	CHANNEL_5GHZ	0x00100	/* 5 GHz spectrum channel */
+#define	CHANNEL_PASSIVE	0x00200	/* Only passive scan allowed in the channel */
+#define	CHANNEL_DYN	0x00400	/* dynamic CCK-OFDM channel */
+#define	CHANNEL_XR	0x00800	/* XR channel */
+#define	CHANNEL_STURBO	0x02000	/* Static turbo, no 11a-only usage */
+#define	CHANNEL_HALF	0x04000 /* Half rate channel */
+#define	CHANNEL_QUARTER	0x08000 /* Quarter rate channel */
+#define	CHANNEL_HT20	0x10000	/* 11n 20MHZ channel */
+#define	CHANNEL_HT40PLUS	0x20000	/* 11n 40MHZ chan w/ ext chan above */
+#define	CHANNEL_HT40MINUS	0x40000	/* 11n 40MHZ chan w/ ext chan below */
 
 #define	CHANNEL_A	(CHANNEL_5GHZ|CHANNEL_OFDM)
 #define	CHANNEL_B	(CHANNEL_2GHZ|CHANNEL_CCK)
@@ -97,8 +98,14 @@ typedef uint16_t 	HAL_REG_DOMAIN;	/* regulatory domain code */
 #define	CHANNEL_108G	(CHANNEL_2GHZ|CHANNEL_OFDM|CHANNEL_TURBO)
 #define	CHANNEL_108A	CHANNEL_T
 #define	CHANNEL_X	(CHANNEL_5GHZ|CHANNEL_OFDM|CHANNEL_XR)
+#define	CHANNEL_G_HT20	(CHANNEL_G|CHANNEL_HT20)
+#define	CHANNEL_A_HT20	(CHANNEL_A|CHANNEL_HT20)
+#define	CHANNEL_G_HT40PLUS	(CHANNEL_G_HT20|CHANNEL_HT40PLUS)
+#define	CHANNEL_A_HT40PLUS	(CHANNEL_A_HT20|CHANNEL_HT40PLUS)
+#define	CHANNEL_A_HT40MINUS	(CHANNEL_A_HT20|CHANNEL_HT40MINUS)
 #define	CHANNEL_ALL \
-	(CHANNEL_OFDM|CHANNEL_CCK|CHANNEL_5GHZ|CHANNEL_2GHZ|CHANNEL_TURBO)
+	(CHANNEL_OFDM|CHANNEL_CCK|CHANNEL_5GHZ|CHANNEL_2GHZ| \
+	CHANNEL_TURBO|CHANNEL_HT20|CHANNEL_HT40PLUS|CHANNEL_HT40MINUS)
 #define	CHANNEL_ALL_NOTURBO 	(CHANNEL_ALL &~ CHANNEL_TURBO)
 
 #define	CHANNEL_COMPAT	(CHANNEL_ALL_NOTURBO | CHANNEL_PASSIVE)
@@ -124,6 +131,9 @@ typedef uint16_t 	HAL_REG_DOMAIN;	/* regulatory domain code */
 #define	HAL_TXDESC_VEOL		0x0020	/* mark virtual EOL */
 /* NB: this only affects frame, not any RTS/CTS */
 #define	HAL_TXDESC_DURENA	0x0040	/* enable h/w write of duration field */
+#define	HAL_TXDESC_EXT_ONLY	0x0080	/* send on ext channel only (11n) */
+#define	HAL_TXDESC_EXT_AND_CTL	0x0100	/* send on ext + ctl channels (11n) */
+#define	HAL_TXDESC_VMF		0x0200	/* virtual more frag */
 
 /* flags passed to rx descriptor setup methods */
 #define	HAL_RXDESC_INTREQ	0x0020	/* enable per-descriptor interrupt */
@@ -132,7 +142,15 @@ typedef uint16_t 	HAL_REG_DOMAIN;	/* regulatory domain code */
 #define	HAL_TXERR_XRETRY	0x01	/* excessive retries */
 #define	HAL_TXERR_FILT		0x02	/* blocked by tx filtering */
 #define	HAL_TXERR_FIFO		0x04	/* fifo underrun */
+#define	HAL_TXERR_XTXOP		0x08	/* txop exceeded */
+#define	HAL_TXERR_DESC_CFG_ERR	0x10	/* Error in 20/40 desc config */
+#define	HAL_TXERR_DATA_UNDERRUN	0x20	/* Tx buffer underrun */
+#define	HAL_TXERR_DELIM_UNDERRUN 0x40	/* Tx delimiter underrun */
 #define	HAL_TXSTAT_ALTRATE	0x80	/* alternate xmit rate used */
+
+/* bits found in ts_flags */
+#define	HAL_TX_BA		0x01	/* Block Ack seen */
+#define	HAL_TX_AGGR		0x02	/* Aggregate */
 
 /* rx error flags */
 #define	HAL_RXERR_CRC		0x01	/* CRC error on frame */
@@ -140,6 +158,16 @@ typedef uint16_t 	HAL_REG_DOMAIN;	/* regulatory domain code */
 #define	HAL_RXERR_FIFO		0x04	/* fifo overrun */
 #define	HAL_RXERR_DECRYPT	0x08	/* non-Michael decrypt error */
 #define	HAL_RXERR_MIC		0x10	/* Michael MIC decrypt error */
+
+/* bits found in rs_flags */
+#define	HAL_RX_MORE		0x01	/* more descriptors follow */
+#define	HAL_RX_MORE_AGGR	0x02	/* more frames in aggr */
+#define	HAL_RX_GI		0x04	/* full gi */
+#define	HAL_RX_2040		0x08	/* 40 Mhz */
+#define	HAL_RX_DELIM_CRC_PRE	0x10	/* crc error in delimiter pre */
+#define	HAL_RX_DELIM_CRC_POST	0x20	/* crc error in delim after */
+#define	HAL_RX_DECRYPT_BUSY	0x40	/* decrypt was too slow */
+#define	HAL_RX_DUP_FRAME	0x80	/* Dup frame rx'd on control channel */
 
 /* value found in rs_keyix to mark invalid entries */
 #define	HAL_RXKEYIX_INVALID	((uint8_t)-1)
@@ -150,7 +178,6 @@ typedef uint16_t 	HAL_REG_DOMAIN;	/* regulatory domain code */
 /* compression definitions */
 #define	HAL_COMP_BUF_MAX_SIZE	9216	/* 9k */
 #define	HAL_COMP_BUF_ALIGN_SIZE	512
-#define	HAL_DECOMP_MASK_SIZE	128
 
 #define	HAL_ANTENNA_MIN_MODE	0
 #define	HAL_ANTENNA_FIXED_A	1
@@ -219,7 +246,12 @@ typedef enum {
 	HAL_CAP_TPC_ACK		= 26,	/* ack txpower with per-packet tpc */
 	HAL_CAP_TPC_CTS		= 27,	/* cts txpower with per-packet tpc */
 	HAL_CAP_11D		= 28,	/* 11d beacon support for changing cc */
-	HAL_CAP_INTMIT		= 29	/* interference mitigation */
+	HAL_CAP_INTMIT		= 29,	/* interference mitigation */
+	HAL_CAP_RXORN_FATAL	= 30,	/* HAL_INT_RXORN treated as fatal */
+	HAL_CAP_HT		= 31,	/* hardware can support HT */
+	HAL_CAP_NUMTXCHAIN	= 32,	/* TX chains supported */
+	HAL_CAP_NUMRXCHAIN	= 33,	/* RX chains supported */
+	HAL_CAP_RXTSTAMP_PREC	= 34	/* rx desc tstamp precision (bits) */
 } HAL_CAPABILITY_TYPE;
 
 /*
@@ -389,7 +421,8 @@ typedef enum {
 	HAL_PKT_TYPE_BEACON	= 3,
 	HAL_PKT_TYPE_PROBE_RESP	= 4,
 	HAL_PKT_TYPE_CHIRP	= 5,
-	HAL_PKT_TYPE_GRP_POLL	= 6
+	HAL_PKT_TYPE_GRP_POLL	= 6,
+	HAL_PKT_TYPE_AMPDU	= 7
 } HAL_PKT_TYPE;
 
 /* Rx Filter Frame Types */
@@ -442,6 +475,8 @@ typedef enum {
 	HAL_INT_DTIMSYNC = 0x00800000,	/* Non-common mapping */
 	HAL_INT_GPIO	= 0x01000000,
 	HAL_INT_CABEND	= 0x02000000,	/* Non-common mapping */
+	HAL_INT_CST	= 0x10000000,	/* Non-common mapping */
+	HAL_INT_GTT	= 0x20000000,	/* Non-common mapping */
 	HAL_INT_FATAL	= 0x40000000,	/* Non-common mapping */
 	HAL_INT_GLOBAL	= INT_MIN,	/* Set/clear IER */
 	HAL_INT_BMISC	= HAL_INT_TIM
@@ -462,7 +497,6 @@ typedef enum {
 			| HAL_INT_SWBA
 			| HAL_INT_BMISS
 			| HAL_INT_GPIO,
-	HAL_INT_NOCARD	= -1	/* To signal the card was removed */
 } HAL_INT;
 
 typedef enum {
@@ -499,8 +533,8 @@ typedef enum {
  * Channels are specified by frequency.
  */
 typedef struct {
+	uint32_t	channelFlags;
 	uint16_t	channel;	/* setting in Mhz */
-	uint16_t	channelFlags;	/* see below */
 	uint8_t		privFlags;
 	int8_t		maxRegTxPower;	/* max regulatory tx power in dBm */
 	int8_t		maxTxPower;	/* max true tx power in 0.5 dBm */
@@ -533,16 +567,22 @@ enum {
 	HAL_MODE_XR	= 0x100,	/* XR channels */
 	HAL_MODE_11A_HALF_RATE = 0x200,	/* 11A half rate channels */
 	HAL_MODE_11A_QUARTER_RATE = 0x400,	/* 11A quarter rate channels */
-	HAL_MODE_ALL	= 0xfff
+	HAL_MODE_11NG_HT20	= 0x8000,
+	HAL_MODE_11NA_HT20	= 0x10000,
+	HAL_MODE_11NG_HT40PLUS	= 0x20000,
+	HAL_MODE_11NG_HT40MINUS	= 0x40000,
+	HAL_MODE_11NA_HT40PLUS	= 0x80000,
+	HAL_MODE_11NA_HT40MINUS	= 0x100000,
+	HAL_MODE_ALL	= 0xffffff
 };
 
 typedef struct {
 	int		rateCount;		/* NB: for proper padding */
-	uint8_t	rateCodeToIndex[32];	/* back mapping */
+	uint8_t	rateCodeToIndex[144];	/* back mapping */
 	struct {
 		uint8_t	valid;		/* valid for rate control use */
 		uint8_t	phy;		/* CCK/OFDM/XR */
-		uint16_t rateKbps;	/* transfer rate in kbs */
+		uint32_t rateKbps;	/* transfer rate in kbs */
 		uint8_t	rateCode;	/* rate for h/w descriptors */
 		/* mask for enabling short preamble in CCK rate code */
 		uint8_t	shortPreamble;
@@ -559,6 +599,45 @@ typedef struct {
 	uint32_t	rs_count;	/* number of valid entries */
 	uint8_t	rs_rates[32];		/* rates */
 } HAL_RATE_SET;
+
+/*
+ * 802.11n specific structures and enums
+ */
+typedef enum {
+	HAL_CHAINTYPE_TX	= 1,	/* Tx chain type */
+	HAL_CHAINTYPE_RX	= 2,	/* RX chain type */
+} HAL_CHAIN_TYPE;
+
+typedef struct {
+	uint_t	Tries;
+	uint_t	Rate;
+	uint_t	PktDuration;
+	uint_t	ChSel;
+	uint_t	RateFlags;
+#define	HAL_RATESERIES_RTS_CTS	0x0001	/* use rts/cts w/this series */
+#define	HAL_RATESERIES_2040	0x0002	/* use ext channel for series */
+#define	HAL_RATESERIES_HALFGI	0x0004	/* use half-gi for series */
+} HAL_11N_RATE_SERIES;
+
+typedef enum {
+	HAL_HT_MACMODE_20	= 0,	/* 20 MHz operation */
+	HAL_HT_MACMODE_2040	= 1	/* 20/40 MHz operation */
+} HAL_HT_MACMODE;
+
+typedef enum {
+	HAL_HT_PHYMODE_20	= 0,	/* 20 MHz operation */
+	HAL_HT_PHYMODE_2040	= 1	/* 20/40 MHz operation */
+} HAL_HT_PHYMODE;
+
+typedef enum {
+	HAL_HT_EXTPROTSPACING_20 = 0,	/* 20 MHz spacing */
+	HAL_HT_EXTPROTSPACING_25 = 1	/* 25 MHz spacing */
+} HAL_HT_EXTPROTSPACING;
+
+typedef enum {
+	HAL_RX_CLEAR_CTL_LOW	= 1,	/* force control chan to appear busy */
+	HAL_RX_CLEAR_EXT_LOW	= 2	/* force ext chan to appear busy */
+} HAL_HT_RXCLEAR;
 
 /*
  * Antenna switch control.  By default antenna selection
@@ -585,6 +664,7 @@ typedef struct {
 	uint16_t	kv_len;		/* length in bits */
 	uint8_t	kv_val[16];		/* enough for 128-bit keys */
 	uint8_t	kv_mic[8];		/* TKIP MIC key */
+	uint8_t	kv_txmic[8];		/* TKIP TX MIC key (optional) */
 } HAL_KEYVAL;
 
 typedef enum {
@@ -634,6 +714,10 @@ typedef struct {
 	uint32_t	bt_nextatim;		/* next ATIM in TU */
 	uint32_t	bt_nextdba;		/* next DBA in 1/8th TU */
 	uint32_t	bt_nextswba;		/* next SWBA in 1/8th TU */
+	uint32_t	bt_flags;		/* timer enables */
+#define	HAL_BEACON_TBTT_EN	0x00000001
+#define	HAL_BEACON_DBA_EN	0x00000002
+#define	HAL_BEACON_SWBA_EN	0x00000004
 } HAL_BEACON_TIMERS;
 
 /*
@@ -665,6 +749,16 @@ struct ath_tx_status {
 	uint8_t		ts_longretry;	/* # long retries */
 	uint8_t		ts_virtcol;	/* virtual collision count */
 	uint8_t		ts_antenna;	/* antenna information */
+	uint8_t		ts_finaltsi;	/* final transmit series index */
+	/* AH_SUPPORT_AR5416 */		/* 802.11n status */
+	uint8_t		ts_flags;	/* misc flags */
+	int8_t		ts_rssi_ctl[3];	/* tx ack RSSI [ctl, chain 0-2] */
+	int8_t		ts_rssi_ext[3];	/* tx ack RSSI [ext, chain 0-2] */
+	uint32_t	ts_ba_low;	/* blockack bitmap low */
+	uint32_t	ts_ba_high;	/* blockack bitmap high */
+	uint32_t	ts_evm0;	/* evm bytes */
+	uint32_t	ts_evm1;
+	uint32_t	ts_evm2;
 };
 
 
@@ -681,7 +775,9 @@ struct ath_tx_status {
  * for some errors (e.g. a decryption error), it may be meaningful.
  *
  * Note that the receive timestamp is expanded using the TSF to
- * a full 16 bits (regardless of what the h/w provides directly).
+ * at least 15 bits (regardless of what the h/w provides directly).
+ * Newer hardware supports a full 32-bits; use HAL_CAP_32TSTAMP to
+ * find out if the hardware is capable.
  *
  * rx_rssi is in units of dbm above the noise floor.  This value
  * is measured during the preamble and PLCP; i.e. with the initial
@@ -690,14 +786,24 @@ struct ath_tx_status {
  */
 struct ath_rx_status {
 	uint16_t	rs_datalen;	/* rx frame length */
-	uint16_t	rs_tstamp;	/* h/w assigned timestamp */
 	uint8_t		rs_status;	/* rx status, 0 => recv ok */
 	uint8_t		rs_phyerr;	/* phy error code */
-	int8_t		rs_rssi;	/* rx frame RSSI */
+	int8_t		rs_rssi;	/* rx frame RSSI (xombined for 11n) */
 	uint8_t		rs_keyix;	/* key cache index */
 	uint8_t		rs_rate;	/* h/w receive rate index */
-	uint8_t		rs_antenna;	/* antenna information */
 	uint8_t		rs_more;	/* see HAL_RXERR_XXX definition */
+	uint32_t	rs_tstamp;	/* h/w assigned timestamp */
+	uint32_t	rs_antenna;	/* antenna information */
+	/* AH_SUPPORT_AR5416 */		/* 802.11n status */
+	int8_t		rs_rssi_ctl[3];	/* rx frame RSSI [ctl, chain 0-2] */
+	int8_t		rs_rssi_ext[3];	/* rx frame RSSI [ext, chain 0-2] */
+	uint8_t		rs_isaggr;	/* is part of the aggregate */
+	uint8_t		rs_moreaggr;	/* more frames in aggr to follow */
+	uint8_t		rs_num_delims;	/* number of delims in aggr */
+	uint8_t		rs_flags;	/* misc flags */
+	uint32_t	rs_evm0;	/* evm bytes */
+	uint32_t	rs_evm1;
+	uint32_t	rs_evm2;
 };
 
 /*
@@ -708,6 +814,9 @@ struct ath_rx_status {
  * to complete the work.  Status for completed frames is returned
  * in a device-independent format.
  */
+/* AH_SUPPORT_AR5416 */
+#define	HAL_DESC_HW_SIZE	20
+
 #pragma pack(1)
 struct ath_desc {
 	/*
@@ -719,17 +828,14 @@ struct ath_desc {
 	uint32_t	ds_data;	/* phys address of data buffer */
 	uint32_t	ds_ctl0;	/* opaque DMA control 0 */
 	uint32_t	ds_ctl1;	/* opaque DMA control 1 */
-	uint32_t	ds_hw[4];	/* opaque h/w region */
-	/*
-	 * The remaining definitions are managed by software;
-	 * these are valid only after the rx/tx process descriptor
-	 * methods return a non-EINPROGRESS  code.
-	 */
+	uint32_t	ds_hw[HAL_DESC_HW_SIZE]; /* opaque h/w region */
+};
+
+struct ath_desc_status {
 	union {
 		struct ath_tx_status tx; /* xmit status */
 		struct ath_rx_status rx; /* recv status */
 	} ds_us;
-	void		*ds_vdata;	  /* virtual addr of data buffer */
 };
 #pragma pack()
 
@@ -762,8 +868,6 @@ struct ath_hal {
 	/* NB: when only one radio is present the rev is in 5Ghz */
 	uint16_t	ah_analog5GhzRev; /* 5GHz radio revision */
 	uint16_t	ah_analog2GhzRev; /* 2GHz radio revision */
-	/* decomp mask array */
-	uint8_t		ah_decompMask[HAL_DECOMP_MASK_SIZE];
 
 	const HAL_RATE_TABLE *(*ah_getRateTable)(struct ath_hal *,
 				uint32_t mode);
@@ -780,12 +884,7 @@ struct ath_hal {
 				HAL_BOOL *);
 	HAL_BOOL  (*ah_setTxPowerLimit)(struct ath_hal *, uint32_t);
 
-	void	  (*ah_arEnable)(struct ath_hal *);
-	void	  (*ah_arDisable)(struct ath_hal *);
-	void	  (*ah_arReset)(struct ath_hal *);
-	HAL_BOOL  (*ah_radarHaveEvent)(struct ath_hal *);
-	HAL_BOOL  (*ah_processDfs)(struct ath_hal *, HAL_CHANNEL *);
-	uint32_t  (*ah_dfsNolCheck)(struct ath_hal *, HAL_CHANNEL *, uint32_t);
+	/* DFS support */
 	HAL_BOOL  (*ah_radarWait)(struct ath_hal *, HAL_CHANNEL *);
 
 	/* Transmit functions */
@@ -820,7 +919,8 @@ struct ath_hal {
 	HAL_BOOL  (*ah_fillTxDesc) (struct ath_hal *, struct ath_desc *,
 				uint32_t segLen, HAL_BOOL firstSeg,
 				HAL_BOOL lastSeg, const struct ath_desc *);
-	HAL_STATUS (*ah_procTxDesc) (struct ath_hal *, struct ath_desc *);
+	HAL_STATUS (*ah_procTxDesc)(struct ath_hal *, struct ath_desc *,
+				struct ath_tx_status *);
 	void	   (*ah_getTxIntrQueue)(struct ath_hal *, uint32_t *);
 	void	   (*ah_reqTxIntrDesc)(struct ath_hal *, struct ath_desc *);
 
@@ -843,7 +943,7 @@ struct ath_hal {
 				uint32_t size, uint32_t flags);
 	HAL_STATUS (*ah_procRxDesc) (struct ath_hal *, struct ath_desc *,
 				uint32_t phyAddr, struct ath_desc *next,
-				uint64_t tsf);
+				uint64_t tsf, struct ath_rx_status *);
 	void	  (*ah_rxMonitor) (struct ath_hal *,
 				const HAL_NODE_STATS *, HAL_CHANNEL *);
 	void	  (*ah_procMibEvent) (struct ath_hal *,
@@ -884,6 +984,8 @@ struct ath_hal {
 	void	  (*ah_setDefAntenna) (struct ath_hal *, uint32_t);
 	HAL_ANT_SETTING (*ah_getAntennaSwitch) (struct ath_hal *);
 	HAL_BOOL  (*ah_setAntennaSwitch) (struct ath_hal *, HAL_ANT_SETTING);
+	HAL_BOOL  (*ah_setSifsTime) (struct ath_hal *, uint32_t);
+	uint32_t  (*ah_getSifsTime) (struct ath_hal *);
 	HAL_BOOL  (*ah_setSlotTime) (struct ath_hal *, uint32_t);
 	uint32_t  (*ah_getSlotTime) (struct ath_hal *);
 	HAL_BOOL  (*ah_setAckTimeout) (struct ath_hal *, uint32_t);
@@ -971,7 +1073,7 @@ extern  HAL_BOOL ath_hal_setvendor(struct ath_hal *, uint32_t);
 extern	HAL_BOOL  ath_hal_init_channels(struct ath_hal *,
 		HAL_CHANNEL *chans, uint32_t maxchans, uint32_t *nchans,
 		uint8_t *regclassids, uint32_t maxregids, uint32_t *nregids,
-		HAL_CTRY_CODE cc, uint16_t modeSelect,
+		HAL_CTRY_CODE cc, uint_t modeSelect,
 		HAL_BOOL enableOutdoor, HAL_BOOL enableExtendedChannels);
 
 /*
@@ -986,12 +1088,6 @@ extern void ath_hal_process_noisefloor(struct ath_hal *ah);
 extern	uint32_t  ath_hal_getwirelessmodes(struct ath_hal *, HAL_CTRY_CODE);
 
 /*
- * Return rate table for specified mode (11a, 11b, 11g, etc).
- */
-extern	const HAL_RATE_TABLE *  ath_hal_getratetable(struct ath_hal *,
-		uint32_t mode);
-
-/*
  * Calculate the transmit duration of a frame.
  */
 extern uint16_t  ath_hal_computetxtime(struct ath_hal *,
@@ -1002,6 +1098,11 @@ extern uint16_t  ath_hal_computetxtime(struct ath_hal *,
  * Return if device is public safety.
  */
 extern HAL_BOOL ath_hal_ispublicsafetysku(struct ath_hal *);
+
+/*
+ * Return if device is operating in 900 MHz band.
+ */
+extern HAL_BOOL ath_hal_isgsmsku(struct ath_hal *);
 
 /*
  * Convert between IEEE channel number and channel frequency
@@ -1029,7 +1130,8 @@ extern	const char *ath_hal_buildopts[];
 #define	ATH_HAL_GETCAPABILITY(_ah, _cap, _param, _result) \
 	((*(_ah)->ah_getCapability)((_ah), (_cap), (_param), (_result)))
 #define	ATH_HAL_SETCAPABILITY(_ah, _type, _cap, _param, _status) \
-	((*ah_setCapability)((_ah), (_type), (_cap), (_param), (_status)))
+	((*(_ah)->ah_setCapability)((_ah), (_type), (_cap), (_param), \
+	(_status)))
 #define	ATH_HAL_GETREGDOMAIN(_ah, _prd) \
 	ATH_HAL_GETCAPABILITY(_ah, HAL_CAP_REG_DMN, 0, (_prd))
 #define	ATH_HAL_GETCOUNTRYCODE(_ah, _pcc) \
@@ -1126,8 +1228,12 @@ extern	const char *ath_hal_buildopts[];
 	((*(_ah)->ah_resetTxQueue)((_ah), (_q)))
 #define	ATH_HAL_RELEASETXQUEUE(_ah, _q) \
 	((*(_ah)->ah_releaseTxQueue)((_ah), (_q)))
-#define	ATH_HAL_HASVEOL \
-	((*(_ah)->ah_hasVEOL)((_ah)))
+#define	ATH_HAL_GETTXQUEUEPROPS(_ah, _q, _qi) \
+	((*(_ah)->ah_getTxQueueProps)((_ah), (_q), (_qi)))
+#define	ATH_HAL_SETTXQUEUEPROPS(_ah, _q, _qi) \
+	((*(_ah)->ah_setTxQueueProps)((_ah), (_q), (_qi)))
+#define	ATH_HAL_HASVEOL(_ah) \
+	(ATH_HAL_GETCAPABILITY(_ah, HAL_CAP_VEOL, 0, NULL) == HAL_OK)
 #define	ATH_HAL_GETRFGAIN(_ah) \
 	((*(_ah)->ah_getRfGain)((_ah)))
 #define	ATH_HAL_RXMONITOR(_ah, _arg, _chan) \
@@ -1140,8 +1246,8 @@ extern	const char *ath_hal_buildopts[];
 		(_flen), (_hlen), (_rate), (_antmode)))
 #define	ATH_HAL_SETUPRXDESC(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
-#define	ATH_HAL_RXPROCDESC(_ah, _ds, _dspa, _dsnext) \
-	((*(_ah)->ah_procRxDesc)((_ah), (_ds), (_dspa), (_dsnext), 0))
+#define	ATH_HAL_RXPROCDESC(_ah, _ds, _dspa, _dsnext, _rs) \
+	((*(_ah)->ah_procRxDesc)((_ah), (_ds), (_dspa), (_dsnext), 0, (_rs)))
 #define	ATH_HAL_SETUPTXDESC(_ah, _ds, _plen, _hlen, _atype, _txpow, \
 		_txr0, _txtr0, _keyix, _ant, _flags, \
 		_rtsrate, _rtsdura) \
@@ -1155,12 +1261,16 @@ extern	const char *ath_hal_buildopts[];
 #define	ATH_HAL_FILLTXDESC(_ah, _ds, _l, _first, _last, _ath_desc) \
 	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last), \
 	(_ath_desc)))
-#define	ATH_HAL_TXPROCDESC(_ah, _ds) \
-	((*(_ah)->ah_procTxDesc)((_ah), (_ds)))
+#define	ATH_HAL_TXPROCDESC(_ah, _ds, _ts) \
+	((*(_ah)->ah_procTxDesc)((_ah), (_ds), (_ts)))
 #define	ATH_HAL_CIPHERSUPPORTED(_ah, _cipher) \
 	(ATH_HAL_GETCAPABILITY(_ah, HAL_CAP_CIPHER, _cipher, NULL) == HAL_OK)
-#define	ATH_HAL_TKIPSPLIT(_ah) \
+#define	ATH_HAL_HASTKIPSPLIT(_ah) \
 	(ATH_HAL_GETCAPABILITY(_ah, HAL_CAP_TKIP_SPLIT, 0, NULL) == HAL_OK)
+#define	ATH_HAL_GETTKIPSPLIT(_ah) \
+	(ATH_HAL_GETCAPABILITY(_ah, HAL_CAP_TKIP_SPLIT, 1, NULL) == HAL_OK)
+#define	ATH_HAL_SETTKIPSPLIT(_ah, _v) \
+	(ATH_HAL_SETCAPABILITY(_ah, HAL_CAP_TKIP_SPLIT, 1, _v, NULL))
 #define	ATH_HAL_HASRFSILENT(ah) \
 	(ATH_HAL_GETCAPABILITY(_ah, HAL_CAP_RFSILENT, 0, NULL) == HAL_OK)
 #define	ATH_HAL_GETRFKILL(_ah) \
