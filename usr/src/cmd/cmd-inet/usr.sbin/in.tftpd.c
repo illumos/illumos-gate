@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Trivial file transfer protocol server.  A top level process runs in
@@ -210,7 +208,7 @@ main(int argc, char **argv)
 	(void) priv_set(PRIV_SET, PRIV_EFFECTIVE, NULL);
 	(void) priv_set(PRIV_SET, PRIV_INHERITABLE, NULL);
 
-	while ((c = getopt(argc, argv, "dspS")) != EOF)
+	while ((c = getopt(argc, argv, "dspST:")) != EOF)
 		switch (c) {
 		case 'd':		/* enable debug */
 			debug++;
@@ -224,11 +222,22 @@ main(int argc, char **argv)
 		case 'S':
 			standalone = 1;
 			continue;
+		case 'T':
+			rexmtval = atoi(optarg);
+			if (rexmtval <= 0 || rexmtval > MAX_TIMEOUT) {
+				(void) fprintf(stderr,
+				    "%s: Invalid retransmission "
+				    "timeout value: %s\n", argv[0], optarg);
+				exit(1);
+			}
+			maxtimeout = 5 * rexmtval;
+			continue;
 		case '?':
 		default:
 usage:
 			(void) fprintf(stderr,
-			    "usage:  %s [-spd] [home-directory]\n", argv[0]);
+			    "usage: %s [-T rexmtval] [-spd] [home-directory]\n",
+			    argv[0]);
 			for (; optind < argc; optind++)
 				syslog(LOG_ERR, "bad argument %s",
 				    argv[optind]);
