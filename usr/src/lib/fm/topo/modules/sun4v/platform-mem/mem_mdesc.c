@@ -477,6 +477,7 @@ mem_mdesc_fini(topo_mod_t *mod, md_mem_info_t *mem)
 		next = dm->dm_next;
 		topo_mod_strfree(mod, dm->dm_label);
 		topo_mod_strfree(mod, dm->dm_serid);
+		topo_mod_strfree(mod, dm->dm_part);
 		topo_mod_free(mod, dm, sizeof (mem_dimm_map_t));
 	}
 	for (bm = mem->mem_bank; bm != NULL; bm = cm) {
@@ -487,7 +488,7 @@ mem_mdesc_fini(topo_mod_t *mod, md_mem_info_t *mem)
 		hm = gm->mg_next;
 		topo_mod_free(mod, gm, sizeof (mem_grp_t));
 	}
-	for (sm = mem->mem_seg; dm != NULL; sm = snext) {
+	for (sm = mem->mem_seg; sm != NULL; sm = snext) {
 		snext = sm->sm_next;
 		topo_mod_free(mod, sm, sizeof (mem_seg_map_t));
 	}
