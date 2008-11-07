@@ -2404,7 +2404,8 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 	int release_all;
 	lwpid_t lwpid;
 
-	if ((mtype & LOCK_ERRORCHECK) && !mutex_held(mp))
+	if ((mtype & (LOCK_ERRORCHECK | LOCK_ROBUST)) &&
+	    !mutex_held(mp))
 		return (EPERM);
 
 	if (self->ul_error_detection && !mutex_held(mp))
@@ -2421,7 +2422,7 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 
 	if (!retain_robust_flags && !(mtype & LOCK_PRIO_INHERIT) &&
 	    (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED))) {
-		ASSERT(mp->mutex_type & LOCK_ROBUST);
+		ASSERT(mtype & LOCK_ROBUST);
 		mp->mutex_flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
 		mp->mutex_flag |= LOCK_NOTRECOVERABLE;
 	}
@@ -2797,6 +2798,7 @@ mutex_destroy(mutex_t *mp)
 }
 
 #pragma weak pthread_mutex_consistent_np = mutex_consistent
+#pragma weak pthread_mutex_consistent = mutex_consistent
 int
 mutex_consistent(mutex_t *mp)
 {
@@ -3464,6 +3466,10 @@ __cond_wait(cond_t *cvp, mutex_t *mp)
 	uberdata_t *udp = self->ul_uberdata;
 	uberflags_t *gflags;
 
+	if ((mp->mutex_type & (LOCK_ERRORCHECK | LOCK_ROBUST)) &&
+	    !mutex_held(mp))
+		return (EPERM);
+
 	/*
 	 * Optimize the common case of USYNC_THREAD plus
 	 * no error detection, no lock statistics, and no event tracing.
@@ -3517,6 +3523,10 @@ __cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 	clockid_t clock_id = cvp->cond_clockid;
 	timespec_t reltime;
 	int error;
+
+	if ((mp->mutex_type & (LOCK_ERRORCHECK | LOCK_ROBUST)) &&
+	    !mutex_held(mp))
+		return (EPERM);
 
 	if (clock_id != CLOCK_REALTIME && clock_id != CLOCK_HIGHRES)
 		clock_id = CLOCK_REALTIME;
@@ -3575,6 +3585,10 @@ int
 __cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 {
 	timespec_t tslocal = *reltime;
+
+	if ((mp->mutex_type & (LOCK_ERRORCHECK | LOCK_ROBUST)) &&
+	    !mutex_held(mp))
+		return (EPERM);
 
 	return (cond_wait_common(cvp, mp, &tslocal));
 }

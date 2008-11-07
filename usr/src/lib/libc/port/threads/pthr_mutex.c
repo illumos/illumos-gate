@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <pthread.h>
@@ -45,7 +43,7 @@ pthread_mutexattr_init(pthread_mutexattr_t *attr)
 	ap->pshared = DEFAULT_TYPE;
 	ap->type = PTHREAD_MUTEX_DEFAULT;
 	ap->protocol = PTHREAD_PRIO_NONE;
-	ap->robustness = PTHREAD_MUTEX_STALL_NP;
+	ap->robustness = PTHREAD_MUTEX_STALLED;
 	attr->__pthread_mutexattrp = ap;
 	return (0);
 }
@@ -167,27 +165,29 @@ pthread_mutexattr_getprotocol(const pthread_mutexattr_t *attr, int *protocol)
 }
 
 /*
- * pthread_mutexattr_setrobust_np: sets the robustness attribute
- * to PTHREAD_MUTEX_ROBUST_NP or PTHREAD_MUTEX_STALL_NP.
+ * pthread_mutexattr_setrobust: set the mutex robust attribute.
+ * pthread_mutexattr_setrobust_np: the historical name.
  */
+#pragma weak pthread_mutexattr_setrobust_np = pthread_mutexattr_setrobust
 int
-pthread_mutexattr_setrobust_np(pthread_mutexattr_t *attr, int robust)
+pthread_mutexattr_setrobust(pthread_mutexattr_t *attr, int robust)
 {
 	mattr_t	*ap;
 
 	if (attr == NULL || (ap = attr->__pthread_mutexattrp) == NULL ||
-	    (robust != PTHREAD_MUTEX_ROBUST_NP &&
-	    robust != PTHREAD_MUTEX_STALL_NP))
+	    (robust != PTHREAD_MUTEX_ROBUST && robust != PTHREAD_MUTEX_STALLED))
 		return (EINVAL);
 	ap->robustness = robust;
 	return (0);
 }
 
 /*
- * pthread_mutexattr_getrobust_np: gets the robustness attribute.
+ * pthread_mutexattr_getrobust: get the mutex robust attribute.
+ * pthread_mutexattr_getrobust_np: the historical name.
  */
+#pragma weak pthread_mutexattr_getrobust_np = pthread_mutexattr_getrobust
 int
-pthread_mutexattr_getrobust_np(const pthread_mutexattr_t *attr, int *robust)
+pthread_mutexattr_getrobust(const pthread_mutexattr_t *attr, int *robust)
 {
 	mattr_t	*ap;
 
@@ -223,7 +223,7 @@ pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
 			prioceiling = ap->prioceiling;
 	} else {
 		type = DEFAULT_TYPE | PTHREAD_MUTEX_DEFAULT |
-		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALL_NP;
+		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALLED;
 	}
 
 	return (mutex_init((mutex_t *)mutex, type, &prioceiling));
@@ -248,11 +248,11 @@ pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int ceil, int *oceil)
 	    ceil < pccp->pcc_primin || ceil > pccp->pcc_primax)
 		return (EINVAL);
 	error = mutex_lock_internal(mp, NULL, MUTEX_LOCK | MUTEX_NOCEIL);
-	if (error == 0) {
+	if (error == 0 || error == EOWNERDEAD || error == ELOCKUNMAPPED) {
 		if (oceil)
 			*oceil = mp->mutex_ceiling;
 		mp->mutex_ceiling = ceil;
-		error = mutex_unlock_internal(mp, 0);
+		error = mutex_unlock_internal(mp, 1);
 	}
 	return (error);
 }

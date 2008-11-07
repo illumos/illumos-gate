@@ -88,14 +88,17 @@ extern "C" {
 #define	PTHREAD_PRIO_PROTECT		0x20
 
 /*
- * Mutex robustness attribute values. The robustness attribute is a
- * Solaris specific extension to support robust mutexes. Note the _NP suffix
- * to indicate these are not part of the current POSIX spec (POSIX 1003.1 1996),
- * but are platform specific non-portable extensions. Keep these in synch
- * with sys/synch.h lock types.
+ * Mutex robust attribute values.
+ * Keep these in synch with sys/synch.h lock types.
  */
-#define	PTHREAD_MUTEX_STALL_NP		0x0
-#define	PTHREAD_MUTEX_ROBUST_NP		0x40
+#define	PTHREAD_MUTEX_STALLED		0x0
+#define	PTHREAD_MUTEX_ROBUST		0x40
+/*
+ * Historical solaris-specific names,
+ * from before pthread_mutexattr_getrobust() became standardized
+ */
+#define	PTHREAD_MUTEX_STALL_NP		PTHREAD_MUTEX_STALLED
+#define	PTHREAD_MUTEX_ROBUST_NP		PTHREAD_MUTEX_ROBUST
 
 /*
  * macros - default initializers defined as in synch.h
@@ -257,12 +260,12 @@ extern int pthread_mutexattr_getprotocol(
 extern int pthread_mutexattr_setprioceiling(pthread_mutexattr_t *, int);
 extern int pthread_mutexattr_getprioceiling(
 	const pthread_mutexattr_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);
-extern int pthread_mutexattr_setrobust_np(pthread_mutexattr_t *, int);
-extern int pthread_mutexattr_getrobust_np(
+extern int pthread_mutexattr_setrobust(pthread_mutexattr_t *, int);
+extern int pthread_mutexattr_getrobust(
 	const pthread_mutexattr_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);
 extern int pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD,
 	const pthread_mutexattr_t *_RESTRICT_KYWD);
-extern int pthread_mutex_consistent_np(pthread_mutex_t *);
+extern int pthread_mutex_consistent(pthread_mutex_t *);
 extern int pthread_mutex_destroy(pthread_mutex_t *);
 extern int pthread_mutex_lock(pthread_mutex_t *);
 extern int pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD,
@@ -338,6 +341,12 @@ extern int pthread_barrier_init(pthread_barrier_t *_RESTRICT_KYWD,
 extern int pthread_barrier_destroy(pthread_barrier_t *);
 extern int pthread_barrier_wait(pthread_barrier_t *);
 
+/* Historical names -- present only for binary compatibility */
+extern int pthread_mutex_consistent_np(pthread_mutex_t *);
+extern int pthread_mutexattr_setrobust_np(pthread_mutexattr_t *, int);
+extern int pthread_mutexattr_getrobust_np(
+	const pthread_mutexattr_t *_RESTRICT_KYWD, int *_RESTRICT_KYWD);
+
 #else	/* __STDC__ */
 
 /*
@@ -392,10 +401,10 @@ extern int pthread_mutexattr_setprotocol();
 extern int pthread_mutexattr_getprotocol();
 extern int pthread_mutexattr_setprioceiling();
 extern int pthread_mutexattr_getprioceiling();
-extern int pthread_mutexattr_setrobust_np();
-extern int pthread_mutexattr_getrobust_np();
+extern int pthread_mutexattr_setrobust();
+extern int pthread_mutexattr_getrobust();
 extern int pthread_mutex_init();
-extern int pthread_mutex_consistent_np();
+extern int pthread_mutex_consistent();
 extern int pthread_mutex_destroy();
 extern int pthread_mutex_lock();
 extern int pthread_mutex_timedlock();
@@ -446,6 +455,11 @@ extern int pthread_barrierattr_getpshared();
 extern int pthread_barrier_init();
 extern int pthread_barrier_destroy();
 extern int pthread_barrier_wait();
+
+/* Historical names -- present only for binary compatibility */
+extern int pthread_mutex_consistent_np();
+extern int pthread_mutexattr_setrobust_np();
+extern int pthread_mutexattr_getrobust_np();
 
 #endif	/* __STDC__ */
 

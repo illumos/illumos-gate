@@ -107,6 +107,9 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	posix_spawnattr_getsigignore_np;
 	posix_spawnattr_setsigignore_np;
 	pthread_key_create_once_np;
+	pthread_mutexattr_getrobust;
+	pthread_mutexattr_setrobust;
+	pthread_mutex_consistent;
 	sched_getparam;
 	sched_get_priority_max;
 	sched_get_priority_min;
@@ -409,9 +412,9 @@ SUNW_1.22 {		# SunOS 5.10 (Solaris 10)
 	pthread_barrier_wait;
 	pthread_condattr_getclock;
 	pthread_condattr_setclock;
-	pthread_mutexattr_getrobust_np;
-	pthread_mutexattr_setrobust_np;
-	pthread_mutex_consistent_np;
+	pthread_mutexattr_getrobust_np =	NODYNSORT;
+	pthread_mutexattr_setrobust_np =	NODYNSORT;
+	pthread_mutex_consistent_np =		NODYNSORT;
 	pthread_mutex_reltimedlock_np;
 	pthread_mutex_timedlock;
 	pthread_rwlock_reltimedrdlock_np;
