@@ -588,6 +588,7 @@ f none usr/lib/help/profiles/locale/C/RtNameServiceSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetAutoconf.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetIPsec.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtNetObservability.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetWifiMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetWifiSecure.html 444 root bin

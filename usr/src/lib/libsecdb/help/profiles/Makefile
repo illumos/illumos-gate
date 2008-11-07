@@ -59,6 +59,7 @@ HTMLENTS = \
 	RtNetAutoconf.html \
 	RtNetIPsec.html \
 	RtNetMngmnt.html \
+	RtNetObservability.html \
 	RtNetSecure.html \
 	RtNetWifiMngmnt.html \
 	RtNetWifiSecure.html \
