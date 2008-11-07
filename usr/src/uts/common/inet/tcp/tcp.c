@@ -4195,12 +4195,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 	ASSERT((connp->conn_fanout != NULL && connp->conn_ref >= 4) ||
 	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
 
-	/* End point has closed this TCP, no need to send up T_ordrel_ind. */
-	if (tcp->tcp_ordrel_mp != NULL) {
-		freeb(tcp->tcp_ordrel_mp);
-		tcp->tcp_ordrel_mp = NULL;
-	}
-
 	mutex_enter(&tcp->tcp_eager_lock);
 	if (tcp->tcp_conn_req_cnt_q0 != 0 || tcp->tcp_conn_req_cnt_q != 0) {
 		/* Cleanup for listener */
