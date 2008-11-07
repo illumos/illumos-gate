@@ -1350,10 +1350,10 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 		    "si_mop_commands sending up completed satapkt: %x",
 		    satapkt);
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_COMPLETED);
 
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
 		CLEAR_BIT(finished_tags, tmpslot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_COMPLETED);
 	}
 
 	ASSERT(finished_tags == 0);
@@ -1426,10 +1426,9 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 			    si_read_log_ext(si_ctlp, si_portp, port);
 		}
 
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_DEV_ERROR);
-
 		CLEAR_BIT(failed_tags, tmpslot);
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_DEV_ERROR);
 	}
 
 	ASSERT(failed_tags == 0);
@@ -1448,10 +1447,9 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		    "spkt up with PKT_TIMEOUT: %x",
 		    satapkt);
 
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_TIMEOUT);
-
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
 		CLEAR_BIT(timedout_tags, tmpslot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_TIMEOUT);
 	}
 
 	ASSERT(timedout_tags == 0);
@@ -1472,10 +1470,10 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		    SATA_DTYPE_ATAPICD) {
 			si_set_sense_data(satapkt, SATA_PKT_ABORTED);
 		}
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_ABORTED);
 
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
 		CLEAR_BIT(aborting_tags, tmpslot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_ABORTED);
 
 	}
 
@@ -1493,10 +1491,10 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		    "si_mop_commands sending PKT_RESET for "
 		    "reset spkt: %x",
 		    satapkt);
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_RESET);
 
 		CLEAR_BIT(reset_tags, tmpslot);
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_RESET);
 	}
 
 	ASSERT(reset_tags == 0);
@@ -1513,10 +1511,10 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 		    "si_mop_commands sending PKT_BUSY for "
 		    "retry spkt: %x",
 		    satapkt);
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_BUSY);
 
 		CLEAR_BIT(unfinished_tags, tmpslot);
 		CLEAR_BIT(si_portp->siport_pending_tags, tmpslot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_BUSY);
 	}
 
 	ASSERT(unfinished_tags == 0);
@@ -3640,10 +3638,9 @@ si_intr_command_complete(
 		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
 			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
 
-		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_COMPLETED);
-
 		CLEAR_BIT(si_portp->siport_pending_tags, finished_slot);
 		CLEAR_BIT(finished_tags, finished_slot);
+		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_COMPLETED);
 	}
 
 	SIDBG2(SIDBG_PKTCOMP, si_ctlp,
