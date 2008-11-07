@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <grp.h>
@@ -43,10 +41,10 @@ putgrent(const struct group *grp, FILE *fp)
 		return (1);
 	}
 
-	if (fprintf(fp, "%s:%s:%d:",
-		    grp->gr_name != NULL ? grp->gr_name : "",
-		    grp->gr_passwd != NULL ? grp->gr_passwd : "",
-		    grp->gr_gid) == EOF)
+	if (fprintf(fp, "%s:%s:%u:",
+	    grp->gr_name != NULL ? grp->gr_name : "",
+	    grp->gr_passwd != NULL ? grp->gr_passwd : "",
+	    grp->gr_gid) == EOF)
 		rc = 1;
 
 	mem = grp ->gr_mem;
@@ -89,7 +87,7 @@ dogetgr(const char **list)
 			 * If the argument passed is not numeric, then
 			 * we take it as the group name and proceed.
 			 */
-			gid = strtol(*list, &ptr, 10);
+			gid = strtoul(*list, &ptr, 10);
 			if (!(*ptr == '\0' && errno == 0) ||
 			    ((grp = getgrgid(gid)) == NULL)) {
 				grp = getgrnam(*list);

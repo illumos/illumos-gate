@@ -124,7 +124,7 @@ idmap_free(void *ptr)
 }
 
 
-#define	MIN_STACK_NEEDS	16384
+#define	MIN_STACK_NEEDS	65536
 
 /*
  * Create and Initialize idmap client handle for rpc/doors
@@ -163,16 +163,19 @@ idmap_init(idmap_handle_t **handle)
 			/* stack grows down */
 			sendsz = ((char *)&sendsz - (char *)st.ss_sp);
 
-		/*
-		 * Take much of the stack space left, divided by two,
-		 * but leave enough for our needs (just a guess!), and
-		 * if we can't, then roll the dice.
-		 */
-		sendsz = RNDUP(sendsz / 2);
-		if (sendsz < MIN_STACK_NEEDS)
+		if (sendsz <= MIN_STACK_NEEDS) {
 			sendsz = 0;	/* RPC call may fail */
-		else if (sendsz > IDMAP_MAX_DOOR_RPC)
-			sendsz = IDMAP_MAX_DOOR_RPC;
+		} else {
+			/* Leave 64Kb (just a guess) for our needs */
+			sendsz -= MIN_STACK_NEEDS;
+
+			/* Divide the stack space left by two */
+			sendsz = RNDUP(sendsz / 2);
+
+			/* Limit sendsz to 256KB */
+			if (sendsz > IDMAP_MAX_DOOR_RPC)
+				sendsz = IDMAP_MAX_DOOR_RPC;
+		}
 	}
 
 	clnt = clnt_door_create(IDMAP_PROG, IDMAP_V1, sendsz);

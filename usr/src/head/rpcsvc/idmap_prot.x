@@ -148,11 +148,15 @@ const IDMAP_REQ_FLG_NO_NAMESERVICE	= 0x00000004;
 
 /* Request how a mapping was formed */
 const IDMAP_REQ_FLG_MAPPING_INFO	= 0x00000008;
+
 /*
  * This libidmap only flag is defined in idmap.h
  * It enables use of the libidmap cache
  * const IDMAP_REQ_FLG_USE_CACHE	= 0x00000010;
  */
+
+/* Request mapping for well-known or local SIDs only */
+const IDMAP_REQ_FLG_WK_OR_LOCAL_SIDS_ONLY	= 0x00000020;
 
 
 /*

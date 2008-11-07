@@ -19,10 +19,8 @@
  * CDDL HEADER END
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +58,7 @@ dogetpw(const char **list)
 			 * If the argument passed is not numeric, then
 			 * we take it as the user name and proceed.
 			 */
-			uid = strtol(*list, &ptr, 10);
+			uid = strtoul(*list, &ptr, 10);
 			if (!(*ptr == '\0' && errno == 0) ||
 			    ((pwp = getpwuid(uid)) == NULL)) {
 				pwp = getpwnam(*list);

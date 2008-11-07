@@ -69,6 +69,8 @@ f none usr/lib/extendedFILE.so.1 755 root bin
 f none usr/lib/lib.b 444 root bin
 s none usr/lib/libadm.so=../../lib/libadm.so.1
 s none usr/lib/libadm.so.1=../../lib/libadm.so.1
+f none usr/lib/libadutils.so.1 755 root bin
+s none usr/lib/libadutils.so=./libadutils.so.1
 s none usr/lib/libaio.so=../../lib/libaio.so.1
 s none usr/lib/libaio.so.1=../../lib/libaio.so.1
 f none usr/lib/libast.so.1 755 root bin
@@ -298,6 +300,7 @@ s none usr/lib/nss_compat.so.1=../../lib/nss_compat.so.1
 s none usr/lib/nss_dns.so.1=../../lib/nss_dns.so.1
 s none usr/lib/nss_files.so.1=../../lib/nss_files.so.1
 f none usr/lib/nss_ldap.so.1 755 root bin
+f none usr/lib/nss_ad.so.1 755 root bin
 s none usr/lib/nss_nis.so.1=../../lib/nss_nis.so.1
 s none usr/lib/nss_nisplus.so.1=../../lib/nss_nisplus.so.1
 s none usr/lib/nss_user.so.1=../../lib/nss_user.so.1

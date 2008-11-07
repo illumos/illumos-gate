@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	getpwent.c
@@ -49,8 +49,6 @@
  *	confusing.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pwd.h>
 #include <shadow.h>		/* For PASSWD (pathname to passwd file) */
 #include <stdlib.h>
@@ -66,6 +64,63 @@ _nss_initf_passwd_compat(p)
 	p->name		  = NSS_DBNAM_PASSWD;
 	p->config_name	  = NSS_DBNAM_PASSWD_COMPAT;
 	p->default_config = NSS_DEFCONF_PASSWD_COMPAT;
+}
+
+/*
+ * Validates passwd entry replacing uid/gid > MAXUID by ID_NOBODY.
+ */
+int
+validate_passwd_ids(char *line, int *linelenp, int buflen, int extra_chars)
+{
+	char	*linep, *limit, *uidp, *gidp;
+	uid_t	uid;
+	gid_t	gid;
+	ulong_t	uidl, gidl;
+	int	olduidlen, oldgidlen, idlen;
+	int	linelen = *linelenp, newlinelen;
+
+	if (linelen == 0 || *line == '+' || *line == '-')
+		return (NSS_STR_PARSE_SUCCESS);
+
+	linep = line;
+	limit = line + linelen;
+
+	while (linep < limit && *linep++ != ':') /* skip username */
+		continue;
+	while (linep < limit && *linep++ != ':') /* skip password */
+		continue;
+	if (linep == limit)
+		return (NSS_STR_PARSE_PARSE);
+
+	uidp = linep;
+	uidl = strtoul(uidp, (char **)&linep, 10); /* grab uid */
+	olduidlen = linep - uidp;
+	if (++linep >= limit || olduidlen == 0)
+		return (NSS_STR_PARSE_PARSE);
+
+	gidp = linep;
+	gidl = strtoul(gidp, (char **)&linep, 10); /* grab gid */
+	oldgidlen = linep - gidp;
+	if (linep >= limit || oldgidlen == 0)
+		return (NSS_STR_PARSE_PARSE);
+
+	if (uidl <= MAXUID && gidl <= MAXUID)
+		return (NSS_STR_PARSE_SUCCESS);
+	uid = (uidl > MAXUID) ? UID_NOBODY : (uid_t)uidl;
+	gid = (gidl > MAXUID) ? GID_NOBODY : (gid_t)gidl;
+
+	/* Check if we have enough space in the buffer */
+	idlen = snprintf(NULL, 0, "%u:%u", uid, gid);
+	newlinelen = linelen + idlen - olduidlen - oldgidlen - 1;
+	if (newlinelen + extra_chars > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+
+	/* Replace ephemeral ids by ID_NOBODY */
+	(void) bcopy(linep, uidp + idlen, limit - linep + extra_chars);
+	(void) snprintf(uidp, idlen + 1, "%u:%u", uid, gid);
+	*(uidp + idlen) = ':'; /* restore : that was overwritten by snprintf */
+	*linelenp = newlinelen;
+	return (NSS_STR_PARSE_SUCCESS);
 }
 
 static const char *
@@ -113,6 +168,8 @@ getbyuid(be, a)
 {
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
+	if (argp->key.uid > MAXUID)
+		return (NSS_NOTFOUND);
 	return (_nss_compat_XY_all(be, argp,
 				check_pwuid, NSS_DBOP_PASSWD_BYUID));
 }
@@ -163,7 +220,7 @@ merge_pwents(be, argp, fields)
 
 	s += len;
 	buflen -= len;
-	len = snprintf(s, buflen, ":%ld:%ld:%s:%s:%s",
+	len = snprintf(s, buflen, ":%u:%u:%s:%s:%s",
 		pw->pw_uid,
 		pw->pw_gid,
 		fields[4] != 0 ? fields[4] : pw->pw_gecos,

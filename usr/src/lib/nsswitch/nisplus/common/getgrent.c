@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * nisplus/getgrent.c -- NIS+ backend for nsswitch "group" database
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <grp.h>
 #include <string.h>
@@ -70,6 +68,9 @@ getbygid(be, a)
 {
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			gidstr[12];	/* More than enough */
+
+	if (argp->key.gid > MAXUID)
+		return (NSS_NOTFOUND);
 
 	(void) snprintf(gidstr, 12, "%u", argp->key.gid);
 	return (_nss_nisplus_lookup(be, argp, GR_TAG_GID, gidstr));
@@ -194,6 +195,8 @@ nis_object2str(nobj, obj, be, argp)
 	nss_XbyY_args_t		*argp;
 {
 	char			*buffer, *name, *passwd, *gid, *members;
+	ulong_t			gidl;
+	char			gid_nobody[NOBODY_STR_LEN];
 	int			buflen, namelen, passwdlen, gidlen, memberslen;
 	char			*endnum;
 	struct entry_col	*ecol;
@@ -224,9 +227,15 @@ nis_object2str(nobj, obj, be, argp)
 
 	/* gid: group id */
 	__NISPLUS_GETCOL_OR_RETURN(ecol, GR_NDX_GID, gidlen, gid);
-	(void) strtol(gid, &endnum, 10);
+	gidl = strtoul(gid, &endnum, 10);
 	if (*endnum != 0 || gid == endnum)
 		return (NSS_STR_PARSE_PARSE);
+	if (gidl > MAXUID) {
+		(void) snprintf(gid_nobody, sizeof (gid_nobody),
+		    "%u", GID_NOBODY);
+		gid = gid_nobody;
+		gidlen = strlen(gid);
+	}
 
 	/* members: gid list */
 	__NISPLUS_GETCOL_OR_EMPTY(ecol, GR_NDX_MEM, memberslen, members);

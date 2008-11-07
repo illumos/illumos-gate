@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <nsswitch.h>
 #include <stdlib.h>
@@ -134,6 +133,8 @@ get_ns(pwu_repository_t *rep, int accesstype)
 	enum __nsw_parse_err pserr;
 	struct __nsw_lookup *lkp;
 	struct __nsw_lookup *lkp2;
+	struct __nsw_lookup *lkp3;
+	struct __nsw_lookup *lkpn;
 	int result = REP_NOREP;
 
 	if (rep != PWU_DEFAULT_REP) {
@@ -150,7 +151,7 @@ get_ns(pwu_repository_t *rep, int accesstype)
 		 * find the name service switch entry. (Backward compat)
 		 */
 		syslog(LOG_ERR, "passwdutil.so: nameservice switch entry for "
-				"passwd not found.");
+		    "passwd not found.");
 		result = REP_FILES | REP_NIS;
 		return (result);
 	}
@@ -158,9 +159,13 @@ get_ns(pwu_repository_t *rep, int accesstype)
 	lkp = conf->lookups;
 
 	/*
-	 * Supported nsswitch.conf can have a maximum of 2 repositories.
+	 * Supported nsswitch.conf can have a maximum of 3 repositories.
 	 * If we encounter an unsupported nsswitch.conf, we return REP_NSS
 	 * to fall back to the nsswitch backend.
+	 *
+	 * Note that specifying 'ad' in the configuration is acceptable
+	 * though changing AD users' passwords through passwd(1) is not.
+	 * Therefore "ad" will be silently ignored.
 	 */
 	if (conf->num_lookups == 1) {
 		/* files or compat */
@@ -184,6 +189,35 @@ get_ns(pwu_repository_t *rep, int accesstype)
 			else if (strcmp(lkp2->service_name, "nis") == 0)
 				result |= REP_NIS;
 			else if (strcmp(lkp2->service_name, "nisplus") == 0)
+				result |= REP_NISPLUS;
+			else if (strcmp(lkp2->service_name, "ad") != 0)
+				result = REP_NSS;
+			/* AD is ignored */
+		} else {
+			result = REP_NSS;
+		}
+	} else if (conf->num_lookups == 3) {
+		/*
+		 * Valid configurations with 3 repositories are:
+		 *   files ad [nis | ldap | nisplus] OR
+		 *   files [nis | ldap | nisplus] ad
+		 */
+		lkp2 = lkp->next;
+		lkp3 = lkp2->next;
+		if (strcmp(lkp2->service_name, "ad") == 0)
+			lkpn = lkp3;
+		else if (strcmp(lkp3->service_name, "ad") == 0)
+			lkpn = lkp2;
+		else
+			lkpn = NULL;
+		if (strcmp(lkp->service_name, "files") == 0 &&
+		    lkpn != NULL) {
+			result = REP_FILES;
+			if (strcmp(lkpn->service_name, "ldap") == 0)
+				result |= REP_LDAP;
+			else if (strcmp(lkpn->service_name, "nis") == 0)
+				result |= REP_NIS;
+			else if (strcmp(lkpn->service_name, "nisplus") == 0)
 				result |= REP_NISPLUS;
 			else
 				result = REP_NSS;

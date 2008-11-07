@@ -26,8 +26,6 @@
 #ifndef	_NSCD_CFGDEF_H
 #define	_NSCD_CFGDEF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -126,6 +124,7 @@ nscd_cfg_id_t _nscd_cfg_nsw_src[] = {
 	{	5,	"dns"			},
 	{	6,	"compat"		},
 	{	7,	"user"			},
+	{	8,	"ad"			},
 	{	-1,	NULL			}
 };
 

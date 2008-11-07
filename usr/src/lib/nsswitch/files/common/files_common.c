@@ -25,8 +25,6 @@
  * Common code and structures used by name-service-switch "files" backends.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * An implementation that used mmap() sensibly would be a wonderful thing,
  *   but this here is just yer standard fgets() thang.
@@ -299,9 +297,27 @@ _nss_files_XY_all(be, args, netdb, filter, check)
 		if (check != NULL && (*check)(args, instr, linelen) == 0)
 			continue;
 
-		func = args->str2ent;
-		parsestat = (*func)(instr, linelen, args->buf.result,
-					args->buf.buffer, args->buf.buflen);
+		parsestat = NSS_STR_PARSE_SUCCESS;
+		if (be->filename != NULL) {
+			/*
+			 * Special case for passwd and group wherein we
+			 * replace uids/gids > MAXUID by ID_NOBODY
+			 * because files backend does not support
+			 * ephemeral ids.
+			 */
+			if (strcmp(be->filename, PF_PATH) == 0)
+				parsestat = validate_passwd_ids(instr,
+				    &linelen, be->minbuf, 2);
+			else if (strcmp(be->filename, GF_PATH) == 0)
+				parsestat = validate_group_ids(instr,
+				    &linelen, be->minbuf, 2, check);
+		}
+
+		if (parsestat == NSS_STR_PARSE_SUCCESS) {
+			func = args->str2ent;
+			parsestat = (*func)(instr, linelen, args->buf.result,
+			    args->buf.buffer, args->buf.buflen);
+		}
 
 		if (parsestat == NSS_STR_PARSE_SUCCESS) {
 			args->returnval = (args->buf.result != NULL)?
@@ -366,7 +382,7 @@ _nss_files_XY_hash(files_backend_ptr_t be, nss_XbyY_args_t *args,
 	int netdb, files_hash_t *fhp, int hashop, files_XY_check_func check)
 {
 	/* LINTED E_FUNC_VAR_UNUSED */
-	int fd, retries, ht;
+	int fd, retries, ht, stat;
 	/* LINTED E_FUNC_VAR_UNUSED */
 	uint_t hash, line, f;
 	/* LINTED E_FUNC_VAR_UNUSED */
@@ -412,6 +428,28 @@ retry:
 			if ((*check)(args, fhp->fh_line[line].l_start,
 					fhp->fh_line[line].l_len) == 0)
 				continue;
+
+			if (be->filename != NULL) {
+				stat = NSS_STR_PARSE_SUCCESS;
+				if (strcmp(be->filename, PF_PATH) == 0)
+					stat = validate_passwd_ids(
+					    fhp->fh_line[line].l_start,
+					    &fhp->fh_line[line].l_len,
+					    fhp->fh_line[line].l_len + 1,
+					    1);
+				else if (strcmp(be->filename, GF_PATH) == 0)
+					stat = validate_group_ids(
+					    fhp->fh_line[line].l_start,
+					    &fhp->fh_line[line].l_len,
+					    fhp->fh_line[line].l_len + 1,
+					    1, check);
+				if (stat != NSS_STR_PARSE_SUCCESS) {
+					if (stat == NSS_STR_PARSE_ERANGE)
+						args->erange = 1;
+					continue;
+				}
+			}
+
 			if ((*args->str2ent)(fhp->fh_line[line].l_start,
 			    fhp->fh_line[line].l_len, args->buf.result,
 			    args->buf.buffer, args->buf.buflen) ==

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <mtlib.h>
 #include <sys/types.h>
@@ -318,6 +316,7 @@ str2group(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	char			*p, *next;
 	int			black_magic;	/* "+" or "-" entry */
 	char			**memlist, **limit;
+	ulong_t			tmp;
 
 	if (lenstr + 1 > buflen)
 		return (NSS_STR_PARSE_ERANGE);
@@ -378,16 +377,15 @@ str2group(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 			return (NSS_STR_PARSE_PARSE);
 	}
 	if (!black_magic) {
-		group->gr_gid = (gid_t)strtol(p, &next, 10);
+		tmp = strtoul(p, &next, 10);
 		if (next == p) {
 			/* gid field should be nonempty */
 			return (NSS_STR_PARSE_PARSE);
 		}
-		/*
-		 * gids should be in the range 0 .. MAXUID
-		 */
-		if (group->gr_gid > MAXUID)
+		if (group->gr_gid >= UINT32_MAX)
 			group->gr_gid = GID_NOBODY;
+		else
+			group->gr_gid = (gid_t)tmp;
 	}
 	if (*next++ != ':') {
 		/* Parse error, even for a '+' entry (which should have	*/

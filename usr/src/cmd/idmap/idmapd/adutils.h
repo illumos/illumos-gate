@@ -27,8 +27,6 @@
 #ifndef _ADUTILS_H
 #define	_ADUTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -51,6 +49,7 @@ extern "C" {
 #include <thread.h>
 #include <synch.h>
 #include "idmap_prot.h"
+#include "libadutils.h"
 #include <sys/idmap.h>
 
 /*
@@ -68,49 +67,12 @@ extern "C" {
 #define	_IDMAP_T_DOMAIN		-1006
 #define	_IDMAP_T_COMPUTER	-1007
 
-#define	SID_MAX_SUB_AUTHORITIES	15
-#define	MAXBINSID	(1 + 1 + 6 + (SID_MAX_SUB_AUTHORITIES * 4))
-#define	MAXHEXBINSID	(MAXBINSID * 3)
-
 typedef uint32_t rid_t;
 
-/*
- * We use the port numbers for normal LDAP and global catalog LDAP as
- * the enum values for this enumeration.  Clever?  Silly?  You decide.
- * Although we never actually use these enum values as port numbers and
- * never will, so this is just cute.
- */
-typedef enum idmap_ad_partition {
-	IDMAP_AD_DATA = 389,
-	IDMAP_AD_GLOBAL_CATALOG = 3268
-} idmap_ad_partition_t;
-
-typedef struct ad ad_t;
 typedef struct idmap_query_state idmap_query_state_t;
 
-/*
- * Idmap interfaces:
- *
- *  - an ad_t represents an AD partition
- *  - a DS (hostname + port, if port != 0) can be added/removed from an ad_t
- *  - and because libldap supports space-separated lists of servers, a
- *  single hostname value can actually be a set of hostnames.
- *  - an ad_t can be allocated, ref'ed and released; last release
- *  releases resources
- *
- *  - lookups are batched; see below.
- *
- * See below.
- */
+int	idmap_add_ds(adutils_ad_t *ad, const char *host, int port);
 
-/* Allocate/release ad_t objects */
-int idmap_ad_alloc(ad_t **new_ad, const char *default_domain,
-		idmap_ad_partition_t part);
-void idmap_ad_free(ad_t **ad);
-
-/* Add/remove a DS to/from an ad_t */
-int idmap_add_ds(ad_t *ad, const char *host, int port);
-void idmap_delete_ds(ad_t *ad, const char *host, int port);
 
 /*
  * Batch lookups
@@ -132,7 +94,7 @@ void idmap_delete_ds(ad_t *ad, const char *host, int port);
  */
 
 /* Start a batch of lookups */
-idmap_retcode idmap_lookup_batch_start(ad_t *ad, int nqueries,
+idmap_retcode idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 		idmap_query_state_t **state);
 
 /* End a batch and release its idmap_query_state_t object */

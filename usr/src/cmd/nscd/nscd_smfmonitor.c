@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <libscf.h>
 #include <string.h>
@@ -164,9 +162,10 @@ _nscd_get_smf_state(int srci, int dbi, int recheck)
 	n = NSCD_NSW_SRC_NAME(srci);
 
 	/* the files, compat, and dns backends are always available */
-	if ((*n == 'f' || *n == 'c' || *n == 'd') &&
+	if ((*n == 'f' || *n == 'c' || *n == 'd' || *n == 'a') &&
 	    (strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 ||
 	    strcmp(NSCD_NSW_SRC_NAME(srci), "compat") == 0 ||
+	    strcmp(NSCD_NSW_SRC_NAME(srci), "ad") == 0 ||
 	    strcmp(NSCD_NSW_SRC_NAME(srci), "dns") == 0)) {
 		return (SCF_STATE_ONLINE);
 	}

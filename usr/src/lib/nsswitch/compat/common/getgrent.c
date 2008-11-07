@@ -21,7 +21,7 @@
 /*
  *	getgrent.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/nsswitch/compat/getgrent.c -- name-service-switch backend for getgrnam()
@@ -43,8 +43,6 @@
  *    -	People who recursively specify "compat" deserve what they get.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <grp.h>
 #include <stdlib.h>
 #include <unistd.h>		/* for GF_PATH */
@@ -60,6 +58,51 @@ _nss_initf_group_compat(p)
 	p->name		  = NSS_DBNAM_GROUP;
 	p->config_name	  = NSS_DBNAM_GROUP_COMPAT;
 	p->default_config = NSS_DEFCONF_GROUP_COMPAT;
+}
+
+/*
+ * Validates group entry replacing gid > MAXUID by GID_NOBODY.
+ */
+int
+validate_group_ids(char *line, int *linelenp, int buflen, int extra_chars)
+{
+	char	*linep, *limit, *gidp;
+	ulong_t	gid;
+	int	oldgidlen, idlen;
+	int	linelen = *linelenp, newlinelen;
+
+	if (linelen == 0 || *line == '+' || *line == '-')
+		return (NSS_STR_PARSE_SUCCESS);
+
+	linep = line;
+	limit = line + linelen;
+
+	while (linep < limit && *linep++ != ':') /* skip groupname */
+		continue;
+	while (linep < limit && *linep++ != ':') /* skip password */
+		continue;
+	if (linep == limit)
+		return (NSS_STR_PARSE_PARSE);
+
+	gidp = linep;
+	gid = strtoul(gidp, (char **)&linep, 10); /* grab gid */
+	oldgidlen = linep - gidp;
+	if (linep >= limit || oldgidlen == 0)
+		return (NSS_STR_PARSE_PARSE);
+
+	if (gid <= MAXUID)
+		return (NSS_STR_PARSE_SUCCESS);
+
+	idlen = snprintf(NULL, 0, "%u", GID_NOBODY);
+	newlinelen = linelen + idlen - oldgidlen;
+	if (newlinelen + extra_chars > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+
+	(void) bcopy(linep, gidp + idlen, limit - linep + extra_chars);
+	(void) snprintf(gidp, idlen + 1, "%u", GID_NOBODY);
+	*(gidp + idlen) = ':';
+	*linelenp = newlinelen;
+	return (NSS_STR_PARSE_SUCCESS);
 }
 
 static const char *
@@ -107,6 +150,8 @@ getbygid(be, a)
 {
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
+	if (argp->key.gid > MAXUID)
+		return (NSS_NOTFOUND);
 	return (_nss_compat_XY_all(be, argp, check_grgid,
 				NSS_DBOP_GROUP_BYGID));
 }
@@ -211,7 +256,7 @@ merge_grents(be, argp, fields)
 		/* Really "out of memory", but PARSE_PARSE will have to do */
 	}
 	s = buf;
-	(void) snprintf(s, NSS_LINELEN_GROUP, "%s:%s:%d:",
+	(void) snprintf(s, NSS_LINELEN_GROUP, "%s:%s:%u:",
 		g->gr_name,
 		fields[1] != 0 ? fields[1] : g->gr_passwd,
 		g->gr_gid);

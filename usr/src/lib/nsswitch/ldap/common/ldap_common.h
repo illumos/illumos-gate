@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LDAP_COMMON_H
 #define	_LDAP_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -87,6 +85,16 @@ extern "C" {
 	    /* Adjust pointer and available buffer length */ \
 	    buffer += len; \
 	    buflen -= len;
+
+/*
+ * We need to use UID_NOBODY and GID_NOBODY as strings. Therefore we use
+ * snprintf to convert [U|G]ID_NOBODY into a string. The target buffer
+ * size was chosen as 21 to allow the largest 64-bit number to be stored
+ * as string in it. Right now uid_t and gid_t are 32-bit so we don't
+ * really need 21 characters but it does allow for future expansion
+ * without having to modify this code.
+ */
+#define	NOBODY_STR_LEN	21
 
 
 /*

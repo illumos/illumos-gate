@@ -149,6 +149,8 @@ f none usr/lib/security/sparcv9/pkcs11_softtoken.so.1 755 root bin
 s none usr/lib/security/sparcv9/pkcs11_softtoken.so=./pkcs11_softtoken.so.1
 s none usr/lib/64=sparcv9
 d none usr/lib/sparcv9 755 root bin
+f none usr/lib/sparcv9/libadutils.so.1 755 root bin
+s none usr/lib/sparcv9/libadutils.so=./libadutils.so.1
 f none usr/lib/sparcv9/libbsdmalloc.so.1 755 root bin
 s none usr/lib/sparcv9/libbsdmalloc.so=libbsdmalloc.so.1
 s none usr/lib/sparcv9/libbsm.so.1=../../../lib/sparcv9/libbsm.so.1
@@ -352,6 +354,7 @@ s none usr/lib/sparcv9/nss_compat.so.1=../../../lib/sparcv9/nss_compat.so.1
 s none usr/lib/sparcv9/nss_dns.so.1=../../../lib/sparcv9/nss_dns.so.1
 s none usr/lib/sparcv9/nss_files.so.1=../../../lib/sparcv9/nss_files.so.1
 f none usr/lib/sparcv9/nss_ldap.so.1 755 root bin
+f none usr/lib/sparcv9/nss_ad.so.1 755 root bin
 s none usr/lib/sparcv9/nss_nis.so.1=../../../lib/sparcv9/nss_nis.so.1
 s none usr/lib/sparcv9/nss_nisplus.so.1=../../../lib/sparcv9/nss_nisplus.so.1
 s none usr/lib/sparcv9/nss_user.so.1=../../../lib/sparcv9/nss_user.so.1

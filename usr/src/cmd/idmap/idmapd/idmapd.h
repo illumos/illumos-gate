@@ -26,8 +26,6 @@
 #ifndef _IDMAPD_H
 #define	_IDMAPD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -41,6 +39,7 @@
 #include "idmap_prot.h"
 #include "adutils.h"
 #include "idmap_config.h"
+#include "libadutils.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,7 +79,7 @@ typedef struct idmapd_state {
 	gid_t		limit_gid;
 	int		new_eph_db;	/* was the ephem ID db [re-]created? */
 	bool_t		eph_map_unres_sids;
-	ad_t		*ad;
+	adutils_ad_t	*ad;
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
 

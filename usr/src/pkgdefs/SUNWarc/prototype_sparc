@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This required package information file contains a list of package contents.
@@ -64,6 +62,7 @@ f none usr/lib/sparcv9/values-Xt.o 644 root bin
 f none usr/lib/sparcv9/values-xpg4.o 644 root bin
 f none usr/lib/sparcv9/values-xpg6.o 644 root bin
 s none usr/lib/sparcv9/llib-ladm.ln=../../../lib/sparcv9/llib-ladm.ln
+f none usr/lib/sparcv9/llib-ladutils.ln 644 root bin
 s none usr/lib/sparcv9/llib-laio.ln=../../../lib/sparcv9/llib-laio.ln
 f none usr/lib/sparcv9/llib-lbsdmalloc.ln 644 root bin
 s none usr/lib/sparcv9/llib-lbsm.ln=../../../lib/sparcv9/llib-lbsm.ln

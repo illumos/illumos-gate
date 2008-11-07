@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * nis/getgrent.c -- "nis" backend for nsswitch "group" database
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <grp.h>
 #include <pwd.h>
@@ -58,8 +56,68 @@ getbygid(be, a)
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			gidstr[12];	/* More than enough */
 
+	if (argp->key.gid > MAXUID)
+		return (NSS_NOTFOUND);
 	(void) snprintf(gidstr, 12, "%d", argp->key.gid);
 	return (_nss_nis_lookup(be, argp, 0, "group.bygid", gidstr, 0));
+}
+
+/*
+ * Validates group entry replacing gid > MAXUID by GID_NOBODY.
+ */
+int
+validate_group_ids(char **linepp, int *linelenp, int allocbuf)
+{
+	char	*linep, *limit, *gidp, *newline;
+	ulong_t	gid;
+	int	oldgidlen, idlen;
+	int	linelen = *linelenp, newlinelen;
+
+	linep = *linepp;
+	limit = linep + linelen;
+
+	/* +/- entries valid for compat source only */
+	if (linelen == 0 || *linep == '+' || *linep == '-')
+		return (NSS_STR_PARSE_SUCCESS);
+
+	while (linep < limit && *linep++ != ':') /* skip groupname */
+		continue;
+	while (linep < limit && *linep++ != ':') /* skip password */
+		continue;
+	if (linep == limit)
+		return (NSS_STR_PARSE_PARSE);
+
+	gidp = linep;
+	gid = strtoul(gidp, (char **)&linep, 10); /* grab gid */
+	oldgidlen = linep - gidp;
+	if (linep >= limit || oldgidlen == 0)
+		return (NSS_STR_PARSE_PARSE);
+
+	if (gid <= MAXUID)
+		return (NSS_STR_PARSE_SUCCESS);
+
+	idlen = snprintf(NULL, 0, "%u", GID_NOBODY);
+	newlinelen = linelen + idlen - oldgidlen;
+	if (newlinelen > linelen) {
+		/* need a larger buffer */
+		if (!allocbuf || (newline = malloc(newlinelen + 1)) == NULL)
+			return (NSS_STR_PARSE_ERANGE);
+		/* Replace ephemeral ids by ID_NOBODY in the new buffer */
+		*(gidp - 1) = '\0';
+		(void) snprintf(newline, newlinelen + 1, "%s:%u%s",
+		    *linepp, GID_NOBODY, linep);
+		free(*linepp);
+		*linepp = newline;
+		*linelenp = newlinelen;
+		return (NSS_STR_PARSE_SUCCESS);
+	}
+
+	/* Replace ephemeral gid by GID_NOBODY in the same buffer */
+	(void) bcopy(linep, gidp + idlen, limit - linep + 1);
+	(void) snprintf(gidp, idlen + 1, "%u", GID_NOBODY);
+	*(gidp + idlen) = ':';
+	*linelenp = newlinelen;
+	return (NSS_STR_PARSE_SUCCESS);
 }
 
 static nss_status_t
@@ -225,16 +283,15 @@ netid_lookup(struct nss_groupsbymem *argp)
 	}
 
 	if ((res = _nss_nis_ypmatch(domain, "netid.byname", netname,
-			&val, &vallen, 0)) != NSS_SUCCESS) {
+	    &val, &vallen, 0)) != NSS_SUCCESS) {
 		return (res);
 	}
 
 	(void) strtok_r(val, "#", &lasts);
 
 	parse_res = parse_netid(val, argp->gid_array, argp->maxgids,
-			&argp->numgids);
+	    &argp->numgids);
 	free(val);
 	return ((parse_res == NSS_STR_PARSE_SUCCESS)
-		? NSS_SUCCESS
-		: NSS_NOTFOUND);
+	    ? NSS_SUCCESS : NSS_NOTFOUND);
 }

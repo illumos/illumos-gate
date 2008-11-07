@@ -31,8 +31,6 @@
 #ifndef _FILES_COMMON_H
 #define	_FILES_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nss_common.h>
 #include <nss_dbdefs.h>
 #include <stdio.h>
@@ -135,6 +133,12 @@ extern nss_status_t	_nss_files_XY_hash();
 
 int	_nss_files_check_name_aliases(nss_XbyY_args_t *, const char *, int);
 int	_nss_files_check_name_colon(nss_XbyY_args_t *, const char *, int);
+
+/* passwd and group validation functions */
+extern int	validate_group_ids(char *line, int *linelenp, int buflen,
+			int extra_chars, files_XY_check_func check);
+extern int	validate_passwd_ids(char *line, int *linelenp, int buflen,
+			int extra_chars);
 
 #ifdef	__cplusplus
 }

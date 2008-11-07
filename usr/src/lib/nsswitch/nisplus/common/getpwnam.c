@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * nisplus/getpwnam.c -- NIS+ backend for nsswitch "passwd" database
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <pwd.h>
@@ -54,6 +52,9 @@ getbyuid(be, a)
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			uidstr[12];	/* More than enough */
 
+	if (argp->key.uid > MAXUID)
+		return (NSS_NOTFOUND);
+
 	(void) snprintf(uidstr, 12, "%ld", argp->key.uid);
 	return (_nss_nisplus_lookup(be, argp, PW_TAG_UID, uidstr));
 }
@@ -73,6 +74,9 @@ nis_object2str(nobj, obj, be, argp)
 	nss_XbyY_args_t		*argp;
 {
 	char			*buffer, *name, *uid, *gid, *gecos;
+	ulong_t			uidl, gidl;
+	char			uid_nobody[NOBODY_STR_LEN];
+	char			gid_nobody[NOBODY_STR_LEN];
 	char			*dir, *shell, *endnum;
 	int			buflen, namelen, uidlen, gidlen, gecoslen;
 	int			dirlen, shelllen;
@@ -100,15 +104,27 @@ nis_object2str(nobj, obj, be, argp)
 
 	/* uid: user id. Must be numeric */
 	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_UID, uidlen, uid);
-	(void) strtol(uid, &endnum, 10);
+	uidl = strtoul(uid, &endnum, 10);
 	if (*endnum != 0 || uid == endnum)
 		return (NSS_STR_PARSE_PARSE);
+	if (uidl > MAXUID) {
+		(void) snprintf(uid_nobody, sizeof (uid_nobody),
+		    "%u", UID_NOBODY);
+		uid = uid_nobody;
+		uidlen = strlen(uid);
+	}
 
 	/* gid: primary group id. Must be numeric */
 	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_GID, gidlen, gid);
-	(void) strtol(gid, &endnum, 10);
+	gidl = strtoul(gid, &endnum, 10);
 	if (*endnum != 0 || gid == endnum)
 		return (NSS_STR_PARSE_PARSE);
+	if (gidl > MAXUID) {
+		(void) snprintf(gid_nobody, sizeof (gid_nobody),
+		    "%u", GID_NOBODY);
+		gid = gid_nobody;
+		gidlen = strlen(gid);
+	}
 
 	/* gecos: user's real name */
 	__NISPLUS_GETCOL_OR_EMPTY(ecol, PW_NDX_GCOS, gecoslen, gecos);

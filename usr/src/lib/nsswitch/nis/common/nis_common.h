@@ -33,9 +33,9 @@
 #ifndef _NIS_COMMON_H
 #define	_NIS_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nss_dbdefs.h>
+#include <stdlib.h>
+#include <strings.h>
 #include <signal.h>
 #include <rpcsvc/ypclnt.h>
 #include <rpcsvc/yp_prot.h>
@@ -130,6 +130,10 @@ extern int __yp_next_cflookup(char *, char *, char *, int, char **, int *,
 			    char **, int  *, int);
 
 extern int __yp_all_cflookup(char *, char *, struct ypall_callback *, int);
+
+/* functions to validate passwd and group ids */
+extern int validate_passwd_ids(char **linepp, int *linelenp, int allocbuf);
+extern int validate_group_ids(char **linepp, int *linelenp, int allocbuf);
 
 #ifdef	__cplusplus
 }

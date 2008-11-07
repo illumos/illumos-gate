@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Initialization routines
  */
@@ -105,9 +103,9 @@ load_config()
 void
 reload_ad()
 {
-	int	i;
-	ad_t	*old;
-	ad_t	*new;
+	int		i;
+	adutils_ad_t	*old;
+	adutils_ad_t	*new;
 
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
 
@@ -126,8 +124,8 @@ reload_ad()
 
 	old = _idmapdstate.ad;
 
-	if (idmap_ad_alloc(&new, pgcfg->default_domain,
-	    IDMAP_AD_GLOBAL_CATALOG) != 0) {
+	if (adutils_ad_alloc(&new, pgcfg->default_domain,
+	    ADUTILS_AD_GLOBAL_CATALOG) != ADUTILS_SUCCESS) {
 		degrade_svc(0, "could not initialize AD context");
 		return;
 	}
@@ -136,7 +134,7 @@ reload_ad()
 		if (idmap_add_ds(new,
 		    pgcfg->global_catalog[i].host,
 		    pgcfg->global_catalog[i].port) != 0) {
-			idmap_ad_free(&new);
+			adutils_ad_free(&new);
 			degrade_svc(0, "could not initialize AD GC context");
 			return;
 		}
@@ -145,7 +143,7 @@ reload_ad()
 	_idmapdstate.ad = new;
 
 	if (old != NULL)
-		idmap_ad_free(&old);
+		adutils_ad_free(&old);
 }
 
 

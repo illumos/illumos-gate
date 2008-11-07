@@ -325,6 +325,7 @@ COMMON_SUBDIRS = \
 	lib/cfgadm_plugins/sdcard \
 	lib/crypt_modules \
 	lib/extendedFILE \
+	lib/libadutils \
 	lib/libadt_jni \
 	lib/libaio \
 	lib/libavl \

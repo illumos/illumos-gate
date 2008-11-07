@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/nsswitch/Makefile
@@ -29,7 +27,7 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIRS= files nis nisplus compat dns ldap user mdns
+SUBDIRS= files nis nisplus compat dns ldap user mdns ad
 
 all:=		TARGET= all
 clean:=		TARGET= clean

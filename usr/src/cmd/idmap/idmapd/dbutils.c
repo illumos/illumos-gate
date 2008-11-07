@@ -67,6 +67,9 @@ static idmap_retcode lookup_cache_name2sid(sqlite *, const char *,
 #define	AVOID_NAMESERVICE(req)\
 		(req->flag & IDMAP_REQ_FLG_NO_NAMESERVICE)
 
+#define	ALLOW_WK_OR_LOCAL_SIDS_ONLY(req)\
+		(req->flag & IDMAP_REQ_FLG_WK_OR_LOCAL_SIDS_ONLY)
+
 #define	IS_EPHEMERAL(pid)	(pid > INT32_MAX && pid != SENTINEL_PID)
 
 #define	LOCALRID_MIN	1000
@@ -1844,10 +1847,13 @@ ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 	}
 
 retry:
+	RDLOCK_CONFIG();
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, state->ad_nqueries,
 	    &qs);
+	UNLOCK_CONFIG();
 	if (retcode != IDMAP_SUCCESS) {
-		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
+		    retries++ < ADUTILS_DEF_NUM_RETRIES)
 			goto retry;
 		degrade_svc(1, "failed to create batch for AD lookup");
 		goto out;
@@ -2019,7 +2025,8 @@ retry:
 			idmap_lookup_release_batch(&qs);
 	}
 
-	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
+	    retries++ < ADUTILS_DEF_NUM_RETRIES)
 		goto retry;
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
 		degrade_svc(1, "some AD lookups timed out repeatedly");
@@ -2224,11 +2231,16 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 	if (retcode != IDMAP_ERR_NOTFOUND)
 		goto out;
 
-	/* Check if this is a localsid */
 	if (!wksid) {
+		/* Check if this is a localsid */
 		retcode = lookup_localsid2pid(req, res);
 		if (retcode != IDMAP_ERR_NOTFOUND)
 			goto out;
+
+		if (ALLOW_WK_OR_LOCAL_SIDS_ONLY(req)) {
+			retcode = IDMAP_ERR_NONEGENERATED;
+			goto out;
+		}
 	}
 
 	/* Lookup cache */
@@ -3581,9 +3593,12 @@ ad_lookup_by_winname(lookup_state_t *state,
 	idmap_retcode		rc, retcode;
 
 retry:
+	RDLOCK_CONFIG();
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
+	UNLOCK_CONFIG();
 	if (retcode != IDMAP_SUCCESS) {
-		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
+		    retries++ < ADUTILS_DEF_NUM_RETRIES)
 			goto retry;
 		degrade_svc(1, "failed to create request for AD lookup "
 		    "by winname");
@@ -3604,7 +3619,8 @@ retry:
 	else
 		retcode = idmap_lookup_batch_end(&qs);
 
-	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
+	    retries++ < ADUTILS_DEF_NUM_RETRIES)
 		goto retry;
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
 		degrade_svc(1, "some AD lookups timed out repeatedly");

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common code and structures used by name-service-switch "compat" backends.
@@ -27,8 +27,6 @@
  * Most of the code in the "compat" backend is a perverted form of code from
  * the "files" backend;  this file is no exception.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -692,6 +690,44 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 	return (res);
 }
 
+static int
+validate_ids(compat_backend_ptr_t be, nss_XbyY_args_t *argp,
+	char *line, int *linelenp, int buflen, int extra_chars)
+{
+	if (be->return_string_data != 1) {
+		struct passwd	*p;
+		struct group	*g;
+		/*
+		 * The data is already marshalled into
+		 * struct passwd or group.
+		 */
+		if (strcmp(be->filename, PASSWD) == 0) {
+			p = (struct passwd *)argp->returnval;
+			if (p->pw_uid > MAXUID)
+				p->pw_uid = UID_NOBODY;
+			if (p->pw_gid > MAXUID)
+				p->pw_gid = GID_NOBODY;
+		} else if (strcmp(be->filename, GF_PATH) == 0) {
+			g = (struct group *)argp->returnval;
+			if (g->gr_gid > MAXUID)
+				g->gr_gid = GID_NOBODY;
+		}
+		return (NSS_STR_PARSE_SUCCESS);
+	}
+
+	/*
+	 * The data needs to be returned in string format therefore
+	 * validate the return string.
+	 */
+	if (strcmp(be->filename, PASSWD) == 0)
+		return (validate_passwd_ids(line, linelenp, buflen,
+		    extra_chars));
+	else if (strcmp(be->filename, GF_PATH) == 0)
+		return (validate_group_ids(line, linelenp, buflen,
+		    extra_chars));
+	return (NSS_STR_PARSE_SUCCESS);
+}
+
 nss_status_t
 _nss_compat_XY_all(be, args, check, op_num)
 	compat_backend_ptr_t	be;
@@ -760,6 +796,19 @@ _nss_compat_XY_all(be, args, check, op_num)
 				args->returnval = args->buf.result;
 				if ((*check)(args) != 0) {
 					int len;
+
+					parsestat = validate_ids(be, args,
+					    instr, &linelen, be->minbuf, 1);
+					if (parsestat ==
+					    NSS_STR_PARSE_ERANGE) {
+						args->erange = 1;
+						res = NSS_NOTFOUND;
+						break;
+					} else if (parsestat !=
+					    NSS_STR_PARSE_SUCCESS) {
+						continue;
+					}
+
 					if (be->return_string_data != 1) {
 						res = NSS_SUCCESS;
 						break;

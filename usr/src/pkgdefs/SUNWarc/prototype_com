@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This required package information file contains a list of package contents.
@@ -72,6 +70,8 @@ s none usr/ccs/lib/values-Xt.o=../../lib/values-Xt.o
 d none usr/lib 755 root bin
 s none usr/lib/llib-ladm=../../lib/llib-ladm
 s none usr/lib/llib-ladm.ln=../../lib/llib-ladm.ln
+f none usr/lib/llib-ladutils 644 root bin
+f none usr/lib/llib-ladutils.ln 644 root bin
 s none usr/lib/llib-laio=../../lib/llib-laio
 s none usr/lib/llib-laio.ln=../../lib/llib-laio.ln
 s none usr/lib/llib-lpam=../../lib/llib-lpam

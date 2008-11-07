@@ -30,8 +30,6 @@
  * Common code and structures used by name-service-switch "nis" backends.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "nis_common.h"
 #include <string.h>
 #include <synch.h>
@@ -233,6 +231,17 @@ _nss_nis_lookup(be, args, netdb, map, key, ypstatusp)
 	if ((res = _nss_nis_ypmatch(be->domain, map, key, &val, &vallen,
 				    ypstatusp)) != NSS_SUCCESS) {
 		return (res);
+	}
+
+	parsestat = NSS_STR_PARSE_SUCCESS;
+	if (strcmp(map, "passwd.byname") == 0 ||
+	    strcmp(map, "passwd.byuid") == 0) {
+		parsestat = validate_passwd_ids(&val, &vallen, 1);
+	} else if (strcmp(map, "group.byname") == 0)
+		parsestat = validate_group_ids(&val, &vallen, 1);
+	if (parsestat != NSS_STR_PARSE_SUCCESS) {
+		free(val);
+		return (NSS_NOTFOUND);
 	}
 
 	free_ptr = val;

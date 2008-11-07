@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -28,8 +28,6 @@
 
 #ifndef _COMPAT_COMMON_H
 #define	_COMPAT_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <nss_common.h>
 #include <nss_dbdefs.h>
@@ -130,6 +128,12 @@ extern nss_status_t	_nss_compat_getent();
 extern nss_status_t	_nss_compat_XY_all();
 extern nss_status_t	_attrdb_compat_XY_all();
 #endif
+
+/* functions to validate passwd and group ids */
+extern int validate_passwd_ids(char *line, int *linelenp, int buflen,
+	int extra_chars);
+extern int validate_group_ids(char *line, int *linelenp, int buflen,
+	int extra_chars);
 
 #ifdef	__cplusplus
 }

@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * files/getgrent.c -- "files" backend for nsswitch "group" database
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <grp.h>
 #include <unistd.h>		/* for GF_PATH */
@@ -69,16 +67,16 @@ hash_grgid(nss_XbyY_args_t *argp, int keyhash, const char *line,
 	if (keyhash)
 		return ((uint_t)argp->key.gid);
 
-	/* skip groupname */
-	while (linep < limit && *linep++ != ':');
-	/* skip password */
-	while (linep < limit && *linep++ != ':');
+	while (linep < limit && *linep++ != ':') /* skip groupname */
+		continue;
+	while (linep < limit && *linep++ != ':') /* skip password */
+		continue;
 	if (linep == limit)
 		return (GID_NOBODY);
 
 	/* gid */
 	end = linep;
-	id = (uint_t)strtol(linep, (char **)&end, 10);
+	id = (uint_t)strtoul(linep, (char **)&end, 10);
 	/* empty gid */
 	if (linep == end)
 		return (GID_NOBODY);
@@ -127,7 +125,7 @@ static int
 check_grgid(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
 	const char	*linep, *limit, *end;
-	gid_t		gr_gid;
+	ulong_t		gr_gid;
 
 	linep = line;
 	limit = line + linelen;
@@ -136,22 +134,22 @@ check_grgid(nss_XbyY_args_t *argp, const char *line, int linelen)
 	if (linelen == 0 || *line == '+' || *line == '-')
 		return (0);
 
-	/* skip username */
-	while (linep < limit && *linep++ != ':');
-	/* skip password */
-	while (linep < limit && *linep++ != ':');
+	while (linep < limit && *linep++ != ':') /* skip groupname */
+		continue;
+	while (linep < limit && *linep++ != ':') /* skip password */
+		continue;
 	if (linep == limit)
 		return (0);
 
-	/* uid */
+	/* gid */
 	end = linep;
-	gr_gid = (gid_t)strtol(linep, (char **)&end, 10);
+	gr_gid = strtoul(linep, (char **)&end, 10);
 
-	/* empty gid is not valid */
-	if (linep == end)
+	/* check if gid is empty or overflows */
+	if (linep == end || gr_gid > UINT32_MAX)
 		return (0);
 
-	return (gr_gid == argp->key.gid);
+	return ((gid_t)gr_gid == argp->key.gid);
 }
 
 static nss_status_t
@@ -159,7 +157,66 @@ getbygid(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	return (_nss_files_XY_hash(be, a, 0, &hashinfo, 1, check_grgid));
+	nss_XbyY_args_t *argp = (nss_XbyY_args_t *)a;
+
+	if (argp->key.gid > MAXUID)
+		return (NSS_NOTFOUND);
+	return (_nss_files_XY_hash(be, argp, 0, &hashinfo, 1, check_grgid));
+}
+
+/*
+ * Validates group entry replacing gid > MAXUID by GID_NOBODY.
+ */
+int
+validate_group_ids(char *line, int *linelenp, int buflen, int extra_chars,
+		files_XY_check_func check)
+{
+	char	*linep, *limit, *gidp;
+	ulong_t	gid;
+	int	oldgidlen, idlen;
+	int	linelen = *linelenp, newlinelen;
+
+	/*
+	 * getbygid() rejects searching by ephemeral gid therefore
+	 * no need to validate because the matched entry won't have
+	 * an ephemeral gid.
+	 */
+	if (check != NULL && check == check_grgid)
+		return (NSS_STR_PARSE_SUCCESS);
+
+	/* +/- entries valid for compat source only */
+	if (linelen == 0 || *line == '+' || *line == '-')
+		return (NSS_STR_PARSE_SUCCESS);
+
+	linep = line;
+	limit = line + linelen;
+
+	while (linep < limit && *linep++ != ':') /* skip groupname */
+		continue;
+	while (linep < limit && *linep++ != ':') /* skip password */
+		continue;
+	if (linep == limit)
+		return (NSS_STR_PARSE_PARSE);
+
+	gidp = linep;
+	gid = strtoul(gidp, (char **)&linep, 10); /* grab gid */
+	oldgidlen = linep - gidp;
+	if (linep >= limit || oldgidlen == 0)
+		return (NSS_STR_PARSE_PARSE);
+
+	if (gid <= MAXUID)
+		return (NSS_STR_PARSE_SUCCESS);
+
+	idlen = snprintf(NULL, 0, "%u", GID_NOBODY);
+	newlinelen = linelen + idlen - oldgidlen;
+	if (newlinelen + extra_chars > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+
+	(void) bcopy(linep, gidp + idlen, limit - linep + extra_chars);
+	(void) snprintf(gidp, idlen + 1, "%u", GID_NOBODY);
+	*(gidp + idlen) = ':';
+	*linelenp = newlinelen;
+	return (NSS_STR_PARSE_SUCCESS);
 }
 
 static nss_status_t

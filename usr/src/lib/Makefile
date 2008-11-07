@@ -243,6 +243,7 @@ SUBDIRS += \
 	libshare	\
 	libsqlite	\
 	libidmap	\
+	libadutils	\
 	libipmi		\
 	libexacct/demo	\
 	libvscan	\
@@ -527,6 +528,8 @@ gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
 $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libast: 	libsocket
+libadutils: 	libldap5 libidmap
+nsswitch:	libadutils
 libbsm:		libtsol
 libcmd: 	libast libsocket libnsl
 libcmdutils:	libavl

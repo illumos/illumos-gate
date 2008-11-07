@@ -225,6 +225,7 @@ e nsswitch etc/nsswitch.conf 644 root sys
 f none etc/nsswitch.files 644 root sys
 f none etc/nsswitch.ldap 644 root sys
 f none etc/nsswitch.dns 644 root sys
+f none etc/nsswitch.ad 644 root sys
 d none etc/opt 755 root sys
 e passwd etc/passwd 644 root sys
 e etcprofile etc/profile 644 root sys

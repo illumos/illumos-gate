@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =		idmapd
 MANIFEST =	idmap.xml
@@ -54,14 +52,15 @@ ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE= 444
 
 INCS += -I. -I../../../lib/libidmap/common -I$(IDMAP_PROT_DIR)\
-	 -I../../../lib/libsldap/common
+	 -I../../../lib/libsldap/common\
+	 -I../../../lib/libadutils/common
 
 $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
 CLOBBERFILES += $(IDMAP_PROT_H)
 
 CFLAGS += -v
-LDLIBS += -lsecdb -lsocket -lnsl -lidmap -lscf -lsldap -lldap -luuid
+LDLIBS += -lsecdb -lsocket -lnsl -lidmap -lscf -lsldap -lldap -luuid -ladutils
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 $(PROG) := LDFLAGS += $(MAPFILES:%=-M%)

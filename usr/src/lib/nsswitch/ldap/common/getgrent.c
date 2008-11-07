@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <grp.h>
 #include "ldap_common.h"
 
@@ -74,9 +72,13 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	int		firstime = 1;
 	char		*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
-	char		**gname, **passwd, **gid, *password;
+	char		**gname, **passwd, **gid, *password, *end;
+	char		gid_nobody[NOBODY_STR_LEN];
+	char		*gid_nobody_v[1];
 	ns_ldap_attr_t	*members;
 
+	(void) snprintf(gid_nobody, sizeof (gid_nobody), "%u", GID_NOBODY);
+	gid_nobody_v[0] = gid_nobody;
 
 	if (result == NULL)
 		return (NSS_STR_PARSE_PARSE);
@@ -121,6 +123,9 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		nss_result = NSS_STR_PARSE_PARSE;
 		goto result_grp2str;
 	}
+	/* Validate GID */
+	if (strtoul(gid[0], &end, 10) > MAXUID)
+		gid = gid_nobody_v;
 	len = snprintf(buffer, buflen, "%s:%s:%s:", gname[0], password, gid[0]);
 	TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
 
@@ -205,6 +210,9 @@ getbygid(ldap_backend_ptr be, void *a)
 	char searchfilter[SEARCHFILTERLEN];
 	char userdata[SEARCHFILTERLEN];
 	int ret;
+
+	if (argp->key.uid > MAXUID)
+		return ((nss_status_t)NSS_NOTFOUND);
 
 	ret = snprintf(searchfilter, sizeof (searchfilter),
 	    _F_GETGRGID, argp->key.uid);

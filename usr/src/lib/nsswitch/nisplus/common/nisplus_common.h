@@ -28,8 +28,6 @@
  *	Common code used by name-service-switch "nisplus" backends
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _NISPLUS_COMMON_H
 #define	_NISPLUS_COMMON_H
 
@@ -41,6 +39,9 @@
  * other flags (USE_DGRAM, EXPAND_NAME) are only wanted for some requests.
  */
 #define	NIS_LIST_COMMON	(FOLLOW_LINKS | FOLLOW_PATH)
+
+/* See the comment in $SRC/lib/nsswitch/ldap/common/ldap_common.h */
+#define	NOBODY_STR_LEN	21
 
 typedef struct nisplus_backend	*nisplus_backend_ptr_t;
 

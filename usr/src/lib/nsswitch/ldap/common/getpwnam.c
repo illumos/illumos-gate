@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pwd.h>
 #include "ldap_common.h"
@@ -79,6 +77,14 @@ _nss_ldap_passwd2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	char		**uid_v, **uidn_v, **gidn_v;
 	char		**gecos_v, **homedir_v, **shell_v;
 	char		*NULL_STR = "";
+	char		uid_nobody[NOBODY_STR_LEN];
+	char		gid_nobody[NOBODY_STR_LEN], *end;
+	char		*uid_nobody_v[1], *gid_nobody_v[1];
+
+	(void) snprintf(uid_nobody, sizeof (uid_nobody), "%u", UID_NOBODY);
+	uid_nobody_v[0] = uid_nobody;
+	(void) snprintf(gid_nobody, sizeof (gid_nobody), "%u", GID_NOBODY);
+	gid_nobody_v[0] = gid_nobody;
 
 	if (result == NULL)
 		return (NSS_STR_PARSE_PARSE);
@@ -98,10 +104,15 @@ _nss_ldap_passwd2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	uidn_v = __ns_ldap_getAttr(entry, _PWD_UIDNUMBER);
 	gidn_v = __ns_ldap_getAttr(entry, _PWD_GIDNUMBER);
 	if (uid_v == NULL || uidn_v == NULL || gidn_v == NULL ||
-		uid_v[0] == NULL || uidn_v[0] == NULL || gidn_v[0] == NULL) {
+	    uid_v[0] == NULL || uidn_v[0] == NULL || gidn_v[0] == NULL) {
 		nss_result = NSS_STR_PARSE_PARSE;
 		goto result_pwd2str;
 	}
+	/* Validate UID and GID */
+	if (strtoul(uidn_v[0], &end, 10) > MAXUID)
+		uidn_v = uid_nobody_v;
+	if (strtoul(gidn_v[0], &end, 10) > MAXUID)
+		gidn_v = gid_nobody_v;
 	str_len = strlen(uid_v[0]) + strlen(uidn_v[0]) + strlen(gidn_v[0]);
 	if (str_len >  buflen) {
 		nss_result = NSS_STR_PARSE_ERANGE;
@@ -140,15 +151,14 @@ _nss_ldap_passwd2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		}
 
 		(void) snprintf(be->buffer, be->buflen,
-				"%s:%s:%s:%s:%s:%s:%s",
-			uid_v[0], "x", uidn_v[0], gidn_v[0],
-			gecos_v[0], homedir_v[0], shell_v[0]);
+		    "%s:%s:%s:%s:%s:%s:%s",
+		    uid_v[0], "x", uidn_v[0], gidn_v[0],
+		    gecos_v[0], homedir_v[0], shell_v[0]);
 	} else {
 		(void) snprintf(argp->buf.buffer, (str_len + 8),
-				"%s:%s:%s:%s:%s:%s:%s",
-			uid_v[0], "x", uidn_v[0], gidn_v[0],
-			gecos_v[0], homedir_v[0], shell_v[0]);
-
+		    "%s:%s:%s:%s:%s:%s:%s",
+		    uid_v[0], "x", uidn_v[0], gidn_v[0],
+		    gecos_v[0], homedir_v[0], shell_v[0]);
 	}
 
 result_pwd2str:
@@ -186,8 +196,7 @@ getbyname(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	return ((nss_status_t)_nss_ldap_lookup(be, argp,
-		_PASSWD, searchfilter, NULL,
-		_merge_SSD_filter, userdata));
+	    _PASSWD, searchfilter, NULL, _merge_SSD_filter, userdata));
 }
 
 
@@ -207,6 +216,9 @@ getbyuid(ldap_backend_ptr be, void *a)
 	char		userdata[SEARCHFILTERLEN];
 	int		ret;
 
+	if (argp->key.uid > MAXUID)
+		return ((nss_status_t)NSS_NOTFOUND);
+
 	ret = snprintf(searchfilter, sizeof (searchfilter),
 	    _F_GETPWUID, (long)argp->key.uid);
 	if (ret >= sizeof (searchfilter) || ret < 0)
@@ -218,8 +230,7 @@ getbyuid(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	return ((nss_status_t)_nss_ldap_lookup(be, argp,
-		_PASSWD, searchfilter, NULL,
-		_merge_SSD_filter, userdata));
+	    _PASSWD, searchfilter, NULL, _merge_SSD_filter, userdata));
 }
 
 static ldap_backend_op_t passwd_ops[] = {
@@ -245,6 +256,6 @@ _nss_ldap_passwd_constr(const char *dummy1, const char *dummy2,
 {
 
 	return ((nss_backend_t *)_nss_ldap_constr(passwd_ops,
-		    sizeof (passwd_ops)/sizeof (passwd_ops[0]),
-		    _PASSWD, pwd_attrs, _nss_ldap_passwd2str));
+	    sizeof (passwd_ops)/sizeof (passwd_ops[0]),
+	    _PASSWD, pwd_attrs, _nss_ldap_passwd2str));
 }

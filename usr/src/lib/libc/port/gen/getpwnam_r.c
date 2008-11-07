@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <sys/types.h>
 #include <pwd.h>
@@ -244,6 +242,7 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	struct passwd	*passwd	= (struct passwd *)ent;
 	char		*p, *next;
 	int		black_magic;	/* "+" or "-" entry */
+	ulong_t		tmp;
 
 	if (lenstr + 1 > buflen)
 		return (NSS_STR_PARSE_ERANGE);
@@ -310,7 +309,14 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 			return (NSS_STR_PARSE_PARSE);
 	}
 	if (!black_magic) {
-		passwd->pw_uid = (uid_t)strtol(p, &next, 10);
+		/*
+		 * strtoul returns unsigned long which is
+		 * 8 bytes on a 64-bit system. We don't want
+		 * to assign it directly to passwd->pw_uid
+		 * which is 4 bytes or else we will end up
+		 * truncating the value.
+		 */
+		tmp = strtoul(p, &next, 10);
 		if (next == p) {
 			/* uid field should be nonempty */
 			return (NSS_STR_PARSE_PARSE);
@@ -321,11 +327,13 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 		 * than 60001 (the rfs limit).  If it met either of
 		 * these conditions, the uid was translated to 60001.
 		 *
-		 * Now we just check for negative uids; anything else
+		 * Now we just check for -1 (UINT32_MAX); anything else
 		 * is administrative policy
 		 */
-		if (passwd->pw_uid > MAXUID)
+		if (tmp >= UINT32_MAX)
 			passwd->pw_uid = UID_NOBODY;
+		else
+			passwd->pw_uid = (uid_t)tmp;
 	}
 	if (*next++ != ':') {
 		if (black_magic)
@@ -341,17 +349,19 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 			return (NSS_STR_PARSE_PARSE);
 	}
 	if (!black_magic) {
-		passwd->pw_gid = (gid_t)strtol(p, &next, 10);
+		tmp = strtoul(p, &next, 10);
 		if (next == p) {
 			/* gid field should be nonempty */
 			return (NSS_STR_PARSE_PARSE);
 		}
 		/*
-		 * gid should be non-negative; anything else
+		 * gid should not be -1; anything else
 		 * is administrative policy.
 		 */
-		if (passwd->pw_gid > MAXUID)
+		if (passwd->pw_gid >= UINT32_MAX)
 			passwd->pw_gid = GID_NOBODY;
+		else
+			passwd->pw_gid = (gid_t)tmp;
 	}
 	if (*next++ != ':') {
 		if (black_magic)

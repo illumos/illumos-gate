@@ -156,6 +156,8 @@ f none usr/lib/security/amd64/pkcs11_softtoken.so.1 755 root bin
 s none usr/lib/security/amd64/pkcs11_softtoken.so=./pkcs11_softtoken.so.1
 s none usr/lib/64=amd64
 d none usr/lib/amd64 755 root bin
+f none usr/lib/amd64/libadutils.so.1 755 root bin
+s none usr/lib/amd64/libadutils.so=./libadutils.so.1
 f none usr/lib/amd64/libbsdmalloc.so.1 755 root bin
 s none usr/lib/amd64/libbsdmalloc.so=libbsdmalloc.so.1
 s none usr/lib/amd64/libbsm.so.1=../../../lib/amd64/libbsm.so.1
@@ -361,6 +363,7 @@ s none usr/lib/amd64/nss_compat.so.1=../../../lib/amd64/nss_compat.so.1
 s none usr/lib/amd64/nss_dns.so.1=../../../lib/amd64/nss_dns.so.1
 s none usr/lib/amd64/nss_files.so.1=../../../lib/amd64/nss_files.so.1
 f none usr/lib/amd64/nss_ldap.so.1 755 root bin
+f none usr/lib/amd64/nss_ad.so.1 755 root bin
 s none usr/lib/amd64/nss_nis.so.1=../../../lib/amd64/nss_nis.so.1
 s none usr/lib/amd64/nss_nisplus.so.1=../../../lib/amd64/nss_nisplus.so.1
 s none usr/lib/amd64/nss_user.so.1=../../../lib/amd64/nss_user.so.1

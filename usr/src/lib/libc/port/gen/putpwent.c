@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * format a password file entry
  */
@@ -55,7 +53,7 @@ putpwent(const struct passwd *p, FILE *f)
 		    p->pw_dir ? p->pw_dir : "",
 		    p->pw_shell ? p->pw_shell : "");
 	} else { /* "normal case" */
-		(void) fprintf(f, ":%d:%d:%s:%s:%s",
+		(void) fprintf(f, ":%u:%u:%s:%s:%s",
 		    p->pw_uid,
 		    p->pw_gid,
 		    p->pw_gecos,
