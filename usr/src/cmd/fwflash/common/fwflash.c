@@ -83,7 +83,7 @@ static int fwflash_in_write = 0;
  * actually of any use - it doesn't line up with Mercurial's
  * concept of the changeset.
  */
-#define	FWFLASH_VERSION		"v1.6"
+#define	FWFLASH_VERSION		"v1.7"
 #define	FWFLASH_PROG_NAME	"fwflash"
 
 static int get_fileopts(char *options);
@@ -103,7 +103,8 @@ static int confirm_target(struct devicelist *thisdev, char *file);
  * FWFlash main code
  */
 int
-main(int argc, char **argv) {
+main(int argc, char **argv)
+{
 	int		rv = FWFLASH_SUCCESS;
 	int		i;
 	char		ch;
@@ -185,8 +186,8 @@ main(int argc, char **argv) {
 	/* Do Help */
 	if ((fwflash_arg_list & FWFLASH_HELP_FLAG) ||
 	    ((fwflash_arg_list & FWFLASH_DEVICE_FLAG) &&
-		!((fwflash_arg_list & FWFLASH_FW_FLAG) ||
-		    (fwflash_arg_list & FWFLASH_READ_FLAG)))) {
+	    !((fwflash_arg_list & FWFLASH_FW_FLAG) ||
+	    (fwflash_arg_list & FWFLASH_READ_FLAG)))) {
 		fwflash_usage(NULL);
 		return (FWFLASH_SUCCESS);
 	}
@@ -225,7 +226,7 @@ main(int argc, char **argv) {
 	/* Do flash update (write) */
 	if ((fwflash_arg_list == (FWFLASH_FW_FLAG | FWFLASH_DEVICE_FLAG)) ||
 	    (fwflash_arg_list == (FWFLASH_FW_FLAG | FWFLASH_DEVICE_FLAG |
-		FWFLASH_YES_FLAG))) {
+	    FWFLASH_YES_FLAG))) {
 		/* the update function handles the real arg parsing */
 		i = 0;
 		while (filelist[i] != NULL) {
@@ -234,7 +235,7 @@ main(int argc, char **argv) {
 				/* failed ops have already been noted */
 				logmsg(MSG_ERROR,
 				    gettext("New firmware will be activated "
-					"after you reboot\n\n"));
+				    "after you reboot\n\n"));
 			}
 			++i;
 		}
@@ -246,7 +247,7 @@ main(int argc, char **argv) {
 	/* Do flash read */
 	if ((fwflash_arg_list == (FWFLASH_READ_FLAG | FWFLASH_DEVICE_FLAG)) ||
 	    (fwflash_arg_list == (FWFLASH_READ_FLAG | FWFLASH_DEVICE_FLAG |
-		FWFLASH_YES_FLAG))) {
+	    FWFLASH_YES_FLAG))) {
 		rv = fwflash_read_file(devpath, read_file);
 		fwflash_intr(0);
 		return (rv);
@@ -259,7 +260,8 @@ main(int argc, char **argv) {
 
 
 static int
-flash_load_plugins() {
+flash_load_plugins()
+{
 
 	int rval = FWFLASH_SUCCESS;
 	DIR *dirp;
@@ -328,7 +330,7 @@ flash_load_plugins() {
 	    == NULL) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to malloc %d bytes while "
-			"trying to load plugins: %s\n"),
+		    "trying to load plugins: %s\n"),
 		    sizeof (struct fw_plugin) + 1, strerror(errno));
 		return (FWFLASH_FAILURE);
 	}
@@ -347,7 +349,7 @@ flash_load_plugins() {
 		if ((plugname = calloc(1, MAXPATHLEN + 1)) == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to malloc %d bytes while "
-				"trying to load plugins: %s\n"),
+			    "trying to load plugins: %s\n"),
 			    MAXPATHLEN + 1, strerror(errno));
 			return (FWFLASH_FAILURE);
 		}
@@ -360,7 +362,7 @@ flash_load_plugins() {
 		    == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to malloc %d bytes while "
-				"trying to load plugins: %s\n"),
+			    "trying to load plugins: %s\n"),
 			    sizeof (struct pluginlist), strerror(errno));
 			return (FWFLASH_FAILURE);
 		}
@@ -385,7 +387,7 @@ flash_load_plugins() {
 		    == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to allocate %d bytes for plugin "
-				"filename %s:%s\n"),
+			    "filename %s:%s\n"),
 			    strlen(plugname) + 1, plugname,
 			    strerror(errno));
 			return (rval);
@@ -454,7 +456,7 @@ flash_load_plugins() {
 		    == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to allocate space for a"
-				"drivername %s\n"),
+			    "drivername %s\n"),
 			    tmpplug->drvname);
 			return (FWFLASH_FAILURE);
 		}
@@ -466,7 +468,7 @@ flash_load_plugins() {
 		    strlen(tmpplug->filename) + 1)) == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to allocate %d bytes for "
-				"filename %s\n"),
+			    "filename %s\n"),
 			    strlen(tmpplug->filename) + 1,
 			    tmpplug->filename);
 			return (FWFLASH_FAILURE);
@@ -505,7 +507,8 @@ flash_load_plugins() {
  * one place.
  */
 int
-fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
+fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
+{
 
 	int rv = FWFLASH_FAILURE;
 	int imgfd;
@@ -536,7 +539,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 		if ((fwvrfydirpath = calloc(1, MAXPATHLEN + 1)) == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to allocate space for a firmware "
-				"verifier file(1)"));
+			    "verifier file(1)"));
 			return (rv);
 		}
 
@@ -557,7 +560,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 			/* invalid vendorid, something's really wrong */
 			logmsg(MSG_ERROR,
 			    gettext("Invalid vendorid (null) specified for "
-				"device\n"));
+			    "device\n"));
 			return (rv);
 		}
 
@@ -590,7 +593,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 		    == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to allocate space to store "
-				"a verifier filename\n"));
+			    "a verifier filename\n"));
 			free(filename);
 			free(fwvrfydirpath);
 			free(vrfy->handle);
@@ -603,8 +606,8 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 			logmsg(MSG_ERROR, gettext(dlerror()));
 			logmsg(MSG_ERROR,
 			    gettext("Unable to open verification plugin "
-				"%s. Unable to verify firmware image. "
-				"Aborting.\n"),
+			    "%s. Unable to verify firmware image. "
+			    "Aborting.\n"),
 			    filename);
 			free(filename);
 			free(fwvrfydirpath);
@@ -614,7 +617,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 		if ((vrfysym = dlsym(vrfy->handle, "vendorvrfy")) == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("%s is an invalid firmware verification "
-				"plugin."), filename);
+			    "plugin."), filename);
 			(void) dlclose(vrfy->handle);
 			free(filename);
 			free(fwvrfydirpath);
@@ -630,7 +633,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 		if (vrfysym == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Invalid vendor (null) in verification "
-				"plugin %s\n"), filename);
+			    "plugin %s\n"), filename);
 			(void) dlclose(vrfy->handle);
 			free(vrfy);
 			return (NULL);
@@ -663,7 +666,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 	if ((imgfd = open(fwimg, O_RDONLY)) < 0) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to open designated firmware "
-			"image file %s: %s\n"),
+		    "image file %s: %s\n"),
 		    (fwimg != NULL) ? fwimg : "(null)",
 		    strerror(errno));
 		rv = FWFLASH_FAILURE;
@@ -673,7 +676,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 	if (stat(fwimg, &fwstat) == -1) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to stat() firmware image file "
-			"%s: %s\n"),
+		    "%s: %s\n"),
 		    fwimg, strerror(errno));
 		rv = FWFLASH_FAILURE;
 		goto cleanup;
@@ -683,7 +686,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 		    == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to load firmware image "
-				"%s: %s\n"),
+			    "%s: %s\n"),
 			    fwimg, strerror(errno));
 			rv = FWFLASH_FAILURE;
 			goto cleanup;
@@ -696,8 +699,8 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 		/* we haven't read enough data, bail */
 		logmsg(MSG_ERROR,
 		    gettext("Failed to read sufficient data "
-			"(got %d bytes, expected %d bytes) from "
-			"firmware image file %s: %s\n"),
+		    "(got %d bytes, expected %d bytes) from "
+		    "firmware image file %s: %s\n"),
 		    rv, verifier->imgsize,
 		    filename, strerror(errno));
 		rv = FWFLASH_FAILURE;
@@ -975,7 +978,7 @@ fwflash_read_file(char *device, char *filename)
 {
 	struct devicelist *curdev;
 	int rv;
-	int notfound = 0;
+	int found = 0;
 
 	/* new firmware filename and device desc */
 
@@ -989,12 +992,12 @@ fwflash_read_file(char *device, char *filename)
 				    gettext("Unable to write out firmware "
 				    "image for %s to file %s\n"),
 				    curdev->access_devname, filename);
-		} else {
-			notfound++;
+			found++;
 		}
 
 	}
-	if (notfound) {
+
+	if (!found) {
 		logmsg(MSG_ERROR,
 		    gettext("No device matching %s was found.\n"),
 		    device);
@@ -1028,7 +1031,7 @@ fwflash_usage(char *arg)
 	    "\t-c device_class limit search to a specific class\n"
 	    "\t\t\teg IB for InfiniBand, ses for SCSI Enclosures\n"
 	    "\t-v\t\tprint version number of fwflash utility\n"
-	    "\t-h\t\tprint this usage mesage\n\n"));
+	    "\t-h\t\tprint this usage message\n\n"));
 	(void) fprintf(stdout,
 	    gettext("\t-f file1,file2,file3,...\n"
 	    "\t\t\tfirmware image file list to flash\n"
