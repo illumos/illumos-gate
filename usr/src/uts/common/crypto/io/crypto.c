@@ -4520,7 +4520,7 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	crypto_session_data_t *sp = NULL;
 	crypto_object_id_t handle;
 	caddr_t og_attributes;
-	caddr_t u_attrs;
+	caddr_t u_attrs = NULL;
 	size_t k_attrs_size;
 	size_t rctl_bytes = 0;
 	boolean_t rctl_chk = B_FALSE;
