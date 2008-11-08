@@ -14,7 +14,7 @@ install	:= TARGET = install
 clean	:= TARGET = clean
 clobber	:= TARGET = clobber
 
-GRUB	= grub-0.95
+GRUB	= grub-0.97
 
 SUBDIRS	= $(GRUB)
 

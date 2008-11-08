@@ -1,7 +1,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 The current version of GRUB is based on
-	grub-0.95 from ftp://alpha.gnu.org/gnu/grub/
+	grub-0.97 from ftp://alpha.gnu.org/gnu/grub/
 
 Graphics patch from Red Hat:
 	http://ruslug.rutgers.edu/~mcgrof/grub-images/patches/historic/redhat/
