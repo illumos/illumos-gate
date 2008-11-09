@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  The Cyclic Subsystem
  *  --------------------
@@ -109,6 +107,7 @@
  *      cyclic_add_omni()    <-- Creates an omnipresent cyclic
  *      cyclic_remove()      <-- Removes a cyclic
  *      cyclic_bind()        <-- Change a cyclic's CPU or partition binding
+ *      cyclic_reprogram()   <-- Reprogram a cyclic's expiration
  *
  *  Inter-subsystem Interfaces
  *
@@ -550,6 +549,63 @@
  *  leverages the existing cyclic expiry processing, which will compensate
  *  for any time lost while juggling.
  *
+ *  Reprogramming
+ *
+ *  Normally, after a cyclic fires, its next expiration is computed from
+ *  the current time and the cyclic interval. But there are situations when
+ *  the next expiration needs to be reprogrammed by the kernel subsystem that
+ *  is using the cyclic. cyclic_reprogram() allows this to be done. This,
+ *  unlike the other kernel at-large cyclic API functions, is permitted to
+ *  be called from the cyclic handler. This is because it does not use the
+ *  cpu_lock to serialize access.
+ *
+ *  When cyclic_reprogram() is called for an omni-cyclic, the operation is
+ *  applied to the omni-cyclic's component on the current CPU.
+ *
+ *  If a high-level cyclic handler reprograms its own cyclic, then
+ *  cyclic_fire() detects that and does not recompute the cyclic's next
+ *  expiration. However, for a lock-level or a low-level cyclic, the
+ *  actual cyclic handler will execute at the lower PIL only after
+ *  cyclic_fire() is done with all expired cyclics. To deal with this, such
+ *  cyclics can be specified with a special interval of CY_INFINITY (INT64_MAX).
+ *  cyclic_fire() recognizes this special value and recomputes the next
+ *  expiration to CY_INFINITY. This effectively moves the cyclic to the
+ *  bottom of the heap and prevents it from going off until its handler has
+ *  had a chance to reprogram it. Infact, this is the way to create and reuse
+ *  "one-shot" timers in the context of the cyclic subsystem without using
+ *  cyclic_remove().
+ *
+ *  Here is the procedure for cyclic reprogramming:
+ *
+ *    1.  cyclic_reprogram() calls cyclic_reprogram_xcall() on the CPU
+ *        that houses the cyclic.
+ *    2.  cyclic_reprogram_xcall() raises interrupt level to CY_HIGH_LEVEL
+ *    3.  The cyclic is located in the cyclic heap. The search for this is
+ *        done from the bottom of the heap to the top as reprogrammable cyclics
+ *        would be located closer to the bottom than the top.
+ *    4.  The cyclic expiration is set and the cyclic is moved to its
+ *        correct position in the heap (up or down depending on whether the
+ *        new expiration is less than or greater than the old one).
+ *    5.  If the cyclic move modified the root of the heap, the backend is
+ *	  reprogrammed.
+ *
+ *  Reprogramming can be a frequent event (see the callout subsystem). So,
+ *  the serialization used has to be efficient. As with all other cyclic
+ *  operations, the interrupt level is raised during reprogramming. Plus,
+ *  during reprogramming, the cyclic must not be juggled (regular cyclic)
+ *  or stopped (omni-cyclic). The implementation defines a per-cyclic
+ *  reader-writer lock to accomplish this. This lock is acquired in the
+ *  reader mode by cyclic_reprogram() and writer mode by cyclic_juggle() and
+ *  cyclic_omni_stop(). The reader-writer lock makes it efficient if
+ *  an omni-cyclic is reprogrammed on different CPUs frequently.
+ *
+ *  Note that since the cpu_lock is not used during reprogramming, it is
+ *  the responsibility of the user of the reprogrammable cyclic to make sure
+ *  that the cyclic is not removed via cyclic_remove() during reprogramming.
+ *  This is not an unreasonable requirement as the user will typically have
+ *  some sort of synchronization for its cyclic-related activities. This
+ *  little caveat exists because the cyclic ID is not really an ID. It is
+ *  implemented as a pointer to a structure.
  */
 #include <sys/cyclic_impl.h>
 #include <sys/sysmacros.h>
@@ -914,6 +970,27 @@ cyclic_fire(cpu_t *c)
 		cyclic_expire(cpu, ndx, cyclic);
 
 		/*
+		 * If the handler reprogrammed the cyclic, then don't
+		 * recompute the expiration. Then, if the interval is
+		 * infinity, set the expiration to infinity. This can
+		 * be used to create one-shot timers.
+		 */
+		if (exp != cyclic->cy_expire) {
+			/*
+			 * If a hi level cyclic reprograms itself,
+			 * the heap adjustment and reprogramming of the
+			 * clock source have already been done at this
+			 * point. So, we can continue.
+			 */
+			continue;
+		}
+
+		if (cyclic->cy_interval == CY_INFINITY)
+			exp = CY_INFINITY;
+		else
+			exp += cyclic->cy_interval;
+
+		/*
 		 * If this cyclic will be set to next expire in the distant
 		 * past, we have one of two situations:
 		 *
@@ -932,7 +1009,6 @@ cyclic_fire(cpu_t *c)
 		 * debugger while still being longer than any legitimate
 		 * stretch at CY_HIGH_LEVEL).
 		 */
-		exp += cyclic->cy_interval;
 
 		if (now - exp > NANOSEC) {
 			hrtime_t interval = cyclic->cy_interval;
@@ -1676,20 +1752,22 @@ cyclic_remove_xcall(cyc_xcallarg_t *arg)
 	cyc_backend_t *be = cpu->cyp_backend;
 	cyb_arg_t bar = be->cyb_arg;
 	cyc_cookie_t cookie;
-	cyc_index_t ndx = arg->cyx_ndx, nelems = cpu->cyp_nelems, i;
-	cyc_index_t *heap = cpu->cyp_heap, last;
+	cyc_index_t ndx = arg->cyx_ndx, nelems, i;
+	cyc_index_t *heap, last;
 	cyclic_t *cyclic;
 #ifdef DEBUG
 	cyc_index_t root;
 #endif
 
 	ASSERT(cpu->cyp_state == CYS_REMOVING);
-	ASSERT(nelems > 0);
 
 	cookie = be->cyb_set_level(bar, CY_HIGH_LEVEL);
 
 	CYC_TRACE1(cpu, CY_HIGH_LEVEL, "remove-xcall", ndx);
 
+	heap = cpu->cyp_heap;
+	nelems = cpu->cyp_nelems;
+	ASSERT(nelems > 0);
 	cyclic = &cpu->cyp_cyclics[ndx];
 
 	/*
@@ -1862,6 +1940,94 @@ cyclic_remove_here(cyc_cpu_t *cpu, cyc_index_t ndx, cyc_time_t *when, int wait)
 }
 
 /*
+ * If cyclic_reprogram() is called on the same CPU as the cyclic's CPU, then
+ * it calls this function directly. Else, it invokes this function through
+ * an X-call to the cyclic's CPU.
+ */
+static void
+cyclic_reprogram_cyclic(cyc_cpu_t *cpu, cyc_index_t ndx, hrtime_t expire)
+{
+	cyc_backend_t *be = cpu->cyp_backend;
+	cyb_arg_t bar = be->cyb_arg;
+	cyc_cookie_t cookie;
+	cyc_index_t nelems, i;
+	cyc_index_t *heap;
+	cyclic_t *cyclic;
+	hrtime_t oexpire;
+	int reprog;
+
+	cookie = be->cyb_set_level(bar, CY_HIGH_LEVEL);
+
+	CYC_TRACE1(cpu, CY_HIGH_LEVEL, "reprog-xcall", ndx);
+
+	nelems = cpu->cyp_nelems;
+	ASSERT(nelems > 0);
+	heap = cpu->cyp_heap;
+
+	/*
+	 * Reprogrammed cyclics are typically one-shot ones that get
+	 * set to infinity on every expiration. We shorten the search by
+	 * searching from the bottom of the heap to the top instead of the
+	 * other way around.
+	 */
+	for (i = nelems - 1; i >= 0; i--) {
+		if (heap[i] == ndx)
+			break;
+	}
+	if (i < 0)
+		panic("attempt to reprogram non-existent cyclic");
+
+	cyclic = &cpu->cyp_cyclics[ndx];
+	oexpire = cyclic->cy_expire;
+	cyclic->cy_expire = expire;
+
+	reprog = (i == 0);
+	if (expire > oexpire) {
+		CYC_TRACE1(cpu, CY_HIGH_LEVEL, "reprog-down", i);
+		cyclic_downheap(cpu, i);
+	} else if (i > 0) {
+		CYC_TRACE1(cpu, CY_HIGH_LEVEL, "reprog-up", i);
+		reprog = cyclic_upheap(cpu, i);
+	}
+
+	if (reprog && (cpu->cyp_state != CYS_SUSPENDED)) {
+		/*
+		 * The root changed. Reprogram the clock source.
+		 */
+		CYC_TRACE0(cpu, CY_HIGH_LEVEL, "reprog-root");
+		cyclic = &cpu->cyp_cyclics[heap[0]];
+		be->cyb_reprogram(bar, cyclic->cy_expire);
+	}
+
+	be->cyb_restore_level(bar, cookie);
+}
+
+static void
+cyclic_reprogram_xcall(cyc_xcallarg_t *arg)
+{
+	cyclic_reprogram_cyclic(arg->cyx_cpu, arg->cyx_ndx,
+	    arg->cyx_when->cyt_when);
+}
+
+static void
+cyclic_reprogram_here(cyc_cpu_t *cpu, cyc_index_t ndx, hrtime_t expiration)
+{
+	cyc_backend_t *be = cpu->cyp_backend;
+	cyc_xcallarg_t arg;
+	cyc_time_t when;
+
+	ASSERT(expiration > 0);
+
+	arg.cyx_ndx = ndx;
+	arg.cyx_cpu = cpu;
+	arg.cyx_when = &when;
+	when.cyt_when = expiration;
+
+	be->cyb_xcall(be->cyb_arg, cpu->cyp_cpu,
+	    (cyc_func_t)cyclic_reprogram_xcall, &arg);
+}
+
+/*
  * cyclic_juggle_one_to() should only be called when the source cyclic
  * can be juggled and the destination CPU is known to be able to accept
  * it.
@@ -1905,6 +2071,13 @@ cyclic_juggle_one_to(cyc_id_t *idp, cyc_cpu_t *dest)
 	}
 
 	/*
+	 * Prevent a reprogram of this cyclic while we are relocating it.
+	 * Otherwise, cyclic_reprogram_here() will end up sending an X-call
+	 * to the wrong CPU.
+	 */
+	rw_enter(&idp->cyi_lock, RW_WRITER);
+
+	/*
 	 * Remove the cyclic from the source.  As mentioned above, we cannot
 	 * block during this operation; if we cannot remove the cyclic
 	 * without waiting, we spin for a time shorter than the interval, and
@@ -1934,7 +2107,13 @@ cyclic_juggle_one_to(cyc_id_t *idp, cyc_cpu_t *dest)
 		if (delay > (cyclic->cy_interval >> 1))
 			delay = cyclic->cy_interval >> 1;
 
+		/*
+		 * Drop the RW lock to avoid a deadlock with the cyclic
+		 * handler (because it can potentially call cyclic_reprogram().
+		 */
+		rw_exit(&idp->cyi_lock);
 		drv_usecwait((clock_t)(delay / (NANOSEC / MICROSEC)));
+		rw_enter(&idp->cyi_lock, RW_WRITER);
 	}
 
 	/*
@@ -1945,6 +2124,12 @@ cyclic_juggle_one_to(cyc_id_t *idp, cyc_cpu_t *dest)
 	idp->cyi_ndx = cyclic_add_here(dest, &hdlr, &when, flags);
 	idp->cyi_cpu = dest;
 	kpreempt_enable();
+
+	/*
+	 * Now that we have successfully relocated the cyclic, allow
+	 * it to be reprogrammed.
+	 */
+	rw_exit(&idp->cyi_lock);
 }
 
 static int
@@ -2326,12 +2511,21 @@ cyclic_omni_stop(cyc_id_t *idp, cyc_cpu_t *cpu)
 {
 	cyc_omni_handler_t *omni = &idp->cyi_omni_hdlr;
 	cyc_omni_cpu_t *ocpu = idp->cyi_omni_list, *prev = NULL;
+	clock_t delay;
+	int ret;
 
 	CYC_PTRACE("omni-stop", cpu, idp);
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(cpu->cyp_state == CYS_ONLINE);
 	ASSERT(idp->cyi_cpu == NULL);
 	ASSERT(ocpu != NULL);
+
+	/*
+	 * Prevent a reprogram of this cyclic while we are removing it.
+	 * Otherwise, cyclic_reprogram_here() will end up sending an X-call
+	 * to the offlined CPU.
+	 */
+	rw_enter(&idp->cyi_lock, RW_WRITER);
 
 	while (ocpu != NULL && ocpu->cyo_cpu != cpu) {
 		prev = ocpu;
@@ -2351,7 +2545,51 @@ cyclic_omni_stop(cyc_id_t *idp, cyc_cpu_t *cpu)
 		prev->cyo_next = ocpu->cyo_next;
 	}
 
-	(void) cyclic_remove_here(ocpu->cyo_cpu, ocpu->cyo_ndx, NULL, CY_WAIT);
+	/*
+	 * Remove the cyclic from the source.  We cannot block during this
+	 * operation because we are holding the cyi_lock which can be held
+	 * by the cyclic handler via cyclic_reprogram().
+	 *
+	 * If we cannot remove the cyclic without waiting, we spin for a time,
+	 * and reattempt the (non-blocking) removal. If the handler is blocked
+	 * on the cyi_lock, then we let go of it in the spin loop to give
+	 * the handler a chance to run. Note that the removal will ultimately
+	 * succeed -- even if the cyclic handler is blocked on a resource
+	 * held by a thread which we have preempted, priority inheritance
+	 * assures that the preempted thread will preempt us and continue
+	 * to progress.
+	 */
+	for (delay = 1; ; delay <<= 1) {
+		/*
+		 * Before we begin this operation, disable kernel preemption.
+		 */
+		kpreempt_disable();
+		ret = cyclic_remove_here(ocpu->cyo_cpu, ocpu->cyo_ndx, NULL,
+		    CY_NOWAIT);
+		/*
+		 * Enable kernel preemption while spinning.
+		 */
+		kpreempt_enable();
+
+		if (ret)
+			break;
+
+		CYC_PTRACE("remove-omni-retry", idp, ocpu->cyo_cpu);
+
+		/*
+		 * Drop the RW lock to avoid a deadlock with the cyclic
+		 * handler (because it can potentially call cyclic_reprogram().
+		 */
+		rw_exit(&idp->cyi_lock);
+		drv_usecwait(delay);
+		rw_enter(&idp->cyi_lock, RW_WRITER);
+	}
+
+	/*
+	 * Now that we have successfully removed the cyclic, allow the omni
+	 * cyclic to be reprogrammed on other CPUs.
+	 */
+	rw_exit(&idp->cyi_lock);
 
 	/*
 	 * The cyclic has been removed from this CPU; time to call the
@@ -2381,6 +2619,7 @@ cyclic_new_id()
 	 */
 	idp->cyi_cpu = NULL;
 	idp->cyi_ndx = 0;
+	rw_init(&idp->cyi_lock, NULL, RW_DEFAULT, NULL);
 
 	idp->cyi_next = cyclic_id_head;
 	idp->cyi_prev = NULL;
@@ -2796,6 +3035,73 @@ cyclic_bind(cyclic_id_t id, cpu_t *d, cpupart_t *part)
 
 	if (!(flags & CYF_PART_BOUND) && part != NULL)
 		cyclic_bind_cpupart(id, part);
+}
+
+int
+cyclic_reprogram(cyclic_id_t id, hrtime_t expiration)
+{
+	cyc_id_t *idp = (cyc_id_t *)id;
+	cyc_cpu_t *cpu;
+	cyc_omni_cpu_t *ocpu;
+	cyc_index_t ndx;
+
+	ASSERT(expiration > 0);
+
+	CYC_PTRACE("reprog", idp, idp->cyi_cpu);
+
+	kpreempt_disable();
+
+	/*
+	 * Prevent the cyclic from moving or disappearing while we reprogram.
+	 */
+	rw_enter(&idp->cyi_lock, RW_READER);
+
+	if (idp->cyi_cpu == NULL) {
+		ASSERT(curthread->t_preempt > 0);
+		cpu = CPU->cpu_cyclic;
+
+		/*
+		 * For an omni cyclic, we reprogram the cyclic corresponding
+		 * to the current CPU. Look for it in the list.
+		 */
+		ocpu = idp->cyi_omni_list;
+		while (ocpu != NULL) {
+			if (ocpu->cyo_cpu == cpu)
+				break;
+			ocpu = ocpu->cyo_next;
+		}
+
+		if (ocpu == NULL) {
+			/*
+			 * Didn't find it. This means that CPU offline
+			 * must have removed it racing with us. So,
+			 * nothing to do.
+			 */
+			rw_exit(&idp->cyi_lock);
+
+			kpreempt_enable();
+
+			return (0);
+		}
+		ndx = ocpu->cyo_ndx;
+	} else {
+		cpu = idp->cyi_cpu;
+		ndx = idp->cyi_ndx;
+	}
+
+	if (cpu->cyp_cpu == CPU)
+		cyclic_reprogram_cyclic(cpu, ndx, expiration);
+	else
+		cyclic_reprogram_here(cpu, ndx, expiration);
+
+	/*
+	 * Allow the cyclic to be moved or removed.
+	 */
+	rw_exit(&idp->cyi_lock);
+
+	kpreempt_enable();
+
+	return (1);
 }
 
 hrtime_t

@@ -23,14 +23,12 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SYSTM_H
 #define	_SYS_SYSTM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -156,9 +154,24 @@ uint_t umax(uint_t, uint_t);
 int grow(caddr_t);
 int grow_internal(caddr_t, uint_t);
 int brk_internal(caddr_t, uint_t);
+typedef uint64_t callout_id_t;
 timeout_id_t timeout(void (*)(void *), void *, clock_t);
 timeout_id_t realtime_timeout(void (*)(void *), void *, clock_t);
 clock_t untimeout(timeout_id_t);
+/*
+ * The last argument to timeout_generic() is flags. See callo.h for the
+ * flags definitions.
+ */
+callout_id_t timeout_generic(int, void (*)(void *), void *, hrtime_t, hrtime_t,
+    int);
+callout_id_t timeout_default(void (*)(void *), void *, clock_t);
+callout_id_t realtime_timeout_default(void (*)(void *), void *, clock_t);
+/*
+ * The last argument to untimeout_generic() is flags. See callout.c for the
+ * use.
+ */
+hrtime_t untimeout_generic(callout_id_t, int);
+clock_t untimeout_default(callout_id_t, int);
 void delay(clock_t);
 int delay_sig(clock_t);
 int nodev();

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
 #include <sys/cyclic.h>
 #include <sys/cyclic_impl.h>
@@ -46,6 +44,11 @@
 static int cbe_vector;
 static int cbe_ticks = 0;
 
+/*
+ * cbe_xcall_lock is used to protect the xcall globals since the cyclic
+ * reprogramming API does not use cpu_lock.
+ */
+static kmutex_t cbe_xcall_lock;
 static cyc_func_t volatile cbe_xcall_func;
 static cpu_t *volatile cbe_xcall_cpu;
 static void *cbe_xcall_farg;
@@ -180,6 +183,8 @@ cbe_xcall(void *arg, cpu_t *dest, cyc_func_t func, void *farg)
 		return;
 	}
 
+	mutex_enter(&cbe_xcall_lock);
+
 	ASSERT(cbe_xcall_func == NULL);
 
 	cbe_xcall_farg = farg;
@@ -192,6 +197,8 @@ cbe_xcall(void *arg, cpu_t *dest, cyc_func_t func, void *farg)
 
 	while (cbe_xcall_func != NULL || cbe_xcall_cpu != NULL)
 		continue;
+
+	mutex_exit(&cbe_xcall_lock);
 
 	kpreempt_enable();
 
@@ -329,6 +336,7 @@ cbe_init(void)
 	cyc_handler_t hdlr;
 	cyc_time_t when;
 
+	mutex_init(&cbe_xcall_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	mutex_enter(&cpu_lock);
 	cyclic_init(&cbe, cbe_timer_resolution);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_CYCLIC_H
 #define	_SYS_CYCLIC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -73,12 +70,15 @@ typedef struct cyc_omni_handler {
 	void *cyo_arg;
 } cyc_omni_handler_t;
 
+#define	CY_INFINITY	INT64_MAX
+
 #ifdef _KERNEL
 
 extern cyclic_id_t cyclic_add(cyc_handler_t *, cyc_time_t *);
 extern cyclic_id_t cyclic_add_omni(cyc_omni_handler_t *);
 extern void cyclic_remove(cyclic_id_t);
 extern void cyclic_bind(cyclic_id_t, cpu_t *, cpupart_t *);
+extern int cyclic_reprogram(cyclic_id_t, hrtime_t);
 extern hrtime_t cyclic_getres();
 
 extern int cyclic_offline(cpu_t *cpu);

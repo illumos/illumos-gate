@@ -79,7 +79,6 @@
  *
  * Functions:
  *	reprime clock
- *	schedule callouts
  *	maintain date
  *	jab the scheduler
  */
@@ -564,11 +563,6 @@ clock(void)
 	if (one_sec)
 		kcage_tick();
 
-	/*
-	 * Schedule timeout() requests if any are due at this time.
-	 */
-	callout_schedule();
-
 	if (one_sec) {
 
 		int drift, absdrift;
@@ -734,6 +728,8 @@ clock(void)
 					timechanged++;
 					tod_needsync = 0;
 					hr_clock_unlock(s);
+					callout_hrestime();
+
 				}
 			} else {
 				if (tod_needsync || !dosynctodr) {
@@ -1720,6 +1716,7 @@ set_hrestime(timestruc_t *ts)
 	timedelta = 0;
 	timechanged++;
 	hr_clock_unlock(spl);
+	callout_hrestime();
 }
 
 static uint_t deadman_seconds;

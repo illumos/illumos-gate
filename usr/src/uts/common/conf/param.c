@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/param.h>
@@ -195,6 +193,7 @@ extern void pg_init(void);
 extern void pg_cmt_class_init(void);
 extern void pg_cpu0_init(void);
 extern void clock_tick_mp_init(void);
+extern void callout_mp_init(void);
 
 void	(*init_tbl[])(void) = {
 	system_taskq_init,
@@ -240,6 +239,7 @@ void	(*mp_init_tbl[])(void) = {
 	siron_mp_init,
 #endif
 	clock_tick_mp_init,
+	callout_mp_init,
 	0
 };
 

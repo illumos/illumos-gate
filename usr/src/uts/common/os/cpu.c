@@ -59,6 +59,7 @@
 #if defined(__x86) || defined(__amd64)
 #include <sys/x86_archext.h>
 #endif
+#include <sys/callo.h>
 
 extern int	mp_cpu_start(cpu_t *);
 extern int	mp_cpu_stop(cpu_t *);
@@ -1206,6 +1207,11 @@ cpu_online(cpu_t *cp)
 		cpu_intr_enable(cp);	/* arch-dep hook */
 		cpu_set_state(cp);
 		cyclic_online(cp);
+		/*
+		 * This has to be called only after cyclic_online(). This
+		 * function uses cyclics.
+		 */
+		callout_cpu_online(cp);
 		poke_cpu(cp->cpu_id);
 	}
 

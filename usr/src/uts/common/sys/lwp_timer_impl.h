@@ -27,12 +27,11 @@
 #ifndef _SYS_LWP_TIMER_IMPL_H
 #define	_SYS_LWP_TIMER_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/lwp.h>
 #include <sys/time.h>
+#include <sys/systm.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,7 +44,7 @@ typedef struct {
 	int		lwpt_timecheck;
 	uint_t		lwpt_imm_timeout;
 	int		lwpt_time_error;
-	timeout_id_t	lwpt_id;
+	callout_id_t	lwpt_id;
 } lwp_timer_t;
 
 #ifdef _KERNEL

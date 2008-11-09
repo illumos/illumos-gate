@@ -37,6 +37,7 @@
 #include <sys/schedctl.h>
 #include <sys/procfs.h>
 #include <sys/sdt.h>
+#include <sys/callo.h>
 
 /*
  * CV_MAX_WAITERS is the maximum number of waiters we track; once
@@ -196,6 +197,21 @@ cv_wait(kcondvar_t *cvp, kmutex_t *mp)
 	mutex_enter(mp);
 }
 
+static void
+cv_wakeup(void *arg)
+{
+	kthread_t *t = arg;
+
+	/*
+	 * This mutex is acquired and released in order to make sure that
+	 * the wakeup does not happen before the block itself happens.
+	 */
+	mutex_enter(t->t_wait_mp);
+	mutex_exit(t->t_wait_mp);
+	setrun(t);
+	t->t_wait_mp = NULL;
+}
+
 /*
  * Same as cv_wait except the thread will unblock at 'tim'
  * (an absolute time) if it hasn't already unblocked.
@@ -207,7 +223,7 @@ clock_t
 cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 {
 	kthread_t *t = curthread;
-	timeout_id_t id;
+	callout_id_t id;
 	clock_t timeleft;
 	int signalled;
 
@@ -217,13 +233,12 @@ cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	timeleft = tim - lbolt;
 	if (timeleft <= 0)
 		return (-1);
-	id = realtime_timeout((void (*)(void *))setrun, t, timeleft);
+	t->t_wait_mp = mp;
+	id = realtime_timeout_default((void (*)(void *))cv_wakeup, t, timeleft);
 	thread_lock(t);		/* lock the thread */
 	cv_block((condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
 	mutex_exit(mp);
-	if ((tim - lbolt) <= 0)		/* allow for wrap */
-		setrun(t);
 	swtch();
 	signalled = (t->t_schedflag & TS_SIGNALLED);
 	/*
@@ -233,7 +248,7 @@ cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	 * we called untimeout.  We will treat this as if the timeout
 	 * has occured and set timeleft to -1.
 	 */
-	timeleft = untimeout(id);
+	timeleft = (t->t_wait_mp == NULL) ? -1 : untimeout_default(id, 0);
 	mutex_enter(mp);
 	if (timeleft <= 0) {
 		timeleft = -1;
@@ -299,28 +314,25 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 	return (rval);
 }
 
-/*
- * Returns:
- * 	Function result in order of presidence:
- *		 0 if a signal was received
- *		-1 if timeout occured
- *		>0 if awakened via cv_signal() or cv_broadcast().
- *		   (returns time remaining)
- *
- * cv_timedwait_sig() is now part of the DDI.
- */
-clock_t
-cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
+static clock_t
+cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 {
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
 	klwp_t *lwp = ttolwp(t);
 	int cancel_pending = 0;
-	timeout_id_t id;
+	callout_id_t id;
 	clock_t rval = 1;
 	clock_t timeleft;
 	int signalled = 0;
 
+	/*
+	 * If the flag is 0, then realtime_timeout() below creates a
+	 * regular realtime timeout. If the flag is CALLOUT_FLAG_HRESTIME,
+	 * then, it creates a special realtime timeout which is affected by
+	 * changes to hrestime. See callo.h for details.
+	 */
+	ASSERT((flag == 0) || (flag == CALLOUT_FLAG_HRESTIME));
 	if (panicstr)
 		return (rval);
 
@@ -351,21 +363,21 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	 * Set the timeout and wait.
 	 */
 	cancel_pending = schedctl_cancel_pending();
-	id = realtime_timeout((void (*)(void *))setrun, t, timeleft);
+	t->t_wait_mp = mp;
+	id = timeout_generic(CALLOUT_REALTIME, (void (*)(void *))cv_wakeup, t,
+	    TICK_TO_NSEC(timeleft), nsec_per_tick, flag);
 	lwp->lwp_asleep = 1;
 	lwp->lwp_sysabort = 0;
 	thread_lock(t);
 	cv_block_sig(t, (condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
 	mutex_exit(mp);
-	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending ||
-	    (tim - lbolt <= 0))
+	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending)
 		setrun(t);
 	/* ASSERT(no locks are held) */
 	swtch();
 	signalled = (t->t_schedflag & TS_SIGNALLED);
 	t->t_flag &= ~T_WAKEABLE;
-	mutex_enter(mp);
 
 	/*
 	 * Untimeout the thread.  untimeout() returns -1 if the timeout has
@@ -374,7 +386,8 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	 * we called untimeout.  We will treat this as if the timeout
 	 * has occured and set rval to -1.
 	 */
-	rval = untimeout(id);
+	rval = (t->t_wait_mp == NULL) ? -1 : untimeout_default(id, 0);
+	mutex_enter(mp);
 	if (rval <= 0)
 		rval = -1;
 
@@ -401,6 +414,24 @@ out:
 	if (rval <= 0 && signalled)	/* avoid consuming the cv_signal() */
 		cv_signal(cvp);
 	return (rval);
+}
+
+/*
+ * Returns:
+ * 	Function result in order of precedence:
+ *		 0 if a signal was received
+ *		-1 if timeout occured
+ *		>0 if awakened via cv_signal() or cv_broadcast().
+ *		   (returns time remaining)
+ *
+ * cv_timedwait_sig() is now part of the DDI.
+ *
+ * This function is now just a wrapper for cv_timedwait_sig_internal().
+ */
+clock_t
+cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
+{
+	return (cv_timedwait_sig_internal(cvp, mp, tim, 0));
 }
 
 /*
@@ -542,7 +573,7 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
 	kthread_t *t = curthread;
 	klwp_t *lwp = ttolwp(t);
 	proc_t *p = ttoproc(t);
-	timeout_id_t id;
+	callout_id_t id;
 	clock_t tim;
 
 	if (panicstr)
@@ -562,16 +593,17 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
 	 * Wakeup in wakeup_time milliseconds, i.e., human time.
 	 */
 	tim = lbolt + MSEC_TO_TICK(wakeup_time);
-	id = realtime_timeout((void (*)(void *))setrun, t, tim - lbolt);
+	t->t_wait_mp = mp;
+	id = realtime_timeout_default((void (*)(void *))cv_wakeup, t,
+	    tim - lbolt);
 	thread_lock(t);			/* lock the thread */
 	cv_block((condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
 	mutex_exit(mp);
 	/* ASSERT(no locks are held); */
-	if ((tim - lbolt) <= 0)		/* allow for wrap */
-		setrun(t);
 	swtch();
-	(void) untimeout(id);
+	if (t->t_wait_mp != NULL)
+		(void) untimeout_default(id, 0);
 
 	/*
 	 * Check for reasons to stop, if lwp_nostop is not true.
@@ -628,7 +660,7 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
  * that a timeout occurred until the future time is passed.
  * If 'when' is a NULL pointer, no timeout will occur.
  * Returns:
- * 	Function result in order of presidence:
+ * 	Function result in order of precedence:
  *		 0 if a signal was received
  *		-1 if timeout occured
  *	        >0 if awakened via cv_signal() or cv_broadcast()
@@ -665,8 +697,9 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 	} else {
 		gethrestime_lasttick(&now);
 		if (timecheck == timechanged) {
-			rval = cv_timedwait_sig(cvp, mp,
-			    lbolt + timespectohz(when, now));
+			rval = cv_timedwait_sig_internal(cvp, mp,
+			    lbolt + timespectohz(when, now),
+			    CALLOUT_FLAG_HRESTIME);
 
 		} else {
 			/*

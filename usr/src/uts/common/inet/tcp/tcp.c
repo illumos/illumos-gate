@@ -64,6 +64,7 @@
 #include <sys/random.h>
 #include <sys/sodirect.h>
 #include <sys/uio.h>
+#include <sys/systm.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netinet/ip6.h>
@@ -100,6 +101,7 @@
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
 #include <rpc/pmap_prot.h>
+#include <sys/callo.h>
 
 /*
  * TCP Notes: aka FireEngine Phase I (PSARC 2002/433)
@@ -541,7 +543,7 @@ static sin6_t	sin6_null;	/* Zero address for quick clears */
 typedef struct tcp_timer_s {
 	conn_t	*connp;
 	void 	(*tcpt_proc)(void *);
-	timeout_id_t   tcpt_tid;
+	callout_id_t   tcpt_tid;
 } tcp_timer_t;
 
 static kmem_cache_t *tcp_timercache;
@@ -576,7 +578,7 @@ kmem_cache_t	*tcp_iphc_cache;
  */
 typedef struct tcp_squeue_priv_s {
 	kmutex_t	tcp_time_wait_lock;
-	timeout_id_t	tcp_time_wait_tid;
+	callout_id_t	tcp_time_wait_tid;
 	tcp_t		*tcp_time_wait_head;
 	tcp_t		*tcp_time_wait_tail;
 	tcp_t		*tcp_free_list;
@@ -1901,7 +1903,9 @@ tcp_time_wait_collector(void *arg)
 		tcp_time_wait->tcp_free_list->tcp_in_free_list = B_TRUE;
 
 	tcp_time_wait->tcp_time_wait_tid =
-	    timeout(tcp_time_wait_collector, sqp, TCP_TIME_WAIT_DELAY);
+	    timeout_generic(CALLOUT_NORMAL, tcp_time_wait_collector, sqp,
+	    TICK_TO_NSEC(TCP_TIME_WAIT_DELAY), CALLOUT_TCP_RESOLUTION,
+	    CALLOUT_FLAG_ROUNDUP);
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 }
 /*
@@ -25931,7 +25935,17 @@ tcp_timeout(conn_t *connp, void (*f)(void *), clock_t tim)
 	tcpt = (tcp_timer_t *)mp->b_rptr;
 	tcpt->connp = connp;
 	tcpt->tcpt_proc = f;
-	tcpt->tcpt_tid = timeout(tcp_timer_callback, mp, tim);
+	/*
+	 * TCP timers are normal timeouts. Plus, they do not require more than
+	 * a 10 millisecond resolution. By choosing a coarser resolution and by
+	 * rounding up the expiration to the next resolution boundary, we can
+	 * batch timers in the callout subsystem to make TCP timers more
+	 * efficient. The roundup also protects short timers from expiring too
+	 * early before they have a chance to be cancelled.
+	 */
+	tcpt->tcpt_tid = timeout_generic(CALLOUT_NORMAL, tcp_timer_callback, mp,
+	    TICK_TO_NSEC(tim), CALLOUT_TCP_RESOLUTION, CALLOUT_FLAG_ROUNDUP);
+
 	return ((timeout_id_t)mp);
 }
 
@@ -25995,7 +26009,7 @@ tcp_timeout_cancel(conn_t *connp, timeout_id_t id)
 	tcpt = (tcp_timer_t *)mp->b_rptr;
 	ASSERT(tcpt->connp == connp);
 
-	delta = untimeout(tcpt->tcpt_tid);
+	delta = untimeout_default(tcpt->tcpt_tid, 0);
 
 	if (delta >= 0) {
 		TCP_DBGSTAT(tcps, tcp_timeout_canceled);
@@ -26597,8 +26611,10 @@ tcp_squeue_add(squeue_t *sqp)
 	    sizeof (tcp_squeue_priv_t), KM_SLEEP);
 
 	*squeue_getprivate(sqp, SQPRIVATE_TCP) = (intptr_t)tcp_time_wait;
-	tcp_time_wait->tcp_time_wait_tid = timeout(tcp_time_wait_collector,
-	    sqp, TCP_TIME_WAIT_DELAY);
+	tcp_time_wait->tcp_time_wait_tid =
+	    timeout_generic(CALLOUT_NORMAL, tcp_time_wait_collector, sqp,
+	    TICK_TO_NSEC(TCP_TIME_WAIT_DELAY), CALLOUT_TCP_RESOLUTION,
+	    CALLOUT_FLAG_ROUNDUP);
 	if (tcp_free_list_max_cnt == 0) {
 		int tcp_ncpus = ((boot_max_ncpus == -1) ?
 		    max_ncpus : boot_max_ncpus);

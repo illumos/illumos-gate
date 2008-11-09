@@ -341,6 +341,7 @@ typedef struct _kthread {
 	hrtime_t	t_hrtime;	/* high-res last time on cpu */
 	kmutex_t	t_ctx_lock;	/* protects t_ctx in removectx() */
 	struct waitq	*t_waitq;	/* wait queue */
+	kmutex_t	*t_wait_mp;	/* used in CV wait functions */
 } kthread_t;
 
 /*

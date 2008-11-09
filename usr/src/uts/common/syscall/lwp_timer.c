@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/debug.h>
@@ -33,6 +31,7 @@
 #include <sys/atomic.h>
 #include <sys/timer.h>
 #include <sys/lwp_timer_impl.h>
+#include <sys/callo.h>
 
 /*
  * lwp_timer_timeout() is called from a timeout set up in lwp_cond_wait(),
@@ -69,8 +68,10 @@ lwp_timer_timeout(void *arg)
 	    (lwptp->lwpt_rqtime.tv_sec == now.tv_sec &&
 	    lwptp->lwpt_rqtime.tv_nsec > now.tv_nsec))) {
 		lwptp->lwpt_imm_timeout = 0;
-		lwptp->lwpt_id = realtime_timeout(lwp_timer_timeout, lwptp,
-		    timespectohz(&lwptp->lwpt_rqtime, now));
+		lwptp->lwpt_id = timeout_generic(CALLOUT_REALTIME,
+		    lwp_timer_timeout, lwptp,
+		    TICK_TO_NSEC(timespectohz(&lwptp->lwpt_rqtime, now)),
+		    nsec_per_tick, CALLOUT_FLAG_HRESTIME);
 	} else {
 		/*
 		 * Set the thread running only if it is asleep on
@@ -156,8 +157,10 @@ lwp_timer_enqueue(lwp_timer_t *lwptp)
 		 * Queue the timeout.
 		 */
 		lwptp->lwpt_imm_timeout = 0;
-		lwptp->lwpt_id = realtime_timeout(lwp_timer_timeout, lwptp,
-		    timespectohz(&lwptp->lwpt_rqtime, now));
+		lwptp->lwpt_id = timeout_generic(CALLOUT_REALTIME,
+		    lwp_timer_timeout, lwptp,
+		    TICK_TO_NSEC(timespectohz(&lwptp->lwpt_rqtime, now)),
+		    nsec_per_tick, CALLOUT_FLAG_HRESTIME);
 		return (0);
 	}
 
@@ -174,13 +177,13 @@ lwp_timer_dequeue(lwp_timer_t *lwptp)
 {
 	kthread_t *t = curthread;
 	clock_t tim = -1;
-	timeout_id_t tmp_id;
+	callout_id_t tmp_id;
 
 	mutex_enter(&t->t_delay_lock);
 	while ((tmp_id = lwptp->lwpt_id) != 0) {
 		lwptp->lwpt_id = 0;
 		mutex_exit(&t->t_delay_lock);
-		tim = untimeout(tmp_id);
+		tim = untimeout_default(tmp_id, 0);
 		mutex_enter(&t->t_delay_lock);
 	}
 	mutex_exit(&t->t_delay_lock);

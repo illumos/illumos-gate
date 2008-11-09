@@ -402,10 +402,10 @@ main(void)
 	startup();
 	segkmem_gc();
 	callb_init();
-	callout_init();	/* callout table MUST be init'd before clock starts */
 	cbe_init_pre();	/* x86 must initialize gethrtimef before timer_init */
 	timer_init();	/* timer must be initialized before cyclic starts */
 	cbe_init();
+	callout_init();	/* callout table MUST be init'd after cyclics */
 	clock_tick_init_pre();
 	clock_init();
 

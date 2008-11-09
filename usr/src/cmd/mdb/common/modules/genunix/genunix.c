@@ -35,6 +35,7 @@
 #include <sys/proc.h>
 #include <sys/var.h>
 #include <sys/t_lock.h>
+#include <sys/systm.h>
 #include <sys/callo.h>
 #include <sys/priocntl.h>
 #include <sys/class.h>
@@ -451,82 +452,1020 @@ project(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-/*ARGSUSED*/
+/* walk callouts themselves, either by list or id hash. */
 int
-callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+callout_walk_init(mdb_walk_state_t *wsp)
 {
-	callout_table_t	*co_ktable[CALLOUT_TABLES];
-	int co_kfanout;
-	callout_table_t co_table;
-	callout_t co_callout;
-	callout_t *co_ptr;
-	int co_id;
-	clock_t lbolt;
-	int i, j, k;
-	const char *lbolt_sym;
-	uintptr_t panicstr;
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("callout doesn't support global walk");
+		return (WALK_ERR);
+	}
+	wsp->walk_data = mdb_alloc(sizeof (callout_t), UM_SLEEP);
+	return (WALK_NEXT);
+}
 
-	if ((flags & DCMD_ADDRSPEC) || argc != 0)
-		return (DCMD_USAGE);
+#define	CALLOUT_WALK_BYLIST	0
+#define	CALLOUT_WALK_BYID	1
 
-	if (mdb_readvar(&panicstr, "panicstr") == -1 ||
-	    panicstr == NULL) {
-		lbolt_sym = "lbolt";
+/* the walker arg switches between walking by list (0) and walking by id (1). */
+int
+callout_walk_step(mdb_walk_state_t *wsp)
+{
+	int retval;
+
+	if (wsp->walk_addr == NULL) {
+		return (WALK_DONE);
+	}
+	if (mdb_vread(wsp->walk_data, sizeof (callout_t),
+	    wsp->walk_addr) == -1) {
+		mdb_warn("failed to read callout at %p", wsp->walk_addr);
+		return (WALK_DONE);
+	}
+	retval = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	if ((ulong_t)wsp->walk_arg == CALLOUT_WALK_BYID) {
+		wsp->walk_addr =
+		    (uintptr_t)(((callout_t *)wsp->walk_data)->c_idnext);
 	} else {
-		lbolt_sym = "panic_lbolt";
+		wsp->walk_addr =
+		    (uintptr_t)(((callout_t *)wsp->walk_data)->c_clnext);
 	}
 
-	if (mdb_readvar(&lbolt, lbolt_sym) == -1) {
-		mdb_warn("failed to read '%s'", lbolt_sym);
-		return (DCMD_ERR);
+	return (retval);
+}
+
+void
+callout_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (callout_t));
+}
+
+/*
+ * walker for callout lists. This is different from hashes and callouts.
+ * Thankfully, it's also simpler.
+ */
+int
+callout_list_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("callout list doesn't support global walk");
+		return (WALK_ERR);
+	}
+	wsp->walk_data = mdb_alloc(sizeof (callout_list_t), UM_SLEEP);
+	return (WALK_NEXT);
+}
+
+int
+callout_list_walk_step(mdb_walk_state_t *wsp)
+{
+	int retval;
+
+	if (wsp->walk_addr == NULL) {
+		return (WALK_DONE);
+	}
+	if (mdb_vread(wsp->walk_data, sizeof (callout_list_t),
+	    wsp->walk_addr) != sizeof (callout_list_t)) {
+		mdb_warn("failed to read callout_list at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	retval = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)
+	    (((callout_list_t *)wsp->walk_data)->cl_next);
+
+	return (retval);
+}
+
+void
+callout_list_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (callout_list_t));
+}
+
+/* routines/structs to walk callout table(s) */
+typedef struct cot_data {
+	callout_table_t *ct0;
+	callout_table_t ct;
+	callout_hash_t cot_idhash[CALLOUT_BUCKETS];
+	callout_hash_t cot_clhash[CALLOUT_BUCKETS];
+	kstat_named_t ct_kstat_data[CALLOUT_NUM_STATS];
+	int cotndx;
+	int cotsize;
+} cot_data_t;
+
+int
+callout_table_walk_init(mdb_walk_state_t *wsp)
+{
+	int max_ncpus;
+	cot_data_t *cot_walk_data;
+
+	cot_walk_data = mdb_alloc(sizeof (cot_data_t), UM_SLEEP);
+
+	if (wsp->walk_addr == NULL) {
+		if (mdb_readvar(&cot_walk_data->ct0, "callout_table") == -1) {
+			mdb_warn("failed to read 'callout_table'");
+			return (WALK_ERR);
+		}
+		if (mdb_readvar(&max_ncpus, "max_ncpus") == -1) {
+			mdb_warn("failed to get callout_table array size");
+			return (WALK_ERR);
+		}
+		cot_walk_data->cotsize = CALLOUT_NTYPES * max_ncpus;
+		wsp->walk_addr = (uintptr_t)cot_walk_data->ct0;
+	} else {
+		/* not a global walk */
+		cot_walk_data->cotsize = 1;
 	}
 
-	if (mdb_readvar(&co_kfanout, "callout_fanout") == -1) {
-		mdb_warn("failed to read callout_fanout");
-		return (DCMD_ERR);
+	cot_walk_data->cotndx = 0;
+	wsp->walk_data = cot_walk_data;
+
+	return (WALK_NEXT);
+}
+
+int
+callout_table_walk_step(mdb_walk_state_t *wsp)
+{
+	int retval;
+	cot_data_t *cotwd = (cot_data_t *)wsp->walk_data;
+	size_t size;
+
+	if (cotwd->cotndx >= cotwd->cotsize) {
+		return (WALK_DONE);
+	}
+	if (mdb_vread(&(cotwd->ct), sizeof (callout_table_t),
+	    wsp->walk_addr) != sizeof (callout_table_t)) {
+		mdb_warn("failed to read callout_table at %p", wsp->walk_addr);
+		return (WALK_ERR);
 	}
 
-	if (mdb_readvar(&co_ktable, "callout_table") == -1) {
-		mdb_warn("failed to read callout_table");
-		return (DCMD_ERR);
+	size = sizeof (callout_hash_t) * CALLOUT_BUCKETS;
+	if (cotwd->ct.ct_idhash != NULL) {
+		if (mdb_vread(cotwd->cot_idhash, size,
+		    (uintptr_t)(cotwd->ct.ct_idhash)) != size) {
+			mdb_warn("failed to read id_hash at %p",
+			    cotwd->ct.ct_idhash);
+			return (WALK_ERR);
+		}
+	}
+	if (cotwd->ct.ct_clhash != NULL) {
+		if (mdb_vread(&(cotwd->cot_clhash), size,
+		    (uintptr_t)cotwd->ct.ct_clhash) == -1) {
+			mdb_warn("failed to read cl_hash at %p",
+			    cotwd->ct.ct_clhash);
+			return (WALK_ERR);
+		}
+	}
+	size = sizeof (kstat_named_t) * CALLOUT_NUM_STATS;
+	if (cotwd->ct.ct_kstat_data != NULL) {
+		if (mdb_vread(&(cotwd->ct_kstat_data), size,
+		    (uintptr_t)cotwd->ct.ct_kstat_data) == -1) {
+			mdb_warn("failed to read kstats at %p",
+			    cotwd->ct.ct_kstat_data);
+			return (WALK_ERR);
+		}
+	}
+	retval = wsp->walk_callback(wsp->walk_addr, (void *)cotwd,
+	    wsp->walk_cbdata);
+
+	cotwd->cotndx++;
+	if (cotwd->cotndx >= cotwd->cotsize) {
+		return (WALK_DONE);
+	}
+	wsp->walk_addr = (uintptr_t)((char *)wsp->walk_addr +
+	    sizeof (callout_table_t));
+
+	return (retval);
+}
+
+void
+callout_table_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (cot_data_t));
+}
+
+static const char *co_typenames[] = { "R", "N" };
+
+#define	CO_PLAIN_ID(xid)	 ((xid) & ~CALLOUT_EXECUTING)
+
+#define	TABLE_TO_SEQID(x)	((x) >> CALLOUT_TYPE_BITS)
+
+/* callout flags, in no particular order */
+#define	COF_REAL	0x0000001
+#define	COF_NORM	0x0000002
+#define	COF_LONG	0x0000004
+#define	COF_SHORT	0x0000008
+#define	COF_EMPTY	0x0000010
+#define	COF_TIME	0x0000020
+#define	COF_BEFORE	0x0000040
+#define	COF_AFTER	0x0000080
+#define	COF_SEQID	0x0000100
+#define	COF_FUNC	0x0000200
+#define	COF_ADDR	0x0000400
+#define	COF_EXEC	0x0000800
+#define	COF_HIRES	0x0001000
+/* 0x0002000 reserved for future flags */
+#define	COF_TABLE	0x0004000
+#define	COF_BYIDH	0x0008000
+#define	COF_FREE	0x0010000
+#define	COF_LIST	0x0020000
+#define	COF_EXPREL	0x0040000
+#define	COF_HDR		0x0080000
+#define	COF_VERBOSE	0x0100000
+#define	COF_LONGLIST	0x0200000
+#define	COF_THDR	0x0400000
+#define	COF_LHDR	0x0800000
+#define	COF_CHDR	0x1000000
+#define	COF_PARAM	0x2000000
+#define	COF_DECODE	0x4000000
+
+/* show real and normal, short and long, expired and unexpired. */
+#define	COF_DEFAULT	(COF_REAL | COF_NORM | COF_LONG | COF_SHORT)
+
+/* private callout data for callback functions */
+typedef struct callout_data {
+	uint_t flags;		/* COF_* */
+	cpu_t *cpu;		/* cpu pointer if given */
+	int seqid;		/* cpu seqid, or -1 */
+	hrtime_t time;		/* expiration time value */
+	hrtime_t atime;		/* expiration before value */
+	hrtime_t btime;		/* expiration after value */
+	uintptr_t funcaddr;	/* function address or NULL */
+	uintptr_t param;	/* parameter to function or NULL */
+	hrtime_t now;		/* current system time */
+	int nsec_per_tick;	/* for conversions */
+	ulong_t ctbits;		/* for decoding xid */
+	callout_table_t *co_table;	/* top of callout table array */
+	int ndx;		/* table index. */
+	int bucket;		/* which list/id bucket are we in */
+	hrtime_t exp;		/* expire time */
+} callout_data_t;
+
+/* this callback does the actual callback itself (finally). */
+/*ARGSUSED*/
+static int
+callouts_cb(uintptr_t addr, const void *data, void *priv)
+{
+	callout_data_t *coargs = (callout_data_t *)priv;
+	callout_t *co = (callout_t *)data;
+	int tableid;
+	callout_id_t coid;
+
+	if ((coargs == NULL) || (co == NULL)) {
+		return (WALK_ERR);
 	}
 
-	mdb_printf("%<u>%-24s %-?s %-?s %-?s%</u>\n",
-	    "FUNCTION", "ARGUMENT", "ID", "TIME");
+	if ((coargs->flags & COF_FUNC) &&
+	    (coargs->funcaddr != (uintptr_t)co->c_func)) {
+		return (WALK_NEXT);
+	}
+	if ((coargs->flags & COF_PARAM) &&
+	    (coargs->param != (uintptr_t)co->c_arg)) {
+		return (WALK_NEXT);
+	}
 
-	for (i = 0; i < CALLOUT_NTYPES; i++) {
-		for (j = 0; j < co_kfanout; j++) {
+	if (!(coargs->flags & COF_LONG) && (co->c_xid & CALLOUT_LONGTERM)) {
+		return (WALK_NEXT);
+	}
+	if (!(coargs->flags & COF_SHORT) && !(co->c_xid & CALLOUT_LONGTERM)) {
+		return (WALK_NEXT);
+	}
+	if ((coargs->flags & COF_EXEC) && !(co->c_xid & CALLOUT_EXECUTING)) {
+		return (WALK_NEXT);
+	}
+	if ((coargs->flags & COF_HIRES) && !(co->c_xid & CALLOUT_HRESTIME)) {
+		return (WALK_NEXT);
+	}
 
-			co_id = CALLOUT_TABLE(i, j);
+	/* it is possible we don't have the exp time */
+	if (coargs->flags & COF_BYIDH) {
+		if (!(coargs->flags & COF_FREE)) {
+			/* we have to fetch the expire time ourselves. */
+			if (mdb_vread(&coargs->exp, sizeof (hrtime_t),
+			    (uintptr_t)co->c_list + offsetof(callout_list_t,
+			    cl_expiration)) == -1) {
+				mdb_warn("failed to read expiration "
+				    "time from %p", co->c_list);
+				coargs->exp = 0;
+			}
+		} else {
+			/* free callouts can't use list pointer. */
+			coargs->exp = 0;
+		}
+	}
 
-			if (mdb_vread(&co_table, sizeof (co_table),
-			    (uintptr_t)co_ktable[co_id]) == -1) {
-				mdb_warn("failed to read table at %p",
-				    (uintptr_t)co_ktable[co_id]);
-				continue;
+#define	callout_table_mask	((1 << coargs->ctbits) - 1)
+	tableid = CALLOUT_ID_TO_TABLE(co->c_xid);
+#undef	callout_table_mask
+	coid = CO_PLAIN_ID(co->c_xid);
+
+	if ((coargs->flags & COF_CHDR) && !(coargs->flags & COF_ADDR)) {
+		/*
+		 * We need to print the headers. If walking by id, then
+		 * the list header isn't printed, so we must include
+		 * that info here.
+		 */
+		if (!(coargs->flags & COF_VERBOSE)) {
+			mdb_printf("%<u>%3s %-1s %-14s %</u>",
+			    "SEQ", "T", "EXP");
+		} else if (coargs->flags & COF_BYIDH) {
+			mdb_printf("%<u>%-14s %</u>", "EXP");
+		}
+		mdb_printf("%<u>%-3s %-?s %-20s%</u>",
+		    "XHL", "XID", "FUNC(ARG)");
+		if (coargs->flags & COF_LONGLIST) {
+			mdb_printf("%<u> %-?s %-?s %-?s %-?s%</u>",
+			    "PREVID", "NEXTID", "PREVL", "NEXTL");
+		}
+		mdb_printf("\n");
+		coargs->flags &= ~COF_CHDR;
+		coargs->flags |= (COF_THDR | COF_LHDR);
+	}
+
+	if (!(coargs->flags & COF_ADDR)) {
+		if (!(coargs->flags & COF_VERBOSE)) {
+			mdb_printf("%-3d %1s %-14llx ",
+			    TABLE_TO_SEQID(tableid),
+			    co_typenames[tableid & CALLOUT_TYPE_MASK],
+			    (coargs->flags & COF_EXPREL) ?
+			    coargs->exp - coargs->now : coargs->exp);
+		} else if (coargs->flags & COF_BYIDH) {
+			mdb_printf("%-14x ",
+			    (coargs->flags & COF_EXPREL) ?
+			    coargs->exp - coargs->now : coargs->exp);
+		}
+		mdb_printf("%1s%1s%1s %-?llx %a(%p)",
+		    (co->c_xid & CALLOUT_EXECUTING) ? "X" : " ",
+		    (co->c_xid & CALLOUT_HRESTIME) ? "H" : " ",
+		    (co->c_xid & CALLOUT_LONGTERM) ? "L" : " ",
+		    (long long)coid, co->c_func, co->c_arg);
+		if (coargs->flags & COF_LONGLIST) {
+			mdb_printf(" %-?p %-?p %-?p %-?p",
+			    co->c_idprev, co->c_idnext, co->c_clprev,
+			    co->c_clnext);
+		}
+	} else {
+		/* address only */
+		mdb_printf("%-0p", addr);
+	}
+	mdb_printf("\n");
+	return (WALK_NEXT);
+}
+
+/* this callback is for callout list handling. idhash is done by callout_t_cb */
+/*ARGSUSED*/
+static int
+callout_list_cb(uintptr_t addr, const void *data, void *priv)
+{
+	callout_data_t *coargs = (callout_data_t *)priv;
+	callout_list_t *cl = (callout_list_t *)data;
+	callout_t *coptr;
+
+	if ((coargs == NULL) || (cl == NULL)) {
+		return (WALK_ERR);
+	}
+
+	coargs->exp = cl->cl_expiration;
+	if ((coargs->flags & COF_TIME) &&
+	    (cl->cl_expiration != coargs->time)) {
+		return (WALK_NEXT);
+	}
+	if ((coargs->flags & COF_BEFORE) &&
+	    (cl->cl_expiration > coargs->btime)) {
+		return (WALK_NEXT);
+	}
+	if ((coargs->flags & COF_AFTER) &&
+	    (cl->cl_expiration < coargs->atime)) {
+		return (WALK_NEXT);
+	}
+	if (!(coargs->flags & COF_EMPTY) &&
+	    (cl->cl_callouts.ch_head == NULL)) {
+		return (WALK_NEXT);
+	}
+
+	if ((coargs->flags & COF_LHDR) && !(coargs->flags & COF_ADDR) &&
+	    (coargs->flags & (COF_LIST | COF_VERBOSE))) {
+		if (!(coargs->flags & COF_VERBOSE)) {
+			/* don't be redundant again */
+			mdb_printf("%<u>SEQ T %</u>");
+		}
+		mdb_printf("%<u>EXP            BUCKET "
+		    "CALLOUTS         UTOS THREAD         %</u>");
+
+		if (coargs->flags & COF_LONGLIST) {
+			mdb_printf("%<u> %-?s %-?s %-?s%</u>",
+			    "DONE", "PREV", "NEXT");
+		}
+		mdb_printf("\n");
+		coargs->flags &= ~COF_LHDR;
+		coargs->flags |= (COF_THDR | COF_CHDR);
+	}
+	if (coargs->flags & (COF_LIST | COF_VERBOSE)) {
+		if (!(coargs->flags & COF_ADDR)) {
+			if (!(coargs->flags & COF_VERBOSE)) {
+				mdb_printf("%3d %1s ",
+				    TABLE_TO_SEQID(coargs->ndx),
+				    co_typenames[coargs->ndx &
+				    CALLOUT_TYPE_MASK]);
 			}
 
-			for (k = 0; k < CALLOUT_BUCKETS; k++) {
-				co_ptr = co_table.ct_idhash[k];
+			mdb_printf("%-14llx %-6d %-0?p %-4d %-0?p",
+			    (coargs->flags & COF_EXPREL) ?
+			    coargs->exp - coargs->now : coargs->exp,
+			    coargs->bucket, cl->cl_callouts.ch_head,
+			    cl->cl_waiting, cl->cl_executor);
 
-				while (co_ptr != NULL) {
-					mdb_vread(&co_callout,
-					    sizeof (co_callout),
-					    (uintptr_t)co_ptr);
+			if (coargs->flags & COF_LONGLIST) {
+				mdb_printf(" %-?p %-?p %-?p",
+				    cl->cl_done, cl->cl_prev, cl->cl_next);
+			}
+		} else {
+			/* address only */
+			mdb_printf("%-0p", addr);
+		}
+		mdb_printf("\n");
+		if (coargs->flags & COF_LIST) {
+			return (WALK_NEXT);
+		}
+	}
+	/* yet another layer as we walk the actual callouts via list. */
+	if (cl->cl_callouts.ch_head == NULL) {
+		return (WALK_NEXT);
+	}
+	/* free list structures do not have valid callouts off of them. */
+	if (coargs->flags & COF_FREE) {
+		return (WALK_NEXT);
+	}
+	coptr = (callout_t *)cl->cl_callouts.ch_head;
 
-					mdb_printf("%-24a %0?p %0?lx %?lx "
-					    "(T%+ld)\n", co_callout.c_func,
-					    co_callout.c_arg, co_callout.c_xid,
-					    co_callout.c_runtime,
-					    co_callout.c_runtime - lbolt);
+	if (coargs->flags & COF_VERBOSE) {
+		mdb_inc_indent(4);
+	}
+	/*
+	 * walk callouts using yet another callback routine.
+	 * we use callouts_bytime because id hash is handled via
+	 * the callout_t_cb callback.
+	 */
+	if (mdb_pwalk("callouts_bytime", callouts_cb, coargs,
+	    (uintptr_t)coptr) == -1) {
+		mdb_warn("cannot walk callouts at %p", coptr);
+		return (WALK_ERR);
+	}
+	if (coargs->flags & COF_VERBOSE) {
+		mdb_dec_indent(4);
+	}
 
-					co_ptr = co_callout.c_idnext;
+	return (WALK_NEXT);
+}
+
+/* this callback handles the details of callout table walking. */
+static int
+callout_t_cb(uintptr_t addr, const void *data, void *priv)
+{
+	callout_data_t *coargs = (callout_data_t *)priv;
+	cot_data_t *cotwd = (cot_data_t *)data;
+	callout_table_t *ct = &(cotwd->ct);
+	int index, seqid, cotype;
+	int i;
+	callout_list_t *clptr;
+	callout_t *coptr;
+
+	if ((coargs == NULL) || (ct == NULL) || (coargs->co_table == NULL)) {
+		return (WALK_ERR);
+	}
+
+	index =  ((char *)addr - (char *)coargs->co_table) /
+	    sizeof (callout_table_t);
+	cotype = index & CALLOUT_TYPE_MASK;
+	seqid = TABLE_TO_SEQID(index);
+
+	if ((coargs->flags & COF_SEQID) && (coargs->seqid != seqid)) {
+		return (WALK_NEXT);
+	}
+
+	if (!(coargs->flags & COF_REAL) && (cotype == CALLOUT_REALTIME)) {
+		return (WALK_NEXT);
+	}
+
+	if (!(coargs->flags & COF_NORM) && (cotype == CALLOUT_NORMAL)) {
+		return (WALK_NEXT);
+	}
+
+	if (!(coargs->flags & COF_EMPTY) && (
+	    (ct->ct_heap == NULL) || (ct->ct_cyclic == NULL))) {
+		return (WALK_NEXT);
+	}
+
+	if ((coargs->flags & COF_THDR) && !(coargs->flags & COF_ADDR) &&
+	    (coargs->flags & (COF_TABLE | COF_VERBOSE))) {
+		/* print table hdr */
+		mdb_printf("%<u>%-3s %-1s %-?s %-?s %-?s %-?s%</u>",
+		    "SEQ", "T", "FREE", "LFREE", "CYCLIC", "HEAP");
+		coargs->flags &= ~COF_THDR;
+		coargs->flags |= (COF_LHDR | COF_CHDR);
+		if (coargs->flags & COF_LONGLIST) {
+			/* more info! */
+			mdb_printf("%<u> %-T%-7s %-7s %-?s %-?s"
+			    " %-?s %-?s %-?s%</u>",
+			    "HEAPNUM", "HEAPMAX", "TASKQ", "EXPQ",
+			    "PEND", "FREE", "LOCK");
+		}
+		mdb_printf("\n");
+	}
+	if (coargs->flags & (COF_TABLE | COF_VERBOSE)) {
+		if (!(coargs->flags & COF_ADDR)) {
+			mdb_printf("%-3d %-1s %-0?p %-0?p %-0?p %-?p",
+			    seqid, co_typenames[cotype],
+			    ct->ct_free, ct->ct_lfree, ct->ct_cyclic,
+			    ct->ct_heap);
+			if (coargs->flags & COF_LONGLIST)  {
+				/* more info! */
+				mdb_printf(" %-7d %-7d %-?p %-?p"
+				    " %-?lld %-?lld %-?p",
+				    ct->ct_heap_num,  ct->ct_heap_max,
+				    ct->ct_taskq, ct->ct_expired.ch_head,
+				    cotwd->ct_timeouts_pending,
+				    cotwd->ct_allocations -
+				    cotwd->ct_timeouts_pending,
+				    ct->ct_mutex);
+			}
+		} else {
+			/* address only */
+			mdb_printf("%-0?p", addr);
+		}
+		mdb_printf("\n");
+		if (coargs->flags & COF_TABLE) {
+			return (WALK_NEXT);
+		}
+	}
+
+	coargs->ndx = index;
+	if (coargs->flags & COF_VERBOSE) {
+		mdb_inc_indent(4);
+	}
+	/* keep digging. */
+	if (!(coargs->flags & COF_BYIDH)) {
+		/* walk the list hash table */
+		if (coargs->flags & COF_FREE) {
+			clptr = ct->ct_lfree;
+			coargs->bucket = 0;
+			if (clptr == NULL) {
+				return (WALK_NEXT);
+			}
+			if (mdb_pwalk("callout_list", callout_list_cb, coargs,
+			    (uintptr_t)clptr) == -1) {
+				mdb_warn("cannot walk callout free list at %p",
+				    clptr);
+				return (WALK_ERR);
+			}
+		} else {
+			/* first print the expired list. */
+			clptr = (callout_list_t *)ct->ct_expired.ch_head;
+			if (clptr != NULL) {
+				coargs->bucket = -1;
+				if (mdb_pwalk("callout_list", callout_list_cb,
+				    coargs, (uintptr_t)clptr) == -1) {
+					mdb_warn("cannot walk callout_list"
+					    " at %p", clptr);
+					return (WALK_ERR);
+				}
+			}
+			for (i = 0; i < CALLOUT_BUCKETS; i++) {
+				if (ct->ct_clhash == NULL) {
+					/* nothing to do */
+					break;
+				}
+				if (cotwd->cot_clhash[i].ch_head == NULL) {
+					continue;
+				}
+				clptr = (callout_list_t *)
+				    cotwd->cot_clhash[i].ch_head;
+				coargs->bucket = i;
+				/* walk list with callback routine. */
+				if (mdb_pwalk("callout_list", callout_list_cb,
+				    coargs, (uintptr_t)clptr) == -1) {
+					mdb_warn("cannot walk callout_list"
+					    " at %p", clptr);
+					return (WALK_ERR);
+				}
+			}
+		}
+	} else {
+		/* walk the id hash table. */
+		if (coargs->flags & COF_FREE) {
+			coptr = ct->ct_free;
+			coargs->bucket = 0;
+			if (coptr == NULL) {
+				return (WALK_NEXT);
+			}
+			if (mdb_pwalk("callouts_byid", callouts_cb, coargs,
+			    (uintptr_t)coptr) == -1) {
+				mdb_warn("cannot walk callout id free list"
+				    " at %p", coptr);
+				return (WALK_ERR);
+			}
+		} else {
+			for (i = 0; i < CALLOUT_BUCKETS; i++) {
+				if (ct->ct_idhash == NULL) {
+					break;
+				}
+				coptr = (callout_t *)
+				    cotwd->cot_idhash[i].ch_head;
+				if (coptr == NULL) {
+					continue;
+				}
+				coargs->bucket = i;
+
+				/*
+				 * walk callouts directly by id. For id
+				 * chain, the callout list is just a header,
+				 * so there's no need to walk it.
+				 */
+				if (mdb_pwalk("callouts_byid", callouts_cb,
+				    coargs, (uintptr_t)coptr) == -1) {
+					mdb_warn("cannot walk callouts at %p",
+					    coptr);
+					return (WALK_ERR);
 				}
 			}
 		}
 	}
+	if (coargs->flags & COF_VERBOSE) {
+		mdb_dec_indent(4);
+	}
+	return (WALK_NEXT);
+}
+
+/*
+ * initialize some common info for both callout dcmds.
+ */
+int
+callout_common_init(callout_data_t *coargs)
+{
+	/* we need a couple of things */
+	if (mdb_readvar(&(coargs->co_table), "callout_table") == -1) {
+		mdb_warn("failed to read 'callout_table'");
+		return (DCMD_ERR);
+	}
+	/* need to get now in nsecs. Approximate with hrtime vars */
+	if (mdb_readsym(&(coargs->now), sizeof (hrtime_t), "hrtime_last") !=
+	    sizeof (hrtime_t)) {
+		if (mdb_readsym(&(coargs->now), sizeof (hrtime_t),
+		    "hrtime_base") != sizeof (hrtime_t)) {
+			mdb_warn("Could not determine current system time");
+			return (DCMD_ERR);
+		}
+	}
+
+	if (mdb_readvar(&(coargs->ctbits), "callout_table_bits") == -1) {
+		mdb_warn("failed to read 'callout_table_bits'");
+		return (DCMD_ERR);
+	}
+	if (mdb_readvar(&(coargs->nsec_per_tick), "nsec_per_tick") == -1) {
+		mdb_warn("failed to read 'nsec_per_tick'");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+/*
+ * dcmd to print callouts.  Optional addr limits to specific table.
+ * Parses lots of options that get passed to callbacks for walkers.
+ * Has it's own help function.
+ */
+/*ARGSUSED*/
+int
+callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	callout_data_t coargs;
+	/* getopts doesn't help much with stuff like this */
+	boolean_t Sflag, Cflag, tflag, aflag, bflag, dflag, kflag;
+	char *funcname = NULL;
+	char *paramstr = NULL;
+	uintptr_t Stmp, Ctmp;	/* for getopt. */
+	int retval;
+
+	coargs.flags = COF_DEFAULT;
+	Sflag = Cflag = tflag = bflag = aflag = dflag = kflag = FALSE;
+	coargs.seqid = -1;
+
+	if (mdb_getopts(argc, argv,
+	    'r', MDB_OPT_CLRBITS, COF_NORM, &coargs.flags,
+	    'n', MDB_OPT_CLRBITS, COF_REAL, &coargs.flags,
+	    'l', MDB_OPT_CLRBITS, COF_SHORT, &coargs.flags,
+	    's', MDB_OPT_CLRBITS, COF_LONG, &coargs.flags,
+	    'x', MDB_OPT_SETBITS, COF_EXEC, &coargs.flags,
+	    'h', MDB_OPT_SETBITS, COF_HIRES, &coargs.flags,
+	    'E', MDB_OPT_SETBITS, COF_EMPTY, &coargs.flags,
+	    'd', MDB_OPT_SETBITS, 1, &dflag,
+	    'C', MDB_OPT_UINTPTR_SET, &Cflag, &Ctmp,
+	    'S', MDB_OPT_UINTPTR_SET, &Sflag, &Stmp,
+	    't', MDB_OPT_UINTPTR_SET, &tflag, (uintptr_t *)&coargs.time,
+	    'a', MDB_OPT_UINTPTR_SET, &aflag, (uintptr_t *)&coargs.atime,
+	    'b', MDB_OPT_UINTPTR_SET, &bflag, (uintptr_t *)&coargs.btime,
+	    'k', MDB_OPT_SETBITS, 1, &kflag,
+	    'f', MDB_OPT_STR, &funcname,
+	    'p', MDB_OPT_STR, &paramstr,
+	    'T', MDB_OPT_SETBITS, COF_TABLE, &coargs.flags,
+	    'D', MDB_OPT_SETBITS, COF_EXPREL, &coargs.flags,
+	    'L', MDB_OPT_SETBITS, COF_LIST, &coargs.flags,
+	    'V', MDB_OPT_SETBITS, COF_VERBOSE, &coargs.flags,
+	    'v', MDB_OPT_SETBITS, COF_LONGLIST, &coargs.flags,
+	    'i', MDB_OPT_SETBITS, COF_BYIDH, &coargs.flags,
+	    'F', MDB_OPT_SETBITS, COF_FREE, &coargs.flags,
+	    'A', MDB_OPT_SETBITS, COF_ADDR, &coargs.flags,
+	    NULL) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	/* initialize from kernel variables */
+	if ((retval = callout_common_init(&coargs)) != DCMD_OK) {
+		return (retval);
+	}
+
+	/* do some option post-processing */
+	if (kflag) {
+		coargs.time *= coargs.nsec_per_tick;
+		coargs.atime *= coargs.nsec_per_tick;
+		coargs.btime *= coargs.nsec_per_tick;
+	}
+
+	if (dflag) {
+		coargs.time += coargs.now;
+		coargs.atime += coargs.now;
+		coargs.btime += coargs.now;
+	}
+	if (Sflag) {
+		if (flags & DCMD_ADDRSPEC) {
+			mdb_printf("-S option conflicts with explicit"
+			    " address\n");
+			return (DCMD_USAGE);
+		}
+		coargs.flags |= COF_SEQID;
+		coargs.seqid = (int)Stmp;
+	}
+	if (Cflag) {
+		if (flags & DCMD_ADDRSPEC) {
+			mdb_printf("-C option conflicts with explicit"
+			    " address\n");
+			return (DCMD_USAGE);
+		}
+		if (coargs.flags & COF_SEQID) {
+			mdb_printf("-C and -S are mutually exclusive\n");
+			return (DCMD_USAGE);
+		}
+		coargs.cpu = (cpu_t *)Ctmp;
+		if (mdb_vread(&coargs.seqid, sizeof (processorid_t),
+		    (uintptr_t)&(coargs.cpu->cpu_seqid)) == -1) {
+			mdb_warn("failed to read cpu_t at %p", Ctmp);
+			return (DCMD_ERR);
+		}
+		coargs.flags |= COF_SEQID;
+	}
+	/* avoid null outputs. */
+	if (!(coargs.flags & (COF_REAL | COF_NORM))) {
+		coargs.flags |= COF_REAL | COF_NORM;
+	}
+	if (!(coargs.flags & (COF_LONG | COF_SHORT))) {
+		coargs.flags |= COF_LONG | COF_SHORT;
+	}
+	if (tflag) {
+		if (aflag || bflag) {
+			mdb_printf("-t and -a|b are mutually exclusive\n");
+			return (DCMD_USAGE);
+		}
+		coargs.flags |= COF_TIME;
+	}
+	if (aflag) {
+		coargs.flags |= COF_AFTER;
+	}
+	if (bflag) {
+		coargs.flags |= COF_BEFORE;
+	}
+	if ((aflag && bflag) && (coargs.btime <= coargs.atime)) {
+		mdb_printf("value for -a must be earlier than the value"
+		    " for -b.\n");
+		return (DCMD_USAGE);
+	}
+
+	if (funcname != NULL) {
+		GElf_Sym sym;
+
+		if (mdb_lookup_by_name(funcname, &sym) != 0) {
+			coargs.funcaddr = mdb_strtoull(funcname);
+		} else {
+			coargs.funcaddr = sym.st_value;
+		}
+		coargs.flags |= COF_FUNC;
+	}
+
+	if (paramstr != NULL) {
+		GElf_Sym sym;
+
+		if (mdb_lookup_by_name(paramstr, &sym) != 0) {
+			coargs.param = mdb_strtoull(paramstr);
+		} else {
+			coargs.param = sym.st_value;
+		}
+		coargs.flags |= COF_PARAM;
+	}
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		/* don't pass "dot" if no addr. */
+		addr = NULL;
+	}
+	if (addr != NULL) {
+		/*
+		 * a callout table was specified. Ignore -r|n option
+		 * to avoid null output.
+		 */
+		coargs.flags |= (COF_REAL | COF_NORM);
+	}
+
+	if (DCMD_HDRSPEC(flags) || (coargs.flags & COF_VERBOSE)) {
+		coargs.flags |= COF_THDR | COF_LHDR | COF_CHDR;
+	}
+	if (coargs.flags & COF_FREE) {
+		coargs.flags |= COF_EMPTY;
+		/* -F = free callouts, -FL = free lists */
+		if (!(coargs.flags & COF_LIST)) {
+			coargs.flags |= COF_BYIDH;
+		}
+	}
+
+	/* walk table, using specialized callback routine. */
+	if (mdb_pwalk("callout_table", callout_t_cb, &coargs, addr) == -1) {
+		mdb_warn("cannot walk callout_table");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+
+/*
+ * Given an extended callout id, dump its information.
+ */
+/*ARGSUSED*/
+int
+calloutid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	callout_data_t coargs;
+	callout_table_t *ctptr;
+	callout_table_t ct;
+	callout_id_t coid;
+	callout_t *coptr;
+	int tableid;
+	callout_id_t xid;
+	ulong_t idhash;
+	int i, retval;
+	const mdb_arg_t *arg;
+	size_t size;
+	callout_hash_t cot_idhash[CALLOUT_BUCKETS];
+
+	coargs.flags = COF_DEFAULT | COF_BYIDH;
+	i = mdb_getopts(argc, argv,
+	    'd', MDB_OPT_SETBITS, COF_DECODE, &coargs.flags,
+	    'v', MDB_OPT_SETBITS, COF_LONGLIST, &coargs.flags,
+	    NULL);
+	argc -= i;
+	argv += i;
+
+	if (argc != 1) {
+		return (DCMD_USAGE);
+	}
+	arg = &argv[0];
+
+	if (arg->a_type == MDB_TYPE_IMMEDIATE) {
+		xid = arg->a_un.a_val;
+	} else {
+		xid = (callout_id_t)mdb_strtoull(arg->a_un.a_str);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		coargs.flags |= COF_CHDR;
+	}
+
+
+	/* initialize from kernel variables */
+	if ((retval = callout_common_init(&coargs)) != DCMD_OK) {
+		return (retval);
+	}
+
+	/* we must massage the environment so that the macros will play nice */
+#define	callout_table_mask	((1 << coargs.ctbits) - 1)
+#define	callout_table_bits	coargs.ctbits
+#define	nsec_per_tick		coargs.nsec_per_tick
+	tableid = CALLOUT_ID_TO_TABLE(xid);
+	idhash = CALLOUT_IDHASH(xid);
+#undef	callouts_table_bits
+#undef	callout_table_mask
+#undef	nsec_per_tick
+	coid = CO_PLAIN_ID(xid);
+
+	if (flags & DCMD_ADDRSPEC) {
+		mdb_printf("calloutid does not accept explicit address.\n");
+		return (DCMD_USAGE);
+	}
+
+	if (coargs.flags & COF_DECODE) {
+		if (DCMD_HDRSPEC(flags)) {
+			mdb_printf("%<u>%3s %1s %3s %-?s %-6s %</u>\n",
+			    "SEQ", "T", "XHL", "XID", "IDHASH");
+		}
+		mdb_printf("%-3d %1s %1s%1s%1s %-?llx %-6d\n",
+		    TABLE_TO_SEQID(tableid),
+		    co_typenames[tableid & CALLOUT_TYPE_MASK],
+		    (xid & CALLOUT_EXECUTING) ? "X" : " ",
+		    (xid & CALLOUT_HRESTIME) ? "H" : " ",
+		    (xid & CALLOUT_LONGTERM) ? "L" : " ",
+		    (long long)coid, idhash);
+		return (DCMD_OK);
+	}
+
+	/* get our table. Note this relies on the types being correct */
+	ctptr = coargs.co_table + tableid;
+	if (mdb_vread(&ct, sizeof (callout_table_t), (uintptr_t)ctptr) == -1) {
+		mdb_warn("failed to read callout_table at %p", ctptr);
+		return (DCMD_ERR);
+	}
+	size = sizeof (callout_hash_t) * CALLOUT_BUCKETS;
+	if (ct.ct_idhash != NULL) {
+		if (mdb_vread(&(cot_idhash), size,
+		    (uintptr_t)ct.ct_idhash) == -1) {
+			mdb_warn("failed to read id_hash at %p",
+			    ct.ct_idhash);
+			return (WALK_ERR);
+		}
+	}
+
+	/* callout at beginning of hash chain */
+	if (ct.ct_idhash == NULL) {
+		mdb_printf("id hash chain for this xid is empty\n");
+		return (DCMD_ERR);
+	}
+	coptr = (callout_t *)cot_idhash[idhash].ch_head;
+	if (coptr == NULL) {
+		mdb_printf("id hash chain for this xid is empty\n");
+		return (DCMD_ERR);
+	}
+
+	coargs.ndx = tableid;
+	coargs.bucket = idhash;
+
+	/* use the walker, luke */
+	if (mdb_pwalk("callouts_byid", callouts_cb, &coargs,
+	    (uintptr_t)coptr) == -1) {
+		mdb_warn("cannot walk callouts at %p", coptr);
+		return (WALK_ERR);
+	}
 
 	return (DCMD_OK);
+}
+
+void
+callout_help(void)
+{
+	mdb_printf("callout: display callouts.\n"
+	    "Given a callout table address, display callouts from table.\n"
+	    "Without an address, display callouts from all tables.\n"
+	    "options:\n"
+	    " -r|n : limit display to (r)ealtime or (n)ormal type callouts\n"
+	    " -s|l : limit display to (s)hort-term ids or (l)ong-term ids\n"
+	    " -x : limit display to callouts which are executing\n"
+	    " -h : limit display to callouts based on hrestime\n"
+	    " -t|a|b nsec: limit display to callouts that expire a(t) time,"
+	    " (a)fter time,\n     or (b)efore time. Use -a and -b together "
+	    " to specify a range.\n     For \"now\", use -d[t|a|b] 0.\n"
+	    " -d : interpret time option to -t|a|b as delta from current time\n"
+	    " -k : use ticks instead of nanoseconds as arguments to"
+	    " -t|a|b. Note that\n     ticks are less accurate and may not"
+	    " match other tick times (ie: lbolt).\n"
+	    " -D : display exiration time as delta from current time\n"
+	    " -S seqid : limit display to callouts for this cpu sequence id\n"
+	    " -C addr :  limit display to callouts for this cpu pointer\n"
+	    " -f name|addr : limit display to callouts with this function\n"
+	    " -p name|addr : limit display to callouts functions with this"
+	    " parameter\n"
+	    " -T : display the callout table itself, instead of callouts\n"
+	    " -L : display callout lists instead of callouts\n"
+	    " -E : with -T or L, display empty data structures.\n"
+	    " -i : traverse callouts by id hash instead of list hash\n"
+	    " -F : walk free callout list (free list with -i) instead\n"
+	    " -v : display more info for each item\n"
+	    " -V : show details of each level of info as it is traversed\n"
+	    " -A : show only addresses. Useful for pipelines.\n");
+}
+
+void
+calloutid_help(void)
+{
+	mdb_printf("calloutid: display callout by id.\n"
+	    "Given an extended callout id, display the callout infomation.\n"
+	    "options:\n"
+	    " -d : do not dereference callout, just decode the id.\n"
+	    " -v : verbose display more info about the callout\n");
 }
 
 /*ARGSUSED*/
@@ -3250,7 +4189,12 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "as2proc", ":", "convert as to proc_t address", as2proc },
 	{ "binding_hash_entry", ":", "print driver names hash table entry",
 		binding_hash_entry },
-	{ "callout", NULL, "print callout table", callout },
+	{ "callout", "?[-r|n] [-s|l] [-xh] [-t | -ab nsec [-dkD]]"
+	    " [-C addr | -S seqid] [-f name|addr] [-p name| addr] [-T|L [-E]]"
+	    " [-FivVA]",
+	    "display callouts", callout, callout_help },
+	{ "calloutid", "[-d|v] xid", "print callout by extended id",
+	    calloutid, calloutid_help },
 	{ "class", NULL, "print process scheduler classes", class },
 	{ "cpuinfo", "?[-v]", "print CPUs and runnable threads", cpuinfo },
 	{ "did2thread", "? kt_did", "find kernel thread for this id",
@@ -3554,6 +4498,16 @@ static const mdb_walker_t walkers[] = {
 	/* from genunix.c */
 	{ "anon", "given an amp, list of anon structures",
 		anon_walk_init, anon_walk_step, anon_walk_fini },
+	{ "callouts_bytime", "walk callouts by list chain (expiration time)",
+		callout_walk_init, callout_walk_step, callout_walk_fini,
+		(void *)CALLOUT_WALK_BYLIST },
+	{ "callouts_byid", "walk callouts by id hash chain",
+		callout_walk_init, callout_walk_step, callout_walk_fini,
+		(void *)CALLOUT_WALK_BYID },
+	{ "callout_list", "walk a callout list", callout_list_walk_init,
+		callout_list_walk_step, callout_list_walk_fini },
+	{ "callout_table", "walk callout table array", callout_table_walk_init,
+		callout_table_walk_step, callout_table_walk_fini },
 	{ "cpu", "walk cpu structures", cpu_walk_init, cpu_walk_step },
 	{ "ereportq_dump", "walk list of ereports in dump error queue",
 		ereportq_dump_walk_init, ereportq_dump_walk_step, NULL },

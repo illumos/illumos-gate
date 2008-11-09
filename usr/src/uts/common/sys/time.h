@@ -16,8 +16,6 @@
 #ifndef _SYS_TIME_H
 #define	_SYS_TIME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.16	*/
-
 #include <sys/feature_tests.h>
 
 /*
@@ -278,7 +276,7 @@ extern int nsec_per_tick;	/* nanoseconds per clock tick */
 #define	USEC_TO_TICK_ROUNDUP(usec)	\
 	((usec) == 0 ? 0 : USEC_TO_TICK((usec) - 1) + 1)
 
-#define	TICK_TO_NSEC(tick)		((tick) * nsec_per_tick)
+#define	TICK_TO_NSEC(tick)		((hrtime_t)(tick) * nsec_per_tick)
 #define	NSEC_TO_TICK(nsec)		((nsec) / nsec_per_tick)
 #define	NSEC_TO_TICK_ROUNDUP(nsec)	\
 	((nsec) == 0 ? 0 : NSEC_TO_TICK((nsec) - 1) + 1)
