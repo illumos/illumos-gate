@@ -1251,7 +1251,7 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 
 	nxge_hio_vr_t *vr;	/* The Virtualization Region */
 	uint64_t rmap, tmap;
-	int rv;
+	int rdctbl, rv;
 
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 
@@ -1272,10 +1272,11 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 	/*
 	 * Get an RDC group for us to use.
 	 */
-	if ((vr->rdc_tbl = nxge_hio_hostinfo_get_rdc_table(nxge)) < 0) {
+	if ((rdctbl = nxge_hio_hostinfo_get_rdc_table(nxge)) < 0) {
 		nxge_hio_unshare(vr);
 		return (EBUSY);
 	}
+	vr->rdc_tbl = (uint8_t)rdctbl;
 
 	/*
 	 * Add resources to the share.

@@ -249,7 +249,7 @@ typedef struct nxge_hio_vr {
 	size_t		size;
 	vr_region_t	region;	/* 1 of 8 regions. */
 
-	int		rdc_tbl; /* 1 of 8 RDC tables. */
+	uint8_t		rdc_tbl; /* 1 of 8 RDC tables. */
 	ether_addr_t	altmac;	/* The alternate MAC address. */
 	mac_addr_slot_t	slot;	/* According to nxge_m_mmac_add(). */
 

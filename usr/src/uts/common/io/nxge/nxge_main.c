@@ -291,8 +291,8 @@ static void nxge_m_ioctl(void *, queue_t *, mblk_t *);
 static void nxge_m_resources(void *);
 mblk_t *nxge_m_tx(void *arg, mblk_t *);
 static nxge_status_t nxge_mac_register(p_nxge_t);
-static int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
-	mac_addr_slot_t slot);
+int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
+	mac_addr_slot_t slot, uint8_t rdctbl);
 void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
 	boolean_t factory);
 static int nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr);
@@ -4040,8 +4040,9 @@ nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot, boolean_t factory)
 /*
  * nxge_altmac_set() -- Set an alternate MAC address
  */
-static int
-nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
+int
+nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot,
+	uint8_t rdctbl)
 {
 	uint8_t addrn;
 	uint8_t portn;
@@ -4066,7 +4067,8 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
 	 */
 	clscfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	mac_rdc.value = 0;
-	mac_rdc.bits.w0.rdc_tbl_num = clscfgp->mac_host_info[addrn].rdctbl;
+	clscfgp->mac_host_info[addrn].rdctbl = rdctbl;
+	mac_rdc.bits.w0.rdc_tbl_num = rdctbl;
 	mac_rdc.bits.w0.mac_pref = clscfgp->mac_host_info[addrn].mpr_npr;
 
 	if (npi_mac_hostinfo_entry(nxgep->npi_handle, OP_SET,
@@ -4089,7 +4091,6 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
 	if (npi_mac_altaddr_enable(nxgep->npi_handle, portn, addrn)
 	    != NPI_SUCCESS)
 		return (EIO);
-
 	return (0);
 }
 
@@ -4166,10 +4167,16 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 		}
 	}
 	ASSERT(slot <= mmac_info->num_mmac);
-	if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot)) != 0) {
+
+	/*
+	 * def_mac_rxdma_grpid is the default rdc table for the port.
+	 */
+	if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot,
+	    nxgep->pt_config.hw_config.def_mac_rxdma_grpid)) != 0) {
 		mutex_exit(nxgep->genlock);
 		return (err);
 	}
+
 	bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr, ETHERADDRL);
 	mmac_info->mac_pool[slot].flags |= MMAC_SLOT_USED;
 	mmac_info->mac_pool[slot].flags &= ~MMAC_VENDOR_ADDR;
@@ -4247,7 +4254,8 @@ nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr)
 		return (EINVAL);
 	}
 	if (err = nxge_altmac_set(nxgep,
-	    mmac_info->factory_mac_pool[slot], slot)) {
+	    mmac_info->factory_mac_pool[slot], slot,
+	    nxgep->pt_config.hw_config.def_mac_rxdma_grpid)) {
 		mutex_exit(nxgep->genlock);
 		return (err);
 	}
@@ -4379,8 +4387,9 @@ nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr)
 		return (EINVAL);
 	}
 	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
-		if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot))
-		    != 0) {
+		if ((err = nxge_altmac_set(nxgep,
+		    maddr->mma_addr, slot,
+		    nxgep->pt_config.hw_config.def_mac_rxdma_grpid)) != 0) {
 			bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr,
 			    ETHERADDRL);
 			/*

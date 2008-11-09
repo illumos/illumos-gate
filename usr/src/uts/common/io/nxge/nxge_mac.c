@@ -51,6 +51,8 @@ extern void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
 	boolean_t factory);
 extern int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
 extern int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
+extern int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
+	mac_addr_slot_t slot, uint8_t rdctbl);
 
 typedef enum {
 	CHECK_LINK_RESCHEDULE,
@@ -3080,23 +3082,17 @@ nxge_hio_hostinfo_get_rdc_table(p_nxge_t nxgep)
  *
  */
 int
-nxge_hio_hostinfo_init(
-	nxge_t *nxge,
-	nxge_hio_vr_t *vr,	/* Virtualization Region */
-	ether_addr_t *macaddr)	/* The alternate MAC address */
+nxge_hio_hostinfo_init(nxge_t *nxge, nxge_hio_vr_t *vr, ether_addr_t *macaddr)
 {
-	int rdc_tbl, slot;
-
-	nxge_class_pt_cfg_t *class;
-	hostinfo_t mac_rdc;
-	npi_mac_addr_t altmac;
+	int slot, error;
+	uint8_t rdc_tbl;
 	nxge_mmac_t *mmac_info;
 	nxge_rdc_grp_t	*group;
 	uint8_t *addr = (uint8_t *)macaddr;
 
 	mutex_enter(nxge->genlock);
 
-	rdc_tbl = vr->rdc_tbl;
+	rdc_tbl = (uint8_t)vr->rdc_tbl;
 
 	/* Initialize the NXGE RDC table data structure. */
 	group = &nxge->pt_config.rdc_grps[rdc_tbl];
@@ -3115,8 +3111,7 @@ nxge_hio_hostinfo_init(
 	}
 
 	/*
-	 * The vswitch has already added this MAC address.
-	 * Find its assigned slot.
+	 * Find a slot for the VR to use for Hybrid I/O.
 	 */
 	if (mmac_info->num_factory_mmac < mmac_info->num_mmac) {
 		for (slot = mmac_info->num_factory_mmac + 1;
@@ -3138,56 +3133,14 @@ nxge_hio_hostinfo_init(
 				break;
 		}
 	}
-
 	ASSERT(slot <= mmac_info->num_mmac);
 	vr->slot = slot;
-	slot = vr->slot - 1;
 
-	/*
-	 * Program the mac address.
-	 */
-	altmac.w2 = (((uint16_t)addr[0]) << 8) |
-	    (((uint16_t)addr[1]) & 0x0ff);
-	altmac.w1 = (((uint16_t)addr[2]) << 8) |
-	    (((uint16_t)addr[3]) & 0x0ff);
-	altmac.w0 = (((uint16_t)addr[4]) << 8) |
-	    (((uint16_t)addr[5]) & 0x0ff);
-
-	if (npi_mac_altaddr_entry(nxge->npi_handle, OP_SET,
-	    nxge->function_num, slot, &altmac) != NPI_SUCCESS) {
+	error = nxge_altmac_set(nxge, addr, slot, rdc_tbl);
+	if (error != 0) {
 		mutex_exit(nxge->genlock);
 		return (EIO);
 	}
-
-	/*
-	 * Associate <rdc_tbl> with this MAC address slot.
-	 */
-	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
-
-	/* Update this variable. */
-	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
-	class->mac_host_info[slot].rdctbl = (uint8_t)rdc_tbl;
-
-	mac_rdc.value = 0;
-	mac_rdc.bits.w0.rdc_tbl_num = rdc_tbl;
-	mac_rdc.bits.w0.mac_pref = class->mac_host_info[slot].mpr_npr;
-	/* <mpr_npr> had better be 1! */
-
-	/* Program the RDC table. */
-	if ((npi_mac_hostinfo_entry(nxge->npi_handle, OP_SET,
-	    nxge->function_num, slot, &mac_rdc)) != NPI_SUCCESS) {
-		mutex_exit(nxge->genlock);
-		(void) nxge_m_mmac_remove(nxge, vr->slot);
-		return (EIO);
-	}
-
-	if (nxge->mac.portnum != XMAC_PORT_0 &&
-	    nxge->mac.portnum != XMAC_PORT_1)
-		slot++;
-
-	/* (Re-)enable the MAC address. */
-	(void) npi_mac_altaddr_enable(
-	    nxge->npi_handle, nxge->mac.portnum, slot);
 
 	bcopy(macaddr, vr->altmac, sizeof (vr->altmac));
 
@@ -3225,25 +3178,25 @@ nxge_hio_hostinfo_init(
  *
  */
 void
-nxge_hio_hostinfo_uninit(
-	nxge_t *nxge,
-	nxge_hio_vr_t *vr)
+nxge_hio_hostinfo_uninit(nxge_t *nxge, nxge_hio_vr_t *vr)
 {
 	nxge_class_pt_cfg_t *class;
+	uint8_t addrn;
 
-	(void) npi_mac_altaddr_disable(
-	    nxge->npi_handle, nxge->mac.portnum, vr->slot);
+	addrn = vr->slot - 1;
+	(void) npi_mac_altaddr_disable(nxge->npi_handle,
+	    nxge->mac.portnum, addrn);
 
 	/* Set this variable to its default. */
 	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
-	class->mac_host_info[vr->slot].rdctbl =
+	class->mac_host_info[addrn].rdctbl =
 	    nxge->pt_config.hw_config.def_mac_rxdma_grpid;
 
 	(void) nxge_m_mmac_remove(nxge, vr->slot);
 	vr->slot = -1;
 
 	(void) nxge_fzc_rdc_tbl_unbind(nxge, vr->rdc_tbl);
-	vr->rdc_tbl = -1;
+	vr->rdc_tbl = (uint8_t)-1;
 }
 
 /* Initialize the RxMAC sub-block */
