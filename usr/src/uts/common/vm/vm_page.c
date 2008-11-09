@@ -7261,8 +7261,11 @@ page_capture_handle_outstanding(void)
 		kmem_reap();
 		seg_preap();
 		page_capture_async();
-	} else {
+	} else if (hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0)) {
 		/*
+		 * Note: Purging only for platforms that support
+		 * ISM hat_pageunload() - mainly SPARC. On x86/x64
+		 * platforms ISM pages SE_SHARED locked until destroyed.
 		 * There are pages pending retirement, so
 		 * we reap prior to attempting to capture.
 		 */
