@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,8 +51,6 @@ extern ServerOptions options;
 extern Authmethod method_kbdint;
 
 RCSID("$Id: auth-pam.c,v 1.54 2002/07/28 20:24:08 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define NEW_AUTHTOK_MSG \
 	"Warning: Your password has expired, please change it now."
@@ -472,15 +470,19 @@ auth_pam_password(Authctxt *authctxt, const char *password)
 	new_start_pam(authctxt, &conv);
 
 	retval = pam_set_item(authctxt->pam->h, PAM_AUTHTOK, password);
-	if (retval != PAM_SUCCESS)
+	if (retval != PAM_SUCCESS) {
+		authctxt->pam->last_pam_retval = retval;
 		return 1;
+	}
 
 	retval = pam_authenticate(authctxt->pam->h,
 			options.permit_empty_passwd ?  0 :
 			PAM_DISALLOW_NULL_AUTHTOK);
 
-	if (retval != PAM_SUCCESS)
+	if (retval != PAM_SUCCESS) {
+		authctxt->pam->last_pam_retval = retval;
 		return 0;
+	}
 
 	if ((retval = finish_userauth_do_pam(authctxt)) != PAM_SUCCESS)
 		return 0;

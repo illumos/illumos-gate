@@ -1113,7 +1113,6 @@ altprivsep_start_and_do_monitor(int use_engine, int inetd, int newsock,
 		}
 
 #ifdef HAVE_BSM
-
 		/* Initialize the group list, audit sometimes needs it. */
 		if (initgroups(authctxt->pw->pw_name,
 		    authctxt->pw->pw_gid) < 0) {
@@ -1121,11 +1120,20 @@ altprivsep_start_and_do_monitor(int use_engine, int inetd, int newsock,
 			exit (1);
 		}
 
-		audit_sshd_login(&ah, authctxt->pw->pw_uid,
-			authctxt->pw->pw_gid);
+		/*
+		 * The monitor process fork()ed before the authentication
+		 * process started so at this point we have an unaudited
+		 * context.  Thus we need to obtain the audit session data
+		 * from the authentication process (aps_child) which will
+		 * have the correct audit context for the user logging in.
+		 * To do so we pass along the process-ID of the aps_child
+		 * process so that it is referenced for this audit session
+		 * rather than referencing the monitor's unaudited context.
+		 */
+		audit_sshd_login(&ah, aps_child);
 
 		fatal_add_cleanup((void (*)(void *))audit_sshd_logout,
-			(void *)&ah);
+		    (void *)&ah);
 #endif /* HAVE_BSM */
 
 #ifdef GSSAPI

@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth.c,v 1.45 2002/09/20 18:41:29 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_LOGIN_H
 #include <login.h>
@@ -310,16 +308,17 @@ audit_failed_login_cleanup(void *ctxt)
 
 	if (authctxt == NULL)
 		/* Internal error */
-		audit_sshd_login_failure(&ah, PAM_ABORT);
+		audit_sshd_login_failure(&ah, PAM_ABORT, NULL);
 	else if (authctxt->pam == NULL && authctxt->pam_retval != PAM_SUCCESS)
-		audit_sshd_login_failure(&ah, authctxt->pam_retval);
+		audit_sshd_login_failure(&ah, authctxt->pam_retval,
+		    authctxt->user);
 	else if (authctxt->pam == NULL && authctxt->pam_retval == PAM_SUCCESS)
-		audit_sshd_login_failure(&ah, PAM_PERM_DENIED);
+		audit_sshd_login_failure(&ah, PAM_PERM_DENIED, authctxt->user);
 	else if (!authctxt->valid)
-		audit_sshd_login_failure(&ah, PAM_USER_UNKNOWN);
+		audit_sshd_login_failure(&ah, PAM_USER_UNKNOWN, NULL);
 	else
 		audit_sshd_login_failure(&ah, AUTHPAM_ERROR(authctxt,
-			    PAM_PERM_DENIED));
+		    PAM_PERM_DENIED), authctxt->user);
 }
 #endif /* HAVE_BSM */
 

@@ -9,14 +9,12 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth1.c,v 1.44 2002/09/26 11:38:43 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "xmalloc.h"
 #include "rsa.h"
@@ -382,7 +380,8 @@ do_authloop(Authctxt *authctxt)
 #ifdef HAVE_BSM
 			fatal_remove_cleanup(audit_failed_login_cleanup,
 				authctxt);
-			audit_sshd_login_failure(&ah, PAM_MAXTRIES);
+			audit_sshd_login_failure(&ah, PAM_MAXTRIES,
+			    authctxt->user);
 #endif /* HAVE_BSM */
 			packet_disconnect(AUTH_FAIL_MSG, authctxt->user);
 		}

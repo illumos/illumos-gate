@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth2.c,v 1.95 2002/08/22 21:33:58 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ssh2.h"
 #include "xmalloc.h"
@@ -368,7 +366,8 @@ done_checking:
 #ifdef HAVE_BSM
 			fatal_remove_cleanup(audit_failed_login_cleanup,
 				authctxt);
-			audit_sshd_login_failure(&ah, PAM_MAXTRIES);
+			audit_sshd_login_failure(&ah, PAM_MAXTRIES,
+			    authctxt->user);
 #endif /* HAVE_BSM */
 			packet_disconnect(AUTH_FAIL_MSG, authctxt->user);
 		}
