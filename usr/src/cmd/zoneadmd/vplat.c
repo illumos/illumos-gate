@@ -2192,28 +2192,6 @@ who_is_using(zlog_t *zlogp, struct lifreq *lifr)
 	return (NULL);
 }
 
-typedef struct mcast_rtmsg_s {
-	struct rt_msghdr	m_rtm;
-	union {
-		struct {
-			struct sockaddr_in	m_dst;
-			struct sockaddr_in	m_gw;
-			struct sockaddr_in	m_netmask;
-		} m_v4;
-		struct {
-			struct sockaddr_in6	m_dst;
-			struct sockaddr_in6	m_gw;
-			struct sockaddr_in6	m_netmask;
-		} m_v6;
-	} m_u;
-} mcast_rtmsg_t;
-#define	m_dst4		m_u.m_v4.m_dst
-#define	m_dst6		m_u.m_v6.m_dst
-#define	m_gw4		m_u.m_v4.m_gw
-#define	m_gw6		m_u.m_v6.m_gw
-#define	m_netmask4	m_u.m_v4.m_netmask
-#define	m_netmask6	m_u.m_v6.m_netmask
-
 /*
  * Configures a single interface: a new virtual interface is added, based on
  * the physical interface nwiftabptr->zone_nwif_physical, with the address
@@ -2222,30 +2200,20 @@ typedef struct mcast_rtmsg_s {
  * IPv4 address (with a /prefixlength optional), or a name; for the latter,
  * an IPv4 name-to-address resolution will be attempted.
  *
- * A default interface route for multicast is created on the first IPv4 and
- * IPv6 interfaces (that have the IFF_MULTICAST flag set), respectively.
- * This should really be done in the init scripts if we ever allow zones to
- * modify the routing tables.
- *
  * If anything goes wrong, we log an detailed error message, attempt to tear
  * down whatever we set up and return an error.
  */
 static int
 configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
-    struct zone_nwiftab *nwiftabptr, boolean_t *mcast_rt_v4_setp,
-    boolean_t *mcast_rt_v6_setp)
+    struct zone_nwiftab *nwiftabptr)
 {
 	struct lifreq lifr;
 	struct sockaddr_in netmask4;
 	struct sockaddr_in6 netmask6;
 	struct in_addr in4;
-	struct in6_addr in6;
 	sa_family_t af;
 	char *slashp = strchr(nwiftabptr->zone_nwif_address, '/');
-	mcast_rtmsg_t mcast_rtmsg;
 	int s;
-	int rs;
-	int rlen;
 	boolean_t got_netmask = B_FALSE;
 	char addrstr4[INET_ADDRSTRLEN];
 	int res;
@@ -2259,9 +2227,6 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	af = lifr.lifr_addr.ss_family;
 	if (af == AF_INET)
 		in4 = ((struct sockaddr_in *)(&lifr.lifr_addr))->sin_addr;
-	else
-		in6 = ((struct sockaddr_in6 *)(&lifr.lifr_addr))->sin6_addr;
-
 	if ((s = socket(af, SOCK_DGRAM, 0)) < 0) {
 		zerror(zlogp, B_TRUE, "could not get socket");
 		return (-1);
@@ -2416,76 +2381,6 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 			    lifr.lifr_name, zone_using);
 		goto bad;
 	}
-	if ((lifr.lifr_flags & IFF_MULTICAST) && ((af == AF_INET &&
-	    mcast_rt_v4_setp != NULL && *mcast_rt_v4_setp == B_FALSE) ||
-	    (af == AF_INET6 &&
-	    mcast_rt_v6_setp != NULL && *mcast_rt_v6_setp == B_FALSE))) {
-		rs = socket(PF_ROUTE, SOCK_RAW, 0);
-		if (rs < 0) {
-			zerror(zlogp, B_TRUE, "%s: could not create "
-			    "routing socket", lifr.lifr_name);
-			goto bad;
-		}
-		(void) shutdown(rs, 0);
-		(void) memset((void *)&mcast_rtmsg, 0, sizeof (mcast_rtmsg_t));
-		mcast_rtmsg.m_rtm.rtm_msglen =  sizeof (struct rt_msghdr) +
-		    3 * (af == AF_INET ? sizeof (struct sockaddr_in) :
-		    sizeof (struct sockaddr_in6));
-		mcast_rtmsg.m_rtm.rtm_version = RTM_VERSION;
-		mcast_rtmsg.m_rtm.rtm_type = RTM_ADD;
-		mcast_rtmsg.m_rtm.rtm_flags = RTF_UP;
-		mcast_rtmsg.m_rtm.rtm_addrs =
-		    RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-		mcast_rtmsg.m_rtm.rtm_seq = ++rts_seqno;
-		if (af == AF_INET) {
-			mcast_rtmsg.m_dst4.sin_family = AF_INET;
-			mcast_rtmsg.m_dst4.sin_addr.s_addr =
-			    htonl(INADDR_UNSPEC_GROUP);
-			mcast_rtmsg.m_gw4.sin_family = AF_INET;
-			mcast_rtmsg.m_gw4.sin_addr = in4;
-			mcast_rtmsg.m_netmask4.sin_family = AF_INET;
-			mcast_rtmsg.m_netmask4.sin_addr.s_addr =
-			    htonl(IN_CLASSD_NET);
-		} else {
-			mcast_rtmsg.m_dst6.sin6_family = AF_INET6;
-			mcast_rtmsg.m_dst6.sin6_addr.s6_addr[0] = 0xffU;
-			mcast_rtmsg.m_gw6.sin6_family = AF_INET6;
-			mcast_rtmsg.m_gw6.sin6_addr = in6;
-			mcast_rtmsg.m_netmask6.sin6_family = AF_INET6;
-			mcast_rtmsg.m_netmask6.sin6_addr.s6_addr[0] = 0xffU;
-		}
-		rlen = write(rs, (char *)&mcast_rtmsg,
-		    mcast_rtmsg.m_rtm.rtm_msglen);
-		/*
-		 * The write to the multicast socket will fail if the
-		 * interface belongs to a failed IPMP group. This is a
-		 * non-fatal error and the zone will continue booting.
-		 * While the zone is running, if any interface in the
-		 * failed IPMP group recovers, the zone will fallback to
-		 * using that interface.
-		 */
-		if (rlen < mcast_rtmsg.m_rtm.rtm_msglen) {
-			if (rlen < 0) {
-				zerror(zlogp, B_TRUE, "WARNING: network "
-				    "interface '%s' not available as default "
-				    "for multicast.", lifr.lifr_name);
-			} else {
-				zerror(zlogp, B_FALSE, "WARNING: network "
-				    "interface '%s' not available as default "
-				    "for multicast; routing socket returned "
-				    "unexpected %d bytes.",
-				    lifr.lifr_name, rlen);
-			}
-		} else {
-
-			if (af == AF_INET) {
-				*mcast_rt_v4_setp = B_TRUE;
-			} else {
-				*mcast_rt_v6_setp = B_TRUE;
-			}
-		}
-		(void) close(rs);
-	}
 
 	if (!got_netmask) {
 		/*
@@ -2554,9 +2449,8 @@ bad:
 
 /*
  * Sets up network interfaces based on information from the zone configuration.
- * An IPv4 loopback interface is set up "for free", modeling the global system.
- * If any of the configuration interfaces were IPv6, then an IPv6 loopback
- * address is set up as well.
+ * IPv4 and IPv6 loopback interfaces are set up "for free", modeling the global
+ * system.
  *
  * If anything goes wrong, we log a general error message, attempt to tear down
  * whatever we set up, and return an error.
@@ -2566,9 +2460,6 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 {
 	zone_dochandle_t handle;
 	struct zone_nwiftab nwiftab, loopback_iftab;
-	boolean_t saw_v6 = B_FALSE;
-	boolean_t mcast_rt_v4_set = B_FALSE;
-	boolean_t mcast_rt_v6_set = B_FALSE;
 	zoneid_t zoneid;
 
 	if ((zoneid = getzoneidbyname(zone_name)) == ZONE_ID_UNDEFINED) {
@@ -2587,20 +2478,14 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 	}
 	if (zonecfg_setnwifent(handle) == Z_OK) {
 		for (;;) {
-			struct in6_addr in6;
-
 			if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
 				break;
-			if (configure_one_interface(zlogp, zoneid,
-			    &nwiftab, &mcast_rt_v4_set, &mcast_rt_v6_set) !=
+			if (configure_one_interface(zlogp, zoneid, &nwiftab) !=
 			    Z_OK) {
 				(void) zonecfg_endnwifent(handle);
 				zonecfg_fini_handle(handle);
 				return (-1);
 			}
-			if (inet_pton(AF_INET6, nwiftab.zone_nwif_address,
-			    &in6) == 1)
-				saw_v6 = B_TRUE;
 		}
 		(void) zonecfg_endnwifent(handle);
 	}
@@ -2617,18 +2502,14 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 	(void) strlcpy(loopback_iftab.zone_nwif_address, "127.0.0.1",
 	    sizeof (loopback_iftab.zone_nwif_address));
 	loopback_iftab.zone_nwif_defrouter[0] = '\0';
-	if (configure_one_interface(zlogp, zoneid, &loopback_iftab, NULL, NULL)
-	    != Z_OK) {
+	if (configure_one_interface(zlogp, zoneid, &loopback_iftab) != Z_OK)
 		return (-1);
-	}
-	if (saw_v6) {
-		(void) strlcpy(loopback_iftab.zone_nwif_address, "::1/128",
-		    sizeof (loopback_iftab.zone_nwif_address));
-		if (configure_one_interface(zlogp, zoneid,
-		    &loopback_iftab, NULL, NULL) != Z_OK) {
-			return (-1);
-		}
-	}
+
+	/* Always plumb up the IPv6 loopback interface. */
+	(void) strlcpy(loopback_iftab.zone_nwif_address, "::1/128",
+	    sizeof (loopback_iftab.zone_nwif_address));
+	if (configure_one_interface(zlogp, zoneid, &loopback_iftab) != Z_OK)
+		return (-1);
 	return (0);
 }
 
