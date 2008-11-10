@@ -412,6 +412,7 @@ iscsi_status_t
 iscsi_sess_destroy(iscsi_sess_t *isp)
 {
 	iscsi_status_t	rval	= ISCSI_STATUS_SUCCESS;
+	iscsi_status_t	tmprval = ISCSI_STATUS_SUCCESS;
 	iscsi_hba_t	*ihp;
 	iscsi_sess_t	*t_isp;
 	iscsi_lun_t	*ilp;
@@ -427,18 +428,27 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 	 * ensure there is no outstanding IO by upper
 	 * level drivers.  If this fails then we are
 	 * unable to destroy the session.
+	 *
+	 * Try all luns and continue upon failure
+	 * to remove what is removable before returning
+	 * the last error.
 	 */
 	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
 	ilp = isp->sess_lun_list;
 	while (ilp != NULL) {
-		rval = iscsi_lun_destroy(ihp, ilp);
-		if (!ISCSI_SUCCESS(rval)) {
-			rw_exit(&isp->sess_lun_list_rwlock);
-			return (rval);
+		iscsi_lun_t	*ilp_next = ilp->lun_next;
+
+		tmprval = iscsi_lun_destroy(ihp, ilp);
+		if (!ISCSI_SUCCESS(tmprval)) {
+			rval = tmprval;
 		}
-			ilp = isp->sess_lun_list;
+		ilp = ilp_next;
 	}
 	rw_exit(&isp->sess_lun_list_rwlock);
+
+	if (!ISCSI_SUCCESS(rval)) {
+		return (rval);
+	}
 
 	/* The next step is to logout of the connections. */
 	icp = isp->sess_conn_list;
