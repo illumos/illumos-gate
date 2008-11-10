@@ -82,6 +82,7 @@ extern "C" {
 #define	G4_CHIP_LBL		"g4_chip_label"
 #define	A4FPLUS_CHIP_LBL	"a4fplus_chip_label"
 #define	SIMPLE_CS_LBL_MP	"simple_cs_label_mp"
+#define	FSB2_CHIP_LBL		"fsb2_chip_label"
 
 /*
  * DIMM serial number property methods
@@ -110,6 +111,8 @@ extern int simple_cs_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int get_dimm_serial(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
+extern int fsb2_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 /*
  * Support functions of chip_subr.c

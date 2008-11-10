@@ -375,6 +375,63 @@ simple_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 
 
 /*
+ * This is a somewhat generic property method for labelling the CPU sockets on
+ * x86/x64 platforms.  This method assumes a correspondence between
+ * the chip topo node instance number and the CPU socket label number.  It takes
+ * the following argument:
+ *
+ * format:	a string containing a printf-like format with a single %d token
+ *              which this method computes
+ *
+ *              i.e.: CPU %d
+ *
+ * offset:      a numeric offset that we'll number the CPU's from.  This is to
+ *              allow for the fact that some systems number the CPU sockets
+ *              from zero and others start from one (like the X8450 systems)
+ */
+/* ARGSUSED */
+int
+fsb2_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *fmtstr, buf[BUFSZ];
+	int ret;
+	uint32_t offset;
+	nvlist_t *args;
+
+	topo_mod_dprintf(mod, "fsb2_chip_label() called\n");
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) snprintf(buf, BUFSZ, fmtstr,
+	    ((topo_node_instance(node) / 2) + offset));
+
+	if (store_prop_val(mod, buf, "label", out) != 0) {
+		topo_mod_dprintf(mod, "Failed to set label\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+/*
  * This is a custom property method for generating the CPU slot label for the
  * Galaxy 4E/4F platforms.
  *

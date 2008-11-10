@@ -300,6 +300,40 @@
             </facility>
         </set> 
         <set type='product'
+	    setlist='Sun-Fire-X4450'>
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='fsb2_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Blade-X8450-Server-Module|SUN-BLADE-X8450-SERVER-MODULE'>
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='fsb2_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+        </set> 
+        <set type='product'
 	    setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
 	    
 	    <fac-enum provider='fac_prov_ipmi' />

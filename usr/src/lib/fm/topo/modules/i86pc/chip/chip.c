@@ -84,6 +84,8 @@ static const topo_method_t chip_methods[] = {
 	    TOPO_STABILITY_INTERNAL, g4_chip_label},
 	{ A4FPLUS_CHIP_LBL, "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, a4fplus_chip_label},
+	{ FSB2_CHIP_LBL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, fsb2_chip_label},
 	{ NULL }
 };
 
