@@ -3229,33 +3229,60 @@ fp_handle_reject(fc_packet_t *pkt)
 	int 		rval = FC_FAILURE;
 	uchar_t		next_class;
 	fp_cmd_t 	*cmd;
+	fc_local_port_t *port;
 
 	cmd = pkt->pkt_ulp_private;
+	port = cmd->cmd_port;
 
-	if (pkt->pkt_reason != FC_REASON_CLASS_NOT_SUPP) {
-		if (pkt->pkt_reason == FC_REASON_QFULL ||
-		    pkt->pkt_reason == FC_REASON_LOGICAL_BSY) {
+	switch (pkt->pkt_state) {
+	case FC_PKT_FABRIC_RJT:
+	case FC_PKT_NPORT_RJT:
+		if (pkt->pkt_reason == FC_REASON_CLASS_NOT_SUPP) {
+			next_class = fp_get_nextclass(cmd->cmd_port,
+			    FC_TRAN_CLASS(pkt->pkt_tran_flags));
+
+			if (next_class == FC_TRAN_CLASS_INVALID) {
+				return (rval);
+			}
+			pkt->pkt_tran_flags = FC_TRAN_INTR | next_class;
+			pkt->pkt_tran_type = FC_PKT_EXCHANGE;
+
+			rval = fp_sendcmd(cmd->cmd_port, cmd,
+			    cmd->cmd_port->fp_fca_handle);
+
+			if (rval != FC_SUCCESS) {
+				pkt->pkt_state = FC_PKT_TRAN_ERROR;
+			}
+		}
+			break;
+
+	case FC_PKT_LS_RJT:
+	case FC_PKT_BA_RJT:
+		if ((pkt->pkt_reason == FC_REASON_LOGICAL_ERROR) ||
+		    (pkt->pkt_reason == FC_REASON_LOGICAL_BSY)) {
 			cmd->cmd_retry_interval = fp_retry_delay;
 			rval = fp_retry_cmd(pkt);
 		}
+		break;
 
-		return (rval);
-	}
+	case FC_PKT_FS_RJT:
+		if (pkt->pkt_reason == FC_REASON_FS_LOGICAL_BUSY) {
+			cmd->cmd_retry_interval = fp_retry_delay;
+			rval = fp_retry_cmd(pkt);
+		}
+		break;
 
-	next_class = fp_get_nextclass(cmd->cmd_port,
-	    FC_TRAN_CLASS(pkt->pkt_tran_flags));
+	case FC_PKT_LOCAL_RJT:
+		if (pkt->pkt_reason == FC_REASON_QFULL) {
+			cmd->cmd_retry_interval = fp_retry_delay;
+			rval = fp_retry_cmd(pkt);
+		}
+		break;
 
-	if (next_class == FC_TRAN_CLASS_INVALID) {
-		return (rval);
-	}
-	pkt->pkt_tran_flags = FC_TRAN_INTR | next_class;
-	pkt->pkt_tran_type = FC_PKT_EXCHANGE;
-
-	rval = fp_sendcmd(cmd->cmd_port, cmd,
-	    cmd->cmd_port->fp_fca_handle);
-
-	if (rval != FC_SUCCESS) {
-		pkt->pkt_state = FC_PKT_TRAN_ERROR;
+	default:
+		FP_TRACE(FP_NHEAD1(1, 0),
+		    "fp_handle_reject(): Invalid pkt_state");
+		break;
 	}
 
 	return (rval);
@@ -5671,6 +5698,7 @@ fp_common_intr(fc_packet_t *pkt, int iodone)
 		case FC_PKT_LOCAL_RJT:
 		case FC_PKT_LS_RJT:
 		case FC_PKT_FS_RJT:
+		case FC_PKT_BA_RJT:
 			rval = fp_handle_reject(pkt);
 			break;
 
