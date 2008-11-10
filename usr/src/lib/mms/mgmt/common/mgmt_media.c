@@ -118,7 +118,7 @@ mms_mgmt_discover_media(
 	 * proceed.
 	 */
 	(void) nvlist_lookup_string(opts, O_ACSHOST, &acshost);
-	in_libs = var_to_array(opts, O_MMSLIB, &count);
+	in_libs = mgmt_var_to_array(opts, O_MMSLIB, &count);
 
 	if (!acshost && !in_libs) {
 		st = ENOENT;
@@ -306,7 +306,7 @@ mms_mgmt_add_mpool(void *session, nvlist_t *nvl, nvlist_t *errs)
 
 	if (st == 0) {
 		/* save original values */
-		varray = var_to_array(nvl, O_APPS, &count);
+		varray = mgmt_var_to_array(nvl, O_APPS, &count);
 
 		for (i = 0; i < count; i++) {
 			if (!varray[i] || (strlen(varray[i]) == 0) ||
@@ -370,7 +370,7 @@ mms_mgmt_modify_mpool(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (st);
 	}
 
-	varray = var_to_array(nvl, O_APPS, &count);
+	varray = mgmt_var_to_array(nvl, O_APPS, &count);
 	if (varray == NULL) {
 		/* error or nothing to do? */
 		return (0);
@@ -569,6 +569,77 @@ done:
 	return (st);
 }
 
+/* ARGSUSED */
+int
+mms_mgmt_remove_dpool(void *session, char *dpool, boolean_t force,
+    nvlist_t *errs)
+{
+	int		st;
+	nvlist_t	*nvl = NULL;
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	char		tid[64];
+	char		cmd[8192];
+
+	if (!dpool) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!mgmt_chk_auth("solaris.mms.delete")) {
+		return (EACCES);
+	}
+
+	st = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
+	if (st != 0) {
+		return (st);
+	}
+
+	(void) nvlist_add_string(nvl, O_NAME, dpool);
+	(void) nvlist_add_boolean_value(nvl, O_FORCE, force);
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			nvlist_free(nvl);
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "delete task['%s'] type[DRIVEGROUPAPPLICATION] "
+	    "match[streq"
+	    "(DRIVEGROUPAPPLICATION.'DriveGroupName' '%s')];",
+	    tid, dpool);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "remove drivegroup",
+	    &response);
+	if (st != 0) {
+		goto done;
+	}
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "delete task['%s'] type[DRIVEGROUP] "
+	    "match[streq(DRIVEGROUP.'DriveGroupName' '%s')];",
+	    tid, dpool);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "remove drivegroup",
+	    &response);
+	if (st != 0) {
+		goto done;
+	}
+
+done:
+	if (nvl) {
+		nvlist_free(nvl);
+	}
+
+	return (st);
+}
+
 int
 mms_mgmt_add_cartridges(void *session, nvlist_t *nvl, nvlist_t *errs)
 {
@@ -592,6 +663,8 @@ mms_mgmt_add_cartridges(void *session, nvlist_t *nvl, nvlist_t *errs)
 	void		*response;
 	nvlist_t	*cart = NULL;
 	char		*volxml = "</token><token>volume</token><token>";
+	int		st_save = 0;
+	char		*rwmode = "readwrite";
 
 	if (!nvl) {
 		return (MMS_MGMT_NOARG);
@@ -621,7 +694,20 @@ mms_mgmt_add_cartridges(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (st);
 	}
 
-	volarr = var_to_array(nvl, O_VOLUMES, &count);
+	st = nvlist_lookup_string(nvl, "readonly", &rwmode);
+	if (st == 0) {
+		if (strcmp(rwmode, "true") == 0) {
+			rwmode = "readonly";
+		} else if (strcmp(rwmode, "false") == 0) {
+			rwmode = "readwrite";
+		} else {
+			st = MMS_MGMT_INVALID_READONLY;
+			MGMT_ADD_OPTERR(errs, "readonly", st);
+			return (st);
+		}
+	}
+
+	volarr = mgmt_var_to_array(nvl, O_VOLUMES, &count);
 	if (volarr == NULL) {
 		st = ENOENT;
 		MGMT_ADD_OPTERR(errs, O_VOLUMES, st);
@@ -722,12 +808,18 @@ mms_mgmt_add_cartridges(void *session, nvlist_t *nvl, nvlist_t *errs)
 		st = mms_mgmt_send_cmd(sessp, tid, cmd, "add volume",
 		    &response);
 		if (st != 0) {
-			break;
+			MGMT_ADD_ERR(errs, vol->label, st);
+			st_save = MMS_MGMT_CREATE_CART_ERR;
+			continue;
 		}
 		/* create the PARTITION */
 		(void) nvlist_add_string(cart, O_NAME, vol->label);
-		st = mms_mgmt_create_partition(sessp, cart, errs);
+		st = mms_mgmt_create_partition(sessp,
+		    vol->label, -1, libname, rwmode, errs);
 		if (st != 0) {
+			MGMT_ADD_ERR(errs, vol->label, st);
+			st_save = MMS_MGMT_CREATE_PART_ERR;
+			mms_mgmt_add_vol_cleanup(sessp, vol->label, libname);
 			break;
 		}
 	}
@@ -745,11 +837,11 @@ done:
 		nvlist_free(cart);
 	}
 
-	return (st);
+	return (st_save == 0 ? st : st_save);
 }
 
 int
-mms_mgmt_create_voltype(void *session, nvlist_t *nvl, nvlist_t *errs)
+mms_mgmt_add_voltype(void *session, nvlist_t *nvl, nvlist_t *errs)
 {
 	int		st;
 	void		*sessp = session;
@@ -853,6 +945,11 @@ mms_mgmt_create_voltype(void *session, nvlist_t *nvl, nvlist_t *errs)
 		}
 		MGMT_ADD_ERR(errs, in_media, st);
 		goto done;
+	}
+
+	/* DISK type may be any size, so set in_sz = 0 */
+	if (strcmp(in_media, "DISK") == 0) {
+		in_sz = "0";
 	}
 
 	/* create the new type */
@@ -1318,7 +1415,7 @@ mms_mgmt_list_vols(void *session, nvlist_t *nvl, nvlist_t **vol_list)
 	}
 	st = 0;
 
-	volarr = var_to_array(nvl, O_VOLUMES, &count);
+	volarr = mgmt_var_to_array(nvl, O_VOLUMES, &count);
 	if (volarr != NULL) {
 		/* special case for all volumes */
 		if (strcmp(volarr[0], "*") != 0) {
@@ -1419,6 +1516,135 @@ done:
 }
 
 int
+mms_mgmt_show_dpool(void *session, nvlist_t *nvl, nvlist_t **pools)
+{
+	int		st;
+	char		**names = NULL;
+	int		count;
+	char		tid[64];
+	char		cmd[8192];
+	char		buf[1024];
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	int		i;
+	char		*key = O_DPOOL;
+	nvlist_t	*nva = NULL;
+	nvpair_t	*nvp = NULL;
+	char		*dpname = NULL;
+
+	if (!nvl || !pools) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	names = mgmt_var_to_array(nvl, O_NAME, &count);
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] reportmode[namevalue] "
+	    "report[DRIVEGROUP]",
+	    tid);
+
+	if (count > 1) {
+		(void) strlcat(cmd, "match[or(", sizeof (cmd));
+	} else if (count == 1) {
+		(void) strlcat(cmd, "match[", sizeof (cmd));
+	}
+	for (i = 0; i < count; i++) {
+		(void) snprintf(buf, sizeof (buf),
+		    " streq (DRIVEGROUP.'DriveGroupName' '%s')",
+		    names[i]);
+		(void) strlcat(cmd, buf, sizeof (cmd));
+	}
+	if (count > 1) {
+		(void) strlcat(cmd, ")];", sizeof (cmd));
+	} else if (count == 1) {
+		(void) strlcat(cmd, "];", sizeof (cmd));
+	} else {
+		(void) strlcat(cmd, ";", sizeof (cmd));
+	}
+
+	*pools = NULL;
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "show dpool", &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs(key, B_TRUE, response, pools);
+		mms_free_rsp(response);
+	}
+
+	if (st != 0) {
+		goto done;
+	}
+
+	while ((nvp = nvlist_next_nvpair(*pools, nvp)) != NULL) {
+		st = nvpair_value_nvlist(nvp, &nva);
+		if (st != 0) {
+			continue;
+		}
+		dpname = nvpair_name(nvp);
+
+		(void) mms_gen_taskid(tid);
+		(void) snprintf(cmd, sizeof (cmd),
+		    "show task['%s'] reportmode[namevalue] "
+		    "report[DRIVEGROUPAPPLICATION.'ApplicationName' ] "
+		    "match[streq(DRIVEGROUP.'DriveGroupName' '%s')];",
+		    tid, dpname);
+
+		st = mms_mgmt_send_cmd(sessp, tid, cmd, "dpool apps",
+		    &response);
+		if (st == 0) {
+			st = mmp_get_nvattrs_array("application", B_TRUE,
+			    response, nva);
+			mms_free_rsp(response);
+		}
+		if (st != 0) {
+			continue;
+		}
+
+		/*
+		 * Get drives in this dpool
+		 */
+		(void) mms_gen_taskid(tid);
+		(void) snprintf(cmd, sizeof (cmd),
+		    "show task['%s'] reportmode[namevalue] "
+		    "report[DRIVE.'DriveName' ] "
+		    "match[streq(DRIVEGROUP.'DriveGroupName' '%s')];",
+		    tid, dpname);
+
+		st = mms_mgmt_send_cmd(sessp, tid, cmd, "dpool apps",
+		    &response);
+		if (st == 0) {
+			st = mmp_get_nvattrs_array("drive", B_TRUE,
+			    response, nva);
+			mms_free_rsp(response);
+		}
+		if (st != 0) {
+			continue;
+		}
+	}
+
+	mgmt_filter_results(nvl, *pools);
+
+done:
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	if (names) {
+		mgmt_free_str_arr(names, count);
+	}
+
+	return (st);
+}
+
+int
 mms_mgmt_show_mpool(void *session, nvlist_t *nvl, nvlist_t **pools)
 {
 	int		st;
@@ -1454,7 +1680,7 @@ mms_mgmt_show_mpool(void *session, nvlist_t *nvl, nvlist_t **pools)
 		sessp = sess;
 	}
 
-	names = var_to_array(nvl, O_NAME, &count);
+	names = mgmt_var_to_array(nvl, O_NAME, &count);
 
 	(void) mms_gen_taskid(tid);
 	(void) snprintf(cmd, sizeof (cmd),
@@ -1463,17 +1689,19 @@ mms_mgmt_show_mpool(void *session, nvlist_t *nvl, nvlist_t **pools)
 	    tid);
 
 	if (count > 1) {
-		(void) strlcat(cmd, "match[or", sizeof (cmd));
+		(void) strlcat(cmd, "match[or(", sizeof (cmd));
 	} else if (count == 1) {
 		(void) strlcat(cmd, "match[", sizeof (cmd));
 	}
 	for (i = 0; i < count; i++) {
 		(void) snprintf(buf, sizeof (buf),
-		    " streq (CARTRIDGEGROUP.'%s' '%s')",
-		    key, names[i]);
+		    " streq (CARTRIDGEGROUP.'CartridgeGroupName' '%s')",
+		    names[i]);
 		(void) strlcat(cmd, buf, sizeof (cmd));
 	}
-	if (count > 0) {
+	if (count > 1) {
+		(void) strlcat(cmd, ")];", sizeof (cmd));
+	} else if (count == 1) {
 		(void) strlcat(cmd, "];", sizeof (cmd));
 	} else {
 		(void) strlcat(cmd, ";", sizeof (cmd));
@@ -1582,8 +1810,10 @@ done:
 	return (st);
 }
 
+/* ARGSUSED */
 int
-mms_mgmt_create_partition(void *session, nvlist_t *nvl, nvlist_t *errs)
+mms_mgmt_create_partition(void *session, char *pcl, int64_t size, char *lib,
+    char *rwmode, nvlist_t *errs)
 {
 	int		st;
 	void		*sess = NULL;
@@ -1591,28 +1821,10 @@ mms_mgmt_create_partition(void *session, nvlist_t *nvl, nvlist_t *errs)
 	void		*response;
 	char		tid[64];
 	char		cmd[8192];
-	char		*pcl = NULL;
-	char		*lib = NULL;
 	nvlist_t	*carts = NULL;
-	nvlist_t	*this = NULL;
 
 	if (!mgmt_chk_auth("solaris.mms.media")) {
 		return (EACCES);
-	}
-
-	if (!nvl) {
-		return (MMS_MGMT_NOARG);
-	}
-
-	st = nvlist_lookup_string(nvl, O_NAME, &pcl);
-	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, O_NAME, st);
-		return (st);
-	}
-
-	st = nvlist_lookup_string(nvl, O_MMSLIB, &lib);
-	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, O_MMSLIB, st);
 	}
 
 	if (!session) {
@@ -1623,23 +1835,8 @@ mms_mgmt_create_partition(void *session, nvlist_t *nvl, nvlist_t *errs)
 		sessp = sess;
 	}
 
-	(void) mms_gen_taskid(tid);
-	(void) snprintf(cmd, sizeof (cmd),
-	    "show task['%s'] reportmode[namevalue] report[CARTRIDGE] "
-	    "match[and (streq(CARTRIDGE.'LibraryName' '%s') "
-	    "streq(CARTRIDGE.'CartridgePCL' '%s'))];",
-	    tid, lib, pcl);
-
-	st = mms_mgmt_send_cmd(sessp, tid, cmd, "show cartridge", &response);
-	if (st == 0) {
-		st = mmp_get_nvattrs("CartridgePCL", B_FALSE, response, &carts);
-		mms_free_rsp(response);
-	}
-
-	st = nvlist_lookup_nvlist(carts, pcl, &this);
-	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, pcl, st);
-		goto done;
+	if (size > 0) {
+		size /= (1024 * 1024);		/* convert to mega bytes */
 	}
 
 	(void) mms_gen_taskid(tid);
@@ -1648,8 +1845,12 @@ mms_mgmt_create_partition(void *session, nvlist_t *nvl, nvlist_t *errs)
 	    "set[PARTITION.'PartitionName' 'part1'] "
 	    "set[PARTITION.'SideName' 'side 1'] "
 	    "set[PARTITION.'CartridgePCL' '%s'] "
+	    "set[PARTITION.'PartitionAvailable' '%lld'] "
+	    "set[PARTITION.'PartitionSize' '%lld'] "
+	    "set[PARTITION.'PartitionPercentAvailable' '%d'] "
+	    "set[PARTITION.'PartitionRWMode' '%s'] "
 	    "set[PARTITION.'LibraryName' '%s'];",
-	    tid, pcl, lib);
+	    tid, pcl, size, size, size == -1 ? -1 : 100, rwmode, lib);
 
 	st = mms_mgmt_send_cmd(sessp, tid, cmd, "create partition", &response);
 
@@ -1776,7 +1977,7 @@ mms_mgmt_label_multi(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (MMS_MGMT_NOARG);
 	}
 
-	varr = var_to_array(nvl, O_NAME, &count);
+	varr = mgmt_var_to_array(nvl, O_NAME, &count);
 	if (!varr) {
 		st = ENOENT;
 		MGMT_ADD_OPTERR(errs, O_NAME, st);
@@ -1835,8 +2036,10 @@ mms_mgmt_label_vol(void *session, nvlist_t *nvl, nvlist_t *errs)
 	char		*inst = NULL;
 	char		*pass = NULL;
 	nvlist_t	*attrs = NULL;
+	nvlist_t	*carts = NULL;
 	nvpair_t	*nva;
 	boolean_t	force = B_FALSE;
+	boolean_t	nomount = B_FALSE;
 
 	if (!mgmt_chk_auth("solaris.mms.media")) {
 		return (EACCES);
@@ -1877,6 +2080,27 @@ mms_mgmt_label_vol(void *session, nvlist_t *nvl, nvlist_t *errs)
 		sessp = sess;
 	}
 
+	/*
+	 * Check if cartridge exists.
+	 */
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] reportmode[namevalue] report[CARTRIDGE] "
+	    "match[and (streq(CARTRIDGE.'LibraryName' '%s') "
+	    "streq(CARTRIDGE.'CartridgePCL' '%s'))];",
+	    tid, lib, pcl);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "show cartridge", &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("CartridgePCL", B_FALSE, response, &carts);
+		mms_free_rsp(response);
+	}
+
+	if (!nvlist_exists(carts, pcl)) {
+		MGMT_ADD_OPTERR(errs, pcl, st);
+		goto done;
+	}
+
 	/* check if partition for cartridge exists.  if no, create */
 	st = mgmt_show_partition(sessp, pcl, lib, &attrs);
 
@@ -1885,7 +2109,8 @@ mms_mgmt_label_vol(void *session, nvlist_t *nvl, nvlist_t *errs)
 	}
 
 	if (attrs == NULL) {
-		st = mms_mgmt_create_partition(sessp, nvl, errs);
+		st = mms_mgmt_create_partition(sessp, pcl, -1, lib,
+		    "readwrite", errs);
 	} else {
 		nva = nvlist_next_nvpair(attrs, NULL);
 		if (nva) {
@@ -1933,12 +2158,18 @@ mms_mgmt_label_vol(void *session, nvlist_t *nvl, nvlist_t *errs)
 	/* filename is 17 spaces - tells MM to re-init volume */
 	(void) nvlist_add_string(nvl, "filename", label_fname);
 
-	/* ok, mount with appropriate options */
-	st = mms_mgmt_mount_vol(sessp, nvl, errs);
+	/*
+	 * If '-n' is not specified, them mount and label the cartridge
+	 */
+	st = nvlist_lookup_boolean_value(nvl, O_NOMOUNT, &nomount);
+	if (st != 0 || nomount != B_TRUE) {
+		/* ok, mount with appropriate options */
+		st = mms_mgmt_mount_vol(sessp, nvl, errs);
 
-	if (st == 0) {
-		/* label is a quick mount/unmount */
-		st = mms_mgmt_unmount_vol(nvl, errs);
+		if (st == 0) {
+			/* label is a quick mount/unmount */
+			st = mms_mgmt_unmount_vol(nvl, errs);
+		}
 	}
 
 done:
@@ -1948,6 +2179,9 @@ done:
 
 	if (attrs) {
 		nvlist_free(attrs);
+	}
+	if (carts) {
+		nvlist_free(carts);
 	}
 
 	return (st);
@@ -2370,7 +2604,7 @@ mms_mgmt_mount_vol(void *session, nvlist_t *nvl, nvlist_t *errs)
 		(void) strlcat(mbuf, buf, sizeof (mbuf));
 	}
 
-	varray = var_to_array(nvl, "mode", &count);
+	varray = mgmt_var_to_array(nvl, "mode", &count);
 	for (i = 0; i < count; i++) {
 		if (!varray[i]) {
 			continue;

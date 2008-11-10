@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/stat.h>
+#include <libgen.h>
 #include <time.h>
 #include <sys/varargs.h>
 #include <pthread.h>
@@ -342,6 +343,152 @@ dm_get_task(mms_par_node_t *root)
 	}
 	task = strdup(mms_pn_token(tasknode));
 	return (task);
+}
+
+/*
+ * Function name
+ *	dm_get_hostpath
+ *
+ * Parameters:
+ *	none
+ *
+ * Description:
+ *	Get the host specific library path if it is set.
+ *
+ * Return code:
+ *	0 - good
+ *	-1 - error
+ *
+ * Note:
+ *
+ *
+ */
+
+int
+dm_get_hostpath(void)
+{
+	char		*show_cmd;
+	char		*val;
+	char		*task;
+	dm_command_t	*cmd;
+	mms_par_node_t	*root;
+
+	if (drv->drv_disk_libpath) {
+		free(drv->drv_disk_libpath);
+		drv->drv_disk_libpath = NULL;
+	}
+
+	task = dm_bld_task("show-hostpath");
+	show_cmd = mms_strnew("show task['%s'] reportmode[namevalue] "
+	    "match[ and( streq(DM.'DMName' '%s') "
+	    "streq(LIBRARYACCESS.'HostName' '%s')) ] "
+	    "report[ LIBRARYACCESS.'LibraryPath' ] "
+	    ";",
+	    task, drv->drv_dmname, wka->dm_local_hostname);
+
+	cmd = dm_send_cmd(show_cmd, dm_cmd_response, task);
+	free(task);
+	free(show_cmd);
+	if (cmd == NULL || cmd->cmd_rc != 0) {
+		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
+		    "send show hostpath error"));
+		goto error;
+	}
+
+	root = cmd->cmd_root;
+	val = dm_get_attr_value(root, "LIBRARYACCESS", "LibraryPath");
+	if (val != NULL) {
+		drv->drv_disk_libpath = strdup(val);
+	}
+
+	dm_destroy_cmd(cmd);
+	return (0);
+
+error:
+	if (cmd != NULL) {
+		dm_destroy_cmd(cmd);
+	}
+	return (-1);
+}
+
+/*
+ * Function name
+ *	dm_get_default_lib_path
+ *
+ * Parameters:
+ *	none
+ *
+ * Description:
+ *	Get the default library path from the LIBRARY object the
+ *	DM belongs to.
+ *
+ * Return code:
+ *	0 - OK
+ *	-1 - error
+ *
+ * Note:
+ *
+ *
+ */
+
+int
+dm_get_default_lib_path(void)
+{
+	char		*show_cmd;
+	char		*val;
+	char		*task;
+	dm_command_t	*cmd;
+	mms_par_node_t	*root;
+	int		err;
+
+	if (drv->drv_disk_libpath) {
+		free(drv->drv_disk_libpath);
+		drv->drv_disk_libpath = NULL;
+	}
+
+	task = dm_bld_task("show-default_lib_path");
+	show_cmd = mms_strnew("show task['%s'] reportmode[namevalue] "
+	    "match[ streq(DM.'DMName' '%s') ] "
+	    "report[ LIBRARY.'DefaultLibraryPath' ] "
+	    ";",
+	    task, drv->drv_dmname);
+
+	cmd = dm_send_cmd(show_cmd, dm_cmd_response, task);
+	free(task);
+	free(show_cmd);
+	if (cmd == NULL || cmd->cmd_rc != 0) {
+		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
+		    "send show default lib path error"));
+		goto error;
+	}
+
+	root = cmd->cmd_root;
+	val = dm_get_attr_value(root, "LIBRARY", "DefaultLibraryPath");
+	if (val == NULL || val[0] == '\0') {
+		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
+		    "no library path specified"));
+		goto error;
+	}
+	if (mkdirp(val, 0755) == 0) {
+		TRACE((MMS_DEBUG, "Created DISK lib %s", val));
+	} else if (errno != EEXIST) {
+		err = errno;
+		/* Unable to create it */
+		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
+		    "unable to access library path %s: %s",
+		    val, strerror(err)));
+		goto error;
+	}
+	drv->drv_disk_libpath = strdup(val);		/* save lib path */
+
+	dm_destroy_cmd(cmd);
+	return (0);
+
+error:
+	if (cmd != NULL) {
+		dm_destroy_cmd(cmd);
+	}
+	return (-1);
 }
 
 /*
@@ -2503,9 +2650,9 @@ dm_activate_enable(dm_command_t *cmd)
 		goto error1;
 	}
 
-	DRV_CALL(drv_init_dev, ());
-
-
+	if (DRV_CALL(drv_init_dev, ())) {
+		goto error1;
+	}
 
 	/*
 	 * Get sense data size
@@ -2538,11 +2685,6 @@ dm_activate_enable(dm_command_t *cmd)
 	if (dm_send_config() != 0) {
 		goto error1;
 	}
-
-	/*
-	 * Initialize the device
-	 */
-	DRV_CALL(drv_init_dev, ());
 
 	drv->drv_flags |= DRV_ENABLED;
 	dm_resp_success(cmd->cmd_task, NULL);
@@ -3621,12 +3763,6 @@ dm_bld_config_cmd(char *task)
 	drv_shape_density_t	*sd;
 	mms_sym_t		*mms_sym;
 
-	if ((drv->drv_mounted = DRV_CALL(drv_get_mounted, ())) == NULL) {
-		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
-		    "cannot get mount point"));
-		return (NULL);
-	}
-
 	/*
 	 * Now, substitute values
 	 */
@@ -3708,17 +3844,6 @@ dm_bld_config_cmd(char *task)
 				    "bitformat "
 				    "['bitformat_%s' 'bit_%s'] ",
 				    sd->drv_bit, sd->drv_bit);
-			}
-		} else if (strncmp(fmt + i, CONF_MOUNT_POINT,
-		    kwlen = strlen(CONF_MOUNT_POINT)) == 0) {
-			for (cp = drv->drv_mounted;
-			    cp != NULL && *cp != NULL; cp++) {
-				conf = mms_strapp(conf,
-				    "'%s' ", *cp);
-			}
-			if (cp == NULL) {
-				conf = mms_strapp(conf,
-				    "'%s' ", "*none");
 			}
 		} else if (strncmp(fmt + i, CONF_SHAPE,
 		    kwlen = strlen(CONF_SHAPE)) == 0) {

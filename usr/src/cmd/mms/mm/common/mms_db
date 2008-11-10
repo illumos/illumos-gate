@@ -2670,7 +2670,6 @@
 17d DROP FUNCTION mm_func_setpassword() CASCADE;
 17d DROP FUNCTION mm_func_defpassword() CASCADE;
 17d DROP TABLE "MMPASSWORD"; 
-r
 17d ALTER TABLE "APPLICATION" ADD "Password" text;
 17d ALTER TABLE "DM" ADD "DMPassword" text;
 17d ALTER TABLE "LM" ADD "LMPassword" text;
@@ -2821,7 +2820,75 @@ r
 	"LMTargetLibrary" text;
 24d ALTER TABLE "DM" ADD
 	"DMTargetLibrary" text;
-	
+
+# Disk archiving default and alternate host library path configuration
+25u ALTER TABLE "LIBRARY" ADD
+        "DefaultLibraryPath" text;
+25u CREATE TABLE "LIBRARYACCESS"(
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"HostName" text
+		CONSTRAINT "HostName_CC"
+		CHECK("HostName" != 'localhost' AND
+		"HostName" != '127.0.0.1' AND
+		"HostName" != '::1')
+		NOT NULL,
+	"LibraryPath" text
+		NOT NULL,
+	CONSTRAINT "LIBRARYACCESS_PK"
+		PRIMARY KEY("LibraryName", "HostName")
+);
+25u SELECT mm_system_defined_add('LIBRARYACCESS','LibraryName');
+25u SELECT mm_system_defined_add('LIBRARYACCESS','HostName');
+25u SELECT mm_system_defined_add('LIBRARYACCESS','LibraryPath');
+25u CREATE FUNCTION mm_func_librarypath() RETURNS TRIGGER AS '
+	BEGIN
+	-- Validate default disk library path is not null. 
+	IF TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'' THEN
+	    IF NEW."LibraryType" = ''DISK'' THEN
+		IF NEW."DefaultLibraryPath" ISNULL THEN
+		    RAISE EXCEPTION ''"LIBRARY"."DefaultLibraryPath" must not be null for "LIBRARY"."LibraryType" "DISK"'';
+		END IF;
+		-- Validate default disk library path ends in library name
+		IF ((select length(NEW."DefaultLibraryPath") -
+		    length(NEW."LibraryName") = position(NEW."LibraryName" in
+		    NEW."DefaultLibraryPath") - 1)) != \'t\' THEN
+			RAISE EXCEPTION ''"LIBRARY"."DefaultLibraryPath" must end in "LIBRARY"."LibraryName"'';
+		END IF;
+	    END IF;  
+	    RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+25u CREATE TRIGGER mm_func_librarypath BEFORE
+	INSERT OR UPDATE ON "LIBRARY"
+	FOR ROW EXECUTE PROCEDURE mm_func_librarypath();
+
+25u CREATE FUNCTION mm_func_libraryaccess() RETURNS TRIGGER AS '
+	BEGIN
+	-- Validate alternate disk library access path ends in library name
+	IF TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'' THEN
+	    IF ((select length(NEW."LibraryPath") -
+	        length(NEW."LibraryName") = position(NEW."LibraryName" in
+	        NEW."LibraryPath") - 1)) != \'t\' THEN
+		    RAISE EXCEPTION ''"LIBRARYACCESS"."LibraryPath" must end in "LIBRARYACCESS"."LibraryName"'';
+	    END IF;
+	    RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+25u CREATE TRIGGER mm_func_libraryaccess BEFORE
+	INSERT OR UPDATE ON "LIBRARYACCESS"
+	FOR ROW EXECUTE PROCEDURE mm_func_libraryaccess();
+
+25u ALTER TABLE "CARTRIDGE" DROP "CartridgePath";
+25u SELECT mm_system_defined_del('CARTRIDGE','CartridgePath');
+25u ALTER TABLE "CARTRIDGE" DROP "CartridgeMountPoint";
+25u SELECT mm_system_defined_del('CARTRIDGE','CartridgeMountPoint');
+25u DROP table "DMMOUNTPOINT";
+
+
 
 ######################################################################
 #                                                                    #

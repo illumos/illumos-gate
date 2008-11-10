@@ -200,6 +200,10 @@ int
 mmp_get_nvattrs(char *key,  boolean_t useropt, void *response, nvlist_t **nvl);
 
 int
+mmp_get_nvattrs_array(char *key, boolean_t useropt,
+    void *response, nvlist_t *nvl);
+
+int
 mms_mgmt_mmp_count(void *response, uint32_t *count);
 
 int
@@ -221,7 +225,7 @@ void
 cmp_mmp_opts(mms_mgmt_setopt_t *opts, char **carray, nvlist_t *nva, int *count);
 
 char **
-var_to_array(nvlist_t *nvl, char *optname, int *count);
+mgmt_var_to_array(nvlist_t *nvl, char *optname, int *count);
 
 void
 mgmt_free_str_arr(char **inarr, int count);
@@ -231,8 +235,6 @@ mgmt_opt_to_var(char *in_str, boolean_t allow_empty, nvlist_t *nvl);
 
 int
 mgmt_set_str_or_arr(char *inargs, char *key, nvlist_t *nvl);
-
-int mgmt_get_mntpt(struct statvfs64 *in, char **mntpt);
 
 int write_buf(int fd, void* buffer, int len);
 

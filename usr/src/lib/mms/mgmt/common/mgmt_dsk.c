@@ -42,14 +42,58 @@
 static char *_SrcFile = __FILE__;
 #define	HERE _SrcFile, __LINE__
 
-static int
-mgmt_get_dklibname(void *session, char *libname, nvlist_t **dklib);
+extern	mms_mgmt_setopt_t dklibopts[];
 
 static int
-mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
-    char **mntpt, char **rpath, nvlist_t *errs);
+mgmt_create_dkvol(char *path, uint64_t volsz, nvlist_t *errs);
 
-#define	DEF_DK_LIBNAME	"MMS_Disk_Archive"
+static int
+mgmt_get_dklibname(void *session, char *libname, nvlist_t **lib)
+{
+	int		st;
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	char		tid[64];
+	char 		cmd[8192];
+
+	if (!lib) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	*lib = NULL;
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] "
+	    "match[and( "
+	    "streq(LIBRARY.'LibraryName' '%s') "
+	    "streq(LIBRARY.'LibraryType' 'DISK'))] "
+	    "report[LIBRARY.'LibraryName' LIBRARY.'DefaultLibraryPath'] "
+	    "reportmode[namevalue]; ", tid, libname);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mgmt_get_lib",
+	    &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("LibraryName", B_FALSE, response,
+		    lib);
+		mms_free_rsp(response);
+	}
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
 
 /*
  *  mms_mgmt_add_dklib()
@@ -59,7 +103,7 @@ mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
  *
  */
 int
-mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs)
+mms_mgmt_create_dklib(void *session, nvlist_t *lib, nvlist_t *errs)
 {
 	int		st;
 	void		*sess = NULL;
@@ -67,10 +111,20 @@ mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs)
 	void		*response;
 	char		tid[64];
 	char 		cmd[8192];
+	int		len = sizeof (cmd);
 	char		buf[1024];
+	char		libpath[PATH_MAX];
 	nvlist_t	*dklib = NULL;
 	nvlist_t	*nva = NULL;
 	char		mmhost[NI_MAXHOST +  NI_MAXSERV + 2]; /* ':' + nul */
+	char		*libname = NULL;
+	char		*dfltpath = NULL;
+	char		**altpath = NULL;
+	char		*pp = NULL;
+	int		i;
+	int		j;
+	int		count = 0;
+	char		*host = NULL;
 
 	if (!mgmt_chk_auth("solaris.mms.create")) {
 		return (EACCES);
@@ -92,20 +146,66 @@ mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs)
 	}
 	if (st != 0) {
 		st = MMS_MGMT_NO_MMHOST;
-		goto done;
+		return (st);
 	}
 
-	if (!libname) {
-		libname = DEF_DK_LIBNAME;
+	/*
+	 * Get dkpath of library
+	 */
+	st = nvlist_lookup_string(lib, "dkpath", &dfltpath);
+	if (st != 0) {
+		MGMT_ADD_OPTERR(errs, "dkpath", st);
+		return (st);
+	}
+	if (dfltpath[0] != '/') {
+		st = MMS_MGMT_INVALID_PATH;
+		return (st);
+	}
+	for (j = strlen(dfltpath) - 1; j > 0 && dfltpath[j] == '/'; j--) {
+		dfltpath[j] = '\0';
+	}
+
+	/*
+	 * Get library name
+	 */
+	st = nvlist_lookup_string(lib, O_NAME, &libname);
+	if (st != 0) {
+		/* No libraryname */
+		if (st == ENOENT) {
+			st = MMS_MGMT_ERR_REQUIRED;
+			MGMT_ADD_OPTERR(errs, "library", st);
+		}
+		return (st);
+	}
+	/*
+	 * Find connection - where the LM is going to run
+	 */
+	st = nvlist_lookup_string(lib, O_HOST, &host);
+	if (st != 0) {
+		/* host not specified, default to mmhost */
+		host = mmhost;
 	}
 
 	st = mgmt_get_dklibname(sessp, libname, &dklib);
 	if (st != 0) {
-		goto done;
+		return (st);
 	}
 
 	if (nvlist_exists(dklib, libname)) {
-		/* already there, nothing to do */
+		/* already there, tell caller */
+		st = MMS_MGMT_LIB_EXISTS;
+		return (st);
+	}
+
+	/*
+	 * Build librarypath
+	 */
+
+	(void) snprintf(libpath, sizeof (libpath),
+	    "%s/%s", dfltpath, libname);
+
+	st = create_mmp_clause("LIBRARY", dklibopts, lib, errs, cmd, len);
+	if (st != 0) {
 		goto done;
 	}
 
@@ -113,9 +213,9 @@ mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs)
 	(void) snprintf(cmd, sizeof (cmd),
 	    "create task['%s'] type[LIBRARY] "
 	    "set[LIBRARY.'LibraryName' '%s'] "
+	    "set[LIBRARY.'DefaultLibraryPath' '%s'] "
 	    "set[LIBRARY.'LibraryType' 'DISK'];",
-	    tid, libname);
-
+	    tid, libname, libpath);
 	st = mms_mgmt_send_cmd(sessp, tid, cmd, "add disk library",
 	    &response);
 
@@ -131,40 +231,93 @@ mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs)
 	    "set[LM.'LMName' '%s'] "
 	    "set[LM.'LibraryName' '%s'] "
 	    "set[LM.'LMTargetHost' '%s'];",
-	    tid, buf, libname, mmhost);
+	    tid, buf, libname, host);
 
-	st = mms_mgmt_send_cmd(sessp, tid, cmd, "add disk library",
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "add disk LM",
 	    &response);
+	if (st != 0) {
+		goto done;
+	}
+
+	/*
+	 * Add LIBRARYACCESS with altpaths
+	 */
+
+	/*
+	 * altpath specifies a list of one or more host and path specs.
+	 */
+	altpath = mgmt_var_to_array(lib, "dkaltpath", &count);
+	for (i = 0; i < count; i++) {
+		/* Break each entry into hostname and path */
+		if ((pp = strchr(altpath[i], '@')) == NULL) {
+			/* Not hostname@path */
+			st = MMS_MGMT_INV_HOSTPATH;
+			goto done;
+		}
+		pp[0] = '\0';
+		pp++;
+		if (pp[0] != '/') {
+			/* Not hostname@path */
+			st = MMS_MGMT_INV_HOSTPATH;
+			goto done;
+		}
+		for (j = strlen(pp) - 1; j > 0 && pp[j] == '/'; j--) {
+			pp[j] = '\0';
+		}
+
+		/* append libname to path */
+		(void) snprintf(libpath, sizeof (libpath),
+		    "%s/%s", pp, libname);
+
+		(void) mms_gen_taskid(tid);
+		(void) snprintf(cmd, sizeof (cmd),
+		    "create task['%s'] "
+		    "type[LIBRARYACCESS] "
+		    "set[LIBRARYACCESS.'LibraryName' '%s'] "
+		    "set[LIBRARYACCESS.'HostName' '%s'] "
+		    "set[LIBRARYACCESS.'LibraryPath' '%s'] "
+		    ";",
+		    tid, libname, altpath[i], libpath);
+
+		st = mms_mgmt_send_cmd(sessp, tid, cmd,
+		    "add disk library",
+		    &response);
+		if (st != 0) {
+			goto done;
+		}
+	}
 
 	if (st == 0) {
 		/* online this library */
 		st = nvlist_alloc(&nva, NV_UNIQUE_NAME, 0);
 		if (st != 0) {
-			goto done;
+			goto done1;
 		}
 		(void) nvlist_add_string(nva, O_OBJSTATE, "online");
 		(void) nvlist_add_string(nva, O_OBJTYPE, "library");
 		(void) nvlist_add_string(nva, O_NAME, libname);
 
 		st = mms_mgmt_set_state(sessp, nva, errs);
-
 		nvlist_free(nva);
+		if (st != 0) {
+			goto done1;
+		}
 	}
 
 done:
+	if (st != 0) {
+		/* had an error */
+		(void) mms_remove_library(sessp, lib, errs);
+	}
+done1:
 	if (sess) {
 		(void) mms_goodbye(sess, 0);
 	}
-
-	if (dklib) {
-		nvlist_free(dklib);
-	}
-
 	return (st);
 }
 
-static int
-mgmt_get_dklibname(void *session, char *libname, nvlist_t **dklib)
+int
+mgmt_get_drvgrp(void *session, char *grpname, nvlist_t **drvgrp)
 {
 	int		st;
 	void		*sess = NULL;
@@ -172,9 +325,8 @@ mgmt_get_dklibname(void *session, char *libname, nvlist_t **dklib)
 	void		*response;
 	char		tid[64];
 	char 		cmd[8192];
-	char		buf[1024];
 
-	if (!dklib) {
+	if (!drvgrp) {
 		return (MMS_MGMT_NOARG);
 	}
 
@@ -186,31 +338,20 @@ mgmt_get_dklibname(void *session, char *libname, nvlist_t **dklib)
 		sessp = sess;
 	}
 
-	*dklib = NULL;
+	*drvgrp = NULL;
 
 	(void) mms_gen_taskid(tid);
 	(void) snprintf(cmd, sizeof (cmd),
-	    "show task['%s'] report[LIBRARY.'LibraryName'] "
-	    "reportmode[namevalue] ", tid);
+	    "show task['%s'] "
+	    "match[streq(DRIVEGROUP.'DriveGroupName' '%s')] "
+	    "report[DRIVEGROUP.'DriveGroupName'] "
+	    "reportmode[namevalue]; ", tid, grpname);
 
-	if (!libname) {
-		(void) strlcat(cmd,
-		    "match[streq(LIBRARY.'LibraryType' 'DISK')];",
-		    sizeof (cmd));
-	} else {
-		(void) snprintf(buf, sizeof (buf),
-		    "match[and "
-		    "(streq(LIBRARY.'LibraryType' 'DISK') "
-		    "streq(LIBRARY.'LibraryName' '%s'))];",
-		    libname);
-		(void) strlcat(cmd, buf, sizeof (cmd));
-	}
-
-	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mgmt_get_dklib",
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "get drivegroup",
 	    &response);
 	if (st == 0) {
-		st = mmp_get_nvattrs("LibraryName", B_FALSE, response,
-		    dklib);
+		st = mmp_get_nvattrs("DriveGroupName", B_FALSE, response,
+		    drvgrp);
 		mms_free_rsp(response);
 	}
 
@@ -221,8 +362,53 @@ mgmt_get_dklibname(void *session, char *libname, nvlist_t **dklib)
 	return (st);
 }
 
+void
+mms_mgmt_add_vol_cleanup(void *session, char *pcl, char *lib)
+{
+	void	*sess = NULL;
+	void	*sessp = session;
+	void	*response;
+	char	cmd[8192];
+	char	tid[64];
+	int	st;
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return;
+		}
+		sessp = sess;
+	}
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "delete task['%s'] "
+	    "match[and (streq(CARTRIDGE.'CartridgePCL' '%s') "
+	    "streq(CARTRIDGE.'LibraryName' '%s'))] "
+	    "type[PARTITION];",
+	    tid, pcl, lib);
+	(void) mms_mgmt_send_cmd(sessp, tid, cmd,
+	    "delete partition",
+	    &response);
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "delete task['%s'] "
+	    "match[and (streq(CARTRIDGE.'CartridgePCL' '%s') "
+	    "streq(CARTRIDGE.'LibraryName' '%s'))] "
+	    "type[CARTRIDGE];",
+	    tid, pcl, lib);
+	(void) mms_mgmt_send_cmd(sessp, tid, cmd,
+	    "delete cartridge",
+	    &response);
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+}
+
 int
-mms_mgmt_create_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs)
+mms_mgmt_add_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs)
 {
 	int		st;
 	void		*sess = NULL;
@@ -230,16 +416,21 @@ mms_mgmt_create_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs)
 	void		*response;
 	char		tid[64];
 	char 		cmd[8192];
-	char		*vdir = NULL;
-	char		*barcode = NULL;
 	char		*val = NULL;
+	char		**pclarr = NULL;
 	uint64_t	sz = 0;
 	char		*libname = NULL;
 	char		*mpool = NULL;
-	char		*mntpt = NULL;
-	char		*rpath = NULL;
+	char		volpath[MAXPATHLEN + 1];
 	nvlist_t	*dklib = NULL;
+	nvlist_t	*lib = NULL;
+	nvlist_t	*cg = NULL;
 	char		thishost[1024];
+	char		*dfltpath = NULL;
+	int		count = 0;
+	int		i;
+	int		st_save = 0;
+	char		*rwmode = "readwrite";
 
 	if (!nvl) {
 		return (MMS_MGMT_NOARG);
@@ -251,37 +442,44 @@ mms_mgmt_create_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (EACCES);
 	}
 
-	st = nvlist_lookup_string(nvl, O_NAME, &barcode);
+	st = nvlist_lookup_string(nvl, O_NAME, &mpool);
 	if (st != 0) {
 		MGMT_ADD_OPTERR(errs, O_NAME, st);
 		return (st);
 	}
 
-	st = nvlist_lookup_string(nvl, "dirname", &vdir);
-	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, "dirname", st);
-		return (st);
-	}
-
 	st = nvlist_lookup_string(nvl, O_SIZE, &val);
-	if (st == 0) {
-		st = do_val_mms_size(val, &sz);
-		if ((st == 0) && (sz == 0)) {
-			st = EINVAL;
-		}
-	}
 	if (st != 0) {
 		MGMT_ADD_OPTERR(errs, O_SIZE, st);
 		return (st);
 	}
 
-	st = nvlist_lookup_string(nvl, O_MPOOL, &mpool);
-	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, O_MPOOL, st);
-		return (st);
+	st = do_val_mms_size(val, &sz);
+	if ((st == 0) && (sz == 0)) {
+		st = EINVAL;
+	} else if (sz < 1024 * 1024) {
+		sz = 1024 * 1024;
 	}
 
-	(void) nvlist_lookup_string(nvl, O_MMSLIB, &libname);
+	st = nvlist_lookup_string(nvl, "readonly", &rwmode);
+	if (st == 0) {
+		if (strcmp(rwmode, "true") == 0) {
+			rwmode = "readonly";
+		} else if (strcmp(rwmode, "false") == 0) {
+			rwmode = "readwrite";
+		} else {
+			st = MMS_MGMT_INVALID_READONLY;
+			MGMT_ADD_OPTERR(errs, "readonly", st);
+			return (st);
+		}
+	}
+
+	pclarr = mgmt_var_to_array(nvl, O_VOLUMES, &count);
+	if (pclarr == NULL) {
+		st = ENOENT;
+		MGMT_ADD_OPTERR(errs, O_VOLUMES, st);
+		return (st);
+	}
 
 	st = gethostname(thishost, sizeof (thishost));
 	if (st != 0) {
@@ -298,13 +496,19 @@ mms_mgmt_create_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs)
 		sessp = sess;
 	}
 
-	/*
-	 * We will always use the 'default' "DISK" library.
-	 * If it wasn't returned in the list, create it.
-	 */
+	st = mgmt_get_cgname(sessp, mpool, &cg);
+	if (st != 0) {
+		goto done;
+	}
+
+	if (!nvlist_exists(cg, mpool)) {
+		st = MMS_MGMT_CG_NOT_EXIST;
+		goto done;
+	}
+
+	(void) nvlist_lookup_string(nvl, O_MMSLIB, &libname);
 	if (!libname) {
-		libname = DEF_DK_LIBNAME;
-		(void) nvlist_add_string(nvl, O_MMSLIB, libname);
+		goto done;
 	}
 
 	st = mgmt_get_dklibname(sessp, libname, &dklib);
@@ -313,36 +517,61 @@ mms_mgmt_create_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs)
 	}
 
 	if (!nvlist_exists(dklib, libname)) {
-		st = mms_mgmt_add_dklib(sessp, libname, errs);
-	}
-
-	if (st != 0) {
+		st = MMS_MGMT_LIB_NOT_EXIST;
 		goto done;
 	}
 
-	st = mgmt_create_dkvol(vdir, barcode, sz, &mntpt, &rpath, errs);
+	st = nvlist_lookup_nvlist(dklib, libname, &lib);
 	if (st != 0) {
+		st = MMS_MGMT_LIB_NOT_EXIST;
+		goto done;
+	}
+	st = nvlist_lookup_string(lib, "DefaultLibraryPath", &dfltpath);
+	if (st != 0) {
+		st = MMS_MGMT_DFLTPATH_ERR;
 		goto done;
 	}
 
-	/* add the cartridge to MMS */
-	(void) mms_gen_taskid(tid);
-	(void) snprintf(cmd, sizeof (cmd),
-	    "create task['%s'] type[CARTRIDGE] "
-	    "set[CARTRIDGE.'CartridgePCL' '%s'] "
-	    "set[CARTRIDGE.'CartridgeTypeName' 'DISK'] "
-	    "set[CARTRIDGE.'CartridgeGroupName' '%s'] "
-	    "set[CARTRIDGE.'LibraryName' '%s'] "
-	    "set[CARTRIDGE.'CartridgeMountPoint' '%s'] "
-	    "set[CARTRIDGE.'CartridgePath' '%s'];",
-	    tid, barcode, mpool, libname, mntpt, rpath);
+	for (i = 0; i < count; i++) {
+		/* add the cartridge to MMS */
+		(void) mms_gen_taskid(tid);
+		(void) snprintf(cmd, sizeof (cmd),
+		    "create task['%s'] type[CARTRIDGE] "
+		    "set[CARTRIDGE.'CartridgePCL' '%s'] "
+		    "set[CARTRIDGE.'CartridgeTypeName' 'DISK'] "
+		    "set[CARTRIDGE.'CartridgeGroupName' '%s'] "
+		    "set[CARTRIDGE.'LibraryName' '%s'] "
+		    ";",
+		    tid, pclarr[i], mpool, libname);
 
-	st = mms_mgmt_send_cmd(sessp, tid, cmd, "create dkvol",
-	    &response);
+		st = mms_mgmt_send_cmd(sessp, tid, cmd, "create dkvol",
+		    &response);
 
-	if (st == 0) {
+		if (st != 0) {
+			/* can't do this one */
+			MGMT_ADD_ERR(errs, pclarr[i], st);
+			st_save = MMS_MGMT_CREATE_CART_ERR;
+			continue;
+		}
+
 		/* create the partition */
-		st = mms_mgmt_create_partition(sessp, nvl, errs);
+		st = mms_mgmt_create_partition(sessp,
+		    pclarr[i], sz, libname, rwmode, errs);
+		if (st != 0) {
+			MGMT_ADD_ERR(errs, pclarr[i], st);
+			st_save = MMS_MGMT_CREATE_PART_ERR;
+			mms_mgmt_add_vol_cleanup(sessp, pclarr[i], libname);
+			continue;
+		}
+
+		/* Create the disk files */
+		(void) snprintf(volpath, sizeof (volpath), "%s/%s",
+		    dfltpath, pclarr[i]);
+		st = mgmt_create_dkvol(volpath, sz, errs);
+		if (st != 0) {
+			mms_mgmt_add_vol_cleanup(sessp, pclarr[i], libname);
+			continue;
+		}
 	}
 
 done:
@@ -354,36 +583,31 @@ done:
 		nvlist_free(dklib);
 	}
 
-	(void) mms_gen_taskid(tid);
-
-	return (st);
+	return (st_save == 0 ? st : st_save);
 }
 
 static int
-mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
-    char **mntpt, char **rpath, nvlist_t *errs)
+mgmt_create_dkvol(char *fname, uint64_t volsz, nvlist_t *errs)
 {
 	int		st;
 	int		fd = -1;
-	char		fname[MAXPATHLEN + 1];
 	char		dname[MAXPATHLEN + 1];
 	dda_metadata_t	metadata;
+	dda_metadata_t	out_metadata;
 	dda_index_t	idx;
-	char		*wpath = NULL;
+	dda_index_t	out_idx;
 	struct stat64	sbuf;
 	struct statvfs64 vbuf;
 	char		pbuf[MAXPATHLEN + 1];
 	size_t		rlen;
 
-	if (!path || (volsz == 0)) {
+	if (!fname || (volsz == 0)) {
 		return (MMS_MGMT_NOARG);
 	}
 
 	(void) memset(&metadata, 0, sizeof (dda_metadata_t));
 	(void) memset(&idx, 0, sizeof (dda_index_t));
 	(void) memset(pbuf, 0, sizeof (pbuf));
-
-	(void) snprintf(fname, sizeof (fname), "%s/%s", path, barcode);
 
 	st = stat64(fname, &sbuf);
 	if (st == 0) {
@@ -428,13 +652,6 @@ mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
 		return (st);
 	}
 
-	if (mntpt) {
-		st = mgmt_get_mntpt(&vbuf, mntpt);
-		if (st != 0) {
-			MGMT_ADD_ERR(errs, fname, st);
-		}
-	}
-
 	/*
 	 *  Create the data file.  TODO:  reserve space??
 	 */
@@ -458,6 +675,8 @@ mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
 	metadata.dda_version.dda_minor = DDA_MINOR_VERSION;
 	metadata.dda_capacity = volsz;
 
+	DDA_BE_METADATA(metadata, out_metadata);	/* to big endian */
+
 	(void) snprintf(dname, sizeof (dname), "%s/%s", fname,
 	    DDA_METADATA_FNAME);
 	fd = open64(dname, O_CREAT|O_EXCL|O_RDWR, 0640);
@@ -468,7 +687,7 @@ mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
 	}
 	(void) fchown(fd, 0, 2);
 
-	rlen = write_buf(fd, &metadata, sizeof (dda_metadata_t));
+	rlen = write_buf(fd, &out_metadata, sizeof (dda_metadata_t));
 	if (rlen != sizeof (dda_metadata_t)) {
 		st = EIO;
 		MGMT_ADD_ERR(errs, dname, st);
@@ -487,7 +706,8 @@ mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
 	}
 	(void) fchown(fd, 0, 2);
 
-	rlen = write_buf(fd, &idx, sizeof (dda_index_t));
+	DDA_BE_INDEX(idx, out_idx);		/* convert to big endian */
+	rlen = write_buf(fd, &out_idx, sizeof (dda_index_t));
 	if (rlen != sizeof (dda_index_t)) {
 		st = EIO;
 		MGMT_ADD_ERR(errs, dname, st);
@@ -495,22 +715,6 @@ mgmt_create_dkvol(char *path, char *barcode, uint64_t volsz,
 		return (st);
 	}
 
-	/* TODO:  Cleanup dangling volume dir/files on error */
-
-	wpath = strstr(pbuf, *mntpt);
-	if (wpath == NULL) {
-		/* can't happen?? */
-		st = ENOTDIR;
-		MGMT_ADD_ERR(errs, pbuf, st);
-		return (st);
-	}
-
-	wpath = pbuf + strlen(*mntpt);
-	if (*wpath == '/') {
-		/* don't include the slash, it upsets DM */
-		wpath++;
-	}
-	*rpath = strdup(wpath);
 	return (0);
 }
 
@@ -530,11 +734,13 @@ mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs)
 	char		*dname = NULL;
 	char		ddadev[1024];
 	nvlist_t	*drvs = NULL;
+	nvlist_t	*dklib = NULL;
+	nvlist_t	*dg = NULL;
 	char		*libname = NULL;
+	char		*dgname = NULL;
 	char		*val = NULL;
 	char		**apps = NULL;
 	int		count = 0;
-	int		i;
 
 	if (!mgmt_chk_auth("solaris.mms.create")) {
 		return (EACCES);
@@ -544,11 +750,6 @@ mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (MMS_MGMT_NOARG);
 	}
 
-	/*
-	 * find an available dda number.  if ! available, fail, error
-	 * msg should tell user how to add new ones.
-	 */
-
 	st = nvlist_lookup_string(nvl, O_NAME, &dname);
 	if (st != 0) {
 		MGMT_ADD_OPTERR(errs, O_NAME, st);
@@ -557,20 +758,8 @@ mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs)
 
 	(void) nvlist_lookup_string(nvl, O_MMSLIB, &libname);
 	if (!libname) {
-		libname = DEF_DK_LIBNAME;
-	}
-
-	dirp = opendir("/dev/dda");
-	if (dirp == NULL) {
-		st = errno;
-		return (st);
-	}
-
-	st = gethostname(thishost, sizeof (thishost));
-	if (st != 0) {
-		st = errno;
-		MGMT_ADD_ERR(errs, "hostname", st);
-		return (st);
+		MGMT_ADD_OPTERR(errs, "library", st);
+		goto done;
 	}
 
 	if (!session) {
@@ -581,9 +770,43 @@ mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs)
 		sessp = sess;
 	}
 
-	/*  Create the library if it doesn't already exist */
-	st = mms_mgmt_add_dklib(sessp, libname, errs);
+	st = mgmt_get_dklibname(sessp, libname, &dklib);
 	if (st != 0) {
+		goto done;
+	}
+
+	if (!nvlist_exists(dklib, libname)) {
+		st = MMS_MGMT_LIB_NOT_EXIST;
+		goto done;
+	}
+
+	(void) nvlist_lookup_string(nvl, O_DPOOL, &dgname);
+	if (!dgname) {
+		MGMT_ADD_OPTERR(errs, "dpool", st);
+		goto done;
+	}
+
+	st = mgmt_get_dgname(sessp, dgname, &dg);
+	if (st != 0) {
+		goto done;
+	}
+
+	if (!nvlist_exists(dg, dgname)) {
+		st = MMS_MGMT_DG_NOT_EXIST;
+		goto done;
+	}
+
+	dirp = opendir("/dev/dda");
+	if (dirp == NULL) {
+		st = errno;
+		goto done;
+	}
+
+	st = gethostname(thishost, sizeof (thishost));
+	if (st != 0) {
+		st = errno;
+		MGMT_ADD_ERR(errs, "hostname", st);
+		(void) closedir(dirp);
 		goto done;
 	}
 
@@ -632,25 +855,13 @@ mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs)
 
 	(void) mms_gen_taskid(tid);
 	(void) snprintf(cmd, sizeof (cmd),
-	    "create task['%s'] type[DRIVEGROUP] "
-	    "set[DRIVEGROUP.'DriveGroupName' 'DG_%s'];",
-	    tid, dname);
-
-	st = mms_mgmt_send_cmd(sessp, tid, cmd, "create drivegroup",
-	    &response);
-	if (st != 0) {
-		goto done;
-	}
-
-	(void) mms_gen_taskid(tid);
-	(void) snprintf(cmd, sizeof (cmd),
 	    "create task['%s'] type[DRIVE] "
 	    "set[DRIVE.'DriveName' '%s'] "
-	    "set[DRIVE.'DriveGroupName' 'DG_%s'] "
+	    "set[DRIVE.'DriveGroupName' '%s'] "
 	    "set[DRIVE.'LibraryName' '%s'] "
 	    "set[DRIVE.'ReserveDrive' 'no'] "
 	    "set[DRIVE.'DriveGeometry' '%s']",
-	    tid, dname, dname, libname, dname);
+	    tid, dname, dgname, libname, dname);
 
 	st = nvlist_lookup_string(nvl, O_MSGLEVEL, &val);
 	if (st == 0) {
@@ -708,23 +919,6 @@ mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs)
 		goto done;
 	}
 
-	apps = var_to_array(nvl, O_APPS, &count);
-
-	for (i = 0; i < count; i++) {
-		(void) mms_gen_taskid(tid);
-		(void) snprintf(cmd, sizeof (cmd),
-		    "create task['%s'] type[DRIVEGROUPAPPLICATION] "
-		    "set[DRIVEGROUPAPPLICATION.'ApplicationName' '%s'] "
-		    "set[DRIVEGROUPAPPLICATION.'DriveGroupName' 'DG_%s'];",
-		    tid, apps[i], dname);
-
-		st = mms_mgmt_send_cmd(sessp, tid, cmd, "create drive",
-		    &response);
-		if (st != 0) {
-			goto done;
-		}
-	}
-
 	if (st == 0) {
 		if (!nvlist_exists(nvl, O_OBJSTATE)) {
 			(void) nvlist_add_string(nvl, O_OBJSTATE, "online");
@@ -745,11 +939,15 @@ done:
 		nvlist_free(drvs);
 	}
 
+	if (dklib) {
+		nvlist_free(dklib);
+	}
+
 	return (st);
 }
 
 int
-mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
+mms_mgmt_set_vol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 {
 	int		st;
 	void		*sess = NULL;
@@ -759,17 +957,19 @@ mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 	char 		cmd[8192];
 	char		buf[1024];
 	char		thishost[1024];
+	char		*libname = NULL;
 	char		*vol = NULL;
 	nvlist_t	*nva = NULL;
 	nvlist_t	*attrs = NULL;
-	int		count = 0;
 	nvpair_t	*nvp;
-	char		*mntp;
-	char		*rpath;
 	int		fd = -1;
 	dda_metadata_t	metadata;
+	dda_metadata_t	out_metadata;
 	char		*readonly = "false";
 	flock64_t	flk;
+	char		*rwmode = NULL;
+	char		*type = NULL;
+	char		*libpath = NULL;
 
 	if (!mgmt_chk_auth("solaris.mms.media")) {
 		return (EACCES);
@@ -785,12 +985,9 @@ mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (st);
 	}
 
-	st = nvlist_lookup_string(nvl, "readonly", &readonly);
-	if (st == 0) {
-		st = val_truefalse(readonly);
-	}
+	st = nvlist_lookup_string(nvl, O_MMSLIB, &libname);
 	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, "readonly", st);
+		MGMT_ADD_OPTERR(errs, O_MMSLIB, st);
 		return (st);
 	}
 
@@ -809,12 +1006,14 @@ mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 		sessp = sess;
 	}
 
-	/* TODO:  Uniquely identify the cartridge.  No host name?! */
 	(void) mms_gen_taskid(tid);
 	(void) snprintf(cmd, sizeof (cmd),
-	    "show task['%s'] report[CARTRIDGE] reportmode[namevalue] "
-	    "match[streq(CARTRIDGE.'CartridgePCL' '%s')];",
-	    tid, vol);
+	    "show task['%s'] "
+	    "report[LIBRARY] "
+	    "reportmode[namevalue] "
+	    "match[and( streq(CARTRIDGE.'CartridgePCL' '%s') "
+	    "streq(LIBRARY.'LibraryName' '%s'))];",
+	    tid, vol, libname);
 
 	st = mms_mgmt_send_cmd(sessp, tid, cmd, "get dkvol",
 	    &response);
@@ -827,41 +1026,59 @@ mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 	if (st != 0) {
 		goto done;
 	}
-
-	/* make sure we only got one */
-	nvp = NULL;
-	count = 0;
-
-	while ((nvp = nvlist_next_nvpair(attrs, nvp)) != NULL) {
-		count++;
+	if (attrs == NULL) {
+		st = ENOENT;
+		goto done;
 	}
 
-	if (count > 1) {
-		st = MMS_MGMT_ERR_CART_NOT_UNIQUE;
-		MGMT_ADD_ERR(nvl, O_NAME, st);
-		goto done;
-	} else if (count == 0) {
-		st = ENOENT;
-		MGMT_ADD_OPTERR(nvl, O_NAME, st);
-		goto done;
+	/*
+	 * If changing readonly mode
+	 */
+	st = nvlist_lookup_string(nvl, "readonly", &rwmode);
+	if (st == 0) {
+		if (strcmp(rwmode, "true") == 0) {
+			rwmode = "readonly";
+		} else if (strcmp(rwmode, "false") == 0) {
+			rwmode = "readwrite";
+		} else {
+			st = MMS_MGMT_INVALID_READONLY;
+			MGMT_ADD_OPTERR(errs, "readonly", st);
+			return (st);
+		}
+
+		(void) mms_gen_taskid(tid);
+		(void) snprintf(cmd, sizeof (cmd),
+		    "attribute task['%s'] "
+		    "match[and( streq(CARTRIDGE.'CartridgePCL' '%s') "
+		    "streq(LIBRARY.'LibraryName' '%s'))] "
+		    "set[PARTITION.'PartitionRWMode' '%s'] "
+		    ";",
+		    tid, vol, libname, rwmode);
+		st = mms_mgmt_send_cmd(sessp, tid, cmd, "get dkvol",
+		    &response);
+		if (st != 0) {
+			goto done;
+		}
+		mms_free_rsp(response);
 	}
 
 	nvp = nvlist_next_nvpair(attrs, NULL);
 	(void) nvpair_value_nvlist(nvp, &nva);
 
-	st = nvlist_lookup_string(nva, "CartridgeMountPoint", &mntp);
+	st = nvlist_lookup_string(nva, "LibraryType", &type);
 	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, "cartridge mount point", st);
+		goto done;
+	}
+	if (strcmp(type, "DISK")) {
+		/* Not DISK library, then we are done */
 		goto done;
 	}
 
-	st = nvlist_lookup_string(nva, "CartridgePath", &rpath);
-	if (st != 0) {
-		MGMT_ADD_OPTERR(errs, "path to cartridge", st);
-		goto done;
-	}
-
-	(void) snprintf(buf, sizeof (buf), "%s/%s/%s", mntp, rpath,
+	/*
+	 * DISK volume, set the DISK cartridge mode
+	 */
+	(void) nvlist_lookup_string(nva, "DefaultLibraryPath", &libpath);
+	(void) snprintf(buf, sizeof (buf), "%s/%s/%s", libpath, vol,
 	    DDA_METADATA_FNAME);
 
 	fd = open64(buf, O_RDWR);
@@ -887,12 +1104,13 @@ mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 		goto done;
 	}
 
-	if (read(fd, &metadata, sizeof (dda_metadata_t)) !=
+	if (read(fd, &out_metadata, sizeof (dda_metadata_t)) !=
 	    sizeof (dda_metadata_t)) {
 		st = errno;
 		MGMT_ADD_ERR(errs, "read index", st);
 		goto done;
 	}
+	DDA_BE_METADATA(out_metadata, metadata);	/* to big endian */
 
 	if (strcasecmp(readonly, "true") == 0) {
 		metadata.dda_flags |= DDA_FLAG_WPROTECT;
@@ -906,7 +1124,8 @@ mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs)
 		goto done;
 	}
 
-	if (write_buf(fd, &metadata, sizeof (dda_metadata_t)) !=
+	DDA_BE_METADATA(metadata, out_metadata);	/* to big endian */
+	if (write_buf(fd, &out_metadata, sizeof (dda_metadata_t)) !=
 	    sizeof (dda_metadata_t)) {
 		st = errno;
 		MGMT_ADD_ERR(errs, "write index", st);

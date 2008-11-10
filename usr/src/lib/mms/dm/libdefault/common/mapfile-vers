@@ -46,7 +46,6 @@ SUNW_1.1 {
 		drv_get_capacity;
 		drv_get_density;
 		drv_get_drivetype;
-		drv_get_mounted;
 		drv_get_pos;
 		drv_get_serial_num;
 		drv_get_statistics;

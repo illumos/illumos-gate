@@ -254,7 +254,6 @@ dm_init_dev_lib(void *hdl, int init)
 	DM_INIT_JTAB(drv_mk_prsv_key);
 	DM_INIT_JTAB(drv_disallowed);
 	DM_INIT_JTAB(drv_rebind_target);
-	DM_INIT_JTAB(drv_get_mounted);
 	DM_INIT_JTAB(drv_get_drivetype);
 	DM_INIT_JTAB(drv_get_targ);
 	DM_INIT_JTAB(drv_set_blksize);

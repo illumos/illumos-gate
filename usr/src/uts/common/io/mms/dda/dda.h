@@ -30,6 +30,8 @@
 extern "C" {
 #endif
 
+#include <sys/byteorder.h>
+
 /*
  * Driver for Disk Archiving (dda)
  */
@@ -40,8 +42,8 @@ extern "C" {
 #endif
 
 /* version for cartridge and dda */
-#define	DDA_MAJOR_VERSION	0	/* dda driver major version */
-#define	DDA_MINOR_VERSION	23	/* dda driver minor version */
+#define	DDA_MAJOR_VERSION	1	/* dda driver major version */
+#define	DDA_MINOR_VERSION	0	/* dda driver minor version */
 
 /* cartridge file names */
 #define	DDA_METADATA_FNAME	"metadata"	/* metadata file name */
@@ -59,12 +61,21 @@ extern "C" {
  * cmd			arg
  * ---			---
  * DDA_CMD_LOAD		char path[PATH_MAX]
+ *			Returns 0 if cartridge path is successfully loaded,
+ *			else non-zero.
  * DDA_CMD_NAME		char path[PATH_MAX]
+ *			Returns 0 and loaded cartridge path, else non-zero.
  * DDA_CMD_CAPACITY	dda_capacity_t *capacity
+ *			If loaded returns 0 along with the cartridge capacity
+ *			and space remaining, else non-zero.
  * DDA_CMD_WROTECT      NULL
- *                      returns 0 if WP flag on, else non 0
+ *                      Returns 0 if WP flag on, else non-zero.
  * DDA_CMD_BLKLMT	dda_blklmt_t *blklmt
+ *			Returns 0 and the cartridge maximum and minimum block
+ *			size, else non-zero.
  * DDA_CMD_SERIAL	dda_serial_t serial
+ *			Returns 0 and pseudo drive unit serial number as
+ *			the host id followed by the instance number.
  */
 #define	DDA_IOC			(('D' << 24) | ('D' << 16) | ('A' << 8))
 #define	DDA_CMD_LOAD		(DDA_IOC | 1)	/* load cartridge */
@@ -118,6 +129,28 @@ typedef struct dda_index {
 	int64_t		dda_lba;	/* logical block address */
 } dda_index_t;
 
+/* convert metadata file record between big endian and native byte order */
+#define	DDA_BE_METADATA(a, b) { \
+	b.dda_version.dda_major = BE_32(a.dda_version.dda_major); \
+	b.dda_version.dda_minor = BE_32(a.dda_version.dda_minor); \
+	b.dda_capacity = BE_64(a.dda_capacity); \
+	b.dda_sector = BE_32(a.dda_sector); \
+	b.dda_stripe = BE_32(a.dda_stripe); \
+	b.dda_flags = BE_32(a.dda_flags); \
+	b.dda_pad = BE_32(a.dda_pad); \
+}
+
+/* convert index file record between big endian and native byte order */
+#define	DDA_BE_INDEX(a, b) { \
+	b.dda_offset = BE_64(a.dda_offset); \
+	b.dda_blksize = BE_32(a.dda_blksize); \
+	b.dda_pad = BE_32(a.dda_pad); \
+	b.dda_blkcount = BE_64(a.dda_blkcount); \
+	b.dda_fmcount = BE_64(a.dda_fmcount); \
+	b.dda_fileno = BE_64(a.dda_fileno); \
+	b.dda_lba = BE_64(a.dda_lba); \
+}
+
 /* End: 32-bit align copyin() structs for amd64 only due to 32-bit x86 ABI */
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
@@ -138,11 +171,13 @@ typedef struct dda {
 	dda_metadata_t	dda_metadata;	/* metatdata file data */
 
 	struct vnode	*dda_index_vp;	/* index file */
+	off64_t		dda_index_fsize; /* index file size */
 	off64_t		dda_index_offset; /* index file offset */
 	dda_index_t	dda_index;	/* index file record */
 	int64_t		dda_pos;	/* index record current block */
 
 	struct vnode	*dda_data_vp;	/* data file */
+	off64_t		dda_data_fsize; /* data file size */
 
 	int		dda_inst;	/* driver instance (drive number) */
 	dda_serial_t	dda_serial;	/* serial number */

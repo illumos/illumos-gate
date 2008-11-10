@@ -4578,7 +4578,6 @@ mm_start_states(mm_data_t *mm_data)
 	/* Delete all DM Configs */
 	(void) mm_db_exec(HERE, db, "delete from \"DMSHAPEPRIORITY\";");
 	(void) mm_db_exec(HERE, db, "delete from \"DMDENSITYPRIORITY\";");
-	(void) mm_db_exec(HERE, db, "delete from \"DMMOUNTPOINT\";");
 	(void) mm_db_exec(HERE, db, "delete from \"DMCAPABILITYTOKEN\";");
 	(void) mm_db_exec(HERE, db, "delete from \"DMBITFORMAT\";");
 	(void) mm_db_exec(HERE, db, "delete from \"DMBITFORMATTOKEN\";");

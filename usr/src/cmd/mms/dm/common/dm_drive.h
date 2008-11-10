@@ -424,7 +424,7 @@ typedef	struct	drv_drive {
 	mms_sym_t	*drv_density;
 	char		**drv_shape;
 	drv_shape_density_t *drv_shape_den;
-	char		**drv_mounted;
+	char		*drv_libname;
 	char		*drv_dmname;
 	char		*drv_drvname;
 	char		*drv_dev_dir;
@@ -438,6 +438,7 @@ typedef	struct	drv_drive {
 	char		drv_sernum[MMS_SER_NUM_LEN + 1];
 						/* serial num from DRIVE obj */
 	uchar_t		drv_prsv_key[8];
+	char		*drv_disk_libpath;		/* DISK library path */
 	int		drv_mtee_stat_len;		/* mtee status len */
 	int		drv_num_sen_bytes;
 	int		*drv_disallowed_cmds;
@@ -508,7 +509,7 @@ typedef	struct	drv_drive {
 #define	DRV_NL		3
 #define	DRV_BLP		4
 
-typedef void		(drv_init_dev_t)(void);
+typedef int		(drv_init_dev_t)(void);
 drv_init_dev_t		drv_init_dev;
 typedef minor_t		(drv_get_targ_t)(minor_t);
 drv_get_targ_t		drv_get_targ;
@@ -603,8 +604,6 @@ drv_prsv_read_rsv_t	drv_prsv_read_rsv;
 typedef int		(drv_set_compression_t)(int);
 drv_set_compression_t	drv_set_compression;
 
-typedef	char **		(drv_get_mounted_t)(void);
-drv_get_mounted_t	drv_get_mounted;
 typedef	int		(drv_get_drivetype_t)(void);
 drv_get_drivetype_t	drv_get_drivetype;
 typedef	int		(drv_rebind_target_t)(void);
@@ -622,7 +621,6 @@ typedef	struct	drv_jtab {
 	drv_disallowed_t	*drv_disallowed;
 	drv_mk_prsv_key_t	*drv_mk_prsv_key;
 	drv_rebind_target_t	*drv_rebind_target;
-	drv_get_mounted_t	*drv_get_mounted;
 	drv_get_drivetype_t	*drv_get_drivetype;
 	drv_get_targ_t		*drv_get_targ;
 	drv_set_blksize_t	*drv_set_blksize;
@@ -726,7 +724,6 @@ int dm_send_cartridge_media_error(void);
 #define	CUR_BITFORMAT_WO	"$cur_bitformat_wo$"
 #define	CONF_CAP_READWRITE	"$conf_cap_readwrite$"
 #define	CONF_CAP_DENSITY_CLAUSE	"$conf_cap_density_clause$"
-#define	CONF_MOUNT_POINT	"$conf_mount_point$"
 
 
 #define	DRV_CAP_WRITEOVER ""						\
@@ -1051,7 +1048,6 @@ int dm_send_cartridge_media_error(void);
 	"	densitypriority [ "					\
 	"	" CONF_BITFORMAT_RW CONF_BITFORMAT_RO			\
 	"	]\n"							\
-	"	mountpoint [ " CONF_MOUNT_POINT " ]\n"			\
 	"	;"
 
 #ifdef	DM_MEM_DEBUG

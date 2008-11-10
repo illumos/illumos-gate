@@ -35,6 +35,9 @@
         <object name="LIBRARY">
             <pkey value="LibraryName"/>
         </object>
+        <object name="LIBRARYACCESS">
+            <pkey value="LibraryName"/>
+        </object>
         <object name="LM">
             <pkey value="LMName"/>
             <pkey value="LibraryName"/>
@@ -217,6 +220,17 @@
                 <att value="CartridgeGroupName"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="APPLICATION" to="LIBRARYACCESS">
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -621,6 +635,20 @@
                 <att value="CartridgeGroupName"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="AI" to="LIBRARYACCESS">
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -1065,6 +1093,11 @@
                 <att value="ConnectionClientName" to_value="ApplicationName"/>
             </node>
         </path>
+        <path from="LIBRARY" to="LIBRARYACCESS">
+            <node from="LIBRARY" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="LIBRARY" to="LM">
             <node from="LIBRARY" to="LM">
                 <att value="LibraryName"/>
@@ -1402,6 +1435,361 @@
                 <att value="SessionID" to_value="AcceptingSessionID"/>
             </node>
         </path>
+        <path from="LIBRARYACCESS" to="AI">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="CONNECTION">
+                <att value="LibraryName" to_value="ConnectionClientName"/>
+                <att value="LMName" to_value="ConnectionClientInstance"/>
+            </node>
+            <node from="CONNECTION" to="AI">
+                <att value="ConnectionClientInstance" to_value="AIName"/>
+                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="LIBRARY">
+            <node from="LIBRARYACCESS" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="LM">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="BAY">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="BAY">
+                <att value="LibraryName"/>
+                <att value="LMName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="SLOT">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="SLOT">
+                <att value="LibraryName"/>
+                <att value="LMName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="SLOTGROUP">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="BAY">
+                <att value="LibraryName"/>
+                <att value="LMName"/>
+            </node>
+            <node from="BAY" to="SLOTGROUP">
+                <att value="BayName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="SLOTCONFIG">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="SLOTCONFIG">
+                <att value="LibraryName"/>
+                <att value="LMName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="SLOTTYPE">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="SLOT">
+                <att value="LibraryName"/>
+                <att value="LMName"/>
+            </node>
+            <node from="SLOT" to="SLOTTYPE">
+                <att value="SlotTypeName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DRIVECARTRIDGEACCESS">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DRIVECARTRIDGEACCESS">
+                <att value="DriveSerialNum"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DRIVECARTRIDGEERROR">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DRIVECARTRIDGEERROR">
+                <att value="DriveSerialNum"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DRIVE">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DRIVEGROUP">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DRIVEGROUP">
+                <att value="DriveGroupName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DRIVEGROUPAPPLICATION">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DRIVEGROUP">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVEGROUP" to="DRIVEGROUPAPPLICATION">
+                <att value="DriveGroupName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DM">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMBITFORMAT">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
+            </node>
+            <node from="DM" to="DMBITFORMAT">
+                <att value="DMName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMBITFORMATTOKEN">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
+            </node>
+            <node from="DM" to="DMBITFORMAT">
+                <att value="DMName"/>
+            </node>
+            <node from="DMBITFORMAT" to="DMBITFORMATTOKEN">
+                <att value="DriveName"/>
+                <att value="DMName"/>
+                <att value="DMBitFormatName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMCAPABILITY">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITY">
+                <att value="DriveName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMCAPABILITYTOKEN">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITYTOKEN">
+                <att value="DriveName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMCAPABILITYDEFAULTTOKEN">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DMCAPABILITYDEFAULTTOKEN">
+                <att value="DriveName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMCAPABILITYGROUP">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
+            </node>
+            <node from="DM" to="DMCAPABILITYGROUP">
+                <att value="DMName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="DMCAPABILITYGROUPTOKEN">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="DM">
+                <att value="DriveName"/>
+            </node>
+            <node from="DM" to="DMCAPABILITYGROUP">
+                <att value="DMName"/>
+            </node>
+            <node from="DMCAPABILITYGROUP" to="DMCAPABILITYGROUPTOKEN">
+                <att value="DriveName"/>
+                <att value="DMName"/>
+                <att value="DMCapabilityGroupName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="CARTRIDGE">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="CARTRIDGEGROUP">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="CARTRIDGEGROUP">
+                <att value="CartridgeGroupName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="CARTRIDGEGROUPAPPLICATION">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="CartridgeGroupName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="CARTRIDGETYPE">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="CARTRIDGETYPE">
+                <att value="CartridgeTypeName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="SIDE">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="SIDE">
+                <att value="CartridgeID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="PARTITION">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="PARTITION">
+                <att value="CartridgeID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="VOLUME">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="VOLUME">
+                <att value="CartridgeID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="MOUNTLOGICAL">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="MOUNTLOGICAL">
+                <att value="DriveName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="MOUNTPHYSICAL">
+            <node from="LIBRARYACCESS" to="MOUNTPHYSICAL">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="CONNECTION">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="CONNECTION">
+                <att value="LibraryName" to_value="ConnectionClientName"/>
+                <att value="LMName" to_value="ConnectionClientInstance"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="SESSION">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="CONNECTION">
+                <att value="LibraryName" to_value="ConnectionClientName"/>
+                <att value="LMName" to_value="ConnectionClientInstance"/>
+            </node>
+            <node from="CONNECTION" to="SESSION">
+                <att value="ConnectionID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="NOTIFY">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="CONNECTION">
+                <att value="LibraryName" to_value="ConnectionClientName"/>
+                <att value="LMName" to_value="ConnectionClientInstance"/>
+            </node>
+            <node from="CONNECTION" to="NOTIFY">
+                <att value="ConnectionID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="TASK">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="TASKDRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="TASKDRIVE" to="TASK">
+                <att value="TaskID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="TASKCARTRIDGE">
+            <node from="LIBRARYACCESS" to="CARTRIDGE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="CARTRIDGE" to="TASKCARTRIDGE">
+                <att value="CartridgeID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="TASKDRIVE">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="TASKDRIVE">
+                <att value="DriveName"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="TASKLIBRARY">
+            <node from="LIBRARYACCESS" to="DRIVE">
+                <att value="LibraryName"/>
+            </node>
+            <node from="DRIVE" to="TASKDRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="TASKDRIVE" to="TASK">
+                <att value="TaskID"/>
+            </node>
+            <node from="TASK" to="TASKLIBRARY">
+                <att value="TaskID"/>
+            </node>
+        </path>
+        <path from="LIBRARYACCESS" to="REQUEST">
+            <node from="LIBRARYACCESS" to="LM">
+                <att value="LibraryName"/>
+            </node>
+            <node from="LM" to="CONNECTION">
+                <att value="LibraryName" to_value="ConnectionClientName"/>
+                <att value="LMName" to_value="ConnectionClientInstance"/>
+            </node>
+            <node from="CONNECTION" to="SESSION">
+                <att value="ConnectionID"/>
+            </node>
+            <node from="SESSION" to="REQUEST">
+                <att value="SessionID" to_value="AcceptingSessionID"/>
+            </node>
+        </path>
         <path from="LM" to="APPLICATION">
             <node from="LM" to="LIBRARY">
                 <att value="LibraryName"/>
@@ -1428,6 +1816,11 @@
         </path>
         <path from="LM" to="LIBRARY">
             <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="LM" to="LIBRARYACCESS">
+            <node from="LM" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -1849,6 +2242,15 @@
                 <att value="LMName"/>
             </node>
             <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="BAY" to="LIBRARYACCESS">
+            <node from="BAY" to="LM">
+                <att value="LibraryName"/>
+                <att value="LMName"/>
+            </node>
+            <node from="LM" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -2356,6 +2758,11 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="SLOT" to="LIBRARYACCESS">
+            <node from="SLOT" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="SLOT" to="LM">
             <node from="SLOT" to="LM">
                 <att value="LibraryName"/>
@@ -2749,6 +3156,11 @@
         </path>
         <path from="SLOTGROUP" to="LIBRARY">
             <node from="SLOTGROUP" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="SLOTGROUP" to="LIBRARYACCESS">
+            <node from="SLOTGROUP" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -3671,6 +4083,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="SLOTTYPE" to="LIBRARYACCESS">
+            <node from="SLOTTYPE" to="SLOT">
+                <att value="SlotTypeName"/>
+            </node>
+            <node from="SLOT" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="SLOTTYPE" to="LM">
             <node from="SLOTTYPE" to="SLOT">
                 <att value="SlotTypeName"/>
@@ -4146,6 +4566,11 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="DRIVE" to="LIBRARYACCESS">
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="DRIVE" to="LM">
             <node from="DRIVE" to="LIBRARY">
                 <att value="LibraryName"/>
@@ -4440,6 +4865,14 @@
                 <att value="DriveGroupName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DRIVEGROUP" to="LIBRARYACCESS">
+            <node from="DRIVEGROUP" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -4832,6 +5265,14 @@
                 <att value="DriveGroupName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DRIVEGROUPAPPLICATION" to="LIBRARYACCESS">
+            <node from="DRIVEGROUPAPPLICATION" to="DRIVE">
+                <att value="DriveGroupName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -5262,6 +5703,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="DM" to="LIBRARYACCESS">
+            <node from="DM" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="DM" to="LM">
             <node from="DM" to="DRIVE">
                 <att value="DriveName"/>
@@ -5643,6 +6092,17 @@
                 <att value="DriveName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DMBITFORMAT" to="LIBRARYACCESS">
+            <node from="DMBITFORMAT" to="DM">
+                <att value="DMName"/>
+            </node>
+            <node from="DM" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -6135,6 +6595,22 @@
                 <att value="DriveName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DMBITFORMATTOKEN" to="LIBRARYACCESS">
+            <node from="DMBITFORMATTOKEN" to="DMBITFORMAT">
+                <att value="DriveName"/>
+                <att value="DMName"/>
+                <att value="DMBitFormatName"/>
+            </node>
+            <node from="DMBITFORMAT" to="DM">
+                <att value="DMName"/>
+            </node>
+            <node from="DM" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -6779,6 +7255,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="DMCAPABILITY" to="LIBRARYACCESS">
+            <node from="DMCAPABILITY" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="DMCAPABILITY" to="LM">
             <node from="DMCAPABILITY" to="DRIVE">
                 <att value="DriveName"/>
@@ -7194,6 +7678,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="DMCAPABILITYTOKEN" to="LIBRARYACCESS">
+            <node from="DMCAPABILITYTOKEN" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="DMCAPABILITYTOKEN" to="LM">
             <node from="DMCAPABILITYTOKEN" to="DRIVE">
                 <att value="DriveName"/>
@@ -7601,6 +8093,14 @@
                 <att value="DriveName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DMCAPABILITYDEFAULTTOKEN" to="LIBRARYACCESS">
+            <node from="DMCAPABILITYDEFAULTTOKEN" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -8017,6 +8517,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="DMCAPABILITYGROUP" to="LIBRARYACCESS">
+            <node from="DMCAPABILITYGROUP" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="DMCAPABILITYGROUP" to="LM">
             <node from="DMCAPABILITYGROUP" to="DRIVE">
                 <att value="DriveName"/>
@@ -8412,6 +8920,19 @@
                 <att value="DriveName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DMCAPABILITYGROUPTOKEN" to="LIBRARYACCESS">
+            <node from="DMCAPABILITYGROUPTOKEN" to="DMCAPABILITYGROUP">
+                <att value="DriveName"/>
+                <att value="DMName"/>
+                <att value="DMCapabilityGroupName"/>
+            </node>
+            <node from="DMCAPABILITYGROUP" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -8956,6 +9477,11 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="CARTRIDGE" to="LIBRARYACCESS">
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="CARTRIDGE" to="LM">
             <node from="CARTRIDGE" to="LIBRARY">
                 <att value="LibraryName"/>
@@ -9305,6 +9831,14 @@
                 <att value="CartridgeGroupName"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="CARTRIDGEGROUP" to="LIBRARYACCESS">
+            <node from="CARTRIDGEGROUP" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -9744,6 +10278,14 @@
                 <att value="CartridgeGroupName"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="CARTRIDGEGROUPAPPLICATION" to="LIBRARYACCESS">
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -10199,6 +10741,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="CARTRIDGETYPE" to="LIBRARYACCESS">
+            <node from="CARTRIDGETYPE" to="CARTRIDGE">
+                <att value="CartridgeTypeName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="CARTRIDGETYPE" to="LM">
             <node from="CARTRIDGETYPE" to="SLOTTYPE">
                 <att value="CartridgeShapeName"/>
@@ -10632,6 +11182,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="SIDE" to="LIBRARYACCESS">
+            <node from="SIDE" to="CARTRIDGE">
+                <att value="CartridgeID"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="SIDE" to="LM">
             <node from="SIDE" to="CARTRIDGE">
                 <att value="CartridgeID"/>
@@ -11035,6 +11593,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="PARTITION" to="LIBRARYACCESS">
+            <node from="PARTITION" to="CARTRIDGE">
+                <att value="CartridgeID"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="PARTITION" to="LM">
             <node from="PARTITION" to="CARTRIDGE">
                 <att value="CartridgeID"/>
@@ -11414,6 +11980,14 @@
                 <att value="CartridgeID"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="VOLUME" to="LIBRARYACCESS">
+            <node from="VOLUME" to="CARTRIDGE">
+                <att value="CartridgeID"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -11838,6 +12412,18 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="MOUNTLOGICAL" to="LIBRARYACCESS">
+            <node from="MOUNTLOGICAL" to="DM">
+                <att value="DriveName"/>
+                <att value="DMName"/>
+            </node>
+            <node from="DM" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="MOUNTLOGICAL" to="LM">
             <node from="MOUNTLOGICAL" to="MOUNTPHYSICAL">
                 <att value="CartridgeID"/>
@@ -12243,6 +12829,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="MOUNTPHYSICAL" to="LIBRARYACCESS">
+            <node from="MOUNTPHYSICAL" to="SLOT">
+                <att value="SlotName"/>
+            </node>
+            <node from="SLOT" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="MOUNTPHYSICAL" to="LM">
             <node from="MOUNTPHYSICAL" to="SLOT">
                 <att value="SlotName"/>
@@ -12605,6 +13199,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="DRIVECARTRIDGEERROR" to="LIBRARYACCESS">
+            <node from="DRIVECARTRIDGEERROR" to="DRIVE">
+                <att value="DriveSerialNum"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="DRIVECARTRIDGEERROR" to="LM">
             <node from="DRIVECARTRIDGEERROR" to="DRIVE">
                 <att value="DriveSerialNum"/>
@@ -12931,6 +13533,14 @@
                 <att value="DriveSerialNum"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="DRIVECARTRIDGEACCESS" to="LIBRARYACCESS">
+            <node from="DRIVECARTRIDGEACCESS" to="DRIVE">
+                <att value="DriveSerialNum"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -13263,6 +13873,15 @@
                 <att value="ConnectionClientName" to_value="LibraryName"/>
             </node>
             <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="CONNECTION" to="LIBRARYACCESS">
+            <node from="CONNECTION" to="LM">
+                <att value="ConnectionClientInstance" to_value="LMName"/>
+                <att value="ConnectionClientName" to_value="LibraryName"/>
+            </node>
+            <node from="LM" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -13686,6 +14305,18 @@
                 <att value="ConnectionClientName" to_value="LibraryName"/>
             </node>
             <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="SESSION" to="LIBRARYACCESS">
+            <node from="SESSION" to="CONNECTION">
+                <att value="ConnectionID"/>
+            </node>
+            <node from="CONNECTION" to="LM">
+                <att value="ConnectionClientInstance" to_value="LMName"/>
+                <att value="ConnectionClientName" to_value="LibraryName"/>
+            </node>
+            <node from="LM" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -14169,6 +14800,27 @@
                 <att value="CartridgeGroupName"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="NOTIFY" to="LIBRARYACCESS">
+            <node from="NOTIFY" to="CONNECTION">
+                <att value="ConnectionID"/>
+            </node>
+            <node from="CONNECTION" to="AI">
+                <att value="ConnectionClientInstance" to_value="AIName"/>
+                <att value="ConnectionClientName" to_value="ApplicationName"/>
+            </node>
+            <node from="AI" to="APPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="APPLICATION" to="CARTRIDGEGROUPAPPLICATION">
+                <att value="ApplicationName"/>
+            </node>
+            <node from="CARTRIDGEGROUPAPPLICATION" to="CARTRIDGE">
+                <att value="CartridgeGroupName"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -14757,6 +15409,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="TASK" to="LIBRARYACCESS">
+            <node from="TASK" to="TASKLIBRARY">
+                <att value="TaskID"/>
+            </node>
+            <node from="TASKLIBRARY" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="TASK" to="LM">
             <node from="TASK" to="REQUEST">
                 <att value="TaskID" to_value="RequestID"/>
@@ -15165,6 +15825,14 @@
                 <att value="CartridgeID"/>
             </node>
             <node from="CARTRIDGE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="TASKCARTRIDGE" to="LIBRARYACCESS">
+            <node from="TASKCARTRIDGE" to="CARTRIDGE">
+                <att value="CartridgeID"/>
+            </node>
+            <node from="CARTRIDGE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -15584,6 +16252,14 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="TASKDRIVE" to="LIBRARYACCESS">
+            <node from="TASKDRIVE" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="TASKDRIVE" to="LM">
             <node from="TASKDRIVE" to="DRIVE">
                 <att value="DriveName"/>
@@ -15966,6 +16642,11 @@
         </path>
         <path from="TASKLIBRARY" to="LIBRARY">
             <node from="TASKLIBRARY" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="TASKLIBRARY" to="LIBRARYACCESS">
+            <node from="TASKLIBRARY" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -16403,6 +17084,15 @@
                 <att value="MessageSenderInstance" to_value="LMName"/>
             </node>
             <node from="LM" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="MESSAGE" to="LIBRARYACCESS">
+            <node from="MESSAGE" to="LM">
+                <att value="MessageSenderName" to_value="LibraryName"/>
+                <att value="MessageSenderInstance" to_value="LMName"/>
+            </node>
+            <node from="LM" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>
@@ -16857,6 +17547,15 @@
                 <att value="LibraryName"/>
             </node>
         </path>
+        <path from="REQUEST" to="LIBRARYACCESS">
+            <node from="REQUEST" to="LM">
+                <att value="RequestingClient" to_value="LibraryName"/>
+                <att value="RequestingInstance" to_value="LMName"/>
+            </node>
+            <node from="LM" to="LIBRARYACCESS">
+                <att value="LibraryName"/>
+            </node>
+        </path>
         <path from="REQUEST" to="LM">
             <node from="REQUEST" to="LM">
                 <att value="RequestingClient" to_value="LibraryName"/>
@@ -17246,6 +17945,14 @@
                 <att value="DriveName"/>
             </node>
             <node from="DRIVE" to="LIBRARY">
+                <att value="LibraryName"/>
+            </node>
+        </path>
+        <path from="STALEHANDLE" to="LIBRARYACCESS">
+            <node from="STALEHANDLE" to="DRIVE">
+                <att value="DriveName"/>
+            </node>
+            <node from="DRIVE" to="LIBRARYACCESS">
                 <att value="LibraryName"/>
             </node>
         </path>

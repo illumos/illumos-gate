@@ -64,6 +64,106 @@ static int file_chown_id(char *file, struct stat64 *statbuf, uid_t uid,
 static void
 filter_on_var(char *varname, char **varray, int count, nvlist_t *nvl);
 
+/* error messages */
+static mms_sym_t	mms_mgmt_errs[] = {
+	"Internal error; missing argument",
+	MMS_MGMT_NOARG,
+	"Could not exec ACSLS ssi daemon",
+	MMS_MGMT_ERR_EXEC_SSI,
+	"Could not communicate with ACSLS server",
+	MMS_MGMT_ERR_ACSLS_COMM,
+	"Received invalid response from ACSLS server",
+	MMS_MGMT_ERR_ACSLS_RSP,
+	"Could not parse response from ACSLS server",
+	MMS_MGMT_ERR_ACSLS_PARSE,
+	"Missing required option",
+	MMS_MGMT_ERR_REQUIRED,
+	"Could not determine MM host",
+	MMS_MGMT_NO_MMHOST,
+	"Volume in use",
+	MMS_MGMT_CARTRIDGE_INUSE,
+	"Could not access database backup",
+	MMS_MGMT_DBDUMP_MISSING,
+	"Unknown response type",
+	MMS_MGMT_RSP_UNKNOWN,
+	"Request cancelled",
+	MMS_MGMT_RSP_CANCELLED,
+	"Request not accepted",
+	MMS_MGMT_REQ_NOT_ACCEPTED,
+	"Could not determine group",
+	MMS_MGMT_ERR_GROUP,
+	"Could not determine user",
+	MMS_MGMT_ERR_USER,
+	"Option applies to MM server host only",
+	MMS_MGMT_ERR_SVRONLY,
+	"Volume not unique",
+	MMS_MGMT_ERR_CART_NOT_UNIQUE,
+	"Partition not unique",
+	MMS_MGMT_ERR_PARTITION_NOT_UNIQUE,
+	"Volume not labeled",
+	MMS_MGMT_VOL_NOT_INIT,
+	"No usable volume found",
+	MMS_MGMT_NO_USABLE_VOL,
+	"Could not find ACSLS client libraries",
+	MMS_MGMT_ACSLS_NOT_FOUND,
+	"MMS is not initialized or not running",
+	MMS_MGMT_MMS_NOT_INIT,
+	"Drives on remote systems cannot be configured at this time",
+	MMS_MGMT_REMOTE_NOT_SUPP,
+	"Operation requires a password",
+	MMS_MGMT_PASSWORD_REQUIRED,
+	"Volume not mounted",
+	MMS_MGMT_VOL_NOT_MOUNTED,
+	"Not authorized.  Use the correct application/password combination.",
+	MMS_MGMT_NOT_AUTHORIZED,
+	"Password validation failed",
+	MMS_MGMT_PASSWD_MISMATCH,
+	"Failed to get the password",
+	MMS_MGMT_GETPASS_FAILED,
+	"Password must be 8 characters or longer.",
+	MMS_MGMT_PASSTOOSHORT,
+	"Internal error:  MMP parsing failed",
+	MMS_MGMT_MMP_PARSE_ERR,
+	"Application is still using one or more volumes.",
+	MMS_MGMT_APP_VOLS_EXIST,
+	"Not a valid MMS database backup file",
+	MMS_MGMT_NOT_DBFILE,
+	"Database Administrator user account not found",
+	MMS_MGMT_DB_USER_NOTFOUND,
+	"Default DISK lib path invalid",
+	MMS_MGMT_INVALID_PATH,
+	"Invalid hostpath format. Must be hostname@path",
+	MMS_MGMT_INV_HOSTPATH,
+	"Library already exists",
+	MMS_MGMT_LIB_EXISTS,
+	"Library does not exist",
+	MMS_MGMT_LIB_NOT_EXIST,
+	"Must specify hardware type",
+	MMS_MGMT_NO_HWTYPE,
+	"Must specify volume type",
+	MMS_MGMT_NO_VOLTYPE,
+	"Cannot get library DefaultPath",
+	MMS_MGMT_DFLTPATH_ERR,
+	"dpool does not exist. Create it first.",
+	MMS_MGMT_DG_NOT_EXIST,
+	"mpool does not exist. Create it first.",
+	MMS_MGMT_CG_NOT_EXIST,
+	"voltype does not exist. Create it first.",
+	MMS_MGMT_SHOW_CT_ERR,
+	"show voltype error",
+	MMS_MGMT_CT_NOT_EXIST,
+	"voltype does not exist. Create it first",
+	MMS_MGMT_SN_ERR,
+	"missing required arguement",
+	MMS_MGMT_REQ_ARG,
+	"create PARTITION error",
+	MMS_MGMT_CREATE_PART_ERR,
+	"create CARTRIDGE error",
+	MMS_MGMT_CREATE_CART_ERR,
+	"invalid readonly value",
+	MMS_MGMT_INVALID_READONLY,
+};
+
 /*
  * mms_gen_taskid()
  *
@@ -941,14 +1041,13 @@ val_objtype(char *val)
 	if ((strcmp(val, "client") == 0) ||
 	    (strcmp(val, "server") == 0) ||
 	    (strcmp(val, "library") == 0) ||
-	    (strcmp(val, "dkdrive") == 0) ||
 	    (strcmp(val, "drive") == 0) ||
+	    (strcmp(val, "dpool") == 0) ||
 	    (strcmp(val, "mpool") == 0) ||
 	    (strcmp(val, "app") == 0) ||
 	    (strcmp(val, "alarm") == 0) ||
 	    (strcmp(val, "vol") == 0) ||
-	    (strcmp(val, "voltype") == 0) ||
-	    (strcmp(val, "dkvol") == 0)) {
+	    (strcmp(val, "voltype") == 0)) {
 		return (0);
 	} else {
 		return (EINVAL);
@@ -1377,7 +1476,7 @@ mk_set_clause(char *objtype, mms_mgmt_setopt_t *opts, char **carray,
 }
 
 char **
-var_to_array(nvlist_t *nvl, char *optname, int *count)
+mgmt_var_to_array(nvlist_t *nvl, char *optname, int *count)
 {
 	int		st;
 	data_type_t	nvt;
@@ -1549,49 +1648,6 @@ mgmt_xlate_cfgerr(scf_error_t in_err)
 }
 
 int
-mgmt_get_mntpt(struct statvfs64 *in, char **mntpt)
-{
-	int		st = ENOENT;
-	FILE		*fp;
-	struct mnttab	mntfs;
-	struct statvfs	sbuf;
-
-	if (!in || !mntpt) {
-		return (MMS_MGMT_NOARG);
-	}
-
-	(void) memset(&mntfs, 0, sizeof (struct mnttab));
-
-	fp = fopen(MNTTAB, "r");
-	if (fp == NULL) {
-		return (EIO);
-	}
-
-	while ((getmntent(fp, &mntfs)) == 0) {
-		if (strcmp(in->f_basetype, mntfs.mnt_fstype) != 0) {
-			continue;
-		}
-
-		if (statvfs(mntfs.mnt_mountp, &sbuf) != 0) {
-			/* should never happen */
-			continue;
-		}
-		if (sbuf.f_fsid == in->f_fsid) {
-			*mntpt = strdup(mntfs.mnt_mountp);
-			if (*mntpt == NULL) {
-				st = ENOMEM;
-			} else {
-				st = 0;
-			}
-			break;
-		}
-	}
-	(void) fclose(fp);
-
-	return (st);
-}
-
-int
 mgmt_compare_hosts(char *host1, char *host2)
 {
 	int			st;
@@ -1647,47 +1703,12 @@ mgmt_compare_hosts(char *host1, char *host2)
 	return (1);
 }
 
-/* error messages */
-static char *mms_mgmt_errs[] = {
-	NULL,
-	"Internal error; missing argument",
-	"Could not exec ACSLS ssi daemon",
-	"Could not communicate with ACSLS server",
-	"Received invalid response from ACSLS server",
-	"Could not parse response from ACSLS server",
-	"Missing required option",
-	"Could not determine MM host",
-	"Volume in use",
-	"Could not access database backup",
-	"Unknown response type",
-	"Request cancelled",
-	"Request not accepted",
-	"Could not determine group",
-	"Could not determine user",
-	"Option applies to MM server host only",
-	"Volume not unique",
-	"Partition not unique",
-	"Volume not labeled",
-	"No usable volume found",
-	"Could not find ACSLS client libraries",
-	"MMS is not initialized or not running",
-	"Drives on remote systems cannot be configured at this time",
-	"Operation requires a password",
-	"Volume not mounted",
-	"Not authorized.  Use the correct application/password combination.",
-	"Password validation failed",
-	"Failed to get the password",
-	"Password must be 8 characters or longer.",
-	"Internal error:  MMP parsing failed",
-	"Application is still using one or more volumes.",
-	"Not a valid MMS database backup file",
-	"Database Administrator user account not found"
-};
-
 const char *
 mms_mgmt_get_errstr(int errcode)
 {
-	int max_err = sizeof (mms_mgmt_errs) / sizeof (char *);
+	int		i;
+	int max_err = sizeof (mms_mgmt_errs) / sizeof (mms_sym_t);
+	static	char	msg[1024];
 
 	/* standard errors */
 	if (errcode < 256) {
@@ -1699,8 +1720,16 @@ mms_mgmt_get_errstr(int errcode)
 		return (scf_strerror(errcode));
 	}
 
-	if ((errcode >= 2000) && (errcode < (2000 + max_err))) {
-		return (mms_mgmt_errs[errcode - 2000]);
+	if ((errcode > MMS_MGMT_ERR_OFFSET) &&
+	    (errcode < MMS_MGMT_LAST_ERR_CODE)) {
+		for (i = 0; i < max_err; i++) {
+			if (mms_mgmt_errs[i].sym_code == errcode) {
+				return (mms_mgmt_errs[i].sym_token);
+			}
+		}
+		(void) snprintf(msg, sizeof (msg), "Unknown err code %d",
+		    errcode);
+		return (msg);
 	}
 
 	if (errcode >= MMS_ERR_BIAS) {
@@ -1771,7 +1800,7 @@ mgmt_filter_results(nvlist_t *filter, nvlist_t *nvl)
 			continue;
 		}
 
-		varray = var_to_array(filter, key, &count);
+		varray = mgmt_var_to_array(filter, key, &count);
 		filter_on_var(key, varray, count, nvl);
 		mgmt_free_str_arr(varray, count);
 	}

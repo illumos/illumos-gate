@@ -845,19 +845,10 @@ drv_skaa_t	drv_skaa_tab[] = {
  * Initialize device.
  * Real drives don't use this.
  */
-void
+int
 drv_init_dev(void)
 {
-}
-
-/*
- * Return array of mounted FS for disk archiving.
- * Real devices don't have mounted FS for disk archiving.x
- */
-char **
-drv_get_mounted(void)
-{
-	return (&drv_mounted[0]);
+	return (0);
 }
 
 /*

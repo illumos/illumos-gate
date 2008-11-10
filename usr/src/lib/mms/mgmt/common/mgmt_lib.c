@@ -46,15 +46,22 @@ static mms_mgmt_setopt_t libopts[] = {
 	{O_NAME, "LibraryName", NULL, B_TRUE, NULL},
 	{O_TYPE, "LibraryType", NULL, B_TRUE, NULL},
 	{O_ACSHOST, "LibraryIP", NULL, B_TRUE, NULL},
-	{O_ACSPORT, "LibraryACSLSPort", "50004", B_TRUE, val_numonly},
 	{O_ACSNUM, "LibraryACS", NULL, B_TRUE, val_numonly},
 	{O_LSMNUM, "LibraryLSM", NULL, B_TRUE, val_numonly},
 	{O_LIBCONN, "LibraryConnection", "network", B_TRUE, NULL},
-	{O_SERIALNO, "LibrarySerialNum", NULL, B_TRUE, NULL},
+	{O_SERIALNO, "LibrarySerialNumber", NULL, B_TRUE, NULL},
 	{O_ACSPORT, NULL, NULL, B_FALSE, val_numonly},
 	{NULL, NULL, NULL, B_FALSE, NULL}
 };
 #define	LIBOPT_COUNT	sizeof (libopts) / sizeof (mms_mgmt_setopt_t)
+
+mms_mgmt_setopt_t dklibopts[] = {
+	{O_NAME, "LibraryName", NULL, B_TRUE, NULL},
+	{O_TYPE, "LibraryType", NULL, B_TRUE, NULL},
+	{O_DFLTPATH, "DefaultLibraryPath", NULL, B_TRUE, NULL},
+	{NULL, NULL, NULL, B_FALSE, NULL}
+};
+#define	DKLIBOPT_COUNT	sizeof (dklibopts) / sizeof (mms_mgmt_setopt_t)
 
 static mms_mgmt_setopt_t lmopts[] = {
 	{O_LMNAME, "LMName", NULL, B_TRUE, NULL},
@@ -77,7 +84,7 @@ static mms_mgmt_setopt_t driveopts[] = {
 	{O_TYPE, "DriveType", NULL, B_TRUE, NULL},
 	{O_SERIALNO, "DriveSerialNum", NULL, B_TRUE, NULL},
 	{O_MMSLIB, "LibraryName", NULL, B_TRUE, NULL},
-	{O_DGNAME, "DriveGroupName", NULL, B_TRUE, NULL},
+	{O_DPOOL, "DriveGroupName", NULL, B_TRUE, NULL},
 	{O_RESERVE, "ReserveDrive", "yes", B_FALSE, val_yesno},
 	{NULL, NULL, NULL, B_FALSE, NULL}
 };
@@ -100,7 +107,7 @@ static mms_mgmt_setopt_t dmopts[] = {
 #define	DMOPT_COUNT	sizeof (dmopts) / sizeof (mms_mgmt_setopt_t)
 
 static mms_mgmt_setopt_t drvgrpopts[] = {
-	{O_DGNAME, "DriveGroupName", NULL, B_TRUE, NULL},
+	{O_NAME, "DriveGroupName", NULL, B_TRUE, NULL},
 	{O_UNLOADTM, "DriveGroupUnloadTime", "60", B_FALSE, NULL},
 	{NULL, NULL, NULL, B_FALSE, NULL}
 };
@@ -112,11 +119,17 @@ static mms_mgmt_setopt_t drvgrpopts[] = {
  *	{O_APPS, "ApplicationName", NULL, B_FALSE, NULL},
  */
 static mms_mgmt_setopt_t drvgrpappopts[] = {
-	{O_DGNAME, "DriveGroupName", NULL, B_TRUE, NULL},
+	{O_NAME, "DriveGroupName", NULL, B_TRUE, NULL},
 	{O_APPS, "ApplicationName", NULL, B_TRUE, NULL},
 	{NULL, NULL, NULL, B_FALSE, NULL}
 };
 #define	DGAOPT_COUNT	sizeof (drvgrpappopts) / sizeof (mms_mgmt_setopt_t)
+
+static int
+mms_remove_libaccess(void *session, char *libname);
+
+static int
+mms_remove_slotgroup(void *session, char *libname);
 
 static int
 mms_remove_lm(void *session, char *libname);
@@ -126,6 +139,9 @@ mms_remove_dm(void *session, nvlist_t *nvl, nvlist_t *errs);
 
 static int
 mms_remove_dg(void *session, char *dgname);
+
+static int
+mms_create_drive(void *session, nvlist_t *nvl, nvlist_t *errs);
 
 static int
 update_DMs(void *session, char *drive, nvlist_t **olddms, int count,
@@ -552,6 +568,41 @@ mms_get_drive(void *session, char *drivename, mms_drive_t **drive)
 int
 mms_add_library(void *session, nvlist_t *lib, nvlist_t *errs)
 {
+	int	st;
+	char	*ltype;
+
+
+	if (!lib) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!mgmt_chk_auth("solaris.mms.create")) {
+		return (EACCES);
+	}
+
+	/* type is required */
+	st = nvlist_lookup_string(lib, O_TYPE, &ltype);
+	if (st != 0) {
+		MGMT_ADD_OPTERR(errs, O_TYPE, st);
+		return (st);
+	}
+
+	/*
+	 * If adding DISK type library, then call add dklib function
+	 */
+	if (strcmp(ltype, "DISK") == 0) {
+		/* Adding DISK library */
+		st = mms_mgmt_create_dklib(session, lib, errs);
+	} else {
+		/* Adding a real library */
+		st = mms_create_library(session, lib, errs);
+	}
+	return (st);
+}
+
+int
+mms_create_library(void *session, nvlist_t *lib, nvlist_t *errs)
+{
 	void		*response;
 	int		st;
 	char		tid[64];
@@ -565,14 +616,6 @@ mms_add_library(void *session, nvlist_t *lib, nvlist_t *errs)
 	void		*sess;
 	void		*sessp = session;
 	char		*ltype = NULL;
-
-	if (!lib) {
-		return (MMS_MGMT_NOARG);
-	}
-
-	if (!mgmt_chk_auth("solaris.mms.create")) {
-		return (EACCES);
-	}
 
 	mms_trace(MMS_DEBUG, "mms_add_library");
 
@@ -589,15 +632,6 @@ mms_add_library(void *session, nvlist_t *lib, nvlist_t *errs)
 			MGMT_ADD_ERR(errs, O_NAME, st);
 			return (st);
 		}
-	}
-
-	/*
-	 * special case for additional disk libraries - just pass it
-	 * off to the disk archiving functions.
-	 */
-	if (strcasecmp(ltype, "DISK") == 0) {
-		st = mms_mgmt_add_dklib(session, namep, errs);
-		return (st);
 	}
 
 	if (namep == NULL) {
@@ -708,6 +742,73 @@ mms_add_library(void *session, nvlist_t *lib, nvlist_t *errs)
 int
 mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 {
+	char	*type;
+	int	st = 0;
+
+	st = nvlist_lookup_string(nvl, O_TYPE, &type);
+	if (st != 0) {
+		st = MMS_MGMT_NO_HWTYPE;
+		MGMT_ADD_OPTERR(errs, "O_TYPE", st);
+		return (st);
+	}
+
+	if (strcmp(type, "DISK") == 0) {
+		st = mms_mgmt_create_dkdrive(session, nvl, errs);
+	} else {
+		st = mms_create_drive(session, nvl, errs);
+	}
+	return (st);
+}
+
+static int
+mgmt_get_libname(void *session, char *libname, nvlist_t **lib)
+{
+	int		st;
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	char		tid[64];
+	char 		cmd[8192];
+
+	if (!lib) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	*lib = NULL;
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] "
+	    "match[streq(LIBRARY.'LibraryName' '%s')] "
+	    "report[LIBRARY.'LibraryName'] "
+	    "reportmode[namevalue]; ", tid, libname);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mgmt_get_lib",
+	    &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("LibraryName", B_FALSE, response,
+		    lib);
+		mms_free_rsp(response);
+	}
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
+
+static int
+mms_create_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
+{
 	int		st;
 	char		buf[2048];
 	void		*sess = NULL;
@@ -716,6 +817,10 @@ mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 	char		drvnm[1024];
 	char		*namep;
 	char		**saved = NULL;
+	char		*dgname = NULL;
+	char		*libname = NULL;
+	nvlist_t	*lib = NULL;
+	nvlist_t	*dg = NULL;
 	int		count = 0;
 	char		hostbuf[1024];
 	int		i;
@@ -736,10 +841,28 @@ mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 	}
 
 	/* Library asssociation and connection are required */
-	if (!nvlist_exists(nvl, O_MMSLIB)) {
-		st = ENOENT;
-		MGMT_ADD_OPTERR(errs, O_MMSLIB, st);
-		return (st);
+	st = nvlist_lookup_string(nvl, O_MMSLIB, &libname);
+	if (st != 0) {
+		MGMT_ADD_OPTERR(errs, "library", st);
+		goto done;
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			goto done;
+		}
+		sessp = sess;
+	}
+
+	st = mgmt_get_libname(sessp, libname, &lib);
+	if (st != 0) {
+		goto done;
+	}
+
+	if (!nvlist_exists(lib, libname)) {
+		st = MMS_MGMT_LIB_NOT_EXIST;
+		goto done;
 	}
 
 #ifdef	MMS_VAR_CFG
@@ -763,6 +886,22 @@ mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 	}
 #endif	/* MMS_VAR_CFG */
 
+	(void) nvlist_lookup_string(nvl, O_DPOOL, &dgname);
+	if (!dgname) {
+		MGMT_ADD_OPTERR(errs, "dpool", st);
+		goto done;
+	}
+
+	st = mgmt_get_dgname(sessp, dgname, &dg);
+	if (st != 0) {
+		goto done;
+	}
+
+	if (!nvlist_exists(dg, dgname)) {
+		st = MMS_MGMT_DG_NOT_EXIST;
+		goto done;
+	}
+
 	st = nvlist_lookup_string(nvl, O_NAME, &val);
 	if (st == 0) {
 		/* name provided */
@@ -784,38 +923,20 @@ mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 		namep = drvnm;
 	}
 
-	/* create the Drive Group Name */
-	(void) snprintf(buf, sizeof (buf), "DG_%s", namep);
-	(void) nvlist_add_string(nvl, O_DGNAME, buf);
-
-	if (session == NULL) {
-		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
-		if (st != 0) {
-			return (st);
-		}
-		sessp = sess;
-	}
-
 	/*
 	 * Ready to create the objects.  On failure, unwind the list and
-	 * remove what was added.  Order is DRIVEGROUP, DRIVE,
-	 * foreach host add DM, foreach app add DRIVEGROUPAPPLICATION.
+	 * remove what was added.  Order is DRIVE,
+	 * foreach host add DM.
 	 */
 
-	/* create DRIVEGROUP */
-	st = mms_add_object(sessp, "DRIVEGROUP", drvgrpopts, nvl, errs);
-	if (st != 0) {
-		goto done;
-	}
-
-	/* Create DRIVE */
 	st = mms_add_object(sessp, "DRIVE", driveopts, nvl, errs);
 	if (st != 0) {
+		MGMT_ADD_ERR(errs, namep, st);
 		goto done;
 	}
 
 	/* For each host specified in O_DEVCONN, create a DM */
-	saved = var_to_array(nvl, O_DEVCONN, &count);
+	saved = mgmt_var_to_array(nvl, O_DEVCONN, &count);
 	if (saved == NULL) {
 		/* should never happen since we checked earlier */
 		goto done;
@@ -841,47 +962,6 @@ mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 		goto done;
 	}
 
-	/* For each application in O_APPS, create a DRIVEGROUPAPPLICATION */
-	saved = var_to_array(nvl, O_APPS, &count);
-	if (saved == NULL) {
-		/* nothing to do */
-		goto done;
-	}
-
-	for (i = 0; i < count; i++) {
-		if (!saved[i]) {
-			continue;
-		}
-
-		/*
-		 * special case 'all' and 'none'.
-		 * 'all' is meant to mean all currently defined apps
-		 * + all future ones, but no way to specify in MMS today.
-		 * 'none' just means set no apps, so do nothing.
-		 */
-		if ((strcasecmp(saved[i], "none") == 0) ||
-		    (strcasecmp(saved[i], "all") == 0)) {
-			continue;
-		}
-
-		(void) nvlist_add_string(nvl, O_APPS, saved[i]);
-		st = mms_add_object(sessp, "DRIVEGROUPAPPLICATION",
-		    drvgrpappopts, nvl, errs);
-		if (st != 0) {
-			/*
-			 * Failure on this particular bit is ok, just note
-			 * the failure as a warning
-			 */
-			(void) snprintf(buf, sizeof (buf),
-			    "%s = %s", O_APPS, saved[i]);
-			MGMT_ADD_ERR(errs, buf, st);
-			st = 0;
-		}
-	}
-	/* put back the original list */
-	(void) nvlist_add_string_array(nvl, O_APPS, saved, count);
-	mgmt_free_str_arr(saved, count);
-
 	/* online the drive */
 	if (st == 0) {
 		if (!nvlist_exists(nvl, O_OBJSTATE)) {
@@ -891,8 +971,11 @@ mms_add_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 	}
 
 done:
-	if (st != 0) {
-		(void) mms_remove_drive(sessp, nvl, errs);
+	if (lib) {
+		nvlist_free(lib);
+	}
+	if (dg != NULL) {
+		nvlist_free(dg);
 	}
 
 	if (sess) {
@@ -974,10 +1057,14 @@ mms_remove_library(void *session, nvlist_t *lib, nvlist_t *errs)
 	/* TODO:  Add checks for library dependencies in cartridgegroups */
 	/* TODO:  Add checks for drives in this library */
 
-	(void) mms_gen_taskid(tid);
+	/* Attempt to delete LMs if they have been created */
+	(void) mms_remove_lm(sessp, val);
 
-	st = mms_remove_lm(sessp, val);
+	/* Attempt to delete LIBRARYACCESS if they have been created */
+	(void) mms_remove_libaccess(sessp, val);
+
 	if (st == 0) {
+		(void) mms_gen_taskid(tid);
 		(void) snprintf(cmd, sizeof (cmd),
 		    "delete task['%s'] type[LIBRARY] "
 		    "match[streq (LIBRARY.'%s' '%s')];",
@@ -1003,7 +1090,7 @@ mms_remove_library(void *session, nvlist_t *lib, nvlist_t *errs)
 }
 
 static int
-mms_remove_lm(void *session, char *libname)
+mms_remove_slotgroup(void *session, char *libname)
 {
 	int		st;
 	void		*sess = NULL;
@@ -1019,8 +1106,9 @@ mms_remove_lm(void *session, char *libname)
 	(void) mms_gen_taskid(tid);
 
 	(void) snprintf(cmd, sizeof (cmd),
-	    "delete task['%s'] type[LM] match[streq (LM.'%s' '%s')];",
-	    tid, "LibraryName", libname);
+	    "delete task['%s'] type[SLOTGROUP] "
+	    "match[streq (SLOTGROUP.'LibraryName' '%s')];",
+	    tid, libname);
 
 	if (!session) {
 		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
@@ -1030,7 +1118,86 @@ mms_remove_lm(void *session, char *libname)
 		sessp = sess;
 	}
 
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mms_remove_slotgroup()",
+	    &response);
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
+
+static int
+mms_remove_lm(void *session, char *libname)
+{
+	int		st;
+	void		*sess = NULL;
+	void		*sessp = session;
+	char		cmd[2048];
+	char		tid[64];
+	void		*response;
+
+	if (!libname) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	(void) mms_remove_slotgroup(sessp, libname);
+
+	(void) mms_gen_taskid(tid);
+
+	(void) snprintf(cmd, sizeof (cmd),
+	    "delete task['%s'] type[LM] match[streq (LM.'LibraryName' '%s')];",
+	    tid, libname);
+
 	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mms_remove_lm()", &response);
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
+
+int
+mms_remove_libaccess(void *session, char *libname)
+{
+	int		st;
+	void		*sess = NULL;
+	void		*sessp = session;
+	char		cmd[2048];
+	char		tid[64];
+	void		*response;
+
+	if (!libname) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	(void) mms_gen_taskid(tid);
+
+	(void) snprintf(cmd, sizeof (cmd),
+	    "delete task['%s'] type[LIBRARYACCESS] "
+	    "match[streq (LIBRARYACCESS.'LibraryName' '%s')];",
+	    tid, libname);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mms_remove_libaccess()",
+	    &response);
 
 	if (sess) {
 		(void) mms_goodbye(sess, 0);
@@ -1219,6 +1386,9 @@ mms_remove_drive(void *session, nvlist_t *nvl, nvlist_t *errs)
 int
 mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 {
+#define	CARRAY_COUNT	\
+	(LIBOPT_COUNT > DKLIBOPT_COUNT ? LIBOPT_COUNT : DKLIBOPT_COUNT)
+
 	int		st;
 	char		*fnam = "mms_modify_library()";
 	char		*libname;
@@ -1231,10 +1401,15 @@ mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 	void		*response = NULL;
 	int		count = 0;
 	int		lmcount = 0;
-	char		*carray[LIBOPT_COUNT];
+	char		*carray[CARRAY_COUNT];
 	char		*lmarray[LMOPT_COUNT];
 	nvpair_t	*nvp;
 	nvlist_t	*nva;
+	char		*type = NULL;
+	mms_mgmt_setopt_t *libopts_p;
+	char		*path = NULL;
+	char		libpath[8192];
+	int		i;
 
 	if (!mgmt_chk_auth("solaris.mms.modify")) {
 		return (EACCES);
@@ -1257,19 +1432,68 @@ mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 		return (st);
 	}
 
-	/* see if there are LIBRARY attrs to be changed.  Skip over O_NAME. */
-	st = mgmt_find_changed_attrs("LIBRARY", libopts, nvl, carray, &count,
-	    errs);
-	if (st != 0) {
-		return (st);
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
 	}
 
+	/*
+	 * Read LIBRARY and see what type it is
+	 */
 	(void) mms_gen_taskid(tid);
-
 	(void) snprintf(cmd, sizeof (cmd),
 	    "show task['%s'] match[streq (LIBRARY.'%s' '%s')] "
 	    "reportmode[namevalue] report[LIBRARY];", tid,
 	    "LibraryName", libname);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, fnam, &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("LibraryName", B_FALSE, response,
+		    &libattrs);
+		mms_free_rsp(response);
+	}
+	if (st != 0) {
+		goto done;
+	}
+
+	st = nvlist_lookup_nvlist(libattrs, libname, &nva);
+	if (st == 0) {
+		st = nvlist_lookup_string(nva, "LibraryType", &type);
+		if (st != 0) {
+			goto done;
+		}
+	}
+
+	/* see if there are LIBRARY attrs to be changed.  Skip over O_NAME. */
+	if (strcmp(type, "DISK") == 0) {
+		/*
+		 * If dkpath is to be set, the library name must be appended
+		 * to the path specified.
+		 */
+		if (nvlist_lookup_string(nvl, "dkpath", &path) == 0) {
+			if (path[0] != '/') {
+				st = MMS_MGMT_INVALID_PATH;
+				goto done;
+			}
+			for (i = strlen(path) - 1;
+			    i > 0 && path[i] == '/';
+			    i--) {
+				path[i] = '\0';
+			}
+			(void) snprintf(libpath, sizeof (libpath),
+			    "%s/%s", path, libname);
+			(void) nvlist_remove_all(nvl, "dkpath");
+			(void) nvlist_add_string(nvl, "dkpath", libpath);
+		}
+		libopts_p = dklibopts;
+	} else {
+		libopts_p = libopts;
+	}
+	st = mgmt_find_changed_attrs("LIBRARY", libopts_p,
+	    nvl, carray, &count, errs);
 
 	/*
 	 * see if there are LM attrs to be changed.
@@ -1278,7 +1502,7 @@ mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 	st = mgmt_find_changed_attrs("LM", lmopts, nvl, lmarray, &lmcount,
 	    errs);
 	if (st != 0) {
-		return (st);
+		goto done;
 	}
 
 	(void) mms_gen_taskid(tid);
@@ -1289,33 +1513,14 @@ mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 
 	if ((count == 0) && (lmcount == 0)) {
 		/* nothing to do */
-		return (MMS_MGMT_NOARG);
-	}
-
-	if (!session) {
-		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
-		if (st != 0) {
-			return (st);
-		}
-		sessp = sess;
+		st = MMS_MGMT_NOARG;
+		goto done;
 	}
 
 	if (count > 0) {
-		st = mms_mgmt_send_cmd(sessp, tid, cmd, fnam, &response);
+		st = nvlist_lookup_nvlist(libattrs, libname, &nva);
 		if (st == 0) {
-			st = mmp_get_nvattrs("LibraryName", B_FALSE, response,
-			    &libattrs);
-			mms_free_rsp(response);
-		}
-		if (st == 0) {
-			st = nvlist_lookup_nvlist(libattrs, libname, &nva);
-			if (st == 0) {
-				cmp_mmp_opts(libopts, carray, nva, &count);
-			}
-			nvlist_free(libattrs);
-			libattrs = NULL;
-		} else {
-			goto done;
+			cmp_mmp_opts(libopts_p, carray, nva, &count);
 		}
 	}
 
@@ -1349,7 +1554,7 @@ mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 		    "match[streq (LIBRARY.'LibraryName' '%s')] ",
 		    tid, libname);
 
-		mk_set_clause("LIBRARY", libopts, carray, cmd, sizeof (cmd));
+		mk_set_clause("LIBRARY", libopts_p, carray, cmd, sizeof (cmd));
 		(void) strlcat(cmd, ";", sizeof (cmd));
 
 		st = mms_mgmt_send_cmd(sessp, tid, cmd, fnam, &response);
@@ -1372,6 +1577,9 @@ mms_modify_library(void *session, nvlist_t *nvl, nvlist_t *errs)
 	}
 
 done:
+	if (libattrs) {
+		nvlist_free(libattrs);
+	}
 	if (sess) {
 		(void) mms_goodbye(sess, 0);
 	}
@@ -1693,7 +1901,7 @@ update_DGAs(void *session, char *dgname, nvlist_t **old, int count,
 	}
 
 	vcount = 0;
-	varray = var_to_array(nvl, O_APPS, &vcount);
+	varray = mgmt_var_to_array(nvl, O_APPS, &vcount);
 
 	for (i = 0; i < count; i++) {
 		val = NULL;
@@ -1804,7 +2012,7 @@ update_DMs(void *session, char *drive, nvlist_t **olddms, int count,
 	(void) snprintf(buf, sizeof (buf), "DM_%s_", drive);
 
 	vcount = 0;
-	varray = var_to_array(nvl, O_DEVCONN, &vcount);
+	varray = mgmt_var_to_array(nvl, O_DEVCONN, &vcount);
 
 	if (!session) {
 		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
@@ -1987,9 +2195,7 @@ mms_mgmt_set_state(void *session, nvlist_t *nvl, nvlist_t *errs)
 
 	st = nvlist_lookup_string(nvl, O_OBJTYPE, &otype);
 	if (st == 0) {
-		if (strcmp(otype, "dkdrive") == 0) {
-			otype = "drive";
-		} else if ((strcmp(otype, "drive") != 0) &&
+		if ((strcmp(otype, "drive") != 0) &&
 		    (strcmp(otype, "library") != 0)) {
 			st = EINVAL;
 		}
@@ -2143,7 +2349,7 @@ mms_mgmt_list_drives(void *session, nvlist_t *nvl, nvlist_t *errs,
 	}
 
 	/* primary filter on name */
-	varray = var_to_array(nvl, O_NAME, &count);
+	varray = mgmt_var_to_array(nvl, O_NAME, &count);
 
 	(void) mms_gen_taskid(tid);
 	(void) snprintf(cmd, sizeof (cmd),
@@ -2368,7 +2574,7 @@ mms_mgmt_list_libraries(void *session, nvlist_t *nvl, nvlist_t *errs,
 	}
 
 	/* primary filter on name */
-	varray = var_to_array(nvl, O_NAME, &count);
+	varray = mgmt_var_to_array(nvl, O_NAME, &count);
 
 	(void) mms_gen_taskid(tid);
 
@@ -2489,5 +2695,275 @@ done:
 	}
 
 
+	return (st);
+}
+
+int
+mgmt_get_dgname(void *session, char *dgname, nvlist_t **dg)
+{
+	int		st;
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	char		tid[64];
+	char 		cmd[8192];
+
+	if (!dg) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	*dg = NULL;
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] "
+	    "match[streq(DRIVEGROUP.'DriveGroupName' '%s')] "
+	    "report[DRIVEGROUP.'DriveGroupName'] "
+	    "reportmode[namevalue]; ", tid, dgname);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mgmt_get_dgname",
+	    &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("DriveGroupName", B_FALSE, response,
+		    dg);
+		mms_free_rsp(response);
+	}
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
+
+int
+mgmt_get_cgname(void *session, char *cgname, nvlist_t **cg)
+{
+	int		st;
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	char		tid[64];
+	char 		cmd[8192];
+
+	if (!cg) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!session) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			return (st);
+		}
+		sessp = sess;
+	}
+
+	*cg = NULL;
+
+	(void) mms_gen_taskid(tid);
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] "
+	    "match[streq(CARTRIDGEGROUP.'CartridgeGroupName' '%s')] "
+	    "report[CARTRIDGEGROUP.'CartridgeGroupName'] "
+	    "reportmode[namevalue]; ", tid, cgname);
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "mgmt_get_cgname",
+	    &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("CartridgeGroupName", B_FALSE, response,
+		    cg);
+		mms_free_rsp(response);
+	}
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
+
+/*
+ * mms_mgmt_modify_dpool()
+ *	Add applications to existing dpool (DRIVEGROUP) by adding a
+ *	DRIVEGROUPAPPLICATION for every app specified.
+ */
+int
+mms_mgmt_modify_dpool(void *session, nvlist_t *nvl, nvlist_t *errs)
+{
+	int		st;
+	char		**varray = NULL;
+	int		count = 0;
+	int		i;
+	char		cmd[8192];
+	char		tid[64];
+	void		*sess = NULL;
+	void		*sessp = session;
+	void		*response;
+	char		*dpool;
+	nvlist_t	*dgattrs = NULL;
+	nvlist_t	*new = NULL;
+
+	/* get list of apps, if new list != old list, update */
+
+	if (!mgmt_chk_auth("solaris.mms.modify")) {
+		return (EACCES);
+	}
+
+	if (!nvl) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	st = nvlist_lookup_string(nvl, O_NAME, &dpool);
+	if (st != 0) {
+		MGMT_ADD_OPTERR(errs, O_NAME, st);
+		return (st);
+	}
+
+	varray = mgmt_var_to_array(nvl, O_APPS, &count);
+	if (varray == NULL) {
+		/* error or nothing to do? */
+		return (0);
+	}
+
+	/* get list of already-established apps */
+	(void) mms_gen_taskid(tid);
+
+	(void) snprintf(cmd, sizeof (cmd),
+	    "show task['%s'] reportmode[namevalue] "
+	    "match[streq(DRIVEGROUPAPPLICATION.'DriveGroupName' '%s')] "
+	    "report[DRIVEGROUPAPPLICATION.'ApplicationName'];",
+	    tid, dpool);
+
+	if (session == NULL) {
+		st = create_mm_clnt(NULL, NULL, NULL, NULL, &sess);
+		if (st != 0) {
+			goto done;
+		}
+		sessp = sess;
+	}
+
+	st = mms_mgmt_send_cmd(sessp, tid, cmd, "modify drivegroup",
+	    &response);
+	if (st == 0) {
+		st = mmp_get_nvattrs("ApplicationName", B_FALSE, response,
+		    &dgattrs);
+		mms_free_rsp(response);
+	}
+	if (st != 0) {
+		goto done;
+	}
+
+	/* see if we need to add any apps */
+	for (i = 0; i < count; i++) {
+		if (!varray[i] || (strlen(varray[i]) == 0) ||
+		    (strcasecmp(varray[i], "none") == 0) ||
+		    (strcasecmp(varray[i], "all") == 0)) {
+			continue;
+		}
+
+		if (!nvlist_exists(dgattrs, varray[i])) {
+			if (!new) {
+				(void) nvlist_alloc(&new, NV_UNIQUE_NAME, 0);
+				(void) nvlist_add_string(new, O_NAME, dpool);
+			}
+
+			(void) nvlist_add_string(new, O_APPS, varray[i]);
+			st = mms_add_object(sessp, "DRIVEGROUPAPPLICATION",
+			    drvgrpappopts, new, errs);
+			if (st != 0) {
+				break;
+			}
+		}
+	}
+
+done:
+
+	if (new) {
+		nvlist_free(new);
+	}
+
+	if (dgattrs) {
+		nvlist_free(dgattrs);
+	}
+
+	mgmt_free_str_arr(varray, count);
+
+	if (sess) {
+		(void) mms_goodbye(sess, 0);
+	}
+
+	return (st);
+}
+
+int
+mms_mgmt_add_dpool(void *session, nvlist_t *nvl, nvlist_t *errs)
+{
+	int		st;
+	char		**varray = NULL;
+	int		count = 0;
+	char		*dpool = NULL;
+	int		i;
+
+	if (!nvl) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	if (!mgmt_chk_auth("solaris.mms.create")) {
+		return (EACCES);
+	}
+
+	st = nvlist_lookup_string(nvl, O_NAME, &dpool);
+	if (st != 0) {
+		MGMT_ADD_OPTERR(errs, O_NAME, st);
+		return (st);
+	}
+
+	/* save original values */
+	varray = mgmt_var_to_array(nvl, O_APPS, &count);
+	if (count == 0) {
+		st = MMS_MGMT_ERR_REQUIRED;
+		MGMT_ADD_OPTERR(errs, O_APPS, st);
+		return (st);
+	}
+
+	st = mms_add_object(session, "DRIVEGROUP", drvgrpopts,
+	    nvl, errs);
+	if (st == EEXIST) {
+		MGMT_ADD_OPTERR(errs, dpool, st);
+		return (st);
+	}
+	if (st == 0) {
+		for (i = 0; i < count; i++) {
+			if (!varray[i] || (strlen(varray[i]) == 0) ||
+			    (strcasecmp(varray[i], "none") == 0) ||
+			    (strcasecmp(varray[i], "all") == 0)) {
+				continue;
+			}
+
+			/* put back a single value */
+			(void) nvlist_add_string(nvl, O_APPS, varray[i]);
+			st = mms_add_object(session,
+			    "DRIVEGROUPAPPLICATION", drvgrpappopts, nvl, errs);
+			if (st != 0) {
+				MGMT_ADD_ERR(errs, varray[i], st);
+				break;
+			}
+		}
+
+		/* put back original values */
+		if (varray) {
+			(void) nvlist_add_string_array(nvl, O_APPS, varray,
+			    count);
+			mgmt_free_str_arr(varray, count);
+		}
+	}
 	return (st);
 }

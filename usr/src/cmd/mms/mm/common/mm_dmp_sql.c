@@ -546,16 +546,6 @@ delete_dm_config(mm_wka_t *mm_wka, mm_db_t *db) {
 	}
 	if (mm_db_exec(HERE, db,
 		    "delete from "\
-		    "\"DMMOUNTPOINT\" "	\
-		    "where \"DMName\" = '%s'",
-		    mm_wka->wka_conn.cci_instance)
-	    != MM_DB_OK) {
-		mms_trace(MMS_ERR,
-		    "Error removing "\
-		    "DMMOUNTPOINT");
-	}
-	if (mm_db_exec(HERE, db,
-		    "delete from "\
 		    "\"DMCAPABILITYGROUP\" " \
 		    "where \"DMName\" = '%s'",
 		    mm_wka->wka_conn.cci_instance)
@@ -624,7 +614,6 @@ mm_dmp_config_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 
 	mms_par_node_t	*shapepriority;
 	mms_par_node_t	*densitypriority;
-	mms_par_node_t	*mountpoint;
 
 	mm_db_t		*db = &mm_wka->mm_data->mm_db;
 	cci_t		*conn = &mm_wka->wka_conn;
@@ -1149,37 +1138,6 @@ mm_dmp_config_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			density_count ++;
 		}
 	}
-
-	/* Mount Points */
-
-	mms_trace(MMS_DEVP, "mountpoint");
-	work = NULL;
-	if ((mountpoint = mms_pn_lookup(cmd->cmd_root,
-	    "mountpoint",
-	    MMS_PN_CLAUSE, NULL)) == NULL) {
-		mms_trace(MMS_ERR,
-		    "DM config is missing the mountpoint clause");
-	} else {
-		item = NULL;
-		while ((item = mms_pn_lookup(mountpoint, NULL,
-		    MMS_PN_STRING, &work)) != NULL) {
-			if (mm_db_exec(HERE, db,
-			    "insert into \"DMMOUNTPOINT\" "
-			    "(\"DMName\", \"DMMountPoint\") "
-			    "values('%s', '%s');",
-			    DMName,
-			    item->pn_string) != MM_DB_OK) {
-				mms_trace(MMS_ERR, "Error adding "
-				    "mountpoint");
-				cmd->cmd_remove = 1;
-				mm_sql_db_err_rsp_new(cmd, db);
-				mm_send_text(mm_wka->mm_wka_conn,
-				    cmd->cmd_buf);
-				goto error;
-			}
-		}
-	}
-
 
 	/* Done Parsing */
 

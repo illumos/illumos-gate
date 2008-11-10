@@ -295,6 +295,7 @@ int mms_get_dm(void *session, char *drivename, mms_list_t *dm_list);
  *
  */
 int mms_add_library(void *session, nvlist_t *lib, nvlist_t *errs);
+int mms_create_library(void *session, nvlist_t *lib, nvlist_t *errs);
 
 
 /*

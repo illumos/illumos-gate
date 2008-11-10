@@ -1496,7 +1496,7 @@ mms_mgmt_show_apps(void *session, nvlist_t *nvl, nvlist_t **apps)
 		sessp = sess;
 	}
 
-	names = var_to_array(nvl, O_NAME, &count);
+	names = mgmt_var_to_array(nvl, O_NAME, &count);
 
 	(void) mms_gen_taskid(tid);
 	if (count == 0) {
@@ -1586,7 +1586,7 @@ mms_mgmt_show_requests(void *session, nvlist_t *nvl, nvlist_t **reqs)
 		sessp = sess;
 	}
 
-	names = var_to_array(nvl, O_NAME, &count);
+	names = mgmt_var_to_array(nvl, O_NAME, &count);
 
 	(void) mms_gen_taskid(tid);
 	if (count == 0) {

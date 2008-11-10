@@ -26,9 +26,7 @@
 
 SUNW_1.1 {
 	global:
-		drv_add_mounted;
 		drv_bind_raw_dev;
-		drv_bld_mounted;
 		drv_blk_limit;
 		drv_clrerr;
 		drv_density;
@@ -37,13 +35,9 @@ SUNW_1.1 {
 		drv_disallowed_cmds;
 		drv_disallowed_ioctls;
 		drv_drive_type;
-		drv_force_mount;
 		drv_get_avail_capacity;
 		drv_get_capacity;
 		drv_get_density;
-		drv_get_mnttab;
-		drv_get_mount_points;
-		drv_get_mounted;
 		drv_get_pos;
 		drv_get_serial_num;
 		drv_get_statistics;
@@ -65,7 +59,6 @@ SUNW_1.1 {
 		drv_prsv_release;
 		drv_prsv_reserve;
 		drv_prsv_supported;
-		drv_pthread_cleanup;
 		drv_rebind_target;
 		drv_release;
 		drv_reserve;
@@ -73,11 +66,12 @@ SUNW_1.1 {
 		drv_set_density;
 		drv_shape;
 		drv_shape_den;
-		drv_stat_mount_point;
 		drv_timeout;
 		drv_tur;
 
 		dm_get_attr_value = extern;
+		dm_get_default_lib_path = extern;
+		dm_get_hostpath = extern;
 		dm_msg_add = extern;
 		dm_msg_destroy = extern;
 		dm_show_mount_point = extern;

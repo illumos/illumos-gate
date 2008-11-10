@@ -1363,7 +1363,6 @@ mm_setup_drive(mm_command_t *cmd,
 	int			drive_not_ready;
 	int			i;
 
-	char			*candidate_cartid = cart->cmi_cart_id;
 	char			*candidate_drive = PQgetvalue(drive_results,
 	    drive_row, 0);
 
@@ -1467,50 +1466,6 @@ mm_setup_drive(mm_command_t *cmd,
 	}
 
 	mm_clear_db(&dm_shape);
-
-	/* Confirm DM MOUNT POINT */
-	if (drive_not_ready == 0) {
-		mms_trace(MMS_DEVP,
-		    "drive is configured, quickly check the mountpoint");
-		if (mm_db_exec(HERE, db,
-		    "select \"DMName\" from \"DMMOUNTPOINT\" "
-		    "cross join \"CARTRIDGE\" where "
-		    "\"CARTRIDGE\".\"CartridgeMountPoint\" = "
-		    "\"DMMOUNTPOINT\".\"DMMountPoint\""
-		    "and"
-		    "\"CARTRIDGE\".\"CartridgeID\" = '%s'"
-		    "and \"DMMOUNTPOINT\".\"DMName\" = '%s'",
-		    candidate_cartid,
-		    dm_name) != MM_DB_DATA) {
-			mms_trace(MMS_ERR,
-		    "Error checking cartridge shape");
-			mm_sql_db_err_rsp_new(cmd, db);
-			mm_clear_db(&dm);
-			return (NULL);
-		}
-		if (PQntuples(db->mm_db_results) == 0) {
-			/* This will be an error for immediate mounts */
-			/* for blocking keep drive, and set drive_not_ready */
-			mms_trace(MMS_ERR,
-			    "dm does not support this mount point");
-			mm_response_error(cmd,
-			    ECLASS_COMPAT,
-			    "EDMNOMOUNTPOINT",
-			    MM_5103_MSG,
-			    "dm",
-			    dm_name,
-			    NULL);
-			mm_clear_db(&dm);
-			mm_clear_db(&db->mm_db_results);
-			return (NULL);
-		}
-		mms_trace(MMS_DEVP,
-		    "dm is configured for this cart's mountpoint");
-		mm_clear_db(&db->mm_db_results);
-	} else {
-		mms_trace(MMS_DEVP,
-		    "drive not ready, skip mountpoint check for now");
-	}
 
 	drive = NULL;
 	drive = (cmi_drive_list_t *)

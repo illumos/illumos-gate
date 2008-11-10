@@ -45,6 +45,7 @@ static char *_SrcFile = __FILE__;
 static int attrs2nvlist(mms_par_node_t *attrs, boolean_t useropt,
     nvlist_t **nvl);
 static char *mgmt_cvt_mmp_to_user(char *in);
+static char *mgmt_cvt_user_to_mmp(char *in);
 
 typedef struct {
 	char	*mmp_opt;
@@ -67,6 +68,7 @@ static map_opt_names optmap[] = {
 	{"CartridgePCL",		"volid"},
 	{"CartridgeState",		"state"},
 	{"CartridgeGroupName",		O_MPOOL},
+	{"DriveGroupName",		O_DPOOL},
 	{"CartridgeTimeCreated",	"created"},
 	{"CartridgeTimeMountedLast",	"last-mounted"},
 	{"CartridgeTimeMountedTotal",	"total-mount-time"},
@@ -111,6 +113,7 @@ static map_opt_names optmap[] = {
 	{"WatcherStartsLimit",		O_NUMRESTART},
 	{"DriveRecordRetention",	NULL},
 	{"DriveName",			O_NAME},
+	{"DriveName",			"drive"},
 	{"DriveGroupName",		NULL},
 	{"DrivePriority",		NULL},
 	{"DriveShapeName",		NULL},
@@ -142,7 +145,7 @@ static map_opt_names optmap[] = {
 	{"LibraryIP",			O_ACSHOST},
 	{"LibraryACS",			O_ACSNUM},
 	{"LibraryLSM",			O_LSMNUM},
-	{"LibrarySerialNum",		O_SERIALNO},
+	{"LibrarySerialNumber",		O_SERIALNO},
 	{"RequestID",			"request-id"},
 	{"RequestingTaskID",		NULL},
 	{"RequestingClient",		"requestor"},
@@ -157,6 +160,7 @@ static map_opt_names optmap[] = {
 	{"RequestTimeAccepted",		"accept-time"},
 	{"RequestTimeResponded",	"response-time"},
 	{"ApplicationName",		O_NAME},
+	{"ApplicationName",		"application"},
 	{"SignatureAlgorithm",		NULL},
 	{"AllowRemoteMount",		NULL},
 	{"BypassVerify",		NULL},
@@ -328,8 +332,8 @@ mmp_parse_lib_attr(mms_par_node_t *node, mms_acslib_t *lib)
 		}
 	}
 
-	/* LibrarySerialNum */
-	name = mms_pn_lookup(node, "LibrarySerialNum", MMS_PN_STRING,
+	/* LibrarySerialNumber */
+	name = mms_pn_lookup(node, "LibrarySerialNumber", MMS_PN_STRING,
 	    &lasts);
 	if (name != NULL) {
 		val = mms_pn_lookup(name, "", MMS_PN_STRING, &lasts);
@@ -883,12 +887,6 @@ mmp_parse_drive_rsp(void *rsp, mms_list_t *drive_list)
  */
 
 /*
- * The MM should create the SLOTTYPE and CARTRIDGETYPE objects by default for
- * all supported media.  Sadly, they're not yet doing CARTRIDGETYPE for reasons
- * that escape me.
- */
-
-/*
  *  Processes a single clause, that may have multiple attr lists
  */
 int
@@ -921,11 +919,14 @@ mmp_get_nvattrs(char *key, boolean_t useropt, void *response, nvlist_t **nvl)
 	if (*nvl == NULL) {
 		(void) nvlist_alloc(nvl, NV_UNIQUE_NAME, 0);
 	}
-
 	lasts = NULL;
 
 	while ((text = mms_pn_lookup(root, "text", MMS_PN_CLAUSE, &lasts))
 	    != NULL) {
+		if (*nvl == NULL) {
+			(void) nvlist_alloc(nvl, NV_UNIQUE_NAME, 0);
+		}
+
 		alast = NULL;
 
 		attrs = mms_pn_lookup_arg(text, NULL, NULL, &alast);
@@ -934,6 +935,9 @@ mmp_get_nvattrs(char *key, boolean_t useropt, void *response, nvlist_t **nvl)
 		}
 
 		if (strcmp(attrs->pn_string, "attrlist") != 0) {
+			/*
+			 * Not attrlist - construct nvlist with args.
+			 */
 			st = attrs2nvlist(text, useropt, &lst);
 		} else {
 			while (attrs != NULL) {
@@ -965,6 +969,73 @@ mmp_get_nvattrs(char *key, boolean_t useropt, void *response, nvlist_t **nvl)
 }
 
 /*
+ * Gether attribute values into an array
+ */
+int
+mmp_get_nvattrs_array(char *key, boolean_t useropt,
+    void *response, nvlist_t *nvl)
+{
+	int		st = 0;
+	mms_par_node_t	*lasts = NULL;
+	mms_par_node_t	*lasta = NULL;
+	mms_par_node_t	*root;
+	mms_par_node_t	*text;
+	mms_par_node_t	*attrs;
+	mms_par_node_t	*val;
+	uint_t		count = 0;
+	char		**arr;
+	int		i;
+	char		*mmpkey = key;
+
+	if (!key|| !response || !nvl) {
+		return (MMS_MGMT_NOARG);
+	}
+
+	mms_trace(MMS_DEBUG, "Response: %s",
+	    ((mms_rsp_ele_t *)response)->mms_rsp_str);
+
+	root = mms_get_tree(response);
+	if (root == NULL) {
+		mms_trace(MMS_ERR, "parse response failed");
+		return (EINVAL);
+	}
+
+	lasts = NULL;
+	if (useropt) {
+		mmpkey = mgmt_cvt_user_to_mmp(key);
+		if (mmpkey == NULL) {
+			return (EINVAL);
+		}
+	}
+
+	/* Count how many we have */
+	while ((text = mms_pn_lookup_arg(root, "text", MMS_PN_CLAUSE, &lasts))
+	    != NULL) {
+		attrs = mms_pn_lookup(text, mmpkey, MMS_PN_STRING, NULL);
+		if (attrs != NULL) {
+			count++;
+		}
+	}
+
+	arr = (char **)calloc(1, sizeof (uint_t *) * count);
+	if (arr == NULL) {
+		return (ENOMEM);
+	}
+
+	lasts =  NULL;
+	for (i = 0; i < count; i++) {
+		text = mms_pn_lookup_arg(root, "text", MMS_PN_CLAUSE, &lasts);
+		attrs = mms_pn_lookup(text, mmpkey, MMS_PN_STRING, &lasta);
+		val = mms_pn_lookup(attrs, NULL, MMS_PN_STRING, &lasta);
+		arr[i] = strdup(mms_pn_token(val));
+	}
+
+	st = nvlist_add_string_array(nvl, key, arr, count);
+
+	return (st);
+}
+
+/*
  *  If useropt = B_TRUE, convert the MMP keys to public keys
  */
 static int
@@ -983,7 +1054,6 @@ attrs2nvlist(mms_par_node_t *attrs, boolean_t useropt, nvlist_t **nvl)
 	}
 
 	*nvl = NULL;
-
 	st = nvlist_alloc(&lst, NV_UNIQUE_NAME, 0);
 	if (st != 0) {
 		return (st);
@@ -1031,6 +1101,29 @@ mgmt_cvt_mmp_to_user(char *in)
 		if (strcmp(optmap[i].mmp_opt, in) == 0) {
 			out = optmap[i].public_opt;
 			break;
+		}
+	}
+
+	return (out);
+}
+
+static char *
+mgmt_cvt_user_to_mmp(char *in)
+{
+	int	size = sizeof (optmap) / sizeof (map_opt_names);
+	int	i;
+	char	*out = NULL;
+
+	if (!in) {
+		return (NULL);
+	}
+
+	for (i = 0; i < size; i++) {
+		if (optmap[i].public_opt != NULL) {
+			if (strcmp(optmap[i].public_opt, in) == 0) {
+				out = optmap[i].mmp_opt;
+				break;
+			}
 		}
 	}
 

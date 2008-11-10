@@ -137,9 +137,7 @@ drv_load(void)
 	/*
 	 * You can only get max capacity of tape at BOM
 	 */
-	if (drv_max_cap == -1) {
-		drv_max_cap = DRV_CALL(drv_get_avail_capacity, ());
-	}
+	drv_max_cap = DRV_CALL(drv_get_avail_capacity, ());
 	drv->drv_capacity = drv_max_cap;
 	TRACE((MMS_DEBUG, "Cartridge \"%s\" loaded", mnt->mnt_pcl));
 	return (0);

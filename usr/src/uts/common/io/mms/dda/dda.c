@@ -39,16 +39,21 @@
  * files: metadata, index and data.
  *
  * The metadata file contains cartridge information such as version,
- * capacity, stripe and directio alignment and the write protect tab.
+ * capacity, stripe alignment, directio alignment, and the write
+ * protect tab.
  *
- * The index file contains index records. An index record contains the
- * data file offset, number of consective same size records and the
- * number of consective filemarks. The data file offset is adjusted
- * for stripe and directio alignment. Stripe alignment only occurs at
- * bot and when data follows a filemark. Directio is only enabled at bot.
+ * The index file contains index records which describes the media format.
+ * An index record contains the data file offset, number of consective
+ * same size records and the number of consective filemarks. The data file
+ * offset is adjusted for stripe and directio alignment. Stripe alignment
+ * occurs at bot and when data follows a filemark. Directio alignment is
+ * checked for at bot and the data alignment occurs when the data length
+ * is modulus the sector size. An index record that contains updated
+ * information is written when a filemark or position change occurs. The
+ * index record file is in big endian.
  *
- * The data file only contains user data with holes for stripe and directio
- * alignment.
+ * The data file contains user data along with holes for stripe and
+ * directio alignment.
  *
  */
 
@@ -108,6 +113,7 @@
 #define	DDA_FLAG_FM_NEEDED	0x8	/* file mark needed */
 #define	DDA_FLAG_EOT_EIO	0x10	/* read return code for eot */
 #define	DDA_FLAG_EW		0x20	/* alternating ew write failure */
+#define	DDA_FLAG_INDEX		0x40	/* index record needs file write */
 
 #define	DDA_GET_TRUNC(x)	(x->dda_flags & DDA_FLAG_TRUNC)
 #define	DDA_GET_FM_FWD_PEND(x)	(x->dda_flags & DDA_FLAG_FM_FWD_PEND)
@@ -115,6 +121,7 @@
 #define	DDA_GET_FM_NEEDED(x)	(x->dda_flags & DDA_FLAG_FM_NEEDED)
 #define	DDA_GET_EOT_EIO(x)	(x->dda_flags & DDA_FLAG_EOT_EIO)
 #define	DDA_GET_EW(x)		(x->dda_flags & DDA_FLAG_EW)
+#define	DDA_GET_INDEX(x)	(x->dda_flags & DDA_FLAG_INDEX)
 
 #define	DDA_SET_TRUNC(x)	(x->dda_flags |= DDA_FLAG_TRUNC)
 #define	DDA_SET_FM_FWD_PEND(x)	(x->dda_flags |= DDA_FLAG_FM_FWD_PEND)
@@ -122,6 +129,7 @@
 #define	DDA_SET_FM_NEEDED(x)	(x->dda_flags |= DDA_FLAG_FM_NEEDED)
 #define	DDA_SET_EOT_EIO(x)	(x->dda_flags |= DDA_FLAG_EOT_EIO)
 #define	DDA_SET_EW(x)		(x->dda_flags |= DDA_FLAG_EW)
+#define	DDA_SET_INDEX(x)	(x->dda_flags |= DDA_FLAG_INDEX)
 
 #define	DDA_CLR_TRUNC(x)	(x->dda_flags &= ~DDA_FLAG_TRUNC)
 #define	DDA_CLR_FM_FWD_PEND(x)	(x->dda_flags &= ~(DDA_FLAG_FM_FWD_PEND | \
@@ -130,13 +138,14 @@
 #define	DDA_CLR_FM_NEEDED(x)	(x->dda_flags &= ~DDA_FLAG_FM_NEEDED)
 #define	DDA_CLR_EOT_EIO(x)	(x->dda_flags &= ~DDA_FLAG_EOT_EIO)
 #define	DDA_CLR_EW(x)		(x->dda_flags &= ~DDA_FLAG_EW)
+#define	DDA_CLR_INDEX(x)	(x->dda_flags &= ~DDA_FLAG_INDEX)
 
 /* metadata flag */
 #define	DDA_GET_WPROTECT(x)	(x->dda_metadata.dda_flags & DDA_FLAG_WPROTECT)
 
 /* read only tape */
-#define	DDA_GET_READ_ONLY(x)		((x->dda_read_only || \
-					    DDA_GET_WPROTECT(x)) ? 1 : 0)
+#define	DDA_GET_READ_ONLY(x)	((x->dda_read_only || \
+				    DDA_GET_WPROTECT(x)) ? 1 : 0)
 
 /* alignment macros */
 #define	DDA_OFF_ALIGNED(off, sz)	(off & (int64_t)(sz - 1))
@@ -156,22 +165,23 @@
 #define	DDA_INDEX_COUNT(x)	(x->dda_index.dda_blkcount + \
 				    x->dda_index.dda_fmcount)
 
-#ifdef	MMSDEBUG
-int dda_debug = 1;
+#ifdef	DEBUG
+#define	DDA_DEBUG(y) y
 #else
-int dda_debug = 0;
+#define	DDA_DEBUG(y)
 #endif
 
-#define	DDA_DEBUG1(x) { if (dda_debug) DTRACE_PROBE1 x; }
-#define	DDA_DEBUG2(x) { if (dda_debug) DTRACE_PROBE2 x; }
-#define	DDA_DEBUG3(x) { if (dda_debug) DTRACE_PROBE3 x; }
-#define	DDA_DEBUG4(x) { if (dda_debug) DTRACE_PROBE4 x; }
+#define	DDA_DEBUG1(x) DDA_DEBUG(DTRACE_PROBE1 x)
+#define	DDA_DEBUG2(x) DDA_DEBUG(DTRACE_PROBE2 x)
+#define	DDA_DEBUG3(x) DDA_DEBUG(DTRACE_PROBE3 x)
+#define	DDA_DEBUG4(x) DDA_DEBUG(DTRACE_PROBE4 x)
 
 /* index record state */
 typedef struct dda_istate {
 	dda_index_t	dda_index;
 	off64_t		dda_index_offset;
 	int64_t		dda_pos;
+	uint32_t	dda_flags;
 } dda_istate_t;
 
 /* driver operations */
@@ -1433,29 +1443,37 @@ dda_tape_load(dda_t *dda, char *path)
 	(void) snprintf(dda->dda_path, PATH_MAX, "%s", path);
 
 	(void) snprintf(fname, PATH_MAX, "%s/%s", dda->dda_path,
-	    DDA_INDEX_FNAME);
-	if (err = dda_vn_open(dda, &dda->dda_index_vp, fname)) {
-		goto load_error;
-	}
-	if (err = dda_read_index(dda)) {
-		goto load_error;
-	}
-	(void) snprintf(fname, PATH_MAX, "%s/%s",
-	    dda->dda_path, DDA_DATA_FNAME);
-	if (err = dda_vn_open(dda, &dda->dda_data_vp, fname)) {
-		goto load_error;
-	}
-	(void) snprintf(fname, PATH_MAX, "%s/%s", dda->dda_path,
 	    DDA_METADATA_FNAME);
 	if (err = dda_vn_open(dda, &dda->dda_metadata_vp, fname)) {
 		goto load_error;
 	}
-	/* check for media in-use and prevent write protect tab access */
 	if (err = dda_vn_lock(dda, dda->dda_metadata_vp, F_WRLCK)) {
 		goto load_error;
 	}
 	if (err = dda_vn_read(dda, dda->dda_metadata_vp, &dda->dda_metadata,
 	    sizeof (dda_metadata_t), 0)) {
+		goto load_error;
+	}
+	DDA_BE_METADATA(dda->dda_metadata, dda->dda_metadata);
+
+	(void) snprintf(fname, PATH_MAX, "%s/%s", dda->dda_path,
+	    DDA_INDEX_FNAME);
+	if (err = dda_vn_open(dda, &dda->dda_index_vp, fname)) {
+		goto load_error;
+	}
+	if (err = dda_vn_size(dda, dda->dda_index_vp, &dda->dda_index_fsize)) {
+		goto load_error;
+	}
+	if (err = dda_read_index(dda)) {
+		goto load_error;
+	}
+
+	(void) snprintf(fname, PATH_MAX, "%s/%s", dda->dda_path,
+	    DDA_DATA_FNAME);
+	if (err = dda_vn_open(dda, &dda->dda_data_vp, fname)) {
+		goto load_error;
+	}
+	if (err = dda_vn_size(dda, dda->dda_data_vp, &dda->dda_data_fsize)) {
 		goto load_error;
 	}
 
@@ -1512,7 +1530,7 @@ load_error:
 }
 
 /*
- * dda_tape_op
+ * dda_tape_unload
  *
  * Parameters:
  *	- dda:		DDA tape drive.
@@ -1541,8 +1559,13 @@ dda_tape_unload(dda_t *dda)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = 0;
+
+	if (err = dda_write_index(dda)) {
+		status = dda->dda_status;
+	}
 
 	if (DDA_GET_FM_NEEDED(dda)) {
 		if (rc = dda_tape_wfm(dda, 1)) {
@@ -1754,19 +1777,20 @@ static int
 dda_write_truncate(dda_t *dda)
 {
 	int	err;
-	off64_t	offset;
 
 	dda->dda_flags = 0;
 
 	if (DDA_IS_BOT(dda)) {
 		bzero(&dda->dda_index, sizeof (dda_index_t));
+		DDA_SET_INDEX(dda);
 	}
 
 	if (dda->dda_pos != DDA_INDEX_COUNT(dda)) {
+		DDA_SET_INDEX(dda);
 		if (dda->dda_pos <= dda->dda_index.dda_blkcount) {
 			dda->dda_index.dda_fmcount = 0;
 			dda->dda_index.dda_blkcount = dda->dda_pos;
-		} else if (dda->dda_pos > dda->dda_index.dda_blkcount) {
+		} else {
 			dda->dda_index.dda_fmcount =
 			    dda->dda_pos - dda->dda_index.dda_blkcount;
 		}
@@ -1791,13 +1815,15 @@ dda_write_truncate(dda_t *dda)
 		return (err);
 	}
 
-	offset = dda->dda_index_offset + sizeof (dda_index_t);
-	if (err = dda_vn_truncate(dda, dda->dda_index_vp, offset)) {
+	dda->dda_index_fsize = dda->dda_index_offset + sizeof (dda_index_t);
+	if (err = dda_vn_truncate(dda, dda->dda_index_vp,
+	    dda->dda_index_fsize)) {
 		return (err);
 	}
 
+	dda->dda_data_fsize = dda_data_offset(dda);
 	if (err = dda_vn_truncate(dda, dda->dda_data_vp,
-	    dda_data_offset(dda))) {
+	    dda->dda_data_fsize)) {
 		return (err);
 	}
 
@@ -1833,6 +1859,7 @@ dda_tape_erase(dda_t *dda)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = 0;
 
@@ -1848,7 +1875,6 @@ dda_tape_erase(dda_t *dda)
 	    int, dda->dda_inst,
 	    int64_t, DDA_LBA(dda)));
 
-	dda->dda_flags = 0;
 	if (err = dda_write_truncate(dda)) {
 		DDA_DEBUG2((dda_cmd_erase_err,
 		    int, dda->dda_inst,
@@ -1949,6 +1975,9 @@ dda_tape_wfm(dda_t *dda, int count)
 	    int, count));
 
 	if (count == 0) {
+		if (err = dda_write_index(dda)) {
+			return (err);
+		}
 		err = dda_sync(dda);
 		return (err);
 	}
@@ -1972,6 +2001,7 @@ dda_tape_wfm(dda_t *dda, int count)
 		return (EIO);
 	}
 
+	DDA_SET_INDEX(dda);
 	dda->dda_index.dda_fmcount += avail;
 	if (err = dda_write_index(dda)) {
 		dda->dda_index.dda_fmcount -= avail;
@@ -2059,6 +2089,9 @@ dda_tape_write(dda_t *dda, struct uio *uio)
 	}
 
 	if ((total = uio->uio_resid) == 0) {
+		if (err = dda_write_index(dda)) {
+			return (err);
+		}
 		return (0);
 	}
 	len = total;
@@ -2212,12 +2245,8 @@ dda_tape_write(dda_t *dda, struct uio *uio)
 	}
 
 	/* update index record block count */
+	DDA_SET_INDEX(dda);
 	dda->dda_index.dda_blkcount += blkcount;
-	if (err = dda_write_index(dda)) {
-		goto write_error;
-	}
-
-	/* increment position within index record by blocks written */
 	dda->dda_pos += blkcount;
 	dda->dda_blkno += blkcount;
 
@@ -2227,11 +2256,10 @@ dda_tape_write(dda_t *dda, struct uio *uio)
 		}
 		dda_save_istate(dda, &istate);
 		dda_gen_next_index(dda, partial);
+
+		/* update new index record with block */
+		DDA_SET_INDEX(dda);
 		dda->dda_index.dda_blkcount = 1;
-		if (err = dda_write_index(dda)) {
-			total = partial;
-			goto write_error;
-		}
 		dda->dda_pos++;
 		dda->dda_blkno++;
 	}
@@ -2261,6 +2289,8 @@ dda_tape_write(dda_t *dda, struct uio *uio)
 	}
 
 	DDA_SET_FM_NEEDED(dda);
+
+	dda->dda_data_fsize += total - uio->uio_resid;
 
 	return (err);
 
@@ -2354,6 +2384,9 @@ dda_tape_read(dda_t *dda, struct uio *uio)
 	DDA_CLR_EW(dda);
 
 	if ((total = uio->uio_resid) == 0) {
+		if (err = dda_write_index(dda)) {
+			return (err);
+		}
 		return (0);
 	}
 	len = total;
@@ -2393,6 +2426,10 @@ dda_tape_read(dda_t *dda, struct uio *uio)
 		dda->dda_resid = blkcount;
 	}
 
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	DDA_DEBUG4((dda_cmd_read,
 	    int, dda->dda_inst,
 	    int64_t, DDA_LBA(dda),
@@ -2415,10 +2452,7 @@ dda_tape_read(dda_t *dda, struct uio *uio)
 		    int, dda->dda_inst));
 	}
 
-	if (err = dda_vn_size(dda, dda->dda_index_vp, &fsize)) {
-		return (err);
-	}
-	fsize -= sizeof (dda_index_t);
+	fsize = dda->dda_index_fsize - sizeof (dda_index_t);
 
 	if (dda->dda_pos >= DDA_INDEX_COUNT(dda)) {
 		dda->dda_index_offset += sizeof (dda_index_t);
@@ -2487,8 +2521,11 @@ dda_tape_read(dda_t *dda, struct uio *uio)
 			} else if (dda_vn_read(dda, dda->dda_index_vp,
 			    &index, sizeof (dda_index_t), offset)) {
 				partial = 0;
-			} else if (index.dda_blkcount == 0) {
-				partial = 0;
+			} else {
+				DDA_BE_INDEX(index, index);
+				if (index.dda_blkcount == 0) {
+					partial = 0;
+				}
 			}
 		}
 
@@ -2637,9 +2674,14 @@ dda_tape_locate(dda_t *dda, off64_t position)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
-	dda->dda_blkno = 0;
 	dda->dda_resid = 0;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	dda->dda_blkno = 0;
 	dda->dda_resid = 0;
 	dda->dda_flags = 0;
@@ -2725,8 +2767,14 @@ dda_tape_fsr(dda_t *dda, int count)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = count;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	DDA_SET_TRUNC(dda);
 	DDA_CLR_FM_NEEDED(dda);
 	DDA_CLR_EW(dda);
@@ -2737,13 +2785,7 @@ dda_tape_fsr(dda_t *dda, int count)
 	    int64_t, dda_get_fileno(dda),
 	    int, count));
 
-	if (err = dda_vn_size(dda, dda->dda_index_vp, &fsize)) {
-		DDA_DEBUG2((dda_cmd_fsr_err,
-		    int, dda->dda_inst,
-		    int, err));
-		return (err);
-	}
-	fsize -= sizeof (dda_index_t);
+	fsize = dda->dda_index_fsize - sizeof (dda_index_t);
 
 	while (dda->dda_resid) {
 		dda_save_istate(dda, &istate);
@@ -2845,8 +2887,14 @@ dda_tape_bsr(dda_t *dda, int count)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = count;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	DDA_SET_TRUNC(dda);
 	DDA_CLR_FM_NEEDED(dda);
 	DDA_CLR_EW(dda);
@@ -2959,8 +3007,14 @@ dda_tape_fsf(dda_t *dda, int count)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = count;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	dda->dda_blkno = 0;
 	DDA_SET_TRUNC(dda);
 	DDA_CLR_FM_NEEDED(dda);
@@ -3069,8 +3123,14 @@ dda_tape_bsf(dda_t *dda, int count)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = count;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	dda->dda_flags = 0;
 	dda->dda_blkno = DDA_BLKNO_UNKNOWN;
 	DDA_SET_TRUNC(dda);
@@ -3152,18 +3212,18 @@ dda_tape_eom(dda_t *dda)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = 0;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
+
 	dda->dda_flags = 0;
 	dda->dda_blkno = 0;
 
-	if (err = dda_vn_size(dda, dda->dda_index_vp, &fsize)) {
-		DDA_DEBUG2((dda_cmd_eom_err,
-		    int, dda->dda_inst,
-		    int, err));
-		return (err);
-	}
-	fsize -= sizeof (dda_index_t);
+	fsize = dda->dda_index_fsize - sizeof (dda_index_t);
 	if (fsize < 0) {
 		DDA_DEBUG2((dda_cmd_eom_err,
 		    int, dda->dda_inst,
@@ -3188,7 +3248,7 @@ dda_tape_eom(dda_t *dda)
 	    int64_t, dda_get_fileno(dda),
 	    int64_t, dda->dda_blkno));
 
-	return (err);
+	return (0);
 }
 
 /*
@@ -3213,8 +3273,13 @@ dda_tape_rewind(dda_t *dda)
 	if (!dda->dda_loaded) {
 		return (EIO);
 	}
+
 	dda->dda_status = 0;
 	dda->dda_resid = 0;
+
+	if (err = dda_write_index(dda)) {
+		return (err);
+	}
 
 	if (DDA_GET_FM_NEEDED(dda)) {
 		if (err = dda_tape_wfm(dda, 1)) {
@@ -3259,19 +3324,25 @@ dda_tape_rewind(dda_t *dda)
 static int
 dda_write_index(dda_t *dda)
 {
-	int	err;
+	int		err;
+	dda_index_t	index;
 
-	if (err = dda_vn_write(dda, dda->dda_index_vp, &dda->dda_index,
-	    sizeof (dda_index_t), dda->dda_index_offset)) {
-		return (err);
+	if (DDA_GET_INDEX(dda)) {
+		DDA_CLR_INDEX(dda);
+		DDA_BE_INDEX(dda->dda_index, index);
+		if (err = dda_vn_write(dda, dda->dda_index_vp, &index,
+		    sizeof (dda_index_t), dda->dda_index_offset)) {
+			return (err);
+		}
+		dda->dda_index_fsize = dda->dda_index_offset +
+		    sizeof (dda_index_t);
+
+		DDA_DEBUG4((dda_write_index,
+		    int, dda->dda_inst,
+		    int64_t, dda->dda_index.dda_lba,
+		    int64_t, dda->dda_index.dda_fileno,
+		    off64_t, dda->dda_index_offset));
 	}
-
-	DDA_DEBUG4((dda_write_index,
-	    int, dda->dda_inst,
-	    int64_t, dda->dda_index.dda_lba,
-	    int64_t, dda->dda_index.dda_fileno,
-	    off64_t, dda->dda_index_offset));
-
 	return (0);
 }
 
@@ -3291,13 +3362,16 @@ dda_write_index(dda_t *dda)
 static int
 dda_read_index(dda_t *dda)
 {
-	int	err;
+	int		err;
+	dda_index_t	index;
 
+	DDA_CLR_INDEX(dda);
 	dda->dda_pos = 0;
-	if (err = dda_vn_read(dda, dda->dda_index_vp, &dda->dda_index,
+	if (err = dda_vn_read(dda, dda->dda_index_vp, &index,
 	    sizeof (dda_index_t), dda->dda_index_offset)) {
 		return (err);
 	}
+	DDA_BE_INDEX(index, dda->dda_index);
 
 	DDA_DEBUG4((dda_read_index,
 	    int, dda->dda_inst,
@@ -3327,6 +3401,7 @@ dda_read_index(dda_t *dda)
 static void
 dda_gen_next_index(dda_t *dda, int32_t blksize)
 {
+	DDA_CLR_INDEX(dda);
 	dda->dda_index.dda_offset = dda_data_offset(dda);
 	dda->dda_index.dda_lba += DDA_INDEX_COUNT(dda);
 	dda->dda_index.dda_fileno += dda->dda_index.dda_fmcount;
@@ -3362,6 +3437,7 @@ dda_save_istate(dda_t *dda, dda_istate_t *istate)
 	istate->dda_index_offset = dda->dda_index_offset;
 	istate->dda_index = dda->dda_index;
 	istate->dda_pos = dda->dda_pos;
+	istate->dda_flags = dda->dda_flags;
 }
 
 /*
@@ -3383,6 +3459,9 @@ dda_restore_istate(dda_t *dda, dda_istate_t *istate)
 	dda->dda_index_offset = istate->dda_index_offset;
 	dda->dda_index = istate->dda_index;
 	dda->dda_pos = istate->dda_pos;
+	if (istate->dda_flags & DDA_FLAG_INDEX) {
+		DDA_SET_INDEX(dda);
+	}
 }
 
 /* alignment */
@@ -3534,6 +3613,7 @@ dda_sector_align(dda_t *dda)
 	struct inode	*ip;
 	int32_t		sector;
 	int		err;
+	dda_metadata_t	metadata;
 
 	/*
 	 * Set sector alignment at bot then use to eom.
@@ -3574,7 +3654,8 @@ dda_sector_align(dda_t *dda)
 	/*
 	 * Save sector alignment change.
 	 */
-	if (err = dda_vn_write(dda, dda->dda_metadata_vp, &dda->dda_metadata,
+	DDA_BE_METADATA(dda->dda_metadata, metadata);
+	if (err = dda_vn_write(dda, dda->dda_metadata_vp, &metadata,
 	    sizeof (dda_metadata_t), 0)) {
 		DDA_DEBUG2((dda_sec_align_err,
 		    int, dda->dda_inst,
@@ -3599,8 +3680,11 @@ dda_sector_align(dda_t *dda)
  *	- dda:		DDA tape drive.
  *	- space:	Amount of space remaining to eom.
  *
- * The amount of space remaining to eom is same no matter the
- * media position.
+ * The amount of available space remaining to eom is from the last
+ * data or fm on tape to phyical eom. The position on media does not
+ * change the space remaining calculation. Filemarks count as 1 byte
+ * of used capacity. The size of the three media files (metadata,
+ * index, and data) are also subtracted from the capacity.
  *
  * Return Values:
  *	0 : success
@@ -3611,48 +3695,56 @@ static int
 dda_tape_capacity(dda_t *dda, int64_t *space)
 {
 	int		err;
-	off64_t		data_fsize;
-	off64_t 	index_fsize;
 	dda_index_t	last_index;
-	int64_t		value;
+	off64_t 	last_index_offset;
+	off64_t		last_index_fileno;
+	off64_t		last_index_fmcount;
 
-	if (err = dda_vn_size(dda, dda->dda_data_vp, &data_fsize)) {
-		return (err);
+
+	/* get offset of last index file record */
+	last_index_offset = dda->dda_index_fsize - sizeof (dda_index_t);
+	if (last_index_offset < 0) {
+		dda->dda_status = KEY_MEDIUM_ERROR;
+		return (EIO);
 	}
 
-	if (err = dda_vn_size(dda, dda->dda_index_vp, &index_fsize)) {
-		return (err);
+	/* get total number of filemarks on tape */
+	if (dda->dda_index_offset >= last_index_offset) {
+		/* current or next index record is the last index record */
+		last_index_fileno = dda->dda_index.dda_fileno;
+		last_index_fmcount = dda->dda_index.dda_fmcount;
+	} else {
+		/* read last index record */
+		if (err = dda_vn_read(dda, dda->dda_index_vp, &last_index,
+		    sizeof (dda_index_t), last_index_offset)) {
+			return (err);
+		}
+		DDA_BE_INDEX(last_index, last_index);
+		last_index_fileno = last_index.dda_fileno;
+		last_index_fmcount = last_index.dda_fmcount;
 	}
-	index_fsize -= sizeof (dda_index_t);
 
-	if (dda->dda_index_offset == index_fsize) {
-		last_index = dda->dda_index;
-	} else if (err = dda_vn_read(dda, dda->dda_index_vp, &last_index,
-	    sizeof (dda_index_t), index_fsize)) {
-		return (err);
-	}
-
-	*space = dda->dda_metadata.dda_capacity -
-	    data_fsize -
-	    index_fsize -
-	    last_index.dda_fileno -
-	    last_index.dda_fmcount;
+	*space = dda->dda_metadata.dda_capacity - /* max cart size minus */
+	    dda->dda_data_fsize -		  /* data file size */
+	    sizeof (dda_metadata_t) -		  /* metadata file size */
+	    dda->dda_index_fsize -		  /* index file size */
+	    last_index_fileno -			  /* total num of prev fms */
+	    last_index_fmcount;			  /* remaining number of fms */
 
 	if (*space < 0) {
 		*space = 0;
 	}
 
-	value = *space;
 	DDA_DEBUG3((dda_capacity,
 	    int, dda->dda_inst,
 	    int64_t, dda->dda_metadata.dda_capacity,
-	    int64_t, value));
+	    int64_t, *space));
 
 	return (0);
 }
 
 /*
- * dda_tape_capacity
+ * dda_ew_eom
  *
  * Parameters:
  *	- dda:		DDA tape drive.
@@ -3843,7 +3935,6 @@ dda_bsearch(dda_t *dda,
 {
 	int	err;
 	int	res;
-	off64_t	fsize;
 	off64_t	nel, width, base, two_width, last;
 
 	/*
@@ -3855,16 +3946,13 @@ dda_bsearch(dda_t *dda,
 	    int64_t, key));
 
 	*found = 0;
-	if (err = dda_vn_size(dda, dda->dda_index_vp, &fsize)) {
-		return (err);
-	}
 
 	/* bsearch(3C) */
 	width = sizeof (dda_index_t);
 	two_width = width + width;
 
 	base = 0;
-	nel = fsize / sizeof (dda_index_t);
+	nel = dda->dda_index_fsize / sizeof (dda_index_t);
 	last = base + width * (nel - 1);
 
 	while (last >= base) {

@@ -83,6 +83,7 @@
 #define	O_RESPTXT	"responsetxt"
 #define	O_FORCE		"force"
 #define	O_MPOOL		"mpool"
+#define	O_DPOOL		"dpool"
 #define	O_HOST		"host"
 #define	O_UNCFG		"uncfg"
 #define	O_NAME		"name"
@@ -90,7 +91,6 @@
 #define	O_LSMNUM	"lsm"
 #define	O_LMNAME	"lmname"
 #define	O_DMNAME	"dmname"
-#define	O_DGNAME	"drivegroupname"
 #define	O_MMSDRV	"drive"
 #define	O_TYPE		"hwtype"
 #define	O_ONLINE	"online"
@@ -104,6 +104,8 @@
 #define	O_DENSITY	"density"
 #define	O_NOWAIT	"nowait"
 #define	O_NOREWIND	"norewind"
+#define	O_NOMOUNT	O_NOREWIND		/* used in mmsadm label */
+#define	O_DFLTPATH	"dkpath"
 /* helpers for MMS services */
 #define	MM	0x00000001
 #define	WCR	0x00000002
@@ -242,10 +244,20 @@ int
 mms_mgmt_add_mpool(void *session, nvlist_t *nvl, nvlist_t *errs);
 
 int
+mms_mgmt_add_dpool(void *session, nvlist_t *nvl, nvlist_t *errs);
+
+int
 mms_mgmt_modify_mpool(void *session, nvlist_t *nvl, nvlist_t *errs);
 
 int
+mms_mgmt_modify_dpool(void *session, nvlist_t *nvl, nvlist_t *errs);
+
+int
 mms_mgmt_remove_mpool(void *session, char *mpool, boolean_t force,
+    nvlist_t *errs);
+
+int
+mms_mgmt_remove_dpool(void *session, char *dpool, boolean_t force,
     nvlist_t *errs);
 
 int
@@ -271,6 +283,9 @@ int
 mms_mgmt_show_cartridge_type(void *session, char *voltype, nvlist_t **nvl);
 
 int
+mms_mgmt_add_voltype(void *session, nvlist_t *nvl, nvlist_t *errs);
+
+int
 mms_mgmt_create_voltype(void *session, nvlist_t *nvl, nvlist_t *errs);
 
 int
@@ -293,10 +308,13 @@ int
 mms_mgmt_reject_request(void *session, char *reqID, char *text);
 
 int
-mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs);
+mms_mgmt_create_dklib(void *session, nvlist_t *lib, nvlist_t *errs);
 
 int
-mms_mgmt_create_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs);
+mms_mgmt_add_dkvol(void *session, nvlist_t *nvl, nvlist_t *errs);
+
+void
+mms_mgmt_add_vol_cleanup(void *session, char *pcl, char *lib);
 
 int
 mms_mgmt_create_dkdrive(void *session, nvlist_t *nvl, nvlist_t *errs);
@@ -308,13 +326,17 @@ int
 mms_mgmt_show_mpool(void *session, nvlist_t *nvl, nvlist_t **pools);
 
 int
-mms_mgmt_set_dkvol_mode(void *session, nvlist_t *nvl, nvlist_t *errs);
+mms_mgmt_show_dpool(void *session, nvlist_t *nvl, nvlist_t **pools);
+
+int
+mms_mgmt_set_vol_mode(void *session, nvlist_t *nvl, nvlist_t *errs);
 
 int
 mgmt_delete_dkvol(char *volpath, nvlist_t *errs);
 
 int
-mms_mgmt_create_partition(void *session, nvlist_t *nvl, nvlist_t *errs);
+mms_mgmt_create_partition(void *session, char *pcl, int64_t size, char *lib,
+    char *rwmode, nvlist_t *errs);
 
 int
 mms_mgmt_remove_partition(void *session, nvlist_t *nvl, nvlist_t *errs);
@@ -351,5 +373,16 @@ mms_mgmt_unmount_vol(nvlist_t *nvl, nvlist_t *errs);
 
 int
 mgmt_set_db_pass(char *dbpass, nvlist_t *errs);
+
+int
+mgmt_get_drvgrp(void *session, char *grpname, nvlist_t **drvgrp);
+
+int
+mgmt_get_dgname(void *session, char *dgname, nvlist_t **dg);
+
+int
+mgmt_get_cgname(void *session, char *dgname, nvlist_t **cg);
+
+
 
 #endif	/* _MMS_MGMT_H_ */

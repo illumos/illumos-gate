@@ -101,18 +101,20 @@ static char discover_usemsg[] =
 \t-t\tResource type\n";
 
 static char create_usemsg[] =
-"\nUsage:  mmsadm create -t <type> -o option=x [-o option2=y ...] name\n\
-\t-t\tResource type - library, drive, mpool, app, dkvol, dkdrive or voltype\n";
+"\nUsage:  mmsadm create -t <type> -o option=x [-o option2=y ...] name\n"
+"\t-t\tResource type - library, drive, dpool, mpool, app "
+"or voltype\n";
 
 static char delete_usemsg[] =
-"\nUsage:  mmsadm delete -t <type> [-f] name\n\
-\t-t\tResource type - library, drive, mpool, app, dkvol, dkdrive or voltype\n\
-\t-f\tForce\n";
+"\nUsage:  mmsadm delete -t <type> [-f] name\n"
+"\t-t\tResource type - library, drive, dpool, mpool, app or "
+"voltype\n "
+"\t-f\tForce\n";
 
 static char set_usemsg[] =
-"\nUsage:  mmsadm set -t <type> -o option=x [-o option2=y ...] name\n\
-\t-t\tResource type - system,  library, drive, mpool, app, dkvol, dkdrive \
-or voltype\n";
+"\nUsage:  mmsadm set -t <type> -o option=x [-o option2=y ...] name\n"
+"\t-t\tResource type - system,  library, drive, dpool, mpool, app "
+"or voltype\n";
 
 static char passwd_usemsg[] =
 "\nUsage:  mmsadm passwd [-P passwdfile] name\n\
@@ -129,11 +131,12 @@ static char offline_usemsg[] =
 \t-t\t Resource type\n";
 
 static char label_usemsg[] =
-"\nUsage:  mmsadm label -l library -A application [-f] volume[,volume]\n\
+"\nUsage:  mmsadm label -l library -A application [-f] [-n] volume[,volume]\n\
 \t-l\tLibrary holding the volume\n\
 \t-A\tApplication to which this volume will be assigned after labeling\n\
 \t-f\tForce label.  Use this option to relabel a tape that has previously \
-been labeled.\n";
+been labeled.\n\
+\t-n\tDo not mount tape\n";
 
 static char add_usemsg[] =
 "\nUsage:  mmsadm add-volume -l library -x vol[,vol2...] mpool\n\
@@ -772,12 +775,10 @@ mmsadm_create(nvlist_t *nvl, nvlist_t *errs)
 		}
 	} else if (strcmp(objtype, "mpool") == 0) {
 		st = mms_mgmt_add_mpool(NULL, nvl, errs);
+	} else if (strcmp(objtype, "dpool") == 0) {
+		st = mms_mgmt_add_dpool(NULL, nvl, errs);
 	} else if (strcmp(objtype, "voltype") == 0) {
-		st = mms_mgmt_create_voltype(NULL, nvl, errs);
-	} else if (strcmp(objtype, "dkvol") == 0) {
-		st = mms_mgmt_create_dkvol(NULL, nvl, errs);
-	} else if (strcmp(objtype, "dkdrive") == 0) {
-		st = mms_mgmt_create_dkdrive(NULL, nvl, errs);
+		st = mms_mgmt_add_voltype(NULL, nvl, errs);
 	} else {
 		return (EINVAL);
 	}
@@ -826,11 +827,6 @@ mmsadm_delete(nvlist_t *nvl, nvlist_t *errs)
 			return (st);
 		}
 		st = mms_remove_drive(NULL, nvl, errs);
-	} else if (strcmp(objtype, "dkdrive") == 0) {
-		if ((st = confirm_delete(objname, force)) != 0) {
-			return (st);
-		}
-		st = mms_remove_drive(NULL, nvl, errs);
 	} else if (strcmp(objtype, "app") == 0) {
 		if ((st = confirm_delete(objname, force)) != 0) {
 			return (st);
@@ -841,6 +837,11 @@ mmsadm_delete(nvlist_t *nvl, nvlist_t *errs)
 			return (st);
 		}
 		st = mms_mgmt_remove_mpool(NULL, objname, force, errs);
+	} else if (strcmp(objtype, "dpool") == 0) {
+		if ((st = confirm_delete(objname, force)) != 0) {
+			return (st);
+		}
+		st = mms_mgmt_remove_dpool(NULL, objname, force, errs);
 	} else if (strcmp(objtype, "voltype") == 0) {
 		if ((st = confirm_delete(objname, force)) != 0) {
 			return (st);
@@ -872,18 +873,18 @@ mmsadm_set(nvlist_t *nvl, nvlist_t *errs)
 		st = mms_modify_library(NULL, nvl, errs);
 	} else if (strcmp(objtype, "drive") == 0) {
 		st = mms_modify_drive(NULL, nvl, errs);
-	} else if (strcmp(objtype, "dkdrive") == 0) {
-		st = mms_modify_drive(NULL, nvl, errs);
 	} else if (strcmp(objtype, "system") == 0) {
 		st = mms_mgmt_set_opts(nvl, errs);
 	} else if (strcmp(objtype, "app") == 0) {
 		st = mms_mgmt_modify_application(NULL, nvl, errs);
 	} else if (strcmp(objtype, "mpool") == 0) {
 		st = mms_mgmt_modify_mpool(NULL, nvl, errs);
+	} else if (strcmp(objtype, "dpool") == 0) {
+		st = mms_mgmt_modify_dpool(NULL, nvl, errs);
 	} else if (strcmp(objtype, "voltype") == 0) {
 		st = mms_mgmt_modify_voltype(NULL, nvl, errs);
-	} else if (strcmp(objtype, "dkvol") == 0) {
-		st = mms_mgmt_set_dkvol_mode(NULL, nvl, errs);
+	} else if (strcmp(objtype, "vol") == 0) {
+		st = mms_mgmt_set_vol_mode(NULL, nvl, errs);
 	} else {
 		return (EINVAL);
 	}
@@ -918,7 +919,7 @@ mmsadm_list(nvlist_t *nvl, nvlist_t *errs)
 	nvlist_lookup_string(nvl, O_NAME, &objname);
 	nvlist_lookup_boolean_value(nvl, "script", &doscript);
 
-	printopts = var_to_array(nvl, "printopts", &pcount);
+	printopts = mgmt_var_to_array(nvl, "printopts", &pcount);
 
 	if (do_all || (strcmp(objtype, "system") == 0)) {
 		found = B_TRUE;
@@ -950,16 +951,6 @@ mmsadm_list(nvlist_t *nvl, nvlist_t *errs)
 			outlist = NULL;
 		}
 	}
-	if (!do_all && (strcmp(objtype, "dkdrive") == 0)) {
-		found = B_TRUE;
-		st = mms_mgmt_list_drives(NULL, nvl, errs, &outlist);
-		if (st == 0) {
-			st = print_list_values("drive", outlist, printopts,
-			    pcount, doscript);
-			nvlist_free(outlist);
-			outlist = NULL;
-		}
-	}
 	if (do_all || (strcmp(objtype, "voltype") == 0)) {
 		found = B_TRUE;
 		st = mms_mgmt_show_cartridge_type(NULL, objname, &outlist);
@@ -976,6 +967,16 @@ mmsadm_list(nvlist_t *nvl, nvlist_t *errs)
 		st = mms_mgmt_list_vols(NULL, nvl, &outlist);
 		if (st == 0) {
 			st = print_list_values("vol", outlist, printopts,
+			    pcount, doscript);
+			nvlist_free(outlist);
+			outlist = NULL;
+		}
+	}
+	if (do_all || (strcmp(objtype, "dpool") == 0)) {
+		found = B_TRUE;
+		st = mms_mgmt_show_dpool(NULL, nvl, &outlist);
+		if (st == 0) {
+			st = print_list_values("dpool", outlist, printopts,
 			    pcount, doscript);
 			nvlist_free(outlist);
 			outlist = NULL;
@@ -1027,6 +1028,9 @@ print_list_values(char *objtype, nvlist_t *nvl, char **printopts, int pcount,
 	boolean_t	first = B_TRUE;
 	int		i;
 	boolean_t	printme;
+	data_type_t	nvt;
+	char		**arr;
+	uint_t		count = 0;
 
 	if (!objtype || !nvl) {
 		return (EFAULT);
@@ -1058,16 +1062,43 @@ print_list_values(char *objtype, nvlist_t *nvl, char **printopts, int pcount,
 					continue;
 				}
 			}
-			nvpair_value_string(nvpb, &val);
-			if (!doscript) {
-				printf("\t%-30s\t%-30s\n", key, val);
-			} else {
-				if (first) {
-					/* LINTED [E_SEC_PRINTF_VAR_FMT] */
-					printf(val);
-					first = B_FALSE;
+			nvt = nvpair_type(nvpb);
+			if (nvt == DATA_TYPE_STRING) {
+				nvpair_value_string(nvpb, &val);
+				if (!doscript) {
+					printf("\t%-30s\t%-30s\n", key, val);
 				} else {
-					printf("\t%s", val);
+					if (first) {
+						printf("%s", val);
+						first = B_FALSE;
+					} else {
+						printf("\t%s", val);
+					}
+				}
+			} else if (nvt == DATA_TYPE_STRING_ARRAY) {
+				count = 0;
+				nvpair_value_string_array(nvpb, &arr, &count);
+				if (!doscript) {
+					for (i = 0;
+					    (i < count) && !doscript;
+					    i++) {
+						if (i > 0) {
+							key = " ";
+						}
+						printf("\t%-30s\t%-30s\n",
+						    key, arr[i]);
+					}
+				} else {
+					for (i = 0;
+					    (i < count) && !doscript;
+					    i++) {
+						if (first) {
+							printf("%s", arr[i]);
+							first = B_FALSE;
+						} else {
+							printf("\t%s", arr[i]);
+						}
+					}
 				}
 			}
 		}
@@ -1217,13 +1248,54 @@ mmsadm_discover_vols(nvlist_t *nvl, nvlist_t *errs)
 static int
 mmsadm_add_vol(nvlist_t *nvl, nvlist_t *errs)
 {
-	int	st;
+	int		st;
+	char		*typename = NULL;
+	char		*shapename = NULL;
+	nvlist_t	*type = NULL;
+	nvlist_t	*tp = NULL;
 
 	if (!nvl) {
 		return (EFAULT);
 	}
 
-	st = mms_mgmt_add_cartridges(NULL, nvl, errs);
+	st = nvlist_lookup_string(nvl, "voltype", &typename);
+	if (st != 0) {
+		st = MMS_MGMT_NO_VOLTYPE;
+		MGMT_ADD_OPTERR(errs, "voltype", st);
+		return (st);
+	}
+
+	/*
+	 * Get shapename from CARTRIDGETYPE
+	 */
+	/* see if we've already got this type */
+	st = mms_mgmt_show_cartridge_type(NULL, typename, &type);
+	if (st != 0) {
+		st = MMS_MGMT_SHOW_CT_ERR;
+		return (st);
+	}
+
+	st = nvlist_lookup_nvlist(type, typename, &tp);
+	if (st != 0) {
+		st = MMS_MGMT_CT_NOT_EXIST;
+		return (st);
+	}
+
+	/* CartridgeShapeName is converted to O_MTYPE */
+	st = nvlist_lookup_string(tp, O_MTYPE, &shapename);
+	if (st != 0) {
+		st = MMS_MGMT_SN_ERR;
+		return (st);
+	}
+
+	/*
+	 * If CartridgeShape of CARTRIDGETYPE is DISK, then create disk volume
+	 */
+	if (strcmp(shapename, "DISK") == 0) {
+		st = mms_mgmt_add_dkvol(NULL, nvl, errs);
+	} else {
+		st = mms_mgmt_add_cartridges(NULL, nvl, errs);
+	}
 
 	return (st);
 }
