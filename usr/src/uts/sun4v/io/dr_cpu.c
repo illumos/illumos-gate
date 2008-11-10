@@ -822,8 +822,13 @@ dr_cpu_check_psrset(uint32_t *cpuids, dr_cpu_res_t *res, int nres)
 		 * generate an error for the last CPU. The correct CPU
 		 * will get the error because the unconfigure attempts
 		 * will occur in the same order in which the CPUs are
-		 * examined in this loop.
+		 * examined in this loop.  The cp_ncpus field of a
+		 * cpupart_t counts only online cpus, so it is safe
+		 * to remove an offline cpu without testing ncpus.
 		 */
+		if (cp->cpu_flags & CPU_OFFLINE)
+			continue;
+
 		if (--psrset[set_idx].ncpus == 0) {
 			/*
 			 * Fill in the various pieces of information
