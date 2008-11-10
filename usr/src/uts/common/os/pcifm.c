@@ -349,8 +349,9 @@ pcix_ereport_setup(dev_info_t *dip, pci_erpt_t *erpt_p)
 	ddi_acc_handle_t eh;
 	int i;
 
-	if (pci_config_setup(dip, &eh) != DDI_SUCCESS) {
+	if (pci_config_setup(dip, &eh) == DDI_SUCCESS) {
 		(void) PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCIX, &pcix_cap_ptr);
+		pci_config_teardown(&eh);
 	}
 
 	if (pcix_cap_ptr != PCI_CAP_NEXT_PTR_NULL)

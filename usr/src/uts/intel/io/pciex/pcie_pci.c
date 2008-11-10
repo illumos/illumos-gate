@@ -1361,7 +1361,8 @@ static x86_error_reg_t intel_5400_rp_regs[] = {
 
 	/* Root Control Register - SERR on NFE/FE */
 	{0x88,  16, 0x0, PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
-			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN,
+			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN |
+			    PCIE_ROOTCTL_SYS_ERR_ON_CE_EN,
 			    PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN |
 			    PCIE_ROOTCTL_SYS_ERR_ON_FE_EN},
 
@@ -1369,10 +1370,12 @@ static x86_error_reg_t intel_5400_rp_regs[] = {
 	{0x108, 32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 
 	/* PEXCTRL[21] check for certain malformed TLP types */
-	{0x48,	32, 0xFFFFFFFF,	0x200000, 0x200000},
+	{0x48,	32, 0xFFFFFFFF,	0xC0200000, 0x200000},
+	/* PEXCTRL3. MSI RAS error enable. */
+	{0x4E,	8, 0x0,	0x1,	0x0},
 
 	/* PEX_ERR_DOCMD[11:0] */
-	{0x144,	16,  0x0, 	0xFF0,	0xFF0},
+	{0x144,	16,  0x0, 	0x0,	0xFF0},
 
 	/* PEX_ERR_PIN_MASK[4:0] do not mask ERR[2:0] pins used by DOCMD */
 	{0x146,	16,  0x0,	0x10,	0x10},
@@ -1381,7 +1384,7 @@ static x86_error_reg_t intel_5400_rp_regs[] = {
 	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 
 	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
-	{0x150,	8,  0x0, 	0x1,	0x1},
+	{0x150,	8,  0x0, 	0x0,	0x1},
 };
 #define	INTEL_5400_RP_REGS_LEN \
 	(sizeof (intel_5400_rp_regs) / sizeof (x86_error_reg_t))
