@@ -35,7 +35,6 @@
 
 #include <libstmf.h>
 #include <libiscsit.h>
-#include <sys/iscsit/iscsit_common.h>
 #include <sys/iscsi_protocol.h>
 #include <sys/iscsit/isns_protocol.h>
 
@@ -1562,6 +1561,8 @@ it_validate_configprops(nvlist_t *nvl, nvlist_t *errs)
 	char				*name;
 	char				*val;
 	struct sockaddr_storage		sa;
+	boolean_t			update_rad_server = B_FALSE;
+	char				*rad_server;
 	char				*auth = NULL;
 
 	if (!nvl) {
@@ -1642,7 +1643,6 @@ it_validate_configprops(nvlist_t *nvl, nvlist_t *errs)
 			}
 		} else if (strcmp(name, PROP_RADIUS_SERVER) == 0) {
 			struct sockaddr_storage		sa;
-
 			if (!val) {
 				PROPERR(errs, name,
 				    gettext("must be a string value"));
@@ -1660,11 +1660,9 @@ it_validate_configprops(nvlist_t *nvl, nvlist_t *errs)
 				 * rewrite this property to ensure port
 				 * number is added.
 				 */
-				char	*rad = NULL;
 
-				if (sockaddr_to_str(&sa, &rad) == 0) {
-					(void) nvlist_add_string(nvl,
-					    name, rad);
+				if (sockaddr_to_str(&sa, &rad_server) == 0) {
+					update_rad_server = B_TRUE;
 				}
 			}
 		} else {
@@ -1672,6 +1670,14 @@ it_validate_configprops(nvlist_t *nvl, nvlist_t *errs)
 			PROPERR(errs, name, gettext("unrecognized property"));
 			errcnt++;
 		}
+	}
+
+	/*
+	 * If we successfully reformatted the radius server to add the port
+	 * number then update the nvlist
+	 */
+	if (update_rad_server) {
+		(void) nvlist_add_string(nvl, name, rad_server);
 	}
 
 	/*

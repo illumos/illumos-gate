@@ -62,9 +62,6 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Ndrv/stmf -Nmisc/idm -Nfs/sockfs -Nmisc/md5
 
 INC_PATH	+= -I$(UTSBASE)/common/io/comstar/port/iscsit
-# This path should be remove with the libiscsit.h/iscsit_common.h issue is
-# resolved.
-INC_PATH	+= -I../../../lib/libiscsit/common/
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

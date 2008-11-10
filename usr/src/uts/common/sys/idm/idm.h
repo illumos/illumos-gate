@@ -73,8 +73,22 @@ typedef enum {
 	TASK_SUSPENDED,
 	TASK_ABORTING,
 	TASK_ABORTED,
-	TASK_COMPLETE
+	TASK_COMPLETE,
+	TASK_MAX_STATE
 } idm_task_state_t;
+
+#ifdef IDM_TASK_SM_STRINGS
+static const char *idm_ts_name[TASK_MAX_STATE+1] = {
+	"TASK_IDLE",
+	"TASK_ACTIVE",
+	"TASK_SUSPENDING",
+	"TASK_SUSPENDED",
+	"TASK_ABORTING",
+	"TASK_ABORTED",
+	"TASK_COMPLETE",
+	"TASK_MAX_STATE"
+};
+#endif
 
 typedef enum {
 	KV_HANDLED = 0,

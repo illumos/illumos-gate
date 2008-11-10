@@ -847,16 +847,17 @@ iscsit_task_aborted(idm_task_t *idt, idm_status_t status)
 	case IDM_STATUS_ABORTED:
 		mutex_enter(&itask->it_mutex);
 		itask->it_aborted = B_TRUE;
+		/*
+		 * We rely on the fact that STMF tracks outstanding
+		 * buffer transfers and will free all of our buffers
+		 * before freeing the task so we don't need to
+		 * explicitly free the buffers from iscsit/idm
+		 */
 		if (itask->it_stmf_abort) {
 			mutex_exit(&itask->it_mutex);
 			/*
-			 * STMF has already asked for this task to be aborted.
-			 * Cleanup the task and call STMF to let it know that
-			 * the abort is complete.
-			 */
-			idm_task_cleanup(idt);
-
-			/*
+			 * STMF has already asked for this task to be aborted
+			 *
 			 * STMF specification is wrong... says to return
 			 * STMF_ABORTED, the code actually looks for
 			 * STMF_ABORT_SUCCESS.
@@ -867,11 +868,8 @@ iscsit_task_aborted(idm_task_t *idt, idm_status_t status)
 		} else {
 			mutex_exit(&itask->it_mutex);
 			/*
-			 * Tell STMF to stop processing the task.  We will
-			 * cleanup the task in the context of iscsit_abort
-			 * (lport_abort).
+			 * Tell STMF to stop processing the task.
 			 */
-			idm_task_cleanup(idt);
 			stmf_abort(STMF_QUEUE_TASK_ABORT, itask->it_stmf_task,
 			    STMF_ABORTED, NULL);
 			return;
@@ -1228,6 +1226,13 @@ iscsit_xfer_scsi_data(scsi_task_t *task, stmf_data_buf_t *dbuf,
 	int idm_rc;
 
 	/*
+	 * If we are aborting then we can ignore this request
+	 */
+	if (iscsit_task->it_stmf_abort) {
+		return (STMF_SUCCESS);
+	}
+
+	/*
 	 * If it's not immediate data then start the transfer
 	 */
 	ASSERT(ibuf->ibuf_is_immed == B_FALSE);
@@ -1271,6 +1276,13 @@ iscsit_buf_xfer_cb(idm_buf_t *idb, idm_status_t status)
 	dbuf->db_xfer_status = iscsit_idm_to_stmf(status);
 
 	/*
+	 * If the task has been aborted then we don't need to call STMF
+	 */
+	if (itask->it_stmf_abort) {
+		return;
+	}
+
+	/*
 	 * COMSTAR currently requires port providers to support
 	 * the DB_SEND_STATUS_GOOD flag even if phase collapse is
 	 * not supported.  So we will roll our own... pretend we are
@@ -1285,9 +1297,10 @@ iscsit_buf_xfer_cb(idm_buf_t *idb, idm_status_t status)
 		 * to call stmf_data_xfer_done in that case.  We
 		 * still need to call it if we get a failure.
 		 *
-		 * To elaborate on this some more, upon successful return
-		 * from iscsit_send_scsi_status it's possible that itask
-		 * and idb have been freed and are no longer valid.
+		 * To elaborate on this some more, upon successful
+		 * return from iscsit_send_scsi_status it's possible
+		 * that itask and idb have been freed and are no
+		 * longer valid.
 		 */
 		if (iscsit_send_scsi_status(itask->it_stmf_task, 0)
 		    != IDM_STATUS_SUCCESS) {
@@ -1300,6 +1313,7 @@ iscsit_buf_xfer_cb(idm_buf_t *idb, idm_status_t status)
 		stmf_data_xfer_done(itask->it_stmf_task, dbuf, 0);
 	}
 }
+
 
 /*ARGSUSED*/
 stmf_status_t
@@ -1314,8 +1328,6 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 	 * If this task is aborted then we don't need to respond.
 	 */
 	if (itask->it_stmf_abort) {
-		stmf_send_status_done(task, STMF_SUCCESS,
-		    STMF_IOF_LPORT_DONE);
 		return (STMF_SUCCESS);
 	}
 
@@ -1419,12 +1431,21 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 static void
 iscsit_send_good_status_done(idm_pdu_t *pdu, idm_status_t status)
 {
-	iscsit_task_t	 *itask;
+	iscsit_task_t	*itask;
+	boolean_t	aborted;
 
 	itask = pdu->isp_private;
+	aborted = itask->it_stmf_abort;
+
+	/*
+	 * After releasing the hold the task may be freed at any time so
+	 * don't touch it.
+	 */
 	idm_task_rele(itask->it_idm_task);
-	stmf_send_status_done(itask->it_stmf_task,
-	    iscsit_idm_to_stmf(pdu->isp_status), STMF_IOF_LPORT_DONE);
+	if (!aborted) {
+		stmf_send_status_done(itask->it_stmf_task,
+		    iscsit_idm_to_stmf(pdu->isp_status), STMF_IOF_LPORT_DONE);
+	}
 	kmem_cache_free(iscsit_status_pdu_cache, pdu);
 }
 
@@ -1433,11 +1454,20 @@ static void
 iscsit_send_status_done(idm_pdu_t *pdu, idm_status_t status)
 {
 	iscsit_task_t	 *itask;
+	boolean_t	aborted;
 
 	itask = pdu->isp_private;
+	aborted = itask->it_stmf_abort;
+
+	/*
+	 * After releasing the hold the task may be freed at any time so
+	 * don't touch it.
+	 */
 	idm_task_rele(itask->it_idm_task);
-	stmf_send_status_done(itask->it_stmf_task,
-	    iscsit_idm_to_stmf(pdu->isp_status), STMF_IOF_LPORT_DONE);
+	if (!aborted) {
+		stmf_send_status_done(itask->it_stmf_task,
+		    iscsit_idm_to_stmf(pdu->isp_status), STMF_IOF_LPORT_DONE);
+	}
 	idm_pdu_free(pdu);
 }
 

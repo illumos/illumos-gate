@@ -47,15 +47,17 @@
 #define	MAX_XID			(2^16)
 #define	ISNS_IDLE_TIME		60
 #define	MAX_RETRY		(3)
+#define	ISNS_RCV_TIMER_SECONDS	5
 
 #define	VALID_NAME(NAME, LEN)	\
 ((LEN) > 0 && (NAME)[0] != 0 && (NAME)[(LEN) - 1] == 0)
 
 static kmutex_t		isns_mutex;
 static kthread_t	*isns_monitor_thr_id;
+static kt_did_t		isns_monitor_thr_did;
+static boolean_t	isns_monitor_thr_running;
 
 static kcondvar_t	isns_idle_cv;
-static boolean_t	isns_idle;
 
 static uint16_t		xid;
 #define	GET_XID()	atomic_inc_16_nv(&xid)
@@ -187,7 +189,7 @@ int isnst_tgt_avl_compare(const void *t1, const void *t2);
 static void isnst_get_target_list(void);
 static void isnst_set_server_status(iscsit_isns_svr_t *svr,
     boolean_t registered);
-static void isnst_wakeup_monitor(void);
+static void isnst_monitor_stop(void);
 static void isns_remove_portal(isns_portal_list_t *p);
 static void isnst_add_default_portals();
 static int isnst_add_default_portal_attrs(isns_pdu_t *pdu, size_t pdu_size);
@@ -286,7 +288,6 @@ iscsit_isns_init(iscsit_hostinfo_t *hostinfo)
 	monitor_idle_interval = ISNS_IDLE_TIME * drv_usectohz(1000000);
 	cv_init(&isns_idle_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&isns_esi_cv, NULL, CV_DEFAULT, NULL);
-	isns_idle = B_TRUE;
 	xid = 0;
 	ISNS_GLOBAL_UNLOCK();
 
@@ -346,15 +347,6 @@ iscsit_isns_fini()
 {
 	ISNS_GLOBAL_LOCK();
 	iscsit_set_isns(B_FALSE);
-	ISNS_GLOBAL_UNLOCK();
-
-	mutex_enter(&isns_mutex);
-	while (isns_monitor_thr_id != NULL) {
-		cv_wait(&isns_idle_cv, &isns_mutex);
-	}
-	mutex_exit(&isns_mutex);
-
-	ISNS_GLOBAL_LOCK();
 	mutex_destroy(&isns_mutex);
 	cv_destroy(&isns_idle_cv);
 	list_destroy(&esi_list);
@@ -591,19 +583,25 @@ isnst_start()
 	 * Create a thread for monitoring server communications
 	 */
 	mutex_enter(&isns_mutex);
-	if (isns_monitor_thr_id == NULL) {
-		isns_monitor_thr_id = thread_create(NULL, 0,
-		    isnst_monitor, NULL, 0, &p0, TS_RUN, minclsyspri);
-	}
+	isns_monitor_thr_id = thread_create(NULL, 0,
+	    isnst_monitor, NULL, 0, &p0, TS_RUN, minclsyspri);
+	while (!isns_monitor_thr_running)
+		cv_wait(&isns_idle_cv, &isns_mutex);
 	mutex_exit(&isns_mutex);
 }
 
 static void
-isnst_wakeup_monitor(void)
+isnst_monitor_stop(void)
 {
 	mutex_enter(&isns_mutex);
-	isns_idle = B_FALSE;
-	cv_signal(&isns_idle_cv);
+	if (isns_monitor_thr_running) {
+		isns_monitor_thr_running = B_FALSE;
+		cv_signal(&isns_idle_cv);
+		mutex_exit(&isns_mutex);
+
+		thread_join(isns_monitor_thr_did);
+		return;
+	}
 	mutex_exit(&isns_mutex);
 }
 
@@ -612,14 +610,15 @@ isnst_stop()
 {
 	isns_target_t *itarget;
 
+	isnst_remove_default_portals();
+	isnst_esi_stop();
+	ISNS_GLOBAL_UNLOCK();
+	isnst_monitor_stop();
+	ISNS_GLOBAL_LOCK();
 	while ((itarget = avl_first(&isns_target_list)) != NULL) {
 		avl_remove(&isns_target_list, itarget);
 		kmem_free(itarget, sizeof (isns_target_t));
 	}
-
-	isnst_remove_default_portals();
-	isnst_esi_stop();
-	isnst_wakeup_monitor();
 }
 
 /*
@@ -686,57 +685,60 @@ isnst_update_server_timestamp(struct sonode *so)
  * This function monitors registration status for each server.
  */
 
+
+static void
+isnst_monitor_all_servers()
+{
+	iscsit_isns_svr_t	*svr;
+	boolean_t		enabled;
+	list_t			*svr_list;
+
+	svr_list = &iscsit_global.global_isns_cfg.isns_svrs;
+
+	ISNS_GLOBAL_LOCK();
+	enabled = iscsit_global.global_isns_cfg.isns_state;
+	for (svr = list_head(svr_list); svr != NULL;
+	    svr = list_next(svr_list, svr)) {
+		if (isnst_monitor_one_server(svr, enabled) != 0) {
+			svr->svr_retry_count++;
+		} else {
+			svr->svr_retry_count = 0;
+		}
+	}
+	ISNS_GLOBAL_UNLOCK();
+}
+
 /*ARGSUSED*/
 static void
 isnst_monitor(void *arg)
 {
-	iscsit_isns_svr_t	*svr;
-	list_t			*svr_list;
-	boolean_t		enabled;
-
-	svr_list = &iscsit_global.global_isns_cfg.isns_svrs;
-
-	do {
-		ISNS_GLOBAL_LOCK();
-		enabled = iscsit_global.global_isns_cfg.isns_state;
-		for (svr = list_head(svr_list); svr != NULL;
-		    svr = list_next(svr_list, svr)) {
-			if (isnst_monitor_one_server(svr, enabled) != 0) {
-				svr->svr_retry_count++;
-			} else {
-				svr->svr_retry_count = 0;
-			}
-		}
-
-		/*
-		 * Attempted registrations, especially to unreachable
-		 * servers, can take time.  Thus, we check the isns_state
-		 * again here.
-		 */
-		enabled = iscsit_global.global_isns_cfg.isns_state;
-		ISNS_GLOBAL_UNLOCK();
-
-		/*
-		 * Keep the while loop running while isns is enabled.
-		 * If isns_idle is FALSE, we have more work to do, so
-		 * no waiting.
-		 */
-
-		mutex_enter(&isns_mutex);
-
-		if (enabled && isns_idle) {
-			(void) cv_timedwait(&isns_idle_cv, &isns_mutex,
-			    ddi_get_lbolt() + monitor_idle_interval);
-		}
-
-		isns_idle = B_TRUE;
-		mutex_exit(&isns_mutex);
-	} while (enabled);
-
 	mutex_enter(&isns_mutex);
-	isns_monitor_thr_id = NULL;
 	cv_signal(&isns_idle_cv);
+	isns_monitor_thr_did = curthread->t_did;
+	isns_monitor_thr_running = B_TRUE;
+
+	while (isns_monitor_thr_running) {
+		mutex_exit(&isns_mutex);
+
+		/* Update servers */
+		isnst_monitor_all_servers();
+
+		/*
+		 * Keep running until isns_monitor_thr_running is set to
+		 * B_FALSE.
+		 */
+		mutex_enter(&isns_mutex);
+		DTRACE_PROBE(iscsit__isns__monitor__sleep);
+		(void) cv_timedwait(&isns_idle_cv, &isns_mutex,
+		    ddi_get_lbolt() + monitor_idle_interval);
+		DTRACE_PROBE1(iscsit__isns__monitor__wakeup,
+		    boolean_t, isns_monitor_thr_running);
+	}
+
 	mutex_exit(&isns_mutex);
+
+	/* Update the servers one last time for deregistration */
+	isnst_monitor_all_servers();
 
 	/* terminate the thread at the last */
 	thread_exit();
@@ -1810,13 +1812,20 @@ isnst_add_attr(isns_pdu_t *pdu,
 	return (0);
 }
 
+static void
+isnst_so_timeout(void *so)
+{
+	/* Wake up any sosend or sorecv blocked on this socket */
+	idm_soshutdown(so);
+}
+
 static int
 isnst_send_pdu(void *so, isns_pdu_t *pdu)
 {
 	size_t		total_len, payload_len, send_len;
 	uint8_t		*payload;
 	uint16_t	flags, seq;
-
+	timeout_id_t	send_timer;
 	iovec_t		iov[2];
 	int		rc;
 
@@ -1863,7 +1872,10 @@ isnst_send_pdu(void *so, isns_pdu_t *pdu)
 
 		/* send the pdu */
 		send_len = ISNSP_HEADER_SIZE + payload_len;
+		send_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
 		rc = idm_iov_sosend(so, &iov[0], 2, send_len);
+		(void) untimeout(send_timer);
 
 		flags &= ~ISNS_FLAG_FIRST_PDU;
 		payload += payload_len;
@@ -1888,7 +1900,7 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 	isns_pdu_t	*combined_pdu;
 	uint8_t		*payload;
 	uint8_t		*combined_payload;
-
+	timeout_id_t	rcv_timer;
 	uint16_t	flags;
 	uint16_t	seq;
 
@@ -1899,17 +1911,25 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 
 	do {
 		/* receive the pdu header */
+		rcv_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
 		if (idm_sorecv(so, &tmp_pdu_hdr, ISNSP_HEADER_SIZE) != 0 ||
 		    ntohs(tmp_pdu_hdr.seq) != seq) {
+			(void) untimeout(rcv_timer);
 			goto rcv_error;
 		}
+		(void) untimeout(rcv_timer);
 
 		/* receive the payload */
 		payload_len = ntohs(tmp_pdu_hdr.payload_len);
 		payload = kmem_alloc(payload_len, KM_SLEEP);
+		rcv_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
 		if (idm_sorecv(so, payload, payload_len) != 0) {
+			(void) untimeout(rcv_timer);
 			goto rcv_error;
 		}
+		(void) untimeout(rcv_timer);
 
 		/* combine the pdu if it is not the first one */
 		if (total_pdu_len > 0) {
@@ -2221,8 +2241,14 @@ isnst_esi_thread(void *arg)
 	while (tinfop->esi_thread_running && !tinfop->esi_thread_failed) {
 		mutex_exit(&isns_esi_mutex);
 
+		DTRACE_PROBE2(iscsit__isns__esi__accept__wait,
+		    boolean_t, tinfop->esi_thread_running,
+		    boolean_t, tinfop->esi_thread_failed);
 		if ((rc = soaccept(tinfop->esi_so, 0, &newso)) != 0) {
 			mutex_enter(&isns_esi_mutex);
+			DTRACE_PROBE2(iscsit__isns__esi__accept__fail,
+			    boolean_t, tinfop->esi_thread_running,
+			    boolean_t, tinfop->esi_thread_failed);
 			/*
 			 * If we were interrupted with EINTR, it's not
 			 * really a failure.
@@ -2236,6 +2262,10 @@ isnst_esi_thread(void *arg)
 			tinfop->esi_thread_running = B_FALSE;
 			continue;
 		}
+		DTRACE_PROBE3(iscsit__isns__esi__accept,
+		    boolean_t, tinfop->esi_thread_running,
+		    boolean_t, tinfop->esi_thread_failed,
+		    struct sonode *, newso);
 
 		mutex_enter(&isns_esi_mutex);
 

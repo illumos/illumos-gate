@@ -39,13 +39,13 @@
 #include <sys/portif.h>
 
 #define	IDM_CONN_SM_STRINGS
+#define	IDM_TASK_SM_STRINGS
 #define	ISCSIT_TGT_SM_STRINGS
 #define	ISCSIT_SESS_SM_STRINGS
 #define	ISCSIT_LOGIN_SM_STRINGS
 #include <sys/idm/idm.h>
 #include <iscsit.h>
 #include <iscsit_isns.h>
-
 
 /*
  * We want to be able to print multiple levels of object hierarchy with a
@@ -1394,17 +1394,16 @@ iscsi_i_task_impl(idm_task_t *idt, uintptr_t addr, iscsi_dcmd_ctrl_t *idc)
 			/* Print task data */
 			if (idc->idc_header) {
 				mdb_printf(
-				    "%<u>%-?s   %-?s %-8s %-8s %-8s%</u>\n",
-				    "Tasks/Active:", "Private",
-				    "Data SN", "Exp SN",
+				    "%<u>%-?s %-16s %-4s %-8s %-8s%</u>\n",
+				    "Tasks:", "State", "Ref",
 				    (conn_type == CONN_TYPE_TGT ? "TTT" :
 				    (conn_type == CONN_TYPE_INI ? "ITT" :
 				    "TT")), "Handle");
 			}
-			mdb_printf("%?p %?p %08x %08x %08x %08x\n", addr,
-			    idt->idt_private, idt->idt_exp_datasn,
-			    idt->idt_exp_rttsn, idt->idt_tt,
-			    idt->idt_client_handle);
+			mdb_printf("%?p %-16s %04x %08x %08x\n", addr,
+			    idm_ts_name[idt->idt_state],
+			    idt->idt_refcnt.ir_refcnt,
+			    idt->idt_tt, idt->idt_client_handle);
 		}
 	}
 	idc->idc_header = 0;
@@ -1516,6 +1515,12 @@ iscsi_print_iscsit_task_data(idm_task_t *idt)
 		good_scsi_task = B_FALSE;
 	}
 
+	mdb_printf("%20s: %s(%d)\n", "State",
+	    idt->idt_state > TASK_MAX_STATE ?
+	    "UNKNOWN" : idm_ts_name[idt->idt_state],
+	    idt->idt_state);
+	mdb_printf("%20s: %d/%d\n", "STMF abort/IDM aborted",
+	    itask.it_stmf_abort, itask.it_aborted);
 	mdb_printf("%20s: %p/%p/%p%s\n",
 	    "iscsit/STMF/LU", idt->idt_private,
 	    itask.it_stmf_task, good_scsi_task ? scsi_task.task_lu_private : 0,
@@ -1531,7 +1536,7 @@ iscsi_print_iscsit_task_data(idm_task_t *idt)
 		    scsi_task.task_lun_no[2], scsi_task.task_lun_no[3],
 		    scsi_task.task_lun_no[4], scsi_task.task_lun_no[5],
 		    scsi_task.task_lun_no[6], scsi_task.task_lun_no[7]);
-		mdb_printf("      CDB (%d bytes):\n",
+		mdb_printf("     CDB (%d bytes):\n",
 		    scsi_task.task_cdb_length);
 		(void) mdb_inc_indent(ISCSI_CDB_INDENT);
 		if (mdb_dumpptr((uintptr_t)scsi_task.task_cdb,
