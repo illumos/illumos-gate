@@ -379,8 +379,14 @@ prop fault.cpu.intel.nb.fsb@chip (0)-> EREPORT_BUS_ERROR;
 
 event ereport.cpu.intel.nb.ie@motherboard{within(12s)};
 event fault.cpu.intel.nb.ie@motherboard, retire=0;
+event upset.cpu.intel.nb.ie_ce@motherboard{within(12s)};
 
-prop fault.cpu.intel.nb.ie@motherboard (1)->
+prop upset.cpu.intel.nb.ie_ce@motherboard
+    { payloadprop("intel-error-list") == "B6" } (0)->
+    ereport.cpu.intel.nb.ie@motherboard;
+
+prop fault.cpu.intel.nb.ie@motherboard
+    { payloadprop("intel-error-list") != "B6" } (1)->
     ereport.cpu.intel.nb.ie@motherboard;
 
 prop fault.cpu.intel.nb.ie@motherboard (0)-> EREPORT_BUS_ERROR;
