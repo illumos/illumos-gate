@@ -2885,6 +2885,14 @@ nfs4_fwrite:
 			cv_wait(&rp->r_cv, &rp->r_statelock);
 		mutex_exit(&rp->r_statelock);
 
+		/*
+		 * Touch the page and fault it in if it is not in core
+		 * before segmap_getmapflt or vpm_data_copy can lock it.
+		 * This is to avoid the deadlock if the buffer is mapped
+		 * to the same file through mmap which we want to write.
+		 */
+		uio_prefaultpages((long)n, uiop);
+
 		if (vpm_enable) {
 			/*
 			 * It will use kpm mappings, so no need to

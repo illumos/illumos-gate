@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -987,6 +985,16 @@ cachefs_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 		n = MAXBSIZE - on;
 		if (n > uiop->uio_resid)
 			n = (int)uiop->uio_resid;
+
+		/*
+		 * Touch the page and fault it in if it is not in
+		 * core before segmap_getmapflt can lock it. This
+		 * is to avoid the deadlock if the buffer is mapped
+		 * to the same file through mmap which we want to
+		 * write to.
+		 */
+		uio_prefaultpages((long)n, uiop);
+
 		base = segmap_getmap(segkmap, vp, off);
 		error = cachefs_writepage(vp, (base + on), n, uiop);
 		if (error == 0) {

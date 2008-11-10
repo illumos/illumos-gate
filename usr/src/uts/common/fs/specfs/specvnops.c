@@ -36,9 +36,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/t_lock.h>
@@ -1141,6 +1138,15 @@ spec_write(
 			pagecreate = 1;
 
 		newpage = 0;
+
+		/*
+		 * Touch the page and fault it in if it is not in core
+		 * before segmap_getmapflt or vpm_data_copy can lock it.
+		 * This is to avoid the deadlock if the buffer is mapped
+		 * to the same file through mmap which we want to write.
+		 */
+		uio_prefaultpages((long)n, uiop);
+
 		if (vpm_enable) {
 			error = vpm_data_copy(blkvp, (u_offset_t)(off + on),
 			    n, uiop, !pagecreate, NULL, 0, S_WRITE);

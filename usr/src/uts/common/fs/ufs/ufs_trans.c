@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/param.h>
 #include <sys/types.h>
@@ -880,69 +878,6 @@ again:
 }
 
 /*
- * Fault in the pages of the first n bytes specified by the uio structure.
- * 1 byte in each page is touched and the uio struct is unmodified.
- * Any error will terminate the process as this is only a best
- * attempt to get the pages resident.
- */
-static void
-ufs_trans_touch(ssize_t n, struct uio *uio)
-{
-	struct iovec *iov;
-	ulong_t cnt, incr;
-	caddr_t p;
-	uint8_t tmp;
-
-	iov = uio->uio_iov;
-
-	while (n) {
-		cnt = MIN(iov->iov_len, n);
-		if (cnt == 0) {
-			/* empty iov entry */
-			iov++;
-			continue;
-		}
-		n -= cnt;
-		/*
-		 * touch each page in this segment.
-		 */
-		p = iov->iov_base;
-		while (cnt) {
-			switch (uio->uio_segflg) {
-			case UIO_USERSPACE:
-			case UIO_USERISPACE:
-				if (fuword8(p, &tmp))
-					return;
-				break;
-			case UIO_SYSSPACE:
-				if (kcopy(p, &tmp, 1))
-					return;
-				break;
-			}
-			incr = MIN(cnt, PAGESIZE);
-			p += incr;
-			cnt -= incr;
-		}
-		/*
-		 * touch the last byte in case it straddles a page.
-		 */
-		p--;
-		switch (uio->uio_segflg) {
-		case UIO_USERSPACE:
-		case UIO_USERISPACE:
-			if (fuword8(p, &tmp))
-				return;
-			break;
-		case UIO_SYSSPACE:
-			if (kcopy(p, &tmp, 1))
-				return;
-			break;
-		}
-		iov++;
-	}
-}
-
-/*
  * Calculate the amount of log space that needs to be reserved for this
  * write request.  If the amount of log space is too large, then
  * calculate the size that the requests needs to be split into.
@@ -968,7 +903,7 @@ ufs_trans_write_resv(
 	resid = MIN(uio->uio_resid, ufs_trans_max_resid);
 	resv = ufs_log_amt(ip, offset, resid, 0);
 	if (resv <= ufs_trans_max_resv) {
-		ufs_trans_touch(resid, uio);
+		uio_prefaultpages(resid, uio);
 		if (resid != uio->uio_resid)
 			*residp = resid;
 		*resvp = resv;
@@ -982,7 +917,7 @@ ufs_trans_write_resv(
 		nchunks++;
 		resid = uio->uio_resid / nchunks;
 	}
-	ufs_trans_touch(resid, uio);
+	uio_prefaultpages(resid, uio);
 	/*
 	 * If this request takes too much log space, it will be split
 	 */
@@ -1049,7 +984,7 @@ again:
 	 * Make sure the input buffer is resident before starting
 	 * the next transaction.
 	 */
-	ufs_trans_touch(MIN(resid, realresid), uio);
+	uio_prefaultpages(MIN(resid, realresid), uio);
 
 	/*
 	 * Generate BOT for next part of the request

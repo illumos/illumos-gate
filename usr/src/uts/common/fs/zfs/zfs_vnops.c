@@ -560,69 +560,6 @@ out:
 }
 
 /*
- * Fault in the pages of the first n bytes specified by the uio structure.
- * 1 byte in each page is touched and the uio struct is unmodified.
- * Any error will exit this routine as this is only a best
- * attempt to get the pages resident. This is a copy of ufs_trans_touch().
- */
-static void
-zfs_prefault_write(ssize_t n, struct uio *uio)
-{
-	struct iovec *iov;
-	ulong_t cnt, incr;
-	caddr_t p;
-	uint8_t tmp;
-
-	iov = uio->uio_iov;
-
-	while (n) {
-		cnt = MIN(iov->iov_len, n);
-		if (cnt == 0) {
-			/* empty iov entry */
-			iov++;
-			continue;
-		}
-		n -= cnt;
-		/*
-		 * touch each page in this segment.
-		 */
-		p = iov->iov_base;
-		while (cnt) {
-			switch (uio->uio_segflg) {
-			case UIO_USERSPACE:
-			case UIO_USERISPACE:
-				if (fuword8(p, &tmp))
-					return;
-				break;
-			case UIO_SYSSPACE:
-				if (kcopy(p, &tmp, 1))
-					return;
-				break;
-			}
-			incr = MIN(cnt, PAGESIZE);
-			p += incr;
-			cnt -= incr;
-		}
-		/*
-		 * touch the last byte in case it straddles a page.
-		 */
-		p--;
-		switch (uio->uio_segflg) {
-		case UIO_USERSPACE:
-		case UIO_USERISPACE:
-			if (fuword8(p, &tmp))
-				return;
-			break;
-		case UIO_SYSSPACE:
-			if (kcopy(p, &tmp, 1))
-				return;
-			break;
-		}
-		iov++;
-	}
-}
-
-/*
  * Write the bytes to a file.
  *
  *	IN:	vp	- vnode of file to be written to.
@@ -689,7 +626,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	 * Pre-fault the pages to ensure slow (eg NFS) pages
 	 * don't hold up txg.
 	 */
-	zfs_prefault_write(n, uio);
+	uio_prefaultpages(n, uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.

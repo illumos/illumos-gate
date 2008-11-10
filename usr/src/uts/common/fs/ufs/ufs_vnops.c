@@ -998,6 +998,15 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 
 		newpage = 0;
 		premove_resid = uio->uio_resid;
+
+		/*
+		 * Touch the page and fault it in if it is not in core
+		 * before segmap_getmapflt or vpm_data_copy can lock it.
+		 * This is to avoid the deadlock if the buffer is mapped
+		 * to the same file through mmap which we want to write.
+		 */
+		uio_prefaultpages((long)n, uio);
+
 		if (vpm_enable) {
 			/*
 			 * Copy data. If new pages are created, part of

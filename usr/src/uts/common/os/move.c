@@ -112,6 +112,73 @@ uiomove(void *p, size_t n, enum uio_rw rw, struct uio *uio)
 }
 
 /*
+ * Fault in the pages of the first n bytes specified by the uio structure.
+ * 1 byte in each page is touched and the uio struct is unmodified. Any
+ * error will terminate the process as this is only a best attempt to get
+ * the pages resident.
+ */
+void
+uio_prefaultpages(ssize_t n, struct uio *uio)
+{
+	struct iovec *iov;
+	ulong_t cnt, incr;
+	caddr_t p;
+	uint8_t tmp;
+	int iovcnt;
+
+	iov = uio->uio_iov;
+	iovcnt = uio->uio_iovcnt;
+
+	while ((n > 0) && (iovcnt > 0)) {
+		cnt = MIN(iov->iov_len, n);
+		if (cnt == 0) {
+			/* empty iov entry */
+			iov++;
+			iovcnt--;
+			continue;
+		}
+		n -= cnt;
+		/*
+		 * touch each page in this segment.
+		 */
+		p = iov->iov_base;
+		while (cnt) {
+			switch (uio->uio_segflg) {
+			case UIO_USERSPACE:
+			case UIO_USERISPACE:
+				if (fuword8(p, &tmp))
+					return;
+				break;
+			case UIO_SYSSPACE:
+				if (kcopy(p, &tmp, 1))
+					return;
+				break;
+			}
+			incr = MIN(cnt, PAGESIZE);
+			p += incr;
+			cnt -= incr;
+		}
+		/*
+		 * touch the last byte in case it straddles a page.
+		 */
+		p--;
+		switch (uio->uio_segflg) {
+		case UIO_USERSPACE:
+		case UIO_USERISPACE:
+			if (fuword8(p, &tmp))
+				return;
+			break;
+		case UIO_SYSSPACE:
+			if (kcopy(p, &tmp, 1))
+				return;
+			break;
+		}
+		iov++;
+		iovcnt--;
+	}
+}
+
+/*
  * transfer a character value into the address space
  * delineated by a uio and update fields within the
  * uio for next character. Return 0 for success, EFAULT

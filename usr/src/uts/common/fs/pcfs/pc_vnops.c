@@ -388,6 +388,16 @@ rwpcp(
 			}
 			n = (int)(limit - uio->uio_loffset);
 		}
+
+		/*
+		 * Touch the page and fault it in if it is not in
+		 * core before segmap_getmapflt can lock it. This
+		 * is to avoid the deadlock if the buffer is mapped
+		 * to the same file through mmap which we want to
+		 * write to.
+		 */
+		uio_prefaultpages((long)n, uio);
+
 		base = segmap_getmap(segkmap, vp, (u_offset_t)off);
 		pagecreate = 0;
 		newpage = 0;

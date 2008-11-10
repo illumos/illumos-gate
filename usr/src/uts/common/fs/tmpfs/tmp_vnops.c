@@ -274,6 +274,14 @@ wrtmp(
 		 */
 		rw_exit(&tp->tn_contents);
 
+		/*
+		 * Touch the page and fault it in if it is not in core
+		 * before segmap_getmapflt or vpm_data_copy can lock it.
+		 * This is to avoid the deadlock if the buffer is mapped
+		 * to the same file through mmap which we want to write.
+		 */
+		uio_prefaultpages((long)bytes, uio);
+
 		newpage = 0;
 		if (vpm_enable) {
 			/*
