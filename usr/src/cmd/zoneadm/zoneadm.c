@@ -5590,7 +5590,7 @@ main(int argc, char **argv)
 	 * brand type and determine whether it is native or not.
 	 */
 	if ((target_zone != NULL) &&
-	    (strcmp(target_zone, GLOBAL_ZONENAME) != NULL)) {
+	    (strcmp(target_zone, GLOBAL_ZONENAME) != 0)) {
 		if (zone_get_brand(target_zone, target_brand,
 		    sizeof (target_brand)) != Z_OK) {
 			zerror(gettext("missing or invalid brand"));

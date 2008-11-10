@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libsysevent.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -2643,8 +2641,10 @@ zonecfg_devperms_apply(zone_dochandle_t hdl, const char *inpath, uid_t owner,
 	if ((acltxt == NULL) || (strcmp(acltxt, "") == 0))
 		return (Z_OK);
 
-	if (acl_fromtext(acltxt, &aclp) != 0)
+	if (acl_fromtext(acltxt, &aclp) != 0) {
+		errno = EINVAL;
 		return (Z_SYSTEM);
+	}
 
 	errno = 0;
 	if (acl_set(path, aclp) == -1) {
@@ -2994,8 +2994,7 @@ zonecfg_lookup_rctl(zone_dochandle_t handle, struct zone_rctltab *tabptr)
 	struct zone_rctlvaltab *valptr;
 	int err;
 
-	if (tabptr->zone_rctl_name == NULL ||
-	    strlen(tabptr->zone_rctl_name) == 0)
+	if (strlen(tabptr->zone_rctl_name) == 0)
 		return (Z_INVAL);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -3076,7 +3075,7 @@ zonecfg_add_rctl(zone_dochandle_t handle, struct zone_rctltab *tabptr)
 {
 	int err;
 
-	if (tabptr == NULL || tabptr->zone_rctl_name == NULL)
+	if (tabptr == NULL)
 		return (Z_INVAL);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -3120,7 +3119,7 @@ zonecfg_delete_rctl(zone_dochandle_t handle, struct zone_rctltab *tabptr)
 {
 	int err;
 
-	if (tabptr == NULL || tabptr->zone_rctl_name == NULL)
+	if (tabptr == NULL)
 		return (Z_INVAL);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -3140,8 +3139,7 @@ zonecfg_modify_rctl(
 {
 	int err;
 
-	if (oldtabptr == NULL || oldtabptr->zone_rctl_name == NULL ||
-	    newtabptr == NULL || newtabptr->zone_rctl_name == NULL)
+	if (oldtabptr == NULL || newtabptr == NULL)
 		return (Z_INVAL);
 
 	if ((err = operation_prep(handle)) != Z_OK)
@@ -3375,6 +3373,8 @@ zonecfg_strerror(int errnum)
 		    "Could not create a temporary pool"));
 	case Z_POOL_BIND:
 		return (dgettext(TEXT_DOMAIN, "Could not bind zone to pool"));
+	case Z_SYSTEM:
+		return (strerror(errno));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown error"));
 	}
