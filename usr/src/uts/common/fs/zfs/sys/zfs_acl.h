@@ -26,8 +26,6 @@
 #ifndef	_SYS_FS_ZFS_ACL_H
 #define	_SYS_FS_ZFS_ACL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef _KERNEL
 #include <sys/isa_defs.h>
 #include <sys/types32.h>
@@ -181,6 +179,7 @@ typedef struct zfs_acl {
 #define	ZFS_ACL_GROUPMASK	2
 #define	ZFS_ACL_PASSTHROUGH	3
 #define	ZFS_ACL_RESTRICTED	4
+#define	ZFS_ACL_PASSTHROUGH_X	5
 
 struct znode;
 struct zfsvfs;

@@ -27,7 +27,7 @@
 /*
  * On-disk version number.
  */
-#define	SPA_VERSION			13ULL
+#define	SPA_VERSION			14ULL
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
