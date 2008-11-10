@@ -401,7 +401,7 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 			 * we won't need it again. Put it on the
 			 * head of the freelist.
 			 */
-			if (mapoffset == 0 && xfersize == PAGESIZE)
+			if (mapoffset == 0 && xfersize == MAXBSIZE)
 				smflags |= SM_DONTNEED;
 			bcopy(mapaddr + mapoffset, bufaddr, xfersize);
 		} else {
