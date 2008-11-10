@@ -74,7 +74,7 @@ usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE
 usr/src/common/crypto/ecc/THIRDPARTYLICENSE
 usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
 usr/src/common/openssl/LICENSE
-usr/src/grub/grub-0.95/COPYING
+usr/src/grub/grub-0.97/COPYING
 usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE
 usr/src/lib/hbaapi/THIRDPARTYLICENSE
 usr/src/lib/krb5/THIRDPARTYLICENSE
