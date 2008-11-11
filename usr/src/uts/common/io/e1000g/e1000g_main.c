@@ -817,12 +817,14 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	uint64_t rx_size;
 	uint64_t tx_size;
 
-#ifdef __sparc
 	dev_info_t *devinfo = Adapter->dip;
+#ifdef __sparc
 	ulong_t iommu_pagesize;
-
+#endif
 	/* Get the system page size */
 	Adapter->sys_page_sz = ddi_ptob(devinfo, (ulong_t)1);
+
+#ifdef __sparc
 	iommu_pagesize = dvma_pagesize(devinfo);
 	if (iommu_pagesize != 0) {
 		if (Adapter->sys_page_sz == iommu_pagesize) {
@@ -3418,6 +3420,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 		case e1000_82571:
 		case e1000_82572:
 		case e1000_82573:
+		case e1000_80003es2lan:
 			break;
 		default:
 			Adapter->lso_enable = B_FALSE;

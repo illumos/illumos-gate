@@ -84,7 +84,8 @@ extern "C" {
 #define	MAX_NUM_MULTICAST_ADDRESSES	256
 
 /*
- * MAX_COOKIES = max_packet_size/page_size + one for cross page split
+ * MAX_COOKIES = max_LSO_packet_size(65535 + ethernet_header_len)/page_size
+ *	+ one for cross page split
  * MAX_TX_DESC_PER_PACKET = MAX_COOKIES + one for the context descriptor +
  *	two for the workaround of the 82546 chip
  */
@@ -742,6 +743,7 @@ typedef struct _e1000g_tx_ring {
 	uint32_t stat_multi_copy;
 	uint32_t stat_multi_cookie;
 	uint32_t stat_lack_desc;
+	uint32_t stat_lso_header_fail;
 #endif
 	/*
 	 * Pointer to the adapter
@@ -887,8 +889,8 @@ typedef struct e1000g {
 	uint32_t mcast_count;
 	struct ether_addr mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
 
-#ifdef __sparc
 	ulong_t sys_page_sz;
+#ifdef __sparc
 	uint_t dvma_page_num;
 #endif
 

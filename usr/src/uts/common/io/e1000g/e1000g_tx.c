@@ -159,13 +159,18 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	uint32_t frag_count;
 	int desc_count;
 	uint32_t desc_total;
+	uint32_t bcopy_thresh;
+	uint32_t hdr_frag_len;
 	boolean_t tx_undersize_flag;
 	mblk_t *nmp;
 	mblk_t *tmp;
+	mblk_t *new_mp;
+	mblk_t *pre_mp;
 	e1000g_tx_ring_t *tx_ring;
 	context_data_t cur_context;
 
 	tx_ring = Adapter->tx_ring;
+	bcopy_thresh = Adapter->tx_bcopy_thresh;
 
 	/* Get the total size and frags number of the message */
 	tx_undersize_flag = B_FALSE;
@@ -232,6 +237,71 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	QUEUE_INIT_LIST(&pending_list);
 
 	/* Process each mblk fragment and fill tx descriptors */
+	/*
+	 * The software should guarantee LSO packet header(MAC+IP+TCP)
+	 * to be within one descriptor. Here we reallocate and refill the
+	 * the header if it's physical memory non-contiguous.
+	 */
+	if (cur_context.lso_flag) {
+		/* find the last fragment of the header */
+		len = MBLKL(mp);
+		ASSERT(len > 0);
+		nmp = mp;
+		pre_mp = NULL;
+		while (len < cur_context.hdr_len) {
+			pre_mp = nmp;
+			nmp = nmp->b_cont;
+			len += MBLKL(nmp);
+		}
+		/*
+		 * If the header and the payload are in different mblks,
+		 * we simply force the header to be copied into pre-allocated
+		 * page-aligned buffer.
+		 */
+		if (len == cur_context.hdr_len)
+			goto adjust_threshold;
+
+		hdr_frag_len = cur_context.hdr_len - (len - MBLKL(nmp));
+		/*
+		 * There are two cases we need to reallocate a mblk for the
+		 * last header fragment:
+		 * 1. the header is in multiple mblks and the last fragment
+		 * share the same mblk with the payload
+		 * 2. the header is in a single mblk shared with the payload
+		 * and the header is physical memory non-contiguous
+		 */
+		if ((nmp != mp) ||
+		    (P2NPHASE((uintptr_t)nmp->b_rptr, Adapter->sys_page_sz)
+		    < len)) {
+			E1000G_DEBUG_STAT(tx_ring->stat_lso_header_fail);
+			/*
+			 * reallocate the mblk for the last header fragment,
+			 * expect to bcopy into pre-allocated page-aligned
+			 * buffer
+			 */
+			new_mp = allocb(hdr_frag_len, NULL);
+			if (!new_mp)
+				return (B_FALSE);
+			bcopy(nmp->b_rptr, new_mp->b_rptr, hdr_frag_len);
+			/* link the new header fragment with the other parts */
+			new_mp->b_wptr = new_mp->b_rptr + hdr_frag_len;
+			new_mp->b_cont = nmp;
+			if (pre_mp)
+				pre_mp->b_cont = new_mp;
+			nmp->b_rptr += hdr_frag_len;
+			if (hdr_frag_len == cur_context.hdr_len)
+				mp = new_mp;
+			frag_count ++;
+		}
+adjust_threshold:
+		/*
+		 * adjust the bcopy threshhold to guarantee
+		 * the header to use bcopy way
+		 */
+		if (bcopy_thresh < cur_context.hdr_len)
+			bcopy_thresh = cur_context.hdr_len;
+	}
+
 	packet = NULL;
 	nmp = mp;
 	while (nmp) {
@@ -277,7 +347,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		 * If the size of the fragment is less than the tx_bcopy_thresh
 		 * we'll use bcopy; Otherwise, we'll use DMA binding.
 		 */
-		if ((len <= Adapter->tx_bcopy_thresh) || tx_undersize_flag) {
+		if ((len <= bcopy_thresh) || tx_undersize_flag) {
 			desc_count =
 			    e1000g_tx_copy(tx_ring, packet, nmp,
 			    tx_undersize_flag);
@@ -463,7 +533,8 @@ e1000g_check_context(e1000g_tx_ring_t *tx_ring, context_data_t *cur_context)
 
 		context_reload = B_TRUE;
 	} else if (cur_context->lso_flag) {
-		if ((cur_context->cksum_flags != pre_context->cksum_flags) ||
+		if ((cur_context->lso_flag != pre_context->lso_flag) ||
+		    (cur_context->cksum_flags != pre_context->cksum_flags) ||
 		    (cur_context->pay_len != pre_context->pay_len) ||
 		    (cur_context->mss != pre_context->mss) ||
 		    (cur_context->hdr_len != pre_context->hdr_len) ||
@@ -475,7 +546,8 @@ e1000g_check_context(e1000g_tx_ring_t *tx_ring, context_data_t *cur_context)
 			context_reload = B_TRUE;
 		}
 	} else if (cur_context->cksum_flags != 0) {
-		if ((cur_context->cksum_flags != pre_context->cksum_flags) ||
+		if ((cur_context->lso_flag != pre_context->lso_flag) ||
+		    (cur_context->cksum_flags != pre_context->cksum_flags) ||
 		    (cur_context->cksum_stuff != pre_context->cksum_stuff) ||
 		    (cur_context->cksum_start != pre_context->cksum_start) ||
 		    (cur_context->ether_header_size !=
