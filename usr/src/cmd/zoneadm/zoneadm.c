@@ -733,11 +733,12 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 	return (Z_OK);
 }
 
+/*
+ * Retrieve a zone entry by name.  Returns NULL if no such zone exists.
+ */
 static zone_entry_t *
-lookup_running_zone(char *str)
+lookup_running_zone(const char *str)
 {
-	zoneid_t zoneid;
-	char *cp;
 	int i;
 
 	if (fetch_zents() != Z_OK)
@@ -745,15 +746,6 @@ lookup_running_zone(char *str)
 
 	for (i = 0; i < nzents; i++) {
 		if (strcmp(str, zents[i].zname) == 0)
-			return (&zents[i]);
-	}
-	errno = 0;
-	zoneid = strtol(str, &cp, 0);
-	if (zoneid < MIN_ZONEID || zoneid > MAX_ZONEID ||
-	    errno != 0 || *cp != '\0')
-		return (NULL);
-	for (i = 0; i < nzents; i++) {
-		if (zoneid == zents[i].zid)
 			return (&zents[i]);
 	}
 	return (NULL);

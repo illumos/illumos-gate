@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=	zonecfg
@@ -38,7 +36,7 @@ MAPOPTS =	$(MAPFILES:%=-M%)
 
 LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
-LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand
+LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand -ldladm -linetutil
 CPPFLAGS +=	-I.
 LDFLAGS +=	$(MAPOPTS)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h

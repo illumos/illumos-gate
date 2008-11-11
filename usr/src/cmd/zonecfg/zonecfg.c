@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * zonecfg is a lex/yacc based command interpreter used to manage zone
  * configurations.  The lexer (see zonecfg_lex.l) builds up tokens, which
@@ -75,6 +73,8 @@
 #include <libzfs.h>
 #include <sys/brand.h>
 #include <libbrand.h>
+#include <libdladm.h>
+#include <libinetutil.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -3732,13 +3732,44 @@ validate_net_address_syntax(char *address)
 }
 
 static int
-validate_net_physical_syntax(char *ifname)
+validate_net_physical_syntax(const char *ifname)
 {
-	if (strchr(ifname, ':') == NULL)
-		return (Z_OK);
-	zerr(gettext("%s: physical interface name required; "
-	    "logical interface name not allowed"), ifname);
-	return (Z_ERR);
+	ifspec_t ifnameprop;
+	zone_iptype_t iptype;
+	int err;
+
+	if ((err = zonecfg_get_iptype(handle, &iptype)) != Z_OK) {
+		zerr(gettext("zone configuration has an invalid or nonexistent "
+		    "ip-type property"));
+		return (Z_ERR);
+	}
+	switch (iptype) {
+	case ZS_SHARED:
+		if (ifparse_ifspec(ifname, &ifnameprop) == B_FALSE) {
+			zerr(gettext("%s: invalid physical interface name"),
+			    ifname);
+			return (Z_ERR);
+		}
+		if (ifnameprop.ifsp_lunvalid) {
+			zerr(gettext("%s: LUNs not allowed in physical "
+			    "interface names"), ifname);
+			return (Z_ERR);
+		}
+		break;
+	case ZS_EXCLUSIVE:
+		if (dladm_valid_linkname(ifname) == B_FALSE) {
+			if (strchr(ifname, ':') != NULL)
+				zerr(gettext("%s: physical interface name "
+				    "required; logical interface name not "
+				    "allowed"), ifname);
+			else
+				zerr(gettext("%s: invalid physical interface "
+				    "name"), ifname);
+			return (Z_ERR);
+		}
+		break;
+	}
+	return (Z_OK);
 }
 
 static boolean_t
