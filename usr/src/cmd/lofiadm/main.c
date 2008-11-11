@@ -30,8 +30,6 @@
  * communicated via a minor number.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/lofi.h>
@@ -54,10 +52,10 @@
 
 static const char USAGE[] =
 	"Usage: %s -a file [ device ]\n"
-	"       %s -d file | device \n"
-	"       %s -C [algorithm] [-s segment_size] file \n"
-	"       %s -U file \n"
-	"       %s [ device | file ]\n";
+	"       %s -d file | device\n"
+	"       %s -C [algorithm] [-s segment_size] file\n"
+	"       %s -U file\n"
+	"       %s [ file | device ]\n";
 
 static const char *pname;
 static int	addflag = 0;
@@ -316,8 +314,8 @@ delete_mapping(int lfd, const char *devicename, const char *filename,
 		}
 		return;
 	}
-	/* delete by device */
 
+	/* delete by device */
 	li.li_minor = name_to_minor(devicename);
 	if (li.li_minor == 0) {
 		die(gettext("malformed device name %s\n"), devicename);
@@ -836,15 +834,13 @@ check_file_validity(const char *filename)
 		    "block, or character device\n"),
 		    filename);
 	} else if ((buf.st_size % DEV_BSIZE) != 0) {
-		die(gettext("size of %s is not a multiple "
-		    "of %d\n"),
+		die(gettext("size of %s is not a multiple of %d\n"),
 		    filename, DEV_BSIZE);
 	}
 	(void) close(fd);
 
 	if (name_to_minor(filename) != 0) {
-		die(gettext("cannot use " LOFI_DRIVER_NAME
-		    " on itself\n"), NULL);
+		die(gettext("cannot use %s on itself\n"), LOFI_DRIVER_NAME);
 	}
 }
 
@@ -898,6 +894,7 @@ main(int argc, char *argv[])
 	uint32_t segsize = SEGSIZE;
 	static char *lofictl = "/dev/" LOFI_CTL_NAME;
 	boolean_t force = B_FALSE;
+	char	realfilename[MAXPATHLEN];
 
 	pname = getpname(argv[0]);
 
@@ -908,7 +905,8 @@ main(int argc, char *argv[])
 		switch (c) {
 		case 'a':
 			addflag = 1;
-			filename = optarg;
+			if ((filename = realpath(optarg, realfilename)) == NULL)
+				die("%s", optarg);
 			check_file_validity(filename);
 
 			if (((argc - optind) > 0) && (*argv[optind] != '-')) {
@@ -929,7 +927,9 @@ main(int argc, char *argv[])
 			} else if (((argc - optind) == 1) &&
 			    (*argv[optind] != '-')) {
 				algname = optarg;
-				filename = argv[optind];
+				if ((filename = realpath(argv[optind],
+				    realfilename)) == NULL)
+					die("%s", argv[optind]);
 				optind++;
 			} else if (((argc - optind) > 1) &&
 			    (*argv[optind] == '-')) {
@@ -938,7 +938,9 @@ main(int argc, char *argv[])
 				    &compress_index);
 				break;
 			} else {
-				filename = optarg;
+				if ((filename = realpath(optarg,
+				    realfilename)) == NULL)
+					die("%s", optarg);
 			}
 
 			check_file_validity(filename);
@@ -950,8 +952,11 @@ main(int argc, char *argv[])
 			minor = name_to_minor(optarg);
 			if (minor != 0)
 				devicename = optarg;
-			else
-				filename = optarg;
+			else {
+				if ((filename = realpath(optarg,
+				    realfilename)) == NULL)
+					die("%s", optarg);
+			}
 			break;
 		case 'f':
 			force = B_TRUE;
@@ -964,13 +969,16 @@ main(int argc, char *argv[])
 				    "or not a multiple of minimum block "
 				    "size %ld\n"), optarg, DEV_BSIZE);
 
-			filename = argv[optind];
+			if ((filename = realpath(argv[optind],
+			    realfilename)) == NULL)
+				die("%s", argv[optind]);
 			check_file_validity(filename);
 			optind++;
 			break;
 		case 'U':
 			uncompressflag = 1;
-			filename = optarg;
+			if ((filename = realpath(optarg, realfilename)) == NULL)
+				die("%s", optarg);
 			check_file_validity(filename);
 			break;
 		case '?':
@@ -995,8 +1003,11 @@ main(int argc, char *argv[])
 		minor = name_to_minor(argv[optind]);
 		if (minor != 0)
 			devicename = argv[optind];
-		else
-			filename = argv[optind];
+		else {
+			if ((filename = realpath(argv[optind],
+			    realfilename)) == NULL)
+				die("%s", argv[optind]);
+		}
 		break;
 	default:
 		usage();
@@ -1022,10 +1033,10 @@ main(int argc, char *argv[])
 	lfd = open(lofictl, openflag);
 	if (lfd == -1) {
 		if ((errno == EPERM) || (errno == EACCES)) {
-			die("you do not have permission to perform "
-			    "that operation.\n");
+			die(gettext("you do not have permission to perform "
+			    "that operation.\n"));
 		} else {
-			die("%s", lofictl);
+			die(gettext("open: %s"), lofictl);
 		}
 		/*NOTREACHED*/
 	}
