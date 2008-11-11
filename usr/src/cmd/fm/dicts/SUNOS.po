@@ -216,31 +216,15 @@ msgstr "Future reboots could fail until this problem is corrected.\n"
 msgid "SUNOS-8000-CF.action"
 msgstr "Examine /boot/grub/menu.lst and revise as\ndescribed in Details.\n"
 #
-# code: SUNOS-8000-DM
-# keys: defect.sunos.eft.undiag.checkpoint
-#
-msgid "SUNOS-8000-DM.type"
-msgstr "Defect"
-msgid "SUNOS-8000-DM.severity"
-msgstr "Minor"
-msgid "SUNOS-8000-DM.description"
-msgstr "The EFT Diagnosis Engine encountered an error while resuming diagnosis.\n  Refer to %s for more information."
-msgid "SUNOS-8000-DM.response"
-msgstr "Error reports have been logged for examination by Sun.\n"
-msgid "SUNOS-8000-DM.impact"
-msgstr "Automated diagnosis and response for these events will not occur.\n"
-msgid "SUNOS-8000-DM.action"
-msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly. Contact Sun for support.\n"
-#
 # code: SUNOS-8000-E8
-# keys: defect.sunos.eft.undiag.fme
+# keys: defect.sunos.eft.undiag.checkpoint
 #
 msgid "SUNOS-8000-E8.type"
 msgstr "Defect"
 msgid "SUNOS-8000-E8.severity"
-msgstr "Major"
+msgstr "Minor"
 msgid "SUNOS-8000-E8.description"
-msgstr "The EFT Diagnosis Engine encountered telemetry for which it was unable to perform a diagnosis.\n  Refer to %s for more information."
+msgstr "The EFT Diagnosis Engine encountered an error while resuming diagnosis.\n  Refer to %s for more information."
 msgid "SUNOS-8000-E8.response"
 msgstr "Error reports have been logged for examination by Sun.\n"
 msgid "SUNOS-8000-E8.impact"
@@ -249,33 +233,49 @@ msgid "SUNOS-8000-E8.action"
 msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly. Contact Sun for support.\n"
 #
 # code: SUNOS-8000-FU
-# keys: defect.sunos.eft.undiag.limit
+# keys: defect.sunos.eft.undiag.fme
 #
 msgid "SUNOS-8000-FU.type"
 msgstr "Defect"
 msgid "SUNOS-8000-FU.severity"
-msgstr "Minor"
+msgstr "Major"
 msgid "SUNOS-8000-FU.description"
-msgstr "The EFT Diagnosis Engine hit a limit restriction and was unable to perform a diagnosis.\n  Refer to %s for more information."
+msgstr "The EFT Diagnosis Engine encountered telemetry for which it was unable to perform a diagnosis.\n  Refer to %s for more information."
 msgid "SUNOS-8000-FU.response"
-msgstr "Error reports will be logged for examination by Sun.\n"
+msgstr "Error reports have been logged for examination by Sun.\n"
 msgid "SUNOS-8000-FU.impact"
 msgstr "Automated diagnosis and response for these events will not occur.\n"
 msgid "SUNOS-8000-FU.action"
 msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly. Contact Sun for support.\n"
 #
 # code: SUNOS-8000-G7
-# keys: defect.sunos.eft.undiag.unknown
+# keys: defect.sunos.eft.undiag.limit
 #
 msgid "SUNOS-8000-G7.type"
 msgstr "Defect"
 msgid "SUNOS-8000-G7.severity"
 msgstr "Minor"
 msgid "SUNOS-8000-G7.description"
-msgstr "The EFT Diagnosis Engine encountered telemetry for which it was unable to perform a diagnosis.\n  Refer to %s for more information."
+msgstr "The EFT Diagnosis Engine hit a limit restriction and was unable to perform a diagnosis.\n  Refer to %s for more information."
 msgid "SUNOS-8000-G7.response"
 msgstr "Error reports have been logged for examination by Sun.\n"
 msgid "SUNOS-8000-G7.impact"
 msgstr "Automated diagnosis and response for these events will not occur.\n"
 msgid "SUNOS-8000-G7.action"
+msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly. Contact Sun for support.\n"
+#
+# code: SUNOS-8000-HV
+# keys: defect.sunos.eft.undiag.unknown
+#
+msgid "SUNOS-8000-HV.type"
+msgstr "Defect"
+msgid "SUNOS-8000-HV.severity"
+msgstr "Minor"
+msgid "SUNOS-8000-HV.description"
+msgstr "The EFT Diagnosis Engine encountered telemetry for which it was unable to perform a diagnosis.\n  Refer to %s for more information."
+msgid "SUNOS-8000-HV.response"
+msgstr "Error reports have been logged for examination by Sun.\n"
+msgid "SUNOS-8000-HV.impact"
+msgstr "Automated diagnosis and response for these events will not occur.\n"
+msgid "SUNOS-8000-HV.action"
 msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly. Contact Sun for support.\n"
