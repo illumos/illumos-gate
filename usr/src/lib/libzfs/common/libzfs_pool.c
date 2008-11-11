@@ -1182,7 +1182,9 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		}
 
 		if (nvlist_add_string(props,
-		    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), altroot) != 0) {
+		    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), altroot) != 0 ||
+		    nvlist_add_string(props,
+		    zpool_prop_to_name(ZPOOL_PROP_CACHEFILE), "none") != 0) {
 			nvlist_free(props);
 			return (zfs_error_fmt(hdl, EZFS_NOMEM,
 			    dgettext(TEXT_DOMAIN, "cannot import '%s'"),
