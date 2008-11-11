@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <pthread.h>
@@ -131,16 +129,14 @@ topo_node_fru_set(tnode_t *node, nvlist_t *fru, int flag, int *err)
 {
 
 	/*
-	 * Inherit FRU property from our parent if * not specified
+	 * Inherit FRU property from our parent if not specified
 	 */
 	if (fru == NULL) {
 		if (topo_prop_inherit(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU,
 		    err) < 0) {
 			return (-1);
 		}
-	}
-
-	if (flag & TOPO_FRU_COMPUTE) {
+	} else if (flag & TOPO_FRU_COMPUTE) {
 		if (topo_prop_method_register(node, TOPO_PGROUP_PROTOCOL,
 		    TOPO_PROP_FRU, TOPO_TYPE_FMRI, TOPO_METH_FRU_COMPUTE,
 		    fru, err) < 0)

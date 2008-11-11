@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fm/protocol.h>
 
 #include <strings.h>
@@ -39,7 +37,29 @@
 int
 fmd_log_filter_class(fmd_log_t *lp, const fmd_log_record_t *rp, void *arg)
 {
-	return (gmatch(rp->rec_class, arg));
+	nvlist_t **nva;
+	uint32_t i, size;
+	char *class;
+
+	if (gmatch(rp->rec_class, arg))
+		return (1);
+
+	/* return false if the record doesn't contain valid fault list */
+	if (! gmatch(rp->rec_class, FM_LIST_EVENT ".*") ||
+	    nvlist_lookup_uint32(rp->rec_nvl, FM_SUSPECT_FAULT_SZ,
+	    &size) != 0 || size == 0 ||
+	    nvlist_lookup_nvlist_array(rp->rec_nvl, FM_SUSPECT_FAULT_LIST,
+	    &nva, &size) != 0)
+		return (0);
+
+	/* return true if any fault in the list matches */
+	for (i = 0; i < size; i++) {
+		if (nvlist_lookup_string(nva[i], FM_CLASS, &class) == 0 &&
+		    gmatch(class, arg))
+			return (1);
+	}
+
+	return (0);
 }
 
 /*ARGSUSED*/

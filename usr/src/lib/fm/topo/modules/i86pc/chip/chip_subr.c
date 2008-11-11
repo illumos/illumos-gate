@@ -39,6 +39,9 @@
 
 #include "chip.h"
 
+static void fmri_dprint(topo_mod_t *, const char *, uint32_t, nvlist_t *);
+static boolean_t is_page_fmri(nvlist_t *);
+
 /*
  * Whinge a debug message via topo_mod_dprintf and increment the
  * given error counter.
@@ -357,105 +360,113 @@ set_retnvl(topo_mod_t *mod, nvlist_t **out, const char *retname, uint32_t ret)
  * the serial num from the unum fmri that got passed into this function as the
  * argument.
  *
+ */
+static int
+fmri_replaced(topo_mod_t *mod, tnode_t *node, nvlist_t *unum, int *errp)
+{
+	tnode_t *dimmnode;
+	int rc, err;
+	char *old_serial, *curr_serial;
+	fmd_agent_hdl_t *hdl;
+
+	/*
+	 * If input is a page, return "replaced" if the offset is invalid.
+	 */
+	if (is_page_fmri(unum) &&
+	    (hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+		rc = fmd_agent_page_isretired(hdl, unum);
+		err = fmd_agent_errno(hdl);
+		fmd_agent_close(hdl);
+
+		if (rc == FMD_AGENT_RETIRE_DONE &&
+		    err == EINVAL)
+			return (FMD_OBJ_STATE_NOT_PRESENT);
+	}
+
+	/*
+	 * If a serial number for the dimm was available at the time of the
+	 * fault, it will have been added as a string to the unum nvlist
+	 */
+	if (nvlist_lookup_string(unum, FM_FMRI_HC_SERIAL_ID, &old_serial))
+		return (FMD_OBJ_STATE_UNKNOWN);
+
+	/*
+	 * If the current serial number is available for the DIMM that this rank
+	 * belongs to, it will be accessible as a property on the parent (dimm)
+	 * node.
+	 */
+	dimmnode = topo_node_parent(node);
+	if (topo_prop_get_string(dimmnode, TOPO_PGROUP_PROTOCOL,
+	    FM_FMRI_HC_SERIAL_ID, &curr_serial, &err) != 0) {
+		if (err == ETOPO_PROP_NOENT) {
+			return (FMD_OBJ_STATE_UNKNOWN);
+		} else {
+			*errp = EMOD_NVL_INVAL;
+			whinge(mod, NULL, "rank_fmri_present: Unexpected "
+			    "error retrieving serial from node");
+			return (-1);
+		}
+	}
+
+	if (strcmp(old_serial, curr_serial) != 0) {
+		topo_mod_strfree(mod, curr_serial);
+		return (FMD_OBJ_STATE_REPLACED);
+	}
+
+	topo_mod_strfree(mod, curr_serial);
+
+	return (FMD_OBJ_STATE_STILL_PRESENT);
+}
+
+/*
  * In the event we encounter problems comparing serials or if a comparison isn't
  * possible, we err on the side of caution and set is_present to TRUE.
  */
-/* ARGSUSED */
 int
 rank_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
-	tnode_t *dimmnode;
-	int err, is_present = 1;
-	nvlist_t *unum;
-	char *curr_serial, *old_serial = NULL;
+	int is_present, err;
 
-	/*
-	 * If a serial number for the dimm was available at the time of the
-	 * fault, it will have been added as a string to the unum nvlist
-	 */
-	unum = in;
-	if (nvlist_lookup_string(unum, FM_FMRI_HC_SERIAL_ID, &old_serial) != 0)
-		goto done;
+	if (version > TOPO_METH_PRESENT_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
-	/*
-	 * If the current serial number is available for the DIMM that this rank
-	 * belongs to, it will be accessible as a property on the parent (dimm)
-	 * node.
-	 */
-	dimmnode = topo_node_parent(node);
-	if (topo_prop_get_string(dimmnode, TOPO_PGROUP_PROTOCOL,
-	    FM_FMRI_HC_SERIAL_ID, &curr_serial, &err) != 0) {
-		if (err != ETOPO_PROP_NOENT) {
-			whinge(mod, &err, "rank_fmri_present: Unexpected error "
-			    "retrieving serial from node");
-			return (topo_mod_seterrno(mod,  EMOD_NVL_INVAL));
-		} else
-			goto done;
+	switch (fmri_replaced(mod, node, in, &err)) {
+	case FMD_OBJ_STATE_REPLACED:
+	case FMD_OBJ_STATE_NOT_PRESENT:
+		is_present = 0;
+		break;
+
+	case FMD_OBJ_STATE_UNKNOWN:
+	case FMD_OBJ_STATE_STILL_PRESENT:
+		is_present = 1;
+		break;
+
+	default:
+		return (topo_mod_seterrno(mod,  err));
 	}
 
-	if (strcmp(old_serial, curr_serial) != 0)
-		is_present = 0;
-
-	topo_mod_strfree(mod, curr_serial);
-done:
+	fmri_dprint(mod, "rank_fmri_present", is_present, in);
 
 	return (set_retnvl(mod, out, TOPO_METH_PRESENT_RET, is_present));
 }
 
-/*
- * If we're getting called then the question of whether this dimm is plugged
- * in has already been answered.  What we don't know for sure is whether it's
- * the same dimm or a different one plugged in the same slot.  To check, we
- * try and compare the serial numbers on the dimm in the current topology with
- * the serial num from the unum fmri that got passed into this function as the
- * argument.
- *
- * In the event we encounter problems comparing serials or if a comparison isn't
- * possible, we err on the side of caution and set is_present to TRUE.
- */
-/* ARGSUSED */
 int
 rank_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
-	tnode_t *dimmnode;
-	int err, rval = FMD_OBJ_STATE_UNKNOWN;
-	nvlist_t *unum;
-	char *curr_serial, *old_serial = NULL;
+	int is_replaced, err;
 
-	/*
-	 * If a serial number for the dimm was available at the time of the
-	 * fault, it will have been added as a string to the unum nvlist
-	 */
-	unum = in;
-	if (nvlist_lookup_string(unum, FM_FMRI_HC_SERIAL_ID, &old_serial) != 0)
-		goto done;
+	if (version > TOPO_METH_REPLACED_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
-	/*
-	 * If the current serial number is available for the DIMM that this rank
-	 * belongs to, it will be accessible as a property on the parent (dimm)
-	 * node.
-	 */
-	dimmnode = topo_node_parent(node);
-	if (topo_prop_get_string(dimmnode, TOPO_PGROUP_PROTOCOL,
-	    FM_FMRI_HC_SERIAL_ID, &curr_serial, &err) != 0) {
-		if (err != ETOPO_PROP_NOENT) {
-			whinge(mod, &err, "rank_fmri_present: Unexpected error "
-			    "retrieving serial from node");
-			return (topo_mod_seterrno(mod,  EMOD_NVL_INVAL));
-		} else
-			goto done;
-	}
+	is_replaced = fmri_replaced(mod, node, in, &err);
+	if (is_replaced == -1)
+		return (topo_mod_seterrno(mod,  err));
 
-	if (strcmp(old_serial, curr_serial) != 0)
-		rval = FMD_OBJ_STATE_REPLACED;
-	else
-		rval = FMD_OBJ_STATE_STILL_PRESENT;
+	fmri_dprint(mod, "rank_fmri_replaced", is_replaced, in);
 
-	topo_mod_strfree(mod, curr_serial);
-done:
-	return (set_retnvl(mod, out, TOPO_METH_REPLACED_RET, rval));
+	return (set_retnvl(mod, out, TOPO_METH_REPLACED_RET, is_replaced));
 }
 
 static void
@@ -481,8 +492,8 @@ fmri_dprint(topo_mod_t *mod, const char *op, uint32_t rc, nvlist_t *fmri)
 		status = "unknown status";
 	}
 	if (fmri != NULL && topo_mod_nvl2str(mod, fmri, &fmristr) == 0) {
-		topo_mod_dprintf(mod, "[%s]: %s => \"%s\"\n", fmristr,
-		    op, status);
+		topo_mod_dprintf(mod, "[%s]: %s => %d (\"%s\")\n", fmristr,
+		    op, rc, status);
 		topo_mod_strfree(mod, fmristr);
 	}
 }

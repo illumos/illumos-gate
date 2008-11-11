@@ -591,7 +591,7 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 	nvlist_t *fmri;
 	nvpair_t *nvp;
 	nvlist_t *mc = NULL;
-	int i;
+	int i, err;
 
 	/*
 	 * Return with no error for anything before AMD family 0xf - we
@@ -620,7 +620,9 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		whinge(mod, nerrp, "mc_create: mc bind failed\n");
 		return;
 	}
-	(void) topo_node_fru_set(mcnode, NULL, 0, nerrp);
+	if (topo_node_fru_set(mcnode, NULL, 0, &err) < 0)
+		whinge(mod, nerrp, "mc_create: topo_node_fru_set failed\n");
+
 	nvlist_free(fmri);
 
 	if ((mc = amd_lookup_by_mcid(mod, topo_node_instance(pnode))) == NULL) {
@@ -633,14 +635,16 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		 */
 		if (amd_generic_mc_create(mod, pnode, mcnode,
 		    family, model, stepping, auth) != 0)
-			++*nerrp;
+			whinge(mod, nerrp,
+			    "mc_create: amd_generic_mc_create failed\n");
 		return;
 	}
 
 	/*
 	 * Add memory controller properties
 	 */
-	(void) topo_pgroup_create(mcnode, &mc_pgroup, nerrp);
+	if (topo_pgroup_create(mcnode, &mc_pgroup, &err) < 0)
+		whinge(mod, nerrp, "mc_create: topo_pgroup_create failed\n");
 
 	for (nvp = nvlist_next_nvpair(mc, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(mc, nvp)) {
@@ -660,17 +664,19 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 
 			(void) nvpair_value_nvlist(nvp, &htnvl);
 			if (amd_htconfig(mod, pnode, htnvl) != 0)
-				++*nerrp;
+				whinge(mod, nerrp,
+				    "mc_create: amd_htconfig failed\n");
 		} else {
 			if (nvprop_add(mod, nvp, PGNAME(MCT), mcnode) != 0)
-				++*nerrp;
+				whinge(mod, nerrp,
+				    "mc_create: nvprop_add failed\n");
 		}
 	}
 
 	if (amd_dramchan_create(mod, mcnode, CHAN_NODE_NAME, auth) != 0 ||
 	    amd_cs_create(mod, mcnode, CS_NODE_NAME, mc, auth) != 0 ||
 	    amd_dimm_create(mod, mcnode, DIMM_NODE_NAME, mc, auth) != 0)
-		++*nerrp;
+		whinge(mod, nerrp, "mc_create: create children failed\n");
 
 	/*
 	 * Free the fmris for the chip-selects allocated in amd_cs_create

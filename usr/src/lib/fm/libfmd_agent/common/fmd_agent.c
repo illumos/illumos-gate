@@ -256,6 +256,7 @@ fmd_agent_page_retire(fmd_agent_hdl_t *hdl, nvlist_t *fmri)
 	 *   0 - success in retiring page
 	 *   -1, errno = EIO - page is already retired
 	 *   -1, errno = EAGAIN - page is scheduled for retirement
+	 *   -1, errno = EINVAL - page fmri is invalid
 	 *   -1, errno = any else - error
 	 */
 	if (rc == 0 || err == EIO || err == EINVAL) {
@@ -280,9 +281,10 @@ fmd_agent_page_unretire(fmd_agent_hdl_t *hdl, nvlist_t *fmri)
 	 *   0 - success in unretiring page
 	 *   -1, errno = EIO - page is already unretired
 	 *   -1, errno = EAGAIN - page couldn't be locked, still retired
+	 *   -1, errno = EINVAL - page fmri is invalid
 	 *   -1, errno = any else - error
 	 */
-	if (rc == 0 || err == EIO) {
+	if (rc == 0 || err == EIO || err == EINVAL) {
 		if (rc == 0)
 			(void) fmd_agent_seterrno(hdl, 0);
 		return (FMD_AGENT_RETIRE_DONE);
@@ -302,6 +304,7 @@ fmd_agent_page_isretired(fmd_agent_hdl_t *hdl, nvlist_t *fmri)
 	 *   0 - page is retired
 	 *   -1, errno = EAGAIN - page is scheduled for retirement
 	 *   -1, errno = EIO - page not scheduled for retirement
+	 *   -1, errno = EINVAL - page fmri is invalid
 	 *   -1, errno = any else - error
 	 */
 	if (rc == 0 || err == EINVAL) {

@@ -1000,7 +1000,7 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 		(void) nvlist_lookup_string(pa[npairs - 1], FM_FMRI_HC_ID,
 		    &hcid);
-		val = strtoll(hcid, NULL, 16);
+		val = strtoull(hcid, NULL, 16);
 		if (topo_mod_nvalloc(mod, &hcsp, NV_UNIQUE_NAME) != 0)
 			goto hcfmbail;
 		if (nvlist_add_uint64(hcsp, hcsn, val) != 0 ||
