@@ -77,6 +77,7 @@ etm_pciexrc_walker(topo_hdl_t *thp, tnode_t *node, void *arg)
 	/* physical id and bus address of a root complex */
 	ins = topo_node_instance(node);
 	(void) sscanf(str, "/pci@%llx", &ba);
+	topo_hdl_strfree(thp, str);
 
 	/*
 	 * prc vector is full, so double its size

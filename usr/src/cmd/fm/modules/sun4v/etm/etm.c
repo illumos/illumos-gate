@@ -87,7 +87,7 @@ etm_recv_from_remote_root(void *arg);
  * ------------------------- data structs for FMD ----------------------------
  */
 
-static fmd_hdl_ops_t fmd_ops = {
+static const fmd_hdl_ops_t fmd_ops = {
 	etm_recv,	/* fmdo_recv */
 	NULL,		/* fmdo_timeout */
 	NULL,		/* fmdo_close */
@@ -1608,15 +1608,21 @@ etm_msg_enq_head(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
 
 /*
  * etm_isovc_cleanup():
- * clean up what's in the passed-in iosvc struct, including the msg Q.
+ * clean up what's in the passed-in iosvc struct, optionally including the msg Q
  */
 static void
-etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc)
+etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc, boolean_t clean_msg_q)
 {
 
 	etm_iosvc_q_ele_t	msg_ele;	/* io svc msg Q ele */
 
 	iosvc->thr_is_dying = 1;
+
+	iosvc->ds_hdl = DS_INVALID_HDL;
+	if (iosvc->fmd_xprt != NULL) {
+		fmd_xprt_close(fmd_hdl, iosvc->fmd_xprt);
+		iosvc->fmd_xprt = NULL;
+	} /* if fmd-xprt has been opened */
 
 	if (iosvc->send_tid != NULL) {
 		fmd_thr_signal(fmd_hdl, iosvc->send_tid);
@@ -1630,21 +1636,17 @@ etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc)
 		iosvc->recv_tid = NULL;
 	} /* if root domain recv thread was created */
 
-	iosvc->ldom_name[0] = '\0';
 
-	iosvc->ds_hdl = DS_INVALID_HDL;
+	if (clean_msg_q) {
+		iosvc->ldom_name[0] = '\0';
 
-	if (iosvc->fmd_xprt != NULL) {
-		fmd_xprt_close(fmd_hdl, iosvc->fmd_xprt);
-		iosvc->fmd_xprt = NULL;
-	} /* if fmd-xprt has been opened */
-
-	(void) pthread_mutex_lock(&iosvc->msg_q_lock);
-	while (iosvc->msg_q_cur_len > 0) {
-		(void) etm_iosvc_msg_deq(fmd_hdl, iosvc, &msg_ele);
-		fmd_hdl_free(fmd_hdl, msg_ele.msg, msg_ele.msg_size);
+		(void) pthread_mutex_lock(&iosvc->msg_q_lock);
+		while (iosvc->msg_q_cur_len > 0) {
+			(void) etm_iosvc_msg_deq(fmd_hdl, iosvc, &msg_ele);
+			fmd_hdl_free(fmd_hdl, msg_ele.msg, msg_ele.msg_size);
+		}
+		(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
 	}
-	(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
 
 	return;
 
@@ -2818,10 +2820,44 @@ etm_async_q_deq(etm_async_event_ele_t *async_e)
 		etm_async_q_head = 0;
 	}
 	etm_async_q_cur_len--;
-/* etm_stats.etm_async__q_cur_len.fmds_value.ui64 = etm_async_q_cur_len; */
 
 	return (1);
 } /* etm_async_q_deq */
+
+
+/*
+ * setting up the fields in iosvc at DS_REG_CB time
+ */
+void
+etm_iosvc_setup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
+	etm_async_event_ele_t *async_e)
+{
+	iosvc->ds_hdl = async_e->ds_hdl;
+	iosvc->cur_send_xid = 0;
+	iosvc->xid_posted_ev = 0;
+	iosvc->start_sending_Q = 0;
+
+	/*
+	 * open the fmd xprt if it
+	 * hasn't been previously opened
+	 */
+	fmd_hdl_debug(fmd_hdl,  "info: before fmd_xprt_open ldom_name is %s\n",
+	    async_e->ldom_name);
+
+	if (iosvc->fmd_xprt == NULL) {
+		iosvc->fmd_xprt = fmd_xprt_open(fmd_hdl, flags, NULL, iosvc);
+	}
+
+	iosvc->thr_is_dying = 0;
+	if (iosvc->recv_tid == NULL) {
+		iosvc->recv_tid = fmd_thr_create(fmd_hdl,
+		    etm_recv_from_remote_root, iosvc);
+	}
+	if (iosvc->send_tid == NULL) {
+		iosvc->send_tid = fmd_thr_create(fmd_hdl,
+		    etm_send_to_remote_root, iosvc);
+	}
+} /* etm_iosvc_setup() */
 
 
 /*
@@ -3009,7 +3045,7 @@ etm_async_event_handler(void *arg)
 					    &iosvc_list_lock);
 					break;
 				}
-				etm_iosvc_cleanup(fmd_hdl, iosvc);
+				etm_iosvc_cleanup(fmd_hdl, iosvc, B_TRUE);
 				(void) pthread_mutex_unlock(
 				    &iosvc_list_lock);
 				break;
@@ -3081,83 +3117,22 @@ etm_async_event_handler(void *arg)
 						    "error: can't create iosvc "
 						    "for async evnt %d\n",
 						    async_e.event_type);
-					(void) pthread_mutex_unlock(
-					    &iosvc_list_lock);
+						(void) pthread_mutex_unlock(
+						    &iosvc_list_lock);
 						break;
 					}
-					iosvc->ds_hdl = async_e.ds_hdl;
-					iosvc->cur_send_xid = 0;
 
-					/*
-					 * open the fmd xprt if it
-					 * hasn't been previously opened
-					 */
-					iosvc->start_sending_Q = 0;
-					fmd_hdl_debug(fmd_hdl,
-					    "info: before fmd_xprt_open"
-					    "ldom_name is %s\n",
-					    async_e.ldom_name);
-					if (iosvc->fmd_xprt == NULL) {
-						iosvc->fmd_xprt =
-						    fmd_xprt_open(
-						    fmd_hdl,
-						    flags, NULL,
-						    iosvc);
-					}
-
-					iosvc->thr_is_dying = 0;
-					if (iosvc->recv_tid == NULL) {
-						iosvc->recv_tid =
-						    fmd_thr_create(
-						    fmd_hdl,
-						    etm_recv_from_remote_root,
-						    iosvc);
-					}
-					if (iosvc->send_tid == NULL) {
-						iosvc->send_tid =
-						    fmd_thr_create(
-						    fmd_hdl,
-						    etm_send_to_remote_root,
-						    iosvc);
-					}
-
+					etm_iosvc_setup(fmd_hdl, iosvc,
+					    &async_e);
 					(void) pthread_mutex_unlock(
 					    &iosvc_list_lock);
 				} else {
 					iosvc = &io_svc;
 					(void) strcpy(iosvc->ldom_name,
 					    async_e.ldom_name);
-					iosvc->ds_hdl = async_e.ds_hdl;
-					iosvc->cur_send_xid = 0;
-					iosvc->start_sending_Q = 0;
 
-					/*
-					 * open the fmd xprt if it
-					 * hasn't been previously opened
-					 */
-					if (iosvc->fmd_xprt == NULL) {
-						iosvc->fmd_xprt =
-						    fmd_xprt_open(
-						    fmd_hdl,
-						    flags, NULL,
-						    iosvc);
-					}
-
-					iosvc->thr_is_dying = 0;
-					if (iosvc->recv_tid == NULL) {
-						iosvc->recv_tid =
-						    fmd_thr_create(
-						    fmd_hdl,
-						    etm_recv_from_remote_root,
-						    iosvc);
-					}
-					if (iosvc->send_tid == NULL) {
-						iosvc->send_tid =
-						    fmd_thr_create(
-						    fmd_hdl,
-						    etm_send_to_remote_root,
-						    iosvc);
-					}
+					etm_iosvc_setup(fmd_hdl, iosvc,
+					    &async_e);
 				}
 				break;
 
@@ -3195,68 +3170,27 @@ etm_async_event_handler(void *arg)
 					 * the ldom name and the msg Q
 					 * remains in iosvc_list
 					 */
-					iosvc->ds_hdl = DS_INVALID_HDL;
-					if (iosvc->fmd_xprt != NULL)
-						fmd_xprt_close(fmd_hdl,
-						    iosvc->fmd_xprt);
-					iosvc->fmd_xprt = NULL;
-
 					if (iosvc->ldom_name != '\0')
 						fmd_hdl_debug(fmd_hdl,
 						    "info: iosvc  w/ ldom_name "
 						    "%s \n", iosvc->ldom_name);
 
 					/*
-					 * destroy send/recv threads
-					 * on Control side.
+					 * destroy send/recv threads and
+					 * other clean up on Control side.
 					 */
-					iosvc->thr_is_dying = 1;
-					if (iosvc->send_tid != NULL) {
-						fmd_thr_signal(fmd_hdl,
-						    iosvc->send_tid);
-						fmd_thr_destroy(fmd_hdl,
-						    iosvc->send_tid);
-						iosvc->send_tid = NULL;
-					} /* if send tid was created */
-
-					if (iosvc->recv_tid != NULL) {
-						fmd_thr_signal(fmd_hdl,
-						    iosvc->recv_tid);
-						fmd_thr_destroy(fmd_hdl,
-						    iosvc->recv_tid);
-						iosvc->recv_tid = NULL;
-					} /* if recv tid was created */
-
+					etm_iosvc_cleanup(fmd_hdl, iosvc,
+					    B_FALSE);
 					(void) pthread_mutex_unlock(
 					    &iosvc_list_lock);
 				} else {
 					iosvc = &io_svc;
 					/*
-					 * destroy send/recv threads
-					 * on Root side.
+					 * destroy send/recv threads and
+					 * then clean up on Root side.
 					 */
-					iosvc->thr_is_dying = 1;
-					if (iosvc->send_tid != NULL) {
-						fmd_thr_signal(fmd_hdl,
-						    iosvc->send_tid);
-						fmd_thr_destroy(fmd_hdl,
-						    iosvc->send_tid);
-						iosvc->send_tid = NULL;
-					} /* if send tid was created */
-
-					if (iosvc->recv_tid != NULL) {
-						fmd_thr_signal(fmd_hdl,
-						    iosvc->recv_tid);
-						fmd_thr_destroy(fmd_hdl,
-						    iosvc->recv_tid);
-						iosvc->recv_tid = NULL;
-					} /* if recv tid was created */
-
-					iosvc->ds_hdl = DS_INVALID_HDL;
-					if (iosvc->fmd_xprt != NULL)
-						fmd_xprt_close(fmd_hdl,
-						    iosvc->fmd_xprt);
-					iosvc->fmd_xprt = NULL;
+					etm_iosvc_cleanup(fmd_hdl, iosvc,
+					    B_FALSE);
 				}
 				break;
 
@@ -4296,7 +4230,7 @@ _fmd_fini(fmd_hdl_t *hdl)
 				 */
 				iosvc = &iosvc_list[i];
 				(void) pthread_mutex_lock(&iosvc_list_lock);
-				etm_iosvc_cleanup(hdl, iosvc);
+				etm_iosvc_cleanup(hdl, iosvc, B_TRUE);
 				(void) pthread_mutex_unlock(&iosvc_list_lock);
 
 			} else {
