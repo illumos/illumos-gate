@@ -358,7 +358,12 @@ static struct blacklist {
 
 	/* Aigo Miniking Device NEHFSP14 */
 	{MS_AIGO_VID, MS_AIGO_DEVICE_6981, 0,
-	    SCSA2USB_ATTRS_USE_CSW_RESIDUE}
+	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
+
+	/* Alcor Micro Corp 6387 flash disk */
+	{MS_ALCOR_VID, MS_ALCOR_PID0, 0,
+	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_USE_CSW_RESIDUE}
+
 };
 
 

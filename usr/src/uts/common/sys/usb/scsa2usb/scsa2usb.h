@@ -108,6 +108,9 @@ extern "C" {
 #define	MS_AIGO_VID		0xed1	/* VendorID of Aigo */
 #define	MS_AIGO_DEVICE_6981	0x6981	/* Aigo Miniking Device NEHFSP14 */
 
+#define	MS_ALCOR_VID	0x58f	/* Vendor ID of Alcor Micro Corp */
+#define	MS_ALCOR_PID0	0x6387	/* PID for 6387 flash disk */
+
 /*
  * The AMI virtual floppy device is not a real USB storage device, but
  * emulated by the SP firmware shipped together with important Sun x86
