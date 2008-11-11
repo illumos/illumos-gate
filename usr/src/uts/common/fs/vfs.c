@@ -1033,7 +1033,7 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 
 	ldi_id = ldi_ident_from_anon();
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
-	(void) strlcpy(li->li_filename, pn.pn_path, MAXPATHLEN + 1);
+	(void) strlcpy(li->li_filename, pn.pn_path, MAXPATHLEN);
 
 	/*
 	 * The lofi control node is currently exclusive-open.  We'd like

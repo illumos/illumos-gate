@@ -844,7 +844,7 @@ copy_in_lofi_ioctl(const struct lofi_ioctl *ulip, int flag)
 	}
 
 	/* make sure filename is always null-terminated */
-	klip->li_filename[MAXPATHLEN] = '\0';
+	klip->li_filename[MAXPATHLEN - 1] = '\0';
 
 	/* validate minor number */
 	if (klip->li_minor > lofi_max_files) {

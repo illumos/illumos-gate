@@ -27,8 +27,6 @@
 #ifndef	_SYS_LOFI_H
 #define	_SYS_LOFI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/taskq.h>
@@ -120,7 +118,7 @@ struct lofi_ioctl {
 	uint32_t 	li_minor;
 	boolean_t	li_force;
 	boolean_t	li_cleanup;
-	char	li_filename[MAXPATHLEN + 1];
+	char	li_filename[MAXPATHLEN];
 	char	li_algorithm[MAXALGLEN];
 };
 

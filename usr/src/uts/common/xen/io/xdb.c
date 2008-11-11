@@ -822,7 +822,7 @@ xdb_setup_node(xdb_t *vdp, char *path)
 	}
 
 	if (!XDB_IS_LOFI(vdp)) {
-		(void) strlcpy(path, node, MAXPATHLEN + 1);
+		(void) strlcpy(path, node, MAXPATHLEN);
 		kmem_free(node, len);
 		return (DDI_SUCCESS);
 	}
@@ -837,7 +837,7 @@ xdb_setup_node(xdb_t *vdp, char *path)
 	}
 
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
-	(void) strlcpy(li->li_filename, node, MAXPATHLEN + 1);
+	(void) strlcpy(li->li_filename, node, MAXPATHLEN);
 	kmem_free(node, len);
 	if (ldi_ioctl(ldi_hdl, LOFI_MAP_FILE, (intptr_t)li,
 	    LOFI_MODE | FKIOCTL, kcred, &minor) != 0) {
@@ -851,7 +851,7 @@ xdb_setup_node(xdb_t *vdp, char *path)
 	 * return '/devices/...' instead of '/dev/lofi/...' since the
 	 * former is available immediately after calling ldi_ioctl
 	 */
-	(void) snprintf(path, MAXPATHLEN + 1, LOFI_DEV_NODE "%d", minor);
+	(void) snprintf(path, MAXPATHLEN, LOFI_DEV_NODE "%d", minor);
 	(void) xenbus_printf(XBT_NULL, xsnode, "node", "%s", path);
 	(void) ldi_close(ldi_hdl, LOFI_MODE, kcred);
 	kmem_free(li, sizeof (*li));
@@ -887,7 +887,7 @@ xdb_teardown_node(xdb_t *vdp)
 	}
 
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
-	(void) strlcpy(li->li_filename, node, MAXPATHLEN + 1);
+	(void) strlcpy(li->li_filename, node, MAXPATHLEN);
 	kmem_free(node, len);
 
 	do {
@@ -952,20 +952,20 @@ xdb_open_device(xdb_t *vdp)
 	if (ldi_ident_from_dip(dip, &vdp->xs_ldi_li) != 0)
 		return (DDI_FAILURE);
 
-	nodepath = kmem_zalloc(MAXPATHLEN + 1, KM_SLEEP);
+	nodepath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 	err = xdb_setup_node(vdp, nodepath);
 	if (err != DDI_SUCCESS) {
 		xvdi_fatal_error(dip, err,
 		    "Getting device path of backend device");
 		ldi_ident_release(vdp->xs_ldi_li);
-		kmem_free(nodepath, MAXPATHLEN + 1);
+		kmem_free(nodepath, MAXPATHLEN);
 		return (DDI_FAILURE);
 	}
 
 	if (*nodepath == '\0') {
 		/* Allow a CD-ROM device with an empty backend. */
 		vdp->xs_sectors = 0;
-		kmem_free(nodepath, MAXPATHLEN + 1);
+		kmem_free(nodepath, MAXPATHLEN);
 		return (DDI_SUCCESS);
 	}
 
@@ -976,7 +976,7 @@ xdb_open_device(xdb_t *vdp)
 		ldi_ident_release(vdp->xs_ldi_li);
 		cmn_err(CE_WARN, "xdb@%s: Failed to open: %s",
 		    ddi_get_name_addr(dip), nodepath);
-		kmem_free(nodepath, MAXPATHLEN + 1);
+		kmem_free(nodepath, MAXPATHLEN);
 		return (DDI_FAILURE);
 	}
 
@@ -995,12 +995,12 @@ xdb_open_device(xdb_t *vdp)
 		    FREAD | (XDB_IS_RO(vdp) ? 0 : FWRITE), kcred);
 		xdb_teardown_node(vdp);
 		ldi_ident_release(vdp->xs_ldi_li);
-		kmem_free(nodepath, MAXPATHLEN + 1);
+		kmem_free(nodepath, MAXPATHLEN);
 		return (DDI_FAILURE);
 	}
 	vdp->xs_sectors = devsize / XB_BSIZE;
 
-	kmem_free(nodepath, MAXPATHLEN + 1);
+	kmem_free(nodepath, MAXPATHLEN);
 	return (DDI_SUCCESS);
 }
 
