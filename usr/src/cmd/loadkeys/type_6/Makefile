@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/loadkeys/type_6/Makefile
@@ -35,7 +34,7 @@ KEYTABLES = \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
         maltauk albania turkeyq turkeyf latvia lithuania macedonia russia \
-	latinamerica
+        latinamerica canadian_bilingual brazil
 
 KEYTABLESCONFIG = kbd_layouts
 
@@ -55,7 +54,8 @@ LAYOUTS= \
 	layout_10a layout_10b layout_1a layout_1b layout_1c layout_1e \
 	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
 	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
-	layout_10f layout_1f layout_23 layout_15 layout_05 layout_11
+	layout_10f layout_1f layout_23 layout_15 layout_05 layout_11 \
+	layout_03 layout_110
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -88,6 +88,9 @@ $(ROOTKEYDIR)/layout_00: $(ROOTKEYDIR)/us
 
 $(ROOTKEYDIR)/layout_02: $(ROOTKEYDIR)/belgium
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/belgium $@
+
+$(ROOTKEYDIR)/layout_03: $(ROOTKEYDIR)/canadian_bilingual
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/canadian_bilingual $@
 
 $(ROOTKEYDIR)/layout_04: $(ROOTKEYDIR)/canadian_french
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/canadian_french $@
@@ -209,5 +212,7 @@ $(ROOTKEYDIR)/layout_1f: $(ROOTKEYDIR)/turkeyq
 $(ROOTKEYDIR)/layout_23: $(ROOTKEYDIR)/turkeyf
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/turkeyf  $@
 
+$(ROOTKEYDIR)/layout_110: $(ROOTKEYDIR)/brazil
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/brazil  $@
 
 include ../../Makefile.targ

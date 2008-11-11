@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # The following lines define the keyboard layouts supported in kernel.
@@ -36,7 +35,9 @@
 Albanian=264
 Belarusian=261
 Belgian=2
+Brazilian=272
 Bulgarian=260
+Canadian-Bilingual=3
 Croatian=259
 Czech=5
 Danish=6

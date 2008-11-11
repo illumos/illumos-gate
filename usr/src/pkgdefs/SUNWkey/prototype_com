@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -108,6 +107,7 @@ l none usr/share/lib/keytables/type_101/layout_3e9=../../../../../usr/share/lib/
 d none usr/share/lib/keytables/type_6 755 root bin
 f none usr/share/lib/keytables/type_6/kbd_layouts 444 root bin
 f none usr/share/lib/keytables/type_6/belgium 444 root bin
+f none usr/share/lib/keytables/type_6/brazil 444 root bin
 f none usr/share/lib/keytables/type_6/czech 444 root bin
 f none usr/share/lib/keytables/type_6/denmark  444 root bin
 f none usr/share/lib/keytables/type_6/finnish 444 root bin
@@ -141,6 +141,7 @@ f none usr/share/lib/keytables/type_6/albania 444 root bin
 f none usr/share/lib/keytables/type_6/turkeyq 444 root bin
 f none usr/share/lib/keytables/type_6/turkeyf 444 root bin
 f none usr/share/lib/keytables/type_6/canadian_french 444 root bin
+f none usr/share/lib/keytables/type_6/canadian_bilingual 444 root bin
 f none usr/share/lib/keytables/type_6/greece 444 root bin
 f none usr/share/lib/keytables/type_6/hungary 444 root bin
 f none usr/share/lib/keytables/type_6/latvia 444 root bin
@@ -151,6 +152,7 @@ f none usr/share/lib/keytables/type_6/latinamerica 444 root bin
 
 l none usr/share/lib/keytables/type_6/layout_00=../../../../../usr/share/lib/keytables/type_6/us
 l none usr/share/lib/keytables/type_6/layout_02=../../../../../usr/share/lib/keytables/type_6/belgium
+l none usr/share/lib/keytables/type_6/layout_03=../../../../../usr/share/lib/keytables/type_6/canadian_bilingual
 l none usr/share/lib/keytables/type_6/layout_05=../../../../../usr/share/lib/keytables/type_6/czech
 l none usr/share/lib/keytables/type_6/layout_06=../../../../../usr/share/lib/keytables/type_6/denmark
 l none usr/share/lib/keytables/type_6/layout_07=../../../../../usr/share/lib/keytables/type_6/finnish
@@ -182,6 +184,7 @@ l none usr/share/lib/keytables/type_6/layout_106=../../../../../usr/share/lib/ke
 l none usr/share/lib/keytables/type_6/layout_107=../../../../../usr/share/lib/keytables/type_6/maltauk
 l none usr/share/lib/keytables/type_6/layout_108=../../../../../usr/share/lib/keytables/type_6/albania
 l none usr/share/lib/keytables/type_6/layout_10f=../../../../../usr/share/lib/keytables/type_6/japan
+l none usr/share/lib/keytables/type_6/layout_110=../../../../../usr/share/lib/keytables/type_6/brazil
 l none usr/share/lib/keytables/type_6/layout_04=../../../../../usr/share/lib/keytables/type_6/canadian_french
 l none usr/share/lib/keytables/type_6/layout_0a=../../../../../usr/share/lib/keytables/type_6/greece
 l none usr/share/lib/keytables/type_6/layout_0c=../../../../../usr/share/lib/keytables/type_6/hungary
