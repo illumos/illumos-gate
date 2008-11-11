@@ -458,6 +458,10 @@ remove_subtractive_res()
 						(void) memlist_remove(
 						    &pci_bus_res[j].mem_space,
 						    list->address, list->size);
+					if (pci_bus_res[j].pmem_space)
+						(void) memlist_remove(
+						    &pci_bus_res[j].pmem_space,
+						    list->address, list->size);
 				}
 				list = list->next;
 			}
@@ -468,6 +472,10 @@ remove_subtractive_res()
 					if (pci_bus_res[j].pmem_space)
 						(void) memlist_remove(
 						    &pci_bus_res[j].pmem_space,
+						    list->address, list->size);
+					if (pci_bus_res[j].mem_space)
+						(void) memlist_remove(
+						    &pci_bus_res[j].mem_space,
 						    list->address, list->size);
 				}
 				list = list->next;
@@ -582,6 +590,11 @@ get_parbus_mem_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
 		if (addr) {
 			memlist_insert(&pci_bus_res[res_bus].mem_space_used,
 			    addr, size);
+			/* remove it from PMEM resource also */
+			if (pci_bus_res[res_bus].pmem_space)
+				(void) memlist_remove(
+				    &pci_bus_res[res_bus].pmem_space,
+				    addr, size);
 			/* free the old resource */
 			memlist_free_all(&pci_bus_res[bus].mem_space);
 			/* add the new resource */
@@ -2053,13 +2066,17 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					res_bus = pci_bus_res[res_bus].par_bus;
 					if (res_bus == (uchar_t)-1)
 						break; /* root bus already */
-					if ((phys_hi & PCI_PREFETCH_B) &&
-					    (res_bus != 0))
-						mres = &pci_bus_res
-						    [res_bus].pmem_space;
+					mem_res =
+					    &pci_bus_res[res_bus].mem_space;
+					if (res_bus == 0)
+						pmem_res = mem_res;
 					else
-						mres = &pci_bus_res
-						    [res_bus].mem_space;
+						pmem_res = &pci_bus_res
+						    [res_bus].pmem_space;
+					if (phys_hi & PCI_PREFETCH_B)
+						mres = pmem_res;
+					else
+						mres = mem_res;
 					if (*mres)
 						break;
 				}
@@ -2075,9 +2092,16 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			if (config_op == CONFIG_INFO) {
 				/* take out of the resource map of the bus */
 				if (base != 0) {
-					if (*mres)
-						(void) memlist_remove(mres,
+					if (*mem_res) {
+						/* remove it from MEM space */
+						(void) memlist_remove(mem_res,
 						    base, len);
+					}
+					if (mem_res != pmem_res && *pmem_res) {
+						/* remove it from PMEM space */
+						(void) memlist_remove(pmem_res,
+						    base, len);
+					}
 					memlist_insert(mres_used, base, len);
 				} else
 					reprogram = 1;
@@ -2085,6 +2109,16 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			    pci_bus_res[bus].mem_reprogram) {
 				base = (uint_t)memlist_find(mres, len, len);
 				if (base != NULL) {
+					if (mres != mem_res && *mem_res) {
+						/* remove it from MEM space */
+						(void) memlist_remove(mem_res,
+						    base, len);
+					} else if (mres != pmem_res &&
+					    *pmem_res) {
+						/* remove it from PMEM space */
+						(void) memlist_remove(pmem_res,
+						    base, len);
+					}
 					memlist_insert(mres_used, base, len);
 					pci_putl(bus, dev, func, offset,
 					    base | type);
@@ -2335,9 +2369,14 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		memlist_insert(&pci_bus_res[bus].mem_space_used,
 		    (uint64_t)mem_range[0],
 		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
-		/* remove from parent resouce list */
+		/* remove from parent resource list */
 		if (pci_bus_res[bus].mem_space != NULL) {
 			(void) memlist_remove(&pci_bus_res[bus].mem_space,
+			    (uint64_t)mem_range[0],
+			    (uint64_t)(mem_range[1] - mem_range[0] + 1));
+		}
+		if (pci_bus_res[bus].pmem_space != NULL) {
+			(void) memlist_remove(&pci_bus_res[bus].pmem_space,
 			    (uint64_t)mem_range[0],
 			    (uint64_t)(mem_range[1] - mem_range[0] + 1));
 		}
@@ -2357,8 +2396,14 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		memlist_insert(&pci_bus_res[bus].pmem_space_used,
 		    (uint64_t)pmem_range[0],
 		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
+		/* remove from parent resource list */
 		if (pci_bus_res[bus].pmem_space != NULL) {
 			(void) memlist_remove(&pci_bus_res[bus].pmem_space,
+			    (uint64_t)pmem_range[0],
+			    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
+		}
+		if (pci_bus_res[bus].mem_space != NULL) {
+			(void) memlist_remove(&pci_bus_res[bus].mem_space,
 			    (uint64_t)pmem_range[0],
 			    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
 		}
