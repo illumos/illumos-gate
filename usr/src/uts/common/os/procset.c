@@ -26,9 +26,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.25 */
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -178,7 +175,8 @@ dotoprocs(procset_t *psp, int (*funcp)(), char *arg)
 			continue;
 
 		mutex_enter(&prp->p_lock);
-		if (prp->p_flag & SSYS || procinset(prp, psp) == 0) {
+		if (prp->p_flag & SSYS || prp->p_tlist == NULL ||
+		    procinset(prp, psp) == 0) {
 			mutex_exit(&prp->p_lock);
 		} else {
 			mutex_exit(&prp->p_lock);
@@ -269,11 +267,11 @@ checkprocset(procset_t *psp)
 
 /*
  * procinset returns 1 if the process pointed to by pp is in the process
- * set specified by psp, otherwise 0 is returned. A process that is
- * exiting, by which we mean that its p_tlist is NULL, cannot belong
- * to any set; pp's p_lock must be held across the call to this function.
- * The caller should ensure that the process does not belong to the SYS
- * scheduling class.
+ * set specified by psp, otherwise 0 is returned. If either process set operand
+ * has type P_CID and pp refers to a process that is exiting, by which we mean
+ * that its p_tlist is NULL, then procinset will return 0. pp's p_lock must be
+ * held across the call to this function. The caller should ensure that the
+ * process does not belong to the SYS scheduling class.
  *
  * This function expects to be called with a valid procset_t.
  * The set should be checked using checkprocset() before calling
@@ -286,12 +284,9 @@ procinset(proc_t *pp, procset_t *psp)
 	int	roperand = 0;
 	int	lwplinproc = 0;
 	int	lwprinproc = 0;
-	kthread_t	*tp = proctot(pp);
+	kthread_t	*tp;
 
 	ASSERT(MUTEX_HELD(&pp->p_lock));
-
-	if (tp == NULL)
-		return (0);
 
 	switch (psp->p_lidtype) {
 
@@ -324,12 +319,10 @@ procinset(proc_t *pp, procset_t *psp)
 		break;
 
 	case P_CID:
-		ASSERT(tp != NULL);
-		/* This case is broken for now. Need to be fixed XXX */
+		tp = proctot(pp);
+		if (tp == NULL)
+			return (0);
 		if (tp->t_cid == psp->p_lid)
-			/*
-			 * if (checkcid(psp->p_lid))
-			 */
 			loperand++;
 		break;
 
@@ -421,12 +414,10 @@ procinset(proc_t *pp, procset_t *psp)
 		break;
 
 	case P_CID:
-		ASSERT(tp != NULL);
-		/* This case is broken for now. Need to be fixed XXX */
+		tp = proctot(pp);
+		if (tp == NULL)
+			return (0);
 		if (tp->t_cid == psp->p_rid)
-			/*
-			 * if (checkcid(psp->p_rid))
-			 */
 			roperand++;
 		break;
 

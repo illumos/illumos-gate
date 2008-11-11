@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/pool.h>
 #include <sys/pool_impl.h>
 #include <sys/pool_pset.h>
@@ -1489,12 +1487,13 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 			continue;
 
 		mutex_enter(&p->p_lock);
+
 		/*
-		 * Skip processes in local zones if we're not binding
-		 * zones to pools (P_ZONEID).  Skip kernel processes also.
+		 * Skip system processes and make sure that the child is in
+		 * the same task/project/pool/zone as the parent.
 		 */
-		if ((!INGLOBALZONE(p) && idtype != P_ZONEID) ||
-		    p->p_flag & SSYS) {
+		if ((!INGLOBALZONE(p) && idtype != P_ZONEID &&
+		    idtype != P_POOLID) || p->p_flag & SSYS) {
 			mutex_exit(&p->p_lock);
 			continue;
 		}
