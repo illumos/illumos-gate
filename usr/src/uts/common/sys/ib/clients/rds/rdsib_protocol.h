@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -74,8 +74,6 @@
 
 #ifndef _RDSIB_PROTOCOL_H
 #define	_RDSIB_PROTOCOL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -199,6 +197,7 @@ typedef struct rds_data_hdr_s {
 #define	RDS_CTRL_CODE_STALL_PORTS	3
 #define	RDS_CTRL_CODE_UNSTALL_PORTS	4
 #define	RDS_CTRL_CODE_HEARTBEAT		5
+#define	RDS_CTRL_CODE_CLOSE_SESSION	6
 
 /*
  * RDS ctrl packet

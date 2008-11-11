@@ -375,7 +375,20 @@ mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
 	mdi_vhci_t		*vh = NULL;
 
 	ASSERT(vops->vo_revision == MDI_VHCI_OPS_REV);
-	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(vdip)));
+#ifdef DEBUG
+	/*
+	 * IB nexus driver is loaded only when IB hardware is present.
+	 * In order to be able to do this there is a need to drive the loading
+	 * and attaching of the IB nexus driver (especially when an IB hardware
+	 * is dynamically plugged in) when an IB HCA driver (PHCI)
+	 * is being attached. Unfortunately this gets into the limitations
+	 * of devfs as there seems to be no clean way to drive configuration
+	 * of a subtree from another subtree of a devfs. Hence, do not ASSERT
+	 * for IB.
+	 */
+	if (strcmp(class, MDI_HCI_CLASS_IB) != 0)
+		ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(vdip)));
+#endif
 
 	i_mdi_init();
 

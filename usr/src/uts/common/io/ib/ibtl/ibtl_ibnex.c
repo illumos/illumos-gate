@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
+#include <sys/sunndi.h>
+#include <sys/sunmdi.h>
 #include <sys/ib/ibtl/impl/ibtl.h>
 #include <sys/ib/ibtl/impl/ibtl_ibnex.h>
 
@@ -264,8 +263,8 @@ ibtl_ibnex_get_hca_info(ib_guid_t hca_guid, int flag, char **buffer,
 		return (ibt_get_module_failure(IBT_FAILURE_IBTL, 0));
 	}
 
-	IBTF_DPRINTF_L4(ibtl_ibnex,
-		"ibtl_ibnex_get_hca_info: size = %x", *bufsiz);
+	IBTF_DPRINTF_L4(ibtl_ibnex, "ibtl_ibnex_get_hca_info: size = %x",
+	    *bufsiz);
 	nvlist_free(nvl);
 	return (IBT_SUCCESS);
 }
@@ -547,4 +546,79 @@ ibtl_ibnex_valid_hca_parent(dev_info_t *pdip)
 		mutex_exit(&ibtl_clnt_list_mutex);
 		return (IBT_NO_HCAS_AVAILABLE);
 	}
+}
+
+/*
+ * Function:
+ *	ibtl_ibnex_phci_register
+ * Input:
+ *	hca_dip		- The HCA dip
+ * Output:
+ *	NONE
+ * Returns:
+ *	IBT_SUCCESS/IBT_FAILURE
+ * Description:
+ * 	Register the HCA dip as the MPxIO PCHI.
+ */
+ibt_status_t
+ibtl_ibnex_phci_register(dev_info_t *hca_dip)
+{
+	/* Register the with MPxIO as PHCI */
+	if (mdi_phci_register(MDI_HCI_CLASS_IB, hca_dip, 0) !=
+	    MDI_SUCCESS) {
+		return (IBT_FAILURE);
+	}
+	return (IBT_SUCCESS);
+}
+
+/*
+ * Function:
+ *	ibtl_ibnex_phci_unregister
+ * Input:
+ *	hca_dip		- The HCA dip
+ * Output:
+ *	NONE
+ * Returns:
+ *	IBT_SUCCESS/IBT_FAILURE
+ * Description:
+ * 	Free up any pending MPxIO Pathinfos and unregister the HCA dip as the
+ * 	MPxIO PCHI.
+ */
+ibt_status_t
+ibtl_ibnex_phci_unregister(dev_info_t *hca_dip)
+{
+	mdi_pathinfo_t *pip = NULL;
+	dev_info_t *vdip = 0;
+	int circ = 0, circ1 = 0;
+
+	/*
+	 * Should free all the Pathinfos associated with the HCA pdip before
+	 * unregistering the PHCI.
+	 *
+	 * mdi_pi_free will call ib_vhci_pi_uninit() callbackfor each PI where
+	 * the ibnex internal datastructures (ibnex_node_data) will have to be
+	 * cleaned up if needed.
+	 */
+	vdip = mdi_devi_get_vdip(hca_dip);
+	ndi_devi_enter(vdip, &circ1);
+	ndi_devi_enter(hca_dip, &circ);
+	while (pip = mdi_get_next_client_path(hca_dip, NULL)) {
+		if (mdi_pi_free(pip, 0) == MDI_SUCCESS) {
+			continue;
+		}
+		ndi_devi_exit(hca_dip, circ);
+		ndi_devi_exit(vdip, circ1);
+		IBTF_DPRINTF_L1(ibtl_ibnex, "ibtl_ibnex_phci_unregister: "
+		    "mdi_pi_free failed");
+		return (IBT_FAILURE);
+	}
+	ndi_devi_exit(hca_dip, circ);
+	ndi_devi_exit(vdip, circ1);
+
+	if (mdi_phci_unregister(hca_dip, 0) != MDI_SUCCESS) {
+		IBTF_DPRINTF_L1(ibtl_ibnex, "ibtl_ibnex_phci_unregister: PHCI "
+		    "unregister failed");
+		return (IBT_FAILURE);
+	}
+	return (IBT_SUCCESS);
 }

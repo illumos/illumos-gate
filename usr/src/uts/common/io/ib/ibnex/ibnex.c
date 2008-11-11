@@ -40,8 +40,6 @@
  * device tree nodes.
  */
 
-
-
 #include <sys/conf.h>
 #include <sys/stat.h>
 #include <sys/modctl.h>
@@ -118,11 +116,11 @@ static int		ibnex_devname2port(char *, int *);
 static int		ibnex_config_ioc_node(char *, dev_info_t *);
 static int		ibnex_devname_to_node_n_ioc_guids(
 			    char *, ib_guid_t *, ib_guid_t *, char **);
-static int		ibnex_is_ioc_present(ib_guid_t);
 static void		ibnex_ioc_node_cleanup();
 static void		ibnex_delete_ioc_node_data(ibnex_node_data_t *);
-int			ibnex_ioc_initnode(ibdm_ioc_info_t *, int,
-					    dev_info_t *);
+int			ibnex_ioc_initnode_all_pi(ibdm_ioc_info_t *);
+static int		ibnex_ioc_initnode_pdip(ibnex_node_data_t *,
+			    ibdm_ioc_info_t *, dev_info_t *);
 static int		ibnex_create_ioc_node_prop(
 			    ibdm_ioc_info_t *, dev_info_t *);
 static int		ibnex_create_ioc_compatible_prop(
@@ -156,10 +154,11 @@ extern int		ibnex_offline_childdip(dev_info_t *);
 
 static int		ibnex_ioc_create_pi(
 			    ibdm_ioc_info_t *, ibnex_node_data_t *,
-			    dev_info_t *);
+			    dev_info_t *, int *);
 static int		ibnex_bus_power(dev_info_t *, void *,
 			    pm_bus_power_op_t, void *, void *);
-int			ibnex_pseudo_create_pi(ibnex_node_data_t *,
+int			ibnex_pseudo_create_all_pi(ibnex_node_data_t *);
+static int		ibnex_pseudo_create_pi_pdip(ibnex_node_data_t *,
 			    dev_info_t *);
 static int		ibnex_pseudo_config_one(
 			    ibnex_node_data_t *, char *, dev_info_t *);
@@ -170,6 +169,11 @@ static int		ibnex_ioc_bus_config_one(dev_info_t **, uint_t,
 			    ddi_bus_config_op_t, void *, dev_info_t **, int *);
 static int		ibnex_is_merge_node(dev_info_t *);
 static void		ibnex_hw_in_dev_tree(char *);
+static int		ibnex_ioc_config_from_pdip(ibdm_ioc_info_t *,
+    dev_info_t *, int);
+static int		ibnex_ioc_pi_exists(ibnex_node_data_t *, dev_info_t *);
+static int		ibnex_ioc_pi_reachable(ibdm_ioc_info_t *,
+    dev_info_t *);
 
 /*
  * The bus_ops structure defines the capabilities of HCA nexus driver.
@@ -326,12 +330,12 @@ _NOTE(MUTEX_PROTECTS_DATA(ibnex.ibnex_mutex, ibnex_s))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibnex.ibnex_num_comm_svcs
 	ibnex.ibnex_comm_svc_names ibnex.ibnex_nvppa_comm_svcs
 	ibnex.ibnex_vppa_comm_svc_names ibnex.ibnex_nhcasvc_comm_svcs
-	ibnex.ibnex_hcasvc_comm_svc_names))
+	ibnex.ibnex_hcasvc_comm_svc_names ibnex.ibnex_ioc_list))
 _NOTE(MUTEX_PROTECTS_DATA(ibnex.ibnex_mutex, ibnex_node_data_s))
 _NOTE(LOCK_ORDER(ibdm.ibdm_hl_mutex ibnex.ibnex_mutex))
 
 /* The port settling time in seconds */
-int	ibnex_port_settling_time = 8;
+int	ibnex_port_settling_time = 30;
 
 /* create an array of properties supported, easier to add new ones here */
 static struct ibnex_property {
@@ -1113,13 +1117,27 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 	ibnex_port_node_t	*port_node;
 	int			use_mdi_devi_locking = 0;
 
+	if (parent != ibnex.ibnex_dip) {
+		/*
+		 * This must be an HCA.In a normal case HCA is setup as a phci.
+		 * If an HCA is in maintenance mode, its phci is not set up
+		 * but the driver is attached to update the firmware. In this
+		 * case, do not configure the MPxIO clients.
+		 */
+		if (mdi_component_is_phci(parent, NULL) == MDI_FAILURE) {
+			if (op == BUS_CONFIG_ALL || op == BUS_CONFIG_DRIVER)
+				return (NDI_SUCCESS);
+			else
+				return (NDI_FAILURE);
+		}
 
-	/* Set use_mdi_devi_locking appropriately */
-	if ((mdi_component_is_phci(parent, NULL) == MDI_SUCCESS) &&
-	    ((op != BUS_CONFIG_ONE) || (op == BUS_CONFIG_ONE &&
-	    strncmp((char *)devname, IBNEX_IBPORT_CNAME, 6) != 0))) {
-		IBTF_DPRINTF_L4("ibnex", "\tbus_config: using mdi_devi_enter");
-		use_mdi_devi_locking = 1;
+		/* Set use_mdi_devi_locking appropriately */
+		if ((op != BUS_CONFIG_ONE) || (op == BUS_CONFIG_ONE &&
+		    strncmp((char *)devname, IBNEX_IBPORT_CNAME, 6) != 0)) {
+			IBTF_DPRINTF_L4("ibnex",
+			    "\tbus_config: using mdi_devi_enter");
+			use_mdi_devi_locking = 1;
+		}
 	}
 
 	if (use_mdi_devi_locking)
@@ -1156,8 +1174,11 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		    "\tbus_config: cname %s addr %s", cname, caddr);
 
 		cdip = ndi_devi_findchild(parent, device_name1);
+		if (cdip)
+			node_data = ddi_get_parent_data(cdip);
 		kmem_free(device_name1, len);
-		if (cdip == NULL) {
+		if (cdip == NULL || (node_data != NULL &&
+		    node_data->node_dip == NULL)) {
 			/* Node is not present */
 			if (strncmp(cname, IBNEX_IOC_CNAME, 3) == 0) {
 				if (use_mdi_devi_locking)
@@ -1280,6 +1301,35 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		 * ibdm and configure all children.
 		 */
 		if (parent == ibnex.ibnex_dip) {
+			ibdm_ioc_info_t	*ioc_list;
+
+			/*
+			 * Optimize the calls for each BUS_CONFIG_ALL request
+			 * to the IB Nexus dip. This is currently done for
+			 * each PDIP.
+			 */
+			if (ibnex.ibnex_ioc_list) {
+				IBTF_DPRINTF_L4("ibnex",
+				    "\tbus_config: freeing ioc_list %p",
+				    ibnex.ibnex_ioc_list);
+				ibdm_ibnex_free_ioc_list(ibnex.ibnex_ioc_list);
+				mutex_enter(&ibnex.ibnex_mutex);
+				ibnex.ibnex_ioc_list = NULL;
+				mutex_exit(&ibnex.ibnex_mutex);
+			}
+
+			/* Enumerate all the IOC's */
+			ibdm_ibnex_port_settle_wait(0,
+			    ibnex_port_settling_time);
+
+			ioc_list = ibdm_ibnex_get_ioc_list(
+			    IBDM_IBNEX_NORMAL_PROBE);
+			IBTF_DPRINTF_L4("ibnex",
+			    "\tbus_config: alloc ioc_list %p", ioc_list);
+			mutex_enter(&ibnex.ibnex_mutex);
+			ibnex.ibnex_ioc_list = ioc_list;
+			mutex_exit(&ibnex.ibnex_mutex);
+
 			ret = mdi_vhci_bus_config(parent,
 			    flag, op, devname, child, NULL);
 			return (ret);
@@ -1317,7 +1367,6 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		return (ret);
 	}
 
-	IBTF_DPRINTF_L2("ibnex", "\tbus_config: Failure End");
 	return (NDI_FAILURE);
 }
 
@@ -1392,12 +1441,11 @@ ibnex_config_root_iocnode(dev_info_t *parent, char *device_name)
 		return (IBNEX_FAILURE);
 	}
 	mutex_enter(&ibnex.ibnex_mutex);
-	if (ibnex_is_ioc_present(ioc_guid) == IBNEX_SUCCESS) {
-		IBTF_DPRINTF_L4("ibnex", "\tconfig_root_iocnode: IOC present");
-		ret = IBNEX_SUCCESS;
-	} else
-		ret = ibnex_ioc_initnode(ioc_info, IBNEX_DEVFS_ENUMERATE,
-		    parent);
+	if ((ret = ibnex_ioc_config_from_pdip(ioc_info, parent, 0)) !=
+	    IBNEX_SUCCESS) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tconfig_root_ioc_node failed for pdip %p", parent);
+	}
 	mutex_exit(&ibnex.ibnex_mutex);
 	ibdm_ibnex_free_ioc_list(ioc_info);
 	return (ret);
@@ -1437,8 +1485,7 @@ static void
 ibnex_config_all_children(dev_info_t *parent)
 {
 	int			ii;
-	time_t			wait_time;
-	ibdm_ioc_info_t		*ioc_list, *ioc;
+	ibdm_ioc_info_t		*ioc_list;
 	ibdm_hca_list_t		*hca_list;
 	ib_guid_t		hca_guid;
 	int			circ;
@@ -1453,11 +1500,7 @@ ibnex_config_all_children(dev_info_t *parent)
 	 */
 	ndi_devi_enter(parent, &circ);
 	hca_guid = ibtl_ibnex_hcadip2guid(parent);
-	wait_time = ibdm_ibnex_get_waittime(
-	    hca_guid, &ibnex_port_settling_time);
-	if (wait_time) {
-		delay(drv_usectohz(wait_time * 1000000));
-	}
+	ibdm_ibnex_port_settle_wait(hca_guid, ibnex_port_settling_time);
 	hca_list = ibdm_ibnex_get_hca_info_by_guid(hca_guid);
 	if (hca_list == NULL) {
 		ndi_devi_exit(parent, circ);
@@ -1474,19 +1517,6 @@ ibnex_config_all_children(dev_info_t *parent)
 	ndi_devi_exit(parent, circ);
 
 	/*
-	 * Check if ibtc_attach() is called and the phci is
-	 * set up for this device before the IB nexus starts
-	 * enumerating MPxIO clients.
-	 *
-	 * If an HCA is in maintenance mode, its phci is not set up
-	 * but the driver is attached to update the firmware. In the
-	 * case, do not configure the MPxIO clients.
-	 */
-	if (mdi_component_is_phci(parent, NULL) == MDI_FAILURE) {
-		return;
-	}
-
-	/*
 	 * Use mdi_devi_enter() for locking. IB Nexus is
 	 * enumerating MPxIO clients.
 	 */
@@ -1494,23 +1524,12 @@ ibnex_config_all_children(dev_info_t *parent)
 
 	ibnex_pseudo_initnodes();
 
-	/* Enumerate all the IOC's */
-	wait_time = ibdm_ibnex_get_waittime(
-	    0, &ibnex_port_settling_time);
-	if (wait_time)
-		delay(drv_usectohz(wait_time * 1000000));
-
-	ioc_list = ibdm_ibnex_get_ioc_list(IBDM_IBNEX_NORMAL_PROBE);
-	ioc = ioc_list;
+	ioc_list = ibnex.ibnex_ioc_list;
 
 	mutex_enter(&ibnex.ibnex_mutex);
 
 	while (ioc_list) {
-		if (ibnex_is_ioc_present(
-		    ioc_list->ioc_profile.ioc_guid) != IBNEX_SUCCESS) {
-			(void) ibnex_ioc_initnode(ioc_list,
-			    IBNEX_DEVFS_ENUMERATE, parent);
-		}
+		(void) ibnex_ioc_config_from_pdip(ioc_list, parent, 0);
 		ioc_list = ioc_list->ioc_next;
 	}
 
@@ -1518,7 +1537,6 @@ ibnex_config_all_children(dev_info_t *parent)
 	ibnex_config_pseudo_all(parent);
 
 	mutex_exit(&ibnex.ibnex_mutex);
-	ibdm_ibnex_free_ioc_list(ioc);
 	mdi_devi_exit(parent, circ);
 
 	IBTF_DPRINTF_L4("ibnex", "\tconfig_all_children: End");
@@ -1583,7 +1601,7 @@ ibnex_create_vppa_nodes(dev_info_t *parent, ibdm_port_attr_t *port_attr)
 			}
 			rval = ibnex_get_dip_from_guid(
 			    port_attr->pa_port_guid, idx, pkey, &dip);
-			if (rval != IBNEX_SUCCESS) {
+			if ((rval != IBNEX_SUCCESS) || (dip == NULL)) {
 				(void) ibnex_commsvc_initnode(parent, port_attr,
 				    idx, IBNEX_VPPA_COMMSVC_NODE,
 				    pkey, &rval, IBNEX_CFGADM_ENUMERATE);
@@ -1623,34 +1641,6 @@ ibnex_create_hcasvc_nodes(dev_info_t *parent, ibdm_port_attr_t *port_attr)
 	mutex_exit(&ibnex.ibnex_mutex);
 }
 
-/*
- * ibnex_is_ioc_present()
- *	Returns IBNEX_SUCCESS if an entry found in the global linked list
- *	Returns IBNEX_FAILURE, if no match found
- */
-static int
-ibnex_is_ioc_present(ib_guid_t ioc_guid)
-{
-	ibnex_node_data_t	*head;
-	ibnex_ioc_node_t	*ioc;
-	int			ret = IBNEX_FAILURE;
-
-	IBTF_DPRINTF_L4("ibnex", "\tis_ioc_present: Begin");
-	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
-
-	head = ibnex.ibnex_ioc_node_head;
-	while (head) {
-		ioc = &head->node_data.ioc_node;
-		if (ioc->ioc_guid == ioc_guid)
-			break;
-		head = head->node_next;
-	}
-	if (head)
-		ret = IBNEX_SUCCESS;
-
-	return (ret);
-}
-
 
 /*
  * ibnex_bus_unconfig()
@@ -1662,7 +1652,87 @@ static int
 ibnex_bus_unconfig(dev_info_t *parent,
     uint_t flag, ddi_bus_config_op_t op, void *device_name)
 {
-	return (ndi_busop_bus_unconfig(parent, flag, op, device_name));
+	ibnex_node_data_t	*ndp;
+	major_t			major = (major_t)(uintptr_t)device_name;
+	dev_info_t		*dip = NULL;
+
+	if (ndi_busop_bus_unconfig(parent, flag, op, device_name) !=
+	    DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/*
+	 * We can come into this routine with dip as ibnexus dip or hca dip.
+	 * When the dip is that of ib nexus we need to clean up the IOC and
+	 * pseudo nodes. When the dip is that of an HCA (not IB nexus dip)
+	 * cleanup the port nodes.
+	 */
+	if ((op == BUS_UNCONFIG_ALL || op == BUS_UNCONFIG_DRIVER) &&
+	    (flag & (NDI_UNCONFIG | NDI_DETACH_DRIVER))) {
+		mutex_enter(&ibnex.ibnex_mutex);
+		if (parent != ibnex.ibnex_dip) {
+			if (major == -1) {
+				/*
+				 * HCA dip. When major number is -1 HCA is
+				 * going away cleanup all the port nodes.
+				 */
+				for (ndp = ibnex.ibnex_port_node_head;
+				    ndp; ndp = ndp->node_next) {
+					ibnex_port_node_t	*port_node;
+
+					port_node = &ndp->node_data.port_node;
+					if (port_node->port_pdip == parent) {
+						port_node->port_pdip = NULL;
+						ndp->node_dip = NULL;
+						ndp->node_state =
+						    IBNEX_CFGADM_UNCONFIGURED;
+					}
+				}
+			} else {
+				/*
+				 * HCA dip. Cleanup only the port nodes that
+				 * match the major number.
+				 */
+				for (ndp = ibnex.ibnex_port_node_head;
+				    ndp; ndp = ndp->node_next) {
+					ibnex_port_node_t	*port_node;
+
+					port_node = &ndp->node_data.port_node;
+					dip = ndp->node_dip;
+					if (dip && (ddi_driver_major(dip) ==
+					    major) && port_node->port_pdip ==
+					    parent) {
+						port_node->port_pdip = NULL;
+						ndp->node_dip = NULL;
+						ndp->node_state =
+						    IBNEX_CFGADM_UNCONFIGURED;
+					}
+				}
+			}
+		} else {
+			/*
+			 * IB dip. here we handle IOC and pseudo nodes which
+			 * are the children of IB nexus. Cleanup only the nodes
+			 * with matching major number. We also need to cleanup
+			 * the PathInfo links to the PHCI here.
+			 */
+			for (ndp = ibnex.ibnex_ioc_node_head;
+			    ndp; ndp = ndp->node_next) {
+				dip = ndp->node_dip;
+				if (dip && (ddi_driver_major(dip) == major)) {
+					ibnex_offline_childdip(dip);
+				}
+			}
+			for (ndp = ibnex.ibnex_pseudo_node_head;
+			    ndp; ndp = ndp->node_next) {
+				dip = ndp->node_dip;
+				if (dip && (ddi_driver_major(dip) == major)) {
+					ibnex_offline_childdip(dip);
+				}
+			}
+		}
+		mutex_exit(&ibnex.ibnex_mutex);
+	}
+	return (DDI_SUCCESS);
 }
 
 
@@ -1683,7 +1753,6 @@ ibnex_config_port_node(dev_info_t *parent, char *devname)
 {
 	int			ii, index;
 	int			rval;
-	time_t			wait_time;
 	uint8_t			port_num;
 	ib_guid_t		hca_guid, port_guid;
 	ib_pkey_t		pkey;
@@ -1718,11 +1787,8 @@ ibnex_config_port_node(dev_info_t *parent, char *devname)
 		}
 
 		if (port_attr->pa_state != IBT_PORT_ACTIVE) {
-			wait_time = ibdm_ibnex_get_waittime(
-			    hca_guid, &ibnex_port_settling_time);
-			if (wait_time) {
-				delay(drv_usectohz(wait_time * 1000000));
-			}
+			ibdm_ibnex_port_settle_wait(
+			    hca_guid, ibnex_port_settling_time);
 			ibdm_ibnex_free_port_attr(port_attr);
 			if ((port_attr = ibdm_ibnex_probe_hcaport(
 			    hca_guid, port_num)) == NULL) {
@@ -2013,7 +2079,6 @@ static int
 ibnex_config_ioc_node(char *device_name, dev_info_t *pdip)
 {
 	int			ret;
-	time_t			wait_time;
 	ib_guid_t		iou_guid, ioc_guid;
 	ibdm_ioc_info_t		*ioc_info;
 
@@ -2024,9 +2089,7 @@ ibnex_config_ioc_node(char *device_name, dev_info_t *pdip)
 		return (IBNEX_FAILURE);
 	}
 
-	wait_time = ibdm_ibnex_get_waittime(0, &ibnex_port_settling_time);
-	if (wait_time)
-		delay(drv_usectohz(wait_time * 1000000));
+	ibdm_ibnex_port_settle_wait(0, ibnex_port_settling_time);
 
 	if ((ioc_info = ibdm_ibnex_probe_ioc(iou_guid, ioc_guid, 0)) ==
 	    NULL) {
@@ -2034,14 +2097,11 @@ ibnex_config_ioc_node(char *device_name, dev_info_t *pdip)
 		return (IBNEX_FAILURE);
 	}
 	mutex_enter(&ibnex.ibnex_mutex);
-	if (ibnex_is_ioc_present(ioc_guid) == IBNEX_SUCCESS) {
-		IBTF_DPRINTF_L4("ibnex", "\tconfig_ioc_node: IOC present");
-		ret = IBNEX_SUCCESS;
-	} else
-		ret = ibnex_ioc_initnode(ioc_info, IBNEX_DEVFS_ENUMERATE,
-		    pdip);
+	ret = ibnex_ioc_config_from_pdip(ioc_info, pdip, 0);
 	mutex_exit(&ibnex.ibnex_mutex);
 	ibdm_ibnex_free_ioc_list(ioc_info);
+	IBTF_DPRINTF_L4("ibnex", "\tconfig_ioc_node: ret %x",
+	    ret);
 	return (ret);
 }
 
@@ -2086,7 +2146,6 @@ ibnex_devname_to_node_n_ioc_guids(
 }
 
 
-/*ARGSUSED*/
 /*
  * ibnex_ioc_initnode()
  *	Allocate a pathinfo node for the IOC
@@ -2095,54 +2154,41 @@ ibnex_devname_to_node_n_ioc_guids(
  *	Update IBnex global data
  *	Returns IBNEX_SUCCESS/IBNEX_FAILURE/IBNEX_BUSY
  */
-int
-ibnex_ioc_initnode(ibdm_ioc_info_t *ioc_info, int flag, dev_info_t *pdip)
+static int
+ibnex_ioc_initnode_pdip(ibnex_node_data_t *node_data,
+    ibdm_ioc_info_t *ioc_info, dev_info_t *pdip)
 {
-	int			rval;
-	ibnex_node_data_t	*node_data;
+	int			rval, node_valid;
+	ibnex_node_state_t	prev_state;
 
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
+	ASSERT(node_data);
 
-	node_data = ibnex_is_node_data_present(IBNEX_IOC_NODE,
-	    (void *)ioc_info, 0, 0);
-
-	/*
-	 * prevent any races
-	 * we have seen this node_data and it has been initialized
-	 * Note that node_dip is already NULL if unconfigure is in
-	 * progress.
-	 */
-	if (node_data && node_data->node_dip) {
-		return ((node_data->node_state == IBNEX_CFGADM_CONFIGURING) ?
-		    IBNEX_BUSY : IBNEX_SUCCESS);
-	} else if (node_data == NULL) {
-		node_data = ibnex_init_child_nodedata(IBNEX_IOC_NODE,
-		    ioc_info, 0, 0);
-	}
 
 	/*
 	 * Return EBUSY if another configure/unconfigure
 	 * operation is in progress
 	 */
 	if (node_data->node_state == IBNEX_CFGADM_UNCONFIGURING) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tioc_initnode_pdip : BUSY");
 		return (IBNEX_BUSY);
 	}
 
-	ASSERT(node_data->node_state != IBNEX_CFGADM_CONFIGURED);
+	prev_state = node_data->node_state;
 	node_data->node_state = IBNEX_CFGADM_CONFIGURING;
-
-
 	mutex_exit(&ibnex.ibnex_mutex);
 
-	rval = ibnex_ioc_create_pi(ioc_info, node_data, pdip);
+	rval = ibnex_ioc_create_pi(ioc_info, node_data, pdip, &node_valid);
 
 	mutex_enter(&ibnex.ibnex_mutex);
 	if (rval == IBNEX_SUCCESS)
 		node_data->node_state = IBNEX_CFGADM_CONFIGURED;
+	else if (node_valid)
+		node_data->node_state = prev_state;
 
 	return (rval);
 }
-
 
 /*
  * ibnex_config_pseudo_all()
@@ -2170,15 +2216,17 @@ ibnex_pseudo_config_one(ibnex_node_data_t *node_data, char *caddr,
     dev_info_t *pdip)
 {
 	int			rval;
+	ibnex_pseudo_node_t	*pseudo;
+	ibnex_node_state_t	prev_state;
 
-	IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one(%p, %p, %p):Begin",
+	IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one(%p, %p, %p)",
 	    node_data, caddr, pdip);
 
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
 
 	if (node_data == NULL) {
-		IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one: caddr = %s",
-		    caddr);
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tpseudo_config_one: caddr = %s", caddr);
 
 		/*
 		 * This function is now called with PHCI / HCA driver
@@ -2193,66 +2241,69 @@ ibnex_pseudo_config_one(ibnex_node_data_t *node_data, char *caddr,
 		    (void *)caddr, 0, 0);
 	}
 
+	if (node_data == NULL) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tpseudo_config_one: Invalid node");
+		return (IBNEX_FAILURE);
+	}
+
+	if (node_data->node_ap_state == IBNEX_NODE_AP_UNCONFIGURED) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tpseudo_config_one: Unconfigured node");
+		return (IBNEX_FAILURE);
+	}
+
+	pseudo = &node_data->node_data.pseudo_node;
+
 	/*
 	 * Do not enumerate nodes with ib-node-type set as "merge"
 	 */
-	if (node_data && node_data->node_data.pseudo_node.pseudo_merge_node
-	    == 1) {
-		IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one: merge_node");
+	if (pseudo->pseudo_merge_node == 1) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tpseudo_config_one: merge_node");
 		return (IBNEX_FAILURE);
 	}
 
 	/*
-	 * prevent any races
-	 * we have seen this node_data and it has been initialized
-	 * Note that node_dip is already NULL if unconfigure is in
-	 * progress.
+	 * Check if a PI has already been created for the PDIP.
+	 * If so, return SUCCESS.
 	 */
-	if (node_data && node_data->node_dip) {
-		return ((node_data->node_state == IBNEX_CFGADM_CONFIGURING) ?
-		    IBNEX_BUSY : IBNEX_SUCCESS);
-	} else if (node_data == NULL) {
-		IBTF_DPRINTF_L2("ibnex", "\tpseudo_config_one: Invalid node");
-		return (IBNEX_FAILURE);
+	if (node_data->node_dip != NULL && mdi_pi_find(pdip,
+	    pseudo->pseudo_node_addr, pseudo->pseudo_node_addr) != NULL) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tpseudo_config_one: PI created,"
+		    " pdip %p, addr %s", pdip, pseudo->pseudo_node_addr);
+		return (IBNEX_SUCCESS);
 	}
 
 	/*
-	 * Return EBUSY if another configure/unconfigure
+	 * Return EBUSY if another unconfigure
 	 * operation is in progress
 	 */
 	if (node_data->node_state == IBNEX_CFGADM_UNCONFIGURING) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tpseudo_config_one: BUSY");
 		return (IBNEX_BUSY);
 	}
 
-	if (node_data->node_state == IBNEX_CFGADM_CONFIGURED)
-		return (IBNEX_SUCCESS);
 
-	/*
-	 * Prevent configuring pseudo nodes specifically unconfigured
-	 * by cfgadm. This is done by checking if this is a newly
-	 * created node, not yet configured by BUS_CONFIG or cfgadm
-	 */
-	if (node_data->node_data.pseudo_node.pseudo_new_node != 1)
-		return (IBNEX_FAILURE);
-	node_data->node_data.pseudo_node.pseudo_new_node = 0;
-
+	prev_state = node_data->node_state;
 	node_data->node_state = IBNEX_CFGADM_CONFIGURING;
 
 	mutex_exit(&ibnex.ibnex_mutex);
-	rval = ibnex_pseudo_create_pi(node_data, pdip);
+	rval = ibnex_pseudo_create_pi_pdip(node_data, pdip);
 	mutex_enter(&ibnex.ibnex_mutex);
 
-	if (rval == IBNEX_SUCCESS)
+	if (rval == IBNEX_SUCCESS) {
 		node_data->node_state = IBNEX_CFGADM_CONFIGURED;
-	else {
-		node_data->node_dip = NULL;
-		node_data->node_state = IBNEX_CFGADM_UNCONFIGURED;
-		node_data->node_data.pseudo_node.pseudo_new_node = 1;
+	} else {
+		node_data->node_state = prev_state;
 	}
 
+	IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one: ret %x",
+	    rval);
 	return (rval);
 }
-
 
 
 /*
@@ -2302,76 +2353,99 @@ ibnex_pseudo_mdi_config_one(int flag, void *devname, dev_info_t **child,
 	return (rval);
 }
 
+
 /*
- * ibnex_pseudo_create_pi()
- *	Create a path info node for each pseudo entry
+ * ibnex_pseudo_create_all_pi()
+ *	Create all path infos node for a pseudo entry
  */
 int
-ibnex_pseudo_create_pi(ibnex_node_data_t *nodep, dev_info_t *parent)
+ibnex_pseudo_create_all_pi(ibnex_node_data_t *nodep)
 {
-	mdi_pathinfo_t		*pip;
-	int			rval, hcacnt;
-	dev_info_t		*hca_dip, *cdip = NULL;
-	ibdm_hca_list_t		*hca_list, *head;
-	ibnex_pseudo_node_t	*pseudo;
+	int		hcacnt, rc;
+	int		hcafailcnt = 0;
+	dev_info_t	*hca_dip;
+	ibdm_hca_list_t	*hca_list, *head;
 
-	IBTF_DPRINTF_L4("ibnex", "\tibnex_pseudo_create_pi: %p", nodep);
-
-	pseudo = &nodep->node_data.pseudo_node;
-
-
+	IBTF_DPRINTF_L4("ibnex", "\tpseudo_create_all_pi(%p)",
+	    nodep);
 	ibdm_ibnex_get_hca_list(&hca_list, &hcacnt);
 
 	head = hca_list;
 
+	/*
+	 * We return failure even if we fail for all HCAs.
+	 */
 	for (; hca_list != NULL; hca_list = hca_list->hl_next) {
-
 		hca_dip = ibtl_ibnex_hcaguid2dip(hca_list->hl_hca_guid);
-
-		/*
-		 * For CONFIG_ONE requests through HCA dip, alloc
-		 * for HCA dip driving BUS_CONFIG request.
-		 */
-		if (parent != NULL && hca_dip != parent)
-			continue;
-
-		rval = mdi_pi_alloc(hca_dip,
-		    pseudo->pseudo_devi_name, pseudo->pseudo_node_addr,
-		    pseudo->pseudo_node_addr, 0, &pip);
-
-		if (rval != MDI_SUCCESS) {
-			(void) ibnex_offline_childdip(cdip);
-			return (IBNEX_FAILURE);
-		}
-		cdip = mdi_pi_get_client(pip);
-
-		IBTF_DPRINTF_L4("ibnex",
-		    "\tpseudo_create_pi: New dip %p", cdip);
-
-		nodep->node_dip = cdip;
-		ddi_set_parent_data(cdip, nodep);
-
-		rval = mdi_pi_online(pip, 0);
-
-		if (rval != MDI_SUCCESS) {
-			ddi_set_parent_data(cdip, NULL);
-			IBTF_DPRINTF_L2("ibnex", "\tpseudo_create_pi:"
-			    "mdi_pi_online: failed for pseudo dip %p,"
-			    " rval %d", cdip, rval);
-			(void) ibnex_offline_childdip(cdip);
-			rval = IBNEX_FAILURE;
-			break;
-		} else
-			rval = IBNEX_SUCCESS;
-
-		if (parent != NULL && hca_dip != parent)
-			break;
+		rc = ibnex_pseudo_create_pi_pdip(nodep, hca_dip);
+		if (rc != IBNEX_SUCCESS)
+			hcafailcnt++;
 	}
 	if (head)
 		ibdm_ibnex_free_hca_list(head);
-	return (rval);
+
+	if (hcafailcnt == hcacnt)
+		rc = IBNEX_FAILURE;
+	else
+		rc = IBNEX_SUCCESS;
+
+	IBTF_DPRINTF_L4("ibnex", "\tpseudo_create_all_pi rc %x",
+	    rc);
+	return (rc);
 }
 
+static int
+ibnex_pseudo_create_pi_pdip(ibnex_node_data_t *nodep, dev_info_t *hca_dip)
+{
+	mdi_pathinfo_t		*pip;
+	int			rval;
+	dev_info_t		*cdip = NULL;
+	ibnex_pseudo_node_t	*pseudo;
+	int			first_pi = 0;
+
+	IBTF_DPRINTF_L4("ibnex", "\tpseudo_create_pi_pdip: %p, %p",
+	    nodep, hca_dip);
+
+	pseudo = &nodep->node_data.pseudo_node;
+
+	rval = mdi_pi_alloc(hca_dip,
+	    pseudo->pseudo_devi_name, pseudo->pseudo_node_addr,
+	    pseudo->pseudo_node_addr, 0, &pip);
+
+	if (rval != MDI_SUCCESS) {
+		IBTF_DPRINTF_L2("ibnex", "\tpseudo_create_pi_pdip:"
+		    " mdi_pi_alloc failed");
+		return (IBNEX_FAILURE);
+	}
+	cdip = mdi_pi_get_client(pip);
+
+	if (nodep->node_dip == NULL) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tpseudo_create_pi: New dip %p", cdip);
+
+		first_pi = 1;
+		nodep->node_dip = cdip;
+		ddi_set_parent_data(cdip, nodep);
+	}
+
+	rval = mdi_pi_online(pip, 0);
+
+	if (rval != MDI_SUCCESS) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tpseudo_create_pi: "
+		    "mdi_pi_online: failed for pseudo dip %p,"
+		    " rval %d", cdip, rval);
+		rval = IBNEX_FAILURE;
+		if (first_pi == 1) {
+			ddi_set_parent_data(cdip, NULL);
+			(void) ibnex_offline_childdip(cdip);
+			nodep->node_dip = NULL;
+		} else
+			(void) mdi_pi_free(pip, 0);
+	} else
+		rval = IBNEX_SUCCESS;
+	return (rval);
+}
 
 /*
  * ibnex_ioc_create_pi()
@@ -2379,84 +2453,74 @@ ibnex_pseudo_create_pi(ibnex_node_data_t *nodep, dev_info_t *parent)
  */
 static int
 ibnex_ioc_create_pi(ibdm_ioc_info_t *ioc_info, ibnex_node_data_t *node_data,
-    dev_info_t *pdip)
+    dev_info_t *pdip, int *node_valid)
 {
-	char			ioc_guid[33], phci_guid[66];
 	mdi_pathinfo_t		*pip;
 	int			rval = DDI_FAILURE;
-	dev_info_t		*hca_dip, *cdip = NULL;
-	int			flag = 1;
-	ibdm_hca_list_t		*hca_list;
+	dev_info_t		*cdip = NULL;
+	int			create_prop = 0;
+	ibnex_ioc_node_t	*ioc = &node_data->node_data.ioc_node;
 
-	IBTF_DPRINTF_L4("ibnex", "\tibnex_ioc_create_pi Begin");
+	IBTF_DPRINTF_L4("ibnex",
+	    "\tibnex_ioc_create_pi(%p, %p, %p)", ioc_info, node_data, pdip);
+	*node_valid = 1;
 
-	(void) snprintf(ioc_guid, 33, "%llX",
-	    (longlong_t)ioc_info->ioc_profile.ioc_guid);
-	(void) snprintf(phci_guid, 66, "%llX,%llX",
-	    (longlong_t)ioc_info->ioc_profile.ioc_guid,
-	    (longlong_t)ioc_info->ioc_iou_guid);
+	/*
+	 * For CONFIG_ONE requests through HCA dip, alloc
+	 * for HCA dip driving BUS_CONFIG request.
+	 */
+	rval =  mdi_pi_alloc(pdip, IBNEX_IOC_CNAME, ioc->ioc_guid_str,
+	    ioc->ioc_phci_guid, 0, &pip);
+	if (rval != MDI_SUCCESS) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tioc_create_pi: mdi_pi_alloc(%p, %s. %s) failed",
+		    pdip, ioc->ioc_guid_str, ioc->ioc_phci_guid);
+		return (IBNEX_FAILURE);
+	}
+	cdip = mdi_pi_get_client(pip);
 
-	hca_list = ioc_info->ioc_hca_list;
+	IBTF_DPRINTF_L4("ibnex", "\tioc_create_pi: IOC dip %p",
+	    cdip);
 
-	for (; hca_list != NULL; hca_list = hca_list->hl_next) {
+	if (node_data->node_dip == NULL) {
+		node_data->node_dip = cdip;
+		ddi_set_parent_data(cdip, node_data);
+		create_prop = 1;
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tioc_create_pi: creating prop");
+		if ((rval = ibnex_create_ioc_node_prop(
+		    ioc_info, cdip)) != IBNEX_SUCCESS) {
+			IBTF_DPRINTF_L4("ibnex",
+			    "\tioc_create_pi: creating prop failed");
+			ibnex_delete_ioc_node_data(node_data);
+			*node_valid = 0;
+			ddi_prop_remove_all(cdip);
+			ddi_set_parent_data(cdip, NULL);
 
-		hca_dip = ibtl_ibnex_hcaguid2dip(hca_list->hl_hca_guid);
-
-		/*
-		 * For CONFIG_ONE requests through HCA dip, alloc
-		 * for HCA dip driving BUS_CONFIG request.
-		 */
-		if (pdip != NULL && hca_dip != pdip)
-			continue;
-
-		IBTF_DPRINTF_L4("ibnex", "\tioc_create_pi "
-		    "hca guid %llX", hca_list->hl_hca_guid);
-
-		rval =  mdi_pi_alloc(hca_dip,
-		    IBNEX_IOC_CNAME, ioc_guid, phci_guid, 0, &pip);
-		if (rval != MDI_SUCCESS) {
 			(void) ibnex_offline_childdip(cdip);
 			return (IBNEX_FAILURE);
 		}
-		cdip = mdi_pi_get_client(pip);
-
-		IBTF_DPRINTF_L4("ibnex",
-		    "\tioc_create_pi: New IOC dip %p", cdip);
-
-		node_data->node_dip = cdip;
-		ddi_set_parent_data(cdip, node_data);
-
-		if (flag) {
-			if ((rval = ibnex_create_ioc_node_prop(
-			    ioc_info, cdip)) != IBNEX_SUCCESS) {
-				ibnex_delete_ioc_node_data(node_data);
-				ddi_prop_remove_all(cdip);
-				ddi_set_parent_data(cdip, NULL);
-
-				(void) ibnex_offline_childdip(cdip);
-				return (IBNEX_FAILURE);
-			}
-			flag = 0;
-		}
-
-		rval = mdi_pi_online(pip, 0);
-
-		if (rval != MDI_SUCCESS) {
-			ibnex_delete_ioc_node_data(node_data);
-			ddi_prop_remove_all(cdip);
-			ddi_set_parent_data(cdip, NULL);
-			IBTF_DPRINTF_L2("ibnex", "\tioc_create_pi: "
-			    "mdi_pi_online() failed ioc dip %p, rval %d",
-			    cdip, rval);
-			(void) ibnex_offline_childdip(cdip);
-			rval = IBNEX_FAILURE;
-			break;
-		} else
-			rval = IBNEX_SUCCESS;
-
-		if (pdip != NULL && hca_dip != pdip)
-			break;
 	}
+
+	rval = mdi_pi_online(pip, 0);
+
+	if (rval != MDI_SUCCESS) {
+		IBTF_DPRINTF_L2("ibnex", "\tioc_create_pi: "
+		    "mdi_pi_online() failed ioc dip %p, rval %d",
+		    cdip, rval);
+		rval = IBNEX_FAILURE;
+		if (create_prop) {
+			ddi_set_parent_data(cdip, NULL);
+			ddi_prop_remove_all(cdip);
+			ibnex_delete_ioc_node_data(node_data);
+			*node_valid = 0;
+			(void) ibnex_offline_childdip(cdip);
+		} else
+			(void) mdi_pi_free(pip, 0);
+	} else
+		rval = IBNEX_SUCCESS;
+
+	IBTF_DPRINTF_L4("ibnex", "\tioc_create_pi ret %x", rval);
 	return (rval);
 }
 
@@ -2985,10 +3049,17 @@ ibnex_comm_svc_init(char *property, ibnex_node_type_t type)
 		int j;
 
 		len = strlen(servicep[count]);
-		if (len == 0 || len > 4) {
+		/*
+		 * ib.conf has NULL strings for port-svc-list &
+		 * hca-svc-list, by default. Do not have L2 message
+		 * for these.
+		 */
+		if (len == 1 || len > 4) {
 			IBTF_DPRINTF_L2("ibnex", "\tcomm_svc_init : "
-			    "Service name %s invalid : length %d",
-			    servicep[count], len);
+			    "Service name %s for property %s invalid : "
+			    "length %d", servicep[count], property, len);
+			continue;
+		} else if (len == 0) {
 			continue;
 		}
 		if (ibnex_unique_svcname(servicep[count]) != IBNEX_SUCCESS) {
@@ -3115,6 +3186,8 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 	char			*svcname;
 	dev_info_t		*cdip;
 	ibnex_node_data_t	*node_data;
+	ibnex_port_node_t	*port_node;
+	char devname[MAXNAMELEN];
 
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
 
@@ -3128,6 +3201,17 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 	 */
 	node_data = ibnex_is_node_data_present(node_type, (void *)port_attr,
 	    index, pkey);
+
+	/*
+	 * If this node has been explicity unconfigured by cfgadm, then it can
+	 * be configured back again only by cfgadm configure.
+	 */
+	if (node_data && (node_data->node_ap_state ==
+	    IBNEX_NODE_AP_UNCONFIGURED)) {
+		*rval = IBNEX_FAILURE;
+		return (NULL);
+	}
+
 	if (node_data && node_data->node_dip) {
 		/*
 		 * Return NULL if another configure
@@ -3143,6 +3227,7 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 		/* allocate a new ibnex_node_data_t */
 		node_data = ibnex_init_child_nodedata(node_type, port_attr,
 		    index, pkey);
+		node_data->node_data.port_node.port_pdip = parent;
 	}
 
 	/*
@@ -3156,34 +3241,53 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 	ASSERT(node_data->node_state != IBNEX_CFGADM_CONFIGURED);
 	node_data->node_state = IBNEX_CFGADM_CONFIGURING;
 
-	ndi_devi_alloc_sleep(parent,
-	    IBNEX_IBPORT_CNAME, (pnode_t)DEVI_SID_NODEID, &cdip);
-
-	node_data->node_dip	= cdip;
-	ddi_set_parent_data(cdip, node_data);
-	mutex_exit(&ibnex.ibnex_mutex);
-
 	switch (node_type) {
 		case IBNEX_VPPA_COMMSVC_NODE :
 			svcname = ibnex.ibnex_vppa_comm_svc_names[index];
+			port_node = &node_data->node_data.port_node;
+			(void) snprintf(devname, MAXNAMELEN, "%s@%x,%x,%s",
+			    IBNEX_IBPORT_CNAME, port_node->port_num,
+			    port_node->port_pkey, svcname);
 			break;
 		case IBNEX_HCASVC_COMMSVC_NODE :
 			svcname = ibnex.ibnex_hcasvc_comm_svc_names[index];
+			port_node = &node_data->node_data.port_node;
+			(void) snprintf(devname, MAXNAMELEN, "%s@%x,0,%s",
+			    IBNEX_IBPORT_CNAME, port_node->port_num, svcname);
 			break;
 		case IBNEX_PORT_COMMSVC_NODE :
 			svcname = ibnex.ibnex_comm_svc_names[index];
+			port_node = &node_data->node_data.port_node;
+			(void) snprintf(devname, MAXNAMELEN, "%s@%x,0,%s",
+			    IBNEX_IBPORT_CNAME, port_node->port_num, svcname);
 			break;
 		default :
 			IBTF_DPRINTF_L2("ibnex", "\tcommsvc_initnode:"
 			    "\tInvalid Node type");
 			*rval = IBNEX_FAILURE;
+			mutex_exit(&ibnex.ibnex_mutex);
 			ibnex_delete_port_node_data(node_data);
-			ddi_prop_remove_all(cdip);
-			ddi_set_parent_data(cdip, NULL);
-			(void) ndi_devi_free(cdip);
 			mutex_enter(&ibnex.ibnex_mutex);
 			return (NULL);
 	}
+
+	if ((cdip = ndi_devi_findchild(parent, devname)) != NULL) {
+		if (i_ddi_devi_attached(cdip)) {
+			node_data->node_dip	= cdip;
+			node_data->node_data.port_node.port_pdip = parent;
+			node_data->node_state = IBNEX_CFGADM_CONFIGURED;
+			ddi_set_parent_data(cdip, node_data);
+			return (cdip);
+		}
+	} else {
+		ndi_devi_alloc_sleep(parent,
+		    IBNEX_IBPORT_CNAME, (pnode_t)DEVI_SID_NODEID, &cdip);
+	}
+
+	node_data->node_dip	= cdip;
+	ddi_set_parent_data(cdip, node_data);
+	mutex_exit(&ibnex.ibnex_mutex);
+
 
 	if (ibnex_create_port_node_prop(port_attr, cdip, svcname, pkey) ==
 	    IBNEX_SUCCESS) {
@@ -3194,13 +3298,13 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 		if (ret == NDI_SUCCESS) {
 			mutex_enter(&ibnex.ibnex_mutex);
 			node_data->node_state	= IBNEX_CFGADM_CONFIGURED;
+			node_data->node_data.port_node.port_pdip = parent;
 			return (cdip);
 		}
 	}
+
 	*rval = IBNEX_FAILURE;
 	ibnex_delete_port_node_data(node_data);
-	ddi_prop_remove_all(cdip);
-	ddi_set_parent_data(cdip, NULL);
 	(void) ndi_devi_free(cdip);
 	mutex_enter(&ibnex.ibnex_mutex);
 	IBTF_DPRINTF_L4("ibnex", "\tcommsvc_initnode: failure exit");
@@ -3614,9 +3718,6 @@ ibnex_pseudo_initnodes()
 		if (node_type && strcmp(node_type, "merge") == 0)
 			nodep->node_data.pseudo_node.pseudo_merge_node = 1;
 
-		/* Mark this as a new psuedo node */
-		nodep->node_data.pseudo_node.pseudo_new_node = 1;
-
 		IBTF_DPRINTF_L3("ibnex", "\tpseudo_initnodes: unit addr = %s"
 		    " : drv name = %s", unit_addr, spec->hwc_devi_name);
 	}
@@ -3645,6 +3746,7 @@ ibnex_init_child_nodedata(ibnex_node_type_t node_type, void *attr, int index,
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
 
 	node_data = kmem_zalloc(sizeof (ibnex_node_data_t), KM_SLEEP);
+	node_data->node_ap_state = IBNEX_NODE_AP_CONFIGURED;
 	node_data->node_state = IBNEX_CFGADM_CONFIGURING;
 	node_data->node_type	= node_type;
 
@@ -4028,29 +4130,72 @@ ibnex_handle_reprobe_dev(void *arg)
  */
 /*ARGSUSED*/
 static int
-ib_vhci_pi_init(dev_info_t *dip, mdi_pathinfo_t *pip, int flag)
+ib_vhci_pi_init(dev_info_t *vdip, mdi_pathinfo_t *pip, int flag)
 {
-	IBTF_DPRINTF_L4("ibnex", "\tpi_init: dip %p pip %p", dip, pip);
+	IBTF_DPRINTF_L4("ibnex", "\tpi_init: dip %p pip %p", vdip, pip);
 	return (MDI_SUCCESS);
 }
 
 
 /*ARGSUSED*/
 static int
-ib_vhci_pi_uninit(dev_info_t *dip, mdi_pathinfo_t *pip, int flag)
+ib_vhci_pi_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flag)
 {
-	IBTF_DPRINTF_L4("ibnex", "\tpi_uninit: dip %p pip %p", dip, pip);
+	dev_info_t *cdip;
+	ibnex_node_data_t *node_data;
+	int clnt_num_pi;
+	IBTF_DPRINTF_L4("ibnex", "\tpi_uninit: dip %p pip %p", vdip, pip);
+
+	if (pip == NULL)
+		return (MDI_FAILURE);
+	/*
+	 * Get the Client dev_info from the pathinfo.
+	 */
+	cdip = mdi_pi_get_client(pip);
+	if (cdip == NULL)
+		return (MDI_FAILURE);
+
+	/*
+	 * How many PIs do we have from this cdip ?
+	 */
+	clnt_num_pi = mdi_client_get_path_count(cdip);
+
+	/*
+	 * If this is the last PI that is being free'd ( called from
+	 * mdi_pi_free) we have to clean up the node data for the cdip since
+	 * the client would have been detached by mdi_devi_offline.
+	 */
+	if (clnt_num_pi == 1) {
+		for (node_data = ibnex.ibnex_ioc_node_head;
+		    node_data; node_data = node_data->node_next) {
+			if (node_data->node_dip == cdip) {
+				node_data->node_dip = NULL;
+				node_data->node_state =
+				    IBNEX_CFGADM_UNCONFIGURED;
+				return (MDI_SUCCESS);
+			}
+		}
+		for (node_data = ibnex.ibnex_pseudo_node_head;
+		    node_data; node_data = node_data->node_next) {
+			if (node_data->node_dip == cdip) {
+				node_data->node_dip = NULL;
+				node_data->node_state =
+				    IBNEX_CFGADM_UNCONFIGURED;
+				return (MDI_SUCCESS);
+			}
+		}
+	}
 	return (MDI_SUCCESS);
 }
 
 
 /*ARGSUSED*/
 static int
-ib_vhci_pi_state_change(dev_info_t *dip, mdi_pathinfo_t *pip,
+ib_vhci_pi_state_change(dev_info_t *vdip, mdi_pathinfo_t *pip,
 		mdi_pathinfo_state_t state, uint32_t arg1, int arg2)
 {
 	IBTF_DPRINTF_L4("ibnex",
-	    "\tpi_state_change: dip %p pip %p state %x", dip, pip, state);
+	    "\tpi_state_change: dip %p pip %p state %x", vdip, pip, state);
 	return (MDI_SUCCESS);
 }
 
@@ -4135,18 +4280,6 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
 		if (ret == MDI_SUCCESS)
 			*need_bus_config = 0;
 	} else {
-		/*
-		 * Check if ibtc_attach() is called and the phci is
-		 * set up for this device.
-		 *
-		 * If an HCA is in maintenance mode, its phci is not set up
-		 * but the driver is attached to update the firmware. In the
-		 * case, do not configure the ioc node because the IB does not
-		 * work properly.
-		 */
-		if (mdi_component_is_phci(pdip, NULL) == MDI_FAILURE) {
-			return (IBNEX_FAILURE);
-		}
 		mdi_devi_enter(pdip, &circ);
 		if (strstr((char *)devname, ":port=") != NULL) {
 			ret = ibnex_config_root_iocnode(pdip, devname);
@@ -4205,4 +4338,134 @@ ibnex_hw_in_dev_tree(char *driver_name)
 
 	if (devnamesp[major].dn_head != (dev_info_t *)NULL)
 		ibnex_hw_status = IBNEX_HW_IN_DEVTREE;
+}
+
+int
+ibnex_ioc_initnode_all_pi(ibdm_ioc_info_t *ioc_info)
+{
+	ibdm_hca_list_t	*hca_list;
+	dev_info_t	*hca_dip;
+	int	rc = IBNEX_FAILURE;
+
+	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
+	/*
+	 * We return failure even if we fail for all HCAs
+	 */
+	for (hca_list = ioc_info->ioc_hca_list; hca_list;
+	    hca_list = hca_list->hl_next) {
+		hca_dip = ibtl_ibnex_hcaguid2dip(hca_list->hl_hca_guid);
+		if (ibnex_ioc_config_from_pdip(ioc_info, hca_dip, 1) ==
+		    IBNEX_SUCCESS)
+			rc = IBNEX_SUCCESS;
+	}
+	return (rc);
+}
+
+static int
+ibnex_ioc_config_from_pdip(ibdm_ioc_info_t *ioc_info, dev_info_t *pdip,
+    int pdip_reachable_checked)
+{
+	ibnex_node_data_t	*node_data;
+	int			create_pdip = 0;
+	int			rc = IBNEX_SUCCESS;
+
+
+	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
+	IBTF_DPRINTF_L4("ibnex",
+	    "/tioc_config_from_pdip(%p, %p, %d)", ioc_info, pdip,
+	    pdip_reachable_checked);
+
+	if (pdip_reachable_checked == 0) {
+		if (ibnex_ioc_pi_reachable(ioc_info, pdip) == IBNEX_FAILURE) {
+			IBTF_DPRINTF_L4("ibnex",
+			    "/tioc_config_from_pdip: ioc %p not reachable"
+			    "from %p", ioc_info, pdip);
+			return (IBNEX_FAILURE);
+		}
+	}
+
+	node_data = ibnex_is_node_data_present(IBNEX_IOC_NODE,
+	    (void *)ioc_info, 0, 0);
+
+	if (node_data && node_data->node_ap_state ==
+	    IBNEX_NODE_AP_UNCONFIGURED) {
+		IBTF_DPRINTF_L4("ibnex",
+		    "\tioc_config_from_pdip: Unconfigured node");
+		return (IBNEX_FAILURE);
+	}
+
+
+	if (node_data == NULL) {
+		ibnex_ioc_node_t	*ioc;
+
+		create_pdip = 1;
+
+		node_data = ibnex_init_child_nodedata(IBNEX_IOC_NODE,
+		    ioc_info, 0, 0);
+		ASSERT(node_data);
+		ioc = &node_data->node_data.ioc_node;
+		(void) snprintf(ioc->ioc_guid_str, IBNEX_IOC_GUID_LEN,
+		    "%llX",
+		    (longlong_t)ioc_info->ioc_profile.ioc_guid);
+		(void) snprintf(ioc->ioc_phci_guid, IBNEX_PHCI_GUID_LEN,
+		    "%llX,%llX",
+		    (longlong_t)ioc_info->ioc_profile.ioc_guid,
+		    (longlong_t)ioc_info->ioc_iou_guid);
+	} else if (ibnex_ioc_pi_exists(node_data, pdip) == IBNEX_FAILURE) {
+		create_pdip = 1;
+	}
+
+	if (create_pdip) {
+		rc = ibnex_ioc_initnode_pdip(node_data, ioc_info, pdip);
+	}
+
+	IBTF_DPRINTF_L4("ibnex", "\tioc_config_from_pdip ret %x",
+	    rc);
+	return (rc);
+}
+
+/*
+ * This function checks if a pathinfo has already been created
+ * for the HCA parent. The function returns SUCCESS if a pathinfo
+ * has already been created, FAILURE if not.
+ */
+static int
+ibnex_ioc_pi_exists(ibnex_node_data_t *node_data, dev_info_t *parent)
+{
+	int	rc;
+	ibnex_ioc_node_t	*ioc;
+
+	ioc = &node_data->node_data.ioc_node;
+	if (mdi_pi_find(parent, (char *)ioc->ioc_guid_str,
+	    (char *)ioc->ioc_phci_guid) != NULL)
+		rc = IBNEX_SUCCESS;
+	else
+		rc = IBNEX_FAILURE;
+
+	IBTF_DPRINTF_L4("ibnex", "\tioc_pi_created- client_guid %s, "
+	    "phci_guid %s, parent %p, rc %x",
+	    ioc->ioc_guid_str, ioc->ioc_phci_guid, parent, rc);
+	return (rc);
+}
+
+static int
+ibnex_ioc_pi_reachable(ibdm_ioc_info_t *ioc_info, dev_info_t *pdip)
+{
+	ibdm_hca_list_t	*hca_list;
+	dev_info_t	*hca_dip;
+
+	IBTF_DPRINTF_L4("ibnex", "\tioc_pi_reachable(%p, %p)",
+	    ioc_info, pdip);
+	for (hca_list = ioc_info->ioc_hca_list; hca_list;
+	    hca_list = hca_list->hl_next) {
+		hca_dip = ibtl_ibnex_hcaguid2dip(hca_list->hl_hca_guid);
+		if (hca_dip == pdip) {
+			IBTF_DPRINTF_L4("ibnex",
+			    "\tioc_pi_reachable FAILURE");
+			return (IBNEX_SUCCESS);
+		}
+	}
+
+	IBTF_DPRINTF_L4("ibnex", "\tioc_pi_reachable FAILURE");
+	return (IBNEX_FAILURE);
 }

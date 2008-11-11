@@ -32,7 +32,6 @@
 
 #include <sys/modctl.h>
 #include <sys/sunndi.h>
-#include <sys/sunmdi.h>
 #include <sys/ib/ibtl/impl/ibtl.h>
 #include <sys/ib/ibtl/impl/ibtl_ibnex.h>
 
@@ -595,8 +594,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	}
 
 	/* Register the with MPxIO as PHCI */
-	if (mdi_phci_register(MDI_HCI_CLASS_IB, info_p->hca_dip, 0) !=
-	    MDI_SUCCESS) {
+	if (ibtl_ibnex_phci_register(info_p->hca_dip) != IBT_SUCCESS) {
 		mutex_exit(&ibtl_clnt_list_mutex);
 		IBTF_DPRINTF_L1(ibtf, "ibc_attach: MPxIO register failed");
 		kmem_free(hca_devp, sizeof (ibtl_hca_devinfo_t) +
@@ -749,7 +747,7 @@ ibc_pre_detach(ibc_clnt_hdl_t hca_devp, ddi_detach_cmd_t cmd)
 		hcapp = &(*hcapp)->hd_hca_dev_link;
 	}
 
-	if (mdi_phci_unregister(hca_devp->hd_hca_dip, 0) != MDI_SUCCESS) {
+	if (ibtl_ibnex_phci_unregister(hca_devp->hd_hca_dip) != IBT_SUCCESS) {
 		hca_devp->hd_state = IBTL_HCA_DEV_ATTACHED; /* fix hd_state */
 		mutex_exit(&ibtl_clnt_list_mutex);
 		IBTF_DPRINTF_L1(ibtf, "ibc_pre_detach: PHCI unregister failed");

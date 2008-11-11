@@ -26,8 +26,6 @@
 #ifndef _SYS_IB_MGT_IBDM_IBDM_IMPL_H
 #define	_SYS_IB_MGT_IBDM_IBDM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ibdm_impl.h
  *
@@ -239,6 +237,7 @@ typedef struct ibdm_s {
 
 	kcondvar_t		ibdm_probe_cv;
 	kcondvar_t		ibdm_busy_cv;
+	kcondvar_t		ibdm_port_settle_cv;
 	uint32_t		ibdm_ngid_probes_in_progress;
 	uint64_t		ibdm_transactionID;
 	uint32_t		ibdm_ngids;

@@ -72,8 +72,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -171,6 +169,143 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 	}
 }
 
+/* Return hcap, given the hca guid */
+rds_hca_t *
+rds_lkup_hca(ib_guid_t hca_guid)
+{
+	rds_hca_t	*hcap;
+
+	RDS_DPRINTF4("rds_lkup_hca", "Enter: statep: 0x%p "
+	    "guid: %llx", rdsib_statep, hca_guid);
+
+	rw_enter(&rdsib_statep->rds_hca_lock, RW_READER);
+
+	hcap = rdsib_statep->rds_hcalistp;
+	while ((hcap != NULL) && (hcap->hca_guid != hca_guid)) {
+		hcap = hcap->hca_nextp;
+	}
+
+	rw_exit(&rdsib_statep->rds_hca_lock);
+
+	RDS_DPRINTF4("rds_lkup_hca", "return");
+
+	return (hcap);
+}
+
+
+static rds_hca_t *
+rdsib_init_hca(ib_guid_t hca_guid)
+{
+	rds_hca_t	*hcap;
+	boolean_t	alloc = B_FALSE;
+	int		ret;
+
+	RDS_DPRINTF2("rdsib_init_hca", "enter: HCA 0x%llx", hca_guid);
+
+	/* Do a HCA lookup */
+	hcap = rds_lkup_hca(hca_guid);
+
+	if (hcap != NULL && hcap->hca_hdl != NULL) {
+		/*
+		 * This can happen if we get IBT_HCA_ATTACH_EVENT on an HCA
+		 * that we have already opened. Just return NULL so that
+		 * we'll not end up reinitializing the HCA again.
+		 */
+		RDS_DPRINTF2("rdsib_init_hca", "HCA already initialized");
+		return (NULL);
+	}
+
+	if (hcap == NULL) {
+		RDS_DPRINTF2("rdsib_init_hca", "New HCA is added");
+		hcap = (rds_hca_t *)kmem_zalloc(sizeof (rds_hca_t), KM_SLEEP);
+		alloc = B_TRUE;
+	}
+
+	hcap->hca_guid = hca_guid;
+	ret = ibt_open_hca(rdsib_statep->rds_ibhdl, hca_guid,
+	    &hcap->hca_hdl);
+	if (ret != IBT_SUCCESS) {
+		if (ret == IBT_HCA_IN_USE) {
+			RDS_DPRINTF2("rdsib_init_hca",
+			    "ibt_open_hca: 0x%llx returned IBT_HCA_IN_USE",
+			    hca_guid);
+		} else {
+			RDS_DPRINTF2("rdsib_init_hca",
+			    "ibt_open_hca: 0x%llx failed: %d", hca_guid, ret);
+		}
+		if (alloc == B_TRUE) {
+			kmem_free(hcap, sizeof (rds_hca_t));
+		}
+		return (NULL);
+	}
+
+	ret = ibt_query_hca(hcap->hca_hdl, &hcap->hca_attr);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rdsib_init_hca",
+		    "Query HCA: 0x%llx failed:  %d", hca_guid, ret);
+		ret = ibt_close_hca(hcap->hca_hdl);
+		ASSERT(ret == IBT_SUCCESS);
+		if (alloc == B_TRUE) {
+			kmem_free(hcap, sizeof (rds_hca_t));
+		} else {
+			hcap->hca_hdl = NULL;
+		}
+		return (NULL);
+	}
+
+	ret = ibt_query_hca_ports(hcap->hca_hdl, 0,
+	    &hcap->hca_pinfop, &hcap->hca_nports, &hcap->hca_pinfo_sz);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rdsib_init_hca",
+		    "Query HCA 0x%llx ports failed: %d", hca_guid,
+		    ret);
+		ret = ibt_close_hca(hcap->hca_hdl);
+		hcap->hca_hdl = NULL;
+		ASSERT(ret == IBT_SUCCESS);
+		if (alloc == B_TRUE) {
+			kmem_free(hcap, sizeof (rds_hca_t));
+		} else {
+			hcap->hca_hdl = NULL;
+		}
+		return (NULL);
+	}
+
+	/* Only one PD per HCA is allocated, so do it here */
+	ret = ibt_alloc_pd(hcap->hca_hdl, IBT_PD_NO_FLAGS,
+	    &hcap->hca_pdhdl);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rdsib_init_hca",
+		    "ibt_alloc_pd 0x%llx failed: %d", hca_guid, ret);
+		(void) ibt_free_portinfo(hcap->hca_pinfop,
+		    hcap->hca_pinfo_sz);
+		ret = ibt_close_hca(hcap->hca_hdl);
+		ASSERT(ret == IBT_SUCCESS);
+		hcap->hca_hdl = NULL;
+		if (alloc == B_TRUE) {
+			kmem_free(hcap, sizeof (rds_hca_t));
+		} else {
+			hcap->hca_hdl = NULL;
+		}
+		return (NULL);
+	}
+
+	rdsib_validate_chan_sizes(&hcap->hca_attr);
+
+	rw_enter(&rdsib_statep->rds_hca_lock, RW_WRITER);
+	hcap->hca_state = RDS_HCA_STATE_OPEN;
+	if (alloc == B_TRUE) {
+		/* this is a new HCA, add it to the list */
+		rdsib_statep->rds_nhcas++;
+		hcap->hca_nextp = rdsib_statep->rds_hcalistp;
+		rdsib_statep->rds_hcalistp = hcap;
+	}
+	rw_exit(&rdsib_statep->rds_hca_lock);
+
+	RDS_DPRINTF2("rdsib_init_hca", "return: HCA 0x%llx", hca_guid);
+
+	return (hcap);
+}
+
 /*
  * Called from attach
  */
@@ -178,7 +313,7 @@ int
 rdsib_initialize_ib()
 {
 	ib_guid_t	*guidp;
-	rds_hca_t	*hcap, *hcap1;
+	rds_hca_t	*hcap;
 	uint_t		ix, hcaix, nhcas;
 	int		ret;
 
@@ -216,65 +351,11 @@ rdsib_initialize_ib()
 	 * opened.
 	 * Initialize a HCA only if all the information is available.
 	 */
-	hcap1 = NULL;
 	for (ix = 0, hcaix = 0; ix < nhcas; ix++) {
 		RDS_DPRINTF3(LABEL, "Open HCA: 0x%llx", guidp[ix]);
 
-		hcap = (rds_hca_t *)kmem_zalloc(sizeof (rds_hca_t), KM_SLEEP);
-
-		ret = ibt_open_hca(rdsib_statep->rds_ibhdl, guidp[ix],
-		    &hcap->hca_hdl);
-		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_initialize_ib",
-			    "ibt_open_hca: 0x%llx failed: %d", guidp[ix], ret);
-			kmem_free(hcap, sizeof (rds_hca_t));
-			continue;
-		}
-
-		hcap->hca_guid = guidp[ix];
-
-		ret = ibt_query_hca(hcap->hca_hdl, &hcap->hca_attr);
-		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_initialize_ib",
-			    "Query HCA: 0x%llx failed:  %d", guidp[ix], ret);
-			ret = ibt_close_hca(hcap->hca_hdl);
-			ASSERT(ret == IBT_SUCCESS);
-			kmem_free(hcap, sizeof (rds_hca_t));
-			continue;
-		}
-
-		ret = ibt_query_hca_ports(hcap->hca_hdl, 0,
-		    &hcap->hca_pinfop, &hcap->hca_nports, &hcap->hca_pinfo_sz);
-		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_initialize_ib",
-			    "Query HCA 0x%llx ports failed: %d", guidp[ix],
-			    ret);
-			ret = ibt_close_hca(hcap->hca_hdl);
-			ASSERT(ret == IBT_SUCCESS);
-			kmem_free(hcap, sizeof (rds_hca_t));
-			continue;
-		}
-
-		/* Only one PD per HCA is allocated, so do it here */
-		ret = ibt_alloc_pd(hcap->hca_hdl, IBT_PD_NO_FLAGS,
-		    &hcap->hca_pdhdl);
-		if (ret != IBT_SUCCESS) {
-			RDS_DPRINTF2("rdsib_initialize_ib",
-			    "ibt_alloc_pd 0x%llx failed: %d", guidp[ix], ret);
-			(void) ibt_free_portinfo(hcap->hca_pinfop,
-			    hcap->hca_pinfo_sz);
-			ret = ibt_close_hca(hcap->hca_hdl);
-			ASSERT(ret == IBT_SUCCESS);
-			kmem_free(hcap, sizeof (rds_hca_t));
-			continue;
-		}
-
-		rdsib_validate_chan_sizes(&hcap->hca_attr);
-
-		/* this HCA is fully initialized, go to the next one */
-		hcaix++;
-		hcap->hca_nextp = hcap1;
-		hcap1 = hcap;
+		hcap = rdsib_init_hca(guidp[ix]);
+		if (hcap != NULL) hcaix++;
 	}
 
 	/* free the HCA list, we are done with it */
@@ -292,9 +373,6 @@ rdsib_initialize_ib()
 		RDS_DPRINTF2("rdsib_open_ib", "HCAs %d/%d failed to initialize",
 		    (nhcas - hcaix), nhcas);
 	}
-
-	rdsib_statep->rds_hcalistp = hcap1;
-	rdsib_statep->rds_nhcas = hcaix;
 
 	RDS_DPRINTF2("rdsib_initialize_ib", "return: statep %p", rdsib_statep);
 
@@ -317,6 +395,8 @@ rdsib_deinitialize_ib()
 
 	/* Release all HCA resources */
 	rw_enter(&rdsib_statep->rds_hca_lock, RW_WRITER);
+	RDS_DPRINTF2("rdsib_deinitialize_ib", "HCA List: %p, NHCA: %d",
+	    rdsib_statep->rds_hcalistp, rdsib_statep->rds_nhcas);
 	hcap = rdsib_statep->rds_hcalistp;
 	rdsib_statep->rds_hcalistp = NULL;
 	rdsib_statep->rds_nhcas = 0;
@@ -325,13 +405,16 @@ rdsib_deinitialize_ib()
 	while (hcap != NULL) {
 		nextp = hcap->hca_nextp;
 
-		ret = ibt_free_pd(hcap->hca_hdl, hcap->hca_pdhdl);
-		ASSERT(ret == IBT_SUCCESS);
+		if (hcap->hca_hdl != NULL) {
+			ret = ibt_free_pd(hcap->hca_hdl, hcap->hca_pdhdl);
+			ASSERT(ret == IBT_SUCCESS);
 
-		(void) ibt_free_portinfo(hcap->hca_pinfop, hcap->hca_pinfo_sz);
+			(void) ibt_free_portinfo(hcap->hca_pinfop,
+			    hcap->hca_pinfo_sz);
 
-		ret = ibt_close_hca(hcap->hca_hdl);
-		ASSERT(ret == IBT_SUCCESS);
+			ret = ibt_close_hca(hcap->hca_hdl);
+			ASSERT(ret == IBT_SUCCESS);
+		}
 
 		kmem_free(hcap, sizeof (rds_hca_t));
 		hcap = nextp;
@@ -405,22 +488,6 @@ rdsib_close_ib()
 		} else {
 			rdsib_statep->rds_srvhdl = NULL;
 		}
-
-		ret = ibt_unbind_all_services(rdsib_statep->rds_old_srvhdl);
-		if (ret != 0) {
-			RDS_DPRINTF2("rdsib_close_ib",
-			    "ibt_unbind_all_services failed for old service"
-			    ": %d\n", ret);
-		}
-		ret = ibt_deregister_service(rdsib_statep->rds_ibhdl,
-		    rdsib_statep->rds_old_srvhdl);
-		if (ret != 0) {
-			RDS_DPRINTF2("rdsib_close_ib",
-			    "ibt_deregister_service failed for old service:"
-			    "%d\n", ret);
-		} else {
-			rdsib_statep->rds_old_srvhdl = NULL;
-		}
 	}
 
 	RDS_DPRINTF2("rdsib_close_ib", "return: statep %p", rdsib_statep);
@@ -442,11 +509,24 @@ rds_get_hcap(rds_state_t *statep, ib_guid_t hca_guid)
 		hcap = hcap->hca_nextp;
 	}
 
+	/*
+	 * don't let anyone use this HCA until the RECV memory
+	 * is registered with this HCA
+	 */
+	if ((hcap != NULL) &&
+	    (hcap->hca_state == RDS_HCA_STATE_MEM_REGISTERED)) {
+		ASSERT(hcap->hca_mrhdl != NULL);
+		rw_exit(&statep->rds_hca_lock);
+		return (hcap);
+	}
+
+	RDS_DPRINTF2("rds_get_hcap",
+	    "HCA (0x%p, 0x%llx) is not initialized", hcap, hca_guid);
 	rw_exit(&statep->rds_hca_lock);
 
 	RDS_DPRINTF4("rds_get_hcap", "rds_get_hcap: return");
 
-	return (hcap);
+	return (NULL);
 }
 
 /* Return hcap, given a gid */
@@ -463,6 +543,19 @@ rds_gid_to_hcap(rds_state_t *statep, ib_gid_t gid)
 
 	hcap = statep->rds_hcalistp;
 	while (hcap != NULL) {
+
+		/*
+		 * don't let anyone use this HCA until the RECV memory
+		 * is registered with this HCA
+		 */
+		if (hcap->hca_state != RDS_HCA_STATE_MEM_REGISTERED) {
+			RDS_DPRINTF3("rds_gid_to_hcap",
+			    "HCA (0x%p, 0x%llx) is not initialized",
+			    hcap, gid.gid_guid);
+			hcap = hcap->hca_nextp;
+			continue;
+		}
+
 		for (ix = 0; ix < hcap->hca_nports; ix++) {
 			if ((hcap->hca_pinfop[ix].p_sgid_tbl[0].gid_prefix ==
 			    gid.gid_prefix) &&
@@ -633,7 +726,7 @@ rds_post_recv_buf(void *arg)
 	RDS_DPRINTF5("rds_post_recv_buf", "EP(%p)", ep);
 
 	/* get the hcap for the HCA hosting this channel */
-	hcap = rds_get_hcap(rdsib_statep, ep->ep_hca_guid);
+	hcap = rds_lkup_hca(ep->ep_hca_guid);
 	if (hcap == NULL) {
 		RDS_DPRINTF2("rds_post_recv_buf", "HCA (0x%llx) not found",
 		    ep->ep_hca_guid);
@@ -643,7 +736,8 @@ rds_post_recv_buf(void *arg)
 	/* Make sure the session is still connected */
 	rw_enter(&sp->session_lock, RW_READER);
 	if ((sp->session_state != RDS_SESSION_STATE_INIT) &&
-	    (sp->session_state != RDS_SESSION_STATE_CONNECTED)) {
+	    (sp->session_state != RDS_SESSION_STATE_CONNECTED) &&
+	    (sp->session_state != RDS_SESSION_STATE_HCA_CLOSING)) {
 		RDS_DPRINTF2("rds_post_recv_buf", "EP(%p): Session is not "
 		    "in active state (%d)", ep, sp->session_state);
 		rw_exit(&sp->session_lock);
@@ -1313,23 +1407,24 @@ rds_handle_portup_event(rds_state_t *statep, ibt_hca_hdl_t hdl,
 	RDS_DPRINTF2("rds_handle_portup_event",
 	    "Enter: GUID: 0x%llx Statep: %p", event->ev_hca_guid, statep);
 
-	/* If RDS service is not registered then no bind is needed */
-	if (statep->rds_srvhdl == NULL) {
-		RDS_DPRINTF2("rds_handle_portup_event",
-		    "RDS Service is not registered, so no action needed");
-		return;
+	rw_enter(&statep->rds_hca_lock, RW_WRITER);
+
+	hcap = statep->rds_hcalistp;
+	while ((hcap != NULL) && (hcap->hca_guid != event->ev_hca_guid)) {
+		hcap = hcap->hca_nextp;
 	}
 
-	hcap = rds_get_hcap(statep, event->ev_hca_guid);
 	if (hcap == NULL) {
 		RDS_DPRINTF2("rds_handle_portup_event", "HCA: 0x%llx is "
 		    "not in our list", event->ev_hca_guid);
+		rw_exit(&statep->rds_hca_lock);
 		return;
 	}
 
 	ret = ibt_query_hca_ports(hdl, 0, &newpinfop, &nport, &newsize);
 	if (ret != IBT_SUCCESS) {
 		RDS_DPRINTF2(LABEL, "ibt_query_hca_ports failed: %d", ret);
+		rw_exit(&statep->rds_hca_lock);
 		return;
 	}
 
@@ -1338,35 +1433,283 @@ rds_handle_portup_event(rds_state_t *statep, ibt_hca_hdl_t hdl,
 	hcap->hca_pinfop = newpinfop;
 	hcap->hca_pinfo_sz = newsize;
 
-	/* structure copy */
-	gid = newpinfop[event->ev_port - 1].p_sgid_tbl[0];
+	(void) ibt_free_portinfo(oldpinfop, oldsize);
 
-	/* bind RDS service on the port, pass statep as cm_private */
-	ret = ibt_bind_service(statep->rds_srvhdl, gid, NULL, statep, NULL);
-	if (ret != IBT_SUCCESS) {
-		RDS_DPRINTF2(LABEL, "Bind service for HCA: 0x%llx Port: %d "
-		    "gid %llx:%llx returned: %d", event->ev_hca_guid,
-		    event->ev_port, gid.gid_prefix, gid.gid_guid, ret);
+	/* If RDS service is not registered then no bind is needed */
+	if (statep->rds_srvhdl == NULL) {
+		RDS_DPRINTF2("rds_handle_portup_event",
+		    "RDS Service is not registered, so no action needed");
+		rw_exit(&statep->rds_hca_lock);
+		return;
 	}
 
-	(void) ibt_free_portinfo(oldpinfop, oldsize);
+	/*
+	 * If the service was previously bound on this port and
+	 * if this port has changed state down and now up, we do not
+	 * need to bind the service again. The bind is expected to
+	 * persist across state changes. If the service was never bound
+	 * before then we bind it this time.
+	 */
+	if (hcap->hca_bindhdl[event->ev_port - 1] == NULL) {
+
+		/* structure copy */
+		gid = newpinfop[event->ev_port - 1].p_sgid_tbl[0];
+
+		/* bind RDS service on the port, pass statep as cm_private */
+		ret = ibt_bind_service(statep->rds_srvhdl, gid, NULL, statep,
+		    &hcap->hca_bindhdl[event->ev_port - 1]);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF2("rds_handle_portup_event",
+			    "Bind service for HCA: 0x%llx Port: %d "
+			    "gid %llx:%llx returned: %d", event->ev_hca_guid,
+			    event->ev_port, gid.gid_prefix, gid.gid_guid, ret);
+		}
+	}
+
+	rw_exit(&statep->rds_hca_lock);
 
 	RDS_DPRINTF2("rds_handle_portup_event", "Return: GUID: 0x%llx",
 	    event->ev_hca_guid);
 }
 
 static void
+rdsib_add_hca(ib_guid_t hca_guid)
+{
+	rds_hca_t	*hcap;
+	ibt_mr_attr_t	mem_attr;
+	ibt_mr_desc_t	mem_desc;
+	int		ret;
+
+	RDS_DPRINTF2("rdsib_add_hca", "Enter: GUID: 0x%llx", hca_guid);
+
+	hcap = rdsib_init_hca(hca_guid);
+	if (hcap == NULL)
+		return;
+
+	/* register the recv memory with this hca */
+	mutex_enter(&rds_dpool.pool_lock);
+	if (rds_dpool.pool_memp == NULL) {
+		/* no memory to register */
+		RDS_DPRINTF2("rdsib_add_hca", "No memory to register");
+		mutex_exit(&rds_dpool.pool_lock);
+		return;
+	}
+
+	mem_attr.mr_vaddr = (ib_vaddr_t)(uintptr_t)rds_dpool.pool_memp;
+	mem_attr.mr_len = rds_dpool.pool_memsize;
+	mem_attr.mr_as = NULL;
+	mem_attr.mr_flags = IBT_MR_ENABLE_LOCAL_WRITE;
+
+	ret = ibt_register_mr(hcap->hca_hdl, hcap->hca_pdhdl, &mem_attr,
+	    &hcap->hca_mrhdl, &mem_desc);
+
+	mutex_exit(&rds_dpool.pool_lock);
+
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rdsib_add_hca", "ibt_register_mr failed: %d",
+		    ret);
+	} else {
+		rw_enter(&rdsib_statep->rds_hca_lock, RW_WRITER);
+		hcap->hca_state = RDS_HCA_STATE_MEM_REGISTERED;
+		hcap->hca_lkey = mem_desc.md_lkey;
+		hcap->hca_rkey = mem_desc.md_rkey;
+		rw_exit(&rdsib_statep->rds_hca_lock);
+	}
+
+	RDS_DPRINTF2("rdsib_add_hca", "Retrun: GUID: 0x%llx", hca_guid);
+}
+
+void rds_close_this_session(rds_session_t *sp, uint8_t wait);
+int rds_post_control_message(rds_session_t *sp, uint8_t code, in_port_t port);
+
+static void
+rdsib_del_hca(rds_state_t *statep, ib_guid_t hca_guid)
+{
+	rds_session_t	*sp;
+	rds_hca_t	*hcap;
+	rds_hca_state_t	saved_state;
+	int		ret, ix;
+
+	RDS_DPRINTF2("rdsib_del_hca", "Enter: GUID: 0x%llx", hca_guid);
+
+	/*
+	 * This should be a write lock as we don't want anyone to get access
+	 * to the hcap while we are modifing its contents
+	 */
+	rw_enter(&statep->rds_hca_lock, RW_WRITER);
+
+	hcap = statep->rds_hcalistp;
+	while ((hcap != NULL) && (hcap->hca_guid != hca_guid)) {
+		hcap = hcap->hca_nextp;
+	}
+
+	/* Prevent initiating any new activity on this HCA */
+	ASSERT(hcap != NULL);
+	saved_state = hcap->hca_state;
+	hcap->hca_state = RDS_HCA_STATE_STOPPING;
+
+	rw_exit(&statep->rds_hca_lock);
+
+	/*
+	 * stop the outgoing traffic and close any active sessions on this hca.
+	 * Any pending messages in the SQ will be allowed to complete.
+	 */
+	rw_enter(&statep->rds_sessionlock, RW_READER);
+	sp = statep->rds_sessionlistp;
+	while (sp) {
+		if (sp->session_hca_guid != hca_guid) {
+			sp = sp->session_nextp;
+			continue;
+		}
+
+		rw_enter(&sp->session_lock, RW_WRITER);
+		RDS_DPRINTF2("rdsib_del_hca", "SP(%p) State: %d", sp,
+		    sp->session_state);
+		/*
+		 * We are changing the session state in advance. This prevents
+		 * further messages to be posted to the SQ. We then
+		 * send a control message to the remote and tell it close
+		 * the session.
+		 */
+		sp->session_state = RDS_SESSION_STATE_HCA_CLOSING;
+		RDS_DPRINTF3("rds_handle_cm_conn_closed", "SP(%p) State "
+		    "RDS_SESSION_STATE_PASSIVE_CLOSING", sp);
+		rw_exit(&sp->session_lock);
+
+		/*
+		 * wait until the sendq is empty then tell the remote to
+		 * close this session. This enables for graceful shutdown of
+		 * the session
+		 */
+		rds_is_sendq_empty(&sp->session_dataep, 2);
+		(void) rds_post_control_message(sp,
+		    RDS_CTRL_CODE_CLOSE_SESSION, 0);
+
+		sp = sp->session_nextp;
+	}
+
+	/* wait until all the sessions are off this HCA */
+	sp = statep->rds_sessionlistp;
+	while (sp) {
+		if (sp->session_hca_guid != hca_guid) {
+			sp = sp->session_nextp;
+			continue;
+		}
+
+		rw_enter(&sp->session_lock, RW_READER);
+		RDS_DPRINTF2("rdsib_del_hca", "SP(%p) State: %d", sp,
+		    sp->session_state);
+
+		while ((sp->session_state == RDS_SESSION_STATE_HCA_CLOSING) ||
+		    (sp->session_state == RDS_SESSION_STATE_ERROR) ||
+		    (sp->session_state == RDS_SESSION_STATE_PASSIVE_CLOSING) ||
+		    (sp->session_state == RDS_SESSION_STATE_CLOSED)) {
+			rw_exit(&sp->session_lock);
+			delay(drv_usectohz(1000000));
+			rw_enter(&sp->session_lock, RW_READER);
+			RDS_DPRINTF2("rdsib_del_hca", "SP(%p) State: %d", sp,
+			    sp->session_state);
+		}
+
+		rw_exit(&sp->session_lock);
+
+		sp = sp->session_nextp;
+	}
+	rw_exit(&statep->rds_sessionlock);
+
+	/*
+	 * if rdsib_close_ib was called before this, then that would have
+	 * unbound the service on all ports. In that case, the HCA structs
+	 * will contain stale bindhdls. Hence, we do not call unbind unless
+	 * the service is still registered.
+	 */
+	if (statep->rds_srvhdl != NULL) {
+		/* unbind RDS service on all ports on this HCA */
+		for (ix = 0; ix < hcap->hca_nports; ix++) {
+			if (hcap->hca_bindhdl[ix] == NULL) {
+				continue;
+			}
+
+			RDS_DPRINTF2("rdsib_del_hca",
+			    "Unbinding Service: port: %d, bindhdl: %p",
+			    ix + 1, hcap->hca_bindhdl[ix]);
+			(void) ibt_unbind_service(rdsib_statep->rds_srvhdl,
+			    hcap->hca_bindhdl[ix]);
+			hcap->hca_bindhdl[ix] = NULL;
+		}
+	}
+
+	RDS_DPRINTF2("rdsib_del_hca", "HCA(%p) State: %d", hcap,
+	    hcap->hca_state);
+
+	switch (saved_state) {
+	case RDS_HCA_STATE_MEM_REGISTERED:
+		ASSERT(hcap->hca_mrhdl != NULL);
+		ret = ibt_deregister_mr(hcap->hca_hdl, hcap->hca_mrhdl);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF2("rdsib_del_hca",
+			    "ibt_deregister_mr failed: %d", ret);
+			return;
+		}
+		hcap->hca_mrhdl = NULL;
+		/* FALLTHRU */
+	case RDS_HCA_STATE_OPEN:
+		ASSERT(hcap->hca_hdl != NULL);
+		ASSERT(hcap->hca_pdhdl != NULL);
+
+
+		ret = ibt_free_pd(hcap->hca_hdl, hcap->hca_pdhdl);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF2("rdsib_del_hca",
+			    "ibt_free_pd failed: %d", ret);
+		}
+
+		(void) ibt_free_portinfo(hcap->hca_pinfop, hcap->hca_pinfo_sz);
+
+		ret = ibt_close_hca(hcap->hca_hdl);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF2("rdsib_del_hca",
+			    "ibt_close_hca failed: %d", ret);
+		}
+
+		hcap->hca_hdl = NULL;
+		hcap->hca_pdhdl = NULL;
+		hcap->hca_lkey = 0;
+		hcap->hca_rkey = 0;
+	}
+
+	/*
+	 * This should be a write lock as we don't want anyone to get access
+	 * to the hcap while we are modifing its contents
+	 */
+	rw_enter(&statep->rds_hca_lock, RW_WRITER);
+	hcap->hca_state = RDS_HCA_STATE_REMOVED;
+	rw_exit(&statep->rds_hca_lock);
+
+	RDS_DPRINTF2("rdsib_del_hca", "Return: GUID: 0x%llx", hca_guid);
+}
+
+static void
 rds_async_handler(void *clntp, ibt_hca_hdl_t hdl, ibt_async_code_t code,
     ibt_async_event_t *event)
 {
-	rds_state_t		*statep;
+	rds_state_t		*statep = (rds_state_t *)clntp;
 
 	RDS_DPRINTF2("rds_async_handler", "Async code: %d", code);
 
 	switch (code) {
 	case IBT_EVENT_PORT_UP:
-		statep = (rds_state_t *)clntp;
 		rds_handle_portup_event(statep, hdl, event);
+		break;
+	case IBT_HCA_ATTACH_EVENT:
+		/*
+		 * NOTE: In some error recovery paths, it is possible to
+		 * receive IBT_HCA_ATTACH_EVENTs on already known HCAs.
+		 */
+		(void) rdsib_add_hca(event->ev_hca_guid);
+		break;
+	case IBT_HCA_DETACH_EVENT:
+		(void) rdsib_del_hca(statep, event->ev_hca_guid);
 		break;
 
 	default:

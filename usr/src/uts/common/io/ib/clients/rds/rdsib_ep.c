@@ -479,6 +479,7 @@ rds_session_init(rds_session_t *sp)
 	}
 
 	hca_guid = hcap->hca_guid;
+	sp->session_hca_guid = hca_guid;
 
 	/* allocate and initialize the ctrl channel */
 	ret = rds_ep_init(&sp->session_ctrlep, hca_guid);
@@ -554,6 +555,8 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 	}
 
 	RDS_DPRINTF2("rds_session_reinit", "Failover across HCAs");
+
+	sp->session_hca_guid = hcap->hca_guid;
 
 	/* re-initialize the control channel */
 	ret = rds_ep_reinit(&sp->session_ctrlep, hcap->hca_guid);
@@ -807,13 +810,14 @@ rds_destroy_session(rds_session_t *sp)
 }
 
 /* This is called on the taskq thread */
-static void
+void
 rds_failover_session(void *arg)
 {
 	rds_session_t	*sp = (rds_session_t *)arg;
 	ib_gid_t	lgid, rgid;
 	ipaddr_t	myip, remip;
 	int		ret, cnt = 0;
+	uint8_t		sp_state;
 
 	RDS_DPRINTF2("rds_failover_session", "Enter: (%p)", sp);
 
@@ -838,13 +842,16 @@ rds_failover_session(void *arg)
 		return;
 	}
 	sp->session_failover = 1;
+	sp_state = sp->session_state;
 	rw_exit(&sp->session_lock);
 
 	/*
 	 * The session is in ERROR state but close both channels
 	 * for a clean start.
 	 */
-	rds_session_close(sp, IBT_BLOCKING, 1);
+	if (sp_state == RDS_SESSION_STATE_ERROR) {
+		rds_session_close(sp, IBT_BLOCKING, 1);
+	}
 
 	/* wait 1 sec before re-connecting */
 	delay(drv_usectohz(1000000));
@@ -1036,6 +1043,50 @@ rds_passive_session_fini(rds_session_t *sp)
 	RDS_DPRINTF2("rds_passive_session_fini", "Return: SP (%p)", sp);
 }
 
+void
+rds_close_this_session(rds_session_t *sp, uint8_t wait)
+{
+	switch (sp->session_state) {
+	case RDS_SESSION_STATE_CONNECTED:
+		sp->session_state = RDS_SESSION_STATE_ACTIVE_CLOSING;
+		rw_exit(&sp->session_lock);
+
+		rds_session_close(sp, IBT_BLOCKING, wait);
+
+		rw_enter(&sp->session_lock, RW_WRITER);
+		sp->session_state = RDS_SESSION_STATE_CLOSED;
+		RDS_DPRINTF3("rds_close_sessions",
+		    "SP(%p) State RDS_SESSION_STATE_CLOSED", sp);
+		rds_session_fini(sp);
+		sp->session_state = RDS_SESSION_STATE_FINI;
+		sp->session_failover = 0;
+		RDS_DPRINTF3("rds_close_sessions",
+		    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
+		break;
+
+	case RDS_SESSION_STATE_ERROR:
+	case RDS_SESSION_STATE_PASSIVE_CLOSING:
+	case RDS_SESSION_STATE_INIT:
+		sp->session_state = RDS_SESSION_STATE_ACTIVE_CLOSING;
+		rw_exit(&sp->session_lock);
+
+		rds_session_close(sp, IBT_BLOCKING, wait);
+
+		rw_enter(&sp->session_lock, RW_WRITER);
+		sp->session_state = RDS_SESSION_STATE_CLOSED;
+		RDS_DPRINTF3("rds_close_sessions",
+		    "SP(%p) State RDS_SESSION_STATE_CLOSED", sp);
+		/* FALLTHRU */
+	case RDS_SESSION_STATE_CLOSED:
+		rds_session_fini(sp);
+		sp->session_state = RDS_SESSION_STATE_FINI;
+		sp->session_failover = 0;
+		RDS_DPRINTF3("rds_close_sessions",
+		    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
+		break;
+	}
+}
+
 /*
  * Can be called:
  * 1. on driver detach
@@ -1066,47 +1117,7 @@ rds_close_sessions(void *arg)
 		rw_enter(&sp->session_lock, RW_WRITER);
 		RDS_DPRINTF2("rds_close_sessions", "SP(%p) State: %d", sp,
 		    sp->session_state);
-
-		switch (sp->session_state) {
-		case RDS_SESSION_STATE_CONNECTED:
-			sp->session_state = RDS_SESSION_STATE_ACTIVE_CLOSING;
-			rw_exit(&sp->session_lock);
-
-			rds_session_close(sp, IBT_BLOCKING, 1);
-
-			rw_enter(&sp->session_lock, RW_WRITER);
-			sp->session_state = RDS_SESSION_STATE_CLOSED;
-			RDS_DPRINTF3("rds_close_sessions",
-			    "SP(%p) State RDS_SESSION_STATE_CLOSED", sp);
-			rds_session_fini(sp);
-			sp->session_state = RDS_SESSION_STATE_FINI;
-			sp->session_failover = 0;
-			RDS_DPRINTF3("rds_close_sessions",
-			    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
-			break;
-
-		case RDS_SESSION_STATE_ERROR:
-		case RDS_SESSION_STATE_PASSIVE_CLOSING:
-		case RDS_SESSION_STATE_INIT:
-			sp->session_state = RDS_SESSION_STATE_ACTIVE_CLOSING;
-			rw_exit(&sp->session_lock);
-
-			rds_session_close(sp, IBT_BLOCKING, 1);
-
-			rw_enter(&sp->session_lock, RW_WRITER);
-			sp->session_state = RDS_SESSION_STATE_CLOSED;
-			RDS_DPRINTF3("rds_close_sessions",
-			    "SP(%p) State RDS_SESSION_STATE_CLOSED", sp);
-			/* FALLTHRU */
-		case RDS_SESSION_STATE_CLOSED:
-			rds_session_fini(sp);
-			sp->session_state = RDS_SESSION_STATE_FINI;
-			sp->session_failover = 0;
-			RDS_DPRINTF3("rds_close_sessions",
-			    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
-			break;
-		}
-
+		rds_close_this_session(sp, 2);
 		rw_exit(&sp->session_lock);
 		sp = sp->session_nextp;
 	}
@@ -1367,6 +1378,23 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 }
 
 void
+rds_handle_close_session_request(void *arg)
+{
+	rds_session_t	*sp = (rds_session_t *)arg;
+
+	RDS_DPRINTF2("rds_handle_close_session_request",
+	    "Enter: Closing this Session (%p)", sp);
+
+	rw_enter(&sp->session_lock, RW_WRITER);
+	RDS_DPRINTF2("rds_handle_close_session_request",
+	    "SP(%p) State: %d", sp, sp->session_state);
+	rds_close_this_session(sp, 2);
+	rw_exit(&sp->session_lock);
+
+	RDS_DPRINTF2("rds_handle_close_session_request", "Return SP(%p)", sp);
+}
+
+void
 rds_handle_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
 {
 	RDS_DPRINTF4("rds_handle_control_message", "Enter: SP(%p) code: %d "
@@ -1388,6 +1416,12 @@ rds_handle_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
 		rds_unmark_all_ports(sp, RDS_REMOTE);
 		break;
 	case RDS_CTRL_CODE_HEARTBEAT:
+		break;
+	case RDS_CTRL_CODE_CLOSE_SESSION:
+		RDS_DPRINTF2("rds_handle_control_message",
+		    "SP(%p) Remote Requested to close this session", sp);
+		(void) ddi_taskq_dispatch(rds_taskq,
+		    rds_handle_close_session_request, (void *)sp, DDI_SLEEP);
 		break;
 	default:
 		RDS_DPRINTF2(LABEL, "ERROR: Invalid Control code: %d",
@@ -2140,7 +2174,7 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 			return (ENOMEM);
 		}
 	} else {
-		RDS_DPRINTF2("rds_sendmsg", "SP(%p): Session is in %d state",
+		RDS_DPRINTF4("rds_sendmsg", "SP(%p): Session is in %d state",
 		    sp, sp->session_state);
 		rw_exit(&sp->session_lock);
 		return (ENOMEM);

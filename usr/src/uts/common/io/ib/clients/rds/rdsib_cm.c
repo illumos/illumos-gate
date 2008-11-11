@@ -116,14 +116,6 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	RDS_DPRINTF2(LABEL, "REQ Received: From: %llx:%llx To: %llx:%llx",
 	    rgid.gid_prefix, rgid.gid_guid, lgid.gid_prefix, lgid.gid_guid);
 
-	/* validate service id */
-	if (reqp->req_service_id == RDS_SERVICE_ID) {
-		RDS_DPRINTF2(LABEL, "Version Mismatch: Remote system "
-		    "(GUID: 0x%llx) is running an older version of RDS",
-		    rgid.gid_guid);
-		return (IBT_CM_REJECT);
-	}
-
 	/*
 	 * CM private data brings IP information
 	 * Private data received is a stream of bytes and may not be properly
@@ -536,6 +528,7 @@ rds_handle_cm_conn_closed(ibt_cm_event_t *evp)
 
 	switch (sp->session_state) {
 	case RDS_SESSION_STATE_CONNECTED:
+	case RDS_SESSION_STATE_HCA_CLOSING:
 		sp->session_state = RDS_SESSION_STATE_PASSIVE_CLOSING;
 		RDS_DPRINTF3("rds_handle_cm_conn_closed", "SP(%p) State "
 		    "RDS_SESSION_STATE_PASSIVE_CLOSING", sp);
@@ -737,19 +730,6 @@ rds_register_service(ibt_clnt_hdl_t rds_ibhdl)
 	srvdesc.sd_flags = IBT_SRV_NO_FLAGS;
 
 	/*
-	 * Register the old service id for backward compatibility
-	 * REQs received on this service id would be rejected
-	 */
-	ret = ibt_register_service(rds_ibhdl, &srvdesc, RDS_SERVICE_ID,
-	    1, &rdsib_statep->rds_old_srvhdl, NULL);
-	if (ret != IBT_SUCCESS) {
-		RDS_DPRINTF2(LABEL,
-		    "RDS Service (0x%llx) Registration Failed: %d",
-		    RDS_SERVICE_ID, ret);
-		return (NULL);
-	}
-
-	/*
 	 * This is the new service id as per:
 	 * Annex A11: RDMA IP CM Service
 	 */
@@ -779,16 +759,33 @@ rds_bind_service(rds_state_t *statep)
 
 	RDS_DPRINTF2("rds_bind_service", "Enter: 0x%p", statep);
 
+	rw_enter(&statep->rds_hca_lock, RW_READER);
+
 	hcap = statep->rds_hcalistp;
 	while (hcap != NULL) {
+
+		/* skip the HCAs that are not fully online */
+		if ((hcap->hca_state != RDS_HCA_STATE_OPEN) &&
+		    (hcap->hca_state != RDS_HCA_STATE_MEM_REGISTERED)) {
+			RDS_DPRINTF2("rds_bind_service",
+			    "Skipping HCA: 0x%llx, state: %d",
+			    hcap->hca_guid, hcap->hca_state);
+			hcap = hcap->hca_nextp;
+			continue;
+		}
+
+		/* currently, we have space for only 4 bindhdls */
+		ASSERT(hcap->hca_nports < 4);
 		for (jx = 0; jx < hcap->hca_nports; jx++) {
 			nports++;
 			if (hcap->hca_pinfop[jx].p_linkstate !=
 			    IBT_PORT_ACTIVE) {
 				/*
 				 * service bind will be called in the async
-				 * handler when the port comes up
+				 * handler when the port comes up. Clear any
+				 * stale bind handle.
 				 */
+				hcap->hca_bindhdl[jx] = NULL;
 				continue;
 			}
 
@@ -800,7 +797,7 @@ rds_bind_service(rds_state_t *statep)
 
 			/* pass statep as cm_private */
 			ret = ibt_bind_service(statep->rds_srvhdl, gid,
-			    NULL, statep, NULL);
+			    NULL, statep, &hcap->hca_bindhdl[jx]);
 			if (ret != IBT_SUCCESS) {
 				RDS_DPRINTF2(LABEL, "Bind service for "
 				    "HCA: 0x%llx Port: %d gid %llx:%llx "
@@ -811,20 +808,11 @@ rds_bind_service(rds_state_t *statep)
 			}
 
 			nbinds++;
-
-			/* bind the old service, ignore if it fails */
-			ret = ibt_bind_service(statep->rds_old_srvhdl, gid,
-			    NULL, statep, NULL);
-			if (ret != IBT_SUCCESS) {
-				RDS_DPRINTF2(LABEL, "Bind service for "
-				    "HCA: 0x%llx Port: %d gid %llx:%llx "
-				    "failed: %d", hcap->hca_guid,
-				    hcap->hca_pinfop[jx].p_port_num,
-				    gid.gid_prefix, gid.gid_guid, ret);
-			}
 		}
 		hcap = hcap->hca_nextp;
 	}
+
+	rw_exit(&statep->rds_hca_lock);
 
 	RDS_DPRINTF2(LABEL, "RDS Service available on %d/%d ports",
 	    nbinds, nports);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -74,8 +74,6 @@
 
 #ifndef _RDSIB_EP_H
 #define	_RDSIB_EP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -174,12 +172,13 @@ typedef enum rds_session_state_s {
 	RDS_SESSION_STATE_FAILED		= 1,
 	RDS_SESSION_STATE_INIT			= 2,
 	RDS_SESSION_STATE_CONNECTED		= 3,
-	RDS_SESSION_STATE_ERROR			= 4,
-	RDS_SESSION_STATE_ACTIVE_CLOSING	= 5,
-	RDS_SESSION_STATE_PASSIVE_CLOSING	= 6,
-	RDS_SESSION_STATE_CLOSED		= 7,
-	RDS_SESSION_STATE_FINI			= 8,
-	RDS_SESSION_STATE_DESTROY		= 9
+	RDS_SESSION_STATE_HCA_CLOSING		= 4,
+	RDS_SESSION_STATE_ERROR			= 5,
+	RDS_SESSION_STATE_ACTIVE_CLOSING	= 6,
+	RDS_SESSION_STATE_PASSIVE_CLOSING	= 7,
+	RDS_SESSION_STATE_CLOSED		= 8,
+	RDS_SESSION_STATE_FINI			= 9,
+	RDS_SESSION_STATE_DESTROY		= 10
 } rds_session_state_t;
 
 #define	RDS_SESSION_TRANSITION(sp, state)			\
@@ -292,6 +291,7 @@ typedef struct rds_session_s {
 	struct rds_session_s	*session_nextp;
 	ipaddr_t		session_remip;
 	ipaddr_t		session_myip;
+	ib_guid_t		session_hca_guid;
 	ib_gid_t		session_lgid;
 	ib_gid_t		session_rgid;
 	krwlock_t		session_lock;

@@ -75,8 +75,6 @@
 #ifndef _RDSIB_IB_H
 #define	_RDSIB_IB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -130,11 +128,20 @@ extern uint_t		rds_rx_pkts_pending_hwm; /* readonly */
 #define	RDS_RDMAW_WRID	0xdabadaba
 #define	RDS_NUM_ACKS	4 /* only 1 is used */
 
+typedef enum rds_hca_state_s {
+	RDS_HCA_STATE_ADDED		= 0,
+	RDS_HCA_STATE_OPEN		= 1,
+	RDS_HCA_STATE_MEM_REGISTERED	= 2,
+	RDS_HCA_STATE_STOPPING		= 3,
+	RDS_HCA_STATE_REMOVED		= 4
+} rds_hca_state_t;
+
 /*
  * There is one of this structure for each HCA in the system.
  * This holds all the information about the HCA.
  *
  * hca_nextp - Points to the next hca in the system.
+ * hca_state - State of the hca (only modified on HCA attach/detach)
  * hca_guid - HCA Guid
  * hca_nports - Number of ports on the HCA
  * hca_hdl - HCA hdl obtained after opening the HCA
@@ -147,6 +154,7 @@ extern uint_t		rds_rx_pkts_pending_hwm; /* readonly */
  */
 typedef struct rds_hca_s {
 	struct rds_hca_s	*hca_nextp;
+	rds_hca_state_t		hca_state;
 	ib_guid_t		hca_guid;
 	uint_t			hca_nports;
 	ibt_hca_hdl_t		hca_hdl;
@@ -154,6 +162,7 @@ typedef struct rds_hca_s {
 	ibt_mr_hdl_t		hca_mrhdl;
 	ibt_lkey_t		hca_lkey;
 	ibt_rkey_t		hca_rkey;
+	ibt_sbind_hdl_t		hca_bindhdl[4];
 	ibt_hca_attr_t		hca_attr;
 	ibt_hca_portinfo_t	*hca_pinfop;
 	uint_t			hca_pinfo_sz;
@@ -182,7 +191,6 @@ typedef struct rds_state_s {
 	uint_t			rds_nhcas;
 	rds_hca_t		*rds_hcalistp;
 	ibt_srv_hdl_t		rds_srvhdl;
-	ibt_srv_hdl_t		rds_old_srvhdl;
 	ib_svc_id_t		rds_service_id;
 } rds_state_t;
 

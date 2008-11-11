@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "cfga_ib.h"
 
 /*
@@ -864,8 +862,6 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
     char **errstring, cfga_flags_t flags)
 {
 	int		ret;
-	int		len;
-	char		*msg;
 	char		*devpath;
 	nvlist_t	*nvl = NULL;
 	boolean_t	static_ap_id = B_TRUE;
@@ -923,19 +919,10 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 
 		rv = CFGA_IB_OK;	/* Other status don't matter */
 
-		len = strlen(IB_CONFIRM0) + strlen(IB_CONFIRM1) +
-		    strlen("Configure") + strlen(ap_id);
-		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
-			(void) snprintf(msg, len + 3, "Configure %s%s\n%s",
-			    IB_CONFIRM0, ap_id, IB_CONFIRM1);
-		}
-
-		if (!ib_confirm(confp, msg)) {
-			free(msg);
+		if (!ib_confirm(confp, IB_CONFIRM1)) {
 			ib_cleanup_after_devctl_cmd(hdl, nvl);
 			return (CFGA_NACK);
 		}
-		free(msg);
 
 		if (devctl_ap_configure(hdl, nvl) != 0) {
 			DPRINTF("cfga_change_state: devctl_ap_configure "
@@ -986,19 +973,11 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 		}
 
 		rv = CFGA_IB_OK;	/* Other statuses don't matter */
-		len = strlen(IB_CONFIRM0) + strlen(IB_CONFIRM1) +
-		    strlen("Unconfigure") + strlen(ap_id);
-		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
-			(void) snprintf(msg, len + 3, "Unconfigure %s%s\n%s",
-			    IB_CONFIRM0, ap_id, IB_CONFIRM1);
-		}
 
-		if (!ib_confirm(confp, msg)) {
-			free(msg);
+		if (!ib_confirm(confp, IB_CONFIRM1)) {
 			ib_cleanup_after_devctl_cmd(hdl, nvl);
 			return (CFGA_NACK);
 		}
-		free(msg);
 
 		devpath = ib_get_devicepath(ap_id);
 		if (devpath == NULL) {
@@ -1127,7 +1106,7 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
 			    ap_id, errno));
 		}
 
-		if ((msg = (char *)calloc(80, 1)) == NULL) {
+		if ((msg = (char *)calloc(256, 1)) == NULL) {
 			DPRINTF("cfga_private_func: malloc for msg failed. "
 			    "errno: %d\n", errno);
 			return (ib_err_msg(errstring, CFGA_IB_ALLOC_FAIL,
@@ -1152,7 +1131,7 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
 			    errno));
 		}
 
-		(void) snprintf(msg, 80, "Ap_Id\t\t\t       IB Client\t\t "
+		(void) snprintf(msg, 256, "Ap_Id\t\t\t       IB Client\t\t "
 		    "Alternate HCA\n");
 		cfga_msg(msgp, msg);
 
@@ -1173,7 +1152,7 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
 			/* check at the end; print message per client found */
 			if (count == 3) {
 				count = 0;
-				(void) snprintf(msg, 80, "%-31s%-26s%s\n",
+				(void) snprintf(msg, 256, "%-30s %-25s %s\n",
 				    clnt_apid, clnt_name, alt_hca);
 				cfga_msg(msgp, msg);
 			}
@@ -1201,19 +1180,12 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
 			    ap_id, errno));
 		}
 
-		/* Check w/ user if it is ok to do this operation */
-		len = strlen(IB_CONFIRM2) + strlen(IB_CONFIRM3) + strlen(ap_id);
-		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
-			(void) snprintf(msg, len + 3, "%s %s\n%s",
-			    IB_CONFIRM2, ap_id, IB_CONFIRM3);
-		}
-
-		/* If the user fails to confirm, bailout */
-		if (!ib_confirm(confp, msg)) {
-			free(msg);
+		/*
+		 * Check w/ user if it is ok to do this operation
+		 * If the user fails to confirm, bailout
+		 */
+		if (!ib_confirm(confp, IB_CONFIRM3))
 			return (CFGA_NACK);
-		}
-		free(msg);
 
 		/* Get device-paths of all the IOC/Port/Pseudo devices */
 		rv = ib_do_control_ioctl((char *)ap_id, IBNEX_UNCFG_CLNTS_SZ,

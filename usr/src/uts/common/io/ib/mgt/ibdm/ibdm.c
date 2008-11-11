@@ -161,7 +161,7 @@ int	ibdm_ignore_saa_event = 0;
 /* Modload support */
 static struct modlmisc ibdm_modlmisc	= {
 	&mod_miscops,
-	"InfiniBand Device Manager",
+	"InfiniBand Device Manager"
 };
 
 struct modlinkage ibdm_modlinkage = {
@@ -257,6 +257,7 @@ ibdm_init(void)
 		mutex_init(&ibdm.ibdm_mutex, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ibdm.ibdm_hl_mutex, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ibdm.ibdm_ibnex_mutex, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&ibdm.ibdm_port_settle_cv, NULL, CV_DRIVER, NULL);
 		mutex_enter(&ibdm.ibdm_mutex);
 		ibdm.ibdm_state |= IBDM_LOCKS_ALLOCED;
 	}
@@ -478,6 +479,7 @@ ibdm_fini()
 		mutex_destroy(&ibdm.ibdm_mutex);
 		mutex_destroy(&ibdm.ibdm_hl_mutex);
 		mutex_destroy(&ibdm.ibdm_ibnex_mutex);
+		cv_destroy(&ibdm.ibdm_port_settle_cv);
 	}
 	if (ibdm.ibdm_state & IBDM_CVS_ALLOCED) {
 		ibdm.ibdm_state &= ~IBDM_CVS_ALLOCED;
@@ -548,6 +550,7 @@ ibdm_event_hdlr(void *clnt_hdl,
 		}
 		ibdm_initialize_port(port);
 		hca_list->hl_nports_active++;
+		cv_broadcast(&ibdm.ibdm_port_settle_cv);
 		mutex_exit(&ibdm.ibdm_hl_mutex);
 		break;
 
@@ -565,6 +568,7 @@ ibdm_event_hdlr(void *clnt_hdl,
 		port_sa_hdl = port->pa_sa_hdl;
 		(void) ibdm_fini_port(port);
 		port->pa_state = IBT_PORT_DOWN;
+		cv_broadcast(&ibdm.ibdm_port_settle_cv);
 		mutex_exit(&ibdm.ibdm_hl_mutex);
 		ibdm_reset_all_dgids(port_sa_hdl);
 		break;
@@ -874,6 +878,7 @@ ibdm_handle_hca_attach(ib_guid_t hca_guid)
 			mutex_enter(&ibdm.ibdm_hl_mutex);
 			hca_list->hl_nports_active++;
 			ibdm_initialize_port(port_attr);
+			cv_broadcast(&ibdm.ibdm_port_settle_cv);
 			mutex_exit(&ibdm.ibdm_hl_mutex);
 		}
 	}
@@ -936,6 +941,8 @@ ibdm_handle_hca_detach(ib_guid_t hca_guid)
 				ibdm.ibdm_hca_list_head = head->hl_next;
 			else
 				prev->hl_next = head->hl_next;
+			if (ibdm.ibdm_hca_list_tail == head)
+				ibdm.ibdm_hca_list_tail = prev;
 			ibdm.ibdm_hca_count--;
 			break;
 		}
@@ -4504,22 +4511,22 @@ ibdm_ibnex_unregister_callback()
 	mutex_exit(&ibdm.ibdm_ibnex_mutex);
 }
 
-
 /*
- * ibdm_ibnex_get_waittime()
+ * ibdm_get_waittime()
  *	Calculates the wait time based on the last HCA attach time
  */
-time_t
-ibdm_ibnex_get_waittime(ib_guid_t hca_guid, int *dft_wait)
+static time_t
+ibdm_get_waittime(ib_guid_t hca_guid, int dft_wait)
 {
 	int		ii;
 	time_t		temp, wait_time = 0;
 	ibdm_hca_list_t	*hca;
 
-	IBTF_DPRINTF_L4("ibdm", "\tibnex_get_waittime hcaguid:%llx"
-	    "\tport settling time %d", hca_guid, *dft_wait);
+	IBTF_DPRINTF_L4("ibdm", "\tget_waittime hcaguid:%llx"
+	    "\tport settling time %d", hca_guid, dft_wait);
 
-	mutex_enter(&ibdm.ibdm_hl_mutex);
+	ASSERT(mutex_owned(&ibdm.ibdm_hl_mutex));
+
 	hca = ibdm.ibdm_hca_list_head;
 
 	if (hca_guid) {
@@ -4528,27 +4535,41 @@ ibdm_ibnex_get_waittime(ib_guid_t hca_guid, int *dft_wait)
 			    (hca->hl_nports != hca->hl_nports_active)) {
 				wait_time =
 				    ddi_get_time() - hca->hl_attach_time;
-				wait_time = ((wait_time >= *dft_wait) ?
-				    0 : (*dft_wait - wait_time));
+				wait_time = ((wait_time >= dft_wait) ?
+				    0 : (dft_wait - wait_time));
 				break;
 			}
 			hca = hca->hl_next;
 		}
-		mutex_exit(&ibdm.ibdm_hl_mutex);
-		IBTF_DPRINTF_L4("ibdm", "\tibnex_get_waittime %llx", wait_time);
+		IBTF_DPRINTF_L4("ibdm", "\tget_waittime %llx", wait_time);
 		return (wait_time);
 	}
 
 	for (ii = 0; ii < ibdm.ibdm_hca_count; ii++) {
 		if (hca->hl_nports != hca->hl_nports_active) {
 			temp = ddi_get_time() - hca->hl_attach_time;
-			temp = ((temp >= *dft_wait) ? 0 : (*dft_wait - temp));
+			temp = ((temp >= dft_wait) ? 0 : (dft_wait - temp));
 			wait_time = (temp > wait_time) ? temp : wait_time;
 		}
 	}
-	mutex_exit(&ibdm.ibdm_hl_mutex);
-	IBTF_DPRINTF_L4("ibdm", "\tibnex_get_waittime %llx", wait_time);
+	IBTF_DPRINTF_L4("ibdm", "\tget_waittime %llx", wait_time);
 	return (wait_time);
+}
+
+void
+ibdm_ibnex_port_settle_wait(ib_guid_t hca_guid, int dft_wait)
+{
+	time_t wait_time;
+
+	mutex_enter(&ibdm.ibdm_hl_mutex);
+
+	while ((wait_time = ibdm_get_waittime(hca_guid, dft_wait)) > 0) {
+		(void) cv_timedwait(&ibdm.ibdm_port_settle_cv,
+		    &ibdm.ibdm_hl_mutex,
+		    ddi_get_lbolt() + drv_usectohz(wait_time * 1000000));
+	}
+
+	mutex_exit(&ibdm.ibdm_hl_mutex);
 }
 
 

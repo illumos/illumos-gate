@@ -1398,17 +1398,16 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 				clntp->clnt_async_cnt++;
 				hca_devp->hd_async_task_cnt++;
 
-				(void) taskq_dispatch(ibtl_async_taskq,
-				    ibtl_tell_client_about_new_hca, new_hcap,
-				    TQ_SLEEP);
+				mutex_exit(&ibtl_clnt_list_mutex);
+				(void) ibtl_tell_client_about_new_hca(
+				    new_hcap);
+				mutex_enter(&ibtl_clnt_list_mutex);
 			}
 			break;
 		}
 		clntp = clntp->clnt_list_link;
 	}
-	if (clntp != NULL)
-		while (clntp->clnt_async_cnt > 0)
-			cv_wait(&ibtl_clnt_cv, &ibtl_clnt_list_mutex);
+
 	clntp = ibtl_clnt_list;
 	while (clntp != NULL) {
 		if (clntp->clnt_modinfop->mi_clnt_class == IBT_CM) {
@@ -1564,14 +1563,12 @@ ibtl_detach_all_clients(ibtl_hca_devinfo_t *hca_devp)
 			mutex_exit(&ibtl_async_mutex);
 			hca_devp->hd_async_task_cnt++;
 
-			(void) taskq_dispatch(ibtl_async_taskq,
-			    ibtl_hca_client_async_task, ibt_hca, TQ_SLEEP);
+			mutex_exit(&ibtl_clnt_list_mutex);
+			ibtl_hca_client_async_task(ibt_hca);
+			mutex_enter(&ibtl_clnt_list_mutex);
+			break;
 		}
 		ibt_hca = ibt_hca->ha_clnt_link;
-	}
-	/* wait for IBDM to complete */
-	while (hca_devp->hd_async_task_cnt != 0) {
-		cv_wait(&hca_devp->hd_async_task_cv, &ibtl_clnt_list_mutex);
 	}
 
 	/*
@@ -1645,8 +1642,16 @@ ibtl_detach_all_clients(ibtl_hca_devinfo_t *hca_devp)
 		retval = 0;
 
 bailout:
-	hca_devp->hd_async_busy = 0;
-	cv_broadcast(&hca_devp->hd_async_busy_cv);
+	if (retval) {
+		hca_devp->hd_state = IBTL_HCA_DEV_ATTACHED; /* fix hd_state */
+		mutex_exit(&ibtl_clnt_list_mutex);
+		ibtl_announce_new_hca(hca_devp);
+		mutex_enter(&ibtl_clnt_list_mutex);
+	} else {
+		hca_devp->hd_async_busy = 0;
+		cv_broadcast(&hca_devp->hd_async_busy_cv);
+	}
+
 	return (retval);
 }
 

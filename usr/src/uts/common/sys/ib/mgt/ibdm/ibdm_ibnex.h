@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_MGT_IBDM_IBDM_IBNEX_H
 #define	_SYS_IB_MGT_IBDM_IBDM_IBNEX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the definitions of private interfaces
@@ -401,13 +398,13 @@ void		ibdm_ibnex_free_hca_list(ibdm_hca_list_t *);
 void	ibdm_ibnex_update_pkey_tbls(void);
 
 /*
- * ibdm_ibnex_get_waittime
- *	Figure out how much to delay for a given port to come up
+ * ibdm_ibnex_port_settle_wait
+ *	Wait until the ports come up
  *
- * Arguments		: IOC/PORT GUID
- * Return Values	: default wait time from IB nexus
+ * Arguments
+ *      HCA GUID and the maximum wait time since the hca instance attach
  */
-time_t	ibdm_ibnex_get_waittime(ib_guid_t, int *);
+void	ibdm_ibnex_port_settle_wait(ib_guid_t, int);
 
 
 #ifdef __cplusplus

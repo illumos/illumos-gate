@@ -19,16 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * This file contains support required for IB cfgadm plugin.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/conf.h>
 #include <sys/stat.h>
@@ -79,8 +76,7 @@ static ibnex_rval_t	ibnex_commsvc_fininode(dev_info_t *);
 static ibnex_rval_t	ibnex_pseudo_fininode(dev_info_t *);
 
 extern uint64_t		ibnex_str2hex(char *, int, int *);
-extern int		ibnex_ioc_initnode(ibdm_ioc_info_t *, int,
-			    dev_info_t *);
+extern int		ibnex_ioc_initnode_all_pi(ibdm_ioc_info_t *);
 extern dev_info_t	*ibnex_commsvc_initnode(dev_info_t *,
 			    ibdm_port_attr_t *, int, int, ib_pkey_t, int *,
 			    int);
@@ -88,8 +84,7 @@ extern int		ibnex_get_dip_from_guid(ib_guid_t, int,
 			    ib_pkey_t, dev_info_t **);
 extern void		ibnex_reprobe_ioc_dev(void *arg);
 extern void		ibnex_reprobe_ioc_all();
-extern int		ibnex_pseudo_create_pi(ibnex_node_data_t *,
-			    dev_info_t *);
+extern int		ibnex_pseudo_create_all_pi(ibnex_node_data_t *);
 extern void		ibnex_pseudo_initnodes(void);
 
 extern ibnex_t	ibnex;
@@ -894,8 +889,10 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (ret_val != IBNEX_SUCCESS) {
 			nodep->node_dip = apid_dip;
 			nodep->node_state = IBNEX_CFGADM_CONFIGURED;
-		} else
+		} else {
 			nodep->node_state = IBNEX_CFGADM_UNCONFIGURED;
+			nodep->node_ap_state = IBNEX_NODE_AP_UNCONFIGURED;
+		}
 
 		rv = (ret_val != IBNEX_SUCCESS) ? EIO : 0;
 		ndi_devi_exit(pdip, circ);
@@ -928,6 +925,35 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		/*
+		 * Let's get the node if it already exists.
+		 * NOTE: ibnex_get_dip_from_apid() finds a valid dip
+		 * and also does a ndi_devi_hold() on the child.
+		 */
+		nodep = NULL;
+		ret_val = ibnex_get_dip_from_apid(apid_n, &apid_dip, &nodep);
+		/*
+		 * We need the node_data but not the dip. If we get a dip for
+		 * this apid, it means it's already configured. We need to
+		 * return.
+		 */
+		if (apid_dip != NULL) {
+			ndi_rele_devi(apid_dip);
+			ndi_devi_exit(ibnex.ibnex_dip, circ);
+			rv = 0;
+			break;
+		}
+
+		/*
+		 * A node exits for this apid but not a dip. So we must have
+		 * unconfigured it earlier. Set the node_ap_state to configuring
+		 * to allow configure operation.
+		 */
+		if (nodep != NULL) {
+			nodep->node_ap_state = IBNEX_NODE_AP_CONFIGURING;
+		}
+
+
+		/*
 		 * Five types of APIDs are supported:
 		 *	o HCA_GUID,0,service-name	(HCA-SVC device)
 		 *	o IOC_GUID 			(IOC device)
@@ -954,8 +980,25 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			}
 		} /* end of else */
 
-		if (ret_val != IBNEX_SUCCESS)
+		if (ret_val != IBNEX_SUCCESS) {
 			rv = (ret_val == IBNEX_BUSY) ? EBUSY : EIO;
+		} else {
+			/*
+			 * Get the newly created node and set the state to
+			 * IBNEX_NODE_AP_CONFIGURED.
+			 * NOTE: ibnex_get_dip_from_apid() finds a valid dip
+			 * and also does a ndi_devi_hold() on the child.
+			 */
+			if (!nodep)
+				ret_val = ibnex_get_dip_from_apid(apid_n,
+				    &apid_dip, &nodep);
+			if (nodep != NULL) {
+				nodep->node_ap_state = IBNEX_NODE_AP_CONFIGURED;
+			}
+			if (apid_dip != NULL) {
+				ndi_rele_devi(apid_dip);
+			}
+		}
 		IBTF_DPRINTF_L2("ibnex", "%s: DONE !! It %s", msg,
 		    rv ? "failed" : "succeeded");
 		ndi_devi_exit(ibnex.ibnex_dip, circ);
@@ -1011,7 +1054,8 @@ ibnex_get_num_devices(void)
 					continue;
 
 				for (l = 0; l < ibnex.ibnex_nvppa_comm_svcs;
-				    l++, ++num_nodes);
+				    l++, ++num_nodes)
+					;
 			} /* end of pa_npkeys */
 		} /* end of  hl_nports */
 	} /* end of hca_list != NULL */
@@ -1770,7 +1814,7 @@ ibnex_get_dip_from_apid(char *apid, dev_info_t **ret_dip,
 				    ibnex.ibnex_nhcasvc_comm_svcs) &&
 				    (strstr(svc_str, ibnex.
 				    ibnex_hcasvc_comm_svc_names[index])
-					!= NULL)))) ||
+				    != NULL)))) ||
 					/* next the VPPA strings */
 				    ((pkey_val != 0) && (strstr(svc_str, ibnex.
 				    ibnex_vppa_comm_svc_names[index]) !=
@@ -1883,10 +1927,9 @@ ibnex_handle_pseudo_configure(char *apid)
 
 		ASSERT(nodep->node_state != IBNEX_CFGADM_CONFIGURED);
 		nodep->node_state = IBNEX_CFGADM_CONFIGURING;
-		nodep->node_data.pseudo_node.pseudo_new_node = 0;
 
 		mutex_exit(&ibnex.ibnex_mutex);
-		retval = ibnex_pseudo_create_pi(nodep, NULL);
+		retval = ibnex_pseudo_create_all_pi(nodep);
 		mutex_enter(&ibnex.ibnex_mutex);
 		if (retval == NDI_SUCCESS) {
 			nodep->node_state = IBNEX_CFGADM_CONFIGURED;
@@ -1945,7 +1988,7 @@ ibnex_handle_ioc_configure(char *apid)
 		return (retval);
 	}
 
-	retval = ibnex_ioc_initnode(ioc_info, IBNEX_CFGADM_ENUMERATE, NULL);
+	retval = ibnex_ioc_initnode_all_pi(ioc_info);
 	ibdm_ibnex_free_ioc_list(ioc_info);
 
 	IBTF_DPRINTF_L4("ibnex", "\tibnex_handle_ioc_configure: "
@@ -1963,7 +2006,7 @@ ibnex_handle_ioc_configure(char *apid)
 static ibnex_rval_t
 ibnex_handle_commsvcnode_configure(char *apid)
 {
-	int			ret, str_len;
+	int			ret, str_len, circ;
 	int			sndx;
 	int			port_pkey = 0;
 	char			*pkey_str = strchr(apid, ',');
@@ -2106,12 +2149,14 @@ ibnex_handle_commsvcnode_configure(char *apid)
 		node_type = IBNEX_VPPA_COMMSVC_NODE;
 
 	mutex_enter(&ibnex.ibnex_mutex);
+	ndi_devi_enter(parent, &circ);
 	if (ibnex_commsvc_initnode(parent, port_attr, sndx, node_type,
 	    port_pkey, &ret, IBNEX_CFGADM_ENUMERATE) != NULL) {
 		retval = IBNEX_SUCCESS;
 	} else {
 		retval = (ret == IBNEX_BUSY) ? IBNEX_BUSY : IBNEX_FAILURE;
 	}
+	ndi_devi_exit(parent, circ);
 
 	if (is_hcasvc_node == B_FALSE)
 		ibdm_ibnex_free_port_attr(port_attr);

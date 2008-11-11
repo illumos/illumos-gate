@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -71,8 +71,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/clients/rds/rdsib_cm.h>
 #include <sys/ib/clients/rds/rdsib_ib.h>
@@ -237,8 +235,15 @@ rds_init_recv_caches(rds_state_t *statep)
 	mem_attr.mr_as = NULL;
 	mem_attr.mr_flags = IBT_MR_ENABLE_LOCAL_WRITE;
 
+	rw_enter(&statep->rds_hca_lock, RW_WRITER);
+
 	hcap = statep->rds_hcalistp;
 	while (hcap != NULL) {
+		if (hcap->hca_state != RDS_HCA_STATE_OPEN) {
+			hcap = hcap->hca_nextp;
+			continue;
+		}
+
 		ret = ibt_register_mr(hcap->hca_hdl, hcap->hca_pdhdl,
 		    &mem_attr, &hcap->hca_mrhdl, &mem_desc);
 		if (ret != IBT_SUCCESS) {
@@ -260,15 +265,18 @@ rds_init_recv_caches(rds_state_t *statep)
 			}
 			kmem_free(bufmemp, nbuf * sizeof (rds_buf_t));
 			kmem_free(memp, memsize);
+			rw_exit(&statep->rds_hca_lock);
 			mutex_exit(&rds_dpool.pool_lock);
 			return (-1);
 		}
 
+		hcap->hca_state = RDS_HCA_STATE_MEM_REGISTERED;
 		hcap->hca_lkey = mem_desc.md_lkey;
 		hcap->hca_rkey = mem_desc.md_rkey;
 
 		hcap = hcap->hca_nextp;
 	}
+	rw_exit(&statep->rds_hca_lock);
 
 	/* Initialize data pool */
 	rds_dpool.pool_memp = memp;
@@ -316,6 +324,8 @@ rds_init_recv_caches(rds_state_t *statep)
 	return (0);
 }
 
+rds_hca_t *rds_lkup_hca(ib_guid_t hca_guid);
+
 void
 rds_free_send_pool(rds_ep_t *ep)
 {
@@ -334,7 +344,7 @@ rds_free_send_pool(rds_ep_t *ep)
 	}
 
 	/* get the hcap for the HCA hosting this channel */
-	hcap = rds_get_hcap(rdsib_statep, ep->ep_hca_guid);
+	hcap = rds_lkup_hca(ep->ep_hca_guid);
 	if (hcap == NULL) {
 		RDS_DPRINTF2("rds_free_send_pool", "HCA (0x%llx) not found",
 		    ep->ep_hca_guid);
@@ -858,6 +868,7 @@ rds_is_sendq_empty(rds_ep_t *ep, uint_t wait)
 
 		if ((wait == 2) && (ep->ep_type == RDS_EP_TYPE_DATA)) {
 			rds_buf_t	*ackbp;
+			rds_buf_t	*prev_ackbp;
 
 			/*
 			 * If the last one is acknowledged then everything
@@ -865,6 +876,7 @@ rds_is_sendq_empty(rds_ep_t *ep, uint_t wait)
 			 */
 			bp = spool->pool_tailp;
 			ackbp = *(rds_buf_t **)ep->ep_ack_addr;
+			prev_ackbp = ackbp;
 			RDS_DPRINTF2("rds_is_sendq_empty", "EP(%p): "
 			    "Checking for acknowledgements", ep);
 			while (bp != ackbp) {
@@ -877,6 +889,13 @@ rds_is_sendq_empty(rds_ep_t *ep, uint_t wait)
 
 				bp = spool->pool_tailp;
 				ackbp = *(rds_buf_t **)ep->ep_ack_addr;
+				if (ackbp == prev_ackbp) {
+					RDS_DPRINTF2("rds_is_sendq_empty",
+					    "There has been no progress,"
+					    "give up and proceed");
+					break;
+				}
+				prev_ackbp = ackbp;
 			}
 		}
 	} else if (spool->pool_nbusy != 0) {
