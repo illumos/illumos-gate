@@ -276,7 +276,7 @@ The instance is not currently transitioning between states.
 			</prop_pattern>
 		</pg_pattern>
 
-		<pg_pattern name='options' type='framework'
+		<pg_pattern name='options' type='application'
 		    target='this' required='false'>
 			<description>
 				<loctext xml:lang='C'>
