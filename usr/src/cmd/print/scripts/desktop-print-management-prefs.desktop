@@ -25,30 +25,28 @@
 #
 
 [Desktop Entry]
-Name=Print Manager
-Name[cs]=Kontrola Tisku
-Name[de]=Drucküberwachung
-Name[es]=Supervisor de impresión
-Name[fr]=Moniteur d'impression
-Name[it]=Monitor di stampa
-Name[ja]=印刷モニター
-Name[ko]=인쇄 모니터
-Name[pt_BR]=Monitor de impressão
-Name[zh_CN]=打印监视器
-Name[zh_HK]=列印監視器
-Name[zh_TW]=列印監視器
-Comment=Manage your printer queues and jobs
-Comment[cs]=Správa tiskových front a procesů
-Comment[de]=Druckerwarteschlangen und Druckaufträge verwalten
-Comment[es]=Administre las tareas y colas de la impresora
-Comment[fr]=Gérer les files d'attente et travaux de l'imprimante
-Comment[it]=Gestisci le code e i processi della stampante
-Comment[ja]=プリンタのキューおよびジョブを管理する
-Comment[ko]=프린터 대기열 및 작업 관리
-Comment[pt_BR]=Gerenciar filas e trabalhos da impressora
-Comment[zh_CN]=管理打印机队列和作业
-Comment[zh_HK]=管理印表機佇列和工作
-Comment[zh_TW]=管理印表機佇列和工作
+Name=Printers
+Name[de]=Drucker
+Name[es]=Impresoras
+Name[fr]=Imprimantes
+Name[it]=Stampanti
+Name[ja]=プリンタ
+Name[ko]=프린터
+Name[pt_BR]=Impressoras
+Name[zh_CN]=打印机
+Name[zh_HK]=印表機
+Name[zh_TW]=印表機
+Comment=Set printer detection and connection behavior
+Comment[de]=Verhalten für Druckererkennung und -verbindung festlegen
+Comment[es]=Definir la detección de impresoras y el comportamiento de conexión
+Comment[fr]=Définir la détection des imprimantes et le comportement des connexions
+Comment[it]=Impostare la rilevazione della stampante e il comportamento della connessione
+Comment[ja]=プリンタの検出および接続の動作を設定します
+Comment[ko]=프린터 감지 및 연결 동작 설정
+Comment[pt_BR]=Definir comportamento de conexão e detecção da impressora
+Comment[zh_CN]=设置打印机检测和连接行为
+Comment[zh_HK]=設定印表機偵測和連線的運作方式
+Comment[zh_TW]=設定印表機偵測和連線的運作方式
 Exec=env DESKTOP_LAUNCHED=true /usr/bin/desktop-print-management-prefs
 Icon=print-manager
 Terminal=false

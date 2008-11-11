@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 
@@ -34,6 +32,7 @@ ACTION=grep SUNWpapi depend > /dev/null || \
 	( chmod 666 depend; \
 	echo "P SUNWpapi      Free Standards Group Open Printing API" >> depend; \
 	echo "P SUNWippcore   Sun Open Print IPP Core libraries" >> depend; \
+	echo "P SUNWapchu     SUNWapchu Apache Web Server (usr)" >> depend; \
 	chmod 444 depend );
 
 .KEEP_STATE:
