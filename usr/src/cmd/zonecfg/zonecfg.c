@@ -3736,9 +3736,8 @@ validate_net_physical_syntax(const char *ifname)
 {
 	ifspec_t ifnameprop;
 	zone_iptype_t iptype;
-	int err;
 
-	if ((err = zonecfg_get_iptype(handle, &iptype)) != Z_OK) {
+	if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
 		zerr(gettext("zone configuration has an invalid or nonexistent "
 		    "ip-type property"));
 		return (Z_ERR);
