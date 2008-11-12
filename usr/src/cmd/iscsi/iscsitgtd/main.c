@@ -500,7 +500,11 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 				(void) xmlFreeTextReader(r);
 				(void) xmlCleanupParser();
 				(void) ucred_free(uc);
+				tgt_node_free(node);
+				if (m.m_q != NULL)
+					queue_free(m.m_q, NULL);
 				(void) door_return("", 1, NULL, 0);
+				return;
 			}
 
 			/*
