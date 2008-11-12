@@ -1158,7 +1158,7 @@ static void sd_ssc_ereport_post(sd_ssc_t *ssc,
  * Using sd_ssc_extract_info to transfer information from internal
  *       data structures to sd_ssc_t.
  */
-static void sd_ssc_set_info(sd_ssc_t *ssc, int ssc_flags,
+static void sd_ssc_set_info(sd_ssc_t *ssc, int ssc_flags, uint_t comp,
     const char *fmt, ...);
 static void sd_ssc_extract_info(sd_ssc_t *ssc, struct sd_lun *un,
     struct scsi_pkt *pktp, struct buf *bp, struct sd_xbuf *xp);
@@ -4691,11 +4691,9 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	}
 
 	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		SD_ERROR(SD_LOG_COMMON, un, "sd_get_physical_geometry: "
-		    "received unexpected bd_len of %d, page3\n", bd_len);
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_get_physical_geometry: received unexpected "
-		    "bd_len of %d, page3", bd_len);
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "sd_get_physical_geometry: received unexpected bd_len "
+		    "of %d, page3\n", bd_len);
 		status = EIO;
 		goto page3_exit;
 	}
@@ -4704,12 +4702,9 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	    ((caddr_t)headerp + mode_header_length + bd_len);
 
 	if (page3p->mode_page.code != SD_MODE_SENSE_PAGE3_CODE) {
-		SD_ERROR(SD_LOG_COMMON, un, "sd_get_physical_geometry: "
-		    "mode sense pg3 code mismatch %d\n",
-		    page3p->mode_page.code);
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_get_physical_geometry: mode sense pg3 code "
-		    "mismatch %d", page3p->mode_page.code);
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "sd_get_physical_geometry: mode sense pg3 code mismatch "
+		    "%d\n", page3p->mode_page.code);
 		status = EIO;
 		goto page3_exit;
 	}
@@ -4772,11 +4767,9 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	}
 
 	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		SD_ERROR(SD_LOG_COMMON, un, "sd_get_physical_geometry: "
-		    "received unexpected bd_len of %d, page4\n", bd_len);
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_get_physical_geometry: received unexpected "
-		    "bd_len of %d, page4", bd_len);
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "sd_get_physical_geometry: received unexpected bd_len of "
+		    "%d, page4\n", bd_len);
 		status = EIO;
 		goto page4_exit;
 	}
@@ -4785,12 +4778,9 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	    ((caddr_t)headerp + mode_header_length + bd_len);
 
 	if (page4p->mode_page.code != SD_MODE_SENSE_PAGE4_CODE) {
-		SD_ERROR(SD_LOG_COMMON, un, "sd_get_physical_geometry: "
-		    "mode sense pg4 code mismatch %d\n",
-		    page4p->mode_page.code);
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_get_physical_geometry: mode sense pg4 code "
-		    "mismatch %d", page4p->mode_page.code);
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "sd_get_physical_geometry: mode sense pg4 code mismatch "
+		    "%d\n", page4p->mode_page.code);
 		status = EIO;
 		goto page4_exit;
 	}
@@ -7500,6 +7490,32 @@ sd_unit_attach(dev_info_t *devi)
 	sfip->fm_ssc.ssc_uscsi_info = &sfip->fm_uinfo;
 	sfip->fm_ssc.ssc_un = un;
 
+	if (ISCD(un) ||
+	    un->un_f_has_removable_media ||
+	    devp->sd_fm_capable == DDI_FM_NOT_CAPABLE) {
+		/*
+		 * We don't touch CDROM or the DDI_FM_NOT_CAPABLE device.
+		 * Their log are unchanged.
+		 */
+		sfip->fm_log_level = SD_FM_LOG_NSUP;
+	} else {
+		/*
+		 * If enter here, it should be non-CDROM and FM-capable
+		 * device, and it will not keep the old scsi_log as before
+		 * in /var/adm/messages. However, the property
+		 * "fm-scsi-log" will control whether the FM telemetry will
+		 * be logged in /var/adm/messages.
+		 */
+		int fm_scsi_log;
+		fm_scsi_log = ddi_prop_get_int(DDI_DEV_T_ANY, SD_DEVINFO(un),
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "fm-scsi-log", 0);
+
+		if (fm_scsi_log)
+			sfip->fm_log_level = SD_FM_LOG_EREPORT;
+		else
+			sfip->fm_log_level = SD_FM_LOG_SILENT;
+	}
+
 	/*
 	 * At this point in the attach, we have enough info in the
 	 * soft state to be able to issue commands to the target.
@@ -8947,24 +8963,18 @@ sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag)
 	}
 
 	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "sd_cache_control: Mode Sense returned invalid "
-		    "block descriptor length\n");
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_cache_control: Mode Sense returned invalid "
-		    "block descriptor length");
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
+		    "sd_cache_control: Mode Sense returned invalid block "
+		    "descriptor length\n");
 		rval = EIO;
 		goto mode_sense_failed;
 	}
 
 	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
 	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
-		SD_ERROR(SD_LOG_COMMON, un, "sd_cache_control: Mode Sense"
-		    " caching page code mismatch %d\n",
-		    mode_caching_page->mode_page.code);
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_cache_control: Mode Sense caching page code "
-		    "mismatch %d", mode_caching_page->mode_page.code);
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "sd_cache_control: Mode Sense caching page code mismatch "
+		    "%d\n", mode_caching_page->mode_page.code);
 		rval = EIO;
 		goto mode_sense_failed;
 	}
@@ -9153,26 +9163,20 @@ sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled)
 	}
 
 	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		/* FMA should make upset complain here */
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
 		    "sd_get_write_cache_enabled: Mode Sense returned invalid "
 		    "block descriptor length\n");
-		/* FMA should make upset complain here */
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_get_write_cache_enabled: Mode Sense returned invalid "
-		    "block descriptor length %d", bd_len);
 		rval = EIO;
 		goto mode_sense_failed;
 	}
 
 	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
 	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
-		SD_ERROR(SD_LOG_COMMON, un, "sd_cache_control: Mode Sense"
-		    " caching page code mismatch %d\n",
-		    mode_caching_page->mode_page.code);
 		/* FMA could make upset complain here */
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-		    "sd_cache_control: Mode Sense caching page code "
-		    "mismatch %d", mode_caching_page->mode_page.code);
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "sd_get_write_cache_enabled: Mode Sense caching page "
+		    "code mismatch %d\n", mode_caching_page->mode_page.code);
 		rval = EIO;
 		goto mode_sense_failed;
 	}
@@ -11572,7 +11576,10 @@ sd_ssc_print(sd_ssc_t *ssc, int sd_severity)
 	extern struct scsi_key_strings scsi_cmds[];
 
 	ASSERT(ssc != NULL);
+	ASSERT(ssc->ssc_un != NULL);
 
+	if (SD_FM_LOG(ssc->ssc_un) != SD_FM_LOG_EREPORT)
+		return;
 	ucmdp = ssc->ssc_uscsi_cmd;
 	devp = SD_SCSI_DEVP(ssc->ssc_un);
 	devinfo = SD_DEVINFO(ssc->ssc_un);
@@ -11601,7 +11608,7 @@ sd_ssc_print(sd_ssc_t *ssc, int sd_severity)
  *              where SD driver may encounter a potential error.
  *
  * Arguments: ssc - the struct of sd_ssc_t will bring uscsi_cmd and
- *                    sd_uscsi_info in.
+ *                  sd_uscsi_info in.
  *            tp_assess - a hint of strategy for ereport posting.
  *            Possible values of tp_assess include:
  *                SD_FMT_IGNORE - we don't post any ereport because we're
@@ -11656,17 +11663,6 @@ sd_ssc_assessment(sd_ssc_t *ssc, enum sd_type_assessment tp_assess)
 		 * Set the ssc_flags to the initial value to avoid passing
 		 * down dirty flags to the following sd_ssc_send function.
 		 */
-		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
-		return;
-	}
-
-	/*
-	 * We don't handle a non-disk drive(CD-ROM, removable media).
-	 * Clear the ssc_flags before return in case we've set
-	 * SSC_FLAGS_INVALID_DATA which should be skipped for a non-disk
-	 * driver.
-	 */
-	if (ISCD(un) || un->un_f_has_removable_media) {
 		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
 		return;
 	}
@@ -11753,18 +11749,26 @@ static void
 sd_ssc_post(sd_ssc_t *ssc, enum sd_driver_assessment sd_assess)
 {
 	struct sd_lun	*un;
-	int 		fm_scsi_log = 0;
 	int		sd_severity;
 
 	ASSERT(ssc != NULL);
 	un = ssc->ssc_un;
 	ASSERT(un != NULL);
 
-	fm_scsi_log = ddi_prop_get_int(DDI_DEV_T_ANY, SD_DEVINFO(un),
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "fm-scsi-log", 0);
+	/*
+	 * We may enter here from sd_ssc_assessment(for USCSI command) or
+	 * by directly called from sdintr context.
+	 * We don't handle a non-disk drive(CD-ROM, removable media).
+	 * Clear the ssc_flags before return in case we've set
+	 * SSC_FLAGS_INVALID_XXX which should be skipped for a non-disk
+	 * driver.
+	 */
+	if (ISCD(un) || un->un_f_has_removable_media) {
+		ssc->ssc_flags = SSC_FLAGS_UNKNOWN;
+		return;
+	}
 
-	if (fm_scsi_log != 0) {
-		switch (sd_assess) {
+	switch (sd_assess) {
 		case SD_FM_DRV_FATAL:
 			sd_severity = SCSI_ERR_FATAL;
 			break;
@@ -11779,10 +11783,9 @@ sd_ssc_post(sd_ssc_t *ssc, enum sd_driver_assessment sd_assess)
 			break;
 		default:
 			sd_severity = SCSI_ERR_UNKNOWN;
-		}
-		/* print log */
-		sd_ssc_print(ssc, sd_severity);
 	}
+	/* print log */
+	sd_ssc_print(ssc, sd_severity);
 
 	/* always post ereport */
 	sd_ssc_ereport_post(ssc, sd_assess);
@@ -11794,20 +11797,57 @@ sd_ssc_post(sd_ssc_t *ssc, enum sd_driver_assessment sd_assess)
  * Description: Mark ssc_flags and set ssc_info which would be the
  *              payload of uderr ereport. This function will cause
  *              sd_ssc_ereport_post to post uderr ereport only.
+ *              Besides, when ssc_flags == SSC_FLAGS_INVALID_DATA(USCSI),
+ *              the function will also call SD_ERROR or scsi_log for a
+ *              CDROM/removable-media/DDI_FM_NOT_CAPABLE device.
+ *
+ * Arguments: ssc - the struct of sd_ssc_t will bring uscsi_cmd and
+ *                  sd_uscsi_info in.
+ *            ssc_flags - indicate the sub-category of a uderr.
+ *            comp - this argument is meaningful only when
+ *                   ssc_flags == SSC_FLAGS_INVALID_DATA, and its possible
+ *                   values include:
+ *                   > 0, SD_ERROR is used with comp as the driver logging
+ *                   component;
+ *                   = 0, scsi-log is used to log error telemetries;
+ *                   < 0, no log available for this telemetry.
  *
  *    Context: Kernel thread or interrupt context
  */
 static void
-sd_ssc_set_info(sd_ssc_t *ssc, int ssc_flags, const char *fmt, ...)
+sd_ssc_set_info(sd_ssc_t *ssc, int ssc_flags, uint_t comp, const char *fmt, ...)
 {
 	va_list	ap;
 
 	ASSERT(ssc != NULL);
+	ASSERT(ssc->ssc_un != NULL);
 
 	ssc->ssc_flags |= ssc_flags;
 	va_start(ap, fmt);
 	(void) vsnprintf(ssc->ssc_info, sizeof (ssc->ssc_info), fmt, ap);
 	va_end(ap);
+
+	/*
+	 * If SSC_FLAGS_INVALID_DATA is set, it should be a uscsi command
+	 * with invalid data sent back. For non-uscsi command, the
+	 * following code will be bypassed.
+	 */
+	if (ssc_flags & SSC_FLAGS_INVALID_DATA) {
+		if (SD_FM_LOG(ssc->ssc_un) == SD_FM_LOG_NSUP) {
+			/*
+			 * If the error belong to certain component and we
+			 * do not want it to show up on the console, we
+			 * will use SD_ERROR, otherwise scsi_log is
+			 * preferred.
+			 */
+			if (comp > 0) {
+				SD_ERROR(comp, ssc->ssc_un, ssc->ssc_info);
+			} else if (comp == 0) {
+				scsi_log(SD_DEVINFO(ssc->ssc_un), sd_label,
+				    CE_WARN, ssc->ssc_info);
+			}
+		}
+	}
 }
 
 /*
@@ -13858,7 +13898,8 @@ sd_print_transport_rejected_message(struct sd_lun *un, struct sd_xbuf *xp,
 	 * The FLAG_SILENT in the scsi_pkt must be CLEARED in ALL of
 	 * the preceeding cases in order for the message to be printed.
 	 */
-	if ((xp->xb_pktp->pkt_flags & FLAG_SILENT) == 0) {
+	if (((xp->xb_pktp->pkt_flags & FLAG_SILENT) == 0) &&
+	    (SD_FM_LOG(un) == SD_FM_LOG_NSUP)) {
 		if ((sd_level_mask & SD_LOGMASK_DIAG) ||
 		    (code != TRAN_FATAL_ERROR) ||
 		    (un->un_tran_fatal_count == 1)) {
@@ -16373,7 +16414,7 @@ not_successful:
 			 */
 			if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
 				sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_STATUS,
-				    "stat-code");
+				    0, "stat-code");
 			}
 			sd_return_failed_command(un, bp, EIO);
 			break;
@@ -16384,7 +16425,7 @@ not_successful:
 			    SD_GET_PKT_STATUS(pktp));
 			if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
 				sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_STATUS,
-				    "stat-code");
+				    0, "stat-code");
 			}
 			sd_return_failed_command(un, bp, EIO);
 			break;
@@ -16435,7 +16476,7 @@ not_successful:
 		 */
 		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
 			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_PKT_REASON,
-			    "pkt-reason");
+			    0, "pkt-reason");
 		}
 		sd_pkt_reason_default(un, bp, xp, pktp);
 		break;
@@ -16884,7 +16925,7 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 		msgp = "Not enough sense information\n";
 		/* Mark the ssc_flags for detecting invalid sense data */
 		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
-			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE, 0,
 			    "sense-data");
 		}
 		goto sense_failed;
@@ -16909,13 +16950,17 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 			}
 			i = strlen(buf);
 			(void) strcpy(&buf[i], "-(assumed fatal)\n");
-			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN, buf);
+
+			if (SD_FM_LOG(un) == SD_FM_LOG_NSUP) {
+				scsi_log(SD_DEVINFO(un), sd_label,
+				    CE_WARN, buf);
+			}
 			mutex_exit(&sd_sense_mutex);
 		}
 
 		/* Mark the ssc_flags for detecting invalid sense data */
 		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
-			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE, 0,
 			    "sense-data");
 		}
 
@@ -16937,7 +16982,7 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	    (esp->es_code != CODE_FMT_VENDOR_SPECIFIC)) {
 		/* Mark the ssc_flags for detecting invalid sense data */
 		if (!(xp->xb_pkt_flags & SD_XB_USCSICMD)) {
-			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE,
+			sd_ssc_set_info(sscp, SSC_FLAGS_INVALID_SENSE, 0,
 			    "sense-data");
 		}
 		goto sense_failed;
@@ -17262,10 +17307,14 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 		}
 	}
 
-	scsi_vu_errmsg(SD_SCSI_DEVP(un), pktp, sd_label, severity,
-	    request_blkno, err_blkno, scsi_cmds,
-	    (struct scsi_extended_sense *)sensep,
-	    un->un_additional_codes, NULL);
+	if (SD_FM_LOG(un) == SD_FM_LOG_NSUP ||
+	    ((scsi_sense_key(sensep) == KEY_RECOVERABLE_ERROR) &&
+	    (pktp->pkt_resid == 0))) {
+		scsi_vu_errmsg(SD_SCSI_DEVP(un), pktp, sd_label, severity,
+		    request_blkno, err_blkno, scsi_cmds,
+		    (struct scsi_extended_sense *)sensep,
+		    un->un_additional_codes, NULL);
+	}
 }
 
 /*
@@ -18109,8 +18158,10 @@ sd_print_retry_msg(struct sd_lun *un, struct buf *bp, void *arg, int flag)
 	reasonp = (((pktp->pkt_statistics & STAT_PERR) != 0) ? "parity error" :
 	    scsi_rname(pktp->pkt_reason));
 
-	scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-	    "SCSI transport failed: reason '%s': %s\n", reasonp, msgp);
+	if (SD_FM_LOG(un) == SD_FM_LOG_NSUP) {
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "SCSI transport failed: reason '%s': %s\n", reasonp, msgp);
+	}
 
 update_pkt_reason:
 	/*
@@ -19252,13 +19303,12 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	case 0:
 		/* Return failure if we did not get valid capacity data. */
 		if (ucmd_buf.uscsi_resid != 0) {
-			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-			    "sd_send_scsi_READ_CAPACITY received "
-			    "invalid capacity data");
+			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, -1,
+			    "sd_send_scsi_READ_CAPACITY received invalid "
+			    "capacity data");
 			kmem_free(capacity_buf, SD_CAPACITY_SIZE);
 			return (EIO);
 		}
-
 		/*
 		 * Read capacity and block size from the READ CAPACITY 10 data.
 		 * This data may be adjusted later due to device specific
@@ -19360,7 +19410,7 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	 * failure to the caller. (4203735)
 	 */
 	if ((capacity == 0) || (lbasize == 0)) {
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, -1,
 		    "sd_send_scsi_READ_CAPACITY received invalid value "
 		    "capacity %llu lbasize %d", capacity, lbasize);
 		return (EIO);
@@ -19468,9 +19518,9 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 	case 0:
 		/* Return failure if we did not get valid capacity data. */
 		if (ucmd_buf.uscsi_resid > 20) {
-			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
-			    "sd_send_scsi_READ_CAPACITY_16 received "
-			    "invalid capacity data");
+			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, -1,
+			    "sd_send_scsi_READ_CAPACITY_16 received invalid "
+			    "capacity data");
 			kmem_free(capacity16_buf, SD_CAPACITY_16_SIZE);
 			return (EIO);
 		}
@@ -19505,7 +19555,7 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 		 * are not defined by any current T10 standards.
 		 */
 		if (capacity == 0xffffffffffffffff) {
-			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
+			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, -1,
 			    "disk is too large");
 			return (EIO);
 		}
@@ -20761,7 +20811,7 @@ sd_send_scsi_MODE_SENSE(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
 		 */
 		if (buflen - ucmd_buf.uscsi_resid <  headlen) {
 			status = EIO;
-			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA,
+			sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, -1,
 			    "mode page header is not returned");
 		}
 		break;	/* Success! */

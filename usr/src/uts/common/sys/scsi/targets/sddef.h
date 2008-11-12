@@ -608,6 +608,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_status_len))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_f_arq_enabled))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_ctype))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_cmlbhandle))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_fm_private))
 
 
 _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
@@ -689,6 +690,8 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	SD_MUTEX(un)		(&((un)->un_sd->sd_mutex))
 #define	SD_ADDRESS(un)		(&((un)->un_sd->sd_address))
 #define	SD_GET_DEV(un)		(sd_make_device(SD_DEVINFO(un)))
+#define	SD_FM_LOG(un)		(((struct sd_fm_internal *)\
+				((un)->un_fm_private))->fm_log_level)
 
 
 /*
@@ -1435,7 +1438,7 @@ typedef struct {
 	struct uscsi_cmd	*ssc_uscsi_cmd;
 	struct sd_uscsi_info	*ssc_uscsi_info;
 	int			ssc_flags; /* Bits for flags */
-	char			ssc_info[64]; /* Buffer holding for info */
+	char			ssc_info[1024]; /* Buffer holding for info */
 } sd_ssc_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_ssc_t))
@@ -1516,6 +1519,7 @@ struct sd_fm_internal {
 	sd_ssc_t fm_ssc;
 	struct uscsi_cmd fm_ucmd;
 	struct sd_uscsi_info fm_uinfo;
+	int fm_log_level;
 };
 
 /*
@@ -1542,6 +1546,21 @@ struct sd_fm_internal {
 #define		SSC_FLAGS_INVALID_STATUS	0x00000020
 #define		SSC_FLAGS_INVALID_SENSE		0x00000040
 #define		SSC_FLAGS_INVALID_DATA		0x00000080
+
+/*
+ * The following are the values available for sd_fm_internal::fm_log_level.
+ * SD_FM_LOG_NSUP	The driver will log things in traditional way as if
+ * 			the SCSI FMA feature is unavailable.
+ * SD_FM_LOG_SILENT	The driver will not print out syslog for FMA error
+ * 			telemetry, all the error telemetries will go into
+ * 			FMA error log.
+ * SD_FM_LOG_EREPORT	The driver will both print the FMA error telemetry
+ * 			and post the error report, but the traditional
+ * 			syslog for error telemetry will be suppressed.
+ */
+#define		SD_FM_LOG_NSUP		0
+#define		SD_FM_LOG_SILENT	1
+#define		SD_FM_LOG_EREPORT	2
 
 /*
  * Macros and definitions for driver kstats and errstats
