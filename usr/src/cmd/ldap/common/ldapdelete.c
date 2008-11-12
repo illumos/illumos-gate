@@ -1,9 +1,7 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* 
  * The contents of this file are subject to the Netscape Public
@@ -139,6 +137,11 @@ main( int argc, char **argv )
 
     ldaptool_reset_control_array( ldaptool_request_ctrls );
     ldaptool_cleanup( ld );
+
+    /* check for and report output error */
+    fflush( stdout );
+    rc = ldaptool_check_ferror( stdout, rc,
+		gettext("output error (output might be incomplete)") );
     return( rc );
 }
 

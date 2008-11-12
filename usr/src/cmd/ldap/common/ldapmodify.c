@@ -1,9 +1,7 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* 
  * The contents of this file are subject to the Netscape Public
@@ -146,6 +144,7 @@ int
 main( int argc, char **argv )
 {
     int		optind, i;
+    int		rc;
 
 #ifdef SOLARIS_LDAP_CMD
     char *locale = setlocale(LC_ALL, "");
@@ -189,8 +188,14 @@ main( int argc, char **argv )
 
 #ifdef SOLARIS_LDAP_CMD
     /* trivial case */
-    if ( nbthreads == 1 )
-	return ( process(NULL) );
+    if ( nbthreads == 1 ) {
+	rc = process(NULL);
+	/* check for and report output error */
+	fflush( stdout );
+	rc = ldaptool_check_ferror( stdout, rc,
+		gettext("output error (output might be incomplete)") );
+	return( rc );
+    }
 
     for ( i=0; i<nbthreads; ++i ) { 
  	if ( thr_create(NULL, 0, process, NULL, NULL, NULL) != 0 )
@@ -201,9 +206,19 @@ main( int argc, char **argv )
     	while ( thr_join(0, NULL, NULL) == 0 );
     else
 	error = -1;
-    return ( error );
+    rc = error;
+    /* check for and report output error */
+    fflush( stdout );
+    rc = ldaptool_check_ferror( stdout, rc,
+		gettext("output error (output might be incomplete)") );
+    return( rc );
 #else
-    return ( process(NULL) );
+    rc = process(NULL);
+    /* check for and report output error */
+    fflush( stdout );
+    rc = ldaptool_check_ferror( stdout, rc,
+		gettext("output error (output might be incomplete)") );
+    return( rc );
 #endif  /* SOLARIS_LDAP_CMD */
 }
 

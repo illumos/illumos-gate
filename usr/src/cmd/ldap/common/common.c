@@ -1,9 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The contents of this file are subject to the Netscape Public
@@ -2631,3 +2629,30 @@ saslSetParam(char *saslarg)
 	return 0;
 }
 #endif	/* HAVE_SASL_OPTIONS */
+
+/*
+ * check for and report input or output error on named stream
+ * return ldap_err or ferror() (ldap_err takes precedence)
+ * assume that fflush() already has been called if needed.
+ * don't want to fflush() an input stream.
+ */
+int
+ldaptool_check_ferror(FILE * stream, const int ldap_err, const char *msg)
+{
+	int err = 0;
+	if ((err = ferror(stream)) != 0 ) {
+		fprintf(stderr, gettext("%s: ERROR: "), ldaptool_progname);
+		perror(msg);
+		err = LDAP_LOCAL_ERROR;
+	}
+
+	/*
+	 * reporting LDAP error code is more important than
+	 * reporting errors from ferror()
+	 */
+	if (ldap_err == LDAP_SUCCESS) {
+		return(err);
+	} else {
+		return(ldap_err);
+	}
+}
