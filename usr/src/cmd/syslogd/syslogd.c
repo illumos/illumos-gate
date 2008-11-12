@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  syslogd -- log system messages
  *
@@ -114,7 +112,6 @@
 #define	RELATIVE_PIDFILE	"../var/run/syslog.pid"
 #define	OLD_PIDFILE		"/etc/syslog.pid"
 
-static char		*Version = "%I%";
 static char		*LogName = "/dev/log";
 static char		*ConfFile = "/etc/syslog.conf";
 static char		ctty[] = "/dev/console";
@@ -3085,8 +3082,8 @@ dumpstats(int fd)
 	if ((out = fdopen(fd, "w+")) == NULL)
 		return;
 
-	(void) fprintf(out, "\n  syslogd: version %s\n", Version);
-	(void) fprintf(out, "  Started: %s", ctime_r(&start_time, cbuf));
+	(void) fprintf(out, "\nSyslogd started: %s",
+	    ctime_r(&start_time, cbuf));
 	(void) fprintf(out, "Input message count: system %d, network %d\n",
 	    sys_msg_count, net_msg_count);
 	(void) fprintf(out, "# Outputs: %d\n\n", nlogs);
@@ -5497,7 +5494,7 @@ hnc_register(struct netbuf *nbp, struct netconfig *ncp,
 	 */
 	h->hl_refcnt++;
 	DPRINT4(9, "hnc_register(%u): reg %p onto %p for %s\n",
-	    mythreadno, (void *)h, (void *)hp, hp->h->hl_hosts[0]);
+	    mythreadno, (void *)entry->h, (void *)entry, entry->h->hl_hosts[0]);
 	(void) pthread_mutex_unlock(&hnc_mutex);
 }
 
