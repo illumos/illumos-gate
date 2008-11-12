@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fork.c - safe forking for svc.startd
  *
@@ -299,7 +297,6 @@ fork_sulogin(boolean_t immediate, const char *format, ...)
  *   in empty events.  This means we have a unique template for initiating
  *   configd.
  */
-/*ARGSUSED*/
 void
 fork_configd(int exitstatus)
 {
@@ -307,6 +304,25 @@ fork_configd(int exitstatus)
 	ctid_t ctid = -1;
 	int err;
 	char path[PATH_MAX];
+
+	/*
+	 * Checking the existatus for the potential failure of the
+	 * daemonized svc.configd.  If this is not the first time
+	 * through, but a call from the svc.configd monitoring thread
+	 * after a failure this is the status that is expected.  Other
+	 * failures are exposed during initialization or are fixed
+	 * by a restart (e.g door closings).
+	 *
+	 * If this is on-disk database corruption it will also be
+	 * caught by a restart but could be cleared before the restart.
+	 *
+	 * Or this could be internal database corruption due to a
+	 * rogue service that needs to be cleared before restart.
+	 */
+	if (WEXITSTATUS(exitstatus) == CONFIGD_EXIT_DATABASE_BAD) {
+		fork_sulogin(B_FALSE, "svc.configd exited with database "
+		    "corrupt error after initialization of the repository\n");
+	}
 
 retry:
 	log_framework(LOG_DEBUG, "fork_configd trying to start svc.configd\n");
