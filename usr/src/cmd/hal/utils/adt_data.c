@@ -35,9 +35,9 @@ get_audit_export_data(DBusConnection *bus, const char *invoked_by_syscon_name, s
 	message = dbus_message_new_method_call ("org.freedesktop.DBus",
 						"/org/freedesktop/DBus",
 						"org.freedesktop.DBus",
-						"GetAuditSessionData");
+						"GetAdtAuditSessionData");
 	if (message == NULL) {
-		printf ("cannot get GetAuditSessionData message\n");
+		printf ("cannot get GetAdtAuditSessionData message\n");
 		return NULL;
 	}
 
