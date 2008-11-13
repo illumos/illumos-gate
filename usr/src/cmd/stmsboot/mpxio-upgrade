@@ -31,12 +31,16 @@
 LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
 STMSBOOTUTIL=/lib/mpxio/stmsboot_util
 SAVEDIR=/etc/mpxio
+BOOTDEVICES=$SAVEDIR/boot-devices
 RECOVERFILE=$SAVEDIR/recover_instructions
 DEVFSADM=/usr/sbin/devfsadm
 DUMPADM=/usr/sbin/dumpadm
 METADEVADM=/usr/sbin/metadevadm
+ISROOTDEV=""
 usrmounted=0
 MACH=`/usr/bin/uname -p`
+ECHO=/usr/bin/echo
+CAT=/usr/bin/cat
 CP=/usr/bin/cp
 DF=/usr/bin/df
 LS=/usr/bin/ls
@@ -70,6 +74,7 @@ mpxio_error()
 mpxio_mount_root()
 {
 	HASZFSROOT=`$DF -g / |grep zfs`
+	RVAL=""
 
 	# In single-user maintenance mode, we don't have a writable
 	# root partition, so we _cannot_ use devlinks. Therefore we
@@ -80,9 +85,9 @@ mpxio_mount_root()
 	exec < $vfstab; readvfstab /
 	# ZFS root environments should _not_ have an entry for /
 	# in their /etc/vfstab.
-	if [ "x$special" != "x" ]; then
+	if [ -n "$special" ]; then
 		# sanity check for ZFSRoot _and_ / in /etc/vfstab
-		if [ "x$HASZFSROOT" != "x" ]; then
+		if [ -n "$HASZFSROOT" ]; then
 			# ERROR - this would cause a failure later
 			# so let root know about it now and provide
 			# a chance to handle it before filesystem/usr
@@ -90,7 +95,11 @@ mpxio_mount_root()
 			exit 1
 		fi
 		ISPHYS=`echo $special |$AWK '/^\/dev\/dsk/ {print}'`;
-		if [ "x$ISPHYS" != "x" ]; then
+		if [ -z "$ISPHYS" ]; then
+			# a metadevice, either /dev/md or /dev/vx
+			new_special=$special
+			$MOUNT -o remount,rw $new_special / >/dev/msglog 2>&1
+		else
 			new_special=`$STMSBOOTUTIL -m $special`
 			if [ "x$new_special" = "xNOT_MAPPED" ]; then
 				# this is a bad state to be in, exit
@@ -100,19 +109,42 @@ mpxio_mount_root()
 	       		checkopt "llock" $mntopts
 			mntopts='remount'
 			[ -n "$otherops" ] && mntopts="${mntopts},${otherops}"
-			$MOUNT -m -F $fstype -o $mntopts $new_special \
-				$mountp >/dev/msglog 2>&1
-
-			# now re-run $STMSBOOTUTIL to get the real mapping
-			new_special=`$STMSBOOTUTIL -m $special`
-		else
-			# a metadevice, either /dev/md or /dev/vx
-			new_special=$special
+			RVAL=`$MOUNT -m -F $fstype -o $mntopts $new_special \
+				$mountp >/dev/msglog 2>&1`
+			# if we've got active-active paths to our rootvp and
+			# the first path returned by $STMSBOOTUTIL is not the
+			# same as the one we booted from, then we need some
+			# handwaving due to restrictions in the ufs module
+			# (see the remountfs() function in 
+			# $SRC/uts/common/fs/ufs/ufs_vfsops.c)
+			if [ $? -eq 0 ]; then
+				# now re-run $STMSBOOTUTIL to get the real
+				# mapping for this device
+				new_special=`$STMSBOOTUTIL -m $special`
+				# mount root for real
+				$MOUNT -o remount,rw $new_special / \
+				    >/dev/msglog 2>&1
+			else
+				SLICE=`$ECHO $special | $AWK -F"s" '{print $3}'`
+				for device in `$CAT $BOOTDEVICES`; do
+					new_special="${device}s${SLICE}"
+					$MOUNT -m -F $fstype -o $mntopts \
+					    $new_special $mountp >/dev/msglog 2>&1
+					if [ $? -eq 0 ]; then
+						# success, break out
+						ISROOTDEV=`$ECHO $new_special |
+						    $SED -e "s,/dev/dsk/,,"`
+					    break;
+					fi
+				done
+				if [ -n "$RVAL" ]; then
+					cecho "Error: Unable to remount your root device"
+					exit 1;
+				fi
+			fi
 		fi
-		# mount root for real
-		$MOUNT -o remount,rw $new_special / >/dev/msglog 2>&1
 	else
-		if [ "x$HASZFSROOT" = "x" ]; then
+		if [ -z "$HASZFSROOT" ]; then
 			cecho "stmsboot: Error: your root slice is invalid"
 			exit 1
 		else
@@ -288,7 +320,22 @@ mpxio_main()
 		$STMSBOOTUTIL -u >/dev/msglog 2>&1
 		if [ $? -eq 0 ]; then
 			$CP /etc/vfstab /etc/vfstab.old
-			$CP $SAVEDIR/vfstab.new /etc/vfstab
+			# handle active-active paths, where the probe order
+			# for the hba reports a different path to what the
+			# boot-device variable gives us
+			if [ -n "$ISROOTDEV" ]; then
+				ROOTDEVCHK=`grep $ISROOTDEV /etc/vfstab`
+				if [ $? != 0 ]; then
+					# we got a different path for root
+					exec < $SAVEDIR/vfstab.new; readvfstab /
+					FILEDEV=`$ECHO $special | \
+					    $SED -e"s,/dev/dsk/,,"`
+					$SED -e"s,$FILEDEV,$ISROOTDEV,g" < \
+					    $SAVEDIR/vfstab.new > /etc/vfstab
+				fi
+			else
+				$CP $SAVEDIR/vfstab.new /etc/vfstab
+			fi
 			$RM $SAVEDIR/vfstab.new
 			cecho ""
 			cecho "stmsboot: vfstab has been updated"

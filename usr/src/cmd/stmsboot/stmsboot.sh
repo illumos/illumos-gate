@@ -36,6 +36,7 @@ DRVLIST=
 GUID=
 VFSTAB=/etc/vfstab
 SAVEDIR=/etc/mpxio
+BOOTDEVICES=$SAVEDIR/boot-devices
 RECOVERFILE=$SAVEDIR/recover_instructions
 SVCCFG_RECOVERY=$SAVEDIR/svccfg_recover
 SUPPORTED_DRIVERS="fp|mpt"
@@ -51,6 +52,7 @@ EGREP=/usr/bin/egrep
 GREP=/usr/bin/grep
 AWK=/usr/bin/awk
 CP=/usr/bin/cp
+DF=/usr/bin/df
 LS=/usr/bin/ls
 MV=/usr/bin/mv
 RM=/usr/bin/rm
@@ -598,14 +600,26 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 		# If mpxio is currently disabled, we will update bootpath
 		# on reboot in the mpxio-upgrade service
 		
-		if [ "x$MACH" = "xi386" -a "x$cmd" = "xdisable" ]; then
-			get_newbootpath_for_stmsdev
-			if [ $? -ne 0 ]; then
-				$RM -f $TMPDRVCONF > /dev/null 2>&1
-				gettext "failed to update bootpath.\n" 1>&2
-				gettext "No changes were made to your STMS configuration.\n" 1>&2
-				return 1
+		if [ "x$cmd" = "xdisable" ]; then
+			if [ "x$MACH" = "xi386" ]; then
+				get_newbootpath_for_stmsdev
+				if [ $? -ne 0 ]; then
+					$RM -f $TMPDRVCONF > /dev/null 2>&1
+					gettext "failed to update bootpath.\n" 1>&2
+					gettext "No changes were made to your STMS configuration.\n" 1>&2
+					return 1
+				fi
 			fi
+			# If we're not using ZFS root then we need
+			# to keep track of what / maps to in case
+			# it's an active-active device and we boot from
+			# the other path
+			ROOTSCSIVHCI=`$DF /|$AWK -F":" '{print $1}' | \
+			    $AWK -F"(" '{print $2}'| \
+			    $SED -e"s,dsk,rdsk," -e"s,s.),,"`
+			$STMSBOOTUTIL -L | $GREP $ROOTSCSIVHCI | \
+			    $AWK '{print $1}' | $SED -e"s,rdsk,dsk,g" \
+			    >$BOOTDEVICES
 		fi
 		update_sysfiles
 	else
