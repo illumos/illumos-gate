@@ -35,8 +35,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Process received frame
  */
@@ -183,9 +181,9 @@ ieee80211_input(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		in->in_inact = 0;
 	}
 
-	hdrspace = ieee80211_hdrspace(wh);
 	switch (type) {
 	case IEEE80211_FC0_TYPE_DATA:
+		hdrspace = ieee80211_hdrspace(wh);
 		if (len < hdrspace) {
 			ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_input: "
 			    "data too short: expecting %u", hdrspace);
@@ -308,6 +306,7 @@ ieee80211_input(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 				ic->ic_stats.is_wep_errors++;
 				goto out_exit_mutex;
 			}
+			hdrspace = ieee80211_hdrspace(wh);
 			key = ieee80211_crypto_decap(ic, mp, hdrspace);
 			if (key == NULL) {
 				/* NB: stats+msgs handled in crypto_decap */

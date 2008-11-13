@@ -94,6 +94,7 @@
 static int pcic_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int pcic_attach(dev_info_t *, ddi_attach_cmd_t);
 static int pcic_detach(dev_info_t *, ddi_detach_cmd_t);
+static int32_t pcic_quiesce(dev_info_t *);
 static uint_t pcic_intr(caddr_t, caddr_t);
 static int pcic_do_io_intr(pcicdev_t *, uint32_t);
 static int pcic_probe(dev_info_t *);
@@ -183,7 +184,7 @@ static struct dev_ops pcic_devops = {
 	&pcic_cbops,
 	&pcmciabus_ops,
 	NULL,
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	pcic_quiesce,	/* devo_quiesce */
 };
 
 void *pcic_soft_state_p = NULL;
@@ -608,6 +609,37 @@ cardbus_enable_cd_intr(dev_info_t *dip)
 
 	ddi_regs_map_free(&iohandle);
 	return (1);
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int32_t
+pcic_quiesce(dev_info_t *dip)
+{
+	anp_t *anp = ddi_get_driver_private(dip);
+	pcicdev_t *pcic = anp->an_private;
+	int i;
+
+	for (i = 0; i < pcic->pc_numsockets; i++) {
+		pcic_putb(pcic, i, PCIC_MANAGEMENT_INT, 0);
+		pcic_putb(pcic, i, PCIC_CARD_DETECT, 0);
+		pcic_putb(pcic, i, PCIC_MAPPING_ENABLE, 0);
+		/* disable interrupts and put card into RESET */
+		pcic_putb(pcic, i, PCIC_INTERRUPT, 0);
+		/* poweroff socket */
+		pcic_putb(pcic, i, PCIC_POWER_CONTROL, 0);
+		pcic_putcb(pcic, CB_CONTROL, 0);
+	}
+
+	return (DDI_SUCCESS);
 }
 
 /*

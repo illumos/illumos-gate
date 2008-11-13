@@ -154,17 +154,17 @@ static ddi_dma_attr_t ral_dma_attr = {
  */
 static int rt2560_attach(dev_info_t *, ddi_attach_cmd_t);
 static int rt2560_detach(dev_info_t *, ddi_detach_cmd_t);
-static int rt2560_reset(dev_info_t *, ddi_reset_cmd_t);
+static int32_t rt2560_quiesce(dev_info_t *);
 
 /*
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ral_dev_ops, nulldev, nulldev, rt2560_attach,
-    rt2560_detach, rt2560_reset, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    rt2560_detach, nodev, NULL, D_MP, NULL, rt2560_quiesce);
 
 static struct modldrv ral_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Ralink RT2500 driver",	/* short description */
+	"Ralink RT2500 driver v1.5",	/* short description */
 	&ral_dev_ops		/* driver specific ops */
 };
 
@@ -182,9 +182,13 @@ static int	rt2560_m_multicst(void *, boolean_t, const uint8_t *);
 static int	rt2560_m_unicst(void *, const uint8_t *);
 static mblk_t	*rt2560_m_tx(void *, mblk_t *);
 static void	rt2560_m_ioctl(void *, queue_t *, mblk_t *);
+static int	rt2560_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+static int	rt2560_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *);
 
 static mac_callbacks_t rt2560_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	rt2560_m_stat,
 	rt2560_m_start,
 	rt2560_m_stop,
@@ -194,7 +198,11 @@ static mac_callbacks_t rt2560_m_callbacks = {
 	rt2560_m_tx,
 	NULL,		/* mc_resources; */
 	rt2560_m_ioctl,
-	NULL		/* mc_getcapab */
+	NULL,		/* mc_getcapab */
+	NULL,
+	NULL,
+	rt2560_m_setprop,
+	rt2560_m_getprop
 };
 
 uint32_t ral_dbg_flags = 0;
@@ -2121,6 +2129,47 @@ rt2560_m_promisc(void *arg, boolean_t on)
 	return (0);
 }
 
+/*
+ * callback functions for /get/set properties
+ */
+static int
+rt2560_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	struct rt2560_softc *sc = arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+	int err;
+
+	err = ieee80211_setprop(ic, pr_name, wldp_pr_num,
+	    wldp_length, wldp_buf);
+	RAL_LOCK(sc);
+	if (err == ENETRESET) {
+		if (RAL_IS_RUNNING(sc)) {
+			RAL_UNLOCK(sc);
+			(void) rt2560_init(sc);
+			(void) ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+			RAL_LOCK(sc);
+		}
+		err = 0;
+	}
+	RAL_UNLOCK(sc);
+
+	return (err);
+}
+
+static int
+rt2560_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+{
+	struct rt2560_softc *sc = arg;
+	int err;
+
+	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
+	    pr_flags, wldp_length, wldp_buf);
+
+	return (err);
+}
+
 static void
 rt2560_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 {
@@ -2254,17 +2303,24 @@ rt2560_intr(caddr_t arg)
 	return (DDI_INTR_CLAIMED);
 }
 
-static int
-rt2560_reset(dev_info_t *devinfo, ddi_reset_cmd_t cmd)
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int32_t
+rt2560_quiesce(dev_info_t *devinfo)
 {
 	struct rt2560_softc *sc;
 
-	RAL_DEBUG(RAL_DBG_GLD, "rt2560_reset(0x%p)\n", (void *)devinfo);
-
-	if (cmd != DDI_RESET_FORCE)
-		return (DDI_FAILURE);
-
 	sc = ddi_get_soft_state(ral_soft_state_p, ddi_get_instance(devinfo));
+	if (sc == NULL)
+		return (DDI_FAILURE);
 
 	/* abort Tx */
 	RAL_WRITE(sc, RT2560_TXCSR0, RT2560_ABORT_TX);

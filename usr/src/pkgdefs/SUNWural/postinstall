@@ -24,12 +24,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # Driver info
 DRV=ural
-DRVALIAS='"usb1044,8007" "usb13b1,d" "usb411,67"'
+DRVALIAS='"usb1044,8007" "usb13b1,d" "usb411,67" "usb2001,3c00"'
 
 BASEDIR=${BASEDIR:-/}
 

@@ -259,11 +259,11 @@ static int ural_detach(dev_info_t *, ddi_detach_cmd_t);
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(ural_dev_ops, nulldev, nulldev, ural_attach,
-    ural_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    ural_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_needed);
 
 static struct modldrv ural_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ural driver",	/* short description */
+	"ural driver v1.3",	/* short description */
 	&ural_dev_ops		/* driver specific ops */
 };
 
@@ -281,9 +281,13 @@ static int	ural_m_multicst(void *, boolean_t, const uint8_t *);
 static int	ural_m_unicst(void *, const uint8_t *);
 static mblk_t	*ural_m_tx(void *, mblk_t *);
 static void	ural_m_ioctl(void *, queue_t *, mblk_t *);
+static int	ural_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+static int	ural_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *);
 
 static mac_callbacks_t ural_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	ural_m_stat,
 	ural_m_start,
 	ural_m_stop,
@@ -293,7 +297,11 @@ static mac_callbacks_t ural_m_callbacks = {
 	ural_m_tx,
 	NULL,		/* mc_resources; */
 	ural_m_ioctl,
-	NULL		/* mc_getcapab */
+	NULL,		/* mc_getcapab */
+	NULL,
+	NULL,
+	ural_m_setprop,
+	ural_m_getprop
 };
 
 extern const char *usb_str_cr(int);
@@ -2040,6 +2048,47 @@ ural_m_promisc(void *arg, boolean_t on)
 
 	ural_update_promisc(sc);
 	return (0);
+}
+
+/*
+ * callback functions for /get/set properties
+ */
+static int
+ural_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	struct ural_softc *sc = (struct ural_softc *)arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+	int err;
+
+	err = ieee80211_setprop(ic, pr_name, wldp_pr_num,
+	    wldp_length, wldp_buf);
+	RAL_LOCK(sc);
+	if (err == ENETRESET) {
+		if (RAL_IS_RUNNING(sc)) {
+			RAL_UNLOCK(sc);
+			(void) ural_init(sc);
+			(void) ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+			RAL_LOCK(sc);
+		}
+		err = 0;
+	}
+	RAL_UNLOCK(sc);
+
+	return (err);
+}
+
+static int
+ural_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+{
+	struct ural_softc *sc = (struct ural_softc *)arg;
+	int err;
+
+	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
+	    pr_flags, wldp_length, wldp_buf);
+
+	return (err);
 }
 
 static void
