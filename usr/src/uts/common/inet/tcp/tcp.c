@@ -8494,11 +8494,12 @@ tcp_icmp_error(tcp_t *tcp, mblk_t *mp)
 	boolean_t ipsec_mctl = B_FALSE;
 	boolean_t secure;
 	mblk_t *first_mp = mp;
-	uint32_t new_mss;
+	int32_t new_mss;
 	uint32_t ratio;
 	size_t mp_size = MBLKL(mp);
 	uint32_t seg_seq;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
 	/* Assume IP provides aligned packets - otherwise toss */
 	if (!OK_32PTR(mp->b_rptr)) {
@@ -8614,12 +8615,34 @@ noticmpv4:
 	 */
 	if (SEQ_LT(seg_seq, tcp->tcp_suna) || SEQ_GEQ(seg_seq, tcp->tcp_snxt)) {
 		/*
-		 * If the ICMP message is bogus, should we kill the
-		 * connection, or should we just drop the bogus ICMP
-		 * message? It would probably make more sense to just
-		 * drop the message so that if this one managed to get
-		 * in, the real connection should not suffer.
+		 * The ICMP message is bogus, just drop it.  But if this is
+		 * an ICMP too big message, IP has already changed
+		 * the ire_max_frag to the bogus value.  We need to change
+		 * it back.
 		 */
+		if (icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
+		    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED) {
+			conn_t *connp = tcp->tcp_connp;
+			ire_t *ire;
+			int flag;
+
+			if (tcp->tcp_ipversion == IPV4_VERSION) {
+				flag = tcp->tcp_ipha->
+				    ipha_fragment_offset_and_flags;
+			} else {
+				flag = 0;
+			}
+			mutex_enter(&connp->conn_lock);
+			if ((ire = connp->conn_ire_cache) != NULL) {
+				mutex_enter(&ire->ire_lock);
+				mutex_exit(&connp->conn_lock);
+				ire->ire_max_frag = tcp->tcp_if_mtu;
+				ire->ire_frag_flag |= flag;
+				mutex_exit(&ire->ire_lock);
+			} else {
+				mutex_exit(&connp->conn_lock);
+			}
+		}
 		goto noticmpv4;
 	}
 
@@ -8641,18 +8664,23 @@ noticmpv4:
 			 * tcp_wput_data().  Need to adjust all those
 			 * params to make sure tcp_wput_data() work properly.
 			 */
-			if (tcps->tcps_ignore_path_mtu)
+			if (tcps->tcps_ignore_path_mtu ||
+			    tcp->tcp_ipha->ipha_fragment_offset_and_flags == 0)
 				break;
 
 			/*
 			 * Decrease the MSS by time stamp options
 			 * IP options and IPSEC options. tcp_hdr_len
 			 * includes time stamp option and IP option
-			 * length.
+			 * length.  Note that new_mss may be negative
+			 * if tcp_ipsec_overhead is large and the
+			 * icmph_du_mtu is the minimum value, which is 68.
 			 */
-
 			new_mss = ntohs(icmph->icmph_du_mtu) -
 			    tcp->tcp_hdr_len - tcp->tcp_ipsec_overhead;
+
+			DTRACE_PROBE2(tcp__pmtu__change, tcp_t *, tcp, int,
+			    new_mss);
 
 			/*
 			 * Only update the MSS if the new one is
@@ -8664,13 +8692,17 @@ noticmpv4:
 				break;
 
 			/*
-			 * Stop doing PMTU if new_mss is less than 68
-			 * or less than tcp_mss_min.
-			 * The value 68 comes from rfc 1191.
+			 * Note that we are using the template header's DF
+			 * bit in the fast path sending.  So we need to compare
+			 * the new mss with both tcps_mss_min and ip_pmtu_min.
+			 * And stop doing IPv4 PMTUd if new_mss is less than
+			 * MAX(tcps_mss_min, ip_pmtu_min).
 			 */
-			if (new_mss < MAX(68, tcps->tcps_mss_min))
+			if (new_mss < tcps->tcps_mss_min ||
+			    new_mss < ipst->ips_ip_pmtu_min) {
 				tcp->tcp_ipha->ipha_fragment_offset_and_flags =
 				    0;
+			}
 
 			ratio = tcp->tcp_cwnd / tcp->tcp_mss;
 			ASSERT(ratio >= 1);
@@ -19445,9 +19477,6 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		    ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH);
 	}
 
-	ipha->ipha_fragment_offset_and_flags |=
-	    (uint32_t)htons(ire->ire_frag_flag);
-
 	/* Calculate IP header checksum if hardware isn't capable */
 	if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
 		IP_HDR_CKSUM(ipha, cksum, ((uint32_t *)ipha)[0],
@@ -21063,9 +21092,6 @@ legacy_send_no_md:
 
 			/* IPv4 header checksum */
 			if (af == AF_INET) {
-				ipha->ipha_fragment_offset_and_flags |=
-				    (uint32_t)htons(ire->ire_frag_flag);
-
 				if (hwcksum_flags & HCK_IPV4_HDRCKSUM) {
 					ipha->ipha_hdr_checksum = 0;
 				} else {
@@ -21448,9 +21474,6 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 	 */
 	DB_LSOFLAGS(mp) |= HW_LSO;
 	DB_LSOMSS(mp) = mss;
-
-	ipha->ipha_fragment_offset_and_flags |=
-	    (uint32_t)htons(ire->ire_frag_flag);
 
 	ire_fp_mp = ire->ire_nce->nce_fp_mp;
 	ire_fp_mp_len = MBLKL(ire_fp_mp);

@@ -2912,6 +2912,8 @@ extern vmem_t *ip_minor_arena_la;
 #define	ips_ip_ndp_unsolicit_interval	ips_param_arr[41].ip_param_value
 #define	ips_ip_ndp_unsolicit_count	ips_param_arr[42].ip_param_value
 #define	ips_ipv6_ignore_home_address_opt ips_param_arr[43].ip_param_value
+
+/* Misc IP configuration knobs */
 #define	ips_ip_policy_mask		ips_param_arr[44].ip_param_value
 #define	ips_ip_multirt_resolution_interval ips_param_arr[45].ip_param_value
 #define	ips_ip_multirt_ttl  		ips_param_arr[46].ip_param_value
@@ -2926,7 +2928,8 @@ extern vmem_t *ip_minor_arena_la;
 #define	ips_ip_lso_outbound		ips_param_arr[55].ip_param_value
 #define	ips_igmp_max_version		ips_param_arr[56].ip_param_value
 #define	ips_mld_max_version		ips_param_arr[57].ip_param_value
-#define	ips_ipv6_drop_inbound_icmpv6	ips_param_arr[58].ip_param_value
+#define	ips_ip_pmtu_min			ips_param_arr[58].ip_param_value
+#define	ips_ipv6_drop_inbound_icmpv6	ips_param_arr[59].ip_param_value
 
 extern int	dohwcksum;	/* use h/w cksum if supported by the h/w */
 #ifdef ZC_TEST

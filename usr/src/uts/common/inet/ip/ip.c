@@ -797,7 +797,7 @@ static void ipobs_fini(ip_stack_t *);
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
 /* How long, in seconds, we allow frags to hang around. */
-#define	IP_FRAG_TIMEOUT	60
+#define	IP_FRAG_TIMEOUT	15
 
 /*
  * Threshold which determines whether MDT should be used when
@@ -903,6 +903,7 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1,	1,	"ip_lso_outbound" },
 	{  IGMP_V1_ROUTER, IGMP_V3_ROUTER, IGMP_V3_ROUTER, "igmp_max_version" },
 	{  MLD_V1_ROUTER, MLD_V2_ROUTER, MLD_V2_ROUTER, "mld_max_version" },
+	{ 68,	65535,	576,	"ip_pmtu_min" },
 #ifdef DEBUG
 	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
 #else
@@ -2233,9 +2234,10 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
     ip_stack_t *ipst)
 {
 	ire_t	*ire, *first_ire;
-	int	mtu;
+	int	mtu, orig_mtu;
 	int	hdr_length;
 	ipaddr_t nexthop_addr;
+	boolean_t disable_pmtud;
 
 	ASSERT(icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
 	    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED);
@@ -2279,8 +2281,12 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 		    ntohl(ipha->ipha_dst)));
 		return (B_FALSE);
 	}
+
 	/* Check for MTU discovery advice as described in RFC 1191 */
 	mtu = ntohs(icmph->icmph_du_mtu);
+	orig_mtu = mtu;
+	disable_pmtud = B_FALSE;
+
 	rw_enter(&first_ire->ire_bucket->irb_lock, RW_READER);
 	for (ire = first_ire; ire != NULL && ire->ire_addr == ipha->ipha_dst;
 	    ire = ire->ire_next) {
@@ -2297,12 +2303,7 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 			continue;
 
 		mutex_enter(&ire->ire_lock);
-		if (icmph->icmph_du_zero == 0 && mtu > 68) {
-			/* Reduce the IRE max frag value as advised. */
-			ip1dbg(("Received mtu from router: %d (was %d)\n",
-			    mtu, ire->ire_max_frag));
-			ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
-		} else {
+		if (icmph->icmph_du_zero != 0 || mtu < ipst->ips_ip_pmtu_min) {
 			uint32_t length;
 			int	i;
 
@@ -2312,6 +2313,8 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 			 * the original IP packet.
 			 */
 			length = ntohs(ipha->ipha_length);
+			DTRACE_PROBE2(ip4__pmtu__guess, ire_t *, ire,
+			    uint32_t, length);
 			if (ire->ire_max_frag <= length &&
 			    ire->ire_max_frag >= length - hdr_length) {
 				/*
@@ -2319,8 +2322,6 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 				 * return the wrong iph_length in ICMP
 				 * errors.
 				 */
-				ip1dbg(("Wrong mtu: sent %d, ire %d\n",
-				    length, ire->ire_max_frag));
 				length -= hdr_length;
 			}
 			for (i = 0; i < A_CNT(icmp_frag_size_table); i++) {
@@ -2329,24 +2330,26 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 			}
 			if (i == A_CNT(icmp_frag_size_table)) {
 				/* Smaller than 68! */
-				ip1dbg(("Too big for packet size %d\n",
-				    length));
-				ire->ire_max_frag = MIN(ire->ire_max_frag, 576);
-				ire->ire_frag_flag = 0;
+				disable_pmtud = B_TRUE;
+				mtu = ipst->ips_ip_pmtu_min;
 			} else {
 				mtu = icmp_frag_size_table[i];
-				ip1dbg(("Calculated mtu %d, packet size %d, "
-				    "before %d", mtu, length,
-				    ire->ire_max_frag));
-				ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
-				ip1dbg((", after %d\n", ire->ire_max_frag));
+				if (mtu < ipst->ips_ip_pmtu_min) {
+					mtu = ipst->ips_ip_pmtu_min;
+					disable_pmtud = B_TRUE;
+				}
 			}
-			/* Record the new max frag size for the ULP. */
+			/* Fool the ULP into believing our guessed PMTU. */
 			icmph->icmph_du_zero = 0;
-			icmph->icmph_du_mtu =
-			    htons((uint16_t)ire->ire_max_frag);
+			icmph->icmph_du_mtu = htons(mtu);
 		}
+		if (disable_pmtud)
+			ire->ire_frag_flag = 0;
+		/* Reduce the IRE max frag value as advised. */
+		ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
 		mutex_exit(&ire->ire_lock);
+		DTRACE_PROBE4(ip4__pmtu__change, icmph_t *, icmph, ire_t *,
+		    ire, int, orig_mtu, int, mtu);
 	}
 	rw_exit(&first_ire->ire_bucket->irb_lock);
 	ire_refrele(first_ire);
