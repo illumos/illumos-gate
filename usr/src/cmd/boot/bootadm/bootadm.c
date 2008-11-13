@@ -2601,6 +2601,16 @@ kernel_parser(entry_t *entry, char *cmd, char *arg, int linenum)
 	    sizeof (DIRECT_BOOT_FAILSAFE_KERNEL) - 1) == 0) {
 		BAM_DPRINTF((D_SET_DBOOT_FAILSAFE, fcn, arg));
 		entry->flags |= BAM_ENTRY_DBOOT | BAM_ENTRY_FAILSAFE;
+	} else if (strncmp(arg, DIRECT_BOOT_FAILSAFE_32,
+	    sizeof (DIRECT_BOOT_FAILSAFE_32) - 1) == 0) {
+		BAM_DPRINTF((D_SET_DBOOT_FAILSAFE_32, fcn, arg));
+		entry->flags |= BAM_ENTRY_DBOOT | BAM_ENTRY_FAILSAFE
+		    | BAM_ENTRY_32BIT;
+	} else if (strncmp(arg, DIRECT_BOOT_FAILSAFE_64,
+	    sizeof (DIRECT_BOOT_FAILSAFE_64) - 1) == 0) {
+		BAM_DPRINTF((D_SET_DBOOT_FAILSAFE_64, fcn, arg));
+		entry->flags |= BAM_ENTRY_DBOOT | BAM_ENTRY_FAILSAFE
+		    | BAM_ENTRY_64BIT;
 	} else if (strncmp(arg, MULTI_BOOT, sizeof (MULTI_BOOT) - 1) == 0) {
 		BAM_DPRINTF((D_SET_MULTIBOOT, fcn, arg));
 		entry->flags |= BAM_ENTRY_MULTIBOOT;
@@ -2643,6 +2653,8 @@ module_parser(entry_t *entry, char *cmd, char *arg, int linenum)
 	    strcmp(arg, DIRECT_BOOT_ARCHIVE_64) == 0 ||
 	    strcmp(arg, MULTIBOOT_ARCHIVE) == 0 ||
 	    strcmp(arg, FAILSAFE_ARCHIVE) == 0 ||
+	    strcmp(arg, FAILSAFE_ARCHIVE_32) == 0 ||
+	    strcmp(arg, FAILSAFE_ARCHIVE_64) == 0 ||
 	    strcmp(arg, XEN_KERNEL_MODULE_LINE) == 0 ||
 	    strcmp(arg, XEN_KERNEL_MODULE_LINE_ZFS) == 0) {
 		BAM_DPRINTF((D_BOOTADM_LU_MODULE, fcn, arg));
@@ -6197,7 +6209,13 @@ find_boot_entry(
 
 		if (kernel &&
 		    (!check_cmd(lp->cmd, KERNEL_CMD, lp->arg, kernel))) {
-			continue;
+			if (!(ent->flags & BAM_ENTRY_FAILSAFE) ||
+			    !(ent->flags & BAM_ENTRY_DBOOT) ||
+			    strcmp(kernel, DIRECT_BOOT_FAILSAFE_LINE) != 0)
+				continue;
+
+			ent->flags |= BAM_ENTRY_UPGFSKERNEL;
+
 		}
 		BAM_DPRINTF((D_KERNEL_MATCH, fcn, kernel, lp->arg));
 
@@ -6215,6 +6233,14 @@ find_boot_entry(
 			BAM_DPRINTF((D_MODULE_MATCH, fcn, module, lp->arg));
 			break;
 		}
+
+		if (strcmp(module, FAILSAFE_ARCHIVE) == 0 &&
+		    (strcmp(lp->prev->arg, FAILSAFE_ARCHIVE_32) == 0 ||
+		    strcmp(lp->prev->arg, FAILSAFE_ARCHIVE_64) == 0)) {
+			ent->flags |= BAM_ENTRY_UPGFSMODULE;
+			break;
+		}
+
 	}
 
 	if (ent && entry_num) {
@@ -6303,6 +6329,29 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 	/* kernel line */
 	lp = lp->next;
 
+	if (ent->flags & BAM_ENTRY_UPGFSKERNEL) {
+		char		*params = NULL;
+
+		params = strstr(lp->line, "-s");
+		if (params != NULL)
+			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s%s",
+			    menu_cmds[KERNEL_DOLLAR_CMD], menu_cmds[SEP_CMD],
+			    kernel, params+2);
+		else
+			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+			    menu_cmds[KERNEL_DOLLAR_CMD], menu_cmds[SEP_CMD],
+			    kernel);
+
+		free(lp->cmd);
+		free(lp->arg);
+		free(lp->line);
+		lp->cmd = s_strdup(menu_cmds[KERNEL_DOLLAR_CMD]);
+		lp->arg = s_strdup(strstr(linebuf, "/"));
+		lp->line = s_strdup(linebuf);
+		ent->flags &= ~BAM_ENTRY_UPGFSKERNEL;
+		BAM_DPRINTF((D_ADDING_KERNEL_DOLLAR, fcn, lp->prev->cmd));
+	}
+
 	if (change_kernel) {
 		/*
 		 * We're upgrading from multiboot to directboot.
@@ -6334,6 +6383,27 @@ update_boot_entry(menu_t *mp, char *title, char *findroot, char *root,
 			BAM_DPRINTF((D_ADDING_MODULE_DOLLAR, fcn, module));
 		}
 	}
+
+	/* module line */
+	lp = lp->next;
+
+	if (ent->flags & BAM_ENTRY_UPGFSMODULE) {
+		if (strcmp(lp->cmd, menu_cmds[MODULE_CMD]) == 0) {
+			(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+			    menu_cmds[MODULE_DOLLAR_CMD], menu_cmds[SEP_CMD],
+			    module);
+			free(lp->cmd);
+			free(lp->arg);
+			free(lp->line);
+			lp->cmd = s_strdup(menu_cmds[MODULE_DOLLAR_CMD]);
+			lp->arg = s_strdup(module);
+			lp->line = s_strdup(linebuf);
+			lp = lp->next;
+			ent->flags &= ~BAM_ENTRY_UPGFSMODULE;
+			BAM_DPRINTF((D_ADDING_MODULE_DOLLAR, fcn, module));
+		}
+	}
+
 	BAM_DPRINTF((D_RETURN_RET, fcn, i));
 	return (i);
 }
@@ -6417,6 +6487,7 @@ update_entry(menu_t *mp, char *menu_root, char *osdev)
 	char		*failsafe_kernel = NULL;
 	struct stat	sbuf;
 	char		failsafe[256];
+	char		failsafe_64[256];
 	int		ret;
 	const char	*fcn = "update_entry()";
 
@@ -6485,13 +6556,25 @@ update_entry(menu_t *mp, char *menu_root, char *osdev)
 	 * failsafe may be different than the installed kernel.
 	 */
 	(void) snprintf(failsafe, sizeof (failsafe), "%s%s",
-	    osroot, FAILSAFE_ARCHIVE);
-	if (stat(failsafe, &sbuf) == 0) {
+	    osroot, FAILSAFE_ARCHIVE_32);
+	(void) snprintf(failsafe_64, sizeof (failsafe_64), "%s%s",
+	    osroot, FAILSAFE_ARCHIVE_64);
+
+	/*
+	 * Check if at least one of the two archives exists
+	 * Using $ISADIR as the default line, we have an entry which works
+	 * for both the cases.
+	 */
+
+	if (stat(failsafe, &sbuf) == 0 || stat(failsafe_64, &sbuf) == 0) {
 
 		/* Figure out where the kernel line should point */
 		(void) snprintf(failsafe, sizeof (failsafe), "%s%s", osroot,
-		    DIRECT_BOOT_FAILSAFE_KERNEL);
-		if (stat(failsafe, &sbuf) == 0) {
+		    DIRECT_BOOT_FAILSAFE_32);
+		(void) snprintf(failsafe_64, sizeof (failsafe_64), "%s%s",
+		    osroot, DIRECT_BOOT_FAILSAFE_64);
+		if (stat(failsafe, &sbuf) == 0 ||
+		    stat(failsafe_64, &sbuf) == 0) {
 			failsafe_kernel = DIRECT_BOOT_FAILSAFE_LINE;
 		} else {
 			(void) snprintf(failsafe, sizeof (failsafe), "%s%s",

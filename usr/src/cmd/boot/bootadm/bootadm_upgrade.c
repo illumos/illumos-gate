@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -337,11 +335,13 @@ rskip_bspace(char *bound, char *ptr)
  *
  * <kernel path> is one of:
  *	/platform/i86pc/kernel/$ISADIR/unix
+ *	/boot/platform/i86pc/kernel/$ISADIR/unix
  *	/platform/i86pc/kernel/unix
  *	/platform/i86pc/kernel/amd64/unix
  *	/boot/platform/i86pc/kernel/unix
+ *	/boot/platform/i86pc/kernel/amd64/unix
  *
- * If <kernel path> is any of the last three, the command may also be "kernel".
+ * If <kernel path> is any of the last four, the command may also be "kernel".
  *
  * <flags> is anything that isn't <kernel path>.
  *
@@ -355,10 +355,10 @@ rskip_bspace(char *bound, char *ptr)
 static error_t
 cvt_kernel_line(line_t *line, const char *osroot, entry_t *entry)
 {
-	char		path[PATH_MAX];
+	char		path[PATH_MAX], path_64[PATH_MAX];
 	char		linebuf[PATH_MAX];
 	char		new_arg[PATH_MAX];
-	struct stat	sb;
+	struct stat	sb, sb_64;
 	char		*old_ptr;
 	char		*unix_ptr;
 	char		*flags1_ptr;
@@ -385,8 +385,10 @@ cvt_kernel_line(line_t *line, const char *osroot, entry_t *entry)
 		 */
 		BAM_DPRINTF((D_TRYING_FAILSAFE_CVT_TO_DBOOT, fcn));
 		(void) snprintf(path, PATH_MAX, "%s%s", osroot,
-		    DIRECT_BOOT_FAILSAFE_KERNEL);
-		if (stat(path, &sb) != 0) {
+		    DIRECT_BOOT_FAILSAFE_32);
+		(void) snprintf(path_64, PATH_MAX, "%s%s", osroot,
+		    DIRECT_BOOT_FAILSAFE_64);
+		if (stat(path, &sb) != 0 && stat(path_64, &sb_64) != 0) {
 			if (bam_verbose) {
 				bam_error(FAILSAFE_MISSING, line->lineNum);
 			}
@@ -396,14 +398,12 @@ cvt_kernel_line(line_t *line, const char *osroot, entry_t *entry)
 	}
 
 	/*
-	 * Make sure we have the correct cmd - either kernel or kernel$
-	 * The failsafe entry should always be kernel.
+	 * Make sure we have the correct cmd
 	 */
-	if (!(entry->flags & BAM_ENTRY_FAILSAFE)) {
-		free(line->cmd);
-		line->cmd = s_strdup(menu_cmds[KERNEL_DOLLAR_CMD]);
-		BAM_DPRINTF((D_CVT_CMD_KERN_DOLLAR, fcn, line->cmd));
-	}
+
+	free(line->cmd);
+	line->cmd = s_strdup(menu_cmds[KERNEL_DOLLAR_CMD]);
+	BAM_DPRINTF((D_CVT_CMD_KERN_DOLLAR, fcn, line->cmd));
 
 	assert(sizeof (linebuf) > strlen(line->arg) + 32);
 	(void) strlcpy(linebuf, line->arg, sizeof (linebuf));
@@ -510,9 +510,18 @@ create:
  * module /platform/i86pc/boot_archive
  * module /platform/i86pc/amd64/boot_archive
  *
- * For either dboot or multiboot, the failsafe is:
+ * Under multiboot, the failsafe is:
  *
  * module /boot/x86.miniroot-safe
+ *
+ * Under dboot, the failsafe is:
+ *
+ * module$ /boot/$ISADIR/x86.miniroot-safe
+ *
+ * which may be specified exactly as either of:
+ *
+ * module /boot/x86.miniroot-safe
+ * module /boot/amd64/x86.miniroot-safe
  */
 static error_t
 cvt_module_line(line_t *line, entry_t *entry)
@@ -541,17 +550,12 @@ cvt_module_line(line_t *line, entry_t *entry)
 		return (BAM_MSG);
 	}
 
-	if (entry->flags & BAM_ENTRY_FAILSAFE) {
-		free(line->cmd);
-		free(line->arg);
-		line->cmd = s_strdup(menu_cmds[MODULE_CMD]);
-		line->arg = s_strdup(FAILSAFE_ARCHIVE);
-	} else {
-		free(line->cmd);
-		free(line->arg);
-		line->cmd = s_strdup(menu_cmds[MODULE_DOLLAR_CMD]);
-		line->arg = s_strdup(DIRECT_BOOT_ARCHIVE);
-	}
+	free(line->cmd);
+	free(line->arg);
+	line->cmd = s_strdup(menu_cmds[MODULE_DOLLAR_CMD]);
+
+	line->arg = s_strdup(entry->flags & BAM_ENTRY_FAILSAFE ?
+	    FAILSAFE_ARCHIVE : DIRECT_BOOT_ARCHIVE);
 
 	update_line(line);
 	BAM_DPRINTF((D_CVTED_MODULE, fcn, line->line));

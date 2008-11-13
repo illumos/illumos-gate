@@ -26,8 +26,6 @@
 #ifndef	_MESSAGE_H
 #define	_MESSAGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -1035,6 +1033,12 @@ gettext("failed to get special file for menu_root: %s\n")
 #define	D_SET_DBOOT_64 "%s: setting DBOOT|DBOOT_64 flag: %s\n"
 
 #define	D_SET_DBOOT_FAILSAFE "%s: setting DBOOT|DBOOT_FAILSAFE flag: %s\n"
+
+#define	D_SET_DBOOT_FAILSAFE_32 \
+	"%s: setting DBOOT|DBOOT_FAILSAFE|DBOOT_32 flag: %s\n"
+
+#define	D_SET_DBOOT_FAILSAFE_64 \
+	"%s: setting DBOOT|DBOOT_FAILSAFE|DBOOT_64 flag: %s\n"
 
 #define	D_SET_MULTIBOOT "%s: setting MULTIBOOT flag: %s\n"
 

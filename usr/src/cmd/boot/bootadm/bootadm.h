@@ -26,8 +26,6 @@
 #ifndef _BOOTADM_H
 #define	_BOOTADM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -84,6 +82,9 @@ typedef struct entry {
 #define	BAM_ENTRY_FINDROOT	0x100	/* entry has a findroot line */
 #define	BAM_ENTRY_MULTIBOOT	0x200	/* is multiboot (normal or failsafe) */
 #define	BAM_ENTRY_64BIT		0x400	/* Is a 64-bit entry */
+
+#define	BAM_ENTRY_UPGFSKERNEL	0x800	/* Upgrade failsafe kernel entry */
+#define	BAM_ENTRY_UPGFSMODULE	0x1000  /* Upgrade failsafe module entry */
 
 typedef struct {
 	line_t	*start;
@@ -213,7 +214,10 @@ extern int is_sparc(void);
 #define	DIRECT_BOOT_32	"/platform/i86pc/kernel/unix"
 #define	DIRECT_BOOT_64	"/platform/i86pc/kernel/amd64/unix"
 #define	DIRECT_BOOT_KERNEL	"/platform/i86pc/kernel/$ISADIR/unix"
-#define	DIRECT_BOOT_FAILSAFE_KERNEL	"/boot/platform/i86pc/kernel/unix"
+#define	DIRECT_BOOT_FAILSAFE_32	"/boot/platform/i86pc/kernel/unix"
+#define	DIRECT_BOOT_FAILSAFE_64	"/boot/platform/i86pc/kernel/amd64/unix"
+#define	DIRECT_BOOT_FAILSAFE_KERNEL \
+	"/boot/platform/i86pc/kernel/$ISADIR/unix"
 #define	DIRECT_BOOT_FAILSAFE_LINE	DIRECT_BOOT_FAILSAFE_KERNEL " -s"
 #define	DIRECT_BOOT_KERNEL_ZFS	DIRECT_BOOT_KERNEL " " ZFS_BOOT
 
@@ -227,7 +231,9 @@ extern int is_sparc(void);
 #define	DIRECT_BOOT_ARCHIVE_32	"/platform/i86pc/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_64	"/platform/i86pc/amd64/boot_archive"
 #define	MULTIBOOT_ARCHIVE	DIRECT_BOOT_ARCHIVE_32
-#define	FAILSAFE_ARCHIVE	"/boot/x86.miniroot-safe"
+#define	FAILSAFE_ARCHIVE	"/boot/$ISADIR/x86.miniroot-safe"
+#define	FAILSAFE_ARCHIVE_32	"/boot/x86.miniroot-safe"
+#define	FAILSAFE_ARCHIVE_64	"/boot/amd64/x86.miniroot-safe"
 
 /* Hypervisors */
 #define	XEN_32			"/boot/xen.gz"
