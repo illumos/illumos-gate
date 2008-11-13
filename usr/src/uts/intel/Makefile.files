@@ -212,12 +212,6 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
 		   dmwalk.o psloop.o
 
-ACPI_INTP_OBJS += acpi_inf.o acpi_mod.o  acpi_ml.o \
-	acpi_decl.o acpi_exe.o acpi_gram.o acpi_io.o acpi_lex.o \
-	acpi_name.o acpi_ns.o acpi_op1.o acpi_op2.o acpi_rule.o \
-	acpi_tab.o acpi_thr.o acpi_val.o \
-	acpi_exc.o acpi_bst.o acpi_node.o acpi_stk.o acpi_par.o
-
 AGP_OBJS += agpmaster.o
 FBT_OBJS += fbt.o
 SDT_OBJS += sdt.o
