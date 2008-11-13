@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -47,3 +46,15 @@
 #
 # SUNWhal
 #
+d none usr/lib/sparcv9 755 root bin
+s none usr/lib/sparcv9/libhal.so=./libhal.so.1.0.0
+s none usr/lib/sparcv9/libhal.so.1=./libhal.so.1.0.0
+f none usr/lib/sparcv9/libhal.so.1.0.0 755 root bin
+s none usr/lib/sparcv9/libhal-storage.so=./libhal-storage.so.1.0.0
+s none usr/lib/sparcv9/libhal-storage.so.1=./libhal-storage.so.1.0.0
+f none usr/lib/sparcv9/libhal-storage.so.1.0.0 755 root bin
+f none usr/lib/sparcv9/llib-lhal.ln 644 root bin
+f none usr/lib/sparcv9/llib-lhal-storage.ln 644 root bin
+d none usr/lib/sparcv9/pkgconfig 755 root other
+f none usr/lib/sparcv9/pkgconfig/hal.pc 644 root bin
+f none usr/lib/sparcv9/pkgconfig/hal-storage.pc 644 root bin

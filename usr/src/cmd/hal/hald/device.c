@@ -68,6 +68,8 @@ hal_device_finalize (GObject *obj)
 
 	g_slist_foreach (device->properties, (GFunc) hal_property_free, NULL);
 
+	g_slist_free (device->properties);
+
 	g_free (device->udi);
 
 	if (parent_class->finalize)

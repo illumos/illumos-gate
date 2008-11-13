@@ -2,14 +2,13 @@
  *
  * hotplug.c : HAL-internal hotplug events
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
@@ -65,8 +64,8 @@ hotplug_event_begin_devfs_add (HotplugEvent *hotplug_event, HalDevice *d)
 	if (d != NULL) {
 		/* XXX */
 		HAL_ERROR (("devpath %s already present in store, ignore event", hotplug_event->un.devfs.devfs_path));
-		hotplug_event_end ((void *) hotplug_event);
-		return;
+
+		goto out;
 	}
 
 	/* find parent */
@@ -80,16 +79,16 @@ hotplug_event_begin_devfs_add (HotplugEvent *hotplug_event, HalDevice *d)
 	if (parent == NULL) {
 		if (strcmp(hotplug_event->un.devfs.devfs_path, "/") != 0) {
 			HAL_ERROR (("Parent is NULL devfs_path=%s parent_udi=%s", hotplug_event->un.devfs.devfs_path, parent_udi ? parent_udi : "<null>"));
-			hotplug_event_end ((void *) hotplug_event);
-			return;
+
+			goto out;
 		}
 	}
 
 	/* children of ignored parent should be ignored */
 	if (parent != NULL && hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("parent ignored %s", parent_udi));
-		hotplug_event_end ((void *) hotplug_event);
-		return;
+
+		goto out;
 	}
 
 	/* custom or generic add function */
@@ -101,6 +100,13 @@ hotplug_event_begin_devfs_add (HotplugEvent *hotplug_event, HalDevice *d)
 			 parent,
 			 hotplug_event->un.devfs.handler, 
 			 (void *) hotplug_event);
+	 return;
+
+out:
+	g_object_unref (hotplug_event->d);
+	hotplug_event_end ((void *) hotplug_event);
+
+	return;
 }
 
 static void
@@ -133,6 +139,8 @@ hotplug_event_begin_devfs (HotplugEvent *hotplug_event)
 	} else if (hotplug_event->action == HOTPLUG_ACTION_REMOVE) {
 		hotplug_event_begin_devfs_remove (hotplug_event, d);
 	} else {
+		HAL_ERROR (("unsupported action %d", hotplug_event->action));
+		g_object_unref (hotplug_event->d);
 		hotplug_event_end ((void *) hotplug_event);
 	}
 }
@@ -148,6 +156,7 @@ hotplug_event_begin (HotplugEvent *hotplug_event)
 
 	default:
 		HAL_ERROR (("Unknown hotplug event type %d", hotplug_event->type));
+		g_object_unref (hotplug_event->d);
 		hotplug_event_end ((void *) hotplug_event);
 		break;
 	}

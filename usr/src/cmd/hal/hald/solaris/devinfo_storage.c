@@ -9,8 +9,6 @@
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
 #endif
@@ -604,7 +602,7 @@ devinfo_lofi_add_major(HalDevice *parent, di_node_t node, char *devfs_path, char
         di_minor_t minor;
         dev_t   dev;
         char    *minor_path = NULL;
-        char    *devpath, *devlink;
+        char    *devlink = NULL;
 
 	driver_name = di_driver_name (node);
 	if ((driver_name == NULL) || (strcmp (driver_name, "lofi") != 0)) {
@@ -1114,6 +1112,11 @@ static void
 devinfo_volume_hotplug_begin_add (HalDevice *d, HalDevice *parent, DevinfoDevHandler *handler, void *end_token)
 {
 	HAL_INFO(("Preprobing volume udi=%s", hal_device_get_udi (d)));
+
+	if (parent == NULL) {
+		HAL_INFO (("no parent %s", hal_device_get_udi (d)));
+		goto skip;
+	}
 
 	if (hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("Ignoring volume: parent's info.ignore is TRUE"));

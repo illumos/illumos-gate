@@ -23,38 +23,10 @@
 # Use is subject to license terms.
 #
 #
-# usr/src/lib/hal/libhal/Makefile.com
-#
 
-LIBRARY =	libhal.a
-VERS =		.1.0.0
-VERS_MAJ =	.1
-OBJECTS =	libhal.o
-LIBPCSRC =	hal.pc
+include ../Makefile.com
+include ../../../Makefile.lib.64
 
-include ../../Makefile.com
+LIBDIR = $(LIBDIR64)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -ldbus-1
-$(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	$(HAL_CONFIG_CPPFLAGS)
-CPPFLAGS +=	-DGETTEXT_PACKAGE=\"$(HAL_GETTEXT_PACKAGE)\" -DENABLE_NLS
-
-ROOTMAJLINK =	$(ROOTLIBDIR)/$(LIBRARY:.a=.so)$(VERS_MAJ)
-ROOTMAJLINK64 =	$(ROOTLIBDIR64)/$(LIBRARY:.a=.so)$(VERS_MAJ)
-
-.KEEP_STATE:
-
-all:		$(LIBS)
-
-$(ROOTMAJLINK):
-	-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
-
-$(ROOTMAJLINK64):
-	-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
-
-include $(SRC)/lib/Makefile.targ
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64) $(ROOTLIBPC64) $(ROOTMAJLINK64)

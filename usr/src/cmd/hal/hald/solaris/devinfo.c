@@ -289,16 +289,21 @@ devinfo_callouts_preprobing_done (HalDevice *d, gpointer userdata1, gpointer use
 void
 hotplug_event_begin_add_devinfo (HalDevice *d, HalDevice *parent, DevinfoDevHandler *handler, void *end_token)
 {
+	HotplugEvent *hotplug_event = (HotplugEvent *)end_token;
+
 	HAL_INFO(("Preprobing udi=%s", hal_device_get_udi (d)));
+
+	if (parent == NULL && (strcmp(hotplug_event->un.devfs.devfs_path, "/") != 0)) {
+		HAL_ERROR (("Parent is NULL, devfs_path=%s", hotplug_event->un.devfs.devfs_path));
+
+		goto skip;
+	}
+
 
 	if (parent != NULL && hal_device_property_get_bool (parent, "info.ignore")) {
 		HAL_INFO (("Ignoring device since parent has info.ignore==TRUE"));
 
-		if (hal_device_store_find (hald_get_tdl (), hal_device_get_udi (d)))
-			hal_device_store_remove (hald_get_tdl (), d);
-
-		hotplug_event_end (end_token);
-		return;
+		goto skip;
 	}
 
 	if (hal_device_store_find (hald_get_tdl (), hal_device_get_udi (d)) == NULL) {
@@ -312,6 +317,17 @@ hotplug_event_begin_add_devinfo (HalDevice *d, HalDevice *parent, DevinfoDevHand
 
         /* Run preprobe callouts */
         hal_util_callout_device_preprobe (d, devinfo_callouts_preprobing_done, end_token, handler);
+
+	return;
+
+skip:
+	if (hal_device_store_find (hald_get_tdl (), hal_device_get_udi (d)))
+		hal_device_store_remove (hald_get_tdl (), d);
+
+	g_object_unref (d);
+	hotplug_event_end (end_token);
+
+	return;
 }
 
 void

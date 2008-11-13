@@ -1,14 +1,13 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Licensed under the Academic Free License version 2.1
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 prefix=/usr
 exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
+libdir=__LIBDIR__
 includedir=${prefix}/include
 
 Name: hal-storage
