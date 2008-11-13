@@ -81,7 +81,7 @@ interface_t INTERFACES[] = {
 	    ib_header_len, interpret_ib, B_TRUE },
 
 	/* ipnet */
-	{ DL_IPNET, INT_MAX, 0, 2, IPV4_VERSION, IPV6_VERSION,
+	{ DL_IPNET, INT_MAX, 1, 1, IPV4_VERSION, IPV6_VERSION,
 	    ipnet_header_len, interpret_ipnet, B_TRUE },
 
 	{ (uint_t)-1, 0, 0, 0, 0, NULL, NULL, B_FALSE }

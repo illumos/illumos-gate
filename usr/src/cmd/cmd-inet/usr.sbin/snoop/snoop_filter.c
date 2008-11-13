@@ -1359,10 +1359,8 @@ static match_type_t ipnet_match_types[] = {
 	 * m_offset is an offset beyond the offset op, which is why
 	 * the offset is zero for when snoop needs to check an ethertype.
 	 */
-	"ip",		0,  2, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
-	-1,	OP_OFFSET_ETHERTYPE,
-	"ip6",		0,  2, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
-	-1,	OP_OFFSET_ETHERTYPE,
+	"ip",		0,  1, IPV4_VERSION,    -1,	OP_OFFSET_ETHERTYPE,
+	"ip6",		0,  1, IPV6_VERSION,    -1,	OP_OFFSET_ETHERTYPE,
 	"tcp",		9,  1, IPPROTO_TCP,	 0,	OP_OFFSET_LINK,
 	"tcp",		6,  1, IPPROTO_TCP,	 1,	OP_OFFSET_LINK,
 	"udp",		9,  1, IPPROTO_UDP,	 0,	OP_OFFSET_LINK,
