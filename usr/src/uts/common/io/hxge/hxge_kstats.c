@@ -71,6 +71,7 @@ typedef enum {
 	RDC_STAT_RCR_INVALIDS,
 	RDC_STAT_RCRTO,
 	RDC_STAT_RCRTHRES,
+	RDC_STAT_PKT_DROP,
 	RDC_STAT_END
 } hxge_rdc_stat_index_t;
 
@@ -94,6 +95,7 @@ hxge_kstat_index_t hxge_rdc_stats[] = {
 	{RDC_STAT_RCR_INVALIDS, KSTAT_DATA_ULONG, "rdc_rcr_invalids"},
 	{RDC_STAT_RCRTO, KSTAT_DATA_ULONG, "rdc_rcrto"},
 	{RDC_STAT_RCRTHRES, KSTAT_DATA_ULONG, "rdc_rcrthres"},
+	{RDC_STAT_PKT_DROP, KSTAT_DATA_ULONG, "rdc_pkt_drop"},
 	{RDC_STAT_END, NULL, NULL}
 };
 
@@ -470,6 +472,7 @@ hxge_rdc_stat_update(kstat_t *ksp, int rw)
 	rdc_kstatsp->rcr_invalids.value.ul = statsp->rcr_invalids;
 	rdc_kstatsp->rcr_to.value.ul = statsp->rcr_to;
 	rdc_kstatsp->rcr_thresh.value.ul = statsp->rcr_thres;
+	rdc_kstatsp->pkt_drop.value.ul = statsp->pkt_drop;
 
 	HXGE_DEBUG_MSG((hxgep, KST_CTL, " <== hxge_rdc_stat_update"));
 	return (0);

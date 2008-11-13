@@ -2578,7 +2578,7 @@ hxge_tx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 		    HXGE_FM_EREPORT_TDMC_TDR_PREF_CPL_TO);
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    "==> hxge_tx_err_evnts(channel %d): "
-		    "fatal error: config_partition_err", channel));
+		    "fatal error: tdr_pref_cpl_to", channel));
 		txchan_fatal = B_TRUE;
 	}
 

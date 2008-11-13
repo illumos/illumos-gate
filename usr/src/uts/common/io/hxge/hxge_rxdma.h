@@ -274,6 +274,8 @@ typedef struct _hxge_rx_ring_stats_t {
 	uint32_t 	rcr_invalids;		/* rcr invalids */
 	uint32_t 	rcr_to;			/* rcr_to */
 	uint32_t 	rcr_thres;		/* rcr_thres */
+	/* Packets dropped in order to prevent rbr_empty condition */
+	uint32_t 	pkt_drop;
 	rdc_errlog_t	errlog;
 } hxge_rx_ring_stats_t, *p_hxge_rx_ring_stats_t;
 
@@ -472,7 +474,7 @@ hxge_status_t hxge_init_rxdma_channel_cntl_stat(p_hxge_t hxgep,
 	uint16_t channel, rdc_stat_t *cs_p);
 hxge_status_t hxge_enable_rxdma_channel(p_hxge_t hxgep,
 	uint16_t channel, p_rx_rbr_ring_t rbr_p, p_rx_rcr_ring_t rcr_p,
-	p_rx_mbox_t mbox_p);
+	p_rx_mbox_t mbox_p, int n_init_kick);
 hxge_status_t hxge_rxdma_hw_mode(p_hxge_t hxgep, boolean_t enable);
 int hxge_rxdma_get_ring_index(p_hxge_t hxgep, uint16_t channel);
 hxge_status_t hxge_rxdma_handle_sys_errors(p_hxge_t hxgep);

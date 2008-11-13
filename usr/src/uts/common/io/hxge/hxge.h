@@ -438,6 +438,7 @@ typedef struct _hxge_rdc_kstat {
 
 	kstat_named_t	rcr_to;
 	kstat_named_t	rcr_thresh;
+	kstat_named_t	pkt_drop;
 } hxge_rdc_kstat_t, *p_hxge_rdc_kstat_t;
 
 typedef struct _hxge_rdc_sys_kstat {
