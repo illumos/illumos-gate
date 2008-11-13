@@ -11713,7 +11713,8 @@ fcp_commoncap(struct scsi_address *ap, char *cap,
 			break;
 
 		case SCSI_CAP_LUN_RESET:
-			rval = plun->lun_cap;
+			rval = ((plun->lun_cap & FCP_LUN_CAP_RESET) != 0) ?
+			    TRUE : FALSE;
 			break;
 
 		default:
