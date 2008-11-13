@@ -37,8 +37,6 @@
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * man
  * links to apropos, whatis, and catman
@@ -446,7 +444,7 @@ main(int argc, char *argv[])
 		case 'c':	/* n|troff compatibility */
 			if (no_sroff)
 				(void) fprintf(stderr, gettext(
-					"catman: SGML conversion not "
+				    "catman: SGML conversion not "
 				    "available -- -c flag ignored\n"));
 			else
 				compargs++;
@@ -484,7 +482,7 @@ main(int argc, char *argv[])
 	if (compargs && (nowhatis || whatonly || troffit)) {
 		(void) fprintf(stderr, "%s\n", gettext(CATMAN_USAGE));
 		(void) fprintf(stderr, gettext(
-			"-c option cannot be used with [-w][-n][-t]\n"));
+		    "-c option cannot be used with [-w][-n][-t]\n"));
 		exit(2);
 	}
 
@@ -637,8 +635,8 @@ build_manpath(char **pathv, int flags)
 		if (access(q[0], R_OK|X_OK) != 0) {
 			if (catmando) {
 				(void) fprintf(stderr,
-					gettext("%s is not accessible.\n"),
-					q[0]);
+				    gettext("%s is not accessible.\n"),
+				    q[0]);
 				(void) fflush(stderr);
 			}
 		} else {
@@ -748,16 +746,16 @@ getsect(struct man_node *manp, char **pv)
  * ex. /usr/share/man: derived from PATH, MANSECTS=,1b
  */
 				(void) printf(gettext(
-					"%s: derived from PATH, MANSECTS=%s\n"),
-						manp->path, sections);
+				    "%s: derived from PATH, MANSECTS=%s\n"),
+				    manp->path, sections);
 			} else {
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
  * ex. /usr/share/man: from -M option, MANSECTS=,1,2,3c
  */
 				(void) fprintf(stdout, gettext(
-					"%s: from -M option, MANSECTS=%s\n"),
-						manp->path, sections);
+				    "%s: from -M option, MANSECTS=%s\n"),
+				    manp->path, sections);
 			}
 		}
 		manp->secv = split(++sections, ',');
@@ -774,7 +772,7 @@ getsect(struct man_node *manp, char **pv)
  */
 		if (debug)
 			(void) fprintf(stdout, gettext(
-				"%s: from %s, MANSECTS=%s\n"),
+			    "%s: from %s, MANSECTS=%s\n"),
 			    manp->path, CONFIG, sections);
 		manp->secv = split(sections, ',');
 
@@ -868,7 +866,7 @@ get_all_sect(struct man_node *manp)
 		if (entries == maxentries) {
 			maxentries += MAXTOKENS;
 			manp->secv = (char **)realloc(manp->secv,
-				sizeof (char *) * maxentries);
+			    sizeof (char *) * maxentries);
 			if (manp->secv == NULL)
 				malloc_error();
 			p = manp->secv + entries;
@@ -928,7 +926,7 @@ catman(struct man_node *manp, char **argv, int argc)
  */
 		if (debug)
 			(void) fprintf(stdout, gettext(
-				"\nmandir path = %s\n"), p->path);
+			    "\nmandir path = %s\n"), p->path);
 		ndirs = 0;
 
 		/*
@@ -944,8 +942,8 @@ catman(struct man_node *manp, char **argv, int argc)
 				ndirs = getdirs(ldir, &dv, 1);
 				if (ndirs != 0) {
 					changed = argc ?
-						makecat(ldir, argv, argc) :
-						makecat(ldir, dv, ndirs);
+					    makecat(ldir, argv, argc) :
+					    makecat(ldir, dv, ndirs);
 					/* release memory by getdirs */
 					for (i = 0; i < ndirs; i++) {
 						free(dv[i]);
@@ -958,8 +956,8 @@ catman(struct man_node *manp, char **argv, int argc)
 			defaultmandir = 1;
 			ndirs = getdirs(p->path, &dv, 1);
 			changed = argc ?
-				makecat(p->path, argv, argc) :
-				makecat(p->path, dv, ndirs);
+			    makecat(p->path, argv, argc) :
+			    makecat(p->path, dv, ndirs);
 			/* release memory allocated by getdirs */
 			for (i = 0; i < ndirs; i++) {
 				free(dv[i]);
@@ -976,16 +974,16 @@ catman(struct man_node *manp, char **argv, int argc)
 				/* just count the number of ndirs */
 				if ((ndirs = getdirs(ldir, NULL, 0)) != 0) {
 					(void) sprintf(cmdbuf,
-						"/usr/bin/sh %s %s",
-						MAKEWHATIS, ldir);
+					    "/usr/bin/sh %s %s",
+					    MAKEWHATIS, ldir);
 					(void) sys(cmdbuf);
 				}
 			}
 			/* whatis database of the default man dir */
 			/* will be always built in C locale. */
 			(void) sprintf(cmdbuf,
-				"/usr/bin/sh %s %s",
-				MAKEWHATIS, p->path);
+			    "/usr/bin/sh %s %s",
+			    MAKEWHATIS, p->path);
 			(void) sys(cmdbuf);
 		}
 		/* release memory allocated by addlocale() */
@@ -1013,11 +1011,11 @@ makecat(char *path, char **dv, int ndirs)
 
 	for (i = fmt = 0; i < ndirs; i++) {
 		(void) snprintf(mandir, MAXPATHLEN, "%s/%s%s",
-				path, MANDIRNAME, dv[i]);
+		    path, MANDIRNAME, dv[i]);
 		(void) snprintf(smandir, MAXPATHLEN, "%s/%s%s",
-				path, SGMLDIR, dv[i]);
+		    path, SGMLDIR, dv[i]);
 		(void) snprintf(catdir, MAXPATHLEN, "%s/%s%s",
-				path, subdirs[1], dv[i]);
+		    path, subdirs[1], dv[i]);
 		dirp = strrchr(mandir, '/') + 1;
 		sdirp = strrchr(smandir, '/') + 1;
 
@@ -1050,7 +1048,7 @@ makecat(char *path, char **dv, int ndirs)
  */
 			if (debug)
 				(void) fprintf(stdout, gettext("mkdir %s\n"),
-					catdir);
+				    catdir);
 			else {
 				if (mkdir(catdir, 0755) < 0) {
 					perror(catdir);
@@ -1080,7 +1078,7 @@ makecat(char *path, char **dv, int ndirs)
 					continue;
 
 				if (format(path, sdirp, (char *)0, d->d_name)
-					> 0)
+				    > 0)
 					fmt++;
 			}
 		}
@@ -1091,7 +1089,7 @@ makecat(char *path, char **dv, int ndirs)
 					continue;
 
 				if (format(path, dirp, (char *)0, d->d_name)
-					> 0)
+				    > 0)
 					fmt++;
 			}
 		}
@@ -1137,7 +1135,7 @@ locale is %s, search in %s\n"), localedir, path);
 	if (flag) {
 		/* allocate memory for dirv */
 		*dirv = (char **)malloc(sizeof (char *) *
-			maxentries);
+		    maxentries);
 		if (*dirv == NULL)
 			malloc_error();
 		dv = *dirv;
@@ -1176,7 +1174,7 @@ locale is %s, search in %s\n"), localedir, path);
 				int entries = maxentries;
 				maxentries += MAXTOKENS;
 				*dirv = (char **)realloc(*dirv,
-					sizeof (char *) * maxentries);
+				    sizeof (char *) * maxentries);
 				if (*dirv == NULL)
 					malloc_error();
 				dv = *dirv + entries;
@@ -1277,13 +1275,13 @@ lookup_windex(char *whatpath, char *word, char **secv)
 	if (apropos) {
 		word_len = strlen(word) + 1;
 		if ((word_wchar = (wchar_t *)malloc(sizeof (wchar_t) *
-			word_len)) == NULL) {
+		    word_len)) == NULL) {
 			malloc_error();
 		}
 		ret = mbstowcs(word_wchar, (const char *)word, word_len);
 		if (ret == (size_t)-1) {
 			(void) fprintf(stderr, gettext(
-				"Invalid character in keyword\n"));
+			    "Invalid character in keyword\n"));
 			exit(1);
 		}
 		while (fgetws(wbuf, BUFSIZ, fp) != NULL)
@@ -1322,8 +1320,8 @@ static int
 icmp(wchar_t *ws, wchar_t *wt)
 {
 	for (; (*ws == 0) ||
-		(*ws == (iswupper(*ws) ? *wt: towlower(*wt)));
-		ws++, wt++)
+	    (*ws == (iswupper(*ws) ? *wt: towlower(*wt)));
+	    ws++, wt++)
 		if (*ws == 0)
 			return (0);
 
@@ -1446,7 +1444,7 @@ split(char *s1, char sep)
 		if (entries == maxentries) {
 			maxentries += MAXTOKENS;
 			tokv = (char **)realloc(tokv,
-				maxentries * sizeof (char *));
+			    maxentries * sizeof (char *));
 			if (tokv == NULL)
 				malloc_error();
 			vp = tokv + entries;
@@ -1578,7 +1576,7 @@ cmp(const void *arg1, const void *arg2)
 
 	/* by section; sman always before man dirs */
 	if ((n = strcmp(*p1 + PLEN + (**p1 == 's' ? 1 : 0),
-		*p2 + PLEN + (**p2 == 's' ? 1 : 0))))
+	    *p2 + PLEN + (**p2 == 's' ? 1 : 0))))
 		return (n);
 
 	/* by prefix reversed */
@@ -1631,8 +1629,8 @@ manual(struct man_node *manp, char *name)
  */
 			if (debug)
 				(void) printf(gettext(
-					"localedir = %s, ldir = %s\n"),
-					localedir, ldir);
+				    "localedir = %s, ldir = %s\n"),
+				    localedir, ldir);
 			ndirs = getdirs(ldir, NULL, 0);
 			if (ndirs != 0) {
 				ldirs[0] = ldir;
@@ -1703,7 +1701,7 @@ mandir(char **secv, char *path, char *name)
  */
 		if (debug)
 			(void) fprintf(stdout, gettext(
-				" opendir on %s failed\n"), path);
+			    " opendir on %s failed\n"), path);
 		return;
 	}
 
@@ -1772,7 +1770,7 @@ mandir(char **secv, char *path, char *name)
 			 * the corresponding cat dir if it exists
 			 */
 			if (all && **dv == 'm' && *(dv+1) &&
-				eq(*(dv+1)+plen, *dv+plen))
+			    eq(*(dv+1)+plen, *dv+plen))
 					dv++;
 		}
 	}
@@ -1817,7 +1815,7 @@ sortdir(DIR *dp, char ***dirv)
 			if (entries == maxentries) {
 				maxentries += MAXDIRS;
 				*dirv = (char **)realloc(*dirv,
-					sizeof (char *) * maxentries);
+				    sizeof (char *) * maxentries);
 				if (*dirv == NULL)
 					malloc_error();
 				dv = *dirv + entries;
@@ -1952,7 +1950,7 @@ windex(char **secv, char *path, char *name)
  */
 	if (debug)
 		(void) fprintf(stdout, gettext(
-			" search in = %s file\n"), whatfile);
+		    " search in = %s file\n"), whatfile);
 
 	if (bfsearch(fp, matches, name, NULL) == 0) {
 		(void) fclose(fp);
@@ -2241,7 +2239,7 @@ compare(char *key, char *entry, char **secv)
 		mlen = mblen(s, mbcurmax);
 		if (mlen == -1) {
 			(void) fprintf(stderr, gettext(
-				"Invalid character in windex file.\n"));
+			    "Invalid character in windex file.\n"));
 			exit(1);
 		}
 		s += mlen;
@@ -2319,7 +2317,7 @@ format(char *path, char *dir, char *name, char *pg)
 		tmpsubdir = SGMLDIR;
 		++plen;
 		(void) sprintf(manpname_sgml, "%s/man%s/%s",
-			path, dir+plen, pg);
+		    path, dir+plen, pg);
 	} else
 		tmpsubdir = MANDIRNAME;
 
@@ -2339,13 +2337,13 @@ format(char *path, char *dir, char *name, char *pg)
  * ex.  unformatted = /usr/share/man/ja/man3s/printf.3s
  */
 	DPRINTF(gettext(
-		"      unformatted = %s\n"), catonly ? "" : manpname);
+	    "      unformatted = %s\n"), catonly ? "" : manpname);
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
  * ex.  formatted = /usr/share/man/ja/cat3s/printf.3s
  */
 	DPRINTF(gettext(
-		"      formatted = %s\n"), catpname);
+	    "      formatted = %s\n"), catpname);
 
 	/*
 	 * Take care of indirect references to other man pages;
@@ -2373,7 +2371,7 @@ format(char *path, char *dir, char *name, char *pg)
 			if (*soed && errno == ENOENT) {
 				(void) fprintf(stderr,
 				    gettext("Can't find referent of "
-					".so in %s\n"), soed);
+				    ".so in %s\n"), soed);
 				(void) fflush(stderr);
 				return (-1);
 			}
@@ -2400,7 +2398,7 @@ so_again:	if (++socount > SOLIMIT) {
 		if ((check_flag == 1) && ((new_s = strrchr(s, '/')) != NULL)) {
 				new_s++;
 				(void) sprintf(s, "%s%s/%s",
-					tmpsubdir, dir+plen, new_s);
+				    tmpsubdir, dir+plen, new_s);
 		}
 
 		cp = strrchr(s, '\n');
@@ -2460,7 +2458,7 @@ so_again:	if (++socount > SOLIMIT) {
 
 		if (!catmando && !debug && !check_flag) {
 			(void) fprintf(stderr, gettext(
-					"Reformatting page.  Please Wait..."));
+			    "Reformatting page.  Please Wait..."));
 			if (sargs && (newsection != NULL) &&
 			    (*newsection != '\0')) {
 				(void) fprintf(stderr, gettext(
@@ -2476,8 +2474,8 @@ so_again:	if (++socount > SOLIMIT) {
 		 */
 
 		if (!no_sroff && catmando &&
-			match(tmpsubdir, MANDIRNAME, PLEN) &&
-			stat(smantmpname, &smansb) >= 0)
+		    match(tmpsubdir, MANDIRNAME, PLEN) &&
+		    stat(smantmpname, &smansb) >= 0)
 			return (1);
 
 		/*
@@ -2510,10 +2508,10 @@ so_again:	if (++socount > SOLIMIT) {
 			sgml_flag = 1;
 			if (defaultmandir && *localedir) {
 				(void) sprintf(cbp, "LC_MESSAGES=C %s %s ",
-					SROFF_CMD, manpname);
+				    SROFF_CMD, manpname);
 			} else {
 				(void) sprintf(cbp, "%s %s ",
-					SROFF_CMD, manpname);
+				    SROFF_CMD, manpname);
 			}
 			cbp += strlen(cbp);
 		} else if (*dir == 's') {
@@ -2545,7 +2543,7 @@ so_again:	if (++socount > SOLIMIT) {
 				if (pp->p_tag == 0) {
 					(void) fprintf(stderr,
 					    gettext("unknown preprocessor "
-						"specifier %c\n"), *ptp);
+					    "specifier %c\n"), *ptp);
 					(void) fflush(stderr);
 					return (-1);
 				}
@@ -2554,8 +2552,8 @@ so_again:	if (++socount > SOLIMIT) {
 				 * Add it to the pipeline.
 				 */
 				(void) sprintf(cbp, "%s %s |",
-					troffit ? pp->p_troff : pp->p_nroff,
-					pipestage++ == 0 ? manpname : "-");
+				    troffit ? pp->p_troff : pp->p_nroff,
+				    pipestage++ == 0 ? manpname : "-");
 				cbp += strlen(cbp);
 
 				/*
@@ -2594,8 +2592,8 @@ so_again:	if (++socount > SOLIMIT) {
  */
 				if (debug)
 					(void) printf(gettext(
-						"\nlocale macros = %s "),
-						macros);
+					    "\nlocale macros = %s "),
+					    macros);
 				if (stat(macros, &statb) < 0)
 					(void) strcpy(macros, TMAC_AN);
 /*
@@ -2604,11 +2602,12 @@ so_again:	if (++socount > SOLIMIT) {
  */
 				if (debug)
 					(void) printf(gettext(
-						"\nmacros = %s\n"),
-						macros);
+					    "\nmacros = %s\n"),
+					    macros);
 			}
 		}
 
+		tmpdir[0] = '\0';
 		if (sgml_flag == 1) {
 			if (check_flag == 0) {
 				strcpy(tmpdir, "/tmp/sman_XXXXXX");
@@ -2623,16 +2622,16 @@ so_again:	if (++socount > SOLIMIT) {
 					close(tempfd);
 
 				(void) sprintf(tmpbuf, "%s > %s",
-					cmdbuf, tmpdir);
+				    cmdbuf, tmpdir);
 				if (sys(tmpbuf)) {
 /*
  * TRANSLATION_NOTE - message for man -d or catman -p
  * Error message if sys(%s) failed
  */
 					(void) fprintf(stderr, gettext(
-						"sys(%s) fail!\n"), tmpbuf);
+					    "sys(%s) fail!\n"), tmpbuf);
 					(void) fprintf(stderr,
-						gettext(" aborted (sorry)\n"));
+					    gettext(" aborted (sorry)\n"));
 					(void) fflush(stderr);
 					/* release memory for tmpname */
 					if (!catmando) {
@@ -2657,7 +2656,7 @@ so_again:	if (++socount > SOLIMIT) {
 					/* if the file is empty, */
 					/* it's a fragment, do nothing */
 					if (fgets(manbuf, BUFSIZ-1, md)
-						== NULL) {
+					    == NULL) {
 						(void) fclose(md);
 						/* release memory for tmpname */
 						if (!catmando)
@@ -2667,7 +2666,7 @@ so_again:	if (++socount > SOLIMIT) {
 					(void) fclose(md);
 
 					if (strncmp(manbuf, DOT_SO,
-						sizeof (DOT_SO) - 1) == 0) {
+					    sizeof (DOT_SO) - 1) == 0) {
 						if (!compargs) {
 						check_flag = 1;
 						(void) unlink(tmpdir);
@@ -2685,7 +2684,7 @@ so_again:	if (++socount > SOLIMIT) {
 						    (md = fdopen(tempfd, "w"))
 						    == NULL) {
 							(void) fprintf(stderr,
-							gettext(
+							    gettext(
 							    "%s: null file\n"),
 							    tmpdir);
 							(void) fflush(stderr);
@@ -2704,7 +2703,7 @@ so_again:	if (++socount > SOLIMIT) {
  * Error message if unable to get file name
  */
 				(void) fprintf(stderr,
-					gettext("file not found\n"));
+				    gettext("file not found\n"));
 				(void) fflush(stderr);
 				return (-1);
 				}
@@ -2714,25 +2713,25 @@ so_again:	if (++socount > SOLIMIT) {
 				}
 				if (catmando && compargs)
 					(void) sprintf(cmdbuf, "cat %s > %s",
-						tmpdir, manpname_sgml);
+					    tmpdir, manpname_sgml);
 				else
-(void) sprintf(cmdbuf, " cat %s | tbl | eqn | %s %s - %s > %s",
-	tmpdir, troffit ? troffcmd : "nroff -u0 -Tlp",
-	macros, troffit ? "" : " | col -x", tmpname);
+	(void) sprintf(cmdbuf, " cat %s | tbl | eqn | %s %s - %s > %s",
+	    tmpdir, troffit ? troffcmd : "nroff -u0 -Tlp",
+	    macros, troffit ? "" : " | col -x", tmpname);
 			} else
 				if (catmando && compargs)
 					(void) sprintf(cbp, " > %s",
-						manpname_sgml);
+					    manpname_sgml);
 				else
-(void) sprintf(cbp, " | tbl | eqn | %s %s - %s > %s",
-	troffit ? troffcmd : "nroff -u0 -Tlp",
-	macros, troffit ? "" : " | col -x", tmpname);
+	(void) sprintf(cbp, " | tbl | eqn | %s %s - %s > %s",
+	    troffit ? troffcmd : "nroff -u0 -Tlp",
+	    macros, troffit ? "" : " | col -x", tmpname);
 
 		} else
-(void) sprintf(cbp, "%s %s %s%s > %s",
-	troffit ? troffcmd : "nroff -u0 -Tlp",
-	macros, pipestage == 0 ? manpname : "-",
-	troffit ? "" : " | col -x", tmpname);
+	(void) sprintf(cbp, "%s %s %s%s > %s",
+	    troffit ? troffcmd : "nroff -u0 -Tlp",
+	    macros, pipestage == 0 ? manpname : "-",
+	    troffit ? "" : " | col -x", tmpname);
 
 		/* Reformat the page. */
 		if (sys(cmdbuf)) {
@@ -2741,7 +2740,7 @@ so_again:	if (++socount > SOLIMIT) {
  * Error message if sys(%s) failed
  */
 			(void) fprintf(stderr, gettext(
-				"sys(%s) fail!\n"), cmdbuf);
+			    "sys(%s) fail!\n"), cmdbuf);
 			(void) fprintf(stderr, gettext(" aborted (sorry)\n"));
 			(void) fflush(stderr);
 			(void) unlink(tmpname);
@@ -2751,7 +2750,8 @@ so_again:	if (++socount > SOLIMIT) {
 			return (-1);
 		}
 
-		(void) unlink(tmpdir);
+		if (tmpdir[0] != '\0')
+			(void) unlink(tmpdir);
 
 		if (catmando)
 			return (1);
@@ -2760,9 +2760,9 @@ so_again:	if (++socount > SOLIMIT) {
 		 * Attempt to move the cat page to its proper home.
 		 */
 		(void) sprintf(cmdbuf,
-			"trap '' 1 15; /usr/bin/mv -f %s %s 2> /dev/null",
-			tmpname,
-			catpname);
+		    "trap '' 1 15; /usr/bin/mv -f %s %s 2> /dev/null",
+		    tmpname,
+		    catpname);
 		if (sys(cmdbuf))
 			updatedcat = 0;
 		else if (debug == 0)
@@ -2916,7 +2916,7 @@ static void
 malloc_error(void)
 {
 	(void) fprintf(stderr, gettext(
-		"Memory allocation failed.\n"));
+	    "Memory allocation failed.\n"));
 	exit(1);
 }
 
@@ -2938,7 +2938,7 @@ sgmlcheck(const char *s1)
 			 */
 			s1++;
 			if (strncasecmp(s1, s2 + 1, SGML_SYMBOL_LEN - 1)
-				== 0) {
+			    == 0) {
 				/*
 				 * SGML_SYMBOL found
 				 */
