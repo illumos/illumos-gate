@@ -117,7 +117,7 @@ static int		bge_m_unicst_get(void *, mac_multi_addr_t *);
 static int		bge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int		bge_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *);
+    uint_t, uint_t, void *, uint_t *);
 static int		bge_set_priv_prop(bge_t *, const char *, uint_t,
     const void *);
 static int		bge_get_priv_prop(bge_t *, const char *, uint_t,
@@ -900,7 +900,7 @@ bge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	}
 	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
 	    ((pr_num == MAC_PROP_EN_100FDX_CAP) ||
-	    (pr_num == MAC_PROP_EN_100FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_100HDX_CAP) ||
 	    (pr_num == MAC_PROP_EN_10FDX_CAP) ||
 	    (pr_num == MAC_PROP_EN_10HDX_CAP))) {
 		/*
@@ -1066,9 +1066,10 @@ reprogram:
 	return (err);
 }
 
+/* ARGSUSED */
 static int
 bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
 	bge_t *bgep = barg;
 	int err = 0;
@@ -1080,20 +1081,40 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	if (pr_valsize == 0)
 		return (EINVAL);
 	bzero(pr_val, pr_valsize);
+
+	*perm = MAC_PROP_PERM_RW;
+
+	mutex_enter(bgep->genlock);
+	if ((bgep->param_loop_mode != BGE_LOOP_NONE &&
+	    bge_param_locked(pr_num)) ||
+	    ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
+	    ((pr_num == MAC_PROP_EN_100FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_100HDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_10FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_10HDX_CAP))) ||
+	    (DEVICE_5906_SERIES_CHIPSETS(bgep) &&
+	    (pr_num == MAC_PROP_EN_1000FDX_CAP) ||
+	    (pr_num == MAC_PROP_EN_1000HDX_CAP)))
+		*perm = MAC_PROP_PERM_READ;
+	mutex_exit(bgep->genlock);
+
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize < sizeof (link_duplex_t))
 				return (EINVAL);
 			bcopy(&bgep->param_link_duplex, pr_val,
 			    sizeof (link_duplex_t));
 			break;
 		case MAC_PROP_SPEED:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize < sizeof (speed))
 				return (EINVAL);
 			speed = bgep->param_link_speed * 1000000ull;
 			bcopy(&speed, pr_val, sizeof (speed));
 			break;
 		case MAC_PROP_STATUS:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize < sizeof (link_state_t))
 				return (EINVAL);
 			bcopy(&bgep->link_state, pr_val,
@@ -1132,6 +1153,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			bcopy(&fl, pr_val, sizeof (fl));
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
 					*(uint8_t *)pr_val = 0;
@@ -1152,6 +1174,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 				*(uint8_t *)pr_val = bgep->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				if (DEVICE_5906_SERIES_CHIPSETS(bgep))
 					*(uint8_t *)pr_val = 0;
@@ -1172,6 +1195,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 				*(uint8_t *)pr_val = bgep->param_en_1000hdx;
 			break;
 		case MAC_PROP_ADV_100FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val =
 				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
@@ -1188,6 +1212,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val =
 				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
@@ -1204,6 +1229,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val =
 				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
@@ -1220,6 +1246,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val =
 				    ((flags & CHIP_FLAG_SERDES) ? 0 : 1);
@@ -1237,6 +1264,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
 		case MAC_PROP_EN_100T4_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = 0;
 			break;
 		case MAC_PROP_PRIVATE:

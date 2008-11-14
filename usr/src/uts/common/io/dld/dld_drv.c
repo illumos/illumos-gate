@@ -436,6 +436,7 @@ drv_ioc_prop_common(dld_ioc_macprop_t *dipp, intptr_t arg, boolean_t set,
 			err = dls_devnet_setzid(dzp->diz_link, dzp->diz_zid);
 			goto done;
 		} else {
+			kdipp->pr_perm_flags = MAC_PROP_PERM_RW;
 			cp = (uchar_t *)kdipp->pr_val;
 			err = dls_devnet_getzid(linkid, (zoneid_t *)cp);
 			goto done;
@@ -451,6 +452,7 @@ drv_ioc_prop_common(dld_ioc_macprop_t *dipp, intptr_t arg, boolean_t set,
 				goto done;
 			}
 		} else {
+			kdipp->pr_perm_flags = MAC_PROP_PERM_RW;
 			dlap = (struct dlautopush *)kdipp->pr_val;
 			err = drv_ioc_getap(linkid, dlap);
 			goto done;
@@ -477,8 +479,9 @@ drv_ioc_prop_common(dld_ioc_macprop_t *dipp, intptr_t arg, boolean_t set,
 		err = mac_set_prop(dvp->dv_dlp->dl_mh, &macprop,
 		    kdipp->pr_val, kdipp->pr_valsize);
 	} else {
+		kdipp->pr_perm_flags = MAC_PROP_PERM_RW;
 		err = mac_get_prop(dvp->dv_dlp->dl_mh, &macprop,
-		    kdipp->pr_val, kdipp->pr_valsize);
+		    kdipp->pr_val, kdipp->pr_valsize, &kdipp->pr_perm_flags);
 	}
 
 	dls_vlan_rele(dvp);

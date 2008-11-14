@@ -1456,15 +1456,25 @@ vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu)
 	mac_prop_t	mp;
 	uint32_t	val;
 	int		rv;
+	uint_t		perm_flags = MAC_PROP_PERM_RW;
 	mp.mp_id = MAC_PROP_MTU;
 	mp.mp_name = mac_mtu_propname;
 	mp.mp_flags = 0;
 
 	/* Get the mtu of the physical device */
-	rv = mac_get_prop(vswp->mh, &mp, (void *)&val, sizeof (uint32_t));
+	rv = mac_get_prop(vswp->mh, &mp, (void *)&val, sizeof (uint32_t),
+	    &perm_flags);
 	if (rv != 0) {
 		cmn_err(CE_NOTE,
 		    "!vsw%d: Unable to get the mtu of the physical device:%s\n",
+		    vswp->instance, vswp->physname);
+		return;
+	}
+
+	/* Return if the mtu is read-only */
+	if (perm_flags != MAC_PROP_PERM_RW) {
+		cmn_err(CE_NOTE,
+		    "!vsw%d: Read-only mtu of the physical device:%s\n",
 		    vswp->instance, vswp->physname);
 		return;
 	}

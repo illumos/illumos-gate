@@ -539,7 +539,7 @@ void ieee80211_free(void *);
 int ieee80211_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
 int ieee80211_getprop(void *, const char *, mac_prop_id_t, uint_t, uint_t,
-    void *);
+    void *, uint_t *);
 
 #ifdef	__cplusplus
 }

@@ -56,6 +56,7 @@ typedef struct dladm_phys_attr {
 typedef enum {
 	DLADM_PROP_VAL_CURRENT = 1,
 	DLADM_PROP_VAL_DEFAULT,
+	DLADM_PROP_VAL_PERM,
 	DLADM_PROP_VAL_MODIFIABLE,
 	DLADM_PROP_VAL_PERSISTENT
 } dladm_prop_type_t;

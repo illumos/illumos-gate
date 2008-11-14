@@ -121,7 +121,7 @@ static int	afe_m_stat(void *, uint_t, uint64_t *);
 static int	afe_m_start(void *);
 static void	afe_m_stop(void *);
 static int	afe_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
-    uint_t, void *);
+    uint_t, void *, uint_t *);
 static int	afe_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
 static unsigned	afe_intr(caddr_t);
@@ -2816,7 +2816,7 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 /*ARGSUSED*/
 int
 afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
-    uint_t sz, void *val)
+    uint_t sz, void *val, uint_t *perm)
 {
 	afe_t		*afep = arg;
 	int		err = 0;
@@ -2825,8 +2825,10 @@ afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 	if (sz == 0)
 		return (EINVAL);
 
+	*perm = MAC_PROP_PERM_RW;
 	switch (num) {
 	case MAC_PROP_DUPLEX:
+		*perm = MAC_PROP_PERM_READ;
 		if (sz >= sizeof (link_duplex_t)) {
 			bcopy(&afep->afe_duplex, val, sizeof (link_duplex_t));
 		} else {
@@ -2835,6 +2837,7 @@ afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 		break;
 
 	case MAC_PROP_SPEED:
+		*perm = MAC_PROP_PERM_READ;
 		if (sz >= sizeof (uint64_t)) {
 			bcopy(&afep->afe_ifspeed, val, sizeof (uint64_t));
 		} else {
@@ -2858,30 +2861,50 @@ afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
 #endif
 
 	case MAC_PROP_ADV_100FDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_100fdx : afep->afe_adv_100fdx;
+		break;
 	case MAC_PROP_EN_100FDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_100fdx : afep->afe_adv_100fdx;
 		break;
 
 	case MAC_PROP_ADV_100HDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_100hdx : afep->afe_adv_100hdx;
+		break;
 	case MAC_PROP_EN_100HDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_100hdx : afep->afe_adv_100hdx;
 		break;
 
 	case MAC_PROP_ADV_10FDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_10fdx : afep->afe_adv_10fdx;
+		break;
 	case MAC_PROP_EN_10FDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_10fdx : afep->afe_adv_10fdx;
 		break;
 
 	case MAC_PROP_ADV_10HDX_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_10hdx : afep->afe_adv_10hdx;
+		break;
 	case MAC_PROP_EN_10HDX_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_10hdx : afep->afe_adv_10hdx;
 		break;
 
 	case MAC_PROP_ADV_100T4_CAP:
+		*perm = MAC_PROP_PERM_READ;
+		*(uint8_t *)val =
+		    dfl ? afep->afe_cap_100T4 : afep->afe_adv_100T4;
+		break;
 	case MAC_PROP_EN_100T4_CAP:
 		*(uint8_t *)val =
 		    dfl ? afep->afe_cap_100T4 : afep->afe_adv_100T4;

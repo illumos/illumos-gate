@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * functions to handle legacy ndd  ioctls
@@ -99,14 +96,30 @@ mac_ndd_get_names(mac_impl_t *mip, mblk_t *mp)
 	int size_out, i;
 	mblk_t *tmp;
 	mac_priv_prop_t *mpriv;
+	uint_t permflags;
+	int status;
+	uint64_t value;
 
 	if (!mac_add_name(mp, "?", MAC_PROP_PERM_READ))
 		return (-1);
 
 	/* first the known ndd mappings */
 	for (i = 0; i < mip->mi_type->mt_mappingcount; i++) {
+		permflags = MAC_PROP_PERM_RW;
+		if ((mip->mi_type->mt_mapping[i].mp_flags & MAC_PROP_MAP_KSTAT)
+		    != 0)
+			permflags = MAC_PROP_PERM_READ;
+		else {
+			status = mip->mi_callbacks->mc_getprop(mip->mi_driver,
+			    mip->mi_type->mt_mapping[i].mp_name,
+			    mip->mi_type->mt_mapping[i].mp_prop_id,
+			    0, mip->mi_type->mt_mapping[i].mp_valsize,
+			    &value, &permflags);
+			if (status != 0)
+				return (-1);
+		}
 		if (!mac_add_name(mp, mip->mi_type->mt_mapping[i].mp_name,
-		    mip->mi_type->mt_mapping[i].mp_flags))
+		    permflags))
 			return (-1);
 	}
 
@@ -172,6 +185,7 @@ mac_ndd_get_ioctl(mac_impl_t *mip, mblk_t *mp, int avail, int *rval)
 	uint16_t	u16;
 	uint32_t	u32;
 	uint64_t	u64;
+	uint_t		perm;
 
 	if (mp->b_cont == NULL || avail < 2)
 		return (EINVAL);
@@ -245,7 +259,8 @@ mac_ndd_get_ioctl(mac_impl_t *mip, mblk_t *mp, int avail, int *rval)
 		} else {
 			status = mip->mi_callbacks->mc_getprop(mip->mi_driver,
 			    name, mip->mi_type->mt_mapping[i].mp_prop_id, 0,
-			    mip->mi_type->mt_mapping[i].mp_valsize, value);
+			    mip->mi_type->mt_mapping[i].mp_valsize, value,
+			    &perm);
 			switch (mip->mi_type->mt_mapping[i].mp_valsize) {
 			case 1:
 				new_value = u8;
@@ -279,7 +294,7 @@ mac_ndd_get_ioctl(mac_impl_t *mip, mblk_t *mp, int avail, int *rval)
 	 */
 	(void) snprintf(priv_name, sizeof (priv_name), "_%s", name);
 	status = mip->mi_callbacks->mc_getprop(mip->mi_driver, priv_name,
-	    MAC_PROP_PRIVATE, 0, avail - 2, mp1->b_rptr);
+	    MAC_PROP_PRIVATE, 0, avail - 2, mp1->b_rptr, &perm);
 	if (status != 0)
 		goto get_done;
 

@@ -177,7 +177,7 @@ static boolean_t	nge_m_getcapab(void *, mac_capab_t, void *);
 static int		nge_m_setprop(void *, const char *, mac_prop_id_t,
 	uint_t, const void *);
 static int		nge_m_getprop(void *, const char *, mac_prop_id_t,
-	uint_t, uint_t, void *);
+	uint_t, uint_t, void *, uint_t *);
 static int		nge_set_priv_prop(nge_t *, const char *, uint_t,
 	const void *);
 static int		nge_get_priv_prop(nge_t *, const char *, uint_t,
@@ -1740,7 +1740,7 @@ reprogram:
 
 static int
 nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
 	nge_t *ngep = barg;
 	int err = 0;
@@ -1751,9 +1751,13 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	if (pr_valsize == 0)
 		return (EINVAL);
 
+	*perm = MAC_PROP_PERM_RW;
+
 	bzero(pr_val, pr_valsize);
+
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize >= sizeof (link_duplex_t)) {
 				bcopy(&ngep->param_link_duplex, pr_val,
 				    sizeof (link_duplex_t));
@@ -1761,6 +1765,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 				err = EINVAL;
 			break;
 		case MAC_PROP_SPEED:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize >= sizeof (uint64_t)) {
 				speed = ngep->param_link_speed * 1000000ull;
 				bcopy(&speed, pr_val, sizeof (speed));
@@ -1801,6 +1806,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 				err = EINVAL;
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
@@ -1815,6 +1821,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 0;
 			} else {
@@ -1822,6 +1829,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_EN_1000HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 0;
 			} else {
@@ -1829,6 +1837,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_100FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
@@ -1843,6 +1852,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
@@ -1857,6 +1867,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
@@ -1871,6 +1882,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			if (is_default) {
 				*(uint8_t *)pr_val = 1;
 			} else {
@@ -1886,6 +1898,7 @@ nge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
 		case MAC_PROP_EN_100T4_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = 0;
 			break;
 		case MAC_PROP_PRIVATE:

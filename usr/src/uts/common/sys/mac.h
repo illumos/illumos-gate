@@ -161,6 +161,15 @@ typedef enum {
  */
 #define	MAXMACADDRLEN	20
 
+/*
+ * Flags to figure out r/w status of legacy ndd props.
+ */
+#define	MAC_PROP_PERM_READ		0x0001
+#define	MAC_PROP_PERM_WRITE		0x0010
+#define	MAC_PROP_MAP_KSTAT		0x0100
+#define	MAC_PROP_PERM_RW		(MAC_PROP_PERM_READ|MAC_PROP_PERM_WRITE)
+#define	MAC_PROP_FLAGS_RK		(MAC_PROP_PERM_READ|MAC_PROP_MAP_KSTAT)
+
 #ifdef	_KERNEL
 
 typedef struct mac_stat_info_s {
@@ -362,7 +371,7 @@ typedef void		(*mac_close_t)(void *);
 typedef	int		(*mac_set_prop_t)(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 typedef	int		(*mac_get_prop_t)(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *);
+    uint_t, uint_t, void *, uint_t *);
 
 /*
  * Drivers must set all of these callbacks except for mc_resources,
@@ -773,15 +782,6 @@ typedef struct mac_ndd_mapping_s {
 #define	mp_prop_id	u_mp_id.u_id
 #define	mp_kstat	u_mp_id.u_kstat
 
-/*
- * Flags to figure out r/w status of legacy ndd props.
- */
-#define	MAC_PROP_PERM_READ		0x0001
-#define	MAC_PROP_PERM_WRITE		0x0010
-#define	MAC_PROP_MAP_KSTAT		0x0100
-#define	MAC_PROP_PERM_RW		(MAC_PROP_PERM_READ|MAC_PROP_PERM_WRITE)
-#define	MAC_PROP_FLAGS_RK		(MAC_PROP_PERM_READ|MAC_PROP_MAP_KSTAT)
-
 typedef struct mactype_register_s {
 	uint_t		mtr_version;	/* set by mactype_alloc() */
 	const char	*mtr_ident;
@@ -923,7 +923,7 @@ extern int			mactype_unregister(const char *);
 extern int			mac_set_prop(mac_handle_t, mac_prop_t *,
 				    void *, uint_t);
 extern int			mac_get_prop(mac_handle_t, mac_prop_t *,
-				    void *, uint_t);
+				    void *, uint_t, uint_t *);
 
 #endif	/* _KERNEL */
 

@@ -302,11 +302,11 @@ static	boolean_t nxge_m_getcapab(void *, mac_capab_t, void *);
 static int nxge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int nxge_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *);
+    uint_t, uint_t, void *, uint_t *);
 static int nxge_set_priv_prop(nxge_t *, const char *, uint_t,
     const void *);
 static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, uint_t,
-    void *);
+    void *, uint_t *);
 static int nxge_get_def_val(nxge_t *, mac_prop_id_t, uint_t, void *);
 
 static void nxge_niu_peu_reset(p_nxge_t nxgep);
@@ -4702,11 +4702,6 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			goto reprogram;
 
 		case MAC_PROP_MTU:
-			if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
-				err = EBUSY;
-				break;
-			}
-
 			cur_mtu = nxgep->mac.default_mtu;
 			bcopy(pr_val, &new_mtu, sizeof (new_mtu));
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -4715,6 +4710,10 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 
 			if (new_mtu == cur_mtu) {
 				err = 0;
+				break;
+			}
+			if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
+				err = EBUSY;
 				break;
 			}
 			if (new_mtu < NXGE_DEFAULT_MTU ||
@@ -4802,7 +4801,7 @@ reprogram:
 
 static int
 nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
 	nxge_t 		*nxgep = barg;
 	p_nxge_param_t	param_arr = nxgep->param_arr;
@@ -4819,6 +4818,8 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	if (pr_valsize == 0)
 		return (EINVAL);
 
+	*perm = MAC_PROP_PERM_RW;
+
 	if ((is_default) && (pr_num != MAC_PROP_PRIVATE)) {
 		err = nxge_get_def_val(nxgep, pr_num, pr_valsize, pr_val);
 		return (err);
@@ -4827,6 +4828,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = statsp->mac_stats.link_duplex;
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_getprop: duplex mode %d",
@@ -4836,6 +4838,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		case MAC_PROP_SPEED:
 			if (pr_valsize < sizeof (uint64_t))
 				return (EINVAL);
+			*perm = MAC_PROP_PERM_READ;
 			tmp = statsp->mac_stats.link_speed * 1000000ull;
 			bcopy(&tmp, pr_val, sizeof (tmp));
 			break;
@@ -4843,6 +4846,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		case MAC_PROP_STATUS:
 			if (pr_valsize < sizeof (link_state_t))
 				return (EINVAL);
+			*perm = MAC_PROP_PERM_READ;
 			if (!statsp->mac_stats.link_up)
 				ls = LINK_STATE_DOWN;
 			else
@@ -4867,6 +4871,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case MAC_PROP_ADV_1000FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_1000fdx].value;
 			break;
@@ -4876,6 +4881,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case MAC_PROP_ADV_100FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_100fdx].value;
 			break;
@@ -4885,6 +4891,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 
 		case MAC_PROP_ADV_10FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val =
 			    param_arr[param_anar_10fdx].value;
 			break;
@@ -4904,7 +4911,7 @@ nxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 
 		case MAC_PROP_PRIVATE:
 			err = nxge_get_priv_prop(nxgep, pr_name, pr_flags,
-			    pr_valsize, pr_val);
+			    pr_valsize, pr_val, perm);
 			break;
 		default:
 			err = EINVAL;
@@ -5211,7 +5218,7 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 static int
 nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
-    uint_t pr_valsize, void *pr_val)
+    uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
 	p_nxge_param_t	param_arr = nxgep->param_arr;
 	char		valstr[MAXNAMELEN];
@@ -5226,6 +5233,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	if (strcmp(pr_name, "_function_number") == 0) {
 		if (is_default)
 			return (ENOTSUP);
+		*perm = MAC_PROP_PERM_READ;
 		(void) snprintf(valstr, sizeof (valstr), "%d",
 		    nxgep->function_num);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5241,6 +5249,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	if (strcmp(pr_name, "_fw_version") == 0) {
 		if (is_default)
 			return (ENOTSUP);
+		*perm = MAC_PROP_PERM_READ;
 		(void) snprintf(valstr, sizeof (valstr), "%s",
 		    nxgep->vpd_info.ver);
 		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
@@ -5256,6 +5265,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	if (strcmp(pr_name, "_port_mode") == 0) {
 		if (is_default)
 			return (ENOTSUP);
+		*perm = MAC_PROP_PERM_READ;
 		switch (nxgep->mac.portmode) {
 		case PORT_1G_COPPER:
 			(void) snprintf(valstr, sizeof (valstr), "1G copper %s",
@@ -5326,6 +5336,7 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 	if (strcmp(pr_name, "_hot_swap_phy") == 0) {
 		if (is_default)
 			return (ENOTSUP);
+		*perm = MAC_PROP_PERM_READ;
 		(void) snprintf(valstr, sizeof (valstr), "%s",
 		    nxgep->hot_swappable_phy ?
 		    "yes" : "no");

@@ -2892,7 +2892,8 @@ mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 }
 
 int
-mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
+mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
+    uint_t *perm)
 {
 	int err = ENOTSUP;
 	mac_impl_t *mip = (mac_impl_t *)mh;
@@ -2906,6 +2907,10 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 		if ((macprop->mp_flags & MAC_PROP_DEFAULT) == 0) {
 			mac_sdu_get(mh, NULL, &sdu);
 			bcopy(&sdu, val, sizeof (sdu));
+			if (mac_set_prop(mh, macprop, val, sizeof (sdu)) != 0)
+				*perm = MAC_PROP_PERM_READ;
+			else
+				*perm = MAC_PROP_PERM_RW;
 			return (0);
 		} else {
 			if (mip->mi_info.mi_media == DL_ETHER) {
@@ -2921,6 +2926,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 	case MAC_PROP_STATUS:
 		if (valsize < sizeof (link_state))
 			return (EINVAL);
+		*perm = MAC_PROP_PERM_READ;
 		link_state = mac_link_get(mh);
 		bcopy(&link_state, val, sizeof (link_state));
 		return (0);
@@ -2930,7 +2936,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 	if (mip->mi_callbacks->mc_callbacks & MC_GETPROP) {
 		err = mip->mi_callbacks->mc_getprop(mip->mi_driver,
 		    macprop->mp_name, macprop->mp_id, macprop->mp_flags,
-		    valsize, val);
+		    valsize, val, perm);
 	}
 	return (err);
 }

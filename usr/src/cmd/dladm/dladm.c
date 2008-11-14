@@ -746,6 +746,7 @@ static char *def_show_wifi_fields =
 typedef enum {
 	LINKPROP_LINK,
 	LINKPROP_PROPERTY,
+	LINKPROP_PERM,
 	LINKPROP_VALUE,
 	LINKPROP_DEFAULT,
 	LINKPROP_POSSIBLE
@@ -755,6 +756,7 @@ static print_field_t linkprop_fields[] = {
 /* name,	header,		field width,  index,		cmdtype */
 { "link",	"LINK",		12,	LINKPROP_LINK,		CMD_TYPE_ANY},
 { "property",	"PROPERTY",	15,	LINKPROP_PROPERTY,	CMD_TYPE_ANY},
+{ "perm",	"PERM",		4,	LINKPROP_PERM,		CMD_TYPE_ANY},
 { "value",	"VALUE",	14,	LINKPROP_VALUE,		CMD_TYPE_ANY},
 { "default",	"DEFAULT",	14,	LINKPROP_DEFAULT, 	CMD_TYPE_ANY},
 { "possible",	"POSSIBLE",	20,	LINKPROP_POSSIBLE,	CMD_TYPE_ANY}}
@@ -4383,7 +4385,8 @@ print_linkprop(datalink_id_t linkid, show_linkprop_state_t *statep,
 		} else if (status == DLADM_STATUS_NOTSUP ||
 		    statep->ls_persist) {
 			valcnt = 1;
-			if (type == DLADM_PROP_VAL_CURRENT)
+			if (type == DLADM_PROP_VAL_CURRENT ||
+			    type == DLADM_PROP_VAL_PERM)
 				propvals = &unknown;
 			else
 				propvals = &notsup;
@@ -4452,6 +4455,13 @@ linkprop_callback(print_field_t *pf, void *ls_arg)
 		 * the persistent value of a non-persistable link property,
 		 * simply skip the output.
 		 */
+		if (statep->ls_status != DLADM_STATUS_OK)
+			goto skip;
+		ptr = statep->ls_line;
+		break;
+	case LINKPROP_PERM:
+		print_linkprop(linkid, statep, propname,
+		    DLADM_PROP_VAL_PERM, "%s", &ptr);
 		if (statep->ls_status != DLADM_STATUS_OK)
 			goto skip;
 		ptr = statep->ls_line;
@@ -4545,7 +4555,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	uint_t			nfields;
 	boolean_t		o_arg = B_FALSE;
 	char			*all_fields =
-	    "link,property,value,default,possible";
+	    "link,property,perm,value,default,possible";
 
 	fields_str = all_fields;
 

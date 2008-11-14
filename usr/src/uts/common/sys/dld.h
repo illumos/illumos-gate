@@ -230,6 +230,7 @@ typedef struct dld_ioc_macprop_s {
 	uint_t		pr_flags;
 	datalink_id_t	pr_linkid;
 	mac_prop_id_t	pr_num;
+	uint_t		pr_perm_flags;
 	char    	pr_name[MAXLINKPROPNAME];
 	uint_t		pr_valsize;		/* sizeof pr_val */
 	char		pr_val[1];

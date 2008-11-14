@@ -273,7 +273,7 @@ static int	wpi_m_setprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
 static int	wpi_m_getprop(void *arg, const char *pr_name,
     mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_lenth,
-    void *wldp_buf);
+    void *wldp_buf, uint_t *);
 static void	wpi_destroy_locks(wpi_sc_t *sc);
 static int	wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type);
 static void	wpi_thread(wpi_sc_t *sc);
@@ -2301,15 +2301,16 @@ wpi_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 /*
  * Callback functions for get/set properties
  */
+/* ARGSUSED */
 static int
 wpi_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_name,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
 {
 	int		err = 0;
 	wpi_sc_t	*sc = (wpi_sc_t *)arg;
 
 	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_name,
-	    pr_flags, wldp_length, wldp_buf);
+	    pr_flags, wldp_length, wldp_buf, perm);
 
 	return (err);
 }

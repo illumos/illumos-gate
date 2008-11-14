@@ -280,7 +280,7 @@ static void	rum_m_ioctl(void *, queue_t *, mblk_t *);
 static int	rum_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	rum_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *);
+    uint_t, uint_t, void *, uint_t *);
 
 static mac_callbacks_t rum_m_callbacks = {
 	MC_IOCTL | MC_SETPROP | MC_GETPROP,
@@ -2096,13 +2096,13 @@ rum_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 static int
 rum_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
 {
 	struct rum_softc *sc = (struct rum_softc *)arg;
 	int err;
 
 	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf);
+	    pr_flags, wldp_length, wldp_buf, perm);
 
 	return (err);
 }

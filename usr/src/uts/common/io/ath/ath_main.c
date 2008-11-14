@@ -221,7 +221,7 @@ static void	ath_m_ioctl(void *, queue_t *, mblk_t *);
 static int	ath_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int	ath_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *);
+    uint_t, uint_t, void *, uint_t *);
 
 static mac_callbacks_t ath_m_callbacks = {
 	MC_IOCTL | MC_SETPROP | MC_GETPROP,
@@ -1780,15 +1780,16 @@ ath_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 
 	return (err);
 }
+/* ARGSUSED */
 static int
 ath_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t pr_flags, uint_t wldp_length, void *wldp_buf)
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
 {
 	ath_t	*asc = arg;
 	int	err = 0;
 
 	err = ieee80211_getprop(&asc->asc_isc, pr_name, wldp_pr_num,
-	    pr_flags, wldp_length, wldp_buf);
+	    pr_flags, wldp_length, wldp_buf, perm);
 
 	return (err);
 }

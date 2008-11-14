@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 /*
@@ -83,11 +83,11 @@ static void e1000g_m_ioctl(void *, queue_t *, mblk_t *);
 static int e1000g_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int e1000g_m_getprop(void *, const char *, mac_prop_id_t,
-    uint_t, uint_t, void *);
+    uint_t, uint_t, void *, uint_t *);
 static int e1000g_set_priv_prop(struct e1000g *, const char *, uint_t,
     const void *);
 static int e1000g_get_priv_prop(struct e1000g *, const char *, uint_t,
-    uint_t, void *);
+    uint_t, void *, uint_t *);
 static void e1000g_init_locks(struct e1000g *);
 static void e1000g_destroy_locks(struct e1000g *);
 static int e1000g_identify_hardware(struct e1000g *);
@@ -2686,10 +2686,6 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			Adapter->param_en_1000fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_1000fdx = *(uint8_t *)pr_val;
 			goto reset;
-		case MAC_PROP_EN_1000HDX_CAP:
-			Adapter->param_en_1000hdx = *(uint8_t *)pr_val;
-			Adapter->param_adv_1000hdx = *(uint8_t *)pr_val;
-			goto reset;
 		case MAC_PROP_EN_100FDX_CAP:
 			Adapter->param_en_100fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_100fdx = *(uint8_t *)pr_val;
@@ -2742,6 +2738,7 @@ reset:
 		case MAC_PROP_ADV_100HDX_CAP:
 		case MAC_PROP_ADV_10FDX_CAP:
 		case MAC_PROP_ADV_10HDX_CAP:
+		case MAC_PROP_EN_1000HDX_CAP:
 		case MAC_PROP_STATUS:
 		case MAC_PROP_SPEED:
 		case MAC_PROP_DUPLEX:
@@ -2802,7 +2799,7 @@ reset:
 
 static int
 e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
 	struct e1000g *Adapter = arg;
 	struct e1000_fc_info *fc = &Adapter->shared.fc;
@@ -2813,6 +2810,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	if (pr_valsize == 0)
 		return (EINVAL);
 
+	*perm = MAC_PROP_PERM_RW;
+
 	bzero(pr_val, pr_valsize);
 	if ((pr_flags & MAC_PROP_DEFAULT) && (pr_num != MAC_PROP_PRIVATE)) {
 		return (e1000g_get_def_val(Adapter, pr_num,
@@ -2821,6 +2820,7 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 	switch (pr_num) {
 		case MAC_PROP_DUPLEX:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize >= sizeof (link_duplex_t)) {
 				bcopy(&Adapter->link_duplex, pr_val,
 				    sizeof (link_duplex_t));
@@ -2828,6 +2828,7 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 				err = EINVAL;
 			break;
 		case MAC_PROP_SPEED:
+			*perm = MAC_PROP_PERM_READ;
 			if (pr_valsize >= sizeof (uint64_t)) {
 				tmp = Adapter->link_speed * 1000000ull;
 				bcopy(&tmp, pr_val, sizeof (tmp));
@@ -2858,36 +2859,43 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 				err = EINVAL;
 			break;
 		case MAC_PROP_ADV_1000FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_1000fdx;
 			break;
 		case MAC_PROP_EN_1000FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_1000hdx;
 			break;
 		case MAC_PROP_EN_1000HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_1000hdx;
 			break;
 		case MAC_PROP_ADV_100FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_100fdx;
 			break;
 		case MAC_PROP_EN_100FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_100fdx;
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_100hdx;
 			break;
 		case MAC_PROP_EN_100HDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_100hdx;
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_10fdx;
 			break;
 		case MAC_PROP_EN_10FDX_CAP:
 			*(uint8_t *)pr_val = Adapter->param_en_10fdx;
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_10hdx;
 			break;
 		case MAC_PROP_EN_10HDX_CAP:
@@ -2895,11 +2903,12 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
 		case MAC_PROP_EN_100T4_CAP:
+			*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_100t4;
 			break;
 		case MAC_PROP_PRIVATE:
 			err = e1000g_get_priv_prop(Adapter, pr_name,
-			    pr_flags, pr_valsize, pr_val);
+			    pr_flags, pr_valsize, pr_val, perm);
 			break;
 		default:
 			err = ENOTSUP;
@@ -3130,13 +3139,14 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 
 static int
 e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
-    uint_t pr_flags, uint_t pr_valsize, void *pr_val)
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
 {
 	int err = ENOTSUP;
 	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
 	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
+		*perm = MAC_PROP_PERM_READ;
 		if (is_default)
 			goto done;
 		value = Adapter->param_adv_pause;
@@ -3144,6 +3154,7 @@ e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
 		goto done;
 	}
 	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
+		*perm = MAC_PROP_PERM_READ;
 		if (is_default)
 			goto done;
 		value = Adapter->param_adv_asym_pause;
