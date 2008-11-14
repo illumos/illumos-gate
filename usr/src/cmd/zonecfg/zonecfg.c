@@ -6305,6 +6305,14 @@ revert_func(cmd_t *cmd)
 	if (zone_is_read_only(CMD_REVERT))
 		return;
 
+	if (!global_scope) {
+		zerr(gettext("You can only use %s in the global scope.\nUse"
+		    " '%s' to cancel changes to a resource specification."),
+		    cmd_to_str(CMD_REVERT), cmd_to_str(CMD_CANCEL));
+		saw_error = B_TRUE;
+		return;
+	}
+
 	if (zonecfg_check_handle(handle) != Z_OK) {
 		zerr(gettext("No changes to revert."));
 		saw_error = B_TRUE;
