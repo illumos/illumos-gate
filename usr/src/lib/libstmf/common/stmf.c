@@ -1705,7 +1705,7 @@ stmfGetTargetList(stmfDevidList **targetList)
 	 */
 	if (stmfIoctl.stmf_obuf_max_nentries > MAX_TARGET_PORT) {
 		fTargetListSize = stmfIoctl.stmf_obuf_max_nentries *
-		    sizeof (slist_lu_t);
+		    sizeof (slist_target_port_t);
 		fTargetList = realloc(fTargetList, fTargetListSize);
 		if (fTargetList == NULL) {
 			return (STMF_ERROR_NOMEM);
