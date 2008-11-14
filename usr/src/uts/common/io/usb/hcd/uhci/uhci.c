@@ -733,20 +733,11 @@ uhci_quiesce(dev_info_t *dip)
 	/* Disable interrupts */
 	Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
 
-	/* Wait for SOF time to handle the scheduled interrupt */
-	drv_usecwait(UHCI_TIMEWAIT);
-
 	/* Stop the Host Controller */
 	Set_OpReg16(USBCMD, 0);
 
-	/* Wait for SOF time to handle the scheduled interrupt */
-	drv_usecwait(UHCI_TIMEWAIT);
-
-	/* Set Global Suspend bit */
-	Set_OpReg16(USBCMD, USBCMD_REG_ENER_GBL_SUSPEND);
-
-	/* Wait for SOF time to handle the scheduled interrupt */
-	drv_usecwait(UHCI_TIMEWAIT);
+	/* Clear all status bits */
+	Set_OpReg16(USBSTS, Get_OpReg16(USBSTS) & UHCI_INTR_MASK);
 
 	return (DDI_SUCCESS);
 }
