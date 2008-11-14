@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <door.h>
 #include <errno.h>
 #include <assert.h>
@@ -224,8 +222,15 @@ i_dladm_phys_status(datalink_id_t linkid, uint32_t *flagsp)
 		/*
 		 * No active status, this link was removed. Update its status
 		 * in the daemon and delete all active linkprops.
+		 *
+		 * Note that the operation could fail. If it does, return
+		 * failure now since otherwise dladm_set_linkprop() might
+		 * call back to i_dladm_phys_status() recursively.
 		 */
-		(void) dladm_destroy_datalink_id(linkid, DLADM_OPT_ACTIVE);
+		status = dladm_destroy_datalink_id(linkid, DLADM_OPT_ACTIVE);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+
 		(void) dladm_set_linkprop(linkid, NULL, NULL, 0,
 		    DLADM_OPT_ACTIVE);
 

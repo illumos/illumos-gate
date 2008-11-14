@@ -1036,8 +1036,11 @@ dlmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 		}
 
 		eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-		if (eset == NULL || !priv_ismember(eset, PRIV_SYS_DL_CONFIG))
+		if ((eset == NULL) ||
+		    (!priv_ismember(eset, PRIV_SYS_DL_CONFIG) &&
+		    !priv_ismember(eset, PRIV_SYS_NET_CONFIG))) {
 			err = EACCES;
+		}
 		ucred_free(cred);
 		if (err != 0)
 			goto fail;
