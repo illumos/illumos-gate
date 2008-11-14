@@ -4231,7 +4231,8 @@ static const mdb_dcmd_t dcmds[] = {
 
 	/* from zone.c */
 	{ "zone", "?", "display kernel zone(s)", zoneprt },
-	{ "zsd", ":[zsd key]", "lookup zsd value from a key", zsd },
+	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
+	    "selected zones", zsd },
 
 	/* from bio.c */
 	{ "bufpagefind", ":addr", "find page_t on buf_t list", bufpagefind },
