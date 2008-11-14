@@ -22,10 +22,41 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
+# lib/pkcs11/libsoftcrypto/sun4u/Makefile.links
+#
+# Used when building links in /usr/platform/sun4u/lib/ and
+# /usr/platform/sun4u/lib/sparcv9/
+#
 
-include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
-
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+LINKED_PLATFORMS =		\
+		SUNW,Ultra-2 \
+		SUNW,Ultra-4 \
+		SUNW,Ultra-250 \
+		SUNW,Ultra-Enterprise \
+		SUNW,Ultra-Enterprise-10000 \
+		SUNW,UltraSPARC-IIi-Netract \
+		SUNW,UltraSPARC-IIe-NetraCT-40 \
+		SUNW,UltraSPARC-IIe-NetraCT-60 \
+		SUNW,Sun-Blade-100 \
+		SUNW,Sun-Blade-1000 \
+		SUNW,Sun-Blade-1500 \
+		SUNW,Sun-Blade-2500 \
+		SUNW,A70 \
+		SUNW,Sun-Fire \
+		SUNW,Sun-Fire-V215 \
+		SUNW,Sun-Fire-V240 \
+		SUNW,Sun-Fire-V250 \
+		SUNW,Sun-Fire-V440 \
+		SUNW,Sun-Fire-V445 \
+		SUNW,Sun-Fire-280R \
+		SUNW,Sun-Fire-15000 \
+		SUNW,Sun-Fire-880 \
+		SUNW,Sun-Fire-480R \
+		SUNW,Sun-Fire-V890 \
+		SUNW,Sun-Fire-V490 \
+		SUNW,Serverblade1 \
+		SUNW,Netra-T12 \
+		SUNW,Netra-T4 \
+		SUNW,Netra-CP2300 \
+		SUNW,Netra-CP3010 \
+		TAD,SPARCLE

@@ -22,10 +22,37 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
+# lib/pkcs11/libsoftcrypto/sun4v/Makefile.com
+#
 
-include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
+LIBRARY = libsoftcrypto_psr.a
+VERS= .1
+PLATFORM = sun4v
+MODULE = libsoftcrypto_psr.so.1
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+include $(SRC)/Makefile.psm
+include ../Makefile.links
+include ../../Makefile.com
+
+# Platform-specific settings
+ARCFOUR_PSM_OBJS=  arcfour_crypt.o
+ARCFOUR_PSM_SRC=   $(ARCFOUR_DIR)/sun4v/arcfour_crypt.c 
+SRCS= $(ARCFOUR_PSM_SRC)
+
+MAPFILES= ../mapfile-vers
+OBJECTS= $(ARCFOUR_PSM_OBJS)
+
+# Compiler settings
+sparc_XARCH =      -m32 -xarch=sparc
+sparcv9_XARCH =    -m64 -xarch=sparcvis
+
+# Niagara perf options as per $SRC/uts/sun4v/arcfour
+CFLAGS +=   -xO5 -xbuiltin=%all -dalign -D$(PLATFORM)
+CFLAGS64 += -D$(PLATFORM)
+ASFLAGS +=  -DPIC
+
+$(USR_PSM_LIB_DIR)/% := FILEMODE = 755
+
+pics/arcfour_crypt.o: $(ARCFOUR_DIR)/sun4v/arcfour_crypt.c
+	$(COMPILE.c) -o $@ $(ARCFOUR_DIR)/sun4v/arcfour_crypt.c
+	$(POST_PROCESS_O)

@@ -69,15 +69,26 @@ s none usr/platform/SUNW,Netra-T5440/sbin=../sun4v/sbin
 # create lib directory 
 #
 d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-T200/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-CP3060/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3260/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6320/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib 755 root bin
+d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,T5140/lib 755 root bin
+d none usr/platform/SUNW,T5140/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,USBRDT-5240/lib 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
+d none usr/platform/SUNW,Netra-T5220/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-T5440/lib 755 root bin
+d none usr/platform/SUNW,Netra-T5440/lib/sparcv9 755 root bin
+
 #
 # add binary and libraries for prtdiag
 #
@@ -109,6 +120,35 @@ s none usr/platform/SUNW,T5140/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,USBRDT-5240/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-T5220/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-T5440/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
+
+#
+# adding libsoftcrypto links
+#
+d none usr/platform/sun4v 755 root sys
+d none usr/platform/sun4v/lib 755 root bin
+d none usr/platform/sun4v/lib/sparcv9 755 root bin
+f none usr/platform/sun4v/lib/libsoftcrypto_psr.so.1 755 root bin
+f none usr/platform/sun4v/lib/sparcv9/libsoftcrypto_psr.so.1 755 root bin
+s none usr/platform/SUNW,Sun-Fire-T200/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-T200/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP3060/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP3060/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP3260/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP3260/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T5220/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T5220/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T5440/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T5440/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-T6300/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-T6300/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,T5140/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,T5140/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,USBRDT-5240/lib/libsoftcrypto_psr.so.1=../../sun4v/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,USBRDT-5240/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4v/lib/sparcv9/libsoftcrypto_psr.so.1
 
 #
 # platform-dependent boot object
@@ -164,8 +204,6 @@ s none usr/platform/SUNW,Netra-CP3060/sbin/trapstat=../../sun4v/sbin/trapstat
 #
 # add library for tsalarm
 #
-d none usr/platform/sun4v 755 root sys
-d none usr/platform/sun4v/lib 755 root bin
 f none usr/platform/sun4v/lib/libtsalarm.so.1 644 root bin
 s none usr/platform/sun4v/lib/libtsalarm.so=./libtsalarm.so.1
 d none usr/platform/sun4v/include 755 root bin

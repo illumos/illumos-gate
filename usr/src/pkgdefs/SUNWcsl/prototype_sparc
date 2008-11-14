@@ -327,6 +327,8 @@ f none usr/lib/sparcv9/libsmbios.so.1 755 root bin
 s none usr/lib/sparcv9/libsmbios.so=libsmbios.so.1
 s none usr/lib/sparcv9/libsocket.so.1=../../../lib/sparcv9/libsocket.so.1
 s none usr/lib/sparcv9/libsocket.so=../../../lib/sparcv9/libsocket.so.1
+f none usr/lib/sparcv9/libsoftcrypto.so.1 755 root bin
+s none usr/lib/sparcv9/libsoftcrypto.so=./libsoftcrypto.so.1
 s none usr/lib/sparcv9/libsysevent.so.1=../../../lib/sparcv9/libsysevent.so.1
 s none usr/lib/sparcv9/libsysevent.so=../../../lib/sparcv9/libsysevent.so.1
 s none usr/lib/sparcv9/libtermcap.so=../../../lib/sparcv9/libcurses.so.1

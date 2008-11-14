@@ -22,10 +22,26 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
+# lib/pkcs11/libsoftcrypto/sun4v/Makefile
+#
 
-include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
+include $(SRC)/lib/Makefile.lib
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+SUBDIRS = $(MACH) $(PLATFORMS)
+$(BUILD64)SUBDIRS += $(MACH64)
+
+all :=		TARGET= all
+check :=	TARGET= check
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+install :=	TARGET= install
+lint :=		TARGET= lint
+
+.PARALLEL: $(SUBDIRS)
+
+all check clean clobber install lint: $(SUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

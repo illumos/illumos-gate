@@ -22,10 +22,37 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
+# lib/pkcs11/libsoftcrypto/i386_hwcap1/Makefile
+#
+LIBRARY=	libsoftcrypto_hwcap1.a
+VERS= .1
+
+MODULE= libsoftcrypto_hwcap1.so.1
+
+BIGNUM_PSM_OBJS= bignum_i386.o bignum_i386_asm.o
+BIGNUM_PSM_SRC=	$(BIGNUM_DIR)/i386/bignum_i386_asm.s \
+		$(BIGNUM_DIR)/i386/bignum_i386.c
 
 include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+BIGNUM_FLAGS += -DMMX_MANAGE -DHWCAP -DPSR_MUL
+LINTFLAGS += $(BIGNUM_FLAGS)
+LDLIBS  += -lc
+
+$(ROOTHWCAPDIR)/% := FILEMODE= 755
+
+install:  all $(ROOTHWCAPDIR)/$(MODULE)
+
+pics/bignum_i386.o:	$(BIGNUM_DIR)/i386/bignum_i386.c
+	$(COMPILE.c) $(BIGNUM_FLAGS) -o $@ $(BIGNUM_DIR)/i386/bignum_i386.c
+	$(POST_PROCESS_O)
+
+pics/bignum_i386_asm.o:	$(BIGNUM_DIR)/i386/bignum_i386_asm.s
+	$(COMPILE.s) -o $@ $(BIGNUM_DIR)/i386/bignum_i386_asm.s
+	$(POST_PROCESS_O)
+
+$(ROOTHWCAPDIR): $(ROOTLIBDIR)
+	$(INS.dir)
+
+$(ROOTHWCAPDIR)/%: $(ROOTHWCAPDIR) %
+	$(INS.file)

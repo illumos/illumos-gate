@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/pkcs11/Makefile
 
 include ../Makefile.lib
@@ -36,8 +34,8 @@ ROOTHDRDIR =	$(ROOT)/usr/include/security
 CHECKHDRS =	$(HDRDIR)/cryptoki.h
 
 SUBDIRS = \
-	libpkcs11
-
+	libpkcs11	\
+	libsoftcrypto
 
 #
 # Don't build these for OpenSolaris, since they will be replaced by

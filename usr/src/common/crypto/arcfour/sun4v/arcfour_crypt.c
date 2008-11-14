@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "../arcfour.h"
 
 /* Initialize the key stream 'key' using the key value */
@@ -67,10 +65,10 @@ arcfour_key_init(ARCFour_key *key, uchar_t *keyval, int keyvallen)
 void
 arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 {
-	size_t ii, it;
-	unsigned long long in0, out0, merge = 0, merge0 = 0, merge1, mask = 0;
+	size_t ii;
+	unsigned long long in0, merge = 0, merge0 = 0, merge1, mask = 0;
 	uchar_t i, j, *base, jj, *base1, tmp;
-	unsigned int tmp0, tmp1, i_accum, count = 0, shift = 0, i1;
+	unsigned int tmp0, tmp1, i_accum, shift = 0, i1;
 
 
 /* EXPORT DELETE START */
@@ -253,6 +251,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					 * Speculation suceeded! Update [i]
 					 * in 2B chunk
 					 */
+					/* LINTED E_BAD_PTR_CAST_ALIGN */
 					*((unsigned short *) &base[i1]) =
 					    i_accum;
 
@@ -361,6 +360,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
 
+					/* LINTED E_BAD_PTR_CAST_ALIGN */
 					*((unsigned short *) &base[i1]) =
 					    i_accum;
 
@@ -432,6 +432,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
 
+					/* LINTED E_BAD_PTR_CAST_ALIGN */
 					*((unsigned short *) &base[jj]) =
 					    i_accum;
 
@@ -531,6 +532,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					    (unsigned long long)(base[tmp0]);
 
 				} else {
+
 					tmp1 = base[j];
 
 					i_accum = i_accum << 8;
@@ -541,6 +543,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 					tmp0 += tmp1;
 					tmp0 = tmp0 & 0xff;
 
+					/* LINTED E_BAD_PTR_CAST_ALIGN */
 					*((unsigned short *) &base[jj]) =
 					    i_accum;
 
@@ -553,6 +556,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 			 * Perform update to [out]
 			 * Remember could be alignment issues
 			 */
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			in0 = *((unsigned long long *) (&in[ii]));
 
 			merge1 = merge0 | (merge >> shift);
@@ -561,6 +565,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 			in0 = in0 ^ merge1;
 
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			*((unsigned long long *) (&out[ii])) = in0;
 		}
 

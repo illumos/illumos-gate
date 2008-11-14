@@ -22,10 +22,20 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
+# lib/pkcs11/libsoftcrypto/sun4u/sparc/Makefile
+#
+
+CLASS = 32
 
 include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+ASFLAGS +=   -xarch=v8plus
+LINTFLAGS += -D$(PLATFORM)
+
+install:  all $(SOFT_PSR_LINKS) $(USR_PSM_LIBS)
+
+include $(SRC)/Makefile.psm.targ
+
+pics/mont_mulf_asm.o: $(BIGNUM_DIR)/sun4u/mont_mulf_v8plus.s
+	$(COMPILE.s) -o $@ $(BIGNUM_DIR)/sun4u/mont_mulf_v8plus.s
+	$(POST_PROCESS_O)

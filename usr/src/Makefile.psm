@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # usr/src/Makefile.psm
 #
 # Makefile.psm, global definitions for platform specific modules
@@ -203,6 +201,7 @@ USR_PSM_SBIN_PROG=		$(PROG:%=$(USR_PSM_SBIN_DIR)/%)
 
 ROOT_PSM_LIBS=			$(LIBS:%=$(ROOT_PSM_LIB_DIR)/%)
 USR_PSM_LIBS=			$(LIBS:%=$(USR_PSM_LIB_DIR)/%)
+USR_PSM_LIBS64=			$(LIBS:%=$(USR_PSM_LIB64_DIR)/%)
 $(ROOT_PSM_LIB_DIR)/$(DYNLIB)	:= FILEMODE= 755
 $(ROOT_PSM_LIB64_DIR)/$(DYNLIB)	:= FILEMODE= 755
 $(USR_PSM_LIB_DIR)/$(DYNLIB)	:= FILEMODE= 755

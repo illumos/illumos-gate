@@ -64,6 +64,9 @@ usr/lib/llib-lcryptoutil		i386
 usr/lib/amd64/llib-lcryptoutil.ln	i386
 usr/include/cryptoutil.h		i386
 usr/include/libelfsign.h		i386
+usr/lib/llib-lsoftcrypto		i386
+usr/lib/llib-lsoftcrypto.ln		i386
+usr/lib/amd64/llib-lsoftcrypto.ln	i386
 #
 # The following files are used by the DHCP service, the
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).

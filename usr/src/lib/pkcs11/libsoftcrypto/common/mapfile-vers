@@ -22,10 +22,52 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
 
-include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+SUNWprivate {
+    global:
+	aes_alloc_keysched;
+	aes_copy_block;
+	aes_decrypt_block;
+	aes_decrypt_contiguous_blocks;
+	aes_encrypt_block;
+	aes_encrypt_contiguous_blocks;
+	aes_init_keysched;
+	arcfour_crypt;
+	arcfour_key_init;
+	big_One;
+	big_Two;
+	big_add;
+	big_bitlength;
+	big_cmp_abs;
+	big_copy;
+	big_div_pos;
+	big_ext_gcd_pos;
+	big_extend;
+	big_finish;
+	big_init1;
+	big_init;
+	big_modexp;
+	big_modexp_crt;
+	big_mul;
+	big_nextprime_pos;
+	big_sub;
+	big_sub_pos;
+	bignum2bytestring;
+	blowfish_alloc_keysched;
+	blowfish_decrypt_contiguous_blocks;
+	blowfish_encrypt_contiguous_blocks;
+	blowfish_init_keysched;
+	bytestring2bignum;
+	ctr_mode_final;
+	ctr_init_ctx;
+	des3_crunch_block;
+	des_alloc_keysched;
+	des_crunch_block;
+	des_decrypt_contiguous_blocks;
+	des_encrypt_contiguous_blocks;
+	des_init_keysched;
+	des_keycheck;
+    local:
+	*;
+};

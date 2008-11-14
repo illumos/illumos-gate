@@ -22,10 +22,18 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/pkcs11_softtoken/sparcv9/Makefile
+# lib/pkcs11/libsoftcrypto/sparcv9/Makefile
+#
+
+LIBRARY=	libsoftcrypto.a
+VERS= .1
 
 include ../Makefile.com
-include ../../../Makefile.lib.64
-CFLAGS64	+=	-Dsun4u
+include $(SRC)/lib/Makefile.lib.64
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+LDLIBS  += -lc
+LIBS += $(LINTLIB)
+
+DYNFLAGS +=     -Wl,-f/usr/platform/\$$PLATFORM/lib/$(MACH64)/$(DYNLIBPSR)
+
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

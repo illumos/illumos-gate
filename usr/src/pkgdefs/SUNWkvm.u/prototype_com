@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -164,40 +162,73 @@ s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libprtdiag_psr.so.1=../..
 # create lib directory for sun4u and for all other sun4u platforms
 #
 d none usr/platform/sun4u/lib 755 root bin
+d none usr/platform/sun4u/lib/sparcv9 755 root bin
 d none usr/platform/sun4u-us3/lib 755 root bin
 d none usr/platform/sun4u-opl/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
+d none usr/platform/SUNW,SPARC-Enterprise/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Ultra-2/lib 755 root bin
+d none usr/platform/SUNW,Ultra-2/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Ultra-250/lib 755 root bin
+d none usr/platform/SUNW,Ultra-250/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Ultra-4/lib 755 root bin
+d none usr/platform/SUNW,Ultra-4/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Ultra-Enterprise/lib 755 root bin
+d none usr/platform/SUNW,Ultra-Enterprise/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Ultra-Enterprise-10000/lib 755 root bin
+d none usr/platform/SUNW,Ultra-Enterprise-10000/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Blade-100/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-100/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Blade-1000/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-1000/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Blade-1500/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-1500/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Blade-2500/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-2500/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,A70/lib 755 root bin
+d none usr/platform/SUNW,A70/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V445/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V445/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V215/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V215/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V240/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V240/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V250/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V250/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V440/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V440/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-280R/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-280R/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-15000/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-15000/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-880/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-880/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-480R/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-480R/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V890/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V890/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V490/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V490/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Serverblade1/lib 755 root bin
+d none usr/platform/SUNW,Serverblade1/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-T4/lib 755 root bin 
+d none usr/platform/SUNW,Netra-T4/lib/sparcv9 755 root bin 
 d none usr/platform/SUNW,Netra-T12/lib 755 root bin 
+d none usr/platform/SUNW,Netra-T12/lib/sparcv9 755 root bin 
 d none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib 755 root bin
+d none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib 755 root bin
+d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib 755 root bin
+d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP2300/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3010/lib/sparcv9 755 root bin
 d none usr/platform/TAD,SPARCLE/lib 755 root bin
+d none usr/platform/TAD,SPARCLE/lib/sparcv9 755 root bin
 #
 # create sun4u/lib/cfgadm and links to it for each sun4u platform
 #
@@ -340,3 +371,74 @@ s none usr/platform/SUNW,Sun-Fire-V215/lib/librsc.so=../../SUNW,Sun-Fire-V240/li
 # make link for Netra-440 from Sun-Fire-V440, basically the same hardware in
 # a different case
 s none usr/platform/SUNW,Netra-440=SUNW,Sun-Fire-V440
+
+#
+# add libsoftcrypto library
+#
+f none usr/platform/sun4u/lib/libsoftcrypto_psr.so.1 755 root bin
+f none usr/platform/sun4u/lib/sparcv9/libsoftcrypto_psr.so.1 755 root bin
+
+s none usr/platform/SUNW,Ultra-2/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-2/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-4/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-4/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-250/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-250/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-Enterprise/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-Enterprise/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-Enterprise-10000/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Ultra-Enterprise-10000/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-100/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-100/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-1000/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-1000/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-1500/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-1500/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-2500/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Blade-2500/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,A70/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,A70/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V215/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V215/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V240/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V240/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V250/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V250/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V440/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V440/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V445/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V445/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-280R/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-280R/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-15000/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-15000/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-880/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-880/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-480R/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-480R/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V890/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V890/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V490/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Sun-Fire-V490/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Serverblade1/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Serverblade1/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T12/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T12/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T4/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-T4/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP2300/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP2300/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP3010/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/SUNW,Netra-CP3010/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+s none usr/platform/TAD,SPARCLE/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
+s none usr/platform/TAD,SPARCLE/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
+
+

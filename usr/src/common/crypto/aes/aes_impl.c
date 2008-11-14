@@ -101,7 +101,8 @@ extern int rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[],
 #define	AES_BYTE_SWAP
 #endif
 
-#ifndef	__amd64
+
+#if !defined(__amd64)
 /*
  *  Constant tables
  */
@@ -121,6 +122,8 @@ extern int rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[],
  */
 
 /* Encrypt Sbox constants (for the substitute bytes operation) */
+
+#ifndef sun4u
 
 static const uint32_t Te0[256] =
 {
@@ -397,6 +400,7 @@ static const uint32_t Te3[256] =
 	0xb0b0cb7bU, 0x5454fca8U, 0xbbbbd66dU, 0x16163a2cU
 };
 
+#endif /* !sun4u */
 static const uint32_t Te4[256] =
 {
 	0x63636363U, 0x7c7c7c7cU, 0x77777777U, 0x7b7b7b7bU,
@@ -739,6 +743,7 @@ static const uint32_t Td3[256] =
 	0xcb84617bU, 0x32b670d5U, 0x6c5c7448U, 0xb85742d0U
 };
 
+#ifndef sun4u
 
 static const uint32_t Td4[256] =
 {
@@ -808,6 +813,7 @@ static const uint32_t Td4[256] =
 	0x55555555U, 0x21212121U, 0x0c0c0c0cU, 0x7d7d7d7dU
 };
 
+#endif /* !sun4u */
 /* Rcon is Round Constant; used for encryption key expansion */
 static const uint32_t rcon[RC_LENGTH] =
 {

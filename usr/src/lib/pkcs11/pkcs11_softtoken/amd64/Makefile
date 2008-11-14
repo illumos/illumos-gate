@@ -22,56 +22,9 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/pkcs11/pkcs11_softtoken/amd64/Makefile
-
-AES_PSR_OBJECTS = aes_amd64.o aeskey.o
-ARCFOUR_PSR_OBJECTS = arcfour-x86_64.o
-DES_PSR_OBJECTS =
-RSA_PSR_OBJECTS =
-BIGNUM_PSR_OBJECTS = bignum_amd64.o bignum_amd64_asm.o
-BIGNUM_PSR_PICS = $(BIGNUM_PSR_OBJECTS:%=pics/%)
-BIGNUM_CFG = -DPSR_MUL
-BIGNUM_PSR_SRCS = \
-	$(BIGNUMDIR)/$(MACH64)/bignum_amd64.c \
-	$(BIGNUMDIR)/$(MACH64)/bignum_amd64_asm.s
-
-pics/bignum_amd64.o := amd64_COPTFLAG = -xO3
 
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
-#
-# Overrides
-#
-CLEANFILES	+= arcfour-x86_64.s
-
 install: all $(ROOTLIBS64) $(ROOTLINKS64)
-
-$(BIGNUM_PSR_PICS) := CFLAGS += $(C_BIGPICFLAGS) $(BIGNUM_CFG)
-
-LINTFLAGS64 += $(BIGNUM_CFG)
-
-pics/%.o: %.s
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
-
-arcfour-x86_64.s: $(ARCFOURDIR)/$(MACH64)/arcfour-x86_64.pl
-	$(PERL) $? $@
-
-pics/%.o: $(BIGNUMDIR)/$(MACH64)/%.c
-	$(COMPILE.c) -o $@ $(C_BIGPICFLAGS) $(BIGNUM_CFG) $<
-	$(POST_PROCESS_O)
-
-pics/%.o: $(BIGNUMDIR)/$(MACH64)/%.s
-	$(COMPILE.s) -o $@ $(AS_BIGPICFLAGS) $(BIGNUM_CFG) $<
-	$(POST_PROCESS_O)
-
-pics/%.o: $(AESDIR)/$(MACH64)/%.c
-	$(COMPILE.c) -o $@ $(AESDIR)/$(MACH64)/${@F:.o=.c}
-	$(POST_PROCESS_O)
-
-pics/%.o: $(AESDIR)/$(MACH64)/%.s
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
