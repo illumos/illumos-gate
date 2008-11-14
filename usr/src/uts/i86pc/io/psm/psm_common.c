@@ -955,12 +955,12 @@ acpi_restore_link_devices(void)
 int
 acpi_poweroff(void)
 {
-	extern int acpica_powering_off;
+	extern int acpica_use_safe_delay;
 	ACPI_STATUS status;
 
 	PSM_VERBOSE_POWEROFF(("acpi_poweroff: starting poweroff\n"));
 
-	acpica_powering_off = 1;
+	acpica_use_safe_delay = 1;
 
 	status = AcpiEnterSleepStatePrep(5);
 	if (status != AE_OK) {

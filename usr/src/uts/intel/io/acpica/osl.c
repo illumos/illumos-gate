@@ -92,8 +92,8 @@ static char *acpi_table_path = "/boot/acpi/tables/";
 static int scanning_d2a_map = 0;
 static int d2a_done = 0;
 
-/* set by acpi_poweroff() in PSMs */
-int acpica_powering_off = 0;
+/* set by acpi_poweroff() in PSMs and appm_ioctl() in acpippm for S3 */
+int acpica_use_safe_delay = 0;
 
 /* CPU mapping data */
 struct cpu_map_item {
@@ -650,15 +650,15 @@ void
 AcpiOsSleep(ACPI_INTEGER Milliseconds)
 {
 	/*
-	 * During kernel startup, before the first
-	 * tick interrupt has taken place, we can't call
-	 * delay; very late in kernel shutdown, clock interrupts
+	 * During kernel startup, before the first tick interrupt
+	 * has taken place, we can't call delay; very late in
+	 * kernel shutdown or suspend/resume, clock interrupts
 	 * are blocked, so delay doesn't work then either.
 	 * So we busy wait if lbolt == 0 (kernel startup)
-	 * or if psm_shutdown() has set acpi_powering_off to
-	 * a non-zero value.
+	 * or if acpica_use_safe_delay has been set to a
+	 * non-zero value.
 	 */
-	if ((ddi_get_lbolt() == 0) || acpica_powering_off)
+	if ((ddi_get_lbolt() == 0) || acpica_use_safe_delay)
 		drv_usecwait(Milliseconds * 1000);
 	else
 		delay(drv_usectohz(Milliseconds * 1000));

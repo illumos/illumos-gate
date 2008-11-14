@@ -50,6 +50,7 @@
  *	It is initially configured as a pseudo driver.
  */
 extern void pc_tod_set_rtc_offsets(ACPI_TABLE_FADT *);
+extern int acpica_use_safe_delay;
 
 /*
  * Configuration Function prototypes and data structures
@@ -423,6 +424,7 @@ appm_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		 * suspend to RAM (ie S3)
 		 */
 		PMD(PMD_SX, ("%s: cmd %x, arg %p\n", str, cmd, (void *)arg))
+		acpica_use_safe_delay = 1;
 		ret = acpi_enter_sleepstate(s3ap);
 		break;
 
@@ -432,6 +434,7 @@ appm_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		 */
 		PMD(PMD_SX, ("%s: cmd %x, arg %p\n", str, cmd, (void *)arg))
 		ret = acpi_exit_sleepstate(s3ap);
+		acpica_use_safe_delay = 0;
 		break;
 
 	default:
