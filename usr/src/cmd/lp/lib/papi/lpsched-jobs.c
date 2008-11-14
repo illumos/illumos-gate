@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdlib.h>
@@ -222,8 +220,10 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 				free(r->title);
 			r->title = strdup(buf);
 		}
-	} else	/* burst page is disabled via lp "option" */
+	} else if ((s != NULL) && (strcasecmp(s, "none") == 0)) {
+		/* burst page is disabled via lp "option" */
 		appendlist(&options, "nobanner");
+	}
 
 	/* Convert attribute "number-up" to mode group=n */
 	papiAttributeListGetInteger(attributes, NULL, "number-up", &numberUp);
