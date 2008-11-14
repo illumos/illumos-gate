@@ -3167,8 +3167,7 @@ nxge_hio_hostinfo_init(nxge_t *nxge, nxge_hio_vr_t *vr, ether_addr_t *macaddr)
  * 	vr	The Virtualization Region
  *
  * Notes:
- *	1. Remove the VR's alternate MAC address.
- *	1. Free (unbind) the RDC table allocated to this VR.
+ *	Remove the VR's alternate MAC address.
  *
  * Context:
  *	Service domain
@@ -3194,9 +3193,6 @@ nxge_hio_hostinfo_uninit(nxge_t *nxge, nxge_hio_vr_t *vr)
 
 	(void) nxge_m_mmac_remove(nxge, vr->slot);
 	vr->slot = -1;
-
-	(void) nxge_fzc_rdc_tbl_unbind(nxge, vr->rdc_tbl);
-	vr->rdc_tbl = (uint8_t)-1;
 }
 
 /* Initialize the RxMAC sub-block */
