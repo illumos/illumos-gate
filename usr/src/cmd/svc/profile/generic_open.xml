@@ -43,13 +43,6 @@
   <!--
       svc.startd(1M) services
   -->
-  <service name='system/console-login' version='1' type='service'>
-    <instance name='vt2' enabled='true'/>
-    <instance name='vt3' enabled='true'/>
-    <instance name='vt4' enabled='true'/>
-    <instance name='vt5' enabled='true'/>
-    <instance name='vt6' enabled='true'/>
-  </service>
   <service name='system/coreadm' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
@@ -92,9 +85,6 @@
     <instance name='default' enabled='true'/>
   </service>
   <service name='system/utmp' version='1' type='service'>
-    <instance name='default' enabled='true'/>
-  </service>
-  <service name='system/vtdaemon' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
   <service name='system/zones' version='1' type='service'>
