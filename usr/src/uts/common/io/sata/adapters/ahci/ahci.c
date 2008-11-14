@@ -296,20 +296,30 @@ static  struct modlinkage modlinkage = {
 	NULL
 };
 
+/* The following variables are watchdog handler related */
 static int ahci_watchdog_timeout = 5; /* 5 seconds */
 static int ahci_watchdog_tick;
 
+/*
+ * This static variable indicates the size of command table,
+ * and it's changeable with prdt number, which ahci_dma_prdt_number
+ * indicates.
+ */
 static size_t ahci_cmd_table_size;
+
+/*
+ * ahci_dma_prdt_number, ahci_msi_enabled and ahci_64bit_dma_addressed
+ * are global variables, and can be changed via /etc/system file.
+ */
 
 /* The number of Physical Region Descriptor Table(PRDT) in Command Table */
 int ahci_dma_prdt_number = AHCI_PRDT_NUMBER;
 
-/*
- * AHCI MSI tunable:
- *
- * MSI will be enabled in phase 2.
- */
+/* AHCI MSI is tunable */
 boolean_t ahci_msi_enabled = B_FALSE;
+
+/* 64-bit dma addressing is tunable */
+boolean_t ahci_64bit_dma_addressed = B_TRUE;
 
 #if AHCI_DEBUG
 uint32_t ahci_debug_flags = 0;
@@ -636,7 +646,14 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	attach_state |= AHCI_ATTACH_STATE_PCICFG_SETUP;
 
-	/* Check the pci configuration space, and set caps */
+	/*
+	 * Check the pci configuration space, and set caps. We also
+	 * handle the hardware defect in this function.
+	 *
+	 * For example, force ATI SB600/SB700/SB750 to use 32-bit dma
+	 * addressing since it doesn't support 64-bit dma though their
+	 * registers declare they support.
+	 */
 	if (ahci_config_space_init(ahci_ctlp) == AHCI_FAILURE) {
 		cmn_err(CE_WARN, "!ahci%d: ahci_config_space_init failed",
 		    instance);
@@ -726,7 +743,8 @@ intr_done:
 	ahci_ctlp->ahcictl_cmd_list_dma_attr = cmd_list_dma_attr;
 	ahci_ctlp->ahcictl_cmd_table_dma_attr = cmd_table_dma_attr;
 
-	if (ahci_ctlp->ahcictl_cap & AHCI_CAP_32BIT_DMA) {
+	if ((ahci_64bit_dma_addressed == B_FALSE) ||
+	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_32BIT_DMA)) {
 		ahci_ctlp->ahcictl_buffer_dma_attr.dma_attr_addr_hi =
 		    0xffffffffull;
 		ahci_ctlp->ahcictl_rcvd_fis_dma_attr.dma_attr_addr_hi =
@@ -2909,8 +2927,7 @@ out:
 }
 
 /*
- * Figure out which chip and set flag for VT8251; Also check
- * the power management capability.
+ *  Check the hardware defects and the power management capability.
  */
 static int
 ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
@@ -2956,14 +2973,14 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	}
 
 	/*
-	 * ATI SB600 (1002,4380) doesn't support 64-bit DMA addressing though it
-	 * declares support, so we need to set AHCI_CAP_32BIT_DMA flag to force
-	 * 32-bit DMA.
+	 * ATI SB600 (1002,4380) and SB700/750 (1002,4391) AHCI chipsets don't
+	 * support 64-bit DMA addressing though they declare the support,
+	 * so we need to set AHCI_CAP_32BIT_DMA flag to force 32-bit DMA.
 	 */
-	if (venid == 0x1002 && devid == 0x4380) {
+	if (venid == 0x1002 && (devid == 0x4380 || devid == 0x4391)) {
 		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
-		    "ATI SB600 cannot do 64-bit DMA though CAP indicates "
-		    "support, so force it to use 32-bit DMA");
+		    "ATI SB600/700/750 cannot do 64-bit DMA though CAP "
+		    "indicates support, so force it to use 32-bit DMA");
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_32BIT_DMA;
 	}
 
