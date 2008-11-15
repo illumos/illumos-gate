@@ -998,7 +998,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 
 		rc = cmlb_ioctl(dkp->dk_cmlbhandle, dev, cmd, arg, flag,
 		    credp, rvalp, 0);
-		if (cmd == DKIOCSVTOC)
+		if (cmd == DKIOCSVTOC || cmd == DKIOCSEXTVTOC)
 			cmdk_devid_setup(dkp);
 		return (rc);
 	}

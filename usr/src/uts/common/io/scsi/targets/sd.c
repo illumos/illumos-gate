@@ -21468,7 +21468,8 @@ skip_ready_valid:
 		if ((err == 0) &&
 		    ((cmd == DKIOCSETEFI) ||
 		    (un->un_f_pkstats_enabled) &&
-		    (cmd == DKIOCSAPART || cmd == DKIOCSVTOC))) {
+		    (cmd == DKIOCSAPART || cmd == DKIOCSVTOC ||
+		    cmd == DKIOCSEXTVTOC))) {
 
 			tmprval = cmlb_validate(un->un_cmlbhandle, CMLB_SILENT,
 			    (void *)SD_PATH_DIRECT);
@@ -21480,7 +21481,7 @@ skip_ready_valid:
 			}
 		}
 
-		if ((cmd == DKIOCSVTOC) ||
+		if ((cmd == DKIOCSVTOC || cmd == DKIOCSEXTVTOC) ||
 		    ((cmd == DKIOCSETEFI) && (tmprval == 0))) {
 
 			mutex_enter(SD_MUTEX(un));
