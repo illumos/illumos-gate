@@ -2062,6 +2062,12 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 			case MBX_REG_LOGIN:
 				control = mbox->un.varRegLogin.un.sp.bdeSize;
 				if (control == 0) {
+#ifdef NPIV_SUPPORT
+					/* Special handle for vport PLOGI */
+					if (hba->mbox_iocbq == (uint8_t *)1) {
+						hba->mbox_iocbq = NULL;
+					}
+#endif /* NPIV_SUPPORT */
 					goto done;
 				}
 				break;
@@ -2070,6 +2076,12 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 				control = mbox->un.varRegLogin.un.sp64.tus.f.
 				    bdeSize;
 				if (control == 0) {
+#ifdef NPIV_SUPPORT
+					/* Special handle for vport PLOGI */
+					if (hba->mbox_iocbq == (uint8_t *)1) {
+						hba->mbox_iocbq = NULL;
+					}
+#endif /* NPIV_SUPPORT */
 					goto done;
 				}
 				break;
@@ -2123,6 +2135,12 @@ emlxs_handle_mb_event(emlxs_hba_t *hba)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_failed_msg,
 			    "Limit reached. count=%d", port->node_count);
 		}
+#ifdef NPIV_SUPPORT
+		/* Special handle for vport PLOGI */
+		if (hba->mbox_iocbq == (uint8_t *)1) {
+			hba->mbox_iocbq = NULL;
+		}
+#endif /* NPIV_SUPPORT */
 		break;
 
 	case MBX_READ_LA:

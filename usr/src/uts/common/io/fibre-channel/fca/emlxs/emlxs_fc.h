@@ -1354,6 +1354,8 @@ typedef struct emlxs_hba {
 	uint16_t iocb_rsp_size;
 	uint32_t hc_copy;	/* local copy of HC register */
 
+	uint32_t io_poll_count;	/* Number of poll commands */
+				/* in progress */
 
 	/* IO Completion management */
 	uint32_t iodone_count;	/* Number of IO's on done queue */

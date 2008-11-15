@@ -2724,7 +2724,11 @@ emlxs_ct_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 		    CtCmd, size, iocb->ulpContext);
 	}
 
-	emlxs_log_ct_event(port, (uint8_t *)mp->virt, size, iocb->ulpContext);
+	if (emlxs_log_ct_event(port, (uint8_t *)mp->virt, size,
+	    iocb->ulpContext)) {
+		/* Abort the exchange */
+		emlxs_abort_ct_exchange(port, iocb->ulpContext);
+	}
 
 	return (0);
 

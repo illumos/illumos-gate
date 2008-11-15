@@ -61,14 +61,18 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno,
 			    (ndlp->nlp_tics[ringno] <
 			    (tics + hba->timer_tics))) ||
 			    !(ndlp->nlp_flag[ringno] & NLP_TIMER)) {
+
+				ndlp->nlp_tics[ringno] = hba->timer_tics + tics;
+				ndlp->nlp_flag[ringno] |= NLP_TIMER;
+
+				mutex_exit(&EMLXS_RINGTX_LOCK);
+
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_node_closed_msg,
 				    "node=%p did=%06x %s. timeout=%d updated.",
 				    ndlp, ndlp->nlp_DID,
 				    emlxs_ring_xlate(ringno), tics);
-
-				ndlp->nlp_tics[ringno] = hba->timer_tics + tics;
-				ndlp->nlp_flag[ringno] |= NLP_TIMER;
+				return;
 			}
 		}
 		mutex_exit(&EMLXS_RINGTX_LOCK);
@@ -79,16 +83,8 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno,
 	ndlp->nlp_flag[ringno] |= NLP_CLOSED;
 
 	if (tics) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
-		    "node=%p did=%06x %s. timeout=%d set.",
-		    ndlp, ndlp->nlp_DID, emlxs_ring_xlate(ringno), tics);
-
 		ndlp->nlp_tics[ringno] = hba->timer_tics + tics;
 		ndlp->nlp_flag[ringno] |= NLP_TIMER;
-	} else {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
-		    "node=%p did=%06x %s.", ndlp, ndlp->nlp_DID,
-		    emlxs_ring_xlate(ringno));
 	}
 
 	if (ndlp->nlp_next[ringno]) {
@@ -126,6 +122,16 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno,
 		ndlp->nlp_next[ringno] = NULL;
 	}
 	mutex_exit(&EMLXS_RINGTX_LOCK);
+	if (tics) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
+		    "node=%p did=%06x %s. timeout=%d set.",
+		    ndlp, ndlp->nlp_DID, emlxs_ring_xlate(ringno), tics);
+
+	} else {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
+		    "node=%p did=%06x %s.", ndlp, ndlp->nlp_DID,
+		    emlxs_ring_xlate(ringno));
+	}
 
 	return;
 
@@ -141,6 +147,7 @@ emlxs_node_open(emlxs_port_t *port, NODELIST * ndlp, uint32_t ringno)
 	NODELIST *nlp;
 	MAILBOXQ *mbox;
 	uint32_t i;
+	uint32_t logit = 0;
 
 	/* If node needs servicing, then add it to the ring queues */
 	mutex_enter(&EMLXS_RINGTX_LOCK);
@@ -162,13 +169,7 @@ emlxs_node_open(emlxs_port_t *port, NODELIST * ndlp, uint32_t ringno)
 
 	if ((ndlp->nlp_flag[ringno] & NLP_TIMER) && ndlp->nlp_tics[ringno] &&
 	    (ndlp->nlp_tics[ringno] <= hba->timer_tics)) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_opened_msg,
-		    "node=%p did=%06x %s. Timeout.", ndlp, ndlp->nlp_DID,
-		    emlxs_ring_xlate(ringno));
-	} else {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_opened_msg,
-		    "node=%p did=%06x %s.", ndlp, ndlp->nlp_DID,
-		    emlxs_ring_xlate(ringno));
+		logit = 1;
 	}
 
 	/* Clear the timer */
@@ -209,6 +210,12 @@ emlxs_node_open(emlxs_port_t *port, NODELIST * ndlp, uint32_t ringno)
 		}
 	}
 	mutex_exit(&EMLXS_RINGTX_LOCK);
+
+	if (logit) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_opened_msg,
+		    "node=%p did=%06x %s. Timeout.", ndlp, ndlp->nlp_DID,
+		    emlxs_ring_xlate(ringno));
+	}
 
 	/* If link attention needs to be cleared */
 	if ((hba->state == FC_LINK_UP) &&

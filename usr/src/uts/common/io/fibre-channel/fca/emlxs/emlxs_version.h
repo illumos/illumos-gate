@@ -32,10 +32,10 @@
 extern "C" {
 #endif
 
-#define	EMLXS_VERSION		"2.31n"
-#define	EMLXS_DATE_MINUTE	"00"	/* 00-59 */
-#define	EMLXS_DATE_HOUR		"13"	/* 00-23 */
-#define	EMLXS_DATE_DAY		"01"	/* 00-31 */
+#define	EMLXS_VERSION		"2.31p"
+#define	EMLXS_DATE_MINUTE	"30"	/* 00-59 */
+#define	EMLXS_DATE_HOUR		"16"	/* 00-23 */
+#define	EMLXS_DATE_DAY		"24"	/* 00-31 */
 #define	EMLXS_DATE_MONTH	"10"	/* 01-12 */
 #define	EMLXS_DATE_YEAR		"2008"	/* YYYY  */
 
@@ -59,4 +59,3 @@ char emlxs_label[] = EMLXS_LABEL;
 #endif
 
 #endif	/* _EMLXS_VERSION_H */
-

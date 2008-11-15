@@ -1650,8 +1650,14 @@ emlxs_offline(emlxs_hba_t *hba)
 	/* For safety flush every iotag list */
 	if (emlxs_iotag_flush(hba)) {
 		/* Pause here for the IO to flush */
-		DELAYMS(1000);
+		delay(drv_usectohz(1000));
 	}
+
+	/* Wait for poll command request to settle */
+	while (hba->io_poll_count > 0) {
+		delay(drv_usectohz(2000000));   /* 2 sec */
+	}
+
 	/* Interlock the adapter to take it down */
 	(void) emlxs_interlock(hba);
 
@@ -3315,6 +3321,28 @@ emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp,
 
 } /* emlxs_create_close_xri_cx() */
 
+
+void
+emlxs_abort_ct_exchange(emlxs_port_t *port, uint32_t rxid)
+{
+	emlxs_hba_t *hba = HBA;
+	RING *rp;
+	IOCBQ *iocbq;
+
+	rp = &hba->ring[FC_CT_RING];
+
+	/* Create the abort IOCB */
+	if (hba->state >= FC_LINK_UP) {
+		iocbq = emlxs_create_abort_xri_cx(port, NULL, rxid, rp,
+		    CLASS3, ABORT_TYPE_ABTS);
+	}
+	else
+	{
+		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, rp);
+	}
+	iocbq->port = port;
+	emlxs_issue_iocb_cmd(hba, rp, iocbq);
+}
 
 
 /* This must be called while holding the EMLXS_FCCTAB_LOCK */

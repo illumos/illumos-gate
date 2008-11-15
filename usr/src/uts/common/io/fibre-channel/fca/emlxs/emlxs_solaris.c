@@ -1673,8 +1673,14 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	(void) sprintf(port_info->pi_attrs.firmware_version, "%s (%s)",
 	    vpd->fw_version, vpd->fw_label);
 
-	(void) strcpy(port_info->pi_attrs.option_rom_version,
-	    vpd->fcode_version);
+#ifdef i386
+		sprintf(port_info->pi_attrs.option_rom_version,
+		    "Boot:%s", vpd->boot_version);
+#else   /* sparc */
+		sprintf(port_info->pi_attrs.option_rom_version,
+		    "Boot:%s Fcode:%s",
+		    vpd->boot_version, vpd->fcode_version);
+#endif  /* i386 */
 
 	(void) sprintf(port_info->pi_attrs.driver_version, "%s (%s)",
 	    emlxs_version, emlxs_revision);
@@ -2025,17 +2031,14 @@ emlxs_pkt_init(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
 	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
-	uint32_t pkt_flags;
 
 	if (!sbp) {
 		return (FC_FAILURE);
 	}
-	pkt_flags = sbp->pkt_flags;
 	bzero((void *) sbp, sizeof (emlxs_buf_t));
 
 	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *) hba->intr_arg);
-	sbp->pkt_flags = PACKET_VALID | PACKET_RETURNED |
-	    (pkt_flags & PACKET_ALLOCATED);
+	sbp->pkt_flags = PACKET_VALID | PACKET_RETURNED;
 	sbp->port = port;
 	sbp->pkt = pkt;
 	sbp->iocbq.sbp = sbp;
@@ -2503,6 +2506,10 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 	uint32_t att_bit;
 	emlxs_ring_t *rp;
 
+	mutex_enter(&EMLXS_PORT_LOCK);
+	hba->io_poll_count++;
+	mutex_exit(&EMLXS_PORT_LOCK);
+
 	/* Set thread timeout */
 	timeout = emlxs_timeout(hba, (pkt->pkt_timeout +
 	    (4 * hba->fc_ratov) + 60));
@@ -2592,7 +2599,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		timeout = emlxs_timeout(hba, 60);
 		(void) drv_getparm(LBOLT, &time);
 		while ((time < timeout) && sbp->flush_count > 0) {
-			delay(drv_usectohz(2000000));
+			delay(drv_usectohz(500000));
 			(void) drv_getparm(LBOLT, &time);
 		}
 
@@ -2619,7 +2626,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		timeout = emlxs_timeout(hba, 60);
 		(void) drv_getparm(LBOLT, &time);
 		while ((time < timeout) && sbp->flush_count > 0) {
-			delay(drv_usectohz(2000000));
+			delay(drv_usectohz(500000));
 			(void) drv_getparm(LBOLT, &time);
 		}
 
@@ -2661,6 +2668,10 @@ done:
 	mutex_enter(&sbp->mtx);
 	sbp->pkt_flags |= PACKET_RETURNED;
 	mutex_exit(&sbp->mtx);
+
+	mutex_enter(&EMLXS_PORT_LOCK);
+	hba->io_poll_count--;
+	mutex_exit(&EMLXS_PORT_LOCK);
 
 	/* Make ULP completion callback if required */
 	if (pkt->pkt_comp) {
@@ -3447,10 +3458,10 @@ begin:
 		}
 
 		if (!found) {
+			mutex_exit(&EMLXS_RINGTX_LOCK);
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
 			    "I/O not found in driver. sbp=%p flags=%x",
 			    sbp, sbp->pkt_flags);
-			mutex_exit(&EMLXS_RINGTX_LOCK);
 			goto done;
 		}
 		/* Check if node still needs servicing */
@@ -7696,7 +7707,6 @@ emlxs_send_fcp_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 } /* emlxs_send_fcp_status() */
 #endif	/* SFCT_SUPPORT */
 
-
 static int32_t
 emlxs_send_sequence(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
@@ -8238,7 +8248,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 #ifdef DHCHAP_SUPPORT
 			emlxs_dhc_init_sp(port, did,
-			    (SERV_PARM *)&els_pkt->un.logi, fcsp_msg);
+			    (SERV_PARM *)&els_pkt->un.logi, (char **)&fcsp_msg);
 #endif	/* DHCHAP_SUPPORT */
 
 			break;
@@ -8615,7 +8625,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 #ifdef DHCHAP_SUPPORT
 			emlxs_dhc_init_sp(port, did,
-			    (SERV_PARM *)&els_pkt->un.logi, fcsp_msg);
+			    (SERV_PARM *)&els_pkt->un.logi, (char **)&fcsp_msg);
 #endif	/* DHCHAP_SUPPORT */
 
 		}

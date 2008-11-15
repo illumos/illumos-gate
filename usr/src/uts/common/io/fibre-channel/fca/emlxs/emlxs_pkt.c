@@ -362,12 +362,15 @@ emlxs_pkt_alloc(emlxs_port_t *port, uint32_t cmdlen, uint32_t rsplen,
 		}
 		bzero(pkt->pkt_data, datalen);
 	}
-	if (emlxs_pkt_init((opaque_t)port, pkt, sleep) != FC_SUCCESS) {
-		goto failed;
-	}
-	/* Set the allocated flag */
+
 	sbp = PKT2PRIV(pkt);
-	sbp->pkt_flags |= PACKET_ALLOCATED;
+	bzero((void *)sbp, sizeof (emlxs_buf_t));
+
+	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *)hba->intr_arg);
+	sbp->pkt_flags = PACKET_VALID | PACKET_RETURNED | PACKET_ALLOCATED;
+	sbp->port = port;
+	sbp->pkt = pkt;
+	sbp->iocbq.sbp = sbp;
 
 	return (pkt);
 

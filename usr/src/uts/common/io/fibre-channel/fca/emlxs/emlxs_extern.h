@@ -67,7 +67,7 @@ extern uint32_t emlxs_msg_log_get(emlxs_hba_t *hba, emlxs_log_req_t *req,
 extern void emlxs_log_dump_event(emlxs_port_t *port, uint8_t *buffer,
 	uint32_t size);
 extern void emlxs_log_link_event(emlxs_port_t *port);
-extern void emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload,
+extern uint32_t emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload,
 	uint32_t size, uint32_t rxid);
 extern void emlxs_log_rscn_event(emlxs_port_t *port, uint8_t *payload,
 	uint32_t size);
@@ -168,7 +168,7 @@ extern void emlxs_dhc_auth_stop(emlxs_port_t *port, emlxs_node_t *node);
 extern int emlxs_dhc_auth_start(emlxs_port_t *port, emlxs_node_t *node,
 	uint8_t *sbp, uint8_t *ubp);
 extern void emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp,
-	char *msg);
+	char **msg);
 extern uint32_t emlxs_dhc_verify_login(emlxs_port_t *port, uint32_t sid,
 	SERV_PARM *sp);
 extern void emlxs_dhc_status(emlxs_port_t *port, emlxs_node_t *ndlp,
@@ -386,6 +386,7 @@ extern IOCBQ *emlxs_create_abort_xri_cx(emlxs_port_t *port, NODELIST *ndlp,
 	uint16_t xid, RING *rp, uint8_t class, int32_t flag);
 extern IOCBQ *emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp,
 	uint16_t xid, RING *rp);
+extern void emlxs_abort_ct_exchange(emlxs_port_t *port, uint32_t rxid);
 
 extern emlxs_buf_t *emlxs_chipq_get(RING *rp, uint16_t iotag);
 extern void emlxs_chipq_put(RING *rp, emlxs_buf_t *sbp);

@@ -203,6 +203,7 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 	uint32_t last;
 	uint32_t mask;
 	emlxs_msg_t *msg2;
+	uint32_t rxid;
 	uint32_t i;
 
 	/* Get the log file for this instance */
@@ -289,6 +290,12 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 			/* Check if this event has not been acquired */
 			if (log->count > (hba->hba_event.last_id + log->size)) {
 				hba->hba_event.missed++;
+
+				if (entry2->msg->mask == EVT_CT) {
+					/* Abort exchange */
+					rxid = *((uint32_t *)entry2->bp);
+					emlxs_abort_ct_exchange(port, rxid);
+				}
 			}
 		}
 		/* Free the old context buffer since we are about to erase it */
@@ -328,6 +335,12 @@ emlxs_msg_log(emlxs_port_t *port, const uint32_t fileno, const uint32_t line,
 		/* Check if this event has not been acquired */
 		if (log->count > (hba->hba_event.last_id + log->size)) {
 			hba->hba_event.missed++;
+
+			if (entry->msg->mask == EVT_CT) {
+				/* Abort exchange */
+				rxid = *((uint32_t *)entry->bp);
+				emlxs_abort_ct_exchange(port, rxid);
+			}
 		}
 	}
 	/* Free the old context buffer since we are about to erase it */
@@ -846,7 +859,7 @@ emlxs_log_rscn_event(emlxs_port_t *port, uint8_t *payload, uint32_t size)
 } /* emlxs_log_rscn_event() */
 
 
-void
+uint32_t
 emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload, uint32_t size,
     uint32_t rxid)
 {
@@ -857,7 +870,7 @@ emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload, uint32_t size,
 
 	/* Check if the event is being requested */
 	if (!(hba->log_events & EVT_CT)) {
-		return;
+		return (1);
 	}
 	if (size > MAX_CT_PAYLOAD) {
 		size = MAX_CT_PAYLOAD;
@@ -866,7 +879,7 @@ emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload, uint32_t size,
 
 	/* Save a copy of the payload for the event log */
 	if (!(bp = (uint8_t *)kmem_alloc(size, KM_NOSLEEP))) {
-		return;
+		return (1);
 	}
 	/*
 	 * Buffer Format: word[0] = RXID tag for outgoing reply to this CT
@@ -880,9 +893,13 @@ emlxs_log_ct_event(emlxs_port_t *port, uint8_t *payload, uint32_t size,
 	EMLXS_MSGF(EMLXS_CONTEXT_BP, bp, size, &emlxs_ct_event,
 	    "bp=%p size=%d rxid=%x", bp, size, rxid);
 
+	return (0);
+
+#else
+	return (1);
+
 #endif	/* DFC_SUPPORT */
 
-	return;
 
 } /* emlxs_log_ct_event() */
 

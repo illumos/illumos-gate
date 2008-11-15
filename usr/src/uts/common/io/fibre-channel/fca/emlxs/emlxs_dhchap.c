@@ -7578,12 +7578,14 @@ emlxs_dhc_detach(emlxs_hba_t *hba)
 
 
 extern void
-emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp, char *msg)
+emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp, char **msg)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_config_t *cfg = &CFG;
 	uint32_t fabric;
 	uint32_t fabric_switch;
+	emlxs_auth_cfg_t *auth_cfg = NULL;
+	emlxs_auth_key_t *auth_key = NULL;
 
 	fabric = ((did & Fabric_DID_MASK) == Fabric_DID_MASK) ? 1 : 0;
 	fabric_switch = ((did == Fabric_DID) ? 1 : 0);
@@ -7591,27 +7593,49 @@ emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp, char *msg)
 	/* Return is authentication is not enabled */
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
 		sp->cmn.fcsp_support = 0;
-		(void) sprintf(msg, "fcsp:Disabled");
+		bcopy("fcsp:Disabled (0)", (void *) &msg[0],
+		    sizeof ("fcsp:Disabled (0)"));
 		return;
 	}
 	if (port->vpi != 0 && cfg[CFG_AUTH_NPIV].current == 0) {
 		sp->cmn.fcsp_support = 0;
-		(void) sprintf(msg, "fcsp:Disabled (npiv)");
+		bcopy("fcsp:Disabled (npiv)", (void *) &msg[0],
+		    sizeof ("fcsp:Disabled (0)"));
 		return;
 	}
 	if (!fabric_switch && fabric) {
 		sp->cmn.fcsp_support = 0;
-		(void) sprintf(msg, "fcsp:Disabled (fs)");
+		bcopy("fcsp:Disabled (fs)", (void *) &msg[0],
+		    sizeof ("fcsp:Disabled (fs)"));
 		return;
 	}
 	/* Return if fcsp support to this node is not enabled */
 	if (!fabric_switch && cfg[CFG_AUTH_E2E].current == 0) {
 		sp->cmn.fcsp_support = 0;
-		(void) sprintf(msg, "fcsp:Disabled (e2e)");
+		bcopy("fcsp:Disabled (e2e)", (void *) &msg[0],
+		    sizeof ("fcsp:Disabled (e2e)"));
 		return;
 	}
-	sp->cmn.fcsp_support = 1;
 
+	mutex_enter(&hba->auth_lock);
+	if (fabric_switch) {
+		auth_cfg = emlxs_auth_cfg_find(port,
+		    (uint8_t *)emlxs_fabric_wwn);
+		auth_key = emlxs_auth_key_find(port,
+		    (uint8_t *)emlxs_fabric_wwn);
+		if ((!auth_cfg) || (!auth_key)) {
+			sp->cmn.fcsp_support = 0;
+			bcopy("fcsp:Disabled (1)", (void *) &msg[0],
+			    sizeof ("fcsp:Disabled (1)"));
+			mutex_exit(&hba->auth_lock);
+			return;
+		}
+
+	}
+
+	mutex_exit(&hba->auth_lock);
+
+	sp->cmn.fcsp_support = 1;
 
 	return;
 
@@ -9296,7 +9320,7 @@ emlxs_dhc_init_auth(emlxs_hba_t *hba, uint8_t *lwwpn, uint8_t *rwwpn)
 		if (!(port->flag & EMLXS_PORT_BOUND)) {
 			continue;
 		}
-		if (bcmp((uint8_t *)&port->wwpn, lwwpn, 8) != 0) {
+		if (bcmp((uint8_t *)&port->wwpn, lwwpn, 8) == 0) {
 			break;
 		}
 	}
@@ -9309,7 +9333,7 @@ emlxs_dhc_init_auth(emlxs_hba_t *hba, uint8_t *lwwpn, uint8_t *rwwpn)
 
 		return (DFC_AUTH_WWN_NOT_FOUND);
 	}
-	if (bcmp(rwwpn, emlxs_fabric_wwn, 8) != 0) {
+	if (bcmp(rwwpn, emlxs_fabric_wwn, 8) == 0) {
 		/* Scan for fabric node */
 		if ((ndlp = emlxs_node_find_did(port, Fabric_DID)) == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
@@ -9505,7 +9529,7 @@ emlxs_dhc_add_auth_cfg(
 		/* Port match found */
 
 		if (bcmp((uint8_t *)&fcsp_cfg->rwwpn,
-		    emlxs_fabric_wwn, 8) != 0) {
+		    emlxs_fabric_wwn, 8) == 0) {
 			/* Scan for fabric node */
 			if ((ndlp = emlxs_node_find_did(port,
 			    Fabric_DID)) == NULL) {
@@ -9843,7 +9867,7 @@ emlxs_dhc_get_auth_status(emlxs_hba_t *hba, dfc_auth_status_t *fcsp_status)
 		return (DFC_AUTH_NOT_CONFIGURED);
 	}
 	if (bcmp((uint8_t *)&fcsp_status->rwwpn,
-	    (uint8_t *)emlxs_fabric_wwn, 8 != 0)) {
+	    (uint8_t *)emlxs_fabric_wwn, 8) == 0) {
 		auth_status = &port->port_dhc.auth_status;
 		auth_time = port->port_dhc.auth_time;
 		ndlp = emlxs_node_find_did(port, Fabric_DID);

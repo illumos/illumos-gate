@@ -4047,8 +4047,8 @@ emlxs_handle_ring_event(emlxs_hba_t *hba, int32_t ring_no, uint32_t ha_copy)
 			 * If this is NOT a polled command completion or a
 			 * driver allocated pkt, then defer pkt completion.
 			 */
-			if (!(sbp->pkt_flags & PACKET_POLLED |
-			    PACKET_ALLOCATED)) {
+			if (!(sbp->pkt_flags &
+			    (PACKET_POLLED | PACKET_ALLOCATED))) {
 				/* Add the IOCB to the local list */
 				if (!rsp_head) {
 					rsp_head = iocbq;

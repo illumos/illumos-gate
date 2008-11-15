@@ -1158,6 +1158,12 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
 		    "MEM_BUF_ALLOC DMA buffer.");
 
+		/* Free the matp object */
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = sizeof (MATCHMAP);
+		buf_info->virt = (uint32_t *)matp;
+		emlxs_mem_free(hba, buf_info);
+
 		return (0);
 	}
 	bp = (uint8_t *)buf_info->virt;

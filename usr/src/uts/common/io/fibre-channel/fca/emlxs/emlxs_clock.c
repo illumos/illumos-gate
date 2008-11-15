@@ -535,6 +535,7 @@ emlxs_timer_check_rings(emlxs_hba_t *hba, uint8_t *flag)
 	emlxs_config_t *cfg = &CFG;
 	int32_t ringno;
 	RING *rp;
+	uint32_t logit = 0;
 
 	if (!cfg[CFG_TIMEOUT_ENABLE].current) {
 		return;
@@ -552,20 +553,23 @@ emlxs_timer_check_rings(emlxs_hba_t *hba, uint8_t *flag)
 				rp->timeout = hba->timer_tics + 10;
 
 				if (hba->state >= FC_LINK_UP) {
-					EMLXS_MSGF(EMLXS_CONTEXT,
-					    &emlxs_ring_watchdog_msg,
-					    "%s host=%d port=%d cnt=%d,%d",
-					    emlxs_ring_xlate(ringno),
-					    rp->fc_cmdidx,
-					    rp->fc_port_cmdidx,
-					    hba->ring_tx_count[ringno],
-					    hba->io_count[ringno]);
+					logit = 1;
 				}
 			} else {
 				rp->timeout = 0;
 			}
 		}
 		mutex_exit(&EMLXS_RINGTX_LOCK);
+
+		if (logit) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_ring_watchdog_msg,
+			    "%s host=%d port=%d cnt=%d,%d",
+			    emlxs_ring_xlate(ringno),
+			    rp->fc_cmdidx, rp->fc_port_cmdidx,
+			    hba->ring_tx_count[ringno],
+			    hba->io_count[ringno]);
+		}
 
 		/*
 		 * If ring flag is set, request iocb servicing here to send
@@ -1255,14 +1259,6 @@ emlxs_tx_watchdog(emlxs_hba_t *hba)
 			did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
 			cmd = *((uint32_t *)pkt->pkt_cmd);
 			cmd = SWAP_DATA32(cmd);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_txq_watchdog_msg,
-			    "sbp=%p node=%p cmd=%08x did=%x",
-			    sbp, sbp->node, cmd, did);
-		} else {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_txq_watchdog_msg,
-			    "sbp=%p node=%p",
-			    sbp, sbp->node);
 		}
 
 
