@@ -102,7 +102,8 @@ check_for_login_inactivity(
 		 * Read the last login (ll) time
 		 */
 		if (llseek(fdl, offset, SEEK_SET) != offset) {
-			syslog(LOG_ERR, "pam_unix_acct: pam_sm_acct_mgmt: "
+			__pam_log(LOG_AUTH | LOG_ERR,
+			    "pam_unix_acct: pam_sm_acct_mgmt: "
 			    "can't obtain last login info on uid %d "
 			    "(uid too large)", pw_uid);
 			return (0);
@@ -122,7 +123,7 @@ check_for_login_inactivity(
 			 * then account inactive too long and no access.
 			 */
 			if (((time_t)((ll.ll_time / DAY) + shpwd->sp_inact)
-				< DAY_NOW) &&
+			    < DAY_NOW) &&
 			    (shpwd->sp_lstchg != 0) &&
 			    (shpwd->sp_lstchg != -1) &&
 			    ((shpwd->sp_lstchg + shpwd->sp_inact) < DAY_NOW)) {
@@ -146,8 +147,7 @@ check_for_login_inactivity(
  */
 
 static int
-new_password_check(pw_uid, shpwd, flags)
-	uid_t		pw_uid;
+new_password_check(shpwd, flags)
 	struct 	spwd 	*shpwd;
 	int 		flags;
 {
@@ -162,8 +162,7 @@ new_password_check(pw_uid, shpwd, flags)
 
 	if ((flags & PAM_DISALLOW_NULL_AUTHTOK) != 0) {
 		if (shpwd->sp_pwdp[0] == '\0') {
-			if ((pw_uid != 0) &&
-				((shpwd->sp_max == -1) ||
+			if (((shpwd->sp_max == -1) ||
 				((time_t)shpwd->sp_lstchg > now) ||
 				((now >= (time_t)(shpwd->sp_lstchg +
 							shpwd->sp_min)) &&
@@ -254,20 +253,20 @@ warn_user_passwd_will_expire(
 		days = (time_t)(shpwd.sp_lstchg + shpwd.sp_max) - now;
 		if (days <= 0)
 			(void) snprintf(messages[0],
-				sizeof (messages[0]),
-				dgettext(TEXT_DOMAIN,
-				"Your password will expire within 24 hours."));
+			    sizeof (messages[0]),
+			    dgettext(TEXT_DOMAIN,
+			    "Your password will expire within 24 hours."));
 		else if (days == 1)
 			(void) snprintf(messages[0],
-				sizeof (messages[0]),
-				dgettext(TEXT_DOMAIN,
-				"Your password will expire in 1 day."));
+			    sizeof (messages[0]),
+			    dgettext(TEXT_DOMAIN,
+			    "Your password will expire in 1 day."));
 		else
 			(void) snprintf(messages[0],
-				sizeof (messages[0]),
-				dgettext(TEXT_DOMAIN,
-				"Your password will expire in %d days."),
-				(int)days);
+			    sizeof (messages[0]),
+			    dgettext(TEXT_DOMAIN,
+			    "Your password will expire in %d days."),
+			    (int)days);
 
 		(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1, messages,
 		    NULL);
@@ -306,18 +305,18 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		else if (strcasecmp(argv[i], "nowarn") == 0) {
 			flags = flags | PAM_SILENT;
 		} else {
-			syslog(LOG_ERR,
-				"ACCOUNT:pam_sm_acct_mgmt: illegal option %s",
-				argv[i]);
+			__pam_log(LOG_AUTH | LOG_ERR,
+			    "ACCOUNT:pam_sm_acct_mgmt: illegal option %s",
+			    argv[i]);
 		}
 	}
 
 	if (debug)
-		syslog(LOG_AUTH | LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "pam_unix_account: entering pam_sm_acct_mgmt()");
 
 	if ((error = pam_get_item(pamh, PAM_USER, (void **)&user))
-							!= PAM_SUCCESS)
+	    != PAM_SUCCESS)
 		goto out;
 
 	if (user == NULL) {
@@ -327,7 +326,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		shpwd.sp_namp = user;
 
 	if ((error = pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep))
-							!= PAM_SUCCESS)
+	    != PAM_SUCCESS)
 		goto out;
 
 	if (auth_rep == NULL) {
@@ -415,13 +414,13 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			pw = NOPWDRTR;
 
 		if (result ==  PWU_DENIED) {
-			syslog(LOG_AUTH | LOG_DEBUG,
-				"pam_unix_account: %s: permission denied "
-				"to access password aging information. "
-				"Using defaults.", user);
+			__pam_log(LOG_AUTH | LOG_DEBUG,
+			    "pam_unix_account: %s: permission denied "
+			    "to access password aging information. "
+			    "Using defaults.", user);
 		}
 
-		syslog(LOG_AUTH | LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "%s Policy:Unix, pw=%s, lstchg=%d, min=%d, max=%d, "
 		    "warn=%d, inact=%d, expire=%d",
 		    user, pw, shpwd.sp_lstchg, shpwd.sp_min, shpwd.sp_max,
@@ -464,6 +463,25 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	/*
+	 * Check for NULL password and, if so, see if such is allowed
+	 */
+	if (shpwd.sp_pwdp[0] == '\0' &&
+	    (flags & PAM_DISALLOW_NULL_AUTHTOK) != 0) {
+		char *service;
+		char *rhost = NULL;
+
+		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+		(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
+
+		__pam_log(LOG_AUTH | LOG_NOTICE,
+		    "pam_unix_account: %s: empty password not allowed for "
+		    "account %s from %s", service, user,
+		    (rhost != NULL && *rhost != '\0') ? rhost : "local host");
+		error = PAM_PERM_DENIED;
+		goto out;
+	}
+
+	/*
 	 * Check for account expiration
 	 */
 	if (shpwd.sp_expire > 0 &&
@@ -483,7 +501,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	/*
 	 * Check to see if the user needs to change their password
 	 */
-	if (error = new_password_check(pw_uid, &shpwd, flags)) {
+	if (error = new_password_check(&shpwd, flags)) {
 		goto out;
 	}
 
@@ -491,7 +509,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	 * Check to make sure password aging information is okay
 	 */
 	if ((error = perform_passwd_aging_check(pamh, &shpwd, flags))
-							!= PAM_SUCCESS) {
+	    != PAM_SUCCESS) {
 		goto out;
 	}
 
@@ -514,10 +532,10 @@ out:
 		unix_authtok_data *authtok_data;
 
 		if (debug) {
-			syslog(LOG_AUTH | LOG_DEBUG,
-				"pam_unix_account: %s: %s",
-				(user == NULL)?"NULL":user,
-				pam_strerror(pamh, error));
+			__pam_log(LOG_AUTH | LOG_DEBUG,
+			    "pam_unix_account: %s: %s",
+			    (user == NULL)?"NULL":user,
+			    pam_strerror(pamh, error));
 		}
 
 		if (repository_name)
@@ -530,21 +548,21 @@ out:
 		}
 
 		/* store the password aging status in the pam handle */
-		pam_res = pam_get_data(
-			pamh, UNIX_AUTHTOK_DATA, (const void **)&authtok_data);
+		pam_res = pam_get_data(pamh, UNIX_AUTHTOK_DATA,
+		    (const void **)&authtok_data);
 
-		if ((status = (unix_authtok_data *)calloc
-			(1, sizeof (unix_authtok_data))) == NULL) {
+		if ((status = (unix_authtok_data *)calloc(1,
+		    sizeof (unix_authtok_data))) == NULL) {
 			return (PAM_BUF_ERR);
 		}
 
 		if (pam_res == PAM_SUCCESS)
 			(void) memcpy(status, authtok_data,
-				sizeof (unix_authtok_data));
+			    sizeof (unix_authtok_data));
 
 		status->age_status = error;
 		if (pam_set_data(pamh, UNIX_AUTHTOK_DATA, status, unix_cleanup)
-							!= PAM_SUCCESS) {
+		    != PAM_SUCCESS) {
 			free(status);
 			return (PAM_SERVICE_ERR);
 		}

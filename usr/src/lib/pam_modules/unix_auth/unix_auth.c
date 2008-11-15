@@ -168,21 +168,23 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	if (debug)
-		syslog(LOG_DEBUG,
+		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "pam_unix_auth: entering pam_sm_authenticate()");
 
 	if (pam_get_item(pamh, PAM_USER, (void **)&user) != PAM_SUCCESS) {
-		syslog(LOG_DEBUG, "pam_unix_auth: USER not set");
+		__pam_log(LOG_AUTH | LOG_DEBUG, "pam_unix_auth: USER not set");
 		return (PAM_SYSTEM_ERR);
 	}
 
 	if (user == NULL || *user == '\0') {
-		syslog(LOG_DEBUG, "pam_unix_auth: USER NULL or empty!\n");
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_unix_auth: USER NULL or empty!\n");
 		return (PAM_USER_UNKNOWN);
 	}
 
 	if (pam_get_item(pamh, PAM_AUTHTOK, (void **)&passwd) != PAM_SUCCESS) {
-		syslog(LOG_DEBUG, "pam_unix_auth: AUTHTOK not set!\n");
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_unix_auth: AUTHTOK not set!\n");
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -219,13 +221,14 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		free(pwu_rep);
 
 	if (result == PWU_NOT_FOUND) {
-		syslog(LOG_DEBUG, "pam_unix_auth: user %s not found\n",
-		    user);
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_unix_auth: user %s not found\n", user);
 		return (PAM_USER_UNKNOWN);
 	}
 
 	if (result == PWU_DENIED) {
-		syslog(LOG_DEBUG, "pam_unix_auth: failed to obtain attributes");
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_unix_auth: failed to obtain attributes");
 		return (PAM_PERM_DENIED);
 	}
 
@@ -256,6 +259,9 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (rep_passwd == NULL || *rep_passwd == '\0') {
 		if (flags & PAM_DISALLOW_NULL_AUTHTOK) {
 			result = PAM_AUTH_ERR;
+			__pam_log(LOG_AUTH | LOG_NOTICE,
+			    "pam_unix_auth: empty password for %s not allowed.",
+			    user);
 			goto out;
 		} else {
 			result = PAM_SUCCESS;
@@ -278,14 +284,15 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	 * while we've obtained it from NIS+, it
 	 * means that the permissions on the NIS+ table are too tight
 	 * for us to get the password without having Secure RPC
-	 * Credentials. In that case, we syslog an error stating that
+	 * Credentials. In that case, we log an error stating that
 	 * the Secure RPC credential Module should be on the PAM stack
 	 * before the unix_auth module. We also tell the user to go
 	 * and inform the administrator of this error.
 	 */
 	if (strcmp(repository_name, "nisplus") == 0 &&
 	    strcmp(rep_passwd, NOPWDRTR) == 0) {
-		syslog(LOG_ERR, "pam_unix_auth: NIS+ permissions require that"
+		__pam_log(LOG_AUTH | LOG_ERR,
+		    "pam_unix_auth: NIS+ permissions require that"
 		    "the pam_dhkeys module is on the PAM stack before "
 		    "pam_unix_auth");
 		if (nowarn == 0) {

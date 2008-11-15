@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -57,6 +54,7 @@
 #include <syslog.h>
 #include <nss_dbdefs.h>
 #include <security/pam_appl.h>
+#include <deflt.h>
 
 #ifdef SYSV
 #include <shadow.h>
@@ -74,6 +72,7 @@ char  *sprintf();
 #endif	/* SYSV */
 
 #define	MAXFD(A, B) ((A) > (B) ? (A) : (B))
+#define	_PATH_DEFAULT_LOGIN	"/etc/default/login"
 
 static void error(char *fmt, ...);
 static void doit(int f, struct sockaddr_storage *fromp);
@@ -182,6 +181,7 @@ doit(int f, struct sockaddr_storage *fromp)
 	socklen_t fromplen;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
+	int pam_flags = 0;
 
 	(void) signal(SIGINT, SIG_DFL);
 	(void) signal(SIGQUIT, SIG_DFL);
@@ -278,6 +278,19 @@ doit(int f, struct sockaddr_storage *fromp)
 		exit(1);
 	}
 
+	if (defopen(_PATH_DEFAULT_LOGIN) == 0) {
+		int flags;
+		char *p;
+		flags = defcntl(DC_GETFLAGS, 0);
+		TURNOFF(flags, DC_CASE);
+		(void) defcntl(DC_SETFLAGS, flags);
+		if ((p = defread("PASSREQ=")) != NULL &&
+		    strcasecmp(p, "YES") == 0) {
+			pam_flags |= PAM_DISALLOW_NULL_AUTHTOK;
+		}
+		defopen(NULL);
+	}
+
 	if (pam_start("rexec", user, &conv, &pamh) != PAM_SUCCESS) {
 		exit(1);
 	}
@@ -285,24 +298,24 @@ doit(int f, struct sockaddr_storage *fromp)
 		exit(1);
 	}
 
-	if ((status = pam_authenticate(pamh, 0)) != PAM_SUCCESS) {
+	if ((status = pam_authenticate(pamh, pam_flags)) != PAM_SUCCESS) {
 		switch (status) {
 		case PAM_USER_UNKNOWN:
 			(void) audit_rexecd_fail("Login incorrect", hostname,
-				user, cmdbuf);		/* BSM */
+			    user, cmdbuf);		/* BSM */
 			error("Login incorrect.\n");
 			break;
 		default:
 			(void) audit_rexecd_fail("Password incorrect", hostname,
-				user, cmdbuf);	/* BSM */
+			    user, cmdbuf);	/* BSM */
 			error("Password incorrect.\n");
 		}
 		pam_end(pamh, status);
 		exit(1);
 	}
-	if ((status = pam_acct_mgmt(pamh, 0)) != PAM_SUCCESS) {
+	if ((status = pam_acct_mgmt(pamh, pam_flags)) != PAM_SUCCESS) {
 		(void) audit_rexecd_fail("Account or Password Expired",
-				hostname, user, cmdbuf);
+		    hostname, user, cmdbuf);
 		switch (status) {
 			case PAM_NEW_AUTHTOK_REQD:
 				error("Password Expired.\n");
@@ -325,7 +338,7 @@ doit(int f, struct sockaddr_storage *fromp)
 
 	if (setgid((gid_t)pwd->pw_gid) < 0) {
 		(void) audit_rexecd_fail("Can't setgid", hostname,
-			user, cmdbuf);	/* BSM */
+		    user, cmdbuf);	/* BSM */
 		error("setgid");
 		pam_end(pamh, PAM_ABORT);
 		exit(1);
@@ -334,7 +347,7 @@ doit(int f, struct sockaddr_storage *fromp)
 
 	if ((status = pam_setcred(pamh, PAM_ESTABLISH_CRED)) != PAM_SUCCESS) {
 		(void) audit_rexecd_fail("Unable to establish credentials",
-				hostname, user, cmdbuf);	/* BSM */
+		    hostname, user, cmdbuf);	/* BSM */
 		error("Unable to establish credentials.\n");
 		pam_end(pamh, PAM_SUCCESS);
 	}
@@ -343,7 +356,7 @@ doit(int f, struct sockaddr_storage *fromp)
 
 	if (setuid((uid_t)pwd->pw_uid) < 0) {
 		(void) audit_rexecd_fail("Can't setuid", hostname,
-			user, cmdbuf);	/* BSM */
+		    user, cmdbuf);	/* BSM */
 		error("setuid");
 		pam_end(pamh, PAM_ABORT);
 		exit(1);

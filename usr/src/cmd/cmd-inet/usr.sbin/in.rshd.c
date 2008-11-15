@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	_FILE_OFFSET_BITS 64
 
 /*
@@ -77,6 +75,7 @@
 #include <stdlib.h>
 
 #include <security/pam_appl.h>
+#include <deflt.h>
 
 #include <k5-int.h>
 #include <krb5_repository.h>
@@ -427,6 +426,8 @@ static krb5_principal client = NULL;
 static char	remote_addr[64];
 static char	local_addr[64];
 
+#define	_PATH_DEFAULT_LOGIN "/etc/default/login"
+
 static void
 doit(int f, struct sockaddr_storage *fromp, char **renvp)
 {
@@ -755,16 +756,49 @@ get_port:
 		}
 	}
 
-	/*
-	 * maintain 2.1 and 4.* and BSD semantics with anonymous rshd
-	 */
-	if (shpwd->sp_pwdp != 0 && *shpwd->sp_pwdp != '\0' &&
-	    (v = pam_authenticate(pamh, 0)) != PAM_SUCCESS) {
-		error("permission denied\n");
-		(void) audit_rshd_fail("Permission denied", hostname,
-			remuser, locuser, cmdbuf);	/* BSM */
-		(void) pam_end(pamh, v);
-		exit(1);
+	if (shpwd->sp_pwdp != 0) {
+		if (*shpwd->sp_pwdp != '\0') {
+			if ((v = pam_authenticate(pamh, 0)) != PAM_SUCCESS) {
+				error("permission denied\n");
+				(void) audit_rshd_fail("Permission denied",
+				    hostname, remuser, locuser, cmdbuf);
+				(void) pam_end(pamh, v);
+				exit(1);
+			}
+		} else {
+			int flags;
+			char *p;
+			/*
+			 * maintain 2.1 and 4.* and BSD semantics with
+			 * anonymous rshd unless PASSREQ is set to YES in
+			 * /etc/default/login: then we deny logins with empty
+			 * passwords.
+			 */
+			if (defopen(_PATH_DEFAULT_LOGIN) == 0) {
+				flags = defcntl(DC_GETFLAGS, 0);
+				TURNOFF(flags, DC_CASE);
+				(void) defcntl(DC_SETFLAGS, flags);
+
+				if ((p = defread("PASSREQ=")) != NULL &&
+				    strcasecmp(p, "YES") == 0) {
+					error("permission denied\n");
+					(void) audit_rshd_fail(
+					    "Permission denied", hostname,
+					    remuser, locuser, cmdbuf);
+					(void) pam_end(pamh, PAM_ABORT);
+					(void) defopen(NULL);
+					syslog(LOG_AUTH|LOG_NOTICE,
+					    "empty password not allowed for "
+					    "%s from %s.", locuser, hostname);
+					exit(1);
+				}
+				(void) defopen(NULL);
+			}
+			/*
+			 * /etc/default/login not found or PASSREQ not set
+			 * to YES. Allow logins without passwords.
+			 */
+		}
 	}
 
 	if (krb5auth_flag > 0) {

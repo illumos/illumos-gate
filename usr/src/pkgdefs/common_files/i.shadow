@@ -23,8 +23,25 @@
 # Use is subject to license terms.
 #
 
+CLEANUP_FILE=/tmp/CLEANUP
+
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
+
+#
+# PASSREQ is enforced. We need to warn upgraders about the fact that
+# they might be locked out if they don't have a root password or
+# change PASSREQ
+#
+NOPASSWARN="Detected password-less accounts while PASSREQ=YES."
+NOPASSWARN="${NOPASSWARN} Please examine ${BASEDIR}/etc/default/login before"
+NOPASSWARN="${NOPASSWARN} rebooting."
+
+if grep -i '^PASSREQ=YES'  ${BASEDIR}/etc/default/login >/dev/null 2>&1 ; then
+	warn_nopass=1
+else
+	warn_nopass=0
+fi
 
 while read src dest
 do
@@ -168,6 +185,18 @@ do
 			printf '/^mysql:NP\na\n%s\n.\nw\nq\n' \
 				"$OPENLDAP_LINE" | ed -s $dest > /dev/null
 		fi
+
+		#
+		# Warn the user if an empty password is found and
+		# PASSREQ is set to yes.
+		#
+		if [ $warn_nopass -eq 1 ]; then
+			if grep '^[^:]*::' $dest > /dev/null 2>&1 ; then
+				echo "${dest} $NOPASSWARN" >> ${CLEANUP_FILE}
+				warn_nopass=0;
+			fi
+		fi
+
 	fi
 done
 

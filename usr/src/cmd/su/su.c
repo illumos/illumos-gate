@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	su [-] [name [arg ...]] change userid, `-' changes environment.
@@ -165,7 +163,7 @@ char *username;					/* the invoker */
 static	int	dosyslog = 0;			/* use syslog? */
 char	*myname;
 #ifdef	DYNAMIC_SU
-int passreq = 0;
+int pam_flags = 0;
 boolean_t embedded = B_FALSE;
 #endif	/* DYNAMIC_SU */
 
@@ -307,7 +305,7 @@ main(int argc, char **argv)
 
 		if ((ptr = defread("PASSREQ=")) != NULL &&
 		    strcasecmp("YES", ptr) == 0)
-			passreq = 1;
+			pam_flags |= PAM_DISALLOW_NULL_AUTHTOK;
 
 		(void) defopen((char *)NULL);
 	}
@@ -321,7 +319,7 @@ main(int argc, char **argv)
 	if (getpwnam_r(nptr, &pwd, pwdbuf, sizeof (pwdbuf)) == NULL)
 		retcode = PAM_USER_UNKNOWN;
 	else if ((flags = (getuid() != (uid_t)ROOT)) != 0) {
-		retcode = pam_authenticate(pamh, 0);
+		retcode = pam_authenticate(pamh, pam_flags);
 	} else /* root user does not need to authenticate */
 		retcode = PAM_SUCCESS;
 
@@ -1259,13 +1257,9 @@ static void
 validate(char *usernam, int *pw_change)
 {
 	int error;
-	int flag = 0;
 	int tries;
 
-	if (passreq)
-		flag = PAM_DISALLOW_NULL_AUTHTOK;
-
-	if ((error = pam_acct_mgmt(pamh, flag)) != PAM_SUCCESS) {
+	if ((error = pam_acct_mgmt(pamh, pam_flags)) != PAM_SUCCESS) {
 		if (Sulog != NULL)
 			log(Sulog, pwd.pw_name, 0);    /* log entry */
 		if (error == PAM_NEW_AUTHTOK_REQD) {

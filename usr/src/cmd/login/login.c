@@ -958,7 +958,7 @@ verify_passwd(void)
 {
 	int error;
 	char *user;
-	int flag = 0;
+	int flag = (Passreqflag ? PAM_DISALLOW_NULL_AUTHTOK : 0);
 
 	/*
 	 * PAM authenticates the user for us.

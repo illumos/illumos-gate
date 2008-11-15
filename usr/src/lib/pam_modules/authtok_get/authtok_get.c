@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/varargs.h>
 #include <string.h>
@@ -77,13 +74,14 @@ read_authtok(pam_handle_t *pamh, int debug)
 			return (res);
 		if (authtok != NULL) {
 			res = pam_set_item(pamh, PAM_OLDAUTHTOK,
-						(void *)authtok);
+			    (void *)authtok);
 			if (res == PAM_SUCCESS)
 				res = pam_set_item(pamh, PAM_AUTHTOK, NULL);
 
 			if (debug)
-				syslog(LOG_DEBUG, "read_authtok: Copied "
-				    "AUTHTOK to OLDAUTHTOK");
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+				    "read_authtok: Copied AUTHTOK to "
+				    "OLDAUTHTOK");
 
 			if (res != PAM_SUCCESS)
 				goto out;
@@ -153,7 +151,8 @@ verify_authtok(pam_handle_t *pamh, int debug)
 	char *pwd;
 
 	if (debug)
-		syslog(LOG_DEBUG, "pam_authtok_get: verifying authtok");
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_authtok_get: verifying authtok");
 
 	/*
 	 * All we need to do, is make sure that the user re-enters
@@ -185,7 +184,8 @@ verify_authtok(pam_handle_t *pamh, int debug)
 	}
 
 	if (debug)
-		syslog(LOG_DEBUG, "pam_authtok_get: new password verified");
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_authtok_get: new password verified");
 
 	(void) memset(pwd, 0, strlen(pwd));
 	free(pwd);
@@ -236,20 +236,21 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			debug = 1;
 
 	if (debug)
-		syslog(LOG_DEBUG, "pam_authtok_get:pam_sm_authenticate: "
-		    "flags = %d", flags);
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_authtok_get:pam_sm_authenticate: flags = %d", flags);
 
 	if ((res = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS) {
 		if (debug)
-			syslog(LOG_DEBUG,
+			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "pam_authtok_get: get user failed: %s",
 			    pam_strerror(pamh, res));
 		return (res);
 	}
 
 	if (user == NULL || *user == '\0') {
-		syslog(LOG_ERR, "pam_authtok_get: pam_sm_authenticate: "
-				"PAM_USER NULL or empty");
+		__pam_log(LOG_AUTH | LOG_ERR,
+		    "pam_authtok_get: pam_sm_authenticate: PAM_USER NULL or "
+		    "empty");
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -267,7 +268,8 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	res = pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
 	if (res != PAM_SUCCESS) {
-		syslog(LOG_ERR, "pam_authtok_get: error getting repository");
+		__pam_log(LOG_AUTH | LOG_ERR,
+		    "pam_authtok_get: error getting repository");
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -292,6 +294,9 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	if (res == PWU_SUCCESS &&
 	    (al[0].data.val_s == NULL || al[0].data.val_s[0] == '\0')) {
+		char *service = NULL;
+		char *rhost = NULL;
+
 		/*
 		 * if PAM_DIASALLOW_NULL_AUTHTOK has not been set, we
 		 * simply return IGNORE
@@ -300,11 +305,18 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			return (PAM_IGNORE);
 
 		/*
-		 * NULL authtoks are not allowed, so we need to
-		 * fail. We will ask for a password to mask the
-		 * failure however.
+		 * NULL authtoks are not allowed, so we need to fail.
+		 * We will ask for a password to mask the failure however.
 		 */
-
+		(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
+		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
+		if (service == NULL)
+			service = "unknown";
+		if (rhost == NULL || *rhost == '\0')
+			rhost = "localhost";
+		__pam_log(LOG_AUTH | LOG_NOTICE,
+		    "pam_authtok_get: %s: empty password not allowed for "
+		    "%s from %s.", service, user, rhost);
 		fail = 1;
 	}
 	if (al[0].data.val_s != NULL) {
@@ -322,12 +334,14 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		(void) memset(password, 0, strlen(password));
 		free(password);
 	} else if (debug) {
-		syslog(LOG_DEBUG, "pam_authtok_get: pam_sm_authenticate: "
-				"got NULL password from get_authtok()");
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_authtok_get: pam_sm_authenticate: "
+		    "got NULL password from get_authtok()");
 	}
 
 	if (fail) {
-		syslog(LOG_DEBUG, "pam_authtok_get:pam_sm_authenticate: "
+		__pam_log(LOG_AUTH | LOG_DEBUG,
+		    "pam_authtok_get:pam_sm_authenticate: "
 		    "failing because NULL authtok not allowed");
 		return (PAM_AUTH_ERR);
 	} else
