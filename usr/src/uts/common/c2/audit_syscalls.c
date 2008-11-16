@@ -1349,6 +1349,10 @@ setumask(caddr_t data)
 	const auditinfo_addr_t	*ainfo;
 	model_t	model;
 
+	/* setumask not applicable in non-global zones without perzone policy */
+	if (!(audit_policy & AUDIT_PERZONE) && (!INGLOBALZONE(curproc)))
+		return (EINVAL);
+
 	model = get_udatamodel();
 	STRUCT_INIT(user_info, model);
 
@@ -1359,7 +1363,19 @@ setumask(caddr_t data)
 	for (p = practive; p != NULL; p = p->p_next) {
 		cred_t	*cr;
 
+		/* if in non-global zone only modify processes in same zone */
+		if (!HASZONEACCESS(curproc, p->p_zone->zone_id))
+			continue;
+
 		mutex_enter(&p->p_lock);	/* so process doesn't go away */
+
+		/* skip system processes and ones being created or going away */
+		if (p->p_stat == SIDL || p->p_stat == SZOMB ||
+		    (p->p_flag & (SSYS | SEXITING | SEXITLWPS))) {
+			mutex_exit(&p->p_lock);
+			continue;
+		}
+
 		mutex_enter(&p->p_crlock);
 		crhold(cr = p->p_cred);
 		mutex_exit(&p->p_crlock);
@@ -1416,6 +1432,10 @@ setsmask(caddr_t data)
 	const auditinfo_addr_t	*ainfo;
 	model_t	model;
 
+	/* setsmask not applicable in non-global zones without perzone policy */
+	if (!(audit_policy & AUDIT_PERZONE) && (!INGLOBALZONE(curproc)))
+		return (EINVAL);
+
 	model = get_udatamodel();
 	STRUCT_INIT(user_info, model);
 
@@ -1426,7 +1446,19 @@ setsmask(caddr_t data)
 	for (p = practive; p != NULL; p = p->p_next) {
 		cred_t	*cr;
 
+		/* if in non-global zone only modify processes in same zone */
+		if (!HASZONEACCESS(curproc, p->p_zone->zone_id))
+			continue;
+
 		mutex_enter(&p->p_lock);	/* so process doesn't go away */
+
+		/* skip system processes and ones being created or going away */
+		if (p->p_stat == SIDL || p->p_stat == SZOMB ||
+		    (p->p_flag & (SSYS | SEXITING | SEXITLWPS))) {
+			mutex_exit(&p->p_lock);
+			continue;
+		}
+
 		mutex_enter(&p->p_crlock);
 		crhold(cr = p->p_cred);
 		mutex_exit(&p->p_crlock);
