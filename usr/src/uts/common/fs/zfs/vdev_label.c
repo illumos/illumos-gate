@@ -520,9 +520,6 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	    vdev_inuse(vd, crtxg, reason, &spare_guid, &l2cache_guid))
 		return (EBUSY);
 
-	ASSERT(reason != VDEV_LABEL_REMOVE ||
-	    vdev_inuse(vd, crtxg, reason, NULL, NULL));
-
 	/*
 	 * If this is a request to add or replace a spare or l2cache device
 	 * that is in use elsewhere on the system, then we must update the
