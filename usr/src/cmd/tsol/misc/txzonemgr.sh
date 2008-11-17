@@ -67,7 +67,7 @@ labelCheck() {
 
 snapshotCheck() {
 	filesystem=`zfs list -t snapshot |grep $ZDSET/$zonename |cut -d " " -f1`
-	if [[ -n $filesystem ]]; then
+	if [[ $filesystem = '' ]]; then
 		snapshot="Create Snapshot\n"
 	fi
 }
@@ -283,7 +283,8 @@ initialize() {
 	echo "timezone=$timezone" >> ${SYSIDCFG}
 	echo "terminal=vt100" >> ${SYSIDCFG}
 	rootpwd=`/bin/grep "^root:" /etc/shadow|cut -d ":" -f2`
-	echo "root_password=$rootpwd" >> ${SYSIDCFG}
+	#echo "root_password=$rootpwd" >> ${SYSIDCFG}
+	echo "nfs4_domain=dynamic" >> ${SYSIDCFG}
 	echo "network_interface=PRIMARY {" >> ${SYSIDCFG}
 	echo "protocol_ipv6=no" >> ${SYSIDCFG}
 	echo "hostname=$hostname" >> ${SYSIDCFG}
