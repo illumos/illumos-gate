@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <ctype.h>
 #include <strings.h>
@@ -50,7 +48,10 @@ static EKUName2OID EKUList[] = {
 	{"ipsecTunnel",		(KMF_OID *)&KMFOID_PKIX_KP_IPSecTunnel},
 	{"ipsecUser",		(KMF_OID *)&KMFOID_PKIX_KP_IPSecUser},
 	{"timeStamping",	(KMF_OID *)&KMFOID_PKIX_KP_TimeStamping},
-	{"OCSPSigning", 	(KMF_OID *)&KMFOID_PKIX_KP_OCSPSigning}
+	{"OCSPSigning", 	(KMF_OID *)&KMFOID_PKIX_KP_OCSPSigning},
+	{"KPClientAuth", 	(KMF_OID *)&KMFOID_PKINIT_ClientAuth},
+	{"KPKdc", 		(KMF_OID *)&KMFOID_PKINIT_Kdc},
+	{"scLogon", 		(KMF_OID *)&KMFOID_MS_KP_SCLogon}
 };
 
 static int num_ekus = sizeof (EKUList) / sizeof (EKUName2OID);

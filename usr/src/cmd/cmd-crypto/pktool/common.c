@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the functions that are shared among
  * the various services this tool will ultimately provide.
@@ -1002,18 +1000,31 @@ get_token_password(KMF_KEYSTORE_TYPE kstype,
 	char *token_spec, KMF_CREDENTIAL *cred)
 {
 	char	prompt[1024];
+	char	temptoken[32];
 	char	*p = NULL;
+	char	*t = NULL;
 
 	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
 		p = strchr(token_spec, ':');
 		if (p != NULL)
-		*p = 0;
+			*p = 0;
 	}
+	(void) strncpy(temptoken, token_spec, sizeof (temptoken));
+
+	/*
+	 * Strip trailing whitespace
+	 */
+	t = temptoken + (strlen(temptoken) - 1);
+	while (isspace(*t) && t >= temptoken) {
+		*t = 0x00;
+		t--;
+	}
+
 	/*
 	 * Login to the token first.
 	 */
 	(void) snprintf(prompt, sizeof (prompt),
-	    gettext(DEFAULT_TOKEN_PROMPT), token_spec);
+	    gettext(DEFAULT_TOKEN_PROMPT), temptoken);
 
 	if (get_pin(prompt, NULL, (uchar_t **)&cred->cred,
 	    (ulong_t *)&cred->credlen) != CKR_OK) {

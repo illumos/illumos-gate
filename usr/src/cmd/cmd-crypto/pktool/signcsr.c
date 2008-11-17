@@ -17,13 +17,11 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
+ *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the sign CSR operation for this tool.
@@ -370,6 +368,8 @@ pk_signcsr_pk11_nss(KMF_HANDLE_T handle,
 	KMF_X509_CERTIFICATE signedCert;
 	boolean_t token_bool = B_TRUE;
 	boolean_t private_bool = B_TRUE;
+
+	(void) memset(&casignkey, 0, sizeof (KMF_KEY_HANDLE));
 
 	rv = read_csrdata(handle, csrfile, &csrdata);
 	if (rv != KMF_OK) {
