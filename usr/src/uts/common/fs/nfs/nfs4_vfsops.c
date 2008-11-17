@@ -2114,7 +2114,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	 * by proxy processes such as automountd.
 	 */
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
-	if (svp->sv_secdata->uid != 0) {
+	if (svp->sv_secdata->uid != 0 &&
+	    svp->sv_secdata->rpcflavor == RPCSEC_GSS) {
 		lcr = crdup(cr);
 		(void) crsetugid(lcr, svp->sv_secdata->uid, crgetgid(cr));
 		tcr = lcr;
