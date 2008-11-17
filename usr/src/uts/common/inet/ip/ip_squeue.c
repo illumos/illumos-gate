@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IP interface to squeues.
  *
@@ -117,6 +115,7 @@
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
 #include <sys/squeue_impl.h>
+#include <sys/atomic.h>
 
 /*
  * We allow multiple NICs to bind to the same CPU but want to preserve 1 <-> 1
@@ -784,6 +783,7 @@ ip_find_unused_squeue(squeue_set_t *sqs, boolean_t fanout)
 		 * First check to see if any squeue on the CPU passed
 		 * is managing a NIC.
 		 */
+		mutex_enter(&sqs->sqs_lock);
 		for (i = 0; i < sqs->sqs_size; i++) {
 			mutex_enter(&sqs->sqs_list[i]->sq_lock);
 			if ((sqs->sqs_list[i]->sq_state & SQS_ILL_BOUND) &&
@@ -793,6 +793,7 @@ ip_find_unused_squeue(squeue_set_t *sqs, boolean_t fanout)
 			}
 			mutex_exit(&sqs->sqs_list[i]->sq_lock);
 		}
+		mutex_exit(&sqs->sqs_lock);
 		if (i != sqs->sqs_size) {
 			best_sqs = NULL;
 
@@ -866,7 +867,14 @@ ip_find_unused_squeue(squeue_set_t *sqs, boolean_t fanout)
 		ASSERT(sqp != NULL);
 
 		squeue_profile_enable(sqp);
-		sqs->sqs_list[sqs->sqs_size++] = sqp;
+		/*
+		 * Other functions scanning sqs_list don't take sqs_lock.
+		 * Once sqp is stored in sqs_list[] global visibility is
+		 * ensured before incrementing the sqs_size counter.
+		 */
+		sqs->sqs_list[sqs->sqs_size] = sqp;
+		membar_producer();
+		sqs->sqs_size++;
 
 		if (ip_squeue_create_callback != NULL)
 			ip_squeue_create_callback(sqp);
