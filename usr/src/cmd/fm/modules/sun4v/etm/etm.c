@@ -83,6 +83,9 @@ etm_send_to_remote_root(void *arg);
 static void
 etm_recv_from_remote_root(void *arg);
 
+static void
+etm_ckpt_remove(fmd_hdl_t *hdl, etm_iosvc_q_ele_t *ele);
+
 /*
  * ------------------------- data structs for FMD ----------------------------
  */
@@ -1607,11 +1610,17 @@ etm_msg_enq_head(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
 } /* etm_msg_enq_head() */
 
 /*
- * etm_isovc_cleanup():
- * clean up what's in the passed-in iosvc struct, optionally including the msg Q
+ * etm_iosvc_cleanup():
+ * Clean up an iosvc structure
+ * 1) close the fmd_xprt if it has not been closed
+ * 2) Terminate the send/revc threads
+ * 3) If the clean_msg_q flag is set, free all fma events in the queue. In
+ *    addition, if the chpt_remove flag is set, delete the checkpoint so that
+ *    the events are not persisted.
  */
 static void
-etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc, boolean_t clean_msg_q)
+etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc, boolean_t clean_msg_q,
+    boolean_t ckpt_remove)
 {
 
 	etm_iosvc_q_ele_t	msg_ele;	/* io svc msg Q ele */
@@ -1643,6 +1652,10 @@ etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc, boolean_t clean_msg_q)
 		(void) pthread_mutex_lock(&iosvc->msg_q_lock);
 		while (iosvc->msg_q_cur_len > 0) {
 			(void) etm_iosvc_msg_deq(fmd_hdl, iosvc, &msg_ele);
+			if (ckpt_remove == B_TRUE &&
+			    msg_ele.ckpt_flag != ETM_CKPT_NOOP) {
+				etm_ckpt_remove(fmd_hdl, &msg_ele);
+			}
 			fmd_hdl_free(fmd_hdl, msg_ele.msg, msg_ele.msg_size);
 		}
 		(void) pthread_mutex_unlock(&iosvc->msg_q_lock);
@@ -3045,7 +3058,12 @@ etm_async_event_handler(void *arg)
 					    &iosvc_list_lock);
 					break;
 				}
-				etm_iosvc_cleanup(fmd_hdl, iosvc, B_TRUE);
+				/*
+				 * Clean up the queue, delete all messages and
+				 * do not persist checkpointed fma events.
+				 */
+				etm_iosvc_cleanup(fmd_hdl, iosvc, B_TRUE,
+				    B_TRUE);
 				(void) pthread_mutex_unlock(
 				    &iosvc_list_lock);
 				break;
@@ -3180,7 +3198,7 @@ etm_async_event_handler(void *arg)
 					 * other clean up on Control side.
 					 */
 					etm_iosvc_cleanup(fmd_hdl, iosvc,
-					    B_FALSE);
+					    B_FALSE, B_FALSE);
 					(void) pthread_mutex_unlock(
 					    &iosvc_list_lock);
 				} else {
@@ -3190,7 +3208,7 @@ etm_async_event_handler(void *arg)
 					 * then clean up on Root side.
 					 */
 					etm_iosvc_cleanup(fmd_hdl, iosvc,
-					    B_FALSE);
+					    B_FALSE, B_FALSE);
 				}
 				break;
 
@@ -4215,13 +4233,10 @@ _fmd_fini(fmd_hdl_t *hdl)
 			fmd_hdl_debug(hdl, "ldom_unregister_event() failed\n");
 
 		/*
-		 * on control side, need to go thru every iosvc struct to
-		 * 1) process remaining events in the iosvc Q:
-		 * for plan A:
-		 *    discard remaining events in the Q/free the memory,
-		 *    since fmd_xprt_log() already logged in Control D's FMD
-		 * 2) unregister the ds_hdl if valid
-		 * 3) close the fmd_xprt if it has not been closed
+		 * On control domain side, there may be multiple iosvc struct
+		 * in use, one for each bound/active domain. Each struct
+		 * manages a queue of fma events destined to the root domain.
+		 * Need to go thru every iosvc struct to clean up its resources.
 		 */
 		for (i = 0; i < NUM_OF_ROOT_DOMAINS; i++) {
 			if (iosvc_list[i].ldom_name[0] != '\0') {
@@ -4230,7 +4245,7 @@ _fmd_fini(fmd_hdl_t *hdl)
 				 */
 				iosvc = &iosvc_list[i];
 				(void) pthread_mutex_lock(&iosvc_list_lock);
-				etm_iosvc_cleanup(hdl, iosvc, B_TRUE);
+				etm_iosvc_cleanup(hdl, iosvc, B_TRUE, B_FALSE);
 				(void) pthread_mutex_unlock(&iosvc_list_lock);
 
 			} else {
@@ -4246,6 +4261,9 @@ _fmd_fini(fmd_hdl_t *hdl)
 		ldom_fini(etm_lhp);
 
 	} else if (etm_ldom_type == LDOM_TYPE_ROOT) {
+		/*
+		 * On root domain side, there is only one iosvc struct in use.
+		 */
 		iosvc = &io_svc;
 		if (iosvc->send_tid != NULL) {
 			fmd_thr_signal(hdl, iosvc->send_tid);
