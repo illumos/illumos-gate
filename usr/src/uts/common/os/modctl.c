@@ -477,22 +477,6 @@ modctl_modreserve(modid_t id, int *data)
 	return (0);
 }
 
-/* to be removed when Ed introduces these */
-static char *
-ddi_strdup(const char *str, int flag)
-{
-	char	*rv;
-	int	n = strlen(str) + 1;
-	rv = kmem_alloc(n, flag);
-	bcopy(str, rv, n);
-	return (rv);
-}
-static void
-strfree(char *str)
-{
-	kmem_free(str, strlen(str)+1);
-}
-
 /* Add/Remove driver and binding aliases */
 static int
 modctl_update_driver_aliases(int add, int *data)
@@ -603,7 +587,7 @@ modctl_update_driver_aliases(int add, int *data)
 		}
 #endif
 		check_esc_sequences(name, cname);
-		aip->alias_name = ddi_strdup(cname, KM_SLEEP);
+		aip->alias_name = strdup(cname);
 		ap = alias.a_next;
 		aip++;
 	}

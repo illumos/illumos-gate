@@ -22,10 +22,8 @@
 #
 # uts/i86pc/xdf/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	i86pc architecture dependent
 #
@@ -55,7 +53,7 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 # Overrides
-CPPFLAGS	+= -DHVMPV_XDF_VERS=1
+CPPFLAGS	+= -DHVMPV_XDF_VERS=2
 LDFLAGS		+= -dy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
 
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON

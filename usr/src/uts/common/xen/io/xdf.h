@@ -20,13 +20,21 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #ifndef _SYS_XDF_H
 #define	_SYS_XDF_H
+
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/cmlb.h>
+#include <sys/dkio.h>
+
+#include <sys/gnttab.h>
+#include <xen/sys/xendev.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,43 +69,50 @@ extern "C" {
  * vdc driver, where as here it is used as an interface between the pv_cmdk
  * driver and the xdf driver.)
  */
-#define	XB_SLICE_NONE	0xFF
+#define	XB_SLICE_NONE		0xFF
 
 /*
  * blkif status
  */
-enum xdf_state {
+typedef enum xdf_state {
 	/*
 	 * initial state
 	 */
-	XD_UNKNOWN,
+	XD_UNKNOWN = 0,
 	/*
 	 * ring and evtchn alloced, xenbus state changed to
 	 * XenbusStateInitialised, wait for backend to connect
 	 */
-	XD_INIT,
+	XD_INIT = 1,
 	/*
-	 * backend's xenbus state has changed to XenbusStateConnected,
-	 * this is the only state allowing I/Os
+	 * backend and frontend xenbus state has changed to
+	 * XenbusStateConnected.  IO is now allowed, but we are not still
+	 * fully initialized.
 	 */
-	XD_READY,
+	XD_CONNECTED = 2,
+	/*
+	 * We're fully initialized and allowing regular IO.
+	 */
+	XD_READY = 3,
 	/*
 	 * vbd interface close request received from backend, no more I/O
 	 * requestis allowed to be put into ring buffer, while interrupt handler
 	 * is allowed to run to finish any outstanding I/O request, disconnect
 	 * process is kicked off by changing xenbus state to XenbusStateClosed
 	 */
-	XD_CLOSING,
+	XD_CLOSING = 4,
 	/*
 	 * disconnection process finished, both backend and frontend's
 	 * xenbus state has been changed to XenbusStateClosed, can be detached
 	 */
-	XD_CLOSED,
+	XD_CLOSED = 5,
 	/*
-	 * disconnection process finished, frontend is suspended
+	 * We're either being suspended or resuming from a suspend.  If we're
+	 * in the process of suspending, we block all new IO, but but allow
+	 * existing IO to drain.
 	 */
-	XD_SUSPEND
-};
+	XD_SUSPEND = 6
+} xdf_state_t;
 
 /*
  * 16 partitions + fdisk
@@ -117,13 +132,13 @@ enum xdf_state {
  * each blkif_request_t when sent out to the ring buffer.
  */
 typedef struct ge_slot {
-	list_node_t	link;
-	domid_t		oeid;
-	struct v_req	*vreq;
-	int		isread;
-	grant_ref_t	ghead;
-	int		ngrefs;
-	grant_ref_t	ge[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	list_node_t	gs_vreq_link;
+	struct v_req	*gs_vreq;
+	domid_t		gs_oeid;
+	int		gs_isread;
+	grant_ref_t	gs_ghead;
+	int		gs_ngrefs;
+	grant_ref_t	gs_ge[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 } ge_slot_t;
 
 /*
@@ -148,20 +163,21 @@ typedef struct ge_slot {
  */
 typedef struct v_req {
 	list_node_t	v_link;
+	list_t		v_gs;
 	int		v_status;
 	buf_t		*v_buf;
-	ddi_dma_handle_t v_dmahdl;
-	ddi_dma_cookie_t v_dmac;
 	uint_t		v_ndmacs;
 	uint_t		v_dmaw;
 	uint_t		v_ndmaws;
 	uint_t		v_nslots;
-	ge_slot_t	*v_gs;
 	uint64_t	v_blkno;
-	ddi_acc_handle_t v_align;
-	caddr_t		v_abuf;
 	ddi_dma_handle_t v_memdmahdl;
+	ddi_acc_handle_t v_align;
+	ddi_dma_handle_t v_dmahdl;
+	ddi_dma_cookie_t v_dmac;
+	caddr_t		v_abuf;
 	uint8_t		v_flush_diskcache;
+	boolean_t	v_runq;
 } v_req_t;
 
 /*
@@ -184,42 +200,55 @@ typedef struct v_req {
  */
 typedef struct xdf {
 	dev_info_t	*xdf_dip;
+	char		*xdf_addr;
 	ddi_iblock_cookie_t xdf_ibc; /* mutex iblock cookie */
 	domid_t		xdf_peer; /* otherend's dom ID */
 	xendev_ring_t	*xdf_xb_ring; /* I/O ring buffer */
 	ddi_acc_handle_t xdf_xb_ring_hdl; /* access handler for ring buffer */
 	list_t		xdf_vreq_act; /* active vreq list */
-	list_t		xdf_gs_act; /* active grant table slot list */
 	buf_t		*xdf_f_act; /* active buf list head */
 	buf_t		*xdf_l_act; /* active buf list tail */
-	enum xdf_state	xdf_status; /* status of this virtual disk */
+	buf_t		*xdf_i_act; /* active buf list index */
+	xdf_state_t	xdf_state; /* status of this virtual disk */
+	boolean_t	xdf_suspending;
 	ulong_t		xdf_vd_open[OTYPCNT];
 	ulong_t		xdf_vd_lyropen[XDF_PEXT];
+	ulong_t		xdf_connect_req;
 	ulong_t		xdf_vd_exclopen;
 	kmutex_t	xdf_iostat_lk; /* muxes lock for the iostat ptr */
 	kmutex_t	xdf_dev_lk; /* mutex lock for I/O path */
 	kmutex_t	xdf_cb_lk; /* mutex lock for event handling path */
 	kcondvar_t	xdf_dev_cv; /* cv used in I/O path */
-	uint_t		xdf_xdev_info; /* disk info from backend xenstore */
+	uint_t		xdf_dinfo; /* disk info from backend xenstore */
 	diskaddr_t	xdf_xdev_nblocks; /* total size in block */
 	cmlb_geom_t	xdf_pgeom;
+	boolean_t	xdf_pgeom_set;
+	boolean_t	xdf_pgeom_fixed;
 	kstat_t		*xdf_xdev_iostat;
 	cmlb_handle_t	xdf_vd_lbl;
 	ddi_softintr_t	xdf_softintr_id;
 	timeout_id_t	xdf_timeout_id;
 	struct gnttab_free_callback xdf_gnt_callback;
-	int		xdf_feature_barrier;
-	int		xdf_flush_supported;
-	int		xdf_wce;
+	boolean_t	xdf_feature_barrier;
+	boolean_t	xdf_flush_supported;
+	boolean_t	xdf_media_req_supported;
+	boolean_t	xdf_wce;
+	boolean_t	xdf_cmbl_reattach;
 	char		*xdf_flush_mem;
 	char		*xdf_cache_flush_block;
 	int		xdf_evtchn;
+	enum dkio_state	xdf_mstate;
+	kcondvar_t	xdf_mstate_cv;
+	kcondvar_t	xdf_hp_status_cv;
+	struct buf	*xdf_ready_bp;
+	ddi_taskq_t	*xdf_ready_tq;
+	kthread_t	*xdf_ready_tq_thread;
+	struct buf	*xdf_ready_tq_bp;
 #ifdef	DEBUG
 	int		xdf_dmacallback_num;
+	kthread_t	*xdf_oe_change_thread;
 #endif
 } xdf_t;
-
-#define	BP2VREQ(bp)	((v_req_t *)((bp)->av_back))
 
 /*
  * VBD I/O requests must be aligned on a 512-byte boundary and specify
@@ -235,14 +264,14 @@ typedef struct xdf {
 /* wrap pa_to_ma() for xdf to run in dom0 */
 #define	PATOMA(addr)	(DOMAIN_IS_INITDOMAIN(xen_info) ? addr : pa_to_ma(addr))
 
-#define	XD_IS_RO(vbd)	((vbd)->xdf_xdev_info & VDISK_READONLY)
-#define	XD_IS_CD(vbd)	((vbd)->xdf_xdev_info & VDISK_CDROM)
-#define	XD_IS_RM(vbd)	((vbd)->xdf_xdev_info & VDISK_REMOVABLE)
-#define	IS_READ(bp)	((bp)->b_flags & B_READ)
-#define	IS_ERROR(bp)	((bp)->b_flags & B_ERROR)
+#define	XD_IS_RO(vbd)	VOID2BOOLEAN((vbd)->xdf_dinfo & VDISK_READONLY)
+#define	XD_IS_CD(vbd)	VOID2BOOLEAN((vbd)->xdf_dinfo & VDISK_CDROM)
+#define	XD_IS_RM(vbd)	VOID2BOOLEAN((vbd)->xdf_dinfo & VDISK_REMOVABLE)
+#define	IS_READ(bp)	VOID2BOOLEAN((bp)->b_flags & B_READ)
+#define	IS_ERROR(bp)	VOID2BOOLEAN((bp)->b_flags & B_ERROR)
 
 #define	XDF_UPDATE_IO_STAT(vdp, bp)					\
-	if ((vdp)->xdf_xdev_iostat != NULL) {				\
+	{								\
 		kstat_io_t *kip = KSTAT_IO_PTR((vdp)->xdf_xdev_iostat);	\
 		size_t n_done = (bp)->b_bcount - (bp)->b_resid;		\
 		if ((bp)->b_flags & B_READ) {				\
@@ -254,9 +283,8 @@ typedef struct xdf {
 		}							\
 	}
 
-extern int xdfdebug;
 #ifdef DEBUG
-#define	DPRINTF(flag, args)	{if (xdfdebug & (flag)) prom_printf args; }
+#define	DPRINTF(flag, args)	{if (xdf_debug & (flag)) prom_printf args; }
 #define	SETDMACBON(vbd)		{(vbd)->xdf_dmacallback_num++; }
 #define	SETDMACBOFF(vbd)	{(vbd)->xdf_dmacallback_num--; }
 #define	ISDMACBON(vbd)		((vbd)->xdf_dmacallback_num > 0)
@@ -276,11 +304,18 @@ extern int xdfdebug;
 #define	LBL_DBG		0x80
 
 #if defined(XPV_HVM_DRIVER)
-extern dev_info_t *xdf_hvm_hold(char *);
-extern int xdf_hvm_connect(dev_info_t *);
+extern int xdf_lb_getinfo(dev_info_t *, int, void *, void *);
+extern int xdf_lb_rdwr(dev_info_t *, uchar_t, void *, diskaddr_t, size_t,
+    void *);
+extern void xdfmin(struct buf *bp);
+extern dev_info_t *xdf_hvm_hold(const char *);
+extern boolean_t xdf_hvm_connect(dev_info_t *);
 extern int xdf_hvm_setpgeom(dev_info_t *, cmlb_geom_t *);
 extern int xdf_kstat_create(dev_info_t *, char *, int);
 extern void xdf_kstat_delete(dev_info_t *);
+extern boolean_t xdf_is_cd(dev_info_t *);
+extern boolean_t xdf_is_rm(dev_info_t *);
+extern boolean_t xdf_media_req_supported(dev_info_t *);
 #endif /* XPV_HVM_DRIVER */
 
 #ifdef __cplusplus

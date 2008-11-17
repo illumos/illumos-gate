@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -52,12 +50,14 @@ d none platform/i86hvm/kernel/drv			0755	root	sys
 d none platform/i86hvm/kernel/drv/amd64			0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/cmdk		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/rtls		0755	root	sys
+f none platform/i86hvm/kernel/drv/amd64/sd		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xdf		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xnf		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xpv		0755	root	sys
 f none platform/i86hvm/kernel/drv/amd64/xpvd		0755	root	sys
 f none platform/i86hvm/kernel/drv/cmdk			0755	root	sys
 f none platform/i86hvm/kernel/drv/rtls			0755	root	sys
+f none platform/i86hvm/kernel/drv/sd			0755	root	sys
 f none platform/i86hvm/kernel/drv/xdf			0755	root	sys
 f none platform/i86hvm/kernel/drv/xnf			0755	root	sys
 f none platform/i86hvm/kernel/drv/xpv			0755	root	sys
@@ -67,4 +67,8 @@ f none platform/i86hvm/kernel/drv/xpvd.conf		0644	root	sys
 d none platform/i86hvm/kernel/misc			0755	root	sys
 d none platform/i86hvm/kernel/misc/amd64		0755	root	sys
 f none platform/i86hvm/kernel/misc/amd64/hvm_bootstrap	0755	root	sys
+f none platform/i86hvm/kernel/misc/amd64/hvm_cmdk	0755	root	sys
+f none platform/i86hvm/kernel/misc/amd64/hvm_sd		0755	root	sys
 f none platform/i86hvm/kernel/misc/hvm_bootstrap	0755	root	sys
+f none platform/i86hvm/kernel/misc/hvm_cmdk		0755	root	sys
+f none platform/i86hvm/kernel/misc/hvm_sd		0755	root	sys

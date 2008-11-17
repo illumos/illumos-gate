@@ -388,6 +388,10 @@ typedef enum {
 #define	DDI_MODEL_NATIVE	DATAMODEL_NATIVE
 #define	DDI_MODEL_NONE		DATAMODEL_NONE
 
+extern char *ddi_strdup(const char *str, int flag);
+extern char *strdup(const char *str);
+extern void strfree(char *str);
+
 /*
  * Functions and data references which really should be in <sys/ddi.h>
  */

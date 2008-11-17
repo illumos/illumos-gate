@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #ifndef _SYS_XDB_H
 #define	_SYS_XDB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,57 +40,17 @@ extern "C" {
 /*
  * Info of the exported blk device
  */
-#define	XDB_DEV_RO	(1)	/* read-only or writable */
-#define	XDB_IS_RO(vdp)	((vdp)->xs_type & XDB_DEV_RO)
-#define	XDB_DEV_LOFI	(1 << 1) /* lofi device or physical device */
-#define	XDB_IS_LOFI(vdp)	((vdp)->xs_type & XDB_DEV_LOFI)
-#define	XDB_DEV_CD	(1 << 2) /* cdrom disc */
-#define	XDB_IS_CD(vdp)	((vdp)->xs_type & XDB_DEV_CD)
-#define	XDB_DEV_RMB	(1 << 3) /* removable device */
-#define	XDB_IS_RMB(vdp)	((vdp)->xs_type & XDB_DEV_RMB)
+#define	XDB_DEV_RO	(1 << 0) /* backend and frontend are read-only */
+#define	XDB_DEV_BE_LOFI	(1 << 1) /* backend device is a lofi device */
+#define	XDB_DEV_BE_RMB	(1 << 2) /* backend device is removable */
+#define	XDB_DEV_BE_CD	(1 << 3) /* backend device is cdrom */
+#define	XDB_DEV_FE_CD	(1 << 4) /* frontend device is cdrom */
 
-/*
- * Xdb interface status
- */
-enum xdb_state {
-	/*
-	 * initial state
-	 */
-	XDB_UNKNOWN,
-	/*
-	 * frontend xenbus state changed to XenbusStateConnected,
-	 * we finally connect
-	 */
-	XDB_CONNECTED,
-	/*
-	 * frontend xenbus state changed to XenbusStateClosed,
-	 * interface disconnected
-	 */
-	XDB_DISCONNECTED
-};
-
-/*
- * backend device status
- */
-enum xdb_dev_state {
-	/* initial state */
-	XDB_DEV_UNKNOWN,
-	/* backend device is ready (hotplug script finishes successfully) */
-	XDB_DEV_READY
-};
-
-/*
- * frontend status
- */
-enum xdb_fe_state {
-	/* initial state */
-	XDB_FE_UNKNOWN,
-	/*
-	 * frontend's xenbus state has changed to
-	 * XenbusStateInitialised, is ready for connecting
-	 */
-	XDB_FE_READY
-};
+#define	XDB_IS_RO(vdp)		((vdp)->xs_type & XDB_DEV_RO)
+#define	XDB_IS_BE_LOFI(vdp)	((vdp)->xs_type & XDB_DEV_BE_LOFI)
+#define	XDB_IS_BE_RMB(vdp)	((vdp)->xs_type & XDB_DEV_BE_RMB)
+#define	XDB_IS_BE_CD(vdp)	((vdp)->xs_type & XDB_DEV_BE_CD)
+#define	XDB_IS_FE_CD(vdp)	((vdp)->xs_type & XDB_DEV_FE_CD)
 
 /*
  * Other handy macrosx
@@ -183,12 +141,6 @@ struct xdb {
 	 */
 	buf_t		*xs_f_iobuf;
 	buf_t		*xs_l_iobuf;
-	/* xdb interface status */
-	enum xdb_state	xs_if_status;
-	/* backend device status */
-	enum xdb_dev_state xs_dev_status;
-	/* frontend status */
-	enum xdb_fe_state xs_fe_status;
 	/* head of free list of xdb_request_t */
 	int		xs_free_req;
 	/* pre-allocated xdb_request_t pool */
@@ -201,6 +153,23 @@ struct xdb {
 	enum blkif_protocol xs_blk_protocol;
 	size_t		xs_nentry;
 	size_t		xs_entrysize;
+
+	/* Protected by xs_cbmutex */
+	boolean_t	xs_hp_connected;	/* hot plug scripts have run */
+	boolean_t	xs_fe_initialised;	/* frontend is initialized */
+	char			*xs_lofi_path;
+	char			*xs_params_path;
+	struct xenbus_watch	*xs_watch_params;
+	struct xenbus_watch	*xs_watch_media_req;
+	ddi_taskq_t		*xs_watch_taskq;
+	int			xs_watch_taskq_count;
+
+	/* Protected by xs_cbmutex and xs_iomutex */
+	boolean_t	xs_if_connected;	/* connected to frontend */
+
+	/* Protected by xs_iomutex */
+	boolean_t	xs_send_buf;
+
 #ifdef DEBUG
 	uint64_t *page_addrs; /* for debug aid */
 #endif /* DEBUG */

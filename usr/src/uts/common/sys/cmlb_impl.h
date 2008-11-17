@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,9 +72,9 @@ extern "C" {
 #define	CMLB_LABEL(cl)		(DEVI(((cl)->cl_devi))->devi_binding_name)
 
 
-#define	ISREMOVABLE(cl)		(cl->cl_is_removable == 1)
+#define	ISREMOVABLE(cl)		(cl->cl_is_removable)
 #define	ISCD(cl)		(cl->cl_device_type == DTYPE_RODIRECT)
-#define	ISHOTPLUGGABLE(cl)	(cl->cl_is_hotpluggable == 1)
+#define	ISHOTPLUGGABLE(cl)	(cl->cl_is_hotpluggable)
 
 #if defined(_SUNOS_VTOC_8)
 
@@ -92,10 +92,6 @@ extern "C" {
 
 #define	CMLBUNIT(dev)		(getminor((dev)) >> CMLBUNIT_SHIFT)
 #define	CMLBPART(dev)		(getminor((dev)) &  CMLBPART_MASK)
-
-
-#define	TRUE 			1
-#define	FALSE			0
 
 /*
  * Return codes of cmlb_uselabel().
@@ -181,14 +177,14 @@ typedef struct cmlb_lun {
 
 	cmlb_state_t	cl_state;		/* state of handle */
 
-	int		cl_f_geometry_is_valid;
+	boolean_t	cl_f_geometry_is_valid;
 	int		cl_sys_blocksize;
 
 	kmutex_t	cl_mutex;
 
 	/* the following are passed in at attach time */
-	int		cl_is_removable;	/* 1 is removable */
-	int		cl_is_hotpluggable;	/* 1 is hotpluggable */
+	boolean_t	cl_is_removable;	/* is removable */
+	boolean_t	cl_is_hotpluggable;	/* is hotpluggable */
 	int		cl_alter_behavior;
 	char 		*cl_node_type;		/* DDI_NT_... */
 	int		cl_device_type;		/* DTYPE_DIRECT,.. */

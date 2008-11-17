@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,21 +224,6 @@ static char *
 getzonename(void)
 {
 	return (curproc->p_zone->zone_name);
-}
-
-static void
-strfree(char *str)
-{
-	kmem_free(str, strlen(str) + 1);
-}
-
-static char *
-strdup(char *str)
-{
-	int	n = strlen(str);
-	char	*ptr = kmem_alloc(n + 1, KM_SLEEP);
-	bcopy(str, ptr, n + 1);
-	return (ptr);
 }
 
 static char *

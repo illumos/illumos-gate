@@ -202,7 +202,7 @@ static struct modlinkage modlinkage = {
 
 /* Local function prototypes */
 static dev_t cmlb_make_device(struct cmlb_lun *cl);
-static int cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid,
+static int cmlb_validate_geometry(struct cmlb_lun *cl, boolean_t forcerevalid,
     int flags, void *tg_cookie);
 static void cmlb_resync_geom_caches(struct cmlb_lun *cl, diskaddr_t capacity,
     void *tg_cookie);
@@ -227,14 +227,14 @@ static void cmlb_clear_vtoc(struct cmlb_lun *cl, void *tg_cookie);
 static void cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie);
 static int cmlb_create_minor_nodes(struct cmlb_lun *cl);
 static int cmlb_check_update_blockcount(struct cmlb_lun *cl, void *tg_cookie);
-static int cmlb_check_efi_mbr(uchar_t *buf, int *is_mbr);
+static boolean_t cmlb_check_efi_mbr(uchar_t *buf, boolean_t *is_mbr);
 
 #if defined(__i386) || defined(__amd64)
 static int cmlb_update_fdisk_and_vtoc(struct cmlb_lun *cl, void *tg_cookie);
 #endif
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
-static int  cmlb_has_max_chs_vals(struct ipart *fdp);
+static boolean_t  cmlb_has_max_chs_vals(struct ipart *fdp);
 #endif
 
 #if defined(_SUNOS_VTOC_16)
@@ -487,10 +487,8 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  *			scsi/generic/inquiry.h
  *
  *	is_removable	whether or not device is removable.
- *			0 non-removable, 1 removable.
  *
  *	is_hotpluggable	whether or not device is hotpluggable.
- *			0 non-hotpluggable, 1 hotpluggable.
  *
  *	node_type	minor node type (as used by ddi_create_minor_node)
  *
@@ -588,13 +586,16 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  */
 int
 cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
-    int is_removable, int is_hotpluggable, char *node_type,
+    boolean_t is_removable, boolean_t is_hotpluggable, char *node_type,
     int alter_behavior, cmlb_handle_t cmlbhandle, void *tg_cookie)
 {
 
 	struct cmlb_lun	*cl = (struct cmlb_lun *)cmlbhandle;
 	diskaddr_t	cap;
 	int		status;
+
+	ASSERT(VALID_BOOLEAN(is_removable));
+	ASSERT(VALID_BOOLEAN(is_hotpluggable));
 
 	if (tgopsp->tg_version < TG_DK_OPS_VERSION_1)
 		return (EINVAL);
@@ -608,13 +609,13 @@ cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
 	cl->cl_is_hotpluggable = is_hotpluggable;
 	cl->cl_node_type = node_type;
 	cl->cl_sys_blocksize = DEV_BSIZE;
-	cl->cl_f_geometry_is_valid = FALSE;
+	cl->cl_f_geometry_is_valid = B_FALSE;
 	cl->cl_def_labeltype = CMLB_LABEL_VTOC;
 	cl->cl_alter_behavior = alter_behavior;
 	cl->cl_reserved = -1;
 	cl->cl_msglog_flag |= CMLB_ALLOW_2TB_WARN;
 
-	if (is_removable == 0) {
+	if (!is_removable) {
 		mutex_exit(CMLB_MUTEX(cl));
 		status = DK_TG_GETCAP(cl, &cap, tg_cookie);
 		mutex_enter(CMLB_MUTEX(cl));
@@ -663,7 +664,7 @@ cmlb_detach(cmlb_handle_t cmlbhandle, void *tg_cookie)
 
 	mutex_enter(CMLB_MUTEX(cl));
 	cl->cl_def_labeltype = CMLB_LABEL_UNDEF;
-	cl->cl_f_geometry_is_valid = FALSE;
+	cl->cl_f_geometry_is_valid = B_FALSE;
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), NULL);
 	i_ddi_prop_dyn_driver_set(CMLB_DEVINFO(cl), NULL);
 	cl->cl_state = CMLB_INITED;
@@ -720,11 +721,11 @@ cmlb_validate(cmlb_handle_t cmlbhandle, int flags, void *tg_cookie)
 		return (ENXIO);
 	}
 
-	rval = cmlb_validate_geometry((struct cmlb_lun *)cmlbhandle, 1,
+	rval = cmlb_validate_geometry((struct cmlb_lun *)cmlbhandle, B_TRUE,
 	    flags, tg_cookie);
 
 	if (rval == ENOTSUP) {
-		if (cl->cl_f_geometry_is_valid == TRUE) {
+		if (cl->cl_f_geometry_is_valid) {
 			cl->cl_cur_labeltype = CMLB_LABEL_EFI;
 			ret = 0;
 		} else {
@@ -762,7 +763,7 @@ cmlb_invalidate(cmlb_handle_t cmlbhandle, void *tg_cookie)
 		return;
 
 	mutex_enter(CMLB_MUTEX(cl));
-	cl->cl_f_geometry_is_valid = FALSE;
+	cl->cl_f_geometry_is_valid = B_FALSE;
 	mutex_exit(CMLB_MUTEX(cl));
 }
 
@@ -774,19 +775,19 @@ cmlb_invalidate(cmlb_handle_t cmlbhandle, void *tg_cookie)
  *	cmlbhandle      cmlb handle associated with device.
  *
  * Return values:
- *	TRUE if incore label/geom data is valid.
- *	FALSE otherwise.
+ *	B_TRUE if incore label/geom data is valid.
+ *	B_FALSE otherwise.
  *
  */
 
 
-int
+boolean_t
 cmlb_is_valid(cmlb_handle_t cmlbhandle)
 {
 	struct cmlb_lun *cl = (struct cmlb_lun *)cmlbhandle;
 
 	if (cmlbhandle == NULL)
-		return (FALSE);
+		return (B_FALSE);
 
 	return (cl->cl_f_geometry_is_valid);
 
@@ -816,7 +817,7 @@ cmlb_close(cmlb_handle_t cmlbhandle, void *tg_cookie)
 	struct cmlb_lun *cl = (struct cmlb_lun *)cmlbhandle;
 
 	mutex_enter(CMLB_MUTEX(cl));
-	cl->cl_f_geometry_is_valid = FALSE;
+	cl->cl_f_geometry_is_valid = B_FALSE;
 
 	/* revert to default minor node for this device */
 	if (ISREMOVABLE(cl)) {
@@ -861,7 +862,7 @@ cmlb_get_devid_block(cmlb_handle_t cmlbhandle, diskaddr_t *devidblockp,
 		return (EINVAL);
 	}
 
-	if ((cl->cl_f_geometry_is_valid == FALSE) ||
+	if ((!cl->cl_f_geometry_is_valid) ||
 	    (cl->cl_solaris_size < DK_LABEL_LOC)) {
 		mutex_exit(CMLB_MUTEX(cl));
 		return (EINVAL);
@@ -955,16 +956,16 @@ cmlb_partinfo(cmlb_handle_t cmlbhandle, int part, diskaddr_t *nblocksp,
 	if (part  < 0 || part >= MAXPART) {
 		rval = EINVAL;
 	} else {
-		if (cl->cl_f_geometry_is_valid == FALSE)
-			(void) cmlb_validate_geometry((struct cmlb_lun *)cl, 0,
-			    0, tg_cookie);
+		if (!cl->cl_f_geometry_is_valid)
+			(void) cmlb_validate_geometry((struct cmlb_lun *)cl,
+			    B_FALSE, 0, tg_cookie);
 
 #if defined(_SUNOS_VTOC_16)
-		if (((cl->cl_f_geometry_is_valid == FALSE) ||
+		if (((!cl->cl_f_geometry_is_valid) ||
 		    (part < NDKMAP && cl->cl_solaris_size == 0)) &&
 		    (part != P0_RAW_DISK)) {
 #else
-		if ((cl->cl_f_geometry_is_valid == FALSE) ||
+		if ((!cl->cl_f_geometry_is_valid) ||
 		    (part < NDKMAP && cl->cl_solaris_size == 0)) {
 #endif
 			rval = EINVAL;
@@ -1030,11 +1031,11 @@ cmlb_efi_label_capacity(cmlb_handle_t cmlbhandle, diskaddr_t *capacity,
 		return (EINVAL);
 	}
 
-	if (cl->cl_f_geometry_is_valid == FALSE)
-		(void) cmlb_validate_geometry((struct cmlb_lun *)cl, 0,
+	if (!cl->cl_f_geometry_is_valid)
+		(void) cmlb_validate_geometry((struct cmlb_lun *)cl, B_FALSE,
 		    0, tg_cookie);
 
-	if ((cl->cl_f_geometry_is_valid == FALSE) || (capacity == NULL) ||
+	if ((!cl->cl_f_geometry_is_valid) || (capacity == NULL) ||
 	    (cl->cl_cur_labeltype != CMLB_LABEL_EFI)) {
 		rval = EINVAL;
 	} else {
@@ -1268,33 +1269,36 @@ cmlb_check_update_blockcount(struct cmlb_lun *cl, void *tg_cookie)
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 
-	if (cl->cl_f_geometry_is_valid == FALSE)  {
-		mutex_exit(CMLB_MUTEX(cl));
-		status = DK_TG_GETCAP(cl, &capacity, tg_cookie);
-		if (status != 0) {
-			mutex_enter(CMLB_MUTEX(cl));
-			return (EIO);
-		}
-
-		status = DK_TG_GETBLOCKSIZE(cl, &lbasize, tg_cookie);
-		mutex_enter(CMLB_MUTEX(cl));
-		if (status != 0)
-			return (EIO);
-
-		if ((capacity != 0) && (lbasize != 0)) {
-			cl->cl_blockcount = capacity;
-			cl->cl_tgt_blocksize = lbasize;
-			return (0);
-		} else
-			return (EIO);
-	} else
+	if (cl->cl_f_geometry_is_valid)
 		return (0);
+
+	mutex_exit(CMLB_MUTEX(cl));
+	status = DK_TG_GETCAP(cl, &capacity, tg_cookie);
+	if (status != 0) {
+		mutex_enter(CMLB_MUTEX(cl));
+		return (EIO);
+	}
+
+	status = DK_TG_GETBLOCKSIZE(cl, &lbasize, tg_cookie);
+	mutex_enter(CMLB_MUTEX(cl));
+	if (status != 0)
+		return (EIO);
+
+	if ((capacity != 0) && (lbasize != 0)) {
+		cl->cl_blockcount = capacity;
+		cl->cl_tgt_blocksize = lbasize;
+		return (0);
+	} else {
+		return (EIO);
+	}
 }
 
 static int
 cmlb_create_minor(dev_info_t *dip, char *name, int spec_type,
     minor_t minor_num, char *node_type, int flag, boolean_t internal)
 {
+	ASSERT(VALID_BOOLEAN(internal));
+
 	if (internal)
 		return (ddi_create_internal_pathname(dip,
 		    name, spec_type, minor_num));
@@ -1331,7 +1335,8 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 	ASSERT(cl != NULL);
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 
-	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
+	internal = VOID2BOOLEAN(
+	    (cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 	/* check the most common case */
 	if (cl->cl_cur_labeltype != CMLB_LABEL_UNDEF &&
@@ -1462,7 +1467,7 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
  *     Context: Kernel thread only (can sleep).
  */
 static int
-cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
+cmlb_validate_geometry(struct cmlb_lun *cl, boolean_t forcerevalid, int flags,
     void *tg_cookie)
 {
 	int		label_error = 0;
@@ -1470,8 +1475,9 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 	int		count;
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
+	ASSERT(VALID_BOOLEAN(forcerevalid));
 
-	if ((cl->cl_f_geometry_is_valid == TRUE) && (forcerevalid == 0)) {
+	if ((cl->cl_f_geometry_is_valid) && (!forcerevalid)) {
 		if (cl->cl_cur_labeltype == CMLB_LABEL_EFI)
 			return (ENOTSUP);
 		return (0);
@@ -1580,7 +1586,7 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 			 * a default label.
 			 */
 			label_error = 0;
-			cl->cl_f_geometry_is_valid = TRUE;
+			cl->cl_f_geometry_is_valid = B_TRUE;
 			goto no_solaris_partition;
 		}
 
@@ -1638,7 +1644,7 @@ cmlb_validate_geometry(struct cmlb_lun *cl, int forcerevalid, int flags,
 #elif defined(_SUNOS_VTOC_16)
 	if (label_error != EACCES) {
 #endif
-		if (cl->cl_f_geometry_is_valid == FALSE) {
+		if (!cl->cl_f_geometry_is_valid) {
 			cmlb_build_default_label(cl, tg_cookie);
 		}
 		label_error = 0;
@@ -2065,7 +2071,7 @@ done:
 		bzero(&cl->cl_g, sizeof (struct dk_geom));
 		bzero(&cl->cl_vtoc, sizeof (struct dk_vtoc));
 		bzero(&cl->cl_map, NDKMAP * (sizeof (struct dk_map)));
-		cl->cl_f_geometry_is_valid = FALSE;
+		cl->cl_f_geometry_is_valid = B_FALSE;
 	}
 	cl->cl_solaris_offset = solaris_offset;
 	cl->cl_solaris_size = solaris_size;
@@ -2130,8 +2136,8 @@ cmlb_validate_efi(efi_gpt_t *labp)
 }
 
 /*
- * This function returns FALSE if there is a valid MBR signature and no
- * partition table entries of type EFI_PMBR (0xEE). Otherwise it returns TRUE.
+ * This function returns B_FALSE if there is a valid MBR signature and no
+ * partition table entries of type EFI_PMBR (0xEE). Otherwise it returns B_TRUE.
  *
  * The EFI spec (1.10 and later) requires having a Protective MBR (PMBR) to
  * recognize the disk as GPT partitioned. However, some other OS creates an MBR
@@ -2139,11 +2145,11 @@ cmlb_validate_efi(efi_gpt_t *labp)
  * corrupted, currently best attempt to allow data access would be to try to
  * check for GPT headers. Hence in case of more than one partition entry, but
  * at least one EFI_PMBR partition type or no valid magic number, the function
- * returns TRUE to continue with looking for GPT header.
+ * returns B_TRUE to continue with looking for GPT header.
  */
 
-static int
-cmlb_check_efi_mbr(uchar_t *buf, int *is_mbr)
+static boolean_t
+cmlb_check_efi_mbr(uchar_t *buf, boolean_t *is_mbr)
 {
 	struct ipart	*fdp;
 	struct mboot	*mbp = (struct mboot *)buf;
@@ -2151,22 +2157,22 @@ cmlb_check_efi_mbr(uchar_t *buf, int *is_mbr)
 	int		i;
 
 	if (is_mbr != NULL)
-		*is_mbr = TRUE;
+		*is_mbr = B_TRUE;
 
 	if (LE_16(mbp->signature) != MBB_MAGIC) {
 		if (is_mbr != NULL)
-			*is_mbr = FALSE;
-		return (TRUE);
+			*is_mbr = B_FALSE;
+		return (B_TRUE);
 	}
 
 	bcopy(&mbp->parts[0], fdisk, sizeof (fdisk));
 
 	for (fdp = fdisk, i = 0; i < FD_NUMPART; i++, fdp++) {
 		if (fdp->systid == EFI_PMBR)
-			return (TRUE);
+			return (B_TRUE);
 	}
 
-	return (FALSE);
+	return (B_FALSE);
 }
 
 static int
@@ -2185,7 +2191,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	int		iofailed = 0;
 	struct uuid	uuid_type_reserved = EFI_RESERVED;
 #if defined(_FIRMWARE_NEEDS_FDISK)
-		int 		is_mbr;
+	boolean_t 	is_mbr;
 #endif
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
@@ -2215,15 +2221,15 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	}
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
-	if (cmlb_check_efi_mbr(buf, &is_mbr) == FALSE) {
-		if (is_mbr == TRUE)
+	if (!cmlb_check_efi_mbr(buf, &is_mbr)) {
+		if (is_mbr)
 			rval = ESRCH;
 		else
 			rval = EINVAL;
 		goto done_err;
 	}
 #else
-	if (cmlb_check_efi_mbr(buf, NULL) == FALSE) {
+	if (!cmlb_check_efi_mbr(buf, NULL)) {
 		rval = EINVAL;
 		goto done_err;
 	}
@@ -2341,7 +2347,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	cl->cl_solaris_offset = 0;
 	cl->cl_solaris_size = capacity;
 	cl->cl_label_from_media = CMLB_LABEL_EFI;
-	cl->cl_f_geometry_is_valid = TRUE;
+	cl->cl_f_geometry_is_valid = B_TRUE;
 
 	/* clear the vtoc label */
 	bzero(&cl->cl_vtoc, sizeof (struct dk_vtoc));
@@ -2362,7 +2368,7 @@ done_err1:
 	 * causes things like opens and stats on the partition to fail.
 	 */
 	if ((capacity > CMLB_EXTVTOC_LIMIT) && (rval != ESRCH) && !iofailed) {
-		cl->cl_f_geometry_is_valid = FALSE;
+		cl->cl_f_geometry_is_valid = B_FALSE;
 	}
 	return (rval);
 }
@@ -2546,7 +2552,7 @@ cmlb_uselabel(struct cmlb_lun *cl, struct dk_label *labp, int flags)
 	}
 
 	/* Mark the geometry as valid. */
-	cl->cl_f_geometry_is_valid = TRUE;
+	cl->cl_f_geometry_is_valid = B_TRUE;
 
 	/*
 	 * if we got invalidated when mutex exit and entered again,
@@ -2584,7 +2590,7 @@ cmlb_uselabel(struct cmlb_lun *cl, struct dk_label *labp, int flags)
 
 			if ((labp->dkl_map[i].dkl_nblk) &&
 			    (part_end > cl->cl_blockcount)) {
-				cl->cl_f_geometry_is_valid = FALSE;
+				cl->cl_f_geometry_is_valid = B_FALSE;
 				break;
 			}
 		}
@@ -2595,7 +2601,7 @@ cmlb_uselabel(struct cmlb_lun *cl, struct dk_label *labp, int flags)
 			part_end = vpartp->p_start + vpartp->p_size;
 			if ((vpartp->p_size > 0) &&
 			    (part_end > cl->cl_blockcount)) {
-				cl->cl_f_geometry_is_valid = FALSE;
+				cl->cl_f_geometry_is_valid = B_FALSE;
 				break;
 			}
 		}
@@ -2609,7 +2615,7 @@ cmlb_uselabel(struct cmlb_lun *cl, struct dk_label *labp, int flags)
 			    "Label says %llu blocks; Drive says %llu blocks\n",
 			    label_capacity, cl->cl_blockcount);
 		}
-		cl->cl_f_geometry_is_valid = FALSE;
+		cl->cl_f_geometry_is_valid = B_FALSE;
 		label_error = CMLB_LABEL_IS_INVALID;
 	}
 
@@ -2775,7 +2781,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 		 * Got fdisk table but no solaris entry therefore
 		 * don't create a default label
 		 */
-		cl->cl_f_geometry_is_valid = TRUE;
+		cl->cl_f_geometry_is_valid = B_TRUE;
 		return;
 	}
 
@@ -2915,7 +2921,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 	cl->cl_vtoc.v_nparts = V_NUMPAR;
 	cl->cl_vtoc.v_version = V_VERSION;
 
-	cl->cl_f_geometry_is_valid = TRUE;
+	cl->cl_f_geometry_is_valid = B_TRUE;
 	cl->cl_label_from_media = CMLB_LABEL_UNDEF;
 
 	cmlb_dbg(CMLB_INFO,  cl,
@@ -2938,7 +2944,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 /*
  *    Function: cmlb_has_max_chs_vals
  *
- * Description: Return TRUE if Cylinder-Head-Sector values are all at maximum.
+ * Description: Return B_TRUE if Cylinder-Head-Sector values are all at maximum.
  *
  *   Arguments: fdp - ptr to CHS info
  *
@@ -2946,7 +2952,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
  *
  *     Context: Any.
  */
-static int
+static boolean_t
 cmlb_has_max_chs_vals(struct ipart *fdp)
 {
 	return ((fdp->begcyl  == LBA_MAX_CYL)	&&
@@ -2992,7 +2998,7 @@ cmlb_dkio_get_geometry(struct cmlb_lun *cl, caddr_t arg, int flag,
 	 * is ready.
 	 */
 	mutex_enter(CMLB_MUTEX(cl));
-	rval = cmlb_validate_geometry(cl, 1, 0, tg_cookie);
+	rval = cmlb_validate_geometry(cl, B_TRUE, 0, tg_cookie);
 #if defined(_SUNOS_VTOC_8)
 	if (rval == EINVAL &&
 	    cl->cl_alter_behavior & CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8) {
@@ -3105,7 +3111,7 @@ cmlb_dkio_set_geometry(struct cmlb_lun *cl, caddr_t arg, int flag)
 		cl->cl_offset[i] += cl->cl_solaris_offset;
 #endif
 	}
-	cl->cl_f_geometry_is_valid = FALSE;
+	cl->cl_f_geometry_is_valid = B_FALSE;
 	mutex_exit(CMLB_MUTEX(cl));
 	kmem_free(tmp_geom, sizeof (struct dk_geom));
 
@@ -3145,7 +3151,7 @@ cmlb_dkio_get_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 	 * information.
 	 */
 	mutex_enter(CMLB_MUTEX(cl));
-	if ((rval = cmlb_validate_geometry(cl, 1, 0, tg_cookie)) != 0) {
+	if ((rval = cmlb_validate_geometry(cl, B_TRUE, 0, tg_cookie)) != 0) {
 		mutex_exit(CMLB_MUTEX(cl));
 		return (rval);
 	}
@@ -3332,7 +3338,7 @@ cmlb_dkio_get_vtoc(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 		return (EOVERFLOW);
 	}
 
-	rval = cmlb_validate_geometry(cl, 1, 0, tg_cookie);
+	rval = cmlb_validate_geometry(cl, B_TRUE, 0, tg_cookie);
 
 #if defined(_SUNOS_VTOC_8)
 	if (rval == EINVAL &&
@@ -3445,7 +3451,7 @@ cmlb_dkio_get_extvtoc(struct cmlb_lun *cl, caddr_t arg, int flag,
 
 	bzero(&ext_vtoc, sizeof (struct extvtoc));
 	mutex_enter(CMLB_MUTEX(cl));
-	rval = cmlb_validate_geometry(cl, 1, 0, tg_cookie);
+	rval = cmlb_validate_geometry(cl, B_TRUE, 0, tg_cookie);
 
 #if defined(_SUNOS_VTOC_8)
 	if (rval == EINVAL &&
@@ -3705,7 +3711,8 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	int		rval = 0;
 	boolean_t	internal;
 
-	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
+	internal = VOID2BOOLEAN(
+	    (cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 #ifdef _MULTI_DATAMODEL
 	switch (ddi_model_convert_from(flag & FMODELS)) {
@@ -3777,7 +3784,8 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 
 	if ((rval = cmlb_build_label_vtoc(cl, &user_vtoc)) == 0) {
 		if ((rval = cmlb_write_label(cl, tg_cookie)) == 0) {
-			if (cmlb_validate_geometry(cl, 1, 0, tg_cookie) != 0) {
+			if (cmlb_validate_geometry(cl,
+			    B_TRUE, 0, tg_cookie) != 0) {
 				cmlb_dbg(CMLB_ERROR, cl,
 				    "cmlb_dkio_set_vtoc: "
 				    "Failed validate geometry\n");
@@ -3822,7 +3830,8 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	vtoctovtoc32(user_extvtoc, user_vtoc);
 #endif
 
-	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
+	internal = VOID2BOOLEAN(
+	    (cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 	mutex_enter(CMLB_MUTEX(cl));
 #if defined(__i386) || defined(__amd64)
 	if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize) {
@@ -3851,7 +3860,8 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 
 	if ((rval = cmlb_build_label_vtoc(cl, &user_vtoc)) == 0) {
 		if ((rval = cmlb_write_label(cl, tg_cookie)) == 0) {
-			if (cmlb_validate_geometry(cl, 1, 0, tg_cookie) != 0) {
+			if (cmlb_validate_geometry(cl,
+			    B_TRUE, 0, tg_cookie) != 0) {
 				cmlb_dbg(CMLB_ERROR, cl,
 				    "cmlb_dkio_set_vtoc: "
 				    "Failed validate geometry\n");
@@ -4307,7 +4317,8 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	if (ddi_copyin(arg, &user_efi, sizeof (dk_efi_t), flag))
 		return (EFAULT);
 
-	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
+	internal = VOID2BOOLEAN(
+	    (cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 
 	user_efi.dki_data = (void *)(uintptr_t)user_efi.dki_data_64;
 
@@ -4359,7 +4370,7 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 
 		if (rval == 0) {
 			mutex_enter(CMLB_MUTEX(cl));
-			cl->cl_f_geometry_is_valid = FALSE;
+			cl->cl_f_geometry_is_valid = B_FALSE;
 			mutex_exit(CMLB_MUTEX(cl));
 		}
 	}
@@ -4491,7 +4502,7 @@ cmlb_dkio_set_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 		 * update the fdisk and vtoc tables in memory
 		 */
 		rval = cmlb_update_fdisk_and_vtoc(cl, tg_cookie);
-		if ((cl->cl_f_geometry_is_valid == FALSE) || (rval != 0)) {
+		if ((!cl->cl_f_geometry_is_valid) || (rval != 0)) {
 			mutex_exit(CMLB_MUTEX(cl));
 			kmem_free(mboot, (size_t)(sizeof (struct mboot)));
 			return (rval);
@@ -4572,7 +4583,7 @@ cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie)
 		ret = DK_TG_GETPHYGEOM(cl, pgeomp, tg_cookie);
 		mutex_enter(CMLB_MUTEX(cl));
 
-		if (ret  == 0) {
+		if (ret == 0) {
 			geom_base_cap = 0;
 		} else {
 			cmlb_dbg(CMLB_ERROR,  cl,
@@ -4648,7 +4659,7 @@ cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie)
 	    " hd %d sec %d", cl->cl_g.dkg_ncyl, cl->cl_g.dkg_acyl,
 	    cl->cl_g.dkg_nhead, cl->cl_g.dkg_nsect);
 
-	cl->cl_f_geometry_is_valid = FALSE;
+	cl->cl_f_geometry_is_valid = B_FALSE;
 }
 
 
@@ -4727,7 +4738,7 @@ cmlb_update_fdisk_and_vtoc(struct cmlb_lun *cl, void *tg_cookie)
 			 * a default label.
 			 */
 			label_rc = 0;
-			cl->cl_f_geometry_is_valid = TRUE;
+			cl->cl_f_geometry_is_valid = B_TRUE;
 			goto no_solaris_partition;
 		}
 	} else if (capacity < 0) {
@@ -4738,11 +4749,11 @@ cmlb_update_fdisk_and_vtoc(struct cmlb_lun *cl, void *tg_cookie)
 	/*
 	 * For Removable media We reach here if we have found a
 	 * SOLARIS PARTITION.
-	 * If cl_f_geometry_is_valid is FALSE it indicates that the SOLARIS
+	 * If cl_f_geometry_is_valid is B_FALSE it indicates that the SOLARIS
 	 * PARTITION has changed from the previous one, hence we will setup a
 	 * default VTOC in this case.
 	 */
-	if (cl->cl_f_geometry_is_valid == FALSE) {
+	if (!cl->cl_f_geometry_is_valid) {
 		/* if we get here it is writable */
 		/* we are called from SMBOOT, and after a write of fdisk */
 		cmlb_build_default_label(cl, tg_cookie);

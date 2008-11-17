@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/i86pc/pv_cmdk/Makefile
+# uts/i86pc/i86hvm/hvm_cmdk/Makefile
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -37,10 +37,10 @@ UTSBASE	= ../../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= cmdk
-OBJECTS		= $(PV_CMDK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PV_CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
+MODULE		= hvm_cmdk
+OBJECTS		= $(HVM_CMDK_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(HVM_CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_HVM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -48,33 +48,30 @@ ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
 include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
 #
-# When generating lint libraries, we want the name of the lint module
-# that will be generated to by pv_cmdk and not cmdk, so override the
-# default lint module name here.
-#
-LINT_MODULE	= pv_cmdk
-
-#
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(LINT_MODULE).lint
+LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LDFLAGS		+= -dy -Nmisc/strategy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xdf
-LDFLAGS		+= -Nmisc/hvm_cmdk
-
-CPPFLAGS	+= -D_EXTVTOC
-
+#
+#	Overrides.
+#
+DEBUG_FLGS	=
+DEBUG_DEFS	+= $(DEBUG_FLGS)
+LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/cmlb
 
 #
-# The Xen header files do not lint cleanly.  Since the troublesome
-# structures form part of the externally defined interface to the
-# hypervisor, we're stuck with the noise.
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
 #
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
 
 #
 #	Default build targets.

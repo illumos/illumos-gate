@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +73,7 @@ static	int	cmdk_debug = DIO;
 #define	DKTP_DATA		(dkp->dk_tgobjp)->tg_data
 #define	DKTP_EXT		(dkp->dk_tgobjp)->tg_ext
 
-static void *cmdk_state;
+void *cmdk_state;
 
 /*
  * the cmdk_attach_mutex protects cmdk_max_instance in multi-threaded
@@ -187,17 +187,29 @@ struct dev_ops cmdk_ops = {
  */
 #include <sys/modctl.h>
 
-extern struct mod_ops mod_driverops;
-
+#ifndef XPV_HVM_DRIVER
 static struct modldrv modldrv = {
-	&mod_driverops, 	/* Type of module. This one is a driver */
+	&mod_driverops,		/* Type of module. This one is a driver */
 	"Common Direct Access Disk",
-	&cmdk_ops, 				/* driver ops 		*/
+	&cmdk_ops,				/* driver ops 		*/
 };
 
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modldrv, NULL
 };
+
+
+#else /* XPV_HVM_DRIVER */
+static struct modlmisc modlmisc = {
+	&mod_miscops,		/* Type of module. This one is a misc */
+	"HVM Common Direct Access Disk",
+};
+
+static struct modlinkage modlinkage = {
+	MODREV_1, (void *)&modlmisc, NULL
+};
+
+#endif /* XPV_HVM_DRIVER */
 
 /* Function prototypes for cmlb callbacks */
 
@@ -244,13 +256,17 @@ _init(void)
 {
 	int 	rval;
 
+#ifndef XPV_HVM_DRIVER
 	if (rval = ddi_soft_state_init(&cmdk_state, sizeof (struct cmdk), 7))
 		return (rval);
+#endif /* !XPV_HVM_DRIVER */
 
 	mutex_init(&cmdk_attach_mutex, NULL, MUTEX_DRIVER, NULL);
 	if ((rval = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&cmdk_attach_mutex);
+#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_fini(&cmdk_state);
+#endif /* !XPV_HVM_DRIVER */
 	}
 	return (rval);
 }
@@ -259,25 +275,6 @@ int
 _fini(void)
 {
 	return (EBUSY);
-
-	/*
-	 * This has been commented out until cmdk is a true
-	 * unloadable module. Right now x86's are panicking on
-	 * a diskless reconfig boot.
-	 */
-
-#if 0 	/* bugid 1186679 */
-	int	rval;
-
-	rval = mod_remove(&modlinkage);
-	if (rval != 0)
-		return (rval);
-
-	mutex_destroy(&cmdk_attach_mutex);
-	ddi_soft_state_fini(&cmdk_state);
-
-	return (0);
-#endif
 }
 
 int
@@ -298,11 +295,15 @@ cmdkprobe(dev_info_t *dip)
 
 	instance = ddi_get_instance(dip);
 
+#ifndef XPV_HVM_DRIVER
 	if (ddi_get_soft_state(cmdk_state, instance))
 		return (DDI_PROBE_PARTIAL);
 
-	if ((ddi_soft_state_zalloc(cmdk_state, instance) != DDI_SUCCESS) ||
-	    ((dkp = ddi_get_soft_state(cmdk_state, instance)) == NULL))
+	if (ddi_soft_state_zalloc(cmdk_state, instance) != DDI_SUCCESS)
+		return (DDI_PROBE_PARTIAL);
+#endif /* !XPV_HVM_DRIVER */
+
+	if ((dkp = ddi_get_soft_state(cmdk_state, instance)) == NULL)
 		return (DDI_PROBE_PARTIAL);
 
 	mutex_init(&dkp->dk_mutex, NULL, MUTEX_DRIVER, NULL);
@@ -318,7 +319,9 @@ cmdkprobe(dev_info_t *dip)
 		mutex_exit(&dkp->dk_mutex);
 		mutex_destroy(&dkp->dk_mutex);
 		rw_destroy(&dkp->dk_bbh_mutex);
+#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_free(cmdk_state, instance);
+#endif /* !XPV_HVM_DRIVER */
 		return (DDI_PROBE_PARTIAL);
 	}
 
@@ -328,7 +331,9 @@ cmdkprobe(dev_info_t *dip)
 		mutex_exit(&dkp->dk_mutex);
 		mutex_destroy(&dkp->dk_mutex);
 		rw_destroy(&dkp->dk_bbh_mutex);
+#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_free(cmdk_state, instance);
+#endif /* !XPV_HVM_DRIVER */
 		return (status);
 	}
 
@@ -401,8 +406,8 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (cmlb_attach(dip,
 	    &cmdk_lb_ops,
 	    DTYPE_DIRECT,		/* device_type */
-	    0,				/* removable */
-	    0,				/* hot pluggable XXX */
+	    B_FALSE,			/* removable */
+	    B_FALSE,			/* hot pluggable XXX */
 	    node_type,
 	    CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT,	/* alter_behaviour */
 	    dkp->dk_cmlbhandle,
@@ -450,7 +455,9 @@ fail2:
 	rw_destroy(&dkp->dk_bbh_mutex);
 	mutex_exit(&dkp->dk_mutex);
 	mutex_destroy(&dkp->dk_mutex);
+#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_free(cmdk_state, instance);
+#endif /* !XPV_HVM_DRIVER */
 	return (DDI_FAILURE);
 }
 
@@ -516,7 +523,9 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	rw_destroy(&dkp->dk_bbh_mutex);
 	mutex_destroy(&dkp->dk_pm_mutex);
 	cv_destroy(&dkp->dk_suspend_cv);
+#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_free(cmdk_state, instance);
+#endif /* !XPV_HVM_DRIVER */
 
 	return (DDI_SUCCESS);
 }

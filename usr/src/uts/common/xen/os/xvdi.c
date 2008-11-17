@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@
 #include <sys/bootsvcs.h>
 #include <sys/bootinfo.h>
 #include <sys/note.h>
+#include <sys/sysmacros.h>
 #ifdef XPV_HVM_DRIVER
 #include <sys/xpv_support.h>
 #include <sys/hypervisor.h>
@@ -263,6 +264,8 @@ xvdi_init_dev(dev_info_t *dip)
 	pdp->xd_vdevnum = vdevnum;
 	pdp->xd_devclass = devcls;
 	pdp->xd_evtchn = INVALID_EVTCHN;
+	list_create(&pdp->xd_xb_watches, sizeof (xd_xb_watches_t),
+	    offsetof(xd_xb_watches_t, xxw_list));
 	mutex_init(&pdp->xd_evt_lk, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&pdp->xd_ndi_lk, NULL, MUTEX_DRIVER, NULL);
 	ddi_set_parent_data(dip, pdp);
@@ -1196,6 +1199,188 @@ i_xvdi_bepath_cb(struct xenbus_watch *w, const char **vec, unsigned int len)
 	}
 }
 
+static void
+i_xvdi_xb_watch_free(xd_xb_watches_t *xxwp)
+{
+	ASSERT(xxwp->xxw_ref == 0);
+	strfree((char *)xxwp->xxw_watch.node);
+	kmem_free(xxwp, sizeof (*xxwp));
+}
+
+static void
+i_xvdi_xb_watch_release(xd_xb_watches_t *xxwp)
+{
+	ASSERT(MUTEX_HELD(&xxwp->xxw_xppd->xd_ndi_lk));
+	ASSERT(xxwp->xxw_ref > 0);
+	if (--xxwp->xxw_ref == 0)
+		i_xvdi_xb_watch_free(xxwp);
+}
+
+static void
+i_xvdi_xb_watch_hold(xd_xb_watches_t *xxwp)
+{
+	ASSERT(MUTEX_HELD(&xxwp->xxw_xppd->xd_ndi_lk));
+	ASSERT(xxwp->xxw_ref > 0);
+	xxwp->xxw_ref++;
+}
+
+static void
+i_xvdi_xb_watch_cb_tq(void *arg)
+{
+	xd_xb_watches_t		*xxwp = (xd_xb_watches_t *)arg;
+	dev_info_t		*dip = (dev_info_t *)xxwp->xxw_watch.dev;
+	struct xendev_ppd	*pdp = xxwp->xxw_xppd;
+
+	xxwp->xxw_cb(dip, xxwp->xxw_watch.node, xxwp->xxw_arg);
+
+	mutex_enter(&pdp->xd_ndi_lk);
+	i_xvdi_xb_watch_release(xxwp);
+	mutex_exit(&pdp->xd_ndi_lk);
+}
+
+static void
+i_xvdi_xb_watch_cb(struct xenbus_watch *w, const char **vec, unsigned int len)
+{
+	dev_info_t		*dip = (dev_info_t *)w->dev;
+	struct xendev_ppd	*pdp = ddi_get_parent_data(dip);
+	xd_xb_watches_t		*xxwp;
+
+	ASSERT(len > XS_WATCH_PATH);
+	ASSERT(vec[XS_WATCH_PATH] != NULL);
+
+	mutex_enter(&pdp->xd_ndi_lk);
+	for (xxwp = list_head(&pdp->xd_xb_watches); xxwp != NULL;
+	    xxwp = list_next(&pdp->xd_xb_watches, xxwp)) {
+		if (w == &xxwp->xxw_watch)
+			break;
+	}
+
+	if (xxwp == NULL) {
+		mutex_exit(&pdp->xd_ndi_lk);
+		return;
+	}
+
+	i_xvdi_xb_watch_hold(xxwp);
+	(void) ddi_taskq_dispatch(pdp->xd_xb_watch_taskq,
+	    i_xvdi_xb_watch_cb_tq, xxwp, DDI_SLEEP);
+	mutex_exit(&pdp->xd_ndi_lk);
+}
+
+/*
+ * Any watches registered with xvdi_add_xb_watch_handler() get torn down during
+ * a suspend operation.  So if a frontend driver want's to use these interfaces,
+ * that driver is responsible for re-registering any watches it had before
+ * the suspend operation.
+ */
+int
+xvdi_add_xb_watch_handler(dev_info_t *dip, const char *dir, const char *node,
+    xvdi_xb_watch_cb_t cb, void *arg)
+{
+	struct xendev_ppd	*pdp = ddi_get_parent_data(dip);
+	xd_xb_watches_t		*xxw_new, *xxwp;
+	char			*path;
+	int			n;
+
+	ASSERT((dip != NULL) && (dir != NULL) && (node != NULL));
+	ASSERT(cb != NULL);
+
+	n = strlen(dir) + 1 + strlen(node) + 1;
+	path = kmem_zalloc(n, KM_SLEEP);
+	(void) strlcat(path, dir, n);
+	(void) strlcat(path, "/", n);
+	(void) strlcat(path, node, n);
+	ASSERT((strlen(path) + 1) == n);
+
+	xxw_new = kmem_zalloc(sizeof (*xxw_new), KM_SLEEP);
+	xxw_new->xxw_ref = 1;
+	xxw_new->xxw_watch.node = path;
+	xxw_new->xxw_watch.callback = i_xvdi_xb_watch_cb;
+	xxw_new->xxw_watch.dev = (struct xenbus_device *)dip;
+	xxw_new->xxw_xppd = pdp;
+	xxw_new->xxw_cb = cb;
+	xxw_new->xxw_arg = arg;
+
+	mutex_enter(&pdp->xd_ndi_lk);
+
+	/*
+	 * If this is the first watch we're setting up, create a taskq
+	 * to dispatch watch events and initialize the watch list.
+	 */
+	if (pdp->xd_xb_watch_taskq == NULL) {
+		char tq_name[TASKQ_NAMELEN];
+
+		ASSERT(list_is_empty(&pdp->xd_xb_watches));
+
+		(void) snprintf(tq_name, sizeof (tq_name),
+		    "%s_xb_watch_tq", ddi_get_name(dip));
+
+		if ((pdp->xd_xb_watch_taskq = ddi_taskq_create(dip, tq_name,
+		    1, TASKQ_DEFAULTPRI, 0)) == NULL) {
+			i_xvdi_xb_watch_release(xxw_new);
+			mutex_exit(&pdp->xd_ndi_lk);
+			return (DDI_FAILURE);
+		}
+	}
+
+	/* Don't allow duplicate watches to be registered */
+	for (xxwp = list_head(&pdp->xd_xb_watches); xxwp != NULL;
+	    xxwp = list_next(&pdp->xd_xb_watches, xxwp)) {
+
+		ASSERT(strcmp(xxwp->xxw_watch.node, path) != 0);
+		if (strcmp(xxwp->xxw_watch.node, path) != 0)
+			continue;
+		i_xvdi_xb_watch_release(xxw_new);
+		mutex_exit(&pdp->xd_ndi_lk);
+		return (DDI_FAILURE);
+	}
+
+	if (register_xenbus_watch(&xxw_new->xxw_watch) != 0) {
+		if (list_is_empty(&pdp->xd_xb_watches)) {
+			ddi_taskq_destroy(pdp->xd_xb_watch_taskq);
+			pdp->xd_xb_watch_taskq = NULL;
+		}
+		i_xvdi_xb_watch_release(xxw_new);
+		mutex_exit(&pdp->xd_ndi_lk);
+		return (DDI_FAILURE);
+	}
+
+	list_insert_head(&pdp->xd_xb_watches, xxw_new);
+	mutex_exit(&pdp->xd_ndi_lk);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Tear down all xenbus watches registered by the specified dip.
+ */
+void
+xvdi_remove_xb_watch_handlers(dev_info_t *dip)
+{
+	struct xendev_ppd	*pdp = ddi_get_parent_data(dip);
+	xd_xb_watches_t		*xxwp;
+	ddi_taskq_t		*tq;
+
+	mutex_enter(&pdp->xd_ndi_lk);
+
+	while ((xxwp = list_remove_head(&pdp->xd_xb_watches)) != NULL) {
+		unregister_xenbus_watch(&xxwp->xxw_watch);
+		i_xvdi_xb_watch_release(xxwp);
+	}
+	ASSERT(list_is_empty(&pdp->xd_xb_watches));
+
+	/*
+	 * We can't hold xd_ndi_lk while we destroy the xd_xb_watch_taskq.
+	 * This is because if there are currently any executing taskq threads,
+	 * we will block until they are finished, and to finish they need
+	 * to aquire xd_ndi_lk in i_xvdi_xb_watch_cb_tq() so they can release
+	 * their reference on their corresponding xxwp structure.
+	 */
+	tq = pdp->xd_xb_watch_taskq;
+	pdp->xd_xb_watch_taskq = NULL;
+	mutex_exit(&pdp->xd_ndi_lk);
+	if (tq != NULL)
+		ddi_taskq_destroy(tq);
+}
+
 static int
 i_xvdi_add_watch_oestate(dev_info_t *dip)
 {
@@ -1417,6 +1602,8 @@ i_xvdi_rem_watches(dev_info_t *dip)
 		i_xvdi_rem_watch_hpstate(dip);
 
 	mutex_exit(&pdp->xd_ndi_lk);
+
+	xvdi_remove_xb_watch_handlers(dip);
 }
 
 static int

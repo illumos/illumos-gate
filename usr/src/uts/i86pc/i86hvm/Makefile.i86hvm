@@ -21,10 +21,8 @@
 #
 # uts/i86pc/Makefile.hvm
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile provides support for building PV drivers that run
 #	in an HVM environment.
@@ -45,8 +43,8 @@ HVM_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/i86hvm/lint-libs/$(OBJS_DIR)
 #
 #       Define modules.
 #
-HVM_DRV_KMODS	= pv_cmdk pv_rtls xdf xnf xpv xpvd
-HVM_MISC_KMODS	= hvm_bootstrap
+HVM_DRV_KMODS	= pv_cmdk pv_sd pv_rtls xdf xnf xpv xpvd
+HVM_MISC_KMODS	= hvm_bootstrap hvm_cmdk hvm_sd
 HVM_KMODS	= $(HVM_DRV_KMODS) $(HVM_MISC_KMODS)
 
 include $(UTSBASE)/i86pc/i86hvm/Makefile.files

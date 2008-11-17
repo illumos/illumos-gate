@@ -74,10 +74,10 @@
 #if (defined(__fibre))
 #define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver"
 char _depends_on[]	= "misc/scsi misc/cmlb drv/fcp";
-#else
+#else /* !__fibre */
 #define	SD_MODULE_NAME	"SCSI Disk Driver"
 char _depends_on[]	= "misc/scsi misc/cmlb";
-#endif
+#endif /* !__fibre */
 
 /*
  * Define the interconnect type, to allow the driver to distinguish
@@ -1674,7 +1674,7 @@ static struct cb_ops sd_cb_ops = {
 	sdawrite		/* async I/O write entry point */
 };
 
-static struct dev_ops sd_ops = {
+struct dev_ops sd_ops = {
 	DEVO_REV,		/* devo_rev, */
 	0,			/* refcnt  */
 	sdinfo,			/* info */
@@ -1689,30 +1689,39 @@ static struct dev_ops sd_ops = {
 	ddi_quiesce_not_needed,		/* quiesce */
 };
 
-
 /*
  * This is the loadable module wrapper.
  */
 #include <sys/modctl.h>
 
+#ifndef XPV_HVM_DRIVER
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
 	SD_MODULE_NAME,		/* Module name. */
 	&sd_ops			/* driver ops */
 };
 
+static struct modlinkage modlinkage = {
+	MODREV_1, &modldrv, NULL
+};
+
+#else /* XPV_HVM_DRIVER */
+static struct modlmisc modlmisc = {
+	&mod_miscops,		/* Type of module. This one is a misc */
+	"HVM " SD_MODULE_NAME,		/* Module name. */
+};
 
 static struct modlinkage modlinkage = {
-	MODREV_1,
-	&modldrv,
-	NULL
+	MODREV_1, &modlmisc, NULL
 };
+
+#endif /* XPV_HVM_DRIVER */
 
 static cmlb_tg_ops_t sd_tgops = {
 	TG_DK_OPS_VERSION_1,
 	sd_tg_rdwr,
 	sd_tg_getinfo
-	};
+};
 
 static struct scsi_asq_key_strings sd_additional_codes[] = {
 	0x81, 0, "Logical Unit is Reserved",
@@ -2204,12 +2213,19 @@ _init(void)
 	/* establish driver name from module name */
 	sd_label = (char *)mod_modname(&modlinkage);
 
+#ifndef XPV_HVM_DRIVER
 	err = ddi_soft_state_init(&sd_state, sizeof (struct sd_lun),
 	    SD_MAXUNIT);
-
 	if (err != 0) {
 		return (err);
 	}
+
+#else /* XPV_HVM_DRIVER */
+	/* Remove the leading "hvm_" from the module name */
+	ASSERT(strncmp(sd_label, "hvm_", strlen("hvm_")) == 0);
+	sd_label += strlen("hvm_");
+
+#endif /* XPV_HVM_DRIVER */
 
 	mutex_init(&sd_detach_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&sd_log_mutex,    NULL, MUTEX_DRIVER, NULL);
@@ -2250,7 +2266,9 @@ _init(void)
 
 		sd_scsi_target_lun_fini();
 
+#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_fini(&sd_state);
+#endif /* !XPV_HVM_DRIVER */
 		return (err);
 	}
 
@@ -2291,7 +2309,9 @@ _fini(void)
 	cv_destroy(&sd_tr.srq_resv_reclaim_cv);
 	cv_destroy(&sd_tr.srq_inprocess_cv);
 
+#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_fini(&sd_state);
+#endif /* !XPV_HVM_DRIVER */
 
 	return (err);
 }
@@ -2495,7 +2515,9 @@ sdprobe(dev_info_t *devi)
 {
 	struct scsi_device	*devp;
 	int			rval;
-	int			instance;
+#ifndef XPV_HVM_DRIVER
+	int			instance = ddi_get_instance(devi);
+#endif /* !XPV_HVM_DRIVER */
 
 	/*
 	 * if it wasn't for pln, sdprobe could actually be nulldev
@@ -2512,11 +2534,11 @@ sdprobe(dev_info_t *devi)
 		return (DDI_PROBE_FAILURE);
 	}
 
-	instance = ddi_get_instance(devi);
-
+#ifndef XPV_HVM_DRIVER
 	if (ddi_get_soft_state(sd_state, instance) != NULL) {
 		return (DDI_PROBE_PARTIAL);
 	}
+#endif /* !XPV_HVM_DRIVER */
 
 	/*
 	 * Call the SCSA utility probe routine to see if we actually
@@ -6903,9 +6925,11 @@ sd_unit_attach(dev_info_t *devi)
 	 * this routine will have a value of zero.
 	 */
 	instance = ddi_get_instance(devp->sd_dev);
+#ifndef XPV_HVM_DRIVER
 	if (ddi_soft_state_zalloc(sd_state, instance) != DDI_SUCCESS) {
 		goto probe_failed;
 	}
+#endif /* !XPV_HVM_DRIVER */
 
 	/*
 	 * Retrieve a pointer to the newly-allocated soft state.
@@ -7798,7 +7822,8 @@ sd_unit_attach(dev_info_t *devi)
 #endif
 
 	if (cmlb_attach(devi, &sd_tgops, (int)devp->sd_inq->inq_dtype,
-	    un->un_f_has_removable_media, un->un_f_is_hotpluggable,
+	    VOID2BOOLEAN(un->un_f_has_removable_media != 0),
+	    VOID2BOOLEAN(un->un_f_is_hotpluggable != 0),
 	    un->un_node_type, offbyone, un->un_cmlbhandle,
 	    (void *)SD_PATH_DIRECT) != 0) {
 		goto cmlb_attach_failed;
@@ -8082,7 +8107,9 @@ get_softstate_failed:
 	 * ddi_get_soft_state() fails.  The implication seems to be
 	 * that the get_soft_state cannot fail if the zalloc succeeds.
 	 */
+#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_free(sd_state, instance);
+#endif /* !XPV_HVM_DRIVER */
 
 probe_failed:
 	scsi_unprobe(devp);
@@ -8111,7 +8138,9 @@ sd_unit_detach(dev_info_t *devi)
 	int			tgt;
 	dev_t			dev;
 	dev_info_t		*pdip = ddi_get_parent(devi);
+#ifndef XPV_HVM_DRIVER
 	int			instance = ddi_get_instance(devi);
+#endif /* !XPV_HVM_DRIVER */
 
 	mutex_enter(&sd_detach_mutex);
 
@@ -8523,7 +8552,9 @@ sd_unit_detach(dev_info_t *devi)
 	devp->sd_private = NULL;
 
 	bzero(un, sizeof (struct sd_lun));
+#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_free(sd_state, instance);
+#endif /* !XPV_HVM_DRIVER */
 
 	mutex_exit(&sd_detach_mutex);
 
@@ -10148,7 +10179,7 @@ sd_ready_and_valid(sd_ssc_t *ssc, int part)
 	uint_t			lbasize;
 	int			rval = SD_READY_VALID;
 	char			name_str[48];
-	int			is_valid;
+	boolean_t		is_valid;
 	struct sd_lun		*un;
 	int			status;
 
@@ -21268,7 +21299,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 	int		i = 0;
 	cred_t		*cr;
 	int		tmprval = EINVAL;
-	int 		is_valid;
+	boolean_t	is_valid;
 	sd_ssc_t	*ssc;
 
 	/*

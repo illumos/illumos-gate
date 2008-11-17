@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CMLB_H
 #define	_SYS_CMLB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -246,10 +244,8 @@ cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep);
  *			scsi/generic/inquiry.h
  *
  *	is_removable	whether or not device is removable.
- *			0 non-removable, 1 removable.
  *
  *	is_hotpluggable	whether or not device is hotpluggable.
- *			0 non-hotpluggable, 1 hotpluggable.
  *
  *	node_type	minor node type (as used by ddi_create_minor_node)
  *
@@ -308,7 +304,7 @@ cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep);
  */
 int
 cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
-    int is_removable, int is_hotpluggable, char *node_type,
+    boolean_t is_removable, boolean_t is_hotpluggable, char *node_type,
     int alter_behavior, cmlb_handle_t cmlbhandle, void *tg_cookie);
 
 
@@ -370,7 +366,7 @@ cmlb_invalidate(cmlb_handle_t cmlbhandle, void *tg_cookie);
  *      FALSE otherwise.
  *
  */
-int
+boolean_t
 cmlb_is_valid(cmlb_handle_t cmlbhandle);
 
 /*

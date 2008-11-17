@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/i86pc/pv_cmdk/Makefile
+# uts/i86pc/i86hvm/pv_sd/Makefile
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -37,9 +37,9 @@ UTSBASE	= ../../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= cmdk
-OBJECTS		= $(PV_CMDK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PV_CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= sd
+OBJECTS		= $(PV_SD_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PV_SD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
 
 #
@@ -49,10 +49,10 @@ include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
 #
 # When generating lint libraries, we want the name of the lint module
-# that will be generated to by pv_cmdk and not cmdk, so override the
+# that will be generated to by pv_sd and not sd, so override the
 # default lint module name here.
 #
-LINT_MODULE	= pv_cmdk
+LINT_MODULE	= pv_sd
 
 #
 #	Define targets
@@ -62,10 +62,7 @@ LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Nmisc/strategy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xdf
-LDFLAGS		+= -Nmisc/hvm_cmdk
-
-CPPFLAGS	+= -D_EXTVTOC
-
+LDFLAGS		+= -Nmisc/hvm_sd
 
 #
 # The Xen header files do not lint cleanly.  Since the troublesome

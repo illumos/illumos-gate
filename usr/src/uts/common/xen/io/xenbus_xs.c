@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,8 +63,6 @@
  * to pass pointers to void* to be filled in with return values and
  * the functions return error codes.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -445,21 +443,34 @@ xenbus_directory(xenbus_transaction_t t,
 	return (split(strings, len, num));
 }
 
-/* Check if a path exists. Return 1 if it does. */
-int
-xenbus_exists(xenbus_transaction_t t, const char *dir, const char *node)
+/* Check if a path exists. */
+boolean_t
+xenbus_exists(const char *dir, const char *node)
+{
+	void	*p;
+	uint_t	n;
+
+	if (xenbus_read(XBT_NULL, dir, node, &p, &n) != 0)
+		return (B_FALSE);
+	kmem_free(p, n);
+	return (B_TRUE);
+}
+
+/* Check if a directory path exists. */
+boolean_t
+xenbus_exists_dir(const char *dir, const char *node)
 {
 	char **d;
 	unsigned int dir_n;
 	int i, len;
 
-	d = xenbus_directory(t, dir, node, &dir_n);
+	d = xenbus_directory(XBT_NULL, dir, node, &dir_n);
 	if (d == NULL)
-		return (0);
+		return (B_FALSE);
 	for (i = 0, len = 0; i < dir_n; i++)
 		len += strlen(d[i]) + 1 + sizeof (char *);
 	kmem_free(d, len);
-	return (1);
+	return (B_TRUE);
 }
 
 /*
@@ -478,6 +489,34 @@ xenbus_read(xenbus_transaction_t t,
 	err = xs_single(t, XS_READ, path, retp, len);
 	kmem_free(path, strlen(path) + 1);
 	return (err);
+}
+
+int
+xenbus_read_str(const char *dir, const char *node, char **retp)
+{
+	uint_t	n;
+	int	err;
+	char	*str;
+
+	/*
+	 * Since we access the xenbus value immediatly we can't be
+	 * part of a transaction.
+	 */
+	if ((err = xenbus_read(XBT_NULL, dir, node, (void **)&str, &n)) != 0)
+		return (err);
+	ASSERT((str != NULL) && (n > 0));
+
+	/*
+	 * Why bother with this?  Because xenbus is truly annoying in the
+	 * fact that when it returns a string, it doesn't guarantee that
+	 * the memory that holds the string is of size strlen() + 1.
+	 * This forces callers to keep track of the size of the memory
+	 * containing the string.  Ugh.  We'll work around this by
+	 * re-allocate strings to always be of size strlen() + 1.
+	 */
+	*retp = strdup(str);
+	kmem_free(str, n);
+	return (0);
 }
 
 /*

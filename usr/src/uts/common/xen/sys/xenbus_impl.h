@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +57,6 @@
 #ifndef _SYS_XENBUS_H
 #define	_SYS_XENBUS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mutex.h>
 #include <sys/list.h>
 
@@ -71,13 +69,14 @@ extern "C" {
 typedef uint32_t xenbus_transaction_t;
 
 /* Register callback to watch this node. */
-struct xenbus_watch
-{
+struct xenbus_watch;
+typedef void (*xenbus_watch_cb_t)(struct xenbus_watch *,
+    const char **vec, unsigned int len);
+struct xenbus_watch {
 	list_t list;
-	const char *node;	/* path being watched */
-	void (*callback)(struct xenbus_watch *,
-			const char **vec,  unsigned int len);
-	struct xenbus_device *dev;
+	const char		*node;	/* path being watched */
+	xenbus_watch_cb_t	callback;
+	struct xenbus_device	*dev;
 };
 
 /*
@@ -103,17 +102,29 @@ struct xenbus_device {
 	void *data;
 };
 
+typedef void (*xvdi_xb_watch_cb_t)(dev_info_t *dip, const char *path,
+    void *arg);
+
+typedef struct xd_xb_watches {
+	list_node_t		xxw_list;
+	int			xxw_ref;
+	struct xenbus_watch	xxw_watch;
+	struct xendev_ppd	*xxw_xppd;
+	xvdi_xb_watch_cb_t	xxw_cb;
+	void			*xxw_arg;
+} xd_xb_watches_t;
 
 extern char **xenbus_directory(xenbus_transaction_t t, const char *dir,
 	    const char *node, unsigned int *num);
 extern int xenbus_read(xenbus_transaction_t t, const char *dir,
 	    const char *node, void **rstr, unsigned int *len);
+extern int xenbus_read_str(const char *dir, const char *node, char **rstr);
 extern int xenbus_write(xenbus_transaction_t t, const char *dir,
 	    const char *node, const char *string);
 extern int xenbus_mkdir(xenbus_transaction_t t, const char *dir,
 	    const char *node);
-extern int xenbus_exists(xenbus_transaction_t t, const char *dir,
-	    const char *node);
+extern boolean_t xenbus_exists(const char *dir, const char *node);
+extern boolean_t xenbus_exists_dir(const char *dir, const char *node);
 extern int xenbus_rm(xenbus_transaction_t t, const char *dir,
 	    const char *node);
 extern int xenbus_transaction_start(xenbus_transaction_t *t);

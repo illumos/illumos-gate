@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cred.h>
 #include <sys/kstat.h>
@@ -81,8 +78,6 @@ static rkstat_t rkstat_template = {
 /* maximum number of messages allowed on the mi's mi_msg_list */
 int nfs4_msg_max = NFS4_MSG_MAX;
 #define	DEFAULT_LEASE	180
-
-static char *strdup(const char *);
 
 /*
  * Sets the appropiate fields of "ep", given "id" and various parameters.
@@ -612,7 +607,7 @@ facts_same(nfs4_debug_msg_t *cur_msg, nfs4_debug_msg_t *new_msg,
 				return (0);
 			len = strlen(cur_msg->msg_srv);
 			if (strncmp(cur_msg->msg_srv, new_msg->msg_srv,
-				len) != 0)
+			    len) != 0)
 				return (0);
 		} else if (new_msg->msg_srv != NULL) {
 			return (0);
@@ -622,7 +617,7 @@ facts_same(nfs4_debug_msg_t *cur_msg, nfs4_debug_msg_t *new_msg,
 				return (0);
 			len = strlen(cur_msg->msg_mntpt);
 			if (strncmp(cur_msg->msg_mntpt, new_msg->msg_mntpt,
-				len) != 0)
+			    len) != 0)
 				return (0);
 		} else if (new_msg->msg_mntpt != NULL) {
 			return (0);
@@ -1519,22 +1514,4 @@ nfs4_mi_kstat_inc_no_grace(mntinfo4_t *mi)
 
 	rsp = (rkstat_t *)mi->mi_recov_ksp->ks_data;
 	rsp->no_grace.value.ul++;
-}
-
-/*
- * Allocate and copy a string.  XXX There really ought to be a single
- * strdup() for the entire kernel.
- */
-static char *
-strdup(const char *s)
-{
-	size_t len;
-	char *new;
-
-	len = strlen(s);
-	new = kmem_alloc(len + 1, KM_SLEEP);
-	bcopy(s, new, len);
-	new[len] = '\0';
-
-	return (new);
 }

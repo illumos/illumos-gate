@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -587,8 +587,8 @@ dcdattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (cmlb_attach(devi,
 	    &dcd_lb_ops,
 	    0,
-	    0,
-	    0,
+	    B_FALSE,
+	    B_FALSE,
 	    DDI_NT_BLOCK_CHAN,
 	    CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8,
 	    un->un_dklbhandle,

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,6 @@
  * IN THE SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef XPV_HVM_DRIVER
 #include <sys/xpv_support.h>
 #endif
@@ -76,7 +74,7 @@ read_otherend_details(struct xenbus_device *xendev,
 		return (err);
 	}
 	if (strlen(xendev->otherend) == 0 ||
-	    !xenbus_exists(XBT_NULL, xendev->otherend, "")) {
+	    !xenbus_exists_dir(xendev->otherend, "")) {
 		xenbus_dev_fatal(xendev, X_ENOENT, "missing other end from %s",
 		    xendev->nodename);
 		kmem_free((void *)xendev->otherend,

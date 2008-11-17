@@ -8963,6 +8963,35 @@ ddi_quiesce_not_supported(dev_info_t *dip)
 	return (DDI_FAILURE);
 }
 
+char *
+ddi_strdup(const char *str, int flag)
+{
+	int	n;
+	char	*ptr;
+
+	ASSERT(str != NULL);
+	ASSERT((flag == KM_SLEEP) || (flag == KM_NOSLEEP));
+
+	n = strlen(str);
+	if ((ptr = kmem_alloc(n + 1, flag)) == NULL)
+		return (NULL);
+	bcopy(str, ptr, n + 1);
+	return (ptr);
+}
+
+char *
+strdup(const char *str)
+{
+	return (ddi_strdup(str, KM_SLEEP));
+}
+
+void
+strfree(char *str)
+{
+	ASSERT(str != NULL);
+	kmem_free(str, strlen(str) + 1);
+}
+
 /*
  * Generic DDI callback interfaces.
  */

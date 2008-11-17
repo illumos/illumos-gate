@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,75 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Xenbus property interfaces, initialized by framework
+ */
+#define	XBP_HP_STATUS		"hotplug-status"	/* backend prop: str */
+#define	XBV_HP_STATUS_CONN	"connected"		/* backend prop val */
+#define	XBP_DEV_TYPE		"device-type"		/* backend prop: str */
+#define	XBV_DEV_TYPE_CD		"cdrom"			/* backend prop val */
+
+/*
+ * Xenbus property interfaces, initialized by backend disk driver
+ */
+#define	XBP_SECTORS	"sectors"		/* backend prop: uint64 */
+#define	XBP_INFO	"info"			/* backend prop: uint */
+#define	XBP_FB		"feature-barrier"	/* backend prop: boolean int */
+
+/*
+ * Xenbus property interfaces, initialized by frontend disk driver
+ */
+#define	XBP_RING_REF	"ring-ref"		/* frontend prop: long */
+#define	XBP_EVENT_CHAN	"event-channel"		/* frontend prop: long */
+#define	XBP_PROTOCOL	"protocol"		/* frontend prop: string */
+
+/*
+ * Xenbus CDROM property interfaces, used by backend and frontend
+ *
+ * XBP_MEDIA_REQ_SUP
+ *	- Backend xenbus property located at:
+ *		backend/vbd/<domU_id>/<domU_dev>/media-req-sup
+ *	- Set by the backend, consumed by the frontend.
+ *	- Cosumed by the frontend.
+ *	- A boolean integer property indicating backend support
+ *	  for the XBP_MEDIA_REQ property.
+ *
+ * XBP_MEDIA_REQ
+ *	- Frontend xenbus property located at:
+ *		/local/domain/<domU_id>/device/vbd/<domU_dev>/media-req
+ *	- Set and consumed by both the frontend and backend.
+ *	- Possible values:
+ *		XBV_MEDIA_REQ_NONE, XBV_MEDIA_REQ_LOCK, and XBV_MEDIA_REQ_EJECT
+ *	- Only applies to CDROM devices.
+ *
+ * XBV_MEDIA_REQ_NONE
+ * 	- XBP_MEDIA_REQ property valud
+ *	- Set and consumed by both the frontend and backend.
+ *	- Indicates that there are no currently outstanding media requet
+ *	  operations.
+ *
+ * XBV_MEDIA_REQ_LOCK
+ * 	- XBP_MEDIA_REQ property valud
+ *	- Set by the frontend, consumed by the backend.
+ *	- Indicates to the backend that the currenct media is locked
+ *	  and changes to the media (via xm block-configure for example)
+ *	  should not be allowed.
+ *
+ * XBV_MEDIA_REQ_EJECT
+ * 	- XBP_MEDIA_REQ property valud
+ *	- Set by the frontend, consumed by the backend.
+ *	- Indicates to the backend that the currenct media should be ejected.
+ *	  This means that the backend should close it's connection to
+ *	  the frontend device, close it's current backing store device/file,
+ *	  and then set the media-req property to XBV_MEDIA_REQ_NONE.  (to
+ *	  indicate that the eject operation is complete.)
+ */
+#define	XBP_MEDIA_REQ_SUP	"media-req-sup"	/* backend prop: boolean int */
+#define	XBP_MEDIA_REQ		"media-req"	/* frontend prop: str */
+#define	XBV_MEDIA_REQ_NONE	"none"		/* frontend prop val */
+#define	XBV_MEDIA_REQ_LOCK	"lock"		/* frontend prop val */
+#define	XBV_MEDIA_REQ_EJECT	"eject"		/* frontend prop val */
 
 /*
  * Xen device class codes
@@ -95,6 +164,8 @@ struct xendev_ppd {
 	ddi_callback_id_t	xd_hp_ehid;
 	ddi_taskq_t		*xd_oe_taskq;
 	ddi_taskq_t		*xd_hp_taskq;
+	ddi_taskq_t		*xd_xb_watch_taskq;
+	list_t			xd_xb_watches;
 };
 
 #define	XS_OE_STATE	"SUNW,xendev:otherend_state"
@@ -136,6 +207,10 @@ dev_info_t	*xvdi_create_dev(dev_info_t *, xendev_devclass_t,
 int	xvdi_init_dev(dev_info_t *);
 void	xvdi_uninit_dev(dev_info_t *);
 dev_info_t	*xvdi_find_dev(dev_info_t *, xendev_devclass_t, domid_t, int);
+
+extern int xvdi_add_xb_watch_handler(dev_info_t *, const char *,
+    const char *, xvdi_xb_watch_cb_t cb, void *);
+extern void xvdi_remove_xb_watch_handlers(dev_info_t *);
 
 /*
  * common ring interfaces

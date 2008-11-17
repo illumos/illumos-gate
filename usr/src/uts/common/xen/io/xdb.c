@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@
 #include <sys/promif.h>
 #include <sys/sysmacros.h>
 #include <public/io/xenbus.h>
+#include <public/io/xs_wire.h>
 #include <xen/sys/xenbus_impl.h>
 #include <xen/sys/xendev.h>
 #include <sys/gnttab.h>
@@ -77,10 +78,13 @@
 static xdb_t *xdb_statep;
 static int xdb_debug = 0;
 
+static void xdb_close(dev_info_t *);
 static int xdb_push_response(xdb_t *, uint64_t, uint8_t, uint16_t);
 static int xdb_get_request(xdb_t *, blkif_request_t *);
 static void blkif_get_x86_32_req(blkif_request_t *, blkif_x86_32_request_t *);
 static void blkif_get_x86_64_req(blkif_request_t *, blkif_x86_64_request_t *);
+static int xdb_biodone(buf_t *);
+
 
 #ifdef DEBUG
 /*
@@ -216,7 +220,18 @@ xdb_kstat_init(xdb_t *vdp)
 	return (B_TRUE);
 }
 
-static int xdb_biodone(buf_t *);
+static char *
+i_pathname(dev_info_t *dip)
+{
+	char *path, *rv;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+	rv = strdup(path);
+	kmem_free(path, MAXPATHLEN);
+
+	return (rv);
+}
 
 static buf_t *
 xdb_get_buf(xdb_t *vdp, blkif_request_t *req, xdb_request_t *xreq)
@@ -501,14 +516,13 @@ xdb_uninit_ioreqs(xdb_t *vdp)
 static uint_t
 xdb_intr(caddr_t arg)
 {
-	blkif_request_t req;
-	blkif_request_t *reqp = &req;
-	xdb_request_t *xreq;
-	buf_t *bp;
-	uint8_t op;
-	xdb_t *vdp = (xdb_t *)arg;
-	int ret = DDI_INTR_UNCLAIMED;
-	dev_info_t *dip = vdp->xs_dip;
+	xdb_t		*vdp = (xdb_t *)arg;
+	dev_info_t	*dip = vdp->xs_dip;
+	blkif_request_t	req, *reqp = &req;
+	xdb_request_t	*xreq;
+	buf_t		*bp;
+	uint8_t		op;
+	int		ret = DDI_INTR_UNCLAIMED;
 
 	XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE,
 	    "xdb@%s: I/O request received from dom %d",
@@ -517,10 +531,11 @@ xdb_intr(caddr_t arg)
 	mutex_enter(&vdp->xs_iomutex);
 
 	/* shouldn't touch ring buffer if not in connected state */
-	if (vdp->xs_if_status != XDB_CONNECTED) {
+	if (!vdp->xs_if_connected) {
 		mutex_exit(&vdp->xs_iomutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
+	ASSERT(vdp->xs_hp_connected && vdp->xs_fe_initialised);
 
 	/*
 	 * We'll loop till there is no more request in the ring
@@ -672,7 +687,8 @@ xdb_biodone(buf_t *bp)
 	mutex_enter(&vdp->xs_iomutex);
 
 	/* send response back to frontend */
-	if (vdp->xs_if_status == XDB_CONNECTED) {
+	if (vdp->xs_if_connected) {
+		ASSERT(vdp->xs_hp_connected && vdp->xs_fe_initialised);
 		if (xdb_push_response(vdp, xreq->xr_id, xreq->xr_op, bioerr))
 			xvdi_notify_oe(vdp->xs_dip);
 		XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE,
@@ -684,7 +700,7 @@ xdb_biodone(buf_t *bp)
 	xdb_free_req(xreq);
 
 	vdp->xs_ionum--;
-	if ((vdp->xs_if_status != XDB_CONNECTED) && (vdp->xs_ionum == 0)) {
+	if (!vdp->xs_if_connected && (vdp->xs_ionum == 0)) {
 		/* we're closing, someone is waiting for I/O clean-up */
 		cv_signal(&vdp->xs_ionumcv);
 	}
@@ -704,6 +720,14 @@ xdb_bindto_frontend(xdb_t *vdp)
 	dev_info_t *dip = vdp->xs_dip;
 	char protocol[64] = "";
 
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
+	/*
+	 * Switch to the XenbusStateInitialised state.  This let's the
+	 * frontend know that we're about to negotiate a connection.
+	 */
+	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateInitialised);
+
 	/*
 	 * Gather info from frontend
 	 */
@@ -712,9 +736,11 @@ xdb_bindto_frontend(xdb_t *vdp)
 		return (DDI_FAILURE);
 
 	err = xenbus_gather(XBT_NULL, oename,
-	    "ring-ref", "%lu", &gref, "event-channel", "%u", &evtchn, NULL);
+	    XBP_RING_REF, "%lu", &gref,
+	    XBP_EVENT_CHAN, "%u", &evtchn,
+	    NULL);
 	if (err != 0) {
-		xvdi_fatal_error(dip, err,
+		xvdi_dev_error(dip, err,
 		    "Getting ring-ref and evtchn from frontend");
 		return (DDI_FAILURE);
 	}
@@ -724,7 +750,7 @@ xdb_bindto_frontend(xdb_t *vdp)
 	vdp->xs_entrysize = sizeof (union blkif_sring_entry);
 
 	err = xenbus_gather(XBT_NULL, oename,
-	    "protocol", "%63s", protocol, NULL);
+	    XBP_PROTOCOL, "%63s", protocol, NULL);
 	if (err)
 		(void) strcpy(protocol, "unspecified, assuming native");
 	else {
@@ -756,15 +782,13 @@ xdb_bindto_frontend(xdb_t *vdp)
 #endif
 
 	/*
-	 * map and init ring
-	 *
-	 * The ring parameters must match those which have been allocated
-	 * in the front end.
+	 * Map and init ring.  The ring parameters must match those which
+	 * have been allocated in the front end.
 	 */
-	err = xvdi_map_ring(dip, vdp->xs_nentry, vdp->xs_entrysize,
-	    gref, &vdp->xs_ring);
-	if (err != DDI_SUCCESS)
+	if (xvdi_map_ring(dip, vdp->xs_nentry, vdp->xs_entrysize,
+	    gref, &vdp->xs_ring) != DDI_SUCCESS)
 		return (DDI_FAILURE);
+
 	/*
 	 * This will be removed after we use shadow I/O ring request since
 	 * we don't need to access the ring itself directly, thus the access
@@ -772,9 +796,7 @@ xdb_bindto_frontend(xdb_t *vdp)
 	 */
 	vdp->xs_ring_hdl = vdp->xs_ring->xr_acc_hdl;
 
-	/*
-	 * bind event channel
-	 */
+	/* bind event channel */
 	err = xvdi_bind_evtchn(dip, evtchn);
 	if (err != DDI_SUCCESS) {
 		xvdi_unmap_ring(vdp->xs_ring);
@@ -787,43 +809,313 @@ xdb_bindto_frontend(xdb_t *vdp)
 static void
 xdb_unbindfrom_frontend(xdb_t *vdp)
 {
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
 	xvdi_free_evtchn(vdp->xs_dip);
 	xvdi_unmap_ring(vdp->xs_ring);
 }
 
+/*
+ * xdb_params_change() initiates a allows change to the underlying device/file
+ * that the backend is accessing.  It does this by disconnecting from the
+ * frontend, closing the old device, clearing a bunch of xenbus parameters,
+ * and switching back to the XenbusStateInitialising state.  The frontend
+ * should notice this transition to the XenbusStateInitialising state and
+ * should attempt to reconnect to us (the backend).
+ */
+static void
+xdb_params_change(xdb_t *vdp, char *params, boolean_t update_xs)
+{
+	xenbus_transaction_t	xbt;
+	dev_info_t		*dip = vdp->xs_dip;
+	char			*xsname;
+	int			err;
+
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+	ASSERT(vdp->xs_params_path != NULL);
+
+	if ((xsname = xvdi_get_xsname(dip)) == NULL)
+		return;
+	if (strcmp(vdp->xs_params_path, params) == 0)
+		return;
+
+	/*
+	 * Close the device we're currently accessing and update the
+	 * path which points to our backend device/file.
+	 */
+	xdb_close(dip);
+	vdp->xs_fe_initialised = B_FALSE;
+
+trans_retry:
+	if ((err = xenbus_transaction_start(&xbt)) != 0) {
+		xvdi_dev_error(dip, err, "params change transaction init");
+		goto errout;
+	}
+
+	/*
+	 * Delete all the xenbus properties that are connection dependant
+	 * and go back to the initializing state so that the frontend
+	 * driver can re-negotiate a connection.
+	 */
+	if (((err = xenbus_rm(xbt, xsname, XBP_FB)) != 0) ||
+	    ((err = xenbus_rm(xbt, xsname, XBP_INFO)) != 0) ||
+	    ((err = xenbus_rm(xbt, xsname, "sector-size")) != 0) ||
+	    ((err = xenbus_rm(xbt, xsname, XBP_SECTORS)) != 0) ||
+	    ((err = xenbus_rm(xbt, xsname, "instance")) != 0) ||
+	    ((err = xenbus_rm(xbt, xsname, "node")) != 0) ||
+	    (update_xs && ((err = xenbus_printf(xbt, xsname,
+	    "params", "%s", params)) != 0)) ||
+	    ((err = xvdi_switch_state(dip,
+	    xbt, XenbusStateInitialising) > 0))) {
+		(void) xenbus_transaction_end(xbt, 1);
+		xvdi_dev_error(dip, err, "params change transaction setup");
+		goto errout;
+	}
+
+	if ((err = xenbus_transaction_end(xbt, 0)) != 0) {
+		if (err == EAGAIN) {
+			/* transaction is ended, don't need to abort it */
+			goto trans_retry;
+		}
+		xvdi_dev_error(dip, err, "params change transaction commit");
+		goto errout;
+	}
+
+	/* Change the device that we plan to access */
+	strfree(vdp->xs_params_path);
+	vdp->xs_params_path = strdup(params);
+	return;
+
+errout:
+	(void) xvdi_switch_state(dip, xbt, XenbusStateInitialising);
+}
+
+/*
+ * xdb_watch_params_cb() - This callback is invoked whenever there
+ * is an update to the following xenbus parameter:
+ *     /local/domain/0/backend/vbd/<domU_id>/<domU_dev>/params
+ *
+ * This normally happens during xm block-configure operations, which
+ * are used to change CD device images for HVM domUs.
+ */
+/*ARGSUSED*/
+static void
+xdb_watch_params_cb(dev_info_t *dip, const char *path, void *arg)
+{
+	xdb_t			*vdp = (xdb_t *)ddi_get_driver_private(dip);
+	char			*xsname, *oename, *str, *str2;
+
+	if (((xsname = xvdi_get_xsname(dip)) == NULL) ||
+	    ((oename = xvdi_get_oename(dip)) == NULL)) {
+		return;
+	}
+
+	mutex_enter(&vdp->xs_cbmutex);
+
+	if (xenbus_read_str(xsname, "params", &str) != 0) {
+		mutex_exit(&vdp->xs_cbmutex);
+		return;
+	}
+
+	if (strcmp(vdp->xs_params_path, str) == 0) {
+		/* Nothing todo */
+		mutex_exit(&vdp->xs_cbmutex);
+		strfree(str);
+		return;
+	}
+
+	/*
+	 * If the frontend isn't a cd device, doesn't support media
+	 * requests, or has locked the media, then we can't change
+	 * the params value.  restore the current value.
+	 */
+	str2 = NULL;
+	if (!XDB_IS_FE_CD(vdp) ||
+	    (xenbus_read_str(oename, XBP_MEDIA_REQ, &str2) != 0) ||
+	    (strcmp(str2, XBV_MEDIA_REQ_LOCK) == 0)) {
+		if (str2 != NULL)
+			strfree(str2);
+		strfree(str);
+
+		str = i_pathname(dip);
+		cmn_err(CE_NOTE,
+		    "!%s: media locked, ignoring params update", str);
+		strfree(str);
+
+		mutex_exit(&vdp->xs_cbmutex);
+		return;
+	}
+
+	XDB_DBPRINT(XDB_DBG_INFO, (CE_NOTE,
+	    "block-configure params request: \"%s\"", str));
+
+	xdb_params_change(vdp, str, B_FALSE);
+	mutex_exit(&vdp->xs_cbmutex);
+	strfree(str);
+}
+
+/*
+ * xdb_watch_media_req_cb() - This callback is invoked whenever there
+ * is an update to the following xenbus parameter:
+ *     /local/domain/<domU_id>/device/vbd/<domU_dev>/media-req
+ *
+ * Media requests are only supported on CD devices and are issued by
+ * the frontend.  Currently the only supported media request operaions
+ * are "lock" and "eject".  A "lock" prevents the backend from changing
+ * the backing device/file (via xm block-configure).  An "eject" requests
+ * tells the backend device that it should disconnect from the frontend
+ * and closing the backing device/file that is currently in use.
+ */
+/*ARGSUSED*/
+static void
+xdb_watch_media_req_cb(dev_info_t *dip, const char *path, void *arg)
+{
+	xdb_t			*vdp = (xdb_t *)ddi_get_driver_private(dip);
+	char			*oename, *str;
+
+	mutex_enter(&vdp->xs_cbmutex);
+
+	if ((oename = xvdi_get_oename(dip)) == NULL) {
+		mutex_exit(&vdp->xs_cbmutex);
+		return;
+	}
+
+	if (xenbus_read_str(oename, XBP_MEDIA_REQ, &str) != 0) {
+		mutex_exit(&vdp->xs_cbmutex);
+		return;
+	}
+
+	if (!XDB_IS_FE_CD(vdp)) {
+		xvdi_dev_error(dip, EINVAL,
+		    "media-req only supported for cdrom devices");
+		mutex_exit(&vdp->xs_cbmutex);
+		return;
+	}
+
+	if (strcmp(str, XBV_MEDIA_REQ_EJECT) != 0) {
+		mutex_exit(&vdp->xs_cbmutex);
+		strfree(str);
+		return;
+	}
+	strfree(str);
+
+	XDB_DBPRINT(XDB_DBG_INFO, (CE_NOTE, "media eject request"));
+
+	xdb_params_change(vdp, "", B_TRUE);
+	(void) xenbus_printf(XBT_NULL, oename,
+	    XBP_MEDIA_REQ, "%s", XBV_MEDIA_REQ_NONE);
+	mutex_exit(&vdp->xs_cbmutex);
+}
+
+/*
+ * If we're dealing with a cdrom device, let the frontend know that
+ * we support media requests via XBP_MEDIA_REQ_SUP, and setup a watch
+ * to handle those frontend media request changes, which modify the
+ * following xenstore parameter:
+ *	/local/domain/<domU_id>/device/vbd/<domU_dev>/media-req
+ */
+static boolean_t
+xdb_media_req_init(xdb_t *vdp)
+{
+	dev_info_t		*dip = vdp->xs_dip;
+	char			*xsname, *oename;
+
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
+	if (((xsname = xvdi_get_xsname(dip)) == NULL) ||
+	    ((oename = xvdi_get_oename(dip)) == NULL))
+		return (B_FALSE);
+
+	if (!XDB_IS_FE_CD(vdp))
+		return (B_TRUE);
+
+	if (xenbus_printf(XBT_NULL, xsname, XBP_MEDIA_REQ_SUP, "%d", 1) != 0)
+		return (B_FALSE);
+
+	if (xvdi_add_xb_watch_handler(dip, oename,
+	    XBP_MEDIA_REQ, xdb_watch_media_req_cb, NULL) != DDI_SUCCESS) {
+		xvdi_dev_error(dip, EAGAIN,
+		    "Failed to register watch for cdrom media requests");
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Get our params value.  Also, if we're using "params" then setup a
+ * watch to handle xm block-configure operations which modify the
+ * following xenstore parameter:
+ *	/local/domain/0/backend/vbd/<domU_id>/<domU_dev>/params
+ */
+static boolean_t
+xdb_params_init(xdb_t *vdp)
+{
+	dev_info_t		*dip = vdp->xs_dip;
+	char			*str, *xsname;
+	int			err, watch_params = B_FALSE;
+
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+	ASSERT(vdp->xs_params_path == NULL);
+
+	if ((xsname = xvdi_get_xsname(dip)) == NULL)
+		return (B_FALSE);
+
+	if ((err = xenbus_read_str(xsname,
+	    "dynamic-device-path", &str)) == ENOENT) {
+		err = xenbus_read_str(xsname, "params", &str);
+		watch_params = B_TRUE;
+	}
+	if (err != 0)
+		return (B_FALSE);
+	vdp->xs_params_path = str;
+
+	/*
+	 * If we got our backing store path from "dynamic-device-path" then
+	 * there's no reason to watch "params"
+	 */
+	if (!watch_params)
+		return (B_TRUE);
+
+	if (xvdi_add_xb_watch_handler(dip, xsname, "params",
+	    xdb_watch_params_cb, NULL) != DDI_SUCCESS) {
+		strfree(vdp->xs_params_path);
+		vdp->xs_params_path = NULL;
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 #define	LOFI_CTRL_NODE	"/dev/lofictl"
 #define	LOFI_DEV_NODE	"/devices/pseudo/lofi@0:"
-#define	LOFI_MODE	FREAD | FWRITE | FEXCL
+#define	LOFI_MODE	(FREAD | FWRITE | FEXCL)
 
 static int
 xdb_setup_node(xdb_t *vdp, char *path)
 {
-	dev_info_t *dip;
-	char *xsnode, *node;
-	ldi_handle_t ldi_hdl;
-	struct lofi_ioctl *li;
-	int minor;
-	int err;
-	unsigned int len;
+	dev_info_t		*dip = vdp->xs_dip;
+	char			*xsname, *str;
+	ldi_handle_t		ldi_hdl;
+	struct lofi_ioctl	*li;
+	int			minor, err;
 
-	dip = vdp->xs_dip;
-	xsnode = xvdi_get_xsname(dip);
-	if (xsnode == NULL)
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
+	if ((xsname = xvdi_get_xsname(dip)) == NULL)
 		return (DDI_FAILURE);
 
-	err = xenbus_read(XBT_NULL, xsnode, "dynamic-device-path",
-	    (void **)&node, &len);
-	if (err == ENOENT)
-		err = xenbus_read(XBT_NULL, xsnode, "params", (void **)&node,
-		    &len);
-	if (err != 0) {
-		xvdi_fatal_error(vdp->xs_dip, err, "reading 'params'");
+	if ((err = xenbus_read_str(xsname, "type", &str)) != 0) {
+		xvdi_dev_error(dip, err, "Getting type from backend device");
 		return (DDI_FAILURE);
 	}
+	if (strcmp(str, "file") == 0)
+		vdp->xs_type |= XDB_DEV_BE_LOFI;
+	strfree(str);
 
-	if (!XDB_IS_LOFI(vdp)) {
-		(void) strlcpy(path, node, MAXPATHLEN);
-		kmem_free(node, len);
+	if (!XDB_IS_BE_LOFI(vdp)) {
+		(void) strlcpy(path, vdp->xs_params_path, MAXPATHLEN);
+		ASSERT(vdp->xs_lofi_path == NULL);
 		return (DDI_SUCCESS);
 	}
 
@@ -832,63 +1124,55 @@ xdb_setup_node(xdb_t *vdp, char *path)
 		    &ldi_hdl, vdp->xs_ldi_li);
 	} while (err == EBUSY);
 	if (err != 0) {
-		kmem_free(node, len);
 		return (DDI_FAILURE);
 	}
 
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
-	(void) strlcpy(li->li_filename, node, MAXPATHLEN);
-	kmem_free(node, len);
-	if (ldi_ioctl(ldi_hdl, LOFI_MAP_FILE, (intptr_t)li,
-	    LOFI_MODE | FKIOCTL, kcred, &minor) != 0) {
+	(void) strlcpy(li->li_filename, vdp->xs_params_path,
+	    sizeof (li->li_filename));
+	err = ldi_ioctl(ldi_hdl, LOFI_MAP_FILE, (intptr_t)li,
+	    LOFI_MODE | FKIOCTL, kcred, &minor);
+	(void) ldi_close(ldi_hdl, LOFI_MODE, kcred);
+	kmem_free(li, sizeof (*li));
+
+	if (err != 0) {
 		cmn_err(CE_WARN, "xdb@%s: Failed to create lofi dev for %s",
-		    ddi_get_name_addr(dip), li->li_filename);
-		(void) ldi_close(ldi_hdl, LOFI_MODE, kcred);
-		kmem_free(li, sizeof (*li));
+		    ddi_get_name_addr(dip), vdp->xs_params_path);
 		return (DDI_FAILURE);
 	}
+
 	/*
 	 * return '/devices/...' instead of '/dev/lofi/...' since the
 	 * former is available immediately after calling ldi_ioctl
 	 */
 	(void) snprintf(path, MAXPATHLEN, LOFI_DEV_NODE "%d", minor);
-	(void) xenbus_printf(XBT_NULL, xsnode, "node", "%s", path);
-	(void) ldi_close(ldi_hdl, LOFI_MODE, kcred);
-	kmem_free(li, sizeof (*li));
+	(void) xenbus_printf(XBT_NULL, xsname, "node", "%s", path);
+
+	ASSERT(vdp->xs_lofi_path == NULL);
+	vdp->xs_lofi_path = strdup(path);
+
 	return (DDI_SUCCESS);
 }
 
 static void
 xdb_teardown_node(xdb_t *vdp)
 {
-	dev_info_t *dip;
-	char *xsnode, *node;
+	dev_info_t *dip = vdp->xs_dip;
 	ldi_handle_t ldi_hdl;
 	struct lofi_ioctl *li;
 	int err;
-	unsigned int len;
 
-	if (!XDB_IS_LOFI(vdp))
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
+	if (!XDB_IS_BE_LOFI(vdp))
 		return;
 
-	dip = vdp->xs_dip;
-	xsnode = xvdi_get_xsname(dip);
-	if (xsnode == NULL)
-		return;
-
-	err = xenbus_read(XBT_NULL, xsnode, "dynamic-device-path",
-	    (void **)&node, &len);
-	if (err == ENOENT)
-		err = xenbus_read(XBT_NULL, xsnode, "params", (void **)&node,
-		    &len);
-	if (err != 0) {
-		xvdi_fatal_error(vdp->xs_dip, err, "reading 'params'");
-		return;
-	}
+	vdp->xs_type &= ~XDB_DEV_BE_LOFI;
+	ASSERT(vdp->xs_lofi_path != NULL);
 
 	li = kmem_zalloc(sizeof (*li), KM_SLEEP);
-	(void) strlcpy(li->li_filename, node, MAXPATHLEN);
-	kmem_free(node, len);
+	(void) strlcpy(li->li_filename, vdp->xs_params_path,
+	    sizeof (li->li_filename));
 
 	do {
 		err = ldi_open_by_name(LOFI_CTRL_NODE, LOFI_MODE, kcred,
@@ -908,65 +1192,45 @@ xdb_teardown_node(xdb_t *vdp)
 
 	(void) ldi_close(ldi_hdl, LOFI_MODE, kcred);
 	kmem_free(li, sizeof (*li));
+
+	strfree(vdp->xs_lofi_path);
+	vdp->xs_lofi_path = NULL;
 }
 
 static int
 xdb_open_device(xdb_t *vdp)
 {
+	dev_info_t *dip = vdp->xs_dip;
 	uint64_t devsize;
-	dev_info_t *dip;
-	char *xsnode;
 	char *nodepath;
-	char *mode = NULL;
-	char *type = NULL;
-	int err;
 
-	dip = vdp->xs_dip;
-	xsnode = xvdi_get_xsname(dip);
-	if (xsnode == NULL)
-		return (DDI_FAILURE);
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
 
-	err = xenbus_gather(XBT_NULL, xsnode,
-	    "mode", NULL, &mode, "type", NULL, &type, NULL);
-	if (err != 0) {
-		if (mode)
-			kmem_free(mode, strlen(mode) + 1);
-		if (type)
-			kmem_free(type, strlen(type) + 1);
-		xvdi_fatal_error(dip, err,
-		    "Getting mode and type from backend device");
-		return (DDI_FAILURE);
+	if (strlen(vdp->xs_params_path) == 0) {
+		/*
+		 * it's possible to have no backing device when dealing
+		 * with a pv cdrom drive that has no virtual cd associated
+		 * with it.
+		 */
+		ASSERT(XDB_IS_FE_CD(vdp));
+		ASSERT(vdp->xs_sectors == 0);
+		ASSERT(vdp->xs_ldi_li == NULL);
+		ASSERT(vdp->xs_ldi_hdl == NULL);
+		return (DDI_SUCCESS);
 	}
-	if (strcmp(type, "file") == 0) {
-		vdp->xs_type |= XDB_DEV_LOFI;
-	}
-	kmem_free(type, strlen(type) + 1);
-	if ((strcmp(mode, "r") == NULL) || (strcmp(mode, "ro") == NULL)) {
-		vdp->xs_type |= XDB_DEV_RO;
-	}
-	kmem_free(mode, strlen(mode) + 1);
 
-	/*
-	 * try to open backend device
-	 */
 	if (ldi_ident_from_dip(dip, &vdp->xs_ldi_li) != 0)
 		return (DDI_FAILURE);
 
 	nodepath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-	err = xdb_setup_node(vdp, nodepath);
-	if (err != DDI_SUCCESS) {
-		xvdi_fatal_error(dip, err,
+
+	/* try to open backend device */
+	if (xdb_setup_node(vdp, nodepath) != DDI_SUCCESS) {
+		xvdi_dev_error(dip, ENXIO,
 		    "Getting device path of backend device");
 		ldi_ident_release(vdp->xs_ldi_li);
 		kmem_free(nodepath, MAXPATHLEN);
 		return (DDI_FAILURE);
-	}
-
-	if (*nodepath == '\0') {
-		/* Allow a CD-ROM device with an empty backend. */
-		vdp->xs_sectors = 0;
-		kmem_free(nodepath, MAXPATHLEN);
-		return (DDI_SUCCESS);
 	}
 
 	if (ldi_open_by_name(nodepath,
@@ -980,16 +1244,6 @@ xdb_open_device(xdb_t *vdp)
 		return (DDI_FAILURE);
 	}
 
-	/* check if it's a CD/DVD disc */
-	if (ldi_prop_get_int(vdp->xs_ldi_hdl, LDI_DEV_T_ANY | DDI_PROP_DONTPASS,
-	    "inquiry-device-type", DTYPE_DIRECT) == DTYPE_RODIRECT)
-		vdp->xs_type |= XDB_DEV_CD;
-	/* check if it's a removable disk */
-	if (ldi_prop_exists(vdp->xs_ldi_hdl,
-	    LDI_DEV_T_ANY | DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-	    "removable-media"))
-		vdp->xs_type |= XDB_DEV_RMB;
-
 	if (ldi_get_size(vdp->xs_ldi_hdl, &devsize) != DDI_SUCCESS) {
 		(void) ldi_close(vdp->xs_ldi_hdl,
 		    FREAD | (XDB_IS_RO(vdp) ? 0 : FWRITE), kcred);
@@ -1000,6 +1254,17 @@ xdb_open_device(xdb_t *vdp)
 	}
 	vdp->xs_sectors = devsize / XB_BSIZE;
 
+	/* check if the underlying device is a CD/DVD disc */
+	if (ldi_prop_get_int(vdp->xs_ldi_hdl, LDI_DEV_T_ANY | DDI_PROP_DONTPASS,
+	    INQUIRY_DEVICE_TYPE, DTYPE_DIRECT) == DTYPE_RODIRECT)
+		vdp->xs_type |= XDB_DEV_BE_CD;
+
+	/* check if the underlying device is a removable disk */
+	if (ldi_prop_exists(vdp->xs_ldi_hdl,
+	    LDI_DEV_T_ANY | DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "removable-media"))
+		vdp->xs_type |= XDB_DEV_BE_RMB;
+
 	kmem_free(nodepath, MAXPATHLEN);
 	return (DDI_SUCCESS);
 }
@@ -1007,171 +1272,155 @@ xdb_open_device(xdb_t *vdp)
 static void
 xdb_close_device(xdb_t *vdp)
 {
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
+	if (strlen(vdp->xs_params_path) == 0) {
+		ASSERT(XDB_IS_FE_CD(vdp));
+		ASSERT(vdp->xs_sectors == 0);
+		ASSERT(vdp->xs_ldi_li == NULL);
+		ASSERT(vdp->xs_ldi_hdl == NULL);
+		return;
+	}
+
 	(void) ldi_close(vdp->xs_ldi_hdl,
 	    FREAD | (XDB_IS_RO(vdp) ? 0 : FWRITE), kcred);
 	xdb_teardown_node(vdp);
 	ldi_ident_release(vdp->xs_ldi_li);
+	vdp->xs_type &= ~(XDB_DEV_BE_CD | XDB_DEV_BE_RMB);
+	vdp->xs_sectors = 0;
 	vdp->xs_ldi_li = NULL;
 	vdp->xs_ldi_hdl = NULL;
 }
 
 /*
  * Kick-off connect process
- * If xs_fe_status == XDB_FE_READY and xs_dev_status == XDB_DEV_READY
- * the xs_if_status will be changed to XDB_CONNECTED on success,
- * otherwise, xs_if_status will not be changed
+ * If xs_fe_initialised == B_TRUE and xs_hp_connected == B_TRUE
+ * the xs_if_connected will be changed to B_TRUE on success,
  */
-static int
+static void
 xdb_start_connect(xdb_t *vdp)
 {
-	uint32_t dinfo;
-	xenbus_transaction_t xbt;
-	int err, svdst;
-	char *xsnode;
-	dev_info_t *dip = vdp->xs_dip;
-	char *barrier;
-	uint_t len;
+	xenbus_transaction_t	xbt;
+	dev_info_t		*dip = vdp->xs_dip;
+	boolean_t		fb_exists;
+	int			err, instance = ddi_get_instance(dip);
+	uint64_t		sectors;
+	uint_t			dinfo, ssize;
+	char			*xsname;
+
+	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
+
+	if (((xsname = xvdi_get_xsname(dip)) == NULL) ||
+	    ((vdp->xs_peer = xvdi_get_oeid(dip)) == (domid_t)-1))
+		return;
+
+	mutex_enter(&vdp->xs_iomutex);
+	/*
+	 * if the hotplug scripts haven't run or if the frontend is not
+	 * initialized, then we can't try to connect.
+	 */
+	if (!vdp->xs_hp_connected || !vdp->xs_fe_initialised) {
+		ASSERT(!vdp->xs_if_connected);
+		mutex_exit(&vdp->xs_iomutex);
+		return;
+	}
+
+	/* If we're already connected then there's nothing todo */
+	if (vdp->xs_if_connected) {
+		mutex_exit(&vdp->xs_iomutex);
+		return;
+	}
+	mutex_exit(&vdp->xs_iomutex);
 
 	/*
 	 * Start connect to frontend only when backend device are ready
 	 * and frontend has moved to XenbusStateInitialised, which means
-	 * ready to connect
+	 * ready to connect.
 	 */
-	ASSERT((vdp->xs_fe_status == XDB_FE_READY) &&
-	    (vdp->xs_dev_status == XDB_DEV_READY));
+	XDB_DBPRINT(XDB_DBG_INFO, (CE_NOTE,
+	    "xdb@%s: starting connection process", ddi_get_name_addr(dip)));
 
-	if (((xsnode = xvdi_get_xsname(dip)) == NULL)		 ||
-	    ((vdp->xs_peer = xvdi_get_oeid(dip)) == (domid_t)-1) ||
-	    (xdb_open_device(vdp) != DDI_SUCCESS))
-		return (DDI_FAILURE);
+	if (xdb_open_device(vdp) != DDI_SUCCESS)
+		return;
 
-	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateInitialised);
-
-	if (xdb_bindto_frontend(vdp) != DDI_SUCCESS)
-		goto errout1;
+	if (xdb_bindto_frontend(vdp) != DDI_SUCCESS) {
+		xdb_close_device(vdp);
+		return;
+	}
 
 	/* init i/o requests */
 	xdb_init_ioreqs(vdp);
 
 	if (ddi_add_intr(dip, 0, NULL, NULL, xdb_intr, (caddr_t)vdp)
-	    != DDI_SUCCESS)
-		goto errout2;
+	    != DDI_SUCCESS) {
+		xdb_uninit_ioreqs(vdp);
+		xdb_unbindfrom_frontend(vdp);
+		xdb_close_device(vdp);
+		return;
+	}
+
+	dinfo = 0;
+	if (XDB_IS_RO(vdp))
+		dinfo |= VDISK_READONLY;
+	if (XDB_IS_BE_RMB(vdp))
+		dinfo |= VDISK_REMOVABLE;
+	if (XDB_IS_BE_CD(vdp))
+		dinfo |= VDISK_CDROM;
+	if (XDB_IS_FE_CD(vdp))
+		dinfo |= VDISK_REMOVABLE | VDISK_CDROM;
 
 	/*
 	 * we can recieve intr any time from now on
 	 * mark that we're ready to take intr
 	 */
 	mutex_enter(&vdp->xs_iomutex);
-	/*
-	 * save it in case we need to restore when we
-	 * fail to write xenstore later
-	 */
-	svdst = vdp->xs_if_status;
-	vdp->xs_if_status = XDB_CONNECTED;
+	ASSERT(vdp->xs_fe_initialised);
+	vdp->xs_if_connected = B_TRUE;
 	mutex_exit(&vdp->xs_iomutex);
 
-	/* write into xenstore the info needed by frontend */
 trans_retry:
-	if (xenbus_transaction_start(&xbt)) {
-		xvdi_fatal_error(dip, EIO, "transaction start");
-		goto errout3;
+	/* write into xenstore the info needed by frontend */
+	if ((err = xenbus_transaction_start(&xbt)) != 0) {
+		xvdi_dev_error(dip, err, "connect transaction init");
+		goto errout;
 	}
 
-	/*
-	 * If feature-barrier isn't present in xenstore, add it.
-	 */
-	if (xenbus_read(xbt, xsnode, "feature-barrier",
-	    (void **)&barrier, &len) != 0) {
-		if ((err = xenbus_printf(xbt, xsnode, "feature-barrier",
-		    "%d", 1)) != 0) {
-			cmn_err(CE_WARN, "xdb@%s: failed to write "
-			    "'feature-barrier'", ddi_get_name_addr(dip));
-			xvdi_fatal_error(dip, err, "writing 'feature-barrier'");
-			goto abort_trans;
-		}
-	} else
-		kmem_free(barrier, len);
-
-	dinfo = 0;
-	if (XDB_IS_RO(vdp))
-		dinfo |= VDISK_READONLY;
-	if (XDB_IS_CD(vdp))
-		dinfo |= VDISK_CDROM;
-	if (XDB_IS_RMB(vdp))
-		dinfo |= VDISK_REMOVABLE;
-	if (err = xenbus_printf(xbt, xsnode, "info", "%u", dinfo)) {
-		xvdi_fatal_error(dip, err, "writing 'info'");
-		goto abort_trans;
-	}
+	/* If feature-barrier isn't present in xenstore, add it.  */
+	fb_exists = xenbus_exists(xsname, XBP_FB);
 
 	/* hard-coded 512-byte sector size */
-	if (err = xenbus_printf(xbt, xsnode, "sector-size", "%u", DEV_BSIZE)) {
-		xvdi_fatal_error(dip, err, "writing 'sector-size'");
-		goto abort_trans;
+	ssize = DEV_BSIZE;
+	sectors = vdp->xs_sectors;
+	if (((!fb_exists &&
+	    (err = xenbus_printf(xbt, xsname, XBP_FB, "%d", 1)))) ||
+	    (err = xenbus_printf(xbt, xsname, XBP_INFO, "%u", dinfo)) ||
+	    (err = xenbus_printf(xbt, xsname, "sector-size", "%u", ssize)) ||
+	    (err = xenbus_printf(xbt, xsname,
+	    XBP_SECTORS, "%"PRIu64, sectors)) ||
+	    (err = xenbus_printf(xbt, xsname, "instance", "%d", instance)) ||
+	    ((err = xvdi_switch_state(dip, xbt, XenbusStateConnected)) > 0)) {
+		(void) xenbus_transaction_end(xbt, 1);
+		xvdi_dev_error(dip, err, "connect transaction setup");
+		goto errout;
 	}
 
-	if (err = xenbus_printf(xbt, xsnode, "sectors", "%"PRIu64,
-	    vdp->xs_sectors)) {
-		xvdi_fatal_error(dip, err, "writing 'sectors'");
-		goto abort_trans;
-	}
-
-	if (err = xenbus_printf(xbt, xsnode, "instance", "%d",
-	    ddi_get_instance(dip))) {
-		xvdi_fatal_error(dip, err, "writing 'instance'");
-		goto abort_trans;
-	}
-
-	if ((err = xvdi_switch_state(dip, xbt, XenbusStateConnected)) > 0) {
-		xvdi_fatal_error(dip, err, "writing 'state'");
-		goto abort_trans;
-	}
-
-	if (err = xenbus_transaction_end(xbt, 0)) {
-		if (err == EAGAIN)
+	if ((err = xenbus_transaction_end(xbt, 0)) != 0) {
+		if (err == EAGAIN) {
 			/* transaction is ended, don't need to abort it */
 			goto trans_retry;
-		xvdi_fatal_error(dip, err, "completing transaction");
-		goto errout3;
+		}
+		xvdi_dev_error(dip, err, "connect transaction commit");
+		goto errout;
 	}
 
-	return (DDI_SUCCESS);
+	return;
 
-abort_trans:
-	(void) xenbus_transaction_end(xbt, 1);
-errout3:
-	mutex_enter(&vdp->xs_iomutex);
-	vdp->xs_if_status = svdst;
-	mutex_exit(&vdp->xs_iomutex);
-	ddi_remove_intr(dip, 0, NULL);
-errout2:
-	xdb_uninit_ioreqs(vdp);
-	xdb_unbindfrom_frontend(vdp);
-errout1:
-	xdb_close_device(vdp);
-	return (DDI_FAILURE);
-}
-
-/*
- * Kick-off disconnect process
- * xs_if_status will not be changed
- */
-static int
-xdb_start_disconnect(xdb_t *vdp)
-{
-	/*
-	 * Kick-off disconnect process
-	 */
-	if (xvdi_switch_state(vdp->xs_dip, XBT_NULL, XenbusStateClosing) > 0)
-		return (DDI_FAILURE);
-
-	return (DDI_SUCCESS);
+errout:
+	xdb_close(dip);
 }
 
 /*
  * Disconnect from frontend and close backend device
- * ifstatus will be changed to XDB_DISCONNECTED
- * Xenbus state will be changed to XenbusStateClosed
  */
 static void
 xdb_close(dev_info_t *dip)
@@ -1179,23 +1428,36 @@ xdb_close(dev_info_t *dip)
 	xdb_t *vdp = (xdb_t *)ddi_get_driver_private(dip);
 
 	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
-
 	mutex_enter(&vdp->xs_iomutex);
 
-	if (vdp->xs_if_status != XDB_CONNECTED) {
-		vdp->xs_if_status = XDB_DISCONNECTED;
-		cv_broadcast(&vdp->xs_iocv);
+	/*
+	 * if the hotplug scripts haven't run or if the frontend is not
+	 * initialized, then we can't be connected, so there's no
+	 * connection to close.
+	 */
+	if (!vdp->xs_hp_connected || !vdp->xs_fe_initialised) {
+		ASSERT(!vdp->xs_if_connected);
 		mutex_exit(&vdp->xs_iomutex);
-		(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateClosed);
 		return;
 	}
-	vdp->xs_if_status = XDB_DISCONNECTED;
+
+	/* if we're not connected, there's nothing to do */
+	if (!vdp->xs_if_connected) {
+		cv_broadcast(&vdp->xs_iocv);
+		mutex_exit(&vdp->xs_iomutex);
+		return;
+	}
+
+	XDB_DBPRINT(XDB_DBG_INFO, (CE_NOTE, "closing while connected"));
+
+	vdp->xs_if_connected = B_FALSE;
 	cv_broadcast(&vdp->xs_iocv);
 
 	mutex_exit(&vdp->xs_iomutex);
 
 	/* stop accepting I/O request from frontend */
 	ddi_remove_intr(dip, 0, NULL);
+
 	/* clear all on-going I/Os, if any */
 	mutex_enter(&vdp->xs_iomutex);
 	while (vdp->xs_ionum > 0)
@@ -1207,109 +1469,53 @@ xdb_close(dev_info_t *dip)
 	xdb_unbindfrom_frontend(vdp);
 	xdb_close_device(vdp);
 	vdp->xs_peer = (domid_t)-1;
-	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateClosed);
-}
-
-/*
- * Xdb_check_state_transition will check the XenbusState change to see
- * if the change is a valid transition or not.
- * The new state is written by frontend domain, or by running xenstore-write
- * to change it manually in dom0
- */
-static int
-xdb_check_state_transition(xdb_t *vdp, XenbusState oestate)
-{
-	enum xdb_state status;
-	int stcheck;
-#define	STOK	0 /* need further process */
-#define	STNOP	1 /* no action need taking */
-#define	STBUG	2 /* unexpected state change, could be a bug */
-
-	status = vdp->xs_if_status;
-	stcheck = STOK;
-
-	switch (status) {
-	case XDB_UNKNOWN:
-		if (vdp->xs_fe_status == XDB_FE_UNKNOWN) {
-			if ((oestate == XenbusStateUnknown)		||
-			    (oestate == XenbusStateConnected))
-				stcheck = STBUG;
-			else if ((oestate == XenbusStateInitialising)	||
-			    (oestate == XenbusStateInitWait))
-				stcheck = STNOP;
-		} else {
-			if ((oestate == XenbusStateUnknown)		||
-			    (oestate == XenbusStateInitialising)	||
-			    (oestate == XenbusStateInitWait)		||
-			    (oestate == XenbusStateConnected))
-				stcheck = STBUG;
-			else if (oestate == XenbusStateInitialised)
-				stcheck = STNOP;
-		}
-		break;
-	case XDB_CONNECTED:
-		if ((oestate == XenbusStateUnknown)		||
-		    (oestate == XenbusStateInitialising)	||
-		    (oestate == XenbusStateInitWait)		||
-		    (oestate == XenbusStateInitialised))
-			stcheck = STBUG;
-		else if (oestate == XenbusStateConnected)
-			stcheck = STNOP;
-		break;
-	case XDB_DISCONNECTED:
-	default:
-			stcheck = STBUG;
-	}
-
-	if (stcheck == STOK)
-		return (DDI_SUCCESS);
-
-	if (stcheck == STBUG)
-		cmn_err(CE_NOTE, "xdb@%s: unexpected otherend "
-		    "state change to %d!, when status is %d",
-		    ddi_get_name_addr(vdp->xs_dip), oestate, status);
-
-	return (DDI_FAILURE);
 }
 
 static void
 xdb_send_buf(void *arg)
 {
-	buf_t *bp;
-	xdb_t *vdp = (xdb_t *)arg;
+	xdb_t	*vdp = (xdb_t *)arg;
+	buf_t	*bp;
+	int	err;
 
 	mutex_enter(&vdp->xs_iomutex);
-
-	while (vdp->xs_if_status != XDB_DISCONNECTED) {
-		while ((bp = vdp->xs_f_iobuf) != NULL) {
-			vdp->xs_f_iobuf = bp->av_forw;
-			bp->av_forw = NULL;
-			vdp->xs_ionum++;
-			mutex_exit(&vdp->xs_iomutex);
-			if (bp->b_bcount != 0) {
-				int err = ldi_strategy(vdp->xs_ldi_hdl, bp);
-				if (err != 0) {
-					bp->b_flags |= B_ERROR;
-					(void) xdb_biodone(bp);
-					XDB_DBPRINT(XDB_DBG_IO, (CE_WARN,
-					    "xdb@%s: sent buf to backend dev"
-					    "failed, err=%d",
-					    ddi_get_name_addr(vdp->xs_dip),
-					    err));
-				} else {
-					XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE,
-					    "sent buf to backend ok"));
-				}
-			} else /* no I/O need to be done */
-				(void) xdb_biodone(bp);
-
-			mutex_enter(&vdp->xs_iomutex);
+	while (vdp->xs_send_buf) {
+		if ((bp = vdp->xs_f_iobuf) == NULL) {
+			/* wait for some io to send */
+			XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE,
+			    "send buf waiting for io"));
+			cv_wait(&vdp->xs_iocv, &vdp->xs_iomutex);
+			continue;
 		}
 
-		if (vdp->xs_if_status != XDB_DISCONNECTED)
-			cv_wait(&vdp->xs_iocv, &vdp->xs_iomutex);
-	}
+		vdp->xs_f_iobuf = bp->av_forw;
+		bp->av_forw = NULL;
+		vdp->xs_ionum++;
 
+		mutex_exit(&vdp->xs_iomutex);
+		if (bp->b_bcount == 0) {
+			/* no I/O needs to be done */
+			(void) xdb_biodone(bp);
+			mutex_enter(&vdp->xs_iomutex);
+			continue;
+		}
+
+		err = EIO;
+		if (vdp->xs_ldi_hdl != NULL)
+			err = ldi_strategy(vdp->xs_ldi_hdl, bp);
+		if (err != 0) {
+			bp->b_flags |= B_ERROR;
+			(void) xdb_biodone(bp);
+			XDB_DBPRINT(XDB_DBG_IO, (CE_WARN,
+			    "xdb@%s: sent buf to backend devfailed, err=%d",
+			    ddi_get_name_addr(vdp->xs_dip), err));
+		} else {
+			XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE,
+			    "sent buf to backend ok"));
+		}
+		mutex_enter(&vdp->xs_iomutex);
+	}
+	XDB_DBPRINT(XDB_DBG_IO, (CE_NOTE, "send buf finishing"));
 	mutex_exit(&vdp->xs_iomutex);
 }
 
@@ -1324,17 +1530,19 @@ xdb_hp_state_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg,
 	XDB_DBPRINT(XDB_DBG_INFO, (CE_NOTE, "xdb@%s: "
 	    "hotplug status change to %d!", ddi_get_name_addr(dip), state));
 
+	if (state != Connected)
+		return;
+
 	mutex_enter(&vdp->xs_cbmutex);
-	if (state == Connected) {
-		/* Hotplug script has completed successfully */
-		if (vdp->xs_dev_status == XDB_DEV_UNKNOWN) {
-			vdp->xs_dev_status = XDB_DEV_READY;
-			if (vdp->xs_fe_status == XDB_FE_READY)
-				/* try to connect to frontend */
-				if (xdb_start_connect(vdp) != DDI_SUCCESS)
-					(void) xdb_start_disconnect(vdp);
-		}
+
+	/* If hotplug script have already run, there's nothing todo */
+	if (vdp->xs_hp_connected) {
+		mutex_exit(&vdp->xs_cbmutex);
+		return;
 	}
+
+	vdp->xs_hp_connected = B_TRUE;
+	xdb_start_connect(vdp);
 	mutex_exit(&vdp->xs_cbmutex);
 }
 
@@ -1351,29 +1559,47 @@ xdb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg,
 
 	mutex_enter(&vdp->xs_cbmutex);
 
-	if (xdb_check_state_transition(vdp, new_state) == DDI_FAILURE) {
-		mutex_exit(&vdp->xs_cbmutex);
-		return;
-	}
-
+	/*
+	 * Now it'd really be nice if there was a well defined state
+	 * transition model for xen frontend drivers, but unfortunatly
+	 * there isn't.  So we're stuck with assuming that all state
+	 * transitions are possible, and we'll just have to deal with
+	 * them regardless of what state we're in.
+	 */
 	switch (new_state) {
-	case XenbusStateInitialised:
-		ASSERT(vdp->xs_if_status == XDB_UNKNOWN);
-
-		/* frontend is ready for connecting */
-		vdp->xs_fe_status = XDB_FE_READY;
-
-		if (vdp->xs_dev_status == XDB_DEV_READY)
-			if (xdb_start_connect(vdp) != DDI_SUCCESS)
-				(void) xdb_start_disconnect(vdp);
+	case XenbusStateUnknown:
+	case XenbusStateInitialising:
+	case XenbusStateInitWait:
+		/* tear down our connection to the frontend */
+		xdb_close(dip);
+		vdp->xs_fe_initialised = B_FALSE;
 		break;
+
+	case XenbusStateInitialised:
+		/*
+		 * If we were conected, then we need to drop the connection
+		 * and re-negotiate it.
+		 */
+		xdb_close(dip);
+		vdp->xs_fe_initialised = B_TRUE;
+		xdb_start_connect(vdp);
+		break;
+
+	case XenbusStateConnected:
+		/* nothing todo here other than congratulate the frontend */
+		break;
+
 	case XenbusStateClosing:
+		/* monkey see monkey do */
 		(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateClosing);
 		break;
-	case XenbusStateClosed:
-		/* clean up */
-		xdb_close(dip);
 
+	case XenbusStateClosed:
+		/* tear down our connection to the frontend */
+		xdb_close(dip);
+		vdp->xs_fe_initialised = B_FALSE;
+		(void) xvdi_switch_state(dip, XBT_NULL, new_state);
+		break;
 	}
 
 	mutex_exit(&vdp->xs_cbmutex);
@@ -1382,9 +1608,11 @@ xdb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg,
 static int
 xdb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	xdb_t *vdp;
-	ddi_iblock_cookie_t ibc;
-	int instance;
+	ddi_iblock_cookie_t	ibc;
+	xdb_t			*vdp;
+	int			instance = ddi_get_instance(dip);
+	char			*xsname, *oename;
+	char			*str;
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -1394,42 +1622,69 @@ xdb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	default:
 		return (DDI_FAILURE);
 	}
-
 	/* DDI_ATTACH */
-	instance = ddi_get_instance(dip);
+
+	if (((xsname = xvdi_get_xsname(dip)) == NULL) ||
+	    ((oename = xvdi_get_oename(dip)) == NULL))
+		return (DDI_FAILURE);
+
+	/*
+	 * Disable auto-detach.  This is necessary so that we don't get
+	 * detached while we're disconnected from the front end.
+	 */
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dip, DDI_NO_AUTODETACH, 1);
+
+	if (ddi_get_iblock_cookie(dip, 0, &ibc) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
 	if (ddi_soft_state_zalloc(xdb_statep, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	vdp = ddi_get_soft_state(xdb_statep, instance);
 	vdp->xs_dip = dip;
-	if (ddi_get_iblock_cookie(dip, 0, &ibc) != DDI_SUCCESS)
-		goto errout1;
-
-	if (!xdb_kstat_init(vdp))
-		goto errout1;
-
 	mutex_init(&vdp->xs_iomutex, NULL, MUTEX_DRIVER, (void *)ibc);
 	mutex_init(&vdp->xs_cbmutex, NULL, MUTEX_DRIVER, (void *)ibc);
 	cv_init(&vdp->xs_iocv, NULL, CV_DRIVER, NULL);
 	cv_init(&vdp->xs_ionumcv, NULL, CV_DRIVER, NULL);
-
 	ddi_set_driver_private(dip, vdp);
 
+	if (!xdb_kstat_init(vdp))
+		goto errout1;
+
+	/* Check if the frontend device is supposed to be a cdrom */
+	if (xenbus_read_str(oename, XBP_DEV_TYPE, &str) != 0)
+		return (DDI_FAILURE);
+	if (strcmp(str, XBV_DEV_TYPE_CD) == 0)
+		vdp->xs_type |= XDB_DEV_FE_CD;
+	strfree(str);
+
+	/* Check if the frontend device is supposed to be read only */
+	if (xenbus_read_str(xsname, "mode", &str) != 0)
+		return (DDI_FAILURE);
+	if ((strcmp(str, "r") == NULL) || (strcmp(str, "ro") == NULL))
+		vdp->xs_type |= XDB_DEV_RO;
+	strfree(str);
+
+	mutex_enter(&vdp->xs_cbmutex);
+	if (!xdb_media_req_init(vdp) || !xdb_params_init(vdp)) {
+		xvdi_remove_xb_watch_handlers(dip);
+		mutex_exit(&vdp->xs_cbmutex);
+		goto errout2;
+	}
+	mutex_exit(&vdp->xs_cbmutex);
+
+	vdp->xs_send_buf = B_TRUE;
 	vdp->xs_iotaskq = ddi_taskq_create(dip, "xdb_iotask", 1,
 	    TASKQ_DEFAULTPRI, 0);
-	if (vdp->xs_iotaskq == NULL)
-		goto errout2;
 	(void) ddi_taskq_dispatch(vdp->xs_iotaskq, xdb_send_buf, vdp,
 	    DDI_SLEEP);
 
 	/* Watch frontend and hotplug state change */
-	if (xvdi_add_event_handler(dip, XS_OE_STATE, xdb_oe_state_change,
-	    NULL) != DDI_SUCCESS)
+	if ((xvdi_add_event_handler(dip, XS_OE_STATE, xdb_oe_state_change,
+	    NULL) != DDI_SUCCESS) ||
+	    (xvdi_add_event_handler(dip, XS_HP_STATE, xdb_hp_state_change,
+	    NULL) != DDI_SUCCESS))
 		goto errout3;
-	if (xvdi_add_event_handler(dip, XS_HP_STATE, xdb_hp_state_change,
-	    NULL) != DDI_SUCCESS) {
-		goto errout4;
-	}
 
 	/*
 	 * Kick-off hotplug script
@@ -1437,7 +1692,7 @@ xdb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (xvdi_post_event(dip, XEN_HP_ADD) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xdb@%s: failed to start hotplug script",
 		    ddi_get_name_addr(dip));
-		goto errout4;
+		goto errout3;
 	}
 
 	/*
@@ -1450,25 +1705,40 @@ xdb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    ddi_get_name_addr(dip)));
 	return (DDI_SUCCESS);
 
-errout4:
-	xvdi_remove_event_handler(dip, NULL);
 errout3:
+	ASSERT(vdp->xs_hp_connected && vdp->xs_if_connected);
+
+	xvdi_remove_event_handler(dip, NULL);
+
+	/* Disconnect from the backend */
 	mutex_enter(&vdp->xs_cbmutex);
 	mutex_enter(&vdp->xs_iomutex);
-	vdp->xs_if_status = XDB_DISCONNECTED;
+	vdp->xs_send_buf = B_FALSE;
 	cv_broadcast(&vdp->xs_iocv);
 	mutex_exit(&vdp->xs_iomutex);
 	mutex_exit(&vdp->xs_cbmutex);
+
+	/* wait for all io to dtrain and destroy io taskq */
 	ddi_taskq_destroy(vdp->xs_iotaskq);
+
+	/* tear down block-configure watch */
+	mutex_enter(&vdp->xs_cbmutex);
+	xvdi_remove_xb_watch_handlers(dip);
+	mutex_exit(&vdp->xs_cbmutex);
+
 errout2:
+	/* remove kstats */
+	kstat_delete(vdp->xs_kstats);
+
+errout1:
+	/* free up driver state */
 	ddi_set_driver_private(dip, NULL);
 	cv_destroy(&vdp->xs_iocv);
 	cv_destroy(&vdp->xs_ionumcv);
 	mutex_destroy(&vdp->xs_cbmutex);
 	mutex_destroy(&vdp->xs_iomutex);
-	kstat_delete(vdp->xs_kstats);
-errout1:
 	ddi_soft_state_free(xdb_statep, instance);
+
 	return (DDI_FAILURE);
 }
 
@@ -1490,19 +1760,25 @@ xdb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	/* DDI_DETACH handling */
 
-	/* shouldn't detach, if still used by frontend */
+	/* refuse to detach if we're still in use by the frontend */
 	mutex_enter(&vdp->xs_iomutex);
-	if (vdp->xs_if_status != XDB_DISCONNECTED) {
+	if (vdp->xs_if_connected) {
 		mutex_exit(&vdp->xs_iomutex);
 		return (DDI_FAILURE);
 	}
+	vdp->xs_send_buf = B_FALSE;
+	cv_broadcast(&vdp->xs_iocv);
 	mutex_exit(&vdp->xs_iomutex);
 
 	xvdi_remove_event_handler(dip, NULL);
-	/* can do nothing about it, if it fails */
 	(void) xvdi_post_event(dip, XEN_HP_REMOVE);
 
 	ddi_taskq_destroy(vdp->xs_iotaskq);
+
+	mutex_enter(&vdp->xs_cbmutex);
+	xvdi_remove_xb_watch_handlers(dip);
+	mutex_exit(&vdp->xs_cbmutex);
+
 	cv_destroy(&vdp->xs_iocv);
 	cv_destroy(&vdp->xs_ionumcv);
 	mutex_destroy(&vdp->xs_cbmutex);
@@ -1528,7 +1804,7 @@ static struct dev_ops xdb_dev_ops = {
 	NULL,		/* devo_cb_ops */
 	NULL,		/* devo_bus_ops */
 	NULL,		/* power */
-	ddi_quiesce_not_needed,	/* quiesce */
+	ddi_quiesce_not_needed, /* quiesce */
 };
 
 /*
@@ -1536,7 +1812,7 @@ static struct dev_ops xdb_dev_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. */
-	"vbd backend driver",	/* Name of the module */
+	"vbd backend driver",		/* Name of the module */
 	&xdb_dev_ops			/* driver ops */
 };
 
