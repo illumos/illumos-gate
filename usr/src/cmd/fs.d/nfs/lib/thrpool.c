@@ -46,21 +46,17 @@ svcstart(void *arg)
 {
 	int id = (int)arg;
 
-	while (_nfssys(SVCPOOL_RUN, &id) < 0) {
-		/*
-		 * Interrupted by a signal while in the kernel.
-		 * this process is still alive, try again.
-		 */
-		if (errno == EINTR)
-			continue;
-		else
-			break;
-	}
+	/*
+	 * Create a kernel worker thread to service
+	 * new incoming requests on a pool.
+	 */
+	_nfssys(SVCPOOL_RUN, &id);
 
 	/*
-	 * If we weren't interrupted by a signal, but did
-	 * return from the kernel, this thread's work is done,
-	 * and it should exit.
+	 * Returned from the kernel, this thread's work is done,
+	 * and it should exit. For new incoming requests,
+	 * svcblock() will spawn another worker thread by
+	 * calling svcstart() again.
 	 */
 	thr_exit(NULL);
 	return (NULL);
@@ -102,14 +98,15 @@ svcblock(void *arg)
 		 * until a thread needs to be created.
 		 */
 		if (_nfssys(SVCPOOL_WAIT, &id) < 0) {
-			if (errno == ECANCELED || errno == EBUSY)
+			if (errno == ECANCELED || errno == EINTR ||
+			    errno == EBUSY)
 				/*
-				 * If we get back ECANCELED, the service
-				 * pool is exiting, and we may as well
-				 * clean up this thread. If EBUSY is
-				 * returned, there's already a thread
-				 * looping on this pool, so we should
-				 * give up.
+				 * If we get back ECANCELED or EINTR,
+				 * the service pool is exiting, and we
+				 * may as well clean up this thread. If
+				 * EBUSY is returned, there's already a
+				 * thread looping on this pool, so we
+				 * should give up.
 				 */
 				break;
 			else
