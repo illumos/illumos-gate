@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <syslog.h>
 #include <errno.h>
@@ -321,10 +318,33 @@ callback_thread(void *varg) {
 	char			*table;
 	nis_error		result;
 	int			i;
+	CLIENT			*cback = NULL;
+	ulong_t			flags;
 	pthread_t		myself = pthread_self();
 
 	(void) nis_add_callback_id(myself, arg->pname);
 
+	if (verbose)
+		syslog(LOG_INFO, "Making callback handle to : %s",
+			arg->nserver[0].name);
+	if ((strcmp(arg->pname, "nobody") == 0) || (secure_level < 2))
+		flags = ZMH_VC;
+	else
+		flags = ZMH_VC+ZMH_AUTH;
+
+	cback = nis_make_rpchandle(arg->nserver, 1,
+				CB_PROG, 1, flags, 16384, 16384);
+	/* If we couldn't create a client handle we're hosed */
+	if (! cback) {
+		syslog(LOG_WARNING, "Unable to create callback.");
+		XFREE(arg->fnr);
+		free(arg->nserver);
+		free(varg);
+		nis_delete_callback_id(myself);
+		return (0);
+	}
+
+	arg->cback = cback;
 	arg->cbarg.entries.entries_val = &(cbarray[0]);
 	cookie = arg->fnr->cookie;
 	cbres = 0;
@@ -438,6 +458,7 @@ callback_thread(void *varg) {
 	auth_destroy(arg->cback->cl_auth);
 	clnt_destroy(arg->cback);
 	/* Our parent thread allocated this, but it's our job to deallocate */
+	free(arg->nserver);
 	free(varg);
 
 	nis_delete_callback_id(myself);

@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* LINTLIBRARY */
 /* PROTOLIB1 */
@@ -297,6 +296,7 @@ nis_error __nis_path(char *from, char *to, int *path_length, char ***namesp);
 int __nis_host_is_server(nis_server *, int);
 void __nis_print_result(nis_result *);
 struct netconfig *__nis_get_netconfig(endpoint *);
+nis_server *__nis_server_dup(nis_server *, nis_server *);
 
 /* nis_misc_proc.c */
 void __nis_auth2princ(char *name, int flavor, caddr_t auth, bool_t refresh,

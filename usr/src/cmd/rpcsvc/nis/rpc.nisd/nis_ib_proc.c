@@ -62,6 +62,7 @@ extern bool_t 	xdr_nis_result();
 extern bool_t 	xdr_nis_error();
 extern bool_t 	xdr_nis_object();
 extern void	(*_svc_getreqset_proc)();
+extern nis_server *__nis_server_dup(nis_server *, nis_server *);
 
 #define	NO_ENTRY_OBJS	96
 
@@ -461,7 +462,6 @@ nis_iblist_callback(argp, pname, ib_obj, all_read, res)
 	nis_object	*d_obj;
 	int		pid = -1; /* Process ID of child making call back */
 	int		i, queued;
-	CLIENT		*cback = NULL;	/* Callback client handle 	*/
 	cback_data	cbarg;		/* Callback arguments		*/
 				/* An array of object pointers	*/
 	struct timeval	tv;		/* Timeout for callback		*/
@@ -470,7 +470,6 @@ nis_iblist_callback(argp, pname, ib_obj, all_read, res)
 	enum clnt_stat	status = RPC_SUCCESS;
 	nis_error	result;
 	table_col	*tc;
-	ulong_t		flags;
 	char		tblbuf[NIS_MAXNAMELEN * 2];
 	char		*table;
 	nis_attr	*a;
@@ -519,26 +518,6 @@ nis_iblist_callback(argp, pname, ib_obj, all_read, res)
 		return (res);
 	}
 
-	if (verbose)
-		syslog(LOG_INFO, "Making callback handle to : %s",
-			argp->ibr_cbhost.ibr_cbhost_val[0].name);
-	if ((strcmp(pname, "nobody") == 0) || (secure_level < 2))
-		flags = ZMH_VC;
-	else
-		flags = ZMH_VC+ZMH_AUTH;
-
-	cback = nis_make_rpchandle(argp->ibr_cbhost.ibr_cbhost_val, 1,
-				CB_PROG, 1, flags, 16384, 16384);
-	/* If we couldn't create a client handle we're hosed */
-	if (! cback) {
-		syslog(LOG_WARNING, "Unable to create callback.");
-		res->status = NIS_NOCALLBACK;
-		res->zticks = __stop_clock(0);
-		XFREE(fnr);
-		fnr = NULL;
-		return (res);
-	}
-
 	/* Create a new thread to perform the callback */
 	{
 		pthread_t		tid;
@@ -546,13 +525,12 @@ nis_iblist_callback(argp, pname, ib_obj, all_read, res)
 		int			stat;
 		callback_thread_arg_t	*cbtarg;
 		int			attrsize = na * sizeof (cbtarg->a[0]);
+		nis_server		*srvl;
 
 		if ((cbtarg = calloc(1, sizeof (*cbtarg))) == 0) {
 			syslog(LOG_WARNING,
 		"nis_iblist_callback: memory allocation failed for %d bytes",
 				sizeof (*cbtarg));
-			auth_destroy(cback->cl_auth);
-			clnt_destroy(cback);
 			res->status = NIS_NOMEMORY;
 			res->zticks = __stop_clock(0);
 			XFREE(fnr);
@@ -577,7 +555,18 @@ nis_iblist_callback(argp, pname, ib_obj, all_read, res)
 		strncpy(cbtarg->pname, pname, sizeof (cbtarg->pname));
 		cbtarg->pname[sizeof (cbtarg->pname) - 1] = '\0';
 		cbtarg->cbarg = cbarg;
-		cbtarg->cback = cback;
+		srvl = (nis_server *) __nis_server_dup(
+		    (nis_server *)argp->ibr_cbhost.ibr_cbhost_val, NULL);
+		if (srvl == NULL) {
+			syslog(LOG_WARNING,
+			    "nis_iblist_callback: out of memory");
+			res->status = NIS_NOMEMORY;
+			res->zticks = __stop_clock(0);
+			XFREE(fnr);
+			free(cbtarg);
+			return (res);
+		}
+		cbtarg->nserver = srvl;
 		strncpy(cbtarg->cbhostname,
 			argp->ibr_cbhost.ibr_cbhost_val[0].name,
 			sizeof (cbtarg->cbhostname));
@@ -674,13 +663,13 @@ __nis_alt_callback_server(endpoint	*org_endpoint,
 	/* Retrieve a netconfig entry for "inet" that matches an endpoint */
 	for (i = 0; i < count; i++) {
 		if ((nc = __nis_get_netconfig(&org_endpoint[i])) != 0 &&
-			nc->nc_semantics == NC_TPI_COTS_ORD) {
+		    nc->nc_semantics == NC_TPI_COTS_ORD) {
 			if (strcasecmp(nc->nc_protofmly, NC_INET) == 0 &&
-				rpcaf == AF_INET) {
+			    rpcaf == AF_INET) {
 				af = AF_INET;
 			} else if (strcasecmp(
-					nc->nc_protofmly, NC_INET6) == 0 &&
-					rpcaf == AF_INET6) {
+			    nc->nc_protofmly, NC_INET6) == 0 &&
+			    rpcaf == AF_INET6) {
 				af = AF_INET6;
 			} else {
 				continue;
@@ -723,16 +712,16 @@ __nis_alt_callback_server(endpoint	*org_endpoint,
 	if (af == AF_INET) {
 		struct in_addr dummy;
 		newaddr =
-			&((struct sockaddr_in *)taddr->buf)->sin_addr.s_addr;
+		    &((struct sockaddr_in *)taddr->buf)->sin_addr.s_addr;
 		rpcaddr =
-		&((struct sockaddr_in *)rpc_origin->buf)->sin_addr.s_addr;
+		    &((struct sockaddr_in *)rpc_origin->buf)->sin_addr.s_addr;
 		addrlen = sizeof (dummy.s_addr);
 	} else {
 		struct in6_addr dummy;
 		newaddr =
-			&((struct sockaddr_in6 *)taddr->buf)->sin6_addr.s6_addr;
-		rpcaddr =
-		&((struct sockaddr_in6 *)rpc_origin->buf)->sin6_addr.s6_addr;
+		    &((struct sockaddr_in6 *)taddr->buf)->sin6_addr.s6_addr;
+		rpcaddr = &((struct sockaddr_in6 *)
+		    rpc_origin->buf)->sin6_addr.s6_addr;
 		addrlen = sizeof (dummy.s6_addr);
 	}
 

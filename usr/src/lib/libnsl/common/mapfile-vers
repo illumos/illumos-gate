@@ -321,6 +321,7 @@ SUNWprivate_1.5 {
 	__pmap_set;
 	__pmap_unset;
 	__use_portmapper;
+	__nis_server_dup;
 } SUNWprivate_1.4;
 
 SUNWprivate_1.4 {
