@@ -8,11 +8,9 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <setjmp.h>
 #include "restore.h"
@@ -60,7 +58,6 @@ static int	pathlen;
 static int	inodeinfo;	/* Have starting volume information */
 static int	hostinfo;	/* Have dump host information */
 
-#ifdef __STDC__
 static int autoload_tape(void);
 static void setdumpnum(void);
 static void metacheck(struct s_spcl *);
@@ -78,25 +75,6 @@ static void accthdr(struct s_spcl *);
 static int ishead(struct s_spcl *);
 static int checktype(struct s_spcl *, int);
 static void metaset(char *name);
-#else
-static int autoload_tape();
-static void setdumpnum();
-static void metacheck();
-static void xtrmeta();
-static void metaskip();
-static void xtrfile();
-static void xtrskip();
-static void xtrlnkfile();
-static void xtrlnkskip();
-static void xtrmap();
-static void xtrmapskip();
-static void readtape();
-static int checkvol();
-static void accthdr();
-static int ishead();
-static checktype();
-static void metaset();
-#endif
 
 /*
  * Set up an input source
@@ -202,11 +180,7 @@ newtapebuf(size_t size)
  * that it actually is a dump tape.
  */
 void
-#ifdef __STDC__
 setup(void)
-#else
-setup()
-#endif
 {
 	int i, j;
 	int32_t *ip;
@@ -317,7 +291,8 @@ setup()
 		i = 0;
 		do
 			i += *ip++;
-		while (--j);
+		while (--j)
+			;
 		endoftapemark.s_spcl.c_checksum = CHECKSUM - i;
 	}
 	if (vflag && command != 't')
@@ -331,12 +306,10 @@ setup()
 	if (stbuf.st_blksize >= tp_bsize && stbuf.st_blksize <= MAXBSIZE) {
 		/* LINTED: value fits in a size_t */
 		fssize = stbuf.st_blksize;
+	} else {
+		fssize = MAXBSIZE;
 	}
-	if (((fssize - 1) & fssize) != 0) {
-		(void) fprintf(stderr,
-		    gettext("bad filesystem block size %d\n"), fssize);
-		done(1);
-	}
+
 	if (checkvol(&spcl, 1) == FAIL) {
 		(void) fprintf(stderr,
 		    gettext("This is not volume 1 of the dump\n"));
@@ -381,8 +354,8 @@ setup()
 	if (checktype(&spcl, TS_BITS) == FAIL) {
 		/* if we have TS_CLRI then no TS_BITS then a TS_END */
 		/* then we have an empty dump file */
-		if (gethead(&spcl) == GOOD && checktype(&spcl, TS_END) == GOOD)
-		{
+		if (gethead(&spcl) == GOOD &&
+		    checktype(&spcl, TS_END) == GOOD) {
 			if ((command == 'r') || (command == 'R')) {
 				initsymtable(syment);
 				dumpsymtable(syment, volno);
@@ -413,11 +386,7 @@ setup()
  * Initialize fssize variable for 'R' command to work.
  */
 void
-#ifdef __STDC__
 setupR(void)
-#else
-setupR()
-#endif
 {
 	struct stat stbuf;
 
@@ -428,11 +397,8 @@ setupR()
 	if (stbuf.st_blksize >= tp_bsize && stbuf.st_blksize <= MAXBSIZE) {
 		/* LINTED: value fits in a size_t */
 		fssize = stbuf.st_blksize;
-	}
-	if (((fssize - 1) & fssize) != 0) {
-		(void) fprintf(stderr,
-		    gettext("bad filesystem block size %d\n"), fssize);
-		done(1);
+	} else {
+		fssize = MAXBSIZE;
 	}
 }
 
@@ -707,11 +673,7 @@ gethdr:
  * as that may take a very long time.
  */
 static void
-#ifdef __STDC__
 setdumpnum(void)
-#else
-setdumpnum()
-#endif
 {
 	struct mtop tcom;
 	int retval;
@@ -734,11 +696,7 @@ setdumpnum()
 }
 
 void
-#ifdef __STDC__
 printdumpinfo(void)
-#else
-printdumpinfo()
-#endif
 {
 	int i;
 	time_t date;
@@ -962,7 +920,13 @@ extractfile(char *name)
 
 	case IFREG:
 		vprintf(stdout, gettext("extract file %s\n"), rname);
-		ofile = creat64(rname, 0666);
+
+		/*
+		 * perform a restrictive creat(2) initally, we'll
+		 * fchmod(2) according to the archive later after
+		 * we've written the blocks.
+		 */
+		ofile = creat64(rname, 0600);
 
 		if (ofile < 0) {
 			saverr = errno;
@@ -986,6 +950,15 @@ extractfile(char *name)
 			    "Additional such failures will be ignored.\n"));
 			complained_chown = 1;
 		}
+
+		getfile(xtrfile, xtrskip);
+		metaset(rname);
+
+		/*
+		 * the fchmod(2) has to come after getfile() as some POSIX
+		 * implementations clear the S_ISUID and S_ISGID bits of the
+		 * file after every write(2).
+		 */
 		if (fchmod(ofile, mode) < 0 && !complained_chmod) {
 			saverr = errno;
 			errmsg = gettext(
@@ -996,10 +969,6 @@ extractfile(char *name)
 			    "Additional such failures will be ignored.\n"));
 			complained_chmod = 1;
 		}
-		getfile(xtrfile, xtrskip);
-		metaset(rname);	/* we don't have metadata until after */
-				/* getfile() - maybe fchmod(0) then */
-				/* fchmod(real) after this? */
 
 		/*
 		 * Some errors don't get reported until we close(2), so
@@ -1042,11 +1011,7 @@ extractfile(char *name)
  * skip over bit maps on the tape
  */
 void
-#ifdef __STDC__
 skipmaps(void)
-#else
-skipmaps()
-#endif
 {
 	continuemap = 1;
 	while (checktype(&spcl, TS_CLRI) == GOOD ||
@@ -1059,11 +1024,7 @@ skipmaps()
  * skip over a file on the tape
  */
 void
-#ifdef __STDC__
 skipfile(void)
-#else
-skipfile()
-#endif
 {
 	curfile.action = SKIP;
 	getfile(null, null);
@@ -1671,11 +1632,7 @@ nextvol:
 }
 
 void
-#ifdef __STDC__
 findtapeblksize(int arfile)
-#else
-findtapeblksize(int arfile)
-#endif
 {
 	int	i;
 
@@ -1717,22 +1674,14 @@ findtapeblksize(int arfile)
 }
 
 void
-#ifdef __STDC__
 flsht(void)
-#else
-flsht()
-#endif
 {
 	/* LINTED unsigned/signed assignment ok */
 	bct = ntrec+1;
 }
 
 void
-#ifdef __STDC__
 closemt(int mode)
-#else
-closemt(int mode)
-#endif
 {
 	/*
 	 * If mode == FORCE_OFFLINE then we're not done but
@@ -2109,11 +2058,7 @@ checktype(struct s_spcl *b, int t)
  * return non-zero.
  */
 static int
-#ifdef __STDC__
 autoload_tape(void)
-#else
-autoload_tape()
-#endif
 {
 	int result = 0;		/* assume failure */
 	int tries;
