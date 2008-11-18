@@ -359,12 +359,22 @@ static const struct nametable_fam6mod15_23 pic1_events[] = {
 	{ "",			0x0,	NT_END }
 };
 
-char *ffc_names[] = {
-	"inst_retired.any",
+/* FFC entries must be in order */
+char *ffc_names_non_htt[] = {
+	"instr_retired.any",
+	"cpu_clk_unhalted.core",
+	"cpu_clk_unhalted.ref",
+	NULL
+};
+
+char *ffc_names_htt[] = {
+	"instr_retired.any",
 	"cpu_clk_unhalted.thread",
 	"cpu_clk_unhalted.ref",
 	NULL
 };
+
+char **ffc_names = NULL;
 
 static char	**gpc_names;
 static uint32_t	versionid;
@@ -403,21 +413,28 @@ struct events_table_t {
 #define	C3 C(3)
 #define	C_ALL 0xFFFFFFFFFFFFFFFF
 
-const struct events_table_t arch_events_table[] = {
+/* Architectural events */
+#define	ARCH_EVENTS_COMMON					\
+	{ 0xc0, 0x00, C_ALL, "inst_retired.any_p" },		\
+	{ 0x3c, 0x01, C_ALL, "cpu_clk_unhalted.ref_p" },	\
+	{ 0x2e, 0x4f, C_ALL, "longest_lat_cache.reference" },	\
+	{ 0x2e, 0x41, C_ALL, "longest_lat_cache.miss" },	\
+	{ 0xc4, 0x00, C_ALL, "br_inst_retired.all_branches" },	\
+	{ 0xc5, 0x00, C_ALL, "br_misp_retired.all_branches" }
 
-{ 0x3c, 0x00, C_ALL, "cpu_clk_unhalted.thread_p" },
-{ 0xc0, 0x00, C_ALL, "inst_retired.any_p" },
-{ 0x3c, 0x01, C_ALL, "cpu_clk_unhalted.ref_p" },
-
-{ 0x2e, 0x4f, C_ALL, "longest_lat_cache.reference" },
-{ 0x2e, 0x41, C_ALL, "longest_lat_cache.miss" },
-{ 0xc4, 0x00, C_ALL, "br_inst_retired.all_branches" },
-
-{ 0xc5, 0x00, C_ALL, "br_misp_retired.all_branches" }
+const struct events_table_t arch_events_table_non_htt[] = {
+	{ 0x3c, 0x00, C_ALL, "cpu_clk_unhalted.core" },
+	ARCH_EVENTS_COMMON
 };
 
-static uint64_t known_arch_events =
-	    sizeof (arch_events_table)/sizeof (struct events_table_t);
+const struct events_table_t arch_events_table_htt[] = {
+	{ 0x3c, 0x00, C_ALL, "cpu_clk_unhalted.thread_p" },
+	ARCH_EVENTS_COMMON
+};
+
+const struct events_table_t *arch_events_table = NULL;
+static uint64_t known_arch_events;
+static uint64_t known_ffc_num;
 
 #define	EVENTS_FAM6_MOD26						\
 									\
@@ -878,14 +895,33 @@ core_pcbe_init(void)
 	if (num_ffc >= 64)
 		return (-1);
 
-	if (num_ffc >= sizeof (ffc_names) / sizeof (char *)) {
+	/* Set HTT-specific names of architectural & FFC events */
+	if (x86_feature & X86_HTT) {
+		ffc_names = ffc_names_htt;
+		arch_events_table = arch_events_table_htt;
+		known_arch_events =
+		    sizeof (arch_events_table_htt) /
+		    sizeof (struct events_table_t);
+		known_ffc_num =
+		    sizeof (ffc_names_htt) / sizeof (char *);
+	} else {
+		ffc_names = ffc_names_non_htt;
+		arch_events_table = arch_events_table_non_htt;
+		known_arch_events =
+		    sizeof (arch_events_table_non_htt) /
+		    sizeof (struct events_table_t);
+		known_ffc_num =
+		    sizeof (ffc_names_non_htt) / sizeof (char *);
+	}
+
+	if (num_ffc >= known_ffc_num) {
 		/*
 		 * The system seems to have more fixed-function counters than
 		 * what this PCBE is able to handle correctly.  Default to the
 		 * maximum number of fixed-function counters that this driver
 		 * is aware of.
 		 */
-		num_ffc = sizeof (ffc_names) / sizeof (char *) - 1;
+		num_ffc = known_ffc_num - 1;
 	}
 
 	mask_ffc = BITMASK_XBITS(width_ffc);
