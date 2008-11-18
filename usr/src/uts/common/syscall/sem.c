@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Inter-Process Communication Semaphore Facility.
@@ -998,6 +995,10 @@ semop(int semid, struct sembuf *sops, size_t nsops, timespec_t *timeout)
 			undo = NULL;
 		mutex_exit(&pp->p_lock);
 		if (undo == NULL) {
+			if (!held) {
+				held = 1;
+				ipc_hold(sem_svc, (kipc_perm_t *)sp);
+			}
 			if (error = sem_undo_alloc(pp, sp, &lock, &template,
 			    &undo))
 				goto semoperr;
