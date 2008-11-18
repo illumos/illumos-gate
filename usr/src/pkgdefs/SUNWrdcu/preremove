@@ -72,6 +72,7 @@ rem_devlink()
 #
 # Disable the services, if they are imported
 #
+if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
 for SVC in $SERVICES
 do
 	svcprop -q -p general/entity_stability svc:/system/${SVC}
@@ -83,7 +84,7 @@ do
 		    ${SVC}-local-fs/grouping=optional_all > /dev/null 2>&1
 	fi
 done
-
+fi
 #
 # if module has been previously installed, remove it
 #
@@ -105,6 +106,7 @@ do
   # unloaded without a reboot.  Also, module rdc must be unloaded 
   # first, hence the required order of modules in this loop, per
   # the variable MODULES
+if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
   MODID=`modinfo | grep -w ${MODULE} | awk '{print $1}'`
   if [ -n "$MODID" ]
   then
@@ -116,6 +118,7 @@ do
     fi
 
   fi
+fi
 
 done
 

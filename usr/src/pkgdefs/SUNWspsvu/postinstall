@@ -63,14 +63,37 @@ fi
 #
 
 # For least privileges add option -P sys_devices,sys_config
-if [ "${PKG_INSTALL_ROOT}" = "/" ]
-then
-    ADD_DRV="add_drv -P sys_devices,sys_config"
-    REM_DRV="rem_drv"
-else
-    ADD_DRV="add_drv -P sys_devices,sys_config -b ${PKG_INSTALL_ROOT}"
+
+       release=`uname -r | sed -e "s/[0-9]*\.//" -e "s/\..*//"`
+        case $release in
+            1[0-9] )
     REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
-fi
+    ADD_DRV="add_drv -P sys_devices,sys_config -b ${PKG_INSTALL_ROOT}"
+                ;;
+            * )
+    REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
+    ADD_DRV="add_drv -b ${PKG_INSTALL_ROOT}"
+    UPD_DRV_AFTER_REBOOT=0
+    cat  >> $BASEDIR/etc/rc2.d/S99storage <<\_SCMU
+                MODULES="sv"
+                for  MODULE in ${MODULES}
+                do
+ADDERR="ERROR: The installation cannot be completed due to an error updating the
+ \
+${MODULE} loadable module.  The file ${ERRLOG} contains the errors.  Exiting...\
+Please fix problem and re-run pkgadd."
+
+                update_drv -a -P sys_devices,sys_config -m  '* 0666 root sys' $M
+ODULE 2>&1
+                [  $? -ne 0 ]  && {
+                       message ${ADDERR}
+                        exit 1
+                }
+                done
+_SCMU
+		chmod a+x  $BASEDIR/etc/rc2.d/S99storage
+                ;;
+        esac
 
 #
 # Functions
@@ -98,6 +121,7 @@ add_devlink()
 #
 enable_service_on_reboot()
 {
+cat  >> $BASEDIR/var/svc/profile/upgrade <<\_SUNWspsvu_reboot
 	# enable the service
 	svcadm enable -s svc:/system/$1
 	if [ $? -ne 0 ]
@@ -124,6 +148,7 @@ enable_service_on_reboot()
 	then
 		message "Warning: Unable to refresh $1 service"
 	fi
+_SUNWspsvu_reboot
 }
 
 
@@ -145,13 +170,6 @@ DEVLINKERR="
 ERROR: The installation cannot be completed due to an error configuring the
 ${MODULE} loadable module.  The file ${ERROR_LOG} contains the errors.
 Exiting...Please fix problem and re-run pkgadd."
-
-#
-# Finalize changes to the pkg database
-#
-
-installf -R ${PKG_INSTALL_ROOT} -f ${PKGINST}
-removef -R ${PKG_INSTALL_ROOT} -f ${PKGINST} >/dev/null 2>&1
 
 
 # if the sv module is still loaded then it has refused to unload

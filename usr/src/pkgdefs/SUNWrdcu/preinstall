@@ -100,4 +100,4 @@ rem_devlink ${MODULE}
 # Remove rogue sndrsyncd that wasn't removed during 3.1 upgrade
 #
 
-rm -f /usr/lib/sndrsyncd >/dev/null 2>&1
+rm -f ${PKG_INSTALL_ROOT}/usr/lib/sndrsyncd >/dev/null 2>&1

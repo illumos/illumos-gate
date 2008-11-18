@@ -85,12 +85,15 @@ fi
 #
 # Disable the service, if it is imported
 #
-svcprop -q -p general/entity_stability svc:/system/${SVC}
+if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
+     if [ -x /usr/bin/svcprop ]; then
+	svcprop -q -p general/entity_stability svc:/system/${SVC}
 # are we imported?
-if [ $? = 0 ]
-then
-	svcadm disable -s svc:/system/${SVC}
-	svccfg -s $FS_LOCAL_SVC setprop ${SVC}-local-fs/grouping=optional_all
+	if [ $? -eq 0 ]; then
+		svcadm disable -s svc:/system/${SVC}
+		svccfg -s $FS_LOCAL_SVC setprop ${SVC}-local-fs/grouping=optional_all
+	fi
+     fi
 fi
 
 
@@ -118,30 +121,34 @@ do
 	rem_devlink ${MODULE}
 	/usr/bin/rm -f ${ERRLOG}
 
+	if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
  	MODID=`modinfo | grep -w $MODULE | awk '{print $1}'`
  	if [ -n "$MODID" ]
  	then
  		modunload -i ${MODID}
- 		if [ $? != 0 ]
+ 		if [ $? -ne 0 ]
  		then
  			echo "Error: Failed to unload $MODULE module."
  			exit 1
  		fi
+ 	fi
  	fi
 
 done
 
 # Since spuni is not configured via add_drv, we cannot rely on rem_drv to
 # unload it.  If it's still loaded, try to unload it.
+if [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
 MODID=`modinfo | grep -w spuni | awk '{print $1}'`
 if [ -n "$MODID" ]
 then
 	modunload -i ${MODID}
-	if [ $? != 0 ]
+	if [ $? -ne 0 ]
 	then
 		echo "Warning: Failed to unload spuni module."
 		exit 1
 	fi
+fi
 fi
 
 # ignore any failures to modunload spuni 

@@ -36,7 +36,7 @@ export PATH
 
 BASEDIR=${BASEDIR:=/}
 DATE=`date +%Y_%m_%d`
-DSLOG="/var/adm/ds.log"
+DSLOG="${PKG_INSTALL_ROOT}/var/adm/ds.log"
 # fatal error
 FAILURE=1
 NAMEMAJOR="${PKG_INSTALL_ROOT}/etc/name_to_major"

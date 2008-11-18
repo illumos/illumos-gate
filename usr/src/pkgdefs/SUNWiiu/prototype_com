@@ -36,7 +36,6 @@ i pkginfo
 i postinstall
 i preinstall
 i preremove
-i space
 i depend
 i i.preserve
 

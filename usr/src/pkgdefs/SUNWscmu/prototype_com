@@ -36,7 +36,6 @@ i postinstall
 i preinstall
 i preremove
 i depend
-i space
 
 d none usr 0755 root sys
 d none usr/kernel 0755 root sys

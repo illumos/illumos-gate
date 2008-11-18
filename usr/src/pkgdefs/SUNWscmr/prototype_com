@@ -35,7 +35,6 @@ i pkginfo
 i copyright
 i depend
 i postinstall
-i space
 i i.manifest
 i r.manifest
 

@@ -40,13 +40,6 @@ MODULES="nskern ncall nsctl sdbc"
 OS_VER=`eval uname -r`
 PKG_INSTALL_ROOT=${PKG_INSTALL_ROOT:=/}
 DEVLINKTB=${PKG_INSTALL_ROOT}/etc/devlink.tab
-DRVDIR64=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/drv/sparcv9
-DRVDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/drv
-SCMBINDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/sbin
-ESMBINDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/sbin
-LIBDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/lib
-MISCDIR64=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/misc/sparcv9
-MISCDIR=${PKG_INSTALL_ROOT}/${BASEDIR}/usr/kernel/misc
 NAMEMAJOR=${PKG_INSTALL_ROOT}/etc/name_to_major
 TMP_DSCFG=/tmp/dscfg.${PKGINST}.$$
 ARCH=`uname -p`
@@ -54,7 +47,7 @@ HOST=`/usr/bin/hostname`
 DSCFG="/usr/sbin/dscfg -r $PKG_INSTALL_ROOT"
 PCONFIG="${PKG_INSTALL_ROOT}/etc/dscfg_format"
 DSCFG_REF="${PKG_INSTALL_ROOT}/etc/opt/SUNWesm/dscfg.cf"
-DSCFG_LOCAL="${PKG_INSTALL_ROOT}etc/dscfg_local"
+DSCFG_LOCAL="${PKG_INSTALL_ROOT}/etc/dscfg_local"
 # number of KB required for the dscfg database (1024 * 5.5)
 DSCFG_SIZE=5632
 FS_LOCAL_SVC="svc:/system/filesystem/local"
@@ -267,45 +260,48 @@ enable_service_on_reboot()
 	fi
 }
 
-
-
-#
-# Installing to an alternate root ensure we can still 
-# find the libraries.
-#
-
-if [ "$PKG_INSTALL_ROOT" != "/" ]
-then
-    if [ -n "$LD_LIBRARY_PATH" ]
-    then
-        # append to existing path               
-	LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PKG_INSTALL_ROOT/usr/lib:/usr/lib
-    else
-	LD_LIBRARY_PATH=$PKG_INSTALL_ROOT/usr/lib:/usr/lib
-    fi
-    export LD_LIBRARY_PATH
-fi
-
 #
 # Set specific command syntax (if needed)
 #
 
-# For least privileges add option -P sys_devices,sys_config
-if [ "${PKG_INSTALL_ROOT}" = "/" ]; then
-    REM_DRV="rem_drv"
-    ADD_DRV="add_drv -P sys_devices,sys_config"
-else
+release=`uname -r | sed -e "s/[0-9]*\.//" -e "s/\..*//"`
+case $release in
+            1[0-9] )
     REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
     ADD_DRV="add_drv -P sys_devices,sys_config -b ${PKG_INSTALL_ROOT}"
-fi
+                ;;
+            * )
+    REM_DRV="rem_drv -b ${PKG_INSTALL_ROOT}"
+    ADD_DRV="add_drv -b ${PKG_INSTALL_ROOT}"
+    UPD_DRV_AFTER_REBOOT=0
+	cat  >> $BASEDIR/etc/rc2.d/S99storage <<\_SCMU
+#!/sbin/sh -x
+		MODULES="nskern ncall nsctl sdbc"
+		for  MODULE in ${MODULES}
+		do
+ADDERR="ERROR: The installation cannot be completed due to an error updating the
+ \
+${MODULE} loadable module.  The file ${ERRLOG} contains the errors.  Exiting...\
+Please fix problem and re-run pkgadd."
 
+                update_drv -a -P sys_devices,sys_config -m  '* 0666 root sys' $MODULE 2>&1
+                [  $? -ne 0 ]  && {
+			message ${ADDERR}
+			exit 1
+		}
+		done
+                        
+_SCMU
+	chmod a+x $BASEDIR/etc/rc2.d/S99storage
+                ;;
+esac
 #
 # the preinstall should have removed the modules therefore,
 # if the lowest level module (nskern or sdsi) is loaded (busy) then we need to
 # notify the user after the install to reboot or remove the clients and
 # re-run pkgadd.
 
-n=`modinfo |grep -w nskern |cut -d" " -f1`
+#n=`modinfo |grep -w nskern |cut -d" " -f1`
 
 #
 # add and load modules
@@ -353,9 +349,12 @@ Please fix problem and re-run pkgadd."
   add_devlink "type=ddi_pseudo;name=${MODULE}" '\D'
   
   case ${MODULE} in
-      *) ${ADD_DRV} $NOPT -m '* 0666 root sys' ${MODULE} > ${ERRLOG} 2>&1 ;;
+      *) 
+	${ADD_DRV} $NOPT -m '* 0666 root sys' ${MODULE} > ${ERRLOG} 2>&1
+	status=$?
+	;;
   esac
-  [ $? -ne 0 ] && {
+  [ $status -ne 0 ] && {
       message ${ADDERR}
       exit ${FAILURE}
   }
@@ -384,10 +383,3 @@ fi
 if [ $MODBUSY = 1 ]; then
 	message $MODBUSYMSG
 fi
-
-#
-# remove keep file from database, and finalize changes to pkg database
-#
-removef ${PKGINST} ${KEEP} >/dev/null 2>&1
-installf -R ${PKG_INSTALL_ROOT} -f ${PKGINST}
-removef -R ${PKG_INSTALL_ROOT} -f ${PKGINST} >/dev/null 2>&1
