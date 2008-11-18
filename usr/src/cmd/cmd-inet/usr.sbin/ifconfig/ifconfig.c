@@ -8,8 +8,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "defs.h"
 #include "strings.h"
 #include "ifconfig.h"
@@ -656,11 +654,13 @@ tun_reality_check(void)
 		return;
 	}
 	if (ioctl(s, SIOCGTUNPARAM, (caddr_t)&treq) < 0 ||
-	    (treq.ifta_flags & IFTUN_SECURITY) == 0) {
+	    !(treq.ifta_flags & IFTUN_SECURITY) ||
+	    (treq.ifta_flags & IFTUN_COMPLEX_SECURITY)) {
 		/*
 		 * Either not a tunnel (the SIOCGTUNPARAM fails on
-		 * non-tunnels), or the security flag is not set.  Either
-		 * way, return.
+		 * non-tunnels), the security flag is not set, or
+		 * this is a tunnel with ipsecconf(1M)-set policy.
+		 * Regardless, return.
 		 */
 		return;
 	}

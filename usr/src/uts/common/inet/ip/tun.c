@@ -31,8 +31,6 @@
  * within IP (IPv4 or IPv6)
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
@@ -2026,23 +2024,25 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 
 		if (tun_policy_present(atp, ns, ipss) &&
 		    tun_thisvers_policy(atp)) {
+			ipsec_req_t *ipsr;
+
+			ipsr = (ipsec_req_t *)ta->ifta_secinfo;
+
 			mutex_enter(&atp->tun_itp->itp_lock);
 			if (!(atp->tun_itp->itp_flags & ITPF_P_TUNNEL) &&
 			    (atp->tun_policy_index >=
 			    atp->tun_itp->itp_next_policy_index)) {
-				ipsec_req_t *ipsr;
-
 				/*
 				 * Convert 0.0.0.0/0, 0::0/0 tree entry to
 				 * ipsec_req_t.
 				 */
-				ipsr = (ipsec_req_t *)ta->ifta_secinfo;
 				*ipsr = atp->tun_secinfo;
 				/* Reality check for empty polhead. */
 				if (ipsr->ipsr_ah_req != 0 ||
 				    ipsr->ipsr_esp_req != 0)
 					ta->ifta_flags |= IFTUN_SECURITY;
 			} else {
+				bzero(ipsr, sizeof (*ipsr));
 				ta->ifta_flags |=
 				    (IFTUN_COMPLEX_SECURITY | IFTUN_SECURITY);
 			}
