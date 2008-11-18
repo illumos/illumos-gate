@@ -550,6 +550,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_ifl		ld64_process_ifl
 #define	ld_process_ordered	ld64_process_ordered
 #define	ld_process_sym_reloc	ld64_process_sym_reloc
+#define	ld_recalc_shdrcnt	ld64_recalc_shdrcnt
 #define	ld_reloc_GOT_relative	ld64_reloc_GOT_relative
 #define	ld_reloc_plt		ld64_reloc_plt
 #define	ld_reloc_remain_entry	ld64_reloc_remain_entry
@@ -634,6 +635,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_ifl		ld32_process_ifl
 #define	ld_process_ordered	ld32_process_ordered
 #define	ld_process_sym_reloc	ld32_process_sym_reloc
+#define	ld_recalc_shdrcnt	ld32_recalc_shdrcnt
 #define	ld_reloc_GOT_relative	ld32_reloc_GOT_relative
 #define	ld_reloc_plt		ld32_reloc_plt
 #define	ld_reloc_remain_entry	ld32_reloc_remain_entry
@@ -737,6 +739,8 @@ extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
 extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *);
+
+extern void		ld_recalc_shdrcnt(Ofl_desc *);
 
 extern uintptr_t	ld_reloc_GOT_relative(Boolean, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_reloc_plt(Rel_desc *, Ofl_desc *);

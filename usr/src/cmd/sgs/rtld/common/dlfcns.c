@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Programmatic interface to the run_time linker.
  */
@@ -590,6 +588,18 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), in_nfavl, mode));
 
 	/*
+	 * Having diagnosed the originally defined modes, assign any defaults
+	 * or corrections.
+	 */
+	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == 0) &&
+	    ((mode & RTLD_NOLOAD) == 0))
+		mode |= (RTLD_GROUP | RTLD_WORLD);
+	if ((mode & RTLD_NOW) && (rtld_flags2 & RT_FL2_BINDLAZY)) {
+		mode &= ~RTLD_NOW;
+		mode |= RTLD_LAZY;
+	}
+
+	/*
 	 * If the path specified is null then we're operating on global
 	 * objects.  Associate a dummy handle with the link-map list.
 	 */
@@ -919,13 +929,6 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp)
 	if ((lml == (Lm_list *)LM_ID_NEWLM) && (mode & RTLD_PARENT)) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_4));
 		return (0);
-	}
-	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == 0) &&
-	    ((mode & RTLD_NOLOAD) == 0))
-		mode |= (RTLD_GROUP | RTLD_WORLD);
-	if ((mode & RTLD_NOW) && (rtld_flags2 & RT_FL2_BINDLAZY)) {
-		mode &= ~RTLD_NOW;
-		mode |= RTLD_LAZY;
 	}
 
 	return (dlmopen_intn(lml, path, mode, clmp, 0, 0));

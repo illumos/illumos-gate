@@ -2352,8 +2352,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				VERSYM(lmp) = (Versym *)(ld->d_un.d_ptr + base);
 				break;
 			case DT_BIND_NOW:
-				if ((ld->d_un.d_val & DF_BIND_NOW) &&
-				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
+				if ((rtld_flags2 & RT_FL2_BINDLAZY) == 0) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}

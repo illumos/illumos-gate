@@ -193,9 +193,11 @@ update_osym(Ofl_desc *ofl)
 	Sym		_sym = {0}, *sym, *symtab = 0;
 	Sym		*dynsym = 0, *ldynsym = 0;
 	Word		symtab_ndx = 0;	/* index into .symtab */
+	Word		symtab_gbl_bndx;	/* .symtab ndx 1st global */
 	Word		ldynsym_ndx = 0;	/* index into .SUNW_ldynsym */
 	Word		dynsym_ndx = 0;		/* index into .dynsym */
 	Word		scopesym_ndx = 0; /* index into scoped symbols */
+	Word		scopesym_bndx = 0;	/* .symtab ndx 1st scoped sym */
 	Word		ldynscopesym_ndx = 0; /* index to ldynsym scoped syms */
 	Word		*dynsymsort = NULL; /* SUNW_dynsymsort index vector */
 	Word		*dyntlssort = NULL; /* SUNW_dyntlssort index vector */
@@ -603,7 +605,8 @@ update_osym(Ofl_desc *ofl)
 	 * to traverse the globals symbol hash array more than once.
 	 */
 	if (symtab) {
-		scopesym_ndx = symtab_ndx;
+		scopesym_bndx = symtab_ndx;
+		scopesym_ndx = scopesym_bndx;
 		symtab_ndx += ofl->ofl_scopecnt;
 	}
 
@@ -684,6 +687,21 @@ update_osym(Ofl_desc *ofl)
 			 */
 			if (sdp->sd_flags & FLG_SY_ISDISC)
 				continue;
+
+			/*
+			 * If this symbol is from a different file
+			 * than the input descriptor we are processing,
+			 * treat it as if it has FLG_SY_ISDISC set.
+			 * This happens when sloppy_comdat_reloc()
+			 * replaces a symbol to a discarded comdat section
+			 * with an equivalent symbol from a different
+			 * file. We only want to enter such a symbol
+			 * once --- as part of the file that actually
+			 * supplies it.
+			 */
+			if (ifl != sdp->sd_file)
+				continue;
+
 
 			/*
 			 * Generate an output symbol to represent this input
@@ -844,6 +862,7 @@ update_osym(Ofl_desc *ofl)
 			}
 		}
 	}
+	symtab_gbl_bndx = symtab_ndx;	/* .symtab index of 1st global entry */
 
 	/*
 	 * Two special symbols are `_init' and `_fini'.  If these are supplied
@@ -1850,8 +1869,7 @@ update_osym(Ofl_desc *ofl)
 	if (symtab) {
 		Shdr	*shdr = ofl->ofl_ossymtab->os_shdr;
 
-		shdr->sh_info = ofl->ofl_shdrcnt + ofl->ofl_locscnt +
-		    ofl->ofl_scopecnt + 2;
+		shdr->sh_info = symtab_gbl_bndx;
 		/* LINTED */
 		shdr->sh_link = (Word)elf_ndxscn(ofl->ofl_osstrtab->os_scn);
 		if (symshndx) {
@@ -1859,6 +1877,20 @@ update_osym(Ofl_desc *ofl)
 			shdr->sh_link =
 			    (Word)elf_ndxscn(ofl->ofl_ossymtab->os_scn);
 		}
+
+		/*
+		 * Ensure that the expected number of symbols
+		 * were entered into the right spots:
+		 *	- Scoped symbols in the right range
+		 *	- Globals start at the right spot
+		 *		(correct number of locals entered)
+		 *	- The table is exactly filled
+		 *		(correct number of globals entered)
+		 */
+		assert((scopesym_bndx + ofl->ofl_scopecnt) == scopesym_ndx);
+		assert(shdr->sh_info == (ofl->ofl_shdrcnt +
+		    ofl->ofl_locscnt + ofl->ofl_scopecnt + 2));
+		assert((shdr->sh_info + ofl->ofl_globcnt) == symtab_ndx);
 	}
 	if (dynsym) {
 		Shdr	*shdr = ofl->ofl_osdynsym->os_shdr;

@@ -27,7 +27,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Symbol table management routines
@@ -1987,6 +1986,9 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					    sizeof (Sym_desc), 1)) == 0)
 						return (S_ERROR);
 					sdp->sd_ref = REF_DYN_SEEN;
+
+					/* Will not appear in output object */
+					ofl->ofl_locscnt--;
 				}
 			} else if (etype == ET_DYN)
 				continue;
@@ -2089,7 +2091,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				if (SYM_LOC_BADADDR(sdp, sym, type)) {
 					issue_badaddr_msg(ifl, ofl, sdp,
 					    sym, shndx);
-					continue;
+					if (ofl->ofl_flags & FLG_OF_FATAL)
+						continue;
 				}
 
 				/*

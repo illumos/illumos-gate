@@ -369,7 +369,7 @@ Dbg_file_dlopen(Rt_map *clmp, const char *name, int *in_nfavl, int mode)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_DLOPEN), name, NAME(clmp), retry,
-	    conv_dl_mode(mode, 1, &dl_mode_buf));
+	    conv_dl_mode(mode, 0, &dl_mode_buf));
 }
 
 void

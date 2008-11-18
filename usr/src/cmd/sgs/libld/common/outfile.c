@@ -344,6 +344,74 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
 }
 
 /*
+ * Recalculate the number of output sections and update ofl->ofl_shdrcnt.
+ *
+ * As new sections are placed, ofl->ofl_shdrcnt is incremented to
+ * track the count. If -z ignore is not in effect, then this is
+ * sufficient. If -z ignore is in effect however, the sections that
+ * are removed are not reflected in the value of ofl->ofl_shdrcnt.
+ * Determining whether ofl->ofl_shdrcnt should get decremented in
+ * that situation  takes some work to determine, and if multiple
+ * sections are discarded (which is typical), then it would be
+ * necessary to do that work each time. Instead, we use this
+ * routine to recompute the number of output sections once at the end.
+ */
+void
+ld_recalc_shdrcnt(Ofl_desc *ofl)
+{
+	Sg_desc		*sgp;
+	Listnode	*lnp1, *lnp2;
+	Word		cnt = 0;
+	Is_desc *isp;
+	Os_desc	*osp;
+	Aliste	idx;
+
+
+	/*
+	 * This code must be kept in sync with the similar code
+	 * found in ld_create_outfile().
+	 *
+	 * We look at the input sections for every output section,
+	 * looking for at least one input section that won't
+	 * be eliminated.
+	 */
+	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		Word	ptype = sgp->sg_phdr.p_type;
+
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+
+			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
+				Ifl_desc	*ifl = isp->is_file;
+
+				/* Input section is tagged for discard? */
+				if (isp->is_flags & FLG_IS_DISCARD)
+					continue;
+
+				/*
+				 * If the file is discarded, it will take
+				 * the section with it.
+				 */
+				if (ifl &&
+				    (((ifl->ifl_flags & FLG_IF_FILEREF) == 0) ||
+				    ((ptype == PT_LOAD) &&
+				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
+				    (isp->is_shdr->sh_size > 0))) &&
+				    (ifl->ifl_flags & FLG_IF_IGNORE))
+					continue;
+
+				/*
+				 * We have found a kept input section.
+				 * so the output section will be created.
+				 */
+				cnt++;
+				break;
+			}
+		}
+	}
+	ofl->ofl_shdrcnt = cnt;
+}
+
+/*
  * Create the elf structures that allow the input data to be associated with the
  * new image:
  *

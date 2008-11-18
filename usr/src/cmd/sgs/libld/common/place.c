@@ -514,12 +514,13 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	 * The .gnu.linkonce is a section naming convention that indicates a
 	 * COMDAT requirement.  Determine whether this section follows the GNU
 	 * pattern, and if so, determine whether this section should be
-	 * discarded or retained.  The comparison of 'g' and 'l' are an
-	 * optimization to skip using strncmp() too much.
+	 * discarded or retained.  The comparison of is_name[1] with 'g'
+	 * is an optimization to skip using strncmp() too much. This is safe,
+	 * because we know the name is not NULL, and therefore must have
+	 * at least one character plus a NULL termination.
 	 */
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
-	    (isp->is_name == oname) &&
-	    (isp->is_name[1] == 'g') && (isp->is_name[5] == 'l') &&
+	    (isp->is_name == oname) && (isp->is_name[1] == 'g') &&
 	    (strncmp(MSG_ORIG(MSG_SCN_GNU_LINKONCE), isp->is_name,
 	    MSG_SCN_GNU_LINKONCE_SIZE) == 0)) {
 		if ((oname =

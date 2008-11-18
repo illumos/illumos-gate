@@ -728,6 +728,7 @@
 @ MSG_SCN_DTORS		".dtors"
 @ MSG_SCN_EHFRAME	".eh_frame"
 @ MSG_SCN_EHFRAME_HDR	".eh_frame_hdr"
+@ MSG_SCN_GCC_X_TBL	".gcc_except_table"
 @ MSG_SCN_JCR		".jcr"
 
 # Entry criteria strings (segment names)

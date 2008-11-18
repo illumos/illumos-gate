@@ -1423,10 +1423,16 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	 * The replacement section must:
 	 *	- Have the same name as the original
 	 *	- Not have been discarded
-	 *	- Have the same size
+	 *	- Have the same size (*)
 	 *	- Have the same section type
 	 *	- Have the same SHF_GROUP flag setting (either on or off)
 	 *	- Must be a COMDAT section of one form or the other.
+	 *
+	 * (*) One might imagine that the replacement section could be
+	 * larger than the original, rather than the exact size. However,
+	 * we have verified that this is the same policy used by the GNU
+	 * ld. If the sections are not the same size, the chance of them
+	 * being interchangeable drops significantly.
 	 */
 	/* BEGIN CSTYLED */
 	for (LIST_TRAVERSE(&isp->is_osdesc->os_isdescs, lnp, rep_isp)) {
@@ -1688,20 +1694,54 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 			 * determine if this is a reference to a discarded
 			 * COMDAT section that can be replaced with a COMDAT
 			 * that has been kept.
-			 *
-			 * If a matching symbol can not be found, issue a
-			 * warning and ignore the relocation.  Note, the GNU
-			 * linker will act as though the symbol were defined at
-			 * the same offset in the copy of the linkonce section
-			 * that was kept.  This seems rather dangerous, and as
-			 * the situation only seems to apply to debugging
-			 * information, our choise is to ignore the relocation.
 			 */
 			if ((ofl->ofl_flags1 & FLG_OF1_RLXREL) &&
 			    sdp->sd_isc->is_osdesc &&
 			    (sdp->sd_isc->is_flags & FLG_IS_COMDAT) &&
 			    ((nsdp = sloppy_comdat_reloc(ofl, reld,
 			    sdp)) == NULL)) {
+				Shdr	*is_shdr = reld->rel_isdesc->is_shdr;
+
+				/*
+				 * A matching symbol was not found. We will
+				 * ignore this relocation. First, we must
+				 * decide whether or not to issue a warning.
+				 * Warnings are always issued under -z verbose,
+				 * but otherwise, we will follow the lead of
+				 * the GNU ld and suppress them for certain
+				 * cases:
+				 *	- It is a non-allocable debug section.
+				 *	  The GNU ld tests for these by name,
+				 *	  but we are willing to extend it to
+				 *	  any non-allocable section.
+				 *	- Target section is .eh_frame.
+				 *	  Note that on amd64 architectures,
+				 *	  these sections are SHT_AMD64_UNWIND.
+				 *	  However, we test it by name: On other
+				 *	  architectures it is PROGBITS, and on
+				 *	  amd64, .eh_frame_hdr is also
+				 *	  SHT_AMD64_UNWIND.
+				 *	- The target section is
+				 *	  .gcc_except_table, which is PROGBITS,
+				 *	  and must be tested by name
+				 */
+				if ((ofl->ofl_flags & FLG_OF_VERBOSE) == 0) {
+					const char *is_name;
+
+					if (!(is_shdr->sh_flags & SHF_ALLOC))
+						return (1);
+
+					is_name = reld->rel_isdesc->is_name;
+					if ((is_name[1] == 'e') &&
+					    (strcmp(is_name,
+					    MSG_ORIG(MSG_SCN_EHFRAME)) == 0))
+						return (1);
+					if ((is_name[1] == 'g') &&
+					    (strcmp(is_name,
+					    MSG_ORIG(MSG_SCN_GCC_X_TBL)) == 0))
+						return (1);
+				}
+
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNOSYM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,

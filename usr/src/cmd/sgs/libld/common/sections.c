@@ -1419,6 +1419,18 @@ make_symtab(Ofl_desc *ofl)
 	Word		symcnt;
 
 	/*
+	 * We increment the number of sections in the output object
+	 * (ofl->ofl_shdrcnt) as we add them. However, if -z ignore
+	 * processing is in effect, the number of sections later removed
+	 * is not reflected in that count. Updating the count as we
+	 * remove these sections is a relatively expensive operation.
+	 * Hence, if -z ignore is in use, we recompute the number of
+	 * sections in a single final pass.
+	 */
+	if (ofl->ofl_flags1 & FLG_OF1_IGNPRC)
+		ld_recalc_shdrcnt(ofl);
+
+	/*
 	 * Create the section headers. Note that we supply an ent_cnt
 	 * of 0. We won't know the count until the section has been placed.
 	 */

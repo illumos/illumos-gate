@@ -1403,3 +1403,4 @@ Bugid   Risk Synopsis
 6765299 ld --version-script option not compatible with GNU ld (D)
 6748160 problem with -zrescan (D)
 	PSARC/2008/651 New ld archive rescan options
+6763342 sloppy relocations need to get sloppier

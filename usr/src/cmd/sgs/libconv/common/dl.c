@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	"_conv.h"
@@ -85,7 +84,7 @@ conv_dl_mode(int mode, int fabricate, Conv_dl_mode_buf_t *dl_mode_buf)
 
 	if (mode & RTLD_NOW) {
 		*lstr++ = MSG_ORIG(MSG_RTLD_NOW);
-	} else if (fabricate) {
+	} else if ((mode & RTLD_LAZY) || fabricate) {
 		*lstr++ = MSG_ORIG(MSG_RTLD_LAZY);
 	}
 	if (mode & RTLD_GLOBAL) {
