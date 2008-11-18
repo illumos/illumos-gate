@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <thread.h>
 #include <stdlib.h>
@@ -48,14 +45,13 @@ static void *
 svcstart(void *arg)
 {
 	int id = (int)arg;
-	int err;
 
-	while ((err = _nfssys(SVCPOOL_RUN, &id)) != 0) {
+	while (_nfssys(SVCPOOL_RUN, &id) < 0) {
 		/*
 		 * Interrupted by a signal while in the kernel.
 		 * this process is still alive, try again.
 		 */
-		if (err == EINTR)
+		if (errno == EINTR)
 			continue;
 		else
 			break;
@@ -73,11 +69,10 @@ svcstart(void *arg)
 static void *
 svc_rdma_creator(void *arg)
 {
-	int error = 0;
 	struct rdma_svc_args *rsap = (struct rdma_svc_args *)arg;
 
-	if (error = _nfssys(RDMA_SVC_INIT, rsap)) {
-		if (error != ENODEV) {
+	if (_nfssys(RDMA_SVC_INIT, rsap) < 0) {
+		if (errno != ENODEV) {
 			(void) syslog(LOG_INFO, "RDMA transport startup "
 			    "failed with %m");
 		}
@@ -101,14 +96,13 @@ svcblock(void *arg)
 	/* CONSTCOND */
 	while (1) {
 		thread_t tid;
-		int err;
 
 		/*
 		 * Call into the kernel, and hang out there
 		 * until a thread needs to be created.
 		 */
-		if (err = _nfssys(SVCPOOL_WAIT, &id)) {
-			if (err == ECANCELED || err == EBUSY)
+		if (_nfssys(SVCPOOL_WAIT, &id) < 0) {
+			if (errno == ECANCELED || errno == EBUSY)
 				/*
 				 * If we get back ECANCELED, the service
 				 * pool is exiting, and we may as well
