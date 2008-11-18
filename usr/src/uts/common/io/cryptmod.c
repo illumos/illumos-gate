@@ -37,7 +37,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -1256,13 +1255,11 @@ aes_cbc_cts_encrypt(struct tmodinfo *tmi, uchar_t *plain, size_t length)
 	mech.cm_type = tmi->enc_data.mech_type;
 	if (tmi->enc_data.ivlen > 0 && tmi->enc_data.ivec != NULL) {
 		bcopy(tmi->enc_data.ivec, tmp, DEFAULT_AES_BLOCKLEN);
-		mech.cm_param = tmi->enc_data.ivec;
-		mech.cm_param_len = tmi->enc_data.ivlen;
 	} else {
 		bzero(tmp, sizeof (tmp));
-		mech.cm_param = NULL;
-		mech.cm_param_len = 0;
 	}
+	mech.cm_param = NULL;
+	mech.cm_param_len = 0;
 
 	nblocks = (length + DEFAULT_AES_BLOCKLEN - 1) / DEFAULT_AES_BLOCKLEN;
 
@@ -1420,13 +1417,12 @@ aes_cbc_cts_decrypt(struct tmodinfo *tmi, uchar_t *buff, size_t length)
 	if (tmi->dec_data.ivec_usage != IVEC_NEVER &&
 	    tmi->dec_data.ivlen > 0 && tmi->dec_data.ivec != NULL) {
 		bcopy(tmi->dec_data.ivec, tmp, DEFAULT_AES_BLOCKLEN);
-		mech.cm_param = tmi->dec_data.ivec;
-		mech.cm_param_len = tmi->dec_data.ivlen;
 	} else {
 		bzero(tmp, sizeof (tmp));
-		mech.cm_param_len = 0;
-		mech.cm_param = NULL;
 	}
+	mech.cm_param_len = 0;
+	mech.cm_param = NULL;
+
 	nblocks = (length + DEFAULT_AES_BLOCKLEN - 1) / DEFAULT_AES_BLOCKLEN;
 
 	bzero(&pt, sizeof (pt));
@@ -1455,7 +1451,7 @@ aes_cbc_cts_decrypt(struct tmodinfo *tmi, uchar_t *buff, size_t length)
 		pt.cd_offset = 0;
 		pt.cd_length = DEFAULT_AES_BLOCKLEN;
 
-		result = crypto_encrypt_init(&mech,
+		result = crypto_decrypt_init(&mech,
 				&tmi->dec_data.d_encr_key,
 				tmi->dec_data.enc_tmpl,
 				&tmi->dec_data.ctx, NULL);
@@ -3014,11 +3010,10 @@ encrypt_block(queue_t *q, struct tmodinfo *tmi, mblk_t *mp, size_t plainlen)
 		 * headspace includes the length fields needed
 		 * for the RCMD modes (v1 == 4 bytes, V2 = 8)
 		 */
-		cbp->b_rptr = DB_BASE(cbp) + headspace;
-
-		ASSERT(cbp->b_rptr + P2ROUNDUP(plainlen, 8)
+		ASSERT(cbp->b_rptr + P2ROUNDUP(plainlen+headspace, 8)
 			<= DB_LIM(cbp));
 
+		cbp->b_rptr = DB_BASE(cbp) + headspace;
 		bcopy(mp->b_rptr, cbp->b_rptr, plainlen);
 		cbp->b_wptr = cbp->b_rptr + plainlen;
 
