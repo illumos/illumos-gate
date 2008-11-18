@@ -27,6 +27,12 @@
 #include <hxge_rxdma.h>
 
 /*
+ * Number of blocks to accumulate before re-enabling DMA
+ * when we get RBR empty.
+ */
+#define	HXGE_RBR_EMPTY_THRESHOLD	64
+
+/*
  * Globals: tunable parameters (/etc/system or adb)
  *
  */
@@ -52,6 +58,9 @@ extern hxge_rxbuf_threshold_t hxge_rx_threshold_hi;
 extern hxge_rxbuf_type_t hxge_rx_buf_size_type;
 extern hxge_rxbuf_threshold_t hxge_rx_threshold_lo;
 
+/*
+ * Static local functions.
+ */
 static hxge_status_t hxge_map_rxdma(p_hxge_t hxgep);
 static void hxge_unmap_rxdma(p_hxge_t hxgep);
 static hxge_status_t hxge_rxdma_hw_start_common(p_hxge_t hxgep);
@@ -991,6 +1000,10 @@ void hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p,
 void
 hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 {
+	hpi_status_t	hpi_status;
+	hxge_status_t	status;
+	int		i;
+
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_post_page"));
 
 	/* Reuse this buffer */
@@ -1011,7 +1024,72 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 	    rx_rbr_p->rbr_wrap_mask);
 	rx_rbr_p->rbr_desc_vp[rx_rbr_p->rbr_wr_index] = rx_msg_p->shifted_addr;
 
-	hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc, 1);
+	/*
+	 * Accumulate some buffers in the ring before re-enabling the
+	 * DMA channel, if rbr empty was signaled.
+	 */
+	if (!rx_rbr_p->rbr_is_empty) {
+		hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep),
+		    rx_rbr_p->rdc, 1);
+	} else {
+		rx_rbr_p->accumulate++;
+		if (rx_rbr_p->accumulate >= HXGE_RBR_EMPTY_THRESHOLD) {
+			rx_rbr_p->rbr_is_empty = B_FALSE;
+			rx_rbr_p->accumulate = 0;
+
+			/*
+			 * Complete the processing for the RBR Empty by:
+			 *	0) kicking back HXGE_RBR_EMPTY_THRESHOLD
+			 *	   packets.
+			 *	1) Disable the RX vmac.
+			 *	2) Re-enable the affected DMA channel.
+			 *	3) Re-enable the RX vmac.
+			 */
+			hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep),
+			    rx_rbr_p->rdc, HXGE_RBR_EMPTY_THRESHOLD);
+
+			/*
+			 * Disable the RX VMAC, but setting the framelength
+			 * to 0, since there is a hardware bug when disabling
+			 * the vmac.
+			 */
+			MUTEX_ENTER(hxgep->genlock);
+			(void) hpi_vmac_rx_set_framesize(
+			    HXGE_DEV_HPI_HANDLE(hxgep), (uint16_t)0);
+
+			hpi_status = hpi_rxdma_cfg_rdc_enable(
+			    HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc);
+			if (hpi_status != HPI_SUCCESS) {
+				p_hxge_rx_ring_stats_t	rdc_stats;
+
+				rdc_stats =
+				    &hxgep->statsp->rdc_stats[rx_rbr_p->rdc];
+				rdc_stats->rbr_empty_fail++;
+
+				status = hxge_rxdma_fatal_err_recover(hxgep,
+				    rx_rbr_p->rdc);
+				if (status != HXGE_OK) {
+					HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+					    "hxge(%d): channel(%d) is empty.",
+					    hxgep->instance, rx_rbr_p->rdc));
+				}
+			}
+
+			for (i = 0; i < 1024; i++) {
+				uint64_t value;
+				RXDMA_REG_READ64(HXGE_DEV_HPI_HANDLE(hxgep),
+				    RDC_STAT, i & 3, &value);
+			}
+
+			/*
+			 * Re-enable the RX VMAC.
+			 */
+			(void) hpi_vmac_rx_set_framesize(
+			    HXGE_DEV_HPI_HANDLE(hxgep),
+			    (uint16_t)hxgep->vmac.maxframesize);
+			MUTEX_EXIT(hxgep->genlock);
+		}
+	}
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
 	    "<== hxge_post_page (channel %d post_next_index %d)",
@@ -1927,6 +2005,31 @@ hxge_receive_packet(p_hxge_t hxgep,
 	    *multi_p, nmp, *mp, *mp_cont));
 }
 
+static void
+hxge_rx_rbr_empty_recover(p_hxge_t hxgep, uint8_t channel)
+{
+	hpi_handle_t	handle;
+	p_rx_rcr_ring_t	rcrp;
+	p_rx_rbr_ring_t	rbrp;
+
+	rcrp = hxgep->rx_rcr_rings->rcr_rings[channel];
+	rbrp = rcrp->rx_rbr_p;
+	handle = HXGE_DEV_HPI_HANDLE(hxgep);
+
+	/*
+	 * Wait for the channel to be quiet
+	 */
+	(void) hpi_rxdma_cfg_rdc_wait_for_qst(handle, channel);
+
+	/*
+	 * Post page will accumulate some buffers before re-enabling
+	 * the DMA channel.
+	 */
+	MUTEX_ENTER(&rbrp->post_lock);
+	rbrp->rbr_is_empty = B_TRUE;
+	MUTEX_EXIT(&rbrp->post_lock);
+}
+
 /*ARGSUSED*/
 static hxge_status_t
 hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
@@ -2037,16 +2140,7 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 
 	if (cs.bits.rbr_empty) {
 		rdc_stats->rbr_empty++;
-
-		/*
-		 * Wait for channel to be quiet.
-		 */
-		(void) hpi_rxdma_cfg_rdc_wait_for_qst(handle, channel);
-
-		/*
-		 * Re-enable the DMA.
-		 */
-		(void) hpi_rxdma_cfg_rdc_enable(handle, channel);
+		hxge_rx_rbr_empty_recover(hxgep, channel);
 	}
 
 	if (cs.bits.rbr_full) {

@@ -70,7 +70,11 @@ uint32_t hxge_tx_lb_policy = HXGE_TX_LB_TCPUDP;
  * Add tunable to reduce the amount of time spent in the
  * ISR doing Rx Processing.
  */
+#if defined(__sparc)
+uint32_t hxge_max_rx_pkts = 512;
+#else
 uint32_t hxge_max_rx_pkts = 1024;
+#endif
 
 /*
  * Tunables to manage the receive buffer blocks.
@@ -79,7 +83,7 @@ uint32_t hxge_max_rx_pkts = 1024;
  * hxge_rx_bcopy_size_type: receive buffer block size type.
  * hxge_rx_threshold_lo: copy only up to tunable block size type.
  */
-hxge_rxbuf_threshold_t hxge_rx_threshold_hi = HXGE_RX_COPY_6;
+hxge_rxbuf_threshold_t hxge_rx_threshold_hi = HXGE_RX_COPY_7;
 hxge_rxbuf_type_t hxge_rx_buf_size_type = RCR_PKTBUFSZ_0;
 hxge_rxbuf_threshold_t hxge_rx_threshold_lo = HXGE_RX_COPY_3;
 
@@ -1816,8 +1820,8 @@ hxge_alloc_rx_buf_dma(p_hxge_t hxgep, uint16_t dma_channel,
 	i = 0;
 	size_index = 0;
 	array_size = sizeof (alloc_sizes) / sizeof (size_t);
-	while ((alloc_sizes[size_index] < alloc_size) &&
-	    (size_index < array_size))
+	while ((size_index < array_size) &&
+	    (alloc_sizes[size_index] < alloc_size))
 		size_index++;
 	if (size_index >= array_size) {
 		size_index = array_size - 1;
@@ -2118,8 +2122,8 @@ hxge_alloc_tx_buf_dma(p_hxge_t hxgep, uint16_t dma_channel,
 	i = 0;
 	size_index = 0;
 	array_size = sizeof (alloc_sizes) / sizeof (size_t);
-	while ((alloc_sizes[size_index] < alloc_size) &&
-	    (size_index < array_size))
+	while ((size_index < array_size) &&
+	    (alloc_sizes[size_index] < alloc_size))
 		size_index++;
 	if (size_index >= array_size) {
 		size_index = array_size - 1;

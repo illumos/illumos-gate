@@ -26,8 +26,6 @@
 #ifndef _HPI_MAC_H
 #define	_HPI_MAC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -47,6 +45,8 @@ hpi_status_t hpi_pfc_set_rx_int_stat_mask(hpi_handle_t handle,
     boolean_t overflow_cnt, boolean_t frame_cnt);
 hpi_status_t hpi_pfc_set_tx_int_stat_mask(hpi_handle_t handle,
     boolean_t overflow_cnt, boolean_t frame_cnt);
+hpi_status_t hpi_vmac_rx_set_framesize(hpi_handle_t handle,
+    uint16_t max_frame_length);
 
 #define	CFG_VMAC_TX_EN			0x00000001
 #define	CFG_VMAC_TX_CRC_INSERT		0x00000002

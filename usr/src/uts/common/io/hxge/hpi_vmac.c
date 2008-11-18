@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 #include <hpi_vmac.h>
 
@@ -123,6 +121,30 @@ hpi_vmac_tx_config(hpi_handle_t handle, config_op_t op, uint64_t config,
 	}
 
 	HXGE_REG_WR64(handle, VMAC_TX_CFG, cfg.value);
+
+	return (HPI_SUCCESS);
+}
+
+hpi_status_t
+hpi_vmac_rx_set_framesize(hpi_handle_t handle, uint16_t max_frame_length)
+{
+	vmac_rx_cfg_t	cfg;
+	uint16_t fsize;
+
+	HXGE_REG_RD64(handle, VMAC_RX_CFG, &cfg.value);
+
+	/*
+	 * HW team not sure setting framesize to 0 is problematic
+	 * or not.
+	 */
+	if (max_frame_length == 0)
+		fsize = 1;
+	else
+		fsize = max_frame_length;
+
+	cfg.bits.rx_max_frame_length = fsize;
+
+	HXGE_REG_WR64(handle, VMAC_RX_CFG, cfg.value);
 
 	return (HPI_SUCCESS);
 }

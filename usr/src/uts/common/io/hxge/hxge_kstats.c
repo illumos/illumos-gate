@@ -67,6 +67,7 @@ typedef enum {
 	RDC_STAT_DATA_FIFO_ECC_ERR,
 	RDC_STAT_RCRFULL,
 	RDC_STAT_RBR_EMPTY,
+	RDC_STAT_RBR_EMPTY_FAIL,
 	RDC_STAT_RBR_FULL,
 	RDC_STAT_RCR_INVALIDS,
 	RDC_STAT_RCRTO,
@@ -91,6 +92,7 @@ hxge_kstat_index_t hxge_rdc_stats[] = {
 	{RDC_STAT_DATA_FIFO_ECC_ERR, KSTAT_DATA_ULONG, "data_fifo_ecc_err"},
 	{RDC_STAT_RCRFULL, KSTAT_DATA_ULONG, "rdc_rcrfull"},
 	{RDC_STAT_RBR_EMPTY, KSTAT_DATA_ULONG, "rdc_rbr_empty"},
+	{RDC_STAT_RBR_EMPTY_FAIL, KSTAT_DATA_ULONG, "rdc_rbr_empty_fail"},
 	{RDC_STAT_RBR_FULL, KSTAT_DATA_ULONG, "rdc_rbrfull"},
 	{RDC_STAT_RCR_INVALIDS, KSTAT_DATA_ULONG, "rdc_rcr_invalids"},
 	{RDC_STAT_RCRTO, KSTAT_DATA_ULONG, "rdc_rcrto"},
@@ -468,6 +470,7 @@ hxge_rdc_stat_update(kstat_t *ksp, int rw)
 	rdc_kstatsp->data_fifo_ecc_err.value.ul = statsp->data_fifo_ecc_err;
 	rdc_kstatsp->rcrfull.value.ul = statsp->rcrfull;
 	rdc_kstatsp->rbr_empty.value.ul = statsp->rbr_empty;
+	rdc_kstatsp->rbr_empty_fail.value.ul = statsp->rbr_empty_fail;
 	rdc_kstatsp->rbrfull.value.ul = statsp->rbrfull;
 	rdc_kstatsp->rcr_invalids.value.ul = statsp->rcr_invalids;
 	rdc_kstatsp->rcr_to.value.ul = statsp->rcr_to;

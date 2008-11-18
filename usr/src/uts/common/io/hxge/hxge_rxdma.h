@@ -265,6 +265,7 @@ typedef struct _hxge_rx_ring_stats_t {
 	uint32_t 	rcr_shadow_full;	/* rcr_shadow_full */
 	uint32_t 	rcrfull;		/* rcr_full */
 	uint32_t 	rbr_empty;		/* rbr_empty */
+	uint32_t 	rbr_empty_fail;		/* rbr_empty_fail */
 	uint32_t 	rbrfull;		/* rbr_full */
 	/*
 	 * RCR invalids: when processing RCR entries, can
@@ -385,6 +386,8 @@ typedef struct _rx_rbr_ring_t {
 
 	hxge_os_mutex_t		lock;
 	hxge_os_mutex_t		post_lock;
+	boolean_t		rbr_is_empty;
+	uint32_t		accumulate;
 	uint16_t		index;
 	struct _hxge_t		*hxgep;
 	uint16_t		rdc;

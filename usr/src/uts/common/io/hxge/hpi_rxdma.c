@@ -108,7 +108,6 @@ hpi_rxdma_cfg_rdc_ctl(hpi_handle_t handle, uint8_t rdc, uint8_t op)
 			RXDMA_REG_READ64(handle, RDC_RX_CFG1, rdc, &cfg.value);
 		}
 		if (cfg.bits.qst == 1) {
-			cmn_err(CE_CONT, "hxge rdc(%d): not enabled\n", rdc);
 			return (HPI_FAILURE);
 		}
 		break;
