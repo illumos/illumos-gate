@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_BIOSDISK_H
 #define	_SYS_BIOSDISK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -107,6 +104,28 @@ typedef struct int13_fn48_result {
 	unsigned char		res3;
 	unsigned char		checksum;	/* offset 73 */
 } fn48_t;
+
+typedef struct int13_fn4b_result {
+	uint8_t		pkt_size;	/* Packet size (== 0x13) */
+
+	uint8_t		boot_mtype;	/* Boot media type: see defines below */
+
+	uint8_t		drivenum;
+	uint8_t		ctlr_idx;
+	uint32_t	lba;
+	uint16_t	dev_spec;
+	uint16_t	buf_seg;
+	uint16_t	load_seg;
+	uint16_t	sect_cnt;
+	uint8_t		cyl_0_7;	/* Bits 0-7 of the 9-bit cylinder cnt */
+	/*
+	 * Bits 0-5: Sector count
+	 *	6-7: High 2 bits of the 9-bit cylinder count
+	 */
+	uint8_t		sec_0_5_and_cyl_8_9;
+	uint8_t		head_cnt;
+} fn4b_t;
+
 #pragma pack()
 
 typedef struct biosdev_data {
@@ -115,6 +134,24 @@ typedef struct biosdev_data {
 	uchar_t			edd_valid;
 	fn48_t			fn48_dev_params;
 } biosdev_data_t;
+
+/*
+ * Definitions for boot_mtype in fn4b_t
+ */
+#define	BOOT_MTYPE_MASK			0xF
+#define	BOOT_MTYPE(x)			((x) & BOOT_MTYPE_MASK)
+#define	BOOT_MTYPE_NO_EMUL		0
+#define	BOOT_MTYPE_1_2M_FLOPPY		1
+#define	BOOT_MTYPE_1_44M_FLOPPY		2
+#define	BOOT_MTYPE_2_88M_FLOPPY		3
+#define	BOOT_MTYPE_HARD_DISK		4
+#define	BOOT_MTYPE_INTF_MASK		0xC0
+#define	BOOT_MTYPE_INTF_ATAPI		0x40
+#define	BOOT_MTYPE_INTF_SCSI		0x80
+#define	BOOT_MTYPE_IS_ATAPI(x) \
+	(((x) & BOOT_MTYPE_INTF_MASK) == BOOT_MTYPE_INTF_ATAPI)
+#define	BOOT_MTYPE_IS_SCSI(x) \
+	(((x) & BOOT_MTYPE_INTF_MASK) == BOOT_MTYPE_INTF_SCSI)
 
 #ifdef __cplusplus
 }

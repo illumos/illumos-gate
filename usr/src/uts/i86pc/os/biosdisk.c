@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -43,6 +41,7 @@
 #include <sys/hypervisor.h>
 #endif
 
+extern int prom_debug;
 
 /* hard code realmode memory address for now */
 #define	BIOS_RES_BUFFER_ADDR		0x7000
@@ -70,7 +69,7 @@ static int get_dev_params(uchar_t);
 static int read_firstblock(uchar_t drivenum);
 static int drive_present(uchar_t drivenum);
 static void reset_disk(uchar_t drivenum);
-
+static int is_eltorito(uchar_t drivenum);
 
 void
 startup_bios_disk()
@@ -80,6 +79,7 @@ startup_bios_disk()
 	int got_first_block = 0;
 	uchar_t	name[20];
 	dev_info_t	*devi;
+	int extensions;
 
 #if defined(__xpv)
 	if (!DOMAIN_IS_INITDOMAIN(xen_info))
@@ -94,7 +94,20 @@ startup_bios_disk()
 		if (!drive_present(drivenum))
 			continue;
 
-		got_devparams = get_dev_params(drivenum);
+		extensions = bios_check_extension_present(drivenum);
+
+		/*
+		 * If we're booting from an Eltorito CD/DVD image, there's
+		 * no need to get the device parameters or read the first block
+		 * because we'll never install onto this device.
+		 */
+		if (extensions && is_eltorito(drivenum))
+			continue;
+
+		if (extensions && get_dev_params(drivenum))
+			got_devparams = 1;
+		else
+			got_devparams = 0;
 
 		if ((got_first_block = read_firstblock(drivenum)) == 0) {
 			/* retry */
@@ -151,9 +164,6 @@ get_dev_params(uchar_t drivenum)
 	uchar_t *tmp;
 
 	dprintf(("In get_dev_params\n"));
-
-	if (bios_check_extension_present(drivenum) == 0)
-		return (0);
 
 	bufp = (fn48_t *)BIOS_RES_BUFFER_ADDR;
 
@@ -213,7 +223,6 @@ drive_present(uchar_t drivenum)
 
 	dprintf(("drive-present %x\n", drivenum));
 	return (1);
-
 }
 
 static void
@@ -276,6 +285,47 @@ read_firstblock(uchar_t drivenum)
 	biosdev_info[index].first_block_valid = 1;
 	for (i = 0; i < 512; i++)
 		biosdev_info[index].first_block[i] = *((uchar_t *)bufp + i);
+
+	return (1);
+}
+
+static int
+is_eltorito(uchar_t drivenum)
+{
+	struct bop_regs rp = {0};
+	fn4b_t	 *bufp;
+	extern struct bootops		*bootops;
+	int i;
+
+	dprintf(("In is_eltorito\n"));
+
+	bufp = (fn4b_t *)BIOS_RES_BUFFER_ADDR;
+
+	/*
+	 * We cannot use bzero here as we're initializing data
+	 * at an address below kernel base.
+	 */
+	for (i = 0; i < sizeof (*bufp); i++)
+		((uchar_t *)bufp)[i] = 0;
+
+	bufp->pkt_size = sizeof (*bufp);
+	rp.eax.word.ax = 0x4b01;
+	rp.edx.byte.dl = drivenum;
+
+	rp.esi.word.si = (uint16_t)FP_OFF((uint_t)(uintptr_t)bufp);
+	rp.ds = FP_SEG((uint_t)(uintptr_t)bufp);
+
+	BOP_DOINT(bootops, 0x13, &rp);
+
+	if ((rp.eflags & PS_C) != 0 || bufp->drivenum != drivenum) {
+		dprintf(("fn 0x4b01 FAILED on drive "
+		    "eflags=%x ah=%x drivenum=%x\n",
+		    rp.eflags, rp.eax.byte.ah, bufp->drivenum));
+		return (0);
+	}
+
+	if (prom_debug)
+		prom_printf("INT13 FN4B01 mtype => %x", bufp->boot_mtype);
 
 	return (1);
 }
