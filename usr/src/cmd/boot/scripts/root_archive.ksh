@@ -476,6 +476,8 @@ packmedia()
 			mkdir -p "$MEDIA/platform/$arch"
 			ln -sf ../../boot/sparc.miniroot \
 			    "$MEDIA/platform/$arch/boot_archive"
+			ln -sf ../../$RELEASE/Tools/Boot/platform/$arch/wanboot \
+			    "$MEDIA/platform/$arch/wanboot"
 		fi
 	done
 
