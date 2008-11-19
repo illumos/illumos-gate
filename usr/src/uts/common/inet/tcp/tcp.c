@@ -4620,6 +4620,11 @@ tcp_free(tcp_t *tcp)
 		tcp->tcp_fused_sigurg_mp = NULL;
 	}
 
+	if (tcp->tcp_ordrel_mp != NULL) {
+		freeb(tcp->tcp_ordrel_mp);
+		tcp->tcp_ordrel_mp = NULL;
+	}
+
 	if (tcp->tcp_sack_info != NULL) {
 		if (tcp->tcp_notsack_list != NULL) {
 			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
@@ -6194,11 +6199,14 @@ tcp_connect(tcp_t *tcp, mblk_t *mp)
 	 * Pre-allocate the T_ordrel_ind mblk so that at close time, we
 	 * will always have that to send up.  Otherwise, we need to do
 	 * special handling in case the allocation fails at that time.
+	 * If the end point is TPI, the tcp_t can be reused and the
+	 * tcp_ordrel_mp may be allocated already.
 	 */
-	ASSERT(tcp->tcp_ordrel_mp == NULL);
-	if ((tcp->tcp_ordrel_mp = mi_tpi_ordrel_ind()) == NULL) {
-		tcp_err_ack(tcp, mp, TSYSERR, ENOMEM);
-		return;
+	if (tcp->tcp_ordrel_mp == NULL) {
+		if ((tcp->tcp_ordrel_mp = mi_tpi_ordrel_ind()) == NULL) {
+			tcp_err_ack(tcp, mp, TSYSERR, ENOMEM);
+			return;
+		}
 	}
 
 	/*
