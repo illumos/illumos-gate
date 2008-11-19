@@ -131,7 +131,11 @@ static ddi_dma_attr_t fastboot_below_1G_dma_attr = {
 static ddi_dma_attr_t fastboot_dma_attr = {
 	DMA_ATTR_V0,
 	0x0000000008000000ULL,	/* dma_attr_addr_lo: 128MB */
+#ifdef	__amd64
+	0xFFFFFFFFFFFFFFFFULL,	/* dma_attr_addr_hi: 2^64B */
+#else
 	0x0000000FFFFFFFFFULL,	/* dma_attr_addr_hi: 64GB */
+#endif	/* __amd64 */
 	0x00000000FFFFFFFFULL,	/* dma_attr_count_max */
 	0x0000000000001000ULL,	/* dma_attr_align: 4KB */
 	1,			/* dma_attr_burstsize */
@@ -205,8 +209,7 @@ fastboot_vatoindex(fastboot_info_t *nk, uintptr_t va, int level)
 
 /*
  * Add mapping from vstart to pstart for the specified size.
- * Only handles 2 level.  Must use 2M pages.  vstart, pstart
- * and size should all have been aligned at 2M boundaries.
+ * vstart, pstart and size should all have been aligned at 2M boundaries.
  */
 static void
 fastboot_map_with_size(fastboot_info_t *nk, uintptr_t vstart, paddr_t pstart,
@@ -242,19 +245,22 @@ fastboot_map_with_size(fastboot_info_t *nk, uintptr_t vstart, paddr_t pstart,
 				table[index] = pteval;
 			}
 		} else if (table[index] & PT_VALID) {
-			if (l == level)
-				break;
 
 			table = (x86pte_t *)
 			    ((uintptr_t)(((paddr_t)table[index] & MMU_PAGEMASK)
 			    - nk->fi_pagetable_pa) + nk->fi_pagetable_va);
 		} else {
 			/*
-			 * Intermediate levels.  Program with either valid
-			 * bit or PTP bits.
+			 * Intermediate levels.
+			 * Program with either valid bit or PTP bits.
 			 */
 			if (l == nk->fi_top_level) {
+#ifdef	__amd64
+				ASSERT(nk->fi_top_level == 3);
+				table[index] = nk->fi_next_table_pa | ptp_bits;
+#else
 				table[index] = nk->fi_next_table_pa | PT_VALID;
+#endif	/* __amd64 */
 			} else {
 				table[index] = nk->fi_next_table_pa | ptp_bits;
 			}
@@ -322,6 +328,9 @@ fastboot_elf64_find_dboot_load_offset(void *img, off_t imgsz, uint32_t *offp)
 
 /*
  * Initialize text and data section information for 32-bit kernel.
+ * sectcntp - is both input/output parameter.
+ * On entry, *sectcntp contains maximum allowable number of sections;
+ * on return, it contains the actual number of sections filled.
  */
 static int
 fastboot_elf32_find_loadables(void *img, off_t imgsz, fastboot_section_t *sectp,
@@ -332,7 +341,7 @@ fastboot_elf32_find_loadables(void *img, off_t imgsz, fastboot_section_t *sectp,
 	uint8_t		*phdrbase;
 	int		i;
 	int		used_sections = 0;
-
+	const int	max_sectcnt = *sectcntp;
 
 	if ((ehdr->e_phoff + ehdr->e_phnum * ehdr->e_phentsize) >= imgsz)
 		return (-1);
@@ -352,6 +361,9 @@ fastboot_elf32_find_loadables(void *img, off_t imgsz, fastboot_section_t *sectp,
 		    phdr->p_paddr == DBOOT_ENTRY_ADDRESS) {
 			*offp = (uint32_t)phdr->p_offset;
 		} else {
+			if (max_sectcnt <= used_sections)
+				return (-1);
+
 			sectp[used_sections].fb_sec_offset = phdr->p_offset;
 			sectp[used_sections].fb_sec_paddr = phdr->p_paddr;
 			sectp[used_sections].fb_sec_size = phdr->p_filesz;
@@ -359,9 +371,15 @@ fastboot_elf32_find_loadables(void *img, off_t imgsz, fastboot_section_t *sectp,
 			    (phdr->p_filesz < phdr->p_memsz) ?
 			    (phdr->p_memsz - phdr->p_filesz) : 0;
 
+			/* Extra sanity check for the input object file */
+			if (sectp[used_sections].fb_sec_paddr +
+			    sectp[used_sections].fb_sec_size +
+			    sectp[used_sections].fb_sec_bss_size >=
+			    DBOOT_ENTRY_ADDRESS)
+				return (-1);
+
 			used_sections++;
 		}
-
 	}
 
 	*sectcntp = used_sections;
@@ -460,7 +478,11 @@ fastboot_init_fields(fastboot_info_t *nk)
 		nk->fi_shift_amt = fastboot_shift_amt_pae;
 		nk->fi_ptes_per_table = 512;
 		nk->fi_lpagesize = (2 << 20);	/* 2M */
+#ifdef	__amd64
+		nk->fi_top_level = 3;
+#else
 		nk->fi_top_level = 2;
+#endif	/* __amd64 */
 	}
 }
 
@@ -764,6 +786,9 @@ load_kernel_retry:
 			    ehdr->e_ident[EI_DATA] == ELFDATA2LSB &&
 			    ehdr->e_machine == EM_386) {
 
+				fb->fb_sectcnt = sizeof (fb->fb_sections) /
+				    sizeof (fb->fb_sections[0]);
+
 				if (fastboot_elf32_find_loadables((void *)va,
 				    fsize, &fb->fb_sections[0],
 				    &fb->fb_sectcnt, &dboot_start_offset) < 0) {
@@ -806,7 +831,7 @@ load_kernel_retry:
 				}
 
 				if ((x86_feature & X86_64) == 0 ||
-				    newkernel.fi_has_pae == 0) {
+				    (x86_feature & X86_PAE) == 0) {
 					cmn_err(CE_WARN, "Fastboot: Cannot "
 					    "reboot to %s: "
 					    "not a 64-bit capable system",
@@ -849,7 +874,7 @@ load_kernel_retry:
 	 */
 	fb = &newkernel.fi_files[FASTBOOT_SWTCH];
 	fb->fb_va = fb->fb_dest_pa = FASTBOOT_SWTCH_PA;
-	fb->fb_size = PAGESIZE;
+	fb->fb_size = MMU_PAGESIZE;
 
 	/*
 	 * Map in FASTBOOT_SWTCH_PA
@@ -869,19 +894,24 @@ load_kernel_retry:
 
 	/*
 	 * Build page table for low 1G physical memory. Use big pages.
-	 * Allocate 4 pages for the page tables.
+	 * Allocate 4 (5 for amd64) pages for the page tables.
+	 *    1 page for PML4 (amd64)
 	 *    1 page for Page-Directory-Pointer Table
-	 *    2 page for Page Directory
+	 *    2 pages for Page Directory
 	 *    1 page for Page Table.
 	 * The page table entry will be rewritten to map the physical
 	 * address as we do the copying.
 	 */
 	if (newkernel.fi_has_pae) {
+#ifdef	__amd64
+		size_t size = MMU_PAGESIZE * 5;
+#else
 		size_t size = MMU_PAGESIZE * 4;
+#endif	/* __amd64 */
 
 		if ((newkernel.fi_pagetable_va = (uintptr_t)
 		    contig_alloc(size, &fastboot_below_1G_dma_attr,
-		    PAGESIZE, 0)) == NULL) {
+		    MMU_PAGESIZE, 0)) == NULL) {
 			cmn_err(CE_WARN, fastboot_enomem_msg,
 			    (uint64_t)size, "1G");
 			goto err_out;
@@ -894,7 +924,7 @@ load_kernel_retry:
 		    (caddr_t)newkernel.fi_pagetable_va));
 
 		newkernel.fi_last_table_pa = newkernel.fi_pagetable_pa +
-		    MMU_PAGESIZE * 3;
+		    size - MMU_PAGESIZE;
 
 		newkernel.fi_next_table_va = newkernel.fi_pagetable_va +
 		    MMU_PAGESIZE;

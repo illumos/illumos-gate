@@ -56,6 +56,35 @@ int fb_swtch_silence_lint = 0;
 	btrl	$31, %eax	/* clear PG bit */			;\
 	movl	%eax, %cr0
 
+/*
+ * This macro contains common code for 64/32-bit versions of copy_sections().
+ * On entry:
+ *	fbf points to the fboot_file_t
+ *	snum contains the number of sections
+ * Registers that would be clobbered:
+ *	fbs, snum, %eax, %ecx, %edi, %esi.
+ * NOTE: fb_dest_pa is supposed to be in the first 1GB,
+ * therefore it is safe to use 32-bit register to hold it's value
+ * even for 64-bit code.
+ */
+
+#define	COPY_SECT(fbf, fbs, snum)		\
+	lea	FB_SECTIONS(fbf), fbs;		\
+	xorl	%eax, %eax;			\
+1:	movl	FB_DEST_PA(fbf), %esi;		\
+	addl	FB_SEC_OFFSET(fbs), %esi;	\
+	movl	FB_SEC_PADDR(fbs), %edi;	\
+	movl	FB_SEC_SIZE(fbs), %ecx;		\
+	rep					\
+	  movsb;				\
+	/* Zero BSS */				\
+	movl	FB_SEC_BSS_SIZE(fbs), %ecx;	\
+	rep					\
+	  stosb;				\
+	add	$FB_SECTIONS_INCR, fbs;		\
+	dec	snum;				\
+	jnz	1b
+
 
 	.globl	_start
 _start:
@@ -141,6 +170,35 @@ _start:
 
 #if defined(__amd64)
 	/*
+	 * Invalidate all TLB entries.
+	 * Load temporary pagetables to copy kernel and boot-archive
+	 */
+	movq	%cr4, %rax
+	andq	$_BITNOT(CR4_PGE), %rax
+	movq	%rax, %cr4
+	movq	FI_PAGETABLE_PA(%rsp), %rax
+	movq	%rax, %cr3
+
+	leaq	FI_FILES(%rsp), %rbx	/* offset to the files */
+
+	/* copy unix to final destination */
+	movq	FI_LAST_TABLE_PA(%rsp), %rsi	/* page table PA */
+	leaq	_MUL(FASTBOOT_UNIX, FI_FILES_INCR)(%rbx), %rdi
+	call	map_copy
+
+	/* copy boot archive to final destination */
+	movq	FI_LAST_TABLE_PA(%rsp), %rsi	/* page table PA */
+	leaq	_MUL(FASTBOOT_BOOTARCHIVE, FI_FILES_INCR)(%rbx), %rdi
+	call	map_copy
+
+	/* Copy sections if there are any */ 
+	leaq	_MUL(FASTBOOT_UNIX, FI_FILES_INCR)(%rbx), %rdi
+	movl	FB_SECTCNT(%rdi), %esi
+	cmpl	$0, %esi
+	je	1f
+	call	copy_sections
+1:
+	/*
 	 * Shut down 64 bit mode. First get into compatiblity mode.
 	 */
 	movq	%rsp, %rax
@@ -164,7 +222,7 @@ _start:
 	 * Disable long mode by:
 	 * - shutting down paging (bit 31 of cr0).  This will flush the
 	 *   TLBs.
-	 * - disabling LME (long made enable) in EFER (extended feature reg)
+	 * - disabling LME (long mode enable) in EFER (extended feature reg)
 	 */
 #endif
 	DISABLE_PAGING		/* clobbers %eax */
@@ -187,8 +245,8 @@ _start:
 	rdmsr
 	btcl	$8, %eax		/* bit 8 Long Mode Enable bit */
 	wrmsr
-#endif
 
+#elif defined(__i386)
 	/*
 	 * If fi_has_pae is set, re-enable paging with PAE.
 	 */
@@ -242,6 +300,7 @@ paging_on:
 	movl	%cr4, %eax
 	andl	$_BITNOT(CR4_PAE), %eax
 	movl	%eax, %cr4
+#endif	/* __i386 */
 
 dboot_jump:
 	/* Jump to dboot */
@@ -249,6 +308,55 @@ dboot_jump:
 	movl	FI_NEW_MBI_PA(%esp), %ebx
 	movl	$MB_BOOTLOADER_MAGIC, %eax
 	jmp	*%edi
+
+#if defined(__amd64)
+
+	.code64
+	ENTRY_NP(copy_sections)
+	/*
+	 * On entry
+	 *	%rdi points to the fboot_file_t
+	 *	%rsi contains number of sections
+	 */
+	movq	%rdi, %rdx
+	movq	%rsi, %r9
+
+	COPY_SECT(%rdx, %r8, %r9)
+	ret
+	SET_SIZE(copy_sections)
+
+	ENTRY_NP(map_copy)
+	/*
+	 * On entry
+	 *	%rdi points to the fboot_file_t
+	 *	%rsi has FI_LAST_TABLE_PA(%rsp)
+	 */
+
+	movq	%rdi, %rdx
+	movq	%rsi, %r8
+	movq	FB_PTE_LIST_PA(%rdx), %rax	/* PA list of the source */
+	movq	FB_DEST_PA(%rdx), %rdi		/* PA of the destination */
+
+2:
+	movq	(%rax), %rcx			/* Are we done? */
+	cmpl	$FASTBOOT_TERMINATE, %ecx
+	je	1f
+
+	movq	%rcx, (%r8)
+	movq	%cr3, %rsi		/* Reload cr3 */
+	movq	%rsi, %cr3
+	movq	FB_VA(%rdx), %rsi	/* Load from VA */
+	movq	$PAGESIZE, %rcx
+	shrq	$3, %rcx		/* 8-byte at a time */
+	rep
+	  smovq
+	addq	$8, %rax 		/* Go to next PTE */
+	jmp	2b
+1:
+	ret
+	SET_SIZE(map_copy)	
+
+#elif defined(__i386)
 
 	ENTRY_NP(copy_sections)
 	/*
@@ -261,27 +369,10 @@ dboot_jump:
 	pushl	%esi
 	pushl	%edi
 
-	leal	FB_SECTIONS(%edx), %ebx
 	movl	%eax, %ebp
-	xorl	%eax, %eax
-1:
-	dec	%ebp
-	movl	FB_DEST_PA(%edx), %esi
-	addl	FB_SEC_OFFSET(%ebx), %esi
-	movl	FB_SEC_PADDR(%ebx), %edi
-	movl	FB_SEC_SIZE(%ebx), %ecx
-	rep
-	  movsb
-	/* Zero BSS */
-	movl	FB_SEC_BSS_SIZE(%ebx), %ecx
-	rep
-	  stosb
 
-	cmpl	$0, %ebp
-	je	2f
-	addl	$FB_SECTIONS_INCR, %ebx
-	jmp	1b
-2:		
+	COPY_SECT(%edx, %ebx, %ebp)
+
 	popl	%edi
 	popl	%esi
 	popl	%ebx
@@ -345,7 +436,7 @@ done:
 	popl	%eax
 	ret
 	SET_SIZE(map_copy)	
-
+#endif	/* __i386 */
 
 
 idt_info:
