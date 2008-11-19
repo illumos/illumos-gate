@@ -34,6 +34,7 @@
 #include <sys/systeminfo.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <sys/systeminfo.h>
 
 /*
  * niu.c
@@ -59,6 +60,8 @@ const topo_modinfo_t niu_info =
 
 static const topo_pgroup_info_t io_pgroup =
 	{ TOPO_PGROUP_IO, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+
+static int ist3120 = 0;
 
 /*ARGSUSED*/
 void
@@ -258,13 +261,19 @@ niufn_declare(tnode_t *parent, const char *name, topo_instance_t i,
 	/* set ASRU */
 	(void) niu_asru_set(ntn, priv, mod);
 
-	if (topo_node_range_create(mod, ntn, XAUI,
-	    0, XAUI_MAX) < 0) {
-		topo_node_unbind(ntn);
-		topo_mod_dprintf(mod, "child_range_add of XAUI"
-		    "failed: %s\n",
-		    topo_strerror(topo_mod_errno(mod)));
-		return (NULL); /* mod_errno already set */
+	/*
+	 * The SPARC-Enterprise-T3120 systems do not have XAUI cards.
+	 * Don't enumerate them.
+	 */
+	if (!ist3120) {
+		if (topo_node_range_create(mod, ntn, XAUI,
+		    0, XAUI_MAX) < 0) {
+			topo_node_unbind(ntn);
+			topo_mod_dprintf(mod, "child_range_add of XAUI"
+			    "failed: %s\n",
+			    topo_strerror(topo_mod_errno(mod)));
+			return (NULL); /* mod_errno already set */
+		}
 	}
 	return (ntn);
 }
@@ -325,9 +334,12 @@ niufn_instantiate(tnode_t *parent, const char *name, di_node_t pnode,
 			    topo_strerror(topo_mod_errno(mod)));
 			return (-1);
 		}
-		if (topo_mod_enumerate(mod,
-		    ntn, XAUI, XAUI, inst, inst, sib) != 0) {
-			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+		if (!ist3120) {
+			if (topo_mod_enumerate(mod,
+			    ntn, XAUI, XAUI, inst, inst, sib) != 0) {
+				return (topo_mod_seterrno(mod,
+				    EMOD_PARTIAL_ENUM));
+			}
 		}
 		sib = di_sibling_node(sib);
 	}
@@ -353,6 +365,7 @@ niu_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	tnode_t *niun;
 	di_node_t devtree;
 	di_node_t dnode;
+	char platform[MAXNAMELEN];
 
 	if (strcmp(name, NIU) != 0) {
 		topo_mod_dprintf(mod,
@@ -365,11 +378,20 @@ niu_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		topo_mod_dprintf(mod, "devinfo init failed.");
 		return (-1);
 	}
+
+	platform[0] = '\0';
+	(void) sysinfo(SI_PLATFORM, platform, sizeof (platform));
+	if ((strcmp(platform, "SUNW,SPARC-Enterprise-T3120") == 0)) {
+		ist3120 = 1;
+	}
+
 	/*
-	 * Load XAUI Enum
+	 * Load XAUI Enum, except for SPARC-Enterprise-T3120
 	 */
-	if (xaui_enum_load(mod) == NULL)
-		return (-1);
+	if (!ist3120) {
+		if (xaui_enum_load(mod) == NULL)
+			return (-1);
+	}
 
 	dnode = di_drv_first_node("niumx", devtree);
 	if (dnode != DI_NODE_NIL) {

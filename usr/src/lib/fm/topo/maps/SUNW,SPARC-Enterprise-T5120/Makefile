@@ -23,13 +23,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PLATFORMS = SUNW,SPARC-Enterprise-T5120
 CLASS = platform
 DTDFILE = topology.dtd.1
 TOPOFILE = SPARC-Enterprise-T5120-hc-topology.xml \
-	   SPARC-Enterprise-T5220-hc-topology.xml
+	   SPARC-Enterprise-T5220-hc-topology.xml \
+	   SPARC-Enterprise-T3120-hc-topology.xml
 SRCDIR = ../SUNW,SPARC-Enterprise-T5120
 
 include ../Makefile.map

@@ -20,10 +20,9 @@
 #
 #
 # uts/sun4v/huron/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the sun4v huron platform
 #	modules.
@@ -70,6 +69,7 @@ lintlib:      unix
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise-T5120
 LINKED_PLATFORMS	= SUNW,SPARC-Enterprise-T5220
+LINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T3120
 
 
 $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)

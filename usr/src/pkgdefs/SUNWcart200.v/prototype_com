@@ -60,6 +60,7 @@ s none platform/SUNW,Netra-T5440=sun4v
 s none platform/SUNW,Netra-CP3060/lib=../sun4v/lib
 s none platform/SUNW,SPARC-Enterprise-T5220=sun4v
 s none platform/SUNW,SPARC-Enterprise-T5120=sun4v
+s none platform/SUNW,SPARC-Enterprise-T3120=sun4v
 s none platform/SUNW,T5140=sun4v
 s none platform/SUNW,T5240=sun4v
 s none platform/SUNW,T5440=sun4v

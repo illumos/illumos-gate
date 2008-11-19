@@ -224,6 +224,7 @@ d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5120-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5220-hc-topology.xml 444 root bin
+f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T3120-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,T5140 755 root sys
 d none usr/platform/SUNW,T5140/lib 755 root bin
 d none usr/platform/SUNW,T5140/lib/fm 755 root bin

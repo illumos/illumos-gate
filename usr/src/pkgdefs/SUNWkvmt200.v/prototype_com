@@ -228,3 +228,7 @@ s none usr/platform/SUNW,Netra-CP3260/sbin/trapstat=../../sun4v/sbin/trapstat
 # add Scottsdale link
 #
 s none usr/platform/SUNW,Sun-Blade-T6340=SUNW,T5140
+#
+# add Tenaya link
+#
+s none usr/platform/SUNW,SPARC-Enterprise-T3120=SUNW,SPARC-Enterprise-T5120

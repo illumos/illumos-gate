@@ -57,6 +57,12 @@ physnm_t t5220_pnms[] = {
 	{   5, "MB/RISER2/PCIE5" }
 };
 
+physnm_t t3120_pnms[] = {
+	/* Slot #, Label */
+	{   0, "MB/RISER0/PCIE0" },
+	{   1, "MB/RISER1/PCIE1" }
+};
+
 physnm_t usbrdt5240_pnms[] = {
 	/* Slot #, Label */
 	{   0, "MB/RISER0/EM0" },
@@ -117,6 +123,9 @@ pphysnm_t plat_pnames[] = {
 	{ "SPARC-Enterprise-T5220",
 	    sizeof (t5220_pnms) / sizeof (physnm_t),
 	    t5220_pnms },
+	{ "SPARC-Enterprise-T3120",
+	    sizeof (t3120_pnms) / sizeof (physnm_t),
+	    t3120_pnms },
 	/*
 	 * T5140/T5240 uses the same chassis as T5120/T5220, hence
 	 * the same PCI slot mappings
