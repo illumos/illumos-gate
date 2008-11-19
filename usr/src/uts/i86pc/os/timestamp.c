@@ -134,6 +134,7 @@ static volatile int tsc_sync_go;
 }
 
 int tsc_master_slave_sync_needed = 1;
+extern int xpv_is_hvm;
 
 static int	tsc_max_delta;
 static hrtime_t tsc_sync_tick_delta[NCPU];
@@ -399,6 +400,13 @@ tsc_gethrtimeunscaled_delta(void)
  * to reflect globally can vary a lot. So instead of taking a single reading,
  * a set of readings are taken and the one with least write time is chosen
  * to calculate the final skew.
+ *
+ * TSC sync is disabled in the context of virtualization because the CPUs
+ * assigned to the guest are virtual CPUs which means the real CPUs on which
+ * guest runs keep changing during life time of guest OS. So we would end up
+ * calculating TSC skews for a set of CPUs during boot whereas the guest
+ * might migrate to a different set of physical CPUs at a later point of
+ * time.
  */
 void
 tsc_sync_master(processorid_t slave)
@@ -408,7 +416,7 @@ tsc_sync_master(processorid_t slave)
 	tsc_sync_t *tsc = tscp;
 	int cnt;
 
-	if (!tsc_master_slave_sync_needed)
+	if (!tsc_master_slave_sync_needed || xpv_is_hvm)
 		return;
 
 	flags = clear_int_flag();
@@ -470,6 +478,13 @@ tsc_sync_master(processorid_t slave)
 	restore_int_flag(flags);
 }
 
+/*
+ * Called by a CPU which has just been onlined.  It is expected that the CPU
+ * performing the online operation will call tsc_sync_master().
+ *
+ * TSC sync is disabled in the context of virtualization. See comments
+ * above tsc_sync_master.
+ */
 void
 tsc_sync_slave(void)
 {
@@ -478,7 +493,7 @@ tsc_sync_slave(void)
 	tsc_sync_t *tsc = tscp;
 	int cnt;
 
-	if (!tsc_master_slave_sync_needed)
+	if (!tsc_master_slave_sync_needed || xpv_is_hvm)
 		return;
 
 	flags = clear_int_flag();
