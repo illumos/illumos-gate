@@ -785,8 +785,10 @@ sctp_verify_chain(mblk_t *head, mblk_t *tail)
  * message and its time is up (assuming we are PR-SCTP aware).
  * 'cansend' is used to determine if need to try and chunkify messages from
  * the unsent list, if any, and also as an input to sctp_chunkify() if so.
- * When called from sctp_rexmit(), we don't want to chunkify, so 'cansend'
- * will be set to 0.
+ *
+ * firstseg indicates the space already used, cansend represents remaining
+ * space in the window, ((sfa_pmss - firstseg) can therefore reasonably
+ * be used to compute the cansend arg).
  */
 mblk_t *
 sctp_get_msg_to_send(sctp_t *sctp, mblk_t **mp, mblk_t *meta, int  *error,
@@ -1637,6 +1639,7 @@ sctp_rexmit(sctp_t *sctp, sctp_faddr_t *oldfp)
 	uint32_t	first_ua_tsn;
 	sctp_msg_hdr_t	*mhdr;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	int		error;
 
 	while (meta != NULL) {
 		for (mp = meta->b_cont; mp != NULL; mp = mp->b_next) {
@@ -1912,8 +1915,18 @@ try_bundle:
 				mp = meta->b_cont;
 				goto try_bundle;
 			}
-			/* No more chunk to be bundled. */
-			break;
+			/*
+			 * Check if there is a new message which potentially
+			 * could be bundled with this retransmission.
+			 */
+			meta = sctp_get_msg_to_send(sctp, &mp, NULL, &error,
+			    seglen, fp->sfa_pmss - seglen, NULL);
+			if (error != 0 || meta == NULL) {
+				/* No more chunk to be bundled. */
+				break;
+			} else {
+				goto try_bundle;
+			}
 		}
 
 		sdc = (sctp_data_hdr_t *)mp->b_rptr;
