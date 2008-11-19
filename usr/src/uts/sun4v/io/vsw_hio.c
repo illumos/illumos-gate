@@ -109,6 +109,9 @@ static void vsw_hio_unbind_macaddr(vsw_share_t *vsharep);
 static boolean_t vsw_hio_reboot_callb(void *arg, int code);
 static boolean_t vsw_hio_panic_callb(void *arg, int code);
 
+static kstat_t *vsw_hio_setup_kstats(char *ks_mod, char *ks_name, vsw_t *vswp);
+static void vsw_hio_destroy_kstats(vsw_t *vswp);
+static int vsw_hio_kstats_update(kstat_t *ksp, int rw);
 
 /*
  * vsw_hio_init -- Initialize the HybridIO related info.
@@ -163,6 +166,12 @@ vsw_hio_init(vsw_t *vswp)
 
 	vswp->hio_panic_cb_id = callb_add(vsw_hio_panic_callb,
 	    (void *)vswp, CB_CL_PANIC, "vsw_hio");
+
+	/* setup kstats for hybrid resources */
+	hiop->vh_ksp = vsw_hio_setup_kstats(DRV_NAME, "hio", vswp);
+	if (hiop->vh_ksp == NULL) {
+		DERR(vswp, "%s: kstats setup failed", __func__);
+	}
 
 	D2(vswp, "%s: %s is HybridIO capable num_shares=%d\n", __func__,
 	    vswp->physname, hiop->vh_num_shares);
@@ -382,6 +391,7 @@ vsw_hio_free_share(vsw_share_t *vsharep)
 	/* free share */
 	hcapab->ms_sfree(vsharep->vs_shdl);
 	vsharep->vs_state = VSW_SHARE_FREE;
+	vsharep->vs_macaddr = 0;
 
 	/* DERR only for printing by default */
 	DERR(vswp, "Share freed for ldc_id=0x%lx Cookie=0x%lX",
@@ -409,6 +419,7 @@ vsw_hio_cleanup(vsw_t *vswp)
 		vswp->hio_panic_cb_id = 0;
 	}
 	vsw_hio_free_all_shares(vswp, B_FALSE);
+	vsw_hio_destroy_kstats(vswp);
 	D1(vswp, "%s:exit\n", __func__);
 }
 
@@ -992,4 +1003,126 @@ vsw_hio_panic_callb(void *arg, int code)
 	vsw_hio_reset_all(vswp);
 	D1(vswp, "%s:exit\n", __func__);
 	return (B_TRUE);
+}
+
+/*
+ * Setup kstats for hio statistics.
+ */
+static kstat_t *
+vsw_hio_setup_kstats(char *ks_mod, char *ks_name, vsw_t *vswp)
+{
+	kstat_t			*ksp;
+	vsw_hio_kstats_t	*hiokp;
+	vsw_hio_t		*hiop;
+	char			share_assigned_info[MAXNAMELEN];
+	size_t			size;
+	int			i;
+
+	hiop = &vswp->vhio;
+	/*
+	 * vsw_hio_stats_t structure is variable size structure
+	 * having fields defined only for one share. So, we need
+	 * allocate additional space for the rest of the shares.
+	 */
+	size = sizeof (vsw_hio_kstats_t) / sizeof (kstat_named_t);
+	ASSERT(hiop->vh_num_shares >= 1);
+	size += ((hiop->vh_num_shares - 1) * 2);
+
+	ksp = kstat_create(ks_mod, vswp->instance, ks_name, "misc",
+	    KSTAT_TYPE_NAMED, size, KSTAT_FLAG_VIRTUAL);
+
+	if (ksp == NULL) {
+		return (NULL);
+	}
+	hiokp = (vsw_hio_kstats_t *)kmem_zalloc(sizeof (kstat_named_t) *
+	    size, KM_SLEEP);
+	ksp->ks_data = hiokp;
+
+	hiop->vh_ksp = ksp;
+	hiop->vh_kstatsp = hiokp;
+	hiop->vh_kstat_size =  size;
+
+	kstat_named_init(&hiokp->hio_capable, "hio_capable", KSTAT_DATA_CHAR);
+	kstat_named_init(&hiokp->hio_num_shares, "hio_num_shares",
+	    KSTAT_DATA_ULONG);
+
+	for (i = 0; i < hiop->vh_num_shares; i++) {
+		(void) sprintf(share_assigned_info, "%s%d", "hio_share_", i);
+		kstat_named_init(&(hiokp->share[i].assigned),
+		    share_assigned_info, KSTAT_DATA_ULONG);
+
+		(void) sprintf(share_assigned_info, "%s%d%s",
+		    "hio_share_", i, "_state");
+		kstat_named_init(&(hiokp->share[i].state),
+		    share_assigned_info, KSTAT_DATA_ULONG);
+	}
+
+	ksp->ks_update = vsw_hio_kstats_update;
+	ksp->ks_private = (void *)vswp;
+	kstat_install(ksp);
+	return (ksp);
+}
+
+/*
+ * Destroy hio kstats.
+ */
+static void
+vsw_hio_destroy_kstats(vsw_t *vswp)
+{
+	kstat_t			*ksp;
+	vsw_hio_t		*hiop;
+
+	ASSERT(vswp != NULL);
+
+	ksp = vswp->vhio.vh_ksp;
+	hiop = &vswp->vhio;
+	if (ksp != NULL) {
+		kmem_free(hiop->vh_kstatsp, sizeof (kstat_named_t) *
+		    hiop->vh_kstat_size);
+		kstat_delete(ksp);
+		hiop->vh_kstatsp = NULL;
+		hiop->vh_ksp = NULL;
+	}
+}
+
+/*
+ * Update hio kstats.
+ */
+static int
+vsw_hio_kstats_update(kstat_t *ksp, int rw)
+{
+	vsw_t			*vswp;
+	vsw_hio_t		*hiop;
+	vsw_hio_kstats_t	*hiokp;
+	int			i;
+
+	vswp = (vsw_t *)ksp->ks_private;
+	ASSERT(vswp != NULL);
+
+	hiop = &vswp->vhio;
+	hiokp = hiop->vh_kstatsp;
+
+	if (rw == KSTAT_READ) {
+		if (vswp->hio_capable) {
+			(void) strcpy(hiokp->hio_capable.value.c, "Yes");
+		} else {
+			/* not hio capable, just return */
+			(void) strcpy(hiokp->hio_capable.value.c, "No");
+			return (0);
+		}
+
+		mutex_enter(&vswp->hw_lock);
+		hiokp->hio_num_shares.value.ul = (uint32_t)hiop->vh_num_shares;
+		for (i = 0; i < hiop->vh_num_shares; i++) {
+			hiokp->share[i].assigned.value.ul =
+			    hiop->vh_shares[i].vs_macaddr;
+			hiokp->share[i].state.value.ul =
+			    hiop->vh_shares[i].vs_state;
+		}
+		mutex_exit(&vswp->hw_lock);
+	} else {
+		return (EACCES);
+	}
+
+	return (0);
 }

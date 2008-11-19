@@ -95,6 +95,12 @@ static void vnet_res_start_task(void *arg);
 static void vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err);
 int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
 
+static kstat_t *vnet_hio_setup_kstats(char *ks_mod, char *ks_name,
+    vnet_res_t *vresp);
+static int vnet_hio_update_kstats(kstat_t *ksp, int rw);
+static void vnet_hio_get_stats(vnet_res_t *vresp, vnet_hio_stats_t *statsp);
+static void vnet_hio_destroy_kstats(kstat_t *ksp);
+
 /* Exported to to vnet_dds */
 int vnet_send_dds_msg(vnet_t *vnetp, void *dmsg);
 
@@ -112,6 +118,7 @@ extern void vdds_cleanup(vnet_t *vnetp);
 extern void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
 extern void vdds_cleanup_hybrid_res(void *arg);
 
+#define	DRV_NAME	"vnet"
 #define	VNET_FDBE_REFHOLD(p)						\
 {									\
 	atomic_inc_32(&(p)->refcnt);					\
@@ -1177,6 +1184,16 @@ int vio_net_resource_reg(mac_register_t *macp, vio_net_res_type_t type,
 		return (ENXIO);
 	}
 
+	/* Setup kstats for hio resource */
+	if (vresp->type == VIO_NET_RES_HYBRID) {
+		vresp->ksp = vnet_hio_setup_kstats(DRV_NAME, "hio", vresp);
+		if (vresp->ksp == NULL) {
+			DWARN(NULL, "Cannot create kstats for hio resource");
+			kmem_free(vresp, sizeof (vnet_res_t));
+			return (ENXIO);
+		}
+	}
+
 	*vhp = vresp;
 	vcb->vio_net_rx_cb = vnet_rx;
 	vcb->vio_net_tx_update = vnet_tx_update;
@@ -1196,6 +1213,7 @@ vio_net_resource_unreg(vio_net_handle_t vhp)
 	vnet_res_t *vresp = (vnet_res_t *)vhp;
 	vnet_t *vnetp = vresp->vnetp;
 	vnet_res_t *vrp;
+	kstat_t *ksp = NULL;
 
 	DBG1(NULL, "Resource Registerig hdl=0x%p", vhp);
 
@@ -1215,9 +1233,14 @@ vio_net_resource_unreg(vio_net_handle_t vhp)
 			vrp = vrp->nextp;
 		}
 	}
+
+	ksp = vresp->ksp;
+	vresp->ksp = NULL;
+
 	vresp->vnetp = NULL;
 	vresp->nextp = NULL;
 	RW_EXIT(&vnetp->vrwlock);
+	vnet_hio_destroy_kstats(ksp);
 	KMEM_FREE(vresp);
 }
 
@@ -1372,4 +1395,200 @@ vnet_stop_resources(vnet_t *vnetp)
 		vresp = nvresp;
 	}
 	DBG1(vnetp, "exit\n");
+}
+
+/*
+ * Setup kstats for the HIO statistics.
+ * NOTE: the synchronization for the statistics is the
+ * responsibility of the caller.
+ */
+kstat_t *
+vnet_hio_setup_kstats(char *ks_mod, char *ks_name, vnet_res_t *vresp)
+{
+	kstat_t *ksp;
+	vnet_t *vnetp = vresp->vnetp;
+	vnet_hio_kstats_t *hiokp;
+	size_t size;
+
+	ASSERT(vnetp != NULL);
+	size = sizeof (vnet_hio_kstats_t) / sizeof (kstat_named_t);
+	ksp = kstat_create(ks_mod, vnetp->instance, ks_name, "net",
+	    KSTAT_TYPE_NAMED, size, 0);
+	if (ksp == NULL) {
+		return (NULL);
+	}
+
+	hiokp = (vnet_hio_kstats_t *)ksp->ks_data;
+	kstat_named_init(&hiokp->ipackets,		"ipackets",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->ierrors,		"ierrors",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->opackets,		"opackets",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->oerrors,		"oerrors",
+	    KSTAT_DATA_ULONG);
+
+
+	/* MIB II kstat variables */
+	kstat_named_init(&hiokp->rbytes,		"rbytes",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->obytes,		"obytes",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->multircv,		"multircv",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->multixmt,		"multixmt",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->brdcstrcv,		"brdcstrcv",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->brdcstxmt,		"brdcstxmt",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->norcvbuf,		"norcvbuf",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&hiokp->noxmtbuf,		"noxmtbuf",
+	    KSTAT_DATA_ULONG);
+
+	ksp->ks_update = vnet_hio_update_kstats;
+	ksp->ks_private = (void *)vresp;
+	kstat_install(ksp);
+	return (ksp);
+}
+
+/*
+ * Destroy kstats.
+ */
+static void
+vnet_hio_destroy_kstats(kstat_t *ksp)
+{
+	if (ksp != NULL)
+		kstat_delete(ksp);
+}
+
+/*
+ * Update the kstats.
+ */
+static int
+vnet_hio_update_kstats(kstat_t *ksp, int rw)
+{
+	vnet_t *vnetp;
+	vnet_res_t *vresp;
+	vnet_hio_stats_t statsp;
+	vnet_hio_kstats_t *hiokp;
+
+	vresp = (vnet_res_t *)ksp->ks_private;
+	vnetp = vresp->vnetp;
+
+	bzero(&statsp, sizeof (vnet_hio_stats_t));
+
+	READ_ENTER(&vnetp->vsw_fp_rw);
+	if (vnetp->hio_fp == NULL) {
+		/* not using hio resources, just return */
+		RW_EXIT(&vnetp->vsw_fp_rw);
+		return (0);
+	}
+	VNET_FDBE_REFHOLD(vnetp->hio_fp);
+	RW_EXIT(&vnetp->vsw_fp_rw);
+	vnet_hio_get_stats(vnetp->hio_fp, &statsp);
+	VNET_FDBE_REFRELE(vnetp->hio_fp);
+
+	hiokp = (vnet_hio_kstats_t *)ksp->ks_data;
+
+	if (rw == KSTAT_READ) {
+		/* Link Input/Output stats */
+		hiokp->ipackets.value.ul	= (uint32_t)statsp.ipackets;
+		hiokp->ipackets64.value.ull	= statsp.ipackets;
+		hiokp->ierrors.value.ul		= statsp.ierrors;
+		hiokp->opackets.value.ul	= (uint32_t)statsp.opackets;
+		hiokp->opackets64.value.ull	= statsp.opackets;
+		hiokp->oerrors.value.ul		= statsp.oerrors;
+
+		/* MIB II kstat variables */
+		hiokp->rbytes.value.ul		= (uint32_t)statsp.rbytes;
+		hiokp->rbytes64.value.ull	= statsp.rbytes;
+		hiokp->obytes.value.ul		= (uint32_t)statsp.obytes;
+		hiokp->obytes64.value.ull	= statsp.obytes;
+		hiokp->multircv.value.ul	= statsp.multircv;
+		hiokp->multixmt.value.ul	= statsp.multixmt;
+		hiokp->brdcstrcv.value.ul	= statsp.brdcstrcv;
+		hiokp->brdcstxmt.value.ul	= statsp.brdcstxmt;
+		hiokp->norcvbuf.value.ul	= statsp.norcvbuf;
+		hiokp->noxmtbuf.value.ul	= statsp.noxmtbuf;
+	} else {
+		return (EACCES);
+	}
+
+	return (0);
+}
+
+static void
+vnet_hio_get_stats(vnet_res_t *vresp, vnet_hio_stats_t *statsp)
+{
+	mac_register_t		*macp;
+	mac_callbacks_t		*cbp;
+	uint64_t		val;
+	int			stat;
+
+	/*
+	 * get the specified statistics from the underlying nxge.
+	 */
+	macp = &vresp->macreg;
+	cbp = macp->m_callbacks;
+	for (stat = MAC_STAT_MIN; stat < MAC_STAT_OVERFLOWS; stat++) {
+		if (cbp->mc_getstat(macp->m_driver, stat, &val) == 0) {
+			switch (stat) {
+			case MAC_STAT_IPACKETS:
+				statsp->ipackets = val;
+				break;
+
+			case MAC_STAT_IERRORS:
+				statsp->ierrors = val;
+				break;
+
+			case MAC_STAT_OPACKETS:
+				statsp->opackets = val;
+				break;
+
+			case MAC_STAT_OERRORS:
+				statsp->oerrors = val;
+				break;
+
+			case MAC_STAT_RBYTES:
+				statsp->rbytes = val;
+				break;
+
+			case MAC_STAT_OBYTES:
+				statsp->obytes = val;
+				break;
+
+			case MAC_STAT_MULTIRCV:
+				statsp->multircv = val;
+				break;
+
+			case MAC_STAT_MULTIXMT:
+				statsp->multixmt = val;
+				break;
+
+			case MAC_STAT_BRDCSTRCV:
+				statsp->brdcstrcv = val;
+				break;
+
+			case MAC_STAT_BRDCSTXMT:
+				statsp->brdcstxmt = val;
+				break;
+
+			case MAC_STAT_NOXMTBUF:
+				statsp->noxmtbuf = val;
+				break;
+
+			case MAC_STAT_NORCVBUF:
+				statsp->norcvbuf = val;
+				break;
+
+			default:
+				/*
+				 * parameters not interested.
+				 */
+				break;
+			}
+		}
+	}
 }

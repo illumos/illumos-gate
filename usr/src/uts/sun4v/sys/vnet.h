@@ -54,6 +54,46 @@ extern "C" {
 #define	VNET_MATCH_RES(vresp, vnetp)	\
 	(ether_cmp(vresp->local_macaddr, vnetp->curr_macaddr) == 0)
 
+typedef struct vnet_hio_stats {
+	/* Link Input/Output stats */
+	uint64_t	ipackets;	/* # rx packets */
+	uint64_t	ierrors;	/* # rx error */
+	uint64_t	opackets;	/* # tx packets */
+	uint64_t	oerrors;	/* # tx error */
+
+	/* MIB II variables */
+	uint64_t	rbytes;		/* # bytes received */
+	uint64_t	obytes;		/* # bytes transmitted */
+	uint32_t	multircv;	/* # multicast packets received */
+	uint32_t	multixmt;	/* # multicast packets for xmit */
+	uint32_t	brdcstrcv;	/* # broadcast packets received */
+	uint32_t	brdcstxmt;	/* # broadcast packets for xmit */
+	uint32_t	norcvbuf;	/* # rcv packets discarded */
+	uint32_t	noxmtbuf;	/* # xmit packets discarded */
+} vnet_hio_stats_t;
+
+typedef struct vnet_hio_kstats {
+	/* Link Input/Output stats */
+	kstat_named_t	ipackets;
+	kstat_named_t	ipackets64;
+	kstat_named_t	ierrors;
+	kstat_named_t	opackets;
+	kstat_named_t	opackets64;
+	kstat_named_t	oerrors;
+
+	/* required by kstat for MIB II objects(RFC 1213) */
+	kstat_named_t	rbytes; 	/* MIB - ifInOctets */
+	kstat_named_t	rbytes64;
+	kstat_named_t	obytes; 	/* MIB - ifOutOctets */
+	kstat_named_t	obytes64;
+	kstat_named_t	multircv; 	/* MIB - ifInNUcastPkts */
+	kstat_named_t	multixmt; 	/* MIB - ifOutNUcastPkts */
+	kstat_named_t	brdcstrcv;	/* MIB - ifInNUcastPkts */
+	kstat_named_t	brdcstxmt;	/* MIB - ifOutNUcastPkts */
+	kstat_named_t	norcvbuf; 	/* MIB - ifInDiscards */
+	kstat_named_t	noxmtbuf; 	/* MIB - ifOutDiscards */
+} vnet_hio_kstats_t;
+
 /*
  * A vnet resource structure.
  */
@@ -66,6 +106,7 @@ typedef struct vnet_res {
 	uint32_t		flags;		/* resource flags */
 	uint32_t		refcnt;		/* reference count */
 	struct	vnet		*vnetp;		/* back pointer to vnet */
+	kstat_t			*ksp;		/* hio kstats */
 } vnet_res_t;
 
 #define	VNET_DDS_TASK_ADD_SHARE		0x01
