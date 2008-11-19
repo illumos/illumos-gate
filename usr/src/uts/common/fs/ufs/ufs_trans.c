@@ -746,8 +746,7 @@ ufs_trans_trunc_resv(
 {
 	ulong_t		resv;
 	u_offset_t	size, offset, resid;
-	int		nchunks, incr;
-	int		is_sparse = 0;
+	int		nchunks, flag;
 
 	/*
 	 *    *resvp is the amount of log space to reserve (in bytes).
@@ -766,40 +765,27 @@ ufs_trans_trunc_resv(
 		goto done;
 	}
 
-	/*
-	 * There is no need to split sparse file truncation into
-	 * as many chunks as that of regular files.
-	 */
-	is_sparse = bmap_has_holes(ip);
-
 	offset = length;
 	resid = size;
 	nchunks = 1;
-	incr = 0;
+	flag = 0;
 
-	do {
-		resv = ufs_log_amt(ip, offset, resid, 1);
-		/*
-		 * If this is the first iteration, set "incr".
-		 */
-		if (!incr) {
-			/*
-			 * If this request takes too much log space,
-			 * it will be split into "nchunks". If this split
-			 * is not enough, linearly increment the nchunks in
-			 * the next iteration.
-			 */
-			if (resv > ufs_trans_max_resv && !is_sparse) {
-				nchunks = MAX(size/ufs_trans_max_resv, 1);
-				incr = nchunks;
-			} else {
-				incr = 1;
-			}
-		} else
-			nchunks += incr;
+	/*
+	 * If this request takes too much log space, it will be split into
+	 * "nchunks". If this split is not enough, linearly increment the
+	 * nchunks in the next iteration.
+	 */
+	for (; (resv = ufs_log_amt(ip, offset, resid, 1)) > ufs_trans_max_resv;
+	    offset = length + (nchunks - 1) * resid) {
+		if (!flag) {
+			nchunks = roundup(resv, ufs_trans_max_resv) /
+			    ufs_trans_max_resv;
+			flag = 1;
+		} else {
+			nchunks++;
+		}
 		resid = size / nchunks;
-		offset = length + (nchunks - 1) * resid;
-	} while (resv > ufs_trans_max_resv);
+	}
 
 	if (nchunks > 1) {
 		*residp = resid;
