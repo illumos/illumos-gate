@@ -114,7 +114,7 @@ dm_ask_preempt(void)
 	char		*reply = NULL;
 	int		rc;
 
-	dm_send_request(&reply, DM_6502_MSG, NULL);
+	dm_send_request(&reply, DM_6502_MSG, DM_MSG_REASON);
 	if (reply == NULL) {
 		return (DM_REP_ERROR);
 	}
@@ -149,7 +149,7 @@ dm_ask_freserve(void)
 	char		*reply = NULL;
 	int		rc;
 
-	dm_send_request(&reply, DM_6504_MSG, NULL);
+	dm_send_request(&reply, DM_6502_MSG, DM_MSG_REASON);
 	if (reply == NULL) {
 		return (DM_REP_ERROR);
 	}
@@ -214,12 +214,13 @@ dm_ask_write_lbl(char *from, char *to, char *pcl)
 
 	if (ask_lsw == 1 && ask_wo == 1) {
 		dm_send_request(&reply, DM_6520_MSG,
-		    "from", from, "to", to, "pcl", pcl, NULL);
+		    "from", from, "to", to, "pcl", pcl, DM_MSG_REASON);
 	} else if (ask_lsw == 1) {
 		dm_send_request(&reply, DM_6519_MSG, "from", from,
-		    "to", to, NULL);
+		    "to", to, DM_MSG_REASON);
 	} else {
-		dm_send_request(&reply, DM_6518_MSG, "pcl", pcl, NULL);
+		dm_send_request(&reply, DM_6518_MSG, "pcl", pcl,
+		    DM_MSG_REASON);
 	}
 	if (reply == NULL) {
 		/* Can't get reply - means "no" */

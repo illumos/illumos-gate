@@ -60,6 +60,7 @@ typedef	struct	dm_msg {
 #define	DM_MSG_PREPEND(x)	TRACE((MMS_ERR, dm_msg_prepend x))
 #define	DM_ADM_ERR		"administrator", "error"
 #define	DM_MSG_SEND(x)		dm_send_message x
+#define	DM_MSG_REASON		"dm", DMNAME, "error", dm_msg_text(), NULL
 
 #ifdef	__cplusplus
 }

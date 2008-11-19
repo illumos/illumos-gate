@@ -142,7 +142,7 @@ dm_parse_err(mms_par_node_t *root, mms_list_t *err_list)
 	    err->pe_col,
 	    err->pe_token, err->pe_code, err->pe_msg));
 
-	dm_resp_unacceptable(6500, NULL);
+	dm_resp_unacceptable(DM_6500_MSG, DM_MSG_REASON);
 }
 
 
@@ -600,7 +600,8 @@ dm_read_input(void)
 			}
 			mms_trace_flush();
 			if (cmd == NULL) {
-				DM_MSG_SEND((DM_ADM_ERR, DM_6505_MSG, NULL));
+				DM_MSG_SEND((DM_ADM_ERR, DM_6505_MSG,
+				    DM_MSG_REASON));
 				mms_pn_destroy(root);
 				free(buf);
 				return;
@@ -633,7 +634,8 @@ dm_read_input(void)
 			if (cmd == NULL) {
 				DM_MSG_ADD((MMS_INTERNAL,
 				    MMS_DM_E_INTERNAL, "Out of memory"));
-				dm_resp_unacceptable(6506, NULL);
+				dm_resp_unacceptable(DM_6506_MSG,
+				    DM_MSG_REASON);
 				mms_pn_destroy(root);
 				free(buf);
 				return;
@@ -645,7 +647,8 @@ dm_read_input(void)
 			cmd->cmd_task = task;
 			if (dm_setup_incoming_cmd(cmd) != 0) {	/* setup cmd */
 				/* Failed */
-				dm_resp_unacceptable(6506, NULL);
+				dm_resp_unacceptable(DM_6506_MSG,
+				    DM_MSG_REASON);
 				dm_destroy_cmd(cmd);
 				free(buf);
 				return;
@@ -675,7 +678,7 @@ dm_read_input(void)
 		TRACE((MMS_OPER, "Exiting DM"));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "Lost connection to MM"));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	} else {
 		/*
@@ -685,7 +688,7 @@ dm_read_input(void)
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_reader error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	}
 	free(buf);
@@ -812,7 +815,7 @@ dm_accept_cmd_aux(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to send accept to task %s: %s",
 		    cmd->cmd_task, strerror(err)));
-		dm_resp_unacceptable(6507, NULL);
+		dm_resp_unacceptable(DM_6507_MSG, DM_MSG_REASON);
 		free(accept);
 		return (-1);
 	}
@@ -916,14 +919,14 @@ dm_resp_error(char *task, int msgid, ...)
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	} else if (rc == DM_PARTIAL_WRITE) {
 		TRACE((MMS_ERR, "dm_resp_error: mms_writer error: %s",
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	}
 }
@@ -968,14 +971,14 @@ dm_resp_success(char *task, char *text)
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	} else if (rc == DM_PARTIAL_WRITE) {
 		TRACE((MMS_DEBUG, "dm_resp_success: mms_writer error: %s",
 		    strerror(errno)));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "mms_writer error: %s", strerror(errno)));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	}
 }
@@ -2343,7 +2346,7 @@ dm_cmd_response(dm_command_t *cmd)
 			TRACE((MMS_CRIT, "Unexpected response from MM"));
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "Unexpected response from MM"));
-			DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+			DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 			DM_EXIT(DM_NO_RESTART);
 		}
 default:
@@ -2353,7 +2356,7 @@ default:
 		TRACE((MMS_CRIT, "Unexpected cmd state: %d", cmd->cmd_state));
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "Unexpected cmd state: %d", cmd->cmd_state));
-		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6526_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	}
 
@@ -2692,9 +2695,11 @@ dm_activate_enable(dm_command_t *cmd)
 	return (DM_COMPLETE);
 
 error1:
-	(void) dm_send_ready_disconnected(DM_6501_MSG, "type", "enable", NULL);
+	(void) dm_send_ready_disconnected(DM_6501_MSG, "type", "enable",
+	    DM_MSG_REASON);
 error:
-	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "enable", NULL);
+	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "enable",
+	    DM_MSG_REASON);
 	return (DM_COMPLETE);
 }
 
@@ -2736,7 +2741,8 @@ success:
 	return (DM_COMPLETE);
 
 error:
-	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "reserve", NULL);
+	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "reserve",
+	    DM_MSG_REASON);
 	return (DM_COMPLETE);
 }
 
@@ -2770,7 +2776,8 @@ dm_activate_release(dm_command_t *cmd)
 	return (DM_COMPLETE);
 
 error:
-	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "release", NULL);
+	dm_resp_error(cmd->cmd_task, DM_6501_MSG, "type", "release",
+	    DM_MSG_REASON);
 	return (DM_COMPLETE);
 }
 
@@ -2794,7 +2801,7 @@ dm_dmpm_private_cmd(dm_command_t *cmd)
 	mnt->mnt_fseq = -1;		/* fseq not specified */
 	if (dm_get_mount_options(cmd) != 0) {
 		/* had error */
-		dm_resp_error(cmd->cmd_task, DM_6507_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6507_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 	/*
@@ -2806,7 +2813,8 @@ dm_dmpm_private_cmd(dm_command_t *cmd)
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "User %s is not authorized to use MMS",
 			    mnt->mnt_user));
-			dm_resp_error(cmd->cmd_task, DM_6527_MSG, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6527_MSG,
+			    DM_MSG_REASON);
 			return (DM_COMPLETE);
 		}
 	}
@@ -2826,7 +2834,8 @@ dm_dmpm_private_cmd(dm_command_t *cmd)
 		if (mnt->mnt_fname == NULL) {
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "out of memory"));
-			dm_resp_error(cmd->cmd_task, DM_6506_MSG, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6506_MSG,
+			    DM_MSG_REASON);
 			return (DM_COMPLETE);
 		}
 		memset(mnt->mnt_fname, ' ', 17);
@@ -2979,12 +2988,12 @@ dm_attach_cmd(dm_command_t *cmd)
 		/* Drive already attached */
 		DM_MSG_ADD((MMS_STATE, MMS_DM_E_INTERNAL,
 		    "already attached"));
-		dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG, DM_MSG_REASON);
 		/*
 		 * Something is very wrong here because MM has not done
 		 * a detach. Restart and cleanup.
 		 */
-		DM_MSG_SEND((DM_ADM_ERR, DM_6524_MSG, NULL));
+		DM_MSG_SEND((DM_ADM_ERR, DM_6524_MSG, DM_MSG_REASON));
 		DM_EXIT(DM_RESTART);
 	}
 
@@ -3017,7 +3026,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_MAKEHANDLE,
 		    "make handle error: %s: %s",
 		    wka->dm_targ_hdl, strerror(err)));
-		dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6508_MSG, DM_MSG_REASON);
 		free(wka->dm_targ_hdl);
 		return (DM_COMPLETE);
 	}
@@ -3040,7 +3049,8 @@ dm_attach_cmd(dm_command_t *cmd)
 			 */
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_USER,
 			    "no user"));
-			dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6508_MSG,
+			    DM_MSG_REASON);
 			free(wka->dm_targ_hdl);
 			return (DM_COMPLETE);
 		}
@@ -3050,7 +3060,8 @@ dm_attach_cmd(dm_command_t *cmd)
 			TRACE((MMS_ERR, "Can't chown to user"));
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_USER,
 			    "cannot chown handle to user"));
-			dm_resp_error(cmd->cmd_task, DM_6508_MSG, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6508_MSG,
+			    DM_MSG_REASON);
 			free(wka->dm_targ_hdl);
 			return (DM_COMPLETE);
 		}
@@ -3067,7 +3078,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get APPLICATION"));
 		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
-		    NULL);
+		    DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 
@@ -3087,7 +3098,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get application name"));
 		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
-		    NULL);
+		    DM_MSG_REASON);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
 		return (DM_COMPLETE);
@@ -3098,7 +3109,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get info for DRIVECARTRIDGEACCESS"));
 		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
-		    NULL);
+		    DM_MSG_REASON);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
 		return (DM_COMPLETE);
@@ -3112,7 +3123,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get info for application/partition"));
 		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
-		    NULL);
+		    DM_MSG_REASON);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
 		return (DM_COMPLETE);
@@ -3185,7 +3196,7 @@ dm_attach_cmd(dm_command_t *cmd)
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "unable to get info for application/partition"));
 		dm_resp_error(cmd->cmd_task, DM_6508_MSG,
-		    NULL);
+		    DM_MSG_REASON);
 		mms_pn_destroy(root);
 		mms_pn_destroy(approot);
 		return (DM_COMPLETE);
@@ -3204,7 +3215,7 @@ dm_attach_cmd(dm_command_t *cmd)
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "unable to update capacity"));
 			dm_resp_error(cmd->cmd_task, DM_6508_MSG,
-			    NULL);
+			    DM_MSG_REASON);
 			mms_pn_destroy(root);
 			mms_pn_destroy(approot);
 			return (DM_COMPLETE);
@@ -3398,7 +3409,7 @@ dm_load_cmd(dm_command_t *cmd)
 	if (DRV_CALL(drv_load, ()) != 0) {
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_DRIVE,
 		    "load failed, drive not ready"));
-		dm_resp_error(cmd->cmd_task, DM_6517_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6517_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 
@@ -3425,7 +3436,7 @@ dm_identify_cmd(dm_command_t *cmd)
 
 	if ((drv->drv_flags & DRV_LOADED) == 0) {
 		DM_MSG_ADD((MMS_STATE, MMS_DM_E_LOAD, "drive not loaded"));
-		dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6510_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 
@@ -3450,14 +3461,14 @@ dm_identify_cmd(dm_command_t *cmd)
 		/* I/O error */
 		drv->drv_flags |= DRV_LOST_POS;
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_IO, "rewind error"));
-		dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6510_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 
 	if (dm_set_label_blksize() != 0) {
 		/* I/O error */
 		TRACE((MMS_DEBUG, "Can't set label blksize"));
-		dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6510_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 
@@ -3489,7 +3500,8 @@ dm_identify_cmd(dm_command_t *cmd)
 			/* I/O error */
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_IO,
 			    "rewind error"));
-			dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6510_MSG,
+			    DM_MSG_REASON);
 			return (DM_COMPLETE);
 		}
 		drv->drv_fseq = 1;	/* at file seq 1 */
@@ -3497,7 +3509,8 @@ dm_identify_cmd(dm_command_t *cmd)
 		if (dm_get_bof_pos() != 0) {
 			DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 			    "unable to get BOF position"));
-			dm_resp_error(cmd->cmd_task, DM_6510_MSG, NULL);
+			dm_resp_error(cmd->cmd_task, DM_6510_MSG,
+			    DM_MSG_REASON);
 			return (DM_COMPLETE);
 		}
 		resp = "No Signature";
@@ -3528,7 +3541,7 @@ dm_identify_cmd(dm_command_t *cmd)
 					    "requested %s, mounted %s",
 					    mnt->mnt_vid, drv->drv_vid));
 					dm_resp_error(cmd->cmd_task,
-					    DM_6510_MSG, NULL);
+					    DM_6510_MSG, DM_MSG_REASON);
 					return (DM_COMPLETE);
 				}
 			}
@@ -3577,22 +3590,22 @@ dm_detach_cmd(dm_command_t *cmd)
 	if (wka->dm_targ_hdl == NULL) {
 		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_NOEXISTHANDLE,
 		    "no handle"));
-		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	} else if (strcmp(mms_pn_token(handle), wka->dm_targ_hdl) != 0) {
 		/* unknown handle name */
 		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_BADHANDLE,
 		    "unknown handle"));
-		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	} else if (wka->dm_app_pid != 0) {
 		DM_MSG_ADD((MMS_INVALID, MMS_DM_E_HANDLEINUSE,
 		    "handle in use by pid %d", (int)wka->dm_app_pid));
-		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	} else if ((drv->drv_flags & DRV_ATTACHED) == 0) {
 		DM_MSG_ADD((MMS_STATE, MMS_DM_E_DEVDET, "not attached"));
-		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, DM_MSG_REASON);
 		return (DM_COMPLETE);
 	}
 
@@ -3626,7 +3639,7 @@ dm_detach_cmd(dm_command_t *cmd)
 		 */
 		DM_MSG_ADD((MMS_INTERNAL, MMS_DM_E_INTERNAL,
 		    "stale handle"));
-		dm_resp_error(cmd->cmd_task, DM_6511_MSG, NULL);
+		dm_resp_error(cmd->cmd_task, DM_6511_MSG, DM_MSG_REASON);
 	}
 
 	return (DM_COMPLETE);
