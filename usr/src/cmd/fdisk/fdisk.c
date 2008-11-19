@@ -2288,8 +2288,14 @@ specify(uchar_t tsystid)
 			if (partition[i]->systid == UNUSED) {
 				size_free = chs_capacity - first_free;
 			} else {
+				/*
+				 * Partition might start before cylinder 1.
+				 * Make sure free space is not negative.
+				 */
 				size_free =
-				    lel(partition[i]->relsect) - first_free;
+				    (lel(partition[i]->relsect > first_free)) ?
+				    (lel(partition[i]->relsect) - first_free) :
+				    0;
 			}
 
 			/* save largest free space */
