@@ -20,25 +20,34 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 
 result=$SMF_EXIT_OK
+mntretry=0
 
 # Mount all local filesystems.
 
-cd /; /sbin/mountall -l >/dev/msglog
+cd /; /sbin/mountall -l >/var/run/fs-local 2>&1
 rc=$?
-if [ $rc -ne 0 ]; then
+if [ $rc -eq 111 ]; then
+	#
+	#  The only failures were lofs mounts, we can try again
+	#  after zfs is mounted, there is a chance a lofs mount
+	#  failed due to it depending on a zfs not yet mounted.
+	#
+	mntretry=1
+elif [ $rc -ne 0 ]; then
+	cat /var/run/fs-local >/dev/msglog
 	msg="WARNING: /sbin/mountall -l failed: exit status $rc"
 	echo $msg
 	echo "$SMF_FMRI:" $msg >/dev/msglog
 	result=$SMF_EXIT_ERR_FATAL
 fi
+rm -f /var/run/fs-local
 
 #
 # If there are non-global UFS filesystems with quotas, check and enable them.
@@ -83,6 +92,18 @@ if [ -x /usr/sbin/zfs ]; then
 	rc=$?
 	if [ $rc -ne 0 ]; then
 		msg="WARNING: /usr/sbin/zfs mount -a failed: exit status $rc"
+		echo $msg
+		echo "$SMF_FMRI:" $msg >/dev/msglog
+		result=$SMF_EXIT_ERR_FATAL
+	fi
+fi
+
+if [ $result = $SMF_EXIT_OK -a $mntretry -eq 1 ]
+then
+	cd /; /sbin/mountall -l >/dev/msglog
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		msg="WARNING: /sbin/mountall -l failed: exit status $rc"
 		echo $msg
 		echo "$SMF_FMRI:" $msg >/dev/msglog
 		result=$SMF_EXIT_ERR_FATAL

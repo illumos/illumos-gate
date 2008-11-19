@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.82	*/
-
 #include	<stdio.h>
 #include	<stdio_ext.h>
 #include 	<limits.h>
@@ -85,6 +83,13 @@
 				/* Y - Year */
 				/* n - newline */
 
+/*
+ * The fs-local method understands this exit code to mean that one or
+ * more failures occurred and that all the failures were of attempted
+ * lofs mounts.
+ */
+#define	ALL_LOFS_FAILURES	111
+
 extern int	optind;
 extern char	*optarg;
 
@@ -123,8 +128,10 @@ char	*specific_opts;		/* holds specific mount options */
 char	*generic_opts;		/* holds generic mount options */
 int	maxrun;
 int	nrun;
+int	failcnt;		/* total count of failures */
 int	lofscnt;		/* presence of lofs prohibits parallel */
 				/* mounting */
+int	lofsfail;		/* count of failures of lofs mounts */
 int	exitcode;
 int	aflg, cflg, fflg, Fflg, gflg, oflg, pflg, rflg, vflg, Vflg, mflg, Oflg,
 	dashflg, questflg, dflg, qflg;
@@ -1010,6 +1017,10 @@ parmount(char **mntlist, int count, char *fstype)
 	sigset(SIGINT, cleanup);
 
 	do_mounts();		/* do the mounts */
+
+	if (failcnt > 0 && failcnt == lofsfail)
+		return (ALL_LOFS_FAILURES);
+
 	return (exitcode);
 }
 
@@ -1442,8 +1453,10 @@ cleanupkid(pid_t pid, int wstat)
 		ret = WEXITSTATUS(wstat);
 	else
 		ret = 1;		/* assume some kind of error */
-	if (ret)
+	if (ret) {
 		exitcode = 1;
+		failcnt++;
+	}
 
 	/*
 	 * Find our child.
@@ -1476,8 +1489,12 @@ cleanupkid(pid_t pid, int wstat)
 	}
 	doio(vp);	/* Any output? */
 
-	if (vp->v.vfs_fstype && (strcmp(vp->v.vfs_fstype, MNTTYPE_LOFS) == 0))
+	if (vp->v.vfs_fstype &&
+	    (strcmp(vp->v.vfs_fstype, MNTTYPE_LOFS) == 0)) {
 		lofscnt--;
+		if (ret)
+			lofsfail++;
+	}
 
 #ifdef CACHEFS_BUG
 	if (vp->v.vfs_fstype && (strcmp(vp->v.vfs_fstype, "cachefs") == 0))

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,9 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +41,13 @@
 #include <fslib.h>
 
 #define	RET_OK		0
-#define	RET_ERR		33
+/*
+ * /sbin/mount and the fs-local method understand this exit code to
+ * mean that all the mount failures were related to lofs mounts. Since
+ * this program only attempts to mount lofs file systems, when it fails
+ * it returns this exit status.
+ */
+#define	RET_ERR		111
 
 static void usage(void);
 
