@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
@@ -130,11 +128,24 @@ hmac_md5(uchar_t *text, size_t text_len, uchar_t *key, size_t key_len,
 /*
  * If inmp is non-NULL, and we need to abort, it will use the IP/SCTP
  * info in initmp to send the abort. Otherwise, no abort will be sent.
- * If errmp is non-NULL, a chain of unrecognized parameters will
- * be created and returned via *errmp.
  *
- * Returns 1 if the parameters are OK (or there are no parameters), or
- * 0 if not.
+ * An ERROR chunk and chain of one or more error cause blocks will be
+ * created if unrecognized parameters marked by the sender as reportable
+ * are found. This error chain is visible to the caller via *errmp.
+ *
+ * When called from stcp_send_init_ack() while processing parameters
+ * from a received INIT_CHUNK want_cookie will be NULL.
+ *
+ * When called from sctp_send_cookie_echo() while processing an INIT_ACK,
+ * want_cookie contains a pointer to a pointer of type *sctp_parm_hdr_t.
+ * However, this last pointer will be NULL until the cookie is processed
+ * at which time it will be set to point to a sctp_parm_hdr_t that contains
+ * the cookie info.
+ *
+ * Note: an INIT_ACK is expected to contain a cookie.
+ *
+ * Returns 1 if the parameters are OK (or if there are no optional
+ * parameters), returns 0 otherwise.
  */
 static int
 validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
@@ -148,7 +159,10 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 	char			*details = NULL;
 	size_t			errlen = 0;
 	boolean_t		got_cookie = B_FALSE;
+	boolean_t		got_errchunk = B_FALSE;
 	uint16_t		ptype;
+
+	ASSERT(errmp != NULL);
 
 	if (sctp_options != NULL)
 		*sctp_options = 0;
@@ -170,7 +184,10 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 	ic = (sctp_init_chunk_t *)(ch + 1);
 	remaining -= sizeof (*ic);
 	if (remaining < sizeof (*cph)) {
-		/* Nothing to validate */
+		/*
+		 * When processing a received INIT_ACK, a cookie is
+		 * expected, if missing there is nothing to validate.
+		 */
 		if (want_cookie != NULL)
 			goto cookie_abort;
 		return (1);
@@ -192,6 +209,10 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 			break;
 		case PARM_COOKIE:
 			got_cookie = B_TRUE;
+			/*
+			 * Processing a received INIT_ACK, we have a cookie
+			 * and a valid pointer in our caller to attach it to.
+			 */
 			if (want_cookie != NULL) {
 				*want_cookie = cph;
 			}
@@ -242,48 +263,55 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 			break;
 		}
 		default:
-			/* Unrecognized param; check the high order bits */
-			if ((ptype & 0xc000) == 0xc000) {
-				/*
-				 * report unrecognized param, and
-				 * keep processing
-				 */
-				if (errmp != NULL) {
-					if (want_cookie != NULL) {
-						*errmp = sctp_make_err(sctp,
-						    PARM_UNRECOGNIZED,
-						    (void *)cph,
-						    ntohs(cph->sph_len));
-					} else {
-						sctp_add_unrec_parm(cph, errmp);
-					}
+			/*
+			 * Handle any unrecognized params, the two high order
+			 * bits of ptype define how the remote wants them
+			 * handled.
+			 * Top bit:
+			 *    1. Continue processing other params in the chunk
+			 *    0. Stop processing params after this one.
+			 * 2nd bit:
+			 *    1. Must report this unrecognized param to remote
+			 *    0. Obey the top bit silently.
+			 */
+			if (ptype & SCTP_REPORT_THIS_PARAM) {
+				if (!got_errchunk) {
+					/*
+					 * First reportable param, create an
+					 * ERROR chunk and populate it with a
+					 * cause block for this parameter.
+					 */
+					*errmp = sctp_make_err(sctp,
+					    PARM_UNRECOGNIZED,
+					    (void *)cph,
+					    ntohs(cph->sph_len));
+					got_errchunk = B_TRUE;
+				} else {
+					/*
+					 * Add an additional cause block to
+					 * an existing ERROR chunk.
+					 */
+					sctp_add_unrec_parm(cph, errmp);
 				}
-				break;
 			}
-			if (ptype & 0x4000) {
+			if (ptype & SCTP_CONT_PROC_PARAMS) {
 				/*
-				 * Stop processing and drop; report
-				 * unrecognized param
+				 * Continue processing params after this
+				 * parameter.
 				 */
-				serror = SCTP_ERR_UNREC_PARM;
-				details = (char *)cph;
-				errlen = ntohs(cph->sph_len);
-				goto abort;
-			}
-			if (ptype & 0x8000) {
-				/* skip and continue processing */
 				break;
 			}
 
 			/*
-			 * 2 high bits are clear; stop processing and
-			 * drop packet
+			 * Stop processing params, report any reportable
+			 * unrecognized params found so far.
 			 */
-			return (0);
+			goto done;
 		}
 
 		cph = sctp_next_parm(cph, &remaining);
 	}
+done:
 	/*
 	 * Some sanity checks.  The following should not fail unless the
 	 * other side is broken.
@@ -1084,8 +1112,11 @@ sendcookie:
 		seglen -= sizeof (*sdc);
 		SCTP_CHUNK_SENT(sctp, mp, sdc, fp, seglen, meta);
 	}
-	if (errmp != NULL)
+	if (errmp != NULL) {
+		if (cemp->b_cont == NULL)
+			cemp->b_wptr += pad;
 		linkb(head, errmp);
+	}
 	sctp->sctp_state = SCTPS_COOKIE_ECHOED;
 	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -177,7 +175,8 @@ sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	mblk_t *mp = NULL;
 
 	/* Unrecognized param; check the high order bits */
-	if ((ph->sph_type & 0xc000) == 0xc000) {
+	if ((ph->sph_type & SCTP_UNREC_PARAM_MASK) ==
+	    (SCTP_CONT_PROC_PARAMS | SCTP_REPORT_THIS_PARAM)) {
 		/* report unrecognized param, and keep processing */
 		sctp_add_unrec_parm(ph, &mp);
 		if (mp == NULL) {
@@ -194,7 +193,7 @@ sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 		*cont = 1;
 		return (mp);
 	}
-	if (ph->sph_type & 0x4000) {
+	if (ph->sph_type & SCTP_REPORT_THIS_PARAM) {
 		/* Stop processing and drop; report unrecognized param */
 		sctp_add_unrec_parm(ph, &mp);
 		if (mp == NULL) {
@@ -211,7 +210,7 @@ sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 		*cont = 0;
 		return (mp);
 	}
-	if (ph->sph_type & 0x8000) {
+	if (ph->sph_type & SCTP_CONT_PROC_PARAMS) {
 		/* skip and continue processing */
 		*cont = 1;
 		return (NULL);

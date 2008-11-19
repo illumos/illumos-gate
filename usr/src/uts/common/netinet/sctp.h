@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_NETINET_SCTP_H
 #define	_NETINET_SCTP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -551,6 +549,17 @@ extern ssize_t sctp_sendmsg();
 
 /* All SCTP chunks and parameters are 32-bit aligned */
 #define	SCTP_ALIGN	4
+
+/*
+ * SCTP association optional parameter handling. The top two bits
+ * of the parameter type define how this and further parameters in
+ * the received chunk should be handled.
+ */
+#define	SCTP_UNREC_PARAM_MASK	0xc000
+/* Continue processing parameters after an unrecognized optional param? */
+#define	SCTP_CONT_PROC_PARAMS	0x8000
+/* Report this unreconized optional parameter or silently ignore it? */
+#define	SCTP_REPORT_THIS_PARAM	0x4000
 
 /*
  * Data chunk bit manipulations

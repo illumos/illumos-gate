@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
@@ -1203,10 +1201,11 @@ sctp_add_unrec_parm(sctp_parm_hdr_t *uph, mblk_t **errmp)
 	sctp_parm_hdr_t *ph;
 	size_t len;
 	int pad;
+	sctp_chunk_hdr_t *ecp;
 
 	len = sizeof (*ph) + ntohs(uph->sph_len);
-	if ((pad = len % 4) != 0) {
-		pad = 4 - pad;
+	if ((pad = len % SCTP_ALIGN) != 0) {
+		pad = SCTP_ALIGN - pad;
 		len += pad;
 	}
 	mp = allocb(len, BPRI_MED);
@@ -1221,8 +1220,18 @@ sctp_add_unrec_parm(sctp_parm_hdr_t *uph, mblk_t **errmp)
 	/* copy in the unrecognized parameter */
 	bcopy(uph, ph + 1, ntohs(uph->sph_len));
 
+	if (pad != 0)
+		bzero((mp->b_rptr + len - pad), pad);
+
 	mp->b_wptr = mp->b_rptr + len;
 	if (*errmp != NULL) {
+		/*
+		 * Update total length of the ERROR chunk, then link this
+		 * cause block to the possible chain of cause blocks
+		 * attached to the ERROR chunk.
+		 */
+		ecp = (sctp_chunk_hdr_t *)((*errmp)->b_rptr);
+		ecp->sch_len = htons(ntohs(ecp->sch_len) + len);
 		linkb(*errmp, mp);
 	} else {
 		*errmp = mp;
