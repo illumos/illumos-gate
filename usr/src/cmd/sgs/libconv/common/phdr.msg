@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 @ MSG_PT_NULL		"[ PT_NULL ]"
@@ -47,8 +45,6 @@
 @ MSG_PT_SUNWBSS_ALT	"PT_SUNWBSS"
 @ MSG_PT_SUNWSTACK	"[ PT_SUNWSTACK ]"
 @ MSG_PT_SUNWSTACK_ALT	"PT_SUNWSTACK"
-@ MSG_PT_SUNWBSS	"[ PT_SUNWBSS ]"
-@ MSG_PT_SUNWBSS_ALT	"PT_SUNWBSS"
 @ MSG_PT_SUNWDTRACE	"[ PT_SUNWDTRACE ]"
 @ MSG_PT_SUNWDTRACE_ALT	"PT_SUNWDTRACE"
 @ MSG_PT_SUNWCAP	"[ PT_SUNWCAP ]"

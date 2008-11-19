@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <msg.h>
 #include <_rtld.h>
 #include <conv.h>
@@ -70,7 +68,6 @@ static const mdb_bitmask_t rtflags_bits[] = {
 	{ MSG_ORIG(MSG_FLG_NOOPEN), FLG_RT_NOOPEN, FLG_RT_NOOPEN},
 	{ MSG_ORIG(MSG_FLG_FINICLCT), FLG_RT_FINICLCT, FLG_RT_FINICLCT},
 	{ MSG_ORIG(MSG_FLG_INITCALL), FLG_RT_INITCALL, FLG_RT_INITCALL},
-	{ MSG_ORIG(MSG_FLG_SUNWBSS), FLG_RT_SUNWBSS, FLG_RT_SUNWBSS},
 	{ MSG_ORIG(MSG_FLG_OBJINTPO), FLG_RT_OBJINTPO, FLG_RT_OBJINTPO},
 	{ MSG_ORIG(MSG_FLG_SYMINTPO), FLG_RT_SYMINTPO, FLG_RT_SYMINTPO},
 	{ MSG_ORIG(MSG_FLG_MOVE), FLG_RT_MOVE, FLG_RT_MOVE},

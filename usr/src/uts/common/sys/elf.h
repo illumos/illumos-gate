@@ -331,7 +331,7 @@ typedef struct {
 
 
 #define	PT_LOSUNW	0x6ffffffa
-#define	PT_SUNWBSS	0x6ffffffa	/* Sun Specific segment */
+#define	PT_SUNWBSS	0x6ffffffa	/* Sun Specific segment (unused) */
 #define	PT_SUNWSTACK	0x6ffffffb	/* describes the stack segment */
 #define	PT_SUNWDTRACE	0x6ffffffc	/* private */
 #define	PT_SUNWCAP	0x6ffffffd	/* hard/soft capabilities segment */

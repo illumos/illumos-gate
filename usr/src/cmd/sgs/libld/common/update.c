@@ -181,14 +181,14 @@ update_osym(Ofl_desc *ofl)
 	Ifl_desc	*ifl;
 	Word		bssndx, etext_ndx, edata_ndx = 0, end_ndx, start_ndx;
 	Word		end_abs = 0, etext_abs = 0, edata_abs;
-	Word		tlsbssndx = 0, sunwbssndx = 0, sunwdata1ndx;
+	Word		tlsbssndx = 0, parexpnndx;
 #if	defined(_ELF64)
 	Word		lbssndx = 0;
 	Addr		lbssaddr = 0;
 #endif
 	Addr		bssaddr, etext = 0, edata = 0, end = 0, start = 0;
 	Addr		tlsbssaddr = 0;
-	Addr 		sunwbssaddr = 0, sunwdata1addr;
+	Addr 		parexpnaddr;
 	int		start_set = 0;
 	Sym		_sym = {0}, *sym, *symtab = 0;
 	Sym		*dynsym = 0, *ldynsym = 0;
@@ -611,15 +611,16 @@ update_osym(Ofl_desc *ofl)
 	}
 
 	/*
-	 * Assign .sunwdata1 information
+	 * If expanding partially expanded symbols under '-z nopartial',
+	 * prepare to do that.
 	 */
-	if (ofl->ofl_issunwdata1) {
-		osp = ofl->ofl_issunwdata1->is_osdesc;
-		sunwdata1addr = (Addr)(osp->os_shdr->sh_addr +
-		    ofl->ofl_issunwdata1->is_indata->d_off);
+	if (ofl->ofl_isparexpn) {
+		osp = ofl->ofl_isparexpn->is_osdesc;
+		parexpnaddr = (Addr)(osp->os_shdr->sh_addr +
+		    ofl->ofl_isparexpn->is_indata->d_off);
 		/* LINTED */
-		sunwdata1ndx = elf_ndxscn(osp->os_scn);
-		ofl->ofl_sunwdata1ndx = osp->os_scnsymndx;
+		parexpnndx = elf_ndxscn(osp->os_scn);
+		ofl->ofl_parexpnndx = osp->os_scnsymndx;
 	}
 
 	/*
@@ -788,19 +789,19 @@ update_osym(Ofl_desc *ofl)
 			 * If we are expanding the locally bound partially
 			 * initialized symbols, then update the address here.
 			 */
-			if (ofl->ofl_issunwdata1 &&
+			if (ofl->ofl_isparexpn &&
 			    (sdp->sd_flags & FLG_SY_PAREXPN) && !update_done) {
 				static	Addr	laddr = 0;
 
-				sym->st_shndx = sunwdata1ndx;
-				sdp->sd_isc = ofl->ofl_issunwdata1;
+				sym->st_shndx = parexpnndx;
+				sdp->sd_isc = ofl->ofl_isparexpn;
 				if (flags & FLG_OF_RELOBJ) {
-					sym->st_value = sunwdata1addr;
+					sym->st_value = parexpnaddr;
 				} else {
 					sym->st_value = laddr;
 					laddr += sym->st_size;
 				}
-				sunwdata1addr += sym->st_size;
+				parexpnaddr += sym->st_size;
 			}
 
 			/*
@@ -941,18 +942,6 @@ update_osym(Ofl_desc *ofl)
 		tlsbssndx = elf_ndxscn(osp->os_scn);
 	}
 
-	/*
-	 * Assign .SUNW_bss information for use with updating COMMON symbols.
-	 */
-	if (ofl->ofl_issunwbss) {
-		osp = ofl->ofl_issunwbss->is_osdesc;
-		sunwbssaddr = (Addr)(osp->os_shdr->sh_addr +
-		    ofl->ofl_issunwbss->is_indata->d_off);
-		/* LINTED */
-		sunwbssndx = elf_ndxscn(osp->os_scn);
-	}
-
-
 	if ((sorted_syms = libld_calloc(ofl->ofl_globcnt +
 	    ofl->ofl_elimcnt + ofl->ofl_scopecnt, sizeof (*sorted_syms))) == 0)
 		return ((Addr)S_ERROR);
@@ -1023,37 +1012,20 @@ update_osym(Ofl_desc *ofl)
 		    (sdp->sd_shndx = symptr->st_shndx) == SHN_COMMON)) {
 
 			/*
-			 * An expanded symbol goes to .sunwdata1.
-			 *
-			 * A partial initialized global symbol within a shared
-			 * object goes to .sunwbss.
-			 *
+			 * An expanded symbol goes to a special .data section
+			 * prepared for that purpose (ofl->ofl_isparexpn).
 			 * Assign COMMON allocations to .bss.
-			 *
 			 * Otherwise leave it as is.
 			 */
 			if (sdp->sd_flags & FLG_SY_PAREXPN) {
 				restore = 1;
-				sdp->sd_shndx = sunwdata1ndx;
+				sdp->sd_shndx = parexpnndx;
 				sdp->sd_flags &= ~FLG_SY_SPECSEC;
 				symptr->st_value = (Xword) S_ROUND(
-				    sunwdata1addr, symptr->st_value);
-				sunwdata1addr = symptr->st_value +
+				    parexpnaddr, symptr->st_value);
+				parexpnaddr = symptr->st_value +
 				    symptr->st_size;
-				sdp->sd_isc = ofl->ofl_issunwdata1;
-				sdp->sd_flags |= FLG_SY_COMMEXP;
-
-			} else if ((sdp->sd_psyminfo != (Psym_info *)NULL) &&
-			    (flags & FLG_OF_SHAROBJ) &&
-			    (ELF_ST_BIND(symptr->st_info) != STB_LOCAL)) {
-				restore = 1;
-				sdp->sd_shndx = sunwbssndx;
-				sdp->sd_flags &= ~FLG_SY_SPECSEC;
-				symptr->st_value = (Xword)S_ROUND(sunwbssaddr,
-				    symptr->st_value);
-				sunwbssaddr = symptr->st_value +
-				    symptr->st_size;
-				sdp->sd_isc = ofl->ofl_issunwbss;
+				sdp->sd_isc = ofl->ofl_isparexpn;
 				sdp->sd_flags |= FLG_SY_COMMEXP;
 
 			} else if (ELF_ST_TYPE(symptr->st_info) != STT_TLS &&
@@ -2952,9 +2924,9 @@ expand_move(Ofl_desc *ofl, Sym_desc *sdp, Move *u1)
 	Addr		base1;
 	unsigned int	stride;
 
-	osp = ofl->ofl_issunwdata1->is_osdesc;
+	osp = ofl->ofl_isparexpn->is_osdesc;
 	base1 = (Addr)(osp->os_shdr->sh_addr +
-	    ofl->ofl_issunwdata1->is_indata->d_off);
+	    ofl->ofl_isparexpn->is_indata->d_off);
 	taddr0 = taddr = osp->os_outdata->d_buf;
 	mv = u1;
 
@@ -3572,12 +3544,6 @@ ld_update_outfile(Ofl_desc *ofl)
 		phdr->p_memsz = offset - hshdr->sh_offset;
 
 		/*
-		 * If this is PT_SUNWBSS, set alignment
-		 */
-		if (phdr->p_type == PT_SUNWBSS)
-			phdr->p_align = p_align;
-
-		/*
 		 * If this is the first loadable segment of a dynamic object,
 		 * or an interpreter has been specified (a static object built
 		 * with an interpreter will still be given a PT_HDR entry), then
@@ -3616,8 +3582,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * (presumably from a map file) use it and make sure the
 		 * previous segment does not run into this segment.
 		 */
-		if ((phdr->p_type == PT_LOAD) ||
-		    (phdr->p_type == PT_SUNWBSS)) {
+		if (phdr->p_type == PT_LOAD) {
 			if ((sgp->sg_flags & FLG_SG_VADDR)) {
 				if (_phdr && (vaddr > phdr->p_vaddr) &&
 				    (phdr->p_type == PT_LOAD))
@@ -3716,8 +3681,7 @@ ld_update_outfile(Ofl_desc *ofl)
 				    shdr->sh_info, MSG_INTL(MSG_FIL_INVSHINFO));
 
 			if (!(flags & FLG_OF_RELOBJ) &&
-			    (phdr->p_type == PT_LOAD) ||
-			    (phdr->p_type == PT_SUNWBSS)) {
+			    (phdr->p_type == PT_LOAD)) {
 				if (hshdr)
 					vaddr += (shdr->sh_offset -
 					    hshdr->sh_offset);
@@ -3837,7 +3801,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	/*
 	 * Update Move Table.
 	 */
-	if (ofl->ofl_osmove || ofl->ofl_issunwdata1) {
+	if (ofl->ofl_osmove || ofl->ofl_isparexpn) {
 		if (update_move(ofl) == S_ERROR)
 			return (S_ERROR);
 	}

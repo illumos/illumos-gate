@@ -1123,8 +1123,7 @@ elf_map_it(
 		 * Skip non-loadable segments or segments that don't occupy
 		 * any memory.
 		 */
-		if (((phdr->p_type != PT_LOAD) &&
-		    (phdr->p_type != PT_SUNWBSS)) || (phdr->p_memsz == 0))
+		if ((phdr->p_type != PT_LOAD) || (phdr->p_memsz == 0))
 			continue;
 
 		/*
@@ -1154,20 +1153,7 @@ elf_map_it(
 		/*
 		 * Determine the type of mapping required.
 		 */
-		if (phdr->p_type == PT_SUNWBSS) {
-			/*
-			 * Potentially, we can defer the loading of any SUNWBSS
-			 * segment, depending on whether the symbols it provides
-			 * have been bound to.  In this manner, large segments
-			 * that are interposed upon between shared libraries
-			 * may not require mapping.  Note, that the mapping
-			 * information is recorded in our mapping descriptor at
-			 * this time.
-			 */
-			mlen = phdr->p_memsz;
-			flen = 0;
-
-		} else if ((phdr->p_filesz == 0) && (phdr->p_flags == 0)) {
+		if ((phdr->p_filesz == 0) && (phdr->p_flags == 0)) {
 			/*
 			 * If this segment has no backing file and no flags
 			 * specified, then it defines a reservation.  At this
@@ -2678,7 +2664,6 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	Phdr		*lph;		/* last loadable Phdr */
 	Phdr		*lfph = 0;	/* last loadable (filesz != 0) Phdr */
 	Phdr		*lmph = 0;	/* last loadable (memsz != 0) Phdr */
-	Phdr		*swph = 0;	/* program header for SUNWBSS */
 	Phdr		*tlph = 0;	/* program header for PT_TLS */
 	Phdr		*unwindph = 0;	/* program header for PT_SUNW_UNWIND */
 	Cap		*cap = 0;	/* program header for SUNWCAP */
@@ -2755,8 +2740,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 */
 	for (i = 0, pptr = phdr; i < (int)ehdr->e_phnum; i++,
 	    pptr = (Phdr *)((Off)pptr + ehdr->e_phentsize)) {
-		if ((pptr->p_type == PT_LOAD) ||
-		    (pptr->p_type == PT_SUNWBSS)) {
+		if (pptr->p_type == PT_LOAD) {
 
 			if (fph == 0) {
 				fph = pptr;
@@ -2773,8 +2757,6 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 				lmph = pptr;
 			if (pptr->p_filesz)
 				lfph = pptr;
-			if (pptr->p_type == PT_SUNWBSS)
-				swph = pptr;
 			if (pptr->p_align > align)
 				align = pptr->p_align;
 
@@ -2950,10 +2932,6 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	/*
 	 * If this shared object contains any special segments, record them.
 	 */
-	if (swph) {
-		FLAGS(lmp) |= FLG_RT_SUNWBSS;
-		SUNWBSS(lmp) = phdr + (swph - phdr0);
-	}
 	if (tlph && (tls_assign(lml, lmp, (phdr + (tlph - phdr0))) == 0)) {
 		remove_so(lml, lmp);
 		return (0);

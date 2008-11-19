@@ -2038,8 +2038,8 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 		if (psdp->sd_flags & FLG_SY_PAREXPN) {
 			int	_num, num;
 
-			reld.rel_osdesc = ofl->ofl_issunwdata1->is_osdesc;
-			reld.rel_isdesc = ofl->ofl_issunwdata1;
+			reld.rel_osdesc = ofl->ofl_isparexpn->is_osdesc;
+			reld.rel_isdesc = ofl->ofl_isparexpn;
 			reld.rel_roffset = mp->m_poffset;
 
 			for (num = mp->m_repeat, _num = 0; _num < num; _num++) {
@@ -2657,7 +2657,7 @@ ld_adj_movereloc(Ofl_desc *ofl, Rel_desc *arsp)
 		 * the relocation entry relocating the expanded partial symbol.
 		 */
 		arsp->rel_roffset += psdp->sd_sym->st_value -
-		    ofl->ofl_issunwdata1->is_osdesc->os_shdr->sh_addr;
+		    ofl->ofl_isparexpn->is_osdesc->os_shdr->sh_addr;
 		DBG_CALL(Dbg_move_adjexpandreloc(ofl->ofl_lml,
 		    arsp->rel_roffset, psdp->sd_name));
 	}

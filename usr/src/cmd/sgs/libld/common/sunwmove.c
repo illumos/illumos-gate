@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	<debug.h>
@@ -39,10 +38,8 @@ make_mvsections(Ofl_desc *ofl)
 	Listnode *	lnp1;
 	Psym_info *	psym;
 	Word 		mv_nums = 0;
-	Xword		align_sunwbss = 0;	/* Alignment for .sunwbss */
-	Xword		align_sunwdata1 = 0;	/*   for .sunwdata1 */
-	size_t		size_sunwbss = 0;	/* Size of .sunwbss */
-	size_t		size_sunwdata1 = 0;	/* Size of .sunwdata1 */
+	Xword		align_parexpn = 0;	/* for -z nopartial .data sec */
+	size_t		size_parexpn = 0;	/* Size of parexpn section */
 
 	/*
 	 * Compute the size of the output move section
@@ -59,27 +56,15 @@ make_mvsections(Ofl_desc *ofl)
 			align_val = 8;
 		if (symd->sd_flags & FLG_SY_PAREXPN) {
 			/*
-			 * This global symbol goes to .sunwdata1
+			 * This global symbol goes to the special
+			 * partial initialization .data section.
 			 */
-			size_sunwdata1 = (size_t)S_ROUND(size_sunwdata1,
+			size_parexpn = (size_t)S_ROUND(size_parexpn,
 			    sym->st_value) + sym->st_size;
-			if (align_val > align_sunwdata1)
-				align_sunwdata1 = align_val;
+			if (align_val > align_parexpn)
+				align_parexpn = align_val;
 
 		} else {
-			if ((ofl->ofl_flags & FLG_OF_SHAROBJ) &&
-			    (symd->sd_flags & FLG_SY_TENTSYM) &&
-			    (ELF_ST_BIND(sym->st_info) != STB_LOCAL)) {
-				/*
-				 * If output file is non-executable
-				 * shared object, and this is a tentative symbol
-				 * this symbol goes to .sunwbss
-				 */
-				size_sunwbss = (size_t)S_ROUND(size_sunwbss,
-				    sym->st_value) + sym->st_size;
-				if (align_val > align_sunwbss)
-					align_sunwbss = align_val;
-			}
 			mv_nums += psym->psym_num;
 		}
 	}
@@ -90,25 +75,15 @@ make_mvsections(Ofl_desc *ofl)
 	}
 
 	/*
-	 * Generate the .sunwbss section now that we know its size and
-	 * alignment.
-	 */
-	if (size_sunwbss) {
-		if (ld_make_sunwbss(ofl, size_sunwbss,
-		    align_sunwbss) == S_ERROR)
-			return (S_ERROR);
-	}
-
-	/*
 	 * Add empty area for partially initialized symbols.
 	 *
-	 * The .SUNWDATA1 is to be created when '-z option' is in effect or
-	 * there are any partially init. symbol which are to be expanded.
+	 * A special .data section is created when the '-z nopartial'
+	 * option is in effect in order to receive the expanded data.
 	 */
-	if (size_sunwdata1) {
+	if (size_parexpn) {
 		/* LINTED */
-		if (ld_make_sunwdata(ofl, size_sunwdata1,
-		    align_sunwdata1) == S_ERROR)
+		if (ld_make_parexpn_data(ofl, size_parexpn,
+		    align_parexpn) == S_ERROR)
 			return (S_ERROR);
 	}
 	return (1);

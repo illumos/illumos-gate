@@ -105,7 +105,6 @@ typedef struct _rt_elf_private {
 	ulong_t		e_moveent;	/* size of base movetab entry */
 	ulong_t		e_tlsstatoff;	/* TLS offset into static block */
 	void		*e_movetab;	/* movetable address */
-	Phdr		*e_sunwbss;	/* program header for SUNWBSS */
 	Phdr		*e_pttls;	/* PT_TLS */
 	Phdr		*e_ptunwind;	/* PT_SUNW_UNWIND (amd64 specific) */
 	ulong_t		e_syment;	/* size of symtab entry */
@@ -149,7 +148,6 @@ typedef struct _rt_elf_private {
 #define	VERDEF(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdef)
 #define	VERDEFNUM(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdefnum)
 #define	VERSYM(X)		(((Rt_elfp *)(X)->rt_priv)->e_versym)
-#define	SUNWBSS(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwbss)
 #define	SYMINENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_syminent)
 #define	PLTPAD(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpad)
 #define	PLTPADEND(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpadend)

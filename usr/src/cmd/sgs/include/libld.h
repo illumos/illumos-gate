@@ -240,9 +240,7 @@ struct ofl_desc {
 	Is_desc		*ofl_isbss;	/* .bss input section (globals) */
 	Is_desc		*ofl_islbss;	/* .lbss input section (globals) */
 	Is_desc		*ofl_istlsbss;	/* .tlsbss input section (globals) */
-	Is_desc		*ofl_issunwdata1; /* .data input section */
-					/* 	partially expanded. */
-	Is_desc		*ofl_issunwbss;	/* .SUNW_bss input section (globals) */
+	Is_desc		*ofl_isparexpn;	/* -z nopartial .data input section */
 	Os_desc		*ofl_osdynamic;	/* .dynamic output section */
 	Os_desc		*ofl_osdynsym;	/* .dynsym output section */
 	Os_desc		*ofl_osldynsym;	/* .SUNW_ldynsym output section */
@@ -272,7 +270,7 @@ struct ofl_desc {
 	Word		ofl_dtflags_1;	/* DT_FLAGS_1 entries */
 	Word		ofl_dtflags;	/* DT_FLAGS entries */
 	Os_desc		*ofl_ossyminfo;	/* .SUNW_syminfo output section */
-	Half		ofl_sunwdata1ndx; /* section index for sunwdata1  */
+	Half		ofl_parexpnndx;	/* -z nopartial section index */
 					/* Ref. at perform_outreloc() in */
 					/* libld/{mach}/machrel.c */
 	Xword		*ofl_checksum;	/* DT_CHECKSUM value address */

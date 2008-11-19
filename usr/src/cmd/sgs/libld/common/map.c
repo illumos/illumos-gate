@@ -2667,14 +2667,11 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 				case PT_NOTE:
 					dst_type = 9;
 					break;
-				case PT_SUNWBSS:
+				case PT_TLS:
 					dst_type = 10;
 					break;
-				case PT_TLS:
-					dst_type = 11;
-					break;
 				case PT_NULL:
-					dst_type = 12;
+					dst_type = 11;
 					break;
 				default:
 					eprintf(ofl->ofl_lml, ERR_FATAL,

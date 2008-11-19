@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	ELF_TARGET_AMD64
 
@@ -53,7 +52,6 @@ typedef enum {
 #endif
 	LD_DYN,
 	LD_DTRACE,
-	LD_SUNWBSS,
 	LD_TLS,
 #if	defined(_ELF64)
 	LD_UNWIND,		/* (amd64-only) */
@@ -136,9 +134,6 @@ static const Sg_desc sg_desc[LD_NUM] = {
 	SG_DESC_INIT(PT_SUNWDTRACE, 0,
 		MSG_ORIG(MSG_ENT_DTRACE), (FLG_SG_TYPE | FLG_SG_FLAGS)),
 
-	/* LD_SUNWBSS */
-	SG_DESC_INIT(PT_SUNWBSS, 0, MSG_ORIG(MSG_ENT_SUNWBSS), FLG_SG_TYPE),
-
 	/* LD_TLS */
 	SG_DESC_INIT(PT_TLS, PF_R, MSG_ORIG(MSG_ENT_TLS),
 	    (FLG_SG_TYPE | FLG_SG_FLAGS)),
@@ -172,10 +167,6 @@ static const Sg_desc sg_desc[LD_NUM] = {
  * at runtime, once memory has been allocated and the templates copied.
  */
 static const Ent_desc	ent_desc[] = {
-	{{NULL, NULL}, MSG_ORIG(MSG_SCN_SUNWBSS), NULL,
-		SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE,
-		(Sg_desc *)LD_SUNWBSS, 0, FALSE},
-
 	{{NULL, NULL}, NULL, SHT_NOTE, 0, 0,
 		(Sg_desc *)LD_NOTE, 0, FALSE},
 
@@ -271,11 +262,8 @@ ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 	sgp[LD_LDATA].sg_phdr.p_flags = ld_targ.t_m.m_dataseg_perm;
 	sgp[LD_DTRACE].sg_phdr.p_flags |= PF_X;
 #endif
-	if (ofl->ofl_flags & FLG_OF_DYNAMIC) {
-		sgp[LD_SUNWBSS].sg_phdr.p_flags = ld_targ.t_m.m_dataseg_perm;
-	} else {
+	if ((ofl->ofl_flags & FLG_OF_DYNAMIC) == 0)
 		sgp[LD_DATA].sg_phdr.p_flags |= PF_X;
-	}
 
 	/*
 	 * Traverse the new entrance descriptor list converting the segment

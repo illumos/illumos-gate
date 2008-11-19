@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Object file dependent support for ELF objects.
  */
@@ -56,7 +54,6 @@ move_data(Rt_map *lmp)
 {
 	Lm_list	*lml = LIST(lmp);
 	Move	*mv = MOVETAB(lmp);
-	Phdr	*pptr = SUNWBSS(lmp);
 	ulong_t	num, mvnum = MOVESZ(lmp) / MOVEENT(lmp);
 	int	moves;
 
@@ -73,32 +70,6 @@ move_data(Rt_map *lmp)
 		Addr	addr, taddr;
 		Half 	rep, repno, stride;
 		Sym	*sym;
-
-		/*
-		 * If the target address needs to be mapped in,
-		 * map it first.
-		 *	(You have to protect the code, thread safe)
-		 */
-		if (FLAGS(lmp) & FLG_RT_SUNWBSS) {
-			long	zlen;
-			Off	foff;
-			caddr_t	zaddr, eaddr;
-
-			foff = (Off) (pptr->p_vaddr + ADDR(lmp));
-			zaddr = (caddr_t)M_PROUND(foff);
-			eaddr = pptr->p_vaddr + ADDR(lmp) +
-			    (caddr_t)pptr->p_memsz;
-			zero((caddr_t)foff, (long)(zaddr - foff));
-			zlen = eaddr - zaddr;
-			if (zlen > 0) {
-				if (dz_map(lml, zaddr, zlen,
-				    (PROT_READ | PROT_WRITE),
-				    (MAP_FIXED | MAP_PRIVATE)) == MAP_FAILED)
-					return (0);
-			}
-
-			FLAGS(lmp) &= ~FLG_RT_SUNWBSS;
-		}
 
 		if ((sym = (Sym *)SYMTAB(lmp) + ELF_M_SYM(mv->m_info)) == 0)
 			continue;

@@ -27,8 +27,6 @@
 #ifndef	_RTLD_H
 #define	_RTLD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Global include file for the runtime linker.
  */
@@ -738,17 +736,16 @@ typedef struct rt_map32 {
 #define	FLG_RT_NOOPEN	0x00100000	/* dlopen() not allowed */
 #define	FLG_RT_FINICLCT	0x00200000	/* fini has been collected (tsort) */
 #define	FLG_RT_INITCALL	0x00400000	/* objects .init has been called */
-#define	FLG_RT_SUNWBSS	0x00800000	/* object with PT_SUNWBSS, not mapped */
-#define	FLG_RT_OBJINTPO	0x01000000	/* object is a global interposer */
-#define	FLG_RT_SYMINTPO	0x02000000	/* object contains symbol interposer */
-#define	MSK_RT_INTPOSE	0x03000000	/* mask for all interposer */
+#define	FLG_RT_OBJINTPO	0x00800000	/* object is a global interposer */
+#define	FLG_RT_SYMINTPO	0x01000000	/* object contains symbol interposer */
+#define	MSK_RT_INTPOSE	0x01800000	/* mask for all interposer */
 					/*	possibilities */
-#define	FLG_RT_MOVE	0x04000000	/* object needs move operation */
-#define	FLG_RT_TMPLIST	0x08000000	/* object is part of a temporary list */
-#define	FLG_RT_REGSYMS	0x10000000	/* object has DT_REGISTER entries */
-#define	FLG_RT_INITCLCT	0x20000000	/* init has been collected (tsort) */
-#define	FLG_RT_HANDLE	0x40000000	/* generate a handle for this object */
-#define	FLG_RT_RELOCING	0x80000000	/* object is being relocated */
+#define	FLG_RT_MOVE	0x02000000	/* object needs move operation */
+#define	FLG_RT_TMPLIST	0x04000000	/* object is part of a temporary list */
+#define	FLG_RT_REGSYMS	0x08000000	/* object has DT_REGISTER entries */
+#define	FLG_RT_INITCLCT	0x10000000	/* init has been collected (tsort) */
+#define	FLG_RT_HANDLE	0x20000000	/* generate a handle for this object */
+#define	FLG_RT_RELOCING	0x40000000	/* object is being relocated */
 
 #define	FL1_RT_COPYTOOK	0x00000001	/* copy relocation taken */
 #define	FL1_RT_RELATIVE	0x00000002	/* relative path expansion required */

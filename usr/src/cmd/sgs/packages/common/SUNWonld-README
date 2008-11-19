@@ -1404,3 +1404,5 @@ Bugid   Risk Synopsis
 6748160 problem with -zrescan (D)
 	PSARC/2008/651 New ld archive rescan options
 6763342 sloppy relocations need to get sloppier
+6736890 PT_SUNWBSS should be disabled (D)
+	PSARC/2008/715 PT_SUNWBSS removal

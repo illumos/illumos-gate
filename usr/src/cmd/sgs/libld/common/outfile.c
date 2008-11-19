@@ -530,9 +530,6 @@ ld_create_outfile(Ofl_desc *ofl)
 				if (ofl->ofl_unwindhdr)
 					nseg++;
 #endif
-			} else if (ptype == PT_SUNWBSS) {
-				if (ofl->ofl_issunwbss)
-					nseg++;
 			} else if (ptype == PT_SUNWDTRACE) {
 				if (ofl->ofl_dtracesym)
 					nseg++;

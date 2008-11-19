@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# pragma ident	"%Z%%M%	%I%	%E% SMI"
-# 
 
 @ _START_
 
@@ -86,7 +84,6 @@
 @ MSG_FLG_NOOPEN	"NO-OPEN"
 @ MSG_FLG_FINICLCT	"FINI-COLLECTED"
 @ MSG_FLG_INITCALL	"INIT-CALLED"
-@ MSG_FLG_SUNWBSS	"SUNWBSS"
 @ MSG_FLG_OBJINTPO	"OBJECT-INTERPOSE"
 @ MSG_FLG_SYMINTPO	"SYMBOL-INTERPOSE"
 @ MSG_FLG_MOVE		"MOVE"

@@ -1408,10 +1408,10 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * object only account for scoped COMMON symbols (these will
 		 * be converted to .bss references).
 		 *
-		 * For partially initialized symbol,
-		 *  if it is expanded, it goes to sunwdata1.
-		 *  if it is local, it goes to .bss.
-		 *  if the output is shared object, it goes to .sunwbss.
+		 * When -z nopartial is in effect, partially initialized
+		 * symbols are directed to the special .data section
+		 * created for that purpose (ofl->ofl_isparexpn).
+		 * Otherwise, partially initialized symbols go to .bss.
 		 *
 		 * Also refer to make_mvsections() in sunwmove.c
 		 */
@@ -1419,20 +1419,8 @@ ld_sym_validate(Ofl_desc *ofl)
 		    (((oflags & FLG_OF_RELOBJ) == 0) ||
 		    ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 		    (oflags & FLG_OF_PROCRED)))) {
-			int countbss = 0;
-
-			if (sdp->sd_psyminfo == 0) {
-				countbss = 1;
-			} else if ((sdp->sd_flags & FLG_SY_PAREXPN) != 0) {
-				countbss = 0;
-			} else if (ELF_ST_BIND(sym->st_info) == STB_LOCAL) {
-				countbss = 1;
-			} else if ((ofl->ofl_flags & FLG_OF_SHAROBJ) != 0) {
-				countbss = 0;
-			} else
-				countbss = 1;
-
-			if (countbss) {
+			if ((sdp->sd_psyminfo == 0) ||
+			    ((sdp->sd_flags & FLG_SY_PAREXPN) == 0)) {
 				Xword * size, * align;
 
 				if (type != STT_TLS) {

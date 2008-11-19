@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Get the x86 version of the relocation engine */
 #define	DO_RELOC_LIBLD_X86
@@ -344,7 +343,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 			else
 				ndx = sdp->sd_shndx;
 		} else
-			ndx = ofl->ofl_sunwdata1ndx;
+			ndx = ofl->ofl_parexpnndx;
 	} else
 		ndx = sdp->sd_symndx;
 
