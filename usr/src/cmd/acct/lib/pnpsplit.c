@@ -252,10 +252,7 @@ inithol()
 				h[1].h_hour = npstart / 100;
 			}
 
-			h[1].h_sec = 0;
-			h[1].h_min = npstart%100;
-			h[1].h_hour = (npstart/100==24) ? 0 : npstart/100;
-			h[1].h_type = PRIME ;
+			h[1].h_type = PRIME;
 
 			/* This is the end of the day */
 			h[2].h_sec = 0;
