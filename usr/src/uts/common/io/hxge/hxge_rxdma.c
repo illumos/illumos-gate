@@ -1119,7 +1119,8 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 	 * from fatal errors. This should not be a performance drag since
 	 * ref_cnt != 0 most times.
 	 */
-	MUTEX_ENTER(&ring->post_lock);
+	if (ring->rbr_state == RBR_POSTING)
+		MUTEX_ENTER(&ring->post_lock);
 
 	/*
 	 * First we need to get the free state, then
@@ -1159,6 +1160,8 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 		if (ring->rbr_ref_cnt == 0 &&
 		    ring->rbr_state == RBR_UNMAPPED) {
 			KMEM_FREE(ring, sizeof (*ring));
+			/* post_lock has been destroyed already */
+			return;
 		}
 	}
 
@@ -1172,7 +1175,8 @@ hxge_freeb(p_rx_msg_t rx_msg_p)
 			hxge_post_page(rx_msg_p->hxgep, ring, rx_msg_p);
 	}
 
-	MUTEX_EXIT(&ring->post_lock);
+	if (ring->rbr_state == RBR_POSTING)
+		MUTEX_EXIT(&ring->post_lock);
 
 	HXGE_DEBUG_MSG((NULL, MEM2_CTL, "<== hxge_freeb"));
 }
@@ -1542,6 +1546,7 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 }
 
 #define	RCR_ENTRY_PATTERN	0x5a5a6b6b7c7c8d8dULL
+#define	NO_PORT_BIT		0x20
 
 /*ARGSUSED*/
 void
@@ -1555,7 +1560,6 @@ hxge_receive_packet(p_hxge_t hxgep,
 	uint8_t			channel;
 
 	boolean_t first_entry = B_TRUE;
-	boolean_t is_tcp_udp = B_FALSE;
 	boolean_t buffer_free = B_FALSE;
 	boolean_t error_send_up = B_FALSE;
 	uint8_t error_type;
@@ -1577,8 +1581,7 @@ hxge_receive_packet(p_hxge_t hxgep,
 	boolean_t is_valid = B_FALSE;
 	p_hxge_rx_ring_stats_t rdc_stats;
 	uint32_t bytes_read;
-
-	uint64_t pkt_type;
+	uint8_t header = 0;
 
 	channel = rcr_p->rdc;
 
@@ -1598,7 +1601,6 @@ hxge_receive_packet(p_hxge_t hxgep,
 	*((uint64_t *)rcr_desc_rd_head_p) = RCR_ENTRY_PATTERN;
 
 	multi = (rcr_entry & RCR_MULTI_MASK);
-	pkt_type = (rcr_entry & RCR_PKT_TYPE_MASK);
 
 	error_type = ((rcr_entry & RCR_ERROR_MASK) >> RCR_ERROR_SHIFT);
 	l2_len = ((rcr_entry & RCR_L2_LEN_MASK) >> RCR_L2_LEN_SHIFT);
@@ -1622,16 +1624,15 @@ hxge_receive_packet(p_hxge_t hxgep,
 	HXGE_DEBUG_MSG((hxgep, RX2_CTL,
 	    "==> hxge_receive_packet: entryp $%p entry 0x%0llx "
 	    "pkt_buf_addr_pp $%p l2_len %d multi %d "
-	    "error_type 0x%x pkt_type 0x%x  "
-	    "pktbufsz_type %d ",
+	    "error_type 0x%x pktbufsz_type %d ",
 	    rcr_desc_rd_head_p, rcr_entry, pkt_buf_addr_pp, l2_len,
-	    multi, error_type, pkt_type, pktbufsz_type));
+	    multi, error_type, pktbufsz_type));
 
 	HXGE_DEBUG_MSG((hxgep, RX2_CTL,
 	    "==> hxge_receive_packet: entryp $%p entry 0x%0llx "
 	    "pkt_buf_addr_pp $%p l2_len %d multi %d "
-	    "error_type 0x%x pkt_type 0x%x ", rcr_desc_rd_head_p,
-	    rcr_entry, pkt_buf_addr_pp, l2_len, multi, error_type, pkt_type));
+	    "error_type 0x%x ", rcr_desc_rd_head_p,
+	    rcr_entry, pkt_buf_addr_pp, l2_len, multi, error_type));
 
 	HXGE_DEBUG_MSG((hxgep, RX2_CTL,
 	    "==> (rbr) hxge_receive_packet: entry 0x%0llx "
@@ -1859,6 +1860,11 @@ hxge_receive_packet(p_hxge_t hxgep,
 
 	bytes_read = rcr_p->rcvd_pkt_bytes;
 	skip_len = sw_offset_bytes + hdr_size;
+
+	if (first_entry) {
+		header = rx_msg_p->buffer[buf_offset];
+	}
+
 	if (!rx_msg_p->rx_use_bcopy) {
 		/*
 		 * For loaned up buffers, the driver reference count
@@ -1976,22 +1982,14 @@ hxge_receive_packet(p_hxge_t hxgep,
 	 * Update stats and hardware checksuming.
 	 */
 	if (is_valid && !multi) {
-		is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP ||
-		    pkt_type == RCR_PKT_IS_UDP) ? B_TRUE : B_FALSE);
-
-		HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_receive_packet: "
-		    "is_valid 0x%x multi %d pkt %d d error %d",
-		    is_valid, multi, is_tcp_udp, error_type));
-
-		if (is_tcp_udp && !error_type) {
+		if (!(header & NO_PORT_BIT) && !error_type) {
 			(void) hcksum_assoc(nmp, NULL, NULL, 0, 0, 0, 0,
 			    HCK_FULLCKSUM_OK | HCK_FULLCKSUM, 0);
 
 			HXGE_DEBUG_MSG((hxgep, RX_CTL,
 			    "==> hxge_receive_packet: Full tcp/udp cksum "
-			    "is_valid 0x%x multi %d pkt %d "
-			    "error %d",
-			    is_valid, multi, is_tcp_udp, error_type));
+			    "is_valid 0x%x multi %d error %d",
+			    is_valid, multi, error_type));
 		}
 	}
 
@@ -2952,7 +2950,7 @@ hxge_map_rxdma_channel_buf_ring_fail1:
 	for (; index >= 0; index--) {
 		rx_msg_p = rx_msg_ring[index];
 		if (rx_msg_p != NULL) {
-			hxge_freeb(rx_msg_p);
+			freeb(rx_msg_p->rx_mblk_p);
 			rx_msg_ring[index] = NULL;
 		}
 	}
@@ -3016,7 +3014,7 @@ hxge_unmap_rxdma_channel_buf_ring(p_hxge_t hxgep,
 		    " hxge_unmap_rxdma_channel_buf_ring: "
 		    "rx_msg_p $%p", rx_msg_p));
 		if (rx_msg_p != NULL) {
-			hxge_freeb(rx_msg_p);
+			freeb(rx_msg_p->rx_mblk_p);
 			rx_msg_ring[i] = NULL;
 		}
 	}
