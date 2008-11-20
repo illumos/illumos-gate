@@ -81,18 +81,6 @@
 
 #define	DEF_NAT_AGE	1200     /* 10 minutes (600 seconds) */
 
-/*
- * Default hi and lo watermarks used with forced flush of nat table.
- */
-
-#define	NAT_FLUSH_HI	95
-#define	NAT_FLUSH_LO	75
-
-/* How full is the nat table? */
-
-#define	NAT_TAB_WATER_LEVEL(x)	((x)->ifs_nat_stats.ns_inuse * 100 \
-				/ (x)->ifs_ipf_nattable_max)
-
 struct ipstate;
 struct ap_session;
 
@@ -487,7 +475,7 @@ extern	nat_t	*nat_maplookup __P((void *, u_int, struct in_addr,
 extern	nat_t	*nat_lookupredir __P((natlookup_t *, ipf_stack_t *));
 extern	nat_t	*nat_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*nat_icmperror __P((fr_info_t *, u_int *, int));
-extern	void	nat_delete __P((struct nat *, int, ipf_stack_t *));
+extern	int	nat_delete __P((struct nat *, int, ipf_stack_t *));
 extern	int	nat_insert __P((nat_t *, int, ipf_stack_t *));
 
 extern	int	fr_checknatout __P((fr_info_t *, u_32_t *));

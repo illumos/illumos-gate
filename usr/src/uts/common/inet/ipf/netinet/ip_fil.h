@@ -108,6 +108,44 @@
 #define	SIOCDELFR	SIOCRMAFR
 #define	SIOCINSFR	SIOCINAFR
 
+/*
+ * What type of table is getting flushed?
+ */
+
+#define	NAT_FLUSH	1
+#define	STATE_FLUSH	2
+
+/*
+ * What table flush options are available?
+ */
+
+#define	FLUSH_LIST	0
+#define	FLUSH_TABLE_ALL		1	/* Flush entire table */
+#define	FLUSH_TABLE_CLOSING	2	/* Flush "closing" entries" */
+#define	FLUSH_TABLE_EXTRA	3	/* Targetted flush: almost closed, long idle */
+
+#define	VALID_TABLE_FLUSH_OPT(x)	((x) >= 1 && (x) <= 3)
+
+/*
+ * Define the default hi and lo watermarks used when flushing the
+ * tables.  The values represent percent full of respective tables.
+ */
+
+#define NAT_FLUSH_HI	95
+#define NAT_FLUSH_LO	75
+
+#define ST_FLUSH_HI	95
+#define ST_FLUSH_LO	75
+
+/*
+ * How full are the tables?
+ */
+
+#define NAT_TAB_WATER_LEVEL(x)	((x)->ifs_nat_stats.ns_inuse * 100 \
+				/ (x)->ifs_ipf_nattable_max)
+
+#define ST_TAB_WATER_LEVEL(x)	((x)->ifs_ips_num * 100 \
+				/ (x)->ifs_fr_statemax)
 
 struct ipscan;
 struct ifnet;
@@ -1522,11 +1560,14 @@ extern	ipftoken_t	*ipf_findtoken __P((int, int, void *, ipf_stack_t *));
 extern	int		ipf_getnextrule __P((ipftoken_t *, void *,
 					     ipf_stack_t *));
 extern  void            ipf_expiretokens __P((ipf_stack_t *));
-extern	void		ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
-extern	int		ipf_deltoken __P((int,int, void *, ipf_stack_t *));
-extern	int		ipf_genericiter __P((void *, int, void *,
-					     ipf_stack_t *));
-#ifndef ipf_random
+extern  void            ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
+extern  int             ipf_deltoken __P((int, int, void *, ipf_stack_t *));
+extern  int             ipf_genericiter __P((void *, int, void *, ipf_stack_t *));
+extern	int		ipf_extraflush __P((int, ipftq_t *, ipftq_t *, ipf_stack_t *));
+extern	int		ipf_flushclosing __P((int, int, ipftq_t *, ipftq_t *, ipf_stack_t *));
+extern	int		ipf_earlydrop __P((int, ipftq_t *, int, ipf_stack_t *));
+
+#ifndef	ipf_random
 extern	u_32_t		ipf_random __P((void));
 #endif
 

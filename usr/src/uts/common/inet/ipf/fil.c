@@ -221,7 +221,6 @@ static	void		*fr_ifsync __P((int, int, char *, char *,
 static	ipftuneable_t	*fr_findtunebyname __P((const char *, ipf_stack_t *));
 static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **, ipf_stack_t *));
 
-
 /*
  * bit values for identifying presence of individual IP options
  * All of these tables should be ordered by increasing key value on the left
@@ -299,6 +298,20 @@ static ipfunc_resolve_t fr_availfuncs[] = {
 	{ "fr_dstgrpmap", fr_dstgrpmap, fr_grpmapinit },
 #endif
 	{ "", NULL }
+};
+
+
+/*
+ * Below we declare a list of constants used only by the ipf_extraflush()
+ * routine.  We are placing it here, instead of in ipf_extraflush() itself,
+ * because we want to make it visible to tools such as mdb, nm etc., so the
+ * values can easily be altered during debugging.
+ */
+static	const	int	idletime_tab[] = {
+	IPF_TTLVAL(30),		/* 30 seconds */
+	IPF_TTLVAL(1800),	/* 30 minutes */
+	IPF_TTLVAL(43200),	/* 12 hours */
+	IPF_TTLVAL(345600),	/* 4 days */
 };
 
 
@@ -2628,7 +2641,7 @@ ipf_stack_t *ifs;
 	if (fin->fin_nat != NULL) {
 		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
 			WRITE_ENTER(&ifs->ifs_ipf_nat);
-			nat_delete((nat_t *)fin->fin_nat, NL_DESTROY, ifs);
+			(void) nat_delete((nat_t *)fin->fin_nat, NL_DESTROY, ifs);
 			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 			fin->fin_nat = NULL;
 		} else {
@@ -6054,6 +6067,10 @@ ipftuneable_t lcl_ipf_tuneables[] = {
 			0, IPFT_WRDISABLED },
 	{ { NULL },	"ipstate_logging",	0,	1,
 			0,	0 },
+	{ { NULL },	"state_flush_level_hi",	1,	100,
+			0,		0 },
+	{ { NULL },	"state_flush_level_lo",	1,	100,
+			0,		0 },
 	/* nat */
 	{ { NULL },		"fr_nat_lock",		0,	1,
 			0,		IPFT_RDONLY },
@@ -6079,9 +6096,9 @@ ipftuneable_t lcl_ipf_tuneables[] = {
 			0,		IPFT_WRDISABLED },
 	{ { NULL }, "fr_defnaticmpage",	1,	0x7fffffff,
 			0,	IPFT_WRDISABLED },
-	{ { NULL },	"nat_flush_lvl_hi",	1,	100,
+	{ { NULL },	"nat_flush_level_hi",	1,	100,
 			0,		0 },
-	{ { NULL },	"nat_flush_lvl_lo",	1,	100,
+	{ { NULL },	"nat_flush_level_lo",	1,	100,
 			0,		0 },
 	/* frag */
 	{ { NULL },	"ipfr_size",		1,	0x7fffffff,
@@ -6160,6 +6177,8 @@ static void ipftuneable_setdefs(ipf_stack_t *ifs)
 	ifs->ifs_fr_statemax = IPSTATE_MAX;
 	ifs->ifs_fr_statesize = IPSTATE_SIZE;
 	ifs->ifs_fr_state_maxbucket_reset = 1;
+	ifs->ifs_state_flush_level_hi = ST_FLUSH_HI;
+	ifs->ifs_state_flush_level_lo = ST_FLUSH_LO;
 
 	/* it comes from fr_natinit() in ipnat */
 	ifs->ifs_ipf_nattable_sz = NAT_TABLE_SZ;
@@ -6171,8 +6190,8 @@ static void ipftuneable_setdefs(ipf_stack_t *ifs)
 	ifs->ifs_fr_defnatage = DEF_NAT_AGE;
 	ifs->ifs_fr_defnatipage = 120;		/* 60 seconds */
 	ifs->ifs_fr_defnaticmpage = 6;		/* 3 seconds */
-	ifs->ifs_nat_flush_lvl_hi = NAT_FLUSH_HI;
-	ifs->ifs_nat_flush_lvl_lo = NAT_FLUSH_LO;
+	ifs->ifs_nat_flush_level_hi = NAT_FLUSH_HI;
+	ifs->ifs_nat_flush_level_lo = NAT_FLUSH_LO;
 
 #ifdef IPFILTER_LOG
 	/* it comes from fr_loginit() in IPF log */
@@ -6253,8 +6272,10 @@ ipftuneable_alloc(ipf_stack_t *ifs)
     TUNE_SET(ifs, "fr_defnatage", ifs_fr_defnatage);
     TUNE_SET(ifs, "fr_defnatipage", ifs_fr_defnatipage);
     TUNE_SET(ifs, "fr_defnaticmpage", ifs_fr_defnaticmpage);
-    TUNE_SET(ifs, "nat_flush_lvl_hi", ifs_nat_flush_lvl_hi);
-    TUNE_SET(ifs, "nat_flush_lvl_lo", ifs_nat_flush_lvl_lo);
+    TUNE_SET(ifs, "nat_flush_level_hi", ifs_nat_flush_level_hi);
+    TUNE_SET(ifs, "nat_flush_level_lo", ifs_nat_flush_level_lo);
+    TUNE_SET(ifs, "state_flush_level_hi", ifs_state_flush_level_hi);
+    TUNE_SET(ifs, "state_flush_level_lo", ifs_state_flush_level_lo);
     TUNE_SET(ifs, "ipfr_size", ifs_ipfr_size);
     TUNE_SET(ifs, "fr_ipfrttl", ifs_fr_ipfrttl);
     TUNE_SET(ifs, "ipf_loopback", ifs_ipf_loopback);
@@ -7244,4 +7265,245 @@ ipf_stack_t *ifs;
 	RWLOCK_EXIT(&ifs->ifs_ipf_tokens);
 
 	return error;
+}
+
+
+/* --------------------------------------------------------------------- */
+/* Function:    ipf_earlydrop                                            */
+/* Returns:     number of dropped/removed entries from the queue         */
+/* Parameters:	flushtype - which table we're cleaning (NAT or State)	 */
+/*              ifq	- pointer to queue with entries to be deleted    */
+/*              idletime - entry must be idle this long to be deleted    */
+/*              ifs     - ipf stack instance                             */
+/*                                                                       */
+/* Function is invoked from state/NAT flush routines to remove entries   */
+/* from specified timeout queue, based on how long they've sat idle,     */
+/* without waiting for it to happen on its own.                          */
+/* --------------------------------------------------------------------- */
+int ipf_earlydrop(flushtype, ifq, idletime, ifs)
+int flushtype;
+ipftq_t *ifq;
+int idletime;
+ipf_stack_t *ifs;
+{
+        ipftqent_t *tqe, *tqn;
+        unsigned int dropped;
+        int droptick;
+	void *ent;
+
+        if (ifq == NULL)
+                return (0);
+
+        dropped = 0;
+
+        /*
+         * Determine the tick representing the idle time we're interested
+         * in.  If an entry exists in the queue, and it was touched before
+         * that tick, then it's been idle longer than idletime, so it should
+	 * be deleted.
+         */
+        droptick = ifs->ifs_fr_ticks - idletime;
+        tqn = ifq->ifq_head;
+        while ((tqe = tqn) != NULL && tqe->tqe_touched < droptick) {
+                tqn = tqe->tqe_next;
+		ent = tqe->tqe_parent;
+		switch (flushtype)
+		{
+		case NAT_FLUSH:
+			if (nat_delete((nat_t *)ent, NL_FLUSH, ifs) == 0)
+				dropped++;
+			break;
+		case STATE_FLUSH:
+			if (fr_delstate((ipstate_t *)ent, ISL_FLUSH, ifs) == 0)
+				dropped++;
+			break;
+		default:
+			return (0);
+		}
+        }
+        return (dropped);
+}
+
+
+/* --------------------------------------------------------------------- */
+/* Function:    ipf_flushclosing                                         */
+/* Returns:     int - number of entries deleted                          */
+/* Parameters:	flushtype - which table we're cleaning (NAT or State)	 */
+/*              stateval - TCP state at which to start removing entries  */
+/*              ipfqs - pointer to timeout queues                        */
+/*              userqs - pointer to user defined queues                  */
+/*              ifs  - ipf stack instance                                */
+/*                                                                       */
+/* Remove state/NAT table entries for TCP connections which are in the   */
+/* process of closing, and have at least reached the state specified by  */
+/* the 'stateval' parameter.                                             */
+/* --------------------------------------------------------------------- */
+int ipf_flushclosing(flushtype, stateval, ipfqs, userqs, ifs)
+int flushtype, stateval;
+ipftq_t *ipfqs, *userqs;
+ipf_stack_t *ifs;
+{
+	ipftq_t *ifq, *ifqn;
+        ipftqent_t *tqe, *tqn;
+        int dropped;
+	void *ent;
+	nat_t *nat;
+	ipstate_t *is;
+
+        dropped = 0;
+
+        /*
+         * Start by deleting any entries in specific timeout queues.
+         */
+	ifqn = &ipfqs[stateval];
+        while ((ifq = ifqn) != NULL) {
+                ifqn = ifq->ifq_next;
+                dropped += ipf_earlydrop(flushtype, ifq, (int)0, ifs);
+        }
+
+        /*
+         * Next, look through user defined queues for closing entries.
+         */
+	ifqn = userqs;
+        while ((ifq = ifqn) != NULL) {
+                ifqn = ifq->ifq_next;
+                tqn = ifq->ifq_head;
+                while ((tqe = tqn) != NULL) {
+                        tqn = tqe->tqe_next;
+			ent = tqe->tqe_parent;
+			switch (flushtype)
+			{
+			case NAT_FLUSH:
+				nat = (nat_t *)ent;
+				if ((nat->nat_p == IPPROTO_TCP) &&
+				    (nat->nat_tcpstate[0] >= stateval) &&
+				    (nat->nat_tcpstate[1] >= stateval) &&
+				    (nat_delete(nat, NL_EXPIRE, ifs) == 0))
+					dropped++;
+				break;
+			case STATE_FLUSH:
+				is = (ipstate_t *)ent;
+				if ((is->is_p == IPPROTO_TCP) &&
+				    (is->is_state[0] >= stateval) &&
+				    (is->is_state[1] >= stateval) &&
+				    (fr_delstate(is, ISL_EXPIRE, ifs) == 0))
+					dropped++;
+				break;
+			default:
+				return (0);
+			}
+                }
+        }
+        return (dropped);
+}
+
+
+/* --------------------------------------------------------------------- */
+/* Function:    ipf_extraflush                                           */
+/* Returns:     int - number of entries flushed (0 = none)               */
+/* Parameters:	flushtype - which table we're cleaning (NAT or State)	 */
+/*              ipfqs - pointer to 'established' timeout queue           */
+/*              userqs - pointer to user defined queues                  */
+/*              ifs  - ipf stack instance                                */
+/*                                                                       */
+/* This function gets called when either NAT or state tables fill up.    */
+/* We need to try a bit harder to free up some space.  The function will */
+/* flush entries for TCP connections which have been idle a long time.   */
+/*                                                                       */
+/* Currently, the idle time is checked using values from ideltime_tab[]	 */
+/* --------------------------------------------------------------------- */
+int ipf_extraflush(flushtype, ipfqs, userqs, ifs)
+int flushtype;
+ipftq_t *ipfqs, *userqs;
+ipf_stack_t *ifs;
+{
+	ipftq_t *ifq, *ifqn;
+	int idletime, removed, idle_idx;
+
+	removed = 0;
+
+	/*
+  	 * Determine initial threshold for minimum idle time based on
+	 * how long ipfilter has been running.  Ipfilter needs to have
+	 * been up as long as the smallest interval to continue on.
+	 *
+	 * Minimum idle times stored in idletime_tab and indexed by
+	 * idle_idx.  Start at upper end of array and work backwards.
+	 *
+	 * Once the index is found, set the initial idle time to the
+	 * first interval before the current ipfilter run time.
+	 */
+	if (ifs->ifs_fr_ticks < idletime_tab[0])
+		return (0);
+	idle_idx = (sizeof (idletime_tab) / sizeof (int)) - 1;
+	if (ifs->ifs_fr_ticks > idletime_tab[idle_idx]) {
+		idletime = idletime_tab[idle_idx];
+	} else {
+		while ((idle_idx > 0) &&
+		    (ifs->ifs_fr_ticks < idletime_tab[idle_idx]))
+			idle_idx--;
+
+		idletime = (ifs->ifs_fr_ticks /
+			    idletime_tab[idle_idx]) *
+			    idletime_tab[idle_idx];
+	}
+
+	while (idle_idx >= 0) {
+		/*
+		 * Check to see if we need to delete more entries.
+		 * If we do, start with appropriate timeout queue.
+		 */
+		if (flushtype == NAT_FLUSH) {
+			if (NAT_TAB_WATER_LEVEL(ifs) <=
+			    ifs->ifs_nat_flush_level_lo)
+				break;
+		} else if (flushtype == STATE_FLUSH) {
+			if (ST_TAB_WATER_LEVEL(ifs) <=
+			    ifs->ifs_state_flush_level_lo)
+				break;
+		} else {
+			break;
+		}
+
+		removed += ipf_earlydrop(flushtype, ipfqs, idletime, ifs);
+
+		/*
+		 * Next, check the user defined queues.  But first, make
+		 * certain that timeout queue deletions didn't do enough.
+		 */
+		if (flushtype == NAT_FLUSH) {
+			if (NAT_TAB_WATER_LEVEL(ifs) <=
+			    ifs->ifs_nat_flush_level_lo)
+				break;
+		} else {
+			if (ST_TAB_WATER_LEVEL(ifs) <=
+			    ifs->ifs_state_flush_level_lo)
+				break;
+		}
+		ifqn = userqs;
+		while ((ifq = ifqn) != NULL) {
+			ifqn = ifq->ifq_next;
+			removed += ipf_earlydrop(flushtype, ifq, idletime, ifs);
+		}
+
+		/*
+		 * Adjust the granularity of idle time.
+		 *
+		 * If we reach an interval boundary, we need to
+		 * either adjust the idle time accordingly or exit
+		 * the loop altogether (if this is very last check).
+		 */
+		idletime -= idletime_tab[idle_idx];
+		if (idletime < idletime_tab[idle_idx]) {
+			if (idle_idx != 0) {
+				idletime = idletime_tab[idle_idx] -
+				idletime_tab[idle_idx - 1];
+				idle_idx--;
+			} else {
+				break;
+			}
+		}
+	}
+
+	return (removed);
 }

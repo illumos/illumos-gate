@@ -233,8 +233,8 @@ struct ipf_stack {
 	natstat_t		ifs_nat_stats;
 	int			ifs_fr_nat_lock;
 	int			ifs_fr_nat_init;
-	uint_t			ifs_nat_flush_lvl_hi;
-	uint_t			ifs_nat_flush_lvl_lo;
+	uint_t			ifs_nat_flush_level_hi;
+	uint_t			ifs_nat_flush_level_lo;
 	ulong_t			ifs_nat_last_force_flush;
 	int			ifs_nat_doflush;
 
@@ -252,6 +252,8 @@ struct ipf_stack {
 	ulong_t			*ifs_ips_seed;
 	int			ifs_ips_num;
 	ulong_t			ifs_ips_last_force_flush;
+	uint_t			ifs_state_flush_level_hi;
+	uint_t			ifs_state_flush_level_lo;
 	ips_stat_t		ifs_ips_stats;
 
 	ulong_t			ifs_fr_tcpidletimeout;

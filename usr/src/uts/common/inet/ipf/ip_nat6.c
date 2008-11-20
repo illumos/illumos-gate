@@ -749,10 +749,10 @@ int direction;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
 	/*
-	 * Trigger automatic call to nat_extraflush() if the
+	 * Trigger automatic call to ipf_extraflush() if the
 	 * table has reached capcity specified by hi watermark.
 	 */
-	if (NAT_TAB_WATER_LEVEL(ifs) > ifs->ifs_nat_flush_lvl_hi)
+	if (NAT_TAB_WATER_LEVEL(ifs) > ifs->ifs_nat_flush_level_hi)
 		ifs->ifs_nat_doflush = 1;
 
 	if (ifs->ifs_nat_stats.ns_inuse >= ifs->ifs_ipf_nattable_max) {

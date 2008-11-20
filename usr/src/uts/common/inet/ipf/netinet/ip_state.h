@@ -245,5 +245,6 @@ extern	void	fr_sttab_destroy __P((struct ipftq *));
 extern	void	fr_updatestate __P((fr_info_t *, ipstate_t *, ipftq_t *));
 extern	void	fr_statederef __P((ipstate_t **, ipf_stack_t *));
 extern	void	fr_setstatequeue __P((ipstate_t *, int, ipf_stack_t *));
+extern	int	fr_delstate __P((ipstate_t *, int, ipf_stack_t *));
 
 #endif /* __IP_STATE_H__ */

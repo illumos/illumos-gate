@@ -397,7 +397,7 @@ int fd, opts;
 	int n = 0;
 
 	if (opts & OPT_FLUSH) {
-		n = 0;
+		n = FLUSH_TABLE_ALL;
 		if (!(opts & OPT_DONOTHING) && ioctl(fd, SIOCIPFFL, &n) == -1)
 			perror("ioctl(SIOCFLNAT)");
 		else
@@ -405,7 +405,7 @@ int fd, opts;
 	}
 
 	if (opts & OPT_CLEAR) {
-		n = 1;
+		n = FLUSH_LIST;
 		if (!(opts & OPT_DONOTHING) && ioctl(fd, SIOCIPFFL, &n) == -1)
 			perror("ioctl(SIOCCNATL)");
 		else

@@ -3,11 +3,9 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__FreeBSD__
 # ifndef __FreeBSD_cc_version
@@ -350,9 +348,9 @@ char	*arg;
 		return;
 	if (!strcmp(arg, "s") || !strcmp(arg, "S")) {
 		if (*arg == 'S')
-			fl = 0;
+			fl = FLUSH_TABLE_ALL;
 		else
-			fl = 1;
+			fl = FLUSH_TABLE_CLOSING;
 		rem = fl;
 
 		closedevice();

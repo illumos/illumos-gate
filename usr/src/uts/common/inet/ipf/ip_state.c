@@ -123,7 +123,6 @@ static ipstate_t *fr_matchsrcdst __P((fr_info_t *, ipstate_t *, i6addr_t *,
 static ipstate_t *fr_checkicmpmatchingstate __P((fr_info_t *));
 static int fr_state_flush __P((int, int, ipf_stack_t *));
 static ips_stat_t *fr_statetstats __P((ipf_stack_t *));
-static void fr_delstate __P((ipstate_t *, int, ipf_stack_t *));
 static int fr_state_remove __P((caddr_t, ipf_stack_t *));
 static void fr_ipsmove __P((ipstate_t *, u_int, ipf_stack_t *));
 static int fr_tcpstate __P((fr_info_t *, tcphdr_t *, ipstate_t *));
@@ -143,11 +142,10 @@ int fr_stgetent __P((caddr_t, ipf_stack_t *));
     (((x) + ifs->ifs_ips_seed[(x) % ifs->ifs_fr_statesize]) % ifs->ifs_fr_statesize)
 
 
-
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_stateinit                                                */
 /* Returns:     int - 0 == success, -1 == failure                           */
-/* Parameters:  Nil                                                         */
+/* Parameters:  ifs - ipf stack instance                                    */
 /*                                                                          */
 /* Initialise all the global variables used within the state code.          */
 /* This action also includes initiailising locks.                           */
@@ -274,7 +272,7 @@ ipf_stack_t *ifs;
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_stateunload                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  Nil                                                         */
+/* Parameters:  ifs - ipf stack instance                                    */
 /*                                                                          */
 /* Release and destroy any resources acquired or initialised so that        */
 /* IPFilter can be unloaded or re-initialised.                              */
@@ -286,7 +284,7 @@ ipf_stack_t *ifs;
 	ipstate_t *is;
 
 	while ((is = ifs->ifs_ips_list) != NULL)
-	    fr_delstate(is, 0, ifs);
+	    (void) fr_delstate(is, 0, ifs);
 
 	/*
 	 * Proxy timeout queues are not cleaned here because although they
@@ -368,6 +366,7 @@ ipf_stack_t *ifs;
 /* Function:    fr_state_remove                                             */
 /* Returns:     int - 0 == success, != 0 == failure                         */
 /* Parameters:  data(I) - pointer to state structure to delete from table   */
+/*              ifs - ipf stack instance                                    */
 /*                                                                          */
 /* Search for a state structure that matches the one passed, according to   */
 /* the IP addresses and other protocol specific information.                */
@@ -393,7 +392,7 @@ ipf_stack_t *ifs;
 			  sizeof(st.is_dst)) &&
 		    !bcmp((caddr_t)&sp->is_ps, (caddr_t)&st.is_ps,
 			  sizeof(st.is_ps))) {
-			fr_delstate(sp, ISL_REMOVE, ifs);
+			(void) fr_delstate(sp, ISL_REMOVE, ifs);
 			RWLOCK_EXIT(&ifs->ifs_ipf_state);
 			return 0;
 		}
@@ -408,6 +407,9 @@ ipf_stack_t *ifs;
 /* Parameters:  data(I) - pointer to ioctl data                             */
 /*              cmd(I)  - ioctl command integer                             */
 /*              mode(I) - file mode bits used with open                     */
+/*              uid(I)  - uid of caller                                     */
+/*              ctx(I)  - pointer to give the uid context                   */
+/*              ifs     - ipf stack instance                                */
 /*                                                                          */
 /* Processes an ioctl call made to operate on the IP Filter state device.   */
 /* ------------------------------------------------------------------------ */
@@ -436,7 +438,7 @@ ipf_stack_t *ifs;
 		if (error != 0) {
 			error = EFAULT;
 		} else {
-			if (arg == 0 || arg == 1) {
+			if (VALID_TABLE_FLUSH_OPT(arg)) {
 				WRITE_ENTER(&ifs->ifs_ipf_state);
 				ret = fr_state_flush(arg, 4, ifs);
 				RWLOCK_EXIT(&ifs->ifs_ipf_state);
@@ -456,7 +458,7 @@ ipf_stack_t *ifs;
 		if (error != 0) {
 			error = EFAULT;
 		} else {
-			if (arg == 0 || arg == 1) {
+			if (VALID_TABLE_FLUSH_OPT(arg)) {
 				WRITE_ENTER(&ifs->ifs_ipf_state);
 				ret = fr_state_flush(arg, 6, ifs);
 				RWLOCK_EXIT(&ifs->ifs_ipf_state);
@@ -541,7 +543,7 @@ ipf_stack_t *ifs;
 	 * Add an entry to the current state table.
 	 */
 	case SIOCSTPUT :
-		if (!ifs->ifs_fr_state_lock || !(mode &FWRITE)) {
+		if (!ifs->ifs_fr_state_lock || !(mode & FWRITE)) {
 			error = EACCES;
 			break;
 		}
@@ -653,6 +655,7 @@ ipf_stack_t *ifs;
 /* Function:    fr_stputent                                                 */
 /* Returns:     int - 0 == success, != 0 == failure                         */
 /* Parameters:  data(I) - pointer to state information struct               */
+/*              ifs     - ipf stack instance                                */
 /*                                                                          */
 /* This function implements the SIOCSTPUT ioctl: insert a state entry into  */
 /* the state table.  If the state info. includes a pointer to a filter rule */
@@ -672,6 +675,22 @@ ipf_stack_t *ifs;
 	error = fr_inobj(data, &ips, IPFOBJ_STATESAVE);
 	if (error)
 		return EFAULT;
+
+	/*
+	 * Trigger automatic call to fr_state_flush() if the
+	 * table has reached capacity specified by hi watermark.
+	 */
+	if (ST_TAB_WATER_LEVEL(ifs) > ifs->ifs_state_flush_level_hi)
+		ifs->ifs_fr_state_doflush = 1;
+
+	/*
+	 * If automatic flushing did not do its job, and the table
+	 * has filled up, don't try to create a new entry.
+	 */
+	if (ifs->ifs_ips_num >= ifs->ifs_fr_statemax) {
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_max);
+		return ENOMEM;
+	}
 
 	KMALLOC(isn, ipstate_t *);
 	if (isn == NULL)
@@ -1113,20 +1132,33 @@ u_int flags;
 		return NULL;
 
 	/*
-	 * If a "keep state" rule has reached the maximum number of references
-	 * to it, then schedule an automatic flush in case we can clear out
-	 * some "dead old wood".  Note that because the lock isn't held on
-	 * fr it is possible that we could overflow.  The cost of overflowing
-	 * is being ignored here as the number by which it can overflow is
-	 * a product of the number of simultaneous threads that could be
-	 * executing in here, so a limit of 100 won't result in 200, but could
-	 * result in 101 or 102.
+	 * Trigger automatic call to fr_state_flush() if the
+	 * table has reached capacity specified by hi watermark.
 	 */
+	if (ST_TAB_WATER_LEVEL(ifs) > ifs->ifs_state_flush_level_hi)
+		ifs->ifs_fr_state_doflush = 1;
+
+	/*
+	 * If the max number of state entries has been reached, and there is no
+	 * limit on the state count for the rule, then do not continue.  In the
+	 * case where a limit exists, it's ok allow the entries to be created as
+	 * long as specified limit itself has not been reached. 
+	 *
+	 * Note that because the lock isn't held on fr, it is possible to exceed
+	 * the specified size of the table.  However, the cost of this is being
+	 * ignored here; as the number by which it can go over is a product of
+	 * the number of simultaneous threads that could be executing in here.
+	 * So, a limit of 100 won't result in 200, but could result in 101 or 102.
+	 *
+	 * Also note that, since the automatic flush should have been triggered
+	 * well before we reach the maximum number of state table entries, the
+	 * likelihood of reaching the max (and thus exceedng it) is minimal.
+	 */ 
 	fr = fin->fin_fr;
 	if (fr != NULL) {
-		if ((ifs->ifs_ips_num == ifs->ifs_fr_statemax) && (fr->fr_statemax == 0)) {
+		if ((ifs->ifs_ips_num >= ifs->ifs_fr_statemax) &&
+		    (fr->fr_statemax == 0)) {
 			ATOMIC_INCL(ifs->ifs_ips_stats.iss_max);
-			ifs->ifs_fr_state_doflush = 1;
 			return NULL;
 		}
 		if ((fr->fr_statemax != 0) &&
@@ -1983,11 +2015,23 @@ ipstate_t *is;
 	u_32_t send;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (ifs->ifs_ips_num == ifs->ifs_fr_statemax) {
-		ATOMIC_INCL(ifs->ifs_ips_stats.iss_max);
+	/*
+	 * Trigger automatic call to fr_state_flush() if the
+	 * table has reached capacity specified by hi watermark.
+	 */
+	if (ST_TAB_WATER_LEVEL(ifs) > ifs->ifs_state_flush_level_hi)
 		ifs->ifs_fr_state_doflush = 1;
+
+	/*
+	 * If automatic flushing did not do its job, and the table
+	 * has filled up, don't try to create a new entry.  A NULL
+	 * return will indicate that the cloning has failed.
+	 */
+	if (ifs->ifs_ips_num >= ifs->ifs_fr_statemax) {
+		ATOMIC_INCL(ifs->ifs_ips_stats.iss_max);
 		return NULL;
 	}
+
 	KMALLOC(clone, ipstate_t *);
 	if (clone == NULL)
 		return NULL;
@@ -3190,17 +3234,17 @@ ipf_stack_t *ifs;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_delstate                                                 */
-/* Returns:     Nil                                                         */
+/* Returns:     int - 0 = entry deleted, else ref count on entry            */
 /* Parameters:  is(I)  - pointer to state structure to delete               */
 /*              why(I) - if not 0, log reason why it was deleted            */
-/*		ifs - ipf stack instance				    */
+/*              ifs    - ipf stack instance                                 */
 /* Write Locks: ipf_state/ipf_global                                        */
 /*                                                                          */
 /* Deletes a state entry from the enumerated list as well as the hash table */
 /* and timeout queue lists.  Make adjustments to hash table statistics and  */
 /* global counters as required.                                             */
 /* ------------------------------------------------------------------------ */
-static void fr_delstate(is, why, ifs)
+int fr_delstate(is, why, ifs)
 ipstate_t *is;
 int why;
 ipf_stack_t *ifs;
@@ -3259,7 +3303,7 @@ ipf_stack_t *ifs;
 		MUTEX_EXIT(&is->is_lock);
 		if (removed)
 			ifs->ifs_ips_stats.iss_orphans++;
-		return;
+		return (is->is_ref);
 	}
 	MUTEX_EXIT(&is->is_lock);
 
@@ -3309,13 +3353,15 @@ ipf_stack_t *ifs;
 	MUTEX_DESTROY(&is->is_lock);
 	KFREE(is);
 	ifs->ifs_ips_num--;
+
+	return (0);
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_timeoutstate                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  Nil                                                         */
+/* Parameters:  ifs - ipf stack instance                                    */
 /*                                                                          */
 /* Slowly expire held state for thingslike UDP and ICMP.  The algorithm     */
 /* used here is to keep the queue sorted with the oldest things at the top  */
@@ -3338,7 +3384,7 @@ ipf_stack_t *ifs;
 				break;
 			tqn = tqe->tqe_next;
 			is = tqe->tqe_parent;
-			fr_delstate(is, ISL_EXPIRE, ifs);
+			(void) fr_delstate(is, ISL_EXPIRE, ifs);
 		}
 
 	for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifq->ifq_next) {
@@ -3347,7 +3393,7 @@ ipf_stack_t *ifs;
 				break;
 			tqn = tqe->tqe_next;
 			is = tqe->tqe_parent;
-			fr_delstate(is, ISL_EXPIRE, ifs);
+			(void) fr_delstate(is, ISL_EXPIRE, ifs);
 		}
 	}
 
@@ -3361,7 +3407,7 @@ ipf_stack_t *ifs;
 	}
 
 	if (ifs->ifs_fr_state_doflush) {
-		(void) fr_state_flush(2, 0, ifs);
+		(void) fr_state_flush(FLUSH_TABLE_EXTRA, 0, ifs);
 		ifs->ifs_fr_state_doflush = 0;
 	}
 	RWLOCK_EXIT(&ifs->ifs_ipf_state);
@@ -3369,154 +3415,86 @@ ipf_stack_t *ifs;
 }
 
 
-/* ------------------------------------------------------------------------ */
-/* Function:    fr_state_flush                                              */
-/* Returns:     int - 0 == success, -1 == failure                           */
-/* Parameters:  Nil                                                         */
-/* Write Locks: ipf_state                                                   */
-/*                                                                          */
-/* Flush state tables.  Three actions currently defined:                    */
-/* which == 0 : flush all state table entries                               */
-/* which == 1 : flush TCP connections which have started to close but are   */
-/*	      stuck for some reason.                                        */
-/* which == 2 : flush TCP connections which have been idle for a long time, */
-/*	      starting at > 4 days idle and working back in successive half-*/
-/*	      days to at most 12 hours old.  If this fails to free enough   */
-/*            slots then work backwards in half hour slots to 30 minutes.   */
-/*            If that too fails, then work backwards in 30 second intervals */
-/*            for the last 30 minutes to at worst 30 seconds idle.          */
-/* ------------------------------------------------------------------------ */
-static int fr_state_flush(which, proto, ifs)
-int which, proto;
+/* ---------------------------------------------------------------------- */
+/* Function:    fr_state_flush                                            */
+/* Returns:     int - 0 == success, -1 == failure                         */
+/* Parameters:  flush_option - how to flush the active State table	  */
+/*              proto    - IP version to flush (4, 6, or both)            */
+/*              ifs      - ipf stack instance                             */
+/* Write Locks: ipf_state                                                 */
+/*                                                                        */
+/* Flush state tables.  Three possible flush options currently defined:	  */
+/*                                                                        */
+/* FLUSH_TABLE_ALL	: Flush all state table entries			  */
+/*                                                                        */
+/* FLUSH_TABLE_CLOSING	: Flush entries with TCP connections which	  */
+/*			  have started to close on both ends using	  */
+/*			  ipf_flushclosing().				  */
+/*                                                                        */
+/* FLUSH_TABLE_EXTRA	: First, flush entries which are "almost" closed. */
+/*			  Then, if needed, flush entries with TCP	  */
+/*			  connections which have been idle for a long	  */
+/*			  time with ipf_extraflush().			  */
+/* ---------------------------------------------------------------------- */
+static int fr_state_flush(flush_option, proto, ifs)
+int flush_option, proto;
 ipf_stack_t *ifs;
 {
-	ipftq_t *ifq, *ifqnext;
-	ipftqent_t *tqe, *tqn;
-	ipstate_t *is, **isp;
-	int delete, removed;
-	long try, maxtick;
-	u_long interval;
+	ipstate_t *is, *isn;
+	int removed;
 	SPL_INT(s);
 
 	removed = 0;
 
 	SPL_NET(s);
-	for (isp = &ifs->ifs_ips_list; ((is = *isp) != NULL); ) {
-		delete = 0;
-
-		if ((proto != 0) && (is->is_v != proto)) {
-			isp = &is->is_next;
-			continue;
+	switch (flush_option)
+	{
+	case FLUSH_TABLE_ALL:
+		isn = ifs->ifs_ips_list;
+		while ((is = isn) != NULL) {
+			isn = is->is_next;
+			if ((proto != 0) && (is->is_v != proto))
+				continue;
+			if (fr_delstate(is, ISL_FLUSH, ifs) == 0)
+				removed++;
 		}
+		break;
 
-		switch (which)
-		{
-		case 0 :
-			delete = 1;
-			break;
-		case 1 :
-		case 2 :
-			if (is->is_p != IPPROTO_TCP)
-				break;
-			if ((is->is_state[0] != IPF_TCPS_ESTABLISHED) ||
-			    (is->is_state[1] != IPF_TCPS_ESTABLISHED))
-				delete = 1;
-			break;
-		}
+	case FLUSH_TABLE_CLOSING:
+		removed = ipf_flushclosing(STATE_FLUSH,
+					   IPF_TCPS_CLOSE_WAIT,
+					   ifs->ifs_ips_tqtqb,
+					   ifs->ifs_ips_utqe,
+					   ifs);
+		break;
 
-		if (delete) {
-			if (is->is_p == IPPROTO_TCP)
-				ifs->ifs_ips_stats.iss_fin++;
-			else
-				ifs->ifs_ips_stats.iss_expire++;
-			fr_delstate(is, ISL_FLUSH, ifs);
-			removed++;
-		} else
-			isp = &is->is_next;
+	case FLUSH_TABLE_EXTRA:
+		removed = ipf_flushclosing(STATE_FLUSH,
+					   IPF_TCPS_FIN_WAIT_2,
+					   ifs->ifs_ips_tqtqb,
+					   ifs->ifs_ips_utqe,
+					   ifs);
+
+		/*
+		 * Be sure we haven't done this in the last 10 seconds.
+		 */
+		if (ifs->ifs_fr_ticks - ifs->ifs_ips_last_force_flush <
+		    IPF_TTLVAL(10))
+			break;
+		ifs->ifs_ips_last_force_flush = ifs->ifs_fr_ticks;
+                removed += ipf_extraflush(STATE_FLUSH,
+					  &ifs->ifs_ips_tqtqb[IPF_TCPS_ESTABLISHED],
+					  ifs->ifs_ips_utqe,
+					  ifs);
+		break;
+
+	default: /* Flush Nothing */
+		break;
 	}
 
-	if (which != 2) {
-		SPL_X(s);
-		return removed;
-	}
-
-	/*
-	 * Asked to remove inactive entries because the table is full, try
-	 * again, 3 times, if first attempt failed with a different criteria
-	 * each time.  The order tried in must be in decreasing age.
-	 * Another alternative is to implement random drop and drop N entries
-	 * at random until N have been freed up.
-	 */
-	if (ifs->ifs_fr_ticks - ifs->ifs_ips_last_force_flush < IPF_TTLVAL(5))
-		goto force_flush_skipped;
-	ifs->ifs_ips_last_force_flush = ifs->ifs_fr_ticks;
-
-	if (ifs->ifs_fr_ticks > IPF_TTLVAL(43200))
-		interval = IPF_TTLVAL(43200);
-	else if (ifs->ifs_fr_ticks > IPF_TTLVAL(1800))
-		interval = IPF_TTLVAL(1800);
-	else if (ifs->ifs_fr_ticks > IPF_TTLVAL(30))
-		interval = IPF_TTLVAL(30);
-	else
-		interval = IPF_TTLVAL(10);
-	try = ifs->ifs_fr_ticks - (ifs->ifs_fr_ticks - interval);
-	if (try < 0)
-		goto force_flush_skipped;
-
-	while (removed == 0) {
-		maxtick = ifs->ifs_fr_ticks - interval;
-		if (maxtick < 0)
-			break;
-
-		while (try < maxtick) {
-			for (ifq = ifs->ifs_ips_tqtqb; ifq != NULL;
-			     ifq = ifq->ifq_next) {
-				for (tqn = ifq->ifq_head;
-				     ((tqe = tqn) != NULL); ) {
-					if (tqe->tqe_die > try)
-						break;
-					tqn = tqe->tqe_next;
-					is = tqe->tqe_parent;
-					fr_delstate(is, ISL_EXPIRE, ifs);
-					removed++;
-				}
-			}
-
-			for (ifq = ifs->ifs_ips_utqe; ifq != NULL; ifq = ifqnext) {
-				ifqnext = ifq->ifq_next;
-
-				for (tqn = ifq->ifq_head;
-				     ((tqe = tqn) != NULL); ) {
-					if (tqe->tqe_die > try)
-						break;
-					tqn = tqe->tqe_next;
-					is = tqe->tqe_parent;
-					fr_delstate(is, ISL_EXPIRE, ifs);
-					removed++;
-				}
-			}
-			if (try + interval > maxtick)
-				break;
-			try += interval;
-		}
-
-		if (removed == 0) {
-			if (interval == IPF_TTLVAL(43200)) {
-				interval = IPF_TTLVAL(1800);
-			} else if (interval == IPF_TTLVAL(1800)) {
-				interval = IPF_TTLVAL(30);
-			} else if (interval == IPF_TTLVAL(30)) {
-				interval = IPF_TTLVAL(10);
-			} else {
-				break;
-			}
-		}
-	}
-force_flush_skipped:
 	SPL_X(s);
-	return removed;
+	return (removed);
 }
-
 
 
 /* ------------------------------------------------------------------------ */
@@ -4191,7 +4169,7 @@ ipf_stack_t *ifs;
 #ifndef	_KERNEL
 		if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
 		   (is->is_sti.tqe_state[1] > IPF_TCPS_ESTABLISHED)) {
-			fr_delstate(is, ISL_ORPHAN, ifs);
+			(void) fr_delstate(is, ISL_ORPHAN, ifs);
 		}
 #endif
 		return;
@@ -4199,7 +4177,7 @@ ipf_stack_t *ifs;
 	MUTEX_EXIT(&is->is_lock);
 
 	WRITE_ENTER(&ifs->ifs_ipf_state);
-	fr_delstate(is, ISL_EXPIRE, ifs);
+	(void) fr_delstate(is, ISL_EXPIRE, ifs);
 	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 }
 
