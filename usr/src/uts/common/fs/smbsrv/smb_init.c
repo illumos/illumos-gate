@@ -29,6 +29,7 @@
 #include <sys/cred.h>
 #include <sys/ioccom.h>
 #include <sys/policy.h>
+#include <sys/cmn_err.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_door_svc.h>
@@ -180,9 +181,18 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 {
 	int		rc = 0;
 	smb_io_t	smb_io;
+	uint32_t	crc1;
+	uint32_t	crc2;
 
 	if (ddi_copyin((smb_io_t *)argp, &smb_io, sizeof (smb_io), flag) ||
 	    (smb_io.sio_version != SMB_IOC_VERSION))
+		return (EFAULT);
+
+	crc1 = smb_io.sio_crc;
+	smb_io.sio_crc = 0;
+	crc2 = smb_crc_gen((uint8_t *)&smb_io, sizeof (smb_io_t));
+
+	if (crc1 != crc2)
 		return (EFAULT);
 
 	switch (cmd) {

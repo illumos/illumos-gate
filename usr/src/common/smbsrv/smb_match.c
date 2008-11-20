@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _KERNEL
 #include <stdlib.h>
@@ -34,6 +32,7 @@
 #endif
 #include <smbsrv/ctype.h>
 
+#define	SMB_CRC_POLYNOMIAL	0xD8B5D8B5
 
 /*
  *	c	Any non-special character matches itslef
@@ -238,4 +237,21 @@ smb_match_ci(char *patn, char *str)
 		}
 	}
 	/* NOT REACHED */
+}
+
+uint32_t
+smb_crc_gen(uint8_t *buf, size_t len)
+{
+	uint32_t crc = SMB_CRC_POLYNOMIAL;
+	uint8_t *p;
+	int i;
+
+	for (p = buf, i = 0; i < len; ++i, ++p) {
+		crc = (crc ^ (uint32_t)*p) + (crc << 12);
+
+		if (crc == 0 || crc == 0xFFFFFFFF)
+			crc = SMB_CRC_POLYNOMIAL;
+	}
+
+	return (crc);
 }

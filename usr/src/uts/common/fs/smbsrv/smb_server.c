@@ -339,7 +339,7 @@ smb_server_create(void)
 		ASSERT(sv->sv_magic == SMB_SERVER_MAGIC);
 		if (sv->sv_zid == zid) {
 			smb_llist_exit(&smb_servers);
-			return (EEXIST);
+			return (EPERM);
 		}
 		sv = smb_llist_next(&smb_servers, sv);
 	}

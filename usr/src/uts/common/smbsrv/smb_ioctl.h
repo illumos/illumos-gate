@@ -26,8 +26,6 @@
 #ifndef _SMB_IOCTL_H_
 #define	_SMB_IOCTL_H_
 
-#pragma ident	"@(#)smb_ioctl.h	1.5	08/07/21 SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -35,7 +33,7 @@ extern "C" {
 #include <sys/types.h>
 #include <smbsrv/smbinfo.h>
 
-#define	SMB_IOC_VERSION		1
+#define	SMB_IOC_VERSION		0x534D4201	/* SMB1 */
 
 #define	SMB_IOC_BASE		(('S' << 16) | ('B' << 8))
 
@@ -51,6 +49,8 @@ extern "C" {
 
 typedef struct {
 	uint32_t	sio_version;
+	uint32_t	sio_crc;
+
 	union {
 		int32_t		gmtoff;
 		int		error;
@@ -65,6 +65,8 @@ typedef struct {
 } smb_io_t;
 
 #pragma	pack()
+
+uint32_t smb_crc_gen(uint8_t *, size_t);
 
 #ifdef __cplusplus
 }

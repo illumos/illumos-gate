@@ -111,6 +111,7 @@ SUNWprivate {
 	smb_config_setbool;
 	smb_config_setnum;
 	smb_config_setstr;
+	smb_crc_gen;
 	smb_ctxbuf_init;
 	smb_ctxbuf_len;
 	smb_ctxbuf_printf;

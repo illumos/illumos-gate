@@ -37,8 +37,6 @@
 
 #include "smbd.h"
 
-extern smbd_t smbd;
-
 /*ARGSUSED*/
 void *
 smbd_nbt_receiver(void *arg)
@@ -46,9 +44,8 @@ smbd_nbt_receiver(void *arg)
 	smb_io_t	smb_io;
 
 	bzero(&smb_io, sizeof (smb_io));
-	smb_io.sio_version = SMB_IOC_VERSION;
 
-	(void) ioctl(smbd.s_drv_fd, SMB_IOC_NBT_RECEIVE, &smb_io);
+	(void) smbd_ioctl(SMB_IOC_NBT_RECEIVE, &smb_io);
 	return (NULL);
 }
 
@@ -70,9 +67,8 @@ smbd_nbt_listener(void *arg)
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 
 	bzero(&smb_io, sizeof (smb_io));
-	smb_io.sio_version = SMB_IOC_VERSION;
 
-	while (ioctl(smbd.s_drv_fd, SMB_IOC_NBT_LISTEN, &smb_io) == 0) {
+	while (smbd_ioctl(SMB_IOC_NBT_LISTEN, &smb_io) == 0) {
 		smb_io.sio_data.error = pthread_create(&tid, &tattr,
 		    smbd_nbt_receiver, NULL);
 	}
@@ -88,9 +84,8 @@ smbd_tcp_receiver(void *arg)
 	smb_io_t	smb_io;
 
 	bzero(&smb_io, sizeof (smb_io));
-	smb_io.sio_version = SMB_IOC_VERSION;
 
-	(void) ioctl(smbd.s_drv_fd, SMB_IOC_TCP_RECEIVE, &smb_io);
+	(void) smbd_ioctl(SMB_IOC_TCP_RECEIVE, &smb_io);
 	return (NULL);
 }
 
@@ -112,9 +107,8 @@ smbd_tcp_listener(void *arg)
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 
 	bzero(&smb_io, sizeof (smb_io));
-	smb_io.sio_version = SMB_IOC_VERSION;
 
-	while (ioctl(smbd.s_drv_fd, SMB_IOC_TCP_LISTEN, &smb_io) == 0) {
+	while (smbd_ioctl(SMB_IOC_TCP_LISTEN, &smb_io) == 0) {
 		smb_io.sio_data.error = pthread_create(&tid, &tattr,
 		    smbd_tcp_receiver, NULL);
 	}

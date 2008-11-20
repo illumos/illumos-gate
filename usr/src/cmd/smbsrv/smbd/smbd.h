@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <smbsrv/smb_ioctl.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -53,6 +54,7 @@ extern void smbd_user_nonauth_logon(uint32_t);
 extern void smbd_user_auth_logoff(uint32_t);
 extern uint32_t smbd_join(smb_joininfo_t *);
 
+extern int smbd_ioctl(int, smb_io_t *);
 
 typedef struct smbd {
 	const char	*s_version;	/* smbd version string */
