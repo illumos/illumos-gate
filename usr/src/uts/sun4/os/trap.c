@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mmu.h>
 #include <sys/systm.h>
@@ -1795,16 +1794,37 @@ kpreempt(int asyncspl)
 		if (curthread->t_preempt) {
 			/*
 			 * either a privileged thread (idle, panic, interrupt)
-			 *	or will check when t_preempt is lowered
+			 * or will check when t_preempt is lowered
+			 * We need to specifically handle the case where
+			 * the thread is in the middle of swtch (resume has
+			 * been called) and has its t_preempt set
+			 * [idle thread and a thread which is in kpreempt
+			 * already] and then a high priority thread is
+			 * available in the local dispatch queue.
+			 * In this case the resumed thread needs to take a
+			 * trap so that it can call kpreempt. We achieve
+			 * this by using siron().
+			 * How do we detect this condition:
+			 * idle thread is running and is in the midst of
+			 * resume: curthread->t_pri == -1 && CPU->dispthread
+			 * != CPU->thread
+			 * Need to ensure that this happens only at high pil
+			 * resume is called at high pil
+			 * Only in resume_from_idle is the pil changed.
 			 */
-			if (curthread->t_pri < 0)
+			if (curthread->t_pri < 0) {
 				kpreempt_cnts.kpc_idle++;
-			else if (curthread->t_flag & T_INTR_THREAD) {
+				if (CPU->cpu_dispthread != CPU->cpu_thread)
+					siron();
+			} else if (curthread->t_flag & T_INTR_THREAD) {
 				kpreempt_cnts.kpc_intr++;
 				if (curthread->t_pil == CLOCK_LEVEL)
 					kpreempt_cnts.kpc_clock++;
-			} else
+			} else {
 				kpreempt_cnts.kpc_blocked++;
+				if (CPU->cpu_dispthread != CPU->cpu_thread)
+					siron();
+			}
 			aston(CPU->cpu_dispthread);
 			return;
 		}
