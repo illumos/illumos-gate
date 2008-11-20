@@ -204,8 +204,10 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 		 */
 		sfv_len = (ssize32_t)sfv->sfv_len;
 
-		if (sfv_len == 0)
+		if (sfv_len == 0) {
+			sfv++;
 			continue;
+		}
 
 		if (sfv_len < 0)
 			return (EINVAL);
@@ -514,6 +516,10 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 
 	ASSERT(vp->v_type == VSOCK);
 	ASSERT(maxblk > 0);
+
+	/* If nothing to send, return */
+	if (total_size == 0)
+		return (0);
 
 	wroff = (int)vp->v_stream->sd_wroff;
 	tail_len = (int)vp->v_stream->sd_tail;
@@ -830,42 +836,61 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 		sfv_off = (u_offset_t)(ulong_t)sfv->sfv_off;
 
 		if (sfv->sfv_fd == SFV_FD_SELF) {
-			aiov.iov_len = sfv_len;
-			aiov.iov_base = (caddr_t)(uintptr_t)sfv_off;
-			auio.uio_loffset = *fileoff;
-			auio.uio_iovcnt = 1;
-			auio.uio_resid = sfv_len;
-			auio.uio_iov = &aiov;
-			auio.uio_segflg = UIO_USERSPACE;
-			auio.uio_llimit = curproc->p_fsz_ctl;
-			auio.uio_fmode = fflag;
-
 			if (vp->v_type == VSOCK) {
+				while (sfv_len > 0) {
+					size_t iov_len;
 
-				/*
-				 * Optimize for the socket case
-				 */
+					iov_len = sfv_len;
+					if (so->so_kssl_ctx != NULL)
+						iov_len = MIN(iov_len, maxblk);
 
-				dmp = allocb(sfv_len + extra, BPRI_HI);
-				if (dmp == NULL)
-					return (ENOMEM);
-				dmp->b_wptr = dmp->b_rptr = dmp->b_rptr + wroff;
-				error = uiomove((caddr_t)dmp->b_wptr,
-				    sfv_len, UIO_WRITE, &auio);
-				if (error != 0) {
-					freeb(dmp);
-					return (error);
+					aiov.iov_len = iov_len;
+					aiov.iov_base =
+					    (caddr_t)(uintptr_t)sfv_off;
+
+					auio.uio_iov = &aiov;
+					auio.uio_iovcnt = 1;
+					auio.uio_loffset = *fileoff;
+					auio.uio_segflg = UIO_USERSPACE;
+					auio.uio_fmode = fflag;
+					auio.uio_llimit = curproc->p_fsz_ctl;
+					auio.uio_resid = iov_len;
+
+					dmp = allocb(iov_len + extra, BPRI_HI);
+					if (dmp == NULL)
+						return (ENOMEM);
+					dmp->b_wptr = dmp->b_rptr =
+					    dmp->b_rptr + wroff;
+					error = uiomove((caddr_t)dmp->b_wptr,
+					    iov_len, UIO_WRITE, &auio);
+					if (error != 0) {
+						freeb(dmp);
+						return (error);
+					}
+					dmp->b_wptr += iov_len;
+					error = kstrwritemp(vp, dmp, fflag);
+					if (error != 0) {
+						freeb(dmp);
+						return (error);
+					}
+					ttolwp(curthread)->lwp_ru.ioch +=
+					    (ulong_t)iov_len;
+					*count += iov_len;
+					sfv_len -= iov_len;
+					sfv_off += iov_len;
 				}
-				dmp->b_wptr += sfv_len;
-				error = kstrwritemp(vp, dmp, fflag);
-				if (error != 0) {
-					freeb(dmp);
-					return (error);
-				}
-				ttolwp(curthread)->lwp_ru.ioch +=
-				    (ulong_t)sfv_len;
-				*count += sfv_len;
 			} else {
+				aiov.iov_len = sfv_len;
+				aiov.iov_base = (caddr_t)(uintptr_t)sfv_off;
+
+				auio.uio_iov = &aiov;
+				auio.uio_iovcnt = 1;
+				auio.uio_loffset = *fileoff;
+				auio.uio_segflg = UIO_USERSPACE;
+				auio.uio_fmode = fflag;
+				auio.uio_llimit = curproc->p_fsz_ctl;
+				auio.uio_resid = sfv_len;
+
 				ioflag = auio.uio_fmode &
 				    (FAPPEND|FSYNC|FDSYNC|FRSYNC);
 				while (sfv_len > 0) {

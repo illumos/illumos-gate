@@ -1938,6 +1938,9 @@ snf_async_read(snf_req_t *sr)
 	mblk_t *mp;
 	struct vnode *vp;
 	int extra = 0;
+	int maxblk = 0;
+	int wroff = 0;
+	struct sonode *so;
 
 	fp = sr->sr_fp;
 	size = sr->sr_file_size;
@@ -1949,25 +1952,39 @@ snf_async_read(snf_req_t *sr)
 	(void) VOP_IOCTL(fp->f_vnode, _FIODIRECTIO, DIRECTIO_ON, 0,
 	    kcred, NULL, NULL);
 
-	vp = fp->f_vnode;
+	vp = sr->sr_vp;
 	if (vp->v_type == VSOCK) {
 		stdata_t *stp;
 
 		/*
 		 * Get the extra space to insert a header and a trailer.
 		 */
+		so = VTOSO(vp);
 		stp = vp->v_stream;
-		extra = (int)(stp->sd_wroff + stp->sd_tail);
+		wroff = (int)(stp->sd_wroff);
+		maxblk = (int)(stp->sd_maxblk);
+		extra = wroff + (int)(stp->sd_tail);
 	}
 
 	while ((size != 0) && (sr->sr_write_error == 0)) {
 
 		iosize = (int)MIN(sr->sr_maxpsz, size);
 
+		/*
+		 * For sockets acting as an SSL proxy, we
+		 * need to adjust the size to the maximum
+		 * SSL record size set in the stream head.
+		 */
+		if (vp->v_type == VSOCK && so->so_kssl_ctx != NULL)
+			iosize = (int)MIN(iosize, maxblk);
+
 		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
 			error = EAGAIN;
 			break;
 		}
+
+		mp->b_rptr += wroff;
+
 		ret_size = soreadfile(fp, mp->b_rptr, fileoff, &error, iosize);
 
 		/* Error or Reached EOF ? */
@@ -2347,6 +2364,9 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	struct uio auio;
 	struct iovec aiov;
 	struct vattr va;
+	int maxblk = 0;
+	int wroff = 0;
+	struct sonode *so;
 
 	vp = fp->f_vnode;
 	if (vp->v_type == VSOCK) {
@@ -2355,8 +2375,11 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		/*
 		 * Get the extra space to insert a header and a trailer.
 		 */
+		so = VTOSO(vp);
 		stp = vp->v_stream;
-		extra = (int)(stp->sd_wroff + stp->sd_tail);
+		wroff = (int)(stp->sd_wroff);
+		maxblk = (int)(stp->sd_maxblk);
+		extra = wroff + (int)(stp->sd_tail);
 	}
 
 	fflag = fp->f_flag;
@@ -2377,10 +2400,22 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			break;
 		}
 		iosize = (int)MIN(maxpsz, size);
+
+		/*
+		 * For sockets acting as an SSL proxy, we
+		 * need to adjust the size to the maximum
+		 * SSL record size set in the stream head.
+		 */
+		if (vp->v_type == VSOCK && so->so_kssl_ctx != NULL)
+			iosize = (int)MIN(iosize, maxblk);
+
 		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
 			error = EAGAIN;
 			break;
 		}
+
+		mp->b_rptr += wroff;
+
 		aiov.iov_base = (caddr_t)mp->b_rptr;
 		aiov.iov_len = iosize;
 		auio.uio_loffset = fileoff;

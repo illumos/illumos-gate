@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -1327,6 +1325,12 @@ nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
 		off = sfvp->sfv_off;
 		len = sfvp->sfv_len;
 		cnt = len;
+
+		if (len == 0) {
+			sfvp++;
+			continue;
+		}
+
 		if (sfvp->sfv_fd == SFV_FD_SELF) {
 			/*
 			 * User memory, copyin() all the bytes.
@@ -1707,7 +1711,7 @@ uri_rd_response(struct sonode *so,
 	size_t		segmap_sz;
 	int		error;
 	int		fflg = ((so->so_state & SS_NDELAY) ? FNDELAY : 0) |
-			    ((so->so_state & SS_NONBLOCK) ? FNONBLOCK : 0);
+	    ((so->so_state & SS_NONBLOCK) ? FNONBLOCK : 0);
 
 
 	/* Initialize template uri_desb_t */
