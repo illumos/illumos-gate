@@ -322,6 +322,7 @@ COMMON_SUBDIRS= \
 	SUNWmpapir \
 	SUNWmpathadm \
 	SUNWmpsvplr \
+	SUNWmrsas \
 	SUNWmxfe \
 	SUNWncar \
 	SUNWncau \
