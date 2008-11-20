@@ -167,8 +167,13 @@ typedef struct vlds_dom_hdl2nam_arg {
 /*
  * Machine Description Constants for vlds driver.
  */
-#define	VLDS_MD_ROOT_NODE_NAME	"domain-services"
-#define	VLDS_MD_PORT_NODE_NAME	"domain-services-port"
+#define	VLDS_MD_VIRT_DEV_NAME	"virtual-device"
+#define	VLDS_MD_VIRT_ROOT_NAME	"virtual-domain-service"
+#define	VLDS_MD_DOMAIN_HDL	"vlds-domain-handle"
+#define	VLDS_MD_DOMAIN_NAME	"vlds-domain-name"
+#define	VLDS_MD_VIRT_PORT_NAME	"virtual-device-port"
+#define	VLDS_MD_REM_DOMAIN_HDL	"vlds-remote-domain-handle"
+#define	VLDS_MD_REM_DOMAIN_NAME	"vlds-remote-domain-name"
 
 /*
  * VLDS Sysevent defines.

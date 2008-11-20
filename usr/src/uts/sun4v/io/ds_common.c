@@ -180,7 +180,8 @@ static char *decode_ldc_events(uint64_t event, char *buf);
 static void ds_loopback_register(ds_svc_hdl_t hdl);
 static void ds_loopback_unregister(ds_svc_hdl_t hdl);
 static void ds_loopback_send(ds_svc_hdl_t hdl, void *buf, size_t buflen);
-static int ds_loopback_set_svc(ds_svc_t *svc, ds_svc_hdl_t lb_hdl);
+static int ds_loopback_set_svc(ds_svc_t *svc, ds_capability_t *cap,
+    ds_svc_hdl_t *lb_hdlp);
 
 /* client handling */
 static int i_ds_hdl_lookup(char *service, uint_t is_client, ds_svc_hdl_t *hdlp,
@@ -1014,18 +1015,38 @@ do_reg_nack:
 
 	/*
 	 * A client sends out a reg req in order to force service providers to
-	 * initiate a reg req from their end (limitation in the protocol).  If a
-	 * service provider already thinks it's talking to someone on that port,
-	 * something's gone wrong (probably an unreg req request was dropped).
-	 * If we see that the service is in the wrong state, reset it.
+	 * initiate a reg req from their end (limitation in the protocol).  We
+	 * expect the service provider to be in the inactive (DS_SVC_INACTIVE)
+	 * state.  If the service provider has already sent out a reg req (the
+	 * state is DS_SVC_REG_PENDING) or has already handshaken (the
+	 * state is DS_SVC_ACTIVE), then we can simply ignore this reg
+	 * req.  For any other state, we force an unregister before initiating
+	 * a reg req.
 	 */
 
 	if (DS_HDL_ISCLIENT(req->svc_handle)) {
-		if (svc->state != DS_SVC_INACTIVE) {
+		switch (svc->state) {
+
+		case DS_SVC_REG_PENDING:
+		case DS_SVC_ACTIVE:
+			DS_DBG_PRCL(CE_NOTE, "ds@%lx: <reg_req: '%s' pinging "
+			    "client, state (%x)" DS_EOL, PORTID(port),
+			    req->svc_id, svc->state);
+			mutex_exit(&ds_svcs.lock);
+			return;
+
+		case DS_SVC_INACTIVE:
+			DS_DBG_PRCL(CE_NOTE, "ds@%lx: <reg_req: '%s' pinging "
+			    "client" DS_EOL, PORTID(port), req->svc_id);
+			break;
+
+		default:
+			DS_DBG_PRCL(CE_NOTE, "ds@%lx: <reg_req: '%s' pinging "
+			    "client forced unreg, state (%x)" DS_EOL,
+			    PORTID(port), req->svc_id, svc->state);
 			(void) ds_svc_unregister(svc, port);
+			break;
 		}
-		DS_DBG_PRCL(CE_NOTE, "ds@%lx: <reg_req: '%s' pinging client"
-		    DS_EOL, PORTID(port), req->svc_id);
 		(void) ds_svc_port_up(svc, port);
 		(void) ds_svc_register_onport(svc, port);
 		mutex_exit(&ds_svcs.lock);
@@ -1635,8 +1656,13 @@ ds_send_reg_req(ds_svc_t *svc, ds_port_t *port)
 	size_t		idlen;
 	int		rv;
 
-	ASSERT(svc->state == DS_SVC_INACTIVE ||
-	    (svc->flags & DSSF_ISCLIENT) != 0);
+	if ((svc->state != DS_SVC_INACTIVE) &&
+	    ((svc->flags & DSSF_ISCLIENT) == 0)) {
+		DS_DBG_PRCL(CE_NOTE, "ds@%lx: reg_req>: invalid svc state (%d) "
+		    "for svc '%s'" DS_EOL, PORTID(port), svc->state,
+		    svc->cap.svc_id);
+		return (-1);
+	}
 
 	mutex_enter(&port->lock);
 
@@ -2405,7 +2431,7 @@ ds_ucap_init(ds_capability_t *cap, ds_clnt_ops_t *ops, uint32_t flags,
 	 * Check for loopback.
 	 */
 	if (i_ds_hdl_lookup(cap->svc_id, is_client == 0, &lb_hdl, 1) == 1) {
-		if ((rv = ds_loopback_set_svc(svc, lb_hdl)) != 0) {
+		if ((rv = ds_loopback_set_svc(svc, cap, &lb_hdl)) != 0) {
 			cmn_err(CE_WARN, "%s: ds_loopback_set_svc err (%d)"
 			    DS_EOL, __func__, rv);
 			mutex_exit(&ds_svcs.lock);
@@ -2860,7 +2886,7 @@ ds_errno_to_str(int ds_errno, char *ebuf)
 static void
 ds_loopback_register(ds_svc_hdl_t hdl)
 {
-	ds_ver_t ds_ver = { 1, 0};
+	ds_ver_t ds_ver;
 	ds_svc_t *svc;
 
 	ASSERT(MUTEX_HELD(&ds_svcs.lock));
@@ -2871,6 +2897,7 @@ ds_loopback_register(ds_svc_hdl_t hdl)
 		    (u_longlong_t)hdl);
 		return;
 	}
+
 	svc->state = DS_SVC_ACTIVE;
 
 	if (svc->ops.ds_reg_cb) {
@@ -2899,6 +2926,7 @@ ds_loopback_unregister(ds_svc_hdl_t hdl)
 
 	svc->flags &= ~DSSF_LOOPBACK;
 	svc->svc_hdl = DS_BADHDL2;
+	svc->state = DS_SVC_INACTIVE;
 
 	if (svc->ops.ds_unreg_cb) {
 		DS_DBG_LOOP(CE_NOTE, "%s: loopback unregcb: hdl: 0x%llx" DS_EOL,
@@ -2932,36 +2960,58 @@ ds_loopback_send(ds_svc_hdl_t hdl, void *buf, size_t buflen)
 }
 
 static int
-ds_loopback_set_svc(ds_svc_t *svc, ds_svc_hdl_t lb_hdl)
+ds_loopback_set_svc(ds_svc_t *svc, ds_capability_t *cap, ds_svc_hdl_t *lb_hdlp)
 {
 	ds_svc_t *lb_svc;
+	ds_svc_hdl_t lb_hdl = *lb_hdlp;
+	int i;
+	int match = 0;
+	uint16_t new_major;
+	uint16_t new_minor;
 
 	if ((lb_svc = ds_get_svc(lb_hdl)) == NULL) {
 		DS_DBG_LOOP(CE_NOTE, "%s: loopback: hdl: 0x%llx invalid" DS_EOL,
 		    __func__, (u_longlong_t)lb_hdl);
 		return (ENXIO);
 	}
+
+	/* negotiate a version between loopback services, if possible */
+	for (i = 0; i < lb_svc->cap.nvers && match == 0; i++) {
+		match = negotiate_version(cap->nvers, cap->vers,
+		    lb_svc->cap.vers[i].major, &new_major, &new_minor);
+	}
+	if (!match) {
+		DS_DBG_LOOP(CE_NOTE, "%s: loopback version negotiate failed"
+		    DS_EOL, __func__);
+		return (ENOTSUP);
+	}
 	if (lb_svc->state != DS_SVC_INACTIVE) {
-		DS_DBG_LOOP(CE_NOTE, "%s: loopback inactive: hdl: 0x%llx"
+		DS_DBG_LOOP(CE_NOTE, "%s: loopback active: hdl: 0x%llx"
 		    DS_EOL, __func__, (u_longlong_t)lb_hdl);
 		if ((lb_svc->flags & DSSF_ISCLIENT) == 0) {
 			DS_DBG_LOOP(CE_NOTE, "%s: loopback busy hdl: 0x%llx"
 			    DS_EOL, __func__, (u_longlong_t)lb_hdl);
 			return (EBUSY);
 		}
+		svc->state = DS_SVC_INACTIVE;	/* prevent alloc'ing svc */
 		lb_svc = ds_svc_clone(lb_svc);
 		DS_DBG_LOOP(CE_NOTE, "%s: loopback clone: ohdl: 0x%llx "
 		    "nhdl: 0x%llx" DS_EOL, __func__, (u_longlong_t)lb_hdl,
 		    (u_longlong_t)lb_svc->hdl);
+		*lb_hdlp = lb_svc->hdl;
 	}
 
 	svc->flags |= DSSF_LOOPBACK;
 	svc->svc_hdl = lb_svc->hdl;
 	svc->port = NULL;
+	svc->ver.major = new_major;
+	svc->ver.minor = new_minor;
 
 	lb_svc->flags |= DSSF_LOOPBACK;
 	lb_svc->svc_hdl = svc->hdl;
 	lb_svc->port = NULL;
+	lb_svc->ver.major = new_major;
+	lb_svc->ver.minor = new_minor;
 
 	DS_DBG_LOOP(CE_NOTE, "%s: setting loopback between: 0x%llx and 0x%llx"
 	    DS_EOL, __func__, (u_longlong_t)svc->hdl,

@@ -88,7 +88,8 @@ static taskq_t *ds_taskq;
 #define	DS_MAX_TASKQ_THR	NCPU
 #define	DS_DISPATCH(fn, arg)	taskq_dispatch(ds_taskq, fn, arg, TQ_SLEEP)
 
-ds_domain_hdl_t ds_my_domain_hdl = NULL;
+ds_domain_hdl_t ds_my_domain_hdl = DS_DHDL_INVALID;
+char *ds_my_domain_name = NULL;
 
 #ifdef DEBUG
 /*
@@ -333,8 +334,6 @@ ds_port_add(md_t *mdp, mde_cookie_t port, mde_cookie_t chan)
 {
 	uint64_t	port_id;
 	uint64_t	ldc_id;
-	uint64_t	dhdl;
-	char		*dom_name;
 
 	/* get the ID for this port */
 	if (md_get_prop_val(mdp, port, "id", &port_id) != 0) {
@@ -357,24 +356,23 @@ ds_port_add(md_t *mdp, mde_cookie_t port, mde_cookie_t chan)
 		return (-1);
 	}
 
-	/* get the remote-domain-id property if it's there */
-	if (md_get_prop_val(mdp, port, "remote-domain-id", &dhdl) != 0) {
-		DS_DBG_MD(CE_NOTE, "ds@%lx: %s: 'remote-domain-id' prop "
-		    " not found", port_id, __func__);
-		dhdl = DS_DHDL_INVALID;
-	}
-
-	/* get the remote-domain-name property if it's there */
-	if (md_get_prop_str(mdp, port, "remote-domain-name", &dom_name) != 0) {
-		DS_DBG_MD(CE_NOTE, "ds@%lx: %s: 'remote-domain-name' prop "
-		    " not found", port_id, __func__);
-		dom_name = NULL;
-	}
-
-	if (ds_add_port(port_id, ldc_id, dhdl, dom_name, 1) != 0)
+	if (ds_add_port(port_id, ldc_id, DS_DHDL_INVALID, NULL, 1) != 0)
 		return (-1);
 
 	return (0);
+}
+
+void
+ds_set_my_dom_hdl_name(ds_domain_hdl_t dhdl, char *name)
+{
+	ds_my_domain_hdl = dhdl;
+	if (ds_my_domain_name != NULL) {
+		DS_FREE(ds_my_domain_name, strlen(ds_my_domain_name)+1);
+		ds_my_domain_name = NULL;
+	}
+	if (name != NULL) {
+		ds_my_domain_name = ds_strdup(name);
+	}
 }
 
 void
@@ -773,8 +771,9 @@ ds_add_port(uint64_t port_id, uint64_t ldc_id, ds_domain_hdl_t dhdl,
 		return (EINVAL);
 	}
 
-	DS_DBG_MD(CE_NOTE, "%s: adding port ds@%ld, LDC: 0x%lx, dhdl: 0x%lx",
-	    __func__, port_id, ldc_id, dhdl);
+	DS_DBG_MD(CE_NOTE, "%s: adding port ds@%ld, LDC: 0x%lx, dhdl: 0x%lx "
+	    "name: '%s'", __func__, port_id, ldc_id, dhdl,
+	    dom_name == NULL ? "NULL" : dom_name);
 
 	/* get the port structure from the array of ports */
 	newport = &ds_ports[port_id];
@@ -915,6 +914,14 @@ ds_dom_name_to_hdl(char *domain_name, ds_domain_hdl_t *dhdlp)
 	int i;
 	ds_port_t *port;
 
+	if (domain_name == NULL) {
+		return (ENXIO);
+	}
+	if (ds_my_domain_name != NULL &&
+	    strcmp(ds_my_domain_name, domain_name) == 0) {
+		*dhdlp = ds_my_domain_hdl;
+		return (0);
+	}
 	for (i = 0, port = ds_ports; i < DS_MAX_PORTS; i++, port++) {
 		if (port->state != DS_PORT_FREE &&
 		    port->domain_name != NULL &&
@@ -935,6 +942,13 @@ ds_dom_hdl_to_name(ds_domain_hdl_t dhdl, char **domain_namep)
 	int i;
 	ds_port_t *port;
 
+	if (dhdl == ds_my_domain_hdl) {
+		if (ds_my_domain_name != NULL) {
+			*domain_namep = ds_my_domain_name;
+			return (0);
+		}
+		return (ENXIO);
+	}
 	for (i = 0, port = ds_ports; i < DS_MAX_PORTS; i++, port++) {
 		if (port->state != DS_PORT_FREE &&
 		    port->domain_hdl == dhdl) {

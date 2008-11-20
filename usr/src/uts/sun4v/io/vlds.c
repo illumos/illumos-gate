@@ -103,10 +103,11 @@ static int vlds_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int vlds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 /* mdeg register functions */
-static int ds_mdeg_cb(void *cb_argp, mdeg_result_t *resp);
-static int ds_mdeg_register(void);
-static int ds_mdeg_unregister(void);
-static int ds_add_mdeg_port(md_t *mdp, mde_cookie_t node);
+static void vlds_mdeg_init(void);
+static int vlds_mdeg_cb(void *cb_argp, mdeg_result_t *resp);
+static int vlds_mdeg_register(void);
+static int vlds_mdeg_unregister(void);
+static int vlds_add_mdeg_port(md_t *mdp, mde_cookie_t node);
 
 /* driver utilities */
 static void vlds_user_reg_cb(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl);
@@ -276,7 +277,8 @@ _init(void)
 		return (s);
 	}
 
-	(void) ds_mdeg_register();
+	vlds_mdeg_init();
+	(void) vlds_mdeg_register();
 
 	return (s);
 }
@@ -291,7 +293,7 @@ _fini(void)
 
 	ddi_soft_state_fini(&vlds_statep);
 
-	(void) ds_mdeg_unregister();
+	(void) vlds_mdeg_unregister();
 
 	return (s);
 }
@@ -985,7 +987,7 @@ vlds_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 
 		dhdl = vlds_arg.vlds_dhdl;
-		if ((rv = ds_dom_hdl_to_name(hdl, &domain_name)) != 0) {
+		if ((rv = ds_dom_hdl_to_name(dhdl, &domain_name)) != 0) {
 			DS_DBG_VLDS(CE_NOTE, "%s: DOM_HDL2NAM lookup dhdl: %lx "
 			    "failed (%d)", __func__, dhdl, rv);
 			return (rv);
@@ -1030,36 +1032,36 @@ vlds_flags_to_svc(uint64_t flags)
  * Placed in vlds rather than ds module due to cirular dependency of
  * platsvc module which contains the mdeg code.
  */
-mdeg_handle_t	ds_mdeg_hdl;
+mdeg_handle_t	vlds_mdeg_hdl;
 
 /*
- * There's only one domain services node, so we don't
- * need to specify any match conditions.  However, we
- * have to supply a non-NULL property spec.
+ * Look for "virtual-device-service" node among the
+ * "virtual-device" nodes.
  */
-static mdeg_prop_spec_t ds_prop_template[] = {
-	{ MDET_LIST_END,    NULL,		NULL    }
+static mdeg_prop_spec_t vlds_prop_template[] = {
+	{ MDET_PROP_STR,	"name",	VLDS_MD_VIRT_ROOT_NAME },
+	{ MDET_LIST_END,	NULL,	NULL    }
 };
 
-static mdeg_node_spec_t ds_node_template =
-	{ VLDS_MD_ROOT_NODE_NAME,	ds_prop_template };
+static mdeg_node_spec_t vlds_node_template =
+	{ VLDS_MD_VIRT_DEV_NAME,	vlds_prop_template };
 
 /*
  * Matching criteria passed to the MDEG to register interest
  * in changes to domain services port nodes identified by their
  * 'id' property.
  */
-static md_prop_match_t ds_port_prop_match[] = {
+static md_prop_match_t vlds_port_prop_match[] = {
 	{ MDET_PROP_VAL,    "id"   },
 	{ MDET_LIST_END,    NULL    }
 };
 
-static mdeg_node_match_t ds_port_match = { VLDS_MD_PORT_NODE_NAME,
-					ds_port_prop_match };
+static mdeg_node_match_t vlds_port_match = { VLDS_MD_VIRT_PORT_NAME,
+					vlds_port_prop_match };
 
 /* mdeg callback */
 static int
-ds_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
+vlds_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 {
 	_NOTE(ARGUNUSED(cb_argp))
 	int		idx;
@@ -1069,7 +1071,7 @@ ds_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	mde_cookie_t	node;
 
 	if (resp == NULL) {
-		DS_DBG_VLDS(CE_NOTE, "ds_mdeg_cb: no result returned");
+		DS_DBG_VLDS(CE_NOTE, "vlds_mdeg_cb: no result returned");
 		return (MDEG_FAILURE);
 	}
 
@@ -1085,7 +1087,7 @@ ds_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 		    __func__, node);
 
 		/* attempt to add a port */
-		if ((rv = ds_add_mdeg_port(mdp, node)) != MDEG_SUCCESS) {
+		if ((rv = vlds_add_mdeg_port(mdp, node)) != MDEG_SUCCESS) {
 			if (vlds_ports_inited) {
 				cmn_err(CE_NOTE, "%s: unable to add port, "
 				    "err = %d", __func__, rv);
@@ -1122,18 +1124,18 @@ ds_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 
 /* register callback to mdeg */
 static int
-ds_mdeg_register(void)
+vlds_mdeg_register(void)
 {
 	int		rv;
 
-	DS_DBG_VLDS(CE_NOTE, "ds_mdeg_register: entered");
+	DS_DBG_VLDS(CE_NOTE, "vlds_mdeg_register: entered");
 
 	/* perform the registration */
-	rv = mdeg_register(&ds_node_template, &ds_port_match, ds_mdeg_cb,
-	    NULL, &ds_mdeg_hdl);
+	rv = mdeg_register(&vlds_node_template, &vlds_port_match, vlds_mdeg_cb,
+	    NULL, &vlds_mdeg_hdl);
 
 	if (rv != MDEG_SUCCESS) {
-		cmn_err(CE_NOTE, "ds_mdeg_register: mdeg_register "
+		cmn_err(CE_NOTE, "vlds_mdeg_register: mdeg_register "
 		    "failed, err = %d", rv);
 		return (DDI_FAILURE);
 	}
@@ -1143,15 +1145,15 @@ ds_mdeg_register(void)
 
 /* unregister callback from mdeg */
 static int
-ds_mdeg_unregister(void)
+vlds_mdeg_unregister(void)
 {
-	DS_DBG_VLDS(CE_NOTE, "ds_mdeg_unregister: hdl=0x%lx", ds_mdeg_hdl);
+	DS_DBG_VLDS(CE_NOTE, "vlds_mdeg_unregister: hdl=0x%lx", vlds_mdeg_hdl);
 
-	return (mdeg_unregister(ds_mdeg_hdl));
+	return (mdeg_unregister(vlds_mdeg_hdl));
 }
 
 static int
-ds_get_port_channel(md_t *mdp, mde_cookie_t node, uint64_t *ldc_id)
+vlds_get_port_channel(md_t *mdp, mde_cookie_t node, uint64_t *ldc_id)
 {
 	int num_nodes, nchan;
 	size_t listsz;
@@ -1199,7 +1201,7 @@ ds_get_port_channel(md_t *mdp, mde_cookie_t node, uint64_t *ldc_id)
 
 /* add a DS services port */
 static int
-ds_add_mdeg_port(md_t *mdp, mde_cookie_t node)
+vlds_add_mdeg_port(md_t *mdp, mde_cookie_t node)
 {
 	uint64_t	portno;
 	uint64_t	ldc_id;
@@ -1222,15 +1224,20 @@ ds_add_mdeg_port(md_t *mdp, mde_cookie_t node)
 	}
 
 	/* get all channels for this device (currently only one) */
-	if (ds_get_port_channel(mdp, node, &ldc_id) == -1) {
+	if (vlds_get_port_channel(mdp, node, &ldc_id) == -1) {
 		return (MDEG_FAILURE);
 	}
 
-	if (md_get_prop_val(mdp, node, "remote-domain-id", &dhdl) != 0) {
+	if (md_get_prop_val(mdp, node, VLDS_MD_REM_DOMAIN_HDL, &dhdl) != 0) {
+		cmn_err(CE_NOTE, "!ds%lx: %s no %s property", portno, __func__,
+		    VLDS_MD_REM_DOMAIN_HDL);
 		dhdl = DS_DHDL_INVALID;
 	}
 
-	if (md_get_prop_str(mdp, node, "remote-domain-name", &dom_name) != 0) {
+	if (md_get_prop_str(mdp, node, VLDS_MD_REM_DOMAIN_NAME, &dom_name)
+	    != 0) {
+		cmn_err(CE_NOTE, "!ds%lx: %s no %s property", portno, __func__,
+		    VLDS_MD_REM_DOMAIN_NAME);
 		dom_name = NULL;
 	}
 
@@ -1248,6 +1255,89 @@ ds_add_mdeg_port(md_t *mdp, mde_cookie_t node)
 	    __func__, ldc_id);
 
 	return (MDEG_SUCCESS);
+}
+
+static void
+vlds_mdeg_init(void)
+{
+	md_t		*mdp;
+	int		num_nodes;
+	int		listsz;
+	mde_cookie_t	rootnode;
+	mde_cookie_t	vldsnode;
+	mde_cookie_t	*vlds_nodes = NULL;
+	int		nvlds;
+	int		i;
+	ds_domain_hdl_t	dhdl;
+	char		*dom_name;
+	char		*svc_name;
+
+	if ((mdp = md_get_handle()) == NULL) {
+		cmn_err(CE_NOTE, "Unable to initialize machine description");
+		return;
+	}
+
+	num_nodes = md_node_count(mdp);
+	ASSERT(num_nodes > 0);
+
+	listsz = num_nodes * sizeof (mde_cookie_t);
+
+	/* allocate temporary storage for MD scans */
+	vlds_nodes = kmem_zalloc(listsz, KM_SLEEP);
+
+	rootnode = md_root_node(mdp);
+	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
+
+	/*
+	 * Search for Virtual Domain Service node.
+	 */
+	nvlds = md_scan_dag(mdp, rootnode, md_find_name(mdp,
+	    VLDS_MD_VIRT_DEV_NAME), md_find_name(mdp, "fwd"), vlds_nodes);
+
+	if (nvlds <= 0) {
+		DS_DBG_MD(CE_NOTE, "No '%s' nodes in MD",
+		    VLDS_MD_VIRT_DEV_NAME);
+		goto done;
+	}
+
+	for (i = 0; i < nvlds; i++) {
+		if (md_get_prop_str(mdp, vlds_nodes[i], "name", &svc_name)) {
+			DS_DBG_MD(CE_NOTE, "%s: missing 'name' property for"
+			    " IO node %d\n", __func__, i);
+			continue;
+		}
+
+		if (strcmp(svc_name, VLDS_MD_VIRT_ROOT_NAME) == 0) {
+			vldsnode = vlds_nodes[i];
+			break;
+		}
+	}
+
+	if (i >= nvlds) {
+		DS_DBG_MD(CE_NOTE, "No '%s' node in MD",
+		    VLDS_MD_VIRT_ROOT_NAME);
+		goto done;
+	}
+
+	if (md_get_prop_val(mdp, vldsnode, VLDS_MD_DOMAIN_HDL, &dhdl) != 0) {
+		DS_DBG_MD(CE_NOTE, "No '%s' property for '%s' node in MD",
+		    VLDS_MD_DOMAIN_HDL, VLDS_MD_VIRT_ROOT_NAME);
+		dhdl = DS_DHDL_INVALID;
+	}
+	if (md_get_prop_str(mdp, vldsnode, VLDS_MD_DOMAIN_NAME, &dom_name)
+	    != 0) {
+		DS_DBG_MD(CE_NOTE, "No '%s' property for '%s' node in MD",
+		    VLDS_MD_DOMAIN_NAME, VLDS_MD_VIRT_ROOT_NAME);
+		dom_name = NULL;
+	}
+	DS_DBG_MD(CE_NOTE, "My Domain Hdl: 0x%lx, Name: '%s'", dhdl,
+	    dom_name == NULL ? "NULL" : dom_name);
+	ds_set_my_dom_hdl_name(dhdl, dom_name);
+
+done:
+	DS_FREE(vlds_nodes, listsz);
+
+	(void) md_fini_handle(mdp);
 }
 
 static void

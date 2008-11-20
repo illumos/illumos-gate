@@ -433,6 +433,7 @@ void ds_cbarg_set_drv_per_svc_ptr(ds_cb_arg_t arg, void *dpsp);
 int ds_hdl_get_cbarg(ds_svc_hdl_t hdl, ds_cb_arg_t *cbargp);
 void ds_cbarg_set_cookie(ds_svc_t *svc);
 int ds_is_my_hdl(ds_svc_hdl_t hdl, int instance);
+void ds_set_my_dom_hdl_name(ds_domain_hdl_t dhdl, char *name);
 
 /* initialization functions */
 void ds_common_init(void);
