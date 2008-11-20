@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rlogin - remote login
@@ -97,12 +94,17 @@ static krb5_data desinbuf, desoutbuf;
 static krb5_encrypt_block eblock;	/* eblock for encrypt/decrypt */
 static krb5_keyblock *session_key;
 static krb5_creds *cred;
-static krb5_context bsd_context;
+static krb5_context bsd_context = NULL;
 static krb5_auth_context auth_context;
 
 static char *krb_realm;
 
 static	int krb5auth_flag;	/* Flag set, when KERBEROS is enabled */
+static profile_options_boolean autologin_option[] = {
+	{ "autologin", &krb5auth_flag, 0 },
+	{ NULL, NULL, 0 }
+};
+
 static	int fflag, Fflag;	/* Flag set, when option -f / -F used */
 static	int encrypt_flag;	/* Flag set, when the "-x" option is used */
 
@@ -245,7 +247,7 @@ usage(void) {
 	(void) fprintf(stderr, "%s\n%s\n",
 	    gettext("usage: rlogin [-option] [-option...] "
 		"[-k realm] [-l username] host"),
-	    gettext("       where option is e, 8, E, L, A, a, x, "
+	    gettext("       where option is e, 8, E, L, A, a, K, x, "
 		"PN / PO, f or F"));
 	pop(EXIT_FAILURE);
 }
@@ -340,18 +342,18 @@ main(int argc, char **argv)
 	}
 
 	while ((c = getopt(argc, argv,
-	    DEBUGOPTSTRING "8AEFLP:ade:fk:l:x")) != -1) {
+	    DEBUGOPTSTRING "8AEFLP:aKde:fk:l:x")) != -1) {
 		switch (c) {
 		case '8':
 			eight = B_TRUE;
 			break;
 		case 'A':
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 #ifdef DEBUG
 		case 'D':
 			portnumber = htons(atoi(optarg));
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 #endif /* DEBUG */
 		case 'E':
@@ -361,14 +363,14 @@ main(int argc, char **argv)
 			if (fflag)
 				usage_forward();
 			Fflag = 1;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			fwdable_done = B_TRUE;
 			break;
 		case 'f':
 			if (Fflag)
 				usage_forward();
 			fflag = 1;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			fwd_done = B_TRUE;
 			break;
 		case 'L':
@@ -386,12 +388,13 @@ main(int argc, char **argv)
 				die(gettext("rlogin: Only one of -PN and -PO "
 				    "allowed.\n"));
 			rcmdoption_done = B_TRUE;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 		case 'a':
+		case 'K':
 		/*
 		 * Force the remote host to prompt for a password by sending
-		 * a NULL username. This option is mutually exclusive with
+		 * a NULL username. These options are mutually exclusive with
 		 * the -A, -x, -f, -F, -k <realm> options.
 		 */
 			null_local_username = B_TRUE;
@@ -429,14 +432,14 @@ main(int argc, char **argv)
 		}
 		case 'k':
 			krb_realm = optarg;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 		case 'l':
 			name = optarg;
 			break;
 		case 'x':
 			encrypt_flag = 1;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			encrypt_done = B_TRUE;
 			break;
 		default:
@@ -467,24 +470,41 @@ main(int argc, char **argv)
 		name = pwd->pw_name;
 
 	/*
-	 * If the `-a' option is issued on the cmd line, we reset all
-	 * flags associated with other KRB5 specific options, since
-	 * the -a option is mutually exclusive with the rest.
+	 * If the `-a or -K' options are issued on the cmd line, we reset
+	 * all flags associated with other KRB5 specific options, since
+	 * these options are mutually exclusive with the rest.
 	 */
 	if (null_local_username) {
-		krb5auth_flag = B_FALSE;
+		krb5auth_flag = 0;
 		fflag = Fflag = encrypt_flag = 0;
-		(void) fprintf(stderr, gettext("Note: The -a option nullifies "
+		(void) fprintf(stderr,
+				gettext("Note: The -a (or -K) option nullifies "
 					"all other Kerberos-specific\noptions "
 					"you may have used.\n"));
+	} else if (!krb5auth_flag) {
+		/* is autologin set in krb5.conf? */
+		status = krb5_init_context(&bsd_context);
+		/* don't sweat failure here */
+		if (!status) {
+			/*
+			 * note that the call to profile_get_options_boolean
+			 * with autologin_option can affect value of
+			 * krb5auth_flag
+			 */
+			profile_get_options_boolean(bsd_context->profile,
+						appdef,
+						autologin_option);
+		}
 	}
 
 	if (krb5auth_flag) {
-		status = krb5_init_context(&bsd_context);
-		if (status) {
-			com_err(rlogin, status, gettext("while initializing"
-					" krb5"));
-			return (EXIT_FAILURE);
+		if (!bsd_context) {
+			status = krb5_init_context(&bsd_context);
+			if (status) {
+				com_err(rlogin, status,
+				    gettext("while initializing krb5"));
+				return (EXIT_FAILURE);
+			}
 		}
 		/*
 		 * Set up buffers for desread and deswrite.
@@ -664,7 +684,7 @@ main(int argc, char **argv)
 			 * fallback to normal rlogin
 			 */
 			port_number = htons(IPPORT_LOGINSERVER);
-			krb5auth_flag = B_FALSE;
+			krb5auth_flag = 0;
 			fflag = Fflag = encrypt_flag = 0;
 			null_local_username = B_FALSE;
 		} else {

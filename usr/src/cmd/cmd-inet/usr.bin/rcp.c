@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -140,7 +138,7 @@ static char des_outbuf[2 * RCP_BUFSIZE];
 static krb5_data desinbuf, desoutbuf;
 static krb5_encrypt_block eblock;	/* eblock for encrypt/decrypt */
 static krb5_keyblock *session_key;	/* static key for session */
-static krb5_context bsd_context;
+static krb5_context bsd_context = NULL;
 static krb5_auth_context auth_context;
 static krb5_flags authopts;
 static krb5_error_code status;
@@ -162,6 +160,12 @@ extern errcode_t	profile_get_options_string(profile_t, char **,
     profile_option_strings *);
 
 static int krb5auth_flag = 0;	/* Flag set, when KERBEROS is enabled */
+static profile_options_boolean autologin_option[] = {
+	{ "autologin", &krb5auth_flag, 0 },
+	{ NULL, NULL, 0 }
+};
+static int no_krb5auth_flag = 0;
+
 static int encrypt_flag = 0;	/* Flag set, when encryption is enabled */
 static int encrypt_done = 0;	/* Flag set, if "-x" is specified */
 static enum kcmd_proto kcmd_proto = KCMD_NEW_PROTOCOL;
@@ -204,7 +208,7 @@ main(int argc, char *argv[])
 	}
 
 	fflag = tflag = 0;
-	while ((ch = getopt(argc, argv, "axdfprtz:D:k:P:Z")) != EOF) {
+	while ((ch = getopt(argc, argv, "axdfprtz:D:k:P:ZK")) != EOF) {
 		switch (ch) {
 		case 'd':
 			targetshouldbedirectory = 1;
@@ -226,6 +230,9 @@ main(int argc, char *argv[])
 			break;
 		case 'Z':
 			acl_aclflag++;
+			break;
+		case 'K':
+			no_krb5auth_flag++;
 			break;
 		case 'x':
 			if (!krb5_privacy_allowed()) {
@@ -286,12 +293,41 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (krb5auth_flag > 0) {
+	/*
+	 * if the user disables krb5 on the cmdline (-K), then skip
+	 * all krb5 setup.
+	 *
+	 * if the user does not disable krb5 or enable krb5 on the
+	 * cmdline, check krb5.conf to see if it should be enabled.
+	 */
+
+	if (no_krb5auth_flag) {
+		krb5auth_flag = 0;
+		fflag = encrypt_flag = 0;
+	} else if (!krb5auth_flag) {
+		/* is autologin set in krb5.conf? */
 		status = krb5_init_context(&bsd_context);
-		if (status) {
-			com_err("rcp", status,
-				gettext("while initializing krb5"));
-			return (1);
+		/* don't sweat failure here */
+		if (!status) {
+			/*
+			 * note that the call to profile_get_options_boolean
+			 * with autologin_option can affect value of
+			 * krb5auth_flag
+			 */
+			(void) profile_get_options_boolean(bsd_context->profile,
+							appdef,
+							autologin_option);
+		}
+	}
+
+	if (krb5auth_flag > 0) {
+		if (!bsd_context) {
+			status = krb5_init_context(&bsd_context);
+			if (status) {
+				com_err("rcp", status,
+				    gettext("while initializing krb5"));
+				return (1);
+			}
 		}
 
 		/*

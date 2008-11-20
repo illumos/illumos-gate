@@ -1,9 +1,7 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1983 Regents of the University of California.
@@ -58,13 +56,19 @@ static char des_inbuf[2 * RSH_BUFSIZ];	/* needs to be > largest read size */
 static char des_outbuf[2 * RSH_BUFSIZ];	/* needs to be > largest write size */
 static krb5_data desinbuf, desoutbuf;
 static krb5_encrypt_block eblock;	/* eblock for encrypt/decrypt */
-static krb5_context bsd_context;
+static krb5_context bsd_context = NULL;
 static krb5_auth_context auth_context;
 static krb5_creds *cred;
 static krb5_keyblock *session_key;
 
 static int encrypt_flag;	/* Flag set, when encryption is used */
-static boolean_t krb5auth_flag;	/* Flag set, when KERBEROS is enabled */
+static int krb5auth_flag;	/* Flag set, when KERBEROS is enabled */
+static profile_options_boolean autologin_option[] = {
+	{ "autologin", &krb5auth_flag, 0 },
+	{ NULL, NULL, 0 }
+};
+
+static int no_krb5auth_flag = 0;
 static int fflag;	/* Flag set, if creds to be fwd'ed via -f */
 static int Fflag;	/* Flag set, if fwd'able creds to be fwd'ed via -F */
 
@@ -269,26 +273,26 @@ main(int argc, char **argv)
 	}
 
 	while ((c = getopt(argc, argv,
-	    DEBUGOPTSTRING "8AFLP:ade:fk:l:nwx")) != -1) {
+	    DEBUGOPTSTRING "8AFKLP:ade:fk:l:nwx")) != -1) {
 		switch (c) {
 #ifdef DEBUG
 		case 'D':
 			portnumber = htons(atoi(optarg));
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 #endif /* DEBUG */
 		case 'F':
 			if (fflag)
 				usage_forward();
 			Fflag = 1;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			fwdable_done = B_TRUE;
 			break;
 		case 'f':
 			if (Fflag)
 				usage_forward();
 			fflag = 1;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			fwd_done = B_TRUE;
 			break;
 		case 'P':
@@ -303,17 +307,20 @@ main(int argc, char **argv)
 				die(gettext("rsh: Only one of -PN and -PO "
 				    "allowed.\n"));
 			rcmdoption_done = B_TRUE;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 		case 'a':
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
+			break;
+		case 'K':
+			no_krb5auth_flag++;
 			break;
 		case 'd':
 			options |= SO_DEBUG;
 			break;
 		case 'k':
 			krb_realm = optarg;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			break;
 		case 'l':
 			user = optarg;
@@ -339,7 +346,7 @@ main(int argc, char **argv)
 			break;
 		case 'x':
 			encrypt_flag = 1;
-			krb5auth_flag = B_TRUE;
+			krb5auth_flag++;
 			encrypt_done = B_TRUE;
 			break;
 		/*
@@ -409,11 +416,42 @@ main(int argc, char **argv)
 	if (user == NULL)
 		user = pwd->pw_name;
 
-	if (krb5auth_flag) {
+	/*
+	 * if the user disables krb5 on the cmdline (-K), then skip
+	 * all krb5 setup.
+	 *
+	 * if the user does not disable krb5 or enable krb5 on the
+	 * cmdline, check krb5.conf to see if it should be enabled.
+	 */
+
+	if (no_krb5auth_flag) {
+		krb5auth_flag = 0;
+		Fflag = fflag = encrypt_flag = 0;
+	} else if (!krb5auth_flag) {
+		/* is autologin set in krb5.conf? */
 		status = krb5_init_context(&bsd_context);
-		if (status) {
-			com_err("rsh", status, "while initializing krb5");
-			return (EXIT_FAILURE);
+		/* don't sweat failure here */
+		if (!status) {
+			/*
+			 * note that the call to profile_get_options_boolean
+			 * with autologin_option can affect value of
+			 * krb5auth_flag
+			 */
+			(void) profile_get_options_boolean(bsd_context->profile,
+							appdef,
+							autologin_option);
+		}
+	}
+
+	if (krb5auth_flag) {
+		if (!bsd_context) {
+			status = krb5_init_context(&bsd_context);
+			if (status) {
+				com_err("rsh", status,
+				    "while initializing krb5");
+				return (EXIT_FAILURE);
+
+			}
 		}
 
 		/*
@@ -482,7 +520,7 @@ main(int argc, char **argv)
 			 * fallback to normal rsh; Reset all KRB5 flags
 			 * and connect to 'shell' service on the server
 			 */
-			krb5auth_flag = B_FALSE;
+			krb5auth_flag = 0;
 			encrypt_flag = fflag = Fflag = 0;
 		}
 	}
@@ -561,7 +599,7 @@ main(int argc, char **argv)
 			 * kcmd() failed, so we now fallback to normal rsh,
 			 * after resetting the KRB5 flags and the 'args' array
 			 */
-			krb5auth_flag = B_FALSE;
+			krb5auth_flag = 0;
 			encrypt_flag = fflag = Fflag = 0;
 			args = args_no_x;
 			(void) init_service(B_FALSE);
