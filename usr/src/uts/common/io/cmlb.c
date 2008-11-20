@@ -2854,8 +2854,6 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 	}
 
 	cl->cl_g.dkg_apc = 0;
-	cl->cl_vtoc.v_nparts = V_NUMPAR;
-	cl->cl_vtoc.v_version = V_VERSION;
 
 	/* Add backup slice */
 	cl->cl_vtoc.v_part[2].p_start = 0;
@@ -2894,6 +2892,8 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 	cl->cl_g.dkg_intrlv = 1;
 
 	cl->cl_vtoc.v_sanity  = VTOC_SANE;
+	cl->cl_vtoc.v_nparts = V_NUMPAR;
+	cl->cl_vtoc.v_version = V_VERSION;
 
 	cl->cl_f_geometry_is_valid = TRUE;
 	cl->cl_label_from_media = CMLB_LABEL_UNDEF;
