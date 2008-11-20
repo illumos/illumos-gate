@@ -3123,6 +3123,7 @@ megasas_dma_alloc(struct megasas_instance *instance, struct scsi_pkt *pkt,
 	cb = (callback == NULL_FUNC) ? DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
 
 	tmp_dma_attr.dma_attr_sgllen = instance->max_num_sge;
+	tmp_dma_attr.dma_attr_addr_hi = 0xffffffffffffffffull;
 
 	if ((i = ddi_dma_alloc_handle(instance->dip, &tmp_dma_attr,
 	    cb, 0, &acmd->cmd_dmahandle)) != DDI_SUCCESS) {
@@ -3308,7 +3309,7 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 	uint32_t	sge_bytes;
 
 	struct megasas_cmd		*cmd;
-	struct megasas_sge32		*mfi_sgl;
+	struct megasas_sge64		*mfi_sgl;
 	struct scsa_cmd			*acmd = PKT2CMD(pkt);
 	struct megasas_pthru_frame 	*pthru;
 	struct megasas_io_frame		*ldio;
@@ -3347,7 +3348,7 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 		flags = MFI_FRAME_DIR_NONE;
 	}
 
-	/* flags |= MFI_FRAME_SGL64; */
+	flags |= MFI_FRAME_SGL64;
 
 	switch (pkt->pkt_cdbp[0]) {
 
@@ -3391,7 +3392,7 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 			ldio->access_byte = (acmd->cmd_cdblen != 6) ?
 			    pkt->pkt_cdbp[1] : 0;
 			ldio->sge_count = acmd->cmd_cookiecnt;
-			mfi_sgl = (struct megasas_sge32	*)&ldio->sgl;
+			mfi_sgl = (struct megasas_sge64	*)&ldio->sgl;
 
 			context = ldio->context;
 
@@ -3464,7 +3465,7 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 		pthru->flags		= flags;
 		pthru->data_xfer_len	= acmd->cmd_dmacount;
 		pthru->sge_count	= acmd->cmd_cookiecnt;
-		mfi_sgl			= (struct megasas_sge32 *)&pthru->sgl;
+		mfi_sgl			= (struct megasas_sge64 *)&pthru->sgl;
 
 		bzero(cmd->sense, SENSE_LENGTH);
 		pthru->sense_len	= SENSE_LENGTH;
@@ -3488,7 +3489,7 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 		mfi_sgl->length    = acmd->cmd_dmacookies[i].dmac_size;
 	}
 
-	sge_bytes = sizeof (struct megasas_sge32)*acmd->cmd_cookiecnt;
+	sge_bytes = sizeof (struct megasas_sge64)*acmd->cmd_cookiecnt;
 
 	cmd->frame_count = (sge_bytes / MEGAMFI_FRAME_SIZE) +
 	    ((sge_bytes % MEGAMFI_FRAME_SIZE) ? 1 : 0) + 1;
