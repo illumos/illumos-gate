@@ -725,9 +725,11 @@ ipw2200_quiesce(dev_info_t *dip)
 {
 	struct ipw2200_softc	*sc =
 	    ddi_get_soft_state(ipw2200_ssp, ddi_get_instance(dip));
-
 	if (sc == NULL)
 		return (DDI_FAILURE);
+
+	/* by pass any messages, if it's quiesce */
+	ipw2200_debug = 0;
 
 	/*
 	 * No more blocking is allowed while we are in the
@@ -738,7 +740,8 @@ ipw2200_quiesce(dev_info_t *dip)
 	/*
 	 * Disable and mask all interrupts.
 	 */
-	ipw2200_stop(sc);
+	ipw2200_master_stop(sc);
+	ipw2200_csr_put32(sc, IPW2200_CSR_RST, IPW2200_RST_SW_RESET);
 	return (DDI_SUCCESS);
 }
 
@@ -758,20 +761,12 @@ ipw2200_stop(struct ipw2200_softc *sc)
 	 */
 	ipw2200_ring_reset(sc);
 
-	/*
-	 * by-pass, if its' quiesced
-	 */
-	if (!(sc->sc_flags & IPW2200_FLAG_QUIESCED))
-		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 	sc->sc_flags &= ~IPW2200_FLAG_SCANNING;
 	sc->sc_flags &= ~IPW2200_FLAG_ASSOCIATED;
 
-	/*
-	 * by-pass, if its' quiesced
-	 */
-	if (!(sc->sc_flags & IPW2200_FLAG_QUIESCED))
-		IPW2200_DBG(IPW2200_DBG_HWCAP, (sc->sc_dip, CE_CONT,
-		    "ipw2200_stop(): exit\n"));
+	IPW2200_DBG(IPW2200_DBG_HWCAP, (sc->sc_dip, CE_CONT,
+	    "ipw2200_stop(): exit\n"));
 }
 
 static int
@@ -1171,10 +1166,7 @@ ipw2200_master_stop(struct ipw2200_softc *sc)
 		/* wait for a while */
 		drv_usecwait(100);
 	}
-	/*
-	 * by pass warning message, if it's quiesced already
-	 */
-	if (ntries == 500 && !(sc->sc_flags & IPW2200_FLAG_QUIESCED))
+	if (ntries == 500)
 		IPW2200_WARN((sc->sc_dip, CE_WARN,
 		    "ipw2200_master_stop(): timeout\n"));
 

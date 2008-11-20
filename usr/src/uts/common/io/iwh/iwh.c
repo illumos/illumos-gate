@@ -295,6 +295,7 @@ static int	iwh_power_up(iwh_sc_t *);
 static int	iwh_preinit(iwh_sc_t *);
 static int	iwh_init(iwh_sc_t *);
 static void	iwh_stop(iwh_sc_t *);
+static int	iwh_quiesce(dev_info_t *t);
 static void	iwh_amrr_init(iwh_amrr_t *);
 static void	iwh_amrr_timeout(iwh_sc_t *);
 static void	iwh_amrr_ratectl(void *, ieee80211_node_t *);
@@ -346,7 +347,7 @@ extern pri_t minclsyspri;
  * Module Loading Data & Entry Points
  */
 DDI_DEFINE_STREAM_OPS(iwh_devops, nulldev, nulldev, iwh_attach,
-    iwh_detach, nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    iwh_detach, nodev, NULL, D_MP, NULL, iwh_quiesce);
 
 static struct modldrv iwh_modldrv = {
 	&mod_driverops,
@@ -1556,9 +1557,12 @@ iwh_reset_tx_ring(iwh_sc_t *sc, iwh_tx_ring_t *ring)
 	}
 	iwh_mac_access_exit(sc);
 
-	for (i = 0; i < ring->count; i++) {
-		data = &ring->data[i];
-		IWH_DMA_SYNC(data->dma_data, DDI_DMA_SYNC_FORDEV);
+	/* by pass, if it's quiesce */
+	if (!(sc->sc_flags & IWH_F_QUIESCED)) {
+		for (i = 0; i < ring->count; i++) {
+			data = &ring->data[i];
+			IWH_DMA_SYNC(data->dma_data, DDI_DMA_SYNC_FORDEV);
+		}
 	}
 
 	ring->queued = 0;
@@ -2205,7 +2209,6 @@ iwh_rx_mpdu_intr(iwh_sc_t *sc, iwh_rx_desc_t *desc)
 	len = mpdu_size->byte_count;
 	tail = (uint32_t *)((uint8_t *)(desc + 1) +
 	    sizeof (struct iwh_rx_mpdu_body_size) + len);
-
 
 	IWH_DBG((IWH_DEBUG_RX, "rx intr: idx=%d phy_len=%x len=%d "
 	    "rate=%x chan=%d tstamp=%x non_cfg_phy_count=%x "
@@ -4020,6 +4023,42 @@ iwh_config(iwh_sc_t *sc)
 	return (IWH_SUCCESS);
 }
 
+/*
+ * quiesce(9E) entry point.
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+static int
+iwh_quiesce(dev_info_t *dip)
+{
+	iwh_sc_t *sc;
+
+	sc = ddi_get_soft_state(iwh_soft_state_p, ddi_get_instance(dip));
+	if (sc == NULL)
+		return (DDI_FAILURE);
+
+#ifdef DEBUG
+	/* by pass any messages, if it's quiesce */
+	iwh_dbg_flags = 0;
+#endif
+
+	/*
+	 * No more blocking is allowed while we are in the
+	 * quiesce(9E) entry point.
+	 */
+	sc->sc_flags |= IWH_F_QUIESCED;
+
+	/*
+	 * Disable and mask all interrupts.
+	 */
+	iwh_stop(sc);
+
+	return (DDI_SUCCESS);
+}
+
 static void
 iwh_stop_master(iwh_sc_t *sc)
 {
@@ -4445,7 +4484,9 @@ iwh_stop(iwh_sc_t *sc)
 	uint32_t tmp;
 	int i;
 
-	mutex_enter(&sc->sc_glock);
+	/* by pass if it's quiesced */
+	if (!(sc->sc_flags & IWH_F_QUIESCED))
+		mutex_enter(&sc->sc_glock);
 
 	IWH_WRITE(sc, CSR_RESET, CSR_RESET_REG_FLAG_NEVO_RESET);
 	/*
@@ -4479,7 +4520,9 @@ iwh_stop(iwh_sc_t *sc)
 	tmp = IWH_READ(sc, CSR_RESET);
 	IWH_WRITE(sc, CSR_RESET, tmp | CSR_RESET_REG_FLAG_SW_RESET);
 
-	mutex_exit(&sc->sc_glock);
+	/* by pass if it's quiesced */
+	if (!(sc->sc_flags & IWH_F_QUIESCED))
+		mutex_exit(&sc->sc_glock);
 }
 
 /*
