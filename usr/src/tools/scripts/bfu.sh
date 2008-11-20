@@ -5160,17 +5160,16 @@ get_rootdev_list()
 		metadev=`grep -v "^#" $rootprefix/etc/vfstab | \
 			grep "[	 ]/[ 	]" | nawk '{print $2}'`
 		if [[ $metadev = /dev/rdsk/* ]]; then
-       		 	rootdevlist=`echo "$metadev" | sed -e "s#/dev/rdsk/##"`
+       		 	rootdevlist=`basename "$metadev"`
 		elif [[ $metadev = /dev/md/rdsk/* ]]; then
-       		 	metavol=`echo "$metadev" | sed -e "s#/dev/md/rdsk/##"`
+       		 	metavol=`basename "$metadev"`
 			rootdevlist=`metastat -p $metavol |\
-			grep -v "^$metavol[         ]" |\
-			nawk '{print $4}' | sed -e "s#/dev/rdsk/##"`
+			    grep -v "^$metavol[         ]" | nawk '{print $4}'`
 		fi
 	fi
 	for rootdev in $rootdevlist
 	do
-		echo /dev/rdsk/$rootdev
+		echo /dev/rdsk/`basename $rootdev`
 	done
 }
 
