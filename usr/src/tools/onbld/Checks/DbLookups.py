@@ -236,12 +236,12 @@ def ARC(arclist):
 	try:
 		data = urllib2.urlopen(req).readlines()
 	except urllib2.HTTPError, e:
-		print "ERROR: HTTP error at " + req.get_ful_url() + \
+		print "ERROR: HTTP error at " + req.get_full_url() + \
 			" got error: " + str(e.code)
 		raise e
 
 	except urllib2.URLError, e:
-		print "ERROR: could not connect to " + req.get_ful_url() + \
+		print "ERROR: could not connect to " + req.get_full_url() + \
 			' got error: "' + e.reason[1] + '"'
 		raise e
 	ret = {}
