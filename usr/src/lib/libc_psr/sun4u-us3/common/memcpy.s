@@ -686,7 +686,7 @@
 
 	! Main loop to write out doubles.  Note: o5 & 7 == 0
 	
-	ldx	[%o1], %d2
+	ldd	[%o1], %d2
 	subcc	%o5, 8, %o5		! update local count
 	bz,pn	%ncc, 1f
 	add	%o1, 8, %o1		! update SRC
