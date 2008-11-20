@@ -129,7 +129,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.40"};
+static char sata_rev_tag[] = {"1.41"};
 
 /*
  * SATA cb_ops functions
@@ -3149,7 +3149,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 				/*
 				 * Request for suported Vital Product Data
 				 * pages - assuming only 2 page codes
-				 * supported
+				 * supported.
 				 */
 				page_buf[0] = peripheral_device_type;
 				page_buf[1] = INQUIRY_SUP_VPD_PAGE;
@@ -3161,42 +3161,63 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 				count = MIN(bp->b_bcount, 6);
 				bcopy(page_buf, bp->b_un.b_addr, count);
 				break;
+
 			case INQUIRY_USN_PAGE:
 				/*
-				 * Request for Unit Serial Number page
+				 * Request for Unit Serial Number page.
+				 * Set-up the page.
 				 */
 				page_buf[0] = peripheral_device_type;
 				page_buf[1] = INQUIRY_USN_PAGE;
 				page_buf[2] = 0;
-				page_buf[3] = 20; /* remaining page length */
+				/* remaining page length */
+				page_buf[3] = SATA_ID_SERIAL_LEN;
+
+				/*
+				 * Copy serial number from Identify Device data
+				 * words into the inquiry page and swap bytes
+				 * when necessary.
+				 */
 				p = (uint8_t *)(sdinfo->satadrv_id.ai_drvser);
 #ifdef	_LITTLE_ENDIAN
-				swab(p, &page_buf[4], 20);
+				swab(p, &page_buf[4], SATA_ID_SERIAL_LEN);
 #else
-				bcopy(p, &page_buf[4], 20);
+				bcopy(p, &page_buf[4], SATA_ID_SERIAL_LEN);
 #endif
-				for (i = 0; i < 20; i++) {
-					if (page_buf[4 + i] == '\0' ||
-					    page_buf[4 + i] == '\040') {
-						break;
-					}
-				}
 				/*
-				 * 'i' contains string length.
-				 *
 				 * Least significant character of the serial
 				 * number shall appear as the last byte,
 				 * according to SBC-3 spec.
+				 * Count trailing spaces to determine the
+				 * necessary shift length.
 				 */
-				p = &page_buf[20 + 4 - 1];
-				for (j = i; j > 0; j--, p--) {
-					*p = *(p - 20 + i);
+				p = &page_buf[SATA_ID_SERIAL_LEN + 4 - 1];
+				for (j = 0; j < SATA_ID_SERIAL_LEN; j++) {
+					if (*(p - j) != '\0' &&
+					    *(p - j) != '\040')
+						break;
 				}
-				p = &page_buf[4];
-				for (j = 20 - i; j > 0; j--) {
-					*p++ = '\040';
-				}
-				count = MIN(bp->b_bcount, 24);
+
+				/*
+				 * Shift SN string right, so that the last
+				 * non-blank character would appear in last
+				 * byte of SN field in the page.
+				 * 'j' is the shift length.
+				 */
+				for (i = 0;
+				    i < (SATA_ID_SERIAL_LEN - j) && j != 0;
+				    i++, p--)
+					*p = *(p - j);
+
+				/*
+				 * Add leading spaces - same number as the
+				 * shift size
+				 */
+				for (; j > 0; j--)
+					page_buf[4 + j - 1] = '\040';
+
+				count = MIN(bp->b_bcount,
+				    SATA_ID_SERIAL_LEN + 4);
 				bcopy(page_buf, bp->b_un.b_addr, count);
 				break;
 
