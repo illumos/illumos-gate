@@ -189,6 +189,8 @@ typedef struct ndmp_devinfo {
 	char *nd_vendor;	/* Vendor name */
 	char *nd_product;	/* Product name */
 	char *nd_revision;	/* Revision */
+	char *nd_serial;	/* Serial */
+	char *nd_wwn;		/* World wide name */
 } ndmp_devinfo_t;
 
 /* Scsi device info sturcture */

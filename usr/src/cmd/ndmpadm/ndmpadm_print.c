@@ -798,6 +798,12 @@ ndmp_devinfo_print(ndmp_devinfo_t *dip, size_t size)
 		if (dip->nd_revision)
 			(void) fprintf(stdout,
 			    gettext("\tRevision  : %s\n"), dip->nd_revision);
+		if (dip->nd_serial)
+			(void) fprintf(stdout,
+			    gettext("\tSerial    : %s\n"), dip->nd_serial);
+		if (dip->nd_wwn)
+			(void) fprintf(stdout,
+			    gettext("\tWWN       : %s\n"), dip->nd_wwn);
 		(void) fprintf(stdout, "\n");
 	}
 }

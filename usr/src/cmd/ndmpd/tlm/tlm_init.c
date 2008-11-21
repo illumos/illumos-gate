@@ -111,6 +111,121 @@ read_inquiry_page(scsi_link_t *slink, struct scsi_inquiry *inq)
 }
 
 /*
+ * Read the Product Data Page.
+ */
+static int
+read_data_page(scsi_link_t *slink, int pcode, char *snum, int size)
+{
+	char cmd[CDB_GROUP0];
+
+	(void) memset(cmd, 0, sizeof (cmd));
+
+	cmd[0] = SCMD_INQUIRY;
+	cmd[1] = pcode ? 0x01 : 0x00;
+	cmd[2] = pcode;
+	cmd[4] = size;
+
+	/* LINTED improper alignment */
+	return (read_scsi_page(slink, (union scsi_cdb *)&cmd, CDB_GROUP0,
+	    (caddr_t)snum, size) == -1 ? -1 : 0);
+}
+
+
+/*
+ * Read the Serial Number Page.
+ */
+static int
+read_serial_num_page(scsi_link_t *slink, char *snum, int size)
+{
+	scsi_serial_t serial;
+	int rv;
+
+	(void) memset(&serial, 0, sizeof (scsi_serial_t));
+	rv = read_data_page(slink, SCSI_SERIAL_PAGE, (caddr_t)&serial,
+	    sizeof (scsi_serial_t));
+	(void) strlcpy(snum, serial.sr_num, size);
+
+	return (rv == -1 ? -1 : 0);
+}
+
+
+/*
+ * Read the Device Name Page.
+ */
+static int
+read_dev_name_page(scsi_link_t *slink, device_name_page_t *devp)
+{
+	(void) memset(devp, 0, sizeof (device_name_page_t));
+
+	if (read_data_page(slink, SCSI_DEVICE_IDENT_PAGE, (caddr_t)devp,
+	    sizeof (device_name_page_t)) == -1)
+		return (-1);
+
+	if (devp->np_header.di_page_code == SCSI_DEVICE_IDENT_PAGE &&
+	    devp->np_node.ni_code_set == 1 &&
+	    devp->np_node.ni_ident_type == 3 &&
+	    devp->np_node.ni_ident_length == 8)
+		return (0);
+
+	if (devp->np_header.di_page_code == SCSI_DEVICE_IDENT_PAGE)
+		return (0);
+
+	return (-1);
+}
+
+/*
+ * Formatted print of WWN
+ */
+char *
+snprintf_wwn(char *buf, int size, uint8_t *wwn)
+{
+	if (wwn == NULL || buf == NULL)
+		return (0);
+
+	(void) snprintf(buf, size, "0x%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X",
+	    wwn[0], wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7]);
+	return (buf);
+}
+
+
+/*
+ * Extract and print the world wide name (WWN)
+ */
+int
+read_device_wwn(scsi_link_t *slink, char *wwnp, int wsize)
+{
+	device_name_page_t dinfo;
+
+	(void) memset(wwnp, 0, wsize);
+	if (read_dev_name_page(slink, &dinfo) == -1)
+		return (-1);
+
+	if (dinfo.np_port.ni_code_set == 1 &&
+	    dinfo.np_port.ni_ident_type == 3) {
+		(void) snprintf_wwn(wwnp, wsize, dinfo.np_port_info.d_name);
+		return (0);
+	}
+	if (dinfo.np_node.ni_code_set == 1 &&
+	    dinfo.np_node.ni_ident_type == 3) {
+		(void) snprintf_wwn(wwnp, wsize, dinfo.np_node_info.d_name);
+		return (0);
+	}
+	if (dinfo.np_port.ni_code_set == 2 &&
+	    dinfo.np_port.ni_ident_type == 1) {
+		(void) snprintf(wwnp, wsize, "%.*s",
+		    dinfo.np_port.ni_ident_length, dinfo.np_port_info.d_name);
+		return (0);
+	}
+	if (dinfo.np_node.ni_code_set == 2 &&
+	    dinfo.np_node.ni_ident_type == 1) {
+		(void) snprintf(wwnp, wsize, "%.*s",
+		    dinfo.np_node.ni_ident_length, dinfo.np_node_info.d_name);
+		return (0);
+	}
+	return (-1);
+}
+
+/*
  * Add the tape library call back function (used while scanning the bus)
  */
 static int
@@ -143,6 +258,10 @@ add_lib(scsi_link_t *slink, struct scsi_inquiry *sd, void *arg)
 			    sizeof (ssd->sd_id));
 			(void) strlcpy(ssd->sd_rev, sd->inq_revision,
 			    sizeof (ssd->sd_rev));
+			(void) read_serial_num_page(slink, ssd->sd_serial,
+			    sizeof (ssd->sd_serial));
+			(void) read_device_wwn(slink, ssd->sd_wwn,
+			    sizeof (ssd->sd_wwn));
 		}
 	}
 
@@ -241,6 +360,7 @@ new_drive(scsi_link_t *slink, int *lib)
 	return (0);
 }
 
+
 /*
  * Add the tape library call back function (used while scanning the bus)
  */
@@ -295,6 +415,10 @@ add_drv(scsi_link_t *slink, struct scsi_inquiry *sd, void *arg)
 			    sizeof (ssd->sd_id));
 			(void) strlcpy(ssd->sd_rev, sd->inq_revision,
 			    sizeof (ssd->sd_rev));
+			(void) read_serial_num_page(slink, ssd->sd_serial,
+			    sizeof (ssd->sd_serial));
+			(void) read_device_wwn(slink, ssd->sd_wwn,
+			    sizeof (ssd->sd_wwn));
 		}
 	}
 

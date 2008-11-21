@@ -1784,7 +1784,7 @@ ndmpd_remote_read(ndmpd_session_t *session, char *data, ulong_t length)
 			request.length =
 			    long_long_to_quad(session->ns_data.dd_read_length);
 
-			if (ndmp_send_request(session->ns_connection,
+			if (ndmp_send_request_lock(session->ns_connection,
 			    NDMP_NOTIFY_DATA_READ, NDMP_NO_ERR,
 			    (void *) &request, 0) < 0) {
 				NDMP_LOG(LOG_DEBUG,

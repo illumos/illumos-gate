@@ -38,7 +38,6 @@
  */
 /* Copyright (c) 2007, The Storage Networking Industry Association. */
 /* Copyright (c) 1996, 1997 PDC, Network Appliance. All Rights Reserved */
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -49,7 +48,6 @@
 #include <string.h>
 #include "ndmpd_common.h"
 #include "ndmpd.h"
-
 
 static int ndmpd_data_error_send_v4(ndmpd_session_t *session,
     ndmp_data_halt_reason reason);
@@ -1592,8 +1590,6 @@ discard_data_v3(ndmpd_session_t *session, ulong_t length)
 	toread = (length < MAX_RECORD_SIZE) ? length :
 	    MAX_RECORD_SIZE;
 
-	NDMP_LOG(LOG_DEBUG, "discard data, length = %u", length);
-
 	/* Read and discard the data. */
 	n = read(session->ns_data.dd_sock, buf, toread);
 	if (n < 0) {
@@ -1691,7 +1687,7 @@ ndmpd_remote_read_v3(ndmpd_session_t *session, char *data, ulong_t length)
 			    session->ns_data.dd_read_offset,
 			    session->ns_data.dd_read_length);
 
-			if (ndmp_send_request(session->ns_connection,
+			if (ndmp_send_request_lock(session->ns_connection,
 			    NDMP_NOTIFY_DATA_READ, NDMP_NO_ERR,
 			    &request, 0) < 0) {
 				NDMP_LOG(LOG_DEBUG,
@@ -1738,10 +1734,8 @@ ndmpd_remote_read_v3(ndmpd_session_t *session, char *data, ulong_t length)
 		session->ns_data.dd_bytes_left_to_read -= n;
 		session->ns_data.dd_position += n;
 	}
-
 	return (0);
 }
-
 
 /*
  * nlp_release_job_stat

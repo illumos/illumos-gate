@@ -90,6 +90,8 @@ ndmp_get_devinfo(ndmp_devinfo_t **dip, size_t *size)
 		dipptr->nd_vendor = ndmp_door_get_string(dec_ctx);
 		dipptr->nd_product = ndmp_door_get_string(dec_ctx);
 		dipptr->nd_revision = ndmp_door_get_string(dec_ctx);
+		dipptr->nd_serial = ndmp_door_get_string(dec_ctx);
+		dipptr->nd_wwn = ndmp_door_get_string(dec_ctx);
 	}
 	if (ndmp_door_fini()) {
 		free(*dip);

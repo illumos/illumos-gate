@@ -90,9 +90,16 @@
 #define	TLM_TAR_READER		0x00000040
 #define	TLM_TAR_WRITER		0x00000080
 
-#define	SCMD_READ_ELEMENT_STATUS		0xB8
+#define	SCSI_SERIAL_PAGE	0x80
+#define	SCSI_DEVICE_IDENT_PAGE	0x83
+#define	SCMD_READ_ELEMENT_STATUS	0xB8
 
 typedef	int (*func_t)();
+
+typedef struct scsi_serial {
+	int sr_flags;
+	char sr_num[16];
+} scsi_serial_t;
 
 typedef struct fs_fhandle {
 	int fh_fid;
@@ -122,6 +129,8 @@ typedef struct sasd_drive {
 	char		sd_vendor[8 + 1];
 	char		sd_id[16 + 1];
 	char		sd_rev[4 + 1];
+	char		sd_serial[16 + 1];
+	char		sd_wwn[32 + 1];
 } sasd_drive_t;
 
 typedef struct scsi_sasd_drive {
@@ -205,6 +214,63 @@ typedef struct	tlm_library {
 	int		tl_slot_count;
 	tlm_slot_t	*tl_slot;
 } tlm_library_t;
+
+typedef struct {
+	unsigned char d_name[8];
+} device_info_t;
+
+typedef struct {
+	unsigned char p_number[4];
+} port_info_t;
+
+typedef struct {
+#ifdef _BIG_ENDIAN
+	uint8_t	di_peripheral_qual	: 3,
+		di_peripheral_dev_type	: 5;
+	uint8_t	di_page_code;
+	uint16_t	di_page_length;
+#else
+	uint8_t	di_peripheral_dev_type	: 5,
+		di_peripheral_qual	: 3;
+	uint8_t	di_page_code;
+	uint16_t	di_page_length;
+#endif
+} device_ident_header_t;
+
+typedef struct {
+#ifdef _BIG_ENDIAN
+	uint8_t	ni_proto_ident	: 4,
+		ni_code_set	: 4;
+
+	uint8_t	ni_PIV		: 1,
+				: 1,
+		ni_asso		: 2,
+		ni_ident_type	: 4;
+
+	uint8_t	ni_reserved;
+	uint8_t	ni_ident_length;
+#else
+	uint8_t	ni_code_set	: 4,
+		ni_proto_ident	: 4;
+
+	uint8_t	ni_ident_type	: 4,
+		ni_asso		: 2,
+				: 1,
+		ni_PIV		: 1;
+	uint8_t	ni_reserved;
+	uint8_t	ni_ident_length;
+#endif
+} name_ident_t;
+
+typedef struct {
+	device_ident_header_t	np_header;
+	name_ident_t		np_node;
+	device_info_t		np_node_info;
+	name_ident_t		np_port;
+	device_info_t		np_port_info;
+	name_ident_t		np_portno;
+	port_info_t		np_portid;
+} device_name_page_t;
 
 #define	TLM_NO_ERRORS			0x00000000
 #define	TLM_ERROR_BUSY			0x00000001

@@ -386,6 +386,12 @@ tar_getdir(tlm_commands_t *commands,
 		} else {
 			tar_hdr = (tlm_tar_hdr_t *)get_read_buffer(want,
 			    &erc, &actual_size, local_commands);
+
+			if (tar_hdr == NULL) {
+				rv = -1;
+				continue;
+			}
+
 			/*
 			 * we can ignore read errors here because
 			 *   1) they are logged by Restore Reader

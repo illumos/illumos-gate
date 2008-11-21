@@ -882,7 +882,7 @@ connection_handler(ndmp_connection_t *connection)
 	req.protocol_version = ndmp_ver;
 	req.text_reason = "";
 
-	if (ndmp_send_request(connection, NDMP_NOTIFY_CONNECTION_STATUS,
+	if (ndmp_send_request_lock(connection, NDMP_NOTIFY_CONNECTION_STATUS,
 	    NDMP_NO_ERR, (void *)&req, 0) < 0) {
 		NDMP_LOG(LOG_DEBUG, "Connection terminated");
 		return;
@@ -970,7 +970,6 @@ connection_file_handler(void *cookie, int fd, ulong_t mode)
 
 
 /* ************* private functions *************************************** */
-
 
 /*
  * ndmp_readit

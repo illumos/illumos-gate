@@ -271,9 +271,10 @@ ndmpd_api_seek_v2(void *cookie, u_longlong_t offset, u_longlong_t length)
 		request.offset = long_long_to_quad(offset);
 		request.length = long_long_to_quad(length);
 
-		if (ndmp_send_request(session->ns_connection,
+		if (ndmp_send_request_lock(session->ns_connection,
 		    NDMP_NOTIFY_DATA_READ, NDMP_NO_ERR,
 		    (void *)&request, 0) < 0) {
+
 			NDMP_LOG(LOG_DEBUG,
 			    "Sending notify_data_read request");
 			return (-1);
@@ -698,7 +699,7 @@ ndmpd_api_seek_v3(void *cookie, u_longlong_t offset, u_longlong_t length)
 		request.offset = long_long_to_quad(offset);
 		request.length = long_long_to_quad(length);
 
-		if (ndmp_send_request(session->ns_connection,
+		if (ndmp_send_request_lock(session->ns_connection,
 		    NDMP_NOTIFY_DATA_READ, NDMP_NO_ERR,
 		    (void *)&request, 0) < 0) {
 			NDMP_LOG(LOG_DEBUG,

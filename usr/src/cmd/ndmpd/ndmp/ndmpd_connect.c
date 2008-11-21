@@ -1140,6 +1140,8 @@ ndmpd_get_devs(ndmp_door_ctx_t *enc_ctx)
 		ndmp_door_put_string(enc_ctx, sd->sd_vendor);
 		ndmp_door_put_string(enc_ctx, sd->sd_id);
 		ndmp_door_put_string(enc_ctx, sd->sd_rev);
+		ndmp_door_put_string(enc_ctx, sd->sd_serial);
+		ndmp_door_put_string(enc_ctx, sd->sd_wwn);
 	}
 }
 

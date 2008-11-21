@@ -664,17 +664,19 @@ ndmpd_config_get_tape_info_v3(ndmp_connection_t *connection, void *body)
 	int i, n, max;
 	sasd_drive_t *sd;
 	scsi_link_t *sl;
-	ndmp_pval env;
-	ndmp_pval *envp = &env;
+	ndmp_pval *envp, *envp_save = NULL;
+	ndmp_pval *envp_head;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
 	max = sasd_dev_count();
 
 	tip_save = tip = ndmp_malloc(sizeof (ndmp_device_info_v3) * max);
 	dcp_save = dcp = ndmp_malloc(sizeof (ndmp_device_capability_v3) * max);
-	if (!tip_save || !dcp_save) {
+	envp_save = envp = ndmp_malloc(sizeof (ndmp_pval) * max * 3);
+	if (!tip_save || !dcp_save || !envp_save) {
 		free(tip_save);
 		free(dcp_save);
+		free(envp_save);
 		reply.error = NDMP_NO_MEM_ERR;
 		ndmp_send_reply(connection, (void *)&reply,
 		    "error sending ndmp_config_get_tape_info reply");
@@ -682,7 +684,6 @@ ndmpd_config_get_tape_info_v3(ndmp_connection_t *connection, void *body)
 	}
 
 	reply.error = NDMP_NO_ERR;
-	NDMP_SETENV(envp, "EXECUTE_CDB", "b");
 
 	for (i = n = 0; i < max; i++) {
 		if (!(sl = sasd_dev_slink(i)) || !(sd = sasd_drive(i)))
@@ -693,13 +694,18 @@ ndmpd_config_get_tape_info_v3(ndmp_connection_t *connection, void *body)
 		NDMP_LOG(LOG_DEBUG,
 		    "model \"%s\" dev \"%s\"", sd->sd_id, sd->sd_name);
 
+		envp_head = envp;
+		NDMP_SETENV(envp, "EXECUTE_CDB", "b");
+		NDMP_SETENV(envp, "SERIAL_NUMBER", sd->sd_serial);
+		NDMP_SETENV(envp, "WORLD_WIDE_NAME", sd->sd_wwn);
+
 		tip->model = sd->sd_id; /* like "DLT7000	 " */
 		tip->caplist.caplist_len = 1;
 		tip->caplist.caplist_val = dcp;
 		dcp->device = sd->sd_name; /* like "isp1t060" */
 		dcp->attr = 0;
-		dcp->capability.capability_len = 1;
-		dcp->capability.capability_val = &env;
+		dcp->capability.capability_len = 3;
+		dcp->capability.capability_val = envp_head;
 		tip++;
 		dcp++;
 		n++;
@@ -716,7 +722,7 @@ ndmpd_config_get_tape_info_v3(ndmp_connection_t *connection, void *body)
 		reply.error = NDMP_NO_DEVICE_ERR;
 		ndmp_send_reply(connection, (void *)&reply,
 		    "error sending ndmp_config_get_tape_info reply");
-		free(tip_save); free(dcp_save);
+		free(tip_save); free(dcp_save); free(envp_save);
 		return;
 	}
 
@@ -729,6 +735,7 @@ ndmpd_config_get_tape_info_v3(ndmp_connection_t *connection, void *body)
 
 	free(tip_save);
 	free(dcp_save);
+	free(envp_save);
 }
 
 
@@ -756,17 +763,21 @@ ndmpd_config_get_scsi_info_v3(ndmp_connection_t *connection, void *body)
 	int i, n, max;
 	sasd_drive_t *sd;
 	scsi_link_t *sl;
+	ndmp_pval *envp, *envp_save = NULL;
+	ndmp_pval *envp_head;
 
 	(void) memset((void*)&reply, 0, sizeof (reply));
 	max = sasd_dev_count();
 	sip_save = sip = ndmp_malloc(sizeof (ndmp_device_info_v3) * max);
 	dcp_save = dcp = ndmp_malloc(sizeof (ndmp_device_capability_v3) * max);
-	if (!sip_save || !dcp_save) {
+	envp_save = envp = ndmp_malloc(sizeof (ndmp_pval) * max * 2);
+	if (!sip_save || !dcp_save || !envp_save) {
 		free(sip_save);
 		free(dcp_save);
+		free(envp_save);
 		reply.error = NDMP_NO_MEM_ERR;
 		ndmp_send_reply(connection, (void *)&reply,
-		    "error sending ndmp_config_get_tape_info reply");
+		    "error sending ndmp_config_get_scsi_info reply");
 		return;
 	}
 
@@ -780,14 +791,18 @@ ndmpd_config_get_scsi_info_v3(ndmp_connection_t *connection, void *body)
 		NDMP_LOG(LOG_DEBUG,
 		    "model \"%s\" dev \"%s\"", sd->sd_id, sd->sd_name);
 
+		envp_head = envp;
+		NDMP_SETENV(envp, "SERIAL_NUMBER", sd->sd_serial);
+		NDMP_SETENV(envp, "WORLD_WIDE_NAME", sd->sd_wwn);
+
 		sip->model = sd->sd_id; /* like "Powerstor L200  " */
 		sip->caplist.caplist_len = 1;
 		sip->caplist.caplist_val = dcp;
 		dcp->device = sd->sd_name; /* like "isp1m000" */
 
 		dcp->attr = 0;
-		dcp->capability.capability_len = 0;
-		dcp->capability.capability_val = NULL;
+		dcp->capability.capability_len = 2;
+		dcp->capability.capability_val = envp_head;
 		sip++;
 		dcp++;
 		n++;
@@ -803,6 +818,7 @@ ndmpd_config_get_scsi_info_v3(ndmp_connection_t *connection, void *body)
 
 	free(sip_save);
 	free(dcp_save);
+	free(envp_save);
 }
 
 

@@ -1705,8 +1705,12 @@ backup_dirv3(bk_param_v3_t *bpp, fst_node_t *pnp,
 	bpos = tlm_get_data_offset(bpp->bp_lcmd);
 
 	p = bpp->bp_tmp + strlen(bpp->bp_chkpnm);
-	(void) snprintf(fullpath, TLM_MAX_PATH_NAME, "%s/%s",
-	    bpp->bp_unchkpnm, p);
+	if (*p == '/')
+		(void) snprintf(fullpath, TLM_MAX_PATH_NAME, "%s%s",
+		    bpp->bp_unchkpnm, p);
+	else
+		(void) snprintf(fullpath, TLM_MAX_PATH_NAME, "%s/%s",
+		    bpp->bp_unchkpnm, p);
 
 	if (tm_tar_ops.tm_putdir != NULL)
 		(void) (tm_tar_ops.tm_putdir)(fullpath, bpp->bp_tlmacl,
@@ -1780,8 +1784,12 @@ backup_filev3(bk_param_v3_t *bpp, fst_node_t *pnp,
 	ent = enp->tn_path ? enp->tn_path : "";
 
 	p = pnp->tn_path + strlen(bpp->bp_chkpnm);
-	(void) snprintf(fullpath, TLM_MAX_PATH_NAME, "%s/%s",
-	    bpp->bp_unchkpnm, p);
+	if (*p == '/')
+		(void) snprintf(fullpath, TLM_MAX_PATH_NAME, "%s%s",
+		    bpp->bp_unchkpnm, p);
+	else
+		(void) snprintf(fullpath, TLM_MAX_PATH_NAME, "%s/%s",
+		    bpp->bp_unchkpnm, p);
 
 	if (tm_tar_ops.tm_putfile != NULL)
 		rv = (tm_tar_ops.tm_putfile)(fullpath, ent, pnp->tn_path,
@@ -3156,6 +3164,7 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 	ndmp_tar_reader_arg_t arg;
 	pthread_t rdtp;
 	ndmp_context_t nctx;
+	mem_ndmp_name_v3_t *ep;
 
 	err = 0;
 
@@ -3202,8 +3211,11 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
 			nctx.nc_cmds = cmds;
+			ep = (mem_ndmp_name_v3_t *)MOD_GETNAME(params,
+			    dar_index - 1);
+
 			if ((err = ndmp_pl->np_pre_restore(ndmp_pl, &nctx,
-			    nlp->nlp_backup_path, nlp->nlp_restore_path))
+			    ep->nm3_opath, ep->nm3_dpath))
 			    != 0) {
 				NDMP_LOG(LOG_DEBUG, "Pre-restore plug-in: %m");
 				cmds->tcs_command->tc_reader = TLM_STOP;
@@ -3282,8 +3294,9 @@ restore_out:
  *   0: on success
  *   -1: on error
  */
-static int ndmpd_dar_locate_window_v3(ndmpd_session_t *session,
-    ndmpd_module_params_t *params, u_longlong_t fh_info, long len)
+static int
+ndmpd_dar_locate_window_v3(ndmpd_session_t *session,
+    ndmpd_module_params_t *params, u_longlong_t fh_info, u_longlong_t len)
 {
 	int ret = 0;
 
@@ -3395,45 +3408,26 @@ ndmpd_rs_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 }
 
 /*
- * ndmp_get_next_path
- *
- * Get the next path from a comma-separated path list
- */
-static int
-ndmp_get_next_path(char **p, char *buf)
-{
-	int len;
-
-	if (!*p || !**p)
-		return (0);
-
-	while (isspace((unsigned char)**p))
-		(*p)++;
-	len = strcspn(*p, ",");
-	(void) strlcpy(buf, *p, len + 1);
-	(*p) += len;
-	if (**p == ',')
-		(*p)++;
-	return (len);
-}
-
-/*
  * ndmp_plugin_pre_restore
  *
  * Wrapper for pre-restore callback with multiple path
  */
 static int
-ndmp_plugin_pre_restore(ndmp_context_t *ctxp, char *orig_path, char *path)
+ndmp_plugin_pre_restore(ndmp_context_t *ctxp, ndmpd_module_params_t *params,
+    int ncount)
 {
-	char buf[PATH_MAX];
-	char *p = path;
+	mem_ndmp_name_v3_t *ep;
 	int err;
+	int i;
 
-	while (ndmp_get_next_path(&p, buf) != 0) {
+	for (i = 0; i < ncount; i++) {
+		if (!(ep = (mem_ndmp_name_v3_t *)MOD_GETNAME(params, i)))
+			continue;
 		if ((err = ndmp_pl->np_pre_restore(ndmp_pl, ctxp,
-		    orig_path, buf)) != 0)
+		    ep->nm3_opath, ep->nm3_dpath)) != 0)
 			return (err);
 	}
+
 	return (0);
 }
 
@@ -3519,8 +3513,8 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		if (ndmp_pl != NULL &&
 		    ndmp_pl->np_pre_restore != NULL) {
 			nctx.nc_cmds = cmds;
-			if ((err = ndmp_plugin_pre_restore(&nctx,
-			    nlp->nlp_backup_path, nlp->nlp_restore_path))
+			if ((err = ndmp_plugin_pre_restore(&nctx, params,
+			    nlp->nlp_nfiles))
 			    != 0) {
 				NDMP_LOG(LOG_DEBUG, "Pre-restore plug-in: %m");
 				cmds->tcs_command->tc_reader = TLM_STOP;

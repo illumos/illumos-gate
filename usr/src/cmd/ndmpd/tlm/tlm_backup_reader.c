@@ -475,7 +475,7 @@ output_file_header(char *name, char *link,
 		tar_hdr->th_linkflag = LF_LINK;
 		(void) snprintf(tar_hdr->th_shared.th_hlink_ino,
 		    sizeof (tar_hdr->th_shared.th_hlink_ino),
-		    "%011o ", attr->st_ino);
+		    "%011llo ", attr->st_ino);
 	} else {
 		tar_hdr->th_linkflag = *link == 0 ? LF_NORMAL : LF_SYMLINK;
 		NDMP_LOG(LOG_DEBUG, "linkflag: '%c'", tar_hdr->th_linkflag);
@@ -817,7 +817,7 @@ tlm_output_file(char *dir, char *name, char *chkdir,
 			goto err_out;
 		}
 	} else {
-		NDMP_LOG(LOG_DEBUG, "found hardlink, inode = %u, pos = %10lld ",
+		NDMP_LOG(LOG_DEBUG, "found hardlink, inode = %llu, pos = %llu ",
 		    tlm_acls->acl_attr.st_ino, hardlink_pos);
 
 		fd = -1;
@@ -941,19 +941,17 @@ tlm_output_file(char *dir, char *name, char *chkdir,
 		(void) hardlink_q_add(hardlink_q, tlm_acls->acl_attr.st_ino,
 		    pos, NULL, 0);
 		NDMP_LOG(LOG_DEBUG,
-		    "backed up hardlink file %s, inode = %u, pos = %10lld ",
+		    "backed up hardlink file %s, inode = %llu, pos = %llu ",
 		    fullname, tlm_acls->acl_attr.st_ino, pos);
 	}
 
 	/*
 	 * For hardlink, if other link belonging to the same inode has been
-	 * backed up, send the offset of the data records for that link.
+	 * backed up, no add_node entry should be sent for this link.
 	 */
 	if (hardlink_done) {
-		(void) tlm_log_fhnode(job_stats, dir, name,
-		    &tlm_acls->acl_attr, hardlink_pos);
 		NDMP_LOG(LOG_DEBUG,
-		    "backed up hardlink link %s, inode = %u, pos = %10lld ",
+		    "backed up hardlink link %s, inode = %llu, pos = %llu ",
 		    fullname, tlm_acls->acl_attr.st_ino, hardlink_pos);
 	} else {
 		(void) tlm_log_fhnode(job_stats, dir, name,
