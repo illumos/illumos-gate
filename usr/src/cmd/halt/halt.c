@@ -76,6 +76,7 @@
 #include <utmpx.h>
 #include <pwd.h>
 #include <zone.h>
+#include <spawn.h>
 
 #include <libzfs.h>
 
@@ -1365,13 +1366,26 @@ main(int argc, char *argv[])
 		need_check_zones = halt_zones();
 	}
 
-
 	/* sync boot archive in the global zone */
 	if (zoneid == GLOBAL_ZONEID && !nosync) {
+		char *fast_argv[] = {"/sbin/bootadm", "-a", "update_all",
+		    "fastboot", NULL};
+		char *b_argv[] = {"/sbin/bootadm", "-a", "update_all", NULL};
+
 		if (fast_reboot)
-			(void) system("/sbin/bootadm -a update_all fastboot");
+			r = posix_spawn(NULL, fast_argv[0], NULL, NULL,
+			    fast_argv, NULL);
 		else
-			(void) system("/sbin/bootadm -a update_all");
+			r = posix_spawn(NULL, b_argv[0], NULL, NULL, b_argv,
+			    NULL);
+
+	/* if posix_spawn fails we emit a warning and continue rebooting */
+
+		if (r != 0)
+			(void) fprintf(stderr, gettext("%s: WARNING, unable to"
+			    "start boot archive update\n"), cmdname);
+		else
+			(void) wait(NULL);
 	}
 
 	/*
@@ -1429,6 +1443,8 @@ main(int argc, char *argv[])
 		(void) kill(-1, SIGTERM);
 		(void) sleep(5);
 	}
+
+	(void) signal(SIGINT, SIG_IGN);
 
 	if (!qflag && !nosync) {
 		struct utmpx wtmpx;
