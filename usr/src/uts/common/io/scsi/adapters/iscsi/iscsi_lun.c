@@ -27,6 +27,7 @@
 
 #include "iscsi.h"
 #include <sys/fs/dv_node.h>	/* devfs_clean */
+#include <sys/bootprops.h>
 
 /* tpgt bytes in string form */
 #define	TPGT_EXT_SIZE	5
@@ -47,6 +48,7 @@ static iscsi_status_t iscsi_lun_phys_create(iscsi_sess_t *isp,
     uint16_t lun_num, iscsi_lun_t *ilp, struct scsi_inquiry *inq);
 
 extern dev_info_t	*scsi_vhci_dip;
+extern ib_boot_prop_t   *iscsiboot_prop;
 
 /*
  * +--------------------------------------------------------------------+
@@ -69,6 +71,8 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	iscsi_lun_t		*ilp		= NULL;
 	iscsi_lun_t		*ilp_tmp	= NULL;
 	char			*addr		= NULL;
+	uint16_t		boot_lun_num	= 0;
+	uint64_t		*lun_num_ptr	= NULL;
 
 	ASSERT(isp != NULL);
 	ihp = isp->sess_hba;
@@ -81,7 +85,7 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	    ADDR_EXT_SIZE + 1),
 	    "%02X%02X%s%04X,%d", isp->sess_isid[4],
 	    isp->sess_isid[5], isp->sess_name,
-	    isp->sess_tpgt_conf & 0xFFFF, lun_num);
+	    isp->sess_tpgt_nego & 0xFFFF, lun_num);
 
 	/* allocate space for lun struct */
 	ilp = kmem_zalloc(sizeof (iscsi_lun_t), KM_SLEEP);
@@ -168,12 +172,26 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	} else {
 		ilp->lun_state = ISCSI_LUN_STATE_ONLINE;
 		ilp->lun_time_online = ddi_get_time();
+
+		/* Check whether this is the required LUN for iscsi boot */
+		if (iscsiboot_prop != NULL && isp->sess_boot == B_TRUE &&
+		    iscsiboot_prop->boot_tgt.lun_online == 0) {
+			lun_num_ptr =
+			    (uint64_t *)iscsiboot_prop->boot_tgt.tgt_boot_lun;
+			boot_lun_num = (uint16_t)(*lun_num_ptr);
+			if (boot_lun_num == ilp->lun_num) {
+				/*
+				 * During iscsi boot, the boot lun has been
+				 * online, we should set the "online flag".
+				 */
+				iscsiboot_prop->boot_tgt.lun_online = 1;
+			}
+		}
 	}
 	rw_exit(&isp->sess_lun_list_rwlock);
 
 	return (rtn);
 }
-
 
 /*
  * iscsi_lun_destroy - offline and remove lun
@@ -490,12 +508,14 @@ phys_create_done:
 void
 iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 {
-	int			circ = 0;
-	int			rval;
+	int			circ		= 0;
+	int			rval		= 0;
+	uint64_t		*lun_num_ptr	= NULL;
+	uint16_t		boot_lun_num	= 0;
+	iscsi_sess_t		*isp		= NULL;
 
 	ASSERT(ilp != NULL);
 	ASSERT((ilp->lun_pip != NULL) || (ilp->lun_dip != NULL));
-
 
 	if (ilp->lun_pip != NULL) {
 		ndi_devi_enter(scsi_vhci_dip, &circ);
@@ -513,6 +533,24 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 		if (rval == NDI_SUCCESS) {
 			ilp->lun_state = ISCSI_LUN_STATE_ONLINE;
 			ilp->lun_time_online = ddi_get_time();
+		}
+	}
+
+	/* Check whether this is the required LUN for iscsi boot */
+	if (iscsiboot_prop != NULL &&
+	    iscsiboot_prop->boot_tgt.lun_online == 0) {
+		isp = ilp->lun_sess;
+		if (isp->sess_boot == B_TRUE) {
+			lun_num_ptr =
+			    (uint64_t *)iscsiboot_prop->boot_tgt.tgt_boot_lun;
+			boot_lun_num = (uint16_t)(*lun_num_ptr);
+			if (boot_lun_num == ilp->lun_num) {
+				/*
+				 * During iscsi boot, the boot lun has been
+				 * online, we should set the "online flag".
+				 */
+				iscsiboot_prop->boot_tgt.lun_online = 1;
+			}
 		}
 	}
 }

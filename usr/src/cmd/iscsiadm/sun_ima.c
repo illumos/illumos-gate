@@ -50,6 +50,7 @@
 #define	LIBRARY_PROPERTY_VENDOR	L"Sun Microsystems, Inc."
 #define	DEFAULT_NODE_NAME_FORMAT    "iqn.2003-13.com.ima.%s"
 #define	PLUGIN_OWNER 1
+#define	MAX_CHAP_SECRET_LEN	16
 
 /* LINTED E_STATIC_UNUSED */
 static IMA_INT32		number_of_plugins = -1;
@@ -2990,5 +2991,153 @@ IMA_API	IMA_STATUS SUN_IMA_GetTargetAuthParms(
 
 	pParms->chapParms.challengeSecretLength = chap_p.c_secret_len;
 
+	return (IMA_STATUS_SUCCESS);
+}
+
+IMA_API IMA_STATUS SUN_IMA_GetBootTargetName(
+    IMA_NODE_NAME tgtName
+)
+{
+	int fd;
+	IMA_STATUS rtn;
+	iscsi_boot_property_t bootProp;
+
+	bootProp.tgt_name.n_name[0] = '\0';
+	bootProp.tgt_chap.c_user[0] = '\0';
+	tgtName[0] = L'\0';
+	rtn = IMA_ERROR_UNEXPECTED_OS_ERROR;
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Unable to open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (ioctl(fd, ISCSI_BOOTPROP_GET, &bootProp) != 0) {
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_BOOTPROP_GET ioctl failed, errno: %d",
+		    errno);
+		(void) close(fd);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if ((bootProp.tgt_name.n_name[0] != '\0') && (tgtName != NULL)) {
+		if (mbstowcs(tgtName, (const char *)bootProp.tgt_name.n_name,
+		    IMA_NODE_NAME_LEN) == (size_t)-1) {
+			syslog(LOG_USER|LOG_DEBUG,
+			    "ISCSI Target name covert to WCHAR fail");
+			return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+		} else {
+			rtn = IMA_STATUS_SUCCESS;
+		}
+	}
+
+	return (rtn);
+}
+
+IMA_API IMA_STATUS SUN_IMA_GetBootTargetAuthParams(
+    IMA_INITIATOR_AUTHPARMS *pTgtCHAP
+)
+{
+	int fd;
+	IMA_STATUS rtn;
+	iscsi_boot_property_t bootProp;
+
+	bootProp.tgt_name.n_name[0] = '\0';
+	bootProp.tgt_chap.c_user[0] = '\0';
+	bootProp.tgt_chap.c_secret[0] = '\0';
+	rtn = IMA_ERROR_UNEXPECTED_OS_ERROR;
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Unable to open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (ioctl(fd, ISCSI_BOOTPROP_GET, &bootProp) != 0) {
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_BOOTPROP_GET ioctl failed, errno: %d",
+		    errno);
+		(void) close(fd);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (pTgtCHAP != NULL) {
+		if (bootProp.tgt_chap.c_user[0] != '\0') {
+			(void) memcpy(pTgtCHAP->chapParms.name,
+			    bootProp.tgt_chap.c_user, ISCSI_MAX_NAME_LEN);
+		} else {
+			pTgtCHAP->chapParms.name[0] = '\0';
+		}
+		if (bootProp.tgt_chap.c_secret[0] != '\0') {
+			(void) memcpy(pTgtCHAP->chapParms.challengeSecret,
+			    bootProp.tgt_chap.c_secret, MAX_CHAP_SECRET_LEN);
+		} else {
+			pTgtCHAP->chapParms.challengeSecret[0] = '\0';
+		}
+		rtn = IMA_STATUS_SUCCESS;
+	}
+	return (rtn);
+}
+
+IMA_STATUS SUN_IMA_GetBootMpxio(
+    IMA_BOOL *pMpxioEnabled
+)
+{
+	int fd;
+	iscsi_boot_property_t bootProp;
+
+	bootProp.hba_mpxio_enabled = B_FALSE;
+	*pMpxioEnabled = IMA_UNKNOWN;
+
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Unable to open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (ioctl(fd, ISCSI_BOOTPROP_GET, &bootProp) != 0) {
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_BOOTPROP_GET ioctl failed, errno: %d",
+		    errno);
+		(void) close(fd);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (bootProp.hba_mpxio_enabled) {
+		*pMpxioEnabled = IMA_TRUE;
+	} else {
+		*pMpxioEnabled = IMA_FALSE;
+	}
+
+	(void) close(fd);
+	return (IMA_STATUS_SUCCESS);
+}
+
+IMA_STATUS SUN_IMA_GetBootIscsi(
+    IMA_BOOL *pIscsiBoot
+)
+{
+	int fd;
+	iscsi_boot_property_t bootProp;
+
+	bootProp.iscsiboot = 0;
+	*pIscsiBoot = 0;
+
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Unable to open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	if (ioctl(fd, ISCSI_BOOTPROP_GET, &bootProp) != 0) {
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_BOOTPROP_GET ioctl failed, errno: %d",
+		    errno);
+		(void) close(fd);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	*pIscsiBoot = bootProp.iscsiboot;
+
+	(void) close(fd);
 	return (IMA_STATUS_SUCCESS);
 }

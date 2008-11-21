@@ -32,7 +32,9 @@
 #include <sys/pathname.h>	/* declares:	lookupname */
 #include <sys/fs/snode.h>	/* defines:	VTOS */
 #include <sys/fs/dv_node.h>	/* declares:	devfs_lookupname */
-#include <netinet/in.h>
+#include <sys/bootconf.h>
+#include <sys/bootprops.h>
+
 #include "iscsi.h"
 
 /*
@@ -142,8 +144,27 @@ const int   is_incoming_opcode_invalid[256] = {
 	/* 0xEX */	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	/* 0xFX */	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 };
+/*
+ * Define macros to manipulate snode, vnode, and open device flags
+ */
+#define	VTYP_VALID(i)	(((i) == VCHR) || ((i) == VBLK))
+#define	STYP_VALID(i)	(((i) == S_IFCHR) || ((i) == S_IFBLK))
+#define	STYP_TO_VTYP(i)	(((i) == S_IFCHR) ? VCHR : VBLK)
+
+#define	IP_4_BITS	32
+#define	IP_6_BITS	128
+
+extern int modrootloaded;
+extern ib_boot_prop_t	*iscsiboot_prop;
 
 /* prototypes */
+
+/* for iSCSI boot */
+static int net_up = 0;
+static iscsi_status_t iscsi_net_interface();
+static int iscsi_ldi_vp_from_name(char *path, vnode_t **vpp);
+/* boot prototypes end */
+
 static void * iscsi_net_socket(int domain, int type, int protocol);
 static int iscsi_net_bind(void *socket, struct sockaddr *
     name, int name_len, int backlog, int flags);
@@ -282,6 +303,11 @@ iscsi_net_socket(int domain, int type, int protocol)
 	int		err		= 0;
 	major_t		maj;
 
+	if (!modrootloaded && !net_up && iscsiboot_prop) {
+		if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS)
+			net_up = 1;
+	}
+
 	/* ---- solookup: start ---- */
 	if ((vp = solookup(domain, type, protocol, NULL, &err)) == NULL) {
 
@@ -291,10 +317,16 @@ iscsi_net_socket(int domain, int type, int protocol)
 		 * to use USERSPACE and declared static we'll do the
 		 * work here instead.
 		 */
-		err = lookupname(type == SOCK_STREAM ? "/dev/tcp" : "/dev/udp",
-		    UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-		if (err)
+		if (!modrootloaded) {
+			err = iscsi_ldi_vp_from_name("/devices/pseudo/tcp@0:"
+			    "tcp", &vp);
+		} else {
+			err = lookupname(type == SOCK_STREAM ? "/dev/tcp" :
+			    "/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
+		}
+		if (err) {
 			return (NULL);
+		}
 
 		/* ---- check that it is the correct vnode ---- */
 		if (vp->v_type != VCHR) {
@@ -904,4 +936,214 @@ iscsi_net_recvdata(void *socket, iscsi_hdr_t *ihp, char *data,
 		}
 	}
 	return (ISCSI_STATUS_SUCCESS);
+}
+
+/*
+ * Convert a prefix length to a mask.
+ */
+static iscsi_status_t
+iscsi_prefixlentomask(int prefixlen, int maxlen, uchar_t *mask)
+{
+	if (prefixlen < 0 || prefixlen > maxlen || mask == NULL) {
+		return (ISCSI_STATUS_INTERNAL_ERROR);
+	}
+
+	while (prefixlen > 0) {
+		if (prefixlen >= 8) {
+			*mask = 0xff;
+			mask++;
+			prefixlen = prefixlen - 8;
+			continue;
+		}
+		*mask = *mask | (1 << (8 - prefixlen));
+		prefixlen--;
+	}
+	return (ISCSI_STATUS_SUCCESS);
+}
+
+static iscsi_status_t
+iscsi_net_interface()
+{
+	struct in_addr	braddr;
+	struct in_addr	subnet;
+	struct in_addr	myaddr;
+	struct in_addr	defgateway;
+	struct in6_addr myaddr6;
+	struct in6_addr subnet6;
+	uchar_t		mask_prefix = 0;
+	int		mask_bits   = 1;
+	TIUSER		*tiptr;
+	TIUSER		*tiptr6;
+	char		ifname[16]	= {0};
+	iscsi_status_t	status;
+
+	struct knetconfig dl_udp_netconf = {
+	    NC_TPI_CLTS,
+	    NC_INET,
+	    NC_UDP,
+	    0, };
+	struct knetconfig dl_udp6_netconf = {
+	    NC_TPI_CLTS,
+	    NC_INET6,
+	    NC_UDP,
+	    0, };
+
+	(void) strlcpy(ifname, rootfs.bo_ifname, sizeof (ifname));
+
+	if (iscsiboot_prop->boot_nic.sin_family == AF_INET) {
+		/*
+		 * Assumes only one linkage array element.
+		 */
+		dl_udp_netconf.knc_rdev =
+		    makedevice(clone_major, ddi_name_to_major("udp"));
+
+		myaddr.s_addr =
+		    iscsiboot_prop->boot_nic.nic_ip_u.u_in4.s_addr;
+
+		mask_prefix = iscsiboot_prop->boot_nic.sub_mask_prefix;
+		(void) memset(&subnet.s_addr, 0, sizeof (subnet));
+		status = iscsi_prefixlentomask(mask_prefix, IP_4_BITS,
+		    (uchar_t *)&subnet.s_addr);
+		if (status != ISCSI_STATUS_SUCCESS) {
+			return (status);
+		}
+
+		mask_bits = mask_bits << (IP_4_BITS - mask_prefix);
+		mask_bits = mask_bits - 1;
+		/*
+		 * Set the last mask bits of the ip address with 1, then
+		 * we can get the broadcast address.
+		 */
+		braddr.s_addr = myaddr.s_addr | mask_bits;
+
+		defgateway.s_addr =
+		    iscsiboot_prop->boot_nic.nic_gw_u.u_in4.s_addr;
+
+		/* initialize interface */
+		if (t_kopen((file_t *)NULL, dl_udp_netconf.knc_rdev,
+		    FREAD|FWRITE, &tiptr, CRED()) == 0) {
+			if (kdlifconfig(tiptr, AF_INET, &myaddr, &subnet,
+			    &braddr, &defgateway, ifname)) {
+				cmn_err(CE_WARN, "Failed to configure"
+				    " iSCSI boot nic");
+				(void) t_kclose(tiptr, 0);
+				return (ISCSI_STATUS_INTERNAL_ERROR);
+			}
+		} else {
+			cmn_err(CE_WARN, "Failed to configure"
+			    " iSCSI boot nic");
+			return (ISCSI_STATUS_INTERNAL_ERROR);
+		}
+		return (ISCSI_STATUS_SUCCESS);
+	} else {
+		dl_udp6_netconf.knc_rdev =
+		    makedevice(clone_major, ddi_name_to_major("udp6"));
+
+		bcopy(&iscsiboot_prop->boot_nic.nic_ip_u.u_in6.s6_addr,
+		    &myaddr6.s6_addr, 16);
+
+		(void) memset(&subnet6, 0, sizeof (subnet6));
+		mask_prefix = iscsiboot_prop->boot_nic.sub_mask_prefix;
+		status = iscsi_prefixlentomask(mask_prefix, IP_6_BITS,
+		    (uchar_t *)&subnet6.s6_addr);
+		if (status != ISCSI_STATUS_SUCCESS) {
+			return (status);
+		}
+
+		if (t_kopen((file_t *)NULL, dl_udp6_netconf.knc_rdev,
+		    FREAD|FWRITE, &tiptr6, CRED()) == 0) {
+			if (kdlifconfig(tiptr6, AF_INET6, &myaddr6,
+			    &subnet6, NULL, NULL, ifname)) {
+				cmn_err(CE_WARN, "Failed to configure"
+				    " iSCSI boot nic");
+				(void) t_kclose(tiptr, 0);
+				return (ISCSI_STATUS_INTERNAL_ERROR);
+			}
+		} else {
+			cmn_err(CE_WARN, "Failed to configure"
+			    " iSCSI boot nic");
+			return (ISCSI_STATUS_INTERNAL_ERROR);
+		}
+		return (ISCSI_STATUS_SUCCESS);
+	}
+}
+
+/*
+ * vp is needed to create the socket for the time being.
+ */
+static int
+iscsi_ldi_vp_from_name(char *path, vnode_t **vpp)
+{
+	vnode_t		*vp = NULL;
+	int		ret;
+
+	/* sanity check required input parameters */
+	if ((path == NULL) || (vpp == NULL))
+		return (EINVAL);
+
+	if (modrootloaded) {
+		cred_t *saved_cred = curthread->t_cred;
+
+		/* we don't want lookupname to fail because of credentials */
+		curthread->t_cred = kcred;
+
+		/*
+		 * all lookups should be done in the global zone.  but
+		 * lookupnameat() won't actually do this if an absolute
+		 * path is passed in.  since the ldi interfaces require an
+		 * absolute path we pass lookupnameat() a pointer to
+		 * the character after the leading '/' and tell it to
+		 * start searching at the current system root directory.
+		 */
+		ASSERT(*path == '/');
+		ret = lookupnameat(path + 1, UIO_SYSSPACE, FOLLOW, NULLVPP,
+		    &vp, rootdir);
+
+		/* restore this threads credentials */
+		curthread->t_cred = saved_cred;
+
+		if (ret == 0) {
+			if (!vn_matchops(vp, spec_getvnodeops()) ||
+			    !VTYP_VALID(vp->v_type)) {
+				VN_RELE(vp);
+				return (ENXIO);
+			}
+		}
+	}
+
+	if (vp == NULL) {
+		dev_info_t	*dip;
+		dev_t		dev;
+		int		spec_type;
+
+		/*
+		 * Root is not mounted, the minor node is not specified,
+		 * or an OBP path has been specified.
+		 */
+
+		/*
+		 * Determine if path can be pruned to produce an
+		 * OBP or devfs path for resolve_pathname.
+		 */
+		if (strncmp(path, "/devices/", 9) == 0)
+			path += strlen("/devices");
+
+		/*
+		 * if no minor node was specified the DEFAULT minor node
+		 * will be returned.  if there is no DEFAULT minor node
+		 * one will be fabricated of type S_IFCHR with the minor
+		 * number equal to the instance number.
+		 */
+		ret = resolve_pathname(path, &dip, &dev, &spec_type);
+		if (ret != 0)
+			return (ENODEV);
+
+		ASSERT(STYP_VALID(spec_type));
+		vp = makespecvp(dev, STYP_TO_VTYP(spec_type));
+		spec_assoc_vp_with_devi(vp, dip);
+		ddi_release_devi(dip);
+	}
+
+	*vpp = vp;
+	return (0);
 }

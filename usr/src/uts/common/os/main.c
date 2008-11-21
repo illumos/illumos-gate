@@ -26,7 +26,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -76,6 +75,7 @@
 #include <sys/dc_ki.h>
 
 #include <c2/audit.h>
+#include <sys/bootprops.h>
 
 /* well known processes */
 proc_t *proc_sched;		/* memory scheduler */
@@ -361,6 +361,7 @@ main(void)
 	extern id_t	syscid, defaultcid;
 	extern int	swaploaded;
 	extern int	netboot;
+	extern ib_boot_prop_t *iscsiboot_prop;
 	extern void	vm_init(void);
 	extern void	cbe_init_pre(void);
 	extern void	cbe_init(void);
@@ -429,7 +430,10 @@ main(void)
 	 */
 	for (initptr = &init_tbl[0]; *initptr; initptr++)
 		(**initptr)();
-
+	/*
+	 * Load iSCSI boot properties
+	 */
+	ld_ib_prop();
 	/*
 	 * initialize vm related stuff.
 	 */
@@ -474,7 +478,7 @@ main(void)
 	 * Plumb the protocol modules and drivers only if we are not
 	 * networked booted, in this case we already did it in rootconf().
 	 */
-	if (netboot == 0)
+	if (netboot == 0 && iscsiboot_prop == NULL)
 		(void) strplumb();
 
 	gethrestime(&PTOU(curproc)->u_start);

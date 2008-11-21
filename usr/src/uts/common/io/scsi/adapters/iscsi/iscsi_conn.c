@@ -27,6 +27,9 @@
 
 #include "iscsi.h"
 #include "persistent.h"
+#include <sys/bootprops.h>
+
+extern ib_boot_prop_t   *iscsiboot_prop;
 
 /* interface connection interfaces */
 static iscsi_status_t iscsi_conn_state_free(iscsi_conn_t *icp,
@@ -51,6 +54,7 @@ static void iscsi_conn_retry(iscsi_sess_t *isp,
 
 #define	SHUTDOWN_TIMEOUT	180 /* seconds */
 
+extern int modrootloaded;
 /*
  * +--------------------------------------------------------------------+
  * | External Connection Interfaces					|
@@ -543,9 +547,22 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 	(void) persistent_param_get((char *)isp->sess_name, &pp);
 	for (param_id = 0; param_id < ISCSI_NUM_LOGIN_PARAM;
 	    param_id++) {
+		if (iscsiboot_prop && modrootloaded &&
+		    !iscsi_chk_bootlun_mpxio(ihp) && isp->sess_boot) {
+			/*
+			 * iscsi boot with mpxio disabled
+			 * while iscsi booting target's parameter overriden
+			 * do no update target's parameters.
+			 */
+			if (pp.p_bitmap) {
+				cmn_err(CE_NOTE, "Adopting "
+				    " default login parameters in"
+				    " boot session as MPxIO is disabled");
+			}
+			break;
+		}
 		if (pp.p_bitmap & (1 << param_id)) {
-
-			switch (param_id) {
+				switch (param_id) {
 			/*
 			 * Boolean parameters
 			 */
@@ -644,13 +661,38 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 		}
 	}
 
+	if (iscsiboot_prop && (ics->ics_out > 1) && isp->sess_boot &&
+	    !iscsi_chk_bootlun_mpxio(ihp)) {
+		/*
+		 * iscsi booting session with mpxio disabled,
+		 * no need set multiple sessions for booting session
+		 */
+		ics->ics_out = 1;
+		ics->ics_bound = B_FALSE;
+		cmn_err(CE_NOTE, "MPxIO is disabled,"
+		    " no need to configure multiple boot sessions");
+	}
+
 	/*
 	 * Check to make sure this session is still a configured
 	 * session.  The user might have decreased the session
 	 * count. (NOTE: byte 5 of the sess_isid is the session
 	 * count (via MS/T).  This counter starts at 0.)
 	 */
+
+
 	idx = isp->sess_isid[5];
+
+	if (iscsiboot_prop && (idx == ISCSI_MAX_CONFIG_SESSIONS)) {
+		/*
+		 * This is temporary session for boot session propose
+		 * no need to bound IP for this session
+		 */
+		icp->conn_bound = B_FALSE;
+		kmem_free(ics, sizeof (iscsi_config_sess_t));
+		return (ISCSI_STATUS_SUCCESS);
+	}
+
 	if (ics->ics_out <= idx) {
 		/*
 		 * No longer a configured session.  Return a

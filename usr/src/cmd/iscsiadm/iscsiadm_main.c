@@ -3586,8 +3586,23 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 	IMA_OID sharedNodeOid;
 	int i;
 	int lowerCase;
+	IMA_BOOL	iscsiBoot = IMA_FALSE;
+	IMA_BOOL	mpxioEnabled = IMA_FALSE;
 
 	assert(funcRet != NULL);
+
+	/* Get boot session's info */
+	(void) SUN_IMA_GetBootIscsi(&iscsiBoot);
+	if (iscsiBoot == IMA_TRUE) {
+		status = SUN_IMA_GetBootMpxio(&mpxioEnabled);
+		if (!IMA_SUCCESS(status)) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, gettext("unable to get MPxIO info"
+			    " of root disk"));
+			*funcRet = 1;
+			return (1);
+		}
+	}
 
 	/* Find Sun initiator */
 	ret = sunInitiatorFind(&oid);
@@ -3643,6 +3658,13 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				 *   return (INF_ERROR);
 				 * }
 				 */
+				if (iscsiBoot == IMA_TRUE) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot, not"
+					    " allowed to change"
+					    " initiator's name"));
+					return (1);
+				}
 				oid.objectType = IMA_OBJECT_TYPE_NODE;
 				status = IMA_SetNodeName(oid, nodeName);
 				if (!IMA_SUCCESS(status)) {
@@ -3653,6 +3675,13 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				break;
 
 			case 'A':
+				if (iscsiBoot == IMA_TRUE) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot, not"
+					    " allowed to change"
+					    " initiator's alias"));
+					return (1);
+				}
 				/* Take the first operand as node alias. */
 				if (strlen(optionList->optarg) >=
 				    MAX_ISCSI_NAME_LEN) {
@@ -3690,6 +3719,13 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				break;
 
 			case 'a':
+				if (iscsiBoot == IMA_TRUE) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot, not"
+					    " allowed to change authentication"
+					    " method"));
+					return (1);
+				}
 				if (modifyNodeAuthMethod(oid, options->optarg,
 				    funcRet) != 0) {
 					return (1);
@@ -3718,6 +3754,12 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				break;
 
 			case 'C':
+				if (iscsiBoot == IMA_TRUE) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot, not"
+					    " allowed to change CHAP secret"));
+					return (1);
+				}
 				if (modifyNodeAuthParam(oid, AUTH_PASSWORD,
 				    NULL, funcRet) != 0) {
 					return (1);
@@ -3725,20 +3767,61 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				break;
 
 			case 'c':
+				if (iscsiBoot == IMA_TRUE) {
+					if (mpxioEnabled == IMA_FALSE) {
+						(void) fprintf(stderr,
+						    "%s: %s\n", cmdName,
+						    gettext("iscsi"
+						    " boot and MPxIO"
+						    " is disabled, not allowed"
+						    " to change number of"
+						    " sessions to be"
+						    " configured"));
+						return (1);
+					}
+				}
 				if (modifyConfiguredSessions(oid,
 				    optionList->optarg) != 0) {
+					if (iscsiBoot == IMA_TRUE) {
+						(void) fprintf(stderr,
+						    "%s: %s\n", cmdName,
+						    gettext("iscsi boot,"
+						    " fail to set configured"
+						    " session"));
+					}
 					return (1);
 				}
 				break;
 
+
 			case 'H':
+				if (iscsiBoot == IMA_TRUE) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot, not"
+					    " allowed to change CHAP name"));
+					return (1);
+				}
 				if (modifyNodeAuthParam(oid, AUTH_NAME,
 				    optionList->optarg, funcRet) != 0) {
 					return (1);
 				}
 				break;
 
+
 			case 'd':
+				if (iscsiBoot == IMA_TRUE) {
+					if (mpxioEnabled == IMA_FALSE) {
+						(void) fprintf(stderr,
+						    "%s: %s\n", cmdName,
+						    gettext("iscsi"
+						    " boot and MPxIO"
+						    " is disabled, not"
+						    " allowed to"
+						    " change initiator's"
+						    " login params"));
+						return (1);
+					}
+				}
 				if (setLoginParameter(oid, DATA_DIGEST,
 				    optionList->optarg) != 0) {
 					return (1);
@@ -3746,6 +3829,19 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				break;
 
 			case 'h':
+				if (iscsiBoot == IMA_TRUE) {
+					if (mpxioEnabled == IMA_FALSE) {
+						(void) fprintf(stderr,
+						    "%s: %s\n", cmdName,
+						    gettext("iscsi"
+						    " boot and MPxIO"
+						    " is disabled, not"
+						    " allowed to"
+						    " change initiator's"
+						    " login params"));
+						return (1);
+					}
+				}
 				if (setLoginParameter(oid, HEADER_DIGEST,
 				    optionList->optarg) != 0) {
 					return (1);
@@ -3785,6 +3881,11 @@ modifyTargetParam(cmdOptions_t *options, char *targetName, int *funcRet)
 	iSCSINameCheckStatusType nameCheckStatus;
 	IMA_UINT16 port = 0;
 	IMA_UINT16 tpgt = 0;
+
+	IMA_NODE_NAME bootTargetName;
+	IMA_INITIATOR_AUTHPARMS bootTargetCHAP;
+	IMA_BOOL  iscsiBoot;
+	IMA_BOOL  mpxioEnabled;
 
 	cmdOptions_t *optionList = options;
 
@@ -3828,6 +3929,34 @@ modifyTargetParam(cmdOptions_t *options, char *targetName, int *funcRet)
 		return (0);
 	}
 
+	(void) SUN_IMA_GetBootIscsi(&iscsiBoot);
+	if (iscsiBoot == IMA_TRUE) {
+		status = SUN_IMA_GetBootMpxio(&mpxioEnabled);
+		if (!IMA_SUCCESS(status)) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, gettext("unable to get MPxIO info"
+			    " of root disk"));
+			*funcRet = 1;
+			return (ret);
+		}
+		status = SUN_IMA_GetBootTargetName(bootTargetName);
+		if (!IMA_SUCCESS(status)) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, gettext("unable to get boot target's"
+			    " name"));
+			*funcRet = 1;
+			return (ret);
+		}
+		status = SUN_IMA_GetBootTargetAuthParams(&bootTargetCHAP);
+		if (!IMA_SUCCESS(status)) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, gettext("unable to get boot target's"
+			    " auth param"));
+			*funcRet = 1;
+			return (ret);
+		}
+	}
+
 	/* find target oid */
 	for (found = B_FALSE, i = 0; i < targetList->oidCount; i++) {
 		status = SUN_IMA_GetTargetProperties(targetList->oids[i],
@@ -3852,6 +3981,43 @@ modifyTargetParam(cmdOptions_t *options, char *targetName, int *funcRet)
 			 */
 			found = B_TRUE;
 			targetOid = targetList->oids[i];
+
+			if ((targetNamesEqual(bootTargetName, wcInputObject)
+			    == B_TRUE) && (iscsiBoot == IMA_TRUE)) {
+				/*
+				 * iscsi booting, need changed target param is
+				 * booting target, for auth param, not allow
+				 * to change, for others dependent on mpxio
+				 */
+
+				if ((optionList->optval == 'C') ||
+				    (optionList->optval == 'H') ||
+				    (optionList->optval == 'B') ||
+				    (optionList->optval == 'a')) {
+					/*
+					 * -C CHAP secret set
+					 * -H CHAP name set
+					 * -a authentication
+					 * -B bi-directional-authentication
+					 */
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot,"
+					    " not allowed to modify"
+					    " authentication parameters"
+					    "  of boot target"));
+					return (1);
+				}
+				if (mpxioEnabled == IMA_FALSE) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName, gettext("iscsi boot and"
+					    " MPxIO is disabled, not allowed"
+					    " to modify boot target's"
+					    " parameters"));
+					return (1);
+				}
+
+			}
+
 			if (modifyIndividualTargetParam(optionList, targetOid,
 			    funcRet) != 0) {
 				return (ret);
@@ -4326,6 +4492,30 @@ removeTargetParam(int operandLen, char *operand[], int *funcRet)
 	int ret;
 	boolean_t found;
 	int i, j;
+	IMA_NODE_NAME bootTargetName;
+	IMA_BOOL	iscsiBoot = IMA_FALSE;
+	IMA_BOOL	mpxioEnabled = IMA_FALSE;
+
+	/* Get boot session's info */
+	(void) SUN_IMA_GetBootIscsi(&iscsiBoot);
+	if (iscsiBoot == IMA_TRUE) {
+		status = SUN_IMA_GetBootMpxio(&mpxioEnabled);
+		if (!IMA_SUCCESS(status)) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, gettext("unable to get MPxIO info of"
+			    " root disk"));
+			*funcRet = 1;
+			return (1);
+		}
+		status = SUN_IMA_GetBootTargetName(bootTargetName);
+		if (!IMA_SUCCESS(status)) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, gettext("unable to get boot"
+			    " target's name"));
+			*funcRet = 1;
+			return (1);
+		}
+	}
 
 	assert(funcRet != NULL);
 
@@ -4381,6 +4571,27 @@ removeTargetParam(int operandLen, char *operand[], int *funcRet)
 			if (targetNamesEqual(targetProps.imaProps.name,
 			    wcInputObject) == B_TRUE) {
 				found = B_TRUE;
+				if ((targetNamesEqual(bootTargetName,
+				    wcInputObject) == B_TRUE) &&
+				    (iscsiBoot == IMA_TRUE)) {
+					/*
+					 * iscsi booting, need changed target
+					 * param is booting target, booting
+					 * session mpxio disabled, not
+					 * allow to update
+					 */
+					if (mpxioEnabled == IMA_FALSE) {
+						(void) fprintf(stderr,
+						    "%s: %s\n", cmdName,
+						    gettext("iscsi boot"
+						    " with MPxIO disabled,"
+						    " not allowed to remove"
+						    " boot sess param"));
+						continue;
+					}
+
+				}
+
 				status = SUN_IMA_RemoveTargetParam(
 				    targetList->oids[j]);
 				if (!IMA_SUCCESS(status)) {

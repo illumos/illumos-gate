@@ -61,6 +61,7 @@ CORE_OBJS +=			\
 	hrtimers.o		\
 	htable.o		\
 	i86_mmu.o		\
+	ibft.o			\
 	instr_size.o		\
 	intr.o			\
 	kboot_mmu.o		\

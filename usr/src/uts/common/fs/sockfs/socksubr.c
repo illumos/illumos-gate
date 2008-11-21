@@ -92,7 +92,7 @@ static struct kmem_cache *socktpi_cache, *socktpi_unix_cache;
 struct kmem_cache *socktpi_sod_cache;
 
 dev_t sockdev;	/* For fsid in getattr */
-
+int sockfs_defer_nl7c_init = 0;
 struct sockparams *sphead;
 krwlock_t splist_lock;
 
@@ -106,6 +106,8 @@ extern void sendfile_init();
 extern void nl7c_init(void);
 
 extern int sostr_init();
+
+extern int modrootloaded;
 
 #define	ADRSTRLEN (2 * sizeof (void *) + 1)
 /*
@@ -194,6 +196,11 @@ soconfig(int domain, int type, int protocol,
 
 	dprint(0, ("soconfig(%d,%d,%d,%s,%d)\n",
 	    domain, type, protocol, devpath, devpathlen));
+
+	if (sockfs_defer_nl7c_init) {
+		nl7c_init();
+		sockfs_defer_nl7c_init = 0;
+	}
 
 	/*
 	 * Look for an existing match.
@@ -769,7 +776,11 @@ sockinit(int fstype, char *name)
 
 	mutex_init(&socklist.sl_lock, NULL, MUTEX_DEFAULT, NULL);
 	sendfile_init();
-	nl7c_init();
+	if (!modrootloaded) {
+		sockfs_defer_nl7c_init = 1;
+	} else {
+		nl7c_init();
+	}
 
 	return (0);
 

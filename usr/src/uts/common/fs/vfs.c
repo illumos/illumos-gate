@@ -36,7 +36,6 @@
  * contributors.
  */
 
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -84,11 +83,11 @@
 #include <sys/attr.h>
 #include <sys/spa.h>
 #include <sys/lofi.h>
+#include <sys/bootprops.h>
 
 #include <vm/page.h>
 
 #include <fs/fs_subr.h>
-
 /* Private interfaces to create vopstats-related data structures */
 extern void		initialize_vopstats(vopstats_t *);
 extern vopstats_t	*get_fstype_vopstats(struct vfs *, struct vfssw *);
@@ -4489,6 +4488,9 @@ vfs_root_redev(vfs_t *vfsp, dev_t ndev, int fstype)
 extern int hvmboot_rootconf();
 #endif /* __x86 */
 
+extern ib_boot_prop_t *iscsiboot_prop;
+extern void iscsi_boot_prop_free();
+
 int
 rootconf()
 {
@@ -4496,6 +4498,7 @@ rootconf()
 	struct vfssw *vsw;
 	extern void pm_init();
 	char *fstyp, *fsmod;
+	int ret = -1;
 
 	getrootfs(&fstyp, &fsmod);
 
@@ -4533,8 +4536,31 @@ rootconf()
 
 	pm_init();
 
-	if (netboot)
-		(void) strplumb();
+	if (netboot && iscsiboot_prop) {
+		cmn_err(CE_WARN, "NFS boot and iSCSI boot"
+		    " shouldn't happen in the same time");
+		return (EINVAL);
+	}
+
+	if (netboot || iscsiboot_prop)
+		ret = strplumb();
+
+	if ((ret == 0) && iscsiboot_prop) {
+		ret = modload("drv", "iscsi");
+		/* -1 indicates fail */
+		if (ret == -1) {
+			cmn_err(CE_WARN, "Failed to load iscsi module");
+			iscsi_boot_prop_free();
+			return (EINVAL);
+		} else {
+			if (!i_ddi_attach_pseudo_node("iscsi")) {
+				cmn_err(CE_WARN,
+				    "Failed to attach iscsi driver");
+				iscsi_boot_prop_free();
+				return (ENODEV);
+			}
+		}
+	}
 
 	error = VFS_MOUNTROOT(rootvfs, ROOT_INIT);
 	vfs_unrefvfssw(vsw);

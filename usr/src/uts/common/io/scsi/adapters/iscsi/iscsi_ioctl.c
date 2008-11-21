@@ -37,6 +37,9 @@
 #include "iscsi_targetparam.h"
 #include <sys/strsubr.h>
 #include <sys/socketvar.h>
+#include <sys/bootprops.h>
+
+extern ib_boot_prop_t	*iscsiboot_prop;
 
 static iscsi_status_t iscsi_create_sendtgts_list(iscsi_conn_t *icp,
     char *data, int data_len, iscsi_sendtgts_list_t *stl);
@@ -869,14 +872,26 @@ iscsi_set_params(iscsi_param_set_t *ils, iscsi_hba_t *ihp, boolean_t persist)
 			}
 
 			/*
-			 * We may have multiple sessions with different
-			 * tpgt values.  So we need to loop through
+			 * Here may have multiple sessions with different
+			 * tpgt values.  So it is needed to loop through
 			 * the sessions and update all sessions.
 			 */
 			if (rtn == 0) {
 				rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
 				for (isp = ihp->hba_sess_list; isp;
 				    isp = isp->sess_next) {
+					if (iscsiboot_prop &&
+					    isp->sess_boot &&
+					    iscsi_chk_bootlun_mpxio(ihp)) {
+						/*
+						 * MPxIO is enabled so capable
+						 * of changing. All changes
+						 * will be applied later,
+						 * after this function
+						 */
+						continue;
+					}
+
 					if (strncmp((char *)isp->sess_name,
 					    (char *)name,
 					    ISCSI_MAX_NAME_LEN) == 0) {
@@ -917,15 +932,24 @@ mutex_exit(&isp->sess_state_mutex);
 			rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
 			for (isp = ihp->hba_sess_list; isp;
 			    isp = isp->sess_next) {
-
 				ilg->g_param = ils->s_param;
 				params = &isp->sess_params;
 				if (iscsi_get_persisted_param(
 				    isp->sess_name, ilg, params) != 0) {
-
 					rtn = iscsi_set_param(params, ils);
 					if (rtn != 0) {
 						break;
+					}
+					if (iscsiboot_prop &&
+					    isp->sess_boot &&
+					    iscsi_chk_bootlun_mpxio(ihp)) {
+						/*
+						 * MPxIO is enabled so capable
+						 * of changing. Changes will
+						 * be applied later, right
+						 * after this function
+						 */
+						continue;
 					}
 
 					/*

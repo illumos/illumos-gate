@@ -29,11 +29,12 @@ PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
 # Driver definitions
 DRVR_NAME=iscsi; export DRVR_NAME
 DRVR_PERM='* 0600 root sys'; export DRVR_PERM
+DRVR_CLS=scsi-self-identify; export DRVR_CLS
 
 if [ "${BASEDIR}" = "/" ]; then
-  add_drv -m "${DRVR_PERM}" ${DRVR_NAME}
+  add_drv -m "${DRVR_PERM}" -c ${DRVR_CLS} ${DRVR_NAME}
 else
-  add_drv -b "${BASEDIR}" -m "${DRVR_PERM}" ${DRVR_NAME}
+  add_drv -b "${BASEDIR}" -m "${DRVR_PERM}" -c ${DRVR_CLS} ${DRVR_NAME}
 fi
 
 exit 0

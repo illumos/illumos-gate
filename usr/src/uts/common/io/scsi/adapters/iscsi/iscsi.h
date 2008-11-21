@@ -228,6 +228,12 @@ extern int	iscsi_rx_window;
 extern int	iscsi_rx_max_window;
 
 /*
+ * During iscsi boot, if the boot session has been created, the
+ * initiator hasn't changed the boot lun to be online, we will wait
+ * 180s here for lun online by default.
+ */
+#define	ISCSI_BOOT_DEFAULT_MAX_DELAY		180 /* seconds */
+/*
  * +--------------------------------------------------------------------+
  * | iSCSI Driver Structures						|
  * +--------------------------------------------------------------------+
@@ -812,6 +818,7 @@ typedef struct iscsi_sess {
 
 	iscsi_thread_t		*sess_ic_thread;
 	boolean_t		sess_window_open;
+	boolean_t		sess_boot;
 	iscsi_sess_type_t	sess_type;
 
 	boolean_t		sess_enum_in_progress;
@@ -914,6 +921,7 @@ typedef struct iscsi_hba {
 	boolean_t		hba_discovery_in_progress;
 
 	boolean_t		hba_mpxio_enabled; /* mpxio-enabled */
+	boolean_t		persistent_loaded; /* persistent_loaded */
 
 	/*
 	 * Ensures only one SendTargets operation occurs at a time
@@ -1084,6 +1092,10 @@ boolean_t iscsid_login_tgt(iscsi_hba_t *ihp, char *target_name,
     iSCSIDiscoveryMethod_t method, struct sockaddr *addr_dsc);
 void iscsid_addr_to_sockaddr(int src_insize, void *src_addr, int src_port,
     struct sockaddr *dst_addr);
+boolean_t iscsi_reconfig_boot_sess(iscsi_hba_t *ihp);
+boolean_t iscsi_chk_bootlun_mpxio(iscsi_hba_t *ihp);
+boolean_t iscsi_cmp_boot_ini_name(char *name);
+boolean_t iscsi_cmp_boot_tgt_name(char *name);
 
 extern void bcopy(const void *s1, void *s2, size_t n);
 extern void bzero(void *s, size_t n);

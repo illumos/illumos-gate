@@ -19,16 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_BOOTPROPS_H
 #define	_BOOTPROPS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/t_kuser.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,6 +47,84 @@ extern "C" {
 #define	BP_SERVER_ROOTOPTS		"server-rootopts"
 #define	BP_BOOTP_RESPONSE		"bootp-response"
 #define	BP_NETWORK_INTERFACE		"network-interface"
+
+/*
+ * kifconf prototypes
+ */
+int
+kdlifconfig(TIUSER *tiptr, int af, void *myIPaddr, void *mymask,
+    struct in_addr *mybraddr, struct in_addr *gateway, char *ifname);
+int
+ksetifflags(TIUSER *tiptr, uint_t value, char *ifname);
+int
+kifioctl(TIUSER *tiptr, int cmd, struct netbuf *nbuf, char *ifname);
+
+/*
+ * Boot properties related to iscsi boot:
+ */
+#define	IB_BOOT_MACLEN		6
+#define	IB_IP_BUFLEN		16
+
+/*
+ * iSCSI boot initiator's properties
+ */
+typedef struct _ib_ini_prop {
+	uchar_t		*ini_name;
+	uchar_t		*ini_chap_name;
+	uchar_t		*ini_chap_sec;
+} ib_ini_prop_t;
+
+/*
+ * iSCSI boot nic's properties
+ */
+typedef struct _ib_nic_prop {
+	uchar_t		nic_mac[6];
+	uchar_t		nic_vlan[2];
+	union {
+		struct in_addr	u_in4;
+		struct in6_addr	u_in6;
+	} nic_ip_u;
+	union {
+		struct in_addr	u_in4;
+		struct in6_addr	u_in6;
+	} nic_gw_u;
+	union {
+		struct in_addr	u_in4;
+		struct in6_addr	u_in6;
+	} nic_dhcp_u;
+	int		sin_family;
+	uchar_t		sub_mask_prefix;
+
+} ib_nic_prop_t;
+
+/*
+ * iSCSI boot target's properties
+ */
+typedef struct _ib_tgt_prop {
+	union {
+		struct in_addr	u_in4;
+		struct in6_addr	u_in6;
+	}tgt_ip_u;
+	int		sin_family;
+	uint32_t	tgt_port;
+	uchar_t		tgt_boot_lun[8];
+	uchar_t		*tgt_name;
+	uchar_t		*tgt_chap_name;
+	uchar_t		*tgt_chap_sec;
+	int		lun_online;
+} ib_tgt_prop_t;
+
+/*
+ * iSCSI boot properties
+ */
+typedef struct _ib_boot_prop {
+	ib_ini_prop_t	boot_init;
+	ib_nic_prop_t	boot_nic;
+	ib_tgt_prop_t	boot_tgt;
+} ib_boot_prop_t;
+
+void
+ld_ib_prop();
 
 #ifdef	__cplusplus
 }

@@ -145,6 +145,8 @@ extern "C" {
 #define	ISCSI_GET_CONFIG_SESSIONS	(ISCSI_IOCTL | 44)
 #define	ISCSI_SET_CONFIG_SESSIONS	(ISCSI_IOCTL | 45)
 #define	ISCSI_INIT_NODE_NAME_SET	(ISCSI_IOCTL | 46)
+#define	ISCSI_IS_ACTIVE			(ISCSI_IOCTL | 47)
+#define	ISCSI_BOOTPROP_GET		(ISCSI_IOCTL | 48)
 #define	ISCSI_DB_DUMP			(ISCSI_IOCTL | 100) /* DBG */
 
 /*
@@ -180,7 +182,13 @@ typedef enum	iSCSIDiscoveryMethod {
 	iSCSIDiscoveryMethodStatic	= 1,
 	iSCSIDiscoveryMethodSLP		= 2,
 	iSCSIDiscoveryMethodISNS	= 4,
-	iSCSIDiscoveryMethodSendTargets	= 8
+	iSCSIDiscoveryMethodSendTargets	= 8,
+	/*
+	 * Since there is no specification about boot discovery method,
+	 * we should leave a value gap in case of other discovery
+	 * methods added.
+	 */
+	iSCSIDiscoveryMethodBoot	= 128
 } iSCSIDiscoveryMethod_t;
 #define	ISCSI_ALL_DISCOVERY_METHODS	(iSCSIDiscoveryMethodStatic |	\
 					iSCSIDiscoveryMethodSLP |	\
@@ -246,6 +254,8 @@ typedef struct entry {
 	int			e_insize;
 	int			e_port;
 	int			e_tpgt;
+	/* e_boot should be true if a boot session is created. */
+	boolean_t		e_boot;
 } entry_t;
 
 /*
@@ -600,6 +610,17 @@ typedef struct iscsi_config_sess {
 	uint_t		ics_out;
 	iscsi_ipaddr_t	ics_bindings[1];
 } iscsi_config_sess_t;
+
+/* iscsi booting prop */
+typedef struct _iSCSIBootProperties {
+	node_name_t	ini_name;
+	node_name_t	tgt_name;
+	iscsi_auth_props_t	auth;
+	iscsi_chap_props_t	ini_chap;
+	iscsi_chap_props_t	tgt_chap;
+	int iscsiboot;
+	boolean_t hba_mpxio_enabled;
+} iscsi_boot_property_t;
 
 #define	ISCSI_SESSION_CONFIG_SIZE(SIZE)		\
 	(sizeof (iscsi_config_sess_t) +		\

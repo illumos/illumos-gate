@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The intent of this file is to contain any data that must remain
@@ -61,6 +59,7 @@
 #include <sys/kbio.h>
 #include <sys/consdev.h>
 #include <sys/wscons.h>
+#include <sys/bootprops.h>
 
 struct	buf	bfreelist;	/* Head of the free list of buffers */
 
@@ -377,3 +376,8 @@ uint_t		ip_threads_per_cpu = NUMBER_OF_THREADS_PER_CPU;
 
 /* Global flag to enable/disable soft ring facility */
 boolean_t	ip_squeue_soft_ring = B_FALSE;
+
+/*
+ * Global iscsi boot prop
+ */
+ib_boot_prop_t	*iscsiboot_prop = NULL;

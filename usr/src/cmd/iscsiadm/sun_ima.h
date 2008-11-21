@@ -135,7 +135,14 @@ IMA_API	IMA_STATUS SUN_IMA_GetTargetAuthParms(
 	IMA_OID oid,
 	IMA_AUTHMETHOD method,
 	IMA_INITIATOR_AUTHPARMS *pParms);
-
+IMA_STATUS SUN_IMA_GetBootTargetName(
+	IMA_NODE_NAME tgtName);
+IMA_STATUS SUN_IMA_GetBootTargetAuthParams(
+	IMA_INITIATOR_AUTHPARMS *pTgtCHAP);
+IMA_STATUS SUN_IMA_GetBootMpxio(
+	IMA_BOOL *pMpxioEnabled);
+IMA_STATUS SUN_IMA_GetBootIscsi(
+	IMA_BOOL *pIscsiBoot);
 
 #ifdef	__cplusplus
 }

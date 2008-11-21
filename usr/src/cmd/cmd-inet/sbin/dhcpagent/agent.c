@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -41,6 +39,10 @@
 #include <netinet/dhcp.h>
 #include <net/route.h>
 #include <sys/sockio.h>
+#include <sys/stat.h>
+#include <stropts.h>
+#include <fcntl.h>
+#include <sys/scsi/adapters/iscsi_if.h>
 
 #include "async.h"
 #include "agent.h"
@@ -120,6 +122,9 @@ static uint_t ipc_cmd_flags[DHCP_NIPC] = {
 	/* DHCP_INFORM */	CMD_CREATE|CMD_ISPRIV,
 	/* DHCP_GET_TAG */	CMD_BOOTP|CMD_IMMED
 };
+
+static boolean_t
+is_iscsi_active(void);
 
 int
 main(int argc, char **argv)
@@ -367,8 +372,16 @@ drain_script(iu_eh_t *ehp, void *arg)
 {
 	if (shutdown_started == B_FALSE) {
 		shutdown_started = B_TRUE;
-		if (do_adopt == B_FALSE)	/* see 4291141 */
+		/*
+		 * Check if the system is diskless client and/or
+		 * there are active iSCSI sessions
+		 *
+		 * Do not drop the lease, or the system will be
+		 * unable to sync(dump) through nfs/iSCSI driver
+		 */
+		if (!do_adopt && !is_iscsi_active()) {
 			nuke_smach_list();
+		}
 	}
 	return (script_count == 0);
 }
@@ -1467,4 +1480,25 @@ boolean_t
 check_cmd_allowed(DHCPSTATE state, dhcp_ipc_type_t cmd)
 {
 	return (ipc_cmd_allowed[state][cmd] != 0);
+}
+
+static boolean_t
+is_iscsi_active(void)
+{
+	int	fd;
+	int	active;
+
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		return (B_FALSE);
+	}
+
+	if ((ioctl(fd, ISCSI_IS_ACTIVE, &active)) != 0) {
+		active = 0;
+	}
+	(void) close(fd);
+	if (active) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
 }

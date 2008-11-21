@@ -1109,6 +1109,10 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/iscsi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:                $(UTSBASE)/common/inet/kifconf/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # krtld must refer to its own bzero/bcopy until the kernel is fully linked
 #
@@ -2116,6 +2120,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/iscsi/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/iscsi/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/kifconf/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 ZMODLINTFLAGS = -erroff=E_CONSTANT_CONDITION

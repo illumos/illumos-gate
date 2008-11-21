@@ -44,6 +44,7 @@ CORE_OBJS +=	forthdebug.o
 CORE_OBJS +=	hardclk.o
 CORE_OBJS +=	hat_sfmmu.o
 CORE_OBJS +=	hat_kdi.o
+CORE_OBJS +=	iscsi_boot.o
 CORE_OBJS +=	mach_copy.o
 CORE_OBJS +=	mach_kpm.o
 CORE_OBJS +=	mach_mp_startup.o

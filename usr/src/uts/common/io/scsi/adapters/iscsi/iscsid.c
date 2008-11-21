@@ -41,6 +41,7 @@
 #include "persistent.h"
 #include "iscsi.h"
 #include <sys/ethernet.h>
+#include <sys/bootprops.h>
 
 /*
  * local function prototypes
@@ -51,6 +52,7 @@ static void iscsid_thread_static(iscsi_thread_t *thread, void *p);
 static void iscsid_thread_sendtgts(iscsi_thread_t *thread, void *p);
 static void iscsid_thread_isns(iscsi_thread_t *thread, void *p);
 static void iscsid_thread_slp(iscsi_thread_t *thread, void *p);
+static void iscsid_thread_boot_wd(iscsi_thread_t *thread, void *p);
 static void iscsid_threads_create(iscsi_hba_t *ihp);
 static void iscsid_threads_destroy(void);
 static int iscsid_copyto_param_set(uint32_t param_id,
@@ -62,11 +64,19 @@ static void iscsid_remove_target_param(char *name);
 static boolean_t iscsid_add(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
     struct sockaddr *addr_dsc, char *target_name, int tpgt,
     struct sockaddr *addr_tgt);
-
 static void iscsi_discovery_event(iscsi_hba_t *ihp,
     iSCSIDiscoveryMethod_t m, boolean_t start);
 static void iscsi_send_sysevent(iscsi_hba_t *ihp,
     char *subclass, nvlist_t *np);
+static boolean_t iscsid_boot_init_config(iscsi_hba_t *ihp);
+static iscsi_sess_t *iscsi_add_boot_sess(iscsi_hba_t *ihp, int isid);
+static boolean_t iscsid_make_entry(ib_boot_prop_t *boot_prop_entry,
+    entry_t *entry);
+
+extern int modrootloaded;
+int iscsi_configroot_retry = 20;
+static boolean_t iscsi_configroot_printed = FALSE;
+extern ib_boot_prop_t   *iscsiboot_prop;
 
 /*
  * iSCSI target discovery thread table
@@ -96,7 +106,6 @@ static iscsid_thr_table iscsid_thr[] = {
 	    NULL }
 };
 
-
 /*
  * discovery method event table
  */
@@ -109,11 +118,128 @@ iSCSIDiscoveryMethod_t	for_failure[] = {
 };
 
 /*
+ * The following private tunable, set in /etc/system, e.g.,
+ *      set iscsi:iscsi_boot_max_delay = 360
+ * , provides with customer a max wait time in
+ * seconds to wait for boot lun online during iscsi boot.
+ * Defaults to 180s.
+ */
+int iscsi_boot_max_delay = ISCSI_BOOT_DEFAULT_MAX_DELAY;
+
+/*
  * discovery configuration semaphore
  */
 ksema_t iscsid_config_semaphore;
 
+static iscsi_thread_t	*iscsi_boot_wd_handle = NULL;
+
 #define	CHECK_METHOD(v) ((dm & v) ? B_TRUE : B_FALSE)
+
+/*
+ * Check if IP is valid
+ */
+static boolean_t
+iscsid_ip_check(char *ip)
+{
+	int	i	= 0;
+
+	if (!ip)
+		return (B_FALSE);
+	for (; (ip[i] == 0) && (i < IB_IP_BUFLEN); i++) {}
+	if (i == IB_IP_BUFLEN) {
+		/* invalid IP address */
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Make an entry for the boot target.
+ * return B_TRUE upon success
+ *        B_FALSE if fail
+ */
+static boolean_t
+iscsid_make_entry(ib_boot_prop_t *boot_prop_entry, entry_t *entry)
+{
+	if (entry == NULL || boot_prop_entry == NULL) {
+		return (B_FALSE);
+	}
+
+	if (!iscsid_ip_check(
+	    (char *)&boot_prop_entry->boot_tgt.tgt_ip_u))
+		return (B_FALSE);
+
+	if (boot_prop_entry->boot_tgt.sin_family != AF_INET &&
+	    boot_prop_entry->boot_tgt.sin_family != AF_INET6)
+		return (B_FALSE);
+
+	entry->e_vers = ISCSI_INTERFACE_VERSION;
+
+	mutex_enter(&iscsi_oid_mutex);
+	entry->e_oid = iscsi_oid++;
+	mutex_exit(&iscsi_oid_mutex);
+
+	entry->e_tpgt = ISCSI_DEFAULT_TPGT;
+
+	if (boot_prop_entry->boot_tgt.sin_family == AF_INET) {
+		entry->e_u.u_in4.s_addr =
+		    boot_prop_entry->boot_tgt.tgt_ip_u.u_in4.s_addr;
+		entry->e_insize = sizeof (struct in_addr);
+	} else {
+		(void) bcopy(
+		    &boot_prop_entry->boot_tgt.tgt_ip_u.u_in6.s6_addr,
+		    entry->e_u.u_in6.s6_addr, 16);
+		entry->e_insize = sizeof (struct in6_addr);
+	}
+
+	entry->e_port = boot_prop_entry->boot_tgt.tgt_port;
+	entry->e_boot = B_TRUE;
+	return (B_TRUE);
+}
+
+/*
+ * Create the boot session
+ */
+static void
+iscsi_boot_session_create(iscsi_hba_t *ihp,
+    ib_boot_prop_t	*boot_prop_table)
+{
+	iSCSIDiscoveryMethod_t  dm;
+	entry_t			e;
+	iscsi_sockaddr_t	addr_dsc;
+
+	if (ihp == NULL || boot_prop_table == NULL) {
+		return;
+	}
+
+	if (!iscsid_ip_check(
+	    (char *)&boot_prop_table->boot_tgt.tgt_ip_u)) {
+		return;
+	}
+
+	if (boot_prop_table->boot_tgt.tgt_name != NULL) {
+		dm = iSCSIDiscoveryMethodStatic |
+		    iSCSIDiscoveryMethodBoot;
+		if (!iscsid_make_entry(boot_prop_table, &e))
+			return;
+		iscsid_addr_to_sockaddr(e.e_insize, &e.e_u,
+		    e.e_port, &addr_dsc.sin);
+
+		(void) iscsid_add(ihp, dm, &addr_dsc.sin,
+		    (char *)boot_prop_table->boot_tgt.tgt_name,
+		    e.e_tpgt, &addr_dsc.sin);
+	} else {
+		dm = iSCSIDiscoveryMethodSendTargets |
+		    iSCSIDiscoveryMethodBoot;
+		if (!iscsid_make_entry(boot_prop_table, &e))
+			return;
+		iscsid_addr_to_sockaddr(e.e_insize, &e.e_u,
+		    e.e_port, &addr_dsc.sin);
+		iscsid_do_sendtgts(&e);
+		(void) iscsid_login_tgt(ihp, NULL, dm,
+		    &addr_dsc.sin);
+	}
+}
 
 /*
  * iscsid_init -- load data from persistent storage and start discovery threads
@@ -132,40 +258,74 @@ iscsid_init(iscsi_hba_t *ihp, boolean_t restart)
 	sema_init(&iscsid_config_semaphore, 1, NULL,
 	    SEMA_DRIVER, NULL);
 
-	rval = persistent_init(restart);
-	if (rval == B_TRUE) {
-		rval = iscsid_init_config(ihp);
-		if (rval == B_TRUE) {
-			rval = iscsid_init_targets(ihp);
+	if (iscsiboot_prop) {
+		if (ihp->persistent_loaded) {
+			rval = persistent_init(B_TRUE);
+		} else {
+			rval = persistent_init(B_FALSE);
+			if (rval)
+				ihp->persistent_loaded = B_TRUE;
 		}
-	}
-
-	if (rval == B_TRUE) {
+	} else {
+		rval = persistent_init(restart);
 		if (restart == B_FALSE) {
-			iscsid_threads_create(ihp);
+			ihp->persistent_loaded = B_TRUE;
 		}
+	}
 
-		dm = persistent_disc_meth_get();
-		rval = iscsid_enable_discovery(ihp, dm, B_FALSE);
+	if ((modrootloaded == 0) && (iscsiboot_prop != NULL) && rval) {
+		if (!iscsid_boot_init_config(ihp)) {
+			rval = B_FALSE;
+		} else {
+			iscsi_boot_session_create(ihp, iscsiboot_prop);
+			iscsi_boot_wd_handle =
+			    iscsi_thread_create(ihp->hba_dip,
+			    "BootWD", iscsid_thread_boot_wd, ihp);
+			if (iscsi_boot_wd_handle) {
+				rval = iscsi_thread_start(
+				    iscsi_boot_wd_handle);
+			} else {
+				rval = B_FALSE;
+			}
+		}
+		if (!rval) {
+			cmn_err(CE_NOTE, "Initializaton of iscsi initiator"
+			    " partially failed");
+		}
+	} else {
 		if (rval == B_TRUE) {
-			rval = iscsid_disable_discovery(ihp, ~dm);
+			rval = iscsid_init_config(ihp);
+			if (rval == B_TRUE) {
+				rval = iscsid_init_targets(ihp);
+			}
+		}
+
+		if (rval == B_TRUE) {
+			if (restart == B_FALSE) {
+				iscsid_threads_create(ihp);
+			}
+
+			dm = persistent_disc_meth_get();
+			rval = iscsid_enable_discovery(ihp, dm, B_FALSE);
+			if (rval == B_TRUE) {
+				rval = iscsid_disable_discovery(ihp, ~dm);
+			}
+
+		}
+		if (rval == B_FALSE) {
+			/*
+			 * In case of failure the events still need to be sent
+			 * because the door daemon will pause until all these
+			 * events have occurred.
+			 */
+			for (fdm = &for_failure[0]; *fdm !=
+			    iSCSIDiscoveryMethodUnknown; fdm++) {
+				/* ---- Send both start and end events ---- */
+				iscsi_discovery_event(ihp, *fdm, B_TRUE);
+				iscsi_discovery_event(ihp, *fdm, B_FALSE);
+			}
 		}
 	}
-
-	if (rval == B_FALSE) {
-		/*
-		 * In case of failure the events still need to be sent
-		 * because the door daemon will pause until all these
-		 * events have occurred.
-		 */
-		for (fdm = &for_failure[0]; *fdm != iSCSIDiscoveryMethodUnknown;
-		    fdm++) {
-			/* ---- Send both start and end events ---- */
-			iscsi_discovery_event(ihp, *fdm, B_TRUE);
-			iscsi_discovery_event(ihp, *fdm, B_FALSE);
-		}
-	}
-
 	return (rval);
 }
 
@@ -177,6 +337,10 @@ void
 iscsid_fini()
 {
 	iscsid_threads_destroy();
+	if (iscsi_boot_wd_handle != NULL) {
+		iscsi_thread_destroy(iscsi_boot_wd_handle);
+		iscsi_boot_wd_handle = NULL;
+	}
 	persistent_fini();
 	sema_destroy(&iscsid_config_semaphore);
 }
@@ -369,7 +533,8 @@ iscsid_do_sendtgts(entry_t *disc_addr)
 	const char		*ip;
 	int			ctr;
 	int			rc;
-	iscsi_hba_t *ihp;
+	iscsi_hba_t		*ihp;
+	iSCSIDiscoveryMethod_t  dm = iSCSIDiscoveryMethodSendTargets;
 
 	/* allocate and initialize sendtargets list header */
 	stl_sz = sizeof (*stl_hdr) + ((stl_num_tgts - 1) *
@@ -436,8 +601,10 @@ retry_sendtgts:
 		    &(stl_hdr->stl_list[ctr].ste_ipaddr.a_addr.i_addr),
 		    stl_hdr->stl_list[ctr].ste_ipaddr.a_port,
 		    &addr_tgt.sin);
-
-		(void) iscsid_add(ihp, iSCSIDiscoveryMethodSendTargets,
+		if (disc_addr->e_boot == B_TRUE) {
+			dm = dm | iSCSIDiscoveryMethodBoot;
+		}
+		(void) iscsid_add(ihp, dm,
 		    &addr_dsc.sin, (char *)stl_hdr->stl_list[ctr].ste_name,
 		    stl_hdr->stl_list[ctr].ste_tpgt,
 		    &addr_tgt.sin);
@@ -528,29 +695,73 @@ iscsid_do_isns_query(iscsi_hba_t *ihp)
 void
 iscsid_config_one(iscsi_hba_t *ihp, char *name, boolean_t protect)
 {
-	boolean_t	rc;
+	boolean_t	rc	    =	B_FALSE;
+	int		retry	    =	0;
+	int		lun_online  =	0;
+	int		cur_sec	    =	0;
 
-	rc = iscsid_login_tgt(ihp, name,
-	    iSCSIDiscoveryMethodUnknown, NULL);
-	/*
-	 * If we didn't login to the device we might have
-	 * to update our discovery information and attempt
-	 * the login again.
-	 */
-	if (rc == B_FALSE) {
+	if (!modrootloaded && (iscsiboot_prop != NULL)) {
+		if (!iscsi_configroot_printed) {
+			cmn_err(CE_NOTE, "Configuring"
+			    " iSCSI boot session...");
+			iscsi_configroot_printed = B_TRUE;
+		}
+		while (rc == B_FALSE && retry <
+		    iscsi_configroot_retry) {
+			rc = iscsid_login_tgt(ihp, name,
+			    iSCSIDiscoveryMethodBoot, NULL);
+			if (rc == B_FALSE) {
+				/*
+				 * create boot session
+				 */
+				iscsi_boot_session_create(ihp,
+				    iscsiboot_prop);
+			} else {
+				/*
+				 * The boot session has been created, if
+				 * the target lun has not been online,
+				 * we should wait here for a while
+				 */
+				do {
+					lun_online =
+					    iscsiboot_prop->boot_tgt.lun_online;
+					if (lun_online == 0) {
+						delay(SEC_TO_TICK(1));
+						cur_sec++;
+					}
+				} while ((lun_online == 0) &&
+				    (cur_sec < iscsi_boot_max_delay));
+			}
+			retry++;
+		}
+		if (!rc) {
+			cmn_err(CE_WARN, "Failed to configure iSCSI"
+			    " boot session");
+		}
+	} else {
+		rc = iscsid_login_tgt(ihp, name, iSCSIDiscoveryMethodUnknown,
+		    NULL);
 		/*
-		 * Stale /dev links can cause us to get floods
-		 * of config requests.  Prevent these repeated
-		 * requests from causing unneeded discovery updates
-		 * if ISCSI_CONFIG_STORM_PROTECT is set.
+		 * If we didn't login to the device we might have
+		 * to update our discovery information and attempt
+		 * the login again.
 		 */
-		if ((protect == B_FALSE) ||
-		    (ddi_get_lbolt() > ihp->hba_config_lbolt +
-		    SEC_TO_TICK(ihp->hba_config_storm_delay))) {
-			ihp->hba_config_lbolt = ddi_get_lbolt();
-			iscsid_poke_discovery(ihp, iSCSIDiscoveryMethodUnknown);
-			(void) iscsid_login_tgt(ihp, name,
-			    iSCSIDiscoveryMethodUnknown, NULL);
+		if (rc == B_FALSE) {
+			/*
+			 * Stale /dev links can cause us to get floods
+			 * of config requests.  Prevent these repeated
+			 * requests from causing unneeded discovery updates
+			 * if ISCSI_CONFIG_STORM_PROTECT is set.
+			 */
+			if ((protect == B_FALSE) ||
+			    (ddi_get_lbolt() > ihp->hba_config_lbolt +
+			    SEC_TO_TICK(ihp->hba_config_storm_delay))) {
+				ihp->hba_config_lbolt = ddi_get_lbolt();
+				iscsid_poke_discovery(ihp,
+				    iSCSIDiscoveryMethodUnknown);
+				(void) iscsid_login_tgt(ihp, name,
+				    iSCSIDiscoveryMethodUnknown, NULL);
+			}
 		}
 	}
 }
@@ -565,20 +776,68 @@ iscsid_config_one(iscsi_hba_t *ihp, char *name, boolean_t protect)
 void
 iscsid_config_all(iscsi_hba_t *ihp, boolean_t protect)
 {
-	/*
-	 * Stale /dev links can cause us to get floods
-	 * of config requests.  Prevent these repeated
-	 * requests from causing unneeded discovery updates
-	 * if ISCSI_CONFIG_STORM_PROTECT is set.
-	 */
-	if ((protect == B_FALSE) ||
-	    (ddi_get_lbolt() > ihp->hba_config_lbolt +
-	    SEC_TO_TICK(ihp->hba_config_storm_delay))) {
-		ihp->hba_config_lbolt = ddi_get_lbolt();
-		iscsid_poke_discovery(ihp, iSCSIDiscoveryMethodUnknown);
+	boolean_t	rc		= B_FALSE;
+	int		retry	= 0;
+	int		lun_online  = 0;
+	int		cur_sec	= 0;
+
+	if (!modrootloaded && iscsiboot_prop != NULL) {
+		if (!iscsi_configroot_printed) {
+			cmn_err(CE_NOTE, "Configuring"
+			    " iSCSI boot session...");
+			iscsi_configroot_printed = B_TRUE;
+		}
+		while (rc == B_FALSE && retry <
+		    iscsi_configroot_retry) {
+			rc = iscsid_login_tgt(ihp, NULL,
+			    iSCSIDiscoveryMethodBoot, NULL);
+			if (rc == B_FALSE) {
+				/*
+				 * No boot session has been created.
+				 * We would like to create the boot
+				 * Session first.
+				 */
+				iscsi_boot_session_create(ihp,
+				    iscsiboot_prop);
+			} else {
+				/*
+				 * The boot session has been created, if
+				 * the target lun has not been online,
+				 * we should wait here for a while
+				 */
+				do {
+					lun_online =
+					    iscsiboot_prop->boot_tgt.lun_online;
+					if (lun_online == 0) {
+						delay(SEC_TO_TICK(1));
+						cur_sec++;
+					}
+				} while ((lun_online == 0) &&
+				    (cur_sec < iscsi_boot_max_delay));
+			}
+			retry++;
+		}
+		if (!rc) {
+			cmn_err(CE_WARN, "Failed to configure"
+			    " boot session");
+		}
+	} else {
+		/*
+		 * Stale /dev links can cause us to get floods
+		 * of config requests.  Prevent these repeated
+		 * requests from causing unneeded discovery updates
+		 * if ISCSI_CONFIG_STORM_PROTECT is set.
+		 */
+		if ((protect == B_FALSE) ||
+		    (ddi_get_lbolt() > ihp->hba_config_lbolt +
+		    SEC_TO_TICK(ihp->hba_config_storm_delay))) {
+			ihp->hba_config_lbolt = ddi_get_lbolt();
+			iscsid_poke_discovery(ihp,
+			    iSCSIDiscoveryMethodUnknown);
+		}
+		(void) iscsid_login_tgt(ihp, NULL,
+		    iSCSIDiscoveryMethodUnknown, NULL);
 	}
-	(void) iscsid_login_tgt(ihp, NULL,
-	    iSCSIDiscoveryMethodUnknown, NULL);
 }
 
 /*
@@ -754,6 +1013,19 @@ iscsid_add(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
 		}
 	}
 
+	if (iscsiboot_prop && (ics->ics_out > 1) &&
+	    !iscsi_chk_bootlun_mpxio(ihp)) {
+		/*
+		 * iscsi boot with mpxio disabled
+		 * no need to search configured boot session
+		 */
+
+		if (iscsi_cmp_boot_ini_name(tmp) ||
+		    iscsi_cmp_boot_tgt_name(tmp)) {
+			ics->ics_out = 1;
+			ics->ics_bound = B_FALSE;
+		}
+	}
 	/* Check to see if we need to get more information */
 	if (ics->ics_out > 1) {
 		/* record new size and free last buffer */
@@ -866,7 +1138,8 @@ iscsid_del(iscsi_hba_t *ihp, char *target_name,
 				try_destroy = B_TRUE;
 			}
 
-			if (try_destroy == B_TRUE) {
+			if (try_destroy == B_TRUE &&
+			    isp->sess_boot == B_FALSE) {
 				(void) strcpy(name, (char *)isp->sess_name);
 				status = iscsi_sess_destroy(isp);
 				if (ISCSI_SUCCESS(status)) {
@@ -914,44 +1187,58 @@ iscsid_login_tgt(iscsi_hba_t *ihp, char *target_name,
 	isp = ihp->hba_sess_list;
 	while (isp != NULL) {
 		boolean_t try_online;
-
-		if (target_name == NULL) {
-			if (method == iSCSIDiscoveryMethodUnknown) {
-				/* unknown method mean login to all */
-				try_online = B_TRUE;
-			} else if (isp->sess_discovered_by & method) {
-				if ((method == iSCSIDiscoveryMethodISNS) ||
-				    (method ==
-				    iSCSIDiscoveryMethodSendTargets)) {
-					if ((addr_dsc == NULL) ||
-					    (bcmp(&isp->sess_discovered_addr,
-					    addr_dsc, SIZEOF_SOCKADDR(
-					    &isp->sess_discovered_addr.sin))
-					    == 0)) {
-						/*
-						 * iSNS or sendtarget
-						 * discovery and discovery
-						 * address is NULL or match
-						 */
-						try_online = B_TRUE;
-					} else {
+		if (!(method & iSCSIDiscoveryMethodBoot)) {
+			if (target_name == NULL) {
+				if (method == iSCSIDiscoveryMethodUnknown) {
+					/* unknown method mean login to all */
+					try_online = B_TRUE;
+				} else if (isp->sess_discovered_by & method) {
+					if ((method ==
+					    iSCSIDiscoveryMethodISNS) ||
+					    (method ==
+					    iSCSIDiscoveryMethodSendTargets)) {
+#define	SESS_DISC_ADDR	isp->sess_discovered_addr.sin
+						if ((addr_dsc == NULL) ||
+						    (bcmp(
+						    &isp->sess_discovered_addr,
+						    addr_dsc, SIZEOF_SOCKADDR(
+						    &SESS_DISC_ADDR))
+						    == 0)) {
+							/*
+							 * iSNS or sendtarget
+							 * discovery and
+							 * discovery address
+							 * is NULL or match
+							 */
+							try_online = B_TRUE;
+						} else {
 						/* addr_dsc not a match */
-						try_online = B_FALSE;
+							try_online = B_FALSE;
+						}
+#undef SESS_DISC_ADDR
+					} else {
+						/* static configuration */
+						try_online = B_TRUE;
 					}
 				} else {
-					/* static configuration */
-					try_online = B_TRUE;
+					/* method not a match */
+					try_online = B_FALSE;
 				}
+			} else if (strcmp(target_name,
+			    (char *)isp->sess_name) == 0) {
+				/* target_name match */
+				try_online = B_TRUE;
 			} else {
-				/* method not a match */
+				/* target_name not a match */
 				try_online = B_FALSE;
 			}
-		} else if (strcmp(target_name, (char *)isp->sess_name) == 0) {
-			/* target_name match */
-			try_online = B_TRUE;
 		} else {
-			/* target_name not a match */
-			try_online = B_FALSE;
+			/*
+			 * online the boot session.
+			 */
+			if (isp->sess_boot == B_TRUE) {
+				try_online = B_TRUE;
+			}
 		}
 
 		if (try_online == B_TRUE) {
@@ -993,22 +1280,36 @@ iscsid_init_config(iscsi_hba_t *ihp)
 	bzero(&ips, sizeof (ips));
 	if (persistent_initiator_name_get(initiatorName,
 	    ISCSI_MAX_NAME_LEN) == B_TRUE) {
-		(void) strncpy((char *)ips.s_value.v_name, initiatorName,
-		    sizeof (ips.s_value.v_name));
-
 		ips.s_vers	= ISCSI_INTERFACE_VERSION;
 		ips.s_param	= ISCSI_LOGIN_PARAM_INITIATOR_NAME;
 
-		(void) iscsi_set_params(&ips, ihp, B_FALSE);
+		if (iscsiboot_prop && !iscsi_cmp_boot_ini_name(initiatorName)) {
+			(void) strncpy(initiatorName,
+			    (const char *)iscsiboot_prop->boot_init.ini_name,
+			    ISCSI_MAX_NAME_LEN);
+			(void) strncpy((char *)ips.s_value.v_name,
+			    (const char *)iscsiboot_prop->boot_init.ini_name,
+			    sizeof (ips.s_value.v_name));
+			(void) iscsi_set_params(&ips, ihp, B_TRUE);
+			cmn_err(CE_NOTE, "Set initiator's name"
+			    " from firmware");
+		} else {
+			(void) strncpy((char *)ips.s_value.v_name,
+			    initiatorName, sizeof (ips.s_value.v_name));
+
+			(void) iscsi_set_params(&ips, ihp, B_FALSE);
+		}
 	} else {
 		/*
-		 * if we don't have an initiator-node name it's most
-		 * likely because this is a fresh install (or we
-		 * couldn't read the persistent store properly).  Set
-		 * a default initiator name so the initiator can
+		 * if no initiator-node name available it is most
+		 * likely due to a fresh install, or the persistent
+		 * store is not working correctly. Set
+		 * a default initiator name so that the initiator can
 		 * be brought up properly.
 		 */
 		iscsid_set_default_initiator_node_settings(ihp);
+		(void) strncpy(initiatorName, (const char *)ihp->hba_name,
+		    ISCSI_MAX_NAME_LEN);
 	}
 
 	/*
@@ -1052,6 +1353,10 @@ iscsid_init_config(iscsi_hba_t *ihp)
 					}
 				}
 			} /* END for() */
+			if (iscsiboot_prop &&
+			    iscsi_chk_bootlun_mpxio(ihp)) {
+				(void) iscsi_reconfig_boot_sess(ihp);
+			}
 			break;
 		}
 	} /* END while() */
@@ -1114,6 +1419,15 @@ iscsid_init_targets(iscsi_hba_t *ihp)
 			continue;
 		}
 
+		if (iscsiboot_prop && iscsi_cmp_boot_tgt_name(name) &&
+		    !iscsi_chk_bootlun_mpxio(ihp)) {
+			/*
+			 * boot target is not mpxio enabled
+			 * simply ignore these overriden parameters
+			 */
+			continue;
+		}
+
 		ips.s_oid = iscsi_targetparam_get_oid((unsigned char *)name);
 
 		for (param_id = 0; param_id < ISCSI_NUM_LOGIN_PARAM;
@@ -1133,6 +1447,10 @@ iscsid_init_targets(iscsi_hba_t *ihp)
 				}
 			}
 		} /* END for() */
+		if (iscsiboot_prop && iscsi_cmp_boot_tgt_name(name) &&
+		    iscsi_chk_bootlun_mpxio(ihp)) {
+			(void) iscsi_reconfig_boot_sess(ihp);
+		}
 	} /* END while() */
 	persistent_param_unlock();
 
@@ -1463,28 +1781,37 @@ iscsid_set_default_initiator_node_settings(iscsi_hba_t *ihp)
 	iscsi_chap_props_t  *chap = NULL;
 
 	/* Set default initiator-node name */
-	(void) snprintf((char *)ihp->hba_name,
-	    ISCSI_MAX_NAME_LEN,
-	    "iqn.1986-03.com.sun:01:");
+	if (iscsiboot_prop && iscsiboot_prop->boot_init.ini_name != NULL) {
+		(void) strncpy((char *)ihp->hba_name,
+		    (const char *)iscsiboot_prop->boot_init.ini_name,
+		    ISCSI_MAX_NAME_LEN);
+	} else {
+		(void) snprintf((char *)ihp->hba_name,
+		    ISCSI_MAX_NAME_LEN,
+		    "iqn.1986-03.com.sun:01:");
 
-	(void) localetheraddr(NULL, &eaddr);
-	for (i = 0; i <  ETHERADDRL; i++) {
-		(void) snprintf(val, sizeof (val), "%02x",
-		    eaddr.ether_addr_octet[i]);
+		(void) localetheraddr(NULL, &eaddr);
+		for (i = 0; i <  ETHERADDRL; i++) {
+			(void) snprintf(val, sizeof (val), "%02x",
+			    eaddr.ether_addr_octet[i]);
+			(void) strncat((char *)ihp->hba_name, val,
+			    ISCSI_MAX_NAME_LEN);
+		}
+
+		/* Set default initiator-node alias */
+		x = ddi_get_time();
+		(void) snprintf(val, sizeof (val), ".%lx", x);
 		(void) strncat((char *)ihp->hba_name, val, ISCSI_MAX_NAME_LEN);
-	}
 
-	/* Set default initiator-node alias */
-	x = ddi_get_time();
-	(void) snprintf(val, sizeof (val), ".%lx", x);
-	(void) strncat((char *)ihp->hba_name, val, ISCSI_MAX_NAME_LEN);
-	(void) persistent_initiator_name_set((char *)ihp->hba_name);
-	if (ihp->hba_alias[0] == '\0') {
-		(void) strncpy((char *)ihp->hba_alias,
-		    utsname.nodename, ISCSI_MAX_NAME_LEN);
-		ihp->hba_alias_length = strlen((char *)ihp->hba_alias);
-		(void) persistent_alias_name_set((char *)ihp->hba_alias);
+		if (ihp->hba_alias[0] == '\0') {
+			(void) strncpy((char *)ihp->hba_alias,
+			    utsname.nodename, ISCSI_MAX_NAME_LEN);
+			ihp->hba_alias_length = strlen((char *)ihp->hba_alias);
+			(void) persistent_alias_name_set(
+			    (char *)ihp->hba_alias);
+		}
 	}
+	(void) persistent_initiator_name_set((char *)ihp->hba_name);
 
 	/* Set default initiator-node CHAP settings */
 	if (persistent_initiator_name_get((char *)ihp->hba_name,
@@ -1632,4 +1959,298 @@ iscsi_send_sysevent(iscsi_hba_t *ihp, char *subclass, nvlist_t *np)
 {
 	(void) ddi_log_sysevent(ihp->hba_dip, DDI_VENDOR_SUNW, EC_ISCSI,
 	    subclass, np, NULL, DDI_SLEEP);
+}
+
+static boolean_t
+iscsid_boot_init_config(iscsi_hba_t *ihp)
+{
+	if (strlen((const char *)iscsiboot_prop->boot_init.ini_name) != 0) {
+		bcopy(iscsiboot_prop->boot_init.ini_name,
+		    ihp->hba_name,
+		    strlen((const char *)iscsiboot_prop->boot_init.ini_name));
+	}
+	/* or using default login param for boot session */
+	return (B_TRUE);
+}
+
+boolean_t
+iscsi_reconfig_boot_sess(iscsi_hba_t *ihp)
+{
+	iscsi_config_sess_t	*ics;
+	int			idx;
+	iscsi_sess_t		*isp, *t_isp;
+	int			isid, size;
+	char			*name;
+	boolean_t		rtn = B_TRUE;
+
+	if (iscsiboot_prop == NULL) {
+		return (B_FALSE);
+	}
+	size = sizeof (*ics);
+	ics = kmem_zalloc(size, KM_SLEEP);
+	ics->ics_in = 1;
+
+	/* get information of number of sessions to be configured */
+	name = (char *)iscsiboot_prop->boot_tgt.tgt_name;
+	if (persistent_get_config_session(name, ics) == B_FALSE) {
+		/*
+		 * No target information available to check
+		 * initiator information. Assume one session
+		 * by default.
+		 */
+		name = (char *)iscsiboot_prop->boot_init.ini_name;
+		if (persistent_get_config_session(name, ics) == B_FALSE) {
+			ics->ics_out = 1;
+			ics->ics_bound = B_TRUE;
+		}
+	}
+
+	/* get necessary information */
+	if (ics->ics_out > 1) {
+		idx = ics->ics_out;
+		size = ISCSI_SESSION_CONFIG_SIZE(ics->ics_out);
+		kmem_free(ics, sizeof (*ics));
+
+		ics = kmem_zalloc(size, KM_SLEEP);
+		ics->ics_in = idx;
+
+		/* get configured sessions information */
+		if (persistent_get_config_session((char *)name,
+		    ics) != B_TRUE) {
+			cmn_err(CE_NOTE, "session(%s) - "
+			    "failed to setup multiple sessions",
+			    name);
+			kmem_free(ics, size);
+			return (B_FALSE);
+		}
+	}
+
+	/* create a temporary session to keep boot session connective */
+	t_isp = iscsi_add_boot_sess(ihp, ISCSI_MAX_CONFIG_SESSIONS);
+	if (t_isp == NULL) {
+		cmn_err(CE_NOTE, "session(%s) - "
+		    "failed to setup multiple sessions", name);
+		rw_exit(&ihp->hba_sess_list_rwlock);
+		kmem_free(ics, size);
+		return (B_FALSE);
+	}
+
+	/* destroy all old boot sessions */
+	rw_enter(&ihp->hba_sess_list_rwlock, RW_WRITER);
+	isp = ihp->hba_sess_list;
+	while (isp != NULL) {
+		if (iscsi_chk_bootlun_mpxio(ihp) && isp->sess_boot) {
+			if (isp->sess_isid[5] != ISCSI_MAX_CONFIG_SESSIONS) {
+				/*
+				 * destroy all stale sessions
+				 * except temporary boot session
+				 */
+				if (ISCSI_SUCCESS(iscsi_sess_destroy(
+				    isp))) {
+					isp = ihp->hba_sess_list;
+				} else {
+					/*
+					 * couldn't destroy stale sessions
+					 * at least poke it to disconnect
+					 */
+					mutex_enter(&isp->sess_state_mutex);
+					iscsi_sess_state_machine(isp,
+					    ISCSI_SESS_EVENT_N7);
+					mutex_exit(&isp->sess_state_mutex);
+					isp = isp->sess_next;
+					cmn_err(CE_NOTE, "session(%s) - "
+					    "failed to setup multiple"
+					    " sessions", name);
+				}
+			} else {
+				isp = isp->sess_next;
+			}
+		} else {
+			isp = isp->sess_next;
+		}
+	}
+	rw_exit(&ihp->hba_sess_list_rwlock);
+
+	for (isid = 0; isid < ics->ics_out; isid++) {
+		isp = iscsi_add_boot_sess(ihp, isid);
+		if (isp == NULL) {
+			cmn_err(CE_NOTE, "session(%s) - failed to setup"
+			    " multiple sessions", name);
+			rtn = B_FALSE;
+			break;
+		}
+	}
+	if (!rtn && (isid == 0)) {
+		/*
+		 * fail to create any new boot session
+		 * so only the temporary session is alive
+		 * quit without destroying it
+		 */
+		kmem_free(ics, size);
+		return (rtn);
+	}
+
+	rw_enter(&ihp->hba_sess_list_rwlock, RW_WRITER);
+	if (!ISCSI_SUCCESS(iscsi_sess_destroy(t_isp))) {
+		/* couldn't destroy temp boot session */
+		cmn_err(CE_NOTE, "session(%s) - "
+		    "failed to setup multiple sessions", name);
+		rw_exit(&ihp->hba_sess_list_rwlock);
+		rtn = B_FALSE;
+	}
+	rw_exit(&ihp->hba_sess_list_rwlock);
+
+	kmem_free(ics, size);
+	return (rtn);
+}
+
+static iscsi_sess_t *
+iscsi_add_boot_sess(iscsi_hba_t *ihp, int isid)
+{
+	iscsi_sess_t	*isp;
+	iscsi_conn_t    *icp;
+	uint_t		oid;
+
+	iscsi_sockaddr_t	addr_dst;
+
+	addr_dst.sin.sa_family = iscsiboot_prop->boot_tgt.sin_family;
+	if (addr_dst.sin.sa_family == AF_INET) {
+		bcopy(&iscsiboot_prop->boot_tgt.tgt_ip_u.u_in4.s_addr,
+		    &addr_dst.sin4.sin_addr.s_addr, sizeof (struct in_addr));
+		addr_dst.sin4.sin_port =
+		    htons(iscsiboot_prop->boot_tgt.tgt_port);
+	} else {
+		bcopy(&iscsiboot_prop->boot_tgt.tgt_ip_u.u_in6.s6_addr,
+		    &addr_dst.sin6.sin6_addr.s6_addr,
+		    sizeof (struct in6_addr));
+		addr_dst.sin6.sin6_port =
+		    htons(iscsiboot_prop->boot_tgt.tgt_port);
+	}
+
+	rw_enter(&ihp->hba_sess_list_rwlock, RW_WRITER);
+	isp = iscsi_sess_create(ihp,
+	    iSCSIDiscoveryMethodBoot|iSCSIDiscoveryMethodStatic,
+	    (struct sockaddr *)&addr_dst,
+	    (char *)iscsiboot_prop->boot_tgt.tgt_name,
+	    ISCSI_DEFAULT_TPGT, isid, ISCSI_SESS_TYPE_NORMAL, &oid);
+	if (isp == NULL) {
+		/* create temp booting session failed */
+		rw_exit(&ihp->hba_sess_list_rwlock);
+		return (NULL);
+	}
+	isp->sess_boot = B_TRUE;
+
+	if (!ISCSI_SUCCESS(iscsi_conn_create((struct sockaddr *)&addr_dst,
+	    isp, &icp))) {
+		rw_exit(&ihp->hba_sess_list_rwlock);
+		return (NULL);
+	}
+
+	rw_exit(&ihp->hba_sess_list_rwlock);
+	/* now online created session */
+	if (iscsid_login_tgt(ihp, (char *)iscsiboot_prop->boot_tgt.tgt_name,
+	    iSCSIDiscoveryMethodBoot|iSCSIDiscoveryMethodStatic,
+	    (struct sockaddr *)&addr_dst) == B_FALSE) {
+		return (NULL);
+	}
+
+	return (isp);
+}
+
+static void
+iscsid_thread_boot_wd(iscsi_thread_t *thread, void *p)
+{
+	int		rc = 1;
+	iscsi_hba_t		*ihp = (iscsi_hba_t *)p;
+
+	while (rc != 0) {
+		if (iscsiboot_prop && (modrootloaded == 1) &&
+		    (ihp->persistent_loaded == B_TRUE)) {
+			(void) iscsid_init(ihp, B_FALSE);
+			(void) iscsi_reconfig_boot_sess(ihp);
+			iscsid_poke_discovery(ihp, iSCSIDiscoveryMethodUnknown);
+			(void) iscsid_login_tgt(ihp, NULL,
+			    iSCSIDiscoveryMethodUnknown, NULL);
+			break;
+		}
+		rc = iscsi_thread_wait(thread, SEC_TO_TICK(1));
+	}
+}
+
+boolean_t
+iscsi_cmp_boot_tgt_name(char *name)
+{
+	if (iscsiboot_prop && (strncmp((const char *)name,
+	    (const char *)iscsiboot_prop->boot_tgt.tgt_name,
+	    ISCSI_MAX_NAME_LEN) == 0)) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
+boolean_t
+iscsi_cmp_boot_ini_name(char *name)
+{
+	if (iscsiboot_prop && (strncmp((const char *)name,
+	    (const char *)iscsiboot_prop->boot_init.ini_name,
+	    ISCSI_MAX_NAME_LEN) == 0)) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
+boolean_t
+iscsi_chk_bootlun_mpxio(iscsi_hba_t *ihp)
+{
+	iscsi_sess_t    *isp;
+	iscsi_lun_t	*ilp;
+	isp = ihp->hba_sess_list;
+	boolean_t	tgt_mpxio_enabled = B_FALSE;
+	boolean_t	bootlun_found = B_FALSE;
+	uint16_t    lun_num;
+
+	if (iscsiboot_prop == NULL) {
+		return (B_FALSE);
+	}
+
+	if (!ihp->hba_mpxio_enabled) {
+		return (B_FALSE);
+	}
+
+	lun_num = *((uint64_t *)(iscsiboot_prop->boot_tgt.tgt_boot_lun));
+
+	while (isp != NULL) {
+		if ((strncmp((char *)isp->sess_name,
+		    (const char *)iscsiboot_prop->boot_tgt.tgt_name,
+		    ISCSI_MAX_NAME_LEN) == 0) &&
+		    (isp->sess_boot == B_TRUE)) {
+			/*
+			 * found boot session.
+			 * check its mdi path info is null or not
+			 */
+			ilp = isp->sess_lun_list;
+			while (ilp != NULL) {
+				if (lun_num == ilp->lun_num) {
+					if (ilp->lun_pip) {
+						tgt_mpxio_enabled = B_TRUE;
+					}
+					bootlun_found = B_TRUE;
+				}
+				ilp = ilp->lun_next;
+			}
+		}
+		isp = isp->sess_next;
+	}
+	if (bootlun_found) {
+		return (tgt_mpxio_enabled);
+	} else {
+		/*
+		 * iscsiboot_prop not NULL while no boot lun found
+		 * in most cases this is none iscsi boot while iscsiboot_prop
+		 * is not NULL, in this scenario return iscsi HBA's mpxio config
+		 */
+		return (ihp->hba_mpxio_enabled);
+	}
 }

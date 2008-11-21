@@ -26,10 +26,12 @@
 #include "iscsi.h"
 #include "nvfile.h"
 #include <sys/file.h>	    /* defines:	FKIOCTL */
+#include <sys/kobj.h>
 
 #define	NVF_GETF	16
 static kmutex_t		nvf_getf_lock;
 static file_t		*nvf_fd[NVF_GETF];
+extern int modrootloaded;
 
 /*
  * file names
@@ -208,7 +210,12 @@ nvf_load(void)
 	/*
 	 * try to load current file
 	 */
-	rval = nvf_parse(nvf_curr_filename);
+	if (!modrootloaded) {
+		mutex_exit(&nvf_lock);
+		return (B_TRUE);
+	} else {
+		rval = nvf_parse(nvf_curr_filename);
+	}
 	if (rval == B_TRUE) {
 		mutex_exit(&nvf_lock);
 		return (rval);
@@ -224,7 +231,13 @@ nvf_load(void)
 	/*
 	 * try to load previous file
 	 */
-	rval = nvf_parse(nvf_prev_filename);
+	if (!modrootloaded) {
+		mutex_exit(&nvf_lock);
+		return (B_TRUE);
+	} else {
+		rval = nvf_parse(nvf_curr_filename);
+	}
+
 	if (rval == B_TRUE) {
 		mutex_exit(&nvf_lock);
 		return (rval);
@@ -837,7 +850,7 @@ nvf_thread(void *arg)
 	/*
 	 * check whether its time to write to file.  If not, reschedule self
 	 */
-	if (nticks > NVF_RESCHED_MIN_TICKS) {
+	if ((nticks > NVF_RESCHED_MIN_TICKS) || !modrootloaded) {
 		if (NVF_IS_ACTIVE(nvf_flags)) {
 			mutex_exit(&nvf_lock);
 			nvf_thread_id = timeout(nvf_thread, NULL, nticks);

@@ -41,6 +41,7 @@
 #include <sys/utsname.h>
 #include "isns_client.h"
 #include "isns_protocol.h"
+#include <sys/bootprops.h>
 
 #define	ISCSI_NAME_VERSION	"iSCSI Initiator v-1.55"
 
@@ -59,6 +60,8 @@ uint32_t	iscsi_oid;
 int		iscsi_nop_delay		= ISCSI_DEFAULT_NOP_DELAY;
 int		iscsi_rx_window		= ISCSI_DEFAULT_RX_WINDOW;
 int		iscsi_rx_max_window	= ISCSI_DEFAULT_RX_MAX_WINDOW;
+
+extern ib_boot_prop_t	*iscsiboot_prop;
 
 /*
  * +--------------------------------------------------------------------+
@@ -140,6 +143,7 @@ static int iscsi_i_commoncap(struct scsi_address *ap, char *cap,
     int val, int lunonly, int doset);
 static void iscsi_get_name_to_iqn(char *name, int name_max_len);
 static void iscsi_get_name_from_iqn(char *name, int name_max_len);
+static boolean_t iscsi_cmp_boot_sess_oid(iscsi_hba_t *ihp, uint32_t oid);
 
 /* struct helpers prototypes */
 
@@ -530,6 +534,7 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * initialize the discovery processes and
 			 * persistent store.
 			 */
+			ihp->persistent_loaded = B_FALSE;
 			if (iscsid_init(ihp, B_FALSE) == B_FALSE) {
 				goto iscsi_attach_failed0;
 			}
@@ -1410,6 +1415,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	boolean_t		rval;
 	char			init_port_name[MAX_NAME_PROP_SIZE];
 	iscsi_sockaddr_t	addr_dsc;
+	iscsi_boot_property_t	*bootProp;
 
 	instance = getminor(dev);
 	ihp = (iscsi_hba_t *)ddi_get_soft_state(iscsi_state, instance);
@@ -1747,6 +1753,20 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 		rtn = iscsi_set_params(ils, ihp, B_TRUE);
+		if (iscsiboot_prop) {
+			if (iscsi_cmp_boot_sess_oid(ihp, ils->s_oid)) {
+				/*
+				 * found active session for this object
+				 * or this is initiator's object
+				 * with mpxio enabled
+				 */
+				if (!iscsi_reconfig_boot_sess(ihp)) {
+					rtn = EINVAL;
+					kmem_free(ils, sizeof (*ils));
+					break;
+				}
+			}
+		}
 		kmem_free(ils, sizeof (*ils));
 		break;
 
@@ -1874,7 +1894,14 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						    hba_params),
 						    &(isp->sess_params),
 						    sizeof (isp->sess_params));
-
+						if (iscsiboot_prop &&
+						    isp->sess_boot) {
+							/*
+							 * reconfig boot
+							 * session later
+							 */
+							continue;
+						}
 						/*
 						 * Notify the session that the
 						 * login parameters have
@@ -1892,6 +1919,19 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			kmem_free(ics, sizeof (*ics));
 			kmem_free(name, ISCSI_MAX_NAME_LEN);
 			rw_exit(&ihp->hba_sess_list_rwlock);
+			if (iscsiboot_prop) {
+				if (iscsi_cmp_boot_sess_oid(ihp, e.e_oid)) {
+					/*
+					 * found active session for this object
+					 * or this is initiator object
+					 * with mpxio enabled
+					 */
+					if (!iscsi_reconfig_boot_sess(ihp)) {
+						rtn = EINVAL;
+						break;
+					}
+				}
+			}
 		}
 		break;
 
@@ -3936,7 +3976,107 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		} else {
 			/* set */
 			rtn = iscsi_ioctl_set_config_sess(ihp, ics);
+			if (iscsiboot_prop) {
+				if (iscsi_cmp_boot_sess_oid(ihp,
+				    ics->ics_oid)) {
+					/*
+					 * found active session for this object
+					 * or this is initiator object
+					 * with mpxio enabled
+					 */
+					if (!iscsi_reconfig_boot_sess(ihp)) {
+						rtn = EINVAL;
+						break;
+					}
+				}
+			}
 		}
+		break;
+
+	case ISCSI_IS_ACTIVE:
+		/*
+		 * dhcpagent calls here to check if there are
+		 * active iSCSI sessions
+		 */
+		instance = 0;
+		if (iscsiboot_prop) {
+			instance = 1;
+		}
+		if (!instance) {
+			rw_enter(&ihp->hba_sess_list_rwlock,
+			    RW_READER);
+			for (isp = ihp->hba_sess_list; isp;
+			    isp = isp->sess_next) {
+				if ((isp->sess_state ==
+				    ISCSI_SESS_STATE_LOGGED_IN) &&
+				    (isp->sess_lun_list !=
+				    NULL)) {
+					instance = 1;
+					break;
+				}
+			}
+			rw_exit(&ihp->hba_sess_list_rwlock);
+		}
+		size = sizeof (instance);
+		if (ddi_copyout(&instance, (caddr_t)arg, size,
+		    mode) != 0) {
+			rtn = EFAULT;
+		}
+		break;
+
+	case ISCSI_BOOTPROP_GET:
+		size = sizeof (*bootProp);
+		bootProp = iscsi_ioctl_copyin((caddr_t)arg, mode, size);
+		if (bootProp == NULL) {
+			rtn = EFAULT;
+			break;
+		}
+		bootProp->hba_mpxio_enabled =
+		    iscsi_chk_bootlun_mpxio(ihp);
+		if (iscsiboot_prop == NULL) {
+			bootProp->iscsiboot = 0;
+			rtn = iscsi_ioctl_copyout(bootProp, size,
+			    (caddr_t)arg, mode);
+			break;
+		} else {
+			bootProp->iscsiboot = 1;
+		}
+
+		if (iscsiboot_prop->boot_init.ini_name != NULL) {
+			(void) strncpy((char *)bootProp->ini_name.n_name,
+			    (char *)iscsiboot_prop->boot_init.ini_name,
+			    ISCSI_MAX_NAME_LEN);
+		}
+		if (iscsiboot_prop->boot_init.ini_chap_name != NULL) {
+			bootProp->auth.a_auth_method = authMethodCHAP;
+			(void) strncpy((char *)bootProp->ini_chap.c_user,
+			    (char *)iscsiboot_prop->boot_init.ini_chap_name,
+			    ISCSI_MAX_NAME_LEN);
+			(void) strncpy((char *)bootProp->ini_chap.c_secret,
+			    (char *)iscsiboot_prop->boot_init.ini_chap_sec,
+			    ISCSI_CHAP_SECRET_LEN);
+			if (iscsiboot_prop->boot_tgt.tgt_chap_name !=
+			    NULL) {
+				bootProp->auth.a_bi_auth = B_TRUE;
+			} else {
+				bootProp->auth.a_bi_auth = B_FALSE;
+			}
+		}
+		if (iscsiboot_prop->boot_tgt.tgt_name != NULL) {
+			(void) strncpy((char *)bootProp->tgt_name.n_name,
+			    (char *)iscsiboot_prop->boot_tgt.tgt_name,
+			    ISCSI_MAX_NAME_LEN);
+		}
+		if (iscsiboot_prop->boot_tgt.tgt_chap_name != NULL) {
+			(void) strncpy((char *)bootProp->tgt_chap.c_user,
+			    (char *)iscsiboot_prop->boot_tgt.tgt_chap_name,
+			    ISCSI_MAX_NAME_LEN);
+			(void) strncpy((char *)bootProp->tgt_chap.c_secret,
+			    (char *)iscsiboot_prop->boot_tgt.tgt_chap_sec,
+			    ISCSI_CHAP_SECRET_LEN);
+		}
+
+		rtn = iscsi_ioctl_copyout(bootProp, size, (caddr_t)arg, mode);
 		break;
 
 	default:
@@ -4725,4 +4865,34 @@ iscsi_override_target_default(iscsi_hba_t *ihp, iscsi_param_get_t *ipg)
 		}
 	}
 	kmem_free(pp, sizeof (*pp));
+}
+
+static boolean_t
+iscsi_cmp_boot_sess_oid(iscsi_hba_t *ihp, uint32_t oid)
+{
+	iscsi_sess_t *isp = NULL;
+
+	if (iscsi_chk_bootlun_mpxio(ihp)) {
+		for (isp = ihp->hba_sess_list; isp; isp = isp->sess_next) {
+			if ((isp->sess_oid == oid) && isp->sess_boot) {
+				/* oid is session object */
+				break;
+			}
+			if ((isp->sess_target_oid == oid) && isp->sess_boot) {
+				/*
+				 * oid is target object while
+				 * this session is boot session
+				 */
+				break;
+			}
+		}
+		if (oid == ihp->hba_oid) {
+			/* oid is initiator object id */
+			return (B_TRUE);
+		} else if ((isp != NULL) && (isp->sess_boot)) {
+			/* oid is boot session object id */
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
 }

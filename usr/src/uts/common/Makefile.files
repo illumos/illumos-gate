@@ -47,6 +47,7 @@ COMMON_CORE_OBJS +=		\
 		disp.o		\
 		group.o		\
 		kstat_fr.o	\
+		iscsiboot_prop.o	\
 		lgrp.o		\
 		lgrp_topo.o	\
 		mutex.o		\
@@ -1797,7 +1798,7 @@ ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
 			iscsi_queue.o persistent.o iscsi_conn.o	\
 			iscsi_sess.o radius_auth.o iscsi_crc.o	\
 			iscsi_stats.o radius_packet.o iscsi_doorclt.o	\
-			iscsi_targetparam.o utils.o
+			iscsi_targetparam.o utils.o kifconf.o
 
 #
 #	ntxn 10Gb/1Gb NIC driver module

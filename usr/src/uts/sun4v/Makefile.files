@@ -42,6 +42,7 @@ CORE_OBJS +=	hardclk.o
 CORE_OBJS +=	hat_sfmmu.o
 CORE_OBJS +=	hat_kdi.o
 CORE_OBJS +=	hsvc.o
+CORE_OBJS +=	iscsi_boot.o
 CORE_OBJS +=	lpad.o
 CORE_OBJS +=	mach_cpu_states.o
 CORE_OBJS +=	mach_ddi_impl.o

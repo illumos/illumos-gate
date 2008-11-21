@@ -25,6 +25,7 @@
  * iSCSI session interfaces
  */
 
+#include <sys/bootprops.h>
 #include "iscsi.h"
 #include "persistent.h"
 #include "iscsi_targetparam.h"
@@ -140,7 +141,16 @@ iscsi_sess_create(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
 		    (uchar_t *)target_name);
 	}
 
+	if (method & iSCSIDiscoveryMethodBoot) {
+		/* This is boot session. */
+		isp->sess_boot = B_TRUE;
+	} else {
+		isp->sess_boot = B_FALSE;
+	}
+
 	/* Associate session with this discovery method */
+	method = method & ~(iSCSIDiscoveryMethodBoot);
+
 	isp->sess_discovered_by = method;
 	if (addr_dsc == NULL) {
 		bzero(&isp->sess_discovered_addr,
@@ -530,6 +540,7 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 	return (rval);
 }
 
+extern ib_boot_prop_t   *iscsiboot_prop;
 /*
  * static iscsi_sess_set_auth -
  *
@@ -540,6 +551,7 @@ iscsi_sess_set_auth(iscsi_sess_t *isp)
 	char			*init_name;
 	iscsi_chap_props_t	*chap = NULL;
 	iscsi_auth_props_t	*auth = NULL;
+	uchar_t			*tmp  = NULL;
 
 	if (isp == (iscsi_sess_t *)NULL) {
 		return (B_FALSE);
@@ -549,100 +561,175 @@ iscsi_sess_set_auth(iscsi_sess_t *isp)
 	if (isp->sess_hba == (iscsi_hba_t *)NULL) {
 		return (B_FALSE);
 	}
+
 	init_name = (char *)isp->sess_hba->hba_name;
-
-	auth = (iscsi_auth_props_t *)kmem_zalloc
-	    (sizeof (iscsi_auth_props_t), KM_SLEEP);
-	/* Obtain target's authentication settings. */
-	if (persistent_auth_get((char *)isp->sess_name, auth) != B_TRUE) {
-		/*
-		 * If no target authentication settings found, try to obtain
-		 * system wide configuration (from the initiator).
-		 */
-		bzero(auth, sizeof (*auth));
-		if (persistent_auth_get(init_name, auth) != B_TRUE) {
-			bzero(auth, sizeof (*auth));
-			auth->a_auth_method = authMethodNone;
-		}
-
-		/* We do not support system wide bi-directional auth flag. */
-		auth->a_bi_auth = B_FALSE;
-	}
 
 	/* Zero out the session authentication structure */
 	bzero(&isp->sess_auth, sizeof (iscsi_auth_t));
 
-	chap = (iscsi_chap_props_t *)kmem_zalloc
-	    (sizeof (iscsi_chap_props_t), KM_SLEEP);
+	if (isp->sess_boot == B_FALSE) {
 
-	/*
-	 * Initialize the target-side chap name to the session name if no chap
-	 * settings have been saved for the current session.
-	 */
-	if (persistent_chap_get((char *)isp->sess_name, chap) == B_FALSE) {
-		int name_len = strlen((char *)isp->sess_name);
-		bcopy((char *)isp->sess_name, chap->c_user, name_len);
-		chap->c_user_len = name_len;
-		(void) (persistent_chap_set((char *)isp->sess_name, chap));
-		bzero(chap, sizeof (*chap));
-	}
+		auth = (iscsi_auth_props_t *)kmem_zalloc
+		    (sizeof (iscsi_auth_props_t), KM_SLEEP);
+		/* Obtain target's authentication settings. */
+		if (persistent_auth_get((char *)isp->sess_name, auth)
+		    != B_TRUE) {
+			/*
+			 * If no target authentication settings found,
+			 * try to obtain system wide configuration
+			 * (from the initiator).
+			 */
+			bzero(auth, sizeof (*auth));
+			if (persistent_auth_get(init_name, auth) != B_TRUE) {
+				bzero(auth, sizeof (*auth));
+				auth->a_auth_method = authMethodNone;
+			}
 
-	if (auth->a_auth_method & authMethodCHAP) {
-		/* Obtain initiator's CHAP settings. */
-		if (persistent_chap_get(init_name, chap) == B_FALSE) {
-			/* No initiator secret defined. */
-			kmem_free(chap, sizeof (iscsi_chap_props_t));
+			/*
+			 * We do not support system wide bi-directional
+			 * auth flag.
+			 */
+			auth->a_bi_auth = B_FALSE;
+		}
+
+		chap = (iscsi_chap_props_t *)kmem_zalloc
+		    (sizeof (iscsi_chap_props_t), KM_SLEEP);
+
+		/*
+		 * Initialize the target-side chap name to the session name
+		 * if no chap settings have been saved for the current session.
+		 */
+		if (persistent_chap_get((char *)isp->sess_name, chap)
+		    == B_FALSE) {
+			int name_len = strlen((char *)isp->sess_name);
+			bcopy((char *)isp->sess_name, chap->c_user, name_len);
+			chap->c_user_len = name_len;
+			(void) (persistent_chap_set((char *)isp->sess_name,
+			    chap));
+			bzero(chap, sizeof (*chap));
+		}
+
+		if (auth->a_auth_method & authMethodCHAP) {
+			/* Obtain initiator's CHAP settings. */
+			if (persistent_chap_get(init_name, chap) == B_FALSE) {
+				/* No initiator secret defined. */
+				kmem_free(chap, sizeof (iscsi_chap_props_t));
+				/* Set authentication method to NONE */
+				isp->sess_auth.password_length = 0;
+				kmem_free(auth, sizeof (iscsi_auth_props_t));
+				return (B_FALSE);
+			}
+
+			bcopy(chap->c_user, isp->sess_auth.username,
+			    sizeof (chap->c_user));
+			bcopy(chap->c_secret, isp->sess_auth.password,
+			    sizeof (chap->c_secret));
+			isp->sess_auth.password_length = chap->c_secret_len;
+		} else {
 			/* Set authentication method to NONE */
 			isp->sess_auth.password_length = 0;
+		}
+
+		/*
+		 * Consider enabling bidirectional authentication only if
+		 * authentication method is not NONE.
+		 */
+		if (auth->a_auth_method & authMethodCHAP &&
+		    auth->a_bi_auth == B_TRUE) {
+			/* Enable bi-directional authentication. */
+			isp->sess_auth.bidirectional_auth = 1;
+
+			bzero(chap, sizeof (*chap));
+			/* Obtain target's CHAP settings. */
+			if (persistent_chap_get((char *)isp->sess_name, chap)
+			    == B_TRUE) {
+				bcopy(chap->c_secret,
+				    isp->sess_auth.password_in,
+				    sizeof (chap->c_secret));
+				bcopy(chap->c_user, isp->sess_auth.username_in,
+				    strlen((char *)chap->c_user));
+				isp->sess_auth.password_length_in =
+				    chap->c_secret_len;
+			} else {
+				/*
+				 * No target secret defined.
+				 * RADIUS server should have been enabled.
+				 */
+				/* EMPTY */
+			}
+		} else {
+			/* Disable bi-directional authentication */
+			isp->sess_auth.bidirectional_auth = 0;
+		}
+
+		if (auth != NULL) {
 			kmem_free(auth, sizeof (iscsi_auth_props_t));
+		}
+		if (chap != NULL) {
+			kmem_free(chap, sizeof (iscsi_chap_props_t));
+		}
+	} else {
+		/*
+		 * This session is boot session. We will use the CHAP and
+		 * the user name got from the boot property structure instead
+		 * of persistent sotre.
+		 */
+		if (iscsiboot_prop == NULL) {
 			return (B_FALSE);
 		}
 
-		bcopy(chap->c_user, isp->sess_auth.username,
-		    sizeof (chap->c_user));
-		bcopy(chap->c_secret, isp->sess_auth.password,
-		    sizeof (chap->c_secret));
-		isp->sess_auth.password_length = chap->c_secret_len;
-	} else {
-		/* Set authentication method to NONE */
-		isp->sess_auth.password_length = 0;
-	}
-
-	/*
-	 * Consider enabling bidirectional authentication only if
-	 * authentication method is not NONE.
-	 */
-	if (auth->a_auth_method & authMethodCHAP &&
-	    auth->a_bi_auth == B_TRUE) {
-		/* Enable bi-directional authentication. */
-		isp->sess_auth.bidirectional_auth = 1;
-
-		bzero(chap, sizeof (*chap));
-		/* Obtain target's CHAP settings. */
-		if (persistent_chap_get((char *)isp->sess_name, chap) ==
-		    B_TRUE) {
-			bcopy(chap->c_secret, isp->sess_auth.password_in,
-			    sizeof (chap->c_secret));
-			bcopy(chap->c_user, isp->sess_auth.username_in,
-			    strlen((char *)chap->c_user));
-			isp->sess_auth.password_length_in = chap->c_secret_len;
-		} else {
-			/*
-			 * No target secret defined.
-			 * RADIUS server should have been enabled.
-			 */
-			/* EMPTY */
+		if (iscsiboot_prop->boot_init.ini_chap_sec == NULL) {
+			return (B_FALSE);
 		}
-	} else {
-		/* Disable bi-directional authentication */
-		isp->sess_auth.bidirectional_auth = 0;
-	}
 
-	if (auth != NULL) {
-		kmem_free(auth, sizeof (iscsi_auth_props_t));
-	}
-	if (chap != NULL) {
-		kmem_free(chap, sizeof (iscsi_chap_props_t));
+		/* CHAP secret */
+		(void) bcopy(iscsiboot_prop->boot_init.ini_chap_sec,
+		    isp->sess_auth.password,
+		    strlen((char *)iscsiboot_prop->boot_init.ini_chap_sec));
+
+		/*
+		 * If chap name is not set,
+		 * we will use initiator name instead.
+		 */
+		if (iscsiboot_prop->boot_init.ini_chap_name == NULL) {
+			(void) bcopy(init_name, isp->sess_auth.username,
+			    strlen(init_name));
+		} else {
+			tmp = iscsiboot_prop->boot_init.ini_chap_name;
+			(void) bcopy(tmp,
+			    isp->sess_auth.username, strlen((char *)tmp));
+		}
+
+		isp->sess_auth.password_length =
+		    strlen((char *)iscsiboot_prop->boot_init.ini_chap_sec);
+
+		if (iscsiboot_prop->boot_tgt.tgt_chap_sec != NULL) {
+			/*
+			 * Bidirectional authentication is required.
+			 */
+			tmp = iscsiboot_prop->boot_tgt.tgt_chap_sec;
+			(void) bcopy(tmp,
+			    isp->sess_auth.password_in, strlen((char *)tmp));
+
+			/*
+			 * If the target's chap name is not set, we will use
+			 * session name instead.
+			 */
+			if (iscsiboot_prop->boot_tgt.tgt_chap_name == NULL) {
+				(void) bcopy(isp->sess_name,
+				    isp->sess_auth.username_in,
+				    isp->sess_name_length);
+			} else {
+				tmp = iscsiboot_prop->boot_tgt.tgt_chap_name;
+				(void) bcopy(tmp,
+				    isp->sess_auth.username_in,
+				    strlen((char *)tmp));
+			}
+			tmp = iscsiboot_prop->boot_tgt.tgt_chap_sec;
+			isp->sess_auth.password_length_in =
+			    strlen((char *)tmp);
+			isp->sess_auth.bidirectional_auth = 1;
+		}
 	}
 
 	/* Set up authentication buffers only if configured */

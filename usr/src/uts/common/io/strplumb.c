@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/param.h>
 #include	<sys/types.h>
 #include	<sys/user.h>
@@ -77,6 +75,8 @@
  * Debug Macros
  */
 int	strplumbdebug = 0;
+
+extern ib_boot_prop_t *iscsiboot_prop;
 
 #define	DBG0(_f) \
 	if (strplumbdebug != 0) \
@@ -143,6 +143,7 @@ _info(struct modinfo *modinfop)
 
 #define	UDPDEV		"/devices/pseudo/udp@0:udp"
 #define	TCP6DEV		"/devices/pseudo/tcp6@0:tcp6"
+#define	UDP6DEV		"/devices/pseudo/udp6@0:udp6"
 #define	SCTP6DEV	"/devices/pseudo/sctp6@0:sctp6"
 #define	IP6DEV		"/devices/pseudo/ip6@0:ip6"
 
@@ -424,6 +425,8 @@ setifname(ldi_handle_t lh, struct lifreq *lifrp)
 	return (ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, CRED(), &rval));
 }
 
+extern ib_boot_prop_t	*iscsiboot_prop;
+
 static int
 strplumb_dev(ldi_ident_t li)
 {
@@ -433,9 +436,15 @@ strplumb_dev(ldi_ident_t li)
 	struct lifreq	lifr;
 	struct ifreq	ifr;
 	int		rval;
+	int		af = 0;
+	char		*name = NULL;
 
 	bzero(&lifr, sizeof (struct lifreq));
 	bzero(&ifr, sizeof (ifr));
+
+	if (iscsiboot_prop != NULL) {
+		af = iscsiboot_prop->boot_nic.sin_family;
+	}
 
 	/*
 	 * Now set up the links. Ultimately, we should have two streams
@@ -474,9 +483,18 @@ strplumb_dev(ldi_ident_t li)
 	if ((err = getifflags(lh, &lifr)) != 0)
 		goto done;
 
-	lifr.lifr_flags |= IFF_IPV4;
-	lifr.lifr_flags &= ~IFF_IPV6;
-
+	if (af == 0 || af == AF_INET) {
+		lifr.lifr_flags |= IFF_IPV4;
+		lifr.lifr_flags &= ~IFF_IPV6;
+		name = UDPDEV;
+	} else {
+		/*
+		 * iscsi boot is used with ipv6 enabled
+		 */
+		lifr.lifr_flags |= IFF_IPV6;
+		lifr.lifr_flags &= ~IFF_IPV4;
+		name = UDP6DEV;
+	}
 	if ((err = ldi_ioctl(lh, I_PUSH, (intptr_t)ARP, FKIOCTL, CRED(),
 	    &rval)) != 0) {
 		printf("strplumb: push ARP failed: %d\n", err);
@@ -498,7 +516,7 @@ strplumb_dev(ldi_ident_t li)
 	}
 
 	/* Pop out ARP if not needed */
-	if (lifr.lifr_flags & IFF_NOARP) {
+	if (lifr.lifr_flags & (IFF_NOARP | IFF_IPV6)) {
 		err = ldi_ioctl(lh, I_POP, (intptr_t)0, FKIOCTL, CRED(),
 		    &rval);
 		if (err != 0) {
@@ -507,9 +525,9 @@ strplumb_dev(ldi_ident_t li)
 		}
 	}
 
-	if ((err = ldi_open_by_name(UDPDEV, FREAD|FWRITE, CRED(), &mux_lh,
+	if ((err = ldi_open_by_name(name, FREAD|FWRITE, CRED(), &mux_lh,
 	    li)) != 0) {
-		printf("strplumb: open of UDPDEV failed: %d\n", err);
+		printf("strplumb: open of %s failed: %d\n", name, err);
 		goto done;
 	}
 
@@ -518,6 +536,10 @@ strplumb_dev(ldi_ident_t li)
 	    &(ifr.ifr_ip_muxid))) != 0) {
 		printf("strplumb: plink UDP-ARP-IP-%s failed: %d\n",
 		    rootfs.bo_ifname, err);
+		goto done;
+	}
+
+	if (af == AF_INET6) {
 		goto done;
 	}
 
@@ -681,8 +703,13 @@ strplumb_get_netdev_path(void)
 		dhcacklen = bootp_len;
 
 		ddi_prop_free(bootp);
-	} else
+	} else  if (iscsiboot_prop != NULL) {
+		bcopy(iscsiboot_prop->boot_nic.nic_mac,
+		    boot_macaddr, IB_BOOT_MACLEN);
+		boot_maclen = IB_BOOT_MACLEN;
+	} else {
 		return (NULL);
+	}
 
 	ddi_walk_devs(ddi_root_node(), matchmac, (void *)&devpath);
 	return (devpath);
