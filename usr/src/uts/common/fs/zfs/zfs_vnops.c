@@ -2342,6 +2342,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	zilog_t		*zilog;
 	dmu_tx_t	*tx;
 	vattr_t		oldva;
+	xvattr_t	tmpxvattr;
 	uint_t		mask = vap->va_mask;
 	uint_t		saved_mask;
 	int		trim_mask = 0;
@@ -2395,6 +2396,8 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 * optional attributes.  If this is NULL, then we have a vattr_t.
 	 */
 	xoap = xva_getxoptattr(xvap);
+
+	xva_init(&tmpxvattr);
 
 	/*
 	 * Immutable files can only alter immutable bit and atime
@@ -2518,28 +2521,78 @@ top:
 	oldva.va_mode = pzp->zp_mode;
 	zfs_fuid_map_ids(zp, cr, &oldva.va_uid, &oldva.va_gid);
 	if (mask & AT_XVATTR) {
-		if ((need_policy == FALSE) &&
-		    (XVA_ISSET_REQ(xvap, XAT_APPENDONLY) &&
-		    xoap->xoa_appendonly !=
-		    ((pzp->zp_flags & ZFS_APPENDONLY) != 0)) ||
-		    (XVA_ISSET_REQ(xvap, XAT_NOUNLINK) &&
-		    xoap->xoa_nounlink !=
-		    ((pzp->zp_flags & ZFS_NOUNLINK) != 0)) ||
-		    (XVA_ISSET_REQ(xvap, XAT_IMMUTABLE) &&
-		    xoap->xoa_immutable !=
-		    ((pzp->zp_flags & ZFS_IMMUTABLE) != 0)) ||
-		    (XVA_ISSET_REQ(xvap, XAT_NODUMP) &&
-		    xoap->xoa_nodump !=
-		    ((pzp->zp_flags & ZFS_NODUMP) != 0)) ||
-		    (XVA_ISSET_REQ(xvap, XAT_AV_MODIFIED) &&
-		    xoap->xoa_av_modified !=
-		    ((pzp->zp_flags & ZFS_AV_MODIFIED) != 0)) ||
-		    ((XVA_ISSET_REQ(xvap, XAT_AV_QUARANTINED) &&
-		    ((vp->v_type != VREG && xoap->xoa_av_quarantined) ||
-		    xoap->xoa_av_quarantined !=
-		    ((pzp->zp_flags & ZFS_AV_QUARANTINED) != 0)))) ||
-		    (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP)) ||
-		    (XVA_ISSET_REQ(xvap, XAT_OPAQUE))) {
+		/*
+		 * Update xvattr mask to include only those attributes
+		 * that are actually changing.
+		 *
+		 * the bits will be restored prior to actually setting
+		 * the attributes so the caller thinks they were set.
+		 */
+		if (XVA_ISSET_REQ(xvap, XAT_APPENDONLY)) {
+			if (xoap->xoa_appendonly !=
+			    ((pzp->zp_flags & ZFS_APPENDONLY) != 0)) {
+				need_policy = TRUE;
+			} else {
+				XVA_CLR_REQ(xvap, XAT_APPENDONLY);
+				XVA_SET_REQ(&tmpxvattr, XAT_APPENDONLY);
+			}
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_NOUNLINK)) {
+			if (xoap->xoa_nounlink !=
+			    ((pzp->zp_flags & ZFS_NOUNLINK) != 0)) {
+				need_policy = TRUE;
+			} else {
+				XVA_CLR_REQ(xvap, XAT_NOUNLINK);
+				XVA_SET_REQ(&tmpxvattr, XAT_NOUNLINK);
+			}
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_IMMUTABLE)) {
+			if (xoap->xoa_immutable !=
+			    ((pzp->zp_flags & ZFS_IMMUTABLE) != 0)) {
+				need_policy = TRUE;
+			} else {
+				XVA_CLR_REQ(xvap, XAT_IMMUTABLE);
+				XVA_SET_REQ(&tmpxvattr, XAT_IMMUTABLE);
+			}
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_NODUMP)) {
+			if (xoap->xoa_nodump !=
+			    ((pzp->zp_flags & ZFS_NODUMP) != 0)) {
+				need_policy = TRUE;
+			} else {
+				XVA_CLR_REQ(xvap, XAT_NODUMP);
+				XVA_SET_REQ(&tmpxvattr, XAT_NODUMP);
+			}
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_AV_MODIFIED)) {
+			if (xoap->xoa_av_modified !=
+			    ((pzp->zp_flags & ZFS_AV_MODIFIED) != 0)) {
+				need_policy = TRUE;
+			} else {
+				XVA_CLR_REQ(xvap, XAT_AV_MODIFIED);
+				XVA_SET_REQ(&tmpxvattr, XAT_AV_MODIFIED);
+			}
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_AV_QUARANTINED)) {
+			if ((vp->v_type != VREG &&
+			    xoap->xoa_av_quarantined) ||
+			    xoap->xoa_av_quarantined !=
+			    ((pzp->zp_flags & ZFS_AV_QUARANTINED) != 0)) {
+				need_policy = TRUE;
+			} else {
+				XVA_CLR_REQ(xvap, XAT_AV_QUARANTINED);
+				XVA_SET_REQ(&tmpxvattr, XAT_AV_QUARANTINED);
+			}
+		}
+
+		if (need_policy == FALSE &&
+		    (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP) ||
+		    XVA_ISSET_REQ(xvap, XAT_OPAQUE))) {
 			need_policy = TRUE;
 		}
 	}
@@ -2732,6 +2785,31 @@ top:
 	 */
 
 	if (xoap && (mask & AT_XVATTR)) {
+
+		/*
+		 * restore trimmed off masks
+		 * so that return masks can be set for caller.
+		 */
+
+		if (XVA_ISSET_REQ(&tmpxvattr, XAT_APPENDONLY)) {
+			XVA_SET_REQ(xvap, XAT_APPENDONLY);
+		}
+		if (XVA_ISSET_REQ(&tmpxvattr, XAT_NOUNLINK)) {
+			XVA_SET_REQ(xvap, XAT_NOUNLINK);
+		}
+		if (XVA_ISSET_REQ(&tmpxvattr, XAT_IMMUTABLE)) {
+			XVA_SET_REQ(xvap, XAT_IMMUTABLE);
+		}
+		if (XVA_ISSET_REQ(&tmpxvattr, XAT_NODUMP)) {
+			XVA_SET_REQ(xvap, XAT_NODUMP);
+		}
+		if (XVA_ISSET_REQ(&tmpxvattr, XAT_AV_MODIFIED)) {
+			XVA_SET_REQ(xvap, XAT_AV_MODIFIED);
+		}
+		if (XVA_ISSET_REQ(&tmpxvattr, XAT_AV_QUARANTINED)) {
+			XVA_SET_REQ(xvap, XAT_AV_QUARANTINED);
+		}
+
 		if (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP)) {
 			size_t len;
 			dmu_object_info_t doi;

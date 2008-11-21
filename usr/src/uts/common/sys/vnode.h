@@ -39,8 +39,6 @@
 #ifndef _SYS_VNODE_H
 #define	_SYS_VNODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/rwstlock.h>
@@ -615,6 +613,14 @@ typedef vattr_t		vattr32_t;
 	ASSERT((xvap)->xva_vattr.va_mask | AT_XVATTR);		\
 	ASSERT((xvap)->xva_magic == XVA_MAGIC);			\
 	(xvap)->xva_reqattrmap[XVA_INDEX(attr)] |= XVA_ATTRBIT(attr)
+/*
+ * XVA_CLR_REQ() clears an attribute bit in the proper element in the bitmap
+ * of requested attributes (xva_reqattrmap[]).
+ */
+#define	XVA_CLR_REQ(xvap, attr)					\
+	ASSERT((xvap)->xva_vattr.va_mask | AT_XVATTR);		\
+	ASSERT((xvap)->xva_magic == XVA_MAGIC);			\
+	(xvap)->xva_reqattrmap[XVA_INDEX(attr)] &= ~XVA_ATTRBIT(attr)
 
 /*
  * XVA_SET_RTN() sets an attribute bit in the proper element in the bitmap
